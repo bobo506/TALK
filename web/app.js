@@ -10,6 +10,7 @@ const NOTIFICATION_SOUND_COOLDOWN_MS = 1200;
 const DEFAULT_REVOKE_WINDOW_SEC = 120;
 const DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const JUMP_HIGHLIGHT_MS = 1000;
+const SETUP_KEY_BYTES = 32;
 
 let appConfig = {
   revoke_window_sec: DEFAULT_REVOKE_WINDOW_SEC,
@@ -45,6 +46,8 @@ let lastNotificationAt = 0;
 let oldestLoadedId = null;
 let hasMoreHistory = false;
 let appliedHistoryQuery = "";
+let setupKeyVisible = false;
+let setupKeyCopyTimer = null;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -57,6 +60,12 @@ const setupPanel = document.getElementById("setup-panel");
 const setupId = document.getElementById("setup-id");
 const setupName = document.getElementById("setup-name");
 const setupKey = document.getElementById("setup-key");
+const setupKeyGenerateBtn = document.getElementById("setup-key-generate-btn");
+const setupKeyToggleBtn = document.getElementById("setup-key-toggle-btn");
+const setupKeyToggleLabel = document.getElementById("setup-key-toggle-label");
+const setupKeyCopyBtn = document.getElementById("setup-key-copy-btn");
+const setupKeyEyeOpen = document.getElementById("setup-key-eye-open");
+const setupKeyEyeClosed = document.getElementById("setup-key-eye-closed");
 const setupBtn = document.getElementById("setup-btn");
 const setupError = document.getElementById("setup-error");
 const connectionStatus = document.getElementById("connection-status");
@@ -124,6 +133,9 @@ loginKey.addEventListener("keydown", (e) => {
   if (e.key === "Enter") doLoginV2();
 });
 setupBtn.addEventListener("click", createInitialAdmin);
+setupKeyGenerateBtn.addEventListener("click", generateSetupKey);
+setupKeyToggleBtn.addEventListener("click", toggleSetupKeyVisibility);
+setupKeyCopyBtn.addEventListener("click", copySetupKeyToClipboard);
 setupId.addEventListener("keydown", (e) => {
   if (e.key === "Enter") createInitialAdmin();
 });
@@ -133,6 +145,7 @@ setupName.addEventListener("keydown", (e) => {
 setupKey.addEventListener("keydown", (e) => {
   if (e.key === "Enter") createInitialAdmin();
 });
+setupKey.addEventListener("input", updateSetupKeyControls);
 
 function clearLoginError() {
   loginError.textContent = "";
@@ -144,10 +157,118 @@ function showSetupError(msg) {
   setupError.classList.toggle("hidden", !msg);
 }
 
+function setSetupKeyVisibility(visible) {
+  setupKeyVisible = visible && Boolean(setupKey.value.trim());
+  setupKey.type = setupKeyVisible ? "text" : "password";
+  setupKeyToggleLabel.textContent = setupKeyVisible ? "隐藏" : "显示";
+  setupKeyEyeOpen.classList.toggle("hidden", !setupKeyVisible);
+  setupKeyEyeClosed.classList.toggle("hidden", setupKeyVisible);
+}
+
+function updateSetupKeyControls() {
+  const hasKey = Boolean(setupKey.value.trim());
+  setupKeyToggleBtn.disabled = !hasKey;
+  setupKeyCopyBtn.disabled = !hasKey;
+  setupKeyToggleBtn.classList.toggle("opacity-50", !hasKey);
+  setupKeyToggleBtn.classList.toggle("cursor-not-allowed", !hasKey);
+  setupKeyCopyBtn.classList.toggle("opacity-50", !hasKey);
+  setupKeyCopyBtn.classList.toggle("cursor-not-allowed", !hasKey);
+
+  if (!hasKey) {
+    clearSetupKeyCopyFeedback();
+  }
+  setSetupKeyVisibility(setupKeyVisible && hasKey);
+}
+
+function clearSetupKeyCopyFeedback() {
+  if (setupKeyCopyTimer) {
+    clearTimeout(setupKeyCopyTimer);
+    setupKeyCopyTimer = null;
+  }
+  setupKeyCopyBtn.textContent = "复制";
+}
+
+function generateRandomSetupKey() {
+  if (!window.crypto || typeof window.crypto.getRandomValues !== "function") {
+    throw new Error("当前浏览器不支持安全随机数，请手动填写登录密钥。");
+  }
+
+  const bytes = new Uint8Array(SETUP_KEY_BYTES);
+  window.crypto.getRandomValues(bytes);
+
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function generateSetupKey() {
+  try {
+    setupKey.value = generateRandomSetupKey();
+    showSetupError("");
+    setSetupKeyVisibility(false);
+    updateSetupKeyControls();
+  } catch (err) {
+    showSetupError(err.message);
+  }
+}
+
+function toggleSetupKeyVisibility() {
+  if (!setupKey.value.trim()) return;
+  setSetupKeyVisibility(!setupKeyVisible);
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const temp = document.createElement("textarea");
+  temp.value = text;
+  temp.setAttribute("readonly", "readonly");
+  temp.style.position = "fixed";
+  temp.style.opacity = "0";
+  document.body.appendChild(temp);
+  temp.select();
+
+  const copied = document.execCommand("copy");
+  document.body.removeChild(temp);
+
+  if (!copied) {
+    throw new Error("复制失败，请手动复制登录密钥。");
+  }
+}
+
+async function copySetupKeyToClipboard() {
+  const key = setupKey.value.trim();
+  if (!key) return;
+
+  try {
+    await copyTextToClipboard(key);
+    clearSetupKeyCopyFeedback();
+    setupKeyCopyBtn.textContent = "已复制";
+    setupKeyCopyTimer = setTimeout(() => {
+      setupKeyCopyTimer = null;
+      setupKeyCopyBtn.textContent = "复制";
+    }, 1600);
+  } catch (err) {
+    showSetupError(err.message);
+  }
+}
+
 function setAuthMode(mode) {
   authLoading.classList.toggle("hidden", mode !== "loading");
   loginPanel.classList.toggle("hidden", mode !== "login");
   setupPanel.classList.toggle("hidden", mode !== "setup");
+  if (mode !== "setup") {
+    clearSetupKeyCopyFeedback();
+  }
 }
 
 function getStoredApiKey() {
@@ -316,6 +437,7 @@ async function doLogin() {
 
 updateComposerPlaceholder();
 resizeComposerInput();
+updateSetupKeyControls();
 bootstrapAuthFlow();
 
 function showLoginError(msg) {

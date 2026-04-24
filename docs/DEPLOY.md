@@ -1,68 +1,67 @@
 # TALK Deployment Guide
 
-This document covers three supported deployment styles:
+本文覆盖 3 种部署路径：
 
-- Docker Compose: recommended for most home users
-- systemd: good for a Linux NAS or old mini PC without Docker
-- Bare metal: manual process for debugging or simple single-user setups
+- Docker Compose：最适合家庭用户和大多数自部署场景
+- systemd：适合 Linux 小主机、NAS 或长期常驻服务
+- Bare metal：适合调试和本地开发
 
-## 1. Common planning
+## 1. 通用准备
 
-### Port plan
+### 端口规划
 
-- Default app port: `8000`
-- Web UI: `http://<host>:8000`
-- API docs: `http://<host>:8000/docs`
-- Health check: `http://<host>:8000/healthz`
+- 默认端口：`8000`
+- Web UI：`http://<host>:8000`
+- API 文档：`http://<host>:8000/docs`
+- 健康检查：`http://<host>:8000/healthz`
 
-If you will expose TALK through a reverse proxy, keep the app on `127.0.0.1:8000` or another private port and publish only the proxy.
+如果前面还有反向代理，建议 TALK 只监听私有地址，再由反向代理对外暴露。
 
-### Files that must persist
+### 必须持久化的文件
 
-- `talk.db`: SQLite database
-- `storage/`: uploaded files
-- `logs/`: JSON logs
-- `backups/`: backup snapshots
-- `config.toml`: runtime config
+- `talk.db`
+- `storage/`
+- `logs/`
+- `backups/`
+- `config.toml`
 
-### Before you start
+### 开始前先改 `config.toml`
 
-Edit `config.toml` and set:
-
-- `[server].public_url` to the real LAN or domain URL
-- `[server].host` if you run without Docker and need direct LAN access
-- `[server].port` if `8000` is already used
+- `[server].public_url`：改成实际访问 TALK 的地址
+- `[server].host`：非 Docker 直连局域网时，通常改成 `0.0.0.0`
+- `[server].port`：如果 `8000` 已占用，再改它
 
 ## 2. Docker Compose
 
-### Start
+### 前置条件
 
-From the project root:
+你需要先装好这些东西：
+
+- Docker Desktop，或 Linux 上的 Docker Engine + Compose 插件
+- 一个包含 `docker-compose.yml` 的 TALK 项目根目录
+- 本机 `8000` 端口未被其它程序占用
+
+### 启动
+
+在项目根目录执行：
 
 ```bash
 docker compose up -d --build
 ```
 
-This project ships with:
+本项目自带：
 
 - `Dockerfile`
 - `docker-compose.yml`
-- persistent bind mounts for `storage`, `talk.db`, `logs`, `backups`, and `config.toml`
+- `storage`、`talk.db`、`logs`、`backups`、`config.toml` 的持久化挂载
 
-On a brand-new checkout, create the writable paths first:
-
-```bash
-mkdir -p storage logs backups
-touch talk.db
-```
-
-### Stop
+### 停止
 
 ```bash
 docker compose down
 ```
 
-### Verify
+### 验证
 
 ```bash
 docker compose ps
@@ -70,54 +69,40 @@ docker compose logs -f talk
 curl http://127.0.0.1:8000/healthz
 ```
 
-### Trigger a backup
+### 创建第一个管理员
 
-```bash
-docker compose exec talk python scripts/backup_db.py
-```
-
-### Create the first administrator
-
-After the container starts, either use the Web UI first-run form or run:
+容器启动后，优先使用 Web UI 首启向导。  
+如果你更想走命令行，也可以：
 
 ```bash
 docker compose exec talk python scripts/create_admin.py --id human:home --name "Home" --key "change-this-to-a-long-random-string"
 ```
 
-With no arguments, the script runs in interactive mode:
+### 触发备份
 
 ```bash
-docker compose exec talk python scripts/create_admin.py
+docker compose exec talk python scripts/backup_db.py
 ```
-
-### Persistence check
-
-1. Start TALK.
-2. Log in and send one message.
-3. Upload one file.
-4. Run a backup.
-5. Stop and start again:
-
-```bash
-docker compose down
-docker compose up -d
-```
-
-6. Confirm:
-   - the message is still visible
-   - the uploaded file is still downloadable
-   - `logs/` still contains log files
-   - `backups/` still contains backup snapshots
 
 ## 3. systemd on Linux
 
-### Install
+### 前置条件
+
+你需要先装好这些东西：
+
+- 一台带 `systemd` 的 Linux 主机
+- `python3.11` 或更高版本
+- `git`
+- `python3-venv`
+- 一个可运行服务的 Linux 用户
+
+### 安装
 
 ```bash
 sudo useradd --system --create-home --home-dir /opt/talk --shell /usr/sbin/nologin talk
 sudo mkdir -p /opt/talk
 sudo chown -R talk:talk /opt/talk
-sudo -u talk git clone <your-repo-url> /opt/talk
+sudo -u talk git clone https://github.com/yourname/talk.git /opt/talk
 cd /opt/talk
 sudo -u talk mkdir -p /opt/talk/storage /opt/talk/logs /opt/talk/backups
 sudo -u talk touch /opt/talk/talk.db
@@ -125,11 +110,11 @@ sudo -u talk python3 -m venv /opt/talk/.venv
 sudo -u talk /opt/talk/.venv/bin/pip install -r requirements.txt
 ```
 
-Edit `/opt/talk/config.toml` before first start.
+启动前先编辑 `/opt/talk/config.toml`。
 
-### Service file
+### 安装服务
 
-Use [deploy/talk.service](../deploy/talk.service) as the template:
+使用 [deploy/talk.service](../deploy/talk.service) 作为模板：
 
 ```bash
 sudo cp deploy/talk.service /etc/systemd/system/talk.service
@@ -137,7 +122,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now talk
 ```
 
-### Verify
+### 验证
 
 ```bash
 sudo systemctl status talk
@@ -145,15 +130,16 @@ journalctl -u talk -f
 curl http://127.0.0.1:8000/healthz
 ```
 
-### Restart after config changes
+### 配置修改后重启
 
 ```bash
 sudo systemctl restart talk
 ```
 
-### Create the first administrator
+### 创建第一个管理员
 
-After the service is up, either use the Web UI first-run form or run:
+服务起来后，优先使用 Web UI 首启向导。  
+如果你要命令行创建：
 
 ```bash
 python scripts/create_admin.py --id human:home --name "Home" --key "change-this-to-a-long-random-string"
@@ -161,7 +147,16 @@ python scripts/create_admin.py --id human:home --name "Home" --key "change-this-
 
 ## 4. Bare metal
 
-Use this when you want the simplest possible manual run.
+### 前置条件
+
+你需要先装好这些东西：
+
+- Python 3.11+
+- `pip`
+- 一个终端
+- 已经切到 TALK 项目根目录
+
+### 启动
 
 ```bash
 python3 -m venv .venv
@@ -170,17 +165,20 @@ pip install -r requirements.txt
 python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
 ```
 
-If you want auto-restart, use `tmux`, `screen`, `supervisord`, or preferably `systemd`.
+如果你需要自动拉起和守护，优先用 `systemd`，不要长期依赖手工终端。
 
-To create the first administrator without the Web UI guide:
+### 创建第一个管理员
+
+优先使用 Web UI 首启向导。  
+如果你要命令行创建：
 
 ```bash
 python scripts/create_admin.py --id human:home --name "Home" --key "change-this-to-a-long-random-string"
 ```
 
-## 5. Reverse proxy examples
+## 5. Reverse Proxy Examples
 
-## Nginx
+### Nginx
 
 ```nginx
 server {
@@ -205,7 +203,7 @@ server {
 }
 ```
 
-## Caddy
+### Caddy
 
 ```caddy
 talk.lan {
@@ -213,34 +211,32 @@ talk.lan {
 }
 ```
 
-For TLS on a private LAN, use local CA tooling or a DNS name Caddy can issue certificates for.
+## 6. Backup and Restore
 
-## 6. Backup and restore
+### 创建备份
 
-### Create a backup
-
-Docker:
+Docker：
 
 ```bash
 docker compose exec talk python scripts/backup_db.py
 ```
 
-systemd or bare metal:
+systemd 或 bare metal：
 
 ```bash
 python scripts/backup_db.py
 ```
 
-### Restore from backup
+### 恢复备份
 
-The full restore sequence is:
+标准流程：
 
-1. Stop TALK.
-2. Replace `talk.db` with the backup file.
-3. Start TALK.
-4. Verify messages and file access.
+1. 停服务
+2. 用备份文件替换 `talk.db`
+3. 启服务
+4. 验证消息和文件是否正常
 
-Docker:
+Docker：
 
 ```bash
 docker compose down
@@ -249,7 +245,7 @@ docker compose up -d
 curl http://127.0.0.1:8000/healthz
 ```
 
-systemd:
+systemd：
 
 ```bash
 sudo systemctl stop talk
@@ -258,7 +254,7 @@ sudo systemctl start talk
 curl http://127.0.0.1:8000/healthz
 ```
 
-Bare metal:
+Bare metal：
 
 ```bash
 pkill -f "uvicorn server.main:app"
@@ -266,18 +262,18 @@ cp backups/backup_YYYY-MM-DD.db talk.db
 python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
 ```
 
-### What restore does not do
+### 恢复不会做什么
 
-- It restores the SQLite database only.
-- It does not recreate deleted files in `storage/`.
-- For a full recovery, back up both `talk.db` and `storage/`.
+- 它只恢复 SQLite 数据库
+- 它不会自动补回已经丢失的 `storage/` 文件实体
+- 想完整恢复，必须一起备份 `talk.db` 和 `storage/`
 
-## 7. Recommended home setup
+## 7. 家庭部署建议
 
-For most families:
+大多数家庭场景建议：
 
-- Use Docker Compose
-- Keep TALK on a fixed LAN IP
-- Put Nginx or Caddy in front only if you need a stable hostname
-- Run `scripts/backup_db.py` daily with cron or the NAS scheduler
-- Back up `storage/` together with `talk.db`
+- 首选 Docker Compose
+- 给运行 TALK 的设备一个固定局域网 IP
+- 只有在你需要稳定域名时，再加 Nginx 或 Caddy
+- 定期运行 `scripts/backup_db.py`
+- `storage/` 和 `talk.db` 一起备份

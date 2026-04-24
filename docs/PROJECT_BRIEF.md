@@ -196,3 +196,11 @@ TALK/
 - `to=<member_id>` is now only a secondary filter on top of that visible set.
 - `to=<other_member>` produces a safe pair view: broadcast, direct messages between the two members, and shared group messages where both are recipients.
 - Search (`q`) is also restricted to the caller's visible set, so keyword queries cannot leak hidden messages.
+
+## 2026-04-24 Onboarding Docs Addendum
+
+- `docs/QUICKSTART.md` 现已降为入口索引页，分别指向家庭用户与 Agent 开发者两份独立快速启动文档
+- 新增 `docs/QUICKSTART_USER.md`：面向家庭新手，只走 Docker Desktop + 浏览器路径
+- 新增 `docs/QUICKSTART_AGENT.md`：面向 Agent 开发者，只走 Python bare metal + SDK 路径
+- `docs/SDK.md` 的异步示例现已补齐 `asyncio.run(main())` 包装，可直接复制到 `.py` 文件运行
+- 首次管理员引导页的 `api_key` 输入已支持浏览器端安全随机生成、显隐切换与一键复制，新手无需手动编造登录密钥

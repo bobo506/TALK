@@ -19,6 +19,19 @@
 - 文档更新范围应限制在与本次已确认改动直接相关的模块文档和公共简报，不得顺手扩写无关内容
 - `docs/PROGRESS.md` 是本项目唯一进度文档，更新该文档时必须通过 `project-daily-progress` 的相关工作流执行，不得手工直接修改
 
+## 编码约定
+
+- 所有文件写入操作必须显式指定 `encoding='utf-8'`
+- Windows 环境下 Python 默认编码可能是 GBK；如果省略编码参数，中文内容可能被写成乱码
+- Python 写文件示例：`open(path, "w", encoding="utf-8")`
+
+## 项目结构注意事项
+
+- SDK 代码位于 `TALK/client/`；项目根目录下存在一个同名 `TALK` 子目录，这不是 bug
+- 这是 `SDK-1` 落地后的当前结构，默认运行前提是 `cwd = 项目根`
+- Python import 路径固定写成 `from TALK.client import TalkClient`
+- 不要写成 `from client import X`，也不要假设 `client/` 是项目根级包
+
 ## 技术栈速查
 
 - 后端：Python 3.11 + FastAPI + uvicorn + SQLModel

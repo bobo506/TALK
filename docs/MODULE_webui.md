@@ -86,3 +86,11 @@
 - Frontend runtime constants are now loaded from unauthenticated `GET /api/config` and cached client-side.
 - Revoke button visibility uses `revoke_window_sec` from `/api/config`.
 - Pending file selection now pre-checks `max_upload_bytes` from `/api/config` before upload.
+
+## 2026-04-24 DOC-1 / SETUP-1 UX Addendum
+
+- 首次管理员引导页已切换为中文提示文案，明确区分 `管理员 ID`、`显示名称` 与 `登录密钥`
+- `登录密钥` 输入框默认隐藏内容（`password`），避免新手误以为需要自己设计一串复杂字符串
+- 表单新增浏览器端 `自动生成` 按钮，使用 `crypto.getRandomValues()` 生成 32 字节 base64url 登录密钥
+- 表单新增显隐切换与一键复制按钮，新手可以在不手输 `api_key` 的情况下完成首次管理员创建
+- 快速启动文档已拆分为家庭用户视角与 Agent 开发者视角两个独立入口，避免把 Docker 新手和 SDK 开发者混在一份说明里

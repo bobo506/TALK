@@ -33,6 +33,13 @@ API 文档：http://127.0.0.1:8000/docs
 - SQLite 在线备份：`python scripts/backup_db.py`
 - 备份目录与保留份数：配置见 `config.toml` 的 `[backup]`
 
+## 项目结构注意事项
+
+- SDK 代码位于 `TALK/client/`；项目根目录下存在一个同名 `TALK` 子目录，这不是 bug
+- 这是 `SDK-1` 落地后的当前结构，默认运行前提是 `cwd = 项目根`
+- Python import 路径固定写成 `from TALK.client import TalkClient`
+- 不要写成 `from client import X`，也不要假设 `client/` 是项目根级包
+
 ### 定时备份参考
 
 Linux / cron：
@@ -47,9 +54,9 @@ Windows 任务计划器：
 powershell -Command "Set-Location 'C:\MY TOOLS\MY WORK\TALK'; & 'C:\Users\bobo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' scripts\backup_db.py"
 ```
 
-### 閮ㄧ讲鍏ュ彛
+### 部署入口
 
-- Docker 蹇€熼儴缃诧細`docker compose up -d --build`
-- systemd 妯℃澘锛歚deploy/talk.service`
-- 瀹朵涵閮ㄧ讲鍏ュ彛锛歚docs/QUICKSTART.md`
-- 瀹屾暣閮ㄧ讲鏂囨。锛歚docs/DEPLOY.md`
+- Docker 快速部署：`docker compose up -d --build`
+- systemd 模板：`deploy/talk.service`
+- 家庭部署入口：`docs/QUICKSTART_USER.md`
+- 完整部署文档：`docs/DEPLOY.md`

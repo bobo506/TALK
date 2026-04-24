@@ -74,3 +74,4 @@
   - non-interactive: `python scripts/create_admin.py --id human:bobo --name "Bobo" --key "<api_key>"`
   - interactive: `python scripts/create_admin.py`
 - The bootstrap script refuses once any human member already exists and tells the operator to use the normal registration flow instead.
+- 首次管理员 Web UI 现已提供客户端生成登录密钥、显隐切换与一键复制，降低新手手工填写 `api_key` 的门槛

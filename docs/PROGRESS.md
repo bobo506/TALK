@@ -1,31 +1,74 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-04-24 19:25 (Asia/Shanghai)
+Updated: 2026-04-24 23:11 (Asia/Shanghai)
 
 ### 1) Current Progress
-- `SETUP-1` completed: added unauthenticated `GET /api/setup/status`, CLI bootstrap script `scripts/create_admin.py`, Web UI first-run admin creation flow, and setup coverage in `tests/test_setup.py`.
-- `QUICKSTART` and `DEPLOY` now document first-run bootstrap via the Web UI and `python scripts/create_admin.py`, including the Docker path `docker compose exec talk python scripts/create_admin.py`.
-- The old onboarding blocker is removed at the code level: first human account creation no longer requires opening `/docs` and manually calling `POST /api/members`.
-- `SDK-1` completed: added `TALK/client/` with async `TalkClient`, sync `TalkClientSync`, HTTP exception mapping, WebSocket-first event flow, reconnect plus HTTP polling fallback, message dedupe, and SDK docs/demo.
-- `MSG-4` completed: added first-level message reply support across database, REST, WebSocket, Web UI, and SDK; reply summaries now travel with history and live events.
-- `DEPLOY-1` completed: added `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `deploy/talk.service`, `README.md`, `docs/QUICKSTART.md`, and `docs/DEPLOY.md` for Docker, systemd, and bare-metal deployment paths.
-- `SEC-1` completed: `GET /api/messages` now enforces visibility in SQL, aligns with WebSocket delivery semantics, and treats `to` as a narrowing filter rather than an access-control boundary.
-- Regression coverage expanded again; full `python -m unittest` is now green with `51` tests, including `3` new setup-specific cases.
+- `DOC-1` completed: split onboarding into `docs/QUICKSTART_USER.md` and `docs/QUICKSTART_AGENT.md`, and reduced `docs/QUICKSTART.md` to a short index page.
+- `QUICKSTART_USER` now follows a true family-user path: Docker Desktop only, screenshot-level browser checks, explicit `config.toml` before/after examples, LAN IP lookup, and ordered troubleshooting steps.
+- `QUICKSTART_AGENT` now follows a Python bare-metal + SDK path: Windows PowerShell and Linux/macOS bash variants, a clear definition of project root, real example repo URLs, and a full runnable Agent sample.
+- `docs/DEPLOY.md` now includes per-path prerequisites for Docker Compose, Linux `systemd`, and bare metal deployment.
+- `docs/SDK.md` async examples now all include `import asyncio` plus `asyncio.run(main())`, so they can be copied straight into `.py` files without `await outside async`.
+- `SETUP-1` UX is improved in `web/index.html` and `web/app.js`: the first-admin form now explains the login key in plain language and supports browser-side 32-byte base64url generation, reveal/hide, and one-click copy.
+- Related docs were synced after implementation: `docs/MODULE_webui.md`, `docs/MODULE_members_auth.md`, and `docs/PROJECT_BRIEF.md` now reflect the onboarding split and first-run key-generation flow.
+- `DOC-2` completed: fixed the remaining mojibake deployment section in `CLAUDE.md`, added explicit UTF-8 write rules plus SDK import-path notes to `AGENTS.md` / `CLAUDE.md`, and added `tests/test_encoding.py` as an encoding regression guard.
+- Regression check still passes: full `python -m unittest` is green with `54` tests, including `3` new encoding-guard cases.
+- Product direction for the next phase is now explicit: TALK will be used as a small home-LAN multi-Agent lab, opened only when the local computer is in use, rather than a 24/7 always-on service.
+- Target usage profile is now clear: up to `5` AI agents, with hybrid backends (`Claude Code` / `Codex` via local CLI bridges, `Kimi` / `DeepSeek` via API bridges).
+- Discussion-mode direction is confirmed: future work should support moderator-led multi-Agent discussion, message-history persistence, and mid-discussion document/material passing so agents can collaborate against shared context.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
 - `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
-- `docs/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
-- The new first-run setup flow has test coverage, but a real browser smoke test for “empty DB -> create admin -> auto login -> reopen -> normal login form” is still pending.
+- `docs/QUICKSTART_USER.md` has not yet been run end-to-end by a first-time non-project user, so there may still be hidden onboarding assumptions.
+- The improved first-run setup flow still lacks one real browser smoke test for “empty DB -> create admin -> auto login -> reopen -> normal login form”.
+- The task card asks for a second clean-session newcomer dry run and readability feedback; that external acceptance has not been performed yet in this environment.
+- The multi-Agent discussion phase still needs a concrete protocol: moderator responsibilities, round limits, stop conditions, material-sharing rules, and summary output format are discussed conceptually but not yet written into an implementation spec.
 
 ### 3) Next Plan
-- Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
-- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
-- Run one real browser smoke test for `SETUP-1` on a fresh DB and confirm the first-run form, automatic sign-in, and second-open login behavior match the task card.
-- Collect first-run feedback from a non-project user against `docs/QUICKSTART.md` and remove any remaining setup friction.
+- Write the next-phase design note for “local experimental mode”: one-command local startup, no always-on assumptions, and per-Agent bridge process layout.
+- Define a unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, API bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
+- Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, and controlled material/document passing during discussion.
+- After the protocol is stable, implement the minimum local-lab path before returning to lower-priority deployment validation tasks.
 
 ## History
+
+### 2026-04-24 23:11 (Asia/Shanghai)
+#### Current Progress
+- `DOC-2` completed: fixed the remaining mojibake deployment section in `CLAUDE.md`, added explicit UTF-8 write rules plus SDK import-path notes to `AGENTS.md` / `CLAUDE.md`, and added `tests/test_encoding.py` as an encoding regression guard.
+- Full regression still passes with `54` tests, including `3` new encoding-guard cases.
+- The intended usage model is now explicit: TALK is a local home-LAN multi-Agent lab used on demand while the local computer is on, not a 24/7 permanently running service.
+- The planned backend mix is now explicit: `Claude Code` / `Codex` through local CLI bridges, and `Kimi` / `DeepSeek` through API bridges.
+- The next product direction is now explicit: moderator-led AI discussion with automatic transcript retention and support for passing shared documents/materials during the discussion.
+#### Open Questions / Pending Confirmation
+- Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
+- `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
+- `docs/QUICKSTART_USER.md` has not yet been run end-to-end by a first-time non-project user, so there may still be hidden onboarding assumptions.
+- The discussion phase still needs a concrete protocol for moderator behavior, round limits, material-sharing rules, and summary output.
+#### Next Plan
+- Write the next-phase design note for local experimental mode and one-command startup.
+- Define a unified bridge contract for mixed CLI/API Agent backends.
+- Define the first moderator-led discussion protocol with transcript retention, bounded rounds, and material passing.
+- Implement the minimum local-lab path first, then return to lower-priority deployment validation tasks.
+
+### 2026-04-24 22:01 (Asia/Shanghai)
+#### Current Progress
+- `DOC-1` completed: split onboarding into `docs/QUICKSTART_USER.md` and `docs/QUICKSTART_AGENT.md`, and reduced `docs/QUICKSTART.md` to a short index page.
+- `QUICKSTART_USER` now follows a family-user path with Docker Desktop, explicit browser verification, `config.toml` before/after examples, LAN IP lookup, and ordered troubleshooting.
+- `QUICKSTART_AGENT` now follows a Python bare-metal + SDK path with PowerShell/bash command pairs, real example repo URLs, and a full runnable Agent sample.
+- `docs/DEPLOY.md` now includes prerequisites for Docker Compose, Linux `systemd`, and bare metal deployment.
+- `docs/SDK.md` async examples now all include `asyncio.run(main())`, and `SETUP-1` now supports browser-side key generation, reveal/hide, and one-click copy in the first-admin UI.
+- Related docs were synced after implementation, and full regression still passes with `51` unit tests.
+#### Open Questions / Pending Confirmation
+- Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
+- `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
+- `docs/QUICKSTART_USER.md` has not yet been run end-to-end by a first-time non-project user, so there may still be hidden onboarding assumptions.
+- The task card asks for a second clean-session newcomer dry run and readability feedback; that external acceptance has not been performed yet in this environment.
+#### Next Plan
+- Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
+- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
+- Run one real browser smoke test for `SETUP-1` on a fresh DB and confirm the first-run form, generated key, automatic sign-in, and second-open login behavior match the task card.
+- Run one clean-session newcomer walkthrough against `docs/QUICKSTART_USER.md`, collect friction points, and trim any remaining expert assumptions.
 
 ### 2026-04-24 19:25 (Asia/Shanghai)
 #### Current Progress
