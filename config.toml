@@ -1,0 +1,21 @@
+[server]
+host = "127.0.0.1"
+port = 8000
+public_url = "http://127.0.0.1:8000"
+ws_ping_interval = 20
+ws_ping_timeout = 45
+revoke_window_sec = 120
+
+[logging]
+path = "./logs/talk.log"
+level = "INFO"
+
+[backup]
+dir = "./backups"
+keep_last = 7
+
+[storage]
+upload_max_mb = 100
+file_retention_days = 30
+storage_dir = "./storage"
+db_path = "./talk.db"

@@ -1,0 +1,363 @@
+/* TALK custom styles */
+
+#presence-strip {
+  background: #111827;
+}
+
+.presence-summary {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.presence-members {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.presence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid rgba(75, 85, 99, 0.85);
+  border-radius: 999px;
+  background: rgba(31, 41, 55, 0.75);
+  color: #d1d5db;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.presence-chip.self {
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.presence-chip.offline {
+  opacity: 0.72;
+}
+
+.presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #6b7280;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.45);
+}
+
+.presence-chip.online .presence-dot {
+  background: #34d399;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.35);
+}
+
+.history-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.history-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.history-search-group,
+.history-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.history-search-input {
+  width: min(320px, 72vw);
+}
+
+.history-status {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.reply-author {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.reply-preview {
+  margin-top: 2px;
+  color: #94a3b8;
+}
+
+/* Scrollbar styling */
+#messages::-webkit-scrollbar {
+  width: 6px;
+}
+#messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+#messages::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+
+/* Message bubble */
+.msg-bubble {
+  max-width: 80%;
+  word-break: break-word;
+}
+
+.msg-bubble.mine {
+  margin-left: auto;
+  background: #1e40af;
+}
+
+.msg-bubble.others {
+  background: #374151;
+}
+
+.msg-bubble.jump-highlight {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.75);
+}
+
+.message-reply {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid rgba(148, 163, 184, 0.45);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.28);
+  color: #cbd5e1;
+}
+
+.message-reply.clickable {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.message-reply.clickable:hover {
+  background: rgba(30, 41, 59, 0.5);
+  border-left-color: rgba(96, 165, 250, 0.65);
+}
+
+.message-reply-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.message-reply-preview {
+  margin-top: 2px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.message-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.message-action-btn {
+  font-size: 12px;
+  color: #e5e7eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.message-action-btn:hover {
+  color: #ffffff;
+}
+
+.composer-textarea {
+  display: block;
+  min-height: 48px;
+  max-height: 240px;
+  resize: none;
+  line-height: 1.5;
+  overflow-y: hidden;
+}
+
+.composer-hint {
+  margin-top: 0.35rem;
+  padding: 0 0.2rem;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* Mention highlight in message content */
+.mention {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.rich-text {
+  line-height: 1.65;
+}
+
+.rich-text > :first-child {
+  margin-top: 0;
+}
+
+.rich-text > :last-child {
+  margin-bottom: 0;
+}
+
+.rich-text p,
+.rich-text ul,
+.rich-text ol,
+.rich-text pre,
+.rich-text blockquote {
+  margin: 0.45rem 0;
+}
+
+.rich-text ul,
+.rich-text ol {
+  padding-left: 1.3rem;
+}
+
+.rich-text li + li {
+  margin-top: 0.2rem;
+}
+
+.rich-text a {
+  color: #93c5fd;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-text code {
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.35rem;
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  font-size: 0.92em;
+  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+}
+
+.rich-text pre {
+  overflow-x: auto;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 0.85rem;
+  background: rgba(2, 6, 23, 0.7);
+}
+
+.rich-text pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.88rem;
+}
+
+.rich-text blockquote {
+  padding-left: 0.85rem;
+  border-left: 3px solid rgba(96, 165, 250, 0.65);
+  color: #cbd5e1;
+}
+
+.rich-text hr {
+  margin: 0.7rem 0;
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* Message highlighted when you are mentioned */
+.msg-mentioned {
+  border-left: 3px solid #60a5fa;
+  padding-left: 8px;
+}
+
+/* Mention dropdown item */
+#mention-dropdown li {
+  padding: 6px 12px;
+  cursor: pointer;
+}
+#mention-dropdown li:hover,
+#mention-dropdown li.active {
+  background: #4b5563;
+}
+
+.file-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.35);
+}
+
+.file-card-meta {
+  min-width: 0;
+}
+
+.file-card-name {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.file-card-caption {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #e5e7eb;
+  word-break: break-word;
+}
+
+.file-card-size {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.file-card-status {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #fca5a5;
+}
+
+.file-download-btn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(96, 165, 250, 0.2);
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.file-download-btn:hover {
+  background: rgba(96, 165, 250, 0.32);
+}
+
+.file-download-btn:disabled {
+  cursor: not-allowed;
+  background: rgba(107, 114, 128, 0.25);
+  color: #9ca3af;
+}
+
+.file-card-expired {
+  opacity: 0.78;
+}
+
+.drop-hint {
+  position: absolute;
+  inset: -8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #60a5fa;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.92);
+  color: #bfdbfe;
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+}

@@ -1,0 +1,16 @@
+services:
+  talk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: talk:local
+    container_name: talk
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./talk.db:/app/talk.db
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+      - ./config.toml:/app/config.toml:ro

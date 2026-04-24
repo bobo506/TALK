@@ -1,0 +1,16 @@
+[Unit]
+Description=TALK server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=talk
+Group=talk
+WorkingDirectory=/opt/talk
+ExecStart=/opt/talk/.venv/bin/uvicorn server.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

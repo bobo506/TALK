@@ -1,0 +1,15 @@
+.git
+.gitignore
+.tmp
+.tmp-tests
+.codex_pydeps
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.db-shm
+*.db-wal
+logs
+backups
+storage
+talk.db
