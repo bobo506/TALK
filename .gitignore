@@ -179,3 +179,10 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+.talk.db
+.talk.db-shm
+.talk.db-wal
+.storage/files/
+.logs/
+.backups/
