@@ -248,7 +248,11 @@ class TalkClient:
 
     async def _run_websocket_session(self) -> None:
         try:
-            async with websockets.connect(self.ws_url, ping_interval=None, close_timeout=1) as ws:
+            ws_kwargs: dict[str, Any] = {"ping_interval": None, "close_timeout": 1}
+            if "proxy" in inspect.signature(websockets.connect).parameters:
+                ws_kwargs["proxy"] = None
+
+            async with websockets.connect(self.ws_url, **ws_kwargs) as ws:
                 self._ws = ws
                 async for raw in ws:
                     await self._handle_ws_event(raw)
@@ -355,6 +359,7 @@ class TalkClient:
                 base_url=self.base_url,
                 headers={"X-API-Key": self.api_key},
                 timeout=self.timeout,
+                trust_env=False,
             )
         return self._http
 

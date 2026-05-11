@@ -20,23 +20,30 @@ class WebSocketTests(RouteTestCase):
         self.addCleanup(setattr, main, "WS_PING_INTERVAL", old_interval)
         self.addCleanup(setattr, main, "WS_PING_TIMEOUT", old_timeout)
 
+    def receive_event(self, websocket, expected_type: str) -> dict:
+        for _ in range(20):
+            event = websocket.receive_json()
+            if event["type"] == expected_type:
+                return event
+            if event["type"] == "ping":
+                websocket.send_json({"type": "pong"})
+                continue
+            self.fail(f"expected {expected_type!r}, got {event['type']!r}")
+        self.fail(f"timed out waiting for {expected_type!r}")
+
     def assert_presence(self, websocket, expected_ids: list[str]) -> None:
-        event = websocket.receive_json()
-        self.assertEqual(event["type"], "presence")
+        event = self.receive_event(websocket, "presence")
         self.assertEqual(event["payload"]["online_ids"], expected_ids)
 
     def assert_message(self, websocket) -> dict:
-        event = websocket.receive_json()
-        self.assertEqual(event["type"], "message")
+        event = self.receive_event(websocket, "message")
         return event["payload"]
 
     def assert_ping(self, websocket) -> None:
-        event = websocket.receive_json()
-        self.assertEqual(event["type"], "ping")
+        self.receive_event(websocket, "ping")
 
     def assert_send_ack(self, websocket) -> dict:
-        event = websocket.receive_json()
-        self.assertEqual(event["type"], "send_ack")
+        event = self.receive_event(websocket, "send_ack")
         return event
 
     def test_websocket_rejects_invalid_api_key(self):
