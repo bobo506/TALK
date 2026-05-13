@@ -71,6 +71,74 @@ class TalkClientSync:
     def list_members(self) -> list[dict[str, Any]]:
         return self._submit(self._client.list_members())
 
+    def report_instance_status(
+        self,
+        instance_id: str,
+        *,
+        runtime: str,
+        status: str,
+        host: str | None = None,
+        pid: int | None = None,
+        current_task_id: str | None = None,
+        last_error: str | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.report_instance_status(
+                instance_id,
+                runtime=runtime,
+                status=status,
+                host=host,
+                pid=pid,
+                current_task_id=current_task_id,
+                last_error=last_error,
+            )
+        )
+
+    def list_instances(
+        self,
+        *,
+        member_id: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_instances(member_id=member_id, status=status))
+
+    def create_task(
+        self,
+        target_member_id: str,
+        content: str,
+        *,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(self._client.create_task(target_member_id, content, title=title))
+
+    def list_tasks(
+        self,
+        *,
+        target_member_id: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_tasks(target_member_id=target_member_id, status=status))
+
+    def claim_task(self, task_id: int, *, instance_id: str | None = None) -> dict[str, Any]:
+        return self._submit(self._client.claim_task(task_id, instance_id=instance_id))
+
+    def complete_task(
+        self,
+        task_id: int,
+        *,
+        status: str,
+        result_message_id: int | None = None,
+        last_error: str | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.complete_task(
+                task_id,
+                status=status,
+                result_message_id=result_message_id,
+                last_error=last_error,
+            )
+        )
+
     def fetch_history(
         self,
         *,

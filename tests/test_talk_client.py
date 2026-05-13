@@ -236,6 +236,28 @@ class TalkClientTests(RouteTestCase):
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))
 
+    def test_task_helpers(self):
+        async def scenario(base_url: str) -> None:
+            async with TalkClient(base_url, "bobo-key") as human_client:
+                created = await human_client.create_task(
+                    "agent:demo",
+                    "Run from SDK",
+                    title="SDK task",
+                )
+
+            async with TalkClient(base_url, "demo-key") as agent_client:
+                await agent_client.report_instance_status("demo-instance-1", runtime="codex", status="idle")
+                queued = await agent_client.list_tasks(status="queued")
+                claimed = await agent_client.claim_task(created["id"], instance_id="demo-instance-1")
+                completed = await agent_client.complete_task(claimed["id"], status="succeeded")
+
+            self.assertEqual(queued[0]["id"], created["id"])
+            self.assertEqual(claimed["status"], "running")
+            self.assertEqual(completed["status"], "succeeded")
+
+        with LiveTalkServer(main.app) as base_url:
+            asyncio.run(scenario(base_url))
+
     async def _wait_for(self, predicate, timeout: float = 2.0) -> None:
         deadline = asyncio.get_running_loop().time() + timeout
         while asyncio.get_running_loop().time() < deadline:

@@ -103,6 +103,23 @@ CREATE TABLE agent_instances (
   updated_at      DATETIME NOT NULL,
   last_seen_at    DATETIME NOT NULL
 );
+
+CREATE TABLE agent_tasks (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_member_id  TEXT NOT NULL REFERENCES members(id), -- 接收任务的 agent:* 成员
+  created_by        TEXT NOT NULL REFERENCES members(id), -- 任务创建者
+  content           TEXT NOT NULL,          -- 任务正文
+  title             TEXT,                   -- 可选短标题
+  status            TEXT NOT NULL,          -- queued | running | succeeded | failed | canceled
+  claimed_by        TEXT REFERENCES members(id),
+  instance_id       TEXT REFERENCES agent_instances(id),
+  result_message_id INTEGER REFERENCES messages(id),
+  last_error        TEXT,
+  created_at        DATETIME NOT NULL,
+  updated_at        DATETIME NOT NULL,
+  claimed_at        DATETIME,
+  finished_at       DATETIME
+);
 ```
 
 ## 鉴权机制
@@ -141,6 +158,7 @@ TALK/
 │   └── routes/
 │       ├── members.py     # 成员注册/列表
 │       ├── instances.py   # Agent 运行实例状态
+│       ├── tasks.py       # Agent 任务队列与调度基础
 │       ├── messages.py    # 消息收发
 │       └── files.py       # 文件上传下载（M2）
 ├── web/
@@ -178,7 +196,8 @@ TALK/
 | [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | M2 已实现，已补渲染优化、过期文件反馈、历史翻页、搜索与撤回态渲染 |
 | [MODULE_agent_example.md](MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | Codex bridge MVP 已落地，local-lab 方向持续设计中 |
-| [MODULE_instances.md](MODULE_instances.md) | Agent 运行实例状态与调度基础 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，调度 API 待实现 |
+| [MODULE_instances.md](MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
+| [MODULE_tasks.md](MODULE_tasks.md) | Agent 任务队列与调度基础 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/` | 任务创建、列表、领取、完成 API 第一版已落地；重复 schedule 待实现 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段
@@ -199,6 +218,7 @@ TALK/
 - local-lab 阶段已确认方向：Codex / Claude Code 走本地 CLI bridge；DeepSeek / Kimi 走本地 `pi` 框架 bridge；后续加入 Group、Hall、SSE、实例/调度 API 与文档编辑协调协议。
 - `bridges/codex_bridge.py` 是第一版 Codex 接入 MVP：通过 TALK SDK 自注册、监听发给 `agent:codex` 的文本任务、调用 `codex exec`，再用 `reply_to` 回复原发送者。
 - `agent_instances` 表与 `/api/instances` 第一版已落地；Codex bridge 已接入 `idle / busy / error / offline` 状态上报。
+- `agent_tasks` 表与 `/api/tasks` 第一版已落地：支持创建任务、按可见性列出任务、Agent 领取任务、完成/失败/取消任务，并联动 `agent_instances.current_task_id` 与实例状态；当前不由 TALK 自动启动 bridge 进程。
 ## 2026-04-23 Data Model Addendum
 
 - `messages.reply_to INTEGER NULL REFERENCES messages(id)` was added for first-level reply/reference support.

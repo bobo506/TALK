@@ -78,6 +78,25 @@ class AgentInstance(SQLModel, table=True):
     last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class AgentTask(SQLModel, table=True):
+    __tablename__ = "agent_tasks"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    target_member_id: str = Field(foreign_key="members.id", index=True)
+    created_by: str = Field(foreign_key="members.id", index=True)
+    content: str
+    title: Optional[str] = None
+    status: str = Field(default="queued", index=True)
+    claimed_by: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
+    instance_id: Optional[str] = Field(default=None, foreign_key="agent_instances.id", index=True)
+    result_message_id: Optional[int] = Field(default=None, foreign_key="messages.id")
+    last_error: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    claimed_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+
+
 # ── API schemas (request / response) ────────────────────────────────
 
 
@@ -229,3 +248,69 @@ class AgentInstanceOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_seen_at: datetime
+
+
+_TASK_STATUSES = {"queued", "running", "succeeded", "failed", "canceled"}
+_TASK_TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
+
+
+class AgentTaskCreate(BaseModel):
+    target_member_id: str
+    content: str
+    title: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_task_create(self) -> "AgentTaskCreate":
+        self.target_member_id = self.target_member_id.strip()
+        self.content = self.content.strip()
+        if self.title is not None:
+            self.title = self.title.strip() or None
+        if not self.target_member_id:
+            raise ValueError("target_member_id is required")
+        if not self.content:
+            raise ValueError("content is required")
+        return self
+
+
+class AgentTaskClaim(BaseModel):
+    instance_id: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_task_claim(self) -> "AgentTaskClaim":
+        if self.instance_id is not None:
+            self.instance_id = self.instance_id.strip() or None
+        return self
+
+
+class AgentTaskComplete(BaseModel):
+    status: str
+    result_message_id: Optional[int] = None
+    last_error: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_task_complete(self) -> "AgentTaskComplete":
+        self.status = self.status.strip().lower()
+        if self.status not in _TASK_TERMINAL_STATUSES:
+            raise ValueError(f"status must be one of {sorted(_TASK_TERMINAL_STATUSES)}")
+        if self.last_error is not None:
+            self.last_error = self.last_error.strip() or None
+        if self.status == "failed" and not self.last_error:
+            raise ValueError("last_error is required when status is failed")
+        return self
+
+
+class AgentTaskOut(BaseModel):
+    id: int
+    target_member_id: str
+    created_by: str
+    content: str
+    title: Optional[str]
+    status: str
+    claimed_by: Optional[str]
+    instance_id: Optional[str]
+    result_message_id: Optional[int]
+    last_error: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    claimed_at: Optional[datetime]
+    finished_at: Optional[datetime]

@@ -222,6 +222,47 @@ class TalkClient:
             params["status"] = status
         return await self._request_json("GET", "/api/instances", params=params)
 
+    async def create_task(
+        self,
+        target_member_id: str,
+        content: str,
+        *,
+        title: str | None = None,
+    ) -> JsonDict:
+        payload: JsonDict = {"target_member_id": target_member_id, "content": content, "title": title}
+        return await self._request_json("POST", "/api/tasks", json_body=payload)
+
+    async def list_tasks(
+        self,
+        *,
+        target_member_id: str | None = None,
+        status: str | None = None,
+    ) -> list[JsonDict]:
+        params: dict[str, Any] = {}
+        if target_member_id:
+            params["target_member_id"] = target_member_id
+        if status:
+            params["status"] = status
+        return await self._request_json("GET", "/api/tasks", params=params)
+
+    async def claim_task(self, task_id: int, *, instance_id: str | None = None) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/claim", json_body={"instance_id": instance_id})
+
+    async def complete_task(
+        self,
+        task_id: int,
+        *,
+        status: str,
+        result_message_id: int | None = None,
+        last_error: str | None = None,
+    ) -> JsonDict:
+        payload: JsonDict = {
+            "status": status,
+            "result_message_id": result_message_id,
+            "last_error": last_error,
+        }
+        return await self._request_json("POST", f"/api/tasks/{task_id}/complete", json_body=payload)
+
     async def fetch_history(
         self,
         *,

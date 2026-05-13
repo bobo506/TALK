@@ -1,36 +1,18 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-13 15:47 (Asia/Shanghai)
+Updated: 2026-05-13 16:07 (Asia/Shanghai)
 
 ### 1) Current Progress
-- `DOC-1` completed: split onboarding into `docs/QUICKSTART_USER.md` and `docs/QUICKSTART_AGENT.md`, and reduced `docs/QUICKSTART.md` to a short index page.
-- `QUICKSTART_USER` now follows a true family-user path: Docker Desktop only, screenshot-level browser checks, explicit `config.toml` before/after examples, LAN IP lookup, and ordered troubleshooting steps.
-- `QUICKSTART_AGENT` now follows a Python bare-metal + SDK path: Windows PowerShell and Linux/macOS bash variants, a clear definition of project root, real example repo URLs, and a full runnable Agent sample.
-- `docs/DEPLOY.md` now includes per-path prerequisites for Docker Compose, Linux `systemd`, and bare metal deployment.
-- `docs/SDK.md` async examples now all include `import asyncio` plus `asyncio.run(main())`, so they can be copied straight into `.py` files without `await outside async`.
-- `SETUP-1` UX is improved in `web/index.html` and `web/app.js`: the first-admin form now explains the login key in plain language and supports browser-side 32-byte base64url generation, reveal/hide, and one-click copy.
-- Related docs were synced after implementation: `docs/MODULE_webui.md`, `docs/MODULE_members_auth.md`, and `docs/PROJECT_BRIEF.md` now reflect the onboarding split and first-run key-generation flow.
-- `DOC-2` completed: fixed the remaining mojibake deployment section in `CLAUDE.md`, added explicit UTF-8 write rules plus SDK import-path notes to `AGENTS.md` / `CLAUDE.md`, and added `tests/test_encoding.py` as an encoding regression guard.
-- Regression check still passes: full `python -m unittest` is green with `54` tests, including `3` new encoding-guard cases.
-- Product direction for the next phase is now explicit: TALK will be used as a small home-LAN multi-Agent lab, opened only when the local computer is in use, rather than a 24/7 always-on service.
-- Target usage profile is now clear: up to `5` AI agents, with hybrid backends (`Claude Code` / `Codex` via local CLI bridges, `Kimi` / `DeepSeek` via API bridges).
-- Discussion-mode direction is confirmed: future work should support moderator-led multi-Agent discussion, message-history persistence, and mid-discussion document/material passing so agents can collaborate against shared context.
-- 2026-05-12 product decisions confirmed: use the locally installed `pi` framework as the DeepSeek / Kimi Agent framework; add Group support for multiple discussion rooms; change Web UI toward Hall shared timeline mode; add SSE streaming for long Agent replies; add instance and scheduling API layers.
-- A new multi-Agent document editing coordination protocol is required to prevent multiple Agents from editing the same document at the same time.
-- Current communication specs were checked: TALK already has member identity, API-key auth, server-side leading-mention routing, broadcast/direct/group-style `to_ids` visibility, REST polling, WebSocket message/presence/revoke events, file exchange, replies, and SDK event callbacks. It does not yet have a formal multi-Agent discussion protocol, document edit locking protocol, room model, Hall timeline contract, SSE stream contract, or instance/scheduler model.
-- Until the next progress summary, Codex is temporarily allowed to act as both decision Agent and execution Agent for this project because the dedicated decision Agent is unavailable.
-- `LOCAL-LAB-1` started: added `docs/LOCAL_LAB_DESIGN.md` to define the thin local-lab plan covering bridge processes, Groups, Hall, moderator-led discussion, SSE stream events, instance/scheduling concepts, and document-edit coordination.
-- `BRIDGE-CODEX-1` MVP landed: added `bridges/codex_bridge.py`, which registers a Codex bridge member, listens for direct text tasks, invokes configurable `codex exec`, and replies to the original sender with `reply_to`.
-- Added `docs/MODULE_bridges.md` and updated `docs/PROJECT_BRIEF.md` so future Agents can discover the new `bridges/` module.
-- Added `tests/test_codex_bridge.py`; targeted bridge tests pass with 6 cases, and `python bridges/codex_bridge.py --help` works.
-- Created an ignored local `.venv` from `requirements.txt` after the tracked `.codex_pydeps` cache proved inconsistent for this run.
-- Full regression now passes: `.venv\Scripts\python.exe -m unittest` is green with `66` tests.
-- Real Codex bridge smoke test passed in an isolated temporary TALK server/database/storage: `human:smoke -> @agent:codex -> codex exec --sandbox read-only -> reply_to`, with reply content `TALK_BRIDGE_SMOKE_OK`.
 - `INSTANCE-1` completed: added the `agent_instances` table, `/api/instances` status APIs, SDK helpers, and `docs/MODULE_instances.md`.
 - Codex bridge now reports runtime status through TALK: startup `idle`, per-task `busy`, success back to `idle`, error/timeout to `error`, and shutdown to `offline`.
 - Instance API coverage added in `tests/test_instances.py`; SDK helper coverage added in `tests/test_talk_client.py`.
 - Instance bridge smoke test passed in an isolated temporary TALK server/database/storage: `agent:codex` followed `idle -> busy -> idle -> offline` and replied with `TALK_BRIDGE_INSTANCE_SMOKE_OK`.
+- `TASK-1` completed: added `agent_tasks`, `/api/tasks`, SDK helpers, sync SDK wrappers, and route / SDK test coverage.
+- First scheduler boundary is now explicit: TALK records and routes tasks to already-running bridge processes; it does not auto-start Codex / Claude / pi processes in this slice.
+- Task lifecycle first version supports `queued -> running -> succeeded / failed / canceled`; task claim and completion update linked instance status and `current_task_id`.
+- Project rules updated: development execution Agents may directly update `docs/PROGRESS.md` after real code, test, or documentation work.
+- Documentation synced: `docs/MODULE_tasks.md` added; `docs/PROJECT_BRIEF.md`, `docs/MODULE_instances.md`, `docs/LOCAL_LAB_DESIGN.md`, and `docs/SDK.md` updated for task APIs.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
@@ -42,14 +24,71 @@ Updated: 2026-05-13 15:47 (Asia/Shanghai)
 - The document editing coordination protocol still needs implementation-level rules: lock granularity, lock timeout, stale-lock recovery, read-only review behavior, conflict handling, and UI/API visibility.
 - The local `pi` framework entrypoint, configuration style, and DeepSeek / Kimi adapter shape still need to be verified on this workstation before bridge implementation.
 - Codex bridge is still MVP-level: it does not yet stream partial output, attach files/materials, or enforce document-edit locks.
+- Scheduler v2 details remain open: delayed / recurring schedule table shape, task retry policy, timeout recovery for stale `running` tasks, and whether Web UI can manually requeue or cancel tasks.
 
 ### 3) Next Plan
 - Continue refining the unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, `pi`-based bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
 - Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, controlled material/document passing, and document-edit coordination.
 - Design the required product model changes before implementation: Groups / rooms, Hall shared timeline, SSE stream events, Agent instances, and scheduling APIs.
-- Next implementation candidates: scheduler task API, Group/Hall data model, SSE stream event contract, or document-edit lock API.
+- Next implementation candidates: schedule API, Group/Hall data model, SSE stream event contract, document-edit lock API, or Codex bridge task-queue integration.
+
+### 4) Verification
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks` passed with `7` tests.
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client.TalkClientTests.test_task_helpers` passed.
+- `.venv\Scripts\python.exe -m unittest` passed with `74` tests.
+
+### 5) Changed Files
+- `AGENTS.md`
+- `server/models.py`
+- `server/routes/tasks.py`
+- `server/main.py`
+- `server/db.py`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `tests/test_tasks.py`
+- `tests/test_talk_client.py`
+- `docs/PROJECT_BRIEF.md`
+- `docs/MODULE_instances.md`
+- `docs/MODULE_tasks.md`
+- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/SDK.md`
+- `docs/PROGRESS.md`
 
 ## History
+
+### 2026-05-13 16:07 (Asia/Shanghai)
+#### Current Progress
+- `TASK-1` completed: added `AgentTask` / `AgentTaskCreate` / `AgentTaskClaim` / `AgentTaskComplete` / `AgentTaskOut`, `/api/tasks`, database indexes, async SDK helpers, sync SDK wrappers, and documentation.
+- Task API first slice supports creating queued tasks for existing `agent:*` members, listing visible tasks, Agent-only claim, and Agent-only completion as `succeeded` / `failed` / `canceled`.
+- Task claim and completion now update linked `AgentInstance`: claim sets `busy` and `current_task_id`; success/cancel returns to `idle`; failure sets `error` and `last_error`.
+- Project rule updated in `AGENTS.md`: development execution Agents may directly update `docs/PROGRESS.md` after actual code, test, or documentation work.
+- Documentation synced across project brief, SDK, local-lab design, instances module, and new tasks module.
+#### Open Questions / Pending Confirmation
+- Schedule API is still not implemented: delayed / recurring trigger shape remains open.
+- Retry, task timeout recovery, stale `running` cleanup, requeue/cancel UI, and Codex bridge task-queue consumption remain future work.
+#### Next Plan
+- Choose the next local-lab slice: schedule API, Group/Hall room model, SSE stream contract, document-edit lock API, or Codex bridge task-queue integration.
+- If continuing scheduler work, define whether schedules create one-off tasks at trigger time and how failed scheduled tasks should be retried or surfaced.
+#### Verification
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks` passed with `7` tests.
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client.TalkClientTests.test_task_helpers` passed.
+- `.venv\Scripts\python.exe -m unittest` passed with `74` tests.
+#### Changed Files
+- `AGENTS.md`
+- `server/models.py`
+- `server/routes/tasks.py`
+- `server/main.py`
+- `server/db.py`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `tests/test_tasks.py`
+- `tests/test_talk_client.py`
+- `docs/PROJECT_BRIEF.md`
+- `docs/MODULE_instances.md`
+- `docs/MODULE_tasks.md`
+- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/SDK.md`
+- `docs/PROGRESS.md`
 
 ### 2026-05-13 15:47 (Asia/Shanghai)
 #### Current Progress

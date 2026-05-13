@@ -1,11 +1,11 @@
 # MODULE: Agent Instances
 
 > 所属项目：TALK
-> 状态：实例状态 API 第一版已落地，调度 API 待实现
+> 状态：实例状态 API 第一版已落地，已与任务 API 第一版联动
 
 ## 目标
 
-记录每个正在运行的 Agent bridge 进程，让 TALK 能知道某个稳定 Agent 身份下有哪些本地实例在线、空闲、忙碌或报错。该模块是后续任务调度层的前置基础。
+记录每个正在运行的 Agent bridge 进程，让 TALK 能知道某个稳定 Agent 身份下有哪些本地实例在线、空闲、忙碌或报错。该模块是任务调度层的运行时状态基础。
 
 ## 负责范围
 
@@ -51,6 +51,8 @@
 - `report_instance_status(instance_id, runtime=..., status=..., ...)`
 - `list_instances(member_id=None, status=None)`
 
+同步客户端 `TalkClientSync` 也暴露同名实例 helper。
+
 ### Codex Bridge
 
 `bridges/codex_bridge.py` 已接入实例状态：
@@ -63,8 +65,8 @@
 
 ## 后续计划
 
-- 增加任务表与调度 API，明确 task / schedule 的生命周期。
-- 决定调度层是否负责启动 bridge 进程，或仅负责记录和分派任务。
+- 任务表与任务 API 第一版已拆到 `MODULE_tasks.md`。
+- 当前决策：TALK 先只记录和分派任务，不负责自动启动 bridge 进程。
 - 将实例状态接入 Hall / Group Web UI。
 - 将 SSE stream 与实例任务状态关联，支持长回复期间的可见进度。
 
@@ -76,3 +78,4 @@
 - [x] 已认证成员可按 `member_id` / `status` 查询实例。
 - [x] SDK 实例状态 helper 通过活服务测试。
 - [x] Codex bridge 实例状态路径已完成烟测：`idle -> busy -> idle -> offline`。
+- [x] 任务领取 / 完成会联动实例状态：`busy + current_task_id`，完成后回到 `idle`，失败后进入 `error`。

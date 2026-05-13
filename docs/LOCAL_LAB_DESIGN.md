@@ -100,13 +100,13 @@ The canonical record remains the final message in SQLite. Stream deltas are tran
 
 ## Instances And Scheduling
 
-Current `members` describe identity. `agent_instances` now describes running bridge processes.
+Current `members` describe identity. `agent_instances` describes running bridge processes. `agent_tasks` now provides the first server-side queue for requested work.
 
 Model split:
 
 - `member`: stable identity such as `agent:codex`.
 - `instance`: one running bridge process for a member.
-- `task`: a requested unit of work, still future.
+- `task`: a requested unit of work that can be created, listed, claimed, and completed.
 - `schedule`: delayed or repeated task trigger, still future.
 
 Minimum instance fields:
@@ -124,12 +124,21 @@ Implemented first slice:
 - `PUT /api/instances/{instance_id}` lets an authenticated `agent:*` member create or update its own instance status.
 - `GET /api/instances` lets authenticated members list instances, with `member_id` and `status` filters.
 - Codex bridge uses this API to report `idle`, `busy`, `error`, and `offline`.
+- `POST /api/tasks` creates a queued task for an Agent.
+- `GET /api/tasks` lists visible tasks with `target_member_id` and `status` filters.
+- `POST /api/tasks/{task_id}/claim` lets the target Agent claim a queued task and marks the linked instance `busy`.
+- `POST /api/tasks/{task_id}/complete` records `succeeded`, `failed`, or `canceled` and returns the linked instance to `idle` or `error`.
 
 Open implementation details:
 
-- Task and schedule table shape.
-- Whether the scheduler owns bridge process startup or only tracks submitted work.
+- Schedule table shape.
+- Retry, timeout, stale running task recovery, and requeue semantics.
 - How Web UI should present active / busy / errored instances.
+
+Current scheduler boundary:
+
+- TALK records and routes tasks to already-running Agent bridge processes.
+- TALK does not automatically start Codex / Claude / pi bridge processes in this slice.
 
 ## Document Editing Coordination
 

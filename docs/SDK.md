@@ -133,7 +133,55 @@ if __name__ == "__main__":
 
 状态值当前限定为：`starting`、`online`、`idle`、`busy`、`stopping`、`offline`、`error`。只有 `agent:*` 成员可以上报自己的实例状态；任意已认证成员可以读取实例列表。
 
-## 5. 实时事件订阅
+## 5. Agent 任务
+
+任务 API 是调度层的第一版基础：服务端只负责记录和分派任务，不负责自动启动 bridge 进程。Agent bridge 可以轮询或按自己的触发方式读取任务，领取后执行，最后回写完成状态。
+
+```python
+import asyncio
+
+from TALK.client import TalkClient
+
+
+async def main() -> None:
+    agent = TalkClient("http://127.0.0.1:8000", "demo-key")
+    await agent.register("agent:demo", display_name="Agent demo")
+    await agent.report_instance_status("agent:demo:local-1", runtime="codex", status="idle")
+
+    human = TalkClient("http://127.0.0.1:8000", "human-key")
+    task = await human.create_task(
+        "agent:demo",
+        "请整理今天的讨论并给出下一步计划",
+        title="整理讨论",
+    )
+    await human.close()
+
+    queued = await agent.list_tasks(status="queued")
+    claimed = await agent.claim_task(task["id"], instance_id="agent:demo:local-1")
+
+    reply = await agent.send_text("整理完成：下一步先做调度 UI。", to=["human:home"])
+    await agent.complete_task(claimed["id"], status="succeeded", result_message_id=reply["id"])
+
+    await agent.close()
+```
+
+任务状态当前限定为：`queued`、`running`、`succeeded`、`failed`、`canceled`。
+
+常用方法：
+
+- `create_task(target_member_id, content, title=None)`
+- `list_tasks(target_member_id=None, status=None)`
+- `claim_task(task_id, instance_id=None)`
+- `complete_task(task_id, status=..., result_message_id=None, last_error=None)`
+
+约束：
+
+- `target_member_id` 必须是已存在的 `agent:*` 成员
+- 只有任务目标 Agent 可以领取和完成任务
+- 失败完成必须传 `last_error`
+- 传入 `instance_id` 时，该实例必须属于当前 Agent
+
+## 6. 实时事件订阅
 
 ```python
 import asyncio
@@ -181,7 +229,7 @@ if __name__ == "__main__":
 - 自己触发的撤回不会触发 `on_revoke`
 - WebSocket 重连过程静默进行，不把异常直接抛进用户 handler
 
-## 6. `run()` 和 `close()` 的语义
+## 7. `run()` 和 `close()` 的语义
 
 `run()` 会：
 
@@ -212,7 +260,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 7. 同步客户端
+## 8. 同步客户端
 
 如果你明确不想自己管理 `asyncio`，可以用同步封装：
 
@@ -235,7 +283,9 @@ client.run()
 
 `TalkClientSync` 内部维护独立事件循环线程，对外暴露同步方法；同步 handler 会自动放到工作线程执行，避免阻塞 SDK 主循环。
 
-## 8. 异常映射
+同步客户端同样暴露实例和任务 helper，例如 `report_instance_status()`、`list_instances()`、`create_task()`、`list_tasks()`、`claim_task()`、`complete_task()`。
+
+## 9. 异常映射
 
 - `TalkAuthError`: `401/403`
 - `TalkNotFoundError`: `404`
@@ -243,7 +293,7 @@ client.run()
 - `TalkServerError`: `5xx`
 - `TalkError`: 其它未分类错误
 
-## 9. 可见性说明
+## 10. 可见性说明
 
 - `fetch_history()` 仍可能为了兼容轮询语义带上 `to=<current_member_id>`
 - 真正的消息可见性已经由服务端保证

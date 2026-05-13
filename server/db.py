@@ -75,6 +75,11 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_member_id ON agent_instances (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_runtime ON agent_instances (runtime)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_status ON agent_instances (status)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_target_member_id ON agent_tasks (target_member_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_created_by ON agent_tasks (created_by)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_status ON agent_tasks (status)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_claimed_by ON agent_tasks (claimed_by)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_instance_id ON agent_tasks (instance_id)")
         conn.exec_driver_sql(
             """
             UPDATE messages
