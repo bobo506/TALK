@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-13 15:24 (Asia/Shanghai)
+Updated: 2026-05-13 15:47 (Asia/Shanghai)
 
 ### 1) Current Progress
 - `DOC-1` completed: split onboarding into `docs/QUICKSTART_USER.md` and `docs/QUICKSTART_AGENT.md`, and reduced `docs/QUICKSTART.md` to a short index page.
@@ -25,8 +25,12 @@ Updated: 2026-05-13 15:24 (Asia/Shanghai)
 - Added `docs/MODULE_bridges.md` and updated `docs/PROJECT_BRIEF.md` so future Agents can discover the new `bridges/` module.
 - Added `tests/test_codex_bridge.py`; targeted bridge tests pass with 6 cases, and `python bridges/codex_bridge.py --help` works.
 - Created an ignored local `.venv` from `requirements.txt` after the tracked `.codex_pydeps` cache proved inconsistent for this run.
-- Full regression now passes: `.venv\Scripts\python.exe -m unittest` is green with `60` tests.
+- Full regression now passes: `.venv\Scripts\python.exe -m unittest` is green with `66` tests.
 - Real Codex bridge smoke test passed in an isolated temporary TALK server/database/storage: `human:smoke -> @agent:codex -> codex exec --sandbox read-only -> reply_to`, with reply content `TALK_BRIDGE_SMOKE_OK`.
+- `INSTANCE-1` completed: added the `agent_instances` table, `/api/instances` status APIs, SDK helpers, and `docs/MODULE_instances.md`.
+- Codex bridge now reports runtime status through TALK: startup `idle`, per-task `busy`, success back to `idle`, error/timeout to `error`, and shutdown to `offline`.
+- Instance API coverage added in `tests/test_instances.py`; SDK helper coverage added in `tests/test_talk_client.py`.
+- Instance bridge smoke test passed in an isolated temporary TALK server/database/storage: `agent:codex` followed `idle -> busy -> idle -> offline` and replied with `TALK_BRIDGE_INSTANCE_SMOKE_OK`.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
@@ -37,15 +41,46 @@ Updated: 2026-05-13 15:24 (Asia/Shanghai)
 - The multi-Agent discussion phase still needs a concrete protocol: moderator responsibilities, round limits, stop conditions, material-sharing rules, and summary output format are discussed conceptually but not yet written into an implementation spec.
 - The document editing coordination protocol still needs implementation-level rules: lock granularity, lock timeout, stale-lock recovery, read-only review behavior, conflict handling, and UI/API visibility.
 - The local `pi` framework entrypoint, configuration style, and DeepSeek / Kimi adapter shape still need to be verified on this workstation before bridge implementation.
-- Codex bridge is still an MVP: it does not yet report instance status, stream partial output, attach files/materials, or enforce document-edit locks.
+- Codex bridge is still MVP-level: it does not yet stream partial output, attach files/materials, or enforce document-edit locks.
 
 ### 3) Next Plan
 - Continue refining the unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, `pi`-based bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
 - Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, controlled material/document passing, and document-edit coordination.
 - Design the required product model changes before implementation: Groups / rooms, Hall shared timeline, SSE stream events, Agent instances, and scheduling APIs.
-- Next implementation candidates: instance status reporting for bridges, Group/Hall data model, SSE stream event contract, or document-edit lock API.
+- Next implementation candidates: scheduler task API, Group/Hall data model, SSE stream event contract, or document-edit lock API.
 
 ## History
+
+### 2026-05-13 15:47 (Asia/Shanghai)
+#### Current Progress
+- `INSTANCE-1` completed: added `AgentInstance` / `AgentInstanceUpdate` / `AgentInstanceOut`, `/api/instances`, database indexes, SDK helpers, and module documentation.
+- Codex bridge now reports its runtime instance state with a stable optional `--instance-id`; task handling updates status to `busy`, success returns to `idle`, failures become `error`, and shutdown reports `offline`.
+- Added coverage for instance API permissions, ownership protection, filters, invalid status validation, and SDK helpers.
+#### Open Questions / Pending Confirmation
+- Task and schedule API semantics are still not implemented: task table shape, retry behavior, process ownership, and scheduler/bridge responsibility split remain open.
+- Group / Hall / SSE / document-lock implementation details remain pending after this instance-status foundation.
+#### Next Plan
+- Choose the next local-lab slice: scheduler task API, Group/Hall room model, SSE stream contract, or document-edit lock API.
+- When scheduler work starts, decide whether TALK launches bridge processes or only routes tasks to already-running instances.
+#### Verification
+- `.venv\Scripts\python.exe -m unittest tests.test_instances tests.test_talk_client tests.test_codex_bridge` passed with `19` tests.
+- `.venv\Scripts\python.exe -m unittest` passed with `66` tests.
+- Isolated bridge instance smoke passed: `idle -> busy -> idle -> offline`, reply content `TALK_BRIDGE_INSTANCE_SMOKE_OK`.
+#### Changed Files
+- `server/models.py`
+- `server/routes/instances.py`
+- `server/main.py`
+- `server/db.py`
+- `TALK/client/talk_client.py`
+- `bridges/codex_bridge.py`
+- `tests/test_instances.py`
+- `tests/test_talk_client.py`
+- `docs/MODULE_instances.md`
+- `docs/MODULE_bridges.md`
+- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/SDK.md`
+- `docs/PROGRESS.md`
 
 ### 2026-05-13 15:24 (Asia/Shanghai)
 #### Current Progress

@@ -17,6 +17,8 @@
 
 - `bridges/codex_bridge.py` 会自注册为 `agent:codex`（可通过 `--name` 修改）。
 - 默认只处理直接发给自己的文本消息，不自动响应普通广播消息。
+- 启动后会通过实例 API 上报运行状态，默认实例 id 为 `agent:codex:<uuid>`，也可用 `--instance-id` 固定。
+- 处理任务时状态从 `idle` 切到 `busy`，完成后回到 `idle`；命令失败、超时或异常时上报 `error`，进程退出前上报 `offline`。
 - 收到任务后调用可配置的 Codex CLI 命令，默认：
 
 ```bash
@@ -40,7 +42,6 @@ Web UI 中发送：
 
 ## 后续计划
 
-- 接入实例状态上报。
 - 接入 Group / Hall 消息上下文。
 - 接入 SSE 流式输出。
 - 接入文档编辑锁协议，避免多个 Agent 同时写同一文件。
@@ -51,3 +52,4 @@ Web UI 中发送：
 - [x] bridge helper 逻辑有单元测试覆盖。
 - [x] `python bridges/codex_bridge.py --help` 可正常输出参数说明。
 - [x] 在临时 TALK server / 临时 SQLite / 临时 storage 中完成 `@agent:codex -> codex exec --sandbox read-only -> reply_to` 端到端验收，收到 `TALK_BRIDGE_SMOKE_OK`。
+- [x] 在临时 TALK server 中验证 Codex bridge 实例状态路径：`idle -> busy -> idle -> offline`。

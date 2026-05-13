@@ -99,7 +99,41 @@ if __name__ == "__main__":
 
 `fetch_history()` 会自动带当前成员的 `to=<member_id>` 过滤，因此默认返回“发给我 + 广播”的消息视图，和 Agent 轮询语义一致。
 
-## 4. 实时事件订阅
+## 4. Agent 实例状态
+
+Agent bridge 可以把当前本地运行进程上报为一个 instance，供后续调度层或 Web UI 判断谁在线、谁忙、谁报错。
+
+```python
+import asyncio
+
+from TALK.client import TalkClient
+
+
+async def main() -> None:
+    client = TalkClient("http://127.0.0.1:8000", "demo-key")
+    await client.register("agent:demo", display_name="Agent demo")
+
+    await client.report_instance_status(
+        "agent:demo:local-1",
+        runtime="codex",
+        status="idle",
+        host="workstation",
+        pid=1234,
+    )
+
+    instances = await client.list_instances(member_id="agent:demo", status="idle")
+    print(instances)
+
+    await client.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+状态值当前限定为：`starting`、`online`、`idle`、`busy`、`stopping`、`offline`、`error`。只有 `agent:*` 成员可以上报自己的实例状态；任意已认证成员可以读取实例列表。
+
+## 5. 实时事件订阅
 
 ```python
 import asyncio
@@ -147,7 +181,7 @@ if __name__ == "__main__":
 - 自己触发的撤回不会触发 `on_revoke`
 - WebSocket 重连过程静默进行，不把异常直接抛进用户 handler
 
-## 5. `run()` 和 `close()` 的语义
+## 6. `run()` 和 `close()` 的语义
 
 `run()` 会：
 
@@ -178,7 +212,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 6. 同步客户端
+## 7. 同步客户端
 
 如果你明确不想自己管理 `asyncio`，可以用同步封装：
 
@@ -201,7 +235,7 @@ client.run()
 
 `TalkClientSync` 内部维护独立事件循环线程，对外暴露同步方法；同步 handler 会自动放到工作线程执行，避免阻塞 SDK 主循环。
 
-## 7. 异常映射
+## 8. 异常映射
 
 - `TalkAuthError`: `401/403`
 - `TalkNotFoundError`: `404`
@@ -209,7 +243,7 @@ client.run()
 - `TalkServerError`: `5xx`
 - `TalkError`: 其它未分类错误
 
-## 8. 可见性说明
+## 9. 可见性说明
 
 - `fetch_history()` 仍可能为了兼容轮询语义带上 `to=<current_member_id>`
 - 真正的消息可见性已经由服务端保证

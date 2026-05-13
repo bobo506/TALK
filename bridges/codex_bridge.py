@@ -8,9 +8,11 @@ import asyncio
 import os
 import shlex
 import sys
+import socket
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
+from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -177,6 +179,26 @@ async def run_bridge(args: argparse.Namespace) -> None:
     workdir = Path(args.workdir).expanduser().resolve()
     client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval)
     await client.register(member_id, display_name=args.display_name or f"Codex Bridge ({member_id})")
+    instance_id = args.instance_id or f"{member_id}:{uuid4()}"
+    host = socket.gethostname()
+
+    async def report_status(
+        status: str,
+        *,
+        current_task_id: str | None = None,
+        last_error: str | None = None,
+    ) -> None:
+        await client.report_instance_status(
+            instance_id,
+            runtime="codex",
+            status=status,
+            host=host,
+            pid=os.getpid(),
+            current_task_id=current_task_id,
+            last_error=last_error,
+        )
+
+    await report_status("idle")
 
     run_lock = asyncio.Lock()
 
@@ -194,27 +216,42 @@ async def run_bridge(args: argparse.Namespace) -> None:
             return
 
         async with run_lock:
-            if args.send_ack:
-                await client.reply(
-                    int(message["id"]),
-                    text="Codex bridge received the task and is working on it.",
-                    to=[sender],
-                )
+            task_id = str(message.get("id") or "")
+            await report_status("busy", current_task_id=task_id)
+            try:
+                if args.send_ack:
+                    await client.reply(
+                        int(message["id"]),
+                        text="Codex bridge received the task and is working on it.",
+                        to=[sender],
+                    )
 
-            prompt = build_codex_prompt(message, member_id=member_id, workdir=workdir)
-            result = await run_codex_command(
-                args.codex_command,
-                prompt,
-                cwd=workdir,
-                timeout=args.timeout,
-            )
-            reply = format_codex_reply(result, max_chars=args.max_reply_chars)
-            await client.reply(int(message["id"]), text=reply, to=[sender])
+                prompt = build_codex_prompt(message, member_id=member_id, workdir=workdir)
+                result = await run_codex_command(
+                    args.codex_command,
+                    prompt,
+                    cwd=workdir,
+                    timeout=args.timeout,
+                )
+                reply = format_codex_reply(result, max_chars=args.max_reply_chars)
+                await client.reply(int(message["id"]), text=reply, to=[sender])
+                await report_status(
+                    "error" if result.timed_out or result.returncode != 0 else "idle",
+                    last_error=reply if result.timed_out or result.returncode != 0 else None,
+                )
+            except Exception as exc:
+                try:
+                    await report_status("error", current_task_id=task_id, last_error=str(exc))
+                finally:
+                    raise
 
     try:
         await client.run()
     finally:
-        await client.close()
+        try:
+            await report_status("offline")
+        finally:
+            await client.close()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -223,6 +260,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--key", required=True, help="API key for this bridge member")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--display-name", default=None)
+    parser.add_argument("--instance-id", default=None)
     parser.add_argument("--workdir", default=".", help="Working directory passed to Codex")
     parser.add_argument("--codex-command", default=os.environ.get("TALK_CODEX_COMMAND", DEFAULT_CODEX_COMMAND))
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SEC)

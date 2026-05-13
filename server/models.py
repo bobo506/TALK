@@ -62,6 +62,22 @@ class File(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class AgentInstance(SQLModel, table=True):
+    __tablename__ = "agent_instances"
+
+    id: str = Field(primary_key=True)
+    member_id: str = Field(foreign_key="members.id", index=True)
+    runtime: str = Field(index=True)
+    status: str = Field(index=True)
+    host: Optional[str] = None
+    pid: Optional[int] = None
+    current_task_id: Optional[str] = None
+    last_error: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 # ── API schemas (request / response) ────────────────────────────────
 
 
@@ -171,3 +187,45 @@ class FileOut(BaseModel):
     file_id: str
     filename: str
     size_bytes: int
+
+
+_INSTANCE_STATUSES = {"starting", "online", "idle", "busy", "stopping", "offline", "error"}
+
+
+class AgentInstanceUpdate(BaseModel):
+    runtime: str
+    status: str
+    host: Optional[str] = None
+    pid: Optional[int] = None
+    current_task_id: Optional[str] = None
+    last_error: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_instance_status(self) -> "AgentInstanceUpdate":
+        self.runtime = self.runtime.strip()
+        self.status = self.status.strip().lower()
+        if not self.runtime:
+            raise ValueError("runtime is required")
+        if self.status not in _INSTANCE_STATUSES:
+            raise ValueError(f"status must be one of {sorted(_INSTANCE_STATUSES)}")
+        if self.host is not None:
+            self.host = self.host.strip() or None
+        if self.current_task_id is not None:
+            self.current_task_id = self.current_task_id.strip() or None
+        if self.last_error is not None:
+            self.last_error = self.last_error.strip() or None
+        return self
+
+
+class AgentInstanceOut(BaseModel):
+    id: str
+    member_id: str
+    runtime: str
+    status: str
+    host: Optional[str]
+    pid: Optional[int]
+    current_task_id: Optional[str]
+    last_error: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    last_seen_at: datetime

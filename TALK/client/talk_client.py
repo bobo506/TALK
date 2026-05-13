@@ -188,6 +188,40 @@ class TalkClient:
     async def list_members(self) -> list[JsonDict]:
         return await self._request_json("GET", "/api/members")
 
+    async def report_instance_status(
+        self,
+        instance_id: str,
+        *,
+        runtime: str,
+        status: str,
+        host: str | None = None,
+        pid: int | None = None,
+        current_task_id: str | None = None,
+        last_error: str | None = None,
+    ) -> JsonDict:
+        payload: JsonDict = {
+            "runtime": runtime,
+            "status": status,
+            "host": host,
+            "pid": pid,
+            "current_task_id": current_task_id,
+            "last_error": last_error,
+        }
+        return await self._request_json("PUT", f"/api/instances/{instance_id}", json_body=payload)
+
+    async def list_instances(
+        self,
+        *,
+        member_id: str | None = None,
+        status: str | None = None,
+    ) -> list[JsonDict]:
+        params: dict[str, Any] = {}
+        if member_id:
+            params["member_id"] = member_id
+        if status:
+            params["status"] = status
+        return await self._request_json("GET", "/api/instances", params=params)
+
     async def fetch_history(
         self,
         *,

@@ -42,9 +42,10 @@ Common bridge responsibilities:
 - Convert TALK messages and files into the runtime-specific prompt/input format.
 - Invoke the underlying runtime with a bounded timeout.
 - Send the final reply back to TALK.
-- Later: emit stream events, expose instance status, and respect document locks.
+- Report runtime instance status.
+- Later: emit stream events and respect document locks.
 
-The first Codex bridge is intentionally narrow: it responds to direct text messages addressed to `agent:codex`, invokes `codex exec`, and replies to the original sender.
+The first Codex bridge is intentionally narrow: it responds to direct text messages addressed to `agent:codex`, invokes `codex exec`, replies to the original sender, and reports its local runtime instance status.
 
 ## Groups And Hall
 
@@ -99,14 +100,14 @@ The canonical record remains the final message in SQLite. Stream deltas are tran
 
 ## Instances And Scheduling
 
-Current `members` describe identity. They do not describe running processes.
+Current `members` describe identity. `agent_instances` now describes running bridge processes.
 
-Future model split:
+Model split:
 
 - `member`: stable identity such as `agent:codex`.
 - `instance`: one running bridge process for a member.
-- `task`: a requested unit of work.
-- `schedule`: delayed or repeated task trigger.
+- `task`: a requested unit of work, still future.
+- `schedule`: delayed or repeated task trigger, still future.
 
 Minimum instance fields:
 
@@ -118,7 +119,17 @@ Minimum instance fields:
 - `last_seen_at`
 - `current_task_id`
 
-The first Codex bridge does not require server-side instance tables. It should be written so it can report instance status later.
+Implemented first slice:
+
+- `PUT /api/instances/{instance_id}` lets an authenticated `agent:*` member create or update its own instance status.
+- `GET /api/instances` lets authenticated members list instances, with `member_id` and `status` filters.
+- Codex bridge uses this API to report `idle`, `busy`, `error`, and `offline`.
+
+Open implementation details:
+
+- Task and schedule table shape.
+- Whether the scheduler owns bridge process startup or only tracks submitted work.
+- How Web UI should present active / busy / errored instances.
 
 ## Document Editing Coordination
 
