@@ -134,6 +134,8 @@ TALK/
 │   └── style.css          # 自定义样式
 ├── examples/
 │   └── agent_poller.py    # 示例 Agent 轮询脚本
+├── bridges/
+│   └── codex_bridge.py    # Codex CLI bridge（local-lab MVP）
 ├── scripts/
 │   └── backup_db.py       # SQLite 在线热备脚本
 ├── tests/
@@ -160,6 +162,7 @@ TALK/
 | [MODULE_files.md](MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
 | [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | M2 已实现，已补渲染优化、过期文件反馈、历史翻页、搜索与撤回态渲染 |
 | [MODULE_agent_example.md](MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
+| [MODULE_bridges.md](MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | Codex bridge MVP 已落地，local-lab 方向持续设计中 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段
@@ -173,6 +176,12 @@ TALK/
 - `config.toml` — 服务配置
 
 修改这些公共文件时需评估对所有模块的影响。
+
+## 2026-05-13 Local Lab Addendum
+
+- 新增 `docs/LOCAL_LAB_DESIGN.md`，用于收敛本地多 Agent 实验室阶段的设计边界。
+- local-lab 阶段已确认方向：Codex / Claude Code 走本地 CLI bridge；DeepSeek / Kimi 走本地 `pi` 框架 bridge；后续加入 Group、Hall、SSE、实例/调度 API 与文档编辑协调协议。
+- `bridges/codex_bridge.py` 是第一版 Codex 接入 MVP：通过 TALK SDK 自注册、监听发给 `agent:codex` 的文本任务、调用 `codex exec`，再用 `reply_to` 回复原发送者。
 ## 2026-04-23 Data Model Addendum
 
 - `messages.reply_to INTEGER NULL REFERENCES messages(id)` was added for first-level reply/reference support.

@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-04-24 23:11 (Asia/Shanghai)
+Updated: 2026-05-13 15:24 (Asia/Shanghai)
 
 ### 1) Current Progress
 - `DOC-1` completed: split onboarding into `docs/QUICKSTART_USER.md` and `docs/QUICKSTART_AGENT.md`, and reduced `docs/QUICKSTART.md` to a short index page.
@@ -16,6 +16,17 @@ Updated: 2026-04-24 23:11 (Asia/Shanghai)
 - Product direction for the next phase is now explicit: TALK will be used as a small home-LAN multi-Agent lab, opened only when the local computer is in use, rather than a 24/7 always-on service.
 - Target usage profile is now clear: up to `5` AI agents, with hybrid backends (`Claude Code` / `Codex` via local CLI bridges, `Kimi` / `DeepSeek` via API bridges).
 - Discussion-mode direction is confirmed: future work should support moderator-led multi-Agent discussion, message-history persistence, and mid-discussion document/material passing so agents can collaborate against shared context.
+- 2026-05-12 product decisions confirmed: use the locally installed `pi` framework as the DeepSeek / Kimi Agent framework; add Group support for multiple discussion rooms; change Web UI toward Hall shared timeline mode; add SSE streaming for long Agent replies; add instance and scheduling API layers.
+- A new multi-Agent document editing coordination protocol is required to prevent multiple Agents from editing the same document at the same time.
+- Current communication specs were checked: TALK already has member identity, API-key auth, server-side leading-mention routing, broadcast/direct/group-style `to_ids` visibility, REST polling, WebSocket message/presence/revoke events, file exchange, replies, and SDK event callbacks. It does not yet have a formal multi-Agent discussion protocol, document edit locking protocol, room model, Hall timeline contract, SSE stream contract, or instance/scheduler model.
+- Until the next progress summary, Codex is temporarily allowed to act as both decision Agent and execution Agent for this project because the dedicated decision Agent is unavailable.
+- `LOCAL-LAB-1` started: added `docs/LOCAL_LAB_DESIGN.md` to define the thin local-lab plan covering bridge processes, Groups, Hall, moderator-led discussion, SSE stream events, instance/scheduling concepts, and document-edit coordination.
+- `BRIDGE-CODEX-1` MVP landed: added `bridges/codex_bridge.py`, which registers a Codex bridge member, listens for direct text tasks, invokes configurable `codex exec`, and replies to the original sender with `reply_to`.
+- Added `docs/MODULE_bridges.md` and updated `docs/PROJECT_BRIEF.md` so future Agents can discover the new `bridges/` module.
+- Added `tests/test_codex_bridge.py`; targeted bridge tests pass with 6 cases, and `python bridges/codex_bridge.py --help` works.
+- Created an ignored local `.venv` from `requirements.txt` after the tracked `.codex_pydeps` cache proved inconsistent for this run.
+- Full regression now passes: `.venv\Scripts\python.exe -m unittest` is green with `60` tests.
+- Real Codex bridge smoke test passed in an isolated temporary TALK server/database/storage: `human:smoke -> @agent:codex -> codex exec --sandbox read-only -> reply_to`, with reply content `TALK_BRIDGE_SMOKE_OK`.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
@@ -24,14 +35,57 @@ Updated: 2026-04-24 23:11 (Asia/Shanghai)
 - The improved first-run setup flow still lacks one real browser smoke test for “empty DB -> create admin -> auto login -> reopen -> normal login form”.
 - The task card asks for a second clean-session newcomer dry run and readability feedback; that external acceptance has not been performed yet in this environment.
 - The multi-Agent discussion phase still needs a concrete protocol: moderator responsibilities, round limits, stop conditions, material-sharing rules, and summary output format are discussed conceptually but not yet written into an implementation spec.
+- The document editing coordination protocol still needs implementation-level rules: lock granularity, lock timeout, stale-lock recovery, read-only review behavior, conflict handling, and UI/API visibility.
+- The local `pi` framework entrypoint, configuration style, and DeepSeek / Kimi adapter shape still need to be verified on this workstation before bridge implementation.
+- Codex bridge is still an MVP: it does not yet report instance status, stream partial output, attach files/materials, or enforce document-edit locks.
 
 ### 3) Next Plan
-- Write the next-phase design note for “local experimental mode”: one-command local startup, no always-on assumptions, and per-Agent bridge process layout.
-- Define a unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, API bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
-- Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, and controlled material/document passing during discussion.
-- After the protocol is stable, implement the minimum local-lab path before returning to lower-priority deployment validation tasks.
+- Continue refining the unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, `pi`-based bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
+- Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, controlled material/document passing, and document-edit coordination.
+- Design the required product model changes before implementation: Groups / rooms, Hall shared timeline, SSE stream events, Agent instances, and scheduling APIs.
+- Next implementation candidates: instance status reporting for bridges, Group/Hall data model, SSE stream event contract, or document-edit lock API.
 
 ## History
+
+### 2026-05-13 15:24 (Asia/Shanghai)
+#### Current Progress
+- Created an ignored local `.venv` from `requirements.txt`; dependency imports resolved consistently there (`pydantic 2.13.4`, `pydantic-core 2.46.4`, `fastapi 0.136.1`, `websockets 15.0.1`).
+- Full regression passed: `.venv\Scripts\python.exe -m unittest` ran `60` tests successfully.
+- Real Codex bridge smoke test passed with isolated temporary TALK server/database/storage: `human:smoke` sent `@agent:codex`, the bridge invoked real `codex exec --sandbox read-only`, and the reply used `reply_to` with content `TALK_BRIDGE_SMOKE_OK`.
+#### Open Questions / Pending Confirmation
+- Codex bridge remains MVP-level and still needs instance status, streaming, file/material handling, and document-lock integration.
+- The `pi` framework path for DeepSeek / Kimi still needs local verification.
+#### Next Plan
+- Choose the next implementation slice: bridge instance status, Group/Hall model, SSE streaming contract, or document-edit lock API.
+- Continue the local-lab protocol design before broad service-model changes.
+
+### 2026-05-13 15:10 (Asia/Shanghai)
+#### Current Progress
+- Added `docs/LOCAL_LAB_DESIGN.md` as the thin local-lab design note.
+- Added `bridges/codex_bridge.py` as the Codex bridge MVP: direct text message in, configurable `codex exec` invocation, `reply_to` answer out.
+- Added `docs/MODULE_bridges.md` and updated `docs/PROJECT_BRIEF.md` to register the new bridge module.
+- Added `tests/test_codex_bridge.py` covering bridge routing, prompt construction, reply formatting, and subprocess stdin piping.
+#### Open Questions / Pending Confirmation
+- Real TALK server smoke test for Codex bridge remains pending.
+- Full test suite is blocked by the local `.codex_pydeps` pydantic / pydantic-core mismatch.
+#### Next Plan
+- Clean or rebuild the Python dependency environment, then run full tests.
+- Start TALK locally, run the Codex bridge, and verify one `@agent:codex` browser-to-bridge-to-reply loop.
+- After the smoke test, continue with Group / Hall / SSE / instance-scheduler design and implementation.
+
+### 2026-05-12 17:36 (Asia/Shanghai)
+#### Current Progress
+- Product decisions confirmed: DeepSeek / Kimi will use the locally installed `pi` framework; TALK should add Groups, Hall shared timeline mode, SSE streaming, and instance/scheduling API layers.
+- A document editing coordination protocol is now required so multiple Agents do not edit the same document at the same time.
+- Existing communication specs were checked. Current TALK supports member identity, API-key auth, server-side leading-mention routing, broadcast/direct/group-style `to_ids`, REST polling, WebSocket events, file exchange, replies, and SDK callbacks, but not a formal discussion protocol or document lock protocol.
+- Temporary role decision: until the next progress summary, Codex may act as both decision Agent and execution Agent because the dedicated decision Agent is unavailable.
+#### Open Questions / Pending Confirmation
+- Document editing coordination still needs exact rules for lock scope, timeout, stale-lock recovery, conflict handling, and UI/API visibility.
+- The local `pi` framework needs a quick workstation-level verification before bridge implementation.
+#### Next Plan
+- Write the next-phase local-lab design note covering bridge layout, `pi` integration, Groups, Hall, SSE, instance/scheduler APIs, and document-edit coordination.
+- Define the first moderator-led multi-Agent discussion protocol before implementation.
+- Implement the minimum local-lab path after the protocol and data model changes are stable.
 
 ### 2026-04-24 23:11 (Asia/Shanghai)
 #### Current Progress
