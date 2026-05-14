@@ -126,6 +126,8 @@ const composerStatusClasses = {
 
 const defaultComposerPlaceholder = "输入消息… 开头用 @ 指定接收者，不写则广播";
 const fileComposerPlaceholder = "输入文件附言… 开头用 @ 指定接收者，不写则广播";
+const emptyTimelineText = "这里是消息时间线。暂无消息，发送第一条消息开始对话。";
+const emptySearchText = "没有找到匹配的消息。换个关键词再试试。";
 
 // ── Login ────────────────────────────────────────────────────────────
 loginBtn.addEventListener("click", () => doLoginV2());
@@ -225,8 +227,13 @@ function toggleSetupKeyVisibility() {
 
 async function copyTextToClipboard(text) {
   if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (_err) {
+      // Some embedded browsers expose Clipboard API but deny write permission.
+      // Fall through to the legacy selection-based copy path below.
+    }
   }
 
   const temp = document.createElement("textarea");
@@ -258,7 +265,9 @@ async function copySetupKeyToClipboard() {
       setupKeyCopyBtn.textContent = "复制";
     }, 1600);
   } catch (err) {
-    showSetupError(err.message);
+    setupKey.focus();
+    setupKey.select();
+    showSetupError("浏览器拒绝了自动复制。登录密钥已帮你选中，请按 Ctrl+C 手动复制。");
   }
 }
 
@@ -302,7 +311,7 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
     if (!meRes.ok) {
       apiKey = "";
       clearStoredApiKeys();
-      showLoginError("Invalid API key or authentication failed.");
+      showLoginError("登录密钥无效或认证失败。");
       return false;
     }
     const me = await meRes.json();
@@ -311,7 +320,7 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
     const membersRes = await apiFetch("/api/members");
     if (!membersRes.ok) {
       apiKey = "";
-      showLoginError("Failed to load member list.");
+      showLoginError("成员列表加载失败。");
       return false;
     }
     members = await membersRes.json();
@@ -327,7 +336,7 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
     return true;
   } catch (err) {
     apiKey = "";
-    showLoginError("Connection failed: " + err.message);
+    showLoginError("连接失败：" + err.message);
     return false;
   }
 }
@@ -340,7 +349,11 @@ async function createInitialAdmin() {
     api_key: setupKey.value.trim(),
   };
   if (!payload.id || !payload.display_name || !payload.api_key) {
-    showSetupError("All fields are required.");
+    showSetupError("请填写管理员 ID、昵称和登录密钥。");
+    return;
+  }
+  if (!payload.id.startsWith("human:")) {
+    showSetupError("管理员 ID 必须以 human: 开头，例如 human:home。");
     return;
   }
 
@@ -352,13 +365,13 @@ async function createInitialAdmin() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      throw new Error(await readErrorDetail(res, `Failed to create administrator: ${res.status}`));
+      throw new Error(await readErrorDetail(res, `创建管理员失败：${res.status}`));
     }
 
     loginKey.value = payload.api_key;
     const loggedIn = await doLoginV2(payload.api_key, { persistent: false });
     if (!loggedIn) {
-      showSetupError("Administrator created, but automatic sign-in failed.");
+      showSetupError("管理员已创建，但自动登录失败。");
     }
   } catch (err) {
     showSetupError(err.message);
@@ -392,7 +405,7 @@ async function bootstrapAuthFlow() {
     });
   } catch (err) {
     setAuthMode("login");
-    showLoginError("Failed to load setup status: " + err.message);
+    showLoginError("初始化状态加载失败：" + err.message);
   }
 }
 
@@ -486,6 +499,7 @@ function startChat() {
   clearAllRevokeButtonTimers();
   clearReplyTarget();
   messagesEl.innerHTML = "";
+  updateMessagesEmptyState();
   historySearchInput.value = "";
   renderHistoryToolbar();
   if (pollTimer) clearInterval(pollTimer);
@@ -519,6 +533,7 @@ async function loadHistory() {
     } else {
       oldestLoadedId = null;
       hasMoreHistory = false;
+      updateMessagesEmptyState();
       renderHistoryToolbar();
     }
   } catch (err) {
@@ -877,6 +892,7 @@ function upsertMessages(messages, position = "append") {
     }
   }
 
+  updateMessagesEmptyState();
   return insertedCount;
 }
 
@@ -976,8 +992,15 @@ async function reloadHistoryView() {
   messageRecords = new Map();
   clearAllRevokeButtonTimers();
   messagesEl.innerHTML = "";
+  updateMessagesEmptyState();
   renderHistoryToolbar();
   await loadHistory();
+}
+
+function updateMessagesEmptyState() {
+  const hasMessages = renderedMessageIds.size > 0;
+  messagesEl.classList.toggle("is-empty", !hasMessages);
+  messagesEl.dataset.emptyText = appliedHistoryQuery ? emptySearchText : emptyTimelineText;
 }
 
 function renderFileCard(message) {

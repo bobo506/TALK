@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-13 16:07 (Asia/Shanghai)
+Updated: 2026-05-14 10:55 (Asia/Shanghai)
 
 ### 1) Current Progress
 - `INSTANCE-1` completed: added the `agent_instances` table, `/api/instances` status APIs, SDK helpers, and `docs/MODULE_instances.md`.
@@ -13,6 +13,9 @@ Updated: 2026-05-13 16:07 (Asia/Shanghai)
 - Task lifecycle first version supports `queued -> running -> succeeded / failed / canceled`; task claim and completion update linked instance status and `current_task_id`.
 - Project rules updated: development execution Agents may directly update `docs/PROGRESS.md` after real code, test, or documentation work.
 - Documentation synced: `docs/MODULE_tasks.md` added; `docs/PROJECT_BRIEF.md`, `docs/MODULE_instances.md`, `docs/LOCAL_LAB_DESIGN.md`, and `docs/SDK.md` updated for task APIs.
+- `SETUP-UX-2` completed: first-admin setup page now shows the `管理员 ID` format hint, renames `显示名称` to `昵称`, validates `human:*` before submit, and changes the create-admin button to a compact bordered primary button with stronger contrast.
+- `SETUP-UX-2` follow-up: setup page now cache-busts `style.css` / `app.js`, puts primary button contrast classes directly on the button, and localizes clipboard failure into a Chinese fallback that selects the login key for manual `Ctrl+C` copy.
+- `CHAT-UI-1` completed: chat page residual English copy was localized, search toolbar and composer controls were visually separated, and the empty message timeline now explains its purpose.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
@@ -36,6 +39,11 @@ Updated: 2026-05-13 16:07 (Asia/Shanghai)
 - `.venv\Scripts\python.exe -m unittest tests.test_tasks` passed with `7` tests.
 - `.venv\Scripts\python.exe -m unittest tests.test_talk_client.TalkClientTests.test_task_helpers` passed.
 - `.venv\Scripts\python.exe -m unittest` passed with `74` tests.
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed with `3` tests.
+- After the Web UI polish changes, `.venv\Scripts\python.exe -m unittest` was rerun and passed with `74` tests.
+- `GET http://127.0.0.1:8000/` returned `200`; in-app browser automation connection still timed out before refresh, so visual recheck is pending manual refresh.
+- A follow-up in-app browser automation attempt against `http://127.0.0.1:8000/` timed out again during browser connection; `/healthz` remained healthy.
 
 ### 5) Changed Files
 - `AGENTS.md`
@@ -52,9 +60,86 @@ Updated: 2026-05-13 16:07 (Asia/Shanghai)
 - `docs/MODULE_tasks.md`
 - `docs/LOCAL_LAB_DESIGN.md`
 - `docs/SDK.md`
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `docs/MODULE_webui.md`
 - `docs/PROGRESS.md`
 
 ## History
+
+### 2026-05-14 10:55 (Asia/Shanghai)
+#### Current Progress
+- Re-ran full backend regression after the Web UI polish changes; all `74` unit tests passed.
+- Confirmed the local TALK service health endpoint still returns `status=ok`.
+#### Open Questions / Pending Confirmation
+- Visual acceptance still depends on browser/manual review; automated in-app browser control was previously timing out in this environment.
+#### Next Plan
+- Commit and push the Web UI polish changes if the current UI review scope is accepted.
+#### Verification
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest` passed with `74` tests.
+- `git diff --check` passed with line-ending warnings only.
+- `GET http://127.0.0.1:8000/healthz` returned `status=ok`.
+- In-app browser automation retry against `http://127.0.0.1:8000/` timed out while connecting.
+#### Changed Files
+- `docs/PROGRESS.md`
+
+### 2026-05-14 10:49 (Asia/Shanghai)
+#### Current Progress
+- `CHAT-UI-1` completed from browser review comments: search toolbar, composer controls, drag/drop hint, logout, remove-file, cancel-reply, and send/file labels are now Chinese.
+- Search toolbar now separates primary search from secondary clear/load-more actions; composer now has a defined container and distinct file/input/send controls.
+- Empty message timeline now shows a Chinese empty-state explanation instead of a visually unexplained blank area.
+#### Open Questions / Pending Confirmation
+- Visual acceptance still depends on manual refresh because Codex in-app browser automation is still timing out when connecting to the browser runtime.
+#### Next Plan
+- If the chat UI review is accepted, commit and push the Web UI polish changes.
+#### Verification
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed with `3` tests.
+- `git diff --check` passed with line-ending warnings only.
+#### Changed Files
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `docs/MODULE_webui.md`
+- `docs/PROGRESS.md`
+
+### 2026-05-14 10:15 (Asia/Shanghai)
+#### Current Progress
+- `SETUP-UX-2` follow-up completed: added cache-busting query strings for `/style.css` and `/app.js`, placed the create-admin button contrast styles directly in HTML classes, and replaced raw Clipboard API permission errors with Chinese copy-fallback guidance.
+- If browser copy permission is denied, the setup key field is focused and selected so the user can press `Ctrl+C` manually.
+#### Open Questions / Pending Confirmation
+- Whether to replace the current API-key-first login model with a human password flow is a product/auth decision. Recommended direction is dual-mode auth: human password login with hashed password plus generated API keys for Agent/SDK use.
+#### Next Plan
+- If approved, design `AUTH-2`: password-based human login without breaking existing `X-API-Key` Agent authentication.
+#### Verification
+- `node --check web\app.js` passed.
+- `git diff --check` passed with line-ending warnings only.
+#### Changed Files
+- `web/index.html`
+- `web/app.js`
+- `docs/MODULE_webui.md`
+- `docs/PROGRESS.md`
+
+### 2026-05-14 10:01 (Asia/Shanghai)
+#### Current Progress
+- `SETUP-UX-2` completed from browser diff comments: added a visible `管理员 ID` format hint, changed `显示名称` to `昵称`, added client-side `human:*` validation, and restyled `创建管理员` as a compact bordered primary button.
+- Synced `docs/MODULE_webui.md` to reflect the updated first-admin setup labels and ID-format hint.
+#### Open Questions / Pending Confirmation
+- In-app browser automation currently times out while connecting to the browser runtime, so the page needs a manual refresh or later browser recheck for visual confirmation.
+#### Next Plan
+- Continue with the next local-lab slice after UI review is accepted: schedule API, Group/Hall room model, SSE stream contract, document-edit lock API, or Codex bridge task-queue integration.
+#### Verification
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed with `3` tests.
+- `GET http://127.0.0.1:8000/` returned `200`.
+#### Changed Files
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `docs/MODULE_webui.md`
+- `docs/PROGRESS.md`
 
 ### 2026-05-13 16:07 (Asia/Shanghai)
 #### Current Progress
