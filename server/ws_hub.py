@@ -62,13 +62,13 @@ class Hub:
         if status_changed:
             await self.broadcast_presence()
 
-    async def broadcast(self, msg_out: MessageOut) -> None:
+    async def broadcast(self, msg_out: MessageOut, *, targets: list[str] | None = None) -> None:
         payload = json.dumps(
             {"type": "message", "payload": msg_out.model_dump(by_alias=True)},
             ensure_ascii=False,
             default=str,
         )
-        targets = self._targets_for_message_out(msg_out)
+        target_members = targets if targets is not None else self._targets_for_message_out(msg_out)
 
         logger.info(
             "ws broadcast",
@@ -77,12 +77,12 @@ class Hub:
                 "message_id": msg_out.id,
                 "message_type": msg_out.type,
                 "broadcast_all": msg_out.to is None,
-                "target_members": len(targets),
+                "target_members": len(target_members),
             },
         )
 
         dead: list[tuple[str, WebSocket]] = []
-        for mid in targets:
+        for mid in target_members:
             for ws in self._connections.get(mid, []):
                 try:
                     await ws.send_text(payload)
@@ -96,7 +96,7 @@ class Hub:
         if status_changed:
             await self.broadcast_presence()
 
-    async def broadcast_revoke(self, message: Message) -> None:
+    async def broadcast_revoke(self, message: Message, *, targets: list[str] | None = None) -> None:
         if message.id is None or message.revoked_by is None:
             return
 
@@ -111,7 +111,7 @@ class Hub:
             ensure_ascii=False,
             default=str,
         )
-        targets = self._targets_for_message(message)
+        target_members = targets if targets is not None else self._targets_for_message(message)
 
         logger.info(
             "ws revoke broadcast",
@@ -119,12 +119,12 @@ class Hub:
                 "event": "revoke",
                 "message_id": message.id,
                 "broadcast_all": message.to_ids is None,
-                "target_members": len(targets),
+                "target_members": len(target_members),
             },
         )
 
         dead: list[tuple[str, WebSocket]] = []
-        for member_id in targets:
+        for member_id in target_members:
             for ws in self._connections.get(member_id, []):
                 try:
                     await ws.send_text(payload)

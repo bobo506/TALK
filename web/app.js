@@ -440,7 +440,7 @@ async function doLogin() {
     renderPresenceStrip();
     startChat();
   } catch (err) {
-    showLoginError("连接失败: " + err.message);
+    showLoginError("连接失败：" + err.message);
   }
 }
 
@@ -1209,7 +1209,7 @@ function renderHistoryToolbar() {
   loadOlderBtn.disabled = historyLoading || !hasMoreHistory || oldestLoadedId === null;
 
   if (historyLoading) {
-    loadOlderBtn.textContent = "加载中...";
+    loadOlderBtn.textContent = "加载中…";
     historyStatus.textContent = appliedHistoryQuery ? `正在搜索“${appliedHistoryQuery}”` : "正在拉取更早消息";
     return;
   }

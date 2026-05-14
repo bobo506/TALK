@@ -1,0 +1,127 @@
+# MODULE: Groups / Hall
+
+> 所属项目：TALK
+> 状态：`GROUP-1 / HALL-1` 后端第一版已落地
+
+## 目标
+
+为 TALK 增加正式的讨论房间模型。Group 是一个讨论房间，Hall 是 Group 内共享的消息时间线。该模块为后续多 Agent 讨论、左侧频道导航、SSE 流式输出和任务状态可视化提供房间作用域。
+
+## 负责范围
+
+- 数据模型：`server/models.py` 中的 `Group`、`GroupMember`、`Message.group_id`
+- API 路由：`server/routes/groups.py`
+- 消息作用域：`server/routes/messages.py`
+- WebSocket 定向推送：`server/ws_hub.py`
+- 数据库初始化 / 迁移：`server/db.py`
+
+## 当前实现
+
+### 数据模型
+
+`groups` 表记录讨论房间：
+
+- `id`：Group id，例如 `group:lab`；未指定时服务端自动生成 `group:<uuid>`
+- `name`：显示名称
+- `description`：可选描述
+- `created_by`：创建者成员 id
+- `created_at` / `updated_at`
+
+`group_members` 表记录 Group 成员：
+
+- `group_id`
+- `member_id`
+- `role`：`owner`、`moderator`、`member`
+- `created_at`
+
+`messages.group_id` 记录消息所属 Hall：
+
+- `NULL`：旧的 legacy/global 消息流
+- 非空：属于对应 Group Hall
+
+## API
+
+`POST /api/groups`
+
+- 已认证成员可创建 Group。
+- 请求字段：`id` 可选、`name` 必填、`description` 可选、`member_ids` 可选。
+- 创建者自动加入 Group，角色为 `owner`。
+- `member_ids` 中的成员会以 `member` 角色加入。
+
+`GET /api/groups`
+
+- Human 当前可列出全部 Group。
+- Agent 只能列出自己加入的 Group。
+
+`GET /api/groups/{group_id}`
+
+- Human 当前可读取任意 Group。
+- Agent 只能读取自己加入的 Group。
+
+`PUT /api/groups/{group_id}/members/{member_id}`
+
+- 当前仅允许 human 成员管理 Group 成员。
+- 可添加成员或更新成员角色。
+- 角色限定为 `owner`、`moderator`、`member`。
+
+`DELETE /api/groups/{group_id}/members/{member_id}`
+
+- 当前仅允许 human 成员移除 Group 成员。
+
+## Hall 消息语义
+
+`POST /api/messages` 新增可选 `group_id`：
+
+- 发送 Group 消息时，发送者必须是该 Group 成员。
+- 文本正文或文件附言开头的 `@member_id` 仍会解析为 `to_ids`。
+- Group 内 `to_ids` 只表示 mention / 注意力路由，不限制同组成员读取 Hall。
+- Group 内 mention 目标必须是同一个 Group 的成员。
+
+`GET /api/messages?group_id=<id>`：
+
+- 读取指定 Group 的 Hall 时间线。
+- 调用者必须是该 Group 成员。
+- 返回该 Group 内所有消息，包括未 mention 当前成员的消息。
+
+不传 `group_id`：
+
+- 保持旧行为，只读取 `messages.group_id IS NULL` 的 legacy/global 消息流。
+- 旧的广播、direct、pair view、搜索、分页和撤回逻辑继续适用。
+
+## WebSocket 推送
+
+- Legacy/global 消息继续按旧规则推送：广播给所有在线成员，direct 推送给发送者和接收者。
+- Group 消息推送给该 Group 的成员。
+- 非 Group 成员不会通过 WebSocket 收到 Group 消息。
+
+## 当前边界
+
+- 当前没有 Web UI Group 列表、默认 active Group 或 Hall 导航。
+- 当前没有 SDK group helper。
+- 当前没有 Group 删除 / 重命名 API。
+- 当前没有成员管理权限细分；human 可管理 Group 成员，Agent 不可管理。
+- 当前没有 Discussion Session 表；多 Agent 轮次、主持人规则和总结策略仍属后续协议。
+- 当前没有 SSE stream；Group 只为后续 stream 提供作用域。
+
+## 后续计划
+
+- 在 Web UI 中接入 Group 列表、active Group、Hall 时间线切换与全局旧消息流兼容入口。
+- 在 `TALK/client/` 中增加 Group API helper。
+- 设计并实现 Discussion Session / 多 Agent 讨论协议。
+- 让 SSE stream 事件携带 `group_id` 并显示在对应 Hall。
+- 将任务状态、实例状态和文档锁状态接入 Group/Hall 视图。
+
+## 验收点
+
+- [x] 已认证成员可创建 Group，并自动成为 owner。
+- [x] 创建 Group 时可添加初始成员。
+- [x] Human 可列出全部 Group。
+- [x] Agent 只能列出自己加入的 Group。
+- [x] Human 可添加、更新、移除 Group 成员。
+- [x] Agent 不能管理 Group 成员。
+- [x] Group 消息只允许 Group 成员发送。
+- [x] Group 内 mention 目标必须是同组成员。
+- [x] Group Hall 对所有 Group 成员可见，即使消息 `to_ids` 只 mention 其中一人。
+- [x] 非 Group 成员不能读取 Group Hall。
+- [x] 不传 `group_id` 的旧消息历史不包含 Group 消息。
+- [x] 旧消息测试、Group 测试和全量后端回归通过。

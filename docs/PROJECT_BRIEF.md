@@ -65,8 +65,9 @@ CREATE TABLE members (
 
 CREATE TABLE messages (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id     TEXT REFERENCES groups(id), -- NULL = legacy/global timeline；非空 = Group Hall 时间线
   from_id      TEXT NOT NULL REFERENCES members(id),
-  to_ids       TEXT,                   -- JSON 数组；NULL = 广播
+  to_ids       TEXT,                   -- JSON 数组；NULL = 广播；Group 内表示 mention/注意力路由
   type         TEXT NOT NULL,          -- 'text' | 'file'
   content      TEXT,                   -- type=text: 消息正文；type=file: 兼容字段（通常与 filename 相同）
   file_id      TEXT REFERENCES files(id), -- type=file 时必填
@@ -77,6 +78,23 @@ CREATE TABLE messages (
   revoked_at   DATETIME,               -- 撤回时间；NULL = 未撤回
   revoked_by   TEXT REFERENCES members(id), -- 撤回者；当前仅允许发送者本人
   created_at   DATETIME NOT NULL
+);
+
+CREATE TABLE groups (
+  id           TEXT PRIMARY KEY,       -- 'group:lab' 或自动生成 group:<uuid>
+  name         TEXT NOT NULL,
+  description  TEXT,
+  created_by   TEXT NOT NULL REFERENCES members(id),
+  created_at   DATETIME NOT NULL,
+  updated_at   DATETIME NOT NULL
+);
+
+CREATE TABLE group_members (
+  group_id     TEXT NOT NULL REFERENCES groups(id),
+  member_id    TEXT NOT NULL REFERENCES members(id),
+  role         TEXT NOT NULL,          -- owner | moderator | member
+  created_at   DATETIME NOT NULL,
+  PRIMARY KEY (group_id, member_id)
 );
 
 CREATE TABLE files (
@@ -157,6 +175,7 @@ TALK/
 │   ├── ws_hub.py          # WebSocket 连接管理
 │   └── routes/
 │       ├── members.py     # 成员注册/列表
+│       ├── groups.py      # Group / Hall 房间与成员关系
 │       ├── instances.py   # Agent 运行实例状态
 │       ├── tasks.py       # Agent 任务队列与调度基础
 │       ├── messages.py    # 消息收发
@@ -191,6 +210,7 @@ TALK/
 |----------|----------|----------|------|
 | [MODULE_members_auth.md](MODULE_members_auth.md) | 成员注册 + API Key 鉴权 | `server/auth.py`, `server/routes/members.py` | M1 已实现，已补 `GET /api/members/me`、Agent 自注册与首轮自动化测试 |
 | [MODULE_messages.md](MODULE_messages.md) | 消息发送与拉取 | `server/routes/messages.py` | M2 已支持服务端 mention 路由解析、文件附言、历史分页、搜索、消息撤回与自动化测试 |
+| [MODULE_groups.md](MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py` | `GROUP-1 / HALL-1` 后端第一版已落地，Web UI 与 SDK 待接入 |
 | [MODULE_websocket.md](MODULE_websocket.md) | WebSocket 连接管理与推送 | `server/ws_hub.py`, `server/main.py`(ws端点) | M1 已实现，有改进点 |
 | [MODULE_files.md](MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
 | [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | M2 已实现，已补渲染优化、过期文件反馈、历史翻页、搜索与撤回态渲染 |
@@ -219,6 +239,16 @@ TALK/
 - `bridges/codex_bridge.py` 是第一版 Codex 接入 MVP：通过 TALK SDK 自注册、监听发给 `agent:codex` 的文本任务、调用 `codex exec`，再用 `reply_to` 回复原发送者。
 - `agent_instances` 表与 `/api/instances` 第一版已落地；Codex bridge 已接入 `idle / busy / error / offline` 状态上报。
 - `agent_tasks` 表与 `/api/tasks` 第一版已落地：支持创建任务、按可见性列出任务、Agent 领取任务、完成/失败/取消任务，并联动 `agent_instances.current_task_id` 与实例状态；当前不由 TALK 自动启动 bridge 进程。
+
+## 2026-05-14 Group / Hall Addendum
+
+- `groups` 与 `group_members` 表已落地，用于表达讨论房间与成员关系。
+- `messages.group_id` 已落地：`NULL` 表示 legacy/global 消息流；非空表示消息属于某个 Group 的 Hall 时间线。
+- `/api/groups` 第一版支持创建 Group、列出可见 Group、读取单个 Group、添加/更新成员角色、移除成员。
+- Group Hall 语义：Group 内消息对所有 Group 成员可见；`to_ids` 在 Group 内只表示 mention/注意力路由，不限制同组成员读取 Hall。
+- `GET /api/messages?group_id=<id>` 读取 Group Hall；不传 `group_id` 时继续读取旧全局消息流，避免旧 Web UI 被新房间消息污染。
+- WebSocket 推送已支持显式目标成员列表；Group 消息实时推送给 Group 成员，非成员不会收到。
+- 当前尚未接入 Web UI Group 导航、SDK group helper、SSE stream 与多 Agent 讨论协议。
 ## 2026-04-23 Data Model Addendum
 
 - `messages.reply_to INTEGER NULL REFERENCES messages(id)` was added for first-level reply/reference support.

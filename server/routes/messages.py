@@ -13,7 +13,7 @@ from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import REVOKE_WINDOW_SEC, get_session
-from server.models import File, Member, Message, MessageCreate, MessageOut, MessageReplyOut, MessageRevokeOut
+from server.models import File, Group, GroupMember, Member, Message, MessageCreate, MessageOut, MessageReplyOut, MessageRevokeOut
 from server.ws_hub import hub
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
@@ -77,9 +77,9 @@ def _validate_recipient_ids(recipient_ids: Iterable[str] | None, member_ids: set
     return normalized or None
 
 
-def _resolve_recipients(body: MessageCreate, session: Session) -> list[str] | None:
+def _resolve_recipients(body: MessageCreate, session: Session, *, allowed_member_ids: set[str] | None = None) -> list[str] | None:
     """Resolve recipients from leading mentions first, then fall back to explicit ids."""
-    member_ids = set(session.exec(select(Member.id)).all())
+    member_ids = allowed_member_ids if allowed_member_ids is not None else set(session.exec(select(Member.id)).all())
     routing_text = body.content if body.type == "text" else body.caption
     mentioned_ids, invalid_mention = _extract_leading_mentions(routing_text, member_ids)
 
@@ -96,9 +96,36 @@ def _resolve_recipients(body: MessageCreate, session: Session) -> list[str] | No
 
 
 def _is_message_visible_to_member(message: Message, member_id: str) -> bool:
+    if message.group_id is not None:
+        return message.from_id == member_id
     if message.from_id == member_id or message.to_ids is None:
         return True
     return member_id in message.to_list
+
+
+def _is_group_member(group_id: str, member_id: str, session: Session) -> bool:
+    return session.get(GroupMember, (group_id, member_id)) is not None
+
+
+def _group_member_ids(group_id: str, session: Session) -> list[str]:
+    return list(
+        session.exec(
+            select(GroupMember.member_id)
+            .where(GroupMember.group_id == group_id)
+            .order_by(GroupMember.member_id)
+        ).all()
+    )
+
+
+def _resolve_group_scope(group_id: str | None, current: Member, session: Session) -> list[str] | None:
+    if group_id is None:
+        return None
+
+    if session.get(Group, group_id) is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="group_id not found")
+    if not _is_group_member(group_id, current.id, session):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="current member is not in group")
+    return _group_member_ids(group_id, session)
 
 
 def _json_array_contains(column, member_id: str):
@@ -156,6 +183,7 @@ def _resolve_reply_target(
     reply_to_id: int | None,
     current: Member,
     session: Session,
+    group_id: str | None,
 ) -> Message | None:
     if reply_to_id is None:
         return None
@@ -163,7 +191,12 @@ def _resolve_reply_target(
     target = session.get(Message, reply_to_id)
     if target is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="reply_to_not_found")
-    if not _is_message_visible_to_member(target, current.id):
+    if target.group_id != group_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot_reply_to_different_group")
+    if target.group_id is not None:
+        if not _is_group_member(target.group_id, current.id, session):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot_reply_to_invisible")
+    elif not _is_message_visible_to_member(target, current.id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot_reply_to_invisible")
     if target.revoked_at is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot_reply_to_revoked")
@@ -185,8 +218,13 @@ async def create_message(
     session: Session,
 ) -> MessageOut:
     """Create, persist, and broadcast a message."""
-    resolved_to = _resolve_recipients(body, session)
-    reply_target = _resolve_reply_target(body.reply_to, current, session)
+    group_member_ids = _resolve_group_scope(body.group_id, current, session)
+    resolved_to = _resolve_recipients(
+        body,
+        session,
+        allowed_member_ids=set(group_member_ids) if group_member_ids is not None else None,
+    )
+    reply_target = _resolve_reply_target(body.reply_to, current, session, body.group_id)
     file_record = None
     if body.type == "file":
         file_record = session.get(File, body.file_id)
@@ -197,6 +235,7 @@ async def create_message(
             )
 
     msg = Message(
+        group_id=body.group_id,
         from_id=current.id,
         to_ids=json.dumps(resolved_to) if resolved_to else None,
         type=body.type,
@@ -217,7 +256,7 @@ async def create_message(
         reply_to=_build_reply_summary(reply_target) if reply_target is not None else None,
     )
 
-    await hub.broadcast(out)
+    await hub.broadcast(out, targets=group_member_ids)
     return out
 
 
@@ -255,7 +294,8 @@ async def revoke_message(
     session.commit()
     session.refresh(msg)
 
-    await hub.broadcast_revoke(msg)
+    targets = _group_member_ids(msg.group_id, session) if msg.group_id is not None else None
+    await hub.broadcast_revoke(msg, targets=targets)
     return MessageRevokeOut(
         id=msg.id,
         revoked_at=msg.revoked_at,
@@ -289,6 +329,7 @@ def get_messages(
     before: Optional[int] = Query(None, ge=1),
     to: Optional[str] = Query(None),
     q: Optional[str] = Query(None, min_length=1),
+    group_id: Optional[str] = None,
     limit: int = Query(100, ge=1, le=500),
     _current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
@@ -308,8 +349,16 @@ def get_messages(
             detail="since and before cannot be used together",
         )
 
-    stmt = select(Message).where(_visible_to_member_expr(_current.id))
-    if to and to != _current.id:
+    if group_id is not None:
+        if session.get(Group, group_id) is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="group_id not found")
+        if not _is_group_member(group_id, _current.id, session):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="current member is not in group")
+        stmt = select(Message).where(Message.group_id == group_id)
+    else:
+        stmt = select(Message).where(Message.group_id.is_(None)).where(_visible_to_member_expr(_current.id))
+
+    if group_id is None and to and to != _current.id:
         stmt = stmt.where(_pair_view_expr(_current.id, to))
 
     if before is not None:

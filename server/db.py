@@ -55,6 +55,8 @@ def init_db() -> None:
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(messages)").fetchall()
         }
+        if "group_id" not in columns:
+            conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN group_id TEXT REFERENCES groups(id)")
         if "caption" not in columns:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN caption TEXT")
         if "filename" not in columns:
@@ -71,7 +73,11 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN revoked_by TEXT")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_files_sha256 ON files (sha256)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_from_id ON messages (from_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_group_id ON messages (group_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_to_ids ON messages (to_ids)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_created_by ON groups (created_by)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_member_id ON group_members (member_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_member_id ON agent_instances (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_runtime ON agent_instances (runtime)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_status ON agent_instances (status)")

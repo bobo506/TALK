@@ -84,6 +84,7 @@ class RouteTestCase(unittest.TestCase):
         from_id: str,
         to_ids: str | None,
         message_type: str,
+        group_id: str | None = None,
         reply_to: int | None = None,
         content: str | None = None,
         file_id: str | None = None,
@@ -96,6 +97,7 @@ class RouteTestCase(unittest.TestCase):
         revoked_by: str | None = None,
     ) -> Message:
         message = Message(
+            group_id=group_id,
             from_id=from_id,
             to_ids=to_ids,
             type=message_type,

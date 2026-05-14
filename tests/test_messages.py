@@ -600,3 +600,117 @@ class MessagesRouteTests(RouteTestCase):
         self.assertIn("revoke_window_sec", payload)
         self.assertIn("max_upload_bytes", payload)
         self.assertIn("ws_ping_interval", payload)
+
+    def test_group_hall_messages_are_scoped_to_group_members(self):
+        with self.make_client() as client:
+            created_group = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:AI1"]},
+            )
+            self.assertEqual(created_group.status_code, 201)
+
+            created_message = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "hello hall"},
+            )
+            ai1_group_history = client.get(
+                "/api/messages",
+                headers={"X-API-Key": "ai1-key"},
+                params={"group_id": "group:lab"},
+            )
+            ai1_global_history = client.get(
+                "/api/messages",
+                headers={"X-API-Key": "ai1-key"},
+            )
+            ai2_group_history = client.get(
+                "/api/messages",
+                headers={"X-API-Key": "ai2-key"},
+                params={"group_id": "group:lab"},
+            )
+
+        self.assertEqual(created_message.status_code, 201)
+        self.assertEqual(created_message.json()["group_id"], "group:lab")
+        self.assertEqual([message["id"] for message in ai1_group_history.json()], [created_message.json()["id"]])
+        self.assertEqual(ai1_global_history.json(), [])
+        self.assertEqual(ai2_group_history.status_code, 403)
+
+    def test_group_mentions_route_attention_but_hall_remains_visible_to_group(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "id": "group:lab",
+                    "name": "Local Lab",
+                    "member_ids": ["agent:AI1", "agent:AI2"],
+                },
+            )
+            created_message = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "@agent:AI1 please review"},
+            )
+            ai2_history = client.get(
+                "/api/messages",
+                headers={"X-API-Key": "ai2-key"},
+                params={"group_id": "group:lab"},
+            )
+
+        self.assertEqual(created_message.status_code, 201)
+        self.assertEqual(created_message.json()["to"], ["agent:AI1"])
+        self.assertEqual([message["id"] for message in ai2_history.json()], [created_message.json()["id"]])
+
+    def test_group_message_rejects_non_member_sender_or_recipient(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:AI1"]},
+            )
+            outside_sender = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "ai2-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "hello"},
+            )
+            outside_recipient = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "@agent:AI2 hello"},
+            )
+
+        self.assertEqual(outside_sender.status_code, 403)
+        self.assertEqual(outside_recipient.status_code, 400)
+        self.assertIn("invalid recipient mention", outside_recipient.json()["detail"])
+
+    def test_reply_to_message_in_different_group_returns_400(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:one", "name": "One", "member_ids": ["agent:AI1"]},
+            )
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:two", "name": "Two", "member_ids": ["agent:AI1"]},
+            )
+            original = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:one", "content": "group one"},
+            )
+            reply = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "ai1-key"},
+                json={
+                    "type": "text",
+                    "group_id": "group:two",
+                    "content": "wrong group",
+                    "reply_to": original.json()["id"],
+                },
+            )
+
+        self.assertEqual(reply.status_code, 400)
+        self.assertEqual(reply.json()["detail"], "cannot_reply_to_different_group")

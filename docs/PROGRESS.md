@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-14 10:55 (Asia/Shanghai)
+Updated: 2026-05-14 16:03 (Asia/Shanghai)
 
 ### 1) Current Progress
 - `INSTANCE-1` completed: added the `agent_instances` table, `/api/instances` status APIs, SDK helpers, and `docs/MODULE_instances.md`.
@@ -16,6 +16,13 @@ Updated: 2026-05-14 10:55 (Asia/Shanghai)
 - `SETUP-UX-2` completed: first-admin setup page now shows the `管理员 ID` format hint, renames `显示名称` to `昵称`, validates `human:*` before submit, and changes the create-admin button to a compact bordered primary button with stronger contrast.
 - `SETUP-UX-2` follow-up: setup page now cache-busts `style.css` / `app.js`, puts primary button contrast classes directly on the button, and localizes clipboard failure into a Chinese fallback that selects the login key for manual `Ctrl+C` copy.
 - `CHAT-UI-1` completed: chat page residual English copy was localized, search toolbar and composer controls were visually separated, and the empty message timeline now explains its purpose.
+- `WEB-VISUAL-1` completed: login/setup and the main chat workspace now use a cohesive dark console visual system with stronger panel boundaries, clearer status/search/composer hierarchy, refined message bubbles, responsive overflow safeguards, and updated cache-busting assets.
+- `WEB-VISUAL-2` completed: after reviewing the `image_gen` mockup direction, the real chat page now groups online members and history/search controls into a unified workspace tools panel above the message timeline, while keeping the left channel/sidebar concept deferred until Group/Hall exists.
+- `WEB-VISUAL-2` verification follow-up completed: real authenticated Chrome headless screenshots caught and fixed a CSS cascade bug where the drag/drop hint overlay stayed visible and blocked the composer.
+- `GROUP-1 / HALL-1` backend first slice completed: added Group and GroupMember persistence, `/api/groups` CRUD-style membership APIs, `messages.group_id`, and group-scoped Hall message visibility.
+- Group Hall semantics are intentionally distinct from legacy direct messages: inside a Group, `to_ids` records attention/mentions, while all Group members can read the Hall timeline; unscoped `GET /api/messages` continues to return only legacy/global messages.
+- Project role boundary updated: Codex is now authorized as a decision Agent for this project and may directly maintain relevant project/module/progress/decision documentation.
+- Group/Hall documentation synced: `docs/MODULE_groups.md` added and `docs/PROJECT_BRIEF.md` updated with the new tables, route, module index entry, and 2026-05-14 addendum.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
@@ -28,12 +35,13 @@ Updated: 2026-05-14 10:55 (Asia/Shanghai)
 - The local `pi` framework entrypoint, configuration style, and DeepSeek / Kimi adapter shape still need to be verified on this workstation before bridge implementation.
 - Codex bridge is still MVP-level: it does not yet stream partial output, attach files/materials, or enforce document-edit locks.
 - Scheduler v2 details remain open: delayed / recurring schedule table shape, task retry policy, timeout recovery for stale `running` tasks, and whether Web UI can manually requeue or cancel tasks.
+- Group/Hall front-end navigation, default active Group selection, SDK wrappers, and SSE stream integration are still pending.
 
 ### 3) Next Plan
 - Continue refining the unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, `pi`-based bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
 - Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, controlled material/document passing, and document-edit coordination.
-- Design the required product model changes before implementation: Groups / rooms, Hall shared timeline, SSE stream events, Agent instances, and scheduling APIs.
-- Next implementation candidates: schedule API, Group/Hall data model, SSE stream event contract, document-edit lock API, or Codex bridge task-queue integration.
+- Commit the current Web UI + Group/Hall backend + documentation work when accepted.
+- Next implementation candidates: Web UI Group/Hall navigation, SDK group helpers, SSE stream event contract, document-edit lock API, schedule API, or Codex bridge task-queue integration.
 
 ### 4) Verification
 - `.venv\Scripts\python.exe -m unittest tests.test_tasks` passed with `7` tests.
@@ -44,6 +52,11 @@ Updated: 2026-05-14 10:55 (Asia/Shanghai)
 - After the Web UI polish changes, `.venv\Scripts\python.exe -m unittest` was rerun and passed with `74` tests.
 - `GET http://127.0.0.1:8000/` returned `200`; in-app browser automation connection still timed out before refresh, so visual recheck is pending manual refresh.
 - A follow-up in-app browser automation attempt against `http://127.0.0.1:8000/` timed out again during browser connection; `/healthz` remained healthy.
+- After `WEB-VISUAL-1`, `node --check web\app.js`, `tests.test_encoding`, full `.venv\Scripts\python.exe -m unittest`, and `git diff --check` all passed; Chrome headless screenshots were used for visual checks because the Codex in-app browser connection still timed out.
+- After `WEB-VISUAL-2`, `node --check web\app.js`, `tests.test_encoding`, full `.venv\Scripts\python.exe -m unittest`, and `git diff --check` all passed; Chrome headless screenshots were regenerated for the real login page and a temporary chat-shell preview at desktop and 500px widths.
+- After the `WEB-VISUAL-2` follow-up fix, `node --check web\app.js`, `.venv\Scripts\python.exe -m unittest tests.test_encoding`, `git diff --check`, and full `.venv\Scripts\python.exe -m unittest` all passed; Chrome headless verified authenticated chat at 1440px and 500px with `#drop-hint` computed as `display: none`.
+- After `GROUP-1 / HALL-1`, `.venv\Scripts\python.exe -m unittest tests.test_groups`, `.venv\Scripts\python.exe -m unittest tests.test_messages`, `node --check web\app.js`, `git diff --check`, and full `.venv\Scripts\python.exe -m unittest` all passed; full suite is now `81` tests.
+- After documentation sync, `git diff --check` passed with line-ending warnings only.
 
 ### 5) Changed Files
 - `AGENTS.md`
@@ -56,6 +69,7 @@ Updated: 2026-05-14 10:55 (Asia/Shanghai)
 - `tests/test_tasks.py`
 - `tests/test_talk_client.py`
 - `docs/PROJECT_BRIEF.md`
+- `docs/MODULE_groups.md`
 - `docs/MODULE_instances.md`
 - `docs/MODULE_tasks.md`
 - `docs/LOCAL_LAB_DESIGN.md`
@@ -65,8 +79,129 @@ Updated: 2026-05-14 10:55 (Asia/Shanghai)
 - `web/style.css`
 - `docs/MODULE_webui.md`
 - `docs/PROGRESS.md`
+- `server/models.py`
+- `server/db.py`
+- `server/main.py`
+- `server/routes/groups.py`
+- `server/routes/messages.py`
+- `server/ws_hub.py`
+- `tests/test_groups.py`
+- `tests/test_messages.py`
+- `tests/test_support.py`
 
 ## History
+
+### 2026-05-14 16:03 (Asia/Shanghai)
+#### Current Progress
+- Project role boundary updated: Codex is now authorized as a decision Agent and can maintain relevant project/module/progress/decision docs directly.
+- Group/Hall docs synced after `GROUP-1 / HALL-1`: added `docs/MODULE_groups.md`.
+- Updated `docs/PROJECT_BRIEF.md` with `groups`, `group_members`, `messages.group_id`, `server/routes/groups.py`, the module index entry, and the 2026-05-14 Group/Hall addendum.
+#### Open Questions / Pending Confirmation
+- None for documentation sync.
+#### Next Plan
+- Commit the current Web UI + Group/Hall backend + documentation set when accepted.
+- Then choose the next slice: Web UI Group/Hall navigation, SDK group helpers, SSE stream events, document-edit locks, schedule API, or Codex bridge task-queue integration.
+#### Verification
+- `git diff --check` passed with line-ending warnings only.
+#### Changed Files
+- `AGENTS.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/MODULE_groups.md`
+- `docs/PROGRESS.md`
+
+### 2026-05-14 15:54 (Asia/Shanghai)
+#### Current Progress
+- `GROUP-1 / HALL-1` backend first slice completed from the confirmed contract.
+- Added `groups` and `group_members` tables, `messages.group_id`, startup migration/index creation, `/api/groups` creation/list/detail/member add/update/remove APIs, and group-scoped message send/history behavior.
+- Group Hall visibility now treats `to_ids` as mention/attention inside a Group: all Group members can read the Hall timeline, while non-members are rejected and old unscoped message history remains legacy/global only.
+#### Open Questions / Pending Confirmation
+- Documentation sync for `docs/PROJECT_BRIEF.md` and a new/updated Group/Hall module doc still needs explicit approval.
+- Web UI Group/Hall navigation and SDK helpers are not implemented yet.
+#### Next Plan
+- If approved, sync Group/Hall docs and commit the current work.
+- Otherwise continue with one follow-up slice: Web UI Group/Hall navigation, SDK group helpers, SSE stream events, document-edit locks, schedule API, or Codex bridge task-queue integration.
+#### Verification
+- `.venv\Scripts\python.exe -m unittest tests.test_groups` passed with `3` tests.
+- `.venv\Scripts\python.exe -m unittest tests.test_messages` passed with `23` tests.
+- `node --check web\app.js` passed.
+- `git diff --check` passed with line-ending warnings only.
+- `.venv\Scripts\python.exe -m unittest` passed with `81` tests.
+#### Changed Files
+- `server/models.py`
+- `server/db.py`
+- `server/main.py`
+- `server/routes/groups.py`
+- `server/routes/messages.py`
+- `server/ws_hub.py`
+- `tests/test_groups.py`
+- `tests/test_messages.py`
+- `tests/test_support.py`
+- `docs/PROGRESS.md`
+
+### 2026-05-14 15:15 (Asia/Shanghai)
+#### Current Progress
+- Resumed from `WEB-VISUAL-2` and reviewed the current Web UI diff instead of starting a new backend slice.
+- Verified the real login page and authenticated chat page with Chrome headless at desktop and 500px widths.
+- Fixed a CSS cascade bug where `.drop-hint` overrode Tailwind `.hidden`, causing the drag/drop overlay to stay visible over the composer when no file was being dragged.
+#### Open Questions / Pending Confirmation
+- `docs/USER.md` remains an untracked local credential note; it should not be committed as-is.
+#### Next Plan
+- Decide how to handle `docs/USER.md`, then commit the accepted Web UI visual changes.
+- After Web UI is committed, choose the next backend/product slice: schedule API, Group/Hall, SSE, document-edit lock API, or Codex bridge task-queue integration.
+#### Verification
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed with `3` tests.
+- `git diff --check` passed with line-ending warnings only.
+- `.venv\Scripts\python.exe -m unittest` passed with `74` tests.
+- Chrome headless screenshots verified real login and authenticated chat pages; `#drop-hint` computed as `display: none` at 1440px and 500px.
+#### Changed Files
+- `web/style.css`
+- `docs/PROGRESS.md`
+
+### 2026-05-14 11:35 (Asia/Shanghai)
+#### Current Progress
+- `WEB-VISUAL-2` completed from the approved `image_gen` visual direction: the chat page now uses a `header + workspace-tools + messages + composer` structure.
+- Online members and history/search controls are grouped into one workspace tools panel; the message timeline and composer now read as a single chat work area.
+- The left channel/conversation area shown in the visual mockup remains deferred until the Group/Hall model exists, so the current page does not expose fake navigation.
+#### Open Questions / Pending Confirmation
+- Real authenticated chat-page acceptance still depends on manual review in the user's browser session or a dedicated non-private test account.
+#### Next Plan
+- If the layout is accepted, commit the Web UI visual changes; then return to backend model work, likely Group/Hall or SSE, so future navigation/sidebar UI has real data behind it.
+#### Verification
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed with `3` tests.
+- `.venv\Scripts\python.exe -m unittest` passed with `74` tests.
+- `git diff --check` passed with line-ending warnings only.
+- `GET http://127.0.0.1:8000/` returned `200`.
+- Chrome headless screenshot checks completed for the real login page and a temporary chat-shell preview at desktop and 500px widths.
+#### Changed Files
+- `web/index.html`
+- `web/style.css`
+- `docs/MODULE_webui.md`
+- `docs/PROGRESS.md`
+
+### 2026-05-14 11:10 (Asia/Shanghai)
+#### Current Progress
+- `WEB-VISUAL-1` completed: login/setup now uses a unified dark card treatment with Chinese copy, branded mark, clearer fields, and primary/secondary button hierarchy.
+- Chat workspace styling was refreshed across header, presence strip, search toolbar, timeline background, message bubbles, reply/file cards, and bottom composer.
+- Added responsive safeguards for narrow screens: constrained auth card width, wrapping toolbar controls, composer min-width fixes, and stronger long-message wrapping.
+#### Open Questions / Pending Confirmation
+- Real authenticated chat-page visual acceptance still depends on manual review or a provided non-private test login key; Codex in-app browser automation continues to time out when connecting.
+#### Next Plan
+- Review the visual result in a normal browser session; if accepted, commit and push `WEB-VISUAL-1`.
+#### Verification
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed with `3` tests.
+- `.venv\Scripts\python.exe -m unittest` passed with `74` tests.
+- `git diff --check` passed with line-ending warnings only.
+- Chrome headless screenshot checks completed for the real login page and a temporary chat-shell preview using the current served `style.css`.
+- Codex in-app browser automation retry still timed out while connecting.
+#### Changed Files
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `docs/MODULE_webui.md`
+- `docs/PROGRESS.md`
 
 ### 2026-05-14 10:55 (Asia/Shanghai)
 #### Current Progress

@@ -6,46 +6,55 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260514-setup-ux">
+  <link rel="stylesheet" href="/style.css?v=20260514-visual-2">
 </head>
-<body class="bg-gray-900 text-gray-100 h-screen flex flex-col">
+<body class="app-shell bg-gray-900 text-gray-100 h-screen flex flex-col">
 
-  <div id="login-overlay" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
-    <div class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-md">
-      <h1 class="text-2xl font-bold mb-3 text-center">TALK</h1>
-      <p id="auth-loading" class="text-gray-400 text-sm mb-4 text-center">Loading setup status...</p>
+  <div id="login-overlay" class="fixed inset-0 flex items-center justify-center z-50">
+    <div class="auth-card w-full max-w-md">
+      <div class="auth-brand">
+        <div class="brand-mark">T</div>
+        <div>
+          <h1>TALK</h1>
+          <p>本地消息中转台</p>
+        </div>
+      </div>
+      <p id="auth-loading" class="auth-loading">正在加载初始化状态…</p>
 
-      <div id="setup-panel" class="hidden">
-        <p class="text-gray-200 text-sm mb-2 text-center">创建第一个管理员</p>
-        <p class="text-gray-500 text-xs mb-4 text-center">只有在数据库里还没有任何人类账号时，才会看到这个页面。</p>
+      <div id="setup-panel" class="auth-section hidden">
+        <div class="auth-section-title">
+          <p>创建第一个管理员</p>
+          <span>首次启动</span>
+        </div>
+        <p class="auth-note">只有在数据库里还没有任何人类账号时，才会看到这个页面。</p>
 
-        <label for="setup-id" class="block text-xs font-medium text-gray-300 mb-1">管理员 ID</label>
-        <p class="text-xs text-gray-500 mb-2">格式必须以 <code>human:</code> 开头，例如 <code>human:home</code>。</p>
+        <label for="setup-id" class="auth-label">管理员 ID</label>
+        <p class="auth-field-hint">格式必须以 <code>human:</code> 开头，例如 <code>human:home</code>。</p>
         <input id="setup-id" type="text" placeholder="human:home"
-               class="w-full px-4 py-2 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 mb-3">
+               class="auth-input mb-3">
 
-        <label for="setup-name" class="block text-xs font-medium text-gray-300 mb-1">昵称</label>
+        <label for="setup-name" class="auth-label">昵称</label>
         <input id="setup-name" type="text" placeholder="例如：Home"
-               class="w-full px-4 py-2 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 mb-3">
+               class="auth-input mb-3">
 
-        <div class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 mb-3">
-          <p class="text-xs leading-5 text-amber-100">
+        <div class="auth-warning">
+          <p>
             这是登录 TALK 的密钥，点“自动生成”让系统帮你生成。请把它记到密码管理器或可靠的地方，丢了就登不进来了。
           </p>
         </div>
 
-        <label for="setup-key" class="block text-xs font-medium text-gray-300 mb-1">登录密钥</label>
-        <div class="flex items-stretch gap-2 mb-2">
+        <label for="setup-key" class="auth-label">登录密钥</label>
+        <div class="auth-key-row mb-2">
           <input id="setup-key" type="password" placeholder="点右侧“自动生成”"
-                 class="flex-1 px-4 py-2 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500">
+                 class="auth-input flex-1">
           <button id="setup-key-generate-btn" type="button"
-                  class="shrink-0 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium transition">
+                  class="auth-secondary-btn shrink-0">
             自动生成
           </button>
         </div>
         <div class="flex items-center justify-between gap-2 mb-4">
           <button id="setup-key-toggle-btn" type="button"
-                  class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-600 bg-gray-700 text-sm text-gray-200 hover:border-gray-500 hover:text-white transition">
+                  class="auth-ghost-btn inline-flex items-center gap-2">
             <svg id="setup-key-eye-open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z" />
               <circle cx="12" cy="12" r="3" />
@@ -58,131 +67,141 @@
             <span id="setup-key-toggle-label">显示</span>
           </button>
           <button id="setup-key-copy-btn" type="button"
-                  class="px-3 py-2 rounded-lg border border-gray-600 bg-gray-700 text-sm text-gray-200 hover:border-gray-500 hover:text-white transition">
+                  class="auth-ghost-btn">
             复制
           </button>
         </div>
-        <div class="flex justify-center">
-          <button id="setup-btn"
-                  class="setup-primary-btn inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-6 py-2 font-medium leading-snug text-gray-900 shadow-sm transition hover:bg-blue-100 hover:border-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:ring-offset-2 focus:ring-offset-gray-800">
-            创建管理员
-          </button>
-        </div>
-        <p id="setup-error" class="text-red-400 text-sm mt-2 hidden"></p>
+        <button id="setup-btn" class="setup-primary-btn auth-primary-btn">
+          创建管理员
+        </button>
+        <p id="setup-error" class="auth-error hidden"></p>
       </div>
 
-      <div id="login-panel" class="hidden">
-        <p class="text-gray-400 text-sm mb-4 text-center">Enter your API key to sign in</p>
-        <input id="login-key" type="text" placeholder="API Key"
-               class="w-full px-4 py-2 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500 mb-4">
-        <button id="login-btn"
-                class="w-full py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition">
-          Sign in
+      <div id="login-panel" class="auth-section hidden">
+        <div class="auth-section-title">
+          <p>登录 TALK</p>
+          <span>API Key</span>
+        </div>
+        <label for="login-key" class="auth-label">登录密钥</label>
+        <input id="login-key" type="password" placeholder="粘贴你的登录密钥"
+               class="auth-input mb-4">
+        <button id="login-btn" class="auth-primary-btn">
+          登录
         </button>
-        <p id="login-error" class="text-red-400 text-sm mt-2 hidden"></p>
+        <p id="login-error" class="auth-error hidden"></p>
       </div>
     </div>
   </div>
 
-  <header class="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between shrink-0">
-    <h1 class="text-lg font-bold">TALK</h1>
-    <div class="flex items-center gap-3">
+  <header class="app-header px-4 py-3 flex items-center justify-between shrink-0">
+    <div class="app-title">
+      <div class="brand-mark small">T</div>
+      <div>
+        <h1>TALK</h1>
+        <p>消息时间线</p>
+      </div>
+    </div>
+    <div class="header-actions">
       <span id="connection-status"
             class="hidden text-xs px-2 py-1 rounded-full border border-gray-600 text-gray-300 bg-gray-700">
       </span>
-      <span id="user-badge" class="text-sm text-gray-400"></span>
-      <button id="logout-btn" class="text-xs text-gray-500 hover:text-gray-300 transition">退出</button>
+      <span id="user-badge" class="user-badge"></span>
+      <button id="logout-btn" class="logout-btn">退出</button>
     </div>
   </header>
 
-  <section id="presence-strip" class="hidden bg-gray-850 border-b border-gray-800 px-4 py-2 shrink-0">
-    <div class="flex items-center gap-3 overflow-x-auto">
-      <div id="presence-summary" class="presence-summary shrink-0">正在同步在线成员…</div>
-      <div id="presence-members" class="presence-members"></div>
-    </div>
-  </section>
+  <div class="chat-shell flex-1 min-h-0 flex flex-col">
+    <section id="workspace-tools" class="workspace-tools shrink-0">
+      <section id="presence-strip" class="hidden px-4 py-2 shrink-0">
+        <div class="flex items-center gap-3 overflow-x-auto">
+          <div id="presence-summary" class="presence-summary shrink-0">正在同步在线成员…</div>
+          <div id="presence-members" class="presence-members"></div>
+        </div>
+      </section>
 
-  <section id="history-toolbar" class="hidden border-b border-gray-800 bg-gray-900/90 px-4 py-2 shrink-0">
-    <div class="history-toolbar-row">
-      <div class="history-search-group">
-        <input id="history-search-input" type="text" placeholder="搜索消息、附言或文件名"
-               class="history-search-input rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-100 focus:border-blue-500 focus:outline-none">
-        <button id="history-search-btn"
-                class="history-btn rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-200 transition hover:border-gray-500 hover:text-white">
-          搜索
-        </button>
-        <button id="history-clear-btn"
-                class="history-btn rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-200 transition hover:border-gray-500 hover:text-white">
-          清除
-        </button>
-      </div>
-      <div class="history-toolbar-actions">
-        <button id="load-older-btn"
-                class="history-btn rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-200 transition hover:border-gray-500 hover:text-white">
-          加载更早消息
-        </button>
-        <div id="history-status" class="history-status">就绪</div>
-      </div>
-    </div>
-  </section>
-
-  <main id="messages" class="flex-1 overflow-y-auto px-4 py-3 space-y-2"></main>
-
-  <footer class="bg-gray-800 border-t border-gray-700 px-4 py-3 shrink-0">
-    <div id="composer" class="relative">
-      <div id="drop-hint" class="drop-hint hidden">
-        松开即可添加文件
-      </div>
-      <div id="pending-file" class="hidden mb-3 px-3 py-2 rounded-lg border border-blue-500 bg-gray-700 text-sm">
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <div id="pending-file-name" class="font-medium truncate"></div>
-            <div id="pending-file-meta" class="text-xs text-gray-400"></div>
+      <section id="history-toolbar" class="hidden px-4 py-2 shrink-0">
+        <div class="history-toolbar-row">
+          <div class="history-search-group">
+            <input id="history-search-input" type="text" placeholder="搜索消息、附言或文件名"
+                   class="history-search-input rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-100 focus:border-blue-500 focus:outline-none">
+            <button id="history-search-btn"
+                    class="history-btn rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-200 transition hover:border-gray-500 hover:text-white">
+              搜索
+            </button>
+            <button id="history-clear-btn"
+                    class="history-btn rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-200 transition hover:border-gray-500 hover:text-white">
+              清除
+            </button>
           </div>
-          <button id="clear-file-btn" class="text-xs text-gray-400 hover:text-gray-200 transition">
-            移除
+          <div class="history-toolbar-actions">
+            <button id="load-older-btn"
+                    class="history-btn rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-200 transition hover:border-gray-500 hover:text-white">
+              加载更早消息
+            </button>
+            <div id="history-status" class="history-status">就绪</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <main id="messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-3"></main>
+
+    <footer class="composer-footer px-4 py-3 shrink-0">
+      <div id="composer" class="relative">
+        <div id="drop-hint" class="drop-hint hidden">
+          松开即可添加文件
+        </div>
+        <div id="pending-file" class="hidden mb-3 px-3 py-2 rounded-lg border border-blue-500 bg-gray-700 text-sm">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div id="pending-file-name" class="font-medium truncate"></div>
+              <div id="pending-file-meta" class="text-xs text-gray-400"></div>
+            </div>
+            <button id="clear-file-btn" class="text-xs text-gray-400 hover:text-gray-200 transition">
+              移除
+            </button>
+          </div>
+        </div>
+        <div id="reply-bar" class="hidden mb-3 px-3 py-2 rounded-lg border border-gray-600 bg-gray-700/80 text-sm">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div id="reply-author" class="reply-author"></div>
+              <div id="reply-preview" class="reply-preview truncate"></div>
+            </div>
+            <button id="clear-reply-btn" class="text-xs text-gray-400 hover:text-gray-200 transition">
+              取消回复
+            </button>
+          </div>
+        </div>
+        <div id="composer-status" class="hidden mb-3 px-3 py-2 rounded-lg text-sm border"></div>
+        <div class="composer-row flex items-end gap-2 relative">
+          <input id="file-input" type="file" class="hidden">
+          <button id="attach-btn"
+                  class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition border border-gray-600">
+            文件
+          </button>
+          <div class="relative flex-1">
+            <textarea id="msg-input"
+                      placeholder="输入消息… 开头用 @ 指定接收者，不写则广播"
+                      class="composer-textarea w-full px-4 py-3 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500"
+                      rows="1"
+                      autocomplete="off"></textarea>
+            <ul id="mention-dropdown"
+                class="absolute bottom-full left-0 mb-1 bg-gray-700 rounded-lg shadow-lg hidden max-h-48 overflow-y-auto w-64 border border-gray-600">
+            </ul>
+          </div>
+          <button id="send-btn"
+                  class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition">
+            发送
           </button>
         </div>
       </div>
-      <div id="reply-bar" class="hidden mb-3 px-3 py-2 rounded-lg border border-gray-600 bg-gray-700/80 text-sm">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div id="reply-author" class="reply-author"></div>
-            <div id="reply-preview" class="reply-preview truncate"></div>
-          </div>
-          <button id="clear-reply-btn" class="text-xs text-gray-400 hover:text-gray-200 transition">
-            取消回复
-          </button>
-        </div>
-      </div>
-      <div id="composer-status" class="hidden mb-3 px-3 py-2 rounded-lg text-sm border"></div>
-      <div class="flex items-end gap-2 relative">
-        <input id="file-input" type="file" class="hidden">
-        <button id="attach-btn"
-                class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition border border-gray-600">
-          文件
-        </button>
-        <div class="relative flex-1">
-                  <textarea id="msg-input"
-                    placeholder="输入消息… 开头用 @ 指定接收者，不写则广播"
-                    class="composer-textarea w-full px-4 py-3 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500"
-                    rows="1"
-                    autocomplete="off"></textarea>
-          <ul id="mention-dropdown"
-              class="absolute bottom-full left-0 mb-1 bg-gray-700 rounded-lg shadow-lg hidden max-h-48 overflow-y-auto w-64 border border-gray-600">
-          </ul>
-        </div>
-        <button id="send-btn"
-                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition">
-          发送
-        </button>
-      </div>
-    </div>
-  </footer>
+    </footer>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/lib/common.min.js"></script>
-  <script src="/app.js?v=20260514-setup-ux"></script>
+  <script src="/app.js?v=20260514-visual-2"></script>
 </body>
 </html>

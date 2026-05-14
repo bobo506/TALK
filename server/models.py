@@ -28,6 +28,7 @@ class Message(SQLModel, table=True):
     __tablename__ = "messages"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: Optional[str] = Field(default=None, foreign_key="groups.id", index=True)
     from_id: str = Field(foreign_key="members.id", index=True)
     to_ids: Optional[str] = None  # JSON array string; NULL = broadcast
     type: str  # 'text' | 'file'
@@ -59,6 +60,26 @@ class File(SQLModel, table=True):
     sha256: str = Field(index=True)
     uploader_id: str = Field(foreign_key="members.id")
     path: str  # disk relative path
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Group(SQLModel, table=True):
+    __tablename__ = "groups"
+
+    id: str = Field(primary_key=True)
+    name: str
+    description: Optional[str] = None
+    created_by: str = Field(foreign_key="members.id", index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class GroupMember(SQLModel, table=True):
+    __tablename__ = "group_members"
+
+    group_id: str = Field(foreign_key="groups.id", primary_key=True)
+    member_id: str = Field(foreign_key="members.id", primary_key=True, index=True)
+    role: str = Field(default="member", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -117,6 +138,7 @@ class MemberOut(BaseModel):
 
 class MessageCreate(BaseModel):
     to: Optional[list[str]] = None  # None = broadcast
+    group_id: Optional[str] = None
     type: str = "text"
     content: Optional[str] = None
     file_id: Optional[str] = None
@@ -129,6 +151,8 @@ class MessageCreate(BaseModel):
             self.content = self.content.strip() or None
         if self.caption is not None:
             self.caption = self.caption.strip() or None
+        if self.group_id is not None:
+            self.group_id = self.group_id.strip() or None
 
         if self.type == "text":
             if not self.content:
@@ -151,6 +175,7 @@ class MessageOut(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: int
+    group_id: Optional[str]
     from_field: str = PydField(alias="from", serialization_alias="from")
     to: Optional[list[str]]
     type: str
@@ -171,6 +196,7 @@ class MessageOut(BaseModel):
         is_revoked = msg.revoked_at is not None
         return cls(**{
             "id": msg.id,
+            "group_id": msg.group_id,
             "from": msg.from_id,
             "to": msg.to_list,
             "type": msg.type,
@@ -206,6 +232,57 @@ class FileOut(BaseModel):
     file_id: str
     filename: str
     size_bytes: int
+
+
+_GROUP_ROLES = {"owner", "moderator", "member"}
+
+
+class GroupMemberOut(BaseModel):
+    member_id: str
+    role: str
+    created_at: datetime
+
+
+class GroupCreate(BaseModel):
+    id: Optional[str] = None
+    name: str
+    description: Optional[str] = None
+    member_ids: list[str] = []
+
+    @model_validator(mode="after")
+    def validate_group_create(self) -> "GroupCreate":
+        if self.id is not None:
+            self.id = self.id.strip() or None
+            if self.id is not None and any(ch.isspace() for ch in self.id):
+                raise ValueError("id cannot contain whitespace")
+        self.name = self.name.strip()
+        if not self.name:
+            raise ValueError("name is required")
+        if self.description is not None:
+            self.description = self.description.strip() or None
+        self.member_ids = list(dict.fromkeys(member_id.strip() for member_id in self.member_ids if member_id.strip()))
+        return self
+
+
+class GroupMemberUpdate(BaseModel):
+    role: str = "member"
+
+    @model_validator(mode="after")
+    def validate_group_member_update(self) -> "GroupMemberUpdate":
+        self.role = self.role.strip().lower()
+        if self.role not in _GROUP_ROLES:
+            raise ValueError(f"role must be one of {sorted(_GROUP_ROLES)}")
+        return self
+
+
+class GroupOut(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+    members: list[GroupMemberOut]
 
 
 _INSTANCE_STATUSES = {"starting", "online", "idle", "busy", "stopping", "offline", "error"}
