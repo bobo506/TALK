@@ -194,6 +194,7 @@ TALK/
 │   └── codex_bridge.py    # Codex CLI bridge（local-lab MVP）
 ├── scripts/
 │   └── backup_db.py       # SQLite 在线热备脚本
+├── AGENTS.md              # Agent 角色与协作规则权威入口
 ├── tests/
 │   ├── test_support.py    # 后端测试基类与隔离环境
 │   └── test_*.py          # M3-4 首轮自动化测试
@@ -204,7 +205,8 @@ TALK/
 │   ├── PROJECT_BRIEF.md   # 本文件
 │   ├── PRODUCT.md         # PM 完整产品文档
 │   ├── MODULE_*.md        # 模块 spec
-│   └── PROGRESS.md        # 进度追踪
+│   ├── PROGRESS.md        # 当前进度快照
+│   └── PROGRESS_HISTORY.md # 已完成切片历史记录
 └── talk.db                # SQLite 数据库（运行时生成）
 ```
 
@@ -235,6 +237,16 @@ TALK/
 - `config.toml` — 服务配置
 
 修改这些公共文件时需评估对所有模块的影响。
+
+## 2026-05-15 Agent Workflow Addendum
+
+- `AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源；每次项目开始必须先读取并确认当前角色。
+- 当前角色：Codex 为决策 Agent，Claude 为执行 Agent；项目管理者可通过修改 `AGENTS.md` 调整后续 Agent 行为。
+- 决策 Agent 在方向明确且无重大不确定项时，可自主连续开发多个切片；执行 Agent 每次只开发一个切片，完成后必须等待确认。
+- 任意角色每完成一个可能影响功能的开发切片，都必须执行“汇总进度”，并记录验证、变更文件、待确认问题和下一步。
+- `docs/PROGRESS.md` 只保存当前快照，保持长度可控；已完成切片完整记录归入 `docs/PROGRESS_HISTORY.md`。
+- 上下文达到 80%-90% 时，必须先汇总进度、落盘、验证与提交，再清除上下文或输出 `继续项目` 恢复指令。
+- 可独立体验的里程碑版本需要暂停继续开发，提交可验收版本，并用中文提供 GitHub/验收说明。
 
 ## 2026-05-13 Local Lab Addendum
 
