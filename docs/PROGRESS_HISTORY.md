@@ -2,11 +2,31 @@
 
 <!--
 项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-15 18:02，当前/历史进度拆分已恢复
+最后更新：2026-05-15 18:21，下班汇总已写入
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
-
+## 2026-05-15 18:21 (Asia/Shanghai)
+### Current Progress
+- End-of-day TALK summary completed.
+- Confirmed TALK worktree was clean before this summary update.
+- Confirmed today's implementation commit `bfb28a3 feat: add group sdk ui and sse events` exists locally and had been pushed earlier to GitHub branch `codex/local-lab-codex-bridge`.
+- Confirmed today's workflow/documentation commit `d9a10d5 更新 Agent 协作规则与进度拆分` exists locally and had been pushed earlier to GitHub branch `codex/local-lab-codex-bridge`.
+- Confirmed standalone `project-framework` skill repository was updated and pushed at `7756b08 更新项目连续性管理规则`.
+- Current recovery instruction for the next session: say `继续项目`.
+### Open Questions / Pending Confirmation
+- Web UI SSE integration is still the recommended next implementation slice.
+- Remaining pending areas: SSE replay/backfill, Group rename/delete UI, document-edit lock API, schedule API, Codex bridge task-queue integration, and environmental deployment/onboarding verification.
+### Next Plan
+1. Resume tomorrow with `继续项目`.
+2. Prefer Web UI SSE fallback/integration unless project priority changes.
+### Verification
+- `git status --short` was clean before this summary update.
+- `git log -3 --oneline` showed `d9a10d5`, `bfb28a3`, and `99578f3`.
+- Prior verification for the completed code slice: full `.venv\Scripts\python.exe -m unittest` passed with `85` tests; `node --check web\app.js` passed; `git diff --check` passed with line-ending warnings only.
+### Changed Files
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
 
 ## 2026-05-15 18:02 (Asia/Shanghai)
 ### Current Progress
