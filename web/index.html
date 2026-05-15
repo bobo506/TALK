@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260514-visual-2">
+  <link rel="stylesheet" href="/style.css?v=20260514-groups-ui">
 </head>
 <body class="app-shell bg-gray-900 text-gray-100 h-screen flex flex-col">
 
@@ -112,6 +112,53 @@
 
   <div class="chat-shell flex-1 min-h-0 flex flex-col">
     <section id="workspace-tools" class="workspace-tools shrink-0">
+      <section id="room-strip" class="room-strip hidden px-4 py-2 shrink-0">
+        <div class="room-strip-row">
+          <div class="room-current">
+            <div id="room-title" class="room-title">全局消息流</div>
+            <div id="room-description" class="room-description">旧全局聊天与私聊时间线</div>
+          </div>
+          <div class="room-actions">
+            <button id="global-room-btn" type="button" class="room-chip active">全局</button>
+            <div id="group-room-list" class="group-room-list"></div>
+            <button id="refresh-groups-btn" type="button" class="room-icon-btn" title="刷新 Group 列表" aria-label="刷新 Group 列表">
+              ↻
+            </button>
+            <button id="toggle-group-create-btn" type="button" class="room-create-btn">
+              新建 Group
+            </button>
+          </div>
+        </div>
+
+        <form id="group-create-panel" class="group-create-panel hidden">
+          <div class="group-create-grid">
+            <label class="group-create-field">
+              <span>名称</span>
+              <input id="group-create-name" type="text" placeholder="例如：SDK 开发组" maxlength="80">
+            </label>
+            <label class="group-create-field">
+              <span>ID（可选）</span>
+              <input id="group-create-id" type="text" placeholder="group:sdk">
+            </label>
+            <label class="group-create-field wide">
+              <span>描述（可选）</span>
+              <input id="group-create-description" type="text" placeholder="这个 Hall 用来同步哪类工作">
+            </label>
+          </div>
+          <div class="group-create-members-wrap">
+            <div class="group-create-label">初始成员</div>
+            <div id="group-create-members" class="group-create-members"></div>
+          </div>
+          <div class="group-create-footer">
+            <p id="group-create-error" class="group-create-error hidden"></p>
+            <div class="group-create-buttons">
+              <button id="cancel-group-create-btn" type="button" class="room-secondary-btn">取消</button>
+              <button id="submit-group-create-btn" type="submit" class="room-primary-btn">创建并进入</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
       <section id="presence-strip" class="hidden px-4 py-2 shrink-0">
         <div class="flex items-center gap-3 overflow-x-auto">
           <div id="presence-summary" class="presence-summary shrink-0">正在同步在线成员…</div>
@@ -202,6 +249,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/lib/common.min.js"></script>
-  <script src="/app.js?v=20260514-visual-2"></script>
+  <script src="/app.js?v=20260514-groups-ui"></script>
 </body>
 </html>

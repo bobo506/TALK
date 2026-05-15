@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-14 16:03 (Asia/Shanghai)
+Updated: 2026-05-14 16:33 (Asia/Shanghai)
 
 ### 1) Current Progress
 - `INSTANCE-1` completed: added the `agent_instances` table, `/api/instances` status APIs, SDK helpers, and `docs/MODULE_instances.md`.
@@ -23,6 +23,7 @@ Updated: 2026-05-14 16:03 (Asia/Shanghai)
 - Group Hall semantics are intentionally distinct from legacy direct messages: inside a Group, `to_ids` records attention/mentions, while all Group members can read the Hall timeline; unscoped `GET /api/messages` continues to return only legacy/global messages.
 - Project role boundary updated: Codex is now authorized as a decision Agent for this project and may directly maintain relevant project/module/progress/decision documentation.
 - Group/Hall documentation synced: `docs/MODULE_groups.md` added and `docs/PROJECT_BRIEF.md` updated with the new tables, route, module index entry, and 2026-05-14 addendum.
+- `WEB-GROUP-1` completed: Web UI now has a room strip for global timeline / Group Hall switching, a new Group panel with initial member selection, active Group persistence, scoped Hall history/轮询/发送, scoped `@` autocomplete, and scoped online member display.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
@@ -35,13 +36,13 @@ Updated: 2026-05-14 16:03 (Asia/Shanghai)
 - The local `pi` framework entrypoint, configuration style, and DeepSeek / Kimi adapter shape still need to be verified on this workstation before bridge implementation.
 - Codex bridge is still MVP-level: it does not yet stream partial output, attach files/materials, or enforce document-edit locks.
 - Scheduler v2 details remain open: delayed / recurring schedule table shape, task retry policy, timeout recovery for stale `running` tasks, and whether Web UI can manually requeue or cancel tasks.
-- Group/Hall front-end navigation, default active Group selection, SDK wrappers, and SSE stream integration are still pending.
+- Group/Hall SDK wrappers, SSE stream integration, Group member management UI, rename/delete controls, and unread/attention state are still pending.
 
 ### 3) Next Plan
 - Continue refining the unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, `pi`-based bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
 - Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, controlled material/document passing, and document-edit coordination.
-- Commit the current Web UI + Group/Hall backend + documentation work when accepted.
-- Next implementation candidates: Web UI Group/Hall navigation, SDK group helpers, SSE stream event contract, document-edit lock API, schedule API, or Codex bridge task-queue integration.
+- Commit the current Web UI Group/Hall follow-up when accepted.
+- Next implementation candidates: SDK group helpers, SSE stream event contract, Group member management UI, document-edit lock API, schedule API, or Codex bridge task-queue integration.
 
 ### 4) Verification
 - `.venv\Scripts\python.exe -m unittest tests.test_tasks` passed with `7` tests.
@@ -57,6 +58,7 @@ Updated: 2026-05-14 16:03 (Asia/Shanghai)
 - After the `WEB-VISUAL-2` follow-up fix, `node --check web\app.js`, `.venv\Scripts\python.exe -m unittest tests.test_encoding`, `git diff --check`, and full `.venv\Scripts\python.exe -m unittest` all passed; Chrome headless verified authenticated chat at 1440px and 500px with `#drop-hint` computed as `display: none`.
 - After `GROUP-1 / HALL-1`, `.venv\Scripts\python.exe -m unittest tests.test_groups`, `.venv\Scripts\python.exe -m unittest tests.test_messages`, `node --check web\app.js`, `git diff --check`, and full `.venv\Scripts\python.exe -m unittest` all passed; full suite is now `81` tests.
 - After documentation sync, `git diff --check` passed with line-ending warnings only.
+- After `WEB-GROUP-1`, `node --check web\app.js` passed; Chrome headless smoke test against an isolated temporary TALK server verified login, Group creation with `agent:codex`, Hall message send, Hall placeholder, and that switching back to global hides the Hall message; `.venv\Scripts\python.exe -m unittest tests.test_groups tests.test_messages` passed with `26` tests; `git diff --check` passed with line-ending warnings only; full `.venv\Scripts\python.exe -m unittest` passed with `81` tests.
 
 ### 5) Changed Files
 - `AGENTS.md`
@@ -88,8 +90,39 @@ Updated: 2026-05-14 16:03 (Asia/Shanghai)
 - `tests/test_groups.py`
 - `tests/test_messages.py`
 - `tests/test_support.py`
+- `docs/MODULE_webui.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/MODULE_groups.md`
 
 ## History
+
+### 2026-05-14 16:33 (Asia/Shanghai)
+#### Current Progress
+- `WEB-GROUP-1` completed: Web UI now exposes a real Group/Hall room strip above the workspace tools.
+- Added global timeline / Group Hall switching, `GET /api/groups` loading, active Group persistence per user, and disabled entries for Groups the current user cannot enter.
+- Added a lightweight new Group panel with name, optional ID, optional description, and initial member checkboxes; creation succeeds through `POST /api/groups` and automatically enters the new Hall.
+- Hall scope now flows through the browser: history and polling include `group_id`, text/file send payloads include `group_id`, WebSocket events are appended only when they belong to the active room, and switching rooms clears reply state.
+- Hall UX now scopes online members and `@` autocomplete to the current Group members and uses a placeholder that states Hall mentions are reminders rather than visibility restrictions.
+- Synced `docs/PROJECT_BRIEF.md`, `docs/MODULE_webui.md`, `docs/MODULE_groups.md`, and this progress file.
+#### Open Questions / Pending Confirmation
+- Group member management after creation, Group rename/delete, unread/attention state, SDK helpers, SSE stream integration, and multi-Agent discussion protocol remain future slices.
+#### Next Plan
+- Commit this Web UI Group/Hall follow-up if accepted.
+- Then continue with one of: SDK group helpers, Group member management UI, SSE stream events, document-edit locks, schedule API, or Codex bridge task-queue integration.
+#### Verification
+- `node --check web\app.js` passed.
+- Chrome headless smoke test against an isolated temporary TALK server/database/storage verified login, Group creation with `agent:codex`, Hall message send, Hall-specific placeholder, and that switching back to global hides the Hall message.
+- `.venv\Scripts\python.exe -m unittest tests.test_groups tests.test_messages` passed with `26` tests.
+- `git diff --check` passed with line-ending warnings only.
+- Full `.venv\Scripts\python.exe -m unittest` passed with `81` tests.
+#### Changed Files
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `docs/PROJECT_BRIEF.md`
+- `docs/MODULE_webui.md`
+- `docs/MODULE_groups.md`
+- `docs/PROGRESS.md`
 
 ### 2026-05-14 16:03 (Asia/Shanghai)
 #### Current Progress

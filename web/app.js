@@ -48,6 +48,10 @@ let hasMoreHistory = false;
 let appliedHistoryQuery = "";
 let setupKeyVisible = false;
 let setupKeyCopyTimer = null;
+let groups = [];
+let activeGroupId = null;
+let groupCreateOpen = false;
+let groupCreateSaving = false;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -71,6 +75,21 @@ const setupError = document.getElementById("setup-error");
 const connectionStatus = document.getElementById("connection-status");
 const userBadge = document.getElementById("user-badge");
 const logoutBtn = document.getElementById("logout-btn");
+const roomStrip = document.getElementById("room-strip");
+const roomTitle = document.getElementById("room-title");
+const roomDescription = document.getElementById("room-description");
+const globalRoomBtn = document.getElementById("global-room-btn");
+const groupRoomList = document.getElementById("group-room-list");
+const refreshGroupsBtn = document.getElementById("refresh-groups-btn");
+const toggleGroupCreateBtn = document.getElementById("toggle-group-create-btn");
+const groupCreatePanel = document.getElementById("group-create-panel");
+const groupCreateName = document.getElementById("group-create-name");
+const groupCreateId = document.getElementById("group-create-id");
+const groupCreateDescription = document.getElementById("group-create-description");
+const groupCreateMembers = document.getElementById("group-create-members");
+const groupCreateError = document.getElementById("group-create-error");
+const cancelGroupCreateBtn = document.getElementById("cancel-group-create-btn");
+const submitGroupCreateBtn = document.getElementById("submit-group-create-btn");
 const presenceStrip = document.getElementById("presence-strip");
 const presenceSummary = document.getElementById("presence-summary");
 const presenceMembers = document.getElementById("presence-members");
@@ -99,6 +118,7 @@ const sendBtn = document.getElementById("send-btn");
 const mentionDropdown = document.getElementById("mention-dropdown");
 const LOCAL_API_KEY_STORAGE = "talk_api_key";
 const SESSION_API_KEY_STORAGE = "talk_session_api_key";
+const ACTIVE_GROUP_STORAGE = "talk_active_group_id";
 
 const connectionStates = {
   connecting: {
@@ -325,6 +345,7 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
     }
     members = await membersRes.json();
     await loadRuntimeConfig();
+    await loadGroups();
 
     loginOverlay.classList.add("hidden");
     userBadge.textContent = myId;
@@ -431,6 +452,7 @@ async function doLogin() {
     }
     members = await membersRes.json();
     await loadRuntimeConfig();
+    await loadGroups();
 
     loginOverlay.classList.add("hidden");
     userBadge.textContent = myId;
@@ -479,6 +501,11 @@ logoutBtn.addEventListener("click", () => {
 loadOlderBtn.addEventListener("click", loadOlderMessages);
 historySearchBtn.addEventListener("click", applyHistorySearch);
 historyClearBtn.addEventListener("click", clearHistorySearch);
+globalRoomBtn.addEventListener("click", () => setActiveGroup(null));
+refreshGroupsBtn.addEventListener("click", refreshGroups);
+toggleGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(!groupCreateOpen));
+cancelGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
+groupCreatePanel.addEventListener("submit", createGroupFromPanel);
 historySearchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
@@ -486,22 +513,298 @@ historySearchInput.addEventListener("keydown", (e) => {
   }
 });
 
-// ── Chat lifecycle ───────────────────────────────────────────────────
-function startChat() {
-  loggingOut = false;
+// ── Group / Hall room navigation ────────────────────────────────────
+function activeGroupStorageKey() {
+  return myId ? `${ACTIVE_GROUP_STORAGE}:${myId}` : ACTIVE_GROUP_STORAGE;
+}
+
+async function loadGroups() {
+  try {
+    const res = await apiFetch("/api/groups");
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `Group 列表加载失败: ${res.status}`));
+    }
+    groups = await res.json();
+    restoreActiveGroup();
+  } catch (err) {
+    groups = [];
+    activeGroupId = null;
+    console.error(err);
+    showComposerStatus(err.message, "error", { source: "load", timeoutMs: 0 });
+  }
+}
+
+async function refreshGroups() {
+  refreshGroupsBtn.disabled = true;
+  try {
+    const previousGroupId = activeGroupId;
+    await loadGroups();
+    renderRoomStrip();
+    renderPresenceStrip();
+    renderMentionDropdownIfOpen();
+    if (previousGroupId !== activeGroupId) {
+      resetTimelineState();
+      await loadHistory();
+    } else {
+      clearComposerStatus("load");
+    }
+  } finally {
+    refreshGroupsBtn.disabled = false;
+  }
+}
+
+function restoreActiveGroup() {
+  const storedGroupId = localStorage.getItem(activeGroupStorageKey()) || "";
+  if (storedGroupId && canEnterGroup(storedGroupId)) {
+    activeGroupId = storedGroupId;
+  } else {
+    activeGroupId = null;
+    localStorage.removeItem(activeGroupStorageKey());
+  }
+}
+
+function getActiveGroup() {
+  if (!activeGroupId) return null;
+  return groups.find((group) => group.id === activeGroupId) || null;
+}
+
+function getGroupMemberIds(group) {
+  return new Set((group?.members || []).map((member) => member.member_id));
+}
+
+function canEnterGroup(groupId) {
+  const group = groups.find((item) => item.id === groupId);
+  return Boolean(group && getGroupMemberIds(group).has(myId));
+}
+
+function setActiveGroup(groupId) {
+  const nextGroupId = groupId || null;
+  if (nextGroupId && !canEnterGroup(nextGroupId)) {
+    showComposerStatus("你还不是这个 Group 的成员，无法进入它的 Hall。", "error", {
+      source: "room",
+      timeoutMs: 3500,
+    });
+    return;
+  }
+  if (activeGroupId === nextGroupId) return;
+
+  activeGroupId = nextGroupId;
+  if (activeGroupId) {
+    localStorage.setItem(activeGroupStorageKey(), activeGroupId);
+  } else {
+    localStorage.removeItem(activeGroupStorageKey());
+  }
+
+  setGroupCreateOpen(false);
+  resetTimelineState();
+  renderRoomStrip();
+  renderPresenceStrip();
+  renderMentionDropdownIfOpen();
+  updateComposerPlaceholder();
+  loadHistory();
+  msgInput.focus();
+}
+
+function renderRoomStrip() {
+  if (!myId) return;
+
+  roomStrip.classList.remove("hidden");
+  const activeGroup = getActiveGroup();
+  globalRoomBtn.classList.toggle("active", !activeGroupId);
+  groupRoomList.innerHTML = "";
+
+  roomTitle.textContent = activeGroup ? `${activeGroup.name} Hall` : "全局消息流";
+  roomDescription.textContent = activeGroup
+    ? `${activeGroup.id} · ${activeGroup.members.length} 位成员${activeGroup.description ? ` · ${activeGroup.description}` : ""}`
+    : "旧全局聊天与私聊时间线";
+
+  if (groups.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "group-room-empty";
+    empty.textContent = "暂无 Group";
+    groupRoomList.appendChild(empty);
+  } else {
+    for (const group of groups) {
+      const button = document.createElement("button");
+      const isActive = group.id === activeGroupId;
+      const canEnter = getGroupMemberIds(group).has(myId);
+      button.type = "button";
+      button.className = `room-chip ${isActive ? "active" : ""}`;
+      button.textContent = group.name;
+      button.title = canEnter
+        ? `${group.name} (${group.id})`
+        : `${group.name} (${group.id}) · 你还不是成员`;
+      button.disabled = !canEnter;
+      button.addEventListener("click", () => setActiveGroup(group.id));
+      groupRoomList.appendChild(button);
+    }
+  }
+
+  toggleGroupCreateBtn.textContent = groupCreateOpen ? "收起" : "新建 Group";
+  groupCreatePanel.classList.toggle("hidden", !groupCreateOpen);
+  renderGroupCreateMembers();
+}
+
+function setGroupCreateOpen(open) {
+  groupCreateOpen = open;
+  showGroupCreateError("");
+  if (open) {
+    renderGroupCreateMembers();
+    groupCreateName.focus();
+  } else {
+    groupCreatePanel.reset();
+  }
+  renderRoomStrip();
+}
+
+function renderGroupCreateMembers() {
+  groupCreateMembers.innerHTML = "";
+  if (!members.length) {
+    const empty = document.createElement("div");
+    empty.className = "group-create-member-empty";
+    empty.textContent = "成员列表尚未加载";
+    groupCreateMembers.appendChild(empty);
+    return;
+  }
+
+  for (const member of members) {
+    const label = document.createElement("label");
+    label.className = "group-create-member";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = member.id;
+    checkbox.checked = member.id === myId;
+    checkbox.disabled = member.id === myId;
+
+    const text = document.createElement("span");
+    text.textContent = member.id === myId
+      ? `${shortName(member.id)} (我)`
+      : `${shortName(member.id)} · ${member.display_name}`;
+
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    groupCreateMembers.appendChild(label);
+  }
+}
+
+function showGroupCreateError(message) {
+  groupCreateError.textContent = message;
+  groupCreateError.classList.toggle("hidden", !message);
+}
+
+async function createGroupFromPanel(event) {
+  event.preventDefault();
+  if (groupCreateSaving) return;
+
+  const name = groupCreateName.value.trim();
+  if (!name) {
+    showGroupCreateError("请填写 Group 名称。");
+    groupCreateName.focus();
+    return;
+  }
+
+  const selectedMemberIds = Array.from(groupCreateMembers.querySelectorAll("input[type='checkbox']:checked"))
+    .map((input) => input.value)
+    .filter((memberId) => memberId && memberId !== myId);
+
+  const body = {
+    name,
+    member_ids: selectedMemberIds,
+  };
+  const id = groupCreateId.value.trim();
+  const description = groupCreateDescription.value.trim();
+  if (id) body.id = id;
+  if (description) body.description = description;
+
+  groupCreateSaving = true;
+  submitGroupCreateBtn.disabled = true;
+  cancelGroupCreateBtn.disabled = true;
+  try {
+    const res = await apiFetch("/api/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `Group 创建失败: ${res.status}`));
+    }
+
+    const group = await res.json();
+    groups = [group, ...groups.filter((item) => item.id !== group.id)];
+    activeGroupId = group.id;
+    localStorage.setItem(activeGroupStorageKey(), activeGroupId);
+    groupCreateOpen = false;
+    groupCreatePanel.reset();
+    clearComposerStatus("room");
+    resetTimelineState();
+    renderRoomStrip();
+    renderPresenceStrip();
+    renderMentionDropdownIfOpen();
+    updateComposerPlaceholder();
+    await loadHistory();
+  } catch (err) {
+    console.error(err);
+    showGroupCreateError(err.message);
+  } finally {
+    groupCreateSaving = false;
+    submitGroupCreateBtn.disabled = false;
+    cancelGroupCreateBtn.disabled = false;
+  }
+}
+
+function getScopedMembers() {
+  const activeGroup = getActiveGroup();
+  if (!activeGroup) return members;
+
+  const memberIds = getGroupMemberIds(activeGroup);
+  return members.filter((member) => memberIds.has(member.id));
+}
+
+function messageBelongsToActiveRoom(message) {
+  return activeGroupId
+    ? message.group_id === activeGroupId
+    : !message.group_id;
+}
+
+function addActiveGroupToParams(params) {
+  if (activeGroupId) {
+    params.set("group_id", activeGroupId);
+  }
+}
+
+function applyActiveGroupToPayload(body) {
+  if (activeGroupId) {
+    body.group_id = activeGroupId;
+  }
+  return body;
+}
+
+function resetTimelineState({ clearSearch = true } = {}) {
   lastId = 0;
   oldestLoadedId = null;
   hasMoreHistory = false;
   historyLoading = false;
-  appliedHistoryQuery = "";
+  if (clearSearch) {
+    appliedHistoryQuery = "";
+    historySearchInput.value = "";
+  }
   renderedMessageIds = new Set();
   messageRecords = new Map();
   clearAllRevokeButtonTimers();
   clearReplyTarget();
   messagesEl.innerHTML = "";
   updateMessagesEmptyState();
-  historySearchInput.value = "";
+  updateComposerPlaceholder();
   renderHistoryToolbar();
+}
+
+// ── Chat lifecycle ───────────────────────────────────────────────────
+function startChat() {
+  loggingOut = false;
+  resetTimelineState();
+  renderRoomStrip();
+  renderPresenceStrip();
   if (pollTimer) clearInterval(pollTimer);
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -546,7 +849,7 @@ async function loadHistory() {
 
 async function pollMessages() {
   try {
-    const res = await apiFetch(`/api/messages?since=${lastId}&limit=100`);
+    const res = await apiFetch(buildPollRequestPath());
     if (!res.ok) {
       showComposerStatus("消息同步失败，正在继续轮询。", "error", { source: "load", timeoutMs: 0 });
       return;
@@ -597,7 +900,7 @@ function connectWS() {
       }
     } else if (data.type === "message") {
       const m = data.payload;
-      if (m.id > lastId) {
+      if (messageBelongsToActiveRoom(m) && m.id > lastId) {
         lastId = m.id;
         const appendedCount = upsertMessages(matchesActiveHistoryQuery(m) ? [m] : [], "append");
         if (appendedCount > 0) {
@@ -660,6 +963,7 @@ async function sendMessage() {
     type: "text",
     content: rawText,
   };
+  applyActiveGroupToPayload(body);
   if (activeReplyTo) {
     body.reply_to = activeReplyTo.id;
   }
@@ -698,13 +1002,13 @@ async function sendFileMessage(caption = null) {
     const res = await apiFetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify(applyActiveGroupToPayload({
         type: "file",
         content: pendingFile.name,
         file_id: uploaded.file_id,
         caption,
         reply_to: activeReplyTo ? activeReplyTo.id : null,
-      }),
+      })),
     });
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `文件消息发送失败: ${res.status}`));
@@ -922,12 +1226,21 @@ function nextFrame() {
 function buildHistoryRequestPath(before = null) {
   const params = new URLSearchParams();
   params.set("limit", String(HISTORY_PAGE_SIZE));
+  addActiveGroupToParams(params);
   if (before !== null) {
     params.set("before", String(before));
   }
   if (appliedHistoryQuery) {
     params.set("q", appliedHistoryQuery);
   }
+  return `/api/messages?${params.toString()}`;
+}
+
+function buildPollRequestPath() {
+  const params = new URLSearchParams();
+  params.set("since", String(lastId));
+  params.set("limit", "100");
+  addActiveGroupToParams(params);
   return `/api/messages?${params.toString()}`;
 }
 
@@ -999,8 +1312,13 @@ async function reloadHistoryView() {
 
 function updateMessagesEmptyState() {
   const hasMessages = renderedMessageIds.size > 0;
+  const activeGroup = getActiveGroup();
   messagesEl.classList.toggle("is-empty", !hasMessages);
-  messagesEl.dataset.emptyText = appliedHistoryQuery ? emptySearchText : emptyTimelineText;
+  messagesEl.dataset.emptyText = appliedHistoryQuery
+    ? emptySearchText
+    : activeGroup
+      ? `${activeGroup.name} Hall 暂无消息，发送第一条消息开始同步。`
+      : emptyTimelineText;
 }
 
 function renderFileCard(message) {
@@ -1237,14 +1555,19 @@ function renderPresenceStrip() {
 
   presenceStrip.classList.remove("hidden");
   presenceMembers.innerHTML = "";
+  const scopedMembers = getScopedMembers();
+  const scopedMemberIds = new Set(scopedMembers.map((member) => member.id));
+  const onlineScopedCount = Array.from(onlineMemberIds).filter((memberId) => scopedMemberIds.has(memberId)).length;
 
   if (!hasPresenceSnapshot) {
     presenceSummary.textContent = "在线成员同步中…";
   } else {
-    presenceSummary.textContent = `在线 ${onlineMemberIds.size}/${members.length}`;
+    presenceSummary.textContent = activeGroupId
+      ? `Hall 在线 ${onlineScopedCount}/${scopedMembers.length}`
+      : `在线 ${onlineScopedCount}/${scopedMembers.length}`;
   }
 
-  const sortedMembers = [...members].sort((a, b) => {
+  const sortedMembers = [...scopedMembers].sort((a, b) => {
     if (a.id === myId) return -1;
     if (b.id === myId) return 1;
     return a.id.localeCompare(b.id, "zh-CN");
@@ -1535,6 +1858,12 @@ function formatFileMeta(message) {
 }
 
 function updateComposerPlaceholder() {
+  if (activeGroupId) {
+    msgInput.placeholder = pendingFile
+      ? "输入文件附言… Hall 内 @ 只用于提醒成员"
+      : "输入 Hall 消息… @ 成员会提醒他，同组成员都可见";
+    return;
+  }
   msgInput.placeholder = pendingFile ? fileComposerPlaceholder : defaultComposerPlaceholder;
 }
 
@@ -1730,7 +2059,7 @@ msgInput.addEventListener("input", () => {
     const query = mentionContext[1].toLowerCase();
     mentionStart = before.lastIndexOf("@");
 
-    const filtered = members.filter(
+    const filtered = getScopedMembers().filter(
       (m) => m.id.toLowerCase().includes(query) || m.display_name.toLowerCase().includes(query)
     );
 
@@ -1750,6 +2079,11 @@ msgInput.addEventListener("input", () => {
 
   mentionDropdown.classList.add("hidden");
 });
+
+function renderMentionDropdownIfOpen() {
+  if (mentionDropdown.classList.contains("hidden")) return;
+  mentionDropdown.classList.add("hidden");
+}
 
 msgInput.addEventListener("keydown", (e) => {
   if (mentionDropdown.classList.contains("hidden")) return;

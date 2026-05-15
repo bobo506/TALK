@@ -96,7 +96,8 @@
 
 ## 当前边界
 
-- 当前没有 Web UI Group 列表、默认 active Group 或 Hall 导航。
+- Web UI 已有 Group 列表、默认 active Group 恢复、Hall 导航和新建 Group 面板。
+- Web UI 尚未提供独立的成员管理面板；创建后的成员增删/角色调整仍需走 API。
 - 当前没有 SDK group helper。
 - 当前没有 Group 删除 / 重命名 API。
 - 当前没有成员管理权限细分；human 可管理 Group 成员，Agent 不可管理。
@@ -105,7 +106,7 @@
 
 ## 后续计划
 
-- 在 Web UI 中接入 Group 列表、active Group、Hall 时间线切换与全局旧消息流兼容入口。
+- 在 Web UI 中补充 Group 成员管理、重命名/删除入口和更完整的未读/提醒状态。
 - 在 `TALK/client/` 中增加 Group API helper。
 - 设计并实现 Discussion Session / 多 Agent 讨论协议。
 - 让 SSE stream 事件携带 `group_id` 并显示在对应 Hall。
@@ -125,3 +126,6 @@
 - [x] 非 Group 成员不能读取 Group Hall。
 - [x] 不传 `group_id` 的旧消息历史不包含 Group 消息。
 - [x] 旧消息测试、Group 测试和全量后端回归通过。
+- [x] Web UI 可在全局消息流和 Group Hall 之间切换。
+- [x] Web UI 可创建 Group、选择初始成员并自动进入新 Hall。
+- [x] Web UI 在 Hall 内发送消息时会携带 `group_id`，且切回全局后不会显示 Hall 消息。

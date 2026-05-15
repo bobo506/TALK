@@ -150,6 +150,10 @@ CREATE TABLE agent_tasks (
 
 ## 当前前端交互约定
 
+- Web UI 登录后会显示“全局消息流”和可进入的 Group Hall 切换条；全局流继续读取不带 `group_id` 的旧消息，Group Hall 读取 `GET /api/messages?group_id=<id>`
+- Web UI 可创建 Group 并选择初始成员；创建后自动进入该 Group 的 Hall
+- 在 Group Hall 中发送文本或文件消息时，前端会自动带上当前 `group_id`
+- 在 Group Hall 中，成员在线条和 `@` 补全会收敛到当前 Group 成员；`@member_id` 只表示提醒/注意力路由，不改变同组可见性
 - 文本消息与文件附言都使用“消息开头连续 `@member_id` 块”决定接收者
 - 实际路由以服务端解析结果为准；前端只负责 `@` 自动补全与输入提示
 - 无开头 mention 时按广播处理
@@ -210,10 +214,10 @@ TALK/
 |----------|----------|----------|------|
 | [MODULE_members_auth.md](MODULE_members_auth.md) | 成员注册 + API Key 鉴权 | `server/auth.py`, `server/routes/members.py` | M1 已实现，已补 `GET /api/members/me`、Agent 自注册与首轮自动化测试 |
 | [MODULE_messages.md](MODULE_messages.md) | 消息发送与拉取 | `server/routes/messages.py` | M2 已支持服务端 mention 路由解析、文件附言、历史分页、搜索、消息撤回与自动化测试 |
-| [MODULE_groups.md](MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py` | `GROUP-1 / HALL-1` 后端第一版已落地，Web UI 与 SDK 待接入 |
+| [MODULE_groups.md](MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py`, `web/` | `GROUP-1 / HALL-1` 后端第一版已落地；Web UI 已接入 Group/Hall 切换与创建入口；SDK 待接入 |
 | [MODULE_websocket.md](MODULE_websocket.md) | WebSocket 连接管理与推送 | `server/ws_hub.py`, `server/main.py`(ws端点) | M1 已实现，有改进点 |
 | [MODULE_files.md](MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
-| [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | M2 已实现，已补渲染优化、过期文件反馈、历史翻页、搜索与撤回态渲染 |
+| [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
 | [MODULE_agent_example.md](MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | Codex bridge MVP 已落地，local-lab 方向持续设计中 |
 | [MODULE_instances.md](MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
@@ -248,7 +252,8 @@ TALK/
 - Group Hall 语义：Group 内消息对所有 Group 成员可见；`to_ids` 在 Group 内只表示 mention/注意力路由，不限制同组成员读取 Hall。
 - `GET /api/messages?group_id=<id>` 读取 Group Hall；不传 `group_id` 时继续读取旧全局消息流，避免旧 Web UI 被新房间消息污染。
 - WebSocket 推送已支持显式目标成员列表；Group 消息实时推送给 Group 成员，非成员不会收到。
-- 当前尚未接入 Web UI Group 导航、SDK group helper、SSE stream 与多 Agent 讨论协议。
+- Web UI 已接入 Group/Hall 切换条、新建 Group 面板、Hall 发送、Hall 历史/轮询作用域、Group 成员范围内 `@` 补全和在线成员显示。
+- 当前尚未接入 SDK group helper、SSE stream 与多 Agent 讨论协议。
 ## 2026-04-23 Data Model Addendum
 
 - `messages.reply_to INTEGER NULL REFERENCES messages(id)` was added for first-level reply/reference support.
