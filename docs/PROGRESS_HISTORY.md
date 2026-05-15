@@ -2,10 +2,30 @@
 
 <!--
 项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-15 18:21，下班汇总已写入
+最后更新：2026-05-15 18:25，文档语言约定已写入
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+
+
+## 2026-05-15 18:25 (Asia/Shanghai)
+### Current Progress
+- `DOC-LANG-1` 已完成：已在 `AGENTS.md` 中加入 TALK 文档语言约定。
+- 项目文档中的描述性内容应尽量使用中文。
+- 代码标识、API 路径、命令、配置键、协议名、库名、错误码、commit hash 等技术字面量可以保留原始写法。
+- 该规则覆盖需求说明、设计说明、进度记录、验收说明、变更摘要和面向人阅读的解释文字。
+### Open Questions / Pending Confirmation
+- 本规则切片没有新增待确认问题。
+### Next Plan
+1. 提交并推送本次文档规则切片。
+2. 明天用 `继续项目` 恢复。
+### Verification
+- 本次文档规则更新前，`git status --short` 为空。
+- `git diff --check` 已通过，仅有换行提示。
+### Changed Files
+- `AGENTS.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
 ## 2026-05-15 18:21 (Asia/Shanghai)
 ### Current Progress
 - End-of-day TALK summary completed.
