@@ -52,6 +52,8 @@ let groups = [];
 let activeGroupId = null;
 let groupCreateOpen = false;
 let groupCreateSaving = false;
+let groupMembersOpen = false;
+let groupMemberSaving = false;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -82,6 +84,7 @@ const globalRoomBtn = document.getElementById("global-room-btn");
 const groupRoomList = document.getElementById("group-room-list");
 const refreshGroupsBtn = document.getElementById("refresh-groups-btn");
 const toggleGroupCreateBtn = document.getElementById("toggle-group-create-btn");
+const toggleGroupMembersBtn = document.getElementById("toggle-group-members-btn");
 const groupCreatePanel = document.getElementById("group-create-panel");
 const groupCreateName = document.getElementById("group-create-name");
 const groupCreateId = document.getElementById("group-create-id");
@@ -90,6 +93,15 @@ const groupCreateMembers = document.getElementById("group-create-members");
 const groupCreateError = document.getElementById("group-create-error");
 const cancelGroupCreateBtn = document.getElementById("cancel-group-create-btn");
 const submitGroupCreateBtn = document.getElementById("submit-group-create-btn");
+const groupMembersPanel = document.getElementById("group-members-panel");
+const groupMembersSubtitle = document.getElementById("group-members-subtitle");
+const closeGroupMembersBtn = document.getElementById("close-group-members-btn");
+const groupMembersList = document.getElementById("group-members-list");
+const groupMemberAddForm = document.getElementById("group-member-add-form");
+const groupMemberAddSelect = document.getElementById("group-member-add-select");
+const groupMemberAddRole = document.getElementById("group-member-add-role");
+const groupMemberAddBtn = document.getElementById("group-member-add-btn");
+const groupMembersError = document.getElementById("group-members-error");
 const presenceStrip = document.getElementById("presence-strip");
 const presenceSummary = document.getElementById("presence-summary");
 const presenceMembers = document.getElementById("presence-members");
@@ -504,8 +516,11 @@ historyClearBtn.addEventListener("click", clearHistorySearch);
 globalRoomBtn.addEventListener("click", () => setActiveGroup(null));
 refreshGroupsBtn.addEventListener("click", refreshGroups);
 toggleGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(!groupCreateOpen));
+toggleGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(!groupMembersOpen));
 cancelGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
 groupCreatePanel.addEventListener("submit", createGroupFromPanel);
+closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(false));
+groupMemberAddForm.addEventListener("submit", addGroupMemberFromPanel);
 historySearchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
@@ -568,6 +583,20 @@ function getActiveGroup() {
   return groups.find((group) => group.id === activeGroupId) || null;
 }
 
+function canManageGroups() {
+  return myId.startsWith("human:");
+}
+
+function findMember(memberId) {
+  return members.find((member) => member.id === memberId) || null;
+}
+
+function replaceGroup(updatedGroup) {
+  groups = groups.some((group) => group.id === updatedGroup.id)
+    ? groups.map((group) => group.id === updatedGroup.id ? updatedGroup : group)
+    : [updatedGroup, ...groups];
+}
+
 function getGroupMemberIds(group) {
   return new Set((group?.members || []).map((member) => member.member_id));
 }
@@ -593,6 +622,7 @@ function setActiveGroup(groupId) {
     localStorage.setItem(activeGroupStorageKey(), activeGroupId);
   } else {
     localStorage.removeItem(activeGroupStorageKey());
+    groupMembersOpen = false;
   }
 
   setGroupCreateOpen(false);
@@ -641,19 +671,36 @@ function renderRoomStrip() {
   }
 
   toggleGroupCreateBtn.textContent = groupCreateOpen ? "收起" : "新建 Group";
+  toggleGroupMembersBtn.classList.toggle("hidden", !activeGroup);
+  toggleGroupMembersBtn.classList.toggle("active", groupMembersOpen && Boolean(activeGroup));
+  toggleGroupMembersBtn.textContent = groupMembersOpen ? "收起成员" : "成员";
   groupCreatePanel.classList.toggle("hidden", !groupCreateOpen);
   renderGroupCreateMembers();
+  renderGroupMembersPanel();
 }
 
 function setGroupCreateOpen(open) {
   groupCreateOpen = open;
   showGroupCreateError("");
   if (open) {
+    groupMembersOpen = false;
+  }
+  if (open) {
     renderGroupCreateMembers();
     groupCreateName.focus();
   } else {
     groupCreatePanel.reset();
   }
+  renderRoomStrip();
+}
+
+function setGroupMembersOpen(open) {
+  const activeGroup = getActiveGroup();
+  groupMembersOpen = Boolean(open && activeGroup);
+  if (groupMembersOpen) {
+    groupCreateOpen = false;
+  }
+  showGroupMembersError("");
   renderRoomStrip();
 }
 
@@ -750,6 +797,181 @@ async function createGroupFromPanel(event) {
     groupCreateSaving = false;
     submitGroupCreateBtn.disabled = false;
     cancelGroupCreateBtn.disabled = false;
+  }
+}
+
+function sortedGroupMembers(group) {
+  const roleRank = { owner: 0, moderator: 1, member: 2 };
+  return [...(group?.members || [])].sort((a, b) => {
+    const rankDiff = (roleRank[a.role] ?? 9) - (roleRank[b.role] ?? 9);
+    if (rankDiff !== 0) return rankDiff;
+    return a.member_id.localeCompare(b.member_id, "zh-CN");
+  });
+}
+
+function showGroupMembersError(message) {
+  groupMembersError.textContent = message;
+  groupMembersError.classList.toggle("hidden", !message);
+}
+
+function renderGroupMembersPanel() {
+  const activeGroup = getActiveGroup();
+  const isOpen = groupMembersOpen && Boolean(activeGroup);
+  groupMembersPanel.classList.toggle("hidden", !isOpen);
+  if (!isOpen || !activeGroup) return;
+
+  const canManage = canManageGroups();
+  const memberIds = getGroupMemberIds(activeGroup);
+  groupMembersSubtitle.textContent = `${activeGroup.id} · ${activeGroup.members.length} 位成员`;
+  groupMembersList.innerHTML = "";
+
+  for (const membership of sortedGroupMembers(activeGroup)) {
+    const member = findMember(membership.member_id);
+    const row = document.createElement("div");
+    row.className = "group-member-row";
+
+    const identity = document.createElement("div");
+    identity.className = "group-member-identity";
+
+    const name = document.createElement("div");
+    name.className = "group-member-name";
+    name.textContent = membership.member_id === myId
+      ? `${shortName(membership.member_id)} (我)`
+      : shortName(membership.member_id);
+
+    const meta = document.createElement("div");
+    meta.className = "group-member-meta";
+    meta.textContent = member ? `${membership.member_id} · ${member.display_name}` : membership.member_id;
+
+    identity.appendChild(name);
+    identity.appendChild(meta);
+
+    const controls = document.createElement("div");
+    controls.className = "group-member-controls";
+
+    const roleSelect = document.createElement("select");
+    roleSelect.className = "group-member-role-select";
+    roleSelect.disabled = !canManage || groupMemberSaving;
+    for (const role of ["member", "moderator", "owner"]) {
+      const option = document.createElement("option");
+      option.value = role;
+      option.textContent = role;
+      option.selected = membership.role === role;
+      roleSelect.appendChild(option);
+    }
+    roleSelect.addEventListener("change", () => updateGroupMemberRole(membership.member_id, roleSelect.value));
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "group-member-remove-btn";
+    removeButton.textContent = "移除";
+    removeButton.disabled = !canManage || groupMemberSaving || membership.member_id === myId;
+    removeButton.title = membership.member_id === myId ? "不能在当前界面移除自己" : "移出 Group";
+    removeButton.addEventListener("click", () => removeGroupMemberFromPanel(membership.member_id));
+
+    controls.appendChild(roleSelect);
+    controls.appendChild(removeButton);
+    row.appendChild(identity);
+    row.appendChild(controls);
+    groupMembersList.appendChild(row);
+  }
+
+  groupMemberAddForm.classList.toggle("hidden", !canManage);
+  groupMemberAddBtn.disabled = groupMemberSaving;
+  groupMemberAddSelect.innerHTML = "";
+  if (canManage) {
+    const availableMembers = members
+      .filter((member) => !memberIds.has(member.id))
+      .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
+
+    if (availableMembers.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "没有可添加的成员";
+      groupMemberAddSelect.appendChild(option);
+      groupMemberAddSelect.disabled = true;
+      groupMemberAddBtn.disabled = true;
+    } else {
+      groupMemberAddSelect.disabled = groupMemberSaving;
+      for (const member of availableMembers) {
+        const option = document.createElement("option");
+        option.value = member.id;
+        option.textContent = `${member.id} · ${member.display_name}`;
+        groupMemberAddSelect.appendChild(option);
+      }
+    }
+    groupMemberAddRole.disabled = groupMemberSaving;
+  }
+}
+
+async function addGroupMemberFromPanel(event) {
+  event.preventDefault();
+  const memberId = groupMemberAddSelect.value;
+  if (!memberId || groupMemberSaving || !activeGroupId) return;
+  await saveGroupMember(memberId, groupMemberAddRole.value);
+}
+
+async function updateGroupMemberRole(memberId, role) {
+  if (!memberId || !role || groupMemberSaving || !activeGroupId) return;
+  await saveGroupMember(memberId, role);
+}
+
+async function saveGroupMember(memberId, role) {
+  groupMemberSaving = true;
+  renderGroupMembersPanel();
+  try {
+    const res = await apiFetch(`/api/groups/${encodeURIComponent(activeGroupId)}/members/${encodeURIComponent(memberId)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `成员更新失败: ${res.status}`));
+    }
+
+    const group = await res.json();
+    replaceGroup(group);
+    clearComposerStatus("room");
+    showGroupMembersError("");
+    renderRoomStrip();
+    renderPresenceStrip();
+    renderMentionDropdownIfOpen();
+  } catch (err) {
+    console.error(err);
+    showGroupMembersError(err.message);
+    renderGroupMembersPanel();
+  } finally {
+    groupMemberSaving = false;
+    renderGroupMembersPanel();
+  }
+}
+
+async function removeGroupMemberFromPanel(memberId) {
+  if (!memberId || memberId === myId || groupMemberSaving || !activeGroupId) return;
+  groupMemberSaving = true;
+  renderGroupMembersPanel();
+  try {
+    const res = await apiFetch(`/api/groups/${encodeURIComponent(activeGroupId)}/members/${encodeURIComponent(memberId)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `成员移除失败: ${res.status}`));
+    }
+
+    const group = await res.json();
+    replaceGroup(group);
+    clearComposerStatus("room");
+    showGroupMembersError("");
+    renderRoomStrip();
+    renderPresenceStrip();
+    renderMentionDropdownIfOpen();
+  } catch (err) {
+    console.error(err);
+    showGroupMembersError(err.message);
+    renderGroupMembersPanel();
+  } finally {
+    groupMemberSaving = false;
+    renderGroupMembersPanel();
   }
 }
 

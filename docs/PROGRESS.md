@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-14 16:33 (Asia/Shanghai)
+Updated: 2026-05-15 11:04 (Asia/Shanghai)
 
 ### 1) Current Progress
 - `INSTANCE-1` completed: added the `agent_instances` table, `/api/instances` status APIs, SDK helpers, and `docs/MODULE_instances.md`.
@@ -24,6 +24,13 @@ Updated: 2026-05-14 16:33 (Asia/Shanghai)
 - Project role boundary updated: Codex is now authorized as a decision Agent for this project and may directly maintain relevant project/module/progress/decision documentation.
 - Group/Hall documentation synced: `docs/MODULE_groups.md` added and `docs/PROJECT_BRIEF.md` updated with the new tables, route, module index entry, and 2026-05-14 addendum.
 - `WEB-GROUP-1` completed: Web UI now has a room strip for global timeline / Group Hall switching, a new Group panel with initial member selection, active Group persistence, scoped Hall history/轮询/发送, scoped `@` autocomplete, and scoped online member display.
+- `SDK-GROUP-1` completed: async and sync SDK clients now expose Group helpers and support `group_id` on `send_text`, `send_file`, `reply`, and `fetch_history`.
+- SDK group helper coverage added in `tests/test_talk_client.py`; docs synced in `docs/SDK.md`, `docs/MODULE_groups.md`, and `docs/PROJECT_BRIEF.md`.
+- `WEB-GROUP-MEMBERS-1` completed: Web UI Hall now has an expandable members panel; human users can add members, adjust roles, and remove other members from the active Group.
+- Group member changes refresh the active Group snapshot, room description, scoped presence strip, and `@` autocomplete immediately.
+- `SSE-1` completed: added read-only `GET /api/events?token=...` Server-Sent Events with `presence`, `message`, `revoke`, and heartbeat `ping` events.
+- The realtime hub now fans out message/revoke/presence updates to both WebSocket connections and SSE queues; online member accounting includes the WebSocket/SSE union.
+- SSE route coverage added in `tests/test_sse.py`; docs synced in `docs/MODULE_websocket.md` and `docs/PROJECT_BRIEF.md`.
 
 ### 2) Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
@@ -36,13 +43,14 @@ Updated: 2026-05-14 16:33 (Asia/Shanghai)
 - The local `pi` framework entrypoint, configuration style, and DeepSeek / Kimi adapter shape still need to be verified on this workstation before bridge implementation.
 - Codex bridge is still MVP-level: it does not yet stream partial output, attach files/materials, or enforce document-edit locks.
 - Scheduler v2 details remain open: delayed / recurring schedule table shape, task retry policy, timeout recovery for stale `running` tasks, and whether Web UI can manually requeue or cancel tasks.
-- Group/Hall SDK wrappers, SSE stream integration, Group member management UI, rename/delete controls, and unread/attention state are still pending.
+- Web UI has not integrated the new SSE stream yet; it still relies on WebSocket plus HTTP polling fallback.
+- SSE currently provides live read-only events only; `Last-Event-ID` replay/backfill is not implemented.
+- Group rename/delete controls and unread/attention state are still pending.
 
 ### 3) Next Plan
 - Continue refining the unified bridge contract for hybrid backends: local CLI bridges for `Claude Code` / `Codex`, `pi`-based bridges for `Kimi` / `DeepSeek`, and a shared TALK-facing message/file interface.
 - Define the first multi-Agent discussion protocol: moderator-led turns, bounded rounds, automatic transcript retention, summary generation, controlled material/document passing, and document-edit coordination.
-- Commit the current Web UI Group/Hall follow-up when accepted.
-- Next implementation candidates: SDK group helpers, SSE stream event contract, Group member management UI, document-edit lock API, schedule API, or Codex bridge task-queue integration.
+- Next implementation candidates: Web UI SSE fallback/integration, SSE `Last-Event-ID` replay/backfill, Group rename/delete UI, document-edit lock API, schedule API, or Codex bridge task-queue integration.
 
 ### 4) Verification
 - `.venv\Scripts\python.exe -m unittest tests.test_tasks` passed with `7` tests.
@@ -59,6 +67,16 @@ Updated: 2026-05-14 16:33 (Asia/Shanghai)
 - After `GROUP-1 / HALL-1`, `.venv\Scripts\python.exe -m unittest tests.test_groups`, `.venv\Scripts\python.exe -m unittest tests.test_messages`, `node --check web\app.js`, `git diff --check`, and full `.venv\Scripts\python.exe -m unittest` all passed; full suite is now `81` tests.
 - After documentation sync, `git diff --check` passed with line-ending warnings only.
 - After `WEB-GROUP-1`, `node --check web\app.js` passed; Chrome headless smoke test against an isolated temporary TALK server verified login, Group creation with `agent:codex`, Hall message send, Hall placeholder, and that switching back to global hides the Hall message; `.venv\Scripts\python.exe -m unittest tests.test_groups tests.test_messages` passed with `26` tests; `git diff --check` passed with line-ending warnings only; full `.venv\Scripts\python.exe -m unittest` passed with `81` tests.
+- After `SDK-GROUP-1`, `.venv\Scripts\python.exe -m unittest tests.test_talk_client` passed with `10` tests.
+- Full `.venv\Scripts\python.exe -m unittest` passed with `82` tests; `git diff --check` passed with line-ending warnings only.
+- After `WEB-GROUP-MEMBERS-1`, `node --check web\app.js` passed; `.venv\Scripts\python.exe -m unittest tests.test_groups tests.test_messages` passed with `26` tests.
+- Chrome headless smoke test against an isolated temporary TALK server verified login, Group creation, members panel open, member add, role update, member removal, and no horizontal overflow at desktop and 500px widths.
+- After `WEB-GROUP-MEMBERS-1`, full `.venv\Scripts\python.exe -m unittest` passed with `82` tests; `git diff --check` passed with line-ending warnings only.
+- After `SSE-1`, `.venv\Scripts\python.exe -m unittest tests.test_sse` passed with `3` tests.
+- `.venv\Scripts\python.exe -m unittest tests.test_websocket` passed with `10` tests.
+- Full `.venv\Scripts\python.exe -m unittest` passed with `85` tests.
+- `node --check web\app.js` passed.
+- `git diff --check` passed with line-ending warnings only.
 
 ### 5) Changed Files
 - `AGENTS.md`
@@ -93,8 +111,98 @@ Updated: 2026-05-14 16:33 (Asia/Shanghai)
 - `docs/MODULE_webui.md`
 - `docs/PROJECT_BRIEF.md`
 - `docs/MODULE_groups.md`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `tests/test_talk_client.py`
+- `docs/SDK.md`
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `docs/MODULE_webui.md`
+- `server/main.py`
+- `server/ws_hub.py`
+- `tests/test_sse.py`
+- `tests/test_support.py`
+- `docs/MODULE_websocket.md`
 
 ## History
+
+### 2026-05-15 11:04 (Asia/Shanghai)
+#### Current Progress
+- `SSE-1` completed: added read-only `GET /api/events?token=...` as a Server-Sent Events stream for clients that cannot or should not hold a WebSocket.
+- SSE authentication uses the existing API key member resolution path; invalid tokens return `401`.
+- The stream emits `presence`, `message`, `revoke`, and idle `ping` events; `message` and `revoke` include SSE `id:` set to the message id.
+- `server/ws_hub.py` now fans out realtime updates to both WebSocket connections and per-member SSE queues, drops the oldest queued SSE event when a member queue is full, and counts online members across the WebSocket/SSE union.
+- Added live streaming tests for invalid token rejection, presence/message delivery, and revoke delivery.
+- Synced `docs/MODULE_websocket.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
+#### Open Questions / Pending Confirmation
+- Web UI has not integrated the new SSE stream yet; this slice only provides the backend event contract.
+- SSE `Last-Event-ID` replay/backfill is not implemented; clients should still use message history APIs after reconnect when they need gap recovery.
+#### Next Plan
+- Continue with one of: Web UI SSE fallback/integration, SSE `Last-Event-ID` replay/backfill, Group rename/delete UI, document-edit lock API, schedule API, or Codex bridge task-queue integration.
+#### Verification
+- `.venv\Scripts\python.exe -m unittest tests.test_sse` passed with `3` tests.
+- `.venv\Scripts\python.exe -m unittest tests.test_websocket` passed with `10` tests.
+- Full `.venv\Scripts\python.exe -m unittest` passed with `85` tests.
+- `node --check web\app.js` passed.
+- `git diff --check` passed with line-ending warnings only.
+#### Changed Files
+- `server/main.py`
+- `server/ws_hub.py`
+- `tests/test_sse.py`
+- `tests/test_support.py`
+- `docs/MODULE_websocket.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
+
+### 2026-05-15 10:52 (Asia/Shanghai)
+#### Current Progress
+- `WEB-GROUP-MEMBERS-1` completed: active Group Hall now exposes a members panel from the top room strip.
+- Human users can add members not yet in the Group, update member roles among `owner / moderator / member`, and remove other members.
+- Agent users retain a read-only member list in the UI; server-side permission remains authoritative.
+- Successful member changes replace the active Group snapshot and immediately refresh room metadata, scoped presence, and `@` autocomplete.
+- Static asset cache-busting updated to `20260515-group-members`.
+- Synced `docs/MODULE_webui.md`, `docs/MODULE_groups.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
+#### Open Questions / Pending Confirmation
+- No new open questions from this slice.
+#### Next Plan
+- Choose the next slice from: SSE stream event contract, Group rename/delete UI, document-edit lock API, schedule API, or Codex bridge task-queue integration.
+#### Verification
+- `node --check web\app.js` passed.
+- `.venv\Scripts\python.exe -m unittest tests.test_groups tests.test_messages` passed with `26` tests.
+- Chrome headless smoke test against an isolated temporary TALK server verified login, Group creation, members panel open, member add, role update, member removal, and no horizontal overflow at desktop and 500px widths.
+#### Changed Files
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `docs/MODULE_webui.md`
+- `docs/MODULE_groups.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
+
+### 2026-05-15 10:37 (Asia/Shanghai)
+#### Current Progress
+- `SDK-GROUP-1` completed: async SDK now exposes `create_group`, `list_groups`, `get_group`, `upsert_group_member`, and `remove_group_member`.
+- Sync SDK parity added for the same Group helpers; sync `reply()` was also exposed for parity with the async client.
+- Message helpers now support Hall scope: `send_text`, `send_file`, `reply`, and `fetch_history` can carry `group_id`.
+- Added live SDK coverage that creates a Group, updates/removes a member, sends a Hall message, reads Hall history as an Agent, and verifies the Hall message does not leak into legacy/global history.
+- Synced `docs/SDK.md`, `docs/MODULE_groups.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
+#### Open Questions / Pending Confirmation
+- No new open questions from this slice.
+#### Next Plan
+- Choose the next slice from: SSE stream event contract, Group member management UI, document-edit lock API, schedule API, or Codex bridge task-queue integration.
+#### Verification
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client` passed with `10` tests.
+- Full `.venv\Scripts\python.exe -m unittest` passed with `82` tests.
+- `git diff --check` passed with line-ending warnings only.
+#### Changed Files
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `tests/test_talk_client.py`
+- `docs/SDK.md`
+- `docs/MODULE_groups.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
 
 ### 2026-05-14 16:33 (Asia/Shanghai)
 #### Current Progress

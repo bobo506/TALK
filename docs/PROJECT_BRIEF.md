@@ -214,8 +214,8 @@ TALK/
 |----------|----------|----------|------|
 | [MODULE_members_auth.md](MODULE_members_auth.md) | 成员注册 + API Key 鉴权 | `server/auth.py`, `server/routes/members.py` | M1 已实现，已补 `GET /api/members/me`、Agent 自注册与首轮自动化测试 |
 | [MODULE_messages.md](MODULE_messages.md) | 消息发送与拉取 | `server/routes/messages.py` | M2 已支持服务端 mention 路由解析、文件附言、历史分页、搜索、消息撤回与自动化测试 |
-| [MODULE_groups.md](MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py`, `web/` | `GROUP-1 / HALL-1` 后端第一版已落地；Web UI 已接入 Group/Hall 切换与创建入口；SDK 待接入 |
-| [MODULE_websocket.md](MODULE_websocket.md) | WebSocket 连接管理与推送 | `server/ws_hub.py`, `server/main.py`(ws端点) | M1 已实现，有改进点 |
+| [MODULE_groups.md](MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py`, `web/`, `TALK/client/` | `GROUP-1 / HALL-1` 后端第一版已落地；Web UI 已接入 Group/Hall 切换与创建入口；SDK helper 已接入 |
+| [MODULE_websocket.md](MODULE_websocket.md) | WebSocket / SSE 实时事件连接管理与推送 | `server/ws_hub.py`, `server/main.py`(WS/SSE端点) | WS 已实现；SSE 只读事件流第一版已落地 |
 | [MODULE_files.md](MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
 | [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
 | [MODULE_agent_example.md](MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
@@ -252,8 +252,11 @@ TALK/
 - Group Hall 语义：Group 内消息对所有 Group 成员可见；`to_ids` 在 Group 内只表示 mention/注意力路由，不限制同组成员读取 Hall。
 - `GET /api/messages?group_id=<id>` 读取 Group Hall；不传 `group_id` 时继续读取旧全局消息流，避免旧 Web UI 被新房间消息污染。
 - WebSocket 推送已支持显式目标成员列表；Group 消息实时推送给 Group 成员，非成员不会收到。
-- Web UI 已接入 Group/Hall 切换条、新建 Group 面板、Hall 发送、Hall 历史/轮询作用域、Group 成员范围内 `@` 补全和在线成员显示。
-- 当前尚未接入 SDK group helper、SSE stream 与多 Agent 讨论协议。
+- Web UI 已接入 Group/Hall 切换条、新建 Group 面板、Hall 发送、Hall 历史/轮询作用域、Group 成员范围内 `@` 补全、在线成员显示和 Hall 内成员管理面板。
+- SDK 已接入 Group helper：支持创建/列表/详情/成员增删改，并支持 `send_text` / `send_file` / `reply` / `fetch_history` 携带 `group_id`。
+- SSE 只读事件流第一版已接入 `GET /api/events?token=<api_key>`：支持 `message / presence / revoke / ping` 事件，payload 复用现有 WS 事件语义。
+- 当前 Web UI 尚未接入 SSE stream，多 Agent 讨论协议也尚未落地。
+
 ## 2026-04-23 Data Model Addendum
 
 - `messages.reply_to INTEGER NULL REFERENCES messages(id)` was added for first-level reply/reference support.

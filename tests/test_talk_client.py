@@ -258,6 +258,45 @@ class TalkClientTests(RouteTestCase):
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))
 
+    def test_group_helpers_and_hall_history(self):
+        async def scenario(base_url: str) -> None:
+            async with TalkClient(base_url, "bobo-key") as human_client:
+                group = await human_client.create_group(
+                    "SDK Lab",
+                    group_id="group:sdk-lab",
+                    description="Created from SDK tests",
+                    member_ids=["agent:demo"],
+                )
+                updated = await human_client.upsert_group_member("group:sdk-lab", "agent:other", role="moderator")
+                removed = await human_client.remove_group_member("group:sdk-lab", "agent:other")
+
+                hall_message = await human_client.send_text(
+                    "@agent:demo hello inside hall",
+                    group_id="group:sdk-lab",
+                )
+                global_history = await human_client.fetch_history(since=0)
+
+            async with TalkClient(base_url, "demo-key") as agent_client:
+                groups = await agent_client.list_groups()
+                fetched = await agent_client.get_group("group:sdk-lab")
+                hall_history = await agent_client.fetch_history(group_id="group:sdk-lab", since=0)
+
+            self.assertEqual(group["id"], "group:sdk-lab")
+            self.assertEqual(group["description"], "Created from SDK tests")
+            self.assertIn("agent:other", {member["member_id"] for member in updated["members"]})
+            self.assertNotIn("agent:other", {member["member_id"] for member in removed["members"]})
+            self.assertEqual([item["id"] for item in groups], ["group:sdk-lab"])
+            self.assertEqual(
+                {member["member_id"] for member in fetched["members"]},
+                {"human:bobo", "agent:demo"},
+            )
+            self.assertEqual(hall_message["group_id"], "group:sdk-lab")
+            self.assertEqual(hall_history[-1]["content"], "@agent:demo hello inside hall")
+            self.assertNotIn(hall_message["id"], {message["id"] for message in global_history})
+
+        with LiveTalkServer(main.app) as base_url:
+            asyncio.run(scenario(base_url))
+
     async def _wait_for(self, predicate, timeout: float = 2.0) -> None:
         deadline = asyncio.get_running_loop().time() + timeout
         while asyncio.get_running_loop().time() < deadline:

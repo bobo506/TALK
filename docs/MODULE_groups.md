@@ -1,7 +1,7 @@
 # MODULE: Groups / Hall
 
 > 所属项目：TALK
-> 状态：`GROUP-1 / HALL-1` 后端第一版已落地
+> 状态：`GROUP-1 / HALL-1` 后端与 Web UI 第一版已落地，SDK helper 已接入
 
 ## 目标
 
@@ -96,9 +96,9 @@
 
 ## 当前边界
 
-- Web UI 已有 Group 列表、默认 active Group 恢复、Hall 导航和新建 Group 面板。
-- Web UI 尚未提供独立的成员管理面板；创建后的成员增删/角色调整仍需走 API。
-- 当前没有 SDK group helper。
+- Web UI 已有 Group 列表、默认 active Group 恢复、Hall 导航、新建 Group 面板和 Hall 内成员管理面板。
+- 创建后的成员增删/角色调整可走 API、SDK helper 或 Web UI 成员面板。
+- SDK 已提供 Group API helper，并支持在 `send_text` / `send_file` / `reply` / `fetch_history` 中携带 `group_id`。
 - 当前没有 Group 删除 / 重命名 API。
 - 当前没有成员管理权限细分；human 可管理 Group 成员，Agent 不可管理。
 - 当前没有 Discussion Session 表；多 Agent 轮次、主持人规则和总结策略仍属后续协议。
@@ -106,8 +106,7 @@
 
 ## 后续计划
 
-- 在 Web UI 中补充 Group 成员管理、重命名/删除入口和更完整的未读/提醒状态。
-- 在 `TALK/client/` 中增加 Group API helper。
+- 在 Web UI 中补充 Group 重命名/删除入口和更完整的未读/提醒状态。
 - 设计并实现 Discussion Session / 多 Agent 讨论协议。
 - 让 SSE stream 事件携带 `group_id` 并显示在对应 Hall。
 - 将任务状态、实例状态和文档锁状态接入 Group/Hall 视图。
@@ -129,3 +128,5 @@
 - [x] Web UI 可在全局消息流和 Group Hall 之间切换。
 - [x] Web UI 可创建 Group、选择初始成员并自动进入新 Hall。
 - [x] Web UI 在 Hall 内发送消息时会携带 `group_id`，且切回全局后不会显示 Hall 消息。
+- [x] SDK 可创建/读取 Group、管理成员，并在 Hall 内发送和读取消息。
+- [x] Web UI 可在 Hall 内添加成员、调整角色和移除其他成员。

@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260514-groups-ui">
+  <link rel="stylesheet" href="/style.css?v=20260515-group-members">
 </head>
 <body class="app-shell bg-gray-900 text-gray-100 h-screen flex flex-col">
 
@@ -127,6 +127,9 @@
             <button id="toggle-group-create-btn" type="button" class="room-create-btn">
               新建 Group
             </button>
+            <button id="toggle-group-members-btn" type="button" class="room-create-btn hidden">
+              成员
+            </button>
           </div>
         </div>
 
@@ -157,6 +160,27 @@
             </div>
           </div>
         </form>
+
+        <section id="group-members-panel" class="group-members-panel hidden">
+          <div class="group-members-header">
+            <div>
+              <div class="group-members-title">Group 成员</div>
+              <div id="group-members-subtitle" class="group-members-subtitle"></div>
+            </div>
+            <button id="close-group-members-btn" type="button" class="room-secondary-btn">收起</button>
+          </div>
+          <div id="group-members-list" class="group-members-list"></div>
+          <form id="group-member-add-form" class="group-member-add-form hidden">
+            <select id="group-member-add-select" class="group-member-select" aria-label="选择要加入 Group 的成员"></select>
+            <select id="group-member-add-role" class="group-member-role-select" aria-label="选择成员角色">
+              <option value="member">member</option>
+              <option value="moderator">moderator</option>
+              <option value="owner">owner</option>
+            </select>
+            <button id="group-member-add-btn" type="submit" class="room-primary-btn">添加成员</button>
+          </form>
+          <p id="group-members-error" class="group-create-error hidden"></p>
+        </section>
       </section>
 
       <section id="presence-strip" class="hidden px-4 py-2 shrink-0">
@@ -249,6 +273,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/lib/common.min.js"></script>
-  <script src="/app.js?v=20260514-groups-ui"></script>
+  <script src="/app.js?v=20260515-group-members"></script>
 </body>
 </html>

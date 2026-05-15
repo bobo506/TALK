@@ -388,6 +388,12 @@ button {
   color: #dbeafe;
 }
 
+.room-create-btn.active {
+  border-color: rgba(96, 165, 250, 0.64);
+  background: rgba(37, 99, 235, 0.18);
+  color: #dbeafe;
+}
+
 .room-chip:disabled {
   cursor: not-allowed;
   opacity: 0.48;
@@ -530,6 +536,141 @@ button {
   color: #fca5a5;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.group-members-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.group-members-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.group-members-title {
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.group-members-subtitle {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.group-members-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.group-member-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(71, 85, 105, 0.78);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.66);
+}
+
+.group-member-identity {
+  min-width: 0;
+}
+
+.group-member-name {
+  color: #e5edf7;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.group-member-meta {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-member-role-select,
+.group-member-select {
+  min-height: 34px;
+  min-width: 112px;
+  padding: 0 9px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0b1220;
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 650;
+  outline: none;
+}
+
+.group-member-select {
+  min-width: min(320px, 100%);
+  flex: 1 1 220px;
+}
+
+.group-member-role-select:focus,
+.group-member-select:focus {
+  border-color: rgba(96, 165, 250, 0.78);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.13);
+}
+
+.group-member-role-select:disabled,
+.group-member-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.group-member-remove-btn {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid rgba(248, 113, 113, 0.36);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.12);
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.group-member-remove-btn:hover {
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(127, 29, 29, 0.26);
+  color: #ffffff;
+}
+
+.group-member-remove-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.group-member-add-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
 }
 
 .header-actions {
@@ -1174,6 +1315,23 @@ button {
 
   .group-create-buttons {
     justify-content: flex-end;
+  }
+
+  .group-members-header,
+  .group-member-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .group-member-controls,
+  .group-member-add-form {
+    width: 100%;
+  }
+
+  .group-member-role-select,
+  .group-member-select,
+  .group-member-remove-btn {
+    flex: 1 1 auto;
   }
 
   .history-search-group,

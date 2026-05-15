@@ -9,7 +9,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from sqlmodel import Session
@@ -222,6 +222,42 @@ def get_public_config():
         "ws_ping_timeout": WS_PING_TIMEOUT,
         "file_retention_days": FILE_RETENTION_DAYS,
     }
+
+
+@app.get("/api/events")
+async def sse_events(
+    request: Request,
+    token: str = Query(...),
+):
+    """Server-Sent Events stream authenticated via ?token=<api_key>."""
+    with Session(engine) as session:
+        member = resolve_member_by_key(token, session)
+
+    if member is None:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    async def event_generator():
+        queue = await hub.subscribe_events(member.id)
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=WS_PING_INTERVAL)
+                    yield event
+                except asyncio.TimeoutError:
+                    yield hub.format_sse_event("ping", {})
+        finally:
+            await hub.unsubscribe_events(member.id, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.websocket("/ws")

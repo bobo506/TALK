@@ -99,7 +99,53 @@ if __name__ == "__main__":
 
 `fetch_history()` 会自动带当前成员的 `to=<member_id>` 过滤，因此默认返回“发给我 + 广播”的消息视图，和 Agent 轮询语义一致。
 
-## 4. Agent 实例状态
+## 4. Group / Hall
+
+Group 是讨论房间，Hall 是 Group 内共享时间线。SDK helper 只是轻量封装服务端已有 API，返回值保持为原始 JSON dict/list。
+
+```python
+import asyncio
+
+from TALK.client import TalkClient
+
+
+async def main() -> None:
+    human = TalkClient("http://127.0.0.1:8000", "human-key")
+
+    group = await human.create_group(
+        "Local Lab",
+        group_id="group:local-lab",
+        description="本地多 Agent 讨论房间",
+        member_ids=["agent:codex", "agent:claude"],
+    )
+    await human.upsert_group_member(group["id"], "agent:kimi", role="member")
+
+    await human.send_text("@agent:codex 请先看这份材料", group_id=group["id"])
+    hall = await human.fetch_history(group_id=group["id"], since=0)
+    print("hall messages:", len(hall))
+
+    await human.close()
+```
+
+常用方法：
+
+- `create_group(name, group_id=None, description=None, member_ids=None)`
+- `list_groups()`
+- `get_group(group_id)`
+- `upsert_group_member(group_id, member_id, role="member")`
+- `remove_group_member(group_id, member_id)`
+- `send_text(..., group_id=None)` / `send_file(..., group_id=None)` / `reply(..., group_id=None)`
+- `fetch_history(..., group_id=None)`
+
+约束：
+
+- 创建者会自动成为 `owner`
+- 当前只有 human 成员可以增删 Group 成员或调整角色
+- Agent 只能列出和读取自己已加入的 Group
+- 在 Group Hall 内，开头 `@member_id` 只表示提醒/注意力路由，不限制同组成员读取
+- 不传 `group_id` 时，`fetch_history()` 仍读取 legacy/global 消息流
+
+## 5. Agent 实例状态
 
 Agent bridge 可以把当前本地运行进程上报为一个 instance，供后续调度层或 Web UI 判断谁在线、谁忙、谁报错。
 
@@ -133,7 +179,7 @@ if __name__ == "__main__":
 
 状态值当前限定为：`starting`、`online`、`idle`、`busy`、`stopping`、`offline`、`error`。只有 `agent:*` 成员可以上报自己的实例状态；任意已认证成员可以读取实例列表。
 
-## 5. Agent 任务
+## 6. Agent 任务
 
 任务 API 是调度层的第一版基础：服务端只负责记录和分派任务，不负责自动启动 bridge 进程。Agent bridge 可以轮询或按自己的触发方式读取任务，领取后执行，最后回写完成状态。
 
@@ -181,7 +227,7 @@ async def main() -> None:
 - 失败完成必须传 `last_error`
 - 传入 `instance_id` 时，该实例必须属于当前 Agent
 
-## 6. 实时事件订阅
+## 7. 实时事件订阅
 
 ```python
 import asyncio
@@ -229,7 +275,7 @@ if __name__ == "__main__":
 - 自己触发的撤回不会触发 `on_revoke`
 - WebSocket 重连过程静默进行，不把异常直接抛进用户 handler
 
-## 7. `run()` 和 `close()` 的语义
+## 8. `run()` 和 `close()` 的语义
 
 `run()` 会：
 
@@ -260,7 +306,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 8. 同步客户端
+## 9. 同步客户端
 
 如果你明确不想自己管理 `asyncio`，可以用同步封装：
 
@@ -283,9 +329,9 @@ client.run()
 
 `TalkClientSync` 内部维护独立事件循环线程，对外暴露同步方法；同步 handler 会自动放到工作线程执行，避免阻塞 SDK 主循环。
 
-同步客户端同样暴露实例和任务 helper，例如 `report_instance_status()`、`list_instances()`、`create_task()`、`list_tasks()`、`claim_task()`、`complete_task()`。
+同步客户端同样暴露 Group、实例和任务 helper，例如 `create_group()`、`list_groups()`、`report_instance_status()`、`list_instances()`、`create_task()`、`list_tasks()`、`claim_task()`、`complete_task()`。
 
-## 9. 异常映射
+## 10. 异常映射
 
 - `TalkAuthError`: `401/403`
 - `TalkNotFoundError`: `404`
@@ -293,7 +339,7 @@ client.run()
 - `TalkServerError`: `5xx`
 - `TalkError`: 其它未分类错误
 
-## 10. 可见性说明
+## 11. 可见性说明
 
 - `fetch_history()` 仍可能为了兼容轮询语义带上 `to=<current_member_id>`
 - 真正的消息可见性已经由服务端保证

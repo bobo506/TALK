@@ -110,6 +110,7 @@ class TalkClient:
         text: str,
         to: str | list[str] | tuple[str, ...] | None = None,
         reply_to: int | None = None,
+        group_id: str | None = None,
     ) -> JsonDict:
         payload: JsonDict = {"type": "text", "content": text}
         normalized_to = self._normalize_recipients(to)
@@ -117,6 +118,8 @@ class TalkClient:
             payload["to"] = normalized_to
         if reply_to is not None:
             payload["reply_to"] = reply_to
+        if group_id is not None:
+            payload["group_id"] = group_id
         return await self._request_json("POST", "/api/messages", json_body=payload)
 
     async def send_file(
@@ -126,6 +129,7 @@ class TalkClient:
         caption: str | None = None,
         to: str | list[str] | tuple[str, ...] | None = None,
         reply_to: int | None = None,
+        group_id: str | None = None,
     ) -> JsonDict:
         file_path = Path(path).expanduser().resolve()
         if not file_path.exists() or not file_path.is_file():
@@ -150,6 +154,8 @@ class TalkClient:
             payload["caption"] = caption
         if reply_to is not None:
             payload["reply_to"] = reply_to
+        if group_id is not None:
+            payload["group_id"] = group_id
         return await self._request_json("POST", "/api/messages", json_body=payload)
 
     async def reply(
@@ -158,8 +164,9 @@ class TalkClient:
         *,
         text: str,
         to: str | list[str] | tuple[str, ...] | None = None,
+        group_id: str | None = None,
     ) -> JsonDict:
-        return await self.send_text(text, to=to, reply_to=message_id)
+        return await self.send_text(text, to=to, reply_to=message_id, group_id=group_id)
 
     async def revoke(self, message_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/messages/{message_id}/revoke")
@@ -187,6 +194,44 @@ class TalkClient:
 
     async def list_members(self) -> list[JsonDict]:
         return await self._request_json("GET", "/api/members")
+
+    async def create_group(
+        self,
+        name: str,
+        *,
+        group_id: str | None = None,
+        description: str | None = None,
+        member_ids: list[str] | tuple[str, ...] | None = None,
+    ) -> JsonDict:
+        payload: JsonDict = {
+            "id": group_id,
+            "name": name,
+            "description": description,
+            "member_ids": list(member_ids or []),
+        }
+        return await self._request_json("POST", "/api/groups", json_body=payload)
+
+    async def list_groups(self) -> list[JsonDict]:
+        return await self._request_json("GET", "/api/groups")
+
+    async def get_group(self, group_id: str) -> JsonDict:
+        return await self._request_json("GET", f"/api/groups/{group_id}")
+
+    async def upsert_group_member(
+        self,
+        group_id: str,
+        member_id: str,
+        *,
+        role: str = "member",
+    ) -> JsonDict:
+        return await self._request_json(
+            "PUT",
+            f"/api/groups/{group_id}/members/{member_id}",
+            json_body={"role": role},
+        )
+
+    async def remove_group_member(self, group_id: str, member_id: str) -> JsonDict:
+        return await self._request_json("DELETE", f"/api/groups/{group_id}/members/{member_id}")
 
     async def report_instance_status(
         self,
@@ -269,10 +314,15 @@ class TalkClient:
         before: int | None = None,
         since: int | None = None,
         q: str | None = None,
+        group_id: str | None = None,
         limit: int = 50,
     ) -> list[JsonDict]:
-        member = await self._ensure_member()
-        params: dict[str, Any] = {"limit": limit, "to": member["id"]}
+        params: dict[str, Any] = {"limit": limit}
+        if group_id is not None:
+            params["group_id"] = group_id
+        else:
+            member = await self._ensure_member()
+            params["to"] = member["id"]
         if before is not None:
             params["before"] = before
         if since is not None:

@@ -39,6 +39,7 @@ class RouteTestCase(unittest.TestCase):
         files_route.STORAGE_DIR = self.storage_dir
         main.engine = self.engine
         hub._connections.clear()
+        hub._event_queues.clear()
 
         SQLModel.metadata.create_all(self.engine)
 
@@ -48,6 +49,7 @@ class RouteTestCase(unittest.TestCase):
         files_route.STORAGE_DIR = self._old_files_storage_dir
         main.engine = self._old_main_engine
         hub._connections.clear()
+        hub._event_queues.clear()
         shutil.rmtree(self._tmpdir, ignore_errors=True)
         super().tearDown()
 

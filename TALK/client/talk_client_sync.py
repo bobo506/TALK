@@ -46,8 +46,9 @@ class TalkClientSync:
         text: str,
         to: str | list[str] | tuple[str, ...] | None = None,
         reply_to: int | None = None,
+        group_id: str | None = None,
     ) -> dict[str, Any]:
-        return self._submit(self._client.send_text(text, to=to, reply_to=reply_to))
+        return self._submit(self._client.send_text(text, to=to, reply_to=reply_to, group_id=group_id))
 
     def send_file(
         self,
@@ -56,11 +57,22 @@ class TalkClientSync:
         caption: str | None = None,
         to: str | list[str] | tuple[str, ...] | None = None,
         reply_to: int | None = None,
+        group_id: str | None = None,
     ) -> dict[str, Any]:
-        return self._submit(self._client.send_file(path, caption=caption, to=to, reply_to=reply_to))
+        return self._submit(self._client.send_file(path, caption=caption, to=to, reply_to=reply_to, group_id=group_id))
 
     def revoke(self, message_id: int) -> dict[str, Any]:
         return self._submit(self._client.revoke(message_id))
+
+    def reply(
+        self,
+        message_id: int,
+        *,
+        text: str,
+        to: str | list[str] | tuple[str, ...] | None = None,
+        group_id: str | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(self._client.reply(message_id, text=text, to=to, group_id=group_id))
 
     def download_file(self, file_id: str, save_to=None):
         return self._submit(self._client.download_file(file_id, save_to=save_to))
@@ -70,6 +82,41 @@ class TalkClientSync:
 
     def list_members(self) -> list[dict[str, Any]]:
         return self._submit(self._client.list_members())
+
+    def create_group(
+        self,
+        name: str,
+        *,
+        group_id: str | None = None,
+        description: str | None = None,
+        member_ids: list[str] | tuple[str, ...] | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.create_group(
+                name,
+                group_id=group_id,
+                description=description,
+                member_ids=member_ids,
+            )
+        )
+
+    def list_groups(self) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_groups())
+
+    def get_group(self, group_id: str) -> dict[str, Any]:
+        return self._submit(self._client.get_group(group_id))
+
+    def upsert_group_member(
+        self,
+        group_id: str,
+        member_id: str,
+        *,
+        role: str = "member",
+    ) -> dict[str, Any]:
+        return self._submit(self._client.upsert_group_member(group_id, member_id, role=role))
+
+    def remove_group_member(self, group_id: str, member_id: str) -> dict[str, Any]:
+        return self._submit(self._client.remove_group_member(group_id, member_id))
 
     def report_instance_status(
         self,
@@ -145,9 +192,12 @@ class TalkClientSync:
         before: int | None = None,
         since: int | None = None,
         q: str | None = None,
+        group_id: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        return self._submit(self._client.fetch_history(before=before, since=since, q=q, limit=limit))
+        return self._submit(
+            self._client.fetch_history(before=before, since=since, q=q, group_id=group_id, limit=limit)
+        )
 
     def run(self) -> None:
         self._submit(self._client.run())
