@@ -2,9 +2,33 @@
 
 <!--
 项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-16 19:04，Web UI SSE 兜底已接入
+最后更新：2026-05-16 19:26，流程守护规则已补充
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-16 19:26 (Asia/Shanghai)
+### Current Progress
+- `WORKFLOW-GUARD-1` 已完成：已在 `AGENTS.md` 中补充 Browser 验证失败诊断规则与 token/额度占比收尾规则。
+- Browser 失败诊断确认：`node_repl` 可执行，`browser-client.mjs` 可 import，但 `setupAtlasRuntime(...)` 阻塞超时，失败点在 Codex Browser 运行时初始化/后端连接，不是 TALK 页面代码。
+- 规则明确：若 `node_repl` 与 import 正常但 Browser runtime 初始化阻塞，应记录限制，改用静态检查、后端测试、必要的临时隔离服务验证，并提示项目管理者从 Codex Desktop / Browser 后端侧恢复后补测。
+- token/额度规则明确：若运行环境提供 5 小时额度或 token 用量占比，达到或超过 90% 时不得开启新切片，必须先完成当前切片收尾、汇总进度、提交/推送并输出 `继续项目`。
+- 当前工具上下文未暴露 5 小时额度或 token 用量占比，Agent 不应臆测具体百分比，继续沿用上下文 80%-90% 接近上限规则。
+### Open Questions / Pending Confirmation
+- 需要项目管理者在 Codex Desktop 侧重启/恢复 in-app Browser 或检查 Browser/Chrome 后端后，再补 Web UI 真实浏览器验证。
+- 若未来 Codex 暴露精确 token/额度占比，可进一步把该信号纳入自动化提醒或进度模板。
+### Next Plan
+1. 提交并推送本次流程规则补充切片。
+2. Browser 恢复可用后，补 Web UI SSE 兜底真实页面烟测。
+3. 下一功能候选切片：SSE `Last-Event-ID` replay/backfill，或 Group 重命名/删除 UI。
+### Verification
+- `node_repl` 最小执行 `nodeRepl.write("node_repl ok")` passed。
+- `browser-client.mjs` import passed，导出 `setupAtlasRuntime`。
+- `setupAtlasRuntime(...)` 30 秒超时；使用 `Promise.race` 的 5 秒超时探针也未返回，说明初始化过程阻塞。
+- `git diff --check` 待提交前执行。
+### Changed Files
+- `AGENTS.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
 
 ## 2026-05-16 19:04 (Asia/Shanghai)
 ### Current Progress
