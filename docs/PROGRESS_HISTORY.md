@@ -2,9 +2,34 @@
 
 <!--
 项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-16 19:26，流程守护规则已补充
+最后更新：2026-05-16 20:24，连续开发批次刹车规则已补充
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-16 20:24 (Asia/Shanghai)
+### Current Progress
+- `WORKFLOW-BATCH-GUARD-1` 已完成：已在全局 `project-framework` skill 与 TALK `AGENTS.md` 中加入连续开发批次刹车规则。
+- 决策 Agent 每次恢复默认最多连续推进 2 个明确切片；若都是小型文档/配置切片，可最多 3 个。
+- 涉及前端真实交互、数据库/协议、部署/权限或跨模块协作时，默认 1 个切片后暂停汇总。
+- 决策 Agent 连续工作约 60-90 分钟后，不应开启新切片，应先完成当前切片的必要验证、汇总进度、提交/推送，并输出下一步建议。
+- 软停止信号仅保留两项：后续任务需要重新读取另一个模块文档，或 Agent 明显开始依赖“回忆前文”才能继续判断。
+- 若环境提供 5 小时额度或 token 用量占比，仍保留达到或超过 90% 时必须完成当前切片收尾的规则；若环境未暴露精确占比，不臆测百分比。
+### Open Questions / Pending Confirmation
+- 当前环境仍未暴露精确 token/5 小时额度占比；后续继续按批次、工作时长、上下文接近上限与两项软停止信号控制连续开发。
+- Browser runtime 初始化问题仍待从 Codex Desktop / Browser 后端侧恢复后补测。
+### Next Plan
+1. 提交并推送全局 `project-framework` skill 更新。
+2. 提交并推送 TALK 本地规则与进度更新。
+3. 下一功能候选切片：SSE `Last-Event-ID` replay/backfill，或 Group 重命名/删除 UI。
+### Verification
+- `$env:PYTHONUTF8='1'; python C:\Users\Administrator\.codex\skills\.system\skill-creator\scripts\quick_validate.py C:\Users\Administrator\.codex\skills\project-framework` passed。
+- `git diff --check` in `C:\Users\Administrator\.codex\skills\project-framework` passed，仅有换行提示。
+- `git diff --check` in TALK passed，仅有换行提示。
+### Changed Files
+- `C:\Users\Administrator\.codex\skills\project-framework\SKILL.md`
+- `AGENTS.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
 
 ## 2026-05-16 19:26 (Asia/Shanghai)
 ### Current Progress
