@@ -25,6 +25,7 @@ let myId = "";
 let members = [];
 let lastId = 0;
 let ws = null;
+let eventSource = null;
 let pollTimer = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
@@ -140,6 +141,18 @@ const connectionStates = {
   connected: {
     label: "实时已连接",
     classes: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
+  },
+  sse: {
+    label: "SSE 已连接",
+    classes: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
+  },
+  sseFallback: {
+    label: "SSE 兜底中",
+    classes: "border-blue-500/40 bg-blue-500/10 text-blue-100",
+  },
+  sseReconnecting: {
+    label: "SSE 重连中 · 轮询兜底",
+    classes: "border-yellow-500/40 bg-yellow-500/10 text-yellow-200",
   },
   reconnecting: {
     label: "重连中 · 轮询兜底",
@@ -506,6 +519,7 @@ logoutBtn.addEventListener("click", () => {
     ws.close();
     ws = null;
   }
+  closeEventStream();
   clearStoredApiKeys();
   location.reload();
 });
@@ -1032,6 +1046,7 @@ function startChat() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  closeEventStream();
   loadHistory();
   connectWS();
   pollTimer = setInterval(pollMessages, 3000);
@@ -1095,6 +1110,10 @@ async function pollMessages() {
 
 function connectWS() {
   if (!apiKey) return;
+  if (!("WebSocket" in window)) {
+    connectEventStream({ fallback: false });
+    return;
+  }
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
     return;
   }
@@ -1106,6 +1125,7 @@ function connectWS() {
   ws.onopen = () => {
     const recovered = reconnectAttempts > 0;
     reconnectAttempts = 0;
+    closeEventStream();
     setConnectionStatus("connected");
     if (recovered) {
       showComposerStatus("实时连接已恢复。", "info", { source: "ws", timeoutMs: 2500 });
@@ -1115,38 +1135,32 @@ function connectWS() {
   };
 
   ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
+    let data = null;
+    try {
+      data = JSON.parse(event.data);
+    } catch (err) {
+      console.warn("Ignoring invalid WS event", err);
+      return;
+    }
     if (data.type === "ping") {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "pong" }));
       }
-    } else if (data.type === "message") {
-      const m = data.payload;
-      if (messageBelongsToActiveRoom(m) && m.id > lastId) {
-        lastId = m.id;
-        const appendedCount = upsertMessages(matchesActiveHistoryQuery(m) ? [m] : [], "append");
-        if (appendedCount > 0) {
-          maybePlayNotification([m]);
-          scrollBottom();
-        }
-      }
-    } else if (data.type === "revoke") {
-      applyRevokeEvent(data.payload);
-    } else if (data.type === "presence") {
-      hasPresenceSnapshot = true;
-      onlineMemberIds = new Set(data.payload?.online_ids || []);
-      renderPresenceStrip();
+      return;
     }
+    handleRealtimeEvent(data);
   };
 
   ws.onclose = () => {
     ws = null;
     if (loggingOut) return;
+    connectEventStream({ fallback: true });
     scheduleReconnect();
   };
 
   ws.onerror = () => {
     setConnectionStatus("polling");
+    connectEventStream({ fallback: true });
   };
 }
 
@@ -1159,6 +1173,80 @@ function scheduleReconnect() {
     reconnectTimer = null;
     connectWS();
   }, delay);
+}
+
+function connectEventStream({ fallback = true } = {}) {
+  if (!apiKey || loggingOut) return;
+  if (!("EventSource" in window)) {
+    setConnectionStatus("polling");
+    return;
+  }
+  if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
+    return;
+  }
+
+  const source = new EventSource(`${API}/api/events?token=${encodeURIComponent(apiKey)}`);
+  eventSource = source;
+
+  source.onopen = () => {
+    if (source !== eventSource) return;
+    setConnectionStatus(fallback ? "sseFallback" : "sse");
+    if (fallback) {
+      clearComposerStatus("ws");
+    }
+  };
+
+  source.onerror = () => {
+    if (source !== eventSource || loggingOut) return;
+    setConnectionStatus("sseReconnecting");
+  };
+
+  for (const eventType of ["message", "revoke", "presence", "ping"]) {
+    source.addEventListener(eventType, (event) => {
+      if (source !== eventSource) return;
+      handleServerSentEvent(eventType, event);
+    });
+  }
+}
+
+function closeEventStream() {
+  if (!eventSource) return;
+  eventSource.close();
+  eventSource = null;
+}
+
+function handleServerSentEvent(type, event) {
+  if (type === "ping") return;
+
+  let payload = {};
+  try {
+    payload = event.data ? JSON.parse(event.data) : {};
+  } catch (err) {
+    console.warn("Ignoring invalid SSE event", err);
+    return;
+  }
+
+  handleRealtimeEvent({ type, payload });
+}
+
+function handleRealtimeEvent(data) {
+  if (data.type === "message") {
+    const message = data.payload;
+    if (messageBelongsToActiveRoom(message) && message.id > lastId) {
+      lastId = message.id;
+      const appendedCount = upsertMessages(matchesActiveHistoryQuery(message) ? [message] : [], "append");
+      if (appendedCount > 0) {
+        maybePlayNotification([message]);
+        scrollBottom();
+      }
+    }
+  } else if (data.type === "revoke") {
+    applyRevokeEvent(data.payload);
+  } else if (data.type === "presence") {
+    hasPresenceSnapshot = true;
+    onlineMemberIds = new Set(data.payload?.online_ids || []);
+    renderPresenceStrip();
+  }
 }
 
 // ── Send message / file ──────────────────────────────────────────────

@@ -2,11 +2,38 @@
 
 <!--
 项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-15 18:25，文档语言约定已写入
+最后更新：2026-05-16 19:04，Web UI SSE 兜底已接入
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
-
+## 2026-05-16 19:04 (Asia/Shanghai)
+### Current Progress
+- `WEB-SSE-UI-1` 已完成：Web UI 已接入 `GET /api/events?token=...` SSE 事件流作为实时兜底。
+- 浏览器优先使用 WebSocket；如果当前浏览器不支持 WebSocket，或 WebSocket 断开/报错，会打开 SSE 并显示 `SSE 已连接 / SSE 兜底中 / SSE 重连中 · 轮询兜底` 状态。
+- WebSocket 恢复后会主动关闭 SSE，避免同一浏览器同时占用两条实时通道。
+- SSE 与 WS 共用前端实时事件处理逻辑，统一处理 `message / revoke / presence`，`ping` 事件只用于保持连接。
+- HTTP 轮询仍保留为断线与事件缺口补漏通道，不承担在线成员状态。
+- `docs/MODULE_webui.md` 已同步接口依赖、当前实现、验收标准和本切片 addendum。
+### Open Questions / Pending Confirmation
+- Codex in-app Browser 插件本轮连接两次超时，未完成真实浏览器前端烟测；临时隔离服务已关闭并清理。
+- SSE `Last-Event-ID` replay/backfill 尚未实现；客户端仍需用历史接口和 HTTP 轮询补漏。
+### Next Plan
+1. 提交并推送本次 Web UI SSE 兜底切片。
+2. 下一候选切片：SSE `Last-Event-ID` replay/backfill，或 Group 重命名/删除 UI。
+3. 如浏览器插件恢复可用，补一轮真实 Web UI SSE 兜底烟测。
+### Verification
+- `node --check web\app.js` passed。
+- `git diff --check` passed，仅有换行提示。
+- `.venv\Scripts\python.exe -m unittest tests.test_sse` passed，3 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_websocket` passed，10 tests。
+- `.venv\Scripts\python.exe -m unittest` passed，85 tests。
+- Browser 插件连接两次超时；临时隔离服务已关闭并清理。
+### Changed Files
+- `web/app.js`
+- `web/index.html`
+- `docs/MODULE_webui.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
 
 ## 2026-05-15 18:25 (Asia/Shanghai)
 ### Current Progress
