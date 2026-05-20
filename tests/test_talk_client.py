@@ -3,6 +3,7 @@ import contextlib
 import socket
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import uvicorn
@@ -254,6 +255,27 @@ class TalkClientTests(RouteTestCase):
             self.assertEqual(queued[0]["id"], created["id"])
             self.assertEqual(claimed["status"], "running")
             self.assertEqual(completed["status"], "succeeded")
+
+        with LiveTalkServer(main.app) as base_url:
+            asyncio.run(scenario(base_url))
+
+    def test_task_schedule_helpers(self):
+        async def scenario(base_url: str) -> None:
+            run_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+            async with TalkClient(base_url, "bobo-key") as human_client:
+                created = await human_client.create_task_schedule(
+                    "agent:demo",
+                    "Run scheduled SDK task",
+                    title="SDK schedule",
+                    run_at=run_at,
+                )
+                visible = await human_client.list_task_schedules(status="active")
+                materialized = await human_client.run_due_task_schedules()
+                completed = await human_client.get_task_schedule(created["id"])
+
+            self.assertEqual(visible[0]["id"], created["id"])
+            self.assertEqual(materialized["created_tasks"][0]["schedule_id"], created["id"])
+            self.assertEqual(completed["status"], "completed")
 
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))

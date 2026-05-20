@@ -103,6 +103,7 @@ class AgentTask(SQLModel, table=True):
     __tablename__ = "agent_tasks"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    schedule_id: Optional[int] = Field(default=None, foreign_key="agent_task_schedules.id", index=True)
     target_member_id: str = Field(foreign_key="members.id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     content: str
@@ -116,6 +117,24 @@ class AgentTask(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     claimed_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+
+
+class AgentTaskSchedule(SQLModel, table=True):
+    __tablename__ = "agent_task_schedules"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    target_member_id: str = Field(foreign_key="members.id", index=True)
+    created_by: str = Field(foreign_key="members.id", index=True)
+    content: str
+    title: Optional[str] = None
+    schedule_type: str = Field(index=True)  # once | interval
+    status: str = Field(default="active", index=True)  # active | paused | completed | canceled
+    next_run_at: datetime = Field(index=True)
+    interval_seconds: Optional[int] = None
+    last_run_at: Optional[datetime] = None
+    last_task_id: Optional[int] = Field(default=None, foreign_key="agent_tasks.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ── API schemas (request / response) ────────────────────────────────
@@ -343,6 +362,7 @@ class AgentInstanceOut(BaseModel):
 
 _TASK_STATUSES = {"queued", "running", "succeeded", "failed", "canceled"}
 _TASK_TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
+_SCHEDULE_STATUSES = {"active", "paused", "completed", "canceled"}
 
 
 class AgentTaskCreate(BaseModel):
@@ -392,6 +412,7 @@ class AgentTaskComplete(BaseModel):
 
 class AgentTaskOut(BaseModel):
     id: int
+    schedule_id: Optional[int]
     target_member_id: str
     created_by: str
     content: str
@@ -405,3 +426,57 @@ class AgentTaskOut(BaseModel):
     updated_at: datetime
     claimed_at: Optional[datetime]
     finished_at: Optional[datetime]
+
+
+class AgentTaskScheduleCreate(BaseModel):
+    target_member_id: str
+    content: str
+    title: Optional[str] = None
+    run_at: Optional[datetime] = None
+    interval_seconds: Optional[int] = None
+
+    @model_validator(mode="after")
+    def validate_schedule_create(self) -> "AgentTaskScheduleCreate":
+        self.target_member_id = self.target_member_id.strip()
+        self.content = self.content.strip()
+        if self.title is not None:
+            self.title = self.title.strip() or None
+        if not self.target_member_id:
+            raise ValueError("target_member_id is required")
+        if not self.content:
+            raise ValueError("content is required")
+        if self.interval_seconds is not None and self.interval_seconds <= 0:
+            raise ValueError("interval_seconds must be greater than 0")
+        return self
+
+
+class AgentTaskScheduleUpdate(BaseModel):
+    status: str
+
+    @model_validator(mode="after")
+    def validate_schedule_update(self) -> "AgentTaskScheduleUpdate":
+        self.status = self.status.strip().lower()
+        if self.status not in {"active", "paused", "canceled"}:
+            raise ValueError("status must be one of ['active', 'canceled', 'paused']")
+        return self
+
+
+class AgentTaskScheduleOut(BaseModel):
+    id: int
+    target_member_id: str
+    created_by: str
+    content: str
+    title: Optional[str]
+    schedule_type: str
+    status: str
+    next_run_at: datetime
+    interval_seconds: Optional[int]
+    last_run_at: Optional[datetime]
+    last_task_id: Optional[int]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AgentTaskScheduleRunOut(BaseModel):
+    created_tasks: list[AgentTaskOut]
+    updated_schedules: list[AgentTaskScheduleOut]

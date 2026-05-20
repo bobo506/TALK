@@ -71,6 +71,12 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN revoked_at TIMESTAMP")
         if "revoked_by" not in columns:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN revoked_by TEXT")
+        task_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(agent_tasks)").fetchall()
+        }
+        if "schedule_id" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN schedule_id INTEGER REFERENCES agent_task_schedules(id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_files_sha256 ON files (sha256)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_from_id ON messages (from_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_group_id ON messages (group_id)")
@@ -86,6 +92,12 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_status ON agent_tasks (status)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_claimed_by ON agent_tasks (claimed_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_instance_id ON agent_tasks (instance_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_schedule_id ON agent_tasks (schedule_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_target_member_id ON agent_task_schedules (target_member_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_created_by ON agent_task_schedules (created_by)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_schedule_type ON agent_task_schedules (schedule_type)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_status ON agent_task_schedules (status)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_next_run_at ON agent_task_schedules (next_run_at)")
         conn.exec_driver_sql(
             """
             UPDATE messages

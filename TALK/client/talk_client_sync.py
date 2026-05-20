@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from concurrent.futures import Future
+from datetime import datetime
 from threading import Thread
 from typing import Any, Callable
 
@@ -194,6 +195,42 @@ class TalkClientSync:
                 last_error=last_error,
             )
         )
+
+    def create_task_schedule(
+        self,
+        target_member_id: str,
+        content: str,
+        *,
+        title: str | None = None,
+        run_at: datetime | str | None = None,
+        interval_seconds: int | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.create_task_schedule(
+                target_member_id,
+                content,
+                title=title,
+                run_at=run_at,
+                interval_seconds=interval_seconds,
+            )
+        )
+
+    def list_task_schedules(
+        self,
+        *,
+        target_member_id: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_task_schedules(target_member_id=target_member_id, status=status))
+
+    def get_task_schedule(self, schedule_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_task_schedule(schedule_id))
+
+    def update_task_schedule(self, schedule_id: int, *, status: str) -> dict[str, Any]:
+        return self._submit(self._client.update_task_schedule(schedule_id, status=status))
+
+    def run_due_task_schedules(self) -> dict[str, Any]:
+        return self._submit(self._client.run_due_task_schedules())
 
     def fetch_history(
         self,

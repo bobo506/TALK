@@ -7,6 +7,7 @@ import inspect
 import json
 import logging
 from collections import OrderedDict
+from datetime import datetime
 from email.parser import BytesParser
 from email.policy import HTTP
 from pathlib import Path
@@ -320,6 +321,46 @@ class TalkClient:
             "last_error": last_error,
         }
         return await self._request_json("POST", f"/api/tasks/{task_id}/complete", json_body=payload)
+
+    async def create_task_schedule(
+        self,
+        target_member_id: str,
+        content: str,
+        *,
+        title: str | None = None,
+        run_at: datetime | str | None = None,
+        interval_seconds: int | None = None,
+    ) -> JsonDict:
+        payload: JsonDict = {
+            "target_member_id": target_member_id,
+            "content": content,
+            "title": title,
+            "run_at": run_at.isoformat() if isinstance(run_at, datetime) else run_at,
+            "interval_seconds": interval_seconds,
+        }
+        return await self._request_json("POST", "/api/tasks/schedules", json_body=payload)
+
+    async def list_task_schedules(
+        self,
+        *,
+        target_member_id: str | None = None,
+        status: str | None = None,
+    ) -> list[JsonDict]:
+        params: dict[str, Any] = {}
+        if target_member_id:
+            params["target_member_id"] = target_member_id
+        if status:
+            params["status"] = status
+        return await self._request_json("GET", "/api/tasks/schedules", params=params)
+
+    async def get_task_schedule(self, schedule_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/tasks/schedules/{schedule_id}")
+
+    async def update_task_schedule(self, schedule_id: int, *, status: str) -> JsonDict:
+        return await self._request_json("PATCH", f"/api/tasks/schedules/{schedule_id}", json_body={"status": status})
+
+    async def run_due_task_schedules(self) -> JsonDict:
+        return await self._request_json("POST", "/api/tasks/schedules/run-due")
 
     async def fetch_history(
         self,

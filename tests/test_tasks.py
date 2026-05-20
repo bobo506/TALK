@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from tests.test_support import RouteTestCase
 
 
@@ -199,3 +201,103 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(failed.json()["status"], "failed")
         self.assertEqual(instances.json()[0]["status"], "error")
         self.assertEqual(instances.json()[0]["last_error"], "boom")
+
+    def test_human_can_create_schedule_and_agent_can_list_it(self):
+        run_at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        with self.make_client() as client:
+            created = client.post(
+                "/api/tasks/schedules",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "title": "Later",
+                    "content": "Run later",
+                    "run_at": run_at,
+                },
+            )
+            agent_schedules = client.get(
+                "/api/tasks/schedules",
+                headers={"X-API-Key": "codex-key"},
+                params={"status": "active"},
+            )
+            other_schedules = client.get("/api/tasks/schedules", headers={"X-API-Key": "other-key"})
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["created_by"], "human:bobo")
+        self.assertEqual(created.json()["schedule_type"], "once")
+        self.assertEqual(created.json()["status"], "active")
+        self.assertEqual([schedule["id"] for schedule in agent_schedules.json()], [created.json()["id"]])
+        self.assertEqual(other_schedules.json(), [])
+
+    def test_run_due_once_schedule_creates_task_and_completes_schedule(self):
+        run_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        with self.make_client() as client:
+            created = client.post(
+                "/api/tasks/schedules",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Run now", "run_at": run_at},
+            )
+            materialized = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "bobo-key"})
+            second_run = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "bobo-key"})
+
+        payload = materialized.json()
+        self.assertEqual(materialized.status_code, 200)
+        self.assertEqual(len(payload["created_tasks"]), 1)
+        self.assertEqual(payload["created_tasks"][0]["schedule_id"], created.json()["id"])
+        self.assertEqual(payload["created_tasks"][0]["status"], "queued")
+        self.assertEqual(payload["updated_schedules"][0]["status"], "completed")
+        self.assertEqual(payload["updated_schedules"][0]["last_task_id"], payload["created_tasks"][0]["id"])
+        self.assertEqual(second_run.json()["created_tasks"], [])
+
+    def test_run_due_interval_schedule_advances_next_run(self):
+        run_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        with self.make_client() as client:
+            created = client.post(
+                "/api/tasks/schedules",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Run repeatedly",
+                    "run_at": run_at,
+                    "interval_seconds": 60,
+                },
+            )
+            materialized = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "codex-key"})
+            fetched = client.get(
+                f"/api/tasks/schedules/{created.json()['id']}",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(materialized.status_code, 200)
+        updated = materialized.json()["updated_schedules"][0]
+        self.assertEqual(updated["status"], "active")
+        self.assertEqual(updated["schedule_type"], "interval")
+        self.assertEqual(updated["interval_seconds"], 60)
+        self.assertEqual(updated["last_task_id"], materialized.json()["created_tasks"][0]["id"])
+        self.assertEqual(fetched.json()["last_task_id"], updated["last_task_id"])
+        self.assertNotEqual(fetched.json()["next_run_at"], created.json()["next_run_at"])
+
+    def test_pause_schedule_blocks_run_due_and_wrong_agent_cannot_update(self):
+        run_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        with self.make_client() as client:
+            created = client.post(
+                "/api/tasks/schedules",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Run later", "run_at": run_at},
+            )
+            wrong_agent = client.patch(
+                f"/api/tasks/schedules/{created.json()['id']}",
+                headers={"X-API-Key": "other-key"},
+                json={"status": "paused"},
+            )
+            paused = client.patch(
+                f"/api/tasks/schedules/{created.json()['id']}",
+                headers={"X-API-Key": "bobo-key"},
+                json={"status": "paused"},
+            )
+            materialized = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "bobo-key"})
+
+        self.assertEqual(wrong_agent.status_code, 404)
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.json()["status"], "paused")
+        self.assertEqual(materialized.json()["created_tasks"], [])
