@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 DEFAULT_CODEX_COMMAND = "codex exec --skip-git-repo-check --sandbox workspace-write --color never -"
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
+DEFAULT_TASK_POLL_INTERVAL = 2.0
 
 
 @dataclass(frozen=True)
@@ -109,6 +110,26 @@ def build_codex_prompt(message: dict[str, Any], *, member_id: str, workdir: Path
     )
 
 
+def build_codex_task_prompt(task: dict[str, Any], *, member_id: str, workdir: Path) -> str:
+    content = str(task.get("content") or "").strip()
+    task_id = task.get("id") or "unknown"
+    creator = task.get("created_by") or "unknown"
+    title = str(task.get("title") or "").strip()
+
+    title_block = f"Title: {title}\n" if title else ""
+    return (
+        f"You are {member_id}, a Codex CLI agent connected to TALK.\n"
+        f"Project root: {workdir}\n"
+        "Answer the queued Agent task. Keep the final response suitable for posting back into TALK.\n"
+        "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
+        f"Task creator: {creator}\n"
+        f"TALK task id: {task_id}\n"
+        f"{title_block}\n"
+        "Task:\n"
+        f"{content}\n"
+    )
+
+
 def format_codex_reply(result: CodexRunResult, *, max_chars: int = DEFAULT_MAX_REPLY_CHARS) -> str:
     output = (result.stdout or "").strip()
     error = (result.stderr or "").strip()
@@ -170,6 +191,96 @@ async def run_codex_command(
             stderr=stderr.decode("utf-8", errors="replace"),
             timed_out=True,
         )
+
+
+async def handle_queued_task(
+    task: dict[str, Any],
+    *,
+    client: Any,
+    member_id: str,
+    workdir: Path,
+    instance_id: str,
+    codex_command: str | Sequence[str],
+    timeout: int,
+    max_reply_chars: int,
+) -> bool:
+    """Claim and execute one queued task. Returns False when another worker claimed it first."""
+    from TALK.client.exceptions import TalkValidationError
+
+    task_id = int(task["id"])
+    try:
+        claimed = await client.claim_task(task_id, instance_id=instance_id)
+    except TalkValidationError as exc:
+        if exc.status_code == 409:
+            return False
+        raise
+
+    prompt = build_codex_task_prompt(claimed, member_id=member_id, workdir=workdir)
+    result_message_id: int | None = None
+    completion_status = "succeeded"
+    last_error: str | None = None
+
+    try:
+        result = await run_codex_command(codex_command, prompt, cwd=workdir, timeout=timeout)
+        reply = format_codex_reply(result, max_chars=max_reply_chars)
+        completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
+        if completion_status == "failed":
+            last_error = reply
+    except Exception as exc:
+        reply = f"Codex bridge failed before completing task {task_id}: {exc}"
+        completion_status = "failed"
+        last_error = reply
+
+    creator = claimed.get("created_by")
+    if creator:
+        try:
+            result_message = await client.send_text(reply, to=[str(creator)])
+            result_message_id = int(result_message["id"])
+        except Exception as exc:
+            completion_status = "failed"
+            last_error = f"Codex bridge could not post task result: {exc}"
+
+    await client.complete_task(
+        task_id,
+        status=completion_status,
+        result_message_id=result_message_id,
+        last_error=last_error,
+    )
+    return True
+
+
+async def run_task_queue_worker(
+    *,
+    client: Any,
+    member_id: str,
+    workdir: Path,
+    instance_id: str,
+    args: argparse.Namespace,
+    run_lock: asyncio.Lock,
+    report_status: Any,
+) -> None:
+    while True:
+        try:
+            tasks = await client.list_tasks(target_member_id=member_id, status="queued")
+            queued = sorted(tasks, key=lambda item: int(item["id"]))
+            for task in queued:
+                async with run_lock:
+                    await handle_queued_task(
+                        task,
+                        client=client,
+                        member_id=member_id,
+                        workdir=workdir,
+                        instance_id=instance_id,
+                        codex_command=args.codex_command,
+                        timeout=args.timeout,
+                        max_reply_chars=args.max_reply_chars,
+                    )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            await report_status("error", last_error=f"task queue worker failed: {exc}")
+
+        await asyncio.sleep(args.task_poll_interval)
 
 
 async def run_bridge(args: argparse.Namespace) -> None:
@@ -245,9 +356,29 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 finally:
                     raise
 
+    task_worker: asyncio.Task[None] | None = None
+    if not args.disable_task_queue:
+        task_worker = asyncio.create_task(
+            run_task_queue_worker(
+                client=client,
+                member_id=member_id,
+                workdir=workdir,
+                instance_id=instance_id,
+                args=args,
+                run_lock=run_lock,
+                report_status=report_status,
+            )
+        )
+
     try:
         await client.run()
     finally:
+        if task_worker is not None:
+            task_worker.cancel()
+            try:
+                await task_worker
+            except asyncio.CancelledError:
+                pass
         try:
             await report_status("offline")
         finally:
@@ -265,6 +396,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--codex-command", default=os.environ.get("TALK_CODEX_COMMAND", DEFAULT_CODEX_COMMAND))
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SEC)
     parser.add_argument("--poll-interval", type=float, default=2.0)
+    parser.add_argument("--task-poll-interval", type=float, default=DEFAULT_TASK_POLL_INTERVAL)
+    parser.add_argument("--disable-task-queue", action="store_true")
     parser.add_argument("--max-reply-chars", type=int, default=DEFAULT_MAX_REPLY_CHARS)
     parser.add_argument("--respond-to-broadcast", action="store_true")
     parser.add_argument("--send-ack", action="store_true")

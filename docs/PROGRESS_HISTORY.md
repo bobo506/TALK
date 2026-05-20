@@ -2,9 +2,38 @@
 
 <!--
 项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-20 10:38，SSE Last-Event-ID 补发已完成
+最后更新：2026-05-20 17:19，Codex bridge 任务队列集成已完成
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-20 17:19 (Asia/Shanghai)
+### Current Progress
+- `BRIDGE-TASK-QUEUE-1` 已完成：Codex bridge 默认同时轮询 `/api/tasks?target_member_id=<member_id>&status=queued`，按任务 `id` 从小到大认领属于自己的 queued task。
+- 新增任务 prompt 构造路径：把 `created_by / task id / title / content / workdir` 注入 Codex CLI stdin，区别于原有消息触发 prompt。
+- 新增 `handle_queued_task(...)`：认领任务、运行 Codex CLI、格式化输出、向任务创建者发送直接文本结果消息，并通过 `/api/tasks/{id}/complete` 写入 `succeeded / failed`、`result_message_id` 与 `last_error`。
+- 新增任务队列后台 worker：与消息处理共用 `run_lock`，保证单个 bridge 实例不会并发启动多个 Codex CLI 进程。
+- CLI 新增 `--task-poll-interval` 与 `--disable-task-queue`；默认开启任务队列轮询，保留旧的消息触发模式。
+- `docs/MODULE_bridges.md` 已同步任务队列行为、CLI 开关与验收点。
+### Open Questions / Pending Confirmation
+- 当前环境仍未暴露精确 token/5 小时额度占比；本轮是 bridge/任务协议相关切片，按协议完成 1 个切片后暂停汇总并提交。
+- Browser runtime 初始化问题仍待从 Codex Desktop / Browser 后端侧恢复后补测；本切片未改前端，因此未做 Browser 真实页面验证。
+### Next Plan
+1. 提交本次 `BRIDGE-TASK-QUEUE-1` 切片。
+2. 后续如需推送，当前分支会包含上一条 `SSE-BACKFILL-1` 本地提交与本次 bridge 提交。
+3. 下一候选切片：Group 重命名/删除 UI，或文档编辑锁协议。
+4. Browser runtime 恢复后，补一次 Web UI SSE 真实浏览器烟测。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\codex_bridge.py tests\test_codex_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_codex_bridge` passed，8 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_codex_bridge tests.test_tasks tests.test_talk_client` passed，25 tests。
+- `.venv\Scripts\python.exe bridges\codex_bridge.py --help` passed。
+- `.venv\Scripts\python.exe -m unittest` passed，90 tests。
+### Changed Files
+- `bridges/codex_bridge.py`
+- `tests/test_codex_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
 
 ## 2026-05-20 10:38 (Asia/Shanghai)
 ### Current Progress

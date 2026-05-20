@@ -3,10 +3,13 @@ import sys
 import unittest
 from pathlib import Path
 
+from bridges import codex_bridge
 from bridges.codex_bridge import (
     CodexRunResult,
+    build_codex_task_prompt,
     build_codex_prompt,
     format_codex_reply,
+    handle_queued_task,
     member_id_from_name,
     run_codex_command,
     should_handle_message,
@@ -80,6 +83,20 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertIn("summarize this", prompt)
         self.assertNotIn("@agent:codex summarize this", prompt)
 
+    def test_build_codex_task_prompt_contains_task_context(self):
+        prompt = build_codex_task_prompt({
+            "id": 7,
+            "created_by": "human:bobo",
+            "title": "Smoke task",
+            "content": "inspect the queue",
+        }, member_id="agent:codex", workdir=Path("D:/claude-test/TALK"))
+
+        self.assertIn("agent:codex", prompt)
+        self.assertIn("human:bobo", prompt)
+        self.assertIn("TALK task id: 7", prompt)
+        self.assertIn("Title: Smoke task", prompt)
+        self.assertIn("inspect the queue", prompt)
+
     def test_format_codex_reply_handles_error_and_truncation(self):
         reply = format_codex_reply(
             CodexRunResult(returncode=2, stdout="out", stderr="err"),
@@ -108,6 +125,62 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "HELLO BRIDGE")
         self.assertEqual(result.stderr, "")
+
+    def test_handle_queued_task_claims_runs_replies_and_completes(self):
+        class FakeClient:
+            def __init__(self):
+                self.claimed = []
+                self.sent = []
+                self.completed = []
+
+            async def claim_task(self, task_id, *, instance_id=None):
+                self.claimed.append((task_id, instance_id))
+                return {
+                    "id": task_id,
+                    "created_by": "human:bobo",
+                    "title": "Queue smoke",
+                    "content": "say ok",
+                }
+
+            async def send_text(self, text, to=None):
+                self.sent.append((text, to))
+                return {"id": 99}
+
+            async def complete_task(self, task_id, *, status, result_message_id=None, last_error=None):
+                self.completed.append((task_id, status, result_message_id, last_error))
+                return {"id": task_id, "status": status}
+
+        async def fake_run_codex_command(command, prompt, *, cwd, timeout):
+            self.assertEqual(command, ["codex", "exec"])
+            self.assertIn("say ok", prompt)
+            self.assertEqual(timeout, 5)
+            return CodexRunResult(returncode=0, stdout="OK", stderr="")
+
+        async def scenario():
+            original = codex_bridge.run_codex_command
+            codex_bridge.run_codex_command = fake_run_codex_command
+            try:
+                client = FakeClient()
+                handled = await handle_queued_task(
+                    {"id": 12},
+                    client=client,
+                    member_id="agent:codex",
+                    workdir=Path.cwd(),
+                    instance_id="agent:codex:test",
+                    codex_command=["codex", "exec"],
+                    timeout=5,
+                    max_reply_chars=100,
+                )
+                return handled, client
+            finally:
+                codex_bridge.run_codex_command = original
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertTrue(handled)
+        self.assertEqual(client.claimed, [(12, "agent:codex:test")])
+        self.assertEqual(client.sent, [("OK", ["human:bobo"])])
+        self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
 
 
 if __name__ == "__main__":
