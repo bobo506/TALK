@@ -71,6 +71,40 @@ class GroupRouteTests(RouteTestCase):
         self.assertEqual(removed.status_code, 200)
         self.assertEqual(codex_groups.json(), [])
 
+    def test_human_can_update_group_metadata(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab", "description": "Old"},
+            )
+            updated = client.patch(
+                "/api/groups/group:lab",
+                headers={"X-API-Key": "bobo-key"},
+                json={"name": "Research Lab", "description": "New focus"},
+            )
+            fetched = client.get("/api/groups/group:lab", headers={"X-API-Key": "alice-key"})
+
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["name"], "Research Lab")
+        self.assertEqual(updated.json()["description"], "New focus")
+        self.assertEqual(fetched.json()["name"], "Research Lab")
+
+    def test_agent_cannot_update_group_metadata(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
+            )
+            updated = client.patch(
+                "/api/groups/group:lab",
+                headers={"X-API-Key": "codex-key"},
+                json={"name": "Agent Lab"},
+            )
+
+        self.assertEqual(updated.status_code, 403)
+
     def test_agent_and_missing_member_cannot_manage_group_members(self):
         with self.make_client() as client:
             client.post(

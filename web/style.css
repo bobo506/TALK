@@ -564,6 +564,18 @@ button {
   font-size: 12px;
 }
 
+.group-meta-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(220px, 1.4fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.64);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
 .group-members-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1321,6 +1333,10 @@ button {
   .group-member-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .group-meta-form {
+    grid-template-columns: 1fr;
   }
 
   .group-member-controls,

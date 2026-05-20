@@ -264,6 +264,20 @@ class GroupCreate(BaseModel):
         return self
 
 
+class GroupUpdate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_group_update(self) -> "GroupUpdate":
+        self.name = self.name.strip()
+        if not self.name:
+            raise ValueError("name is required")
+        if self.description is not None:
+            self.description = self.description.strip() or None
+        return self
+
+
 class GroupMemberUpdate(BaseModel):
     role: str = "member"
 

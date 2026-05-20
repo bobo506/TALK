@@ -267,6 +267,11 @@ class TalkClientTests(RouteTestCase):
                     description="Created from SDK tests",
                     member_ids=["agent:demo"],
                 )
+                renamed = await human_client.update_group(
+                    "group:sdk-lab",
+                    name="SDK Lab Renamed",
+                    description="Updated from SDK tests",
+                )
                 updated = await human_client.upsert_group_member("group:sdk-lab", "agent:other", role="moderator")
                 removed = await human_client.remove_group_member("group:sdk-lab", "agent:other")
 
@@ -283,6 +288,8 @@ class TalkClientTests(RouteTestCase):
 
             self.assertEqual(group["id"], "group:sdk-lab")
             self.assertEqual(group["description"], "Created from SDK tests")
+            self.assertEqual(renamed["name"], "SDK Lab Renamed")
+            self.assertEqual(renamed["description"], "Updated from SDK tests")
             self.assertIn("agent:other", {member["member_id"] for member in updated["members"]})
             self.assertNotIn("agent:other", {member["member_id"] for member in removed["members"]})
             self.assertEqual([item["id"] for item in groups], ["group:sdk-lab"])
@@ -290,6 +297,7 @@ class TalkClientTests(RouteTestCase):
                 {member["member_id"] for member in fetched["members"]},
                 {"human:bobo", "agent:demo"},
             )
+            self.assertEqual(fetched["name"], "SDK Lab Renamed")
             self.assertEqual(hall_message["group_id"], "group:sdk-lab")
             self.assertEqual(hall_history[-1]["content"], "@agent:demo hello inside hall")
             self.assertNotIn(hall_message["id"], {message["id"] for message in global_history})

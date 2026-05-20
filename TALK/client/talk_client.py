@@ -217,6 +217,19 @@ class TalkClient:
     async def get_group(self, group_id: str) -> JsonDict:
         return await self._request_json("GET", f"/api/groups/{group_id}")
 
+    async def update_group(
+        self,
+        group_id: str,
+        *,
+        name: str,
+        description: str | None = None,
+    ) -> JsonDict:
+        return await self._request_json(
+            "PATCH",
+            f"/api/groups/{group_id}",
+            json_body={"name": name, "description": description},
+        )
+
     async def upsert_group_member(
         self,
         group_id: str,

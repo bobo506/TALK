@@ -55,6 +55,7 @@ let groupCreateOpen = false;
 let groupCreateSaving = false;
 let groupMembersOpen = false;
 let groupMemberSaving = false;
+let groupMetaSaving = false;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -97,6 +98,10 @@ const submitGroupCreateBtn = document.getElementById("submit-group-create-btn");
 const groupMembersPanel = document.getElementById("group-members-panel");
 const groupMembersSubtitle = document.getElementById("group-members-subtitle");
 const closeGroupMembersBtn = document.getElementById("close-group-members-btn");
+const groupMetaForm = document.getElementById("group-meta-form");
+const groupMetaName = document.getElementById("group-meta-name");
+const groupMetaDescription = document.getElementById("group-meta-description");
+const groupMetaSaveBtn = document.getElementById("group-meta-save-btn");
 const groupMembersList = document.getElementById("group-members-list");
 const groupMemberAddForm = document.getElementById("group-member-add-form");
 const groupMemberAddSelect = document.getElementById("group-member-add-select");
@@ -534,6 +539,7 @@ toggleGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(!group
 cancelGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
 groupCreatePanel.addEventListener("submit", createGroupFromPanel);
 closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(false));
+groupMetaForm.addEventListener("submit", updateGroupMetadataFromPanel);
 groupMemberAddForm.addEventListener("submit", addGroupMemberFromPanel);
 historySearchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -837,6 +843,14 @@ function renderGroupMembersPanel() {
   const canManage = canManageGroups();
   const memberIds = getGroupMemberIds(activeGroup);
   groupMembersSubtitle.textContent = `${activeGroup.id} · ${activeGroup.members.length} 位成员`;
+  groupMetaForm.classList.toggle("hidden", !canManage);
+  if (canManage) {
+    groupMetaName.value = activeGroup.name || "";
+    groupMetaDescription.value = activeGroup.description || "";
+    groupMetaName.disabled = groupMetaSaving;
+    groupMetaDescription.disabled = groupMetaSaving;
+    groupMetaSaveBtn.disabled = groupMetaSaving;
+  }
   groupMembersList.innerHTML = "";
 
   for (const membership of sortedGroupMembers(activeGroup)) {
@@ -915,6 +929,49 @@ function renderGroupMembersPanel() {
       }
     }
     groupMemberAddRole.disabled = groupMemberSaving;
+  }
+}
+
+async function updateGroupMetadataFromPanel(event) {
+  event.preventDefault();
+  const activeGroup = getActiveGroup();
+  if (!activeGroup || groupMetaSaving) return;
+
+  const name = groupMetaName.value.trim();
+  const description = groupMetaDescription.value.trim();
+  if (!name) {
+    showGroupMembersError("请填写 Group 名称。");
+    groupMetaName.focus();
+    return;
+  }
+
+  groupMetaSaving = true;
+  renderGroupMembersPanel();
+  try {
+    const res = await apiFetch(`/api/groups/${encodeURIComponent(activeGroup.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description }),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `Group 更新失败: ${res.status}`));
+    }
+
+    const group = await res.json();
+    replaceGroup(group);
+    clearComposerStatus("room");
+    showGroupMembersError("");
+    renderRoomStrip();
+    renderPresenceStrip();
+    renderMentionDropdownIfOpen();
+    updateMessagesEmptyState();
+  } catch (err) {
+    console.error(err);
+    showGroupMembersError(err.message);
+    renderGroupMembersPanel();
+  } finally {
+    groupMetaSaving = false;
+    renderGroupMembersPanel();
   }
 }
 

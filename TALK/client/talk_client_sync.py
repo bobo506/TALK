@@ -106,6 +106,15 @@ class TalkClientSync:
     def get_group(self, group_id: str) -> dict[str, Any]:
         return self._submit(self._client.get_group(group_id))
 
+    def update_group(
+        self,
+        group_id: str,
+        *,
+        name: str,
+        description: str | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(self._client.update_group(group_id, name=name, description=description))
+
     def upsert_group_member(
         self,
         group_id: str,

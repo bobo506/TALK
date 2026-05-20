@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import get_session
-from server.models import Group, GroupCreate, GroupMember, GroupMemberOut, GroupMemberUpdate, GroupOut, Member
+from server.models import Group, GroupCreate, GroupMember, GroupMemberOut, GroupMemberUpdate, GroupOut, GroupUpdate, Member
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -126,6 +126,25 @@ def get_group(
     """Return one Group if it is visible to the current member."""
     group = _get_group(group_id, session)
     _ensure_can_view_group(group_id, current, session)
+    return _group_out(group, session)
+
+
+@router.patch("/{group_id}", response_model=GroupOut)
+def update_group(
+    group_id: str,
+    body: GroupUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Update Group display metadata."""
+    _require_human(current)
+    group = _get_group(group_id, session)
+    group.name = body.name
+    group.description = body.description
+    group.updated_at = datetime.now(timezone.utc)
+    session.add(group)
+    session.commit()
+    session.refresh(group)
     return _group_out(group, session)
 
 

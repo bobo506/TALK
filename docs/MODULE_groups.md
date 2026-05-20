@@ -58,6 +58,12 @@
 - Human 当前可读取任意 Group。
 - Agent 只能读取自己加入的 Group。
 
+`PATCH /api/groups/{group_id}`
+
+- 当前仅允许 human 成员更新 Group 显示元数据。
+- 请求字段：`name` 必填，`description` 可选。
+- 更新后会刷新 `updated_at` 并返回最新 Group 快照。
+
 `PUT /api/groups/{group_id}/members/{member_id}`
 
 - 当前仅允许 human 成员管理 Group 成员。
@@ -97,16 +103,18 @@
 ## 当前边界
 
 - Web UI 已有 Group 列表、默认 active Group 恢复、Hall 导航、新建 Group 面板和 Hall 内成员管理面板。
+- Web UI 成员面板顶部已支持 human 更新当前 Group 名称与描述；Agent 仍只读。
 - 创建后的成员增删/角色调整可走 API、SDK helper 或 Web UI 成员面板。
 - SDK 已提供 Group API helper，并支持在 `send_text` / `send_file` / `reply` / `fetch_history` 中携带 `group_id`。
-- 当前没有 Group 删除 / 重命名 API。
+- 当前没有 Group 删除 API；删除语义需先确认历史 Hall 消息如何保留或归档。
 - 当前没有成员管理权限细分；human 可管理 Group 成员，Agent 不可管理。
 - 当前没有 Discussion Session 表；多 Agent 轮次、主持人规则和总结策略仍属后续协议。
 - 当前没有 SSE stream；Group 只为后续 stream 提供作用域。
 
 ## 后续计划
 
-- 在 Web UI 中补充 Group 重命名/删除入口和更完整的未读/提醒状态。
+- 确认 Group 删除 / 归档语义，并补充删除或归档入口。
+- 在 Web UI 中补充更完整的未读/提醒状态。
 - 设计并实现 Discussion Session / 多 Agent 讨论协议。
 - 让 SSE stream 事件携带 `group_id` 并显示在对应 Hall。
 - 将任务状态、实例状态和文档锁状态接入 Group/Hall 视图。
@@ -127,6 +135,7 @@
 - [x] 旧消息测试、Group 测试和全量后端回归通过。
 - [x] Web UI 可在全局消息流和 Group Hall 之间切换。
 - [x] Web UI 可创建 Group、选择初始成员并自动进入新 Hall。
+- [x] Human 可通过 API / SDK / Web UI 更新 Group 名称与描述。
 - [x] Web UI 在 Hall 内发送消息时会携带 `group_id`，且切回全局后不会显示 Hall 消息。
 - [x] SDK 可创建/读取 Group、管理成员，并在 Hall 内发送和读取消息。
 - [x] Web UI 可在 Hall 内添加成员、调整角色和移除其他成员。
