@@ -24,6 +24,7 @@
 - **`ping / pong` 心跳**：服务端周期性下发 `{"type":"ping"}`，客户端回 `{"type":"pong"}`；超过超时时间无任何入站帧时，服务端主动断开连接
 - **`send` 入站事件**：客户端可发送 `{"type":"send","payload":{...MessageCreate...}}`，其行为与 `POST /api/messages` 等价；失败时返回 `{"type":"send_ack","ok":false,"error":"..."}`
 - **SSE 只读事件流**：`GET /api/events?token=<api_key>` 返回 `text/event-stream`；事件名为 `message / presence / revoke / ping`，`data:` 为对应 payload JSON
+- **SSE 断线补发**：`GET /api/events` 支持浏览器自动发送的 `Last-Event-ID` header，也支持 `last_event_id=<id>` query 参数；服务端会补发当前成员可见且 `message.id > last_event_id` 的历史消息快照
 
 ### 依赖外部
 
@@ -45,7 +46,7 @@
 - `broadcast()`：序列化 `MessageOut` 为 JSON，按目标列表同时推送给 WS 与 SSE，自动清理异常 WS 连接
 - `presence`：连接建立后先向当前连接下发在线成员快照；当成员从“离线→在线”或“在线→离线”切换时，向所有在线 WS/SSE 连接广播 presence 事件
 - WS 端点（`main.py`）：`?token=` 鉴权 → `hub.connect()` → 启动心跳任务 → 循环接收入站事件（`pong` / `ping` / `send`）→ 断开时 `hub.disconnect_and_broadcast()`
-- SSE 端点（`main.py`）：`?token=` 鉴权 → `hub.subscribe_events()` → 按 `text/event-stream` 输出事件；空闲超过 `WS_PING_INTERVAL` 时输出 `ping` 事件；断开时 `hub.unsubscribe_events()`
+- SSE 端点（`main.py`）：`?token=` 鉴权 → 解析可选 `Last-Event-ID` / `last_event_id` → `hub.subscribe_events()` → 输出在线快照 → 按当前成员可见性补发缺失消息快照 → 按 `text/event-stream` 输出实时事件；空闲超过 `WS_PING_INTERVAL` 时输出 `ping` 事件；断开时 `hub.unsubscribe_events()`
 - 推送格式：`{"type": "message", "payload": {MessageOut 字段}}`
 - presence 格式：`{"type": "presence", "payload": {"online_ids": ["human:bobo", "agent:AI1"]}}`
 - SSE 格式：
@@ -54,6 +55,8 @@
   data: {"id":1,"group_id":"group:lab",...}
   ```
   其中 `message / revoke` 会带 `id:` 字段，便于客户端做 Last-Event-ID / 去重扩展。
+- SSE backfill 补发的是 `message` 事件快照；如果历史消息已撤回，补发 payload 会按 `MessageOut` 当前规则携带 `revoked=true` 并隐藏正文/文件快照字段。
+- SSE 连接会先完成实时订阅再查询补发历史，降低重连窗口里的事件丢失风险；若同一事件同时进入补发结果和实时队列，服务端会按事件 id 去重。
 - 心跳参数来自 `config.toml`：`ws_ping_interval` 默认 `20s`，`ws_ping_timeout` 默认 `45s`
 - WS `send` 事件会复用消息模块的 `create_message()`，因此 mention 解析、文件消息校验、错误明细和 REST 保持一致；成功时只回广播消息本身，不额外发送成功 ack
 - 浏览器端 `web/app.js` 已在收到 `ping` 时立即回 `pong`
@@ -85,3 +88,5 @@
 - [x] SSE 可收到 presence 初始事件
 - [x] SSE 可收到目标成员可见的 message 事件
 - [x] SSE 可收到目标成员可见的 revoke 事件
+- [x] SSE 支持 `Last-Event-ID` / `last_event_id` 补发当前成员可见的历史消息快照
+- [x] SSE 补发会过滤当前成员不可见消息，并保留撤回消息的当前快照语义

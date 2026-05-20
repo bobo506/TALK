@@ -2,6 +2,7 @@ import json
 import socket
 import threading
 import time
+from datetime import datetime, timezone
 
 import httpx
 import uvicorn
@@ -81,6 +82,16 @@ class ServerSentEventsTests(RouteTestCase):
 
         self.assertEqual(response.status_code, 401)
 
+    def test_sse_rejects_invalid_last_event_id_header(self):
+        with self.make_client() as client:
+            response = client.get(
+                "/api/events?token=ai1-key",
+                headers={"Last-Event-ID": "not-an-int"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Last-Event-ID must be a non-negative integer")
+
     def test_sse_presence_and_message_events(self):
         with LiveTalkServer(main.app) as base_url:
             with httpx.Client(base_url=base_url, timeout=5.0, trust_env=False) as client:
@@ -105,6 +116,72 @@ class ServerSentEventsTests(RouteTestCase):
                     self.assertEqual(event["_event_id"], str(created["id"]))
                     self.assertEqual(event["content"], "@agent:AI1 hello sse")
                     self.assertEqual(event["to"], ["agent:AI1"])
+
+        self.assertEqual(hub.online_members_count(), 0)
+
+    def test_sse_replays_visible_messages_after_last_event_id_header(self):
+        first = self.add_message(
+            from_id="human:bobo",
+            to_ids=None,
+            message_type="text",
+            content="already delivered",
+        )
+        hidden = self.add_message(
+            from_id="human:bobo",
+            to_ids='["agent:AI2"]',
+            message_type="text",
+            content="@agent:AI2 hidden from ai1",
+        )
+        direct = self.add_message(
+            from_id="human:bobo",
+            to_ids='["agent:AI1"]',
+            message_type="text",
+            content="@agent:AI1 replay me",
+        )
+
+        with LiveTalkServer(main.app) as base_url:
+            with httpx.Client(base_url=base_url, timeout=5.0, trust_env=False) as client:
+                with client.stream(
+                    "GET",
+                    "/api/events?token=ai1-key",
+                    headers={"Last-Event-ID": str(first.id)},
+                ) as stream:
+                    self.assertEqual(stream.status_code, 200)
+                    lines = stream.iter_lines()
+
+                    initial_presence = self.read_sse_event(lines, "presence")
+                    self.assertEqual(initial_presence["online_ids"], ["agent:AI1"])
+
+                    event = self.read_sse_event(lines, "message")
+                    self.assertEqual(event["id"], direct.id)
+                    self.assertEqual(event["_event_id"], str(direct.id))
+                    self.assertNotEqual(event["id"], hidden.id)
+                    self.assertEqual(event["content"], "@agent:AI1 replay me")
+
+        self.assertEqual(hub.online_members_count(), 0)
+
+    def test_sse_replay_zero_last_event_id_backfills_current_snapshot(self):
+        revoked = self.add_message(
+            from_id="human:bobo",
+            to_ids='["agent:AI1"]',
+            message_type="text",
+            content="@agent:AI1 now revoked",
+            revoked_at=datetime.now(timezone.utc),
+            revoked_by="human:bobo",
+        )
+
+        with LiveTalkServer(main.app) as base_url:
+            with httpx.Client(base_url=base_url, timeout=5.0, trust_env=False) as client:
+                with client.stream("GET", "/api/events?token=ai1-key&last_event_id=0") as stream:
+                    self.assertEqual(stream.status_code, 200)
+                    lines = stream.iter_lines()
+                    self.read_sse_event(lines, "presence")
+
+                    event = self.read_sse_event(lines, "message")
+                    self.assertEqual(event["id"], revoked.id)
+                    self.assertTrue(event["revoked"])
+                    self.assertIsNone(event["content"])
+                    self.assertEqual(event["revoked_by"], "human:bobo")
 
         self.assertEqual(hub.online_members_count(), 0)
 

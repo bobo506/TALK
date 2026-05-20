@@ -2,9 +2,37 @@
 
 <!--
 项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-16 20:24，连续开发批次刹车规则已补充
+最后更新：2026-05-20 10:38，SSE Last-Event-ID 补发已完成
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-20 10:38 (Asia/Shanghai)
+### Current Progress
+- `SSE-BACKFILL-1` 已完成：`GET /api/events` 已支持 `Last-Event-ID` header 与 `last_event_id` query 参数。
+- 连接建立时会先完成 SSE 实时订阅并发送在线快照，再按当前成员可见性补发 `message.id > last_event_id` 的历史消息快照，降低重连窗口中的事件丢失风险。
+- 补发查询覆盖全局可见消息与当前成员所在 Group 的 Hall 消息，并会过滤对当前成员不可见的消息。
+- 撤回消息按当前 `MessageOut` 快照语义补发：`revoked=true`，正文、附言和文件快照字段保持隐藏。
+- 若同一消息同时出现在补发结果和实时队列中，服务端会按 SSE `id:` 去重后再输出。
+- `docs/MODULE_websocket.md` 已同步接口契约、当前实现与验收标准。
+### Open Questions / Pending Confirmation
+- 当前环境仍未暴露精确 token/5 小时额度占比；本轮按协议切片规则完成 1 个切片后暂停汇总。
+- Browser runtime 初始化问题仍待从 Codex Desktop / Browser 后端侧恢复后补测；本切片未改前端，因此未做 Browser 真实页面验证。
+### Next Plan
+1. 提交本次 `SSE-BACKFILL-1` 切片。
+2. 下一候选切片：Group 重命名/删除 UI，或 Codex bridge task-queue integration。
+3. Browser runtime 恢复后，补一次 Web UI SSE 真实浏览器烟测。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile server\main.py tests\test_sse.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_sse` passed，6 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_sse tests.test_websocket tests.test_messages` passed，39 tests。
+- `.venv\Scripts\python.exe -m unittest` passed，88 tests。
+- `git diff --check` passed，仅有换行提示。
+### Changed Files
+- `server/main.py`
+- `tests/test_sse.py`
+- `docs/MODULE_websocket.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
 
 ## 2026-05-16 20:24 (Asia/Shanghai)
 ### Current Progress

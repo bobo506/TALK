@@ -8,11 +8,13 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+from sqlalchemy import and_, exists, literal, or_
 from sqlmodel import Session
+from sqlmodel import select
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from server.auth import resolve_member_by_key
@@ -29,7 +31,7 @@ from server.db import (
     init_db,
 )
 from server.logging_config import configure_logging
-from server.models import Member, MessageCreate
+from server.models import GroupMember, Member, Message, MessageCreate, MessageOut
 from server.routes import files, groups, instances, members, messages, tasks
 from server.ws_hub import hub
 
@@ -39,6 +41,7 @@ START_TIME = time.monotonic()
 
 WS_CLOSE_INVALID_API_KEY = 4001
 WS_CLOSE_IDLE_TIMEOUT = 4002
+SSE_BACKFILL_BATCH_SIZE = 500
 
 
 def _format_validation_error(exc: ValidationError) -> str:
@@ -114,6 +117,76 @@ def _check_storage_health() -> str:
     probe_path.write_text("ok", encoding="utf-8")
     probe_path.unlink(missing_ok=True)
     return "ok"
+
+
+def _resolve_sse_last_event_id(last_event_id: int | None, header_value: str | None) -> tuple[int, bool]:
+    if last_event_id is not None:
+        return last_event_id, True
+    if header_value is None or not header_value.strip():
+        return 0, False
+
+    try:
+        parsed = int(header_value.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Last-Event-ID must be a non-negative integer") from exc
+    if parsed < 0:
+        raise HTTPException(status_code=400, detail="Last-Event-ID must be a non-negative integer")
+    return parsed, True
+
+
+def _group_visible_to_member_expr(member_id: str):
+    return exists(
+        select(literal(1))
+        .where(GroupMember.group_id == Message.group_id)
+        .where(GroupMember.member_id == member_id)
+    )
+
+
+def _sse_backfill_stmt(member_id: str, since_id: int):
+    global_visible = and_(
+        Message.group_id.is_(None),
+        messages._visible_to_member_expr(member_id),
+    )
+    group_visible = and_(
+        Message.group_id.is_not(None),
+        _group_visible_to_member_expr(member_id),
+    )
+    return (
+        select(Message)
+        .where(Message.id > since_id)
+        .where(or_(global_visible, group_visible))
+        .order_by(Message.id)
+        .limit(SSE_BACKFILL_BATCH_SIZE)
+    )
+
+
+def _sse_backfill_events(member_id: str, since_id: int, session: Session):
+    cursor = since_id
+    while True:
+        batch = session.exec(_sse_backfill_stmt(member_id, cursor)).all()
+        if not batch:
+            return
+
+        reply_lookup = messages._build_reply_lookup(batch, session)
+        for message in batch:
+            out = MessageOut.from_orm_msg(message, reply_to=reply_lookup.get(message.reply_to))
+            yield out.id, hub.format_sse_event(
+                "message",
+                out.model_dump(by_alias=True),
+                event_id=out.id,
+            )
+            cursor = max(cursor, out.id)
+
+
+def _sse_event_id(event_text: str) -> int | None:
+    for line in event_text.splitlines():
+        if not line.startswith("id: "):
+            continue
+        try:
+            return int(line[4:])
+        except ValueError:
+            return None
+    return None
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -228,6 +301,8 @@ def get_public_config():
 async def sse_events(
     request: Request,
     token: str = Query(...),
+    last_event_id: int | None = Query(None, ge=0),
+    last_event_id_header: str | None = Header(None, alias="Last-Event-ID"),
 ):
     """Server-Sent Events stream authenticated via ?token=<api_key>."""
     with Session(engine) as session:
@@ -236,14 +311,31 @@ async def sse_events(
     if member is None:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+    since_id, backfill_requested = _resolve_sse_last_event_id(last_event_id, last_event_id_header)
+
     async def event_generator():
         queue = await hub.subscribe_events(member.id)
+        replayed_event_ids: set[int] = set()
         try:
+            try:
+                yield queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+
+            if backfill_requested:
+                with Session(engine) as session:
+                    for event_id, event_text in _sse_backfill_events(member.id, since_id, session):
+                        replayed_event_ids.add(event_id)
+                        yield event_text
+
             while True:
                 if await request.is_disconnected():
                     break
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=WS_PING_INTERVAL)
+                    queued_event_id = _sse_event_id(event)
+                    if queued_event_id is not None and queued_event_id in replayed_event_ids:
+                        continue
                     yield event
                 except asyncio.TimeoutError:
                     yield hub.format_sse_event("ping", {})
