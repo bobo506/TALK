@@ -6,6 +6,40 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-21 16:54 (Asia/Shanghai)
+### Current Progress
+- `CLI-BRIDGE-1` 已完成：新增 `bridges/cli_bridge.py` 通用 CLI bridge，承接 TALK 成员注册、实例状态上报、消息触发、任务队列轮询、任务认领、CLI stdin/stdout 调用、结果回复与任务完成。
+- `bridges/codex_bridge.py` 已收敛为 Codex 兼容入口：复用通用 CLI bridge 实现，同时保留 `--codex-command`、默认 `codex exec` 命令、`CodexRunResult` 和原 helper 函数兼容面。
+- 通用 CLI bridge 支持 `--name / --runtime / --bridge-label / --command`：例如后续 `pi` 可注册为 `agent:pi`，以 `runtime=pi` 上报实例，并使用可配置命令读取 stdin prompt、输出 stdout 回复。
+- 新增 `tests/test_cli_bridge.py`，覆盖通用 CLI 参数必填、runtime prompt、错误回复标签、stdin/stdout 命令执行、queued task 认领/回复/完成路径。
+- `tests/test_codex_bridge.py` 继续通过，确认 Codex 旧兼容面未破坏。
+- `docs/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 已同步通用 CLI bridge、Codex 兼容入口和 pi 接入方向。
+### Open Questions / Pending Confirmation
+- 用户方向判断已确认：先把 Codex bridge 泛化为通用 CLI bridge，是更快跑通 Codex + pi 双 Agent 的路线。
+- pi 的具体 CLI 启动命令 / stdin/stdout 协议仍需确认；若 pi 不能直接从 stdin 读 prompt 并向 stdout 写最终回复，需要补一个很薄的 pi adapter。
+- 本轮未做真实 Codex + pi 双进程端到端验收；下一切片应优先补 pi 启动示例 / adapter 与最小双 Agent 回合验证。
+### Next Plan
+1. 提交本次 `CLI-BRIDGE-1` 切片。
+2. 下一切片：基于 `bridges/cli_bridge.py` 落 `pi` 启动示例 / adapter，并用 fake CLI 或真实 pi 命令跑通 `agent:codex <-> agent:pi` 的最小任务回合。
+3. 若 pi 命令可直接适配 stdin/stdout，优先做配置与验收脚本；否则先实现 pi adapter。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\codex_bridge.py tests\test_cli_bridge.py tests\test_codex_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge` passed，13 tests。
+- `.venv\Scripts\python.exe bridges\cli_bridge.py --help` passed。
+- `.venv\Scripts\python.exe bridges\codex_bridge.py --help` passed。
+- `.venv\Scripts\python.exe -u -m unittest -v` passed，102 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed（仅换行提示）。
+- `scripts/check-progress.ps1` 与 `scripts/check-git-ready.ps1` 当前工作树不存在，本轮无法运行这两个历史门禁脚本。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `bridges/codex_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-20 23:16 (Asia/Shanghai)
 ### Current Progress
 - `TASK-SCHEDULE-1` 已完成：新增 `agent_task_schedules` 表与 `/api/tasks/schedules` API 第一版。
