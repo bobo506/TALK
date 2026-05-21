@@ -6,6 +6,33 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-21 17:59 (Asia/Shanghai)
+### Current Progress
+- `WEB-MENTION-ENTER-1` 验收期修复已完成：修复前端在 `@` 补全下拉打开时按 Enter 会先发送裸 `@`，导致服务端返回 `invalid recipient mention: @` 的问题。
+- `web/app.js` 的消息发送快捷键现在会在 mention 下拉框可见时让出 Enter，避免与补全选择逻辑抢事件顺序。
+- mention 补全逻辑已调整为：下拉框打开时，Enter / Tab 都会选择当前高亮项；若没有高亮项，则选择首个候选。
+- mention 候选项增加 `mousedown` 防 blur 处理，鼠标点击选择 `agent:pi` / `agent:codex` 时会稳定补全到输入框。
+- `web/index.html` 已更新 `app.js` 版本参数，浏览器刷新后会加载本次修复。
+### Open Questions / Pending Confirmation
+- 需用户刷新前端页面后继续人工验收：输入 `@`，分别用 Enter 和鼠标选择 `agent:pi` / `agent:codex`，确认不再出现裸 `@` 错误。
+- Codex + pi 双 bridge 的真实端到端回复仍在人工验收中；本切片只修复前端 mention 补全误发送问题。
+### Next Plan
+1. 提交本次 `WEB-MENTION-ENTER-1` 修复。
+2. 用户刷新页面后复测 `@` 补全选择。
+3. 重启 Codex / pi bridge，继续双 Agent 回复与 Web UI 视觉/交互联合验收。
+### Verification
+- Browser / in-app browser 手工验证 passed：输入裸 `@` 后按 Enter 会补全为首个候选，不再出现 `invalid recipient mention: @`。
+- Browser / in-app browser 手工验证 passed：输入 `@agent:p` 后鼠标点击 `agent:pi` 候选，会稳定补全为 `@agent:pi `。
+- `node --check web\app.js` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `.venv\Scripts\python.exe -u -m unittest -v` passed，108 tests。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `web/app.js`
+- `web/index.html`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-21 17:35 (Asia/Shanghai)
 ### Current Progress
 - `BRIDGE-WINDOWS-CMD-1` 验收期修复已完成：修复 Windows 下 bridge 直接调用 `codex` / `pi` 找不到命令的问题。

@@ -1310,6 +1310,9 @@ function handleRealtimeEvent(data) {
 sendBtn.addEventListener("click", sendMessage);
 msgInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
+    if (!mentionDropdown.classList.contains("hidden")) {
+      return;
+    }
     e.preventDefault();
     sendMessage();
   }
@@ -2436,6 +2439,7 @@ msgInput.addEventListener("input", () => {
         const li = document.createElement("li");
         li.textContent = `${m.id} (${m.display_name})`;
         li.dataset.id = m.id;
+        li.addEventListener("mousedown", (event) => event.preventDefault());
         li.addEventListener("click", () => completeMention(m.id));
         mentionDropdown.appendChild(li);
       }
@@ -2469,7 +2473,7 @@ msgInput.addEventListener("keydown", (e) => {
     if (active) active.classList.remove("active");
     idx = idx <= 0 ? items.length - 1 : idx - 1;
     items[idx].classList.add("active");
-  } else if (e.key === "Tab" || (e.key === "Enter" && active)) {
+  } else if (e.key === "Tab" || e.key === "Enter") {
     e.preventDefault();
     const sel = active || items[0];
     if (sel) completeMention(sel.dataset.id);
