@@ -12,6 +12,7 @@ from bridges.cli_bridge import (
     build_parser,
     format_cli_reply,
     handle_queued_task,
+    resolve_command_executable,
     run_cli_command,
 )
 
@@ -38,6 +39,12 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(args.name, "pi")
         self.assertEqual(args.runtime, "pi")
         self.assertEqual(args.command, "pi run -")
+
+    def test_resolve_command_executable_uses_path_lookup(self):
+        resolved = resolve_command_executable([Path(sys.executable).name, "--version"])
+
+        self.assertTrue(Path(resolved[0]).is_absolute())
+        self.assertEqual(resolved[1], "--version")
 
     def test_build_cli_task_prompt_uses_runtime_label(self):
         prompt = build_cli_task_prompt(

@@ -6,6 +6,35 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-21 17:35 (Asia/Shanghai)
+### Current Progress
+- `BRIDGE-WINDOWS-CMD-1` 验收期修复已完成：修复 Windows 下 bridge 直接调用 `codex` / `pi` 找不到命令的问题。
+- 用户在前端 `@agent:codex` / `@agent:pi` 后未收到回复；排查确认 TALK 服务在线，消息已正确写入 `messages.to_ids`，bridge 进程在线并轮询任务，但 `agent_instances` 中 Codex / pi 均上报 `error`，`last_error` 为 `[WinError 2] 系统找不到指定的文件。`。
+- `bridges/cli_bridge.py` 在启动子进程前会用 `shutil.which()` 解析命令入口，使 `pi` 可解析到 `pi.CMD`。
+- `bridges/codex_bridge.py` 默认优先使用 `~\AppData\Local\OpenAI\Codex\bin\codex.exe`，避免命中 WindowsApps 中会 `Access is denied` 的 `codex.exe`。
+- 新增测试覆盖：通用命令入口解析，以及 Codex 默认命令的环境变量覆盖路径。
+### Open Questions / Pending Confirmation
+- 需用户重启 Codex / pi bridge 后，在前端重新发送 `@agent:codex` 与 `@agent:pi` 消息完成回复验收。
+- 当前已有旧 bridge 进程处于错误状态；建议在启动新 bridge 前先在原终端 `Ctrl+C` 停掉旧进程，避免多个实例同时处理。
+### Next Plan
+1. 提交本次 `BRIDGE-WINDOWS-CMD-1` 验收期修复。
+2. 重启 Codex / pi bridge，再在前端重新发送消息验收。
+3. 验收通过后，继续完成 Web UI 视觉/交互联合验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\codex_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_codex_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge` passed，18 tests。
+- `.venv\Scripts\python.exe bridges\codex_bridge.py --help` passed。
+- `.venv\Scripts\python.exe bridges\pi_bridge.py --help` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `bridges/codex_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_codex_bridge.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-21 17:01 (Asia/Shanghai)
 ### Current Progress
 - `PI-BRIDGE-1` 已完成：新增 `bridges/pi_bridge.py`，默认注册 `agent:pi`，默认 runtime 为 `pi`，默认错误标签为 `pi bridge`。

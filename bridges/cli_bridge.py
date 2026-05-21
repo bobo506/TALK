@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import os
 import shlex
+import shutil
 import socket
 import sys
 from dataclasses import dataclass
@@ -42,6 +43,21 @@ def parse_command(command: str) -> list[str]:
     if not parsed:
         raise ValueError("CLI command cannot be empty")
     return parsed
+
+
+def resolve_command_executable(args: Sequence[str]) -> list[str]:
+    resolved = list(args)
+    if not resolved:
+        raise ValueError("CLI command cannot be empty")
+
+    executable = resolved[0]
+    if Path(executable).parent != Path("."):
+        return resolved
+
+    found = shutil.which(executable)
+    if found:
+        resolved[0] = found
+    return resolved
 
 
 def strip_leading_mentions(text: str, *, member_id: str | None = None) -> str:
@@ -184,6 +200,7 @@ async def run_cli_command(
         raise ValueError("CLI command cannot be empty")
     if prompt_transport not in PROMPT_TRANSPORTS:
         raise ValueError(f"prompt transport must be one of: {', '.join(sorted(PROMPT_TRANSPORTS))}")
+    args = resolve_command_executable(args)
 
     stdin = asyncio.subprocess.PIPE if prompt_transport == "stdin" else asyncio.subprocess.DEVNULL
     if prompt_transport == "argv":

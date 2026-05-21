@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from bridges.codex_bridge import (
     CodexRunResult,
     build_codex_task_prompt,
     build_codex_prompt,
+    default_codex_command,
     format_codex_reply,
     handle_queued_task,
     member_id_from_name,
@@ -21,6 +23,17 @@ class CodexBridgeTests(unittest.TestCase):
     def test_member_id_from_name_adds_agent_prefix(self):
         self.assertEqual(member_id_from_name("codex"), "agent:codex")
         self.assertEqual(member_id_from_name("agent:codex"), "agent:codex")
+
+    def test_default_codex_command_prefers_env_override(self):
+        old_value = os.environ.get("TALK_CODEX_COMMAND")
+        os.environ["TALK_CODEX_COMMAND"] = "custom codex command"
+        try:
+            self.assertEqual(default_codex_command(), "custom codex command")
+        finally:
+            if old_value is None:
+                os.environ.pop("TALK_CODEX_COMMAND", None)
+            else:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
 
     def test_should_handle_only_direct_text_by_default(self):
         member_id = "agent:codex"

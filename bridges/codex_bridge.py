@@ -32,6 +32,17 @@ strip_leading_mentions = cli_bridge.strip_leading_mentions
 should_handle_message = cli_bridge.should_handle_message
 
 
+def default_codex_command() -> str:
+    if os.environ.get("TALK_CODEX_COMMAND"):
+        return os.environ["TALK_CODEX_COMMAND"]
+
+    windows_codex = Path.home() / "AppData" / "Local" / "OpenAI" / "Codex" / "bin" / "codex.exe"
+    if windows_codex.exists():
+        return f"{windows_codex.as_posix()} exec --skip-git-repo-check --sandbox workspace-write --color never -"
+
+    return DEFAULT_CODEX_COMMAND
+
+
 def build_codex_prompt(message: dict[str, Any], *, member_id: str, workdir: Path) -> str:
     return cli_bridge.build_cli_prompt(message, member_id=member_id, workdir=workdir, runtime="Codex")
 
@@ -150,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="TALK Codex CLI bridge",
         default_name="codex",
         default_runtime="codex",
-        default_command=os.environ.get("TALK_CODEX_COMMAND", DEFAULT_CODEX_COMMAND),
+        default_command=default_codex_command(),
         command_help="Codex CLI command that reads the TALK prompt from stdin",
         command_option="--codex-command",
         command_dest="codex_command",
