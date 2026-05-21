@@ -6,6 +6,42 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-21 17:01 (Asia/Shanghai)
+### Current Progress
+- `PI-BRIDGE-1` 已完成：新增 `bridges/pi_bridge.py`，默认注册 `agent:pi`，默认 runtime 为 `pi`，默认错误标签为 `pi bridge`。
+- `pi_bridge.py` 默认调用 `pi --print --mode text`；可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖，例如切换 provider / model。
+- 通用 `bridges/cli_bridge.py` 已支持 `--prompt-transport stdin|argv`：Codex 继续用 stdin，pi 默认用 argv，把 TALK prompt 追加为最后一个命令行参数。
+- 新增 `tests/test_pi_bridge.py`，覆盖 pi 默认身份、默认命令、argv prompt 传递方式与自定义 `--pi-command`。
+- 扩展 `tests/test_cli_bridge.py`，覆盖通用 bridge 的 argv prompt 传递以及 queued task 调用时传递 `prompt_transport`。
+- 本机已确认 `pi --help` 与 `pi --version` 可执行，版本为 `0.74.1`。
+- `docs/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 已同步 pi bridge 入口、启动命令和当前边界。
+### Open Questions / Pending Confirmation
+- 真实 pi 模型调用仍依赖本机 `pi` 的 provider/API key 配置；本轮未消耗真实模型请求，只验证 CLI 入口与桥接参数。
+- Codex + pi 双 Agent 同时运行的真实端到端回合尚未执行；下一步应进入人工验收或补一个双桥 smoke 脚本。
+### Next Plan
+1. 提交本次 `PI-BRIDGE-1` 切片。
+2. 按里程碑门禁暂停，提供 Codex + pi 双 bridge 人工验收步骤。
+3. 验收通过后，下一候选切片是双 Agent 最小回合脚本 / 讨论 runner。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\codex_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_codex_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge tests.test_encoding` passed，19 tests。
+- `.venv\Scripts\python.exe bridges\pi_bridge.py --help` passed。
+- `.venv\Scripts\python.exe bridges\codex_bridge.py --help` passed。
+- `pi --help` passed。
+- `pi --version` returned `0.74.1`。
+- `.venv\Scripts\python.exe -u -m unittest -v` passed，105 tests。
+- `git diff --check` passed（仅换行提示）。
+- `scripts/check-progress.ps1` 与 `scripts/check-git-ready.ps1` 当前工作树不存在，本轮无法运行这两个历史门禁脚本。
+### Changed Files
+- `bridges/pi_bridge.py`
+- `bridges/cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-21 16:54 (Asia/Shanghai)
 ### Current Progress
 - `CLI-BRIDGE-1` 已完成：新增 `bridges/cli_bridge.py` 通用 CLI bridge，承接 TALK 成员注册、实例状态上报、消息触发、任务队列轮询、任务认领、CLI stdin/stdout 调用、结果回复与任务完成。

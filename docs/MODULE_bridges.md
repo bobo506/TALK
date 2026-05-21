@@ -1,7 +1,7 @@
 # MODULE: Agent Bridges
 
 > 所属项目：TALK
-> 状态：通用 CLI bridge 第一版已落地，Codex bridge 保持兼容入口
+> 状态：通用 CLI bridge 第一版已落地，Codex / pi bridge 保持专用入口
 
 ## 目标
 
@@ -10,7 +10,7 @@
 ## 负责范围
 
 - 桥接脚本：`bridges/`
-- 当前已实现：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`
+- 当前已实现：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/pi_bridge.py`
 - 依赖 SDK：`TALK/client/`
 
 ## 当前实现
@@ -18,7 +18,8 @@
 ### 通用 CLI bridge
 
 - `bridges/cli_bridge.py` 是通用 CLI bridge：负责 TALK 成员注册、实例状态上报、消息触发、任务队列轮询、任务认领、调用本地 CLI 命令、发送结果与完成任务状态。
-- 默认要求通过 `--command` 传入本地 CLI 命令；该命令必须从 `stdin` 读取 TALK 生成的任务 prompt，并把最终回复写到 `stdout`。
+- 默认要求通过 `--command` 传入本地 CLI 命令；该命令应把最终回复写到 `stdout`。
+- prompt 传递支持两种方式：`--prompt-transport stdin` 会通过标准输入传入任务 prompt；`--prompt-transport argv` 会把任务 prompt 追加为最后一个命令行参数。
 - 可通过 `--name` 设置 Agent 成员名，例如 `pi` 会注册为 `agent:pi`；也可直接传完整 `agent:*`。
 - 可通过 `--runtime` 设置实例上报 runtime，例如 `pi`、`codex`、`claude`。
 - 可通过 `--bridge-label` 设置错误回复中的桥接名称，例如 `pi bridge`。
@@ -50,16 +51,32 @@ codex exec --skip-git-repo-check --sandbox workspace-write --color never -
 - 命令、工作目录、超时、回复最大长度、是否响应广播、是否先发 ACK 都可通过 CLI 参数配置。
 - 任务队列轮询间隔可通过 `--task-poll-interval` 配置；如只想保留旧的消息触发模式，可用 `--disable-task-queue` 关闭。
 
+### pi 兼容入口
+
+- `bridges/pi_bridge.py` 会自注册为 `agent:pi`（可通过 `--name` 修改）。
+- `bridges/pi_bridge.py` 复用通用 CLI bridge 实现，默认 runtime 为 `pi`，默认错误标签为 `pi bridge`。
+- 本机已确认 `pi` CLI 支持 `--print` 非交互模式，版本为 `0.74.1`。
+- 默认 pi 命令为：
+
+```bash
+pi --print --mode text
+```
+
+- 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
+- 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
+
 ## 运行示例
 
 ```bash
 python bridges/codex_bridge.py --key codex-key --base-url http://127.0.0.1:8000
+python bridges/pi_bridge.py --key pi-key --base-url http://127.0.0.1:8000
 ```
 
 Web UI 中发送：
 
 ```text
 @agent:codex 总结一下当前项目结构
+@agent:pi 总结一下当前项目结构
 ```
 
 ## 后续计划
@@ -67,14 +84,17 @@ Web UI 中发送：
 - 接入 Group / Hall 消息上下文。
 - 接入 SSE 流式输出。
 - 接入文档编辑锁协议，避免多个 Agent 同时写同一文件。
-- 基于 `bridges/cli_bridge.py` 增加 `pi` 启动配置 / 示例脚本，用于 DeepSeek / Kimi；如果 pi CLI 的 stdin/stdout 协议不能直接适配，再补一层很薄的 pi adapter。
+- 增加双 Agent 最小回合验收脚本：同时启动 Codex / pi bridge，验证 `agent:codex` 与 `agent:pi` 可在 TALK 中完成一轮消息或任务往返。
 
 ## 验收点
 
 - [x] bridge helper 逻辑有单元测试覆盖。
 - [x] 通用 CLI bridge 已抽出，可通过 `--name / --runtime / --command` 接入新的本地 CLI Agent。
+- [x] 通用 CLI bridge 支持 `stdin` 与 `argv` 两种 prompt 传递方式。
 - [x] Codex bridge 已接入任务队列 helper：可认领 queued task、运行 Codex、发送结果消息并完成任务状态。
+- [x] pi bridge 已落地：默认调用 `pi --print --mode text`，通过 argv 传入 TALK prompt。
 - [x] `python bridges/cli_bridge.py --help` 可正常输出参数说明。
 - [x] `python bridges/codex_bridge.py --help` 可正常输出参数说明。
+- [x] `python bridges/pi_bridge.py --help` 可正常输出参数说明。
 - [x] 在临时 TALK server / 临时 SQLite / 临时 storage 中完成 `@agent:codex -> codex exec --sandbox read-only -> reply_to` 端到端验收，收到 `TALK_BRIDGE_SMOKE_OK`。
 - [x] 在临时 TALK server 中验证 Codex bridge 实例状态路径：`idle -> busy -> idle -> offline`。

@@ -80,6 +80,21 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "PI:hello")
 
+    def test_run_cli_command_can_pass_prompt_as_final_argv(self):
+        async def scenario():
+            return await run_cli_command(
+                [sys.executable, "-c", "import sys; print('ARGV:' + sys.argv[1])"],
+                "hello argv",
+                cwd=Path.cwd(),
+                timeout=5,
+                prompt_transport="argv",
+            )
+
+        result = asyncio.run(scenario())
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), "ARGV:hello argv")
+
     def test_handle_queued_task_claims_runs_replies_and_completes(self):
         class FakeClient:
             def __init__(self):
@@ -103,10 +118,11 @@ class CliBridgeTests(unittest.TestCase):
                 self.completed.append((task_id, status, result_message_id, last_error))
                 return {"id": task_id, "status": status}
 
-        async def fake_run_cli_command(command, prompt, *, cwd, timeout):
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             self.assertEqual(command, ["pi", "run"])
             self.assertIn("say ok", prompt)
             self.assertIn("pi CLI agent", prompt)
+            self.assertEqual(prompt_transport, "argv")
             return CliRunResult(returncode=0, stdout="OK", stderr="")
 
         async def scenario():
@@ -125,6 +141,7 @@ class CliBridgeTests(unittest.TestCase):
                     max_reply_chars=100,
                     runtime="pi",
                     bridge_label="pi bridge",
+                    prompt_transport="argv",
                 )
                 return handled, client
             finally:

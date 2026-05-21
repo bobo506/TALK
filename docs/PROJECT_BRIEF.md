@@ -209,7 +209,8 @@ TALK/
 │   └── agent_poller.py    # 示例 Agent 轮询脚本
 ├── bridges/
 │   ├── cli_bridge.py      # 通用 CLI bridge（local-lab Agent CLI 接入骨架）
-│   └── codex_bridge.py    # Codex CLI bridge 兼容入口
+│   ├── codex_bridge.py    # Codex CLI bridge 兼容入口
+│   └── pi_bridge.py       # pi CLI bridge 兼容入口
 ├── scripts/
 │   └── backup_db.py       # SQLite 在线热备脚本
 ├── AGENTS.md              # Agent 角色与协作规则权威入口
@@ -239,7 +240,7 @@ TALK/
 | [MODULE_files.md](MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
 | [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
 | [MODULE_agent_example.md](MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
-| [MODULE_bridges.md](MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex bridge 保持兼容入口，pi 可基于通用桥接入 |
+| [MODULE_bridges.md](MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
 | [MODULE_instances.md](MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
 | [MODULE_tasks.md](MODULE_tasks.md) | Agent 任务队列与调度基础 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/` | 任务创建、列表、领取、完成 API 与显式触发 schedule API 第一版已落地 |
 
@@ -270,7 +271,7 @@ TALK/
 
 - 新增 `docs/LOCAL_LAB_DESIGN.md`，用于收敛本地多 Agent 实验室阶段的设计边界。
 - local-lab 阶段已确认方向：Codex / Claude Code 走本地 CLI bridge；DeepSeek / Kimi 走本地 `pi` 框架 bridge；后续加入 Group、Hall、SSE、实例/调度 API 与文档编辑协调协议。
-- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 保留 Codex 兼容入口与默认 `codex exec` 命令。
+- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 保留 Codex 兼容入口与默认 `codex exec` 命令，`bridges/pi_bridge.py` 保留 pi 兼容入口与默认 `pi --print --mode text` 命令。
 - `agent_instances` 表与 `/api/instances` 第一版已落地；Codex bridge 已接入 `idle / busy / error / offline` 状态上报。
 - `agent_tasks` 表与 `/api/tasks` 第一版已落地：支持创建任务、按可见性列出任务、Agent 领取任务、完成/失败/取消任务，并联动 `agent_instances.current_task_id` 与实例状态；当前不由 TALK 自动启动 bridge 进程。
 - `agent_task_schedules` 表与 `/api/tasks/schedules` 第一版已落地：支持一次性 / 周期性 schedule 记录、状态暂停/取消、显式 `run-due` 物化为 queued task；当前不内置后台调度循环。

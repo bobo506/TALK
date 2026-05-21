@@ -22,6 +22,7 @@ DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
+PROMPT_TRANSPORTS = {"stdin", "argv"}
 
 
 @dataclass(frozen=True)
@@ -176,22 +177,30 @@ async def run_cli_command(
     *,
     cwd: Path,
     timeout: int = DEFAULT_TIMEOUT_SEC,
+    prompt_transport: str = "stdin",
 ) -> CliRunResult:
     args = parse_command(command) if isinstance(command, str) else list(command)
     if not args:
         raise ValueError("CLI command cannot be empty")
+    if prompt_transport not in PROMPT_TRANSPORTS:
+        raise ValueError(f"prompt transport must be one of: {', '.join(sorted(PROMPT_TRANSPORTS))}")
+
+    stdin = asyncio.subprocess.PIPE if prompt_transport == "stdin" else asyncio.subprocess.DEVNULL
+    if prompt_transport == "argv":
+        args = [*args, prompt]
 
     process = await asyncio.create_subprocess_exec(
         *args,
-        stdin=asyncio.subprocess.PIPE,
+        stdin=stdin,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=str(cwd),
     )
 
     try:
+        input_data = prompt.encode("utf-8") if prompt_transport == "stdin" else None
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(prompt.encode("utf-8")),
+            process.communicate(input_data),
             timeout=timeout,
         )
         return CliRunResult(
@@ -222,6 +231,7 @@ async def handle_queued_task(
     max_reply_chars: int,
     runtime: str = "cli",
     bridge_label: str = "CLI bridge",
+    prompt_transport: str = "stdin",
 ) -> bool:
     """Claim and execute one queued task. Returns False when another worker claimed it first."""
     from TALK.client.exceptions import TalkValidationError
@@ -240,7 +250,13 @@ async def handle_queued_task(
     last_error: str | None = None
 
     try:
-        result = await run_cli_command(command, prompt, cwd=workdir, timeout=timeout)
+        result = await run_cli_command(
+            command,
+            prompt,
+            cwd=workdir,
+            timeout=timeout,
+            prompt_transport=prompt_transport,
+        )
         reply = format_cli_reply(result, max_chars=max_reply_chars, bridge_label=bridge_label)
         completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
         if completion_status == "failed":
@@ -295,6 +311,7 @@ async def run_task_queue_worker(
                         max_reply_chars=args.max_reply_chars,
                         runtime=args.runtime,
                         bridge_label=args.bridge_label,
+                        prompt_transport=args.prompt_transport,
                     )
         except asyncio.CancelledError:
             raise
@@ -364,6 +381,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
                     prompt,
                     cwd=workdir,
                     timeout=args.timeout,
+                    prompt_transport=args.prompt_transport,
                 )
                 reply = format_cli_reply(result, max_chars=args.max_reply_chars, bridge_label=args.bridge_label)
                 await client.reply(int(message["id"]), text=reply, to=[sender])
@@ -416,6 +434,7 @@ def build_parser(
     command_option: str = "--command",
     command_dest: str = "command",
     command_metavar: str | None = None,
+    default_prompt_transport: str = "stdin",
     default_bridge_label: str = "CLI bridge",
 ) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=description)
@@ -427,6 +446,12 @@ def build_parser(
     parser.add_argument("--runtime", default=default_runtime, help=f"Runtime label reported to TALK. Default: {default_runtime}")
     parser.add_argument("--bridge-label", default=default_bridge_label, help="Human-readable label used in error replies")
     parser.add_argument("--workdir", default=".", help="Working directory passed to the CLI command")
+    parser.add_argument(
+        "--prompt-transport",
+        choices=sorted(PROMPT_TRANSPORTS),
+        default=default_prompt_transport,
+        help="How to pass the TALK prompt to the CLI command. Default: %(default)s",
+    )
     parser.add_argument(
         command_option,
         dest=command_dest,
