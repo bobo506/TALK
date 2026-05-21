@@ -59,11 +59,14 @@ codex exec --skip-git-repo-check --sandbox workspace-write --color never -
 - 默认 pi 命令为：
 
 ```bash
-pi --print --mode text
+pi --print --mode text --no-context-files --no-tools --no-session --thinking off --system-prompt "<TALK pi concise chat prompt>"
 ```
 
 - 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
+- pi 默认入口面向前端人工聊天验收做了收敛：禁止自动加载 `AGENTS.md` / `CLAUDE.md` 上下文文件，禁止工具调用，不保存/恢复会话，并关闭 thinking，以减少回复延迟和避免把普通聊天误输出成项目状态报告。
+- 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。
 - 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
+- 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留上述 pi CLI 收敛参数；否则 pi 可能重新读取项目上下文并产生较长回复。
 
 ## 运行示例
 

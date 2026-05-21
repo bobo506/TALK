@@ -10,6 +10,7 @@ from bridges.cli_bridge import (
     CliRunResult,
     build_cli_prompt,
     build_cli_task_prompt,
+    first_sentence,
     build_parser,
     format_cli_reply,
     handle_queued_task,
@@ -85,6 +86,19 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertIn("pi bridge failed with exit code 2", reply)
         self.assertIn("stderr", reply)
+
+    def test_format_cli_reply_can_force_one_sentence(self):
+        reply = format_cli_reply(
+            CliRunResult(returncode=0, stdout="第一句。\n\n第二句，还有很多状态。", stderr=""),
+            force_one_sentence=True,
+        )
+
+        self.assertEqual(reply, "第一句。")
+
+    def test_first_sentence_falls_back_to_first_compact_line(self):
+        reply = first_sentence("agent:pi 已连接 — 状态报告\n\n项目 | 状态")
+
+        self.assertEqual(reply, "agent:pi 已连接 — 状态报告")
 
     def test_run_cli_command_pipes_prompt_to_subprocess(self):
         async def scenario():

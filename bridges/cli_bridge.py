@@ -29,6 +29,8 @@ DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
 PROMPT_TRANSPORTS = {"stdin", "argv"}
+ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
+SENTENCE_ENDINGS = "。！？.!?"
 
 
 @dataclass(frozen=True)
@@ -91,6 +93,30 @@ def strip_leading_mentions(text: str, *, member_id: str | None = None) -> str:
     if not saw_mention:
         return text.strip()
     return text[cursor:].strip()
+
+
+def wants_one_sentence(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in ONE_SENTENCE_MARKERS)
+
+
+def first_sentence(text: str, *, max_chars: int = 240) -> str:
+    lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    compact = " ".join(lines)
+    if not compact:
+        return text
+
+    positions = [compact.find(mark) for mark in SENTENCE_ENDINGS if compact.find(mark) != -1]
+    if positions:
+        index = min(positions) + 1
+        return compact[:index].strip()
+
+    if len(lines) > 1:
+        return first_sentence(lines[0], max_chars=max_chars)
+
+    if len(compact) > max_chars:
+        return f"{compact[:max_chars].rstrip()}..."
+    return compact
 
 
 def should_handle_message(
@@ -171,6 +197,7 @@ def format_cli_reply(
     *,
     max_chars: int = DEFAULT_MAX_REPLY_CHARS,
     bridge_label: str = "CLI bridge",
+    force_one_sentence: bool = False,
 ) -> str:
     output = (result.stdout or "").strip()
     error = (result.stderr or "").strip()
@@ -187,6 +214,9 @@ def format_cli_reply(
             text += f"\n\nstdout:\n{output}"
     else:
         text = output or f"({bridge_label} finished without output.)"
+
+    if force_one_sentence and not result.timed_out and result.returncode == 0:
+        text = first_sentence(text)
 
     if len(text) > max_chars:
         remaining = len(text) - max_chars
@@ -268,6 +298,7 @@ async def handle_queued_task(
             return False
         raise
 
+    task_text = str(claimed.get("content") or "")
     prompt = build_cli_task_prompt(claimed, member_id=member_id, workdir=workdir, runtime=runtime)
     result_message_id: int | None = None
     completion_status = "succeeded"
@@ -281,7 +312,12 @@ async def handle_queued_task(
             timeout=timeout,
             prompt_transport=prompt_transport,
         )
-        reply = format_cli_reply(result, max_chars=max_reply_chars, bridge_label=bridge_label)
+        reply = format_cli_reply(
+            result,
+            max_chars=max_reply_chars,
+            bridge_label=bridge_label,
+            force_one_sentence=wants_one_sentence(task_text),
+        )
         completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
         if completion_status == "failed":
             last_error = reply
@@ -407,7 +443,16 @@ async def run_bridge(args: argparse.Namespace) -> None:
                     timeout=args.timeout,
                     prompt_transport=args.prompt_transport,
                 )
-                reply = format_cli_reply(result, max_chars=args.max_reply_chars, bridge_label=args.bridge_label)
+                task_text = strip_leading_mentions(
+                    str(message.get("content") or ""),
+                    member_id=member_id,
+                )
+                reply = format_cli_reply(
+                    result,
+                    max_chars=args.max_reply_chars,
+                    bridge_label=args.bridge_label,
+                    force_one_sentence=wants_one_sentence(task_text),
+                )
                 await client.reply(int(message["id"]), text=reply, to=[sender])
                 await report_status(
                     "error" if result.timed_out or result.returncode != 0 else "idle",

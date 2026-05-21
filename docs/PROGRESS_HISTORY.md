@@ -6,6 +6,38 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-21 18:13 (Asia/Shanghai)
+### Current Progress
+- `PI-BRIDGE-CHAT-1` 验收期修复已完成：针对用户反馈的 pi 回复慢、回复过长、即使要求一句话仍带入项目状态报告的问题，收敛 pi bridge 默认运行方式。
+- `bridges/pi_bridge.py` 默认命令从裸 `pi --print --mode text` 调整为聊天验收模式：增加 `--no-context-files --no-tools --no-session --thinking off`，并通过 `--system-prompt` 要求 pi 只回复 TALK 用户任务、不要读取/总结项目文件或进度。
+- 通用 `bridges/cli_bridge.py` 新增“一句话”兜底：当任务文本包含“一句话 / one sentence / single sentence”等约束时，CLI 成功输出会在 bridge 层收敛为第一句或第一行后再发回 TALK。
+- `tests/test_pi_bridge.py` 已覆盖 pi 默认命令中的上下文/工具/session/thinking/system prompt 收敛参数。
+- `tests/test_cli_bridge.py` 已覆盖“一句话”输出收敛逻辑。
+- `docs/MODULE_bridges.md` 已同步 pi 默认命令的新边界，并提醒自定义 `TALK_PI_COMMAND` / `--pi-command` 时需自行保留收敛参数。
+### Open Questions / Pending Confirmation
+- 需用户重启 pi bridge 后在前端人工验收：`@agent:pi 只用一句话回复：你在线吗？` 应返回简短一句，不再输出项目状态报告。
+- 如果用户当前通过 `TALK_PI_COMMAND` 或 `--pi-command` 自定义了 pi 命令，需要同步加入本次默认命令中的收敛参数；否则会绕过默认修复。
+- 本轮未真实调用 DeepSeek/pi 模型 API，只通过命令参数、单元测试和全量测试验证 bridge 行为。
+### Next Plan
+1. 提交本次 `PI-BRIDGE-CHAT-1` 修复。
+2. 用户重启 pi bridge 后继续前端人工验收。
+3. 验收通过后继续 Codex + pi 双 Agent 回复链路与 Web UI 视觉/交互联合验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，12 tests。
+- `.venv\Scripts\python.exe bridges\pi_bridge.py --help` passed。
+- `.venv\Scripts\python.exe -u -m unittest -v` passed，110 tests。
+- `node --check web\app.js` passed。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-21 17:59 (Asia/Shanghai)
 ### Current Progress
 - `WEB-MENTION-ENTER-1` 验收期修复已完成：修复前端在 `@` 补全下拉打开时按 Enter 会先发送裸 `@`，导致服务端返回 `invalid recipient mention: @` 的问题。
