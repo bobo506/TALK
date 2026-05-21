@@ -19,6 +19,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+RESPONSE_STYLE_INSTRUCTIONS = (
+    "Match the scope of the user's request. For a simple presence check, greeting, or acknowledgement request, "
+    "reply in one short sentence only, for example '<agent id> 在线。'. "
+    "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
+)
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
@@ -125,6 +130,7 @@ def build_cli_prompt(
         f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
         f"Project root: {workdir}\n"
         "Answer the user's task. Keep the final response suitable for posting back into TALK.\n"
+        f"{RESPONSE_STYLE_INSTRUCTIONS}"
         "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
         f"Sender: {sender}\n"
         f"TALK message id: {message_id}\n\n"
@@ -150,6 +156,7 @@ def build_cli_task_prompt(
         f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
         f"Project root: {workdir}\n"
         "Answer the queued Agent task. Keep the final response suitable for posting back into TALK.\n"
+        f"{RESPONSE_STYLE_INSTRUCTIONS}"
         "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
         f"Task creator: {creator}\n"
         f"TALK task id: {task_id}\n"

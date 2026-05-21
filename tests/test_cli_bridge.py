@@ -8,6 +8,7 @@ from pathlib import Path
 from bridges import cli_bridge
 from bridges.cli_bridge import (
     CliRunResult,
+    build_cli_prompt,
     build_cli_task_prompt,
     build_parser,
     format_cli_reply,
@@ -62,6 +63,18 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("pi CLI agent", prompt)
         self.assertIn("human:bobo", prompt)
         self.assertIn("ask codex to review this too", prompt)
+        self.assertIn("simple presence check", prompt)
+
+    def test_build_cli_prompt_discourages_status_report_for_presence_check(self):
+        prompt = build_cli_prompt({
+            "id": 4,
+            "from": "human:bobo",
+            "content": "@agent:pi 在吗",
+        }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+
+        self.assertIn("one short sentence", prompt)
+        self.assertIn("Do not inspect project files", prompt)
+        self.assertIn("在吗", prompt)
 
     def test_format_cli_reply_uses_bridge_label(self):
         reply = format_cli_reply(
