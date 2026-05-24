@@ -151,6 +151,8 @@ def build_cli_prompt(
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
+    group_id = message.get("group_id")
+    group_line = f"TALK group id: {group_id}\n" if group_id else ""
 
     return (
         f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
@@ -160,6 +162,7 @@ def build_cli_prompt(
         "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
         f"Sender: {sender}\n"
         f"TALK message id: {message_id}\n\n"
+        f"{group_line}"
         "Task:\n"
         f"{task}\n"
     )
@@ -344,6 +347,69 @@ async def handle_queued_task(
     return True
 
 
+async def handle_incoming_message(
+    message: dict[str, Any],
+    *,
+    client: Any,
+    member_id: str,
+    workdir: Path,
+    command: str | Sequence[str],
+    timeout: int,
+    max_reply_chars: int,
+    runtime: str = "cli",
+    bridge_label: str = "CLI bridge",
+    prompt_transport: str = "stdin",
+    send_ack: bool = False,
+    report_status: Any | None = None,
+) -> None:
+    sender = message.get("from")
+    if not sender:
+        return
+
+    task_id = str(message.get("id") or "")
+    group_id = message.get("group_id") if isinstance(message.get("group_id"), str) else None
+    if report_status is not None:
+        await report_status("busy", current_task_id=task_id)
+
+    try:
+        if send_ack:
+            await client.reply(
+                int(message["id"]),
+                text=f"{bridge_label} received the task and is working on it.",
+                to=[sender],
+                group_id=group_id,
+            )
+
+        prompt = build_cli_prompt(message, member_id=member_id, workdir=workdir, runtime=runtime)
+        result = await run_cli_command(
+            command,
+            prompt,
+            cwd=workdir,
+            timeout=timeout,
+            prompt_transport=prompt_transport,
+        )
+        task_text = strip_leading_mentions(
+            str(message.get("content") or ""),
+            member_id=member_id,
+        )
+        reply = format_cli_reply(
+            result,
+            max_chars=max_reply_chars,
+            bridge_label=bridge_label,
+            force_one_sentence=wants_one_sentence(task_text),
+        )
+        await client.reply(int(message["id"]), text=reply, to=[sender], group_id=group_id)
+        if report_status is not None:
+            await report_status(
+                "error" if result.timed_out or result.returncode != 0 else "idle",
+                last_error=reply if result.timed_out or result.returncode != 0 else None,
+            )
+    except Exception as exc:
+        if report_status is not None:
+            await report_status("error", current_task_id=task_id, last_error=str(exc))
+        raise
+
+
 async def run_task_queue_worker(
     *,
     client: Any,
@@ -420,49 +486,21 @@ async def run_bridge(args: argparse.Namespace) -> None:
         ):
             return
 
-        sender = message.get("from")
-        if not sender:
-            return
-
         async with run_lock:
-            task_id = str(message.get("id") or "")
-            await report_status("busy", current_task_id=task_id)
-            try:
-                if args.send_ack:
-                    await client.reply(
-                        int(message["id"]),
-                        text=f"{args.bridge_label} received the task and is working on it.",
-                        to=[sender],
-                    )
-
-                prompt = build_cli_prompt(message, member_id=member_id, workdir=workdir, runtime=args.runtime)
-                result = await run_cli_command(
-                    args.command,
-                    prompt,
-                    cwd=workdir,
-                    timeout=args.timeout,
-                    prompt_transport=args.prompt_transport,
-                )
-                task_text = strip_leading_mentions(
-                    str(message.get("content") or ""),
-                    member_id=member_id,
-                )
-                reply = format_cli_reply(
-                    result,
-                    max_chars=args.max_reply_chars,
-                    bridge_label=args.bridge_label,
-                    force_one_sentence=wants_one_sentence(task_text),
-                )
-                await client.reply(int(message["id"]), text=reply, to=[sender])
-                await report_status(
-                    "error" if result.timed_out or result.returncode != 0 else "idle",
-                    last_error=reply if result.timed_out or result.returncode != 0 else None,
-                )
-            except Exception as exc:
-                try:
-                    await report_status("error", current_task_id=task_id, last_error=str(exc))
-                finally:
-                    raise
+            await handle_incoming_message(
+                message,
+                client=client,
+                member_id=member_id,
+                workdir=workdir,
+                command=args.command,
+                timeout=args.timeout,
+                max_reply_chars=args.max_reply_chars,
+                runtime=args.runtime,
+                bridge_label=args.bridge_label,
+                prompt_transport=args.prompt_transport,
+                send_ack=args.send_ack,
+                report_status=report_status,
+            )
 
     task_worker: asyncio.Task[None] | None = None
     if not args.disable_task_queue:

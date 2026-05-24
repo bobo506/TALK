@@ -13,6 +13,7 @@ from bridges.cli_bridge import (
     first_sentence,
     build_parser,
     format_cli_reply,
+    handle_incoming_message,
     handle_queued_task,
     resolve_command_executable,
     run_cli_command,
@@ -76,6 +77,16 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("one short sentence", prompt)
         self.assertIn("Do not inspect project files", prompt)
         self.assertIn("在吗", prompt)
+
+    def test_build_cli_prompt_includes_group_context_when_present(self):
+        prompt = build_cli_prompt({
+            "id": 8,
+            "from": "human:bobo",
+            "group_id": "group:lab",
+            "content": "@agent:pi 在群里回我",
+        }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+
+        self.assertIn("TALK group id: group:lab", prompt)
 
     def test_format_cli_reply_uses_bridge_label(self):
         reply = format_cli_reply(
@@ -187,6 +198,60 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.claimed, [(12, "agent:pi:test")])
         self.assertEqual(client.sent, [("OK", ["human:bobo"])])
         self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
+
+    def test_handle_incoming_message_replies_inside_same_group(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+        statuses = []
+
+        async def fake_report_status(status, **kwargs):
+            statuses.append((status, kwargs))
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            self.assertIn("TALK group id: group:lab", prompt)
+            self.assertIn("group task", prompt)
+            return CliRunResult(returncode=0, stdout="group reply", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:bobo",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi group task",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=100,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                    report_status=fake_report_status,
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.replies, [(40, "group reply", ["human:bobo"], "group:lab")])
+        self.assertEqual(statuses[0][0], "busy")
+        self.assertEqual(statuses[-1][0], "idle")
 
 
 if __name__ == "__main__":

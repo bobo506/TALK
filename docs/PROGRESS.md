@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-24 16:41 (Asia/Shanghai)
+Updated: 2026-05-24 21:37 (Asia/Shanghai)
 
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md`。
@@ -9,6 +9,13 @@ Updated: 2026-05-24 16:41 (Asia/Shanghai)
 - 当前 Claude 角色：执行 Agent。
 
 ### 2) Current Progress
+- `GROUP-BRIDGE-REPLY-1` 验收期修复已完成：修复 Group Hall 中 `@agent:codex` / `@agent:pi` 后 bridge 已收到消息但回复失败的问题。
+- 现场排查确认：新建 group 中的消息已写入 `messages.group_id`，且 `to_ids` 分别指向 `agent:codex` / `agent:pi`；两个 bridge 都已领取到消息，但实例状态进入 `error`，`last_error` 为 `cannot_reply_to_different_group`。
+- 根因是通用 CLI bridge 在 `reply_to` 原消息时没有把原消息的 `group_id` 带回，导致服务端认为这是跨 group 回复并拒绝写入。
+- `bridges/cli_bridge.py` 已抽出 `handle_incoming_message(...)`，统一处理 ACK、CLI 调用、最终回复和状态上报，并在 Group Hall 消息中保留原始 `group_id`。
+- bridge 生成的 CLI prompt 现在包含 `TALK group id`，让外部 Agent 能感知当前消息来自哪个 Hall。
+- `tests/test_cli_bridge.py` 已补充 Group Hall prompt 与同 group 回复回归测试。
+- `docs/MODULE_bridges.md` 已同步 Codex / pi 在 Group Hall 中的当前边界：直接 `@agent:*` 可以处理，回复会写回原 Hall；HTTP fallback 的 Agent group cursor 仍是后续计划。
 - `OPENHANAKO-REF-1` 文档沉淀已完成：将 `liliMozi/openhanako` 中对 TALK 有参考价值的多 Agent 频道群聊设计记录到项目文档。
 - `docs/LOCAL_LAB_DESIGN.md` 已新增 OpenHanako 参考笔记：保留 Group Hall 作为真相源、`@mention` 只作提醒/调度、Agent 需要显式 `reply/pass`、后续需要 Agent group cursor 与调度保护参数。
 - `docs/MODULE_groups.md` 已补充 Group/Hall 后续协议参考：继续使用 SQLite 的 `groups / group_members / messages`，不照搬 Markdown 文件存储、Electron/Node Hub 和主动人格/记忆系统。
@@ -26,6 +33,9 @@ Updated: 2026-05-24 16:41 (Asia/Shanghai)
 - 本机已确认 `pi --help` 与 `pi --version` 可执行，版本为 `0.74.1`。
 
 ### 3) Open Questions / Pending Confirmation
+- 需要用户重启 Codex bridge 与 pi bridge；当前正在运行的 bridge 进程仍加载旧代码，不会自动获得本次修复。
+- 旧的失败消息（本次现场看到的 group 消息 id 20 / 21）不会自动重试；重启 bridge 后请在同一个 Group Hall 重新发送新的 `@agent:codex` / `@agent:pi` 消息验收。
+- Group Hall 的实时触发当前依赖 WebSocket 推送；Agent group cursor / HTTP fallback 轮询仍留到当前验收通过后的下一阶段设计。
 - OpenHanako 参考只作为下一阶段设计素材；是否实现 Agent group cursor、`reply/pass` 决策协议和自动讨论调度器，需等当前验收完成后再确认。
 - 需用户重启 pi bridge 后在前端实测：`@agent:pi 只用一句话回复：你在线吗？` 应返回简短一句，不再输出项目状态报告。
 - 如果用户本机通过 `TALK_PI_COMMAND` 或 `--pi-command` 自定义了 pi 命令，需要把 `--no-context-files --no-tools --no-session --thinking off --system-prompt ...` 等收敛参数带回自定义命令，否则会绕过本次默认修复。
@@ -39,18 +49,23 @@ Updated: 2026-05-24 16:41 (Asia/Shanghai)
 - 未读/关注状态、文档编辑锁仍待实现。
 
 ### 4) Next Plan
-1. 提交本次 `OPENHANAKO-REF-1` 文档沉淀。
-2. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
-3. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
+1. 提交本次 `GROUP-BRIDGE-REPLY-1` 验收期修复。
+2. 用户重启 Codex / pi bridge 后，在同一个 Group Hall 重新发送 `@agent:codex` 与 `@agent:pi` 消息，确认回复出现在该 Hall。
+3. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+4. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
 
 ### 5) Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_talk_client` passed，23 tests。
+- `.venv\Scripts\python.exe -u -m unittest -v` passed，112 tests。
 - `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
 - `git diff --check` passed（仅换行提示）。
 - `scripts/check-progress.ps1` 与 `scripts/check-git-ready.ps1` 当前工作树不存在，本轮无法运行这两个历史门禁脚本。
 
 ### 6) Changed Files
-- `docs/LOCAL_LAB_DESIGN.md`
-- `docs/MODULE_groups.md`
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 

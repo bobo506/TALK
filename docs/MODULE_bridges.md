@@ -36,6 +36,7 @@ python bridges/cli_bridge.py --name pi --runtime pi --bridge-label "pi bridge" -
 - `bridges/codex_bridge.py` 会自注册为 `agent:codex`（可通过 `--name` 修改）。
 - `bridges/codex_bridge.py` 现在复用通用 CLI bridge 实现，但保留原有 `--codex-command` 参数、默认 Codex 命令和 helper 函数兼容面。
 - 默认只处理直接发给自己的文本消息，不自动响应普通广播消息。
+- Group Hall 中直接 `@agent:codex` 的文本消息也会被处理；bridge 回复会保留原消息的 `group_id`，因此回复写回同一个 Hall，而不是落到全局 direct 流。
 - 启动后会通过实例 API 上报运行状态，默认实例 id 为 `agent:codex:<uuid>`，也可用 `--instance-id` 固定。
 - 处理任务时状态从 `idle` 切到 `busy`，完成后回到 `idle`；命令失败、超时或异常时上报 `error`，进程退出前上报 `offline`。
 - 默认同时轮询 `/api/tasks?target_member_id=<member_id>&status=queued`，按 `id` 从小到大认领属于自己的排队任务。
@@ -47,7 +48,7 @@ python bridges/cli_bridge.py --name pi --runtime pi --bridge-label "pi bridge" -
 codex exec --skip-git-repo-check --sandbox workspace-write --color never -
 ```
 
-- bridge 通过 stdin 把 TALK 任务传给 Codex，并把 Codex 输出作为 `reply_to` 回复给原发送者。
+- bridge 通过 stdin 把 TALK 任务传给 Codex，并把 Codex 输出作为 `reply_to` 回复给原发送者；若原消息属于 Group Hall，则同时携带相同 `group_id`。
 - 命令、工作目录、超时、回复最大长度、是否响应广播、是否先发 ACK 都可通过 CLI 参数配置。
 - 任务队列轮询间隔可通过 `--task-poll-interval` 配置；如只想保留旧的消息触发模式，可用 `--disable-task-queue` 关闭。
 
@@ -63,6 +64,7 @@ pi --print --mode text --no-context-files --no-tools --no-session --thinking off
 ```
 
 - 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
+- Group Hall 中直接 `@agent:pi` 的文本消息也会被处理；bridge 回复会保留原消息的 `group_id`，因此回复写回同一个 Hall。
 - pi 默认入口面向前端人工聊天验收做了收敛：禁止自动加载 `AGENTS.md` / `CLAUDE.md` 上下文文件，禁止工具调用，不保存/恢复会话，并关闭 thinking，以减少回复延迟和避免把普通聊天误输出成项目状态报告。
 - 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。
 - 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
@@ -84,7 +86,8 @@ Web UI 中发送：
 
 ## 后续计划
 
-- 接入 Group / Hall 消息上下文。
+- 完善 Group / Hall 历史上下文读取，让 Agent 可按需看到同一 Hall 的近期消息。
+- 为 Group Hall 的 HTTP fallback 轮询补充 Agent group cursor；当前 Group 触发主要依赖 WebSocket 实时推送。
 - 接入 SSE 流式输出。
 - 接入文档编辑锁协议，避免多个 Agent 同时写同一文件。
 - 增加双 Agent 最小回合验收脚本：同时启动 Codex / pi bridge，验证 `agent:codex` 与 `agent:pi` 可在 TALK 中完成一轮消息或任务往返。
@@ -101,3 +104,4 @@ Web UI 中发送：
 - [x] `python bridges/pi_bridge.py --help` 可正常输出参数说明。
 - [x] 在临时 TALK server / 临时 SQLite / 临时 storage 中完成 `@agent:codex -> codex exec --sandbox read-only -> reply_to` 端到端验收，收到 `TALK_BRIDGE_SMOKE_OK`。
 - [x] 在临时 TALK server 中验证 Codex bridge 实例状态路径：`idle -> busy -> idle -> offline`。
+- [x] 通用 CLI bridge 在处理 Group Hall 消息时会把回复写回原 `group_id`，避免触发 `cannot_reply_to_different_group`。

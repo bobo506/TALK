@@ -6,6 +6,36 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-24 21:37 (Asia/Shanghai)
+### Current Progress
+- `GROUP-BRIDGE-REPLY-1` 验收期修复已完成：修复 Group Hall 中 `@agent:codex` / `@agent:pi` 后 bridge 已收到消息但回复失败的问题。
+- 现场排查确认：用户新建 group 后发送的两条消息都已写入 `messages.group_id`，`to_ids` 分别为 `["agent:codex"]` 与 `["agent:pi"]`，且两个 bridge 都已领取到对应消息。
+- 两个实例失败原因一致：`agent_instances.last_error` 为 `cannot_reply_to_different_group`，说明 bridge 处理了消息，但回复时没有保留原 Hall 上下文。
+- `bridges/cli_bridge.py` 已抽出 `handle_incoming_message(...)`，统一处理 ACK、CLI 调用、最终回复和状态上报；当原消息带有 `group_id` 时，ACK 与最终 `reply_to` 都会携带同一个 `group_id`。
+- CLI prompt 现在包含 `TALK group id`，便于 Codex / pi 等外部 Agent 感知当前消息来自哪个 Group Hall。
+- `tests/test_cli_bridge.py` 已新增 Group Hall prompt 与同 group 回复回归测试，覆盖 `group_id` 传递行为。
+- `docs/MODULE_bridges.md` 已同步 Codex / pi Group Hall 当前能力与后续 HTTP fallback group cursor 边界。
+### Open Questions / Pending Confirmation
+- 需要用户重启 Codex bridge 与 pi bridge 后重新验收；正在运行的旧进程不会自动加载本次代码修复。
+- 本次现场失败的旧消息不会自动重试；重启 bridge 后需在前端 Group Hall 中重新发送新的 `@agent:codex` / `@agent:pi` 消息。
+- Group Hall 的实时触发当前主要依赖 WebSocket；Agent group cursor / HTTP fallback 轮询仍留作当前验收后的下一阶段设计。
+### Next Plan
+1. 提交本次 `GROUP-BRIDGE-REPLY-1` 验收期修复。
+2. 用户重启 Codex / pi bridge 后，继续在前端 Group Hall 验收双 Agent 回复。
+3. 验收通过后，再评估下一阶段多 Agent 自动讨论协议。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_talk_client` passed，23 tests。
+- `.venv\Scripts\python.exe -u -m unittest -v` passed，112 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-24 16:41 (Asia/Shanghai)
 ### Current Progress
 - `OPENHANAKO-REF-1` 文档沉淀已完成：用户提供 `liliMozi/openhanako` 作为多 Agent 拉群交流参考后，已把对 TALK 有帮助的设计点记录到项目文档。
