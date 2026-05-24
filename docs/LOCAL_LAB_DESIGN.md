@@ -85,6 +85,33 @@ Minimum flow:
 5. Moderator stops when the round limit or stop condition is reached.
 6. Moderator posts a final summary with decisions, open questions, and next actions.
 
+### OpenHanako Reference Notes
+
+2026-05-24 调研 `liliMozi/openhanako` 后，确认其多 Agent 频道群聊模型对 TALK 的下一阶段有参考价值，但不应照搬其 Electron / Node Hub / Markdown 文件存储架构。TALK 继续以 FastAPI + SQLite + Group Hall 为核心。参考版本：`dbc794de87d58b44bbf5f75f8d20fd99a5d7e156`，重点文件包括 `hub/channel-router.js`、`lib/channels/channel-ticker.js`、`lib/channels/channel-store.js`、`lib/channels/channel-mentions.js`、`lib/tools/dm-tool.js`。
+
+可借鉴的设计点：
+
+- `Group Hall` 应保持为唯一真相源：所有 human / agent 发言写入同一条 `messages.group_id` 时间线，Agent 只读取 Hall 的 recent window，而不是为每个 Agent 复制一份聊天记录。
+- `@mention` 应继续表示提醒 / 优先调度，而不是可见性规则；Group 成员都能读取 Hall，`to_ids` 只影响注意力路由。
+- 多 Agent 自动讨论需要显式 `reply` / `pass` 决策：Agent 读到新群聊消息后，必须决定是否发言，避免所有 Agent 同时抢答或无声失败。
+- 每个 Agent 对每个 Group 需要独立 read cursor，例如后续可引入 `agent_group_cursors(member_id, group_id, last_message_id)`，用于判断该 Agent 尚未处理的 Hall 消息窗口。
+- 调度器需要内置保护：`max_rounds`、`cooldown`、`max_agent_checks`、recent window 上限，避免 Codex 与 pi 等 Agent 互相触发无限对话。
+- 可区分 Group 频道与 Agent DM：Group 用共享 Hall；DM 可作为后续 1v1 Agent 私信能力，但不应替代主讨论面。
+
+不纳入当前验收分支的内容：
+
+- 主动心跳、长期记忆、人格系统、技能安装、桌面工作台、复杂沙盒与跨平台 IM bridge。
+- Markdown 文件作为频道存储；TALK 已有 SQLite 消息模型，后续应在现有表或新表上扩展。
+
+候选下一阶段最小落地路径：
+
+1. Human 在 Group Hall 中发布主题或 @ 某个 Agent。
+2. Server 根据 Group 成员与 mention 结果创建或触发 Agent group tasks。
+3. Bridge 领取任务后读取该 Group 的 recent Hall messages。
+4. Agent 返回结构化决策：`reply` 或 `pass`。
+5. `reply` 写回同一个 `group_id`；`pass` 只更新 cursor / task 状态。
+6. 调度器按 `max_rounds`、`cooldown` 和 `max_agent_checks` 停止本轮讨论。
+
 ## SSE Streaming
 
 WebSocket already handles committed messages and presence. SSE should be used for long-running Agent output where the user should see partial text before the final message is committed.

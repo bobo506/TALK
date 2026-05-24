@@ -115,9 +115,27 @@
 
 - 确认 Group 删除 / 归档语义，并补充删除或归档入口。
 - 在 Web UI 中补充更完整的未读/提醒状态。
-- 设计并实现 Discussion Session / 多 Agent 讨论协议。
+- 设计并实现 Discussion Session / 多 Agent 讨论协议；参考 `openhanako` 的频道群聊模型时，只吸收调度思想，不照搬文件存储和桌面架构。
 - 让 SSE stream 事件携带 `group_id` 并显示在对应 Hall。
 - 将任务状态、实例状态和文档锁状态接入 Group/Hall 视图。
+
+## 参考设计：OpenHanako Channel Model
+
+2026-05-24 参考仓库：`liliMozi/openhanako`，参考版本：`dbc794de87d58b44bbf5f75f8d20fd99a5d7e156`。
+
+对 TALK 有帮助的点：
+
+- Channel transcript / Hall 应作为讨论真相源：TALK 已有 `messages.group_id`，后续多 Agent 讨论应继续写入同一 Group Hall 时间线。
+- `@mention` 只作为提醒和调度优先级，不作为 Group 内可见性规则；这与 TALK 当前 `to_ids` 在 Group 内只表示注意力路由的语义一致。
+- Agent 读取群聊后应显式选择 `reply` 或 `pass`，避免自动讨论时出现抢答、沉默或重复发言。
+- 后续需要 Agent 级 cursor：每个 `agent:*` 对每个 `group_id` 记录处理到的 `last_message_id`，用于构造未读窗口和避免重复处理。
+- 讨论调度必须有保护参数：`max_rounds`、`cooldown`、`max_agent_checks`、recent window 上限。
+
+TALK 的差异化选择：
+
+- 不采用 Markdown 文件作为频道存储；继续使用 SQLite 的 `groups / group_members / messages`。
+- 当前验收分支不引入主动心跳、长期记忆、人格系统或复杂桌面工作台。
+- DM / 私信能力可作为后续独立能力，不替代 Group Hall 的主协作路径。
 
 ## 验收点
 

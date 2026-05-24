@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-21 18:13 (Asia/Shanghai)
+Updated: 2026-05-24 16:41 (Asia/Shanghai)
 
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md`。
@@ -9,6 +9,10 @@ Updated: 2026-05-21 18:13 (Asia/Shanghai)
 - 当前 Claude 角色：执行 Agent。
 
 ### 2) Current Progress
+- `OPENHANAKO-REF-1` 文档沉淀已完成：将 `liliMozi/openhanako` 中对 TALK 有参考价值的多 Agent 频道群聊设计记录到项目文档。
+- `docs/LOCAL_LAB_DESIGN.md` 已新增 OpenHanako 参考笔记：保留 Group Hall 作为真相源、`@mention` 只作提醒/调度、Agent 需要显式 `reply/pass`、后续需要 Agent group cursor 与调度保护参数。
+- `docs/MODULE_groups.md` 已补充 Group/Hall 后续协议参考：继续使用 SQLite 的 `groups / group_members / messages`，不照搬 Markdown 文件存储、Electron/Node Hub 和主动人格/记忆系统。
+- 当前验收分支范围仍保持冻结：本次只记录下一阶段参考，不把自动多 Agent 讨论协议纳入当前 Codex + pi + Web UI 联合验收。
 - `PI-BRIDGE-CHAT-1` 验收期修复已完成：收敛 pi bridge 的默认聊天模式，降低普通前端消息回复慢、回复过长和误输出项目状态报告的概率。
 - `bridges/pi_bridge.py` 默认命令已加入 `--no-context-files --no-tools --no-session --thinking off`，并通过 `--system-prompt` 把 pi 固定为 TALK 中的简洁聊天 Agent。
 - 通用 bridge 新增“一句话”兜底：当用户任务明确包含“一句话 / one sentence / single sentence”等约束时，成功回复会被收敛为第一句或第一行再发回 TALK。
@@ -22,6 +26,7 @@ Updated: 2026-05-21 18:13 (Asia/Shanghai)
 - 本机已确认 `pi --help` 与 `pi --version` 可执行，版本为 `0.74.1`。
 
 ### 3) Open Questions / Pending Confirmation
+- OpenHanako 参考只作为下一阶段设计素材；是否实现 Agent group cursor、`reply/pass` 决策协议和自动讨论调度器，需等当前验收完成后再确认。
 - 需用户重启 pi bridge 后在前端实测：`@agent:pi 只用一句话回复：你在线吗？` 应返回简短一句，不再输出项目状态报告。
 - 如果用户本机通过 `TALK_PI_COMMAND` 或 `--pi-command` 自定义了 pi 命令，需要把 `--no-context-files --no-tools --no-session --thinking off --system-prompt ...` 等收敛参数带回自定义命令，否则会绕过本次默认修复。
 - 需用户刷新前端页面后，重新验证 `@` 下拉选择 `agent:codex` / `agent:pi` 不再出现 `invalid recipient mention: @`。
@@ -34,25 +39,18 @@ Updated: 2026-05-21 18:13 (Asia/Shanghai)
 - 未读/关注状态、文档编辑锁仍待实现。
 
 ### 4) Next Plan
-1. 提交本次 `PI-BRIDGE-CHAT-1` 验收期修复。
-2. 用户重启 pi bridge，并在前端发送一句话约束的消息，确认回复不再带项目状态报告。
-3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互的联合人工验收。
+1. 提交本次 `OPENHANAKO-REF-1` 文档沉淀。
+2. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+3. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
 
 ### 5) Verification
-- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
-- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，12 tests。
-- `.venv\Scripts\python.exe bridges\pi_bridge.py --help` passed。
-- `.venv\Scripts\python.exe -u -m unittest -v` passed，110 tests。
-- `node --check web\app.js` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
 - `git diff --check` passed（仅换行提示）。
 - `scripts/check-progress.ps1` 与 `scripts/check-git-ready.ps1` 当前工作树不存在，本轮无法运行这两个历史门禁脚本。
 
 ### 6) Changed Files
-- `bridges/cli_bridge.py`
-- `bridges/pi_bridge.py`
-- `tests/test_cli_bridge.py`
-- `tests/test_pi_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/MODULE_groups.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 

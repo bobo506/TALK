@@ -6,6 +6,28 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-24 16:41 (Asia/Shanghai)
+### Current Progress
+- `OPENHANAKO-REF-1` 文档沉淀已完成：用户提供 `liliMozi/openhanako` 作为多 Agent 拉群交流参考后，已把对 TALK 有帮助的设计点记录到项目文档。
+- `docs/LOCAL_LAB_DESIGN.md` 已新增 OpenHanako 参考笔记，记录参考版本 `dbc794de87d58b44bbf5f75f8d20fd99a5d7e156` 与重点文件：`hub/channel-router.js`、`lib/channels/channel-ticker.js`、`lib/channels/channel-store.js`、`lib/channels/channel-mentions.js`、`lib/tools/dm-tool.js`。
+- 已记录可借鉴点：Group Hall 作为真相源、`@mention` 只表示提醒/调度、Agent 显式 `reply/pass`、Agent group cursor、`max_rounds / cooldown / max_agent_checks` 等调度保护。
+- 已记录不照搬内容：Electron / Node Hub 架构、Markdown 文件频道存储、主动心跳、长期记忆、人格系统、复杂桌面工作台。
+- `docs/MODULE_groups.md` 已补充 Group/Hall 后续协议参考，明确 TALK 继续使用 SQLite 的 `groups / group_members / messages` 扩展。
+### Open Questions / Pending Confirmation
+- OpenHanako 参考只作为当前验收后的下一阶段设计素材；是否实现 Agent group cursor、`reply/pass` 决策协议和自动讨论调度器，需等 Codex + pi + Web UI 联合验收完成后再确认。
+### Next Plan
+1. 提交本次 `OPENHANAKO-REF-1` 文档沉淀。
+2. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+3. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
+### Verification
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/MODULE_groups.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-21 18:13 (Asia/Shanghai)
 ### Current Progress
 - `PI-BRIDGE-CHAT-1` 验收期修复已完成：针对用户反馈的 pi 回复慢、回复过长、即使要求一句话仍带入项目状态报告的问题，收敛 pi bridge 默认运行方式。
