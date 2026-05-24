@@ -24,6 +24,8 @@
 - 可通过 `--runtime` 设置实例上报 runtime，例如 `pi`、`codex`、`claude`。
 - 可通过 `--bridge-label` 设置错误回复中的桥接名称，例如 `pi bridge`。
 - 通用桥与 Codex 桥共享消息过滤、运行锁、任务队列、超时、回复截断和状态上报语义。
+- 子进程输出会优先按 UTF-8 解码，并在 Windows 下兜底尝试系统代码页，避免本地 CLI / 系统工具输出中文时出现替换字符乱码。
+- bridge 会过滤 Windows `taskkill` 进程清理提示，避免 Codex CLI 退出时的进程管理噪声混入前端聊天回复。
 
 运行示例：
 
@@ -105,3 +107,4 @@ Web UI 中发送：
 - [x] 在临时 TALK server / 临时 SQLite / 临时 storage 中完成 `@agent:codex -> codex exec --sandbox read-only -> reply_to` 端到端验收，收到 `TALK_BRIDGE_SMOKE_OK`。
 - [x] 在临时 TALK server 中验证 Codex bridge 实例状态路径：`idle -> busy -> idle -> offline`。
 - [x] 通用 CLI bridge 在处理 Group Hall 消息时会把回复写回原 `group_id`，避免触发 `cannot_reply_to_different_group`。
+- [x] 通用 CLI bridge 已对 Windows 本地 CLI 输出做编码兜底和 `taskkill` 噪声过滤，避免 Codex 在线回复前出现乱码进程终止提示。

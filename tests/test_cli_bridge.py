@@ -10,6 +10,8 @@ from bridges.cli_bridge import (
     CliRunResult,
     build_cli_prompt,
     build_cli_task_prompt,
+    clean_cli_output,
+    decode_subprocess_output,
     first_sentence,
     build_parser,
     format_cli_reply,
@@ -105,6 +107,24 @@ class CliBridgeTests(unittest.TestCase):
         )
 
         self.assertEqual(reply, "第一句。")
+
+    def test_decode_subprocess_output_falls_back_to_windows_codepage(self):
+        data = "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。".encode("gbk")
+
+        self.assertEqual(
+            decode_subprocess_output(data),
+            "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。",
+        )
+
+    def test_clean_cli_output_filters_taskkill_noise(self):
+        output = clean_cli_output(
+            "成功: 已终止 PID 4956 (属于 PID 12336 子进程)的进程。\n"
+            "\ufffd\u0279\ufffd: \ufffd\ufffd\ufffd\ufffdֹ PID 12336 "
+            "(\ufffd\ufffd\ufffd\ufffd PID 6340 \ufffdӽ\ufffd\ufffd\ufffd)\ufffdĽ\ufffd\ufffd̡\ufffd\n"
+            "codex 在线。"
+        )
+
+        self.assertEqual(output, "codex 在线。")
 
     def test_first_sentence_falls_back_to_first_compact_line(self):
         reply = first_sentence("agent:pi 已连接 — 状态报告\n\n项目 | 状态")

@@ -6,6 +6,34 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-24 21:41 (Asia/Shanghai)
+### Current Progress
+- `CODEX-BRIDGE-OUTPUT-1` 验收期修复已完成：修复 Codex 在 Group Hall 回复“在线”前混入 Windows 进程终止提示且中文乱码的问题。
+- 现场排查确认：最新 Codex 回复已写回 Group Hall，说明 `GROUP-BRIDGE-REPLY-1` 的同 Hall 回复修复已生效；但消息内容包含乱码的 `taskkill` PID 成功提示，对应 Windows 进程清理输出被错误编码解码后混入回复。
+- `bridges/cli_bridge.py` 已新增 `decode_subprocess_output(...)`：优先 UTF-8，并在出现替换字符时兜底尝试系统代码页、`gbk`、`cp936`，降低 Windows 本地 CLI 中文输出乱码概率。
+- `format_cli_reply(...)` 现在会对 stdout / stderr 做 `taskkill` 噪声过滤，避免 Codex CLI 退出清理子进程时的 PID 提示出现在前端聊天回复里。
+- `tests/test_cli_bridge.py` 已新增 GBK 输出解码与中英文/乱码 `taskkill` 过滤回归测试。
+- `docs/MODULE_bridges.md` 已同步通用 CLI bridge 的 Windows 输出编码与进程清理噪声过滤边界。
+### Open Questions / Pending Confirmation
+- 需要用户重启 Codex bridge 后重新发送 `@agent:codex 你好` 验收；正在运行的旧 Codex bridge 不会自动加载本次修复。
+- 历史消息 id 23 已经写入数据库，仍会保留旧乱码内容；本次修复只影响后续新回复。
+### Next Plan
+1. 提交本次 `CODEX-BRIDGE-OUTPUT-1` 验收期修复。
+2. 用户重启 Codex bridge 后，继续在 Group Hall 验收 Codex 回复内容是否干净。
+3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge` passed，25 tests。
+- `.venv\Scripts\python.exe -u -m unittest -v` passed，114 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-24 21:37 (Asia/Shanghai)
 ### Current Progress
 - `GROUP-BRIDGE-REPLY-1` 验收期修复已完成：修复 Group Hall 中 `@agent:codex` / `@agent:pi` 后 bridge 已收到消息但回复失败的问题。

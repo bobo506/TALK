@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import locale
 import os
+import re
 import shlex
 import shutil
 import socket
@@ -31,6 +33,13 @@ DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
 PROMPT_TRANSPORTS = {"stdin", "argv"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
+WINDOWS_TASKKILL_EN_RE = re.compile(
+    r"^SUCCESS:\s+The process with PID \d+ .* has been terminated\.$"
+)
+WINDOWS_TASKKILL_ZH_RE = re.compile(
+    r"^成功:\s*已终止 PID \d+ .*的进程。$"
+)
+MOJIBAKE_TASKKILL_PREFIX = "\ufffd\u0279\ufffd:"
 
 
 @dataclass(frozen=True)
@@ -119,6 +128,48 @@ def first_sentence(text: str, *, max_chars: int = 240) -> str:
     return compact
 
 
+def decode_subprocess_output(data: bytes) -> str:
+    if not data:
+        return ""
+
+    encodings = ["utf-8", "utf-8-sig", locale.getpreferredencoding(False)]
+    if os.name == "nt":
+        encodings.extend(["mbcs", "gbk", "cp936"])
+
+    candidates: list[tuple[int, int, str]] = []
+    seen: set[str] = set()
+    for index, encoding in enumerate(encodings):
+        if not encoding or encoding.lower() in seen:
+            continue
+        seen.add(encoding.lower())
+        try:
+            text = data.decode(encoding, errors="replace")
+        except LookupError:
+            continue
+        candidates.append((text.count("\ufffd"), index, text))
+
+    if not candidates:
+        return data.decode("utf-8", errors="replace")
+    return min(candidates, key=lambda item: (item[0], item[1]))[2]
+
+
+def is_process_cleanup_noise(line: str) -> bool:
+    stripped = line.strip()
+    if WINDOWS_TASKKILL_EN_RE.match(stripped):
+        return True
+    if WINDOWS_TASKKILL_ZH_RE.match(stripped):
+        return True
+    return stripped.startswith(MOJIBAKE_TASKKILL_PREFIX) and "PID " in stripped
+
+
+def clean_cli_output(text: str) -> str:
+    if not text:
+        return ""
+    lines = text.splitlines()
+    kept = [line for line in lines if not is_process_cleanup_noise(line)]
+    return "\n".join(kept).strip()
+
+
 def should_handle_message(
     message: dict[str, Any],
     member_id: str,
@@ -202,8 +253,8 @@ def format_cli_reply(
     bridge_label: str = "CLI bridge",
     force_one_sentence: bool = False,
 ) -> str:
-    output = (result.stdout or "").strip()
-    error = (result.stderr or "").strip()
+    output = clean_cli_output((result.stdout or "").strip())
+    error = clean_cli_output((result.stderr or "").strip())
 
     if result.timed_out:
         text = f"{bridge_label} timed out before producing a final answer."
@@ -262,16 +313,16 @@ async def run_cli_command(
         )
         return CliRunResult(
             returncode=int(process.returncode or 0),
-            stdout=stdout.decode("utf-8", errors="replace"),
-            stderr=stderr.decode("utf-8", errors="replace"),
+            stdout=decode_subprocess_output(stdout),
+            stderr=decode_subprocess_output(stderr),
         )
     except asyncio.TimeoutError:
         process.kill()
         stdout, stderr = await process.communicate()
         return CliRunResult(
             returncode=-1,
-            stdout=stdout.decode("utf-8", errors="replace"),
-            stderr=stderr.decode("utf-8", errors="replace"),
+            stdout=decode_subprocess_output(stdout),
+            stderr=decode_subprocess_output(stderr),
             timed_out=True,
         )
 
