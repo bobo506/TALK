@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-24 22:00 (Asia/Shanghai)
+Updated: 2026-05-24 22:15 (Asia/Shanghai)
 
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md`。
@@ -9,6 +9,11 @@ Updated: 2026-05-24 22:00 (Asia/Shanghai)
 - 当前 Claude 角色：执行 Agent。
 
 ### 2) Current Progress
+- `PI-NATURAL-CHAT-1` 验收期修正已完成：按用户确认，将 pi 调整为“自然回答的 TALK 聊天成员”，不再用强 system prompt 或 bridge 弱回复替换限制它的回答风格。
+- `bridges/pi_bridge.py` 默认命令已移除 `--system-prompt`，只保留 `--no-context-files --no-tools --no-session --thinking off`，用于防止 pi 自动读取 TALK 代码项目上下文、调用工具或恢复旧会话。
+- `bridges/cli_bridge.py` 已移除能力问题弱回复替换逻辑；pi 的成功输出不再被 bridge 改写。
+- pi 的消息 prompt 不再包含 `Project root`，只标识为 `TALK chat member`，并携带发送人、消息 id、可选 group id 与用户任务，避免它把自己当成 TALK 代码仓库里的开发 Agent。
+- `tests/test_cli_bridge.py` 已覆盖 pi 消息/任务 prompt 不含项目根路径；`tests/test_pi_bridge.py` 已覆盖 pi 默认命令不再包含 `--system-prompt`，但仍保留隔离参数。
 - `PI-CAPABILITY-REPLY-1` 验收期修复已完成：修复用户在 Group Hall 询问 `@agent:pi 你能做啥？/ 给我介绍下` 时，pi 只回复 `ok` 或 `Pi agent online...` 的问题。
 - 现场排查确认：最新消息 id 32 -> 33 为 `@agent:pi 你能做啥？` 后回复 `ok`；id 36 -> 37 为 `@agent:pi 你能做啥？给我介绍下` 后回复 `Pi agent online. What task would you like me to help with?`，说明消息路由和 group 回复正常，问题集中在 pi 的默认聊天提示词与弱回复兜底。
 - `bridges/pi_bridge.py` 已补充默认 system prompt：当用户询问能力或介绍时，pi 应说明自己适合轻量聊天、回答问题、拆解任务和参与 TALK 群聊协作，并说明默认桥接模式不读取项目文件、不调用工具。
@@ -47,6 +52,8 @@ Updated: 2026-05-24 22:00 (Asia/Shanghai)
 - 本机已确认 `pi --help` 与 `pi --version` 可执行，版本为 `0.74.1`。
 
 ### 3) Open Questions / Pending Confirmation
+- 需要用户重启 pi bridge；当前正在运行的 pi bridge 仍可能加载上一版强提示词/弱回复替换逻辑。
+- 重启后建议验收：`@agent:pi 你好`、`@agent:pi 你能做啥？给我介绍下`、`@agent:pi 随便聊两句`，观察 pi 是否像普通聊天 Agent 一样自然回答，同时不再输出 TALK 项目进度报告。
 - 需要用户重启 pi bridge；当前正在运行的 pi bridge 仍加载旧提示词和旧 bridge 逻辑，下一条能力介绍问题仍可能回到 `ok` / 在线待命话术。
 - 需要用户再次重启 Codex bridge；当前正在运行的 Codex bridge 仍加载旧的整段解码逻辑，下一条回复仍可能把“在线。”显示成 mojibake。
 - 需要用户重启 Codex bridge；当前正在运行的 Codex bridge 仍加载旧代码，下一次回复仍可能带出旧的乱码噪声。
@@ -66,13 +73,16 @@ Updated: 2026-05-24 22:00 (Asia/Shanghai)
 - 未读/关注状态、文档编辑锁仍待实现。
 
 ### 4) Next Plan
-1. 提交本次 `PI-CAPABILITY-REPLY-1` 验收期修复。
-2. 用户重启 pi bridge 后，在同一个 Group Hall 重新发送 `@agent:pi 你能做啥？给我介绍下`，确认不再只返回 `ok` 或在线待命话术。
+1. 提交本次 `PI-NATURAL-CHAT-1` 验收期修正。
+2. 用户重启 pi bridge 后，在同一个 Group Hall 重新发送 `@agent:pi 你好` 与 `@agent:pi 你能做啥？给我介绍下`，确认 pi 自然回答且不读取 TALK 项目上下文。
 3. 用户如尚未重启 Codex bridge，也需重启后继续确认 `@agent:codex 你好` 中文显示正常。
 4. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
 5. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
 
 ### 5) Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，17 tests。
+- `.venv\Scripts\python.exe -m unittest` passed，115 tests。
 - `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
 - `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，18 tests。
 - `.venv\Scripts\python.exe -m unittest` passed，116 tests。

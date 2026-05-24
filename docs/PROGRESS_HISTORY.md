@@ -6,6 +6,37 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-24 22:15 (Asia/Shanghai)
+### Current Progress
+- `PI-NATURAL-CHAT-1` 验收期修正已完成：按用户确认，将 pi 调整为“自然回答的 TALK 聊天成员”，不再用强 system prompt 或 bridge 弱回复替换限制它的回答风格。
+- 设计判断已确认：方向上与 OpenHanako 一致，平台应负责上下文/权限隔离；Agent 在频道里默认是聊天成员，不应因为 bridge 从 TALK 代码项目根目录启动，就自动成为 TALK 项目的开发 Agent。
+- `bridges/pi_bridge.py` 默认命令已移除 `--system-prompt`，只保留 `--no-context-files --no-tools --no-session --thinking off`，用于防止 pi 自动读取 TALK 代码项目上下文、调用工具或恢复旧会话。
+- `bridges/cli_bridge.py` 已移除能力问题弱回复替换逻辑；pi 的成功输出不再被 bridge 改写。
+- pi 的消息与任务 prompt 不再包含 `Project root`，只标识为 `TALK chat member`，并携带发送人/任务创建人、消息或任务 id、可选 group id 与用户任务。
+- `tests/test_cli_bridge.py` 已覆盖 pi 消息/任务 prompt 不含项目根路径；`tests/test_pi_bridge.py` 已覆盖 pi 默认命令不再包含 `--system-prompt`，但仍保留隔离参数。
+### Open Questions / Pending Confirmation
+- 需要用户重启 pi bridge 后重新验收；正在运行的旧 pi bridge 不会自动加载本次修正。
+- 重启后建议验收：`@agent:pi 你好`、`@agent:pi 你能做啥？给我介绍下`、`@agent:pi 随便聊两句`，观察 pi 是否自然回答，同时不再输出 TALK 项目进度报告。
+- 后续可把“上下文/工具/文件权限由平台管理”的设计沉淀为 Group/Agent 协议，而不是依赖各 bridge 的 CLI 参数。
+### Next Plan
+1. 提交本次 `PI-NATURAL-CHAT-1` 验收期修正。
+2. 用户重启 pi bridge 后，继续在 Group Hall 验收 pi 自然聊天回复。
+3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，17 tests。
+- `.venv\Scripts\python.exe -m unittest` passed，115 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-24 22:00 (Asia/Shanghai)
 ### Current Progress
 - `PI-CAPABILITY-REPLY-1` 验收期修复已完成：修复用户在 Group Hall 询问 `@agent:pi 你能做啥？/ 给我介绍下` 时，pi 只回复 `ok` 或在线待命话术的问题。

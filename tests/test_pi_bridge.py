@@ -19,12 +19,7 @@ class PiBridgeTests(unittest.TestCase):
         self.assertIn("--no-session", command_args)
         self.assertIn("--thinking", command_args)
         self.assertIn("off", command_args)
-        self.assertIn("--system-prompt", command_args)
-        system_prompt = command_args[command_args.index("--system-prompt") + 1]
-        self.assertIn("concise chat agent", system_prompt)
-        self.assertIn("what you can do", system_prompt)
-        self.assertIn("default bridge mode does not read project files", system_prompt)
-        self.assertIn("one sentence", system_prompt)
+        self.assertNotIn("--system-prompt", command_args)
 
     def test_parser_accepts_custom_pi_command(self):
         args = pi_bridge.build_parser().parse_args([

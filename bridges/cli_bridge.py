@@ -33,24 +33,6 @@ DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
 PROMPT_TRANSPORTS = {"stdin", "argv"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
-CAPABILITY_QUESTION_MARKERS = (
-    "你能做啥",
-    "你能做什么",
-    "能做啥",
-    "能做什么",
-    "介绍下",
-    "介绍一下",
-    "what can you do",
-    "capabilities",
-)
-WEAK_CAPABILITY_REPLY_MARKERS = (
-    "ok",
-    "okay",
-    "standing by",
-    "agent online",
-    "what task would you like",
-    "what would you like",
-)
 WINDOWS_TASKKILL_EN_RE = re.compile(
     r"^SUCCESS:\s+The process with PID \d+ .* has been terminated\.$"
 )
@@ -125,34 +107,6 @@ def strip_leading_mentions(text: str, *, member_id: str | None = None) -> str:
 def wants_one_sentence(text: str) -> bool:
     lowered = text.lower()
     return any(marker in lowered for marker in ONE_SENTENCE_MARKERS)
-
-
-def asks_capabilities(text: str) -> bool:
-    lowered = text.lower()
-    return any(marker in lowered for marker in CAPABILITY_QUESTION_MARKERS)
-
-
-def is_weak_capability_reply(text: str) -> bool:
-    compact = " ".join(line.strip() for line in text.splitlines() if line.strip()).strip()
-    lowered = compact.lower()
-    if lowered in {"ok", "okay"}:
-        return True
-    return len(compact) <= 100 and any(marker in lowered for marker in WEAK_CAPABILITY_REPLY_MARKERS)
-
-
-def capability_fallback_reply(*, member_id: str, runtime: str) -> str:
-    if runtime.lower() == "pi" or member_id == "agent:pi":
-        return (
-            "pi 可以在 TALK 里做轻量聊天、回答问题、帮你拆解任务和参与群聊协作；"
-            "当前默认模式不读取项目文件、不调用工具，适合快速讨论和辅助判断。"
-        )
-    return f"{member_id} 可以在 TALK 里接收任务并把处理结果回复到当前聊天。"
-
-
-def normalize_cli_reply(reply: str, *, task_text: str, member_id: str, runtime: str) -> str:
-    if asks_capabilities(task_text) and is_weak_capability_reply(reply):
-        return capability_fallback_reply(member_id=member_id, runtime=runtime)
-    return reply
 
 
 def first_sentence(text: str, *, max_chars: int = 240) -> str:
@@ -257,6 +211,17 @@ def build_cli_prompt(
     message_id = message.get("id") or "unknown"
     group_id = message.get("group_id")
     group_line = f"TALK group id: {group_id}\n" if group_id else ""
+    if runtime.lower() == "pi" or member_id == "agent:pi":
+        return (
+            f"You are {member_id}, a TALK chat member.\n"
+            "Answer the user's task naturally. Keep the final response suitable for posting back into TALK.\n"
+            "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
+            f"Sender: {sender}\n"
+            f"TALK message id: {message_id}\n\n"
+            f"{group_line}"
+            "Task:\n"
+            f"{task}\n"
+        )
 
     return (
         f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
@@ -285,6 +250,18 @@ def build_cli_task_prompt(
     title = str(task.get("title") or "").strip()
 
     title_block = f"Title: {title}\n" if title else ""
+    if runtime.lower() == "pi" or member_id == "agent:pi":
+        return (
+            f"You are {member_id}, a TALK chat member.\n"
+            "Answer the queued TALK task naturally. Keep the final response suitable for posting back into TALK.\n"
+            "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
+            f"Task creator: {creator}\n"
+            f"TALK task id: {task_id}\n"
+            f"{title_block}\n"
+            "Task:\n"
+            f"{content}\n"
+        )
+
     return (
         f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
         f"Project root: {workdir}\n"
@@ -425,7 +402,6 @@ async def handle_queued_task(
             bridge_label=bridge_label,
             force_one_sentence=wants_one_sentence(task_text),
         )
-        reply = normalize_cli_reply(reply, task_text=task_text, member_id=member_id, runtime=runtime)
         completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
         if completion_status == "failed":
             last_error = reply
@@ -503,7 +479,6 @@ async def handle_incoming_message(
             bridge_label=bridge_label,
             force_one_sentence=wants_one_sentence(task_text),
         )
-        reply = normalize_cli_reply(reply, task_text=task_text, member_id=member_id, runtime=runtime)
         await client.reply(int(message["id"]), text=reply, to=[sender], group_id=group_id)
         if report_status is not None:
             await report_status(

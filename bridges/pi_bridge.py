@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
-import shlex
 import sys
 from pathlib import Path
 
@@ -16,20 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from bridges import cli_bridge
 
-PI_SYSTEM_PROMPT = (
-    "You are agent:pi in TALK, a concise chat agent. "
-    "Reply only to the user's Task. "
-    "If the user asks what you can do or asks for an introduction, briefly explain that you can do lightweight chat, "
-    "answer questions, help break down tasks, and participate in TALK group discussions; also mention that the default "
-    "bridge mode does not read project files or use tools. "
-    "Do not read or summarize project files, AGENTS.md, CLAUDE.md, progress docs, or runtime status unless the user explicitly asks. "
-    "Never output status tables for greetings or presence checks. "
-    "If the user asks for one sentence, answer in exactly one sentence."
-)
-DEFAULT_PI_COMMAND = (
-    "pi --print --mode text --no-context-files --no-tools --no-session --thinking off "
-    f"--system-prompt {shlex.quote(PI_SYSTEM_PROMPT)}"
-)
+DEFAULT_PI_COMMAND = "pi --print --mode text --no-context-files --no-tools --no-session --thinking off"
 DEFAULT_TIMEOUT_SEC = cli_bridge.DEFAULT_TIMEOUT_SEC
 DEFAULT_MAX_REPLY_CHARS = cli_bridge.DEFAULT_MAX_REPLY_CHARS
 DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL

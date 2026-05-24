@@ -17,7 +17,6 @@ from bridges.cli_bridge import (
     format_cli_reply,
     handle_incoming_message,
     handle_queued_task,
-    normalize_cli_reply,
     resolve_command_executable,
     run_cli_command,
 )
@@ -52,7 +51,7 @@ class CliBridgeTests(unittest.TestCase):
         self.assertTrue(Path(resolved[0]).is_absolute())
         self.assertEqual(resolved[1], "--version")
 
-    def test_build_cli_task_prompt_uses_runtime_label(self):
+    def test_build_cli_task_prompt_for_pi_uses_chat_member_context(self):
         prompt = build_cli_task_prompt(
             {
                 "id": 7,
@@ -65,21 +64,22 @@ class CliBridgeTests(unittest.TestCase):
         )
 
         self.assertIn("agent:pi", prompt)
-        self.assertIn("pi CLI agent", prompt)
+        self.assertIn("TALK chat member", prompt)
         self.assertIn("human:bobo", prompt)
         self.assertIn("ask codex to review this too", prompt)
-        self.assertIn("simple presence check", prompt)
+        self.assertNotIn("Project root:", prompt)
 
-    def test_build_cli_prompt_discourages_status_report_for_presence_check(self):
+    def test_build_cli_prompt_for_pi_uses_chat_member_context(self):
         prompt = build_cli_prompt({
             "id": 4,
             "from": "human:bobo",
             "content": "@agent:pi 在吗",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertIn("one short sentence", prompt)
-        self.assertIn("Do not inspect project files", prompt)
+        self.assertIn("TALK chat member", prompt)
+        self.assertIn("Answer the user's task naturally", prompt)
         self.assertIn("在吗", prompt)
+        self.assertNotIn("Project root:", prompt)
 
     def test_build_cli_prompt_includes_group_context_when_present(self):
         prompt = build_cli_prompt({
@@ -108,17 +108,6 @@ class CliBridgeTests(unittest.TestCase):
         )
 
         self.assertEqual(reply, "第一句。")
-
-    def test_normalize_cli_reply_replaces_weak_pi_capability_reply(self):
-        reply = normalize_cli_reply(
-            "ok",
-            task_text="你能做啥？给我介绍下",
-            member_id="agent:pi",
-            runtime="pi",
-        )
-
-        self.assertIn("轻量聊天", reply)
-        self.assertIn("不读取项目文件", reply)
 
     def test_decode_subprocess_output_falls_back_to_windows_codepage(self):
         data = "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。".encode("gbk")
@@ -209,7 +198,7 @@ class CliBridgeTests(unittest.TestCase):
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             self.assertEqual(command, ["pi", "run"])
             self.assertIn("say ok", prompt)
-            self.assertIn("pi CLI agent", prompt)
+            self.assertIn("TALK chat member", prompt)
             self.assertEqual(prompt_transport, "argv")
             return CliRunResult(returncode=0, stdout="OK", stderr="")
 
