@@ -116,6 +116,17 @@ class CliBridgeTests(unittest.TestCase):
             "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。",
         )
 
+    def test_decode_subprocess_output_handles_mixed_encoded_lines(self):
+        data = (
+            "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。\n".encode("gbk")
+            + "codex 在线。\n".encode("utf-8")
+        )
+
+        self.assertEqual(
+            decode_subprocess_output(data),
+            "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。\ncodex 在线。\n",
+        )
+
     def test_clean_cli_output_filters_taskkill_noise(self):
         output = clean_cli_output(
             "成功: 已终止 PID 4956 (属于 PID 12336 子进程)的进程。\n"

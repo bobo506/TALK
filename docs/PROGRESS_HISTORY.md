@@ -6,6 +6,31 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-24 21:53 (Asia/Shanghai)
+### Current Progress
+- `CODEX-BRIDGE-MIXED-ENCODING-1` 验收期修复已完成：修复 Codex 回复中 `taskkill` 噪声已被过滤后，正文“在线。”仍显示为 `鍦ㄧ嚎銆` 一类 mojibake 的问题。
+- 现场排查确认：数据库最新 Codex 回复已不再包含 PID 清理提示，但 `content` 中“在线。”被错误解码成 mojibake，说明上一版噪声过滤生效但编码选择仍不够细。
+- 根因是 Codex stdout 中混合了不同编码来源：Windows `taskkill` 行更像系统代码页，Codex 正文行是 UTF-8；按整段输出选择单一编码会互相拖累。
+- `bridges/cli_bridge.py` 的 `decode_subprocess_output(...)` 已改为逐行选择编码；同一 stdout 中 GBK 清理提示和 UTF-8 正文可以分别正确解码。
+- `tests/test_cli_bridge.py` 已新增混合编码行回归测试，覆盖 GBK `taskkill` 行 + UTF-8 `codex 在线。` 行的组合。
+- `docs/MODULE_bridges.md` 已同步通用 CLI bridge 的逐行解码边界。
+### Open Questions / Pending Confirmation
+- 需要用户再次重启 Codex bridge 后重新发送 `@agent:codex 你好` 验收；正在运行的旧 Codex bridge 不会自动加载本次修复。
+- 历史消息 id 29 已经写入数据库，仍会保留旧 mojibake 内容；本次修复只影响后续新回复。
+### Next Plan
+1. 提交本次 `CODEX-BRIDGE-MIXED-ENCODING-1` 验收期修复。
+2. 用户重启 Codex bridge 后，继续在 Group Hall 验收 Codex 回复内容是否干净且中文正常。
+3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_encoding` passed，18 tests。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-24 21:41 (Asia/Shanghai)
 ### Current Progress
 - `CODEX-BRIDGE-OUTPUT-1` 验收期修复已完成：修复 Codex 在 Group Hall 回复“在线”前混入 Windows 进程终止提示且中文乱码的问题。

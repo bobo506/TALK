@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-24 21:41 (Asia/Shanghai)
+Updated: 2026-05-24 21:53 (Asia/Shanghai)
 
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md`。
@@ -9,6 +9,10 @@ Updated: 2026-05-24 21:41 (Asia/Shanghai)
 - 当前 Claude 角色：执行 Agent。
 
 ### 2) Current Progress
+- `CODEX-BRIDGE-MIXED-ENCODING-1` 验收期修复已完成：修复 Codex 回复中 `taskkill` 噪声已被过滤后，正文“在线。”仍显示为 `鍦ㄧ嚎銆` 一类 mojibake 的问题。
+- 根因是同一段 stdout 同时包含 Windows 代码页的 `taskkill` 行和 UTF-8 的 Codex 正文行；上一版按整段输出选择编码，会因进程清理行而把正文行误按 GBK 解码。
+- `decode_subprocess_output(...)` 已改为逐行选择最合适编码，避免不同来源的输出行互相影响。
+- `tests/test_cli_bridge.py` 已补充混合编码行回归测试：GBK 的 Windows 清理提示与 UTF-8 的 `codex 在线。` 可以在同一 stdout 中正确解码。
 - `CODEX-BRIDGE-OUTPUT-1` 验收期修复已完成：修复 Codex 在 Group Hall 回复“在线”前混入 Windows 进程终止提示且中文乱码的问题。
 - 现场排查确认：最新 Codex 回复已写回 Group Hall，说明 `group_id` 修复生效；但消息内容包含乱码的 `taskkill` PID 成功提示，这是 Windows 进程清理输出按错误编码解码后混进了 bridge 回复。
 - `bridges/cli_bridge.py` 已新增子进程输出解码兜底：优先 UTF-8，若出现替换字符则在 Windows 下尝试系统代码页 / `gbk` / `cp936`。
@@ -38,6 +42,7 @@ Updated: 2026-05-24 21:41 (Asia/Shanghai)
 - 本机已确认 `pi --help` 与 `pi --version` 可执行，版本为 `0.74.1`。
 
 ### 3) Open Questions / Pending Confirmation
+- 需要用户再次重启 Codex bridge；当前正在运行的 Codex bridge 仍加载旧的整段解码逻辑，下一条回复仍可能把“在线。”显示成 mojibake。
 - 需要用户重启 Codex bridge；当前正在运行的 Codex bridge 仍加载旧代码，下一次回复仍可能带出旧的乱码噪声。
 - 如果 pi bridge 也尚未在 `GROUP-BRIDGE-REPLY-1` 后重启，则也需要一并重启；正在运行的旧 bridge 进程不会自动获得本次修复。
 - 旧的失败消息（本次现场看到的 group 消息 id 20 / 21）不会自动重试；重启 bridge 后请在同一个 Group Hall 重新发送新的 `@agent:codex` / `@agent:pi` 消息验收。
@@ -55,13 +60,14 @@ Updated: 2026-05-24 21:41 (Asia/Shanghai)
 - 未读/关注状态、文档编辑锁仍待实现。
 
 ### 4) Next Plan
-1. 提交本次 `CODEX-BRIDGE-OUTPUT-1` 验收期修复。
-2. 用户重启 Codex bridge 后，在同一个 Group Hall 重新发送 `@agent:codex 你好`，确认回复不再包含 `taskkill` 乱码或 PID 清理提示。
+1. 提交本次 `CODEX-BRIDGE-MIXED-ENCODING-1` 验收期修复。
+2. 用户重启 Codex bridge 后，在同一个 Group Hall 重新发送 `@agent:codex 你好`，确认回复不再包含 `taskkill` 乱码或 `鍦ㄧ嚎` 这类 mojibake。
 3. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
 4. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
 
 ### 5) Verification
 - `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_encoding` passed，18 tests。
 - `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge` passed，25 tests。
 - `.venv\Scripts\python.exe -u -m unittest -v` passed，114 tests。
 - `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。

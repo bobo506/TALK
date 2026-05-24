@@ -132,6 +132,13 @@ def decode_subprocess_output(data: bytes) -> str:
     if not data:
         return ""
 
+    return "".join(decode_subprocess_output_chunk(chunk) for chunk in data.splitlines(keepends=True))
+
+
+def decode_subprocess_output_chunk(data: bytes) -> str:
+    if not data:
+        return ""
+
     encodings = ["utf-8", "utf-8-sig", locale.getpreferredencoding(False)]
     if os.name == "nt":
         encodings.extend(["mbcs", "gbk", "cp936"])
