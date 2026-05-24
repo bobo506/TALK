@@ -68,7 +68,9 @@ pi --print --mode text --no-context-files --no-tools --no-session --thinking off
 - 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
 - Group Hall 中直接 `@agent:pi` 的文本消息也会被处理；bridge 回复会保留原消息的 `group_id`，因此回复写回同一个 Hall。
 - pi 默认入口面向前端人工聊天验收做了收敛：禁止自动加载 `AGENTS.md` / `CLAUDE.md` 上下文文件，禁止工具调用，不保存/恢复会话，并关闭 thinking，以减少回复延迟和避免把普通聊天误输出成项目状态报告。
+- pi 默认 system prompt 已补充能力介绍边界：当用户询问“你能做什么 / 介绍一下”时，应说明自己适合轻量聊天、回答问题、拆解任务和参与 TALK 群聊协作，同时说明默认桥接模式不读取项目文件、不调用工具。
 - 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。
+- 当用户询问能力介绍而 CLI 只返回 `ok`、`standing by` 等弱回复时，通用 bridge 会替换为一条可验收的能力说明，避免前端验收出现“问能力只回 ok”的情况。
 - 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
 - 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留上述 pi CLI 收敛参数；否则 pi 可能重新读取项目上下文并产生较长回复。
 
@@ -108,3 +110,4 @@ Web UI 中发送：
 - [x] 在临时 TALK server 中验证 Codex bridge 实例状态路径：`idle -> busy -> idle -> offline`。
 - [x] 通用 CLI bridge 在处理 Group Hall 消息时会把回复写回原 `group_id`，避免触发 `cannot_reply_to_different_group`。
 - [x] 通用 CLI bridge 已对 Windows 本地 CLI 输出做编码兜底和 `taskkill` 噪声过滤，避免 Codex 在线回复前出现乱码进程终止提示。
+- [x] pi bridge 已补充能力介绍提示词与弱回复兜底，避免 `@agent:pi 你能做啥` 只返回 `ok` 或在线待命话术。

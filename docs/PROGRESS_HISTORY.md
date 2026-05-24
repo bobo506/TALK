@@ -6,6 +6,36 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-24 22:00 (Asia/Shanghai)
+### Current Progress
+- `PI-CAPABILITY-REPLY-1` 验收期修复已完成：修复用户在 Group Hall 询问 `@agent:pi 你能做啥？/ 给我介绍下` 时，pi 只回复 `ok` 或在线待命话术的问题。
+- 现场排查确认：消息 id 32 -> 33 为 `@agent:pi 你能做啥？` 后回复 `ok`；消息 id 36 -> 37 为 `@agent:pi 你能做啥？给我介绍下` 后回复 `Pi agent online. What task would you like me to help with?`。消息已正确进入同一个 Group Hall，说明问题不在路由，而在 pi 默认提示词缺少能力介绍边界，以及模型弱回复没有兜底。
+- `bridges/pi_bridge.py` 已补充默认 system prompt：当用户询问能力或介绍时，pi 应说明自己适合轻量聊天、回答问题、拆解任务和参与 TALK 群聊协作，并说明默认桥接模式不读取项目文件、不调用工具。
+- `bridges/cli_bridge.py` 已新增能力问题弱回复兜底：当任务问“你能做啥 / 你能做什么 / 介绍下”等，而 CLI 成功输出只有 `ok`、`standing by` 或在线待命话术时，bridge 会替换为一条可验收的能力说明。
+- `tests/test_cli_bridge.py` 已覆盖 pi 能力问题弱回复替换；`tests/test_pi_bridge.py` 已覆盖 pi 默认 system prompt 包含能力介绍边界。
+- `docs/MODULE_bridges.md` 已同步 pi 能力介绍提示词与弱回复兜底边界。
+### Open Questions / Pending Confirmation
+- 需要用户重启 pi bridge 后重新发送 `@agent:pi 你能做啥？给我介绍下` 验收；正在运行的旧 pi bridge 不会自动加载本次修复。
+- 如果用户使用 `TALK_PI_COMMAND` 或 `--pi-command` 自定义 pi 命令，需要保留默认命令中的 system prompt 边界，或自行提供等价提示词。
+### Next Plan
+1. 提交本次 `PI-CAPABILITY-REPLY-1` 验收期修复。
+2. 用户重启 pi bridge 后，继续在 Group Hall 验收 pi 能力介绍回复。
+3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，18 tests。
+- `.venv\Scripts\python.exe -m unittest` passed，116 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed（仅换行提示）。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-24 21:53 (Asia/Shanghai)
 ### Current Progress
 - `CODEX-BRIDGE-MIXED-ENCODING-1` 验收期修复已完成：修复 Codex 回复中 `taskkill` 噪声已被过滤后，正文“在线。”仍显示为 `鍦ㄧ嚎銆` 一类 mojibake 的问题。

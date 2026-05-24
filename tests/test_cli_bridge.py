@@ -17,6 +17,7 @@ from bridges.cli_bridge import (
     format_cli_reply,
     handle_incoming_message,
     handle_queued_task,
+    normalize_cli_reply,
     resolve_command_executable,
     run_cli_command,
 )
@@ -107,6 +108,17 @@ class CliBridgeTests(unittest.TestCase):
         )
 
         self.assertEqual(reply, "第一句。")
+
+    def test_normalize_cli_reply_replaces_weak_pi_capability_reply(self):
+        reply = normalize_cli_reply(
+            "ok",
+            task_text="你能做啥？给我介绍下",
+            member_id="agent:pi",
+            runtime="pi",
+        )
+
+        self.assertIn("轻量聊天", reply)
+        self.assertIn("不读取项目文件", reply)
 
     def test_decode_subprocess_output_falls_back_to_windows_codepage(self):
         data = "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。".encode("gbk")

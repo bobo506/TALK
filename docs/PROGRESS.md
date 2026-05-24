@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-24 21:53 (Asia/Shanghai)
+Updated: 2026-05-24 22:00 (Asia/Shanghai)
 
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md`。
@@ -9,6 +9,11 @@ Updated: 2026-05-24 21:53 (Asia/Shanghai)
 - 当前 Claude 角色：执行 Agent。
 
 ### 2) Current Progress
+- `PI-CAPABILITY-REPLY-1` 验收期修复已完成：修复用户在 Group Hall 询问 `@agent:pi 你能做啥？/ 给我介绍下` 时，pi 只回复 `ok` 或 `Pi agent online...` 的问题。
+- 现场排查确认：最新消息 id 32 -> 33 为 `@agent:pi 你能做啥？` 后回复 `ok`；id 36 -> 37 为 `@agent:pi 你能做啥？给我介绍下` 后回复 `Pi agent online. What task would you like me to help with?`，说明消息路由和 group 回复正常，问题集中在 pi 的默认聊天提示词与弱回复兜底。
+- `bridges/pi_bridge.py` 已补充默认 system prompt：当用户询问能力或介绍时，pi 应说明自己适合轻量聊天、回答问题、拆解任务和参与 TALK 群聊协作，并说明默认桥接模式不读取项目文件、不调用工具。
+- `bridges/cli_bridge.py` 已新增能力问题兜底：当任务问“你能做啥 / 你能做什么 / 介绍下”等，而 CLI 成功输出只有 `ok`、`standing by` 或在线待命话术时，bridge 会替换为一条可验收的能力说明。
+- `tests/test_cli_bridge.py` 已覆盖 pi 能力问题弱回复替换；`tests/test_pi_bridge.py` 已覆盖 pi 默认 system prompt 包含能力介绍边界。
 - `CODEX-BRIDGE-MIXED-ENCODING-1` 验收期修复已完成：修复 Codex 回复中 `taskkill` 噪声已被过滤后，正文“在线。”仍显示为 `鍦ㄧ嚎銆` 一类 mojibake 的问题。
 - 根因是同一段 stdout 同时包含 Windows 代码页的 `taskkill` 行和 UTF-8 的 Codex 正文行；上一版按整段输出选择编码，会因进程清理行而把正文行误按 GBK 解码。
 - `decode_subprocess_output(...)` 已改为逐行选择最合适编码，避免不同来源的输出行互相影响。
@@ -42,6 +47,7 @@ Updated: 2026-05-24 21:53 (Asia/Shanghai)
 - 本机已确认 `pi --help` 与 `pi --version` 可执行，版本为 `0.74.1`。
 
 ### 3) Open Questions / Pending Confirmation
+- 需要用户重启 pi bridge；当前正在运行的 pi bridge 仍加载旧提示词和旧 bridge 逻辑，下一条能力介绍问题仍可能回到 `ok` / 在线待命话术。
 - 需要用户再次重启 Codex bridge；当前正在运行的 Codex bridge 仍加载旧的整段解码逻辑，下一条回复仍可能把“在线。”显示成 mojibake。
 - 需要用户重启 Codex bridge；当前正在运行的 Codex bridge 仍加载旧代码，下一次回复仍可能带出旧的乱码噪声。
 - 如果 pi bridge 也尚未在 `GROUP-BRIDGE-REPLY-1` 后重启，则也需要一并重启；正在运行的旧 bridge 进程不会自动获得本次修复。
@@ -60,12 +66,16 @@ Updated: 2026-05-24 21:53 (Asia/Shanghai)
 - 未读/关注状态、文档编辑锁仍待实现。
 
 ### 4) Next Plan
-1. 提交本次 `CODEX-BRIDGE-MIXED-ENCODING-1` 验收期修复。
-2. 用户重启 Codex bridge 后，在同一个 Group Hall 重新发送 `@agent:codex 你好`，确认回复不再包含 `taskkill` 乱码或 `鍦ㄧ嚎` 这类 mojibake。
-3. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
-4. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
+1. 提交本次 `PI-CAPABILITY-REPLY-1` 验收期修复。
+2. 用户重启 pi bridge 后，在同一个 Group Hall 重新发送 `@agent:pi 你能做啥？给我介绍下`，确认不再只返回 `ok` 或在线待命话术。
+3. 用户如尚未重启 Codex bridge，也需重启后继续确认 `@agent:codex 你好` 中文显示正常。
+4. 继续当前范围冻结分支的 Codex + pi 双 bridge 与 Web UI 视觉/交互联合人工验收。
+5. 验收通过后，再基于 OpenHanako 参考评估下一阶段多 Agent 自动讨论协议。
 
 ### 5) Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，18 tests。
+- `.venv\Scripts\python.exe -m unittest` passed，116 tests。
 - `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
 - `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_encoding` passed，18 tests。
 - `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge` passed，25 tests。
@@ -76,7 +86,9 @@ Updated: 2026-05-24 21:53 (Asia/Shanghai)
 
 ### 6) Changed Files
 - `bridges/cli_bridge.py`
+- `bridges/pi_bridge.py`
 - `tests/test_cli_bridge.py`
+- `tests/test_pi_bridge.py`
 - `docs/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
