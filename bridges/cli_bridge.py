@@ -26,11 +26,6 @@ RESPONSE_STYLE_INSTRUCTIONS = (
     "reply in one short sentence only, for example '<agent id> 在线。'. "
     "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
 )
-PI_CHAT_INSTRUCTIONS = (
-    "回复要求：你是 TALK 群聊里的 pi，按用户语言自然回复。"
-    "默认不要声称能读取项目文件、执行命令、编辑文件或调用工具。"
-    "不要输出 <Language: ...> 之类语言标签。\n"
-)
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
@@ -267,11 +262,7 @@ def build_cli_prompt(
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        return (
-            "用户消息：\n"
-            f"{task}\n\n"
-            f"{PI_CHAT_INSTRUCTIONS}"
-        )
+        return task
 
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
@@ -302,12 +293,7 @@ def build_cli_task_prompt(
     title = str(task.get("title") or "").strip()
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        task_text = f"标题：{title}\n{content}" if title else content
-        return (
-            "用户任务：\n"
-            f"{task_text}\n\n"
-            f"{PI_CHAT_INSTRUCTIONS}"
-        )
+        return f"标题：{title}\n\n{content}" if title else content
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"

@@ -6,6 +6,41 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-25 12:21 (Asia/Shanghai)
+### Current Progress
+- `PI-SYSTEM-PROMPT-BOUNDARY-1` 已完成：按项目管理者确认，将 pi 的身份/能力边界从用户 prompt 中移到默认 `pi --system-prompt`，避免 `TALK...` 等包装文本被 pi 当成用户没说完的正文。
+- `bridges/pi_bridge.py` 默认命令恢复极短中文 `--system-prompt`，同时继续保留 `--no-context-files --no-tools --no-session --thinking off`。
+- `bridges/cli_bridge.py` 的 pi 消息 prompt 现在只返回去掉 `@agent:pi` 后的用户原文，例如 `@agent:pi 你好` 精确传给 pi 为 `你好`。
+- pi 队列任务 prompt 默认只传 `content`；如存在 `title`，传 `标题：<title>\n\n<content>`。
+- pi prompt 不再包含 `用户消息`、`用户任务`、`回复要求`、`Sender`、`TALK message id`、`TALK task id`、`Task creator`、`TALK group id` 或 `Project root`；但实际回复仍携带原消息 `group_id` 写回同一个 Group Hall。
+- 非 pi runtime 的执行型 prompt 保持不变；Codex bridge 不受影响。
+- `normalize_pi_reply_language(...)` 保留为异常兜底：中文请求得到非中文/语言标签回复时才替换；正常中文或用户明确要求英文时不干预。
+- `tests/test_cli_bridge.py` 已更新 pi prompt 断言：普通消息精确等于去 mention 后原文、队列任务只保留正文/标题、Group Hall 回复仍保留原 `group_id`。
+- `tests/test_pi_bridge.py` 已更新默认命令断言：必须包含 `--system-prompt` 与隔离参数。
+- `docs/MODULE_bridges.md` 已同步 pi system prompt 分离边界。
+### Open Questions / Pending Confirmation
+- 需要用户重启 pi bridge；正在运行的旧 pi bridge 不会自动加载本次修复。
+- 重启后建议验收：`@agent:pi 你好`、`@agent:pi 你好啊，你有哪些功能？`、`@agent:pi 你好啊，你有哪些功能？用中文回复`、`@agent:pi 请用英文介绍你有哪些功能`。
+- 如果用户使用 `TALK_PI_COMMAND` 或 `--pi-command` 自定义 pi 命令，需要自行带上等价 `--system-prompt` 和隔离参数。
+### Next Plan
+1. 提交本次 `PI-SYSTEM-PROMPT-BOUNDARY-1` 修复。
+2. 用户重启 pi bridge 后继续人工验收语言跟随和能力边界。
+3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互联合验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，23 tests。
+- 分组显式全量 passed，合计 121 tests：`tests.test_cli_bridge tests.test_codex_bridge tests.test_encoding tests.test_pi_bridge` 35 tests；`tests.test_files tests.test_groups tests.test_healthz tests.test_members_auth tests.test_messages` 40 tests；`tests.test_instances tests.test_tasks tests.test_talk_client` 27 tests；`tests.test_setup tests.test_sse tests.test_websocket` 19 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
+- `git diff --check` passed；仅提示 Windows 工作区后续可能将 LF 替换为 CRLF，无 whitespace error。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-25 11:41 (Asia/Shanghai)
 ### Current Progress
 - `PI-MINIMAL-PROMPT-1` 已完成：按项目管理者确认，将 pi bridge 输入包装改为“用户原话优先”的极简 prompt，减少英文元指令对 pi 语言选择和身份判断的干扰。

@@ -15,7 +15,15 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from bridges import cli_bridge
 
-DEFAULT_PI_COMMAND = "pi --print --mode text --no-context-files --no-tools --no-session --thinking off"
+DEFAULT_SYSTEM_PROMPT = (
+    "你是 TALK 群聊里的 pi。按用户语言自然回复。"
+    "默认不要声称能读取项目文件、执行命令、编辑文件或调用工具。"
+    "不要输出 <Language: ...> 之类语言标签。"
+)
+DEFAULT_PI_COMMAND = (
+    "pi --print --mode text --no-context-files --no-tools --no-session --thinking off "
+    f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
+)
 DEFAULT_TIMEOUT_SEC = cli_bridge.DEFAULT_TIMEOUT_SEC
 DEFAULT_MAX_REPLY_CHARS = cli_bridge.DEFAULT_MAX_REPLY_CHARS
 DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL

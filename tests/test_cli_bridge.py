@@ -52,7 +52,7 @@ class CliBridgeTests(unittest.TestCase):
         self.assertTrue(Path(resolved[0]).is_absolute())
         self.assertEqual(resolved[1], "--version")
 
-    def test_build_cli_task_prompt_for_pi_uses_minimal_user_first_prompt(self):
+    def test_build_cli_task_prompt_for_pi_uses_raw_content(self):
         prompt = build_cli_task_prompt(
             {
                 "id": 7,
@@ -64,38 +64,53 @@ class CliBridgeTests(unittest.TestCase):
             runtime="pi",
         )
 
-        self.assertTrue(prompt.startswith("用户任务：\nask codex to review this too"))
-        self.assertIn("按用户语言自然回复", prompt)
-        self.assertIn("默认不要声称能读取项目文件、执行命令、编辑文件或调用工具", prompt)
-        self.assertIn("ask codex to review this too", prompt)
+        self.assertEqual(prompt, "ask codex to review this too")
+        self.assertNotIn("用户任务", prompt)
+        self.assertNotIn("回复要求", prompt)
         self.assertNotIn("Task creator:", prompt)
         self.assertNotIn("TALK task id:", prompt)
         self.assertNotIn("Project root:", prompt)
 
-    def test_build_cli_prompt_for_pi_uses_minimal_user_first_prompt(self):
+    def test_build_cli_task_prompt_for_pi_keeps_title_as_user_text(self):
+        prompt = build_cli_task_prompt(
+            {
+                "id": 7,
+                "created_by": "human:bobo",
+                "title": "复盘",
+                "content": "总结一下",
+            },
+            member_id="agent:pi",
+            workdir=Path("D:/claude-test/TALK"),
+            runtime="pi",
+        )
+
+        self.assertEqual(prompt, "标题：复盘\n\n总结一下")
+
+    def test_build_cli_prompt_for_pi_uses_raw_user_text(self):
         prompt = build_cli_prompt({
             "id": 4,
             "from": "human:bobo",
             "content": "@agent:pi 在吗",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("用户消息：\n在吗"))
-        self.assertIn("按用户语言自然回复", prompt)
-        self.assertIn("在吗", prompt)
+        self.assertEqual(prompt, "在吗")
+        self.assertNotIn("用户消息", prompt)
+        self.assertNotIn("回复要求", prompt)
         self.assertNotIn("Sender:", prompt)
         self.assertNotIn("TALK message id:", prompt)
         self.assertNotIn("Project root:", prompt)
 
-    def test_build_cli_prompt_for_pi_describes_default_capability_boundary(self):
+    def test_build_cli_prompt_for_pi_does_not_embed_capability_boundary(self):
         prompt = build_cli_prompt({
             "id": 40,
             "from": "human:bobo",
             "content": "@agent:pi 你好啊，你有哪些功能？用中文回复",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertIn("你是 TALK 群聊里的 pi", prompt)
-        self.assertIn("默认不要声称能读取项目文件、执行命令、编辑文件或调用工具", prompt)
-        self.assertIn("不要输出 <Language: ...>", prompt)
+        self.assertEqual(prompt, "你好啊，你有哪些功能？用中文回复")
+        self.assertNotIn("TALK", prompt)
+        self.assertNotIn("执行命令", prompt)
+        self.assertNotIn("<Language:", prompt)
 
     def test_build_cli_prompt_for_pi_omits_group_context_when_present(self):
         prompt = build_cli_prompt({
@@ -105,7 +120,7 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在群里回我",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertIn("在群里回我", prompt)
+        self.assertEqual(prompt, "在群里回我")
         self.assertNotIn("TALK group id: group:lab", prompt)
 
     def test_format_cli_reply_uses_bridge_label(self):
@@ -241,9 +256,7 @@ class CliBridgeTests(unittest.TestCase):
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             self.assertEqual(command, ["pi", "run"])
-            self.assertIn("say ok", prompt)
-            self.assertIn("用户任务：", prompt)
-            self.assertIn("按用户语言自然回复", prompt)
+            self.assertEqual(prompt, "say ok")
             self.assertEqual(prompt_transport, "argv")
             return CliRunResult(returncode=0, stdout="OK", stderr="")
 
@@ -291,7 +304,7 @@ class CliBridgeTests(unittest.TestCase):
             statuses.append((status, kwargs))
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
-            self.assertIn("group task", prompt)
+            self.assertEqual(prompt, "group task")
             self.assertNotIn("TALK group id: group:lab", prompt)
             return CliRunResult(returncode=0, stdout="group reply", stderr="")
 
@@ -345,7 +358,7 @@ class CliBridgeTests(unittest.TestCase):
             statuses.append((status, kwargs))
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
-            self.assertIn("按用户语言自然回复", prompt)
+            self.assertEqual(prompt, "你好啊，你有哪些功能？用中文回复")
             return CliRunResult(
                 returncode=0,
                 stdout="Hey there! I'm pi, powered by Claude. I can read files and execute commands.",

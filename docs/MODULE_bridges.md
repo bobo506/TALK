@@ -62,19 +62,20 @@ codex exec --skip-git-repo-check --sandbox workspace-write --color never -
 - 默认 pi 命令为：
 
 ```bash
-pi --print --mode text --no-context-files --no-tools --no-session --thinking off
+pi --print --mode text --no-context-files --no-tools --no-session --thinking off --system-prompt "<short TALK chat boundary>"
 ```
 
 - 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
 - Group Hall 中直接 `@agent:pi` 的文本消息也会被处理；bridge 回复会保留原消息的 `group_id`，因此回复写回同一个 Hall。
 - pi 默认入口只保留运行隔离：禁止自动加载 `AGENTS.md` / `CLAUDE.md` 上下文文件，禁止工具调用，不保存/恢复会话，并关闭 thinking，以减少回复延迟和避免把普通聊天误输出成项目状态报告。
-- pi 默认命令不使用 `--system-prompt` 强行约束回答风格；bridge 只在传入任务 prompt 时保留极简中文边界，不传项目根路径，避免它把自己当成 TALK 代码仓库里的开发 Agent。
-- pi 的 TALK prompt 采用“用户原话优先”的极简模板：开头只放去掉 `@agent:pi` 后的 `用户消息` / `用户任务`，后面追加一句短边界：“你是 TALK 群聊里的 pi，按用户语言自然回复。默认不要声称能读取项目文件、执行命令、编辑文件或调用工具。不要输出 `<Language: ...>` 之类语言标签。”
-- pi prompt 不再包含 `Sender`、`TALK message id` 或 `TALK group id` 等对自然聊天回答无帮助的元信息；但 bridge 回复仍会保留原消息 `group_id`，确保 Group Hall 回复写回同一个 Hall。
+- pi 默认命令使用极短中文 `--system-prompt` 放置身份/能力边界，避免边界说明混入用户消息正文。
+- pi 的 TALK prompt 现在只传去掉 `@agent:pi` 后的用户原文；队列任务默认只传 `content`，有 `title` 时传 `标题：<title>\n\n<content>`。
+- pi prompt 不再包含 `用户消息`、`回复要求`、`Sender`、`TALK message id` 或 `TALK group id` 等包装文本；但 bridge 回复仍会保留原消息 `group_id`，确保 Group Hall 回复写回同一个 Hall。
+- 默认 system prompt 内容为：`你是 TALK 群聊里的 pi。按用户语言自然回复。默认不要声称能读取项目文件、执行命令、编辑文件或调用工具。不要输出 <Language: ...> 之类语言标签。`
 - 当 pi 在中文能力/自我介绍问题上成功返回明显非中文、阿拉伯语语言标签或错误声称自己可读文件/执行命令时，通用 bridge 会把回复兜底替换为中文能力说明；正常中文回复或用户明确要求英文时不干预。
 - 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。
 - 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
-- 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留 `--no-context-files --no-tools --no-session` 等隔离参数；否则 pi 可能重新读取项目上下文并产生项目状态类回复。极简语言边界与中文能力兜底由 TALK bridge prompt/后处理提供，不依赖默认命令中的 `--system-prompt`。
+- 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留 `--no-context-files --no-tools --no-session` 等隔离参数和等价 `--system-prompt`；否则 pi 可能重新读取项目上下文或重新把自己当成 coding assistant。
 
 ## 运行示例
 
@@ -112,5 +113,4 @@ Web UI 中发送：
 - [x] 在临时 TALK server 中验证 Codex bridge 实例状态路径：`idle -> busy -> idle -> offline`。
 - [x] 通用 CLI bridge 在处理 Group Hall 消息时会把回复写回原 `group_id`，避免触发 `cannot_reply_to_different_group`。
 - [x] 通用 CLI bridge 已对 Windows 本地 CLI 输出做编码兜底和 `taskkill` 噪声过滤，避免 Codex 在线回复前出现乱码进程终止提示。
-- [x] pi bridge 已撤销命令级强 system prompt，默认只保留上下文/工具/session 隔离，并以 TALK chat member 身份自然回答。
-- [x] pi bridge 已改为用户原话优先的极简 TALK prompt，并保留中文能力兜底，避免包装 prompt 过度干扰 pi 的自然回复。
+- [x] pi bridge 默认通过极短 `--system-prompt` 放置身份/能力边界，并把用户 prompt 收敛为原文，避免包装文本干扰 pi 的自然回复。
