@@ -27,11 +27,9 @@ RESPONSE_STYLE_INSTRUCTIONS = (
     "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
 )
 PI_CHAT_INSTRUCTIONS = (
-    "Answer the user's task naturally. Reply in the same language as the user's task; if the user asks for Chinese, "
-    "use Simplified Chinese. Do not prepend language tags such as '<Language: ...>'. "
-    "If asked what you can do or to introduce yourself, explain that you are a lightweight TALK chat member that can chat, "
-    "answer questions, break down tasks, and participate in TALK group collaboration. "
-    "In the default bridge mode, do not claim you can read project files, execute commands, edit files, or use tools.\n"
+    "回复要求：你是 TALK 群聊里的 pi，按用户语言自然回复。"
+    "默认不要声称能读取项目文件、执行命令、编辑文件或调用工具。"
+    "不要输出 <Language: ...> 之类语言标签。\n"
 )
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
@@ -268,23 +266,17 @@ def build_cli_prompt(
 ) -> str:
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
+    if runtime.lower() == "pi" or member_id == "agent:pi":
+        return (
+            "用户消息：\n"
+            f"{task}\n\n"
+            f"{PI_CHAT_INSTRUCTIONS}"
+        )
+
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
     group_id = message.get("group_id")
     group_line = f"TALK group id: {group_id}\n" if group_id else ""
-    if runtime.lower() == "pi" or member_id == "agent:pi":
-        return (
-            f"You are {member_id}, a TALK chat member.\n"
-            f"{PI_CHAT_INSTRUCTIONS}"
-            "Keep the final response suitable for posting back into TALK.\n"
-            "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
-            f"Sender: {sender}\n"
-            f"TALK message id: {message_id}\n\n"
-            f"{group_line}"
-            "Task:\n"
-            f"{task}\n"
-        )
-
     return (
         f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
         f"Project root: {workdir}\n"
@@ -307,24 +299,19 @@ def build_cli_task_prompt(
     runtime: str = "cli",
 ) -> str:
     content = str(task.get("content") or "").strip()
-    task_id = task.get("id") or "unknown"
-    creator = task.get("created_by") or "unknown"
     title = str(task.get("title") or "").strip()
 
-    title_block = f"Title: {title}\n" if title else ""
     if runtime.lower() == "pi" or member_id == "agent:pi":
+        task_text = f"标题：{title}\n{content}" if title else content
         return (
-            f"You are {member_id}, a TALK chat member.\n"
+            "用户任务：\n"
+            f"{task_text}\n\n"
             f"{PI_CHAT_INSTRUCTIONS}"
-            "Answer the queued TALK task. Keep the final response suitable for posting back into TALK.\n"
-            "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
-            f"Task creator: {creator}\n"
-            f"TALK task id: {task_id}\n"
-            f"{title_block}\n"
-            "Task:\n"
-            f"{content}\n"
         )
 
+    task_id = task.get("id") or "unknown"
+    creator = task.get("created_by") or "unknown"
+    title_block = f"Title: {title}\n" if title else ""
     return (
         f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
         f"Project root: {workdir}\n"

@@ -6,6 +6,37 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-25 11:41 (Asia/Shanghai)
+### Current Progress
+- `PI-MINIMAL-PROMPT-1` 已完成：按项目管理者确认，将 pi bridge 输入包装改为“用户原话优先”的极简 prompt，减少英文元指令对 pi 语言选择和身份判断的干扰。
+- `bridges/cli_bridge.py` 中 pi 消息 prompt 现在以 `用户消息：` 开头，直接放去掉 `@agent:pi` 后的原话；pi 队列任务 prompt 以 `用户任务：` 开头，只有任务标题存在时才作为用户任务内容的一部分保留。
+- pi prompt 后置一条中文短边界：`你是 TALK 群聊里的 pi，按用户语言自然回复。默认不要声称能读取项目文件、执行命令、编辑文件或调用工具。不要输出 <Language: ...> 之类语言标签。`
+- pi prompt 不再传入 `Sender`、`TALK message id`、`TALK task id`、`Task creator` 或 `TALK group id`；但实际回复仍携带原消息 `group_id` 写回同一个 Group Hall。
+- 非 pi runtime 的执行型 prompt 保持不变；Codex bridge 不受影响。
+- `normalize_pi_reply_language(...)` 保留为异常兜底：中文请求得到非中文/语言标签回复时才替换；正常中文或用户明确要求英文时不干预。
+- `tests/test_cli_bridge.py` 已更新 pi prompt 断言：用户原话在最前、无不必要元信息、包含中文短边界、Group Hall 回复仍保留原 `group_id`。
+- `docs/MODULE_bridges.md` 已同步 pi 极简 prompt 边界。
+### Open Questions / Pending Confirmation
+- 需要用户重启 pi bridge；正在运行的旧 pi bridge 不会自动加载本次极简 prompt 修复。
+- 重启后建议验收：`@agent:pi 你好啊，你有哪些功能？`、`@agent:pi 你好啊，你有哪些功能？用中文回复`、`@agent:pi 请用英文介绍你有哪些功能`。
+- 旧消息 `#39` / `#41` 不会自动改写；本次修复只影响后续新回复。
+- 单条显式全量 `unittest` 本轮 300 秒超时且无失败栈；分组运行同一模块集合合计 120 tests 全部通过。
+### Next Plan
+1. 提交本次 `PI-MINIMAL-PROMPT-1` 修复。
+2. 用户重启 pi bridge 后继续人工验收语言跟随和能力边界。
+3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互联合验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，22 tests。
+- 分组显式全量 passed，合计 120 tests：bridge/pi/encoding 34 tests；files/groups/healthz/auth/messages 40 tests；instances/tasks/client 27 tests；setup/sse/websocket 19 tests。
+- `.venv\Scripts\python.exe -u -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_encoding tests.test_files tests.test_groups tests.test_healthz tests.test_instances tests.test_members_auth tests.test_messages tests.test_pi_bridge tests.test_setup tests.test_sse tests.test_talk_client tests.test_tasks tests.test_websocket` timeout after 300s，无失败栈。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-25 11:16 (Asia/Shanghai)
 ### Current Progress
 - `PI-LANGUAGE-REPLY-1` 验收期修复已完成：根据用户反馈，排查最近 Group Hall 消息，确认 `#38 -> #39` 为中文功能问题却返回 `<Language: ar>` 阿拉伯语；`#40 -> #41` 明确要求中文却返回英文，并误称自己能读文件、执行命令、编辑文件。
