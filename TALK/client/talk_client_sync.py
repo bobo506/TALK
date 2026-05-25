@@ -128,6 +128,49 @@ class TalkClientSync:
     def remove_group_member(self, group_id: str, member_id: str) -> dict[str, Any]:
         return self._submit(self._client.remove_group_member(group_id, member_id))
 
+    def create_discussion(
+        self,
+        group_id: str,
+        topic: str,
+        participant_ids: list[str] | tuple[str, ...],
+        *,
+        max_rounds: int = 2,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.create_discussion(group_id, topic, participant_ids, max_rounds=max_rounds)
+        )
+
+    def list_discussions(self, *, group_id: str | None = None) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_discussions(group_id=group_id))
+
+    def get_discussion(self, discussion_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_discussion(discussion_id))
+
+    def update_discussion(self, discussion_id: int, *, status: str) -> dict[str, Any]:
+        return self._submit(self._client.update_discussion(discussion_id, status=status))
+
+    def append_discussion_turn(
+        self,
+        discussion_id: int,
+        *,
+        message_id: int,
+        stance: str,
+        target_member_id: str | None = None,
+        round_index: int = 1,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.append_discussion_turn(
+                discussion_id,
+                message_id=message_id,
+                stance=stance,
+                target_member_id=target_member_id,
+                round_index=round_index,
+            )
+        )
+
+    def list_discussion_turns(self, discussion_id: int) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_discussion_turns(discussion_id))
+
     def report_instance_status(
         self,
         instance_id: str,

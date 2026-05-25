@@ -21,9 +21,22 @@ class PiBridgeTests(unittest.TestCase):
         self.assertIn("off", command_args)
         self.assertIn("--system-prompt", command_args)
         system_prompt = command_args[command_args.index("--system-prompt") + 1]
-        self.assertIn("你是 TALK 群聊里的 pi", system_prompt)
+        self.assertIn("TALK Group Hall", system_prompt)
+        self.assertIn("群聊参与者", system_prompt)
         self.assertIn("按用户语言自然回复", system_prompt)
-        self.assertIn("默认不要声称能读取项目文件、执行命令、编辑文件或调用工具", system_prompt)
+        self.assertIn("默认讨论模式", system_prompt)
+        self.assertIn("talk-action", system_prompt)
+
+    def test_parser_can_enable_pi_tools_profile_with_default_command(self):
+        args = pi_bridge.build_parser().parse_args(["--key", "pi-key", "--pi-execution-profile", "tools"])
+
+        self.assertEqual(args.pi_execution_profile, "tools")
+        self.assertEqual(args.pi_command, pi_bridge.DEFAULT_PI_COMMAND)
+        args.pi_command = pi_bridge.DEFAULT_PI_TOOLS_COMMAND
+        command_args = shlex.split(args.pi_command, posix=True)
+        self.assertIn("--tools", command_args)
+        self.assertIn("read,grep,find,ls,bash,edit,write", command_args)
+        self.assertNotIn("--no-tools", command_args)
 
     def test_parser_accepts_custom_pi_command(self):
         args = pi_bridge.build_parser().parse_args([

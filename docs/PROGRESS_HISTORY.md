@@ -6,6 +6,51 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-25 16:10 (Asia/Shanghai)
+### Current Progress
+- `DISCUSSION-PROTOCOL-1` 已完成：新增可记录多 Agent 讨论协议，Discussion Session / Turn 结构化记录讨论参与者、顺序、立场和轮次。
+- `server/models.py` 新增 `DiscussionSession`、`DiscussionTurn` 及请求/响应 schema；`server/db.py` 补充 discussion 相关索引。
+- 新增 `server/routes/discussions.py` 并接入 `server/main.py`：支持创建/读取/更新 discussion、追加/查询 ordered turns；非 Group 成员不可访问，turn 只能引用当前成员本人在同一 Group Hall 的消息。
+- `TALK/client/talk_client.py` 与 sync wrapper 新增 discussion helper，SDK 可创建 session、追加 turn、查询 turns。
+- `bridges/cli_bridge.py` 新增 Group Hall 参与者 prompt、`talk-action` 解析与执行：`send_message` 可同 Hall 代发 `@agent:*` 并自动创建/复用 discussion，`mark_stance` 可记录当前回复立场，连续两条不同 agent 的 `disagree` 后自动 `@human:*` 升级仲裁。
+- `bridges/pi_bridge.py` 默认 system prompt 改为 TALK Group Hall 参与者身份与动作协议；默认仍是讨论档，新增 `--pi-execution-profile tools` 显式施工档，使用默认命令时启用 `read,grep,find,ls,bash,edit,write`。
+- 新增 `docs/MODULE_discussions.md`，并同步 `docs/PROJECT_BRIEF.md`、`docs/MODULE_groups.md`、`docs/MODULE_bridges.md`。
+### Open Questions / Pending Confirmation
+- 需要重启 codex/pi bridge 后才能加载本次新协议。
+- Web UI 尚未展示 discussion session/turn；当前通过 API、SDK 与 bridge 自动动作使用。
+- pi 施工档只在显式 `--pi-execution-profile tools` 时启用；后续若让 pi 真正施工，需要按任务明确授权并验收。
+- Codex + pi 双 Agent 真实端到端讨论仍需人工验收。
+### Next Plan
+1. 提交 `DISCUSSION-PROTOCOL-1`。
+2. 重启 bridge 后，在 Group Hall 验收 Codex 向 pi 转交计划、pi 回复优化/分歧、两轮分歧升级 human。
+3. 后续补 Web UI discussion 面板，并评估与任务队列、文档锁、SSE 的联动。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\routes\discussions.py server\main.py TALK\client\talk_client.py TALK\client\talk_client_sync.py bridges\cli_bridge.py bridges\pi_bridge.py tests\test_discussions.py tests\test_cli_bridge.py tests\test_pi_bridge.py tests\test_talk_client.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_discussions tests.test_cli_bridge tests.test_pi_bridge` passed，30 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client` passed，11 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_codex_bridge tests.test_groups tests.test_messages` passed，37 tests。
+- `.venv\Scripts\python.exe -m unittest` passed，128 tests。
+- `git diff --check` passed；仅提示 Windows 工作区后续可能将 LF 替换为 CRLF，无 whitespace error。
+### Changed Files
+- `server/models.py`
+- `server/routes/discussions.py`
+- `server/main.py`
+- `server/db.py`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `bridges/cli_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_discussions.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `tests/test_talk_client.py`
+- `docs/PROJECT_BRIEF.md`
+- `docs/MODULE_discussions.md`
+- `docs/MODULE_groups.md`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-25 12:21 (Asia/Shanghai)
 ### Current Progress
 - `PI-SYSTEM-PROMPT-BOUNDARY-1` 已完成：按项目管理者确认，将 pi 的身份/能力边界从用户 prompt 中移到默认 `pi --system-prompt`，避免 `TALK...` 等包装文本被 pi 当成用户没说完的正文。

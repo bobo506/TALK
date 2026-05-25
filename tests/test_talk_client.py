@@ -301,11 +301,36 @@ class TalkClientTests(RouteTestCase):
                     "@agent:demo hello inside hall",
                     group_id="group:sdk-lab",
                 )
+                discussion = await human_client.create_discussion(
+                    "group:sdk-lab",
+                    "SDK discussion",
+                    ["human:bobo", "agent:demo"],
+                    max_rounds=2,
+                )
+                human_turn = await human_client.append_discussion_turn(
+                    discussion["id"],
+                    message_id=hall_message["id"],
+                    stance="question",
+                    target_member_id="agent:demo",
+                    round_index=1,
+                )
                 global_history = await human_client.fetch_history(since=0)
 
             async with TalkClient(base_url, "demo-key") as agent_client:
                 groups = await agent_client.list_groups()
                 fetched = await agent_client.get_group("group:sdk-lab")
+                agent_message = await agent_client.send_text(
+                    "@human:bobo reply inside discussion",
+                    group_id="group:sdk-lab",
+                )
+                agent_turn = await agent_client.append_discussion_turn(
+                    discussion["id"],
+                    message_id=agent_message["id"],
+                    stance="answer",
+                    target_member_id="human:bobo",
+                    round_index=1,
+                )
+                turns = await agent_client.list_discussion_turns(discussion["id"])
                 hall_history = await agent_client.fetch_history(group_id="group:sdk-lab", since=0)
 
             self.assertEqual(group["id"], "group:sdk-lab")
@@ -321,7 +346,12 @@ class TalkClientTests(RouteTestCase):
             )
             self.assertEqual(fetched["name"], "SDK Lab Renamed")
             self.assertEqual(hall_message["group_id"], "group:sdk-lab")
-            self.assertEqual(hall_history[-1]["content"], "@agent:demo hello inside hall")
+            self.assertEqual(discussion["topic"], "SDK discussion")
+            self.assertEqual(human_turn["turn_index"], 1)
+            self.assertEqual(agent_turn["turn_index"], 2)
+            self.assertEqual([turn["stance"] for turn in turns], ["question", "answer"])
+            self.assertIn("@agent:demo hello inside hall", [message["content"] for message in hall_history])
+            self.assertIn("@human:bobo reply inside discussion", [message["content"] for message in hall_history])
             self.assertNotIn(hall_message["id"], {message["id"] for message in global_history})
 
         with LiveTalkServer(main.app) as base_url:

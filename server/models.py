@@ -137,6 +137,38 @@ class AgentTaskSchedule(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class DiscussionSession(SQLModel, table=True):
+    __tablename__ = "discussion_sessions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: str = Field(foreign_key="groups.id", index=True)
+    created_by: str = Field(foreign_key="members.id", index=True)
+    topic: str
+    participant_ids: str
+    status: str = Field(default="active", index=True)
+    max_rounds: int = 2
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def participant_list(self) -> list[str]:
+        return json.loads(self.participant_ids)
+
+
+class DiscussionTurn(SQLModel, table=True):
+    __tablename__ = "discussion_turns"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="discussion_sessions.id", index=True)
+    turn_index: int = Field(index=True)
+    message_id: int = Field(foreign_key="messages.id", index=True)
+    speaker_id: str = Field(foreign_key="members.id", index=True)
+    target_member_id: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
+    stance: str = Field(index=True)
+    round_index: int = Field(default=1, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 # ── API schemas (request / response) ────────────────────────────────
 
 
@@ -316,6 +348,101 @@ class GroupOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     members: list[GroupMemberOut]
+
+
+_DISCUSSION_STATUSES = {"active", "resolved", "escalated", "canceled"}
+_DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate"}
+
+
+class DiscussionSessionCreate(BaseModel):
+    group_id: str
+    topic: str
+    participant_ids: list[str]
+    max_rounds: int = 2
+
+    @model_validator(mode="after")
+    def validate_discussion_create(self) -> "DiscussionSessionCreate":
+        self.group_id = self.group_id.strip()
+        self.topic = self.topic.strip()
+        self.participant_ids = list(dict.fromkeys(member_id.strip() for member_id in self.participant_ids if member_id.strip()))
+        if not self.group_id:
+            raise ValueError("group_id is required")
+        if not self.topic:
+            raise ValueError("topic is required")
+        if not self.participant_ids:
+            raise ValueError("participant_ids is required")
+        if self.max_rounds <= 0:
+            raise ValueError("max_rounds must be greater than 0")
+        return self
+
+
+class DiscussionSessionUpdate(BaseModel):
+    status: str
+
+    @model_validator(mode="after")
+    def validate_discussion_update(self) -> "DiscussionSessionUpdate":
+        self.status = self.status.strip().lower()
+        if self.status not in _DISCUSSION_STATUSES:
+            raise ValueError(f"status must be one of {sorted(_DISCUSSION_STATUSES)}")
+        return self
+
+
+class DiscussionSessionOut(BaseModel):
+    id: int
+    group_id: str
+    created_by: str
+    topic: str
+    participant_ids: list[str]
+    status: str
+    max_rounds: int
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_orm_session(cls, session: DiscussionSession) -> "DiscussionSessionOut":
+        return cls(
+            id=int(session.id or 0),
+            group_id=session.group_id,
+            created_by=session.created_by,
+            topic=session.topic,
+            participant_ids=session.participant_list,
+            status=session.status,
+            max_rounds=session.max_rounds,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+        )
+
+
+class DiscussionTurnCreate(BaseModel):
+    message_id: int
+    target_member_id: Optional[str] = None
+    stance: str
+    round_index: int = 1
+
+    @model_validator(mode="after")
+    def validate_discussion_turn_create(self) -> "DiscussionTurnCreate":
+        if self.message_id <= 0:
+            raise ValueError("message_id must be greater than 0")
+        if self.target_member_id is not None:
+            self.target_member_id = self.target_member_id.strip() or None
+        self.stance = self.stance.strip().lower()
+        if self.stance not in _DISCUSSION_STANCES:
+            raise ValueError(f"stance must be one of {sorted(_DISCUSSION_STANCES)}")
+        if self.round_index <= 0:
+            raise ValueError("round_index must be greater than 0")
+        return self
+
+
+class DiscussionTurnOut(BaseModel):
+    id: int
+    session_id: int
+    turn_index: int
+    message_id: int
+    speaker_id: str
+    target_member_id: Optional[str]
+    stance: str
+    round_index: int
+    created_at: datetime
 
 
 _INSTANCE_STATUSES = {"starting", "online", "idle", "busy", "stopping", "offline", "error"}

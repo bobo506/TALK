@@ -247,6 +247,58 @@ class TalkClient:
     async def remove_group_member(self, group_id: str, member_id: str) -> JsonDict:
         return await self._request_json("DELETE", f"/api/groups/{group_id}/members/{member_id}")
 
+    async def create_discussion(
+        self,
+        group_id: str,
+        topic: str,
+        participant_ids: list[str] | tuple[str, ...],
+        *,
+        max_rounds: int = 2,
+    ) -> JsonDict:
+        payload: JsonDict = {
+            "group_id": group_id,
+            "topic": topic,
+            "participant_ids": list(participant_ids),
+            "max_rounds": max_rounds,
+        }
+        return await self._request_json("POST", "/api/discussions", json_body=payload)
+
+    async def list_discussions(self, *, group_id: str | None = None) -> list[JsonDict]:
+        params: dict[str, Any] = {}
+        if group_id is not None:
+            params["group_id"] = group_id
+        return await self._request_json("GET", "/api/discussions", params=params)
+
+    async def get_discussion(self, discussion_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/discussions/{discussion_id}")
+
+    async def update_discussion(self, discussion_id: int, *, status: str) -> JsonDict:
+        return await self._request_json(
+            "PATCH",
+            f"/api/discussions/{discussion_id}",
+            json_body={"status": status},
+        )
+
+    async def append_discussion_turn(
+        self,
+        discussion_id: int,
+        *,
+        message_id: int,
+        stance: str,
+        target_member_id: str | None = None,
+        round_index: int = 1,
+    ) -> JsonDict:
+        payload: JsonDict = {
+            "message_id": message_id,
+            "target_member_id": target_member_id,
+            "stance": stance,
+            "round_index": round_index,
+        }
+        return await self._request_json("POST", f"/api/discussions/{discussion_id}/turns", json_body=payload)
+
+    async def list_discussion_turns(self, discussion_id: int) -> list[JsonDict]:
+        return await self._request_json("GET", f"/api/discussions/{discussion_id}/turns")
+
     async def report_instance_status(
         self,
         instance_id: str,

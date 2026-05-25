@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import html
 import locale
 import os
 import re
@@ -25,6 +26,19 @@ RESPONSE_STYLE_INSTRUCTIONS = (
     "Match the scope of the user's request. For a simple presence check, greeting, or acknowledgement request, "
     "reply in one short sentence only, for example '<agent id> 在线。'. "
     "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
+)
+DISCUSSION_PROTOCOL_INSTRUCTIONS = (
+    "You are a participant in a TALK Group Hall, not a TALK administrator or user manual. "
+    "You may talk with humans and other agents. If the user asks you to contact another agent, "
+    "emit a TALK action and keep any visible acknowledgement brief.\n"
+    "Discussion protocol: answer questions first. When responding to another agent, decide whether you agree. "
+    "If you agree, add an optimization if useful or briefly affirm them. If you disagree, state the different recommendation. "
+    "If both sides have disagreed across two turns, ask a human to make the final decision.\n"
+    "Action syntax, one per line when needed: "
+    "<talk-action type=\"send_message\" to=\"agent:name\" stance=\"question\">message</talk-action>, "
+    "<talk-action type=\"mark_stance\" stance=\"agree|optimize|disagree|answer\"></talk-action>, "
+    "or <talk-action type=\"escalate_to_human\" to=\"human:name\">question for the human</talk-action>. "
+    "Do not explain these action tags to the user.\n"
 )
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
@@ -56,6 +70,13 @@ WINDOWS_TASKKILL_ZH_RE = re.compile(
     r"^成功:\s*已终止 PID \d+ .*的进程。$"
 )
 MOJIBAKE_TASKKILL_PREFIX = "\ufffd\u0279\ufffd:"
+ACTION_RE = re.compile(
+    r"<talk-action\b(?P<attrs>[^>]*)>(?P<body>.*?)</talk-action>",
+    re.IGNORECASE | re.DOTALL,
+)
+ACTION_ATTR_RE = re.compile(r"([a-zA-Z_][\w-]*)\s*=\s*(['\"])(.*?)\2")
+ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human"}
+ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate"}
 
 
 @dataclass(frozen=True)
@@ -64,6 +85,17 @@ class CliRunResult:
     stdout: str
     stderr: str
     timed_out: bool = False
+
+
+@dataclass(frozen=True)
+class TalkAction:
+    action_type: str
+    body: str = ""
+    to: str | None = None
+    target_member_id: str | None = None
+    stance: str | None = None
+    discussion_id: int | None = None
+    round_index: int | None = None
 
 
 def member_id_from_name(name: str) -> str:
@@ -162,9 +194,9 @@ def asks_capability_question(text: str) -> bool:
 
 def pi_chinese_capability_reply() -> str:
     return (
-        "我是 pi，TALK 里的轻量聊天成员。"
-        "我可以陪你聊天、回答问题、拆解任务，也可以在 Group Hall 里参与协作；"
-        "默认 bridge 模式下我不会读取项目文件、执行命令或调用工具。"
+        "我是 pi，TALK Group Hall 里的参与者。"
+        "我可以聊天、回答问题、评审方案、联系其他 agent，并通过 TALK 动作参与协作；"
+        "默认讨论模式下我不会读取项目文件、执行本机命令或编辑文件。"
     )
 
 
@@ -180,6 +212,260 @@ def normalize_pi_reply_language(task_text: str, reply: str) -> str:
     if asks_capability_question(task_text):
         return pi_chinese_capability_reply()
     return pi_chinese_language_fallback_reply()
+
+
+def _parse_action_attrs(raw_attrs: str) -> dict[str, str]:
+    return {match.group(1).replace("-", "_").lower(): html.unescape(match.group(3)).strip() for match in ACTION_ATTR_RE.finditer(raw_attrs)}
+
+
+def parse_talk_actions(text: str) -> tuple[str, list[TalkAction]]:
+    actions: list[TalkAction] = []
+
+    def replace(match: re.Match[str]) -> str:
+        attrs = _parse_action_attrs(match.group("attrs") or "")
+        action_type = attrs.get("type", "").strip().lower()
+        if action_type not in ACTION_TYPES:
+            return ""
+
+        stance = attrs.get("stance", "").strip().lower() or None
+        if stance is not None and stance not in ACTION_STANCES:
+            stance = None
+
+        discussion_id: int | None = None
+        raw_discussion_id = attrs.get("discussion_id") or attrs.get("session_id")
+        if raw_discussion_id:
+            try:
+                discussion_id = int(raw_discussion_id)
+            except ValueError:
+                discussion_id = None
+
+        round_index: int | None = None
+        raw_round_index = attrs.get("round_index") or attrs.get("round")
+        if raw_round_index:
+            try:
+                round_index = int(raw_round_index)
+            except ValueError:
+                round_index = None
+
+        target = attrs.get("target") or attrs.get("target_member_id")
+        to = attrs.get("to") or target
+        body = html.unescape(match.group("body") or "").strip()
+        actions.append(
+            TalkAction(
+                action_type=action_type,
+                body=body,
+                to=to or None,
+                target_member_id=target or to or None,
+                stance=stance,
+                discussion_id=discussion_id,
+                round_index=round_index if round_index and round_index > 0 else None,
+            )
+        )
+        return ""
+
+    visible_text = ACTION_RE.sub(replace, text).strip()
+    return visible_text, actions
+
+
+def _discussion_topic_from_text(text: str, *, max_chars: int = 120) -> str:
+    topic = " ".join(text.split())
+    if len(topic) > max_chars:
+        topic = f"{topic[:max_chars].rstrip()}..."
+    return topic or "TALK Agent discussion"
+
+
+def _discussion_participants(*member_ids: str | None) -> list[str]:
+    return list(dict.fromkeys(member_id for member_id in member_ids if member_id))
+
+
+async def _resolve_discussion_id(
+    client: Any,
+    *,
+    group_id: str | None,
+    member_id: str,
+    peer_id: str | None,
+    topic: str,
+    create_if_missing: bool,
+    max_rounds: int = 2,
+) -> int | None:
+    if not group_id or not peer_id:
+        return None
+
+    try:
+        discussions = await client.list_discussions(group_id=group_id)
+    except AttributeError:
+        return None
+
+    for discussion in discussions:
+        participants = set(discussion.get("participant_ids") or [])
+        if discussion.get("status") == "active" and {member_id, peer_id}.issubset(participants):
+            return int(discussion["id"])
+
+    if not create_if_missing:
+        return None
+
+    created = await client.create_discussion(
+        group_id,
+        topic,
+        _discussion_participants(member_id, peer_id),
+        max_rounds=max_rounds,
+    )
+    return int(created["id"])
+
+
+async def _append_discussion_turn(
+    client: Any,
+    *,
+    discussion_id: int | None,
+    message_id: int | None,
+    stance: str,
+    target_member_id: str | None = None,
+    round_index: int = 1,
+) -> bool:
+    if discussion_id is None or message_id is None:
+        return False
+    try:
+        await client.append_discussion_turn(
+            discussion_id,
+            message_id=message_id,
+            stance=stance,
+            target_member_id=target_member_id,
+            round_index=round_index,
+        )
+        return True
+    except AttributeError:
+        return False
+
+
+def _last_two_turns_disagree(turns: list[dict[str, Any]]) -> bool:
+    if len(turns) < 2:
+        return False
+    latest = turns[-2:]
+    return (
+        latest[0].get("stance") == "disagree"
+        and latest[1].get("stance") == "disagree"
+        and latest[0].get("speaker_id") != latest[1].get("speaker_id")
+    )
+
+
+async def _find_human_reviewer(client: Any, group_id: str | None) -> str | None:
+    if not group_id:
+        return None
+    try:
+        group = await client.get_group(group_id)
+    except AttributeError:
+        return None
+    for member in group.get("members") or []:
+        member_id = str(member.get("member_id") or "")
+        if member_id.startswith("human:"):
+            return member_id
+    return None
+
+
+async def _maybe_escalate_disagreement(
+    client: Any,
+    *,
+    discussion_id: int | None,
+    group_id: str | None,
+    reply_to: int | None,
+) -> None:
+    if discussion_id is None or not group_id:
+        return
+    try:
+        turns = await client.list_discussion_turns(discussion_id)
+    except AttributeError:
+        return
+    if not _last_two_turns_disagree(turns):
+        return
+
+    human_id = await _find_human_reviewer(client, group_id)
+    if human_id is None:
+        return
+    text = f"@{human_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
+    message = await client.send_text(text, to=[human_id], reply_to=reply_to, group_id=group_id)
+    await _append_discussion_turn(
+        client,
+        discussion_id=discussion_id,
+        message_id=int(message["id"]),
+        stance="escalate",
+        target_member_id=human_id,
+        round_index=2,
+    )
+    try:
+        await client.update_discussion(discussion_id, status="escalated")
+    except AttributeError:
+        pass
+
+
+async def execute_talk_actions(
+    actions: list[TalkAction],
+    *,
+    client: Any,
+    source_message: dict[str, Any],
+    member_id: str,
+    task_text: str,
+) -> list[str]:
+    summaries: list[str] = []
+    group_id = source_message.get("group_id") if isinstance(source_message.get("group_id"), str) else None
+    source_message_id = int(source_message["id"]) if source_message.get("id") is not None else None
+
+    for action in actions:
+        target = action.to or action.target_member_id
+        if action.action_type == "send_message":
+            if not target or not target.startswith("agent:"):
+                summaries.append("send_message skipped: target must be an agent member")
+                continue
+            if not action.body:
+                summaries.append("send_message skipped: message body is empty")
+                continue
+            text = f"@{target} {action.body}".strip()
+            discussion_id = action.discussion_id or await _resolve_discussion_id(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=target,
+                topic=_discussion_topic_from_text(task_text),
+                create_if_missing=True,
+            )
+            sent = await client.send_text(text, to=[target], reply_to=source_message_id, group_id=group_id)
+            await _append_discussion_turn(
+                client,
+                discussion_id=discussion_id,
+                message_id=int(sent["id"]),
+                stance=action.stance or "question",
+                target_member_id=target,
+                round_index=action.round_index or 1,
+            )
+            summaries.append(f"sent message to {target}")
+        elif action.action_type == "escalate_to_human":
+            if not target or not target.startswith("human:"):
+                summaries.append("escalate_to_human skipped: target must be a human member")
+                continue
+            text = f"@{target} {action.body or '请你做最终判断。'}".strip()
+            sent = await client.send_text(text, to=[target], reply_to=source_message_id, group_id=group_id)
+            discussion_id = action.discussion_id or await _resolve_discussion_id(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=str(source_message.get("from") or ""),
+                topic=_discussion_topic_from_text(task_text),
+                create_if_missing=False,
+            )
+            await _append_discussion_turn(
+                client,
+                discussion_id=discussion_id,
+                message_id=int(sent["id"]),
+                stance="escalate",
+                target_member_id=target,
+                round_index=action.round_index or 2,
+            )
+            if discussion_id is not None:
+                try:
+                    await client.update_discussion(discussion_id, status="escalated")
+                except AttributeError:
+                    pass
+            summaries.append(f"escalated to {target}")
+    return summaries
 
 
 def decode_subprocess_output(data: bytes) -> str:
@@ -273,6 +559,7 @@ def build_cli_prompt(
         f"Project root: {workdir}\n"
         "Answer the user's task. Keep the final response suitable for posting back into TALK.\n"
         f"{RESPONSE_STYLE_INSTRUCTIONS}"
+        f"{DISCUSSION_PROTOCOL_INSTRUCTIONS}"
         "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
         f"Sender: {sender}\n"
         f"TALK message id: {message_id}\n\n"
@@ -303,6 +590,7 @@ def build_cli_task_prompt(
         f"Project root: {workdir}\n"
         "Answer the queued Agent task. Keep the final response suitable for posting back into TALK.\n"
         f"{RESPONSE_STYLE_INSTRUCTIONS}"
+        f"{DISCUSSION_PROTOCOL_INSTRUCTIONS}"
         "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
         f"Task creator: {creator}\n"
         f"TALK task id: {task_id}\n"
@@ -519,7 +807,48 @@ async def handle_incoming_message(
         )
         if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
             reply = normalize_pi_reply_language(task_text, reply)
-        await client.reply(int(message["id"]), text=reply, to=[sender], group_id=group_id)
+        visible_reply, actions = parse_talk_actions(reply)
+        await execute_talk_actions(
+            actions,
+            client=client,
+            source_message=message,
+            member_id=member_id,
+            task_text=task_text,
+        )
+        mark_actions = [action for action in actions if action.action_type == "mark_stance"]
+        if not visible_reply and actions:
+            visible_reply = "已按讨论协议继续推进。"
+        if not visible_reply:
+            visible_reply = f"({bridge_label} finished without visible output.)"
+
+        reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
+        reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
+        for action in mark_actions:
+            peer_id = action.target_member_id or str(sender)
+            discussion_id = action.discussion_id or await _resolve_discussion_id(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=peer_id,
+                topic=_discussion_topic_from_text(task_text),
+                create_if_missing=group_id is not None,
+            )
+            stance = action.stance or "answer"
+            await _append_discussion_turn(
+                client,
+                discussion_id=discussion_id,
+                message_id=reply_message_id,
+                stance=stance,
+                target_member_id=peer_id,
+                round_index=action.round_index or 1,
+            )
+            if stance == "disagree":
+                await _maybe_escalate_disagreement(
+                    client,
+                    discussion_id=discussion_id,
+                    group_id=group_id,
+                    reply_to=reply_message_id,
+                )
         if report_status is not None:
             await report_status(
                 "error" if result.timed_out or result.returncode != 0 else "idle",

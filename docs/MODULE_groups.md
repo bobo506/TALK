@@ -108,14 +108,14 @@
 - SDK 已提供 Group API helper，并支持在 `send_text` / `send_file` / `reply` / `fetch_history` 中携带 `group_id`。
 - 当前没有 Group 删除 API；删除语义需先确认历史 Hall 消息如何保留或归档。
 - 当前没有成员管理权限细分；human 可管理 Group 成员，Agent 不可管理。
-- 当前没有 Discussion Session 表；多 Agent 轮次、主持人规则和总结策略仍属后续协议。
+- `DISCUSSION-PROTOCOL-1` 已新增 Discussion Session / Turn 表，用于记录多 Agent 讨论顺序、立场和轮次；具体协议见 `docs/MODULE_discussions.md`。
 - 当前没有 SSE stream；Group 只为后续 stream 提供作用域。
 
 ## 后续计划
 
 - 确认 Group 删除 / 归档语义，并补充删除或归档入口。
 - 在 Web UI 中补充更完整的未读/提醒状态。
-- 设计并实现 Discussion Session / 多 Agent 讨论协议；参考 `openhanako` 的频道群聊模型时，只吸收调度思想，不照搬文件存储和桌面架构。
+- 将 Discussion Session / Turn 接入 Web UI，并补充未读、轮次状态和人工仲裁提示。
 - 让 SSE stream 事件携带 `group_id` 并显示在对应 Hall。
 - 将任务状态、实例状态和文档锁状态接入 Group/Hall 视图。
 

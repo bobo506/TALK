@@ -26,6 +26,11 @@
 - 通用桥与 Codex 桥共享消息过滤、运行锁、任务队列、超时、回复截断和状态上报语义。
 - 子进程输出会逐行优先按 UTF-8 解码，并在 Windows 下兜底尝试系统代码页，避免本地 CLI / 系统工具输出中文时出现替换字符乱码或不同输出行互相拖累编码判断。
 - bridge 会过滤 Windows `taskkill` 进程清理提示，避免 Codex CLI 退出时的进程管理噪声混入前端聊天回复。
+- bridge prompt 现在明确要求接入 agent 以 TALK Group Hall 参与者身份行动，而不是把自己当作 TALK 管理员或功能说明书。
+- 模型最终输出中的 `<talk-action ...>` 标签会被 bridge 解析为 TALK 内动作；标签不会出现在最终可见聊天正文中。
+- `send_message` 动作会在同一 Group Hall 中代表当前 agent 发送 `@agent:*` 消息，并自动创建或复用 active discussion 记录 turn。
+- `mark_stance` 动作用于把当前回复标记为 `answer / agree / optimize / disagree` 等讨论立场；连续两条不同 agent 的 `disagree` 会自动 `@human:*` 请求最终判断。
+- `escalate_to_human` 动作可显式向指定 `human:*` 成员发起仲裁，并将 discussion 标记为 `escalated`。
 
 运行示例：
 
@@ -68,14 +73,15 @@ pi --print --mode text --no-context-files --no-tools --no-session --thinking off
 - 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
 - Group Hall 中直接 `@agent:pi` 的文本消息也会被处理；bridge 回复会保留原消息的 `group_id`，因此回复写回同一个 Hall。
 - pi 默认入口只保留运行隔离：禁止自动加载 `AGENTS.md` / `CLAUDE.md` 上下文文件，禁止工具调用，不保存/恢复会话，并关闭 thinking，以减少回复延迟和避免把普通聊天误输出成项目状态报告。
-- pi 默认命令使用极短中文 `--system-prompt` 放置身份/能力边界，避免边界说明混入用户消息正文。
+- pi 默认命令使用中文 `--system-prompt` 放置 Group Hall 参与者身份、讨论协议和 TALK 动作边界，避免边界说明混入用户消息正文。
 - pi 的 TALK prompt 现在只传去掉 `@agent:pi` 后的用户原文；队列任务默认只传 `content`，有 `title` 时传 `标题：<title>\n\n<content>`。
 - pi prompt 不再包含 `用户消息`、`回复要求`、`Sender`、`TALK message id` 或 `TALK group id` 等包装文本；但 bridge 回复仍会保留原消息 `group_id`，确保 Group Hall 回复写回同一个 Hall。
-- 默认 system prompt 内容为：`你是 TALK 群聊里的 pi。按用户语言自然回复。默认不要声称能读取项目文件、执行命令、编辑文件或调用工具。不要输出 <Language: ...> 之类语言标签。`
+- 默认 system prompt 要求 pi 是 TALK Group Hall 参与者，可与人类和其他 agent 交流、评审方案、提出优化/分歧，并在需要时输出 `talk-action`；默认讨论模式下不声称能读取项目文件、执行命令或编辑文件。
+- 可通过 `--pi-execution-profile tools` 在使用默认命令时显式启用 `read,grep,find,ls,bash,edit,write` 工具，让 pi CLI 子进程具备可施工能力；默认 `discussion` 档不启用工具。
 - 当 pi 在中文能力/自我介绍问题上成功返回明显非中文、阿拉伯语语言标签或错误声称自己可读文件/执行命令时，通用 bridge 会把回复兜底替换为中文能力说明；正常中文回复或用户明确要求英文时不干预。
 - 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。
 - 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
-- 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留 `--no-context-files --no-tools --no-session` 等隔离参数和等价 `--system-prompt`；否则 pi 可能重新读取项目上下文或重新把自己当成 coding assistant。
+- 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留等价上下文、session、工具权限和 `--system-prompt` 边界；否则 pi 可能重新读取项目上下文、错误启用工具或重新把自己当成 coding assistant。
 
 ## 运行示例
 
@@ -98,6 +104,7 @@ Web UI 中发送：
 - 接入 SSE 流式输出。
 - 接入文档编辑锁协议，避免多个 Agent 同时写同一文件。
 - 增加双 Agent 最小回合验收脚本：同时启动 Codex / pi bridge，验证 `agent:codex` 与 `agent:pi` 可在 TALK 中完成一轮消息或任务往返。
+- 将 Discussion Session / Turn 状态接入 Web UI，显示多 Agent 讨论轮次、立场和升级仲裁提示。
 
 ## 验收点
 
@@ -114,3 +121,5 @@ Web UI 中发送：
 - [x] 通用 CLI bridge 在处理 Group Hall 消息时会把回复写回原 `group_id`，避免触发 `cannot_reply_to_different_group`。
 - [x] 通用 CLI bridge 已对 Windows 本地 CLI 输出做编码兜底和 `taskkill` 噪声过滤，避免 Codex 在线回复前出现乱码进程终止提示。
 - [x] pi bridge 默认通过极短 `--system-prompt` 放置身份/能力边界，并把用户 prompt 收敛为原文，避免包装文本干扰 pi 的自然回复。
+- [x] bridge 已支持 `talk-action` 动作协议：代发 `@agent:*`、记录 stance、两轮分歧升级给 human。
+- [x] pi bridge 默认保持讨论档，并提供显式 `--pi-execution-profile tools` 施工工具档。
