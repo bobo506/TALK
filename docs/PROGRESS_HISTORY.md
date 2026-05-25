@@ -6,6 +6,43 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-26 01:22 (Asia/Shanghai)
+### Current Progress
+- `DISCUSSION-FSM-TOKEN-SAFE-1` 已完成：按 `docs/p.drawio` 的有限状态机思路，为多 Agent 讨论加入安全动作协议、回合上限、最终答案动作和偏题抑制。
+- `bridges/cli_bridge.py` 现在同时解析旧 `<talk-action ...>` 与新 `TALK_ACTION ...` 安全行协议；新增 `final_to_human`，可发送最终答案给 human 并把 discussion 标为 `resolved`。
+- agent-to-agent 讨论默认最多 3 个自动 turn；最近一条为 `disagree` 时允许额外 1 个 turn。超限时 bridge 不再调用模型，直接 `@human:*` 请求最终判断并标记 `escalated`。
+- agent-to-agent prompt 注入极短讨论上下文：原始话题、当前阶段、剩余回合和 human 目标，并明确禁止引入项目、文档、版本号或施工档等无关话题。
+- bridge 会清理开头或结尾的孤立协议残片，例如 `mark_stance`、`update`、`动作已记录...`；模型只输出动作且来源是另一个 agent 时，不再额外发送默认回执。
+- `bridges/pi_bridge.py` 默认 system prompt 改为只教授 `TALK_ACTION` 安全行协议，继续避开 Windows `pi.cmd` 高风险命令元字符。
+- `tests/test_cli_bridge.py` 与 `tests/test_pi_bridge.py` 已补回归测试，覆盖安全行协议、`final_to_human`、协议残片清理、action-only agent 回执抑制、回合上限升级和 pi prompt 高风险字符限制。
+- `docs/MODULE_discussions.md` 与 `docs/MODULE_bridges.md` 已同步当前协议边界。
+### Open Questions / Pending Confirmation
+- 需要重启 codex bridge 与 pi bridge；旧进程不会自动加载新的协议解析、回合上限和 pi 默认 `--system-prompt`。
+- `docs/p.drawio` 是本次评估输入，未被本切片修改；当前仍是未跟踪文件，是否纳入仓库需后续由项目管理者确认。
+- Codex + pi 双 Agent 真实端到端讨论回合仍需人工验收，重点观察 pi 不再露出 `mark_stance`、讨论不再跑题、Codex 不再跟随偏题、自动回合数受限。
+### Next Plan
+1. 提交 `DISCUSSION-FSM-TOKEN-SAFE-1`。
+2. 重启 TALK server（如仍是旧进程）、codex bridge 与 pi bridge。
+3. 在 Group Hall 重试：`@agent:codex 帮我把“人类是怎么进化来的？”这个问题拿去问下@agent:pi，然后你们讨论下答案。`
+4. 验收达成共识后能 `final_to_human` 回给 human；若分歧或超限，则自动转 human 裁决。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，34 tests。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge tests.test_discussions` passed，37 tests。
+- 分批验证 passed：`tests.test_codex_bridge tests.test_groups tests.test_messages` 37 tests；`tests.test_files tests.test_healthz tests.test_instances tests.test_members_auth tests.test_tasks` 28 tests；`tests.test_encoding tests.test_setup` 6 tests；`tests.test_talk_client` 11 tests；`tests.test_sse` 6 tests。
+- `tests.test_websocket` 聚合运行在当前环境超时；已用逐用例 30s 超时脚本验证 `WebSocketTests` 10 个用例全部单独 passed。
+- `.venv\Scripts\python.exe -m unittest` 当前环境超时，未作为通过项记录。
+- `git diff --check` passed；仅提示 Windows 工作区后续可能将 LF 替换为 CRLF，无 whitespace error。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/MODULE_discussions.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-25 16:51 (Asia/Shanghai)
 ### Current Progress
 - `WEB-REPLY-COMPACT-1 / PI-CMD-METACHAR-HOTFIX-1` 已完成：优化多 Agent 讨论中的引用展示，并修复 pi 默认 prompt 在 Windows `pi.cmd` 启动链下被误解释为命令的问题。

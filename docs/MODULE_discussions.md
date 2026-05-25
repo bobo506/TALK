@@ -48,7 +48,16 @@
 
 ### Bridge 动作协议
 
-bridge 会从模型最终输出中解析并移除以下动作标签，执行 TALK 内动作后再把可见文本发回 Hall：
+bridge 会从模型最终输出中解析并移除动作指令，执行 TALK 内动作后再把可见文本发回 Hall。当前推荐使用无 Windows 高风险命令元字符的安全行协议：
+
+```text
+TALK_ACTION send_message to=agent:codex stance=question body=请给出下一步计划
+TALK_ACTION mark_stance stance=agree
+TALK_ACTION final_to_human to=human:bobo body=这是整理后的最终答案
+TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
+```
+
+为兼容已有 bridge 输出，旧 XML 标签仍可解析，但 pi 默认 system prompt 只教授安全行协议：
 
 ```text
 <talk-action type="send_message" to="agent:codex" stance="question">请给出下一步计划</talk-action>
@@ -58,8 +67,16 @@ bridge 会从模型最终输出中解析并移除以下动作标签，执行 TAL
 
 - `send_message`：在同一 Group Hall 里用当前 agent 身份发送 `@agent:*` 消息；若找不到 active discussion，会按当前 agent 和目标 agent 自动创建 session。
 - `mark_stance`：把 bridge 的可见回复记录为当前 discussion 的一个 turn。
+- `final_to_human`：把共识后的最终答案发送给指定 human，并把 discussion 标为 `resolved`。
 - `escalate_to_human`：向指定 human 发送仲裁请求，并把 discussion 标为 `escalated`。
-- 当最近两条 turn 都是不同 agent 的 `disagree`，bridge 会自动在同一 Hall `@human:*` 请求最终判断。
+- 当最近两条 turn 都是不同 agent 的 `disagree`，或自动讨论回合达到上限，bridge 会自动在同一 Hall `@human:*` 请求最终判断。
+
+### 有限状态控制
+
+- 讨论按 `question -> answer -> agree/optimize/disagree -> resolved/escalated` 推进，默认只允许 3 个自动 turn；最近一条为 `disagree` 时允许额外 1 个 turn 供对方回应。
+- agent-to-agent prompt 会注入极短讨论上下文：原始话题、当前阶段、剩余回合和 human 仲裁目标，并明确禁止引入与原始话题无关的项目、文档、版本号或施工档内容。
+- 当模型只输出动作且来源是另一个 agent 时，bridge 不再额外发送“已按讨论协议继续推进。”这类默认回执，避免无意义消息继续触发对方 bridge。
+- bridge 会清理开头或结尾的孤立协议残片，例如 `mark_stance`、`update`、`动作已记录...`，避免动作词泄漏到可见聊天正文。
 
 ### pi 权限档
 
@@ -82,4 +99,5 @@ bridge 会从模型最终输出中解析并移除以下动作标签，执行 TAL
 - [x] SDK 已提供 discussion 创建、查询、状态更新和 turn 追加 helper。
 - [x] bridge 可解析 `talk-action`，执行同 Hall 代发并写入 discussion turn。
 - [x] bridge 在两条连续不同 agent `disagree` 后自动升级给 human。
+- [x] bridge 已支持安全行协议、`final_to_human`、自动回合上限和 action-only 回执抑制。
 - [x] pi 默认保持讨论档，施工工具档必须显式启用。

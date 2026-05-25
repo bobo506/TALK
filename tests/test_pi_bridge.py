@@ -25,8 +25,11 @@ class PiBridgeTests(unittest.TestCase):
         self.assertIn("群聊参与者", system_prompt)
         self.assertIn("按用户语言自然回复", system_prompt)
         self.assertIn("默认讨论模式", system_prompt)
-        self.assertIn("talk-action", system_prompt)
-        for metachar in ("|", "<", ">", "&"):
+        self.assertIn("安全行协议", system_prompt)
+        self.assertIn("TALK_ACTION", system_prompt)
+        self.assertIn("final_to_human", system_prompt)
+        self.assertNotIn("talk-action", system_prompt)
+        for metachar in ("|", "/", "<", ">", "&"):
             self.assertNotIn(metachar, system_prompt)
 
     def test_parser_can_enable_pi_tools_profile_with_default_command(self):
