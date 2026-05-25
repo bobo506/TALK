@@ -26,6 +26,13 @@ RESPONSE_STYLE_INSTRUCTIONS = (
     "reply in one short sentence only, for example '<agent id> 在线。'. "
     "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
 )
+PI_CHAT_INSTRUCTIONS = (
+    "Answer the user's task naturally. Reply in the same language as the user's task; if the user asks for Chinese, "
+    "use Simplified Chinese. Do not prepend language tags such as '<Language: ...>'. "
+    "If asked what you can do or to introduce yourself, explain that you are a lightweight TALK chat member that can chat, "
+    "answer questions, break down tasks, and participate in TALK group collaboration. "
+    "In the default bridge mode, do not claim you can read project files, execute commands, edit files, or use tools.\n"
+)
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
@@ -33,6 +40,22 @@ DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
 PROMPT_TRANSPORTS = {"stdin", "argv"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
+CHINESE_REQUEST_MARKERS = ("中文", "汉语", "普通话", "简体中文", "用中文")
+ENGLISH_REQUEST_MARKERS = ("英文", "英语", "用英语", "用英文", "in english", "english")
+CAPABILITY_QUESTION_MARKERS = (
+    "哪些功能",
+    "有什么功能",
+    "你能做啥",
+    "你能做什么",
+    "你会什么",
+    "介绍下",
+    "介绍一下",
+    "自我介绍",
+    "功能",
+    "capabilit",
+    "what can you do",
+    "who are you",
+)
 WINDOWS_TASKKILL_EN_RE = re.compile(
     r"^SUCCESS:\s+The process with PID \d+ .* has been terminated\.$"
 )
@@ -128,6 +151,44 @@ def first_sentence(text: str, *, max_chars: int = 240) -> str:
     return compact
 
 
+def contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+
+def prefers_chinese(text: str) -> bool:
+    lowered = text.lower()
+    if any(marker in lowered for marker in ENGLISH_REQUEST_MARKERS):
+        return False
+    return contains_cjk(text) or any(marker in lowered for marker in CHINESE_REQUEST_MARKERS)
+
+
+def asks_capability_question(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in CAPABILITY_QUESTION_MARKERS)
+
+
+def pi_chinese_capability_reply() -> str:
+    return (
+        "我是 pi，TALK 里的轻量聊天成员。"
+        "我可以陪你聊天、回答问题、拆解任务，也可以在 Group Hall 里参与协作；"
+        "默认 bridge 模式下我不会读取项目文件、执行命令或调用工具。"
+    )
+
+
+def pi_chinese_language_fallback_reply() -> str:
+    return "我是 pi，已切换为中文回复。你可以继续告诉我想聊什么，或让我帮你拆解一个具体任务。"
+
+
+def normalize_pi_reply_language(task_text: str, reply: str) -> str:
+    if not prefers_chinese(task_text):
+        return reply
+    if contains_cjk(reply) and not reply.lstrip().lower().startswith("<language:"):
+        return reply
+    if asks_capability_question(task_text):
+        return pi_chinese_capability_reply()
+    return pi_chinese_language_fallback_reply()
+
+
 def decode_subprocess_output(data: bytes) -> str:
     if not data:
         return ""
@@ -214,7 +275,8 @@ def build_cli_prompt(
     if runtime.lower() == "pi" or member_id == "agent:pi":
         return (
             f"You are {member_id}, a TALK chat member.\n"
-            "Answer the user's task naturally. Keep the final response suitable for posting back into TALK.\n"
+            f"{PI_CHAT_INSTRUCTIONS}"
+            "Keep the final response suitable for posting back into TALK.\n"
             "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
             f"Sender: {sender}\n"
             f"TALK message id: {message_id}\n\n"
@@ -253,7 +315,8 @@ def build_cli_task_prompt(
     if runtime.lower() == "pi" or member_id == "agent:pi":
         return (
             f"You are {member_id}, a TALK chat member.\n"
-            "Answer the queued TALK task naturally. Keep the final response suitable for posting back into TALK.\n"
+            f"{PI_CHAT_INSTRUCTIONS}"
+            "Answer the queued TALK task. Keep the final response suitable for posting back into TALK.\n"
             "Do not mention internal bridge mechanics unless they are relevant to the task.\n\n"
             f"Task creator: {creator}\n"
             f"TALK task id: {task_id}\n"
@@ -402,6 +465,8 @@ async def handle_queued_task(
             bridge_label=bridge_label,
             force_one_sentence=wants_one_sentence(task_text),
         )
+        if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
+            reply = normalize_pi_reply_language(task_text, reply)
         completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
         if completion_status == "failed":
             last_error = reply
@@ -479,6 +544,8 @@ async def handle_incoming_message(
             bridge_label=bridge_label,
             force_one_sentence=wants_one_sentence(task_text),
         )
+        if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
+            reply = normalize_pi_reply_language(task_text, reply)
         await client.reply(int(message["id"]), text=reply, to=[sender], group_id=group_id)
         if report_status is not None:
             await report_status(

@@ -17,6 +17,7 @@ from bridges.cli_bridge import (
     format_cli_reply,
     handle_incoming_message,
     handle_queued_task,
+    normalize_pi_reply_language,
     resolve_command_executable,
     run_cli_command,
 )
@@ -78,8 +79,21 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertIn("TALK chat member", prompt)
         self.assertIn("Answer the user's task naturally", prompt)
+        self.assertIn("Reply in the same language", prompt)
+        self.assertIn("Simplified Chinese", prompt)
         self.assertIn("在吗", prompt)
         self.assertNotIn("Project root:", prompt)
+
+    def test_build_cli_prompt_for_pi_describes_default_capability_boundary(self):
+        prompt = build_cli_prompt({
+            "id": 40,
+            "from": "human:bobo",
+            "content": "@agent:pi 你好啊，你有哪些功能？用中文回复",
+        }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+
+        self.assertIn("lightweight TALK chat member", prompt)
+        self.assertIn("do not claim you can read project files", prompt)
+        self.assertIn("execute commands", prompt)
 
     def test_build_cli_prompt_includes_group_context_when_present(self):
         prompt = build_cli_prompt({
@@ -108,6 +122,33 @@ class CliBridgeTests(unittest.TestCase):
         )
 
         self.assertEqual(reply, "第一句。")
+
+    def test_normalize_pi_reply_language_replaces_non_chinese_capability_reply(self):
+        reply = normalize_pi_reply_language(
+            "你好啊，你有哪些功能？用中文回复",
+            "Hey there! I'm pi, powered by Claude. I can read files and execute commands.",
+        )
+
+        self.assertIn("我是 pi", reply)
+        self.assertIn("轻量聊天成员", reply)
+        self.assertIn("不会读取项目文件", reply)
+
+    def test_normalize_pi_reply_language_replaces_language_tagged_arabic_reply(self):
+        reply = normalize_pi_reply_language(
+            "你好啊，你有哪些功能？",
+            "<Language: ar> مرحباً! أنا pi.",
+        )
+
+        self.assertIn("我是 pi", reply)
+        self.assertIn("默认 bridge 模式", reply)
+
+    def test_normalize_pi_reply_language_keeps_requested_english_reply(self):
+        reply = normalize_pi_reply_language(
+            "请用英文介绍你有哪些功能",
+            "I can chat and help break down tasks.",
+        )
+
+        self.assertEqual(reply, "I can chat and help break down tasks.")
 
     def test_decode_subprocess_output_falls_back_to_windows_codepage(self):
         data = "成功: 已终止 PID 1 (属于 PID 2 子进程)的进程。".encode("gbk")
@@ -284,6 +325,63 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.replies, [(40, "group reply", ["human:bobo"], "group:lab")])
         self.assertEqual(statuses[0][0], "busy")
         self.assertEqual(statuses[-1][0], "idle")
+
+    def test_handle_incoming_message_normalizes_pi_chinese_capability_reply(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+        statuses = []
+
+        async def fake_report_status(status, **kwargs):
+            statuses.append((status, kwargs))
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            self.assertIn("Reply in the same language", prompt)
+            return CliRunResult(
+                returncode=0,
+                stdout="Hey there! I'm pi, powered by Claude. I can read files and execute commands.",
+                stderr="",
+            )
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:bobo",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi 你好啊，你有哪些功能？用中文回复",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                    report_status=fake_report_status,
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertIn("我是 pi", client.replies[0][1])
+        self.assertIn("不会读取项目文件", client.replies[0][1])
+        self.assertEqual(client.replies[0][3], "group:lab")
 
 
 if __name__ == "__main__":

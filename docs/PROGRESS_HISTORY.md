@@ -6,6 +6,35 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-25 11:16 (Asia/Shanghai)
+### Current Progress
+- `PI-LANGUAGE-REPLY-1` 验收期修复已完成：根据用户反馈，排查最近 Group Hall 消息，确认 `#38 -> #39` 为中文功能问题却返回 `<Language: ar>` 阿拉伯语；`#40 -> #41` 明确要求中文却返回英文，并误称自己能读文件、执行命令、编辑文件。
+- 根因判断：消息已正确写入同一个 Group Hall，路由和 `group_id` 回复不是问题；问题在于 pi 撤销命令级强 system prompt 后，TALK prompt 语言跟随约束不足，且缺少窄范围后处理来拦住明显跑语种/能力误述。
+- `bridges/cli_bridge.py` 新增 `PI_CHAT_INSTRUCTIONS`：pi 继续是自然聊天的 TALK chat member，但明确要求回复语言跟随用户任务；用户要求中文时使用简体中文；不要输出 `<Language: ...>` 标签；能力介绍只能描述轻量聊天、回答问题、拆解任务、参与 Group Hall 协作，不得声称默认 bridge 模式能读文件、执行命令、编辑文件或调用工具。
+- `bridges/cli_bridge.py` 新增 pi 成功输出后的中文归一化兜底：当中文任务/能力问题得到明显非中文回复或语言标签回复时，替换为中文能力说明；真实 CLI 失败或超时不做替换，避免遮盖错误。
+- `tests/test_cli_bridge.py` 新增回归覆盖：pi prompt 语言要求、能力边界、中文能力问题的非中文回复替换、阿拉伯语语言标签替换、明确要求英文时不误替换、Group Hall 中 pi 回复仍保留原 `group_id`。
+- `docs/MODULE_bridges.md` 已同步 pi 语言跟随与中文能力兜底边界；默认 `pi_bridge.py` 命令仍不使用 `--system-prompt`。
+### Open Questions / Pending Confirmation
+- 需要用户重启 pi bridge；正在运行的旧 pi bridge 不会自动加载本次修复。
+- 重启后建议验收：`@agent:pi 你好啊，你有哪些功能？`、`@agent:pi 你好啊，你有哪些功能？用中文回复`、`@agent:pi 请用英文介绍你有哪些功能`。
+- 旧消息 `#39` / `#41` 不会自动改写；本次修复只影响后续新回复。
+- `python -m unittest` discovery 在本轮环境中超时但无失败栈；显式模块列表全量 120 tests 已通过，后续可单独排查 discovery 阻塞原因。
+### Next Plan
+1. 提交本次 `PI-LANGUAGE-REPLY-1` 修复。
+2. 用户重启 pi bridge 后继续人工验收语言跟随和能力边界。
+3. 继续 Codex + pi 双 bridge 与 Web UI 视觉/交互联合验收。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge` passed，22 tests。
+- `.venv\Scripts\python.exe -u -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_encoding tests.test_files tests.test_groups tests.test_healthz tests.test_instances tests.test_members_auth tests.test_messages tests.test_pi_bridge tests.test_setup tests.test_sse tests.test_talk_client tests.test_tasks tests.test_websocket` passed，120 tests。
+- `.venv\Scripts\python.exe -m unittest` 超时 120 秒；`.venv\Scripts\python.exe -m unittest -v` 超时 300 秒，均未输出失败栈。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-24 22:15 (Asia/Shanghai)
 ### Current Progress
 - `PI-NATURAL-CHAT-1` 验收期修正已完成：按用户确认，将 pi 调整为“自然回答的 TALK 聊天成员”，不再用强 system prompt 或 bridge 弱回复替换限制它的回答风格。
