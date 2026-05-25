@@ -6,6 +6,28 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-25 16:21 (Asia/Shanghai)
+### Current Progress
+- `DISCUSSION-PROTOCOL-1-HOTFIX-1` 已完成：修复 bridge 在 `/api/discussions` 返回 404 时直接抛 `TalkNotFoundError` 的问题。
+- 根因：用户实际验收时 codex bridge 已尝试执行 `talk-action`，但 TALK server 可能仍是旧进程或尚未加载 `server/routes/discussions.py`，导致 SDK 在 `client.list_discussions(...)` 处收到 404。
+- `bridges/cli_bridge.py` 现在将 discussion API 的 404 视为“讨论记录暂不可用”，跳过 session/turn 写入，但继续执行 `send_message` 代发、可见回复和其它可完成动作。
+- `tests/test_cli_bridge.py` 新增 discussion API 缺失时仍能代发 `@agent:*` 且不崩溃的回归测试。
+### Open Questions / Pending Confirmation
+- 仍建议重启 TALK server、codex bridge、pi bridge，让 server API 与 bridge 协议版本一致；否则可以代发，但不会记录 discussion turn。
+### Next Plan
+1. 提交 hotfix。
+2. 重启服务与 bridge 后重试用户原句：`@agent:codex 帮我把“人类是怎么进化来的？”这个问题拿去问下@agent:pi，然后你们讨论下答案。`
+3. 观察 Group Hall 是否出现 codex 代发给 pi 的 `@agent:pi ...` 消息，以及 `/api/discussions` 是否记录 session/turn。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_discussions tests.test_pi_bridge` passed，31 tests。
+- `git diff --check` passed；仅提示 Windows 工作区后续可能将 LF 替换为 CRLF，无 whitespace error。
+### Changed Files
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-25 16:10 (Asia/Shanghai)
 ### Current Progress
 - `DISCUSSION-PROTOCOL-1` 已完成：新增可记录多 Agent 讨论协议，Discussion Session / Turn 结构化记录讨论参与者、顺序、立场和轮次。

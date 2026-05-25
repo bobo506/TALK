@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from bridges import cli_bridge
+from TALK.client.exceptions import TalkNotFoundError
 from bridges.cli_bridge import (
     CliRunResult,
     build_cli_prompt,
@@ -425,6 +426,69 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.created_discussions[0][2], ["agent:pi", "agent:codex"])
         self.assertEqual(client.turns, [(7, 42, "question", "agent:codex", 1)])
         self.assertEqual(client.replies, [(40, "我去问 codex。", ["human:bobo"], "group:lab")])
+
+    def test_send_message_action_degrades_when_discussion_api_is_missing(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 42}
+
+            async def list_discussions(self, *, group_id=None):
+                raise TalkNotFoundError("Not Found", status_code=404)
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2):
+                raise TalkNotFoundError("Not Found", status_code=404)
+
+            async def append_discussion_turn(self, discussion_id, *, message_id, stance, target_member_id=None, round_index=1):
+                raise AssertionError("append_discussion_turn should not be called without a discussion id")
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(
+                returncode=0,
+                stdout='<talk-action type="send_message" to="agent:codex" stance="question">请问 pi 的问题</talk-action>',
+                stderr="",
+            )
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:bobo",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi 去问 codex",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@agent:codex 请问 pi 的问题", ["agent:codex"], 40, "group:lab")])
+        self.assertEqual(client.replies, [(40, "已按讨论协议继续推进。", ["human:bobo"], "group:lab")])
 
     def test_handle_incoming_message_escalates_after_two_disagree_turns(self):
         class FakeClient:

@@ -278,6 +278,10 @@ def _discussion_participants(*member_ids: str | None) -> list[str]:
     return list(dict.fromkeys(member_id for member_id in member_ids if member_id))
 
 
+def _is_talk_not_found(exc: Exception) -> bool:
+    return getattr(exc, "status_code", None) == 404
+
+
 async def _resolve_discussion_id(
     client: Any,
     *,
@@ -295,6 +299,10 @@ async def _resolve_discussion_id(
         discussions = await client.list_discussions(group_id=group_id)
     except AttributeError:
         return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
 
     for discussion in discussions:
         participants = set(discussion.get("participant_ids") or [])
@@ -304,12 +312,17 @@ async def _resolve_discussion_id(
     if not create_if_missing:
         return None
 
-    created = await client.create_discussion(
-        group_id,
-        topic,
-        _discussion_participants(member_id, peer_id),
-        max_rounds=max_rounds,
-    )
+    try:
+        created = await client.create_discussion(
+            group_id,
+            topic,
+            _discussion_participants(member_id, peer_id),
+            max_rounds=max_rounds,
+        )
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
     return int(created["id"])
 
 
@@ -335,6 +348,10 @@ async def _append_discussion_turn(
         return True
     except AttributeError:
         return False
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return False
+        raise
 
 
 def _last_two_turns_disagree(turns: list[dict[str, Any]]) -> bool:
@@ -355,6 +372,10 @@ async def _find_human_reviewer(client: Any, group_id: str | None) -> str | None:
         group = await client.get_group(group_id)
     except AttributeError:
         return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
     for member in group.get("members") or []:
         member_id = str(member.get("member_id") or "")
         if member_id.startswith("human:"):
@@ -375,6 +396,10 @@ async def _maybe_escalate_disagreement(
         turns = await client.list_discussion_turns(discussion_id)
     except AttributeError:
         return
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return
+        raise
     if not _last_two_turns_disagree(turns):
         return
 
@@ -395,6 +420,9 @@ async def _maybe_escalate_disagreement(
         await client.update_discussion(discussion_id, status="escalated")
     except AttributeError:
         pass
+    except Exception as exc:
+        if not _is_talk_not_found(exc):
+            raise
 
 
 async def execute_talk_actions(
@@ -464,6 +492,9 @@ async def execute_talk_actions(
                     await client.update_discussion(discussion_id, status="escalated")
                 except AttributeError:
                     pass
+                except Exception as exc:
+                    if not _is_talk_not_found(exc):
+                        raise
             summaries.append(f"escalated to {target}")
     return summaries
 
