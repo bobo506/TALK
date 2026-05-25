@@ -77,6 +77,7 @@ pi --print --mode text --no-context-files --no-tools --no-session --thinking off
 - pi 的 TALK prompt 现在只传去掉 `@agent:pi` 后的用户原文；队列任务默认只传 `content`，有 `title` 时传 `标题：<title>\n\n<content>`。
 - pi prompt 不再包含 `用户消息`、`回复要求`、`Sender`、`TALK message id` 或 `TALK group id` 等包装文本；但 bridge 回复仍会保留原消息 `group_id`，确保 Group Hall 回复写回同一个 Hall。
 - 默认 system prompt 要求 pi 是 TALK Group Hall 参与者，可与人类和其他 agent 交流、评审方案、提出优化/分歧，并在需要时输出 `talk-action`；默认讨论模式下不声称能读取项目文件、执行命令或编辑文件。
+- 默认 system prompt 不再包含原始 `<talk-action ...>` 示例和 `agree|optimize|...` 竖线写法，避免 Windows 下 `pi.cmd` 启动链把 `| / < / > / &` 等字符解释成命令管道或重定向，导致 `'optimize' 不是内部或外部命令` 这类错误。
 - 可通过 `--pi-execution-profile tools` 在使用默认命令时显式启用 `read,grep,find,ls,bash,edit,write` 工具，让 pi CLI 子进程具备可施工能力；默认 `discussion` 档不启用工具。
 - 当 pi 在中文能力/自我介绍问题上成功返回明显非中文、阿拉伯语语言标签或错误声称自己可读文件/执行命令时，通用 bridge 会把回复兜底替换为中文能力说明；正常中文回复或用户明确要求英文时不干预。
 - 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。

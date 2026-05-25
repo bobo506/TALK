@@ -6,6 +6,41 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-25 16:51 (Asia/Shanghai)
+### Current Progress
+- `WEB-REPLY-COMPACT-1 / PI-CMD-METACHAR-HOTFIX-1` 已完成：优化多 Agent 讨论中的引用展示，并修复 pi 默认 prompt 在 Windows `pi.cmd` 启动链下被误解释为命令的问题。
+- `web/app.js` 的回复引用渲染现在会区分双方互相回复与引用第三方：双方互相回复显示 `A 回复 B` 短文本；引用第三方仍保留原引用框和预览。
+- `web/style.css` 新增紧凑引用条样式，去掉大背景与左边框，仅保留小号灰色文本，并继续支持已加载原消息的点击跳转。
+- `web/index.html` 静态资源版本号更新为 `20260525-reply-compact`，避免浏览器继续拿旧 CSS/JS。
+- `bridges/pi_bridge.py` 默认 system prompt 移除原始 `<talk-action ...>` 示例、`agree|optimize|...` 竖线写法和 Windows 高风险命令元字符，避免 `pi.cmd` 把 prompt 当作管道/重定向语法解析。
+- `tests/test_pi_bridge.py` 新增默认 prompt 不包含 `| / < / > / &` 的回归断言。
+- `docs/MODULE_webui.md` 与 `docs/MODULE_bridges.md` 已同步本次行为边界。
+### Open Questions / Pending Confirmation
+- 需要重启 pi bridge；正在运行的旧 pi 进程不会自动加载新的默认 `--system-prompt`。
+- Web UI 刷新页面即可加载新静态资源；若仍看到旧引用框，先强制刷新浏览器缓存。
+- Codex + pi 双 Agent 真实端到端讨论回合仍需人工验收，重点观察 codex 代发给 pi、pi 回复不再出现 `optimize` 命令错误、双方互相回复时引用条是否紧凑。
+### Next Plan
+1. 提交本次 hotfix。
+2. 重启 pi bridge；必要时一并重启 TALK server 与 codex bridge，确保 server API、bridge 协议和前端资源同版。
+3. 重试用户原句：`@agent:codex 帮我把“人类是怎么进化来的？”这个问题拿去问下@agent:pi，然后你们讨论下答案。`
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\pi_bridge.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_pi_bridge tests.test_cli_bridge` passed，28 tests。
+- `node --check web\app.js` passed。
+- `.venv\Scripts\python.exe -m unittest` passed，129 tests。
+- `git diff --check` passed；仅提示 Windows 工作区后续可能将 LF 替换为 CRLF，无 whitespace error。
+- Browser / in-app browser：已打开 `http://127.0.0.1:8000/` 并确认页面加载 `style.css?v=20260525-reply-compact` 与 `app.js?v=20260525-reply-compact`；受当前 browser 安全/只读执行环境限制，未能构造临时消息样例做视觉断言。
+### Changed Files
+- `bridges/pi_bridge.py`
+- `tests/test_pi_bridge.py`
+- `web/app.js`
+- `web/style.css`
+- `web/index.html`
+- `docs/MODULE_bridges.md`
+- `docs/MODULE_webui.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
 ## 2026-05-25 16:21 (Asia/Shanghai)
 ### Current Progress
 - `DISCUSSION-PROTOCOL-1-HOTFIX-1` 已完成：修复 bridge 在 `/api/discussions` 返回 404 时直接抛 `TalkNotFoundError` 的问题。

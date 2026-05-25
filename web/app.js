@@ -1437,7 +1437,7 @@ function createMessageElement(m) {
   header.textContent = `${shortName(m.from)}  ${time}`;
 
   div.appendChild(header);
-  const replyRef = renderReplyReference(m.reply_to);
+  const replyRef = renderReplyReference(m.reply_to, m);
   if (replyRef) {
     div.appendChild(replyRef);
   }
@@ -1502,11 +1502,15 @@ function renderMessageActions(message) {
   return actions;
 }
 
-function renderReplyReference(replyTo) {
+function renderReplyReference(replyTo, message = null) {
   if (!replyTo || !replyTo.id) return null;
 
   const reply = document.createElement("div");
   reply.className = "message-reply";
+  const compact = shouldUseCompactReplyReference(replyTo, message);
+  if (compact) {
+    reply.classList.add("compact");
+  }
   const targetLoaded = Boolean(document.getElementById("msg-" + replyTo.id));
   if (targetLoaded) {
     reply.classList.add("clickable");
@@ -1514,10 +1518,17 @@ function renderReplyReference(replyTo) {
     reply.addEventListener("click", () => jumpToMessage(replyTo.id));
   }
 
+  if (compact) {
+    const summary = document.createElement("div");
+    summary.className = "message-reply-summary";
+    summary.textContent = `${shortName(message.from || "unknown")} 回复 ${shortName(replyTo.from_id || "unknown")}`;
+    reply.appendChild(summary);
+    return reply;
+  }
+
   const label = document.createElement("div");
   label.className = "message-reply-label";
   label.textContent = shortName(replyTo.from_id || "unknown");
-
   const preview = document.createElement("div");
   preview.className = "message-reply-preview";
   preview.textContent = replyPreviewText(replyTo);
@@ -1525,6 +1536,17 @@ function renderReplyReference(replyTo) {
   reply.appendChild(label);
   reply.appendChild(preview);
   return reply;
+}
+
+function shouldUseCompactReplyReference(replyTo, message) {
+  if (!replyTo || !message || !message.from || !replyTo.from_id) return false;
+  if (message.from === replyTo.from_id) return false;
+
+  const recipients = Array.isArray(message.to) ? message.to : null;
+  if (!recipients || recipients.length === 0) {
+    return true;
+  }
+  return recipients.includes(replyTo.from_id);
 }
 
 function replyPreviewText(replyTo) {
