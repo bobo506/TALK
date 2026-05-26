@@ -84,6 +84,15 @@ SAFE_ACTION_ATTR_RE = re.compile(r"\b([a-zA-Z_][\w-]*)=([^\s]+)")
 ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human", "final_to_human"}
 ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate"}
 DISCUSSION_MAX_AUTO_TURNS = 3
+INTERNAL_SCOPE_MARKERS = (
+    "discussion_id",
+    "root_message_id",
+    "requester_id",
+    "assignee_id",
+    "scope_text",
+    "TALK_SCOPE",
+    "控制上下文",
+)
 
 
 @dataclass(frozen=True)
@@ -103,6 +112,13 @@ class TalkAction:
     stance: str | None = None
     discussion_id: int | None = None
     round_index: int | None = None
+
+
+@dataclass(frozen=True)
+class DiscussionScopeContext:
+    discussion: dict[str, Any] | None
+    turns: list[dict[str, Any]]
+    closed: bool = False
 
 
 def member_id_from_name(name: str) -> str:
@@ -221,6 +237,17 @@ def normalize_pi_reply_language(task_text: str, reply: str) -> str:
     return pi_chinese_language_fallback_reply()
 
 
+def contains_internal_scope_marker(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker.lower() in lowered for marker in INTERNAL_SCOPE_MARKERS)
+
+
+def sanitize_scope_leak(text: str) -> str:
+    if not contains_internal_scope_marker(text):
+        return text
+    return "我需要先确认当前请求范围后再继续。"
+
+
 def _parse_action_attrs(raw_attrs: str) -> dict[str, str]:
     return {match.group(1).replace("-", "_").lower(): html.unescape(match.group(3)).strip() for match in ACTION_ATTR_RE.finditer(raw_attrs)}
 
@@ -336,8 +363,62 @@ def _discussion_participants(*member_ids: str | None) -> list[str]:
     return list(dict.fromkeys(member_id for member_id in member_ids if member_id))
 
 
+def _message_id(message: dict[str, Any]) -> int | None:
+    raw_id = message.get("id")
+    if raw_id is None:
+        return None
+    try:
+        return int(raw_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _message_reply_to_id(message: dict[str, Any]) -> int | None:
+    raw_reply_to = message.get("reply_to")
+    if isinstance(raw_reply_to, dict):
+        raw_reply_to = raw_reply_to.get("id")
+    if raw_reply_to is None:
+        return None
+    try:
+        return int(raw_reply_to)
+    except (TypeError, ValueError):
+        return None
+
+
 def _is_talk_not_found(exc: Exception) -> bool:
     return getattr(exc, "status_code", None) == 404
+
+
+async def _create_discussion(
+    client: Any,
+    group_id: str,
+    topic: str,
+    participant_ids: list[str],
+    *,
+    root_message_id: int | None = None,
+    requester_id: str | None = None,
+    assignee_id: str | None = None,
+    scope_text: str | None = None,
+    max_rounds: int = 2,
+) -> dict[str, Any]:
+    try:
+        return await client.create_discussion(
+            group_id,
+            topic,
+            participant_ids,
+            root_message_id=root_message_id,
+            requester_id=requester_id,
+            assignee_id=assignee_id,
+            scope_text=scope_text,
+            max_rounds=max_rounds,
+        )
+    except TypeError:
+        return await client.create_discussion(
+            group_id,
+            topic,
+            participant_ids,
+            max_rounds=max_rounds,
+        )
 
 
 async def _resolve_discussion_id(
@@ -348,6 +429,10 @@ async def _resolve_discussion_id(
     peer_id: str | None,
     topic: str,
     create_if_missing: bool,
+    root_message_id: int | None = None,
+    requester_id: str | None = None,
+    assignee_id: str | None = None,
+    scope_text: str | None = None,
     max_rounds: int = 2,
 ) -> int | None:
     if not group_id or not peer_id:
@@ -363,18 +448,29 @@ async def _resolve_discussion_id(
         raise
 
     for discussion in discussions:
+        if root_message_id is not None and discussion.get("root_message_id") is not None:
+            try:
+                if int(discussion["root_message_id"]) == root_message_id:
+                    return int(discussion["id"])
+            except (TypeError, ValueError):
+                pass
         participants = set(discussion.get("participant_ids") or [])
-        if discussion.get("status") == "active" and {member_id, peer_id}.issubset(participants):
+        if root_message_id is None and discussion.get("status") == "active" and {member_id, peer_id}.issubset(participants):
             return int(discussion["id"])
 
     if not create_if_missing:
         return None
 
     try:
-        created = await client.create_discussion(
+        created = await _create_discussion(
+            client,
             group_id,
             topic,
             _discussion_participants(member_id, peer_id),
+            root_message_id=root_message_id,
+            requester_id=requester_id,
+            assignee_id=assignee_id,
+            scope_text=scope_text,
             max_rounds=max_rounds,
         )
     except Exception as exc:
@@ -514,6 +610,119 @@ async def _active_discussion_for_peer(
     return None
 
 
+async def _discussion_for_message_id(
+    client: Any,
+    *,
+    group_id: str | None,
+    message_id: int | None,
+) -> dict[str, Any] | None:
+    if not group_id or message_id is None:
+        return None
+    try:
+        discussions = await client.list_discussions(group_id=group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
+
+    for discussion in discussions:
+        try:
+            if discussion.get("root_message_id") is not None and int(discussion["root_message_id"]) == message_id:
+                return discussion
+        except (TypeError, ValueError):
+            pass
+
+    for discussion in discussions:
+        discussion_id = discussion.get("id")
+        if discussion_id is None:
+            continue
+        turns = await _list_discussion_turns(client, int(discussion_id))
+        for turn in turns:
+            try:
+                if int(turn.get("message_id")) == message_id:
+                    return discussion
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+async def _discussion_scope_for_incoming_agent_message(
+    client: Any,
+    *,
+    group_id: str | None,
+    member_id: str,
+    sender_id: str,
+    message: dict[str, Any],
+    task_text: str,
+) -> DiscussionScopeContext:
+    reply_discussion = await _discussion_for_message_id(
+        client,
+        group_id=group_id,
+        message_id=_message_reply_to_id(message),
+    )
+    if reply_discussion is not None:
+        turns = await _list_discussion_turns(client, int(reply_discussion["id"]))
+        return DiscussionScopeContext(
+            discussion=reply_discussion,
+            turns=turns,
+            closed=reply_discussion.get("status") != "active",
+        )
+
+    root_discussion = await _discussion_for_message_id(
+        client,
+        group_id=group_id,
+        message_id=_message_id(message),
+    )
+    if root_discussion is not None:
+        turns = await _list_discussion_turns(client, int(root_discussion["id"]))
+        return DiscussionScopeContext(
+            discussion=root_discussion,
+            turns=turns,
+            closed=root_discussion.get("status") != "active",
+        )
+
+    legacy_discussion = await _active_discussion_for_peer(
+        client,
+        group_id=group_id,
+        member_id=member_id,
+        peer_id=sender_id,
+    )
+    if legacy_discussion is not None and legacy_discussion.get("root_message_id") is None:
+        turns = await _list_discussion_turns(client, int(legacy_discussion["id"]))
+        return DiscussionScopeContext(discussion=legacy_discussion, turns=turns)
+
+    discussion_id = await _resolve_discussion_id(
+        client,
+        group_id=group_id,
+        member_id=sender_id,
+        peer_id=member_id,
+        topic=_discussion_topic_from_text(task_text),
+        create_if_missing=group_id is not None,
+        root_message_id=_message_id(message),
+        requester_id=sender_id,
+        assignee_id=member_id,
+        scope_text=task_text,
+    )
+    discussion = None
+    if discussion_id is not None:
+        try:
+            discussion = await client.get_discussion(discussion_id)
+        except AttributeError:
+            discussion = {
+                "id": discussion_id,
+                "status": "active",
+                "topic": _discussion_topic_from_text(task_text),
+                "participant_ids": [sender_id, member_id],
+                "root_message_id": _message_id(message),
+                "requester_id": sender_id,
+                "assignee_id": member_id,
+                "scope_text": task_text,
+            }
+    return DiscussionScopeContext(discussion=discussion, turns=[])
+
+
 async def _list_discussion_turns(client: Any, discussion_id: int | None) -> list[dict[str, Any]]:
     if discussion_id is None:
         return []
@@ -531,21 +740,40 @@ def _discussion_context_text(
     discussion: dict[str, Any] | None,
     turns: list[dict[str, Any]],
     *,
+    current_message_id: int | None,
+    current_message_text: str,
+    responder_id: str,
+    direct_requester_id: str | None,
     human_id: str | None,
 ) -> str:
     if not discussion:
         return ""
     topic = str(discussion.get("topic") or "当前讨论").strip()
+    scope_text = str(discussion.get("scope_text") or topic).strip()
+    requester_id = str(discussion.get("requester_id") or direct_requester_id or "unknown")
+    assignee_id = str(discussion.get("assignee_id") or responder_id)
+    discussion_id = discussion.get("id")
+    root_message_id = discussion.get("root_message_id")
     latest = turns[-1].get("stance") if turns else "question"
     remaining = max(0, DISCUSSION_MAX_AUTO_TURNS - len(turns))
     human_hint = human_id or "human:bobo"
     return (
-        "TALK 讨论上下文："
-        f"原始话题是“{topic}”。"
-        f"当前阶段是 {latest}，自动回合剩余 {remaining}。"
-        f"只围绕原始话题回复，不要引入项目、文档、版本号或施工档等无关内容。"
-        f"达成共识时用 TALK_ACTION final_to_human to={human_hint} body=最终答案。"
-        f"需要人类裁决时用 TALK_ACTION escalate_to_human to={human_hint} body=裁决问题。"
+        "TALK 控制上下文，以下内容只用于约束回复，不要在可见回复中复述字段名或 ID：\n"
+        f"discussion_id: {discussion_id}\n"
+        f"root_message_id: {root_message_id}\n"
+        f"current_message_id: {current_message_id}\n"
+        f"requester_id: {requester_id}\n"
+        f"assignee_id: {assignee_id}\n"
+        f"responder_id: {responder_id}\n"
+        f"scope_text: {scope_text}\n"
+        f"current_message_text: {current_message_text}\n"
+        f"current_stage: {latest}\n"
+        f"remaining_auto_turns: {remaining}\n"
+        "回复必须服务于 requester_id 在 scope_text/current_message_text 中提出的当前请求。"
+        "可以补充必要上下文、指出风险或提出确认问题，但不能把话题迁移到无关任务。"
+        "如果想引申但不确定是否仍在范围内，先向 requester_id 追问确认。"
+        "不要展示 discussion_id、root_message_id、requester_id、assignee_id、scope_text、TALK_SCOPE 或控制上下文。"
+        f"确需向人类裁决时用 TALK_ACTION escalate_to_human to={human_hint} body=裁决问题。"
     )
 
 
@@ -592,19 +820,35 @@ async def execute_talk_actions(
             if not target or not target.startswith("agent:"):
                 summaries.append("send_message skipped: target must be an agent member")
                 continue
-            if not action.body:
+            action_body = sanitize_scope_leak(action.body)
+            if not action_body:
                 summaries.append("send_message skipped: message body is empty")
                 continue
-            text = f"@{target} {action.body}".strip()
-            discussion_id = action.discussion_id or await _resolve_discussion_id(
-                client,
-                group_id=group_id,
-                member_id=member_id,
-                peer_id=target,
-                topic=_discussion_topic_from_text(task_text),
-                create_if_missing=True,
-            )
+            text = f"@{target} {action_body}".strip()
             sent = await client.send_text(text, to=[target], reply_to=source_message_id, group_id=group_id)
+            discussion_id = action.discussion_id
+            if discussion_id is None and str(source_message.get("from") or "").startswith("agent:"):
+                discussion_id = await _resolve_discussion_id(
+                    client,
+                    group_id=group_id,
+                    member_id=member_id,
+                    peer_id=target,
+                    topic=_discussion_topic_from_text(task_text),
+                    create_if_missing=False,
+                )
+            if discussion_id is None:
+                discussion_id = await _resolve_discussion_id(
+                    client,
+                    group_id=group_id,
+                    member_id=member_id,
+                    peer_id=target,
+                    topic=_discussion_topic_from_text(action_body or task_text),
+                    create_if_missing=True,
+                    root_message_id=int(sent["id"]) if sent and sent.get("id") is not None else source_message_id,
+                    requester_id=member_id,
+                    assignee_id=target,
+                    scope_text=action_body,
+                )
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
@@ -620,6 +864,7 @@ async def execute_talk_actions(
             if not target or not target.startswith("human:"):
                 summaries.append("escalate_to_human skipped: target must be a human member")
                 continue
+            action_body = sanitize_scope_leak(action.body or "请你做最终判断。")
             discussion_id = action.discussion_id or await _resolve_discussion_id(
                 client,
                 group_id=group_id,
@@ -629,7 +874,7 @@ async def execute_talk_actions(
                 create_if_missing=False,
             )
             sent = await client.send_text(
-                f"@{target} {action.body or '请你做最终判断。'}".strip(),
+                f"@{target} {action_body}".strip(),
                 to=[target],
                 reply_to=source_message_id,
                 group_id=group_id,
@@ -650,7 +895,8 @@ async def execute_talk_actions(
             if not target or not target.startswith("human:"):
                 summaries.append("final_to_human skipped: target must be a human member")
                 continue
-            if not action.body:
+            action_body = sanitize_scope_leak(action.body)
+            if not action_body:
                 summaries.append("final_to_human skipped: message body is empty")
                 continue
             discussion_id = action.discussion_id or await _resolve_discussion_id(
@@ -662,7 +908,7 @@ async def execute_talk_actions(
                 create_if_missing=False,
             )
             sent = await client.send_text(
-                f"@{target} {action.body}".strip(),
+                f"@{target} {action_body}".strip(),
                 to=[target],
                 reply_to=source_message_id,
                 group_id=group_id,
@@ -1010,14 +1256,21 @@ async def handle_incoming_message(
         turns: list[dict[str, Any]] = []
         discussion_context = ""
         if sender_id.startswith("agent:") and group_id:
-            discussion = await _active_discussion_for_peer(
+            scope_context = await _discussion_scope_for_incoming_agent_message(
                 client,
                 group_id=group_id,
                 member_id=member_id,
-                peer_id=sender_id,
+                sender_id=sender_id,
+                message=message,
+                task_text=task_text,
             )
+            if scope_context.closed:
+                if report_status is not None:
+                    await report_status("idle")
+                return
+            discussion = scope_context.discussion
+            turns = scope_context.turns
             discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None
-            turns = await _list_discussion_turns(client, discussion_id)
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
             allowed_turns = DISCUSSION_MAX_AUTO_TURNS + (1 if latest_stance == "disagree" else 0)
             if discussion_id is not None and len(turns) >= allowed_turns:
@@ -1034,6 +1287,10 @@ async def handle_incoming_message(
             discussion_context = _discussion_context_text(
                 discussion,
                 turns,
+                current_message_id=_message_id(message),
+                current_message_text=task_text,
+                responder_id=member_id,
+                direct_requester_id=sender_id,
                 human_id=await _find_human_reviewer(client, group_id),
             )
 
@@ -1060,6 +1317,7 @@ async def handle_incoming_message(
         if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
             reply = normalize_pi_reply_language(task_text, reply)
         visible_reply, actions = parse_talk_actions(reply)
+        visible_reply = sanitize_scope_leak(visible_reply)
         await execute_talk_actions(
             actions,
             client=client,
@@ -1083,6 +1341,15 @@ async def handle_incoming_message(
         if should_post_reply:
             reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
             reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
+        if sender_id.startswith("agent:") and discussion and not mark_actions and reply_message_id is not None:
+            await _append_discussion_turn(
+                client,
+                discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
+                message_id=reply_message_id,
+                stance="answer",
+                target_member_id=sender_id,
+                round_index=1,
+            )
         for action in mark_actions:
             peer_id = action.target_member_id or str(sender)
             existing_discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None

@@ -33,7 +33,10 @@
 - `final_to_human` 动作用于把达成共识后的最终答案发送给 human，并将 discussion 标为 `resolved`。
 - `escalate_to_human` 动作可显式向指定 `human:*` 成员发起仲裁，并将 discussion 标记为 `escalated`。
 - agent-to-agent 讨论现在默认最多 3 个自动 turn；最近一条为 `disagree` 时允许额外 1 个 turn。超限后 bridge 不再调用模型，而是直接升级给 human。
-- agent-to-agent prompt 会注入极短讨论上下文，约束模型只围绕原始话题回答，避免把 docs、版本号或施工档等无关上下文卷入讨论。
+- agent-to-agent prompt 会注入“请求者局部范围”控制上下文，约束模型只围绕当前直接提问/派活者的请求回答，避免把 docs、版本号、施工档或其它无关上下文卷入讨论。
+- 控制上下文包含 `discussion_id / root_message_id / requester_id / assignee_id / scope_text` 等字段，只用于约束模型；bridge 会拦截这些内部字段泄漏到可见回复。
+- bridge 会优先沿 `reply_to` / `root_message_id` 复用 discussion scope；已结束 scope 不会因为普通 agent 回复继续触发模型续聊。
+- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会按 `answer` 记录 turn。
 - 当模型只输出动作且来源是另一个 agent 时，bridge 不再额外发送默认回执，避免 action-only 回执继续触发对方 bridge。
 
 运行示例：
@@ -127,4 +130,5 @@ Web UI 中发送：
 - [x] 通用 CLI bridge 已对 Windows 本地 CLI 输出做编码兜底和 `taskkill` 噪声过滤，避免 Codex 在线回复前出现乱码进程终止提示。
 - [x] pi bridge 默认通过极短 `--system-prompt` 放置身份/能力边界，并把用户 prompt 收敛为原文，避免包装文本干扰 pi 的自然回复。
 - [x] bridge 已支持安全行动作协议：代发 `@agent:*`、记录 stance、发送最终答案、回合上限与升级 human。
+- [x] bridge 已支持请求者局部范围约束：scope 记录、reply/root 复用、已结束 scope 停止续聊和内部字段泄漏拦截。
 - [x] pi bridge 默认保持讨论档，并提供显式 `--pi-execution-profile tools` 施工工具档。

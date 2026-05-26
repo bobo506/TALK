@@ -145,6 +145,10 @@ class DiscussionSession(SQLModel, table=True):
     created_by: str = Field(foreign_key="members.id", index=True)
     topic: str
     participant_ids: str
+    root_message_id: Optional[int] = Field(default=None, foreign_key="messages.id", index=True)
+    requester_id: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
+    assignee_id: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
+    scope_text: Optional[str] = None
     status: str = Field(default="active", index=True)
     max_rounds: int = 2
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -358,6 +362,10 @@ class DiscussionSessionCreate(BaseModel):
     group_id: str
     topic: str
     participant_ids: list[str]
+    root_message_id: Optional[int] = None
+    requester_id: Optional[str] = None
+    assignee_id: Optional[str] = None
+    scope_text: Optional[str] = None
     max_rounds: int = 2
 
     @model_validator(mode="after")
@@ -365,12 +373,20 @@ class DiscussionSessionCreate(BaseModel):
         self.group_id = self.group_id.strip()
         self.topic = self.topic.strip()
         self.participant_ids = list(dict.fromkeys(member_id.strip() for member_id in self.participant_ids if member_id.strip()))
+        if self.requester_id is not None:
+            self.requester_id = self.requester_id.strip() or None
+        if self.assignee_id is not None:
+            self.assignee_id = self.assignee_id.strip() or None
+        if self.scope_text is not None:
+            self.scope_text = self.scope_text.strip() or None
         if not self.group_id:
             raise ValueError("group_id is required")
         if not self.topic:
             raise ValueError("topic is required")
         if not self.participant_ids:
             raise ValueError("participant_ids is required")
+        if self.root_message_id is not None and self.root_message_id <= 0:
+            raise ValueError("root_message_id must be greater than 0")
         if self.max_rounds <= 0:
             raise ValueError("max_rounds must be greater than 0")
         return self
@@ -393,6 +409,10 @@ class DiscussionSessionOut(BaseModel):
     created_by: str
     topic: str
     participant_ids: list[str]
+    root_message_id: Optional[int]
+    requester_id: Optional[str]
+    assignee_id: Optional[str]
+    scope_text: Optional[str]
     status: str
     max_rounds: int
     created_at: datetime
@@ -406,6 +426,10 @@ class DiscussionSessionOut(BaseModel):
             created_by=session.created_by,
             topic=session.topic,
             participant_ids=session.participant_list,
+            root_message_id=session.root_message_id,
+            requester_id=session.requester_id,
+            assignee_id=session.assignee_id,
+            scope_text=session.scope_text,
             status=session.status,
             max_rounds=session.max_rounds,
             created_at=session.created_at,

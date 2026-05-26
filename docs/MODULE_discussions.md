@@ -24,6 +24,10 @@
 - `created_by`：发起成员
 - `topic`：讨论主题
 - `participant_ids`：JSON 数组，记录参与成员
+- `root_message_id`：可选，本轮讨论范围的起点消息；旧记录可为空
+- `requester_id`：可选，当前范围里提出要求的成员，可以是 human，也可以是 agent
+- `assignee_id`：可选，当前范围里被要求回复/执行的成员
+- `scope_text`：可选，去掉开头 mention 后的任务范围文本；作为模型控制上下文，不应直接展示在可见回复中
 - `status`：`active`、`resolved`、`escalated`、`canceled`
 - `max_rounds`：默认 2，用于两轮分歧后升级给 human 判断
 
@@ -65,16 +69,21 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 <talk-action type="escalate_to_human" to="human:bobo">请你做最终判断</talk-action>
 ```
 
-- `send_message`：在同一 Group Hall 里用当前 agent 身份发送 `@agent:*` 消息；若找不到 active discussion，会按当前 agent 和目标 agent 自动创建 session。
+- `send_message`：在同一 Group Hall 里用当前 agent 身份发送 `@agent:*` 消息；若找不到可复用 discussion，会按当前请求者、目标 agent 和发出的消息自动创建带范围锚点的 session。
 - `mark_stance`：把 bridge 的可见回复记录为当前 discussion 的一个 turn。
 - `final_to_human`：把共识后的最终答案发送给指定 human，并把 discussion 标为 `resolved`。
 - `escalate_to_human`：向指定 human 发送仲裁请求，并把 discussion 标为 `escalated`。
 - 当最近两条 turn 都是不同 agent 的 `disagree`，或自动讨论回合达到上限，bridge 会自动在同一 Hall `@human:*` 请求最终判断。
 
-### 有限状态控制
+### 请求者局部范围与有限状态控制
 
+- 讨论范围不固定绑定 human，而是绑定“当前直接提问/派活者”的请求：谁提出要求，回复者就围绕谁的这条要求回复。
+- bridge 会优先沿 `reply_to` / `root_message_id` 复用 discussion scope；已 `resolved / escalated / canceled` 的 scope 不会因为普通 agent 回复而继续触发模型续聊。
+- agent-to-agent prompt 会注入控制上下文：`discussion_id / root_message_id / requester_id / assignee_id / scope_text / current_message_id` 等字段。这些字段只用于约束模型，禁止出现在可见聊天回复中。
+- 如果模型可见回复泄漏内部字段名或控制上下文，bridge 会替换为“我需要先确认当前请求范围后再继续。”，避免把内部 ID 暴露给用户或其它 agent。
+- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会按 `answer` 记录一个 turn，便于后续 UI 展示讨论轮次。
 - 讨论按 `question -> answer -> agree/optimize/disagree -> resolved/escalated` 推进，默认只允许 3 个自动 turn；最近一条为 `disagree` 时允许额外 1 个 turn 供对方回应。
-- agent-to-agent prompt 会注入极短讨论上下文：原始话题、当前阶段、剩余回合和 human 仲裁目标，并明确禁止引入与原始话题无关的项目、文档、版本号或施工档内容。
+- agent-to-agent prompt 会明确禁止引入与当前请求范围无关的项目、文档、版本号或施工档内容；想引申但不确定是否仍在范围内时，默认先向请求者追问确认。
 - 当模型只输出动作且来源是另一个 agent 时，bridge 不再额外发送“已按讨论协议继续推进。”这类默认回执，避免无意义消息继续触发对方 bridge。
 - bridge 会清理开头或结尾的孤立协议残片，例如 `mark_stance`、`update`、`动作已记录...`，避免动作词泄漏到可见聊天正文。
 
@@ -90,6 +99,7 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 - 讨论 turn 只引用文本/文件消息，不复制正文；如果消息被撤回，turn 仍保留顺序与立场记录。
 - 自动分歧升级当前选择 Group 内第一个 `human:*` 成员作为仲裁目标。
 - v1 不做后台主动调度；Agent 仍由 mention、消息触发或任务队列驱动。
+- v1 的范围越界识别主要依赖结构化 scope、prompt 约束和内部字段泄漏拦截，不做复杂自然语言分类。
 
 ## 验收点
 
@@ -100,4 +110,6 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 - [x] bridge 可解析 `talk-action`，执行同 Hall 代发并写入 discussion turn。
 - [x] bridge 在两条连续不同 agent `disagree` 后自动升级给 human。
 - [x] bridge 已支持安全行协议、`final_to_human`、自动回合上限和 action-only 回执抑制。
+- [x] discussion session 已记录可选任务范围锚点，bridge 会按 reply/root scope 限制 agent-to-agent 续聊。
+- [x] 已结束 scope 不再因普通 agent 回复自动开启无关话题。
 - [x] pi 默认保持讨论档，施工工具档必须显式启用。

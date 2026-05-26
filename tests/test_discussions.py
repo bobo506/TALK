@@ -42,12 +42,20 @@ class DiscussionRouteTests(RouteTestCase):
                     "group_id": "group:lab",
                     "topic": "下一步开发计划",
                     "participant_ids": ["agent:codex", "agent:pi"],
+                    "root_message_id": first.id,
+                    "requester_id": "agent:codex",
+                    "assignee_id": "agent:pi",
+                    "scope_text": "下一步计划如下",
                     "max_rounds": 2,
                 },
             )
             self.assertEqual(created.status_code, 201)
             discussion = created.json()
             self.assertEqual(discussion["participant_ids"], ["agent:codex", "agent:pi"])
+            self.assertEqual(discussion["root_message_id"], first.id)
+            self.assertEqual(discussion["requester_id"], "agent:codex")
+            self.assertEqual(discussion["assignee_id"], "agent:pi")
+            self.assertEqual(discussion["scope_text"], "下一步计划如下")
 
             codex_turn = client.post(
                 f"/api/discussions/{discussion['id']}/turns",
@@ -139,3 +147,27 @@ class DiscussionRouteTests(RouteTestCase):
             )
 
         self.assertEqual(wrong_owner.status_code, 403)
+
+    def test_scope_root_message_must_belong_to_discussion_group(self):
+        global_message = self.add_message(
+            from_id=self.agent_codex.id,
+            to_ids=json.dumps([self.agent_pi.id]),
+            group_id=None,
+            message_type="text",
+            content="@agent:pi outside group",
+        )
+
+        with self.make_client() as client:
+            created = client.post(
+                "/api/discussions",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "group_id": "group:lab",
+                    "topic": "bad scope",
+                    "participant_ids": ["agent:codex", "agent:pi"],
+                    "root_message_id": global_message.id,
+                },
+            )
+
+        self.assertEqual(created.status_code, 400)
+        self.assertEqual(created.json()["detail"], "root message is not in discussion group")

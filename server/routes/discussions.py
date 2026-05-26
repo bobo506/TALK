@@ -47,6 +47,16 @@ def _require_group_members(group_id: str, member_ids: list[str], session: Sessio
             )
 
 
+def _require_scope_message(group_id: str, message_id: int | None, session: Session) -> None:
+    if message_id is None:
+        return
+    message = session.get(Message, message_id)
+    if message is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="root_message_id not found")
+    if message.group_id != group_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="root message is not in discussion group")
+
+
 def _get_visible_discussion(discussion_id: int, current: Member, session: Session) -> DiscussionSession:
     discussion = session.get(DiscussionSession, discussion_id)
     if discussion is None:
@@ -85,6 +95,10 @@ def create_discussion(
     """Create a recorded discussion session scoped to one Group Hall."""
     _require_group_member(body.group_id, current.id, session)
     _require_group_members(body.group_id, body.participant_ids, session)
+    scope_members = [member_id for member_id in [body.requester_id, body.assignee_id] if member_id is not None]
+    if scope_members:
+        _require_group_members(body.group_id, scope_members, session)
+    _require_scope_message(body.group_id, body.root_message_id, session)
 
     now = datetime.now(timezone.utc)
     discussion = DiscussionSession(
@@ -92,6 +106,10 @@ def create_discussion(
         created_by=current.id,
         topic=body.topic,
         participant_ids=json.dumps(body.participant_ids),
+        root_message_id=body.root_message_id,
+        requester_id=body.requester_id,
+        assignee_id=body.assignee_id,
+        scope_text=body.scope_text,
         status="active",
         max_rounds=body.max_rounds,
         created_at=now,

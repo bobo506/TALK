@@ -77,6 +77,18 @@ def init_db() -> None:
         }
         if "schedule_id" not in task_columns:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN schedule_id INTEGER REFERENCES agent_task_schedules(id)")
+        discussion_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(discussion_sessions)").fetchall()
+        }
+        if "root_message_id" not in discussion_columns:
+            conn.exec_driver_sql("ALTER TABLE discussion_sessions ADD COLUMN root_message_id INTEGER REFERENCES messages(id)")
+        if "requester_id" not in discussion_columns:
+            conn.exec_driver_sql("ALTER TABLE discussion_sessions ADD COLUMN requester_id TEXT REFERENCES members(id)")
+        if "assignee_id" not in discussion_columns:
+            conn.exec_driver_sql("ALTER TABLE discussion_sessions ADD COLUMN assignee_id TEXT REFERENCES members(id)")
+        if "scope_text" not in discussion_columns:
+            conn.exec_driver_sql("ALTER TABLE discussion_sessions ADD COLUMN scope_text TEXT")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_files_sha256 ON files (sha256)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_from_id ON messages (from_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_group_id ON messages (group_id)")
@@ -100,6 +112,9 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_next_run_at ON agent_task_schedules (next_run_at)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_group_id ON discussion_sessions (group_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_created_by ON discussion_sessions (created_by)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_root_message_id ON discussion_sessions (root_message_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_requester_id ON discussion_sessions (requester_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_assignee_id ON discussion_sessions (assignee_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_status ON discussion_sessions (status)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_turns_session_id ON discussion_turns (session_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_turns_turn_index ON discussion_turns (turn_index)")

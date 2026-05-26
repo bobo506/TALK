@@ -134,10 +134,23 @@ class TalkClientSync:
         topic: str,
         participant_ids: list[str] | tuple[str, ...],
         *,
+        root_message_id: int | None = None,
+        requester_id: str | None = None,
+        assignee_id: str | None = None,
+        scope_text: str | None = None,
         max_rounds: int = 2,
     ) -> dict[str, Any]:
         return self._submit(
-            self._client.create_discussion(group_id, topic, participant_ids, max_rounds=max_rounds)
+            self._client.create_discussion(
+                group_id,
+                topic,
+                participant_ids,
+                root_message_id=root_message_id,
+                requester_id=requester_id,
+                assignee_id=assignee_id,
+                scope_text=scope_text,
+                max_rounds=max_rounds,
+            )
         )
 
     def list_discussions(self, *, group_id: str | None = None) -> list[dict[str, Any]]:

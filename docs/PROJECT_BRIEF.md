@@ -103,6 +103,10 @@ CREATE TABLE discussion_sessions (
   created_by      TEXT NOT NULL REFERENCES members(id),
   topic           TEXT NOT NULL,
   participant_ids TEXT NOT NULL,       -- JSON 数组
+  root_message_id INTEGER REFERENCES messages(id), -- 可选：本轮范围起点消息
+  requester_id    TEXT REFERENCES members(id), -- 可选：当前范围提要求者
+  assignee_id     TEXT REFERENCES members(id), -- 可选：当前范围被要求回复/执行者
+  scope_text      TEXT,                -- 可选：当前请求范围文本
   status          TEXT NOT NULL,       -- active | resolved | escalated | canceled
   max_rounds      INTEGER NOT NULL,
   created_at      DATETIME NOT NULL,
@@ -260,7 +264,7 @@ TALK/
 | [MODULE_members_auth.md](MODULE_members_auth.md) | 成员注册 + API Key 鉴权 | `server/auth.py`, `server/routes/members.py` | M1 已实现，已补 `GET /api/members/me`、Agent 自注册与首轮自动化测试 |
 | [MODULE_messages.md](MODULE_messages.md) | 消息发送与拉取 | `server/routes/messages.py` | M2 已支持服务端 mention 路由解析、文件附言、历史分页、搜索、消息撤回与自动化测试 |
 | [MODULE_groups.md](MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py`, `web/`, `TALK/client/` | `GROUP-1 / HALL-1` 后端第一版已落地；Web UI 已接入 Group/Hall 切换与创建入口；SDK helper 已接入 |
-| [MODULE_discussions.md](MODULE_discussions.md) | 可记录多 Agent 讨论协议 | `server/routes/discussions.py`, `server/models.py`, `TALK/client/`, `bridges/` | `DISCUSSION-PROTOCOL-1` 已落地：session/turn 记录、SDK helper、bridge TALK 动作协议与 pi 可选施工档 |
+| [MODULE_discussions.md](MODULE_discussions.md) | 可记录多 Agent 讨论协议 | `server/routes/discussions.py`, `server/models.py`, `TALK/client/`, `bridges/` | `DISCUSSION-SCOPE-1` 已落地：session/turn 记录、请求者局部范围锚点、SDK helper、bridge TALK 动作协议与 pi 可选施工档 |
 | [MODULE_websocket.md](MODULE_websocket.md) | WebSocket / SSE 实时事件连接管理与推送 | `server/ws_hub.py`, `server/main.py`(WS/SSE端点) | WS 已实现；SSE 只读事件流第一版已落地 |
 | [MODULE_files.md](MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
 | [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
