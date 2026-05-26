@@ -80,7 +80,11 @@ class CodexBridgeTests(unittest.TestCase):
         )
         self.assertEqual(
             strip_leading_mentions("@agent:other leave intact", member_id="agent:codex"),
-            "@agent:other leave intact",
+            "leave intact",
+        )
+        self.assertEqual(
+            strip_leading_mentions("请让 @agent:other 看看", member_id="agent:codex"),
+            "请让 @agent:other 看看",
         )
 
     def test_build_codex_prompt_contains_task_context(self):
@@ -115,8 +119,9 @@ class CodexBridgeTests(unittest.TestCase):
             CodexRunResult(returncode=2, stdout="out", stderr="err"),
             max_chars=100,
         )
-        self.assertIn("exit code 2", reply)
-        self.assertIn("stderr", reply)
+        self.assertIn("Codex bridge 运行失败", reply)
+        self.assertNotIn("stderr", reply)
+        self.assertNotIn("err", reply)
 
         truncated = format_codex_reply(
             CodexRunResult(returncode=0, stdout="x" * 20, stderr=""),

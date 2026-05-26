@@ -101,11 +101,13 @@ async def handle_queued_task(
         reply = format_codex_reply(result, max_chars=max_reply_chars)
         completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
         if completion_status == "failed":
-            last_error = reply
+            last_error = "\n".join(
+                part for part in (cli_bridge.clean_cli_output(result.stderr), cli_bridge.clean_cli_output(result.stdout)) if part
+            ) or reply
     except Exception as exc:
-        reply = f"Codex bridge failed before completing task {task_id}: {exc}"
+        reply = "Codex bridge 运行失败，错误详情已记录。"
         completion_status = "failed"
-        last_error = reply
+        last_error = f"Codex bridge failed before completing task {task_id}: {exc}"
 
     creator = claimed.get("created_by")
     if creator:

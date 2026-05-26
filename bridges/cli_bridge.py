@@ -84,6 +84,7 @@ SAFE_ACTION_ATTR_RE = re.compile(r"\b([a-zA-Z_][\w-]*)=([^\s]+)")
 ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human", "final_to_human"}
 ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate"}
 DISCUSSION_MAX_AUTO_TURNS = 3
+DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
 INTERNAL_SCOPE_MARKERS = (
     "discussion_id",
     "root_message_id",
@@ -93,6 +94,11 @@ INTERNAL_SCOPE_MARKERS = (
     "TALK_SCOPE",
     "控制上下文",
 )
+CONTROL_PROTOCOL_RESIDUE_RE = re.compile(
+    r"(?is)(\bTALK_ACTION\b|</?talk-action\b|"
+    r"\b(?:send_message|mark_stance|final_to_human|escalate_to_human)\b[^\r\n]*(?:\bto=|\bbody=|\bstance=))"
+)
+LEADING_MENTION_RE = re.compile(r"@(agent|human):[^\s]+", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -155,18 +161,13 @@ def strip_leading_mentions(text: str, *, member_id: str | None = None) -> str:
         cursor += 1
 
     saw_mention = False
-    while cursor < length and text[cursor] == "@":
-        token_start = cursor + 1
-        token_end = token_start
-        while token_end < length and not text[token_end].isspace():
-            token_end += 1
-
-        token = text[token_start:token_end]
-        if member_id is not None and token != member_id:
+    while cursor < length:
+        match = LEADING_MENTION_RE.match(text, cursor)
+        if not match:
             break
 
         saw_mention = True
-        cursor = token_end
+        cursor = match.end()
         while cursor < length and text[cursor].isspace():
             cursor += 1
 
@@ -246,6 +247,17 @@ def sanitize_scope_leak(text: str) -> str:
     if not contains_internal_scope_marker(text):
         return text
     return "我需要先确认当前请求范围后再继续。"
+
+
+def contains_control_protocol_residue(text: str) -> bool:
+    return bool(text and CONTROL_PROTOCOL_RESIDUE_RE.search(text))
+
+
+def sanitize_visible_reply(text: str) -> str:
+    text = sanitize_scope_leak(text)
+    if contains_control_protocol_residue(text):
+        return "我需要先确认当前请求范围后再继续。"
+    return text
 
 
 def _parse_action_attrs(raw_attrs: str) -> dict[str, str]:
@@ -537,6 +549,20 @@ async def _find_human_reviewer(client: Any, group_id: str | None) -> str | None:
     return None
 
 
+async def _group_member_ids(client: Any, group_id: str | None) -> set[str] | None:
+    if not group_id:
+        return None
+    try:
+        group = await client.get_group(group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return set()
+        raise
+    return {str(member.get("member_id") or "") for member in group.get("members") or []}
+
+
 async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:
     if discussion_id is None:
         return
@@ -802,6 +828,30 @@ async def _send_human_escalation(
     return True
 
 
+async def _send_agent_scope_closure(
+    client: Any,
+    *,
+    discussion_id: int | None,
+    group_id: str | None,
+    reply_to: int | None,
+    responder_id: str,
+    target_agent_id: str,
+) -> bool:
+    text = f"收到。这个扩展先停在这里；如果还需要我继续判断，请在群里 @{responder_id} 另开请求。"
+    message = await client.reply(reply_to, text=text, to=[target_agent_id], group_id=group_id)
+    message_id = int(message["id"]) if message and message.get("id") is not None else None
+    await _append_discussion_turn(
+        client,
+        discussion_id=discussion_id,
+        message_id=message_id,
+        stance="answer",
+        target_member_id=target_agent_id,
+        round_index=2,
+    )
+    await _update_discussion_status(client, discussion_id, "resolved")
+    return True
+
+
 async def execute_talk_actions(
     actions: list[TalkAction],
     *,
@@ -813,16 +863,23 @@ async def execute_talk_actions(
     summaries: list[str] = []
     group_id = source_message.get("group_id") if isinstance(source_message.get("group_id"), str) else None
     source_message_id = int(source_message["id"]) if source_message.get("id") is not None else None
+    group_member_ids: set[str] | None = None
 
     for action in actions:
         target = action.to or action.target_member_id
         if action.action_type == "send_message":
             if not target or not target.startswith("agent:"):
-                summaries.append("send_message skipped: target must be an agent member")
+                summaries.append("我不能代发给这个目标；请确认要联系的 agent。")
                 continue
+            if group_id:
+                if group_member_ids is None:
+                    group_member_ids = await _group_member_ids(client, group_id)
+                if group_member_ids is not None and target not in group_member_ids:
+                    summaries.append(f"当前 Group 里没有 {target}，我不能代发；请确认是否需要我直接处理。")
+                    continue
             action_body = sanitize_scope_leak(action.body)
             if not action_body:
-                summaries.append("send_message skipped: message body is empty")
+                summaries.append("我不能代发空消息；请补充要发送的内容。")
                 continue
             text = f"@{target} {action_body}".strip()
             sent = await client.send_text(text, to=[target], reply_to=source_message_id, group_id=group_id)
@@ -1068,18 +1125,11 @@ def format_cli_reply(
     force_one_sentence: bool = False,
 ) -> str:
     output = clean_cli_output((result.stdout or "").strip())
-    error = clean_cli_output((result.stderr or "").strip())
 
     if result.timed_out:
-        text = f"{bridge_label} timed out before producing a final answer."
-        if output:
-            text += f"\n\nPartial output:\n{output}"
+        text = f"{bridge_label} 暂时没有返回结果，错误详情已记录。"
     elif result.returncode != 0:
-        text = f"{bridge_label} failed with exit code {result.returncode}."
-        if error:
-            text += f"\n\nstderr:\n{error}"
-        if output:
-            text += f"\n\nstdout:\n{output}"
+        text = f"{bridge_label} 运行失败，错误详情已记录。"
     else:
         text = output or f"({bridge_label} finished without output.)"
 
@@ -1190,11 +1240,12 @@ async def handle_queued_task(
             reply = normalize_pi_reply_language(task_text, reply)
         completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
         if completion_status == "failed":
-            last_error = reply
+            detail = "\n".join(part for part in (clean_cli_output(result.stderr), clean_cli_output(result.stdout)) if part)
+            last_error = detail or reply
     except Exception as exc:
-        reply = f"{bridge_label} failed before completing task {task_id}: {exc}"
+        reply = f"{bridge_label} 运行失败，错误详情已记录。"
         completion_status = "failed"
-        last_error = reply
+        last_error = f"{bridge_label} failed before completing task {task_id}: {exc}"
 
     creator = claimed.get("created_by")
     if creator:
@@ -1272,14 +1323,25 @@ async def handle_incoming_message(
             turns = scope_context.turns
             discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
-            allowed_turns = DISCUSSION_MAX_AUTO_TURNS + (1 if latest_stance == "disagree" else 0)
-            if discussion_id is not None and len(turns) >= allowed_turns:
+            if discussion_id is not None and latest_stance == "disagree" and len(turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS:
                 await _send_human_escalation(
                     client,
                     discussion_id=discussion_id,
                     group_id=group_id,
                     reply_to=int(message["id"]),
                     text="自动讨论回合已达到上限，请你做最终判断。",
+                )
+                if report_status is not None:
+                    await report_status("idle")
+                return
+            if discussion_id is not None and latest_stance != "disagree" and len(turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS:
+                await _send_agent_scope_closure(
+                    client,
+                    discussion_id=discussion_id,
+                    group_id=group_id,
+                    reply_to=int(message["id"]),
+                    responder_id=member_id,
+                    target_agent_id=sender_id,
                 )
                 if report_status is not None:
                     await report_status("idle")
@@ -1317,14 +1379,17 @@ async def handle_incoming_message(
         if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
             reply = normalize_pi_reply_language(task_text, reply)
         visible_reply, actions = parse_talk_actions(reply)
-        visible_reply = sanitize_scope_leak(visible_reply)
-        await execute_talk_actions(
+        visible_reply = sanitize_visible_reply(visible_reply)
+        action_notices = await execute_talk_actions(
             actions,
             client=client,
             source_message=message,
             member_id=member_id,
             task_text=task_text,
         )
+        visible_action_notices = [notice for notice in action_notices if not notice.startswith("sent ")]
+        if visible_action_notices:
+            visible_reply = visible_action_notices[0]
         mark_actions = [action for action in actions if action.action_type == "mark_stance"]
         has_final_action = any(action.action_type == "final_to_human" for action in actions)
         should_post_reply = True
@@ -1381,16 +1446,6 @@ async def handle_incoming_message(
                     group_id=group_id,
                     reply_to=reply_message_id,
                 )
-            elif sender_id.startswith("agent:") and not has_final_action:
-                updated_turns = await _list_discussion_turns(client, discussion_id)
-                if len(updated_turns) >= DISCUSSION_MAX_AUTO_TURNS:
-                    await _send_human_escalation(
-                        client,
-                        discussion_id=discussion_id,
-                        group_id=group_id,
-                        reply_to=reply_message_id,
-                        text="自动讨论回合已达到上限，请你做最终判断。",
-                    )
         if report_status is not None:
             await report_status(
                 "error" if result.timed_out or result.returncode != 0 else "idle",

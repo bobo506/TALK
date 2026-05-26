@@ -28,11 +28,15 @@
 - bridge 会过滤 Windows `taskkill` 进程清理提示，避免 Codex CLI 退出时的进程管理噪声混入前端聊天回复。
 - bridge prompt 现在明确要求接入 agent 以 TALK Group Hall 参与者身份行动，而不是把自己当作 TALK 管理员或功能说明书。
 - 模型最终输出中的安全行协议 `TALK_ACTION ...` 会被 bridge 解析为 TALK 内动作；旧 `<talk-action ...>` 标签仍兼容解析，动作行不会出现在最终可见聊天正文中。
+- bridge 会把消息开头连续 `@member_id` 块视为 Group Hall 路由头，传给 CLI 的任务正文会剥掉整段路由头；正文中间的 `@agent:*` 保留为普通文本提及。
+- CLI 非 0 退出或超时时，bridge 给聊天里只发送简短失败提示，不回显 `stderr / stdout / traceback / 本地路径`；详细错误只保留在任务或实例错误记录中。
+- 若模型把 malformed 动作协议、控制语法或内部字段残留在可见正文中，bridge 会隔离该回复，替换为确认范围的简短自然语言，避免把协议片段展示给 human 或其它 agent。
 - `send_message` 动作会在同一 Group Hall 中代表当前 agent 发送 `@agent:*` 消息，并自动创建或复用 active discussion 记录 turn。
+- `send_message` 动作的目标必须是当前 Group 内存在的 `agent:*` 成员；目标不存在或不在 Group 内时不发送，并向直接请求者给出简短说明。
 - `mark_stance` 动作用于把当前回复标记为 `answer / agree / optimize / disagree` 等讨论立场；连续两条不同 agent 的 `disagree` 会自动 `@human:*` 请求最终判断。
 - `final_to_human` 动作用于把达成共识后的最终答案发送给 human，并将 discussion 标为 `resolved`。
 - `escalate_to_human` 动作可显式向指定 `human:*` 成员发起仲裁，并将 discussion 标记为 `escalated`。
-- agent-to-agent 讨论现在默认最多 3 个自动 turn；最近一条为 `disagree` 时允许额外 1 个 turn。超限后 bridge 不再调用模型，而是直接升级给 human。
+- agent-to-agent 讨论现在默认最多 3 个自动 turn；普通轻扩展允许对方再回答 1 个 turn，之后由收到回复的一方自动收口并标记 `resolved`；最近一条为 `disagree` 时仍允许额外 1 个 turn 并在超限后升级给 human。
 - agent-to-agent prompt 会注入“请求者局部范围”控制上下文，约束模型只围绕当前直接提问/派活者的请求回答，避免把 docs、版本号、施工档或其它无关上下文卷入讨论。
 - 控制上下文包含 `discussion_id / root_message_id / requester_id / assignee_id / scope_text` 等字段，只用于约束模型；bridge 会拦截这些内部字段泄漏到可见回复。
 - bridge 会优先沿 `reply_to` / `root_message_id` 复用 discussion scope；已结束 scope 不会因为普通 agent 回复继续触发模型续聊。
@@ -81,7 +85,7 @@ pi --print --mode text --no-context-files --no-tools --no-session --thinking off
 - Group Hall 中直接 `@agent:pi` 的文本消息也会被处理；bridge 回复会保留原消息的 `group_id`，因此回复写回同一个 Hall。
 - pi 默认入口只保留运行隔离：禁止自动加载 `AGENTS.md` / `CLAUDE.md` 上下文文件，禁止工具调用，不保存/恢复会话，并关闭 thinking，以减少回复延迟和避免把普通聊天误输出成项目状态报告。
 - pi 默认命令使用中文 `--system-prompt` 放置 Group Hall 参与者身份、讨论协议和 TALK 动作边界，避免边界说明混入用户消息正文。
-- pi 的 TALK prompt 现在只传去掉 `@agent:pi` 后的用户原文；队列任务默认只传 `content`，有 `title` 时传 `标题：<title>\n\n<content>`。
+- pi 的 TALK prompt 现在只传去掉开头连续 `@member_id` 路由头后的用户原文；队列任务默认只传 `content`，有 `title` 时传 `标题：<title>\n\n<content>`。
 - pi prompt 不再包含 `用户消息`、`回复要求`、`Sender`、`TALK message id` 或 `TALK group id` 等包装文本；但 bridge 回复仍会保留原消息 `group_id`，确保 Group Hall 回复写回同一个 Hall。
 - 默认 system prompt 要求 pi 是 TALK Group Hall 参与者，可与人类和其他 agent 交流、评审方案、提出优化/分歧，并在需要时输出 `TALK_ACTION` 安全行协议；默认讨论模式下不声称能读取项目文件、执行命令或编辑文件。
 - 默认 system prompt 不再包含原始 `<talk-action ...>` 示例、斜杠、竖线、尖括号或 `&`，避免 Windows 下 `pi.cmd` 启动链把 prompt 误解释为命令管道或重定向。

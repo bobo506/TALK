@@ -102,6 +102,25 @@ class CliBridgeTests(unittest.TestCase):
         self.assertNotIn("TALK message id:", prompt)
         self.assertNotIn("Project root:", prompt)
 
+    def test_build_cli_prompt_strips_leading_mention_cluster_for_pi(self):
+        prompt = build_cli_prompt({
+            "id": 4,
+            "from": "human:bobo",
+            "content": "@agent:pi @agent:codex 我觉得这个对话系统还需要完善",
+        }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+
+        self.assertEqual(prompt, "我觉得这个对话系统还需要完善")
+        self.assertFalse(prompt.startswith("@"))
+
+    def test_build_cli_prompt_keeps_mid_sentence_mentions(self):
+        prompt = build_cli_prompt({
+            "id": 4,
+            "from": "human:bobo",
+            "content": "@agent:pi 请去问 @agent:codex 能不能看一下",
+        }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+
+        self.assertEqual(prompt, "请去问 @agent:codex 能不能看一下")
+
     def test_build_cli_prompt_for_pi_does_not_embed_capability_boundary(self):
         prompt = build_cli_prompt({
             "id": 40,
@@ -127,13 +146,16 @@ class CliBridgeTests(unittest.TestCase):
 
     def test_format_cli_reply_uses_bridge_label(self):
         reply = format_cli_reply(
-            CliRunResult(returncode=2, stdout="", stderr="boom"),
+            CliRunResult(returncode=2, stdout="out", stderr="boom\nTraceback\nD:\\claude-test\\TALK\\x.py"),
             max_chars=200,
             bridge_label="pi bridge",
         )
 
-        self.assertIn("pi bridge failed with exit code 2", reply)
-        self.assertIn("stderr", reply)
+        self.assertIn("pi bridge 运行失败", reply)
+        self.assertNotIn("stderr", reply)
+        self.assertNotIn("stdout", reply)
+        self.assertNotIn("D:\\", reply)
+        self.assertNotIn("Traceback", reply)
 
     def test_format_cli_reply_can_force_one_sentence(self):
         reply = format_cli_reply(
@@ -222,6 +244,54 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertEqual(visible, "可见内容")
         self.assertEqual(actions, [])
+
+    def test_malformed_action_residue_is_not_posted_visibly(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(
+                returncode=0,
+                stdout="我先问一下。\n\n**TALK_ACTION send_message to=agent:uxwriter stance=question body=请确认上下文**",
+                stderr="",
+            )
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:bobo",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi 检查按钮文案",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.replies, [(40, "我需要先确认当前请求范围后再继续。", ["human:bobo"], "group:lab")])
 
     def test_decode_subprocess_output_handles_mixed_encoded_lines(self):
         data = (
@@ -463,6 +533,69 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.created_discussions[0][4]["scope_text"], "请给 pi 下一步开发计划")
         self.assertEqual(client.turns, [(7, 42, "question", "agent:codex", 1)])
         self.assertEqual(client.replies, [(40, "我去问 codex。", ["human:bobo"], "group:lab")])
+
+    def test_send_message_action_to_missing_group_agent_is_blocked(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 42}
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:pi"}, {"member_id": "agent:codex"}]}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(
+                returncode=0,
+                stdout=(
+                    "我去问 uxwriter。\n"
+                    "TALK_ACTION send_message to=agent:uxwriter stance=question body=请确认按钮文案上下文"
+                ),
+                stderr="",
+            )
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:bobo",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi 请检查按钮文案",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [])
+        self.assertEqual(
+            client.replies,
+            [(40, "当前 Group 里没有 agent:uxwriter，我不能代发；请确认是否需要我直接处理。", ["human:bobo"], "group:lab")],
+        )
 
     def test_send_message_action_degrades_when_discussion_api_is_missing(self):
         class FakeClient:
@@ -770,15 +903,17 @@ class CliBridgeTests(unittest.TestCase):
         )
         self.assertEqual(client.updated, [(9, "resolved")])
 
-    def test_agent_message_over_turn_budget_escalates_without_running_model(self):
+    def test_agent_message_after_extension_answer_closes_without_running_model(self):
         class FakeClient:
             def __init__(self):
+                self.replies = []
                 self.sent = []
                 self.updated = []
                 self.turns = [
                     {"speaker_id": "agent:codex", "stance": "question"},
                     {"speaker_id": "agent:pi", "stance": "answer"},
                     {"speaker_id": "agent:codex", "stance": "optimize"},
+                    {"speaker_id": "agent:pi", "stance": "answer"},
                 ]
 
             async def list_discussions(self, *, group_id=None):
@@ -795,9 +930,13 @@ class CliBridgeTests(unittest.TestCase):
             async def get_group(self, group_id):
                 return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:codex"}, {"member_id": "agent:pi"}]}
 
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 52}
+
             async def send_text(self, text, to=None, reply_to=None, group_id=None):
                 self.sent.append((text, to, reply_to, group_id))
-                return {"id": 52}
+                return {"id": 53}
 
             async def append_discussion_turn(self, discussion_id, *, message_id, stance, target_member_id=None, round_index=1):
                 self.turns.append({"speaker_id": "agent:pi", "stance": stance})
@@ -841,10 +980,78 @@ class CliBridgeTests(unittest.TestCase):
         client = asyncio.run(scenario())
 
         self.assertEqual(
-            client.sent,
-            [("@human:bobo 自动讨论回合已达到上限，请你做最终判断。", ["human:bobo"], 50, "group:lab")],
+            client.replies,
+            [(50, "收到。这个扩展先停在这里；如果还需要我继续判断，请在群里 @agent:pi 另开请求。", ["agent:codex"], "group:lab")],
         )
-        self.assertEqual(client.updated, [(9, "escalated")])
+        self.assertEqual(client.sent, [])
+        self.assertEqual(client.updated, [(9, "resolved")])
+
+    def test_agent_message_at_extension_budget_allows_one_more_answer(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.turns = [
+                    {"speaker_id": "agent:codex", "stance": "question"},
+                    {"speaker_id": "agent:pi", "stance": "answer"},
+                    {"speaker_id": "agent:codex", "stance": "optimize"},
+                ]
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 9,
+                    "status": "active",
+                    "topic": "打招呼",
+                    "participant_ids": ["agent:codex", "agent:pi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:codex"}, {"member_id": "agent:pi"}]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 52}
+
+            async def append_discussion_turn(self, discussion_id, *, message_id, stance, target_member_id=None, round_index=1):
+                self.turns.append({"speaker_id": "agent:pi", "stance": stance})
+                return {"id": 4}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(returncode=0, stdout="可以，先停在打招呼这里。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 50,
+                        "from": "agent:codex",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi 我只是回应一下这个扩展问题",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.replies, [(50, "可以，先停在打招呼这里。", ["agent:codex"], "group:lab")])
 
     def test_agent_reply_to_resolved_scope_does_not_start_new_topic(self):
         class FakeClient:
