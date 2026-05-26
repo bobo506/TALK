@@ -238,10 +238,16 @@ def _is_greeting_scope(text: str) -> bool:
     )
 
 
-def infer_discussion_stance(task_text: str, visible_reply: str, *, default: str = "answer") -> str:
+def infer_reply_stance(task_text: str, visible_reply: str) -> str:
     if _is_greeting_scope(task_text) and _is_short_text(visible_reply) and _is_greeting_like(visible_reply):
         return "greeting"
-    return default
+    return "answer"
+
+
+def infer_discussion_stance(task_text: str, visible_reply: str, *, default: str = "answer") -> str:
+    if infer_reply_stance(task_text, visible_reply) == "greeting":
+        return "greeting"
+    return default or "answer"
 
 
 def contains_cjk(text: str) -> bool:
@@ -1474,7 +1480,7 @@ async def handle_incoming_message(
                 client,
                 discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
                 message_id=reply_message_id,
-                stance=infer_discussion_stance(task_text, visible_reply),
+                stance=infer_reply_stance(task_text, visible_reply),
                 target_member_id=sender_id,
                 round_index=1,
             )

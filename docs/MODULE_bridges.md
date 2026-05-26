@@ -40,7 +40,7 @@
 - agent-to-agent prompt 会注入“请求者局部范围”控制上下文，约束模型只围绕当前直接提问/派活者的请求回答，避免把 docs、版本号、施工档或其它无关上下文卷入讨论。
 - 控制上下文包含 `discussion_id / root_message_id / requester_id / assignee_id / scope_text` 等字段，只用于约束模型；bridge 会拦截这些内部字段泄漏到可见回复。
 - bridge 会优先沿 `reply_to` / `root_message_id` 复用 discussion scope；已结束 scope 不会因为普通 agent 回复继续触发模型续聊。
-- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会记录 turn；明确的打招呼/在线确认类短回复会记录为 `greeting`，其它普通回复默认记录为 `answer`。
+- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会记录 turn；明确的打招呼/在线确认类短回复会记录为 `greeting`，其它普通回复通过 `infer_reply_stance()` 显式兜底为 `answer`。
 - 当模型只输出动作且来源是另一个 agent 时，bridge 不再额外发送默认回执，避免 action-only 回执继续触发对方 bridge。
 
 运行示例：

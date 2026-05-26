@@ -601,6 +601,21 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.sent, [("@agent:codex 你好 codex，我是 pi，来打个招呼。", ["agent:codex"], 40, "group:lab")])
         self.assertEqual(client.turns, [(7, 42, "greeting", "agent:codex", 1)])
 
+    def test_reply_stance_defaults_to_answer(self):
+        self.assertEqual(cli_bridge.infer_reply_stance("请给 pi 下一步开发计划", "可以，我建议先补测试。"), "answer")
+        self.assertEqual(cli_bridge.infer_reply_stance("你去和 codex 打个招呼", "你好，我在线。"), "greeting")
+        self.assertEqual(cli_bridge.infer_discussion_stance("请给 pi 下一步开发计划", "可以，我建议先补测试。", default=""), "answer")
+
+    def test_non_substantive_turn_filter_excludes_greeting_and_closure(self):
+        turns = [
+            {"stance": "greeting"},
+            {"stance": "closure"},
+            {"stance": "answer"},
+            {"stance": ""},
+        ]
+
+        self.assertEqual(cli_bridge._substantive_discussion_turns(turns), [{"stance": "answer"}, {"stance": ""}])
+
     def test_send_message_action_to_missing_group_agent_is_blocked(self):
         class FakeClient:
             def __init__(self):
@@ -1062,8 +1077,8 @@ class CliBridgeTests(unittest.TestCase):
                 self.turns = [
                     {"speaker_id": "agent:pi", "stance": "greeting"},
                     {"speaker_id": "agent:codex", "stance": "greeting"},
-                    {"speaker_id": "agent:pi", "stance": "greeting"},
-                    {"speaker_id": "agent:codex", "stance": "greeting"},
+                    {"speaker_id": "agent:pi", "stance": "closure"},
+                    {"speaker_id": "agent:codex", "stance": "closure"},
                 ]
 
             async def list_discussions(self, *, group_id=None):

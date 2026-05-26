@@ -81,7 +81,7 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 - bridge 会优先沿 `reply_to` / `root_message_id` 复用 discussion scope；已 `resolved / escalated / canceled` 的 scope 不会因为普通 agent 回复而继续触发模型续聊。
 - agent-to-agent prompt 会注入控制上下文：`discussion_id / root_message_id / requester_id / assignee_id / scope_text / current_message_id` 等字段。这些字段只用于约束模型，禁止出现在可见聊天回复中。
 - 如果模型可见回复泄漏内部字段名、控制上下文或 malformed 动作协议残留，bridge 会替换为“我需要先确认当前请求范围后再继续。”，避免把内部 ID 或协议片段暴露给用户或其它 agent。
-- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会记录一个 turn；明确的打招呼/在线确认类短回复会记录为 `greeting`，其它普通回复默认记录为 `answer`，便于后续 UI 展示讨论轮次。
+- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会记录一个 turn；明确的打招呼/在线确认类短回复会记录为 `greeting`，其它普通回复通过 `infer_reply_stance()` 显式兜底为 `answer`，便于后续 UI 展示讨论轮次。
 - 讨论按 `question -> answer -> agree/optimize/disagree -> resolved/escalated` 推进，默认只允许 3 个实质自动 turn。`greeting / closure` 不计入收口阈值，避免把打招呼和在线确认误算成议题讨论。普通轻扩展允许对方再回答 1 个实质 turn，随后由收到回复的一方自动发出稳定但按 agent 区分的话术并标记 `closure/resolved`；最近一条为 `disagree` 时允许额外 1 个实质 turn 供对方回应，超限后仍升级 human。
 - agent-to-agent prompt 会明确禁止引入与当前请求范围无关的项目、文档、版本号或施工档内容；想引申但不确定是否仍在范围内时，默认先向请求者追问确认。
 - 当模型只输出动作且来源是另一个 agent 时，bridge 不再额外发送“已按讨论协议继续推进。”这类默认回执，避免无意义消息继续触发对方 bridge。

@@ -6,6 +6,24 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-27 00:13 (Asia/Shanghai)
+### Current Progress
+- 在 `codex/scenario-1-scope-fix` 上补强场景 1 寒暄收口边界：确认 `greeting / closure` 都由 `NON_SUBSTANTIVE_STANCES` 排除，不计入实质 turn。
+- 普通可见回复记录改走 `infer_reply_stance()`，寒暄返回 `greeting`，其它路径显式返回 `answer`，避免空 stance 落库。
+- 动作转发仍可沿用动作自身 stance；若传入空默认值，会兜底为 `answer`。
+- 新增测试覆盖：普通回复 stance 兜底、`greeting / closure` 过滤、已有寒暄 turn 不触发收口。
+### Open Questions / Pending Confirmation
+- `greeting` 识别仍采用保守关键词法；若后续黑盒验收发现“报个到 / 认识一下”等说法漏标较多，再考虑由模型结构化输出 `is_greeting`。
+- `docs/p.drawio` 仍是未跟踪文件，本轮未修改。
+### Next Plan
+1. 提交本次补强。
+2. 项目管理者重启 server / Codex bridge / pi bridge 后，复验黑盒场景 1。
+### Verification
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` passed，43 tests。
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\routes\discussions.py bridges\cli_bridge.py bridges\codex_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_codex_bridge.py tests\test_discussions.py tests\test_pi_bridge.py` passed。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_discussions tests.test_pi_bridge` passed，59 tests。
+
 ## 2026-05-27 00:06 (Asia/Shanghai)
 ### Current Progress
 - 已在分支 `codex/scenario-1-scope-fix` 完成 `SCENARIO1-GREETING-TURNS-1`：收口阈值改为只统计实质 turn，避免把打招呼/在线确认当成议题讨论轮次。
