@@ -63,7 +63,7 @@ class DiscussionRouteTests(RouteTestCase):
                 json={
                     "message_id": first.id,
                     "target_member_id": "agent:pi",
-                    "stance": "question",
+                    "stance": "greeting",
                     "round_index": 1,
                 },
             )
@@ -73,7 +73,7 @@ class DiscussionRouteTests(RouteTestCase):
                 json={
                     "message_id": second.id,
                     "target_member_id": "agent:codex",
-                    "stance": "optimize",
+                    "stance": "closure",
                     "round_index": 1,
                 },
             )
@@ -88,7 +88,7 @@ class DiscussionRouteTests(RouteTestCase):
             payload = turns.json()
             self.assertEqual([turn["turn_index"] for turn in payload], [1, 2])
             self.assertEqual([turn["message_id"] for turn in payload], [first.id, second.id])
-            self.assertEqual([turn["stance"] for turn in payload], ["question", "optimize"])
+            self.assertEqual([turn["stance"] for turn in payload], ["greeting", "closure"])
 
     def test_non_group_member_cannot_create_or_read_discussion(self):
         with self.make_client() as client:

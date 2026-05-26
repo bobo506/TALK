@@ -355,7 +355,7 @@ class GroupOut(BaseModel):
 
 
 _DISCUSSION_STATUSES = {"active", "resolved", "escalated", "canceled"}
-_DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate"}
+_DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
 
 
 class DiscussionSessionCreate(BaseModel):

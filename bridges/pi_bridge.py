@@ -24,7 +24,7 @@ DEFAULT_SYSTEM_PROMPT = (
     "表达立场用 TALK_ACTION mark_stance stance=agree。"
     "给人类最终答案用 TALK_ACTION final_to_human to=human:bobo body=答案。"
     "需要人类判断用 TALK_ACTION escalate_to_human to=human:bobo body=问题。"
-    "立场可用 question、answer、agree、optimize、disagree、escalate。"
+    "立场可用 question、answer、agree、optimize、disagree、escalate、greeting、closure。"
     "动作行不要解释给用户，不要把动作名当正文说出来。"
     "不要输出 Language 语言标签。"
 )

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import html
 import locale
 import os
@@ -82,9 +83,20 @@ SAFE_ACTION_RE = re.compile(
 )
 SAFE_ACTION_ATTR_RE = re.compile(r"\b([a-zA-Z_][\w-]*)=([^\s]+)")
 ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human", "final_to_human"}
-ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate"}
+ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
 DISCUSSION_MAX_AUTO_TURNS = 3
 DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
+NON_SUBSTANTIVE_STANCES = {"greeting", "closure"}
+CLOSURE_LINES = (
+    "那这次就先聊到这儿，有需要再喊我。",
+    "好的，这轮先告一段落，回头有事群里找我。",
+    "嗯，先这样，有新的再说。",
+    "行，这次就到这里，需要的话再开个话题。",
+    "好，先收个尾，之后有事随时 @ 我。",
+    "可以，这轮先打住，后面有需要再继续。",
+)
+GREETING_SCOPE_MARKERS = ("打招呼", "打个招呼", "打声招呼", "问好", "确认在线", "在线状态", "互相认识", "认识一下")
+GREETING_REPLY_MARKERS = ("你好", "在线", "收到", "见到你", "认识你")
 INTERNAL_SCOPE_MARKERS = (
     "discussion_id",
     "root_message_id",
@@ -200,6 +212,38 @@ def first_sentence(text: str, *, max_chars: int = 240) -> str:
     return compact
 
 
+def _compact_text(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _is_short_text(text: str, *, max_chars: int = 80) -> bool:
+    return len(_compact_text(text)) <= max_chars
+
+
+def _is_greeting_like(text: str) -> bool:
+    compact = _compact_text(text)
+    if not compact:
+        return False
+    lowered = compact.lower()
+    return any(marker in compact for marker in GREETING_REPLY_MARKERS) or any(
+        marker in lowered for marker in ("hello", "hi ", "hi,", "hey", "online")
+    )
+
+
+def _is_greeting_scope(text: str) -> bool:
+    compact = _compact_text(text)
+    lowered = compact.lower()
+    return any(marker in compact for marker in GREETING_SCOPE_MARKERS) or any(
+        marker in lowered for marker in ("say hello", "greet", "check online")
+    )
+
+
+def infer_discussion_stance(task_text: str, visible_reply: str, *, default: str = "answer") -> str:
+    if _is_greeting_scope(task_text) and _is_short_text(visible_reply) and _is_greeting_like(visible_reply):
+        return "greeting"
+    return default
+
+
 def contains_cjk(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in text)
 
@@ -258,6 +302,16 @@ def sanitize_visible_reply(text: str) -> str:
     if contains_control_protocol_residue(text):
         return "我需要先确认当前请求范围后再继续。"
     return text
+
+
+def _substantive_discussion_turns(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [turn for turn in turns if str(turn.get("stance") or "") not in NON_SUBSTANTIVE_STANCES]
+
+
+def _pick_closure_line(responder_id: str) -> str:
+    digest = hashlib.sha256(responder_id.encode("utf-8")).digest()
+    index = int.from_bytes(digest[:2], "big") % len(CLOSURE_LINES)
+    return CLOSURE_LINES[index]
 
 
 def _parse_action_attrs(raw_attrs: str) -> dict[str, str]:
@@ -837,14 +891,14 @@ async def _send_agent_scope_closure(
     responder_id: str,
     target_agent_id: str,
 ) -> bool:
-    text = f"收到。这个扩展先停在这里；如果还需要我继续判断，请在群里 @{responder_id} 另开请求。"
+    text = _pick_closure_line(responder_id)
     message = await client.reply(reply_to, text=text, to=[target_agent_id], group_id=group_id)
     message_id = int(message["id"]) if message and message.get("id") is not None else None
     await _append_discussion_turn(
         client,
         discussion_id=discussion_id,
         message_id=message_id,
-        stance="answer",
+        stance="closure",
         target_member_id=target_agent_id,
         round_index=2,
     )
@@ -910,7 +964,7 @@ async def execute_talk_actions(
                 client,
                 discussion_id=discussion_id,
                 message_id=int(sent["id"]),
-                stance=action.stance or "question",
+                stance=infer_discussion_stance(task_text, action_body, default=action.stance or "question"),
                 target_member_id=target,
                 round_index=action.round_index or 1,
             )
@@ -1323,7 +1377,12 @@ async def handle_incoming_message(
             turns = scope_context.turns
             discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
-            if discussion_id is not None and latest_stance == "disagree" and len(turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS:
+            substantive_turns = _substantive_discussion_turns(turns)
+            if (
+                discussion_id is not None
+                and latest_stance == "disagree"
+                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+            ):
                 await _send_human_escalation(
                     client,
                     discussion_id=discussion_id,
@@ -1334,7 +1393,11 @@ async def handle_incoming_message(
                 if report_status is not None:
                     await report_status("idle")
                 return
-            if discussion_id is not None and latest_stance != "disagree" and len(turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS:
+            if (
+                discussion_id is not None
+                and latest_stance != "disagree"
+                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+            ):
                 await _send_agent_scope_closure(
                     client,
                     discussion_id=discussion_id,
@@ -1411,7 +1474,7 @@ async def handle_incoming_message(
                 client,
                 discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
                 message_id=reply_message_id,
-                stance="answer",
+                stance=infer_discussion_stance(task_text, visible_reply),
                 target_member_id=sender_id,
                 round_index=1,
             )
