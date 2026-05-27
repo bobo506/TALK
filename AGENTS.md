@@ -11,12 +11,11 @@
 
 ## Agent 角色与协作约束
 
-`AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源。每次项目开始时，Agent 必须先读取本文件，确认自己当前是决策 Agent 还是执行 Agent；如项目管理者人工修改本节，后续 Agent 必须按最新角色执行。
+`AGENTS.md` 是本项目 除Claude外其他Agent 角色与协作边界的权威来源。每次项目开始时，Agent 必须先读取本文件，确认自己当前是决策 Agent 还是执行 Agent；如项目管理者人工修改本节，后续 Agent 必须按最新角色执行。
 
 ## 当前 Agent 角色
 
 - 当前 Codex 角色：决策 Agent
-- 当前 Claude 角色：执行 Agent
 - 未在本节明确授权为决策 Agent 的其它 Agent，默认按执行 Agent 处理
 
 ## 开发节奏与确认规则
