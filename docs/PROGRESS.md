@@ -28,6 +28,40 @@ Updated: 2026-05-27 00:13 (Asia/Shanghai)
 1. 提交场景 1 寒暄收口补强。
 2. 项目管理者重启 server / Codex bridge / pi bridge 后，优先复验黑盒场景 1：打招呼不应过早收口，也不应复读固定收口话术。
 3. 若场景 1 通过，再继续处理测试文档中的下一类问题。
+4. 已与项目管理者完成产品形态对齐（2026-05-27），共识写入 `docs/LOCAL_LAB_DESIGN.md` 新增"2026-05-27 产品形态对齐共识"章节，待后续按章节拆切片落地（优先级建议：`groups.metadata` 字段 → bridge 服务化模板 → 项目目录文档模板）。本轮不动代码与表结构。
+5. 已与项目管理者复盘 `codex/scenario-1-scope-fix` 分支黑盒测试结果（外部测试文档：`D:\claude-test\black box test\talk\codexscenario-1-scope-fix\test.md`），场景 1/2/3 FAIL，场景 4/5 PASS。归并为 3 个修复项，按以下顺序由后续开发承接（本轮 Claude 不动代码，开发另作安排）：
+
+   **修复项 5.1：visible_reply 调度顺序修正**（覆盖原报告 A + B）
+   - 规则：bridge 处理消息时，若 `visible_reply` 非空，**必须先回 sender，再执行任何 `TALK_ACTION` 副作用**；不论 sender 是 human 还是 agent。
+   - 规则：若 `visible_reply` 为空，**不补任何 fallback 文案**；彻底删除 `cli_bridge.py` 中 "已按讨论协议继续推进。" 的 hard-coded fallback 分支。
+   - 修复后效果：测试 #247 / #251 / #261 三类问题同时消除。
+   - 影响代码：`bridges/cli_bridge.py` 内 visible_reply / fallback / action 执行调度逻辑。
+
+   **修复项 5.2：去除 prompt 中可被照搬的具体例句**（覆盖原报告 C）
+   - 规则：`bridges/cli_bridge.py` 的 `RESPONSE_STYLE_INSTRUCTIONS` 不应再给出 `"<agent id> 在线。"` 这种具体例句。建议直接移除该例句，仅保留"短句、贴近请求范围"的抽象指令；或保留多个变体并显式声明 `"these are formatting hints, do not copy the exact wording"`。
+   - 修复后效果：codex 不再每条回复都以 "codex 在线，…" 起头，回复语言自然多样化。
+   - 影响代码：`bridges/cli_bridge.py` 中 `RESPONSE_STYLE_INSTRUCTIONS` 常量。
+
+   **修复项 5.3：bridge 处理消息前读取群信息并注入 prompt**（覆盖原报告 D + E）
+   - 规则：bridge 在 spawn LLM CLI 前，按当前消息所属 `group_id` 调用 `GET /api/groups/{id}` 与 `GET /api/groups/{id}/members`，取得成员清单（含 `display_name`）和 metadata，再据此动态拼 prompt。
+   - prompt 注入内容：
+     - **本群完整成员清单**（事实清单，禁止指名清单外成员）
+     - **该 agent 在本群的角色**（来自 `metadata.roles[<self_member_id>]`，如有）
+     - **缺省策略**：若 `metadata.roles` 缺失或当前 agent 无角色，注入"本群无角色约定，只严格回应字面请求，不要主动扩展，不要假设这是项目讨论"
+   - 修复后效果：
+     - pi 不再幻觉出 `paddy / bobo` 之类非群成员名（经项目管理者确认，这两个名字不在项目任何文档中定义，判定为 pi CLI 自身训练污染）
+     - 寒暄/在线确认类纯测试群内，pi 不再主动追问项目/模块/协作机会
+   - 实现节奏：本项目前 `groups` 表尚无 `metadata` 字段（待修复项 5.4 落地），因此修复项 5.3 先按"metadata 缺失 → 默认严格策略"实现；待 `groups.metadata` 字段加入后再扩出"按角色注入"分支，无需返工成员清单注入逻辑。
+   - 影响代码：`bridges/cli_bridge.py` 消息处理入口与 prompt 拼装函数。
+
+   **修复项 5.4（后置，依赖产品形态对齐切片）**：`groups.metadata` JSON 字段落地与读写 API；按 `docs/LOCAL_LAB_DESIGN.md` "2026-05-27 产品形态对齐共识"章节执行。修复项 5.3 在该字段就绪后回头打开"按角色注入"分支。
+
+   **复跑要求**：5.1 + 5.2 + 5.3 完成后，重启 server / Codex bridge / pi bridge，复跑 `test.md` 中场景 1/2/3，确认：
+   - 不再出现"已按讨论协议继续推进。"
+   - pi 收到 human 任务后**先**回 human，**再**去找另一个 agent
+   - codex 回复不再固定以 `"<id> 在线。"` 起头
+   - 任何 agent 不再指名群外成员
+   - 寒暄/在线确认场景下 agent 不主动扩展为项目讨论
 
 ### 5) Verification
 - `.venv\Scripts\python.exe -m py_compile server\models.py server\routes\discussions.py bridges\cli_bridge.py bridges\codex_bridge.py bridges\pi_bridge.py tests\test_cli_bridge.py tests\test_codex_bridge.py tests\test_discussions.py tests\test_pi_bridge.py` passed。
@@ -48,6 +82,7 @@ Updated: 2026-05-27 00:13 (Asia/Shanghai)
 - `docs/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
+- `docs/LOCAL_LAB_DESIGN.md`（2026-05-27 新增产品形态对齐共识章节，不涉及代码改动）
 
 ## Recent Notes
 - 完整历史见 `docs/PROGRESS_HISTORY.md`。

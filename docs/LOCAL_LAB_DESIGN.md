@@ -202,3 +202,78 @@ The first slice is Codex bridge MVP:
 8. Keep command, working directory, timeout, and reply size configurable.
 
 This gives the project a real bridge to test before the deeper Group / Hall / SSE / scheduler changes.
+
+## 2026-05-27 产品形态对齐共识
+
+本节记录与项目管理者完成对齐的产品形态约束，作为后续切片设计的指导原则。所有原则均为方向性约束，未独立成切片落地前不会改动现有代码与表结构。
+
+### 目标使用场景
+
+家庭局域网内，本地多 Agent 跨项目协作：
+
+1. 每个项目由其"1 号 Agent"负责协调（产品/方案 owner），与人类用户对齐方向后，在 TALK 上为该项目建群、拉相关角色 Agent（UI、开发、测试等）入群，并把任务以"读取某份文档"的方式派发出去。
+2. 各角色 Agent 完成工作后，在群内以"指针消息（@ 接收方 + 产物所在目录路径）"形式交付，由任务给予方与人类用户确认。
+3. 任何 Agent 遇到不清楚的问题，按升级链向上询问：`assignee → requester → 1 号 Agent → 人类用户`。
+
+### 设计原则
+
+1. **平台保持纯消息中心定位** —— TALK 不引入业务角色字段（产品 / UI / 开发 / 测试不进 schema）。`group_members.role` 仍只表达 `owner / moderator / member` 等平台权限语义。业务角色由群约定承载，平台只负责存与转发。
+
+2. **严格"项目 + 模型 = member"** —— 同一模型在不同项目中注册为相互独立的 member（例如 `agent:codex@projA` 与 `agent:codex@projB` 是两个 member，各自一份 api_key 与一份 bridge 进程），各自绑定独立工作目录，避免跨项目上下文混杂。代价是工作站上 bridge 进程数 ≈ 项目数 × 各项目使用的模型数，可接受。
+
+3. **bridge 服务化 + agent CLI 按需 spawn** —— bridge 进程注册成系统服务（Windows Service / systemd），工作站开机即全部 idle 在线，用户无需手动启动任何命令。模型 CLI（codex / claude / pi 等）只在 bridge 收到任务时由 `subprocess` spawn，跑完即退；其登录凭证（订阅或 API key）由各 CLI 自行管理，与 TALK 的 `X-API-Key` 完全独立、互不感知。
+
+4. **项目约定结构化存于 `groups.metadata`** —— 在 `groups` 表上引入 JSON 字段 `metadata`，作为该项目的"宪法"存储位。约定示例字段：
+
+   ```json
+   {
+     "project_id": "A",
+     "doc_root": "D:\\proj\\A\\docs",
+     "shared_progress": "PROGRESS.md",
+     "agent_notes_dir": "agents/",
+     "roles": {
+       "lead":   "agent:codex@projA",
+       "ui":     "agent:claude@projA",
+       "dev":    "agent:codex@projB",
+       "tester": "agent:pi@global"
+     },
+     "escalation_chain": ["assignee", "requester", "lead", "human:bobo"]
+   }
+   ```
+
+   平台只读写存储，不解析语义；所有解释工作由 Agent 自行完成。`metadata` 没有强制 schema，允许逐项目演进。
+
+5. **记忆载体是项目目录文档，群消息只发指针** —— 不在群里贴大段正文，所有方案、设计稿、开发产物、进度都落到项目目录下的文档系统：
+
+   ```
+   D:\proj\A\
+   └── docs\
+       ├── PROJECT_BRIEF.md         共享：项目宪法
+       ├── PROGRESS.md              共享：项目级总进度（由 1 号 Agent 维护）
+       └── agents\
+           ├── codex@projA.md       个人：1 号 Agent 工作笔记
+           ├── claude@projA.md      个人：UI Agent 工作笔记
+           └── pi@global.md         个人：测试 Agent 跨项目笔记
+   ```
+
+   写入约定：各角色 Agent 只写自己的 `agents/<member_id>.md`；`PROGRESS.md` 由 1 号 Agent 定期汇总，避免并发写冲突。这也天然让 1 号 Agent 成为信息汇总点，与升级链结构一致。
+
+6. **升级链 + 角色映射均由 metadata 承载** —— 平台层只提供原语：`discussion_sessions.requester_id / assignee_id / scope_text` 及 `discussion_turns.stance`（含 `question / answer / agree / optimize / disagree / escalate / greeting / closure`）。"不清楚要问谁"由 Agent 读群 metadata 中的 `escalation_chain` 自行判断并发起 `stance=question` 或 `stance=escalate` 的 turn。
+
+### 与现有平台能力的对照
+
+| 共识点 | 现有能力 | 待补 |
+|--------|----------|------|
+| 平台中立 | `group_members.role` 已是平台权限角色 | 无 |
+| 项目+模型=member | 现有 `members` 表已支持自由 id | 命名约定与配置模板 |
+| bridge 服务化 | `agent_instances` 表已记录 bridge 状态 | Windows Service / systemd 模板、`deploy/bridges.example.json` |
+| `groups.metadata` | `groups` 表当前无 metadata 字段 | 增加 JSON 字段、读写 API |
+| 项目目录文档 | 完全在 Agent prompt / 项目目录层面 | 无需平台改动 |
+| 升级链原语 | DISCUSSION-SCOPE-1 已落地 | 无需平台改动；由各 bridge prompt 落实 |
+
+### 不在本节范围内的事项
+
+- 自动启动 / 监控 Agent 进程的具体实现（先用系统服务托管，TALK 不充当 supervisor）。
+- 跨工作站 / 跨机器部署（先假定所有 bridge 与 TALK 同台工作站）。
+- 业务角色权限校验（平台不参与，由 Agent 自律 + 文档审计）。
+- 同一 LLM 订阅在多项目并发时的限流策略（属订阅本身限制，由用户和 Agent prompt 自行规避）。
