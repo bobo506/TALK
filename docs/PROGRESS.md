@@ -28,7 +28,7 @@ Updated: 2026-05-27 00:13 (Asia/Shanghai)
 1. 提交场景 1 寒暄收口补强。
 2. 项目管理者重启 server / Codex bridge / pi bridge 后，优先复验黑盒场景 1：打招呼不应过早收口，也不应复读固定收口话术。
 3. 若场景 1 通过，再继续处理测试文档中的下一类问题。
-4. 已与项目管理者完成产品形态对齐（2026-05-27），共识写入 `docs/LOCAL_LAB_DESIGN.md` 新增"2026-05-27 产品形态对齐共识"章节，待后续按章节拆切片落地（优先级建议：`groups.metadata` 字段 → bridge 服务化模板 → 项目目录文档模板）。本轮不动代码与表结构。
+4. 已与项目管理者完成产品形态对齐（2026-05-27），共识写入 `docs/LOCAL_LAB_DESIGN.md` 新增"2026-05-27 产品形态对齐共识"章节，待后续按章节拆切片落地（优先级建议：`groups.metadata` 字段 → bridge 服务化模板 → 项目目录文档模板）。本轮不动代码与表结构。同一章节当日补充了两条细化：(a) 身份模型由"项目+模型=member"修正为"**项目+模型+角色=member**"，并区分订阅 CLI 单例与 API-key 模型的部署约束；(b) 新增原则 7：`AGENTS.md` 仅承载抽象角色字典，bridge 在 prompt 注入"member_id / decision_tier / 业务角色"三元事实。同步改写 `AGENTS.md` 的"角色与协作约束"与"当前 Agent 角色"两段，去除"Codex = 决策 Agent"等具体身份指派，改为纯抽象字典。
 5. 已与项目管理者复盘 `codex/scenario-1-scope-fix` 分支黑盒测试结果（外部测试文档：`D:\claude-test\black box test\talk\codexscenario-1-scope-fix\test.md`），场景 1/2/3 FAIL，场景 4/5 PASS。归并为 3 个修复项，按以下顺序由后续开发承接（本轮 Claude 不动代码，开发另作安排）：
 
    **修复项 5.1：visible_reply 调度顺序修正**（覆盖原报告 A + B）
@@ -82,7 +82,8 @@ Updated: 2026-05-27 00:13 (Asia/Shanghai)
 - `docs/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
-- `docs/LOCAL_LAB_DESIGN.md`（2026-05-27 新增产品形态对齐共识章节，不涉及代码改动）
+- `docs/LOCAL_LAB_DESIGN.md`（2026-05-27 新增产品形态对齐共识章节 + 当日补充身份三元组与 AGENTS.md 抽象字典原则，不涉及代码改动）
+- `AGENTS.md`（同步去除具体身份指派，改为抽象角色字典；业务角色由 `groups.metadata.roles` 承载，不在本文件枚举）
 
 ## Recent Notes
 - 完整历史见 `docs/PROGRESS_HISTORY.md`。

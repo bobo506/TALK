@@ -219,9 +219,19 @@ This gives the project a real bridge to test before the deeper Group / Hall / SS
 
 1. **平台保持纯消息中心定位** —— TALK 不引入业务角色字段（产品 / UI / 开发 / 测试不进 schema）。`group_members.role` 仍只表达 `owner / moderator / member` 等平台权限语义。业务角色由群约定承载，平台只负责存与转发。
 
-2. **严格"项目 + 模型 = member"** —— 同一模型在不同项目中注册为相互独立的 member（例如 `agent:codex@projA` 与 `agent:codex@projB` 是两个 member，各自一份 api_key 与一份 bridge 进程），各自绑定独立工作目录，避免跨项目上下文混杂。代价是工作站上 bridge 进程数 ≈ 项目数 × 各项目使用的模型数，可接受。
+2. **严格"项目 + 模型 + 角色 = member"** —— 完整身份三元组：项目、模型、业务角色共同决定一个 TALK member 身份。同一模型在不同项目、或同一项目不同角色，都各自注册为相互独立的 member（例如 `agent:codex@projA:lead`、`agent:deepseek@projA:dev`、`agent:deepseek@projA:tester` 是三个独立 member，各有 api_key 与 bridge 进程），各自绑定独立工作目录。
+
+   **命名约定**：`agent:<model>@<project>:<role>`，便于人工排查日志时一眼读出"是谁、在哪个项目、干什么"。
+
+   **运行时约束（按模型类型分两类）**：
+   - **订阅型 CLI 单例**（codex / claude）：CLI 二进制和登录会话是机器级单例，即便平台层注册多个 member，bridge 调起 CLI 时仍串行用同一份订阅。**部署建议每项目每模型仅启用 1 个角色**（典型如 `agent:codex@projA:lead`），不在同一项目里把同一订阅 CLI 拆成多个角色。
+   - **API-key 模型**（DeepSeek / Kimi / Qwen 等通过 `pi` 框架走 API key 调用的）：每次 spawn 都是独立 HTTP 调用，进程之间完全隔离，**可在同一项目里同模型多角色并存**（如 `agent:deepseek@projA:dev` 与 `agent:deepseek@projA:tester`）。注意盲点风险：同模型多角色互相评审时，模型判断偏差通常一致，严肃测试链路建议混搭不同厂商模型。
+
+   代价是工作站上 bridge 进程数 ≈ Σ(项目数 × 各项目下"模型+角色"组合数)，仍可接受。
 
 3. **bridge 服务化 + agent CLI 按需 spawn** —— bridge 进程注册成系统服务（Windows Service / systemd），工作站开机即全部 idle 在线，用户无需手动启动任何命令。模型 CLI（codex / claude / pi 等）只在 bridge 收到任务时由 `subprocess` spawn，跑完即退；其登录凭证（订阅或 API key）由各 CLI 自行管理，与 TALK 的 `X-API-Key` 完全独立、互不感知。
+
+   **bridge = 本机所有项目的基础设施**：由于 bridge 配置承载了"项目 + 模型 + 角色 + 工作目录 + CLI 命令 + 决策分级"等全部身份与运行参数，bridge 已深度绑定本机所有项目，**必须作为常驻系统服务存在**。新增 / 修改 / 下线一个 agent 身份，等同于增/改/停一个系统服务条目（编辑 `deploy/bridges.json` + 重新注册服务），是 ops 操作，不是日常使用操作。
 
 4. **项目约定结构化存于 `groups.metadata`** —— 在 `groups` 表上引入 JSON 字段 `metadata`，作为该项目的"宪法"存储位。约定示例字段：
 
@@ -260,16 +270,30 @@ This gives the project a real bridge to test before the deeper Group / Hall / SS
 
 6. **升级链 + 角色映射均由 metadata 承载** —— 平台层只提供原语：`discussion_sessions.requester_id / assignee_id / scope_text` 及 `discussion_turns.stance`（含 `question / answer / agree / optimize / disagree / escalate / greeting / closure`）。"不清楚要问谁"由 Agent 读群 metadata 中的 `escalation_chain` 自行判断并发起 `stance=question` 或 `stance=escalate` 的 turn。
 
+7. **`AGENTS.md` 仅承载抽象角色字典，具体身份由 bridge 在 prompt 中注入** —— `AGENTS.md` 不再点名"Codex / Claude 是谁"，只定义"决策 Agent / 执行 Agent"两类**行为分级**的规则，以及"默认未声明分级时按执行 Agent 处理"的兜底规则。具体某个 member 属于哪一类，由 bridge 启动时根据自身配置（`decision_tier`）在 system prompt 里注入。
+
+   类似地，**业务角色（lead / ui / dev / tester / reviewer 等）由 `groups.metadata.roles` 在群创建时定义**，bridge 在处理每条消息前通过反查 `roles[<self_member_id>]` 在 prompt 中注入给模型；平台不在 schema 层固化业务角色枚举。
+
+   bridge 在 prompt 注入的最小三元事实：
+   ```
+   - 你的 member_id：agent:deepseek@projA:tester
+   - 你的决策分级：执行 Agent（来自 bridge 配置）
+   - 你的业务角色：tester（反查自 group.metadata.roles）
+   ```
+
+   这样任何 agent 模型读 `AGENTS.md` 之前，bridge 已经告诉它"你属于哪一类"，再去查字典就能直接对号入座。同一份 `AGENTS.md` 不需要因为新增模型 / 切换决策 Agent / 拆分角色而被反复改动 —— 宪法稳定、配置流动。
+
 ### 与现有平台能力的对照
 
 | 共识点 | 现有能力 | 待补 |
 |--------|----------|------|
 | 平台中立 | `group_members.role` 已是平台权限角色 | 无 |
-| 项目+模型=member | 现有 `members` 表已支持自由 id | 命名约定与配置模板 |
-| bridge 服务化 | `agent_instances` 表已记录 bridge 状态 | Windows Service / systemd 模板、`deploy/bridges.example.json` |
+| 项目+模型+角色=member | 现有 `members` 表已支持自由 id | 命名约定 `agent:<model>@<project>:<role>`、`deploy/bridges.json` 配置模板（含 `decision_tier` 字段） |
+| bridge 服务化 + 基础设施定位 | `agent_instances` 表已记录 bridge 状态 | Windows Service / systemd 模板、bridge 配置文件、ops 文档 |
 | `groups.metadata` | `groups` 表当前无 metadata 字段 | 增加 JSON 字段、读写 API |
 | 项目目录文档 | 完全在 Agent prompt / 项目目录层面 | 无需平台改动 |
 | 升级链原语 | DISCUSSION-SCOPE-1 已落地 | 无需平台改动；由各 bridge prompt 落实 |
+| AGENTS.md 抽象字典 + bridge 注入身份 | bridge 已能在 prompt 中传递 member_id | bridge 配置增加 `decision_tier` 字段；bridge 处理消息时反查 `groups.metadata.roles` 注入业务角色；`AGENTS.md` 角色段需去具体化 |
 
 ### 不在本节范围内的事项
 
