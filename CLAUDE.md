@@ -1,62 +1,19 @@
-# TALK — AI 智能体聊天中转平台
+# TALK — Claude Code 入口
 
-家庭局域网内的轻量级 Agent ↔ Agent ↔ 人类 实时聊天与文件交换平台。
+本文件由 Claude Code 自动加载。Claude 在本项目中作为一个普通 agent，遵循全 agent 通用的协作约定，不享受特殊待遇。
 
-## 开发者指引
+## 必读清单
 
-1. **先读** `docs/PROJECT_BRIEF.md`：了解项目全貌、技术栈、数据模型。
-2. **再读你负责的模块文档**：根据任务，在 `PROJECT_BRIEF` 的模块索引中找到对应的 `MODULE_xxx.md`，只读那一份。
-3. **不要读其它模块文档**：节省 token，保持专注。
-4. **不确定时**：查看 `PROJECT_BRIEF` 的模块索引表，或询问项目管理者。
+1. `AGENTS.md` —— 抽象角色字典（决策 / 执行 Agent）、协作节奏、切片收尾约定、编码与文档语言约定、项目结构注意事项、技术栈速查、启动方式
+2. `docs/PROJECT_BRIEF.md` —— 项目定位、系统架构、数据模型、运维基线、模块索引；模块索引指向各 `MODULE_xxx.md`，按任务只读对应那一份
+3. `docs/PROGRESS.md` —— 当前进度快照、当前角色分配、卡点与下一步计划
 
-## 技术栈速查
+## Claude 在本项目的身份
 
-- 后端：Python 3.11 + FastAPI + uvicorn + SQLModel
-- 数据库：SQLite（WAL 模式）
-- 前端：Vanilla JS + Tailwind CSS (CDN)
-- 鉴权：`X-API-Key` header
-- 配置：`config.toml`（由 `tomllib` 读取）
+- **决策分级**（决策 Agent / 执行 Agent）与**业务角色**（lead / dev / ui / tester 等）的来源：
+  - **目标态**：bridge 在 prompt 中按 bridge 配置 + `groups.metadata.roles` 注入。该"角色注入框架"尚未落地，对应 `docs/PROGRESS.md` Next Plan 修复项 5.3。
+  - **过渡态**：5.3 落地之前，Claude 的角色由 `docs/PROGRESS.md` 第 1 节 "Current Agent Role" 显式声明；未声明则按 `AGENTS.md` 默认规则处理（即**执行 Agent**）。
 
-## 启动方式
+## 部署 / 运维入口
 
-```bash
-pip install -r requirements.txt
-python -m uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-API 文档：http://127.0.0.1:8000/docs
-
-## 运维说明
-
-- 健康检查：`GET /healthz`
-- 结构化日志：默认写入 `logs/talk.log`，按天切割，配置见 `config.toml` 的 `[logging]`
-- SQLite 在线备份：`python scripts/backup_db.py`
-- 备份目录与保留份数：配置见 `config.toml` 的 `[backup]`
-
-## 项目结构注意事项
-
-- SDK 代码位于 `TALK/client/`；项目根目录下存在一个同名 `TALK` 子目录，这不是 bug
-- 这是 `SDK-1` 落地后的当前结构，默认运行前提是 `cwd = 项目根`
-- Python import 路径固定写成 `from TALK.client import TalkClient`
-- 不要写成 `from client import X`，也不要假设 `client/` 是项目根级包
-
-### 定时备份参考
-
-Linux / cron：
-
-```bash
-0 3 * * * cd /path/to/TALK && python scripts/backup_db.py
-```
-
-Windows 任务计划器：
-
-```powershell
-powershell -Command "Set-Location 'C:\MY TOOLS\MY WORK\TALK'; & 'C:\Users\bobo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' scripts\backup_db.py"
-```
-
-### 部署入口
-
-- Docker 快速部署：`docker compose up -d --build`
-- systemd 模板：`deploy/talk.service`
-- 家庭部署入口：`docs/QUICKSTART_USER.md`
-- 完整部署文档：`docs/DEPLOY.md`
+详见 `docs/DEPLOY.md`、`docs/QUICKSTART_USER.md`，及 `docs/PROJECT_BRIEF.md` "运维基线"段。

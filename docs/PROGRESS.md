@@ -42,17 +42,25 @@ Updated: 2026-05-27 00:13 (Asia/Shanghai)
    - 修复后效果：codex 不再每条回复都以 "codex 在线，…" 起头，回复语言自然多样化。
    - 影响代码：`bridges/cli_bridge.py` 中 `RESPONSE_STYLE_INSTRUCTIONS` 常量。
 
-   **修复项 5.3：bridge 处理消息前读取群信息并注入 prompt**（覆盖原报告 D + E）
+   **修复项 5.3：建立 Agent 角色注入框架**（覆盖原报告 D + E；同时是 `docs/LOCAL_LAB_DESIGN.md` 2026-05-27 共识章节原则 7 的最小落地）
+   - **真实定位**：这不是一个单点 bug 修复，而是"全 agent 角色管理"的基础设施切片。落地后 `AGENTS.md` 抽象角色字典才真正能被 agent 对号入座；本项 + 5.4 一起构成完整的角色框架。
    - 规则：bridge 在 spawn LLM CLI 前，按当前消息所属 `group_id` 调用 `GET /api/groups/{id}` 与 `GET /api/groups/{id}/members`，取得成员清单（含 `display_name`）和 metadata，再据此动态拼 prompt。
-   - prompt 注入内容：
+   - bridge 启动配置增加 `decision_tier` 字段（取值 `decision` / `execution`，缺省按 `execution` 处理）。
+   - prompt 必须注入的"身份三元事实"：
+     1. **`member_id`**：当前 agent 的完整身份（如 `agent:deepseek@projA:tester`）—— 已有部分实现，本项确认覆盖
+     2. **`decision_tier`**：当前 agent 的决策分级（来自 bridge 启动配置）—— 新增
+     3. **业务角色**：当前 agent 在本群的业务角色（反查 `metadata.roles[<self_member_id>]`，如有；缺失走缺省策略）—— 新增
+   - prompt 同时注入：
      - **本群完整成员清单**（事实清单，禁止指名清单外成员）
-     - **该 agent 在本群的角色**（来自 `metadata.roles[<self_member_id>]`，如有）
      - **缺省策略**：若 `metadata.roles` 缺失或当前 agent 无角色，注入"本群无角色约定，只严格回应字面请求，不要主动扩展，不要假设这是项目讨论"
    - 修复后效果：
+     - 所有 agent 进会话即知道自己 `member_id / decision_tier / 业务角色`，不再需要从 PROGRESS.md 临时声明读出（PROGRESS.md 第 1 节"Current Agent Role"可在 5.3 落地后简化甚至移除）
      - pi 不再幻觉出 `paddy / bobo` 之类非群成员名（经项目管理者确认，这两个名字不在项目任何文档中定义，判定为 pi CLI 自身训练污染）
      - 寒暄/在线确认类纯测试群内，pi 不再主动追问项目/模块/协作机会
-   - 实现节奏：本项目前 `groups` 表尚无 `metadata` 字段（待修复项 5.4 落地），因此修复项 5.3 先按"metadata 缺失 → 默认严格策略"实现；待 `groups.metadata` 字段加入后再扩出"按角色注入"分支，无需返工成员清单注入逻辑。
-   - 影响代码：`bridges/cli_bridge.py` 消息处理入口与 prompt 拼装函数。
+   - 实现节奏：本项目前 `groups` 表尚无 `metadata` 字段（待修复项 5.4 落地），因此修复项 5.3 先按"metadata 缺失 → 默认严格策略"实现；待 `groups.metadata` 字段加入后再扩出"按角色注入"分支，无需返工成员清单注入逻辑与 `decision_tier` 注入。
+   - 影响代码：`bridges/cli_bridge.py` 消息处理入口与 prompt 拼装函数；`deploy/bridges.example.json` 模板增加 `decision_tier` 字段。
+
+   **5.3 落地前的过渡机制**：角色管理仍由 `docs/PROGRESS.md` 第 1 节"Current Agent Role"显式声明，沿用本轮当前做法。Claude 通过 `CLAUDE.md` 必读清单先读 `PROGRESS.md` 即可在每次会话开始确认自己的临时角色。
 
    **修复项 5.4（后置，依赖产品形态对齐切片）**：`groups.metadata` JSON 字段落地与读写 API；按 `docs/LOCAL_LAB_DESIGN.md` "2026-05-27 产品形态对齐共识"章节执行。修复项 5.3 在该字段就绪后回头打开"按角色注入"分支。
 
@@ -84,6 +92,7 @@ Updated: 2026-05-27 00:13 (Asia/Shanghai)
 - `docs/PROGRESS_HISTORY.md`
 - `docs/LOCAL_LAB_DESIGN.md`（2026-05-27 新增产品形态对齐共识章节 + 当日补充身份三元组与 AGENTS.md 抽象字典原则，不涉及代码改动）
 - `AGENTS.md`（同步去除具体身份指派，改为抽象角色字典；业务角色由 `groups.metadata.roles` 承载，不在本文件枚举）
+- `CLAUDE.md`（砍成薄壳入口：保留必读清单、Claude 身份说明、部署/运维指路；移除与 `AGENTS.md` / `docs/PROJECT_BRIEF.md` 重复的开发者指引、技术栈速查、启动方式、运维说明、项目结构注意事项、定时备份参考、部署入口具体内容）
 
 ## Recent Notes
 - 完整历史见 `docs/PROGRESS_HISTORY.md`。
