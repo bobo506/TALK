@@ -1,10 +1,72 @@
 # 开发历史 · TALK
 
 <!--
-项目根：c:\MY TOOLS\MY WORK\TALK
-最后更新：2026-05-20 23:16，任务调度 API 第一版已完成并验证
+项目根：d:\claude-test\TALK
+最后更新：2026-05-29 第二轮，5.3 修复回炉（pi system prompt 去硬编码 + 5.3 注入挪到 prompt 开头）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-29 第二轮 (Asia/Shanghai) — 5.3 修复回炉
+### 背景
+- 第一轮 5.1/5.2/5.3 落地后跑黑盒测试 `test_after_5.3.md`：codex 表现达预期，但 pi 全线 FAIL —— 反复"bobo"幻觉名（场景 2/3/6）、自封"方案评审"（场景 1/9）、寒暄持续扩展（场景 1/2/3/8）。
+- 诊断：根因不是 5.3 设计错误或注入逻辑，而是 `bridges/pi_bridge.py` 的 `DEFAULT_SYSTEM_PROMPT`（commit `3c7ca9a` 引入，先于 5.1-5.3）硬编码了 `to=human:bobo` 与"评审方案"，并通过 `--system-prompt` argv 以 system role 高权重传给 pi CLI，压垮了 5.3 在 user prompt 末尾的群成员清单注入。codex 没有 system prompt 硬编码所以 5.3 对它生效。
+
+### Current Progress
+- **P0：`bridges/pi_bridge.py` 去硬编码**
+  - 删除 `DEFAULT_SYSTEM_PROMPT` 中两处 `to=human:bobo`，改为 `to=「清单内的 human id」`（CJK 角括号避免触发 shell metacharacter 守卫）
+  - 删除"评审方案"自封定位
+  - 新增"回复克制"段（一两句话回应寒暄、不要追问、不要主动 offer 评审/优化/规划等服务）
+  - 新增"身份与成员清单"段（明确声明用户消息开头的 `[系统]` 块是唯一身份事实，禁止使用清单外的任何名字 — 即便在过往记忆里出现过）
+- **P1：`bridges/cli_bridge.py` pi 路径让 5.3 真正生效**
+  - `build_cli_prompt()` 和 `build_cli_task_prompt()` 的 pi 分支：`[系统]` 块从 prompt 末尾挪到开头（高权重位置），新增 `[用户消息]` / `[任务]` 分段
+  - pi 现在也拿到了"回复克制"指引（之前完全没拿到 `RESPONSE_STYLE_INSTRUCTIONS`，这是寒暄持续扩展的另一根因）
+
+### Open Questions / Pending Confirmation
+- 待项目管理者复跑黑盒测试 `D:\claude-test\black box test\talk\codexscenario-1-scope-fix\test_after_5.3.md`（结果区已清空回模板状态）
+- 重点验证 pi 路径：bobo/paddy 应消失、不应自封角色、寒暄一两句即收口；codex 路径不应被打坏；场景 4/5 不变量应保持
+- 5.1 / 5.2 / 5.3 第一轮代码完全未动；codex 路径完全未动
+
+### Verification
+- `py_compile bridges/cli_bridge.py bridges/codex_bridge.py bridges/pi_bridge.py tests/test_cli_bridge.py tests/test_pi_bridge.py` 通过
+- `unittest tests.test_pi_bridge tests.test_cli_bridge` — 48 tests 全过（含新增 2 个 5.3 P1 回归测试）
+- `unittest tests.test_codex_bridge tests.test_discussions tests.test_talk_client` — 24 tests 全过（确认未打坏 codex/discussions/SDK 路径）
+- 全量 `unittest discover` — 150 tests，1 个 known-flaky `test_websocket.py` presence timing failure（与本轮改动无关，独立重跑前历史已记录类似 WS timing flakiness）
+- 未做真实 Codex+pi 长链路主观体验自测（按黑盒测试设计要求保留给无项目记忆 agent）
+
+### Changed Files
+- `bridges/pi_bridge.py`
+- `bridges/cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`（本文件）
+
+---
+
+## 2026-05-29 (Asia/Shanghai)
+### Current Progress
+- **修复项 5.1（visible_reply 调度顺序修正）**：`handle_incoming_message()` 中将 `client.reply()` 移到 `execute_talk_actions()` 之前，确保 visible_reply 先回 sender；删除 `"已按讨论协议继续推进。"` 和 `"({bridge_label} finished without visible output.)"` 两个 fallback 文案；action 错误通知作为 follow-up relay。
+- **修复项 5.2（去除 prompt 中具体例句）**：`RESPONSE_STYLE_INSTRUCTIONS` 中移除 `"for example '<agent id> 在线。'"` 具体例句，仅保留抽象风格指令。
+- **修复项 5.3（Agent 角色注入框架）**：
+  - 新增 `--decision-tier` CLI 参数（`decision` / `execution`，缺省 `execution`），bridge 启动配置注入
+  - 新增 `_decision_tier_line()` 中文分级描述辅助函数
+  - 新增 `_build_group_member_context()`：bridge 在 spawn LLM CLI 前调用 `GET /api/groups/{id}` 获取群成员清单和 metadata，动态拼入 prompt
+  - `build_cli_prompt()` 和 `build_cli_task_prompt()` 均注入身份三元事实（`member_id` + `decision_tier` + 业务角色）和群成员约束（只能提及清单内成员）
+  - metadata 缺失时走默认严格策略："本群无角色约定，只严格回应字面请求，不要主动扩展话题，不要假设这是项目讨论环境，不要指名群外成员"
+  - 新建 `deploy/bridges.example.json` 模板，含 `decision_tier` 字段和字段参考
+- pi 和非 pi prompt 格式均同步更新为中文身份声明（"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK"）
+- 测试同步更新：9 个 pi prompt 测试适配新格式，2 个 FakeClient 补充 `get_group` 方法
+### Open Questions / Pending Confirmation
+- `groups.metadata` 字段尚未落地（待修复项 5.4），5.3 按"metadata 缺失 → 默认严格策略"实现
+- PROGRESS.md 第 1 节"Current Agent Role"过渡声明在 5.3 落地后可简化
+### Verification
+- `py_compile` 10 文件全部通过
+- `unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge tests.test_discussions tests.test_talk_client` 全部通过，70 tests
+- 未做真实 Codex+pi 长链路主观体验自测
+### Changed Files
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `deploy/bridges.example.json`（新建）
 
 ## 2026-05-27 00:13 (Asia/Shanghai)
 ### Current Progress

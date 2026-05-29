@@ -29,6 +29,18 @@ class PiBridgeTests(unittest.TestCase):
         self.assertIn("TALK_ACTION", system_prompt)
         self.assertIn("final_to_human", system_prompt)
         self.assertNotIn("talk-action", system_prompt)
+        # 5.3 P0 修复：禁止 system prompt 里出现任何具体人名硬编码
+        # （之前 to=human:bobo 导致 pi 把"bobo"幻觉成群里的人类）
+        self.assertNotIn("human:bobo", system_prompt)
+        self.assertNotIn("human:qa", system_prompt)
+        self.assertNotIn("agent:codex", system_prompt)
+        # 5.3 P0 修复：禁止 system prompt 自封业务角色
+        # （之前"评审方案"让 pi 把自己定位成"方案评审者"主动招揽工作）
+        self.assertNotIn("评审方案", system_prompt)
+        # 5.3 P0 修复：必须强调"只能提及清单内成员"与"回复克制"
+        self.assertIn("成员清单", system_prompt)
+        self.assertIn("不得", system_prompt)  # "不得称呼或 @ 清单外的任何名字"
+        self.assertIn("回复克制", system_prompt)
         for metachar in ("|", "/", "<", ">", "&"):
             self.assertNotIn(metachar, system_prompt)
 

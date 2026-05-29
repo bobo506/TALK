@@ -1176,8 +1176,17 @@ def build_cli_prompt(
     tier_line = _decision_tier_line(decision_tier)
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        member_block = f"\n\n[系统]\n你的身份：{member_id}。{tier_line}\n{group_member_context}".rstrip()
-        return f"{task}{context_block}{member_block}"
+        # 5.3 注入：把身份事实块放在 prompt 开头（权重高于结尾），
+        # 强约束 pi 必须使用此处提供的身份与成员清单，覆盖任何 system prompt 内的示例值。
+        member_block = (
+            "[系统]\n"
+            f"你的身份：{member_id}。{tier_line}\n"
+            f"{group_member_context}"
+            "回复克制：与请求范围匹配。打招呼/确认在线/寒暄请求只用一两句话回应；"
+            "不要追问对方在做什么、负责什么模块、有什么任务；"
+            "不要主动 offer 评审、优化、方案对比、规划等服务。\n"
+        ).rstrip() + "\n\n[用户消息]\n"
+        return f"{member_block}{task}{context_block}"
 
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
@@ -1213,7 +1222,13 @@ def build_cli_task_prompt(
     tier_line = _decision_tier_line(decision_tier)
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        header = f"[系统]\n你的身份：{member_id}。{tier_line}\n\n"
+        # 5.3 注入：身份事实块放在 prompt 开头，覆盖 system prompt 内的示例值。
+        header = (
+            "[系统]\n"
+            f"你的身份：{member_id}。{tier_line}\n"
+            "回复克制：与请求范围匹配。简单任务一两句话完成；不要主动扩展为项目讨论或方案规划。\n"
+            "\n[任务]\n"
+        )
         return f"{header}标题：{title}\n\n{content}" if title else f"{header}{content}"
 
     task_id = task.get("id") or "unknown"

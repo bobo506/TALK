@@ -68,6 +68,9 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertIn("ask codex to review this too", prompt)
         self.assertIn("你的身份：agent:pi", prompt)
+        # 5.3 P1：[系统] 块在 prompt 开头（高权重位置），任务正文紧随其后
+        self.assertTrue(prompt.startswith("[系统]"))
+        self.assertIn("[任务]", prompt)
         self.assertNotIn("用户任务", prompt)
         self.assertNotIn("回复要求", prompt)
         self.assertNotIn("Task creator:", prompt)
@@ -90,6 +93,7 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("标题：复盘", prompt)
         self.assertIn("总结一下", prompt)
         self.assertIn("你的身份：agent:pi", prompt)
+        self.assertTrue(prompt.startswith("[系统]"))
 
     def test_build_cli_prompt_for_pi_uses_raw_user_text(self):
         prompt = build_cli_prompt({
@@ -98,9 +102,10 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在吗",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("在吗"))
+        # 5.3 P1：[系统] 块在 prompt 开头，用户消息紧随 [用户消息] 标签后
+        self.assertTrue(prompt.startswith("[系统]"))
+        self.assertIn("[用户消息]\n在吗", prompt)
         self.assertIn("你的身份：agent:pi", prompt)
-        self.assertNotIn("用户消息", prompt)
         self.assertNotIn("回复要求", prompt)
         self.assertNotIn("Sender:", prompt)
         self.assertNotIn("TALK message id:", prompt)
@@ -113,8 +118,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi @agent:codex 我觉得这个对话系统还需要完善",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("我觉得这个对话系统还需要完善"))
-        self.assertFalse(prompt.startswith("@"))
+        self.assertTrue(prompt.startswith("[系统]"))
+        self.assertIn("[用户消息]\n我觉得这个对话系统还需要完善", prompt)
         self.assertIn("你的身份：agent:pi", prompt)
 
     def test_build_cli_prompt_keeps_mid_sentence_mentions(self):
@@ -124,7 +129,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 请去问 @agent:codex 能不能看一下",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("请去问 @agent:codex 能不能看一下"))
+        self.assertTrue(prompt.startswith("[系统]"))
+        self.assertIn("[用户消息]\n请去问 @agent:codex 能不能看一下", prompt)
         self.assertIn("你的身份：agent:pi", prompt)
 
     def test_build_cli_prompt_for_pi_does_not_embed_capability_boundary(self):
@@ -134,9 +140,9 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 你好啊，你有哪些功能？用中文回复",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("你好啊，你有哪些功能？用中文回复"))
+        self.assertTrue(prompt.startswith("[系统]"))
+        self.assertIn("[用户消息]\n你好啊，你有哪些功能？用中文回复", prompt)
         self.assertIn("你的身份：agent:pi", prompt)
-        self.assertNotIn("TALK", prompt)
         self.assertNotIn("执行命令", prompt)
         self.assertNotIn("<Language:", prompt)
 
@@ -148,9 +154,55 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在群里回我",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("在群里回我"))
+        self.assertTrue(prompt.startswith("[系统]"))
+        self.assertIn("[用户消息]\n在群里回我", prompt)
         self.assertIn("你的身份：agent:pi", prompt)
         self.assertNotIn("TALK group id: group:lab", prompt)
+
+    def test_build_cli_prompt_for_pi_includes_role_restraint_instructions(self):
+        """5.3 P1 回归：pi prompt 必须包含'回复克制'指引（之前 pi 完全没拿到 RESPONSE_STYLE 类指引）。"""
+        prompt = build_cli_prompt({
+            "id": 9,
+            "from": "human:qa",
+            "content": "@agent:pi 你去和 codex 打个招呼",
+        }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+
+        self.assertIn("回复克制", prompt)
+        self.assertIn("一两句话", prompt)
+        self.assertIn("不要追问", prompt)
+
+    def test_build_cli_prompt_for_pi_injects_group_member_context_at_top(self):
+        """5.3 P1 回归：group_member_context 必须出现在 [系统] 块内，位于 prompt 开头。"""
+        group_ctx = (
+            "\n[当前群成员 — 只能提及以下成员]\n"
+            "  human:qa（QA Tester）\n"
+            "  agent:pi\n"
+            "  agent:codex\n\n"
+            "本群无角色约定，只严格回应字面请求，不要主动扩展话题，"
+            "不要假设这是项目讨论环境，不要指名群外成员。\n"
+        )
+        prompt = build_cli_prompt(
+            {
+                "id": 10,
+                "from": "human:qa",
+                "group_id": "group:bbtest",
+                "content": "@agent:pi 介绍下你自己",
+            },
+            member_id="agent:pi",
+            workdir=Path("D:/claude-test/TALK"),
+            runtime="pi",
+            group_member_context=group_ctx,
+        )
+
+        # 群成员清单必须出现在 [用户消息] 之前（即权重高的位置）
+        idx_system = prompt.find("[系统]")
+        idx_member_list = prompt.find("[当前群成员")
+        idx_user = prompt.find("[用户消息]")
+        self.assertGreaterEqual(idx_system, 0)
+        self.assertGreater(idx_member_list, idx_system)
+        self.assertGreater(idx_user, idx_member_list)
+        self.assertIn("human:qa", prompt)
+        self.assertIn("本群无角色约定", prompt)
 
     def test_format_cli_reply_uses_bridge_label(self):
         reply = format_cli_reply(
