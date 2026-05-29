@@ -159,17 +159,26 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("你的身份：agent:pi", prompt)
         self.assertNotIn("TALK group id: group:lab", prompt)
 
-    def test_build_cli_prompt_for_pi_includes_role_restraint_instructions(self):
-        """5.3 P1 回归：pi prompt 必须包含'回复克制'指引（之前 pi 完全没拿到 RESPONSE_STYLE 类指引）。"""
+    def test_build_cli_prompt_for_pi_does_not_duplicate_restraint_instructions(self):
+        """5.3 热修：'回复克制'语义规则应当只由 pi system prompt 承载，cli_bridge 不再重复注入。
+
+        上一轮把'回复克制'同时塞进 DEFAULT_SYSTEM_PROMPT 和 cli_bridge 的 [系统] 块，
+        双重指令导致 pi 把'用户派我去联系另一个 agent'误判为'打招呼克制'而不执行 TALK_ACTION。
+        本测试断言 cli_bridge 不再注入该指令，避免双重压制。
+        """
         prompt = build_cli_prompt({
             "id": 9,
             "from": "human:qa",
             "content": "@agent:pi 你去和 codex 打个招呼",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertIn("回复克制", prompt)
-        self.assertIn("一两句话", prompt)
-        self.assertIn("不要追问", prompt)
+        # cli_bridge 现在只注入身份事实 + 群成员清单，不重复语义规则
+        self.assertNotIn("回复克制", prompt)
+        self.assertNotIn("一两句话", prompt)
+        self.assertNotIn("不要追问", prompt)
+        # 但身份事实必须仍在
+        self.assertIn("你的身份：agent:pi", prompt)
+        self.assertIn("决策分级", prompt)
 
     def test_build_cli_prompt_for_pi_injects_group_member_context_at_top(self):
         """5.3 P1 回归：group_member_context 必须出现在 [系统] 块内，位于 prompt 开头。"""

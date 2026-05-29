@@ -41,6 +41,16 @@ class PiBridgeTests(unittest.TestCase):
         self.assertIn("成员清单", system_prompt)
         self.assertIn("不得", system_prompt)  # "不得称呼或 @ 清单外的任何名字"
         self.assertIn("回复克制", system_prompt)
+        # 5.3 热修：回复克制必须区分 A/B/C 三类，且 B 类（用户派 pi 联系另一个 agent）
+        # 必须明确"必须用 TALK_ACTION 实际执行任务转交"。
+        # 上一轮被这条规则误压制，pi 收到"请和 codex 确认在线状态"只敷衍回了一句 hi。
+        self.assertIn("A 类", system_prompt)
+        self.assertIn("B 类", system_prompt)
+        self.assertIn("C 类", system_prompt)
+        self.assertIn("任务转交", system_prompt)
+        self.assertIn("必须用 TALK_ACTION send_message", system_prompt)
+        # 防止误简化：必须出现"先承接用户再 TALK_ACTION"的顺序约束
+        self.assertIn("先简短承接用户一句", system_prompt)
         for metachar in ("|", "/", "<", ">", "&"):
             self.assertNotIn(metachar, system_prompt)
 

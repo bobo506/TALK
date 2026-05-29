@@ -2,9 +2,50 @@
 
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-05-29 第二轮，5.3 修复回炉（pi system prompt 去硬编码 + 5.3 注入挪到 prompt 开头）
+最后更新：2026-05-29 第三轮，5.3 回炉热修（区分 A/B/C 三类回复克制，B 类必须 TALK_ACTION）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-29 第三轮 (Asia/Shanghai) — 5.3 回炉热修
+### 背景
+- 第二轮回炉完成后开始重测 `test_after_5.3.md`，刚跑场景 2 就发现 pi 收到 `@agent:pi 请和 codex 互相确认在线状态` 只对 human 回了 `嘿，我是 pi！👋 有什么可以帮你的吗？`，未用 TALK_ACTION 联系 codex，120s 静默。场景 1 同样：pi 收到"你去和 codex 打个招呼"也未联系 codex。
+- 用户暂停测试，把测试 agent 抓取的消息流（s1-s6 的 JSON）留在测试目录供诊断。
+
+### 根因
+- 第二轮回炉时加的"回复克制"措辞过宽：`打招呼/确认在线/寒暄请求只用一两句话回应`。
+- pi 看到用户消息里有"确认在线状态"几个字，触发字面匹配，**忽略了"请和 codex 互相"将任务转交给 codex 的语义**，只对 human 敷衍一句就停下。
+- 同样的"克制"在 `pi_bridge.py` 的 `DEFAULT_SYSTEM_PROMPT` 和 `cli_bridge.py` 的 pi `[系统]` 块里**各放了一份**，双重保险变成双重压制。
+
+### Current Progress
+- **`bridges/pi_bridge.py` 的 `DEFAULT_SYSTEM_PROMPT`**：把"回复克制"重写为显式区分 **A/B/C 三类**：
+  - **A 类**（用户直接问候/确认状态）：一两句话简短回应
+  - **B 类**（用户派 pi 联系另一个 agent）：**必须**用 TALK_ACTION send_message 真的发消息；先简短承接 human 再发 action
+  - **C 类**（agent 间互回）：一两句即停，不主动追问/扩展
+  - 加 B 类判定信号清单（"请和、让、去问、去找、联系、通知" + agent 名）和"识别到 B 类时优先执行任务转交，不要被 A 或 C 的简短规则覆盖"兜底
+- **`bridges/cli_bridge.py`**：`build_cli_prompt` 和 `build_cli_task_prompt` 的 pi 分支**删除重复的"回复克制"行**；语义规则统一由 pi `DEFAULT_SYSTEM_PROMPT` 承载
+- **`tests/test_pi_bridge.py`**：加 assertion 守住 A/B/C 区分 + `必须用 TALK_ACTION send_message` + `先简短承接用户一句`等关键短语
+- **`tests/test_cli_bridge.py`**：原 `test_build_cli_prompt_for_pi_includes_role_restraint_instructions` 重写为 `test_build_cli_prompt_for_pi_does_not_duplicate_restraint_instructions`，断言 cli_bridge 不再重复注入
+
+### Open Questions / Pending Confirmation
+- 待项目管理者**只重启 pi bridge**（codex bridge 与 server 本轮未动）+ **新建测试群**（不复用 `646ab3e4fe7f`，那个含失败试跑的 6 条消息会污染场景 4/5）后复跑 `test_after_5.3.md`
+- 重点验证 pi 在场景 1/2 必须真的用 TALK_ACTION 联系 codex（不能再敷衍一句就停）
+- 旁观察：第二轮测试时测试 agent 创建群没加 `group:` 前缀（纯 hex `646ab3e4fe7f`），server 接受了；后续可以在 SDK 或 server 加格式规范化
+
+### Verification
+- `py_compile bridges/pi_bridge.py bridges/cli_bridge.py tests/test_pi_bridge.py tests/test_cli_bridge.py` 通过
+- `unittest tests.test_pi_bridge tests.test_cli_bridge` — 48 tests 全过
+- `unittest tests.test_codex_bridge tests.test_discussions tests.test_talk_client` — 24 tests 全过
+- 本轮总计 72 tests 全过
+
+### Changed Files
+- `bridges/pi_bridge.py`
+- `bridges/cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`（本文件）
+
+---
 
 ## 2026-05-29 第二轮 (Asia/Shanghai) — 5.3 修复回炉
 ### 背景

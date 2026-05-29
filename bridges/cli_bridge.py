@@ -1178,13 +1178,12 @@ def build_cli_prompt(
     if runtime.lower() == "pi" or member_id == "agent:pi":
         # 5.3 注入：把身份事实块放在 prompt 开头（权重高于结尾），
         # 强约束 pi 必须使用此处提供的身份与成员清单，覆盖任何 system prompt 内的示例值。
+        # 注意："回复克制"这条语义规则已经放在 pi 的 system prompt（DEFAULT_SYSTEM_PROMPT）里，
+        # 这里不再重复，避免双重指令导致 pi 把"任务转交"误判为"打招呼克制"而不执行 TALK_ACTION。
         member_block = (
             "[系统]\n"
             f"你的身份：{member_id}。{tier_line}\n"
             f"{group_member_context}"
-            "回复克制：与请求范围匹配。打招呼/确认在线/寒暄请求只用一两句话回应；"
-            "不要追问对方在做什么、负责什么模块、有什么任务；"
-            "不要主动 offer 评审、优化、方案对比、规划等服务。\n"
         ).rstrip() + "\n\n[用户消息]\n"
         return f"{member_block}{task}{context_block}"
 
@@ -1223,10 +1222,10 @@ def build_cli_task_prompt(
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
         # 5.3 注入：身份事实块放在 prompt 开头，覆盖 system prompt 内的示例值。
+        # "回复克制"语义规则统一放在 pi system prompt 里，避免双重指令冲突。
         header = (
             "[系统]\n"
             f"你的身份：{member_id}。{tier_line}\n"
-            "回复克制：与请求范围匹配。简单任务一两句话完成；不要主动扩展为项目讨论或方案规划。\n"
             "\n[任务]\n"
         )
         return f"{header}标题：{title}\n\n{content}" if title else f"{header}{content}"
