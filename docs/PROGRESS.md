@@ -30,6 +30,22 @@ Updated: 2026-05-29 (Asia/Shanghai)
 
   **背景**：第一轮 5.3 落地后跑黑盒测试，codex 表现达预期，但 pi 全线 FAIL —— 反复出现"bobo"幻觉名、自封"方案评审者"、寒暄场景持续扩展。诊断发现根因不是 5.3 设计或注入逻辑，而是 **pi 自己的 `DEFAULT_SYSTEM_PROMPT`（在 commit 3c7ca9a 引入）硬编码了 `to=human:bobo` 与 `"评审方案"`**，且通过 `--system-prompt` argv 以 system role 高权重传给 pi CLI，**直接压垮了 5.3 在 user prompt 末尾的群成员清单注入**。codex 没有这种 system prompt 硬编码所以 5.3 对它生效。
 
+- **5.3 回炉热修第二弹**（Claude 作为执行 Agent，2026-05-30，针对第三轮跑测试时发现"关键词匹配"+"A/B/C 标签"两个设计缺陷）：
+
+  **现象**：第三轮热修后跑测试，pi 不再敷衍但**仍然不执行任务转交**，#431 铁证 pi 把 `"A 类。"` 直接当话术输出！测试结果：场景 1/2/3 全 FAIL（pi 没去找 codex），场景 4/5/6/7 PASS，场景 8 MILD（pi 守住，codex 越界），场景 9 FAIL（pi 回避自我介绍）。
+
+  **根因（双重）**：
+  - **关键词匹配脆弱**：第三轮"判定 B 类的关键信号"列了`'请和、让、去问、去找、联系、通知'`，但用户消息"你去和 codex 打个招呼"里的"去和"不在清单里，pi 字面匹配失败→默认走 A 类→不执行
+  - **A/B/C 显式标签污染**：pi 把"A 类。"直接当话术输出（#431），说明标签暴露后会被模型当成回复模板用
+
+  **第四轮修复内容**：放弃关键词枚举，改用**场景类型描述**让 LLM 用语义理解判定：
+  - `bridges/pi_bridge.py` 的 `DEFAULT_SYSTEM_PROMPT`：把"回复克制"段从 A/B/C 关键词改写为【信使场景】/【自身询问场景】/【agent 互回场景】
+  - **信使场景判定核心**："用户的意图焦点是另一个成员还是你"，让 pi 自己问"用户期望谁回答这个问题、谁去做这件事？"
+  - **"拿不准时优先按信使处理"** 兜底——错执行比不执行容易补救
+  - **自身询问场景兜底**：被问"介绍下你自己"必须说出 member_id + 本群是否有角色（修场景 9）
+  - **显式禁止输出场景标签**：封掉"A 类。"那种泄漏
+  - `tests/test_pi_bridge.py`：守住"信使场景""意图焦点""拿不准时优先按信使处理""member_id""本群没有给我分配特定业务角色"等关键短语；assertNotIn `"A 类——"`/`"B 类——"`/`"C 类——"`防止字母标签回归
+
 - **5.3 回炉热修**（Claude 作为执行 Agent，2026-05-29 第三轮，针对第二轮跑测试时发现 pi 不再执行 TALK_ACTION 任务转交的问题）：
 
   **现象**：第二轮回炉后开始重测，刚跑到场景 2，pi 收到 `@agent:pi 请和 codex 互相确认在线状态`，只对 human 敷衍回了 `嘿，我是 pi！👋 有什么可以帮你的吗？`，**完全没有用 TALK_ACTION 联系 codex**，120s 静默。场景 1 同样：pi 收到"你去和 codex 打个招呼"也只回"是的，随时可以开始"，没去找 codex。
@@ -70,15 +86,17 @@ Updated: 2026-05-29 (Asia/Shanghai)
 
 ### 4) Next Plan
 1. 项目管理者**仅需重启 pi bridge**（TALK server 与 codex bridge 本轮未改动；pi bridge 必须重启因为 `DEFAULT_SYSTEM_PROMPT` 在 module import 时算进 argv，老进程加载的还是旧版）。
-2. **新建测试群**（不要复用 `646ab3e4fe7f`，那个有第二轮失败试跑的 6 条消息，会污染场景 4/5 的"旧讨论"判断；顺便加上 `group:` 前缀符合项目惯例）。
+2. **新建测试群**（不要复用 `group:2b3c9432ac73`，那个有第三轮失败试跑的 20+ 条消息会污染场景 4/5 的"旧讨论"判断；顺便加上 `group:` 前缀符合项目惯例）。
 3. 复跑 `D:\claude-test\black box test\talk\codexscenario-1-scope-fix\test_after_5.3.md`。本轮重点验证：
-   - **pi 在场景 1/2 必须真的用 TALK_ACTION 联系 codex**（不能像第二轮那样只对 human 回一句敷衍就停）
-   - pi 不再出现 `bobo` / `paddy` 等清单外人名（场景 2/3/6）
-   - pi 不再自称"方案评审"或类似自封角色（场景 1/9）
-   - pi 在 agent 互回阶段一两句即停，不主动追问项目/协作（场景 1/2/3/8）
-   - codex 路径保持不变；场景 4/5 不变量保持
+   - **pi 在场景 1/2/3 必须真的用 TALK_ACTION 联系 codex**（不能像第三轮那样只对 human 敷衍）—— 这次靠"意图焦点"语义判断 + "拿不准按信使处理"兜底，不再依赖关键词匹配
+   - **pi 不再在回复里写"A 类"等场景标签**（修第三轮 #431 的话术泄漏）
+   - **场景 9 pi 必须说出 member_id + 承认本群无业务角色**（修第三轮回避问题）
+   - pi 在 agent 互回阶段一两句即停（不变量保持）
+   - codex 路径保持不变；场景 4/5/6/7 不变量保持
+   - 已 PASS 的场景不应回归（场景 4/5/6/7）
 4. 黑盒测试通过后，继续修复项 5.4：`groups.metadata` JSON 字段落地与读写 API
 5. 5.4 就绪后，回头打开 5.3 的"按角色注入"分支（`_build_group_member_context()` 中 `metadata.roles` 线路无需返工）
+6. **遗留观察**（不在 5.3 范围内，先记录）：场景 8 codex 对 SQL 评审 FAIL —— codex 走 cli_bridge.py 的非 pi 分支，那里的克制只有英文 `RESPONSE_STYLE_INSTRUCTIONS`，强度不够。可在 5.4 之后单独处理
 
 ### 5) Verification
 - `py_compile bridges/cli_bridge.py bridges/codex_bridge.py bridges/pi_bridge.py tests/test_cli_bridge.py tests/test_pi_bridge.py` 通过
@@ -93,6 +111,11 @@ Updated: 2026-05-29 (Asia/Shanghai)
 - Not run by design: 真实 Codex+pi 长链路体验自测；由项目管理者复跑 `test_after_5.3.md` 黑盒验证
 
 ### 6) Changed Files
+**第四轮（5.3 回炉热修第二弹）改动**（叠加在第三轮之上）：
+- `bridges/pi_bridge.py`（"回复克制"段从 A/B/C 关键词改写为场景类型描述：信使 / 自身询问 / agent 互回；加意图焦点判定 + 拿不准兜底 + 自我介绍模板 + 禁止输出场景标签）
+- `tests/test_pi_bridge.py`（测试断言换成新关键词：信使场景 / 意图焦点 / 拿不准时优先按信使处理 / 本群没有给我分配特定业务角色；assertNotIn `A 类——` 防字母标签回归）
+- `docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
+
 **第三轮（5.3 回炉热修）改动**（叠加在第二轮工作树之上）：
 - `bridges/pi_bridge.py`（重写"回复克制"为 A/B/C 三类区分，加 B 类必须 TALK_ACTION 兜底）
 - `bridges/cli_bridge.py`（删除 pi 分支重复的"回复克制"，统一只由 system prompt 承载）

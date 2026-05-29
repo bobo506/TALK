@@ -41,16 +41,29 @@ class PiBridgeTests(unittest.TestCase):
         self.assertIn("成员清单", system_prompt)
         self.assertIn("不得", system_prompt)  # "不得称呼或 @ 清单外的任何名字"
         self.assertIn("回复克制", system_prompt)
-        # 5.3 热修：回复克制必须区分 A/B/C 三类，且 B 类（用户派 pi 联系另一个 agent）
-        # 必须明确"必须用 TALK_ACTION 实际执行任务转交"。
-        # 上一轮被这条规则误压制，pi 收到"请和 codex 确认在线状态"只敷衍回了一句 hi。
-        self.assertIn("A 类", system_prompt)
-        self.assertIn("B 类", system_prompt)
-        self.assertIn("C 类", system_prompt)
-        self.assertIn("任务转交", system_prompt)
+        # 5.3 热修第二弹：用场景类型描述替代 A/B/C 关键词匹配。
+        # 上一轮采用 A/B/C 标签 + 关键词清单的方式，结果 pi 把"A 类。"当话术输出（#431 铁证），
+        # 而且关键词"去和"不在清单里导致"你去和 codex 打个招呼"被误判为 A 类不执行 TALK_ACTION。
+        # 本轮改成场景描述 + "意图焦点"语义判断 + "拿不准优先按信使处理"兜底。
+        self.assertIn("信使场景", system_prompt)
+        self.assertIn("意图焦点", system_prompt)
         self.assertIn("必须用 TALK_ACTION send_message", system_prompt)
         # 防止误简化：必须出现"先承接用户再 TALK_ACTION"的顺序约束
         self.assertIn("先简短承接用户一句", system_prompt)
+        # 兜底：拿不准优先按信使处理，避免不执行任务
+        self.assertIn("拿不准时优先按信使处理", system_prompt)
+        # 场景 9 自我介绍修复：被问"介绍下你自己"时必须说出 member_id 和角色状态
+        self.assertIn("自身询问场景", system_prompt)
+        self.assertIn("member_id", system_prompt)
+        self.assertIn("本群没有给我分配特定业务角色", system_prompt)
+        # 防 #431 那种"A 类。"开头泄漏：必须显式禁止输出场景标签
+        self.assertIn("不要在回复里写出", system_prompt)
+        # 旧的 A/B/C 字母标签必须从行为指令中去掉
+        # 注意：上面"不要在回复里写出"那条本身可能提到 'A 类' 作为反例，
+        # 所以只检查 A 类是否作为指令性章节标题出现（用 "A 类——" 这种破折号结构判定）
+        self.assertNotIn("A 类——", system_prompt)
+        self.assertNotIn("B 类——", system_prompt)
+        self.assertNotIn("C 类——", system_prompt)
         for metachar in ("|", "/", "<", ">", "&"):
             self.assertNotIn(metachar, system_prompt)
 

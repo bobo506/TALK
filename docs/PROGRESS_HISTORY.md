@@ -2,9 +2,47 @@
 
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-05-29 第三轮，5.3 回炉热修（区分 A/B/C 三类回复克制，B 类必须 TALK_ACTION）
+最后更新：2026-05-30 第四轮，5.3 回炉热修第二弹（场景类型描述替代 A/B/C 关键词匹配）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-30 第四轮 (Asia/Shanghai) — 5.3 回炉热修第二弹
+### 背景
+- 第三轮（同日早些时候）把"回复克制"重写为 A/B/C 三类区分以解决"pi 不执行 TALK_ACTION"问题。但黑盒复测后发现两个新问题：
+  - **#431 铁证**：pi 把 `"A 类。"` 直接当话术输出（"A 类。你好，我是 Talk Group Hall 里的 pi..."），显式标签污染回复
+  - **关键词匹配脆弱**：B 类触发词清单 `"请和、让、去问、去找、联系、通知"` 不全，用户消息"你**去和** codex 打个招呼"里的"去和"不在清单里，pi 按字面匹配失败 → 默认走 A 类 → 不执行 TALK_ACTION
+- 测试结果分布：场景 1/2/3/9 FAIL，4/5/6/7 PASS，8 MILD。"无敷衍机械文案 / 无 bobo 幻觉 / 无越界扩展 / 无 codex 模板"四类已修问题没有回归。
+- 项目管理者点出根因方向："关键词匹配很难穷尽，应该用场景类型描述"。
+
+### Current Progress
+- **`bridges/pi_bridge.py` 的 `DEFAULT_SYSTEM_PROMPT`**：把"回复克制"段彻底重写：
+  - 放弃 A/B/C 字母标签 + 关键词清单
+  - 改用 **场景类型描述**：【信使场景】/【自身询问场景】/【agent 互回场景】
+  - **信使场景的判定核心是"意图焦点"语义判断**：让 pi 自己问"用户期望谁回答这个问题、谁去做这件事？"，答案是另一个成员就是信使场景
+  - **"拿不准时优先按信使处理"** 兜底——错执行比不执行容易补救
+  - **自身询问场景兜底**：被问"介绍下你自己"必须说出 member_id + 本群是否有角色（直接修场景 9）
+  - **显式禁止输出场景标签**：封掉"A 类。"那种泄漏
+- **`tests/test_pi_bridge.py`**：测试断言换成新关键词（信使场景 / 意图焦点 / 拿不准时优先按信使处理 / member_id / 本群没有给我分配特定业务角色）；`assertNotIn "A 类——"` / `"B 类——"` / `"C 类——"` 防字母标签回归
+
+### Open Questions / Pending Confirmation
+- 待项目管理者**只重启 pi bridge** + **新建测试群**（不复用 `group:2b3c9432ac73`）后复跑 `test_after_5.3.md`
+- 重点验证：场景 1/2/3 pi 是否真的发 TALK_ACTION 联系 codex；场景 9 是否说出 member_id + 承认无角色；pi 回复不含场景标签
+- 已 PASS 的场景 4/5/6/7 不应回归
+- **遗留**：场景 8 codex 对 SQL 评审 FAIL（codex 走 cli_bridge.py 非 pi 分支，那里克制只有英文 `RESPONSE_STYLE_INSTRUCTIONS`），不在 5.3 范围内；待 5.4 后单独处理
+
+### Verification
+- `py_compile bridges/pi_bridge.py tests/test_pi_bridge.py` 通过
+- `unittest tests.test_pi_bridge tests.test_cli_bridge` — 48 tests 全过
+- `unittest tests.test_codex_bridge tests.test_discussions tests.test_talk_client` 首次跑遇到 1 个 timing flaky（与本轮改动无关），立即重跑 24 tests 全过
+- 本轮总计 72 tests 全过
+
+### Changed Files
+- `bridges/pi_bridge.py`
+- `tests/test_pi_bridge.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`（本文件）
+
+---
 
 ## 2026-05-29 第三轮 (Asia/Shanghai) — 5.3 回炉热修
 ### 背景
