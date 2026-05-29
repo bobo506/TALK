@@ -25,7 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 RESPONSE_STYLE_INSTRUCTIONS = (
     "Match the scope of the user's request. For a simple presence check, greeting, or acknowledgement request, "
-    "reply in one short sentence only, for example '<agent id> 在线。'. "
+    "reply in one short sentence only. "
     "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
 )
 DISCUSSION_PROTOCOL_INSTRUCTIONS = (
@@ -623,6 +623,47 @@ async def _group_member_ids(client: Any, group_id: str | None) -> set[str] | Non
     return {str(member.get("member_id") or "") for member in group.get("members") or []}
 
 
+async def _build_group_member_context(client: Any, group_id: str | None, member_id: str) -> str:
+    """Build group member list and role context for prompt injection."""
+    if not group_id:
+        return ""
+    try:
+        group = await client.get_group(group_id)
+    except Exception:
+        return ""
+
+    members = group.get("members") or []
+    member_lines: list[str] = []
+    for m in members:
+        mid = str(m.get("member_id") or "")
+        display = str(m.get("display_name") or "")
+        if display and display != mid:
+            member_lines.append(f"  {mid}（{display}）")
+        else:
+            member_lines.append(f"  {mid}")
+
+    if not member_lines:
+        return ""
+
+    metadata = group.get("metadata") or {}
+    roles = (metadata.get("roles") or {}) if isinstance(metadata, dict) else {}
+    my_role = roles.get(member_id) if isinstance(roles, dict) else None
+
+    if my_role:
+        role_line = f"你在本群的业务角色：{my_role}。"
+    else:
+        role_line = (
+            "本群无角色约定，只严格回应字面请求，不要主动扩展话题，"
+            "不要假设这是项目讨论环境，不要指名群外成员。"
+        )
+
+    return (
+        "\n[当前群成员 — 只能提及以下成员]\n"
+        + "\n".join(member_lines)
+        + f"\n\n{role_line}\n"
+    )
+
+
 async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:
     if discussion_id is None:
         return
@@ -1113,6 +1154,12 @@ def should_handle_message(
     return recipients is None and respond_to_broadcast
 
 
+def _decision_tier_line(tier: str) -> str:
+    if tier == "decision":
+        return "你的决策分级：决策 Agent — 方向明确时可自主连续推进，遇方向/接口/权限/重大分歧时需先确认。"
+    return "你的决策分级：执行 Agent — 每次只处理一个已确认请求，完成后暂停等待确认。"
+
+
 def build_cli_prompt(
     message: dict[str, Any],
     *,
@@ -1120,19 +1167,26 @@ def build_cli_prompt(
     workdir: Path,
     runtime: str = "cli",
     discussion_context: str | None = None,
+    decision_tier: str = "execution",
+    group_member_context: str = "",
 ) -> str:
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
     context_block = f"\n\n{discussion_context}" if discussion_context else ""
+    tier_line = _decision_tier_line(decision_tier)
+
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        return f"{task}{context_block}"
+        member_block = f"\n\n[系统]\n你的身份：{member_id}。{tier_line}\n{group_member_context}".rstrip()
+        return f"{task}{context_block}{member_block}"
 
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
     group_id = message.get("group_id")
     group_line = f"TALK group id: {group_id}\n" if group_id else ""
     return (
-        f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
+        f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
+        f"{tier_line}\n"
+        f"{group_member_context}"
         f"Project root: {workdir}\n"
         "Answer the user's task. Keep the final response suitable for posting back into TALK.\n"
         f"{RESPONSE_STYLE_INSTRUCTIONS}"
@@ -1152,18 +1206,22 @@ def build_cli_task_prompt(
     member_id: str,
     workdir: Path,
     runtime: str = "cli",
+    decision_tier: str = "execution",
 ) -> str:
     content = str(task.get("content") or "").strip()
     title = str(task.get("title") or "").strip()
+    tier_line = _decision_tier_line(decision_tier)
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        return f"标题：{title}\n\n{content}" if title else content
+        header = f"[系统]\n你的身份：{member_id}。{tier_line}\n\n"
+        return f"{header}标题：{title}\n\n{content}" if title else f"{header}{content}"
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"
     title_block = f"Title: {title}\n" if title else ""
     return (
-        f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
+        f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
+        f"{tier_line}\n"
         f"Project root: {workdir}\n"
         "Answer the queued Agent task. Keep the final response suitable for posting back into TALK.\n"
         f"{RESPONSE_STYLE_INSTRUCTIONS}"
@@ -1264,6 +1322,7 @@ async def handle_queued_task(
     runtime: str = "cli",
     bridge_label: str = "CLI bridge",
     prompt_transport: str = "stdin",
+    decision_tier: str = "execution",
 ) -> bool:
     """Claim and execute one queued task. Returns False when another worker claimed it first."""
     from TALK.client.exceptions import TalkValidationError
@@ -1277,7 +1336,7 @@ async def handle_queued_task(
         raise
 
     task_text = str(claimed.get("content") or "")
-    prompt = build_cli_task_prompt(claimed, member_id=member_id, workdir=workdir, runtime=runtime)
+    prompt = build_cli_task_prompt(claimed, member_id=member_id, workdir=workdir, runtime=runtime, decision_tier=decision_tier)
     result_message_id: int | None = None
     completion_status = "succeeded"
     last_error: str | None = None
@@ -1339,6 +1398,7 @@ async def handle_incoming_message(
     prompt_transport: str = "stdin",
     send_ack: bool = False,
     report_status: Any | None = None,
+    decision_tier: str = "execution",
 ) -> None:
     sender = message.get("from")
     if not sender:
@@ -1425,12 +1485,16 @@ async def handle_incoming_message(
                 human_id=await _find_human_reviewer(client, group_id),
             )
 
+        group_member_context = await _build_group_member_context(client, group_id, member_id)
+
         prompt = build_cli_prompt(
             message,
             member_id=member_id,
             workdir=workdir,
             runtime=runtime,
             discussion_context=discussion_context,
+            decision_tier=decision_tier,
+            group_member_context=group_member_context,
         )
         result = await run_cli_command(
             command,
@@ -1449,6 +1513,14 @@ async def handle_incoming_message(
             reply = normalize_pi_reply_language(task_text, reply)
         visible_reply, actions = parse_talk_actions(reply)
         visible_reply = sanitize_visible_reply(visible_reply)
+
+        # Reply to sender FIRST, before executing any TALK_ACTION side effects
+        reply_message_id: int | None = None
+        if visible_reply:
+            reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
+            reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
+
+        # Then execute TALK_ACTION side effects
         action_notices = await execute_talk_actions(
             actions,
             client=client,
@@ -1456,25 +1528,18 @@ async def handle_incoming_message(
             member_id=member_id,
             task_text=task_text,
         )
+
+        # Relay action error notices to sender (as follow-up if visible reply was already sent)
         visible_action_notices = [notice for notice in action_notices if not notice.startswith("sent ")]
         if visible_action_notices:
-            visible_reply = visible_action_notices[0]
+            reply_message = await client.reply(
+                int(message["id"]), text=visible_action_notices[0], to=[sender], group_id=group_id
+            )
+            if reply_message_id is None:
+                reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
+
         mark_actions = [action for action in actions if action.action_type == "mark_stance"]
         has_final_action = any(action.action_type == "final_to_human" for action in actions)
-        should_post_reply = True
-        if not visible_reply and actions:
-            if sender_id.startswith("agent:"):
-                should_post_reply = False
-            else:
-                visible_reply = "已按讨论协议继续推进。"
-        if not visible_reply:
-            if should_post_reply:
-                visible_reply = f"({bridge_label} finished without visible output.)"
-
-        reply_message_id: int | None = None
-        if should_post_reply:
-            reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
-            reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
         if sender_id.startswith("agent:") and discussion and not mark_actions and reply_message_id is not None:
             await _append_discussion_turn(
                 client,
@@ -1554,6 +1619,7 @@ async def run_task_queue_worker(
                         runtime=args.runtime,
                         bridge_label=args.bridge_label,
                         prompt_transport=args.prompt_transport,
+                        decision_tier=args.decision_tier,
                     )
         except asyncio.CancelledError:
             raise
@@ -1616,6 +1682,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 prompt_transport=args.prompt_transport,
                 send_ack=args.send_ack,
                 report_status=report_status,
+                decision_tier=args.decision_tier,
             )
 
     task_worker: asyncio.Task[None] | None = None
@@ -1690,6 +1757,12 @@ def build_parser(
     parser.add_argument("--max-reply-chars", type=int, default=DEFAULT_MAX_REPLY_CHARS)
     parser.add_argument("--respond-to-broadcast", action="store_true")
     parser.add_argument("--send-ack", action="store_true")
+    parser.add_argument(
+        "--decision-tier",
+        choices=["decision", "execution"],
+        default="execution",
+        help="Agent decision tier for role injection. Default: %(default)s",
+    )
     return parser
 
 

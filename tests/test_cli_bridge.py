@@ -66,7 +66,8 @@ class CliBridgeTests(unittest.TestCase):
             runtime="pi",
         )
 
-        self.assertEqual(prompt, "ask codex to review this too")
+        self.assertIn("ask codex to review this too", prompt)
+        self.assertIn("你的身份：agent:pi", prompt)
         self.assertNotIn("用户任务", prompt)
         self.assertNotIn("回复要求", prompt)
         self.assertNotIn("Task creator:", prompt)
@@ -86,7 +87,9 @@ class CliBridgeTests(unittest.TestCase):
             runtime="pi",
         )
 
-        self.assertEqual(prompt, "标题：复盘\n\n总结一下")
+        self.assertIn("标题：复盘", prompt)
+        self.assertIn("总结一下", prompt)
+        self.assertIn("你的身份：agent:pi", prompt)
 
     def test_build_cli_prompt_for_pi_uses_raw_user_text(self):
         prompt = build_cli_prompt({
@@ -95,7 +98,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在吗",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertEqual(prompt, "在吗")
+        self.assertTrue(prompt.startswith("在吗"))
+        self.assertIn("你的身份：agent:pi", prompt)
         self.assertNotIn("用户消息", prompt)
         self.assertNotIn("回复要求", prompt)
         self.assertNotIn("Sender:", prompt)
@@ -109,8 +113,9 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi @agent:codex 我觉得这个对话系统还需要完善",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertEqual(prompt, "我觉得这个对话系统还需要完善")
+        self.assertTrue(prompt.startswith("我觉得这个对话系统还需要完善"))
         self.assertFalse(prompt.startswith("@"))
+        self.assertIn("你的身份：agent:pi", prompt)
 
     def test_build_cli_prompt_keeps_mid_sentence_mentions(self):
         prompt = build_cli_prompt({
@@ -119,7 +124,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 请去问 @agent:codex 能不能看一下",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertEqual(prompt, "请去问 @agent:codex 能不能看一下")
+        self.assertTrue(prompt.startswith("请去问 @agent:codex 能不能看一下"))
+        self.assertIn("你的身份：agent:pi", prompt)
 
     def test_build_cli_prompt_for_pi_does_not_embed_capability_boundary(self):
         prompt = build_cli_prompt({
@@ -128,7 +134,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 你好啊，你有哪些功能？用中文回复",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertEqual(prompt, "你好啊，你有哪些功能？用中文回复")
+        self.assertTrue(prompt.startswith("你好啊，你有哪些功能？用中文回复"))
+        self.assertIn("你的身份：agent:pi", prompt)
         self.assertNotIn("TALK", prompt)
         self.assertNotIn("执行命令", prompt)
         self.assertNotIn("<Language:", prompt)
@@ -141,7 +148,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在群里回我",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertEqual(prompt, "在群里回我")
+        self.assertTrue(prompt.startswith("在群里回我"))
+        self.assertIn("你的身份：agent:pi", prompt)
         self.assertNotIn("TALK group id: group:lab", prompt)
 
     def test_format_cli_reply_uses_bridge_label(self):
@@ -373,7 +381,8 @@ class CliBridgeTests(unittest.TestCase):
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             self.assertEqual(command, ["pi", "run"])
-            self.assertEqual(prompt, "say ok")
+            self.assertIn("say ok", prompt)
+            self.assertIn("你的身份：agent:pi", prompt)
             self.assertEqual(prompt_transport, "argv")
             return CliRunResult(returncode=0, stdout="OK", stderr="")
 
@@ -415,13 +424,17 @@ class CliBridgeTests(unittest.TestCase):
                 self.replies.append((message_id, text, to, group_id))
                 return {"id": 41}
 
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:pi"}]}
+
         statuses = []
 
         async def fake_report_status(status, **kwargs):
             statuses.append((status, kwargs))
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
-            self.assertEqual(prompt, "group task")
+            self.assertIn("group task", prompt)
+            self.assertIn("你的身份：agent:pi", prompt)
             self.assertNotIn("TALK group id: group:lab", prompt)
             return CliRunResult(returncode=0, stdout="group reply", stderr="")
 
@@ -676,7 +689,10 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.sent, [])
         self.assertEqual(
             client.replies,
-            [(40, "当前 Group 里没有 agent:uxwriter，我不能代发；请确认是否需要我直接处理。", ["human:bobo"], "group:lab")],
+            [
+                (40, "我去问 uxwriter。", ["human:bobo"], "group:lab"),
+                (40, "当前 Group 里没有 agent:uxwriter，我不能代发；请确认是否需要我直接处理。", ["human:bobo"], "group:lab"),
+            ],
         )
 
     def test_send_message_action_degrades_when_discussion_api_is_missing(self):
@@ -740,7 +756,7 @@ class CliBridgeTests(unittest.TestCase):
         client = asyncio.run(scenario())
 
         self.assertEqual(client.sent, [("@agent:codex 请问 pi 的问题", ["agent:codex"], 40, "group:lab")])
-        self.assertEqual(client.replies, [(40, "已按讨论协议继续推进。", ["human:bobo"], "group:lab")])
+        self.assertEqual(client.replies, [])
 
     def test_action_only_agent_message_does_not_post_default_reply(self):
         class FakeClient:
@@ -1418,13 +1434,17 @@ class CliBridgeTests(unittest.TestCase):
                 self.replies.append((message_id, text, to, group_id))
                 return {"id": 41}
 
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:pi"}]}
+
         statuses = []
 
         async def fake_report_status(status, **kwargs):
             statuses.append((status, kwargs))
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
-            self.assertEqual(prompt, "你好啊，你有哪些功能？用中文回复")
+            self.assertIn("你好啊，你有哪些功能？用中文回复", prompt)
+            self.assertIn("你的身份：agent:pi", prompt)
             return CliRunResult(
                 returncode=0,
                 stdout="Hey there! I'm pi, powered by Claude. I can read files and execute commands.",
