@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-30 (Asia/Shanghai) — 5.3 黑盒测试 5 轮后定位根因为协议机制；5.5 立项 function-calling 重构
+Updated: 2026-05-30 (Asia/Shanghai) — 5.3 接受现状；下一切片 5.5（function-calling 重构）优先于 5.4
 
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md` 抽象角色字典 + bridge 启动时注入的 `decision_tier`。
@@ -90,17 +90,19 @@ Updated: 2026-05-30 (Asia/Shanghai) — 5.3 黑盒测试 5 轮后定位根因为
 
 1. **5.3 状态：接受当前实现作为过渡版本**。已落地的部分（去硬编码、群成员清单注入、决策分级注入、自我介绍模板）设计正确、dump 验证 pi 是收到的；剩余的"pi 不输出 TALK_ACTION"问题留给 5.5 从协议层解决，不再继续改 prompt 文案。
 
-2. **下一切片 5.4：`groups.metadata` JSON 字段落地**（与协议机制正交，先做）
-   - `groups` 表加 `metadata JSON` 字段（SQLite TEXT 存 JSON 字符串）
-   - `POST /api/groups` / `PATCH /api/groups/{id}` 增加 `metadata` 字段读写
-   - SDK `create_group` / `update_group` helper 增加 `metadata` 参数
-   - 5.4 完成后回头打开 5.3 的"按角色注入"分支（`_build_group_member_context()` 中 `metadata.roles` 反查线路无需返工）
-
-3. **5.5 立项：agent 通信协议改造 function-calling**（5.4 落地后进入）
-   - 第一步：bridge 改用 LLM CLI 的原生工具调用接口（pi 关掉 `--no-tools`、注册 `talk_send` 等工具回调）
+2. **下一切片 5.5：agent 通信协议改造 function-calling**（**优先于 5.4**，理由：5.4 是给 agent 看的项目约定，前提是 agent 能可靠地"看见+行动"；当前 agent 行动层不可靠，先做 5.4 等于在着火的房子里铺地砖。具体落地阶段详见 `docs/LOCAL_LAB_DESIGN.md` "2026-05-30 Agent 通信协议方向调整" 章节）
+   - **最小可验证切片**：pi bridge 关掉 `--no-tools`、注册 1 个工具 `talk_send` 跑通；如果第一步跑通方向就对，后续顺势推进；如果第一步卡住说明 function-calling 路径本身有其它问题，需要重新评估
+   - 第一步：bridge 改用 LLM CLI 的原生工具调用接口（pi、codex、claude 各自的 function-calling 协议可能略有差异，先单独搞定 pi）
    - 第二步：实现 `agent_end` 钩子，bridge 自动把本轮可见输出作为 reply 回发
    - 第三步：保留 `TALK_ACTION` 文本协议解析作过渡兼容期
-   - 第四步：所有 bridge 升级后删除 `cli_bridge.py` 中 800+ 行协议补偿代码（详见 `docs/LOCAL_LAB_DESIGN.md` 新增章节）
+   - 第四步：所有 bridge 升级后删除 `cli_bridge.py` 中 800+ 行协议补偿代码
+
+3. **5.5 落地后做 5.4：`groups.metadata` JSON 字段**
+   - `groups` 表加 `metadata JSON` 字段
+   - `POST /api/groups` / `PATCH /api/groups/{id}` 增加 `metadata` 字段读写
+   - SDK `create_group` / `update_group` helper 增加 `metadata` 参数
+   - 5.5 落地后再做 5.4 有额外好处：可以根据 5.5 实施中观察到的"agent 实际需要哪些上下文"来反向定义 metadata schema，避免凭想象设计字段
+   - 5.4 完成后回头打开 5.3 的"按角色注入"分支（`_build_group_member_context()` 中 `metadata.roles` 反查线路无需返工）
 
 4. **诊断工具保留**：`bridges/cli_bridge.py` 中 `_dump_prompt()` / `_dump_diagnostic()` 通过环境变量 `TALK_DUMP_PROMPT=1` 控制，默认关闭不影响正常运行；将来排查 prompt 注入问题随时可用。
 
