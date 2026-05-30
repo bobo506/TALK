@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-05-29 (Asia/Shanghai)
+Updated: 2026-05-30 (Asia/Shanghai) — 5.3 黑盒测试 5 轮后定位根因为协议机制；5.5 立项 function-calling 重构
 
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md` 抽象角色字典 + bridge 启动时注入的 `decision_tier`。
@@ -85,18 +85,26 @@ Updated: 2026-05-29 (Asia/Shanghai)
 - Group 删除 / 归档语义、Schedule 后台触发策略、未读/关注状态和文档编辑锁仍待后续确认。
 
 ### 4) Next Plan
-1. 项目管理者**仅需重启 pi bridge**（TALK server 与 codex bridge 本轮未改动；pi bridge 必须重启因为 `DEFAULT_SYSTEM_PROMPT` 在 module import 时算进 argv，老进程加载的还是旧版）。
-2. **新建测试群**（不要复用 `group:2b3c9432ac73`，那个有第三轮失败试跑的 20+ 条消息会污染场景 4/5 的"旧讨论"判断；顺便加上 `group:` 前缀符合项目惯例）。
-3. 复跑 `D:\claude-test\black box test\talk\codexscenario-1-scope-fix\test_after_5.3.md`。本轮重点验证：
-   - **pi 在场景 1/2/3 必须真的用 TALK_ACTION 联系 codex**（不能像第三轮那样只对 human 敷衍）—— 这次靠"意图焦点"语义判断 + "拿不准按信使处理"兜底，不再依赖关键词匹配
-   - **pi 不再在回复里写"A 类"等场景标签**（修第三轮 #431 的话术泄漏）
-   - **场景 9 pi 必须说出 member_id + 承认本群无业务角色**（修第三轮回避问题）
-   - pi 在 agent 互回阶段一两句即停（不变量保持）
-   - codex 路径保持不变；场景 4/5/6/7 不变量保持
-   - 已 PASS 的场景不应回归（场景 4/5/6/7）
-4. 黑盒测试通过后，继续修复项 5.4：`groups.metadata` JSON 字段落地与读写 API
-5. 5.4 就绪后，回头打开 5.3 的"按角色注入"分支（`_build_group_member_context()` 中 `metadata.roles` 线路无需返工）
-6. **遗留观察**（不在 5.3 范围内，先记录）：场景 8 codex 对 SQL 评审 FAIL —— codex 走 cli_bridge.py 的非 pi 分支，那里的克制只有英文 `RESPONSE_STYLE_INSTRUCTIONS`，强度不够。可在 5.4 之后单独处理
+
+> **方向调整通告**：经过 5.3 的 4 轮 prompt 改写 + prompt dump 诊断 + 与 `disler/pi-vs-claude-code` 项目对比，确认 TALK 现有 `TALK_ACTION` 文本协议机制本身是 agent 通信不可靠的根因。后续不再在 5.3 prompt 文案上加压力，转而推进 5.4 / 5.5 两个切片。详见 `docs/LOCAL_LAB_DESIGN.md` "2026-05-30 Agent 通信协议方向调整" 章节。
+
+1. **5.3 状态：接受当前实现作为过渡版本**。已落地的部分（去硬编码、群成员清单注入、决策分级注入、自我介绍模板）设计正确、dump 验证 pi 是收到的；剩余的"pi 不输出 TALK_ACTION"问题留给 5.5 从协议层解决，不再继续改 prompt 文案。
+
+2. **下一切片 5.4：`groups.metadata` JSON 字段落地**（与协议机制正交，先做）
+   - `groups` 表加 `metadata JSON` 字段（SQLite TEXT 存 JSON 字符串）
+   - `POST /api/groups` / `PATCH /api/groups/{id}` 增加 `metadata` 字段读写
+   - SDK `create_group` / `update_group` helper 增加 `metadata` 参数
+   - 5.4 完成后回头打开 5.3 的"按角色注入"分支（`_build_group_member_context()` 中 `metadata.roles` 反查线路无需返工）
+
+3. **5.5 立项：agent 通信协议改造 function-calling**（5.4 落地后进入）
+   - 第一步：bridge 改用 LLM CLI 的原生工具调用接口（pi 关掉 `--no-tools`、注册 `talk_send` 等工具回调）
+   - 第二步：实现 `agent_end` 钩子，bridge 自动把本轮可见输出作为 reply 回发
+   - 第三步：保留 `TALK_ACTION` 文本协议解析作过渡兼容期
+   - 第四步：所有 bridge 升级后删除 `cli_bridge.py` 中 800+ 行协议补偿代码（详见 `docs/LOCAL_LAB_DESIGN.md` 新增章节）
+
+4. **诊断工具保留**：`bridges/cli_bridge.py` 中 `_dump_prompt()` / `_dump_diagnostic()` 通过环境变量 `TALK_DUMP_PROMPT=1` 控制，默认关闭不影响正常运行；将来排查 prompt 注入问题随时可用。
+
+5. **遗留观察**（不属于 5.3 范围）：场景 8 codex 直接评审 SQL 不检查角色约定 —— codex 走 cli_bridge.py 非 pi 分支，那里仍是英文 `RESPONSE_STYLE_INSTRUCTIONS`。5.5 function-calling 重构会一并改造非 pi 路径，届时此问题自然解决。
 
 ### 5) Verification
 - `py_compile bridges/cli_bridge.py bridges/codex_bridge.py bridges/pi_bridge.py tests/test_cli_bridge.py tests/test_pi_bridge.py` 通过
@@ -111,6 +119,12 @@ Updated: 2026-05-29 (Asia/Shanghai)
 - Not run by design: 真实 Codex+pi 长链路体验自测；由项目管理者复跑 `test_after_5.3.md` 黑盒验证
 
 ### 6) Changed Files
+**第五轮（诊断 + 方向调整）改动**（叠加在第四轮之上）：
+- `bridges/cli_bridge.py`（新增 `_dump_prompt()` / `_dump_diagnostic()` 诊断工具 + `_build_group_member_context()` 加诊断日志 + `handle_incoming_message` 调用 dump；全部用 `TALK_DUMP_PROMPT=1` 环境变量 gated，默认关闭）
+- `docs/LOCAL_LAB_DESIGN.md`（新增 "2026-05-30 Agent 通信协议方向调整：从文本协议标签转向 function-calling" 章节，记录 dump 诊断结论、对比报告引用、5.5 落地阶段规划）
+- `docs/PROGRESS.md`（更新 Next Plan：5.3 接受现状、5.4 优先、5.5 立项）
+- `docs/PROGRESS_HISTORY.md`（第五轮条目）
+
 **第四轮（5.3 回炉热修第二弹）改动**（叠加在第三轮之上）：
 - `bridges/pi_bridge.py`（"回复克制"段从 A/B/C 关键词改写为场景类型描述：信使 / 自身询问 / agent 互回；加意图焦点判定 + 拿不准兜底 + 自我介绍模板 + 禁止输出场景标签）
 - `tests/test_pi_bridge.py`（测试断言换成新关键词：信使场景 / 意图焦点 / 拿不准时优先按信使处理 / 本群没有给我分配特定业务角色；assertNotIn `A 类——` 防字母标签回归）

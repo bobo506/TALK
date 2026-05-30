@@ -2,9 +2,58 @@
 
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-05-30 第四轮，5.3 回炉热修第二弹（场景类型描述替代 A/B/C 关键词匹配）
+最后更新：2026-05-30 第五轮，5.3 黑盒测试 5 轮后定位根因为协议机制；5.5 立项 function-calling 重构
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-30 第五轮 (Asia/Shanghai) — 诊断 + 方向调整：协议机制层重构立项
+### 背景
+- 第四轮"信使场景"上线后跑黑盒测试，pi 仍然不发 TALK_ACTION，新冒出"系统 prompt 整段泄漏给用户"（场景 5 #460 "决策分级是：高自主权"、"本群成员清单（member_id）：[人类: 小白] [agent: pi]" —— 这些字串我代码里根本没写过）和"完全偏题回复"（场景 9 #470 触发"分组讨论已经开始"会议主持模板）等新症状
+- 项目管理者判断"模型不应该会忽视指令"，要求复查代码并做诊断
+
+### 诊断过程
+1. **代码复查**找到 2 个原则性问题 + 4 个设计问题：
+   - 原则性：`_build_group_member_context()` 静默失败（group_id 为空或 get_group 报错都返回 "")
+   - 原则性：`build_cli_prompt` pi 分支降级时无告警（清单为空时 [系统] 块只剩身份+决策分级）
+   - 设计：系统 prompt 太"对话式"，pi 把它当对话内容来 paraphrase
+   - 设计：缺 few-shot 示例
+   - 设计："系统 块"引用与 `[系统]` 实际不一致
+   - 设计：系统 prompt 是一坨无结构长字符串
+2. **加 prompt dump 诊断**（`bridges/cli_bridge.py` 新增 `_dump_prompt()` / `_dump_diagnostic()`，环境变量 `TALK_DUMP_PROMPT=1` 启用）
+3. **项目管理者手动重启 pi bridge + 跑场景 1/5/2，dump 写入 `logs/pi_prompt_dump.log`**
+4. **dump 结论非常清晰**：
+   - `group_id` 正常（`group:139f88c27756`）
+   - `group_member_ctx` 非空（107 chars）
+   - 群成员清单完整含 `agent:codex / agent:pi / human:qa`
+   - 决策分级文案与代码一致（`执行 Agent — 每次只处理一个已确认请求...`）
+   - **prompt 注入完全正确，但 pi 仍然乱回**
+5. **项目管理者提供 `disler/pi-vs-claude-code` 项目对比报告**（桌面 `pi-vs-claude-code-vs-TALK-评估报告.md`），第 3.3 节直指根因：TALK 的"自由文本嵌结构化协议标签"（`TALK_ACTION send_message to=agent:codex stance=question body=...`）架构本身让 LLM 不可能可靠输出 —— 任何模型在"对人说自然语言"+"对 bridge 说协议指令"双信道下都会失败
+6. **`bridges/pi_bridge.py:22-23` 自证**：pi CLI 当前以 `--no-tools` 启动，明确禁用了原生 function-calling 能力。我们自己关掉了更可靠的路径
+
+### Current Progress
+- **5.3 状态：接受当前实现作为过渡版本**。dump 证明 5.1-5.3 已落地的设计（调度顺序、去硬编码、群成员清单注入、决策分级注入、自我介绍模板）全部正确，pi 是收到这些事实的，剩余"pi 不输出 TALK_ACTION"问题是协议机制层的，不是 prompt 文案层
+- **`bridges/cli_bridge.py` 加入 prompt dump 工具**（73 行）：`_dump_prompt()` 完整记录 spawn LLM CLI 前的 prompt + 上下文元数据；`_dump_diagnostic()` 记录注入失败时的诊断信息；`_build_group_member_context()` 失败路径加诊断 log。全部通过 `TALK_DUMP_PROMPT=1` 环境变量 gated，默认关闭、零运行时影响；将来排查 prompt 问题随时可用
+- **`docs/LOCAL_LAB_DESIGN.md` 新增 "2026-05-30 Agent 通信协议方向调整：从文本协议标签转向 function-calling" 章节**，包含触发证据、根因分析、新方向工具集设计（`talk_send` / `talk_reply` / `talk_list_agents` / `talk_escalate` / `talk_mark_stance`）、与现有 5.1-5.3 工作的关系、5.5 落地阶段规划
+
+### Next Plan
+- **5.4 优先**：`groups.metadata` JSON 字段落地（与协议机制正交）
+- **5.5 立项**：agent 通信协议改造 function-calling，4 阶段落地（详见 `docs/LOCAL_LAB_DESIGN.md` 新章节）
+- 5.4 落地后 5.3 的 `metadata.roles` 反查线路自动激活，无需返工
+- 5.5 落地后预计可删 `cli_bridge.py` 中 800+ 行文本协议解析/清理/推断/兼容代码
+
+### Verification
+- 改动只涉及 `bridges/cli_bridge.py` 增加诊断函数 + 文档更新，不动其它代码
+- `py_compile bridges/cli_bridge.py` 通过
+- `unittest tests.test_pi_bridge tests.test_cli_bridge` 全过（dump 代码默认关闭，不影响测试）
+- 实证：prompt dump 文件 `D:\claude-test\TALK\logs\pi_prompt_dump.log` 3 条 dump 验证注入正确
+
+### Changed Files
+- `bridges/cli_bridge.py`
+- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`（本文件）
+
+---
 
 ## 2026-05-30 第四轮 (Asia/Shanghai) — 5.3 回炉热修第二弹
 ### 背景

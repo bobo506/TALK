@@ -300,4 +300,84 @@ This gives the project a real bridge to test before the deeper Group / Hall / SS
 - 自动启动 / 监控 Agent 进程的具体实现（先用系统服务托管，TALK 不充当 supervisor）。
 - 跨工作站 / 跨机器部署（先假定所有 bridge 与 TALK 同台工作站）。
 - 业务角色权限校验（平台不参与，由 Agent 自律 + 文档审计）。
+
+## 2026-05-30 Agent 通信协议方向调整：从文本协议标签转向 function-calling
+
+本节记录在多轮场景 1 黑盒测试 + pi prompt dump 诊断 + 与 `disler/pi-vs-claude-code` 项目对比之后，对 TALK 当前 agent 通信协议（`TALK_ACTION` 文本标签）的根本性反思和方向调整。
+
+### 触发证据
+
+经过 5.1-5.3 共 4 轮 prompt 改写仍无法让 pi 可靠完成"用户让 pi 联系另一个 agent"类任务（参考 `D:\claude-test\black box test\talk\codexscenario-1-scope-fix\test_after_5.3.md` 多轮结果），加入 prompt dump 诊断（`bridges/cli_bridge.py` 中 `_dump_prompt()`，环境变量 `TALK_DUMP_PROMPT=1` 启用）后得到决定性观察：
+
+- **dump 显示注入给 pi 的 prompt 完全正确**：群成员清单（含 codex）、决策分级、`本群无角色约定`兜底、`[系统]` 块在 prompt 开头位置 —— 都跟设计一致；
+- **pi 仍然不输出 `TALK_ACTION send_message`**：不联系 codex；
+- **pi 反而把 prompt 内容 paraphrase 回复给用户**（出现"高自主权""[人类: 小白] [agent: pi]"等 prompt 里根本没写的内容）；
+- pi 的后端是 DeepSeek V4，指令遵循能力本不应有这种缺陷。
+
+这条排除链得出唯一结论：**不是模型问题、不是注入问题、不是文案问题，是协议机制问题。**
+
+### 根因（参考 `pi-vs-claude-code-vs-TALK-评估报告` 第 3.3 节）
+
+TALK 当前要求 LLM 在自由文本输出中嵌入 `TALK_ACTION send_message to=agent:codex stance=question body=...` 这种自定义结构化协议，bridge 再用正则把它解析出来。该设计有四个根本问题：
+
+1. **格式脆弱**：模型拼错一个空格、写成驼峰、漏写 `body=` 就解析失败
+2. **双信道认知负担**：模型一段输出要同时承载"对人说自然语言"+"对 bridge 说协议指令"两种内容，LLM 经常把两者混在一起 —— 可见文本里泄漏协议关键词，或动作标签写得像自然语言
+3. **bridge 补偿代码膨胀**：`cli_bridge.py` 现已包含 1500+ 行专门修复文本协议不确定性的代码（正则解析、stance 推断、泄漏清理、协议残片清洗、新旧格式兼容）
+4. **新旧格式兼容负担**：旧 XML 标签 `<talk-action>` 和新行协议 `TALK_ACTION` 共存
+
+### 新方向：function-calling 协议
+
+参考 pi-vs-claude-code 的 `coms` 设计，agent 通信应改用 LLM **原生 function-calling** 机制：
+
+| | 旧方向（TALK_ACTION 文本协议）| 新方向（function-calling）|
+|---|---|---|
+| Agent 输出形式 | 自由文本嵌结构化标签 | 调用工具：`talk_send({target, body, stance})` |
+| 格式保证 | 靠模型记语法 | LLM function-calling API 天然保证 |
+| 协议指令量 | ~40 行 prompt 注入 | 1 行工具描述 |
+| bridge 补偿代码 | 1500+ 行 | 0 行 |
+| 模型认知负担 | 5+ 项同时考虑 | 1 项（"我要发给谁、说什么"）|
+| 协议透明性 | Agent 必须理解 stance 枚举等内部协议 | Agent 不知道协议存在 |
+
+### 平台层规划的工具集（初步）
+
+bridge 在 spawn LLM CLI 时注册以下工具，LLM 通过原生 function-calling 调用：
+
+| 工具名 | 参数 | 作用 |
+|--------|------|------|
+| `talk_send` | `target: str, body: str, stance?: str` | 向指定群内成员发送消息（替代 `TALK_ACTION send_message`）|
+| `talk_reply` | `body: str` | 回复当前对话的发起方（自动确定目标）|
+| `talk_list_agents` | 无 | 列出当前群内成员（替代靠 prompt 注入清单）|
+| `talk_escalate` | `body: str` | 升级给人类仲裁（替代 `TALK_ACTION escalate_to_human`）|
+| `talk_mark_stance` | `stance: str` | 标记本轮立场（替代 `TALK_ACTION mark_stance`）|
+
+可见回复仍走 bridge 的 `agent_end` / 输出捕获，**LLM 不需要显式调用"发送可见回复"** —— bridge 自动把本轮 LLM 输出的可见部分作为回复发回给 sender。
+
+### 关键代码层面观察
+
+`bridges/pi_bridge.py:22-23` 显示 pi CLI 当前以 `--no-tools` 启动，**明确禁用了 pi 原生的 function-calling 能力**。这就是为什么我们必须用文本协议 —— 是我们自己关掉了更好的路径。同行 `--tools` profile（第 31-32 行 `DEFAULT_PI_TOOLS_COMMAND`）已经证明 pi CLI 是支持工具调用的。
+
+### 落地阶段（暂定为切片 5.5）
+
+**第一步**：bridge 在 spawn LLM CLI 时注册 TALK 通信工具（替换 `--no-tools` 为 `--tools talk_send,talk_reply,talk_list_agents,talk_escalate,talk_mark_stance`，并配套实现工具回调）。
+
+**第二步**：bridge 实现 `agent_end` 钩子：LLM 本轮输出结束时，bridge 自动把可见文本作为对当前 sender 的 reply 发出。LLM 不需要显式调用 reply。
+
+**第三步**：保留旧 `TALK_ACTION` 文本协议解析作为过渡兼容（让旧 agent / 旧消息仍能工作），新 bridge 全部走工具调用。
+
+**第四步**：所有 bridge 升级到 function-calling 后，删除 `cli_bridge.py` 中文本协议的解析 / 清理 / 推断 / 兼容代码（评估报告估计可删 800+ 行）。
+
+### 与现有 5.1-5.3 工作的关系
+
+- **5.1**（visible_reply 调度顺序）：与协议机制无关，**保留**
+- **5.2**（去 prompt 例句）：保留
+- **5.3**（角色注入框架：member_id / decision_tier / 群成员清单 / 严格策略）：**设计正确，保留** —— dump 证明 pi 是收到了这些事实的，问题在它没法可靠输出协议，跟注入无关
+- **5.3 P0**（去 pi system prompt 硬编码）：保留，bobo 幻觉确实消失
+- **5.3 后续多轮回炉**（A/B/C 关键词、信使场景描述）：性价比变低 —— 在 5.5 function-calling 上线后这些 prompt 段大部分可以删掉，因为模型不再需要被"教会"协议
+- **5.4**（`groups.metadata` 字段落地）：与协议机制正交，**优先做完再做 5.5**
+
+### 不在本节范围内
+
+- 老 bridge 的兼容期限（暂定无明确截止，等所有 bridge 升级再下线）
+- 跨厂商 CLI 工具调用规范差异（codex / claude / pi 各自 function-calling 接口可能略异，5.5 实施时再适配）
+- 兼容旧消息历史里的 `TALK_ACTION` 残留（只影响展示，不影响新消息执行）
 - 同一 LLM 订阅在多项目并发时的限流策略（属订阅本身限制，由用户和 Agent prompt 自行规避）。

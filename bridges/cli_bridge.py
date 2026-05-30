@@ -623,13 +623,74 @@ async def _group_member_ids(client: Any, group_id: str | None) -> set[str] | Non
     return {str(member.get("member_id") or "") for member in group.get("members") or []}
 
 
+# ----------------------------------------------------------------------------
+# 临时诊断工具：TALK_DUMP_PROMPT=1 时把 pi spawn 前的完整 prompt 写到日志
+# 用完即移除，不应进入正式发布
+# ----------------------------------------------------------------------------
+_DIAGNOSTIC_DUMP_PATH = Path(os.environ.get("TALK_DUMP_PROMPT_FILE", "logs/pi_prompt_dump.log"))
+
+
+def _dump_diagnostic(line: str) -> None:
+    """Append a single diagnostic line (no full prompt). Best-effort, never raises."""
+    try:
+        _DIAGNOSTIC_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(_DIAGNOSTIC_DUMP_PATH, "a", encoding="utf-8") as f:
+            from datetime import datetime
+            f.write(f"[{datetime.now().isoformat(timespec='seconds')}] {line}\n")
+    except Exception:
+        pass
+
+
+def _dump_prompt(
+    *,
+    member_id: str,
+    message_id: str,
+    sender: str,
+    group_id: str | None,
+    group_member_context: str,
+    runtime: str,
+    decision_tier: str,
+    prompt: str,
+) -> None:
+    """Append the full prompt that's about to be sent to the LLM CLI. Best-effort, never raises."""
+    try:
+        _DIAGNOSTIC_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        from datetime import datetime
+        with open(_DIAGNOSTIC_DUMP_PATH, "a", encoding="utf-8") as f:
+            f.write("\n" + "=" * 78 + "\n")
+            f.write(f"timestamp        : {datetime.now().isoformat(timespec='seconds')}\n")
+            f.write(f"member_id        : {member_id}\n")
+            f.write(f"runtime          : {runtime}\n")
+            f.write(f"decision_tier    : {decision_tier}\n")
+            f.write(f"incoming msg id  : {message_id}\n")
+            f.write(f"sender           : {sender}\n")
+            f.write(f"group_id         : {group_id!r}\n")
+            f.write(f"group_member_ctx : {'(EMPTY!)' if not group_member_context else f'({len(group_member_context)} chars)'}\n")
+            f.write("-" * 78 + "\n")
+            f.write("FULL PROMPT (between <<<PROMPT and PROMPT>>> markers):\n")
+            f.write("<<<PROMPT\n")
+            f.write(prompt)
+            if not prompt.endswith("\n"):
+                f.write("\n")
+            f.write("PROMPT>>>\n")
+            f.write("=" * 78 + "\n")
+    except Exception:
+        pass
+
+
 async def _build_group_member_context(client: Any, group_id: str | None, member_id: str) -> str:
     """Build group member list and role context for prompt injection."""
+    # Diagnostic (TALK_DUMP_PROMPT=1): log when context is missing so we can
+    # tell whether pi sees the member list at all.
     if not group_id:
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_diagnostic(f"_build_group_member_context: group_id is None/empty; returning empty context for member_id={member_id}")
         return ""
     try:
         group = await client.get_group(group_id)
-    except Exception:
+    except Exception as exc:
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_diagnostic(f"_build_group_member_context: get_group({group_id!r}) raised {type(exc).__name__}: {exc}; returning empty context")
         return ""
 
     members = group.get("members") or []
@@ -1510,6 +1571,17 @@ async def handle_incoming_message(
             decision_tier=decision_tier,
             group_member_context=group_member_context,
         )
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_prompt(
+                member_id=member_id,
+                message_id=str(message.get("id") or ""),
+                sender=str(message.get("from") or ""),
+                group_id=group_id,
+                group_member_context=group_member_context,
+                runtime=runtime,
+                decision_tier=decision_tier,
+                prompt=prompt,
+            )
         result = await run_cli_command(
             command,
             prompt,
