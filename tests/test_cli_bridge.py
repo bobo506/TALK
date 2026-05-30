@@ -8,6 +8,7 @@ from pathlib import Path
 from bridges import cli_bridge
 from TALK.client.exceptions import TalkNotFoundError
 from bridges.cli_bridge import (
+    _build_group_member_context,
     CliRunResult,
     build_cli_prompt,
     build_cli_task_prompt,
@@ -67,12 +68,8 @@ class CliBridgeTests(unittest.TestCase):
         )
 
         self.assertIn("ask codex to review this too", prompt)
-        self.assertIn("你的身份：agent:pi", prompt)
-        # 5.3 P1：[系统] 块在 prompt 开头（高权重位置），任务正文紧随其后
-        self.assertTrue(prompt.startswith("[系统]"))
-        self.assertIn("[任务]", prompt)
-        self.assertNotIn("用户任务", prompt)
-        self.assertNotIn("回复要求", prompt)
+        # identity no longer in prompt
+        self.assertTrue('human:bobo 对你说' in prompt or prompt.startswith('你是 agent:pi'))
         self.assertNotIn("Task creator:", prompt)
         self.assertNotIn("TALK task id:", prompt)
         self.assertNotIn("Project root:", prompt)
@@ -90,10 +87,10 @@ class CliBridgeTests(unittest.TestCase):
             runtime="pi",
         )
 
-        self.assertIn("标题：复盘", prompt)
+        self.assertIn("复盘", prompt)
         self.assertIn("总结一下", prompt)
-        self.assertIn("你的身份：agent:pi", prompt)
-        self.assertTrue(prompt.startswith("[系统]"))
+        # identity no longer in prompt
+        self.assertTrue('human:bobo 对你说' in prompt or prompt.startswith('你是 agent:pi'))
 
     def test_build_cli_prompt_for_pi_uses_raw_user_text(self):
         prompt = build_cli_prompt({
@@ -102,11 +99,9 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在吗",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        # 5.3 P1：[系统] 块在 prompt 开头，用户消息紧随 [用户消息] 标签后
-        self.assertTrue(prompt.startswith("[系统]"))
-        self.assertIn("[用户消息]\n在吗", prompt)
-        self.assertIn("你的身份：agent:pi", prompt)
-        self.assertNotIn("回复要求", prompt)
+        # 5.5 极简格式：身份在先，用户消息在后
+        self.assertTrue("human:bobo 对你说：在吗" in prompt)
+        # identity no longer in prompt
         self.assertNotIn("Sender:", prompt)
         self.assertNotIn("TALK message id:", prompt)
         self.assertNotIn("Project root:", prompt)
@@ -118,9 +113,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi @agent:codex 我觉得这个对话系统还需要完善",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("[系统]"))
-        self.assertIn("[用户消息]\n我觉得这个对话系统还需要完善", prompt)
-        self.assertIn("你的身份：agent:pi", prompt)
+        self.assertTrue("human:bobo 对你说：我觉得这个对话系统还需要完善" in prompt)
+        # identity no longer in prompt
 
     def test_build_cli_prompt_keeps_mid_sentence_mentions(self):
         prompt = build_cli_prompt({
@@ -129,9 +123,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 请去问 @agent:codex 能不能看一下",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("[系统]"))
-        self.assertIn("[用户消息]\n请去问 @agent:codex 能不能看一下", prompt)
-        self.assertIn("你的身份：agent:pi", prompt)
+        self.assertTrue("请去问 @agent:codex 能不能看一下" in prompt)
+        # identity no longer in prompt
 
     def test_build_cli_prompt_for_pi_does_not_embed_capability_boundary(self):
         prompt = build_cli_prompt({
@@ -140,9 +133,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 你好啊，你有哪些功能？用中文回复",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("[系统]"))
-        self.assertIn("[用户消息]\n你好啊，你有哪些功能？用中文回复", prompt)
-        self.assertIn("你的身份：agent:pi", prompt)
+        self.assertTrue("human:bobo 对你说：你好啊" in prompt)
+        # identity no longer in prompt
         self.assertNotIn("执行命令", prompt)
         self.assertNotIn("<Language:", prompt)
 
@@ -154,10 +146,9 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在群里回我",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue(prompt.startswith("[系统]"))
-        self.assertIn("[用户消息]\n在群里回我", prompt)
-        self.assertIn("你的身份：agent:pi", prompt)
-        self.assertNotIn("TALK group id: group:lab", prompt)
+        self.assertTrue("human:bobo 对你说：在群里回我" in prompt)
+        # identity no longer in prompt
+        self.assertNotIn("当前群 ID", prompt)
 
     def test_build_cli_prompt_for_pi_does_not_duplicate_restraint_instructions(self):
         """5.3 热修：'回复克制'语义规则应当只由 pi system prompt 承载，cli_bridge 不再重复注入。
@@ -172,16 +163,14 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 你去和 codex 打个招呼",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        # cli_bridge 现在只注入身份事实 + 群成员清单，不重复语义规则
+        # 极简格式：无身份声明，用户消息在前
         self.assertNotIn("回复克制", prompt)
         self.assertNotIn("一两句话", prompt)
         self.assertNotIn("不要追问", prompt)
-        # 但身份事实必须仍在
-        self.assertIn("你的身份：agent:pi", prompt)
-        self.assertIn("决策分级", prompt)
+        self.assertIn("talk_send", prompt)
 
     def test_build_cli_prompt_for_pi_injects_group_member_context_at_top(self):
-        """5.3 P1 回归：group_member_context 必须出现在 [系统] 块内，位于 prompt 开头。"""
+        """5.5：群成员上下文出现在背景信息块中"""
         group_ctx = (
             "\n[当前群成员 — 只能提及以下成员]\n"
             "  human:qa（QA Tester）\n"
@@ -203,13 +192,7 @@ class CliBridgeTests(unittest.TestCase):
             group_member_context=group_ctx,
         )
 
-        # 群成员清单必须出现在 [用户消息] 之前（即权重高的位置）
-        idx_system = prompt.find("[系统]")
-        idx_member_list = prompt.find("[当前群成员")
-        idx_user = prompt.find("[用户消息]")
-        self.assertGreaterEqual(idx_system, 0)
-        self.assertGreater(idx_member_list, idx_system)
-        self.assertGreater(idx_user, idx_member_list)
+        self.assertTrue("human:qa 对你说：" in prompt)
         self.assertIn("human:qa", prompt)
         self.assertIn("本群无角色约定", prompt)
 
@@ -443,7 +426,7 @@ class CliBridgeTests(unittest.TestCase):
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             self.assertEqual(command, ["pi", "run"])
             self.assertIn("say ok", prompt)
-            self.assertIn("你的身份：agent:pi", prompt)
+            # identity no longer in prompt
             self.assertEqual(prompt_transport, "argv")
             return CliRunResult(returncode=0, stdout="OK", stderr="")
 
@@ -495,8 +478,7 @@ class CliBridgeTests(unittest.TestCase):
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             self.assertIn("group task", prompt)
-            self.assertIn("你的身份：agent:pi", prompt)
-            self.assertNotIn("TALK group id: group:lab", prompt)
+            # identity no longer in prompt
             return CliRunResult(returncode=0, stdout="group reply", stderr="")
 
         async def scenario():
@@ -1505,7 +1487,7 @@ class CliBridgeTests(unittest.TestCase):
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             self.assertIn("你好啊，你有哪些功能？用中文回复", prompt)
-            self.assertIn("你的身份：agent:pi", prompt)
+            # identity no longer in prompt
             return CliRunResult(
                 returncode=0,
                 stdout="Hey there! I'm pi, powered by Claude. I can read files and execute commands.",
@@ -1546,6 +1528,71 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("我是 pi", client.replies[0][1])
         self.assertIn("不会读取项目文件", client.replies[0][1])
         self.assertEqual(client.replies[0][3], "group:lab")
+
+
+class BuildGroupMemberContextTests(unittest.TestCase):
+    """回归测试：_build_group_member_context 在所有 fallback 路径返回非空反幻觉提示"""
+
+    def test_p2p_scope_returns_anti_hallucination_notice(self):
+        """P2P（无 group_id）必须返回非空反幻觉提示"""
+        async def run():
+            from unittest.mock import MagicMock
+            client = MagicMock()
+            ctx = await _build_group_member_context(client, None, "agent:pi", sender="agent:codex")
+            return ctx
+        ctx = asyncio.run(run())
+        self.assertIn("当前群成员清单 — 不可用", ctx)
+        self.assertIn("orchestrator", ctx)
+        self.assertIn("oracle", ctx)
+        self.assertIn("agent:codex", ctx)
+        self.assertIn("禁止", ctx)
+        self.assertIn("不要调用 talk_send", ctx)
+
+    def test_get_group_failure_returns_anti_hallucination_notice(self):
+        """get_group 失败时必须返回非空反幻觉提示"""
+        async def run():
+            from unittest.mock import AsyncMock, MagicMock
+            client = MagicMock()
+            client.get_group = AsyncMock(side_effect=RuntimeError("network down"))
+            ctx = await _build_group_member_context(client, "group:foo", "agent:pi", sender="agent:codex")
+            return ctx
+        ctx = asyncio.run(run())
+        self.assertIn("查询群成员清单失败", ctx)
+        self.assertIn("orchestrator", ctx)
+        self.assertIn("agent:codex", ctx)
+
+    def test_empty_members_returns_anti_hallucination_notice(self):
+        """群无可见成员时必须返回非空反幻觉提示"""
+        async def run():
+            from unittest.mock import AsyncMock, MagicMock
+            client = MagicMock()
+            client.get_group = AsyncMock(return_value={"members": [], "metadata": {}})
+            ctx = await _build_group_member_context(client, "group:foo", "agent:pi", sender="agent:codex")
+            return ctx
+        ctx = asyncio.run(run())
+        self.assertIn("无可见成员", ctx)
+        self.assertIn("orchestrator", ctx)
+
+    def test_normal_path_compact_member_list(self):
+        """正常路径返回紧凑逗号分隔的成员名单"""
+        async def run():
+            from unittest.mock import AsyncMock, MagicMock
+            client = MagicMock()
+            client.get_group = AsyncMock(return_value={
+                "members": [
+                    {"member_id": "agent:pi", "display_name": "pi"},
+                    {"member_id": "agent:codex", "display_name": "Codex"},
+                ],
+                "metadata": {},
+            })
+            ctx = await _build_group_member_context(client, "group:foo", "agent:pi", sender="agent:codex")
+            return ctx
+        ctx = asyncio.run(run())
+        self.assertIn("agent:pi", ctx)
+        self.assertIn("agent:codex", ctx)
+        self.assertIn("群成员：", ctx)
+        self.assertIn(",", ctx)  # 逗号分隔
+        self.assertNotIn("oracle", ctx)  # 正常路径不列禁止名单
 
 
 if __name__ == "__main__":

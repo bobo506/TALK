@@ -678,20 +678,55 @@ def _dump_prompt(
         pass
 
 
-async def _build_group_member_context(client: Any, group_id: str | None, member_id: str) -> str:
-    """Build group member list and role context for prompt injection."""
-    # Diagnostic (TALK_DUMP_PROMPT=1): log when context is missing so we can
-    # tell whether pi sees the member list at all.
+async def _build_group_member_context(
+    client: Any,
+    group_id: str | None,
+    member_id: str,
+    sender: str = "",
+) -> str:
+    """Build group member list and role context for prompt injection.
+
+    All "no list available" paths now return an explicit anti-hallucination
+    notice instead of an empty string, because empty prompts caused pi/codex
+    to invent fictitious member names (orchestrator / oracle / dan / sage ...)
+    when calling talk_send.
+    """
+    def _no_list_fallback(reason: str) -> str:
+        sender_hint = (
+            f"如需回复，目标只能是当前消息的发件人 {sender}。"
+            if sender
+            else "如需回复，目标只能是当前消息的发件人。"
+        )
+        return (
+            "\n[当前群成员清单 — 不可用]\n"
+            f"{reason}\n"
+            "严格禁止凭想象列出或向任何未经清单确认的 member_id 调用 talk_send。"
+            "特别注意：agent:orchestrator / agent:oracle / agent:dan / agent:sage "
+            "/ agent:trace / agent:omni / agent:review 等常见 multi-agent 框架角色名"
+            "在本系统中默认不存在，禁止凭印象使用。\n"
+            f"{sender_hint}\n"
+            "本条消息不要调用 talk_send 工具转发给其它成员。\n"
+        )
+
     if not group_id:
         if os.environ.get("TALK_DUMP_PROMPT") == "1":
-            _dump_diagnostic(f"_build_group_member_context: group_id is None/empty; returning empty context for member_id={member_id}")
-        return ""
+            _dump_diagnostic(
+                f"_build_group_member_context: group_id is None/empty (P2P scope); "
+                f"emitting no-list fallback for member_id={member_id}"
+            )
+        return _no_list_fallback("本条消息不在任何群组上下文中（P2P 私聊场景）。")
+
     try:
         group = await client.get_group(group_id)
     except Exception as exc:
         if os.environ.get("TALK_DUMP_PROMPT") == "1":
-            _dump_diagnostic(f"_build_group_member_context: get_group({group_id!r}) raised {type(exc).__name__}: {exc}; returning empty context")
-        return ""
+            _dump_diagnostic(
+                f"_build_group_member_context: get_group({group_id!r}) raised "
+                f"{type(exc).__name__}: {exc}; emitting no-list fallback"
+            )
+        return _no_list_fallback(
+            f"查询群成员清单失败（group_id={group_id}），清单暂不可用。"
+        )
 
     members = group.get("members") or []
     member_lines: list[str] = []
@@ -704,25 +739,17 @@ async def _build_group_member_context(client: Any, group_id: str | None, member_
             member_lines.append(f"  {mid}")
 
     if not member_lines:
-        return ""
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_diagnostic(
+                f"_build_group_member_context: group {group_id!r} has no visible members; "
+                f"emitting no-list fallback for member_id={member_id}"
+            )
+        return _no_list_fallback(f"群 {group_id} 当前无可见成员。")
 
-    metadata = group.get("metadata") or {}
-    roles = (metadata.get("roles") or {}) if isinstance(metadata, dict) else {}
-    my_role = roles.get(member_id) if isinstance(roles, dict) else None
-
-    if my_role:
-        role_line = f"你在本群的业务角色：{my_role}。"
-    else:
-        role_line = (
-            "本群无角色约定，只严格回应字面请求，不要主动扩展话题，"
-            "不要假设这是项目讨论环境，不要指名群外成员。"
-        )
-
-    return (
-        "\n[当前群成员 — 只能提及以下成员]\n"
-        + "\n".join(member_lines)
-        + f"\n\n{role_line}\n"
-    )
+    # 正常路径：返回紧凑逗号分隔名单，同时写入环境变量供扩展使用
+    mids = [str(m.get("member_id") or "") for m in members]
+    os.environ["TALK_GROUP_MEMBERS"] = ",".join(mids)
+    return f"群成员：{', '.join(mids)}。\n"
 
 
 async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:
@@ -1216,9 +1243,7 @@ def should_handle_message(
 
 
 def _decision_tier_line(tier: str) -> str:
-    if tier == "decision":
-        return "你的决策分级：决策 Agent — 方向明确时可自主连续推进，遇方向/接口/权限/重大分歧时需先确认。"
-    return "你的决策分级：执行 Agent — 每次只处理一个已确认请求，完成后暂停等待确认。"
+    return "决策 Agent" if tier == "decision" else "执行 Agent"
 
 
 def build_cli_prompt(
@@ -1235,18 +1260,14 @@ def build_cli_prompt(
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
     context_block = f"\n\n{discussion_context}" if discussion_context else ""
     tier_line = _decision_tier_line(decision_tier)
+    sender = message.get("from") or "unknown"
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        # 5.3 注入：把身份事实块放在 prompt 开头（权重高于结尾），
-        # 强约束 pi 必须使用此处提供的身份与成员清单，覆盖任何 system prompt 内的示例值。
-        # 注意："回复克制"这条语义规则已经放在 pi 的 system prompt（DEFAULT_SYSTEM_PROMPT）里，
-        # 这里不再重复，避免双重指令导致 pi 把"任务转交"误判为"打招呼克制"而不执行 TALK_ACTION。
-        member_block = (
-            "[系统]\n"
-            f"你的身份：{member_id}。{tier_line}\n"
-            f"{group_member_context}"
-        ).rstrip() + "\n\n[用户消息]\n"
-        return f"{member_block}{task}{context_block}"
+        return (
+            f"{sender} 对你说：{task}\n"
+            f"\n（群内有 {group_member_context.strip()} 要向其他成员发消息时，使用 talk_send 工具。）"
+            + (f"\n{discussion_context}" if discussion_context else "")
+        )
 
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
@@ -1282,14 +1303,10 @@ def build_cli_task_prompt(
     tier_line = _decision_tier_line(decision_tier)
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
-        # 5.3 注入：身份事实块放在 prompt 开头，覆盖 system prompt 内的示例值。
-        # "回复克制"语义规则统一放在 pi system prompt 里，避免双重指令冲突。
         header = (
-            "[系统]\n"
-            f"你的身份：{member_id}。{tier_line}\n"
-            "\n[任务]\n"
+            f"你是 {member_id}。{tier_line}\n"
         )
-        return f"{header}标题：{title}\n\n{content}" if title else f"{header}{content}"
+        return f"{header}任务：{title}\n{content}" if title else f"{header}任务：{content}"
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"
@@ -1560,7 +1577,14 @@ async def handle_incoming_message(
                 human_id=await _find_human_reviewer(client, group_id),
             )
 
-        group_member_context = await _build_group_member_context(client, group_id, member_id)
+        group_member_context = await _build_group_member_context(client, group_id, member_id, sender=str(sender))
+
+        # 5.5：元数据走环境变量，不放 prompt。空值不设，避免扩展误判
+        if group_id:
+            os.environ["TALK_GROUP_ID"] = group_id
+        else:
+            os.environ.pop("TALK_GROUP_ID", None)
+        os.environ["TALK_DECISION_TIER"] = decision_tier
 
         prompt = build_cli_prompt(
             message,
@@ -1589,6 +1613,14 @@ async def handle_incoming_message(
             timeout=timeout,
             prompt_transport=prompt_transport,
         )
+        # 诊断：function-calling 模式下，工具调用由 LLM 扩展内部处理
+        # bridge 只读取 stdout 作为可见回复；TALK_ACTION 文本协议解析继续共存
+        if os.environ.get("TALK_DUMP_PROMPT") == "1" and result.returncode == 0:
+            raw_output = (result.stdout or "").strip()
+            _dump_diagnostic(
+                f"LLM raw output ({len(raw_output)} chars, ends with '"
+                f"{raw_output[-80:] if len(raw_output) > 80 else raw_output}')"
+            )
         reply = format_cli_reply(
             result,
             max_chars=max_reply_chars,

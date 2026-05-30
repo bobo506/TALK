@@ -6,6 +6,37 @@
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-05-30 — 5.5 Step 1：function-calling 最小可验证版本
+
+### Current Progress
+- **pi bridge 切换到 function-calling 模式**，注册 `talk_send` 工具（通过 `talk_tools_extension.ts` pi 扩展）
+- **双向通信验证通过**：pi（kimi-k2.6）→ pi-kimi（kimi-k2.6），消息均正确入群时间线（`group_id` 正确注入）
+- **架构共识落地**：元数据（group_id / decision_tier / member_id）走环境变量，不放 prompt；用户消息放最前面；不声明 agent 身份避免与 pi 内核冲突
+- **prompt 极简化**：从最初 ~800 字降到 ~130 字，system prompt 仅 8 字
+- **prompt 迭代路径**：R1 方括号格式被 LLM 当元数据跳过 → R2 自然语言但上下文太长淹没指令 → R3 去掉身份声明 + 括号备注，模型不再内部冲突
+- **工具集污染修复**：确认所有内置工具会让模型切到代码助手模式，必须 `--no-builtin-tools --tools talk_send`
+- **反幻觉黑名单"粉象效应"修复**：正常路径不列禁止名单；fallback（清单不可用）保留
+- **多 bridge 环境变量 key 冲突修复**：`if not in os.environ` → 无条件覆盖
+- **DeepSeek 模型确认不适合 function-calling**：pi 切 kimi-k2.6 后解决
+- **时序问题**：`talk_send` 在 visible reply 之前（`--print` 限制），留给 step 2 `agent_end` 钩子
+
+### Changed Files
+- `bridges/talk_tools_extension.ts`（新建）
+- `bridges/pi_bridge.py`
+- `bridges/cli_bridge.py`
+- `tests/test_pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `deploy/bridges.example.json`（新建）
+
+### Verification
+- `py_compile` 全部通过
+- 72 tests 全部通过（cli/codex/pi/discussions/talk_client）
+- 群内测试：pi ↔ pi-kimi 10 条消息全部正确入群时间线
+
+### Next
+- 5.5 step 2：`agent_end` 钩子解决时序问题
+- 5.5 step 3-4：迁移所有 bridge，删除 TALK_ACTION 文本协议
+
 ## 2026-05-30 第五轮 (Asia/Shanghai) — 诊断 + 方向调整：协议机制层重构立项
 ### 背景
 - 第四轮"信使场景"上线后跑黑盒测试，pi 仍然不发 TALK_ACTION，新冒出"系统 prompt 整段泄漏给用户"（场景 5 #460 "决策分级是：高自主权"、"本群成员清单（member_id）：[人类: 小白] [agent: pi]" —— 这些字串我代码里根本没写过）和"完全偏题回复"（场景 9 #470 触发"分组讨论已经开始"会议主持模板）等新症状
