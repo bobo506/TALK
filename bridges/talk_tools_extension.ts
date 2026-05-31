@@ -1,12 +1,14 @@
 /**
- * TALK talk_send 工具扩展 — pi bridge 专用（5.5 step 1 最小可验证版）
+ * TALK talk_send 工具扩展 — pi bridge 专用（5.5 step 2+ P0 修复）
  *
  * 注册 talk_send 工具，pi 通过 function-calling 发送消息给群内其他成员。
- * 工具 handler 直接向 TALK server 发 HTTP POST。
+ *
+ * 延迟模式（唯一模式）：写 JSONL 到 TALK_DEFERRED_FILE，bridge 在 visible reply 后执行发送。
+ * TALK_DEFERRED_FILE 未设置时（如 agent-to-agent 消息）返回不可用。
  *
  * 环境变量：
- *   TALK_BASE_URL — TALK server 地址（默认 http://127.0.0.1:8000）
- *   TALK_API_KEY   — 当前 agent 的 API Key（必需）
+ *   TALK_API_KEY        — 当前 agent 的 API Key（用于校验）
+ *   TALK_DEFERRED_FILE  — 延迟动作 JSONL 文件路径（bridge 创建、extension 写入、bridge 消费）
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -25,47 +27,6 @@ function getConfig() {
 }
 
 // ---------------------------------------------------------------------------
-// 向 TALK server 发送消息
-// ---------------------------------------------------------------------------
-async function sendToTalk(
-  baseUrl: string,
-  apiKey: string,
-  target: string,
-  body: string,
-  groupId?: string,
-): Promise<{ ok: boolean; messageId?: number; error?: string }> {
-  const payload: Record<string, unknown> = {
-    to: [target],
-    type: "text",
-    content: `@${target} ${body}`,
-  };
-  if (groupId) {
-    payload.group_id = groupId;
-  }
-
-  try {
-    const resp = await fetch(`${baseUrl}/api/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": apiKey,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      return { ok: false, error: `HTTP ${resp.status}: ${text.slice(0, 200)}` };
-    }
-
-    const data = (await resp.json()) as { id: number };
-    return { ok: true, messageId: data.id };
-  } catch (err) {
-    return { ok: false, error: String(err).slice(0, 200) };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // 扩展入口
 // ---------------------------------------------------------------------------
 export default function talkToolsExtension(pi: ExtensionAPI) {
@@ -80,11 +41,13 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
     label: "Send to TALK member",
     description:
       "向当前群内的指定成员发送消息。当你需要联系、转告、询问或通知另一成员时使用。" +
-      "发送后你会收到确认。target 必须是群成员清单中列出的成员。",
+      "发送后你会收到确认。target 必须是群成员清单中列出的成员。" +
+      " stance 参数标记消息类型：question（提问时用）、greeting（寒暄/打招呼时用）、answer/agree/disagree/closure。",
     promptSnippet: "Send a message to another group member via TALK",
     promptGuidelines: [
-      "当用户让你联系、转告、询问或通知群里另一成员时，调用 talk_send。",
-      "调用后会收到工具执行结果，在可见回复里简要说明结果即可。",
+      "当 human 明确让你联系、转告、询问或通知群里另一成员时，调用 talk_send。调用后在可见回复里简要告诉 human 已发送即可。",
+      "如果其他 agent 给你发了消息（寒暄/闲聊/确认）：只需自然回应，不要加'已回复 X'之类的任务汇报。不要再调用 talk_send，除非对方明确向你提出了一个需要回答的问题（stance=question）。",
+      "调用 talk_send 时务必填写 stance：提问用 question，打招呼用 greeting，回答用 answer。",
       "target 必须是群成员清单中的完整 member_id，body 是消息正文（不要加 @ 前缀）。",
     ],
     parameters: Type.Object({
@@ -94,6 +57,9 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
       body: Type.String({
         description: "消息正文，不要加 @ 前缀",
       }),
+      stance: Type.Optional(Type.String({
+        description: "消息立场（可选）。question=提问, answer=回答, agree=同意, disagree=反对, greeting=寒暄, closure=收尾。不填默认 greeting",
+      })),
     }),
 
     async execute(_toolCallId, params) {
@@ -106,13 +72,14 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
 
       const target = String(params.target || "").trim();
       const body = String(params.body || "").trim();
+      const stance = String(params.stance || "greeting").trim() || "greeting";
       const groupId = process.env.TALK_GROUP_ID || undefined;
       // 诊断
       try {
         const dumpPath = process.env.TALK_DUMP_PROMPT_FILE || "logs/pi_prompt_dump.log";
         const dumpDir = path.dirname(dumpPath);
         if (dumpDir) fs.mkdirSync(dumpDir, { recursive: true });
-        fs.appendFileSync(dumpPath, `[${new Date().toISOString()}] talk_send: target=${target} group_id=${groupId || "(NONE)"} body_len=${body.length}\n`);
+        fs.appendFileSync(dumpPath, `[${new Date().toISOString()}] talk_send: target=${target} stance=${stance} group_id=${groupId || "(NONE)"} body_len=${body.length}\n`);
       } catch (_) {}
 
       if (!target || !body) {
@@ -122,21 +89,30 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
         };
       }
 
-      const result = await sendToTalk(config.baseUrl, config.apiKey, target, body, groupId);
-
-      // 向 TALK server 发送消息（直接 HTTP POST）
-      const result = await sendToTalk(config.baseUrl, config.apiKey, target, body, groupId);
-
-      if (result.ok) {
-        return {
-          content: [{ type: "text", text: `已发送给 ${target}（消息 ID ${result.messageId}）。` }],
-          details: { messageId: result.messageId, target, groupId },
-        };
+      // ---- deferred mode：写 JSONL，由 bridge 在 agent 结束后执行发送 ----
+      const deferredFile = process.env.TALK_DEFERRED_FILE;
+      if (deferredFile) {
+        try {
+          const dir = path.dirname(deferredFile);
+          if (dir) fs.mkdirSync(dir, { recursive: true });
+          const record = JSON.stringify({ tool: "talk_send", target, body, stance, group_id: groupId || null });
+          fs.appendFileSync(deferredFile, record + "\n");
+          return {
+            content: [{ type: "text", text: `talk_send 已登记：将向 ${target} 发送消息（本轮结束后执行）。` }],
+            details: { deferred: true, target, groupId },
+          };
+        } catch (err) {
+          return {
+            content: [{ type: "text", text: `talk_send 登记失败：${String(err)}` }],
+            details: { error: "deferred write failed" },
+          };
+        }
       }
 
+      // TALK_DEFERRED_FILE 未设置 = bridge 未授权（如 agent-to-agent 消息），返回不可用
       return {
-        content: [{ type: "text", text: `发送失败：${result.error}` }],
-        details: { error: result.error, target },
+        content: [{ type: "text", text: "talk_send 暂不可用（当前消息不需要向其他成员发送）。" }],
+        details: { error: "talk_send not available for this message" },
       };
     },
   });

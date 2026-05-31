@@ -2,9 +2,105 @@
 
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-05-30 第五轮，5.3 黑盒测试 5 轮后定位根因为协议机制；5.5 立项 function-calling 重构
+最后更新：2026-05-31 docs 目录整理（spec / guides 分层）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-05-31 — docs 目录整理：spec / guides 分层
+
+### 背景
+项目管理者确认 `docs/` 当前平铺文档过多，希望先整理为少量高频目录；同时确认暂不创建“产品迭代”和“技术验证”空目录，等有真实内容再补。
+
+### Current Progress
+- 保留根目录锚点文档：`docs/PROJECT_BRIEF.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+- 新增 `docs/spec/`，并移入 `PRODUCT.md`、`SDK.md`、`LOCAL_LAB_DESIGN.md`、全部 `MODULE_*.md`。
+- 新增 `docs/guides/`，并移入 `QUICKSTART.md`、`QUICKSTART_USER.md`、`QUICKSTART_AGENT.md`、`DEPLOY.md`。
+- 暂未创建 `iterations/`、`validation/`、`milestones/` 空目录。
+- 已更新 `PROJECT_BRIEF` 目录树和模块索引，修正 README、AGENTS、CLAUDE、进度历史和文档内相对链接。
+
+### Changed Files
+- `AGENTS.md`
+- `CLAUDE.md`
+- `README.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+- `docs/spec/*`
+- `docs/guides/*`
+
+### Verification
+- `rg` 旧路径模式搜索：未发现计划关注的旧路径模式残留。
+- Markdown 本地链接校验：通过。
+- `git diff --check`：通过；仅有既有 Windows 换行提示。
+- 未运行后端测试：本切片仅移动和修正文档。
+
+### Next
+- 继续原 5.5 P0 后续：重启 pi bridge + pi-kimi bridge 后跑黑盒测试。
+- 后续出现真实迭代计划、技术验证报告或里程碑验收材料时，再分别创建对应目录。
+
+---
+
+## 2026-05-31 — 5.5 Step 2+ P0 热修复：身份幻觉 + 消息风暴 + stance 参数
+
+### 背景
+Step 2 agent_end 钩子落地后，项目管理者在 group:83aae24462b7 跑黑盒测试（10:19），发送 `@agent:pi 你去和 agent:pi-kimi 打个招呼`。结果 42 条消息，pi ↔ pi-kimi 陷入无限循环对话，暴露三个致命问题：
+1. **消息风暴**：双方互相调用 talk_send，无刹车机制
+2. **身份幻觉**：pi 自称 "agent:codex"
+3. **重复发起**：pi-kimi 把连续对话的后续消息当成全新打招呼请求
+
+### Current Progress
+- **`talk_send` 加 `stance` 参数**：支持 question / greeting / answer / agree / disagree / closure，JSONL 记录带 stance
+- **Bridge 层 turn limit 刹车**：`_read_and_execute_deferred_actions` 新增 `current_turn_count` / `max_auto_turns` 参数，greeting/answer/agree/closure 类型在 turn ≥ 3 时自动丢弃
+- **Prompt 注入 `member_id`**：pi prompt 新增 `"你是 agent:pi。"` 前缀，防止身份幻觉
+- **Prompt agent-to-agent 约束**：新增 "如果只是其他 agent 在寒暄/闲聊/确认，直接简短回复即可，不要再调用 talk_send"
+- **Discussion 上下文对齐**：`_discussion_context_text` 增加 talk_send 说明
+- **Extension promptGuidelines 更新**：告知模型区分 human 指令 vs agent 寒暄，强调 stance 必填
+
+### Changed Files
+- `bridges/talk_tools_extension.ts`
+- `bridges/cli_bridge.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`（本文件）
+
+### Verification
+- `py_compile` 全部通过
+- 52 tests 全部通过（49 cli + 3 pi）
+- turn limit 刹车单元测试通过（turn=0 全执行，turn=3 greeting 跳过 question 照发）
+- 未经真实 pi 端到端验证（需重启 bridge 后跑黑盒测试）
+
+### Next
+- 重启 pi/pi-kimi bridge 后跑黑盒测试验证三个 P0 问题
+- 如仍有消息风暴，考虑 bridge 层更激进刹车
+
+---
+
+## 2026-05-31 — 5.5 Step 2：agent_end 钩子
+
+### Current Progress
+- **talk_send 改为延迟执行**：extension 不再直接 HTTP POST，改为写入 JSONL 临时文件；bridge 在 visible reply 发送后才读取执行
+- **修复 step 1 遗留 bug**：`talk_tools_extension.ts` 中 `sendToTalk` 重复调用（两次同语句）
+- **时序修复**：visible reply → deferred talk_send → cleanup，确保 sender 先看到回复再触发跨 agent 消息
+- **回退兼容**：`TALK_DEFERRED_FILE` env 不存在时扩展仍走直接 HTTP POST 模式
+- **新函数**：`_read_and_execute_deferred_actions(filepath, client, group_id)` — 读 JSONL、逐条用 TALK SDK 发送
+- **临时文件生命周期**：bridge spawn pi 前 `mkstemp` 创建，`finally` 清理（`os.unlink` + `os.environ.pop`）
+- **向后兼容**：TALK_ACTION 文本协议解析代码全部保留，不做删除
+
+### Changed Files
+- `bridges/talk_tools_extension.ts`
+- `bridges/cli_bridge.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`（本文件）
+
+### Verification
+- `py_compile` 全部通过
+- 52 tests 全部通过（49 cli + 3 pi）
+- 未经真实 pi 端到端验证（需重启 bridge 后跑黑盒测试）
+
+### Next
+- 5.5 step 3：扩展工具集（`talk_reply` / `talk_list_agents` / `talk_escalate` / `talk_mark_stance`），支持 `stance` 参数
+- 黑盒验证 step 2 deferred 时序
+
+---
 
 ## 2026-05-30 — 5.5 Step 1：function-calling 最小可验证版本
 
@@ -64,11 +160,11 @@
 ### Current Progress
 - **5.3 状态：接受当前实现作为过渡版本**。dump 证明 5.1-5.3 已落地的设计（调度顺序、去硬编码、群成员清单注入、决策分级注入、自我介绍模板）全部正确，pi 是收到这些事实的，剩余"pi 不输出 TALK_ACTION"问题是协议机制层的，不是 prompt 文案层
 - **`bridges/cli_bridge.py` 加入 prompt dump 工具**（73 行）：`_dump_prompt()` 完整记录 spawn LLM CLI 前的 prompt + 上下文元数据；`_dump_diagnostic()` 记录注入失败时的诊断信息；`_build_group_member_context()` 失败路径加诊断 log。全部通过 `TALK_DUMP_PROMPT=1` 环境变量 gated，默认关闭、零运行时影响；将来排查 prompt 问题随时可用
-- **`docs/LOCAL_LAB_DESIGN.md` 新增 "2026-05-30 Agent 通信协议方向调整：从文本协议标签转向 function-calling" 章节**，包含触发证据、根因分析、新方向工具集设计（`talk_send` / `talk_reply` / `talk_list_agents` / `talk_escalate` / `talk_mark_stance`）、与现有 5.1-5.3 工作的关系、5.5 落地阶段规划
+- **`docs/spec/LOCAL_LAB_DESIGN.md` 新增 "2026-05-30 Agent 通信协议方向调整：从文本协议标签转向 function-calling" 章节**，包含触发证据、根因分析、新方向工具集设计（`talk_send` / `talk_reply` / `talk_list_agents` / `talk_escalate` / `talk_mark_stance`）、与现有 5.1-5.3 工作的关系、5.5 落地阶段规划
 
 ### Next Plan
 - **5.4 优先**：`groups.metadata` JSON 字段落地（与协议机制正交）
-- **5.5 立项**：agent 通信协议改造 function-calling，4 阶段落地（详见 `docs/LOCAL_LAB_DESIGN.md` 新章节）
+- **5.5 立项**：agent 通信协议改造 function-calling，4 阶段落地（详见 `docs/spec/LOCAL_LAB_DESIGN.md` 新章节）
 - 5.4 落地后 5.3 的 `metadata.roles` 反查线路自动激活，无需返工
 - 5.5 落地后预计可删 `cli_bridge.py` 中 800+ 行文本协议解析/清理/推断/兼容代码
 
@@ -80,7 +176,7 @@
 
 ### Changed Files
 - `bridges/cli_bridge.py`
-- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/spec/LOCAL_LAB_DESIGN.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`（本文件）
 
@@ -252,7 +348,7 @@
 - `greeting / closure` 被视为非实质 turn，不计入普通收口或分歧升级阈值；`disagree` 仍保留 human 裁决路径。
 - `_send_agent_scope_closure()` 保留硬兜底 `resolved` 状态更新，但收口话术改为按 agent id 稳定挑选，避免不同 agent 复读同一句固定机器话。
 - 新增/调整测试覆盖：代发打招呼动作为 `greeting` turn、非实质 turn 不触发收口、自动收口记录 `closure`、discussion API 接受 `greeting / closure`。
-- 文档已同步 `docs/MODULE_discussions.md`、`docs/MODULE_bridges.md`。
+- 文档已同步 `docs/spec/MODULE_discussions.md`、`docs/spec/MODULE_bridges.md`。
 ### Open Questions / Pending Confirmation
 - 本轮仍按项目管理者要求不做真实 Codex+pi 长链路主观体验自测；后续可由无项目记忆的黑盒测试 agent 复验场景 1。
 - `greeting` 识别采用保守规则：任务范围像打招呼/在线确认，且回复较短、包含问候/在线确认特征时才标记为非实质 turn；其它回复仍默认 `answer`。
@@ -273,8 +369,8 @@
 - `server/models.py`
 - `tests/test_cli_bridge.py`
 - `tests/test_discussions.py`
-- `docs/MODULE_discussions.md`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_discussions.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -286,7 +382,7 @@
 - malformed 动作协议或内部控制语法残留不会展示到可见回复；`send_message` 目标必须是当前 Group 内存在的 `agent:*`。
 - 普通轻扩展允许对方再回答 1 个 turn；随后收到回复的一方自动收口并将 discussion 标记为 `resolved`。`disagree` 场景仍保留 human 裁决路径。
 - 新增/调整单元测试覆盖：多 mention 路由头剥离、正文中间 mention 保留、CLI 失败输出安全、malformed 动作残留拦截、缺失 Group agent 代发拦截、轻扩展一轮回答和自动收口。
-- 文档已同步 `docs/MODULE_discussions.md`、`docs/MODULE_bridges.md`。
+- 文档已同步 `docs/spec/MODULE_discussions.md`、`docs/spec/MODULE_bridges.md`。
 ### Open Questions / Pending Confirmation
 - 本轮仍按项目管理者要求不做真实 Codex+pi 长链路主观体验自测；后续由无项目记忆的黑盒测试 agent 复验自然对话效果。
 - malformed 协议残留拦截采用“控制语法特征”隔离，不做自然语言意图分类；如果未来模型出现新型协议泄漏，可继续收敛规则。
@@ -307,8 +403,8 @@
 - `bridges/codex_bridge.py`
 - `tests/test_cli_bridge.py`
 - `tests/test_codex_bridge.py`
-- `docs/MODULE_discussions.md`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_discussions.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -320,7 +416,7 @@
 - agent-to-agent prompt 会传入控制上下文和消息原文，要求模型服从当前 scope 且不要把内部 ID/字段展示到可见回复；若可见回复泄漏内部字段，bridge 会替换为确认范围的简短回复。
 - agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会按 `answer` 记录 turn。
 - 新增/调整单元测试覆盖：打招呼 resolved scope 不再续聊、agent 给 agent 派活时 scope prompt 正确、普通 agent 回复自动记 turn、内部字段泄漏拦截、discussion scope API 校验。
-- 文档已同步 `docs/PROJECT_BRIEF.md`、`docs/MODULE_discussions.md`、`docs/MODULE_bridges.md`。
+- 文档已同步 `docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_discussions.md`、`docs/spec/MODULE_bridges.md`。
 ### Open Questions / Pending Confirmation
 - 本轮按项目管理者要求不做真实 Codex+pi 长链路主观体验自测；后续由无项目记忆的黑盒测试 agent 验收自然对话效果。
 - 范围越界识别当前主要依赖结构化 scope、prompt 约束和内部字段泄漏拦截；未做复杂自然语言分类。
@@ -344,8 +440,8 @@
 - `tests/test_discussions.py`
 - `tests/test_cli_bridge.py`
 - `docs/PROJECT_BRIEF.md`
-- `docs/MODULE_discussions.md`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_discussions.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -384,7 +480,7 @@
 - bridge 会清理开头或结尾的孤立协议残片，例如 `mark_stance`、`update`、`动作已记录...`；模型只输出动作且来源是另一个 agent 时，不再额外发送默认回执。
 - `bridges/pi_bridge.py` 默认 system prompt 改为只教授 `TALK_ACTION` 安全行协议，继续避开 Windows `pi.cmd` 高风险命令元字符。
 - `tests/test_cli_bridge.py` 与 `tests/test_pi_bridge.py` 已补回归测试，覆盖安全行协议、`final_to_human`、协议残片清理、action-only agent 回执抑制、回合上限升级和 pi prompt 高风险字符限制。
-- `docs/MODULE_discussions.md` 与 `docs/MODULE_bridges.md` 已同步当前协议边界。
+- `docs/spec/MODULE_discussions.md` 与 `docs/spec/MODULE_bridges.md` 已同步当前协议边界。
 ### Open Questions / Pending Confirmation
 - 需要重启 codex bridge 与 pi bridge；旧进程不会自动加载新的协议解析、回合上限和 pi 默认 `--system-prompt`。
 - `docs/p.drawio` 是本次评估输入，未被本切片修改；当前仍是未跟踪文件，是否纳入仓库需后续由项目管理者确认。
@@ -407,8 +503,8 @@
 - `bridges/pi_bridge.py`
 - `tests/test_cli_bridge.py`
 - `tests/test_pi_bridge.py`
-- `docs/MODULE_bridges.md`
-- `docs/MODULE_discussions.md`
+- `docs/spec/MODULE_bridges.md`
+- `docs/spec/MODULE_discussions.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -420,7 +516,7 @@
 - `web/index.html` 静态资源版本号更新为 `20260525-reply-compact`，避免浏览器继续拿旧 CSS/JS。
 - `bridges/pi_bridge.py` 默认 system prompt 移除原始 `<talk-action ...>` 示例、`agree|optimize|...` 竖线写法和 Windows 高风险命令元字符，避免 `pi.cmd` 把 prompt 当作管道/重定向语法解析。
 - `tests/test_pi_bridge.py` 新增默认 prompt 不包含 `| / < / > / &` 的回归断言。
-- `docs/MODULE_webui.md` 与 `docs/MODULE_bridges.md` 已同步本次行为边界。
+- `docs/spec/MODULE_webui.md` 与 `docs/spec/MODULE_bridges.md` 已同步本次行为边界。
 ### Open Questions / Pending Confirmation
 - 需要重启 pi bridge；正在运行的旧 pi 进程不会自动加载新的默认 `--system-prompt`。
 - Web UI 刷新页面即可加载新静态资源；若仍看到旧引用框，先强制刷新浏览器缓存。
@@ -442,8 +538,8 @@
 - `web/app.js`
 - `web/style.css`
 - `web/index.html`
-- `docs/MODULE_bridges.md`
-- `docs/MODULE_webui.md`
+- `docs/spec/MODULE_bridges.md`
+- `docs/spec/MODULE_webui.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -477,7 +573,7 @@
 - `TALK/client/talk_client.py` 与 sync wrapper 新增 discussion helper，SDK 可创建 session、追加 turn、查询 turns。
 - `bridges/cli_bridge.py` 新增 Group Hall 参与者 prompt、`talk-action` 解析与执行：`send_message` 可同 Hall 代发 `@agent:*` 并自动创建/复用 discussion，`mark_stance` 可记录当前回复立场，连续两条不同 agent 的 `disagree` 后自动 `@human:*` 升级仲裁。
 - `bridges/pi_bridge.py` 默认 system prompt 改为 TALK Group Hall 参与者身份与动作协议；默认仍是讨论档，新增 `--pi-execution-profile tools` 显式施工档，使用默认命令时启用 `read,grep,find,ls,bash,edit,write`。
-- 新增 `docs/MODULE_discussions.md`，并同步 `docs/PROJECT_BRIEF.md`、`docs/MODULE_groups.md`、`docs/MODULE_bridges.md`。
+- 新增 `docs/spec/MODULE_discussions.md`，并同步 `docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_groups.md`、`docs/spec/MODULE_bridges.md`。
 ### Open Questions / Pending Confirmation
 - 需要重启 codex/pi bridge 后才能加载本次新协议。
 - Web UI 尚未展示 discussion session/turn；当前通过 API、SDK 与 bridge 自动动作使用。
@@ -508,9 +604,9 @@
 - `tests/test_pi_bridge.py`
 - `tests/test_talk_client.py`
 - `docs/PROJECT_BRIEF.md`
-- `docs/MODULE_discussions.md`
-- `docs/MODULE_groups.md`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_discussions.md`
+- `docs/spec/MODULE_groups.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -525,7 +621,7 @@
 - `normalize_pi_reply_language(...)` 保留为异常兜底：中文请求得到非中文/语言标签回复时才替换；正常中文或用户明确要求英文时不干预。
 - `tests/test_cli_bridge.py` 已更新 pi prompt 断言：普通消息精确等于去 mention 后原文、队列任务只保留正文/标题、Group Hall 回复仍保留原 `group_id`。
 - `tests/test_pi_bridge.py` 已更新默认命令断言：必须包含 `--system-prompt` 与隔离参数。
-- `docs/MODULE_bridges.md` 已同步 pi system prompt 分离边界。
+- `docs/spec/MODULE_bridges.md` 已同步 pi system prompt 分离边界。
 ### Open Questions / Pending Confirmation
 - 需要用户重启 pi bridge；正在运行的旧 pi bridge 不会自动加载本次修复。
 - 重启后建议验收：`@agent:pi 你好`、`@agent:pi 你好啊，你有哪些功能？`、`@agent:pi 你好啊，你有哪些功能？用中文回复`、`@agent:pi 请用英文介绍你有哪些功能`。
@@ -545,7 +641,7 @@
 - `bridges/pi_bridge.py`
 - `tests/test_cli_bridge.py`
 - `tests/test_pi_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -558,7 +654,7 @@
 - 非 pi runtime 的执行型 prompt 保持不变；Codex bridge 不受影响。
 - `normalize_pi_reply_language(...)` 保留为异常兜底：中文请求得到非中文/语言标签回复时才替换；正常中文或用户明确要求英文时不干预。
 - `tests/test_cli_bridge.py` 已更新 pi prompt 断言：用户原话在最前、无不必要元信息、包含中文短边界、Group Hall 回复仍保留原 `group_id`。
-- `docs/MODULE_bridges.md` 已同步 pi 极简 prompt 边界。
+- `docs/spec/MODULE_bridges.md` 已同步 pi 极简 prompt 边界。
 ### Open Questions / Pending Confirmation
 - 需要用户重启 pi bridge；正在运行的旧 pi bridge 不会自动加载本次极简 prompt 修复。
 - 重启后建议验收：`@agent:pi 你好啊，你有哪些功能？`、`@agent:pi 你好啊，你有哪些功能？用中文回复`、`@agent:pi 请用英文介绍你有哪些功能`。
@@ -576,7 +672,7 @@
 ### Changed Files
 - `bridges/cli_bridge.py`
 - `tests/test_cli_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -587,7 +683,7 @@
 - `bridges/cli_bridge.py` 新增 `PI_CHAT_INSTRUCTIONS`：pi 继续是自然聊天的 TALK chat member，但明确要求回复语言跟随用户任务；用户要求中文时使用简体中文；不要输出 `<Language: ...>` 标签；能力介绍只能描述轻量聊天、回答问题、拆解任务、参与 Group Hall 协作，不得声称默认 bridge 模式能读文件、执行命令、编辑文件或调用工具。
 - `bridges/cli_bridge.py` 新增 pi 成功输出后的中文归一化兜底：当中文任务/能力问题得到明显非中文回复或语言标签回复时，替换为中文能力说明；真实 CLI 失败或超时不做替换，避免遮盖错误。
 - `tests/test_cli_bridge.py` 新增回归覆盖：pi prompt 语言要求、能力边界、中文能力问题的非中文回复替换、阿拉伯语语言标签替换、明确要求英文时不误替换、Group Hall 中 pi 回复仍保留原 `group_id`。
-- `docs/MODULE_bridges.md` 已同步 pi 语言跟随与中文能力兜底边界；默认 `pi_bridge.py` 命令仍不使用 `--system-prompt`。
+- `docs/spec/MODULE_bridges.md` 已同步 pi 语言跟随与中文能力兜底边界；默认 `pi_bridge.py` 命令仍不使用 `--system-prompt`。
 ### Open Questions / Pending Confirmation
 - 需要用户重启 pi bridge；正在运行的旧 pi bridge 不会自动加载本次修复。
 - 重启后建议验收：`@agent:pi 你好啊，你有哪些功能？`、`@agent:pi 你好啊，你有哪些功能？用中文回复`、`@agent:pi 请用英文介绍你有哪些功能`。
@@ -605,7 +701,7 @@
 ### Changed Files
 - `bridges/cli_bridge.py`
 - `tests/test_cli_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -636,7 +732,7 @@
 - `bridges/pi_bridge.py`
 - `tests/test_cli_bridge.py`
 - `tests/test_pi_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -647,7 +743,7 @@
 - `bridges/pi_bridge.py` 已补充默认 system prompt：当用户询问能力或介绍时，pi 应说明自己适合轻量聊天、回答问题、拆解任务和参与 TALK 群聊协作，并说明默认桥接模式不读取项目文件、不调用工具。
 - `bridges/cli_bridge.py` 已新增能力问题弱回复兜底：当任务问“你能做啥 / 你能做什么 / 介绍下”等，而 CLI 成功输出只有 `ok`、`standing by` 或在线待命话术时，bridge 会替换为一条可验收的能力说明。
 - `tests/test_cli_bridge.py` 已覆盖 pi 能力问题弱回复替换；`tests/test_pi_bridge.py` 已覆盖 pi 默认 system prompt 包含能力介绍边界。
-- `docs/MODULE_bridges.md` 已同步 pi 能力介绍提示词与弱回复兜底边界。
+- `docs/spec/MODULE_bridges.md` 已同步 pi 能力介绍提示词与弱回复兜底边界。
 ### Open Questions / Pending Confirmation
 - 需要用户重启 pi bridge 后重新发送 `@agent:pi 你能做啥？给我介绍下` 验收；正在运行的旧 pi bridge 不会自动加载本次修复。
 - 如果用户使用 `TALK_PI_COMMAND` 或 `--pi-command` 自定义 pi 命令，需要保留默认命令中的 system prompt 边界，或自行提供等价提示词。
@@ -666,7 +762,7 @@
 - `bridges/pi_bridge.py`
 - `tests/test_cli_bridge.py`
 - `tests/test_pi_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -677,7 +773,7 @@
 - 根因是 Codex stdout 中混合了不同编码来源：Windows `taskkill` 行更像系统代码页，Codex 正文行是 UTF-8；按整段输出选择单一编码会互相拖累。
 - `bridges/cli_bridge.py` 的 `decode_subprocess_output(...)` 已改为逐行选择编码；同一 stdout 中 GBK 清理提示和 UTF-8 正文可以分别正确解码。
 - `tests/test_cli_bridge.py` 已新增混合编码行回归测试，覆盖 GBK `taskkill` 行 + UTF-8 `codex 在线。` 行的组合。
-- `docs/MODULE_bridges.md` 已同步通用 CLI bridge 的逐行解码边界。
+- `docs/spec/MODULE_bridges.md` 已同步通用 CLI bridge 的逐行解码边界。
 ### Open Questions / Pending Confirmation
 - 需要用户再次重启 Codex bridge 后重新发送 `@agent:codex 你好` 验收；正在运行的旧 Codex bridge 不会自动加载本次修复。
 - 历史消息 id 29 已经写入数据库，仍会保留旧 mojibake 内容；本次修复只影响后续新回复。
@@ -691,7 +787,7 @@
 ### Changed Files
 - `bridges/cli_bridge.py`
 - `tests/test_cli_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -702,7 +798,7 @@
 - `bridges/cli_bridge.py` 已新增 `decode_subprocess_output(...)`：优先 UTF-8，并在出现替换字符时兜底尝试系统代码页、`gbk`、`cp936`，降低 Windows 本地 CLI 中文输出乱码概率。
 - `format_cli_reply(...)` 现在会对 stdout / stderr 做 `taskkill` 噪声过滤，避免 Codex CLI 退出清理子进程时的 PID 提示出现在前端聊天回复里。
 - `tests/test_cli_bridge.py` 已新增 GBK 输出解码与中英文/乱码 `taskkill` 过滤回归测试。
-- `docs/MODULE_bridges.md` 已同步通用 CLI bridge 的 Windows 输出编码与进程清理噪声过滤边界。
+- `docs/spec/MODULE_bridges.md` 已同步通用 CLI bridge 的 Windows 输出编码与进程清理噪声过滤边界。
 ### Open Questions / Pending Confirmation
 - 需要用户重启 Codex bridge 后重新发送 `@agent:codex 你好` 验收；正在运行的旧 Codex bridge 不会自动加载本次修复。
 - 历史消息 id 23 已经写入数据库，仍会保留旧乱码内容；本次修复只影响后续新回复。
@@ -719,7 +815,7 @@
 ### Changed Files
 - `bridges/cli_bridge.py`
 - `tests/test_cli_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -731,7 +827,7 @@
 - `bridges/cli_bridge.py` 已抽出 `handle_incoming_message(...)`，统一处理 ACK、CLI 调用、最终回复和状态上报；当原消息带有 `group_id` 时，ACK 与最终 `reply_to` 都会携带同一个 `group_id`。
 - CLI prompt 现在包含 `TALK group id`，便于 Codex / pi 等外部 Agent 感知当前消息来自哪个 Group Hall。
 - `tests/test_cli_bridge.py` 已新增 Group Hall prompt 与同 group 回复回归测试，覆盖 `group_id` 传递行为。
-- `docs/MODULE_bridges.md` 已同步 Codex / pi Group Hall 当前能力与后续 HTTP fallback group cursor 边界。
+- `docs/spec/MODULE_bridges.md` 已同步 Codex / pi Group Hall 当前能力与后续 HTTP fallback group cursor 边界。
 ### Open Questions / Pending Confirmation
 - 需要用户重启 Codex bridge 与 pi bridge 后重新验收；正在运行的旧进程不会自动加载本次代码修复。
 - 本次现场失败的旧消息不会自动重试；重启 bridge 后需在前端 Group Hall 中重新发送新的 `@agent:codex` / `@agent:pi` 消息。
@@ -749,17 +845,17 @@
 ### Changed Files
 - `bridges/cli_bridge.py`
 - `tests/test_cli_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
 ## 2026-05-24 16:41 (Asia/Shanghai)
 ### Current Progress
 - `OPENHANAKO-REF-1` 文档沉淀已完成：用户提供 `liliMozi/openhanako` 作为多 Agent 拉群交流参考后，已把对 TALK 有帮助的设计点记录到项目文档。
-- `docs/LOCAL_LAB_DESIGN.md` 已新增 OpenHanako 参考笔记，记录参考版本 `dbc794de87d58b44bbf5f75f8d20fd99a5d7e156` 与重点文件：`hub/channel-router.js`、`lib/channels/channel-ticker.js`、`lib/channels/channel-store.js`、`lib/channels/channel-mentions.js`、`lib/tools/dm-tool.js`。
+- `docs/spec/LOCAL_LAB_DESIGN.md` 已新增 OpenHanako 参考笔记，记录参考版本 `dbc794de87d58b44bbf5f75f8d20fd99a5d7e156` 与重点文件：`hub/channel-router.js`、`lib/channels/channel-ticker.js`、`lib/channels/channel-store.js`、`lib/channels/channel-mentions.js`、`lib/tools/dm-tool.js`。
 - 已记录可借鉴点：Group Hall 作为真相源、`@mention` 只表示提醒/调度、Agent 显式 `reply/pass`、Agent group cursor、`max_rounds / cooldown / max_agent_checks` 等调度保护。
 - 已记录不照搬内容：Electron / Node Hub 架构、Markdown 文件频道存储、主动心跳、长期记忆、人格系统、复杂桌面工作台。
-- `docs/MODULE_groups.md` 已补充 Group/Hall 后续协议参考，明确 TALK 继续使用 SQLite 的 `groups / group_members / messages` 扩展。
+- `docs/spec/MODULE_groups.md` 已补充 Group/Hall 后续协议参考，明确 TALK 继续使用 SQLite 的 `groups / group_members / messages` 扩展。
 ### Open Questions / Pending Confirmation
 - OpenHanako 参考只作为当前验收后的下一阶段设计素材；是否实现 Agent group cursor、`reply/pass` 决策协议和自动讨论调度器，需等 Codex + pi + Web UI 联合验收完成后再确认。
 ### Next Plan
@@ -770,8 +866,8 @@
 - `.venv\Scripts\python.exe -m unittest tests.test_encoding` passed，3 tests。
 - `git diff --check` passed（仅换行提示）。
 ### Changed Files
-- `docs/LOCAL_LAB_DESIGN.md`
-- `docs/MODULE_groups.md`
+- `docs/spec/LOCAL_LAB_DESIGN.md`
+- `docs/spec/MODULE_groups.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -782,7 +878,7 @@
 - 通用 `bridges/cli_bridge.py` 新增“一句话”兜底：当任务文本包含“一句话 / one sentence / single sentence”等约束时，CLI 成功输出会在 bridge 层收敛为第一句或第一行后再发回 TALK。
 - `tests/test_pi_bridge.py` 已覆盖 pi 默认命令中的上下文/工具/session/thinking/system prompt 收敛参数。
 - `tests/test_cli_bridge.py` 已覆盖“一句话”输出收敛逻辑。
-- `docs/MODULE_bridges.md` 已同步 pi 默认命令的新边界，并提醒自定义 `TALK_PI_COMMAND` / `--pi-command` 时需自行保留收敛参数。
+- `docs/spec/MODULE_bridges.md` 已同步 pi 默认命令的新边界，并提醒自定义 `TALK_PI_COMMAND` / `--pi-command` 时需自行保留收敛参数。
 ### Open Questions / Pending Confirmation
 - 需用户重启 pi bridge 后在前端人工验收：`@agent:pi 只用一句话回复：你在线吗？` 应返回简短一句，不再输出项目状态报告。
 - 如果用户当前通过 `TALK_PI_COMMAND` 或 `--pi-command` 自定义了 pi 命令，需要同步加入本次默认命令中的收敛参数；否则会绕过默认修复。
@@ -803,7 +899,7 @@
 - `bridges/pi_bridge.py`
 - `tests/test_cli_bridge.py`
 - `tests/test_pi_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -871,11 +967,11 @@
 - 新增 `tests/test_pi_bridge.py`，覆盖 pi 默认身份、默认命令、argv prompt 传递方式与自定义 `--pi-command`。
 - 扩展 `tests/test_cli_bridge.py`，覆盖通用 bridge 的 argv prompt 传递以及 queued task 调用时传递 `prompt_transport`。
 - 本机已确认 `pi --help` 与 `pi --version` 可执行，版本为 `0.74.1`。
-- `docs/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 已同步 pi bridge 入口、启动命令和当前边界。
+- `docs/spec/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 已同步 pi bridge 入口、启动命令和当前边界。
 ### Open Questions / Pending Confirmation
 - 真实 pi 模型调用仍依赖本机 `pi` 的 provider/API key 配置；本轮未消耗真实模型请求，只验证 CLI 入口与桥接参数。
 - Codex + pi 双 Agent 同时运行的真实端到端回合尚未执行；下一步应进入人工验收或补一个双桥 smoke 脚本。
-- 本里程碑验收必须同时覆盖 Web UI：此前 Web UI 第一版质量不达标，后续已按 `image_gen` 视觉稿方向重做并记录在 `docs/MODULE_webui.md` 的 `WEB-VISUAL-2 Addendum`，需要和双 Agent bridge 一起验收。
+- 本里程碑验收必须同时覆盖 Web UI：此前 Web UI 第一版质量不达标，后续已按 `image_gen` 视觉稿方向重做并记录在 `docs/spec/MODULE_webui.md` 的 `WEB-VISUAL-2 Addendum`，需要和双 Agent bridge 一起验收。
 ### Next Plan
 1. 提交本次 `PI-BRIDGE-1` 切片。
 2. 按里程碑门禁暂停，提供 Codex + pi 双 bridge 与 Web UI 视觉/交互的联合人工验收步骤。
@@ -895,7 +991,7 @@
 - `bridges/cli_bridge.py`
 - `tests/test_pi_bridge.py`
 - `tests/test_cli_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROJECT_BRIEF.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
@@ -907,7 +1003,7 @@
 - 通用 CLI bridge 支持 `--name / --runtime / --bridge-label / --command`：例如后续 `pi` 可注册为 `agent:pi`，以 `runtime=pi` 上报实例，并使用可配置命令读取 stdin prompt、输出 stdout 回复。
 - 新增 `tests/test_cli_bridge.py`，覆盖通用 CLI 参数必填、runtime prompt、错误回复标签、stdin/stdout 命令执行、queued task 认领/回复/完成路径。
 - `tests/test_codex_bridge.py` 继续通过，确认 Codex 旧兼容面未破坏。
-- `docs/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 已同步通用 CLI bridge、Codex 兼容入口和 pi 接入方向。
+- `docs/spec/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 已同步通用 CLI bridge、Codex 兼容入口和 pi 接入方向。
 ### Open Questions / Pending Confirmation
 - 用户方向判断已确认：先把 Codex bridge 泛化为通用 CLI bridge，是更快跑通 Codex + pi 双 Agent 的路线。
 - pi 的具体 CLI 启动命令 / stdin/stdout 协议仍需确认；若 pi 不能直接从 stdin 读 prompt 并向 stdout 写最终回复，需要补一个很薄的 pi adapter。
@@ -929,7 +1025,7 @@
 - `bridges/cli_bridge.py`
 - `bridges/codex_bridge.py`
 - `tests/test_cli_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROJECT_BRIEF.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
@@ -944,7 +1040,7 @@
 - Schedule 列表与读取沿用任务可见性：Human 可读全部，Agent 只能读目标为自己或自己创建的 schedule。
 - Schedule 状态更新支持 `active`、`paused`、`canceled`；completed / canceled 不可恢复为 active 或 paused。
 - SDK 已新增 async/sync schedule helper：创建、列表、读取、更新状态、运行到期计划。
-- `docs/MODULE_tasks.md` 与 `docs/PROJECT_BRIEF.md` 已同步数据模型、接口契约、当前边界和验收点。
+- `docs/spec/MODULE_tasks.md` 与 `docs/PROJECT_BRIEF.md` 已同步数据模型、接口契约、当前边界和验收点。
 ### Open Questions / Pending Confirmation
 - Schedule 当前仅记录并显式物化，不内置后台调度循环；后续需决定由 bridge 轮询、系统定时脚本，还是服务端后台 worker 触发。
 - Group 删除 / 归档语义仍需确认：历史 Hall 消息应保留、归档还是随 Group 删除。
@@ -970,7 +1066,7 @@
 - `TALK/client/talk_client_sync.py`
 - `tests/test_tasks.py`
 - `tests/test_talk_client.py`
-- `docs/MODULE_tasks.md`
+- `docs/spec/MODULE_tasks.md`
 - `docs/PROJECT_BRIEF.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
@@ -983,7 +1079,7 @@
 - Web UI 已在 Hall 成员面板顶部加入 Group 设置表单，保存后会刷新 room strip、成员面板与 mention/presence 相关视图。
 - 静态资源 cache busting 已更新到 `20260520-group-meta`。
 - Group 删除未在本切片实现：删除会影响历史 Hall 消息可见性，属于需要项目管理者确认的数据语义。
-- `docs/MODULE_groups.md` 已同步接口契约、Web UI 能力、当前边界和验收点。
+- `docs/spec/MODULE_groups.md` 已同步接口契约、Web UI 能力、当前边界和验收点。
 ### Open Questions / Pending Confirmation
 - Group 删除 / 归档语义仍需确认：历史 Hall 消息应保留、归档还是随 Group 删除。
 ### Next Plan
@@ -1006,7 +1102,7 @@
 - `web/index.html`
 - `web/app.js`
 - `web/style.css`
-- `docs/MODULE_groups.md`
+- `docs/spec/MODULE_groups.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -1017,7 +1113,7 @@
 - 新增 `handle_queued_task(...)`：认领任务、运行 Codex CLI、格式化输出、向任务创建者发送直接文本结果消息，并通过 `/api/tasks/{id}/complete` 写入 `succeeded / failed`、`result_message_id` 与 `last_error`。
 - 新增任务队列后台 worker：与消息处理共用 `run_lock`，保证单个 bridge 实例不会并发启动多个 Codex CLI 进程。
 - CLI 新增 `--task-poll-interval` 与 `--disable-task-queue`；默认开启任务队列轮询，保留旧的消息触发模式。
-- `docs/MODULE_bridges.md` 已同步任务队列行为、CLI 开关与验收点。
+- `docs/spec/MODULE_bridges.md` 已同步任务队列行为、CLI 开关与验收点。
 ### Open Questions / Pending Confirmation
 - 当前环境仍未暴露精确 token/5 小时额度占比；本轮是 bridge/任务协议相关切片，按协议完成 1 个切片后暂停汇总并提交。
 - Browser runtime 初始化问题仍待从 Codex Desktop / Browser 后端侧恢复后补测；本切片未改前端，因此未做 Browser 真实页面验证。
@@ -1035,7 +1131,7 @@
 ### Changed Files
 - `bridges/codex_bridge.py`
 - `tests/test_codex_bridge.py`
-- `docs/MODULE_bridges.md`
+- `docs/spec/MODULE_bridges.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -1046,7 +1142,7 @@
 - 补发查询覆盖全局可见消息与当前成员所在 Group 的 Hall 消息，并会过滤对当前成员不可见的消息。
 - 撤回消息按当前 `MessageOut` 快照语义补发：`revoked=true`，正文、附言和文件快照字段保持隐藏。
 - 若同一消息同时出现在补发结果和实时队列中，服务端会按 SSE `id:` 去重后再输出。
-- `docs/MODULE_websocket.md` 已同步接口契约、当前实现与验收标准。
+- `docs/spec/MODULE_websocket.md` 已同步接口契约、当前实现与验收标准。
 ### Open Questions / Pending Confirmation
 - 当前环境仍未暴露精确 token/5 小时额度占比；本轮按协议切片规则完成 1 个切片后暂停汇总。
 - Browser runtime 初始化问题仍待从 Codex Desktop / Browser 后端侧恢复后补测；本切片未改前端，因此未做 Browser 真实页面验证。
@@ -1063,7 +1159,7 @@
 ### Changed Files
 - `server/main.py`
 - `tests/test_sse.py`
-- `docs/MODULE_websocket.md`
+- `docs/spec/MODULE_websocket.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -1123,7 +1219,7 @@
 - WebSocket 恢复后会主动关闭 SSE，避免同一浏览器同时占用两条实时通道。
 - SSE 与 WS 共用前端实时事件处理逻辑，统一处理 `message / revoke / presence`，`ping` 事件只用于保持连接。
 - HTTP 轮询仍保留为断线与事件缺口补漏通道，不承担在线成员状态。
-- `docs/MODULE_webui.md` 已同步接口依赖、当前实现、验收标准和本切片 addendum。
+- `docs/spec/MODULE_webui.md` 已同步接口依赖、当前实现、验收标准和本切片 addendum。
 ### Open Questions / Pending Confirmation
 - Codex in-app Browser 插件本轮连接两次超时，未完成真实浏览器前端烟测；临时隔离服务已关闭并清理。
 - SSE `Last-Event-ID` replay/backfill 尚未实现；客户端仍需用历史接口和 HTTP 轮询补漏。
@@ -1141,7 +1237,7 @@
 ### Changed Files
 - `web/app.js`
 - `web/index.html`
-- `docs/MODULE_webui.md`
+- `docs/spec/MODULE_webui.md`
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 
@@ -1219,7 +1315,7 @@
 - The stream emits `presence`, `message`, `revoke`, and idle `ping` events; `message` and `revoke` include SSE `id:` set to the message id.
 - `server/ws_hub.py` now fans out realtime updates to both WebSocket connections and per-member SSE queues, drops the oldest queued SSE event when a member queue is full, and counts online members across the WebSocket/SSE union.
 - Added live streaming tests for invalid token rejection, presence/message delivery, and revoke delivery.
-- Synced `docs/MODULE_websocket.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
+- Synced `docs/spec/MODULE_websocket.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
 #### Open Questions / Pending Confirmation
 - Web UI has not integrated the new SSE stream yet; this slice only provides the backend event contract.
 - SSE `Last-Event-ID` replay/backfill is not implemented; clients should still use message history APIs after reconnect when they need gap recovery.
@@ -1236,7 +1332,7 @@
 - `server/ws_hub.py`
 - `tests/test_sse.py`
 - `tests/test_support.py`
-- `docs/MODULE_websocket.md`
+- `docs/spec/MODULE_websocket.md`
 - `docs/PROJECT_BRIEF.md`
 - `docs/PROGRESS.md`
 
@@ -1247,7 +1343,7 @@
 - Agent users retain a read-only member list in the UI; server-side permission remains authoritative.
 - Successful member changes replace the active Group snapshot and immediately refresh room metadata, scoped presence, and `@` autocomplete.
 - Static asset cache-busting updated to `20260515-group-members`.
-- Synced `docs/MODULE_webui.md`, `docs/MODULE_groups.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
+- Synced `docs/spec/MODULE_webui.md`, `docs/spec/MODULE_groups.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
 #### Open Questions / Pending Confirmation
 - No new open questions from this slice.
 #### Next Plan
@@ -1260,8 +1356,8 @@
 - `web/index.html`
 - `web/app.js`
 - `web/style.css`
-- `docs/MODULE_webui.md`
-- `docs/MODULE_groups.md`
+- `docs/spec/MODULE_webui.md`
+- `docs/spec/MODULE_groups.md`
 - `docs/PROJECT_BRIEF.md`
 - `docs/PROGRESS.md`
 
@@ -1271,7 +1367,7 @@
 - Sync SDK parity added for the same Group helpers; sync `reply()` was also exposed for parity with the async client.
 - Message helpers now support Hall scope: `send_text`, `send_file`, `reply`, and `fetch_history` can carry `group_id`.
 - Added live SDK coverage that creates a Group, updates/removes a member, sends a Hall message, reads Hall history as an Agent, and verifies the Hall message does not leak into legacy/global history.
-- Synced `docs/SDK.md`, `docs/MODULE_groups.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
+- Synced `docs/spec/SDK.md`, `docs/spec/MODULE_groups.md`, `docs/PROJECT_BRIEF.md`, and this progress file.
 #### Open Questions / Pending Confirmation
 - No new open questions from this slice.
 #### Next Plan
@@ -1284,8 +1380,8 @@
 - `TALK/client/talk_client.py`
 - `TALK/client/talk_client_sync.py`
 - `tests/test_talk_client.py`
-- `docs/SDK.md`
-- `docs/MODULE_groups.md`
+- `docs/spec/SDK.md`
+- `docs/spec/MODULE_groups.md`
 - `docs/PROJECT_BRIEF.md`
 - `docs/PROGRESS.md`
 
@@ -1296,7 +1392,7 @@
 - Added a lightweight new Group panel with name, optional ID, optional description, and initial member checkboxes; creation succeeds through `POST /api/groups` and automatically enters the new Hall.
 - Hall scope now flows through the browser: history and polling include `group_id`, text/file send payloads include `group_id`, WebSocket events are appended only when they belong to the active room, and switching rooms clears reply state.
 - Hall UX now scopes online members and `@` autocomplete to the current Group members and uses a placeholder that states Hall mentions are reminders rather than visibility restrictions.
-- Synced `docs/PROJECT_BRIEF.md`, `docs/MODULE_webui.md`, `docs/MODULE_groups.md`, and this progress file.
+- Synced `docs/PROJECT_BRIEF.md`, `docs/spec/MODULE_webui.md`, `docs/spec/MODULE_groups.md`, and this progress file.
 #### Open Questions / Pending Confirmation
 - Group member management after creation, Group rename/delete, unread/attention state, SDK helpers, SSE stream integration, and multi-Agent discussion protocol remain future slices.
 #### Next Plan
@@ -1313,14 +1409,14 @@
 - `web/app.js`
 - `web/style.css`
 - `docs/PROJECT_BRIEF.md`
-- `docs/MODULE_webui.md`
-- `docs/MODULE_groups.md`
+- `docs/spec/MODULE_webui.md`
+- `docs/spec/MODULE_groups.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-14 16:03 (Asia/Shanghai)
 #### Current Progress
 - Project role boundary updated: Codex is now authorized as a decision Agent and can maintain relevant project/module/progress/decision docs directly.
-- Group/Hall docs synced after `GROUP-1 / HALL-1`: added `docs/MODULE_groups.md`.
+- Group/Hall docs synced after `GROUP-1 / HALL-1`: added `docs/spec/MODULE_groups.md`.
 - Updated `docs/PROJECT_BRIEF.md` with `groups`, `group_members`, `messages.group_id`, `server/routes/groups.py`, the module index entry, and the 2026-05-14 Group/Hall addendum.
 #### Open Questions / Pending Confirmation
 - None for documentation sync.
@@ -1332,7 +1428,7 @@
 #### Changed Files
 - `AGENTS.md`
 - `docs/PROJECT_BRIEF.md`
-- `docs/MODULE_groups.md`
+- `docs/spec/MODULE_groups.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-14 15:54 (Asia/Shanghai)
@@ -1403,7 +1499,7 @@
 #### Changed Files
 - `web/index.html`
 - `web/style.css`
-- `docs/MODULE_webui.md`
+- `docs/spec/MODULE_webui.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-14 11:10 (Asia/Shanghai)
@@ -1426,7 +1522,7 @@
 - `web/index.html`
 - `web/app.js`
 - `web/style.css`
-- `docs/MODULE_webui.md`
+- `docs/spec/MODULE_webui.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-14 10:55 (Asia/Shanghai)
@@ -1463,7 +1559,7 @@
 - `web/index.html`
 - `web/app.js`
 - `web/style.css`
-- `docs/MODULE_webui.md`
+- `docs/spec/MODULE_webui.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-14 10:15 (Asia/Shanghai)
@@ -1480,13 +1576,13 @@
 #### Changed Files
 - `web/index.html`
 - `web/app.js`
-- `docs/MODULE_webui.md`
+- `docs/spec/MODULE_webui.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-14 10:01 (Asia/Shanghai)
 #### Current Progress
 - `SETUP-UX-2` completed from browser diff comments: added a visible `管理员 ID` format hint, changed `显示名称` to `昵称`, added client-side `human:*` validation, and restyled `创建管理员` as a compact bordered primary button.
-- Synced `docs/MODULE_webui.md` to reflect the updated first-admin setup labels and ID-format hint.
+- Synced `docs/spec/MODULE_webui.md` to reflect the updated first-admin setup labels and ID-format hint.
 #### Open Questions / Pending Confirmation
 - In-app browser automation currently times out while connecting to the browser runtime, so the page needs a manual refresh or later browser recheck for visual confirmation.
 #### Next Plan
@@ -1499,7 +1595,7 @@
 - `web/index.html`
 - `web/app.js`
 - `web/style.css`
-- `docs/MODULE_webui.md`
+- `docs/spec/MODULE_webui.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-13 16:07 (Asia/Shanghai)
@@ -1530,10 +1626,10 @@
 - `tests/test_tasks.py`
 - `tests/test_talk_client.py`
 - `docs/PROJECT_BRIEF.md`
-- `docs/MODULE_instances.md`
-- `docs/MODULE_tasks.md`
-- `docs/LOCAL_LAB_DESIGN.md`
-- `docs/SDK.md`
+- `docs/spec/MODULE_instances.md`
+- `docs/spec/MODULE_tasks.md`
+- `docs/spec/LOCAL_LAB_DESIGN.md`
+- `docs/spec/SDK.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-13 15:47 (Asia/Shanghai)
@@ -1560,11 +1656,11 @@
 - `bridges/codex_bridge.py`
 - `tests/test_instances.py`
 - `tests/test_talk_client.py`
-- `docs/MODULE_instances.md`
-- `docs/MODULE_bridges.md`
-- `docs/LOCAL_LAB_DESIGN.md`
+- `docs/spec/MODULE_instances.md`
+- `docs/spec/MODULE_bridges.md`
+- `docs/spec/LOCAL_LAB_DESIGN.md`
 - `docs/PROJECT_BRIEF.md`
-- `docs/SDK.md`
+- `docs/spec/SDK.md`
 - `docs/PROGRESS.md`
 
 ### 2026-05-13 15:24 (Asia/Shanghai)
@@ -1581,9 +1677,9 @@
 
 ### 2026-05-13 15:10 (Asia/Shanghai)
 #### Current Progress
-- Added `docs/LOCAL_LAB_DESIGN.md` as the thin local-lab design note.
+- Added `docs/spec/LOCAL_LAB_DESIGN.md` as the thin local-lab design note.
 - Added `bridges/codex_bridge.py` as the Codex bridge MVP: direct text message in, configurable `codex exec` invocation, `reply_to` answer out.
-- Added `docs/MODULE_bridges.md` and updated `docs/PROJECT_BRIEF.md` to register the new bridge module.
+- Added `docs/spec/MODULE_bridges.md` and updated `docs/PROJECT_BRIEF.md` to register the new bridge module.
 - Added `tests/test_codex_bridge.py` covering bridge routing, prompt construction, reply formatting, and subprocess stdin piping.
 #### Open Questions / Pending Confirmation
 - Real TALK server smoke test for Codex bridge remains pending.
@@ -1617,7 +1713,7 @@
 #### Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
 - `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
-- `docs/QUICKSTART_USER.md` has not yet been run end-to-end by a first-time non-project user, so there may still be hidden onboarding assumptions.
+- `docs/guides/QUICKSTART_USER.md` has not yet been run end-to-end by a first-time non-project user, so there may still be hidden onboarding assumptions.
 - The discussion phase still needs a concrete protocol for moderator behavior, round limits, material-sharing rules, and summary output.
 #### Next Plan
 - Write the next-phase design note for local experimental mode and one-command startup.
@@ -1627,22 +1723,22 @@
 
 ### 2026-04-24 22:01 (Asia/Shanghai)
 #### Current Progress
-- `DOC-1` completed: split onboarding into `docs/QUICKSTART_USER.md` and `docs/QUICKSTART_AGENT.md`, and reduced `docs/QUICKSTART.md` to a short index page.
+- `DOC-1` completed: split onboarding into `docs/guides/QUICKSTART_USER.md` and `docs/guides/QUICKSTART_AGENT.md`, and reduced `docs/guides/QUICKSTART.md` to a short index page.
 - `QUICKSTART_USER` now follows a family-user path with Docker Desktop, explicit browser verification, `config.toml` before/after examples, LAN IP lookup, and ordered troubleshooting.
 - `QUICKSTART_AGENT` now follows a Python bare-metal + SDK path with PowerShell/bash command pairs, real example repo URLs, and a full runnable Agent sample.
-- `docs/DEPLOY.md` now includes prerequisites for Docker Compose, Linux `systemd`, and bare metal deployment.
-- `docs/SDK.md` async examples now all include `asyncio.run(main())`, and `SETUP-1` now supports browser-side key generation, reveal/hide, and one-click copy in the first-admin UI.
+- `docs/guides/DEPLOY.md` now includes prerequisites for Docker Compose, Linux `systemd`, and bare metal deployment.
+- `docs/spec/SDK.md` async examples now all include `asyncio.run(main())`, and `SETUP-1` now supports browser-side key generation, reveal/hide, and one-click copy in the first-admin UI.
 - Related docs were synced after implementation, and full regression still passes with `51` unit tests.
 #### Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
 - `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
-- `docs/QUICKSTART_USER.md` has not yet been run end-to-end by a first-time non-project user, so there may still be hidden onboarding assumptions.
+- `docs/guides/QUICKSTART_USER.md` has not yet been run end-to-end by a first-time non-project user, so there may still be hidden onboarding assumptions.
 - The task card asks for a second clean-session newcomer dry run and readability feedback; that external acceptance has not been performed yet in this environment.
 #### Next Plan
 - Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
-- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
+- Run one real Linux host smoke test for `deploy/talk.service` following `docs/guides/DEPLOY.md`.
 - Run one real browser smoke test for `SETUP-1` on a fresh DB and confirm the first-run form, generated key, automatic sign-in, and second-open login behavior match the task card.
-- Run one clean-session newcomer walkthrough against `docs/QUICKSTART_USER.md`, collect friction points, and trim any remaining expert assumptions.
+- Run one clean-session newcomer walkthrough against `docs/guides/QUICKSTART_USER.md`, collect friction points, and trim any remaining expert assumptions.
 
 ### 2026-04-24 19:25 (Asia/Shanghai)
 #### Current Progress
@@ -1653,71 +1749,71 @@
 #### Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
 - `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
-- `docs/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
+- `docs/guides/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
 - The new first-run setup flow has test coverage, but a real browser smoke test for “empty DB -> create admin -> auto login -> reopen -> normal login form” is still pending.
 #### Next Plan
 - Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
-- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
+- Run one real Linux host smoke test for `deploy/talk.service` following `docs/guides/DEPLOY.md`.
 - Run one real browser smoke test for `SETUP-1` on a fresh DB and confirm the first-run form, automatic sign-in, and second-open login behavior match the task card.
-- Collect first-run feedback from a non-project user against `docs/QUICKSTART.md` and remove any remaining setup friction.
+- Collect first-run feedback from a non-project user against `docs/guides/QUICKSTART.md` and remove any remaining setup friction.
 
 ### 2026-04-23 20:39 (Asia/Shanghai)
 #### Current Progress
 - `SDK-1` completed: added `TALK/client/` with async `TalkClient`, sync `TalkClientSync`, HTTP exception mapping, WebSocket-first event flow, reconnect plus HTTP polling fallback, message dedupe, and SDK docs/demo.
 - `MSG-4` completed: added first-level message reply support across database, REST, WebSocket, Web UI, and SDK; reply summaries now travel with history and live events.
-- `DEPLOY-1` completed: added `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `deploy/talk.service`, `README.md`, `docs/QUICKSTART.md`, and `docs/DEPLOY.md` for Docker, systemd, and bare-metal deployment paths.
+- `DEPLOY-1` completed: added `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `deploy/talk.service`, `README.md`, `docs/guides/QUICKSTART.md`, and `docs/guides/DEPLOY.md` for Docker, systemd, and bare-metal deployment paths.
 - `SEC-1` completed: `GET /api/messages` now enforces visibility in SQL, aligns with WebSocket delivery semantics, and treats `to` as a narrowing filter rather than an access-control boundary.
 - Regression coverage expanded across SDK and message flows; full `python -m unittest` is green with `48` tests.
 #### Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
 - `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
-- `docs/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
+- `docs/guides/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
 - First human account creation still relies on `/docs` plus `POST /api/members`; there is still no dedicated first-run bootstrap flow.
 #### Next Plan
 - Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
-- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
+- Run one real Linux host smoke test for `deploy/talk.service` following `docs/guides/DEPLOY.md`.
 - Decide whether to turn first human account creation into a dedicated bootstrap flow, or explicitly accept `/docs` as the administrator-only setup path for now.
-- Collect first-run feedback from a non-project user against `docs/QUICKSTART.md` and remove any remaining setup friction.
+- Collect first-run feedback from a non-project user against `docs/guides/QUICKSTART.md` and remove any remaining setup friction.
 
 ### 2026-04-23 20:38 (Asia/Shanghai)
 #### Current Progress
 - `SEC-1` completed: `GET /api/messages` now enforces message visibility in SQL and matches WebSocket delivery semantics instead of trusting the caller's `to` filter.
 - `to=<member_id>` is now only a narrowing filter on the caller's visible set; `to=<other_member>` returns a safe pair view without exposing third-party private messages.
 - Added regression coverage in `tests/test_messages.py` for third-party private message isolation, `to` filter escape attempts, broadcast visibility, pair-view filtering, and search visibility boundaries.
-- Added startup indexes for `messages.from_id` and `messages.to_ids`, and updated `docs/MODULE_messages.md`, `docs/PROJECT_BRIEF.md`, and `docs/SDK.md` to document the new server-enforced visibility contract.
+- Added startup indexes for `messages.from_id` and `messages.to_ids`, and updated `docs/spec/MODULE_messages.md`, `docs/PROJECT_BRIEF.md`, and `docs/spec/SDK.md` to document the new server-enforced visibility contract.
 - Full regression check passed: `python -m unittest` is green with `48` tests.
 #### Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup are still unverified.
 - `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
-- `docs/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
+- `docs/guides/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
 - First human account creation still relies on `/docs` plus `POST /api/members`; there is still no dedicated first-run bootstrap flow.
 #### Next Plan
 - Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
-- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
+- Run one real Linux host smoke test for `deploy/talk.service` following `docs/guides/DEPLOY.md`.
 - Decide whether to turn first human account creation into a dedicated bootstrap flow, or explicitly accept `/docs` as the administrator-only setup path for now.
-- Collect first-run feedback from a non-project user against `docs/QUICKSTART.md` and remove any remaining setup friction.
+- Collect first-run feedback from a non-project user against `docs/guides/QUICKSTART.md` and remove any remaining setup friction.
 
 ### 2026-04-23 19:59 (Asia/Shanghai)
 #### Current Progress
 - `DEPLOY-1` completed: added `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `deploy/talk.service` to support Docker and systemd deployment paths.
-- Added human-facing deployment docs: `README.md` as the root entry, `docs/QUICKSTART.md` for first install/login/use, and `docs/DEPLOY.md` for Docker, systemd, bare-metal, reverse proxy, backup, and restore workflows.
+- Added human-facing deployment docs: `README.md` as the root entry, `docs/guides/QUICKSTART.md` for first install/login/use, and `docs/guides/DEPLOY.md` for Docker, systemd, bare-metal, reverse proxy, backup, and restore workflows.
 - `CLAUDE.md` now points operators to the new deployment entry docs and templates.
 - Docker docs now include writable path bootstrap steps for a clean machine: `storage/`, `logs/`, `backups/`, and `talk.db`.
 - Regression check passed: `python -m unittest` remains green with `43` tests.
 #### Open Questions / Pending Confirmation
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup were not verified here.
 - `deploy/talk.service` and the Linux deployment path are documented but not yet validated on a clean Linux host.
-- `docs/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
+- `docs/guides/QUICKSTART.md` has not yet been run end-to-end by a first-time non-project user, so there may still be onboarding friction.
 - Outside `DEPLOY-1`, one known product-side gap remains: `GET /api/messages` history visibility still relies on the caller using the expected `to=<member_id>` view and is not yet fully tightened to WebSocket-level visibility semantics.
 #### Next Plan
 - Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
-- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
-- Collect first-run feedback from a non-project user against `docs/QUICKSTART.md` and remove any remaining setup friction.
+- Run one real Linux host smoke test for `deploy/talk.service` following `docs/guides/DEPLOY.md`.
+- Collect first-run feedback from a non-project user against `docs/guides/QUICKSTART.md` and remove any remaining setup friction.
 
 ### 2026-04-23 19:57 (Asia/Shanghai)
 #### Current Progress
 - `DEPLOY-1` completed: added `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `deploy/talk.service` to support Docker and systemd deployment paths.
-- Added human-facing deployment docs: `README.md` as the root entry, `docs/QUICKSTART.md` for first install/login/use, and `docs/DEPLOY.md` for Docker, systemd, bare-metal, reverse proxy, backup, and restore workflows.
+- Added human-facing deployment docs: `README.md` as the root entry, `docs/guides/QUICKSTART.md` for first install/login/use, and `docs/guides/DEPLOY.md` for Docker, systemd, bare-metal, reverse proxy, backup, and restore workflows.
 - `CLAUDE.md` now points operators to the new deployment entry docs and templates.
 - Docker docs now include writable path bootstrap steps for a clean machine: `storage/`, `logs/`, `backups/`, and `talk.db`.
 - Regression check passed: `python -m unittest` remains green with `43` tests.
@@ -1725,8 +1821,8 @@
 - Docker was not available in the current workstation environment, so `docker compose config` and real container startup were not verified here.
 #### Next Plan
 - Run one real Docker smoke test on a machine with Docker: `docker compose up -d --build`, open Web UI, create one account, send one message, upload one file, then restart and confirm persistence.
-- Run one real Linux host smoke test for `deploy/talk.service` following `docs/DEPLOY.md`.
-- Collect first-run feedback from a non-project user against `docs/QUICKSTART.md` and remove any remaining setup friction.
+- Run one real Linux host smoke test for `deploy/talk.service` following `docs/guides/DEPLOY.md`.
+- Collect first-run feedback from a non-project user against `docs/guides/QUICKSTART.md` and remove any remaining setup friction.
 
 ### 2026-04-23 19:48 (Asia/Shanghai)
 #### Current Progress
@@ -1747,7 +1843,7 @@
 - `SDK-1` ?????????? `TALK/client/`????? `TalkClient`?????? `TalkClientSync`?????? `register/send_text/send_file/revoke/download_file/me/list_members/fetch_history/run` ??????
 - SDK ??????? WebSocket ?????JSON `ping/pong` ??????????????? HTTP `since` ??????????? N ? `message.id` ???????? WS `from_field` ? REST `from` ?????
 - ?? `examples/agent_sdk_demo.py`?????? `24` ????????? `agent:<name>`????? `ping` ??????? `pong`?????????? Agent??
-- ?? `docs/SDK.md` ?? SDK API ?????? `docs/MODULE_agent_example.md` ?? SDK ?????`server/routes/files.py` ?? `HTTP_413_REQUEST_ENTITY_TOO_LARGE` ?? `HTTP_413_CONTENT_TOO_LARGE`?
+- ?? `docs/spec/SDK.md` ?? SDK API ?????? `docs/spec/MODULE_agent_example.md` ?? SDK ?????`server/routes/files.py` ?? `HTTP_413_REQUEST_ENTITY_TOO_LARGE` ?? `HTTP_413_CONTENT_TOO_LARGE`?
 - ?? `tests/test_talk_client.py` ? 6 ? `unittest` ???????/?????????????WS ????????????????? handler????????????? `36` ? `unittest`?`python -m unittest` ???
 #### Open Questions / Pending Confirmation
 - None
@@ -1776,7 +1872,7 @@
 - 扩充 `tests/test_files.py` 4 个上传链路用例，覆盖成功上传落盘/落库、上传鉴权拒绝、超限文件拒绝、上传后 `type=file` 消息对 `filename / size_bytes / mime` 的快照冻结。
 - 为了让基于 FastAPI `TestClient` 的自动化测试可直接运行，`requirements.txt` 已补入 `httpx>=0.27,<1`。
 - 测试基类已补应用注入与隔离能力：`tests/test_support.py` 现在会把临时 SQLite 引擎注入 `server.main`，并在每个用例前后清空 `hub` 连接状态，避免 WS 单测串扰。
-- 已同步更新 `docs/MODULE_websocket.md` 与 `docs/MODULE_files.md` 的当前实现现状和验收标准，反映本轮新增自动化覆盖。
+- 已同步更新 `docs/spec/MODULE_websocket.md` 与 `docs/spec/MODULE_files.md` 的当前实现现状和验收标准，反映本轮新增自动化覆盖。
 - 当前全量自动化测试为 `15` 个 `unittest` 用例，已通过 `python -m unittest` 全量验证。
 #### Open Questions / Pending Confirmation
 - None
@@ -1926,7 +2022,7 @@
 #### Next Plan
 - 等待项目管理者确认文件生命周期策略，优先建议先明确“已被消息引用的文件是否永久保留”这一条基线规则。
 - 策略确认后，按决策实现对应的文件保留/清理方案，并补充 API/前端在文件缺失场景下的用户可见行为。
-- 在本轮已确认改动稳定后，同步更新 `docs/MODULE_messages.md`、`docs/MODULE_webui.md` 与 `docs/MODULE_files.md` 的实现状态描述。
+- 在本轮已确认改动稳定后，同步更新 `docs/spec/MODULE_messages.md`、`docs/spec/MODULE_webui.md` 与 `docs/spec/MODULE_files.md` 的实现状态描述。
 
 ### 2026-04-14 00:12 (Asia/Shanghai)
 #### Current Progress
@@ -1935,7 +2031,7 @@
 - Web UI 已完成一轮细化：加入连接状态徽标、WS 自动重连（指数退避）、页内失败提示，不再依赖 `prompt` 和阻断式 `alert`。
 - 文件消息协议已扩展：支持 `caption`，并在消息中冻结 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段。
 - 接收者表达已统一为 `@mention` 模式：文本正文与文件附言都只解析“消息开头连续 mention 块”作为接收者；无开头 mention 时按广播处理；无效 mention 会在发送前红色提示并阻止发送。
-- 相关文档已同步到当前实现：`AGENTS.md`、`docs/PROJECT_BRIEF.md`、`docs/MODULE_members_auth.md`、`docs/MODULE_messages.md`、`docs/MODULE_files.md`、`docs/MODULE_webui.md`、`docs/MODULE_agent_example.md`。
+- 相关文档已同步到当前实现：`AGENTS.md`、`docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_members_auth.md`、`docs/spec/MODULE_messages.md`、`docs/spec/MODULE_files.md`、`docs/spec/MODULE_webui.md`、`docs/spec/MODULE_agent_example.md`。
 #### Open Questions / Pending Confirmation
 - None
 #### Next Plan
@@ -1960,7 +2056,7 @@
 
 **完成**
 
-- **M1 MVP 代码全部落地并通过 API 端到端验证**：按 [§9 目录结构](PRODUCT.md) 创建 `server/`、`web/`、`examples/` 完整代码骨架
+- **M1 MVP 代码全部落地并通过 API 端到端验证**：按 [§9 目录结构](spec/PRODUCT.md) 创建 `server/`、`web/`、`examples/` 完整代码骨架
 - `server/models.py`：SQLModel 定义 members/messages/files 三张表 + Pydantic 请求/响应 schemas，`from` 关键字用 `Field(alias="from")` 解决
 - `server/db.py`：用 `tomllib` 读取 `config.toml`，创建 SQLite engine（WAL 模式），提供 `get_session` 依赖
 - `server/auth.py`：`X-API-Key` header → Member 查表鉴权依赖
@@ -1974,16 +2070,16 @@
 - **API 端到端验证通过**：注册 human:bobo + agent:AI1 + agent:AI2 → 定向消息 + 广播消息 → AI1 拉到所有消息 / AI2 只拉到广播 → TestBot Agent 自动注册+轮询+回复 → 中文 UTF-8 存储正确 → OpenAPI `/docs` 200 OK
 - **建立全局项目文档结构规范**：创建 `~/.claude/CLAUDE.md`（文档结构标准 + MODULE 统一模板 + 模块拆分原则 + Agent 路由规则）
 - **TALK 项目文档重构为 "1+N" 结构**：
-  - `talk.md` → `docs/PRODUCT.md`（PM 完整产品文档，位置标准化）
+  - `talk.md` → `docs/spec/PRODUCT.md`（PM 完整产品文档，位置标准化）
   - 新建 `CLAUDE.md`（项目级路由入口，指引 agent 先读 PROJECT_BRIEF 再读对应 MODULE）
   - 新建 `docs/PROJECT_BRIEF.md`（~100 行公共上下文：架构图 + 技术栈 + 数据模型 + 模块索引表）
   - 新建 6 份 MODULE spec：`MODULE_members_auth` / `MODULE_messages` / `MODULE_websocket` / `MODULE_files` / `MODULE_webui` / `MODULE_agent_example`，每份含目标、范围、接口契约、约束、现状、待改进、验收标准
 - **改进 progress skill**：触发词增加"继续项目"，§3.4 强化为必须用 AskUserQuestion 等待用户指示才能行动
 - **清理记忆文件**：删除已过期的 `project_sql_exam.md`，更新 `user_sql_background.md` 去除考试上下文
-- 为 TALK 补充**部署拓扑**章节 [§4.1](PRODUCT.md)：画出"拓扑 A 同机多 Agent"和"拓扑 B 跨机多 Agent"两张 ASCII 图，明确从 A 切到 B 只需 3 处配置修改（`host` / 防火墙 / Agent base_url），**零代码改动**
-- 新增 [§5.1 关键配置项](PRODUCT.md)：`config.toml` 的 6 个字段（`host / port / public_url / upload_max_mb / storage_dir / db_path`）及默认值，并在备注里留下"默认 `127.0.0.1` 的安全理由"
-- [§12 验证步骤](PRODUCT.md) 补了第 9 步：跨机部署端到端验证流程
-- Plan 文件与 [TALK/talk.md](PRODUCT.md) 双份同步，保持两份文档内容一致
+- 为 TALK 补充**部署拓扑**章节 [§4.1](spec/PRODUCT.md)：画出"拓扑 A 同机多 Agent"和"拓扑 B 跨机多 Agent"两张 ASCII 图，明确从 A 切到 B 只需 3 处配置修改（`host` / 防火墙 / Agent base_url），**零代码改动**
+- 新增 [§5.1 关键配置项](spec/PRODUCT.md)：`config.toml` 的 6 个字段（`host / port / public_url / upload_max_mb / storage_dir / db_path`）及默认值，并在备注里留下"默认 `127.0.0.1` 的安全理由"
+- [§12 验证步骤](spec/PRODUCT.md) 补了第 9 步：跨机部署端到端验证流程
+- Plan 文件与 [TALK/talk.md](spec/PRODUCT.md) 双份同步，保持两份文档内容一致
 - 创建并落地 `project-progress` skill：[SKILL.md](C:\Users\bobo\.claude\skills\progress\SKILL.md) 211 行，含两种操作分发（summarize/resume）、三源素材采集、同日合并、首次初始化、计划自动迁移、历史归档、auto-resume hook 文档化
 - 首次运行本 skill 并生成本进度文件 `docs/PROGRESS.md`
 - **改进 skill 项目根裁定逻辑**（SKILL.md 从 211 行 → 256 行）：把原本 "git → cwd" 的 2 级回退换成 **5 级 Tier 算法**：Tier1 git 根 → Tier2 IDE 打开文件的最近项目祖先 → Tier3 cwd 自带项目标记 → Tier4 cwd 是多项目父目录时 AskUserQuestion 让用户选 → Tier5 回退 cwd 并显式警告。定义统一的 8 种"项目标记"（`.git/` / README / package.json / pyproject.toml / Cargo.toml / go.mod / requirements.txt / **已存在的 `docs/PROGRESS.md`**）。新增 §1.3 透明度约束，要求 Tier 2/3 命中时在输出开头标注来源，Tier 4 必须询问，Tier 5 必须警告
@@ -2013,7 +2109,7 @@
 
 - 确定 TALK 项目方向：家庭局域网内的 AI Agent 聊天中转平台，支持 Agent ↔ Agent 和 人 ↔ Agent 通过 `@` 定向交互
 - 通过 4 轮关键决策问答冻结技术栈：**Python + FastAPI** / **SQLite 全部持久化** / **HTTP 轮询 + WebSocket 可选** / **X-API-Key 鉴权**
-- 撰写产品文档初版 [talk.md](PRODUCT.md)，覆盖 13 个章节：产品背景、角色场景、F1–F4 功能需求、系统架构、技术选型、数据模型（含 SQL schema）、API 设计（REST + WebSocket）、关键流程（轮询/发消息/文件传输）、项目目录结构、非功能需求、M1/M2/M3 里程碑、端到端验证、待定议题
+- 撰写产品文档初版 [talk.md](spec/PRODUCT.md)，覆盖 13 个章节：产品背景、角色场景、F1–F4 功能需求、系统架构、技术选型、数据模型（含 SQL schema）、API 设计（REST + WebSocket）、关键流程（轮询/发消息/文件传输）、项目目录结构、非功能需求、M1/M2/M3 里程碑、端到端验证、待定议题
 - Plan 文件 [prancy-soaring-eagle.md](C:\Users\bobo\.claude\plans\prancy-soaring-eagle.md) 完成并经用户批准
 - 调研确认无任何既有 skill 可响应"汇总今日进度/继续开发"关键词
 - 设计并通过 3 轮 AskUserQuestion 敲定 `project-progress` skill 方案：

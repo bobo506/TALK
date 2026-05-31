@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import hashlib
 import html
+import json
 import locale
 import os
 import re
@@ -14,6 +15,7 @@ import shlex
 import shutil
 import socket
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -87,6 +89,10 @@ ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escala
 DISCUSSION_MAX_AUTO_TURNS = 3
 DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
 NON_SUBSTANTIVE_STANCES = {"greeting", "closure"}
+# 5.5：agent-to-agent 消息的"任务汇报"可见回复，直接拦截不发送
+AGENT_TASK_REPORT_RE = re.compile(
+    r"^(已经|已)(跟|向|回复|登记|发送|给)",
+)
 CLOSURE_LINES = (
     "那这次就先聊到这儿，有需要再喊我。",
     "好的，这轮先告一段落，回头有事群里找我。",
@@ -678,6 +684,66 @@ def _dump_prompt(
         pass
 
 
+async def _read_and_execute_deferred_actions(
+    filepath: str,
+    *,
+    client: Any,
+    group_id: str | None,
+    current_turn_count: int = 0,
+    max_auto_turns: int = DISCUSSION_MAX_AUTO_TURNS,
+) -> list[dict[str, Any]]:
+    """读取 JSONL 延迟文件，用 TALK SDK 逐条执行 talk_send。
+
+    返回每条的执行结果（ok / skipped / target / message_id / error）。
+    文件不存在或读不到有效行不报错，返回空列表。
+
+    Turn limit 刹车：
+    - greeting / answer / agree / closure 类型的 talk_send，current_turn_count >= max_auto_turns 时跳过
+    - question / disagree 类型不受 turn limit 限制
+    - 无 stance 视为 greeting（保守策略）
+    """
+    results: list[dict[str, Any]] = []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    action = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if action.get("tool") != "talk_send":
+                    continue
+                target = str(action.get("target", "")).strip()
+                body = str(action.get("body", "")).strip()
+                stance = str(action.get("stance", "greeting")).strip().lower() or "greeting"
+                act_group_id = action.get("group_id") or group_id
+                if not target or not body:
+                    continue
+                # ---- turn limit 刹车 ----
+                if stance in ("greeting", "answer", "agree", "closure"):
+                    if current_turn_count >= max_auto_turns:
+                        results.append({
+                            "ok": False, "skipped": True, "target": target, "stance": stance,
+                            "reason": f"turn limit ({current_turn_count} >= {max_auto_turns})",
+                        })
+                        continue
+                try:
+                    result = await client.send_text(
+                        to=[target],
+                        text=f"@{target} {body}",
+                        group_id=act_group_id,
+                    )
+                    msg_id = result.get("id") if isinstance(result, dict) else None
+                    results.append({"ok": True, "target": target, "message_id": msg_id, "stance": stance})
+                except Exception as exc:
+                    results.append({"ok": False, "target": target, "error": str(exc), "stance": stance})
+    except FileNotFoundError:
+        pass
+    return results
+
+
 async def _build_group_member_context(
     client: Any,
     group_id: str | None,
@@ -971,7 +1037,6 @@ def _discussion_context_text(
     root_message_id = discussion.get("root_message_id")
     latest = turns[-1].get("stance") if turns else "question"
     remaining = max(0, DISCUSSION_MAX_AUTO_TURNS - len(turns))
-    human_hint = human_id or "human:bobo"
     return (
         "TALK 控制上下文，以下内容只用于约束回复，不要在可见回复中复述字段名或 ID：\n"
         f"discussion_id: {discussion_id}\n"
@@ -988,7 +1053,7 @@ def _discussion_context_text(
         "可以补充必要上下文、指出风险或提出确认问题，但不能把话题迁移到无关任务。"
         "如果想引申但不确定是否仍在范围内，先向 requester_id 追问确认。"
         "不要展示 discussion_id、root_message_id、requester_id、assignee_id、scope_text、TALK_SCOPE 或控制上下文。"
-        f"确需向人类裁决时用 TALK_ACTION escalate_to_human to={human_hint} body=裁决问题。"
+        "确需向人类裁决时用 talk_send target=human 或 TALK_ACTION escalate_to_human to=human 告知裁决问题。"
     )
 
 
@@ -1263,9 +1328,12 @@ def build_cli_prompt(
     sender = message.get("from") or "unknown"
 
     if runtime.lower() == "pi" or member_id == "agent:pi":
+        # 5.5 step 2+：注入 member_id 防止身份幻觉；区分 human 指令 vs agent 消息
         return (
-            f"{sender} 对你说：{task}\n"
-            f"\n（群内有 {group_member_context.strip()} 要向其他成员发消息时，使用 talk_send 工具。）"
+            f"你是 {member_id}。{sender} 对你说：{task}\n"
+            f"\n（群内有 {group_member_context.strip()}。"
+            f"如果 human 让你联系其他成员，使用 talk_send 工具。调用后在可见回复简要确认。"
+            f"如果其他 agent 给你发了消息，自然回应即可，不要加'已回复 X'之类的汇报，不要再调用 talk_send。）"
             + (f"\n{discussion_context}" if discussion_context else "")
         )
 
@@ -1501,6 +1569,7 @@ async def handle_incoming_message(
     if report_status is not None:
         await report_status("busy", current_task_id=task_id)
 
+    deferred_file: str | None = None
     try:
         if send_ack:
             await client.reply(
@@ -1518,6 +1587,7 @@ async def handle_incoming_message(
         discussion: dict[str, Any] | None = None
         turns: list[dict[str, Any]] = []
         discussion_context = ""
+        discussion_turn_count: int = 0
         if sender_id.startswith("agent:") and group_id:
             scope_context = await _discussion_scope_for_incoming_agent_message(
                 client,
@@ -1536,6 +1606,7 @@ async def handle_incoming_message(
             discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
             substantive_turns = _substantive_discussion_turns(turns)
+            discussion_turn_count = len(substantive_turns)
             if (
                 discussion_id is not None
                 and latest_stance == "disagree"
@@ -1586,6 +1657,14 @@ async def handle_incoming_message(
             os.environ.pop("TALK_GROUP_ID", None)
         os.environ["TALK_DECISION_TIER"] = decision_tier
 
+        # 5.5 step 2：为 talk_send 延迟执行创建 JSONL 临时文件
+        # agent-to-agent 消息不创建（防止消息风暴），只有 human 发起的消息才允许 talk_send
+        if group_id and not sender_id.startswith("agent:"):
+            fd, deferred_path = tempfile.mkstemp(suffix=".jsonl", prefix="talk_deferred_")
+            os.close(fd)
+            os.environ["TALK_DEFERRED_FILE"] = deferred_path
+            deferred_file = deferred_path
+
         prompt = build_cli_prompt(
             message,
             member_id=member_id,
@@ -1635,10 +1714,27 @@ async def handle_incoming_message(
         # Reply to sender FIRST, before executing any TALK_ACTION side effects
         reply_message_id: int | None = None
         if visible_reply:
+            # 5.5：agent-to-agent 消息的"任务汇报"不发送（bridge 层硬拦截）
+            if sender_id.startswith("agent:") and AGENT_TASK_REPORT_RE.match(visible_reply.strip()):
+                visible_reply = ""
+        if visible_reply:
             reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
             reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
 
-        # Then execute TALK_ACTION side effects
+        # 5.5 step 2：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）
+        if deferred_file:
+            # agent-to-agent 硬刹车：无 discussion 时视为已达 turn 上限，只放行 question
+            brake_turn_count = discussion_turn_count
+            if sender_id.startswith("agent:") and discussion is None:
+                brake_turn_count = DISCUSSION_MAX_AUTO_TURNS
+            await _read_and_execute_deferred_actions(
+                deferred_file,
+                client=client,
+                group_id=group_id,
+                current_turn_count=brake_turn_count,
+            )
+
+        # Then execute TALK_ACTION side effects (backward compat)
         action_notices = await execute_talk_actions(
             actions,
             client=client,
@@ -1707,6 +1803,13 @@ async def handle_incoming_message(
         if report_status is not None:
             await report_status("error", current_task_id=task_id, last_error=str(exc))
         raise
+    finally:
+        if deferred_file:
+            try:
+                os.unlink(deferred_file)
+            except OSError:
+                pass
+            os.environ.pop("TALK_DEFERRED_FILE", None)
 
 
 async def run_task_queue_worker(
