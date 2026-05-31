@@ -89,10 +89,6 @@ ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escala
 DISCUSSION_MAX_AUTO_TURNS = 3
 DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
 NON_SUBSTANTIVE_STANCES = {"greeting", "closure"}
-# 5.5：agent-to-agent 消息的"任务汇报"可见回复，直接拦截不发送
-AGENT_TASK_REPORT_RE = re.compile(
-    r"^(已经|已)(跟|向|回复|登记|发送|给)",
-)
 CLOSURE_LINES = (
     "那这次就先聊到这儿，有需要再喊我。",
     "好的，这轮先告一段落，回头有事群里找我。",
@@ -689,6 +685,7 @@ async def _read_and_execute_deferred_actions(
     *,
     client: Any,
     group_id: str | None,
+    reply_to: int | None = None,
     current_turn_count: int = 0,
     max_auto_turns: int = DISCUSSION_MAX_AUTO_TURNS,
 ) -> list[dict[str, Any]]:
@@ -733,6 +730,7 @@ async def _read_and_execute_deferred_actions(
                     result = await client.send_text(
                         to=[target],
                         text=f"@{target} {body}",
+                        reply_to=reply_to,
                         group_id=act_group_id,
                     )
                     msg_id = result.get("id") if isinstance(result, dict) else None
@@ -1657,9 +1655,24 @@ async def handle_incoming_message(
             os.environ.pop("TALK_GROUP_ID", None)
         os.environ["TALK_DECISION_TIER"] = decision_tier
 
-        # 5.5 step 2：为 talk_send 延迟执行创建 JSONL 临时文件
-        # agent-to-agent 消息不创建（防止消息风暴），只有 human 发起的消息才允许 talk_send
-        if group_id and not sender_id.startswith("agent:"):
+        # 5.5 方案 C：reply_to 链深度判断 talk_send 是否允许
+        # human 始终允许；agent 按 reply_to 链深度：
+        #   depth 0 (无 reply_to) → 允许
+        #   depth 1 (reply_to.from 是 human) → 允许第 1 次 agent 扩展
+        #   depth 2+ (reply_to.from 是 agent) → 禁止
+        talk_send_allowed = False
+        if group_id:
+            if not sender_id.startswith("agent:"):
+                talk_send_allowed = True  # human 始终允许
+            else:
+                reply_to_info = message.get("reply_to")
+                if not reply_to_info:
+                    talk_send_allowed = True  # depth 0
+                elif isinstance(reply_to_info, dict):
+                    parent_from = reply_to_info.get("from_id", "")
+                    if parent_from.startswith("human:"):
+                        talk_send_allowed = True  # depth 1
+        if talk_send_allowed:
             fd, deferred_path = tempfile.mkstemp(suffix=".jsonl", prefix="talk_deferred_")
             os.close(fd)
             os.environ["TALK_DEFERRED_FILE"] = deferred_path
@@ -1714,24 +1727,19 @@ async def handle_incoming_message(
         # Reply to sender FIRST, before executing any TALK_ACTION side effects
         reply_message_id: int | None = None
         if visible_reply:
-            # 5.5：agent-to-agent 消息的"任务汇报"不发送（bridge 层硬拦截）
-            if sender_id.startswith("agent:") and AGENT_TASK_REPORT_RE.match(visible_reply.strip()):
-                visible_reply = ""
-        if visible_reply:
             reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
             reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
 
-        # 5.5 step 2：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）
+        # 5.5 方案 C：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）
+        # talk_send 继承当前消息的 id 为 reply_to，建立链深度
         if deferred_file:
-            # agent-to-agent 硬刹车：无 discussion 时视为已达 turn 上限，只放行 question
-            brake_turn_count = discussion_turn_count
-            if sender_id.startswith("agent:") and discussion is None:
-                brake_turn_count = DISCUSSION_MAX_AUTO_TURNS
+            current_msg_id = int(message["id"]) if message.get("id") is not None else None
             await _read_and_execute_deferred_actions(
                 deferred_file,
                 client=client,
                 group_id=group_id,
-                current_turn_count=brake_turn_count,
+                reply_to=current_msg_id,
+                current_turn_count=discussion_turn_count,
             )
 
         # Then execute TALK_ACTION side effects (backward compat)
