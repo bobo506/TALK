@@ -114,7 +114,7 @@ sudo -u talk /opt/talk/.venv/bin/pip install -r requirements.txt
 
 ### 安装服务
 
-使用 [deploy/talk.service](../deploy/talk.service) 作为模板：
+使用 [deploy/talk.service](../../deploy/talk.service) 作为模板：
 
 ```bash
 sudo cp deploy/talk.service /etc/systemd/system/talk.service

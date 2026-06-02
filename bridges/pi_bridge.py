@@ -22,10 +22,10 @@ from bridges import cli_bridge
 _TALK_EXTENSION_PATH = str(PROJECT_ROOT / "bridges" / "talk_tools_extension.ts").replace("\\", "/")
 
 # ---------------------------------------------------------------------------
-# 系统 prompt — 极简版。场景判断交给 LLM 自行理解，不预设分类。
-# 身份、成员清单、约束全部由 系统 块动态注入，这里只保留最小骨架。
+# 系统层 prompt：角色、输出通道、单轮语义与反工具幻觉约束。
+# 工具能力说明由 pi runtime 的 extension/tool catalog 注入。
 # ---------------------------------------------------------------------------
-DEFAULT_SYSTEM_PROMPT = "按用户语言自然回复。"
+DEFAULT_SYSTEM_PROMPT = cli_bridge.FUNCTION_CALLING_SYSTEM_PROMPT
 
 # ---------------------------------------------------------------------------
 # pi 命令模板
@@ -37,13 +37,17 @@ DEFAULT_PI_COMMAND_LEGACY = (
 )
 # 施工档命令（文件工具启用）
 DEFAULT_PI_TOOLS_COMMAND = (
-    "pi --print --mode text --no-context-files --no-session --thinking off "
+    "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
     "--tools read,grep,find,ls,bash,edit,write "
     f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
 )
-# 当前默认命令：function-calling 模式（talk_send 工具，禁用内置工具）
+# 当前默认命令：function-calling 模式
+# --no-builtin-tools  禁用 read/bash/edit/write 等(LLM 表面只剩 talk_send)
+# --no-extensions     禁用自动发现扩展(规避 plan-mode 在 rebindSession 中
+#                     setActiveTools(NORMAL_MODE_TOOLS) 覆盖 talk_send 的 bug)
+# --extension <path>  显式加载我们自己的 talk_tools_extension.ts 不受 -ne 影响
 DEFAULT_PI_COMMAND = (
-    f"pi --print --mode text --no-context-files --no-builtin-tools "
+    f"pi --print --mode text --no-context-files --no-builtin-tools --no-extensions "
     f"--tools talk_send --no-session --thinking off "
     f"--extension {_TALK_EXTENSION_PATH} "
     f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"

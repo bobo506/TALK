@@ -312,6 +312,7 @@ class TalkClientTests(RouteTestCase):
                     message_id=hall_message["id"],
                     stance="question",
                     target_member_id="agent:demo",
+                    turn_kind="demand",
                     round_index=1,
                 )
                 global_history = await human_client.fetch_history(since=0)
@@ -348,7 +349,9 @@ class TalkClientTests(RouteTestCase):
             self.assertEqual(hall_message["group_id"], "group:sdk-lab")
             self.assertEqual(discussion["topic"], "SDK discussion")
             self.assertEqual(human_turn["turn_index"], 1)
+            self.assertEqual(human_turn["turn_kind"], "demand")
             self.assertEqual(agent_turn["turn_index"], 2)
+            self.assertEqual(agent_turn["turn_kind"], "reply")
             self.assertEqual([turn["stance"] for turn in turns], ["question", "answer"])
             self.assertIn("@agent:demo hello inside hall", [message["content"] for message in hall_history])
             self.assertIn("@human:bobo reply inside discussion", [message["content"] for message in hall_history])

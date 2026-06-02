@@ -168,6 +168,7 @@ class DiscussionTurn(SQLModel, table=True):
     message_id: int = Field(foreign_key="messages.id", index=True)
     speaker_id: str = Field(foreign_key="members.id", index=True)
     target_member_id: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
+    turn_kind: str = Field(default="reply", index=True)
     stance: str = Field(index=True)
     round_index: int = Field(default=1, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -356,6 +357,7 @@ class GroupOut(BaseModel):
 
 _DISCUSSION_STATUSES = {"active", "resolved", "escalated", "canceled"}
 _DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
+_DISCUSSION_TURN_KINDS = {"demand", "reply"}
 
 
 class DiscussionSessionCreate(BaseModel):
@@ -440,6 +442,7 @@ class DiscussionSessionOut(BaseModel):
 class DiscussionTurnCreate(BaseModel):
     message_id: int
     target_member_id: Optional[str] = None
+    turn_kind: str = "reply"
     stance: str
     round_index: int = 1
 
@@ -449,6 +452,9 @@ class DiscussionTurnCreate(BaseModel):
             raise ValueError("message_id must be greater than 0")
         if self.target_member_id is not None:
             self.target_member_id = self.target_member_id.strip() or None
+        self.turn_kind = self.turn_kind.strip().lower()
+        if self.turn_kind not in _DISCUSSION_TURN_KINDS:
+            raise ValueError(f"turn_kind must be one of {sorted(_DISCUSSION_TURN_KINDS)}")
         self.stance = self.stance.strip().lower()
         if self.stance not in _DISCUSSION_STANCES:
             raise ValueError(f"stance must be one of {sorted(_DISCUSSION_STANCES)}")
@@ -464,6 +470,7 @@ class DiscussionTurnOut(BaseModel):
     message_id: int
     speaker_id: str
     target_member_id: Optional[str]
+    turn_kind: str
     stance: str
     round_index: int
     created_at: datetime

@@ -169,6 +169,7 @@ class TalkClientSync:
         message_id: int,
         stance: str,
         target_member_id: str | None = None,
+        turn_kind: str = "reply",
         round_index: int = 1,
     ) -> dict[str, Any]:
         return self._submit(
@@ -177,6 +178,7 @@ class TalkClientSync:
                 message_id=message_id,
                 stance=stance,
                 target_member_id=target_member_id,
+                turn_kind=turn_kind,
                 round_index=round_index,
             )
         )

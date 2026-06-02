@@ -1,6 +1,8 @@
 import asyncio
 import contextlib
 import io
+import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -68,8 +70,8 @@ class CliBridgeTests(unittest.TestCase):
         )
 
         self.assertIn("ask codex to review this too", prompt)
-        # identity no longer in prompt
-        self.assertTrue('human:bobo 对你说' in prompt or prompt.startswith('你是 agent:pi'))
+        self.assertIn("human:bobo 对你说:", prompt)
+        self.assertNotIn("agent:pi", prompt)
         self.assertNotIn("Task creator:", prompt)
         self.assertNotIn("TALK task id:", prompt)
         self.assertNotIn("Project root:", prompt)
@@ -89,8 +91,8 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertIn("复盘", prompt)
         self.assertIn("总结一下", prompt)
-        # identity no longer in prompt
-        self.assertTrue('human:bobo 对你说' in prompt or prompt.startswith('你是 agent:pi'))
+        self.assertIn("human:bobo 对你说:", prompt)
+        self.assertNotIn("agent:pi", prompt)
 
     def test_build_cli_prompt_for_pi_uses_raw_user_text(self):
         prompt = build_cli_prompt({
@@ -99,9 +101,9 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在吗",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        # 5.5 极简格式：身份在先，用户消息在后
-        self.assertTrue("human:bobo 对你说：在吗" in prompt)
+        self.assertTrue("human:bobo 对你说:在吗" in prompt)
         # identity no longer in prompt
+        self.assertNotIn("agent:pi", prompt)
         self.assertNotIn("Sender:", prompt)
         self.assertNotIn("TALK message id:", prompt)
         self.assertNotIn("Project root:", prompt)
@@ -113,8 +115,8 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi @agent:codex 我觉得这个对话系统还需要完善",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue("human:bobo 对你说：我觉得这个对话系统还需要完善" in prompt)
-        # identity no longer in prompt
+        self.assertTrue("human:bobo 对你说:我觉得这个对话系统还需要完善" in prompt)
+        self.assertNotIn("agent:pi", prompt)
 
     def test_build_cli_prompt_keeps_mid_sentence_mentions(self):
         prompt = build_cli_prompt({
@@ -124,7 +126,7 @@ class CliBridgeTests(unittest.TestCase):
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
         self.assertTrue("请去问 @agent:codex 能不能看一下" in prompt)
-        # identity no longer in prompt
+        self.assertNotIn("工具：", prompt)
 
     def test_build_cli_prompt_for_pi_does_not_embed_capability_boundary(self):
         prompt = build_cli_prompt({
@@ -133,7 +135,7 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 你好啊，你有哪些功能？用中文回复",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue("human:bobo 对你说：你好啊" in prompt)
+        self.assertTrue("human:bobo 对你说:你好啊" in prompt)
         # identity no longer in prompt
         self.assertNotIn("执行命令", prompt)
         self.assertNotIn("<Language:", prompt)
@@ -146,7 +148,7 @@ class CliBridgeTests(unittest.TestCase):
             "content": "@agent:pi 在群里回我",
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
-        self.assertTrue("human:bobo 对你说：在群里回我" in prompt)
+        self.assertTrue("human:bobo 对你说:在群里回我" in prompt)
         # identity no longer in prompt
         self.assertNotIn("当前群 ID", prompt)
 
@@ -164,10 +166,11 @@ class CliBridgeTests(unittest.TestCase):
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
         # 极简格式：无身份声明，用户消息在前
+        # 5.5 方案 D：旧"回复克制"语义已移除，不再双重压制 pi 执行 talk_send
         self.assertNotIn("回复克制", prompt)
-        self.assertNotIn("一两句话", prompt)
         self.assertNotIn("不要追问", prompt)
-        self.assertIn("talk_send", prompt)
+        self.assertNotIn("talk_send", prompt)
+        # 5.5 codex 统一 prompt："一两句话"作为行为指引保留（非克制语义）
 
     def test_build_cli_prompt_for_pi_injects_group_member_context_at_top(self):
         """5.5：群成员上下文出现在背景信息块中"""
@@ -192,9 +195,52 @@ class CliBridgeTests(unittest.TestCase):
             group_member_context=group_ctx,
         )
 
-        self.assertTrue("human:qa 对你说：" in prompt)
+        self.assertTrue("human:qa 对你说:" in prompt)
         self.assertIn("human:qa", prompt)
         self.assertIn("本群无角色约定", prompt)
+
+    def test_function_calling_prompt_is_minimal(self):
+        message = {
+            "id": 1,
+            "from": "human:qa",
+            "content": "@agent:pi 去跟agent:pi-kimi打个招呼",
+            "group_id": "g1",
+        }
+        prompt = build_cli_prompt(
+            message,
+            member_id="agent:pi",
+            workdir=Path("."),
+            runtime="pi",
+            group_member_context="群成员:human:qa, agent:pi, agent:pi-kimi。\n",
+        )
+
+        self.assertLess(len(prompt), 200)
+        self.assertIn("human:qa 对你说:去跟agent:pi-kimi打个招呼", prompt)
+        self.assertNotIn("不存在下一轮", prompt)
+        self.assertNotIn("反工具幻觉", prompt)
+        self.assertNotIn("输出通道", prompt)
+        self.assertNotIn("talk_send", prompt)
+
+    def test_function_calling_prompt_does_not_depend_on_tool_catalog(self):
+        message = {
+            "id": 1,
+            "from": "human:qa",
+            "content": "@agent:pi 去跟agent:pi-kimi打个招呼",
+            "group_id": "g1",
+        }
+        old_command = os.environ.get("TALK_PI_COMMAND")
+        try:
+            os.environ["TALK_PI_COMMAND"] = "pi --tools talk_send"
+            prompt_one_tool = build_cli_prompt(message, member_id="agent:pi", workdir=Path("."), runtime="pi")
+            os.environ["TALK_PI_COMMAND"] = "pi --tools talk_send,talk_create_task"
+            prompt_two_tools = build_cli_prompt(message, member_id="agent:pi", workdir=Path("."), runtime="pi")
+        finally:
+            if old_command is None:
+                os.environ.pop("TALK_PI_COMMAND", None)
+            else:
+                os.environ["TALK_PI_COMMAND"] = old_command
+
+        self.assertEqual(prompt_one_tool, prompt_two_tools)
 
     def test_format_cli_reply_uses_bridge_label(self):
         reply = format_cli_reply(
@@ -656,6 +702,320 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertEqual(client.sent, [("@agent:codex 你好 codex，我是 pi，来打个招呼。", ["agent:codex"], 40, "group:lab")])
         self.assertEqual(client.turns, [(7, 42, "greeting", "agent:codex", 1)])
+
+    def test_deferred_talk_send_records_demand_round_one(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.created_discussions = []
+                self.turns = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 42}
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:qa"}, {"member_id": "agent:pi"}, {"member_id": "agent:pi-kimi"}]}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                self.created_discussions.append((group_id, topic, participant_ids, max_rounds, kwargs))
+                return {"id": 7}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            path = os.environ.get("TALK_DEFERRED_FILE")
+            assert path
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"tool": "talk_send", "target": "agent:pi-kimi", "body": "你好", "stance": "greeting"}, ensure_ascii=False) + "\n")
+            return CliRunResult(returncode=0, stdout="我去打个招呼。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:qa",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi 去跟 agent:pi-kimi 打个招呼",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@agent:pi-kimi 你好", ["agent:pi-kimi"], 40, "group:lab")])
+        self.assertEqual(client.turns, [(7, 42, "greeting", "agent:pi-kimi", "demand", 1)])
+
+    def test_round_one_demand_receiver_may_extend_once(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.next_id = 51
+                self.turns = [{"message_id": 42, "speaker_id": "agent:pi", "stance": "greeting", "turn_kind": "demand", "round_index": 1}]
+                self.appended = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                self.next_id += 1
+                return {"id": self.next_id - 1}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                self.next_id += 1
+                return {"id": self.next_id - 1}
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:qa"}, {"member_id": "agent:pi"}, {"member_id": "agent:pi-kimi"}]}
+
+            async def list_discussions(self, *, group_id=None):
+                return [{"id": 9, "status": "active", "participant_ids": ["agent:pi", "agent:pi-kimi"], "root_message_id": 40}]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                item = {
+                    "message_id": message_id,
+                    "speaker_id": "agent:pi-kimi",
+                    "stance": stance,
+                    "target_member_id": target_member_id,
+                    "turn_kind": turn_kind,
+                    "round_index": round_index,
+                }
+                self.turns.append(item)
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            path = os.environ.get("TALK_DEFERRED_FILE")
+            assert path
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"tool": "talk_send", "target": "agent:pi", "body": "我再确认一个点", "stance": "question"}, ensure_ascii=False) + "\n")
+            return CliRunResult(returncode=0, stdout="你好，我再确认一个点。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 42,
+                        "from": "agent:pi",
+                        "to": ["agent:pi-kimi"],
+                        "group_id": "group:lab",
+                        "reply_to": 40,
+                        "type": "text",
+                        "content": "@agent:pi-kimi 你好",
+                    },
+                    client=client,
+                    member_id="agent:pi-kimi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@agent:pi 我再确认一个点", ["agent:pi"], 42, "group:lab")])
+        self.assertEqual([turn[4] for turn in client.appended], ["reply", "demand"])
+        self.assertEqual(client.appended[-1], (9, 52, "question", "agent:pi", "demand", 2))
+
+    def test_reply_receiver_may_extend_round_two_from_ledger(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.next_id = 61
+                self.turns = [{"message_id": 42, "speaker_id": "agent:pi", "stance": "greeting", "turn_kind": "demand", "round_index": 1}]
+                self.appended = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                self.next_id += 1
+                return {"id": self.next_id - 1}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                self.next_id += 1
+                return {"id": self.next_id - 1}
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:qa"}, {"member_id": "agent:pi"}, {"member_id": "agent:pi-kimi"}]}
+
+            async def list_discussions(self, *, group_id=None):
+                return [{"id": 9, "status": "active", "participant_ids": ["agent:pi", "agent:pi-kimi"], "root_message_id": 40}]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                item = {
+                    "message_id": message_id,
+                    "speaker_id": "agent:pi",
+                    "stance": stance,
+                    "target_member_id": target_member_id,
+                    "turn_kind": turn_kind,
+                    "round_index": round_index,
+                }
+                self.turns.append(item)
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            path = os.environ.get("TALK_DEFERRED_FILE")
+            assert path
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"tool": "talk_send", "target": "agent:pi-kimi", "body": "再补一个上下文", "stance": "question"}, ensure_ascii=False) + "\n")
+            return CliRunResult(returncode=0, stdout="收到，我补一个上下文。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 60,
+                        "from": "agent:pi-kimi",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "reply_to": 42,
+                        "type": "text",
+                        "content": "@agent:pi 你好呀",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@agent:pi-kimi 再补一个上下文", ["agent:pi-kimi"], 60, "group:lab")])
+        self.assertEqual([turn[4] for turn in client.appended], ["reply", "demand"])
+        self.assertEqual(client.appended[-1], (9, 62, "question", "agent:pi-kimi", "demand", 2))
+
+    def test_existing_round_two_demand_blocks_deferred_talk_send(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.turns = [
+                    {"message_id": 42, "speaker_id": "agent:pi", "stance": "greeting", "turn_kind": "demand", "round_index": 1},
+                    {"message_id": 52, "speaker_id": "agent:pi-kimi", "stance": "question", "turn_kind": "demand", "round_index": 2},
+                ]
+                self.appended = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 61}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 62}
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:qa"}, {"member_id": "agent:pi"}, {"member_id": "agent:pi-kimi"}]}
+
+            async def list_discussions(self, *, group_id=None):
+                return [{"id": 9, "status": "active", "participant_ids": ["agent:pi", "agent:pi-kimi"], "root_message_id": 40}]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns) + len(self.appended)}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            assert os.environ.get("TALK_DEFERRED_FILE") is None
+            return CliRunResult(returncode=0, stdout="收到，这里收口。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 60,
+                        "from": "agent:pi-kimi",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "reply_to": 52,
+                        "type": "text",
+                        "content": "@agent:pi 再确认一下",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [])
+        self.assertEqual(client.appended, [(9, 61, "answer", "agent:pi-kimi", "reply", 1)])
 
     def test_reply_stance_defaults_to_answer(self):
         self.assertEqual(cli_bridge.infer_reply_stance("请给 pi 下一步开发计划", "可以，我建议先补测试。"), "answer")
@@ -1593,6 +1953,99 @@ class BuildGroupMemberContextTests(unittest.TestCase):
         self.assertIn("群成员：", ctx)
         self.assertIn(",", ctx)  # 逗号分隔
         self.assertNotIn("oracle", ctx)  # 正常路径不列禁止名单
+
+    # ------------------------------------------------------------------
+    # 5.5 方案 D：codex MCP 路径与 pi TS extension 产物等价测试
+    # ------------------------------------------------------------------
+
+    def test_codex_deferred_talk_send_via_mcp_equivalent_to_pi_path(self):
+        """codex bridge 通过 MCP server 写 JSONL → bridge 消费 → 写 demand turn，与 pi 路径产物等价"""
+
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.created_discussions = []
+                self.turns = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 81}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 82}
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                self.created_discussions.append((group_id, topic, participant_ids, max_rounds, kwargs))
+                return {"id": 9}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            # 模拟 codex MCP server 写 JSONL 到 TALK_DEFERRED_FILE
+            path = os.environ.get("TALK_DEFERRED_FILE")
+            assert path, "TALK_DEFERRED_FILE must be set for talk_send to work"
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "tool": "talk_send",
+                    "target": "agent:pi",
+                    "body": "你好，Codex 向你问好",
+                    "stance": "greeting",
+                }, ensure_ascii=False) + "\n")
+            return CliRunResult(returncode=0, stdout="我去打个招呼。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 80,
+                        "from": "human:bobo",
+                        "to": ["agent:codex"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:codex 去跟 agent:pi 打个招呼",
+                    },
+                    client=client,
+                    member_id="agent:codex",
+                    workdir=Path.cwd(),
+                    command=["codex", "exec", "-"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="codex",
+                    bridge_label="Codex bridge",
+                    prompt_transport="stdin",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        # visible reply 先于 talk_send 发送
+        self.assertTrue(any("我去打个招呼" in str(r) for r in client.replies),
+                        "visible reply should be sent before deferred talk_send")
+        # defer talk_send 被消费并发送
+        self.assertIn(("@agent:pi 你好，Codex 向你问好", ["agent:pi"], 80, "group:lab"), client.sent)
+        # demand turn 已写入账本
+        self.assertEqual(client.turns, [(9, 82, "greeting", "agent:pi", "demand", 1)])
 
 
 if __name__ == "__main__":

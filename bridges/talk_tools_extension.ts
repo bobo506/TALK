@@ -43,7 +43,8 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
       "向当前群内的指定成员发送消息。当你需要联系、转告、询问或通知另一成员时使用。" +
       "发送后你会收到确认。target 必须是群成员清单中列出的成员。" +
       " stance 参数标记消息类型：question（提问时用）、greeting（寒暄/打招呼时用）、answer/agree/disagree/closure。",
-    promptSnippet: "Send a message to another group member via TALK",
+    promptSnippet:
+      "当 human 明确要求你联系、转告、询问、通知或打招呼给另一位群成员时，使用 talk_send 发送消息。",
     promptGuidelines: [
       "当 human 明确让你联系、转告、询问或通知群里另一成员时，调用 talk_send。调用后在可见回复里简要告诉 human 已发送即可。",
       "如果其他 agent 给你发了消息（寒暄/闲聊/确认）：只需自然回应，不要加'已回复 X'之类的任务汇报。不要再调用 talk_send，除非对方明确向你提出了一个需要回答的问题（stance=question）。",
@@ -70,8 +71,8 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
         };
       }
 
-      const target = String(params.target || "").trim();
-      const body = String(params.body || "").trim();
+      const target = String(params.target || params.agent || "").trim();
+      const body = String(params.body || params.message || "").trim();
       const stance = String(params.stance || "greeting").trim() || "greeting";
       const groupId = process.env.TALK_GROUP_ID || undefined;
       // 诊断

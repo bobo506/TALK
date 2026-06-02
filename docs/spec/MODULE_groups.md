@@ -108,7 +108,7 @@
 - SDK 已提供 Group API helper，并支持在 `send_text` / `send_file` / `reply` / `fetch_history` 中携带 `group_id`。
 - 当前没有 Group 删除 API；删除语义需先确认历史 Hall 消息如何保留或归档。
 - 当前没有成员管理权限细分；human 可管理 Group 成员，Agent 不可管理。
-- `DISCUSSION-PROTOCOL-1` 已新增 Discussion Session / Turn 表，用于记录多 Agent 讨论顺序、立场和轮次；具体协议见 `docs/MODULE_discussions.md`。
+- `DISCUSSION-PROTOCOL-1` 已新增 Discussion Session / Turn 表，用于记录多 Agent 讨论顺序、立场和轮次；具体协议见 `docs/spec/MODULE_discussions.md`。
 - 当前没有 SSE stream；Group 只为后续 stream 提供作用域。
 
 ## 后续计划

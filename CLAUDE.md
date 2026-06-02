@@ -5,7 +5,7 @@
 ## 必读清单
 
 1. `AGENTS.md` —— 抽象角色字典（决策 / 执行 Agent）、协作节奏、切片收尾约定、编码与文档语言约定、项目结构注意事项、技术栈速查、启动方式
-2. `docs/PROJECT_BRIEF.md` —— 项目定位、系统架构、数据模型、运维基线、模块索引；模块索引指向各 `MODULE_xxx.md`，按任务只读对应那一份
+2. `docs/PROJECT_BRIEF.md` —— 项目定位、系统架构、数据模型、运维基线、模块索引；模块索引指向 `docs/spec/MODULE_xxx.md`，按任务只读对应那一份
 3. `docs/PROGRESS.md` —— 当前进度快照、当前角色分配、卡点与下一步计划
 
 ## Claude 在本项目的身份
@@ -16,4 +16,4 @@
 
 ## 部署 / 运维入口
 
-详见 `docs/DEPLOY.md`、`docs/QUICKSTART_USER.md`，及 `docs/PROJECT_BRIEF.md` "运维基线"段。
+详见 `docs/guides/DEPLOY.md`、`docs/guides/QUICKSTART_USER.md`，及 `docs/PROJECT_BRIEF.md` "运维基线"段。

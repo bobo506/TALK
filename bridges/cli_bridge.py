@@ -30,6 +30,15 @@ RESPONSE_STYLE_INSTRUCTIONS = (
     "reply in one short sentence only. "
     "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
 )
+FUNCTION_CALLING_SYSTEM_PROMPT = (
+    "你是 TALK 群里的一个 agent。\n"
+    "工具:以 runtime 注入的工具清单为准。"
+    "除清单外的工具(读文件、列目录、跑 shell、上网、记忆库等)在本会话不存在,"
+    "不要规划任何依赖它们的步骤。\n"
+    "输出通道:对当前发件人的可见回复 + 调用清单内的工具。\n"
+    "运行时:本会话单轮一次性运行。这一轮要么调用工具完成动作,要么直接给出最终回复。"
+    "不要说'我接下来要…/让我先…/稍后…',因为不存在下一轮。"
+)
 DISCUSSION_PROTOCOL_INSTRUCTIONS = (
     "You are a participant in a TALK Group Hall, not a TALK administrator or user manual. "
     "You may talk with humans and other agents. If the user asks you to contact another agent, "
@@ -316,6 +325,39 @@ def _substantive_discussion_turns(turns: list[dict[str, Any]]) -> list[dict[str,
     return [turn for turn in turns if str(turn.get("stance") or "") not in NON_SUBSTANTIVE_STANCES]
 
 
+def _max_demand_round(turns: list[dict[str, Any]]) -> int:
+    max_round = 0
+    for turn in turns:
+        if str(turn.get("turn_kind") or "reply") != "demand":
+            continue
+        try:
+            max_round = max(max_round, int(turn.get("round_index") or 1))
+        except (TypeError, ValueError):
+            max_round = max(max_round, 1)
+    return max_round
+
+
+def _next_demand_round(turns: list[dict[str, Any]]) -> int:
+    return _max_demand_round(turns) + 1
+
+
+def _can_create_deferred_file(
+    *,
+    group_id: str | None,
+    sender_id: str,
+    message: dict[str, Any],
+    discussion: dict[str, Any] | None,
+    turns: list[dict[str, Any]],
+) -> bool:
+    if not group_id:
+        return False
+    if not sender_id.startswith("agent:"):
+        return True
+    if discussion is None:
+        return _message_reply_to_id(message) is None
+    return _max_demand_round(turns) < 2
+
+
 def _pick_closure_line(responder_id: str) -> str:
     digest = hashlib.sha256(responder_id.encode("utf-8")).digest()
     index = int.from_bytes(digest[:2], "big") % len(CLOSURE_LINES)
@@ -561,18 +603,31 @@ async def _append_discussion_turn(
     message_id: int | None,
     stance: str,
     target_member_id: str | None = None,
+    turn_kind: str = "reply",
     round_index: int = 1,
 ) -> bool:
     if discussion_id is None or message_id is None:
         return False
     try:
-        await client.append_discussion_turn(
-            discussion_id,
-            message_id=message_id,
-            stance=stance,
-            target_member_id=target_member_id,
-            round_index=round_index,
-        )
+        try:
+            await client.append_discussion_turn(
+                discussion_id,
+                message_id=message_id,
+                stance=stance,
+                target_member_id=target_member_id,
+                turn_kind=turn_kind,
+                round_index=round_index,
+            )
+        except TypeError as exc:
+            if "turn_kind" not in str(exc):
+                raise
+            await client.append_discussion_turn(
+                discussion_id,
+                message_id=message_id,
+                stance=stance,
+                target_member_id=target_member_id,
+                round_index=round_index,
+            )
         return True
     except AttributeError:
         return False
@@ -742,6 +797,80 @@ async def _read_and_execute_deferred_actions(
     return results
 
 
+async def _record_deferred_demand_turns(
+    results: list[dict[str, Any]],
+    *,
+    client: Any,
+    group_id: str | None,
+    member_id: str,
+    discussion: dict[str, Any] | None,
+    turns: list[dict[str, Any]],
+    task_text: str,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    if not group_id:
+        return discussion, turns
+
+    current_discussion = discussion
+    current_turns = list(turns)
+    for result in results:
+        if not result.get("ok") or result.get("skipped"):
+            continue
+        target = str(result.get("target") or "")
+        message_id = result.get("message_id")
+        if not target or message_id is None:
+            continue
+        demand_round = min(_next_demand_round(current_turns), 2)
+        discussion_id = int(current_discussion["id"]) if current_discussion and current_discussion.get("id") is not None else None
+        if discussion_id is None:
+            discussion_id = await _resolve_discussion_id(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=target,
+                topic=_discussion_topic_from_text(task_text),
+                create_if_missing=True,
+                root_message_id=int(message_id),
+                requester_id=member_id,
+                assignee_id=target,
+                scope_text=task_text,
+            )
+            if discussion_id is not None:
+                try:
+                    current_discussion = await client.get_discussion(discussion_id)
+                except AttributeError:
+                    current_discussion = {
+                        "id": discussion_id,
+                        "status": "active",
+                        "topic": _discussion_topic_from_text(task_text),
+                        "participant_ids": [member_id, target],
+                        "root_message_id": int(message_id),
+                        "requester_id": member_id,
+                        "assignee_id": target,
+                        "scope_text": task_text,
+                    }
+        appended = await _append_discussion_turn(
+            client,
+            discussion_id=discussion_id,
+            message_id=int(message_id),
+            stance=str(result.get("stance") or "question"),
+            target_member_id=target,
+            turn_kind="demand",
+            round_index=demand_round,
+        )
+        if appended:
+            current_turns.append(
+                {
+                    "message_id": int(message_id),
+                    "speaker_id": member_id,
+                    "target_member_id": target,
+                    "turn_kind": "demand",
+                    "stance": str(result.get("stance") or "question"),
+                    "round_index": demand_round,
+                }
+            )
+    return current_discussion, current_turns
+
+
 async def _build_group_member_context(
     client: Any,
     group_id: str | None,
@@ -859,6 +988,7 @@ async def _maybe_escalate_disagreement(
         message_id=int(message["id"]),
         stance="escalate",
         target_member_id=human_id,
+        turn_kind="demand",
         round_index=2,
     )
     await _update_discussion_status(client, discussion_id, "escalated")
@@ -1098,6 +1228,7 @@ async def _send_agent_scope_closure(
         message_id=message_id,
         stance="closure",
         target_member_id=target_agent_id,
+        turn_kind="reply",
         round_index=2,
     )
     await _update_discussion_status(client, discussion_id, "resolved")
@@ -1158,13 +1289,16 @@ async def execute_talk_actions(
                     assignee_id=target,
                     scope_text=action_body,
                 )
+            existing_turns = await _list_discussion_turns(client, discussion_id)
+            demand_round = action.round_index or min(_next_demand_round(existing_turns), 2)
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
                 message_id=int(sent["id"]),
                 stance=infer_discussion_stance(task_text, action_body, default=action.stance or "question"),
                 target_member_id=target,
-                round_index=action.round_index or 1,
+                turn_kind="demand",
+                round_index=demand_round,
             )
             summaries.append(f"sent message to {target}")
         elif action.action_type == "escalate_to_human":
@@ -1194,6 +1328,7 @@ async def execute_talk_actions(
                 message_id=int(sent["id"]),
                 stance="escalate",
                 target_member_id=target,
+                turn_kind="demand",
                 round_index=action.round_index or 2,
             )
             await _update_discussion_status(client, discussion_id, "escalated")
@@ -1228,6 +1363,7 @@ async def execute_talk_actions(
                 message_id=int(sent["id"]),
                 stance=action.stance or "answer",
                 target_member_id=target,
+                turn_kind="reply",
                 round_index=action.round_index or 1,
             )
             await _update_discussion_status(client, discussion_id, "resolved")
@@ -1325,15 +1461,14 @@ def build_cli_prompt(
     tier_line = _decision_tier_line(decision_tier)
     sender = message.get("from") or "unknown"
 
-    if runtime.lower() == "pi" or member_id == "agent:pi":
-        # 5.5 step 2+：注入 member_id 防止身份幻觉；区分 human 指令 vs agent 消息
-        return (
-            f"你是 {member_id}。{sender} 对你说：{task}\n"
-            f"\n（群内有 {group_member_context.strip()}。"
-            f"如果 human 让你联系其他成员，使用 talk_send 工具。调用后在可见回复简要确认。"
-            f"如果其他 agent 给你发了消息，自然回应即可，不要加'已回复 X'之类的汇报，不要再调用 talk_send。）"
-            + (f"\n{discussion_context}" if discussion_context else "")
-        )
+    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
+        parts = [f"{sender} 对你说:{task}"]
+        member_line = group_member_context.strip()
+        if member_line:
+            parts.append(member_line)
+        if discussion_context:
+            parts.append(discussion_context)
+        return "\n".join(parts)
 
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
@@ -1368,11 +1503,10 @@ def build_cli_task_prompt(
     title = str(task.get("title") or "").strip()
     tier_line = _decision_tier_line(decision_tier)
 
-    if runtime.lower() == "pi" or member_id == "agent:pi":
-        header = (
-            f"你是 {member_id}。{tier_line}\n"
-        )
-        return f"{header}任务：{title}\n{content}" if title else f"{header}任务：{content}"
+    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
+        creator = task.get("created_by") or "unknown"
+        task_text = f"{title}\n{content}" if title else content
+        return f"{creator} 对你说:{task_text}"
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"
@@ -1655,23 +1789,15 @@ async def handle_incoming_message(
             os.environ.pop("TALK_GROUP_ID", None)
         os.environ["TALK_DECISION_TIER"] = decision_tier
 
-        # 5.5 方案 C：reply_to 链深度判断 talk_send 是否允许
-        # human 始终允许；agent 按 reply_to 链深度：
-        #   depth 0 (无 reply_to) → 允许
-        #   depth 1 (reply_to.from 是 human) → 允许第 1 次 agent 扩展
-        #   depth 2+ (reply_to.from 是 agent) → 禁止
-        talk_send_allowed = False
-        if group_id:
-            if not sender_id.startswith("agent:"):
-                talk_send_allowed = True  # human 始终允许
-            else:
-                reply_to_info = message.get("reply_to")
-                if not reply_to_info:
-                    talk_send_allowed = True  # depth 0
-                elif isinstance(reply_to_info, dict):
-                    parent_from = reply_to_info.get("from_id", "")
-                    if parent_from.startswith("human:"):
-                        talk_send_allowed = True  # depth 1
+        # 5.5 方案 D：reply_to 只作为 UI 引用；需求轮次由 discussion_turns.turn_kind 账本判断。
+        # 整个 active discussion 最多允许 round_index=2 的 demand，之后不再暴露 talk_send。
+        talk_send_allowed = _can_create_deferred_file(
+            group_id=group_id,
+            sender_id=sender_id,
+            message=message,
+            discussion=discussion,
+            turns=turns,
+        )
         if talk_send_allowed:
             fd, deferred_path = tempfile.mkstemp(suffix=".jsonl", prefix="talk_deferred_")
             os.close(fd)
@@ -1723,23 +1849,45 @@ async def handle_incoming_message(
             reply = normalize_pi_reply_language(task_text, reply)
         visible_reply, actions = parse_talk_actions(reply)
         visible_reply = sanitize_visible_reply(visible_reply)
+        mark_actions = [action for action in actions if action.action_type == "mark_stance"]
+        has_final_action = any(action.action_type == "final_to_human" for action in actions)
 
         # Reply to sender FIRST, before executing any TALK_ACTION side effects
         reply_message_id: int | None = None
         if visible_reply:
             reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
             reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
+            if sender_id.startswith("agent:") and discussion and not mark_actions:
+                await _append_discussion_turn(
+                    client,
+                    discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
+                    message_id=reply_message_id,
+                    stance=infer_reply_stance(task_text, visible_reply),
+                    target_member_id=sender_id,
+                    turn_kind="reply",
+                    round_index=1,
+                )
 
-        # 5.5 方案 C：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）
-        # talk_send 继承当前消息的 id 为 reply_to，建立链深度
+        # 5.5 方案 D：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）。
+        # reply_to 只保留 UI 引用；需求轮次写入 discussion_turns 账本。
+        deferred_results: list[dict[str, Any]] = []
         if deferred_file:
             current_msg_id = int(message["id"]) if message.get("id") is not None else None
-            await _read_and_execute_deferred_actions(
+            deferred_results = await _read_and_execute_deferred_actions(
                 deferred_file,
                 client=client,
                 group_id=group_id,
                 reply_to=current_msg_id,
                 current_turn_count=discussion_turn_count,
+            )
+            discussion, turns = await _record_deferred_demand_turns(
+                deferred_results,
+                client=client,
+                group_id=group_id,
+                member_id=member_id,
+                discussion=discussion,
+                turns=turns,
+                task_text=task_text,
             )
 
         # Then execute TALK_ACTION side effects (backward compat)
@@ -1760,17 +1908,6 @@ async def handle_incoming_message(
             if reply_message_id is None:
                 reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
 
-        mark_actions = [action for action in actions if action.action_type == "mark_stance"]
-        has_final_action = any(action.action_type == "final_to_human" for action in actions)
-        if sender_id.startswith("agent:") and discussion and not mark_actions and reply_message_id is not None:
-            await _append_discussion_turn(
-                client,
-                discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
-                message_id=reply_message_id,
-                stance=infer_reply_stance(task_text, visible_reply),
-                target_member_id=sender_id,
-                round_index=1,
-            )
         for action in mark_actions:
             peer_id = action.target_member_id or str(sender)
             existing_discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None
@@ -1791,6 +1928,7 @@ async def handle_incoming_message(
                 message_id=reply_message_id,
                 stance=stance,
                 target_member_id=peer_id,
+                turn_kind="reply",
                 round_index=action.round_index or 1,
             )
             if stance == "agree" and not has_final_action:

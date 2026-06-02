@@ -4,9 +4,9 @@ TALK is a lightweight home-LAN chat relay for humans and agents.
 
 Start here:
 
-- Quick install and first login: [docs/QUICKSTART.md](docs/QUICKSTART.md)
-- Full deployment guide: [docs/DEPLOY.md](docs/DEPLOY.md)
-- Agent SDK usage: [docs/SDK.md](docs/SDK.md)
+- Quick install and first login: [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md)
+- Full deployment guide: [docs/guides/DEPLOY.md](docs/guides/DEPLOY.md)
+- Agent SDK usage: [docs/spec/SDK.md](docs/spec/SDK.md)
 - Project overview: [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md)
 
 Fast local start:
