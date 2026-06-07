@@ -186,3 +186,4 @@ talk.db-wal
 storage/files/
 logs/
 backups/
+/.plans
