@@ -37,7 +37,10 @@ FUNCTION_CALLING_SYSTEM_PROMPT = (
     "不要规划任何依赖它们的步骤。\n"
     "输出通道:对当前发件人的可见回复 + 调用清单内的工具。\n"
     "运行时:本会话单轮一次性运行。这一轮要么调用工具完成动作,要么直接给出最终回复。"
-    "不要说'我接下来要…/让我先…/稍后…',因为不存在下一轮。"
+    "不要说'我接下来要…/让我先…/稍后…',因为不存在下一轮。\n"
+    "回复风格:直接说要说的内容(问候、问题、答案、看法、感受)。"
+    "不要写'已经XX了/已经打过招呼了/已经回复了/已经发送了'这类元叙述——"
+    "你说出口就是动作本身,无需汇报。也不要在 visible reply 里复述刚才发生的事。"
 )
 DISCUSSION_PROTOCOL_INSTRUCTIONS = (
     "You are a participant in a TALK Group Hall, not a TALK administrator or user manual. "
@@ -1462,12 +1465,23 @@ def build_cli_prompt(
     sender = message.get("from") or "unknown"
 
     if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
-        parts = [f"{sender} 对你说:{task}"]
+        # 身份在 per-call 注入,系统层是静态文本无法区分 pi / pi-kimi 等同进程不同实例。
+        # 写法刻意紧凑:身份和任务同一行,避免占据独立首行让模型陷入"自我介绍"模式,
+        # 把"对你说"的动词淡化(2026-06-06 黑盒实测:独立首行 + 括号注释会让 pi 忽略任务,
+        # 改成"已就位,有什么需要帮忙"式空回应)。
+        #
+        # discussion_context 在此**故意不注入**:那段 600+ 字的"TALK 控制上下文"
+        # (assignee_id / requester_id / scope_text / remaining_auto_turns 等)是 5.x
+        # 之前 scenario-1 scope 严格化时为"任务式讨论"设计的,在 function-calling +
+        # 方案 D 账本的当前架构下完全冗余 —— round_index 刹车由 bridge 的
+        # _can_create_deferred_file 自动执行,模型不需要看到协议字段。2026-06-06 黑盒
+        # 实测:注入这段会让闲聊场景产生"已经XX啦"式元叙述(模型把寒暄当成 assignee
+        # 完成的 request),信噪比被 10x 压垮。其他 runtime(legacy 文本协议)仍保留,
+        # 兼容由下方分支承担。
+        parts = [f"你是 {member_id}。{sender} 对你说:{task}"]
         member_line = group_member_context.strip()
         if member_line:
             parts.append(member_line)
-        if discussion_context:
-            parts.append(discussion_context)
         return "\n".join(parts)
 
     sender = message.get("from") or "unknown"
@@ -1506,7 +1520,8 @@ def build_cli_task_prompt(
     if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
         creator = task.get("created_by") or "unknown"
         task_text = f"{title}\n{content}" if title else content
-        return f"{creator} 对你说:{task_text}"
+        # 任务路径同样注入身份(紧凑写法,理由同 build_cli_prompt)。
+        return f"你是 {member_id}。{creator} 对你说:{task_text}"
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"

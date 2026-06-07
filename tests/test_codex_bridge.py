@@ -155,7 +155,7 @@ class CodexBridgeTests(unittest.TestCase):
 
         self.assertIn("human:bobo", prompt)
         self.assertIn("summarize this", prompt)
-        self.assertNotIn("agent:codex", prompt)
+        self.assertIn("agent:codex", prompt)  # 身份锚:identity in per-call prompt
         self.assertNotIn("TALK message id: 42", prompt)
         self.assertNotIn("Project root:", prompt)
         self.assertNotIn("@agent:codex summarize this", prompt)
@@ -169,7 +169,7 @@ class CodexBridgeTests(unittest.TestCase):
         }, member_id="agent:codex", workdir=Path("D:/claude-test/TALK"))
 
         self.assertIn("human:bobo", prompt)
-        self.assertNotIn("agent:codex", prompt)
+        self.assertIn("agent:codex", prompt)  # 身份锚:identity in per-call prompt
         self.assertNotIn("TALK task id: 7", prompt)
         self.assertNotIn("Title: Smoke task", prompt)
         self.assertIn("inspect the queue", prompt)

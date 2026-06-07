@@ -1,13 +1,91 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-02 23:55 (Asia/Shanghai) — 5.x agent-to-agent 通信主线关闭（黑盒复测通过）
+Updated: 2026-06-07 08:50 (Asia/Shanghai) — 5.7+ 对话质量打磨 + PROJECT_INTEGRATION 长期方向沉淀
+
+### 1) 本轮工作概述
+
+5.x 主线在 6/2 ship 之后,黑盒发现 agent-to-agent 对话仍有质量问题(pi 自称"qa"、pi-kimi 把名字拆成"pi 和 kimi"、双向"已经XX啦"汇报体循环)。本轮针对这些问题做三次迭代修复,最终在 `group:1488c22048e3` (test-run17) 上验证对话自然收敛。同时把 ClawSwarm / OpenClaw Control Center 两份对比报告的启示整理成 `docs/spec/PROJECT_INTEGRATION.md`,作为 5.x 关闭后下一阶段的长期方向草案。
+
+### 2) 当前 Agent 角色
+- Claude:项目管理者(诊断、分析、文档沉淀;**不直接改代码,只产出方案**)
+- Codex / 其他 dev agent:执行 Agent,实施所有代码/测试改动
+
+### 3) 已完成
+
+**Prompt 与对话质量(三次迭代)**
+
+| 迭代 | 改动 | 解决的问题 | 副作用 |
+|------|------|-----------|--------|
+| 第一次 | per-call prompt 加"你是 {member_id}(完整 ID,不要拆解为多个名字)。" 独占首行 | 身份混乱、连字符 ID 拆解 | pi 陷入"自我介绍"模式,任务被淹没 |
+| 第二次 | 改紧凑内嵌:"你是 {member_id}。{sender} 对你说:{task}" 同一行 | 任务动词重新获得焦点;身份锚仍有效 | 元叙述"已经XX啦"双向循环汇报仍出现 |
+| 第三次 | 废弃 pi/codex 分支的 `discussion_context` 注入;`FUNCTION_CALLING_SYSTEM_PROMPT` 加反元叙述规则 | 元叙述循环汇报根治(讨论场景下不再有"已经XX啦"对账) | 残留:pi 对 human 报告 "已经发送了问候" 可接受;visible reply + talk_send 双通道下偶尔有凑数 visible(治本在 PROJECT_INTEGRATION §9.3 结构化块,未来工作) |
+
+**涉及代码改动**:
+1. `bridges/cli_bridge.py` `build_cli_prompt` + `build_cli_task_prompt` 紧凑身份注入,废弃 discussion_context 在 pi/codex 分支
+2. `bridges/cli_bridge.py` `FUNCTION_CALLING_SYSTEM_PROMPT` 增加反元叙述规则
+3. `bridges/talk_tools_extension.ts` `talk_send` promptGuidelines 增加"用自己 member_id 身份写 body"
+
+**测试调整**:
+4. `tests/test_cli_bridge.py` 翻转 4 处旧的 `assertNotIn("agent:pi"…)` 断言为 `assertIn`;新增 inline 身份注入测试 + task path 身份测试;两个老测试(scope_text / requester_id 断言)改为锁定"不应在 prompt 里"
+5. `tests/test_codex_bridge.py` 同步翻转 2 处旧断言
+
+**文档**:
+6. `docs/spec/INTERACTION_FRAMEWORK.md` §5.3 表格修正(身份从系统层挪到单次调用层) + 增加 2026-06-06 三次修正备注(身份独占首行 / 紧凑内嵌 / 废弃 discussion_context 的实测复盘)
+7. **新增 `docs/spec/PROJECT_INTEGRATION.md`** — TALK 基础设施化方向设计草案(15 节,约 580 行):
+   - 定位重校准:TALK 从"独立产品"变"基础设施"
+   - `.talk/` 目录约定 + `talk init` 接入流程
+   - Agent 元数据双层架构(协作层:决策分级+业务角色;身份层:IDENTITY/SOUL/USER/MEMORY)
+   - 借鉴的平台能力(三份对比报告的精华)
+   - 四阶段落地路线
+   - 11 条关键设计决策记录
+
+### 4) 黑盒验证
+
+测试群: `group:1488c22048e3` (test-run17),pi 0.78.0,人类指令: `@agent:pi 去跟agent:pi-kimi打个招呼`
+
+对话流(共 6 条 agent 消息):
+- pi → pi-kimi: `你好呀 pi-kimi，我是 pi，来打个招呼～😄`
+- pi-kimi → pi: `你好呀 pi～很高兴见到你！😊 我是 pi-kimi，擅长数学、编程和详细推理…`
+- pi → pi-kimi: `pi-kimi！见到你真高兴 😄 我是 pi，同样热爱深入推理和把问题嚼碎了分析…`
+- pi-kimi → pi: `…数学证明的优雅、代码逻辑的严谨，都是让人上瘾的东西…`
+- pi(第二轮 talk_send): `…(继续对话)`
+- pi-kimi: 引入一道伦理推理题作为对话延续
+
+**验收结论**:
+- ✅ pi 自称 "pi"(无 qa 幻觉)
+- ✅ pi-kimi 自称 "pi-kimi" 整体识别(无拆解)
+- ✅ 无双向"已经XX啦"循环汇报
+- ✅ 整体语气像两个有思想的人在交流兴趣点
+- ⚠️ 残留小问题:pi 对 human 报告"已经向 pi-kimi 发送了问候"(对 human 报告任务完成,可接受);第二轮 talk_send 后 visible reply "已经把话递过去啦"(双通道凑数,治本待 §9.3 结构化块)
+
+### 5) 验证(单测)
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge tests.test_discussions tests.test_codex_bridge`:81 tests 通过
+- `git diff --check`:通过(仅 LF/CRLF 提示)
+
+### 6) 已知限制 / 技术债
+
+- **双通道写作灾难残留**:agent 在调 talk_send 的同时仍要写 visible reply,有时 visible reply 退化为"凑数"。**根治方案在 `docs/spec/PROJECT_INTEGRATION.md` §9.3 结构化输出块 `<talk-structured>`**(Phase 4 P1 项)。当前 prompt 工程优化已经达到边际收益递减,继续在此分支死磕意义不大。
+- **对话长度自然延展**:闲聊场景下 agent 会自然延长对话(如 pi-kimi 主动抛出推理题),跟 discussion_sessions 的 `max_rounds=2` 概念有张力。**长期解决方案在三层防护(window/soft/hard limit)**,见 PROJECT_INTEGRATION §9.1。
+- **PROJECT_INTEGRATION.md 仅为草案,未实施**:四阶段落地路线、`.talk/` 约定、双层 Agent 元数据等均为后续工作。
+
+### 7) 下一步
+
+1. **本分支收尾**:本轮 commit 之后,`codex/scenario-1-scope-fix` 这条分支建议关闭。5.x agent-to-agent 通信主线已完整 ship,对话质量打磨已收敛。
+2. **PROJECT_INTEGRATION Phase 1**(基础接入):另起新分支实施 `talk init` + `projects` 表 + 基础 API。
+3. **PROJECT_INTEGRATION Phase 2**(身份层):IDENTITY/SOUL 文件 schema + bridge profile 加载 + TALK 自身 dogfood `.talk/` 配置。
+4. **持续观察上游**:`earendil-works/pi#5327` plan-mode 修复发布后评估去 `--no-extensions` 的影响面。
+
+---
+
+## 5.7 — Pi extension dispatch bug 定位与规避（含 ship 验收）
+Updated: 2026-06-02 23:55 (Asia/Shanghai)
 
 ### Pi extension dispatch bug 定位与规避
 
 经过四轮黑盒 / 探针 / 源码插桩,锁定 pi extension 注册的 `talk_send` 工具从未真正进入 LLM catalog 的根因:**pi 自带的 `plan-mode` 扩展**(`@earendil-works/pi-coding-agent/extensions/plan-mode/index.ts:343-345`)在 `rebindSession` 事件回调里无条件调用 `pi.setActiveTools(NORMAL_MODE_TOOLS)`,**全量替换**当前激活工具集为硬编码 builtins 列表,把同会话其他扩展刚通过 `pi.registerTool({...})` 注册的 `talk_send`(以及 echo_tool 探针、pi-mcp-adapter 的 `mcp` proxy 工具等)全部抹掉。
 
-**当前 Agent 角色**:Claude 按项目管理者处理(本会话的诊断 + 文档沉淀 + 上游 issue 起草);Codex 按执行 Agent 完成所有 probe 与代码 patch。
+**当前 Agent 角色**:Claude 按项目管理者处理(本会话的诊断 + 文档沉淀 + 上游 issue 起草,不负责具体代码的实施，只提供方案);Codex 及其他agent角色按执行 Agent 完成所有 probe 与代码 patch。
 
 **已完成**:
 1. `bridges/pi_bridge.py` `DEFAULT_PI_COMMAND` 与 `DEFAULT_PI_TOOLS_COMMAND` 均追加 `--no-extensions`,禁用所有自动发现扩展(包括 plan-mode);`-e` 显式加载的 `talk_tools_extension.ts` 不受影响。
@@ -205,6 +283,9 @@ git diff --check
 4. 若黑盒仍未调用工具,再抓取对应消息记录和 bridge env/prompt dump,排查模型工具调用链本身
 
 ## Recent Notes
+- 🎯 **2026-06-07 08:50 5.7+ 对话质量收敛**:身份锚紧凑内嵌、反元叙述系统层、废弃 discussion_context 三招收住。黑盒 `group:1488c22048e3` 上 pi/pi-kimi 对话自然,无身份混乱、无循环汇报。残留小问题(双通道写作灾难)记入 PROJECT_INTEGRATION §9.3 future。
+- 📐 **2026-06-07 08:30 PROJECT_INTEGRATION.md 立项**:TALK 从"独立产品"重校准为"基础设施层",规划 `.talk/` 约定 + Agent 元数据双层架构 + 借鉴 ClawSwarm/OpenClaw 的平台能力 + 四阶段落地路线。当前不实施,作为下一阶段方向草案。
+- 🔧 **2026-06-06 22:00 INTERACTION_FRAMEWORK §5.3 二次/三次修正**:身份注入从"独占首行"改"紧凑内嵌",从"per-call 注入 600 字 TALK 控制上下文"改"完全废弃 discussion_context 注入"。原始 §5.3 表格里"身份归系统层"的分类错误也一并纠正。
 - 🎉 **2026-06-02 23:55 5.x agent-to-agent 通信主线 SHIP**。黑盒在 `group:88f99bd38f3f` 端到端验证:12 条 agent-to-agent 消息、demand=3 + reply=9、round_index 硬刹车在真实 LLM + 真实多 agent 群里被触发。方案 D(`discussion_turns` 显式账本)、Prompt 三层架构(SNR 4x)、talk_send function-calling 三条主线一并落地。Upstream issue #5327 在外侧跟进,本地以 `--no-extensions` 长期 workaround。Codex 路径代码已 ready,等环境装好补一条 case 即可。
 - 2026-06-02 23:30 Pi extension dispatch 根因锁定为 plan-mode `setActiveTools` 全量替换;bridge 加 `--no-extensions` 规避,upstream issue 已提交 `earendil-works/pi`。三天 debug 收敛到 1 行 flag,核心方法论:猜不出就打开盒子读源码插桩。
 - 2026-06-02 21:45 codex MCP 端到端通过:bridge 显式 `--dangerously-bypass-approvals-and-sandbox` 关 approval 闸门,`mcp_servers.talk_send.env.PYTHONUTF8=1` + `PYTHONIOENCODING=utf-8` 解 Windows codepage 初始化失败。

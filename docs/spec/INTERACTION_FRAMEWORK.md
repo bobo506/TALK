@@ -160,12 +160,21 @@ Function-calling 转向后,bridge 仍需要让模型获取若干信息:角色与
 |------|:---:|:---:|:---:|
 | 工具 name / 参数 schema | ✅ |  |  |
 | "什么时候调这个工具" | ✅ promptGuidelines |  |  |
-| 你是谁、有什么通道 |  | ✅ |  |
+| "talk_send body 用自己口吻,不冒充请求者" | ✅ promptGuidelines |  |  |
+| 输出通道("可见回复 + 调用清单内工具") |  | ✅ |  |
 | 本会话单轮运行 |  | ✅ |  |
 | 清单外工具不存在 |  | ✅ |  |
+| **"你是 {member_id}"(身份锚)** |  |  | **✅** |
 | 当前 sender + task |  |  | ✅ |
 | 群成员清单 |  |  | ✅ |
-| 当前 discussion 上下文 |  |  | ✅ |
+| ~~当前 discussion 上下文~~(已废弃) |  |  | ❌ |
+
+> **设计修正(2026-06-03)**:身份(`member_id`)最初被归到系统层,但实测发现同一个 bridge 进程会被启动成不同 member_id(如 `pi_bridge.py --name agent:pi-kimi`),系统层是静态 `--system-prompt` 文本无法承载 per-instance 信息,导致模型在 prompt 里没有自我身份锚 ——
+> 观察到的具体症状:pi 自称"我是 qa"(把请求者身份当成自己),pi-kimi 把自己拆成"pi 和 kimi 两个人"(连字符 ID 被模型当成多个名字)。修正:身份归单次调用层,在 per-call prompt 起首明确"你是 {member_id}"。
+>
+> **二次修正(2026-06-06)**:身份注入的**写法**也是 SNR 敏感的。第一版把"你是 {member_id}(完整 ID,作为整体,不要拆解为多个名字)"放成独占首行,实测让 pi 陷入"自我介绍"模式回了一句"我是 agent:pi,已就位,有什么需要帮忙的?"——任务动词被身份块完全淹没。改回紧凑写法 `你是 {member_id}。{sender} 对你说:{task}` 同一行,身份只占 10-12 字符,动词获得焦点。连字符 ID 拆解的对抗,如果紧凑写法压不住,再用 display_name 或别名做次级防御,不再在 prompt 里硬塞 meta 提示。
+>
+> **三次修正(2026-06-06):废弃"当前 discussion 上下文"在 per-call 的注入**。原 `_discussion_context_text` 生成的 ~600 字"TALK 控制上下文"块(scope_text / requester_id / assignee_id / remaining_auto_turns / "回复必须服务于 requester_id 提出的当前请求" 等)是 5.x 前 scenario-1 scope 严格化时为**任务式讨论**设计的。在 function-calling + 方案 D 账本架构下完全冗余 —— round_index 刹车由 bridge 的 `_can_create_deferred_file` 自动执行,scope 也无需模型自己维护。实测注入这段会让闲聊场景产生"已经XX啦"式元叙述(模型把寒暄当成 assignee 需要完成的 request,看见 `remaining_auto_turns: 0` 就立刻收尾汇报)。pi/codex 分支当前不再注入,legacy 文本协议分支保留作兼容。
 
 ### 5.4 可扩展性
 

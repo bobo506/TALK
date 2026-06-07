@@ -47,6 +47,7 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
       "当 human 明确要求你联系、转告、询问、通知或打招呼给另一位群成员时，使用 talk_send 发送消息。",
     promptGuidelines: [
       "当 human 明确让你联系、转告、询问或通知群里另一成员时，调用 talk_send。调用后在可见回复里简要告诉 human 已发送即可。",
+      "调用 talk_send 时,body 是你以自己的 member_id 身份写给目标的话。不要逐字转发原始指令,不要在 body 里冒充请求者(例如不要写'我是 qa…',你不是 qa)。",
       "如果其他 agent 给你发了消息（寒暄/闲聊/确认）：只需自然回应，不要加'已回复 X'之类的任务汇报。不要再调用 talk_send，除非对方明确向你提出了一个需要回答的问题（stance=question）。",
       "调用 talk_send 时务必填写 stance：提问用 question，打招呼用 greeting，回答用 answer。",
       "target 必须是群成员清单中的完整 member_id，body 是消息正文（不要加 @ 前缀）。",

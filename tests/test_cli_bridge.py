@@ -71,7 +71,7 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertIn("ask codex to review this too", prompt)
         self.assertIn("human:bobo 对你说:", prompt)
-        self.assertNotIn("agent:pi", prompt)
+        self.assertIn("agent:pi", prompt)  # 身份锚:identity in per-call prompt
         self.assertNotIn("Task creator:", prompt)
         self.assertNotIn("TALK task id:", prompt)
         self.assertNotIn("Project root:", prompt)
@@ -92,7 +92,7 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("复盘", prompt)
         self.assertIn("总结一下", prompt)
         self.assertIn("human:bobo 对你说:", prompt)
-        self.assertNotIn("agent:pi", prompt)
+        self.assertIn("agent:pi", prompt)  # 身份锚:identity in per-call prompt
 
     def test_build_cli_prompt_for_pi_uses_raw_user_text(self):
         prompt = build_cli_prompt({
@@ -103,10 +103,36 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertTrue("human:bobo 对你说:在吗" in prompt)
         # identity no longer in prompt
-        self.assertNotIn("agent:pi", prompt)
+        self.assertIn("agent:pi", prompt)  # 身份锚:identity in per-call prompt
         self.assertNotIn("Sender:", prompt)
         self.assertNotIn("TALK message id:", prompt)
         self.assertNotIn("Project root:", prompt)
+
+    def test_build_cli_prompt_injects_identity_inline(self):
+        """身份锚必须出现在 per-call prompt 里,且**紧凑内嵌**而非独占首行。
+        历史教训(2026-06-06 黑盒实测):身份独占首行 + 大段括号注释会让 pi 陷入"自我介绍"
+        模式,忽略任务动词。改回身份和任务同一行的紧凑写法。
+        参考 INTERACTION_FRAMEWORK §5.3 修正记录。
+        """
+        prompt = build_cli_prompt({
+            "id": 5,
+            "from": "human:qa",
+            "content": "@agent:pi-kimi 你忙不忙",
+        }, member_id="agent:pi-kimi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+
+        # 身份必须出现,且明确告诉模型"你是 agent:pi-kimi"
+        self.assertIn("你是 agent:pi-kimi", prompt)
+        # 任务必须直接跟在身份后(同一行),让动词获得焦点
+        self.assertIn("你是 agent:pi-kimi。human:qa 对你说:你忙不忙", prompt)
+
+    def test_build_cli_task_prompt_for_pi_injects_identity(self):
+        """任务路径同样要注入身份,跟 build_cli_prompt 一致(同一行紧凑写法)。"""
+        prompt = build_cli_task_prompt({
+            "id": 7,
+            "created_by": "human:qa",
+            "content": "整理一下今天的进度",
+        }, member_id="agent:pi-kimi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
+        self.assertIn("你是 agent:pi-kimi。human:qa 对你说:整理一下今天的进度", prompt)
 
     def test_build_cli_prompt_strips_leading_mention_cluster_for_pi(self):
         prompt = build_cli_prompt({
@@ -116,7 +142,9 @@ class CliBridgeTests(unittest.TestCase):
         }, member_id="agent:pi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
 
         self.assertTrue("human:bobo 对你说:我觉得这个对话系统还需要完善" in prompt)
-        self.assertNotIn("agent:pi", prompt)
+        self.assertNotIn("@agent:pi", prompt)  # leading mention cluster stripped from task
+        self.assertNotIn("@agent:codex", prompt)
+        self.assertIn("agent:pi", prompt)  # 身份锚仍在(identity line,非 @mention)
 
     def test_build_cli_prompt_keeps_mid_sentence_mentions(self):
         prompt = build_cli_prompt({
@@ -1198,9 +1226,12 @@ class CliBridgeTests(unittest.TestCase):
                 return {"id": 2}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
-            self.assertIn("scope_text: 人类是怎么进化来的？", prompt)
-            self.assertIn("current_message_text: 你怎么看？", prompt)
-            self.assertIn("不要在可见回复中复述字段名或 ID", prompt)
+            # 2026-06-06:pi/codex 分支不再注入 TALK 控制上下文(scope_text / requester_id /
+            # remaining_auto_turns 等),那段任务式 metadata 在闲聊场景会让模型陷入"已经XX了"
+            # 元叙述,且方案 D 账本已经在 bridge 端代管 scope/round 刹车,模型不需要看。
+            self.assertNotIn("scope_text:", prompt)
+            self.assertNotIn("requester_id:", prompt)
+            self.assertIn("agent:codex 对你说:你怎么看？", prompt)
             return CliRunResult(
                 returncode=0,
                 stdout="TALK_ACTION send_message to=agent:codex stance=question body=请确认最终答案",
@@ -1739,10 +1770,12 @@ class CliBridgeTests(unittest.TestCase):
                 return {"id": len(self.turns)}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
-            self.assertIn("requester_id: agent:codex", prompt)
-            self.assertIn("assignee_id: agent:pi", prompt)
-            self.assertIn("scope_text: 请检查这个按钮文案是否清楚", prompt)
-            self.assertIn("current_message_text: 请检查这个按钮文案是否清楚", prompt)
+            # 2026-06-06:pi/codex 分支不再注入 TALK 控制上下文。本测试仍然覆盖账本写入
+            # (discussion / turn 创建)行为,prompt 内容只需保留身份 + sender + task。
+            self.assertNotIn("requester_id:", prompt)
+            self.assertNotIn("assignee_id:", prompt)
+            self.assertNotIn("scope_text:", prompt)
+            self.assertIn("agent:codex 对你说:请检查这个按钮文案是否清楚", prompt)
             return CliRunResult(returncode=0, stdout="这个按钮文案清楚，但可以更短。", stderr="")
 
         async def scenario():
