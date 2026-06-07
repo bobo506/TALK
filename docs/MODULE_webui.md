@@ -152,3 +152,12 @@
 - 若当前消息是发给 B、但引用的是第三方 C 的内容，前端仍保留原来的引用框与预览，避免丢失第三方上下文。
 - 紧凑引用仍保留点击跳转能力；当被引用消息已加载时，点击 `A 回复 B` 会滚动并高亮原消息。
 - 静态资源 cache-busting 版本已更新到 `20260525-reply-compact`。
+
+## 2026-06-07 WEB-WORKBENCH-REDESIGN-1 Addendum
+
+- Web UI 第一版 Product Design 重设计已落地：页面从“顶部工具条 + 聊天流”改为“左侧 Hall 控制台 + 右侧消息时间线”的工作台结构。
+- 左侧 `Hall 控制台` 聚合全局 / Group Hall 切换、新建 Group、成员面板和在线成员状态；右侧保留历史搜索、消息流和底部 composer。
+- 本轮只调整信息架构与视觉层级，不改变现有 API、DOM id 行为契约或 Vanilla JS 技术约束。
+- 视觉系统改为中性暗色工作台，辅以 teal / indigo / amber 状态色；桌面为双栏，窄屏自动切为单列并避免横向溢出。
+- highlight.js 浏览器脚本路径改用 `highlightjs/cdn-release@11.11.1/build/highlight.min.js`，避免旧 `lib/common.min.js` 在浏览器中触发 `require is not defined`。
+- 静态资源 cache-busting 版本已更新到 `20260607-workbench-redesign`。

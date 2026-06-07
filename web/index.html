@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260525-reply-compact">
+  <link rel="stylesheet" href="/style.css?v=20260607-workbench-redesign">
 </head>
 <body class="app-shell bg-gray-900 text-gray-100 h-screen flex flex-col">
 
@@ -98,7 +98,7 @@
       <div class="brand-mark small">T</div>
       <div>
         <h1>TALK</h1>
-        <p>消息时间线</p>
+        <p>Agent 协作工作台</p>
       </div>
     </div>
     <div class="header-actions">
@@ -110,9 +110,18 @@
     </div>
   </header>
 
-  <div class="chat-shell flex-1 min-h-0 flex flex-col">
-    <section id="workspace-tools" class="workspace-tools shrink-0">
-      <section id="room-strip" class="room-strip hidden px-4 py-2 shrink-0">
+  <div class="chat-shell flex-1 min-h-0">
+    <div class="workbench">
+      <aside id="workspace-tools" class="workspace-tools">
+        <div class="workspace-panel-heading">
+          <div>
+            <div class="workspace-kicker">Workspace</div>
+            <h2>Hall 控制台</h2>
+          </div>
+          <span class="workspace-live-dot" aria-hidden="true"></span>
+        </div>
+
+      <section id="room-strip" class="room-strip hidden shrink-0">
         <div class="room-strip-row">
           <div class="room-current">
             <div id="room-title" class="room-title">全局消息流</div>
@@ -194,14 +203,17 @@
         </section>
       </section>
 
-      <section id="presence-strip" class="hidden px-4 py-2 shrink-0">
+      <section id="presence-strip" class="hidden shrink-0">
         <div class="flex items-center gap-3 overflow-x-auto">
           <div id="presence-summary" class="presence-summary shrink-0">正在同步在线成员…</div>
           <div id="presence-members" class="presence-members"></div>
         </div>
       </section>
 
-      <section id="history-toolbar" class="hidden px-4 py-2 shrink-0">
+      </aside>
+
+      <section class="timeline-workspace">
+      <section id="history-toolbar" class="hidden shrink-0">
         <div class="history-toolbar-row">
           <div class="history-search-group">
             <input id="history-search-input" type="text" placeholder="搜索消息、附言或文件名"
@@ -224,11 +236,10 @@
           </div>
         </div>
       </section>
-    </section>
 
-    <main id="messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-3"></main>
+      <main id="messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-3"></main>
 
-    <footer class="composer-footer px-4 py-3 shrink-0">
+      <footer class="composer-footer px-4 py-3 shrink-0">
       <div id="composer" class="relative">
         <div id="drop-hint" class="drop-hint hidden">
           松开即可添加文件
@@ -278,12 +289,14 @@
           </button>
         </div>
       </div>
-    </footer>
+      </footer>
+      </section>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/lib/common.min.js"></script>
-  <script src="/app.js?v=20260525-reply-compact"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
+  <script src="/app.js?v=20260607-workbench-redesign"></script>
 </body>
 </html>
