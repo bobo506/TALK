@@ -1,0 +1,49 @@
+{
+  "comment": "TALK bridge 部署配置模板。每个 bridge 进程对应一个 member。",
+  "bridges": [
+    {
+      "comment": "示例：Codex CLI bridge（决策 Agent + lead 角色）",
+      "name": "agent:codex@projA:lead",
+      "key": "<api_key>",
+      "runtime": "codex",
+      "command": "codex exec",
+      "display_name": "Codex",
+      "decision_tier": "decision",
+      "workdir": ".",
+      "prompt_transport": "stdin",
+      "timeout": 600,
+      "poll_interval": 2.0,
+      "send_ack": true,
+      "respond_to_broadcast": false
+    },
+    {
+      "comment": "示例：pi CLI bridge（执行 Agent + tester 角色）",
+      "name": "agent:pi@projA:tester",
+      "key": "<api_key>",
+      "runtime": "pi",
+      "command": "pi --print --mode text",
+      "display_name": "pi",
+      "decision_tier": "execution",
+      "workdir": ".",
+      "prompt_transport": "argv",
+      "timeout": 600,
+      "poll_interval": 2.0,
+      "send_ack": false,
+      "respond_to_broadcast": false
+    }
+  ],
+  "field_reference": {
+    "name": "Agent 完整 member_id（需与 TALK 注册一致）",
+    "key": "API Key（对应 member 的 api_key）",
+    "runtime": "运行时标签（codex / pi / cli / claude），上报给 TALK 实例状态",
+    "command": "启动 LLM CLI 的命令行",
+    "display_name": "前端显示名称",
+    "decision_tier": "决策分级：decision（决策 Agent）/ execution（执行 Agent），缺省按 execution。注入到 LLM prompt 中与 AGENTS.md 抽象字典对照",
+    "workdir": "工作目录，传给 CLI 子进程",
+    "prompt_transport": "stdin：通过标准输入传 prompt；argv：作为最后一个命令行参数",
+    "timeout": "CLI 子进程超时秒数",
+    "poll_interval": "消息轮询间隔（秒）",
+    "send_ack": "是否在处理前先发送回执",
+    "respond_to_broadcast": "是否响应广播消息（无明确 to 的消息）"
+  }
+}

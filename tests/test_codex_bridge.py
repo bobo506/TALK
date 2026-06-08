@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shlex
 import sys
 import unittest
 from pathlib import Path
@@ -34,6 +35,64 @@ class CodexBridgeTests(unittest.TestCase):
                 os.environ.pop("TALK_CODEX_COMMAND", None)
             else:
                 os.environ["TALK_CODEX_COMMAND"] = old_value
+
+    def test_default_codex_command_injects_system_instructions(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            command_args = shlex.split(default_codex_command(), posix=True)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertIn("-c", command_args)
+        config_values = [
+            command_args[index + 1]
+            for index, arg in enumerate(command_args)
+            if arg == "-c" and index + 1 < len(command_args)
+        ]
+        self.assertTrue(any(value.startswith("base_instructions=") for value in config_values))
+        self.assertTrue(any("不存在下一轮" in value for value in config_values))
+        self.assertTrue(any(value == 'mcp_servers.talk_send.command="python"' for value in config_values))
+        self.assertTrue(any(value.startswith("mcp_servers.talk_send.args=[") for value in config_values))
+        self.assertIn("--dangerously-bypass-approvals-and-sandbox", command_args)
+        self.assertTrue(any(value == 'mcp_servers.talk_send.env.PYTHONUTF8="1"' for value in config_values))
+        self.assertTrue(any(value == 'mcp_servers.talk_send.env.PYTHONIOENCODING="utf-8"' for value in config_values))
+
+    def test_default_codex_command_includes_mcp_utf8_env(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            cmd = default_codex_command(profile="discussion")
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertIn("mcp_servers.talk_send.env.PYTHONUTF8", cmd)
+        self.assertIn("mcp_servers.talk_send.env.PYTHONIOENCODING", cmd)
+
+    def test_default_codex_command_includes_approval_bypass(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            cmd = default_codex_command(profile="discussion")
+            tools_cmd = default_codex_command(profile="tools")
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertIn("--dangerously-bypass-approvals-and-sandbox", cmd)
+        self.assertIn("--sandbox read-only", cmd)
+        self.assertIn("--sandbox workspace-write", tools_cmd)
+
+    def test_default_codex_command_does_not_hardcode_per_call_env(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            cmd = default_codex_command(profile="discussion")
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertNotIn("TALK_API_KEY", cmd)
+        self.assertNotIn("TALK_DEFERRED_FILE", cmd)
+        self.assertNotIn("TALK_GROUP_ID", cmd)
 
     def test_should_handle_only_direct_text_by_default(self):
         member_id = "agent:codex"
@@ -94,10 +153,11 @@ class CodexBridgeTests(unittest.TestCase):
             "content": "@agent:codex summarize this",
         }, member_id="agent:codex", workdir=Path("D:/claude-test/TALK"))
 
-        self.assertIn("agent:codex", prompt)
         self.assertIn("human:bobo", prompt)
-        self.assertIn("TALK message id: 42", prompt)
         self.assertIn("summarize this", prompt)
+        self.assertIn("agent:codex", prompt)  # 身份锚:identity in per-call prompt
+        self.assertNotIn("TALK message id: 42", prompt)
+        self.assertNotIn("Project root:", prompt)
         self.assertNotIn("@agent:codex summarize this", prompt)
 
     def test_build_codex_task_prompt_contains_task_context(self):
@@ -108,10 +168,10 @@ class CodexBridgeTests(unittest.TestCase):
             "content": "inspect the queue",
         }, member_id="agent:codex", workdir=Path("D:/claude-test/TALK"))
 
-        self.assertIn("agent:codex", prompt)
         self.assertIn("human:bobo", prompt)
-        self.assertIn("TALK task id: 7", prompt)
-        self.assertIn("Title: Smoke task", prompt)
+        self.assertIn("agent:codex", prompt)  # 身份锚:identity in per-call prompt
+        self.assertNotIn("TALK task id: 7", prompt)
+        self.assertNotIn("Title: Smoke task", prompt)
         self.assertIn("inspect the queue", prompt)
 
     def test_format_codex_reply_handles_error_and_truncation(self):

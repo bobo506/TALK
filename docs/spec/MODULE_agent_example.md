@@ -11,7 +11,7 @@
 
 - SDK 包：`TALK/client/`
 - 示例脚本：`examples/agent_sdk_demo.py`
-- 详细 API 文档：`docs/SDK.md`
+- 详细 API 文档：`docs/spec/SDK.md`
 
 ## 当前实现
 
@@ -47,4 +47,4 @@ python examples/agent_sdk_demo.py --name demo --key demo-key
 - [x] 示例脚本可本地自注册并跑通 `ping -> pong`
 - [x] SDK 覆盖文本发送、文件发送、文件下载、撤回、成员查询、历史拉取
 - [x] SDK 支持 WebSocket 事件、自动重连、轮询降级和去重
-- [x] 详细 API 说明已收敛到 `docs/SDK.md`
+- [x] 详细 API 说明已收敛到 `docs/spec/SDK.md`

@@ -5,19 +5,37 @@
 ## 开发者指引
 
 1. **先读** `docs/PROJECT_BRIEF.md` — 了解项目全貌、技术栈、数据模型
-2. **再读你负责的模块文档** — 根据你的任务，在 PROJECT_BRIEF 的模块索引中找到对应的 `MODULE_xxx.md`，只读那一份
+2. **再读你负责的模块文档** — 根据你的任务，在 PROJECT_BRIEF 的模块索引中找到对应的 `spec/MODULE_xxx.md`，只读那一份
 3. **不要读其它模块的文档** — 节省 token，保持专注
 4. **不确定时** — 查看 PROJECT_BRIEF 的模块索引表，或询问项目管理者
 
 ## Agent 角色与协作约束
 
-`AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源。每次项目开始时，Agent 必须先读取本文件，确认自己当前是决策 Agent 还是执行 Agent；如项目管理者人工修改本节，后续 Agent 必须按最新角色执行。
+`AGENTS.md` 是本项目**抽象角色字典**的权威来源：只定义"决策 Agent / 执行 Agent"两类**行为分级**的规则，以及"未声明分级时按执行 Agent 处理"的兜底规则。
 
-## 当前 Agent 角色
+本文件**不再点名"某具体模型 = 哪一类"**。具体某个 member 属于哪一类，由 bridge 启动时根据自身配置（`decision_tier`）在 system prompt 里注入；agent 模型在读本文件之前已被 bridge 告知"你是 X 类"，再来本文件查规则即可对号入座。
 
-- 当前 Codex 角色：决策 Agent
-- 当前 Claude 角色：执行 Agent
-- 未在本节明确授权为决策 Agent 的其它 Agent，默认按执行 Agent 处理
+每次会话开始，agent 应先读取 bridge 注入的身份事实（`member_id / decision_tier / 业务角色`），再读本文件确认其行为规则。
+
+## Agent 决策分级（抽象字典）
+
+### 决策 Agent
+
+在需求方向已明确、无重大不确定项时，可自主连续开发多个切片。详细规则见下方"开发节奏与确认规则"。
+
+### 执行 Agent
+
+每次只开发一个已确认切片，完成后必须暂停等待确认。详细规则见下方"开发节奏与确认规则"。
+
+### 默认分级
+
+bridge 未在配置中明确声明 `decision_tier=decision` 的 agent，一律按**执行 Agent** 处理。
+
+## Agent 业务角色
+
+业务角色（lead / ui / dev / tester / reviewer 等）**不在本文件枚举**，由 `groups.metadata.roles` 在群创建时定义；bridge 在处理每条消息前反查 `roles[<self_member_id>]` 在 prompt 中注入给模型。平台不在 schema 层固化业务角色枚举。
+
+业务角色与决策分级是**两个独立维度**：例如 `agent:codex@projA:lead` 业务角色是 `lead`，决策分级可能是"决策 Agent"；而 `agent:deepseek@projA:tester` 业务角色是 `tester`，决策分级通常是"执行 Agent"。
 
 ## 开发节奏与确认规则
 

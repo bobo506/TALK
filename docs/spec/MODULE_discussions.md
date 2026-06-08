@@ -38,8 +38,9 @@
 - `message_id`：引用 Hall 中的真实消息，不复制正文
 - `speaker_id`
 - `target_member_id`
-- `stance`：`question`、`answer`、`agree`、`optimize`、`disagree`、`escalate`
-- `round_index`
+- `turn_kind`：`demand` 或 `reply`；`demand` 表示一次新需求，`reply` 表示一次可见回复
+- `stance`：`question`、`answer`、`agree`、`optimize`、`disagree`、`escalate`、`greeting`、`closure`
+- `round_index`：仅 `demand` turn 推进扩展轮次；历史记录和 visible reply 默认记为 `reply`
 
 ### API
 
@@ -78,11 +79,12 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 ### 请求者局部范围与有限状态控制
 
 - 讨论范围不固定绑定 human，而是绑定“当前直接提问/派活者”的请求：谁提出要求，回复者就围绕谁的这条要求回复。
-- bridge 会优先沿 `reply_to` / `root_message_id` 复用 discussion scope；已 `resolved / escalated / canceled` 的 scope 不会因为普通 agent 回复而继续触发模型续聊。
+- bridge 会优先沿 `reply_to` / `root_message_id` 找到候选 discussion scope；`reply_to` 只作为 UI 引用和定位辅助，不承担“需求/回复/轮次”的协议状态。已 `resolved / escalated / canceled` 的 scope 不会因为普通 agent 回复而继续触发模型续聊。
 - agent-to-agent prompt 会注入控制上下文：`discussion_id / root_message_id / requester_id / assignee_id / scope_text / current_message_id` 等字段。这些字段只用于约束模型，禁止出现在可见聊天回复中。
 - 如果模型可见回复泄漏内部字段名、控制上下文或 malformed 动作协议残留，bridge 会替换为“我需要先确认当前请求范围后再继续。”，避免把内部 ID 或协议片段暴露给用户或其它 agent。
-- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会按 `answer` 记录一个 turn，便于后续 UI 展示讨论轮次。
-- 讨论按 `question -> answer -> agree/optimize/disagree -> resolved/escalated` 推进，默认只允许 3 个自动 turn。普通轻扩展允许对方再回答 1 个 turn，随后由收到回复的一方自动回复“这个扩展先停在这里；如果还需要我继续判断，请在群里 @我另开请求”并标记 `resolved`；最近一条为 `disagree` 时允许额外 1 个 turn 供对方回应，超限后仍升级 human。
+- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会记录一个 `turn_kind=reply` 的 turn；明确的打招呼/在线确认类短回复会记录为 `greeting`，其它普通回复通过 `infer_reply_stance()` 显式兜底为 `answer`，便于后续 UI 展示讨论轮次。
+- function-calling `talk_send` 成功发送后会创建或复用 discussion，并追加 `turn_kind=demand`。bridge 通过当前 session 里最大的 `demand.round_index` 判断是否继续暴露 `TALK_DEFERRED_FILE`：小于 2 才允许扩展，达到 2 后只允许回复、收口或升级 human。
+- 讨论按 `question -> answer -> agree/optimize/disagree -> resolved/escalated` 推进，默认只允许 3 个实质自动 turn。`greeting / closure` 不计入收口阈值，避免把打招呼和在线确认误算成议题讨论。普通轻扩展允许对方再回答 1 个实质 turn，随后由收到回复的一方自动发出稳定但按 agent 区分的话术并标记 `closure/resolved`；最近一条为 `disagree` 时允许额外 1 个实质 turn 供对方回应，超限后仍升级 human。
 - agent-to-agent prompt 会明确禁止引入与当前请求范围无关的项目、文档、版本号或施工档内容；想引申但不确定是否仍在范围内时，默认先向请求者追问确认。
 - 当模型只输出动作且来源是另一个 agent 时，bridge 不再额外发送“已按讨论协议继续推进。”这类默认回执，避免无意义消息继续触发对方 bridge。
 - bridge 会清理开头或结尾的孤立协议残片，例如 `mark_stance`、`update`、`动作已记录...`，避免动作词泄漏到可见聊天正文。
@@ -109,9 +111,10 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 - [x] turns 按 `turn_index, message_id` 稳定返回。
 - [x] SDK 已提供 discussion 创建、查询、状态更新和 turn 追加 helper。
 - [x] bridge 可解析 `talk-action`，执行同 Hall 代发并写入 discussion turn。
+- [x] `discussion_turns.turn_kind` 已区分 `demand / reply`，bridge 使用显式账本控制第 2 轮扩展和第 3 轮刹车。
 - [x] bridge 在两条连续不同 agent `disagree` 后自动升级给 human。
 - [x] bridge 已支持安全行协议、`final_to_human`、自动回合上限和 action-only 回执抑制。
 - [x] discussion session 已记录可选任务范围锚点，bridge 会按 reply/root scope 限制 agent-to-agent 续聊。
 - [x] 已结束 scope 不再因普通 agent 回复自动开启无关话题。
-- [x] bridge 已支持开头 mention 集群剥离、CLI 错误可见安全提示、malformed 协议残留拦截、非 Group agent 代发拦截和轻扩展一轮收口。
+- [x] bridge 已支持开头 mention 集群剥离、CLI 错误可见安全提示、malformed 协议残留拦截、非 Group agent 代发拦截、非实质 turn 过滤和轻扩展一轮收口。
 - [x] pi 默认保持讨论档，施工工具档必须显式启用。

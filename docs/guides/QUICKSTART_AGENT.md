@@ -295,6 +295,6 @@ docker compose logs talk
 
 ## 11. 下一步看哪里
 
-- SDK 详细 API 和更多可运行示例看 [SDK.md](./SDK.md)
+- SDK 详细 API 和更多可运行示例看 [SDK.md](../spec/SDK.md)
 - Docker、systemd 和恢复流程看 [DEPLOY.md](./DEPLOY.md)
 - 家庭用户安装入口看 [QUICKSTART_USER.md](./QUICKSTART_USER.md)

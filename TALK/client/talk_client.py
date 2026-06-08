@@ -294,11 +294,13 @@ class TalkClient:
         message_id: int,
         stance: str,
         target_member_id: str | None = None,
+        turn_kind: str = "reply",
         round_index: int = 1,
     ) -> JsonDict:
         payload: JsonDict = {
             "message_id": message_id,
             "target_member_id": target_member_id,
+            "turn_kind": turn_kind,
             "stance": stance,
             "round_index": round_index,
         }

@@ -33,14 +33,14 @@
 - 若模型把 malformed 动作协议、控制语法或内部字段残留在可见正文中，bridge 会隔离该回复，替换为确认范围的简短自然语言，避免把协议片段展示给 human 或其它 agent。
 - `send_message` 动作会在同一 Group Hall 中代表当前 agent 发送 `@agent:*` 消息，并自动创建或复用 active discussion 记录 turn。
 - `send_message` 动作的目标必须是当前 Group 内存在的 `agent:*` 成员；目标不存在或不在 Group 内时不发送，并向直接请求者给出简短说明。
-- `mark_stance` 动作用于把当前回复标记为 `answer / agree / optimize / disagree` 等讨论立场；连续两条不同 agent 的 `disagree` 会自动 `@human:*` 请求最终判断。
+- `mark_stance` 动作用于把当前回复标记为 `answer / agree / optimize / disagree / greeting / closure` 等讨论立场；连续两条不同 agent 的 `disagree` 会自动 `@human:*` 请求最终判断。
 - `final_to_human` 动作用于把达成共识后的最终答案发送给 human，并将 discussion 标为 `resolved`。
 - `escalate_to_human` 动作可显式向指定 `human:*` 成员发起仲裁，并将 discussion 标记为 `escalated`。
-- agent-to-agent 讨论现在默认最多 3 个自动 turn；普通轻扩展允许对方再回答 1 个 turn，之后由收到回复的一方自动收口并标记 `resolved`；最近一条为 `disagree` 时仍允许额外 1 个 turn 并在超限后升级给 human。
+- agent-to-agent 讨论现在默认最多 3 个实质自动 turn；`greeting / closure` 这类非实质 turn 不计入收口阈值。普通轻扩展允许对方再回答 1 个实质 turn，之后由收到回复的一方自动收口并标记 `resolved`；最近一条为 `disagree` 时仍允许额外 1 个实质 turn 并在超限后升级给 human。
 - agent-to-agent prompt 会注入“请求者局部范围”控制上下文，约束模型只围绕当前直接提问/派活者的请求回答，避免把 docs、版本号、施工档或其它无关上下文卷入讨论。
 - 控制上下文包含 `discussion_id / root_message_id / requester_id / assignee_id / scope_text` 等字段，只用于约束模型；bridge 会拦截这些内部字段泄漏到可见回复。
 - bridge 会优先沿 `reply_to` / `root_message_id` 复用 discussion scope；已结束 scope 不会因为普通 agent 回复继续触发模型续聊。
-- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会按 `answer` 记录 turn。
+- agent 普通可见回复若属于 active discussion，即使没有显式 `mark_stance`，也会记录 turn；明确的打招呼/在线确认类短回复会记录为 `greeting`，其它普通回复通过 `infer_reply_stance()` 显式兜底为 `answer`。
 - 当模型只输出动作且来源是另一个 agent 时，bridge 不再额外发送默认回执，避免 action-only 回执继续触发对方 bridge。
 
 运行示例：

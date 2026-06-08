@@ -120,6 +120,7 @@ CREATE TABLE discussion_turns (
   message_id       INTEGER NOT NULL REFERENCES messages(id),
   speaker_id       TEXT NOT NULL REFERENCES members(id),
   target_member_id TEXT REFERENCES members(id),
+  turn_kind        TEXT NOT NULL,      -- demand | reply
   stance           TEXT NOT NULL,      -- question | answer | agree | optimize | disagree | escalate
   round_index      INTEGER NOT NULL,
   created_at       DATETIME NOT NULL
@@ -250,10 +251,19 @@ TALK/
 ├── storage/files/         # 上传文件实体
 ├── docs/
 │   ├── PROJECT_BRIEF.md   # 本文件
-│   ├── PRODUCT.md         # PM 完整产品文档
-│   ├── MODULE_*.md        # 模块 spec
 │   ├── PROGRESS.md        # 当前进度快照
-│   └── PROGRESS_HISTORY.md # 已完成切片历史记录
+│   ├── PROGRESS_HISTORY.md # 已完成切片历史记录
+│   ├── spec/
+│   │   ├── PRODUCT.md     # PM 完整产品文档
+│   │   ├── SDK.md         # SDK 使用文档
+│   │   ├── LOCAL_LAB_DESIGN.md  # 本地多 Agent 实验室设计
+│   │   ├── INTERACTION_FRAMEWORK.md # Agent 交互框架
+│   │   └── MODULE_*.md    # 模块 spec
+│   └── guides/
+│       ├── QUICKSTART.md      # 快速启动入口索引
+│       ├── QUICKSTART_USER.md # 家庭用户快速启动
+│       ├── QUICKSTART_AGENT.md # Agent 开发者快速启动
+│       └── DEPLOY.md          # 部署指南
 └── talk.db                # SQLite 数据库（运行时生成）
 ```
 
@@ -261,17 +271,17 @@ TALK/
 
 | 模块文档 | 负责范围 | 涉及文件 | 状态 |
 |----------|----------|----------|------|
-| [MODULE_members_auth.md](MODULE_members_auth.md) | 成员注册 + API Key 鉴权 | `server/auth.py`, `server/routes/members.py` | M1 已实现，已补 `GET /api/members/me`、Agent 自注册与首轮自动化测试 |
-| [MODULE_messages.md](MODULE_messages.md) | 消息发送与拉取 | `server/routes/messages.py` | M2 已支持服务端 mention 路由解析、文件附言、历史分页、搜索、消息撤回与自动化测试 |
-| [MODULE_groups.md](MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py`, `web/`, `TALK/client/` | `GROUP-1 / HALL-1` 后端第一版已落地；Web UI 已接入 Group/Hall 切换与创建入口；SDK helper 已接入 |
-| [MODULE_discussions.md](MODULE_discussions.md) | 可记录多 Agent 讨论协议 | `server/routes/discussions.py`, `server/models.py`, `TALK/client/`, `bridges/` | `DISCUSSION-SCOPE-1` 已落地：session/turn 记录、请求者局部范围锚点、SDK helper、bridge TALK 动作协议与 pi 可选施工档 |
-| [MODULE_websocket.md](MODULE_websocket.md) | WebSocket / SSE 实时事件连接管理与推送 | `server/ws_hub.py`, `server/main.py`(WS/SSE端点) | WS 已实现；SSE 只读事件流第一版已落地 |
-| [MODULE_files.md](MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
-| [MODULE_webui.md](MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
-| [MODULE_agent_example.md](MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
-| [MODULE_bridges.md](MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
-| [MODULE_instances.md](MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
-| [MODULE_tasks.md](MODULE_tasks.md) | Agent 任务队列与调度基础 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/` | 任务创建、列表、领取、完成 API 与显式触发 schedule API 第一版已落地 |
+| [MODULE_members_auth.md](spec/MODULE_members_auth.md) | 成员注册 + API Key 鉴权 | `server/auth.py`, `server/routes/members.py` | M1 已实现，已补 `GET /api/members/me`、Agent 自注册与首轮自动化测试 |
+| [MODULE_messages.md](spec/MODULE_messages.md) | 消息发送与拉取 | `server/routes/messages.py` | M2 已支持服务端 mention 路由解析、文件附言、历史分页、搜索、消息撤回与自动化测试 |
+| [MODULE_groups.md](spec/MODULE_groups.md) | Group / Hall 房间与共享时间线作用域 | `server/routes/groups.py`, `server/routes/messages.py`, `server/models.py`, `web/`, `TALK/client/` | `GROUP-1 / HALL-1` 后端第一版已落地；Web UI 已接入 Group/Hall 切换与创建入口；SDK helper 已接入 |
+| [MODULE_discussions.md](spec/MODULE_discussions.md) | 可记录多 Agent 讨论协议 | `server/routes/discussions.py`, `server/models.py`, `TALK/client/`, `bridges/` | `DISCUSSION-SCOPE-1` 已落地：session/turn 记录、请求者局部范围锚点、SDK helper、bridge TALK 动作协议与 pi 可选施工档 |
+| [MODULE_websocket.md](spec/MODULE_websocket.md) | WebSocket / SSE 实时事件连接管理与推送 | `server/ws_hub.py`, `server/main.py`(WS/SSE端点) | WS 已实现；SSE 只读事件流第一版已落地 |
+| [MODULE_files.md](spec/MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
+| [MODULE_webui.md](spec/MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
+| [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
+| [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
+| [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
+| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列与调度基础 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/` | 任务创建、列表、领取、完成 API 与显式触发 schedule API 第一版已落地 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段
@@ -298,7 +308,7 @@ TALK/
 
 ## 2026-05-13 Local Lab Addendum
 
-- 新增 `docs/LOCAL_LAB_DESIGN.md`，用于收敛本地多 Agent 实验室阶段的设计边界。
+- 新增 `docs/spec/LOCAL_LAB_DESIGN.md`，用于收敛本地多 Agent 实验室阶段的设计边界。
 - local-lab 阶段已确认方向：Codex / Claude Code 走本地 CLI bridge；DeepSeek / Kimi 走本地 `pi` 框架 bridge；后续加入 Group、Hall、SSE、实例/调度 API 与文档编辑协调协议。
 - `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 保留 Codex 兼容入口与默认 `codex exec` 命令，`bridges/pi_bridge.py` 保留 pi 兼容入口与默认 `pi --print --mode text` 命令。
 - `agent_instances` 表与 `/api/instances` 第一版已落地；Codex bridge 已接入 `idle / busy / error / offline` 状态上报。
@@ -321,6 +331,7 @@ TALK/
 ## 2026-04-23 Data Model Addendum
 
 - `messages.reply_to INTEGER NULL REFERENCES messages(id)` was added for first-level reply/reference support.
+- `reply_to` is a UI/reference relationship only; multi-agent demand/reply state and round control live in `discussion_turns.turn_kind` and `round_index`.
 - Reply rendering is intentionally flat: only the direct parent summary is returned, with no recursive tree expansion.
 - Message REST and WebSocket payloads may now include:
   - `reply_to.id`
@@ -344,8 +355,8 @@ TALK/
 
 ## 2026-04-24 Onboarding Docs Addendum
 
-- `docs/QUICKSTART.md` 现已降为入口索引页，分别指向家庭用户与 Agent 开发者两份独立快速启动文档
-- 新增 `docs/QUICKSTART_USER.md`：面向家庭新手，只走 Docker Desktop + 浏览器路径
-- 新增 `docs/QUICKSTART_AGENT.md`：面向 Agent 开发者，只走 Python bare metal + SDK 路径
-- `docs/SDK.md` 的异步示例现已补齐 `asyncio.run(main())` 包装，可直接复制到 `.py` 文件运行
+- `docs/guides/QUICKSTART.md` 现已降为入口索引页，分别指向家庭用户与 Agent 开发者两份独立快速启动文档
+- 新增 `docs/guides/QUICKSTART_USER.md`：面向家庭新手，只走 Docker Desktop + 浏览器路径
+- 新增 `docs/guides/QUICKSTART_AGENT.md`：面向 Agent 开发者，只走 Python bare metal + SDK 路径
+- `docs/spec/SDK.md` 的异步示例现已补齐 `asyncio.run(main())` 包装，可直接复制到 `.py` 文件运行
 - 首次管理员引导页的 `api_key` 输入已支持浏览器端安全随机生成、显隐切换与一键复制，新手无需手动编造登录密钥

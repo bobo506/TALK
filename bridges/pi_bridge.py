@@ -15,28 +15,44 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from bridges import cli_bridge
 
-DEFAULT_SYSTEM_PROMPT = (
-    "你是 TALK Group Hall 里的 pi，是群聊参与者，不是 TALK 管理员或说明书。按用户语言自然回复。"
-    "你可以与人类和其他 agent 交流，评审方案，提出优化或分歧，并在需要时输出 TALK 动作标签。"
-    "默认讨论模式下不要声称能读取项目文件、执行本机命令或编辑文件；只有启动施工档时才可使用工具。"
-    "动作只用安全行协议输出，格式是 TALK_ACTION 动作名 参数 正文。"
-    "联系其他 agent 用 TALK_ACTION send_message to=agent:name stance=question body=消息。"
-    "表达立场用 TALK_ACTION mark_stance stance=agree。"
-    "给人类最终答案用 TALK_ACTION final_to_human to=human:bobo body=答案。"
-    "需要人类判断用 TALK_ACTION escalate_to_human to=human:bobo body=问题。"
-    "立场可用 question、answer、agree、optimize、disagree、escalate。"
-    "动作行不要解释给用户，不要把动作名当正文说出来。"
-    "不要输出 Language 语言标签。"
-)
-DEFAULT_PI_COMMAND = (
+# ---------------------------------------------------------------------------
+# pi 扩展路径（talk_send 工具）
+# 用正斜杠避免 Windows 反斜杠被 shlex.split(posix=True) 当成转义符
+# ---------------------------------------------------------------------------
+_TALK_EXTENSION_PATH = str(PROJECT_ROOT / "bridges" / "talk_tools_extension.ts").replace("\\", "/")
+
+# ---------------------------------------------------------------------------
+# 系统层 prompt：角色、输出通道、单轮语义与反工具幻觉约束。
+# 工具能力说明由 pi runtime 的 extension/tool catalog 注入。
+# ---------------------------------------------------------------------------
+DEFAULT_SYSTEM_PROMPT = cli_bridge.FUNCTION_CALLING_SYSTEM_PROMPT
+
+# ---------------------------------------------------------------------------
+# pi 命令模板
+# ---------------------------------------------------------------------------
+# 旧文本协议命令（保留作过渡兼容）
+DEFAULT_PI_COMMAND_LEGACY = (
     "pi --print --mode text --no-context-files --no-tools --no-session --thinking off "
     f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
 )
+# 施工档命令（文件工具启用）
 DEFAULT_PI_TOOLS_COMMAND = (
-    "pi --print --mode text --no-context-files --no-session --thinking off "
+    "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
     "--tools read,grep,find,ls,bash,edit,write "
     f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
 )
+# 当前默认命令：function-calling 模式
+# --no-builtin-tools  禁用 read/bash/edit/write 等(LLM 表面只剩 talk_send)
+# --no-extensions     禁用自动发现扩展(规避 plan-mode 在 rebindSession 中
+#                     setActiveTools(NORMAL_MODE_TOOLS) 覆盖 talk_send 的 bug)
+# --extension <path>  显式加载我们自己的 talk_tools_extension.ts 不受 -ne 影响
+DEFAULT_PI_COMMAND = (
+    f"pi --print --mode text --no-context-files --no-builtin-tools --no-extensions "
+    f"--tools talk_send --no-session --thinking off "
+    f"--extension {_TALK_EXTENSION_PATH} "
+    f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
+)
+
 DEFAULT_TIMEOUT_SEC = cli_bridge.DEFAULT_TIMEOUT_SEC
 DEFAULT_MAX_REPLY_CHARS = cli_bridge.DEFAULT_MAX_REPLY_CHARS
 DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL
@@ -46,6 +62,11 @@ async def run_bridge(args: argparse.Namespace) -> None:
     if args.pi_execution_profile == "tools" and args.pi_command == DEFAULT_PI_COMMAND:
         args.pi_command = DEFAULT_PI_TOOLS_COMMAND
     args.command = args.pi_command
+    # 把 TALK 连接信息注入环境变量，供 talk_tools_extension.ts 使用
+    # 每个 bridge 实例必须用自己的 key/url/id，不能复用其他实例的旧值
+    os.environ["TALK_API_KEY"] = args.key
+    os.environ["TALK_BASE_URL"] = args.base_url
+    os.environ["TALK_MEMBER_ID"] = cli_bridge.member_id_from_name(args.name)
     await cli_bridge.run_bridge(args)
 
 

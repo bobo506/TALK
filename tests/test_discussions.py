@@ -63,7 +63,7 @@ class DiscussionRouteTests(RouteTestCase):
                 json={
                     "message_id": first.id,
                     "target_member_id": "agent:pi",
-                    "stance": "question",
+                    "stance": "greeting",
                     "round_index": 1,
                 },
             )
@@ -73,7 +73,7 @@ class DiscussionRouteTests(RouteTestCase):
                 json={
                     "message_id": second.id,
                     "target_member_id": "agent:codex",
-                    "stance": "optimize",
+                    "stance": "closure",
                     "round_index": 1,
                 },
             )
@@ -88,7 +88,48 @@ class DiscussionRouteTests(RouteTestCase):
             payload = turns.json()
             self.assertEqual([turn["turn_index"] for turn in payload], [1, 2])
             self.assertEqual([turn["message_id"] for turn in payload], [first.id, second.id])
-            self.assertEqual([turn["stance"] for turn in payload], ["question", "optimize"])
+            self.assertEqual([turn["stance"] for turn in payload], ["greeting", "closure"])
+            self.assertEqual([turn["turn_kind"] for turn in payload], ["reply", "reply"])
+
+    def test_append_turn_accepts_explicit_demand_kind(self):
+        message = self.add_message(
+            from_id=self.agent_codex.id,
+            to_ids=json.dumps([self.agent_pi.id]),
+            group_id="group:lab",
+            message_type="text",
+            content="@agent:pi 请确认接口方案",
+        )
+
+        with self.make_client() as client:
+            created = client.post(
+                "/api/discussions",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "group_id": "group:lab",
+                    "topic": "接口方案",
+                    "participant_ids": ["agent:codex", "agent:pi"],
+                    "root_message_id": message.id,
+                },
+            )
+            self.assertEqual(created.status_code, 201)
+            discussion_id = created.json()["id"]
+
+            turn = client.post(
+                f"/api/discussions/{discussion_id}/turns",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "message_id": message.id,
+                    "target_member_id": "agent:pi",
+                    "stance": "question",
+                    "turn_kind": "demand",
+                    "round_index": 2,
+                },
+            )
+
+        self.assertEqual(turn.status_code, 201)
+        payload = turn.json()
+        self.assertEqual(payload["turn_kind"], "demand")
+        self.assertEqual(payload["round_index"], 2)
 
     def test_non_group_member_cannot_create_or_read_discussion(self):
         with self.make_client() as client:

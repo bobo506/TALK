@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import html
+import json
 import locale
 import os
 import re
@@ -13,6 +15,7 @@ import shlex
 import shutil
 import socket
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -24,8 +27,20 @@ if str(PROJECT_ROOT) not in sys.path:
 
 RESPONSE_STYLE_INSTRUCTIONS = (
     "Match the scope of the user's request. For a simple presence check, greeting, or acknowledgement request, "
-    "reply in one short sentence only, for example '<agent id> 在线。'. "
+    "reply in one short sentence only. "
     "Do not inspect project files, summarize project progress, or produce status tables unless the user explicitly asks for that.\n"
+)
+FUNCTION_CALLING_SYSTEM_PROMPT = (
+    "你是 TALK 群里的一个 agent。\n"
+    "工具:以 runtime 注入的工具清单为准。"
+    "除清单外的工具(读文件、列目录、跑 shell、上网、记忆库等)在本会话不存在,"
+    "不要规划任何依赖它们的步骤。\n"
+    "输出通道:对当前发件人的可见回复 + 调用清单内的工具。\n"
+    "运行时:本会话单轮一次性运行。这一轮要么调用工具完成动作,要么直接给出最终回复。"
+    "不要说'我接下来要…/让我先…/稍后…',因为不存在下一轮。\n"
+    "回复风格:直接说要说的内容(问候、问题、答案、看法、感受)。"
+    "不要写'已经XX了/已经打过招呼了/已经回复了/已经发送了'这类元叙述——"
+    "你说出口就是动作本身,无需汇报。也不要在 visible reply 里复述刚才发生的事。"
 )
 DISCUSSION_PROTOCOL_INSTRUCTIONS = (
     "You are a participant in a TALK Group Hall, not a TALK administrator or user manual. "
@@ -82,9 +97,20 @@ SAFE_ACTION_RE = re.compile(
 )
 SAFE_ACTION_ATTR_RE = re.compile(r"\b([a-zA-Z_][\w-]*)=([^\s]+)")
 ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human", "final_to_human"}
-ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate"}
+ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
 DISCUSSION_MAX_AUTO_TURNS = 3
 DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
+NON_SUBSTANTIVE_STANCES = {"greeting", "closure"}
+CLOSURE_LINES = (
+    "那这次就先聊到这儿，有需要再喊我。",
+    "好的，这轮先告一段落，回头有事群里找我。",
+    "嗯，先这样，有新的再说。",
+    "行，这次就到这里，需要的话再开个话题。",
+    "好，先收个尾，之后有事随时 @ 我。",
+    "可以，这轮先打住，后面有需要再继续。",
+)
+GREETING_SCOPE_MARKERS = ("打招呼", "打个招呼", "打声招呼", "问好", "确认在线", "在线状态", "互相认识", "认识一下")
+GREETING_REPLY_MARKERS = ("你好", "在线", "收到", "见到你", "认识你")
 INTERNAL_SCOPE_MARKERS = (
     "discussion_id",
     "root_message_id",
@@ -200,6 +226,44 @@ def first_sentence(text: str, *, max_chars: int = 240) -> str:
     return compact
 
 
+def _compact_text(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _is_short_text(text: str, *, max_chars: int = 80) -> bool:
+    return len(_compact_text(text)) <= max_chars
+
+
+def _is_greeting_like(text: str) -> bool:
+    compact = _compact_text(text)
+    if not compact:
+        return False
+    lowered = compact.lower()
+    return any(marker in compact for marker in GREETING_REPLY_MARKERS) or any(
+        marker in lowered for marker in ("hello", "hi ", "hi,", "hey", "online")
+    )
+
+
+def _is_greeting_scope(text: str) -> bool:
+    compact = _compact_text(text)
+    lowered = compact.lower()
+    return any(marker in compact for marker in GREETING_SCOPE_MARKERS) or any(
+        marker in lowered for marker in ("say hello", "greet", "check online")
+    )
+
+
+def infer_reply_stance(task_text: str, visible_reply: str) -> str:
+    if _is_greeting_scope(task_text) and _is_short_text(visible_reply) and _is_greeting_like(visible_reply):
+        return "greeting"
+    return "answer"
+
+
+def infer_discussion_stance(task_text: str, visible_reply: str, *, default: str = "answer") -> str:
+    if infer_reply_stance(task_text, visible_reply) == "greeting":
+        return "greeting"
+    return default or "answer"
+
+
 def contains_cjk(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in text)
 
@@ -258,6 +322,49 @@ def sanitize_visible_reply(text: str) -> str:
     if contains_control_protocol_residue(text):
         return "我需要先确认当前请求范围后再继续。"
     return text
+
+
+def _substantive_discussion_turns(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [turn for turn in turns if str(turn.get("stance") or "") not in NON_SUBSTANTIVE_STANCES]
+
+
+def _max_demand_round(turns: list[dict[str, Any]]) -> int:
+    max_round = 0
+    for turn in turns:
+        if str(turn.get("turn_kind") or "reply") != "demand":
+            continue
+        try:
+            max_round = max(max_round, int(turn.get("round_index") or 1))
+        except (TypeError, ValueError):
+            max_round = max(max_round, 1)
+    return max_round
+
+
+def _next_demand_round(turns: list[dict[str, Any]]) -> int:
+    return _max_demand_round(turns) + 1
+
+
+def _can_create_deferred_file(
+    *,
+    group_id: str | None,
+    sender_id: str,
+    message: dict[str, Any],
+    discussion: dict[str, Any] | None,
+    turns: list[dict[str, Any]],
+) -> bool:
+    if not group_id:
+        return False
+    if not sender_id.startswith("agent:"):
+        return True
+    if discussion is None:
+        return _message_reply_to_id(message) is None
+    return _max_demand_round(turns) < 2
+
+
+def _pick_closure_line(responder_id: str) -> str:
+    digest = hashlib.sha256(responder_id.encode("utf-8")).digest()
+    index = int.from_bytes(digest[:2], "big") % len(CLOSURE_LINES)
+    return CLOSURE_LINES[index]
 
 
 def _parse_action_attrs(raw_attrs: str) -> dict[str, str]:
@@ -499,18 +606,31 @@ async def _append_discussion_turn(
     message_id: int | None,
     stance: str,
     target_member_id: str | None = None,
+    turn_kind: str = "reply",
     round_index: int = 1,
 ) -> bool:
     if discussion_id is None or message_id is None:
         return False
     try:
-        await client.append_discussion_turn(
-            discussion_id,
-            message_id=message_id,
-            stance=stance,
-            target_member_id=target_member_id,
-            round_index=round_index,
-        )
+        try:
+            await client.append_discussion_turn(
+                discussion_id,
+                message_id=message_id,
+                stance=stance,
+                target_member_id=target_member_id,
+                turn_kind=turn_kind,
+                round_index=round_index,
+            )
+        except TypeError as exc:
+            if "turn_kind" not in str(exc):
+                raise
+            await client.append_discussion_turn(
+                discussion_id,
+                message_id=message_id,
+                stance=stance,
+                target_member_id=target_member_id,
+                round_index=round_index,
+            )
         return True
     except AttributeError:
         return False
@@ -563,6 +683,271 @@ async def _group_member_ids(client: Any, group_id: str | None) -> set[str] | Non
     return {str(member.get("member_id") or "") for member in group.get("members") or []}
 
 
+# ----------------------------------------------------------------------------
+# 临时诊断工具：TALK_DUMP_PROMPT=1 时把 pi spawn 前的完整 prompt 写到日志
+# 用完即移除，不应进入正式发布
+# ----------------------------------------------------------------------------
+_DIAGNOSTIC_DUMP_PATH = Path(os.environ.get("TALK_DUMP_PROMPT_FILE", "logs/pi_prompt_dump.log"))
+
+
+def _dump_diagnostic(line: str) -> None:
+    """Append a single diagnostic line (no full prompt). Best-effort, never raises."""
+    try:
+        _DIAGNOSTIC_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(_DIAGNOSTIC_DUMP_PATH, "a", encoding="utf-8") as f:
+            from datetime import datetime
+            f.write(f"[{datetime.now().isoformat(timespec='seconds')}] {line}\n")
+    except Exception:
+        pass
+
+
+def _dump_prompt(
+    *,
+    member_id: str,
+    message_id: str,
+    sender: str,
+    group_id: str | None,
+    group_member_context: str,
+    runtime: str,
+    decision_tier: str,
+    prompt: str,
+) -> None:
+    """Append the full prompt that's about to be sent to the LLM CLI. Best-effort, never raises."""
+    try:
+        _DIAGNOSTIC_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        from datetime import datetime
+        with open(_DIAGNOSTIC_DUMP_PATH, "a", encoding="utf-8") as f:
+            f.write("\n" + "=" * 78 + "\n")
+            f.write(f"timestamp        : {datetime.now().isoformat(timespec='seconds')}\n")
+            f.write(f"member_id        : {member_id}\n")
+            f.write(f"runtime          : {runtime}\n")
+            f.write(f"decision_tier    : {decision_tier}\n")
+            f.write(f"incoming msg id  : {message_id}\n")
+            f.write(f"sender           : {sender}\n")
+            f.write(f"group_id         : {group_id!r}\n")
+            f.write(f"group_member_ctx : {'(EMPTY!)' if not group_member_context else f'({len(group_member_context)} chars)'}\n")
+            f.write("-" * 78 + "\n")
+            f.write("FULL PROMPT (between <<<PROMPT and PROMPT>>> markers):\n")
+            f.write("<<<PROMPT\n")
+            f.write(prompt)
+            if not prompt.endswith("\n"):
+                f.write("\n")
+            f.write("PROMPT>>>\n")
+            f.write("=" * 78 + "\n")
+    except Exception:
+        pass
+
+
+async def _read_and_execute_deferred_actions(
+    filepath: str,
+    *,
+    client: Any,
+    group_id: str | None,
+    reply_to: int | None = None,
+    current_turn_count: int = 0,
+    max_auto_turns: int = DISCUSSION_MAX_AUTO_TURNS,
+) -> list[dict[str, Any]]:
+    """读取 JSONL 延迟文件，用 TALK SDK 逐条执行 talk_send。
+
+    返回每条的执行结果（ok / skipped / target / message_id / error）。
+    文件不存在或读不到有效行不报错，返回空列表。
+
+    Turn limit 刹车：
+    - greeting / answer / agree / closure 类型的 talk_send，current_turn_count >= max_auto_turns 时跳过
+    - question / disagree 类型不受 turn limit 限制
+    - 无 stance 视为 greeting（保守策略）
+    """
+    results: list[dict[str, Any]] = []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    action = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if action.get("tool") != "talk_send":
+                    continue
+                target = str(action.get("target", "")).strip()
+                body = str(action.get("body", "")).strip()
+                stance = str(action.get("stance", "greeting")).strip().lower() or "greeting"
+                act_group_id = action.get("group_id") or group_id
+                if not target or not body:
+                    continue
+                # ---- turn limit 刹车 ----
+                if stance in ("greeting", "answer", "agree", "closure"):
+                    if current_turn_count >= max_auto_turns:
+                        results.append({
+                            "ok": False, "skipped": True, "target": target, "stance": stance,
+                            "reason": f"turn limit ({current_turn_count} >= {max_auto_turns})",
+                        })
+                        continue
+                try:
+                    result = await client.send_text(
+                        to=[target],
+                        text=f"@{target} {body}",
+                        reply_to=reply_to,
+                        group_id=act_group_id,
+                    )
+                    msg_id = result.get("id") if isinstance(result, dict) else None
+                    results.append({"ok": True, "target": target, "message_id": msg_id, "stance": stance})
+                except Exception as exc:
+                    results.append({"ok": False, "target": target, "error": str(exc), "stance": stance})
+    except FileNotFoundError:
+        pass
+    return results
+
+
+async def _record_deferred_demand_turns(
+    results: list[dict[str, Any]],
+    *,
+    client: Any,
+    group_id: str | None,
+    member_id: str,
+    discussion: dict[str, Any] | None,
+    turns: list[dict[str, Any]],
+    task_text: str,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    if not group_id:
+        return discussion, turns
+
+    current_discussion = discussion
+    current_turns = list(turns)
+    for result in results:
+        if not result.get("ok") or result.get("skipped"):
+            continue
+        target = str(result.get("target") or "")
+        message_id = result.get("message_id")
+        if not target or message_id is None:
+            continue
+        demand_round = min(_next_demand_round(current_turns), 2)
+        discussion_id = int(current_discussion["id"]) if current_discussion and current_discussion.get("id") is not None else None
+        if discussion_id is None:
+            discussion_id = await _resolve_discussion_id(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=target,
+                topic=_discussion_topic_from_text(task_text),
+                create_if_missing=True,
+                root_message_id=int(message_id),
+                requester_id=member_id,
+                assignee_id=target,
+                scope_text=task_text,
+            )
+            if discussion_id is not None:
+                try:
+                    current_discussion = await client.get_discussion(discussion_id)
+                except AttributeError:
+                    current_discussion = {
+                        "id": discussion_id,
+                        "status": "active",
+                        "topic": _discussion_topic_from_text(task_text),
+                        "participant_ids": [member_id, target],
+                        "root_message_id": int(message_id),
+                        "requester_id": member_id,
+                        "assignee_id": target,
+                        "scope_text": task_text,
+                    }
+        appended = await _append_discussion_turn(
+            client,
+            discussion_id=discussion_id,
+            message_id=int(message_id),
+            stance=str(result.get("stance") or "question"),
+            target_member_id=target,
+            turn_kind="demand",
+            round_index=demand_round,
+        )
+        if appended:
+            current_turns.append(
+                {
+                    "message_id": int(message_id),
+                    "speaker_id": member_id,
+                    "target_member_id": target,
+                    "turn_kind": "demand",
+                    "stance": str(result.get("stance") or "question"),
+                    "round_index": demand_round,
+                }
+            )
+    return current_discussion, current_turns
+
+
+async def _build_group_member_context(
+    client: Any,
+    group_id: str | None,
+    member_id: str,
+    sender: str = "",
+) -> str:
+    """Build group member list and role context for prompt injection.
+
+    All "no list available" paths now return an explicit anti-hallucination
+    notice instead of an empty string, because empty prompts caused pi/codex
+    to invent fictitious member names (orchestrator / oracle / dan / sage ...)
+    when calling talk_send.
+    """
+    def _no_list_fallback(reason: str) -> str:
+        sender_hint = (
+            f"如需回复，目标只能是当前消息的发件人 {sender}。"
+            if sender
+            else "如需回复，目标只能是当前消息的发件人。"
+        )
+        return (
+            "\n[当前群成员清单 — 不可用]\n"
+            f"{reason}\n"
+            "严格禁止凭想象列出或向任何未经清单确认的 member_id 调用 talk_send。"
+            "特别注意：agent:orchestrator / agent:oracle / agent:dan / agent:sage "
+            "/ agent:trace / agent:omni / agent:review 等常见 multi-agent 框架角色名"
+            "在本系统中默认不存在，禁止凭印象使用。\n"
+            f"{sender_hint}\n"
+            "本条消息不要调用 talk_send 工具转发给其它成员。\n"
+        )
+
+    if not group_id:
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_diagnostic(
+                f"_build_group_member_context: group_id is None/empty (P2P scope); "
+                f"emitting no-list fallback for member_id={member_id}"
+            )
+        return _no_list_fallback("本条消息不在任何群组上下文中（P2P 私聊场景）。")
+
+    try:
+        group = await client.get_group(group_id)
+    except Exception as exc:
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_diagnostic(
+                f"_build_group_member_context: get_group({group_id!r}) raised "
+                f"{type(exc).__name__}: {exc}; emitting no-list fallback"
+            )
+        return _no_list_fallback(
+            f"查询群成员清单失败（group_id={group_id}），清单暂不可用。"
+        )
+
+    members = group.get("members") or []
+    member_lines: list[str] = []
+    for m in members:
+        mid = str(m.get("member_id") or "")
+        display = str(m.get("display_name") or "")
+        if display and display != mid:
+            member_lines.append(f"  {mid}（{display}）")
+        else:
+            member_lines.append(f"  {mid}")
+
+    if not member_lines:
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_diagnostic(
+                f"_build_group_member_context: group {group_id!r} has no visible members; "
+                f"emitting no-list fallback for member_id={member_id}"
+            )
+        return _no_list_fallback(f"群 {group_id} 当前无可见成员。")
+
+    # 正常路径：返回紧凑逗号分隔名单，同时写入环境变量供扩展使用
+    mids = [str(m.get("member_id") or "") for m in members]
+    os.environ["TALK_GROUP_MEMBERS"] = ",".join(mids)
+    return f"群成员：{', '.join(mids)}。\n"
+
+
 async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:
     if discussion_id is None:
         return
@@ -606,6 +991,7 @@ async def _maybe_escalate_disagreement(
         message_id=int(message["id"]),
         stance="escalate",
         target_member_id=human_id,
+        turn_kind="demand",
         round_index=2,
     )
     await _update_discussion_status(client, discussion_id, "escalated")
@@ -782,7 +1168,6 @@ def _discussion_context_text(
     root_message_id = discussion.get("root_message_id")
     latest = turns[-1].get("stance") if turns else "question"
     remaining = max(0, DISCUSSION_MAX_AUTO_TURNS - len(turns))
-    human_hint = human_id or "human:bobo"
     return (
         "TALK 控制上下文，以下内容只用于约束回复，不要在可见回复中复述字段名或 ID：\n"
         f"discussion_id: {discussion_id}\n"
@@ -799,7 +1184,7 @@ def _discussion_context_text(
         "可以补充必要上下文、指出风险或提出确认问题，但不能把话题迁移到无关任务。"
         "如果想引申但不确定是否仍在范围内，先向 requester_id 追问确认。"
         "不要展示 discussion_id、root_message_id、requester_id、assignee_id、scope_text、TALK_SCOPE 或控制上下文。"
-        f"确需向人类裁决时用 TALK_ACTION escalate_to_human to={human_hint} body=裁决问题。"
+        "确需向人类裁决时用 talk_send target=human 或 TALK_ACTION escalate_to_human to=human 告知裁决问题。"
     )
 
 
@@ -837,15 +1222,16 @@ async def _send_agent_scope_closure(
     responder_id: str,
     target_agent_id: str,
 ) -> bool:
-    text = f"收到。这个扩展先停在这里；如果还需要我继续判断，请在群里 @{responder_id} 另开请求。"
+    text = _pick_closure_line(responder_id)
     message = await client.reply(reply_to, text=text, to=[target_agent_id], group_id=group_id)
     message_id = int(message["id"]) if message and message.get("id") is not None else None
     await _append_discussion_turn(
         client,
         discussion_id=discussion_id,
         message_id=message_id,
-        stance="answer",
+        stance="closure",
         target_member_id=target_agent_id,
+        turn_kind="reply",
         round_index=2,
     )
     await _update_discussion_status(client, discussion_id, "resolved")
@@ -906,13 +1292,16 @@ async def execute_talk_actions(
                     assignee_id=target,
                     scope_text=action_body,
                 )
+            existing_turns = await _list_discussion_turns(client, discussion_id)
+            demand_round = action.round_index or min(_next_demand_round(existing_turns), 2)
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
                 message_id=int(sent["id"]),
-                stance=action.stance or "question",
+                stance=infer_discussion_stance(task_text, action_body, default=action.stance or "question"),
                 target_member_id=target,
-                round_index=action.round_index or 1,
+                turn_kind="demand",
+                round_index=demand_round,
             )
             summaries.append(f"sent message to {target}")
         elif action.action_type == "escalate_to_human":
@@ -942,6 +1331,7 @@ async def execute_talk_actions(
                 message_id=int(sent["id"]),
                 stance="escalate",
                 target_member_id=target,
+                turn_kind="demand",
                 round_index=action.round_index or 2,
             )
             await _update_discussion_status(client, discussion_id, "escalated")
@@ -976,6 +1366,7 @@ async def execute_talk_actions(
                 message_id=int(sent["id"]),
                 stance=action.stance or "answer",
                 target_member_id=target,
+                turn_kind="reply",
                 round_index=action.round_index or 1,
             )
             await _update_discussion_status(client, discussion_id, "resolved")
@@ -1053,6 +1444,10 @@ def should_handle_message(
     return recipients is None and respond_to_broadcast
 
 
+def _decision_tier_line(tier: str) -> str:
+    return "决策 Agent" if tier == "decision" else "执行 Agent"
+
+
 def build_cli_prompt(
     message: dict[str, Any],
     *,
@@ -1060,19 +1455,43 @@ def build_cli_prompt(
     workdir: Path,
     runtime: str = "cli",
     discussion_context: str | None = None,
+    decision_tier: str = "execution",
+    group_member_context: str = "",
 ) -> str:
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
     context_block = f"\n\n{discussion_context}" if discussion_context else ""
-    if runtime.lower() == "pi" or member_id == "agent:pi":
-        return f"{task}{context_block}"
+    tier_line = _decision_tier_line(decision_tier)
+    sender = message.get("from") or "unknown"
+
+    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
+        # 身份在 per-call 注入,系统层是静态文本无法区分 pi / pi-kimi 等同进程不同实例。
+        # 写法刻意紧凑:身份和任务同一行,避免占据独立首行让模型陷入"自我介绍"模式,
+        # 把"对你说"的动词淡化(2026-06-06 黑盒实测:独立首行 + 括号注释会让 pi 忽略任务,
+        # 改成"已就位,有什么需要帮忙"式空回应)。
+        #
+        # discussion_context 在此**故意不注入**:那段 600+ 字的"TALK 控制上下文"
+        # (assignee_id / requester_id / scope_text / remaining_auto_turns 等)是 5.x
+        # 之前 scenario-1 scope 严格化时为"任务式讨论"设计的,在 function-calling +
+        # 方案 D 账本的当前架构下完全冗余 —— round_index 刹车由 bridge 的
+        # _can_create_deferred_file 自动执行,模型不需要看到协议字段。2026-06-06 黑盒
+        # 实测:注入这段会让闲聊场景产生"已经XX啦"式元叙述(模型把寒暄当成 assignee
+        # 完成的 request),信噪比被 10x 压垮。其他 runtime(legacy 文本协议)仍保留,
+        # 兼容由下方分支承担。
+        parts = [f"你是 {member_id}。{sender} 对你说:{task}"]
+        member_line = group_member_context.strip()
+        if member_line:
+            parts.append(member_line)
+        return "\n".join(parts)
 
     sender = message.get("from") or "unknown"
     message_id = message.get("id") or "unknown"
     group_id = message.get("group_id")
     group_line = f"TALK group id: {group_id}\n" if group_id else ""
     return (
-        f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
+        f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
+        f"{tier_line}\n"
+        f"{group_member_context}"
         f"Project root: {workdir}\n"
         "Answer the user's task. Keep the final response suitable for posting back into TALK.\n"
         f"{RESPONSE_STYLE_INSTRUCTIONS}"
@@ -1092,18 +1511,24 @@ def build_cli_task_prompt(
     member_id: str,
     workdir: Path,
     runtime: str = "cli",
+    decision_tier: str = "execution",
 ) -> str:
     content = str(task.get("content") or "").strip()
     title = str(task.get("title") or "").strip()
+    tier_line = _decision_tier_line(decision_tier)
 
-    if runtime.lower() == "pi" or member_id == "agent:pi":
-        return f"标题：{title}\n\n{content}" if title else content
+    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
+        creator = task.get("created_by") or "unknown"
+        task_text = f"{title}\n{content}" if title else content
+        # 任务路径同样注入身份(紧凑写法,理由同 build_cli_prompt)。
+        return f"你是 {member_id}。{creator} 对你说:{task_text}"
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"
     title_block = f"Title: {title}\n" if title else ""
     return (
-        f"You are {member_id}, a {runtime} CLI agent connected to TALK.\n"
+        f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
+        f"{tier_line}\n"
         f"Project root: {workdir}\n"
         "Answer the queued Agent task. Keep the final response suitable for posting back into TALK.\n"
         f"{RESPONSE_STYLE_INSTRUCTIONS}"
@@ -1204,6 +1629,7 @@ async def handle_queued_task(
     runtime: str = "cli",
     bridge_label: str = "CLI bridge",
     prompt_transport: str = "stdin",
+    decision_tier: str = "execution",
 ) -> bool:
     """Claim and execute one queued task. Returns False when another worker claimed it first."""
     from TALK.client.exceptions import TalkValidationError
@@ -1217,7 +1643,7 @@ async def handle_queued_task(
         raise
 
     task_text = str(claimed.get("content") or "")
-    prompt = build_cli_task_prompt(claimed, member_id=member_id, workdir=workdir, runtime=runtime)
+    prompt = build_cli_task_prompt(claimed, member_id=member_id, workdir=workdir, runtime=runtime, decision_tier=decision_tier)
     result_message_id: int | None = None
     completion_status = "succeeded"
     last_error: str | None = None
@@ -1279,6 +1705,7 @@ async def handle_incoming_message(
     prompt_transport: str = "stdin",
     send_ack: bool = False,
     report_status: Any | None = None,
+    decision_tier: str = "execution",
 ) -> None:
     sender = message.get("from")
     if not sender:
@@ -1289,6 +1716,7 @@ async def handle_incoming_message(
     if report_status is not None:
         await report_status("busy", current_task_id=task_id)
 
+    deferred_file: str | None = None
     try:
         if send_ack:
             await client.reply(
@@ -1306,6 +1734,7 @@ async def handle_incoming_message(
         discussion: dict[str, Any] | None = None
         turns: list[dict[str, Any]] = []
         discussion_context = ""
+        discussion_turn_count: int = 0
         if sender_id.startswith("agent:") and group_id:
             scope_context = await _discussion_scope_for_incoming_agent_message(
                 client,
@@ -1323,7 +1752,13 @@ async def handle_incoming_message(
             turns = scope_context.turns
             discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
-            if discussion_id is not None and latest_stance == "disagree" and len(turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS:
+            substantive_turns = _substantive_discussion_turns(turns)
+            discussion_turn_count = len(substantive_turns)
+            if (
+                discussion_id is not None
+                and latest_stance == "disagree"
+                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+            ):
                 await _send_human_escalation(
                     client,
                     discussion_id=discussion_id,
@@ -1334,7 +1769,11 @@ async def handle_incoming_message(
                 if report_status is not None:
                     await report_status("idle")
                 return
-            if discussion_id is not None and latest_stance != "disagree" and len(turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS:
+            if (
+                discussion_id is not None
+                and latest_stance != "disagree"
+                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+            ):
                 await _send_agent_scope_closure(
                     client,
                     discussion_id=discussion_id,
@@ -1356,13 +1795,50 @@ async def handle_incoming_message(
                 human_id=await _find_human_reviewer(client, group_id),
             )
 
+        group_member_context = await _build_group_member_context(client, group_id, member_id, sender=str(sender))
+
+        # 5.5：元数据走环境变量，不放 prompt。空值不设，避免扩展误判
+        if group_id:
+            os.environ["TALK_GROUP_ID"] = group_id
+        else:
+            os.environ.pop("TALK_GROUP_ID", None)
+        os.environ["TALK_DECISION_TIER"] = decision_tier
+
+        # 5.5 方案 D：reply_to 只作为 UI 引用；需求轮次由 discussion_turns.turn_kind 账本判断。
+        # 整个 active discussion 最多允许 round_index=2 的 demand，之后不再暴露 talk_send。
+        talk_send_allowed = _can_create_deferred_file(
+            group_id=group_id,
+            sender_id=sender_id,
+            message=message,
+            discussion=discussion,
+            turns=turns,
+        )
+        if talk_send_allowed:
+            fd, deferred_path = tempfile.mkstemp(suffix=".jsonl", prefix="talk_deferred_")
+            os.close(fd)
+            os.environ["TALK_DEFERRED_FILE"] = deferred_path
+            deferred_file = deferred_path
+
         prompt = build_cli_prompt(
             message,
             member_id=member_id,
             workdir=workdir,
             runtime=runtime,
             discussion_context=discussion_context,
+            decision_tier=decision_tier,
+            group_member_context=group_member_context,
         )
+        if os.environ.get("TALK_DUMP_PROMPT") == "1":
+            _dump_prompt(
+                member_id=member_id,
+                message_id=str(message.get("id") or ""),
+                sender=str(message.get("from") or ""),
+                group_id=group_id,
+                group_member_context=group_member_context,
+                runtime=runtime,
+                decision_tier=decision_tier,
+                prompt=prompt,
+            )
         result = await run_cli_command(
             command,
             prompt,
@@ -1370,6 +1846,14 @@ async def handle_incoming_message(
             timeout=timeout,
             prompt_transport=prompt_transport,
         )
+        # 诊断：function-calling 模式下，工具调用由 LLM 扩展内部处理
+        # bridge 只读取 stdout 作为可见回复；TALK_ACTION 文本协议解析继续共存
+        if os.environ.get("TALK_DUMP_PROMPT") == "1" and result.returncode == 0:
+            raw_output = (result.stdout or "").strip()
+            _dump_diagnostic(
+                f"LLM raw output ({len(raw_output)} chars, ends with '"
+                f"{raw_output[-80:] if len(raw_output) > 80 else raw_output}')"
+            )
         reply = format_cli_reply(
             result,
             max_chars=max_reply_chars,
@@ -1380,6 +1864,48 @@ async def handle_incoming_message(
             reply = normalize_pi_reply_language(task_text, reply)
         visible_reply, actions = parse_talk_actions(reply)
         visible_reply = sanitize_visible_reply(visible_reply)
+        mark_actions = [action for action in actions if action.action_type == "mark_stance"]
+        has_final_action = any(action.action_type == "final_to_human" for action in actions)
+
+        # Reply to sender FIRST, before executing any TALK_ACTION side effects
+        reply_message_id: int | None = None
+        if visible_reply:
+            reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
+            reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
+            if sender_id.startswith("agent:") and discussion and not mark_actions:
+                await _append_discussion_turn(
+                    client,
+                    discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
+                    message_id=reply_message_id,
+                    stance=infer_reply_stance(task_text, visible_reply),
+                    target_member_id=sender_id,
+                    turn_kind="reply",
+                    round_index=1,
+                )
+
+        # 5.5 方案 D：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）。
+        # reply_to 只保留 UI 引用；需求轮次写入 discussion_turns 账本。
+        deferred_results: list[dict[str, Any]] = []
+        if deferred_file:
+            current_msg_id = int(message["id"]) if message.get("id") is not None else None
+            deferred_results = await _read_and_execute_deferred_actions(
+                deferred_file,
+                client=client,
+                group_id=group_id,
+                reply_to=current_msg_id,
+                current_turn_count=discussion_turn_count,
+            )
+            discussion, turns = await _record_deferred_demand_turns(
+                deferred_results,
+                client=client,
+                group_id=group_id,
+                member_id=member_id,
+                discussion=discussion,
+                turns=turns,
+                task_text=task_text,
+            )
+
+        # Then execute TALK_ACTION side effects (backward compat)
         action_notices = await execute_talk_actions(
             actions,
             client=client,
@@ -1387,34 +1913,16 @@ async def handle_incoming_message(
             member_id=member_id,
             task_text=task_text,
         )
+
+        # Relay action error notices to sender (as follow-up if visible reply was already sent)
         visible_action_notices = [notice for notice in action_notices if not notice.startswith("sent ")]
         if visible_action_notices:
-            visible_reply = visible_action_notices[0]
-        mark_actions = [action for action in actions if action.action_type == "mark_stance"]
-        has_final_action = any(action.action_type == "final_to_human" for action in actions)
-        should_post_reply = True
-        if not visible_reply and actions:
-            if sender_id.startswith("agent:"):
-                should_post_reply = False
-            else:
-                visible_reply = "已按讨论协议继续推进。"
-        if not visible_reply:
-            if should_post_reply:
-                visible_reply = f"({bridge_label} finished without visible output.)"
-
-        reply_message_id: int | None = None
-        if should_post_reply:
-            reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
-            reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
-        if sender_id.startswith("agent:") and discussion and not mark_actions and reply_message_id is not None:
-            await _append_discussion_turn(
-                client,
-                discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
-                message_id=reply_message_id,
-                stance="answer",
-                target_member_id=sender_id,
-                round_index=1,
+            reply_message = await client.reply(
+                int(message["id"]), text=visible_action_notices[0], to=[sender], group_id=group_id
             )
+            if reply_message_id is None:
+                reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
+
         for action in mark_actions:
             peer_id = action.target_member_id or str(sender)
             existing_discussion_id = int(discussion["id"]) if discussion and discussion.get("id") is not None else None
@@ -1435,6 +1943,7 @@ async def handle_incoming_message(
                 message_id=reply_message_id,
                 stance=stance,
                 target_member_id=peer_id,
+                turn_kind="reply",
                 round_index=action.round_index or 1,
             )
             if stance == "agree" and not has_final_action:
@@ -1455,6 +1964,13 @@ async def handle_incoming_message(
         if report_status is not None:
             await report_status("error", current_task_id=task_id, last_error=str(exc))
         raise
+    finally:
+        if deferred_file:
+            try:
+                os.unlink(deferred_file)
+            except OSError:
+                pass
+            os.environ.pop("TALK_DEFERRED_FILE", None)
 
 
 async def run_task_queue_worker(
@@ -1485,6 +2001,7 @@ async def run_task_queue_worker(
                         runtime=args.runtime,
                         bridge_label=args.bridge_label,
                         prompt_transport=args.prompt_transport,
+                        decision_tier=args.decision_tier,
                     )
         except asyncio.CancelledError:
             raise
@@ -1547,6 +2064,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 prompt_transport=args.prompt_transport,
                 send_ack=args.send_ack,
                 report_status=report_status,
+                decision_tier=args.decision_tier,
             )
 
     task_worker: asyncio.Task[None] | None = None
@@ -1621,6 +2139,12 @@ def build_parser(
     parser.add_argument("--max-reply-chars", type=int, default=DEFAULT_MAX_REPLY_CHARS)
     parser.add_argument("--respond-to-broadcast", action="store_true")
     parser.add_argument("--send-ack", action="store_true")
+    parser.add_argument(
+        "--decision-tier",
+        choices=["decision", "execution"],
+        default="execution",
+        help="Agent decision tier for role injection. Default: %(default)s",
+    )
     return parser
 
 
