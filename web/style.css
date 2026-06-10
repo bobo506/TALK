@@ -3214,3 +3214,227 @@ body.app-shell {
     border-bottom: 1px solid var(--talk-line) !important;
   }
 }
+
+/* Final color sweep: neutralize leftover dark workbench styles. */
+.app-title h1,
+.sidebar-heading h2,
+.hall-title,
+.details-card h3,
+.auth-brand h1,
+.auth-section-title p {
+  color: var(--talk-copy) !important;
+}
+
+.sidebar-heading h2,
+.details-card h3,
+.auth-section-title p {
+  color: var(--talk-blue) !important;
+}
+
+.room-description,
+.group-members-subtitle,
+.details-hint,
+.history-status,
+.group-member-meta,
+.all-member-meta,
+.auth-brand p,
+.auth-loading,
+.auth-note,
+.auth-field-hint {
+  color: var(--talk-muted) !important;
+}
+
+.hall-filter-shell,
+.quick-actions .room-chip,
+.room-chip,
+.history-toolbar,
+#history-toolbar,
+.history-toolbar-row,
+.history-search-group,
+.history-toolbar-actions,
+.group-meta-form,
+.group-member-add-form,
+.pending-file,
+.reply-bar,
+.composer-status {
+  background: transparent !important;
+  color: var(--talk-copy) !important;
+  box-shadow: none !important;
+}
+
+.hall-filter-shell,
+.quick-actions .room-chip,
+.room-chip,
+.details-card,
+#composer,
+.auth-card {
+  background: var(--talk-card) !important;
+  border-color: var(--talk-line) !important;
+}
+
+.room-chip {
+  color: #667484 !important;
+}
+
+.room-chip:not(.active):hover {
+  background: #fffefa !important;
+  color: var(--talk-copy) !important;
+}
+
+.room-chip.active {
+  background: #fbfdff !important;
+  border-color: #94deda !important;
+  color: var(--talk-copy) !important;
+}
+
+.group-room-list .room-chip.active::after {
+  background: #fff4f2 !important;
+  border-color: #f1beb9 !important;
+  color: var(--talk-red) !important;
+}
+
+.group-create-field input,
+.group-member-role-select,
+.group-member-select,
+.auth-input,
+.history-search-input,
+.composer-textarea,
+#login-key,
+#setup-id,
+#setup-name,
+#setup-key,
+#group-meta-name,
+#group-meta-description,
+#group-member-add-select,
+#group-member-add-role {
+  background: #fffefa !important;
+  border-color: #d7d2c8 !important;
+  color: var(--talk-copy) !important;
+  box-shadow: none !important;
+}
+
+.composer-textarea {
+  background: #fffefa !important;
+  color: var(--talk-copy) !important;
+}
+
+.group-create-field input:focus,
+.group-member-role-select:focus,
+.group-member-select:focus,
+.auth-input:focus,
+.history-search-input:focus,
+.composer-textarea:focus {
+  border-color: #9ec3e6 !important;
+  box-shadow: 0 0 0 3px rgba(82, 119, 156, 0.14) !important;
+}
+
+.room-primary-btn,
+.auth-primary-btn,
+.send-btn,
+#group-meta-save-btn,
+#group-member-add-btn {
+  background: var(--talk-blue-strong) !important;
+  border-color: var(--talk-blue-strong) !important;
+  color: #ffffff !important;
+}
+
+.room-secondary-btn,
+.auth-secondary-btn,
+.auth-ghost-btn,
+.history-btn,
+.tool-chip,
+.message-action-btn,
+.file-download-btn {
+  background: #fffefa !important;
+  border-color: #d7d2c8 !important;
+  color: #627186 !important;
+}
+
+.history-btn.primary,
+#history-search-btn {
+  background: var(--talk-blue-strong) !important;
+  border-color: var(--talk-blue-strong) !important;
+  color: #ffffff !important;
+}
+
+#history-clear-btn,
+#load-older-btn {
+  background: #fffefa !important;
+  border-color: #d7d2c8 !important;
+  color: #627186 !important;
+}
+
+.group-member-remove-btn {
+  background: #fff4f2 !important;
+  border-color: #f0bbb6 !important;
+  color: var(--talk-red) !important;
+}
+
+.group-member-remove-btn:disabled {
+  background: #f4f1eb !important;
+  border-color: #e1ddd4 !important;
+  color: #b0a99f !important;
+}
+
+.member-add-btn {
+  background: #eef7ff !important;
+  border-color: #c8ddeb !important;
+  color: var(--talk-blue) !important;
+}
+
+.member-kind-pill {
+  background: #f5fbff !important;
+  border-color: #c9ddeb !important;
+  color: var(--talk-blue) !important;
+}
+
+.member-kind-pill.active {
+  background: #e5f2ff !important;
+  border-color: #8ebde8 !important;
+  color: #2c649a !important;
+}
+
+.member-added-pill {
+  background: #f4f1eb !important;
+  border-color: #e1ddd4 !important;
+  color: #8f98a3 !important;
+}
+
+.pending-file {
+  background: #eef7ff !important;
+  border-color: #c9ddeb !important;
+  color: #58718c !important;
+}
+
+.message-reply,
+.reply-bar,
+.auth-warning {
+  background: #fff8df !important;
+  border-color: #eadcb7 !important;
+  color: #71633b !important;
+}
+
+.msg-bubble,
+.msg-bubble.mine,
+.msg-bubble.others {
+  background: #fffefa !important;
+  border-color: var(--talk-line) !important;
+  color: var(--talk-copy) !important;
+}
+
+.msg-bubble.mine {
+  background: #f7fbff !important;
+  border-color: #c8dced !important;
+}
+
+#mention-dropdown,
+.mention-dropdown {
+  background: var(--talk-card) !important;
+  border-color: var(--talk-line) !important;
+  color: var(--talk-copy) !important;
+}
+
+#mention-dropdown li:hover,
+#mention-dropdown li.active {
+  background: #eef6fd !important;
+}
