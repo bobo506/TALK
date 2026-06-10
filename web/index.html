@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260610-clean-light">
+  <link rel="stylesheet" href="/style.css?v=20260610-preview-match">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -78,18 +78,12 @@
 
   <header class="app-header shrink-0">
     <div class="window-brand">
-      <span class="brand-dot red"></span>
-      <span class="brand-dot yellow"></span>
-      <span class="brand-dot green"></span>
       <div class="brand-mark small">T</div>
       <div class="app-title">
         <h1>TALK</h1>
       </div>
     </div>
-    <div class="title-tabs" aria-hidden="true">
-      <span class="active">Hall</span>
-      <span>消息</span>
-    </div>
+    <div class="title-center">Hall 协作</div>
     <div class="header-actions">
       <span id="connection-status" class="hidden"></span>
       <span id="user-badge" class="user-badge"></span>
@@ -108,7 +102,7 @@
             <h2>Hall 列表</h2>
             <div class="sidebar-actions">
               <button id="toggle-group-create-btn" type="button" class="icon-action" title="新建 Hall" aria-label="新建 Hall">＋</button>
-              <button id="refresh-groups-btn" type="button" class="icon-action subtle" title="刷新 Hall 列表" aria-label="刷新 Hall 列表">↻</button>
+              <button id="refresh-groups-btn" type="button" class="icon-action subtle hidden" title="刷新 Hall 列表" aria-label="刷新 Hall 列表">↻</button>
             </div>
           </div>
           <div class="hall-filter-shell">
@@ -275,6 +269,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/app.js?v=20260610-clean-light"></script>
+  <script src="/app.js?v=20260610-preview-match"></script>
 </body>
 </html>
