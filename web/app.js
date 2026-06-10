@@ -57,6 +57,7 @@ let groupMembersOpen = false;
 let groupMemberSaving = false;
 let groupMetaSaving = false;
 let selectedMemberKindFilters = new Set();
+let groupMetaEditing = false;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -551,8 +552,10 @@ groupMetaForm.addEventListener("submit", updateGroupMetadataFromPanel);
 groupMemberAddForm.addEventListener("submit", addGroupMemberFromPanel);
 hallFilterInput.addEventListener("input", renderRoomStrip);
 roomTitle.addEventListener("click", () => {
-  if (!activeGroupId || groupMetaForm.classList.contains("hidden")) return;
+  if (!activeGroupId || !canManageGroups()) return;
+  groupMetaEditing = true;
   setGroupMembersOpen(true);
+  renderGroupMembersPanel();
   groupMetaName.focus();
   groupMetaName.select();
 });
@@ -892,8 +895,8 @@ function renderGroupMembersPanel() {
     ? Array.from(selectedMemberKindFilters).join(" / ")
     : "全部";
   groupMembersSubtitle.textContent = `${activeGroup.id} · ${activeGroup.members.length} 位成员 · ${selectedKinds}`;
-  groupMetaForm.classList.toggle("hidden", !canManage);
-  if (canManage) {
+  groupMetaForm.classList.toggle("hidden", !canManage || !groupMetaEditing);
+  if (canManage && groupMetaEditing) {
     groupMetaName.value = activeGroup.name || "";
     groupMetaDescription.value = activeGroup.description || "";
     groupMetaName.disabled = groupMetaSaving;
@@ -972,7 +975,7 @@ function renderGroupMembersPanel() {
     groupMembersList.appendChild(empty);
   }
 
-  groupMemberAddForm.classList.toggle("hidden", !canManage);
+  groupMemberAddForm.classList.add("hidden");
   groupMemberAddBtn.disabled = groupMemberSaving;
   groupMemberAddSelect.innerHTML = "";
   if (canManage) {
@@ -1101,6 +1104,7 @@ async function updateGroupMetadataFromPanel(event) {
 
     const group = await res.json();
     replaceGroup(group);
+    groupMetaEditing = false;
     clearComposerStatus("room");
     showGroupMembersError("");
     renderRoomStrip();
