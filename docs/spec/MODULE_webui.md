@@ -32,7 +32,7 @@
 ## 关键约束
 
 - 纯 Vanilla JS，不使用任何前端框架或构建工具
-- 暗色主题（bg-gray-900）
+- 当前主界面与登录页使用浅色 Windows 风格；历史暗色工作台样式仅作为旧实现记录保留
 - 消息中的 `@member_id` 需高亮显示
 - 被 `@` 的消息整条高亮（左侧蓝色边框）
 - 中文界面
@@ -161,3 +161,15 @@
 - 视觉系统改为中性暗色工作台，辅以 teal / indigo / amber 状态色；桌面为双栏，窄屏自动切为单列并避免横向溢出。
 - highlight.js 浏览器脚本路径改用 `highlightjs/cdn-release@11.11.1/build/highlight.min.js`，避免旧 `lib/common.min.js` 在浏览器中触发 `require is not defined`。
 - 静态资源 cache-busting 版本已更新到 `20260607-workbench-redesign`。
+
+## 2026-06-10 WEB-WINDOWS-LIGHT-REDESIGN-1 Addendum
+
+- Web UI 按已确认的 `.plans/talk-webui-redesign-preview.html` 预览稿落地为浅色 Windows 风格：桌面为左侧 Hall 列表、中间消息时间线、右侧成员详情三栏。
+- 登录页 / 首次管理员页同步切换到同一套浅色面板、控件、字体层级和按钮样式，避免登录前后视觉断裂。
+- 左侧 Hall 列表显示成员数量 `(x)`，并支持按 Hall 名称、ID、成员 ID、昵称或 kind 做本地过滤。
+- 右侧成员区改为常驻：上方展示当前 Hall 成员与移除按钮，下方展示所有成员；点击下方成员的 `human / agent` 角色标签可多选筛选上方当前 Hall 成员，未选择时默认显示全部。
+- Hall 标题可点击并聚焦右侧重命名表单；当前 Hall 的在线统计保留在标题区，不再重复展示成员列表。
+- 当前 Hall 消息搜索保留原 `q` 后端过滤能力，并在正文命中处追加前端 `mark` 高亮。
+- Composer 保留“文件 / 发送”主操作；上传文件后继续在输入框上方显示待发送文件名和体积。
+- 本轮不改后端 API、不引入前端构建链，继续复用现有 Vanilla JS DOM id 与 Group 成员管理接口。
+- 静态资源 cache-busting 版本已更新到 `20260610-windows-redesign`。

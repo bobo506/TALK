@@ -56,6 +56,7 @@ let groupCreateSaving = false;
 let groupMembersOpen = false;
 let groupMemberSaving = false;
 let groupMetaSaving = false;
+let selectedMemberKindFilters = new Set();
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -84,6 +85,7 @@ const roomTitle = document.getElementById("room-title");
 const roomDescription = document.getElementById("room-description");
 const globalRoomBtn = document.getElementById("global-room-btn");
 const groupRoomList = document.getElementById("group-room-list");
+const hallFilterInput = document.getElementById("hall-filter-input");
 const refreshGroupsBtn = document.getElementById("refresh-groups-btn");
 const toggleGroupCreateBtn = document.getElementById("toggle-group-create-btn");
 const toggleGroupMembersBtn = document.getElementById("toggle-group-members-btn");
@@ -108,6 +110,7 @@ const groupMemberAddSelect = document.getElementById("group-member-add-select");
 const groupMemberAddRole = document.getElementById("group-member-add-role");
 const groupMemberAddBtn = document.getElementById("group-member-add-btn");
 const groupMembersError = document.getElementById("group-members-error");
+const allMembersList = document.getElementById("all-members-list");
 const presenceStrip = document.getElementById("presence-strip");
 const presenceSummary = document.getElementById("presence-summary");
 const presenceMembers = document.getElementById("presence-members");
@@ -535,12 +538,24 @@ historyClearBtn.addEventListener("click", clearHistorySearch);
 globalRoomBtn.addEventListener("click", () => setActiveGroup(null));
 refreshGroupsBtn.addEventListener("click", refreshGroups);
 toggleGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(!groupCreateOpen));
-toggleGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(!groupMembersOpen));
+toggleGroupMembersBtn.addEventListener("click", () => {
+  setGroupMembersOpen(true);
+  if (groupMemberAddSelect && !groupMemberAddSelect.disabled) {
+    groupMemberAddSelect.focus();
+  }
+});
 cancelGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
 groupCreatePanel.addEventListener("submit", createGroupFromPanel);
-closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(false));
+closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(true));
 groupMetaForm.addEventListener("submit", updateGroupMetadataFromPanel);
 groupMemberAddForm.addEventListener("submit", addGroupMemberFromPanel);
+hallFilterInput.addEventListener("input", renderRoomStrip);
+roomTitle.addEventListener("click", () => {
+  if (!activeGroupId || groupMetaForm.classList.contains("hidden")) return;
+  setGroupMembersOpen(true);
+  groupMetaName.focus();
+  groupMetaName.select();
+});
 historySearchInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
@@ -660,27 +675,43 @@ function renderRoomStrip() {
 
   roomStrip.classList.remove("hidden");
   const activeGroup = getActiveGroup();
+  groupMembersOpen = Boolean(activeGroup);
   globalRoomBtn.classList.toggle("active", !activeGroupId);
   groupRoomList.innerHTML = "";
 
   roomTitle.textContent = activeGroup ? `${activeGroup.name} Hall` : "全局消息流";
+  roomTitle.classList.toggle("editable", Boolean(activeGroup));
   roomDescription.textContent = activeGroup
-    ? `${activeGroup.id} · ${activeGroup.members.length} 位成员${activeGroup.description ? ` · ${activeGroup.description}` : ""}`
+    ? `${activeGroup.id} · Hall 在线同步中 · @ 开头提醒成员，同组可见${activeGroup.description ? ` · ${activeGroup.description}` : ""}`
     : "旧全局聊天与私聊时间线";
+  const titleEditHint = document.getElementById("hall-title-edit-hint");
+  if (titleEditHint) {
+    titleEditHint.classList.toggle("hidden", !activeGroup);
+  }
+
+  const hallQuery = hallFilterInput.value.trim().toLowerCase();
+  const visibleGroups = hallQuery
+    ? groups.filter((group) => groupMatchesHallQuery(group, hallQuery))
+    : groups;
 
   if (groups.length === 0) {
     const empty = document.createElement("span");
     empty.className = "group-room-empty";
     empty.textContent = "暂无 Group";
     groupRoomList.appendChild(empty);
+  } else if (visibleGroups.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "group-room-empty";
+    empty.textContent = "没有匹配的 Hall";
+    groupRoomList.appendChild(empty);
   } else {
-    for (const group of groups) {
+    for (const group of visibleGroups) {
       const button = document.createElement("button");
       const isActive = group.id === activeGroupId;
       const canEnter = getGroupMemberIds(group).has(myId);
       button.type = "button";
       button.className = `room-chip ${isActive ? "active" : ""}`;
-      button.textContent = group.name;
+      button.textContent = `${group.name} (${getGroupMemberIds(group).size})`;
       button.title = canEnter
         ? `${group.name} (${group.id})`
         : `${group.name} (${group.id}) · 你还不是成员`;
@@ -690,13 +721,28 @@ function renderRoomStrip() {
     }
   }
 
-  toggleGroupCreateBtn.textContent = groupCreateOpen ? "收起" : "新建 Group";
+  toggleGroupCreateBtn.textContent = groupCreateOpen ? "×" : "＋";
   toggleGroupMembersBtn.classList.toggle("hidden", !activeGroup);
   toggleGroupMembersBtn.classList.toggle("active", groupMembersOpen && Boolean(activeGroup));
-  toggleGroupMembersBtn.textContent = groupMembersOpen ? "收起成员" : "成员";
+  toggleGroupMembersBtn.textContent = "＋";
   groupCreatePanel.classList.toggle("hidden", !groupCreateOpen);
   renderGroupCreateMembers();
   renderGroupMembersPanel();
+}
+
+function groupMatchesHallQuery(group, query) {
+  const haystack = [
+    group.id,
+    group.name,
+    group.description,
+    ...(group.members || []).flatMap((membership) => {
+      const member = findMember(membership.member_id);
+      return [membership.member_id, membership.role, member?.display_name, member?.kind];
+    }),
+  ];
+  return haystack
+    .filter((value) => typeof value === "string" && value)
+    .some((value) => value.toLowerCase().includes(query));
 }
 
 function setGroupCreateOpen(open) {
@@ -836,13 +882,16 @@ function showGroupMembersError(message) {
 
 function renderGroupMembersPanel() {
   const activeGroup = getActiveGroup();
-  const isOpen = groupMembersOpen && Boolean(activeGroup);
+  const isOpen = Boolean(activeGroup);
   groupMembersPanel.classList.toggle("hidden", !isOpen);
   if (!isOpen || !activeGroup) return;
 
   const canManage = canManageGroups();
   const memberIds = getGroupMemberIds(activeGroup);
-  groupMembersSubtitle.textContent = `${activeGroup.id} · ${activeGroup.members.length} 位成员`;
+  const selectedKinds = selectedMemberKindFilters.size
+    ? Array.from(selectedMemberKindFilters).join(" / ")
+    : "全部";
+  groupMembersSubtitle.textContent = `${activeGroup.id} · ${activeGroup.members.length} 位成员 · ${selectedKinds}`;
   groupMetaForm.classList.toggle("hidden", !canManage);
   if (canManage) {
     groupMetaName.value = activeGroup.name || "";
@@ -853,7 +902,13 @@ function renderGroupMembersPanel() {
   }
   groupMembersList.innerHTML = "";
 
-  for (const membership of sortedGroupMembers(activeGroup)) {
+  const memberships = sortedGroupMembers(activeGroup).filter((membership) => {
+    if (!selectedMemberKindFilters.size) return true;
+    const member = findMember(membership.member_id);
+    return selectedMemberKindFilters.has(member?.kind || memberKindFromId(membership.member_id));
+  });
+
+  for (const membership of memberships) {
     const member = findMember(membership.member_id);
     const row = document.createElement("div");
     row.className = "group-member-row";
@@ -869,8 +924,14 @@ function renderGroupMembersPanel() {
 
     const meta = document.createElement("div");
     meta.className = "group-member-meta";
-    meta.textContent = member ? `${membership.member_id} · ${member.display_name}` : membership.member_id;
+    const kind = member?.kind || memberKindFromId(membership.member_id);
+    const onlineText = onlineMemberIds.has(membership.member_id) ? "在线" : "离线";
+    meta.textContent = `${membership.role} · ${onlineText}${member ? ` · ${member.display_name}` : ""}`;
 
+    const dot = document.createElement("span");
+    dot.className = `member-status-dot ${onlineMemberIds.has(membership.member_id) ? "online" : "offline"}`;
+
+    identity.appendChild(dot);
     identity.appendChild(name);
     identity.appendChild(meta);
 
@@ -904,6 +965,13 @@ function renderGroupMembersPanel() {
     groupMembersList.appendChild(row);
   }
 
+  if (memberships.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "member-empty-state";
+    empty.textContent = "没有符合当前角色筛选的 Hall 成员";
+    groupMembersList.appendChild(empty);
+  }
+
   groupMemberAddForm.classList.toggle("hidden", !canManage);
   groupMemberAddBtn.disabled = groupMemberSaving;
   groupMemberAddSelect.innerHTML = "";
@@ -929,6 +997,80 @@ function renderGroupMembersPanel() {
       }
     }
     groupMemberAddRole.disabled = groupMemberSaving;
+  }
+  renderAllMembersPanel(activeGroup, canManage);
+}
+
+function memberKindFromId(memberId) {
+  return String(memberId || "").startsWith("agent:") ? "agent" : "human";
+}
+
+function toggleMemberKindFilter(kind) {
+  if (!kind) return;
+  selectedMemberKindFilters = new Set(selectedMemberKindFilters);
+  if (selectedMemberKindFilters.has(kind)) {
+    selectedMemberKindFilters.delete(kind);
+  } else {
+    selectedMemberKindFilters.add(kind);
+  }
+  renderGroupMembersPanel();
+}
+
+function renderAllMembersPanel(activeGroup, canManage) {
+  if (!allMembersList) return;
+  allMembersList.innerHTML = "";
+  if (!activeGroup) return;
+
+  const memberIds = getGroupMemberIds(activeGroup);
+  const sortedMembers = [...members].sort((a, b) => {
+    if (memberIds.has(a.id) !== memberIds.has(b.id)) {
+      return memberIds.has(a.id) ? -1 : 1;
+    }
+    return a.id.localeCompare(b.id, "zh-CN");
+  });
+
+  for (const member of sortedMembers) {
+    const row = document.createElement("div");
+    row.className = "all-member-row";
+
+    const body = document.createElement("div");
+    body.className = "all-member-body";
+
+    const name = document.createElement("div");
+    name.className = "all-member-name";
+    name.textContent = member.id === myId ? `${shortName(member.id)} (我)` : shortName(member.id);
+
+    const meta = document.createElement("div");
+    meta.className = "all-member-meta";
+    meta.textContent = member.display_name || member.id;
+
+    const roleButton = document.createElement("button");
+    roleButton.type = "button";
+    roleButton.className = `member-kind-pill ${selectedMemberKindFilters.has(member.kind) ? "active" : ""}`;
+    roleButton.textContent = member.kind || memberKindFromId(member.id);
+    roleButton.addEventListener("click", () => toggleMemberKindFilter(member.kind || memberKindFromId(member.id)));
+
+    body.appendChild(name);
+    body.appendChild(meta);
+    body.appendChild(roleButton);
+
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = memberIds.has(member.id) ? "member-added-pill" : "member-add-btn";
+    action.textContent = memberIds.has(member.id) ? "已在 Hall" : "加入";
+    action.disabled = memberIds.has(member.id) || !canManage || groupMemberSaving;
+    action.addEventListener("click", () => saveGroupMember(member.id, "member"));
+
+    row.appendChild(body);
+    row.appendChild(action);
+    allMembersList.appendChild(row);
+  }
+
+  if (!sortedMembers.length) {
+    const empty = document.createElement("div");
+    empty.className = "member-empty-state";
+    empty.textContent = "暂无可显示成员";
+    allMembersList.appendChild(empty);
   }
 }
 
@@ -1958,6 +2100,12 @@ function renderPresenceStrip() {
       ? `Hall 在线 ${onlineScopedCount}/${scopedMembers.length}`
       : `在线 ${onlineScopedCount}/${scopedMembers.length}`;
   }
+  if (activeGroupId && roomDescription) {
+    const activeGroup = getActiveGroup();
+    roomDescription.textContent = activeGroup
+      ? `${activeGroup.id} · Hall 在线 ${onlineScopedCount}/${scopedMembers.length} · @ 开头提醒成员，同组可见${activeGroup.description ? ` · ${activeGroup.description}` : ""}`
+      : roomDescription.textContent;
+  }
 
   const sortedMembers = [...scopedMembers].sort((a, b) => {
     if (a.id === myId) return -1;
@@ -1982,6 +2130,7 @@ function renderPresenceStrip() {
     chip.appendChild(label);
     presenceMembers.appendChild(chip);
   }
+  renderGroupMembersPanel();
 }
 
 function maybePlayNotification(messages) {
@@ -2065,6 +2214,7 @@ function renderRichText(container, text) {
   container.innerHTML = renderMarkdown(text);
   highlightCodeBlocks(container);
   decorateMentions(container);
+  decorateSearchHits(container);
 }
 
 function renderMarkdown(text) {
@@ -2110,6 +2260,52 @@ function decorateMentions(container) {
       node.parentNode.replaceChild(fragment, node);
     }
   }
+}
+
+function decorateSearchHits(container) {
+  const query = appliedHistoryQuery.trim();
+  if (!query) return;
+
+  const textNodes = [];
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const parent = node.parentElement;
+    if (!parent) continue;
+    if (parent.closest("code, pre, mark, .mention")) continue;
+    textNodes.push(node);
+  }
+
+  for (const node of textNodes) {
+    const fragment = buildSearchHitFragment(node.textContent || "", query);
+    if (fragment) {
+      node.parentNode.replaceChild(fragment, node);
+    }
+  }
+}
+
+function buildSearchHitFragment(text, query) {
+  const needle = query.toLowerCase();
+  const source = text.toLowerCase();
+  if (!needle || !source.includes(needle)) return null;
+
+  const fragment = document.createDocumentFragment();
+  let cursor = 0;
+  let index = source.indexOf(needle, cursor);
+  while (index !== -1) {
+    if (index > cursor) {
+      fragment.appendChild(document.createTextNode(text.slice(cursor, index)));
+    }
+    const mark = document.createElement("mark");
+    mark.textContent = text.slice(index, index + query.length);
+    fragment.appendChild(mark);
+    cursor = index + query.length;
+    index = source.indexOf(needle, cursor);
+  }
+  if (cursor < text.length) {
+    fragment.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+  return fragment;
 }
 
 function buildMentionFragment(text, memberIds) {
