@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260610-preview-match">
+  <link rel="stylesheet" href="/style.css?v=20260611-ui-refine">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -83,14 +83,10 @@
         <h1>TALK</h1>
       </div>
     </div>
-    <div class="title-center">Hall 协作</div>
     <div class="header-actions">
       <span id="connection-status" class="hidden"></span>
       <span id="user-badge" class="user-badge"></span>
       <button id="logout-btn" class="logout-btn">退出</button>
-      <span class="window-control">-</span>
-      <span class="window-control">□</span>
-      <span class="window-control">×</span>
     </div>
   </header>
 
@@ -150,7 +146,7 @@
             <div>
               <div class="hall-title-wrap">
                 <h2 id="room-title" class="hall-title">全局消息流</h2>
-                <span id="hall-title-edit-hint" class="title-edit-hint hidden">✎ 点击名称可重命名</span>
+                <span id="hall-group-id" class="hall-group-id hidden"></span>
               </div>
               <div id="room-description" class="room-description">旧全局聊天与私聊时间线</div>
             </div>
@@ -269,6 +265,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/app.js?v=20260610-preview-match"></script>
+  <script src="/app.js?v=20260611-ui-refine"></script>
 </body>
 </html>

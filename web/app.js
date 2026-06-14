@@ -687,9 +687,10 @@ function renderRoomStrip() {
   roomDescription.textContent = activeGroup
     ? `${activeGroup.id} · Hall 在线同步中 · @ 开头提醒成员，同组可见${activeGroup.description ? ` · ${activeGroup.description}` : ""}`
     : "旧全局聊天与私聊时间线";
-  const titleEditHint = document.getElementById("hall-title-edit-hint");
-  if (titleEditHint) {
-    titleEditHint.classList.toggle("hidden", !activeGroup);
+  const hallGroupId = document.getElementById("hall-group-id");
+  if (hallGroupId) {
+    hallGroupId.textContent = activeGroup ? activeGroup.id : "";
+    hallGroupId.classList.toggle("hidden", !activeGroup);
   }
 
   const hallQuery = hallFilterInput.value.trim().toLowerCase();
@@ -891,10 +892,7 @@ function renderGroupMembersPanel() {
 
   const canManage = canManageGroups();
   const memberIds = getGroupMemberIds(activeGroup);
-  const selectedKinds = selectedMemberKindFilters.size
-    ? Array.from(selectedMemberKindFilters).join(" / ")
-    : "全部";
-  groupMembersSubtitle.textContent = `${activeGroup.id} · ${activeGroup.members.length} 位成员 · ${selectedKinds}`;
+  groupMembersSubtitle.textContent = "";
   groupMetaForm.classList.toggle("hidden", !canManage || !groupMetaEditing);
   if (canManage && groupMetaEditing) {
     groupMetaName.value = activeGroup.name || "";
@@ -927,9 +925,8 @@ function renderGroupMembersPanel() {
 
     const meta = document.createElement("div");
     meta.className = "group-member-meta";
-    const kind = member?.kind || memberKindFromId(membership.member_id);
     const onlineText = onlineMemberIds.has(membership.member_id) ? "在线" : "离线";
-    meta.textContent = `${membership.role} · ${onlineText}${member ? ` · ${member.display_name}` : ""}`;
+    meta.textContent = `${membership.role} · ${onlineText}`;
 
     const dot = document.createElement("span");
     dot.className = `member-status-dot ${onlineMemberIds.has(membership.member_id) ? "online" : "offline"}`;
@@ -941,18 +938,6 @@ function renderGroupMembersPanel() {
     const controls = document.createElement("div");
     controls.className = "group-member-controls";
 
-    const roleSelect = document.createElement("select");
-    roleSelect.className = "group-member-role-select";
-    roleSelect.disabled = !canManage || groupMemberSaving;
-    for (const role of ["member", "moderator", "owner"]) {
-      const option = document.createElement("option");
-      option.value = role;
-      option.textContent = role;
-      option.selected = membership.role === role;
-      roleSelect.appendChild(option);
-    }
-    roleSelect.addEventListener("change", () => updateGroupMemberRole(membership.member_id, roleSelect.value));
-
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "group-member-remove-btn";
@@ -961,7 +946,6 @@ function renderGroupMembersPanel() {
     removeButton.title = membership.member_id === myId ? "不能在当前界面移除自己" : "移出 Group";
     removeButton.addEventListener("click", () => removeGroupMemberFromPanel(membership.member_id));
 
-    controls.appendChild(roleSelect);
     controls.appendChild(removeButton);
     row.appendChild(identity);
     row.appendChild(controls);
@@ -1043,10 +1027,6 @@ function renderAllMembersPanel(activeGroup, canManage) {
     name.className = "all-member-name";
     name.textContent = member.id === myId ? `${shortName(member.id)} (我)` : shortName(member.id);
 
-    const meta = document.createElement("div");
-    meta.className = "all-member-meta";
-    meta.textContent = member.display_name || member.id;
-
     const roleButton = document.createElement("button");
     roleButton.type = "button";
     roleButton.className = `member-kind-pill ${selectedMemberKindFilters.has(member.kind) ? "active" : ""}`;
@@ -1054,7 +1034,6 @@ function renderAllMembersPanel(activeGroup, canManage) {
     roleButton.addEventListener("click", () => toggleMemberKindFilter(member.kind || memberKindFromId(member.id)));
 
     body.appendChild(name);
-    body.appendChild(meta);
     body.appendChild(roleButton);
 
     const action = document.createElement("button");
@@ -1126,11 +1105,6 @@ async function addGroupMemberFromPanel(event) {
   const memberId = groupMemberAddSelect.value;
   if (!memberId || groupMemberSaving || !activeGroupId) return;
   await saveGroupMember(memberId, groupMemberAddRole.value);
-}
-
-async function updateGroupMemberRole(memberId, role) {
-  if (!memberId || !role || groupMemberSaving || !activeGroupId) return;
-  await saveGroupMember(memberId, role);
 }
 
 async function saveGroupMember(memberId, role) {

@@ -4,6 +4,48 @@
 项目根：d:\claude-test\TALK
 最后更新：2026-06-02 5.x agent-to-agent 通信主线关闭（黑盒复测通过）
 
+## 2026-06-07 5.7+ 对话质量打磨 + PROJECT_INTEGRATION 长期方向沉淀
+
+**背景**：5.x 主线在 6/2 ship 之后，黑盒发现 agent-to-agent 对话仍有质量问题（pi 自称 "qa"、pi-kimi 把名字拆成 "pi 和 kimi"、双向 "已经XX啦" 汇报体循环）。本轮针对这些问题做三次迭代修复，最终在 `group:1488c22048e3` (test-run17) 上验证对话自然收敛。同时把 ClawSwarm / OpenClaw Control Center / Multica 三份对比报告的启示整理成 `docs/spec/PROJECT_INTEGRATION.md`，作为 5.x 关闭后下一阶段的长期方向草案。
+
+### Prompt 与对话质量（三次迭代）
+
+| 迭代 | 改动 | 解决的问题 | 副作用 |
+|------|------|-----------|--------|
+| 第一次 | per-call prompt 加 "你是 {member_id}（完整 ID，不要拆解为多个名字）。" 独占首行 | 身份混乱、连字符 ID 拆解 | pi 陷入 "自我介绍" 模式，任务被淹没 |
+| 第二次 | 改紧凑内嵌："你是 {member_id}。{sender} 对你说：{task}" 同一行 | 任务动词重新获得焦点；身份锚仍有效 | 元叙述 "已经XX啦" 双向循环汇报仍出现 |
+| 第三次 | 废弃 pi/codex 分支的 `discussion_context` 注入；`FUNCTION_CALLING_SYSTEM_PROMPT` 加反元叙述规则 | 元叙述循环汇报根治 | 残留：visible reply + talk_send 双通道下偶尔有凑数 visible（治本在 PROJECT_INTEGRATION §9.3 结构化块） |
+
+### 涉及代码改动
+
+- `bridges/cli_bridge.py` `build_cli_prompt` + `build_cli_task_prompt` 紧凑身份注入，废弃 discussion_context 在 pi/codex 分支
+- `bridges/cli_bridge.py` `FUNCTION_CALLING_SYSTEM_PROMPT` 增加反元叙述规则
+- `bridges/talk_tools_extension.ts` `talk_send` promptGuidelines 增加 "用自己 member_id 身份写 body"
+- `tests/test_cli_bridge.py` 翻转 4 处旧的 `assertNotIn("agent:pi"…)` 断言为 `assertIn`；新增 inline 身份注入测试 + task path 身份测试；两个老测试（scope_text / requester_id 断言）改为锁定 "不应在 prompt 里"
+- `tests/test_codex_bridge.py` 同步翻转 2 处旧断言
+
+### 文档
+
+- `docs/spec/INTERACTION_FRAMEWORK.md` §5.3 表格修正（身份从系统层挪到单次调用层）+ 增加 2026-06-06 三次修正备注
+- **新增 `docs/spec/PROJECT_INTEGRATION.md`** — TALK 基础设施化方向设计草案
+
+### 黑盒验证
+
+测试群：`group:1488c22048e3` (test-run17)，pi 0.78.0，人类指令：`@agent:pi 去跟 agent:pi-kimi 打个招呼`
+
+**验收结论**：
+- ✅ pi 自称 "pi"（无 qa 幻觉）
+- ✅ pi-kimi 自称 "pi-kimi" 整体识别（无拆解）
+- ✅ 无双向 "已经XX啦" 循环汇报
+- ✅ 整体语气像两个有思想的人在交流兴趣点
+- ⚠️ 残留小问题：pi 对 human 报告 "已经向 pi-kimi 发送了问候"（可接受）；第二轮 talk_send 后 visible reply 凑数（治本待 §9.3 结构化块）
+
+### 单测验证
+
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_pi_bridge tests.test_discussions tests.test_codex_bridge`：81 tests 通过
+
+---
+
 ## 2026-06-02 黑盒复测：agent-to-agent 通信端到端验证
 
 **背景**：Pi extension dispatch 根因定位与规避完成后，按 PROGRESS.md 下一步执行完整黑盒复测。
@@ -141,6 +183,70 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最后更新：2026-06-01 5.5 方案 D：discussion_turns 显式交互账本
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-06-11 Web UI 精修支线收尾（浅色工作台多轮微调）
+
+### Current Progress
+在 `WEB-WINDOWS-LIGHT-REDESIGN-1` 浅色三栏基础上，按项目管理者多轮反馈完成一整轮视觉/布局精修，前端支线本轮收尾。**纯 `web/` 改动，未动后端 / API / 数据模型。**
+
+- **字体收小并分级**：`--font-control 13→11`、`--font-body 15→13`、`--font-section 16→14`、`--font-title 19→16`；全站字重从 750–850 一档档降为 750 / 600 / 450 / 400 四级，消除"满屏粗体"。
+- **比例对齐预览稿、中间消息区约占 2/3**：三栏从 `324 / 1fr / 380` 收窄为 `196px / 1fr / 252px`（1440 宽下中栏约 66%）；顶部查询区由"标题下方堆叠"改为"标题右侧同行"，修掉"搜索"按钮被压成竖排的问题；消息区底部 160px 死留白改为 16/24px，气泡 86% 宽、行高 1.55→1.6。
+- **清爽化**：统一三栏底色（`--panel` 提亮）、柔化所有边框线（`--line` 调淡）、右侧卡片去投影变平面、加大模块间留白；顶部输入框改为悬浮大圆角卡片（圆角 18px、最大 860px）。
+- **右侧成员栏重排**：成员行从横向挤压（重叠竖排 bug）改为可读布局，名字超长省略号截断；「所有成员」列表撑满到面板底部、内部滚动。
+- **成员信息去冗余**：每个成员原本显示「短名 / display_name(含重复 id) / 类型标签」三处，简化为「短名 + 类型标签(agent/human)」；当前 Hall 成员 meta 从「角色 · 在线 · display_name」简化为「角色 · 在线」。
+- **去掉角色下拉框**：owner/moderator/member 切换下拉是管理控件、非固定类型，按管理者要求移除（角色仍在 meta 文字可见）；连带删除已无调用者的 `updateGroupMemberRole()` 死函数。
+- **group id 移位 + 顶栏精简**：group id 从右侧成员卡副标题移到中间 Hall 标题右侧的代码风格小标签；删右侧「· N 位成员 · 全部」副标题与「✎ 点击名称可重命名」提示；删顶部假窗口控件 `- □ ×`、中间「Hall 协作」、右侧 `human:qa`（DOM 保留但隐藏，避免 app.js 赋值报错）；标题栏高度 `52px→42px`（全站 6 处高度计算同步）。
+- 静态资源版本号最终更新为 `20260611-ui-refine`。
+
+### Decisions / Pending
+- **成员软删除（决策已定，本轮未实现）**：将来做"agent 管理功能"时，成员删除采用**软删除 = 标记禁用**，保留历史消息归属、UI 隐藏；不做硬删除（避免破坏 `messages.from_id` 等外键引用）。需新增 `members` 禁用字段 + `PATCH/DELETE /api/members/{id}` 后端接口 + 前端入口，属全栈改动。
+- 左侧"删除 Hall"入口仍为视觉态，后端 Group 删除 API 与二次确认弹窗待补（沿用上一轮遗留）。
+
+### Verification
+- `node --check web/app.js`：通过；CSS 花括号 194/194 平衡；`git diff --check`：通过（仅 LF/CRLF 提示）。
+- Browser 实测（精修早期几轮）：以 `human:qa` 登录 `http://127.0.0.1:8000/` 进入 `test-run19 Hall`，用 `preview_inspect` 核验计算样式——三栏 `240/948/252`（中栏 66%）、body 14px/400、标题 17px/750、composer 圆角浮卡、成员行纵向无重叠、`all-members-list` 封顶滚动均符合预期。
+- 后续几轮（成员去冗余、去下拉、填满、顶栏精简）以"服务端返回的 app.js/index.html 字节校验 + CSS 花括号 + 项目管理者在自己浏览器确认"验证；预览 MCP 截图工具因 SSE 长连接挂起未用。
+
+### Changed Files
+- `web/index.html`、`web/style.css`、`web/app.js`
+- `docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
+
+### Next Plan
+1. 前端支线已收尾，等项目管理者最终验收。
+2. 下一阶段候选：agent 管理功能（含成员软删除）、Hall 删除真实 API + 二次确认、或回到后端主线（`PROJECT_INTEGRATION` 路线）。
+
+## 2026-06-10 Web UI 浅色 Windows 风格重设计落地
+
+### Current Progress
+- `WEB-WINDOWS-LIGHT-REDESIGN-1` 已按用户确认的预览稿落地到正式 `web/`。
+- 主界面改为浅色 Windows 风格三栏：左侧 Hall 列表，中间消息时间线，右侧当前 Hall 成员 / 所有成员详情。
+- 登录页和首次管理员页同步匹配同一套浅色面板、字体层级、控件和按钮样式。
+- 左侧 Hall 名称显示成员数 `(x)`，并支持按 Hall 名称、ID、成员 ID、昵称或 kind 做本地过滤。
+- 右侧成员区常驻：当前 Hall 成员列表保留角色与在线状态，可移除成员；下方所有成员列表支持加入成员，并可点击 `human / agent` 角色标签多选筛选上方列表。
+- Hall 标题可点击并聚焦重命名表单；当前 Hall 消息搜索新增正文命中高亮。
+- 静态资源版本号更新为 `20260610-windows-redesign`。
+
+### Verification
+- `node --check web\app.js`：通过。
+- `git diff --check -- web\index.html web\style.css web\app.js`：通过，仅有 Windows LF/CRLF 提示。
+- `/healthz`：本地服务返回 ok。
+- Browser 登录页验证：浅色风格正常，无横向溢出，无控制台 error。
+- Browser Hall 验证：`human:qa` 进入 `test-run19 Hall` 后，当前成员 3 个、所有成员 10 个、删除按钮圆角、标题可重命名、左侧活动 Hall 显示删除入口，无控制台 error。
+- Browser 桌面验证：1600x900 viewport 下三栏为 `324px / 896px / 380px`，`scrollWidth == clientWidth`。
+
+### Changed Files
+- `web/index.html`
+- `web/style.css`
+- `web/app.js`
+- `docs/spec/MODULE_webui.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### Next
+- 等项目管理者人工验收新版登录页与 Hall 页面。
+- 下一切片建议优先补 Hall 删除真实 API / 二次确认弹窗，再继续做成员详情或未读状态。
+
+---
 
 ## 2026-06-07 21:52 (Asia/Shanghai)
 ### Current Progress
