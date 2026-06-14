@@ -6,7 +6,8 @@ Updated: 2026-06-11 (Asia/Shanghai) — Web UI 精修支线收尾
 ### 1) Current Agent Role
 - 角色来源：`AGENTS.md`；本轮启动角色：Claude = 执行 Agent（PROGRESS 未单独声明 Claude，按兜底规则）。
 - 当前 Codex 角色：决策 Agent。
-- 当前分支：`codex/web-ui-feature`，基于 `codex/local-lab-codex-bridge`，已合并 `codex/scenario-1-scope-fix`（5.x agent 通信主线全部内容）。
+- 当前分支：`codex/web-ui-feature`（已与 `main` 同步，均为 `7aeebf5`）；全部已完成工作（5.x agent 通信主线 + Web UI 重设计/精修）已合并入 `main` 并推送 GitHub。
+- 历史分支 `codex/local-lab-codex-bridge`、`codex/scenario-1-scope-fix` 内容已并入 `main`，本地 + 远程均已删除；现仅保留 `main` 与 `codex/web-ui-feature` 两条分支。
 
 ### 2) Current Progress
 - 前端支线已收尾：在浅色三栏重设计基础上，按管理者多轮反馈完成一整轮视觉/布局精修（纯 `web/` 改动，未动后端 / API / 数据模型）。
