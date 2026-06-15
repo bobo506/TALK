@@ -184,6 +184,35 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-16 Phase 2 身份层 · 切片 8b：pi bridge --project 注入（B 方案，含黑盒发现的 shlex bug 修复）
+
+**背景**：管理者选定 B 方案（人设作背景进系统层），并告知本机已装 pi/codex（解锁黑盒验证）。本片把 pi 的 `--system-prompt` 接到 `compose_system_prompt`，`--project` 给定时注入 profile。
+
+### 改动
+
+- `bridges/cli_bridge.py`：`build_parser` 加共享 `--project` 参数（缺省 None）。
+- `bridges/pi_bridge.py`：
+  - `_build_pi_command(system_prompt, *, execution_profile)`：命令构造参数化，系统提示可注入；`DEFAULT_PI_COMMAND`/`TOOLS` 改由它构建。
+  - `resolve_pi_command(args)`：用户/env 覆盖命令→原样尊重；`--project` + 非空 profile→注入；否则与现状字节一致（严格 opt-in，零回归）。
+  - `run_bridge` 改用 `resolve_pi_command`（执行档切换 + 注入合一）。
+- `tests/test_pi_bridge.py`：+4 注入用例 + 工具档测试改用 `resolve_pi_command`。
+
+### 黑盒发现并修复的真 bug（关键）
+
+- 命令里系统提示原用 `{x!r}`（repr）。`parse_command` 用 `shlex.split(posix=True)` 再解析，repr 的 `\'` 转义与 POSIX 单引号语义**不兼容**——真实 profile 含引号/换行时 shlex 报 `No closing quotation`；repr 还把换行传成字面 `\n`。改 `shlex.quote(x)`：正确往返 + 保留真换行。**默认命令也受益**（此前 pi 收到的是字面 `\n`）。
+
+### 验证
+
+- 全套件 **215/215**（干净跑，无并发）；之前并发跑出现的 2 个 timeout 经隔离单跑确认为 websocket/SSE 时序测试的负载偶发，与改动无关。
+- 真机黑盒（pi 0.79.3）：① resolve 命令 shlex 往返通过、profile 真注入（header+SOUL+IDENTITY 标记齐、真换行保留）；② 短系统提示 pi **采纳人设**（自称指定名）→ 证明 pi honors 注入；③ DEFAULT 与 INJECTED 行为完全一致 → 零回归。
+- 已知：pi 在裁剪 flag（无 tools/extension）的 text 模式下，长系统提示（DEFAULT 与 INJECTED 都如此）会空输出，是 pi CLI 自身怪癖、非本改动引入。完整"pi 不再自称 qa"端到端需用生产 function-calling 命令跑真实 bridge+server 闭环——**留人工验收**。commit 1c17304。
+
+### 待确认 / 下一步
+
+- **人工验收（管理者）**：用 `python bridges/pi_bridge.py --key <k> --project D:\claude-test\TALK`（或目标项目根）起真实 pi bridge，在 Group Hall 里观察身份/风格是否按 dogfood profile 收敛。
+- 切片 8c：codex bridge 注入（系统层接缝 = `-c base_instructions=<json>`，已认明）。
+- 切片 9：server `project_agents` 表 + `/agents` + `/sync` 子资源。
+
 ## 2026-06-15 Phase 2 身份层 · 切片 7：agent profile 加载器（地基）
 
 **背景**：管理者授权进入 Phase 2 身份层并自主开发切片。Phase 2 最敏感的是 bridge prompt 注入（前次三天 debug 战场），故先做零风险的纯函数地基。
