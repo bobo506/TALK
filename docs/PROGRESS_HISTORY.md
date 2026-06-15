@@ -184,6 +184,33 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-16 Phase 2 身份层 · 切片 8c：codex bridge --project 注入 base_instructions
+
+**背景**：管理者确认 8c 后一起测。codex 的系统层 = `-c base_instructions=<json>`（接缝在 8b 已认明）。与 pi 8b 同构实现。
+
+### 改动
+
+- `bridges/codex_bridge.py`：
+  - `_build_codex_command(codex_exe, *, profile, system_instructions)`：命令构造参数化，`base_instructions` 可注入；`default_codex_command` 改由它构建（去重）。
+  - `resolve_codex_command(args)`：env(`TALK_CODEX_COMMAND`)/自定义 `--codex-command` 覆盖→原样尊重；`--project` + 非空 profile→把 `compose_system_prompt(CODEX_SYSTEM_INSTRUCTIONS, profile)` 注入 `base_instructions`；否则与现状字节一致（严格 opt-in）。
+  - `run_bridge` 改用 `resolve_codex_command`（执行档切换 + 注入合一）。
+- `tests/test_codex_bridge.py`：+5 用例（无 project 默认 / 工具档 workspace-write / 注入 base_instructions / 空 profile 字节一致 / env 覆盖）。
+
+### 与 pi 8b 的关键差异
+
+codex 命令的 `_codex_config_arg` 本就 `json.dumps(ensure_ascii=False)` + `shlex.quote`，任意 profile 内容（引号/换行）天然 shlex 安全——**无 pi 8b 那个 repr→shlex bug**。
+
+### 验证
+
+- 单测 `test_codex_bridge` 18/18（13 原有 + 5 新；原有 `default_codex_command` 测试在重构后仍绿）。
+- 真机黑盒（codex.exe 已装）：`resolve_codex_command` 用 dogfood `agent:codex` profile → shlex 往返通过（argc 20）、codex.exe 路径解析正确、`base_instructions` 含基础提示 + profile（header/SOUL/IDENTITY 标记齐）。
+- 全套件 220 个仅 1 个 `test_websocket` presence 时序测试在 **499s 过载**下偶发失败；隔离单跑 19/19 通过，与本改动无关（8c 只动 codex_bridge）。commit 820aee8。
+
+### 待确认 / 下一步
+
+- **人工验收（管理者，pi + codex 一起测）**：起真实 bridge（`python bridges/pi_bridge.py --key <k> --project <根>` / `python bridges/codex_bridge.py --key <k> --project <根>`），在 Group Hall 观察两者身份/风格是否按各自 dogfood profile 收敛。
+- 切片 9：server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`（profile 路径索引/同步，纯服务端）。
+
 ## 2026-06-16 Phase 2 身份层 · 切片 8b：pi bridge --project 注入（B 方案，含黑盒发现的 shlex bug 修复）
 
 **背景**：管理者选定 B 方案（人设作背景进系统层），并告知本机已装 pi/codex（解锁黑盒验证）。本片把 pi 的 `--system-prompt` 接到 `compose_system_prompt`，`--project` 给定时注入 profile。

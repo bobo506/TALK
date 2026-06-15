@@ -1,15 +1,19 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-16 (Asia/Shanghai) — Phase 2 身份层：切片 8b 完成（pi bridge --project 注入，真机黑盒通过），待人工验收
+Updated: 2026-06-16 (Asia/Shanghai) — Phase 2 身份层：pi(8b)+codex(8c) bridge --project 注入完成，待 pi+codex 一起人工验收
 
 ### 0) Phase 2 进行中
 - **切片 7 完成**（`ffa80b2`）：`cli/profiles.py` profile 加载器（纯函数地基）+ 7 单测。
-- **注入策略 = B 方案（系统层）**：人设作"背景底色"进 agent 系统层（`--system-prompt`），不混进消息流（§5.4）。
+- **注入策略 = B 方案（系统层）**：人设作"背景底色"进 agent 系统层，不混进消息流（§5.4）。
 - **切片 8a 完成**（`fc15aa6`）：`compose_system_prompt(base, profile)` 纯函数（profile 作背景 + "别复述"框定；空 profile→base 原样）。
-- **切片 8b 完成**（`1c17304`）：pi bridge 加 `--project` → 用 `compose_system_prompt` 把 profile 注入 `--system-prompt`；`resolve_pi_command` 统一执行档切换 + 注入，严格 opt-in（无 `--project`/空 profile 字节一致）。**黑盒发现并修复真 bug**：命令系统提示 `repr`→`shlex.quote`（repr 转义与 POSIX shlex 不兼容，真实 profile 含引号/换行会炸，且把换行传成字面 `\n`）。全套件 **215/215**；真机 pi 0.79.3 黑盒：注入生效、pi 采纳人设、INJECTED 与 DEFAULT 零差异。
-- **待人工验收**：起真实 pi bridge（`python bridges/pi_bridge.py --key <k> --project <项目根>`）在 Group Hall 观察身份/风格是否按 dogfood profile 收敛。完整端到端需生产 function-calling 命令 + 真实 server 闭环。
-- **下一步**：切片 8c（codex 注入，接缝 = `-c base_instructions=<json>`）；切片 9（server `project_agents` 表 + `/agents` + `/sync`）。
+- **切片 8b 完成**（`1c17304`）：pi bridge `--project` → 注入 `--system-prompt`；`resolve_pi_command` 统一执行档 + 注入，严格 opt-in。**黑盒修复真 bug**：命令系统提示 `repr`→`shlex.quote`。
+- **切片 8c 完成**（`820aee8`）：codex bridge `--project` → 注入 `-c base_instructions=<json>`；`resolve_codex_command` 同构 pi。codex 命令本就 json+shlex.quote 安全，无 pi 那个 repr bug。
+- **现状**：pi/codex 两个 runtime 的身份层注入都打通，严格 opt-in（无 `--project` 字节一致）。单测全绿（codex 18/18、pi 13/13）；真机黑盒两者均确认 shlex 往返 + profile 真注入。
+- **待人工验收（管理者，pi+codex 一起测）**：`python bridges/pi_bridge.py --key <k> --project <根>` 与 `python bridges/codex_bridge.py --key <k> --project <根>`，在 Group Hall 观察身份/风格是否按各自 dogfood profile 收敛。完整端到端需真实 server 闭环。
+- **下一步**：切片 9（server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`，profile 路径索引/同步）。
+
+> 注：全套件偶发的 `test_websocket` presence 时序测试失败仅在机器过载（曾跑 499s）时出现，隔离单跑稳定通过，与 Phase 2 改动无关。
 
 ---
 
