@@ -24,6 +24,8 @@ from uuid import uuid4
 
 import yaml
 
+from cli.profiles import member_dir_name
+
 DEFAULT_SERVER = "http://127.0.0.1:8000"
 
 
@@ -148,16 +150,6 @@ def scaffold_project(
     _write_text(talk_dir / ".gitignore", "memory/\ncache/\n")
 
     return project_meta
-
-
-def member_dir_name(member_id: str) -> str:
-    """Filesystem-safe directory name for a ``member_id``.
-
-    member_ids contain ``:`` (e.g. ``agent:codex``) which Windows forbids in
-    paths, so map ``:`` -> ``_``. The bridge must use the same mapping when it
-    looks up ``.talk/agents/<member_id>/`` profiles (Phase 2).
-    """
-    return member_id.replace(":", "_")
 
 
 def _agent_profile_files(member_id: str) -> dict[str, str]:
