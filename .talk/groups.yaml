@@ -1,0 +1,21 @@
+# TALK dogfood 群定义 —— 业务角色 + 决策分级（PROJECT_INTEGRATION §5.2）
+# project_id 关联见 ./project.yaml。
+# 历史 test-run* 群保持"无项目上下文"（§10.2），不在此登记，bridge 退化到旧行为。
+groups:
+  - id: group:talk-dev
+    name: TALK 主线开发
+    members:
+      - member_id: agent:codex
+        business_role: lead
+        decision_tier: decision
+      - member_id: agent:claude
+        business_role: dev
+        decision_tier: decision
+      - member_id: agent:pi
+        business_role: reviewer
+        decision_tier: execution
+      - member_id: agent:pi-kimi
+        business_role: reviewer
+        decision_tier: execution
+      - member_id: human:bobo
+        business_role: stakeholder

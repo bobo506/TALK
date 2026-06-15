@@ -1,0 +1,7 @@
+version: 1
+project_id: prj_e8fe7066bbec
+display_name: TALK
+description: AI 智能体聊天中转平台（自身 dogfood 接入，同时作为外部项目接入的参考模板）
+talk_server: http://127.0.0.1:8000
+created_at: '2026-06-15T12:29:53.889284+00:00'
+maintainer: human:bobo
