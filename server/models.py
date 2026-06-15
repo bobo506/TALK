@@ -69,6 +69,7 @@ class Group(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
     description: Optional[str] = None
+    project_id: Optional[str] = Field(default=None, foreign_key="projects.project_id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -317,6 +318,7 @@ class GroupCreate(BaseModel):
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
+    project_id: Optional[str] = None  # NULL = 无项目上下文（向后兼容历史群）
     member_ids: list[str] = []
 
     @model_validator(mode="after")
@@ -330,6 +332,8 @@ class GroupCreate(BaseModel):
             raise ValueError("name is required")
         if self.description is not None:
             self.description = self.description.strip() or None
+        if self.project_id is not None:
+            self.project_id = self.project_id.strip() or None
         self.member_ids = list(dict.fromkeys(member_id.strip() for member_id in self.member_ids if member_id.strip()))
         return self
 
@@ -363,6 +367,7 @@ class GroupOut(BaseModel):
     id: str
     name: str
     description: Optional[str]
+    project_id: Optional[str]
     created_by: str
     created_at: datetime
     updated_at: datetime

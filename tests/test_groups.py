@@ -105,6 +105,45 @@ class GroupRouteTests(RouteTestCase):
 
         self.assertEqual(updated.status_code, 403)
 
+    def test_group_can_be_associated_with_a_project_on_create(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_bike", "display_name": "自行车计划"},
+            )
+            created = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:design", "name": "设计讨论", "project_id": "prj_bike"},
+            )
+            fetched = client.get("/api/groups/group:design", headers={"X-API-Key": "bobo-key"})
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["project_id"], "prj_bike")
+        self.assertEqual(fetched.json()["project_id"], "prj_bike")
+
+    def test_group_without_project_is_backward_compatible(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:legacy", "name": "历史群"},
+            )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertIsNone(created.json()["project_id"])
+
+    def test_group_create_rejects_unknown_project(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:orphan", "name": "孤儿群", "project_id": "prj_ghost"},
+            )
+
+        self.assertEqual(created.status_code, 400)
+
     def test_agent_and_missing_member_cannot_manage_group_members(self):
         with self.make_client() as client:
             client.post(

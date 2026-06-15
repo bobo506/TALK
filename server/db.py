@@ -95,11 +95,18 @@ def init_db() -> None:
         }
         if "turn_kind" not in discussion_turn_columns:
             conn.exec_driver_sql("ALTER TABLE discussion_turns ADD COLUMN turn_kind TEXT NOT NULL DEFAULT 'reply'")
+        group_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(groups)").fetchall()
+        }
+        if "project_id" not in group_columns:
+            conn.exec_driver_sql("ALTER TABLE groups ADD COLUMN project_id TEXT REFERENCES projects(project_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_files_sha256 ON files (sha256)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_from_id ON messages (from_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_group_id ON messages (group_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_to_ids ON messages (to_ids)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_created_by ON groups (created_by)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_project_id ON groups (project_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_projects_maintainer_member_id ON projects (maintainer_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_member_id ON group_members (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")

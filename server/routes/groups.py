@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import get_session
-from server.models import Group, GroupCreate, GroupMember, GroupMemberOut, GroupMemberUpdate, GroupOut, GroupUpdate, Member
+from server.models import Group, GroupCreate, GroupMember, GroupMemberOut, GroupMemberUpdate, GroupOut, GroupUpdate, Member, Project
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -34,6 +34,11 @@ def _get_member(member_id: str, session: Session) -> Member:
     return member
 
 
+def _ensure_project_exists(project_id: str, session: Session) -> None:
+    if session.get(Project, project_id) is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"project not found: {project_id}")
+
+
 def _is_group_member(group_id: str, member_id: str, session: Session) -> bool:
     return session.get(GroupMember, (group_id, member_id)) is not None
 
@@ -55,6 +60,7 @@ def _group_out(group: Group, session: Session) -> GroupOut:
         id=group.id,
         name=group.name,
         description=group.description,
+        project_id=group.project_id,
         created_by=group.created_by,
         created_at=group.created_at,
         updated_at=group.updated_at,
@@ -76,6 +82,9 @@ def create_group(
     if session.get(Group, group_id) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="group id already exists")
 
+    if body.project_id is not None:
+        _ensure_project_exists(body.project_id, session)
+
     member_ids = list(dict.fromkeys([current.id, *body.member_ids]))
     for member_id in member_ids:
         _get_member(member_id, session)
@@ -85,6 +94,7 @@ def create_group(
         id=group_id,
         name=body.name,
         description=body.description,
+        project_id=body.project_id,
         created_by=current.id,
         created_at=now,
         updated_at=now,
