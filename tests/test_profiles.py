@@ -4,9 +4,11 @@ import unittest
 from pathlib import Path
 
 from cli.profiles import (
+    SYSTEM_PROMPT_PROFILE_HEADER,
     AgentProfile,
     agent_profile_dir,
     compose_identity_block,
+    compose_system_prompt,
     load_profile,
     member_dir_name,
 )
@@ -70,6 +72,30 @@ class ProfileLoaderTests(unittest.TestCase):
         profile = AgentProfile(member_id="agent:x", identity="I", soul="S", user="U")
         block = compose_identity_block(profile)
         self.assertEqual(block, "I\n\nS\n\nU")
+
+    def test_compose_system_prompt_empty_profile_unchanged(self):
+        # A member without a profile keeps today's base system prompt byte-for-byte.
+        base = "你是 TALK 群里的一个 agent。"
+        self.assertEqual(compose_system_prompt(base, AgentProfile(member_id="agent:x")), base)
+
+    def test_compose_system_prompt_appends_background(self):
+        base = "你是 TALK 群里的一个 agent。"
+        profile = AgentProfile(member_id="agent:pi", identity="ID-pi", soul="不写汇报体", user="队友 codex")
+        result = compose_system_prompt(base, profile)
+
+        self.assertTrue(result.startswith(base))
+        self.assertIn(SYSTEM_PROMPT_PROFILE_HEADER, result)
+        # the profile content is present as background
+        self.assertIn("不写汇报体", result)
+        self.assertIn("队友 codex", result)
+        # base appears before the profile block
+        self.assertLess(result.index(base), result.index("不写汇报体"))
+
+    def test_compose_system_prompt_no_base(self):
+        profile = AgentProfile(member_id="agent:pi", soul="只有 soul")
+        result = compose_system_prompt("", profile)
+        self.assertIn(SYSTEM_PROMPT_PROFILE_HEADER, result)
+        self.assertIn("只有 soul", result)
 
     def test_loads_committed_dogfood_profile(self):
         # Real data: the repo's own .talk/ dogfood profile for agent:codex.

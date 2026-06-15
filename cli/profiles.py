@@ -85,3 +85,30 @@ def compose_identity_block(profile: AgentProfile) -> str:
         return ""
     parts = [text.strip() for text in (profile.identity, profile.soul, profile.user) if text]
     return "\n\n".join(parts)
+
+
+# Framing so the model treats the profile as stable background ("底色"), not as
+# something to restate — guards against the "已经XX啦" / self-introduction echo.
+SYSTEM_PROMPT_PROFILE_HEADER = (
+    "以下是你的固定身份与风格背景，作为你说话的底色。"
+    "理解并体现它即可，不要在回复里复述、声明或解释这些内容。"
+)
+
+
+def compose_system_prompt(base_prompt: str, profile: AgentProfile) -> str:
+    """Build a runtime ``--system-prompt`` string with the profile as background.
+
+    This is the system-layer approach (PROJECT_INTEGRATION §5.4): the agent's
+    stable identity/style lives in the launch-time system prompt, not in the
+    per-message stream. Returns ``base_prompt`` unchanged when the profile is
+    empty, so a member without a profile keeps today's behavior exactly.
+    """
+    block = compose_identity_block(profile)
+    if not block:
+        return base_prompt
+
+    parts: list[str] = []
+    if base_prompt and base_prompt.strip():
+        parts.append(base_prompt.strip())
+    parts.append(f"{SYSTEM_PROMPT_PROFILE_HEADER}\n\n{block}")
+    return "\n\n".join(parts)
