@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import shlex
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from bridges import cli_bridge
+from cli.profiles import compose_system_prompt, load_profile
 
 # ---------------------------------------------------------------------------
 # pi 扩展路径（talk_send 工具）
@@ -33,25 +35,68 @@ DEFAULT_SYSTEM_PROMPT = cli_bridge.FUNCTION_CALLING_SYSTEM_PROMPT
 # 旧文本协议命令（保留作过渡兼容）
 DEFAULT_PI_COMMAND_LEGACY = (
     "pi --print --mode text --no-context-files --no-tools --no-session --thinking off "
-    f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
+    f"--system-prompt {shlex.quote(DEFAULT_SYSTEM_PROMPT)}"
 )
+
+
+def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussion") -> str:
+    """Build the pi CLI command for a given system prompt + execution profile.
+
+    The system prompt is the system layer (PROJECT_INTEGRATION §5.4). Phase 2
+    profile injection works purely by passing an enhanced ``system_prompt`` here,
+    so the rest of the command (tools, extension, session flags) is unchanged.
+
+    Quoting uses ``shlex.quote`` (not ``repr``): the command string is later
+    re-split by ``cli_bridge.parse_command`` via ``shlex.split(posix=True)``, and
+    only ``shlex.quote`` round-trips arbitrary profile content (quotes/newlines)
+    safely. ``repr`` happened to work for the static default prompt but breaks on
+    real IDENTITY/SOUL markdown, and also passed newlines as literal ``\\n``.
+    """
+    if execution_profile == "tools":
+        # 施工档命令（文件工具启用）
+        return (
+            "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
+            "--tools read,grep,find,ls,bash,edit,write "
+            f"--system-prompt {shlex.quote(system_prompt)}"
+        )
+    # 当前默认命令：function-calling 模式
+    # --no-builtin-tools  禁用 read/bash/edit/write 等(LLM 表面只剩 talk_send)
+    # --no-extensions     禁用自动发现扩展(规避 plan-mode 在 rebindSession 中
+    #                     setActiveTools(NORMAL_MODE_TOOLS) 覆盖 talk_send 的 bug)
+    # --extension <path>  显式加载我们自己的 talk_tools_extension.ts 不受 -ne 影响
+    return (
+        f"pi --print --mode text --no-context-files --no-builtin-tools --no-extensions "
+        f"--tools talk_send --no-session --thinking off "
+        f"--extension {_TALK_EXTENSION_PATH} "
+        f"--system-prompt {shlex.quote(system_prompt)}"
+    )
+
+
 # 施工档命令（文件工具启用）
-DEFAULT_PI_TOOLS_COMMAND = (
-    "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
-    "--tools read,grep,find,ls,bash,edit,write "
-    f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
-)
+DEFAULT_PI_TOOLS_COMMAND = _build_pi_command(DEFAULT_SYSTEM_PROMPT, execution_profile="tools")
 # 当前默认命令：function-calling 模式
-# --no-builtin-tools  禁用 read/bash/edit/write 等(LLM 表面只剩 talk_send)
-# --no-extensions     禁用自动发现扩展(规避 plan-mode 在 rebindSession 中
-#                     setActiveTools(NORMAL_MODE_TOOLS) 覆盖 talk_send 的 bug)
-# --extension <path>  显式加载我们自己的 talk_tools_extension.ts 不受 -ne 影响
-DEFAULT_PI_COMMAND = (
-    f"pi --print --mode text --no-context-files --no-builtin-tools --no-extensions "
-    f"--tools talk_send --no-session --thinking off "
-    f"--extension {_TALK_EXTENSION_PATH} "
-    f"--system-prompt {DEFAULT_SYSTEM_PROMPT!r}"
-)
+DEFAULT_PI_COMMAND = _build_pi_command(DEFAULT_SYSTEM_PROMPT)
+
+
+def resolve_pi_command(args: argparse.Namespace) -> str:
+    """Resolve the pi command, applying execution profile + opt-in profile injection.
+
+    - A user/env override (``--pi-command`` / ``TALK_PI_COMMAND``) is respected
+      as-is; whoever overrides the command owns its system prompt.
+    - With ``--project`` set and a non-empty ``.talk/`` profile for this member,
+      the IDENTITY/SOUL/USER profile is composed into the system prompt
+      (approach B, system layer).
+    - Without ``--project`` (or with an empty profile) the result is
+      byte-identical to today — strictly opt-in, zero regression.
+    """
+    if args.pi_command != DEFAULT_PI_COMMAND:
+        return args.pi_command
+    system_prompt = DEFAULT_SYSTEM_PROMPT
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_prompt = compose_system_prompt(DEFAULT_SYSTEM_PROMPT, profile)
+    return _build_pi_command(system_prompt, execution_profile=args.pi_execution_profile)
 
 DEFAULT_TIMEOUT_SEC = cli_bridge.DEFAULT_TIMEOUT_SEC
 DEFAULT_MAX_REPLY_CHARS = cli_bridge.DEFAULT_MAX_REPLY_CHARS
@@ -59,8 +104,9 @@ DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL
 
 
 async def run_bridge(args: argparse.Namespace) -> None:
-    if args.pi_execution_profile == "tools" and args.pi_command == DEFAULT_PI_COMMAND:
-        args.pi_command = DEFAULT_PI_TOOLS_COMMAND
+    # resolve_pi_command applies the execution profile swap AND (opt-in) the
+    # --project identity-layer injection in one place.
+    args.pi_command = resolve_pi_command(args)
     args.command = args.pi_command
     # 把 TALK 连接信息注入环境变量，供 talk_tools_extension.ts 使用
     # 每个 bridge 实例必须用自己的 key/url/id，不能复用其他实例的旧值

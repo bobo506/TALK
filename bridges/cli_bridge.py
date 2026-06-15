@@ -2145,6 +2145,13 @@ def build_parser(
         default="execution",
         help="Agent decision tier for role injection. Default: %(default)s",
     )
+    parser.add_argument(
+        "--project",
+        default=None,
+        help="Project root holding a .talk/ directory. When set, this member's "
+        "IDENTITY/SOUL/USER profile is composed into the runtime system prompt "
+        "(Phase 2 identity layer). Omit to keep current behavior unchanged.",
+    )
     return parser
 
 

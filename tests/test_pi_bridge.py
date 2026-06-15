@@ -1,7 +1,11 @@
-import unittest
 import shlex
+import shutil
+import tempfile
+import unittest
+from pathlib import Path
 
 from bridges import pi_bridge
+from cli.profiles import SYSTEM_PROMPT_PROFILE_HEADER, agent_profile_dir
 
 
 class PiBridgeTests(unittest.TestCase):
@@ -40,13 +44,12 @@ class PiBridgeTests(unittest.TestCase):
         self.assertNotIn("human:qa", system_prompt)
         self.assertNotIn("agent:codex", system_prompt)
 
-    def test_parser_can_enable_pi_tools_profile_with_default_command(self):
+    def test_tools_profile_resolves_to_tools_command(self):
         args = pi_bridge.build_parser().parse_args(["--key", "pi-key", "--pi-execution-profile", "tools"])
 
         self.assertEqual(args.pi_execution_profile, "tools")
-        self.assertEqual(args.pi_command, pi_bridge.DEFAULT_PI_COMMAND)
-        args.pi_command = pi_bridge.DEFAULT_PI_TOOLS_COMMAND
-        command_args = shlex.split(args.pi_command, posix=True)
+        resolved = pi_bridge.resolve_pi_command(args)
+        command_args = shlex.split(resolved, posix=True)
         self.assertIn("--tools", command_args)
         self.assertIn("read,grep,find,ls,bash,edit,write", command_args)
         self.assertNotIn("--no-tools", command_args)
@@ -75,6 +78,61 @@ class PiBridgeTests(unittest.TestCase):
         但保留 -ne 让工具表面完全由 bridge 控制,避免未来 plan-mode 改成员时炸我们。"""
         cmd = pi_bridge.DEFAULT_PI_TOOLS_COMMAND
         self.assertIn("--no-extensions", cmd)
+
+
+class PiBridgeProfileInjectionTests(unittest.TestCase):
+    """Phase 2 / approach B: --project injects IDENTITY/SOUL into the system prompt."""
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="talk-pi-project-"))
+        self.addCleanup(lambda: shutil.rmtree(self._tmp, ignore_errors=True))
+
+    def _write_pi_profile(self):
+        agent_dir = agent_profile_dir(self._tmp, "agent:pi")
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        (agent_dir / "IDENTITY.md").write_text("# IDENTITY\n我是 pi，对话型 Agent。", encoding="utf-8")
+        (agent_dir / "SOUL.md").write_text("# SOUL\n语气平实，绝不写汇报体。", encoding="utf-8")
+
+    def _system_prompt_of(self, command: str) -> str:
+        args = shlex.split(command, posix=True)
+        return args[args.index("--system-prompt") + 1]
+
+    def test_without_project_is_byte_identical(self):
+        args = pi_bridge.build_parser().parse_args(["--key", "pi-key"])
+        self.assertEqual(pi_bridge.resolve_pi_command(args), pi_bridge.DEFAULT_PI_COMMAND)
+
+    def test_project_with_profile_injects_into_system_prompt(self):
+        self._write_pi_profile()
+        args = pi_bridge.build_parser().parse_args(
+            ["--key", "pi-key", "--name", "pi", "--project", str(self._tmp)]
+        )
+        resolved = pi_bridge.resolve_pi_command(args)
+        system_prompt = self._system_prompt_of(resolved)
+
+        # base system prompt is preserved …
+        self.assertIn("TALK 群里的一个 agent", system_prompt)
+        # … and the profile is appended as framed background
+        self.assertIn(SYSTEM_PROMPT_PROFILE_HEADER, system_prompt)
+        self.assertIn("绝不写汇报体", system_prompt)
+        self.assertIn("对话型 Agent", system_prompt)
+        # the rest of the command is untouched (still function-calling shape)
+        self.assertIn("--tools talk_send", resolved)
+
+    def test_project_without_matching_profile_is_byte_identical(self):
+        # .talk/ exists but no profile for agent:pi → opt-in stays a no-op
+        agent_profile_dir(self._tmp, "agent:other").mkdir(parents=True, exist_ok=True)
+        args = pi_bridge.build_parser().parse_args(
+            ["--key", "pi-key", "--name", "pi", "--project", str(self._tmp)]
+        )
+        self.assertEqual(pi_bridge.resolve_pi_command(args), pi_bridge.DEFAULT_PI_COMMAND)
+
+    def test_command_override_is_respected_even_with_project(self):
+        self._write_pi_profile()
+        args = pi_bridge.build_parser().parse_args(
+            ["--key", "pi-key", "--name", "pi", "--project", str(self._tmp),
+             "--pi-command", "pi --provider deepseek --print"]
+        )
+        self.assertEqual(pi_bridge.resolve_pi_command(args), "pi --provider deepseek --print")
 
 
 if __name__ == "__main__":
