@@ -1,41 +1,40 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 基础接入 · 切片 1–4 完成（接入机制 + CLI + dogfood）
+Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 全部完成（接入机制 + 4 CLI 子命令 + dogfood + 项目群子资源）
 
 ### 1) Current Agent Role
-- 角色来源：`AGENTS.md`；本轮启动角色：Claude = **决策 Agent**（管理者显式声明）。管理者本轮另改 `AGENTS.md`：决策 Agent **默认只给方案、需管理者明确要求才开发**。
+- 角色来源：`AGENTS.md`；Claude = **决策 Agent**。管理者已改 `AGENTS.md`：决策 Agent **默认只给方案、需管理者明确要求才开发**（已提交 `d110a86`）。
 - 当前 Codex 角色：执行 Agent。
-- 当前分支：`claude/project-integration-phase1`（从 `main` 新开）。切片 1–4 已提交本地（`41ad2dd`→`dec9d25`），**尚未 push**（等管理者确认 push / 开 PR）。
-- `AGENTS.md` 角色定义改动属管理者治理改动，**未纳入**任何切片 commit，留工作区待管理者处理。
+- 当前分支：`claude/project-integration-phase1`（从 `main` 新开），含 8 个 commit（切片 1–6 + AGENTS.md 治理 + docs），**尚未 push**（等管理者确认 push / 开 PR）。
 
 ### 2) Current Progress
-- **核心主线重启**：回到 `PROJECT_INTEGRATION.md` §12 四阶段路线，**Phase 1 基础接入已基本成型**。管理者授权连做切片 2→3→4。
-- **切片 1**（`41ad2dd`）：`projects` 表 + 注册/查询 CRUD API（`POST/GET/PATCH/DELETE /api/projects`，写操作限人类成员）。
-- **切片 2**（`523fffe`）：`groups.project_id` NULLABLE 扩展，群可归属 project；旧群保持无项目上下文，向后兼容。
-- **切片 3**（`570c18d`）：`talk` CLI 脚手架——`python -m cli.talk init` 生成 `.talk/` + 可选注册到 server；`register_project` http client 可注入便于测试；新增 `pyyaml` 依赖；Windows GBK 控制台 UTF-8 输出修复。
-- **切片 4**（`dec9d25`）：TALK 自身 dogfood `.talk/`（用 CLI 生成基座 + 三 agent 身份层四件套 + 带角色/分级的 groups.yaml），同时作为外部接入参考模板。
-- 全套件 **189/189 通过**，无回归。
+- **Phase 1 基础接入全部完成**（`PROJECT_INTEGRATION.md` §12 四阶段路线第一阶段）：
+  - 切片 1（`41ad2dd`）：`projects` 表 + 注册/查询 CRUD API。
+  - 切片 2（`523fffe`）：`groups.project_id` NULLABLE 扩展 + 旧群向后兼容。
+  - 切片 3（`570c18d`）：`talk init` CLI 脚手架 + `pyyaml` 依赖 + Windows UTF-8 输出修复。
+  - 切片 4（`dec9d25`）：TALK 自身 dogfood `.talk/`（CLI 生成 + 三 agent 身份层 + 角色/分级 groups.yaml）。
+  - 切片 5（`da0dad7`）：`talk add-agent` / `talk create-group` 子命令 + `member_dir_name` 净化 helper。
+  - 切片 6（`99b9076`）：`GET /api/projects/{id}/groups` 子资源。
+- 全套件 **201/201 通过**，无回归（累计新增 28 个单测）。
 
 ### 3) Open Questions / Pending Confirmation
-- **分支待 push / 开 PR**：切片 1–4 在 `claude/project-integration-phase1`，等管理者确认。
-- **`:`→`_` 目录净化约定待 ratify**：member_id 含 `:`，Windows 不能做目录名，agent 目录采用 `agent:codex → agent_codex/`；bridge 在 Phase 2 查 profile 时需落地同样的净化映射。
+- **分支待 push / 开 PR**：切片 1–6 在 `claude/project-integration-phase1`，等管理者确认。
+- **`:`→`_` 目录净化约定待 ratify**：已落地为 `member_dir_name()` helper（`agent:codex → agent_codex/`）；bridge 在 Phase 2 查 profile 须复用同一映射。
+- **测试策略已定**：Phase 1 是管道层，单测兜底；功能/人工验收推迟到 **Phase 2 之后**合并做一次（首个可观察行为 = 身份注入改变 agent 行为）。
 - `last_seen_at` 暂等于 `created_at`；bridge `--project` 连接刷新逻辑留待 Phase 2。
 
 ### 4) Next Plan
 1. 等管理者确认是否 push 分支 / 开 PR。
-2. **Phase 2 身份层**：bridge 加 `--project` 参数 → 读 `.talk/agents/<member_id>/{IDENTITY,SOUL}.md` → 注入 system prompt（须落地 member_id→目录 `:`→`_` 净化）。根治 dogfood 反复出现的身份混乱/汇报体。
-3. Phase 1 收尾项（按需）：§7.3 子资源 `/api/projects/{id}/agents|groups|sync`、`talk add-agent` / `talk create-group` 子命令。
+2. **Phase 2 身份层**（下一阶段，待管理者点头）：bridge 加 `--project` → 读 `.talk/agents/<净化名>/{IDENTITY,SOUL}.md` → 注入 system prompt（复用 `member_dir_name`）；并入 `project_agents` 表 + `/api/projects/{id}/agents` + `POST /api/projects/{id}/sync`。根治 dogfood 反复出现的身份混乱/汇报体。
 
 ### 5) Verification
-- 逐片：`test_groups`+`test_projects` 16/16；`test_talk_cli` 8/8。
-- `python -m unittest discover -s tests` → 切片 2 后 181/181、切片 3 后 **189/189**，均无回归。
-- `python -m cli.talk init` 实跑生成结构正确；dogfood `.talk/` 全部 YAML 可解析、3×4 profile 齐全、`memory/` 忽略生效。
+- 逐片单测全绿；`python -m unittest discover -s tests` → 切片 5 后 199/199、切片 6 后 **201/201**，无回归。
+- `python -m cli.talk init` / `add-agent` 实跑生成结构正确；dogfood `.talk/` YAML 可解析、profile 齐全、`memory/` 忽略生效。
 
-### 6) Changed Files（切片 1–4 累计）
-- 新增 `server/routes/projects.py`、`cli/__init__.py`、`cli/talk.py`、`tests/test_projects.py`、`tests/test_talk_cli.py`
-- 新增 `.talk/`（project.yaml / AGENTS.md / groups.yaml / agents 三套 profile / .gitignore，共 17 文件）
-- 改 `server/models.py`、`server/main.py`、`server/db.py`、`server/routes/groups.py`、`tests/test_groups.py`、`requirements.txt`
+### 6) Changed Files（Phase 1 累计）
+- 新增 `server/routes/projects.py`、`cli/__init__.py`、`cli/talk.py`、`tests/test_projects.py`、`tests/test_talk_cli.py`、`.talk/`（17 文件）
+- 改 `server/models.py`、`server/main.py`、`server/db.py`、`server/routes/groups.py`、`tests/test_groups.py`、`requirements.txt`、`AGENTS.md`
 - 改 `docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
 
 ---

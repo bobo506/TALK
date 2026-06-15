@@ -184,6 +184,38 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-15 Phase 1 收尾 · 切片 5–6：CLI 子命令 + 项目群子资源
+
+**背景**：与管理者确认"先收 Phase 1 尾巴再进 Phase 2"，并约定功能/人工验收推迟到 Phase 2 之后（Phase 1 是管道层，单测兜底；首个可观察行为在 Phase 2 身份注入）。管理者授权连做这两片。`project_agents` 表 / `/api/projects/{id}/agents` / `/sync` 明确并入 Phase 2（消费者是 bridge profile 加载），不在本收尾内。
+
+### 切片 5：`talk add-agent` / `talk create-group` 子命令（commit da0dad7）
+
+- `cli/talk.py`：
+  - `member_dir_name()`：member_id→目录名的 `:`→`_` 净化**公共 helper**（Windows 安全；Phase 2 bridge 查 profile 复用同一映射）。
+  - `scaffold_agent()`：`.talk/agents/<净化名>/` 生成 IDENTITY/SOUL/USER/MEMORY 占位模板；要求先 `talk init`；FileExistsError 防覆盖 + force。
+  - `create_group()`：`POST /api/groups`（http client 可注入）。
+  - `load_project` / `load_groups` / `save_groups`：`.talk/` YAML 读写。
+  - `cmd_add_agent` / `cmd_create_group`：create-group 默认从本地 `project.yaml` 取 server URL 与 project_id，成功后把群追加进本地 `groups.yaml`。
+  - `main()` 捕获 FileNotFoundError → 缺 `.talk/` 给干净 ✗ + exit 1。
+- `tests/test_talk_cli.py`：+10 用例。实跑 `add-agent agent:codex` 生成 `agent_codex/` 正确。
+
+### 切片 6：`GET /api/projects/{id}/groups`（commit 99b9076）
+
+- `server/routes/projects.py`：`list_project_groups` 按 project_id 过滤，可见性沿用 `GET /api/groups`（human 全部 / agent 仅已入群），复用 groups 路由 `_group_out`，项目不存在 404；projects.py 单向 import groups.py（无循环）。
+- `tests/test_projects.py`：+2 用例（按项目过滤 + 未知项目 404 / agent 可见性）。
+
+### 验证
+
+- 逐片：`test_talk_cli` 18/18；`test_projects`+`test_groups` 18/18。
+- 全套件：切片 5 后 **199/199**、切片 6 后 **201/201**，均无回归。
+
+### 待确认 / 下一步
+
+- **Phase 1 全部完成**（接入机制 + 4 CLI 子命令 + dogfood 模板 + 项目群子资源）。
+- 分支 `claude/project-integration-phase1` 现含 8 个 commit（切片 1–6 + AGENTS.md 治理 + docs），**未 push**，等管理者确认 push / 开 PR。
+- 测试策略：Phase 1 单测兜底，功能/人工验收待 Phase 2 之后合并做一次（首个可观察行为）。
+- 下一阶段 **Phase 2 身份层**：bridge 加 `--project` → 读 `.talk/agents/<member_id 净化>/{IDENTITY,SOUL}.md` → 注入 system prompt（落地 `member_dir_name` 映射）；并入 `project_agents` 表 + `/api/projects/{id}/agents` + `/sync`。
+
 ## 2026-06-15 Phase 1 基础接入 · 切片 2–4：groups 关联 + talk CLI + TALK dogfood
 
 **背景**：切片 1（projects 表 + API）完成后，项目管理者明确改 `AGENTS.md` 角色定义（决策 Agent 默认只给方案、需明确要求才开发），并授权 Claude 按 1→2→3 顺序自主连续开发 Phase 1 余下三片。本批次三片一气呵成，每片独立验证 + 提交到分支 `claude/project-integration-phase1`。
