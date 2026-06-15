@@ -184,6 +184,45 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-15 Phase 1 基础接入 · 切片 2–4：groups 关联 + talk CLI + TALK dogfood
+
+**背景**：切片 1（projects 表 + API）完成后，项目管理者明确改 `AGENTS.md` 角色定义（决策 Agent 默认只给方案、需明确要求才开发），并授权 Claude 按 1→2→3 顺序自主连续开发 Phase 1 余下三片。本批次三片一气呵成，每片独立验证 + 提交到分支 `claude/project-integration-phase1`。
+
+### 切片 2：`groups.project_id` 字段扩展 + 旧群向后兼容（commit 523fffe）
+
+- `server/models.py`：Group 新增 `project_id`（NULLABLE，FK→projects.project_id，index）；GroupCreate 接受+strip 校验；GroupOut 暴露。
+- `server/routes/groups.py`：create_group 设置前校验项目存在（不存在 400）；`_group_out` 输出 project_id。
+- `server/db.py`：幂等 `ALTER TABLE groups ADD COLUMN project_id` + `ix_groups_project_id`。
+- `tests/test_groups.py`：+3 用例（关联项目 / 无项目向后兼容 / 未知项目 400）。
+- **向后兼容**：project_id 默认 NULL，历史群与未接入项目的群行为不变（§10.2）。
+
+### 切片 3：`talk` CLI 脚手架（commit 570c18d）
+
+- `cli/talk.py`：`scaffold_project()`（纯文件系统，生成 `.talk/{project.yaml,AGENTS.md,groups.yaml,agents/README.md,.gitignore}`，FileExistsError 防误覆盖 + force 重写）；`register_project()`（POST /api/projects，**http client 可注入**，便于对进程内 FastAPI TestClient 端到端测试）；`generate_project_id()`；argparse 子命令 `init`；`_force_utf8_streams()` 解决 Windows GBK 控制台打印 ✓/中文路径报错。
+- `requirements.txt`：显式新增 `pyyaml>=6,<7`（此前为隐式依赖）。
+- `tests/test_talk_cli.py`：8 用例（脚手架/默认群/防覆盖/id 格式/注册成功/注册失败/init --no-register/init 防覆盖）。
+- 实跑 `python -m cli.talk init` 生成结构正确，中文 UTF-8 正常。
+
+### 切片 4：TALK 自身 dogfood `.talk/` 目录（commit dec9d25）
+
+- 用切片 3 的 CLI 生成基座（真实 dogfood CLI），再补三个 agent 的身份层四件套 `agents/agent_{codex,pi,pi-kimi}/{IDENTITY,SOUL,USER,MEMORY}.md`（内容取自 §6.3–6.6 示例 + dogfood 实况）。
+- `groups.yaml`：`group:talk-dev` 群，按 §5.2 标注业务角色 + 决策分级。
+- **关键设计决策（待 ratify）**：`member_id` 含 `:`，Windows 文件系统禁止目录名含 `:`，故 agent 目录按 **`:` → `_`** 净化（`agent:codex` → `agent_codex/`）。已在 `.talk/agents/README.md` 记录；bridge 在 Phase 2 查 profile 时需做同样净化映射。spec 的 `agent:<id>/` 记法在 Windows 下即采用此适配。
+- `memory/` 被 `.talk/.gitignore` 忽略（已 `git check-ignore` 验证命中）。
+
+### 验证
+
+- 逐片：`test_groups`+`test_projects` 16/16；`test_talk_cli` 8/8。
+- 全套件 `python -m unittest discover -s tests`：切片 2 后 **181/181**，切片 3 后 **189/189**，均无回归。
+- dogfood `.talk/` 全部 YAML 可解析、3×4 profile 齐全、角色映射正确。
+
+### 待确认 / 下一步
+
+- 分支 `claude/project-integration-phase1` 含切片 1–4（commit 41ad2dd→dec9d25），**未 push**，等管理者确认 push / 开 PR。
+- `AGENTS.md` 角色定义改动是管理者治理改动，**未纳入**任何切片 commit，留工作区待管理者处理。
+- Phase 1 已基本成型（接入机制 + CLI + dogfood 模板）。下一阶段 Phase 2 身份层：bridge `--project` 加载 profile + IDENTITY/SOUL 注入 system prompt，届时需落地 member_id→目录的 `:`→`_` 净化映射。
+- 仍未做（§7.3 子资源）：`/api/projects/{id}/agents|groups|sync`、`talk add-agent` / `talk create-group` 子命令。
+
 ## 2026-06-15 Phase 1 基础接入 · 切片 1：`projects` 表 + 注册/查询 API
 
 **背景**：前端精修支线收尾、5.x 主线关闭后，项目管理者确认回到核心主线。从 `docs/spec/PROJECT_INTEGRATION.md` §12 登记的四阶段路线选定 **Phase 1 基础接入**作为重启起点。本切片落地整条主线的最小地基——server 端 `projects` 表与项目注册/查询 CRUD API（对应 §7.1 表结构、§7.3 API 草案、§3.4 talk init 握手）。

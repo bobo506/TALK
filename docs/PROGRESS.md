@@ -1,45 +1,42 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 基础接入 · 切片 1：`projects` 表 + 注册/查询 API
+Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 基础接入 · 切片 1–4 完成（接入机制 + CLI + dogfood）
 
 ### 1) Current Agent Role
-- 角色来源：`AGENTS.md`；本轮启动角色：Claude = **决策 Agent**（本轮由项目管理者改 PROGRESS 显式声明）。
+- 角色来源：`AGENTS.md`；本轮启动角色：Claude = **决策 Agent**（管理者显式声明）。管理者本轮另改 `AGENTS.md`：决策 Agent **默认只给方案、需管理者明确要求才开发**。
 - 当前 Codex 角色：执行 Agent。
-- 当前分支：`claude/project-integration-phase1`（从 `main` 新开）。切片 1 已提交本地 `52ccf78`，**尚未 push**（等管理者确认是否 push / 开 PR）。`AGENTS.md` 角色定义改动属管理者治理改动，未纳入本切片 commit。
-- 用量门禁：`~/.claude/usage.json` 为空，无法读取占比；按"无法获取用量"规则节制——Phase 1 涉及数据库改动，本轮 1 片即暂停汇总。
+- 当前分支：`claude/project-integration-phase1`（从 `main` 新开）。切片 1–4 已提交本地（`41ad2dd`→`dec9d25`），**尚未 push**（等管理者确认 push / 开 PR）。
+- `AGENTS.md` 角色定义改动属管理者治理改动，**未纳入**任何切片 commit，留工作区待管理者处理。
 
 ### 2) Current Progress
-- **核心主线重启**：前端/对话质量支线收尾后，项目管理者确认回到 `PROJECT_INTEGRATION.md` §12 四阶段路线，选定 **Phase 1 基础接入** 为起点。
-- **切片 1 完成**：server 端落地 `projects` 表 + 完整注册/查询 CRUD API（整条主线的最小地基）。
-  - `Project` ORM 表：`project_id`(PK) / `display_name` / `description` / `project_root_path` / `maintainer_member_id`(FK→members) / `created_at` / `last_seen_at`。
-  - `POST /api/projects`（注册，缺省生成 `prj_<hex12>`，maintainer 缺省取当前成员并校验）、`GET`（列表 / 详情）、`PATCH`（部分更新，`model_fields_set` 实现真 PATCH）、`DELETE`（注销 204）。
-  - 写操作限人类成员（`_require_human`），读操作任意已鉴权成员；与 groups 路由同构。
-- 8 个新单测 + 全套件 178/178 通过，无回归。
+- **核心主线重启**：回到 `PROJECT_INTEGRATION.md` §12 四阶段路线，**Phase 1 基础接入已基本成型**。管理者授权连做切片 2→3→4。
+- **切片 1**（`41ad2dd`）：`projects` 表 + 注册/查询 CRUD API（`POST/GET/PATCH/DELETE /api/projects`，写操作限人类成员）。
+- **切片 2**（`523fffe`）：`groups.project_id` NULLABLE 扩展，群可归属 project；旧群保持无项目上下文，向后兼容。
+- **切片 3**（`570c18d`）：`talk` CLI 脚手架——`python -m cli.talk init` 生成 `.talk/` + 可选注册到 server；`register_project` http client 可注入便于测试；新增 `pyyaml` 依赖；Windows GBK 控制台 UTF-8 输出修复。
+- **切片 4**（`dec9d25`）：TALK 自身 dogfood `.talk/`（用 CLI 生成基座 + 三 agent 身份层四件套 + 带角色/分级的 groups.yaml），同时作为外部接入参考模板。
+- 全套件 **189/189 通过**，无回归。
 
 ### 3) Open Questions / Pending Confirmation
-- **本切片已提交分支 `claude/project-integration-phase1`（52ccf78）**：是否 push GitHub / 开 PR 等管理者确认。
-- `last_seen_at` 暂等于 `created_at`；bridge 连接时刷新逻辑留待 bridge `--project` 切片。
-- （支线遗留，未启动）成员软删除、Hall 删除真实 API + 二次确认——非主线，暂缓。
+- **分支待 push / 开 PR**：切片 1–4 在 `claude/project-integration-phase1`，等管理者确认。
+- **`:`→`_` 目录净化约定待 ratify**：member_id 含 `:`，Windows 不能做目录名，agent 目录采用 `agent:codex → agent_codex/`；bridge 在 Phase 2 查 profile 时需落地同样的净化映射。
+- `last_seen_at` 暂等于 `created_at`；bridge `--project` 连接刷新逻辑留待 Phase 2。
 
 ### 4) Next Plan
-1. 本轮按刹车规则暂停，等管理者确认是否 push + 是否继续下一片。
-2. Phase 1 续切片候选：① `groups.project_id` NULLABLE 字段扩展 + 旧群向后兼容；② `talk` CLI 脚手架（`talk init` 写 `.talk/` + 调注册 API）；③ TALK 自身 dogfood `.talk/` 目录建立。
-3. 之后进入 Phase 2 身份层（IDENTITY/SOUL + bridge `--project` 注入）。
+1. 等管理者确认是否 push 分支 / 开 PR。
+2. **Phase 2 身份层**：bridge 加 `--project` 参数 → 读 `.talk/agents/<member_id>/{IDENTITY,SOUL}.md` → 注入 system prompt（须落地 member_id→目录 `:`→`_` 净化）。根治 dogfood 反复出现的身份混乱/汇报体。
+3. Phase 1 收尾项（按需）：§7.3 子资源 `/api/projects/{id}/agents|groups|sync`、`talk add-agent` / `talk create-group` 子命令。
 
 ### 5) Verification
-- `python -m unittest tests.test_projects -v` → 8/8 通过。
-- `python -m unittest discover -s tests -q` → **178/178 通过**，无回归。
-- 未做：CLI、`groups.project_id` 扩展、`/api/projects/{id}/agents|groups|sync` 子资源、bridge `--project`——均为后续切片。
+- 逐片：`test_groups`+`test_projects` 16/16；`test_talk_cli` 8/8。
+- `python -m unittest discover -s tests` → 切片 2 后 181/181、切片 3 后 **189/189**，均无回归。
+- `python -m cli.talk init` 实跑生成结构正确；dogfood `.talk/` 全部 YAML 可解析、3×4 profile 齐全、`memory/` 忽略生效。
 
-### 6) Changed Files
-- `server/models.py`（新增 Project ORM + 3 个 schema）
-- `server/routes/projects.py`（新文件）
-- `server/main.py`（注册路由）
-- `server/db.py`（projects 索引）
-- `tests/test_projects.py`（新文件）
-- `docs/PROGRESS.md`
-- `docs/PROGRESS_HISTORY.md`
+### 6) Changed Files（切片 1–4 累计）
+- 新增 `server/routes/projects.py`、`cli/__init__.py`、`cli/talk.py`、`tests/test_projects.py`、`tests/test_talk_cli.py`
+- 新增 `.talk/`（project.yaml / AGENTS.md / groups.yaml / agents 三套 profile / .gitignore，共 17 文件）
+- 改 `server/models.py`、`server/main.py`、`server/db.py`、`server/routes/groups.py`、`tests/test_groups.py`、`requirements.txt`
+- 改 `docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
 
 ---
 
