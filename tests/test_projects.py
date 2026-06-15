@@ -140,6 +140,51 @@ class ProjectRouteTests(RouteTestCase):
         self.assertEqual(deleted.status_code, 204)
         self.assertEqual(fetched.status_code, 404)
 
+    def test_list_project_groups_filters_by_project(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_a", "display_name": "A"},
+            )
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:in", "name": "属于项目", "project_id": "prj_a"},
+            )
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:out", "name": "无项目"},
+            )
+            listed = client.get("/api/projects/prj_a/groups", headers={"X-API-Key": "bobo-key"})
+            missing = client.get("/api/projects/prj_ghost/groups", headers={"X-API-Key": "bobo-key"})
+
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual([g["id"] for g in listed.json()], ["group:in"])
+        self.assertEqual(missing.status_code, 404)
+
+    def test_list_project_groups_respects_agent_visibility(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_v", "display_name": "V"},
+            )
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:joined", "name": "已入群", "project_id": "prj_v", "member_ids": ["agent:codex"]},
+            )
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:other", "name": "未入群", "project_id": "prj_v"},
+            )
+            agent_view = client.get("/api/projects/prj_v/groups", headers={"X-API-Key": "codex-key"})
+
+        self.assertEqual([g["id"] for g in agent_view.json()], ["group:joined"])
+
     def test_validation_rejects_bad_input(self):
         with self.make_client() as client:
             no_name = client.post(

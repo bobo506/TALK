@@ -16,7 +16,8 @@ from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import get_session
-from server.models import Member, Project, ProjectCreate, ProjectOut, ProjectUpdate
+from server.models import Group, GroupMember, GroupOut, Member, Project, ProjectCreate, ProjectOut, ProjectUpdate
+from server.routes.groups import _group_out
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -90,6 +91,23 @@ def get_project(
     """Return one registered project."""
     project = _get_project(project_id, session)
     return ProjectOut.from_orm_project(project)
+
+
+@router.get("/{project_id}/groups", response_model=list[GroupOut])
+def list_project_groups(
+    project_id: str,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """List groups belonging to a project (visibility same as GET /api/groups)."""
+    _get_project(project_id, session)
+    stmt = select(Group).where(Group.project_id == project_id)
+    if current.kind != "human":
+        stmt = stmt.join(GroupMember, GroupMember.group_id == Group.id).where(
+            GroupMember.member_id == current.id
+        )
+    groups = session.exec(stmt.order_by(Group.created_at.desc())).all()
+    return [_group_out(group, session) for group in groups]
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
