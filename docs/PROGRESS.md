@@ -3,10 +3,13 @@
 ## Latest
 Updated: 2026-06-15 (Asia/Shanghai) — Phase 2 身份层启动：切片 7 profile 加载器完成，切片 8 注入策略待管理者选型
 
-### 0) Phase 2 进行中
-- **切片 7 完成**（commit `ffa80b2`）：`cli/profiles.py` agent profile 加载器（纯函数地基，零风险）+ 7 单测（含 dogfood 真实数据校验）。全套件 **208/208**。
-- **切片 8 暂停等选型**：bridge 把 profile 注入 prompt 是前次 debug 战场、多方案、改现有行为、本机无 pi/codex CLI 无法黑盒验证 → 按 `AGENTS.md`（多方案/影响现有行为须先确认）暂停。三个候选注入策略见 PROGRESS_HISTORY 切片 7 条目；共同安全设计：`--project` 缺省时行为与现状字节一致（严格 opt-in）。
-- **切片 9（安全，可先做）**：server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`，纯服务端、可测，与切片 8 正交。
+### 0) Phase 2 进行中（用量门禁触发，暂停）
+- **切片 7 完成**（`ffa80b2`）：`cli/profiles.py` profile 加载器（纯函数地基）+ 7 单测。
+- **注入策略已定 = B 方案（系统层）**：管理者拍板——人设作为"背景底色"放进 agent 系统层（`--system-prompt`），不混进每条消息流（§5.4 路线）。
+- **切片 8a 完成**（`fc15aa6`）：`compose_system_prompt(base, profile)` 纯函数——profile 作背景拼进系统提示，带"这是底色、别复述"框定；profile 为空时 base 原样返回（无 profile 成员零行为变化）。+3 单测。全套件 **211/211**。
+- **切片 8b 待做（需真机验证）**：把 pi/codex bridge 的 `--system-prompt` 真正接到 `compose_system_prompt` + 加 `--project` 参数。**重活、改 agent 现有行为、本机无 pi/codex CLI 无法黑盒验证** → 留待有真机环境时做；严格 opt-in（`--project` 缺省字节一致）。
+- **切片 9（安全，可并行）**：server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`，纯服务端、可测、与 8b 正交。
+- **暂停原因**：5 小时窗口已用约 86%（≥85% 红线）。按规则 + 管理者指示，做完一个小切片（8a）即停，等用量刷新再继续。
 
 ---
 
