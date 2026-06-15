@@ -150,6 +150,85 @@ def scaffold_project(
     return project_meta
 
 
+def member_dir_name(member_id: str) -> str:
+    """Filesystem-safe directory name for a ``member_id``.
+
+    member_ids contain ``:`` (e.g. ``agent:codex``) which Windows forbids in
+    paths, so map ``:`` -> ``_``. The bridge must use the same mapping when it
+    looks up ``.talk/agents/<member_id>/`` profiles (Phase 2).
+    """
+    return member_id.replace(":", "_")
+
+
+def _agent_profile_files(member_id: str) -> dict[str, str]:
+    return {
+        "IDENTITY.md": (
+            f"# {member_id} — IDENTITY\n\n"
+            "## 名字\n<短名>\n\n"
+            f"完整 ID：`{member_id}`，作为整体看待，不拆解。\n\n"
+            "## Agent 类型\n<对话型 / 决策型代码 / ...>\n\n"
+            "## 擅长领域\n- <...>\n\n"
+            "## 不擅长\n- <...>\n"
+        ),
+        "SOUL.md": (
+            f"# {member_id} — SOUL\n\n"
+            "## 语气\n<...>\n\n"
+            '## 风格\n- 直接说要说的内容，不写"已经XX啦"汇报体\n- <...>\n\n'
+            "## 决策风格\n<...>\n\n"
+            "## 不可逾越的边界（Hard Limits）\n"
+            "- 以自己 member_id 身份回应，不冒充请求者\n- <...>\n"
+        ),
+        "USER.md": (
+            f"# {member_id} — USER（在本项目中）\n\n"
+            "## 项目所有者\n<human:xxx —— ...>\n\n"
+            "## 同伴 Agent\n- <...>\n\n"
+            "## 项目偏好\n- <...>\n"
+        ),
+        "MEMORY.md": (
+            f"# {member_id} — MEMORY\n\n"
+            "## <日期>\n- <长期记忆，持续追加>\n"
+        ),
+    }
+
+
+def scaffold_agent(root: Path, member_id: str, *, force: bool = False) -> Path:
+    """Create ``.talk/agents/<dir>/`` placeholder profile for ``member_id``.
+
+    Requires ``.talk/`` to already exist (run ``talk init`` first).
+    """
+    talk_dir = Path(root) / ".talk"
+    if not (talk_dir / "project.yaml").exists():
+        raise FileNotFoundError(f"no .talk/project.yaml under {root}; run `talk init` first")
+    agent_dir = talk_dir / "agents" / member_dir_name(member_id)
+    if agent_dir.exists() and not force:
+        raise FileExistsError(f"agent profile already exists at {agent_dir} (use force to overwrite)")
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    for fname, content in _agent_profile_files(member_id).items():
+        _write_text(agent_dir / fname, content)
+    return agent_dir
+
+
+def load_project(root: Path) -> dict[str, Any]:
+    path = Path(root) / ".talk" / "project.yaml"
+    if not path.exists():
+        raise FileNotFoundError(f"no .talk/project.yaml under {root}; run `talk init` first")
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def load_groups(root: Path) -> dict[str, Any]:
+    path = Path(root) / ".talk" / "groups.yaml"
+    doc = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else None
+    if not isinstance(doc, dict):
+        doc = {}
+    if not isinstance(doc.get("groups"), list):
+        doc["groups"] = []
+    return doc
+
+
+def save_groups(root: Path, doc: dict[str, Any]) -> None:
+    _write_yaml(Path(root) / ".talk" / "groups.yaml", doc)
+
+
 # ── server registration ──────────────────────────────────────────────
 
 
@@ -190,6 +269,47 @@ def register_project(
     return resp.json()
 
 
+def create_group(
+    server_url: str,
+    api_key: str,
+    *,
+    name: str,
+    group_id: Optional[str] = None,
+    description: Optional[str] = None,
+    project_id: Optional[str] = None,
+    member_ids: Optional[list[str]] = None,
+    http: Any = None,
+) -> dict[str, Any]:
+    """Create a group via ``POST /api/groups`` (used by ``talk create-group``).
+
+    ``http`` is injectable like :func:`register_project`.
+    """
+    payload: dict[str, Any] = {"name": name}
+    if group_id:
+        payload["id"] = group_id
+    if description:
+        payload["description"] = description
+    if project_id:
+        payload["project_id"] = project_id
+    if member_ids:
+        payload["member_ids"] = member_ids
+
+    owns_client = http is None
+    if http is None:
+        import httpx
+
+        http = httpx.Client(base_url=server_url, timeout=10.0)
+    try:
+        resp = http.post("/api/groups", json=payload, headers={"X-API-Key": api_key})
+    finally:
+        if owns_client:
+            http.close()
+
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"create group failed: HTTP {resp.status_code} {resp.text}")
+    return resp.json()
+
+
 # ── CLI ──────────────────────────────────────────────────────────────
 
 
@@ -226,6 +346,47 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_add_agent(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    agent_dir = scaffold_agent(root, args.member_id, force=args.force)
+    print(f"✓ Created {agent_dir} (IDENTITY/SOUL/USER/MEMORY placeholders)")
+    print("• Fill in IDENTITY.md and SOUL.md, then commit.")
+    return 0
+
+
+def cmd_create_group(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    project = load_project(root)
+    server_url = args.server or project.get("talk_server") or DEFAULT_SERVER
+    project_id = args.project or project.get("project_id")
+    if not args.key:
+        print("✗ --key is required to create a group on the server", file=sys.stderr)
+        return 1
+
+    result = create_group(
+        server_url,
+        args.key,
+        name=args.name,
+        group_id=args.id,
+        description=args.description,
+        project_id=project_id,
+        member_ids=args.members or None,
+    )
+
+    doc = load_groups(root)
+    doc["groups"].append(
+        {
+            "id": result["id"],
+            "name": result["name"],
+            "members": [{"member_id": m["member_id"]} for m in result.get("members", [])],
+        }
+    )
+    save_groups(root, doc)
+    print(f"✓ Created group {result['id']} (project_id: {result.get('project_id')})")
+    print(f"✓ Updated {root / '.talk' / 'groups.yaml'}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="talk", description="TALK project integration CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -240,6 +401,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("--no-register", action="store_true", help="scaffold only; skip server registration")
     p_init.add_argument("--force", action="store_true", help="overwrite an existing .talk/ directory")
     p_init.set_defaults(func=cmd_init)
+
+    p_add = sub.add_parser("add-agent", help="Scaffold an agent profile under .talk/agents/")
+    p_add.add_argument("member_id", help="member id, e.g. agent:codex")
+    p_add.add_argument("--root", default=".", help="project root directory (default: cwd)")
+    p_add.add_argument("--force", action="store_true", help="overwrite an existing profile")
+    p_add.set_defaults(func=cmd_add_agent)
+
+    p_grp = sub.add_parser("create-group", help="Create a group on the server and record it in groups.yaml")
+    p_grp.add_argument("--name", required=True, help="group display name")
+    p_grp.add_argument("--id", default=None, help="explicit group id (default: server-generated)")
+    p_grp.add_argument("--description", default=None, help="group description")
+    p_grp.add_argument("--project", default=None, help="project_id to associate (default: local project.yaml)")
+    p_grp.add_argument("--members", nargs="*", default=None, help="member_ids to add to the group")
+    p_grp.add_argument("--server", default=None, help="TALK server URL (default: local project.yaml)")
+    p_grp.add_argument("--root", default=".", help="project root directory (default: cwd)")
+    p_grp.add_argument("--key", default=None, help="X-API-Key used to authenticate with the server")
+    p_grp.set_defaults(func=cmd_create_group)
 
     return parser
 
@@ -261,7 +439,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except (FileExistsError, RuntimeError) as exc:
+    except (FileExistsError, FileNotFoundError, RuntimeError) as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 1
 

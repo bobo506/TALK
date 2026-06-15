@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -91,4 +92,119 @@ class TalkCliTests(RouteTestCase):
         root = self._root()
         talk.scaffold_project(root, display_name="Exists")
         rc = talk.main(["init", "--root", str(root), "--no-register"])
+        self.assertEqual(rc, 1)
+
+    # ── add-agent ────────────────────────────────────────────────────
+
+    def test_member_dir_name_sanitizes_colon(self):
+        self.assertEqual(talk.member_dir_name("agent:codex"), "agent_codex")
+        self.assertEqual(talk.member_dir_name("agent:pi-kimi"), "agent_pi-kimi")
+        self.assertEqual(talk.member_dir_name("human:bobo"), "human_bobo")
+
+    def test_scaffold_agent_creates_sanitized_profile(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        agent_dir = talk.scaffold_agent(root, "agent:codex")
+
+        self.assertEqual(agent_dir.name, "agent_codex")
+        for fname in ("IDENTITY.md", "SOUL.md", "USER.md", "MEMORY.md"):
+            self.assertTrue((agent_dir / fname).exists(), f"missing {fname}")
+        # the full member_id (with colon) is preserved inside the file content
+        self.assertIn("agent:codex", (agent_dir / "IDENTITY.md").read_text(encoding="utf-8"))
+
+    def test_scaffold_agent_requires_talk_dir(self):
+        root = self._root()  # no `talk init` run
+        with self.assertRaises(FileNotFoundError):
+            talk.scaffold_agent(root, "agent:codex")
+
+    def test_scaffold_agent_refuses_existing_without_force(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        talk.scaffold_agent(root, "agent:codex")
+        with self.assertRaises(FileExistsError):
+            talk.scaffold_agent(root, "agent:codex")
+        # force overwrites
+        talk.scaffold_agent(root, "agent:codex", force=True)
+
+    def test_cmd_add_agent(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        rc = talk.main(["add-agent", "agent:pi-kimi", "--root", str(root)])
+        self.assertEqual(rc, 0)
+        self.assertTrue((root / ".talk" / "agents" / "agent_pi-kimi" / "SOUL.md").exists())
+
+    def test_cmd_add_agent_without_init_returns_1(self):
+        root = self._root()
+        rc = talk.main(["add-agent", "agent:codex", "--root", str(root)])
+        self.assertEqual(rc, 1)
+
+    # ── create-group ─────────────────────────────────────────────────
+
+    def test_create_group_against_server_with_project(self):
+        self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        self.add_member("agent:codex", api_key="codex-key", display_name="Codex")
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_x", "display_name": "X"},
+            )
+            result = talk.create_group(
+                "http://testserver",
+                "bobo-key",
+                name="设计讨论",
+                project_id="prj_x",
+                member_ids=["agent:codex"],
+                http=client,
+            )
+        self.assertEqual(result["project_id"], "prj_x")
+        self.assertIn("agent:codex", [m["member_id"] for m in result["members"]])
+
+    def test_create_group_raises_on_unknown_project(self):
+        self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        with self.make_client() as client:
+            with self.assertRaises(RuntimeError):
+                talk.create_group(
+                    "http://testserver",
+                    "bobo-key",
+                    name="孤儿群",
+                    project_id="prj_ghost",
+                    http=client,
+                )
+
+    def test_cmd_create_group_updates_local_groups_yaml(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P", project_id="prj_local")
+
+        fake_result = {
+            "id": "group:abc",
+            "name": "设计讨论",
+            "project_id": "prj_local",
+            "members": [{"member_id": "agent:codex"}, {"member_id": "human:bobo"}],
+        }
+        with patch.object(talk, "create_group", return_value=fake_result) as mocked:
+            rc = talk.main(
+                [
+                    "create-group",
+                    "--root", str(root),
+                    "--name", "设计讨论",
+                    "--members", "agent:codex",
+                    "--key", "bobo-key",
+                ]
+            )
+
+        self.assertEqual(rc, 0)
+        # project_id defaulted from local project.yaml
+        self.assertEqual(mocked.call_args.kwargs["project_id"], "prj_local")
+        groups_doc = yaml.safe_load((root / ".talk" / "groups.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(groups_doc["groups"][0]["id"], "group:abc")
+        self.assertEqual(
+            [m["member_id"] for m in groups_doc["groups"][0]["members"]],
+            ["agent:codex", "human:bobo"],
+        )
+
+    def test_cmd_create_group_requires_key(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        rc = talk.main(["create-group", "--root", str(root), "--name", "X"])
         self.assertEqual(rc, 1)
