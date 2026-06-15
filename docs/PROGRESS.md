@@ -1,42 +1,43 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-11 (Asia/Shanghai) — Web UI 精修支线收尾
+Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 基础接入 · 切片 1：`projects` 表 + 注册/查询 API
 
 ### 1) Current Agent Role
-- 角色来源：`AGENTS.md`；本轮启动角色：Claude = 执行 Agent（PROGRESS 未单独声明 Claude，按兜底规则）。
-- 当前 Codex 角色：决策 Agent。
-- 当前分支：`main`（仓库现仅此一条分支，本地 + 远程同步）；全部已完成工作（5.x agent 通信主线 + Web UI 重设计/精修）均在 `main` 并已推送 GitHub。
-- 历史特性分支 `codex/web-ui-feature`、`codex/local-lab-codex-bridge`、`codex/scenario-1-scope-fix` 内容已全部并入 `main`，本地 + 远程均已删除。
+- 角色来源：`AGENTS.md`；本轮启动角色：Claude = **决策 Agent**（本轮由项目管理者改 PROGRESS 显式声明）。
+- 当前 Codex 角色：执行 Agent。
+- 当前分支：`claude/project-integration-phase1`（从 `main` 新开）。切片 1 已提交本地 `52ccf78`，**尚未 push**（等管理者确认是否 push / 开 PR）。`AGENTS.md` 角色定义改动属管理者治理改动，未纳入本切片 commit。
+- 用量门禁：`~/.claude/usage.json` 为空，无法读取占比；按"无法获取用量"规则节制——Phase 1 涉及数据库改动，本轮 1 片即暂停汇总。
 
 ### 2) Current Progress
-- 前端支线已收尾：在浅色三栏重设计基础上，按管理者多轮反馈完成一整轮视觉/布局精修（纯 `web/` 改动，未动后端 / API / 数据模型）。
-- 字体整体收小并分级（control 11 / body 13 / section 14 / title 16），全站字重从 750–850 降为 750 / 600 / 450 / 400 四级，消除"满屏粗体"。
-- 三栏收窄为 `196px / 1fr / 252px`，中间消息区约占 2/3；顶部查询区改为标题右侧同行（修掉"搜索"被压成竖排）；消息区去掉 160px 死留白。
-- 清爽化：统一三栏底色、柔化边框、右侧卡片去投影、加大留白；顶部输入框改为悬浮大圆角卡片。
-- 右侧成员栏重排（修重叠 bug）：成员信息去冗余为「短名 + 类型标签」；去掉角色下拉框（管理控件、非固定类型）；「所有成员」列表撑满到底部、内部滚动。
-- group id 移到中间 Hall 标题右侧小标签；删右侧「· N 位成员 · 全部」副标题与「✎ 点击名称可重命名」提示。
-- 顶部标题栏精简：删假窗口控件 `- □ ×`、「Hall 协作」、`human:qa`；标题栏高度 52→42px。
-- 清理无用代码 `updateGroupMemberRole()`；静态资源版本号 `20260611-ui-refine`。
+- **核心主线重启**：前端/对话质量支线收尾后，项目管理者确认回到 `PROJECT_INTEGRATION.md` §12 四阶段路线，选定 **Phase 1 基础接入** 为起点。
+- **切片 1 完成**：server 端落地 `projects` 表 + 完整注册/查询 CRUD API（整条主线的最小地基）。
+  - `Project` ORM 表：`project_id`(PK) / `display_name` / `description` / `project_root_path` / `maintainer_member_id`(FK→members) / `created_at` / `last_seen_at`。
+  - `POST /api/projects`（注册，缺省生成 `prj_<hex12>`，maintainer 缺省取当前成员并校验）、`GET`（列表 / 详情）、`PATCH`（部分更新，`model_fields_set` 实现真 PATCH）、`DELETE`（注销 204）。
+  - 写操作限人类成员（`_require_human`），读操作任意已鉴权成员；与 groups 路由同构。
+- 8 个新单测 + 全套件 178/178 通过，无回归。
 
 ### 3) Open Questions / Pending Confirmation
-- **成员软删除（决策已定，待实现）**：将来做"agent 管理功能"时采用软删除＝标记禁用，保留历史消息归属、UI 隐藏；不做硬删除（避免破坏 `messages.from_id` 等外键）。需 `members` 禁用字段 + `PATCH/DELETE /api/members/{id}` + 前端入口，属全栈改动，本轮不做。
-- 左侧"删除 Hall"入口仍为视觉态，后端 Group 删除 API 与二次确认弹窗待补。
-- 角色变更入口已随下拉框移除；如需在网页改成员角色，将来由 agent 管理功能统一提供。
+- **本切片已提交分支 `claude/project-integration-phase1`（52ccf78）**：是否 push GitHub / 开 PR 等管理者确认。
+- `last_seen_at` 暂等于 `created_at`；bridge 连接时刷新逻辑留待 bridge `--project` 切片。
+- （支线遗留，未启动）成员软删除、Hall 删除真实 API + 二次确认——非主线，暂缓。
 
 ### 4) Next Plan
-1. 前端支线已收尾，等项目管理者最终验收。
-2. 下一阶段候选：agent 管理功能（含成员软删除）、Hall 删除真实 API + 二次确认、或回到后端主线（PROJECT_INTEGRATION 路线）。
+1. 本轮按刹车规则暂停，等管理者确认是否 push + 是否继续下一片。
+2. Phase 1 续切片候选：① `groups.project_id` NULLABLE 字段扩展 + 旧群向后兼容；② `talk` CLI 脚手架（`talk init` 写 `.talk/` + 调注册 API）；③ TALK 自身 dogfood `.talk/` 目录建立。
+3. 之后进入 Phase 2 身份层（IDENTITY/SOUL + bridge `--project` 注入）。
 
 ### 5) Verification
-- `node --check web\app.js`：通过；CSS 花括号 194/194 平衡；`git diff --check`：通过（仅 LF/CRLF 提示）。
-- Browser 实测（精修早期几轮）：以 `human:qa` 登录进入 `test-run19 Hall`，`preview_inspect` 核验计算样式——三栏 `240/948/252`（中栏 66%）、body 14px/400、标题 17px/750、composer 圆角浮卡、成员行无重叠均符合预期。
-- 后续几轮以"服务端返回字节校验 + CSS 花括号 + 管理者浏览器确认"验证；预览 MCP 截图因 SSE 长连接挂起未用。
+- `python -m unittest tests.test_projects -v` → 8/8 通过。
+- `python -m unittest discover -s tests -q` → **178/178 通过**，无回归。
+- 未做：CLI、`groups.project_id` 扩展、`/api/projects/{id}/agents|groups|sync` 子资源、bridge `--project`——均为后续切片。
 
 ### 6) Changed Files
-- `web/index.html`
-- `web/style.css`
-- `web/app.js`
+- `server/models.py`（新增 Project ORM + 3 个 schema）
+- `server/routes/projects.py`（新文件）
+- `server/main.py`（注册路由）
+- `server/db.py`（projects 索引）
+- `tests/test_projects.py`（新文件）
 - `docs/PROGRESS.md`
 - `docs/PROGRESS_HISTORY.md`
 

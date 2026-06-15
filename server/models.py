@@ -83,6 +83,20 @@ class GroupMember(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class Project(SQLModel, table=True):
+    """A project that integrates with TALK (registered via `talk init`)."""
+
+    __tablename__ = "projects"
+
+    project_id: str = Field(primary_key=True)  # CLI-generated, e.g. 'prj_a1b2c3d4e5f6'
+    display_name: str
+    description: Optional[str] = None
+    project_root_path: Optional[str] = None
+    maintainer_member_id: str = Field(foreign_key="members.id", index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class AgentInstance(SQLModel, table=True):
     __tablename__ = "agent_instances"
 
@@ -638,3 +652,70 @@ class AgentTaskScheduleOut(BaseModel):
 class AgentTaskScheduleRunOut(BaseModel):
     created_tasks: list[AgentTaskOut]
     updated_schedules: list[AgentTaskScheduleOut]
+
+
+class ProjectCreate(BaseModel):
+    project_id: Optional[str] = None  # CLI generates; server fills if omitted
+    display_name: str
+    description: Optional[str] = None
+    project_root_path: Optional[str] = None
+    maintainer_member_id: Optional[str] = None  # defaults to the registering member
+
+    @model_validator(mode="after")
+    def validate_project_create(self) -> "ProjectCreate":
+        if self.project_id is not None:
+            self.project_id = self.project_id.strip() or None
+            if self.project_id is not None and any(ch.isspace() for ch in self.project_id):
+                raise ValueError("project_id cannot contain whitespace")
+        self.display_name = self.display_name.strip()
+        if not self.display_name:
+            raise ValueError("display_name is required")
+        if self.description is not None:
+            self.description = self.description.strip() or None
+        if self.project_root_path is not None:
+            self.project_root_path = self.project_root_path.strip() or None
+        if self.maintainer_member_id is not None:
+            self.maintainer_member_id = self.maintainer_member_id.strip() or None
+        return self
+
+
+class ProjectUpdate(BaseModel):
+    """Partial update — only fields explicitly provided are applied."""
+
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    project_root_path: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_project_update(self) -> "ProjectUpdate":
+        if "display_name" in self.model_fields_set:
+            if self.display_name is None or not self.display_name.strip():
+                raise ValueError("display_name cannot be empty")
+            self.display_name = self.display_name.strip()
+        if "description" in self.model_fields_set and self.description is not None:
+            self.description = self.description.strip() or None
+        if "project_root_path" in self.model_fields_set and self.project_root_path is not None:
+            self.project_root_path = self.project_root_path.strip() or None
+        return self
+
+
+class ProjectOut(BaseModel):
+    project_id: str
+    display_name: str
+    description: Optional[str]
+    project_root_path: Optional[str]
+    maintainer_member_id: str
+    created_at: datetime
+    last_seen_at: datetime
+
+    @classmethod
+    def from_orm_project(cls, project: Project) -> "ProjectOut":
+        return cls(
+            project_id=project.project_id,
+            display_name=project.display_name,
+            description=project.description,
+            project_root_path=project.project_root_path,
+            maintainer_member_id=project.maintainer_member_id,
+            created_at=project.created_at,
+            last_seen_at=project.last_seen_at,
+        )

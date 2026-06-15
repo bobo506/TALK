@@ -32,7 +32,7 @@ from server.db import (
 )
 from server.logging_config import configure_logging
 from server.models import GroupMember, Member, Message, MessageCreate, MessageOut
-from server.routes import discussions, files, groups, instances, members, messages, tasks
+from server.routes import discussions, files, groups, instances, members, messages, projects, tasks
 from server.ws_hub import hub
 
 configure_logging()
@@ -248,6 +248,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(members.router)
 app.include_router(members.setup_router)
 app.include_router(groups.router)
+app.include_router(projects.router)
 app.include_router(discussions.router)
 app.include_router(instances.router)
 app.include_router(tasks.router)

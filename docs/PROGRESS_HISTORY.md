@@ -184,6 +184,31 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-15 Phase 1 基础接入 · 切片 1：`projects` 表 + 注册/查询 API
+
+**背景**：前端精修支线收尾、5.x 主线关闭后，项目管理者确认回到核心主线。从 `docs/spec/PROJECT_INTEGRATION.md` §12 登记的四阶段路线选定 **Phase 1 基础接入**作为重启起点。本切片落地整条主线的最小地基——server 端 `projects` 表与项目注册/查询 CRUD API（对应 §7.1 表结构、§7.3 API 草案、§3.4 talk init 握手）。
+
+**当前角色**：Claude = 决策 Agent（本轮由项目管理者改 PROGRESS 显式声明）；用量文件 `~/.claude/usage.json` 为空 → 按"无法获取用量"规则，且 Phase 1 涉及数据库改动 → 本轮 1 片即暂停汇总。
+
+### 改动内容
+
+- `server/models.py`：新增 `Project` ORM 表（`project_id` 主键、`display_name`、`description`、`project_root_path`、`maintainer_member_id` FK→members、`created_at`、`last_seen_at`）；新增 `ProjectCreate` / `ProjectUpdate` / `ProjectOut` 三个 Pydantic schema。`ProjectCreate` 校验 project_id 不含空白、display_name 必填；`ProjectUpdate` 用 `model_fields_set` 实现真正的部分更新（PATCH 只动显式传入字段，支持 `talk sync` 只改 path 的场景）。
+- `server/routes/projects.py`（新文件）：`POST /api/projects`（注册，project_id 缺省时服务端生成 `prj_<hex12>`，maintainer 缺省取当前成员并校验存在）、`GET /api/projects`（列表）、`GET /api/projects/{id}`（详情）、`PATCH /api/projects/{id}`（部分更新元数据）、`DELETE /api/projects/{id}`（注销，204）。写操作 `_require_human` 限人类成员，读操作任意已鉴权成员可访问。沿用 `get_current_member` / `get_session` 依赖与 groups 路由同构。
+- `server/main.py`：import 并 `include_router(projects.router)`（排在 groups 之后）。
+- `server/db.py`：`init_db` 增加 `CREATE INDEX IF NOT EXISTS ix_projects_maintainer_member_id`（与既有显式索引管理风格一致；新表的索引本由 `Field(index=True)` + `create_all` 生成，此行用于幂等）。
+- `tests/test_projects.py`（新文件）：8 个用例覆盖——人类注册+任意成员可读、服务端生成 id、maintainer 必须存在、重复 id 409、agent 注册/改/删均 403、部分 PATCH 不动未传字段、注销后 GET 404、校验拒绝空 display_name / 含空格 project_id。
+
+### 验证
+
+- `python -m unittest tests.test_projects -v` → 8/8 通过。
+- `python -m unittest discover -s tests -q` → **178/178 通过**，无回归（动了 models/db/main 全局 import 文件，全套件复跑确认）。
+- 未做：CLI（`talk init`）、`groups.project_id` 字段扩展、`/api/projects/{id}/agents|groups|sync` 子资源、bridge `--project` 加载——均为 Phase 1 后续切片 / Phase 2 内容。
+
+### 待确认 / 下一步
+
+- 下一片候选（Phase 1 续）：① `groups.project_id` NULLABLE 字段扩展 + 旧群向后兼容；② `talk` CLI 脚手架（`talk init` 写 `.talk/` + 调注册 API）；③ TALK 自身 dogfood `.talk/` 目录建立。
+- `last_seen_at` 当前等于 `created_at`，bridge 连接时刷新的逻辑留待 bridge `--project` 切片接入。
+
 ## 2026-06-11 Web UI 精修支线收尾（浅色工作台多轮微调）
 
 ### Current Progress
