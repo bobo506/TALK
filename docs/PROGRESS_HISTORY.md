@@ -184,6 +184,23 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-15 Phase 2 身份层 · 切片 7：agent profile 加载器（地基）
+
+**背景**：管理者授权进入 Phase 2 身份层并自主开发切片。Phase 2 最敏感的是 bridge prompt 注入（前次三天 debug 战场），故先做零风险的纯函数地基。
+
+- `cli/profiles.py`（新模块，纯文件系统、无重依赖）：`member_dir_name`（从 cli/talk.py 收归此处作唯一权威）、`AgentProfile` dataclass、`load_profile(root, member_id)`（读 IDENTITY/SOUL/USER，缺文件→None，空白→None，`is_empty` 让调用方回退不注入）、`compose_identity_block()`（拼接紧凑块，空 profile→""）。
+- `cli/talk.py`：`member_dir_name` 改从 `cli.profiles` import 并再导出（去重，slice 5 测试经再导出仍通过）。
+- `tests/test_profiles.py`：7 用例，含对仓库已提交 dogfood `.talk/agents/agent_codex/` 的**真实数据**加载校验。
+- 验证：test_profiles 7/7；全套件 **208/208**，无回归。commit ffa80b2。
+
+### 待确认（切片 8 注入策略——需管理者拍板）
+
+bridge 把 profile 注入 prompt 有多种路径、且直接改 agent 现有行为，当前环境无 pi/codex CLI 无法黑盒验证，故暂停等管理者选型。三个候选：
+1. **系统层注入**（§5.4 推荐）：把 SOUL 拼进 CLI 命令的 `--system-prompt`，稳态只注一次；但需改各 runtime（pi/codex）命令构造，复杂。
+2. **per-call 紧凑注入**：在现有 `你是 {member_id}。{sender} 对你说:{task}` 旁加 SOUL/USER 块；改动小但稳态内容进了 per-call 层，且需防"独立首行触发自我介绍"老坑。
+3. **混合**：IDENTITY 维持现状 per-call 紧凑身份锚，只把 SOUL（风格/边界）+ USER（搭档）注入，避免重复自我介绍。
+- 共同安全设计：`--project` 缺省时行为与现状**字节一致**（严格 opt-in，零回归）。
+
 ## 2026-06-15 Phase 1 收尾 · 切片 5–6：CLI 子命令 + 项目群子资源
 
 **背景**：与管理者确认"先收 Phase 1 尾巴再进 Phase 2"，并约定功能/人工验收推迟到 Phase 2 之后（Phase 1 是管道层，单测兜底；首个可观察行为在 Phase 2 身份注入）。管理者授权连做这两片。`project_agents` 表 / `/api/projects/{id}/agents` / `/sync` 明确并入 Phase 2（消费者是 bridge profile 加载），不在本收尾内。

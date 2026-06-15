@@ -1,6 +1,16 @@
 # Project Progress
 
 ## Latest
+Updated: 2026-06-15 (Asia/Shanghai) — Phase 2 身份层启动：切片 7 profile 加载器完成，切片 8 注入策略待管理者选型
+
+### 0) Phase 2 进行中
+- **切片 7 完成**（commit `ffa80b2`）：`cli/profiles.py` agent profile 加载器（纯函数地基，零风险）+ 7 单测（含 dogfood 真实数据校验）。全套件 **208/208**。
+- **切片 8 暂停等选型**：bridge 把 profile 注入 prompt 是前次 debug 战场、多方案、改现有行为、本机无 pi/codex CLI 无法黑盒验证 → 按 `AGENTS.md`（多方案/影响现有行为须先确认）暂停。三个候选注入策略见 PROGRESS_HISTORY 切片 7 条目；共同安全设计：`--project` 缺省时行为与现状字节一致（严格 opt-in）。
+- **切片 9（安全，可先做）**：server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`，纯服务端、可测，与切片 8 正交。
+
+---
+
+## Phase 1（已完成）
 Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 全部完成（接入机制 + 4 CLI 子命令 + dogfood + 项目群子资源）
 
 ### 1) Current Agent Role
