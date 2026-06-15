@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from bridges import cli_bridge
+from cli.profiles import compose_system_prompt, load_profile
 
 _MCP_SERVER_PATH = str(PROJECT_ROOT / "bridges" / "talk_send_mcp.py").replace("\\", "/")
 CODEX_SYSTEM_INSTRUCTIONS = cli_bridge.FUNCTION_CALLING_SYSTEM_PROMPT
@@ -91,31 +92,64 @@ def _default_codex_exe() -> str:
     return "codex"
 
 
-def default_codex_command(profile: str = "discussion") -> str:
-    if os.environ.get("TALK_CODEX_COMMAND"):
-        return os.environ["TALK_CODEX_COMMAND"]
+def _build_codex_command(
+    codex_exe: str,
+    *,
+    profile: str = "discussion",
+    system_instructions: str = CODEX_SYSTEM_INSTRUCTIONS,
+) -> str:
+    """Build the codex exec command for a given system instructions + profile.
 
-    codex_exe = _default_codex_exe()
-    if profile == "tools":
-        return (
-            f"{codex_exe} exec --skip-git-repo-check --ignore-rules --sandbox workspace-write --color never "
-            f"{_CODEX_APPROVAL_BYPASS_FLAG} "
-            f"-c {_CODEX_SYSTEM_CONFIG_ARG} "
-            f"-c {_CODEX_MCP_COMMAND_CONFIG_ARG} "
-            f"-c {_CODEX_MCP_ARGS_CONFIG_ARG} "
-            f"-c {_CODEX_MCP_ENV_UTF8_CONFIG_ARG} "
-            f"-c {_CODEX_MCP_ENV_IOENC_CONFIG_ARG} "
-            f"-"
-        )
+    The system layer for codex is the ``base_instructions`` config value
+    (PROJECT_INTEGRATION §5.4); Phase 2 profile injection works by passing an
+    enhanced ``system_instructions`` here. ``_codex_config_arg`` already wraps
+    values with ``shlex.quote`` over a JSON encoding, so arbitrary profile
+    content (quotes/newlines) round-trips through ``shlex.split`` safely.
+    """
+    sandbox = "workspace-write" if profile == "tools" else "read-only"
     return (
-        f"{codex_exe} exec --skip-git-repo-check --ignore-rules --sandbox read-only --color never "
+        f"{codex_exe} exec --skip-git-repo-check --ignore-rules --sandbox {sandbox} --color never "
         f"{_CODEX_APPROVAL_BYPASS_FLAG} "
-        f"-c {_CODEX_SYSTEM_CONFIG_ARG} "
+        f"-c {_codex_config_arg('base_instructions', system_instructions)} "
         f"-c {_CODEX_MCP_COMMAND_CONFIG_ARG} "
         f"-c {_CODEX_MCP_ARGS_CONFIG_ARG} "
         f"-c {_CODEX_MCP_ENV_UTF8_CONFIG_ARG} "
         f"-c {_CODEX_MCP_ENV_IOENC_CONFIG_ARG} "
         f"-"
+    )
+
+
+def default_codex_command(profile: str = "discussion") -> str:
+    if os.environ.get("TALK_CODEX_COMMAND"):
+        return os.environ["TALK_CODEX_COMMAND"]
+    return _build_codex_command(_default_codex_exe(), profile=profile)
+
+
+def resolve_codex_command(args: argparse.Namespace) -> str:
+    """Resolve the codex command, applying execution profile + opt-in injection.
+
+    - ``TALK_CODEX_COMMAND`` env or a custom ``--codex-command`` is respected
+      as-is; whoever overrides owns the system instructions.
+    - With ``--project`` set and a non-empty ``.talk/`` profile for this member,
+      the IDENTITY/SOUL/USER profile is composed into ``base_instructions``
+      (approach B, system layer).
+    - Without ``--project`` (or with an empty profile) the result is
+      byte-identical to today — strictly opt-in, zero regression.
+    """
+    if os.environ.get("TALK_CODEX_COMMAND"):
+        return args.codex_command
+    resolved_default = _build_codex_command(_default_codex_exe(), profile="discussion")
+    if args.codex_command not in (resolved_default, DEFAULT_CODEX_COMMAND_DISCUSSION):
+        return args.codex_command
+    system_instructions = CODEX_SYSTEM_INSTRUCTIONS
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_instructions = compose_system_prompt(CODEX_SYSTEM_INSTRUCTIONS, profile)
+    return _build_codex_command(
+        _default_codex_exe(),
+        profile=args.codex_execution_profile,
+        system_instructions=system_instructions,
     )
 
 
@@ -228,14 +262,9 @@ async def run_task_queue_worker(
 
 
 async def run_bridge(args: argparse.Namespace) -> None:
-    if (
-        args.codex_execution_profile == "tools"
-        and not os.environ.get("TALK_CODEX_COMMAND")
-        and args.codex_command == default_codex_command("discussion")
-    ):
-        args.codex_command = default_codex_command("tools")
-    elif args.codex_execution_profile == "tools" and args.codex_command == DEFAULT_CODEX_COMMAND_DISCUSSION:
-        args.codex_command = DEFAULT_CODEX_COMMAND_TOOLS
+    # resolve_codex_command applies the execution profile AND (opt-in) the
+    # --project identity-layer injection in one place.
+    args.codex_command = resolve_codex_command(args)
     args.command = args.codex_command
     args.runtime = "codex"
     args.bridge_label = "Codex bridge"

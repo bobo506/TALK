@@ -1,7 +1,9 @@
 import asyncio
 import os
 import shlex
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,10 +16,20 @@ from bridges.codex_bridge import (
     format_codex_reply,
     handle_queued_task,
     member_id_from_name,
+    resolve_codex_command,
     run_codex_command,
     should_handle_message,
     strip_leading_mentions,
 )
+from cli.profiles import SYSTEM_PROMPT_PROFILE_HEADER, agent_profile_dir
+
+
+def _base_instructions_value(command: str) -> str:
+    args = shlex.split(command, posix=True)
+    for index, arg in enumerate(args):
+        if arg == "-c" and index + 1 < len(args) and args[index + 1].startswith("base_instructions="):
+            return args[index + 1]
+    raise AssertionError("base_instructions config arg not found")
 
 
 class CodexBridgeTests(unittest.TestCase):
@@ -93,6 +105,80 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertNotIn("TALK_API_KEY", cmd)
         self.assertNotIn("TALK_DEFERRED_FILE", cmd)
         self.assertNotIn("TALK_GROUP_ID", cmd)
+
+    def test_resolve_codex_command_without_project_is_default(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(["--key", "codex-key"])
+            self.assertEqual(resolve_codex_command(args), default_codex_command("discussion"))
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+    def test_resolve_codex_command_tools_profile_uses_workspace_write(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(
+                ["--key", "codex-key", "--codex-execution-profile", "tools"]
+            )
+            resolved = resolve_codex_command(args)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+        self.assertIn("--sandbox workspace-write", resolved)
+
+    def test_resolve_codex_command_injects_profile_into_base_instructions(self):
+        tmp = Path(tempfile.mkdtemp(prefix="talk-codex-project-"))
+        self.addCleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
+        agent_dir = agent_profile_dir(tmp, "agent:codex")
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        (agent_dir / "IDENTITY.md").write_text("# IDENTITY\n决策型代码 Agent。", encoding="utf-8")
+        (agent_dir / "SOUL.md").write_text("# SOUL\n不写汇报体。", encoding="utf-8")
+
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(
+                ["--key", "codex-key", "--name", "codex", "--project", str(tmp)]
+            )
+            resolved = resolve_codex_command(args)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        base_instructions = _base_instructions_value(resolved)
+        # base system instructions preserved …
+        self.assertIn("不存在下一轮", base_instructions)
+        # … plus the framed profile background
+        self.assertIn(SYSTEM_PROMPT_PROFILE_HEADER, base_instructions)
+        self.assertIn("不写汇报体", base_instructions)
+        self.assertIn("决策型代码 Agent", base_instructions)
+
+    def test_resolve_codex_command_project_without_profile_is_byte_identical(self):
+        tmp = Path(tempfile.mkdtemp(prefix="talk-codex-noprofile-"))
+        self.addCleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
+        agent_profile_dir(tmp, "agent:other").mkdir(parents=True, exist_ok=True)
+
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(
+                ["--key", "codex-key", "--name", "codex", "--project", str(tmp)]
+            )
+            self.assertEqual(resolve_codex_command(args), default_codex_command("discussion"))
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+    def test_resolve_codex_command_respects_env_override(self):
+        old_value = os.environ.get("TALK_CODEX_COMMAND")
+        os.environ["TALK_CODEX_COMMAND"] = "custom codex command"
+        try:
+            args = codex_bridge.build_parser().parse_args(["--key", "codex-key", "--project", "."])
+            self.assertEqual(resolve_codex_command(args), "custom codex command")
+        finally:
+            if old_value is None:
+                os.environ.pop("TALK_CODEX_COMMAND", None)
+            else:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
 
     def test_should_handle_only_direct_text_by_default(self):
         member_id = "agent:codex"
