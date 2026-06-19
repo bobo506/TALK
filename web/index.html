@@ -109,34 +109,6 @@
             <button id="global-room-btn" type="button" class="room-chip active">全局消息流</button>
           </div>
           <div id="group-room-list" class="group-room-list"></div>
-
-          <form id="group-create-panel" class="group-create-panel hidden">
-            <div class="group-create-grid">
-              <label class="group-create-field">
-                <span>名称</span>
-                <input id="group-create-name" type="text" placeholder="例如：SDK 开发组" maxlength="80">
-              </label>
-              <label class="group-create-field">
-                <span>ID（可选）</span>
-                <input id="group-create-id" type="text" placeholder="group:sdk">
-              </label>
-              <label class="group-create-field wide">
-                <span>描述（可选）</span>
-                <input id="group-create-description" type="text" placeholder="这个 Hall 用来同步哪类工作">
-              </label>
-            </div>
-            <div class="group-create-members-wrap">
-              <div class="group-create-label">初始成员</div>
-              <div id="group-create-members" class="group-create-members"></div>
-            </div>
-            <div class="group-create-footer">
-              <p id="group-create-error" class="group-create-error hidden"></p>
-              <div class="group-create-buttons">
-                <button id="cancel-group-create-btn" type="button" class="room-secondary-btn">取消</button>
-                <button id="submit-group-create-btn" type="submit" class="room-primary-btn">创建并进入</button>
-              </div>
-            </div>
-          </form>
         </section>
       </aside>
 
@@ -262,9 +234,46 @@
     </div>
   </div>
 
+  <div id="group-create-overlay" class="modal-overlay hidden">
+    <form id="group-create-panel" class="group-create-panel modal-card">
+      <div class="modal-header">
+        <h3>新建 Hall</h3>
+        <button id="close-group-create-btn" type="button" class="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="group-create-grid">
+        <label class="group-create-field">
+          <span>名称</span>
+          <input id="group-create-name" type="text" placeholder="例如：SDK 开发组" maxlength="80">
+        </label>
+        <label class="group-create-field">
+          <span>ID（可选）</span>
+          <input id="group-create-id" type="text" placeholder="group:sdk">
+        </label>
+        <label class="group-create-field wide">
+          <span>描述（可选）</span>
+          <input id="group-create-description" type="text" placeholder="这个 Hall 用来同步哪类工作">
+        </label>
+      </div>
+      <div class="group-create-members-wrap">
+        <div class="group-create-label">初始成员</div>
+        <select id="group-create-member-select" class="group-member-select">
+          <option value="">添加成员…</option>
+        </select>
+        <div id="group-create-member-chips" class="group-create-chips"></div>
+      </div>
+      <div class="group-create-footer">
+        <p id="group-create-error" class="group-create-error hidden"></p>
+        <div class="group-create-buttons">
+          <button id="cancel-group-create-btn" type="button" class="room-secondary-btn">取消</button>
+          <button id="submit-group-create-btn" type="submit" class="room-primary-btn">创建并进入</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/app.js?v=20260611-ui-refine"></script>
+  <script src="/app.js?v=20260619-hall-modal-2"></script>
 </body>
 </html>

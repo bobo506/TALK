@@ -90,11 +90,15 @@ const hallFilterInput = document.getElementById("hall-filter-input");
 const refreshGroupsBtn = document.getElementById("refresh-groups-btn");
 const toggleGroupCreateBtn = document.getElementById("toggle-group-create-btn");
 const toggleGroupMembersBtn = document.getElementById("toggle-group-members-btn");
+const groupCreateOverlay = document.getElementById("group-create-overlay");
 const groupCreatePanel = document.getElementById("group-create-panel");
+const closeGroupCreateBtn = document.getElementById("close-group-create-btn");
 const groupCreateName = document.getElementById("group-create-name");
 const groupCreateId = document.getElementById("group-create-id");
 const groupCreateDescription = document.getElementById("group-create-description");
-const groupCreateMembers = document.getElementById("group-create-members");
+const groupCreateMemberSelect = document.getElementById("group-create-member-select");
+const groupCreateMemberChips = document.getElementById("group-create-member-chips");
+let selectedCreateMemberIds = new Set();
 const groupCreateError = document.getElementById("group-create-error");
 const cancelGroupCreateBtn = document.getElementById("cancel-group-create-btn");
 const submitGroupCreateBtn = document.getElementById("submit-group-create-btn");
@@ -546,6 +550,19 @@ toggleGroupMembersBtn.addEventListener("click", () => {
   }
 });
 cancelGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
+closeGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
+groupCreateOverlay.addEventListener("mousedown", (event) => {
+  if (event.target === groupCreateOverlay) setGroupCreateOpen(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && groupCreateOpen) setGroupCreateOpen(false);
+});
+groupCreateMemberSelect.addEventListener("change", () => {
+  const memberId = groupCreateMemberSelect.value;
+  if (!memberId) return;
+  selectedCreateMemberIds.add(memberId);
+  renderGroupCreateMembers();
+});
 groupCreatePanel.addEventListener("submit", createGroupFromPanel);
 closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(true));
 groupMetaForm.addEventListener("submit", updateGroupMetadataFromPanel);
@@ -729,7 +746,7 @@ function renderRoomStrip() {
   toggleGroupMembersBtn.classList.toggle("hidden", !activeGroup);
   toggleGroupMembersBtn.classList.toggle("active", groupMembersOpen && Boolean(activeGroup));
   toggleGroupMembersBtn.textContent = "＋";
-  groupCreatePanel.classList.toggle("hidden", !groupCreateOpen);
+  groupCreateOverlay.classList.toggle("hidden", !groupCreateOpen);
   renderGroupCreateMembers();
   renderGroupMembersPanel();
 }
@@ -756,6 +773,7 @@ function setGroupCreateOpen(open) {
     groupMembersOpen = false;
   }
   if (open) {
+    selectedCreateMemberIds = new Set();
     renderGroupCreateMembers();
     groupCreateName.focus();
   } else {
@@ -775,33 +793,43 @@ function setGroupMembersOpen(open) {
 }
 
 function renderGroupCreateMembers() {
-  groupCreateMembers.innerHTML = "";
-  if (!members.length) {
-    const empty = document.createElement("div");
-    empty.className = "group-create-member-empty";
-    empty.textContent = "成员列表尚未加载";
-    groupCreateMembers.appendChild(empty);
-    return;
-  }
-
+  // Dropdown lists members not yet added (self is always the owner, excluded).
+  groupCreateMemberSelect.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = members.length ? "添加成员…" : "成员列表尚未加载";
+  groupCreateMemberSelect.appendChild(placeholder);
   for (const member of members) {
-    const label = document.createElement("label");
-    label.className = "group-create-member";
+    if (member.id === myId || selectedCreateMemberIds.has(member.id)) continue;
+    const option = document.createElement("option");
+    option.value = member.id;
+    option.textContent = `${shortName(member.id)} · ${member.display_name}`;
+    groupCreateMemberSelect.appendChild(option);
+  }
+  groupCreateMemberSelect.disabled = !members.length;
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = member.id;
-    checkbox.checked = member.id === myId;
-    checkbox.disabled = member.id === myId;
+  // Chips show the selected members, each removable.
+  groupCreateMemberChips.innerHTML = "";
+  for (const memberId of selectedCreateMemberIds) {
+    const chip = document.createElement("span");
+    chip.className = "group-create-chip";
 
     const text = document.createElement("span");
-    text.textContent = member.id === myId
-      ? `${shortName(member.id)} (我)`
-      : `${shortName(member.id)} · ${member.display_name}`;
+    text.textContent = shortName(memberId);
 
-    label.appendChild(checkbox);
-    label.appendChild(text);
-    groupCreateMembers.appendChild(label);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "group-create-chip-remove";
+    remove.setAttribute("aria-label", `移除 ${memberId}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      selectedCreateMemberIds.delete(memberId);
+      renderGroupCreateMembers();
+    });
+
+    chip.appendChild(text);
+    chip.appendChild(remove);
+    groupCreateMemberChips.appendChild(chip);
   }
 }
 
@@ -821,8 +849,7 @@ async function createGroupFromPanel(event) {
     return;
   }
 
-  const selectedMemberIds = Array.from(groupCreateMembers.querySelectorAll("input[type='checkbox']:checked"))
-    .map((input) => input.value)
+  const selectedMemberIds = Array.from(selectedCreateMemberIds)
     .filter((memberId) => memberId && memberId !== myId);
 
   const body = {
