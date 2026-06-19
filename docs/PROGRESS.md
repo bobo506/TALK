@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-16 (Asia/Shanghai) — Phase 2 身份层：pi(8b)+codex(8c) bridge --project 注入完成，待 pi+codex 一起人工验收
+Updated: 2026-06-19 (Asia/Shanghai) — Phase 2 身份层：pi(8b)+codex(8c) 注入已在真实 Hall 人工验收通过；Web UI 新建 Hall 弹窗已确认
 
 ### 0) Phase 2 进行中
 - **切片 7 完成**（`ffa80b2`）：`cli/profiles.py` profile 加载器（纯函数地基）+ 7 单测。
@@ -10,10 +10,19 @@ Updated: 2026-06-16 (Asia/Shanghai) — Phase 2 身份层：pi(8b)+codex(8c) bri
 - **切片 8b 完成**（`1c17304`）：pi bridge `--project` → 注入 `--system-prompt`；`resolve_pi_command` 统一执行档 + 注入，严格 opt-in。**黑盒修复真 bug**：命令系统提示 `repr`→`shlex.quote`。
 - **切片 8c 完成**（`820aee8`）：codex bridge `--project` → 注入 `-c base_instructions=<json>`；`resolve_codex_command` 同构 pi。codex 命令本就 json+shlex.quote 安全，无 pi 那个 repr bug。
 - **现状**：pi/codex 两个 runtime 的身份层注入都打通，严格 opt-in（无 `--project` 字节一致）。单测全绿（codex 18/18、pi 13/13）；真机黑盒两者均确认 shlex 往返 + profile 真注入。
-- **待人工验收（管理者，pi+codex 一起测）**：`python bridges/pi_bridge.py --key <k> --project <根>` 与 `python bridges/codex_bridge.py --key <k> --project <根>`，在 Group Hall 观察身份/风格是否按各自 dogfood profile 收敛。完整端到端需真实 server 闭环。
+- **人工验收（2026-06-19，已带 `--project` 真实跑 `test-run20` / `group:843d8433bae1`）**：
+  - codex 8c：先撞外部坑——codex 全局 `~/.codex/config.toml` 的 `service_tier="default"` 在 `codex-cli 0.130.0-alpha.5` 非法，codex exec 启动即退（与注入无关，黑盒对照确认；经黑板 `agent-docs/BLACKBOARD.md` 与 codex 协作改配置后恢复）。恢复后 codex 招呼自然、身份正确（自报 codex、点到 pi/qa），✅ 注入行为符合预期。
+  - pi 8b：同 Hall 内 pi 正常中文回复，无身份混乱。
+  - **决策（管理者）**：agent-to-agent 对"软邀请"不强行续聊、完成交办即回报人类（"打招呼就收"）= **可接受，维持现状，不动回合/收口逻辑**。
+- **遗留小毛病（待处理，不阻断）**：① codex"撤回+重发"招呼导致建了两个 discussion session（#84/#85）、pi 回了两次；② 两个 session 停在 `active` 未标 `resolved`（收口本应标 resolved，疑似小 bug）。
 - **下一步**：切片 9（server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`，profile 路径索引/同步）。
 
 > 注：全套件偶发的 `test_websocket` presence 时序测试失败仅在机器过载（曾跑 499s）时出现，隔离单跑稳定通过，与 Phase 2 改动无关。
+
+### Web UI 侧支（测试中发现）
+- **#1 新建 Hall 改弹窗 —— 已改并经管理者确认**：原"点 ＋"是在左侧 Hall 列表底部内联展开表单；改为居中模态弹窗（`#group-create-overlay` 遮罩 + `.modal-card`），字段：名称必填 / ID 可选 / 描述可选；**初始成员从"全员勾选墙"改为下拉添加 + 可删标签 chips**（解决 agent 多时卡片被撑满屏、像跳整页的问题），chips 加了柔和蓝底 + 拉开间距；关闭方式：取消 / × / 点遮罩 / ESC。纯前端，后端 `POST /api/groups` 逻辑未动。改文件：`web/index.html`、`web/style.css`、`web/app.js`（资源版本号 `20260619-hall-modal-2`）。验证：JS 语法 + CSS 花括号 + HTML/JS ID 一致 + 运行中 server 字节校验 + 管理者浏览器实看均通过。**未提交**（在 Phase 2 分支工作区，待定提交去向）。
+- **#2 删除 Hall（待处理）**：当前前端无删除按钮、后端无 `DELETE /api/groups/{id}`。需后端删除 API（仅人类、级联清理成员关系）+ 前端入口 + 二次确认弹窗。全栈一片。
+- **#3 全局移除/禁用 agent（待处理）**：当前只有"从 Hall 移除成员"（`DELETE /api/groups/{id}/members/{id}`）；缺"全局禁用/移除 agent 成员"。需 `members` 加禁用字段 + `PATCH/DELETE /api/members/{id}`（软删除，保留 `messages.from_id` 归属）+ 前端入口。最大一片，涉及数据模型。
 
 ---
 
