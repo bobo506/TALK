@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8fcec`）；新分支 `claude/phase3-collab-and-ui`，切片 P3-1（群成员角色存储）+ P3-2（bridge 注入业务角色）完成，全套件 242（仅 1 个 websocket presence 偶发，隔离 10/10 通过，与改动无关）；Claude=决策 Agent（管理者授权自主开发）
+Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8fcec`）；新分支 `claude/phase3-collab-and-ui`，本轮连做 P3-1（群成员角色存储）+ P3-2（bridge 注入业务角色）+ UI #2 删 Hall 后端；groups 测试 14/14（全套件 242，仅 1 个 websocket presence 在过载下偶发、隔离 10/10）；下一片 = UI #2 前端。Claude=决策 Agent（管理者授权自主开发）
 
 ### 0) Phase 3 协作层 + Web UI #2/#3（当前分支 `claude/phase3-collab-and-ui`，进行中）
 
@@ -9,7 +9,8 @@ Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8f
 - **切片 P3-1 完成（群成员业务角色/决策分级存储）**：`GroupMember` 加 `business_role`（自由文本）/`decision_tier`（`decision`|`execution`）两列；`PUT /api/groups/{id}/members/{member_id}` 接收并全量替换、`GroupOut.members` 返回；`GroupMemberUpdate` 校验 decision_tier 枚举（大小写归一）；`db.py` 加幂等列迁移 + 索引。+3 单测。对齐 `PROJECT_INTEGRATION.md` §5.2 的 groups.yaml 角色模型。
 - **切片 P3-2 完成（bridge 注入业务角色）**：`bridges/cli_bridge._build_group_member_context` 在群成员清单后追加"你在本群的业务角色：{business_role}。"（business_role 取自 P3-1 群成员数据中当前 member 的条目）；`decision_tier` 维持由 bridge 启动参数 `--decision-tier` 注入（`_decision_tier_line`），避免双源冲突。纯追加，无 business_role 时字节不变。+2 单测。**行为黑盒验证待人工**（同 Phase 2 注入，需真机 pi/codex 在群里观察是否按业务角色行动）。
 - **管理者已决策（2026-06-20）**：① UI #2 删 Hall = **连带删除消息**（级联清成员关系 + 该群所有消息）；② MEMORY = **完整 server 端 COLD/WARM/RESUME**——范围扩大为独立子阶段，排到本分支最后做。
-- **本分支切片路线**：P3-1 存储 ✓ → P3-2 注入业务角色 ✓ → **UI #2 删 Hall（下一片，级联删消息）** → UI #3 全局禁用 agent（软删，加 `disabled_at`）→ P3-3 MEMORY（完整 server 端，大，独立子阶段，最后做）。
+- **切片 UI #2 后端完成（`53846b8`）**：`DELETE /api/groups/{id}`，仅人类；子表先删后删群（group_members / 该群 messages / discussion_sessions / discussion_turns），顺序保证无论 SQLite FK 是否启用都正确（运行时未开 FK）。+3 单测（级联清空验证、agent 拒删 403、缺群 404）。**前端按钮 + 二次确认弹窗 = 下一片（待做，需浏览器验证；按 UI #1 先例，静态校验 + 管理者浏览器实看）**。
+- **本分支切片路线**：P3-1 存储 ✓ → P3-2 注入业务角色 ✓ → UI #2 删 Hall 后端 ✓ → **UI #2 前端（下一片：删除按钮 + 二次确认）** → UI #3 全局禁用 agent（软删，加 `disabled_at`）→ P3-3 MEMORY（完整 server 端，大，独立子阶段，最后做）。
 
 ### Phase 2（已合入 main · PR #1）
 
