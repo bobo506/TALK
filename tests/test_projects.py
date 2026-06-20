@@ -185,6 +185,98 @@ class ProjectRouteTests(RouteTestCase):
 
         self.assertEqual([g["id"] for g in agent_view.json()], ["group:joined"])
 
+    def test_sync_then_list_agents(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_s", "display_name": "S"},
+            )
+            synced = client.post(
+                "/api/projects/prj_s/sync",
+                headers={"X-API-Key": "bobo-key"},
+                json={"agents": [
+                    {"member_id": "agent:codex", "identity_path": ".talk/agents/agent_codex/IDENTITY.md",
+                     "soul_path": ".talk/agents/agent_codex/SOUL.md"},
+                    {"member_id": "agent:pi", "identity_path": ".talk/agents/agent_pi/IDENTITY.md"},
+                ]},
+            )
+            listed = client.get("/api/projects/prj_s/agents", headers={"X-API-Key": "codex-key"})
+
+        self.assertEqual(synced.status_code, 200)
+        self.assertEqual([a["member_id"] for a in synced.json()], ["agent:codex", "agent:pi"])
+        self.assertEqual(
+            listed.json()[0]["soul_path"], ".talk/agents/agent_codex/SOUL.md"
+        )
+        self.assertEqual([a["member_id"] for a in listed.json()], ["agent:codex", "agent:pi"])
+
+    def test_sync_is_full_replace(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_r", "display_name": "R"},
+            )
+            client.post(
+                "/api/projects/prj_r/sync",
+                headers={"X-API-Key": "bobo-key"},
+                json={"agents": [{"member_id": "agent:codex"}, {"member_id": "agent:pi"}]},
+            )
+            replaced = client.post(
+                "/api/projects/prj_r/sync",
+                headers={"X-API-Key": "bobo-key"},
+                json={"agents": [{"member_id": "agent:pi"}]},
+            )
+
+        self.assertEqual([a["member_id"] for a in replaced.json()], ["agent:pi"])
+
+    def test_sync_unknown_project_404(self):
+        with self.make_client() as client:
+            res = client.post(
+                "/api/projects/prj_ghost/sync",
+                headers={"X-API-Key": "bobo-key"},
+                json={"agents": []},
+            )
+        self.assertEqual(res.status_code, 404)
+
+    def test_agent_cannot_sync(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_a2", "display_name": "A2"},
+            )
+            res = client.post(
+                "/api/projects/prj_a2/sync",
+                headers={"X-API-Key": "codex-key"},
+                json={"agents": []},
+            )
+        self.assertEqual(res.status_code, 403)
+
+    def test_sync_rejects_duplicate_member(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_d", "display_name": "D"},
+            )
+            res = client.post(
+                "/api/projects/prj_d/sync",
+                headers={"X-API-Key": "bobo-key"},
+                json={"agents": [{"member_id": "agent:pi"}, {"member_id": "agent:pi"}]},
+            )
+        self.assertEqual(res.status_code, 422)
+
+    def test_list_agents_empty_when_unsynced(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_e", "display_name": "E"},
+            )
+            listed = client.get("/api/projects/prj_e/agents", headers={"X-API-Key": "bobo-key"})
+        self.assertEqual(listed.json(), [])
+
     def test_validation_rejects_bad_input(self):
         with self.make_client() as client:
             no_name = client.post(

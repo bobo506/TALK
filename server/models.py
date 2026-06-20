@@ -98,6 +98,26 @@ class Project(SQLModel, table=True):
     last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class ProjectAgent(SQLModel, table=True):
+    """Per-(project, agent) profile path index (PROJECT_INTEGRATION §7.1).
+
+    Server stores only the relative paths to the agent's `.talk/` profile files;
+    the actual file content stays in the project repo and is read by the bridge.
+    member_id is plain TEXT (no FK) so a profile can be synced before the agent
+    self-registers as a Member.
+    """
+
+    __tablename__ = "project_agents"
+
+    project_id: str = Field(foreign_key="projects.project_id", primary_key=True)
+    member_id: str = Field(primary_key=True)
+    identity_path: Optional[str] = None
+    soul_path: Optional[str] = None
+    user_path: Optional[str] = None
+    memory_pointer: Optional[str] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class AgentInstance(SQLModel, table=True):
     __tablename__ = "agent_instances"
 
@@ -723,4 +743,60 @@ class ProjectOut(BaseModel):
             maintainer_member_id=project.maintainer_member_id,
             created_at=project.created_at,
             last_seen_at=project.last_seen_at,
+        )
+
+
+class ProjectAgentEntry(BaseModel):
+    """One agent's profile paths in a sync payload."""
+
+    member_id: str
+    identity_path: Optional[str] = None
+    soul_path: Optional[str] = None
+    user_path: Optional[str] = None
+    memory_pointer: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_entry(self) -> "ProjectAgentEntry":
+        self.member_id = self.member_id.strip()
+        if not self.member_id:
+            raise ValueError("member_id is required")
+        for field in ("identity_path", "soul_path", "user_path", "memory_pointer"):
+            value = getattr(self, field)
+            if value is not None:
+                setattr(self, field, value.strip() or None)
+        return self
+
+
+class ProjectSyncRequest(BaseModel):
+    """`POST /api/projects/{id}/sync` body — full replace of the agent index."""
+
+    agents: list[ProjectAgentEntry] = []
+
+    @model_validator(mode="after")
+    def validate_sync(self) -> "ProjectSyncRequest":
+        seen: set[str] = set()
+        for entry in self.agents:
+            if entry.member_id in seen:
+                raise ValueError(f"duplicate member_id in sync payload: {entry.member_id}")
+            seen.add(entry.member_id)
+        return self
+
+
+class ProjectAgentOut(BaseModel):
+    member_id: str
+    identity_path: Optional[str]
+    soul_path: Optional[str]
+    user_path: Optional[str]
+    memory_pointer: Optional[str]
+    updated_at: datetime
+
+    @classmethod
+    def from_orm_agent(cls, agent: ProjectAgent) -> "ProjectAgentOut":
+        return cls(
+            member_id=agent.member_id,
+            identity_path=agent.identity_path,
+            soul_path=agent.soul_path,
+            user_path=agent.user_path,
+            memory_pointer=agent.memory_pointer,
+            updated_at=agent.updated_at,
         )

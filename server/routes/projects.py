@@ -16,7 +16,19 @@ from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import get_session
-from server.models import Group, GroupMember, GroupOut, Member, Project, ProjectCreate, ProjectOut, ProjectUpdate
+from server.models import (
+    Group,
+    GroupMember,
+    GroupOut,
+    Member,
+    Project,
+    ProjectAgent,
+    ProjectAgentOut,
+    ProjectCreate,
+    ProjectOut,
+    ProjectSyncRequest,
+    ProjectUpdate,
+)
 from server.routes.groups import _group_out
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -108,6 +120,68 @@ def list_project_groups(
         )
     groups = session.exec(stmt.order_by(Group.created_at.desc())).all()
     return [_group_out(group, session) for group in groups]
+
+
+@router.get("/{project_id}/agents", response_model=list[ProjectAgentOut])
+def list_project_agents(
+    project_id: str,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """List the agent profile-path index for a project (PROJECT_INTEGRATION §7.3)."""
+    _get_project(project_id, session)
+    agents = session.exec(
+        select(ProjectAgent)
+        .where(ProjectAgent.project_id == project_id)
+        .order_by(ProjectAgent.member_id)
+    ).all()
+    return [ProjectAgentOut.from_orm_agent(agent) for agent in agents]
+
+
+@router.post("/{project_id}/sync", response_model=list[ProjectAgentOut])
+def sync_project(
+    project_id: str,
+    body: ProjectSyncRequest,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Sync the project's `.talk/` agent index to the server (called by `talk sync`).
+
+    Full-replace semantics: rows not present in the payload are removed, so the
+    server index always mirrors the project's local `.talk/agents/`.
+    """
+    _require_human(current)
+    project = _get_project(project_id, session)
+
+    existing = session.exec(
+        select(ProjectAgent).where(ProjectAgent.project_id == project_id)
+    ).all()
+    for row in existing:
+        session.delete(row)
+
+    now = datetime.now(timezone.utc)
+    for entry in body.agents:
+        session.add(
+            ProjectAgent(
+                project_id=project_id,
+                member_id=entry.member_id,
+                identity_path=entry.identity_path,
+                soul_path=entry.soul_path,
+                user_path=entry.user_path,
+                memory_pointer=entry.memory_pointer,
+                updated_at=now,
+            )
+        )
+    project.last_seen_at = now
+    session.add(project)
+    session.commit()
+
+    agents = session.exec(
+        select(ProjectAgent)
+        .where(ProjectAgent.project_id == project_id)
+        .order_by(ProjectAgent.member_id)
+    ).all()
+    return [ProjectAgentOut.from_orm_agent(agent) for agent in agents]
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
