@@ -1105,6 +1105,47 @@ pre {
   border-bottom: 0;
 }
 
+.all-member-row.disabled .all-member-name {
+  color: var(--muted);
+}
+
+.member-disabled-badge {
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px solid #f0bbb6;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: var(--font-control);
+  font-weight: 700;
+}
+
+.member-toggle-btn {
+  flex: 0 0 auto;
+  height: 30px;
+  min-width: 46px;
+  border-radius: 999px;
+  font-size: var(--font-control);
+  font-weight: 750;
+}
+
+.member-toggle-btn.disable {
+  border: 1px solid #f0bbb6;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.member-toggle-btn.enable {
+  border: 1px solid #c8ddeb;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.member-toggle-btn:disabled {
+  opacity: 0.5;
+}
+
 .group-member-identity {
   min-width: 0;
   flex: 1 1 auto;
