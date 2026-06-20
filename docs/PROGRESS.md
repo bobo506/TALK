@@ -12,7 +12,8 @@ Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8f
 - **切片 UI #2 删 Hall 完成（全栈）**：
   - 后端（`53846b8`）：`DELETE /api/groups/{id}`，仅人类；子表先删后删群（group_members / 该群 messages / discussion_sessions / discussion_turns），顺序保证无论 SQLite FK 是否启用都正确（运行时未开 FK）。+3 单测。
   - 前端：群成员面板加红色"删除此 Hall"按钮（`renderGroupMembersPanel` 按 `canManage` 显隐，仅人类）→ `window.confirm` 二次确认（含级联删除警告）→ `DELETE` → 从本地 `groups` 移除、若为当前群则 `setActiveGroup(null)` 重置。新增 `.room-danger-btn` 样式；资源版本号 `20260620-hall-delete`。
-  - 验证：静态（JS 语法 / CSS 配平 / ID 一致 / 逻辑复核）通过；运行中 server 实测确认已服务新前端文件。**浏览器点选端到端待管理者**——运行中 server 为旧 Python 代码（无 `--reload`，缺 DELETE 端点），未停其进程，需重启后真机验。
+  - 验证：静态（JS 语法 / CSS 配平 / ID 一致 / 逻辑复核）通过；运行中 server 实测确认已服务新前端文件。
+  - **管理者真机验收（2026-06-20）**：右侧成员面板删除按钮**点选通过**。反馈收尾：① 去掉左侧 Hall 列表那个从未接线的 `::after content:"删除"` 视觉残留（`padding-right:78px` 挤压名称→换 2 行），`.room-chip` 改 `nowrap`/省略号单行显示（版本号 `20260620-hall-list`）；② 经授权用 API 删除 7 个灰色老测试 Hall（`qa` 非成员、UI 删不到），群数 31→24（纯数据清理）。
 - **本分支切片路线**：P3-1 存储 ✓ → P3-2 注入业务角色 ✓ → UI #2 删 Hall（全栈）✓ → **UI #3 全局禁用 agent（下一片：软删 `disabled_at` + `PATCH/DELETE /api/members/{id}` + 鉴权拒绝 + 前端入口）** → P3-3 MEMORY（完整 server 端，大，独立子阶段，最后做）。
 
 ### Phase 2（已合入 main · PR #1）

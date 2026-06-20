@@ -338,6 +338,9 @@ button:disabled {
   font-size: var(--font-body);
   font-weight: 600;
   padding: 9px 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
@@ -363,29 +366,6 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.group-room-list .room-chip {
-  position: relative;
-  padding-right: 78px;
-}
-
-.group-room-list .room-chip.active::after {
-  content: "删除";
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  min-width: 50px;
-  height: 28px;
-  transform: translateY(-50%);
-  border: 1px solid #f1beb9;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--red-soft);
-  color: var(--red);
-  font-size: var(--font-control);
-  font-weight: 750;
 }
 
 .group-room-empty,
