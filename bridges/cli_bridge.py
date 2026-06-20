@@ -945,7 +945,21 @@ async def _build_group_member_context(
     # 正常路径：返回紧凑逗号分隔名单，同时写入环境变量供扩展使用
     mids = [str(m.get("member_id") or "") for m in members]
     os.environ["TALK_GROUP_MEMBERS"] = ",".join(mids)
-    return f"群成员：{', '.join(mids)}。\n"
+    context = f"群成员：{', '.join(mids)}。\n"
+    # 协作层（PROJECT_INTEGRATION §5.2 / P3-2）：注入"我在本群的业务角色"，让 agent 知道
+    # 自己在这一群里的岗位（lead / reviewer / ...）。decision_tier 由 bridge 启动参数注入
+    # （见 _decision_tier_line），此处只补 business_role，避免双源冲突。
+    self_role = next(
+        (
+            str(m.get("business_role") or "").strip()
+            for m in members
+            if str(m.get("member_id") or "") == member_id
+        ),
+        "",
+    )
+    if self_role:
+        context += f"你在本群的业务角色：{self_role}。\n"
+    return context
 
 
 async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:

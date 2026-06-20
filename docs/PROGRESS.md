@@ -1,14 +1,15 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8fcec`）；新分支 `claude/phase3-collab-and-ui` 启动 Phase 3 协作层 + Web UI #2/#3，切片 P3-1（群成员业务角色/决策分级存储）完成，全套件 240/240；Claude=决策 Agent（管理者授权自主开发）
+Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8fcec`）；新分支 `claude/phase3-collab-and-ui`，切片 P3-1（群成员角色存储）+ P3-2（bridge 注入业务角色）完成，全套件 242（仅 1 个 websocket presence 偶发，隔离 10/10 通过，与改动无关）；Claude=决策 Agent（管理者授权自主开发）
 
 ### 0) Phase 3 协作层 + Web UI #2/#3（当前分支 `claude/phase3-collab-and-ui`，进行中）
 
 - **Phase 1+2 已合入 `main`**：PR #1（merge commit `6e8fcec`，2026-06-20 管理者 merge）。本分支从 `main` 新开，承载 Phase 3（业务角色注入 + MEMORY）与 Web UI #2（删 Hall）/ #3（全局禁用 agent）。
-- **切片 P3-1 完成（群成员业务角色/决策分级存储）**：`GroupMember` 加 `business_role`（自由文本）/`decision_tier`（`decision`|`execution`）两列；`PUT /api/groups/{id}/members/{member_id}` 接收并全量替换、`GroupOut.members` 返回；`GroupMemberUpdate` 校验 decision_tier 枚举（大小写归一）；`db.py` 加幂等列迁移 + 索引。+3 单测，全套件 **240/240**。对齐 `PROJECT_INTEGRATION.md` §5.2 的 groups.yaml 角色模型；消费方（bridge 注入）留待 P3-2。
-- **待管理者拍板（进下一片前）**：① UI #2 删 Hall 时该群历史 `messages` 如何处理——连带删 / 保留并置 `group_id=NULL` / 拒删非空群；② P3-3 MEMORY 做到哪层——最小（bridge 启动读 `.talk/agents/<id>/MEMORY.md` 注入）/ 完整（server 端 COLD/WARM/RESUME）。
-- **本分支切片路线**：P3-1 存储 ✓ → P3-2 bridge 注入业务角色（+分级）→ UI #2 删 Hall → UI #3 全局禁用 agent（软删，加 `disabled_at`）→ P3-3 MEMORY（范围待定）。
+- **切片 P3-1 完成（群成员业务角色/决策分级存储）**：`GroupMember` 加 `business_role`（自由文本）/`decision_tier`（`decision`|`execution`）两列；`PUT /api/groups/{id}/members/{member_id}` 接收并全量替换、`GroupOut.members` 返回；`GroupMemberUpdate` 校验 decision_tier 枚举（大小写归一）；`db.py` 加幂等列迁移 + 索引。+3 单测。对齐 `PROJECT_INTEGRATION.md` §5.2 的 groups.yaml 角色模型。
+- **切片 P3-2 完成（bridge 注入业务角色）**：`bridges/cli_bridge._build_group_member_context` 在群成员清单后追加"你在本群的业务角色：{business_role}。"（business_role 取自 P3-1 群成员数据中当前 member 的条目）；`decision_tier` 维持由 bridge 启动参数 `--decision-tier` 注入（`_decision_tier_line`），避免双源冲突。纯追加，无 business_role 时字节不变。+2 单测。**行为黑盒验证待人工**（同 Phase 2 注入，需真机 pi/codex 在群里观察是否按业务角色行动）。
+- **管理者已决策（2026-06-20）**：① UI #2 删 Hall = **连带删除消息**（级联清成员关系 + 该群所有消息）；② MEMORY = **完整 server 端 COLD/WARM/RESUME**——范围扩大为独立子阶段，排到本分支最后做。
+- **本分支切片路线**：P3-1 存储 ✓ → P3-2 注入业务角色 ✓ → **UI #2 删 Hall（下一片，级联删消息）** → UI #3 全局禁用 agent（软删，加 `disabled_at`）→ P3-3 MEMORY（完整 server 端，大，独立子阶段，最后做）。
 
 ### Phase 2（已合入 main · PR #1）
 
