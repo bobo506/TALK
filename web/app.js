@@ -1063,14 +1063,7 @@ function renderAllMembersPanel(activeGroup, canManage) {
     name.className = "all-member-name";
     name.textContent = member.id === myId ? `${shortName(member.id)} (我)` : shortName(member.id);
 
-    const roleButton = document.createElement("button");
-    roleButton.type = "button";
-    roleButton.className = `member-kind-pill ${selectedMemberKindFilters.has(member.kind) ? "active" : ""}`;
-    roleButton.textContent = member.kind || memberKindFromId(member.id);
-    roleButton.addEventListener("click", () => toggleMemberKindFilter(member.kind || memberKindFromId(member.id)));
-
     body.appendChild(name);
-    body.appendChild(roleButton);
     if (isDisabled) {
       const badge = document.createElement("span");
       badge.className = "member-disabled-badge";

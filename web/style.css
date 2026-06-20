@@ -1146,6 +1146,12 @@ pre {
   opacity: 0.5;
 }
 
+.member-add-btn,
+.member-added-pill,
+.member-toggle-btn {
+  white-space: nowrap;
+}
+
 .group-member-identity {
   min-width: 0;
   flex: 1 1 auto;
