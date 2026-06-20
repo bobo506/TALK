@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-19 (Asia/Shanghai) — Phase 2 身份层：pi(8b)+codex(8c) 注入已在真实 Hall 人工验收通过；Web UI 新建 Hall 弹窗已确认
+Updated: 2026-06-19 (Asia/Shanghai) — Phase 2 server 端完整（切片 7–9：注入 + project_agents 索引/sync）；Hall 人工验收通过；CCB 调研已登记
 
 ### 0) Phase 2 进行中
 - **切片 7 完成**（`ffa80b2`）：`cli/profiles.py` profile 加载器（纯函数地基）+ 7 单测。
@@ -14,8 +14,10 @@ Updated: 2026-06-19 (Asia/Shanghai) — Phase 2 身份层：pi(8b)+codex(8c) 注
   - codex 8c：先撞外部坑——codex 全局 `~/.codex/config.toml` 的 `service_tier="default"` 在 `codex-cli 0.130.0-alpha.5` 非法，codex exec 启动即退（与注入无关，黑盒对照确认；经黑板 `agent-docs/BLACKBOARD.md` 与 codex 协作改配置后恢复）。恢复后 codex 招呼自然、身份正确（自报 codex、点到 pi/qa），✅ 注入行为符合预期。
   - pi 8b：同 Hall 内 pi 正常中文回复，无身份混乱。
   - **决策（管理者）**：agent-to-agent 对"软邀请"不强行续聊、完成交办即回报人类（"打招呼就收"）= **可接受，维持现状，不动回合/收口逻辑**。
+- **切片 9 完成**（`6d2bc47`）：server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`（full-replace，镜像本地 `.talk/agents/`；仅人类；刷新 last_seen_at）。+6 单测，全套件 **226/226**。**Phase 2 server 端到此完整**（身份注入 + profile 路径索引/同步）。
+- **CCB 调研已登记**（`b16ffdd`）：`PROJECT_INTEGRATION.md` §9.4 + Phase2/4 路线注入 CCB 借鉴方向（Mailbox/Callback/Attempt/RolePack-skills），只记录不写代码。
 - **遗留小毛病（待处理，不阻断）**：① codex"撤回+重发"招呼导致建了两个 discussion session（#84/#85）、pi 回了两次；② 两个 session 停在 `active` 未标 `resolved`（收口本应标 resolved，疑似小 bug）。
-- **下一步**：切片 9（server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`，profile 路径索引/同步）。
+- **下一步候选**：① CLI `talk sync`（读本地 `.talk/agents/` 调 `/sync`，把 Phase 2 闭环到"本地→server 索引"）；② Phase 3 协作层（业务角色注入 + MEMORY）；③ 清两个 discussion 小毛病；④ UI #2/#3（删 Hall / 禁用 agent）。
 
 > 注：全套件偶发的 `test_websocket` presence 时序测试失败仅在机器过载（曾跑 499s）时出现，隔离单跑稳定通过，与 Phase 2 改动无关。
 
