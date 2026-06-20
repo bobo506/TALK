@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8fcec`）；新分支 `claude/phase3-collab-and-ui`（已 push），本轮连做 P3-1（群成员角色存储）+ P3-2（bridge 注入业务角色）+ UI #2 删 Hall（全栈）；groups 测试 14/14。UI #2 浏览器点选待管理者真机验。下一片 = UI #3 全局禁用 agent。Claude=决策 Agent（管理者授权自主开发）
+Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1）；分支 `claude/phase3-collab-and-ui`（已 push）。本轮：P3-1 + P3-2 + UI #2 删 Hall 全栈（右侧删除已真机验收、左侧列表收尾）+ 清理 30 个老测试群（仅留 test-run20）+ UI #3 全局禁用 agent 后端。下一片 = UI #3 前端开关。Claude=决策 Agent（管理者授权自主开发）
 
 ### 0) Phase 3 协作层 + Web UI #2/#3（当前分支 `claude/phase3-collab-and-ui`，进行中）
 
@@ -14,7 +14,9 @@ Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8f
   - 前端：群成员面板加红色"删除此 Hall"按钮（`renderGroupMembersPanel` 按 `canManage` 显隐，仅人类）→ `window.confirm` 二次确认（含级联删除警告）→ `DELETE` → 从本地 `groups` 移除、若为当前群则 `setActiveGroup(null)` 重置。新增 `.room-danger-btn` 样式；资源版本号 `20260620-hall-delete`。
   - 验证：静态（JS 语法 / CSS 配平 / ID 一致 / 逻辑复核）通过；运行中 server 实测确认已服务新前端文件。
   - **管理者真机验收（2026-06-20）**：右侧成员面板删除按钮**点选通过**。反馈收尾：① 去掉左侧 Hall 列表那个从未接线的 `::after content:"删除"` 视觉残留（`padding-right:78px` 挤压名称→换 2 行），`.room-chip` 改 `nowrap`/省略号单行显示（版本号 `20260620-hall-list`）；② 经授权用 API 删除 7 个灰色老测试 Hall（`qa` 非成员、UI 删不到），群数 31→24（纯数据清理）。
-- **本分支切片路线**：P3-1 存储 ✓ → P3-2 注入业务角色 ✓ → UI #2 删 Hall（全栈）✓ → **UI #3 全局禁用 agent（下一片：软删 `disabled_at` + `PATCH/DELETE /api/members/{id}` + 鉴权拒绝 + 前端入口）** → P3-3 MEMORY（完整 server 端，大，独立子阶段，最后做）。
+- **切片 UI #3 全局禁用 agent 后端完成**：`Member` 加 `disabled_at`（软删，保留行 + `messages.from_id` 归属 + 群成员关系，不自动退群）；`get_current_member` 对已禁用成员返回 403（拒鉴权）；`PATCH /api/members/{id}`（仅人类、仅 agent 目标）切换启用/禁用；`MemberOut` 加 `disabled_at`；`db.py` 幂等列迁移 + 索引。+4 单测（禁用→403→重启用 / agent 拒操作 / 不可禁用 human / 缺成员 404）；鉴权子集 69 测无回归。**前端开关 = 下一片**（成员面板每个 agent 行加禁用/启用切换）。
+- **数据清理（管理者授权，2026-06-20）**：经 API 删除 30 个老测试群（7 个灰色 + 23 个 test-run/BBT 等），仅保留 `test-run20`（`group:843d8433bae1`），群数 31→1。
+- **本分支切片路线**：P3-1 存储 ✓ → P3-2 注入业务角色 ✓ → UI #2 删 Hall（全栈）✓ → UI #3 全局禁用 agent 后端 ✓ → **UI #3 前端（下一片：成员面板禁用/启用开关）** → P3-3 MEMORY（完整 server 端，大，独立子阶段，最后做）。
 
 ### Phase 2（已合入 main · PR #1）
 

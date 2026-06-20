@@ -109,6 +109,12 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE group_members ADD COLUMN business_role TEXT")
         if "decision_tier" not in group_member_columns:
             conn.exec_driver_sql("ALTER TABLE group_members ADD COLUMN decision_tier TEXT")
+        member_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(members)").fetchall()
+        }
+        if "disabled_at" not in member_columns:
+            conn.exec_driver_sql("ALTER TABLE members ADD COLUMN disabled_at TIMESTAMP")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_files_sha256 ON files (sha256)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_from_id ON messages (from_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_group_id ON messages (group_id)")
@@ -120,6 +126,7 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_business_role ON group_members (business_role)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_decision_tier ON group_members (decision_tier)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_members_disabled_at ON members (disabled_at)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_member_id ON agent_instances (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_runtime ON agent_instances (runtime)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_status ON agent_instances (status)")

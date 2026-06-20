@@ -22,6 +22,8 @@ class Member(SQLModel, table=True):
     api_key: str = Field(unique=True, index=True)
     poll_hint: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # 全局禁用（UI #3 / 软删）：非空 = 已禁用，被鉴权拒绝；保留行以维持 messages.from_id 归属。
+    disabled_at: Optional[datetime] = Field(default=None, index=True)
 
 
 class Message(SQLModel, table=True):
@@ -223,12 +225,19 @@ class MemberCreate(BaseModel):
     poll_hint: Optional[int] = None
 
 
+class MemberDisableUpdate(BaseModel):
+    """`PATCH /api/members/{id}` body — toggle a member's global disabled state."""
+
+    disabled: bool
+
+
 class MemberOut(BaseModel):
     id: str
     kind: str
     display_name: str
     poll_hint: Optional[int] = None
     created_at: datetime
+    disabled_at: Optional[datetime] = None
 
 
 class MessageCreate(BaseModel):
