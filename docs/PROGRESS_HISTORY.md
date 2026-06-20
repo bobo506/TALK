@@ -184,6 +184,37 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-20 Phase 3 协作层（前两片）+ Web UI #2/#3（全栈）+ 测试数据清理
+
+分支 `claude/phase3-collab-and-ui`（基于已合入 main 的 Phase 1+2，PR #1）。决策 Agent 在管理者授权下自主连续开发。
+
+### Phase 3 协作层
+- **P3-1（`533bc5d`）群成员业务角色/决策分级存储**：`GroupMember` 加 `business_role`（自由文本）/ `decision_tier`（`decision`|`execution`）两列；`PUT /api/groups/{id}/members/{member_id}` 接收并全量替换，`GroupOut.members` 返回；`GroupMemberUpdate` 校验 decision_tier 枚举（大小写归一）；`db.py` 幂等列迁移 + 索引。+3 单测。对齐 `PROJECT_INTEGRATION.md` §5.2 groups.yaml 角色模型。
+- **P3-2（`51da887`）bridge 注入业务角色**：`bridges/cli_bridge._build_group_member_context` 在群成员清单后追加"你在本群的业务角色：{business_role}。"（取自 P3-1 群成员数据中当前 member 条目）；`decision_tier` 维持由 bridge 启动参数 `--decision-tier` 注入，避免双源冲突。纯追加，无 business_role 时字节不变。+2 单测。**行为黑盒待真机**（pi/codex）。
+
+### Web UI #2 删 Hall（全栈）
+- 后端（`53846b8`）：`DELETE /api/groups/{id}`，仅人类；子表先删后删群（group_members / 该群 messages / discussion_sessions / discussion_turns），顺序保证无论 SQLite FK 是否启用都正确（运行时未开 FK）。+3 单测。
+- 前端（`5578ac2`）：群成员面板红色"删除此 Hall"按钮（仅人类）→ `window.confirm` 二次确认 → `DELETE` → 本地 `groups` 移除 + 若当前群则 `setActiveGroup(null)`。新增 `.room-danger-btn`。
+- 收尾（`a54e4d3`）：移除左侧 Hall 列表从未接线的 `::after content:"删除"` 残留（`padding-right:78px` 致名称换 2 行），`.room-chip` 改 `nowrap`/省略号。
+- **管理者真机验收：右侧删除点选通过。**
+
+### Web UI #3 全局禁用 agent（全栈）
+- 后端（`4cec246`）：`Member.disabled_at` 软删（保留行 + `messages.from_id` 归属 + 群成员关系，不自动退群）；`get_current_member` 对已禁用成员返回 403；`PATCH /api/members/{id}`（仅人类、仅 agent 目标）切换启用/禁用；`MemberOut` 暴露 `disabled_at`；`db.py` 幂等列迁移 + 索引。+4 单测；鉴权子集 69 测无回归。
+- 前端（`dea5ff9`）：右侧列表只列 agent（不展示 human）；每行禁用/启用开关（仅人类）→ `PATCH`；已禁用置灰 + "已禁用"徽标、"加入"禁用。新增 `toggleMemberDisabled` + 样式。
+- 收尾（`05db723`）：列表既已 agent-only，移除每行冗余 `agent` 标签 + 过时"点角色筛选"提示，标题改"所有 Agent"，按钮加 `nowrap`（解决名字被挤 / "已在 Hall"换行）。
+- **管理者真机验收：功能通过。**（端到端"禁用→403"需重启 server 加载 `PATCH` 端点后验。）
+
+### 测试数据清理（管理者授权）
+- API 删 30 个老测试群，仅留 `test-run20`（`group:843d8433bae1`），群 31→1。
+- 直接删 DB 清掉 5 个测试成员（agent：ui52226 / testpi / pi@projA:tester；human：tester / ui52226），仅 0 消息者才删以保归属。现存 5 成员 = agent `codex`/`pi`/`pi-kimi` + human `bobo`/`qa`。
+
+### 验证
+- 子集全绿：groups 14/14、member_disable 4、cli_bridge 60、鉴权子集（messages/discussions/instances/tasks/files/projects）69；唯一偶发 = `test_websocket` presence 过载时序（隔离 10/10，与改动无关）。
+- 前端：JS 语法 / CSS 配平 / ID 一致 / 逻辑复核 + 运行中 server 实测服务新文件。
+
+### 下一步
+- P3-3 MEMORY（完整 server 端 COLD/WARM/RESUME，独立子阶段）在本分支做；先出切片拆分方案。
+
 ## 2026-06-20 Phase 2 闭环 · 切片 10：CLI `talk sync`（本地 `.talk/agents/` → server 索引）
 
 **背景**：切片 9 把 server 端 `project_agents` 表 + `/agents` + `/sync` 做完，但缺一个本地侧入口把 `.talk/agents/` 的 profile 索引推到 server。本片补上 `talk sync` 子命令，Phase 2 从"server 端完整"收口成"本地 → server 索引"的完整闭环。决策 Agent 在管理者授权自主开发下完成。
