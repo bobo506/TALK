@@ -65,7 +65,13 @@ def _group_out(group: Group, session: Session) -> GroupOut:
         created_at=group.created_at,
         updated_at=group.updated_at,
         members=[
-            GroupMemberOut(member_id=member.member_id, role=member.role, created_at=member.created_at)
+            GroupMemberOut(
+                member_id=member.member_id,
+                role=member.role,
+                business_role=member.business_role,
+                decision_tier=member.decision_tier,
+                created_at=member.created_at,
+            )
             for member in members
         ],
     )
@@ -174,9 +180,18 @@ def upsert_group_member(
 
     membership = session.get(GroupMember, (group_id, member_id))
     if membership is None:
-        membership = GroupMember(group_id=group_id, member_id=member_id, role=body.role, created_at=now)
+        membership = GroupMember(
+            group_id=group_id,
+            member_id=member_id,
+            role=body.role,
+            business_role=body.business_role,
+            decision_tier=body.decision_tier,
+            created_at=now,
+        )
     else:
         membership.role = body.role
+        membership.business_role = body.business_role
+        membership.decision_tier = body.decision_tier
     group.updated_at = now
     session.add(membership)
     session.add(group)

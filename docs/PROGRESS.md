@@ -1,11 +1,18 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-20 (Asia/Shanghai) — 切片 10 `talk sync` 完成，Phase 2 本地→server 索引闭环；全套件 237/237；当前角色 Claude=决策 Agent（管理者本次授权自主开发）
+Updated: 2026-06-20 (Asia/Shanghai) — Phase 1+2 已合入 `main`（PR #1 `6e8fcec`）；新分支 `claude/phase3-collab-and-ui` 启动 Phase 3 协作层 + Web UI #2/#3，切片 P3-1（群成员业务角色/决策分级存储）完成，全套件 240/240；Claude=决策 Agent（管理者授权自主开发）
 
-### 0) Phase 2 进行中
+### 0) Phase 3 协作层 + Web UI #2/#3（当前分支 `claude/phase3-collab-and-ui`，进行中）
 
-- **切片 10 完成（`talk sync`，本次新增，未提交）**：CLI 子命令 `talk sync` 扫描本地 `.talk/agents/` → `POST /api/projects/{id}/sync`，把 profile 路径索引推到 server，Phase 2 从"server 端完整"收口成"本地→server 索引"完整闭环。新增 `cli/profiles.member_id_from_dir_name`（`member_dir_name` 逆映射）+ `cli/talk.scan_agents`/`sync_project`/`cmd_sync`。+11 单测，全套件 **237/237**。真实 dogfood `.talk/agents/` 验证逆出 3 个 agent 正确。
+- **Phase 1+2 已合入 `main`**：PR #1（merge commit `6e8fcec`，2026-06-20 管理者 merge）。本分支从 `main` 新开，承载 Phase 3（业务角色注入 + MEMORY）与 Web UI #2（删 Hall）/ #3（全局禁用 agent）。
+- **切片 P3-1 完成（群成员业务角色/决策分级存储）**：`GroupMember` 加 `business_role`（自由文本）/`decision_tier`（`decision`|`execution`）两列；`PUT /api/groups/{id}/members/{member_id}` 接收并全量替换、`GroupOut.members` 返回；`GroupMemberUpdate` 校验 decision_tier 枚举（大小写归一）；`db.py` 加幂等列迁移 + 索引。+3 单测，全套件 **240/240**。对齐 `PROJECT_INTEGRATION.md` §5.2 的 groups.yaml 角色模型；消费方（bridge 注入）留待 P3-2。
+- **待管理者拍板（进下一片前）**：① UI #2 删 Hall 时该群历史 `messages` 如何处理——连带删 / 保留并置 `group_id=NULL` / 拒删非空群；② P3-3 MEMORY 做到哪层——最小（bridge 启动读 `.talk/agents/<id>/MEMORY.md` 注入）/ 完整（server 端 COLD/WARM/RESUME）。
+- **本分支切片路线**：P3-1 存储 ✓ → P3-2 bridge 注入业务角色（+分级）→ UI #2 删 Hall → UI #3 全局禁用 agent（软删，加 `disabled_at`）→ P3-3 MEMORY（范围待定）。
+
+### Phase 2（已合入 main · PR #1）
+
+- **切片 10 完成（`talk sync`，`882b70c`，已合入 main）**：CLI 子命令 `talk sync` 扫描本地 `.talk/agents/` → `POST /api/projects/{id}/sync`，把 profile 路径索引推到 server，Phase 2 从"server 端完整"收口成"本地→server 索引"完整闭环。新增 `cli/profiles.member_id_from_dir_name`（`member_dir_name` 逆映射）+ `cli/talk.scan_agents`/`sync_project`/`cmd_sync`。+11 单测，全套件 **237/237**。真实 dogfood `.talk/agents/` 验证逆出 3 个 agent 正确。
 - **切片 7 完成**（`ffa80b2`）：`cli/profiles.py` profile 加载器（纯函数地基）+ 7 单测。
 - **注入策略 = B 方案（系统层）**：人设作"背景底色"进 agent 系统层，不混进消息流（§5.4）。
 - **切片 8a 完成**（`fc15aa6`）：`compose_system_prompt(base, profile)` 纯函数（profile 作背景 + "别复述"框定；空 profile→base 原样）。

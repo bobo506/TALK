@@ -80,7 +80,11 @@ class GroupMember(SQLModel, table=True):
 
     group_id: str = Field(foreign_key="groups.id", primary_key=True)
     member_id: str = Field(foreign_key="members.id", primary_key=True, index=True)
-    role: str = Field(default="member", index=True)
+    role: str = Field(default="member", index=True)  # chat role: owner | moderator | member
+    # 协作层（PROJECT_INTEGRATION §5.2）：业务角色 + 决策分级，按 (群, 成员) 存储。
+    # business_role 自由文本（lead / dev / ui / tester / reviewer / ...）；decision_tier ∈ {decision, execution}。
+    business_role: Optional[str] = Field(default=None, index=True)
+    decision_tier: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -326,11 +330,14 @@ class FileOut(BaseModel):
 
 
 _GROUP_ROLES = {"owner", "moderator", "member"}
+_DECISION_TIERS = {"decision", "execution"}
 
 
 class GroupMemberOut(BaseModel):
     member_id: str
     role: str
+    business_role: Optional[str] = None
+    decision_tier: Optional[str] = None
     created_at: datetime
 
 
@@ -374,12 +381,20 @@ class GroupUpdate(BaseModel):
 
 class GroupMemberUpdate(BaseModel):
     role: str = "member"
+    business_role: Optional[str] = None
+    decision_tier: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_group_member_update(self) -> "GroupMemberUpdate":
         self.role = self.role.strip().lower()
         if self.role not in _GROUP_ROLES:
             raise ValueError(f"role must be one of {sorted(_GROUP_ROLES)}")
+        if self.business_role is not None:
+            self.business_role = self.business_role.strip() or None
+        if self.decision_tier is not None:
+            self.decision_tier = self.decision_tier.strip().lower() or None
+            if self.decision_tier is not None and self.decision_tier not in _DECISION_TIERS:
+                raise ValueError(f"decision_tier must be one of {sorted(_DECISION_TIERS)}")
         return self
 
 
