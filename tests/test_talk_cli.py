@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
@@ -207,4 +208,125 @@ class TalkCliTests(RouteTestCase):
         root = self._root()
         talk.scaffold_project(root, display_name="P")
         rc = talk.main(["create-group", "--root", str(root), "--name", "X"])
+        self.assertEqual(rc, 1)
+
+    # ── sync ─────────────────────────────────────────────────────────
+
+    def test_member_id_from_dir_name_restores_colon(self):
+        self.assertEqual(talk.member_id_from_dir_name("agent_codex"), "agent:codex")
+        self.assertEqual(talk.member_id_from_dir_name("agent_pi-kimi"), "agent:pi-kimi")
+        self.assertEqual(talk.member_id_from_dir_name("human_bobo"), "human:bobo")
+
+    def test_scan_agents_builds_sorted_index(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        talk.scaffold_agent(root, "agent:pi")
+        talk.scaffold_agent(root, "agent:codex")
+
+        entries = talk.scan_agents(root)
+        # sorted by member_id, colon restored from the sanitized dir name
+        self.assertEqual([e["member_id"] for e in entries], ["agent:codex", "agent:pi"])
+        codex = entries[0]
+        # relative-to-root forward-slash paths (stable across OSes)
+        self.assertEqual(codex["identity_path"], ".talk/agents/agent_codex/IDENTITY.md")
+        self.assertEqual(codex["soul_path"], ".talk/agents/agent_codex/SOUL.md")
+        self.assertEqual(codex["user_path"], ".talk/agents/agent_codex/USER.md")
+        # MEMORY.md is surfaced as the memory_pointer
+        self.assertEqual(codex["memory_pointer"], ".talk/agents/agent_codex/MEMORY.md")
+
+    def test_scan_agents_marks_missing_files_none(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        talk.scaffold_agent(root, "agent:codex")
+        (root / ".talk" / "agents" / "agent_codex" / "USER.md").unlink()
+
+        entry = talk.scan_agents(root)[0]
+        self.assertIsNone(entry["user_path"])
+        self.assertEqual(entry["identity_path"], ".talk/agents/agent_codex/IDENTITY.md")
+
+    def test_scan_agents_empty_without_profiles(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")  # only agents/README.md exists
+        self.assertEqual(talk.scan_agents(root), [])
+
+    def test_sync_project_against_server(self):
+        self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        root = self._root()
+        talk.scaffold_project(root, display_name="P", project_id="prj_sync", maintainer="human:bobo")
+        talk.scaffold_agent(root, "agent:codex")
+        talk.scaffold_agent(root, "agent:pi")
+
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_sync", "display_name": "P"},
+            )
+            result = talk.sync_project(
+                "http://testserver", "bobo-key", "prj_sync", talk.scan_agents(root), http=client
+            )
+            self.assertEqual([a["member_id"] for a in result], ["agent:codex", "agent:pi"])
+
+            listed = client.get("/api/projects/prj_sync/agents", headers={"X-API-Key": "bobo-key"})
+            self.assertEqual(
+                [a["member_id"] for a in listed.json()], ["agent:codex", "agent:pi"]
+            )
+            self.assertEqual(
+                listed.json()[0]["identity_path"], ".talk/agents/agent_codex/IDENTITY.md"
+            )
+
+    def test_sync_project_is_full_replace(self):
+        self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        root = self._root()
+        talk.scaffold_project(root, display_name="P", project_id="prj_fr", maintainer="human:bobo")
+        talk.scaffold_agent(root, "agent:codex")
+        talk.scaffold_agent(root, "agent:pi")
+
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_fr", "display_name": "P"},
+            )
+            talk.sync_project("http://testserver", "bobo-key", "prj_fr", talk.scan_agents(root), http=client)
+            # drop one profile locally, re-sync → server mirrors the local state
+            shutil.rmtree(root / ".talk" / "agents" / "agent_pi")
+            result = talk.sync_project(
+                "http://testserver", "bobo-key", "prj_fr", talk.scan_agents(root), http=client
+            )
+            self.assertEqual([a["member_id"] for a in result], ["agent:codex"])
+
+    def test_sync_project_raises_on_error(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P", project_id="prj_ghost")
+        with self.make_client() as client:
+            with self.assertRaises(RuntimeError):
+                talk.sync_project(
+                    "http://testserver", "bobo-key", "prj_ghost", talk.scan_agents(root), http=client
+                )
+
+    def test_cmd_sync_defaults_project_from_yaml(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P", project_id="prj_local")
+        talk.scaffold_agent(root, "agent:codex")
+
+        fake_result = [{"member_id": "agent:codex"}]
+        with patch.object(talk, "sync_project", return_value=fake_result) as mocked:
+            rc = talk.main(["sync", "--root", str(root), "--key", "bobo-key"])
+
+        self.assertEqual(rc, 0)
+        # project_id defaulted from local project.yaml; scanned agents passed through
+        self.assertEqual(mocked.call_args.args[2], "prj_local")
+        passed_agents = mocked.call_args.args[3]
+        self.assertEqual([a["member_id"] for a in passed_agents], ["agent:codex"])
+
+    def test_cmd_sync_requires_key(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        rc = talk.main(["sync", "--root", str(root)])
+        self.assertEqual(rc, 1)
+
+    def test_cmd_sync_without_init_returns_1(self):
+        root = self._root()  # no `talk init`
+        rc = talk.main(["sync", "--root", str(root), "--key", "k"])
         self.assertEqual(rc, 1)

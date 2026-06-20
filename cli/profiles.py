@@ -31,6 +31,18 @@ def member_dir_name(member_id: str) -> str:
     return member_id.replace(":", "_")
 
 
+def member_id_from_dir_name(dir_name: str) -> str:
+    """Inverse of :func:`member_dir_name` for the standard ``<kind>:<name>`` form.
+
+    Profile directories under ``.talk/agents/`` hold base member_ids with a
+    single ``:`` separating the kind (``agent`` / ``human``) from the name, which
+    :func:`member_dir_name` maps to ``_``. Restore the first ``_`` to ``:``. The
+    kind prefix never contains ``_``, so this is unambiguous for the ids TALK
+    stores on disk (e.g. ``agent_pi-kimi`` -> ``agent:pi-kimi``).
+    """
+    return dir_name.replace("_", ":", 1)
+
+
 @dataclass
 class AgentProfile:
     """An agent's identity-layer profile loaded from disk."""

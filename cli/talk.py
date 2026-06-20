@@ -24,7 +24,7 @@ from uuid import uuid4
 
 import yaml
 
-from cli.profiles import member_dir_name
+from cli.profiles import member_dir_name, member_id_from_dir_name
 
 DEFAULT_SERVER = "http://127.0.0.1:8000"
 
@@ -221,6 +221,42 @@ def save_groups(root: Path, doc: dict[str, Any]) -> None:
     _write_yaml(Path(root) / ".talk" / "groups.yaml", doc)
 
 
+# Maps a sync-payload field to the profile filename it indexes. ``MEMORY.md`` is
+# surfaced as ``memory_pointer`` — a pointer to where this agent's memory lives.
+_SYNC_PROFILE_FILES: dict[str, str] = {
+    "identity_path": "IDENTITY.md",
+    "soul_path": "SOUL.md",
+    "user_path": "USER.md",
+    "memory_pointer": "MEMORY.md",
+}
+
+
+def scan_agents(root: Path) -> list[dict[str, Any]]:
+    """Build the agent profile-path index from ``.talk/agents/`` (for `talk sync`).
+
+    Each subdirectory under ``.talk/agents/`` is one agent; its directory name is
+    reversed back to a ``member_id`` (see :func:`member_id_from_dir_name`). Paths
+    are relative to ``root`` with forward slashes so they are stable across OSes;
+    a missing profile file yields ``None`` for that field. Returns entries sorted
+    by ``member_id`` to match the server's index ordering.
+    """
+    agents_dir = Path(root) / ".talk" / "agents"
+    if not agents_dir.exists():
+        return []
+
+    entries: list[dict[str, Any]] = []
+    for child in sorted(agents_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue  # skips agents/README.md and any dotted dirs
+        entry: dict[str, Any] = {"member_id": member_id_from_dir_name(child.name)}
+        for field, fname in _SYNC_PROFILE_FILES.items():
+            fpath = child / fname
+            entry[field] = fpath.relative_to(root).as_posix() if fpath.exists() else None
+        entries.append(entry)
+    entries.sort(key=lambda e: e["member_id"])
+    return entries
+
+
 # ── server registration ──────────────────────────────────────────────
 
 
@@ -302,6 +338,40 @@ def create_group(
     return resp.json()
 
 
+def sync_project(
+    server_url: str,
+    api_key: str,
+    project_id: str,
+    agents: list[dict[str, Any]],
+    *,
+    http: Any = None,
+) -> list[dict[str, Any]]:
+    """Sync the local agent index to the server (``POST /api/projects/{id}/sync``).
+
+    Full-replace semantics on the server side: the returned list is the project's
+    complete agent index after the sync. ``http`` is injectable like
+    :func:`register_project`.
+    """
+    owns_client = http is None
+    if http is None:
+        import httpx
+
+        http = httpx.Client(base_url=server_url, timeout=10.0)
+    try:
+        resp = http.post(
+            f"/api/projects/{project_id}/sync",
+            json={"agents": agents},
+            headers={"X-API-Key": api_key},
+        )
+    finally:
+        if owns_client:
+            http.close()
+
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"sync failed: HTTP {resp.status_code} {resp.text}")
+    return resp.json()
+
+
 # ── CLI ──────────────────────────────────────────────────────────────
 
 
@@ -379,6 +449,26 @@ def cmd_create_group(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sync(args: argparse.Namespace) -> int:
+    root = Path(args.root).resolve()
+    project = load_project(root)
+    server_url = args.server or project.get("talk_server") or DEFAULT_SERVER
+    project_id = args.project or project.get("project_id")
+    if not project_id:
+        print("✗ no project_id in .talk/project.yaml; pass --project", file=sys.stderr)
+        return 1
+    if not args.key:
+        print("✗ --key is required to sync with the server", file=sys.stderr)
+        return 1
+
+    agents = scan_agents(root)
+    result = sync_project(server_url, args.key, project_id, agents)
+    print(f"✓ Synced {len(result)} agent profile(s) (project_id: {project_id})")
+    for entry in result:
+        print(f"  • {entry['member_id']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="talk", description="TALK project integration CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -410,6 +500,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_grp.add_argument("--root", default=".", help="project root directory (default: cwd)")
     p_grp.add_argument("--key", default=None, help="X-API-Key used to authenticate with the server")
     p_grp.set_defaults(func=cmd_create_group)
+
+    p_sync = sub.add_parser("sync", help="Sync .talk/agents/ profile index to the server")
+    p_sync.add_argument("--project", default=None, help="project_id to sync (default: local project.yaml)")
+    p_sync.add_argument("--server", default=None, help="TALK server URL (default: local project.yaml)")
+    p_sync.add_argument("--root", default=".", help="project root directory (default: cwd)")
+    p_sync.add_argument("--key", default=None, help="X-API-Key used to authenticate with the server")
+    p_sync.set_defaults(func=cmd_sync)
 
     return parser
 

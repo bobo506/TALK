@@ -184,6 +184,30 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-20 Phase 2 闭环 · 切片 10：CLI `talk sync`（本地 `.talk/agents/` → server 索引）
+
+**背景**：切片 9 把 server 端 `project_agents` 表 + `/agents` + `/sync` 做完，但缺一个本地侧入口把 `.talk/agents/` 的 profile 索引推到 server。本片补上 `talk sync` 子命令，Phase 2 从"server 端完整"收口成"本地 → server 索引"的完整闭环。决策 Agent 在管理者授权自主开发下完成。
+
+### 改动
+
+- `cli/profiles.py`：新增 `member_id_from_dir_name(dir_name)` —— `member_dir_name` 的逆映射（首个 `_` 还原为 `:`，如 `agent_pi-kimi` → `agent:pi-kimi`）；kind 前缀（agent/human）不含 `_`，对磁盘上的单冒号 member_id 无歧义。
+- `cli/talk.py`：
+  - `scan_agents(root)`：扫描 `.talk/agents/` 各子目录，逆出 member_id，构造相对项目根的正斜杠路径（跨 OS 稳定）；缺失文件→`None`；`MEMORY.md` 映射为 `memory_pointer`；按 member_id 排序，与 server 索引顺序一致。跳过 `agents/README.md` 与点目录。
+  - `sync_project(server_url, api_key, project_id, agents, *, http=None)`：`POST /api/projects/{id}/sync`，可注入 http 客户端（同 `register_project`/`create_group`）；非 2xx → `RuntimeError`。
+  - `cmd_sync` + `sync` 子命令：`--project`/`--server` 默认取本地 `project.yaml`；`--key` 必填；无 project_id/无 key → 退 1。
+- `tests/test_talk_cli.py`：+11 用例（逆映射、scan 排序/缺失文件→None/空目录、sync 真服务端往返、全量替换、报错、cmd 默认 project_id、缺 key、未 init）。
+
+### 验证
+
+- `python -m unittest tests.test_talk_cli tests.test_projects` → 44/44 通过。
+- 全套件 `python -m unittest discover -s tests` → **237/237 通过**（较切片 9 的 226 增 11 个新测），无回归。
+- 真实 dogfood 数据 `python -c "from cli.talk import scan_agents; ..." .` → 正确逆出 3 个 agent（`agent:codex` / `agent:pi` / `agent:pi-kimi`，含连字符名），路径正确。
+- server 往返由 in-process TestClient 覆盖（POST `/sync` → DB → GET `/agents` 一致；含全量替换：删本地一个 profile 再 sync，server 镜像为剩余一个）。未做真实运行 server 的端到端手测（留待人工验收或集成）。
+
+### 待确认 / 下一步
+
+- Phase 2 server 端 + 本地侧入口均已闭环。下一阶段候选：② Phase 3 协作层（业务角色注入 + MEMORY，属新阶段/产品方向，开工前需确认范围）；③ 清两个 discussion 遗留小毛病（管理者已记"以后再修"）；④ Web UI #2 删 Hall / #3 全局禁用 agent（全栈，#3 涉数据模型）。
+
 ## 2026-06-16 Phase 2 身份层 · 切片 8c：codex bridge --project 注入 base_instructions
 
 **背景**：管理者确认 8c 后一起测。codex 的系统层 = `-c base_instructions=<json>`（接缝在 8b 已认明）。与 pi 8b 同构实现。

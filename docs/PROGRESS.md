@@ -1,9 +1,11 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-20 (Asia/Shanghai) — Phase 2 完成并 Hall 验收通过（pi+codex 注入真生效）；pi.CMD 换行 bug 已修；CCB 调研已登记；分支已 push
+Updated: 2026-06-20 (Asia/Shanghai) — 切片 10 `talk sync` 完成，Phase 2 本地→server 索引闭环；全套件 237/237；当前角色 Claude=决策 Agent（管理者本次授权自主开发）
 
 ### 0) Phase 2 进行中
+
+- **切片 10 完成（`talk sync`，本次新增，未提交）**：CLI 子命令 `talk sync` 扫描本地 `.talk/agents/` → `POST /api/projects/{id}/sync`，把 profile 路径索引推到 server，Phase 2 从"server 端完整"收口成"本地→server 索引"完整闭环。新增 `cli/profiles.member_id_from_dir_name`（`member_dir_name` 逆映射）+ `cli/talk.scan_agents`/`sync_project`/`cmd_sync`。+11 单测，全套件 **237/237**。真实 dogfood `.talk/agents/` 验证逆出 3 个 agent 正确。
 - **切片 7 完成**（`ffa80b2`）：`cli/profiles.py` profile 加载器（纯函数地基）+ 7 单测。
 - **注入策略 = B 方案（系统层）**：人设作"背景底色"进 agent 系统层，不混进消息流（§5.4）。
 - **切片 8a 完成**（`fc15aa6`）：`compose_system_prompt(base, profile)` 纯函数（profile 作背景 + "别复述"框定；空 profile→base 原样）。
