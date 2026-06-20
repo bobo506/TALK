@@ -1193,6 +1193,30 @@ pre {
   color: #b0a99f;
 }
 
+.room-danger-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  min-height: 36px;
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: var(--font-control);
+  font-weight: 750;
+}
+
+.room-danger-btn:hover {
+  background: var(--red);
+  color: #ffffff;
+}
+
+.room-danger-btn:disabled {
+  border-color: #e1ddd4;
+  background: #f4f1eb;
+  color: #b0a99f;
+}
+
 .all-member-body {
   min-width: 0;
   flex: 1 1 auto;

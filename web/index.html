@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260611-ui-refine">
+  <link rel="stylesheet" href="/style.css?v=20260620-hall-delete">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -221,6 +221,7 @@
               <button id="group-member-add-btn" type="submit" class="room-primary-btn">添加成员</button>
             </form>
             <p id="group-members-error" class="group-create-error hidden"></p>
+            <button id="delete-group-btn" type="button" class="room-danger-btn hidden">删除此 Hall</button>
           </div>
           <div class="details-card all-members-card">
             <div class="details-card-header compact">
@@ -274,6 +275,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/app.js?v=20260619-hall-modal-2"></script>
+  <script src="/app.js?v=20260620-hall-delete"></script>
 </body>
 </html>

@@ -115,6 +115,7 @@ const groupMemberAddSelect = document.getElementById("group-member-add-select");
 const groupMemberAddRole = document.getElementById("group-member-add-role");
 const groupMemberAddBtn = document.getElementById("group-member-add-btn");
 const groupMembersError = document.getElementById("group-members-error");
+const deleteGroupBtn = document.getElementById("delete-group-btn");
 const allMembersList = document.getElementById("all-members-list");
 const presenceStrip = document.getElementById("presence-strip");
 const presenceSummary = document.getElementById("presence-summary");
@@ -567,6 +568,7 @@ groupCreatePanel.addEventListener("submit", createGroupFromPanel);
 closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(true));
 groupMetaForm.addEventListener("submit", updateGroupMetadataFromPanel);
 groupMemberAddForm.addEventListener("submit", addGroupMemberFromPanel);
+deleteGroupBtn.addEventListener("click", deleteActiveGroup);
 hallFilterInput.addEventListener("input", renderRoomStrip);
 roomTitle.addEventListener("click", () => {
   if (!activeGroupId || !canManageGroups()) return;
@@ -1012,6 +1014,11 @@ function renderGroupMembersPanel() {
     }
     groupMemberAddRole.disabled = groupMemberSaving;
   }
+  if (deleteGroupBtn) {
+    deleteGroupBtn.classList.toggle("hidden", !canManage);
+    deleteGroupBtn.disabled = groupMemberSaving;
+  }
+
   renderAllMembersPanel(activeGroup, canManage);
 }
 
@@ -1183,6 +1190,42 @@ async function removeGroupMemberFromPanel(memberId) {
     renderRoomStrip();
     renderPresenceStrip();
     renderMentionDropdownIfOpen();
+  } catch (err) {
+    console.error(err);
+    showGroupMembersError(err.message);
+    renderGroupMembersPanel();
+  } finally {
+    groupMemberSaving = false;
+    renderGroupMembersPanel();
+  }
+}
+
+async function deleteActiveGroup() {
+  const group = getActiveGroup();
+  if (!group || !canManageGroups() || groupMemberSaving) return;
+  const confirmed = window.confirm(
+    `确定删除 Hall「${group.name}」(${group.id}) 吗？\n` +
+    "将永久删除该 Hall 及其全部消息记录，不可恢复。"
+  );
+  if (!confirmed) return;
+
+  groupMemberSaving = true;
+  renderGroupMembersPanel();
+  try {
+    const res = await apiFetch(`/api/groups/${encodeURIComponent(group.id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `删除 Hall 失败: ${res.status}`));
+    }
+    groups = groups.filter((item) => item.id !== group.id);
+    groupMembersOpen = false;
+    showGroupMembersError("");
+    if (activeGroupId === group.id) {
+      setActiveGroup(null); // 重置时间线 / 本地存储 / 各处渲染
+    } else {
+      renderRoomStrip();
+      renderPresenceStrip();
+      renderMentionDropdownIfOpen();
+    }
   } catch (err) {
     console.error(err);
     showGroupMembersError(err.message);
