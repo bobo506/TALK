@@ -44,6 +44,17 @@ class PiBridgeTests(unittest.TestCase):
         self.assertNotIn("human:qa", system_prompt)
         self.assertNotIn("agent:codex", system_prompt)
 
+    def test_system_prompt_has_no_newlines(self):
+        # pi.CMD (Windows shim) mangles a --system-prompt arg containing newlines
+        # → pi 0.79.8 emits nothing. The bridge collapses the prompt to one line.
+        args = pi_bridge.build_parser().parse_args(["--key", "pi-key"])
+        command_args = shlex.split(args.pi_command, posix=True)
+        system_prompt = command_args[command_args.index("--system-prompt") + 1]
+        self.assertNotIn("\n", system_prompt)
+        # content is preserved across the collapse
+        self.assertIn("TALK 群里的一个 agent", system_prompt)
+        self.assertIn("不存在下一轮", system_prompt)
+
     def test_tools_profile_resolves_to_tools_command(self):
         args = pi_bridge.build_parser().parse_args(["--key", "pi-key", "--pi-execution-profile", "tools"])
 
@@ -115,6 +126,8 @@ class PiBridgeProfileInjectionTests(unittest.TestCase):
         self.assertIn(SYSTEM_PROMPT_PROFILE_HEADER, system_prompt)
         self.assertIn("绝不写汇报体", system_prompt)
         self.assertIn("对话型 Agent", system_prompt)
+        # injected profile is also collapsed to one line (pi.CMD newline mangling)
+        self.assertNotIn("\n", system_prompt)
         # the rest of the command is untouched (still function-calling shape)
         self.assertIn("--tools talk_send", resolved)
 

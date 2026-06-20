@@ -29,13 +29,26 @@ _TALK_EXTENSION_PATH = str(PROJECT_ROOT / "bridges" / "talk_tools_extension.ts")
 # ---------------------------------------------------------------------------
 DEFAULT_SYSTEM_PROMPT = cli_bridge.FUNCTION_CALLING_SYSTEM_PROMPT
 
+
+def _single_line(text: str) -> str:
+    """Collapse the system prompt to a single line (newlines/whitespace → spaces).
+
+    pi.CMD（pi CLI 在 Windows 上的 .CMD 批处理 shim）会把含**换行**的
+    ``--system-prompt`` 参数在 cmd.exe 这层截断/破坏，pi 收到残缺提示后**不产出任何可见
+    回复**（→ bridge 兜底成"我是 pi，已切换为中文回复…"那句）。把提示压成一行即可绕过该
+    shim，同时完整保留内容。2026-06-19 实测 pi 0.79.8：含 \\n 的提示 pi 吐空，单行化后正常
+    出话。codex 不受影响（它走 JSON 编码的 ``-c base_instructions``，换行被转义）。
+    """
+    return " ".join(text.split())
+
+
 # ---------------------------------------------------------------------------
 # pi 命令模板
 # ---------------------------------------------------------------------------
 # 旧文本协议命令（保留作过渡兼容）
 DEFAULT_PI_COMMAND_LEGACY = (
     "pi --print --mode text --no-context-files --no-tools --no-session --thinking off "
-    f"--system-prompt {shlex.quote(DEFAULT_SYSTEM_PROMPT)}"
+    f"--system-prompt {shlex.quote(_single_line(DEFAULT_SYSTEM_PROMPT))}"
 )
 
 
@@ -52,6 +65,7 @@ def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussio
     safely. ``repr`` happened to work for the static default prompt but breaks on
     real IDENTITY/SOUL markdown, and also passed newlines as literal ``\\n``.
     """
+    system_prompt = _single_line(system_prompt)
     if execution_profile == "tools":
         # 施工档命令（文件工具启用）
         return (
