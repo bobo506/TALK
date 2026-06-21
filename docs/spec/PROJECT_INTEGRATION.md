@@ -18,6 +18,8 @@
 
 TALK 的最终形态是**给其他项目使用的多 Agent 协作基础设施**。其他项目通过接入 TALK 获得 Agent 间的通信、讨论、文件交换、任务调度能力,但 Agent 的**身份、风格、记忆、业务角色**都归项目自己持有,不归 TALK 持有。
 
+> 2026-06-20 定位再精炼:TALK 的差异化在于 **Hall 作为审议层**(头脑风暴 / 评审),纯任务 RPC 交给 CCB 式 mailbox。使用场景分类(4 类)、Hall 类型 / RolePack、通用化与受众分层,详见 [`POSITIONING.md`](POSITIONING.md)。记忆方向(原 §5.3 MEMORY / COLD-WARM-RESUME)已关闭,连续性由项目 `PROGRESS.md` + 身份注入承载。
+
 ### 1.3 类比体系
 
 | 基础设施 | 上层应用 | 类比角色 |
