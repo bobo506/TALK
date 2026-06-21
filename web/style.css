@@ -338,6 +338,9 @@ button:disabled {
   font-size: var(--font-body);
   font-weight: 600;
   padding: 9px 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
@@ -363,29 +366,6 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.group-room-list .room-chip {
-  position: relative;
-  padding-right: 78px;
-}
-
-.group-room-list .room-chip.active::after {
-  content: "删除";
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  min-width: 50px;
-  height: 28px;
-  transform: translateY(-50%);
-  border: 1px solid #f1beb9;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--red-soft);
-  color: var(--red);
-  font-size: var(--font-control);
-  font-weight: 750;
 }
 
 .group-room-empty,
@@ -1125,6 +1105,53 @@ pre {
   border-bottom: 0;
 }
 
+.all-member-row.disabled .all-member-name {
+  color: var(--muted);
+}
+
+.member-disabled-badge {
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px solid #f0bbb6;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: var(--font-control);
+  font-weight: 700;
+}
+
+.member-toggle-btn {
+  flex: 0 0 auto;
+  height: 30px;
+  min-width: 46px;
+  border-radius: 999px;
+  font-size: var(--font-control);
+  font-weight: 750;
+}
+
+.member-toggle-btn.disable {
+  border: 1px solid #f0bbb6;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.member-toggle-btn.enable {
+  border: 1px solid #c8ddeb;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.member-toggle-btn:disabled {
+  opacity: 0.5;
+}
+
+.member-add-btn,
+.member-added-pill,
+.member-toggle-btn {
+  white-space: nowrap;
+}
+
 .group-member-identity {
   min-width: 0;
   flex: 1 1 auto;
@@ -1188,6 +1215,30 @@ pre {
 }
 
 .group-member-remove-btn:disabled {
+  border-color: #e1ddd4;
+  background: #f4f1eb;
+  color: #b0a99f;
+}
+
+.room-danger-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  min-height: 36px;
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: var(--font-control);
+  font-weight: 750;
+}
+
+.room-danger-btn:hover {
+  background: var(--red);
+  color: #ffffff;
+}
+
+.room-danger-btn:disabled {
   border-color: #e1ddd4;
   background: #f4f1eb;
   color: #b0a99f;

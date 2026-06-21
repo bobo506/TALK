@@ -10,7 +10,20 @@ from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import get_session
-from server.models import Group, GroupCreate, GroupMember, GroupMemberOut, GroupMemberUpdate, GroupOut, GroupUpdate, Member, Project
+from server.models import (
+    DiscussionSession,
+    DiscussionTurn,
+    Group,
+    GroupCreate,
+    GroupMember,
+    GroupMemberOut,
+    GroupMemberUpdate,
+    GroupOut,
+    GroupUpdate,
+    Member,
+    Message,
+    Project,
+)
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -65,7 +78,13 @@ def _group_out(group: Group, session: Session) -> GroupOut:
         created_at=group.created_at,
         updated_at=group.updated_at,
         members=[
-            GroupMemberOut(member_id=member.member_id, role=member.role, created_at=member.created_at)
+            GroupMemberOut(
+                member_id=member.member_id,
+                role=member.role,
+                business_role=member.business_role,
+                decision_tier=member.decision_tier,
+                created_at=member.created_at,
+            )
             for member in members
         ],
     )
@@ -174,9 +193,18 @@ def upsert_group_member(
 
     membership = session.get(GroupMember, (group_id, member_id))
     if membership is None:
-        membership = GroupMember(group_id=group_id, member_id=member_id, role=body.role, created_at=now)
+        membership = GroupMember(
+            group_id=group_id,
+            member_id=member_id,
+            role=body.role,
+            business_role=body.business_role,
+            decision_tier=body.decision_tier,
+            created_at=now,
+        )
     else:
         membership.role = body.role
+        membership.business_role = body.business_role
+        membership.decision_tier = body.decision_tier
     group.updated_at = now
     session.add(membership)
     session.add(group)
@@ -205,3 +233,41 @@ def remove_group_member(
     session.commit()
     session.refresh(group)
     return _group_out(group, session)
+
+
+@router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_group(
+    group_id: str,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Delete a Group, cascade-removing its membership, messages and discussions.
+
+    Human-only. Per the manager's decision (2026-06-20) the group's message history
+    is deleted along with it. Children are removed before the group so the operation
+    is correct regardless of SQLite FK enforcement (which is off at runtime).
+    """
+    _require_human(current)
+    group = _get_group(group_id, session)
+
+    session_ids = session.exec(
+        select(DiscussionSession.id).where(DiscussionSession.group_id == group_id)
+    ).all()
+    if session_ids:
+        for turn in session.exec(
+            select(DiscussionTurn).where(DiscussionTurn.session_id.in_(session_ids))
+        ).all():
+            session.delete(turn)
+    for discussion in session.exec(
+        select(DiscussionSession).where(DiscussionSession.group_id == group_id)
+    ).all():
+        session.delete(discussion)
+    for message in session.exec(select(Message).where(Message.group_id == group_id)).all():
+        session.delete(message)
+    for membership in session.exec(
+        select(GroupMember).where(GroupMember.group_id == group_id)
+    ).all():
+        session.delete(membership)
+    session.delete(group)
+    session.commit()
+    return None

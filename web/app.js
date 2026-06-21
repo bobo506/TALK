@@ -115,6 +115,7 @@ const groupMemberAddSelect = document.getElementById("group-member-add-select");
 const groupMemberAddRole = document.getElementById("group-member-add-role");
 const groupMemberAddBtn = document.getElementById("group-member-add-btn");
 const groupMembersError = document.getElementById("group-members-error");
+const deleteGroupBtn = document.getElementById("delete-group-btn");
 const allMembersList = document.getElementById("all-members-list");
 const presenceStrip = document.getElementById("presence-strip");
 const presenceSummary = document.getElementById("presence-summary");
@@ -567,6 +568,7 @@ groupCreatePanel.addEventListener("submit", createGroupFromPanel);
 closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(true));
 groupMetaForm.addEventListener("submit", updateGroupMetadataFromPanel);
 groupMemberAddForm.addEventListener("submit", addGroupMemberFromPanel);
+deleteGroupBtn.addEventListener("click", deleteActiveGroup);
 hallFilterInput.addEventListener("input", renderRoomStrip);
 roomTitle.addEventListener("click", () => {
   if (!activeGroupId || !canManageGroups()) return;
@@ -1012,6 +1014,11 @@ function renderGroupMembersPanel() {
     }
     groupMemberAddRole.disabled = groupMemberSaving;
   }
+  if (deleteGroupBtn) {
+    deleteGroupBtn.classList.toggle("hidden", !canManage);
+    deleteGroupBtn.disabled = groupMemberSaving;
+  }
+
   renderAllMembersPanel(activeGroup, canManage);
 }
 
@@ -1036,16 +1043,18 @@ function renderAllMembersPanel(activeGroup, canManage) {
   if (!activeGroup) return;
 
   const memberIds = getGroupMemberIds(activeGroup);
-  const sortedMembers = [...members].sort((a, b) => {
+  // 只列 agent —— human 不在此列表展示（UI #3）。
+  const agents = [...members].filter((member) => member.kind === "agent").sort((a, b) => {
     if (memberIds.has(a.id) !== memberIds.has(b.id)) {
       return memberIds.has(a.id) ? -1 : 1;
     }
     return a.id.localeCompare(b.id, "zh-CN");
   });
 
-  for (const member of sortedMembers) {
+  for (const member of agents) {
+    const isDisabled = Boolean(member.disabled_at);
     const row = document.createElement("div");
-    row.className = "all-member-row";
+    row.className = `all-member-row${isDisabled ? " disabled" : ""}`;
 
     const body = document.createElement("div");
     body.className = "all-member-body";
@@ -1054,32 +1063,69 @@ function renderAllMembersPanel(activeGroup, canManage) {
     name.className = "all-member-name";
     name.textContent = member.id === myId ? `${shortName(member.id)} (我)` : shortName(member.id);
 
-    const roleButton = document.createElement("button");
-    roleButton.type = "button";
-    roleButton.className = `member-kind-pill ${selectedMemberKindFilters.has(member.kind) ? "active" : ""}`;
-    roleButton.textContent = member.kind || memberKindFromId(member.id);
-    roleButton.addEventListener("click", () => toggleMemberKindFilter(member.kind || memberKindFromId(member.id)));
-
     body.appendChild(name);
-    body.appendChild(roleButton);
+    if (isDisabled) {
+      const badge = document.createElement("span");
+      badge.className = "member-disabled-badge";
+      badge.textContent = "已禁用";
+      body.appendChild(badge);
+    }
 
     const action = document.createElement("button");
     action.type = "button";
     action.className = memberIds.has(member.id) ? "member-added-pill" : "member-add-btn";
     action.textContent = memberIds.has(member.id) ? "已在 Hall" : "加入";
-    action.disabled = memberIds.has(member.id) || !canManage || groupMemberSaving;
+    // 已禁用的 agent 不能加入群
+    action.disabled = memberIds.has(member.id) || !canManage || groupMemberSaving || isDisabled;
     action.addEventListener("click", () => saveGroupMember(member.id, "member"));
 
     row.appendChild(body);
+    if (canManage) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = `member-toggle-btn ${isDisabled ? "enable" : "disable"}`;
+      toggle.textContent = isDisabled ? "启用" : "禁用";
+      toggle.disabled = groupMemberSaving;
+      toggle.title = isDisabled ? "重新启用此 agent" : "全局禁用此 agent（拒绝其登录/收发，保留历史与群关系）";
+      toggle.addEventListener("click", () => toggleMemberDisabled(member));
+      row.appendChild(toggle);
+    }
     row.appendChild(action);
     allMembersList.appendChild(row);
   }
 
-  if (!sortedMembers.length) {
+  if (!agents.length) {
     const empty = document.createElement("div");
     empty.className = "member-empty-state";
-    empty.textContent = "暂无可显示成员";
+    empty.textContent = "暂无 agent";
     allMembersList.appendChild(empty);
+  }
+}
+
+async function toggleMemberDisabled(member) {
+  if (!member || !canManageGroups() || groupMemberSaving) return;
+  const disabling = !member.disabled_at;
+  groupMemberSaving = true;
+  renderGroupMembersPanel();
+  try {
+    const res = await apiFetch(`/api/members/${encodeURIComponent(member.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ disabled: disabling }),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `${disabling ? "禁用" : "启用"}失败: ${res.status}`));
+    }
+    const updated = await res.json();
+    const idx = members.findIndex((m) => m.id === updated.id);
+    if (idx >= 0) members[idx] = updated;
+    showGroupMembersError("");
+  } catch (err) {
+    console.error(err);
+    showGroupMembersError(err.message);
+  } finally {
+    groupMemberSaving = false;
+    renderGroupMembersPanel();
   }
 }
 
@@ -1183,6 +1229,42 @@ async function removeGroupMemberFromPanel(memberId) {
     renderRoomStrip();
     renderPresenceStrip();
     renderMentionDropdownIfOpen();
+  } catch (err) {
+    console.error(err);
+    showGroupMembersError(err.message);
+    renderGroupMembersPanel();
+  } finally {
+    groupMemberSaving = false;
+    renderGroupMembersPanel();
+  }
+}
+
+async function deleteActiveGroup() {
+  const group = getActiveGroup();
+  if (!group || !canManageGroups() || groupMemberSaving) return;
+  const confirmed = window.confirm(
+    `确定删除 Hall「${group.name}」(${group.id}) 吗？\n` +
+    "将永久删除该 Hall 及其全部消息记录，不可恢复。"
+  );
+  if (!confirmed) return;
+
+  groupMemberSaving = true;
+  renderGroupMembersPanel();
+  try {
+    const res = await apiFetch(`/api/groups/${encodeURIComponent(group.id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `删除 Hall 失败: ${res.status}`));
+    }
+    groups = groups.filter((item) => item.id !== group.id);
+    groupMembersOpen = false;
+    showGroupMembersError("");
+    if (activeGroupId === group.id) {
+      setActiveGroup(null); // 重置时间线 / 本地存储 / 各处渲染
+    } else {
+      renderRoomStrip();
+      renderPresenceStrip();
+      renderMentionDropdownIfOpen();
+    }
   } catch (err) {
     console.error(err);
     showGroupMembersError(err.message);

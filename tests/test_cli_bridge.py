@@ -227,6 +227,32 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("human:qa", prompt)
         self.assertIn("本群无角色约定", prompt)
 
+    def test_group_member_context_injects_self_business_role(self):
+        """P3-2：群成员上下文带上"我在本群的业务角色"（business_role 来自群成员数据）。"""
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:lab", "agent:pi"))
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+
+    def test_group_member_context_omits_role_when_absent(self):
+        """无 business_role 时不注入角色行（保持现状字节）。"""
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:lab", "agent:pi"))
+        self.assertIn("群成员：", ctx)
+        self.assertNotIn("你在本群的业务角色", ctx)
+
     def test_function_calling_prompt_is_minimal(self):
         message = {
             "id": 1,

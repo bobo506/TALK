@@ -1,3 +1,8 @@
+import json
+
+from sqlmodel import select
+
+from server.models import DiscussionSession, DiscussionTurn, GroupMember, Message
 from tests.test_support import RouteTestCase
 
 
@@ -70,6 +75,129 @@ class GroupRouteTests(RouteTestCase):
         ])
         self.assertEqual(removed.status_code, 200)
         self.assertEqual(codex_groups.json(), [])
+
+    def test_member_business_role_and_decision_tier_roundtrip(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab"},
+            )
+            added = client.put(
+                "/api/groups/group:lab/members/agent:codex",
+                headers={"X-API-Key": "bobo-key"},
+                json={"role": "member", "business_role": "lead", "decision_tier": "Decision"},
+            )
+            fetched = client.get("/api/groups/group:lab", headers={"X-API-Key": "bobo-key"})
+
+        self.assertEqual(added.status_code, 200)
+        codex = next(m for m in added.json()["members"] if m["member_id"] == "agent:codex")
+        # business_role kept verbatim; decision_tier normalized to lowercase
+        self.assertEqual(codex["business_role"], "lead")
+        self.assertEqual(codex["decision_tier"], "decision")
+        # owner (auto-added at create) has no collaboration role
+        owner = next(m for m in added.json()["members"] if m["member_id"] == "human:bobo")
+        self.assertIsNone(owner["business_role"])
+        self.assertIsNone(owner["decision_tier"])
+        # persisted across a fresh GET
+        codex_get = next(m for m in fetched.json()["members"] if m["member_id"] == "agent:codex")
+        self.assertEqual((codex_get["business_role"], codex_get["decision_tier"]), ("lead", "decision"))
+
+    def test_put_member_full_replace_clears_collab_fields(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab"},
+            )
+            client.put(
+                "/api/groups/group:lab/members/agent:codex",
+                headers={"X-API-Key": "bobo-key"},
+                json={"role": "member", "business_role": "lead", "decision_tier": "decision"},
+            )
+            # a later PUT without the fields clears them (PUT = full replace)
+            cleared = client.put(
+                "/api/groups/group:lab/members/agent:codex",
+                headers={"X-API-Key": "bobo-key"},
+                json={"role": "moderator"},
+            )
+
+        codex = next(m for m in cleared.json()["members"] if m["member_id"] == "agent:codex")
+        self.assertEqual(codex["role"], "moderator")
+        self.assertIsNone(codex["business_role"])
+        self.assertIsNone(codex["decision_tier"])
+
+    def test_invalid_decision_tier_rejected(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab"},
+            )
+            bad = client.put(
+                "/api/groups/group:lab/members/agent:codex",
+                headers={"X-API-Key": "bobo-key"},
+                json={"role": "member", "decision_tier": "boss"},
+            )
+        self.assertEqual(bad.status_code, 422)
+
+    # ── delete group (UI #2) ─────────────────────────────────────────
+
+    def test_human_can_delete_group_and_cascade(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
+            )
+        msg = self.add_message(
+            from_id="agent:codex", to_ids=None, message_type="text",
+            group_id="group:lab", content="hello",
+        )
+        with self.session() as s:
+            disc = DiscussionSession(
+                group_id="group:lab", created_by="human:bobo",
+                topic="t", participant_ids=json.dumps(["agent:codex"]),
+            )
+            s.add(disc)
+            s.commit()
+            s.refresh(disc)
+            disc_id = disc.id
+            s.add(DiscussionTurn(
+                session_id=disc_id, turn_index=0, message_id=msg.id,
+                speaker_id="agent:codex", stance="answer",
+            ))
+            s.commit()
+
+        with self.make_client() as client:
+            deleted = client.delete("/api/groups/group:lab", headers={"X-API-Key": "bobo-key"})
+            gone = client.get("/api/groups/group:lab", headers={"X-API-Key": "bobo-key"})
+
+        self.assertEqual(deleted.status_code, 204)
+        self.assertEqual(gone.status_code, 404)
+        # cascade: membership, messages, discussions and turns all gone
+        with self.session() as s:
+            self.assertEqual(s.exec(select(GroupMember).where(GroupMember.group_id == "group:lab")).all(), [])
+            self.assertEqual(s.exec(select(Message).where(Message.group_id == "group:lab")).all(), [])
+            self.assertEqual(s.exec(select(DiscussionSession).where(DiscussionSession.group_id == "group:lab")).all(), [])
+            self.assertEqual(s.exec(select(DiscussionTurn).where(DiscussionTurn.session_id == disc_id)).all(), [])
+
+    def test_agent_cannot_delete_group(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
+            )
+            forbidden = client.delete("/api/groups/group:lab", headers={"X-API-Key": "codex-key"})
+            still_there = client.get("/api/groups/group:lab", headers={"X-API-Key": "bobo-key"})
+        self.assertEqual(forbidden.status_code, 403)
+        self.assertEqual(still_there.status_code, 200)
+
+    def test_delete_missing_group_returns_404(self):
+        with self.make_client() as client:
+            missing = client.delete("/api/groups/group:ghost", headers={"X-API-Key": "bobo-key"})
+        self.assertEqual(missing.status_code, 404)
 
     def test_human_can_update_group_metadata(self):
         with self.make_client() as client:
