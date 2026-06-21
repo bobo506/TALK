@@ -184,6 +184,16 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-20（下午）定位再校准 + 审议方向设计定稿（仅文档，无代码）
+
+与管理者多轮讨论后,把 Phase 3 的剩余方向从"server 端 MEMORY"转向"审议类协议",并沉淀两份 spec:
+
+- **`spec/POSITIONING.md`**:TALK 定位为审议层,**TALK ⊇ CCB**（任务委派 TALK 也能做,CCB 仅作机制借鉴）;4 类使用场景（单次任务协作 / 任务分配 / 头脑风暴 / 评审）+ 升级横切;Hall 类型/RolePack（软预设、数据驱动、可自定义）;通用化（领域无关,非编程项目亦可）+ 受众分层（非技术受众/Web 低门槛接入列为远期）。
+- **`spec/DELIBERATION.md`**:信息类型 stance 终集（去 `idea`、`synthesis`→`decision`、`closure` 降级）；**结束归一模型**——单一出口 `handoff` → 决策人（= `decision_tier`/human）,4 种 `end_reason`（consensus/deadlock/timeout/manual）,仅 `deadlock` 有参与者断路器 `escalate`,成功收敛靠决策人 `decision` 收口；Hall 类型；@所有人（展开全体、直接回内容不回执）；人设网页编辑走方案 (a)（改 `.talk/*.md` 文件、bridge 不变）；切片方案 D1–D5。
+
+**关键决策**:① MEMORY 方向关闭（连续性靠项目 `PROGRESS.md` + 身份注入）；② 人设网页编辑 = 方案 (a)；③ 结束机制 = 单一 handoff + 仅 deadlock 有 escalate（"给出错打标不给成功打标"）。
+**下一步**:从 D1（Hall `type` + 模板地基,纯 server）开写。
+
 ## 2026-06-20 Phase 3 协作层（前两片）+ Web UI #2/#3（全栈）+ 测试数据清理
 
 分支 `claude/phase3-collab-and-ui`（基于已合入 main 的 Phase 1+2，PR #1）。决策 Agent 在管理者授权下自主连续开发。

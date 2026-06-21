@@ -21,7 +21,7 @@
 | 表态 | `agree` | 同意 |
 | | `disagree` | 反对 + 理由 |
 | | `optimize` | 改进 / 补充（yes-and） |
-| 触发信号 | `escalate` | 僵局，主动请求移交决策人（见 §2，是 handoff 的入口之一） |
+| 触发信号 | `escalate` | **僵局断路器**：参与者主动请求移交决策人（见 §2）。这是**唯一由参与者发出的 handoff 触发 stance**——只给失败模式留逃生口 |
 | 决策人产出 | `decision` | **定论**（原 `synthesis` 改名；覆盖"归纳"与"裁决"） |
 | 社交（降级、不计实质轮次） | `greeting` | 打招呼 |
 | | `closure` | 纯社交收尾，**不承载"结束"语义** |
@@ -40,7 +40,10 @@
   - `timeout` 聊太久（`demand` 轮到上限）
   - `manual` 人工中止（人发"别聊了"指令）
 - **决策人收到后产出 1 条 `decision`（定论）** → `status=resolved`；决策人也可说"继续" → 回 `active`。
-- **`escalate` 只是 4 个入口里"僵局"那一个**；其余 3 个不经 `escalate` 也触发 handoff。
+- **只有 `deadlock` 有参与者触发 stance（`escalate`）；`consensus` / `timeout` / `manual` 没有专门 stance：**
+  - `consensus`（顺利收敛）：**决策人直接产出 `decision`（带 `end_reason=consensus`）收口**，不需要参与者打标——这条 `decision` 本身就标记"达成共识、结论在此"。
+  - `timeout`：系统刹车自动触发；`manual`：人发指令触发。
+  - 设计原则:**只给失败模式（僵局）留一个参与者断路器 `escalate`；成功路径靠决策人 `decision` 收口，不设单独的"达成共识"标签**（给出错打标，不给成功打标）。
 
 **生命周期：** `active` →（任一 reason）**handoff 移交决策人** → 决策人 `decision` → `resolved`（或回 `active`）。
 

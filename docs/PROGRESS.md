@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-20 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`（基于已合入 `main` 的 Phase 1+2，PR #1；已 push）。本轮完成 Phase 3 协作层前两片（P3-1/P3-2）+ Web UI #2/#3 全栈 + 测试数据清理。**MEMORY 方向已关闭**；定位/场景已沉淀入 `spec/POSITIONING.md`，下一步转向**审议类协议（头脑风暴 / 评审）+ Hall 类型**。Claude = **决策 Agent**（管理者授权自主开发）。完整切片记录见 `docs/PROGRESS_HISTORY.md`。
+Updated: 2026-06-20 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`（基于已合入 `main` 的 Phase 1+2，PR #1；已 push）。本轮：Phase 3 前两片（P3-1/P3-2）+ Web UI #2/#3 全栈 + 测试数据清理 + **审议方向设计定稿**（`spec/POSITIONING.md` 定位/4 类场景；`spec/DELIBERATION.md` 信息类型终集/结束归一/Hall 类型/@所有人/人设编辑(a)/切片 D1–D5；MEMORY 已关闭；结束机制确认走"单一出口 handoff + 仅 deadlock 有参与者断路器 escalate"）。**下一步 = 从 D1 开写**（新窗口说"继续项目"恢复）。Claude = **决策 Agent**。完整记录见 `docs/PROGRESS_HISTORY.md`。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
