@@ -3,6 +3,7 @@
 
 const API = "";
 const mentionPattern = /@([^\s]+)/g;
+const ALL_MENTION_ID = "所有人";
 const HISTORY_RENDER_CHUNK = 80;
 const HISTORY_PAGE_SIZE = 100;
 const markdownRenderer = configureMarkdownRenderer();
@@ -2404,7 +2405,7 @@ function buildMentionFragment(text, memberIds) {
 
   while ((match = mentionPattern.exec(text)) !== null) {
     const [full, memberId] = match;
-    if (!memberIds.has(memberId)) {
+    if (!memberIds.has(memberId) && !isAllMentionToken(memberId)) {
       continue;
     }
 
@@ -2429,6 +2430,10 @@ function buildMentionFragment(text, memberIds) {
   }
 
   return fragment;
+}
+
+function isAllMentionToken(token) {
+  return token === ALL_MENTION_ID || token.toLowerCase() === "all";
 }
 
 function escapeHtml(s) {
@@ -2737,9 +2742,18 @@ msgInput.addEventListener("input", () => {
     const filtered = getScopedMembers().filter(
       (m) => m.id.toLowerCase().includes(query) || m.display_name.toLowerCase().includes(query)
     );
+    const canMentionAll = Boolean(activeGroup) && (query === "" || ALL_MENTION_ID.includes(query) || "all".includes(query));
 
-    if (filtered.length > 0) {
+    if (canMentionAll || filtered.length > 0) {
       mentionDropdown.innerHTML = "";
+      if (canMentionAll) {
+        const li = document.createElement("li");
+        li.textContent = "所有人（全体成员）";
+        li.dataset.id = ALL_MENTION_ID;
+        li.addEventListener("mousedown", (event) => event.preventDefault());
+        li.addEventListener("click", () => completeMention(ALL_MENTION_ID));
+        mentionDropdown.appendChild(li);
+      }
       for (const m of filtered) {
         const li = document.createElement("li");
         li.textContent = `${m.id} (${m.display_name})`;

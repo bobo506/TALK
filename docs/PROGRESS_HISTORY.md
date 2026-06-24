@@ -184,6 +184,38 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-24 @所有人：mention 解析"所有人/all" + 前端下拉
+
+**背景**：承接 D1（`f20811a`）/ D2（`411269f`）。按 `agent-docs/BLACKBOARD.md` 的"@所有人"工单，让 Hall 里 `@所有人`/`@all` 把消息 `to_ids` 展开为全体群成员（每个 agent 因此被 mention 触发），是头脑风暴（D3）的前置依赖。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `server/routes/messages.py`：
+  - 新增 `_ALL_MENTION_TOKENS = {"所有人", "all"}` + `_is_all_token`（`所有人` 精确、`all` 大小写不敏感）。
+  - `_extract_leading_mentions` 改为返回三元组 `(recipients, invalid_mention, mention_all)`；遇 all-token 不按具体成员校验、置 `mention_all`、继续消费。
+  - `_resolve_recipients` 加 `sender_id`；`mention_all` 时仅群作用域允许（legacy/全局 → `400 "所有人 mention is only allowed in a group"`），返回 `sorted(全体群成员 - 发送者)`。
+  - `create_message` 传 `sender_id=current.id`。
+- `web/app.js`：`ALL_MENTION_ID="所有人"` + `isAllMentionToken`；`@` 下拉在群作用域（query 命中）顶部 prepend"所有人（全体成员）"项 → `completeMention("所有人")`；`@所有人`/`@all` 放行为 `.mention` 高亮。
+- `tests/test_messages.py`：+4 用例（`@所有人` 展开除发送者、`@ALL` 大小写、混用具体 mention 时全体优先、全局 `@所有人`→400）；既有单 mention/广播/非法 mention 回归由原测试覆盖。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_messages -v` → `Ran 27 tests ... OK`；`node --check web/app.js` 通过；diff 与工单逐条对齐。
+- 前端"所有人"下拉点选 + 发出后全体高亮**未起服务真机点选**（待后续攒一次前端真机）。
+
+### 变更文件
+
+- `server/routes/messages.py`
+- `web/app.js`
+- `tests/test_messages.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3（头脑风暴协议）或 人设编辑(a) 二选一（新会话再定）。
+
+---
+
 ## 2026-06-24 D2：bridge 注入 Hall `type` + 角色规范
 
 **背景**：承接 D1（`f20811a`）。按 `agent-docs/BLACKBOARD.md` 的 D2 工单，让 bridge 在每条消息上下文里按本群 Hall `type` 注入流程指引 + 当前 agent 的角色职责（软预设、纯追加，不引入硬状态机）。执行 Agent 实现，决策 Agent 复核验证后落库。

@@ -18,6 +18,7 @@ from server.ws_hub import hub
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 _REPLY_PREVIEW_LIMIT = 80
+_ALL_MENTION_TOKENS = {"所有人", "all"}
 
 
 def _as_utc(dt: datetime) -> datetime:
@@ -26,10 +27,14 @@ def _as_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-def _extract_leading_mentions(text: str | None, member_ids: set[str]) -> tuple[list[str], str | None]:
+def _is_all_token(token: str) -> bool:
+    return token == "所有人" or token.lower() in _ALL_MENTION_TOKENS
+
+
+def _extract_leading_mentions(text: str | None, member_ids: set[str]) -> tuple[list[str], str | None, bool]:
     """Parse leading @mention blocks and validate them against known members."""
     if not text:
-        return [], None
+        return [], None, False
 
     cursor = 0
     while cursor < len(text) and text[cursor].isspace():
@@ -37,6 +42,7 @@ def _extract_leading_mentions(text: str | None, member_ids: set[str]) -> tuple[l
 
     recipients: list[str] = []
     saw_mention = False
+    mention_all = False
 
     while cursor < len(text) and text[cursor] == "@":
         token_start = cursor + 1
@@ -45,8 +51,16 @@ def _extract_leading_mentions(text: str | None, member_ids: set[str]) -> tuple[l
             token_end += 1
 
         member_id = text[token_start:token_end]
+        if _is_all_token(member_id):
+            mention_all = True
+            saw_mention = True
+            cursor = token_end
+            while cursor < len(text) and text[cursor].isspace():
+                cursor += 1
+            continue
+
         if not member_id or member_id not in member_ids:
-            return [], f"@{member_id}"
+            return [], f"@{member_id}", mention_all
 
         recipients.append(member_id)
         saw_mention = True
@@ -56,9 +70,9 @@ def _extract_leading_mentions(text: str | None, member_ids: set[str]) -> tuple[l
             cursor += 1
 
     if not saw_mention:
-        return [], None
+        return [], None, False
 
-    return list(dict.fromkeys(recipients)), None
+    return list(dict.fromkeys(recipients)), None, mention_all
 
 
 def _validate_recipient_ids(recipient_ids: Iterable[str] | None, member_ids: set[str]) -> list[str] | None:
@@ -77,17 +91,31 @@ def _validate_recipient_ids(recipient_ids: Iterable[str] | None, member_ids: set
     return normalized or None
 
 
-def _resolve_recipients(body: MessageCreate, session: Session, *, allowed_member_ids: set[str] | None = None) -> list[str] | None:
+def _resolve_recipients(
+    body: MessageCreate,
+    session: Session,
+    *,
+    allowed_member_ids: set[str] | None = None,
+    sender_id: str,
+) -> list[str] | None:
     """Resolve recipients from leading mentions first, then fall back to explicit ids."""
     member_ids = allowed_member_ids if allowed_member_ids is not None else set(session.exec(select(Member.id)).all())
     routing_text = body.content if body.type == "text" else body.caption
-    mentioned_ids, invalid_mention = _extract_leading_mentions(routing_text, member_ids)
+    mentioned_ids, invalid_mention, mention_all = _extract_leading_mentions(routing_text, member_ids)
 
     if invalid_mention is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"invalid recipient mention: {invalid_mention}",
         )
+
+    if mention_all:
+        if allowed_member_ids is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="所有人 mention is only allowed in a group",
+            )
+        return sorted(member_id for member_id in member_ids if member_id != sender_id)
 
     if mentioned_ids:
         return mentioned_ids
@@ -223,6 +251,7 @@ async def create_message(
         body,
         session,
         allowed_member_ids=set(group_member_ids) if group_member_ids is not None else None,
+        sender_id=current.id,
     )
     reply_target = _resolve_reply_target(body.reply_to, current, session, body.group_id)
     file_record = None

@@ -662,6 +662,77 @@ class MessagesRouteTests(RouteTestCase):
         self.assertEqual(created_message.json()["to"], ["agent:AI1"])
         self.assertEqual([message["id"] for message in ai2_history.json()], [created_message.json()["id"]])
 
+    def test_group_all_mention_expands_to_all_group_members_except_sender(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "id": "group:lab",
+                    "name": "Local Lab",
+                    "member_ids": ["agent:AI1", "agent:AI2"],
+                },
+            )
+            created_message = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "@所有人 hi"},
+            )
+
+        self.assertEqual(created_message.status_code, 201)
+        self.assertEqual(created_message.json()["to"], ["agent:AI1", "agent:AI2"])
+
+    def test_group_all_mention_is_case_insensitive_for_all_token(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "id": "group:lab",
+                    "name": "Local Lab",
+                    "member_ids": ["agent:AI1", "agent:AI2"],
+                },
+            )
+            created_message = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "@ALL hi"},
+            )
+
+        self.assertEqual(created_message.status_code, 201)
+        self.assertEqual(created_message.json()["to"], ["agent:AI1", "agent:AI2"])
+
+    def test_group_all_mention_wins_when_mixed_with_specific_mentions(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "id": "group:lab",
+                    "name": "Local Lab",
+                    "member_ids": ["agent:AI1", "agent:AI2"],
+                },
+            )
+            created_message = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "@所有人 @agent:AI1 hi"},
+            )
+
+        self.assertEqual(created_message.status_code, 201)
+        self.assertEqual(created_message.json()["to"], ["agent:AI1", "agent:AI2"])
+
+    def test_global_all_mention_returns_400(self):
+        with self.make_client() as client:
+            response = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "content": "@所有人 hi"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "所有人 mention is only allowed in a group")
+
     def test_group_message_rejects_non_member_sender_or_recipient(self):
         with self.make_client() as client:
             client.post(
