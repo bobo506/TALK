@@ -32,6 +32,7 @@ class GroupRouteTests(RouteTestCase):
 
         self.assertEqual(created.status_code, 201)
         self.assertEqual(created.json()["id"], "group:lab")
+        self.assertEqual(created.json()["type"], "free")
         self.assertEqual(
             {member["member_id"]: member["role"] for member in created.json()["members"]},
             {"human:bobo": "owner", "agent:codex": "member"},
@@ -261,6 +262,30 @@ class GroupRouteTests(RouteTestCase):
 
         self.assertEqual(created.status_code, 201)
         self.assertIsNone(created.json()["project_id"])
+        self.assertEqual(created.json()["type"], "free")
+
+    def test_group_can_be_created_with_hall_type(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:ideas", "name": "点子会", "type": "BrainStorm"},
+            )
+            fetched = client.get("/api/groups/group:ideas", headers={"X-API-Key": "bobo-key"})
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["type"], "brainstorm")
+        self.assertEqual(fetched.json()["type"], "brainstorm")
+
+    def test_group_create_rejects_invalid_hall_type(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:bogus", "name": "坏类型", "type": "bogus"},
+            )
+
+        self.assertEqual(created.status_code, 422)
 
     def test_group_create_rejects_unknown_project(self):
         with self.make_client() as client:

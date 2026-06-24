@@ -184,6 +184,61 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-24 D1：Hall `type` + 模板地基（纯 server）
+
+**背景**：按 `agent-docs/BLACKBOARD.md` 中 Claude（决策 Agent）给执行 Agent 的 D1 工单推进。目标是给 Hall 增加 `type` 维度，并建立服务端内置、数据驱动的 Hall 类型模板注册表，作为后续 D2/D3/D5 的协议地基。本切片严格不改 bridge、不改 discussion stance/状态机、不做前端。
+
+### 完成事项
+
+- 新增 `server/hall_types.py` 作为 Hall 类型模板单一来源：
+  - `free`
+  - `task`
+  - `brainstorm`
+  - `review`
+  - 每项包含 `label` / `protocol_guidance` / `roles:[{role,norm}]`
+  - 暴露 `HALL_TYPES` 与 `DEFAULT_HALL_TYPE`
+- `server.models.Group` 增加 `type` 字段，默认 `free` 并建索引。
+- `GroupCreate` 支持可选 `type`，创建时默认 `free`，输入会 `.strip().lower()`，非法值返回 `422`。
+- `GroupOut` 回显 `type`。
+- `server.db.init_db()` 增加旧库迁移：若 `groups.type` 不存在则 `ALTER TABLE` 加 `TEXT NOT NULL DEFAULT 'free'`，并创建 `ix_groups_type`。
+- `server.routes.groups` 创建与输出路径均带上 `type`。
+- 新增认证只读 API `GET /api/hall-types`，返回 4 类内置模板。
+- 增加测试覆盖：
+  - 默认创建 Hall 回显 `type="free"`
+  - 创建时指定 `"type":"BrainStorm"` 归一为 `brainstorm`
+  - 非法 `type` 返回 `422`
+  - `GET /api/hall-types` 返回结构与认证要求
+  - 旧 schema 迁移后老 Hall 自动获得 `type="free"` 并创建索引
+
+### 验证
+
+- **决策 Agent（Claude）独立复核（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_hall_types tests.test_groups tests.test_member_disable -v` → `Ran 23 tests ... OK`，确认执行 Agent 自测结论；代码与工单逐条对齐。
+- `python -m pytest tests/test_groups.py -q`：未运行；全局 Python 无 `pytest`。
+- `.venv\Scripts\python.exe -m pytest tests/test_groups.py -q`：未运行；项目 `.venv` 也无 `pytest`。
+- `.venv\Scripts\python.exe -m unittest tests.test_groups -v`：16/16 通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_hall_types -v`：3/3 通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_member_disable -v`：4/4 通过。
+- 验证噪声：测试期间 `TimedRotatingFileHandler` 在 Windows 上尝试重命名被占用的 `logs/talk.log`，出现 `PermissionError` 日志噪声；测试退出码仍为 0，本切片未处理该日志轮转问题。
+
+### 变更文件
+
+- `server/hall_types.py`
+- `server/models.py`
+- `server/db.py`
+- `server/routes/groups.py`
+- `server/routes/hall_types.py`
+- `server/main.py`
+- `tests/test_groups.py`
+- `tests/test_hall_types.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+- `agent-docs/BLACKBOARD.md`
+
+### 待确认 / 下一步
+
+- 待决策 Agent/项目管理者确认是否 `git commit`。
+- 确认后下一片按设计进入 D2：Hall `type` → bridge prompt 注入；本轮执行 Agent 已按规则暂停。
+
 ## 2026-06-20（下午）定位再校准 + 审议方向设计定稿（仅文档，无代码）
 
 与管理者多轮讨论后,把 Phase 3 的剩余方向从"server 端 MEMORY"转向"审议类协议",并沉淀两份 spec:

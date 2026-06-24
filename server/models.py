@@ -9,6 +9,8 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
 from sqlmodel import Field, SQLModel
 
+from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
+
 
 # ── ORM models (SQLite tables) ──────────────────────────────────────
 
@@ -71,6 +73,7 @@ class Group(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
     description: Optional[str] = None
+    type: str = Field(default=DEFAULT_HALL_TYPE, index=True)
     project_id: Optional[str] = Field(default=None, foreign_key="projects.project_id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -354,6 +357,7 @@ class GroupCreate(BaseModel):
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
+    type: Optional[str] = None  # None -> 创建时落为 DEFAULT_HALL_TYPE
     project_id: Optional[str] = None  # NULL = 无项目上下文（向后兼容历史群）
     member_ids: list[str] = []
 
@@ -368,6 +372,12 @@ class GroupCreate(BaseModel):
             raise ValueError("name is required")
         if self.description is not None:
             self.description = self.description.strip() or None
+        if self.type is None:
+            self.type = DEFAULT_HALL_TYPE
+        else:
+            self.type = self.type.strip().lower()
+            if self.type not in HALL_TYPES:
+                raise ValueError(f"type must be one of {sorted(HALL_TYPES)}")
         if self.project_id is not None:
             self.project_id = self.project_id.strip() or None
         self.member_ids = list(dict.fromkeys(member_id.strip() for member_id in self.member_ids if member_id.strip()))
@@ -411,6 +421,7 @@ class GroupOut(BaseModel):
     id: str
     name: str
     description: Optional[str]
+    type: str
     project_id: Optional[str]
     created_by: str
     created_at: datetime

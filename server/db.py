@@ -101,6 +101,8 @@ def init_db() -> None:
         }
         if "project_id" not in group_columns:
             conn.exec_driver_sql("ALTER TABLE groups ADD COLUMN project_id TEXT REFERENCES projects(project_id)")
+        if "type" not in group_columns:
+            conn.exec_driver_sql("ALTER TABLE groups ADD COLUMN type TEXT NOT NULL DEFAULT 'free'")
         group_member_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(group_members)").fetchall()
@@ -121,6 +123,7 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_to_ids ON messages (to_ids)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_created_by ON groups (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_project_id ON groups (project_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_type ON groups (type)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_projects_maintainer_member_id ON projects (maintainer_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_member_id ON group_members (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")
