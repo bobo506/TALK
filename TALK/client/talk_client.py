@@ -218,6 +218,9 @@ class TalkClient:
     async def get_group(self, group_id: str) -> JsonDict:
         return await self._request_json("GET", f"/api/groups/{group_id}")
 
+    async def get_hall_types(self) -> list[JsonDict]:
+        return await self._request_json("GET", "/api/hall-types")
+
     async def update_group(
         self,
         group_id: str,

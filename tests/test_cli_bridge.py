@@ -9,6 +9,7 @@ from pathlib import Path
 
 from bridges import cli_bridge
 from TALK.client.exceptions import TalkNotFoundError
+from server.hall_types import HALL_TYPE_TEMPLATES
 from bridges.cli_bridge import (
     _build_group_member_context,
     CliRunResult,
@@ -29,6 +30,14 @@ from bridges.cli_bridge import (
 
 
 class CliBridgeTests(unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        cli_bridge._HALL_TYPE_TEMPLATES = None
+
+    def tearDown(self):
+        cli_bridge._HALL_TYPE_TEMPLATES = None
+        super().tearDown()
+
     def test_parser_requires_command_for_generic_cli(self):
         parser = build_parser()
 
@@ -252,6 +261,101 @@ class CliBridgeTests(unittest.TestCase):
         ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:lab", "agent:pi"))
         self.assertIn("群成员：", ctx)
         self.assertNotIn("你在本群的业务角色", ctx)
+
+    def test_group_member_context_injects_review_type_and_matching_role_norm(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertIn("本群类型：评审（review）。", ctx)
+        self.assertIn("流程指引：评审 Hall：作者提交标的产物", ctx)
+        self.assertIn("你的角色职责：针对产物给出收敛式批评与改进建议", ctx)
+
+    def test_group_member_context_injects_brainstorm_type_and_matching_role_norm(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "brainstorm", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "Contributor"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:ideas", "agent:pi"))
+
+        self.assertIn("你在本群的业务角色：Contributor。", ctx)
+        self.assertIn("本群类型：头脑风暴（brainstorm）。", ctx)
+        self.assertIn("流程指引：头脑风暴 Hall：主持人抛出主题", ctx)
+        self.assertIn("你的角色职责：围绕主题给出具体想法", ctx)
+
+    def test_group_member_context_injects_type_without_role_norm_when_role_unmatched(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "lead"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("你在本群的业务角色：lead。", ctx)
+        self.assertIn("本群类型：评审（review）。", ctx)
+        self.assertNotIn("你的角色职责", ctx)
+
+    def test_group_member_context_omits_type_block_for_free_hall(self):
+        class FakeClient:
+            def __init__(self):
+                self.hall_type_calls = 0
+
+            async def get_group(self, group_id):
+                return {"type": "free", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                self.hall_type_calls += 1
+                raise AssertionError("free hall must not fetch hall type templates")
+
+        client = FakeClient()
+        ctx = asyncio.run(_build_group_member_context(client, "group:free", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertNotIn("本群类型", ctx)
+        self.assertEqual(client.hall_type_calls, 0)
+
+    def test_group_member_context_skips_type_block_when_template_fetch_fails(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                raise RuntimeError("hall type endpoint unavailable")
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertNotIn("本群类型", ctx)
+        self.assertNotIn("你的角色职责", ctx)
 
     def test_function_calling_prompt_is_minimal(self):
         message = {

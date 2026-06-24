@@ -107,6 +107,9 @@ class TalkClientSync:
     def get_group(self, group_id: str) -> dict[str, Any]:
         return self._submit(self._client.get_group(group_id))
 
+    def get_hall_types(self) -> list[dict[str, Any]]:
+        return self._submit(self._client.get_hall_types())
+
     def update_group(
         self,
         group_id: str,

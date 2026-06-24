@@ -60,6 +60,7 @@ DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
+_HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] | None = None
 PROMPT_TRANSPORTS = {"stdin", "argv"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
@@ -874,6 +875,28 @@ async def _record_deferred_demand_turns(
     return current_discussion, current_turns
 
 
+async def _get_hall_type_templates(client: Any) -> dict[str, dict[str, Any]]:
+    global _HALL_TYPE_TEMPLATES
+    if _HALL_TYPE_TEMPLATES is not None:
+        return _HALL_TYPE_TEMPLATES
+
+    try:
+        payload = await client.get_hall_types()
+    except Exception:
+        return {}
+
+    templates: dict[str, dict[str, Any]] = {}
+    for item in payload or []:
+        if not isinstance(item, dict):
+            continue
+        hall_type = str(item.get("type") or "").strip()
+        if hall_type:
+            templates[hall_type] = item
+
+    _HALL_TYPE_TEMPLATES = templates
+    return templates
+
+
 async def _build_group_member_context(
     client: Any,
     group_id: str | None,
@@ -959,6 +982,31 @@ async def _build_group_member_context(
     )
     if self_role:
         context += f"你在本群的业务角色：{self_role}。\n"
+    group_type = str(group.get("type") or "free").strip().lower() or "free"
+    if group_type == "free":
+        return context
+
+    templates = await _get_hall_type_templates(client)
+    template = templates.get(group_type)
+    if not template:
+        return context
+
+    label = str(template.get("label") or group_type).strip()
+    protocol_guidance = str(template.get("protocol_guidance") or "").strip()
+    if protocol_guidance:
+        context += f"本群类型：{label}（{group_type}）。流程指引：{protocol_guidance}\n"
+
+    if self_role:
+        self_role_normalized = self_role.lower()
+        for role in template.get("roles") or []:
+            if not isinstance(role, dict):
+                continue
+            if str(role.get("role") or "").strip().lower() != self_role_normalized:
+                continue
+            norm = str(role.get("norm") or "").strip()
+            if norm:
+                context += f"你的角色职责：{norm}\n"
+            break
     return context
 
 

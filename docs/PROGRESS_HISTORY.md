@@ -184,6 +184,37 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-24 D2：bridge 注入 Hall `type` + 角色规范
+
+**背景**：承接 D1（`f20811a`）。按 `agent-docs/BLACKBOARD.md` 的 D2 工单，让 bridge 在每条消息上下文里按本群 Hall `type` 注入流程指引 + 当前 agent 的角色职责（软预设、纯追加，不引入硬状态机）。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `TALK/client/talk_client.py`：新增异步 SDK helper `get_hall_types()`（`GET /api/hall-types`）；`talk_client_sync.py` 加同步 parity。
+- `bridges/cli_bridge.py`：
+  - 模块级缓存 `_HALL_TYPE_TEMPLATES` + `_get_hall_type_templates(client)`（取一次复用；任何异常含 `AttributeError` → 返回 `{}` 不写缓存，绝不抛）。
+  - 扩展 `_build_group_member_context`：`free`/缺省 `type` 不注入（保 P3-2 字节不变）；非 `free` 注入 `本群类型：{label}（{type}）。流程指引：…`；`business_role` 与模板 `roles[].role` 大小写不敏感匹配则追加 `你的角色职责：{norm}`；模板不可用 / client 无 `get_hall_types` → 降级为成员清单 + business_role。
+- `tests/test_cli_bridge.py`：`setUp/tearDown` reset 缓存防串扰；新增 5 个 D2 用例（review+reviewer、brainstorm+Contributor 大小写、role 不匹配、free 不取模板、模板接口异常降级），P3-2 两个用例零回归。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge -v` → `Ran 65 tests ... OK`；diff 与工单逐条对齐。
+- 注入行为（agent 是否实际遵循）属黑盒，待真机攒一次（与 P3-2 同桶）。
+
+### 变更文件
+
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- 在 @所有人 / 人设编辑(a) 间二选一，再进 D3/D4。
+
+---
+
 ## 2026-06-24 D1：Hall `type` + 模板地基（纯 server）
 
 **背景**：按 `agent-docs/BLACKBOARD.md` 中 Claude（决策 Agent）给执行 Agent 的 D1 工单推进。目标是给 Hall 增加 `type` 维度，并建立服务端内置、数据驱动的 Hall 类型模板注册表，作为后续 D2/D3/D5 的协议地基。本切片严格不改 bridge、不改 discussion stance/状态机、不做前端。

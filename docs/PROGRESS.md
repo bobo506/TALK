@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-24 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**D1：Hall `type` + 模板地基（纯 server）** 由执行 Agent（Codex）按 `agent-docs/BLACKBOARD.md` 工单完成，**决策 Agent（Claude）已独立复跑验证通过**（合并跑 `test_hall_types`+`test_groups`+`test_member_disable` 共 23 测试全绿）。本轮起进度文档由决策 Agent 收口（新 `AGENTS.md`：执行 Agent 不改进度文档）。**待项目管理者确认是否 `git commit`**；D2 待黑板清空后再出工单。Claude = **决策 Agent**。
+Updated: 2026-06-24 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**D1（Hall `type` 地基 · server · `f20811a`）+ D2（bridge 注入 Hall `type` + 角色规范）** 均由执行 Agent 按 `agent-docs/BLACKBOARD.md` 工单完成、**决策 Agent 独立复跑验证通过**（D1 共 23 测试 / D2 `test_cli_bridge` 65 测试全绿）。工作流稳定：决策 Agent 出工单 + 复核 + 收口进度/提交，执行 Agent 只开发。**下一步在 @所有人 / 人设编辑(a) 间二选一**（待管理者定）。Claude = **决策 Agent**。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
@@ -9,10 +9,11 @@ Updated: 2026-06-24 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **UI #2 删 Hall 全栈 ✓**（`53846b8`/`5578ac2`/`a54e4d3`）：`DELETE /api/groups/{id}` 级联删 + 前端删除按钮/二次确认；右侧删除已真机验收。
 - **UI #3 全局禁用 agent 全栈 ✓**（`4cec246`/`dea5ff9`/`05db723`）：`Member.disabled_at` 软删 + 拒鉴权 + `PATCH`；前端"所有 Agent"列表禁用/启用开关；功能已真机验收。
 - **数据清理 ✓**：群 31→1（仅留 `test-run20`）、成员→5（agent `codex`/`pi`/`pi-kimi` + human `bobo`/`qa`）。
-- **D1 ✓（已验证·未提交）**：新增 `server/hall_types.py` 内置 4 类 Hall 模板（`free`/`task`/`brainstorm`/`review`）；`groups.type` 模型列 + `init_db()` 旧库迁移 + `ix_groups_type`；`POST /api/groups` 支持创建时指定 `type`，默认 `free`，非法值 `422`；`GroupOut` 回显 `type`；新增认证只读 `GET /api/hall-types`。
+- **D1 ✓**（`f20811a`）：新增 `server/hall_types.py` 内置 4 类 Hall 模板（`free`/`task`/`brainstorm`/`review`）；`groups.type` 模型列 + `init_db()` 旧库迁移 + `ix_groups_type`；`POST /api/groups` 支持创建时指定 `type`，默认 `free`，非法值 `422`；`GroupOut` 回显 `type`；新增认证只读 `GET /api/hall-types`。
+- **D2 ✓（已验证·本轮提交）**：bridge `_build_group_member_context` 按群 `type` 注入"本群类型/流程指引"+ 角色职责（`free` 不注入保零回归；模板取自 server `GET /api/hall-types`、进程级缓存、失败优雅降级）；SDK 新增 `get_hall_types`（async + sync parity）。`test_cli_bridge` 65 测试全绿（5 个 D2 用例 + P3-2 零回归）。
 
 ### 2) Open Questions / Pending Confirmation
-- **D1 待项目管理者确认**：决策 Agent 已复跑验证通过，是否对当前改动做 git commit（提交后 D2 待黑板清空再出工单）。
+- **D2 注入行为黑盒待真机**：agent 是否按注入的 Hall `type` 流程指引 / 角色职责实际行动（与 P3-2 同一桶，攒一次真机黑盒）。
 - **P3-2 业务角色注入黑盒待真机**：pi/codex 在群里是否按业务角色行动（同 Phase 2 注入，攒一次真机黑盒）。
 - **UI #3 禁用开关端到端待真机**：功能已验，但运行中 server 需重启加载 UI #3 后端 `PATCH` 端点后才能跑通"禁用 → 该 agent key 被 403"。
 
@@ -20,7 +21,7 @@ Updated: 2026-06-24 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
 - **新方向（已沉淀 `spec/POSITIONING.md`）**：优先做**审议类协议**——头脑风暴（轮流 + 表态 + 归纳）、评审（针对产物的收敛式批评），由 **Hall 类型 / RolePack** 框架承载；协调类（1/2）借 CCB；非技术受众 / Web 低门槛接入列为远期。
 - **设计已定稿**：审议协议、信息类型（stance 终集：去 `idea`、`synthesis`→`decision`、`closure` 降级）、结束归一模型（单一出口 `handoff` → 决策人 = `decision_tier`/human，4 种 `end_reason`）、Hall 类型/RolePack、@所有人、人设网页编辑(a)、切片 D1–D5 —— 见 [`spec/DELIBERATION.md`](spec/DELIBERATION.md)。
-- **下一步**：确认 D1 后再进入 **D2（type → bridge prompt 注入）**；本轮不继续。
+- **下一步**：D1/D2 已落地。按设计建议顺序，接下来在 **@所有人**（mention 解析"所有人/all" + 前端 `@` 下拉，头脑风暴前置依赖）与 **人设编辑(a)**（读写 `.talk/*.md` + business_role 网页编辑，管理者曾要求优先）之间二选一，再进 D3（头脑风暴协议）/ D4（评审）。
 
 ### 4) Verification
 - **决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_hall_types tests.test_groups tests.test_member_disable -v` → `Ran 23 tests ... OK`（确认执行 Agent 自测结论）。
@@ -31,6 +32,7 @@ Updated: 2026-06-24 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - 验证噪声：测试期间 Windows 日志轮转尝试重命名 `logs/talk.log` 时因文件被占用报 `PermissionError`，不影响测试退出码；需后续另片处理 logging 轮转健壮性时再看。
 - 唯一偶发：`test_websocket` presence 时序仅在机器过载（曾跑 464s/499s）时失败，隔离单跑 10/10 通过，与本轮改动无关。
 - D1 为纯 server 切片，未做前端/Browser 验证。
+- **D2 决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge -v` → `Ran 65 tests ... OK`（含 5 个 D2 用例 + P3-2 零回归）；D2 为 bridge/SDK 切片，注入行为黑盒待真机。
 
 > Phase 1 / Phase 2 / Web UI #1 等已合入 `main` 的更早阶段记录，见 `docs/PROGRESS_HISTORY.md`。
 
