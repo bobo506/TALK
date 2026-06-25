@@ -184,6 +184,38 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-25 人设编辑(a)：网页读写 `.talk/*.md` + business_role
+
+**背景**：承接 D1（`f20811a`）/ D2（`411269f`）/ @所有人（`6e645bb`）。按 `agent-docs/BLACKBOARD.md` 的"人设编辑(a)"工单，让 human 在 Web UI 编辑某 agent 在某项目的人设文件（`<project_root>/.talk/agents/<dir>/{IDENTITY,SOUL,USER}.md`）与其在当前 Hall 的 `business_role`。文件即唯一真相源、**bridge 不变**（仍用 `cli/profiles.py` 读同一批文件）。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `cli/profiles.py`（只新增写侧，读侧不动）：`PROFILE_FILES` 映射；`resolve_profile_path`（**双层路径穿越防御**：member 目录必须单段 + `resolve()` 后 `is_relative_to(agents_root)`）；`write_profile_file`（`mkdir parents` + `encoding="utf-8"` 写）。
+- `server/models.py`：`AgentProfileOut`（project_id/member_id/identity/soul/user）+ `AgentProfileUpdate`（三字段 Optional，按 `model_fields_set` 选择性写）。
+- `server/routes/projects.py`：human-only `GET`/`PUT /api/projects/{project_id}/agents/{member_id:path}/profile`；无 `project_root_path`→400；路径穿越 `ValueError`→400；PUT 仅写 body 出现的字段、写后重读返回。（用 `{member_id:path}` 让含 `/` 的穿越 member_id 进到校验而非 404。）
+- `web/index.html` / `web/app.js` / `web/style.css`：Hall 成员行（agent + 可管理 + 群有 `project_id`）显示"编辑人设"；模态编辑 IDENTITY/SOUL/USER + business_role；保存人设走新 `PUT .../profile`，business_role 变化时复用 `PUT /api/groups/{id}/members/{member_id}`（保留原 role/decision_tier）。
+- `tests/test_projects.py`：缺文件读取→null、三件套 round-trip（含落盘断言）、局部更新、无 root→400、路径穿越→400（断言外部无文件）、agent 禁止读写→403。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-06-25）**：`.venv\Scripts\python.exe -m unittest tests.test_projects tests.test_profiles -v` → `Ran 32 tests ... OK`；`node --check web/app.js` 通过；diff 逐条对齐、双层穿越防御复核。
+- 前端"编辑人设"弹窗真机点选 + 保存持久化**未起服务真机点选**（待后续攒一次前端真机）。
+
+### 变更文件
+
+- `cli/profiles.py`
+- `server/models.py`
+- `server/routes/projects.py`
+- `web/index.html` / `web/app.js` / `web/style.css`
+- `tests/test_projects.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- 审议主线进 D3（头脑风暴协议）；改动面大，按 `spec/DELIBERATION.md §7` 迁移点实施。
+
+---
+
 ## 2026-06-24 @所有人：mention 解析"所有人/all" + 前端下拉
 
 **背景**：承接 D1（`f20811a`）/ D2（`411269f`）。按 `agent-docs/BLACKBOARD.md` 的"@所有人"工单，让 Hall 里 `@所有人`/`@all` 把消息 `to_ids` 展开为全体群成员（每个 agent 因此被 mention 触发），是头脑风暴（D3）的前置依赖。执行 Agent 实现，决策 Agent 复核验证后落库。

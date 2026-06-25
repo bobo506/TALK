@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-24 (Asia/Shanghai) 收工 — 分支 `claude/phase3-collab-and-ui`。今日 3 片均由执行 Agent 按 `agent-docs/BLACKBOARD.md` 工单完成、**决策 Agent 独立复跑验证 + 收口提交**：**D1**（Hall `type` 地基 · server · `f20811a`）、**D2**（bridge 注入 type/角色 · `411269f`）、**@所有人**（mention `所有人`/`all` 展开 + 前端下拉 · server+前端 · 本轮提交）。工作流稳定（决策 Agent 出工单 + 复核 + 收口进度/提交，执行 Agent 只开发）。**下一步**：D3 头脑风暴协议 或 人设编辑(a)（新会话再定）。Claude = **决策 Agent**。
+Updated: 2026-06-25 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**人设编辑(a)**（网页读写 `.talk/agents/<id>/{IDENTITY,SOUL,USER}.md` + business_role）由执行 Agent 按 `agent-docs/BLACKBOARD.md` 工单完成、**决策 Agent 独立复跑验证 + 收口提交**（`test_projects`+`test_profiles` 32 测试全绿、含路径穿越/human-only；`node --check` 通过）。累计已落库：D1(`f20811a`)、D2(`411269f`)、@所有人(`6e645bb`)、人设编辑(本轮)。工作流稳定（决策 Agent 出工单 + 复核 + 收口进度/提交，执行 Agent 只开发）。**下一步**：D3 头脑风暴协议 或 D4 评审。Claude = **决策 Agent**。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
@@ -11,10 +11,12 @@ Updated: 2026-06-24 (Asia/Shanghai) 收工 — 分支 `claude/phase3-collab-and-
 - **数据清理 ✓**：群 31→1（仅留 `test-run20`）、成员→5（agent `codex`/`pi`/`pi-kimi` + human `bobo`/`qa`）。
 - **D1 ✓**（`f20811a`）：新增 `server/hall_types.py` 内置 4 类 Hall 模板（`free`/`task`/`brainstorm`/`review`）；`groups.type` 模型列 + `init_db()` 旧库迁移 + `ix_groups_type`；`POST /api/groups` 支持创建时指定 `type`，默认 `free`，非法值 `422`；`GroupOut` 回显 `type`；新增认证只读 `GET /api/hall-types`。
 - **D2 ✓**（`411269f`）：bridge `_build_group_member_context` 按群 `type` 注入"本群类型/流程指引"+ 角色职责（`free` 不注入保零回归；模板取自 server `GET /api/hall-types`、进程级缓存、失败优雅降级）；SDK 新增 `get_hall_types`（async + sync parity）。`test_cli_bridge` 65 测试全绿（5 个 D2 用例 + P3-2 零回归）。
-- **@所有人 ✓（已验证·本轮提交）**：`@所有人`/`@all`（`所有人`精确、`all`大小写不敏感）在群作用域把 `to_ids` 展开为全体群成员（排除发送者），非群发 `@所有人`→`400`；`_extract_leading_mentions` 改三元组 + `_resolve_recipients(sender_id)`；前端 `@` 下拉加"所有人"项 + `@所有人`/`@all` 高亮。`test_messages` 27 全绿 + `node --check` 通过。是 D3 头脑风暴的前置依赖。
+- **@所有人 ✓**（`6e645bb`）：`@所有人`/`@all`（`所有人`精确、`all`大小写不敏感）在群作用域把 `to_ids` 展开为全体群成员（排除发送者），非群发 `@所有人`→`400`；`_extract_leading_mentions` 改三元组 + `_resolve_recipients(sender_id)`；前端 `@` 下拉加"所有人"项 + `@所有人`/`@all` 高亮。`test_messages` 27 全绿 + `node --check` 通过。是 D3 头脑风暴的前置依赖。
+- **人设编辑(a) ✓（已验证·本轮提交）**：`cli/profiles.py` 新增 `resolve_profile_path`（双层路径穿越防御）/`write_profile_file`（读侧不动）；human-only `GET`/`PUT /api/projects/{id}/agents/{member_id:path}/profile` 读写 IDENTITY/SOUL/USER（无 `project_root_path`→400、穿越→400）；business_role 复用 P3-1 `PUT group member`（保留 role/decision_tier）；前端 Hall 成员行"编辑人设"按钮（agent+canManage+project_id 守卫）+ 模态。`test_projects`/`test_profiles` 32 全绿（含穿越/human-only/round-trip 落盘）+ `node --check`。bridge 不变（文件即真相源）。
 
 ### 2) Open Questions / Pending Confirmation
 - **@所有人 前端真机待验**：server + 单测已验、`node --check` 通过；前端"所有人"下拉点选 + 发出后全体高亮未起服务真机点选。
+- **人设编辑(a) 前端真机待验**：server + 32 单测已验、`node --check` 通过；前端"编辑人设"弹窗点选 + 保存持久化未起服务真机点选。
 - **D2 注入行为黑盒待真机**：agent 是否按注入的 Hall `type` 流程指引 / 角色职责实际行动（与 P3-2 同一桶，攒一次真机黑盒）。
 - **P3-2 业务角色注入黑盒待真机**：pi/codex 在群里是否按业务角色行动（同 Phase 2 注入，攒一次真机黑盒）。
 - **UI #3 禁用开关端到端待真机**：功能已验，但运行中 server 需重启加载 UI #3 后端 `PATCH` 端点后才能跑通"禁用 → 该 agent key 被 403"。
@@ -23,7 +25,7 @@ Updated: 2026-06-24 (Asia/Shanghai) 收工 — 分支 `claude/phase3-collab-and-
 - **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
 - **新方向（已沉淀 `spec/POSITIONING.md`）**：优先做**审议类协议**——头脑风暴（轮流 + 表态 + 归纳）、评审（针对产物的收敛式批评），由 **Hall 类型 / RolePack** 框架承载；协调类（1/2）借 CCB；非技术受众 / Web 低门槛接入列为远期。
 - **设计已定稿**：审议协议、信息类型（stance 终集：去 `idea`、`synthesis`→`decision`、`closure` 降级）、结束归一模型（单一出口 `handoff` → 决策人 = `decision_tier`/human，4 种 `end_reason`）、Hall 类型/RolePack、@所有人、人设网页编辑(a)、切片 D1–D5 —— 见 [`spec/DELIBERATION.md`](spec/DELIBERATION.md)。
-- **下一步**：D1/D2/@所有人 已落地（@所有人 = D3 前置）。下一片在 **D3（头脑风暴协议：stance 终集落地 + `decision` 收口 + 轻编排，server+bridge）** 与 **人设编辑(a)**（读写 `.talk/*.md` + business_role 网页编辑，管理者曾要求优先，server+前端）之间二选一，再进 D4（评审）。
+- **下一步**：D1/D2/@所有人/人设编辑(a) 已落地。审议主线接下来进 **D3（头脑风暴协议：stance 终集落地 + `escalate` 信号 + 结束归一/`end_reason` + `decision` 收口 + 轻编排，server+bridge）**，之后 D4（评审）/ D5（Web 审议视图）。注意 D3 改动面大（stance/status 迁移），按设计 `spec/DELIBERATION.md §7` 迁移点实施。
 
 ### 4) Verification
 - **决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_hall_types tests.test_groups tests.test_member_disable -v` → `Ran 23 tests ... OK`（确认执行 Agent 自测结论）。
@@ -36,6 +38,7 @@ Updated: 2026-06-24 (Asia/Shanghai) 收工 — 分支 `claude/phase3-collab-and-
 - D1 为纯 server 切片，未做前端/Browser 验证。
 - **D2 决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge -v` → `Ran 65 tests ... OK`（含 5 个 D2 用例 + P3-2 零回归）；D2 为 bridge/SDK 切片，注入行为黑盒待真机。
 - **@所有人 决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_messages -v` → `Ran 27 tests ... OK`（4 新用例 + 回归）；`node --check web/app.js` 通过；前端真机点选未做。
+- **人设编辑(a) 决策 Agent 独立复跑（2026-06-25）**：`.venv\Scripts\python.exe -m unittest tests.test_projects tests.test_profiles -v` → `Ran 32 tests ... OK`（含路径穿越→400+断言外部无文件、human-only 403、三件套 round-trip 落盘）；`node --check web/app.js` 通过；前端真机点选未做。
 
 > Phase 1 / Phase 2 / Web UI #1 等已合入 `main` 的更早阶段记录，见 `docs/PROGRESS_HISTORY.md`。
 

@@ -392,6 +392,11 @@ button:disabled {
   padding: 16px;
 }
 
+.agent-profile-panel {
+  width: min(760px, 94vw);
+  padding: 16px;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -412,6 +417,10 @@ button:disabled {
   width: min(460px, 94vw);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+}
+
+.modal-card.agent-profile-panel {
+  width: min(760px, 94vw);
 }
 
 .modal-header {
@@ -460,6 +469,7 @@ button:disabled {
 }
 
 .group-create-field input,
+.profile-textarea,
 .group-member-role-select,
 .group-member-select,
 .auth-input,
@@ -485,7 +495,16 @@ button:disabled {
   padding: 0 12px;
 }
 
+.profile-textarea {
+  min-height: 120px;
+  resize: vertical;
+  padding: 10px 12px;
+  line-height: 1.5;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
 .group-create-field input:focus,
+.profile-textarea:focus,
 .group-member-role-select:focus,
 .group-member-select:focus,
 .auth-input:focus,

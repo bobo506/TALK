@@ -59,6 +59,8 @@ let groupMemberSaving = false;
 let groupMetaSaving = false;
 let selectedMemberKindFilters = new Set();
 let groupMetaEditing = false;
+let agentProfileEditing = null;
+let agentProfileSaving = false;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -118,6 +120,18 @@ const groupMemberAddBtn = document.getElementById("group-member-add-btn");
 const groupMembersError = document.getElementById("group-members-error");
 const deleteGroupBtn = document.getElementById("delete-group-btn");
 const allMembersList = document.getElementById("all-members-list");
+const agentProfileOverlay = document.getElementById("agent-profile-overlay");
+const agentProfilePanel = document.getElementById("agent-profile-panel");
+const closeAgentProfileBtn = document.getElementById("close-agent-profile-btn");
+const cancelAgentProfileBtn = document.getElementById("cancel-agent-profile-btn");
+const saveAgentProfileBtn = document.getElementById("save-agent-profile-btn");
+const agentProfileTitle = document.getElementById("agent-profile-title");
+const agentProfileMember = document.getElementById("agent-profile-member");
+const agentProfileBusinessRole = document.getElementById("agent-profile-business-role");
+const agentProfileIdentity = document.getElementById("agent-profile-identity");
+const agentProfileSoul = document.getElementById("agent-profile-soul");
+const agentProfileUser = document.getElementById("agent-profile-user");
+const agentProfileError = document.getElementById("agent-profile-error");
 const presenceStrip = document.getElementById("presence-strip");
 const presenceSummary = document.getElementById("presence-summary");
 const presenceMembers = document.getElementById("presence-members");
@@ -558,6 +572,7 @@ groupCreateOverlay.addEventListener("mousedown", (event) => {
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && groupCreateOpen) setGroupCreateOpen(false);
+  if (event.key === "Escape" && agentProfileEditing) closeAgentProfileEditor();
 });
 groupCreateMemberSelect.addEventListener("change", () => {
   const memberId = groupCreateMemberSelect.value;
@@ -566,6 +581,12 @@ groupCreateMemberSelect.addEventListener("change", () => {
   renderGroupCreateMembers();
 });
 groupCreatePanel.addEventListener("submit", createGroupFromPanel);
+agentProfilePanel.addEventListener("submit", saveAgentProfileEditor);
+closeAgentProfileBtn.addEventListener("click", closeAgentProfileEditor);
+cancelAgentProfileBtn.addEventListener("click", closeAgentProfileEditor);
+agentProfileOverlay.addEventListener("mousedown", (event) => {
+  if (event.target === agentProfileOverlay && !agentProfileSaving) closeAgentProfileEditor();
+});
 closeGroupMembersBtn.addEventListener("click", () => setGroupMembersOpen(true));
 groupMetaForm.addEventListener("submit", updateGroupMetadataFromPanel);
 groupMemberAddForm.addEventListener("submit", addGroupMemberFromPanel);
@@ -956,7 +977,10 @@ function renderGroupMembersPanel() {
     const meta = document.createElement("div");
     meta.className = "group-member-meta";
     const onlineText = onlineMemberIds.has(membership.member_id) ? "在线" : "离线";
-    meta.textContent = `${membership.role} · ${onlineText}`;
+    const metaParts = [membership.role];
+    if (membership.business_role) metaParts.push(membership.business_role);
+    metaParts.push(onlineText);
+    meta.textContent = metaParts.join(" · ");
 
     const dot = document.createElement("span");
     dot.className = `member-status-dot ${onlineMemberIds.has(membership.member_id) ? "online" : "offline"}`;
@@ -967,6 +991,17 @@ function renderGroupMembersPanel() {
 
     const controls = document.createElement("div");
     controls.className = "group-member-controls";
+
+    if (member?.kind === "agent" && canManage && activeGroup.project_id) {
+      const editProfileButton = document.createElement("button");
+      editProfileButton.type = "button";
+      editProfileButton.className = "group-member-remove-btn";
+      editProfileButton.textContent = "编辑人设";
+      editProfileButton.disabled = groupMemberSaving || agentProfileSaving;
+      editProfileButton.title = "编辑该 agent 的 IDENTITY / SOUL / USER 与业务角色";
+      editProfileButton.addEventListener("click", () => openAgentProfileEditor(membership));
+      controls.appendChild(editProfileButton);
+    }
 
     const removeButton = document.createElement("button");
     removeButton.type = "button";
@@ -1127,6 +1162,135 @@ async function toggleMemberDisabled(member) {
   } finally {
     groupMemberSaving = false;
     renderGroupMembersPanel();
+  }
+}
+
+function showAgentProfileError(message) {
+  agentProfileError.textContent = message;
+  agentProfileError.classList.toggle("hidden", !message);
+}
+
+function setAgentProfileSaving(isSaving) {
+  agentProfileSaving = isSaving;
+  agentProfileBusinessRole.disabled = isSaving;
+  agentProfileIdentity.disabled = isSaving;
+  agentProfileSoul.disabled = isSaving;
+  agentProfileUser.disabled = isSaving;
+  saveAgentProfileBtn.disabled = isSaving;
+  cancelAgentProfileBtn.disabled = isSaving;
+  closeAgentProfileBtn.disabled = isSaving;
+  saveAgentProfileBtn.textContent = isSaving ? "保存中..." : "保存";
+}
+
+function closeAgentProfileEditor() {
+  if (agentProfileSaving) return;
+  agentProfileEditing = null;
+  agentProfileOverlay.classList.add("hidden");
+  showAgentProfileError("");
+}
+
+async function openAgentProfileEditor(membership) {
+  const activeGroup = getActiveGroup();
+  if (!membership || !activeGroup?.project_id || !canManageGroups()) return;
+
+  agentProfileEditing = {
+    groupId: activeGroup.id,
+    projectId: activeGroup.project_id,
+    memberId: membership.member_id,
+    role: membership.role,
+    businessRole: membership.business_role || "",
+    decisionTier: membership.decision_tier || null,
+  };
+  agentProfileTitle.textContent = "编辑人设";
+  agentProfileMember.textContent = `${membership.member_id} · ${activeGroup.name}`;
+  agentProfileBusinessRole.value = membership.business_role || "";
+  agentProfileIdentity.value = "";
+  agentProfileSoul.value = "";
+  agentProfileUser.value = "";
+  showAgentProfileError("");
+  agentProfileOverlay.classList.remove("hidden");
+  setAgentProfileSaving(true);
+
+  try {
+    const res = await apiFetch(
+      `/api/projects/${encodeURIComponent(activeGroup.project_id)}/agents/${encodeURIComponent(membership.member_id)}/profile`
+    );
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `人设加载失败: ${res.status}`));
+    }
+    const profile = await res.json();
+    agentProfileIdentity.value = profile.identity || "";
+    agentProfileSoul.value = profile.soul || "";
+    agentProfileUser.value = profile.user || "";
+    showAgentProfileError("");
+  } catch (err) {
+    console.error(err);
+    showAgentProfileError(err.message);
+  } finally {
+    setAgentProfileSaving(false);
+    agentProfileBusinessRole.focus();
+  }
+}
+
+async function saveAgentProfileEditor(event) {
+  event.preventDefault();
+  if (!agentProfileEditing || agentProfileSaving) return;
+
+  const editing = agentProfileEditing;
+  const nextBusinessRole = agentProfileBusinessRole.value.trim();
+  setAgentProfileSaving(true);
+  showAgentProfileError("");
+
+  try {
+    const profileRes = await apiFetch(
+      `/api/projects/${encodeURIComponent(editing.projectId)}/agents/${encodeURIComponent(editing.memberId)}/profile`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identity: agentProfileIdentity.value,
+          soul: agentProfileSoul.value,
+          user: agentProfileUser.value,
+        }),
+      }
+    );
+    if (!profileRes.ok) {
+      throw new Error(await readErrorDetail(profileRes, `人设保存失败: ${profileRes.status}`));
+    }
+
+    if (nextBusinessRole !== editing.businessRole) {
+      const roleRes = await apiFetch(
+        `/api/groups/${encodeURIComponent(editing.groupId)}/members/${encodeURIComponent(editing.memberId)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: editing.role,
+            business_role: nextBusinessRole,
+            decision_tier: editing.decisionTier,
+          }),
+        }
+      );
+      if (!roleRes.ok) {
+        throw new Error(await readErrorDetail(roleRes, `业务角色保存失败: ${roleRes.status}`));
+      }
+      const group = await roleRes.json();
+      replaceGroup(group);
+    }
+
+    agentProfileEditing = null;
+    agentProfileOverlay.classList.add("hidden");
+    showAgentProfileError("");
+    showGroupMembersError("");
+    renderRoomStrip();
+    renderPresenceStrip();
+    renderMentionDropdownIfOpen();
+    renderGroupMembersPanel();
+  } catch (err) {
+    console.error(err);
+    showAgentProfileError(err.message);
+  } finally {
+    setAgentProfileSaving(false);
   }
 }
 

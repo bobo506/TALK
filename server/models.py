@@ -835,3 +835,17 @@ class ProjectAgentOut(BaseModel):
             memory_pointer=agent.memory_pointer,
             updated_at=agent.updated_at,
         )
+
+
+class AgentProfileOut(BaseModel):
+    project_id: str
+    member_id: str
+    identity: Optional[str]
+    soul: Optional[str]
+    user: Optional[str]
+
+
+class AgentProfileUpdate(BaseModel):
+    identity: Optional[str] = None
+    soul: Optional[str] = None
+    user: Optional[str] = None

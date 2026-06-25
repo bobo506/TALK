@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 PathLike = Union[str, Path]
+PROFILE_FILES = {"identity": "IDENTITY.md", "soul": "SOUL.md", "user": "USER.md"}
 
 
 def member_dir_name(member_id: str) -> str:
@@ -67,6 +68,31 @@ def _read_if_exists(path: Path) -> Optional[str]:
 def agent_profile_dir(root: PathLike, member_id: str) -> Path:
     """Return the profile directory for ``member_id`` under ``root``."""
     return Path(root) / ".talk" / "agents" / member_dir_name(member_id)
+
+
+def resolve_profile_path(root: PathLike, member_id: str, kind: str) -> Path:
+    """Return the canonical profile file path and reject path traversal."""
+    if kind not in PROFILE_FILES:
+        raise ValueError(f"profile kind must be one of {sorted(PROFILE_FILES)}")
+
+    member_dir = member_dir_name(member_id)
+    member_parts = Path(member_dir).parts
+    if len(member_parts) != 1 or member_parts[0] in {"", ".", ".."}:
+        raise ValueError("profile path escapes project")
+
+    agents_root = (Path(root) / ".talk" / "agents").resolve()
+    path = Path(root) / ".talk" / "agents" / member_dir / PROFILE_FILES[kind]
+    resolved = path.resolve()
+    if not resolved.is_relative_to(agents_root):
+        raise ValueError("profile path escapes project")
+    return resolved
+
+
+def write_profile_file(root: PathLike, member_id: str, kind: str, content: str) -> None:
+    """Write one profile file under ``<root>/.talk/agents/<member>/``."""
+    path = resolve_profile_path(root, member_id, kind)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 def load_profile(root: PathLike, member_id: str) -> AgentProfile:

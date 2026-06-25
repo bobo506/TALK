@@ -271,6 +271,43 @@
     </form>
   </div>
 
+  <div id="agent-profile-overlay" class="modal-overlay hidden">
+    <form id="agent-profile-panel" class="agent-profile-panel modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 id="agent-profile-title">编辑人设</h3>
+          <div id="agent-profile-member" class="group-members-subtitle"></div>
+        </div>
+        <button id="close-agent-profile-btn" type="button" class="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="group-create-grid">
+        <label class="group-create-field wide">
+          <span>业务角色</span>
+          <input id="agent-profile-business-role" type="text" placeholder="例如：lead / dev / reviewer">
+        </label>
+        <label class="group-create-field wide">
+          <span>IDENTITY.md</span>
+          <textarea id="agent-profile-identity" class="profile-textarea" rows="6"></textarea>
+        </label>
+        <label class="group-create-field wide">
+          <span>SOUL.md</span>
+          <textarea id="agent-profile-soul" class="profile-textarea" rows="6"></textarea>
+        </label>
+        <label class="group-create-field wide">
+          <span>USER.md</span>
+          <textarea id="agent-profile-user" class="profile-textarea" rows="6"></textarea>
+        </label>
+      </div>
+      <div class="group-create-footer">
+        <p id="agent-profile-error" class="group-create-error hidden"></p>
+        <div class="group-create-buttons">
+          <button id="cancel-agent-profile-btn" type="button" class="room-secondary-btn">取消</button>
+          <button id="save-agent-profile-btn" type="submit" class="room-primary-btn">保存</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
