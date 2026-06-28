@@ -184,6 +184,49 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-06-28 真机黑盒验收（A/B/C）+ BUGFIX-1
+
+**背景**：D1/D2/@所有人/人设编辑(a) 落地后，真机黑盒验收前端 3 项已开发功能。由**无项目经验的 agent 当黑盒测试者**（真·黑盒：只按 Web UI 行为测、不看代码），决策 Agent 出验收工单 + 复核。fixture 用 `scripts/seed_acceptance.py` 种入（隔离临时项目根 `.tmp-acceptance`，建 brainstorm 类型 Hall「验收测试群」+ 设 business_role），避免污染仓库已提交的 `.talk/` profile。注入行为（D2/P3-2）本轮主动不验——头脑风暴协议引擎（D3）尚未开发，那部分留待 D3 连同结构化流程一起真机验。
+
+### 验收结果（测试者）
+
+- **A=@所有人**：FAIL —— `@` 下拉不弹、`@所有人` 未高亮。
+- **B=禁用/启用开关**：PASS —— 禁用出"已禁用"标记 + 不可加入，启用还原。
+- **C=编辑人设**：PASS —— 读已有/从空白新建/持久化/business_role 改 reviewer 均正常；附带发现保存后"编辑人设"按钮卡 disabled。
+
+### 根因定位（决策 Agent 复核代码）
+
+- **A 下拉**：`@所有人` 提交（`6e645bb`）在 `msgInput` 输入处理器写了 `Boolean(activeGroup)`，但该作用域无 `activeGroup`（模块级只有 `activeGroupId`）→ 输入 `@` 即 `ReferenceError`，整段下拉构建抛错，所有 mention 下拉全废。**决策 Agent 当时 diff 复核漏判作用域**——黑盒补上了静态复核盲区。
+- **A 高亮**：`buildMentionFragment`+`isAllMentionToken` 静态看正确；疑测试环境（消息绕过正常渲染注入）。
+- **C 按钮**：`saveAgentProfileEditor` 成功路径在 `try` 内、清 `agentProfileSaving`（在 `finally`）之前就 `renderGroupMembersPanel()` → 按钮以 saving 态渲染成 disabled 后无人再刷新。
+
+### BUGFIX-1（执行 Agent 修，仅 `web/app.js`）
+
+- Bug 1：输入处理器 mention 块内加 `const activeGroup = getActiveGroup();`。
+- Bug 3：保存成功路径在重渲染前调 `setAgentProfileSaving(false)`。
+- Bug 2：无代码改动；真机 Chrome 复现确认 `@所有人` 已渲染为 `<span class="mention">` → 原现象=测试环境，非缺陷。
+
+### 验证
+
+- **决策 Agent 复核（2026-06-28）**：`git diff web/app.js` 仅 2 处确定性修复、与根因吻合；`node --check web/app.js` 通过；执行 Agent 用真机系统 Chrome 复验三条（下拉出现所有人+成员、`@pi` 过滤、`@所有人` 高亮、保存后按钮即恢复）。前端运行时 bug 无单测覆盖，以 diff 复核 + 真机为准。
+- **结论**：A/B/C 三项前端真机验收闭环。
+
+### 变更文件
+
+- `web/app.js`（BUGFIX-1）
+- `scripts/seed_acceptance.py`（fixture 种子，新增·未提交）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 备注（架构对齐 2026-06-28）
+
+管理者确认 TALK 架构理解：TALK 是中转 hub，背后真正干活的是 agent 框架（codex/pi/claude 这类，经 bridge 以 CLI 子进程接入）；codex 与 Claude Code 是同类不同厂的框架，CLI 是接入面。衍生候选「`claude_bridge`」（让 Claude Code/Codex 成为一等公民 worker）记入 PROGRESS Next Plan，暂不排期。
+
+### 下一步
+
+- 进 D3（头脑风暴协议）。
+
+---
+
 ## 2026-06-25 人设编辑(a)：网页读写 `.talk/*.md` + business_role
 
 **背景**：承接 D1（`f20811a`）/ D2（`411269f`）/ @所有人（`6e645bb`）。按 `agent-docs/BLACKBOARD.md` 的"人设编辑(a)"工单，让 human 在 Web UI 编辑某 agent 在某项目的人设文件（`<project_root>/.talk/agents/<dir>/{IDENTITY,SOUL,USER}.md`）与其在当前 Hall 的 `business_role`。文件即唯一真相源、**bridge 不变**（仍用 `cli/profiles.py` 读同一批文件）。执行 Agent 实现，决策 Agent 复核验证后落库。

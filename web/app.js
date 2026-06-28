@@ -1285,6 +1285,7 @@ async function saveAgentProfileEditor(event) {
     renderRoomStrip();
     renderPresenceStrip();
     renderMentionDropdownIfOpen();
+    setAgentProfileSaving(false);
     renderGroupMembersPanel();
   } catch (err) {
     console.error(err);
@@ -2902,6 +2903,7 @@ msgInput.addEventListener("input", () => {
   if (mentionContext) {
     const query = mentionContext[1].toLowerCase();
     mentionStart = before.lastIndexOf("@");
+    const activeGroup = getActiveGroup();
 
     const filtered = getScopedMembers().filter(
       (m) => m.id.toLowerCase().includes(query) || m.display_name.toLowerCase().includes(query)
