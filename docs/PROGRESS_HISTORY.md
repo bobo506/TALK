@@ -184,6 +184,31 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-04 D3-2：bridge 接 `decision` 立场（plumbing，纯加法）
+
+**背景**：承接 D3-1（`afc1eb7`，server 已认 `decision`）。本片让 bridge 也把 `decision` 当合法、实质、不受轮次刹车的立场正确接住。纯机械改动，不碰编排/prompt/escalated（D3-3）。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `bridges/cli_bridge.py`：仅 `ACTION_STANCES` 加 `decision` → 动作解析（`stance not in ACTION_STANCES → None`）不再把 `stance=decision` 抹掉。
+- **护栏未破**（复核确认）：`NON_SUBSTANTIVE_STANCES`（仍 `{greeting, closure}`）→ `decision` 被 `_substantive_discussion_turns` 当实质轮次；自动轮次刹车元组（仍 `{greeting, answer, agree, closure}`）→ `decision` 不受 turn limit skip；`infer_*`/prompt/`escalated` 均未动。
+- `tests/test_cli_bridge.py`：+2 —— `decision` `TALK_ACTION` 解析后 stance 保留（不被置 None）+ 计入实质轮次；轮次预算耗尽时 `decision` deferred talk_send 不被 skip（对照 `answer` 被 skip）。
+
+### 验证
+
+- **决策 Agent 复核（2026-07-04）**：`git diff bridges/cli_bridge.py` 仅 1 行；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 67 tests ... OK`（原 65 + 2 D3-2）。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-3（重头）：结束归一 + 决策人 `decision` 收口 + 轻编排 + prompt 指引 + `escalated`→`resolved+deadlock` 迁移下线。
+
+---
+
 ## 2026-07-04 D3-1：审议数据层地基（stance `decision` + `end_reason`，纯加法）
 
 **背景**：进入审议主线 D3（头脑风暴协议）。因改动面大（stance/status 迁移 + 结束归一 + 决策人收口 + 轻编排），拆为 3 片：D3-1 数据层、D3-2 bridge stance、D3-3 结束归一/编排/escalated 下线。本片 D3-1 只做数据层地基，**纯加法、零回归**。执行 Agent 实现，决策 Agent 复核验证后落库。

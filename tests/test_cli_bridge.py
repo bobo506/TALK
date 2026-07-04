@@ -4,6 +4,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -480,6 +481,17 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(actions[0].stance, "agree")
         self.assertEqual(actions[1].to, "human:bobo")
         self.assertEqual(actions[1].body, "人类是长期演化来的。")
+
+    def test_parse_talk_actions_preserves_decision_stance(self):
+        visible, actions = parse_talk_actions(
+            "定论如下。\n"
+            "TALK_ACTION mark_stance stance=decision"
+        )
+
+        self.assertEqual(visible, "定论如下。")
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0].action_type, "mark_stance")
+        self.assertEqual(actions[0].stance, "decision")
 
     def test_parse_talk_actions_cleans_protocol_fragments_from_visible_text(self):
         visible, actions = parse_talk_actions(
@@ -1185,10 +1197,58 @@ class CliBridgeTests(unittest.TestCase):
             {"stance": "greeting"},
             {"stance": "closure"},
             {"stance": "answer"},
+            {"stance": "decision"},
             {"stance": ""},
         ]
 
-        self.assertEqual(cli_bridge._substantive_discussion_turns(turns), [{"stance": "answer"}, {"stance": ""}])
+        self.assertEqual(
+            cli_bridge._substantive_discussion_turns(turns),
+            [{"stance": "answer"}, {"stance": "decision"}, {"stance": ""}],
+        )
+
+    def test_deferred_decision_talk_send_bypasses_turn_limit(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": len(self.sent)}
+
+        fd, path = tempfile.mkstemp(suffix=".jsonl", prefix="talk-decision-test-")
+        os.close(fd)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "tool": "talk_send",
+                    "target": "agent:pi",
+                    "body": "普通回答应被跳过",
+                    "stance": "answer",
+                }, ensure_ascii=False) + "\n")
+                f.write(json.dumps({
+                    "tool": "talk_send",
+                    "target": "agent:lead",
+                    "body": "最终定论",
+                    "stance": "decision",
+                }, ensure_ascii=False) + "\n")
+
+            client = FakeClient()
+            results = asyncio.run(cli_bridge._read_and_execute_deferred_actions(
+                path,
+                client=client,
+                group_id="group:lab",
+                reply_to=40,
+                current_turn_count=3,
+                max_auto_turns=3,
+            ))
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(client.sent, [("@agent:lead 最终定论", ["agent:lead"], 40, "group:lab")])
+        self.assertEqual(results[0]["skipped"], True)
+        self.assertEqual(results[0]["stance"], "answer")
+        self.assertEqual(results[1]["ok"], True)
+        self.assertEqual(results[1]["stance"], "decision")
 
     def test_send_message_action_to_missing_group_agent_is_blocked(self):
         class FakeClient:

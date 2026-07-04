@@ -98,7 +98,7 @@ SAFE_ACTION_RE = re.compile(
 )
 SAFE_ACTION_ATTR_RE = re.compile(r"\b([a-zA-Z_][\w-]*)=([^\s]+)")
 ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human", "final_to_human"}
-ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
+ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure", "decision"}
 DISCUSSION_MAX_AUTO_TURNS = 3
 DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
 NON_SUBSTANTIVE_STANCES = {"greeting", "closure"}
