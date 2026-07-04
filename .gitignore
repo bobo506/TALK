@@ -194,3 +194,8 @@ backups/
 
 # Claude Code 本地配置与预览辅助(本机,不入库)
 /.claude
+
+# 真机黑盒验收产物(本机,不入库)：fixture 种子脚本、临时项目根、测试截图
+/scripts/seed_acceptance.py
+/.tmp-acceptance/
+/agent-docs/blackbox-screenshots/
