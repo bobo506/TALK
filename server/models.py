@@ -194,6 +194,7 @@ class DiscussionSession(SQLModel, table=True):
     assignee_id: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
     scope_text: Optional[str] = None
     status: str = Field(default="active", index=True)
+    end_reason: Optional[str] = Field(default=None, index=True)  # consensus/deadlock/timeout/manual; None=not ended or unmarked
     max_rounds: int = 2
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -430,7 +431,8 @@ class GroupOut(BaseModel):
 
 
 _DISCUSSION_STATUSES = {"active", "resolved", "escalated", "canceled"}
-_DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
+_DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure", "decision"}
+_DISCUSSION_END_REASONS = {"consensus", "deadlock", "timeout", "manual"}
 _DISCUSSION_TURN_KINDS = {"demand", "reply"}
 
 
@@ -470,12 +472,17 @@ class DiscussionSessionCreate(BaseModel):
 
 class DiscussionSessionUpdate(BaseModel):
     status: str
+    end_reason: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_discussion_update(self) -> "DiscussionSessionUpdate":
         self.status = self.status.strip().lower()
         if self.status not in _DISCUSSION_STATUSES:
             raise ValueError(f"status must be one of {sorted(_DISCUSSION_STATUSES)}")
+        if self.end_reason is not None:
+            self.end_reason = self.end_reason.strip().lower()
+            if self.end_reason not in _DISCUSSION_END_REASONS:
+                raise ValueError(f"end_reason must be one of {sorted(_DISCUSSION_END_REASONS)}")
         return self
 
 
@@ -490,6 +497,7 @@ class DiscussionSessionOut(BaseModel):
     assignee_id: Optional[str]
     scope_text: Optional[str]
     status: str
+    end_reason: Optional[str]
     max_rounds: int
     created_at: datetime
     updated_at: datetime
@@ -507,6 +515,7 @@ class DiscussionSessionOut(BaseModel):
             assignee_id=session.assignee_id,
             scope_text=session.scope_text,
             status=session.status,
+            end_reason=session.end_reason,
             max_rounds=session.max_rounds,
             created_at=session.created_at,
             updated_at=session.updated_at,

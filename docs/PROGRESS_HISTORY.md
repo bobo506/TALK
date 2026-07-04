@@ -184,6 +184,35 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-04 D3-1：审议数据层地基（stance `decision` + `end_reason`，纯加法）
+
+**背景**：进入审议主线 D3（头脑风暴协议）。因改动面大（stance/status 迁移 + 结束归一 + 决策人收口 + 轻编排），拆为 3 片：D3-1 数据层、D3-2 bridge stance、D3-3 结束归一/编排/escalated 下线。本片 D3-1 只做数据层地基，**纯加法、零回归**。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+**现状对齐**：`DELIBERATION §7` 的 stance 迁移点（去 `idea`、`synthesis`→`decision`）是设计期写法、与现状不符——当前 `_DISCUSSION_STANCES` 早已无 `idea`/`synthesis`，故本片对 stance 只新增 `decision`。`escalated` 仍被 bridge 使用，本片不删（迁移/下线留 D3-3）。
+
+### 完成事项
+
+- `server/models.py`：`_DISCUSSION_STANCES` 加 `decision`；新增 `_DISCUSSION_END_REASONS = {consensus, deadlock, timeout, manual}`；`_DISCUSSION_STATUSES` 未动。`DiscussionSession` 加 `end_reason`（可空、索引）；`DiscussionSessionOut`(+`from_orm_session`) 回显；`DiscussionSessionUpdate` 加可选 `end_reason` + 校验（非 None 时须 ∈ 集合，否则 422）。
+- `server/db.py`：`init_db()` 为旧 `discussion_sessions` 补 `end_reason` 列 + `ix_discussion_sessions_end_reason` 索引。
+- `server/routes/discussions.py`：`update_discussion` 仅当 `end_reason` 在 `body.model_fields_set` 时更新该字段（status-only PATCH 保留原 end_reason）。
+- `tests/test_discussions.py`：+5 组（`decision` stance turn、end_reason PATCH round-trip、非法 end_reason 422、status-only 保留、`escalated` 零回归 + 旧 schema 迁移补列）。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-07-04）**：`.venv\Scripts\python.exe -m unittest tests.test_discussions tests.test_cli_bridge` → `Ran 74 tests ... OK`（9 discussion + 65 cli_bridge）；diff 逐条吻合工单、纯加法未破 `_DISCUSSION_STATUSES`/`escalated`。
+
+### 变更文件
+
+- `server/models.py` / `server/db.py` / `server/routes/discussions.py`
+- `tests/test_discussions.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-2：bridge `ACTION_STANCES` / stance 推断接 `decision`（仍不删 escalated）。
+
+---
+
 ## 2026-06-28 真机黑盒验收（A/B/C）+ BUGFIX-1
 
 **背景**：D1/D2/@所有人/人设编辑(a) 落地后，真机黑盒验收前端 3 项已开发功能。由**无项目经验的 agent 当黑盒测试者**（真·黑盒：只按 Web UI 行为测、不看代码），决策 Agent 出验收工单 + 复核。fixture 用 `scripts/seed_acceptance.py` 种入（隔离临时项目根 `.tmp-acceptance`，建 brainstorm 类型 Hall「验收测试群」+ 设 business_role），避免污染仓库已提交的 `.talk/` profile。注入行为（D2/P3-2）本轮主动不验——头脑风暴协议引擎（D3）尚未开发，那部分留待 D3 连同结构化流程一起真机验。

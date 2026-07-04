@@ -89,6 +89,8 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE discussion_sessions ADD COLUMN assignee_id TEXT REFERENCES members(id)")
         if "scope_text" not in discussion_columns:
             conn.exec_driver_sql("ALTER TABLE discussion_sessions ADD COLUMN scope_text TEXT")
+        if "end_reason" not in discussion_columns:
+            conn.exec_driver_sql("ALTER TABLE discussion_sessions ADD COLUMN end_reason TEXT")
         discussion_turn_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(discussion_turns)").fetchall()
@@ -150,6 +152,7 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_requester_id ON discussion_sessions (requester_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_assignee_id ON discussion_sessions (assignee_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_status ON discussion_sessions (status)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_sessions_end_reason ON discussion_sessions (end_reason)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_turns_session_id ON discussion_turns (session_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_turns_turn_index ON discussion_turns (turn_index)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discussion_turns_message_id ON discussion_turns (message_id)")

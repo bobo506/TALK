@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-28 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**真机黑盒验收（A=@所有人 / B=禁用开关 / C=编辑人设）+ BUGFIX-1**：无项目经验 agent 当黑盒测试者，验出 @所有人 下拉因作用域回归（输入处理器引用未定义的 `activeGroup`）完全不弹、编辑人设保存后按钮卡 disabled；执行 Agent 修复（仅 `web/app.js` 两处），决策 Agent 复核（diff 吻合根因 + `node --check` + 真机 Chrome）通过 → **A/B/C 三项前端真机验收闭环**。累计已落库：D1`f20811a`/D2`411269f`/@所有人`6e645bb`/人设编辑`8eaf092`/BUGFIX-1(本轮)。**下一步**：D3 头脑风暴协议。Claude = **决策 Agent**。
+Updated: 2026-07-04 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**D3-1（审议数据层地基）** 由执行 Agent 按黑板工单完成、决策 Agent 独立复跑验证 + 收口提交：discussion 加 `decision` stance + `end_reason`（consensus/deadlock/timeout/manual）+ 迁移，**纯加法零回归**（`_DISCUSSION_STATUSES`/`escalated` 未动）。`test_discussions`+`test_cli_bridge` 74 全绿。D3 拆 3 片：**D3-1 ✓**、D3-2（bridge stance）、D3-3（结束归一+决策人收口+编排+escalated 下线）。已推 GitHub 到 BUGFIX-1（`6ed5179`）；D3-1 本轮提交待推。**下一步**：D3-2。Claude = **决策 Agent**。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
@@ -13,7 +13,8 @@ Updated: 2026-06-28 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **D2 ✓**（`411269f`）：bridge `_build_group_member_context` 按群 `type` 注入"本群类型/流程指引"+ 角色职责（`free` 不注入保零回归；模板取自 server `GET /api/hall-types`、进程级缓存、失败优雅降级）；SDK 新增 `get_hall_types`（async + sync parity）。`test_cli_bridge` 65 测试全绿（5 个 D2 用例 + P3-2 零回归）。
 - **@所有人 ✓**（`6e645bb`）：`@所有人`/`@all`（`所有人`精确、`all`大小写不敏感）在群作用域把 `to_ids` 展开为全体群成员（排除发送者），非群发 `@所有人`→`400`；`_extract_leading_mentions` 改三元组 + `_resolve_recipients(sender_id)`；前端 `@` 下拉加"所有人"项 + `@所有人`/`@all` 高亮。`test_messages` 27 全绿 + `node --check` 通过。是 D3 头脑风暴的前置依赖。
 - **人设编辑(a) ✓**（`8eaf092`）：`cli/profiles.py` 新增 `resolve_profile_path`（双层路径穿越防御）/`write_profile_file`（读侧不动）；human-only `GET`/`PUT /api/projects/{id}/agents/{member_id:path}/profile` 读写 IDENTITY/SOUL/USER（无 `project_root_path`→400、穿越→400）；business_role 复用 P3-1 `PUT group member`（保留 role/decision_tier）；前端 Hall 成员行"编辑人设"按钮（agent+canManage+project_id 守卫）+ 模态。`test_projects`/`test_profiles` 32 全绿（含穿越/human-only/round-trip 落盘）+ `node --check`。bridge 不变（文件即真相源）。
-- **BUGFIX-1 ✓（已验证·本轮提交）**：真机黑盒验收回归修复（仅 `web/app.js`）——① `@` 下拉因输入处理器引用未定义的 `activeGroup` 抛 `ReferenceError`、所有 mention 下拉全废 → 改取 `getActiveGroup()`；② 保存人设后"编辑人设"按钮卡 disabled → 渲染前先清 `agentProfileSaving`；③ `@所有人` 高亮经真机确认本就正常（原现象=测试环境）。`node --check` + 真机 Chrome 复验三条通过。
+- **BUGFIX-1 ✓**（`28298bd`）：真机黑盒验收回归修复（仅 `web/app.js`）——① `@` 下拉因输入处理器引用未定义的 `activeGroup` 抛 `ReferenceError`、所有 mention 下拉全废 → 改取 `getActiveGroup()`；② 保存人设后"编辑人设"按钮卡 disabled → 渲染前先清 `agentProfileSaving`；③ `@所有人` 高亮经真机确认本就正常（原现象=测试环境）。`node --check` + 真机 Chrome 复验三条通过。
+- **D3-1 ✓（已验证·本轮提交）**：审议数据层地基（纯加法·零回归）——`_DISCUSSION_STANCES` 加 `decision`、新增 `_DISCUSSION_END_REASONS`（consensus/deadlock/timeout/manual）；`DiscussionSession.end_reason` 列 + `init_db()` 旧库迁移 + 索引；`DiscussionSessionOut` 回显、`DiscussionSessionUpdate` 可选 `end_reason`（校验）、更新端点按 `model_fields_set` 落值；`_DISCUSSION_STATUSES`/`escalated` 未动。`test_discussions`(9)+`test_cli_bridge`(65) 74 全绿（含 escalated 零回归 + 旧库迁移）。
 
 ### 2) Open Questions / Pending Confirmation
 - **✅ A/B/C 真机验收闭环（2026-06-28，黑盒 + BUGFIX-1）**：@所有人 下拉/高亮、UI#3 禁用/启用开关 + 禁用 agent 不可加入、人设编辑弹窗读写/持久化/business_role——均通过。
@@ -24,7 +25,8 @@ Updated: 2026-06-28 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
 - **新方向（已沉淀 `spec/POSITIONING.md`）**：优先做**审议类协议**——头脑风暴（轮流 + 表态 + 归纳）、评审（针对产物的收敛式批评），由 **Hall 类型 / RolePack** 框架承载；协调类（1/2）借 CCB；非技术受众 / Web 低门槛接入列为远期。
 - **设计已定稿**：审议协议、信息类型（stance 终集：去 `idea`、`synthesis`→`decision`、`closure` 降级）、结束归一模型（单一出口 `handoff` → 决策人 = `decision_tier`/human，4 种 `end_reason`）、Hall 类型/RolePack、@所有人、人设网页编辑(a)、切片 D1–D5 —— 见 [`spec/DELIBERATION.md`](spec/DELIBERATION.md)。
-- **下一步**：D1/D2/@所有人/人设编辑(a) 已落地，A/B/C 前端真机验收闭环（+BUGFIX-1）。审议主线进 **D3（头脑风暴协议：stance 终集落地 + `escalate` 信号 + 结束归一/`end_reason` + `decision` 收口 + 轻编排，server+bridge）**，之后 D4（评审）/ D5（Web 审议视图）。注意 D3 改动面大（stance/status 迁移），按设计 `spec/DELIBERATION.md §7` 迁移点实施。
+- **下一步**：审议主线 D3 拆 3 片——**D3-1 ✓（数据层：`decision` stance + `end_reason` + 迁移，纯加法）**；下一片 **D3-2（bridge：`ACTION_STANCES` / stance 推断接 `decision`；不删 escalated）**；再 **D3-3（结束归一 + 决策人 `decision` 收口 + 轻编排 + `escalated`→`resolved+deadlock` 迁移下线，server+bridge）**。之后 D4（评审）/ D5（Web 审议视图）。
+  - 注意：`DELIBERATION §7` 的 stance 迁移点（去 `idea`/`synthesis`）与现状不符——现状 `_DISCUSSION_STANCES` 早已无 `idea`/`synthesis`，D3 对 stance 只是加 `decision`。
 - **候选（未排期）**：`claude_bridge` —— 让 Claude Code/Codex 这类 agent 框架成为 TALK 一等公民 worker（现仅 codex/pi 特化 + 通用 cli_bridge）。管理者 2026-06-28 确认架构理解（TALK 背后真正干活的是 agent 框架），此项作为方向候选、暂不排期。
 
 ### 4) Verification
@@ -41,6 +43,7 @@ Updated: 2026-06-28 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **人设编辑(a) 决策 Agent 独立复跑（2026-06-25）**：`.venv\Scripts\python.exe -m unittest tests.test_projects tests.test_profiles -v` → `Ran 32 tests ... OK`（含路径穿越→400+断言外部无文件、human-only 403、三件套 round-trip 落盘）；`node --check web/app.js` 通过；前端真机点选未做。
 - **真机黑盒验收（2026-06-28）**：无项目经验 agent 当测试者 + 决策 Agent 复核。fixture 经 `scripts/seed_acceptance.py`（临时项目根 `.tmp-acceptance`，建 brainstorm Hall「验收测试群」+ business_role）。A=@所有人 ✓（修 BUGFIX-1 后下拉/高亮均正常）、B=禁用开关 ✓、C=编辑人设 ✓。无需接 bridge。
 - **BUGFIX-1 决策 Agent 复核（2026-06-28）**：`web/app.js` diff 仅 2 处确定性修复（与根因吻合：`getActiveGroup()` 取值、保存路径提前清 `agentProfileSaving`）+ `node --check` 通过 + 执行 Agent 真机 Chrome 三条复验；前端运行时 bug 无单测覆盖，以 diff 复核 + 真机为准。
+- **D3-1 决策 Agent 独立复跑（2026-07-04）**：`.venv\Scripts\python.exe -m unittest tests.test_discussions tests.test_cli_bridge` → `Ran 74 tests ... OK`（含 `decision` stance、`end_reason` PATCH/校验 422、status-only 保留 end_reason、`escalated` 零回归、旧库迁移补列）；diff 逐条吻合、纯加法未动 `_DISCUSSION_STATUSES`。
 
 > Phase 1 / Phase 2 / Web UI #1 等已合入 `main` 的更早阶段记录，见 `docs/PROGRESS_HISTORY.md`。
 
