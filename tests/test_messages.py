@@ -733,6 +733,92 @@ class MessagesRouteTests(RouteTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "所有人 mention is only allowed in a group")
 
+    def _create_group(self, client, group_id: str, hall_type: str) -> None:
+        created = client.post(
+            "/api/groups",
+            headers={"X-API-Key": "bobo-key"},
+            json={
+                "id": group_id,
+                "name": f"{hall_type} 群",
+                "type": hall_type,
+                "member_ids": ["agent:AI1", "agent:AI2"],
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+
+    def _list_discussions(self, client, group_id: str) -> list[dict]:
+        response = client.get(
+            "/api/discussions",
+            params={"group_id": group_id},
+            headers={"X-API-Key": "bobo-key"},
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_all_mention_in_brainstorm_hall_creates_multiparty_discussion(self):
+        with self.make_client() as client:
+            self._create_group(client, "group:bs", "brainstorm")
+            created = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:bs", "content": "@所有人 帮部门想 3 个团建点子"},
+            )
+            discussions = self._list_discussions(client, "group:bs")
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(len(discussions), 1)
+        discussion = discussions[0]
+        self.assertEqual(discussion["status"], "active")
+        self.assertEqual(discussion["root_message_id"], created.json()["id"])
+        self.assertEqual(
+            discussion["participant_ids"],
+            ["agent:AI1", "agent:AI2", "human:bobo"],
+        )
+        self.assertEqual(discussion["requester_id"], "human:bobo")
+        # 2 个 agent + 2（开场 + 请汇总）
+        self.assertEqual(discussion["max_rounds"], 4)
+        self.assertIn("帮部门想 3 个团建点子", discussion["topic"])
+
+    def test_all_mention_does_not_duplicate_active_brainstorm_discussion(self):
+        with self.make_client() as client:
+            self._create_group(client, "group:bs", "brainstorm")
+            for _ in range(2):
+                sent = client.post(
+                    "/api/messages",
+                    headers={"X-API-Key": "bobo-key"},
+                    json={"type": "text", "group_id": "group:bs", "content": "@所有人 再想想团建点子"},
+                )
+                self.assertEqual(sent.status_code, 201)
+            discussions = self._list_discussions(client, "group:bs")
+
+        self.assertEqual(len(discussions), 1)
+
+    def test_all_mention_in_free_hall_does_not_create_discussion(self):
+        with self.make_client() as client:
+            self._create_group(client, "group:free", "free")
+            sent = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:free", "content": "@所有人 随便聊聊"},
+            )
+            discussions = self._list_discussions(client, "group:free")
+
+        self.assertEqual(sent.status_code, 201)
+        self.assertEqual(discussions, [])
+
+    def test_targeted_mention_in_brainstorm_hall_does_not_create_discussion(self):
+        with self.make_client() as client:
+            self._create_group(client, "group:bs", "brainstorm")
+            sent = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "bobo-key"},
+                json={"type": "text", "group_id": "group:bs", "content": "@agent:AI1 你先说一个"},
+            )
+            discussions = self._list_discussions(client, "group:bs")
+
+        self.assertEqual(sent.status_code, 201)
+        self.assertEqual(discussions, [])
+
     def test_group_message_rejects_non_member_sender_or_recipient(self):
         with self.make_client() as client:
             client.post(

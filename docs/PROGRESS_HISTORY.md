@@ -184,6 +184,38 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-14 BS-1：@所有人 × brainstorm 自动建多方 discussion + 模板四阶段（决策 Agent 获授权自行开发）
+
+**背景**：编排 v1（`spec/DELIBERATION.md §8`）第一片。真机验收 v1 证实 @所有人 广播建不出 1:1 discussion、收口无处挂；BS-1 给后续 turns/decision 一个挂载点。**管理者本轮明确授权决策 Agent 直接开发本片**（工单仍走黑板留痕）。
+
+### 完成事项
+
+- `server/routes/messages.py`：
+  - `_resolve_recipients` 返回 `(resolved_to, mention_all)`（唯一调用方 `create_message` 同步解包）。
+  - 新增 `_maybe_create_brainstorm_discussion`：@所有人 且群 `type=brainstorm` → 消息落库后自动建多方 `DiscussionSession`（`root_message_id`=开场消息、`participant_ids`=全体群成员含发送者、`topic`=去 mention 正文截 80（空则"头脑风暴"）、`requester_id`=发送者、`max_rounds=agent 数+2`）。
+  - 幂等守卫：该群已有 `active` 且参与者=全体成员的场次 → 跳过（一群同时一场）。
+  - 容错：全程 `try/except`+`logger.warning`，建场失败不影响消息发送。
+- `server/hall_types.py`：brainstorm `protocol_guidance` 改为四阶段协议（①需求 ②各自想法含决策人 ③点名表态 agree/disagree(否决附看法) ④决策人 decision 收口；未轮到不抢跑）；facilitator norm=「先贡献，等指示后汇总产出 decision」、contributor norm=「给想法；被点名时明确 agree/disagree」。
+- 测试：`tests/test_messages.py` +4（建场字段断言含 max_rounds=4 / 幂等 / free 群不建 / 定向不建）；`tests/test_cli_bridge.py` 2 处文案断言同步。
+
+### 验证
+
+- **自验（2026-07-14）**：`unittest tests.test_messages tests.test_discussions tests.test_hall_types tests.test_cli_bridge` → `Ran 118 tests ... OK`；`tests.test_groups` 16/16。diff 自检（单调用方 / 挂钩位置 / 幂等 / 异常不阻断）。
+- 限制：真机上 agent 回复是否落 turns 依赖 BS-2（bridge 侧），本片只建"场"。
+
+### 变更文件
+
+- `server/routes/messages.py` / `server/hall_types.py`
+- `tests/test_messages.py` / `tests/test_cli_bridge.py`
+- `agent-docs/BLACKBOARD.md`（工单 + 执行回贴）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- BS-2（bridge：广播 turns 落账 + 表态透传 + 多方回合预算）；执行者待管理者定。
+
+---
+
 ## 2026-07-14 真机验收 v1（三 agent 头脑风暴）+ 编排 v1 设计定稿
 
 **背景**：D3-1~3c 落地并推 GitHub（`8e1f029`）后，按黑板验收指南真机跑第一轮头脑风暴：「验收测试群」（brainstorm），codex=决策人(facilitator)、pi/pi-kimi=contributor，人（qa）发 `@所有人 …想 3 个点子…codex 最后收敛成结论`。

@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`（已推 GitHub 到 `8e1f029`=D3-3c）。**真机验收 v1（三 agent 头脑风暴）**：pi/pi-kimi/codex 均给出实质想法（D2 注入生效 ✓），但暴露两缺口——① @所有人 广播**建不出 discussion**（现有创建是 1:1 依赖 `peer_id`）→ 收口无处挂；② 无"该你归纳"信号，决策人只当普通贡献者。期间修复 codex 环境两层问题（`service_tier=default` 非法 + 老 CLI 不支持 `gpt-5.6-sol`，管理者已重装新 CLI 并把 `_default_codex_exe` 改走 PATH）。**管理者定稿头脑风暴编排 v1**（人驱动 + 四阶段：需求→各自想法(含决策人)→逐一表态 agree/disagree→决策人汇总 decision）→ 已写入 `spec/DELIBERATION.md §8`，切片 BS-1(server)/BS-2(bridge)/BS-3(真机 v2)。**下一步**：BS-1。Claude = **决策 Agent**。
+Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**BS-1（@所有人 × brainstorm 自动建多方 discussion + 模板四阶段文案）已完成**——本片由**决策 Agent 获管理者授权直接开发**并自验（5 模块 134 测试全绿：messages/discussions/hall_types/cli_bridge 118 + groups 16）。编排 v1 设计见 `spec/DELIBERATION.md §8`（人驱动四阶段，真机验收 v1 后定稿）。**下一步**：BS-2（bridge：广播 turns 落账 + 表态透传 + 多方回合预算按 N 放大）→ BS-3（真机验收 v2，届时请管理者当主持人）。GitHub 推到 `8e1f029`；`9d6b1f3`(设计+codex 修复)/BS-1(本轮) 本地待推。Claude = **决策 Agent**。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
@@ -18,7 +18,9 @@ Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`（�
 - **D3-2 ✓**（`6801a27`）：bridge 接 `decision`（纯 plumbing）——`bridges/cli_bridge.py` 仅 `ACTION_STANCES` 加 `decision`（动作解析不再把 `stance=decision` 抹成 `None`）；护栏未破（`NON_SUBSTANTIVE_STANCES`/轮次刹车元组/`infer_*`/prompt/`escalated` 均未动 → `decision` 计入实质轮次、不受 turn limit）。`test_cli_bridge` 67 全绿（+2：decision 解析保留、decision talk_send 轮次耗尽不被 skip vs answer 被 skip）。
 - **D3-3a ✓**（`db6584b`）：决策人 `decision` 收口——新增 `_find_decision_maker`（decision_tier=decision 优先，否则 human）+ `_resolve_if_decision_maker`（`stance!=decision` 先早返回零开销；决策人发 decision → `_update_discussion_status(resolved, end_reason=consensus)`，非决策人不收口）；三落点（deferred talk_send / send_message / 回复路径）挂钩；SDK `update_discussion` 加可选 `end_reason`（未传 body 不含）。不碰现有 escalate/final/escalated。`test_cli_bridge`(71)+`test_discussions`(9) 80 全绿（含非决策人不收口 + human 回退守卫）。
 - **D3-3b ✓**（`cf900bc`）：自动 handoff 目标从 human 扩到决策人——`_maybe_escalate_disagreement`（连续两轮 disagree 触发）+ `_send_human_escalation` 回退 均改用 `_find_decision_maker`（decision_tier=decision agent 优先，否则 human）；显式 `escalate_to_human`/`final_to_human`（agent 主动要人类裁决）保持 human-only 不动；`escalated`/`end_reason` 未碰。`test_cli_bridge` 73 全绿（+2：无决策人回退 human、显式 escalate_to_human 仍 human-only）。
-- **D3-3c ✓（已验证·本轮提交）**：收口 `end_reason` 归一——`_resolve_if_decision_maker` 取讨论 turns，有 `escalate` turn → `deadlock` 否则 `consensus`；取 turns 失败 `try/except` 退化 `consensus`（收口不失败）；`stance!=decision` 早返回仍在最前（零开销）。仅 deadlock/consensus，`timeout`/`manual` 显式 defer；`escalated` 未碰。`test_cli_bridge` 75 全绿（+2：deadlock 收口、取 turns 失败退化 consensus）。
+- **D3-3c ✓**（`8e1f029`）：收口 `end_reason` 归一——`_resolve_if_decision_maker` 取讨论 turns，有 `escalate` turn → `deadlock` 否则 `consensus`；取 turns 失败 `try/except` 退化 `consensus`（收口不失败）；`stance!=decision` 早返回仍在最前（零开销）。仅 deadlock/consensus，`timeout`/`manual` 显式 defer；`escalated` 未碰。`test_cli_bridge` 75 全绿（+2：deadlock 收口、取 turns 失败退化 consensus）。
+- **编排 v1 设计 ✓**（`9d6b1f3`）：真机验收 v1 发现（@所有人 建不出 1:1 discussion / 决策人无归纳信号）→ 管理者定稿人驱动四阶段协议，入 `spec/DELIBERATION.md §8`；随片收口 codex 走 PATH 修复（管理者重装新 CLI 后 `gpt-5.6-sol` 400 解除）。
+- **BS-1 ✓（已验证·本轮提交·决策 Agent 获授权自行开发）**：`_resolve_recipients` 返回 `(resolved_to, mention_all)`；@所有人 × `type=brainstorm` 群 → 消息落库后自动建**多方** discussion（root=开场消息、participants=全体成员含发送者、topic=正文截 80、`max_rounds=agent数+2`；幂等=同群已有 active 全员场次则跳过；建失败仅日志不阻断消息）；brainstorm 模板文案改四阶段协议（教 agent 流程 + 不抢跑）。`test_messages` +4、`test_cli_bridge` 文案断言同步；5 模块 134 全绿。
 
 ### 2) Open Questions / Pending Confirmation
 - **✅ A/B/C 真机验收闭环（2026-06-28，黑盒 + BUGFIX-1）**：@所有人 下拉/高亮、UI#3 禁用/启用开关 + 禁用 agent 不可加入、人设编辑弹窗读写/持久化/business_role——均通过。
@@ -29,7 +31,7 @@ Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`（�
 - **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
 - **新方向（已沉淀 `spec/POSITIONING.md`）**：优先做**审议类协议**——头脑风暴（轮流 + 表态 + 归纳）、评审（针对产物的收敛式批评），由 **Hall 类型 / RolePack** 框架承载；协调类（1/2）借 CCB；非技术受众 / Web 低门槛接入列为远期。
 - **设计已定稿**：审议协议、信息类型（stance 终集：去 `idea`、`synthesis`→`decision`、`closure` 降级）、结束归一模型（单一出口 `handoff` → 决策人 = `decision_tier`/human，4 种 `end_reason`）、Hall 类型/RolePack、@所有人、人设网页编辑(a)、切片 D1–D5 —— 见 [`spec/DELIBERATION.md`](spec/DELIBERATION.md)。
-- **下一步（真机验收 v1 后重排，见 `spec/DELIBERATION.md §8`）**：**BS-1（server：@所有人 × brainstorm 群自动建多方 discussion + 模板文案改四阶段协议）** → BS-2（bridge：广播 turns 落账 + 表态透传 + 多方回合预算按 N 放大）→ BS-3（真机验收 v2：人按四阶段驱动完整闭环）。
+- **下一步（真机验收 v1 后重排，见 `spec/DELIBERATION.md §8`）**：BS-1 ✓ → **BS-2（bridge：广播回复 turns 落到多方 session + 表态 stance 透传 + 多方回合预算按 N 放大）** → BS-3（真机验收 v2：人按四阶段驱动完整闭环）。
 - **推迟**：D3-3d（`escalated` 下线·清理）、`end_reason` 的 `timeout`/`manual`、server 自动编排（模式 I）、D4（评审）/ D5（Web 审议视图）。
   - 注意：`DELIBERATION §7` 的 stance 迁移点（去 `idea`/`synthesis`）与现状不符——现状 `_DISCUSSION_STANCES` 早已无 `idea`/`synthesis`，D3 对 stance 只是加 `decision`。
 - **候选（未排期）**：`claude_bridge` —— 让 Claude Code/Codex 这类 agent 框架成为 TALK 一等公民 worker（现仅 codex/pi 特化 + 通用 cli_bridge）。管理者 2026-06-28 确认架构理解（TALK 背后真正干活的是 agent 框架），此项作为方向候选、暂不排期。
@@ -53,6 +55,7 @@ Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`（�
 - **D3-3a 决策 Agent 独立复跑（2026-07-05）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_discussions` → `Ran 80 tests ... OK`（+4 D3-3a：决策人 send/mark_stance 收口、非决策人不收口、无 decision_tier 时 human 回退不收口）；bridge diff 复核确认 `_resolve_if_decision_maker` 仅 `stance=decision` 才查 group（普通轮次零开销）、非决策人守卫、现有 escalate/final/`escalated` 未动；SDK `end_reason` 未传时 body 不含（向后兼容）。
 - **D3-3b 决策 Agent 复核（2026-07-14）**：`git diff bridges/cli_bridge.py` 仅两处自动路径改目标（`_maybe_escalate_disagreement` + `_send_human_escalation` 回退 → `_find_decision_maker`），显式 escalate/final、`escalated`、`end_reason` 均未动；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 73 tests ... OK`（+2：无决策人回退 human、显式 escalate_to_human 仍 human-only）。
 - **D3-3c 决策 Agent 复核（2026-07-14）**：`git diff bridges/cli_bridge.py` 仅 `_resolve_if_decision_maker` 内加取 turns + deadlock/consensus 判定 + `try/except` 容错退化（早返回与其它未动）；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 75 tests ... OK`（+2：deadlock 收口、取 turns 失败退化 consensus）。
+- **BS-1 自验（2026-07-14，决策 Agent 开发）**：`.venv\Scripts\python.exe -m unittest tests.test_messages tests.test_discussions tests.test_hall_types tests.test_cli_bridge` → `Ran 118 tests ... OK`；另 `tests.test_groups` 16/16。diff 自检：`_resolve_recipients` 单调用方、挂钩在消息 commit 后广播前、幂等守卫、异常不阻断主流程。真机行为（agent 回复落 turns）依赖 BS-2，本片只建"场"。
 
 > Phase 1 / Phase 2 / Web UI #1 等已合入 `main` 的更早阶段记录，见 `docs/PROGRESS_HISTORY.md`。
 

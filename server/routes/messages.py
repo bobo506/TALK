@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -13,12 +15,28 @@ from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import REVOKE_WINDOW_SEC, get_session
-from server.models import File, Group, GroupMember, Member, Message, MessageCreate, MessageOut, MessageReplyOut, MessageRevokeOut
+from server.models import (
+    DiscussionSession,
+    File,
+    Group,
+    GroupMember,
+    Member,
+    Message,
+    MessageCreate,
+    MessageOut,
+    MessageReplyOut,
+    MessageRevokeOut,
+)
 from server.ws_hub import hub
+
+logger = logging.getLogger("talk")
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 _REPLY_PREVIEW_LIMIT = 80
 _ALL_MENTION_TOKENS = {"所有人", "all"}
+# 头脑风暴自动开场（DELIBERATION §8）：topic 截断长度
+_BRAINSTORM_TOPIC_LIMIT = 80
+_LEADING_MENTION_BLOCK_RE = re.compile(r"^\s*(?:@\S+\s*)+")
 
 
 def _as_utc(dt: datetime) -> datetime:
@@ -97,8 +115,11 @@ def _resolve_recipients(
     *,
     allowed_member_ids: set[str] | None = None,
     sender_id: str,
-) -> list[str] | None:
-    """Resolve recipients from leading mentions first, then fall back to explicit ids."""
+) -> tuple[list[str] | None, bool]:
+    """Resolve recipients from leading mentions first, then fall back to explicit ids.
+
+    Returns ``(resolved_to, mention_all)``；`mention_all` 供 brainstorm 自动开场挂钩使用。
+    """
     member_ids = allowed_member_ids if allowed_member_ids is not None else set(session.exec(select(Member.id)).all())
     routing_text = body.content if body.type == "text" else body.caption
     mentioned_ids, invalid_mention, mention_all = _extract_leading_mentions(routing_text, member_ids)
@@ -115,12 +136,73 @@ def _resolve_recipients(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="所有人 mention is only allowed in a group",
             )
-        return sorted(member_id for member_id in member_ids if member_id != sender_id)
+        return sorted(member_id for member_id in member_ids if member_id != sender_id), True
 
     if mentioned_ids:
-        return mentioned_ids
+        return mentioned_ids, False
 
-    return _validate_recipient_ids(body.to, member_ids)
+    return _validate_recipient_ids(body.to, member_ids), False
+
+
+def _strip_leading_mentions(text: str) -> str:
+    """去掉开头的 @mention 块，取正文（供头脑风暴 topic 用）。"""
+    return _LEADING_MENTION_BLOCK_RE.sub("", text or "")
+
+
+def _maybe_create_brainstorm_discussion(
+    session: Session,
+    *,
+    group_id: str,
+    sender_id: str,
+    member_ids: Iterable[str],
+    root_message_id: int,
+    content: str,
+) -> None:
+    """@所有人 落在 brainstorm 群时自动开一场多方讨论（编排 v1 挂载点，DELIBERATION §8）。
+
+    幂等：该群已有 active 且参与者=全体成员的场次则不重复建。
+    任何失败只记日志，不影响消息主流程。
+    """
+    try:
+        group = session.get(Group, group_id)
+        if group is None or group.type != "brainstorm":
+            return
+        participants = sorted(set(member_ids))
+        if not participants:
+            return
+        active_sessions = session.exec(
+            select(DiscussionSession).where(
+                DiscussionSession.group_id == group_id,
+                DiscussionSession.status == "active",
+            )
+        ).all()
+        for existing in active_sessions:
+            if set(existing.participant_list) == set(participants):
+                return
+        body_text = _strip_leading_mentions(content).strip()
+        topic = body_text[:_BRAINSTORM_TOPIC_LIMIT] or "头脑风暴"
+        agent_count = sum(1 for member_id in participants if member_id.startswith("agent:"))
+        now = datetime.now(timezone.utc)
+        session.add(
+            DiscussionSession(
+                group_id=group_id,
+                created_by=sender_id,
+                topic=topic,
+                participant_ids=json.dumps(participants),
+                root_message_id=root_message_id,
+                requester_id=sender_id,
+                scope_text=body_text or None,
+                status="active",
+                # 人驱动的 demand 阶段数：开场 1 + 每个 agent 一轮表态 + 请汇总 1
+                max_rounds=agent_count + 2,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.warning("brainstorm discussion auto-create failed for group %s", group_id, exc_info=True)
 
 
 def _is_message_visible_to_member(message: Message, member_id: str) -> bool:
@@ -247,7 +329,7 @@ async def create_message(
 ) -> MessageOut:
     """Create, persist, and broadcast a message."""
     group_member_ids = _resolve_group_scope(body.group_id, current, session)
-    resolved_to = _resolve_recipients(
+    resolved_to, mention_all = _resolve_recipients(
         body,
         session,
         allowed_member_ids=set(group_member_ids) if group_member_ids is not None else None,
@@ -279,6 +361,16 @@ async def create_message(
     session.add(msg)
     session.commit()
     session.refresh(msg)
+
+    if mention_all and body.group_id is not None and msg.id is not None:
+        _maybe_create_brainstorm_discussion(
+            session,
+            group_id=body.group_id,
+            sender_id=current.id,
+            member_ids=group_member_ids or [],
+            root_message_id=msg.id,
+            content=msg.content or "",
+        )
 
     out = MessageOut.from_orm_msg(
         msg,

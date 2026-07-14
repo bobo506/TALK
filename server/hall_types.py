@@ -28,13 +28,15 @@ HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] = {
     "brainstorm": {
         "label": "头脑风暴",
         "protocol_guidance": (
-            "头脑风暴 Hall：主持人抛出主题（question），参与者各自给出具体想法（answer）；"
-            "被 @所有人 时直接给实质想法，不回'收到'。随后用 agree / optimize / disagree "
-            "互相补充与碰撞。先发散、暂缓评判，最后由决策人归纳产出结论（decision）收口。"
+            "头脑风暴 Hall，流程分四步：① 发起人提出需求；"
+            "② 每位成员（包括决策人）各给出一条具体想法（answer），被 @所有人 时直接给实质想法、不回'收到'；"
+            "③ 按发起人指示，对指定成员的想法逐一表态：同意用 agree，否决用 disagree 且必须给出你自己的看法；"
+            "④ 全部想法表态完成后，由决策人汇总全场想法与表态，产出唯一结论（decision）收口。"
+            "未轮到表态或汇总时不要抢跑。"
         ),
         "roles": [
-            {"role": "facilitator", "norm": "抛出主题、控制节奏、最后归纳产出 decision"},
-            {"role": "contributor", "norm": "围绕主题给出具体想法（answer），并对他人想法做 optimize / agree / disagree"},
+            {"role": "facilitator", "norm": "先与大家一样贡献想法；等发起人指示后，汇总全场想法与表态，产出唯一结论（decision）"},
+            {"role": "contributor", "norm": "给出具体想法（answer）；被点名表态时对指定想法明确 agree 或 disagree（否决必须附自己的看法）"},
         ],
     },
     "review": {

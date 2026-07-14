@@ -297,8 +297,8 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertIn("你在本群的业务角色：Contributor。", ctx)
         self.assertIn("本群类型：头脑风暴（brainstorm）。", ctx)
-        self.assertIn("流程指引：头脑风暴 Hall：主持人抛出主题", ctx)
-        self.assertIn("你的角色职责：围绕主题给出具体想法", ctx)
+        self.assertIn("流程指引：头脑风暴 Hall，流程分四步", ctx)
+        self.assertIn("你的角色职责：给出具体想法（answer）；被点名表态时", ctx)
 
     def test_group_member_context_injects_type_without_role_norm_when_role_unmatched(self):
         class FakeClient:
