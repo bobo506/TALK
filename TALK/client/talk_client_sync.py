@@ -162,8 +162,14 @@ class TalkClientSync:
     def get_discussion(self, discussion_id: int) -> dict[str, Any]:
         return self._submit(self._client.get_discussion(discussion_id))
 
-    def update_discussion(self, discussion_id: int, *, status: str) -> dict[str, Any]:
-        return self._submit(self._client.update_discussion(discussion_id, status=status))
+    def update_discussion(
+        self,
+        discussion_id: int,
+        *,
+        status: str,
+        end_reason: str | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(self._client.update_discussion(discussion_id, status=status, end_reason=end_reason))
 
     def append_discussion_turn(
         self,

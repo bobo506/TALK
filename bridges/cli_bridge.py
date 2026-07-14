@@ -670,6 +670,30 @@ async def _find_human_reviewer(client: Any, group_id: str | None) -> str | None:
     return None
 
 
+async def _find_decision_maker(client: Any, group_id: str | None) -> str | None:
+    if not group_id:
+        return None
+    try:
+        group = await client.get_group(group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
+    members = group.get("members") or []
+    for member in members:
+        member_id = str(member.get("member_id") or "")
+        decision_tier = str(member.get("decision_tier") or "").strip().lower()
+        if member_id and decision_tier == "decision":
+            return member_id
+    for member in members:
+        member_id = str(member.get("member_id") or "")
+        if member_id.startswith("human:"):
+            return member_id
+    return None
+
+
 async def _group_member_ids(client: Any, group_id: str | None) -> set[str] | None:
     if not group_id:
         return None
@@ -852,14 +876,22 @@ async def _record_deferred_demand_turns(
                         "assignee_id": target,
                         "scope_text": task_text,
                     }
+        stance = str(result.get("stance") or "question")
         appended = await _append_discussion_turn(
             client,
             discussion_id=discussion_id,
             message_id=int(message_id),
-            stance=str(result.get("stance") or "question"),
+            stance=stance,
             target_member_id=target,
             turn_kind="demand",
             round_index=demand_round,
+        )
+        await _resolve_if_decision_maker(
+            client,
+            discussion_id=discussion_id,
+            group_id=group_id,
+            member_id=member_id,
+            stance=stance,
         )
         if appended:
             current_turns.append(
@@ -868,7 +900,7 @@ async def _record_deferred_demand_turns(
                     "speaker_id": member_id,
                     "target_member_id": target,
                     "turn_kind": "demand",
-                    "stance": str(result.get("stance") or "question"),
+                    "stance": stance,
                     "round_index": demand_round,
                 }
             )
@@ -1010,16 +1042,41 @@ async def _build_group_member_context(
     return context
 
 
-async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:
+async def _update_discussion_status(
+    client: Any,
+    discussion_id: int | None,
+    status: str,
+    *,
+    end_reason: str | None = None,
+) -> None:
     if discussion_id is None:
         return
     try:
-        await client.update_discussion(discussion_id, status=status)
+        if end_reason is None:
+            await client.update_discussion(discussion_id, status=status)
+        else:
+            await client.update_discussion(discussion_id, status=status, end_reason=end_reason)
     except AttributeError:
         pass
     except Exception as exc:
         if not _is_talk_not_found(exc):
             raise
+
+
+async def _resolve_if_decision_maker(
+    client: Any,
+    *,
+    discussion_id: int | None,
+    group_id: str | None,
+    member_id: str,
+    stance: str,
+) -> None:
+    if stance != "decision":
+        return
+    decision_maker = await _find_decision_maker(client, group_id)
+    if decision_maker != member_id:
+        return
+    await _update_discussion_status(client, discussion_id, "resolved", end_reason="consensus")
 
 
 async def _maybe_escalate_disagreement(
@@ -1356,14 +1413,22 @@ async def execute_talk_actions(
                 )
             existing_turns = await _list_discussion_turns(client, discussion_id)
             demand_round = action.round_index or min(_next_demand_round(existing_turns), 2)
+            effective_stance = infer_discussion_stance(task_text, action_body, default=action.stance or "question")
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
                 message_id=int(sent["id"]),
-                stance=infer_discussion_stance(task_text, action_body, default=action.stance or "question"),
+                stance=effective_stance,
                 target_member_id=target,
                 turn_kind="demand",
                 round_index=demand_round,
+            )
+            await _resolve_if_decision_maker(
+                client,
+                discussion_id=discussion_id,
+                group_id=group_id,
+                member_id=member_id,
+                stance=effective_stance,
             )
             summaries.append(f"sent message to {target}")
         elif action.action_type == "escalate_to_human":
@@ -2007,6 +2072,13 @@ async def handle_incoming_message(
                 target_member_id=peer_id,
                 turn_kind="reply",
                 round_index=action.round_index or 1,
+            )
+            await _resolve_if_decision_maker(
+                client,
+                discussion_id=discussion_id,
+                group_id=group_id,
+                member_id=member_id,
+                stance=stance,
             )
             if stance == "agree" and not has_final_action:
                 await _update_discussion_status(client, discussion_id, "resolved")

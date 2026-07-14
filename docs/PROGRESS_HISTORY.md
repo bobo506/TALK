@@ -184,6 +184,36 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-05 D3-3a：决策人 `decision` 收口 → `resolved`+`end_reason=consensus`
+
+**背景**：D3-3（头脑风暴协议编排）拆 4 片，本片 D3-3a 是第一片——新增"决策人产出定论则收口"的路径，不碰现有 escalate/final 流程、不删 `escalated`。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- SDK `update_discussion` 加可选 `end_reason`（`talk_client.py` async + `talk_client_sync.py`）：未传时 body 只含 `status`（向后兼容，服务端 `model_fields_set` 不动 end_reason）。
+- `bridges/cli_bridge.py`：
+  - 新增 `_find_decision_maker(client, group_id)`：先找 `decision_tier=="decision"` 成员，否则回退第一个 `human:`。
+  - `_update_discussion_status` 加 `end_reason` 透传（现有调用零变化）。
+  - 新增 `_resolve_if_decision_maker`：`stance!="decision"` 先早返回（普通轮次不查 group，零开销）；决策人发 `decision` → `resolved`+`end_reason=consensus`；**非决策人不收口**。
+  - 三落点挂钩：`_record_deferred_demand_turns`（deferred talk_send）、`execute_talk_actions` 的 send_message 分支、`handle_incoming_message` 回复路径。
+- `tests/test_cli_bridge.py`：所有 `FakeClient.update_discussion` 加 `end_reason=None` 形参；+4 用例（决策人 send 收口、非决策人不收口、无 decision_tier 时 human 回退不收口、决策人 mark_stance 收口）。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-07-05）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_discussions` → `Ran 80 tests ... OK`（test_cli_bridge 71 + test_discussions 9）；bridge diff 逐条复核，护栏（非决策人不收口 / 现有 escalate/final/escalated 未动）确认。
+
+### 变更文件
+
+- `TALK/client/talk_client.py` / `TALK/client/talk_client_sync.py`
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-3b：handoff 目标从"只找 human"扩到"决策人（decision_tier=decision 优先）"。
+
+---
+
 ## 2026-07-04 D3-2：bridge 接 `decision` 立场（plumbing，纯加法）
 
 **背景**：承接 D3-1（`afc1eb7`，server 已认 `decision`）。本片让 bridge 也把 `decision` 当合法、实质、不受轮次刹车的立场正确接住。纯机械改动，不碰编排/prompt/escalated（D3-3）。执行 Agent 实现，决策 Agent 复核验证后落库。

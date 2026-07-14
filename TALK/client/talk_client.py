@@ -283,11 +283,14 @@ class TalkClient:
     async def get_discussion(self, discussion_id: int) -> JsonDict:
         return await self._request_json("GET", f"/api/discussions/{discussion_id}")
 
-    async def update_discussion(self, discussion_id: int, *, status: str) -> JsonDict:
+    async def update_discussion(self, discussion_id: int, *, status: str, end_reason: str | None = None) -> JsonDict:
+        payload: JsonDict = {"status": status}
+        if end_reason is not None:
+            payload["end_reason"] = end_reason
         return await self._request_json(
             "PATCH",
             f"/api/discussions/{discussion_id}",
-            json_body={"status": status},
+            json_body=payload,
         )
 
     async def append_discussion_turn(
