@@ -184,6 +184,35 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-14 D3-3c：收口 `end_reason` 归一（deadlock vs consensus）
+
+**背景**：D3-3 第三片。修掉 D3-3b 的临时不精确——决策人收口时按讨论是否经 deadlock 移交，落 `deadlock` 或 `consensus`。`timeout`（轮次阈值语义待定）/ `manual`（缺人类"停"指令机制）本片刻意不做、显式 defer。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `bridges/cli_bridge.py` `_resolve_if_decision_maker`：确认「决策人 + stance=decision」后取讨论 turns（`_list_discussion_turns`，`try/except` 包裹）；若有 `stance="escalate"` 的 turn → `end_reason="deadlock"`，否则 `consensus`；取 turns 失败退化 `consensus`（收口不因此失败）。`stance!=decision` 早返回仍在最前（普通轮次零开销）；加 `isinstance(turn, dict)` 防御。
+- `tests/test_cli_bridge.py`：+2（含 escalate turn → deadlock 收口、取 turns 失败 → consensus 退化）；既有 consensus / 非决策人不收口用例保持覆盖。
+
+### 明确未做（defer）
+
+- `timeout` / `manual` 两种 `end_reason` 未接入。
+- 未删 / 未改 `escalated` 状态（D3-3d）。未改 server / prompt / 显式动作 / 其它切片。
+
+### 验证
+
+- **决策 Agent 复核（2026-07-14）**：`git diff` 仅 `_resolve_if_decision_maker` 内改动；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 75 tests ... OK`。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- **D3-3d（破坏性）**：`escalated` 下线——旧 `escalated`→`resolved+deadlock` 迁移、从 `_DISCUSSION_STATUSES` 移除、bridge 改写不再写 `escalated`。**做前请管理者确认**（唯一有回滚风险的一片）。
+
+---
+
 ## 2026-07-14 D3-3b：自动 handoff 目标从"只找 human"扩到"决策人"
 
 **背景**：D3-3 第二片。把系统**自动**发起 handoff 的移交目标从"群里第一个 human"改为"本群决策人"（复用 D3-3a 的 `_find_decision_maker`，decision_tier=decision agent 优先、否则回退 human）。这样 deadlock 能交给 agent 决策人，它随后产出 `decision` → D3-3a 自动收口，闭环。执行 Agent 实现，决策 Agent 复核验证后落库。

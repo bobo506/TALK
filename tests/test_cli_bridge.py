@@ -1800,6 +1800,79 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
         self.assertEqual(client.updated, [(9, "resolved", "consensus")])
 
+    def test_decision_maker_decision_after_escalate_resolves_as_deadlock(self):
+        class FakeClient:
+            def __init__(self):
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def list_discussion_turns(self, discussion_id):
+                return [
+                    {"speaker_id": "agent:codex", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "escalate"},
+                    {"speaker_id": "agent:lead", "stance": "decision"},
+                ]
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._resolve_if_decision_maker(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                member_id="agent:lead",
+                stance="decision",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.updated, [(9, "resolved", "deadlock")])
+
+    def test_decision_maker_decision_turn_lookup_failure_resolves_as_consensus(self):
+        class FakeClient:
+            def __init__(self):
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def list_discussion_turns(self, discussion_id):
+                raise RuntimeError("turn lookup failed")
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._resolve_if_decision_maker(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                member_id="agent:lead",
+                stance="decision",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.updated, [(9, "resolved", "consensus")])
+
     def test_non_decision_maker_decision_does_not_resolve_discussion(self):
         class FakeClient:
             def __init__(self):

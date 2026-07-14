@@ -1076,7 +1076,14 @@ async def _resolve_if_decision_maker(
     decision_maker = await _find_decision_maker(client, group_id)
     if decision_maker != member_id:
         return
-    await _update_discussion_status(client, discussion_id, "resolved", end_reason="consensus")
+    end_reason = "consensus"
+    try:
+        turns = await _list_discussion_turns(client, discussion_id)
+    except Exception:
+        turns = []
+    if any(str(turn.get("stance") or "") == "escalate" for turn in turns if isinstance(turn, dict)):
+        end_reason = "deadlock"
+    await _update_discussion_status(client, discussion_id, "resolved", end_reason=end_reason)
 
 
 async def _maybe_escalate_disagreement(
