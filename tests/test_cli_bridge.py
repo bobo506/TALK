@@ -1489,7 +1489,12 @@ class CliBridgeTests(unittest.TestCase):
                 return self.turns
 
             async def get_group(self, group_id):
-                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:codex"}, {"member_id": "agent:pi"}]}
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
 
             async def send_text(self, text, to=None, reply_to=None, group_id=None):
                 self.sent.append((text, to, reply_to, group_id))
@@ -1535,8 +1540,117 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.replies, [(50, "我仍然不同意，建议先补协议测试。", ["agent:codex"], "group:lab")])
         self.assertEqual(
             client.sent,
+            [("@agent:lead 我和对方连续两轮仍有不同判断，请你做最终决定。", ["agent:lead"], 51, "group:lab")],
+        )
+
+    def test_disagreement_escalation_falls_back_to_human_without_decision_maker(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.turns = [
+                    {"speaker_id": "agent:codex", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                ]
+                self.updated = []
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 52}
+
+            async def append_discussion_turn(
+                self,
+                discussion_id,
+                *,
+                message_id,
+                stance,
+                target_member_id=None,
+                turn_kind="reply",
+                round_index=1,
+            ):
+                self.turns.append({
+                    "speaker_id": "agent:pi",
+                    "stance": stance,
+                    "target_member_id": target_member_id,
+                    "turn_kind": turn_kind,
+                })
+                return {"id": 3}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._maybe_escalate_disagreement(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                reply_to=51,
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(
+            client.sent,
             [("@human:bobo 我和对方连续两轮仍有不同判断，请你做最终决定。", ["human:bobo"], 51, "group:lab")],
         )
+        self.assertEqual(client.turns[-1]["target_member_id"], "human:bobo")
+        self.assertEqual(client.updated, [(9, "escalated", None)])
+
+    def test_explicit_escalate_to_human_stays_human_only(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                ]}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 52}
+
+            async def append_discussion_turn(self, *args, **kwargs):
+                return {"id": 3}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            summaries = await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(action_type="escalate_to_human", body="请裁决")],
+                client=client,
+                source_message={"id": 50, "from": "agent:pi", "group_id": "group:lab"},
+                member_id="agent:codex",
+                task_text="请裁决这个分歧",
+            )
+            return client, summaries
+
+        client, summaries = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@human:bobo 请裁决", ["human:bobo"], 50, "group:lab")])
+        self.assertEqual(summaries, ["escalated to human:bobo"])
+        self.assertEqual(client.updated, [])
 
     def test_final_to_human_action_resolves_discussion(self):
         class FakeClient:

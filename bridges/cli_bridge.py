@@ -1099,17 +1099,17 @@ async def _maybe_escalate_disagreement(
     if not _last_two_turns_disagree(turns):
         return
 
-    human_id = await _find_human_reviewer(client, group_id)
-    if human_id is None:
+    decision_maker_id = await _find_decision_maker(client, group_id)
+    if decision_maker_id is None:
         return
-    text = f"@{human_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
-    message = await client.send_text(text, to=[human_id], reply_to=reply_to, group_id=group_id)
+    text = f"@{decision_maker_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
+    message = await client.send_text(text, to=[decision_maker_id], reply_to=reply_to, group_id=group_id)
     await _append_discussion_turn(
         client,
         discussion_id=discussion_id,
         message_id=int(message["id"]),
         stance="escalate",
-        target_member_id=human_id,
+        target_member_id=decision_maker_id,
         turn_kind="demand",
         round_index=2,
     )
@@ -1316,7 +1316,7 @@ async def _send_human_escalation(
     text: str,
     human_id: str | None = None,
 ) -> bool:
-    target = human_id or await _find_human_reviewer(client, group_id)
+    target = human_id or await _find_decision_maker(client, group_id)
     if target is None:
         return False
     message = await client.send_text(f"@{target} {text}".strip(), to=[target], reply_to=reply_to, group_id=group_id)

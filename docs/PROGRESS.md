@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-07-05 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**D3-3a（决策人 `decision` 收口）** 由执行 Agent 按黑板工单完成、决策 Agent 独立复跑验证 + 收口提交：决策人（`decision_tier=decision` 优先 / 否则 human）发 `decision` → 讨论 `resolved`+`end_reason=consensus`（新增 `_find_decision_maker` + `_resolve_if_decision_maker`，非决策人不收口）；SDK `update_discussion` 加可选 `end_reason`。`test_cli_bridge`(71)+`test_discussions`(9) 80 全绿。D3-3 拆 4 片：**D3-3a ✓**、D3-3b（handoff 目标扩容）、D3-3c（end_reason 归一 deadlock/timeout/manual）、D3-3d（escalated 下线·破坏性）。GitHub 停在 BUGFIX-1（`6ed5179`）；D3-1/2/3a 本地待推。**下一步**：D3-3b。Claude = **决策 Agent**。
+Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**D3-3b（自动 handoff 目标扩到决策人）** 由执行 Agent 完成、决策 Agent 复核（`_maybe_escalate_disagreement` + `_send_human_escalation` 回退 → `_find_decision_maker`；显式 escalate/final 未动；`test_cli_bridge` 73 全绿）通过 + 收口提交。D3-3：D3-3a ✓ / **D3-3b ✓** / D3-3c（end_reason 归一）/ D3-3d（escalated 下线·破坏性）。GitHub 停在 BUGFIX-1（`6ed5179`）；D3-1/2/3a/3b 本地待推。**下一步**：D3-3c（自主推），D3-3d 破坏性迁移前会找管理者。Claude = **决策 Agent**。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
@@ -16,7 +16,8 @@ Updated: 2026-07-05 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **BUGFIX-1 ✓**（`28298bd`）：真机黑盒验收回归修复（仅 `web/app.js`）——① `@` 下拉因输入处理器引用未定义的 `activeGroup` 抛 `ReferenceError`、所有 mention 下拉全废 → 改取 `getActiveGroup()`；② 保存人设后"编辑人设"按钮卡 disabled → 渲染前先清 `agentProfileSaving`；③ `@所有人` 高亮经真机确认本就正常（原现象=测试环境）。`node --check` + 真机 Chrome 复验三条通过。
 - **D3-1 ✓**（`afc1eb7`）：审议数据层地基（纯加法·零回归）——`_DISCUSSION_STANCES` 加 `decision`、新增 `_DISCUSSION_END_REASONS`（consensus/deadlock/timeout/manual）；`DiscussionSession.end_reason` 列 + `init_db()` 旧库迁移 + 索引；`DiscussionSessionOut` 回显、`DiscussionSessionUpdate` 可选 `end_reason`（校验）、更新端点按 `model_fields_set` 落值；`_DISCUSSION_STATUSES`/`escalated` 未动。`test_discussions`(9)+`test_cli_bridge`(65) 74 全绿（含 escalated 零回归 + 旧库迁移）。
 - **D3-2 ✓**（`6801a27`）：bridge 接 `decision`（纯 plumbing）——`bridges/cli_bridge.py` 仅 `ACTION_STANCES` 加 `decision`（动作解析不再把 `stance=decision` 抹成 `None`）；护栏未破（`NON_SUBSTANTIVE_STANCES`/轮次刹车元组/`infer_*`/prompt/`escalated` 均未动 → `decision` 计入实质轮次、不受 turn limit）。`test_cli_bridge` 67 全绿（+2：decision 解析保留、decision talk_send 轮次耗尽不被 skip vs answer 被 skip）。
-- **D3-3a ✓（已验证·本轮提交）**：决策人 `decision` 收口——新增 `_find_decision_maker`（decision_tier=decision 优先，否则 human）+ `_resolve_if_decision_maker`（`stance!=decision` 先早返回零开销；决策人发 decision → `_update_discussion_status(resolved, end_reason=consensus)`，非决策人不收口）；三落点（deferred talk_send / send_message / 回复路径）挂钩；SDK `update_discussion` 加可选 `end_reason`（未传 body 不含）。不碰现有 escalate/final/escalated。`test_cli_bridge`(71)+`test_discussions`(9) 80 全绿（含非决策人不收口 + human 回退守卫）。
+- **D3-3a ✓**（`db6584b`）：决策人 `decision` 收口——新增 `_find_decision_maker`（decision_tier=decision 优先，否则 human）+ `_resolve_if_decision_maker`（`stance!=decision` 先早返回零开销；决策人发 decision → `_update_discussion_status(resolved, end_reason=consensus)`，非决策人不收口）；三落点（deferred talk_send / send_message / 回复路径）挂钩；SDK `update_discussion` 加可选 `end_reason`（未传 body 不含）。不碰现有 escalate/final/escalated。`test_cli_bridge`(71)+`test_discussions`(9) 80 全绿（含非决策人不收口 + human 回退守卫）。
+- **D3-3b ✓（已验证·本轮提交）**：自动 handoff 目标从 human 扩到决策人——`_maybe_escalate_disagreement`（连续两轮 disagree 触发）+ `_send_human_escalation` 回退 均改用 `_find_decision_maker`（decision_tier=decision agent 优先，否则 human）；显式 `escalate_to_human`/`final_to_human`（agent 主动要人类裁决）保持 human-only 不动；`escalated`/`end_reason` 未碰。`test_cli_bridge` 73 全绿（+2：无决策人回退 human、显式 escalate_to_human 仍 human-only）。
 
 ### 2) Open Questions / Pending Confirmation
 - **✅ A/B/C 真机验收闭环（2026-06-28，黑盒 + BUGFIX-1）**：@所有人 下拉/高亮、UI#3 禁用/启用开关 + 禁用 agent 不可加入、人设编辑弹窗读写/持久化/business_role——均通过。
@@ -27,7 +28,7 @@ Updated: 2026-07-05 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
 - **新方向（已沉淀 `spec/POSITIONING.md`）**：优先做**审议类协议**——头脑风暴（轮流 + 表态 + 归纳）、评审（针对产物的收敛式批评），由 **Hall 类型 / RolePack** 框架承载；协调类（1/2）借 CCB；非技术受众 / Web 低门槛接入列为远期。
 - **设计已定稿**：审议协议、信息类型（stance 终集：去 `idea`、`synthesis`→`decision`、`closure` 降级）、结束归一模型（单一出口 `handoff` → 决策人 = `decision_tier`/human，4 种 `end_reason`）、Hall 类型/RolePack、@所有人、人设网页编辑(a)、切片 D1–D5 —— 见 [`spec/DELIBERATION.md`](spec/DELIBERATION.md)。
-- **下一步**：D3 → D3-1 ✓（数据层）/ D3-2 ✓（bridge stance）/ **D3-3a ✓（决策人收口）**。D3-3 剩 3 片：**D3-3b（handoff 目标从"只找 human"扩到"决策人 decision_tier=decision 优先"）**、D3-3c（`end_reason` 归一到 deadlock/timeout/manual 各触发点）、D3-3d（`escalated` 下线·破坏性放最后）。之后 D4（评审）/ D5（Web 审议视图）。
+- **下一步**：D3 → D3-1/2/3a/3b ✓。D3-3 剩 2 片：**D3-3c（`end_reason` 归一到 deadlock/timeout/manual 各触发点）**、D3-3d（`escalated` 下线·破坏性，做前会找管理者确认）。之后 D4（评审）/ D5（Web 审议视图）。
   - 注意：`DELIBERATION §7` 的 stance 迁移点（去 `idea`/`synthesis`）与现状不符——现状 `_DISCUSSION_STANCES` 早已无 `idea`/`synthesis`，D3 对 stance 只是加 `decision`。
 - **候选（未排期）**：`claude_bridge` —— 让 Claude Code/Codex 这类 agent 框架成为 TALK 一等公民 worker（现仅 codex/pi 特化 + 通用 cli_bridge）。管理者 2026-06-28 确认架构理解（TALK 背后真正干活的是 agent 框架），此项作为方向候选、暂不排期。
 
@@ -48,6 +49,7 @@ Updated: 2026-07-05 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **D3-1 决策 Agent 独立复跑（2026-07-04）**：`.venv\Scripts\python.exe -m unittest tests.test_discussions tests.test_cli_bridge` → `Ran 74 tests ... OK`（含 `decision` stance、`end_reason` PATCH/校验 422、status-only 保留 end_reason、`escalated` 零回归、旧库迁移补列）；diff 逐条吻合、纯加法未动 `_DISCUSSION_STATUSES`。
 - **D3-2 决策 Agent 复核（2026-07-04）**：`git diff bridges/cli_bridge.py` 仅 1 行（`ACTION_STANCES` 加 `decision`）、护栏三处（NON_SUBSTANTIVE/轮次元组/infer）未动；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 67 tests ... OK`（+2 D3-2 用例：decision 解析保留、decision talk_send 轮次耗尽不被 skip）。
 - **D3-3a 决策 Agent 独立复跑（2026-07-05）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_discussions` → `Ran 80 tests ... OK`（+4 D3-3a：决策人 send/mark_stance 收口、非决策人不收口、无 decision_tier 时 human 回退不收口）；bridge diff 复核确认 `_resolve_if_decision_maker` 仅 `stance=decision` 才查 group（普通轮次零开销）、非决策人守卫、现有 escalate/final/`escalated` 未动；SDK `end_reason` 未传时 body 不含（向后兼容）。
+- **D3-3b 决策 Agent 复核（2026-07-14）**：`git diff bridges/cli_bridge.py` 仅两处自动路径改目标（`_maybe_escalate_disagreement` + `_send_human_escalation` 回退 → `_find_decision_maker`），显式 escalate/final、`escalated`、`end_reason` 均未动；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 73 tests ... OK`（+2：无决策人回退 human、显式 escalate_to_human 仍 human-only）。
 
 > Phase 1 / Phase 2 / Web UI #1 等已合入 `main` 的更早阶段记录，见 `docs/PROGRESS_HISTORY.md`。
 

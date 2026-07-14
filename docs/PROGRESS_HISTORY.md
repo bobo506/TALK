@@ -184,6 +184,37 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-14 D3-3b：自动 handoff 目标从"只找 human"扩到"决策人"
+
+**背景**：D3-3 第二片。把系统**自动**发起 handoff 的移交目标从"群里第一个 human"改为"本群决策人"（复用 D3-3a 的 `_find_decision_maker`，decision_tier=decision agent 优先、否则回退 human）。这样 deadlock 能交给 agent 决策人，它随后产出 `decision` → D3-3a 自动收口，闭环。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `bridges/cli_bridge.py`：
+  - `_maybe_escalate_disagreement`（连续两轮 disagree 触发）自动目标 `_find_human_reviewer` → `_find_decision_maker`（消息文案/turn/target 一并更新；仍记 `escalate` turn + `status=escalated`）。
+  - `_send_human_escalation` 的 fallback（未显式传 `human_id` 时）`_find_human_reviewer` → `_find_decision_maker`；显式传入 `human_id` 行为不变。
+- **未动**（复核确认）：显式 `escalate_to_human` / `final_to_human`（agent 主动要人类裁决）保持 human-only；`escalated` 状态、`end_reason`、server、prompt 均未碰。
+- `tests/test_cli_bridge.py`：更新 disagree 自动 handoff 用例断言 agent 决策人目标；+2（无决策人回退 human、显式 escalate_to_human 仍 human-only）。
+
+### 已知临时不精确（留 D3-3c）
+
+- deadlock 触发的收口目前仍被 D3-3a 标成 `end_reason=consensus`（D3-3a 对决策人 decision 一律 consensus）。D3-3c 会按触发原因归一（deadlock/timeout/manual）。
+
+### 验证
+
+- **决策 Agent 复核（2026-07-14）**：`git diff bridges/cli_bridge.py` 仅两处自动路径改目标；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 73 tests ... OK`。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-3c：`end_reason` 归一到 deadlock/timeout/manual 各触发点。
+
+---
+
 ## 2026-07-05 D3-3a：决策人 `decision` 收口 → `resolved`+`end_reason=consensus`
 
 **背景**：D3-3（头脑风暴协议编排）拆 4 片，本片 D3-3a 是第一片——新增"决策人产出定论则收口"的路径，不碰现有 escalate/final 流程、不删 `escalated`。执行 Agent 实现，决策 Agent 复核验证后落库。
