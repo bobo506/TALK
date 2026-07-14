@@ -103,3 +103,44 @@
 - **复用**：`discussion_sessions`/`turns`、`business_role`（P3-1）、注入（P3-2）、`decision_tier`（决策人）、`escalate` 升级机制。
 
 > 关联：定位与场景见 `POSITIONING.md`；接入与基础设施见 `PROJECT_INTEGRATION.md`；讨论账本现状见 `MODULE_discussions.md`。
+
+---
+
+## 8. 头脑风暴编排 v1（人驱动 + 结构化轮流表态）
+
+> 状态：Design（2026-07-14 真机验收后与项目管理者定稿）。
+> 背景：D1/D2/D3-1~3c 落地后真机跑了一轮 @所有人 头脑风暴，暴露两个缺口——
+> ① 现有 discussion 创建是 **1:1**（`_resolve_discussion_id` 依赖 `peer_id`，requester↔assignee 模式），@所有人 的 N 方广播**建不出 discussion**，收口逻辑无处可挂；
+> ② 没有任何"该你归纳了"的信号，决策人和普通贡献者行为无差别（都只各报各的想法）。
+
+### 8.1 编排模式：先做「人驱动」（模式 III）
+
+阶段转换由**人**驱动（发起人=主持节奏的人）。server 自动编排（检测每人已表态→自动 ping 决策人）列为后续升级，不在 v1。
+
+### 8.2 四阶段协议（管理者定稿）
+
+设参与 agent 为 A/B/C…（含决策人；**决策人也先贡献想法，最后才汇总**）：
+
+1. **提出需求**：人在 brainstorm Hall 发 `@所有人 <需求>` → **server 自动创建多方 discussion session**（root=该消息，participants=全体群成员含发起人，topic=需求文本）。
+2. **各自想法**：每个 agent（**含决策人**）被广播触发，各回一条实质想法（`stance=answer`，计入 turns）。
+3. **逐一表态**：人按顺序驱动——`@B @C 请对 A 的想法表态` → 被点到的每个 agent 对该想法**一次表态**：`agree`（同意）或 `disagree`（否决，**必须附自己的看法**）。依次 A→B→C 的想法各来一轮（每人对每个他人想法恰好一次机会）。
+4. **决策人汇总**：全部想法被表态后，人发 `@决策人 请汇总产出结论` → 决策人 `stance=decision` 产出定论 → 触发 D3-3a 自动收口（`resolved` + `end_reason=consensus`）。
+
+**stance 映射**：想法=`answer`；同意=`agree`；否决=`disagree`（带理由）；汇总=`decision`。`optimize` 不在本流程（留给评审 D4）。
+
+### 8.3 机制要点
+
+- **多方 session 由 server 建**（不是 bridge）：`POST /api/messages` 检测「群 `type=brainstorm` + @所有人」→ 自动创建 discussion（幂等：该群已有 active 的多方 session 则不重复建）。避免多个 bridge 并发创建的竞态。
+- **bridge 记账复用现有查找**：session 的 `root_message_id`=开场消息、participants=全体成员，现有 `_resolve_discussion_id` 的 root 匹配 / participants 包含匹配可命中（BS-2 验证并补多方 case）。
+- **刹车适配**：1:1 的自动回合预算（常量 3）装不下多方——N 个 agent 的预期实质 turns ≈ N(想法)+N×(N-1)(表态)+1(decision)=N²+1。多方 session 的预算须按参与者数放大；`decision` 不受刹车（D3-2 已保证）。`max_rounds`（demand 轮）≈ 人驱动阶段数：1(开场)+N(表态轮)+1(请汇总)。
+- **模板教流程**：brainstorm 模板 `protocol_guidance` 改写为四阶段协议 + 表态规则 +「未轮到不抢跑」；facilitator norm 改为「先同样贡献想法；等发起人指示后汇总产出 decision」。（软预设，仍非硬状态机。）
+
+### 8.4 切片（取代原 D3"轻编排"与 D3-3d 的优先级）
+
+| 切片 | 内容 | 层 |
+|---|---|---|
+| **BS-1** | server：@所有人 × brainstorm 群 → 自动建多方 discussion（root/participants/topic/放大 max_rounds，幂等）；brainstorm 模板文案改四阶段协议 | server |
+| **BS-2** | bridge：广播回复 turns 落到多方 session（root/participants 匹配验证）；表态 stance 透传；多方 session 回合预算按 N 放大 | bridge |
+| **BS-3** | 真机验收 v2：人按四阶段驱动一轮，验 turns 完整落账 + decision 收口 `resolved+consensus` | 验收 |
+
+**推迟**：`escalated` 下线（原 D3-3d，属清理）、`end_reason` 的 `timeout`/`manual`、server 自动编排（模式 I）。

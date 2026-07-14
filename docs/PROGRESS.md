@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**D3-3c（收口 `end_reason` 归一 deadlock/consensus）** 由执行 Agent 完成、决策 Agent 复核（`_resolve_if_decision_maker` 按有无 `escalate` turn 判 deadlock/consensus + 取 turns 失败退化 consensus；`test_cli_bridge` 75 全绿）通过 + 收口提交。D3-3：D3-3a/b/c ✓；**只剩 D3-3d（`escalated` 下线·破坏性）——做前需管理者确认**。`timeout`/`manual` 两种 end_reason 仍未做（阈值/人类停指令待定）。GitHub 停在 BUGFIX-1（`6ed5179`）；D3-1~3c 本地待推。**下一步**：等管理者点头开 D3-3d。Claude = **决策 Agent**。
+Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`（已推 GitHub 到 `8e1f029`=D3-3c）。**真机验收 v1（三 agent 头脑风暴）**：pi/pi-kimi/codex 均给出实质想法（D2 注入生效 ✓），但暴露两缺口——① @所有人 广播**建不出 discussion**（现有创建是 1:1 依赖 `peer_id`）→ 收口无处挂；② 无"该你归纳"信号，决策人只当普通贡献者。期间修复 codex 环境两层问题（`service_tier=default` 非法 + 老 CLI 不支持 `gpt-5.6-sol`，管理者已重装新 CLI 并把 `_default_codex_exe` 改走 PATH）。**管理者定稿头脑风暴编排 v1**（人驱动 + 四阶段：需求→各自想法(含决策人)→逐一表态 agree/disagree→决策人汇总 decision）→ 已写入 `spec/DELIBERATION.md §8`，切片 BS-1(server)/BS-2(bridge)/BS-3(真机 v2)。**下一步**：BS-1。Claude = **决策 Agent**。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
@@ -29,7 +29,8 @@ Updated: 2026-07-14 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
 - **新方向（已沉淀 `spec/POSITIONING.md`）**：优先做**审议类协议**——头脑风暴（轮流 + 表态 + 归纳）、评审（针对产物的收敛式批评），由 **Hall 类型 / RolePack** 框架承载；协调类（1/2）借 CCB；非技术受众 / Web 低门槛接入列为远期。
 - **设计已定稿**：审议协议、信息类型（stance 终集：去 `idea`、`synthesis`→`decision`、`closure` 降级）、结束归一模型（单一出口 `handoff` → 决策人 = `decision_tier`/human，4 种 `end_reason`）、Hall 类型/RolePack、@所有人、人设网页编辑(a)、切片 D1–D5 —— 见 [`spec/DELIBERATION.md`](spec/DELIBERATION.md)。
-- **下一步**：D3 → D3-1/2/3a/3b/3c ✓。**只剩 D3-3d（`escalated` 下线：迁移旧 `escalated`→`resolved+deadlock`、从 `_DISCUSSION_STATUSES` 移除、bridge 改写不再写 escalated；破坏性）——做前先请管理者确认**。`end_reason` 的 `timeout`/`manual` 仍未接（阈值语义 / 人类停指令机制待定），列后续。之后 D4（评审）/ D5（Web 审议视图）。
+- **下一步（真机验收 v1 后重排，见 `spec/DELIBERATION.md §8`）**：**BS-1（server：@所有人 × brainstorm 群自动建多方 discussion + 模板文案改四阶段协议）** → BS-2（bridge：广播 turns 落账 + 表态透传 + 多方回合预算按 N 放大）→ BS-3（真机验收 v2：人按四阶段驱动完整闭环）。
+- **推迟**：D3-3d（`escalated` 下线·清理）、`end_reason` 的 `timeout`/`manual`、server 自动编排（模式 I）、D4（评审）/ D5（Web 审议视图）。
   - 注意：`DELIBERATION §7` 的 stance 迁移点（去 `idea`/`synthesis`）与现状不符——现状 `_DISCUSSION_STANCES` 早已无 `idea`/`synthesis`，D3 对 stance 只是加 `decision`。
 - **候选（未排期）**：`claude_bridge` —— 让 Claude Code/Codex 这类 agent 框架成为 TALK 一等公民 worker（现仅 codex/pi 特化 + 通用 cli_bridge）。管理者 2026-06-28 确认架构理解（TALK 背后真正干活的是 agent 框架），此项作为方向候选、暂不排期。
 

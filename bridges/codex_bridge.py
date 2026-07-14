@@ -86,9 +86,6 @@ should_handle_message = cli_bridge.should_handle_message
 
 
 def _default_codex_exe() -> str:
-    windows_codex = Path.home() / "AppData" / "Local" / "OpenAI" / "Codex" / "bin" / "codex.exe"
-    if windows_codex.exists():
-        return windows_codex.as_posix()
     return "codex"
 
 

@@ -184,6 +184,29 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-14 真机验收 v1（三 agent 头脑风暴）+ 编排 v1 设计定稿
+
+**背景**：D3-1~3c 落地并推 GitHub（`8e1f029`）后，按黑板验收指南真机跑第一轮头脑风暴：「验收测试群」（brainstorm），codex=决策人(facilitator)、pi/pi-kimi=contributor，人（qa）发 `@所有人 …想 3 个点子…codex 最后收敛成结论`。
+
+### 结果与发现
+
+- **通过项**：三个 agent 均直接给出实质想法（消息 2412/2413/2416/2417/2418），氛围贴合头脑风暴——**D2 的 Hall 类型注入真机生效**；@所有人 展开/触发正常。
+- **缺口 ①（结构）**：整轮**未创建任何 `discussion_session`**——现有创建路径是 1:1（`_resolve_discussion_id` 依赖 `peer_id`，requester↔assignee），@所有人 的 N 方广播建不出讨论 → turns/decision 收口（D3-3a）无处可挂。
+- **缺口 ②（行为）**：无"该你归纳"的信号，codex（决策人）表现同普通贡献者，只报自己的点子、未汇总。
+- **环境修复（codex 两层）**：`~/.codex/config.toml` 的 `service_tier="default"` 非法（删除后过配置解析）→ 又暴露老 CLI(v0.130.0-alpha.5) 不支持 `gpt-5.6-sol`（API 400）→ 管理者重装独立新 CLI，`_default_codex_exe()` 改走 PATH（删除写死的旧安装路径）。修复后 codex 正常回复。
+
+### 决策（管理者 2026-07-14 定稿）
+
+头脑风暴编排 v1 = **人驱动 + 四阶段**：① 人发需求（server 自动建多方 discussion）→ ② 每个 agent **含决策人**各给想法(answer) → ③ 人逐一点名，其他角色对每个想法一次表态（agree / disagree+自己的看法）→ ④ 人请决策人汇总(decision) → D3-3a 自动收口。已写入 `spec/DELIBERATION.md §8`；切片 **BS-1(server)/BS-2(bridge)/BS-3(真机 v2)**；D3-3d、timeout/manual、自动编排推迟。
+
+### 变更文件
+
+- `bridges/codex_bridge.py` + `tests/test_codex_bridge.py`（管理者改 codex 路径，随 BS-1 一并收口提交）
+- `docs/spec/DELIBERATION.md`（§8 编排 v1）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+---
+
 ## 2026-07-14 D3-3c：收口 `end_reason` 归一（deadlock vs consensus）
 
 **背景**：D3-3 第三片。修掉 D3-3b 的临时不精确——决策人收口时按讨论是否经 deadlock 移交，落 `deadlock` 或 `consensus`。`timeout`（轮次阈值语义待定）/ `manual`（缺人类"停"指令机制）本片刻意不做、显式 defer。执行 Agent 实现，决策 Agent 复核验证后落库。
