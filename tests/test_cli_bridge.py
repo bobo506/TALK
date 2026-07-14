@@ -2154,6 +2154,181 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.updated, [(9, "resolved", None)])
         self.assertEqual(client.turns[-1]["stance"], "closure")
 
+    def test_discussion_auto_turn_budget_scales_for_multiparty(self):
+        # 1:1 / 无 discussion：保持常量
+        self.assertEqual(cli_bridge._discussion_auto_turn_budget(None), 3)
+        self.assertEqual(
+            cli_bridge._discussion_auto_turn_budget({"participant_ids": ["agent:a", "agent:b"]}),
+            3,
+        )
+        # 多方（3 agent + 1 human）：N²+1 = 10
+        self.assertEqual(
+            cli_bridge._discussion_auto_turn_budget(
+                {"participant_ids": ["human:qa", "agent:a", "agent:b", "agent:c"]}
+            ),
+            10,
+        )
+
+    def test_human_broadcast_reply_records_turn_on_multiparty_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.appended = []
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 7,
+                    "status": "active",
+                    "topic": "帮部门想团建点子",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                    {"member_id": "agent:pi-kimi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 61}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind))
+                return {"id": 5}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(returncode=0, stdout="我的点子：密室逃脱、轻徒步、桌游夜。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 60,
+                        "from": "human:qa",
+                        "to": ["agent:pi", "agent:codex", "agent:pi-kimi"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@所有人 帮部门想 3 个团建点子",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        # human 发起的广播回复记账到多方场（想法 = answer）
+        self.assertEqual(client.appended, [(7, 61, "answer", "human:qa", "reply")])
+
+    def test_agent_message_in_multiparty_discussion_uses_scaled_budget(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.updated = []
+                self.turns = [
+                    {"speaker_id": "agent:codex", "stance": "answer"},
+                    {"speaker_id": "agent:pi", "stance": "answer"},
+                    {"speaker_id": "agent:pi-kimi", "stance": "answer"},
+                    {"speaker_id": "agent:codex", "stance": "agree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                ]
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 8,
+                    "status": "active",
+                    "topic": "帮部门想团建点子",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                    {"member_id": "agent:pi-kimi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 71}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 72}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append({"speaker_id": "agent:pi", "stance": stance})
+                return {"id": 6}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(returncode=0, stdout="我觉得桌游夜更稳。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 70,
+                        "from": "agent:codex",
+                        "to": ["agent:pi"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@agent:pi 你觉得哪个点子最好？",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        # 5 条实质轮次 ≥ 1:1 阈值(4)，但多方预算=10+1，模型应正常运行、不触发收尾/升级
+        self.assertEqual(client.replies, [(70, "我觉得桌游夜更稳。", ["agent:codex"], "group:bs")])
+        self.assertEqual(client.updated, [])
+        self.assertEqual(client.turns[-1]["stance"], "answer")
+
     def test_non_substantive_greeting_turns_do_not_trigger_closure(self):
         class FakeClient:
             def __init__(self):

@@ -329,6 +329,19 @@ def _substantive_discussion_turns(turns: list[dict[str, Any]]) -> list[dict[str,
     return [turn for turn in turns if str(turn.get("stance") or "") not in NON_SUBSTANTIVE_STANCES]
 
 
+def _discussion_auto_turn_budget(discussion: dict[str, Any] | None) -> int:
+    """自动回合预算：多方场（>2 参与者，如 brainstorm）按参与者规模放大（DELIBERATION §8.3）。
+
+    N 个 agent 的头脑风暴预期实质轮次 ≈ N(想法) + N×(N-1)(表态) + 1(decision) = N²+1；
+    1:1 讨论保持原常量 DISCUSSION_MAX_AUTO_TURNS。
+    """
+    participants = list((discussion or {}).get("participant_ids") or [])
+    if len(participants) <= 2:
+        return DISCUSSION_MAX_AUTO_TURNS
+    agent_count = sum(1 for participant in participants if str(participant).startswith("agent:"))
+    return max(agent_count * agent_count + 1, DISCUSSION_MAX_AUTO_TURNS)
+
+
 def _max_demand_round(turns: list[dict[str, Any]]) -> int:
     max_round = 0
     for turn in turns:
@@ -1148,6 +1161,39 @@ async def _active_discussion_for_peer(
     return None
 
 
+async def _active_multiparty_discussion(
+    client: Any,
+    *,
+    group_id: str | None,
+    member_id: str,
+    peer_id: str | None,
+) -> dict[str, Any] | None:
+    """找包含双方的 active 多方（>2 参与者）discussion——人驱动编排（DELIBERATION §8）的记账场。
+
+    只匹配多方场，避免把 human 的普通消息记进 1:1 讨论（保持既有 1:1 流程零变化）。
+    """
+    if not group_id or not peer_id:
+        return None
+    try:
+        discussions = await client.list_discussions(group_id=group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
+
+    for discussion in discussions:
+        participants = set(discussion.get("participant_ids") or [])
+        if (
+            discussion.get("status") == "active"
+            and len(participants) > 2
+            and {member_id, peer_id}.issubset(participants)
+        ):
+            return discussion
+    return None
+
+
 async def _discussion_for_message_id(
     client: Any,
     *,
@@ -1293,7 +1339,7 @@ def _discussion_context_text(
     discussion_id = discussion.get("id")
     root_message_id = discussion.get("root_message_id")
     latest = turns[-1].get("stance") if turns else "question"
-    remaining = max(0, DISCUSSION_MAX_AUTO_TURNS - len(turns))
+    remaining = max(0, _discussion_auto_turn_budget(discussion) - len(turns))
     return (
         "TALK 控制上下文，以下内容只用于约束回复，不要在可见回复中复述字段名或 ID：\n"
         f"discussion_id: {discussion_id}\n"
@@ -1888,10 +1934,12 @@ async def handle_incoming_message(
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
             substantive_turns = _substantive_discussion_turns(turns)
             discussion_turn_count = len(substantive_turns)
+            # 多方场（如 brainstorm）预算按参与者规模放大；1:1 阈值不变（DELIBERATION §8.3）
+            close_threshold = _discussion_auto_turn_budget(discussion) + 1
             if (
                 discussion_id is not None
                 and latest_stance == "disagree"
-                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+                and len(substantive_turns) >= close_threshold
             ):
                 await _send_human_escalation(
                     client,
@@ -1906,7 +1954,7 @@ async def handle_incoming_message(
             if (
                 discussion_id is not None
                 and latest_stance != "disagree"
-                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+                and len(substantive_turns) >= close_threshold
             ):
                 await _send_agent_scope_closure(
                     client,
@@ -1928,6 +1976,18 @@ async def handle_incoming_message(
                 direct_requester_id=sender_id,
                 human_id=await _find_human_reviewer(client, group_id),
             )
+        elif group_id:
+            # 人驱动编排（DELIBERATION §8）：human 发起/点名时，把本次回复记账到已开的多方场
+            # （如 brainstorm 自动开的场）。只解析多方场，1:1 流程与 prompt 保持零变化。
+            discussion = await _active_multiparty_discussion(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=sender_id,
+            )
+            if discussion is not None and discussion.get("id") is not None:
+                turns = await _list_discussion_turns(client, int(discussion["id"]))
+                discussion_turn_count = len(_substantive_discussion_turns(turns))
 
         group_member_context = await _build_group_member_context(client, group_id, member_id, sender=str(sender))
 
@@ -2006,7 +2066,8 @@ async def handle_incoming_message(
         if visible_reply:
             reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
             reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
-            if sender_id.startswith("agent:") and discussion and not mark_actions:
+            # agent 发送者：沿用原记账；human 发送者：仅当解析到多方场（人驱动编排）时记账
+            if discussion and not mark_actions:
                 await _append_discussion_turn(
                     client,
                     discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
@@ -2028,6 +2089,7 @@ async def handle_incoming_message(
                 group_id=group_id,
                 reply_to=current_msg_id,
                 current_turn_count=discussion_turn_count,
+                max_auto_turns=_discussion_auto_turn_budget(discussion),
             )
             discussion, turns = await _record_deferred_demand_turns(
                 deferred_results,

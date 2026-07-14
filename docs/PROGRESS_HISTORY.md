@@ -184,6 +184,33 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-15 BS-2：bridge 多方场记账 + 回合预算按 N 放大（决策 Agent 继续自行开发）
+
+**背景**：编排 v1（`spec/DELIBERATION.md §8`）第二片，管理者授权决策 Agent 继续直接开发。BS-1 建好"场"后，本片让 bridge 把真实头脑风暴流量记进这个场，并解除 1:1 回合预算对多方场的误伤。
+
+### 完成事项（仅 `bridges/cli_bridge.py` + `tests/test_cli_bridge.py`）
+
+- `_discussion_auto_turn_budget(discussion)`：多方场（>2 参与者）预算 = agent 数²+1（想法 N + 表态 N×(N-1) + decision 1）；1:1/无场保持常量 3。接入四处：agent 发送者刹车阈值（固定 `DISCUSSION_EXTENSION_CLOSE_TURNS` → `预算+1`，1:1 阈值仍为 4 不变）、deferred talk_send 预算、控制上下文 `remaining_auto_turns`。
+- `_active_multiparty_discussion`：只匹配 active 且 >2 参与者的场——human 的普通消息不会被记进 1:1 讨论（既有流程零污染）。
+- **human 发送者记账**：human 发起/点名（人驱动编排）时，agent 的可见回复记 turn 到多方场（`infer_reply_stance` → answer）；显式 `mark_stance`/talk_send 的 agree/disagree/decision 走原有路径落**同一场**（`_resolve_discussion_id` 的 participants 匹配可命中），D3-3a decision 收口链路依旧生效。human 发送者不注入 discussion 上下文、不受刹车（prompt 与 1:1 行为零变化）。
+
+### 验证
+
+- **自验（2026-07-15）**：`unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge` → `Ran 140 tests ... OK`（`test_cli_bridge` 78 = 75+3：预算缩放、human 广播回复记账到多方场、agent 消息在多方场 5 实质轮不触发 1:1 阈值收尾）。
+- **已知观察点（留 BS-3 真机）**：表态/汇总的 stance 依赖 agent 实际用带 stance 的工具（模板文案已教）；纯口头回复会被记为 `answer`。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `agent-docs/BLACKBOARD.md`（执行记录）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- **BS-3 真机验收 v2**：重启 server + 三 bridge，人按四阶段驱动一轮，验 turns 落账 + `resolved+end_reason=consensus`。
+
+---
+
 ## 2026-07-14 BS-1：@所有人 × brainstorm 自动建多方 discussion + 模板四阶段（决策 Agent 获授权自行开发）
 
 **背景**：编排 v1（`spec/DELIBERATION.md §8`）第一片。真机验收 v1 证实 @所有人 广播建不出 1:1 discussion、收口无处挂；BS-1 给后续 turns/decision 一个挂载点。**管理者本轮明确授权决策 Agent 直接开发本片**（工单仍走黑板留痕）。
