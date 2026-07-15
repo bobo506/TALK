@@ -184,6 +184,20 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-15 Task Hall 开工前清理
+
+**完成**
+
+- 明确 `agent-docs/BLACKBOARD.md` 为本地协作文件；保留本地文件和 `.gitignore` 规则，从 Git 索引移除，不再作为项目文件维护。
+- 将 `docs/PROGRESS.md` 从混合历史记录精简为当前快照，仅保留 Task Hall 目标、待决实现选择、下一切片、验证基线和有效技术债。
+- 已完成切片、历史测试和长期方向未删除，仍由本文件及 `docs/spec/PROJECT_INTEGRATION.md` 保存。
+
+**下一步**
+
+- 进入 Task Hall 数据 / API 地基切片；先复核现有任务、Group、消息和成员模型，再确定一任务一 Hall 的最小兼容关联方案。
+
+---
+
 ## 2026-07-15 BS-3a：汇总 grounding + bridge 推断 decision（Discussion 分支收尾）
 
 **背景**：BS-3 真机 v2 证明 BS-2b 的通用历史块在技术上已注入，但模型仍可能忽略实际意见、引用旧成见或私信重问；汇总纯 prose 又统一被记为 `answer`，导致 session 虽可能被 closure 收掉，却留下 `end_reason=null`。项目管理者确认先做一个限定范围的 Discussion 收尾切片，再关闭当前分支并转入 Task Hall。

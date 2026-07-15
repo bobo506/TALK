@@ -199,3 +199,4 @@ backups/
 /scripts/seed_acceptance.py
 /.tmp-acceptance/
 /agent-docs/blackbox-screenshots/
+agent-docs/BLACKBOARD.md
