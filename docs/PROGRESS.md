@@ -1,96 +1,98 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-06-20 (Asia/Shanghai) — 切片 10 `talk sync` 完成，Phase 2 本地→server 索引闭环；全套件 237/237；当前角色 Claude=决策 Agent（管理者本次授权自主开发）
+Updated: 2026-07-15 (Asia/Shanghai) — 收尾分支 `claude/phase3-collab-and-ui`。**BS-3a 汇总结构性缺陷已修复**：汇总轮不再让决策人从通用历史中自行找意见，而是按 discussion turns 取齐每位 Agent（含决策人）的首条 `answer` 原文，作为专用 grounding 内联；符合“active 多方 brainstorm + human 单独点名决策人 + 明确汇总意图 + 意见齐全 + CLI 成功非空回复”时，bridge 强制把回复记为 `decision`，复用既有链路得到 `resolved + end_reason=consensus/deadlock`。普通提问、多目标、非 brainstorm、1 对 1、材料不全和 CLI 失败均不触发。五模块 **147 tests 全绿**。真实模型最终汇总质量尚未补跑，但 `answer/end_reason=null` 的结构性病根已由自动化覆盖。**本分支完成后关闭，下一步创建 Task Hall 分支。**
 
-### 0) Phase 2 进行中
+### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
+- **BS-3a ✓（2026-07-15，Discussion 收尾）**：新增 `_is_brainstorm_summary_request` 严格识别汇总轮、`_brainstorm_summary_grounding` 取齐各 Agent 首条意见原文（含决策人、剔除后续噪声）并注入 prompt；成功汇总 prose / 错误 stance 均由 bridge 归一为 `decision` 后自动收口。新增 4 个测试覆盖材料选择、缺人拒绝、直接点名守卫和端到端 `decision + resolved/consensus`；`test_cli_bridge` 85 个、五模块共 147 个测试通过。
+- **Task Hall 产品方向 ✓（2026-07-15，文档切片）**：确认 Task Halls / Discussion Halls 两类产品信息架构；Task Hall 固定为一任务一 Hall、1 对 1 请求 / 执行、项目归属、可见澄清 / 状态 / 结果；确认混合终端 + runner 模型、终端 TALK MCP / client 能力合同和 Project Blackboard 目标。已同步 `POSITIONING`、`MODULE_tasks`、`PROJECT_INTEGRATION`、项目简报、旧 MVP / Discussion 优先级说明与进度历史；无代码改动。
+- **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
+- **P3-2 ✓**（`51da887`）：bridge 注入"你在本群的业务角色"（黑盒待真机）。
+- **UI #2 删 Hall 全栈 ✓**（`53846b8`/`5578ac2`/`a54e4d3`）：`DELETE /api/groups/{id}` 级联删 + 前端删除按钮/二次确认；右侧删除已真机验收。
+- **UI #3 全局禁用 agent 全栈 ✓**（`4cec246`/`dea5ff9`/`05db723`）：`Member.disabled_at` 软删 + 拒鉴权 + `PATCH`；前端"所有 Agent"列表禁用/启用开关；功能已真机验收。
+- **数据清理 ✓**：群 31→1（仅留 `test-run20`）、成员→5（agent `codex`/`pi`/`pi-kimi` + human `bobo`/`qa`）。
+- **D1 ✓**（`f20811a`）：新增 `server/hall_types.py` 内置 4 类 Hall 模板（`free`/`task`/`brainstorm`/`review`）；`groups.type` 模型列 + `init_db()` 旧库迁移 + `ix_groups_type`；`POST /api/groups` 支持创建时指定 `type`，默认 `free`，非法值 `422`；`GroupOut` 回显 `type`；新增认证只读 `GET /api/hall-types`。
+- **D2 ✓**（`411269f`）：bridge `_build_group_member_context` 按群 `type` 注入"本群类型/流程指引"+ 角色职责（`free` 不注入保零回归；模板取自 server `GET /api/hall-types`、进程级缓存、失败优雅降级）；SDK 新增 `get_hall_types`（async + sync parity）。`test_cli_bridge` 65 测试全绿（5 个 D2 用例 + P3-2 零回归）。
+- **@所有人 ✓**（`6e645bb`）：`@所有人`/`@all`（`所有人`精确、`all`大小写不敏感）在群作用域把 `to_ids` 展开为全体群成员（排除发送者），非群发 `@所有人`→`400`；`_extract_leading_mentions` 改三元组 + `_resolve_recipients(sender_id)`；前端 `@` 下拉加"所有人"项 + `@所有人`/`@all` 高亮。`test_messages` 27 全绿 + `node --check` 通过。是 D3 头脑风暴的前置依赖。
+- **人设编辑(a) ✓**（`8eaf092`）：`cli/profiles.py` 新增 `resolve_profile_path`（双层路径穿越防御）/`write_profile_file`（读侧不动）；human-only `GET`/`PUT /api/projects/{id}/agents/{member_id:path}/profile` 读写 IDENTITY/SOUL/USER（无 `project_root_path`→400、穿越→400）；business_role 复用 P3-1 `PUT group member`（保留 role/decision_tier）；前端 Hall 成员行"编辑人设"按钮（agent+canManage+project_id 守卫）+ 模态。`test_projects`/`test_profiles` 32 全绿（含穿越/human-only/round-trip 落盘）+ `node --check`。bridge 不变（文件即真相源）。
+- **BUGFIX-1 ✓**（`28298bd`）：真机黑盒验收回归修复（仅 `web/app.js`）——① `@` 下拉因输入处理器引用未定义的 `activeGroup` 抛 `ReferenceError`、所有 mention 下拉全废 → 改取 `getActiveGroup()`；② 保存人设后"编辑人设"按钮卡 disabled → 渲染前先清 `agentProfileSaving`；③ `@所有人` 高亮经真机确认本就正常（原现象=测试环境）。`node --check` + 真机 Chrome 复验三条通过。
+- **D3-1 ✓**（`afc1eb7`）：审议数据层地基（纯加法·零回归）——`_DISCUSSION_STANCES` 加 `decision`、新增 `_DISCUSSION_END_REASONS`（consensus/deadlock/timeout/manual）；`DiscussionSession.end_reason` 列 + `init_db()` 旧库迁移 + 索引；`DiscussionSessionOut` 回显、`DiscussionSessionUpdate` 可选 `end_reason`（校验）、更新端点按 `model_fields_set` 落值；`_DISCUSSION_STATUSES`/`escalated` 未动。`test_discussions`(9)+`test_cli_bridge`(65) 74 全绿（含 escalated 零回归 + 旧库迁移）。
+- **D3-2 ✓**（`6801a27`）：bridge 接 `decision`（纯 plumbing）——`bridges/cli_bridge.py` 仅 `ACTION_STANCES` 加 `decision`（动作解析不再把 `stance=decision` 抹成 `None`）；护栏未破（`NON_SUBSTANTIVE_STANCES`/轮次刹车元组/`infer_*`/prompt/`escalated` 均未动 → `decision` 计入实质轮次、不受 turn limit）。`test_cli_bridge` 67 全绿（+2：decision 解析保留、decision talk_send 轮次耗尽不被 skip vs answer 被 skip）。
+- **D3-3a ✓**（`db6584b`）：决策人 `decision` 收口——新增 `_find_decision_maker`（decision_tier=decision 优先，否则 human）+ `_resolve_if_decision_maker`（`stance!=decision` 先早返回零开销；决策人发 decision → `_update_discussion_status(resolved, end_reason=consensus)`，非决策人不收口）；三落点（deferred talk_send / send_message / 回复路径）挂钩；SDK `update_discussion` 加可选 `end_reason`（未传 body 不含）。不碰现有 escalate/final/escalated。`test_cli_bridge`(71)+`test_discussions`(9) 80 全绿（含非决策人不收口 + human 回退守卫）。
+- **D3-3b ✓**（`cf900bc`）：自动 handoff 目标从 human 扩到决策人——`_maybe_escalate_disagreement`（连续两轮 disagree 触发）+ `_send_human_escalation` 回退 均改用 `_find_decision_maker`（decision_tier=decision agent 优先，否则 human）；显式 `escalate_to_human`/`final_to_human`（agent 主动要人类裁决）保持 human-only 不动；`escalated`/`end_reason` 未碰。`test_cli_bridge` 73 全绿（+2：无决策人回退 human、显式 escalate_to_human 仍 human-only）。
+- **D3-3c ✓**（`8e1f029`）：收口 `end_reason` 归一——`_resolve_if_decision_maker` 取讨论 turns，有 `escalate` turn → `deadlock` 否则 `consensus`；取 turns 失败 `try/except` 退化 `consensus`（收口不失败）；`stance!=decision` 早返回仍在最前（零开销）。仅 deadlock/consensus，`timeout`/`manual` 显式 defer；`escalated` 未碰。`test_cli_bridge` 75 全绿（+2：deadlock 收口、取 turns 失败退化 consensus）。
+- **编排 v1 设计 ✓**（`9d6b1f3`）：真机验收 v1 发现（@所有人 建不出 1:1 discussion / 决策人无归纳信号）→ 管理者定稿人驱动四阶段协议，入 `spec/DELIBERATION.md §8`；随片收口 codex 走 PATH 修复（管理者重装新 CLI 后 `gpt-5.6-sol` 400 解除）。
+- **BS-1 ✓**（`072fe54`·决策 Agent 获授权自行开发）：`_resolve_recipients` 返回 `(resolved_to, mention_all)`；@所有人 × `type=brainstorm` 群 → 消息落库后自动建**多方** discussion（root=开场消息、participants=全体成员含发送者、topic=正文截 80、`max_rounds=agent数+2`；幂等=同群已有 active 全员场次则跳过；建失败仅日志不阻断消息）；brainstorm 模板文案改四阶段协议（教 agent 流程 + 不抢跑）。`test_messages` +4、`test_cli_bridge` 文案断言同步；5 模块 134 全绿。
+- **BS-2b ✓（已验证·本轮提交·发言可见性）**：真机 v2 卡在"表态看不到别人发言"→ 修：多方场（>2 参与者）prompt 注入`_shared_discussion_history`（`fetch_history` 拉本场 root 起群发言，speaker：内容截 240，剔当前消息/空/撤回，框"勿复述"）；`build_cli_prompt` 加 `shared_history` 参；1:1/free/无场 → 空串零变化；拉历史失败降级不阻断。`test_cli_bridge` +3；5 模块 143 全绿。真机行为待重测。
+- **BS-2 ✓**（`7fdf67d`·决策 Agent 继续自行开发）：bridge 多方场记账 + 预算放大——`_discussion_auto_turn_budget`（多方 = agent数²+1，1:1 保持 3）接入刹车阈值/deferred 预算/控制上下文；`_active_multiparty_discussion`（只匹配 >2 参与者场，1:1 零污染）；human 发起/点名时 agent 回复记 turn 到多方场（answer 推断；agree/disagree/decision 走原 mark_stance/talk_send 路径落同一场，D3-3a 收口依旧生效）；human 发送者不注入 discussion 上下文、不受刹车（prompt 零变化）。`test_cli_bridge` +3（预算缩放/human 广播记账/多方 5 轮不触发 1:1 收尾）；5 模块 140 全绿。
 
-- **切片 10 完成（`talk sync`，本次新增，未提交）**：CLI 子命令 `talk sync` 扫描本地 `.talk/agents/` → `POST /api/projects/{id}/sync`，把 profile 路径索引推到 server，Phase 2 从"server 端完整"收口成"本地→server 索引"完整闭环。新增 `cli/profiles.member_id_from_dir_name`（`member_dir_name` 逆映射）+ `cli/talk.scan_agents`/`sync_project`/`cmd_sync`。+11 单测，全套件 **237/237**。真实 dogfood `.talk/agents/` 验证逆出 3 个 agent 正确。
-- **切片 7 完成**（`ffa80b2`）：`cli/profiles.py` profile 加载器（纯函数地基）+ 7 单测。
-- **注入策略 = B 方案（系统层）**：人设作"背景底色"进 agent 系统层，不混进消息流（§5.4）。
-- **切片 8a 完成**（`fc15aa6`）：`compose_system_prompt(base, profile)` 纯函数（profile 作背景 + "别复述"框定；空 profile→base 原样）。
-- **切片 8b 完成**（`1c17304`）：pi bridge `--project` → 注入 `--system-prompt`；`resolve_pi_command` 统一执行档 + 注入，严格 opt-in。**黑盒修复真 bug**：命令系统提示 `repr`→`shlex.quote`。
-- **切片 8c 完成**（`820aee8`）：codex bridge `--project` → 注入 `-c base_instructions=<json>`；`resolve_codex_command` 同构 pi。codex 命令本就 json+shlex.quote 安全，无 pi 那个 repr bug。
-- **现状**：pi/codex 两个 runtime 的身份层注入都打通，严格 opt-in（无 `--project` 字节一致）。单测全绿（codex 18/18、pi 13/13）；真机黑盒两者均确认 shlex 往返 + profile 真注入。
-- **人工验收（2026-06-19，已带 `--project` 真实跑 `test-run20` / `group:843d8433bae1`）**：
-  - codex 8c：先撞外部坑——codex 全局 `~/.codex/config.toml` 的 `service_tier="default"` 在 `codex-cli 0.130.0-alpha.5` 非法，codex exec 启动即退（与注入无关，黑盒对照确认；经黑板 `agent-docs/BLACKBOARD.md` 与 codex 协作改配置后恢复）。恢复后 codex 招呼自然、身份正确（自报 codex、点到 pi/qa），✅ 注入行为符合预期。
-  - pi 8b：**先发现真问题再修复**——`@agent:pi` 只回 bridge 兜底句"我是 pi，已切换为中文回复…"。逐步黑盒定位（与 8b 注入/plan-mode/工具路由均无关）：**pi 0.79.8 经 Windows `pi.CMD` shim 时，`--system-prompt` 含换行就被 cmd.exe 截断 → pi 完全不产出 → bridge 中文兜底**。修复：`pi_bridge._single_line()` 把系统提示（含注入 profile）压成一行（commit `5b57042`）。**Hall 复验通过（2026-06-20）**：`@agent:pi 帮我问 codex 下午2点开会有没有空` → pi 听懂、转达 codex、codex 确认参会、pi 把结果回报给 qa（msg #2368–2373），全程真智能回复、带人设 emoji。pi 注入正式生效。
-  - **决策（管理者）**：agent-to-agent 对"软邀请"不强行续聊、完成交办即回报人类（"打招呼就收"）= **可接受，维持现状，不动回合/收口逻辑**。
-- **切片 9 完成**（`6d2bc47`）：server `project_agents` 表 + `GET /api/projects/{id}/agents` + `POST /api/projects/{id}/sync`（full-replace，镜像本地 `.talk/agents/`；仅人类；刷新 last_seen_at）。+6 单测，全套件 **226/226**。**Phase 2 server 端到此完整**（身份注入 + profile 路径索引/同步）。
-- **CCB 调研已登记**（`b16ffdd`）：`PROJECT_INTEGRATION.md` §9.4 + Phase2/4 路线注入 CCB 借鉴方向（Mailbox/Callback/Attempt/RolePack-skills），只记录不写代码。
-- **遗留小毛病（待处理，不阻断；管理者已确认"以后再修"）**：① codex"撤回+重发"招呼导致建了两个 discussion session（#84/#85）、pi 回了两次；② 早期两个 session 停在 `active` 未标 `resolved`（疑似小 bug；注：session#86 任务流已正常 resolved）；③ **双重收口**：任务做完、结果已回报人类后，两个 agent 仍各甩一句 `CLOSURE_LINES` 收口语（如 codex"嗯，先这样" + pi"那先聊到这儿"，msg #2374/#2375）——无害不死循环，纯观感，管理者确认保持现状、以后再收敛。
-- **下一步候选**：① CLI `talk sync`（读本地 `.talk/agents/` 调 `/sync`，把 Phase 2 闭环到"本地→server 索引"）；② Phase 3 协作层（业务角色注入 + MEMORY）；③ 清两个 discussion 小毛病；④ UI #2/#3（删 Hall / 禁用 agent）。
+### 2) Open Questions / Pending Confirmation
+- **产品方向已确认，不再待定**：先 Task Hall，后继续 Discussion Hall；一个 task 自动建立一个 1 对 1 Task Hall；项目黑板聚合任务，详情仍是独立 Hall。
+- **首个实现切片需决定**：Task Hall 直接复用 `groups.type=task` 还是新增专用 thread；目标生命周期如何向后兼容现有 `queued/running/succeeded/failed/canceled`。这两项是实现选择，不改变已确认的体验合同。
+- **BS-3 残余人工验收**：D-i / D-ii 已由 BS-3a 自动化闭环；仍可用真实 Codex / pi 再跑一次最终汇总，确认模型输出质量确实引用内联意见。该项不再阻塞 Task Hall 分支创建，验收时不得把自动化通过写成真机已通过。
+- **✅ A/B/C 真机验收闭环（2026-06-28，黑盒 + BUGFIX-1）**：@所有人 下拉/高亮、UI#3 禁用/启用开关 + 禁用 agent 不可加入、人设编辑弹窗读写/持久化/business_role——均通过。
+- **UI #3 "禁用 → 该 key 被 403" 运行时端到端**：黑盒只验了 UI 开关；"禁用后该 agent key 被拒鉴权"未单独跑，低优先。
+- **D2 / P3-2 注入行为黑盒待真机**：agent 是否按注入的 Hall `type` 流程指引 / 业务角色实际行动——**本轮主动不验**（需 D3 头脑风暴协议把"注入的流程"变成可运行机制后，连同结构化流程一起真机验）。
 
-> 注：全套件偶发的 `test_websocket` presence 时序测试失败仅在机器过载（曾跑 499s）时出现，隔离单跑稳定通过，与 Phase 2 改动无关。
+### 3) Next Plan
+- **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
+- **当前里程碑（Task Hall）**：按 [`spec/MODULE_tasks.md`](spec/MODULE_tasks.md) 的目标合同推进。
+- **下一切片**：设计并实现 Task Hall 数据 / API 最小闭环，包含 `project_id`、一任务一 Hall、请求者 / 执行者权限、澄清 / 接受 / 提交 / 结果收取，以及对现有任务状态的兼容策略；本切片涉及数据库与协议，完成后暂停验收。
+- **后续顺序**：终端 TALK MCP / client 委派与查询 / 等待 → Project Blackboard + Task Hall UI → Codex / Claude 等跨模型端到端人工验收。
+- **Discussion Hall 暂缓项**：BS-3a 真实模型质量补验、D3-3d、`timeout/manual`、server 自动编排、D4 评审与 D5 Web 审议视图；已有设计和实现均保留。
 
-### Web UI 侧支（测试中发现）
-- **#1 新建 Hall 改弹窗 —— 已改并经管理者确认**：原"点 ＋"是在左侧 Hall 列表底部内联展开表单；改为居中模态弹窗（`#group-create-overlay` 遮罩 + `.modal-card`），字段：名称必填 / ID 可选 / 描述可选；**初始成员从"全员勾选墙"改为下拉添加 + 可删标签 chips**（解决 agent 多时卡片被撑满屏、像跳整页的问题），chips 加了柔和蓝底 + 拉开间距；关闭方式：取消 / × / 点遮罩 / ESC。纯前端，后端 `POST /api/groups` 逻辑未动。改文件：`web/index.html`、`web/style.css`、`web/app.js`（资源版本号 `20260619-hall-modal-2`）。验证：JS 语法 + CSS 花括号 + HTML/JS ID 一致 + 运行中 server 字节校验 + 管理者浏览器实看均通过。**已提交**（`1d3cdcf`，在本分支 `claude/project-integration-phase1`）。
-- **#2 删除 Hall（待处理）**：当前前端无删除按钮、后端无 `DELETE /api/groups/{id}`。需后端删除 API（仅人类、级联清理成员关系）+ 前端入口 + 二次确认弹窗。全栈一片。
-- **#3 全局移除/禁用 agent（待处理）**：当前只有"从 Hall 移除成员"（`DELETE /api/groups/{id}/members/{id}`）；缺"全局禁用/移除 agent 成员"。需 `members` 加禁用字段 + `PATCH/DELETE /api/members/{id}`（软删除，保留 `messages.from_id` 归属）+ 前端入口。最大一片，涉及数据模型。
+### 4) Verification
+- **BS-3a 自验（2026-07-15）**：`.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py` 通过；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge` → `Ran 147 tests ... OK`。当前 8000 / 8001 / 8010 均无 server 监听，发现旧 bridge 重连进程但未擅自终止，故本轮未伪造真实模型验收结论。
+- **Task Hall 文档切片（2026-07-15）**：`git diff --check`、Markdown 本地链接校验和关键术语一致性检查通过；纯文档改动，未运行代码测试或 Browser 验证。
+- **决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_hall_types tests.test_groups tests.test_member_disable -v` → `Ran 23 tests ... OK`（确认执行 Agent 自测结论）。
+- `python -m pytest ...`：全局 Python 与 `.venv` 均无 `pytest`，未运行 pytest。
+- `.venv\Scripts\python.exe -m unittest tests.test_groups -v`：16/16 通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_hall_types -v`：3/3 通过（含旧 schema 迁移实测）。
+- `.venv\Scripts\python.exe -m unittest tests.test_member_disable -v`：4/4 通过。
+- 验证噪声：测试期间 Windows 日志轮转尝试重命名 `logs/talk.log` 时因文件被占用报 `PermissionError`，不影响测试退出码；需后续另片处理 logging 轮转健壮性时再看。
+- 唯一偶发：`test_websocket` presence 时序仅在机器过载（曾跑 464s/499s）时失败，隔离单跑 10/10 通过，与本轮改动无关。
+- D1 为纯 server 切片，未做前端/Browser 验证。
+- **D2 决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge -v` → `Ran 65 tests ... OK`（含 5 个 D2 用例 + P3-2 零回归）；D2 为 bridge/SDK 切片，注入行为黑盒待真机。
+- **@所有人 决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_messages -v` → `Ran 27 tests ... OK`（4 新用例 + 回归）；`node --check web/app.js` 通过；前端真机点选未做。
+- **人设编辑(a) 决策 Agent 独立复跑（2026-06-25）**：`.venv\Scripts\python.exe -m unittest tests.test_projects tests.test_profiles -v` → `Ran 32 tests ... OK`（含路径穿越→400+断言外部无文件、human-only 403、三件套 round-trip 落盘）；`node --check web/app.js` 通过；前端真机点选未做。
+- **真机黑盒验收（2026-06-28）**：无项目经验 agent 当测试者 + 决策 Agent 复核。fixture 经 `scripts/seed_acceptance.py`（临时项目根 `.tmp-acceptance`，建 brainstorm Hall「验收测试群」+ business_role）。A=@所有人 ✓（修 BUGFIX-1 后下拉/高亮均正常）、B=禁用开关 ✓、C=编辑人设 ✓。无需接 bridge。
+- **BUGFIX-1 决策 Agent 复核（2026-06-28）**：`web/app.js` diff 仅 2 处确定性修复（与根因吻合：`getActiveGroup()` 取值、保存路径提前清 `agentProfileSaving`）+ `node --check` 通过 + 执行 Agent 真机 Chrome 三条复验；前端运行时 bug 无单测覆盖，以 diff 复核 + 真机为准。
+- **D3-1 决策 Agent 独立复跑（2026-07-04）**：`.venv\Scripts\python.exe -m unittest tests.test_discussions tests.test_cli_bridge` → `Ran 74 tests ... OK`（含 `decision` stance、`end_reason` PATCH/校验 422、status-only 保留 end_reason、`escalated` 零回归、旧库迁移补列）；diff 逐条吻合、纯加法未动 `_DISCUSSION_STATUSES`。
+- **D3-2 决策 Agent 复核（2026-07-04）**：`git diff bridges/cli_bridge.py` 仅 1 行（`ACTION_STANCES` 加 `decision`）、护栏三处（NON_SUBSTANTIVE/轮次元组/infer）未动；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 67 tests ... OK`（+2 D3-2 用例：decision 解析保留、decision talk_send 轮次耗尽不被 skip）。
+- **D3-3a 决策 Agent 独立复跑（2026-07-05）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_discussions` → `Ran 80 tests ... OK`（+4 D3-3a：决策人 send/mark_stance 收口、非决策人不收口、无 decision_tier 时 human 回退不收口）；bridge diff 复核确认 `_resolve_if_decision_maker` 仅 `stance=decision` 才查 group（普通轮次零开销）、非决策人守卫、现有 escalate/final/`escalated` 未动；SDK `end_reason` 未传时 body 不含（向后兼容）。
+- **D3-3b 决策 Agent 复核（2026-07-14）**：`git diff bridges/cli_bridge.py` 仅两处自动路径改目标（`_maybe_escalate_disagreement` + `_send_human_escalation` 回退 → `_find_decision_maker`），显式 escalate/final、`escalated`、`end_reason` 均未动；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 73 tests ... OK`（+2：无决策人回退 human、显式 escalate_to_human 仍 human-only）。
+- **D3-3c 决策 Agent 复核（2026-07-14）**：`git diff bridges/cli_bridge.py` 仅 `_resolve_if_decision_maker` 内加取 turns + deadlock/consensus 判定 + `try/except` 容错退化（早返回与其它未动）；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 75 tests ... OK`（+2：deadlock 收口、取 turns 失败退化 consensus）。
+- **BS-1 自验（2026-07-14，决策 Agent 开发）**：`.venv\Scripts\python.exe -m unittest tests.test_messages tests.test_discussions tests.test_hall_types tests.test_cli_bridge` → `Ran 118 tests ... OK`；另 `tests.test_groups` 16/16。diff 自检：`_resolve_recipients` 单调用方、挂钩在消息 commit 后广播前、幂等守卫、异常不阻断主流程。真机行为（agent 回复落 turns）依赖 BS-2，本片只建"场"。
+- **BS-2 自验（2026-07-15，决策 Agent 开发）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge` → `Ran 140 tests ... OK`。diff 自检：7 处改动全聚焦（预算函数/多方场 helper/两处刹车阈值/human elif/记账条件/deferred 预算），1:1 路径预算与阈值数值不变。
 
----
-
-## Phase 1（已完成）
-Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 全部完成（接入机制 + 4 CLI 子命令 + dogfood + 项目群子资源）
-
-### 1) Current Agent Role
-- 角色来源：`AGENTS.md`；Claude = **决策 Agent**。管理者已改 `AGENTS.md`：决策 Agent **默认只给方案、需管理者明确要求才开发**（已提交 `d110a86`）。
-- 当前 Codex 角色：执行 Agent。
-- 当前分支：`claude/project-integration-phase1`（从 `main` 新开），含 8 个 commit（切片 1–6 + AGENTS.md 治理 + docs），**尚未 push**（等管理者确认 push / 开 PR）。
-
-### 2) Current Progress
-- **Phase 1 基础接入全部完成**（`PROJECT_INTEGRATION.md` §12 四阶段路线第一阶段）：
-  - 切片 1（`41ad2dd`）：`projects` 表 + 注册/查询 CRUD API。
-  - 切片 2（`523fffe`）：`groups.project_id` NULLABLE 扩展 + 旧群向后兼容。
-  - 切片 3（`570c18d`）：`talk init` CLI 脚手架 + `pyyaml` 依赖 + Windows UTF-8 输出修复。
-  - 切片 4（`dec9d25`）：TALK 自身 dogfood `.talk/`（CLI 生成 + 三 agent 身份层 + 角色/分级 groups.yaml）。
-  - 切片 5（`da0dad7`）：`talk add-agent` / `talk create-group` 子命令 + `member_dir_name` 净化 helper。
-  - 切片 6（`99b9076`）：`GET /api/projects/{id}/groups` 子资源。
-- 全套件 **201/201 通过**，无回归（累计新增 28 个单测）。
-
-### 3) Open Questions / Pending Confirmation
-- **分支待 push / 开 PR**：切片 1–6 在 `claude/project-integration-phase1`，等管理者确认。
-- **`:`→`_` 目录净化约定待 ratify**：已落地为 `member_dir_name()` helper（`agent:codex → agent_codex/`）；bridge 在 Phase 2 查 profile 须复用同一映射。
-- **测试策略已定**：Phase 1 是管道层，单测兜底；功能/人工验收推迟到 **Phase 2 之后**合并做一次（首个可观察行为 = 身份注入改变 agent 行为）。
-- `last_seen_at` 暂等于 `created_at`；bridge `--project` 连接刷新逻辑留待 Phase 2。
-
-### 4) Next Plan
-1. 等管理者确认是否 push 分支 / 开 PR。
-2. **Phase 2 身份层**（下一阶段，待管理者点头）：bridge 加 `--project` → 读 `.talk/agents/<净化名>/{IDENTITY,SOUL}.md` → 注入 system prompt（复用 `member_dir_name`）；并入 `project_agents` 表 + `/api/projects/{id}/agents` + `POST /api/projects/{id}/sync`。根治 dogfood 反复出现的身份混乱/汇报体。
-
-### 5) Verification
-- 逐片单测全绿；`python -m unittest discover -s tests` → 切片 5 后 199/199、切片 6 后 **201/201**，无回归。
-- `python -m cli.talk init` / `add-agent` 实跑生成结构正确；dogfood `.talk/` YAML 可解析、profile 齐全、`memory/` 忽略生效。
-
-### 6) Changed Files（Phase 1 累计）
-- 新增 `server/routes/projects.py`、`cli/__init__.py`、`cli/talk.py`、`tests/test_projects.py`、`tests/test_talk_cli.py`、`.talk/`（17 文件）
-- 改 `server/models.py`、`server/main.py`、`server/db.py`、`server/routes/groups.py`、`tests/test_groups.py`、`requirements.txt`、`AGENTS.md`
-- 改 `docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
+> Phase 1 / Phase 2 / Web UI #1 等已合入 `main` 的更早阶段记录，见 `docs/PROGRESS_HISTORY.md`。
 
 ---
 
 ## 未来方向
 
-来自三份评估报告（`docs/调研/` 系列：pi-vs-claude-code、ClawSwarm、OpenClaw Control Center、Multica）与 `docs/spec/PROJECT_INTEGRATION.md` 设计草案，作为 5.x agent 通信主线关闭后的下一阶段方向（暂未启动实施）：
+来自三份评估报告（`docs/调研/` 系列：pi-vs-claude-code、ClawSwarm、OpenClaw Control Center、Multica）与 `docs/spec/PROJECT_INTEGRATION.md` 设计草案：
 
 - **TALK 基础设施化**：从"独立产品"重新定位为"给其他项目使用的多 Agent 协作基础设施"
+- **两类 Hall**：Task Halls 承接一任务一线程的 1 对 1 跨模型委派；Discussion Halls 承接多角色讨论，当前优先前者
+- **混合终端模型**：实际操作终端发 / 查 / 汇总，目标 Agent runner 独占领取执行，TALK 持久化澄清、状态与结果
 - **项目接入机制**：`talk init` + `.talk/` 目录约定 + 项目级 server API
 - **Agent 元数据双层架构**：
-  - 协作层（已有概念，未完全实施）：决策分级 + 业务角色
-  - 身份层（待引入，借鉴 ClawSwarm）：IDENTITY / SOUL / USER / MEMORY 四件套，按项目分配
+  - 协作层：决策分级 + 业务角色（P3-1/P3-2 已落地存储与注入）
+  - 身份层（借鉴 ClawSwarm）：IDENTITY / SOUL / USER / MEMORY 四件套，按项目分配
 - **平台能力补全**：
   - 结构化输出块 `<talk-structured>`（OpenClaw）—— 治本"双通道写作灾难"
   - 意图分类（OpenClaw）：greeting / chat / task，避免寒暄被当任务执行
   - Agent 自动接力对话三层防护（ClawSwarm）：window / soft / hard limit
   - 消息投递追踪 `message_dispatches`（ClawSwarm / Multica）—— 可观测性
   - 零信任安全模型（Multica）：agent vs human 隔离、凭证不可自读、操作审计
-  - COLD / WARM / RESUME 上下文读取（Multica）—— MEMORY 实施方向
+  - Project Blackboard + Task Hall 生命周期 / 结果收取 —— 当前实施方向
   - 任务失败 14 类精细分类与差异化重试（Multica）
-- **四阶段落地路线**（详见 PROJECT_INTEGRATION.md §12）：
-  1. 基础接入（`talk init` + `projects` 表）
-  2. 身份层（IDENTITY/SOUL 文件 + bridge profile 加载）
-  3. 协作层完整化（业务角色注入 + MEMORY 系统）
-  4. 平台能力补全（结构化块 + 意图分类 + 投递追踪 + 三层防护）
+- **总体四阶段路线**（详见 PROJECT_INTEGRATION.md §12；当前优先级已插入 Task Hall 里程碑）：
+  1. 基础接入（`talk init` + `projects` 表）—— ✅ 已合入 main
+  2. 身份层（IDENTITY/SOUL 文件 + bridge profile 加载）—— ✅ 已合入 main
+  3. 协作层完整化（业务角色注入）—— P3-1/P3-2 已完成；MEMORY 方向已关闭
+  4. Task Hall + 平台能力补全 —— 任务队列基础已存在，Task Hall 目标态合同已定、实现未启动
 
 完整设计请参考 `docs/spec/PROJECT_INTEGRATION.md`（15 节，~580 行）。
 
@@ -100,18 +102,16 @@ Updated: 2026-06-15 (Asia/Shanghai) — Phase 1 全部完成（接入机制 + 4 
 
 - **双通道写作灾难残留**：agent 在调 talk_send 的同时仍要写 visible reply，有时 visible reply 退化为"凑数"。根治方案在 PROJECT_INTEGRATION §9.3 结构化输出块（Phase 4）。
 - **`--no-extensions` 是粗粒度规避**：禁用所有 pi 自动发现扩展（含 plan-mode bug 源）。等 upstream `earendil-works/pi#5327` 修复后可去掉此 flag。
-- **codex 黑盒补测未完成**：当前测试环境未装 codex CLI，agent:codex 在群里的端到端流程只跑过独立 probe，未跑过完整 Group Hall 黑盒。环境装好即可补。
-- **PROJECT_INTEGRATION.md 仅为草案**：四阶段路线、`.talk/` 约定、双层 Agent 元数据等均为后续工作，未启动实施。
+- **Phase 2/3 注入行为黑盒补测**：身份注入（Phase 2）已真机验；业务角色注入（P3-2）黑盒待真机。
+- **遗留小毛病（管理者确认"以后再修"）**：早期 discussion 的双重收口语、个别 session 停在 `active` 未标 `resolved`——无害，纯观感。
 
 ---
 
 ## Recent Notes
-- 🎯 **2026-06-07 08:50 5.7+ 对话质量收敛**：身份锚紧凑内嵌、反元叙述系统层、废弃 discussion_context 三招收住。黑盒 `group:1488c22048e3` 上 pi/pi-kimi 对话自然，无身份混乱、无循环汇报。
-- 📐 **2026-06-07 08:30 PROJECT_INTEGRATION.md 立项**：TALK 从"独立产品"重校准为"基础设施层"，规划 `.talk/` 约定 + Agent 元数据双层架构 + 借鉴 ClawSwarm/OpenClaw/Multica 的平台能力 + 四阶段落地路线。
-- 🔧 **2026-06-06 22:00 INTERACTION_FRAMEWORK §5.3 二次/三次修正**：身份注入从"独占首行"改"紧凑内嵌"；废弃 600 字"TALK 控制上下文"在 pi/codex 分支的注入。
-- 🎉 **2026-06-02 23:55 5.x agent-to-agent 通信主线 SHIP**。方案 D（`discussion_turns` 显式账本）、Prompt 三层架构（SNR 4x）、talk_send function-calling 三条主线一并落地。Upstream issue #5327 在外侧跟进。
-- 2026-06-02 23:30 Pi extension dispatch 根因锁定为 plan-mode `setActiveTools` 全量替换，bridge 加 `--no-extensions` 规避。
-- 2026-06-02 21:45 codex MCP 端到端通过：`--dangerously-bypass-approvals-and-sandbox` + UTF-8 env。
-- 2026-06-01 18:00 codex MCP 路径集成完成：新增 `bridges/talk_send_mcp.py`。
-- 2026-06-01 docs 目录二次整理：根目录 *.md 全部移至 `spec/` 或 `guides/`。
+- 🧾 **2026-07-15 BS-3a 汇总收尾**：汇总者改用全部 Agent 首条意见原文 grounding，bridge 受限推断 `decision` 并干净收口；147 tests 通过，真机最终质量补验保留。
+- 🧭 **2026-07-15 Task Hall 方向收敛**：确认 Task Halls / Discussion Halls 两类产品结构，当前优先一任务一 Hall 的 1 对 1 跨模型委派闭环，并同步设计与进度文档。
+- 🧩 **2026-06-20 Phase 3 + UI #2/#3**：群成员业务角色存储/注入、删 Hall、全局禁用 agent 全栈落地；清理测试数据（群 31→1、成员→5）。详见 `PROGRESS_HISTORY.md`。
+- 🎯 **2026-06-07 5.7+ 对话质量收敛**：身份锚紧凑内嵌、反元叙述系统层、废弃 discussion_context 三招收住。
+- 📐 **2026-06-07 PROJECT_INTEGRATION.md 立项**：TALK 重校准为"基础设施层"，规划 `.talk/` 约定 + 双层 Agent 元数据 + 四阶段路线。
+- 🎉 **2026-06-02 5.x agent-to-agent 通信主线 SHIP**：方案 D（`discussion_turns` 账本）、Prompt 三层架构、talk_send function-calling 三条主线落地。
 - 完整历史见 `docs/PROGRESS_HISTORY.md`。

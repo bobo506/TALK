@@ -1,7 +1,7 @@
 # MODULE: Groups / Hall
 
 > 所属项目：TALK
-> 状态：`GROUP-1 / HALL-1` 后端与 Web UI 第一版已落地，SDK helper 已接入
+> 状态：`GROUP-1 / HALL-1` 后端与 Web UI 第一版已落地，SDK helper 已接入；D1 Hall `type` + 模板地基已落地（server）
 
 ## 目标
 
@@ -24,6 +24,7 @@
 - `id`：Group id，例如 `group:lab`；未指定时服务端自动生成 `group:<uuid>`
 - `name`：显示名称
 - `description`：可选描述
+- `type`：Hall 类型，`free` / `task` / `brainstorm` / `review`，默认 `free`（模板见 `server/hall_types.py`；D1 落地）
 - `created_by`：创建者成员 id
 - `created_at` / `updated_at`
 
@@ -44,7 +45,8 @@
 `POST /api/groups`
 
 - 已认证成员可创建 Group。
-- 请求字段：`id` 可选、`name` 必填、`description` 可选、`member_ids` 可选。
+- 请求字段：`id` 可选、`name` 必填、`description` 可选、`type` 可选、`member_ids` 可选。
+- `type` 省略时默认 `free`；传入会归一为小写并校验，非法值返回 `422`。`GroupOut` 回显 `type`。
 - 创建者自动加入 Group，角色为 `owner`。
 - `member_ids` 中的成员会以 `member` 角色加入。
 
@@ -73,6 +75,15 @@
 `DELETE /api/groups/{group_id}/members/{member_id}`
 
 - 当前仅允许 human 成员移除 Group 成员。
+
+## Hall 类型模板（D1）
+
+`GET /api/hall-types`
+
+- 已认证成员可读，返回服务端内置的 Hall 类型模板数组。
+- 每项：`type` / `label` / `protocol_guidance` / `roles:[{role, norm}]`。
+- 软预设（注入用"流程指引"，非硬状态机），数据源 `server/hall_types.py`；后续可由 `.talk/` 覆盖。
+- D2 起 bridge 将按群 `type` 注入对应 `protocol_guidance` + 角色规范（扩展 `_build_group_member_context`）。
 
 ## Hall 消息语义
 
@@ -157,3 +168,6 @@ TALK 的差异化选择：
 - [x] Web UI 在 Hall 内发送消息时会携带 `group_id`，且切回全局后不会显示 Hall 消息。
 - [x] SDK 可创建/读取 Group、管理成员，并在 Hall 内发送和读取消息。
 - [x] Web UI 可在 Hall 内添加成员、调整角色和移除其他成员。
+- [x] `POST /api/groups` 可指定 `type`（默认 `free`，非法值 `422`），`GroupOut` 回显 `type`。
+- [x] `GET /api/hall-types` 返回 4 类内置模板，需认证。
+- [x] 旧库迁移后既有 Hall 自动获得 `type="free"`。

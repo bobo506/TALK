@@ -48,6 +48,16 @@ class CodexBridgeTests(unittest.TestCase):
             else:
                 os.environ["TALK_CODEX_COMMAND"] = old_value
 
+    def test_default_codex_command_uses_path_cli(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            command_args = shlex.split(default_codex_command(), posix=True)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertEqual(command_args[0], "codex")
+
     def test_default_codex_command_injects_system_instructions(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
         try:

@@ -29,6 +29,7 @@
 - `assignee_id`：可选，当前范围里被要求回复/执行的成员
 - `scope_text`：可选，去掉开头 mention 后的任务范围文本；作为模型控制上下文，不应直接展示在可见回复中
 - `status`：`active`、`resolved`、`escalated`、`canceled`
+- `end_reason`：`consensus`、`deadlock`、`timeout`、`manual`；当前自动收口主要落 `consensus / deadlock`
 - `max_rounds`：默认 2，用于两轮分歧后升级给 human 判断
 
 `discussion_turns` 记录一次关键发言：
@@ -39,7 +40,7 @@
 - `speaker_id`
 - `target_member_id`
 - `turn_kind`：`demand` 或 `reply`；`demand` 表示一次新需求，`reply` 表示一次可见回复
-- `stance`：`question`、`answer`、`agree`、`optimize`、`disagree`、`escalate`、`greeting`、`closure`
+- `stance`：`question`、`answer`、`agree`、`optimize`、`disagree`、`escalate`、`greeting`、`closure`、`decision`
 - `round_index`：仅 `demand` turn 推进扩展轮次；历史记录和 visible reply 默认记为 `reply`
 
 ### API
@@ -90,6 +91,14 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 - bridge 会清理开头或结尾的孤立协议残片，例如 `mark_stance`、`update`、`动作已记录...`，避免动作词泄漏到可见聊天正文。
 - bridge 会把消息开头连续 `@member_id` 块视为路由头并从模型任务正文中剥离；正文中间的 `@agent:*` 仍保留为普通提及。
 
+### Brainstorm 汇总收口（BS-3a）
+
+- 仅当“`type=brainstorm` 的 active 多方 discussion + human 单独定向当前决策人 + 文本明确要求汇总 / 总结 / 归纳 / 最终结论”同时成立时，bridge 才进入自动汇总路径。
+- bridge 从 `discussion_turns` 中为每个 `agent:*` 参与者选择**首条 `stance=answer` 的 reply turn**，再按 `message_id` 取回原始消息；必须全部取齐，缺任一成员、消息撤回或正文缺失都不自动推断 `decision`。
+- 汇总 prompt 使用专用结构块内联这些首条意见原文（单条最多 4000 字）。决策人此前的首条意见也包含在内；后续闲聊和重复 `answer` 不进入材料，避免 BS-2b 通用历史块稀释 grounding。
+- CLI 成功返回非空汇总后，bridge 将该回复强制记为 `stance=decision`，即使模型只输出 prose 或错误地标为其它 stance；随后复用 `_resolve_if_decision_maker` 收口为 `resolved + end_reason=consensus`（存在 `escalate` turn 时为 `deadlock`）。
+- CLI 超时 / 失败、非直接点名、非决策人、非 brainstorm、1 对 1 场或意见未取齐时均不触发自动 decision。其它多方轮次继续使用 BS-2b 通用历史回顾。
+
 ### pi 权限档
 
 - 默认 `discussion` 档继续使用 `--no-context-files --no-tools --no-session --thinking off`，pi 可参与讨论和 TALK 内消息动作，但不默认读取/编辑项目文件或执行本机命令。
@@ -118,3 +127,6 @@ TALK_ACTION escalate_to_human to=human:bobo body=请你做最终判断
 - [x] 已结束 scope 不再因普通 agent 回复自动开启无关话题。
 - [x] bridge 已支持开头 mention 集群剥离、CLI 错误可见安全提示、malformed 协议残留拦截、非 Group agent 代发拦截、非实质 turn 过滤和轻扩展一轮收口。
 - [x] pi 默认保持讨论档，施工工具档必须显式启用。
+- [x] Brainstorm 汇总轮会内联每位 Agent（含决策人）的首条意见原文，后续闲聊不进入 grounding。
+- [x] 决策人对合格汇总触发的成功 prose 回复会自动记为 `decision`，并收口为 `resolved + end_reason`。
+- [x] 汇总自动推断具备 Hall 类型、human 单独定向、决策人身份、意见完整性和 CLI 成功守卫。

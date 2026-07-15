@@ -1,3 +1,6 @@
+from urllib.parse import quote
+
+from cli.profiles import member_dir_name
 from tests.test_support import RouteTestCase
 
 
@@ -7,6 +10,21 @@ class ProjectRouteTests(RouteTestCase):
         self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
         self.add_member("human:alice", api_key="alice-key", display_name="Alice")
         self.add_member("agent:codex", api_key="codex-key", display_name="Codex")
+
+    def register_profile_project(self, client, project_id: str = "prj_profile"):
+        project_root = self._tmpdir / project_id
+        project_root.mkdir(parents=True, exist_ok=True)
+        response = client.post(
+            "/api/projects",
+            headers={"X-API-Key": "bobo-key"},
+            json={
+                "project_id": project_id,
+                "display_name": project_id,
+                "project_root_path": str(project_root),
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        return project_root
 
     def test_human_registers_project_and_anyone_can_read(self):
         with self.make_client() as client:
@@ -276,6 +294,124 @@ class ProjectRouteTests(RouteTestCase):
             )
             listed = client.get("/api/projects/prj_e/agents", headers={"X-API-Key": "bobo-key"})
         self.assertEqual(listed.json(), [])
+
+    def test_agent_profile_get_returns_nulls_when_files_are_missing(self):
+        with self.make_client() as client:
+            self.register_profile_project(client)
+            response = client.get(
+                "/api/projects/prj_profile/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "project_id": "prj_profile",
+                "member_id": "agent:codex",
+                "identity": None,
+                "soul": None,
+                "user": None,
+            },
+        )
+
+    def test_agent_profile_put_round_trips_and_writes_files(self):
+        with self.make_client() as client:
+            project_root = self.register_profile_project(client)
+            written = client.put(
+                "/api/projects/prj_profile/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "identity": "# Codex\n工程执行者",
+                    "soul": "# Soul\n稳健直接",
+                    "user": "# User\nBobo",
+                },
+            )
+            fetched = client.get(
+                "/api/projects/prj_profile/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(written.status_code, 200)
+        self.assertEqual(fetched.json()["identity"], "# Codex\n工程执行者")
+        self.assertEqual(fetched.json()["soul"], "# Soul\n稳健直接")
+        self.assertEqual(fetched.json()["user"], "# User\nBobo")
+
+        profile_dir = project_root / ".talk" / "agents" / member_dir_name("agent:codex")
+        self.assertEqual((profile_dir / "IDENTITY.md").read_text(encoding="utf-8"), "# Codex\n工程执行者")
+        self.assertEqual((profile_dir / "SOUL.md").read_text(encoding="utf-8"), "# Soul\n稳健直接")
+        self.assertEqual((profile_dir / "USER.md").read_text(encoding="utf-8"), "# User\nBobo")
+
+    def test_agent_profile_put_only_touches_provided_fields(self):
+        with self.make_client() as client:
+            self.register_profile_project(client)
+            client.put(
+                "/api/projects/prj_profile/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "bobo-key"},
+                json={"identity": "identity v1", "soul": "soul v1", "user": "user v1"},
+            )
+            updated = client.put(
+                "/api/projects/prj_profile/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "bobo-key"},
+                json={"soul": "soul v2"},
+            )
+
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["identity"], "identity v1")
+        self.assertEqual(updated.json()["soul"], "soul v2")
+        self.assertEqual(updated.json()["user"], "user v1")
+
+    def test_agent_profile_project_without_root_path_returns_400(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_no_root", "display_name": "No Root"},
+            )
+            fetched = client.get(
+                "/api/projects/prj_no_root/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            updated = client.put(
+                "/api/projects/prj_no_root/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "bobo-key"},
+                json={"soul": "new"},
+            )
+
+        self.assertEqual(fetched.status_code, 400)
+        self.assertEqual(updated.status_code, 400)
+        self.assertIn("project has no root path", fetched.json()["detail"])
+
+    def test_agent_profile_path_traversal_returns_400_without_writing(self):
+        bad_member_id = "agent:../../evil"
+        encoded_member_id = quote(bad_member_id, safe="")
+        with self.make_client() as client:
+            project_root = self.register_profile_project(client)
+            response = client.put(
+                f"/api/projects/prj_profile/agents/{encoded_member_id}/profile",
+                headers={"X-API-Key": "bobo-key"},
+                json={"identity": "escape"},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "profile path escapes project")
+        self.assertFalse((project_root / ".talk" / "evil" / "IDENTITY.md").exists())
+
+    def test_agent_cannot_read_or_write_agent_profile(self):
+        with self.make_client() as client:
+            self.register_profile_project(client)
+            fetched = client.get(
+                "/api/projects/prj_profile/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "codex-key"},
+            )
+            updated = client.put(
+                "/api/projects/prj_profile/agents/agent%3Acodex/profile",
+                headers={"X-API-Key": "codex-key"},
+                json={"soul": "hacked"},
+            )
+
+        self.assertEqual(fetched.status_code, 403)
+        self.assertEqual(updated.status_code, 403)
 
     def test_validation_rejects_bad_input(self):
         with self.make_client() as client:

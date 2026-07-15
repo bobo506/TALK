@@ -14,9 +14,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
+from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.auth import get_current_member
 from server.db import get_session
 from server.models import (
+    AgentProfileOut,
+    AgentProfileUpdate,
     Group,
     GroupMember,
     GroupOut,
@@ -51,6 +54,32 @@ def _get_member(member_id: str, session: Session) -> Member:
     if member is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"member not found: {member_id}")
     return member
+
+
+def _require_project_root(project: Project) -> str:
+    if not project.project_root_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project has no root path; cannot locate profile files",
+        )
+    return project.project_root_path
+
+
+def _profile_out(project_id: str, member_id: str, root: str) -> AgentProfileOut:
+    try:
+        for kind in ("identity", "soul", "user"):
+            resolve_profile_path(root, member_id, kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    profile = load_profile(root, member_id)
+    return AgentProfileOut(
+        project_id=project_id,
+        member_id=member_id,
+        identity=profile.identity,
+        soul=profile.soul,
+        user=profile.user,
+    )
 
 
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
@@ -136,6 +165,43 @@ def list_project_agents(
         .order_by(ProjectAgent.member_id)
     ).all()
     return [ProjectAgentOut.from_orm_agent(agent) for agent in agents]
+
+
+@router.get("/{project_id}/agents/{member_id:path}/profile", response_model=AgentProfileOut)
+def get_agent_profile(
+    project_id: str,
+    member_id: str,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Read one agent's IDENTITY/SOUL/USER files from the registered project root."""
+    _require_human(current)
+    project = _get_project(project_id, session)
+    root = _require_project_root(project)
+    return _profile_out(project_id, member_id, root)
+
+
+@router.put("/{project_id}/agents/{member_id:path}/profile", response_model=AgentProfileOut)
+def update_agent_profile(
+    project_id: str,
+    member_id: str,
+    body: AgentProfileUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Write selected IDENTITY/SOUL/USER files under the registered project root."""
+    _require_human(current)
+    project = _get_project(project_id, session)
+    root = _require_project_root(project)
+
+    try:
+        for kind in ("identity", "soul", "user"):
+            if kind in body.model_fields_set:
+                write_profile_file(root, member_id, kind, getattr(body, kind) or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return _profile_out(project_id, member_id, root)
 
 
 @router.post("/{project_id}/sync", response_model=list[ProjectAgentOut])

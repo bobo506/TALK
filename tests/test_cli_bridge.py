@@ -4,11 +4,13 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 from bridges import cli_bridge
 from TALK.client.exceptions import TalkNotFoundError
+from server.hall_types import HALL_TYPE_TEMPLATES
 from bridges.cli_bridge import (
     _build_group_member_context,
     CliRunResult,
@@ -29,6 +31,14 @@ from bridges.cli_bridge import (
 
 
 class CliBridgeTests(unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        cli_bridge._HALL_TYPE_TEMPLATES = None
+
+    def tearDown(self):
+        cli_bridge._HALL_TYPE_TEMPLATES = None
+        super().tearDown()
+
     def test_parser_requires_command_for_generic_cli(self):
         parser = build_parser()
 
@@ -227,6 +237,127 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("human:qa", prompt)
         self.assertIn("本群无角色约定", prompt)
 
+    def test_group_member_context_injects_self_business_role(self):
+        """P3-2：群成员上下文带上"我在本群的业务角色"（business_role 来自群成员数据）。"""
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:lab", "agent:pi"))
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+
+    def test_group_member_context_omits_role_when_absent(self):
+        """无 business_role 时不注入角色行（保持现状字节）。"""
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:lab", "agent:pi"))
+        self.assertIn("群成员：", ctx)
+        self.assertNotIn("你在本群的业务角色", ctx)
+
+    def test_group_member_context_injects_review_type_and_matching_role_norm(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertIn("本群类型：评审（review）。", ctx)
+        self.assertIn("流程指引：评审 Hall：作者提交标的产物", ctx)
+        self.assertIn("你的角色职责：针对产物给出收敛式批评与改进建议", ctx)
+
+    def test_group_member_context_injects_brainstorm_type_and_matching_role_norm(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "brainstorm", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "Contributor"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:ideas", "agent:pi"))
+
+        self.assertIn("你在本群的业务角色：Contributor。", ctx)
+        self.assertIn("本群类型：头脑风暴（brainstorm）。", ctx)
+        self.assertIn("流程指引：头脑风暴 Hall，流程分四步", ctx)
+        self.assertIn("你的角色职责：给出具体想法（answer）；被点名表态时", ctx)
+
+    def test_group_member_context_injects_type_without_role_norm_when_role_unmatched(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "lead"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("你在本群的业务角色：lead。", ctx)
+        self.assertIn("本群类型：评审（review）。", ctx)
+        self.assertNotIn("你的角色职责", ctx)
+
+    def test_group_member_context_omits_type_block_for_free_hall(self):
+        class FakeClient:
+            def __init__(self):
+                self.hall_type_calls = 0
+
+            async def get_group(self, group_id):
+                return {"type": "free", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                self.hall_type_calls += 1
+                raise AssertionError("free hall must not fetch hall type templates")
+
+        client = FakeClient()
+        ctx = asyncio.run(_build_group_member_context(client, "group:free", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertNotIn("本群类型", ctx)
+        self.assertEqual(client.hall_type_calls, 0)
+
+    def test_group_member_context_skips_type_block_when_template_fetch_fails(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                raise RuntimeError("hall type endpoint unavailable")
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertNotIn("本群类型", ctx)
+        self.assertNotIn("你的角色职责", ctx)
+
     def test_function_calling_prompt_is_minimal(self):
         message = {
             "id": 1,
@@ -350,6 +481,17 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(actions[0].stance, "agree")
         self.assertEqual(actions[1].to, "human:bobo")
         self.assertEqual(actions[1].body, "人类是长期演化来的。")
+
+    def test_parse_talk_actions_preserves_decision_stance(self):
+        visible, actions = parse_talk_actions(
+            "定论如下。\n"
+            "TALK_ACTION mark_stance stance=decision"
+        )
+
+        self.assertEqual(visible, "定论如下。")
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0].action_type, "mark_stance")
+        self.assertEqual(actions[0].stance, "decision")
 
     def test_parse_talk_actions_cleans_protocol_fragments_from_visible_text(self):
         visible, actions = parse_talk_actions(
@@ -1055,10 +1197,58 @@ class CliBridgeTests(unittest.TestCase):
             {"stance": "greeting"},
             {"stance": "closure"},
             {"stance": "answer"},
+            {"stance": "decision"},
             {"stance": ""},
         ]
 
-        self.assertEqual(cli_bridge._substantive_discussion_turns(turns), [{"stance": "answer"}, {"stance": ""}])
+        self.assertEqual(
+            cli_bridge._substantive_discussion_turns(turns),
+            [{"stance": "answer"}, {"stance": "decision"}, {"stance": ""}],
+        )
+
+    def test_deferred_decision_talk_send_bypasses_turn_limit(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": len(self.sent)}
+
+        fd, path = tempfile.mkstemp(suffix=".jsonl", prefix="talk-decision-test-")
+        os.close(fd)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "tool": "talk_send",
+                    "target": "agent:pi",
+                    "body": "普通回答应被跳过",
+                    "stance": "answer",
+                }, ensure_ascii=False) + "\n")
+                f.write(json.dumps({
+                    "tool": "talk_send",
+                    "target": "agent:lead",
+                    "body": "最终定论",
+                    "stance": "decision",
+                }, ensure_ascii=False) + "\n")
+
+            client = FakeClient()
+            results = asyncio.run(cli_bridge._read_and_execute_deferred_actions(
+                path,
+                client=client,
+                group_id="group:lab",
+                reply_to=40,
+                current_turn_count=3,
+                max_auto_turns=3,
+            ))
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(client.sent, [("@agent:lead 最终定论", ["agent:lead"], 40, "group:lab")])
+        self.assertEqual(results[0]["skipped"], True)
+        self.assertEqual(results[0]["stance"], "answer")
+        self.assertEqual(results[1]["ok"], True)
+        self.assertEqual(results[1]["stance"], "decision")
 
     def test_send_message_action_to_missing_group_agent_is_blocked(self):
         class FakeClient:
@@ -1299,7 +1489,12 @@ class CliBridgeTests(unittest.TestCase):
                 return self.turns
 
             async def get_group(self, group_id):
-                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:codex"}, {"member_id": "agent:pi"}]}
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
 
             async def send_text(self, text, to=None, reply_to=None, group_id=None):
                 self.sent.append((text, to, reply_to, group_id))
@@ -1345,8 +1540,117 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.replies, [(50, "我仍然不同意，建议先补协议测试。", ["agent:codex"], "group:lab")])
         self.assertEqual(
             client.sent,
+            [("@agent:lead 我和对方连续两轮仍有不同判断，请你做最终决定。", ["agent:lead"], 51, "group:lab")],
+        )
+
+    def test_disagreement_escalation_falls_back_to_human_without_decision_maker(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.turns = [
+                    {"speaker_id": "agent:codex", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                ]
+                self.updated = []
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 52}
+
+            async def append_discussion_turn(
+                self,
+                discussion_id,
+                *,
+                message_id,
+                stance,
+                target_member_id=None,
+                turn_kind="reply",
+                round_index=1,
+            ):
+                self.turns.append({
+                    "speaker_id": "agent:pi",
+                    "stance": stance,
+                    "target_member_id": target_member_id,
+                    "turn_kind": turn_kind,
+                })
+                return {"id": 3}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._maybe_escalate_disagreement(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                reply_to=51,
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(
+            client.sent,
             [("@human:bobo 我和对方连续两轮仍有不同判断，请你做最终决定。", ["human:bobo"], 51, "group:lab")],
         )
+        self.assertEqual(client.turns[-1]["target_member_id"], "human:bobo")
+        self.assertEqual(client.updated, [(9, "escalated", None)])
+
+    def test_explicit_escalate_to_human_stays_human_only(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                ]}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 52}
+
+            async def append_discussion_turn(self, *args, **kwargs):
+                return {"id": 3}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            summaries = await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(action_type="escalate_to_human", body="请裁决")],
+                client=client,
+                source_message={"id": 50, "from": "agent:pi", "group_id": "group:lab"},
+                member_id="agent:codex",
+                task_text="请裁决这个分歧",
+            )
+            return client, summaries
+
+        client, summaries = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@human:bobo 请裁决", ["human:bobo"], 50, "group:lab")])
+        self.assertEqual(summaries, ["escalated to human:bobo"])
+        self.assertEqual(client.updated, [])
 
     def test_final_to_human_action_resolves_discussion(self):
         class FakeClient:
@@ -1385,9 +1689,9 @@ class CliBridgeTests(unittest.TestCase):
                 self.turns.append({"speaker_id": "agent:codex", "stance": stance})
                 return {"id": 3}
 
-            async def update_discussion(self, discussion_id, *, status):
-                self.updated.append((discussion_id, status))
-                return {"id": discussion_id, "status": status}
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             return CliRunResult(
@@ -1433,7 +1737,338 @@ class CliBridgeTests(unittest.TestCase):
             client.sent,
             [("@human:bobo 人类是从远古灵长类分支长期演化来的。", ["human:bobo"], 50, "group:lab")],
         )
-        self.assertEqual(client.updated, [(9, "resolved")])
+        self.assertEqual(client.updated, [(9, "resolved", None)])
+
+    def test_decision_maker_send_message_decision_resolves_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.created = []
+                self.turns = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 80}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                self.created.append((group_id, topic, participant_ids, max_rounds, kwargs))
+                return {"id": 9}
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(
+                    action_type="send_message",
+                    to="agent:pi",
+                    body="最终定论",
+                    stance="decision",
+                )],
+                client=client,
+                source_message={"id": 50, "from": "human:bobo", "group_id": "group:lab"},
+                member_id="agent:lead",
+                task_text="请给出定论",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@agent:pi 最终定论", ["agent:pi"], 50, "group:lab")])
+        self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
+        self.assertEqual(client.updated, [(9, "resolved", "consensus")])
+
+    def test_decision_maker_decision_after_escalate_resolves_as_deadlock(self):
+        class FakeClient:
+            def __init__(self):
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def list_discussion_turns(self, discussion_id):
+                return [
+                    {"speaker_id": "agent:codex", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "escalate"},
+                    {"speaker_id": "agent:lead", "stance": "decision"},
+                ]
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._resolve_if_decision_maker(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                member_id="agent:lead",
+                stance="decision",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.updated, [(9, "resolved", "deadlock")])
+
+    def test_decision_maker_decision_turn_lookup_failure_resolves_as_consensus(self):
+        class FakeClient:
+            def __init__(self):
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def list_discussion_turns(self, discussion_id):
+                raise RuntimeError("turn lookup failed")
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._resolve_if_decision_maker(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                member_id="agent:lead",
+                stance="decision",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.updated, [(9, "resolved", "consensus")])
+
+    def test_non_decision_maker_decision_does_not_resolve_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.turns = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 80}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                return {"id": 9}
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(
+                    action_type="send_message",
+                    to="agent:pi",
+                    body="我认为这是定论",
+                    stance="decision",
+                )],
+                client=client,
+                source_message={"id": 50, "from": "human:bobo", "group_id": "group:lab"},
+                member_id="agent:codex",
+                task_text="请给出定论",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
+        self.assertEqual(client.updated, [])
+
+    def test_decision_maker_falls_back_to_human_without_decision_tier(self):
+        class FakeClient:
+            def __init__(self):
+                self.turns = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                return {"id": 80}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                return {"id": 9}
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            decision_maker = await cli_bridge._find_decision_maker(client, "group:lab")
+            await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(
+                    action_type="send_message",
+                    to="agent:pi",
+                    body="我认为这是定论",
+                    stance="decision",
+                )],
+                client=client,
+                source_message={"id": 50, "from": "human:bobo", "group_id": "group:lab"},
+                member_id="agent:codex",
+                task_text="请给出定论",
+            )
+            return client, decision_maker
+
+        client, decision_maker = asyncio.run(scenario())
+
+        self.assertEqual(decision_maker, "human:bobo")
+        self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
+        self.assertEqual(client.updated, [])
+
+    def test_decision_maker_mark_stance_resolves_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.turns = []
+                self.updated = []
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 9,
+                    "status": "active",
+                    "topic": "最终定论",
+                    "participant_ids": ["agent:lead", "agent:pi"],
+                    "root_message_id": 50,
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 51}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(
+                returncode=0,
+                stdout="定论如下。\nTALK_ACTION mark_stance stance=decision",
+                stderr="",
+            )
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 50,
+                        "from": "agent:pi",
+                        "to": ["agent:lead"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:lead 请给出最终判断",
+                    },
+                    client=client,
+                    member_id="agent:lead",
+                    workdir=Path.cwd(),
+                    command=["codex", "exec", "-"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="Codex",
+                    bridge_label="Codex bridge",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.replies, [(50, "定论如下。", ["agent:pi"], "group:lab")])
+        self.assertEqual(client.turns, [(9, 51, "decision", "agent:pi", "reply", 1)])
+        self.assertEqual(client.updated, [(9, "resolved", "consensus")])
 
     def test_agent_message_after_extension_answer_closes_without_running_model(self):
         class FakeClient:
@@ -1474,9 +2109,9 @@ class CliBridgeTests(unittest.TestCase):
                 self.turns.append({"speaker_id": "agent:pi", "stance": stance})
                 return {"id": 4}
 
-            async def update_discussion(self, discussion_id, *, status):
-                self.updated.append((discussion_id, status))
-                return {"id": discussion_id, "status": status}
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             raise AssertionError("model should not run after turn budget is exhausted")
@@ -1516,8 +2151,458 @@ class CliBridgeTests(unittest.TestCase):
             [(50, cli_bridge._pick_closure_line("agent:pi"), ["agent:codex"], "group:lab")],
         )
         self.assertEqual(client.sent, [])
-        self.assertEqual(client.updated, [(9, "resolved")])
+        self.assertEqual(client.updated, [(9, "resolved", None)])
         self.assertEqual(client.turns[-1]["stance"], "closure")
+
+    def test_shared_history_builds_block_for_multiparty(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [
+                    {"id": 10, "from": "human:qa", "content": "@所有人 想 3 个团建点子"},
+                    {"id": 11, "from": "agent:codex", "content": "城市闯关赛、共创工作坊"},
+                    {"id": 12, "from": "agent:pi", "content": "密室逃脱、桌游夜"},
+                    {"id": 20, "from": "human:qa", "content": "@agent:pi 请表态"},
+                    {"id": 13, "from": "agent:x", "content": ""},
+                ]
+
+        discussion = {
+            "root_message_id": 10,
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+        }
+        block = asyncio.run(
+            cli_bridge._shared_discussion_history(
+                FakeClient(), group_id="g", discussion=discussion, current_message_id=20, self_id="agent:pi"
+            )
+        )
+        self.assertIn("本场已有发言", block)
+        self.assertIn("agent:codex：城市闯关赛、共创工作坊", block)
+        self.assertIn("agent:pi：密室逃脱、桌游夜", block)
+        self.assertNotIn("请表态", block)  # 当前触发消息剔除
+        self.assertNotIn("agent:x：", block)  # 空内容剔除
+
+    def test_shared_history_empty_for_pair_or_missing(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [{"id": 1, "from": "agent:a", "content": "hi"}]
+
+        pair = {"root_message_id": 1, "participant_ids": ["agent:a", "agent:b"]}
+        self.assertEqual(
+            asyncio.run(
+                cli_bridge._shared_discussion_history(
+                    FakeClient(), group_id="g", discussion=pair, current_message_id=9, self_id="agent:a"
+                )
+            ),
+            "",
+        )
+        # 无 discussion / 无 group → 空
+        self.assertEqual(
+            asyncio.run(
+                cli_bridge._shared_discussion_history(
+                    FakeClient(), group_id="g", discussion=None, current_message_id=9, self_id="agent:a"
+                )
+            ),
+            "",
+        )
+
+    def test_build_cli_prompt_injects_shared_history_for_pi(self):
+        prompt = cli_bridge.build_cli_prompt(
+            {"from": "human:qa", "content": "@agent:pi 请对 codex 的想法表态", "group_id": "g", "id": 20},
+            member_id="agent:pi",
+            workdir=Path("."),
+            runtime="pi",
+            shared_history="【本场已有发言（供你表态/汇总参考，请勿逐条复述）】\nagent:codex：城市闯关赛",
+        )
+        self.assertIn("本场已有发言", prompt)
+        self.assertIn("agent:codex：城市闯关赛", prompt)
+
+    def test_summary_grounding_uses_each_agents_first_answer_including_decision_maker(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [
+                    {"id": 11, "from": "agent:pi", "content": "pi 的首条意见"},
+                    {"id": 12, "from": "agent:pi-kimi", "content": "pi-kimi 的首条意见"},
+                    {"id": 13, "from": "agent:codex", "content": "codex 作为决策人的首条意见"},
+                    {"id": 14, "from": "agent:pi", "content": "pi 后续闲聊噪声"},
+                ]
+
+        discussion = {
+            "root_message_id": 10,
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+        }
+        turns = [
+            {"message_id": 11, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 12, "speaker_id": "agent:pi-kimi", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 13, "speaker_id": "agent:codex", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 14, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+        ]
+
+        block = asyncio.run(
+            cli_bridge._brainstorm_summary_grounding(
+                FakeClient(), group_id="group:bs", discussion=discussion, turns=turns
+            )
+        )
+
+        self.assertIn("必须据此形成最终结论", block)
+        self.assertIn("pi 的首条意见", block)
+        self.assertIn("pi-kimi 的首条意见", block)
+        self.assertIn("codex 作为决策人的首条意见", block)
+        self.assertNotIn("pi 后续闲聊噪声", block)
+
+    def test_summary_grounding_requires_first_answer_from_every_agent(self):
+        class FakeClient:
+            async def fetch_history(self, **kwargs):
+                raise AssertionError("意见未取齐时不应读取消息历史")
+
+        discussion = {
+            "root_message_id": 10,
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+        }
+        turns = [
+            {"message_id": 11, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 13, "speaker_id": "agent:codex", "turn_kind": "reply", "stance": "answer"},
+        ]
+
+        block = asyncio.run(
+            cli_bridge._brainstorm_summary_grounding(
+                FakeClient(), group_id="group:bs", discussion=discussion, turns=turns
+            )
+        )
+
+        self.assertEqual(block, "")
+
+    def test_brainstorm_summary_request_requires_direct_human_targeting_of_decision_maker(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {
+                    "type": "brainstorm",
+                    "members": [
+                        {"member_id": "human:qa"},
+                        {"member_id": "agent:codex", "decision_tier": "decision"},
+                        {"member_id": "agent:pi"},
+                    ],
+                }
+
+        discussion = {
+            "status": "active",
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi"],
+        }
+
+        async def scenario():
+            direct = await cli_bridge._is_brainstorm_summary_request(
+                FakeClient(),
+                message={"to": ["agent:codex"]},
+                group_id="group:bs",
+                discussion=discussion,
+                member_id="agent:codex",
+                sender_id="human:qa",
+                task_text="请汇总并给出最终结论",
+            )
+            multi_target = await cli_bridge._is_brainstorm_summary_request(
+                FakeClient(),
+                message={"to": ["agent:codex", "agent:pi"]},
+                group_id="group:bs",
+                discussion=discussion,
+                member_id="agent:codex",
+                sender_id="human:qa",
+                task_text="请汇总并给出最终结论",
+            )
+            ordinary_request = await cli_bridge._is_brainstorm_summary_request(
+                FakeClient(),
+                message={"to": ["agent:codex"]},
+                group_id="group:bs",
+                discussion=discussion,
+                member_id="agent:codex",
+                sender_id="human:qa",
+                task_text="请再补充一条意见",
+            )
+            return direct, multi_target, ordinary_request
+
+        self.assertEqual(asyncio.run(scenario()), (True, False, False))
+
+    def test_human_summary_to_decision_maker_infers_decision_and_resolves(self):
+        captured_prompts = []
+
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.appended = []
+                self.updated = []
+                self.turns = [
+                    {"message_id": 11, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+                    {"message_id": 12, "speaker_id": "agent:pi-kimi", "turn_kind": "reply", "stance": "answer"},
+                    {"message_id": 13, "speaker_id": "agent:codex", "turn_kind": "reply", "stance": "answer"},
+                    {"message_id": 14, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+                ]
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 7,
+                    "status": "active",
+                    "root_message_id": 10,
+                    "topic": "单位捐款方案",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {
+                    "type": "brainstorm",
+                    "members": [
+                        {"member_id": "human:qa"},
+                        {"member_id": "agent:codex", "decision_tier": "decision"},
+                        {"member_id": "agent:pi"},
+                        {"member_id": "agent:pi-kimi"},
+                    ],
+                }
+
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [
+                    {"id": 11, "from": "agent:pi", "content": "pi：不应组织摊派。"},
+                    {"id": 12, "from": "agent:pi-kimi", "content": "pi-kimi：改成自愿倡议。"},
+                    {"id": 13, "from": "agent:codex", "content": "codex：给出合规替代方案。"},
+                    {"id": 14, "from": "agent:pi", "content": "这是一条后续闲聊。"},
+                ]
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 61}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind))
+                self.turns.append({
+                    "message_id": message_id,
+                    "speaker_id": "agent:codex",
+                    "target_member_id": target_member_id,
+                    "turn_kind": turn_kind,
+                    "stance": stance,
+                })
+                return {"id": 5}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            captured_prompts.append(prompt)
+            return CliRunResult(returncode=0, stdout="最终结论：停止摊派，改为公开、自愿且有上限的倡议。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 60,
+                        "from": "human:qa",
+                        "to": ["agent:codex"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@agent:codex 请汇总全部意见并产出最终结论",
+                    },
+                    client=client,
+                    member_id="agent:codex",
+                    workdir=Path.cwd(),
+                    command=["codex", "exec"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="codex",
+                    bridge_label="codex bridge",
+                    prompt_transport="stdin",
+                    decision_tier="decision",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertIn("本轮汇总材料", captured_prompts[0])
+        self.assertIn("pi：不应组织摊派。", captured_prompts[0])
+        self.assertIn("pi-kimi：改成自愿倡议。", captured_prompts[0])
+        self.assertIn("codex：给出合规替代方案。", captured_prompts[0])
+        self.assertNotIn("这是一条后续闲聊。", captured_prompts[0])
+        self.assertEqual(client.appended, [(7, 61, "decision", "human:qa", "reply")])
+        self.assertEqual(client.updated, [(7, "resolved", "consensus")])
+
+    def test_discussion_auto_turn_budget_scales_for_multiparty(self):
+        # 1:1 / 无 discussion：保持常量
+        self.assertEqual(cli_bridge._discussion_auto_turn_budget(None), 3)
+        self.assertEqual(
+            cli_bridge._discussion_auto_turn_budget({"participant_ids": ["agent:a", "agent:b"]}),
+            3,
+        )
+        # 多方（3 agent + 1 human）：N²+1 = 10
+        self.assertEqual(
+            cli_bridge._discussion_auto_turn_budget(
+                {"participant_ids": ["human:qa", "agent:a", "agent:b", "agent:c"]}
+            ),
+            10,
+        )
+
+    def test_human_broadcast_reply_records_turn_on_multiparty_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.appended = []
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 7,
+                    "status": "active",
+                    "topic": "帮部门想团建点子",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                    {"member_id": "agent:pi-kimi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 61}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind))
+                return {"id": 5}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(returncode=0, stdout="我的点子：密室逃脱、轻徒步、桌游夜。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 60,
+                        "from": "human:qa",
+                        "to": ["agent:pi", "agent:codex", "agent:pi-kimi"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@所有人 帮部门想 3 个团建点子",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        # human 发起的广播回复记账到多方场（想法 = answer）
+        self.assertEqual(client.appended, [(7, 61, "answer", "human:qa", "reply")])
+
+    def test_agent_message_in_multiparty_discussion_uses_scaled_budget(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.updated = []
+                self.turns = [
+                    {"speaker_id": "agent:codex", "stance": "answer"},
+                    {"speaker_id": "agent:pi", "stance": "answer"},
+                    {"speaker_id": "agent:pi-kimi", "stance": "answer"},
+                    {"speaker_id": "agent:codex", "stance": "agree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                ]
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 8,
+                    "status": "active",
+                    "topic": "帮部门想团建点子",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                    {"member_id": "agent:pi-kimi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 71}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 72}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append({"speaker_id": "agent:pi", "stance": stance})
+                return {"id": 6}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(returncode=0, stdout="我觉得桌游夜更稳。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 70,
+                        "from": "agent:codex",
+                        "to": ["agent:pi"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@agent:pi 你觉得哪个点子最好？",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        # 5 条实质轮次 ≥ 1:1 阈值(4)，但多方预算=10+1，模型应正常运行、不触发收尾/升级
+        self.assertEqual(client.replies, [(70, "我觉得桌游夜更稳。", ["agent:codex"], "group:bs")])
+        self.assertEqual(client.updated, [])
+        self.assertEqual(client.turns[-1]["stance"], "answer")
 
     def test_non_substantive_greeting_turns_do_not_trigger_closure(self):
         class FakeClient:
@@ -1553,9 +2638,9 @@ class CliBridgeTests(unittest.TestCase):
                 self.turns.append({"speaker_id": "agent:pi", "stance": stance})
                 return {"id": 5}
 
-            async def update_discussion(self, discussion_id, *, status):
-                self.updated.append((discussion_id, status))
-                return {"id": discussion_id, "status": status}
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             return CliRunResult(returncode=0, stdout="你好，我在线。", stderr="")

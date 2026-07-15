@@ -60,6 +60,7 @@ DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
+_HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] | None = None
 PROMPT_TRANSPORTS = {"stdin", "argv"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
@@ -97,7 +98,7 @@ SAFE_ACTION_RE = re.compile(
 )
 SAFE_ACTION_ATTR_RE = re.compile(r"\b([a-zA-Z_][\w-]*)=([^\s]+)")
 ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human", "final_to_human"}
-ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
+ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure", "decision"}
 DISCUSSION_MAX_AUTO_TURNS = 3
 DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
 NON_SUBSTANTIVE_STANCES = {"greeting", "closure"}
@@ -111,6 +112,20 @@ CLOSURE_LINES = (
 )
 GREETING_SCOPE_MARKERS = ("打招呼", "打个招呼", "打声招呼", "问好", "确认在线", "在线状态", "互相认识", "认识一下")
 GREETING_REPLY_MARKERS = ("你好", "在线", "收到", "见到你", "认识你")
+BRAINSTORM_SUMMARY_MARKERS = (
+    "汇总",
+    "总结",
+    "归纳",
+    "形成结论",
+    "给出结论",
+    "产出结论",
+    "最终结论",
+    "最终决定",
+    "summarize",
+    "synthesi",
+    "final decision",
+    "conclusion",
+)
 INTERNAL_SCOPE_MARKERS = (
     "discussion_id",
     "root_message_id",
@@ -258,6 +273,11 @@ def infer_reply_stance(task_text: str, visible_reply: str) -> str:
     return "answer"
 
 
+def _is_summary_request(text: str) -> bool:
+    lowered = _compact_text(text).lower()
+    return bool(lowered) and any(marker.lower() in lowered for marker in BRAINSTORM_SUMMARY_MARKERS)
+
+
 def infer_discussion_stance(task_text: str, visible_reply: str, *, default: str = "answer") -> str:
     if infer_reply_stance(task_text, visible_reply) == "greeting":
         return "greeting"
@@ -326,6 +346,19 @@ def sanitize_visible_reply(text: str) -> str:
 
 def _substantive_discussion_turns(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [turn for turn in turns if str(turn.get("stance") or "") not in NON_SUBSTANTIVE_STANCES]
+
+
+def _discussion_auto_turn_budget(discussion: dict[str, Any] | None) -> int:
+    """自动回合预算：多方场（>2 参与者，如 brainstorm）按参与者规模放大（DELIBERATION §8.3）。
+
+    N 个 agent 的头脑风暴预期实质轮次 ≈ N(想法) + N×(N-1)(表态) + 1(decision) = N²+1；
+    1:1 讨论保持原常量 DISCUSSION_MAX_AUTO_TURNS。
+    """
+    participants = list((discussion or {}).get("participant_ids") or [])
+    if len(participants) <= 2:
+        return DISCUSSION_MAX_AUTO_TURNS
+    agent_count = sum(1 for participant in participants if str(participant).startswith("agent:"))
+    return max(agent_count * agent_count + 1, DISCUSSION_MAX_AUTO_TURNS)
 
 
 def _max_demand_round(turns: list[dict[str, Any]]) -> int:
@@ -669,6 +702,34 @@ async def _find_human_reviewer(client: Any, group_id: str | None) -> str | None:
     return None
 
 
+async def _find_decision_maker(client: Any, group_id: str | None) -> str | None:
+    if not group_id:
+        return None
+    try:
+        group = await client.get_group(group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
+    return _decision_maker_from_group(group)
+
+
+def _decision_maker_from_group(group: dict[str, Any]) -> str | None:
+    members = group.get("members") or []
+    for member in members:
+        member_id = str(member.get("member_id") or "")
+        decision_tier = str(member.get("decision_tier") or "").strip().lower()
+        if member_id and decision_tier == "decision":
+            return member_id
+    for member in members:
+        member_id = str(member.get("member_id") or "")
+        if member_id.startswith("human:"):
+            return member_id
+    return None
+
+
 async def _group_member_ids(client: Any, group_id: str | None) -> set[str] | None:
     if not group_id:
         return None
@@ -851,14 +912,22 @@ async def _record_deferred_demand_turns(
                         "assignee_id": target,
                         "scope_text": task_text,
                     }
+        stance = str(result.get("stance") or "question")
         appended = await _append_discussion_turn(
             client,
             discussion_id=discussion_id,
             message_id=int(message_id),
-            stance=str(result.get("stance") or "question"),
+            stance=stance,
             target_member_id=target,
             turn_kind="demand",
             round_index=demand_round,
+        )
+        await _resolve_if_decision_maker(
+            client,
+            discussion_id=discussion_id,
+            group_id=group_id,
+            member_id=member_id,
+            stance=stance,
         )
         if appended:
             current_turns.append(
@@ -867,11 +936,33 @@ async def _record_deferred_demand_turns(
                     "speaker_id": member_id,
                     "target_member_id": target,
                     "turn_kind": "demand",
-                    "stance": str(result.get("stance") or "question"),
+                    "stance": stance,
                     "round_index": demand_round,
                 }
             )
     return current_discussion, current_turns
+
+
+async def _get_hall_type_templates(client: Any) -> dict[str, dict[str, Any]]:
+    global _HALL_TYPE_TEMPLATES
+    if _HALL_TYPE_TEMPLATES is not None:
+        return _HALL_TYPE_TEMPLATES
+
+    try:
+        payload = await client.get_hall_types()
+    except Exception:
+        return {}
+
+    templates: dict[str, dict[str, Any]] = {}
+    for item in payload or []:
+        if not isinstance(item, dict):
+            continue
+        hall_type = str(item.get("type") or "").strip()
+        if hall_type:
+            templates[hall_type] = item
+
+    _HALL_TYPE_TEMPLATES = templates
+    return templates
 
 
 async def _build_group_member_context(
@@ -945,19 +1036,90 @@ async def _build_group_member_context(
     # 正常路径：返回紧凑逗号分隔名单，同时写入环境变量供扩展使用
     mids = [str(m.get("member_id") or "") for m in members]
     os.environ["TALK_GROUP_MEMBERS"] = ",".join(mids)
-    return f"群成员：{', '.join(mids)}。\n"
+    context = f"群成员：{', '.join(mids)}。\n"
+    # 协作层（PROJECT_INTEGRATION §5.2 / P3-2）：注入"我在本群的业务角色"，让 agent 知道
+    # 自己在这一群里的岗位（lead / reviewer / ...）。decision_tier 由 bridge 启动参数注入
+    # （见 _decision_tier_line），此处只补 business_role，避免双源冲突。
+    self_role = next(
+        (
+            str(m.get("business_role") or "").strip()
+            for m in members
+            if str(m.get("member_id") or "") == member_id
+        ),
+        "",
+    )
+    if self_role:
+        context += f"你在本群的业务角色：{self_role}。\n"
+    group_type = str(group.get("type") or "free").strip().lower() or "free"
+    if group_type == "free":
+        return context
+
+    templates = await _get_hall_type_templates(client)
+    template = templates.get(group_type)
+    if not template:
+        return context
+
+    label = str(template.get("label") or group_type).strip()
+    protocol_guidance = str(template.get("protocol_guidance") or "").strip()
+    if protocol_guidance:
+        context += f"本群类型：{label}（{group_type}）。流程指引：{protocol_guidance}\n"
+
+    if self_role:
+        self_role_normalized = self_role.lower()
+        for role in template.get("roles") or []:
+            if not isinstance(role, dict):
+                continue
+            if str(role.get("role") or "").strip().lower() != self_role_normalized:
+                continue
+            norm = str(role.get("norm") or "").strip()
+            if norm:
+                context += f"你的角色职责：{norm}\n"
+            break
+    return context
 
 
-async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:
+async def _update_discussion_status(
+    client: Any,
+    discussion_id: int | None,
+    status: str,
+    *,
+    end_reason: str | None = None,
+) -> None:
     if discussion_id is None:
         return
     try:
-        await client.update_discussion(discussion_id, status=status)
+        if end_reason is None:
+            await client.update_discussion(discussion_id, status=status)
+        else:
+            await client.update_discussion(discussion_id, status=status, end_reason=end_reason)
     except AttributeError:
         pass
     except Exception as exc:
         if not _is_talk_not_found(exc):
             raise
+
+
+async def _resolve_if_decision_maker(
+    client: Any,
+    *,
+    discussion_id: int | None,
+    group_id: str | None,
+    member_id: str,
+    stance: str,
+) -> None:
+    if stance != "decision":
+        return
+    decision_maker = await _find_decision_maker(client, group_id)
+    if decision_maker != member_id:
+        return
+    end_reason = "consensus"
+    try:
+        turns = await _list_discussion_turns(client, discussion_id)
+    except Exception:
+        turns = []
+    if any(str(turn.get("stance") or "") == "escalate" for turn in turns if isinstance(turn, dict)):
+        end_reason = "deadlock"
+    await _update_discussion_status(client, discussion_id, "resolved", end_reason=end_reason)
 
 
 async def _maybe_escalate_disagreement(
@@ -980,17 +1142,17 @@ async def _maybe_escalate_disagreement(
     if not _last_two_turns_disagree(turns):
         return
 
-    human_id = await _find_human_reviewer(client, group_id)
-    if human_id is None:
+    decision_maker_id = await _find_decision_maker(client, group_id)
+    if decision_maker_id is None:
         return
-    text = f"@{human_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
-    message = await client.send_text(text, to=[human_id], reply_to=reply_to, group_id=group_id)
+    text = f"@{decision_maker_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
+    message = await client.send_text(text, to=[decision_maker_id], reply_to=reply_to, group_id=group_id)
     await _append_discussion_turn(
         client,
         discussion_id=discussion_id,
         message_id=int(message["id"]),
         stance="escalate",
-        target_member_id=human_id,
+        target_member_id=decision_maker_id,
         turn_kind="demand",
         round_index=2,
     )
@@ -1020,6 +1182,195 @@ async def _active_discussion_for_peer(
         if discussion.get("status") == "active" and {member_id, peer_id}.issubset(participants):
             return discussion
     return None
+
+
+async def _active_multiparty_discussion(
+    client: Any,
+    *,
+    group_id: str | None,
+    member_id: str,
+    peer_id: str | None,
+) -> dict[str, Any] | None:
+    """找包含双方的 active 多方（>2 参与者）discussion——人驱动编排（DELIBERATION §8）的记账场。
+
+    只匹配多方场，避免把 human 的普通消息记进 1:1 讨论（保持既有 1:1 流程零变化）。
+    """
+    if not group_id or not peer_id:
+        return None
+    try:
+        discussions = await client.list_discussions(group_id=group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
+
+    for discussion in discussions:
+        participants = set(discussion.get("participant_ids") or [])
+        if (
+            discussion.get("status") == "active"
+            and len(participants) > 2
+            and {member_id, peer_id}.issubset(participants)
+        ):
+            return discussion
+    return None
+
+
+# 多方场（brainstorm）发言可见性（DELIBERATION §8）：拉本场发言喂进 prompt，
+# 让 agent 能对彼此的想法表态/汇总。仅 >2 参与者的场生效；1:1/free 不注入。
+_SHARED_HISTORY_MAX_MESSAGES = 24
+_SHARED_HISTORY_MAX_CHARS_EACH = 240
+_SUMMARY_OPINION_MAX_CHARS_EACH = 4000
+
+
+async def _is_brainstorm_summary_request(
+    client: Any,
+    *,
+    message: dict[str, Any],
+    group_id: str | None,
+    discussion: dict[str, Any] | None,
+    member_id: str,
+    sender_id: str,
+    task_text: str,
+) -> bool:
+    if not group_id or not sender_id.startswith("human:") or not discussion or not _is_summary_request(task_text):
+        return False
+    recipients = message.get("to")
+    if not isinstance(recipients, list) or {str(recipient) for recipient in recipients} != {member_id}:
+        return False
+    participants = set(discussion.get("participant_ids") or [])
+    if discussion.get("status") != "active" or len(participants) <= 2 or {member_id, sender_id} - participants:
+        return False
+    try:
+        group = await client.get_group(group_id)
+    except AttributeError:
+        return False
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return False
+        raise
+    return group.get("type") == "brainstorm" and _decision_maker_from_group(group) == member_id
+
+
+async def _brainstorm_summary_grounding(
+    client: Any,
+    *,
+    group_id: str,
+    discussion: dict[str, Any],
+    turns: list[dict[str, Any]],
+) -> str:
+    """取齐每位 Agent 的首条意见原文，给最终汇总者一个有边界的事实块。"""
+    agent_ids = {
+        str(participant)
+        for participant in discussion.get("participant_ids") or []
+        if str(participant).startswith("agent:")
+    }
+    first_opinions: list[tuple[str, int]] = []
+    seen: set[str] = set()
+    for turn in turns:
+        if not isinstance(turn, dict) or str(turn.get("stance") or "") != "answer":
+            continue
+        if turn.get("turn_kind") not in (None, "reply"):
+            continue
+        speaker = str(turn.get("speaker_id") or "")
+        if speaker not in agent_ids or speaker in seen:
+            continue
+        try:
+            message_id = int(turn["message_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        seen.add(speaker)
+        first_opinions.append((speaker, message_id))
+
+    if not agent_ids or seen != agent_ids:
+        return ""
+
+    root_id = discussion.get("root_message_id")
+    try:
+        since = int(root_id) - 1 if root_id is not None else None
+        messages = await client.fetch_history(group_id=group_id, since=since, limit=500)
+    except AttributeError:
+        return ""
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return ""
+        raise
+
+    messages_by_id = {
+        str(message.get("id")): message
+        for message in messages or []
+        if isinstance(message, dict) and not message.get("revoked_at") and not message.get("revoked")
+    }
+    blocks: list[str] = []
+    for index, (speaker, message_id) in enumerate(first_opinions, start=1):
+        message = messages_by_id.get(str(message_id))
+        if not message or str(message.get("from") or "") != speaker:
+            return ""
+        content = str(message.get("content") or "").strip()
+        if not content:
+            return ""
+        if len(content) > _SUMMARY_OPINION_MAX_CHARS_EACH:
+            content = content[:_SUMMARY_OPINION_MAX_CHARS_EACH] + "…（原文过长，已截断）"
+        blocks.append(f"[{index}] {speaker}（message_id={message_id}）\n{content}")
+
+    return (
+        "【本轮汇总材料（必须据此形成最终结论）】\n"
+        "以下是每位 Agent 在本场的首条意见原文，你此前的意见也在其中。"
+        "现在不要再补一条并列意见；请综合全部意见，直接产出唯一的最终结论。\n\n"
+        + "\n\n".join(blocks)
+    )
+
+
+async def _shared_discussion_history(
+    client: Any,
+    *,
+    group_id: str | None,
+    discussion: dict[str, Any] | None,
+    current_message_id: int | None,
+    self_id: str,
+) -> str:
+    """多方场里，把本场（从 root 消息起）的群发言拼成回顾块，供 agent 表态/汇总参考。
+
+    只对 >2 参与者的 discussion 生效（brainstorm）；1:1/free/无场 → 空串，行为不变。
+    拉历史失败（无该方法 / 404）也返回空串，绝不阻断回复。
+    """
+    if not group_id or not discussion:
+        return ""
+    participants = list(discussion.get("participant_ids") or [])
+    if len(participants) <= 2:
+        return ""
+    root_id = discussion.get("root_message_id")
+    try:
+        since = int(root_id) - 1 if root_id is not None else None
+        messages = await client.fetch_history(
+            group_id=group_id, since=since, limit=_SHARED_HISTORY_MAX_MESSAGES
+        )
+    except AttributeError:
+        return ""
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return ""
+        raise
+
+    lines: list[str] = []
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("revoked_at") or msg.get("revoked"):
+            continue
+        if current_message_id is not None and str(msg.get("id")) == str(current_message_id):
+            continue  # 当前触发消息已在 prompt 里，不重复
+        content = str(msg.get("content") or "").strip()
+        if not content:
+            continue
+        speaker = str(msg.get("from") or "?")
+        lines.append(f"{speaker}：{content[:_SHARED_HISTORY_MAX_CHARS_EACH]}")
+
+    if not lines:
+        return ""
+    body = "\n".join(lines[-_SHARED_HISTORY_MAX_MESSAGES:])
+    return "【本场已有发言（供你表态/汇总参考，请勿逐条复述）】\n" + body
 
 
 async def _discussion_for_message_id(
@@ -1167,7 +1518,7 @@ def _discussion_context_text(
     discussion_id = discussion.get("id")
     root_message_id = discussion.get("root_message_id")
     latest = turns[-1].get("stance") if turns else "question"
-    remaining = max(0, DISCUSSION_MAX_AUTO_TURNS - len(turns))
+    remaining = max(0, _discussion_auto_turn_budget(discussion) - len(turns))
     return (
         "TALK 控制上下文，以下内容只用于约束回复，不要在可见回复中复述字段名或 ID：\n"
         f"discussion_id: {discussion_id}\n"
@@ -1197,7 +1548,7 @@ async def _send_human_escalation(
     text: str,
     human_id: str | None = None,
 ) -> bool:
-    target = human_id or await _find_human_reviewer(client, group_id)
+    target = human_id or await _find_decision_maker(client, group_id)
     if target is None:
         return False
     message = await client.send_text(f"@{target} {text}".strip(), to=[target], reply_to=reply_to, group_id=group_id)
@@ -1294,14 +1645,22 @@ async def execute_talk_actions(
                 )
             existing_turns = await _list_discussion_turns(client, discussion_id)
             demand_round = action.round_index or min(_next_demand_round(existing_turns), 2)
+            effective_stance = infer_discussion_stance(task_text, action_body, default=action.stance or "question")
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
                 message_id=int(sent["id"]),
-                stance=infer_discussion_stance(task_text, action_body, default=action.stance or "question"),
+                stance=effective_stance,
                 target_member_id=target,
                 turn_kind="demand",
                 round_index=demand_round,
+            )
+            await _resolve_if_decision_maker(
+                client,
+                discussion_id=discussion_id,
+                group_id=group_id,
+                member_id=member_id,
+                stance=effective_stance,
             )
             summaries.append(f"sent message to {target}")
         elif action.action_type == "escalate_to_human":
@@ -1457,6 +1816,7 @@ def build_cli_prompt(
     discussion_context: str | None = None,
     decision_tier: str = "execution",
     group_member_context: str = "",
+    shared_history: str = "",
 ) -> str:
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
@@ -1479,6 +1839,9 @@ def build_cli_prompt(
         # 完成的 request),信噪比被 10x 压垮。其他 runtime(legacy 文本协议)仍保留,
         # 兼容由下方分支承担。
         parts = [f"你是 {member_id}。{sender} 对你说:{task}"]
+        history_line = shared_history.strip()
+        if history_line:
+            parts.append(history_line)
         member_line = group_member_context.strip()
         if member_line:
             parts.append(member_line)
@@ -1488,6 +1851,7 @@ def build_cli_prompt(
     message_id = message.get("id") or "unknown"
     group_id = message.get("group_id")
     group_line = f"TALK group id: {group_id}\n" if group_id else ""
+    history_block = f"{shared_history.strip()}\n\n" if shared_history.strip() else ""
     return (
         f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
         f"{tier_line}\n"
@@ -1500,6 +1864,7 @@ def build_cli_prompt(
         f"Sender: {sender}\n"
         f"TALK message id: {message_id}\n\n"
         f"{group_line}"
+        f"{history_block}"
         "Task:\n"
         f"{task}{context_block}\n"
     )
@@ -1754,10 +2119,12 @@ async def handle_incoming_message(
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
             substantive_turns = _substantive_discussion_turns(turns)
             discussion_turn_count = len(substantive_turns)
+            # 多方场（如 brainstorm）预算按参与者规模放大；1:1 阈值不变（DELIBERATION §8.3）
+            close_threshold = _discussion_auto_turn_budget(discussion) + 1
             if (
                 discussion_id is not None
                 and latest_stance == "disagree"
-                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+                and len(substantive_turns) >= close_threshold
             ):
                 await _send_human_escalation(
                     client,
@@ -1772,7 +2139,7 @@ async def handle_incoming_message(
             if (
                 discussion_id is not None
                 and latest_stance != "disagree"
-                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+                and len(substantive_turns) >= close_threshold
             ):
                 await _send_agent_scope_closure(
                     client,
@@ -1794,6 +2161,18 @@ async def handle_incoming_message(
                 direct_requester_id=sender_id,
                 human_id=await _find_human_reviewer(client, group_id),
             )
+        elif group_id:
+            # 人驱动编排（DELIBERATION §8）：human 发起/点名时，把本次回复记账到已开的多方场
+            # （如 brainstorm 自动开的场）。只解析多方场，1:1 流程与 prompt 保持零变化。
+            discussion = await _active_multiparty_discussion(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=sender_id,
+            )
+            if discussion is not None and discussion.get("id") is not None:
+                turns = await _list_discussion_turns(client, int(discussion["id"]))
+                discussion_turn_count = len(_substantive_discussion_turns(turns))
 
         group_member_context = await _build_group_member_context(client, group_id, member_id, sender=str(sender))
 
@@ -1819,6 +2198,35 @@ async def handle_incoming_message(
             os.environ["TALK_DEFERRED_FILE"] = deferred_path
             deferred_file = deferred_path
 
+        summary_request = await _is_brainstorm_summary_request(
+            client,
+            message=message,
+            group_id=group_id,
+            discussion=discussion,
+            member_id=member_id,
+            sender_id=sender_id,
+            task_text=task_text,
+        )
+        summary_grounding = ""
+        if summary_request and discussion is not None:
+            summary_grounding = await _brainstorm_summary_grounding(
+                client,
+                group_id=group_id or "",
+                discussion=discussion,
+                turns=turns,
+            )
+
+        # 汇总轮只注入每位 Agent 的首条意见原文；其它多方轮次沿用 BS-2b 历史回顾。
+        shared_history = summary_grounding
+        if not shared_history:
+            shared_history = await _shared_discussion_history(
+                client,
+                group_id=group_id,
+                discussion=discussion,
+                current_message_id=_message_id(message),
+                self_id=member_id,
+            )
+
         prompt = build_cli_prompt(
             message,
             member_id=member_id,
@@ -1827,6 +2235,7 @@ async def handle_incoming_message(
             discussion_context=discussion_context,
             decision_tier=decision_tier,
             group_member_context=group_member_context,
+            shared_history=shared_history,
         )
         if os.environ.get("TALK_DUMP_PROMPT") == "1":
             _dump_prompt(
@@ -1866,22 +2275,35 @@ async def handle_incoming_message(
         visible_reply = sanitize_visible_reply(visible_reply)
         mark_actions = [action for action in actions if action.action_type == "mark_stance"]
         has_final_action = any(action.action_type == "final_to_human" for action in actions)
+        summary_reply_is_decision = bool(
+            summary_grounding and visible_reply and not result.timed_out and result.returncode == 0
+        )
 
         # Reply to sender FIRST, before executing any TALK_ACTION side effects
         reply_message_id: int | None = None
         if visible_reply:
             reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
             reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
-            if sender_id.startswith("agent:") and discussion and not mark_actions:
-                await _append_discussion_turn(
+            # agent 发送者：沿用原记账；human 发送者：仅当解析到多方场（人驱动编排）时记账
+            if discussion and not mark_actions:
+                reply_stance = "decision" if summary_reply_is_decision else infer_reply_stance(task_text, visible_reply)
+                appended = await _append_discussion_turn(
                     client,
                     discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
                     message_id=reply_message_id,
-                    stance=infer_reply_stance(task_text, visible_reply),
+                    stance=reply_stance,
                     target_member_id=sender_id,
                     turn_kind="reply",
                     round_index=1,
                 )
+                if appended:
+                    await _resolve_if_decision_maker(
+                        client,
+                        discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
+                        group_id=group_id,
+                        member_id=member_id,
+                        stance=reply_stance,
+                    )
 
         # 5.5 方案 D：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）。
         # reply_to 只保留 UI 引用；需求轮次写入 discussion_turns 账本。
@@ -1894,6 +2316,7 @@ async def handle_incoming_message(
                 group_id=group_id,
                 reply_to=current_msg_id,
                 current_turn_count=discussion_turn_count,
+                max_auto_turns=_discussion_auto_turn_budget(discussion),
             )
             discussion, turns = await _record_deferred_demand_turns(
                 deferred_results,
@@ -1936,7 +2359,7 @@ async def handle_incoming_message(
                     topic=_discussion_topic_from_text(task_text),
                     create_if_missing=group_id is not None,
                 )
-            stance = action.stance or "answer"
+            stance = "decision" if summary_reply_is_decision else action.stance or "answer"
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
@@ -1945,6 +2368,13 @@ async def handle_incoming_message(
                 target_member_id=peer_id,
                 turn_kind="reply",
                 round_index=action.round_index or 1,
+            )
+            await _resolve_if_decision_maker(
+                client,
+                discussion_id=discussion_id,
+                group_id=group_id,
+                member_id=member_id,
+                stance=stance,
             )
             if stance == "agree" and not has_final_action:
                 await _update_discussion_status(client, discussion_id, "resolved")

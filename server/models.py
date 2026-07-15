@@ -9,6 +9,8 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
 from sqlmodel import Field, SQLModel
 
+from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
+
 
 # ── ORM models (SQLite tables) ──────────────────────────────────────
 
@@ -22,6 +24,8 @@ class Member(SQLModel, table=True):
     api_key: str = Field(unique=True, index=True)
     poll_hint: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # 全局禁用（UI #3 / 软删）：非空 = 已禁用，被鉴权拒绝；保留行以维持 messages.from_id 归属。
+    disabled_at: Optional[datetime] = Field(default=None, index=True)
 
 
 class Message(SQLModel, table=True):
@@ -69,6 +73,7 @@ class Group(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
     description: Optional[str] = None
+    type: str = Field(default=DEFAULT_HALL_TYPE, index=True)
     project_id: Optional[str] = Field(default=None, foreign_key="projects.project_id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -80,7 +85,11 @@ class GroupMember(SQLModel, table=True):
 
     group_id: str = Field(foreign_key="groups.id", primary_key=True)
     member_id: str = Field(foreign_key="members.id", primary_key=True, index=True)
-    role: str = Field(default="member", index=True)
+    role: str = Field(default="member", index=True)  # chat role: owner | moderator | member
+    # 协作层（PROJECT_INTEGRATION §5.2）：业务角色 + 决策分级，按 (群, 成员) 存储。
+    # business_role 自由文本（lead / dev / ui / tester / reviewer / ...）；decision_tier ∈ {decision, execution}。
+    business_role: Optional[str] = Field(default=None, index=True)
+    decision_tier: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -185,6 +194,7 @@ class DiscussionSession(SQLModel, table=True):
     assignee_id: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
     scope_text: Optional[str] = None
     status: str = Field(default="active", index=True)
+    end_reason: Optional[str] = Field(default=None, index=True)  # consensus/deadlock/timeout/manual; None=not ended or unmarked
     max_rounds: int = 2
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -219,12 +229,19 @@ class MemberCreate(BaseModel):
     poll_hint: Optional[int] = None
 
 
+class MemberDisableUpdate(BaseModel):
+    """`PATCH /api/members/{id}` body — toggle a member's global disabled state."""
+
+    disabled: bool
+
+
 class MemberOut(BaseModel):
     id: str
     kind: str
     display_name: str
     poll_hint: Optional[int] = None
     created_at: datetime
+    disabled_at: Optional[datetime] = None
 
 
 class MessageCreate(BaseModel):
@@ -326,11 +343,14 @@ class FileOut(BaseModel):
 
 
 _GROUP_ROLES = {"owner", "moderator", "member"}
+_DECISION_TIERS = {"decision", "execution"}
 
 
 class GroupMemberOut(BaseModel):
     member_id: str
     role: str
+    business_role: Optional[str] = None
+    decision_tier: Optional[str] = None
     created_at: datetime
 
 
@@ -338,6 +358,7 @@ class GroupCreate(BaseModel):
     id: Optional[str] = None
     name: str
     description: Optional[str] = None
+    type: Optional[str] = None  # None -> 创建时落为 DEFAULT_HALL_TYPE
     project_id: Optional[str] = None  # NULL = 无项目上下文（向后兼容历史群）
     member_ids: list[str] = []
 
@@ -352,6 +373,12 @@ class GroupCreate(BaseModel):
             raise ValueError("name is required")
         if self.description is not None:
             self.description = self.description.strip() or None
+        if self.type is None:
+            self.type = DEFAULT_HALL_TYPE
+        else:
+            self.type = self.type.strip().lower()
+            if self.type not in HALL_TYPES:
+                raise ValueError(f"type must be one of {sorted(HALL_TYPES)}")
         if self.project_id is not None:
             self.project_id = self.project_id.strip() or None
         self.member_ids = list(dict.fromkeys(member_id.strip() for member_id in self.member_ids if member_id.strip()))
@@ -374,12 +401,20 @@ class GroupUpdate(BaseModel):
 
 class GroupMemberUpdate(BaseModel):
     role: str = "member"
+    business_role: Optional[str] = None
+    decision_tier: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_group_member_update(self) -> "GroupMemberUpdate":
         self.role = self.role.strip().lower()
         if self.role not in _GROUP_ROLES:
             raise ValueError(f"role must be one of {sorted(_GROUP_ROLES)}")
+        if self.business_role is not None:
+            self.business_role = self.business_role.strip() or None
+        if self.decision_tier is not None:
+            self.decision_tier = self.decision_tier.strip().lower() or None
+            if self.decision_tier is not None and self.decision_tier not in _DECISION_TIERS:
+                raise ValueError(f"decision_tier must be one of {sorted(_DECISION_TIERS)}")
         return self
 
 
@@ -387,6 +422,7 @@ class GroupOut(BaseModel):
     id: str
     name: str
     description: Optional[str]
+    type: str
     project_id: Optional[str]
     created_by: str
     created_at: datetime
@@ -395,7 +431,8 @@ class GroupOut(BaseModel):
 
 
 _DISCUSSION_STATUSES = {"active", "resolved", "escalated", "canceled"}
-_DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
+_DISCUSSION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure", "decision"}
+_DISCUSSION_END_REASONS = {"consensus", "deadlock", "timeout", "manual"}
 _DISCUSSION_TURN_KINDS = {"demand", "reply"}
 
 
@@ -435,12 +472,17 @@ class DiscussionSessionCreate(BaseModel):
 
 class DiscussionSessionUpdate(BaseModel):
     status: str
+    end_reason: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_discussion_update(self) -> "DiscussionSessionUpdate":
         self.status = self.status.strip().lower()
         if self.status not in _DISCUSSION_STATUSES:
             raise ValueError(f"status must be one of {sorted(_DISCUSSION_STATUSES)}")
+        if self.end_reason is not None:
+            self.end_reason = self.end_reason.strip().lower()
+            if self.end_reason not in _DISCUSSION_END_REASONS:
+                raise ValueError(f"end_reason must be one of {sorted(_DISCUSSION_END_REASONS)}")
         return self
 
 
@@ -455,6 +497,7 @@ class DiscussionSessionOut(BaseModel):
     assignee_id: Optional[str]
     scope_text: Optional[str]
     status: str
+    end_reason: Optional[str]
     max_rounds: int
     created_at: datetime
     updated_at: datetime
@@ -472,6 +515,7 @@ class DiscussionSessionOut(BaseModel):
             assignee_id=session.assignee_id,
             scope_text=session.scope_text,
             status=session.status,
+            end_reason=session.end_reason,
             max_rounds=session.max_rounds,
             created_at=session.created_at,
             updated_at=session.updated_at,
@@ -800,3 +844,17 @@ class ProjectAgentOut(BaseModel):
             memory_pointer=agent.memory_pointer,
             updated_at=agent.updated_at,
         )
+
+
+class AgentProfileOut(BaseModel):
+    project_id: str
+    member_id: str
+    identity: Optional[str]
+    soul: Optional[str]
+    user: Optional[str]
+
+
+class AgentProfileUpdate(BaseModel):
+    identity: Optional[str] = None
+    soul: Optional[str] = None
+    user: Optional[str] = None
