@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：任务队列与显式触发调度 API 第一版已落地；Task Hall 目标态已确认，尚未实现
+> 状态：任务队列与显式触发调度 API 第一版已落地；Task Hall 数据 / API 地基已实现，终端接入、runner Hall 回传和 Web UI 待后续切片
 
 ## 目标
 
@@ -10,13 +10,13 @@
 ## 负责范围
 
 - 数据模型：`server/models.py` 中的 `AgentTask`、`AgentTaskSchedule`
-- API 路由：`server/routes/tasks.py`
+- API 路由：`server/routes/tasks.py`；自动生成 Task Hall 的结构保护涉及 `server/routes/groups.py`
 - 数据库初始化：`server/db.py`
 - SDK 方法：`TALK/client/talk_client.py`、`TALK/client/talk_client_sync.py`
 
 ## 当前实现
 
-> 本节只描述已经落地的行为。后文“Task Hall 目标态”是下一阶段合同，不应被理解为现有 API 已具备对应字段或状态。
+> 本节只描述已经落地的行为。后文“Task Hall 目标态”同时保留尚未完成的终端、runner 与 Web 合同。
 
 ### 数据模型
 
@@ -24,16 +24,21 @@
 
 - `id`：自增任务 id
 - `schedule_id`：可选来源 schedule id；普通即时任务为空
+- `project_id`：可选项目归属；新 Task Hall 调用应提供，空值只为旧客户端和现有 schedule 兼容
+- `hall_group_id`：唯一关联的 `groups.type=task` Hall id
 - `target_member_id`：目标 Agent 成员，例如 `agent:codex`
 - `created_by`：任务创建者
 - `content`：任务正文
 - `title`：可选短标题
-- `status`：`queued`、`running`、`succeeded`、`failed`、`canceled`
+- `status`：runner 执行五态，保持 `queued`、`running`、`succeeded`、`failed`、`canceled`
+- `workflow_status`：协作流程状态，支持 `assigned`、`clarification_requested`、`accepted`、`in_progress`、`submitted`、`completed`、`failed`、`canceled`
 - `claimed_by`：领取任务的 Agent
 - `instance_id`：处理任务的 Agent 实例
 - `result_message_id`：任务完成后对应的 TALK 消息，可为空
 - `last_error`：失败原因摘要
-- `created_at` / `updated_at` / `claimed_at` / `finished_at`
+- `created_at` / `updated_at` / `claimed_at` / `finished_at` / `result_collected_at`
+
+即时任务和 schedule 物化任务都会原子创建一个独立 Task Hall。Hall 当前只包含请求者与执行者：请求者为 `owner`，执行者为 `member`。关联 Task Hall 不能通过普通 Group API 增删成员或独立删除。
 
 `agent_task_schedules` 表记录延迟或周期性任务计划：
 
@@ -54,13 +59,33 @@
 
 - 任意已认证成员可创建任务。
 - `target_member_id` 必须是已存在的 `agent:*` 成员。
-- 创建后状态为 `queued`。
+- 请求者与目标成员必须不同。
+- 可传 `project_id`，且项目必须存在；省略时按旧客户端兼容为无项目归属。
+- 创建后执行状态为 `queued`、协作状态为 `assigned`，并自动返回唯一 `hall_group_id`。
 
 `GET /api/tasks`
 
 - 已认证成员可读取任务。
 - Human 当前可读取全部任务；Agent 只能读取目标是自己或自己创建的任务。
-- 支持 `target_member_id` 与 `status` 查询过滤。
+- 支持 `target_member_id`、执行 `status`、`workflow_status` 与 `project_id` 查询过滤。
+
+`GET /api/tasks/{task_id}`
+
+- Human 延续现有管理视角；Agent 只能读取目标是自己或自己创建的任务，其他 Agent 得到 `404`。
+
+`POST /api/tasks/{task_id}/request-clarification`
+
+- 仅执行者可调用；把 `assigned` 推进为 `clarification_requested`。
+- 实际问题正文通过对应 Task Hall 的消息时间线发送；处于该状态时不能 claim。
+
+`POST /api/tasks/{task_id}/accept`
+
+- 仅执行者可调用；把 `assigned` 或 `clarification_requested` 推进为 `accepted`。
+
+`POST /api/tasks/{task_id}/collect-result`
+
+- 仅原请求者可调用；任务必须处于 `submitted` 且存在 `result_message_id`。
+- 调用后协作状态变为 `completed` 并记录 `result_collected_at`；重复调用幂等返回。
 
 `POST /api/tasks/{task_id}/claim`
 
@@ -68,7 +93,8 @@
 - 只有任务目标 Agent 可以领取该任务。
 - 只允许领取 `queued` 任务。
 - 可传 `instance_id`，且该实例必须属于当前 Agent。
-- 领取后任务变为 `running`；关联实例会变为 `busy`，并写入 `current_task_id`。
+- `clarification_requested` 必须先接受，不能直接领取；旧客户端从 `assigned` 直接领取仍兼容。
+- 领取后执行状态变为 `running`、协作状态变为 `in_progress`；关联实例会变为 `busy`，并写入 `current_task_id`。
 
 `POST /api/tasks/{task_id}/complete`
 
@@ -77,6 +103,8 @@
 - 终态限定为 `succeeded`、`failed`、`canceled`。
 - `failed` 必须提供 `last_error`。
 - 可传 `result_message_id`，该消息必须由当前 Agent 发送。
+- `result_message_id` 可来自对应 Task Hall；为兼容尚未升级的 bridge，暂时也接受旧全局时间线，但拒绝其它 Hall 的消息。
+- `succeeded` 将协作状态推进为 `submitted`；`failed` / `canceled` 同步为同名协作状态，不会误标为请求者已收取。
 - 成功或取消后关联实例回到 `idle`；失败后关联实例进入 `error` 并记录 `last_error`。
 
 `POST /api/tasks/schedules`
@@ -106,6 +134,7 @@
 - 显式物化当前已到期的 `active` schedule，返回 `created_tasks` 与 `updated_schedules`。
 - Human 会触发全部到期 schedule；Agent 只会触发目标为自己或自己创建的到期 schedule。
 - 一次性 schedule 物化后变为 `completed`；周期 schedule 物化后保持 `active`，并将 `next_run_at` 推进到当前时间之后。
+- 每次物化都创建独立 Task Hall；schedule 尚无 `project_id` 字段，因此当前物化 Hall 保持无项目归属，项目化 schedule 后续另片处理。
 - TALK 当前不自动启动后台调度器；该接口供 bridge、人工脚本或后续服务端调度器调用。
 
 ### SDK
@@ -145,7 +174,7 @@ A 创建并指派
 ```
 
 - `failed`、`canceled`、`timed_out`、`rework_requested` 属于异常或返工分支，后续随状态机设计补齐。
-- 当前 `queued / running / succeeded / failed / canceled` 五态继续兼容；目标态是产品语义。是否扩充数据库枚举，或由 task 状态 + Hall 事件组合表达，在首个实现切片决定并提供迁移方案。
+- 当前 `queued / running / succeeded / failed / canceled` 五态继续作为 runner 执行状态；已新增独立 `workflow_status` 表达产品语义，claim / complete 自动同步两套状态。旧库按执行状态回填协作状态。
 - B 提出澄清时任务不能被误标为执行中；B 提交结果也不等于 A 已经收取 / 验收。`submitted` 与 `result_collected / completed` 必须可区分。
 
 ### 混合终端运行模型
@@ -168,20 +197,18 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 | 等待变化 | `talk_wait_tasks` | 等待澄清、状态变化或结果，避免终端盲轮询 |
 | 回复与纠偏 | `talk_reply_task` / `talk_steer_task` | 回答疑问、补充约束、请求返工 |
 | 取消任务 | `talk_cancel_task` | 按权限取消未完成任务 |
-| 收集结果 | `talk_collect_results` | 获取一个或多个子任务结果供主 Agent整合 |
+| 收集结果 | `talk_collect_results` | 获取一个或多个子任务结果供主 Agent 整合 |
 
-### 数据关联草案
+### 数据关联现状与后续
 
-在不破坏现有表的前提下，`agent_tasks` 后续至少需要表达：
+首个实现切片已确定复用 `groups.type=task`，不新增 thread 实体，并落地：
 
-- `project_id`：所属项目；
-- `task_hall_id` 或 `thread_id`：对应 Task Hall；
-- `parent_task_id` / `root_goal_id`：可选父任务或总目标；
-- 请求者、执行者与实际 runner / instance 的区分；
-- `accepted_at`、`submitted_at`、`result_collected_at` 等关键节点；
-- claim / lease、attempt 与幂等键，防止多个 runner 重复执行。
+- `project_id`：所属项目，旧客户端兼容为空；
+- `hall_group_id`：唯一对应 Task Hall；
+- `created_by` / `target_member_id` / `claimed_by` / `instance_id`：区分请求者、执行者和实际 runner；
+- `workflow_status` / `result_collected_at`：区分执行状态、结果提交与结果收取。
 
-字段名与 Task Hall 最终复用 `groups` 还是独立 thread 实体，均属于实现决策；体验层的一任务一 Hall、1 对 1 执行、项目归属和结果可收取不变。
+`parent_task_id` / `root_goal_id`、更细时间点、lease、attempt 与幂等键仍属于后续可靠性切片。
 
 ### 项目级 Web 信息架构
 
@@ -195,16 +222,17 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 - 当前支持 schedule 记录与显式 `run-due` 物化，但没有内置后台调度循环。
 - 当前不实现任务重试、超时回收、抢占、重新排队。
 - 当前不由 TALK 服务端创建或管理 bridge 进程。
-- 当前任务 API 不替代消息系统；任务结果仍建议通过普通 TALK 消息记录，并用 `result_message_id` 关联。
-- 当前尚未自动创建 Task Hall，也没有澄清 / 接受 / 提交 / 结果收取的完整状态和项目黑板；这些属于上述目标态。
+- 当前任务 API 不替代消息系统；澄清正文和结果正文仍通过 Task Hall 消息记录，并用动作 API / `result_message_id` 关联。
+- SDK 尚未暴露 `project_id`、Task Hall 动作与协作状态过滤 helper；bundled bridge 结果仍发到旧全局时间线，这是下一切片的明确兼容债。
+- 当前没有 Project Blackboard / Task Hall Web UI，也尚未实现 observer、取消、返工和 lease / 超时回收。
 
 ## 后续计划
 
-1. 定稿 Task Hall 的存储关联与向后兼容状态映射，先落 `project_id`、一任务一 Hall 和 1 对 1 权限边界。
-2. 打通创建、澄清、接受、执行、提交与结果收取 API，并补 claim / lease 幂等约束。
-3. 提供终端 TALK MCP / client 的委派、查询 / 等待、纠偏 / 取消与结果收集能力。
-4. 建项目 Blackboard + Task Hall Web UI，并进行一轮跨模型端到端人工验收。
-5. 后续再决定 schedule 后台触发、长任务 SSE、document lock 与递归委派策略。
+1. [x] 复用 `groups.type=task`，落 `project_id` / `hall_group_id` / `workflow_status`、一任务一 Hall 和 1 对 1 结构边界。
+2. [x] 打通澄清、接受、claim 执行、提交与结果收取 API，并保持旧五态兼容。
+3. 提供终端 TALK MCP / client 的委派、查询 / 等待、纠偏 / 取消与结果收集能力，并让 bundled runner 把结果写入 Task Hall。
+4. 补 claim lease / attempt / 幂等约束，再建 Project Blackboard + Task Hall Web UI。
+5. 完成一轮跨模型端到端人工验收；后续再决定 schedule 项目化 / 后台触发、长任务 SSE、document lock 与递归委派策略。
 
 ## 验收点
 
@@ -223,3 +251,8 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 - [x] `run-due` 可将到期周期 schedule 物化为 queued task，并推进 `next_run_at`。
 - [x] 暂停的 schedule 不会被 `run-due` 物化。
 - [x] SDK schedule helper 通过活服务测试。
+- [x] 创建 task 自动建立唯一 `groups.type=task` Hall，并固定请求者 / 执行者 1 对 1 成员结构。
+- [x] `project_id` 校验、项目 / 协作状态过滤和单任务读取通过自动化测试。
+- [x] 澄清会阻止 claim；接受后可进入执行；成功提交与请求者收取结果可区分。
+- [x] Task Hall 不能通过普通 Group API 改成员或独立删除。
+- [x] 旧库新增字段、唯一索引与五态到协作状态回填通过迁移测试。

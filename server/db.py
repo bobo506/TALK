@@ -77,6 +77,28 @@ def init_db() -> None:
         }
         if "schedule_id" not in task_columns:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN schedule_id INTEGER REFERENCES agent_task_schedules(id)")
+        if "project_id" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN project_id TEXT REFERENCES projects(project_id)")
+        if "hall_group_id" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN hall_group_id TEXT REFERENCES groups(id)")
+        if "workflow_status" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN workflow_status TEXT NOT NULL DEFAULT 'assigned'"
+            )
+            conn.exec_driver_sql(
+                """
+                UPDATE agent_tasks
+                SET workflow_status = CASE status
+                    WHEN 'running' THEN 'in_progress'
+                    WHEN 'succeeded' THEN 'submitted'
+                    WHEN 'failed' THEN 'failed'
+                    WHEN 'canceled' THEN 'canceled'
+                    ELSE 'assigned'
+                END
+                """
+            )
+        if "result_collected_at" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN result_collected_at TIMESTAMP")
         discussion_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(discussion_sessions)").fetchall()
@@ -141,6 +163,11 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_claimed_by ON agent_tasks (claimed_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_instance_id ON agent_tasks (instance_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_schedule_id ON agent_tasks (schedule_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_project_id ON agent_tasks (project_id)")
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_agent_tasks_hall_group_id ON agent_tasks (hall_group_id)"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_workflow_status ON agent_tasks (workflow_status)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_target_member_id ON agent_task_schedules (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_created_by ON agent_task_schedules (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_schedule_type ON agent_task_schedules (schedule_type)")

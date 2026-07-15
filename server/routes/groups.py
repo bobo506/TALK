@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 from server.auth import get_current_member
 from server.db import get_session
 from server.models import (
+    AgentTask,
     DiscussionSession,
     DiscussionTurn,
     Group,
@@ -54,6 +55,18 @@ def _ensure_project_exists(project_id: str, session: Session) -> None:
 
 def _is_group_member(group_id: str, member_id: str, session: Session) -> bool:
     return session.get(GroupMember, (group_id, member_id)) is not None
+
+
+def _task_for_hall(group_id: str, session: Session) -> AgentTask | None:
+    return session.exec(select(AgentTask).where(AgentTask.hall_group_id == group_id)).first()
+
+
+def _ensure_task_hall_membership_is_managed_by_task(group_id: str, session: Session) -> None:
+    if _task_for_hall(group_id, session) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Task Hall membership is managed by the task workflow",
+        )
 
 
 def _ensure_can_view_group(group_id: str, current: Member, session: Session) -> None:
@@ -190,6 +203,7 @@ def upsert_group_member(
     """Add a member to a Group or update that member's role."""
     _require_human(current)
     group = _get_group(group_id, session)
+    _ensure_task_hall_membership_is_managed_by_task(group_id, session)
     _get_member(member_id, session)
     now = datetime.now(timezone.utc)
 
@@ -225,6 +239,7 @@ def remove_group_member(
     """Remove a member from a Group."""
     _require_human(current)
     group = _get_group(group_id, session)
+    _ensure_task_hall_membership_is_managed_by_task(group_id, session)
     membership = session.get(GroupMember, (group_id, member_id))
     if membership is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="group member not found")
@@ -251,6 +266,11 @@ def delete_group(
     """
     _require_human(current)
     group = _get_group(group_id, session)
+    if _task_for_hall(group_id, session) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Task Hall cannot be deleted independently from its task",
+        )
 
     session_ids = session.exec(
         select(DiscussionSession.id).where(DiscussionSession.group_id == group_id)

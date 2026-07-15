@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+import server.db as db
 from tests.test_support import RouteTestCase
 
 
@@ -7,6 +8,7 @@ class AgentTaskTests(RouteTestCase):
     def setUp(self):
         super().setUp()
         self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        self.add_member("human:alice", api_key="alice-key", display_name="Alice")
         self.add_member("agent:codex", api_key="codex-key", display_name="Codex")
         self.add_member("agent:other", api_key="other-key", display_name="Other")
 
@@ -31,8 +33,190 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(created.status_code, 201)
         self.assertEqual(created.json()["created_by"], "human:bobo")
         self.assertEqual(created.json()["status"], "queued")
+        self.assertEqual(created.json()["workflow_status"], "assigned")
+        self.assertIsNotNone(created.json()["hall_group_id"])
         self.assertEqual([task["id"] for task in agent_tasks.json()], [created.json()["id"]])
         self.assertEqual(other_tasks.json(), [])
+
+    def test_project_task_creates_dedicated_one_to_one_hall_and_supports_filters(self):
+        with self.make_client() as client:
+            project = client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_talk", "display_name": "TALK"},
+            )
+            created = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "project_id": "prj_talk",
+                    "target_member_id": "agent:codex",
+                    "title": "Task Hall foundation",
+                    "content": "Build the first Task Hall slice",
+                },
+            )
+            task = created.json()
+            hall = client.get(
+                f"/api/groups/{task['hall_group_id']}",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            filtered = client.get(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                params={"project_id": "prj_talk", "workflow_status": "assigned"},
+            )
+            hidden = client.get(
+                f"/api/tasks/{task['id']}",
+                headers={"X-API-Key": "other-key"},
+            )
+
+        self.assertEqual(project.status_code, 201)
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(task["project_id"], "prj_talk")
+        self.assertEqual(task["workflow_status"], "assigned")
+        self.assertIsNone(task["result_collected_at"])
+        self.assertEqual(hall.status_code, 200)
+        self.assertEqual(hall.json()["type"], "task")
+        self.assertEqual(hall.json()["project_id"], "prj_talk")
+        self.assertEqual(hall.json()["name"], "Task Hall foundation")
+        self.assertEqual(
+            {member["member_id"]: member["role"] for member in hall.json()["members"]},
+            {"human:bobo": "owner", "agent:codex": "member"},
+        )
+        self.assertEqual([item["id"] for item in filtered.json()], [task["id"]])
+        self.assertEqual(hidden.status_code, 404)
+
+    def test_task_rejects_unknown_project_and_self_assignment(self):
+        with self.make_client() as client:
+            unknown_project = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "project_id": "prj_missing",
+                    "target_member_id": "agent:codex",
+                    "content": "hello",
+                },
+            )
+            self_assignment = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={"target_member_id": "agent:codex", "content": "hello"},
+            )
+
+        self.assertEqual(unknown_project.status_code, 400)
+        self.assertEqual(self_assignment.status_code, 400)
+
+    def test_task_workflow_clarification_accept_submit_and_collect(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+            )
+            task = created.json()
+            wrong_clarification = client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "other-key"},
+            )
+            clarification = client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "codex-key"},
+            )
+            blocked_claim = client.post(
+                f"/api/tasks/{task['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            accepted = client.post(
+                f"/api/tasks/{task['id']}/accept",
+                headers={"X-API-Key": "codex-key"},
+            )
+            claimed = client.post(
+                f"/api/tasks/{task['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            client.post(
+                "/api/groups",
+                headers={"X-API-Key": "bobo-key"},
+                json={"id": "group:unrelated", "name": "Unrelated", "member_ids": ["agent:codex"]},
+            )
+            unrelated_result = self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id="group:unrelated",
+                content="Wrong Hall",
+            )
+            wrong_submission = client.post(
+                f"/api/tasks/{task['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "result_message_id": unrelated_result.id},
+            )
+            result = self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="Done",
+            )
+            submitted = client.post(
+                f"/api/tasks/{task['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "result_message_id": result.id},
+            )
+            wrong_collector = client.post(
+                f"/api/tasks/{task['id']}/collect-result",
+                headers={"X-API-Key": "alice-key"},
+            )
+            collected = client.post(
+                f"/api/tasks/{task['id']}/collect-result",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(wrong_clarification.status_code, 403)
+        self.assertEqual(clarification.json()["workflow_status"], "clarification_requested")
+        self.assertEqual(blocked_claim.status_code, 409)
+        self.assertEqual(accepted.json()["workflow_status"], "accepted")
+        self.assertEqual(claimed.json()["workflow_status"], "in_progress")
+        self.assertEqual(wrong_submission.status_code, 400)
+        self.assertEqual(submitted.json()["status"], "succeeded")
+        self.assertEqual(submitted.json()["workflow_status"], "submitted")
+        self.assertIsNone(submitted.json()["result_collected_at"])
+        self.assertEqual(wrong_collector.status_code, 403)
+        self.assertEqual(collected.json()["workflow_status"], "completed")
+        self.assertIsNotNone(collected.json()["result_collected_at"])
+
+    def test_task_hall_cannot_be_rewired_or_deleted_as_a_regular_group(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Protected Hall"},
+            ).json()
+            hall_group_id = created["hall_group_id"]
+            add_member = client.put(
+                f"/api/groups/{hall_group_id}/members/agent:other",
+                headers={"X-API-Key": "bobo-key"},
+                json={"role": "member"},
+            )
+            remove_member = client.delete(
+                f"/api/groups/{hall_group_id}/members/agent:codex",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            delete_hall = client.delete(
+                f"/api/groups/{hall_group_id}",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            still_there = client.get(
+                f"/api/groups/{hall_group_id}",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(add_member.status_code, 409)
+        self.assertEqual(remove_member.status_code, 409)
+        self.assertEqual(delete_hall.status_code, 409)
+        self.assertEqual(still_there.status_code, 200)
 
     def test_task_target_must_be_agent_member(self):
         with self.make_client() as client:
@@ -75,6 +259,7 @@ class AgentTaskTests(RouteTestCase):
 
         self.assertEqual(claimed.status_code, 200)
         self.assertEqual(claimed.json()["status"], "running")
+        self.assertEqual(claimed.json()["workflow_status"], "in_progress")
         self.assertEqual(claimed.json()["claimed_by"], "agent:codex")
         self.assertEqual(claimed.json()["instance_id"], "codex-1")
         self.assertEqual(instances.json()[0]["status"], "busy")
@@ -158,6 +343,7 @@ class AgentTaskTests(RouteTestCase):
 
         self.assertEqual(completed.status_code, 200)
         self.assertEqual(completed.json()["status"], "succeeded")
+        self.assertEqual(completed.json()["workflow_status"], "submitted")
         self.assertEqual(completed.json()["result_message_id"], result.id)
         self.assertIsNotNone(completed.json()["finished_at"])
         self.assertEqual(instances.json()[0]["status"], "idle")
@@ -199,6 +385,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(missing_error.status_code, 422)
         self.assertEqual(failed.status_code, 200)
         self.assertEqual(failed.json()["status"], "failed")
+        self.assertEqual(failed.json()["workflow_status"], "failed")
         self.assertEqual(instances.json()[0]["status"], "error")
         self.assertEqual(instances.json()[0]["last_error"], "boom")
 
@@ -238,6 +425,11 @@ class AgentTaskTests(RouteTestCase):
                 json={"target_member_id": "agent:codex", "content": "Run now", "run_at": run_at},
             )
             materialized = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "bobo-key"})
+            materialized_task = materialized.json()["created_tasks"][0]
+            hall = client.get(
+                f"/api/groups/{materialized_task['hall_group_id']}",
+                headers={"X-API-Key": "bobo-key"},
+            )
             second_run = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "bobo-key"})
 
         payload = materialized.json()
@@ -245,6 +437,13 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(len(payload["created_tasks"]), 1)
         self.assertEqual(payload["created_tasks"][0]["schedule_id"], created.json()["id"])
         self.assertEqual(payload["created_tasks"][0]["status"], "queued")
+        self.assertEqual(payload["created_tasks"][0]["workflow_status"], "assigned")
+        self.assertIsNotNone(payload["created_tasks"][0]["hall_group_id"])
+        self.assertEqual(hall.json()["type"], "task")
+        self.assertEqual(
+            {member["member_id"] for member in hall.json()["members"]},
+            {"human:bobo", "agent:codex"},
+        )
         self.assertEqual(payload["updated_schedules"][0]["status"], "completed")
         self.assertEqual(payload["updated_schedules"][0]["last_task_id"], payload["created_tasks"][0]["id"])
         self.assertEqual(second_run.json()["created_tasks"], [])
@@ -301,3 +500,68 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(paused.status_code, 200)
         self.assertEqual(paused.json()["status"], "paused")
         self.assertEqual(materialized.json()["created_tasks"], [])
+
+    def test_init_db_adds_task_hall_fields_and_backfills_legacy_workflow_status(self):
+        with self.engine.begin() as conn:
+            conn.exec_driver_sql("DROP TABLE agent_tasks")
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE agent_tasks (
+                    id INTEGER PRIMARY KEY,
+                    target_member_id TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    title TEXT,
+                    status TEXT NOT NULL,
+                    claimed_by TEXT,
+                    instance_id TEXT,
+                    result_message_id INTEGER,
+                    last_error TEXT,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
+                    claimed_at TIMESTAMP,
+                    finished_at TIMESTAMP
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                INSERT INTO agent_tasks (
+                    id, target_member_id, created_by, content, status, created_at, updated_at
+                ) VALUES
+                    (1, 'agent:codex', 'human:bobo', 'queued', 'queued', '2026-07-15', '2026-07-15'),
+                    (2, 'agent:codex', 'human:bobo', 'running', 'running', '2026-07-15', '2026-07-15'),
+                    (3, 'agent:codex', 'human:bobo', 'succeeded', 'succeeded', '2026-07-15', '2026-07-15'),
+                    (4, 'agent:codex', 'human:bobo', 'failed', 'failed', '2026-07-15', '2026-07-15'),
+                    (5, 'agent:codex', 'human:bobo', 'canceled', 'canceled', '2026-07-15', '2026-07-15')
+                """
+            )
+
+        db.init_db()
+
+        with self.engine.connect() as conn:
+            columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(agent_tasks)").fetchall()}
+            indexes = {
+                row[1]: row[2]
+                for row in conn.exec_driver_sql("PRAGMA index_list(agent_tasks)").fetchall()
+            }
+            workflow_by_id = dict(
+                conn.exec_driver_sql(
+                    "SELECT id, workflow_status FROM agent_tasks ORDER BY id"
+                ).fetchall()
+            )
+
+        self.assertTrue(
+            {"project_id", "hall_group_id", "workflow_status", "result_collected_at"}.issubset(columns)
+        )
+        self.assertEqual(indexes["ix_agent_tasks_hall_group_id"], 1)
+        self.assertEqual(
+            workflow_by_id,
+            {
+                1: "assigned",
+                2: "in_progress",
+                3: "submitted",
+                4: "failed",
+                5: "canceled",
+            },
+        )

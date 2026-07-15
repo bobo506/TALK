@@ -184,6 +184,35 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-15 TH-1：Task Hall 数据 / API 地基
+
+**背景**：项目管理者确认先实现 Task Hall，并批准首个数据库 / 协议切片采用“复用 Group + 双状态”方案：不新增 thread 表，`AgentTask.status` 继续服务现有 runner，另设协作状态表达澄清、接受、提交和结果收取。
+
+### 决策与实现
+
+- `AgentTask` 新增可选 `project_id`、唯一 `hall_group_id`、`workflow_status` 和 `result_collected_at`；`init_db()` 为旧库补列、建索引，并把旧五态回填为对应协作状态。
+- `POST /api/tasks` 原子创建 `groups.type=task` Hall，请求者与执行者固定为不同成员；请求者是 `owner`、执行者是 `member`。schedule 每次物化也建立独立无项目 Hall。
+- 保留执行五态 `queued/running/succeeded/failed/canceled`；协作状态新增 `assigned/clarification_requested/accepted/in_progress/submitted/completed/failed/canceled`。
+- 新增 `GET /api/tasks/{id}`、`workflow_status/project_id` 列表过滤，以及 `request-clarification`、`accept`、`collect-result` 三类动作；澄清状态阻止 claim，成功 complete 只到 `submitted`，请求者收取后才到 `completed`。
+- 关联 Task Hall 不能通过普通 Group API增删成员或独立删除，避免一任务一 Hall 的 1 对 1 结构被拆散。
+- 为兼容现有外部客户端，`project_id` 暂时可为空；结果消息接受对应 Hall 或旧全局时间线，但拒绝其它 Hall。bundled runner 改为 Hall 回传留到下一切片。
+
+### 测试与验证
+
+- `tests/test_tasks.py` 从 11 个扩展到 16 个测试，新增项目关联 / 自动建 Hall、完整协作流程、权限、结构保护、schedule Hall 和旧库迁移覆盖。
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py server\routes\groups.py tests\test_tasks.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -v`：`Ran 16 tests ... OK`。
+- 任务相关七模块最终回归：`Ran 200 tests ... OK`；其余十四模块：`Ran 103 tests ... OK`，最终代码合计 303 项通过。
+- 核心实现完成后的单次 unittest discovery 曾 `Ran 303 tests ... OK`。最后一次单进程复跑在活服务测试退出阶段未结束而被工具超时终止，无断言失败；随后以上述 200 + 103 分批复跑覆盖全部模块，不把超时轮次记为通过。
+- 纯后端数据库 / API 切片，无前端或 Browser 验证。
+
+### 文档与下一步
+
+- 更新 `docs/spec/MODULE_tasks.md`、`docs/PROJECT_BRIEF.md`、`docs/PROGRESS.md` 和本历史记录，使实现态、兼容边界和后续顺序一致。
+- 下一切片扩展 async / sync client 与 bundled runner：支持项目化委派、协作动作和 Task Hall 结果回传；完成后仍按单切片暂停验收。
+
+---
+
 ## 2026-07-15 Task Hall 开工前清理
 
 **完成**

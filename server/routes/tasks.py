@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
@@ -22,10 +23,14 @@ from server.models import (
     AgentTaskScheduleOut,
     AgentTaskScheduleRunOut,
     AgentTaskScheduleUpdate,
+    Group,
+    GroupMember,
     Member,
     Message,
+    Project,
     _SCHEDULE_STATUSES,
     _TASK_STATUSES,
+    _TASK_WORKFLOW_STATUSES,
 )
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -46,6 +51,12 @@ def _get_task(task_id: int, session: Session) -> AgentTask:
     return task
 
 
+def _ensure_task_visible(task: AgentTask, current: Member) -> None:
+    if current.kind == "human" or current.id in {task.created_by, task.target_member_id}:
+        return
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task not found")
+
+
 def _get_schedule(schedule_id: int, current: Member, session: Session) -> AgentTaskSchedule:
     schedule = session.get(AgentTaskSchedule, schedule_id)
     if schedule is None:
@@ -62,6 +73,19 @@ def _ensure_target_agent(member_id: str, session: Session) -> Member:
     return member
 
 
+def _ensure_project_exists(project_id: str | None, session: Session) -> None:
+    if project_id is not None and session.get(Project, project_id) is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="project_id not found")
+
+
+def _ensure_distinct_participants(requester_id: str, target_member_id: str) -> None:
+    if requester_id == target_member_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="task requester and target member must be different",
+        )
+
+
 def _ensure_instance_owner(instance_id: str | None, current: Member, session: Session) -> AgentInstance | None:
     if instance_id is None:
         return None
@@ -74,7 +98,12 @@ def _ensure_instance_owner(instance_id: str | None, current: Member, session: Se
     return instance
 
 
-def _ensure_result_message_owner(message_id: int | None, current: Member, session: Session) -> None:
+def _ensure_result_message_owner(
+    message_id: int | None,
+    current: Member,
+    task: AgentTask,
+    session: Session,
+) -> None:
     if message_id is None:
         return
 
@@ -83,6 +112,16 @@ def _ensure_result_message_owner(message_id: int | None, current: Member, sessio
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="result_message_id not found")
     if message.from_id != current.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="result_message_id must belong to task agent")
+    if task.hall_group_id is not None and message.group_id not in {None, task.hall_group_id}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="result_message_id must belong to the task Hall or the legacy global timeline",
+        )
+    if message.group_id is None and message.to_list is not None and task.created_by not in message.to_list:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="legacy result message must be visible to the task requester",
+        )
 
 
 def _touch_task(task: AgentTask, now: datetime) -> None:
@@ -99,17 +138,82 @@ def _require_schedule_manager(schedule: AgentTaskSchedule, current: Member) -> N
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only human members or schedule creators can update schedules")
 
 
-def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime) -> AgentTask:
-    return AgentTask(
+def _task_hall_name(title: str | None, content: str) -> str:
+    source = " ".join((title or content).split())
+    return source[:80] or "Task"
+
+
+def _create_task_with_hall(
+    *,
+    target_member_id: str,
+    created_by: str,
+    content: str,
+    title: str | None,
+    project_id: str | None,
+    schedule_id: int | None,
+    now: datetime,
+    session: Session,
+) -> AgentTask:
+    hall_group_id = f"group:task-{uuid4().hex}"
+    session.add(
+        Group(
+            id=hall_group_id,
+            name=_task_hall_name(title, content),
+            description=content,
+            type="task",
+            project_id=project_id,
+            created_by=created_by,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    for member_id in dict.fromkeys((created_by, target_member_id)):
+        session.add(
+            GroupMember(
+                group_id=hall_group_id,
+                member_id=member_id,
+                role="owner" if member_id == created_by else "member",
+                created_at=now,
+            )
+        )
+
+    task = AgentTask(
+        schedule_id=schedule_id,
+        project_id=project_id,
+        hall_group_id=hall_group_id,
+        target_member_id=target_member_id,
+        created_by=created_by,
+        content=content,
+        title=title,
+        status="queued",
+        workflow_status="assigned",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(task)
+    return task
+
+
+def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime, session: Session) -> AgentTask:
+    return _create_task_with_hall(
         schedule_id=schedule.id,
+        project_id=None,
         target_member_id=schedule.target_member_id,
         created_by=schedule.created_by,
         content=schedule.content,
         title=schedule.title,
-        status="queued",
-        created_at=now,
-        updated_at=now,
+        now=now,
+        session=session,
     )
+
+
+def _update_workflow_status(task: AgentTask, workflow_status: str, now: datetime, session: Session) -> AgentTask:
+    task.workflow_status = workflow_status
+    _touch_task(task, now)
+    session.add(task)
+    session.commit()
+    session.refresh(task)
+    return task
 
 
 @router.post("", response_model=AgentTaskOut, status_code=status.HTTP_201_CREATED)
@@ -118,19 +222,21 @@ def create_task(
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
-    """Create a queued task for an Agent member."""
+    """Create a queued task and its dedicated one-to-one Task Hall."""
     _ensure_target_agent(body.target_member_id, session)
+    _ensure_distinct_participants(current.id, body.target_member_id)
+    _ensure_project_exists(body.project_id, session)
     now = datetime.now(timezone.utc)
-    task = AgentTask(
+    task = _create_task_with_hall(
         target_member_id=body.target_member_id,
         created_by=current.id,
         content=body.content,
         title=body.title,
-        status="queued",
-        created_at=now,
-        updated_at=now,
+        project_id=body.project_id,
+        schedule_id=None,
+        now=now,
+        session=session,
     )
-    session.add(task)
     session.commit()
     session.refresh(task)
     return task
@@ -140,6 +246,8 @@ def create_task(
 def list_tasks(
     target_member_id: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
+    workflow_status: str | None = Query(None),
+    project_id: str | None = Query(None),
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
@@ -157,6 +265,16 @@ def list_tasks(
                 detail=f"status must be one of {sorted(_TASK_STATUSES)}",
             )
         stmt = stmt.where(AgentTask.status == normalized_status)
+    if workflow_status:
+        normalized_workflow_status = workflow_status.strip().lower()
+        if normalized_workflow_status not in _TASK_WORKFLOW_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"workflow_status must be one of {sorted(_TASK_WORKFLOW_STATUSES)}",
+            )
+        stmt = stmt.where(AgentTask.workflow_status == normalized_workflow_status)
+    if project_id:
+        stmt = stmt.where(AgentTask.project_id == project_id.strip())
     return session.exec(stmt.order_by(AgentTask.created_at.desc())).all()  # type: ignore[union-attr]
 
 
@@ -168,6 +286,7 @@ def create_task_schedule(
 ):
     """Create a one-off or interval task schedule."""
     _ensure_target_agent(body.target_member_id, session)
+    _ensure_distinct_participants(current.id, body.target_member_id)
     now = datetime.now(timezone.utc)
     run_at = body.run_at or now
     schedule = AgentTaskSchedule(
@@ -238,8 +357,7 @@ def run_due_task_schedules(
     created_tasks: list[AgentTask] = []
     updated_schedules: list[AgentTaskSchedule] = []
     for schedule in schedules:
-        task = _create_task_from_schedule(schedule, now)
-        session.add(task)
+        task = _create_task_from_schedule(schedule, now, session)
         session.flush()
 
         schedule.last_run_at = now
@@ -295,6 +413,83 @@ def update_task_schedule(
     return schedule
 
 
+@router.get("/{task_id}", response_model=AgentTaskOut)
+def get_task(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Read one task visible to the requester or assignee."""
+    task = _get_task(task_id, session)
+    _ensure_task_visible(task, current)
+    return task
+
+
+@router.post("/{task_id}/request-clarification", response_model=AgentTaskOut)
+def request_task_clarification(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Record that the assignee has asked a question in the Task Hall."""
+    task = _get_task(task_id, session)
+    if task.target_member_id != current.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the task assignee can request clarification")
+    if task.workflow_status == "clarification_requested":
+        return task
+    if task.workflow_status != "assigned":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}, not assigned",
+        )
+    return _update_workflow_status(task, "clarification_requested", datetime.now(timezone.utc), session)
+
+
+@router.post("/{task_id}/accept", response_model=AgentTaskOut)
+def accept_task(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Record that the assignee accepts the task after any clarification."""
+    task = _get_task(task_id, session)
+    if task.target_member_id != current.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the task assignee can accept the task")
+    if task.workflow_status == "accepted":
+        return task
+    if task.workflow_status not in {"assigned", "clarification_requested"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}, not assignable",
+        )
+    return _update_workflow_status(task, "accepted", datetime.now(timezone.utc), session)
+
+
+@router.post("/{task_id}/collect-result", response_model=AgentTaskOut)
+def collect_task_result(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Mark a submitted result as collected by the original requester."""
+    task = _get_task(task_id, session)
+    if task.created_by != current.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the task requester can collect the result")
+    if task.workflow_status == "completed":
+        return task
+    if task.workflow_status != "submitted":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}, not submitted",
+        )
+    if task.result_message_id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task has no result message to collect")
+
+    now = datetime.now(timezone.utc)
+    task.result_collected_at = now
+    return _update_workflow_status(task, "completed", now, session)
+
+
 @router.post("/{task_id}/claim", response_model=AgentTaskOut)
 def claim_task(
     task_id: int,
@@ -313,9 +508,17 @@ def claim_task(
         return task
     if task.status != "queued":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is already {task.status}")
+    if task.workflow_status == "clarification_requested":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task is waiting for clarification before acceptance")
+    if task.workflow_status not in {"assigned", "accepted"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}, not ready to start",
+        )
 
     now = datetime.now(timezone.utc)
     task.status = "running"
+    task.workflow_status = "in_progress"
     task.claimed_by = current.id
     task.instance_id = body.instance_id
     task.claimed_at = now
@@ -351,11 +554,16 @@ def complete_task(
     if task.status != "running":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is {task.status}, not running")
 
-    _ensure_result_message_owner(body.result_message_id, current, session)
+    _ensure_result_message_owner(body.result_message_id, current, task, session)
     instance = _ensure_instance_owner(task.instance_id, current, session)
 
     now = datetime.now(timezone.utc)
     task.status = body.status
+    task.workflow_status = {
+        "succeeded": "submitted",
+        "failed": "failed",
+        "canceled": "canceled",
+    }[body.status]
     task.result_message_id = body.result_message_id
     task.last_error = body.last_error
     task.finished_at = now

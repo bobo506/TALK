@@ -4,38 +4,43 @@
 
 Updated: 2026-07-15 (Asia/Shanghai)
 
-- 当前分支：`codex/task-hall`，基线为已收尾的 Discussion 分支提交 `1da4797`。
-- 当前里程碑：实现一任务一 Hall、请求者与执行者 1 对 1 的 Task Hall 最小闭环。
-- `agent-docs/BLACKBOARD.md` 属于本地协作文件，从本分支起不再纳入项目版本控制。
-- 上一里程碑 BS-3a 已完成自动化收口修复，五模块共 147 个测试通过；真实模型汇总质量补验不阻塞 Task Hall。
+- 当前分支：`codex/task-hall`。
+- Task Hall 数据 / API 地基切片已完成：复用 `groups.type=task`，自动一任务一 Hall，保留 runner 五态并新增独立协作状态。
+- 最终代码全量覆盖分两批完成：任务相关七模块 `200 tests` + 其余十四模块 `103 tests`，合计 `303 tests` 全绿。
+- 当前按数据库 / 协议切片门禁暂停，等待项目管理者或决策 Agent 验收后再进入 SDK / runner 接入。
 
 ## Current Snapshot
 
-- 当前执行者：Codex；项目管理者已授权开始 Task Hall，按数据库 / 协议单切片完成后暂停验收。
-- 产品合同已确认：Task Halls 与 Discussion Halls 分区；当前优先 Task Hall；每项委派任务自动建立独立 Hall，并归属于项目。
-- Task Hall 标准流程：分配任务 -> 可选澄清 -> 接受 -> 执行 -> 提交结果 -> 请求者收取结果并完成。
-- 现有基础：`AgentTask` 已提供 `queued/running/succeeded/failed/canceled` 队列状态；Group Hall 已支持 `type=task`、成员、消息和文件。
-- 终端定位：实际操作终端负责发起、查询和收取结果；目标 Agent runner 负责领取、执行和回传，TALK 保存全过程。
+- `AgentTask` 已新增 `project_id`、唯一 `hall_group_id`、`workflow_status`、`result_collected_at`，旧库会补列并按原五态回填协作状态。
+- `POST /api/tasks` 会原子创建独立 Task Hall；请求者为 `owner`、执行者为 `member`，双方必须不同。
+- Task Hall 成员不能通过普通 Group API 改写，Hall 也不能脱离关联 task 独立删除。
+- 协作流程已支持 `assigned -> clarification_requested -> accepted -> in_progress -> submitted -> completed`；`failed/canceled` 同步保留。
+- 新增单任务读取、项目 / 协作状态过滤、请求澄清、接受和收取结果 API；claim / complete 自动同步执行状态与协作状态。
+- schedule 物化任务同样自动创建独立 Hall；schedule 尚无项目字段，因此当前物化 Hall 为无项目归属。
 
-## Pending Decisions
+## Current Boundaries
 
-- 首个实现切片需结合现有模型决定：Task Hall 复用 `groups.type=task`，还是增加专用 thread 实体。
-- 目标生命周期需与现有五种任务状态保持向后兼容，避免破坏当前 runner 和 API 客户端。
-- BS-3a 仍保留一次真实 Codex / pi 最终汇总质量补验；这是 Discussion Hall 后续项，不阻塞当前里程碑。
+- `project_id` 为旧客户端兼容仍可为空；新 Task Hall 终端调用应提供项目。
+- SDK 尚未暴露项目参数、协作状态过滤和三类动作 helper。
+- bundled bridge 仍把结果发到旧全局时间线；服务端暂时兼容，下一片改为使用 `hall_group_id`。
+- observer、取消 / 返工、lease / attempt、Project Blackboard 和 Task Hall Web UI 尚未实现。
+- BS-3a 真实模型最终汇总质量补验属于 Discussion Hall 后续项，不阻塞当前里程碑。
 
 ## Next Slice
 
-1. 复核现有 `AgentTask`、Group、消息、成员和任务 API / 测试，确定最小兼容的数据关联方案。
-2. 实现 Task Hall 数据与 API 地基：项目归属、一任务一 Hall、请求者 / 执行者关联及生命周期兼容。
-3. 补迁移与自动化测试，完成后暂停并提交验收，不提前进入 MCP、runner 或 Web UI。
+1. 扩展 async / sync TALK client：项目化委派、单任务读取、协作状态过滤、澄清 / 接受 / 收取结果。
+2. 让 bundled CLI / Codex runner 把任务结果写入对应 Task Hall，并保持旧任务兼容。
+3. 补 SDK 活服务与 bridge 自动化测试；完成后暂停，不提前进入 Web UI。
 
-后续顺序：终端 TALK MCP / client -> runner 领取与回传 -> Project Blackboard + Task Hall UI -> 跨模型端到端人工验收。
+后续顺序：终端 MCP 能力 -> claim lease / attempt -> Project Blackboard + Task Hall UI -> 跨模型端到端人工验收。
 
-## Verification Baseline
+## Verification
 
-- BS-3a：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge` -> `Ran 147 tests ... OK`。
-- Task Hall 产品文档：`git diff --check`、Markdown 本地链接和关键术语检查已通过；尚未开始功能代码验证。
-- 历史测试、验收结果与完整切片记录见 `docs/PROGRESS_HISTORY.md`。
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py server\routes\groups.py tests\test_tasks.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -v`：`Ran 16 tests ... OK`。
+- 任务相关七模块最终回归：`Ran 200 tests ... OK`；其余十四模块：`Ran 103 tests ... OK`，最终代码合计 303 项通过。
+- 核心实现完成后的单次 unittest discovery 也曾 `Ran 303 tests ... OK`；最后一次单进程复跑在活服务测试退出阶段未结束而被工具超时终止，无断言失败，随后用上述 200 + 103 分批复跑覆盖全部模块。
+- 本切片为后端数据库 / API 改动，无前端或 Browser 验证。
 
 ## Known Debt
 

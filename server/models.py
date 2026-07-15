@@ -148,11 +148,14 @@ class AgentTask(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     schedule_id: Optional[int] = Field(default=None, foreign_key="agent_task_schedules.id", index=True)
+    project_id: Optional[str] = Field(default=None, foreign_key="projects.project_id", index=True)
+    hall_group_id: Optional[str] = Field(default=None, foreign_key="groups.id", index=True, unique=True)
     target_member_id: str = Field(foreign_key="members.id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     content: str
     title: Optional[str] = None
     status: str = Field(default="queued", index=True)
+    workflow_status: str = Field(default="assigned", index=True)
     claimed_by: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
     instance_id: Optional[str] = Field(default=None, foreign_key="agent_instances.id", index=True)
     result_message_id: Optional[int] = Field(default=None, foreign_key="messages.id")
@@ -161,6 +164,7 @@ class AgentTask(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     claimed_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    result_collected_at: Optional[datetime] = None
 
 
 class AgentTaskSchedule(SQLModel, table=True):
@@ -603,6 +607,16 @@ class AgentInstanceOut(BaseModel):
 
 _TASK_STATUSES = {"queued", "running", "succeeded", "failed", "canceled"}
 _TASK_TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
+_TASK_WORKFLOW_STATUSES = {
+    "assigned",
+    "clarification_requested",
+    "accepted",
+    "in_progress",
+    "submitted",
+    "completed",
+    "failed",
+    "canceled",
+}
 _SCHEDULE_STATUSES = {"active", "paused", "completed", "canceled"}
 
 
@@ -610,6 +624,7 @@ class AgentTaskCreate(BaseModel):
     target_member_id: str
     content: str
     title: Optional[str] = None
+    project_id: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_task_create(self) -> "AgentTaskCreate":
@@ -617,6 +632,8 @@ class AgentTaskCreate(BaseModel):
         self.content = self.content.strip()
         if self.title is not None:
             self.title = self.title.strip() or None
+        if self.project_id is not None:
+            self.project_id = self.project_id.strip() or None
         if not self.target_member_id:
             raise ValueError("target_member_id is required")
         if not self.content:
@@ -654,11 +671,14 @@ class AgentTaskComplete(BaseModel):
 class AgentTaskOut(BaseModel):
     id: int
     schedule_id: Optional[int]
+    project_id: Optional[str]
+    hall_group_id: Optional[str]
     target_member_id: str
     created_by: str
     content: str
     title: Optional[str]
     status: str
+    workflow_status: str
     claimed_by: Optional[str]
     instance_id: Optional[str]
     result_message_id: Optional[int]
@@ -667,6 +687,7 @@ class AgentTaskOut(BaseModel):
     updated_at: datetime
     claimed_at: Optional[datetime]
     finished_at: Optional[datetime]
+    result_collected_at: Optional[datetime]
 
 
 class AgentTaskScheduleCreate(BaseModel):

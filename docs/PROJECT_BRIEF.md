@@ -157,11 +157,14 @@ CREATE TABLE agent_instances (
 CREATE TABLE agent_tasks (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   schedule_id       INTEGER REFERENCES agent_task_schedules(id), -- 可选来源 schedule
+  project_id        TEXT REFERENCES projects(project_id), -- 可选项目归属；旧客户端兼容为空
+  hall_group_id     TEXT UNIQUE REFERENCES groups(id), -- 自动生成的一任务一 Hall
   target_member_id  TEXT NOT NULL REFERENCES members(id), -- 接收任务的 agent:* 成员
   created_by        TEXT NOT NULL REFERENCES members(id), -- 任务创建者
   content           TEXT NOT NULL,          -- 任务正文
   title             TEXT,                   -- 可选短标题
   status            TEXT NOT NULL,          -- queued | running | succeeded | failed | canceled
+  workflow_status   TEXT NOT NULL,          -- assigned | clarification_requested | accepted | in_progress | submitted | completed | failed | canceled
   claimed_by        TEXT REFERENCES members(id),
   instance_id       TEXT REFERENCES agent_instances(id),
   result_message_id INTEGER REFERENCES messages(id),
@@ -169,7 +172,8 @@ CREATE TABLE agent_tasks (
   created_at        DATETIME NOT NULL,
   updated_at        DATETIME NOT NULL,
   claimed_at        DATETIME,
-  finished_at       DATETIME
+  finished_at       DATETIME,
+  result_collected_at DATETIME
 );
 
 CREATE TABLE agent_task_schedules (
@@ -199,7 +203,7 @@ CREATE TABLE agent_task_schedules (
 
 ## 当前前端交互约定
 
-> 当前 Web UI 仍是全局消息流 + Group Hall 的已实现形态。目标态将按 Project 提供 Blackboard，并把 Task Halls 与 Discussion Halls 分区；尚未实现，见 `spec/MODULE_tasks.md`。
+> 当前 Web UI 仍是全局消息流 + Group Hall 的已实现形态。Task Hall 数据 / API 地基已落地，但目标态 Project Blackboard 与 Task Halls / Discussion Halls 分区尚未实现，见 `spec/MODULE_tasks.md`。
 
 - Web UI 登录后会显示“全局消息流”和可进入的 Group Hall 切换条；全局流继续读取不带 `group_id` 的旧消息，Group Hall 读取 `GET /api/messages?group_id=<id>`
 - Web UI 可创建 Group 并选择初始成员；创建后自动进入该 Group 的 Hall
@@ -286,7 +290,7 @@ TALK/
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
-| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | 任务队列 / schedule API 第一版已落地；一任务一 Hall、1 对 1 流程与终端能力目标态已确认，待实现 |
+| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | Task Hall 数据 / API 地基已落地：自动一任务一 Hall、双状态、澄清 / 接受 / 提交 / 收取；终端、runner Hall 回传与 Web 待实现 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段
