@@ -232,16 +232,45 @@ class TalkClientSync:
         content: str,
         *,
         title: str | None = None,
+        project_id: str | None = None,
     ) -> dict[str, Any]:
-        return self._submit(self._client.create_task(target_member_id, content, title=title))
+        return self._submit(
+            self._client.create_task(
+                target_member_id,
+                content,
+                title=title,
+                project_id=project_id,
+            )
+        )
 
     def list_tasks(
         self,
         *,
         target_member_id: str | None = None,
         status: str | None = None,
+        workflow_status: str | None = None,
+        project_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        return self._submit(self._client.list_tasks(target_member_id=target_member_id, status=status))
+        return self._submit(
+            self._client.list_tasks(
+                target_member_id=target_member_id,
+                status=status,
+                workflow_status=workflow_status,
+                project_id=project_id,
+            )
+        )
+
+    def get_task(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_task(task_id))
+
+    def request_task_clarification(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.request_task_clarification(task_id))
+
+    def accept_task(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.accept_task(task_id))
+
+    def collect_task_result(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.collect_task_result(task_id))
 
     def claim_task(self, task_id: int, *, instance_id: str | None = None) -> dict[str, Any]:
         return self._submit(self._client.claim_task(task_id, instance_id=instance_id))

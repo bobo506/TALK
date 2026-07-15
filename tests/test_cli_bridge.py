@@ -629,10 +629,11 @@ class CliBridgeTests(unittest.TestCase):
                     "id": task_id,
                     "created_by": "human:bobo",
                     "content": "say ok",
+                    "hall_group_id": "group:task-12",
                 }
 
-            async def send_text(self, text, to=None):
-                self.sent.append((text, to))
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
                 return {"id": 99}
 
             async def complete_task(self, task_id, *, status, result_message_id=None, last_error=None):
@@ -672,7 +673,7 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertTrue(handled)
         self.assertEqual(client.claimed, [(12, "agent:pi:test")])
-        self.assertEqual(client.sent, [("OK", ["human:bobo"])])
+        self.assertEqual(client.sent, [("OK", ["human:bobo"], "group:task-12")])
         self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
 
     def test_handle_incoming_message_replies_inside_same_group(self):

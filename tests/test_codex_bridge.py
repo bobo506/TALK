@@ -316,8 +316,8 @@ class CodexBridgeTests(unittest.TestCase):
                     "content": "say ok",
                 }
 
-            async def send_text(self, text, to=None):
-                self.sent.append((text, to))
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
                 return {"id": 99}
 
             async def complete_task(self, task_id, *, status, result_message_id=None, last_error=None):
@@ -353,7 +353,7 @@ class CodexBridgeTests(unittest.TestCase):
 
         self.assertTrue(handled)
         self.assertEqual(client.claimed, [(12, "agent:codex:test")])
-        self.assertEqual(client.sent, [("OK", ["human:bobo"])])
+        self.assertEqual(client.sent, [("OK", ["human:bobo"], None)])
         self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
 
 

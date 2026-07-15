@@ -355,8 +355,14 @@ class TalkClient:
         content: str,
         *,
         title: str | None = None,
+        project_id: str | None = None,
     ) -> JsonDict:
-        payload: JsonDict = {"target_member_id": target_member_id, "content": content, "title": title}
+        payload: JsonDict = {
+            "target_member_id": target_member_id,
+            "content": content,
+            "title": title,
+            "project_id": project_id,
+        }
         return await self._request_json("POST", "/api/tasks", json_body=payload)
 
     async def list_tasks(
@@ -364,13 +370,31 @@ class TalkClient:
         *,
         target_member_id: str | None = None,
         status: str | None = None,
+        workflow_status: str | None = None,
+        project_id: str | None = None,
     ) -> list[JsonDict]:
         params: dict[str, Any] = {}
         if target_member_id:
             params["target_member_id"] = target_member_id
         if status:
             params["status"] = status
+        if workflow_status:
+            params["workflow_status"] = workflow_status
+        if project_id:
+            params["project_id"] = project_id
         return await self._request_json("GET", "/api/tasks", params=params)
+
+    async def get_task(self, task_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/tasks/{task_id}")
+
+    async def request_task_clarification(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/request-clarification")
+
+    async def accept_task(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/accept")
+
+    async def collect_task_result(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/collect-result")
 
     async def claim_task(self, task_id: int, *, instance_id: str | None = None) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/claim", json_body={"instance_id": instance_id})

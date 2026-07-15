@@ -184,6 +184,35 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-15 TH-2：async / sync client 与 bundled runner Task Hall 接入
+
+**背景**：TH-1 已完成 Task Hall 数据 / API 地基。本轮按项目管理者确认，只推进一个 SDK / runner 切片：让实际终端 client 能使用项目化任务与协作动作，并让 bundled runner 的最终结果落到任务专属 Hall。
+
+### 实现
+
+- `TalkClient` 与 `TalkClientSync.create_task()` 新增可选 `project_id`；`list_tasks()` 新增 `workflow_status` 与 `project_id` 过滤。
+- async / sync client 新增 `get_task()`、`request_task_clarification()`、`accept_task()` 与 `collect_task_result()`，覆盖 TH-1 已落地的单任务查询和协作动作 API。
+- 通用 `cli_bridge` runner 与 `codex_bridge` 兼容任务处理入口会从 claim 响应读取 `hall_group_id`，将成功或失败的可见结果写入对应 Task Hall，再用消息 id 完成任务。
+- 旧任务没有 `hall_group_id` 时继续写入全局时间线，保持服务端与 runner 的兼容路径。
+- `tests/test_talk_client.py` 新增 sync 活服务全流程，并扩展 async 流程覆盖项目过滤、澄清、接受、Hall 结果、提交和收取；bridge 测试分别覆盖 Task Hall 回传与旧任务兼容。
+
+### 验证
+
+- `py_compile` 覆盖两套 client、两条 bridge 入口和三份相关测试文件：通过。
+- `tests.test_talk_client`：`Ran 12 tests ... OK`。
+- `tests.test_cli_bridge`：`Ran 85 tests ... OK`；`tests.test_codex_bridge`：`Ran 19 tests ... OK`。
+- `tests.test_tasks + tests.test_pi_bridge`：`Ran 26 tests ... OK`。
+- 全量 `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 304 tests ... OK`。
+- 本切片无前端改动，不需要 Browser 验证。
+
+### 边界与下一步
+
+- 当前 client 已具备项目化创建、查询与协作动作；终端 MCP 仍缺 Agent 发现、委派、等待、纠偏 / 取消和批量结果收集工具。
+- observer、返工、lease / attempt、Project Blackboard 与 Task Hall Web UI 仍未进入实现。
+- 按执行 Agent 单切片门禁暂停，等待项目管理者或决策 Agent 验收后再进入终端 MCP 切片。
+
+---
+
 ## 2026-07-15 TH-1：Task Hall 数据 / API 地基
 
 **背景**：项目管理者确认先实现 Task Hall，并批准首个数据库 / 协议切片采用“复用 Group + 双状态”方案：不新增 thread 表，`AgentTask.status` 继续服务现有 runner，另设协作状态表达澄清、接受、提交和结果收取。

@@ -9,7 +9,7 @@ from pathlib import Path
 import uvicorn
 
 import server.main as main
-from TALK.client import TalkClient
+from TALK.client import TalkClient, TalkClientSync
 from tests.test_support import RouteTestCase
 
 
@@ -55,6 +55,15 @@ class TalkClientTests(RouteTestCase):
         main.WS_PING_TIMEOUT = 3.0
         self.addCleanup(setattr, main, "WS_PING_INTERVAL", self._old_ping_interval)
         self.addCleanup(setattr, main, "WS_PING_TIMEOUT", self._old_ping_timeout)
+
+    def register_project(self, project_id: str) -> None:
+        with self.make_client() as client:
+            response = client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": project_id, "display_name": project_id},
+            )
+        self.assertEqual(response.status_code, 201)
 
     def test_me_and_members(self):
         async def scenario(base_url: str) -> None:
@@ -238,26 +247,98 @@ class TalkClientTests(RouteTestCase):
             asyncio.run(scenario(base_url))
 
     def test_task_helpers(self):
+        self.register_project("prj_sdk_async")
+
         async def scenario(base_url: str) -> None:
             async with TalkClient(base_url, "bobo-key") as human_client:
                 created = await human_client.create_task(
                     "agent:demo",
                     "Run from SDK",
                     title="SDK task",
+                    project_id="prj_sdk_async",
                 )
 
             async with TalkClient(base_url, "demo-key") as agent_client:
                 await agent_client.report_instance_status("demo-instance-1", runtime="codex", status="idle")
-                queued = await agent_client.list_tasks(status="queued")
+                queued = await agent_client.list_tasks(
+                    status="queued",
+                    workflow_status="assigned",
+                    project_id="prj_sdk_async",
+                )
+                fetched = await agent_client.get_task(created["id"])
+                clarification = await agent_client.request_task_clarification(created["id"])
+                accepted = await agent_client.accept_task(created["id"])
                 claimed = await agent_client.claim_task(created["id"], instance_id="demo-instance-1")
-                completed = await agent_client.complete_task(claimed["id"], status="succeeded")
+                result = await agent_client.send_text(
+                    "SDK async result",
+                    to=["human:bobo"],
+                    group_id=claimed["hall_group_id"],
+                )
+                submitted = await agent_client.complete_task(
+                    claimed["id"],
+                    status="succeeded",
+                    result_message_id=result["id"],
+                )
+
+            async with TalkClient(base_url, "bobo-key") as human_client:
+                collected = await human_client.collect_task_result(created["id"])
 
             self.assertEqual(queued[0]["id"], created["id"])
+            self.assertEqual(fetched["project_id"], "prj_sdk_async")
+            self.assertEqual(clarification["workflow_status"], "clarification_requested")
+            self.assertEqual(accepted["workflow_status"], "accepted")
             self.assertEqual(claimed["status"], "running")
-            self.assertEqual(completed["status"], "succeeded")
+            self.assertEqual(submitted["workflow_status"], "submitted")
+            self.assertEqual(collected["workflow_status"], "completed")
+            self.assertIsNotNone(collected["result_collected_at"])
 
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))
+
+    def test_sync_task_helpers(self):
+        self.register_project("prj_sdk_sync")
+
+        with LiveTalkServer(main.app) as base_url:
+            human_client = TalkClientSync(base_url, "bobo-key")
+            agent_client = TalkClientSync(base_url, "demo-key")
+            try:
+                created = human_client.create_task(
+                    "agent:demo",
+                    "Run from sync SDK",
+                    title="Sync SDK task",
+                    project_id="prj_sdk_sync",
+                )
+                queued = agent_client.list_tasks(
+                    target_member_id="agent:demo",
+                    status="queued",
+                    workflow_status="assigned",
+                    project_id="prj_sdk_sync",
+                )
+                fetched = agent_client.get_task(created["id"])
+                clarification = agent_client.request_task_clarification(created["id"])
+                accepted = agent_client.accept_task(created["id"])
+                claimed = agent_client.claim_task(created["id"])
+                result = agent_client.send_text(
+                    "SDK sync result",
+                    to=["human:bobo"],
+                    group_id=claimed["hall_group_id"],
+                )
+                submitted = agent_client.complete_task(
+                    claimed["id"],
+                    status="succeeded",
+                    result_message_id=result["id"],
+                )
+                collected = human_client.collect_task_result(created["id"])
+            finally:
+                agent_client.close()
+                human_client.close()
+
+        self.assertEqual([task["id"] for task in queued], [created["id"]])
+        self.assertEqual(fetched["project_id"], "prj_sdk_sync")
+        self.assertEqual(clarification["workflow_status"], "clarification_requested")
+        self.assertEqual(accepted["workflow_status"], "accepted")
+        self.assertEqual(submitted["workflow_status"], "submitted")
+        self.assertEqual(collected["workflow_status"], "completed")
 
     def test_task_schedule_helpers(self):
         async def scenario(base_url: str) -> None:

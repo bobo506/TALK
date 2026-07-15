@@ -2041,7 +2041,11 @@ async def handle_queued_task(
     creator = claimed.get("created_by")
     if creator:
         try:
-            result_message = await client.send_text(reply, to=[str(creator)])
+            result_message = await client.send_text(
+                reply,
+                to=[str(creator)],
+                group_id=claimed.get("hall_group_id"),
+            )
             result_message_id = int(result_message["id"])
         except Exception as exc:
             completion_status = "failed"

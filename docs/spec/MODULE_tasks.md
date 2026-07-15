@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：任务队列与显式触发调度 API 第一版已落地；Task Hall 数据 / API 地基已实现，终端接入、runner Hall 回传和 Web UI 待后续切片
+> 状态：Task Hall 数据 / API、async / sync client 与 bundled runner Hall 回传已实现；终端 MCP、可靠性约束和 Web UI 待后续切片
 
 ## 目标
 
@@ -139,10 +139,14 @@
 
 ### SDK
 
-`TalkClient` 与 `TalkClientSync` 新增：
+`TalkClient` 与 `TalkClientSync` 已提供：
 
-- `create_task(target_member_id, content, title=None)`
-- `list_tasks(target_member_id=None, status=None)`
+- `create_task(target_member_id, content, title=None, project_id=None)`
+- `list_tasks(target_member_id=None, status=None, workflow_status=None, project_id=None)`
+- `get_task(task_id)`
+- `request_task_clarification(task_id)`
+- `accept_task(task_id)`
+- `collect_task_result(task_id)`
 - `claim_task(task_id, instance_id=None)`
 - `complete_task(task_id, status=..., result_message_id=None, last_error=None)`
 - `create_task_schedule(target_member_id, content, title=None, run_at=None, interval_seconds=None)`
@@ -150,6 +154,12 @@
 - `get_task_schedule(schedule_id)`
 - `update_task_schedule(schedule_id, status=...)`
 - `run_due_task_schedules()`
+
+### Bundled runner
+
+- `bridges/cli_bridge.py` 的任务队列 runner 会从 claim 响应读取 `hall_group_id`，把成功或失败的可见结果写入对应 Task Hall，再用该消息的 `id` 完成任务。
+- `bridges/codex_bridge.py` 的兼容任务处理入口采用同一 Hall 回传规则；实际 Codex 队列 worker 继续复用通用 runner。
+- 旧任务若没有 `hall_group_id`，runner 会保留原有全局时间线回传行为，服务端继续接受这类兼容结果。
 
 ## Task Hall 目标态（2026-07-15 确认）
 
@@ -223,16 +233,18 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 - 当前不实现任务重试、超时回收、抢占、重新排队。
 - 当前不由 TALK 服务端创建或管理 bridge 进程。
 - 当前任务 API 不替代消息系统；澄清正文和结果正文仍通过 Task Hall 消息记录，并用动作 API / `result_message_id` 关联。
-- SDK 尚未暴露 `project_id`、Task Hall 动作与协作状态过滤 helper；bundled bridge 结果仍发到旧全局时间线，这是下一切片的明确兼容债。
+- async / sync client 已覆盖项目化创建、单任务读取、协作状态过滤、澄清、接受和结果收取；终端 MCP 仍缺等待、纠偏、取消、批量结果收集和按项目发现可委派 Agent 等能力。
+- bundled runner 已把新任务结果写入对应 Task Hall，但仍兼容无 `hall_group_id` 的旧任务全局回传。
 - 当前没有 Project Blackboard / Task Hall Web UI，也尚未实现 observer、取消、返工和 lease / 超时回收。
 
 ## 后续计划
 
 1. [x] 复用 `groups.type=task`，落 `project_id` / `hall_group_id` / `workflow_status`、一任务一 Hall 和 1 对 1 结构边界。
 2. [x] 打通澄清、接受、claim 执行、提交与结果收取 API，并保持旧五态兼容。
-3. 提供终端 TALK MCP / client 的委派、查询 / 等待、纠偏 / 取消与结果收集能力，并让 bundled runner 把结果写入 Task Hall。
-4. 补 claim lease / attempt / 幂等约束，再建 Project Blackboard + Task Hall Web UI。
-5. 完成一轮跨模型端到端人工验收；后续再决定 schedule 项目化 / 后台触发、长任务 SSE、document lock 与递归委派策略。
+3. [x] 扩展 async / sync client 的项目化委派、查询和协作动作，并让 bundled runner 把结果写入 Task Hall。
+4. 提供终端 TALK MCP 的发现、委派、查询 / 等待、纠偏 / 取消与结果收集能力。
+5. 补 claim lease / attempt / 幂等约束，再建 Project Blackboard + Task Hall Web UI。
+6. 完成一轮跨模型端到端人工验收；后续再决定 schedule 项目化 / 后台触发、长任务 SSE、document lock 与递归委派策略。
 
 ## 验收点
 
@@ -256,3 +268,5 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 - [x] 澄清会阻止 claim；接受后可进入执行；成功提交与请求者收取结果可区分。
 - [x] Task Hall 不能通过普通 Group API 改成员或独立删除。
 - [x] 旧库新增字段、唯一索引与五态到协作状态回填通过迁移测试。
+- [x] async / sync client 均可创建项目任务、按协作状态与项目过滤、读取单任务并执行澄清 / 接受 / 收取结果动作。
+- [x] bundled runner 会把结果写入对应 Task Hall，并兼容无 Hall 的旧任务全局回传。
