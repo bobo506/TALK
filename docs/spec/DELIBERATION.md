@@ -137,10 +137,13 @@
 
 ### 8.4 切片（取代原 D3"轻编排"与 D3-3d 的优先级）
 
-| 切片 | 内容 | 层 |
-|---|---|---|
-| **BS-1** | server：@所有人 × brainstorm 群 → 自动建多方 discussion（root/participants/topic/放大 max_rounds，幂等）；brainstorm 模板文案改四阶段协议 | server |
-| **BS-2** | bridge：广播回复 turns 落到多方 session（root/participants 匹配验证）；表态 stance 透传；多方 session 回合预算按 N 放大 | bridge |
-| **BS-3** | 真机验收 v2：人按四阶段驱动一轮，验 turns 完整落账 + decision 收口 `resolved+consensus` | 验收 |
+| 切片 | 内容 | 层 | 状态 |
+|---|---|---|---|
+| **BS-1** | server：@所有人 × brainstorm 群 → 自动建多方 discussion（root/participants/topic/放大 max_rounds，幂等）；brainstorm 模板文案改四阶段协议 | server | ✓ `072fe54` |
+| **BS-2** | bridge：广播回复 turns 落到多方 session（root/participants 匹配验证）；表态 stance 透传；多方 session 回合预算按 N 放大 | bridge | ✓ `7fdf67d` |
+| **BS-2b** | bridge：**发言可见性**——多方场里给 agent prompt 注入"本场已有发言回顾"（真机 v2 发现：agent 表态时看不到彼此发言）。仅多方场，1:1/free 不变 | bridge | ✓ `79de68f` |
+| **BS-3** | 真机验收 v2：人按四阶段驱动一轮，验 turns 完整落账 + decision 收口 `resolved+consensus` | 验收 | 进行中（第一步 OK，第二步经 BS-2b 修复后待重测） |
+
+> BS-2b 说明：真机 v1→v2 逐步暴露"agent 无 Hall 上下文"是本编排的隐性依赖；prompt 的发言可见性是让多方表态/汇总成立的必要条件（详见 `PROGRESS_HISTORY` 2026-07-15 BS-2b）。
 
 **推迟**：`escalated` 下线（原 D3-3d，属清理）、`end_reason` 的 `timeout`/`manual`、server 自动编排（模式 I）。
