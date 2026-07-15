@@ -2154,6 +2154,67 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.updated, [(9, "resolved", None)])
         self.assertEqual(client.turns[-1]["stance"], "closure")
 
+    def test_shared_history_builds_block_for_multiparty(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [
+                    {"id": 10, "from": "human:qa", "content": "@所有人 想 3 个团建点子"},
+                    {"id": 11, "from": "agent:codex", "content": "城市闯关赛、共创工作坊"},
+                    {"id": 12, "from": "agent:pi", "content": "密室逃脱、桌游夜"},
+                    {"id": 20, "from": "human:qa", "content": "@agent:pi 请表态"},
+                    {"id": 13, "from": "agent:x", "content": ""},
+                ]
+
+        discussion = {
+            "root_message_id": 10,
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+        }
+        block = asyncio.run(
+            cli_bridge._shared_discussion_history(
+                FakeClient(), group_id="g", discussion=discussion, current_message_id=20, self_id="agent:pi"
+            )
+        )
+        self.assertIn("本场已有发言", block)
+        self.assertIn("agent:codex：城市闯关赛、共创工作坊", block)
+        self.assertIn("agent:pi：密室逃脱、桌游夜", block)
+        self.assertNotIn("请表态", block)  # 当前触发消息剔除
+        self.assertNotIn("agent:x：", block)  # 空内容剔除
+
+    def test_shared_history_empty_for_pair_or_missing(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [{"id": 1, "from": "agent:a", "content": "hi"}]
+
+        pair = {"root_message_id": 1, "participant_ids": ["agent:a", "agent:b"]}
+        self.assertEqual(
+            asyncio.run(
+                cli_bridge._shared_discussion_history(
+                    FakeClient(), group_id="g", discussion=pair, current_message_id=9, self_id="agent:a"
+                )
+            ),
+            "",
+        )
+        # 无 discussion / 无 group → 空
+        self.assertEqual(
+            asyncio.run(
+                cli_bridge._shared_discussion_history(
+                    FakeClient(), group_id="g", discussion=None, current_message_id=9, self_id="agent:a"
+                )
+            ),
+            "",
+        )
+
+    def test_build_cli_prompt_injects_shared_history_for_pi(self):
+        prompt = cli_bridge.build_cli_prompt(
+            {"from": "human:qa", "content": "@agent:pi 请对 codex 的想法表态", "group_id": "g", "id": 20},
+            member_id="agent:pi",
+            workdir=Path("."),
+            runtime="pi",
+            shared_history="【本场已有发言（供你表态/汇总参考，请勿逐条复述）】\nagent:codex：城市闯关赛",
+        )
+        self.assertIn("本场已有发言", prompt)
+        self.assertIn("agent:codex：城市闯关赛", prompt)
+
     def test_discussion_auto_turn_budget_scales_for_multiparty(self):
         # 1:1 / 无 discussion：保持常量
         self.assertEqual(cli_bridge._discussion_auto_turn_budget(None), 3)

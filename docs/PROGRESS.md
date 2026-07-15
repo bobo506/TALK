@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-07-15 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**BS-2（bridge：多方场记账 + 回合预算按 N 放大）已完成**——继 BS-1 后仍由**决策 Agent 获管理者授权直接开发**并自验（5 模块 140 测试全绿）。编排 v1 的开发面（BS-1 server + BS-2 bridge）到此齐了。**下一步 = BS-3 真机验收 v2**：请管理者当主持人按四阶段驱动一轮（黑板有指引），验证 turns 完整落账 + decision 收口 `resolved+consensus`。GitHub 推到 `8e1f029`；`9d6b1f3`/BS-1`072fe54`/BS-2(本轮) 本地待推。Claude = **决策 Agent**。
+Updated: 2026-07-15 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。**BS-3 真机 v2 卡在第二步 → 已修（BS-2b 发言可见性）**：真机跑到"逐一表态"时 agent 反馈"不知道对方发了啥"——根因是 pi/codex 的 prompt **只含触发消息 + 角色**，无任何 Hall 历史（`discussion_context` 对 pi/codex 故意不注入，5.x 遗留）。修复：多方场（>2 参与者）里给 prompt 注入"本场已有发言回顾"（从 root 起的群发言，speaker：内容，框成"仅供参考勿复述"）；1:1/free 零变化。决策 Agent 获授权自行开发并自验（5 模块 143 全绿）。**下一步 = 重跑 BS-3 真机 v2**（重启 server+三 bridge，第二步表态应能看到彼此想法）。GitHub 推到 `7fdf67d`；BS-2b(本轮) 本地待推。Claude = **决策 Agent**。
 
 ### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。
@@ -21,7 +21,8 @@ Updated: 2026-07-15 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **D3-3c ✓**（`8e1f029`）：收口 `end_reason` 归一——`_resolve_if_decision_maker` 取讨论 turns，有 `escalate` turn → `deadlock` 否则 `consensus`；取 turns 失败 `try/except` 退化 `consensus`（收口不失败）；`stance!=decision` 早返回仍在最前（零开销）。仅 deadlock/consensus，`timeout`/`manual` 显式 defer；`escalated` 未碰。`test_cli_bridge` 75 全绿（+2：deadlock 收口、取 turns 失败退化 consensus）。
 - **编排 v1 设计 ✓**（`9d6b1f3`）：真机验收 v1 发现（@所有人 建不出 1:1 discussion / 决策人无归纳信号）→ 管理者定稿人驱动四阶段协议，入 `spec/DELIBERATION.md §8`；随片收口 codex 走 PATH 修复（管理者重装新 CLI 后 `gpt-5.6-sol` 400 解除）。
 - **BS-1 ✓**（`072fe54`·决策 Agent 获授权自行开发）：`_resolve_recipients` 返回 `(resolved_to, mention_all)`；@所有人 × `type=brainstorm` 群 → 消息落库后自动建**多方** discussion（root=开场消息、participants=全体成员含发送者、topic=正文截 80、`max_rounds=agent数+2`；幂等=同群已有 active 全员场次则跳过；建失败仅日志不阻断消息）；brainstorm 模板文案改四阶段协议（教 agent 流程 + 不抢跑）。`test_messages` +4、`test_cli_bridge` 文案断言同步；5 模块 134 全绿。
-- **BS-2 ✓（已验证·本轮提交·决策 Agent 继续自行开发）**：bridge 多方场记账 + 预算放大——`_discussion_auto_turn_budget`（多方 = agent数²+1，1:1 保持 3）接入刹车阈值/deferred 预算/控制上下文；`_active_multiparty_discussion`（只匹配 >2 参与者场，1:1 零污染）；human 发起/点名时 agent 回复记 turn 到多方场（answer 推断；agree/disagree/decision 走原 mark_stance/talk_send 路径落同一场，D3-3a 收口依旧生效）；human 发送者不注入 discussion 上下文、不受刹车（prompt 零变化）。`test_cli_bridge` +3（预算缩放/human 广播记账/多方 5 轮不触发 1:1 收尾）；5 模块 140 全绿。
+- **BS-2b ✓（已验证·本轮提交·发言可见性）**：真机 v2 卡在"表态看不到别人发言"→ 修：多方场（>2 参与者）prompt 注入`_shared_discussion_history`（`fetch_history` 拉本场 root 起群发言，speaker：内容截 240，剔当前消息/空/撤回，框"勿复述"）；`build_cli_prompt` 加 `shared_history` 参；1:1/free/无场 → 空串零变化；拉历史失败降级不阻断。`test_cli_bridge` +3；5 模块 143 全绿。真机行为待重测。
+- **BS-2 ✓**（`7fdf67d`·决策 Agent 继续自行开发）：bridge 多方场记账 + 预算放大——`_discussion_auto_turn_budget`（多方 = agent数²+1，1:1 保持 3）接入刹车阈值/deferred 预算/控制上下文；`_active_multiparty_discussion`（只匹配 >2 参与者场，1:1 零污染）；human 发起/点名时 agent 回复记 turn 到多方场（answer 推断；agree/disagree/decision 走原 mark_stance/talk_send 路径落同一场，D3-3a 收口依旧生效）；human 发送者不注入 discussion 上下文、不受刹车（prompt 零变化）。`test_cli_bridge` +3（预算缩放/human 广播记账/多方 5 轮不触发 1:1 收尾）；5 模块 140 全绿。
 
 ### 2) Open Questions / Pending Confirmation
 - **✅ A/B/C 真机验收闭环（2026-06-28，黑盒 + BUGFIX-1）**：@所有人 下拉/高亮、UI#3 禁用/启用开关 + 禁用 agent 不可加入、人设编辑弹窗读写/持久化/business_role——均通过。
@@ -32,7 +33,7 @@ Updated: 2026-07-15 (Asia/Shanghai) — 分支 `claude/phase3-collab-and-ui`。*
 - **MEMORY 方向已关闭**：连续性由项目 `PROGRESS.md` + 身份注入承载（见 `spec/POSITIONING.md §5`）。
 - **新方向（已沉淀 `spec/POSITIONING.md`）**：优先做**审议类协议**——头脑风暴（轮流 + 表态 + 归纳）、评审（针对产物的收敛式批评），由 **Hall 类型 / RolePack** 框架承载；协调类（1/2）借 CCB；非技术受众 / Web 低门槛接入列为远期。
 - **设计已定稿**：审议协议、信息类型（stance 终集：去 `idea`、`synthesis`→`decision`、`closure` 降级）、结束归一模型（单一出口 `handoff` → 决策人 = `decision_tier`/human，4 种 `end_reason`）、Hall 类型/RolePack、@所有人、人设网页编辑(a)、切片 D1–D5 —— 见 [`spec/DELIBERATION.md`](spec/DELIBERATION.md)。
-- **下一步（编排 v1，见 `spec/DELIBERATION.md §8`）**：BS-1 ✓ / BS-2 ✓ → **BS-3（真机验收 v2）**：重启 server + 重启三 bridge → 人按四阶段驱动（开场 @所有人 → 各自想法 → 逐一点名表态 → @决策人 请汇总）→ 验 `GET /api/discussions` 的 turns 落账与 `resolved+end_reason=consensus`。已知观察点：表态/汇总 stance 依赖 agent 实际用带 stance 的工具（模板已教），纯口头回复记为 `answer`。
+- **下一步（编排 v1，见 `spec/DELIBERATION.md §8`）**：BS-1 ✓ / BS-2 ✓ / BS-2b ✓（发言可见性）→ **重跑 BS-3（真机验收 v2）**：重启 server + 三 bridge → 四阶段驱动 → 验第二步表态能看到彼此想法、turns 落账、`resolved+consensus`。已知观察点：表态/汇总 stance 依赖 agent 实际用带 stance 的工具（模板已教），纯口头回复记为 `answer`。
 - **推迟**：D3-3d（`escalated` 下线·清理）、`end_reason` 的 `timeout`/`manual`、server 自动编排（模式 I）、D4（评审）/ D5（Web 审议视图）。
   - 注意：`DELIBERATION §7` 的 stance 迁移点（去 `idea`/`synthesis`）与现状不符——现状 `_DISCUSSION_STANCES` 早已无 `idea`/`synthesis`，D3 对 stance 只是加 `decision`。
 - **候选（未排期）**：`claude_bridge` —— 让 Claude Code/Codex 这类 agent 框架成为 TALK 一等公民 worker（现仅 codex/pi 特化 + 通用 cli_bridge）。管理者 2026-06-28 确认架构理解（TALK 背后真正干活的是 agent 框架），此项作为方向候选、暂不排期。

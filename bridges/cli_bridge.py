@@ -1194,6 +1194,63 @@ async def _active_multiparty_discussion(
     return None
 
 
+# 多方场（brainstorm）发言可见性（DELIBERATION §8）：拉本场发言喂进 prompt，
+# 让 agent 能对彼此的想法表态/汇总。仅 >2 参与者的场生效；1:1/free 不注入。
+_SHARED_HISTORY_MAX_MESSAGES = 24
+_SHARED_HISTORY_MAX_CHARS_EACH = 240
+
+
+async def _shared_discussion_history(
+    client: Any,
+    *,
+    group_id: str | None,
+    discussion: dict[str, Any] | None,
+    current_message_id: int | None,
+    self_id: str,
+) -> str:
+    """多方场里，把本场（从 root 消息起）的群发言拼成回顾块，供 agent 表态/汇总参考。
+
+    只对 >2 参与者的 discussion 生效（brainstorm）；1:1/free/无场 → 空串，行为不变。
+    拉历史失败（无该方法 / 404）也返回空串，绝不阻断回复。
+    """
+    if not group_id or not discussion:
+        return ""
+    participants = list(discussion.get("participant_ids") or [])
+    if len(participants) <= 2:
+        return ""
+    root_id = discussion.get("root_message_id")
+    try:
+        since = int(root_id) - 1 if root_id is not None else None
+        messages = await client.fetch_history(
+            group_id=group_id, since=since, limit=_SHARED_HISTORY_MAX_MESSAGES
+        )
+    except AttributeError:
+        return ""
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return ""
+        raise
+
+    lines: list[str] = []
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("revoked_at") or msg.get("revoked"):
+            continue
+        if current_message_id is not None and str(msg.get("id")) == str(current_message_id):
+            continue  # 当前触发消息已在 prompt 里，不重复
+        content = str(msg.get("content") or "").strip()
+        if not content:
+            continue
+        speaker = str(msg.get("from") or "?")
+        lines.append(f"{speaker}：{content[:_SHARED_HISTORY_MAX_CHARS_EACH]}")
+
+    if not lines:
+        return ""
+    body = "\n".join(lines[-_SHARED_HISTORY_MAX_MESSAGES:])
+    return "【本场已有发言（供你表态/汇总参考，请勿逐条复述）】\n" + body
+
+
 async def _discussion_for_message_id(
     client: Any,
     *,
@@ -1637,6 +1694,7 @@ def build_cli_prompt(
     discussion_context: str | None = None,
     decision_tier: str = "execution",
     group_member_context: str = "",
+    shared_history: str = "",
 ) -> str:
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
@@ -1659,6 +1717,9 @@ def build_cli_prompt(
         # 完成的 request),信噪比被 10x 压垮。其他 runtime(legacy 文本协议)仍保留,
         # 兼容由下方分支承担。
         parts = [f"你是 {member_id}。{sender} 对你说:{task}"]
+        history_line = shared_history.strip()
+        if history_line:
+            parts.append(history_line)
         member_line = group_member_context.strip()
         if member_line:
             parts.append(member_line)
@@ -1668,6 +1729,7 @@ def build_cli_prompt(
     message_id = message.get("id") or "unknown"
     group_id = message.get("group_id")
     group_line = f"TALK group id: {group_id}\n" if group_id else ""
+    history_block = f"{shared_history.strip()}\n\n" if shared_history.strip() else ""
     return (
         f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
         f"{tier_line}\n"
@@ -1680,6 +1742,7 @@ def build_cli_prompt(
         f"Sender: {sender}\n"
         f"TALK message id: {message_id}\n\n"
         f"{group_line}"
+        f"{history_block}"
         "Task:\n"
         f"{task}{context_block}\n"
     )
@@ -2013,6 +2076,15 @@ async def handle_incoming_message(
             os.environ["TALK_DEFERRED_FILE"] = deferred_path
             deferred_file = deferred_path
 
+        # 多方场（brainstorm）发言可见性：让 agent 看到本场别人的想法，才能表态/汇总（DELIBERATION §8）
+        shared_history = await _shared_discussion_history(
+            client,
+            group_id=group_id,
+            discussion=discussion,
+            current_message_id=_message_id(message),
+            self_id=member_id,
+        )
+
         prompt = build_cli_prompt(
             message,
             member_id=member_id,
@@ -2021,6 +2093,7 @@ async def handle_incoming_message(
             discussion_context=discussion_context,
             decision_tier=decision_tier,
             group_member_context=group_member_context,
+            shared_history=shared_history,
         )
         if os.environ.get("TALK_DUMP_PROMPT") == "1":
             _dump_prompt(

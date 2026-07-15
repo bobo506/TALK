@@ -184,6 +184,35 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-15 BS-2b：多方场发言可见性（真机 v2 卡第二步的修复，决策 Agent 自行开发）
+
+**背景**：BS-3 真机验收 v2 第一步（各自想法）正常，但第二步"逐一表态"时 agent 反馈"不知道对方发了哪条"——卡住。诊断根因：pi/codex 的 prompt（`build_cli_prompt` 紧凑分支）**只含触发消息 + 角色注入**，无任何 Hall 历史；`discussion_context`（带 turns 的那段）对 pi/codex 是 5.x 时故意砍掉的（防"已经XX啦"元叙述），且它本就不含 turn 的正文内容。→ 表态/汇总这类"对别人发言的反应"结构上拿不到别人说了什么。
+
+### 完成事项（仅 `bridges/cli_bridge.py` + `tests/test_cli_bridge.py`）
+
+- `_shared_discussion_history(client, group_id, discussion, current_message_id, self_id)`：只对 >2 参与者的多方场生效；`client.fetch_history(group_id, since=root-1)` 拉本场从开场起的群发言，拼成"speaker：内容（截 240）"回顾块（剔除当前触发消息/空内容/撤回，最多 24 条），框成"【本场已有发言…请勿逐条复述】"。1:1/free/无场 → 空串；拉历史失败（无方法/404）降级空串不阻断。
+- `build_cli_prompt` 加 `shared_history` 参数：pi/codex 紧凑分支在"任务行"后注入该块；通用分支也注入。默认空串 → 非多方场行为不变。
+- `handle_incoming_message`：build prompt 前计算 `shared_history`（discussion 已由 BS-2 解析，含 agent 触发与 human 触发两路）。
+
+### 为什么这次注入是安全的（对照 5.x 教训）
+
+5.x 砍 `discussion_context` 是因为那段是**协议字段**（assignee_id/requester_id/remaining_auto_turns…），模型会把它当"任务完成状态"复述。本片注入的是**真实发言内容**（人读 Hall 看到的东西），且明确框为"仅供参考、勿复述"，且**只在多方 brainstorm 场**注入——1:1/free 的既有紧凑 prompt 一字未动。真机行为仍需重测确认（BS-3 v2 重跑）。
+
+### 验证
+
+- **自验（2026-07-15）**：`unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge` → `Ran 143 tests ... OK`（`test_cli_bridge` +3：多方拼块/1:1 空/prompt 注入）。另跑临时脚本验降级与剔除逻辑。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- 重跑 BS-3 真机 v2：第二步表态应能看到彼此想法；继续验到第四步 decision 收口。
+
+---
+
 ## 2026-07-15 BS-2：bridge 多方场记账 + 回合预算按 N 放大（决策 Agent 继续自行开发）
 
 **背景**：编排 v1（`spec/DELIBERATION.md §8`）第二片，管理者授权决策 Agent 继续直接开发。BS-1 建好"场"后，本片让 bridge 把真实头脑风暴流量记进这个场，并解除 1:1 回合预算对多方场的误伤。
