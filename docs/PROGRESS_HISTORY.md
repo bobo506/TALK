@@ -184,6 +184,90 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-15 BS-3a：汇总 grounding + bridge 推断 decision（Discussion 分支收尾）
+
+**背景**：BS-3 真机 v2 证明 BS-2b 的通用历史块在技术上已注入，但模型仍可能忽略实际意见、引用旧成见或私信重问；汇总纯 prose 又统一被记为 `answer`，导致 session 虽可能被 closure 收掉，却留下 `end_reason=null`。项目管理者确认先做一个限定范围的 Discussion 收尾切片，再关闭当前分支并转入 Task Hall。
+
+### 决策
+
+- **D-i 采用内联 grounding**：汇总触发时按 `discussion_turns` 为每个 `agent:*` 参与者选择首条 `answer` reply，再按 `message_id` 取回原文。决策人的前置意见与其他 Agent 一样纳入；后续闲聊 / 重复 answer 不进入材料。
+- **D-ii 采用 bridge 推断**：仅在 active 多方 brainstorm、human 单独定向当前决策人、文本明确要求汇总、全部 Agent 意见取齐、CLI 成功并返回非空回复时，把回复强制记为 `decision`，再复用 `_resolve_if_decision_maker` 收口。
+- **D-iii 保持原协议**：决策人先贡献一条普通 `answer`，最终再单独产出 `decision`。
+
+### 实现
+
+- `bridges/cli_bridge.py`
+  - 新增汇总意图 markers 与 `_is_brainstorm_summary_request`，校验 Hall 类型、human 来源、单目标、决策人身份和 active 多方参与关系。
+  - 新增 `_brainstorm_summary_grounding`：必须取齐每位 Agent 的首条意见原文，单条最多 4000 字；撤回、正文缺失或成员不全时返回空，不自动收口。
+  - 汇总轮使用专用材料块替代通用 BS-2b 历史；其它多方轮次保持原行为。
+  - 成功汇总 prose 或错误 mark stance 均归一为 `decision`；CLI 超时 / 失败或无可见回复不触发。
+- `tests/test_cli_bridge.py`
+  - 覆盖首条意见选择、决策人意见包含、后续噪声剔除、成员未齐拒绝、直接点名守卫，以及完整的 prose → `decision` → `resolved+consensus` 路径。
+
+### 文档
+
+- `docs/spec/MODULE_discussions.md`：补当前 `decision/end_reason` 能力、BS-3a 行为合同和验收点。
+- `docs/spec/DELIBERATION.md`：登记 D-i / D-ii / D-iii 决策、严格守卫、BS-3 与 BS-3a 状态。
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`：登记分支收尾、验证和残余人工验收。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge`：`Ran 85 tests ... OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge`：`Ran 147 tests ... OK`。
+- 真实模型最终汇总质量未在本切片重跑：检查时 8000 / 8001 / 8010 均无 server 监听，存在此前留下的 bridge 重连进程；未擅自终止这些进程或把自动化结果写成真机通过。
+
+### 分支交接
+
+- `claude/phase3-collab-and-ui` 在本片提交并推送后关闭开发。
+- 下一分支从本分支最终提交创建，进入 Task Hall 数据 / API 最小闭环；本轮只创建分支，不提前开发下一切片。
+
+---
+
+## 2026-07-15 Task Hall 产品方向收敛（文档切片）
+
+**背景**：项目管理者重新确认 TALK 的实际使用方式：用户在 Codex、Claude Code 等真实终端中推进总目标，主 Agent 在过程中按角色把子任务通过 TALK 分给其他模型 Agent；任务完成后，结果必须回到 TALK，来源终端再查询 / 等待并整合。Desktop 与 CLI 不共享同一对话上下文可以接受，TALK 承担跨入口持久化真相源。
+
+### 已确认决策
+
+- 产品级 Hall 分为 **Task Halls** 与 **Discussion Halls**。当前先完成 Task Hall，Discussion Hall 的多角色讨论效果后续继续。
+- 一项委派任务自动建立一个独立 Task Hall；执行关系固定为请求者 A ↔ 执行者 B 1 对 1。项目所有者 / 决策 Agent 可观察、介入和验收，但不成为第三个执行参与者。
+- 标准流程为：A 指派 → B 可选提问 → B 接受 → 执行 → 提交结果 → A 的终端获取并验收。提交结果与来源终端已收取结果需要可区分。
+- 任一接入 TALK MCP / client 的交互终端都获得跨模型“子 Agent 委派”能力，不依赖终端原生 subagent 功能。
+- bridge / runner 是独占领取并驱动目标模型执行的基础设施，不是第三类 Agent，也不代表额外订阅；TALK 通过 claim / lease 防止同一任务被多个 runner 重复执行。
+- Web UI 按 Project 组织，默认提供 Blackboard 聚合 Task Hall 状态；Task Halls 与 Discussion Halls 分区，点击黑板任务进入对应独立 Hall。
+
+### 文档落盘
+
+- `docs/spec/POSITIONING.md`：更新产品定位、Hall 两类结构、混合终端 / runner 模型和当前优先级。
+- `docs/spec/MODULE_tasks.md`：新增 Task Hall 产品合同、标准流程、终端能力、数据关联草案与 Web 信息架构；明确区分现有实现和目标态。
+- `docs/spec/PROJECT_INTEGRATION.md`：补充项目级任务关联、终端接入、路线调整和关键决策记录。
+- `docs/PROJECT_BRIEF.md`：同步公共上下文、当前前端与目标态差异、模块索引状态。
+- `docs/spec/PRODUCT.md`：标记为历史 MVP 基线，避免“多房间不做”继续覆盖当前方向。
+- `docs/spec/DELIBERATION.md`：保留已有 Discussion Hall 设计与代码，标记 BS-3 等后续工作在 Task Hall 里程碑后恢复。
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`：登记方向、当前状态、实现待决项与下一步。
+
+### 实现待决项
+
+- Task Hall 最终直接复用 `groups.type=task`，还是新增专用 thread 实体。
+- 目标流程如何兼容现有 `queued/running/succeeded/failed/canceled`，是否引入独立 `submitted` / `result_collected` 状态。
+
+这些是首个实现切片需要定稿的技术选择，不改变“一任务一 Hall、1 对 1 执行、项目聚合、结果可收取”的产品合同。
+
+### 验证
+
+- `git diff --check`：通过。
+- Markdown 本地链接校验：通过。
+- 关键术语一致性检查：通过。
+- 纯文档切片，未运行代码测试或 Browser 验证。
+
+### 下一步
+
+- 由决策 Agent / 项目管理者验收本次方向文档。
+- 下一开发切片从 Task Hall 数据模型与 API 最小闭环开始；涉及数据库 / 协议，完成后暂停验收。
+
+---
+
 ## 2026-07-15 BS-2b：多方场发言可见性（真机 v2 卡第二步的修复，决策 Agent 自行开发）
 
 **背景**：BS-3 真机验收 v2 第一步（各自想法）正常，但第二步"逐一表态"时 agent 反馈"不知道对方发了哪条"——卡住。诊断根因：pi/codex 的 prompt（`build_cli_prompt` 紧凑分支）**只含触发消息 + 角色注入**，无任何 Hall 历史；`discussion_context`（带 turns 的那段）对 pi/codex 是 5.x 时故意砍掉的（防"已经XX啦"元叙述），且它本就不含 turn 的正文内容。→ 表态/汇总这类"对别人发言的反应"结构上拿不到别人说了什么。

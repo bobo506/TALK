@@ -3,6 +3,7 @@
 > 状态：Design（2026-06-20 与项目管理者多轮讨论定稿）。承接 [`POSITIONING.md`](POSITIONING.md)（定位与 4 类场景）。
 > 覆盖：信息类型（discussion stance 终集）、结束归一模型、决策人、Hall 类型 / RolePack、@所有人、人设网页编辑、切片方案 D1–D5。
 > 命名为草案，实现时可微调。
+> **优先级说明（2026-07-15）**：本文对应 **Discussion Halls**。D1 / D2 / D3 / BS 基础与 BS-3a 结构性收尾已完成；项目接下来优先完成 **Task Halls**。真实模型的最终汇总质量仍可补验，但评审流程与其它审议效果暂缓，不代表方案撤销。
 
 ---
 
@@ -142,8 +143,16 @@
 | **BS-1** | server：@所有人 × brainstorm 群 → 自动建多方 discussion（root/participants/topic/放大 max_rounds，幂等）；brainstorm 模板文案改四阶段协议 | server | ✓ `072fe54` |
 | **BS-2** | bridge：广播回复 turns 落到多方 session（root/participants 匹配验证）；表态 stance 透传；多方 session 回合预算按 N 放大 | bridge | ✓ `7fdf67d` |
 | **BS-2b** | bridge：**发言可见性**——多方场里给 agent prompt 注入"本场已有发言回顾"（真机 v2 发现：agent 表态时看不到彼此发言）。仅多方场，1:1/free 不变 | bridge | ✓ `79de68f` |
-| **BS-3** | 真机验收 v2：人按四阶段驱动一轮，验 turns 完整落账 + decision 收口 `resolved+consensus` | 验收 | 进行中（第一步 OK，第二步经 BS-2b 修复后待重测） |
+| **BS-3** | 真机验收 v2：人按四阶段驱动一轮，验 turns 完整落账 + decision 收口 `resolved+consensus` | 验收 | 已执行并暴露 D-i / D-ii：通用历史虽已注入，但模型未可靠 grounding；纯 prose 汇总仍记为 `answer` |
+| **BS-3a** | 汇总收尾：内联所有 Agent 首条意见原文；决策人成功回复按严格守卫推断 `decision` 并自动收口 | bridge | ✓ 自动化通过；真实模型最终汇总质量留作人工补验 |
 
 > BS-2b 说明：真机 v1→v2 逐步暴露"agent 无 Hall 上下文"是本编排的隐性依赖；prompt 的发言可见性是让多方表态/汇总成立的必要条件（详见 `PROGRESS_HISTORY` 2026-07-15 BS-2b）。
+
+### 8.5 BS-3 收尾决策（D-i / D-ii / D-iii）
+
+- **D-i · 汇总 grounding**：采用内联方案。只在合格汇总触发时，从 turns 锚定每位 Agent 的首条 `answer` 原文并拼成专用材料块，不再要求汇总者自己从通用 Hall 历史中捞取意见；材料必须覆盖全部 Agent，否则不进入自动决策。
+- **D-ii · 结构化 decision 与收口**：采用 bridge 推断。条件限定为 active 多方 brainstorm、human 单独点名当前决策人、明确汇总意图、意见已取齐、CLI 成功且有非空回复；满足后强制 `stance=decision` 并复用 D3-3a / D3-3c 得到 `resolved + end_reason`。
+- **D-iii · 决策人先出意见**：保持原协议。决策人和其他 Agent 一样先贡献一条 `answer`；最终汇总是后续独立的 `decision`。BS-3a grounding 会显式包含决策人的首条意见。
+- **零回归边界**：普通 human 提问、多目标广播、非决策人、非 brainstorm、1 对 1 discussion、材料不完整或 CLI 失败均不会被误判为 `decision`。
 
 **推迟**：`escalated` 下线（原 D3-3d，属清理）、`end_reason` 的 `timeout`/`manual`、server 自动编排（模式 I）。

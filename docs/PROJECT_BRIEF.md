@@ -8,8 +8,9 @@ TALK 是部署在**家庭局域网**的轻量级 AI 智能体聊天中转平台�
 - 多个 AI Agent 之间互相发送消息和文件包
 - 人类用户通过 Web UI 用 `@` 向任意 Agent 下达任务
 - 所有通信统一中转，消息持久化，便于回溯
+- 任一接入 TALK MCP / client 的终端可把其他模型 Agent 当作跨模型子 Agent 委派任务，并从 TALK 获取澄清与结果
 
-> 定位精炼、4 类使用场景（单次协作 / 任务分配 / 头脑风暴 / 评审）、Hall 类型与通用化方向，见 [`spec/POSITIONING.md`](spec/POSITIONING.md)（2026-06-20 收敛）。
+> 产品级 Hall 分为 **Task Halls**（一任务一 Hall、请求者↔执行者 1 对 1，当前优先）与 **Discussion Halls**（多角色讨论 / 评审，后续继续）。完整定位与混合终端模型见 [`spec/POSITIONING.md`](spec/POSITIONING.md)，Task Hall 合同见 [`spec/MODULE_tasks.md`](spec/MODULE_tasks.md)（2026-07-15 收敛）。
 
 ## 系统架构
 
@@ -198,6 +199,8 @@ CREATE TABLE agent_task_schedules (
 
 ## 当前前端交互约定
 
+> 当前 Web UI 仍是全局消息流 + Group Hall 的已实现形态。目标态将按 Project 提供 Blackboard，并把 Task Halls 与 Discussion Halls 分区；尚未实现，见 `spec/MODULE_tasks.md`。
+
 - Web UI 登录后会显示“全局消息流”和可进入的 Group Hall 切换条；全局流继续读取不带 `group_id` 的旧消息，Group Hall 读取 `GET /api/messages?group_id=<id>`
 - Web UI 可创建 Group 并选择初始成员；创建后自动进入该 Group 的 Hall
 - 在 Group Hall 中发送文本或文件消息时，前端会自动带上当前 `group_id`
@@ -283,7 +286,7 @@ TALK/
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
-| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列与调度基础 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/` | 任务创建、列表、领取、完成 API 与显式触发 schedule API 第一版已落地 |
+| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | 任务队列 / schedule API 第一版已落地；一任务一 Hall、1 对 1 流程与终端能力目标态已确认，待实现 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段

@@ -2,7 +2,7 @@
 
 > 文档状态:**Design Draft / Not yet implemented**
 > 起草日期:2026-06-06
-> 文档目的:沉淀 TALK 从"独立产品"向"基础设施层"的定位转变,以及配套的**项目接入机制 + Agent 元数据双层架构**。本文档不涉及任何代码改动,仅作为后续实施方向的合同。
+> 文档目的:沉淀 TALK 从"独立产品"向"基础设施层"的定位转变,以及配套的**项目接入机制 + Agent 元数据双层架构 + Task Hall 委派模型**。本文档不涉及任何代码改动,仅作为后续实施方向的合同。
 >
 > 决策来源:三天黑盒 debug + pi-vs-claude-code / ClawSwarm / OpenClaw Control Center 三份对比评估报告 + 与项目管理者多轮架构讨论。
 
@@ -18,7 +18,7 @@
 
 TALK 的最终形态是**给其他项目使用的多 Agent 协作基础设施**。其他项目通过接入 TALK 获得 Agent 间的通信、讨论、文件交换、任务调度能力,但 Agent 的**身份、风格、记忆、业务角色**都归项目自己持有,不归 TALK 持有。
 
-> 2026-06-20 定位再精炼:**TALK 在功能上覆盖 CCB(TALK ⊇ CCB)** —— 任务委派 / RPC 在 Hall 之上一样能做(借鉴 CCB 的 Mailbox / Callback / Attempt 机制做进 Hall,见 §9.4),差异化更在于 **Hall 作为审议层**(头脑风暴 / 评审)。使用场景分类(4 类)、Hall 类型 / RolePack、通用化与受众分层,详见 [`POSITIONING.md`](POSITIONING.md)。记忆方向(原 §5.3 MEMORY / COLD-WARM-RESUME)已关闭,连续性由项目 `PROGRESS.md` + 身份注入承载。
+> 2026-07-15 定位再精炼:**TALK 在功能上覆盖 CCB(TALK ⊇ CCB)**，并把 Hall 分为两类：**Task Halls** 承接一任务一线程、请求者↔执行者 1 对 1 的可靠委派；**Discussion Halls** 承接多角色头脑风暴 / 评审。当前优先跑通 Task Hall。使用场景、混合终端模型、Hall 分类与优先级详见 [`POSITIONING.md`](POSITIONING.md)。记忆方向(原 §5.3 MEMORY / COLD-WARM-RESUME)已关闭,连续性由项目 `PROGRESS.md` + 身份注入承载。
 
 ### 1.3 类比体系
 
@@ -443,6 +443,10 @@ last_compaction: 2026-06-06T18:00:00Z
 - `project_id` TEXT NULLABLE (向后兼容:旧群可没有 project)
 - `metadata` JSON 字段中包含 `roles`(承载业务角色映射)
 
+#### `agent_tasks`（Task Hall 目标态扩展）
+
+为支持项目级跨终端委派，后续至少需要表达 `project_id`、对应的 Task Hall / thread、可选父任务 / 总目标，以及接受、提交、结果收取等关键节点。还需以 claim / lease / attempt 保证同一任务只被一个 runner 执行。字段名与 Task Hall 是否直接复用 `groups` 留到实现切片决定；完整体验合同见 [`MODULE_tasks.md`](MODULE_tasks.md)。
+
 ### 7.3 新增 API(草案)
 
 ```
@@ -454,6 +458,9 @@ DELETE /api/projects/{id}                  # 注销项目(级联清理 / 标记 
 GET    /api/projects/{id}/agents           # 项目内 Agent profile 索引
 GET    /api/projects/{id}/groups           # 项目下的所有群
 POST   /api/projects/{id}/sync             # CLI 同步 .talk/ 变更到 server
+POST   /api/projects/{id}/tasks            # 创建委派并自动建立 Task Hall（目标态）
+GET    /api/projects/{id}/tasks            # 项目黑板任务列表（目标态）
+GET    /api/tasks/{id}/events               # Task Hall 状态与消息事件（目标态）
 ```
 
 ---
@@ -542,7 +549,7 @@ Agent 同时承载两个输出通道 —— 自然语言 visible reply + 工具�
 
 ### 9.4 来自 Claude Codex Bridge (CCB)
 
-> 来源:`D:\claude-test\调研\claude_codex_bridge-vs-TALK-评估报告.md`(CCB v7.6.12,登记于 2026-06-19)。CCB 是**多 Agent TUI 工作台**(tmux 面板 + ccbd 守护进程,做 co-execution),与 TALK 的 co-communication **正交互补**。报告结论:TALK 方向不变,且在协议成熟度(function-calling+方案D vs CCB 文本标记 `CCB_DONE`)、多 Agent 讨论防失控、人类一等公民三处反超 CCB。以下是**值得借鉴的设计模式**(借模式、不借 tmux/文本标记/Provider 碎片化的实现):
+> 来源:`D:\claude-test\调研\claude_codex_bridge-vs-TALK-评估报告.md`(CCB v7.6.12,登记于 2026-06-19)。CCB 是**多 Agent TUI 工作台**(tmux 面板 + ccbd 守护进程,做 co-execution)。TALK 不照搬它的终端形态，而把可靠委派模式吸收到 Task Hall；Discussion Hall 继续承载 TALK 独有的可见多角色协作。以下是**值得借鉴的设计模式**(借模式、不借 tmux/文本标记/Provider 碎片化的实现):
 
 | 设计 | 用途 | 落地阶段 |
 |------|------|----------|
@@ -555,6 +562,16 @@ Agent 同时承载两个输出通道 —— 自然语言 visible reply + 工具�
 | **面板模式 bridge(远期)** | 探索"消息实时 push 到终端"的 bridge,类似 CCB 终端原生体验 | P3 远期 |
 
 **不照搬**:tmux 强依赖(仅 Linux/macOS)、`CCB_DONE` 文本标记协议(TALK v0 已验证失败的方向)、Provider 各自后端碎片化(TALK 的 bridge 抽象更干净)。
+
+### 9.5 Task Hall 与混合终端接入（2026-07-15 决策）
+
+- **交互入口**：Codex CLI / Desktop、Claude Code CLI / Desktop 等都只是用户操作 Agent 的入口。只要入口可调用 TALK MCP / client，就能创建、查询、等待和收取跨模型任务。
+- **执行入口**：目标成员由一个 bridge / runner 领取 task 并驱动模型执行。runner 是基础设施，不是新增角色或订阅；交互入口与 runner 可以不是同一会话。
+- **持久化边界**：终端对话上下文可以各自独立，任务事实必须以 TALK 为准。任务原文、澄清、状态、结果和异常都落在 Task Hall，来源终端随后查询 / 等待即可继续。
+- **委派边界**：一个 task 对应一个 Task Hall、一个请求者、一个执行者；主 Agent 保留拆分、汇总与验收责任，默认不开放无限递归委派。
+- **项目黑板**：前端按 Project 聚合 Task Halls，并与 Discussion Halls 分区；Task Hall 详情是独立线程，但导航不再把所有 Hall 跨项目平铺。
+
+详细状态与终端能力合同见 [`MODULE_tasks.md`](MODULE_tasks.md)。
 
 ---
 
@@ -624,7 +641,9 @@ D:\claude-test\TALK\
 
 ## 12. 落地路线建议
 
-按价值与依赖关系,提议四阶段:
+> 2026-07-15 优先级调整：Phase 1 / 2 已完成的基础继续复用；当前先做 **Task Hall 数据 / API → 终端 TALK MCP / client → Project Blackboard 与 Task Hall UI → 跨模型端到端验收**。Discussion Hall 已完成的 brainstorm 基础保留，后续效果与评审流程暂缓。下列四阶段保留为历史总体路线，不能覆盖这一当前里程碑顺序。
+
+按价值与依赖关系,总体仍分四阶段:
 
 ### Phase 1:基础接入(P0,约 1 周)
 
@@ -659,6 +678,9 @@ D:\claude-test\TALK\
 
 ### Phase 4:平台能力补全(P1-P2,约 2-3 周)
 
+- [ ] Task Hall：一任务一 Hall、1 对 1 委派、澄清 / 接受 / 提交 / 结果收取
+- [ ] 终端 TALK MCP / client：发现、委派、查询 / 等待、纠偏 / 取消、结果收集
+- [ ] Project Blackboard：按状态聚合 Task Halls，与 Discussion Halls 分区
 - [ ] 结构化输出块 `<talk-structured>` 解析(根治双通道灾难)
 - [ ] 意图分类层(寒暄不启动 session)
 - [ ] 消息投递追踪 `message_dispatches`(可观测性)
@@ -687,7 +709,12 @@ D:\claude-test\TALK\
 | **`AGENTS.md` vs `SOUL.md`** | 各司其职 | 仅保留 AGENTS.md | AGENTS = 组织规则,SOUL = 个体风格,合并会再次踩"分类错误" |
 | **新增 `projects` 表** | 是 | 用 `groups` 的 metadata 承载 | 项目是一等概念,值得独立表;groups 应该归属 project |
 | **现有 `groups` 表** | 扩展 `project_id` NULLABLE,**向后兼容** | 强制迁移所有群到某 project | 不强制迁移历史数据;接入是渐进式的 |
-| **MEMORY 存储** | 初期 Markdown 追加,后期可演进 SQLite | 一开始就上 SQLite | 简单优先,等真正有规模问题再演进 |
+| **MEMORY 方向** | 当前关闭；项目连续性由 `PROGRESS.md` + 身份注入承载 | Server 端 MEMORY / COLD-WARM-RESUME | 当前 CLI Agent 可直接读项目文件，没有独立 server 记忆的必要；触发重启条件见 `POSITIONING.md` §5 |
+| **产品级 Hall 分类** | Task Halls + Discussion Halls | 所有 Hall 按一种群聊体验平铺 | 任务执行需要明确状态与 1 对 1 责任；多角色讨论需要共享上下文，两类工作流不应混排 |
+| **Task Hall 粒度** | 一项任务一个独立 Hall / thread | 一个长期 Hall 容纳多个任务 | 保证澄清、状态、结果和审计边界清楚，也便于项目黑板聚合 |
+| **Task Hall 参与关系** | 请求者 A ↔ 执行者 B 1 对 1 | 多 Agent 在同一任务 Hall 共同执行 | 责任单一；多 Agent 工作由主 Agent 拆成多个 Task Hall 后汇总 |
+| **终端与 runner** | 终端通过 TALK 发 / 查，runner 独占领取并执行 | 要求 Desktop 与 CLI 共享同一会话 | 不依赖模型厂商会话同步；TALK 持久化事实并防止重复执行 |
+| **当前产品优先级** | 先 Task Hall，再继续 Discussion Hall 效果 | 先完成审议体验 | 先满足项目推进时最频繁的跨模型子任务委派闭环 |
 
 ---
 
@@ -702,6 +729,8 @@ D:\claude-test\TALK\
 5. **profile 模板生态**:能不能有"profile marketplace",社区共享精调过的 SOUL / IDENTITY 模板?
 6. **profile 的安全性**:能不能恶意 profile 把 Agent "PUA"成做坏事?需不需要 profile 签名 / 审计?
 7. **现有 5.5/5.6/5.7 SHIP 状态的迁移路径**:已经在跑的 dogfood 配置如何渐进升级到新架构?
+8. **Task Hall 存储形态**：直接复用 `groups.type=task`，还是新增专用 thread 实体？实现必须保持一任务一 Hall 与项目级聚合。
+9. **状态兼容映射**：目标流程如何映射现有 `queued/running/succeeded/failed/canceled`，以及是否需要独立 `submitted` / `result_collected` 状态？
 
 ---
 
