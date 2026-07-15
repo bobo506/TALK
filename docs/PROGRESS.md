@@ -1,9 +1,9 @@
 # Project Progress
 
 ## Latest
-Updated: 2026-07-15 (Asia/Shanghai) — 收尾分支 `claude/phase3-collab-and-ui`。**BS-3a 汇总结构性缺陷已修复**：汇总轮不再让决策人从通用历史中自行找意见，而是按 discussion turns 取齐每位 Agent（含决策人）的首条 `answer` 原文，作为专用 grounding 内联；符合“active 多方 brainstorm + human 单独点名决策人 + 明确汇总意图 + 意见齐全 + CLI 成功非空回复”时，bridge 强制把回复记为 `decision`，复用既有链路得到 `resolved + end_reason=consensus/deadlock`。普通提问、多目标、非 brainstorm、1 对 1、材料不全和 CLI 失败均不触发。五模块 **147 tests 全绿**。真实模型最终汇总质量尚未补跑，但 `answer/end_reason=null` 的结构性病根已由自动化覆盖。**本分支完成后关闭，下一步创建 Task Hall 分支。**
+Updated: 2026-07-15 (Asia/Shanghai) — 分支 `codex/task-hall`，从已收尾并推送的 `claude/phase3-collab-and-ui@1da4797` 创建。上一分支已完成 **BS-3a 汇总结构性修复**：按 discussion turns 取齐每位 Agent（含决策人）的首条 `answer` 原文做专用 grounding；符合严格守卫时，bridge 将成功汇总归一为 `decision`，并得到 `resolved + end_reason=consensus/deadlock`。五模块 **147 tests 全绿**；真实模型最终汇总质量保留为人工补验，不冒充真机通过。**当前里程碑 = Task Hall；下一步 = 数据模型与 API 最小闭环切片。**
 
-### 1) Current Progress（分支 `claude/phase3-collab-and-ui`）
+### 1) Current Progress（分支 `codex/task-hall`）
 - **BS-3a ✓（2026-07-15，Discussion 收尾）**：新增 `_is_brainstorm_summary_request` 严格识别汇总轮、`_brainstorm_summary_grounding` 取齐各 Agent 首条意见原文（含决策人、剔除后续噪声）并注入 prompt；成功汇总 prose / 错误 stance 均由 bridge 归一为 `decision` 后自动收口。新增 4 个测试覆盖材料选择、缺人拒绝、直接点名守卫和端到端 `decision + resolved/consensus`；`test_cli_bridge` 85 个、五模块共 147 个测试通过。
 - **Task Hall 产品方向 ✓（2026-07-15，文档切片）**：确认 Task Halls / Discussion Halls 两类产品信息架构；Task Hall 固定为一任务一 Hall、1 对 1 请求 / 执行、项目归属、可见澄清 / 状态 / 结果；确认混合终端 + runner 模型、终端 TALK MCP / client 能力合同和 Project Blackboard 目标。已同步 `POSITIONING`、`MODULE_tasks`、`PROJECT_INTEGRATION`、项目简报、旧 MVP / Discussion 优先级说明与进度历史；无代码改动。
 - **P3-1 ✓**（`533bc5d`）：群成员 `business_role`/`decision_tier` 存储 + `PUT members` API。

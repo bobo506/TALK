@@ -220,7 +220,7 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 ### 分支交接
 
 - `claude/phase3-collab-and-ui` 在本片提交并推送后关闭开发。
-- 下一分支从本分支最终提交创建，进入 Task Hall 数据 / API 最小闭环；本轮只创建分支，不提前开发下一切片。
+- 已从最终提交 `1da4797` 创建并切换到 `codex/task-hall`，进入 Task Hall 数据 / API 最小闭环；本轮只完成分支接力，不提前开发下一切片。
 
 ---
 
