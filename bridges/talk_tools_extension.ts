@@ -26,6 +26,101 @@ function getConfig() {
   };
 }
 
+type JsonObject = Record<string, any>;
+
+function effectiveProjectId(value?: unknown): string | undefined {
+  return String(value || process.env.TALK_PROJECT_ID || "").trim() || undefined;
+}
+
+async function apiRequest(
+  method: string,
+  apiPath: string,
+  body?: JsonObject,
+  params?: JsonObject,
+): Promise<any> {
+  const config = getConfig();
+  if (!config.apiKey) throw new Error("TALK_API_KEY 未设置");
+  const url = new URL(apiPath, config.baseUrl + "/");
+  for (const [key, value] of Object.entries(params || {})) {
+    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    method,
+    headers: {
+      "X-API-Key": config.apiKey,
+      "Accept": "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json; charset=utf-8" }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  let payload: any = null;
+  if (text) {
+    try { payload = JSON.parse(text); } catch (_) { payload = text; }
+  }
+  if (!response.ok) {
+    const detail = payload && typeof payload === "object" ? payload.detail || payload : payload;
+    throw new Error(`TALK API HTTP ${response.status}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
+  }
+  return payload;
+}
+
+function availability(statuses: string[]): string {
+  if (statuses.includes("busy")) return "busy";
+  if (statuses.some((status) => ["online", "idle", "starting"].includes(status))) return "available";
+  if (statuses.includes("error")) return "error";
+  return "offline";
+}
+
+async function taskWithMessages(taskId: number): Promise<JsonObject> {
+  const task = await apiRequest("GET", `/api/tasks/${taskId}`);
+  const params: JsonObject = { limit: 50 };
+  if (task.hall_group_id) params.group_id = task.hall_group_id;
+  const messages = await apiRequest("GET", "/api/messages", undefined, params);
+  return {
+    task,
+    messages,
+    result_message: messages.find((message: JsonObject) => message.id === task.result_message_id) || null,
+  };
+}
+
+async function replyTask(taskId: number, body: string, workflowAction = "none"): Promise<JsonObject> {
+  if (!["none", "request_clarification", "accept"].includes(workflowAction)) {
+    throw new Error("workflow_action 必须是 none、request_clarification 或 accept");
+  }
+  let task = await apiRequest("GET", `/api/tasks/${taskId}`);
+  const currentMemberId = process.env.TALK_MEMBER_ID || (await apiRequest("GET", "/api/members/me")).id;
+  let target: string;
+  if (currentMemberId === task.created_by) target = task.target_member_id;
+  else if (currentMemberId === task.target_member_id) target = task.created_by;
+  else throw new Error("当前成员不是该 Task Hall 的请求者或执行者");
+
+  const messageBody: JsonObject = { type: "text", content: body, to: [target] };
+  if (task.hall_group_id) messageBody.group_id = task.hall_group_id;
+  const message = await apiRequest("POST", "/api/messages", messageBody);
+  if (workflowAction === "request_clarification") {
+    task = await apiRequest("POST", `/api/tasks/${taskId}/request-clarification`);
+  } else if (workflowAction === "accept") {
+    task = await apiRequest("POST", `/api/tasks/${taskId}/accept`);
+  }
+  return { task, message };
+}
+
+async function toolResponse(operation: () => Promise<any>) {
+  try {
+    const payload = await operation();
+    return {
+      content: [{ type: "text", text: JSON.stringify(payload) }],
+      details: payload,
+    };
+  } catch (err) {
+    return {
+      content: [{ type: "text", text: `TALK 工具失败：${String(err)}` }],
+      details: { error: String(err) },
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 扩展入口
 // ---------------------------------------------------------------------------
@@ -116,6 +211,189 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
         content: [{ type: "text", text: "talk_send 暂不可用（当前消息不需要向其他成员发送）。" }],
         details: { error: "talk_send not available for this message" },
       };
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_list_agents",
+    label: "List TALK agents",
+    description: "列出当前项目可委派的 Agent 及其实例忙闲状态。",
+    parameters: Type.Object({ project_id: Type.Optional(Type.String()) }),
+    async execute(_toolCallId, params) {
+      return toolResponse(async () => {
+        const projectId = effectiveProjectId(params.project_id);
+        const members = await apiRequest("GET", "/api/members");
+        const instances = await apiRequest("GET", "/api/instances");
+        let projectMembers: Set<string> | undefined;
+        if (projectId) {
+          const projectAgents = await apiRequest("GET", `/api/projects/${encodeURIComponent(projectId)}/agents`);
+          projectMembers = new Set(projectAgents.map((agent: JsonObject) => String(agent.member_id)));
+        }
+        const agents = members
+          .filter((member: JsonObject) => member.kind === "agent" && !member.disabled_at)
+          .filter((member: JsonObject) => !projectMembers || projectMembers.has(String(member.id)))
+          .map((member: JsonObject) => {
+            const memberInstances = instances.filter((instance: JsonObject) => instance.member_id === member.id);
+            return {
+              member_id: member.id,
+              display_name: member.display_name,
+              availability: availability(memberInstances.map((instance: JsonObject) => String(instance.status || "offline"))),
+              instances: memberInstances,
+            };
+          });
+        return { project_id: projectId || null, agents };
+      });
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_delegate_task",
+    label: "Delegate TALK task",
+    description: "向指定 Agent 创建项目化任务并自动建立独立 Task Hall。",
+    parameters: Type.Object({
+      project_id: Type.Optional(Type.String()),
+      target_member_id: Type.String(),
+      title: Type.Optional(Type.String()),
+      content: Type.String(),
+    }),
+    async execute(_toolCallId, params) {
+      return toolResponse(async () => {
+        const projectId = effectiveProjectId(params.project_id);
+        if (!projectId) throw new Error("缺少 project_id，且当前 bridge 未设置 TALK_PROJECT_ID");
+        return apiRequest("POST", "/api/tasks", {
+          project_id: projectId,
+          target_member_id: String(params.target_member_id || "").trim(),
+          title: String(params.title || "").trim() || null,
+          content: String(params.content || "").trim(),
+        });
+      });
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_get_task",
+    label: "Get TALK task",
+    description: "读取一个任务、Task Hall 最近消息及关联结果。",
+    parameters: Type.Object({ task_id: Type.Number() }),
+    async execute(_toolCallId, params) {
+      return toolResponse(() => taskWithMessages(Number(params.task_id)));
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_list_tasks",
+    label: "List TALK tasks",
+    description: "按项目、目标 Agent、runner 状态或协作状态查询可见任务。",
+    parameters: Type.Object({
+      project_id: Type.Optional(Type.String()),
+      target_member_id: Type.Optional(Type.String()),
+      status: Type.Optional(Type.String()),
+      workflow_status: Type.Optional(Type.String()),
+    }),
+    async execute(_toolCallId, params) {
+      return toolResponse(async () => {
+        const projectId = effectiveProjectId(params.project_id);
+        const tasks = await apiRequest("GET", "/api/tasks", undefined, {
+          project_id: projectId,
+          target_member_id: params.target_member_id,
+          status: params.status,
+          workflow_status: params.workflow_status,
+        });
+        return { project_id: projectId || null, tasks };
+      });
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_wait_tasks",
+    label: "Wait for TALK tasks",
+    description: "等待任务进入澄清、已提交、完成或失败等指定协作状态，最长 30 秒。",
+    parameters: Type.Object({
+      project_id: Type.Optional(Type.String()),
+      task_ids: Type.Optional(Type.Array(Type.Number())),
+      workflow_statuses: Type.Optional(Type.Array(Type.String())),
+      timeout_seconds: Type.Optional(Type.Number()),
+    }),
+    async execute(_toolCallId, params) {
+      return toolResponse(async () => {
+        const desired = new Set((params.workflow_statuses || [
+          "clarification_requested", "submitted", "completed", "failed", "canceled",
+        ]).map((status: unknown) => String(status).trim().toLowerCase()).filter(Boolean));
+        const timeout = Math.max(0, Math.min(Number(params.timeout_seconds ?? 10), 30));
+        const deadline = Date.now() + timeout * 1000;
+        let tasks: JsonObject[] = [];
+        while (true) {
+          if (params.task_ids && params.task_ids.length) {
+            tasks = await Promise.all(params.task_ids.map((taskId: number) => apiRequest("GET", `/api/tasks/${taskId}`)));
+          } else {
+            tasks = await apiRequest("GET", "/api/tasks", undefined, {
+              project_id: effectiveProjectId(params.project_id),
+            });
+          }
+          const matched = tasks.filter((task) => desired.has(String(task.workflow_status || "")));
+          if (matched.length) return { timed_out: false, workflow_statuses: [...desired].sort(), tasks: matched };
+          if (Date.now() >= deadline) return { timed_out: true, workflow_statuses: [...desired].sort(), tasks };
+          await new Promise((resolve) => setTimeout(resolve, Math.min(500, Math.max(0, deadline - Date.now()))));
+        }
+      });
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_reply_task",
+    label: "Reply in TALK task",
+    description: "在 Task Hall 回复或纠偏；执行者可同时请求澄清或接受任务。",
+    parameters: Type.Object({
+      task_id: Type.Number(),
+      body: Type.String(),
+      workflow_action: Type.Optional(Type.String()),
+    }),
+    async execute(_toolCallId, params) {
+      return toolResponse(() => replyTask(
+        Number(params.task_id),
+        String(params.body || "").trim(),
+        String(params.workflow_action || "none").trim().toLowerCase(),
+      ));
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_cancel_task",
+    label: "Cancel TALK task",
+    description: "原请求者取消尚未 claim 的任务；运行中任务暂不支持强制取消。",
+    parameters: Type.Object({
+      task_id: Type.Number(),
+      reason: Type.Optional(Type.String()),
+    }),
+    async execute(_toolCallId, params) {
+      return toolResponse(async () => {
+        const taskId = Number(params.task_id);
+        const task = await apiRequest("GET", `/api/tasks/${taskId}`);
+        if (!["queued", "canceled"].includes(task.status)) {
+          throw new Error("当前仅支持取消尚未 claim 的任务；运行中取消等待 lease/attempt 支撑");
+        }
+        let message = null;
+        const reason = String(params.reason || "").trim();
+        if (reason && task.status !== "canceled") message = (await replyTask(taskId, reason)).message;
+        const canceled = await apiRequest("POST", `/api/tasks/${taskId}/cancel`);
+        return { task: canceled, message };
+      });
+    },
+  });
+
+  pi.registerTool({
+    name: "talk_collect_result",
+    label: "Collect TALK result",
+    description: "原请求者收取已提交结果，并返回结果消息与 Task Hall 最近消息。",
+    parameters: Type.Object({ task_id: Type.Number() }),
+    async execute(_toolCallId, params) {
+      return toolResponse(async () => {
+        const taskId = Number(params.task_id);
+        const task = await apiRequest("GET", `/api/tasks/${taskId}`);
+        if (task.workflow_status === "submitted") await apiRequest("POST", `/api/tasks/${taskId}/collect-result`);
+        else if (task.workflow_status !== "completed") throw new Error(`任务协作状态为 ${task.workflow_status}，尚无可收取结果`);
+        return taskWithMessages(taskId);
+      });
     },
   });
 }

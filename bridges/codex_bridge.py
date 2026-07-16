@@ -269,11 +269,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
     args.command = args.codex_command
     args.runtime = "codex"
     args.bridge_label = "Codex bridge"
-    # 把 TALK 连接信息注入环境变量，供 talk_send_mcp.py 使用
-    # 每个 bridge 实例必须用自己的 key/url/id
-    os.environ["TALK_API_KEY"] = args.key
-    os.environ["TALK_BASE_URL"] = args.base_url
-    os.environ["TALK_MEMBER_ID"] = cli_bridge.member_id_from_name(args.name)
+    cli_bridge.configure_talk_tool_environment(args, cli_bridge.member_id_from_name(args.name))
     await cli_bridge.run_bridge(args)
 
 

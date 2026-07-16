@@ -282,6 +282,12 @@ class TalkClientTests(RouteTestCase):
 
             async with TalkClient(base_url, "bobo-key") as human_client:
                 collected = await human_client.collect_task_result(created["id"])
+                cancelable = await human_client.create_task(
+                    "agent:demo",
+                    "Cancel from async SDK",
+                    project_id="prj_sdk_async",
+                )
+                canceled = await human_client.cancel_task(cancelable["id"])
 
             self.assertEqual(queued[0]["id"], created["id"])
             self.assertEqual(fetched["project_id"], "prj_sdk_async")
@@ -291,6 +297,7 @@ class TalkClientTests(RouteTestCase):
             self.assertEqual(submitted["workflow_status"], "submitted")
             self.assertEqual(collected["workflow_status"], "completed")
             self.assertIsNotNone(collected["result_collected_at"])
+            self.assertEqual(canceled["workflow_status"], "canceled")
 
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))
@@ -329,6 +336,12 @@ class TalkClientTests(RouteTestCase):
                     result_message_id=result["id"],
                 )
                 collected = human_client.collect_task_result(created["id"])
+                cancelable = human_client.create_task(
+                    "agent:demo",
+                    "Cancel from sync SDK",
+                    project_id="prj_sdk_sync",
+                )
+                canceled = human_client.cancel_task(cancelable["id"])
             finally:
                 agent_client.close()
                 human_client.close()
@@ -339,6 +352,7 @@ class TalkClientTests(RouteTestCase):
         self.assertEqual(accepted["workflow_status"], "accepted")
         self.assertEqual(submitted["workflow_status"], "submitted")
         self.assertEqual(collected["workflow_status"], "completed")
+        self.assertEqual(canceled["workflow_status"], "canceled")
 
     def test_task_schedule_helpers(self):
         async def scenario(base_url: str) -> None:

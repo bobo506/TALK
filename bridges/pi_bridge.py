@@ -22,6 +22,18 @@ from cli.profiles import compose_system_prompt, load_profile
 # 用正斜杠避免 Windows 反斜杠被 shlex.split(posix=True) 当成转义符
 # ---------------------------------------------------------------------------
 _TALK_EXTENSION_PATH = str(PROJECT_ROOT / "bridges" / "talk_tools_extension.ts").replace("\\", "/")
+TALK_TOOL_NAMES = (
+    "talk_send",
+    "talk_list_agents",
+    "talk_delegate_task",
+    "talk_get_task",
+    "talk_list_tasks",
+    "talk_wait_tasks",
+    "talk_reply_task",
+    "talk_cancel_task",
+    "talk_collect_result",
+)
+TALK_TOOL_CSV = ",".join(TALK_TOOL_NAMES)
 
 # ---------------------------------------------------------------------------
 # 系统层 prompt：角色、输出通道、单轮语义与反工具幻觉约束。
@@ -67,10 +79,11 @@ def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussio
     """
     system_prompt = _single_line(system_prompt)
     if execution_profile == "tools":
-        # 施工档命令（文件工具启用）
+        # 施工档命令（文件工具 + TALK Task Hall 工具）
         return (
             "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
-            "--tools read,grep,find,ls,bash,edit,write "
+            f"--tools read,grep,find,ls,bash,edit,write,{TALK_TOOL_CSV} "
+            f"--extension {_TALK_EXTENSION_PATH} "
             f"--system-prompt {shlex.quote(system_prompt)}"
         )
     # 当前默认命令：function-calling 模式
@@ -80,7 +93,7 @@ def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussio
     # --extension <path>  显式加载我们自己的 talk_tools_extension.ts 不受 -ne 影响
     return (
         f"pi --print --mode text --no-context-files --no-builtin-tools --no-extensions "
-        f"--tools talk_send --no-session --thinking off "
+        f"--tools {TALK_TOOL_CSV} --no-session --thinking off "
         f"--extension {_TALK_EXTENSION_PATH} "
         f"--system-prompt {shlex.quote(system_prompt)}"
     )
@@ -122,11 +135,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
     # --project identity-layer injection in one place.
     args.pi_command = resolve_pi_command(args)
     args.command = args.pi_command
-    # 把 TALK 连接信息注入环境变量，供 talk_tools_extension.ts 使用
-    # 每个 bridge 实例必须用自己的 key/url/id，不能复用其他实例的旧值
-    os.environ["TALK_API_KEY"] = args.key
-    os.environ["TALK_BASE_URL"] = args.base_url
-    os.environ["TALK_MEMBER_ID"] = cli_bridge.member_id_from_name(args.name)
+    cli_bridge.configure_talk_tool_environment(args, cli_bridge.member_id_from_name(args.name))
     await cli_bridge.run_bridge(args)
 
 

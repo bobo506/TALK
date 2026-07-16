@@ -187,6 +187,49 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(collected.json()["workflow_status"], "completed")
         self.assertIsNotNone(collected.json()["result_collected_at"])
 
+    def test_requester_can_cancel_unclaimed_task_but_not_running_task(self):
+        with self.make_client() as client:
+            pending = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Cancel before claim"},
+            ).json()
+            wrong_member = client.post(
+                f"/api/tasks/{pending['id']}/cancel",
+                headers={"X-API-Key": "alice-key"},
+            )
+            canceled = client.post(
+                f"/api/tasks/{pending['id']}/cancel",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            canceled_again = client.post(
+                f"/api/tasks/{pending['id']}/cancel",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+            running = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Already running"},
+            ).json()
+            client.post(
+                f"/api/tasks/{running['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            running_cancel = client.post(
+                f"/api/tasks/{running['id']}/cancel",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(wrong_member.status_code, 403)
+        self.assertEqual(canceled.status_code, 200)
+        self.assertEqual(canceled.json()["status"], "canceled")
+        self.assertEqual(canceled.json()["workflow_status"], "canceled")
+        self.assertIsNotNone(canceled.json()["finished_at"])
+        self.assertEqual(canceled_again.json()["status"], "canceled")
+        self.assertEqual(running_cancel.status_code, 409)
+
     def test_task_hall_cannot_be_rewired_or_deleted_as_a_regular_group(self):
         with self.make_client() as client:
             created = client.post(

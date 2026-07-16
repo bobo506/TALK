@@ -64,6 +64,26 @@ _HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] | None = None
 PROMPT_TRANSPORTS = {"stdin", "argv"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
+
+
+def configure_talk_tool_environment(args: argparse.Namespace, member_id: str) -> None:
+    """Expose bridge identity and optional project id to runtime-injected TALK tools."""
+    os.environ["TALK_API_KEY"] = args.key
+    os.environ["TALK_BASE_URL"] = args.base_url
+    os.environ["TALK_MEMBER_ID"] = member_id
+    os.environ.pop("TALK_PROJECT_ID", None)
+    project_root = getattr(args, "project", None)
+    if not project_root:
+        return
+    try:
+        from cli.talk import load_project
+
+        project = load_project(Path(project_root).expanduser().resolve())
+    except (FileNotFoundError, OSError, ValueError):
+        return
+    project_id = str(project.get("project_id") or "").strip()
+    if project_id:
+        os.environ["TALK_PROJECT_ID"] = project_id
 CHINESE_REQUEST_MARKERS = ("中文", "汉语", "普通话", "简体中文", "用中文")
 ENGLISH_REQUEST_MARKERS = ("英文", "英语", "用英语", "用英文", "in english", "english")
 CAPABILITY_QUESTION_MARKERS = (
@@ -2449,6 +2469,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
     from TALK.client import TalkClient
 
     member_id = member_id_from_name(args.name)
+    configure_talk_tool_environment(args, member_id)
     workdir = Path(args.workdir).expanduser().resolve()
     client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval)
     await client.register(member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})")

@@ -490,6 +490,35 @@ def collect_task_result(
     return _update_workflow_status(task, "completed", now, session)
 
 
+@router.post("/{task_id}/cancel", response_model=AgentTaskOut)
+def cancel_task(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Cancel a task before it is claimed by its runner."""
+    task = _get_task(task_id, session)
+    if task.created_by != current.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the task requester can cancel the task")
+    if task.status == "canceled":
+        return task
+    if task.status != "queued":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="only unclaimed tasks can be canceled; running cancellation requires runner lease support",
+        )
+
+    now = datetime.now(timezone.utc)
+    task.status = "canceled"
+    task.workflow_status = "canceled"
+    task.finished_at = now
+    _touch_task(task, now)
+    session.add(task)
+    session.commit()
+    session.refresh(task)
+    return task
+
+
 @router.post("/{task_id}/claim", response_model=AgentTaskOut)
 def claim_task(
     task_id: int,

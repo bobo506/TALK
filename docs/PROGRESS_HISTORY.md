@@ -184,6 +184,36 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-15 TH-3：终端 MCP / pi Task Hall 工具闭环
+
+**背景**：TH-2 已完成 async / sync client 与 bundled runner Hall 回传，并提交为 `99e8a28`。本轮按项目管理者确认推进一个终端接入切片，让 Codex 与 pi 的实际操作终端可以发现 Agent、委派任务、处理澄清并收取结果。
+
+### 实现
+
+- 新增 `bridges/talk_task_tools.py`，统一实现 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result` 八个 HTTP-backed Task Hall 工具及 schema / dispatch。
+- `bridges/talk_send_mcp.py` 在保留 deferred `talk_send` 的基础上注册全部 Task Hall 工具；`bridges/talk_tools_extension.ts` 为 pi 提供同名工具面。
+- Codex discussion profile 与 pi 的 discussion / tools profile 均获得对应工具；bridge 从项目目录 `.talk/project.yaml` 注入默认 `TALK_PROJECT_ID`。
+- Agent 发现结合项目 profile、成员与实例状态；等待采用最长 30 秒的有界轮询；Hall 回复可同时推进请求澄清或接受动作。
+- 服务端及 async / sync client 新增取消动作。只有原请求者可幂等取消未领取任务；运行中取消返回 `409`，避免在没有 lease / runner 中断协议时伪造停止。
+- 新增 MCP 真实工具调用、桥接项目上下文、pi 工具面一致性与活服务完整委派流程测试；现有 task、client 和 bridge 测试同步扩展。
+
+### 验证
+
+- Python `py_compile` 覆盖服务端、两套 client、bridge、Task Hall 工具和相关测试：通过。
+- `node --experimental-strip-types --check bridges\talk_tools_extension.ts`：通过。
+- `tests.test_talk_task_tools`：`Ran 4 tests ... OK`；`tests.test_talk_client`：`Ran 12 tests ... OK`。
+- `tests.test_pi_bridge + tests.test_codex_bridge`：`Ran 29 tests ... OK`。
+- 全量 `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 309 tests ... OK`。
+- `git diff --check`：通过；本切片无前端改动，不需要 Browser 验证。
+
+### 边界与下一步
+
+- `talk_wait_tasks` 当前是客户端有界轮询，不是服务端事件流；Agent 发现结果尚未带项目业务角色。
+- 取消当前只覆盖未领取任务；运行中取消、超时回收和重领需要 claim lease / attempt 与 runner 中断协议。
+- 按执行 Agent 单切片门禁暂停，等待验收后再进入 claim lease / attempt，不提前开发 Project Blackboard / Task Hall Web UI。
+
+---
+
 ## 2026-07-15 TH-2：async / sync client 与 bundled runner Task Hall 接入
 
 **背景**：TH-1 已完成 Task Hall 数据 / API 地基。本轮按项目管理者确认，只推进一个 SDK / runner 切片：让实际终端 client 能使用项目化任务与协作动作，并让 bundled runner 的最终结果落到任务专属 Hall。

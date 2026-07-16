@@ -396,6 +396,9 @@ class TalkClient:
     async def collect_task_result(self, task_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/collect-result")
 
+    async def cancel_task(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/cancel")
+
     async def claim_task(self, task_id: int, *, instance_id: str | None = None) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/claim", json_body={"instance_id": instance_id})
 

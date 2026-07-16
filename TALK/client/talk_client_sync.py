@@ -272,6 +272,9 @@ class TalkClientSync:
     def collect_task_result(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.collect_task_result(task_id))
 
+    def cancel_task(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.cancel_task(task_id))
+
     def claim_task(self, task_id: int, *, instance_id: str | None = None) -> dict[str, Any]:
         return self._submit(self._client.claim_task(task_id, instance_id=instance_id))
 

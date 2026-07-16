@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、async / sync client 与 bundled runner Hall 回传已实现；终端 MCP、可靠性约束和 Web UI 待后续切片
+> 状态：Task Hall 数据 / API、async / sync client、bundled runner Hall 回传及 Codex MCP / pi 终端工具已实现；可靠性约束和 Web UI 待后续切片
 
 ## 目标
 
@@ -87,6 +87,12 @@
 - 仅原请求者可调用；任务必须处于 `submitted` 且存在 `result_message_id`。
 - 调用后协作状态变为 `completed` 并记录 `result_collected_at`；重复调用幂等返回。
 
+`POST /api/tasks/{task_id}/cancel`
+
+- 仅原请求者可调用；重复取消同一任务会幂等返回。
+- 当前只允许取消尚未领取的 `queued` 任务，并同步把执行状态与协作状态更新为 `canceled`。
+- 已进入 `running` 的任务会返回 `409`；在 claim lease / attempt 与 runner 中断协议落地前，不伪造运行中任务已被停止。
+
 `POST /api/tasks/{task_id}/claim`
 
 - 仅允许 `agent:*` 成员调用。
@@ -147,6 +153,7 @@
 - `request_task_clarification(task_id)`
 - `accept_task(task_id)`
 - `collect_task_result(task_id)`
+- `cancel_task(task_id)`
 - `claim_task(task_id, instance_id=None)`
 - `complete_task(task_id, status=..., result_message_id=None, last_error=None)`
 - `create_task_schedule(target_member_id, content, title=None, run_at=None, interval_seconds=None)`
@@ -160,6 +167,15 @@
 - `bridges/cli_bridge.py` 的任务队列 runner 会从 claim 响应读取 `hall_group_id`，把成功或失败的可见结果写入对应 Task Hall，再用该消息的 `id` 完成任务。
 - `bridges/codex_bridge.py` 的兼容任务处理入口采用同一 Hall 回传规则；实际 Codex 队列 worker 继续复用通用 runner。
 - 旧任务若没有 `hall_group_id`，runner 会保留原有全局时间线回传行为，服务端继续接受这类兼容结果。
+
+### 终端工具
+
+- Codex 使用 `bridges/talk_send_mcp.py`，pi 使用 `bridges/talk_tools_extension.ts`；两端共同提供 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result` 八个 Task Hall 工具，原有 deferred `talk_send` 保持兼容。
+- bridge 会从项目目录的 `.talk/project.yaml` 注入默认 `TALK_PROJECT_ID`；调用方仍可在工具参数中显式覆盖项目。
+- `talk_list_agents` 会结合项目 Agent profile、成员与实例状态返回可委派对象及在线 / 忙闲情况。
+- `talk_wait_tasks` 当前采用最长 30 秒的有界客户端轮询，等待澄清、提交、完成、失败或取消状态；尚未引入服务端事件等待协议。
+- `talk_reply_task` 把正文写入对应 Task Hall，并可附带请求澄清或接受任务动作；`talk_collect_result` 在请求者读取结果后把 `submitted` 推进为 `completed`。
+- `talk_cancel_task` 遵循服务端安全边界，只能由原请求者取消尚未领取的任务；可选取消原因会先写入 Task Hall。
 
 ## Task Hall 目标态（2026-07-15 确认）
 
@@ -195,9 +211,9 @@ A 创建并指派
 - Desktop 与 CLI 不共享对话上下文并不阻塞流程：TALK 是跨入口的持久化真相源。为了避免重复执行，同一任务只能由一个 runner 持有有效 claim / lease。
 - 默认委派深度为 1，主 Agent 保留整合与验收责任；递归委派、循环检测和更深链路以后按可靠性需求开放。
 
-### 终端能力合同（名称为草案）
+### 终端能力合同
 
-TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统一：
+TALK MCP / pi extension 已覆盖以下能力：
 
 | 能力 | 草案名称 | 说明 |
 |---|---|---|
@@ -205,9 +221,9 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 | 创建委派 | `talk_delegate_task` | 指定 `project_id`、目标成员、任务标题与正文，自动创建 Task Hall |
 | 查询任务 | `talk_get_task` / `talk_list_tasks` | 查询自己创建或分配给自己的任务及状态 |
 | 等待变化 | `talk_wait_tasks` | 等待澄清、状态变化或结果，避免终端盲轮询 |
-| 回复与纠偏 | `talk_reply_task` / `talk_steer_task` | 回答疑问、补充约束、请求返工 |
-| 取消任务 | `talk_cancel_task` | 按权限取消未完成任务 |
-| 收集结果 | `talk_collect_results` | 获取一个或多个子任务结果供主 Agent 整合 |
+| 回复与纠偏 | `talk_reply_task` | 回答疑问、补充约束，并执行澄清 / 接受动作；返工状态后续补齐 |
+| 取消任务 | `talk_cancel_task` | 原请求者取消尚未领取的任务 |
+| 收集结果 | `talk_collect_result` | 获取单个子任务结果并完成收取动作 |
 
 ### 数据关联现状与后续
 
@@ -233,16 +249,18 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 - 当前不实现任务重试、超时回收、抢占、重新排队。
 - 当前不由 TALK 服务端创建或管理 bridge 进程。
 - 当前任务 API 不替代消息系统；澄清正文和结果正文仍通过 Task Hall 消息记录，并用动作 API / `result_message_id` 关联。
-- async / sync client 已覆盖项目化创建、单任务读取、协作状态过滤、澄清、接受和结果收取；终端 MCP 仍缺等待、纠偏、取消、批量结果收集和按项目发现可委派 Agent 等能力。
+- async / sync client 与 Codex MCP / pi extension 已覆盖项目化创建、单任务读取、协作状态过滤、澄清、接受、等待、Hall 回复、安全取消和结果收取。
 - bundled runner 已把新任务结果写入对应 Task Hall，但仍兼容无 `hall_group_id` 的旧任务全局回传。
-- 当前没有 Project Blackboard / Task Hall Web UI，也尚未实现 observer、取消、返工和 lease / 超时回收。
+- `talk_wait_tasks` 当前是最长 30 秒的客户端轮询，不是服务端事件流；Agent 发现结果也尚未提供项目业务角色字段。
+- 当前取消只覆盖未领取任务；运行中取消必须等待 claim lease / attempt 与 runner 中断协议。
+- 当前没有 Project Blackboard / Task Hall Web UI，也尚未实现 observer、返工和 lease / 超时回收。
 
 ## 后续计划
 
 1. [x] 复用 `groups.type=task`，落 `project_id` / `hall_group_id` / `workflow_status`、一任务一 Hall 和 1 对 1 结构边界。
 2. [x] 打通澄清、接受、claim 执行、提交与结果收取 API，并保持旧五态兼容。
 3. [x] 扩展 async / sync client 的项目化委派、查询和协作动作，并让 bundled runner 把结果写入 Task Hall。
-4. 提供终端 TALK MCP 的发现、委派、查询 / 等待、纠偏 / 取消与结果收集能力。
+4. [x] 为 Codex MCP / pi extension 提供发现、委派、查询 / 有界等待、Hall 回复、安全取消与结果收集能力。
 5. 补 claim lease / attempt / 幂等约束，再建 Project Blackboard + Task Hall Web UI。
 6. 完成一轮跨模型端到端人工验收；后续再决定 schedule 项目化 / 后台触发、长任务 SSE、document lock 与递归委派策略。
 
@@ -270,3 +288,6 @@ TALK MCP / client 至少应覆盖以下能力，具体方法名在实施时统�
 - [x] 旧库新增字段、唯一索引与五态到协作状态回填通过迁移测试。
 - [x] async / sync client 均可创建项目任务、按协作状态与项目过滤、读取单任务并执行澄清 / 接受 / 收取结果动作。
 - [x] bundled runner 会把结果写入对应 Task Hall，并兼容无 Hall 的旧任务全局回传。
+- [x] Codex MCP 与 pi extension 暴露一致的八个 Task Hall 工具，MCP 目录与真实工具调用通过自动化测试。
+- [x] 活服务测试贯通发现、委派、澄清 / 回复、接受、领取、Hall 结果提交、等待与结果收取。
+- [x] 原请求者可幂等取消尚未领取的任务；其他成员和运行中任务取消均被拒绝。
