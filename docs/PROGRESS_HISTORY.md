@@ -184,6 +184,37 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-16 TH-5 人工验收反馈与后续澄清 / 终端接入决策
+
+**人工反馈**：项目管理者已通过页面委派任务并成功拿到返回结果，确认 Project Blackboard → bundled runner → 对应 Task Hall → 结果收取的基础链路可用。本轮未继续开发，只沉淀下一阶段需求与当前边界。
+
+### 已确认的澄清流程
+
+- 一项任务始终使用创建时生成的同一个 Task Hall，请求者 A 与执行者 B 的成员关系固定。
+- B 在领取前发现信息不足时，应先把问题写入该 Hall，并将任务置为 `queued / clarification_requested`；“停止领取”只表示暂不 claim / 执行，runner 仍继续监听任务和 Hall。
+- A 在同一 Hall 回复后，B 应携带原始任务和按时间排序的全部问答重新判断；信息充分则 `accept → claim → execute`，仍不足则继续在同一 Hall 提问。
+- 当前服务端已有提问、回复、`clarification_requested`、`accept` 和待澄清禁止 claim 的基础能力，但 bundled runner 仍会直接领取 `assigned` 任务，尚无领取前预检、等待答复和重新唤醒闭环。
+
+### 上下文边界
+
+- Hall 消息会完整持久化，A / B 都有读取权限；Web 和 async client 支持分页读取。
+- `talk_get_task` 当前只返回最近 50 条 Hall 消息，正式 runner prompt 目前仅包含任务标题 / 正文，因此“消息已保存”不等于“执行模型已获得完整上下文”。
+- TH-6 必须在每次预检和正式执行前分页读取 Hall，并按顺序注入任务原文、B 的问题、A 的回答及后续多轮澄清；还需覆盖重复唤醒幂等与等待期间不 claim。
+- 文件消息可保留附件元数据，但附件正文自动下载 / 注入策略仍待后续确定。
+
+### 终端委派方向
+
+- 通过 TALK bridge 启动的 Codex CLI 和 pi 已提供 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result`。
+- CLI 已具备直接自然语言委派的底层能力；普通 Codex Desktop 会话尚未自动注册 TALK MCP，需要增加项目上下文、成员身份、API Key 与工具注册的接入包装。
+- TH-7 目标链路：终端 A 委派 → B 在 Hall 澄清 → 终端 A 读取并回复 → B 执行 → 结果回同一 Hall → 终端 A 收取。
+
+### 下次恢复顺序
+
+1. 先开发 TH-6 领取前预检、自动澄清和完整 Hall 上下文重放。
+2. TH-6 通过自动化与真实模型验收后，再进入 TH-7 Codex Desktop / 通用终端接入包装。
+
+---
+
 ## 2026-07-16 TH-5：Project Blackboard、Task Hall Web UI 与真实跨模型链路
 
 **背景**：项目管理者明确表示逐片确认缺少直观价值，希望等“任务创建 → runner 执行 → 结果写入 Task Hall → 人类收取”整个流程可见后再介入。本轮因此把 Web 可视化、bundled runner 活服务链路和真实 Codex / pi CLI 冒烟作为同一个里程碑收口。
