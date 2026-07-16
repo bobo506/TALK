@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260620-agent-disable-2">
+  <link rel="stylesheet" href="/style.css?v=20260716-task-blackboard-1">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -93,6 +93,22 @@
   <div class="chat-shell flex-1 min-h-0">
     <div class="workbench">
       <aside id="workspace-tools" class="workspace-tools">
+        <section id="project-strip" class="project-strip hidden">
+          <div class="sidebar-heading project-heading">
+            <div>
+              <div class="sidebar-kicker">Project</div>
+              <h2>项目工作台</h2>
+            </div>
+            <button id="refresh-project-btn" type="button" class="icon-action subtle" title="刷新项目任务" aria-label="刷新项目任务">↻</button>
+          </div>
+          <select id="project-select" class="project-select" aria-label="选择项目"></select>
+          <button id="project-blackboard-btn" type="button" class="project-nav-btn">
+            <span>任务黑板</span>
+            <span id="project-task-count" class="project-task-count">0</span>
+          </button>
+          <button id="delegate-task-btn" type="button" class="project-delegate-btn">＋ 委派任务</button>
+          <p id="project-empty-note" class="project-empty-note hidden">还没有已注册项目。先用 <code>talk init</code> 建立项目上下文。</p>
+        </section>
         <section id="room-strip" class="room-strip hidden">
           <div class="sidebar-heading">
             <h2>Hall 列表</h2>
@@ -113,7 +129,27 @@
       </aside>
 
       <section class="timeline-workspace">
-        <header class="hall-header">
+        <section id="blackboard-view" class="blackboard-view hidden">
+          <header class="blackboard-header">
+            <div>
+              <div class="blackboard-kicker">Project Blackboard</div>
+              <h2 id="blackboard-title">任务黑板</h2>
+              <p id="blackboard-description">按协作状态查看项目任务</p>
+            </div>
+            <div class="blackboard-actions">
+              <button id="blackboard-refresh-btn" type="button" class="room-secondary-btn">刷新</button>
+              <button id="blackboard-delegate-btn" type="button" class="room-primary-btn">委派任务</button>
+            </div>
+          </header>
+          <div id="blackboard-summary" class="blackboard-summary"></div>
+          <div id="blackboard-columns" class="blackboard-columns"></div>
+          <div id="blackboard-empty" class="blackboard-empty hidden">
+            <strong>这个项目还没有任务</strong>
+            <span>从这里委派第一项工作，TALK 会自动创建对应 Task Hall。</span>
+          </div>
+        </section>
+
+        <header id="hall-header" class="hall-header">
           <div class="hall-title-row">
             <div>
               <div class="hall-title-wrap">
@@ -146,7 +182,7 @@
 
         <main id="messages" class="flex-1 overflow-y-auto"></main>
 
-        <footer class="composer-footer shrink-0">
+        <footer id="composer-footer" class="composer-footer shrink-0">
           <div id="composer" class="relative">
             <div id="drop-hint" class="drop-hint hidden">松开即可添加文件</div>
             <div id="pending-file" class="pending-file hidden">
@@ -189,6 +225,22 @@
       </section>
 
       <aside class="details-panel">
+        <section id="task-details-panel" class="task-details-panel hidden">
+          <div class="details-card task-details-card">
+            <div class="task-details-heading">
+              <div>
+                <div class="sidebar-kicker">Task Hall</div>
+                <h3 id="task-details-title">任务详情</h3>
+              </div>
+              <button id="task-details-refresh-btn" type="button" class="icon-action subtle" title="刷新任务" aria-label="刷新任务">↻</button>
+            </div>
+            <div id="task-details-status" class="task-details-status"></div>
+            <div id="task-details-meta" class="task-details-meta"></div>
+            <p id="task-details-content" class="task-details-content"></p>
+            <p id="task-details-error" class="group-create-error hidden"></p>
+            <div id="task-details-actions" class="task-details-actions"></div>
+          </div>
+        </section>
         <section id="group-members-panel" class="group-members-panel hidden">
           <div class="details-card">
             <div class="details-card-header">
@@ -308,9 +360,42 @@
     </form>
   </div>
 
+  <div id="task-create-overlay" class="modal-overlay hidden">
+    <form id="task-create-panel" class="task-create-panel modal-card">
+      <div class="modal-header">
+        <div>
+          <h3>委派项目任务</h3>
+          <div id="task-create-project" class="group-members-subtitle"></div>
+        </div>
+        <button id="close-task-create-btn" type="button" class="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="group-create-grid">
+        <label class="group-create-field wide">
+          <span>执行 Agent</span>
+          <select id="task-create-agent" class="group-member-select"></select>
+        </label>
+        <label class="group-create-field wide">
+          <span>任务标题</span>
+          <input id="task-create-title" type="text" placeholder="一句话说明要交付什么" maxlength="120">
+        </label>
+        <label class="group-create-field wide">
+          <span>任务正文</span>
+          <textarea id="task-create-content" class="profile-textarea" rows="8" placeholder="写清目标、约束、完成标准和需要回传的结果"></textarea>
+        </label>
+      </div>
+      <div class="group-create-footer">
+        <p id="task-create-error" class="group-create-error hidden"></p>
+        <div class="group-create-buttons">
+          <button id="cancel-task-create-btn" type="button" class="room-secondary-btn">取消</button>
+          <button id="submit-task-create-btn" type="submit" class="room-primary-btn">创建 Task Hall</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/app.js?v=20260620-agent-disable-2"></script>
+  <script src="/app.js?v=20260716-task-blackboard-1"></script>
 </body>
 </html>

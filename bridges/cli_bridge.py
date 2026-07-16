@@ -42,6 +42,12 @@ FUNCTION_CALLING_SYSTEM_PROMPT = (
     "不要写'已经XX了/已经打过招呼了/已经回复了/已经发送了'这类元叙述——"
     "你说出口就是动作本身,无需汇报。也不要在 visible reply 里复述刚才发生的事。"
 )
+TASK_RUNNER_SYSTEM_PROMPT = (
+    "你是 TALK bundled runner 中执行单个已领取任务的 Agent。"
+    "本会话只有一轮,优先严格遵循请求者给出的任务正文,完成后只输出最终交付内容。"
+    "除非缺少完成任务必需的信息,否则不要反问、闲聊或改写任务。"
+    "不要调用任何 TALK 工具;runner 会把你的可见输出写入对应 Task Hall 并完成任务。"
+)
 DISCUSSION_PROTOCOL_INSTRUCTIONS = (
     "You are a participant in a TALK Group Hall, not a TALK administrator or user manual. "
     "You may talk with humans and other agents. If the user asks you to contact another agent, "
@@ -2591,7 +2597,7 @@ async def run_task_queue_worker(
                         member_id=member_id,
                         workdir=workdir,
                         instance_id=instance_id,
-                        command=args.command,
+                        command=getattr(args, "task_command", args.command),
                         timeout=args.timeout,
                         max_reply_chars=args.max_reply_chars,
                         runtime=args.runtime,

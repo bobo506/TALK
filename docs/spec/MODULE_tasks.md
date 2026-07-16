@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具及 claim lease / attempt 可靠性协议已实现；Project Blackboard / Task Hall Web UI 与跨模型验收待后续切片
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现；跨模型人工验收待后续切片
 
 ## 目标
 
@@ -186,6 +186,7 @@
 - `bridges/codex_bridge.py` 的兼容任务处理入口采用同一 Hall 回传规则；实际 Codex 队列 worker 继续复用通用 runner。
 - runner 默认申请 120 秒租约并每 30 秒续租；每轮轮询会先回收属于自己的过期 claim，再领取 queued task。
 - runner 在本地命令执行期间持续验证 token。租约丢失时会取消本地子进程，不发送结果、不调用 complete；正常完成时携带 token 回写，服务端再次做原子校验。
+- Codex / pi bridge 为队列 worker 使用独立任务命令：保留所选 read-only / workspace-write 能力，但不向嵌套模型暴露 TALK 结果投递工具；Task Hall 的结果消息只由 runner 写入，避免模型工具调用与 runner 可见输出形成重复结果。
 - 旧任务若没有 `hall_group_id`，runner 会保留原有全局时间线回传行为，服务端继续接受这类兼容结果。
 
 ### 终端工具
@@ -196,6 +197,14 @@
 - `talk_wait_tasks` 当前采用最长 30 秒的有界客户端轮询，等待澄清、提交、完成、失败或取消状态；尚未引入服务端事件等待协议。
 - `talk_reply_task` 把正文写入对应 Task Hall，并可附带请求澄清或接受任务动作；`talk_collect_result` 在请求者读取结果后把 `submitted` 推进为 `completed`。
 - `talk_cancel_task` 遵循服务端安全边界，只能由原请求者取消尚未领取的任务；可选取消原因会先写入 Task Hall。
+
+### Project Blackboard / Task Hall Web UI
+
+- Web UI 登录后以 Project 为一级范围，默认打开所选项目的任务黑板；项目选择和最近项目按成员保存在本地浏览器。
+- Blackboard 以“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合项目任务；待响应列包含待确认、待澄清和已接受待领取状态，详情面板保留精确协作状态。
+- 人类可在项目内选择 Agent、填写标题与正文并创建任务；服务端自动建立的 Task Hall 会同步出现在项目 Hall 列表。
+- 任务卡和详情面板展示请求者、执行者、运行状态、attempt 与活动租约，并按当前成员权限提供进入 Hall、请求澄清、接受、收取结果和取消未领取任务动作。
+- Task Hall 继续复用既有消息时间线和文件 / 回复能力；项目任务每 5 秒刷新一次，runner 回写结果后可从 Hall 与黑板两处看到，并由请求者收取为完成态。
 
 ## Task Hall 目标态（2026-07-15 确认）
 
@@ -254,7 +263,7 @@ TALK MCP / pi extension 已覆盖以下能力：
 - `created_by` / `target_member_id` / `claimed_by` / `instance_id`：区分请求者、执行者和实际 runner；
 - `workflow_status` / `result_collected_at`：区分执行状态、结果提交与结果收取。
 
-`parent_task_id` / `root_goal_id`、更细时间点、lease、attempt 与幂等键仍属于后续可靠性切片。
+`parent_task_id` / `root_goal_id`、更细时间点与业务幂等键仍属于后续可靠性切片；claim lease、attempt 与私有 token 已落地。
 
 ### 项目级 Web 信息架构
 
@@ -274,7 +283,8 @@ TALK MCP / pi extension 已覆盖以下能力：
 - `talk_wait_tasks` 当前是最长 30 秒的客户端轮询，不是服务端事件流；Agent 发现结果也尚未提供项目业务角色字段。
 - 当前取消只覆盖未领取任务；运行中取消仍需 runner 协作中断协议。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
-- 当前没有 Project Blackboard / Task Hall Web UI，也尚未实现 observer 与返工。
+- Project Blackboard 与 Task Hall Web UI 已覆盖创建、查看、Hall 协作、接受 / 澄清、结果收取和安全取消；项目级 `Members / Activity` 独立页面、observer 与返工尚未实现。
+- Codex 与 pi 真实 CLI 均已完成 Task Hall 技术链路冒烟；pi 在“逐字回复”类指令上的内容遵循仍弱于 Codex，属于模型输出质量边界，不影响单 Hall 结果投递与状态推进，需在项目管理者人工验收时继续观察。
 
 ## 后续计划
 
@@ -283,7 +293,7 @@ TALK MCP / pi extension 已覆盖以下能力：
 3. [x] 扩展 async / sync client 的项目化委派、查询和协作动作，并让 bundled runner 把结果写入 Task Hall。
 4. [x] 为 Codex MCP / pi extension 提供发现、委派、查询 / 有界等待、Hall 回复、安全取消与结果收集能力。
 5. [x] 补 claim lease / attempt / token 幂等约束、runner 心跳、过期回收和陈旧结果拒绝。
-6. 建 Project Blackboard + Task Hall Web UI，形成项目内可见、可操作的完整委派流程。
+6. [x] 建 Project Blackboard + Task Hall Web UI，形成项目内可见、可操作的完整委派流程。
 7. 完成一轮跨模型端到端人工验收；后续再决定运行中协作取消、schedule 项目化 / 后台触发、长任务 SSE、document lock 与递归委派策略。
 
 ## 验收点
@@ -317,3 +327,6 @@ TALK MCP / pi extension 已覆盖以下能力：
 - [x] 心跳可续租，过期 claim 会安全回队并允许新 attempt 重领。
 - [x] 陈旧 token 与重领后缺少 token 的 complete 均被拒绝；当前 runner 会携带 token 完成任务。
 - [x] runner 丢失租约时会取消本地命令，且不会发送或提交陈旧结果。
+- [x] Web UI 可按项目创建任务、查看黑板分栏与任务详情，并进入服务端自动创建的对应 Task Hall。
+- [x] Browser 真实交互已贯通登录、委派、Hall 消息、bundled runner 领取 / 回写、结果待收取和请求者完成收取，控制台无 error / warning。
+- [x] 真实 Codex / pi CLI 均已贯通领取、执行、单条 Hall 结果回写与结果收取；独立任务命令已消除 pi 同时调用 TALK 工具造成的重复结果。

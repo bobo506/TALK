@@ -116,6 +116,27 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertNotIn("TALK_DEFERRED_FILE", cmd)
         self.assertNotIn("TALK_GROUP_ID", cmd)
 
+    def test_default_task_command_omits_talk_mcp_catalog(self):
+        command = codex_bridge.default_codex_task_command(profile="discussion")
+
+        self.assertIn("--sandbox read-only", command)
+        self.assertNotIn("mcp_servers.talk_send", command)
+        self.assertIn("优先严格遵循请求者给出的任务正文", _base_instructions_value(command))
+
+    def test_tools_profile_task_command_keeps_workspace_write_without_talk_mcp(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(
+                ["--key", "codex-key", "--codex-execution-profile", "tools"]
+            )
+            command = codex_bridge.resolve_codex_task_command(args)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertIn("--sandbox workspace-write", command)
+        self.assertNotIn("mcp_servers.talk_send", command)
+
     def test_resolve_codex_command_without_project_is_default(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
         try:

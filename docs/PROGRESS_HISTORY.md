@@ -184,6 +184,47 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-16 TH-5：Project Blackboard、Task Hall Web UI 与真实跨模型链路
+
+**背景**：项目管理者明确表示逐片确认缺少直观价值，希望等“任务创建 → runner 执行 → 结果写入 Task Hall → 人类收取”整个流程可见后再介入。本轮因此把 Web 可视化、bundled runner 活服务链路和真实 Codex / pi CLI 冒烟作为同一个里程碑收口。
+
+### Project Blackboard / Task Hall Web UI
+
+- Web UI 登录后以 Project 为一级工作范围，默认打开项目任务黑板；当前项目按成员保存在本地浏览器。
+- 黑板按“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合任务，并在详情面板保留待确认、待澄清、已接受等精确协作状态。
+- 新增页面委派表单，可选择项目 Agent、填写标题与正文；创建后服务端自动生成的 Task Hall 会出现在项目 Hall 列表。
+- 任务详情显示请求者、执行者、运行状态、attempt 与租约，并按权限提供进入 Hall、请求澄清、接受、收取结果和取消未领取任务动作。
+- Task Hall 继续复用既有消息时间线、回复和文件能力；任务状态每 5 秒刷新，runner 回写后黑板自动进入“结果待收取”。
+
+### runner 输出所有权修复
+
+- 真实 pi 冒烟首次发现：嵌套模型调用 TALK 工具写入 Hall 后，runner 又回写 visible reply，单任务产生 3 条重复结果。
+- Codex / pi bridge 现在为队列 worker 解析独立 `task_command`：保留 discussion / tools 权限档，但不暴露 TALK 结果投递工具；交互消息继续使用原命令，不影响终端 Task Hall 工具。
+- 新增任务专用 system prompt，明确单轮执行、优先遵循任务正文、避免无必要反问，并由 runner 独占 Hall 结果写入与 complete。
+- 真实 pi 复测结果从 3 条收敛为 1 条；Codex 当前任务命令同样只写一条结果。
+
+### 自动化与真实验收
+
+- 新增 `tests/test_task_web_ui.py`，锁定 Project Blackboard / Task Hall 静态结构、项目任务 API 与安全 `textContent` 渲染。
+- 新增 `tests/test_task_hall_e2e.py`，在活 FastAPI 服务上贯通 SDK 创建、runner claim / 执行、Hall 结果、complete 和请求者 collect。
+- Browser 真实交互贯通登录、空黑板、页面委派、进入 Hall、发送协作消息、runner 结果出现、收取完成与“已结束”分栏；1280px 四列布局修正后无多余横向滚动，控制台 error / warning 为 0。
+- 真实 Codex 0.144.4 使用当前无 TALK MCP 的任务命令返回 `Codex Task Hall connected.`，单条 Hall 结果并完成收取。
+- 真实 pi 0.80.3 使用当前无 TALK 工具的任务命令完成 claim、单条 Hall 回写与收取；模型会把逐字回复要求改写为简短确认，记录为模型输出质量边界，不视为基础设施链路失败。
+
+### 验证
+
+- Python `py_compile`、`node --check web\app.js`、`node --experimental-strip-types --check bridges\talk_tools_extension.ts` 与 `git diff --check`：通过。
+- 定向 Web / runner / client：`Ran 124 tests ... OK`。
+- 全量回归：清理真实验收服务后 `Ran 321 tests in 98.917s ... OK`。
+- 首次全量运行时一个既有 WebSocket 降级测试在固定 2 秒清理窗口超时；关闭并行真实服务后该用例连续两次单测通过，第二轮全量也通过。
+
+### 下一步
+
+- 当前已达到人工验收门禁：项目管理者可只通过页面完成一次真实委派、观察结果进入对应 Hall 并收取。
+- 人工验收通过后关闭 Task Hall 当前里程碑，再决定运行中协作取消、返工 / observer、后台 schedule 或项目级 Members / Activity 的优先级。
+
+---
+
 ## 2026-07-16 TH-4：claim lease / attempt 与 runner 过期回收
 
 **背景**：项目管理者接受 TH-3，并明确逐片人工验收缺少直观价值，后续人工介入点应放在完整委派流程里程碑。本轮先提交 TH-3 为 `ff8f8a8`，再补齐同一任务只能由一个有效 runner 持有的可靠性协议。

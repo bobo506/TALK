@@ -797,6 +797,55 @@ class CliBridgeTests(unittest.TestCase):
             ],
         )
 
+    def test_task_worker_uses_task_specific_command(self):
+        class FakeClient:
+            async def requeue_expired_tasks(self):
+                return []
+
+            async def list_tasks(self, **kwargs):
+                return [{"id": 1}]
+
+        class Args:
+            command = "interactive-command"
+            task_command = "runner-owned-task-command"
+            timeout = 5
+            max_reply_chars = 100
+            runtime = "pi"
+            bridge_label = "pi bridge"
+            prompt_transport = "argv"
+            decision_tier = "execution"
+            task_lease_seconds = 30
+            task_heartbeat_interval = 5
+            task_poll_interval = 1
+
+        seen_commands = []
+
+        async def fake_handle_queued_task(task, **kwargs):
+            seen_commands.append(kwargs["command"])
+            raise asyncio.CancelledError
+
+        async def scenario():
+            original = cli_bridge.handle_queued_task
+            cli_bridge.handle_queued_task = fake_handle_queued_task
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=FakeClient(),
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    instance_id="agent:pi:test",
+                    args=Args(),
+                    run_lock=asyncio.Lock(),
+                    report_status=None,
+                )
+            except asyncio.CancelledError:
+                pass
+            finally:
+                cli_bridge.handle_queued_task = original
+
+        asyncio.run(scenario())
+
+        self.assertEqual(seen_commands, ["runner-owned-task-command"])
+
     def test_handle_incoming_message_replies_inside_same_group(self):
         class FakeClient:
             def __init__(self):

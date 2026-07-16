@@ -28,6 +28,7 @@ let lastId = 0;
 let ws = null;
 let eventSource = null;
 let pollTimer = null;
+let taskPollTimer = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let pendingFile = null;
@@ -61,6 +62,15 @@ let selectedMemberKindFilters = new Set();
 let groupMetaEditing = false;
 let agentProfileEditing = null;
 let agentProfileSaving = false;
+let projects = [];
+let activeProjectId = null;
+let projectAgents = [];
+let projectTasks = [];
+let blackboardOpen = false;
+let selectedTaskId = null;
+let taskCreateOpen = false;
+let taskCreateSaving = false;
+let taskActionSaving = false;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -85,6 +95,22 @@ const connectionStatus = document.getElementById("connection-status");
 const userBadge = document.getElementById("user-badge");
 const logoutBtn = document.getElementById("logout-btn");
 const roomStrip = document.getElementById("room-strip");
+const projectStrip = document.getElementById("project-strip");
+const projectSelect = document.getElementById("project-select");
+const refreshProjectBtn = document.getElementById("refresh-project-btn");
+const projectBlackboardBtn = document.getElementById("project-blackboard-btn");
+const projectTaskCount = document.getElementById("project-task-count");
+const delegateTaskBtn = document.getElementById("delegate-task-btn");
+const projectEmptyNote = document.getElementById("project-empty-note");
+const blackboardView = document.getElementById("blackboard-view");
+const blackboardTitle = document.getElementById("blackboard-title");
+const blackboardDescription = document.getElementById("blackboard-description");
+const blackboardRefreshBtn = document.getElementById("blackboard-refresh-btn");
+const blackboardDelegateBtn = document.getElementById("blackboard-delegate-btn");
+const blackboardSummary = document.getElementById("blackboard-summary");
+const blackboardColumns = document.getElementById("blackboard-columns");
+const blackboardEmpty = document.getElementById("blackboard-empty");
+const hallHeader = document.getElementById("hall-header");
 const roomTitle = document.getElementById("room-title");
 const roomDescription = document.getElementById("room-description");
 const globalRoomBtn = document.getElementById("global-room-btn");
@@ -142,6 +168,7 @@ const historyClearBtn = document.getElementById("history-clear-btn");
 const loadOlderBtn = document.getElementById("load-older-btn");
 const historyStatus = document.getElementById("history-status");
 const messagesEl = document.getElementById("messages");
+const composerFooter = document.getElementById("composer-footer");
 const composer = document.getElementById("composer");
 const dropHint = document.getElementById("drop-hint");
 const pendingFileEl = document.getElementById("pending-file");
@@ -158,9 +185,28 @@ const attachBtn = document.getElementById("attach-btn");
 const msgInput = document.getElementById("msg-input");
 const sendBtn = document.getElementById("send-btn");
 const mentionDropdown = document.getElementById("mention-dropdown");
+const taskDetailsPanel = document.getElementById("task-details-panel");
+const taskDetailsTitle = document.getElementById("task-details-title");
+const taskDetailsStatus = document.getElementById("task-details-status");
+const taskDetailsMeta = document.getElementById("task-details-meta");
+const taskDetailsContent = document.getElementById("task-details-content");
+const taskDetailsError = document.getElementById("task-details-error");
+const taskDetailsActions = document.getElementById("task-details-actions");
+const taskDetailsRefreshBtn = document.getElementById("task-details-refresh-btn");
+const taskCreateOverlay = document.getElementById("task-create-overlay");
+const taskCreatePanel = document.getElementById("task-create-panel");
+const taskCreateProject = document.getElementById("task-create-project");
+const taskCreateAgent = document.getElementById("task-create-agent");
+const taskCreateTitle = document.getElementById("task-create-title");
+const taskCreateContent = document.getElementById("task-create-content");
+const taskCreateError = document.getElementById("task-create-error");
+const closeTaskCreateBtn = document.getElementById("close-task-create-btn");
+const cancelTaskCreateBtn = document.getElementById("cancel-task-create-btn");
+const submitTaskCreateBtn = document.getElementById("submit-task-create-btn");
 const LOCAL_API_KEY_STORAGE = "talk_api_key";
 const SESSION_API_KEY_STORAGE = "talk_session_api_key";
 const ACTIVE_GROUP_STORAGE = "talk_active_group_id";
+const ACTIVE_PROJECT_STORAGE = "talk_active_project_id";
 
 const connectionStates = {
   connecting: {
@@ -399,6 +445,7 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
     }
     members = await membersRes.json();
     await loadRuntimeConfig();
+    await loadProjects();
     await loadGroups();
 
     loginOverlay.classList.add("hidden");
@@ -506,6 +553,7 @@ async function doLogin() {
     }
     members = await membersRes.json();
     await loadRuntimeConfig();
+    await loadProjects();
     await loadGroups();
 
     loginOverlay.classList.add("hidden");
@@ -540,6 +588,10 @@ logoutBtn.addEventListener("click", () => {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  if (taskPollTimer) {
+    clearInterval(taskPollTimer);
+    taskPollTimer = null;
+  }
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -557,6 +609,19 @@ loadOlderBtn.addEventListener("click", loadOlderMessages);
 historySearchBtn.addEventListener("click", applyHistorySearch);
 historyClearBtn.addEventListener("click", clearHistorySearch);
 globalRoomBtn.addEventListener("click", () => setActiveGroup(null));
+projectSelect.addEventListener("change", () => setActiveProject(projectSelect.value));
+projectBlackboardBtn.addEventListener("click", () => setBlackboardOpen(true));
+refreshProjectBtn.addEventListener("click", refreshProjectWorkspace);
+blackboardRefreshBtn.addEventListener("click", refreshProjectWorkspace);
+delegateTaskBtn.addEventListener("click", () => setTaskCreateOpen(true));
+blackboardDelegateBtn.addEventListener("click", () => setTaskCreateOpen(true));
+taskDetailsRefreshBtn.addEventListener("click", () => loadProjectTasks());
+closeTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
+cancelTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
+taskCreatePanel.addEventListener("submit", createTaskFromPanel);
+taskCreateOverlay.addEventListener("mousedown", (event) => {
+  if (event.target === taskCreateOverlay && !taskCreateSaving) setTaskCreateOpen(false);
+});
 refreshGroupsBtn.addEventListener("click", refreshGroups);
 toggleGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(!groupCreateOpen));
 toggleGroupMembersBtn.addEventListener("click", () => {
@@ -573,6 +638,7 @@ groupCreateOverlay.addEventListener("mousedown", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && groupCreateOpen) setGroupCreateOpen(false);
   if (event.key === "Escape" && agentProfileEditing) closeAgentProfileEditor();
+  if (event.key === "Escape" && taskCreateOpen && !taskCreateSaving) setTaskCreateOpen(false);
 });
 groupCreateMemberSelect.addEventListener("change", () => {
   const memberId = groupCreateMemberSelect.value;
@@ -606,6 +672,509 @@ historySearchInput.addEventListener("keydown", (e) => {
     applyHistorySearch();
   }
 });
+
+// ── Project Blackboard / Task Hall ─────────────────────────────────
+function activeProjectStorageKey() {
+  return myId ? `${ACTIVE_PROJECT_STORAGE}:${myId}` : ACTIVE_PROJECT_STORAGE;
+}
+
+function getActiveProject() {
+  return projects.find((project) => project.project_id === activeProjectId) || null;
+}
+
+async function loadProjects() {
+  try {
+    const res = await apiFetch("/api/projects");
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `项目列表加载失败: ${res.status}`));
+    }
+    projects = await res.json();
+    const stored = localStorage.getItem(activeProjectStorageKey());
+    activeProjectId = projects.some((project) => project.project_id === stored)
+      ? stored
+      : projects[0]?.project_id || null;
+    if (activeProjectId) {
+      localStorage.setItem(activeProjectStorageKey(), activeProjectId);
+      blackboardOpen = true;
+      await loadProjectAgents();
+      await loadProjectTasks({ silent: true });
+    } else {
+      projectAgents = [];
+      projectTasks = [];
+      selectedTaskId = null;
+      blackboardOpen = false;
+    }
+    renderProjectStrip();
+    renderWorkspaceMode();
+  } catch (err) {
+    projects = [];
+    activeProjectId = null;
+    projectAgents = [];
+    projectTasks = [];
+    blackboardOpen = false;
+    console.error(err);
+  }
+}
+
+async function loadProjectAgents() {
+  if (!activeProjectId) {
+    projectAgents = [];
+    return;
+  }
+  const res = await apiFetch(`/api/projects/${encodeURIComponent(activeProjectId)}/agents`);
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res, `项目 Agent 加载失败: ${res.status}`));
+  }
+  projectAgents = await res.json();
+}
+
+async function loadProjectTasks({ silent = false } = {}) {
+  if (!activeProjectId) {
+    projectTasks = [];
+    selectedTaskId = null;
+    renderProjectStrip();
+    renderBlackboard();
+    renderGroupMembersPanel();
+    return;
+  }
+  try {
+    const params = new URLSearchParams({ project_id: activeProjectId });
+    const res = await apiFetch(`/api/tasks?${params.toString()}`);
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `项目任务加载失败: ${res.status}`));
+    }
+    projectTasks = await res.json();
+    projectTasks.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+    if (!projectTasks.some((task) => Number(task.id) === Number(selectedTaskId))) {
+      selectedTaskId = projectTasks[0]?.id ?? null;
+    }
+    const hasUnknownHall = projectTasks.some(
+      (task) => task.hall_group_id && !groups.some((group) => group.id === task.hall_group_id)
+    );
+    if (hasUnknownHall) {
+      await loadGroups();
+    }
+    renderProjectStrip();
+    renderRoomStrip();
+    renderBlackboard();
+    renderGroupMembersPanel();
+  } catch (err) {
+    if (!silent) {
+      showComposerStatus(err.message, "error", { source: "tasks", timeoutMs: 3500 });
+    }
+    console.error(err);
+  }
+}
+
+async function setActiveProject(projectId) {
+  if (!projectId || projectId === activeProjectId) {
+    if (projectId) setBlackboardOpen(true);
+    return;
+  }
+  activeProjectId = projectId;
+  localStorage.setItem(activeProjectStorageKey(), activeProjectId);
+  selectedTaskId = null;
+  blackboardOpen = true;
+  try {
+    await Promise.all([loadProjectAgents(), loadProjectTasks({ silent: true })]);
+  } catch (err) {
+    showComposerStatus(err.message, "error", { source: "tasks", timeoutMs: 3500 });
+  }
+  renderProjectStrip();
+  renderRoomStrip();
+  renderWorkspaceMode();
+}
+
+async function refreshProjectWorkspace() {
+  if (!activeProjectId) return;
+  refreshProjectBtn.disabled = true;
+  blackboardRefreshBtn.disabled = true;
+  taskDetailsRefreshBtn.disabled = true;
+  try {
+    await loadProjectAgents();
+    await loadProjectTasks();
+    await loadGroups();
+    renderRoomStrip();
+  } finally {
+    refreshProjectBtn.disabled = false;
+    blackboardRefreshBtn.disabled = false;
+    taskDetailsRefreshBtn.disabled = false;
+  }
+}
+
+function renderProjectStrip() {
+  if (!myId) return;
+  projectStrip.classList.remove("hidden");
+  projectSelect.innerHTML = "";
+  if (!projects.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "暂无项目";
+    projectSelect.appendChild(option);
+  } else {
+    for (const project of projects) {
+      const option = document.createElement("option");
+      option.value = project.project_id;
+      option.textContent = project.display_name;
+      option.selected = project.project_id === activeProjectId;
+      projectSelect.appendChild(option);
+    }
+  }
+  projectSelect.disabled = projects.length === 0;
+  projectBlackboardBtn.disabled = !activeProjectId;
+  projectBlackboardBtn.classList.toggle("active", blackboardOpen && Boolean(activeProjectId));
+  projectTaskCount.textContent = String(projectTasks.length);
+  const canDelegate = Boolean(activeProjectId && eligibleProjectAgents().length);
+  delegateTaskBtn.disabled = !canDelegate;
+  blackboardDelegateBtn.disabled = !canDelegate;
+  projectEmptyNote.classList.toggle("hidden", projects.length > 0);
+}
+
+function eligibleProjectAgents() {
+  const indexedIds = new Set(projectAgents.map((agent) => agent.member_id));
+  const hasIndex = indexedIds.size > 0;
+  return members
+    .filter((member) => member.kind === "agent")
+    .filter((member) => !member.disabled_at && member.id !== myId)
+    .filter((member) => !hasIndex || indexedIds.has(member.id))
+    .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
+}
+
+function setBlackboardOpen(open) {
+  blackboardOpen = Boolean(open && activeProjectId);
+  setGroupCreateOpen(false);
+  renderProjectStrip();
+  renderRoomStrip();
+  renderWorkspaceMode();
+  if (blackboardOpen) {
+    loadProjectTasks({ silent: true });
+  } else if (activeGroupId) {
+    loadHistory();
+  }
+}
+
+function renderWorkspaceMode() {
+  blackboardView.classList.toggle("hidden", !blackboardOpen);
+  hallHeader.classList.toggle("hidden", blackboardOpen);
+  messagesEl.classList.toggle("hidden", blackboardOpen);
+  composerFooter.classList.toggle("hidden", blackboardOpen);
+  if (blackboardOpen) renderBlackboard();
+  renderGroupMembersPanel();
+}
+
+function taskStatusMeta(task) {
+  const workflow = task?.workflow_status || "assigned";
+  const mapping = {
+    assigned: ["待执行者确认", "attention"],
+    clarification_requested: ["待请求者澄清", "attention"],
+    accepted: ["已接受 · 待领取", ""],
+    in_progress: ["执行中", "running"],
+    submitted: ["结果待收取", "attention"],
+    completed: ["已完成", "success"],
+    failed: ["失败", "danger"],
+    canceled: ["已取消", "danger"],
+  };
+  const [label, className] = mapping[workflow] || [workflow, ""];
+  return { label, className };
+}
+
+function taskBoardColumn(task) {
+  if (["assigned", "clarification_requested", "accepted"].includes(task.workflow_status)) return "attention";
+  if (task.workflow_status === "in_progress") return "running";
+  if (task.workflow_status === "submitted") return "submitted";
+  return "finished";
+}
+
+function formatTaskTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function renderBlackboard() {
+  const project = getActiveProject();
+  blackboardTitle.textContent = project ? `${project.display_name} · 任务黑板` : "任务黑板";
+  blackboardDescription.textContent = project?.description || "按协作状态查看项目任务，点击卡片可查看 Task Hall 与可执行动作。";
+  blackboardSummary.innerHTML = "";
+  blackboardColumns.innerHTML = "";
+
+  const columns = [
+    { key: "attention", label: "待响应" },
+    { key: "running", label: "执行中" },
+    { key: "submitted", label: "结果待收取" },
+    { key: "finished", label: "已结束" },
+  ];
+  for (const column of columns) {
+    const count = projectTasks.filter((task) => taskBoardColumn(task) === column.key).length;
+    const chip = document.createElement("span");
+    chip.className = "blackboard-summary-chip";
+    const label = document.createElement("span");
+    label.textContent = column.label;
+    const number = document.createElement("strong");
+    number.textContent = String(count);
+    chip.appendChild(label);
+    chip.appendChild(number);
+    blackboardSummary.appendChild(chip);
+  }
+
+  blackboardEmpty.classList.toggle("hidden", projectTasks.length > 0);
+  blackboardColumns.classList.toggle("hidden", projectTasks.length === 0);
+  for (const column of columns) {
+    const tasks = projectTasks.filter((task) => taskBoardColumn(task) === column.key);
+    const columnEl = document.createElement("section");
+    columnEl.className = "blackboard-column";
+    const header = document.createElement("div");
+    header.className = "blackboard-column-header";
+    const title = document.createElement("span");
+    title.textContent = column.label;
+    const count = document.createElement("span");
+    count.className = "blackboard-column-count";
+    count.textContent = String(tasks.length);
+    header.appendChild(title);
+    header.appendChild(count);
+    const list = document.createElement("div");
+    list.className = "blackboard-card-list";
+    if (!tasks.length) {
+      const empty = document.createElement("div");
+      empty.className = "blackboard-column-empty";
+      empty.textContent = "暂无任务";
+      list.appendChild(empty);
+    }
+    for (const task of tasks) {
+      list.appendChild(renderTaskCard(task));
+    }
+    columnEl.appendChild(header);
+    columnEl.appendChild(list);
+    blackboardColumns.appendChild(columnEl);
+  }
+}
+
+function renderTaskCard(task) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = `task-card ${Number(task.id) === Number(selectedTaskId) ? "selected" : ""}`;
+  const title = document.createElement("div");
+  title.className = "task-card-title";
+  title.textContent = task.title || task.content || `任务 #${task.id}`;
+  const status = document.createElement("span");
+  const meta = taskStatusMeta(task);
+  status.className = `task-status-badge ${meta.className}`;
+  status.textContent = meta.label;
+  const people = document.createElement("div");
+  people.className = "task-card-meta";
+  people.textContent = `${shortName(task.created_by)} → ${shortName(task.target_member_id)}`;
+  const footer = document.createElement("div");
+  footer.className = "task-card-footer";
+  const attempt = document.createElement("span");
+  attempt.textContent = `#${task.id} · attempt ${task.attempt || 0}`;
+  const updated = document.createElement("span");
+  updated.textContent = formatTaskTime(task.updated_at);
+  footer.appendChild(attempt);
+  footer.appendChild(updated);
+  card.appendChild(title);
+  card.appendChild(status);
+  card.appendChild(people);
+  card.appendChild(footer);
+  card.addEventListener("click", () => {
+    selectedTaskId = task.id;
+    renderBlackboard();
+    renderTaskDetailsPanel();
+  });
+  card.addEventListener("dblclick", () => openTaskHall(task));
+  return card;
+}
+
+function getContextTask() {
+  if (!blackboardOpen && activeGroupId) {
+    return projectTasks.find((task) => task.hall_group_id === activeGroupId) || null;
+  }
+  return projectTasks.find((task) => Number(task.id) === Number(selectedTaskId)) || null;
+}
+
+function showTaskDetailsError(message) {
+  taskDetailsError.textContent = message || "";
+  taskDetailsError.classList.toggle("hidden", !message);
+}
+
+function taskActionButton(label, className, handler) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
+  button.disabled = taskActionSaving;
+  button.addEventListener("click", handler);
+  return button;
+}
+
+function renderTaskDetailsPanel() {
+  const task = getContextTask();
+  taskDetailsPanel.classList.toggle("hidden", !task);
+  groupMembersPanel.classList.toggle("hidden", Boolean(task));
+  if (!task) return;
+
+  taskDetailsTitle.textContent = task.title || `任务 #${task.id}`;
+  taskDetailsStatus.innerHTML = "";
+  const meta = taskStatusMeta(task);
+  const badge = document.createElement("span");
+  badge.className = `task-status-badge ${meta.className}`;
+  badge.textContent = meta.label;
+  taskDetailsStatus.appendChild(badge);
+  taskDetailsMeta.innerHTML = "";
+  const rows = [
+    `任务 ID：${task.id}`,
+    `请求者：${task.created_by}`,
+    `执行者：${task.target_member_id}`,
+    `执行状态：${task.status}`,
+    `attempt：${task.attempt || 0}`,
+    task.lease_expires_at ? `租约截止：${formatTaskTime(task.lease_expires_at)}` : "当前无活动租约",
+  ];
+  for (const value of rows) {
+    const row = document.createElement("div");
+    row.textContent = value;
+    taskDetailsMeta.appendChild(row);
+  }
+  taskDetailsContent.textContent = task.content || "";
+  showTaskDetailsError("");
+  taskDetailsActions.innerHTML = "";
+
+  if (task.hall_group_id) {
+    taskDetailsActions.appendChild(
+      taskActionButton("进入 Task Hall", "task-action-primary", () => openTaskHall(task))
+    );
+  }
+  if (task.target_member_id === myId && task.workflow_status === "assigned") {
+    taskDetailsActions.appendChild(
+      taskActionButton("标记为待澄清", "task-action-secondary", () => runTaskAction(task, "request-clarification"))
+    );
+  }
+  if (task.target_member_id === myId && ["assigned", "clarification_requested"].includes(task.workflow_status)) {
+    taskDetailsActions.appendChild(
+      taskActionButton("接受任务", "task-action-secondary", () => runTaskAction(task, "accept"))
+    );
+  }
+  if (task.created_by === myId && task.workflow_status === "submitted") {
+    taskDetailsActions.appendChild(
+      taskActionButton("收取并完成", "task-action-primary", () => runTaskAction(task, "collect-result"))
+    );
+  }
+  if (task.created_by === myId && task.status === "queued") {
+    taskDetailsActions.appendChild(
+      taskActionButton("取消未领取任务", "task-action-danger", () => runTaskAction(task, "cancel", { confirmCancel: true }))
+    );
+  }
+}
+
+async function openTaskHall(task) {
+  if (!task?.hall_group_id) return;
+  if (!groups.some((group) => group.id === task.hall_group_id)) {
+    await loadGroups();
+  }
+  selectedTaskId = task.id;
+  setActiveGroup(task.hall_group_id);
+}
+
+async function runTaskAction(task, action, { confirmCancel = false } = {}) {
+  if (taskActionSaving) return;
+  if (confirmCancel && !window.confirm("取消后该任务不能重新领取。确定取消吗？")) return;
+  taskActionSaving = true;
+  showTaskDetailsError("");
+  renderTaskDetailsPanel();
+  try {
+    const res = await apiFetch(`/api/tasks/${encodeURIComponent(task.id)}/${action}`, { method: "POST" });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `任务操作失败: ${res.status}`));
+    }
+    const updated = await res.json();
+    projectTasks = projectTasks.map((item) => Number(item.id) === Number(updated.id) ? updated : item);
+    selectedTaskId = updated.id;
+    renderProjectStrip();
+    renderBlackboard();
+  } catch (err) {
+    showTaskDetailsError(err.message);
+  } finally {
+    taskActionSaving = false;
+    renderTaskDetailsPanel();
+  }
+}
+
+function showTaskCreateError(message) {
+  taskCreateError.textContent = message || "";
+  taskCreateError.classList.toggle("hidden", !message);
+}
+
+function renderTaskCreateAgentOptions() {
+  taskCreateAgent.innerHTML = "";
+  const agents = eligibleProjectAgents();
+  if (!agents.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "项目中没有可委派 Agent";
+    taskCreateAgent.appendChild(option);
+  } else {
+    for (const member of agents) {
+      const option = document.createElement("option");
+      option.value = member.id;
+      option.textContent = `${member.display_name || shortName(member.id)} · ${member.id}`;
+      taskCreateAgent.appendChild(option);
+    }
+  }
+  taskCreateAgent.disabled = taskCreateSaving || !agents.length;
+  submitTaskCreateBtn.disabled = taskCreateSaving || !agents.length;
+}
+
+function setTaskCreateOpen(open) {
+  taskCreateOpen = Boolean(open && activeProjectId);
+  showTaskCreateError("");
+  taskCreateOverlay.classList.toggle("hidden", !taskCreateOpen);
+  if (!taskCreateOpen) {
+    taskCreatePanel.reset();
+    return;
+  }
+  const project = getActiveProject();
+  taskCreateProject.textContent = project ? `${project.display_name} · ${project.project_id}` : "";
+  renderTaskCreateAgentOptions();
+  taskCreateTitle.focus();
+}
+
+async function createTaskFromPanel(event) {
+  event.preventDefault();
+  if (taskCreateSaving || !activeProjectId) return;
+  const payload = {
+    project_id: activeProjectId,
+    target_member_id: taskCreateAgent.value,
+    title: taskCreateTitle.value.trim() || null,
+    content: taskCreateContent.value.trim(),
+  };
+  if (!payload.target_member_id || !payload.content) {
+    showTaskCreateError("请选择执行 Agent，并填写任务正文。");
+    return;
+  }
+  taskCreateSaving = true;
+  submitTaskCreateBtn.disabled = true;
+  showTaskCreateError("");
+  try {
+    const res = await apiFetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `任务创建失败: ${res.status}`));
+    }
+    const created = await res.json();
+    selectedTaskId = created.id;
+    setTaskCreateOpen(false);
+    blackboardOpen = true;
+    await Promise.all([loadGroups(), loadProjectTasks()]);
+    renderWorkspaceMode();
+  } catch (err) {
+    showTaskCreateError(err.message);
+  } finally {
+    taskCreateSaving = false;
+    renderTaskCreateAgentOptions();
+  }
+}
 
 // ── Group / Hall room navigation ────────────────────────────────────
 function activeGroupStorageKey() {
@@ -694,8 +1263,9 @@ function setActiveGroup(groupId) {
     });
     return;
   }
-  if (activeGroupId === nextGroupId) return;
+  if (activeGroupId === nextGroupId && !blackboardOpen) return;
 
+  blackboardOpen = false;
   activeGroupId = nextGroupId;
   if (activeGroupId) {
     localStorage.setItem(activeGroupStorageKey(), activeGroupId);
@@ -710,6 +1280,8 @@ function setActiveGroup(groupId) {
   renderPresenceStrip();
   renderMentionDropdownIfOpen();
   updateComposerPlaceholder();
+  renderProjectStrip();
+  renderWorkspaceMode();
   loadHistory();
   msgInput.focus();
 }
@@ -720,7 +1292,7 @@ function renderRoomStrip() {
   roomStrip.classList.remove("hidden");
   const activeGroup = getActiveGroup();
   groupMembersOpen = Boolean(activeGroup);
-  globalRoomBtn.classList.toggle("active", !activeGroupId);
+  globalRoomBtn.classList.toggle("active", !blackboardOpen && !activeGroupId);
   groupRoomList.innerHTML = "";
 
   roomTitle.textContent = activeGroup ? `${activeGroup.name} Hall` : "全局消息流";
@@ -735,14 +1307,17 @@ function renderRoomStrip() {
   }
 
   const hallQuery = hallFilterInput.value.trim().toLowerCase();
-  const visibleGroups = hallQuery
-    ? groups.filter((group) => groupMatchesHallQuery(group, hallQuery))
+  const projectGroups = activeProjectId
+    ? groups.filter((group) => group.project_id === activeProjectId || !group.project_id)
     : groups;
+  const visibleGroups = hallQuery
+    ? projectGroups.filter((group) => groupMatchesHallQuery(group, hallQuery))
+    : projectGroups;
 
-  if (groups.length === 0) {
+  if (projectGroups.length === 0) {
     const empty = document.createElement("span");
     empty.className = "group-room-empty";
-    empty.textContent = "暂无 Group";
+    empty.textContent = activeProjectId ? "当前项目暂无 Hall" : "暂无 Group";
     groupRoomList.appendChild(empty);
   } else if (visibleGroups.length === 0) {
     const empty = document.createElement("span");
@@ -752,11 +1327,12 @@ function renderRoomStrip() {
   } else {
     for (const group of visibleGroups) {
       const button = document.createElement("button");
-      const isActive = group.id === activeGroupId;
+      const isActive = !blackboardOpen && group.id === activeGroupId;
       const canEnter = getGroupMemberIds(group).has(myId);
       button.type = "button";
       button.className = `room-chip ${isActive ? "active" : ""}`;
-      button.textContent = `${group.name} (${getGroupMemberIds(group).size})`;
+      const typeLabel = group.type === "task" ? "任务" : group.type === "discussion" ? "讨论" : "Hall";
+      button.textContent = `${typeLabel} · ${group.name}`;
       button.title = canEnter
         ? `${group.name} (${group.id})`
         : `${group.name} (${group.id}) · 你还不是成员`;
@@ -767,7 +1343,10 @@ function renderRoomStrip() {
   }
 
   toggleGroupCreateBtn.textContent = groupCreateOpen ? "×" : "＋";
-  toggleGroupMembersBtn.classList.toggle("hidden", !activeGroup);
+  toggleGroupMembersBtn.classList.toggle(
+    "hidden",
+    !activeGroup || blackboardOpen || activeGroup.type === "task" || Boolean(getContextTask())
+  );
   toggleGroupMembersBtn.classList.toggle("active", groupMembersOpen && Boolean(activeGroup));
   toggleGroupMembersBtn.textContent = "＋";
   groupCreateOverlay.classList.toggle("hidden", !groupCreateOpen);
@@ -937,7 +1516,9 @@ function showGroupMembersError(message) {
 
 function renderGroupMembersPanel() {
   const activeGroup = getActiveGroup();
-  const isOpen = Boolean(activeGroup);
+  const contextTask = getContextTask();
+  renderTaskDetailsPanel();
+  const isOpen = Boolean(activeGroup && activeGroup.type !== "task" && !blackboardOpen && !contextTask);
   groupMembersPanel.classList.toggle("hidden", !isOpen);
   if (!isOpen || !activeGroup) return;
 
@@ -1491,7 +2072,9 @@ function resetTimelineState({ clearSearch = true } = {}) {
 function startChat() {
   loggingOut = false;
   resetTimelineState();
+  renderProjectStrip();
   renderRoomStrip();
+  renderWorkspaceMode();
   renderPresenceStrip();
   if (pollTimer) clearInterval(pollTimer);
   if (reconnectTimer) {
@@ -1499,9 +2082,15 @@ function startChat() {
     reconnectTimer = null;
   }
   closeEventStream();
-  loadHistory();
+  if (blackboardOpen) {
+    loadProjectTasks({ silent: true });
+  } else {
+    loadHistory();
+  }
   connectWS();
   pollTimer = setInterval(pollMessages, 3000);
+  if (taskPollTimer) clearInterval(taskPollTimer);
+  taskPollTimer = setInterval(() => loadProjectTasks({ silent: true }), 5000);
 }
 
 async function loadHistory() {

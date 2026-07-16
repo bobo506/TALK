@@ -116,10 +116,30 @@ def _build_codex_command(
     )
 
 
+def _build_codex_task_command(
+    codex_exe: str,
+    *,
+    profile: str = "discussion",
+    system_instructions: str = cli_bridge.TASK_RUNNER_SYSTEM_PROMPT,
+) -> str:
+    """Build a queue-worker command without the TALK MCP catalog."""
+    sandbox = "workspace-write" if profile == "tools" else "read-only"
+    return (
+        f"{codex_exe} exec --skip-git-repo-check --ignore-rules --sandbox {sandbox} --color never "
+        f"{_CODEX_APPROVAL_BYPASS_FLAG} "
+        f"-c {_codex_config_arg('base_instructions', system_instructions)} "
+        f"-"
+    )
+
+
 def default_codex_command(profile: str = "discussion") -> str:
     if os.environ.get("TALK_CODEX_COMMAND"):
         return os.environ["TALK_CODEX_COMMAND"]
     return _build_codex_command(_default_codex_exe(), profile=profile)
+
+
+def default_codex_task_command(profile: str = "discussion") -> str:
+    return _build_codex_task_command(_default_codex_exe(), profile=profile)
 
 
 def resolve_codex_command(args: argparse.Namespace) -> str:
@@ -144,6 +164,25 @@ def resolve_codex_command(args: argparse.Namespace) -> str:
         profile = load_profile(args.project, member_id)
         system_instructions = compose_system_prompt(CODEX_SYSTEM_INSTRUCTIONS, profile)
     return _build_codex_command(
+        _default_codex_exe(),
+        profile=args.codex_execution_profile,
+        system_instructions=system_instructions,
+    )
+
+
+def resolve_codex_task_command(args: argparse.Namespace) -> str:
+    """Resolve a task command whose visible output is posted only by the runner."""
+    if os.environ.get("TALK_CODEX_COMMAND"):
+        return args.codex_command
+    resolved_default = _build_codex_command(_default_codex_exe(), profile="discussion")
+    if args.codex_command not in (resolved_default, DEFAULT_CODEX_COMMAND_DISCUSSION):
+        return args.codex_command
+    system_instructions = cli_bridge.TASK_RUNNER_SYSTEM_PROMPT
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_instructions = compose_system_prompt(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT, profile)
+    return _build_codex_task_command(
         _default_codex_exe(),
         profile=args.codex_execution_profile,
         system_instructions=system_instructions,
@@ -292,6 +331,7 @@ async def run_task_queue_worker(
 async def run_bridge(args: argparse.Namespace) -> None:
     # resolve_codex_command applies the execution profile AND (opt-in) the
     # --project identity-layer injection in one place.
+    args.task_command = resolve_codex_task_command(args)
     args.codex_command = resolve_codex_command(args)
     args.command = args.codex_command
     args.runtime = "codex"

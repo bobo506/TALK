@@ -5,17 +5,17 @@
 Updated: 2026-07-16 (Asia/Shanghai)
 
 - 当前分支：`codex/task-hall`。
-- TH-3 终端 Task Hall 工具已提交为 `ff8f8a8`；TH-4 claim lease / attempt 可靠性切片已完成。
-- 并发 claim、token 持有、runner 心跳、过期回收、重领与陈旧结果拒绝已形成闭环。
-- 全量回归 `313 tests` 全绿。项目管理者已明确把人工介入点放到完整流程里程碑，下一步进入 Project Blackboard + Task Hall Web UI。
+- TH-3 终端工具已提交为 `ff8f8a8`，TH-4 claim lease / attempt 已提交为 `a5aa3bb`；TH-5 Project Blackboard + Task Hall 完整流程已完成并进入人工验收门禁。
+- Web UI、async SDK、bundled runner、真实 Codex / pi CLI 与对应 Task Hall 结果回写已经贯通；项目管理者现在可以从项目黑板直观看到并验收完整流程。
+- 全量回归 `321 tests` 全绿；Browser 真实交互覆盖委派、Hall 消息、runner 回写、结果收取和完成态，控制台无 error / warning。
 
 ## Current Snapshot
 
-- `AgentTask` 新增 `attempt`、私有 `claim_token`、`lease_expires_at` 与 `heartbeat_at`；普通任务查询不暴露 token。
-- claim 采用条件更新，两个实例并发领取只有一个成功；同一实例重复请求保持幂等。
-- 新增 heartbeat 与 expired requeue API 及 async / sync SDK；过期任务回到 `queued / accepted`，下一次 claim 递增 attempt。
-- complete 校验当前 token 与未过期租约；陈旧 attempt 不能覆盖新结果，首次 attempt 仍保留旧 runner 无 token 兼容。
-- bundled runner 默认 120 秒租约 / 30 秒心跳，每轮先回收过期任务；租约丢失会取消本地子进程且不回写结果。
+- Web UI 登录后默认进入项目黑板，以“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合任务；项目侧栏同步列出对应 Task Hall。
+- 人类可从页面选择项目 Agent 并委派任务；详情面板显示精确协作状态、attempt 与租约，并按权限提供 Hall、澄清 / 接受、结果收取和未领取取消动作。
+- 新增活服务整链测试：任务创建后由真实 bundled runner claim、执行并写入唯一 Task Hall，再由请求者收取为 `completed`。
+- Codex / pi 队列 worker 使用独立任务命令，不向嵌套模型暴露 TALK 结果投递工具；runner 成为唯一 Hall 结果写入者，真实 pi 复测从 3 条重复结果收敛为 1 条。
+- 真实 Codex 当前任务命令精确返回 `Codex Task Hall connected.`；真实 pi 完成领取、单条 Hall 回写与收取，但逐字指令遵循仍弱于 Codex。
 
 ## Current Boundaries
 
@@ -24,23 +24,24 @@ Updated: 2026-07-16 (Asia/Shanghai)
 - `talk_wait_tasks` 目前是客户端轮询而非服务端事件等待；Agent 发现结果尚未提供项目业务角色字段。
 - bundled runner 仍兼容旧任务全局结果；第三方旧 runner 也可继续使用服务端兼容路径。
 - 无 lease 的历史 `running` 任务不会自动回收；业务重试上限与退避策略尚未定义。
-- observer、返工、Project Blackboard 和 Task Hall Web UI 尚未实现。
+- 项目级 `Members / Activity` 独立页面、observer 与返工尚未实现；当前 Hall 列表继续兼容无 `project_id` 的旧 Group。
+- pi 的真实模型在“逐字回复”类任务上可能改写为简短确认，属于模型输出质量边界；基础设施已保证只写一条结果并正确推进状态。
 - BS-3a 真实模型最终汇总质量补验属于 Discussion Hall 后续项，不阻塞当前里程碑。
 
 ## Next Slice
 
-1. 实现 Project Blackboard：按待确认、待澄清、执行中、待收取、已完成聚合项目任务。
-2. 实现 Task Hall 详情与操作：时间线、状态、回复、接受 / 收取、未领取取消，并做 Browser 真实交互验证。
-
-后续顺序：Project Blackboard + Task Hall UI -> bundled runner 完整链路验证 -> 跨模型端到端人工验收。
+1. 由项目管理者按页面验收说明完成一次真实可视化验收：创建 Task Hall、观察 runner 执行结果、进入 Hall、收取结果。
+2. 验收通过后关闭 Task Hall 当前里程碑，再决定运行中协作取消、返工 / observer、后台 schedule 或项目级 Members / Activity 的优先级。
 
 ## Verification
 
-- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py TALK\client\talk_client.py TALK\client\talk_client_sync.py bridges\cli_bridge.py bridges\codex_bridge.py bridges\talk_task_tools.py tests\test_tasks.py tests\test_talk_client.py tests\test_cli_bridge.py tests\test_codex_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py bridges\codex_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py tests\test_codex_bridge.py`：通过。
 - `node --experimental-strip-types --check bridges\talk_tools_extension.ts`：通过。
-- `.venv\Scripts\python.exe -m unittest tests.test_tasks tests.test_talk_client tests.test_cli_bridge tests.test_codex_bridge tests.test_talk_task_tools -q`：`Ran 141 tests ... OK`。
-- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 313 tests ... OK`。
-- 本切片无前端改动，不需要 Browser 验证。
+- `node --check web\app.js` 与 `git diff --check`：通过。
+- 定向 Web / runner / client 测试：`Ran 124 tests ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：清理真实验收服务后 `Ran 321 tests in 98.917s ... OK`；首次并行运行有一个既有 WS 降级测试 2 秒清理超时，该用例随后连续两次单测通过。
+- Browser 真实交互：登录、项目空态、委派、Hall 消息、runner 回写、结果待收取、点击收取、已结束分栏全部通过；最终控制台 error / warning 为 0。
+- 真实 CLI：Codex 与 pi 均完成 claim → 执行 → 单条 Hall 结果 → collect；Codex 精确遵循测试正文，pi 基础确认链通过但逐字遵循仍有质量差异。
 
 ## Known Debt
 

@@ -97,6 +97,28 @@ class PiBridgeTests(unittest.TestCase):
         self.assertIn("talk_delegate_task", cmd)
         self.assertIn("--extension", cmd)
 
+    def test_default_task_command_leaves_result_delivery_to_runner(self):
+        command_args = shlex.split(pi_bridge.DEFAULT_PI_TASK_COMMAND, posix=True)
+        system_prompt = command_args[command_args.index("--system-prompt") + 1]
+
+        self.assertIn("--no-tools", command_args)
+        self.assertIn("--no-extensions", command_args)
+        self.assertNotIn("--extension", command_args)
+        self.assertFalse(any(name in command_args for name in pi_bridge.TALK_TOOL_NAMES))
+        self.assertIn("优先严格遵循请求者给出的任务正文", system_prompt)
+        self.assertIn("runner 会把你的可见输出写入对应 Task Hall", system_prompt)
+
+    def test_tools_profile_task_command_keeps_local_tools_only(self):
+        args = pi_bridge.build_parser().parse_args(
+            ["--key", "pi-key", "--pi-execution-profile", "tools"]
+        )
+        command_args = shlex.split(pi_bridge.resolve_pi_task_command(args), posix=True)
+        tool_names = command_args[command_args.index("--tools") + 1].split(",")
+
+        self.assertEqual(set(tool_names), {"read", "grep", "find", "ls", "bash", "edit", "write"})
+        self.assertNotIn("--extension", command_args)
+        self.assertTrue(set(tool_names).isdisjoint(pi_bridge.TALK_TOOL_NAMES))
+
 
 class PiBridgeProfileInjectionTests(unittest.TestCase):
     """Phase 2 / approach B: --project injects IDENTITY/SOUL into the system prompt."""
@@ -138,6 +160,10 @@ class PiBridgeProfileInjectionTests(unittest.TestCase):
         # the rest of the command is untouched (still function-calling shape)
         self.assertIn("--tools talk_send", resolved)
         self.assertIn("talk_delegate_task", resolved)
+
+        task_system_prompt = self._system_prompt_of(pi_bridge.resolve_pi_task_command(args))
+        self.assertIn("优先严格遵循请求者给出的任务正文", task_system_prompt)
+        self.assertIn("绝不写汇报体", task_system_prompt)
 
     def test_project_without_matching_profile_is_byte_identical(self):
         # .talk/ exists but no profile for agent:pi → opt-in stays a no-op

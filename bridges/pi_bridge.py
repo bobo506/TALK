@@ -40,6 +40,7 @@ TALK_TOOL_CSV = ",".join(TALK_TOOL_NAMES)
 # 工具能力说明由 pi runtime 的 extension/tool catalog 注入。
 # ---------------------------------------------------------------------------
 DEFAULT_SYSTEM_PROMPT = cli_bridge.FUNCTION_CALLING_SYSTEM_PROMPT
+TASK_SYSTEM_PROMPT = cli_bridge.TASK_RUNNER_SYSTEM_PROMPT
 
 
 def _single_line(text: str) -> str:
@@ -99,10 +100,26 @@ def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussio
     )
 
 
+def _build_pi_task_command(system_prompt: str, *, execution_profile: str = "discussion") -> str:
+    """Build a queue-worker command without TALK result-delivery tools."""
+    system_prompt = _single_line(system_prompt)
+    if execution_profile == "tools":
+        return (
+            "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
+            "--tools read,grep,find,ls,bash,edit,write "
+            f"--system-prompt {shlex.quote(system_prompt)}"
+        )
+    return (
+        "pi --print --mode text --no-context-files --no-tools --no-extensions "
+        f"--no-session --thinking off --system-prompt {shlex.quote(system_prompt)}"
+    )
+
+
 # 施工档命令（文件工具启用）
 DEFAULT_PI_TOOLS_COMMAND = _build_pi_command(DEFAULT_SYSTEM_PROMPT, execution_profile="tools")
 # 当前默认命令：function-calling 模式
 DEFAULT_PI_COMMAND = _build_pi_command(DEFAULT_SYSTEM_PROMPT)
+DEFAULT_PI_TASK_COMMAND = _build_pi_task_command(TASK_SYSTEM_PROMPT)
 
 
 def resolve_pi_command(args: argparse.Namespace) -> str:
@@ -125,6 +142,18 @@ def resolve_pi_command(args: argparse.Namespace) -> str:
         system_prompt = compose_system_prompt(DEFAULT_SYSTEM_PROMPT, profile)
     return _build_pi_command(system_prompt, execution_profile=args.pi_execution_profile)
 
+
+def resolve_pi_task_command(args: argparse.Namespace) -> str:
+    """Resolve a task command whose visible output is posted only by the runner."""
+    if args.pi_command != DEFAULT_PI_COMMAND:
+        return args.pi_command
+    system_prompt = TASK_SYSTEM_PROMPT
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_prompt = compose_system_prompt(TASK_SYSTEM_PROMPT, profile)
+    return _build_pi_task_command(system_prompt, execution_profile=args.pi_execution_profile)
+
 DEFAULT_TIMEOUT_SEC = cli_bridge.DEFAULT_TIMEOUT_SEC
 DEFAULT_MAX_REPLY_CHARS = cli_bridge.DEFAULT_MAX_REPLY_CHARS
 DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL
@@ -133,6 +162,7 @@ DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL
 async def run_bridge(args: argparse.Namespace) -> None:
     # resolve_pi_command applies the execution profile swap AND (opt-in) the
     # --project identity-layer injection in one place.
+    args.task_command = resolve_pi_task_command(args)
     args.pi_command = resolve_pi_command(args)
     args.command = args.pi_command
     cli_bridge.configure_talk_tool_environment(args, cli_bridge.member_id_from_name(args.name))
