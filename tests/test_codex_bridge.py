@@ -304,30 +304,45 @@ class CodexBridgeTests(unittest.TestCase):
         class FakeClient:
             def __init__(self):
                 self.claimed = []
+                self.heartbeats = []
                 self.sent = []
                 self.completed = []
 
-            async def claim_task(self, task_id, *, instance_id=None):
-                self.claimed.append((task_id, instance_id))
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                self.claimed.append((task_id, instance_id, lease_seconds))
                 return {
                     "id": task_id,
                     "created_by": "human:bobo",
                     "title": "Queue smoke",
                     "content": "say ok",
+                    "claim_token": "lease-12",
                 }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                self.heartbeats.append((task_id, claim_token, lease_seconds))
+                return {"id": task_id, "status": "running"}
 
             async def send_text(self, text, to=None, group_id=None):
                 self.sent.append((text, to, group_id))
                 return {"id": 99}
 
-            async def complete_task(self, task_id, *, status, result_message_id=None, last_error=None):
-                self.completed.append((task_id, status, result_message_id, last_error))
+            async def complete_task(
+                self,
+                task_id,
+                *,
+                status,
+                result_message_id=None,
+                last_error=None,
+                claim_token=None,
+            ):
+                self.completed.append((task_id, status, result_message_id, last_error, claim_token))
                 return {"id": task_id, "status": status}
 
         async def fake_run_codex_command(command, prompt, *, cwd, timeout):
             self.assertEqual(command, ["codex", "exec"])
             self.assertIn("say ok", prompt)
             self.assertEqual(timeout, 5)
+            await asyncio.sleep(0.01)
             return CodexRunResult(returncode=0, stdout="OK", stderr="")
 
         async def scenario():
@@ -344,6 +359,8 @@ class CodexBridgeTests(unittest.TestCase):
                     codex_command=["codex", "exec"],
                     timeout=5,
                     max_reply_chars=100,
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
                 )
                 return handled, client
             finally:
@@ -352,9 +369,10 @@ class CodexBridgeTests(unittest.TestCase):
         handled, client = asyncio.run(scenario())
 
         self.assertTrue(handled)
-        self.assertEqual(client.claimed, [(12, "agent:codex:test")])
+        self.assertEqual(client.claimed, [(12, "agent:codex:test", 5)])
+        self.assertTrue(client.heartbeats)
         self.assertEqual(client.sent, [("OK", ["human:bobo"], None)])
-        self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
+        self.assertEqual(client.completed, [(12, "succeeded", 99, None, "lease-12")])
 
 
 if __name__ == "__main__":

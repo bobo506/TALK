@@ -218,7 +218,7 @@ def reply_task(*, task_id: int, body: str, workflow_action: str = "none") -> Jso
 def cancel_task(*, task_id: int, reason: str | None = None) -> JsonDict:
     task = _api_request("GET", f"/api/tasks/{int(task_id)}")
     if task.get("status") not in {"queued", "canceled"}:
-        raise TalkToolError("当前仅支持取消尚未 claim 的任务；运行中取消等待 lease/attempt 支撑")
+        raise TalkToolError("当前仅支持取消尚未 claim 的任务；运行中取消等待 runner 协作中断协议")
     message = None
     if reason and task.get("status") != "canceled":
         message = reply_task(task_id=task_id, body=reason, workflow_action="none")["message"]

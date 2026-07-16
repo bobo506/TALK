@@ -275,8 +275,24 @@ class TalkClientSync:
     def cancel_task(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.cancel_task(task_id))
 
-    def claim_task(self, task_id: int, *, instance_id: str | None = None) -> dict[str, Any]:
-        return self._submit(self._client.claim_task(task_id, instance_id=instance_id))
+    def claim_task(
+        self,
+        task_id: int,
+        *,
+        instance_id: str | None = None,
+        lease_seconds: int = 120,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.claim_task(task_id, instance_id=instance_id, lease_seconds=lease_seconds)
+        )
+
+    def heartbeat_task(self, task_id: int, *, claim_token: str, lease_seconds: int = 120) -> dict[str, Any]:
+        return self._submit(
+            self._client.heartbeat_task(task_id, claim_token=claim_token, lease_seconds=lease_seconds)
+        )
+
+    def requeue_expired_tasks(self) -> list[dict[str, Any]]:
+        return self._submit(self._client.requeue_expired_tasks())
 
     def complete_task(
         self,
@@ -285,6 +301,7 @@ class TalkClientSync:
         status: str,
         result_message_id: int | None = None,
         last_error: str | None = None,
+        claim_token: str | None = None,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.complete_task(
@@ -292,6 +309,7 @@ class TalkClientSync:
                 status=status,
                 result_message_id=result_message_id,
                 last_error=last_error,
+                claim_token=claim_token,
             )
         )
 

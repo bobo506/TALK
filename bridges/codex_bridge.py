@@ -186,56 +186,83 @@ async def handle_queued_task(
     codex_command: str | Sequence[str],
     timeout: int,
     max_reply_chars: int,
+    lease_seconds: int = cli_bridge.DEFAULT_TASK_LEASE_SECONDS,
+    heartbeat_interval: float = cli_bridge.DEFAULT_TASK_HEARTBEAT_INTERVAL,
 ) -> bool:
     """Claim and execute one queued task. Returns False when another worker claimed it first."""
     from TALK.client.exceptions import TalkValidationError
 
     task_id = int(task["id"])
     try:
-        claimed = await client.claim_task(task_id, instance_id=instance_id)
+        claimed = await client.claim_task(task_id, instance_id=instance_id, lease_seconds=lease_seconds)
     except TalkValidationError as exc:
         if exc.status_code == 409:
             return False
         raise
 
-    prompt = build_codex_task_prompt(claimed, member_id=member_id, workdir=workdir)
-    result_message_id: int | None = None
-    completion_status = "succeeded"
-    last_error: str | None = None
-
-    try:
-        result = await run_codex_command(codex_command, prompt, cwd=workdir, timeout=timeout)
-        reply = format_codex_reply(result, max_chars=max_reply_chars)
-        completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
-        if completion_status == "failed":
-            last_error = "\n".join(
-                part for part in (cli_bridge.clean_cli_output(result.stderr), cli_bridge.clean_cli_output(result.stdout)) if part
-            ) or reply
-    except Exception as exc:
-        reply = "Codex bridge 运行失败，错误详情已记录。"
-        completion_status = "failed"
-        last_error = f"Codex bridge failed before completing task {task_id}: {exc}"
-
-    creator = claimed.get("created_by")
-    if creator:
-        try:
-            result_message = await client.send_text(
-                reply,
-                to=[str(creator)],
-                group_id=claimed.get("hall_group_id"),
-            )
-            result_message_id = int(result_message["id"])
-        except Exception as exc:
-            completion_status = "failed"
-            last_error = f"Codex bridge could not post task result: {exc}"
-
-    await client.complete_task(
-        task_id,
-        status=completion_status,
-        result_message_id=result_message_id,
-        last_error=last_error,
+    claim_token = str(claimed.get("claim_token") or "") or None
+    heartbeat_task = cli_bridge._start_task_heartbeat(
+        client=client,
+        task_id=task_id,
+        claim_token=claim_token,
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
     )
-    return True
+    try:
+        try:
+            prompt = build_codex_task_prompt(claimed, member_id=member_id, workdir=workdir)
+            result = await cli_bridge._run_while_task_lease_active(
+                run_codex_command(codex_command, prompt, cwd=workdir, timeout=timeout),
+                heartbeat_task,
+            )
+            reply = format_codex_reply(result, max_chars=max_reply_chars)
+            completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
+            last_error = None
+            if completion_status == "failed":
+                last_error = "\n".join(
+                    part
+                    for part in (
+                        cli_bridge.clean_cli_output(result.stderr),
+                        cli_bridge.clean_cli_output(result.stdout),
+                    )
+                    if part
+                ) or reply
+        except cli_bridge.TaskLeaseLostError:
+            raise
+        except Exception as exc:
+            reply = "Codex bridge 运行失败，错误详情已记录。"
+            completion_status = "failed"
+            last_error = f"Codex bridge failed before completing task {task_id}: {exc}"
+
+        await cli_bridge._raise_if_task_lease_lost(heartbeat_task)
+        result_message_id: int | None = None
+        creator = claimed.get("created_by")
+        if creator:
+            try:
+                result_message = await client.send_text(
+                    reply,
+                    to=[str(creator)],
+                    group_id=claimed.get("hall_group_id"),
+                )
+                result_message_id = int(result_message["id"])
+            except Exception as exc:
+                completion_status = "failed"
+                last_error = f"Codex bridge could not post task result: {exc}"
+
+        await cli_bridge._raise_if_task_lease_lost(heartbeat_task)
+        completion_kwargs: dict[str, Any] = {
+            "status": completion_status,
+            "result_message_id": result_message_id,
+            "last_error": last_error,
+        }
+        if claim_token is not None:
+            completion_kwargs["claim_token"] = claim_token
+        await client.complete_task(task_id, **completion_kwargs)
+        return True
+    except cli_bridge.TaskLeaseLostError:
+        return False
+    finally:
+        await cli_bridge._stop_task_heartbeat(heartbeat_task)
 
 
 async def run_task_queue_worker(

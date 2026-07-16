@@ -370,7 +370,7 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
         const taskId = Number(params.task_id);
         const task = await apiRequest("GET", `/api/tasks/${taskId}`);
         if (!["queued", "canceled"].includes(task.status)) {
-          throw new Error("当前仅支持取消尚未 claim 的任务；运行中取消等待 lease/attempt 支撑");
+          throw new Error("当前仅支持取消尚未 claim 的任务；运行中取消等待 runner 协作中断协议");
         }
         let message = null;
         const reason = String(params.reason || "").trim();

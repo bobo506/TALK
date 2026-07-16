@@ -18,7 +18,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Awaitable, Sequence
 from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +59,8 @@ DISCUSSION_PROTOCOL_INSTRUCTIONS = (
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
+DEFAULT_TASK_LEASE_SECONDS = 120
+DEFAULT_TASK_HEARTBEAT_INTERVAL = 30.0
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
 _HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] | None = None
 PROMPT_TRANSPORTS = {"stdin", "argv"}
@@ -1999,6 +2001,113 @@ async def run_cli_command(
             stderr=decode_subprocess_output(stderr),
             timed_out=True,
         )
+    except asyncio.CancelledError:
+        process.kill()
+        await process.communicate()
+        raise
+
+
+class TaskLeaseLostError(RuntimeError):
+    """Raised when a runner can no longer prove ownership of a task claim."""
+
+
+async def _task_heartbeat_loop(
+    *,
+    client: Any,
+    task_id: int,
+    claim_token: str,
+    lease_seconds: int,
+    heartbeat_interval: float,
+) -> None:
+    from TALK.client.exceptions import TalkValidationError
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + lease_seconds
+    interval = min(heartbeat_interval, max(0.5, lease_seconds / 3))
+    last_error: Exception | None = None
+    while True:
+        await asyncio.sleep(min(interval, max(0.05, deadline - loop.time())))
+        try:
+            await client.heartbeat_task(
+                task_id,
+                claim_token=claim_token,
+                lease_seconds=lease_seconds,
+            )
+        except TalkValidationError as exc:
+            if exc.status_code in {404, 409}:
+                raise TaskLeaseLostError(f"task {task_id} claim is no longer active") from exc
+            last_error = exc
+        except Exception as exc:
+            last_error = exc
+        else:
+            deadline = loop.time() + lease_seconds
+            last_error = None
+            continue
+
+        if loop.time() >= deadline:
+            raise TaskLeaseLostError(f"task {task_id} heartbeat failed until its local lease deadline") from last_error
+
+
+def _start_task_heartbeat(
+    *,
+    client: Any,
+    task_id: int,
+    claim_token: str | None,
+    lease_seconds: int,
+    heartbeat_interval: float,
+) -> asyncio.Task[None] | None:
+    if not claim_token:
+        return None
+    if lease_seconds <= 0 or heartbeat_interval <= 0:
+        raise ValueError("task lease and heartbeat intervals must be positive")
+    return asyncio.create_task(
+        _task_heartbeat_loop(
+            client=client,
+            task_id=task_id,
+            claim_token=claim_token,
+            lease_seconds=lease_seconds,
+            heartbeat_interval=heartbeat_interval,
+        )
+    )
+
+
+async def _raise_if_task_lease_lost(heartbeat_task: asyncio.Task[None] | None) -> None:
+    if heartbeat_task is not None and heartbeat_task.done():
+        await heartbeat_task
+
+
+async def _run_while_task_lease_active(
+    operation: Awaitable[Any],
+    heartbeat_task: asyncio.Task[None] | None,
+) -> Any:
+    if heartbeat_task is None:
+        return await operation
+    operation_task = asyncio.create_task(operation)
+    done, _ = await asyncio.wait({operation_task, heartbeat_task}, return_when=asyncio.FIRST_COMPLETED)
+    if heartbeat_task in done:
+        operation_task.cancel()
+        try:
+            await operation_task
+        except asyncio.CancelledError:
+            pass
+        await heartbeat_task
+    return await operation_task
+
+
+async def _stop_task_heartbeat(heartbeat_task: asyncio.Task[None] | None) -> None:
+    if heartbeat_task is None:
+        return
+    if heartbeat_task.done():
+        try:
+            await heartbeat_task
+        except TaskLeaseLostError:
+            pass
+        return
+    heartbeat_task.cancel()
+    try:
+        await heartbeat_task
+    except asyncio.CancelledError:
+        pass
 
 
 async def handle_queued_task(
@@ -2015,69 +2124,99 @@ async def handle_queued_task(
     bridge_label: str = "CLI bridge",
     prompt_transport: str = "stdin",
     decision_tier: str = "execution",
+    lease_seconds: int = DEFAULT_TASK_LEASE_SECONDS,
+    heartbeat_interval: float = DEFAULT_TASK_HEARTBEAT_INTERVAL,
 ) -> bool:
     """Claim and execute one queued task. Returns False when another worker claimed it first."""
     from TALK.client.exceptions import TalkValidationError
 
     task_id = int(task["id"])
     try:
-        claimed = await client.claim_task(task_id, instance_id=instance_id)
+        claimed = await client.claim_task(task_id, instance_id=instance_id, lease_seconds=lease_seconds)
     except TalkValidationError as exc:
         if exc.status_code == 409:
             return False
         raise
 
-    task_text = str(claimed.get("content") or "")
-    prompt = build_cli_task_prompt(claimed, member_id=member_id, workdir=workdir, runtime=runtime, decision_tier=decision_tier)
-    result_message_id: int | None = None
-    completion_status = "succeeded"
-    last_error: str | None = None
-
-    try:
-        result = await run_cli_command(
-            command,
-            prompt,
-            cwd=workdir,
-            timeout=timeout,
-            prompt_transport=prompt_transport,
-        )
-        reply = format_cli_reply(
-            result,
-            max_chars=max_reply_chars,
-            bridge_label=bridge_label,
-            force_one_sentence=wants_one_sentence(task_text),
-        )
-        if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
-            reply = normalize_pi_reply_language(task_text, reply)
-        completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
-        if completion_status == "failed":
-            detail = "\n".join(part for part in (clean_cli_output(result.stderr), clean_cli_output(result.stdout)) if part)
-            last_error = detail or reply
-    except Exception as exc:
-        reply = f"{bridge_label} 运行失败，错误详情已记录。"
-        completion_status = "failed"
-        last_error = f"{bridge_label} failed before completing task {task_id}: {exc}"
-
-    creator = claimed.get("created_by")
-    if creator:
-        try:
-            result_message = await client.send_text(
-                reply,
-                to=[str(creator)],
-                group_id=claimed.get("hall_group_id"),
-            )
-            result_message_id = int(result_message["id"])
-        except Exception as exc:
-            completion_status = "failed"
-            last_error = f"{bridge_label} could not post task result: {exc}"
-
-    await client.complete_task(
-        task_id,
-        status=completion_status,
-        result_message_id=result_message_id,
-        last_error=last_error,
+    claim_token = str(claimed.get("claim_token") or "") or None
+    heartbeat_task = _start_task_heartbeat(
+        client=client,
+        task_id=task_id,
+        claim_token=claim_token,
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
     )
-    return True
+    try:
+        try:
+            task_text = str(claimed.get("content") or "")
+            prompt = build_cli_task_prompt(
+                claimed,
+                member_id=member_id,
+                workdir=workdir,
+                runtime=runtime,
+                decision_tier=decision_tier,
+            )
+            result = await _run_while_task_lease_active(
+                run_cli_command(
+                    command,
+                    prompt,
+                    cwd=workdir,
+                    timeout=timeout,
+                    prompt_transport=prompt_transport,
+                ),
+                heartbeat_task,
+            )
+            reply = format_cli_reply(
+                result,
+                max_chars=max_reply_chars,
+                bridge_label=bridge_label,
+                force_one_sentence=wants_one_sentence(task_text),
+            )
+            if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
+                reply = normalize_pi_reply_language(task_text, reply)
+            completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
+            last_error = None
+            if completion_status == "failed":
+                detail = "\n".join(
+                    part for part in (clean_cli_output(result.stderr), clean_cli_output(result.stdout)) if part
+                )
+                last_error = detail or reply
+        except TaskLeaseLostError:
+            raise
+        except Exception as exc:
+            reply = f"{bridge_label} 运行失败，错误详情已记录。"
+            completion_status = "failed"
+            last_error = f"{bridge_label} failed before completing task {task_id}: {exc}"
+
+        await _raise_if_task_lease_lost(heartbeat_task)
+        result_message_id: int | None = None
+        creator = claimed.get("created_by")
+        if creator:
+            try:
+                result_message = await client.send_text(
+                    reply,
+                    to=[str(creator)],
+                    group_id=claimed.get("hall_group_id"),
+                )
+                result_message_id = int(result_message["id"])
+            except Exception as exc:
+                completion_status = "failed"
+                last_error = f"{bridge_label} could not post task result: {exc}"
+
+        await _raise_if_task_lease_lost(heartbeat_task)
+        completion_kwargs: dict[str, Any] = {
+            "status": completion_status,
+            "result_message_id": result_message_id,
+            "last_error": last_error,
+        }
+        if claim_token is not None:
+            completion_kwargs["claim_token"] = claim_token
+        await client.complete_task(task_id, **completion_kwargs)
+        return True
+    except TaskLeaseLostError:
+        return False
+    finally:
+        await _stop_task_heartbeat(heartbeat_task)
 
 
 async def handle_incoming_message(
@@ -2439,6 +2578,9 @@ async def run_task_queue_worker(
 ) -> None:
     while True:
         try:
+            requeue_expired = getattr(client, "requeue_expired_tasks", None)
+            if requeue_expired is not None:
+                await requeue_expired()
             tasks = await client.list_tasks(target_member_id=member_id, status="queued")
             queued = sorted(tasks, key=lambda item: int(item["id"]))
             for task in queued:
@@ -2456,6 +2598,12 @@ async def run_task_queue_worker(
                         bridge_label=args.bridge_label,
                         prompt_transport=args.prompt_transport,
                         decision_tier=args.decision_tier,
+                        lease_seconds=getattr(args, "task_lease_seconds", DEFAULT_TASK_LEASE_SECONDS),
+                        heartbeat_interval=getattr(
+                            args,
+                            "task_heartbeat_interval",
+                            DEFAULT_TASK_HEARTBEAT_INTERVAL,
+                        ),
                     )
         except asyncio.CancelledError:
             raise
@@ -2590,6 +2738,8 @@ def build_parser(
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SEC)
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--task-poll-interval", type=float, default=DEFAULT_TASK_POLL_INTERVAL)
+    parser.add_argument("--task-lease-seconds", type=int, default=DEFAULT_TASK_LEASE_SECONDS)
+    parser.add_argument("--task-heartbeat-interval", type=float, default=DEFAULT_TASK_HEARTBEAT_INTERVAL)
     parser.add_argument("--disable-task-queue", action="store_true")
     parser.add_argument("--max-reply-chars", type=int, default=DEFAULT_MAX_REPLY_CHARS)
     parser.add_argument("--respond-to-broadcast", action="store_true")

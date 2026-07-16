@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import or_, update
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
@@ -15,8 +15,10 @@ from server.models import (
     AgentInstance,
     AgentTask,
     AgentTaskClaim,
+    AgentTaskClaimOut,
     AgentTaskComplete,
     AgentTaskCreate,
+    AgentTaskHeartbeat,
     AgentTaskOut,
     AgentTaskSchedule,
     AgentTaskScheduleCreate,
@@ -126,6 +128,59 @@ def _ensure_result_message_owner(
 
 def _touch_task(task: AgentTask, now: datetime) -> None:
     task.updated_at = now
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _lease_expired(task: AgentTask, now: datetime) -> bool:
+    return task.lease_expires_at is not None and _as_utc(task.lease_expires_at) <= now
+
+
+def _release_expired_instance(task: AgentTask, now: datetime, session: Session, reason: str) -> None:
+    if task.instance_id is None:
+        return
+    instance = session.get(AgentInstance, task.instance_id)
+    if instance is None or instance.current_task_id != str(task.id):
+        return
+    instance.status = "error"
+    instance.current_task_id = None
+    instance.last_error = reason
+    instance.updated_at = now
+    session.add(instance)
+
+
+def _try_requeue_expired_task(task: AgentTask, now: datetime, session: Session) -> bool:
+    if task.id is None or not _lease_expired(task, now):
+        return False
+    reason = f"claim lease expired after attempt {task.attempt}"
+    result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == task.id,
+            AgentTask.status == "running",
+            AgentTask.lease_expires_at.is_not(None),
+            AgentTask.lease_expires_at <= now,
+        )
+        .values(
+            status="queued",
+            workflow_status="accepted",
+            claimed_by=None,
+            instance_id=None,
+            claim_token=None,
+            lease_expires_at=None,
+            last_error=reason,
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        return False
+    _release_expired_instance(task, now, session, reason)
+    return True
 
 
 def _touch_schedule(schedule: AgentTaskSchedule, now: datetime) -> None:
@@ -413,6 +468,32 @@ def update_task_schedule(
     return schedule
 
 
+@router.post("/requeue-expired", response_model=list[AgentTaskOut])
+def requeue_expired_tasks(
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Return this Agent's expired running claims to the queued state."""
+    _require_agent(current)
+    now = datetime.now(timezone.utc)
+    expired = session.exec(
+        select(AgentTask).where(
+            AgentTask.target_member_id == current.id,
+            AgentTask.status == "running",
+            AgentTask.lease_expires_at.is_not(None),
+            AgentTask.lease_expires_at <= now,
+        )
+    ).all()
+    requeued_ids = [
+        int(task.id)
+        for task in expired
+        if task.id is not None and _try_requeue_expired_task(task, now, session)
+    ]
+    session.commit()
+    session.expire_all()
+    return [_get_task(task_id, session) for task_id in requeued_ids]
+
+
 @router.get("/{task_id}", response_model=AgentTaskOut)
 def get_task(
     task_id: int,
@@ -505,7 +586,7 @@ def cancel_task(
     if task.status != "queued":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="only unclaimed tasks can be canceled; running cancellation requires runner lease support",
+            detail="only unclaimed tasks can be canceled; running cancellation requires cooperative runner interruption",
         )
 
     now = datetime.now(timezone.utc)
@@ -519,7 +600,7 @@ def cancel_task(
     return task
 
 
-@router.post("/{task_id}/claim", response_model=AgentTaskOut)
+@router.post("/{task_id}/claim", response_model=AgentTaskClaimOut)
 def claim_task(
     task_id: int,
     body: AgentTaskClaim,
@@ -533,7 +614,23 @@ def claim_task(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task belongs to another agent")
 
     instance = _ensure_instance_owner(body.instance_id, current, session)
+    now = datetime.now(timezone.utc)
+    if task.status == "running" and _lease_expired(task, now):
+        _try_requeue_expired_task(task, now, session)
+        session.commit()
+        session.expire_all()
+        task = _get_task(task_id, session)
+        instance = _ensure_instance_owner(body.instance_id, current, session)
     if task.status == "running" and task.claimed_by == current.id and task.instance_id == body.instance_id:
+        if task.claim_token is None:
+            task.claim_token = uuid4().hex
+            task.attempt = max(task.attempt, 1)
+            task.heartbeat_at = now
+            task.lease_expires_at = now + timedelta(seconds=body.lease_seconds)
+            _touch_task(task, now)
+            session.add(task)
+            session.commit()
+            session.refresh(task)
         return task
     if task.status != "queued":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is already {task.status}")
@@ -545,15 +642,35 @@ def claim_task(
             detail=f"task workflow is {task.workflow_status}, not ready to start",
         )
 
-    now = datetime.now(timezone.utc)
-    task.status = "running"
-    task.workflow_status = "in_progress"
-    task.claimed_by = current.id
-    task.instance_id = body.instance_id
-    task.claimed_at = now
-    _touch_task(task, now)
-    session.add(task)
-    session.flush()
+    claim_token = uuid4().hex
+    result = session.execute(
+        update(AgentTask)
+        .where(AgentTask.id == task_id, AgentTask.status == "queued")
+        .values(
+            status="running",
+            workflow_status="in_progress",
+            attempt=AgentTask.attempt + 1,
+            claimed_by=current.id,
+            instance_id=body.instance_id,
+            claim_token=claim_token,
+            claimed_at=now,
+            heartbeat_at=now,
+            lease_expires_at=now + timedelta(seconds=body.lease_seconds),
+            last_error=None,
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        current_task = _get_task(task_id, session)
+        if (
+            current_task.status == "running"
+            and current_task.claimed_by == current.id
+            and current_task.instance_id == body.instance_id
+        ):
+            return current_task
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is already {current_task.status}")
 
     if instance is not None:
         instance.status = "busy"
@@ -564,8 +681,60 @@ def claim_task(
         session.add(instance)
 
     session.commit()
-    session.refresh(task)
-    return task
+    session.expire_all()
+    return _get_task(task_id, session)
+
+
+@router.post("/{task_id}/heartbeat", response_model=AgentTaskOut)
+def heartbeat_task(
+    task_id: int,
+    body: AgentTaskHeartbeat,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Renew an active task claim lease held by this Agent."""
+    _require_agent(current)
+    task = _get_task(task_id, session)
+    if task.target_member_id != current.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task belongs to another agent")
+    if task.status != "running":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is {task.status}, not running")
+    if task.claim_token != body.claim_token:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim token is stale")
+
+    now = datetime.now(timezone.utc)
+    if _lease_expired(task, now):
+        _try_requeue_expired_task(task, now, session)
+        session.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim lease has expired")
+
+    result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == task_id,
+            AgentTask.status == "running",
+            AgentTask.claim_token == body.claim_token,
+            or_(AgentTask.lease_expires_at.is_(None), AgentTask.lease_expires_at > now),
+        )
+        .values(
+            heartbeat_at=now,
+            lease_expires_at=now + timedelta(seconds=body.lease_seconds),
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim is no longer active")
+
+    instance = _ensure_instance_owner(task.instance_id, current, session)
+    if instance is not None:
+        instance.last_seen_at = now
+        instance.updated_at = now
+        session.add(instance)
+    session.commit()
+    session.expire_all()
+    return _get_task(task_id, session)
 
 
 @router.post("/{task_id}/complete", response_model=AgentTaskOut)
@@ -583,20 +752,53 @@ def complete_task(
     if task.status != "running":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is {task.status}, not running")
 
+    now = datetime.now(timezone.utc)
+    if task.claim_token is not None:
+        if body.claim_token is None and task.attempt > 1:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="claim_token is required after a task is reclaimed")
+        if body.claim_token is not None and body.claim_token != task.claim_token:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim token is stale")
+        if _lease_expired(task, now):
+            _try_requeue_expired_task(task, now, session)
+            session.commit()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim lease has expired")
+
     _ensure_result_message_owner(body.result_message_id, current, task, session)
     instance = _ensure_instance_owner(task.instance_id, current, session)
 
-    now = datetime.now(timezone.utc)
-    task.status = body.status
-    task.workflow_status = {
+    workflow_status = {
         "succeeded": "submitted",
         "failed": "failed",
         "canceled": "canceled",
     }[body.status]
-    task.result_message_id = body.result_message_id
-    task.last_error = body.last_error
-    task.finished_at = now
-    _touch_task(task, now)
+    completion_conditions = [AgentTask.id == task_id, AgentTask.status == "running"]
+    if task.claim_token is not None:
+        completion_conditions.extend(
+            [
+                AgentTask.claim_token == task.claim_token,
+                or_(AgentTask.lease_expires_at.is_(None), AgentTask.lease_expires_at > now),
+            ]
+        )
+    else:
+        completion_conditions.append(AgentTask.claim_token.is_(None))
+    result = session.execute(
+        update(AgentTask)
+        .where(*completion_conditions)
+        .values(
+            status=body.status,
+            workflow_status=workflow_status,
+            claim_token=None,
+            lease_expires_at=None,
+            result_message_id=body.result_message_id,
+            last_error=body.last_error,
+            finished_at=now,
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim is no longer active")
 
     if instance is not None:
         instance.status = "error" if body.status == "failed" else "idle"
@@ -606,7 +808,6 @@ def complete_task(
         instance.last_seen_at = now
         session.add(instance)
 
-    session.add(task)
     session.commit()
-    session.refresh(task)
-    return task
+    session.expire_all()
+    return _get_task(task_id, session)

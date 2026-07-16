@@ -268,7 +268,17 @@ class TalkClientTests(RouteTestCase):
                 fetched = await agent_client.get_task(created["id"])
                 clarification = await agent_client.request_task_clarification(created["id"])
                 accepted = await agent_client.accept_task(created["id"])
-                claimed = await agent_client.claim_task(created["id"], instance_id="demo-instance-1")
+                requeued = await agent_client.requeue_expired_tasks()
+                claimed = await agent_client.claim_task(
+                    created["id"],
+                    instance_id="demo-instance-1",
+                    lease_seconds=30,
+                )
+                heartbeat = await agent_client.heartbeat_task(
+                    claimed["id"],
+                    claim_token=claimed["claim_token"],
+                    lease_seconds=30,
+                )
                 result = await agent_client.send_text(
                     "SDK async result",
                     to=["human:bobo"],
@@ -278,6 +288,7 @@ class TalkClientTests(RouteTestCase):
                     claimed["id"],
                     status="succeeded",
                     result_message_id=result["id"],
+                    claim_token=claimed["claim_token"],
                 )
 
             async with TalkClient(base_url, "bobo-key") as human_client:
@@ -293,7 +304,10 @@ class TalkClientTests(RouteTestCase):
             self.assertEqual(fetched["project_id"], "prj_sdk_async")
             self.assertEqual(clarification["workflow_status"], "clarification_requested")
             self.assertEqual(accepted["workflow_status"], "accepted")
+            self.assertEqual(requeued, [])
             self.assertEqual(claimed["status"], "running")
+            self.assertEqual(claimed["attempt"], 1)
+            self.assertIsNotNone(heartbeat["heartbeat_at"])
             self.assertEqual(submitted["workflow_status"], "submitted")
             self.assertEqual(collected["workflow_status"], "completed")
             self.assertIsNotNone(collected["result_collected_at"])
@@ -324,7 +338,13 @@ class TalkClientTests(RouteTestCase):
                 fetched = agent_client.get_task(created["id"])
                 clarification = agent_client.request_task_clarification(created["id"])
                 accepted = agent_client.accept_task(created["id"])
-                claimed = agent_client.claim_task(created["id"])
+                requeued = agent_client.requeue_expired_tasks()
+                claimed = agent_client.claim_task(created["id"], lease_seconds=30)
+                heartbeat = agent_client.heartbeat_task(
+                    claimed["id"],
+                    claim_token=claimed["claim_token"],
+                    lease_seconds=30,
+                )
                 result = agent_client.send_text(
                     "SDK sync result",
                     to=["human:bobo"],
@@ -334,6 +354,7 @@ class TalkClientTests(RouteTestCase):
                     claimed["id"],
                     status="succeeded",
                     result_message_id=result["id"],
+                    claim_token=claimed["claim_token"],
                 )
                 collected = human_client.collect_task_result(created["id"])
                 cancelable = human_client.create_task(
@@ -350,6 +371,9 @@ class TalkClientTests(RouteTestCase):
         self.assertEqual(fetched["project_id"], "prj_sdk_sync")
         self.assertEqual(clarification["workflow_status"], "clarification_requested")
         self.assertEqual(accepted["workflow_status"], "accepted")
+        self.assertEqual(requeued, [])
+        self.assertEqual(claimed["attempt"], 1)
+        self.assertIsNotNone(heartbeat["heartbeat_at"])
         self.assertEqual(submitted["workflow_status"], "submitted")
         self.assertEqual(collected["workflow_status"], "completed")
         self.assertEqual(canceled["workflow_status"], "canceled")

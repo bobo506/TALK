@@ -184,6 +184,37 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-16 TH-4：claim lease / attempt 与 runner 过期回收
+
+**背景**：项目管理者接受 TH-3，并明确逐片人工验收缺少直观价值，后续人工介入点应放在完整委派流程里程碑。本轮先提交 TH-3 为 `ff8f8a8`，再补齐同一任务只能由一个有效 runner 持有的可靠性协议。
+
+### 实现
+
+- `AgentTask` 新增 `attempt`、私有 `claim_token`、`lease_expires_at` 与 `heartbeat_at`；旧库通过 `init_db()` 增量迁移并建立租约截止索引。
+- claim 改为数据库条件更新，多个实例并发领取只有一个成功；同一实例重复 claim 保持 attempt / token 不变。
+- 新增 `POST /api/tasks/{id}/heartbeat` 与 `POST /api/tasks/requeue-expired`。过期 claim 回到 `queued / accepted`，旧实例进入 `error`，下一次领取递增 attempt 并生成新 token。
+- complete 原子校验当前 token 和未过期租约；陈旧 token 与重领后缺少 token 的提交均被拒绝。首次 attempt 暂时允许省略 token，兼容尚未升级的第三方 runner。
+- async / sync client 新增 heartbeat 与过期回收 helper，并扩展 claim / complete 参数。
+- bundled runner 默认使用 120 秒 lease、30 秒心跳；轮询前先回收自己的过期任务。租约丢失时取消本地子进程，不发送 Hall 结果，也不提交陈旧完成状态。
+- 运行中取消的错误提示同步调整：lease 基础已经存在，剩余缺口是请求者触发的 runner 协作中断协议。
+
+### 验证
+
+- Python `py_compile` 覆盖模型、迁移、路由、client、runner 与相关测试：通过。
+- `node --experimental-strip-types --check bridges\talk_tools_extension.ts`：通过。
+- 定向 tasks / client / CLI bridge / Codex bridge / Task Hall tools：`Ran 141 tests ... OK`。
+- 全量 `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 313 tests ... OK`。
+- 新测试覆盖真实并发 claim、幂等重试、心跳续租、过期回队、attempt 递增、陈旧完成拒绝、SDK 活服务和 runner 租约丢失取消。
+- `git diff --check`：通过；本切片无前端改动，不需要 Browser 验证。
+
+### 边界与下一步
+
+- 无 lease 字段的历史 `running` 任务不会被自动回收，避免升级时误终止旧 runner。
+- 当前仍只允许取消未领取任务；运行中取消需要协作中断状态与 runner 主动停止协议。
+- 下一切片进入 Project Blackboard + Task Hall Web UI，让项目管理者第一次可以从页面直观看到并操作完整任务流程。
+
+---
+
 ## 2026-07-15 TH-3：终端 MCP / pi Task Hall 工具闭环
 
 **背景**：TH-2 已完成 async / sync client 与 bundled runner Hall 回传，并提交为 `99e8a28`。本轮按项目管理者确认推进一个终端接入切片，让 Codex 与 pi 的实际操作终端可以发现 Agent、委派任务、处理澄清并收取结果。

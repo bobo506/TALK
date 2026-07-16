@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 from bridges import cli_bridge
-from TALK.client.exceptions import TalkNotFoundError
+from TALK.client.exceptions import TalkNotFoundError, TalkValidationError
 from server.hall_types import HALL_TYPE_TEMPLATES
 from bridges.cli_bridge import (
     _build_group_member_context,
@@ -620,24 +620,38 @@ class CliBridgeTests(unittest.TestCase):
         class FakeClient:
             def __init__(self):
                 self.claimed = []
+                self.heartbeats = []
                 self.sent = []
                 self.completed = []
 
-            async def claim_task(self, task_id, *, instance_id=None):
-                self.claimed.append((task_id, instance_id))
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                self.claimed.append((task_id, instance_id, lease_seconds))
                 return {
                     "id": task_id,
                     "created_by": "human:bobo",
                     "content": "say ok",
                     "hall_group_id": "group:task-12",
+                    "claim_token": "lease-12",
                 }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                self.heartbeats.append((task_id, claim_token, lease_seconds))
+                return {"id": task_id, "status": "running"}
 
             async def send_text(self, text, to=None, group_id=None):
                 self.sent.append((text, to, group_id))
                 return {"id": 99}
 
-            async def complete_task(self, task_id, *, status, result_message_id=None, last_error=None):
-                self.completed.append((task_id, status, result_message_id, last_error))
+            async def complete_task(
+                self,
+                task_id,
+                *,
+                status,
+                result_message_id=None,
+                last_error=None,
+                claim_token=None,
+            ):
+                self.completed.append((task_id, status, result_message_id, last_error, claim_token))
                 return {"id": task_id, "status": status}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
@@ -645,6 +659,7 @@ class CliBridgeTests(unittest.TestCase):
             self.assertIn("say ok", prompt)
             # identity no longer in prompt
             self.assertEqual(prompt_transport, "argv")
+            await asyncio.sleep(0.01)
             return CliRunResult(returncode=0, stdout="OK", stderr="")
 
         async def scenario():
@@ -664,6 +679,8 @@ class CliBridgeTests(unittest.TestCase):
                     runtime="pi",
                     bridge_label="pi bridge",
                     prompt_transport="argv",
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
                 )
                 return handled, client
             finally:
@@ -672,9 +689,113 @@ class CliBridgeTests(unittest.TestCase):
         handled, client = asyncio.run(scenario())
 
         self.assertTrue(handled)
-        self.assertEqual(client.claimed, [(12, "agent:pi:test")])
+        self.assertEqual(client.claimed, [(12, "agent:pi:test", 5)])
+        self.assertTrue(client.heartbeats)
         self.assertEqual(client.sent, [("OK", ["human:bobo"], "group:task-12")])
-        self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
+        self.assertEqual(client.completed, [(12, "succeeded", 99, None, "lease-12")])
+
+    def test_handle_queued_task_stops_when_claim_lease_is_lost(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.completed = []
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return {
+                    "id": task_id,
+                    "created_by": "human:bobo",
+                    "content": "long task",
+                    "claim_token": "lease-12",
+                }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                raise TalkValidationError("stale", status_code=409)
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append(text)
+                return {"id": 99}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id}
+
+        command_cancelled = False
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            nonlocal command_cancelled
+            try:
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                command_cancelled = True
+                raise
+            return CliRunResult(returncode=0, stdout="late", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                handled = await handle_queued_task(
+                    {"id": 12},
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    instance_id="agent:pi:test",
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=100,
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
+                )
+                return handled, client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertFalse(handled)
+        self.assertTrue(command_cancelled)
+        self.assertEqual(client.sent, [])
+        self.assertEqual(client.completed, [])
+
+    def test_task_worker_requeues_expired_claims_before_listing(self):
+        class FakeClient:
+            def __init__(self):
+                self.calls = []
+
+            async def requeue_expired_tasks(self):
+                self.calls.append("requeue")
+                return []
+
+            async def list_tasks(self, **kwargs):
+                self.calls.append(("list", kwargs))
+                raise asyncio.CancelledError
+
+        async def scenario():
+            client = FakeClient()
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    instance_id="agent:pi:test",
+                    args=object(),
+                    run_lock=asyncio.Lock(),
+                    report_status=None,
+                )
+            except asyncio.CancelledError:
+                pass
+            return client.calls
+
+        calls = asyncio.run(scenario())
+
+        self.assertEqual(
+            calls,
+            [
+                "requeue",
+                ("list", {"target_member_id": "agent:pi", "status": "queued"}),
+            ],
+        )
 
     def test_handle_incoming_message_replies_inside_same_group(self):
         class FakeClient:

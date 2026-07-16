@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import server.db as db
+from server.models import AgentInstance, AgentTask
 from tests.test_support import RouteTestCase
 
 
@@ -329,6 +332,139 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(human_claim.status_code, 403)
         self.assertEqual(other_claim.status_code, 403)
 
+    def test_claim_is_atomic_idempotent_and_renews_with_heartbeat(self):
+        with self.make_client() as client:
+            for instance_id in ("codex-1", "codex-2"):
+                client.put(
+                    f"/api/instances/{instance_id}",
+                    headers={"X-API-Key": "codex-key"},
+                    json={"runtime": "codex", "status": "idle"},
+                )
+            created = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+            )
+            task_id = created.json()["id"]
+
+        barrier = Barrier(2)
+
+        def claim(instance_id: str):
+            with self.make_client() as client:
+                barrier.wait()
+                return client.post(
+                    f"/api/tasks/{task_id}/claim",
+                    headers={"X-API-Key": "codex-key"},
+                    json={"instance_id": instance_id, "lease_seconds": 30},
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(claim, ("codex-1", "codex-2")))
+
+        winner = next(response for response in responses if response.status_code == 200)
+        loser = next(response for response in responses if response.status_code == 409)
+        claimed = winner.json()
+        winner_instance = claimed["instance_id"]
+        claim_token = claimed["claim_token"]
+
+        with self.make_client() as client:
+            repeated = client.post(
+                f"/api/tasks/{task_id}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={"instance_id": winner_instance, "lease_seconds": 30},
+            )
+            stale_heartbeat = client.post(
+                f"/api/tasks/{task_id}/heartbeat",
+                headers={"X-API-Key": "codex-key"},
+                json={"claim_token": "stale", "lease_seconds": 30},
+            )
+            heartbeat = client.post(
+                f"/api/tasks/{task_id}/heartbeat",
+                headers={"X-API-Key": "codex-key"},
+                json={"claim_token": claim_token, "lease_seconds": 30},
+            )
+            visible = client.get(f"/api/tasks/{task_id}", headers={"X-API-Key": "bobo-key"})
+
+        self.assertEqual(loser.status_code, 409)
+        self.assertEqual(claimed["attempt"], 1)
+        self.assertIsNotNone(claimed["lease_expires_at"])
+        self.assertEqual(repeated.json()["attempt"], 1)
+        self.assertEqual(repeated.json()["claim_token"], claim_token)
+        self.assertEqual(stale_heartbeat.status_code, 409)
+        self.assertEqual(heartbeat.status_code, 200)
+        self.assertIsNotNone(heartbeat.json()["heartbeat_at"])
+        self.assertNotIn("claim_token", visible.json())
+
+    def test_expired_claim_is_requeued_and_stale_attempt_cannot_complete(self):
+        with self.make_client() as client:
+            for instance_id in ("codex-1", "codex-2"):
+                client.put(
+                    f"/api/instances/{instance_id}",
+                    headers={"X-API-Key": "codex-key"},
+                    json={"runtime": "codex", "status": "idle"},
+                )
+            created = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Recover me"},
+            )
+            task_id = created.json()["id"]
+            first_claim = client.post(
+                f"/api/tasks/{task_id}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={"instance_id": "codex-1", "lease_seconds": 30},
+            ).json()
+
+        with self.session() as session:
+            task = session.get(AgentTask, task_id)
+            assert task is not None
+            task.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+            session.add(task)
+            session.commit()
+
+        with self.make_client() as client:
+            human_reap = client.post("/api/tasks/requeue-expired", headers={"X-API-Key": "bobo-key"})
+            requeued = client.post("/api/tasks/requeue-expired", headers={"X-API-Key": "codex-key"})
+            second_claim = client.post(
+                f"/api/tasks/{task_id}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={"instance_id": "codex-2", "lease_seconds": 30},
+            ).json()
+            stale_complete = client.post(
+                f"/api/tasks/{task_id}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": first_claim["claim_token"]},
+            )
+            missing_token = client.post(
+                f"/api/tasks/{task_id}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded"},
+            )
+            completed = client.post(
+                f"/api/tasks/{task_id}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": second_claim["claim_token"]},
+            )
+
+        with self.session() as session:
+            first_instance = session.get(AgentInstance, "codex-1")
+            second_instance = session.get(AgentInstance, "codex-2")
+
+        self.assertEqual(human_reap.status_code, 403)
+        self.assertEqual([task["id"] for task in requeued.json()], [task_id])
+        self.assertEqual(requeued.json()[0]["status"], "queued")
+        self.assertEqual(requeued.json()[0]["workflow_status"], "accepted")
+        self.assertEqual(second_claim["attempt"], 2)
+        self.assertNotEqual(second_claim["claim_token"], first_claim["claim_token"])
+        self.assertEqual(stale_complete.status_code, 409)
+        self.assertEqual(missing_token.status_code, 409)
+        self.assertEqual(completed.status_code, 200)
+        self.assertEqual(completed.json()["status"], "succeeded")
+        self.assertIsNotNone(first_instance)
+        self.assertEqual(first_instance.status, "error")
+        self.assertIsNotNone(second_instance)
+        self.assertEqual(second_instance.status, "idle")
+
     def test_claim_rejects_instance_owned_by_another_agent(self):
         with self.make_client() as client:
             client.put(
@@ -594,10 +730,18 @@ class AgentTaskTests(RouteTestCase):
                 ).fetchall()
             )
 
-        self.assertTrue(
-            {"project_id", "hall_group_id", "workflow_status", "result_collected_at"}.issubset(columns)
-        )
+        self.assertTrue({
+            "project_id",
+            "hall_group_id",
+            "workflow_status",
+            "result_collected_at",
+            "attempt",
+            "claim_token",
+            "lease_expires_at",
+            "heartbeat_at",
+        }.issubset(columns))
         self.assertEqual(indexes["ix_agent_tasks_hall_group_id"], 1)
+        self.assertEqual(indexes["ix_agent_tasks_lease_expires_at"], 0)
         self.assertEqual(
             workflow_by_id,
             {

@@ -399,8 +399,28 @@ class TalkClient:
     async def cancel_task(self, task_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/cancel")
 
-    async def claim_task(self, task_id: int, *, instance_id: str | None = None) -> JsonDict:
-        return await self._request_json("POST", f"/api/tasks/{task_id}/claim", json_body={"instance_id": instance_id})
+    async def claim_task(
+        self,
+        task_id: int,
+        *,
+        instance_id: str | None = None,
+        lease_seconds: int = 120,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/claim",
+            json_body={"instance_id": instance_id, "lease_seconds": lease_seconds},
+        )
+
+    async def heartbeat_task(self, task_id: int, *, claim_token: str, lease_seconds: int = 120) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/heartbeat",
+            json_body={"claim_token": claim_token, "lease_seconds": lease_seconds},
+        )
+
+    async def requeue_expired_tasks(self) -> list[JsonDict]:
+        return await self._request_json("POST", "/api/tasks/requeue-expired")
 
     async def complete_task(
         self,
@@ -409,11 +429,13 @@ class TalkClient:
         status: str,
         result_message_id: int | None = None,
         last_error: str | None = None,
+        claim_token: str | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "status": status,
             "result_message_id": result_message_id,
             "last_error": last_error,
+            "claim_token": claim_token,
         }
         return await self._request_json("POST", f"/api/tasks/{task_id}/complete", json_body=payload)
 

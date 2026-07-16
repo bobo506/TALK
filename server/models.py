@@ -156,8 +156,12 @@ class AgentTask(SQLModel, table=True):
     title: Optional[str] = None
     status: str = Field(default="queued", index=True)
     workflow_status: str = Field(default="assigned", index=True)
+    attempt: int = Field(default=0)
     claimed_by: Optional[str] = Field(default=None, foreign_key="members.id", index=True)
     instance_id: Optional[str] = Field(default=None, foreign_key="agent_instances.id", index=True)
+    claim_token: Optional[str] = None
+    lease_expires_at: Optional[datetime] = Field(default=None, index=True)
+    heartbeat_at: Optional[datetime] = None
     result_message_id: Optional[int] = Field(default=None, foreign_key="messages.id")
     last_error: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -618,6 +622,9 @@ _TASK_WORKFLOW_STATUSES = {
     "canceled",
 }
 _SCHEDULE_STATUSES = {"active", "paused", "completed", "canceled"}
+TASK_LEASE_DEFAULT_SECONDS = 120
+TASK_LEASE_MIN_SECONDS = 5
+TASK_LEASE_MAX_SECONDS = 3600
 
 
 class AgentTaskCreate(BaseModel):
@@ -643,6 +650,11 @@ class AgentTaskCreate(BaseModel):
 
 class AgentTaskClaim(BaseModel):
     instance_id: Optional[str] = None
+    lease_seconds: int = Field(
+        default=TASK_LEASE_DEFAULT_SECONDS,
+        ge=TASK_LEASE_MIN_SECONDS,
+        le=TASK_LEASE_MAX_SECONDS,
+    )
 
     @model_validator(mode="after")
     def validate_task_claim(self) -> "AgentTaskClaim":
@@ -651,10 +663,27 @@ class AgentTaskClaim(BaseModel):
         return self
 
 
+class AgentTaskHeartbeat(BaseModel):
+    claim_token: str
+    lease_seconds: int = Field(
+        default=TASK_LEASE_DEFAULT_SECONDS,
+        ge=TASK_LEASE_MIN_SECONDS,
+        le=TASK_LEASE_MAX_SECONDS,
+    )
+
+    @model_validator(mode="after")
+    def validate_task_heartbeat(self) -> "AgentTaskHeartbeat":
+        self.claim_token = self.claim_token.strip()
+        if not self.claim_token:
+            raise ValueError("claim_token is required")
+        return self
+
+
 class AgentTaskComplete(BaseModel):
     status: str
     result_message_id: Optional[int] = None
     last_error: Optional[str] = None
+    claim_token: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_task_complete(self) -> "AgentTaskComplete":
@@ -663,6 +692,8 @@ class AgentTaskComplete(BaseModel):
             raise ValueError(f"status must be one of {sorted(_TASK_TERMINAL_STATUSES)}")
         if self.last_error is not None:
             self.last_error = self.last_error.strip() or None
+        if self.claim_token is not None:
+            self.claim_token = self.claim_token.strip() or None
         if self.status == "failed" and not self.last_error:
             raise ValueError("last_error is required when status is failed")
         return self
@@ -679,8 +710,11 @@ class AgentTaskOut(BaseModel):
     title: Optional[str]
     status: str
     workflow_status: str
+    attempt: int
     claimed_by: Optional[str]
     instance_id: Optional[str]
+    lease_expires_at: Optional[datetime]
+    heartbeat_at: Optional[datetime]
     result_message_id: Optional[int]
     last_error: Optional[str]
     created_at: datetime
@@ -688,6 +722,10 @@ class AgentTaskOut(BaseModel):
     claimed_at: Optional[datetime]
     finished_at: Optional[datetime]
     result_collected_at: Optional[datetime]
+
+
+class AgentTaskClaimOut(AgentTaskOut):
+    claim_token: str
 
 
 class AgentTaskScheduleCreate(BaseModel):

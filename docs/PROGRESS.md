@@ -2,45 +2,44 @@
 
 ## Latest
 
-Updated: 2026-07-15 (Asia/Shanghai)
+Updated: 2026-07-16 (Asia/Shanghai)
 
 - 当前分支：`codex/task-hall`。
-- TH-3 终端 Task Hall 工具切片已完成；TH-2 已提交为 `99e8a28`。
-- Codex MCP 与 pi extension 已具备 Agent 发现、项目化委派、查询 / 有界等待、Hall 回复、安全取消和结果收取能力。
-- 全量回归 `309 tests` 全绿；当前按执行 Agent 单切片门禁暂停，等待项目管理者或决策 Agent 验收后再进入 claim lease / attempt。
+- TH-3 终端 Task Hall 工具已提交为 `ff8f8a8`；TH-4 claim lease / attempt 可靠性切片已完成。
+- 并发 claim、token 持有、runner 心跳、过期回收、重领与陈旧结果拒绝已形成闭环。
+- 全量回归 `313 tests` 全绿。项目管理者已明确把人工介入点放到完整流程里程碑，下一步进入 Project Blackboard + Task Hall Web UI。
 
 ## Current Snapshot
 
-- `bridges/talk_send_mcp.py` 在保留 deferred `talk_send` 的同时新增八个 Task Hall 工具；`bridges/talk_tools_extension.ts` 提供同名 pi 工具面。
-- `talk_list_agents` 结合项目 Agent profile、成员和实例状态；`talk_delegate_task` 会创建项目任务及专属 Task Hall。
-- `talk_reply_task`、`talk_wait_tasks`、`talk_collect_result` 贯通澄清、回复、接受、提交和结果收取；等待采用最长 30 秒的有界轮询。
-- async / sync client 与服务端新增 `cancel_task` / `POST /api/tasks/{id}/cancel`；仅原请求者可幂等取消未领取任务。
-- bridge 会从 `.talk/project.yaml` 注入默认 `TALK_PROJECT_ID`；Codex discussion profile 与 pi 的 discussion / tools profile 都能访问对应工具。
+- `AgentTask` 新增 `attempt`、私有 `claim_token`、`lease_expires_at` 与 `heartbeat_at`；普通任务查询不暴露 token。
+- claim 采用条件更新，两个实例并发领取只有一个成功；同一实例重复请求保持幂等。
+- 新增 heartbeat 与 expired requeue API 及 async / sync SDK；过期任务回到 `queued / accepted`，下一次 claim 递增 attempt。
+- complete 校验当前 token 与未过期租约；陈旧 attempt 不能覆盖新结果，首次 attempt 仍保留旧 runner 无 token 兼容。
+- bundled runner 默认 120 秒租约 / 30 秒心跳，每轮先回收过期任务；租约丢失会取消本地子进程且不回写结果。
 
 ## Current Boundaries
 
 - `project_id` 为旧客户端兼容仍可为空；新 Task Hall 终端调用应提供项目。
-- 运行中任务取消尚未开放；必须先有 claim lease / attempt 与 runner 中断协议，避免服务端状态与真实执行脱节。
+- 运行中任务取消尚未开放；lease 已能识别并终止失去持有权的 runner，但还缺请求者触发的协作中断状态。
 - `talk_wait_tasks` 目前是客户端轮询而非服务端事件等待；Agent 发现结果尚未提供项目业务角色字段。
 - bundled runner 仍兼容旧任务全局结果；第三方旧 runner 也可继续使用服务端兼容路径。
-- observer、返工、lease / attempt、Project Blackboard 和 Task Hall Web UI 尚未实现。
+- 无 lease 的历史 `running` 任务不会自动回收；业务重试上限与退避策略尚未定义。
+- observer、返工、Project Blackboard 和 Task Hall Web UI 尚未实现。
 - BS-3a 真实模型最终汇总质量补验属于 Discussion Hall 后续项，不阻塞当前里程碑。
 
 ## Next Slice
 
-1. 设计 claim lease / attempt 与幂等约束，明确心跳、过期回收和重领规则。
-2. 更新 runner 与服务端状态机并补并发 / 超时回收测试；完成后暂停，不提前进入 Web UI。
+1. 实现 Project Blackboard：按待确认、待澄清、执行中、待收取、已完成聚合项目任务。
+2. 实现 Task Hall 详情与操作：时间线、状态、回复、接受 / 收取、未领取取消，并做 Browser 真实交互验证。
 
-后续顺序：claim lease / attempt -> Project Blackboard + Task Hall UI -> 跨模型端到端人工验收。
+后续顺序：Project Blackboard + Task Hall UI -> bundled runner 完整链路验证 -> 跨模型端到端人工验收。
 
 ## Verification
 
-- `.venv\Scripts\python.exe -m py_compile server\routes\tasks.py TALK\client\talk_client.py TALK\client\talk_client_sync.py bridges\talk_task_tools.py bridges\talk_send_mcp.py bridges\cli_bridge.py bridges\codex_bridge.py bridges\pi_bridge.py tests\test_tasks.py tests\test_talk_client.py tests\test_talk_task_tools.py tests\test_pi_bridge.py tests\test_codex_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py TALK\client\talk_client.py TALK\client\talk_client_sync.py bridges\cli_bridge.py bridges\codex_bridge.py bridges\talk_task_tools.py tests\test_tasks.py tests\test_talk_client.py tests\test_cli_bridge.py tests\test_codex_bridge.py`：通过。
 - `node --experimental-strip-types --check bridges\talk_tools_extension.ts`：通过。
-- `.venv\Scripts\python.exe -m unittest tests.test_talk_task_tools -v`：`Ran 4 tests ... OK`。
-- `.venv\Scripts\python.exe -m unittest tests.test_talk_client -v`：`Ran 12 tests ... OK`。
-- `.venv\Scripts\python.exe -m unittest tests.test_pi_bridge tests.test_codex_bridge -v`：`Ran 29 tests ... OK`。
-- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 309 tests ... OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks tests.test_talk_client tests.test_cli_bridge tests.test_codex_bridge tests.test_talk_task_tools -q`：`Ran 141 tests ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 313 tests ... OK`。
 - 本切片无前端改动，不需要 Browser 验证。
 
 ## Known Debt
