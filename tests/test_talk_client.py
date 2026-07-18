@@ -256,6 +256,7 @@ class TalkClientTests(RouteTestCase):
                     "Run from SDK",
                     title="SDK task",
                     project_id="prj_sdk_async",
+                    may_delegate=True,
                 )
 
             async with TalkClient(base_url, "demo-key") as agent_client:
@@ -274,6 +275,12 @@ class TalkClientTests(RouteTestCase):
                     instance_id="demo-instance-1",
                     lease_seconds=30,
                 )
+                child = await agent_client.create_task(
+                    "agent:other",
+                    "Delegated from async SDK",
+                    parent_task_id=claimed["id"],
+                )
+                canceled_child = await agent_client.cancel_task(child["id"])
                 heartbeat = await agent_client.heartbeat_task(
                     claimed["id"],
                     claim_token=claimed["claim_token"],
@@ -307,6 +314,11 @@ class TalkClientTests(RouteTestCase):
             self.assertEqual(requeued, [])
             self.assertEqual(claimed["status"], "running")
             self.assertEqual(claimed["attempt"], 1)
+            self.assertEqual(child["parent_task_id"], created["id"])
+            self.assertEqual(child["root_task_id"], created["id"])
+            self.assertEqual(child["delegation_depth"], 1)
+            self.assertEqual(child["project_id"], "prj_sdk_async")
+            self.assertEqual(canceled_child["status"], "canceled")
             self.assertIsNotNone(heartbeat["heartbeat_at"])
             self.assertEqual(submitted["workflow_status"], "submitted")
             self.assertEqual(collected["workflow_status"], "completed")
@@ -328,6 +340,7 @@ class TalkClientTests(RouteTestCase):
                     "Run from sync SDK",
                     title="Sync SDK task",
                     project_id="prj_sdk_sync",
+                    may_delegate=True,
                 )
                 queued = agent_client.list_tasks(
                     target_member_id="agent:demo",
@@ -340,6 +353,12 @@ class TalkClientTests(RouteTestCase):
                 accepted = agent_client.accept_task(created["id"])
                 requeued = agent_client.requeue_expired_tasks()
                 claimed = agent_client.claim_task(created["id"], lease_seconds=30)
+                child = agent_client.create_task(
+                    "agent:other",
+                    "Delegated from sync SDK",
+                    parent_task_id=claimed["id"],
+                )
+                canceled_child = agent_client.cancel_task(child["id"])
                 heartbeat = agent_client.heartbeat_task(
                     claimed["id"],
                     claim_token=claimed["claim_token"],
@@ -373,6 +392,11 @@ class TalkClientTests(RouteTestCase):
         self.assertEqual(accepted["workflow_status"], "accepted")
         self.assertEqual(requeued, [])
         self.assertEqual(claimed["attempt"], 1)
+        self.assertEqual(child["parent_task_id"], created["id"])
+        self.assertEqual(child["root_task_id"], created["id"])
+        self.assertEqual(child["delegation_depth"], 1)
+        self.assertEqual(child["project_id"], "prj_sdk_sync")
+        self.assertEqual(canceled_child["status"], "canceled")
         self.assertIsNotNone(heartbeat["heartbeat_at"])
         self.assertEqual(submitted["workflow_status"], "submitted")
         self.assertEqual(collected["workflow_status"], "completed")

@@ -184,6 +184,106 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-18 TH-6a1：任务树与服务端硬预算落地
+
+**背景**：项目管理者确认 TH-6a0 合同后，授权开始第一个数据库 / 协议代码切片。由于本轮未注入 `decision_tier`，按 `AGENTS.md` 兜底作为执行 Agent，只完成 TH-6a1 并在验证、进度落盘后暂停。
+
+### 已完成
+
+- `agent_tasks` 新增 `parent_task_id`、`root_task_id`、`delegation_depth`、`may_delegate`，以及根任务保存的 `max_delegation_depth`、`max_running_descendants`、`max_running_per_target`、`max_nonterminal_descendants`。
+- 新根任务创建后 `root_task_id` 指向自身；旧数据库升级时，每个历史任务回填为独立根、深度 0、`may_delegate=false`，默认治理值为 1 / 3 / 1 / 8，并补齐父任务、根任务和深度索引。
+- 顶层自定义治理仅允许 Human 设置；普通 Agent 仍可按旧接口创建顶层任务，但不能为自己授予委派能力或放宽根预算。
+- 创建子任务要求父任务处于 `running / in_progress`、父任务已获 `may_delegate`，调用者是父执行者、根请求者或 Human；项目从父任务继承，深度和非终态后代预算由服务端事务校验。
+- 非终态后代预留通过更新根任务的条件语句串行化并发创建；子任务 claim 通过同一条件更新原子校验根仍在运行、根运行后代和单目标运行预算，直接 REST API 与第三方客户端无法绕过。
+- `TalkClient` / `TalkClientSync.create_task` 新增父任务、委派权限和四项根预算参数；活服务测试分别用异步和同步 SDK 创建一层子任务并验证父根关联、深度与项目继承。
+- `docs/spec/MODULE_tasks.md` 已同步当前实现、迁移兼容、已知边界与后续实施顺序；TH-6a2 的控制状态、有限授权和 runner 协作中断没有提前实现。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py TALK\client\talk_client.py TALK\client\talk_client_sync.py tests\test_tasks.py tests\test_talk_client.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -v`：`Ran 23 tests ... OK`；覆盖旧库迁移、委派权限、深度 / 项目继承、非终态创建竞争、根运行并发和单目标 claim 竞争。
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client -q`：`Ran 12 tests ... OK`。
+- Task Hall / SDK / runner / 工具 / bridge 跨模块回归：`Ran 128 tests ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 325 tests in 103.757s ... OK`。
+
+### 变更文件
+
+- 功能：`server/models.py`、`server/db.py`、`server/routes/tasks.py`、`TALK/client/talk_client.py`、`TALK/client/talk_client_sync.py`。
+- 测试：`tests/test_tasks.py`、`tests/test_talk_client.py`。
+- 文档：`docs/spec/MODULE_tasks.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+
+### 已知边界与下一步
+
+- 当前根任务尚无 `control_status`、授权 epoch 或切片额度；Human 仍不能通过服务端暂停整棵树，bundled runner 也没有最长 5 秒的暂停 / 终止轮询。
+- 根任务当前仍可在后代未结束时自行完成，整树汇总与质量门禁要在后续控制、Review/Test 切片中收敛。
+- 下一候选切片是 TH-6a2；按执行 Agent 规则，本轮不提交、不推送、不自动继续，等待项目管理者或决策 Agent 确认。
+
+## 2026-07-18 TH-6a0：任务治理、可中断推进与质量门禁合同冻结
+
+**背景**：TH-5 已贯通“页面委派 → bundled runner → Task Hall 结果 → Human 收取”的基础链路。项目管理者随后确认，下一阶段不能只补递归委派和澄清，还要把开发后的独立 Review、里程碑黑盒测试、人工验收，以及“主 Agent 有限自主推进、Human 可随时喊停”纳入正式流程。本切片只冻结协议和实施顺序，没有修改功能代码。
+
+### 已确认的总体流程
+
+```text
+Human 有限批次授权
+  -> 主 Agent 分配 development
+  -> 开发 Agent 实现并自测
+  -> 独立 review（不通过则 rework，最多自动两轮）
+  -> 未到检查点时在剩余额度内继续
+  -> 里程碑完整自动化回归 + 黑盒 / E2E test
+  -> 根任务 awaiting_human
+  -> Human 验收、调整、继续一批或终止
+```
+
+- 主 Agent 获得有限批次授权而非无限自治：普通小切片默认 2 个，纯文档 / 配置可显式授权到 3 个，高风险 / 跨模块默认 1 个。
+- 批次、时间、风险、额度、Review、澄清或里程碑边界会自动暂停；Human 也可随时撤销尚未消费的授权。
+- Review 覆盖每个功能切片，但低风险同模块任务允许 2–3 个批量审查；黑盒测试只在可独立体验的里程碑运行。
+- 里程碑测试通过不等于自动进入下一阶段，根任务必须等待 Human 显式确认。
+
+### 冻结的任务树与预算合同
+
+- 新增 `parent_task_id / root_task_id / delegation_depth / may_delegate` 语义，旧任务迁移后各自成为独立根并保持兼容。
+- 根任务统一保存最大深度、根运行并发、单目标并发和非终态后代预算；默认分别为 1、3、1、8。
+- 创建子任务时校验调用者、父任务、根控制状态、委派权限、深度和非终态预算；claim 时再次原子校验根与单目标并发。
+- 子任务默认不能继续委派，只有根控制者显式提高深度并授权具体任务后才能突破默认能力边界。
+- 直接 REST API、TALK 自带工具和第三方客户端适用相同拒绝规则，不能依赖 runner 工具裁剪或进程内锁。
+
+### 冻结的有限授权与暂停合同
+
+- 根任务使用独立 `control_status`：`active / pause_requested / paused / awaiting_human / cancel_requested / canceled`，不污染现有执行五态和协作状态。
+- 每次 Human “继续一批”生成新的 `authorization_epoch`、切片预算和有效期；陈旧主 Agent 不能使用旧授权继续创建任务。
+- `pause-tree` 立即禁止新建后代和 claim；bundled runner 最多每 5 秒检查控制指令，安全终止本地子进程并失效 claim token。
+- 暂停后的任务保留 Hall、消息、attempt 与现场，可恢复为 `queued / accepted` 后重新领取；整树终止与可恢复暂停严格区分。
+- 第三方 runner 若不支持协作中断，服务端至少撤销写回资格并依靠租约回收，不承诺跨机器强杀未知进程。
+
+### 冻结的澄清与质量门禁合同
+
+- 澄清默认最多 1 轮、显式可提高到 2 轮；一轮是 B 的集中问题批次与 A 的完整答复，不按消息数计数。
+- A 可连续补充多条消息，以 `submit-clarification-answer` 显式结束答复；额度耗尽仍不足时进入 `needs_decision` 并暂停根任务。
+- 新增 `general / development / review / test / rework` 任务类型；Review / Test 使用独立 Task Hall 和结构化 `gate_verdict`，不能从自然语言猜测通过结论。
+- Review 结论为 `approved / changes_requested / blocked`，测试结论为 `passed / failed / blocked`；返工产生新任务并保留旧结果。
+- 旧冻结版本的 Review / 测试结论在新返工后失效；必需 Review 或里程碑最新测试未通过时，服务端拒绝根任务提交成功结果。
+- `business_role` 保持项目自定义自由文本；工具和项目 API 返回角色与能力摘要，但质量强语义由 `task_kind`、任务关系和门禁结论提供。
+
+### 实施顺序
+
+1. TH-6a1：任务树字段、迁移和服务端硬预算。
+2. TH-6a2：有限批次授权、暂停 / 继续 / 整树终止与 runner 协作中断。
+3. TH-6a3：澄清轮次账本、答复提交和 `needs_decision`。
+4. TH-6b：runner 领取前预检、完整 Hall 上下文与自动澄清。
+5. TH-6c：Review / 返工门禁和角色发现。
+6. TH-6d：里程碑测试、Blackboard 控制和人工验收暂停。
+7. TH-7：Codex Desktop / 通用终端接入。
+
+### 验证与变更
+
+- 验证：仅文档切片；完成 Markdown 结构、关键合同覆盖和 `git diff --check` 检查，未运行功能测试。
+- 变更文件：`docs/spec/MODULE_tasks.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+- 提交状态：当前按执行 Agent 规则未提交，等待项目管理者确认是否进入 TH-6a1 或先提交文档切片。
+- 下一步：TH-6a1，实现任务树字段、旧库迁移和服务端硬预算并发测试。
+
+---
+
 ## 2026-07-16 Task Hall 委派深度、并发预算与澄清轮次决策
 
 **背景**：项目管理者在准备切换上下文前，确认需要为跨终端委派加入类似 Codex 子 Agent 的递归与并发保护，并讨论任务执行者领取前是否只允许一次澄清机会。本轮只核对现状、冻结产品规则和更新进度，没有修改功能代码。

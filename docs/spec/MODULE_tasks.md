@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现；跨模型人工验收待后续切片
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树、委派权限与服务端硬预算已实现，暂停 / 授权、澄清轮次和 Review/Test 门禁仍待后续切片
 
 ## 目标
 
@@ -26,6 +26,11 @@
 - `schedule_id`：可选来源 schedule id；普通即时任务为空
 - `project_id`：可选项目归属；新 Task Hall 调用应提供，空值只为旧客户端和现有 schedule 兼容
 - `hall_group_id`：唯一关联的 `groups.type=task` Hall id
+- `parent_task_id`：直接父任务；根任务为空
+- `root_task_id`：任务树根 id；根任务创建后指向自身
+- `delegation_depth`：根任务为 0，后代为父任务深度 + 1
+- `may_delegate`：当前任务执行者是否可继续创建子任务；默认 `false`
+- `max_delegation_depth` / `max_running_descendants` / `max_running_per_target` / `max_nonterminal_descendants`：只保存在根任务上的统一治理预算；后代字段为空并读取根任务
 - `target_member_id`：目标 Agent 成员，例如 `agent:codex`
 - `created_by`：任务创建者
 - `content`：任务正文
@@ -64,6 +69,9 @@
 - `target_member_id` 必须是已存在的 `agent:*` 成员。
 - 请求者与目标成员必须不同。
 - 可传 `project_id`，且项目必须存在；省略时按旧客户端兼容为无项目归属。
+- 顶层任务可传 `may_delegate` 和四项根治理预算；只有 Human 可以授予顶层委派权限或覆盖默认预算，普通 Agent 创建的顶层任务保持默认限制且不可继续委派。
+- 带 `parent_task_id` 时创建子任务：父任务必须处于 `running / in_progress`、父任务已获 `may_delegate`，调用者必须是父任务执行者、根请求者或 Human；`project_id` 从父任务继承，不能改写。
+- 子任务深度和非终态后代数量由服务端在创建事务中校验；后代并发和同目标并发由 claim 条件更新再次原子校验，直接 REST API 不能绕过。
 - 创建后执行状态为 `queued`、协作状态为 `assigned`，并自动返回唯一 `hall_group_id`。
 
 `GET /api/tasks`
@@ -163,7 +171,7 @@
 
 `TalkClient` 与 `TalkClientSync` 已提供：
 
-- `create_task(target_member_id, content, title=None, project_id=None)`
+- `create_task(target_member_id, content, title=None, project_id=None, parent_task_id=None, may_delegate=False, max_delegation_depth=None, max_running_descendants=None, max_running_per_target=None, max_nonterminal_descendants=None)`
 - `list_tasks(target_member_id=None, status=None, workflow_status=None, project_id=None)`
 - `get_task(task_id)`
 - `request_task_clarification(task_id)`
@@ -263,7 +271,7 @@ TALK MCP / pi extension 已覆盖以下能力：
 - `created_by` / `target_member_id` / `claimed_by` / `instance_id`：区分请求者、执行者和实际 runner；
 - `workflow_status` / `result_collected_at`：区分执行状态、结果提交与结果收取。
 
-`parent_task_id` / `root_goal_id`、更细时间点与业务幂等键仍属于后续可靠性切片；claim lease、attempt 与私有 token 已落地。
+`parent_task_id` / `root_task_id` / `delegation_depth` / `may_delegate` 与四项根治理预算已在 TH-6a1 落地；根控制状态、授权 epoch、更细时间点与业务幂等键仍属于后续可靠性切片。claim lease、attempt 与私有 token 已落地。
 
 ### 项目级 Web 信息架构
 
@@ -415,6 +423,10 @@ Review 策略：
 - bundled runner 已把新任务结果写入对应 Task Hall，但仍兼容无 `hall_group_id` 的旧任务全局回传。
 - `talk_wait_tasks` 当前是最长 30 秒的客户端轮询，不是服务端事件流；Agent 发现结果也尚未提供项目业务角色字段。
 - 当前取消只覆盖未领取任务；运行中取消仍需 runner 协作中断协议。
+- TH-6a1 已实现任务树字段、旧库回填、委派权限及深度 / 根并发 / 单目标并发 / 非终态后代硬预算；async / sync SDK 已暴露对应创建参数。
+- 当前尚无根任务 `control_status` 和有限批次授权；服务端已能拒绝直接 API 绕过任务树预算，但还不能在人类暂停后阻止推进或传播协作中断，需由 TH-6a2 补齐。
+- 根任务当前仍可在后代未结束时自行完成；整树汇总、完成条件和质量门禁要随控制 / Review/Test 后续切片收敛。
+- 当前任务没有 `task_kind`、结构化 Review / 测试结论或任务关系记录；现有 `agent:pi` / `agent:pi-kimi` profile 也不具备完整黑盒测试能力，质量流水线尚不可启用。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
 - Project Blackboard 与 Task Hall Web UI 已覆盖创建、查看、Hall 协作、接受 / 澄清、结果收取和安全取消；项目级 `Members / Activity` 独立页面、observer 与返工尚未实现。
 - Codex 与 pi 真实 CLI 均已完成 Task Hall 技术链路冒烟；pi 在“逐字回复”类指令上的内容遵循仍弱于 Codex，属于模型输出质量边界，不影响单 Hall 结果投递与状态推进，需在项目管理者人工验收时继续观察。
@@ -427,7 +439,14 @@ Review 策略：
 4. [x] 为 Codex MCP / pi extension 提供发现、委派、查询 / 有界等待、Hall 回复、安全取消与结果收集能力。
 5. [x] 补 claim lease / attempt / token 幂等约束、runner 心跳、过期回收和陈旧结果拒绝。
 6. [x] 建 Project Blackboard + Task Hall Web UI，形成项目内可见、可操作的完整委派流程。
-7. 完成一轮跨模型端到端人工验收；后续再决定运行中协作取消、schedule 项目化 / 后台触发、长任务 SSE、document lock 与递归委派策略。
+7. [x] TH-6a0：冻结任务树治理、有限批次授权、随时暂停、澄清轮次与 Review/Test 质量门禁合同。
+8. [x] TH-6a1：实现任务树字段、旧数据迁移、委派权限、深度 / 根并发 / 单目标并发 / 非终态后代硬预算及并发测试。
+9. TH-6a2：实现根任务控制状态、有限批次授权、暂停 / 继续 / 整树终止与 bundled runner 协作中断。
+10. TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
+11. TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
+12. TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
+13. TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停。
+14. TH-7：补 Codex Desktop / 通用终端接入包装，再评估 schedule 项目化、长任务事件等待、document lock 等后续能力。
 
 ## 验收点
 
@@ -463,3 +482,9 @@ Review 策略：
 - [x] Web UI 可按项目创建任务、查看黑板分栏与任务详情，并进入服务端自动创建的对应 Task Hall。
 - [x] Browser 真实交互已贯通登录、委派、Hall 消息、bundled runner 领取 / 回写、结果待收取和请求者完成收取，控制台无 error / warning。
 - [x] 真实 Codex / pi CLI 均已贯通领取、执行、单条 Hall 结果回写与结果收取；独立任务命令已消除 pi 同时调用 TALK 工具造成的重复结果。
+- [x] 服务端原子强制任务树深度、根并发、单目标并发、非终态后代和委派授权预算，直接 API 不可绕过。
+- [ ] Human 可随时暂停根任务树；暂停后禁止新建 / claim，bundled runner 协作中断且陈旧结果无法写回。
+- [ ] “继续一批”生成有限切片授权；额度、时间、风险、Review 或里程碑边界会进入 `awaiting_human`。
+- [ ] 澄清按问题批次与显式答复边界计轮，额度耗尽进入 `needs_decision`，不能猜测执行。
+- [ ] 必需 Review 未通过时根任务不能提交；低风险批量 Review、独立 Reviewer 和最多两轮自动返工受服务端约束。
+- [ ] 里程碑最新冻结版本必须通过完整自动化回归和黑盒测试，随后自动暂停等待 Human 验收。

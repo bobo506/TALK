@@ -143,6 +143,12 @@ class AgentInstance(SQLModel, table=True):
     last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+TASK_MAX_DELEGATION_DEPTH_DEFAULT = 1
+TASK_MAX_RUNNING_DESCENDANTS_DEFAULT = 3
+TASK_MAX_RUNNING_PER_TARGET_DEFAULT = 1
+TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT = 8
+
+
 class AgentTask(SQLModel, table=True):
     __tablename__ = "agent_tasks"
 
@@ -150,6 +156,14 @@ class AgentTask(SQLModel, table=True):
     schedule_id: Optional[int] = Field(default=None, foreign_key="agent_task_schedules.id", index=True)
     project_id: Optional[str] = Field(default=None, foreign_key="projects.project_id", index=True)
     hall_group_id: Optional[str] = Field(default=None, foreign_key="groups.id", index=True, unique=True)
+    parent_task_id: Optional[int] = Field(default=None, foreign_key="agent_tasks.id", index=True)
+    root_task_id: Optional[int] = Field(default=None, foreign_key="agent_tasks.id", index=True)
+    delegation_depth: int = Field(default=0, index=True)
+    may_delegate: bool = Field(default=False)
+    max_delegation_depth: Optional[int] = None
+    max_running_descendants: Optional[int] = None
+    max_running_per_target: Optional[int] = None
+    max_nonterminal_descendants: Optional[int] = None
     target_member_id: str = Field(foreign_key="members.id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     content: str
@@ -632,6 +646,12 @@ class AgentTaskCreate(BaseModel):
     content: str
     title: Optional[str] = None
     project_id: Optional[str] = None
+    parent_task_id: Optional[int] = PydField(default=None, ge=1)
+    may_delegate: bool = False
+    max_delegation_depth: Optional[int] = PydField(default=None, ge=0, le=8)
+    max_running_descendants: Optional[int] = PydField(default=None, ge=1, le=32)
+    max_running_per_target: Optional[int] = PydField(default=None, ge=1, le=32)
+    max_nonterminal_descendants: Optional[int] = PydField(default=None, ge=1, le=128)
 
     @model_validator(mode="after")
     def validate_task_create(self) -> "AgentTaskCreate":
@@ -645,6 +665,26 @@ class AgentTaskCreate(BaseModel):
             raise ValueError("target_member_id is required")
         if not self.content:
             raise ValueError("content is required")
+        if self.parent_task_id is not None and any(
+            value is not None
+            for value in (
+                self.max_delegation_depth,
+                self.max_running_descendants,
+                self.max_running_per_target,
+                self.max_nonterminal_descendants,
+            )
+        ):
+            raise ValueError("child tasks inherit governance limits from their root task")
+
+        max_running = self.max_running_descendants or TASK_MAX_RUNNING_DESCENDANTS_DEFAULT
+        max_per_target = self.max_running_per_target or TASK_MAX_RUNNING_PER_TARGET_DEFAULT
+        max_nonterminal = self.max_nonterminal_descendants or TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT
+        if self.max_delegation_depth == 0 and self.may_delegate:
+            raise ValueError("may_delegate requires max_delegation_depth greater than zero")
+        if max_per_target > max_running:
+            raise ValueError("max_running_per_target cannot exceed max_running_descendants")
+        if max_running > max_nonterminal:
+            raise ValueError("max_running_descendants cannot exceed max_nonterminal_descendants")
         return self
 
 
@@ -704,6 +744,14 @@ class AgentTaskOut(BaseModel):
     schedule_id: Optional[int]
     project_id: Optional[str]
     hall_group_id: Optional[str]
+    parent_task_id: Optional[int]
+    root_task_id: Optional[int]
+    delegation_depth: int
+    may_delegate: bool
+    max_delegation_depth: Optional[int]
+    max_running_descendants: Optional[int]
+    max_running_per_target: Optional[int]
+    max_nonterminal_descendants: Optional[int]
     target_member_id: str
     created_by: str
     content: str

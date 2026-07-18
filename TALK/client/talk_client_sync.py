@@ -233,6 +233,12 @@ class TalkClientSync:
         *,
         title: str | None = None,
         project_id: str | None = None,
+        parent_task_id: int | None = None,
+        may_delegate: bool = False,
+        max_delegation_depth: int | None = None,
+        max_running_descendants: int | None = None,
+        max_running_per_target: int | None = None,
+        max_nonterminal_descendants: int | None = None,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.create_task(
@@ -240,6 +246,12 @@ class TalkClientSync:
                 content,
                 title=title,
                 project_id=project_id,
+                parent_task_id=parent_task_id,
+                may_delegate=may_delegate,
+                max_delegation_depth=max_delegation_depth,
+                max_running_descendants=max_running_descendants,
+                max_running_per_target=max_running_per_target,
+                max_nonterminal_descendants=max_nonterminal_descendants,
             )
         )
 

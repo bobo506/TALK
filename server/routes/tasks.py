@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, update
+from sqlalchemy import func, or_, update
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
@@ -30,6 +30,10 @@ from server.models import (
     Member,
     Message,
     Project,
+    TASK_MAX_DELEGATION_DEPTH_DEFAULT,
+    TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
+    TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
+    TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
     _SCHEDULE_STATUSES,
     _TASK_STATUSES,
     _TASK_WORKFLOW_STATUSES,
@@ -78,6 +82,211 @@ def _ensure_target_agent(member_id: str, session: Session) -> Member:
 def _ensure_project_exists(project_id: str | None, session: Session) -> None:
     if project_id is not None and session.get(Project, project_id) is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="project_id not found")
+
+
+def _get_root_task(task: AgentTask, session: Session) -> AgentTask:
+    root_id = task.root_task_id or task.id
+    root = session.get(AgentTask, root_id)
+    if root is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task root is missing")
+    return root
+
+
+def _root_limit(value: int | None, default: int) -> int:
+    return value if value is not None else default
+
+
+def _ensure_root_governance_request_allowed(body: AgentTaskCreate, current: Member) -> None:
+    custom_governance = body.may_delegate or any(
+        value is not None
+        for value in (
+            body.max_delegation_depth,
+            body.max_running_descendants,
+            body.max_running_per_target,
+            body.max_nonterminal_descendants,
+        )
+    )
+    if current.kind != "human" and custom_governance:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only human members can grant root delegation or override root governance limits",
+        )
+
+
+def _resolve_child_context(
+    body: AgentTaskCreate,
+    current: Member,
+    session: Session,
+) -> tuple[AgentTask, AgentTask, str | None, int]:
+    if body.parent_task_id is None:
+        raise RuntimeError("parent_task_id is required")
+
+    parent = session.get(AgentTask, body.parent_task_id)
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="parent task not found")
+    root = _get_root_task(parent, session)
+    if current.kind != "human" and current.id not in {parent.target_member_id, root.created_by}:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="parent task not found")
+    if parent.status != "running" or parent.workflow_status != "in_progress":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="parent task must be running before it can delegate child tasks",
+        )
+    if not parent.may_delegate:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="parent task has no delegation permission",
+        )
+
+    project_id = parent.project_id
+    if body.project_id is not None and body.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="child task project_id must match its parent task",
+        )
+
+    delegation_depth = parent.delegation_depth + 1
+    max_depth = _root_limit(root.max_delegation_depth, TASK_MAX_DELEGATION_DEPTH_DEFAULT)
+    if delegation_depth > max_depth:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task delegation depth exceeds root limit {max_depth}",
+        )
+    if body.may_delegate and delegation_depth >= max_depth:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="child task cannot delegate because it is already at the root depth limit",
+        )
+    return parent, root, project_id, delegation_depth
+
+
+def _reserve_nonterminal_descendant(root: AgentTask, now: datetime, session: Session) -> None:
+    if root.id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task root is missing")
+
+    descendants = AgentTask.__table__.alias("nonterminal_descendants")
+    nonterminal_count = (
+        select(func.count())
+        .select_from(descendants)
+        .where(
+            descendants.c.root_task_id == root.id,
+            descendants.c.parent_task_id.is_not(None),
+            descendants.c.status.in_(("queued", "running")),
+        )
+        .scalar_subquery()
+    )
+    limit = _root_limit(
+        root.max_nonterminal_descendants,
+        TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
+    )
+    result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == root.id,
+            AgentTask.status == "running",
+            nonterminal_count < limit,
+        )
+        .values(updated_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        current_root = session.get(AgentTask, root.id)
+        if current_root is None or current_root.status != "running":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="task root must be running before it can add descendants",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"root task nonterminal descendant limit {limit} reached",
+        )
+
+
+def _descendant_claim_conditions(task: AgentTask, root: AgentTask) -> list:
+    if task.parent_task_id is None or root.id is None:
+        return []
+
+    root_rows = AgentTask.__table__.alias("claim_root")
+    running_descendants = AgentTask.__table__.alias("claim_running_descendants")
+    running_for_target = AgentTask.__table__.alias("claim_running_for_target")
+    root_is_running = (
+        select(func.count())
+        .select_from(root_rows)
+        .where(root_rows.c.id == root.id, root_rows.c.status == "running")
+        .scalar_subquery()
+    )
+    running_descendant_count = (
+        select(func.count())
+        .select_from(running_descendants)
+        .where(
+            running_descendants.c.root_task_id == root.id,
+            running_descendants.c.parent_task_id.is_not(None),
+            running_descendants.c.status == "running",
+        )
+        .scalar_subquery()
+    )
+    running_for_target_count = (
+        select(func.count())
+        .select_from(running_for_target)
+        .where(
+            running_for_target.c.root_task_id == root.id,
+            running_for_target.c.parent_task_id.is_not(None),
+            running_for_target.c.target_member_id == task.target_member_id,
+            running_for_target.c.status == "running",
+        )
+        .scalar_subquery()
+    )
+    return [
+        root_is_running == 1,
+        running_descendant_count
+        < _root_limit(root.max_running_descendants, TASK_MAX_RUNNING_DESCENDANTS_DEFAULT),
+        running_for_target_count
+        < _root_limit(root.max_running_per_target, TASK_MAX_RUNNING_PER_TARGET_DEFAULT),
+    ]
+
+
+def _running_descendant_count(
+    root_id: int,
+    session: Session,
+    *,
+    target_member_id: str | None = None,
+) -> int:
+    stmt = select(func.count()).select_from(AgentTask).where(
+        AgentTask.root_task_id == root_id,
+        AgentTask.parent_task_id.is_not(None),
+        AgentTask.status == "running",
+    )
+    if target_member_id is not None:
+        stmt = stmt.where(AgentTask.target_member_id == target_member_id)
+    return int(session.execute(stmt).scalar_one())
+
+
+def _claim_budget_conflict_detail(task: AgentTask, session: Session) -> str:
+    root = _get_root_task(task, session)
+    if root.id is None or root.status != "running":
+        return "task root must be running before descendants can be claimed"
+
+    running_descendants = _running_descendant_count(root.id, session)
+    max_running = _root_limit(
+        root.max_running_descendants,
+        TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
+    )
+    if running_descendants >= max_running:
+        return f"root task running descendant limit {max_running} reached"
+
+    running_for_target = _running_descendant_count(
+        root.id,
+        session,
+        target_member_id=task.target_member_id,
+    )
+    max_per_target = _root_limit(
+        root.max_running_per_target,
+        TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
+    )
+    if running_for_target >= max_per_target:
+        return f"root task per-target running limit {max_per_target} reached"
+    return "task claim was blocked by root governance limits"
 
 
 def _ensure_distinct_participants(requester_id: str, target_member_id: str) -> None:
@@ -206,6 +415,14 @@ def _create_task_with_hall(
     title: str | None,
     project_id: str | None,
     schedule_id: int | None,
+    parent_task_id: int | None,
+    root_task_id: int | None,
+    delegation_depth: int,
+    may_delegate: bool,
+    max_delegation_depth: int | None,
+    max_running_descendants: int | None,
+    max_running_per_target: int | None,
+    max_nonterminal_descendants: int | None,
     now: datetime,
     session: Session,
 ) -> AgentTask:
@@ -236,6 +453,14 @@ def _create_task_with_hall(
         schedule_id=schedule_id,
         project_id=project_id,
         hall_group_id=hall_group_id,
+        parent_task_id=parent_task_id,
+        root_task_id=root_task_id,
+        delegation_depth=delegation_depth,
+        may_delegate=may_delegate,
+        max_delegation_depth=max_delegation_depth,
+        max_running_descendants=max_running_descendants,
+        max_running_per_target=max_running_per_target,
+        max_nonterminal_descendants=max_nonterminal_descendants,
         target_member_id=target_member_id,
         created_by=created_by,
         content=content,
@@ -246,6 +471,10 @@ def _create_task_with_hall(
         updated_at=now,
     )
     session.add(task)
+    session.flush()
+    if task.root_task_id is None:
+        task.root_task_id = task.id
+        session.add(task)
     return task
 
 
@@ -257,6 +486,14 @@ def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime, sessi
         created_by=schedule.created_by,
         content=schedule.content,
         title=schedule.title,
+        parent_task_id=None,
+        root_task_id=None,
+        delegation_depth=0,
+        may_delegate=False,
+        max_delegation_depth=TASK_MAX_DELEGATION_DEPTH_DEFAULT,
+        max_running_descendants=TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
+        max_running_per_target=TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
+        max_nonterminal_descendants=TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
         now=now,
         session=session,
     )
@@ -280,15 +517,61 @@ def create_task(
     """Create a queued task and its dedicated one-to-one Task Hall."""
     _ensure_target_agent(body.target_member_id, session)
     _ensure_distinct_participants(current.id, body.target_member_id)
-    _ensure_project_exists(body.project_id, session)
     now = datetime.now(timezone.utc)
+
+    if body.parent_task_id is None:
+        _ensure_root_governance_request_allowed(body, current)
+        project_id = body.project_id
+        _ensure_project_exists(project_id, session)
+        parent_task_id = None
+        root_task_id = None
+        delegation_depth = 0
+        max_delegation_depth = (
+            body.max_delegation_depth
+            if body.max_delegation_depth is not None
+            else TASK_MAX_DELEGATION_DEPTH_DEFAULT
+        )
+        max_running_descendants = (
+            body.max_running_descendants
+            if body.max_running_descendants is not None
+            else TASK_MAX_RUNNING_DESCENDANTS_DEFAULT
+        )
+        max_running_per_target = (
+            body.max_running_per_target
+            if body.max_running_per_target is not None
+            else TASK_MAX_RUNNING_PER_TARGET_DEFAULT
+        )
+        max_nonterminal_descendants = (
+            body.max_nonterminal_descendants
+            if body.max_nonterminal_descendants is not None
+            else TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT
+        )
+    else:
+        parent, root, project_id, delegation_depth = _resolve_child_context(body, current, session)
+        _ensure_project_exists(project_id, session)
+        _reserve_nonterminal_descendant(root, now, session)
+        parent_task_id = parent.id
+        root_task_id = root.id
+        max_delegation_depth = None
+        max_running_descendants = None
+        max_running_per_target = None
+        max_nonterminal_descendants = None
+
     task = _create_task_with_hall(
         target_member_id=body.target_member_id,
         created_by=current.id,
         content=body.content,
         title=body.title,
-        project_id=body.project_id,
+        project_id=project_id,
         schedule_id=None,
+        parent_task_id=parent_task_id,
+        root_task_id=root_task_id,
+        delegation_depth=delegation_depth,
+        may_delegate=body.may_delegate,
+        max_delegation_depth=max_delegation_depth,
+        max_running_descendants=max_running_descendants,
+        max_running_per_target=max_running_per_target,
+        max_nonterminal_descendants=max_nonterminal_descendants,
         now=now,
         session=session,
     )
@@ -643,9 +926,12 @@ def claim_task(
         )
 
     claim_token = uuid4().hex
+    root = _get_root_task(task, session)
+    claim_conditions = [AgentTask.id == task_id, AgentTask.status == "queued"]
+    claim_conditions.extend(_descendant_claim_conditions(task, root))
     result = session.execute(
         update(AgentTask)
-        .where(AgentTask.id == task_id, AgentTask.status == "queued")
+        .where(*claim_conditions)
         .values(
             status="running",
             workflow_status="in_progress",
@@ -670,6 +956,11 @@ def claim_task(
             and current_task.instance_id == body.instance_id
         ):
             return current_task
+        if current_task.status == "queued" and current_task.parent_task_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=_claim_budget_conflict_detail(current_task, session),
+            )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is already {current_task.status}")
 
     if instance is not None:

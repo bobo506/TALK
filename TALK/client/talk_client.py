@@ -356,12 +356,24 @@ class TalkClient:
         *,
         title: str | None = None,
         project_id: str | None = None,
+        parent_task_id: int | None = None,
+        may_delegate: bool = False,
+        max_delegation_depth: int | None = None,
+        max_running_descendants: int | None = None,
+        max_running_per_target: int | None = None,
+        max_nonterminal_descendants: int | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "target_member_id": target_member_id,
             "content": content,
             "title": title,
             "project_id": project_id,
+            "parent_task_id": parent_task_id,
+            "may_delegate": may_delegate,
+            "max_delegation_depth": max_delegation_depth,
+            "max_running_descendants": max_running_descendants,
+            "max_running_per_target": max_running_per_target,
+            "max_nonterminal_descendants": max_nonterminal_descendants,
         }
         return await self._request_json("POST", "/api/tasks", json_body=payload)
 

@@ -14,6 +14,7 @@ class AgentTaskTests(RouteTestCase):
         self.add_member("human:alice", api_key="alice-key", display_name="Alice")
         self.add_member("agent:codex", api_key="codex-key", display_name="Codex")
         self.add_member("agent:other", api_key="other-key", display_name="Other")
+        self.add_member("agent:third", api_key="third-key", display_name="Third")
 
     def test_human_can_create_task_for_agent_and_agent_can_list_it(self):
         with self.make_client() as client:
@@ -37,6 +38,14 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(created.json()["created_by"], "human:bobo")
         self.assertEqual(created.json()["status"], "queued")
         self.assertEqual(created.json()["workflow_status"], "assigned")
+        self.assertIsNone(created.json()["parent_task_id"])
+        self.assertEqual(created.json()["root_task_id"], created.json()["id"])
+        self.assertEqual(created.json()["delegation_depth"], 0)
+        self.assertFalse(created.json()["may_delegate"])
+        self.assertEqual(created.json()["max_delegation_depth"], 1)
+        self.assertEqual(created.json()["max_running_descendants"], 3)
+        self.assertEqual(created.json()["max_running_per_target"], 1)
+        self.assertEqual(created.json()["max_nonterminal_descendants"], 8)
         self.assertIsNotNone(created.json()["hall_group_id"])
         self.assertEqual([task["id"] for task in agent_tasks.json()], [created.json()["id"]])
         self.assertEqual(other_tasks.json(), [])
@@ -108,6 +117,239 @@ class AgentTaskTests(RouteTestCase):
 
         self.assertEqual(unknown_project.status_code, 400)
         self.assertEqual(self_assignment.status_code, 400)
+
+    def test_task_tree_requires_explicit_delegation_and_inherits_root_governance(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_tree", "display_name": "Task tree"},
+            )
+            locked_root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "No delegation"},
+            ).json()
+            client.post(
+                f"/api/tasks/{locked_root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            blocked_child = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": locked_root["id"],
+                    "target_member_id": "agent:other",
+                    "content": "Must be blocked",
+                },
+            )
+
+            root_response = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "project_id": "prj_tree",
+                    "target_member_id": "agent:codex",
+                    "content": "Delegating root",
+                    "may_delegate": True,
+                },
+            )
+            root = root_response.json()
+            client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            excessive_grant = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "target_member_id": "agent:other",
+                    "content": "Cannot redelegate at depth one",
+                    "may_delegate": True,
+                },
+            )
+            child_response = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "target_member_id": "agent:other",
+                    "content": "Allowed child",
+                },
+            )
+            agent_override = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "other-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Unauthorized root override",
+                    "may_delegate": True,
+                },
+            )
+
+        child = child_response.json()
+        self.assertEqual(blocked_child.status_code, 409)
+        self.assertIn("no delegation permission", blocked_child.json()["detail"])
+        self.assertEqual(root_response.status_code, 201)
+        self.assertTrue(root["may_delegate"])
+        self.assertEqual(excessive_grant.status_code, 409)
+        self.assertIn("depth limit", excessive_grant.json()["detail"])
+        self.assertEqual(child_response.status_code, 201)
+        self.assertEqual(child["parent_task_id"], root["id"])
+        self.assertEqual(child["root_task_id"], root["id"])
+        self.assertEqual(child["delegation_depth"], 1)
+        self.assertEqual(child["project_id"], "prj_tree")
+        self.assertFalse(child["may_delegate"])
+        self.assertIsNone(child["max_delegation_depth"])
+        self.assertEqual(agent_override.status_code, 403)
+
+    def test_nonterminal_descendant_limit_is_atomic_during_concurrent_creation(self):
+        with self.make_client() as client:
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "One child only",
+                    "may_delegate": True,
+                    "max_running_descendants": 1,
+                    "max_running_per_target": 1,
+                    "max_nonterminal_descendants": 1,
+                },
+            ).json()
+            client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+
+        barrier = Barrier(2)
+
+        def create_child(target_member_id: str):
+            with self.make_client() as client:
+                barrier.wait()
+                return client.post(
+                    "/api/tasks",
+                    headers={"X-API-Key": "codex-key"},
+                    json={
+                        "parent_task_id": root["id"],
+                        "target_member_id": target_member_id,
+                        "content": f"Child for {target_member_id}",
+                    },
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(create_child, ("agent:other", "agent:third")))
+
+        self.assertEqual(sorted(response.status_code for response in responses), [201, 409])
+        loser = next(response for response in responses if response.status_code == 409)
+        self.assertIn("nonterminal descendant limit 1", loser.json()["detail"])
+        with self.make_client() as client:
+            tasks = client.get("/api/tasks", headers={"X-API-Key": "bobo-key"}).json()
+        children = [task for task in tasks if task["parent_task_id"] == root["id"]]
+        self.assertEqual(len(children), 1)
+
+    def test_running_descendant_limit_is_atomic_during_concurrent_claims(self):
+        with self.make_client() as client:
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "One running child",
+                    "may_delegate": True,
+                    "max_running_descendants": 1,
+                    "max_running_per_target": 1,
+                },
+            ).json()
+            client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            children = [
+                client.post(
+                    "/api/tasks",
+                    headers={"X-API-Key": "codex-key"},
+                    json={
+                        "parent_task_id": root["id"],
+                        "target_member_id": target,
+                        "content": f"Run {target}",
+                    },
+                ).json()
+                for target in ("agent:other", "agent:third")
+            ]
+
+        barrier = Barrier(2)
+
+        def claim_child(task_and_key: tuple[dict, str]):
+            task, api_key = task_and_key
+            with self.make_client() as client:
+                barrier.wait()
+                return client.post(
+                    f"/api/tasks/{task['id']}/claim",
+                    headers={"X-API-Key": api_key},
+                    json={},
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(claim_child, zip(children, ("other-key", "third-key"))))
+
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 409])
+        loser = next(response for response in responses if response.status_code == 409)
+        self.assertIn("running descendant limit 1", loser.json()["detail"])
+
+    def test_per_target_running_limit_is_atomic_during_concurrent_claims(self):
+        with self.make_client() as client:
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "One running task per target",
+                    "may_delegate": True,
+                    "max_running_descendants": 3,
+                    "max_running_per_target": 1,
+                },
+            ).json()
+            client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            children = [
+                client.post(
+                    "/api/tasks",
+                    headers={"X-API-Key": "codex-key"},
+                    json={
+                        "parent_task_id": root["id"],
+                        "target_member_id": "agent:other",
+                        "content": f"Same target {index}",
+                    },
+                ).json()
+                for index in range(2)
+            ]
+
+        barrier = Barrier(2)
+
+        def claim_child(task: dict):
+            with self.make_client() as client:
+                barrier.wait()
+                return client.post(
+                    f"/api/tasks/{task['id']}/claim",
+                    headers={"X-API-Key": "other-key"},
+                    json={},
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(claim_child, children))
+
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 409])
+        loser = next(response for response in responses if response.status_code == 409)
+        self.assertIn("per-target running limit 1", loser.json()["detail"])
 
     def test_task_workflow_clarification_accept_submit_and_collect(self):
         with self.make_client() as client:
@@ -729,6 +971,16 @@ class AgentTaskTests(RouteTestCase):
                     "SELECT id, workflow_status FROM agent_tasks ORDER BY id"
                 ).fetchall()
             )
+            tree_rows = conn.exec_driver_sql(
+                """
+                SELECT
+                    id, parent_task_id, root_task_id, delegation_depth, may_delegate,
+                    max_delegation_depth, max_running_descendants,
+                    max_running_per_target, max_nonterminal_descendants
+                FROM agent_tasks
+                ORDER BY id
+                """
+            ).fetchall()
 
         self.assertTrue({
             "project_id",
@@ -739,9 +991,20 @@ class AgentTaskTests(RouteTestCase):
             "claim_token",
             "lease_expires_at",
             "heartbeat_at",
+            "parent_task_id",
+            "root_task_id",
+            "delegation_depth",
+            "may_delegate",
+            "max_delegation_depth",
+            "max_running_descendants",
+            "max_running_per_target",
+            "max_nonterminal_descendants",
         }.issubset(columns))
         self.assertEqual(indexes["ix_agent_tasks_hall_group_id"], 1)
         self.assertEqual(indexes["ix_agent_tasks_lease_expires_at"], 0)
+        self.assertEqual(indexes["ix_agent_tasks_parent_task_id"], 0)
+        self.assertEqual(indexes["ix_agent_tasks_root_task_id"], 0)
+        self.assertEqual(indexes["ix_agent_tasks_delegation_depth"], 0)
         self.assertEqual(
             workflow_by_id,
             {
@@ -751,4 +1014,11 @@ class AgentTaskTests(RouteTestCase):
                 4: "failed",
                 5: "canceled",
             },
+        )
+        self.assertEqual(
+            tree_rows,
+            [
+                (task_id, None, task_id, 0, 0, 1, 3, 1, 8)
+                for task_id in range(1, 6)
+            ],
         )

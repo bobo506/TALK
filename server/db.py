@@ -107,6 +107,50 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN lease_expires_at TIMESTAMP")
         if "heartbeat_at" not in task_columns:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN heartbeat_at TIMESTAMP")
+        if "parent_task_id" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN parent_task_id INTEGER REFERENCES agent_tasks(id)"
+            )
+        if "root_task_id" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN root_task_id INTEGER REFERENCES agent_tasks(id)"
+            )
+        if "delegation_depth" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN delegation_depth INTEGER NOT NULL DEFAULT 0"
+            )
+        if "may_delegate" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN may_delegate INTEGER NOT NULL DEFAULT 0"
+            )
+        if "max_delegation_depth" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN max_delegation_depth INTEGER")
+        if "max_running_descendants" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN max_running_descendants INTEGER")
+        if "max_running_per_target" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN max_running_per_target INTEGER")
+        if "max_nonterminal_descendants" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN max_nonterminal_descendants INTEGER")
+        conn.exec_driver_sql(
+            "UPDATE agent_tasks SET root_task_id = id WHERE root_task_id IS NULL"
+        )
+        conn.exec_driver_sql(
+            """
+            UPDATE agent_tasks
+            SET
+              max_delegation_depth = COALESCE(max_delegation_depth, ?),
+              max_running_descendants = COALESCE(max_running_descendants, ?),
+              max_running_per_target = COALESCE(max_running_per_target, ?),
+              max_nonterminal_descendants = COALESCE(max_nonterminal_descendants, ?)
+            WHERE parent_task_id IS NULL
+            """,
+            (
+                server.models.TASK_MAX_DELEGATION_DEPTH_DEFAULT,
+                server.models.TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
+                server.models.TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
+                server.models.TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
+            ),
+        )
         discussion_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(discussion_sessions)").fetchall()
@@ -172,6 +216,9 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_instance_id ON agent_tasks (instance_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_schedule_id ON agent_tasks (schedule_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_project_id ON agent_tasks (project_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_parent_task_id ON agent_tasks (parent_task_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_root_task_id ON agent_tasks (root_task_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_delegation_depth ON agent_tasks (delegation_depth)")
         conn.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_agent_tasks_hall_group_id ON agent_tasks (hall_group_id)"
         )
