@@ -272,6 +272,139 @@ TALK MCP / pi extension 已覆盖以下能力：
 - Blackboard 按“待执行者确认 / 待请求者澄清 / 执行中 / 结果待收取 / 已完成”等状态聚合任务；点击一行进入对应 Task Hall。
 - Discussion Halls 单独呈现多角色讨论，不与 Task Hall 的 1 对 1 执行状态混排。
 
+## TH-6 治理、可中断推进与质量门禁合同（2026-07-18 确认）
+
+### 设计原则
+
+- 主 Agent 获得的是**有限批次授权**，不是一次确认后的无限自主推进。额度允许时可连续完成少量明确切片，但到达批次边界、重大风险点或里程碑后必须暂停并等待人类确认。
+- “系统定期停下来”和“人类随时喊停”是两个独立能力：自动检查点负责防止任务持续扩张，人工暂停负责立即撤销尚未消费的推进授权。
+- 关键限制必须由服务端原子校验。prompt、`AGENTS.md`、runner 工具裁剪和进程内锁继续作为行为指导，但不能替代服务端的任务树、预算、暂停和质量门禁。
+- 现有 `status` 执行五态与 `workflow_status` 协作状态继续表达单个任务的执行事实；根任务控制状态单独建模，暂停不能伪装成失败、取消或完成。
+- 开发、Review、测试与返工分别使用独立 Task Hall，保持每个 Hall 请求者 A ↔ 执行者 B 的 1 对 1 合同；主 Agent 通过根任务和任务关联组织流水线。
+
+### 任务树与治理字段
+
+TH-6a1 已按以下字段语义实现任务树与硬预算：
+
+- `parent_task_id`：直接委派来源；顶层任务为空。
+- `root_task_id`：整棵任务树的根任务；新根任务在创建后指向自身，旧任务迁移时也各自成为独立根。
+- `delegation_depth`：根任务为 0，子任务为父任务深度 + 1。
+- `may_delegate`：当前任务的执行者是否获得继续创建子任务的权限；兼容旧任务与普通直派任务默认 `false`。
+- 根任务保存 `max_delegation_depth`、`max_running_descendants`、`max_running_per_target`、`max_nonterminal_descendants` 等治理值，后代读取根任务的统一预算，不能自行放宽。
+
+默认硬保护值：
+
+- 最大委派深度 1。
+- 单个根任务同时运行的后代任务最多 3 个。
+- 同一根任务内，单个目标 Agent 同时运行最多 1 个任务。
+- 单个根任务累计非终态后代最多 8 个；非终态指执行状态仍为 `queued` 或 `running`。
+- 子任务默认 `may_delegate=false`；只有根任务控制者显式提高深度并授予具体任务继续委派权限后才能突破默认边界。
+
+创建带 `parent_task_id` 的任务时，服务端必须校验：调用者确实是父任务执行者或有权控制该根任务、父任务仍可继续协作、根控制状态允许推进、委派权限存在、深度未超限、非终态后代预算尚有余额。claim 时必须再次原子校验根控制状态、根并发和单目标并发，覆盖并发请求、直接 REST API 与第三方客户端。
+
+当前已实现其中的调用者权限、父任务执行状态、委派权限、项目继承、深度、非终态后代、根运行并发和单目标运行并发校验。非终态预留与 claim 均通过条件更新串行化竞争请求；根控制状态要等 TH-6a2 引入后再并入同一原子条件。旧任务迁移时各自回填为独立根，深度为 0、`may_delegate=false`，并获得默认治理值，旧完成 / 收取流程不变。
+
+### 有限批次授权与自动检查点
+
+根任务的推进授权至少记录：
+
+- `authorization_epoch`：每次人类重新授权时递增，便于拒绝陈旧主 Agent 使用旧授权继续创建任务。
+- `authorized_slice_budget` / `reserved_slice_count`：当前批次允许启动与已预留的开发切片数。
+- `authorization_expires_at`：当前批次授权到期时间；默认最长连续推进窗口遵循 `AGENTS.md` 的 60–90 分钟规则。
+- `checkpoint_reason`：暂停原因，例如 `batch_limit`、`risk_boundary`、`milestone`、`time_limit`、`usage_limit`、`review_exhausted`、`needs_decision`、`manual_pause`。
+
+批次规则：
+
+- 普通明确小切片默认最多连续 2 个；纯文档 / 配置批次可由人类显式授权到 3 个。
+- 前端真实交互、数据库 / 协议、部署 / 权限或跨模块协作默认每批 1 个切片。
+- 创建 `development` 任务时预留 1 个切片额度，防止并发创建绕过预算；`review`、`test` 不消费开发切片额度。
+- 同一切片的 `rework` 不算新功能切片，但 Review 自动返工最多 2 轮；仍未通过时根任务进入 `awaiting_human`，由人类决定调整范围、继续或终止。
+- 批次额度耗尽后，已创建任务及其 Review 可以安全收尾，但主 Agent 不能创建新的开发切片；收尾完成后根任务自动进入 `awaiting_human`。
+- 到达可独立体验的里程碑时，无论额度是否仍有剩余，都必须在 Review、完整自动化回归和黑盒测试结束后进入 `awaiting_human`，不能自动开启下一阶段。
+
+### 根任务控制状态与随时喊停
+
+根任务新增独立 `control_status`：
+
+```text
+active -> pause_requested -> paused
+active/paused -> awaiting_human
+paused/awaiting_human -> active        # 仅人类重新授权
+active/paused/awaiting_human -> cancel_requested -> canceled
+```
+
+- `active`：允许在当前授权和治理预算内创建、领取及执行任务。
+- `pause_requested`：暂停请求已持久化；服务端立即禁止新建后代和新 claim，并通知运行中 runner 协作中断。
+- `paused`：没有仍持有有效执行权的后代；Hall、消息、结果、attempt 和进度全部保留，可重新授权恢复。
+- `awaiting_human`：系统因批次、风险、额度、Review、澄清或里程碑门禁主动暂停，语义上同样禁止继续推进。
+- `cancel_requested` / `canceled`：终止整棵任务树；与可恢复的暂停严格区分。
+
+控制动作合同：
+
+- `POST /api/tasks/{task_id}/pause-tree`：根请求者、Human 管理者或根执行者均可请求暂停；传入任一后代 id 时先解析到根任务。
+- `POST /api/tasks/{task_id}/resume-tree`：只有根请求者或 Human 管理者可调用；必须提交新的 `slice_budget` 与授权有效期，生成新 `authorization_epoch`。
+- `POST /api/tasks/{task_id}/checkpoint`：主 Agent 主动汇总并进入 `awaiting_human`，用于风险、额度或产品方向需要人工判断的情况。
+- `POST /api/tasks/{task_id}/cancel-tree`：只有根请求者或 Human 管理者可调用；排队任务取消，运行任务进入协作中断，最终整树终止。
+- `GET /api/tasks/{task_id}/tree`：返回根任务、后代、当前授权、预算占用、质量门禁与控制状态，供终端和 Blackboard 使用。
+
+暂停传播规则：
+
+- 服务端写入 `pause_requested` 后立即拒绝后代创建和 claim，不能等待主 Agent 下一轮 prompt 自查。
+- bundled runner 在本地命令运行期间最多每 5 秒检查一次控制指令；收到暂停 / 终止后停止本地子进程，不写入伪成功结果。
+- 暂停导致的协作中断把仍需继续的任务安全恢复为 `queued / accepted`，清除并失效当前 claim token；恢复后产生新 attempt，陈旧 runner 结果继续被服务端拒绝。
+- 第三方 runner 若不支持协作中断，服务端至少立即撤销其写回资格并等待租约回收；TALK 不承诺跨机器强杀未知进程。
+
+### Task Hall 澄清轮次合同
+
+- 默认 `max_clarification_rounds=1`，复杂任务可由根控制者在创建时显式提高到 2，不允许无限追问。
+- 一轮是“B 的一批集中问题 + A 的完整答复”，不是一条 Hall 消息。服务端保存澄清轮次账本和问题 / 答复消息边界，不能按消息数量推断轮次。
+- B 先把集中问题写入 Task Hall，再调用 `request-clarification` 原子登记本轮；任务进入 `clarification_requested`，禁止 claim。
+- A 可以连续发送多条补充，最后调用 `POST /api/tasks/{task_id}/submit-clarification-answer` 显式提交本轮答复边界；普通 Hall 回复不会提前唤醒 B。
+- 答复提交后任务进入 `clarification_answered`，runner 携带任务原文和分页读取的完整 Hall 上下文重新预检；充分则 `accept -> claim -> execute`，仍不足且有额度则开启下一轮。
+- 额度耗尽仍无法执行时进入 `needs_decision`，同时使根任务进入 `awaiting_human`；Human 可补充范围、增加一次明确额度、改派或终止，系统不得强制领取或猜测执行。
+- 根任务 `paused / awaiting_human / cancel_requested / canceled` 的控制状态优先于单任务澄清状态；即使答复已提交也不能绕过根控制门禁 claim。
+
+### 开发、Review、测试与返工门禁
+
+任务新增 `task_kind`：`general`、`development`、`review`、`test`、`rework`。旧任务迁移为 `general`，不被新质量门禁追溯阻断。
+
+- `development`：实现一个明确切片，结果必须提供可审查的变更引用、修改文件、自测命令、结果和已知风险。
+- `review`：独立 Reviewer 只读审查一个或多个开发 / 返工任务，结构化结论为 `approved`、`changes_requested` 或 `blocked`。
+- `test`：Tester 对冻结版本执行里程碑级完整自动化回归和黑盒 / E2E 测试，结构化结论为 `passed`、`failed` 或 `blocked`。
+- `rework`：针对 Review / 测试缺陷创建的新任务，必须关联原开发任务与触发返工的门禁任务，不能覆盖或篡改旧结果。
+
+任务关系使用独立关联记录表达 `reviews`、`tests`、`reworks` 等关系，使一次低风险批量 Review 可以覆盖 2–3 个开发任务，测试任务也可以覆盖整个根任务的冻结版本。Review / 测试结论不得只从自然语言中猜测；`complete` 必须提交与 `task_kind` 匹配的结构化 `gate_verdict`。
+
+Review 策略：
+
+- 高风险切片逐片 `required` Review。
+- 同模块低风险切片可标为 `batch`，一次 Review 最多覆盖当前授权批次内 2–3 个切片。
+- 纯文案、注释或轻量配置可由具备决策权限的控制者显式标记 `exempt`；开发 Agent 不能自行豁免。
+- Reviewer 必须与被审开发任务的执行者不同；Review Agent 默认只返回问题和结论，不直接修改开发结果。
+- `changes_requested` 后由主 Agent 创建 `rework`；同一质量问题自动返工达到 2 轮仍未通过时必须暂停交回人类。
+
+里程碑测试策略：
+
+- 黑盒测试不在每个普通切片运行；开发 Agent 每个切片仍必须完成单元 / 定向测试，Tester 只在根任务标记的里程碑出场。
+- Tester 必须能启动隔离服务、调用 API、控制浏览器并读取日志；仅修改业务角色名称而没有这些能力不算有效 Tester。
+- 新返工发生后，针对旧变更版本的 Review / 测试通过结论失效；主 Agent 必须对最新冻结版本重新取得所需门禁结论。
+- 有任一必需 Review 未通过，或里程碑尚无最新版本的 `passed` 测试时，服务端拒绝根任务提交成功结果。
+- 里程碑测试通过后根任务自动进入 `awaiting_human`；Human 明确验收或重新授权前，主 Agent 不能继续下一阶段。
+
+### 业务角色发现与权限边界
+
+- `talk_list_agents` 与项目 Agent API 应返回项目业务角色、`decision_tier`、实例状态和能力摘要，便于主 Agent 建议开发者、Reviewer 与 Tester。
+- `business_role` 仍是项目自定义自由文本，服务端不把 `dev / reviewer / tester` 固化成全局枚举；质量任务通过 `task_kind` 与门禁结论获得强语义。
+- 主 Agent 可选择合适成员，但服务端仍强制 Reviewer 与被审开发者分离、根任务控制权限、门禁完整性和暂停传播。
+- 当前 `.talk/groups.yaml` 把 `agent:pi` 与 `agent:pi-kimi` 都标为 `reviewer`，尚无具备黑盒运行能力的 `tester`；正式启用质量流水线前必须新增或重新配置具有相应工具权限的成员。
+
+### 兼容、非目标与实施顺序
+
+- 旧任务迁移后各自成为根任务，`task_kind=general`、`may_delegate=false`、无强制 Review / 测试门禁，继续兼容旧客户端完成与收取流程。
+- TH-6 不自动启动或强杀 bridge 进程，不引入正式 CI/CD、灰度发布或复杂运维监控，也不要求每个普通切片执行浏览器黑盒测试。
+- 控制、预算和质量门禁应先覆盖服务端与 bundled runner；第三方客户端可逐步升级，但不能绕过服务端拒绝行为。
+- 实施顺序固定为：TH-6a1 任务树 / 硬预算 -> TH-6a2 暂停 / 授权控制 -> TH-6a3 澄清轮次 -> TH-6b runner 自动预检与澄清 -> TH-6c Review 门禁 -> TH-6d 里程碑测试 / Blackboard / 人工验收 -> TH-7 通用终端接入。
+
 ## 当前边界
 
 - 当前支持 schedule 记录与显式 `run-due` 物化，但没有内置后台调度循环。
