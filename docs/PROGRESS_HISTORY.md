@@ -184,6 +184,39 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-20 用户手册骨架与项目内同步规则
+
+**背景**：项目管理者提出，任务暂停、澄清、Review 等机制最终都需要用非技术语言告诉普通使用者，同时确认不应让 TALK 的项目特有规则影响其它项目，也不应把开发环境启动命令混入最终产品操作手册。
+
+### 已确认并完成
+
+- 保持用户级全局 `project-framework` skill 不变；用户手册同步规则只落在 TALK 的 `docs/PROJECT_BRIEF.md`。
+- 新增 `docs/guides/USER_MANUAL.md`，明确以“系统已经部署完成”为前提，只面向日常使用 TALK 的家庭成员或项目成员。
+- 手册首版记录当前已验证的登录、项目黑板、任务委派、Task Hall 沟通、澄清补充、结果收取、未开始任务取消，以及全局消息流 / Group Hall 的使用方式。
+- 尚未提供最终用户入口的暂停、继续、整树终止、澄清轮次和 Review/Test 只作为当前版本边界，不提前写成可操作步骤。
+- `QUICKSTART_USER.md` 继续负责家庭管理员首次安装与启动，`DEPLOY.md` 负责部署运维，`QUICKSTART_AGENT.md` 负责开发者和 Agent 接入；普通用户手册不包含 Docker、Python、API、测试或本地开发启动命令。
+- `docs/guides/QUICKSTART.md` 已增加日常用户手册入口；`PROJECT_BRIEF.md` 目录结构已登记新文档。
+- 后续每个用户可见功能切片都要检查手册影响；只有真实入口落地并完成验证后才转写为正式操作步骤，里程碑人工验收需按手册从头复现。
+
+### 验证
+
+- `git diff --check`：通过，仅有现有 Windows LF / CRLF 转换提示。
+- 用户手册技术命令关键词扫描：未发现开发步骤；`Python / Docker / API / 数据库` 只出现在“普通用户无需了解”的范围声明中。
+- `USER_MANUAL.md`、`QUICKSTART.md`、`PROJECT_BRIEF.md` 的本地 Markdown 链接检查：全部可解析。
+- 未运行功能测试：本切片只修改 Markdown 文档，没有修改产品代码。
+
+### 变更文件
+
+- `docs/guides/USER_MANUAL.md`
+- `docs/guides/QUICKSTART.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- TH-6a2.1：实现根任务控制状态、有限批次授权和服务端暂停 / 继续 / 检查点 / 整树终止控制面；完成时继续按本规则判断哪些内容可进入用户手册。
+
 ## 2026-07-18 TH-6a1：任务树与服务端硬预算落地
 
 **背景**：项目管理者确认 TH-6a0 合同后，授权开始第一个数据库 / 协议代码切片。由于本轮未注入 `decision_tier`，按 `AGENTS.md` 兜底作为执行 Agent，只完成 TH-6a1 并在验证、进度落盘后暂停。

@@ -2,10 +2,12 @@
 
 ## Latest
 
-Updated: 2026-07-18 (Asia/Shanghai)
+Updated: 2026-07-20 (Asia/Shanghai)
 
 - 当前分支：`codex/task-hall`。
-- 项目管理者已于 2026-07-18 明确授权当前 Codex 作为决策 Agent，并授权提交、推送 TH-6a0 / TH-6a1；本次按协议与实现边界拆分为两笔中文提交。
+- `.talk/groups.yaml` 已持久配置 `agent:codex` 为 `lead + decision`；当前 Codex 按决策 Agent 节奏维护项目与进度文档。
+- 用户手册维护策略已确认并落地：不修改全局 `project-framework`，TALK 在 `docs/guides/USER_MANUAL.md` 维护系统部署完成后的非技术性操作方法，部署、启动、开发和 Agent 接入继续由现有专门指南承载。
+- 用户手册首版已覆盖当前真正可用的登录、项目黑板、任务委派、Task Hall 沟通、澄清回复、结果收取、未开始任务取消与普通 Group Hall；尚未落地的暂停 / 继续 / 整树终止、澄清轮次和 Review/Test 只列为当前边界，不写成可用步骤。
 - TH-5 Project Blackboard + Task Hall 完整流程已提交为 `04fade4` 并推送；项目管理者已从页面委派任务并成功拿到 runner 返回结果，基础可视化链路人工验收通过。
 - TH-6a0 协议文档切片已完成：任务树硬预算、有限批次授权、自动检查点、随时暂停 / 继续 / 整树终止、澄清轮次以及开发 → Review → 里程碑黑盒测试 → 人工验收门禁已写入 `docs/spec/MODULE_tasks.md`。
 - TH-6a1 已完成：`agent_tasks` 新增 `parent_task_id / root_task_id / delegation_depth / may_delegate` 与四项根治理预算；旧任务迁移为独立根，保持不可继续委派，并回填默认预算。
@@ -49,10 +51,11 @@ Updated: 2026-07-18 (Asia/Shanghai)
 
 ## Next Slice
 
-1. TH-6a2：实现根控制状态、有限批次授权、暂停 / 继续 / 整树终止和 bundled runner 最长 5 秒控制检查；这是下一候选代码切片。
-2. TH-6a3 / TH-6b：依次实现澄清轮次账本、显式答复提交、`needs_decision`，再接领取前预检、完整 Hall 上下文重放与自动澄清闭环。
-3. TH-6c / TH-6d：实现 Review / 返工门禁、业务角色发现、里程碑黑盒测试、Blackboard 控制和人工验收暂停。
-4. TH-7：最后补 Codex Desktop / 通用终端接入包装并做完整跨终端验收。
+1. TH-6a2.1：先实现根任务控制状态、有限批次授权、`pause-tree / resume-tree / checkpoint / cancel-tree / tree` 服务端控制面及创建 / claim 原子门禁；这是下一候选数据库 / 协议切片。
+2. TH-6a2.2：再实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断、claim 失效与安全回队。
+3. TH-6a3 / TH-6b：依次实现澄清轮次账本、显式答复提交、`needs_decision`，再接领取前预检、完整 Hall 上下文重放与自动澄清闭环。
+4. TH-6c / TH-6d：实现 Review / 返工门禁、业务角色发现、里程碑黑盒测试、Blackboard 控制和人工验收暂停。
+5. TH-7：最后补 Codex Desktop / 通用终端接入包装并做完整跨终端验收。
 
 ## Verification
 
@@ -68,6 +71,7 @@ Updated: 2026-07-18 (Asia/Shanghai)
 - 2026-07-18 TH-6a0：完成任务树治理、可中断推进、澄清和 Review/Test 门禁合同落盘；文档检查结果见本轮历史记录，未运行功能测试。
 - 2026-07-18 TH-6a1：`py_compile` 通过；任务路由 `Ran 23 tests ... OK`，活服务 SDK `Ran 12 tests ... OK`，Task Hall / runner / bridge 跨模块 `Ran 128 tests ... OK`，全量 `Ran 325 tests in 103.757s ... OK`。
 - 2026-07-18 发布前复跑：全量 `Ran 325 tests`，其中 324 项通过；既有 `test_disconnect_falls_back_to_http_polling` 在固定 2 秒退出等待中超时。该用例随后连续单跑 2 次通过，`tests.test_tasks + tests.test_talk_client` 定向回归 `Ran 35 tests ... OK`；本次未修改 WebSocket 降级路径。
+- 2026-07-20 用户手册切片：`git diff --check` 通过（仅现有 Windows CRLF 提示）；`USER_MANUAL.md` 技术命令关键词扫描未发现开发步骤，3 份相关文档的本地 Markdown 链接全部可解析；未运行功能测试，因为本切片没有修改产品代码。
 
 ## Known Debt
 
