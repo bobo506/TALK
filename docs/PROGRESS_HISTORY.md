@@ -184,6 +184,49 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-20 TH-6a2.1：根控制状态与有限批次授权服务端落地
+
+**背景**：项目管理者确认 TH-6a0 的有限批次与随时喊停合同，并授权以决策 Agent 身份推进下一切片。由于本轮涉及数据库 / 协议和权限边界，按批次刹车只完成 TH-6a2.1 服务端控制面，不进入 bundled runner 协作中断或 Web 控制按钮。
+
+### 已完成
+
+- `agent_tasks` 根任务新增 `control_status`、`authorization_epoch`、`authorized_slice_budget`、`reserved_slice_count`、`authorization_expires_at`、`checkpoint_reason`；控制状态与到期时间补齐索引。
+- 新建可委派根任务默认获得 2 个切片、90 分钟授权，Human 可显式设为 1–3 个切片与 60–5400 秒；恢复会递增 epoch、重置本批次预留数并生成新到期时间。
+- 新后代创建必须提交当前 `authorization_epoch`，并在同一条条件更新中原子检查根仍在运行、控制状态为 `active`、授权未过期、epoch 未陈旧、切片额度和非终态后代硬预算均有余额；并发创建只有预算内请求成功。
+- claim 已把根控制状态与授权到期加入原子条件；过期创建 / claim 会把根任务推进到 `awaiting_human / time_limit`。旧 epoch 即使在恢复后晚到，也不能消费新批次授权。
+- 新增 `pause-tree / resume-tree / checkpoint / cancel-tree / tree` 五个接口，传入任一后代 id 均解析到根任务，并分别约束根请求者、Human 管理者和根执行者权限。
+- 暂停 / 检查点立即把运行任务安全回到 `queued / accepted`，清除 claim token、lease 与实例占用；整树终止取消全部非终态任务；Hall、消息、attempt、完成结果与历史任务行均保留。陈旧 runner 的心跳和完成写回由现有状态 / token 门禁拒绝。
+- async / sync SDK 的 `create_task` 新增授权额度、有效期与 epoch 参数，并新增五个任务树控制 helper；活服务测试贯通暂停、恢复、检查点、查询和终止。
+
+### 迁移与兼容
+
+- 历史根任务回填为 `active`；历史不可委派任务使用 `epoch=0 / budget=0`，旧完成与结果收取不变。
+- 历史可委派根任务使用 `epoch=1 / budget=2`，当前已有后代数计入 `reserved_slice_count`，避免升级后凭空获得额外切片；后代不复制根控制字段。
+- 当前还没有 `task_kind`，所以每个新后代暂统一消费 1 个切片；`review / test / rework` 的免计与批次安全收尾后自动 `batch_limit` 检查点留待 TH-6c 的任务关系实现。
+- 服务端现已立即撤销本地 runner 的执行与写回资格，但不会强杀正在运行的未知进程；bundled runner 最长 5 秒检查和本地子进程停止留待 TH-6a2.2。
+
+### 验证
+
+- `python -m py_compile server/models.py server/db.py server/routes/tasks.py TALK/client/talk_client.py TALK/client/talk_client_sync.py tests/test_tasks.py tests/test_talk_client.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -q`：`Ran 29 tests ... OK`；覆盖旧库迁移、历史委派树回填、并发切片预留、权限、暂停 / 恢复、检查点、整树终止、到期、陈旧 epoch，以及控制状态持久化后心跳 / 完成立即失效。
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client -q`：`Ran 12 tests in 17.354s ... OK`；async / sync 活服务控制流程通过。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 331 tests in 71.979s ... OK`。
+- `git diff --check`：通过，仅有 Windows 工作区既有 LF / CRLF 转换提示。本切片没有前端改动，不需要 Browser 验证。
+
+### 用户手册影响
+
+- 已复核 `docs/guides/USER_MANUAL.md`：本轮只有服务端 API 与 SDK，还没有普通用户可见按钮，runner 也未完成主动中断，因此不把暂停 / 继续 / 整树终止提前写成正式操作步骤；手册现有“当前版本边界”保持正确。
+
+### 变更文件
+
+- 功能：`server/models.py`、`server/db.py`、`server/routes/tasks.py`、`TALK/client/talk_client.py`、`TALK/client/talk_client_sync.py`。
+- 测试：`tests/test_tasks.py`、`tests/test_talk_client.py`。
+- 文档：`docs/spec/MODULE_tasks.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+
+### 下一步
+
+- TH-6a2.2：实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断与服务端暂停 / 终止状态联动。该切片涉及真实执行中断，完成后应暂停汇总并进行独立人工 / 黑盒验收准备。
+
 ## 2026-07-20 用户手册骨架与项目内同步规则
 
 **背景**：项目管理者提出，任务暂停、澄清、Review 等机制最终都需要用非技术语言告诉普通使用者，同时确认不应让 TALK 的项目特有规则影响其它项目，也不应把开发环境启动命令混入最终产品操作手册。

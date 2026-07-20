@@ -234,11 +234,14 @@ class TalkClientSync:
         title: str | None = None,
         project_id: str | None = None,
         parent_task_id: int | None = None,
+        authorization_epoch: int | None = None,
         may_delegate: bool = False,
         max_delegation_depth: int | None = None,
         max_running_descendants: int | None = None,
         max_running_per_target: int | None = None,
         max_nonterminal_descendants: int | None = None,
+        slice_budget: int | None = None,
+        authorization_ttl_seconds: int | None = None,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.create_task(
@@ -247,11 +250,14 @@ class TalkClientSync:
                 title=title,
                 project_id=project_id,
                 parent_task_id=parent_task_id,
+                authorization_epoch=authorization_epoch,
                 may_delegate=may_delegate,
                 max_delegation_depth=max_delegation_depth,
                 max_running_descendants=max_running_descendants,
                 max_running_per_target=max_running_per_target,
                 max_nonterminal_descendants=max_nonterminal_descendants,
+                slice_budget=slice_budget,
+                authorization_ttl_seconds=authorization_ttl_seconds,
             )
         )
 
@@ -274,6 +280,33 @@ class TalkClientSync:
 
     def get_task(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.get_task(task_id))
+
+    def get_task_tree(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_task_tree(task_id))
+
+    def pause_task_tree(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.pause_task_tree(task_id))
+
+    def checkpoint_task_tree(self, task_id: int, *, reason: str) -> dict[str, Any]:
+        return self._submit(self._client.checkpoint_task_tree(task_id, reason=reason))
+
+    def resume_task_tree(
+        self,
+        task_id: int,
+        *,
+        slice_budget: int,
+        authorization_ttl_seconds: int = 90 * 60,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.resume_task_tree(
+                task_id,
+                slice_budget=slice_budget,
+                authorization_ttl_seconds=authorization_ttl_seconds,
+            )
+        )
+
+    def cancel_task_tree(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.cancel_task_tree(task_id))
 
     def request_task_clarification(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.request_task_clarification(task_id))

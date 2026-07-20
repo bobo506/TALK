@@ -147,6 +147,11 @@ TASK_MAX_DELEGATION_DEPTH_DEFAULT = 1
 TASK_MAX_RUNNING_DESCENDANTS_DEFAULT = 3
 TASK_MAX_RUNNING_PER_TARGET_DEFAULT = 1
 TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT = 8
+TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT = 2
+TASK_AUTHORIZED_SLICE_BUDGET_MAX = 3
+TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS = 90 * 60
+TASK_AUTHORIZATION_TTL_MIN_SECONDS = 60
+TASK_AUTHORIZATION_TTL_MAX_SECONDS = 90 * 60
 
 
 class AgentTask(SQLModel, table=True):
@@ -164,6 +169,12 @@ class AgentTask(SQLModel, table=True):
     max_running_descendants: Optional[int] = None
     max_running_per_target: Optional[int] = None
     max_nonterminal_descendants: Optional[int] = None
+    control_status: Optional[str] = Field(default=None, index=True)
+    authorization_epoch: Optional[int] = None
+    authorized_slice_budget: Optional[int] = None
+    reserved_slice_count: Optional[int] = None
+    authorization_expires_at: Optional[datetime] = Field(default=None, index=True)
+    checkpoint_reason: Optional[str] = None
     target_member_id: str = Field(foreign_key="members.id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     content: str
@@ -635,6 +646,23 @@ _TASK_WORKFLOW_STATUSES = {
     "failed",
     "canceled",
 }
+_TASK_CONTROL_STATUSES = {
+    "active",
+    "pause_requested",
+    "paused",
+    "awaiting_human",
+    "cancel_requested",
+    "canceled",
+}
+_TASK_CHECKPOINT_REASONS = {
+    "batch_limit",
+    "risk_boundary",
+    "milestone",
+    "time_limit",
+    "usage_limit",
+    "review_exhausted",
+    "needs_decision",
+}
 _SCHEDULE_STATUSES = {"active", "paused", "completed", "canceled"}
 TASK_LEASE_DEFAULT_SECONDS = 120
 TASK_LEASE_MIN_SECONDS = 5
@@ -647,11 +675,22 @@ class AgentTaskCreate(BaseModel):
     title: Optional[str] = None
     project_id: Optional[str] = None
     parent_task_id: Optional[int] = PydField(default=None, ge=1)
+    authorization_epoch: Optional[int] = PydField(default=None, ge=0)
     may_delegate: bool = False
     max_delegation_depth: Optional[int] = PydField(default=None, ge=0, le=8)
     max_running_descendants: Optional[int] = PydField(default=None, ge=1, le=32)
     max_running_per_target: Optional[int] = PydField(default=None, ge=1, le=32)
     max_nonterminal_descendants: Optional[int] = PydField(default=None, ge=1, le=128)
+    slice_budget: Optional[int] = PydField(
+        default=None,
+        ge=1,
+        le=TASK_AUTHORIZED_SLICE_BUDGET_MAX,
+    )
+    authorization_ttl_seconds: Optional[int] = PydField(
+        default=None,
+        ge=TASK_AUTHORIZATION_TTL_MIN_SECONDS,
+        le=TASK_AUTHORIZATION_TTL_MAX_SECONDS,
+    )
 
     @model_validator(mode="after")
     def validate_task_create(self) -> "AgentTaskCreate":
@@ -672,9 +711,21 @@ class AgentTaskCreate(BaseModel):
                 self.max_running_descendants,
                 self.max_running_per_target,
                 self.max_nonterminal_descendants,
+                self.slice_budget,
+                self.authorization_ttl_seconds,
             )
         ):
-            raise ValueError("child tasks inherit governance limits from their root task")
+            raise ValueError("child tasks inherit governance and authorization limits from their root task")
+
+        if self.parent_task_id is None and self.authorization_epoch is not None:
+            raise ValueError("authorization_epoch is only valid when creating a child task")
+        if self.parent_task_id is not None and self.authorization_epoch is None:
+            raise ValueError("child task creation requires the current authorization_epoch")
+
+        if not self.may_delegate and (
+            self.slice_budget is not None or self.authorization_ttl_seconds is not None
+        ):
+            raise ValueError("slice authorization requires may_delegate=true")
 
         max_running = self.max_running_descendants or TASK_MAX_RUNNING_DESCENDANTS_DEFAULT
         max_per_target = self.max_running_per_target or TASK_MAX_RUNNING_PER_TARGET_DEFAULT
@@ -739,6 +790,26 @@ class AgentTaskComplete(BaseModel):
         return self
 
 
+class AgentTaskTreeResume(BaseModel):
+    slice_budget: int = PydField(ge=0, le=TASK_AUTHORIZED_SLICE_BUDGET_MAX)
+    authorization_ttl_seconds: int = PydField(
+        default=TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
+        ge=TASK_AUTHORIZATION_TTL_MIN_SECONDS,
+        le=TASK_AUTHORIZATION_TTL_MAX_SECONDS,
+    )
+
+
+class AgentTaskTreeCheckpoint(BaseModel):
+    reason: str
+
+    @model_validator(mode="after")
+    def validate_checkpoint_reason(self) -> "AgentTaskTreeCheckpoint":
+        self.reason = self.reason.strip().lower()
+        if self.reason not in _TASK_CHECKPOINT_REASONS:
+            raise ValueError(f"reason must be one of {sorted(_TASK_CHECKPOINT_REASONS)}")
+        return self
+
+
 class AgentTaskOut(BaseModel):
     id: int
     schedule_id: Optional[int]
@@ -752,6 +823,12 @@ class AgentTaskOut(BaseModel):
     max_running_descendants: Optional[int]
     max_running_per_target: Optional[int]
     max_nonterminal_descendants: Optional[int]
+    control_status: Optional[str]
+    authorization_epoch: Optional[int]
+    authorized_slice_budget: Optional[int]
+    reserved_slice_count: Optional[int]
+    authorization_expires_at: Optional[datetime]
+    checkpoint_reason: Optional[str]
     target_member_id: str
     created_by: str
     content: str
@@ -774,6 +851,15 @@ class AgentTaskOut(BaseModel):
 
 class AgentTaskClaimOut(AgentTaskOut):
     claim_token: str
+
+
+class AgentTaskTreeOut(BaseModel):
+    root: AgentTaskOut
+    tasks: list[AgentTaskOut]
+    running_descendants: int
+    nonterminal_descendants: int
+    remaining_slice_budget: int
+    authorization_expired: bool
 
 
 class AgentTaskScheduleCreate(BaseModel):

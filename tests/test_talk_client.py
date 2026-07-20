@@ -257,6 +257,15 @@ class TalkClientTests(RouteTestCase):
                     title="SDK task",
                     project_id="prj_sdk_async",
                     may_delegate=True,
+                    slice_budget=2,
+                    authorization_ttl_seconds=60,
+                )
+                control_root = await human_client.create_task(
+                    "agent:demo",
+                    "Exercise async task-tree controls",
+                    may_delegate=True,
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
                 )
 
             async with TalkClient(base_url, "demo-key") as agent_client:
@@ -279,6 +288,7 @@ class TalkClientTests(RouteTestCase):
                     "agent:other",
                     "Delegated from async SDK",
                     parent_task_id=claimed["id"],
+                    authorization_epoch=claimed["authorization_epoch"],
                 )
                 canceled_child = await agent_client.cancel_task(child["id"])
                 heartbeat = await agent_client.heartbeat_task(
@@ -297,6 +307,19 @@ class TalkClientTests(RouteTestCase):
                     result_message_id=result["id"],
                     claim_token=claimed["claim_token"],
                 )
+                await agent_client.claim_task(control_root["id"])
+                paused_tree = await agent_client.pause_task_tree(control_root["id"])
+                async with TalkClient(base_url, "bobo-key") as control_manager:
+                    resumed_tree = await control_manager.resume_task_tree(
+                        control_root["id"],
+                        slice_budget=1,
+                        authorization_ttl_seconds=60,
+                    )
+                await agent_client.claim_task(control_root["id"])
+                checkpointed_tree = await agent_client.checkpoint_task_tree(
+                    control_root["id"],
+                    reason="milestone",
+                )
 
             async with TalkClient(base_url, "bobo-key") as human_client:
                 collected = await human_client.collect_task_result(created["id"])
@@ -306,6 +329,13 @@ class TalkClientTests(RouteTestCase):
                     project_id="prj_sdk_async",
                 )
                 canceled = await human_client.cancel_task(cancelable["id"])
+                tree = await human_client.get_task_tree(control_root["id"])
+                await human_client.resume_task_tree(
+                    control_root["id"],
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
+                )
+                canceled_tree = await human_client.cancel_task_tree(control_root["id"])
 
             self.assertEqual(queued[0]["id"], created["id"])
             self.assertEqual(fetched["project_id"], "prj_sdk_async")
@@ -324,6 +354,11 @@ class TalkClientTests(RouteTestCase):
             self.assertEqual(collected["workflow_status"], "completed")
             self.assertIsNotNone(collected["result_collected_at"])
             self.assertEqual(canceled["workflow_status"], "canceled")
+            self.assertEqual(paused_tree["root"]["control_status"], "paused")
+            self.assertEqual(resumed_tree["root"]["authorization_epoch"], 2)
+            self.assertEqual(checkpointed_tree["root"]["checkpoint_reason"], "milestone")
+            self.assertEqual(tree["root"]["control_status"], "awaiting_human")
+            self.assertEqual(canceled_tree["root"]["control_status"], "canceled")
 
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))
@@ -341,6 +376,15 @@ class TalkClientTests(RouteTestCase):
                     title="Sync SDK task",
                     project_id="prj_sdk_sync",
                     may_delegate=True,
+                    slice_budget=2,
+                    authorization_ttl_seconds=60,
+                )
+                control_root = human_client.create_task(
+                    "agent:demo",
+                    "Exercise sync task-tree controls",
+                    may_delegate=True,
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
                 )
                 queued = agent_client.list_tasks(
                     target_member_id="agent:demo",
@@ -357,6 +401,7 @@ class TalkClientTests(RouteTestCase):
                     "agent:other",
                     "Delegated from sync SDK",
                     parent_task_id=claimed["id"],
+                    authorization_epoch=claimed["authorization_epoch"],
                 )
                 canceled_child = agent_client.cancel_task(child["id"])
                 heartbeat = agent_client.heartbeat_task(
@@ -382,6 +427,25 @@ class TalkClientTests(RouteTestCase):
                     project_id="prj_sdk_sync",
                 )
                 canceled = human_client.cancel_task(cancelable["id"])
+                agent_client.claim_task(control_root["id"])
+                paused_tree = agent_client.pause_task_tree(control_root["id"])
+                resumed_tree = human_client.resume_task_tree(
+                    control_root["id"],
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
+                )
+                agent_client.claim_task(control_root["id"])
+                checkpointed_tree = agent_client.checkpoint_task_tree(
+                    control_root["id"],
+                    reason="needs_decision",
+                )
+                tree = human_client.get_task_tree(control_root["id"])
+                human_client.resume_task_tree(
+                    control_root["id"],
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
+                )
+                canceled_tree = human_client.cancel_task_tree(control_root["id"])
             finally:
                 agent_client.close()
                 human_client.close()
@@ -401,6 +465,11 @@ class TalkClientTests(RouteTestCase):
         self.assertEqual(submitted["workflow_status"], "submitted")
         self.assertEqual(collected["workflow_status"], "completed")
         self.assertEqual(canceled["workflow_status"], "canceled")
+        self.assertEqual(paused_tree["root"]["control_status"], "paused")
+        self.assertEqual(resumed_tree["root"]["authorization_epoch"], 2)
+        self.assertEqual(checkpointed_tree["root"]["checkpoint_reason"], "needs_decision")
+        self.assertEqual(tree["root"]["control_status"], "awaiting_human")
+        self.assertEqual(canceled_tree["root"]["control_status"], "canceled")
 
     def test_task_schedule_helpers(self):
         async def scenario(base_url: str) -> None:

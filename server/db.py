@@ -131,6 +131,18 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN max_running_per_target INTEGER")
         if "max_nonterminal_descendants" not in task_columns:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN max_nonterminal_descendants INTEGER")
+        if "control_status" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN control_status TEXT")
+        if "authorization_epoch" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN authorization_epoch INTEGER")
+        if "authorized_slice_budget" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN authorized_slice_budget INTEGER")
+        if "reserved_slice_count" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN reserved_slice_count INTEGER")
+        if "authorization_expires_at" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN authorization_expires_at TIMESTAMP")
+        if "checkpoint_reason" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN checkpoint_reason TEXT")
         conn.exec_driver_sql(
             "UPDATE agent_tasks SET root_task_id = id WHERE root_task_id IS NULL"
         )
@@ -149,6 +161,45 @@ def init_db() -> None:
                 server.models.TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
                 server.models.TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
                 server.models.TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
+            ),
+        )
+        conn.exec_driver_sql(
+            """
+            UPDATE agent_tasks
+            SET
+              control_status = COALESCE(control_status, 'active'),
+              authorization_epoch = COALESCE(
+                authorization_epoch,
+                CASE WHEN may_delegate = 1 THEN 1 ELSE 0 END
+              ),
+              authorized_slice_budget = COALESCE(
+                authorized_slice_budget,
+                CASE WHEN may_delegate = 1 THEN ? ELSE 0 END
+              ),
+              reserved_slice_count = COALESCE(
+                reserved_slice_count,
+                CASE
+                  WHEN may_delegate = 1 THEN (
+                    SELECT COUNT(*)
+                    FROM agent_tasks AS child
+                    WHERE child.root_task_id = agent_tasks.id
+                      AND child.parent_task_id IS NOT NULL
+                  )
+                  ELSE 0
+                END
+              ),
+              authorization_expires_at = CASE
+                WHEN may_delegate = 1 THEN COALESCE(
+                  authorization_expires_at,
+                  datetime('now', '+' || ? || ' seconds')
+                )
+                ELSE NULL
+              END
+            WHERE parent_task_id IS NULL
+            """,
+            (
+                server.models.TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT,
+                server.models.TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
             ),
         )
         discussion_columns = {
@@ -219,6 +270,10 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_parent_task_id ON agent_tasks (parent_task_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_root_task_id ON agent_tasks (root_task_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_delegation_depth ON agent_tasks (delegation_depth)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_control_status ON agent_tasks (control_status)")
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_tasks_authorization_expires_at ON agent_tasks (authorization_expires_at)"
+        )
         conn.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_agent_tasks_hall_group_id ON agent_tasks (hall_group_id)"
         )

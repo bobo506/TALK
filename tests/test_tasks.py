@@ -46,6 +46,11 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(created.json()["max_running_descendants"], 3)
         self.assertEqual(created.json()["max_running_per_target"], 1)
         self.assertEqual(created.json()["max_nonterminal_descendants"], 8)
+        self.assertEqual(created.json()["control_status"], "active")
+        self.assertEqual(created.json()["authorization_epoch"], 0)
+        self.assertEqual(created.json()["authorized_slice_budget"], 0)
+        self.assertEqual(created.json()["reserved_slice_count"], 0)
+        self.assertIsNone(created.json()["authorization_expires_at"])
         self.assertIsNotNone(created.json()["hall_group_id"])
         self.assertEqual([task["id"] for task in agent_tasks.json()], [created.json()["id"]])
         self.assertEqual(other_tasks.json(), [])
@@ -140,6 +145,7 @@ class AgentTaskTests(RouteTestCase):
                 headers={"X-API-Key": "codex-key"},
                 json={
                     "parent_task_id": locked_root["id"],
+                    "authorization_epoch": locked_root["authorization_epoch"],
                     "target_member_id": "agent:other",
                     "content": "Must be blocked",
                 },
@@ -166,6 +172,7 @@ class AgentTaskTests(RouteTestCase):
                 headers={"X-API-Key": "codex-key"},
                 json={
                     "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
                     "target_member_id": "agent:other",
                     "content": "Cannot redelegate at depth one",
                     "may_delegate": True,
@@ -176,6 +183,7 @@ class AgentTaskTests(RouteTestCase):
                 headers={"X-API-Key": "codex-key"},
                 json={
                     "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
                     "target_member_id": "agent:other",
                     "content": "Allowed child",
                 },
@@ -236,6 +244,7 @@ class AgentTaskTests(RouteTestCase):
                     headers={"X-API-Key": "codex-key"},
                     json={
                         "parent_task_id": root["id"],
+                        "authorization_epoch": root["authorization_epoch"],
                         "target_member_id": target_member_id,
                         "content": f"Child for {target_member_id}",
                     },
@@ -251,6 +260,363 @@ class AgentTaskTests(RouteTestCase):
             tasks = client.get("/api/tasks", headers={"X-API-Key": "bobo-key"}).json()
         children = [task for task in tasks if task["parent_task_id"] == root["id"]]
         self.assertEqual(len(children), 1)
+
+    def test_authorized_slice_budget_is_atomic_during_concurrent_creation(self):
+        with self.make_client() as client:
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Authorize exactly one child slice",
+                    "may_delegate": True,
+                    "slice_budget": 1,
+                    "max_running_descendants": 3,
+                    "max_running_per_target": 1,
+                    "max_nonterminal_descendants": 8,
+                },
+            ).json()
+            claimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            self.assertEqual(claimed.status_code, 200)
+
+        barrier = Barrier(2)
+
+        def create_child(target_member_id: str):
+            with self.make_client() as client:
+                barrier.wait()
+                return client.post(
+                    "/api/tasks",
+                    headers={"X-API-Key": "codex-key"},
+                    json={
+                        "parent_task_id": root["id"],
+                        "authorization_epoch": root["authorization_epoch"],
+                        "target_member_id": target_member_id,
+                        "content": f"Authorized child for {target_member_id}",
+                    },
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(create_child, ("agent:other", "agent:third")))
+
+        self.assertEqual(sorted(response.status_code for response in responses), [201, 409])
+        loser = next(response for response in responses if response.status_code == 409)
+        self.assertIn("authorized slice budget 1 exhausted", loser.json()["detail"])
+        with self.make_client() as client:
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            ).json()
+        self.assertEqual(tree["root"]["reserved_slice_count"], 1)
+        self.assertEqual(tree["remaining_slice_budget"], 0)
+        self.assertEqual(len(tree["tasks"]), 2)
+
+    def test_pause_resume_revoke_claims_and_open_a_new_authorization_epoch(self):
+        with self.make_client() as client:
+            client.put(
+                "/api/instances/codex-control",
+                headers={"X-API-Key": "codex-key"},
+                json={"runtime": "codex", "status": "idle"},
+            )
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Pause and resume this tree",
+                    "may_delegate": True,
+                    "slice_budget": 1,
+                },
+            ).json()
+            claimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={"instance_id": "codex-control"},
+            ).json()
+            child = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:other",
+                    "content": "First authorized child",
+                },
+            ).json()
+            paused = client.post(
+                f"/api/tasks/{child['id']}/pause-tree",
+                headers={"X-API-Key": "codex-key"},
+            )
+            blocked_claim = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            stale_complete = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": claimed["claim_token"]},
+            )
+            blocked_create = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Blocked while paused",
+                },
+            )
+            forbidden_resume = client.post(
+                f"/api/tasks/{root['id']}/resume-tree",
+                headers={"X-API-Key": "other-key"},
+                json={"slice_budget": 1, "authorization_ttl_seconds": 60},
+            )
+            resumed = client.post(
+                f"/api/tasks/{root['id']}/resume-tree",
+                headers={"X-API-Key": "bobo-key"},
+                json={"slice_budget": 1, "authorization_ttl_seconds": 60},
+            )
+            reclaimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            stale_epoch_create = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Stale first-epoch request",
+                },
+            )
+            second_child = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": resumed.json()["root"]["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Second epoch child",
+                },
+            )
+            hidden_tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "third-key"},
+            )
+            instances = client.get(
+                "/api/instances",
+                headers={"X-API-Key": "bobo-key"},
+                params={"member_id": "agent:codex"},
+            ).json()
+
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.json()["root"]["control_status"], "paused")
+        self.assertEqual(paused.json()["root"]["status"], "queued")
+        self.assertEqual(blocked_claim.status_code, 409)
+        self.assertIn("control is paused", blocked_claim.json()["detail"])
+        self.assertEqual(stale_complete.status_code, 409)
+        self.assertEqual(blocked_create.status_code, 409)
+        self.assertEqual(forbidden_resume.status_code, 403)
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(resumed.json()["root"]["authorization_epoch"], 2)
+        self.assertEqual(resumed.json()["root"]["reserved_slice_count"], 0)
+        self.assertEqual(reclaimed.status_code, 200)
+        self.assertEqual(stale_epoch_create.status_code, 409)
+        self.assertIn("epoch 1 is stale", stale_epoch_create.json()["detail"])
+        self.assertEqual(second_child.status_code, 201)
+        self.assertEqual(hidden_tree.status_code, 404)
+        self.assertEqual(instances[0]["status"], "idle")
+        self.assertIsNone(instances[0]["current_task_id"])
+
+    def test_expired_authorization_blocks_claim_and_creation_until_human_resume(self):
+        with self.make_client() as client:
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Expire this authorization",
+                    "may_delegate": True,
+                },
+            ).json()
+
+        with self.session() as session:
+            task = session.get(AgentTask, root["id"])
+            task.authorization_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+            session.add(task)
+            session.commit()
+
+        with self.make_client() as client:
+            expired_claim = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            waiting = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            client.post(
+                f"/api/tasks/{root['id']}/resume-tree",
+                headers={"X-API-Key": "bobo-key"},
+                json={"slice_budget": 1, "authorization_ttl_seconds": 60},
+            )
+            claimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            self.assertEqual(claimed.status_code, 200)
+
+        with self.session() as session:
+            task = session.get(AgentTask, root["id"])
+            task.authorization_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+            session.add(task)
+            session.commit()
+
+        with self.make_client() as client:
+            expired_create = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": 2,
+                    "target_member_id": "agent:other",
+                    "content": "Blocked by elapsed authorization",
+                },
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(expired_claim.status_code, 409)
+        self.assertIn("authorization has expired", expired_claim.json()["detail"])
+        self.assertEqual(waiting.json()["root"]["control_status"], "awaiting_human")
+        self.assertTrue(waiting.json()["authorization_expired"])
+        self.assertEqual(expired_create.status_code, 409)
+        self.assertIn("authorization has expired", expired_create.json()["detail"])
+        self.assertEqual(tree.json()["root"]["checkpoint_reason"], "time_limit")
+
+    def test_persisted_nonactive_root_immediately_blocks_heartbeat_and_complete(self):
+        with self.make_client() as client:
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Simulate the pause propagation window",
+                },
+            ).json()
+            claimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={"lease_seconds": 60},
+            ).json()
+
+        with self.session() as session:
+            task = session.get(AgentTask, root["id"])
+            task.control_status = "pause_requested"
+            session.add(task)
+            session.commit()
+
+        with self.make_client() as client:
+            duplicate_claim = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            heartbeat = client.post(
+                f"/api/tasks/{root['id']}/heartbeat",
+                headers={"X-API-Key": "codex-key"},
+                json={"claim_token": claimed["claim_token"], "lease_seconds": 60},
+            )
+            complete = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": claimed["claim_token"]},
+            )
+
+        self.assertEqual(duplicate_claim.status_code, 409)
+        self.assertEqual(heartbeat.status_code, 409)
+        self.assertEqual(complete.status_code, 409)
+
+    def test_checkpoint_and_cancel_tree_enforce_roles_and_preserve_history(self):
+        with self.make_client() as client:
+            root = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Checkpoint then cancel",
+                    "may_delegate": True,
+                },
+            ).json()
+            claimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            self.assertEqual(claimed.status_code, 200)
+            forbidden_checkpoint = client.post(
+                f"/api/tasks/{root['id']}/checkpoint",
+                headers={"X-API-Key": "other-key"},
+                json={"reason": "risk_boundary"},
+            )
+            checkpoint = client.post(
+                f"/api/tasks/{root['id']}/checkpoint",
+                headers={"X-API-Key": "codex-key"},
+                json={"reason": "risk_boundary"},
+            )
+            resumed = client.post(
+                f"/api/tasks/{root['id']}/resume-tree",
+                headers={"X-API-Key": "bobo-key"},
+                json={"slice_budget": 1, "authorization_ttl_seconds": 60},
+            )
+            client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            child = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": resumed.json()["root"]["authorization_epoch"],
+                    "target_member_id": "agent:other",
+                    "content": "Canceled descendant",
+                },
+            ).json()
+            forbidden_cancel = client.post(
+                f"/api/tasks/{root['id']}/cancel-tree",
+                headers={"X-API-Key": "codex-key"},
+            )
+            canceled = client.post(
+                f"/api/tasks/{child['id']}/cancel-tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            canceled_again = client.post(
+                f"/api/tasks/{root['id']}/cancel-tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(forbidden_checkpoint.status_code, 403)
+        self.assertEqual(checkpoint.status_code, 200)
+        self.assertEqual(checkpoint.json()["root"]["control_status"], "awaiting_human")
+        self.assertEqual(checkpoint.json()["root"]["checkpoint_reason"], "risk_boundary")
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(forbidden_cancel.status_code, 403)
+        self.assertEqual(canceled.status_code, 200)
+        self.assertEqual(canceled.json()["root"]["control_status"], "canceled")
+        self.assertEqual({task["status"] for task in canceled.json()["tasks"]}, {"canceled"})
+        self.assertEqual(len(canceled_again.json()["tasks"]), 2)
 
     def test_running_descendant_limit_is_atomic_during_concurrent_claims(self):
         with self.make_client() as client:
@@ -276,6 +642,7 @@ class AgentTaskTests(RouteTestCase):
                     headers={"X-API-Key": "codex-key"},
                     json={
                         "parent_task_id": root["id"],
+                        "authorization_epoch": root["authorization_epoch"],
                         "target_member_id": target,
                         "content": f"Run {target}",
                     },
@@ -326,6 +693,7 @@ class AgentTaskTests(RouteTestCase):
                     headers={"X-API-Key": "codex-key"},
                     json={
                         "parent_task_id": root["id"],
+                        "authorization_epoch": root["authorization_epoch"],
                         "target_member_id": "agent:other",
                         "content": f"Same target {index}",
                     },
@@ -981,6 +1349,16 @@ class AgentTaskTests(RouteTestCase):
                 ORDER BY id
                 """
             ).fetchall()
+            control_rows = conn.exec_driver_sql(
+                """
+                SELECT
+                    id, control_status, authorization_epoch,
+                    authorized_slice_budget, reserved_slice_count,
+                    authorization_expires_at, checkpoint_reason
+                FROM agent_tasks
+                ORDER BY id
+                """
+            ).fetchall()
 
         self.assertTrue({
             "project_id",
@@ -999,12 +1377,20 @@ class AgentTaskTests(RouteTestCase):
             "max_running_descendants",
             "max_running_per_target",
             "max_nonterminal_descendants",
+            "control_status",
+            "authorization_epoch",
+            "authorized_slice_budget",
+            "reserved_slice_count",
+            "authorization_expires_at",
+            "checkpoint_reason",
         }.issubset(columns))
         self.assertEqual(indexes["ix_agent_tasks_hall_group_id"], 1)
         self.assertEqual(indexes["ix_agent_tasks_lease_expires_at"], 0)
         self.assertEqual(indexes["ix_agent_tasks_parent_task_id"], 0)
         self.assertEqual(indexes["ix_agent_tasks_root_task_id"], 0)
         self.assertEqual(indexes["ix_agent_tasks_delegation_depth"], 0)
+        self.assertEqual(indexes["ix_agent_tasks_control_status"], 0)
+        self.assertEqual(indexes["ix_agent_tasks_authorization_expires_at"], 0)
         self.assertEqual(
             workflow_by_id,
             {
@@ -1022,3 +1408,76 @@ class AgentTaskTests(RouteTestCase):
                 for task_id in range(1, 6)
             ],
         )
+        self.assertEqual(
+            control_rows,
+            [
+                (task_id, "active", 0, 0, 0, None, None)
+                for task_id in range(1, 6)
+            ],
+        )
+
+    def test_init_db_backfills_existing_delegating_tree_without_granting_extra_slices(self):
+        with self.engine.begin() as conn:
+            conn.exec_driver_sql("DROP TABLE agent_tasks")
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE agent_tasks (
+                    id INTEGER PRIMARY KEY,
+                    parent_task_id INTEGER,
+                    root_task_id INTEGER,
+                    delegation_depth INTEGER NOT NULL DEFAULT 0,
+                    may_delegate INTEGER NOT NULL DEFAULT 0,
+                    max_delegation_depth INTEGER,
+                    max_running_descendants INTEGER,
+                    max_running_per_target INTEGER,
+                    max_nonterminal_descendants INTEGER,
+                    target_member_id TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    title TEXT,
+                    status TEXT NOT NULL,
+                    claimed_by TEXT,
+                    instance_id TEXT,
+                    result_message_id INTEGER,
+                    last_error TEXT,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
+                    claimed_at TIMESTAMP,
+                    finished_at TIMESTAMP
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                INSERT INTO agent_tasks (
+                    id, parent_task_id, root_task_id, delegation_depth, may_delegate,
+                    max_delegation_depth, max_running_descendants,
+                    max_running_per_target, max_nonterminal_descendants,
+                    target_member_id, created_by, content, status, created_at, updated_at
+                ) VALUES
+                    (1, NULL, 1, 0, 1, 1, 3, 1, 8,
+                     'agent:codex', 'human:bobo', 'legacy root', 'running',
+                     '2026-07-15', '2026-07-15'),
+                    (2, 1, 1, 1, 0, NULL, NULL, NULL, NULL,
+                     'agent:other', 'agent:codex', 'legacy child', 'queued',
+                     '2026-07-15', '2026-07-15')
+                """
+            )
+
+        db.init_db()
+
+        with self.engine.connect() as conn:
+            rows = conn.exec_driver_sql(
+                """
+                SELECT
+                    id, control_status, authorization_epoch,
+                    authorized_slice_budget, reserved_slice_count,
+                    authorization_expires_at
+                FROM agent_tasks
+                ORDER BY id
+                """
+            ).fetchall()
+
+        self.assertEqual(rows[0][:5], (1, "active", 1, 2, 1))
+        self.assertIsNotNone(rows[0][5])
+        self.assertEqual(rows[1], (2, None, None, None, None, None))

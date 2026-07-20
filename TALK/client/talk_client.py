@@ -357,11 +357,14 @@ class TalkClient:
         title: str | None = None,
         project_id: str | None = None,
         parent_task_id: int | None = None,
+        authorization_epoch: int | None = None,
         may_delegate: bool = False,
         max_delegation_depth: int | None = None,
         max_running_descendants: int | None = None,
         max_running_per_target: int | None = None,
         max_nonterminal_descendants: int | None = None,
+        slice_budget: int | None = None,
+        authorization_ttl_seconds: int | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "target_member_id": target_member_id,
@@ -369,11 +372,14 @@ class TalkClient:
             "title": title,
             "project_id": project_id,
             "parent_task_id": parent_task_id,
+            "authorization_epoch": authorization_epoch,
             "may_delegate": may_delegate,
             "max_delegation_depth": max_delegation_depth,
             "max_running_descendants": max_running_descendants,
             "max_running_per_target": max_running_per_target,
             "max_nonterminal_descendants": max_nonterminal_descendants,
+            "slice_budget": slice_budget,
+            "authorization_ttl_seconds": authorization_ttl_seconds,
         }
         return await self._request_json("POST", "/api/tasks", json_body=payload)
 
@@ -398,6 +404,38 @@ class TalkClient:
 
     async def get_task(self, task_id: int) -> JsonDict:
         return await self._request_json("GET", f"/api/tasks/{task_id}")
+
+    async def get_task_tree(self, task_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/tree")
+
+    async def pause_task_tree(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/pause-tree")
+
+    async def checkpoint_task_tree(self, task_id: int, *, reason: str) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/checkpoint",
+            json_body={"reason": reason},
+        )
+
+    async def resume_task_tree(
+        self,
+        task_id: int,
+        *,
+        slice_budget: int,
+        authorization_ttl_seconds: int = 90 * 60,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/resume-tree",
+            json_body={
+                "slice_budget": slice_budget,
+                "authorization_ttl_seconds": authorization_ttl_seconds,
+            },
+        )
+
+    async def cancel_task_tree(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/cancel-tree")
 
     async def request_task_clarification(self, task_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/request-clarification")

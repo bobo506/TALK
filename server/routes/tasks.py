@@ -25,11 +25,16 @@ from server.models import (
     AgentTaskScheduleOut,
     AgentTaskScheduleRunOut,
     AgentTaskScheduleUpdate,
+    AgentTaskTreeCheckpoint,
+    AgentTaskTreeOut,
+    AgentTaskTreeResume,
     Group,
     GroupMember,
     Member,
     Message,
     Project,
+    TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
+    TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT,
     TASK_MAX_DELEGATION_DEPTH_DEFAULT,
     TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
     TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
@@ -104,6 +109,8 @@ def _ensure_root_governance_request_allowed(body: AgentTaskCreate, current: Memb
             body.max_running_descendants,
             body.max_running_per_target,
             body.max_nonterminal_descendants,
+            body.slice_budget,
+            body.authorization_ttl_seconds,
         )
     )
     if current.kind != "human" and custom_governance:
@@ -127,6 +134,17 @@ def _resolve_child_context(
     root = _get_root_task(parent, session)
     if current.kind != "human" and current.id not in {parent.target_member_id, root.created_by}:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="parent task not found")
+    if root.control_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task tree control is {root.control_status}, not active",
+        )
+    current_epoch = root.authorization_epoch or 0
+    if body.authorization_epoch != current_epoch:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"authorization epoch {body.authorization_epoch} is stale; current epoch is {current_epoch}",
+        )
     if parent.status != "running" or parent.workflow_status != "in_progress":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -160,7 +178,19 @@ def _resolve_child_context(
     return parent, root, project_id, delegation_depth
 
 
-def _reserve_nonterminal_descendant(root: AgentTask, now: datetime, session: Session) -> None:
+def _authorization_expired(root: AgentTask, now: datetime) -> bool:
+    return (
+        root.authorization_expires_at is not None
+        and _as_utc(root.authorization_expires_at) <= now
+    )
+
+
+def _reserve_authorized_descendant(
+    root: AgentTask,
+    expected_epoch: int,
+    now: datetime,
+    session: Session,
+) -> None:
     if root.id is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task root is missing")
 
@@ -184,9 +214,19 @@ def _reserve_nonterminal_descendant(root: AgentTask, now: datetime, session: Ses
         .where(
             AgentTask.id == root.id,
             AgentTask.status == "running",
+            AgentTask.control_status == "active",
+            AgentTask.authorization_epoch == expected_epoch,
+            or_(
+                AgentTask.authorization_expires_at.is_(None),
+                AgentTask.authorization_expires_at > now,
+            ),
+            AgentTask.reserved_slice_count < AgentTask.authorized_slice_budget,
             nonterminal_count < limit,
         )
-        .values(updated_at=now)
+        .values(
+            reserved_slice_count=AgentTask.reserved_slice_count + 1,
+            updated_at=now,
+        )
         .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:
@@ -197,17 +237,72 @@ def _reserve_nonterminal_descendant(root: AgentTask, now: datetime, session: Ses
                 status_code=status.HTTP_409_CONFLICT,
                 detail="task root must be running before it can add descendants",
             )
+        if current_root.control_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"task tree control is {current_root.control_status}, not active",
+            )
+        if _authorization_expired(current_root, now):
+            _expire_root_authorization(current_root, now, session)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="task tree authorization has expired and is awaiting human approval",
+            )
+        current_epoch = current_root.authorization_epoch or 0
+        if current_epoch != expected_epoch:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"authorization epoch {expected_epoch} is stale; current epoch is {current_epoch}",
+            )
+        reserved = current_root.reserved_slice_count or 0
+        authorized = current_root.authorized_slice_budget or 0
+        if reserved >= authorized:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"task tree authorized slice budget {authorized} exhausted",
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"root task nonterminal descendant limit {limit} reached",
         )
 
 
-def _descendant_claim_conditions(task: AgentTask, root: AgentTask) -> list:
-    if task.parent_task_id is None or root.id is None:
+def _root_control_claim_conditions(
+    root: AgentTask,
+    now: datetime,
+    *,
+    require_unexpired: bool = True,
+) -> list:
+    if root.id is None:
         return []
 
     root_rows = AgentTask.__table__.alias("claim_root")
+    root_conditions = [
+        root_rows.c.id == root.id,
+        root_rows.c.control_status == "active",
+    ]
+    if require_unexpired:
+        root_conditions.append(
+            or_(
+                root_rows.c.authorization_expires_at.is_(None),
+                root_rows.c.authorization_expires_at > now,
+            )
+        )
+    root_is_active = (
+        select(func.count())
+        .select_from(root_rows)
+        .where(*root_conditions)
+        .scalar_subquery()
+    )
+    return [root_is_active == 1]
+
+
+def _descendant_claim_conditions(task: AgentTask, root: AgentTask, now: datetime) -> list:
+    conditions = _root_control_claim_conditions(root, now)
+    if task.parent_task_id is None or root.id is None:
+        return conditions
+
+    root_rows = AgentTask.__table__.alias("claim_running_root")
     running_descendants = AgentTask.__table__.alias("claim_running_descendants")
     running_for_target = AgentTask.__table__.alias("claim_running_for_target")
     root_is_running = (
@@ -237,13 +332,14 @@ def _descendant_claim_conditions(task: AgentTask, root: AgentTask) -> list:
         )
         .scalar_subquery()
     )
-    return [
+    conditions.extend([
         root_is_running == 1,
         running_descendant_count
         < _root_limit(root.max_running_descendants, TASK_MAX_RUNNING_DESCENDANTS_DEFAULT),
         running_for_target_count
         < _root_limit(root.max_running_per_target, TASK_MAX_RUNNING_PER_TARGET_DEFAULT),
-    ]
+    ])
+    return conditions
 
 
 def _running_descendant_count(
@@ -262,8 +358,15 @@ def _running_descendant_count(
     return int(session.execute(stmt).scalar_one())
 
 
-def _claim_budget_conflict_detail(task: AgentTask, session: Session) -> str:
+def _claim_budget_conflict_detail(task: AgentTask, now: datetime, session: Session) -> str:
     root = _get_root_task(task, session)
+    if root.control_status != "active":
+        return f"task tree control is {root.control_status}, not active"
+    if _authorization_expired(root, now):
+        _expire_root_authorization(root, now, session)
+        return "task tree authorization has expired and is awaiting human approval"
+    if task.parent_task_id is None:
+        return "task claim was blocked by task tree control state"
     if root.id is None or root.status != "running":
         return "task root must be running before descendants can be claimed"
 
@@ -287,6 +390,177 @@ def _claim_budget_conflict_detail(task: AgentTask, session: Session) -> str:
     if running_for_target >= max_per_target:
         return f"root task per-target running limit {max_per_target} reached"
     return "task claim was blocked by root governance limits"
+
+
+def _tree_tasks(root: AgentTask, session: Session) -> list[AgentTask]:
+    if root.id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task root is missing")
+    return list(
+        session.exec(
+            select(AgentTask)
+            .where(AgentTask.root_task_id == root.id)
+            .order_by(AgentTask.id)
+        ).all()
+    )
+
+
+def _ensure_tree_visible(root: AgentTask, current: Member) -> None:
+    if current.kind == "human" or current.id in {root.created_by, root.target_member_id}:
+        return
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="task tree not found")
+
+
+def _require_tree_pause_actor(root: AgentTask, current: Member) -> None:
+    if current.kind == "human" or current.id in {root.created_by, root.target_member_id}:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only a human manager, root requester, or root executor can pause this task tree")
+
+
+def _require_tree_manager(root: AgentTask, current: Member) -> None:
+    if current.kind == "human" or current.id == root.created_by:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only a human manager or root requester can resume or cancel this task tree")
+
+
+def _require_checkpoint_actor(root: AgentTask, current: Member) -> None:
+    if current.kind == "human" or current.id == root.target_member_id:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only a human manager or root executor can checkpoint this task tree")
+
+
+def _tree_response(root: AgentTask, now: datetime, session: Session) -> dict:
+    tasks = _tree_tasks(root, session)
+    descendants = [task for task in tasks if task.parent_task_id is not None]
+    authorized = root.authorized_slice_budget or 0
+    reserved = root.reserved_slice_count or 0
+    return {
+        "root": root,
+        "tasks": tasks,
+        "running_descendants": sum(task.status == "running" for task in descendants),
+        "nonterminal_descendants": sum(task.status in {"queued", "running"} for task in descendants),
+        "remaining_slice_budget": max(authorized - reserved, 0),
+        "authorization_expired": _authorization_expired(root, now),
+    }
+
+
+def _release_tree_claims(root: AgentTask, now: datetime, reason: str, session: Session) -> None:
+    running_tasks = [task for task in _tree_tasks(root, session) if task.status == "running"]
+    if not running_tasks:
+        return
+
+    running_ids = [task.id for task in running_tasks if task.id is not None]
+    session.execute(
+        update(AgentTask)
+        .where(AgentTask.id.in_(running_ids), AgentTask.status == "running")
+        .values(
+            status="queued",
+            workflow_status="accepted",
+            claimed_by=None,
+            instance_id=None,
+            claim_token=None,
+            lease_expires_at=None,
+            last_error=reason,
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    for task in running_tasks:
+        if task.instance_id is None:
+            continue
+        instance = session.get(AgentInstance, task.instance_id)
+        if instance is None or instance.current_task_id != str(task.id):
+            continue
+        instance.status = "idle"
+        instance.current_task_id = None
+        instance.last_error = reason
+        instance.updated_at = now
+        instance.last_seen_at = now
+        session.add(instance)
+
+
+def _cancel_tree_tasks(root: AgentTask, now: datetime, session: Session) -> None:
+    active_tasks = [
+        task for task in _tree_tasks(root, session) if task.status in {"queued", "running"}
+    ]
+    if not active_tasks:
+        return
+
+    active_ids = [task.id for task in active_tasks if task.id is not None]
+    session.execute(
+        update(AgentTask)
+        .where(AgentTask.id.in_(active_ids), AgentTask.status.in_(("queued", "running")))
+        .values(
+            status="canceled",
+            workflow_status="canceled",
+            claimed_by=None,
+            instance_id=None,
+            claim_token=None,
+            lease_expires_at=None,
+            finished_at=now,
+            last_error="task tree canceled",
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    for task in active_tasks:
+        if task.instance_id is None:
+            continue
+        instance = session.get(AgentInstance, task.instance_id)
+        if instance is None or instance.current_task_id != str(task.id):
+            continue
+        instance.status = "idle"
+        instance.current_task_id = None
+        instance.last_error = "task tree canceled"
+        instance.updated_at = now
+        instance.last_seen_at = now
+        session.add(instance)
+
+
+def _transition_root_control(
+    root: AgentTask,
+    *,
+    allowed_statuses: set[str],
+    next_status: str,
+    now: datetime,
+    session: Session,
+    **values,
+) -> AgentTask:
+    if root.id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task root is missing")
+    result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == root.id,
+            AgentTask.control_status.in_(allowed_statuses),
+        )
+        .values(control_status=next_status, updated_at=now, **values)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        current_root = _get_task(root.id, session)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task tree control changed to {current_root.control_status}; retry from the current state",
+        )
+    session.commit()
+    session.expire_all()
+    return _get_task(root.id, session)
+
+
+def _expire_root_authorization(root: AgentTask, now: datetime, session: Session) -> AgentTask:
+    root = _transition_root_control(
+        root,
+        allowed_statuses={"active"},
+        next_status="awaiting_human",
+        checkpoint_reason="time_limit",
+        now=now,
+        session=session,
+    )
+    _release_tree_claims(root, now, "task tree authorization expired", session)
+    session.commit()
+    session.expire_all()
+    return _get_task(int(root.id), session)
 
 
 def _ensure_distinct_participants(requester_id: str, target_member_id: str) -> None:
@@ -423,6 +697,12 @@ def _create_task_with_hall(
     max_running_descendants: int | None,
     max_running_per_target: int | None,
     max_nonterminal_descendants: int | None,
+    control_status: str | None,
+    authorization_epoch: int | None,
+    authorized_slice_budget: int | None,
+    reserved_slice_count: int | None,
+    authorization_expires_at: datetime | None,
+    checkpoint_reason: str | None,
     now: datetime,
     session: Session,
 ) -> AgentTask:
@@ -461,6 +741,12 @@ def _create_task_with_hall(
         max_running_descendants=max_running_descendants,
         max_running_per_target=max_running_per_target,
         max_nonterminal_descendants=max_nonterminal_descendants,
+        control_status=control_status,
+        authorization_epoch=authorization_epoch,
+        authorized_slice_budget=authorized_slice_budget,
+        reserved_slice_count=reserved_slice_count,
+        authorization_expires_at=authorization_expires_at,
+        checkpoint_reason=checkpoint_reason,
         target_member_id=target_member_id,
         created_by=created_by,
         content=content,
@@ -494,6 +780,12 @@ def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime, sessi
         max_running_descendants=TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
         max_running_per_target=TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
         max_nonterminal_descendants=TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
+        control_status="active",
+        authorization_epoch=0,
+        authorized_slice_budget=0,
+        reserved_slice_count=0,
+        authorization_expires_at=None,
+        checkpoint_reason=None,
         now=now,
         session=session,
     )
@@ -546,16 +838,41 @@ def create_task(
             if body.max_nonterminal_descendants is not None
             else TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT
         )
+        control_status = "active"
+        authorization_epoch = 1 if body.may_delegate else 0
+        authorized_slice_budget = (
+            body.slice_budget
+            if body.slice_budget is not None
+            else TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT
+        ) if body.may_delegate else 0
+        reserved_slice_count = 0
+        authorization_expires_at = (
+            now
+            + timedelta(
+                seconds=body.authorization_ttl_seconds
+                if body.authorization_ttl_seconds is not None
+                else TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS
+            )
+            if body.may_delegate
+            else None
+        )
+        checkpoint_reason = None
     else:
         parent, root, project_id, delegation_depth = _resolve_child_context(body, current, session)
         _ensure_project_exists(project_id, session)
-        _reserve_nonterminal_descendant(root, now, session)
+        _reserve_authorized_descendant(root, int(body.authorization_epoch), now, session)
         parent_task_id = parent.id
         root_task_id = root.id
         max_delegation_depth = None
         max_running_descendants = None
         max_running_per_target = None
         max_nonterminal_descendants = None
+        control_status = None
+        authorization_epoch = None
+        authorized_slice_budget = None
+        reserved_slice_count = None
+        authorization_expires_at = None
+        checkpoint_reason = None
 
     task = _create_task_with_hall(
         target_member_id=body.target_member_id,
@@ -572,6 +889,12 @@ def create_task(
         max_running_descendants=max_running_descendants,
         max_running_per_target=max_running_per_target,
         max_nonterminal_descendants=max_nonterminal_descendants,
+        control_status=control_status,
+        authorization_epoch=authorization_epoch,
+        authorized_slice_budget=authorized_slice_budget,
+        reserved_slice_count=reserved_slice_count,
+        authorization_expires_at=authorization_expires_at,
+        checkpoint_reason=checkpoint_reason,
         now=now,
         session=session,
     )
@@ -789,6 +1112,160 @@ def get_task(
     return task
 
 
+@router.get("/{task_id}/tree", response_model=AgentTaskTreeOut)
+def get_task_tree(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Read the root control state and all tasks in a task tree."""
+    root = _get_root_task(_get_task(task_id, session), session)
+    _ensure_tree_visible(root, current)
+    return _tree_response(root, datetime.now(timezone.utc), session)
+
+
+@router.post("/{task_id}/pause-tree", response_model=AgentTaskTreeOut)
+def pause_task_tree(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Stop new claims and revoke current server-side claims for a task tree."""
+    root = _get_root_task(_get_task(task_id, session), session)
+    _require_tree_pause_actor(root, current)
+    if root.control_status == "canceled":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task tree is canceled")
+
+    now = datetime.now(timezone.utc)
+    root = _transition_root_control(
+        root,
+        allowed_statuses={"active", "pause_requested", "paused", "awaiting_human"},
+        next_status="pause_requested",
+        checkpoint_reason="manual_pause",
+        now=now,
+        session=session,
+    )
+    _release_tree_claims(root, now, "task tree paused", session)
+    root = _transition_root_control(
+        root,
+        allowed_statuses={"pause_requested"},
+        next_status="paused",
+        now=now,
+        session=session,
+    )
+    return _tree_response(root, now, session)
+
+
+@router.post("/{task_id}/checkpoint", response_model=AgentTaskTreeOut)
+def checkpoint_task_tree(
+    task_id: int,
+    body: AgentTaskTreeCheckpoint,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Pause a task tree at a declared checkpoint pending human approval."""
+    root = _get_root_task(_get_task(task_id, session), session)
+    _require_checkpoint_actor(root, current)
+    if root.control_status == "canceled":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task tree is canceled")
+
+    now = datetime.now(timezone.utc)
+    root = _transition_root_control(
+        root,
+        allowed_statuses={"active", "pause_requested", "paused", "awaiting_human"},
+        next_status="awaiting_human",
+        checkpoint_reason=body.reason,
+        now=now,
+        session=session,
+    )
+    _release_tree_claims(root, now, f"task tree checkpoint: {body.reason}", session)
+    session.commit()
+    session.expire_all()
+    return _tree_response(_get_task(int(root.id), session), now, session)
+
+
+@router.post("/{task_id}/resume-tree", response_model=AgentTaskTreeOut)
+def resume_task_tree(
+    task_id: int,
+    body: AgentTaskTreeResume,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Open a new finite authorization epoch for a paused task tree."""
+    root = _get_root_task(_get_task(task_id, session), session)
+    _require_tree_manager(root, current)
+    if root.control_status not in {"paused", "awaiting_human"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task tree control is {root.control_status}, not paused or awaiting_human",
+        )
+    if root.may_delegate and body.slice_budget < 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="delegating task trees require a slice_budget between 1 and 3",
+        )
+    if not root.may_delegate and body.slice_budget != 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="non-delegating task trees require slice_budget=0",
+        )
+
+    now = datetime.now(timezone.utc)
+    root = _transition_root_control(
+        root,
+        allowed_statuses={"paused", "awaiting_human"},
+        next_status="active",
+        authorization_epoch=(root.authorization_epoch or 0) + 1,
+        authorized_slice_budget=body.slice_budget,
+        reserved_slice_count=0,
+        authorization_expires_at=(
+            now + timedelta(seconds=body.authorization_ttl_seconds)
+            if root.may_delegate
+            else None
+        ),
+        checkpoint_reason=None,
+        now=now,
+        session=session,
+    )
+    return _tree_response(root, now, session)
+
+
+@router.post("/{task_id}/cancel-tree", response_model=AgentTaskTreeOut)
+def cancel_task_tree(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Cancel every nonterminal task and permanently close the task tree."""
+    root = _get_root_task(_get_task(task_id, session), session)
+    _require_tree_manager(root, current)
+    now = datetime.now(timezone.utc)
+    if root.control_status != "canceled":
+        root = _transition_root_control(
+            root,
+            allowed_statuses={
+                "active",
+                "pause_requested",
+                "paused",
+                "awaiting_human",
+                "cancel_requested",
+            },
+            next_status="cancel_requested",
+            checkpoint_reason="manual_cancel",
+            now=now,
+            session=session,
+        )
+        _cancel_tree_tasks(root, now, session)
+        root = _transition_root_control(
+            root,
+            allowed_statuses={"cancel_requested"},
+            next_status="canceled",
+            now=now,
+            session=session,
+        )
+    return _tree_response(root, now, session)
+
+
 @router.post("/{task_id}/request-clarification", response_model=AgentTaskOut)
 def request_task_clarification(
     task_id: int,
@@ -904,16 +1381,45 @@ def claim_task(
         session.expire_all()
         task = _get_task(task_id, session)
         instance = _ensure_instance_owner(body.instance_id, current, session)
+    root = _get_root_task(task, session)
     if task.status == "running" and task.claimed_by == current.id and task.instance_id == body.instance_id:
+        if root.control_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"task tree control is {root.control_status}, not active",
+            )
         if task.claim_token is None:
-            task.claim_token = uuid4().hex
-            task.attempt = max(task.attempt, 1)
-            task.heartbeat_at = now
-            task.lease_expires_at = now + timedelta(seconds=body.lease_seconds)
-            _touch_task(task, now)
-            session.add(task)
+            claim_token = uuid4().hex
+            token_conditions = [
+                AgentTask.id == task_id,
+                AgentTask.status == "running",
+                AgentTask.claimed_by == current.id,
+                AgentTask.claim_token.is_(None),
+            ]
+            token_conditions.extend(
+                _root_control_claim_conditions(root, now, require_unexpired=False)
+            )
+            result = session.execute(
+                update(AgentTask)
+                .where(*token_conditions)
+                .values(
+                    claim_token=claim_token,
+                    attempt=func.max(AgentTask.attempt, 1),
+                    heartbeat_at=now,
+                    lease_expires_at=now + timedelta(seconds=body.lease_seconds),
+                    updated_at=now,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if result.rowcount != 1:
+                session.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="task claim is no longer active",
+                )
             session.commit()
-            session.refresh(task)
+            session.expire_all()
+            return _get_task(task_id, session)
         return task
     if task.status != "queued":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is already {task.status}")
@@ -926,9 +1432,8 @@ def claim_task(
         )
 
     claim_token = uuid4().hex
-    root = _get_root_task(task, session)
     claim_conditions = [AgentTask.id == task_id, AgentTask.status == "queued"]
-    claim_conditions.extend(_descendant_claim_conditions(task, root))
+    claim_conditions.extend(_descendant_claim_conditions(task, root, now))
     result = session.execute(
         update(AgentTask)
         .where(*claim_conditions)
@@ -956,10 +1461,10 @@ def claim_task(
             and current_task.instance_id == body.instance_id
         ):
             return current_task
-        if current_task.status == "queued" and current_task.parent_task_id is not None:
+        if current_task.status == "queued":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=_claim_budget_conflict_detail(current_task, session),
+                detail=_claim_budget_conflict_detail(current_task, now, session),
             )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is already {current_task.status}")
 
@@ -999,14 +1504,19 @@ def heartbeat_task(
         session.commit()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim lease has expired")
 
+    root = _get_root_task(task, session)
+    heartbeat_conditions = [
+        AgentTask.id == task_id,
+        AgentTask.status == "running",
+        AgentTask.claim_token == body.claim_token,
+        or_(AgentTask.lease_expires_at.is_(None), AgentTask.lease_expires_at > now),
+    ]
+    heartbeat_conditions.extend(
+        _root_control_claim_conditions(root, now, require_unexpired=False)
+    )
     result = session.execute(
         update(AgentTask)
-        .where(
-            AgentTask.id == task_id,
-            AgentTask.status == "running",
-            AgentTask.claim_token == body.claim_token,
-            or_(AgentTask.lease_expires_at.is_(None), AgentTask.lease_expires_at > now),
-        )
+        .where(*heartbeat_conditions)
         .values(
             heartbeat_at=now,
             lease_expires_at=now + timedelta(seconds=body.lease_seconds),
@@ -1063,6 +1573,10 @@ def complete_task(
         "canceled": "canceled",
     }[body.status]
     completion_conditions = [AgentTask.id == task_id, AgentTask.status == "running"]
+    root = _get_root_task(task, session)
+    completion_conditions.extend(
+        _root_control_claim_conditions(root, now, require_unexpired=False)
+    )
     if task.claim_token is not None:
         completion_conditions.extend(
             [

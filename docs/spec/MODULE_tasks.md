@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树、委派权限与服务端硬预算已实现，暂停 / 授权、澄清轮次和 Review/Test 门禁仍待后续切片
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2.1 根控制状态与有限批次授权已实现，runner 协作中断、澄清轮次和 Review/Test 门禁仍待后续切片
 
 ## 目标
 
@@ -271,7 +271,7 @@ TALK MCP / pi extension 已覆盖以下能力：
 - `created_by` / `target_member_id` / `claimed_by` / `instance_id`：区分请求者、执行者和实际 runner；
 - `workflow_status` / `result_collected_at`：区分执行状态、结果提交与结果收取。
 
-`parent_task_id` / `root_task_id` / `delegation_depth` / `may_delegate` 与四项根治理预算已在 TH-6a1 落地；根控制状态、授权 epoch、更细时间点与业务幂等键仍属于后续可靠性切片。claim lease、attempt 与私有 token 已落地。
+`parent_task_id` / `root_task_id` / `delegation_depth` / `may_delegate` 与四项根治理预算已在 TH-6a1 落地；`control_status`、授权 epoch、切片额度、授权到期时间和检查点原因已在 TH-6a2.1 落地。claim lease、attempt 与私有 token 已落地；业务幂等键仍属于后续可靠性切片。
 
 ### 项目级 Web 信息架构
 
@@ -310,16 +310,18 @@ TH-6a1 已按以下字段语义实现任务树与硬预算：
 
 创建带 `parent_task_id` 的任务时，服务端必须校验：调用者确实是父任务执行者或有权控制该根任务、父任务仍可继续协作、根控制状态允许推进、委派权限存在、深度未超限、非终态后代预算尚有余额。claim 时必须再次原子校验根控制状态、根并发和单目标并发，覆盖并发请求、直接 REST API 与第三方客户端。
 
-当前已实现其中的调用者权限、父任务执行状态、委派权限、项目继承、深度、非终态后代、根运行并发和单目标运行并发校验。非终态预留与 claim 均通过条件更新串行化竞争请求；根控制状态要等 TH-6a2 引入后再并入同一原子条件。旧任务迁移时各自回填为独立根，深度为 0、`may_delegate=false`，并获得默认治理值，旧完成 / 收取流程不变。
+当前已实现调用者权限、父任务执行状态、委派权限、项目继承、深度、非终态后代、根运行并发、单目标运行并发、根控制状态、授权到期时间和授权 epoch 校验。子任务创建必须提交根任务当前 `authorization_epoch`；切片预留和 claim 均通过条件更新串行化竞争请求，旧批次请求、直接 REST API 与第三方客户端不能绕过。旧任务迁移时各自回填为独立根，深度为 0、`may_delegate=false`，并获得默认治理值，旧完成 / 收取流程不变。
 
 ### 有限批次授权与自动检查点
 
-根任务的推进授权至少记录：
+TH-6a2.1 已实现以下根任务推进授权字段：
 
 - `authorization_epoch`：每次人类重新授权时递增，便于拒绝陈旧主 Agent 使用旧授权继续创建任务。
 - `authorized_slice_budget` / `reserved_slice_count`：当前批次允许启动与已预留的开发切片数。
 - `authorization_expires_at`：当前批次授权到期时间；默认最长连续推进窗口遵循 `AGENTS.md` 的 60–90 分钟规则。
 - `checkpoint_reason`：暂停原因，例如 `batch_limit`、`risk_boundary`、`milestone`、`time_limit`、`usage_limit`、`review_exhausted`、`needs_decision`、`manual_pause`。
+
+当前根任务开启委派时默认获得 2 个切片、90 分钟授权；Human 可显式设置 1–3 个切片与 60–5400 秒有效期。恢复会递增 `authorization_epoch`、重置当前批次预留数并生成新的到期时间。历史可委派根任务回填为 `active / epoch=1`，已有后代数量计入默认额度，避免升级后凭空获得额外切片；历史不可委派任务保持兼容，授权额度为 0。
 
 批次规则：
 
@@ -329,6 +331,8 @@ TH-6a1 已按以下字段语义实现任务树与硬预算：
 - 同一切片的 `rework` 不算新功能切片，但 Review 自动返工最多 2 轮；仍未通过时根任务进入 `awaiting_human`，由人类决定调整范围、继续或终止。
 - 批次额度耗尽后，已创建任务及其 Review 可以安全收尾，但主 Agent 不能创建新的开发切片；收尾完成后根任务自动进入 `awaiting_human`。
 - 到达可独立体验的里程碑时，无论额度是否仍有剩余，都必须在 Review、完整自动化回归和黑盒测试结束后进入 `awaiting_human`，不能自动开启下一阶段。
+
+TH-6a2.1 尚无 `task_kind`，因此当前每个新后代统一按 1 个开发切片计数；`review / test / rework` 的免计或复用规则要等 TH-6c 的任务类型与关系落地。额度耗尽已能原子拒绝新后代，授权到期会在下一次创建或 claim 时把根任务推进到 `awaiting_human / time_limit`；“已创建任务安全收尾后自动因 `batch_limit` 进入等待”仍待后续任务关系与汇总逻辑补齐。
 
 ### 根任务控制状态与随时喊停
 
@@ -355,12 +359,16 @@ active/paused/awaiting_human -> cancel_requested -> canceled
 - `POST /api/tasks/{task_id}/cancel-tree`：只有根请求者或 Human 管理者可调用；排队任务取消，运行任务进入协作中断，最终整树终止。
 - `GET /api/tasks/{task_id}/tree`：返回根任务、后代、当前授权、预算占用、质量门禁与控制状态，供终端和 Blackboard 使用。
 
+以上五个服务端入口已在 TH-6a2.1 实现，并同步提供 async / sync SDK helper。当前 `tree` 返回根任务、全树任务、运行 / 非终态后代数、剩余切片额度和授权是否过期；质量门禁字段要等 TH-6c / TH-6d 再加入。权限按根请求者、Human 管理者和根执行者分级，传入后代 id 会先解析到根任务。
+
 暂停传播规则：
 
 - 服务端写入 `pause_requested` 后立即拒绝后代创建和 claim，不能等待主 Agent 下一轮 prompt 自查。
 - bundled runner 在本地命令运行期间最多每 5 秒检查一次控制指令；收到暂停 / 终止后停止本地子进程，不写入伪成功结果。
 - 暂停导致的协作中断把仍需继续的任务安全恢复为 `queued / accepted`，清除并失效当前 claim token；恢复后产生新 attempt，陈旧 runner 结果继续被服务端拒绝。
 - 第三方 runner 若不支持协作中断，服务端至少立即撤销其写回资格并等待租约回收；TALK 不承诺跨机器强杀未知进程。
+
+TH-6a2.1 已完成服务端部分：暂停 / 检查点会把运行任务安全回到 `queued / accepted`，清除 claim token 与实例占用；整树终止会取消所有非终态任务；心跳和完成接口会拒绝陈旧 claim。bundled runner 仍不会在本地命令运行时主动轮询控制状态，最长 5 秒检查与本地子进程停止属于 TH-6a2.2。
 
 ### Task Hall 澄清轮次合同
 
@@ -422,9 +430,9 @@ Review 策略：
 - async / sync client 与 Codex MCP / pi extension 已覆盖项目化创建、单任务读取、协作状态过滤、澄清、接受、等待、Hall 回复、安全取消和结果收取。
 - bundled runner 已把新任务结果写入对应 Task Hall，但仍兼容无 `hall_group_id` 的旧任务全局回传。
 - `talk_wait_tasks` 当前是最长 30 秒的客户端轮询，不是服务端事件流；Agent 发现结果也尚未提供项目业务角色字段。
-- 当前取消只覆盖未领取任务；运行中取消仍需 runner 协作中断协议。
+- 单任务 `cancel` 仍只覆盖未领取任务；`cancel-tree` 已能立即撤销全树服务端执行权并取消非终态任务，但本地运行进程的主动停止仍需 runner 协作中断协议。
 - TH-6a1 已实现任务树字段、旧库回填、委派权限及深度 / 根并发 / 单目标并发 / 非终态后代硬预算；async / sync SDK 已暴露对应创建参数。
-- 当前尚无根任务 `control_status` 和有限批次授权；服务端已能拒绝直接 API 绕过任务树预算，但还不能在人类暂停后阻止推进或传播协作中断，需由 TH-6a2 补齐。
+- TH-6a2.1 已实现根任务 `control_status`、有限批次授权、旧 epoch 拒绝，以及暂停 / 恢复 / 检查点 / 整树终止的服务端传播；TH-6a2.2 仍需让 bundled runner 在本地执行期间最多每 5 秒响应控制并停止子进程。
 - 根任务当前仍可在后代未结束时自行完成；整树汇总、完成条件和质量门禁要随控制 / Review/Test 后续切片收敛。
 - 当前任务没有 `task_kind`、结构化 Review / 测试结论或任务关系记录；现有 `agent:pi` / `agent:pi-kimi` profile 也不具备完整黑盒测试能力，质量流水线尚不可启用。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
@@ -441,12 +449,13 @@ Review 策略：
 6. [x] 建 Project Blackboard + Task Hall Web UI，形成项目内可见、可操作的完整委派流程。
 7. [x] TH-6a0：冻结任务树治理、有限批次授权、随时暂停、澄清轮次与 Review/Test 质量门禁合同。
 8. [x] TH-6a1：实现任务树字段、旧数据迁移、委派权限、深度 / 根并发 / 单目标并发 / 非终态后代硬预算及并发测试。
-9. TH-6a2：实现根任务控制状态、有限批次授权、暂停 / 继续 / 整树终止与 bundled runner 协作中断。
-10. TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
-11. TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
-12. TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
-13. TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停。
-14. TH-7：补 Codex Desktop / 通用终端接入包装，再评估 schedule 项目化、长任务事件等待、document lock 等后续能力。
+9. [x] TH-6a2.1：实现根任务控制状态、有限批次授权、暂停 / 继续 / 检查点 / 整树终止服务端控制面、SDK 与原子门禁。
+10. TH-6a2.2：实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断与安全回队。
+11. TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
+12. TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
+13. TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
+14. TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停。
+15. TH-7：补 Codex Desktop / 通用终端接入包装，再评估 schedule 项目化、长任务事件等待、document lock 等后续能力。
 
 ## 验收点
 
@@ -483,8 +492,10 @@ Review 策略：
 - [x] Browser 真实交互已贯通登录、委派、Hall 消息、bundled runner 领取 / 回写、结果待收取和请求者完成收取，控制台无 error / warning。
 - [x] 真实 Codex / pi CLI 均已贯通领取、执行、单条 Hall 结果回写与结果收取；独立任务命令已消除 pi 同时调用 TALK 工具造成的重复结果。
 - [x] 服务端原子强制任务树深度、根并发、单目标并发、非终态后代和委派授权预算，直接 API 不可绕过。
-- [ ] Human 可随时暂停根任务树；暂停后禁止新建 / claim，bundled runner 协作中断且陈旧结果无法写回。
-- [ ] “继续一批”生成有限切片授权；额度、时间、风险、Review 或里程碑边界会进入 `awaiting_human`。
+- [x] 服务端可随时暂停根任务树；暂停后禁止新建 / claim、立即撤销现有 claim，陈旧心跳与结果无法写回。
+- [ ] bundled runner 收到暂停 / 终止后最多 5 秒停止本地子进程，并按服务端状态安全回队或取消。
+- [x] “继续一批”生成新的有限切片授权与 `authorization_epoch`；并发预留、到期和陈旧 epoch 由服务端原子拒绝。
+- [ ] 批次安全收尾、风险、Review 或里程碑边界会按完整任务关系自动进入 `awaiting_human`。
 - [ ] 澄清按问题批次与显式答复边界计轮，额度耗尽进入 `needs_decision`，不能猜测执行。
 - [ ] 必需 Review 未通过时根任务不能提交；低风险批量 Review、独立 Reviewer 和最多两轮自动返工受服务端约束。
 - [ ] 里程碑最新冻结版本必须通过完整自动化回归和黑盒测试，随后自动暂停等待 Human 验收。
