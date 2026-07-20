@@ -184,6 +184,59 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-20 TH-6a3：Task Hall 有界澄清轮次与决策阻塞
+
+**背景**：TH-6a0 已冻结“一批集中问题 + 一批完整答复”按轮计数、默认 1 轮、绝对上限 2 轮的合同；旧实现只有 `clarification_requested` 状态，普通回复与完整答复无法区分，也没有额度耗尽后的阻塞。由于本轮涉及数据库、协议和根控制传播，按高风险切片刹车只完成 TH-6a3，不进入 runner 自动预检或 Web 控制入口。
+
+### 实现
+
+- `agent_tasks` 新增 `max_clarification_rounds / clarification_round_count`；旧库默认回填 1 / 0。创建任务只接受 1–2 轮，schedule 物化任务保持默认 1 轮。
+- 新增 `agent_task_clarification_rounds` 账本，按任务和轮次保存问题消息、答复起止消息与时间；`task_id + round_index` 唯一，配合条件更新保证并发请求只建立一轮。
+- B 必须先在 Task Hall 发送问题，再调用 `request-clarification` 登记边界；A 可连续补充多条，最后调用 `submit-clarification-answer` 明确结束答复。普通 Hall 回复不会改变状态。
+- 新增 `clarification_answered / needs_decision`。显式答复后仍禁止直接 claim，B 必须 `accept`；额度耗尽时任务进入 `needs_decision`，根任务进入 `awaiting_human / needs_decision`，活动 claim 被撤销。
+- 新增 `resolve-clarification`：Human、当前任务请求者或根请求者可补充范围后释放，或增加一轮额度；绝对上限仍为 2。根控制保持等待，需单独 `resume-tree` 恢复，防止解决局部澄清时意外放开全树。
+- async / sync SDK 新增轮次查询、问题登记、答复提交和人工释放 helper；Python MCP 与 pi extension 的 `talk_reply_task` 使用当前 Hall 消息 id 作为问题 / 答复边界，并支持人工释放动作。
+- 旧无 Hall / 无轮次账本的澄清任务保留兼容接受路径；旧客户端从 `assigned` 直接 claim 继续兼容，但新澄清三态均受服务端 claim 门禁约束。
+
+### 测试
+
+- 覆盖 1–2 轮创建边界、错误发送者边界、普通回复不推进、重复问题 / 答复幂等、多条答复起止边界和明确接受后才能 claim。
+- 覆盖额度耗尽进入 `needs_decision / awaiting_human`、错误解决者拒绝、增加一轮、显式恢复根控制、绝对上限 2 和再次耗尽。
+- 使用两个并发客户端同时登记不同问题，验证仅一个请求成功、计数为 1 且只有一条账本记录。
+- 迁移测试验证旧任务字段回填及轮次唯一索引；async / sync SDK 与 Task Hall 工具活服务流程均贯通新协议。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -q`：`Ran 32 tests in 17.814s ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 337 tests in 118.141s ... OK`。
+- Python `py_compile`、TypeScript `node --experimental-strip-types --check` 与 `git diff --check`：通过。
+- 本切片无 Web 代码改动，不需要 Browser 验证。
+
+### 用户手册影响
+
+- 已同步 `docs/guides/USER_MANUAL.md`：使用非技术语言说明普通消息不会自动结束澄清、默认一轮 / 最多两轮和额度耗尽会暂停；页面尚无提交答复或人工决策入口，因此只说明需项目负责人协助，不写启动服务、API 或开发命令。
+
+### 变更文件
+
+- `server/models.py`
+- `server/db.py`
+- `server/routes/tasks.py`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `bridges/talk_task_tools.py`
+- `bridges/talk_tools_extension.ts`
+- `tests/test_tasks.py`
+- `tests/test_talk_client.py`
+- `tests/test_talk_task_tools.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. TH-6b：让 bundled runner 在 claim 前预检任务充分性，自动进入同 Hall 澄清、等待显式答复，并分页重放完整任务 / Hall 上下文。
+2. TH-6c / TH-6d：再进入 Review / Test 门禁与 Blackboard 最终用户控制入口；本高风险切片完成后先暂停汇总，不连续开启下一切片。
+
+---
+
 ## 2026-07-20 TH-6a2.2：bundled runner 最长 5 秒协作中断
 
 **背景**：TH-6a2.1 已能在服务端持久化暂停 / 检查点 / 整树终止并立即撤销运行 claim，但 bundled runner 默认每 30 秒才续租一次，导致本地 CLI 进程不能在合同要求的 5 秒窗口内感知控制。本轮按 runner 高风险切片只补协作中断，不进入澄清轮次、Web 控制入口或 Review/Test 门禁。

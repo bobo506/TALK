@@ -365,6 +365,7 @@ class TalkClient:
         max_nonterminal_descendants: int | None = None,
         slice_budget: int | None = None,
         authorization_ttl_seconds: int | None = None,
+        max_clarification_rounds: int = 1,
     ) -> JsonDict:
         payload: JsonDict = {
             "target_member_id": target_member_id,
@@ -380,6 +381,7 @@ class TalkClient:
             "max_nonterminal_descendants": max_nonterminal_descendants,
             "slice_budget": slice_budget,
             "authorization_ttl_seconds": authorization_ttl_seconds,
+            "max_clarification_rounds": max_clarification_rounds,
         }
         return await self._request_json("POST", "/api/tasks", json_body=payload)
 
@@ -437,8 +439,45 @@ class TalkClient:
     async def cancel_task_tree(self, task_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/cancel-tree")
 
-    async def request_task_clarification(self, task_id: int) -> JsonDict:
-        return await self._request_json("POST", f"/api/tasks/{task_id}/request-clarification")
+    async def list_task_clarification_rounds(self, task_id: int) -> list[JsonDict]:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/clarification-rounds")
+
+    async def request_task_clarification(
+        self,
+        task_id: int,
+        *,
+        question_message_id: int | None = None,
+    ) -> JsonDict:
+        body = None if question_message_id is None else {"question_message_id": question_message_id}
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/request-clarification",
+            json_body=body,
+        )
+
+    async def submit_task_clarification_answer(
+        self,
+        task_id: int,
+        *,
+        answer_message_id: int,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/submit-clarification-answer",
+            json_body={"answer_message_id": answer_message_id},
+        )
+
+    async def resolve_task_clarification(
+        self,
+        task_id: int,
+        *,
+        allow_additional_round: bool = False,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/resolve-clarification",
+            json_body={"allow_additional_round": allow_additional_round},
+        )
 
     async def accept_task(self, task_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/accept")

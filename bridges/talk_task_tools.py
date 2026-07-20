@@ -13,6 +13,8 @@ from urllib.request import Request, urlopen
 JsonDict = dict[str, Any]
 DEFAULT_WAIT_WORKFLOW_STATUSES = [
     "clarification_requested",
+    "clarification_answered",
+    "needs_decision",
     "submitted",
     "completed",
     "failed",
@@ -190,10 +192,26 @@ def get_task(task_id: int, *, include_messages: bool = True) -> JsonDict:
     return result
 
 
-def reply_task(*, task_id: int, body: str, workflow_action: str = "none") -> JsonDict:
+def reply_task(
+    *,
+    task_id: int,
+    body: str,
+    workflow_action: str = "none",
+    allow_additional_round: bool = False,
+) -> JsonDict:
     normalized_action = workflow_action.strip().lower()
-    if normalized_action not in {"none", "request_clarification", "accept"}:
-        raise TalkToolError("workflow_action 必须是 none、request_clarification 或 accept")
+    allowed_actions = {
+        "none",
+        "request_clarification",
+        "submit_clarification_answer",
+        "resolve_clarification",
+        "accept",
+    }
+    if normalized_action not in allowed_actions:
+        raise TalkToolError(
+            "workflow_action 必须是 none、request_clarification、"
+            "submit_clarification_answer、resolve_clarification 或 accept"
+        )
     task = _api_request("GET", f"/api/tasks/{int(task_id)}")
     current_member_id = _member_id()
     if current_member_id == task.get("created_by"):
@@ -209,7 +227,23 @@ def reply_task(*, task_id: int, body: str, workflow_action: str = "none") -> Jso
     message = _api_request("POST", "/api/messages", json_body=message_body)
 
     if normalized_action == "request_clarification":
-        task = _api_request("POST", f"/api/tasks/{int(task_id)}/request-clarification")
+        task = _api_request(
+            "POST",
+            f"/api/tasks/{int(task_id)}/request-clarification",
+            json_body={"question_message_id": message["id"]},
+        )
+    elif normalized_action == "submit_clarification_answer":
+        task = _api_request(
+            "POST",
+            f"/api/tasks/{int(task_id)}/submit-clarification-answer",
+            json_body={"answer_message_id": message["id"]},
+        )
+    elif normalized_action == "resolve_clarification":
+        task = _api_request(
+            "POST",
+            f"/api/tasks/{int(task_id)}/resolve-clarification",
+            json_body={"allow_additional_round": bool(allow_additional_round)},
+        )
     elif normalized_action == "accept":
         task = _api_request("POST", f"/api/tasks/{int(task_id)}/accept")
     return {"task": task, "message": message}
@@ -332,7 +366,7 @@ TOOL_SCHEMAS: list[JsonDict] = [
     },
     {
         "name": "talk_reply_task",
-        "description": "在 Task Hall 回复或纠偏；执行者可同时标记 request_clarification 或 accept。",
+        "description": "在 Task Hall 回复，并可同步请求澄清、明确提交回答、释放人工决策或接受任务。",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -340,8 +374,15 @@ TOOL_SCHEMAS: list[JsonDict] = [
                 "body": {"type": "string"},
                 "workflow_action": {
                     "type": "string",
-                    "enum": ["none", "request_clarification", "accept"],
+                    "enum": [
+                        "none",
+                        "request_clarification",
+                        "submit_clarification_answer",
+                        "resolve_clarification",
+                        "accept",
+                    ],
                 },
+                "allow_additional_round": {"type": "boolean"},
             },
             "required": ["task_id", "body"],
         },
@@ -401,6 +442,7 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             task_id=int(arguments["task_id"]),
             body=str(arguments.get("body") or "").strip(),
             workflow_action=str(arguments.get("workflow_action") or "none"),
+            allow_additional_round=bool(arguments.get("allow_additional_round", False)),
         )
     if name == "talk_cancel_task":
         return cancel_task(

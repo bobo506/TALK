@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2.1 根控制状态与有限批次授权、TH-6a2.2 runner 协作中断已实现，澄清轮次和 Review/Test 门禁仍待后续切片
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2 根控制 / 有限授权 / runner 协作中断、TH-6a3 澄清轮次已实现，runner 自动预检和 Review/Test 门禁仍待后续切片
 
 ## 目标
 
@@ -31,12 +31,14 @@
 - `delegation_depth`：根任务为 0，后代为父任务深度 + 1
 - `may_delegate`：当前任务执行者是否可继续创建子任务；默认 `false`
 - `max_delegation_depth` / `max_running_descendants` / `max_running_per_target` / `max_nonterminal_descendants`：只保存在根任务上的统一治理预算；后代字段为空并读取根任务
+- `max_clarification_rounds`：当前任务允许的澄清轮数，默认 1，绝对上限 2
+- `clarification_round_count`：已经开启的澄清轮数；同一轮的多条问题或答复消息不会重复计数
 - `target_member_id`：目标 Agent 成员，例如 `agent:codex`
 - `created_by`：任务创建者
 - `content`：任务正文
 - `title`：可选短标题
 - `status`：runner 执行五态，保持 `queued`、`running`、`succeeded`、`failed`、`canceled`
-- `workflow_status`：协作流程状态，支持 `assigned`、`clarification_requested`、`accepted`、`in_progress`、`submitted`、`completed`、`failed`、`canceled`
+- `workflow_status`：协作流程状态，支持 `assigned`、`clarification_requested`、`clarification_answered`、`needs_decision`、`accepted`、`in_progress`、`submitted`、`completed`、`failed`、`canceled`
 - `attempt`：成功 claim 的递增次数；首次领取为 1，租约过期重领后递增
 - `claimed_by`：领取任务的 Agent
 - `instance_id`：处理任务的 Agent 实例
@@ -47,6 +49,8 @@
 - `created_at` / `updated_at` / `claimed_at` / `finished_at` / `result_collected_at`
 
 即时任务和 schedule 物化任务都会原子创建一个独立 Task Hall。Hall 当前只包含请求者与执行者：请求者为 `owner`，执行者为 `member`。关联 Task Hall 不能通过普通 Group API 增删成员或独立删除。
+
+`agent_task_clarification_rounds` 保存任务澄清轮次账本：每条记录包含 `task_id / round_index / status`、B 的 `question_message_id`、A 答复的起止消息 id 和请求 / 答复时间；`task_id + round_index` 唯一，防止并发请求重复消耗轮次。
 
 `agent_task_schedules` 表记录延迟或周期性任务计划：
 
@@ -70,6 +74,7 @@
 - 请求者与目标成员必须不同。
 - 可传 `project_id`，且项目必须存在；省略时按旧客户端兼容为无项目归属。
 - 顶层任务可传 `may_delegate` 和四项根治理预算；只有 Human 可以授予顶层委派权限或覆盖默认预算，普通 Agent 创建的顶层任务保持默认限制且不可继续委派。
+- 可传 `max_clarification_rounds=1|2`；省略时默认 1，不接受 0、3 或无限轮次。
 - 带 `parent_task_id` 时创建子任务：父任务必须处于 `running / in_progress`、父任务已获 `may_delegate`，调用者必须是父任务执行者、根请求者或 Human；`project_id` 从父任务继承，不能改写。
 - 子任务深度和非终态后代数量由服务端在创建事务中校验；后代并发和同目标并发由 claim 条件更新再次原子校验，直接 REST API 不能绕过。
 - 创建后执行状态为 `queued`、协作状态为 `assigned`，并自动返回唯一 `hall_group_id`。
@@ -86,12 +91,29 @@
 
 `POST /api/tasks/{task_id}/request-clarification`
 
-- 仅执行者可调用；把 `assigned` 推进为 `clarification_requested`。
-- 实际问题正文通过对应 Task Hall 的消息时间线发送；处于该状态时不能 claim。
+- 仅执行者可在未领取且根控制为 `active` 时调用；B 必须先在对应 Task Hall 发送集中问题，再以 `question_message_id` 登记边界。为兼容既有工具，省略 id 时会使用 Hall 中 B 最近一条未撤回消息。
+- 从 `assigned` 或 `clarification_answered` 开启下一轮，并原子递增 `clarification_round_count`；同一问题边界重复调用幂等返回，并发不同请求只有一个能建立该轮。
+- 轮次额度已耗尽时不再创建新账本记录，任务进入 `needs_decision`，根任务同步进入 `awaiting_human / needs_decision` 并撤销全树活动 claim。
+
+`GET /api/tasks/{task_id}/clarification-rounds`
+
+- 当前任务可见成员可按轮次顺序读取问题与答复消息边界。
+
+`POST /api/tasks/{task_id}/submit-clarification-answer`
+
+- 仅原请求者可调用；A 可先连续发送多条补充，再用最后一条答复的 `answer_message_id` 明确提交整批答复。
+- 服务端从问题边界之后找到 A 的第一条未撤回消息作为答复起点，并保存显式结束边界；普通 Hall 回复本身不会改变任务状态。
+- 提交成功后任务进入 `clarification_answered`；相同结束边界重复提交幂等返回。
+
+`POST /api/tasks/{task_id}/resolve-clarification`
+
+- 仅 Human 管理者、当前任务请求者或根任务请求者可释放 `needs_decision`。
+- 可选择只补充范围后继续，或把额度增加 1 轮；总额度仍不能超过 2。释放后任务回到 `clarification_answered`，根任务继续保持 `awaiting_human`，必须再经既有 `resume-tree` 明确恢复推进权限。
 
 `POST /api/tasks/{task_id}/accept`
 
-- 仅执行者可调用；把 `assigned` 或 `clarification_requested` 推进为 `accepted`。
+- 仅执行者可调用；新协议只允许把 `assigned` 或 `clarification_answered` 推进为 `accepted`。
+- 有显式轮次账本的 `clarification_requested` 不能直接接受，必须由请求者先提交答复；无账本的历史澄清状态保留兼容接受路径。
 
 `POST /api/tasks/{task_id}/collect-result`
 
@@ -111,7 +133,7 @@
 - claim 使用条件更新保证并发领取只有一个请求成功；同一实例重复 claim 当前任务保持幂等。
 - 可传 `instance_id`，且该实例必须属于当前 Agent。
 - 可传 `lease_seconds`（默认 120 秒，范围 5–3600 秒）；成功领取生成私有 `claim_token`、递增 `attempt` 并返回 `lease_expires_at`。
-- `clarification_requested` 必须先接受，不能直接领取；旧客户端从 `assigned` 直接领取仍兼容。
+- `clarification_requested / clarification_answered / needs_decision` 均不能直接领取；B 必须完成澄清协议并显式接受。旧客户端从 `assigned` 直接领取仍兼容。
 - 领取后执行状态变为 `running`、协作状态变为 `in_progress`；关联实例会变为 `busy`，并写入 `current_task_id`。
 
 `POST /api/tasks/{task_id}/heartbeat`
@@ -171,10 +193,13 @@
 
 `TalkClient` 与 `TalkClientSync` 已提供：
 
-- `create_task(target_member_id, content, title=None, project_id=None, parent_task_id=None, may_delegate=False, max_delegation_depth=None, max_running_descendants=None, max_running_per_target=None, max_nonterminal_descendants=None)`
+- `create_task(target_member_id, content, ..., max_clarification_rounds=1)`
 - `list_tasks(target_member_id=None, status=None, workflow_status=None, project_id=None)`
 - `get_task(task_id)`
-- `request_task_clarification(task_id)`
+- `list_task_clarification_rounds(task_id)`
+- `request_task_clarification(task_id, question_message_id=None)`
+- `submit_task_clarification_answer(task_id, answer_message_id=...)`
+- `resolve_task_clarification(task_id, allow_additional_round=False)`
 - `accept_task(task_id)`
 - `collect_task_result(task_id)`
 - `cancel_task(task_id)`
@@ -202,8 +227,8 @@
 - Codex 使用 `bridges/talk_send_mcp.py`，pi 使用 `bridges/talk_tools_extension.ts`；两端共同提供 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result` 八个 Task Hall 工具，原有 deferred `talk_send` 保持兼容。
 - bridge 会从项目目录的 `.talk/project.yaml` 注入默认 `TALK_PROJECT_ID`；调用方仍可在工具参数中显式覆盖项目。
 - `talk_list_agents` 会结合项目 Agent profile、成员与实例状态返回可委派对象及在线 / 忙闲情况。
-- `talk_wait_tasks` 当前采用最长 30 秒的有界客户端轮询，等待澄清、提交、完成、失败或取消状态；尚未引入服务端事件等待协议。
-- `talk_reply_task` 把正文写入对应 Task Hall，并可附带请求澄清或接受任务动作；`talk_collect_result` 在请求者读取结果后把 `submitted` 推进为 `completed`。
+- `talk_wait_tasks` 当前采用最长 30 秒的有界客户端轮询，默认也会返回 `clarification_answered / needs_decision`；尚未引入服务端事件等待协议。
+- `talk_reply_task` 把正文写入对应 Task Hall，并可把该消息原子关联为请求澄清、提交澄清答复、释放人工决策或接受任务动作；`talk_collect_result` 在请求者读取结果后把 `submitted` 推进为 `completed`。
 - `talk_cancel_task` 遵循服务端安全边界，只能由原请求者取消尚未领取的任务；可选取消原因会先写入 Task Hall。
 
 ### Project Blackboard / Task Hall Web UI
@@ -213,6 +238,7 @@
 - 人类可在项目内选择 Agent、填写标题与正文并创建任务；服务端自动建立的 Task Hall 会同步出现在项目 Hall 列表。
 - 任务卡和详情面板展示请求者、执行者、运行状态、attempt 与活动租约，并按当前成员权限提供进入 Hall、请求澄清、接受、收取结果和取消未领取任务动作。
 - Task Hall 继续复用既有消息时间线和文件 / 回复能力；项目任务每 5 秒刷新一次，runner 回写结果后可从 Hall 与黑板两处看到，并由请求者收取为完成态。
+- Web 目前还没有“提交澄清答复”、轮次提示或 `needs_decision` 处理入口；TH-6a3 先完成服务端、SDK 和终端工具协议，页面闭环留待后续 Blackboard 控制切片。
 
 ## Task Hall 目标态（2026-07-15 确认）
 
@@ -433,6 +459,7 @@ Review 策略：
 - 单任务 `cancel` 仍只覆盖未领取任务；`cancel-tree` 已能立即撤销全树服务端执行权并取消非终态任务，bundled runner 会在最长 5 秒控制探针发现 claim 失效后终止本地命令。第三方 runner 仍需自行实现同一协议。
 - TH-6a1 已实现任务树字段、旧库回填、委派权限及深度 / 根并发 / 单目标并发 / 非终态后代硬预算；async / sync SDK 已暴露对应创建参数。
 - TH-6a2.1 已实现根任务 `control_status`、有限批次授权、旧 epoch 拒绝，以及暂停 / 恢复 / 检查点 / 整树终止的服务端传播；TH-6a2.2 已让 bundled runner 在本地执行期间最多每 5 秒响应 claim 撤销并停止子进程。服务不可达时无法接收新的控制事实，仍由现有本地租约截止时间提供最终失效保护。
+- TH-6a3 已实现每任务 1–2 轮澄清额度、显式问题 / 答复边界账本、`clarification_answered / needs_decision`、人工释放动作和 claim 原子门禁；bundled runner 尚未自动预检、等待答复或重放完整 Hall 上下文，这部分属于 TH-6b。
 - 根任务当前仍可在后代未结束时自行完成；整树汇总、完成条件和质量门禁要随控制 / Review/Test 后续切片收敛。
 - 当前任务没有 `task_kind`、结构化 Review / 测试结论或任务关系记录；现有 `agent:pi` / `agent:pi-kimi` profile 也不具备完整黑盒测试能力，质量流水线尚不可启用。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
@@ -451,7 +478,7 @@ Review 策略：
 8. [x] TH-6a1：实现任务树字段、旧数据迁移、委派权限、深度 / 根并发 / 单目标并发 / 非终态后代硬预算及并发测试。
 9. [x] TH-6a2.1：实现根任务控制状态、有限批次授权、暂停 / 继续 / 检查点 / 整树终止服务端控制面、SDK 与原子门禁。
 10. [x] TH-6a2.2：实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断与安全回队。
-11. TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
+11. [x] TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
 12. TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
 13. TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
 14. TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停。
@@ -496,6 +523,6 @@ Review 策略：
 - [x] bundled runner 收到暂停 / 终止后最多 5 秒停止本地子进程，并按服务端状态安全回队或取消。
 - [x] “继续一批”生成新的有限切片授权与 `authorization_epoch`；并发预留、到期和陈旧 epoch 由服务端原子拒绝。
 - [ ] 批次安全收尾、风险、Review 或里程碑边界会按完整任务关系自动进入 `awaiting_human`。
-- [ ] 澄清按问题批次与显式答复边界计轮，额度耗尽进入 `needs_decision`，不能猜测执行。
+- [x] 澄清按问题批次与显式答复边界计轮，普通回复不提前唤醒；额度耗尽进入 `needs_decision / awaiting_human`，claim 不能猜测执行。
 - [ ] 必需 Review 未通过时根任务不能提交；低风险批量 Review、独立 Reviewer 和最多两轮自动返工受服务端约束。
 - [ ] 里程碑最新冻结版本必须通过完整自动化回归和黑盒测试，随后自动暂停等待 Human 验收。

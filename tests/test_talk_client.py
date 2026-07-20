@@ -276,7 +276,31 @@ class TalkClientTests(RouteTestCase):
                     project_id="prj_sdk_async",
                 )
                 fetched = await agent_client.get_task(created["id"])
-                clarification = await agent_client.request_task_clarification(created["id"])
+                question = await agent_client.send_text(
+                    "Which format?",
+                    to=["human:bobo"],
+                    group_id=created["hall_group_id"],
+                )
+                clarification = await agent_client.request_task_clarification(
+                    created["id"],
+                    question_message_id=question["id"],
+                )
+                async with TalkClient(base_url, "bobo-key") as clarification_manager:
+                    await clarification_manager.send_text(
+                        "Use Markdown.",
+                        to=["agent:demo"],
+                        group_id=created["hall_group_id"],
+                    )
+                    answer_end = await clarification_manager.send_text(
+                        "Keep it concise.",
+                        to=["agent:demo"],
+                        group_id=created["hall_group_id"],
+                    )
+                    answered = await clarification_manager.submit_task_clarification_answer(
+                        created["id"],
+                        answer_message_id=answer_end["id"],
+                    )
+                clarification_rounds = await agent_client.list_task_clarification_rounds(created["id"])
                 accepted = await agent_client.accept_task(created["id"])
                 requeued = await agent_client.requeue_expired_tasks()
                 claimed = await agent_client.claim_task(
@@ -340,6 +364,9 @@ class TalkClientTests(RouteTestCase):
             self.assertEqual(queued[0]["id"], created["id"])
             self.assertEqual(fetched["project_id"], "prj_sdk_async")
             self.assertEqual(clarification["workflow_status"], "clarification_requested")
+            self.assertEqual(answered["workflow_status"], "clarification_answered")
+            self.assertEqual(clarification_rounds[0]["question_message_id"], question["id"])
+            self.assertEqual(clarification_rounds[0]["answer_end_message_id"], answer_end["id"])
             self.assertEqual(accepted["workflow_status"], "accepted")
             self.assertEqual(requeued, [])
             self.assertEqual(claimed["status"], "running")
@@ -393,7 +420,25 @@ class TalkClientTests(RouteTestCase):
                     project_id="prj_sdk_sync",
                 )
                 fetched = agent_client.get_task(created["id"])
-                clarification = agent_client.request_task_clarification(created["id"])
+                question = agent_client.send_text(
+                    "Which format?",
+                    to=["human:bobo"],
+                    group_id=created["hall_group_id"],
+                )
+                clarification = agent_client.request_task_clarification(
+                    created["id"],
+                    question_message_id=question["id"],
+                )
+                answer_end = human_client.send_text(
+                    "Use Markdown and keep it concise.",
+                    to=["agent:demo"],
+                    group_id=created["hall_group_id"],
+                )
+                answered = human_client.submit_task_clarification_answer(
+                    created["id"],
+                    answer_message_id=answer_end["id"],
+                )
+                clarification_rounds = agent_client.list_task_clarification_rounds(created["id"])
                 accepted = agent_client.accept_task(created["id"])
                 requeued = agent_client.requeue_expired_tasks()
                 claimed = agent_client.claim_task(created["id"], lease_seconds=30)
@@ -453,6 +498,9 @@ class TalkClientTests(RouteTestCase):
         self.assertEqual([task["id"] for task in queued], [created["id"]])
         self.assertEqual(fetched["project_id"], "prj_sdk_sync")
         self.assertEqual(clarification["workflow_status"], "clarification_requested")
+        self.assertEqual(answered["workflow_status"], "clarification_answered")
+        self.assertEqual(clarification_rounds[0]["question_message_id"], question["id"])
+        self.assertEqual(clarification_rounds[0]["answer_end_message_id"], answer_end["id"])
         self.assertEqual(accepted["workflow_status"], "accepted")
         self.assertEqual(requeued, [])
         self.assertEqual(claimed["attempt"], 1)

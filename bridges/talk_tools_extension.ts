@@ -84,9 +84,19 @@ async function taskWithMessages(taskId: number): Promise<JsonObject> {
   };
 }
 
-async function replyTask(taskId: number, body: string, workflowAction = "none"): Promise<JsonObject> {
-  if (!["none", "request_clarification", "accept"].includes(workflowAction)) {
-    throw new Error("workflow_action 必须是 none、request_clarification 或 accept");
+async function replyTask(
+  taskId: number,
+  body: string,
+  workflowAction = "none",
+  allowAdditionalRound = false,
+): Promise<JsonObject> {
+  const allowedActions = [
+    "none", "request_clarification", "submit_clarification_answer", "resolve_clarification", "accept",
+  ];
+  if (!allowedActions.includes(workflowAction)) {
+    throw new Error(
+      "workflow_action 必须是 none、request_clarification、submit_clarification_answer、resolve_clarification 或 accept",
+    );
   }
   let task = await apiRequest("GET", `/api/tasks/${taskId}`);
   const currentMemberId = process.env.TALK_MEMBER_ID || (await apiRequest("GET", "/api/members/me")).id;
@@ -99,7 +109,18 @@ async function replyTask(taskId: number, body: string, workflowAction = "none"):
   if (task.hall_group_id) messageBody.group_id = task.hall_group_id;
   const message = await apiRequest("POST", "/api/messages", messageBody);
   if (workflowAction === "request_clarification") {
-    task = await apiRequest("POST", `/api/tasks/${taskId}/request-clarification`);
+    task = await apiRequest(
+      "POST", `/api/tasks/${taskId}/request-clarification`, { question_message_id: message.id },
+    );
+  } else if (workflowAction === "submit_clarification_answer") {
+    task = await apiRequest(
+      "POST", `/api/tasks/${taskId}/submit-clarification-answer`, { answer_message_id: message.id },
+    );
+  } else if (workflowAction === "resolve_clarification") {
+    task = await apiRequest(
+      "POST", `/api/tasks/${taskId}/resolve-clarification`,
+      { allow_additional_round: Boolean(allowAdditionalRound) },
+    );
   } else if (workflowAction === "accept") {
     task = await apiRequest("POST", `/api/tasks/${taskId}/accept`);
   }
@@ -317,7 +338,8 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
     async execute(_toolCallId, params) {
       return toolResponse(async () => {
         const desired = new Set((params.workflow_statuses || [
-          "clarification_requested", "submitted", "completed", "failed", "canceled",
+          "clarification_requested", "clarification_answered", "needs_decision",
+          "submitted", "completed", "failed", "canceled",
         ]).map((status: unknown) => String(status).trim().toLowerCase()).filter(Boolean));
         const timeout = Math.max(0, Math.min(Number(params.timeout_seconds ?? 10), 30));
         const deadline = Date.now() + timeout * 1000;
@@ -342,17 +364,19 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "talk_reply_task",
     label: "Reply in TALK task",
-    description: "在 Task Hall 回复或纠偏；执行者可同时请求澄清或接受任务。",
+    description: "在 Task Hall 回复，并可同步请求澄清、明确提交回答、释放人工决策或接受任务。",
     parameters: Type.Object({
       task_id: Type.Number(),
       body: Type.String(),
       workflow_action: Type.Optional(Type.String()),
+      allow_additional_round: Type.Optional(Type.Boolean()),
     }),
     async execute(_toolCallId, params) {
       return toolResponse(() => replyTask(
         Number(params.task_id),
         String(params.body || "").trim(),
         String(params.workflow_action || "none").trim().toLowerCase(),
+        Boolean(params.allow_additional_round || false),
       ));
     },
   });

@@ -16,6 +16,11 @@ from server.models import (
     AgentTask,
     AgentTaskClaim,
     AgentTaskClaimOut,
+    AgentTaskClarificationAnswer,
+    AgentTaskClarificationDecision,
+    AgentTaskClarificationRequest,
+    AgentTaskClarificationRound,
+    AgentTaskClarificationRoundOut,
     AgentTaskComplete,
     AgentTaskCreate,
     AgentTaskHeartbeat,
@@ -35,6 +40,8 @@ from server.models import (
     Project,
     TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
     TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT,
+    TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
+    TASK_MAX_CLARIFICATION_ROUNDS_LIMIT,
     TASK_MAX_DELEGATION_DEPTH_DEFAULT,
     TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
     TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
@@ -609,6 +616,146 @@ def _ensure_result_message_owner(
         )
 
 
+def _latest_clarification_round(task_id: int, session: Session) -> AgentTaskClarificationRound | None:
+    return session.exec(
+        select(AgentTaskClarificationRound)
+        .where(AgentTaskClarificationRound.task_id == task_id)
+        .order_by(AgentTaskClarificationRound.round_index.desc())
+    ).first()
+
+
+def _clarification_message(
+    task: AgentTask,
+    *,
+    message_id: int | None,
+    expected_sender_id: str,
+    boundary_name: str,
+    session: Session,
+) -> Message:
+    if task.hall_group_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task has no Task Hall for clarification message boundaries",
+        )
+
+    if message_id is None:
+        message = session.exec(
+            select(Message)
+            .where(
+                Message.group_id == task.hall_group_id,
+                Message.from_id == expected_sender_id,
+                Message.revoked_at.is_(None),
+            )
+            .order_by(Message.id.desc())
+        ).first()
+    else:
+        message = session.get(Message, message_id)
+
+    if message is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{boundary_name}_message_id not found in the task Hall",
+        )
+    if message.group_id != task.hall_group_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{boundary_name}_message_id must belong to the task Hall",
+        )
+    if message.from_id != expected_sender_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{boundary_name}_message_id must belong to {expected_sender_id}",
+        )
+    if message.revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{boundary_name}_message_id cannot reference a revoked message",
+        )
+    return message
+
+
+def _answer_message_bounds(
+    task: AgentTask,
+    clarification_round: AgentTaskClarificationRound,
+    answer_message_id: int,
+    session: Session,
+) -> tuple[int, int]:
+    answer_end = _clarification_message(
+        task,
+        message_id=answer_message_id,
+        expected_sender_id=task.created_by,
+        boundary_name="answer",
+        session=session,
+    )
+    question_message_id = clarification_round.question_message_id
+    if answer_end.id is None or answer_end.id <= question_message_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="clarification answer must be posted after the question boundary",
+        )
+    answer_messages = session.exec(
+        select(Message)
+        .where(
+            Message.group_id == task.hall_group_id,
+            Message.from_id == task.created_by,
+            Message.revoked_at.is_(None),
+            Message.id > question_message_id,
+            Message.id <= answer_end.id,
+        )
+        .order_by(Message.id.asc())
+    ).all()
+    if not answer_messages or answer_messages[0].id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="clarification answer has no requester messages after the question boundary",
+        )
+    return int(answer_messages[0].id), int(answer_end.id)
+
+
+def _escalate_clarification_decision(
+    task: AgentTask,
+    root: AgentTask,
+    now: datetime,
+    session: Session,
+) -> AgentTask:
+    if task.id is None or root.id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task tree is incomplete")
+    task_result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == task.id,
+            AgentTask.status == "queued",
+            AgentTask.workflow_status == "clarification_answered",
+            AgentTask.clarification_round_count >= AgentTask.max_clarification_rounds,
+        )
+        .values(workflow_status="needs_decision", updated_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    root_result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == root.id,
+            AgentTask.control_status == "active",
+        )
+        .values(
+            control_status="awaiting_human",
+            checkpoint_reason="needs_decision",
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if task_result.rowcount != 1 or root_result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task or root control changed while escalating clarification",
+        )
+    _release_tree_claims(root, now, "clarification needs human decision", session)
+    session.commit()
+    session.expire_all()
+    return _get_task(int(task.id), session)
+
+
 def _touch_task(task: AgentTask, now: datetime) -> None:
     task.updated_at = now
 
@@ -703,6 +850,7 @@ def _create_task_with_hall(
     reserved_slice_count: int | None,
     authorization_expires_at: datetime | None,
     checkpoint_reason: str | None,
+    max_clarification_rounds: int,
     now: datetime,
     session: Session,
 ) -> AgentTask:
@@ -747,6 +895,8 @@ def _create_task_with_hall(
         reserved_slice_count=reserved_slice_count,
         authorization_expires_at=authorization_expires_at,
         checkpoint_reason=checkpoint_reason,
+        max_clarification_rounds=max_clarification_rounds,
+        clarification_round_count=0,
         target_member_id=target_member_id,
         created_by=created_by,
         content=content,
@@ -786,6 +936,7 @@ def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime, sessi
         reserved_slice_count=0,
         authorization_expires_at=None,
         checkpoint_reason=None,
+        max_clarification_rounds=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
         now=now,
         session=session,
     )
@@ -895,6 +1046,7 @@ def create_task(
         reserved_slice_count=reserved_slice_count,
         authorization_expires_at=authorization_expires_at,
         checkpoint_reason=checkpoint_reason,
+        max_clarification_rounds=body.max_clarification_rounds,
         now=now,
         session=session,
     )
@@ -1266,24 +1418,258 @@ def cancel_task_tree(
     return _tree_response(root, now, session)
 
 
-@router.post("/{task_id}/request-clarification", response_model=AgentTaskOut)
-def request_task_clarification(
+@router.get("/{task_id}/clarification-rounds", response_model=list[AgentTaskClarificationRoundOut])
+def list_task_clarification_rounds(
     task_id: int,
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
-    """Record that the assignee has asked a question in the Task Hall."""
+    """Return the explicit question and answer boundaries for a task."""
+    task = _get_task(task_id, session)
+    _ensure_task_visible(task, current)
+    return session.exec(
+        select(AgentTaskClarificationRound)
+        .where(AgentTaskClarificationRound.task_id == task_id)
+        .order_by(AgentTaskClarificationRound.round_index.asc())
+    ).all()
+
+
+@router.post("/{task_id}/request-clarification", response_model=AgentTaskOut)
+def request_task_clarification(
+    task_id: int,
+    body: AgentTaskClarificationRequest | None = None,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Open one bounded clarification round around an assignee Hall message."""
     task = _get_task(task_id, session)
     if task.target_member_id != current.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the task assignee can request clarification")
-    if task.workflow_status == "clarification_requested":
-        return task
-    if task.workflow_status != "assigned":
+    if task.status != "queued":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"task workflow is {task.workflow_status}, not assigned",
+            detail="clarification can only be requested before the task is claimed",
         )
-    return _update_workflow_status(task, "clarification_requested", datetime.now(timezone.utc), session)
+    root = _get_root_task(task, session)
+    if root.control_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task tree control is {root.control_status}, not active",
+        )
+
+    requested_message_id = body.question_message_id if body is not None else None
+    latest_round = _latest_clarification_round(task_id, session)
+    if task.workflow_status == "clarification_requested":
+        if latest_round is None or requested_message_id in {None, latest_round.question_message_id}:
+            return task
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task already has a different open clarification round",
+        )
+    if task.workflow_status not in {"assigned", "clarification_answered"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}, not ready for clarification",
+        )
+
+    # Preserve the old no-Hall task path. New tasks always use explicit Hall boundaries.
+    if task.hall_group_id is None and requested_message_id is None and task.workflow_status == "assigned":
+        return _update_workflow_status(task, "clarification_requested", datetime.now(timezone.utc), session)
+
+    question = _clarification_message(
+        task,
+        message_id=requested_message_id,
+        expected_sender_id=current.id,
+        boundary_name="question",
+        session=session,
+    )
+    if question.id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="clarification question is missing an id")
+    if latest_round is not None:
+        previous_boundary = latest_round.answer_end_message_id or latest_round.question_message_id
+        if question.id <= previous_boundary:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="clarification question must be posted after the previous round boundary",
+            )
+
+    now = datetime.now(timezone.utc)
+    if task.clarification_round_count >= task.max_clarification_rounds:
+        return _escalate_clarification_decision(task, root, now, session)
+
+    next_round_index = task.clarification_round_count + 1
+    update_conditions = [
+        AgentTask.id == task_id,
+        AgentTask.status == "queued",
+        AgentTask.workflow_status == task.workflow_status,
+        AgentTask.clarification_round_count == task.clarification_round_count,
+    ]
+    update_conditions.extend(_root_control_claim_conditions(root, now, require_unexpired=False))
+    result = session.execute(
+        update(AgentTask)
+        .where(*update_conditions)
+        .values(
+            workflow_status="clarification_requested",
+            clarification_round_count=next_round_index,
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task workflow or root control changed while opening clarification",
+        )
+    session.add(
+        AgentTaskClarificationRound(
+            task_id=task_id,
+            round_index=next_round_index,
+            status="requested",
+            question_message_id=int(question.id),
+            requested_at=now,
+        )
+    )
+    session.commit()
+    session.expire_all()
+    return _get_task(task_id, session)
+
+
+@router.post("/{task_id}/submit-clarification-answer", response_model=AgentTaskOut)
+def submit_task_clarification_answer(
+    task_id: int,
+    body: AgentTaskClarificationAnswer,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Close the current clarification round at an explicit requester message boundary."""
+    task = _get_task(task_id, session)
+    if task.created_by != current.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the task requester can submit clarification answers")
+    latest_round = _latest_clarification_round(task_id, session)
+    if task.workflow_status == "clarification_answered":
+        if latest_round is not None and latest_round.answer_end_message_id == body.answer_message_id:
+            return task
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="clarification answer was already submitted with a different boundary",
+        )
+    if task.workflow_status != "clarification_requested":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}, not awaiting a clarification answer",
+        )
+    if latest_round is None or latest_round.status != "requested" or latest_round.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="legacy clarification has no explicit round boundary; the assignee may accept it through the compatibility path",
+        )
+    root = _get_root_task(task, session)
+    if root.control_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task tree control is {root.control_status}, not active",
+        )
+    answer_start_id, answer_end_id = _answer_message_bounds(
+        task,
+        latest_round,
+        body.answer_message_id,
+        session,
+    )
+    now = datetime.now(timezone.utc)
+    round_result = session.execute(
+        update(AgentTaskClarificationRound)
+        .where(
+            AgentTaskClarificationRound.id == latest_round.id,
+            AgentTaskClarificationRound.status == "requested",
+        )
+        .values(
+            status="answered",
+            answer_start_message_id=answer_start_id,
+            answer_end_message_id=answer_end_id,
+            answered_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    task_conditions = [
+        AgentTask.id == task_id,
+        AgentTask.status == "queued",
+        AgentTask.workflow_status == "clarification_requested",
+        AgentTask.clarification_round_count == latest_round.round_index,
+    ]
+    task_conditions.extend(_root_control_claim_conditions(root, now, require_unexpired=False))
+    task_result = session.execute(
+        update(AgentTask)
+        .where(*task_conditions)
+        .values(workflow_status="clarification_answered", updated_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    if round_result.rowcount != 1 or task_result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="clarification round or root control changed while submitting the answer",
+        )
+    session.commit()
+    session.expire_all()
+    return _get_task(task_id, session)
+
+
+@router.post("/{task_id}/resolve-clarification", response_model=AgentTaskOut)
+def resolve_task_clarification_decision(
+    task_id: int,
+    body: AgentTaskClarificationDecision,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Release a needs-decision task after human/root-controller intervention."""
+    task = _get_task(task_id, session)
+    root = _get_root_task(task, session)
+    if current.kind != "human" and current.id not in {task.created_by, root.created_by}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only a human manager or task-tree requester can resolve clarification decisions",
+        )
+    if task.workflow_status == "clarification_answered":
+        return task
+    if task.workflow_status != "needs_decision":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}, not needs_decision",
+        )
+    if root.control_status != "awaiting_human":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task tree control is {root.control_status}, not awaiting_human",
+        )
+    if body.allow_additional_round and task.max_clarification_rounds >= TASK_MAX_CLARIFICATION_ROUNDS_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"clarification round limit {TASK_MAX_CLARIFICATION_ROUNDS_LIMIT} already reached",
+        )
+    now = datetime.now(timezone.utc)
+    new_limit = task.max_clarification_rounds + (1 if body.allow_additional_round else 0)
+    result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == task_id,
+            AgentTask.status == "queued",
+            AgentTask.workflow_status == "needs_decision",
+            AgentTask.max_clarification_rounds == task.max_clarification_rounds,
+        )
+        .values(
+            workflow_status="clarification_answered",
+            max_clarification_rounds=new_limit,
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="clarification decision changed concurrently")
+    session.commit()
+    session.expire_all()
+    return _get_task(task_id, session)
 
 
 @router.post("/{task_id}/accept", response_model=AgentTaskOut)
@@ -1296,14 +1682,43 @@ def accept_task(
     task = _get_task(task_id, session)
     if task.target_member_id != current.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="only the task assignee can accept the task")
+    root = _get_root_task(task, session)
+    if root.control_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task tree control is {root.control_status}, not active",
+        )
     if task.workflow_status == "accepted":
         return task
-    if task.workflow_status not in {"assigned", "clarification_requested"}:
+    if task.workflow_status == "clarification_requested" and _latest_clarification_round(task_id, session) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="the requester must explicitly submit the current clarification answer before acceptance",
+        )
+    if task.workflow_status not in {"assigned", "clarification_requested", "clarification_answered"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"task workflow is {task.workflow_status}, not assignable",
         )
-    return _update_workflow_status(task, "accepted", datetime.now(timezone.utc), session)
+    now = datetime.now(timezone.utc)
+    accept_conditions = [
+        AgentTask.id == task_id,
+        AgentTask.status == "queued",
+        AgentTask.workflow_status == task.workflow_status,
+    ]
+    accept_conditions.extend(_root_control_claim_conditions(root, now, require_unexpired=False))
+    result = session.execute(
+        update(AgentTask)
+        .where(*accept_conditions)
+        .values(workflow_status="accepted", updated_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task workflow changed while accepting")
+    session.commit()
+    session.expire_all()
+    return _get_task(task_id, session)
 
 
 @router.post("/{task_id}/collect-result", response_model=AgentTaskOut)
@@ -1423,8 +1838,11 @@ def claim_task(
         return task
     if task.status != "queued":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is already {task.status}")
-    if task.workflow_status == "clarification_requested":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task is waiting for clarification before acceptance")
+    if task.workflow_status in {"clarification_requested", "clarification_answered", "needs_decision"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"task workflow is {task.workflow_status}; the assignee must finish the clarification protocol before claim",
+        )
     if task.workflow_status not in {"assigned", "accepted"}:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1432,7 +1850,11 @@ def claim_task(
         )
 
     claim_token = uuid4().hex
-    claim_conditions = [AgentTask.id == task_id, AgentTask.status == "queued"]
+    claim_conditions = [
+        AgentTask.id == task_id,
+        AgentTask.status == "queued",
+        AgentTask.workflow_status.in_(("assigned", "accepted")),
+    ]
     claim_conditions.extend(_descendant_claim_conditions(task, root, now))
     result = session.execute(
         update(AgentTask)
@@ -1462,6 +1884,11 @@ def claim_task(
         ):
             return current_task
         if current_task.status == "queued":
+            if current_task.workflow_status not in {"assigned", "accepted"}:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"task workflow is {current_task.workflow_status}, not ready to start",
+                )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=_claim_budget_conflict_detail(current_task, now, session),

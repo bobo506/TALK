@@ -143,6 +143,23 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN authorization_expires_at TIMESTAMP")
         if "checkpoint_reason" not in task_columns:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN checkpoint_reason TEXT")
+        if "max_clarification_rounds" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN max_clarification_rounds INTEGER NOT NULL DEFAULT 1"
+            )
+        if "clarification_round_count" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN clarification_round_count INTEGER NOT NULL DEFAULT 0"
+            )
+        conn.exec_driver_sql(
+            """
+            UPDATE agent_tasks
+            SET
+              max_clarification_rounds = COALESCE(max_clarification_rounds, ?),
+              clarification_round_count = COALESCE(clarification_round_count, 0)
+            """,
+            (server.models.TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,),
+        )
         conn.exec_driver_sql(
             "UPDATE agent_tasks SET root_task_id = id WHERE root_task_id IS NULL"
         )
@@ -279,6 +296,18 @@ def init_db() -> None:
         )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_workflow_status ON agent_tasks (workflow_status)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_lease_expires_at ON agent_tasks (lease_expires_at)")
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_task_clarification_rounds_task_id "
+            "ON agent_task_clarification_rounds (task_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_task_clarification_rounds_status "
+            "ON agent_task_clarification_rounds (status)"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_task_clarification_round_index "
+            "ON agent_task_clarification_rounds (task_id, round_index)"
+        )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_target_member_id ON agent_task_schedules (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_created_by ON agent_task_schedules (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_schedule_type ON agent_task_schedules (schedule_type)")

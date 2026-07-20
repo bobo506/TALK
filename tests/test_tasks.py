@@ -51,6 +51,8 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(created.json()["authorized_slice_budget"], 0)
         self.assertEqual(created.json()["reserved_slice_count"], 0)
         self.assertIsNone(created.json()["authorization_expires_at"])
+        self.assertEqual(created.json()["max_clarification_rounds"], 1)
+        self.assertEqual(created.json()["clarification_round_count"], 0)
         self.assertIsNotNone(created.json()["hall_group_id"])
         self.assertEqual([task["id"] for task in agent_tasks.json()], [created.json()["id"]])
         self.assertEqual(other_tasks.json(), [])
@@ -122,6 +124,41 @@ class AgentTaskTests(RouteTestCase):
 
         self.assertEqual(unknown_project.status_code, 400)
         self.assertEqual(self_assignment.status_code, 400)
+
+    def test_task_clarification_round_limit_is_bounded_to_one_or_two(self):
+        with self.make_client() as client:
+            custom = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Allow two rounds",
+                    "max_clarification_rounds": 2,
+                },
+            )
+            too_few = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Invalid zero rounds",
+                    "max_clarification_rounds": 0,
+                },
+            )
+            too_many = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Invalid unlimited rounds",
+                    "max_clarification_rounds": 3,
+                },
+            )
+
+        self.assertEqual(custom.status_code, 201)
+        self.assertEqual(custom.json()["max_clarification_rounds"], 2)
+        self.assertEqual(too_few.status_code, 422)
+        self.assertEqual(too_many.status_code, 422)
 
     def test_task_tree_requires_explicit_delegation_and_inherits_root_governance(self):
         with self.make_client() as client:
@@ -731,11 +768,77 @@ class AgentTaskTests(RouteTestCase):
                 f"/api/tasks/{task['id']}/request-clarification",
                 headers={"X-API-Key": "other-key"},
             )
+            wrong_question = self.add_message(
+                from_id="human:bobo",
+                to_ids='["agent:codex"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="This is not an assignee question",
+            )
+            invalid_boundary = client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "codex-key"},
+                json={"question_message_id": wrong_question.id},
+            )
+            question = self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="Which format should I use?",
+            )
             clarification = client.post(
                 f"/api/tasks/{task['id']}/request-clarification",
                 headers={"X-API-Key": "codex-key"},
+                json={"question_message_id": question.id},
+            )
+            clarification_again = client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "codex-key"},
+                json={"question_message_id": question.id},
             )
             blocked_claim = client.post(
+                f"/api/tasks/{task['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            blocked_accept = client.post(
+                f"/api/tasks/{task['id']}/accept",
+                headers={"X-API-Key": "codex-key"},
+            )
+            first_answer = self.add_message(
+                from_id="human:bobo",
+                to_ids='["agent:codex"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="Use Markdown.",
+            )
+            answer_end = self.add_message(
+                from_id="human:bobo",
+                to_ids='["agent:codex"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="Include a short summary too.",
+            )
+            before_submit = client.get(
+                f"/api/tasks/{task['id']}",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            answered = client.post(
+                f"/api/tasks/{task['id']}/submit-clarification-answer",
+                headers={"X-API-Key": "bobo-key"},
+                json={"answer_message_id": answer_end.id},
+            )
+            answered_again = client.post(
+                f"/api/tasks/{task['id']}/submit-clarification-answer",
+                headers={"X-API-Key": "bobo-key"},
+                json={"answer_message_id": answer_end.id},
+            )
+            rounds = client.get(
+                f"/api/tasks/{task['id']}/clarification-rounds",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            blocked_claim_after_answer = client.post(
                 f"/api/tasks/{task['id']}/claim",
                 headers={"X-API-Key": "codex-key"},
                 json={},
@@ -788,8 +891,20 @@ class AgentTaskTests(RouteTestCase):
             )
 
         self.assertEqual(wrong_clarification.status_code, 403)
+        self.assertEqual(invalid_boundary.status_code, 400)
         self.assertEqual(clarification.json()["workflow_status"], "clarification_requested")
+        self.assertEqual(clarification_again.json()["clarification_round_count"], 1)
+        self.assertEqual(clarification.json()["clarification_round_count"], 1)
         self.assertEqual(blocked_claim.status_code, 409)
+        self.assertEqual(blocked_accept.status_code, 409)
+        self.assertEqual(before_submit.json()["workflow_status"], "clarification_requested")
+        self.assertEqual(answered.json()["workflow_status"], "clarification_answered")
+        self.assertEqual(answered_again.json()["workflow_status"], "clarification_answered")
+        self.assertEqual(blocked_claim_after_answer.status_code, 409)
+        self.assertEqual(len(rounds.json()), 1)
+        self.assertEqual(rounds.json()[0]["question_message_id"], question.id)
+        self.assertEqual(rounds.json()[0]["answer_start_message_id"], first_answer.id)
+        self.assertEqual(rounds.json()[0]["answer_end_message_id"], answer_end.id)
         self.assertEqual(accepted.json()["workflow_status"], "accepted")
         self.assertEqual(claimed.json()["workflow_status"], "in_progress")
         self.assertEqual(wrong_submission.status_code, 400)
@@ -799,6 +914,167 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(wrong_collector.status_code, 403)
         self.assertEqual(collected.json()["workflow_status"], "completed")
         self.assertIsNotNone(collected.json()["result_collected_at"])
+
+    def test_clarification_round_limit_escalates_and_requires_explicit_resolution(self):
+        with self.make_client() as client:
+            task = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Bounded clarification",
+                    "max_clarification_rounds": 1,
+                },
+            ).json()
+            question_one = self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="First question",
+            )
+            client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "codex-key"},
+                json={"question_message_id": question_one.id},
+            )
+            answer_one = self.add_message(
+                from_id="human:bobo",
+                to_ids='["agent:codex"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="First answer",
+            )
+            client.post(
+                f"/api/tasks/{task['id']}/submit-clarification-answer",
+                headers={"X-API-Key": "bobo-key"},
+                json={"answer_message_id": answer_one.id},
+            )
+            question_two = self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="Second question",
+            )
+            escalated = client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "codex-key"},
+                json={"question_message_id": question_two.id},
+            )
+            blocked_claim = client.post(
+                f"/api/tasks/{task['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            wrong_resolver = client.post(
+                f"/api/tasks/{task['id']}/resolve-clarification",
+                headers={"X-API-Key": "other-key"},
+                json={"allow_additional_round": True},
+            )
+            resolved = client.post(
+                f"/api/tasks/{task['id']}/resolve-clarification",
+                headers={"X-API-Key": "bobo-key"},
+                json={"allow_additional_round": True},
+            )
+            resumed = client.post(
+                f"/api/tasks/{task['id']}/resume-tree",
+                headers={"X-API-Key": "bobo-key"},
+                json={"slice_budget": 0, "authorization_ttl_seconds": 60},
+            )
+            second_round = client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "codex-key"},
+                json={"question_message_id": question_two.id},
+            )
+            answer_two = self.add_message(
+                from_id="human:bobo",
+                to_ids='["agent:codex"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="Second answer",
+            )
+            client.post(
+                f"/api/tasks/{task['id']}/submit-clarification-answer",
+                headers={"X-API-Key": "bobo-key"},
+                json={"answer_message_id": answer_two.id},
+            )
+            question_three = self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content="Third question",
+            )
+            escalated_again = client.post(
+                f"/api/tasks/{task['id']}/request-clarification",
+                headers={"X-API-Key": "codex-key"},
+                json={"question_message_id": question_three.id},
+            )
+            cannot_exceed_limit = client.post(
+                f"/api/tasks/{task['id']}/resolve-clarification",
+                headers={"X-API-Key": "bobo-key"},
+                json={"allow_additional_round": True},
+            )
+
+        self.assertEqual(escalated.status_code, 200)
+        self.assertEqual(escalated.json()["workflow_status"], "needs_decision")
+        self.assertEqual(escalated.json()["control_status"], "awaiting_human")
+        self.assertEqual(blocked_claim.status_code, 409)
+        self.assertEqual(wrong_resolver.status_code, 403)
+        self.assertEqual(resolved.json()["workflow_status"], "clarification_answered")
+        self.assertEqual(resolved.json()["max_clarification_rounds"], 2)
+        self.assertEqual(resolved.json()["control_status"], "awaiting_human")
+        self.assertEqual(resumed.json()["root"]["control_status"], "active")
+        self.assertEqual(second_round.json()["workflow_status"], "clarification_requested")
+        self.assertEqual(second_round.json()["clarification_round_count"], 2)
+        self.assertEqual(escalated_again.json()["workflow_status"], "needs_decision")
+        self.assertEqual(cannot_exceed_limit.status_code, 409)
+
+    def test_concurrent_clarification_requests_open_only_one_round(self):
+        with self.make_client() as client:
+            task = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"target_member_id": "agent:codex", "content": "Concurrent clarification"},
+            ).json()
+        questions = [
+            self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id=task["hall_group_id"],
+                content=f"Question {index}",
+            )
+            for index in range(2)
+        ]
+        barrier = Barrier(2)
+
+        def request_round(question_id: int):
+            with self.make_client() as client:
+                barrier.wait()
+                return client.post(
+                    f"/api/tasks/{task['id']}/request-clarification",
+                    headers={"X-API-Key": "codex-key"},
+                    json={"question_message_id": question_id},
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(request_round, [int(item.id) for item in questions]))
+
+        with self.make_client() as client:
+            current = client.get(
+                f"/api/tasks/{task['id']}",
+                headers={"X-API-Key": "bobo-key"},
+            ).json()
+            rounds = client.get(
+                f"/api/tasks/{task['id']}/clarification-rounds",
+                headers={"X-API-Key": "bobo-key"},
+            ).json()
+
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 409])
+        self.assertEqual(current["clarification_round_count"], 1)
+        self.assertEqual(len(rounds), 1)
 
     def test_requester_can_cancel_unclaimed_task_but_not_running_task(self):
         with self.make_client() as client:
@@ -1334,6 +1610,12 @@ class AgentTaskTests(RouteTestCase):
                 row[1]: row[2]
                 for row in conn.exec_driver_sql("PRAGMA index_list(agent_tasks)").fetchall()
             }
+            clarification_indexes = {
+                row[1]: row[2]
+                for row in conn.exec_driver_sql(
+                    "PRAGMA index_list(agent_task_clarification_rounds)"
+                ).fetchall()
+            }
             workflow_by_id = dict(
                 conn.exec_driver_sql(
                     "SELECT id, workflow_status FROM agent_tasks ORDER BY id"
@@ -1354,7 +1636,8 @@ class AgentTaskTests(RouteTestCase):
                 SELECT
                     id, control_status, authorization_epoch,
                     authorized_slice_budget, reserved_slice_count,
-                    authorization_expires_at, checkpoint_reason
+                    authorization_expires_at, checkpoint_reason,
+                    max_clarification_rounds, clarification_round_count
                 FROM agent_tasks
                 ORDER BY id
                 """
@@ -1383,6 +1666,8 @@ class AgentTaskTests(RouteTestCase):
             "reserved_slice_count",
             "authorization_expires_at",
             "checkpoint_reason",
+            "max_clarification_rounds",
+            "clarification_round_count",
         }.issubset(columns))
         self.assertEqual(indexes["ix_agent_tasks_hall_group_id"], 1)
         self.assertEqual(indexes["ix_agent_tasks_lease_expires_at"], 0)
@@ -1391,6 +1676,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(indexes["ix_agent_tasks_delegation_depth"], 0)
         self.assertEqual(indexes["ix_agent_tasks_control_status"], 0)
         self.assertEqual(indexes["ix_agent_tasks_authorization_expires_at"], 0)
+        self.assertEqual(clarification_indexes["uq_task_clarification_round_index"], 1)
         self.assertEqual(
             workflow_by_id,
             {
@@ -1411,7 +1697,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(
             control_rows,
             [
-                (task_id, "active", 0, 0, 0, None, None)
+                (task_id, "active", 0, 0, 0, None, None, 1, 0)
                 for task_id in range(1, 6)
             ],
         )

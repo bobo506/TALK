@@ -242,6 +242,7 @@ class TalkClientSync:
         max_nonterminal_descendants: int | None = None,
         slice_budget: int | None = None,
         authorization_ttl_seconds: int | None = None,
+        max_clarification_rounds: int = 1,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.create_task(
@@ -258,6 +259,7 @@ class TalkClientSync:
                 max_nonterminal_descendants=max_nonterminal_descendants,
                 slice_budget=slice_budget,
                 authorization_ttl_seconds=authorization_ttl_seconds,
+                max_clarification_rounds=max_clarification_rounds,
             )
         )
 
@@ -308,8 +310,47 @@ class TalkClientSync:
     def cancel_task_tree(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.cancel_task_tree(task_id))
 
-    def request_task_clarification(self, task_id: int) -> dict[str, Any]:
-        return self._submit(self._client.request_task_clarification(task_id))
+    def list_task_clarification_rounds(self, task_id: int) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_task_clarification_rounds(task_id))
+
+    def request_task_clarification(
+        self,
+        task_id: int,
+        *,
+        question_message_id: int | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.request_task_clarification(
+                task_id,
+                question_message_id=question_message_id,
+            )
+        )
+
+    def submit_task_clarification_answer(
+        self,
+        task_id: int,
+        *,
+        answer_message_id: int,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.submit_task_clarification_answer(
+                task_id,
+                answer_message_id=answer_message_id,
+            )
+        )
+
+    def resolve_task_clarification(
+        self,
+        task_id: int,
+        *,
+        allow_additional_round: bool = False,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.resolve_task_clarification(
+                task_id,
+                allow_additional_round=allow_additional_round,
+            )
+        )
 
     def accept_task(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.accept_task(task_id))

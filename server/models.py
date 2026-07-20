@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
@@ -152,6 +153,8 @@ TASK_AUTHORIZED_SLICE_BUDGET_MAX = 3
 TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS = 90 * 60
 TASK_AUTHORIZATION_TTL_MIN_SECONDS = 60
 TASK_AUTHORIZATION_TTL_MAX_SECONDS = 90 * 60
+TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT = 1
+TASK_MAX_CLARIFICATION_ROUNDS_LIMIT = 2
 
 
 class AgentTask(SQLModel, table=True):
@@ -175,6 +178,8 @@ class AgentTask(SQLModel, table=True):
     reserved_slice_count: Optional[int] = None
     authorization_expires_at: Optional[datetime] = Field(default=None, index=True)
     checkpoint_reason: Optional[str] = None
+    max_clarification_rounds: int = Field(default=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT)
+    clarification_round_count: int = Field(default=0)
     target_member_id: str = Field(foreign_key="members.id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
     content: str
@@ -194,6 +199,23 @@ class AgentTask(SQLModel, table=True):
     claimed_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     result_collected_at: Optional[datetime] = None
+
+
+class AgentTaskClarificationRound(SQLModel, table=True):
+    __tablename__ = "agent_task_clarification_rounds"
+    __table_args__ = (
+        Index("uq_task_clarification_round_index", "task_id", "round_index", unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    task_id: int = Field(foreign_key="agent_tasks.id", index=True)
+    round_index: int
+    status: str = Field(default="requested", index=True)
+    question_message_id: int = Field(foreign_key="messages.id")
+    answer_start_message_id: Optional[int] = Field(default=None, foreign_key="messages.id")
+    answer_end_message_id: Optional[int] = Field(default=None, foreign_key="messages.id")
+    requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    answered_at: Optional[datetime] = None
 
 
 class AgentTaskSchedule(SQLModel, table=True):
@@ -639,6 +661,8 @@ _TASK_TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
 _TASK_WORKFLOW_STATUSES = {
     "assigned",
     "clarification_requested",
+    "clarification_answered",
+    "needs_decision",
     "accepted",
     "in_progress",
     "submitted",
@@ -690,6 +714,11 @@ class AgentTaskCreate(BaseModel):
         default=None,
         ge=TASK_AUTHORIZATION_TTL_MIN_SECONDS,
         le=TASK_AUTHORIZATION_TTL_MAX_SECONDS,
+    )
+    max_clarification_rounds: int = PydField(
+        default=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
+        ge=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
+        le=TASK_MAX_CLARIFICATION_ROUNDS_LIMIT,
     )
 
     @model_validator(mode="after")
@@ -810,6 +839,30 @@ class AgentTaskTreeCheckpoint(BaseModel):
         return self
 
 
+class AgentTaskClarificationRequest(BaseModel):
+    question_message_id: Optional[int] = PydField(default=None, ge=1)
+
+
+class AgentTaskClarificationAnswer(BaseModel):
+    answer_message_id: int = PydField(ge=1)
+
+
+class AgentTaskClarificationDecision(BaseModel):
+    allow_additional_round: bool = False
+
+
+class AgentTaskClarificationRoundOut(BaseModel):
+    id: int
+    task_id: int
+    round_index: int
+    status: str
+    question_message_id: int
+    answer_start_message_id: Optional[int]
+    answer_end_message_id: Optional[int]
+    requested_at: datetime
+    answered_at: Optional[datetime]
+
+
 class AgentTaskOut(BaseModel):
     id: int
     schedule_id: Optional[int]
@@ -829,6 +882,8 @@ class AgentTaskOut(BaseModel):
     reserved_slice_count: Optional[int]
     authorization_expires_at: Optional[datetime]
     checkpoint_reason: Optional[str]
+    max_clarification_rounds: int
+    clarification_round_count: int
     target_member_id: str
     created_by: str
     content: str

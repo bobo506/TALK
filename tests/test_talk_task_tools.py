@@ -151,7 +151,11 @@ class TalkTaskToolTests(RouteTestCase):
             with patch.dict(os.environ, human_env, clear=False):
                 answer = dispatch_tool(
                     "talk_reply_task",
-                    {"task_id": created["id"], "body": "Use Markdown."},
+                    {
+                        "task_id": created["id"],
+                        "body": "Use Markdown.",
+                        "workflow_action": "submit_clarification_answer",
+                    },
                 )
 
             with patch.dict(os.environ, worker_env, clear=False):
@@ -212,6 +216,7 @@ class TalkTaskToolTests(RouteTestCase):
         self.assertEqual(fetched["task"]["hall_group_id"], created["hall_group_id"])
         self.assertEqual(clarification["task"]["workflow_status"], "clarification_requested")
         self.assertEqual(answer["message"]["group_id"], created["hall_group_id"])
+        self.assertEqual(answer["task"]["workflow_status"], "clarification_answered")
         self.assertEqual(accepted["task"]["workflow_status"], "accepted")
         self.assertFalse(waited["timed_out"])
         self.assertEqual(collected["task"]["workflow_status"], "completed")
