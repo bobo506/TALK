@@ -616,6 +616,50 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.strip(), "ARGV:hello argv")
 
+    def test_task_claim_checks_are_capped_at_five_seconds(self):
+        self.assertEqual(
+            cli_bridge._effective_task_claim_check_interval(
+                lease_seconds=120,
+                heartbeat_interval=30,
+            ),
+            5,
+        )
+        self.assertEqual(
+            cli_bridge._effective_task_claim_check_interval(
+                lease_seconds=120,
+                heartbeat_interval=2,
+            ),
+            2,
+        )
+        self.assertEqual(
+            cli_bridge._effective_task_claim_check_interval(
+                lease_seconds=6,
+                heartbeat_interval=30,
+            ),
+            2,
+        )
+
+    def test_run_cli_command_cancellation_stops_the_local_process(self):
+        async def scenario():
+            operation = asyncio.create_task(
+                run_cli_command(
+                    [sys.executable, "-c", "import time; time.sleep(30)"],
+                    "",
+                    cwd=Path.cwd(),
+                    timeout=60,
+                )
+            )
+            await asyncio.sleep(0.1)
+            started = asyncio.get_running_loop().time()
+            operation.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(operation, timeout=2)
+            return asyncio.get_running_loop().time() - started
+
+        elapsed = asyncio.run(scenario())
+
+        self.assertLess(elapsed, 2)
+
     def test_handle_queued_task_claims_runs_replies_and_completes(self):
         class FakeClient:
             def __init__(self):
@@ -694,43 +738,47 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.sent, [("OK", ["human:bobo"], "group:task-12")])
         self.assertEqual(client.completed, [(12, "succeeded", 99, None, "lease-12")])
 
-    def test_handle_queued_task_stops_when_claim_lease_is_lost(self):
-        class FakeClient:
-            def __init__(self):
-                self.sent = []
-                self.completed = []
+    def test_handle_queued_task_stops_for_task_tree_control_revocations(self):
+        async def scenario(control_status):
+            class FakeClient:
+                def __init__(self):
+                    self.sent = []
+                    self.completed = []
 
-            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
-                return {
-                    "id": task_id,
-                    "created_by": "human:bobo",
-                    "content": "long task",
-                    "claim_token": "lease-12",
-                }
+                async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                    return {
+                        "id": task_id,
+                        "created_by": "human:bobo",
+                        "content": "long task",
+                        "claim_token": "lease-12",
+                    }
 
-            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
-                raise TalkValidationError("stale", status_code=409)
+                async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                    raise TalkValidationError(
+                        "claim revoked",
+                        status_code=409,
+                        payload={"control_status": control_status},
+                    )
 
-            async def send_text(self, text, to=None, group_id=None):
-                self.sent.append(text)
-                return {"id": 99}
+                async def send_text(self, text, to=None, group_id=None):
+                    self.sent.append(text)
+                    return {"id": 99}
 
-            async def complete_task(self, task_id, **kwargs):
-                self.completed.append((task_id, kwargs))
-                return {"id": task_id}
+                async def complete_task(self, task_id, **kwargs):
+                    self.completed.append((task_id, kwargs))
+                    return {"id": task_id}
 
-        command_cancelled = False
+            command_cancelled = False
 
-        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
-            nonlocal command_cancelled
-            try:
-                await asyncio.sleep(1)
-            except asyncio.CancelledError:
-                command_cancelled = True
-                raise
-            return CliRunResult(returncode=0, stdout="late", stderr="")
+            async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+                nonlocal command_cancelled
+                try:
+                    await asyncio.sleep(1)
+                except asyncio.CancelledError:
+                    command_cancelled = True
+                    raise
+                return CliRunResult(returncode=0, stdout="late", stderr="")
 
-        async def scenario():
             original = cli_bridge.run_cli_command
             cli_bridge.run_cli_command = fake_run_cli_command
             try:
@@ -747,16 +795,17 @@ class CliBridgeTests(unittest.TestCase):
                     lease_seconds=5,
                     heartbeat_interval=0.001,
                 )
-                return handled, client
+                return handled, client, command_cancelled
             finally:
                 cli_bridge.run_cli_command = original
 
-        handled, client = asyncio.run(scenario())
-
-        self.assertFalse(handled)
-        self.assertTrue(command_cancelled)
-        self.assertEqual(client.sent, [])
-        self.assertEqual(client.completed, [])
+        for control_status in ("paused", "awaiting_human", "canceled"):
+            with self.subTest(control_status=control_status):
+                handled, client, command_cancelled = asyncio.run(scenario(control_status))
+                self.assertFalse(handled)
+                self.assertTrue(command_cancelled)
+                self.assertEqual(client.sent, [])
+                self.assertEqual(client.completed, [])
 
     def test_task_worker_requeues_expired_claims_before_listing(self):
         class FakeClient:

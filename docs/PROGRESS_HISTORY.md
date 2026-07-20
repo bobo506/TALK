@@ -184,6 +184,49 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-20 TH-6a2.2：bundled runner 最长 5 秒协作中断
+
+**背景**：TH-6a2.1 已能在服务端持久化暂停 / 检查点 / 整树终止并立即撤销运行 claim，但 bundled runner 默认每 30 秒才续租一次，导致本地 CLI 进程不能在合同要求的 5 秒窗口内感知控制。本轮按 runner 高风险切片只补协作中断，不进入澄清轮次、Web 控制入口或 Review/Test 门禁。
+
+### 实现
+
+- `bridges/cli_bridge.py` 将 bundled runner 默认 claim heartbeat 调整为 5 秒，并新增 5 秒硬上限；即使启动参数显式传入更长的 `--task-heartbeat-interval`，有效 claim / 控制探针也不会被放宽。
+- claim heartbeat 继续由服务端原子校验根控制状态。暂停、检查点、整树终止或其它 claim 失效返回 `404 / 409` 时，runner 抛出 `TaskLeaseLostError` 并取消正在等待的命令。
+- 通用 CLI runner 与 Codex 兼容 runner 共用上述守卫；命令协程取消会进入 `run_cli_command` 的既有清理路径，终止并回收本地子进程。
+- 控制中断后 runner 不发送 Task Hall 结果消息、不调用 `complete`；暂停 / 检查点的 `queued / accepted` 回队和整树终止的 `canceled` 状态继续由服务端作为唯一真相源。
+- 服务不可达时 runner 无法接收新的控制事实，仍由现有本地租约截止时间提供最终失效保护；第三方 runner 也仍需自行实现相同协议。
+
+### 测试
+
+- 新增有效 claim / 控制探针间隔测试，覆盖默认 30 秒配置被硬性收敛到 5 秒、显式更短间隔和短租约自适应。
+- 新增真实 Python 子进程取消测试，确认取消执行协程会及时终止本地进程。
+- 通用 CLI runner 覆盖 `paused / awaiting_human / canceled` 三类控制撤销，Codex runner 单独覆盖共享守卫接入；均断言本地命令被取消，且没有发送结果或调用 `complete`。
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\codex_bridge.py tests\test_cli_bridge.py tests\test_codex_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge -q`：`Ran 112 tests in 0.643s ... OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 153 tests in 15.782s ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 334 tests in 97.578s ... OK`。
+- 本切片无 Web 改动，不需要 Browser 验证。
+
+### 用户手册影响
+
+- 已检查 `docs/guides/USER_MANUAL.md`：暂停 / 继续 / 整树终止尚无最终用户页面入口，仍不能写成可操作步骤，因此本轮不修改用户手册；模块合同和进度文档记录后台能力已完成。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_codex_bridge.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
+2. TH-6b：在轮次合同落地后接 runner 领取前预检、完整 Hall 上下文重放和自动澄清闭环。
+
+---
+
 ## 2026-07-20 TH-6a2.1：根控制状态与有限批次授权服务端落地
 
 **背景**：项目管理者确认 TH-6a0 的有限批次与随时喊停合同，并授权以决策 Agent 身份推进下一切片。由于本轮涉及数据库 / 协议和权限边界，按批次刹车只完成 TH-6a2.1 服务端控制面，不进入 bundled runner 协作中断或 Web 控制按钮。

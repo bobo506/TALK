@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2.1 根控制状态与有限批次授权已实现，runner 协作中断、澄清轮次和 Review/Test 门禁仍待后续切片
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2.1 根控制状态与有限批次授权、TH-6a2.2 runner 协作中断已实现，澄清轮次和 Review/Test 门禁仍待后续切片
 
 ## 目标
 
@@ -192,8 +192,8 @@
 
 - `bridges/cli_bridge.py` 的任务队列 runner 会从 claim 响应读取 `hall_group_id`，把成功或失败的可见结果写入对应 Task Hall，再用该消息的 `id` 完成任务。
 - `bridges/codex_bridge.py` 的兼容任务处理入口采用同一 Hall 回传规则；实际 Codex 队列 worker 继续复用通用 runner。
-- runner 默认申请 120 秒租约并每 30 秒续租；每轮轮询会先回收属于自己的过期 claim，再领取 queued task。
-- runner 在本地命令执行期间持续验证 token。租约丢失时会取消本地子进程，不发送结果、不调用 complete；正常完成时携带 token 回写，服务端再次做原子校验。
+- runner 默认申请 120 秒租约；claim 心跳同时承担根控制探针，默认及硬上限均为每 5 秒一次，即使显式传入更长的 `--task-heartbeat-interval` 也不会放宽控制检查上限。每轮队列轮询仍会先回收属于自己的过期 claim，再领取 queued task。
+- runner 在本地命令执行期间持续验证 token。服务端因暂停、检查点、整树终止或其它 claim 失效原因返回 `404 / 409` 时，通用 CLI 与 Codex runner 都会取消执行协程；`run_cli_command` 收到取消后终止并回收本地子进程，不发送结果、不调用 `complete`。正常完成时仍携带 token 回写，由服务端再次做原子校验。
 - Codex / pi bridge 为队列 worker 使用独立任务命令：保留所选 read-only / workspace-write 能力，但不向嵌套模型暴露 TALK 结果投递工具；Task Hall 的结果消息只由 runner 写入，避免模型工具调用与 runner 可见输出形成重复结果。
 - 旧任务若没有 `hall_group_id`，runner 会保留原有全局时间线回传行为，服务端继续接受这类兼容结果。
 
@@ -368,7 +368,7 @@ active/paused/awaiting_human -> cancel_requested -> canceled
 - 暂停导致的协作中断把仍需继续的任务安全恢复为 `queued / accepted`，清除并失效当前 claim token；恢复后产生新 attempt，陈旧 runner 结果继续被服务端拒绝。
 - 第三方 runner 若不支持协作中断，服务端至少立即撤销其写回资格并等待租约回收；TALK 不承诺跨机器强杀未知进程。
 
-TH-6a2.1 已完成服务端部分：暂停 / 检查点会把运行任务安全回到 `queued / accepted`，清除 claim token 与实例占用；整树终止会取消所有非终态任务；心跳和完成接口会拒绝陈旧 claim。bundled runner 仍不会在本地命令运行时主动轮询控制状态，最长 5 秒检查与本地子进程停止属于 TH-6a2.2。
+TH-6a2.1 已完成服务端部分：暂停 / 检查点会把运行任务安全回到 `queued / accepted`，清除 claim token 与实例占用；整树终止会取消所有非终态任务；心跳和完成接口会拒绝陈旧 claim。TH-6a2.2 已让 bundled runner 复用 claim 心跳作为最长 5 秒一次的控制探针：服务端撤销 claim 后会取消本地命令，并放弃结果消息与 `complete`，因此暂停后的安全回队和终止后的取消状态不会被陈旧 runner 覆盖。
 
 ### Task Hall 澄清轮次合同
 
@@ -430,9 +430,9 @@ Review 策略：
 - async / sync client 与 Codex MCP / pi extension 已覆盖项目化创建、单任务读取、协作状态过滤、澄清、接受、等待、Hall 回复、安全取消和结果收取。
 - bundled runner 已把新任务结果写入对应 Task Hall，但仍兼容无 `hall_group_id` 的旧任务全局回传。
 - `talk_wait_tasks` 当前是最长 30 秒的客户端轮询，不是服务端事件流；Agent 发现结果也尚未提供项目业务角色字段。
-- 单任务 `cancel` 仍只覆盖未领取任务；`cancel-tree` 已能立即撤销全树服务端执行权并取消非终态任务，但本地运行进程的主动停止仍需 runner 协作中断协议。
+- 单任务 `cancel` 仍只覆盖未领取任务；`cancel-tree` 已能立即撤销全树服务端执行权并取消非终态任务，bundled runner 会在最长 5 秒控制探针发现 claim 失效后终止本地命令。第三方 runner 仍需自行实现同一协议。
 - TH-6a1 已实现任务树字段、旧库回填、委派权限及深度 / 根并发 / 单目标并发 / 非终态后代硬预算；async / sync SDK 已暴露对应创建参数。
-- TH-6a2.1 已实现根任务 `control_status`、有限批次授权、旧 epoch 拒绝，以及暂停 / 恢复 / 检查点 / 整树终止的服务端传播；TH-6a2.2 仍需让 bundled runner 在本地执行期间最多每 5 秒响应控制并停止子进程。
+- TH-6a2.1 已实现根任务 `control_status`、有限批次授权、旧 epoch 拒绝，以及暂停 / 恢复 / 检查点 / 整树终止的服务端传播；TH-6a2.2 已让 bundled runner 在本地执行期间最多每 5 秒响应 claim 撤销并停止子进程。服务不可达时无法接收新的控制事实，仍由现有本地租约截止时间提供最终失效保护。
 - 根任务当前仍可在后代未结束时自行完成；整树汇总、完成条件和质量门禁要随控制 / Review/Test 后续切片收敛。
 - 当前任务没有 `task_kind`、结构化 Review / 测试结论或任务关系记录；现有 `agent:pi` / `agent:pi-kimi` profile 也不具备完整黑盒测试能力，质量流水线尚不可启用。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
@@ -450,7 +450,7 @@ Review 策略：
 7. [x] TH-6a0：冻结任务树治理、有限批次授权、随时暂停、澄清轮次与 Review/Test 质量门禁合同。
 8. [x] TH-6a1：实现任务树字段、旧数据迁移、委派权限、深度 / 根并发 / 单目标并发 / 非终态后代硬预算及并发测试。
 9. [x] TH-6a2.1：实现根任务控制状态、有限批次授权、暂停 / 继续 / 检查点 / 整树终止服务端控制面、SDK 与原子门禁。
-10. TH-6a2.2：实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断与安全回队。
+10. [x] TH-6a2.2：实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断与安全回队。
 11. TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
 12. TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
 13. TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
@@ -493,7 +493,7 @@ Review 策略：
 - [x] 真实 Codex / pi CLI 均已贯通领取、执行、单条 Hall 结果回写与结果收取；独立任务命令已消除 pi 同时调用 TALK 工具造成的重复结果。
 - [x] 服务端原子强制任务树深度、根并发、单目标并发、非终态后代和委派授权预算，直接 API 不可绕过。
 - [x] 服务端可随时暂停根任务树；暂停后禁止新建 / claim、立即撤销现有 claim，陈旧心跳与结果无法写回。
-- [ ] bundled runner 收到暂停 / 终止后最多 5 秒停止本地子进程，并按服务端状态安全回队或取消。
+- [x] bundled runner 收到暂停 / 终止后最多 5 秒停止本地子进程，并按服务端状态安全回队或取消。
 - [x] “继续一批”生成新的有限切片授权与 `authorization_epoch`；并发预留、到期和陈旧 epoch 由服务端原子拒绝。
 - [ ] 批次安全收尾、风险、Review 或里程碑边界会按完整任务关系自动进入 `awaiting_human`。
 - [ ] 澄清按问题批次与显式答复边界计轮，额度耗尽进入 `needs_decision`，不能猜测执行。

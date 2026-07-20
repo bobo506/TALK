@@ -22,6 +22,7 @@ from bridges.codex_bridge import (
     strip_leading_mentions,
 )
 from cli.profiles import SYSTEM_PROMPT_PROFILE_HEADER, agent_profile_dir
+from TALK.client.exceptions import TalkValidationError
 
 
 def _base_instructions_value(command: str) -> str:
@@ -394,6 +395,74 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertTrue(client.heartbeats)
         self.assertEqual(client.sent, [("OK", ["human:bobo"], None)])
         self.assertEqual(client.completed, [(12, "succeeded", 99, None, "lease-12")])
+
+    def test_handle_queued_task_stops_when_tree_control_revokes_claim(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.completed = []
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return {
+                    "id": task_id,
+                    "created_by": "human:bobo",
+                    "content": "long task",
+                    "claim_token": "lease-12",
+                }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                raise TalkValidationError(
+                    "claim revoked",
+                    status_code=409,
+                    payload={"control_status": "paused"},
+                )
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append(text)
+                return {"id": 99}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id}
+
+        command_cancelled = False
+
+        async def fake_run_codex_command(command, prompt, *, cwd, timeout):
+            nonlocal command_cancelled
+            try:
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                command_cancelled = True
+                raise
+            return CodexRunResult(returncode=0, stdout="late", stderr="")
+
+        async def scenario():
+            original = codex_bridge.run_codex_command
+            codex_bridge.run_codex_command = fake_run_codex_command
+            try:
+                client = FakeClient()
+                handled = await handle_queued_task(
+                    {"id": 12},
+                    client=client,
+                    member_id="agent:codex",
+                    workdir=Path.cwd(),
+                    instance_id="agent:codex:test",
+                    codex_command=["codex", "exec"],
+                    timeout=5,
+                    max_reply_chars=100,
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
+                )
+                return handled, client
+            finally:
+                codex_bridge.run_codex_command = original
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertFalse(handled)
+        self.assertTrue(command_cancelled)
+        self.assertEqual(client.sent, [])
+        self.assertEqual(client.completed, [])
 
 
 if __name__ == "__main__":

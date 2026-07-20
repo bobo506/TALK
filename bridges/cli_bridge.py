@@ -66,7 +66,8 @@ DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_TASK_LEASE_SECONDS = 120
-DEFAULT_TASK_HEARTBEAT_INTERVAL = 30.0
+DEFAULT_TASK_HEARTBEAT_INTERVAL = 5.0
+MAX_TASK_CONTROL_CHECK_INTERVAL = 5.0
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
 _HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] | None = None
 PROMPT_TRANSPORTS = {"stdin", "argv"}
@@ -2017,6 +2018,17 @@ class TaskLeaseLostError(RuntimeError):
     """Raised when a runner can no longer prove ownership of a task claim."""
 
 
+def _effective_task_claim_check_interval(*, lease_seconds: int, heartbeat_interval: float) -> float:
+    """Keep claim/control probes frequent enough to honor the five-second stop contract."""
+    if lease_seconds <= 0 or heartbeat_interval <= 0:
+        raise ValueError("task lease and heartbeat intervals must be positive")
+    return min(
+        heartbeat_interval,
+        MAX_TASK_CONTROL_CHECK_INTERVAL,
+        max(0.5, lease_seconds / 3),
+    )
+
+
 async def _task_heartbeat_loop(
     *,
     client: Any,
@@ -2029,7 +2041,13 @@ async def _task_heartbeat_loop(
 
     loop = asyncio.get_running_loop()
     deadline = loop.time() + lease_seconds
-    interval = min(heartbeat_interval, max(0.5, lease_seconds / 3))
+    # The heartbeat endpoint also validates the root control state atomically.
+    # A pause/checkpoint/cancel revokes the claim with 409, so this probe doubles
+    # as the runner's bounded control check while the local command is running.
+    interval = _effective_task_claim_check_interval(
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
+    )
     last_error: Exception | None = None
     while True:
         await asyncio.sleep(min(interval, max(0.05, deadline - loop.time())))
@@ -2064,8 +2082,10 @@ def _start_task_heartbeat(
 ) -> asyncio.Task[None] | None:
     if not claim_token:
         return None
-    if lease_seconds <= 0 or heartbeat_interval <= 0:
-        raise ValueError("task lease and heartbeat intervals must be positive")
+    _effective_task_claim_check_interval(
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
+    )
     return asyncio.create_task(
         _task_heartbeat_loop(
             client=client,
@@ -2745,7 +2765,12 @@ def build_parser(
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--task-poll-interval", type=float, default=DEFAULT_TASK_POLL_INTERVAL)
     parser.add_argument("--task-lease-seconds", type=int, default=DEFAULT_TASK_LEASE_SECONDS)
-    parser.add_argument("--task-heartbeat-interval", type=float, default=DEFAULT_TASK_HEARTBEAT_INTERVAL)
+    parser.add_argument(
+        "--task-heartbeat-interval",
+        type=float,
+        default=DEFAULT_TASK_HEARTBEAT_INTERVAL,
+        help="Task claim heartbeat interval; effective control checks are capped at 5 seconds",
+    )
     parser.add_argument("--disable-task-queue", action="store_true")
     parser.add_argument("--max-reply-chars", type=int, default=DEFAULT_MAX_REPLY_CHARS)
     parser.add_argument("--respond-to-broadcast", action="store_true")
