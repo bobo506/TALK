@@ -151,12 +151,21 @@ def init_db() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE agent_tasks ADD COLUMN clarification_round_count INTEGER NOT NULL DEFAULT 0"
             )
+        if "task_kind" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN task_kind TEXT NOT NULL DEFAULT 'general'"
+            )
+        if "review_policy" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN review_policy TEXT")
+        if "gate_verdict" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN gate_verdict JSON")
         conn.exec_driver_sql(
             """
             UPDATE agent_tasks
             SET
               max_clarification_rounds = COALESCE(max_clarification_rounds, ?),
-              clarification_round_count = COALESCE(clarification_round_count, 0)
+              clarification_round_count = COALESCE(clarification_round_count, 0),
+              task_kind = COALESCE(task_kind, 'general')
             """,
             (server.models.TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,),
         )
@@ -255,6 +264,18 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE group_members ADD COLUMN business_role TEXT")
         if "decision_tier" not in group_member_columns:
             conn.exec_driver_sql("ALTER TABLE group_members ADD COLUMN decision_tier TEXT")
+        project_agent_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(project_agents)").fetchall()
+        }
+        if "business_role" not in project_agent_columns:
+            conn.exec_driver_sql("ALTER TABLE project_agents ADD COLUMN business_role TEXT")
+        if "decision_tier" not in project_agent_columns:
+            conn.exec_driver_sql("ALTER TABLE project_agents ADD COLUMN decision_tier TEXT")
+        if "capability_summary" not in project_agent_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE project_agents ADD COLUMN capability_summary JSON NOT NULL DEFAULT '[]'"
+            )
         member_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(members)").fetchall()
@@ -269,6 +290,14 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_project_id ON groups (project_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_type ON groups (type)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_projects_maintainer_member_id ON projects (maintainer_member_id)")
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_project_agents_business_role "
+            "ON project_agents (business_role)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_project_agents_decision_tier "
+            "ON project_agents (decision_tier)"
+        )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_member_id ON group_members (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_business_role ON group_members (business_role)")
@@ -288,6 +317,10 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_root_task_id ON agent_tasks (root_task_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_delegation_depth ON agent_tasks (delegation_depth)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_control_status ON agent_tasks (control_status)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_task_kind ON agent_tasks (task_kind)")
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_tasks_review_policy ON agent_tasks (review_policy)"
+        )
         conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_agent_tasks_authorization_expires_at ON agent_tasks (authorization_expires_at)"
         )
@@ -307,6 +340,34 @@ def init_db() -> None:
         conn.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_task_clarification_round_index "
             "ON agent_task_clarification_rounds (task_id, round_index)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_task_relations_source_task_id "
+            "ON agent_task_relations (source_task_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_task_relations_target_task_id "
+            "ON agent_task_relations (target_task_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_task_relations_relation_type "
+            "ON agent_task_relations (relation_type)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_task_relations_trigger_task_id "
+            "ON agent_task_relations (trigger_task_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_task_relations_round_index "
+            "ON agent_task_relations (round_index)"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_task_relation_source_target_type "
+            "ON agent_task_relations (source_task_id, target_task_id, relation_type)"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_task_relation_type_target_round "
+            "ON agent_task_relations (relation_type, target_task_id, round_index)"
         )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_target_member_id ON agent_task_schedules (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_task_schedules_created_by ON agent_task_schedules (created_by)")

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
-from sqlalchemy import Index
+from sqlalchemy import Column, Index, JSON
 from sqlmodel import Field, SQLModel
 
 from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
@@ -125,6 +125,12 @@ class ProjectAgent(SQLModel, table=True):
     soul_path: Optional[str] = None
     user_path: Optional[str] = None
     memory_pointer: Optional[str] = None
+    business_role: Optional[str] = Field(default=None, index=True)
+    decision_tier: Optional[str] = Field(default=None, index=True)
+    capability_summary: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -184,6 +190,9 @@ class AgentTask(SQLModel, table=True):
     created_by: str = Field(foreign_key="members.id", index=True)
     content: str
     title: Optional[str] = None
+    task_kind: str = Field(default="general", index=True)
+    review_policy: Optional[str] = Field(default=None, index=True)
+    gate_verdict: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     status: str = Field(default="queued", index=True)
     workflow_status: str = Field(default="assigned", index=True)
     attempt: int = Field(default=0)
@@ -216,6 +225,38 @@ class AgentTaskClarificationRound(SQLModel, table=True):
     answer_end_message_id: Optional[int] = Field(default=None, foreign_key="messages.id")
     requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     answered_at: Optional[datetime] = None
+
+
+class AgentTaskRelation(SQLModel, table=True):
+    __tablename__ = "agent_task_relations"
+    __table_args__ = (
+        Index(
+            "uq_agent_task_relation_source_target_type",
+            "source_task_id",
+            "target_task_id",
+            "relation_type",
+            unique=True,
+        ),
+        Index(
+            "uq_agent_task_relation_type_target_round",
+            "relation_type",
+            "target_task_id",
+            "round_index",
+            unique=True,
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source_task_id: int = Field(foreign_key="agent_tasks.id", index=True)
+    target_task_id: int = Field(foreign_key="agent_tasks.id", index=True)
+    relation_type: str = Field(index=True)
+    trigger_task_id: Optional[int] = Field(
+        default=None,
+        foreign_key="agent_tasks.id",
+        index=True,
+    )
+    round_index: Optional[int] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AgentTaskSchedule(SQLModel, table=True):
@@ -678,6 +719,11 @@ _TASK_CONTROL_STATUSES = {
     "cancel_requested",
     "canceled",
 }
+_TASK_KINDS = {"general", "development", "review", "test", "rework"}
+_TASK_REVIEW_POLICIES = {"required", "batch", "exempt"}
+_TASK_RELATION_TYPES = {"reviews", "tests", "reworks"}
+_TASK_REVIEW_VERDICTS = {"approved", "changes_requested", "blocked"}
+_TASK_TEST_VERDICTS = {"passed", "failed", "blocked"}
 _TASK_CHECKPOINT_REASONS = {
     "batch_limit",
     "risk_boundary",
@@ -697,6 +743,10 @@ class AgentTaskCreate(BaseModel):
     target_member_id: str
     content: str
     title: Optional[str] = None
+    task_kind: str = "general"
+    review_policy: Optional[str] = None
+    related_task_ids: list[int] = PydField(default_factory=list)
+    trigger_task_id: Optional[int] = PydField(default=None, ge=1)
     project_id: Optional[str] = None
     parent_task_id: Optional[int] = PydField(default=None, ge=1)
     authorization_epoch: Optional[int] = PydField(default=None, ge=0)
@@ -729,10 +779,53 @@ class AgentTaskCreate(BaseModel):
             self.title = self.title.strip() or None
         if self.project_id is not None:
             self.project_id = self.project_id.strip() or None
+        self.task_kind = self.task_kind.strip().lower()
+        if self.task_kind not in _TASK_KINDS:
+            raise ValueError(f"task_kind must be one of {sorted(_TASK_KINDS)}")
+        if self.review_policy is not None:
+            self.review_policy = self.review_policy.strip().lower() or None
+        if self.review_policy is not None and self.review_policy not in _TASK_REVIEW_POLICIES:
+            raise ValueError(
+                f"review_policy must be one of {sorted(_TASK_REVIEW_POLICIES)}"
+            )
+        self.related_task_ids = list(dict.fromkeys(self.related_task_ids))
+        if any(task_id < 1 for task_id in self.related_task_ids):
+            raise ValueError("related_task_ids must contain positive task ids")
         if not self.target_member_id:
             raise ValueError("target_member_id is required")
         if not self.content:
             raise ValueError("content is required")
+        if self.parent_task_id is None and self.task_kind != "general":
+            raise ValueError(
+                "development, review, test, and rework are only valid for child tasks"
+            )
+        if self.task_kind == "development":
+            self.review_policy = self.review_policy or "required"
+        elif self.task_kind == "rework":
+            if self.review_policy not in {None, "required"}:
+                raise ValueError("rework tasks require review_policy=required")
+            self.review_policy = "required"
+        elif self.review_policy is not None:
+            raise ValueError(
+                "review_policy is only valid for development and rework tasks"
+            )
+        if self.task_kind in {"general", "development"}:
+            if self.related_task_ids or self.trigger_task_id is not None:
+                raise ValueError(
+                    "related_task_ids and trigger_task_id are only valid for quality tasks"
+                )
+        elif self.task_kind in {"review", "test"}:
+            if not self.related_task_ids:
+                raise ValueError(f"{self.task_kind} tasks require related_task_ids")
+            if self.trigger_task_id is not None:
+                raise ValueError(
+                    f"trigger_task_id is not valid for {self.task_kind} tasks"
+                )
+        elif self.task_kind == "rework":
+            if len(self.related_task_ids) != 1 or self.trigger_task_id is None:
+                raise ValueError(
+                    "rework tasks require exactly one original development task and a trigger_task_id"
+                )
         if self.parent_task_id is not None and any(
             value is not None
             for value in (
@@ -799,11 +892,33 @@ class AgentTaskHeartbeat(BaseModel):
         return self
 
 
+class AgentTaskGateVerdict(BaseModel):
+    verdict: str
+    summary: str
+    findings: list[str] = PydField(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_gate_verdict(self) -> "AgentTaskGateVerdict":
+        self.verdict = self.verdict.strip().lower()
+        self.summary = self.summary.strip()
+        self.findings = [
+            finding.strip()
+            for finding in self.findings
+            if finding.strip()
+        ]
+        if not self.verdict:
+            raise ValueError("gate verdict is required")
+        if not self.summary:
+            raise ValueError("gate verdict summary is required")
+        return self
+
+
 class AgentTaskComplete(BaseModel):
     status: str
     result_message_id: Optional[int] = None
     last_error: Optional[str] = None
     claim_token: Optional[str] = None
+    gate_verdict: Optional[AgentTaskGateVerdict] = None
 
     @model_validator(mode="after")
     def validate_task_complete(self) -> "AgentTaskComplete":
@@ -888,6 +1003,9 @@ class AgentTaskOut(BaseModel):
     created_by: str
     content: str
     title: Optional[str]
+    task_kind: str
+    review_policy: Optional[str]
+    gate_verdict: Optional[dict]
     status: str
     workflow_status: str
     attempt: int
@@ -908,6 +1026,38 @@ class AgentTaskClaimOut(AgentTaskOut):
     claim_token: str
 
 
+class AgentTaskRelationOut(BaseModel):
+    id: int
+    source_task_id: int
+    target_task_id: int
+    relation_type: str
+    trigger_task_id: Optional[int]
+    round_index: Optional[int]
+    created_at: datetime
+
+
+class AgentTaskReviewGateOut(BaseModel):
+    development_task_id: int
+    current_subject_task_id: int
+    review_policy: str
+    current_verdict: Optional[dict]
+    review_task_id: Optional[int]
+    rework_round: int
+
+
+class AgentTaskQualityContextItem(BaseModel):
+    relation: AgentTaskRelationOut
+    task: AgentTaskOut
+    messages: list[MessageOut]
+
+
+class AgentTaskQualityContextOut(BaseModel):
+    task_id: int
+    relations: list[AgentTaskRelationOut]
+    related_tasks: list[AgentTaskQualityContextItem]
+    trigger_tasks: list[AgentTaskQualityContextItem]
+
+
 class AgentTaskTreeOut(BaseModel):
     root: AgentTaskOut
     tasks: list[AgentTaskOut]
@@ -915,6 +1065,8 @@ class AgentTaskTreeOut(BaseModel):
     nonterminal_descendants: int
     remaining_slice_budget: int
     authorization_expired: bool
+    relations: list[AgentTaskRelationOut] = PydField(default_factory=list)
+    review_gates: list[AgentTaskReviewGateOut] = PydField(default_factory=list)
 
 
 class AgentTaskScheduleCreate(BaseModel):
@@ -1046,6 +1198,9 @@ class ProjectAgentEntry(BaseModel):
     soul_path: Optional[str] = None
     user_path: Optional[str] = None
     memory_pointer: Optional[str] = None
+    business_role: Optional[str] = None
+    decision_tier: Optional[str] = None
+    capability_summary: list[str] = PydField(default_factory=list)
 
     @model_validator(mode="after")
     def validate_entry(self) -> "ProjectAgentEntry":
@@ -1056,6 +1211,24 @@ class ProjectAgentEntry(BaseModel):
             value = getattr(self, field)
             if value is not None:
                 setattr(self, field, value.strip() or None)
+        if self.business_role is not None:
+            self.business_role = self.business_role.strip() or None
+        if self.decision_tier is not None:
+            self.decision_tier = self.decision_tier.strip().lower() or None
+            if (
+                self.decision_tier is not None
+                and self.decision_tier not in _DECISION_TIERS
+            ):
+                raise ValueError(
+                    f"decision_tier must be one of {sorted(_DECISION_TIERS)}"
+                )
+        self.capability_summary = list(
+            dict.fromkeys(
+                capability.strip()
+                for capability in self.capability_summary
+                if capability.strip()
+            )
+        )
         return self
 
 
@@ -1080,16 +1253,35 @@ class ProjectAgentOut(BaseModel):
     soul_path: Optional[str]
     user_path: Optional[str]
     memory_pointer: Optional[str]
+    business_role: Optional[str]
+    decision_tier: Optional[str]
+    capability_summary: list[str]
+    display_name: Optional[str]
+    availability: str
+    instances: list[AgentInstanceOut]
     updated_at: datetime
 
     @classmethod
-    def from_orm_agent(cls, agent: ProjectAgent) -> "ProjectAgentOut":
+    def from_orm_agent(
+        cls,
+        agent: ProjectAgent,
+        *,
+        display_name: Optional[str] = None,
+        availability: str = "offline",
+        instances: Optional[list[AgentInstanceOut]] = None,
+    ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
             identity_path=agent.identity_path,
             soul_path=agent.soul_path,
             user_path=agent.user_path,
             memory_pointer=agent.memory_pointer,
+            business_role=agent.business_role,
+            decision_tier=agent.decision_tier,
+            capability_summary=list(agent.capability_summary or []),
+            display_name=display_name,
+            availability=availability,
+            instances=instances or [],
             updated_at=agent.updated_at,
         )
 

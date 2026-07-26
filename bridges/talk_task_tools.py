@@ -100,15 +100,43 @@ def _availability(statuses: list[str]) -> str:
 
 def list_agents(*, project_id: str | None = None) -> JsonDict:
     effective_project_id = _project_id(project_id)
-    members = _api_request("GET", "/api/members")
-    instances = _api_request("GET", "/api/instances")
-    project_member_ids: set[str] | None = None
     if effective_project_id is not None:
         project_agents = _api_request(
             "GET",
             f"/api/projects/{quote(effective_project_id, safe='')}/agents",
         )
-        project_member_ids = {str(agent["member_id"]) for agent in project_agents}
+        active_agent_ids = {
+            str(member["id"])
+            for member in _api_request("GET", "/api/members")
+            if member.get("kind") == "agent" and member.get("disabled_at") is None
+        }
+        agents: list[JsonDict] = []
+        for agent in project_agents:
+            if str(agent["member_id"]) not in active_agent_ids:
+                continue
+            member_instances = list(agent.get("instances") or [])
+            statuses = [
+                str(instance.get("status") or "offline")
+                for instance in member_instances
+            ]
+            agents.append(
+                {
+                    "member_id": str(agent["member_id"]),
+                    "display_name": agent.get("display_name"),
+                    "business_role": agent.get("business_role"),
+                    "decision_tier": agent.get("decision_tier"),
+                    "capability_summary": list(
+                        agent.get("capability_summary") or []
+                    ),
+                    "availability": agent.get("availability")
+                    or _availability(statuses),
+                    "instances": member_instances,
+                }
+            )
+        return {"project_id": effective_project_id, "agents": agents}
+
+    members = _api_request("GET", "/api/members")
+    instances = _api_request("GET", "/api/instances")
 
     instances_by_member: dict[str, list[JsonDict]] = {}
     for instance in instances:
@@ -118,8 +146,6 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
     for member in members:
         member_id = str(member["id"])
         if member.get("kind") != "agent" or member.get("disabled_at") is not None:
-            continue
-        if project_member_ids is not None and member_id not in project_member_ids:
             continue
         member_instances = instances_by_member.get(member_id, [])
         statuses = [str(instance.get("status") or "offline") for instance in member_instances]
@@ -140,6 +166,13 @@ def delegate_task(
     content: str,
     title: str | None = None,
     project_id: str | None = None,
+    task_kind: str = "general",
+    review_policy: str | None = None,
+    related_task_ids: list[int] | None = None,
+    trigger_task_id: int | None = None,
+    parent_task_id: int | None = None,
+    authorization_epoch: int | None = None,
+    max_clarification_rounds: int = 1,
 ) -> JsonDict:
     effective_project_id = _project_id(project_id, required=True)
     return _api_request(
@@ -150,6 +183,13 @@ def delegate_task(
             "content": content,
             "title": title,
             "project_id": effective_project_id,
+            "task_kind": task_kind,
+            "review_policy": review_policy,
+            "related_task_ids": list(related_task_ids or []),
+            "trigger_task_id": trigger_task_id,
+            "parent_task_id": parent_task_id,
+            "authorization_epoch": authorization_epoch,
+            "max_clarification_rounds": max_clarification_rounds,
         },
     )
 
@@ -160,6 +200,7 @@ def list_tasks(
     status: str | None = None,
     workflow_status: str | None = None,
     project_id: str | None = None,
+    task_kind: str | None = None,
 ) -> JsonDict:
     effective_project_id = _project_id(project_id)
     tasks = _api_request(
@@ -170,6 +211,7 @@ def list_tasks(
             "status": status,
             "workflow_status": workflow_status,
             "project_id": effective_project_id,
+            "task_kind": task_kind,
         },
     )
     return {"project_id": effective_project_id, "tasks": tasks}
@@ -177,7 +219,8 @@ def list_tasks(
 
 def get_task(task_id: int, *, include_messages: bool = True) -> JsonDict:
     task = _api_request("GET", f"/api/tasks/{int(task_id)}")
-    result: JsonDict = {"task": task}
+    relations = _api_request("GET", f"/api/tasks/{int(task_id)}/relations")
+    result: JsonDict = {"task": task, "relations": relations}
     if include_messages:
         params: JsonDict = {"limit": 50}
         if task.get("hall_group_id"):
@@ -325,13 +368,35 @@ TOOL_SCHEMAS: list[JsonDict] = [
                 "target_member_id": {"type": "string"},
                 "title": {"type": "string"},
                 "content": {"type": "string"},
+                "task_kind": {
+                    "type": "string",
+                    "enum": ["general", "development", "review", "test", "rework"],
+                    "default": "general",
+                },
+                "review_policy": {
+                    "type": "string",
+                    "enum": ["required", "batch", "exempt"],
+                },
+                "related_task_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                },
+                "trigger_task_id": {"type": "integer"},
+                "parent_task_id": {"type": "integer"},
+                "authorization_epoch": {"type": "integer"},
+                "max_clarification_rounds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2,
+                    "default": 1,
+                },
             },
             "required": ["target_member_id", "content"],
         },
     },
     {
         "name": "talk_get_task",
-        "description": "读取一个任务、Task Hall 最近消息及关联结果。",
+        "description": "读取一个任务、任务关系、Task Hall 最近消息及关联结果。",
         "inputSchema": {
             "type": "object",
             "properties": {"task_id": {"type": "integer"}},
@@ -348,6 +413,10 @@ TOOL_SCHEMAS: list[JsonDict] = [
                 "target_member_id": {"type": "string"},
                 "status": {"type": "string"},
                 "workflow_status": {"type": "string"},
+                "task_kind": {
+                    "type": "string",
+                    "enum": ["general", "development", "review", "test", "rework"],
+                },
             },
         },
     },
@@ -420,6 +489,29 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             target_member_id=str(arguments.get("target_member_id") or "").strip(),
             title=str(arguments.get("title") or "").strip() or None,
             content=str(arguments.get("content") or "").strip(),
+            task_kind=str(arguments.get("task_kind") or "general").strip().lower(),
+            review_policy=str(arguments.get("review_policy") or "").strip().lower() or None,
+            related_task_ids=[
+                int(task_id) for task_id in (arguments.get("related_task_ids") or [])
+            ],
+            trigger_task_id=(
+                int(arguments["trigger_task_id"])
+                if arguments.get("trigger_task_id") is not None
+                else None
+            ),
+            parent_task_id=(
+                int(arguments["parent_task_id"])
+                if arguments.get("parent_task_id") is not None
+                else None
+            ),
+            authorization_epoch=(
+                int(arguments["authorization_epoch"])
+                if arguments.get("authorization_epoch") is not None
+                else None
+            ),
+            max_clarification_rounds=int(
+                arguments.get("max_clarification_rounds", 1)
+            ),
         )
     if name == "talk_get_task":
         return get_task(int(arguments["task_id"]))
@@ -429,6 +521,7 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             target_member_id=arguments.get("target_member_id"),
             status=arguments.get("status"),
             workflow_status=arguments.get("workflow_status"),
+            task_kind=arguments.get("task_kind"),
         )
     if name == "talk_wait_tasks":
         return wait_tasks(

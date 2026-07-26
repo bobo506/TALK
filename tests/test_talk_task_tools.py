@@ -32,7 +32,16 @@ class TalkTaskToolTests(RouteTestCase):
             synced = client.post(
                 "/api/projects/prj_tools/sync",
                 headers={"X-API-Key": "bobo-key"},
-                json={"agents": [{"member_id": "agent:worker"}]},
+                json={
+                    "agents": [
+                        {
+                            "member_id": "agent:worker",
+                            "business_role": "developer",
+                            "decision_tier": "execution",
+                            "capability_summary": ["代码实现", "API 测试"],
+                        }
+                    ]
+                },
             )
             instance = client.put(
                 "/api/instances/worker-1",
@@ -98,6 +107,22 @@ class TalkTaskToolTests(RouteTestCase):
                 "talk_collect_result",
             },
         )
+        delegate_schema = next(
+            tool["inputSchema"]
+            for tool in tools
+            if tool["name"] == "talk_delegate_task"
+        )
+        self.assertTrue(
+            {
+                "task_kind",
+                "review_policy",
+                "related_task_ids",
+                "trigger_task_id",
+                "parent_task_id",
+                "authorization_epoch",
+                "max_clarification_rounds",
+            }.issubset(delegate_schema["properties"])
+        )
         self.assertFalse(responses[2]["result"]["isError"])
         listed = json.loads(responses[2]["result"]["content"][0]["text"])
         self.assertEqual([agent["member_id"] for agent in listed["agents"]], ["agent:worker"])
@@ -134,7 +159,7 @@ class TalkTaskToolTests(RouteTestCase):
                 )
                 listed = dispatch_tool(
                     "talk_list_tasks",
-                    {"workflow_status": "assigned"},
+                    {"workflow_status": "assigned", "task_kind": "general"},
                 )
                 fetched = dispatch_tool("talk_get_task", {"task_id": created["id"]})
 
@@ -212,8 +237,15 @@ class TalkTaskToolTests(RouteTestCase):
 
         self.assertEqual([agent["member_id"] for agent in agents["agents"]], ["agent:worker"])
         self.assertEqual(agents["agents"][0]["availability"], "available")
+        self.assertEqual(agents["agents"][0]["business_role"], "developer")
+        self.assertEqual(agents["agents"][0]["decision_tier"], "execution")
+        self.assertEqual(
+            agents["agents"][0]["capability_summary"],
+            ["代码实现", "API 测试"],
+        )
         self.assertEqual([task["id"] for task in listed["tasks"]], [created["id"]])
         self.assertEqual(fetched["task"]["hall_group_id"], created["hall_group_id"])
+        self.assertEqual(fetched["relations"], [])
         self.assertEqual(clarification["task"]["workflow_status"], "clarification_requested")
         self.assertEqual(answer["message"]["group_id"], created["hall_group_id"])
         self.assertEqual(answer["task"]["workflow_status"], "clarification_answered")
@@ -223,6 +255,124 @@ class TalkTaskToolTests(RouteTestCase):
         self.assertEqual(collected["result_message"]["content"], "# Result\nDone")
         self.assertEqual(canceled["task"]["workflow_status"], "canceled")
         self.assertEqual(canceled["message"]["group_id"], cancelable["hall_group_id"])
+
+    def test_task_tools_create_typed_children_and_return_relations(self):
+        self.add_member(
+            "agent:reviewer",
+            api_key="reviewer-key",
+            display_name="Reviewer",
+        )
+        with LiveTalkServer(main.app) as base_url:
+            worker_env = self._environment(base_url, "worker-key", "agent:worker")
+            with httpx.Client(
+                base_url=base_url,
+                timeout=10,
+                trust_env=False,
+            ) as client:
+                client.post(
+                    "/api/projects/prj_tools/sync",
+                    headers={"X-API-Key": "bobo-key"},
+                    json={
+                        "agents": [
+                            {"member_id": "agent:worker"},
+                            {"member_id": "agent:reviewer"},
+                        ]
+                    },
+                ).raise_for_status()
+                root = client.post(
+                    "/api/tasks",
+                    headers={"X-API-Key": "bobo-key"},
+                    json={
+                        "target_member_id": "agent:worker",
+                        "content": "Coordinate a reviewed slice",
+                        "project_id": "prj_tools",
+                        "may_delegate": True,
+                        "slice_budget": 2,
+                        "authorization_ttl_seconds": 60,
+                    },
+                ).json()
+                claimed_root = client.post(
+                    f"/api/tasks/{root['id']}/claim",
+                    headers={"X-API-Key": "worker-key"},
+                    json={},
+                ).json()
+
+            with patch.dict(os.environ, worker_env, clear=False):
+                development = dispatch_tool(
+                    "talk_delegate_task",
+                    {
+                        "target_member_id": "agent:other",
+                        "content": "Implement the frozen slice",
+                        "task_kind": "development",
+                        "review_policy": "required",
+                        "parent_task_id": claimed_root["id"],
+                        "authorization_epoch": claimed_root["authorization_epoch"],
+                    },
+                )
+
+            with httpx.Client(
+                base_url=base_url,
+                timeout=10,
+                trust_env=False,
+            ) as client:
+                claimed_development = client.post(
+                    f"/api/tasks/{development['id']}/claim",
+                    headers={"X-API-Key": "other-key"},
+                    json={},
+                ).json()
+                result = client.post(
+                    "/api/messages",
+                    headers={"X-API-Key": "other-key"},
+                    json={
+                        "type": "text",
+                        "content": "Frozen implementation result",
+                        "to": ["agent:worker"],
+                        "group_id": development["hall_group_id"],
+                    },
+                ).json()
+                client.post(
+                    f"/api/tasks/{development['id']}/complete",
+                    headers={"X-API-Key": "other-key"},
+                    json={
+                        "status": "succeeded",
+                        "result_message_id": result["id"],
+                        "claim_token": claimed_development["claim_token"],
+                    },
+                ).raise_for_status()
+
+            with patch.dict(os.environ, worker_env, clear=False):
+                dispatch_tool("talk_collect_result", {"task_id": development["id"]})
+                review = dispatch_tool(
+                    "talk_delegate_task",
+                    {
+                        "target_member_id": "agent:reviewer",
+                        "content": "Review the frozen slice",
+                        "task_kind": "review",
+                        "related_task_ids": [development["id"]],
+                        "parent_task_id": claimed_root["id"],
+                        "authorization_epoch": claimed_root["authorization_epoch"],
+                        "max_clarification_rounds": 2,
+                    },
+                )
+                fetched = dispatch_tool(
+                    "talk_get_task",
+                    {"task_id": review["id"]},
+                )
+                listed = dispatch_tool(
+                    "talk_list_tasks",
+                    {"project_id": "prj_tools", "task_kind": "review"},
+                )
+
+        self.assertEqual(development["task_kind"], "development")
+        self.assertEqual(development["review_policy"], "required")
+        self.assertEqual(review["task_kind"], "review")
+        self.assertEqual(review["max_clarification_rounds"], 2)
+        self.assertEqual(fetched["relations"][0]["relation_type"], "reviews")
+        self.assertEqual(
+            fetched["relations"][0]["target_task_id"],
+            development["id"],
+        )
+        self.assertEqual([task["id"] for task in listed["tasks"]], [review["id"]])
 
     def test_pi_extension_registers_same_task_tool_surface(self):
         source = Path("bridges/talk_tools_extension.ts").read_text(encoding="utf-8")
@@ -237,3 +387,15 @@ class TalkTaskToolTests(RouteTestCase):
             "talk_collect_result",
         ):
             self.assertIn(f'name: "{name}"', source)
+        for field in (
+            "task_kind",
+            "review_policy",
+            "related_task_ids",
+            "trigger_task_id",
+            "parent_task_id",
+            "authorization_epoch",
+            "max_clarification_rounds",
+            "capability_summary",
+            "relations",
+        ):
+            self.assertIn(field, source)

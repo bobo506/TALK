@@ -74,11 +74,13 @@ function availability(statuses: string[]): string {
 
 async function taskWithMessages(taskId: number): Promise<JsonObject> {
   const task = await apiRequest("GET", `/api/tasks/${taskId}`);
+  const relations = await apiRequest("GET", `/api/tasks/${taskId}/relations`);
   const params: JsonObject = { limit: 50 };
   if (task.hall_group_id) params.group_id = task.hall_group_id;
   const messages = await apiRequest("GET", "/api/messages", undefined, params);
   return {
     task,
+    relations,
     messages,
     result_message: messages.find((message: JsonObject) => message.id === task.result_message_id) || null,
   };
@@ -243,16 +245,43 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
     async execute(_toolCallId, params) {
       return toolResponse(async () => {
         const projectId = effectiveProjectId(params.project_id);
+        if (projectId) {
+          const projectAgents = await apiRequest(
+            "GET",
+            `/api/projects/${encodeURIComponent(projectId)}/agents`,
+          );
+          const members = await apiRequest("GET", "/api/members");
+          const activeAgentIds = new Set(
+            members
+              .filter((member: JsonObject) => member.kind === "agent" && !member.disabled_at)
+              .map((member: JsonObject) => String(member.id)),
+          );
+          const agents = projectAgents
+            .filter((agent: JsonObject) => activeAgentIds.has(String(agent.member_id)))
+            .map((agent: JsonObject) => {
+              const memberInstances = Array.isArray(agent.instances) ? agent.instances : [];
+              return {
+                member_id: agent.member_id,
+                display_name: agent.display_name ?? null,
+                business_role: agent.business_role ?? null,
+                decision_tier: agent.decision_tier ?? null,
+                capability_summary: Array.isArray(agent.capability_summary)
+                  ? agent.capability_summary
+                  : [],
+                availability: agent.availability
+                  || availability(memberInstances.map(
+                    (instance: JsonObject) => String(instance.status || "offline"),
+                  )),
+                instances: memberInstances,
+              };
+            });
+          return { project_id: projectId, agents };
+        }
+
         const members = await apiRequest("GET", "/api/members");
         const instances = await apiRequest("GET", "/api/instances");
-        let projectMembers: Set<string> | undefined;
-        if (projectId) {
-          const projectAgents = await apiRequest("GET", `/api/projects/${encodeURIComponent(projectId)}/agents`);
-          projectMembers = new Set(projectAgents.map((agent: JsonObject) => String(agent.member_id)));
-        }
         const agents = members
           .filter((member: JsonObject) => member.kind === "agent" && !member.disabled_at)
-          .filter((member: JsonObject) => !projectMembers || projectMembers.has(String(member.id)))
           .map((member: JsonObject) => {
             const memberInstances = instances.filter((instance: JsonObject) => instance.member_id === member.id);
             return {
@@ -276,6 +305,17 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
       target_member_id: Type.String(),
       title: Type.Optional(Type.String()),
       content: Type.String(),
+      task_kind: Type.Optional(Type.String({
+        description: "任务类型：general、development、review、test 或 rework",
+      })),
+      review_policy: Type.Optional(Type.String({
+        description: "Review 策略：required、batch 或 exempt",
+      })),
+      related_task_ids: Type.Optional(Type.Array(Type.Number())),
+      trigger_task_id: Type.Optional(Type.Number()),
+      parent_task_id: Type.Optional(Type.Number()),
+      authorization_epoch: Type.Optional(Type.Number()),
+      max_clarification_rounds: Type.Optional(Type.Number()),
     }),
     async execute(_toolCallId, params) {
       return toolResponse(async () => {
@@ -286,6 +326,21 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
           target_member_id: String(params.target_member_id || "").trim(),
           title: String(params.title || "").trim() || null,
           content: String(params.content || "").trim(),
+          task_kind: String(params.task_kind || "general").trim().toLowerCase(),
+          review_policy: String(params.review_policy || "").trim().toLowerCase() || null,
+          related_task_ids: (params.related_task_ids || []).map(
+            (taskId: unknown) => Number(taskId),
+          ),
+          trigger_task_id: params.trigger_task_id == null
+            ? null
+            : Number(params.trigger_task_id),
+          parent_task_id: params.parent_task_id == null
+            ? null
+            : Number(params.parent_task_id),
+          authorization_epoch: params.authorization_epoch == null
+            ? null
+            : Number(params.authorization_epoch),
+          max_clarification_rounds: Number(params.max_clarification_rounds ?? 1),
         });
       });
     },
@@ -310,6 +365,9 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
       target_member_id: Type.Optional(Type.String()),
       status: Type.Optional(Type.String()),
       workflow_status: Type.Optional(Type.String()),
+      task_kind: Type.Optional(Type.String({
+        description: "任务类型：general、development、review、test 或 rework",
+      })),
     }),
     async execute(_toolCallId, params) {
       return toolResponse(async () => {
@@ -319,6 +377,7 @@ export default function talkToolsExtension(pi: ExtensionAPI) {
           target_member_id: params.target_member_id,
           status: params.status,
           workflow_status: params.workflow_status,
+          task_kind: params.task_kind,
         });
         return { project_id: projectId || null, tasks };
       });

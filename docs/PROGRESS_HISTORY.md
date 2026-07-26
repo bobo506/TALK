@@ -184,6 +184,71 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-26 TH-6c：结构化 Review、返工关系门禁与角色发现
+
+**背景**：TH-6b 已让 bundled runner 在领取前完成预检与澄清，但任务仍缺少开发 / Review / Test / 返工的强类型、显式关系和服务端质量门禁。项目管理者授权继续下一切片，并说明暂时无暇人工验收。由于本轮涉及数据库、任务协议与跨模块 runner，按决策 Agent 的高风险批次刹车只推进 TH-6c，不进入 TH-6d。
+
+### 数据与服务端合同
+
+- `agent_tasks` 新增 `task_kind`、`review_policy`、JSON `gate_verdict`；旧任务迁移为 `general`。
+- 新增 `agent_task_relations`，记录 `reviews / tests / reworks`、触发任务和冻结版本轮次；迁移补齐索引与唯一约束。
+- 类型化任务只允许作为子任务；同根、同项目、当前 `authorization_epoch`、授权有效期和非终态后代上限由服务端校验。
+- `general / development` 消耗授权切片；`review / test / rework` 不消耗新的开发切片。
+- `development` 默认 `required` Review；低风险 `batch` 一次覆盖同批次 2–3 项；`exempt` 仅 Human 或项目 `decision_tier=decision` 的 Agent 可授权。
+- Reviewer 必须与所有被审任务执行者不同。开发 / 返工成功必须引用结果消息；Review / Test 成功必须提交匹配类型的结构化 verdict，负向结论必须带 findings。
+- `GET /api/tasks/{id}/relations` 返回显式关系；`quality-context` 向质量任务创建者 / 执行者只读开放关联任务、触发任务及完整 Task Hall。
+- 类型化任务树只有在所有非终态后代结束、最新开发 / 返工成功且必需 Review 为 `approved` 时才能完成；纯 `general` 旧流程不被追溯阻断。
+- 同一质量问题最多自动返工两轮；第 2 轮返工再次得到 `changes_requested` 时，根任务在同一事务进入 `awaiting_human / review_exhausted` 并撤销其它 claim。
+
+### Review 冻结版本语义槽
+
+独立集成审查发现，若允许同一冻结版本重复创建 Review，后续 `approved` 可以覆盖先前 `changes_requested`，并绕过返工上限。最终合同收敛为：
+
+- Review relation 按当前冻结版本轮次 `0 / 1 / 2` 占用唯一语义槽，并发创建只能一条成功。
+- `approved / changes_requested` 是终结语义，保留槽位；原版本不能再次 Review。
+- runner `failed`、任务 `canceled` 或结构化 `blocked` 不形成批准 / 变更结论，会在完成或取消事务中释放槽位，允许同一冻结版本重试。
+- 根门禁因此不会把未变化版本上的后续结论当作对既有变更请求的覆盖。
+
+### Runner、SDK 与工具
+
+- bundled runner 为 Review / Test 注入显式 `TALK_GATE_VERDICT` 合同，读取关系授权的完整质量上下文，首次格式错误有界纠正一次。
+- runner 只把解析出的结构化结论传给 `complete`；若 Task Hall 结果回写失败，任务按 `failed` 完成且不携带 verdict，避免服务端 422 后卡在 `running`。
+- async / sync SDK 支持类型、Review 策略、关联任务、触发任务、结构化 verdict，以及 relations / quality-context helper。
+- CLI 从 `.talk/groups.yaml` 聚合自由业务角色、决策分级和能力列表；跨群组角色稳定去重，分级冲突显式报错。
+- 项目 Agent API 与 `talk_list_agents` 返回 `business_role`、`decision_tier`、`capability_summary`、实例列表和聚合可用状态。
+- Python MCP 与 Pi extension 保持原有八个工具名，扩展 typed delegate、类型过滤、关系读取和项目 Agent 富化结果。
+
+### 验证与审查
+
+- Python `py_compile` 覆盖服务端模型 / 迁移 / 路由、CLI、async / sync SDK、runner 与 Python 工具；Pi TypeScript 通过 Node 语法检查。
+- 服务端 + runner 定向回归：`Ran 166 tests in 39.405s ... OK`。
+- CLI / SDK / Python MCP / Pi 工具联合回归：`Ran 48 tests ... OK`。
+- 最终全量回归：`Ran 366 tests in 147.008s ... OK`。
+- 首次全量命令因外部 5 分钟工具时限被终止，没有最终结果；提高时限后从头完整重跑通过。
+- 独立只读集成审查覆盖权限 / epoch / 项目范围、切片非消费、批量 Review、两轮返工原子暂停、结构化 verdict、关系上下文、并发唯一性、旧 `general` 兼容与角色发现；修复上述两个失败路径后无剩余阻断项。
+- `usage-gate.cmd` 返回 `decision=continue`，但没有提供 session / weekly 精确百分比；未臆测具体额度，仍按数据库 / 协议高风险单切片规则停止。
+- 本切片未修改 Web，按 Browser 约定无需页面验证。
+
+### 当前边界
+
+- `test` 类型、关系和结构化 verdict 已持久化，但根任务 Test 门禁、最新冻结版本失效、Blackboard 质量控制与测试通过后的人工验收暂停属于 TH-6d。
+- Review 的“只读”由 bundled runner prompt 约束；服务端不能替代第三方 Reviewer 的操作系统文件写权限隔离。
+- Web 尚无 Review / 返工创建、关系查看、结构化结论和质量检查点入口。
+- 项目管理者本轮暂时无暇人工验收；自动化与代码审查完成后按高风险单切片规则暂停，未把验收门禁永久取消。
+
+### 变更文件
+
+- 服务端：`server/models.py`、`server/db.py`、`server/routes/tasks.py`、`server/routes/projects.py`
+- SDK / CLI / 工具：`TALK/client/talk_client.py`、`TALK/client/talk_client_sync.py`、`cli/talk.py`、`bridges/cli_bridge.py`、`bridges/talk_task_tools.py`、`bridges/talk_tools_extension.ts`
+- 测试：`tests/test_tasks.py`、`tests/test_projects.py`、`tests/test_cli_bridge.py`、`tests/test_talk_cli.py`、`tests/test_talk_client.py`、`tests/test_talk_task_tools.py`
+- 文档：`docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_tasks.md`、`docs/guides/USER_MANUAL.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. 暂停并提交 / 推送 TH-6c 可回溯版本。
+2. 项目管理者恢复后进入 TH-6d：里程碑 Test 门禁、最新冻结版本、Blackboard 控制、批次自动检查点与人工验收暂停。
+3. TH-6d 构成下一处里程碑门禁，完成后必须提供人工验收说明并等待确认。
+
 ## 2026-07-26 TH-6b：runner 领取前预检、自动澄清与完整 Hall 重放
 
 **背景**：TH-6a3 已建立澄清轮次和服务端状态门禁，但 bundled runner 仍会从 `assigned` 直接 claim，正式执行也只获得任务标题 / 正文。本轮属于 runner / 协议高风险切片，按批次刹车只完成 TH-6b，并同步落实项目管理者确认的 Codex 决策 Agent 身份，不进入 TH-6c Review 门禁。

@@ -18,6 +18,8 @@ from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.auth import get_current_member
 from server.db import get_session
 from server.models import (
+    AgentInstance,
+    AgentInstanceOut,
     AgentProfileOut,
     AgentProfileUpdate,
     Group,
@@ -80,6 +82,79 @@ def _profile_out(project_id: str, member_id: str, root: str) -> AgentProfileOut:
         soul=profile.soul,
         user=profile.user,
     )
+
+
+def _availability(statuses: list[str]) -> str:
+    if "busy" in statuses:
+        return "busy"
+    if any(instance_status in {"online", "idle", "starting"} for instance_status in statuses):
+        return "available"
+    if "error" in statuses:
+        return "error"
+    return "offline"
+
+
+def _instance_out(instance: AgentInstance) -> AgentInstanceOut:
+    return AgentInstanceOut(
+        id=instance.id,
+        member_id=instance.member_id,
+        runtime=instance.runtime,
+        status=instance.status,
+        host=instance.host,
+        pid=instance.pid,
+        current_task_id=instance.current_task_id,
+        last_error=instance.last_error,
+        created_at=instance.created_at,
+        updated_at=instance.updated_at,
+        last_seen_at=instance.last_seen_at,
+    )
+
+
+def _project_agent_outs(
+    agents: list[ProjectAgent],
+    session: Session,
+) -> list[ProjectAgentOut]:
+    member_ids = [agent.member_id for agent in agents]
+    members = (
+        session.exec(select(Member).where(Member.id.in_(member_ids))).all()
+        if member_ids
+        else []
+    )
+    instances = (
+        session.exec(
+            select(AgentInstance)
+            .where(AgentInstance.member_id.in_(member_ids))
+            .order_by(AgentInstance.member_id, AgentInstance.created_at)
+        ).all()
+        if member_ids
+        else []
+    )
+    members_by_id = {member.id: member for member in members}
+    instances_by_member: dict[str, list[AgentInstance]] = {}
+    for instance in instances:
+        instances_by_member.setdefault(instance.member_id, []).append(instance)
+
+    return [
+        ProjectAgentOut.from_orm_agent(
+            agent,
+            display_name=(
+                members_by_id[agent.member_id].display_name
+                if agent.member_id in members_by_id
+                else None
+            ),
+            availability=_availability(
+                [
+                    instance.status
+                    for instance in instances_by_member.get(agent.member_id, [])
+                ]
+            ),
+            instances=[
+                _instance_out(instance)
+                for instance in instances_by_member.get(agent.member_id, [])
+            ],
+        )
+        for agent in agents
+    ]
 
 
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
@@ -164,7 +239,7 @@ def list_project_agents(
         .where(ProjectAgent.project_id == project_id)
         .order_by(ProjectAgent.member_id)
     ).all()
-    return [ProjectAgentOut.from_orm_agent(agent) for agent in agents]
+    return _project_agent_outs(list(agents), session)
 
 
 @router.get("/{project_id}/agents/{member_id:path}/profile", response_model=AgentProfileOut)
@@ -235,6 +310,9 @@ def sync_project(
                 soul_path=entry.soul_path,
                 user_path=entry.user_path,
                 memory_pointer=entry.memory_pointer,
+                business_role=entry.business_role,
+                decision_tier=entry.decision_tier,
+                capability_summary=entry.capability_summary,
                 updated_at=now,
             )
         )
@@ -247,7 +325,7 @@ def sync_project(
         .where(ProjectAgent.project_id == project_id)
         .order_by(ProjectAgent.member_id)
     ).all()
-    return [ProjectAgentOut.from_orm_agent(agent) for agent in agents]
+    return _project_agent_outs(list(agents), session)
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)

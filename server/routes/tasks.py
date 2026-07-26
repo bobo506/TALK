@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, update
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
@@ -25,6 +26,9 @@ from server.models import (
     AgentTaskCreate,
     AgentTaskHeartbeat,
     AgentTaskOut,
+    AgentTaskQualityContextOut,
+    AgentTaskRelation,
+    AgentTaskRelationOut,
     AgentTaskSchedule,
     AgentTaskScheduleCreate,
     AgentTaskScheduleOut,
@@ -37,7 +41,9 @@ from server.models import (
     GroupMember,
     Member,
     Message,
+    MessageOut,
     Project,
+    ProjectAgent,
     TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
     TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT,
     TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
@@ -47,9 +53,13 @@ from server.models import (
     TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
     TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
     _SCHEDULE_STATUSES,
+    _TASK_KINDS,
     _TASK_STATUSES,
+    _TASK_REVIEW_VERDICTS,
+    _TASK_TEST_VERDICTS,
     _TASK_WORKFLOW_STATUSES,
 )
+from server.routes.messages import _build_reply_lookup
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -94,6 +104,175 @@ def _ensure_target_agent(member_id: str, session: Session) -> Member:
 def _ensure_project_exists(project_id: str | None, session: Session) -> None:
     if project_id is not None and session.get(Project, project_id) is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="project_id not found")
+
+
+def _can_exempt_review(
+    current: Member,
+    project_id: str | None,
+    session: Session,
+) -> bool:
+    if current.kind == "human":
+        return True
+    if project_id is None:
+        return False
+    profile = session.get(ProjectAgent, (project_id, current.id))
+    return profile is not None and profile.decision_tier == "decision"
+
+
+def _relations_for_source(
+    task_id: int,
+    session: Session,
+) -> list[AgentTaskRelation]:
+    return list(
+        session.exec(
+            select(AgentTaskRelation)
+            .where(AgentTaskRelation.source_task_id == task_id)
+            .order_by(AgentTaskRelation.id)
+        ).all()
+    )
+
+
+def _release_review_version_lock(
+    review_task_id: int,
+    session: Session,
+) -> None:
+    """Allow retry when Review produced no terminal approval/change decision."""
+    session.execute(
+        update(AgentTaskRelation)
+        .where(
+            AgentTaskRelation.source_task_id == review_task_id,
+            AgentTaskRelation.relation_type == "reviews",
+        )
+        .values(round_index=None)
+        .execution_options(synchronize_session=False)
+    )
+
+
+def _rework_relation(
+    rework_task_id: int,
+    session: Session,
+) -> AgentTaskRelation | None:
+    return session.exec(
+        select(AgentTaskRelation).where(
+            AgentTaskRelation.source_task_id == rework_task_id,
+            AgentTaskRelation.relation_type == "reworks",
+        )
+    ).first()
+
+
+def _latest_quality_subject(
+    development: AgentTask,
+    session: Session,
+) -> tuple[AgentTask, int]:
+    if development.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="development task is missing",
+        )
+    relation = session.exec(
+        select(AgentTaskRelation)
+        .where(
+            AgentTaskRelation.relation_type == "reworks",
+            AgentTaskRelation.target_task_id == development.id,
+        )
+        .order_by(AgentTaskRelation.round_index.desc(), AgentTaskRelation.id.desc())
+    ).first()
+    if relation is None:
+        return development, 0
+    rework = session.get(AgentTask, relation.source_task_id)
+    if rework is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="rework relation points to a missing task",
+        )
+    return rework, relation.round_index or 0
+
+
+def _quality_origin(
+    task: AgentTask,
+    session: Session,
+) -> AgentTask:
+    if task.task_kind == "development":
+        return task
+    if task.task_kind != "rework" or task.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="quality target must be a development or rework task",
+        )
+    relation = _rework_relation(task.id, session)
+    if relation is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="rework task has no original development relation",
+        )
+    development = session.get(AgentTask, relation.target_task_id)
+    if development is None or development.task_kind != "development":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="rework relation does not point to an original development task",
+        )
+    return development
+
+
+def _latest_review_for_subject(
+    subject_task_id: int,
+    session: Session,
+) -> AgentTask | None:
+    relation = session.exec(
+        select(AgentTaskRelation)
+        .where(
+            AgentTaskRelation.relation_type == "reviews",
+            AgentTaskRelation.target_task_id == subject_task_id,
+        )
+        .order_by(AgentTaskRelation.source_task_id.desc())
+    ).first()
+    if relation is None:
+        return None
+    review = session.get(AgentTask, relation.source_task_id)
+    if review is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="review relation points to a missing task",
+        )
+    return review
+
+
+def _review_gate_rows(
+    root: AgentTask,
+    session: Session,
+) -> list[dict]:
+    if root.id is None:
+        return []
+    developments = list(
+        session.exec(
+            select(AgentTask)
+            .where(
+                AgentTask.root_task_id == root.id,
+                AgentTask.task_kind == "development",
+                AgentTask.review_policy.in_(("required", "batch")),
+            )
+            .order_by(AgentTask.id)
+        ).all()
+    )
+    gates: list[dict] = []
+    for development in developments:
+        subject, rework_round = _latest_quality_subject(development, session)
+        review = (
+            _latest_review_for_subject(int(subject.id), session)
+            if subject.id is not None
+            else None
+        )
+        gates.append(
+            {
+                "development_task_id": development.id,
+                "current_subject_task_id": subject.id,
+                "review_policy": development.review_policy,
+                "current_verdict": review.gate_verdict if review is not None else None,
+                "review_task_id": review.id if review is not None else None,
+                "rework_round": rework_round,
+            }
+        )
+    return gates
 
 
 def _get_root_task(task: AgentTask, session: Session) -> AgentTask:
@@ -185,6 +364,231 @@ def _resolve_child_context(
     return parent, root, project_id, delegation_depth
 
 
+def _escalate_review_exhausted(
+    root: AgentTask,
+    now: datetime,
+    session: Session,
+) -> None:
+    if root.id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task root is missing",
+        )
+    session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == root.id,
+            AgentTask.control_status.in_(
+                ("active", "pause_requested", "paused", "awaiting_human")
+            ),
+        )
+        .values(
+            control_status="awaiting_human",
+            checkpoint_reason="review_exhausted",
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    _release_tree_claims(
+        root,
+        now,
+        "review rework limit exhausted",
+        session,
+    )
+
+
+def _validate_quality_target_scope(
+    target: AgentTask,
+    *,
+    root: AgentTask,
+    project_id: str | None,
+) -> None:
+    if target.root_task_id != root.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="quality task targets must belong to the same task root",
+        )
+    if target.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="quality task targets must belong to the same project",
+        )
+    if target.authorization_epoch != root.authorization_epoch:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="quality task targets must belong to the current authorization batch",
+        )
+
+
+def _validate_quality_task_create(
+    body: AgentTaskCreate,
+    current: Member,
+    *,
+    root: AgentTask,
+    project_id: str | None,
+    now: datetime,
+    session: Session,
+) -> list[dict]:
+    if body.task_kind == "development":
+        if body.review_policy == "exempt" and not _can_exempt_review(
+            current,
+            project_id,
+            session,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="review exemption requires a human or project decision agent",
+            )
+        return []
+    if body.task_kind == "general":
+        return []
+
+    related_tasks: list[AgentTask] = []
+    for task_id in body.related_task_ids:
+        related = session.get(AgentTask, task_id)
+        if related is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"related task not found: {task_id}",
+            )
+        related_tasks.append(related)
+
+    if body.task_kind in {"review", "test"}:
+        origins: list[AgentTask] = []
+        target_rounds: dict[int, int] = {}
+        for target in related_tasks:
+            if target.task_kind not in {"development", "rework"}:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"{body.task_kind} targets must be development or rework tasks",
+                )
+            _validate_quality_target_scope(
+                target,
+                root=root,
+                project_id=project_id,
+            )
+            if target.status != "succeeded":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"quality target {target.id} must be succeeded before review or test",
+                )
+            origin = _quality_origin(target, session)
+            current_subject, current_round = _latest_quality_subject(origin, session)
+            if current_subject.id != target.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"quality target {target.id} is not the latest version",
+                )
+            origins.append(origin)
+            if target.id is not None:
+                target_rounds[int(target.id)] = current_round
+
+        if len({origin.id for origin in origins}) != len(origins):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="a quality task cannot cover multiple versions of the same development task",
+            )
+
+        if body.task_kind == "review":
+            policies = {target.review_policy for target in related_tasks}
+            if len(related_tasks) == 1 and policies == {"required"}:
+                pass
+            elif 2 <= len(related_tasks) <= 3 and policies == {"batch"}:
+                pass
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="review must cover one required target or two to three batch targets",
+                )
+            if any(
+                target.target_member_id == body.target_member_id
+                for target in related_tasks
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="reviewer must be different from every reviewed task executor",
+                )
+
+        relation_type = "reviews" if body.task_kind == "review" else "tests"
+        return [
+            {
+                "target_task_id": int(target.id),
+                "relation_type": relation_type,
+                "trigger_task_id": None,
+                "round_index": (
+                    target_rounds[int(target.id)]
+                    if body.task_kind == "review"
+                    else None
+                ),
+            }
+            for target in related_tasks
+            if target.id is not None
+        ]
+
+    development = related_tasks[0]
+    if development.task_kind != "development":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="rework must reference an original development task",
+        )
+    _validate_quality_target_scope(
+        development,
+        root=root,
+        project_id=project_id,
+    )
+    current_subject, current_round = _latest_quality_subject(development, session)
+    trigger = session.get(AgentTask, body.trigger_task_id)
+    if trigger is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="trigger review task not found",
+        )
+    if (
+        trigger.task_kind != "review"
+        or trigger.status != "succeeded"
+        or not trigger.gate_verdict
+        or trigger.gate_verdict.get("verdict") != "changes_requested"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="rework requires a succeeded changes_requested review trigger",
+        )
+    _validate_quality_target_scope(
+        trigger,
+        root=root,
+        project_id=project_id,
+    )
+    trigger_relation = session.exec(
+        select(AgentTaskRelation).where(
+            AgentTaskRelation.source_task_id == trigger.id,
+            AgentTaskRelation.target_task_id == current_subject.id,
+            AgentTaskRelation.relation_type == "reviews",
+        )
+    ).first()
+    if trigger_relation is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="trigger review does not review the latest development version",
+        )
+
+    next_round = current_round + 1
+    if next_round > 2:
+        _escalate_review_exhausted(root, now, session)
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="review rework limit exhausted; task tree is awaiting human review",
+        )
+    return [
+        {
+            "target_task_id": int(development.id),
+            "relation_type": "reworks",
+            "trigger_task_id": int(trigger.id),
+            "round_index": next_round,
+        }
+    ]
+
+
 def _authorization_expired(root: AgentTask, now: datetime) -> bool:
     return (
         root.authorization_expires_at is not None
@@ -197,6 +601,8 @@ def _reserve_authorized_descendant(
     expected_epoch: int,
     now: datetime,
     session: Session,
+    *,
+    consume_slice: bool,
 ) -> None:
     if root.id is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task root is missing")
@@ -216,24 +622,28 @@ def _reserve_authorized_descendant(
         root.max_nonterminal_descendants,
         TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
     )
+    reserve_conditions = [
+        AgentTask.id == root.id,
+        AgentTask.status == "running",
+        AgentTask.control_status == "active",
+        AgentTask.authorization_epoch == expected_epoch,
+        or_(
+            AgentTask.authorization_expires_at.is_(None),
+            AgentTask.authorization_expires_at > now,
+        ),
+        nonterminal_count < limit,
+    ]
+    if consume_slice:
+        reserve_conditions.append(
+            AgentTask.reserved_slice_count < AgentTask.authorized_slice_budget
+        )
+    reserve_values = {"updated_at": now}
+    if consume_slice:
+        reserve_values["reserved_slice_count"] = AgentTask.reserved_slice_count + 1
     result = session.execute(
         update(AgentTask)
-        .where(
-            AgentTask.id == root.id,
-            AgentTask.status == "running",
-            AgentTask.control_status == "active",
-            AgentTask.authorization_epoch == expected_epoch,
-            or_(
-                AgentTask.authorization_expires_at.is_(None),
-                AgentTask.authorization_expires_at > now,
-            ),
-            AgentTask.reserved_slice_count < AgentTask.authorized_slice_budget,
-            nonterminal_count < limit,
-        )
-        .values(
-            reserved_slice_count=AgentTask.reserved_slice_count + 1,
-            updated_at=now,
-        )
+        .where(*reserve_conditions)
+        .values(**reserve_values)
         .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:
@@ -263,7 +673,7 @@ def _reserve_authorized_descendant(
             )
         reserved = current_root.reserved_slice_count or 0
         authorized = current_root.authorized_slice_budget or 0
-        if reserved >= authorized:
+        if consume_slice and reserved >= authorized:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"task tree authorized slice budget {authorized} exhausted",
@@ -438,6 +848,18 @@ def _require_checkpoint_actor(root: AgentTask, current: Member) -> None:
 def _tree_response(root: AgentTask, now: datetime, session: Session) -> dict:
     tasks = _tree_tasks(root, session)
     descendants = [task for task in tasks if task.parent_task_id is not None]
+    task_ids = [task.id for task in tasks if task.id is not None]
+    relations = (
+        list(
+            session.exec(
+                select(AgentTaskRelation)
+                .where(AgentTaskRelation.source_task_id.in_(task_ids))
+                .order_by(AgentTaskRelation.id)
+            ).all()
+        )
+        if task_ids
+        else []
+    )
     authorized = root.authorized_slice_budget or 0
     reserved = root.reserved_slice_count or 0
     return {
@@ -447,6 +869,8 @@ def _tree_response(root: AgentTask, now: datetime, session: Session) -> dict:
         "nonterminal_descendants": sum(task.status in {"queued", "running"} for task in descendants),
         "remaining_slice_budget": max(authorized - reserved, 0),
         "authorization_expired": _authorization_expired(root, now),
+        "relations": relations,
+        "review_gates": _review_gate_rows(root, session),
     }
 
 
@@ -828,12 +1252,37 @@ def _task_hall_name(title: str | None, content: str) -> str:
     return source[:80] or "Task"
 
 
+def _task_hall_messages(
+    task: AgentTask,
+    session: Session,
+) -> list[MessageOut]:
+    if task.hall_group_id is None:
+        return []
+    messages = list(
+        session.exec(
+            select(Message)
+            .where(Message.group_id == task.hall_group_id)
+            .order_by(Message.id)
+        ).all()
+    )
+    reply_lookup = _build_reply_lookup(messages, session)
+    return [
+        MessageOut.from_orm_msg(
+            message,
+            reply_to=reply_lookup.get(message.reply_to),
+        )
+        for message in messages
+    ]
+
+
 def _create_task_with_hall(
     *,
     target_member_id: str,
     created_by: str,
     content: str,
     title: str | None,
+    task_kind: str,
+    review_policy: str | None,
     project_id: str | None,
     schedule_id: int | None,
     parent_task_id: int | None,
@@ -901,6 +1350,9 @@ def _create_task_with_hall(
         created_by=created_by,
         content=content,
         title=title,
+        task_kind=task_kind,
+        review_policy=review_policy,
+        gate_verdict=None,
         status="queued",
         workflow_status="assigned",
         created_at=now,
@@ -922,6 +1374,8 @@ def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime, sessi
         created_by=schedule.created_by,
         content=schedule.content,
         title=schedule.title,
+        task_kind="general",
+        review_policy=None,
         parent_task_id=None,
         root_task_id=None,
         delegation_depth=0,
@@ -961,6 +1415,7 @@ def create_task(
     _ensure_target_agent(body.target_member_id, session)
     _ensure_distinct_participants(current.id, body.target_member_id)
     now = datetime.now(timezone.utc)
+    relation_values: list[dict] = []
 
     if body.parent_task_id is None:
         _ensure_root_governance_request_allowed(body, current)
@@ -1011,7 +1466,26 @@ def create_task(
     else:
         parent, root, project_id, delegation_depth = _resolve_child_context(body, current, session)
         _ensure_project_exists(project_id, session)
-        _reserve_authorized_descendant(root, int(body.authorization_epoch), now, session)
+        try:
+            _reserve_authorized_descendant(
+                root,
+                int(body.authorization_epoch),
+                now,
+                session,
+                consume_slice=body.task_kind in {"general", "development"},
+            )
+            relation_values = _validate_quality_task_create(
+                body,
+                current,
+                root=root,
+                project_id=project_id,
+                now=now,
+                session=session,
+            )
+        except HTTPException:
+            if session.in_transaction():
+                session.rollback()
+            raise
         parent_task_id = parent.id
         root_task_id = root.id
         max_delegation_depth = None
@@ -1019,7 +1493,7 @@ def create_task(
         max_running_per_target = None
         max_nonterminal_descendants = None
         control_status = None
-        authorization_epoch = None
+        authorization_epoch = body.authorization_epoch
         authorized_slice_budget = None
         reserved_slice_count = None
         authorization_expires_at = None
@@ -1030,6 +1504,8 @@ def create_task(
         created_by=current.id,
         content=body.content,
         title=body.title,
+        task_kind=body.task_kind,
+        review_policy=body.review_policy,
         project_id=project_id,
         schedule_id=None,
         parent_task_id=parent_task_id,
@@ -1050,7 +1526,28 @@ def create_task(
         now=now,
         session=session,
     )
-    session.commit()
+    if task.id is None:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task id was not assigned",
+        )
+    for relation_value in relation_values:
+        session.add(
+            AgentTaskRelation(
+                source_task_id=task.id,
+                created_at=now,
+                **relation_value,
+            )
+        )
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task relation conflicts with an existing quality task",
+        ) from exc
     session.refresh(task)
     return task
 
@@ -1061,6 +1558,7 @@ def list_tasks(
     status_filter: str | None = Query(None, alias="status"),
     workflow_status: str | None = Query(None),
     project_id: str | None = Query(None),
+    task_kind: str | None = Query(None),
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
@@ -1088,6 +1586,14 @@ def list_tasks(
         stmt = stmt.where(AgentTask.workflow_status == normalized_workflow_status)
     if project_id:
         stmt = stmt.where(AgentTask.project_id == project_id.strip())
+    if task_kind:
+        normalized_task_kind = task_kind.strip().lower()
+        if normalized_task_kind not in _TASK_KINDS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"task_kind must be one of {sorted(_TASK_KINDS)}",
+            )
+        stmt = stmt.where(AgentTask.task_kind == normalized_task_kind)
     return session.exec(stmt.order_by(AgentTask.created_at.desc())).all()  # type: ignore[union-attr]
 
 
@@ -1262,6 +1768,83 @@ def get_task(
     task = _get_task(task_id, session)
     _ensure_task_visible(task, current)
     return task
+
+
+@router.get("/{task_id}/relations", response_model=list[AgentTaskRelationOut])
+def list_task_relations(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Return the explicit quality relations owned by one task."""
+    task = _get_task(task_id, session)
+    _ensure_task_visible(task, current)
+    return _relations_for_source(task_id, session)
+
+
+@router.get(
+    "/{task_id}/quality-context",
+    response_model=AgentTaskQualityContextOut,
+)
+def get_task_quality_context(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Return read-only relation targets and their complete Task Hall histories."""
+    task = _get_task(task_id, session)
+    if task.task_kind not in {"review", "test", "rework"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="quality context is only available for review, test, or rework tasks",
+        )
+    if current.kind != "human" and current.id not in {
+        task.created_by,
+        task.target_member_id,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="quality context is only visible to the quality task creator or executor",
+        )
+
+    relations = _relations_for_source(task_id, session)
+    related_tasks: list[dict] = []
+    trigger_tasks: list[dict] = []
+    for relation in relations:
+        related = session.get(AgentTask, relation.target_task_id)
+        if related is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="task relation target is missing",
+            )
+        related_tasks.append(
+            {
+                "relation": relation,
+                "task": related,
+                "messages": _task_hall_messages(related, session),
+            }
+        )
+        if relation.trigger_task_id is None:
+            continue
+        trigger = session.get(AgentTask, relation.trigger_task_id)
+        if trigger is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="task relation trigger is missing",
+            )
+        trigger_tasks.append(
+            {
+                "relation": relation,
+                "task": trigger,
+                "messages": _task_hall_messages(trigger, session),
+            }
+        )
+    return {
+        "task_id": task_id,
+        "relations": relations,
+        "related_tasks": related_tasks,
+        "trigger_tasks": trigger_tasks,
+    }
 
 
 @router.get("/{task_id}/tree", response_model=AgentTaskTreeOut)
@@ -1770,6 +2353,8 @@ def cancel_task(
     task.finished_at = now
     _touch_task(task, now)
     session.add(task)
+    if task.task_kind == "review" and task.id is not None:
+        _release_review_version_lock(task.id, session)
     session.commit()
     session.refresh(task)
     return task
@@ -1965,6 +2550,156 @@ def heartbeat_task(
     return _get_task(task_id, session)
 
 
+def _validated_gate_verdict(
+    task: AgentTask,
+    body: AgentTaskComplete,
+) -> dict | None:
+    verdict = body.gate_verdict
+    if task.task_kind not in {"review", "test"}:
+        if verdict is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="gate_verdict is only valid for review and test tasks",
+            )
+        return None
+    if body.status != "succeeded":
+        if verdict is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="gate_verdict is only valid when a quality task succeeds",
+            )
+        return None
+    if verdict is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{task.task_kind} tasks require a structured gate_verdict when succeeded",
+        )
+
+    allowed = (
+        _TASK_REVIEW_VERDICTS
+        if task.task_kind == "review"
+        else _TASK_TEST_VERDICTS
+    )
+    if verdict.verdict not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"{task.task_kind} verdict must be one of "
+                f"{sorted(allowed)}"
+            ),
+        )
+    negative = (
+        {"changes_requested", "blocked"}
+        if task.task_kind == "review"
+        else {"failed", "blocked"}
+    )
+    if verdict.verdict in negative and not verdict.findings:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="negative gate verdicts require at least one finding",
+        )
+    return verdict.model_dump()
+
+
+def _tree_has_quality_tasks(root: AgentTask, session: Session) -> bool:
+    if root.id is None:
+        return False
+    count = session.execute(
+        select(func.count())
+        .select_from(AgentTask)
+        .where(
+            AgentTask.root_task_id == root.id,
+            AgentTask.task_kind != "general",
+        )
+    ).scalar_one()
+    return int(count) > 0
+
+
+def _ensure_root_review_gates_satisfied(
+    root: AgentTask,
+    session: Session,
+) -> None:
+    if root.id is None or not _tree_has_quality_tasks(root, session):
+        return
+    active_descendants = int(
+        session.execute(
+            select(func.count())
+            .select_from(AgentTask)
+            .where(
+                AgentTask.root_task_id == root.id,
+                AgentTask.parent_task_id.is_not(None),
+                AgentTask.status.in_(("queued", "running")),
+            )
+        ).scalar_one()
+    )
+    if active_descendants:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task tree still has nonterminal descendants",
+        )
+
+    developments = list(
+        session.exec(
+            select(AgentTask).where(
+                AgentTask.root_task_id == root.id,
+                AgentTask.task_kind == "development",
+            )
+        ).all()
+    )
+    for development in developments:
+        subject, _ = _latest_quality_subject(development, session)
+        if subject.status != "succeeded":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"development task {development.id} latest version "
+                    f"{subject.id} has not succeeded"
+                ),
+            )
+        if development.review_policy == "exempt":
+            continue
+        if development.review_policy not in {"required", "batch"}:
+            continue
+        if subject.id is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"development task {development.id} is missing its current version",
+            )
+        review = _latest_review_for_subject(subject.id, session)
+        if (
+            review is None
+            or review.status != "succeeded"
+            or not review.gate_verdict
+            or review.gate_verdict.get("verdict") != "approved"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"development task {development.id} latest version "
+                    f"{subject.id} has no approved review"
+                ),
+            )
+
+
+def _reviewed_round_two_rework(
+    review: AgentTask,
+    session: Session,
+) -> bool:
+    if review.id is None:
+        return False
+    relations = _relations_for_source(review.id, session)
+    for relation in relations:
+        if relation.relation_type != "reviews":
+            continue
+        target = session.get(AgentTask, relation.target_task_id)
+        if target is None or target.task_kind != "rework" or target.id is None:
+            continue
+        rework_relation = _rework_relation(target.id, session)
+        if rework_relation is not None and (rework_relation.round_index or 0) >= 2:
+            return True
+    return False
+
+
 @router.post("/{task_id}/complete", response_model=AgentTaskOut)
 def complete_task(
     task_id: int,
@@ -1981,6 +2716,16 @@ def complete_task(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"task is {task.status}, not running")
 
     now = datetime.now(timezone.utc)
+    gate_verdict = _validated_gate_verdict(task, body)
+    if (
+        body.status == "succeeded"
+        and task.task_kind in {"development", "rework"}
+        and body.result_message_id is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{task.task_kind} tasks require result_message_id when succeeded",
+        )
     if task.claim_token is not None:
         if body.claim_token is None and task.attempt > 1:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="claim_token is required after a task is reclaimed")
@@ -2001,6 +2746,8 @@ def complete_task(
     }[body.status]
     completion_conditions = [AgentTask.id == task_id, AgentTask.status == "running"]
     root = _get_root_task(task, session)
+    if body.status == "succeeded" and task.id == root.id:
+        _ensure_root_review_gates_satisfied(root, session)
     completion_conditions.extend(
         _root_control_claim_conditions(root, now, require_unexpired=False)
     )
@@ -2022,6 +2769,7 @@ def complete_task(
             claim_token=None,
             lease_expires_at=None,
             result_message_id=body.result_message_id,
+            gate_verdict=gate_verdict,
             last_error=body.last_error,
             finished_at=now,
             updated_at=now,
@@ -2031,6 +2779,22 @@ def complete_task(
     if result.rowcount != 1:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="task claim is no longer active")
+
+    if (
+        task.task_kind == "review"
+        and gate_verdict is not None
+        and gate_verdict.get("verdict") == "changes_requested"
+        and _reviewed_round_two_rework(task, session)
+    ):
+        _escalate_review_exhausted(root, now, session)
+    elif task.task_kind == "review" and task.id is not None and (
+        body.status in {"failed", "canceled"}
+        or (
+            gate_verdict is not None
+            and gate_verdict.get("verdict") == "blocked"
+        )
+    ):
+        _release_review_version_lock(task.id, session)
 
     if instance is not None:
         instance.status = "error" if body.status == "failed" else "idle"

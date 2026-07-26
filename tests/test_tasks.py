@@ -16,6 +16,114 @@ class AgentTaskTests(RouteTestCase):
         self.add_member("agent:other", api_key="other-key", display_name="Other")
         self.add_member("agent:third", api_key="third-key", display_name="Third")
 
+    def _create_claimed_quality_root(
+        self,
+        client,
+        *,
+        project_id: str,
+        slice_budget: int = 3,
+    ) -> dict:
+        registered = client.post(
+            "/api/projects",
+            headers={"X-API-Key": "bobo-key"},
+            json={"project_id": project_id, "display_name": project_id},
+        )
+        self.assertEqual(registered.status_code, 201)
+        created = client.post(
+            "/api/tasks",
+            headers={"X-API-Key": "bobo-key"},
+            json={
+                "project_id": project_id,
+                "target_member_id": "agent:codex",
+                "content": "Coordinate a frozen quality batch",
+                "may_delegate": True,
+                "slice_budget": slice_budget,
+                "max_running_descendants": 8,
+                "max_running_per_target": 4,
+                "max_nonterminal_descendants": 32,
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        root = created.json()
+        claimed = client.post(
+            f"/api/tasks/{root['id']}/claim",
+            headers={"X-API-Key": "codex-key"},
+            json={},
+        )
+        self.assertEqual(claimed.status_code, 200)
+        return claimed.json()
+
+    def _create_quality_child(
+        self,
+        client,
+        root: dict,
+        *,
+        target_member_id: str,
+        content: str,
+        task_kind: str,
+        review_policy: str | None = None,
+        related_task_ids: list[int] | None = None,
+        trigger_task_id: int | None = None,
+    ) -> dict:
+        body = {
+            "parent_task_id": root["id"],
+            "authorization_epoch": root["authorization_epoch"],
+            "target_member_id": target_member_id,
+            "content": content,
+            "task_kind": task_kind,
+        }
+        if review_policy is not None:
+            body["review_policy"] = review_policy
+        if related_task_ids is not None:
+            body["related_task_ids"] = related_task_ids
+        if trigger_task_id is not None:
+            body["trigger_task_id"] = trigger_task_id
+        response = client.post(
+            "/api/tasks",
+            headers={"X-API-Key": "codex-key"},
+            json=body,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        return response.json()
+
+    def _claim_and_complete_quality_task(
+        self,
+        client,
+        task: dict,
+        *,
+        api_key: str,
+        from_id: str,
+        result_text: str,
+        gate_verdict: dict | None = None,
+    ) -> tuple[dict, int]:
+        claimed = client.post(
+            f"/api/tasks/{task['id']}/claim",
+            headers={"X-API-Key": api_key},
+            json={},
+        )
+        self.assertEqual(claimed.status_code, 200, claimed.text)
+        result = self.add_message(
+            from_id=from_id,
+            to_ids=f'["{task["created_by"]}"]',
+            message_type="text",
+            group_id=task["hall_group_id"],
+            content=result_text,
+        )
+        body = {
+            "status": "succeeded",
+            "result_message_id": result.id,
+            "claim_token": claimed.json()["claim_token"],
+        }
+        if gate_verdict is not None:
+            body["gate_verdict"] = gate_verdict
+        completed = client.post(
+            f"/api/tasks/{task['id']}/complete",
+            headers={"X-API-Key": api_key},
+            json=body,
+        )
+        self.assertEqual(completed.status_code, 200, completed.text)
+        return completed.json(), int(result.id)
+
     def test_human_can_create_task_for_agent_and_agent_can_list_it(self):
         with self.make_client() as client:
             created = client.post(
@@ -38,6 +146,9 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(created.json()["created_by"], "human:bobo")
         self.assertEqual(created.json()["status"], "queued")
         self.assertEqual(created.json()["workflow_status"], "assigned")
+        self.assertEqual(created.json()["task_kind"], "general")
+        self.assertIsNone(created.json()["review_policy"])
+        self.assertIsNone(created.json()["gate_verdict"])
         self.assertIsNone(created.json()["parent_task_id"])
         self.assertEqual(created.json()["root_task_id"], created.json()["id"])
         self.assertEqual(created.json()["delegation_depth"], 0)
@@ -250,6 +361,1037 @@ class AgentTaskTests(RouteTestCase):
         self.assertFalse(child["may_delegate"])
         self.assertIsNone(child["max_delegation_depth"])
         self.assertEqual(agent_override.status_code, 403)
+
+    def test_typed_children_count_only_general_and_development_against_slice_budget(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_typed_budget",
+                slice_budget=2,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Implement the first frozen slice",
+                task_kind="development",
+                review_policy="required",
+            )
+            completed_development, _ = self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Development result",
+            )
+            collected_development = client.post(
+                f"/api/tasks/{development['id']}/collect-result",
+                headers={"X-API-Key": "codex-key"},
+            )
+            general = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Preserve a legacy general child",
+                task_kind="general",
+            )
+            review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the development result",
+                task_kind="review",
+                related_task_ids=[development["id"]],
+            )
+            reviewed, _ = self._claim_and_complete_quality_task(
+                client,
+                review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Please address the finding",
+                gate_verdict={
+                    "verdict": "changes_requested",
+                    "summary": "One issue remains",
+                    "findings": ["Add the missing boundary assertion"],
+                },
+            )
+            rework = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Address the first review finding",
+                task_kind="rework",
+                related_task_ids=[development["id"]],
+                trigger_task_id=review["id"],
+            )
+            blocked_extra_slice = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:other",
+                    "content": "Exceeds the two authorized slices",
+                    "task_kind": "development",
+                    "review_policy": "required",
+                },
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(development["task_kind"], "development")
+        self.assertEqual(development["review_policy"], "required")
+        self.assertEqual(completed_development["workflow_status"], "submitted")
+        self.assertEqual(collected_development.status_code, 200)
+        self.assertEqual(collected_development.json()["workflow_status"], "completed")
+        self.assertEqual(general["task_kind"], "general")
+        self.assertIsNone(general["review_policy"])
+        self.assertEqual(review["task_kind"], "review")
+        self.assertIsNone(review["review_policy"])
+        self.assertEqual(reviewed["gate_verdict"]["verdict"], "changes_requested")
+        self.assertEqual(rework["task_kind"], "rework")
+        self.assertEqual(blocked_extra_slice.status_code, 409)
+        self.assertIn("authorized slice budget 2 exhausted", blocked_extra_slice.json()["detail"])
+        self.assertEqual(tree.status_code, 200)
+        self.assertEqual(tree.json()["root"]["reserved_slice_count"], 2)
+        self.assertEqual(tree.json()["remaining_slice_budget"], 0)
+        self.assertEqual(
+            {relation["relation_type"] for relation in tree.json()["relations"]},
+            {"reviews", "reworks"},
+        )
+
+    def test_review_creation_enforces_policy_cardinality_and_reviewer_separation(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_review_policy",
+                slice_budget=3,
+            )
+            required = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Required-review slice",
+                task_kind="development",
+                review_policy="required",
+            )
+            batch_targets = [
+                self._create_quality_child(
+                    client,
+                    root,
+                    target_member_id="agent:other",
+                    content=f"Batch-review slice {index}",
+                    task_kind="development",
+                    review_policy="batch",
+                )
+                for index in range(2)
+            ]
+            for task in [required, *batch_targets]:
+                self._claim_and_complete_quality_task(
+                    client,
+                    task,
+                    api_key="other-key",
+                    from_id="agent:other",
+                    result_text=f"Frozen result for task {task['id']}",
+                )
+
+            same_reviewer = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:other",
+                    "content": "Reviewer cannot be the developer",
+                    "task_kind": "review",
+                    "related_task_ids": [required["id"]],
+                },
+            )
+            required_with_two = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Required review cannot cover two slices",
+                    "task_kind": "review",
+                    "related_task_ids": [required["id"], batch_targets[0]["id"]],
+                },
+            )
+            batch_with_one = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Batch review needs at least two slices",
+                    "task_kind": "review",
+                    "related_task_ids": [batch_targets[0]["id"]],
+                },
+            )
+            batch_with_four = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Batch review cannot cover four slices",
+                    "task_kind": "review",
+                    "related_task_ids": [
+                        *(task["id"] for task in batch_targets),
+                        999_998,
+                        999_999,
+                    ],
+                },
+            )
+            required_review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Independent required review",
+                task_kind="review",
+                related_task_ids=[required["id"]],
+            )
+            batch_review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Independent two-slice batch review",
+                task_kind="review",
+                related_task_ids=[task["id"] for task in batch_targets],
+            )
+            required_relations = client.get(
+                f"/api/tasks/{required_review['id']}/relations",
+                headers={"X-API-Key": "codex-key"},
+            )
+            batch_relations = client.get(
+                f"/api/tasks/{batch_review['id']}/relations",
+                headers={"X-API-Key": "codex-key"},
+            )
+
+        self.assertIn(same_reviewer.status_code, {400, 409})
+        self.assertIn(required_with_two.status_code, {400, 409, 422})
+        self.assertIn(batch_with_one.status_code, {400, 409, 422})
+        self.assertIn(batch_with_four.status_code, {400, 409, 422})
+        self.assertEqual(required_relations.status_code, 200)
+        self.assertEqual(batch_relations.status_code, 200)
+        self.assertEqual(
+            [
+                (item["relation_type"], item["target_task_id"])
+                for item in required_relations.json()
+            ],
+            [("reviews", required["id"])],
+        )
+        self.assertEqual(
+            {item["target_task_id"] for item in batch_relations.json()},
+            {task["id"] for task in batch_targets},
+        )
+        self.assertEqual(
+            {item["relation_type"] for item in batch_relations.json()},
+            {"reviews"},
+        )
+
+    def test_batch_review_rejects_development_slices_from_different_authorization_epochs(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_review_epoch",
+                slice_budget=2,
+            )
+            first = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Epoch one slice",
+                task_kind="development",
+                review_policy="batch",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                first,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Epoch one result",
+            )
+            checkpointed = client.post(
+                f"/api/tasks/{root['id']}/checkpoint",
+                headers={"X-API-Key": "codex-key"},
+                json={"reason": "milestone"},
+            )
+            resumed = client.post(
+                f"/api/tasks/{root['id']}/resume-tree",
+                headers={"X-API-Key": "bobo-key"},
+                json={"slice_budget": 2, "authorization_ttl_seconds": 60},
+            )
+            reclaimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            self.assertEqual(checkpointed.status_code, 200)
+            self.assertEqual(resumed.status_code, 200)
+            self.assertEqual(reclaimed.status_code, 200)
+            current_root = reclaimed.json()
+            second = self._create_quality_child(
+                client,
+                current_root,
+                target_member_id="agent:other",
+                content="Epoch two slice",
+                task_kind="development",
+                review_policy="batch",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                second,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Epoch two result",
+            )
+            mixed_epoch_review = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": current_root["id"],
+                    "authorization_epoch": current_root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Must not cross authorization epochs",
+                    "task_kind": "review",
+                    "related_task_ids": [first["id"], second["id"]],
+                },
+            )
+
+        self.assertIn(mixed_epoch_review.status_code, {400, 409})
+        self.assertIn("authorization batch", mixed_epoch_review.json()["detail"].lower())
+
+    def test_batch_review_accepts_three_slices_from_the_same_authorization_epoch(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_review_batch_three",
+                slice_budget=3,
+            )
+            developments = [
+                self._create_quality_child(
+                    client,
+                    root,
+                    target_member_id="agent:other",
+                    content=f"Same-epoch batch slice {index}",
+                    task_kind="development",
+                    review_policy="batch",
+                )
+                for index in range(3)
+            ]
+            for task in developments:
+                self._claim_and_complete_quality_task(
+                    client,
+                    task,
+                    api_key="other-key",
+                    from_id="agent:other",
+                    result_text=f"Same-epoch result {task['id']}",
+                )
+            review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review all three same-epoch slices",
+                task_kind="review",
+                related_task_ids=[task["id"] for task in developments],
+            )
+            relations = client.get(
+                f"/api/tasks/{review['id']}/relations",
+                headers={"X-API-Key": "codex-key"},
+            )
+
+        self.assertEqual(relations.status_code, 200)
+        self.assertEqual(
+            {relation["target_task_id"] for relation in relations.json()},
+            {task["id"] for task in developments},
+        )
+
+    def test_legacy_general_task_still_completes_and_collects_without_quality_payload(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "target_member_id": "agent:codex",
+                    "content": "Legacy clients do not send quality fields",
+                },
+            )
+            claimed = client.post(
+                f"/api/tasks/{created.json()['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            result = self.add_message(
+                from_id="agent:codex",
+                to_ids='["human:bobo"]',
+                message_type="text",
+                group_id=created.json()["hall_group_id"],
+                content="Legacy general result",
+            )
+            completed = client.post(
+                f"/api/tasks/{created.json()['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "result_message_id": result.id},
+            )
+            collected = client.post(
+                f"/api/tasks/{created.json()['id']}/collect-result",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["task_kind"], "general")
+        self.assertIsNone(created.json()["review_policy"])
+        self.assertEqual(claimed.status_code, 200)
+        self.assertEqual(completed.status_code, 200)
+        self.assertEqual(completed.json()["workflow_status"], "submitted")
+        self.assertIsNone(completed.json()["gate_verdict"])
+        self.assertEqual(collected.status_code, 200)
+        self.assertEqual(collected.json()["workflow_status"], "completed")
+
+    def test_review_completion_requires_a_valid_structured_verdict(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_verdict",
+                slice_budget=2,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Produce a reviewable result",
+                task_kind="development",
+                review_policy="required",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Reviewable development result",
+            )
+            review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Return a structured verdict",
+                task_kind="review",
+                related_task_ids=[development["id"]],
+            )
+            claimed = client.post(
+                f"/api/tasks/{review['id']}/claim",
+                headers={"X-API-Key": "third-key"},
+                json={},
+            )
+            self.assertEqual(claimed.status_code, 200)
+            result = self.add_message(
+                from_id="agent:third",
+                to_ids='["agent:codex"]',
+                message_type="text",
+                group_id=review["hall_group_id"],
+                content="Structured review result",
+            )
+            base_body = {
+                "status": "succeeded",
+                "result_message_id": result.id,
+                "claim_token": claimed.json()["claim_token"],
+            }
+            missing_verdict = client.post(
+                f"/api/tasks/{review['id']}/complete",
+                headers={"X-API-Key": "third-key"},
+                json=base_body,
+            )
+            invalid_verdict = client.post(
+                f"/api/tasks/{review['id']}/complete",
+                headers={"X-API-Key": "third-key"},
+                json={
+                    **base_body,
+                    "gate_verdict": {
+                        "verdict": "looks_good",
+                        "summary": "Not a supported verdict",
+                        "findings": [],
+                    },
+                },
+            )
+            empty_change_findings = client.post(
+                f"/api/tasks/{review['id']}/complete",
+                headers={"X-API-Key": "third-key"},
+                json={
+                    **base_body,
+                    "gate_verdict": {
+                        "verdict": "changes_requested",
+                        "summary": "A change is required",
+                        "findings": [],
+                    },
+                },
+            )
+            wrong_reviewer = client.post(
+                f"/api/tasks/{review['id']}/complete",
+                headers={"X-API-Key": "other-key"},
+                json={
+                    **base_body,
+                    "gate_verdict": {
+                        "verdict": "approved",
+                        "summary": "The developer cannot approve their own result",
+                        "findings": [],
+                    },
+                },
+            )
+            approved = client.post(
+                f"/api/tasks/{review['id']}/complete",
+                headers={"X-API-Key": "third-key"},
+                json={
+                    **base_body,
+                    "gate_verdict": {
+                        "verdict": "approved",
+                        "summary": "The frozen result is acceptable",
+                        "findings": [],
+                    },
+                },
+            )
+            fetched = client.get(
+                f"/api/tasks/{review['id']}",
+                headers={"X-API-Key": "codex-key"},
+            )
+
+            blocked_development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Produce a result with an external blocker",
+                task_kind="development",
+                review_policy="required",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                blocked_development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Result awaiting an external dependency",
+            )
+            blocked_review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Record a blocked review",
+                task_kind="review",
+                related_task_ids=[blocked_development["id"]],
+            )
+            blocked, _ = self._claim_and_complete_quality_task(
+                client,
+                blocked_review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Cannot finish this review yet",
+                gate_verdict={
+                    "verdict": "blocked",
+                    "summary": "External dependency is unavailable",
+                    "findings": ["Wait for the dependency owner"],
+                },
+            )
+            retry_after_blocked = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Retry the same frozen version after the blocker clears",
+                task_kind="review",
+                related_task_ids=[blocked_development["id"]],
+            )
+
+        self.assertIn(missing_verdict.status_code, {400, 422})
+        self.assertEqual(invalid_verdict.status_code, 422)
+        self.assertIn(empty_change_findings.status_code, {400, 422})
+        self.assertEqual(wrong_reviewer.status_code, 403)
+        self.assertEqual(approved.status_code, 200)
+        self.assertEqual(
+            approved.json()["gate_verdict"],
+            {
+                "verdict": "approved",
+                "summary": "The frozen result is acceptable",
+                "findings": [],
+            },
+        )
+        self.assertEqual(fetched.json()["gate_verdict"], approved.json()["gate_verdict"])
+        self.assertEqual(blocked["gate_verdict"]["verdict"], "blocked")
+        self.assertEqual(retry_after_blocked["task_kind"], "review")
+
+    def test_development_success_requires_result_message_but_not_gate_verdict(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_development_result",
+                slice_budget=2,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Development must point to its frozen result",
+                task_kind="development",
+                review_policy="required",
+            )
+            claimed = client.post(
+                f"/api/tasks/{development['id']}/claim",
+                headers={"X-API-Key": "other-key"},
+                json={},
+            )
+            missing_result = client.post(
+                f"/api/tasks/{development['id']}/complete",
+                headers={"X-API-Key": "other-key"},
+                json={
+                    "status": "succeeded",
+                    "claim_token": claimed.json()["claim_token"],
+                },
+            )
+            result = self.add_message(
+                from_id="agent:other",
+                to_ids='["agent:codex"]',
+                message_type="text",
+                group_id=development["hall_group_id"],
+                content="Frozen development result",
+            )
+            completed = client.post(
+                f"/api/tasks/{development['id']}/complete",
+                headers={"X-API-Key": "other-key"},
+                json={
+                    "status": "succeeded",
+                    "result_message_id": result.id,
+                    "claim_token": claimed.json()["claim_token"],
+                },
+            )
+
+        self.assertIn(missing_result.status_code, {400, 422})
+        self.assertEqual(completed.status_code, 200)
+        self.assertIsNone(completed.json()["gate_verdict"])
+
+    def test_root_success_waits_for_latest_rework_review_and_exposes_quality_context(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_quality_gate",
+                slice_budget=1,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Implement a required-review slice",
+                task_kind="development",
+                review_policy="required",
+            )
+            _, development_result_id = self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Initial frozen result",
+            )
+            unreviewed_root = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": root["claim_token"]},
+            )
+
+            first_review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the initial result",
+                task_kind="review",
+                related_task_ids=[development["id"]],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                first_review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Initial review requests changes",
+                gate_verdict={
+                    "verdict": "changes_requested",
+                    "summary": "Boundary handling is incomplete",
+                    "findings": ["Add the missing boundary behavior"],
+                },
+            )
+            changed_root = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": root["claim_token"]},
+            )
+            duplicate_review = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "A second review cannot overwrite a rejected frozen version",
+                    "task_kind": "review",
+                    "related_task_ids": [development["id"]],
+                },
+            )
+
+            rework = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Address the boundary finding",
+                task_kind="rework",
+                related_task_ids=[development["id"]],
+                trigger_task_id=first_review["id"],
+            )
+            _, rework_result_id = self._claim_and_complete_quality_task(
+                client,
+                rework,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Updated frozen result",
+            )
+            pending_latest_review = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": root["claim_token"]},
+            )
+            latest_review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the latest rework",
+                task_kind="review",
+                related_task_ids=[rework["id"]],
+            )
+            approved_review, _ = self._claim_and_complete_quality_task(
+                client,
+                latest_review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Latest rework is approved",
+                gate_verdict={
+                    "verdict": "approved",
+                    "summary": "The boundary behavior is now covered",
+                    "findings": [],
+                },
+            )
+            rework_relations = client.get(
+                f"/api/tasks/{rework['id']}/relations",
+                headers={"X-API-Key": "codex-key"},
+            )
+            latest_review_relations = client.get(
+                f"/api/tasks/{latest_review['id']}/relations",
+                headers={"X-API-Key": "codex-key"},
+            )
+            rework_context = client.get(
+                f"/api/tasks/{rework['id']}/quality-context",
+                headers={"X-API-Key": "codex-key"},
+            )
+            review_context = client.get(
+                f"/api/tasks/{latest_review['id']}/quality-context",
+                headers={"X-API-Key": "third-key"},
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            completed_root = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": root["claim_token"]},
+            )
+
+        self.assertEqual(unreviewed_root.status_code, 409)
+        self.assertEqual(changed_root.status_code, 409)
+        self.assertEqual(duplicate_review.status_code, 409)
+        self.assertEqual(pending_latest_review.status_code, 409)
+        self.assertEqual(approved_review["gate_verdict"]["verdict"], "approved")
+        self.assertEqual(rework_relations.status_code, 200)
+        self.assertEqual(len(rework_relations.json()), 1)
+        self.assertEqual(rework_relations.json()[0]["relation_type"], "reworks")
+        self.assertEqual(rework_relations.json()[0]["target_task_id"], development["id"])
+        self.assertEqual(rework_relations.json()[0]["trigger_task_id"], first_review["id"])
+        self.assertEqual(rework_relations.json()[0]["round_index"], 1)
+        self.assertEqual(latest_review_relations.status_code, 200)
+        self.assertEqual(
+            [
+                (item["relation_type"], item["target_task_id"], item["round_index"])
+                for item in latest_review_relations.json()
+            ],
+            [("reviews", rework["id"], 1)],
+        )
+        self.assertEqual(rework_context.status_code, 200)
+        self.assertEqual(rework_context.json()["task_id"], rework["id"])
+        self.assertEqual(
+            [item["task"]["id"] for item in rework_context.json()["related_tasks"]],
+            [development["id"]],
+        )
+        self.assertEqual(
+            [item["task"]["id"] for item in rework_context.json()["trigger_tasks"]],
+            [first_review["id"]],
+        )
+        self.assertIn(
+            development_result_id,
+            [
+                message["id"]
+                for item in rework_context.json()["related_tasks"]
+                for message in item["messages"]
+            ],
+        )
+        self.assertEqual(review_context.status_code, 200)
+        self.assertEqual(
+            [item["task"]["id"] for item in review_context.json()["related_tasks"]],
+            [rework["id"]],
+        )
+        self.assertIn(
+            rework_result_id,
+            [
+                message["id"]
+                for item in review_context.json()["related_tasks"]
+                for message in item["messages"]
+            ],
+        )
+        self.assertEqual(review_context.json()["trigger_tasks"], [])
+        self.assertEqual(tree.status_code, 200)
+        self.assertEqual(len(tree.json()["review_gates"]), 1)
+        gate = tree.json()["review_gates"][0]
+        self.assertEqual(gate["development_task_id"], development["id"])
+        self.assertEqual(gate["current_subject_task_id"], rework["id"])
+        self.assertEqual(gate["review_policy"], "required")
+        self.assertEqual(
+            gate["current_verdict"],
+            {
+                "verdict": "approved",
+                "summary": "The boundary behavior is now covered",
+                "findings": [],
+            },
+        )
+        self.assertEqual(gate["review_task_id"], latest_review["id"])
+        self.assertEqual(gate["rework_round"], 1)
+        self.assertEqual(completed_root.status_code, 200)
+        self.assertEqual(completed_root.json()["status"], "succeeded")
+
+    def test_third_changes_requested_exhausts_two_rework_rounds_and_pauses_root(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_rework_limit",
+                slice_budget=1,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Initial implementation",
+                task_kind="development",
+                review_policy="required",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Initial result",
+            )
+
+            current_subject = development
+            reviews: list[dict] = []
+            reworks: list[dict] = []
+            for round_index in range(1, 4):
+                review = self._create_quality_child(
+                    client,
+                    root,
+                    target_member_id="agent:third",
+                    content=f"Review quality round {round_index}",
+                    task_kind="review",
+                    related_task_ids=[current_subject["id"]],
+                )
+                reviews.append(review)
+                self._claim_and_complete_quality_task(
+                    client,
+                    review,
+                    api_key="third-key",
+                    from_id="agent:third",
+                    result_text=f"Round {round_index} requests another change",
+                    gate_verdict={
+                        "verdict": "changes_requested",
+                        "summary": f"Round {round_index} is not approved",
+                        "findings": [f"Unresolved finding {round_index}"],
+                    },
+                )
+                if round_index <= 2:
+                    rework = self._create_quality_child(
+                        client,
+                        root,
+                        target_member_id="agent:other",
+                        content=f"Rework round {round_index}",
+                        task_kind="rework",
+                        related_task_ids=[development["id"]],
+                        trigger_task_id=review["id"],
+                    )
+                    reworks.append(rework)
+                    self._claim_and_complete_quality_task(
+                        client,
+                        rework,
+                        api_key="other-key",
+                        from_id="agent:other",
+                        result_text=f"Reworked result {round_index}",
+                    )
+                    current_subject = rework
+
+            forbidden_third_rework = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:other",
+                    "content": "A third automatic rework must not be created",
+                    "task_kind": "rework",
+                    "related_task_ids": [development["id"]],
+                    "trigger_task_id": reviews[-1]["id"],
+                },
+            )
+            blocked_root_completion = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": root["claim_token"]},
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            rework_relations = [
+                client.get(
+                    f"/api/tasks/{task['id']}/relations",
+                    headers={"X-API-Key": "codex-key"},
+                ).json()[0]
+                for task in reworks
+            ]
+
+        self.assertEqual(forbidden_third_rework.status_code, 409)
+        self.assertEqual(blocked_root_completion.status_code, 409)
+        self.assertEqual(tree.status_code, 200)
+        payload = tree.json()
+        self.assertEqual(payload["root"]["control_status"], "awaiting_human")
+        self.assertEqual(payload["root"]["checkpoint_reason"], "review_exhausted")
+        self.assertEqual(
+            [task["task_kind"] for task in payload["tasks"]].count("review"),
+            3,
+        )
+        self.assertEqual(
+            [task["task_kind"] for task in payload["tasks"]].count("rework"),
+            2,
+        )
+        self.assertEqual(
+            [relation["round_index"] for relation in rework_relations],
+            [1, 2],
+        )
+        self.assertEqual(payload["root"]["reserved_slice_count"], 1)
+        self.assertEqual(payload["remaining_slice_budget"], 0)
+        self.assertEqual(len(payload["review_gates"]), 1)
+        self.assertEqual(
+            payload["review_gates"][0]["current_verdict"],
+            {
+                "verdict": "changes_requested",
+                "summary": "Round 3 is not approved",
+                "findings": ["Unresolved finding 3"],
+            },
+        )
+        self.assertEqual(payload["review_gates"][0]["rework_round"], 2)
+
+    def test_concurrent_reviews_cannot_cover_the_same_frozen_version_twice(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_review_race",
+                slice_budget=1,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Produce one frozen version for a review race",
+                task_kind="development",
+                review_policy="required",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Frozen result for concurrent review creation",
+            )
+            failed_review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="A runner failure must not permanently lock this version",
+                task_kind="review",
+                related_task_ids=[development["id"]],
+            )
+            failed_claim = client.post(
+                f"/api/tasks/{failed_review['id']}/claim",
+                headers={"X-API-Key": "third-key"},
+                json={},
+            )
+            failed_completion = client.post(
+                f"/api/tasks/{failed_review['id']}/complete",
+                headers={"X-API-Key": "third-key"},
+                json={
+                    "status": "failed",
+                    "last_error": "review runner crashed",
+                    "claim_token": failed_claim.json()["claim_token"],
+                },
+            )
+            failed_relations = client.get(
+                f"/api/tasks/{failed_review['id']}/relations",
+                headers={"X-API-Key": "codex-key"},
+            )
+
+        self.assertEqual(failed_completion.status_code, 200)
+        self.assertIsNone(failed_relations.json()[0]["round_index"])
+
+        barrier = Barrier(2)
+
+        def create_review(label: str):
+            with self.make_client() as client:
+                barrier.wait()
+                return client.post(
+                    "/api/tasks",
+                    headers={"X-API-Key": "codex-key"},
+                    json={
+                        "parent_task_id": root["id"],
+                        "authorization_epoch": root["authorization_epoch"],
+                        "target_member_id": "agent:third",
+                        "content": f"Concurrent review {label}",
+                        "task_kind": "review",
+                        "related_task_ids": [development["id"]],
+                    },
+                )
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = list(pool.map(create_review, ("A", "B")))
+
+        self.assertEqual(
+            sorted(response.status_code for response in responses),
+            [201, 409],
+        )
+        created_review = next(
+            response.json()
+            for response in responses
+            if response.status_code == 201
+        )
+        with self.make_client() as client:
+            relations = client.get(
+                f"/api/tasks/{created_review['id']}/relations",
+                headers={"X-API-Key": "codex-key"},
+            )
+        self.assertEqual(relations.status_code, 200)
+        self.assertEqual(relations.json()[0]["round_index"], 0)
 
     def test_nonterminal_descendant_limit_is_atomic_during_concurrent_creation(self):
         with self.make_client() as client:
@@ -1568,6 +2710,7 @@ class AgentTaskTests(RouteTestCase):
 
     def test_init_db_adds_task_hall_fields_and_backfills_legacy_workflow_status(self):
         with self.engine.begin() as conn:
+            conn.exec_driver_sql("DROP TABLE IF EXISTS agent_task_relations")
             conn.exec_driver_sql("DROP TABLE agent_tasks")
             conn.exec_driver_sql(
                 """
@@ -1642,6 +2785,39 @@ class AgentTaskTests(RouteTestCase):
                 ORDER BY id
                 """
             ).fetchall()
+            quality_rows = conn.exec_driver_sql(
+                """
+                SELECT id, task_kind, review_policy, gate_verdict
+                FROM agent_tasks
+                ORDER BY id
+                """
+            ).fetchall()
+            relation_columns = {
+                row[1]
+                for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(agent_task_relations)"
+                ).fetchall()
+            }
+            relation_indexes = conn.exec_driver_sql(
+                "PRAGMA index_list(agent_task_relations)"
+            ).fetchall()
+            relation_index_columns = {
+                tuple(
+                    item[2]
+                    for item in conn.exec_driver_sql(
+                        f"PRAGMA index_info('{row[1]}')"
+                    ).fetchall()
+                ): bool(row[2])
+                for row in relation_indexes
+            }
+            relation_rows = conn.exec_driver_sql(
+                """
+                SELECT
+                    source_task_id, target_task_id, relation_type,
+                    trigger_task_id, round_index
+                FROM agent_task_relations
+                """
+            ).fetchall()
 
         self.assertTrue({
             "project_id",
@@ -1668,6 +2844,9 @@ class AgentTaskTests(RouteTestCase):
             "checkpoint_reason",
             "max_clarification_rounds",
             "clarification_round_count",
+            "task_kind",
+            "review_policy",
+            "gate_verdict",
         }.issubset(columns))
         self.assertEqual(indexes["ix_agent_tasks_hall_group_id"], 1)
         self.assertEqual(indexes["ix_agent_tasks_lease_expires_at"], 0)
@@ -1701,6 +2880,51 @@ class AgentTaskTests(RouteTestCase):
                 for task_id in range(1, 6)
             ],
         )
+        self.assertEqual(
+            quality_rows,
+            [
+                (task_id, "general", None, None)
+                for task_id in range(1, 6)
+            ],
+        )
+        self.assertTrue(
+            {
+                "id",
+                "source_task_id",
+                "target_task_id",
+                "relation_type",
+                "trigger_task_id",
+                "round_index",
+                "created_at",
+            }.issubset(relation_columns)
+        )
+        self.assertTrue(
+            any(
+                columns == ("source_task_id",)
+                for columns in relation_index_columns
+            )
+        )
+        self.assertTrue(
+            any(
+                columns == ("target_task_id",)
+                for columns in relation_index_columns
+            )
+        )
+        self.assertTrue(
+            any(
+                columns == ("trigger_task_id",)
+                for columns in relation_index_columns
+            )
+        )
+        self.assertTrue(
+            any(
+                is_unique
+                and columns[:3]
+                == ("source_task_id", "target_task_id", "relation_type")
+                for columns, is_unique in relation_index_columns.items()
+            )
+        )
+        self.assertEqual(relation_rows, [])
 
     def test_init_db_backfills_existing_delegating_tree_without_granting_extra_slices(self):
         with self.engine.begin() as conn:

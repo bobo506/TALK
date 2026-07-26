@@ -356,6 +356,10 @@ class TalkClient:
         *,
         title: str | None = None,
         project_id: str | None = None,
+        task_kind: str = "general",
+        review_policy: str | None = None,
+        related_task_ids: list[int] | tuple[int, ...] | None = None,
+        trigger_task_id: int | None = None,
         parent_task_id: int | None = None,
         authorization_epoch: int | None = None,
         may_delegate: bool = False,
@@ -372,6 +376,10 @@ class TalkClient:
             "content": content,
             "title": title,
             "project_id": project_id,
+            "task_kind": task_kind,
+            "review_policy": review_policy,
+            "related_task_ids": list(related_task_ids or []),
+            "trigger_task_id": trigger_task_id,
             "parent_task_id": parent_task_id,
             "authorization_epoch": authorization_epoch,
             "may_delegate": may_delegate,
@@ -392,6 +400,7 @@ class TalkClient:
         status: str | None = None,
         workflow_status: str | None = None,
         project_id: str | None = None,
+        task_kind: str | None = None,
     ) -> list[JsonDict]:
         params: dict[str, Any] = {}
         if target_member_id:
@@ -402,6 +411,8 @@ class TalkClient:
             params["workflow_status"] = workflow_status
         if project_id:
             params["project_id"] = project_id
+        if task_kind:
+            params["task_kind"] = task_kind
         return await self._request_json("GET", "/api/tasks", params=params)
 
     async def get_task(self, task_id: int) -> JsonDict:
@@ -409,6 +420,12 @@ class TalkClient:
 
     async def get_task_tree(self, task_id: int) -> JsonDict:
         return await self._request_json("GET", f"/api/tasks/{task_id}/tree")
+
+    async def list_task_relations(self, task_id: int) -> list[JsonDict]:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/relations")
+
+    async def get_task_quality_context(self, task_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/quality-context")
 
     async def pause_task_tree(self, task_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/pause-tree")
@@ -519,12 +536,14 @@ class TalkClient:
         result_message_id: int | None = None,
         last_error: str | None = None,
         claim_token: str | None = None,
+        gate_verdict: JsonDict | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "status": status,
             "result_message_id": result_message_id,
             "last_error": last_error,
             "claim_token": claim_token,
+            "gate_verdict": gate_verdict,
         }
         return await self._request_json("POST", f"/api/tasks/{task_id}/complete", json_body=payload)
 

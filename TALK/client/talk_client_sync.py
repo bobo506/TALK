@@ -233,6 +233,10 @@ class TalkClientSync:
         *,
         title: str | None = None,
         project_id: str | None = None,
+        task_kind: str = "general",
+        review_policy: str | None = None,
+        related_task_ids: list[int] | tuple[int, ...] | None = None,
+        trigger_task_id: int | None = None,
         parent_task_id: int | None = None,
         authorization_epoch: int | None = None,
         may_delegate: bool = False,
@@ -250,6 +254,10 @@ class TalkClientSync:
                 content,
                 title=title,
                 project_id=project_id,
+                task_kind=task_kind,
+                review_policy=review_policy,
+                related_task_ids=related_task_ids,
+                trigger_task_id=trigger_task_id,
                 parent_task_id=parent_task_id,
                 authorization_epoch=authorization_epoch,
                 may_delegate=may_delegate,
@@ -270,6 +278,7 @@ class TalkClientSync:
         status: str | None = None,
         workflow_status: str | None = None,
         project_id: str | None = None,
+        task_kind: str | None = None,
     ) -> list[dict[str, Any]]:
         return self._submit(
             self._client.list_tasks(
@@ -277,6 +286,7 @@ class TalkClientSync:
                 status=status,
                 workflow_status=workflow_status,
                 project_id=project_id,
+                task_kind=task_kind,
             )
         )
 
@@ -285,6 +295,12 @@ class TalkClientSync:
 
     def get_task_tree(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.get_task_tree(task_id))
+
+    def list_task_relations(self, task_id: int) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_task_relations(task_id))
+
+    def get_task_quality_context(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_task_quality_context(task_id))
 
     def pause_task_tree(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.pause_task_tree(task_id))
@@ -388,6 +404,7 @@ class TalkClientSync:
         result_message_id: int | None = None,
         last_error: str | None = None,
         claim_token: str | None = None,
+        gate_verdict: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.complete_task(
@@ -396,6 +413,7 @@ class TalkClientSync:
                 result_message_id=result_message_id,
                 last_error=last_error,
                 claim_token=claim_token,
+                gate_verdict=gate_verdict,
             )
         )
 

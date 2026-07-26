@@ -227,6 +227,62 @@ class ProjectRouteTests(RouteTestCase):
             listed.json()[0]["soul_path"], ".talk/agents/agent_codex/SOUL.md"
         )
         self.assertEqual([a["member_id"] for a in listed.json()], ["agent:codex", "agent:pi"])
+        for agent in synced.json():
+            self.assertIsNone(agent["business_role"])
+            self.assertIsNone(agent["decision_tier"])
+            self.assertEqual(agent["capability_summary"], [])
+            self.assertEqual(agent["availability"], "offline")
+            self.assertEqual(agent["instances"], [])
+        for agent in listed.json():
+            self.assertIsNone(agent["business_role"])
+            self.assertIsNone(agent["decision_tier"])
+            self.assertEqual(agent["capability_summary"], [])
+            self.assertEqual(agent["availability"], "offline")
+            self.assertEqual(agent["instances"], [])
+
+    def test_sync_and_list_agents_return_role_capability_and_live_availability(self):
+        with self.make_client() as client:
+            client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_roles", "display_name": "Roles"},
+            )
+            instance = client.put(
+                "/api/instances/codex-reviewer",
+                headers={"X-API-Key": "codex-key"},
+                json={"runtime": "codex", "status": "idle"},
+            )
+            synced = client.post(
+                "/api/projects/prj_roles/sync",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "agents": [
+                        {
+                            "member_id": "agent:codex",
+                            "business_role": "reviewer",
+                            "decision_tier": "decision",
+                            "capability_summary": ["代码审查", "风险分析"],
+                        }
+                    ]
+                },
+            )
+            listed = client.get(
+                "/api/projects/prj_roles/agents",
+                headers={"X-API-Key": "codex-key"},
+            )
+
+        self.assertEqual(instance.status_code, 200)
+        self.assertEqual(synced.status_code, 200)
+        self.assertEqual(listed.status_code, 200)
+        for payload in (synced.json()[0], listed.json()[0]):
+            self.assertEqual(payload["business_role"], "reviewer")
+            self.assertEqual(payload["decision_tier"], "decision")
+            self.assertEqual(payload["capability_summary"], ["代码审查", "风险分析"])
+            self.assertEqual(payload["availability"], "available")
+            self.assertEqual(
+                [(item["id"], item["status"]) for item in payload["instances"]],
+                [("codex-reviewer", "idle")],
+            )
 
     def test_sync_is_full_replace(self):
         with self.make_client() as client:

@@ -9,44 +9,50 @@ Updated: 2026-07-26 (Asia/Shanghai)
 - `.talk/groups.yaml` 已配置 `agent:codex = lead + decision`；通用 CLI bridge 在提供 `--project` 且未显式传 `--decision-tier` 时会从该文件解析分级，命令行显式值继续优先。
 - TH-5 Project Blackboard + Task Hall 基础可视化链路已人工验收。
 - TH-6a1 任务树与硬预算、TH-6a2 根控制 / 有限授权 / runner 协作中断、TH-6a3 有界澄清轮次均已完成。
-- TH-6b 已完成：bundled runner 在领取 Task Hall 任务前先以独立只读 / 无工具命令预检，分页读取并按时间顺序重放完整 Hall；信息充分才 `accept -> claim`，信息不足则在同 Hall 集中提问并登记澄清。
-- 澄清等待中的任务不会重复唤醒；自动问题带稳定任务 / 轮次标记，可恢复“消息已发送但动作未登记”的中断窗口。答复显式提交后，runner 会带完整 Hall 重新预检。
-- 正式执行 prompt 与预检复用同一份完整 Hall 上下文。附件消息目前只注入可见元数据，不自动下载正文。
-- 预检只接受显式结构化结论；兼容单行、显式标记后的多行 JSON 及已观察到的嵌套 `ready` 变体。成功命令若首次格式无效，会以同一只读命令纠正一次；自然语言不会被猜测为接受。
+- TH-6b runner 领取前预检、同 Hall 自动澄清和完整上下文重放已完成。
+- TH-6c 已完成：新增 `general / development / review / test / rework`、独立任务关系、`required / batch / exempt` Review 策略、结构化 `gate_verdict`、两轮返工门禁与项目 Agent 角色 / 能力发现。
+- Review / Test runner 会读取关系授权的关联 Task Hall 完整上下文，并只接受显式 `TALK_GATE_VERDICT`；首次格式错误会有界纠正一次。
+- 同一冻结版本的 Review 使用唯一语义槽：`approved / changes_requested` 禁止原版本重审覆盖，`failed / canceled / blocked` 释放槽位允许重试；并发双 Review 只能有一个创建成功。
+- 第二轮返工再次得到 `changes_requested` 时，根任务原子进入 `awaiting_human / review_exhausted` 并撤销其它 claim；类型化任务树缺少必需 Review 时不能完成。
+- 项目管理者本轮暂时无暇人工验收。TH-6c 没有 Web 改动，已完成自动化与独立代码审查；按高风险单切片刹车暂停，不直接进入 TH-6d。
 
 ## Current Snapshot
 
 - Web UI 登录后默认进入项目黑板，以“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合任务，并可进入对应 Task Hall。
-- Human 可从页面委派任务、查看 Hall、收取结果和取消未领取任务；服务端 / SDK 已支持显式澄清答复、人工释放、根暂停 / 恢复 / 终止，但 Web 尚未覆盖这些新入口。
-- Task Hall 原始任务、问题、答复和结果持久化在同一 Hall；bundled runner 现在会完整分页读取，不再只把标题 / 正文交给模型。
-- `clarification_requested / needs_decision` 会保持等待；`clarification_answered` 会触发重新预检；`accepted` 可在 runner 重启后直接 claim。
-- bundled runner 执行中的 claim 心跳同时是最长 5 秒控制探针；服务端撤销 claim 后，本地命令被取消且不会写回陈旧结果。
-- 当前任务树仍只有治理预算和澄清协议，尚无 `task_kind`、任务关系、结构化 Review/Test 结论或质量门禁。
+- Human 可从页面委派普通任务、查看 Hall、收取结果和取消未领取任务；根控制、澄清提交与质量任务尚无完整 Web 入口。
+- 类型化任务仅作为子任务创建；`development / general` 消耗开发切片，`review / test / rework` 不额外消耗切片，但仍受同根、同项目、授权 epoch、有效期和非终态上限约束。
+- `GET /api/tasks/{id}/relations` 返回显式关系；`quality-context` 向 Review / Test / Rework 的创建者和执行者只读开放关联任务、触发任务及其完整 Hall。
+- 开发 / 返工成功必须引用结果消息；Review / Test 成功必须提交匹配类型的结构化结论，负向结论必须带具体发现。
+- 类型化任务树完成前会检查非终态后代和每个最新开发 / 返工版本的必需 Review；旧 `general` 任务继续兼容原五态流程。
+- async / sync SDK、CLI、Python MCP 与 Pi extension 已同步新字段、关系查询、类型过滤和项目 Agent 富化发现，工具名仍保持原有八个。
 
 ## Current Boundaries
 
 - Web UI 尚无提交澄清答复、轮次提示、`needs_decision` 处理、根控制或人工验收门禁入口。
+- Web UI 尚无 Review / 返工任务的创建、关系查看、结构化结论或质量检查点入口。
+- `test` 类型、关系和结构化结论已经持久化，但根任务 Test 门禁、最新冻结版本失效、Blackboard 控制和通过后自动暂停留待 TH-6d。
+- bundled runner 通过 Review prompt 约束“只读审查”，服务端能控制任务和数据写回，但不能替代操作系统对第三方 Reviewer 的文件写权限隔离。
 - 附件只重放文件元数据，执行前自动下载与正文注入尚未定义。
 - 预检失败后的跨轮询重试没有独立上限与退避；多个 bridge 实例在极窄并发窗口内仍可能都先发出问题，服务端动作会阻止重复状态推进，但消息级跨实例原子去重尚未实现。
 - 真实 Pi 冒烟能安全返回“信息不足”并阻止 claim，但曾忽略已给出的任务正文、要求请求者重复内容；这是模型理解质量残余，结构化解析层不会把它误判为接受。
 - 单任务运行中取消尚未开放；整树终止通过服务端撤权和 runner 控制探针生效，第三方 runner 需自行实现相同协议。
-- 根任务当前可以在后代未结束时自行完成；整树汇总、Review/Test 门禁和里程碑人工验收留待后续切片。
 - 普通 Codex Desktop 会话尚未自动注册 TALK MCP；TH-7 再补通用终端接入包装。
 
 ## Next Slice
 
-1. TH-6c：实现任务类型、任务关系、结构化 Review / 返工门禁与业务角色发现。
-2. TH-6d：实现里程碑黑盒测试、Blackboard 控制、批次自动检查点与人工验收暂停。
-3. TH-7：补 Codex Desktop / 通用终端接入包装并做完整跨终端验收。
+1. TH-6d：实现里程碑黑盒测试、最新冻结版本 Test 门禁、Blackboard 控制、批次自动检查点与人工验收暂停；这是下一处里程碑门禁。
+2. TH-7：补 Codex Desktop / 通用终端接入包装并做完整跨终端验收。
+3. 后续再处理附件正文注入、预检退避和跨实例消息级去重。
 
 ## Verification
 
-- Python `py_compile`：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/pi_bridge.py` 及相关测试文件通过。
-- TH-6b 定向回归：`Ran 168 tests in 28.697s ... OK`。
-- 全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q`，`Ran 348 tests in 154.472s ... OK`。
-- 活服务 E2E 覆盖 `created -> 自动提问 -> 显式答复 -> 重新预检 -> accept -> claim -> 完成`，并验证正式执行 prompt 能读到答复中的 `8123`。
-- 真实 Codex 只读预检返回可解析的结构化结论；真实 Pi 返回显式多行结构化阻塞结论，安全地不领取任务，但提问内容质量存在上述边界。
-- 较早的混合定向命令曾命中既有 WebSocket 降级测试的固定 2 秒退出超时；该用例随后连续单跑两次通过，最终全量 348 项也通过。本切片未修改该路径。
+- Python `py_compile` 覆盖服务端模型 / 迁移 / 任务与项目路由、CLI、async / sync SDK、runner 与 Python 工具；Pi TypeScript 通过 Node 语法检查。
+- 服务端 + runner 定向回归：`Ran 166 tests in 39.405s ... OK`。
+- CLI / SDK / Python MCP / Pi 工具联合回归：`Ran 48 tests ... OK`，并被最终全量回归再次覆盖。
+- 最终全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q`，`Ran 366 tests in 147.008s ... OK`。
+- 独立集成审查补获并验证两条失败路径：Hall 回写失败不得提交 `failed + gate_verdict`；同冻结版本不得以重复 / 并发 Review 覆盖 `changes_requested`。
+- 首次全量命令曾因外部 5 分钟工具时限被终止且没有产出最终结果；提高时限后的完整重跑通过，未把前一次超时记为成功。
+- `usage-gate.cmd guard --provider codex --json` 返回 `decision=continue`；精确 session / weekly 百分比为 `null`，未臆测具体用量。本轮仍按数据库 / 协议高风险单切片刹车停止。
 - 本切片未修改 Web 代码，按 Browser 验证约定无需执行页面验证。
 
 ## Known Debt
@@ -54,6 +60,7 @@ Updated: 2026-07-26 (Asia/Shanghai)
 - 双通道输出仍可能让 Agent 的 visible reply 退化，结构化输出块方案延后处理。
 - pi 的 `--no-extensions` 仍是临时规避，等待 upstream 修复后移除。
 - 预检问题的模型语义质量、附件正文注入和跨实例消息级去重仍需后续加强。
+- 里程碑 Test 门禁、Blackboard 质量控制、自动人工验收暂停和 Reviewer 文件系统硬只读边界尚未完成。
 
 ## References
 

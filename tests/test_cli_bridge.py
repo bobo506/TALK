@@ -23,9 +23,11 @@ from bridges.cli_bridge import (
     first_sentence,
     build_parser,
     format_cli_reply,
+    format_task_quality_context,
     handle_incoming_message,
     handle_queued_task,
     normalize_pi_reply_language,
+    parse_task_gate_verdict,
     parse_task_preflight_result,
     parse_talk_actions,
     resolve_decision_tier,
@@ -233,6 +235,91 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(multiline_clarification.question, "请提供测试 API Key。")
         with self.assertRaises(RuntimeError):
             parse_task_preflight_result(CliRunResult(returncode=0, stdout="看起来可以开始", stderr=""))
+
+    def test_task_gate_prompt_and_parser_require_explicit_structured_verdict(self):
+        prompt = build_cli_task_prompt(
+            {
+                "id": 18,
+                "created_by": "agent:lead",
+                "task_kind": "review",
+                "title": "审查实现",
+                "content": "只读检查关联开发任务。",
+            },
+            member_id="agent:pi",
+            workdir=Path.cwd(),
+            runtime="pi",
+            hall_history="关联任务 #12 已完成。",
+        )
+        approved = parse_task_gate_verdict(
+            CliRunResult(
+                returncode=0,
+                stdout=(
+                    "审查完成。\n"
+                    'TALK_GATE_VERDICT {"verdict":"approved","summary":"未发现阻塞问题",'
+                    '"findings":[]}'
+                ),
+                stderr="",
+            ),
+            task_kind="review",
+        )
+        changes = parse_task_gate_verdict(
+            CliRunResult(
+                returncode=0,
+                stdout=(
+                    "TALK_GATE_VERDICT\n"
+                    '{"verdict":"changes_requested","summary":"需要修正",'
+                    '"findings":["缺少并发保护"]}'
+                ),
+                stderr="",
+            ),
+            task_kind="review",
+        )
+
+        self.assertIn("这是只读 Review 任务", prompt)
+        self.assertIn("关联任务 #12 已完成", prompt)
+        self.assertEqual(approved.as_payload()["verdict"], "approved")
+        self.assertEqual(changes.findings, ("缺少并发保护",))
+        with self.assertRaises(RuntimeError):
+            parse_task_gate_verdict(
+                CliRunResult(
+                    returncode=0,
+                    stdout=(
+                        'TALK_GATE_VERDICT {"verdict":"changes_requested",'
+                        '"summary":"需要修正","findings":[]}'
+                    ),
+                    stderr="",
+                ),
+                task_kind="review",
+            )
+
+    def test_format_task_quality_context_keeps_related_hall_separate(self):
+        rendered = format_task_quality_context(
+            {
+                "related_tasks": [
+                    {
+                        "relation": {"relation_type": "reviews"},
+                        "task": {
+                            "id": 12,
+                            "task_kind": "development",
+                            "title": "实现队列",
+                            "content": "增加队列原子门禁",
+                        },
+                        "messages": [
+                            {
+                                "id": 91,
+                                "from": "agent:dev",
+                                "type": "text",
+                                "content": "测试 42 项通过。",
+                            }
+                        ],
+                    }
+                ],
+                "trigger_tasks": [],
+            }
+        )
+
+        self.assertIn("关联任务 #12（development，关系 reviews）", rendered)
+        self.assertIn("测试 42 项通过", rendered)
 
     def test_resolve_decision_tier_reads_project_groups_for_codex(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -904,6 +991,143 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("禁止嵌套 JSON", prompts[1][1])
         self.assertEqual(client.sent, [("已按 8123 端口完成。", ["human:bobo"], "group:task-12")])
         self.assertEqual(client.completed[0][1]["claim_token"], "lease-12")
+
+    def test_handle_review_task_replays_quality_context_and_submits_gate_verdict(self):
+        class FakeClient:
+            def __init__(self, *, fail_send: bool = False):
+                self.completed = []
+                self.sent = []
+                self.fail_send = fail_send
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                return []
+
+            async def get_task_quality_context(self, task_id):
+                return {
+                    "task_id": task_id,
+                    "relations": [
+                        {
+                            "id": 1,
+                            "source_task_id": task_id,
+                            "target_task_id": 12,
+                            "relation_type": "reviews",
+                        }
+                    ],
+                    "related_tasks": [
+                        {
+                            "relation": {"relation_type": "reviews"},
+                            "task": {
+                                "id": 12,
+                                "task_kind": "development",
+                                "content": "实现并发门禁",
+                            },
+                            "messages": [
+                                {
+                                    "id": 50,
+                                    "from": "agent:dev",
+                                    "type": "text",
+                                    "content": "并发测试 42 项通过。",
+                                }
+                            ],
+                        }
+                    ],
+                    "trigger_tasks": [],
+                }
+
+            async def accept_task(self, task_id):
+                return {"id": task_id, "workflow_status": "accepted"}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return {
+                    "id": task_id,
+                    "created_by": "agent:lead",
+                    "target_member_id": "agent:reviewer",
+                    "task_kind": "review",
+                    "content": "只读审查关联开发任务。",
+                    "hall_group_id": "group:task-18",
+                    "workflow_status": "in_progress",
+                    "claim_token": "lease-18",
+                }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                return {"id": task_id, "status": "running"}
+
+            async def send_text(self, text, to=None, group_id=None):
+                if self.fail_send:
+                    raise RuntimeError("Task Hall unavailable")
+                self.sent.append((text, to, group_id))
+                return {"id": 99}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id}
+
+        prompts = []
+
+        async def fake_command_runner(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            prompts.append((command, prompt))
+            if command == ["preflight"]:
+                return CliRunResult(
+                    returncode=0,
+                    stdout='TALK_TASK_PREFLIGHT {"action":"accept"}',
+                    stderr="",
+                )
+            return CliRunResult(
+                returncode=0,
+                stdout=(
+                    "审查通过。\n"
+                    'TALK_GATE_VERDICT {"verdict":"approved","summary":"并发门禁完整",'
+                    '"findings":[]}'
+                ),
+                stderr="",
+            )
+
+        async def scenario(*, fail_send: bool = False):
+            client = FakeClient(fail_send=fail_send)
+            handled = await handle_queued_task(
+                {
+                    "id": 18,
+                    "created_by": "agent:lead",
+                    "target_member_id": "agent:reviewer",
+                    "task_kind": "review",
+                    "content": "只读审查关联开发任务。",
+                    "hall_group_id": "group:task-18",
+                    "workflow_status": "assigned",
+                    "clarification_round_count": 0,
+                },
+                client=client,
+                member_id="agent:reviewer",
+                workdir=Path.cwd(),
+                instance_id="agent:reviewer:test",
+                command=["execute"],
+                preflight_command=["preflight"],
+                command_runner=fake_command_runner,
+                timeout=5,
+                max_reply_chars=500,
+                runtime="pi",
+                lease_seconds=5,
+                heartbeat_interval=1,
+            )
+            return handled, client
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertTrue(handled)
+        self.assertEqual([command for command, _ in prompts], [["preflight"], ["execute"]])
+        self.assertTrue(all("并发测试 42 项通过" in prompt for _, prompt in prompts))
+        self.assertIn("这是只读 Review 任务", prompts[1][1])
+        self.assertEqual(
+            client.completed[0][1]["gate_verdict"],
+            {"verdict": "approved", "summary": "并发门禁完整", "findings": []},
+        )
+        self.assertEqual(client.completed[0][1]["claim_token"], "lease-18")
+
+        failed_handled, failed_client = asyncio.run(scenario(fail_send=True))
+        self.assertTrue(failed_handled)
+        failed_completion = failed_client.completed[0][1]
+        self.assertEqual(failed_completion["status"], "failed")
+        self.assertNotIn("gate_verdict", failed_completion)
+        self.assertIn("could not post task result", failed_completion["last_error"])
 
     def test_handle_queued_task_posts_clarification_without_claim(self):
         class FakeClient:

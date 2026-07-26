@@ -56,6 +56,7 @@ TASK_PREFLIGHT_SYSTEM_PROMPT = (
     "信息充分时只输出 TALK_TASK_PREFLIGHT JSON;信息不足时把同一轮必须回答的问题集中到一个 question 字段。"
     "不要调用任何 TALK 工具;runner 会原子推进任务状态并把问题写入对应 Task Hall。"
 )
+TASK_GATE_VERDICT_MARKER = "TALK_GATE_VERDICT"
 DISCUSSION_PROTOCOL_INSTRUCTIONS = (
     "You are a participant in a TALK Group Hall, not a TALK administrator or user manual. "
     "You may talk with humans and other agents. If the user asks you to contact another agent, "
@@ -229,6 +230,20 @@ class CliRunResult:
 class TaskPreflightDecision:
     action: str
     question: str | None = None
+
+
+@dataclass(frozen=True)
+class TaskGateVerdict:
+    verdict: str
+    summary: str
+    findings: tuple[str, ...]
+
+    def as_payload(self) -> dict[str, Any]:
+        return {
+            "verdict": self.verdict,
+            "summary": self.summary,
+            "findings": list(self.findings),
+        }
 
 
 @dataclass(frozen=True)
@@ -1915,6 +1930,55 @@ def format_task_hall_history(messages: Sequence[dict[str, Any]]) -> str:
     return "\n".join(_task_hall_message_text(message) for message in messages)
 
 
+def format_task_quality_context(context: dict[str, Any] | None) -> str:
+    """Render relation-granted, read-only context for review/test/rework tasks."""
+    if not context:
+        return ""
+
+    sections: list[str] = []
+    for heading, key in (
+        ("关联任务", "related_tasks"),
+        ("触发门禁任务", "trigger_tasks"),
+    ):
+        entries = context.get(key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            relation = entry.get("relation") if isinstance(entry.get("relation"), dict) else {}
+            task = entry.get("task") if isinstance(entry.get("task"), dict) else {}
+            messages = entry.get("messages") if isinstance(entry.get("messages"), list) else []
+            task_id = task.get("id") or "unknown"
+            task_kind = task.get("task_kind") or "general"
+            relation_type = relation.get("relation_type") or "related"
+            title = str(task.get("title") or "").strip()
+            title_line = f"\n标题: {title}" if title else ""
+            verdict = task.get("gate_verdict")
+            verdict_line = (
+                f"\n结构化门禁结论: {json.dumps(verdict, ensure_ascii=False)}"
+                if isinstance(verdict, dict)
+                else ""
+            )
+            sections.append(
+                f"{heading} #{task_id}（{task_kind}，关系 {relation_type}）"
+                f"{title_line}\n任务原文:\n{str(task.get('content') or '').strip()}"
+                f"{verdict_line}\nTask Hall 完整上下文:\n"
+                f"{format_task_hall_history(messages)}"
+            )
+    if not sections:
+        return ""
+    return "\n\n".join(sections)
+
+
+async def fetch_task_quality_context(client: Any, task: dict[str, Any]) -> str:
+    task_kind = str(task.get("task_kind") or "general").strip().lower()
+    if task_kind not in {"review", "test", "rework"}:
+        return ""
+    context = await client.get_task_quality_context(int(task["id"]))
+    return format_task_quality_context(context)
+
+
 async def fetch_complete_task_hall_history(
     client: Any,
     group_id: str | None,
@@ -2145,15 +2209,34 @@ def build_cli_task_prompt(
 ) -> str:
     content = str(task.get("content") or "").strip()
     title = str(task.get("title") or "").strip()
+    task_kind = str(task.get("task_kind") or "general").strip().lower()
     tier_line = _decision_tier_line(decision_tier)
     history = hall_history.strip()
     history_block = f"\n\nTask Hall 完整上下文（按消息顺序）:\n{history}" if history else ""
+    gate_contract = ""
+    if task_kind == "review":
+        gate_contract = (
+            "\n\n这是只读 Review 任务：不得修改被审结果。完成审查后，最终输出必须包含且只包含一个"
+            '显式结构化结论行：TALK_GATE_VERDICT {"verdict":"approved|changes_requested|blocked",'
+            '"summary":"审查摘要","findings":["具体发现"]}。'
+            "`changes_requested` 或 `blocked` 的 findings 不得为空；不要从自然语言暗示结论。"
+        )
+    elif task_kind == "test":
+        gate_contract = (
+            "\n\n这是 Test 任务。完成验证后，最终输出必须包含且只包含一个显式结构化结论行："
+            'TALK_GATE_VERDICT {"verdict":"passed|failed|blocked","summary":"测试摘要",'
+            '"findings":["具体发现"]}。'
+            "`failed` 或 `blocked` 的 findings 不得为空；不要从自然语言暗示结论。"
+        )
 
     if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
         creator = task.get("created_by") or "unknown"
         task_text = f"{title}\n{content}" if title else content
         # 任务路径同样注入身份(紧凑写法,理由同 build_cli_prompt)。
-        return f"你是 {member_id}（{tier_line}）。{creator} 对你说:{task_text}{history_block}"
+        return (
+            f"你是 {member_id}（{tier_line}）。{creator} 对你说:"
+            f"{task_text}{history_block}{gate_contract}"
+        )
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"
@@ -2172,7 +2255,78 @@ def build_cli_task_prompt(
         "Task:\n"
         f"{content}\n"
         f"{history_block}\n"
+        f"{gate_contract}\n"
     )
+
+
+def parse_task_gate_verdict(result: CliRunResult, *, task_kind: str) -> TaskGateVerdict:
+    if result.timed_out:
+        raise RuntimeError("task gate command timed out")
+    if result.returncode != 0:
+        detail = clean_cli_output(result.stderr) or clean_cli_output(result.stdout)
+        raise RuntimeError(f"task gate command failed: {detail or f'exit code {result.returncode}'}")
+
+    output = clean_cli_output(result.stdout).strip()
+    candidates: list[str] = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(f"{TASK_GATE_VERDICT_MARKER} "):
+            candidates.append(stripped.removeprefix(f"{TASK_GATE_VERDICT_MARKER} ").strip())
+
+    decoder = json.JSONDecoder()
+    for marker_match in re.finditer(r"TALK_GATE_VERDICT(?:\s+|$)", output):
+        marked_output = output[marker_match.end() :].lstrip()
+        if not marked_output.startswith("{"):
+            continue
+        try:
+            marked_payload, _ = decoder.raw_decode(marked_output)
+        except json.JSONDecodeError:
+            continue
+        candidates.append(json.dumps(marked_payload, ensure_ascii=False))
+    candidates.extend(
+        match.group(1).strip()
+        for match in re.finditer(
+            r"```(?:json)?\s*(\{.*?\})\s*```",
+            output,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if TASK_GATE_VERDICT_MARKER in match.group(1)
+    )
+    if output.startswith("{") and output.endswith("}"):
+        candidates.append(output)
+
+    normalized_kind = task_kind.strip().lower()
+    allowed = {
+        "review": {"approved", "changes_requested", "blocked"},
+        "test": {"passed", "failed", "blocked"},
+    }.get(normalized_kind)
+    if allowed is None:
+        raise RuntimeError(f"task kind {task_kind!r} does not accept a gate verdict")
+
+    for candidate in reversed(candidates):
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        nested = payload.get(TASK_GATE_VERDICT_MARKER)
+        if isinstance(nested, dict):
+            payload = nested
+        verdict = str(payload.get("verdict") or "").strip().lower()
+        summary = str(payload.get("summary") or "").strip()
+        raw_findings = payload.get("findings", [])
+        if verdict not in allowed or not summary or not isinstance(raw_findings, list):
+            continue
+        findings = tuple(
+            str(finding).strip()
+            for finding in raw_findings
+            if str(finding).strip()
+        )
+        if verdict in {"changes_requested", "blocked", "failed"} and not findings:
+            continue
+        return TaskGateVerdict(verdict=verdict, summary=summary, findings=findings)
+    raise RuntimeError("task gate output did not return a valid TALK_GATE_VERDICT decision")
 
 
 def format_cli_reply(
@@ -2412,20 +2566,28 @@ async def _prepare_task_before_claim(
     prompt_transport: str,
     decision_tier: str,
     command_runner: Any,
-) -> tuple[dict[str, Any] | None, list[dict[str, Any]], bool]:
-    """Run Task Hall preflight and return (ready_task, history, workflow_advanced)."""
+) -> tuple[dict[str, Any] | None, str, bool]:
+    """Run Task Hall preflight and return (ready_task, replay_context, workflow_advanced)."""
     from TALK.client.exceptions import TalkValidationError
 
     hall_group_id = str(task.get("hall_group_id") or "").strip()
     if not hall_group_id:
-        return task, [], False
+        return task, "", False
 
     history = await fetch_complete_task_hall_history(client, hall_group_id)
+    quality_context = await fetch_task_quality_context(client, task)
+    replay_context = format_task_hall_history(history)
+    if quality_context:
+        replay_context = (
+            f"{replay_context}\n\n"
+            "关系授权的只读质量上下文：\n"
+            f"{quality_context}"
+        )
     workflow_status = str(task.get("workflow_status") or "assigned")
     if workflow_status == "accepted":
-        return task, history, False
+        return task, replay_context, False
     if workflow_status not in {"assigned", "clarification_answered"}:
-        return None, history, False
+        return None, replay_context, False
 
     task_id = int(task["id"])
     marker = _task_preflight_question_marker(task)
@@ -2440,14 +2602,14 @@ async def _prepare_task_before_claim(
                 task_id,
                 question_message_id=int(pending_question["id"]),
             )
-            return None, history, True
+            return None, replay_context, True
         except TalkValidationError as exc:
             if exc.status_code != 409:
                 raise
             current = await client.get_task(task_id)
             if str(current.get("workflow_status") or "") in {"clarification_requested", "needs_decision"}:
-                return None, history, True
-            return None, history, False
+                return None, replay_context, True
+            return None, replay_context, False
 
     prompt = build_cli_task_preflight_prompt(
         task,
@@ -2455,7 +2617,7 @@ async def _prepare_task_before_claim(
         workdir=workdir,
         runtime=runtime,
         decision_tier=decision_tier,
-        hall_history=format_task_hall_history(history),
+        hall_history=replay_context,
     )
     result = await command_runner(
         preflight_command,
@@ -2485,14 +2647,14 @@ async def _prepare_task_before_claim(
     if decision.action == "accept":
         try:
             accepted = await client.accept_task(task_id)
-            return accepted, history, True
+            return accepted, replay_context, True
         except TalkValidationError as exc:
             if exc.status_code != 409:
                 raise
             current = await client.get_task(task_id)
             if str(current.get("workflow_status") or "") == "accepted":
-                return current, history, True
-            return None, history, False
+                return current, replay_context, True
+            return None, replay_context, False
 
     creator = str(task.get("created_by") or "").strip()
     if not creator or not decision.question:
@@ -2508,14 +2670,14 @@ async def _prepare_task_before_claim(
             task_id,
             question_message_id=question_message_id,
         )
-        return None, history, True
+        return None, replay_context, True
     except TalkValidationError as exc:
         if exc.status_code != 409:
             raise
         current = await client.get_task(task_id)
         if str(current.get("workflow_status") or "") in {"clarification_requested", "needs_decision"}:
-            return None, history, True
-        return None, history, False
+            return None, replay_context, True
+        return None, replay_context, False
 
 
 async def handle_queued_task(
@@ -2542,7 +2704,7 @@ async def handle_queued_task(
 
     task_id = int(task["id"])
     runner = command_runner or run_cli_command
-    ready_task, hall_history, workflow_advanced = await _prepare_task_before_claim(
+    ready_task, replay_context, workflow_advanced = await _prepare_task_before_claim(
         task,
         client=client,
         member_id=member_id,
@@ -2572,16 +2734,18 @@ async def handle_queued_task(
         lease_seconds=lease_seconds,
         heartbeat_interval=heartbeat_interval,
     )
+    gate_verdict_payload: dict[str, Any] | None = None
     try:
         try:
             task_text = str(claimed.get("content") or "")
+            task_kind = str(claimed.get("task_kind") or "general").strip().lower()
             prompt = build_cli_task_prompt(
                 claimed,
                 member_id=member_id,
                 workdir=workdir,
                 runtime=runtime,
                 decision_tier=decision_tier,
-                hall_history=format_task_hall_history(hall_history) if hall_history else "",
+                hall_history=replay_context,
             )
             result = await _run_while_task_lease_active(
                 runner(
@@ -2593,13 +2757,39 @@ async def handle_queued_task(
                 ),
                 heartbeat_task,
             )
+            if task_kind in {"review", "test"} and not result.timed_out and result.returncode == 0:
+                try:
+                    gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
+                except RuntimeError:
+                    repair_prompt = (
+                        f"{prompt}\n\n"
+                        "你上一次的门禁输出没有遵守协议。不要修改任何文件，也不要解释格式；"
+                        "请重新检查现有结论，只输出一行约定的 TALK_GATE_VERDICT JSON。"
+                    )
+                    result = await _run_while_task_lease_active(
+                        runner(
+                            command,
+                            repair_prompt,
+                            cwd=workdir,
+                            timeout=timeout,
+                            prompt_transport=prompt_transport,
+                        ),
+                        heartbeat_task,
+                    )
+                    gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
+                gate_verdict_payload = gate_verdict.as_payload()
             reply = format_cli_reply(
                 result,
                 max_chars=max_reply_chars,
                 bridge_label=bridge_label,
                 force_one_sentence=wants_one_sentence(task_text),
             )
-            if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
+            if (
+                task_kind not in {"review", "test"}
+                and (runtime.lower() == "pi" or member_id == "agent:pi")
+                and not result.timed_out
+                and result.returncode == 0
+            ):
                 reply = normalize_pi_reply_language(task_text, reply)
             completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
             last_error = None
@@ -2638,6 +2828,8 @@ async def handle_queued_task(
         }
         if claim_token is not None:
             completion_kwargs["claim_token"] = claim_token
+        if completion_status == "succeeded" and gate_verdict_payload is not None:
+            completion_kwargs["gate_verdict"] = gate_verdict_payload
         await client.complete_task(task_id, **completion_kwargs)
         return True
     except TaskLeaseLostError:

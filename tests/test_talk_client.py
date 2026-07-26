@@ -390,6 +390,106 @@ class TalkClientTests(RouteTestCase):
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))
 
+    def test_async_quality_task_helpers_and_structured_verdict(self):
+        self.register_project("prj_sdk_quality")
+        self.add_member(
+            "agent:reviewer",
+            api_key="reviewer-key",
+            display_name="Reviewer",
+        )
+
+        async def scenario(base_url: str) -> None:
+            async with TalkClient(base_url, "bobo-key") as human_client:
+                root = await human_client.create_task(
+                    "agent:demo",
+                    "Coordinate one reviewed slice",
+                    project_id="prj_sdk_quality",
+                    may_delegate=True,
+                    slice_budget=2,
+                    authorization_ttl_seconds=60,
+                )
+
+            async with TalkClient(base_url, "demo-key") as lead_client:
+                claimed_root = await lead_client.claim_task(root["id"])
+                development = await lead_client.create_task(
+                    "agent:other",
+                    "Implement a reviewable slice",
+                    parent_task_id=claimed_root["id"],
+                    authorization_epoch=claimed_root["authorization_epoch"],
+                    task_kind="development",
+                    review_policy="required",
+                )
+
+            async with TalkClient(base_url, "other-key") as developer_client:
+                claimed_development = await developer_client.claim_task(
+                    development["id"]
+                )
+                development_result = await developer_client.send_text(
+                    "Development result",
+                    to=["agent:demo"],
+                    group_id=development["hall_group_id"],
+                )
+                await developer_client.complete_task(
+                    development["id"],
+                    status="succeeded",
+                    result_message_id=development_result["id"],
+                    claim_token=claimed_development["claim_token"],
+                )
+
+            async with TalkClient(base_url, "demo-key") as lead_client:
+                await lead_client.collect_task_result(development["id"])
+                review = await lead_client.create_task(
+                    "agent:reviewer",
+                    "Review the frozen development result",
+                    parent_task_id=claimed_root["id"],
+                    authorization_epoch=claimed_root["authorization_epoch"],
+                    task_kind="review",
+                    related_task_ids=[development["id"]],
+                )
+
+            async with TalkClient(base_url, "reviewer-key") as reviewer_client:
+                claimed_review = await reviewer_client.claim_task(review["id"])
+                review_result = await reviewer_client.send_text(
+                    "Review approved",
+                    to=["agent:demo"],
+                    group_id=review["hall_group_id"],
+                )
+                completed_review = await reviewer_client.complete_task(
+                    review["id"],
+                    status="succeeded",
+                    result_message_id=review_result["id"],
+                    claim_token=claimed_review["claim_token"],
+                    gate_verdict={
+                        "verdict": "approved",
+                        "summary": "No blocking findings",
+                        "findings": [],
+                    },
+                )
+
+            async with TalkClient(base_url, "demo-key") as lead_client:
+                review_tasks = await lead_client.list_tasks(
+                    project_id="prj_sdk_quality",
+                    task_kind="review",
+                )
+                relations = await lead_client.list_task_relations(review["id"])
+                quality_context = await lead_client.get_task_quality_context(
+                    review["id"]
+                )
+
+            self.assertEqual(development["task_kind"], "development")
+            self.assertEqual(development["review_policy"], "required")
+            self.assertEqual([task["id"] for task in review_tasks], [review["id"]])
+            self.assertEqual(relations[0]["relation_type"], "reviews")
+            self.assertEqual(relations[0]["target_task_id"], development["id"])
+            self.assertEqual(quality_context["task_id"], review["id"])
+            self.assertEqual(
+                completed_review["gate_verdict"]["verdict"],
+                "approved",
+            )
+
+        with LiveTalkServer(main.app) as base_url:
+            asyncio.run(scenario(base_url))
+
     def test_sync_task_helpers(self):
         self.register_project("prj_sdk_sync")
 
@@ -418,8 +518,10 @@ class TalkClientTests(RouteTestCase):
                     status="queued",
                     workflow_status="assigned",
                     project_id="prj_sdk_sync",
+                    task_kind="general",
                 )
                 fetched = agent_client.get_task(created["id"])
+                relations = agent_client.list_task_relations(created["id"])
                 question = agent_client.send_text(
                     "Which format?",
                     to=["human:bobo"],
@@ -464,6 +566,7 @@ class TalkClientTests(RouteTestCase):
                     status="succeeded",
                     result_message_id=result["id"],
                     claim_token=claimed["claim_token"],
+                    gate_verdict=None,
                 )
                 collected = human_client.collect_task_result(created["id"])
                 cancelable = human_client.create_task(
@@ -497,6 +600,8 @@ class TalkClientTests(RouteTestCase):
 
         self.assertEqual([task["id"] for task in queued], [created["id"]])
         self.assertEqual(fetched["project_id"], "prj_sdk_sync")
+        self.assertEqual(fetched["task_kind"], "general")
+        self.assertEqual(relations, [])
         self.assertEqual(clarification["workflow_status"], "clarification_requested")
         self.assertEqual(answered["workflow_status"], "clarification_answered")
         self.assertEqual(clarification_rounds[0]["question_message_id"], question["id"])

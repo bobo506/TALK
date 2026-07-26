@@ -231,6 +231,71 @@ _SYNC_PROFILE_FILES: dict[str, str] = {
 }
 
 
+def _group_agent_metadata(root: Path) -> dict[str, dict[str, Any]]:
+    """Aggregate project-local role metadata from ``.talk/groups.yaml``.
+
+    ``business_role`` remains free text and may legitimately vary across
+    project groups, so distinct values are kept in declaration order and joined
+    for the project-level discovery summary. Decision tier is a behavioral
+    boundary and therefore must be consistent across all groups. Capabilities
+    are explicit strings, de-duplicated in declaration order.
+    """
+
+    aggregated: dict[str, dict[str, list[str]]] = {}
+    for group in load_groups(root).get("groups") or []:
+        if not isinstance(group, dict):
+            continue
+        for member in group.get("members") or []:
+            if not isinstance(member, dict):
+                continue
+            member_id = str(member.get("member_id") or "").strip()
+            if not member_id:
+                continue
+            record = aggregated.setdefault(
+                member_id,
+                {"business_roles": [], "decision_tiers": [], "capabilities": []},
+            )
+
+            business_role = str(member.get("business_role") or "").strip()
+            if business_role and business_role not in record["business_roles"]:
+                record["business_roles"].append(business_role)
+
+            decision_tier = str(member.get("decision_tier") or "").strip().lower()
+            if decision_tier and decision_tier not in record["decision_tiers"]:
+                record["decision_tiers"].append(decision_tier)
+
+            capabilities = member.get("capabilities")
+            if capabilities is None:
+                capabilities = []
+            if not isinstance(capabilities, list):
+                raise ValueError(
+                    f"{member_id} capabilities in .talk/groups.yaml must be a list"
+                )
+            for capability in capabilities:
+                normalized = str(capability or "").strip()
+                if normalized and normalized not in record["capabilities"]:
+                    record["capabilities"].append(normalized)
+
+    result: dict[str, dict[str, Any]] = {}
+    for member_id, record in aggregated.items():
+        tiers = record["decision_tiers"]
+        if len(tiers) > 1:
+            raise ValueError(
+                f"{member_id} has conflicting decision_tier values in .talk/groups.yaml: "
+                f"{tiers}"
+            )
+        if tiers and tiers[0] not in {"decision", "execution"}:
+            raise ValueError(
+                f"unsupported decision_tier for {member_id}: {tiers[0]}"
+            )
+        result[member_id] = {
+            "business_role": " / ".join(record["business_roles"]) or None,
+            "decision_tier": tiers[0] if tiers else None,
+            "capability_summary": record["capabilities"],
+        }
+    return result
+
+
 def scan_agents(root: Path) -> list[dict[str, Any]]:
     """Build the agent profile-path index from ``.talk/agents/`` (for `talk sync`).
 
@@ -243,6 +308,7 @@ def scan_agents(root: Path) -> list[dict[str, Any]]:
     agents_dir = Path(root) / ".talk" / "agents"
     if not agents_dir.exists():
         return []
+    group_metadata = _group_agent_metadata(Path(root))
 
     entries: list[dict[str, Any]] = []
     for child in sorted(agents_dir.iterdir()):
@@ -252,6 +318,10 @@ def scan_agents(root: Path) -> list[dict[str, Any]]:
         for field, fname in _SYNC_PROFILE_FILES.items():
             fpath = child / fname
             entry[field] = fpath.relative_to(root).as_posix() if fpath.exists() else None
+        metadata = group_metadata.get(entry["member_id"], {})
+        entry["business_role"] = metadata.get("business_role")
+        entry["decision_tier"] = metadata.get("decision_tier")
+        entry["capability_summary"] = list(metadata.get("capability_summary") or [])
         entries.append(entry)
     entries.sort(key=lambda e: e["member_id"])
     return entries
