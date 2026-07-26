@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2 根控制 / 有限授权 / runner 协作中断、TH-6a3 澄清轮次已实现，runner 自动预检和 Review/Test 门禁仍待后续切片
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2 根控制 / 有限授权 / runner 协作中断、TH-6a3 澄清轮次、TH-6b runner 自动预检与完整 Hall 上下文重放已实现，Review/Test 门禁仍待后续切片
 
 ## 目标
 
@@ -217,6 +217,9 @@
 
 - `bridges/cli_bridge.py` 的任务队列 runner 会从 claim 响应读取 `hall_group_id`，把成功或失败的可见结果写入对应 Task Hall，再用该消息的 `id` 完成任务。
 - `bridges/codex_bridge.py` 的兼容任务处理入口采用同一 Hall 回传规则；实际 Codex 队列 worker 继续复用通用 runner。
+- 对带 Task Hall 的 `assigned / clarification_answered` 任务，runner 会在 claim 前以独立只读 / 无工具命令分页读取完整 Hall，并要求模型返回结构化 `TALK_TASK_PREFLIGHT` 决策；信息充分才原子 `accept`，信息不足则把集中问题写入同一 Hall 并登记澄清轮次。
+- `clarification_requested / needs_decision` 不会被任务 worker 重复唤醒；`accepted` 表示预检已完成，runner 重启后可直接 claim。自动问题带稳定的任务 / 轮次标记；若进程在“消息已发送、动作未登记”之间退出，下轮会复用原消息完成登记，不重复调用模型或再发问题。
+- 正式执行 prompt 会复用预检阶段按时间顺序分页取得的完整 Hall 上下文，包含 B 的问题、A 的显式答复以及可见文件元数据；附件正文仍不会自动下载或注入。
 - runner 默认申请 120 秒租约；claim 心跳同时承担根控制探针，默认及硬上限均为每 5 秒一次，即使显式传入更长的 `--task-heartbeat-interval` 也不会放宽控制检查上限。每轮队列轮询仍会先回收属于自己的过期 claim，再领取 queued task。
 - runner 在本地命令执行期间持续验证 token。服务端因暂停、检查点、整树终止或其它 claim 失效原因返回 `404 / 409` 时，通用 CLI 与 Codex runner 都会取消执行协程；`run_cli_command` 收到取消后终止并回收本地子进程，不发送结果、不调用 `complete`。正常完成时仍携带 token 回写，由服务端再次做原子校验。
 - Codex / pi bridge 为队列 worker 使用独立任务命令：保留所选 read-only / workspace-write 能力，但不向嵌套模型暴露 TALK 结果投递工具；Task Hall 的结果消息只由 runner 写入，避免模型工具调用与 runner 可见输出形成重复结果。
@@ -459,7 +462,8 @@ Review 策略：
 - 单任务 `cancel` 仍只覆盖未领取任务；`cancel-tree` 已能立即撤销全树服务端执行权并取消非终态任务，bundled runner 会在最长 5 秒控制探针发现 claim 失效后终止本地命令。第三方 runner 仍需自行实现同一协议。
 - TH-6a1 已实现任务树字段、旧库回填、委派权限及深度 / 根并发 / 单目标并发 / 非终态后代硬预算；async / sync SDK 已暴露对应创建参数。
 - TH-6a2.1 已实现根任务 `control_status`、有限批次授权、旧 epoch 拒绝，以及暂停 / 恢复 / 检查点 / 整树终止的服务端传播；TH-6a2.2 已让 bundled runner 在本地执行期间最多每 5 秒响应 claim 撤销并停止子进程。服务不可达时无法接收新的控制事实，仍由现有本地租约截止时间提供最终失效保护。
-- TH-6a3 已实现每任务 1–2 轮澄清额度、显式问题 / 答复边界账本、`clarification_answered / needs_decision`、人工释放动作和 claim 原子门禁；bundled runner 尚未自动预检、等待答复或重放完整 Hall 上下文，这部分属于 TH-6b。
+- TH-6a3 已实现每任务 1–2 轮澄清额度、显式问题 / 答复边界账本、`clarification_answered / needs_decision`、人工释放动作和 claim 原子门禁；TH-6b 已让 bundled runner 在 claim 前自动预检、等待显式答复、分页重放完整 Hall，并通过稳定问题标记恢复发送后未登记的中断窗口。
+- 预检只接受显式 `TALK_TASK_PREFLIGHT` JSON，兼容单行、显式标记后的多行 JSON 和已观察到的嵌套 `ready` 变体；纯自然语言不会被猜测为结论。成功命令首次格式无效时会用同一只读 / 无工具命令纠正一次；模型超时、命令失败或再次无效均不会 claim，也不会消耗澄清轮次。当前 runner 会留待后续轮询重试，尚无独立的跨轮询预检重试上限与退避策略。
 - 根任务当前仍可在后代未结束时自行完成；整树汇总、完成条件和质量门禁要随控制 / Review/Test 后续切片收敛。
 - 当前任务没有 `task_kind`、结构化 Review / 测试结论或任务关系记录；现有 `agent:pi` / `agent:pi-kimi` profile 也不具备完整黑盒测试能力，质量流水线尚不可启用。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
@@ -479,7 +483,7 @@ Review 策略：
 9. [x] TH-6a2.1：实现根任务控制状态、有限批次授权、暂停 / 继续 / 检查点 / 整树终止服务端控制面、SDK 与原子门禁。
 10. [x] TH-6a2.2：实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断与安全回队。
 11. [x] TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
-12. TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
+12. [x] TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
 13. TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
 14. TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停。
 15. TH-7：补 Codex Desktop / 通用终端接入包装，再评估 schedule 项目化、长任务事件等待、document lock 等后续能力。
@@ -524,5 +528,6 @@ Review 策略：
 - [x] “继续一批”生成新的有限切片授权与 `authorization_epoch`；并发预留、到期和陈旧 epoch 由服务端原子拒绝。
 - [ ] 批次安全收尾、风险、Review 或里程碑边界会按完整任务关系自动进入 `awaiting_human`。
 - [x] 澄清按问题批次与显式答复边界计轮，普通回复不提前唤醒；额度耗尽进入 `needs_decision / awaiting_human`，claim 不能猜测执行。
+- [x] bundled runner 在 claim 前完成结构化预检；同 Hall 自动提问并等待显式答复，恢复后把完整分页上下文重放给预检与正式执行，重复轮询不会重复唤醒等待中的任务。
 - [ ] 必需 Review 未通过时根任务不能提交；低风险批量 Review、独立 Reviewer 和最多两轮自动返工受服务端约束。
 - [ ] 里程碑最新冻结版本必须通过完整自动化回归和黑盒测试，随后自动暂停等待 Human 验收。

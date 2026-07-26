@@ -184,6 +184,65 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-26 TH-6b：runner 领取前预检、自动澄清与完整 Hall 重放
+
+**背景**：TH-6a3 已建立澄清轮次和服务端状态门禁，但 bundled runner 仍会从 `assigned` 直接 claim，正式执行也只获得任务标题 / 正文。本轮属于 runner / 协议高风险切片，按批次刹车只完成 TH-6b，并同步落实项目管理者确认的 Codex 决策 Agent 身份，不进入 TH-6c Review 门禁。
+
+### Agent 分级
+
+- `AGENTS.md` 明确当前普通 Codex 项目会话按决策 Agent 工作；bridge 内成员继续以启动时注入的 `decision_tier` 为权威，未声明的其它成员仍按执行 Agent。
+- `.talk/groups.yaml` 已有 `agent:codex = lead + decision`。通用 CLI bridge 在传入 `--project` 且没有显式 `--decision-tier` 时会从项目配置解析分级；显式命令行覆盖保持最高优先级。
+- Codex / pi 的普通任务和预检 prompt 都携带解析后的决策分级，避免模型只看到业务角色而不知道行为边界。
+
+### 实现
+
+- 对带 Task Hall 的 `assigned / clarification_answered` 任务，runner 会先分页读取完整 Hall，再以独立只读 / 无工具命令做领取前预检；Codex 预检不挂载 TALK MCP，pi 预检不启用本地工具或 extension。
+- 预检信息充分时先 `accept`，随后才 `claim`；信息不足时把一批集中问题写入同一个 Task Hall，并以问题消息 id 原子登记澄清轮次。`clarification_requested / needs_decision` 不会重复唤醒。
+- 自动问题使用稳定的任务 / 澄清轮次标记。若进程在“问题消息已发送、澄清动作尚未登记”之间退出，下次轮询会复用已有问题完成登记，不重复调用模型或再发一条消息。
+- `accepted` 表示预检已完成，runner 重启后可以直接 claim；`clarification_answered` 会携带 A 的显式答复重新预检。
+- Hall 以 500 条为一页向前分页，去重后按消息 id / 时间顺序重放。正式执行 prompt 复用同一份完整上下文，包含任务原文、问题、答复和可见文件元数据；附件正文仍不自动下载。
+- 解析器只接受显式结构化结论，兼容单行 `TALK_TASK_PREFLIGHT`、显式标记后的多行 JSON 以及真实 Pi 出现的嵌套 / `ready` 变体；纯自然语言不会被猜测为接受。
+- 成功命令首次返回无效格式时，runner 会用同一个只读 / 无工具命令纠正一次；超时、非零退出或再次无效都不会 claim，也不会消耗澄清轮次。
+- Codex 重复任务执行实现收敛为共享 `cli_bridge.handle_queued_task`，保留 Codex command adapter 和原测试替换点，减少两套 runner 行为漂移。
+
+### 测试
+
+- 单元测试覆盖项目分级解析与显式覆盖、预检 prompt 合同、结构化变体解析、首次格式纠正、完整分页顺序、充分后先 accept 再 claim、同 Hall 澄清、等待状态过滤和中断窗口恢复。
+- Codex / pi 测试锁定预检命令始终为只读 / 无工具配置，即使正式执行选择 tools profile 也不会在领取前修改项目或调用 TALK 投递工具。
+- 活服务 E2E 覆盖 `created -> 自动提问 -> clarification_requested -> Human 回答并显式提交 -> 重新预检 -> accept -> claim -> execute -> complete`；正式执行 prompt 断言能看到答复中的 `8123`。
+- Python `py_compile` 通过。
+- 定向回归：`Ran 168 tests in 28.697s ... OK`。
+- 全量回归：`Ran 348 tests in 154.472s ... OK`。
+- 较早的一次混合定向命令误含不存在的测试模块，并命中既有 WebSocket 降级用例的固定 2 秒退出超时；该用例随后连续单跑两次通过，最终全量回归也通过。本切片没有修改 WebSocket 降级路径。
+- 真实 Codex 只读预检返回可解析的显式结构化结论。真实 Pi 返回显式多行 `ready=false`，基础设施安全阻止 claim；但它忽略了正文中已给出的信息并要求重复任务，记录为模型理解质量残余，不伪造成语义验收通过。
+- 本切片没有修改 Web 页面，按 Browser 验证约定无需做页面验证。
+
+### 用户手册影响
+
+- `docs/guides/USER_MANUAL.md` 已用非技术语言说明 Agent 会在领取前检查完整 Task Hall；信息不足会在原 Hall 提问并保持待响应，Human 明确提交答复后 Agent 会重新读取全部上下文。
+
+### 变更文件
+
+- `AGENTS.md`
+- `bridges/cli_bridge.py`
+- `bridges/codex_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_codex_bridge.py`
+- `tests/test_pi_bridge.py`
+- `tests/test_task_hall_e2e.py`
+- `docs/PROJECT_BRIEF.md`
+- `docs/spec/MODULE_tasks.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. 暂停等待项目管理者确认本切片。
+2. 确认后进入 TH-6c：任务类型、任务关系、结构化 Review / 返工门禁与业务角色发现。
+3. 后续 TH-6d 再实现里程碑黑盒测试、Blackboard 控制、批次自动检查点与人工验收暂停。
+
 ## 2026-07-20 TH-6a3：Task Hall 有界澄清轮次与决策阻塞
 
 **背景**：TH-6a0 已冻结“一批集中问题 + 一批完整答复”按轮计数、默认 1 轮、绝对上限 2 轮的合同；旧实现只有 `clarification_requested` 状态，普通回复与完整答复无法区分，也没有额度耗尽后的阻塞。由于本轮涉及数据库、协议和根控制传播，按高风险切片刹车只完成 TH-6a3，不进入 runner 自动预检或 Web 控制入口。

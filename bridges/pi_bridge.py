@@ -154,6 +154,22 @@ def resolve_pi_task_command(args: argparse.Namespace) -> str:
         system_prompt = compose_system_prompt(TASK_SYSTEM_PROMPT, profile)
     return _build_pi_task_command(system_prompt, execution_profile=args.pi_execution_profile)
 
+
+def resolve_pi_task_preflight_command(args: argparse.Namespace) -> str:
+    """Resolve a no-tools command for Task Hall preflight."""
+    configured = getattr(args, "task_preflight_command", None)
+    if configured:
+        return configured
+    if args.pi_command != DEFAULT_PI_COMMAND:
+        return args.pi_command
+    system_prompt = cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_prompt = compose_system_prompt(cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT, profile)
+    return _build_pi_task_command(system_prompt, execution_profile="discussion")
+
+
 DEFAULT_TIMEOUT_SEC = cli_bridge.DEFAULT_TIMEOUT_SEC
 DEFAULT_MAX_REPLY_CHARS = cli_bridge.DEFAULT_MAX_REPLY_CHARS
 DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL
@@ -162,6 +178,7 @@ DEFAULT_TASK_POLL_INTERVAL = cli_bridge.DEFAULT_TASK_POLL_INTERVAL
 async def run_bridge(args: argparse.Namespace) -> None:
     # resolve_pi_command applies the execution profile swap AND (opt-in) the
     # --project identity-layer injection in one place.
+    args.task_preflight_command = resolve_pi_task_preflight_command(args)
     args.task_command = resolve_pi_task_command(args)
     args.pi_command = resolve_pi_command(args)
     args.command = args.pi_command

@@ -138,6 +138,22 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertIn("--sandbox workspace-write", command)
         self.assertNotIn("mcp_servers.talk_send", command)
 
+    def test_task_preflight_command_stays_read_only_for_tools_profile(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(
+                ["--key", "codex-key", "--codex-execution-profile", "tools"]
+            )
+            command = codex_bridge.resolve_codex_task_preflight_command(args)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertIn("--sandbox read-only", command)
+        self.assertNotIn("--sandbox workspace-write", command)
+        self.assertNotIn("mcp_servers.talk_send", command)
+        self.assertIn("领取前预检", _base_instructions_value(command))
+
     def test_resolve_codex_command_without_project_is_default(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
         try:

@@ -142,6 +142,14 @@ def default_codex_task_command(profile: str = "discussion") -> str:
     return _build_codex_task_command(_default_codex_exe(), profile=profile)
 
 
+def default_codex_task_preflight_command() -> str:
+    return _build_codex_task_command(
+        _default_codex_exe(),
+        profile="discussion",
+        system_instructions=cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT,
+    )
+
+
 def resolve_codex_command(args: argparse.Namespace) -> str:
     """Resolve the codex command, applying execution profile + opt-in injection.
 
@@ -189,6 +197,28 @@ def resolve_codex_task_command(args: argparse.Namespace) -> str:
     )
 
 
+def resolve_codex_task_preflight_command(args: argparse.Namespace) -> str:
+    """Resolve the read-only command used before accepting a Task Hall task."""
+    configured = getattr(args, "task_preflight_command", None)
+    if configured:
+        return configured
+    if os.environ.get("TALK_CODEX_COMMAND"):
+        return args.codex_command
+    resolved_default = _build_codex_command(_default_codex_exe(), profile="discussion")
+    if args.codex_command not in (resolved_default, DEFAULT_CODEX_COMMAND_DISCUSSION):
+        return args.codex_command
+    system_instructions = cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_instructions = compose_system_prompt(cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT, profile)
+    return _build_codex_task_command(
+        _default_codex_exe(),
+        profile="discussion",
+        system_instructions=system_instructions,
+    )
+
+
 def build_codex_prompt(message: dict[str, Any], *, member_id: str, workdir: Path) -> str:
     return cli_bridge.build_cli_prompt(message, member_id=member_id, workdir=workdir, runtime="Codex")
 
@@ -225,83 +255,39 @@ async def handle_queued_task(
     codex_command: str | Sequence[str],
     timeout: int,
     max_reply_chars: int,
+    preflight_command: str | Sequence[str] | None = None,
     lease_seconds: int = cli_bridge.DEFAULT_TASK_LEASE_SECONDS,
     heartbeat_interval: float = cli_bridge.DEFAULT_TASK_HEARTBEAT_INTERVAL,
 ) -> bool:
-    """Claim and execute one queued task. Returns False when another worker claimed it first."""
-    from TALK.client.exceptions import TalkValidationError
+    """Codex compatibility wrapper around the shared Task Hall runner."""
+    async def command_runner(
+        command: str | Sequence[str],
+        prompt: str,
+        *,
+        cwd: Path,
+        timeout: int,
+        prompt_transport: str = "stdin",
+    ) -> CodexRunResult:
+        del prompt_transport
+        return await run_codex_command(command, prompt, cwd=cwd, timeout=timeout)
 
-    task_id = int(task["id"])
-    try:
-        claimed = await client.claim_task(task_id, instance_id=instance_id, lease_seconds=lease_seconds)
-    except TalkValidationError as exc:
-        if exc.status_code == 409:
-            return False
-        raise
-
-    claim_token = str(claimed.get("claim_token") or "") or None
-    heartbeat_task = cli_bridge._start_task_heartbeat(
+    return await cli_bridge.handle_queued_task(
+        task,
         client=client,
-        task_id=task_id,
-        claim_token=claim_token,
+        member_id=member_id,
+        workdir=workdir,
+        instance_id=instance_id,
+        command=codex_command,
+        timeout=timeout,
+        max_reply_chars=max_reply_chars,
+        runtime="codex",
+        bridge_label="Codex bridge",
+        prompt_transport="stdin",
+        preflight_command=preflight_command,
+        command_runner=command_runner,
         lease_seconds=lease_seconds,
         heartbeat_interval=heartbeat_interval,
     )
-    try:
-        try:
-            prompt = build_codex_task_prompt(claimed, member_id=member_id, workdir=workdir)
-            result = await cli_bridge._run_while_task_lease_active(
-                run_codex_command(codex_command, prompt, cwd=workdir, timeout=timeout),
-                heartbeat_task,
-            )
-            reply = format_codex_reply(result, max_chars=max_reply_chars)
-            completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
-            last_error = None
-            if completion_status == "failed":
-                last_error = "\n".join(
-                    part
-                    for part in (
-                        cli_bridge.clean_cli_output(result.stderr),
-                        cli_bridge.clean_cli_output(result.stdout),
-                    )
-                    if part
-                ) or reply
-        except cli_bridge.TaskLeaseLostError:
-            raise
-        except Exception as exc:
-            reply = "Codex bridge 运行失败，错误详情已记录。"
-            completion_status = "failed"
-            last_error = f"Codex bridge failed before completing task {task_id}: {exc}"
-
-        await cli_bridge._raise_if_task_lease_lost(heartbeat_task)
-        result_message_id: int | None = None
-        creator = claimed.get("created_by")
-        if creator:
-            try:
-                result_message = await client.send_text(
-                    reply,
-                    to=[str(creator)],
-                    group_id=claimed.get("hall_group_id"),
-                )
-                result_message_id = int(result_message["id"])
-            except Exception as exc:
-                completion_status = "failed"
-                last_error = f"Codex bridge could not post task result: {exc}"
-
-        await cli_bridge._raise_if_task_lease_lost(heartbeat_task)
-        completion_kwargs: dict[str, Any] = {
-            "status": completion_status,
-            "result_message_id": result_message_id,
-            "last_error": last_error,
-        }
-        if claim_token is not None:
-            completion_kwargs["claim_token"] = claim_token
-        await client.complete_task(task_id, **completion_kwargs)
-        return True
-    except cli_bridge.TaskLeaseLostError:
-        return False
-    finally:
-        await cli_bridge._stop_task_heartbeat(heartbeat_task)
 
 
 async def run_task_queue_worker(
@@ -331,6 +317,7 @@ async def run_task_queue_worker(
 async def run_bridge(args: argparse.Namespace) -> None:
     # resolve_codex_command applies the execution profile AND (opt-in) the
     # --project identity-layer injection in one place.
+    args.task_preflight_command = resolve_codex_task_preflight_command(args)
     args.task_command = resolve_codex_task_command(args)
     args.codex_command = resolve_codex_command(args)
     args.command = args.codex_command

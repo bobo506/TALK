@@ -11,11 +11,17 @@
 
 ## Agent 角色与协作约束
 
-`AGENTS.md` 是本项目**抽象角色字典**的权威来源：只定义"决策 Agent / 执行 Agent"两类**行为分级**的规则，以及"未声明分级时按执行 Agent 处理"的兜底规则。
+`AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源：定义"决策 Agent / 执行 Agent"两类**行为分级**的规则、当前项目会话的明确角色，以及"未声明分级时按执行 Agent 处理"的兜底规则。
 
-本文件**不再点名"某具体模型 = 哪一类"**。具体某个 member 属于哪一类，由 bridge 启动时根据自身配置（`decision_tier`）在 system prompt 里注入；agent 模型在读本文件之前已被 bridge 告知"你是 X 类"，再来本文件查规则即可对号入座。
+通过 bridge 运行的具体 member 属于哪一类，由 bridge 启动时根据自身配置（`decision_tier`）在 system prompt 里注入；普通 Codex 项目会话不经过 bridge 时，则读取下方"当前 Agent 角色"确定身份。
 
-每次会话开始，agent 应先读取 bridge 注入的身份事实（`member_id / decision_tier / 业务角色`），再读本文件确认其行为规则。
+每次会话开始，agent 应先读取 bridge 注入的身份事实（`member_id / decision_tier / 业务角色`）；若当前会话没有 bridge 注入，再读取本文件的"当前 Agent 角色"，随后按对应分级确认行为规则。
+
+## 当前 Agent 角色
+
+- 当前 Codex 角色：**决策 Agent**（项目管理者于 2026-07-26 明确确认）。
+- 通过 TALK bridge 运行的其它 member 继续以其注入的 `decision_tier` 为准，不因模型名称自动继承 Codex 的项目会话角色。
+- 如项目管理者人工修改本节，后续 Agent 必须按最新角色执行。
 
 ## Agent 决策分级（抽象字典）
 
@@ -29,7 +35,7 @@
 
 ### 默认分级
 
-bridge 未在配置中明确声明 `decision_tier=decision` 的 agent，一律按**执行 Agent** 处理。
+普通 Codex 项目会话按"当前 Agent 角色"处理。除此之外，bridge 未在配置中明确声明 `decision_tier=decision`、且本文件也未明确记录角色的 agent，一律按**执行 Agent** 处理。
 
 ## Agent 业务角色
 

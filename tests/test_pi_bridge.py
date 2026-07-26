@@ -119,6 +119,18 @@ class PiBridgeTests(unittest.TestCase):
         self.assertNotIn("--extension", command_args)
         self.assertTrue(set(tool_names).isdisjoint(pi_bridge.TALK_TOOL_NAMES))
 
+    def test_task_preflight_command_disables_tools_for_tools_profile(self):
+        args = pi_bridge.build_parser().parse_args(
+            ["--key", "pi-key", "--pi-execution-profile", "tools"]
+        )
+        command_args = shlex.split(pi_bridge.resolve_pi_task_preflight_command(args), posix=True)
+        system_prompt = command_args[command_args.index("--system-prompt") + 1]
+
+        self.assertIn("--no-tools", command_args)
+        self.assertNotIn("--tools", command_args)
+        self.assertNotIn("--extension", command_args)
+        self.assertIn("领取前预检", system_prompt)
+
 
 class PiBridgeProfileInjectionTests(unittest.TestCase):
     """Phase 2 / approach B: --project injects IDENTITY/SOUL into the system prompt."""

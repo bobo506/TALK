@@ -2,93 +2,58 @@
 
 ## Latest
 
-Updated: 2026-07-20 (Asia/Shanghai)
+Updated: 2026-07-26 (Asia/Shanghai)
 
 - 当前分支：`codex/task-hall`。
-- `.talk/groups.yaml` 已持久配置 `agent:codex` 为 `lead + decision`；当前 Codex 按决策 Agent 节奏维护项目与进度文档。
-- 用户手册维护策略已确认并落地：不修改全局 `project-framework`，TALK 在 `docs/guides/USER_MANUAL.md` 维护系统部署完成后的非技术性操作方法，部署、启动、开发和 Agent 接入继续由现有专门指南承载。
-- 用户手册首版已覆盖当前真正可用的登录、项目黑板、任务委派、Task Hall 沟通、澄清回复、结果收取、未开始任务取消与普通 Group Hall；暂停 / 继续 / 整树终止虽已有服务端与 bundled runner 支持，但尚无页面入口，因此仍只列为当前边界，不提前写成可用步骤。
-- TH-5 Project Blackboard + Task Hall 完整流程已提交为 `04fade4` 并推送；项目管理者已从页面委派任务并成功拿到 runner 返回结果，基础可视化链路人工验收通过。
-- TH-6a0 协议文档切片已完成：任务树硬预算、有限批次授权、自动检查点、随时暂停 / 继续 / 整树终止、澄清轮次以及开发 → Review → 里程碑黑盒测试 → 人工验收门禁已写入 `docs/spec/MODULE_tasks.md`。
-- TH-6a1 已完成：`agent_tasks` 新增 `parent_task_id / root_task_id / delegation_depth / may_delegate` 与四项根治理预算；旧任务迁移为独立根，保持不可继续委派，并回填默认预算。
-- 创建子任务时服务端强制父任务仍在执行、调用者有权、父任务已获委派权限、项目继承、深度和非终态后代预算；领取子任务时再次原子校验根运行后代与单目标运行预算，并发请求不能通过直接 API 绕过。
-- TH-6a2.1 已完成：根任务新增控制状态、授权 epoch、切片额度 / 预留数、授权到期时间和检查点原因；`pause-tree / resume-tree / checkpoint / cancel-tree / tree` 五个服务端入口已实现。
-- 新后代创建必须携带当前 `authorization_epoch`，并与控制状态、到期时间、切片额度和非终态硬预算一起原子预留；claim 同样原子检查根控制与授权到期，旧批次请求不能在恢复后继续推进。
-- 暂停 / 检查点会立即将运行任务安全回到 `queued / accepted`，清除 claim token 和实例占用；整树终止取消所有非终态任务。服务端会拒绝陈旧心跳与完成写回。
-- TH-6a2.2 已完成：bundled runner 的 claim 心跳同时作为控制探针，默认和硬上限均为 5 秒；暂停、检查点或整树终止撤销 claim 后，通用 CLI 与 Codex runner 会取消本地命令，不发送结果消息、不调用 `complete`，回队 / 取消状态继续以服务端为准。
-- TH-6a3 已完成：任务新增默认 1、绝对上限 2 的澄清轮数和独立轮次账本；问题、答复起止消息边界被显式记录，普通 Hall 回复不会提前推进任务。
-- 答复提交后进入 `clarification_answered`，必须由执行者明确接受后才能 claim；额度耗尽进入 `needs_decision`，根任务同步 `awaiting_human / needs_decision` 并撤销活动 claim。Human / 请求者可补充范围或增加一轮，再单独恢复任务树。
-- async / sync SDK 已新增轮次查询、问题登记、答复提交和人工释放 helper；Codex MCP / pi extension 的 `talk_reply_task` 同步支持四类澄清动作，并把当前 Hall 消息 id 作为原子边界提交。
-- 已冻结默认保护值：最大委派深度 1、单个根任务同时执行子任务 3、单个目标 Agent 同时执行 1、单个根任务累计非终态子任务 8；子任务默认不可继续委派，只有主控显式授权后才能突破默认能力边界。
-- 澄清默认最多 1 轮、绝对上限 2 轮的合同已落地；并发登记只会建立一轮，错误 Hall / 发送者 / 撤回消息边界会被拒绝。
-- 主 Agent 只获得有限批次授权：普通小切片默认 2 个、纯文档 / 配置可显式提高到 3 个、高风险 / 跨模块批次默认 1 个；批次、时间、风险、额度、Review 或里程碑边界进入 `awaiting_human`，Human 可随时暂停并撤销后续推进权限。
-- 质量流水线已冻结为独立 Task Hall：`development / review / test / rework` 通过任务关系和结构化 `gate_verdict` 形成门禁；高风险逐片 Review，低风险可批量 Review，黑盒测试只在里程碑运行，测试通过后仍必须暂停等待人工验收。
-- CLI 终端已具备 `talk_delegate_task` 等八个 Task Hall 工具；Codex Desktop 与其它普通终端仍需接入包装，才能在非 bridge 会话中直接自然语言委派。
+- 项目管理者已确认当前 Codex 为决策 Agent；`AGENTS.md` 现明确本项目普通 Codex 会话按决策 Agent 工作，bridge 内成员仍以启动时注入的 `decision_tier` 为准。
+- `.talk/groups.yaml` 已配置 `agent:codex = lead + decision`；通用 CLI bridge 在提供 `--project` 且未显式传 `--decision-tier` 时会从该文件解析分级，命令行显式值继续优先。
+- TH-5 Project Blackboard + Task Hall 基础可视化链路已人工验收。
+- TH-6a1 任务树与硬预算、TH-6a2 根控制 / 有限授权 / runner 协作中断、TH-6a3 有界澄清轮次均已完成。
+- TH-6b 已完成：bundled runner 在领取 Task Hall 任务前先以独立只读 / 无工具命令预检，分页读取并按时间顺序重放完整 Hall；信息充分才 `accept -> claim`，信息不足则在同 Hall 集中提问并登记澄清。
+- 澄清等待中的任务不会重复唤醒；自动问题带稳定任务 / 轮次标记，可恢复“消息已发送但动作未登记”的中断窗口。答复显式提交后，runner 会带完整 Hall 重新预检。
+- 正式执行 prompt 与预检复用同一份完整 Hall 上下文。附件消息目前只注入可见元数据，不自动下载正文。
+- 预检只接受显式结构化结论；兼容单行、显式标记后的多行 JSON 及已观察到的嵌套 `ready` 变体。成功命令若首次格式无效，会以同一只读命令纠正一次；自然语言不会被猜测为接受。
 
 ## Current Snapshot
 
-- Web UI 登录后默认进入项目黑板，以“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合任务；项目侧栏同步列出对应 Task Hall。
-- 人类可从页面选择项目 Agent 并委派任务；详情面板显示精确协作状态、attempt 与租约，并按权限提供 Hall、澄清 / 接受、结果收取和未领取取消动作。
-- Task Hall 原始任务、提问、回答和结果均持久化在同一个 Hall，固定请求者 A 与执行者 B 均有读取权限；Web 可分页查看，SDK 可分页拉取。
-- `talk_get_task` 当前只自动返回最近 50 条 Hall 消息；bundled runner 正式执行 prompt 目前只含任务标题 / 正文，尚未自动注入澄清历史。
-- `clarification_requested -> clarification_answered -> accepted` 的显式协议和 `needs_decision` 阻塞已落地；缺口是 runner 对 `assigned` 任务仍会直接 claim，没有领取前预检、等待 A 回复、分页重放上下文和重新唤醒 B 的自动流程。
-- bundled runner 的嵌套任务命令仍默认不暴露 TALK 委派工具；服务端现已支持显式 `parent_task_id` 委派，并强制深度、根运行后代、单目标运行和非终态后代预算。默认根任务不可委派，只有 Human 可授予顶层委派能力或覆盖根预算。
-- 单个 bridge 进程继续通过共享运行锁串行执行任务；多个 bridge 实例领取同一任务树的后代时，服务端会统一执行根级和单目标并发限制，但尚无项目级跨根总预算。
-- Web UI 仍只有旧的请求澄清 / 接受入口，没有提交澄清答复、轮次提示或 `needs_decision` 处理入口；服务端、SDK 和终端工具已完成的 TH-6a3 能力尚未形成页面闭环。
-- 根任务控制状态、有限批次授权、服务端暂停传播和 bundled runner 执行中控制探针已生效；当前还没有任务类型 / 关系或结构化 Review/Test 结论。没有 `task_kind` 前，每个新后代暂统一消费 1 个切片额度。
-- 通过 TALK bridge 启动的 Codex CLI / pi 已可发现 Agent、委派、等待、读取 Hall、回复和收取；普通 Codex Desktop 会话尚未自动注册 TALK MCP。
+- Web UI 登录后默认进入项目黑板，以“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合任务，并可进入对应 Task Hall。
+- Human 可从页面委派任务、查看 Hall、收取结果和取消未领取任务；服务端 / SDK 已支持显式澄清答复、人工释放、根暂停 / 恢复 / 终止，但 Web 尚未覆盖这些新入口。
+- Task Hall 原始任务、问题、答复和结果持久化在同一 Hall；bundled runner 现在会完整分页读取，不再只把标题 / 正文交给模型。
+- `clarification_requested / needs_decision` 会保持等待；`clarification_answered` 会触发重新预检；`accepted` 可在 runner 重启后直接 claim。
+- bundled runner 执行中的 claim 心跳同时是最长 5 秒控制探针；服务端撤销 claim 后，本地命令被取消且不会写回陈旧结果。
+- 当前任务树仍只有治理预算和澄清协议，尚无 `task_kind`、任务关系、结构化 Review/Test 结论或质量门禁。
 
 ## Current Boundaries
 
-- `project_id` 为旧客户端兼容仍可为空；新 Task Hall 终端调用应提供项目。
-- 单任务运行中取消尚未开放；整树终止会立即撤销服务端执行权并取消非终态任务，bundled runner 最迟在下一次 5 秒 claim 控制探针时停止本地命令；第三方 runner 仍需自行实现相同协议。
-- `talk_wait_tasks` 目前是客户端轮询而非服务端事件等待；Agent 发现结果尚未提供项目业务角色字段。
-- Hall 数据完整持久化不等于模型自动获得完整上下文；TH-6 必须分页读取并按顺序重放任务原文、B 的问题与 A 的答复。
-- 服务端已有任务树、根治理预算、有限批次授权与控制状态，并在创建 / claim 入口原子拒绝越权、超深度、超预算、过期和陈旧 epoch 请求；bundled runner 已补最长 5 秒控制检查和本地子进程协作中断。服务不可达时无法接收新的暂停事实，仍由本地租约截止时间提供最终失效保护。
-- 根任务当前可以在后代未结束时自行完成；整树汇总、完成条件和 Review/Test 门禁留待后续控制与质量切片收敛。
-- 澄清已按“B 的集中问题批次 + A 的完整答复”计数，并保存问题 / 答复边界；额度耗尽会阻塞全树。当前边界是页面尚无最终用户入口，bundled runner 也尚未自动执行预检、等待与完整上下文重放。
-- 现有任务没有 `task_kind`、门禁关系和 `gate_verdict`；当前 `.talk/groups.yaml` 只有 reviewer 角色，没有具备启动隔离服务与浏览器能力的 tester，正式质量流水线启用前需补合适成员配置。
-- 文件消息可保留元数据，但附件正文是否在任务执行前自动下载和注入尚未定义。
-- bundled runner 仍兼容旧任务全局结果；第三方旧 runner 也可继续使用服务端兼容路径。
-- 无 lease 的历史 `running` 任务不会自动回收；业务重试上限与退避策略尚未定义。
-- 项目级 `Members / Activity` 独立页面、observer 与返工尚未实现；当前 Hall 列表继续兼容无 `project_id` 的旧 Group。
-- pi 的真实模型在“逐字回复”类任务上可能改写为简短确认，属于模型输出质量边界；基础设施已保证只写一条结果并正确推进状态。
-- BS-3a 真实模型最终汇总质量补验属于 Discussion Hall 后续项，不阻塞当前里程碑。
+- Web UI 尚无提交澄清答复、轮次提示、`needs_decision` 处理、根控制或人工验收门禁入口。
+- 附件只重放文件元数据，执行前自动下载与正文注入尚未定义。
+- 预检失败后的跨轮询重试没有独立上限与退避；多个 bridge 实例在极窄并发窗口内仍可能都先发出问题，服务端动作会阻止重复状态推进，但消息级跨实例原子去重尚未实现。
+- 真实 Pi 冒烟能安全返回“信息不足”并阻止 claim，但曾忽略已给出的任务正文、要求请求者重复内容；这是模型理解质量残余，结构化解析层不会把它误判为接受。
+- 单任务运行中取消尚未开放；整树终止通过服务端撤权和 runner 控制探针生效，第三方 runner 需自行实现相同协议。
+- 根任务当前可以在后代未结束时自行完成；整树汇总、Review/Test 门禁和里程碑人工验收留待后续切片。
+- 普通 Codex Desktop 会话尚未自动注册 TALK MCP；TH-7 再补通用终端接入包装。
 
 ## Next Slice
 
-1. TH-6b：实现 runner 领取前预检、完整 Hall 上下文分页重放、同 Hall 自动澄清闭环和重复唤醒幂等保护；这是下一候选 runner / 协议高风险切片。
-2. TH-6c / TH-6d：实现任务类型、Review / 返工门禁、业务角色发现、批次安全收尾后的自动检查点、里程碑黑盒测试、Blackboard 控制和人工验收暂停。
-3. TH-7：最后补 Codex Desktop / 通用终端接入包装并做完整跨终端验收。
+1. TH-6c：实现任务类型、任务关系、结构化 Review / 返工门禁与业务角色发现。
+2. TH-6d：实现里程碑黑盒测试、Blackboard 控制、批次自动检查点与人工验收暂停。
+3. TH-7：补 Codex Desktop / 通用终端接入包装并做完整跨终端验收。
 
 ## Verification
 
-- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py TALK\client\talk_client.py TALK\client\talk_client_sync.py bridges\talk_task_tools.py tests\test_tasks.py tests\test_talk_client.py tests\test_talk_task_tools.py`：通过。
-- `node --experimental-strip-types --check bridges\talk_tools_extension.ts` 与 `git diff --check`：通过。
-- `.venv\Scripts\python.exe -m unittest tests.test_tasks -q`：`Ran 32 tests in 17.814s ... OK`。
-- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 337 tests in 118.141s ... OK`。
-- 本切片未修改 Web 页面；按项目 Browser 约定无需执行浏览器验证。用户手册已同步说明后台协议已生效但页面提交 / 决策入口尚未开放。
-- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\pi_bridge.py bridges\codex_bridge.py tests\test_cli_bridge.py tests\test_pi_bridge.py tests\test_codex_bridge.py`：通过。
-- `node --experimental-strip-types --check bridges\talk_tools_extension.ts`：通过。
-- `node --check web\app.js` 与 `git diff --check`：通过。
-- 定向 Web / runner / client 测试：`Ran 124 tests ... OK`。
-- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：清理真实验收服务后 `Ran 321 tests in 98.917s ... OK`；首次并行运行有一个既有 WS 降级测试 2 秒清理超时，该用例随后连续两次单测通过。
-- Browser 真实交互：登录、项目空态、委派、Hall 消息、runner 回写、结果待收取、点击收取、已结束分栏全部通过；最终控制台 error / warning 为 0。
-- 真实 CLI：Codex 与 pi 均完成 claim → 执行 → 单条 Hall 结果 → collect；Codex 精确遵循测试正文，pi 基础确认链通过但逐字遵循仍有质量差异。
-- 2026-07-16 人工页面测试：项目管理者成功拿到委派任务返回结果；本次收工仅记录后续设计与边界，没有新增代码验证。
-- 2026-07-16 委派治理讨论：完成现有代码与协议的只读核对，确认当前深度 / 并发主要是运行路径软保护，澄清尚无轮次限制；本次仅更新进度文档，未修改或运行功能代码。
-- 2026-07-18 TH-6a0：完成任务树治理、可中断推进、澄清和 Review/Test 门禁合同落盘；文档检查结果见本轮历史记录，未运行功能测试。
-- 2026-07-18 TH-6a1：`py_compile` 通过；任务路由 `Ran 23 tests ... OK`，活服务 SDK `Ran 12 tests ... OK`，Task Hall / runner / bridge 跨模块 `Ran 128 tests ... OK`，全量 `Ran 325 tests in 103.757s ... OK`。
-- 2026-07-18 发布前复跑：全量 `Ran 325 tests`，其中 324 项通过；既有 `test_disconnect_falls_back_to_http_polling` 在固定 2 秒退出等待中超时。该用例随后连续单跑 2 次通过，`tests.test_tasks + tests.test_talk_client` 定向回归 `Ran 35 tests ... OK`；本次未修改 WebSocket 降级路径。
-- 2026-07-20 用户手册切片：`git diff --check` 通过（仅现有 Windows CRLF 提示）；`USER_MANUAL.md` 技术命令关键词扫描未发现开发步骤，3 份相关文档的本地 Markdown 链接全部可解析；未运行功能测试，因为本切片没有修改产品代码。
-- 2026-07-20 TH-6a2.1：`py_compile` 通过；任务路由 `Ran 29 tests ... OK`，async / sync SDK 活服务 `Ran 12 tests ... OK`，全量 `Ran 331 tests in 71.979s ... OK`；纯后端 / SDK 切片，无 Web 改动，不需要 Browser 验证。
-- 2026-07-20 TH-6a2.2：`py_compile` 通过；通用 CLI / Codex bridge 定向 `Ran 112 tests in 0.643s ... OK`，任务控制与 bridge 跨模块 `Ran 153 tests in 15.782s ... OK`，全量 `Ran 334 tests in 97.578s ... OK`；无 Web 改动，不需要 Browser 验证。
+- Python `py_compile`：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/pi_bridge.py` 及相关测试文件通过。
+- TH-6b 定向回归：`Ran 168 tests in 28.697s ... OK`。
+- 全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q`，`Ran 348 tests in 154.472s ... OK`。
+- 活服务 E2E 覆盖 `created -> 自动提问 -> 显式答复 -> 重新预检 -> accept -> claim -> 完成`，并验证正式执行 prompt 能读到答复中的 `8123`。
+- 真实 Codex 只读预检返回可解析的结构化结论；真实 Pi 返回显式多行结构化阻塞结论，安全地不领取任务，但提问内容质量存在上述边界。
+- 较早的混合定向命令曾命中既有 WebSocket 降级测试的固定 2 秒退出超时；该用例随后连续单跑两次通过，最终全量 348 项也通过。本切片未修改该路径。
+- 本切片未修改 Web 代码，按 Browser 验证约定无需执行页面验证。
 
 ## Known Debt
 
-- 双通道输出仍可能让 agent 的 visible reply 退化，结构化输出块方案延后处理。
+- 双通道输出仍可能让 Agent 的 visible reply 退化，结构化输出块方案延后处理。
 - pi 的 `--no-extensions` 仍是临时规避，等待 upstream 修复后移除。
-- 业务角色注入与 BS-3a 最终汇总质量仍有低优先级真实模型补验。
+- 预检问题的模型语义质量、附件正文注入和跨实例消息级去重仍需后续加强。
 
 ## References
 
