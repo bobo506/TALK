@@ -143,6 +143,10 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN authorization_expires_at TIMESTAMP")
         if "checkpoint_reason" not in task_columns:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN checkpoint_reason TEXT")
+        if "milestone_test_required" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN milestone_test_required INTEGER NOT NULL DEFAULT 0"
+            )
         if "max_clarification_rounds" not in task_columns:
             conn.exec_driver_sql(
                 "ALTER TABLE agent_tasks ADD COLUMN max_clarification_rounds INTEGER NOT NULL DEFAULT 1"
@@ -165,7 +169,8 @@ def init_db() -> None:
             SET
               max_clarification_rounds = COALESCE(max_clarification_rounds, ?),
               clarification_round_count = COALESCE(clarification_round_count, 0),
-              task_kind = COALESCE(task_kind, 'general')
+              task_kind = COALESCE(task_kind, 'general'),
+              milestone_test_required = COALESCE(milestone_test_required, 0)
             """,
             (server.models.TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,),
         )
@@ -318,6 +323,10 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_delegation_depth ON agent_tasks (delegation_depth)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_control_status ON agent_tasks (control_status)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_task_kind ON agent_tasks (task_kind)")
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_tasks_milestone_test_required "
+            "ON agent_tasks (milestone_test_required)"
+        )
         conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_agent_tasks_review_policy ON agent_tasks (review_policy)"
         )

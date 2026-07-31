@@ -246,6 +246,7 @@ class TalkClientSync:
         max_nonterminal_descendants: int | None = None,
         slice_budget: int | None = None,
         authorization_ttl_seconds: int | None = None,
+        milestone_test_required: bool = False,
         max_clarification_rounds: int = 1,
     ) -> dict[str, Any]:
         return self._submit(
@@ -267,6 +268,7 @@ class TalkClientSync:
                 max_nonterminal_descendants=max_nonterminal_descendants,
                 slice_budget=slice_budget,
                 authorization_ttl_seconds=authorization_ttl_seconds,
+                milestone_test_required=milestone_test_required,
                 max_clarification_rounds=max_clarification_rounds,
             )
         )
@@ -325,6 +327,9 @@ class TalkClientSync:
 
     def cancel_task_tree(self, task_id: int) -> dict[str, Any]:
         return self._submit(self._client.cancel_task_tree(task_id))
+
+    def accept_task_milestone(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.accept_task_milestone(task_id))
 
     def list_task_clarification_rounds(self, task_id: int) -> list[dict[str, Any]]:
         return self._submit(self._client.list_task_clarification_rounds(task_id))

@@ -21,9 +21,12 @@ class TaskWebUiTests(RouteTestCase):
             "task-create-overlay",
             "task-create-agent",
             "task-create-content",
+            "task-create-milestone",
+            "task-create-kind",
+            "task-create-related",
         ):
             self.assertIn(f'id="{element_id}"', html)
-        self.assertIn("20260716-task-blackboard-1", html)
+        self.assertIn("20260731-th6d-milestone-1", html)
 
     def test_task_ui_script_uses_project_scoped_api_and_safe_text_rendering(self):
         script = (PROJECT_ROOT / "web" / "app.js").read_text(encoding="utf-8")
@@ -33,6 +36,10 @@ class TaskWebUiTests(RouteTestCase):
         self.assertIn('apiFetch("/api/tasks"', script)
         self.assertIn('runTaskAction(task, "collect-result")', script)
         self.assertIn('runTaskAction(task, "cancel", { confirmCancel: true })', script)
+        self.assertIn('runTaskTreeAction(root, "accept-milestone")', script)
+        self.assertIn('runTaskTreeAction(root, "pause-tree")', script)
+        self.assertIn('submitLatestClarificationAnswer(task)', script)
+        self.assertIn('payload.milestone_test_required = taskCreateMilestone.checked', script)
         self.assertIn("taskDetailsContent.textContent = task.content", script)
         self.assertIn("function renderBlackboard()", script)
         self.assertIn(".blackboard-columns", stylesheet)

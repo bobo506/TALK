@@ -184,6 +184,7 @@ class AgentTask(SQLModel, table=True):
     reserved_slice_count: Optional[int] = None
     authorization_expires_at: Optional[datetime] = Field(default=None, index=True)
     checkpoint_reason: Optional[str] = None
+    milestone_test_required: bool = Field(default=False, index=True)
     max_clarification_rounds: int = Field(default=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT)
     clarification_round_count: int = Field(default=0)
     target_member_id: str = Field(foreign_key="members.id", index=True)
@@ -765,6 +766,7 @@ class AgentTaskCreate(BaseModel):
         ge=TASK_AUTHORIZATION_TTL_MIN_SECONDS,
         le=TASK_AUTHORIZATION_TTL_MAX_SECONDS,
     )
+    milestone_test_required: bool = False
     max_clarification_rounds: int = PydField(
         default=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
         ge=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
@@ -838,6 +840,10 @@ class AgentTaskCreate(BaseModel):
             )
         ):
             raise ValueError("child tasks inherit governance and authorization limits from their root task")
+        if self.parent_task_id is not None and self.milestone_test_required:
+            raise ValueError("milestone_test_required is only valid for root tasks")
+        if self.milestone_test_required and not self.may_delegate:
+            raise ValueError("milestone_test_required requires may_delegate=true")
 
         if self.parent_task_id is None and self.authorization_epoch is not None:
             raise ValueError("authorization_epoch is only valid when creating a child task")
@@ -997,6 +1003,7 @@ class AgentTaskOut(BaseModel):
     reserved_slice_count: Optional[int]
     authorization_expires_at: Optional[datetime]
     checkpoint_reason: Optional[str]
+    milestone_test_required: bool
     max_clarification_rounds: int
     clarification_round_count: int
     target_member_id: str
@@ -1045,6 +1052,14 @@ class AgentTaskReviewGateOut(BaseModel):
     rework_round: int
 
 
+class AgentTaskTestGateOut(BaseModel):
+    required: bool
+    frozen_task_ids: list[int] = PydField(default_factory=list)
+    test_task_id: Optional[int]
+    current_verdict: Optional[dict]
+    satisfied: bool
+
+
 class AgentTaskQualityContextItem(BaseModel):
     relation: AgentTaskRelationOut
     task: AgentTaskOut
@@ -1067,6 +1082,7 @@ class AgentTaskTreeOut(BaseModel):
     authorization_expired: bool
     relations: list[AgentTaskRelationOut] = PydField(default_factory=list)
     review_gates: list[AgentTaskReviewGateOut] = PydField(default_factory=list)
+    test_gate: AgentTaskTestGateOut
 
 
 class AgentTaskScheduleCreate(BaseModel):

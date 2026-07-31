@@ -184,6 +184,65 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-07-31 TH-6d：里程碑 Test 门禁、Blackboard 控制与人工验收
+
+**背景**：TH-6c 已落地任务类型、冻结关系、结构化 Review 与两轮返工，但 Test 尚未成为根任务完成门禁，批次安全收尾和里程碑通过后也不会自动暂停。项目管理者确认继续 TH-6d。该切片同时涉及数据库、任务协议和前端真实交互，按决策 Agent 高风险单切片刹车完成后暂停等待人工验收，不进入 TH-7。
+
+### 数据与服务端状态机
+
+- 根任务新增 `milestone_test_required`，仅可委派根任务可开启；旧库迁移回填 `false` 并建立索引。
+- `GET /api/tasks/{id}/tree` 新增 `test_gate`，返回是否必需、当前完整冻结版本 id 集、覆盖它的 Test、结构化结论和满足状态。
+- 里程碑 Test 只能在全部最新必需 Review 通过后创建，并且必须精确覆盖根任务的完整最新冻结版本集；质量任务使用版本语义槽阻止重复或并发终结结论。
+- `failed` Test 可作为返工触发器；返工成功后冻结版本切换，旧 Review / Test 结论不再覆盖新版本，必须重新取得门禁。
+- 根任务成功完成前统一检查非终态后代、最新冻结结果、必需 Review 与里程碑 Test；旧 `general` 根任务保持兼容。
+- 非里程碑批次额度耗尽后，既有开发与 Review 安全收尾即自动进入 `awaiting_human / batch_limit`。
+- 里程碑 Test 得到 `passed` 后，根任务原子进入 `awaiting_human / milestone` 并撤销活动 claim；Human 新入口 `POST /api/tasks/{id}/accept-milestone` 验收后递增授权 epoch、清除检查点，但不自动增加开发额度。
+- Review / Test 的 `blocked`、runner 失败或取消会释放未形成终结结论的版本槽，允许安全重试。
+
+### SDK 与 Project Blackboard
+
+- async / sync `create_task()` 增加 `milestone_test_required`，新增 `accept_task_milestone()`。
+- 根任务创建表单增加委派开关、1–3 个切片额度和里程碑 Test 标记。
+- 类型化子任务表单支持 `development / review / test / rework / general`、Review 策略、冻结任务多选和返工触发任务。
+- 任务详情新增治理卡，展示根控制状态、检查点、授权 epoch、剩余切片、非终态后代、Review 门禁和 Test 门禁。
+- 页面补齐提交最新澄清答复、释放人工决策、暂停整树、风险检查点、授权继续一批、人工验收通过、终止整树等动作。
+- 质量任务下拉框增加稳定的可访问名称；Web 资源更新缓存版本。
+
+### 验证
+
+- Python `py_compile` 覆盖模型、迁移、任务路由、async / sync SDK 和相关测试文件；`node --check web/app.js` 通过。
+- 新增自动化覆盖：里程碑 Test 通过后暂停且根任务不能提前完成、Human 人工验收、非里程碑批次安全检查点、Test 失败触发返工、返工后旧 Test 失效、旧库字段回填和 Web 控制入口。
+- 全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q`，`Ran 370 tests in 122.729s ... OK`。
+- Codex in-app Browser 真实贯通：Human 创建带里程碑 Test 的根任务并从页面创建开发子任务；Review 与完整 Test 通过后，页面显示 `awaiting_human / milestone`、Review `approved`、Test `passed` 和“人工验收通过”；验收后根恢复 `active`、epoch `1 -> 2`、剩余开发额度保持 0。
+- 页面控制台没有 `error / warning`；临时隔离服务与浏览器验收数据库已停止并清理。
+- `usage-gate.cmd guard --provider codex --json` 返回 `decision=continue`；session / weekly 精确百分比均为 `null`，本轮仍按高风险单切片与里程碑门禁停止。
+
+### 文档与边界
+
+- 同步 `docs/spec/MODULE_tasks.md`、`docs/PROJECT_BRIEF.md`、`docs/guides/USER_MANUAL.md` 和当前进度快照。
+- 服务端可强制冻结关系和结构化门禁，但无法从自由文本角色证明第三方 Tester 的操作系统级工具能力；正式运行仍需配置能启动隔离服务、调用 API、控制浏览器和读取日志的 Tester。
+- TH-6d 当前等待项目管理者人工验收；验收通过前不进入 TH-7。
+
+### 变更文件
+
+- `server/models.py`
+- `server/db.py`
+- `server/routes/tasks.py`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `tests/test_tasks.py`
+- `tests/test_task_web_ui.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-07-26 TH-6c：结构化 Review、返工关系门禁与角色发现
 
 **背景**：TH-6b 已让 bundled runner 在领取前完成预检与澄清，但任务仍缺少开发 / Review / Test / 返工的强类型、显式关系和服务端质量门禁。项目管理者授权继续下一切片，并说明暂时无暇人工验收。由于本轮涉及数据库、任务协议与跨模块 runner，按决策 Agent 的高风险批次刹车只推进 TH-6c，不进入 TH-6d。

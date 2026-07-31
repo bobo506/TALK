@@ -6,7 +6,7 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260716-task-blackboard-1">
+  <link rel="stylesheet" href="/style.css?v=20260731-th6d-milestone-1">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -372,7 +372,7 @@
       <div class="group-create-grid">
         <label class="group-create-field wide">
           <span>执行 Agent</span>
-          <select id="task-create-agent" class="group-member-select"></select>
+          <select id="task-create-agent" class="group-member-select" aria-label="执行 Agent"></select>
         </label>
         <label class="group-create-field wide">
           <span>任务标题</span>
@@ -382,6 +382,48 @@
           <span>任务正文</span>
           <textarea id="task-create-content" class="profile-textarea" rows="8" placeholder="写清目标、约束、完成标准和需要回传的结果"></textarea>
         </label>
+        <div id="task-create-governance" class="task-create-advanced wide">
+          <label class="task-create-check">
+            <input id="task-create-delegation" type="checkbox">
+            <span>允许该根任务拆分子任务</span>
+          </label>
+          <label class="group-create-field compact-field">
+            <span>本批开发切片额度</span>
+            <input id="task-create-slice-budget" type="number" min="1" max="3" value="1">
+          </label>
+          <label class="task-create-check">
+            <input id="task-create-milestone" type="checkbox">
+            <span>这是里程碑，要求最新冻结版本通过完整 Test</span>
+          </label>
+        </div>
+        <div id="task-create-quality" class="task-create-advanced wide hidden">
+          <label class="group-create-field wide">
+            <span>子任务类型</span>
+            <select id="task-create-kind" class="group-member-select" aria-label="子任务类型">
+              <option value="development">开发切片</option>
+              <option value="review">Review</option>
+              <option value="test">里程碑 Test</option>
+              <option value="rework">返工</option>
+              <option value="general">普通子任务</option>
+            </select>
+          </label>
+          <label id="task-create-review-policy-field" class="group-create-field wide">
+            <span>Review 策略</span>
+            <select id="task-create-review-policy" class="group-member-select" aria-label="Review 策略">
+              <option value="required">逐片必审</option>
+              <option value="batch">低风险批量 Review</option>
+              <option value="exempt">显式豁免</option>
+            </select>
+          </label>
+          <label id="task-create-related-field" class="group-create-field wide hidden">
+            <span>关联的最新冻结任务</span>
+            <select id="task-create-related" class="group-member-select" multiple size="5" aria-label="关联冻结任务"></select>
+          </label>
+          <label id="task-create-trigger-field" class="group-create-field wide hidden">
+            <span>触发返工的质量任务</span>
+            <select id="task-create-trigger" class="group-member-select" aria-label="触发返工的质量任务"></select>
+          </label>
+        </div>
       </div>
       <div class="group-create-footer">
         <p id="task-create-error" class="group-create-error hidden"></p>
@@ -396,6 +438,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/app.js?v=20260716-task-blackboard-1"></script>
+  <script src="/app.js?v=20260731-th6d-milestone-1"></script>
 </body>
 </html>

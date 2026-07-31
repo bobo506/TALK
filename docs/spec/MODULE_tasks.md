@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 任务树与硬预算、TH-6a2 根控制 / 有限授权 / runner 协作中断、TH-6a3 澄清轮次、TH-6b runner 自动预检与完整 Hall 上下文重放已实现，Review/Test 门禁仍待后续切片
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 等待项目管理者人工验收
 
 ## 目标
 
@@ -31,6 +31,9 @@
 - `delegation_depth`：根任务为 0，后代为父任务深度 + 1
 - `may_delegate`：当前任务执行者是否可继续创建子任务；默认 `false`
 - `max_delegation_depth` / `max_running_descendants` / `max_running_per_target` / `max_nonterminal_descendants`：只保存在根任务上的统一治理预算；后代字段为空并读取根任务
+- `control_status` / `authorization_epoch` / `authorized_slice_budget` / `reserved_slice_count` / `authorization_expires_at` / `checkpoint_reason`：根任务的控制状态、有限批次授权与检查点事实
+- `milestone_test_required`：根任务是否要求完整冻结版本集通过里程碑 Test；默认 `false`，仅可委派根任务可开启
+- `task_kind` / `review_policy` / `gate_verdict`：任务类型、Review 策略与 Review / Test 结构化结论
 - `max_clarification_rounds`：当前任务允许的澄清轮数，默认 1，绝对上限 2
 - `clarification_round_count`：已经开启的澄清轮数；同一轮的多条问题或答复消息不会重复计数
 - `target_member_id`：目标 Agent 成员，例如 `agent:codex`
@@ -51,6 +54,8 @@
 即时任务和 schedule 物化任务都会原子创建一个独立 Task Hall。Hall 当前只包含请求者与执行者：请求者为 `owner`，执行者为 `member`。关联 Task Hall 不能通过普通 Group API 增删成员或独立删除。
 
 `agent_task_clarification_rounds` 保存任务澄清轮次账本：每条记录包含 `task_id / round_index / status`、B 的 `question_message_id`、A 答复的起止消息 id 和请求 / 答复时间；`task_id + round_index` 唯一，防止并发请求重复消耗轮次。
+
+`agent_task_relations` 保存 Review、Test 与返工对冻结任务的显式关系；质量任务的创建轮次与关系组合形成唯一语义槽，防止同一冻结版本并发或重复结论互相覆盖。
 
 `agent_task_schedules` 表记录延迟或周期性任务计划：
 
@@ -73,9 +78,10 @@
 - `target_member_id` 必须是已存在的 `agent:*` 成员。
 - 请求者与目标成员必须不同。
 - 可传 `project_id`，且项目必须存在；省略时按旧客户端兼容为无项目归属。
-- 顶层任务可传 `may_delegate` 和四项根治理预算；只有 Human 可以授予顶层委派权限或覆盖默认预算，普通 Agent 创建的顶层任务保持默认限制且不可继续委派。
+- 顶层任务可传 `may_delegate`、`milestone_test_required` 和四项根治理预算；里程碑 Test 只能用于已开启委派的根任务。只有 Human 可以授予顶层委派权限或覆盖默认预算，普通 Agent 创建的顶层任务保持默认限制且不可继续委派。
 - 可传 `max_clarification_rounds=1|2`；省略时默认 1，不接受 0、3 或无限轮次。
 - 带 `parent_task_id` 时创建子任务：父任务必须处于 `running / in_progress`、父任务已获 `may_delegate`，调用者必须是父任务执行者、根请求者或 Human；`project_id` 从父任务继承，不能改写。
+- 类型化子任务可传 `task_kind`、`review_policy`、`related_task_ids` 和 `trigger_task_id`；Review / Test 必须覆盖服务端计算的合法冻结版本，返工必须由 `changes_requested` Review 或 `failed` Test 触发。
 - 子任务深度和非终态后代数量由服务端在创建事务中校验；后代并发和同目标并发由 claim 条件更新再次原子校验，直接 REST API 不能绕过。
 - 创建后执行状态为 `queued`、协作状态为 `assigned`，并自动返回唯一 `hall_group_id`。
 
@@ -157,6 +163,8 @@
 - 可传 `result_message_id`，该消息必须由当前 Agent 发送。
 - `result_message_id` 可来自对应 Task Hall；为兼容尚未升级的 bridge，暂时也接受旧全局时间线，但拒绝其它 Hall 的消息。
 - `succeeded` 将协作状态推进为 `submitted`；`failed` / `canceled` 同步为同名协作状态，不会误标为请求者已收取。
+- Review / Test 成功必须提交匹配任务类型的结构化 `gate_verdict`；根任务成功前必须满足最新必需 Review 与里程碑 Test 门禁。
+- 里程碑 Test 得到 `passed` 后根任务自动进入 `awaiting_human / milestone`；普通批次额度耗尽并安全完成 Review 后自动进入 `awaiting_human / batch_limit`。
 - 成功或取消后关联实例回到 `idle`；失败后关联实例进入 `error` 并记录 `last_error`。
 
 `POST /api/tasks/schedules`
@@ -193,13 +201,14 @@
 
 `TalkClient` 与 `TalkClientSync` 已提供：
 
-- `create_task(target_member_id, content, ..., max_clarification_rounds=1)`
+- `create_task(target_member_id, content, ..., max_clarification_rounds=1, milestone_test_required=False)`
 - `list_tasks(target_member_id=None, status=None, workflow_status=None, project_id=None)`
 - `get_task(task_id)`
 - `list_task_clarification_rounds(task_id)`
 - `request_task_clarification(task_id, question_message_id=None)`
 - `submit_task_clarification_answer(task_id, answer_message_id=...)`
 - `resolve_task_clarification(task_id, allow_additional_round=False)`
+- `accept_task_milestone(task_id)`
 - `accept_task(task_id)`
 - `collect_task_result(task_id)`
 - `cancel_task(task_id)`
@@ -239,9 +248,11 @@
 - Web UI 登录后以 Project 为一级范围，默认打开所选项目的任务黑板；项目选择和最近项目按成员保存在本地浏览器。
 - Blackboard 以“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合项目任务；待响应列包含待确认、待澄清和已接受待领取状态，详情面板保留精确协作状态。
 - 人类可在项目内选择 Agent、填写标题与正文并创建任务；服务端自动建立的 Task Hall 会同步出现在项目 Hall 列表。
-- 任务卡和详情面板展示请求者、执行者、运行状态、attempt 与活动租约，并按当前成员权限提供进入 Hall、请求澄清、接受、收取结果和取消未领取任务动作。
+- 根任务创建入口可开启委派、选择 1–3 个开发切片额度并标记里程碑 Test；Human 可从根详情创建开发、Review、Test 与返工子任务，并选择 Review 策略、冻结任务关系和触发质量任务；根执行 Agent 继续通过 API / SDK 执行同一合同。
+- 任务卡和详情面板展示请求者、执行者、运行状态、attempt 与活动租约；治理卡同时展示根控制状态、授权 epoch、剩余切片、Review 门禁和里程碑 Test 门禁。
+- 页面按当前成员权限提供进入 Hall、澄清答复提交、人工决策释放、接受、收取结果、安全取消、暂停整树、风险检查点、有限批次恢复、里程碑验收和整树终止动作。
 - Task Hall 继续复用既有消息时间线和文件 / 回复能力；项目任务每 5 秒刷新一次，runner 回写结果后可从 Hall 与黑板两处看到，并由请求者收取为完成态。
-- Web 目前还没有“提交澄清答复”、轮次提示或 `needs_decision` 处理入口；TH-6a3 先完成服务端、SDK 和终端工具协议，页面闭环留待后续 Blackboard 控制切片。
+- Review / Test 的结构化结论仍由对应 runner / SDK 随 `complete` 提交；Human 页面负责查看门禁摘要、控制推进和执行人工验收，不从自然语言消息猜测质量结论。
 
 ## Task Hall 目标态（2026-07-15 确认）
 
@@ -361,7 +372,7 @@ TH-6a2.1 已实现以下根任务推进授权字段：
 - 批次额度耗尽后，已创建任务及其 Review 可以安全收尾，但主 Agent 不能创建新的开发切片；收尾完成后根任务自动进入 `awaiting_human`。
 - 到达可独立体验的里程碑时，无论额度是否仍有剩余，都必须在 Review、完整自动化回归和黑盒测试结束后进入 `awaiting_human`，不能自动开启下一阶段。
 
-TH-6a2.1 尚无 `task_kind`，因此当前每个新后代统一按 1 个开发切片计数；`review / test / rework` 的免计或复用规则要等 TH-6c 的任务类型与关系落地。额度耗尽已能原子拒绝新后代，授权到期会在下一次创建或 claim 时把根任务推进到 `awaiting_human / time_limit`；“已创建任务安全收尾后自动因 `batch_limit` 进入等待”仍待后续任务关系与汇总逻辑补齐。
+TH-6c / TH-6d 已补齐类型化切片计数与自动检查点：`development / general` 消耗开发切片，`review / test / rework` 不额外消耗；额度耗尽后允许既有开发与质量任务安全收尾，最新必需 Review 均通过且没有非终态后代时，非里程碑根任务自动进入 `awaiting_human / batch_limit`。授权到期仍会在下一次创建或 claim 时推进到 `awaiting_human / time_limit`。
 
 ### 根任务控制状态与随时喊停
 
@@ -385,10 +396,11 @@ active/paused/awaiting_human -> cancel_requested -> canceled
 - `POST /api/tasks/{task_id}/pause-tree`：根请求者、Human 管理者或根执行者均可请求暂停；传入任一后代 id 时先解析到根任务。
 - `POST /api/tasks/{task_id}/resume-tree`：只有根请求者或 Human 管理者可调用；必须提交新的 `slice_budget` 与授权有效期，生成新 `authorization_epoch`。
 - `POST /api/tasks/{task_id}/checkpoint`：主 Agent 主动汇总并进入 `awaiting_human`，用于风险、额度或产品方向需要人工判断的情况。
+- `POST /api/tasks/{task_id}/accept-milestone`：仅 Human 可在最新完整冻结集的里程碑 Test 已通过时验收；动作递增授权 epoch、清除里程碑检查点，但不凭空增加下一批开发额度。
 - `POST /api/tasks/{task_id}/cancel-tree`：只有根请求者或 Human 管理者可调用；排队任务取消，运行任务进入协作中断，最终整树终止。
 - `GET /api/tasks/{task_id}/tree`：返回根任务、后代、当前授权、预算占用、质量门禁与控制状态，供终端和 Blackboard 使用。
 
-以上五个服务端入口已在 TH-6a2.1 实现，并同步提供 async / sync SDK helper。当前 `tree` 返回根任务、全树任务、运行 / 非终态后代数、剩余切片额度、授权是否过期、任务关系和 Review 门禁摘要；里程碑测试门禁字段留待 TH-6d。权限按根请求者、Human 管理者和根执行者分级，传入后代 id 会先解析到根任务。
+暂停、恢复、检查点、整树终止和树查询已在 TH-6a2.1 实现；TH-6d 新增里程碑验收入口。async / sync SDK 已同步 helper。当前 `tree` 返回根任务、全树任务、运行 / 非终态后代数、剩余切片额度、授权是否过期、任务关系、Review 门禁和最新完整冻结集的 Test 门禁摘要。权限按根请求者、Human 管理者和根执行者分级，传入后代 id 会先解析到根任务。
 
 暂停传播规则：
 
@@ -430,7 +442,7 @@ Review 策略：
 
 TH-6c 已落地上述 Review 合同：`development / general` 消耗授权切片，`review / test / rework` 不额外消耗开发切片；Review 关系按冻结版本轮次 `0 / 1 / 2` 占用唯一语义槽，阻止并发双 Review，也禁止用未变化版本上的后续 `approved` 覆盖既有 `changes_requested`。`approved / changes_requested` 保留该版本槽位；runner 失败、任务取消或 `blocked` 不形成终结结论，会在同一事务释放槽位，允许对同一冻结版本重试。第二轮返工再次得到 `changes_requested` 时，根任务会原子进入 `awaiting_human / review_exhausted` 并撤销其它运行 claim。
 
-服务端同时保存 `test` 关系和结构化 `passed / failed / blocked` 结论，但 TH-6c 不把测试结论纳入根任务完成门禁，也不自动创建测试触发的返工；这些属于 TH-6d。
+TH-6d 已把 Test 纳入服务端强门禁：里程碑 Test 只能覆盖根任务当前全部最新冻结版本，且必须在这些版本的必需 Review 均通过后创建；同一冻结集只允许一个终结结论。`failed` Test 可以触发返工，返工成功后旧 `passed / failed` 结论不再覆盖新冻结版本，必须重新 Review 并对完整最新冻结集执行 Test。`blocked`、runner 失败或取消会释放当前 Test 语义槽，允许安全重试。
 
 里程碑测试策略：
 
@@ -468,10 +480,11 @@ TH-6c 已落地上述 Review 合同：`development / general` 消耗授权切片
 - TH-6a2.1 已实现根任务 `control_status`、有限批次授权、旧 epoch 拒绝，以及暂停 / 恢复 / 检查点 / 整树终止的服务端传播；TH-6a2.2 已让 bundled runner 在本地执行期间最多每 5 秒响应 claim 撤销并停止子进程。服务不可达时无法接收新的控制事实，仍由现有本地租约截止时间提供最终失效保护。
 - TH-6a3 已实现每任务 1–2 轮澄清额度、显式问题 / 答复边界账本、`clarification_answered / needs_decision`、人工释放动作和 claim 原子门禁；TH-6b 已让 bundled runner 在 claim 前自动预检、等待显式答复、分页重放完整 Hall，并通过稳定问题标记恢复发送后未登记的中断窗口。
 - 预检只接受显式 `TALK_TASK_PREFLIGHT` JSON，兼容单行、显式标记后的多行 JSON 和已观察到的嵌套 `ready` 变体；纯自然语言不会被猜测为结论。成功命令首次格式无效时会用同一只读 / 无工具命令纠正一次；模型超时、命令失败或再次无效均不会 claim，也不会消耗澄清轮次。当前 runner 会留待后续轮询重试，尚无独立的跨轮询预检重试上限与退避策略。
-- 包含 TH-6c 类型化质量任务的根任务在存在非终态后代、最新开发 / 返工未成功或必需 Review 未获 `approved` 时不能成功完成；纯 `general` 旧任务树继续保持旧流程兼容。里程碑 Test 门禁和自动人工验收暂停尚未接入。
-- 当前已有 `task_kind`、Review/Test 结构化结论、独立任务关系、质量上下文与 Review/返工门禁；现有 `agent:pi` / `agent:pi-kimi` profile 仍不具备完整黑盒测试能力，里程碑质量流水线要等 TH-6d。
+- 类型化质量任务树在存在非终态后代、最新开发 / 返工未成功、必需 Review 未获 `approved` 或里程碑最新冻结集未获 `passed` Test 时不能成功完成；纯 `general` 旧任务树继续保持旧流程兼容。
+- `task_kind`、Review / Test 结构化结论、独立关系、质量上下文、Review / 返工 / Test 门禁和人工验收暂停均已落地；现有 `agent:pi` / `agent:pi-kimi` profile 仍不具备完整黑盒测试能力，正式流水线需配置能启动隔离服务、调用 API、控制浏览器和读取日志的 Tester。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
-- Project Blackboard 与 Task Hall Web UI 已覆盖创建、查看、Hall 协作、接受 / 澄清、结果收取和安全取消；项目级 `Members / Activity` 独立页面、observer 与返工尚未实现。
+- Project Blackboard 与 Task Hall Web UI 已覆盖创建、查看、Hall 协作、接受 / 澄清、质量子任务、根控制、结果收取、人工验收和安全取消；项目级 `Members / Activity` 独立页面与 observer 尚未实现。
+- 服务端能验证任务类型、冻结关系、Reviewer 分离和结构化结论，但无法仅凭自由文本业务角色证明第三方 Tester 具备操作系统级工具权限；实际隔离与浏览器 / 日志能力仍由 runner 配置和人工选择保证。
 - Codex 与 pi 真实 CLI 均已完成 Task Hall 技术链路冒烟；pi 在“逐字回复”类指令上的内容遵循仍弱于 Codex，属于模型输出质量边界，不影响单 Hall 结果投递与状态推进，需在项目管理者人工验收时继续观察。
 
 ## 后续计划
@@ -489,7 +502,7 @@ TH-6c 已落地上述 Review 合同：`development / general` 消耗授权切片
 11. [x] TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
 12. [x] TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
 13. [x] TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
-14. TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停。
+14. [x] TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停。
 15. TH-7：补 Codex Desktop / 通用终端接入包装，再评估 schedule 项目化、长任务事件等待、document lock 等后续能力。
 
 ## 验收点
@@ -530,8 +543,8 @@ TH-6c 已落地上述 Review 合同：`development / general` 消耗授权切片
 - [x] 服务端可随时暂停根任务树；暂停后禁止新建 / claim、立即撤销现有 claim，陈旧心跳与结果无法写回。
 - [x] bundled runner 收到暂停 / 终止后最多 5 秒停止本地子进程，并按服务端状态安全回队或取消。
 - [x] “继续一批”生成新的有限切片授权与 `authorization_epoch`；并发预留、到期和陈旧 epoch 由服务端原子拒绝。
-- [ ] 批次安全收尾、风险、Review 或里程碑边界会按完整任务关系自动进入 `awaiting_human`。
+- [x] 批次安全收尾、风险、Review 或里程碑边界会按完整任务关系自动进入 `awaiting_human`。
 - [x] 澄清按问题批次与显式答复边界计轮，普通回复不提前唤醒；额度耗尽进入 `needs_decision / awaiting_human`，claim 不能猜测执行。
 - [x] bundled runner 在 claim 前完成结构化预检；同 Hall 自动提问并等待显式答复，恢复后把完整分页上下文重放给预检与正式执行，重复轮询不会重复唤醒等待中的任务。
 - [x] 必需 Review 未通过时根任务不能提交；低风险批量 Review、独立 Reviewer 和最多两轮自动返工受服务端约束。
-- [ ] 里程碑最新冻结版本必须通过完整自动化回归和黑盒测试，随后自动暂停等待 Human 验收。
+- [x] 里程碑最新冻结版本必须通过完整自动化回归和黑盒测试，随后自动暂停等待 Human 验收。

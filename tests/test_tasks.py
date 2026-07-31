@@ -22,6 +22,7 @@ class AgentTaskTests(RouteTestCase):
         *,
         project_id: str,
         slice_budget: int = 3,
+        milestone_test_required: bool = False,
     ) -> dict:
         registered = client.post(
             "/api/projects",
@@ -41,6 +42,7 @@ class AgentTaskTests(RouteTestCase):
                 "max_running_descendants": 8,
                 "max_running_per_target": 4,
                 "max_nonterminal_descendants": 32,
+                "milestone_test_required": milestone_test_required,
             },
         )
         self.assertEqual(created.status_code, 201)
@@ -976,7 +978,7 @@ class AgentTaskTests(RouteTestCase):
             root = self._create_claimed_quality_root(
                 client,
                 project_id="prj_quality_gate",
-                slice_budget=1,
+                slice_budget=2,
             )
             development = self._create_quality_child(
                 client,
@@ -1173,6 +1175,401 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(gate["rework_round"], 1)
         self.assertEqual(completed_root.status_code, 200)
         self.assertEqual(completed_root.json()["status"], "succeeded")
+
+    def test_passed_milestone_test_pauses_for_human_acceptance_before_root_completion(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_milestone_gate",
+                slice_budget=1,
+                milestone_test_required=True,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Implement the milestone slice",
+                task_kind="development",
+                review_policy="required",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Frozen milestone result",
+            )
+            premature_test = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Test before review approval",
+                    "task_kind": "test",
+                    "related_task_ids": [development["id"]],
+                },
+            )
+            review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the milestone slice",
+                task_kind="review",
+                related_task_ids=[development["id"]],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Review approved",
+                gate_verdict={
+                    "verdict": "approved",
+                    "summary": "The frozen slice is ready for milestone testing",
+                    "findings": [],
+                },
+            )
+            test_task = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Run full regression and black-box checks",
+                task_kind="test",
+                related_task_ids=[development["id"]],
+            )
+            duplicate_test = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Duplicate test for the same frozen version",
+                    "task_kind": "test",
+                    "related_task_ids": [development["id"]],
+                },
+            )
+            passed_test, _ = self._claim_and_complete_quality_task(
+                client,
+                test_task,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Regression and black-box checks passed",
+                gate_verdict={
+                    "verdict": "passed",
+                    "summary": "The latest frozen version passed the milestone suite",
+                    "findings": [],
+                },
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            stale_root_completion = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": root["claim_token"]},
+            )
+            agent_accept = client.post(
+                f"/api/tasks/{root['id']}/accept-milestone",
+                headers={"X-API-Key": "codex-key"},
+            )
+            accepted = client.post(
+                f"/api/tasks/{root['id']}/accept-milestone",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            reclaimed = client.post(
+                f"/api/tasks/{root['id']}/claim",
+                headers={"X-API-Key": "codex-key"},
+                json={},
+            )
+            completed_root = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "status": "succeeded",
+                    "claim_token": reclaimed.json()["claim_token"],
+                },
+            )
+
+        self.assertEqual(premature_test.status_code, 409)
+        self.assertEqual(duplicate_test.status_code, 409)
+        self.assertEqual(passed_test["gate_verdict"]["verdict"], "passed")
+        self.assertEqual(tree.status_code, 200)
+        payload = tree.json()
+        self.assertEqual(payload["root"]["control_status"], "awaiting_human")
+        self.assertEqual(payload["root"]["checkpoint_reason"], "milestone")
+        self.assertTrue(payload["test_gate"]["required"])
+        self.assertEqual(payload["test_gate"]["frozen_task_ids"], [development["id"]])
+        self.assertEqual(payload["test_gate"]["test_task_id"], test_task["id"])
+        self.assertTrue(payload["test_gate"]["satisfied"])
+        self.assertEqual(stale_root_completion.status_code, 409)
+        self.assertEqual(agent_accept.status_code, 403)
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.json()["root"]["control_status"], "active")
+        self.assertEqual(accepted.json()["remaining_slice_budget"], 0)
+        self.assertEqual(reclaimed.status_code, 200)
+        self.assertEqual(completed_root.status_code, 200)
+        self.assertEqual(completed_root.json()["status"], "succeeded")
+
+    def test_exhausted_non_milestone_batch_auto_checkpoints_after_review(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_batch_checkpoint",
+                slice_budget=1,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Implement the only authorized slice",
+                task_kind="development",
+                review_policy="required",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Frozen batch result",
+            )
+            review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the exhausted batch",
+                task_kind="review",
+                related_task_ids=[development["id"]],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Batch review approved",
+                gate_verdict={
+                    "verdict": "approved",
+                    "summary": "The authorized batch is safe to checkpoint",
+                    "findings": [],
+                },
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(tree.status_code, 200)
+        self.assertEqual(tree.json()["root"]["control_status"], "awaiting_human")
+        self.assertEqual(tree.json()["root"]["checkpoint_reason"], "batch_limit")
+        self.assertEqual(tree.json()["remaining_slice_budget"], 0)
+
+    def test_milestone_test_must_cover_every_latest_frozen_slice(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_complete_milestone_set",
+                slice_budget=2,
+                milestone_test_required=True,
+            )
+            developments = [
+                self._create_quality_child(
+                    client,
+                    root,
+                    target_member_id="agent:other",
+                    content=f"Implement batch slice {index}",
+                    task_kind="development",
+                    review_policy="batch",
+                )
+                for index in (1, 2)
+            ]
+            for index, development in enumerate(developments, start=1):
+                self._claim_and_complete_quality_task(
+                    client,
+                    development,
+                    api_key="other-key",
+                    from_id="agent:other",
+                    result_text=f"Frozen batch slice {index}",
+                )
+            review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the complete frozen batch",
+                task_kind="review",
+                related_task_ids=[task["id"] for task in developments],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Complete batch review approved",
+                gate_verdict={
+                    "verdict": "approved",
+                    "summary": "Both frozen slices are ready for milestone testing",
+                    "findings": [],
+                },
+            )
+            partial_test = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "parent_task_id": root["id"],
+                    "authorization_epoch": root["authorization_epoch"],
+                    "target_member_id": "agent:third",
+                    "content": "Incorrectly test only one frozen slice",
+                    "task_kind": "test",
+                    "related_task_ids": [developments[0]["id"]],
+                },
+            )
+            complete_test = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Test the complete latest frozen set",
+                task_kind="test",
+                related_task_ids=[task["id"] for task in developments],
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+
+        self.assertEqual(partial_test.status_code, 409)
+        self.assertEqual(complete_test["task_kind"], "test")
+        self.assertEqual(
+            tree.json()["test_gate"]["frozen_task_ids"],
+            [task["id"] for task in developments],
+        )
+        self.assertEqual(tree.json()["test_gate"]["test_task_id"], complete_test["id"])
+
+    def test_failed_test_can_trigger_rework_and_old_verdict_does_not_cover_new_version(self):
+        with self.make_client() as client:
+            root = self._create_claimed_quality_root(
+                client,
+                project_id="prj_test_rework",
+                slice_budget=1,
+                milestone_test_required=True,
+            )
+            development = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Implement the milestone",
+                task_kind="development",
+                review_policy="required",
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                development,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Initial milestone version",
+            )
+            review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the initial version",
+                task_kind="review",
+                related_task_ids=[development["id"]],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Initial review approved",
+                gate_verdict={
+                    "verdict": "approved",
+                    "summary": "Ready for milestone testing",
+                    "findings": [],
+                },
+            )
+            failed_test = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Run the milestone suite",
+                task_kind="test",
+                related_task_ids=[development["id"]],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                failed_test,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Milestone suite found a regression",
+                gate_verdict={
+                    "verdict": "failed",
+                    "summary": "The black-box workflow regressed",
+                    "findings": ["The submit action does not reach the result state"],
+                },
+            )
+            rework = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:other",
+                content="Repair the failed black-box workflow",
+                task_kind="rework",
+                related_task_ids=[development["id"]],
+                trigger_task_id=failed_test["id"],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                rework,
+                api_key="other-key",
+                from_id="agent:other",
+                result_text="Repaired milestone version",
+            )
+            latest_review = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Review the repaired version",
+                task_kind="review",
+                related_task_ids=[rework["id"]],
+            )
+            self._claim_and_complete_quality_task(
+                client,
+                latest_review,
+                api_key="third-key",
+                from_id="agent:third",
+                result_text="Repaired version approved",
+                gate_verdict={
+                    "verdict": "approved",
+                    "summary": "The repair is ready for a fresh milestone test",
+                    "findings": [],
+                },
+            )
+            stale_test_root_completion = client.post(
+                f"/api/tasks/{root['id']}/complete",
+                headers={"X-API-Key": "codex-key"},
+                json={"status": "succeeded", "claim_token": root["claim_token"]},
+            )
+            tree = client.get(
+                f"/api/tasks/{root['id']}/tree",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            fresh_test = self._create_quality_child(
+                client,
+                root,
+                target_member_id="agent:third",
+                content="Retest the repaired frozen version",
+                task_kind="test",
+                related_task_ids=[rework["id"]],
+            )
+
+        self.assertEqual(stale_test_root_completion.status_code, 409)
+        self.assertEqual(tree.status_code, 200)
+        self.assertEqual(tree.json()["root"]["control_status"], "active")
+        self.assertEqual(tree.json()["test_gate"]["frozen_task_ids"], [rework["id"]])
+        self.assertIsNone(tree.json()["test_gate"]["test_task_id"])
+        self.assertFalse(tree.json()["test_gate"]["satisfied"])
+        self.assertEqual(fresh_test["task_kind"], "test")
 
     def test_third_changes_requested_exhausts_two_rework_rounds_and_pauses_root(self):
         with self.make_client() as client:
@@ -2787,7 +3184,7 @@ class AgentTaskTests(RouteTestCase):
             ).fetchall()
             quality_rows = conn.exec_driver_sql(
                 """
-                SELECT id, task_kind, review_policy, gate_verdict
+                SELECT id, task_kind, review_policy, gate_verdict, milestone_test_required
                 FROM agent_tasks
                 ORDER BY id
                 """
@@ -2847,6 +3244,7 @@ class AgentTaskTests(RouteTestCase):
             "task_kind",
             "review_policy",
             "gate_verdict",
+            "milestone_test_required",
         }.issubset(columns))
         self.assertEqual(indexes["ix_agent_tasks_hall_group_id"], 1)
         self.assertEqual(indexes["ix_agent_tasks_lease_expires_at"], 0)
@@ -2883,7 +3281,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(
             quality_rows,
             [
-                (task_id, "general", None, None)
+                (task_id, "general", None, None, 0)
                 for task_id in range(1, 6)
             ],
         )

@@ -961,9 +961,64 @@ input.auth-input:-webkit-autofill:focus,
 .task-action-secondary { border: 1px solid var(--line-strong); background: var(--card); color: var(--blue); }
 .task-action-danger { border: 1px solid #e7b0ad; background: var(--red-soft); color: #a6423e; }
 
+.task-governance-card {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card-soft);
+  color: var(--muted-strong);
+  font-size: var(--font-control);
+  line-height: 1.55;
+}
+
+.task-governance-card strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text);
+}
+
+.task-gate-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+
 .task-create-panel {
   width: min(620px, 94vw);
   padding: 18px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.task-create-advanced {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card-soft);
+}
+
+.task-create-advanced.hidden {
+  display: none;
+}
+
+.task-create-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text);
+  font-size: var(--font-control);
+  line-height: 1.45;
+}
+
+.task-create-check input {
+  margin-top: 2px;
+}
+
+.compact-field {
+  max-width: 220px;
 }
 
 .hall-title-row {

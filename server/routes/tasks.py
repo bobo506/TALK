@@ -132,16 +132,17 @@ def _relations_for_source(
     )
 
 
-def _release_review_version_lock(
-    review_task_id: int,
+def _release_quality_version_lock(
+    quality_task_id: int,
+    relation_type: str,
     session: Session,
 ) -> None:
-    """Allow retry when Review produced no terminal approval/change decision."""
+    """Allow retry when a quality task produced no terminal version decision."""
     session.execute(
         update(AgentTaskRelation)
         .where(
-            AgentTaskRelation.source_task_id == review_task_id,
-            AgentTaskRelation.relation_type == "reviews",
+            AgentTaskRelation.source_task_id == quality_task_id,
+            AgentTaskRelation.relation_type == relation_type,
         )
         .values(round_index=None)
         .execution_options(synchronize_session=False)
@@ -275,6 +276,82 @@ def _review_gate_rows(
     return gates
 
 
+def _frozen_quality_subjects(
+    root: AgentTask,
+    session: Session,
+) -> list[AgentTask]:
+    """Return the latest development/rework version for every slice."""
+    if root.id is None:
+        return []
+    developments = list(
+        session.exec(
+            select(AgentTask)
+            .where(
+                AgentTask.root_task_id == root.id,
+                AgentTask.task_kind == "development",
+            )
+            .order_by(AgentTask.id)
+        ).all()
+    )
+    return [_latest_quality_subject(development, session)[0] for development in developments]
+
+
+def _latest_test_for_frozen_subjects(
+    frozen_task_ids: list[int],
+    session: Session,
+) -> AgentTask | None:
+    expected = set(frozen_task_ids)
+    if not expected:
+        return None
+    source_ids = list(
+        session.exec(
+            select(AgentTaskRelation.source_task_id)
+            .where(
+                AgentTaskRelation.relation_type == "tests",
+                AgentTaskRelation.target_task_id.in_(expected),
+            )
+            .distinct()
+            .order_by(AgentTaskRelation.source_task_id.desc())
+        ).all()
+    )
+    for source_id in source_ids:
+        relations = _relations_for_source(int(source_id), session)
+        tested_ids = {
+            relation.target_task_id
+            for relation in relations
+            if relation.relation_type == "tests"
+        }
+        if tested_ids != expected:
+            continue
+        task = session.get(AgentTask, int(source_id))
+        if task is not None and task.task_kind == "test":
+            return task
+    return None
+
+
+def _test_gate_row(root: AgentTask, session: Session) -> dict:
+    frozen_ids = [
+        int(task.id)
+        for task in _frozen_quality_subjects(root, session)
+        if task.id is not None
+    ]
+    test = _latest_test_for_frozen_subjects(frozen_ids, session)
+    verdict = test.gate_verdict if test is not None else None
+    satisfied = bool(
+        test is not None
+        and test.status == "succeeded"
+        and verdict
+        and verdict.get("verdict") == "passed"
+    )
+    return {
+        "required": bool(root.milestone_test_required),
+        "frozen_task_ids": frozen_ids,
+        "test_task_id": test.id if test is not None else None,
+        "current_verdict": verdict,
+        "satisfied": satisfied,
+    }
+
+
 def _get_root_task(task: AgentTask, session: Session) -> AgentTask:
     root_id = task.root_task_id or task.id
     root = session.get(AgentTask, root_id)
@@ -402,6 +479,7 @@ def _validate_quality_target_scope(
     *,
     root: AgentTask,
     project_id: str | None,
+    require_current_epoch: bool = True,
 ) -> None:
     if target.root_task_id != root.id:
         raise HTTPException(
@@ -413,7 +491,7 @@ def _validate_quality_target_scope(
             status_code=status.HTTP_409_CONFLICT,
             detail="quality task targets must belong to the same project",
         )
-    if target.authorization_epoch != root.authorization_epoch:
+    if require_current_epoch and target.authorization_epoch != root.authorization_epoch:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="quality task targets must belong to the current authorization batch",
@@ -466,6 +544,7 @@ def _validate_quality_task_create(
                 target,
                 root=root,
                 project_id=project_id,
+                require_current_epoch=body.task_kind == "review",
             )
             if target.status != "succeeded":
                 raise HTTPException(
@@ -509,6 +588,20 @@ def _validate_quality_task_create(
                     detail="reviewer must be different from every reviewed task executor",
                 )
 
+        if body.task_kind == "test":
+            frozen_ids = {
+                int(task.id)
+                for task in _frozen_quality_subjects(root, session)
+                if task.id is not None
+            }
+            requested_ids = {int(task.id) for task in related_tasks if task.id is not None}
+            if not frozen_ids or requested_ids != frozen_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="milestone test must cover the complete latest frozen task version",
+                )
+            _ensure_root_review_gates_satisfied(root, session)
+
         relation_type = "reviews" if body.task_kind == "review" else "tests"
         return [
             {
@@ -517,8 +610,6 @@ def _validate_quality_task_create(
                 "trigger_task_id": None,
                 "round_index": (
                     target_rounds[int(target.id)]
-                    if body.task_kind == "review"
-                    else None
                 ),
             }
             for target in related_tasks
@@ -543,41 +634,55 @@ def _validate_quality_task_create(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="trigger review task not found",
         )
-    if (
-        trigger.task_kind != "review"
-        or trigger.status != "succeeded"
-        or not trigger.gate_verdict
-        or trigger.gate_verdict.get("verdict") != "changes_requested"
-    ):
+    trigger_verdict = (
+        trigger.gate_verdict.get("verdict")
+        if trigger.gate_verdict
+        else None
+    )
+    valid_trigger = (
+        trigger.task_kind == "review" and trigger_verdict == "changes_requested"
+    ) or (
+        trigger.task_kind == "test" and trigger_verdict == "failed"
+    )
+    if trigger.status != "succeeded" or not valid_trigger:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="rework requires a succeeded changes_requested review trigger",
+            detail="rework requires a succeeded changes_requested review or failed test trigger",
         )
     _validate_quality_target_scope(
         trigger,
         root=root,
         project_id=project_id,
     )
+    trigger_relation_type = "reviews" if trigger.task_kind == "review" else "tests"
     trigger_relation = session.exec(
         select(AgentTaskRelation).where(
             AgentTaskRelation.source_task_id == trigger.id,
             AgentTaskRelation.target_task_id == current_subject.id,
-            AgentTaskRelation.relation_type == "reviews",
+            AgentTaskRelation.relation_type == trigger_relation_type,
         )
     ).first()
     if trigger_relation is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="trigger review does not review the latest development version",
+            detail="trigger quality task does not cover the latest development version",
         )
 
     next_round = current_round + 1
     if next_round > 2:
-        _escalate_review_exhausted(root, now, session)
+        if trigger.task_kind == "review":
+            _escalate_review_exhausted(root, now, session)
+        else:
+            _checkpoint_root_in_transaction(
+                root,
+                reason="risk_boundary",
+                now=now,
+                session=session,
+            )
         session.commit()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="review rework limit exhausted; task tree is awaiting human review",
+            detail="quality rework limit exhausted; task tree is awaiting human review",
         )
     return [
         {
@@ -871,6 +976,7 @@ def _tree_response(root: AgentTask, now: datetime, session: Session) -> dict:
         "authorization_expired": _authorization_expired(root, now),
         "relations": relations,
         "review_gates": _review_gate_rows(root, session),
+        "test_gate": _test_gate_row(root, session),
     }
 
 
@@ -1299,6 +1405,7 @@ def _create_task_with_hall(
     reserved_slice_count: int | None,
     authorization_expires_at: datetime | None,
     checkpoint_reason: str | None,
+    milestone_test_required: bool,
     max_clarification_rounds: int,
     now: datetime,
     session: Session,
@@ -1344,6 +1451,7 @@ def _create_task_with_hall(
         reserved_slice_count=reserved_slice_count,
         authorization_expires_at=authorization_expires_at,
         checkpoint_reason=checkpoint_reason,
+        milestone_test_required=milestone_test_required,
         max_clarification_rounds=max_clarification_rounds,
         clarification_round_count=0,
         target_member_id=target_member_id,
@@ -1390,6 +1498,7 @@ def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime, sessi
         reserved_slice_count=0,
         authorization_expires_at=None,
         checkpoint_reason=None,
+        milestone_test_required=False,
         max_clarification_rounds=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
         now=now,
         session=session,
@@ -1463,6 +1572,7 @@ def create_task(
             else None
         )
         checkpoint_reason = None
+        milestone_test_required = body.milestone_test_required
     else:
         parent, root, project_id, delegation_depth = _resolve_child_context(body, current, session)
         _ensure_project_exists(project_id, session)
@@ -1498,6 +1608,7 @@ def create_task(
         reserved_slice_count = None
         authorization_expires_at = None
         checkpoint_reason = None
+        milestone_test_required = False
 
     task = _create_task_with_hall(
         target_member_id=body.target_member_id,
@@ -1522,6 +1633,7 @@ def create_task(
         reserved_slice_count=reserved_slice_count,
         authorization_expires_at=authorization_expires_at,
         checkpoint_reason=checkpoint_reason,
+        milestone_test_required=milestone_test_required,
         max_clarification_rounds=body.max_clarification_rounds,
         now=now,
         session=session,
@@ -1965,6 +2077,42 @@ def resume_task_tree(
     return _tree_response(root, now, session)
 
 
+@router.post("/{task_id}/accept-milestone", response_model=AgentTaskTreeOut)
+def accept_task_milestone(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Accept a passed milestone without granting another development slice."""
+    if current.kind != "human":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only a human manager can accept a milestone",
+        )
+    root = _get_root_task(_get_task(task_id, session), session)
+    if root.control_status != "awaiting_human" or root.checkpoint_reason != "milestone":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="task tree is not awaiting milestone acceptance",
+        )
+    _ensure_root_test_gate_satisfied(root, session)
+    now = datetime.now(timezone.utc)
+    reserved = root.reserved_slice_count or 0
+    root = _transition_root_control(
+        root,
+        allowed_statuses={"awaiting_human"},
+        next_status="active",
+        authorization_epoch=(root.authorization_epoch or 0) + 1,
+        authorized_slice_budget=reserved,
+        reserved_slice_count=reserved,
+        authorization_expires_at=None,
+        checkpoint_reason=None,
+        now=now,
+        session=session,
+    )
+    return _tree_response(root, now, session)
+
+
 @router.post("/{task_id}/cancel-tree", response_model=AgentTaskTreeOut)
 def cancel_task_tree(
     task_id: int,
@@ -2353,8 +2501,9 @@ def cancel_task(
     task.finished_at = now
     _touch_task(task, now)
     session.add(task)
-    if task.task_kind == "review" and task.id is not None:
-        _release_review_version_lock(task.id, session)
+    if task.task_kind in {"review", "test"} and task.id is not None:
+        relation_type = "reviews" if task.task_kind == "review" else "tests"
+        _release_quality_version_lock(task.id, relation_type, session)
     session.commit()
     session.refresh(task)
     return task
@@ -2615,11 +2764,11 @@ def _tree_has_quality_tasks(root: AgentTask, session: Session) -> bool:
     return int(count) > 0
 
 
-def _ensure_root_review_gates_satisfied(
+def _ensure_no_nonterminal_descendants(
     root: AgentTask,
     session: Session,
 ) -> None:
-    if root.id is None or not _tree_has_quality_tasks(root, session):
+    if root.id is None:
         return
     active_descendants = int(
         session.execute(
@@ -2637,6 +2786,15 @@ def _ensure_root_review_gates_satisfied(
             status_code=status.HTTP_409_CONFLICT,
             detail="task tree still has nonterminal descendants",
         )
+
+
+def _ensure_root_review_gates_satisfied(
+    root: AgentTask,
+    session: Session,
+) -> None:
+    if root.id is None or not _tree_has_quality_tasks(root, session):
+        return
+    _ensure_no_nonterminal_descendants(root, session)
 
     developments = list(
         session.exec(
@@ -2679,6 +2837,104 @@ def _ensure_root_review_gates_satisfied(
                     f"{subject.id} has no approved review"
                 ),
             )
+
+
+def _ensure_root_test_gate_satisfied(
+    root: AgentTask,
+    session: Session,
+) -> None:
+    if not root.milestone_test_required:
+        return
+    gate = _test_gate_row(root, session)
+    if not gate["frozen_task_ids"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="milestone task tree has no frozen development version to test",
+        )
+    if not gate["satisfied"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="latest frozen task version has no passed milestone test",
+        )
+
+
+def _ensure_root_quality_gates_satisfied(
+    root: AgentTask,
+    session: Session,
+) -> None:
+    _ensure_root_review_gates_satisfied(root, session)
+    _ensure_root_test_gate_satisfied(root, session)
+
+
+def _checkpoint_root_in_transaction(
+    root: AgentTask,
+    *,
+    reason: str,
+    now: datetime,
+    session: Session,
+) -> bool:
+    if root.id is None:
+        return False
+    result = session.execute(
+        update(AgentTask)
+        .where(
+            AgentTask.id == root.id,
+            AgentTask.control_status == "active",
+        )
+        .values(
+            control_status="awaiting_human",
+            checkpoint_reason=reason,
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        return False
+    _release_tree_claims(root, now, f"task tree checkpoint: {reason}", session)
+    return True
+
+
+def _maybe_checkpoint_completed_batch(
+    task: AgentTask,
+    root: AgentTask,
+    now: datetime,
+    session: Session,
+) -> None:
+    if task.id == root.id or root.control_status != "active":
+        return
+
+    if task.task_kind == "test" and root.milestone_test_required:
+        if (
+            task.status == "succeeded"
+            and task.gate_verdict
+            and task.gate_verdict.get("verdict") == "passed"
+        ):
+            _ensure_root_quality_gates_satisfied(root, session)
+            _checkpoint_root_in_transaction(
+                root,
+                reason="milestone",
+                now=now,
+                session=session,
+            )
+        return
+
+    if root.milestone_test_required:
+        return
+    authorized = root.authorized_slice_budget or 0
+    reserved = root.reserved_slice_count or 0
+    if authorized < 1 or reserved < authorized:
+        return
+    try:
+        _ensure_no_nonterminal_descendants(root, session)
+        _ensure_root_review_gates_satisfied(root, session)
+    except HTTPException:
+        return
+    _checkpoint_root_in_transaction(
+        root,
+        reason="batch_limit",
+        now=now,
+        session=session,
+    )
 
 
 def _reviewed_round_two_rework(
@@ -2747,7 +3003,7 @@ def complete_task(
     completion_conditions = [AgentTask.id == task_id, AgentTask.status == "running"]
     root = _get_root_task(task, session)
     if body.status == "succeeded" and task.id == root.id:
-        _ensure_root_review_gates_satisfied(root, session)
+        _ensure_root_quality_gates_satisfied(root, session)
     completion_conditions.extend(
         _root_control_claim_conditions(root, now, require_unexpired=False)
     )
@@ -2787,14 +3043,26 @@ def complete_task(
         and _reviewed_round_two_rework(task, session)
     ):
         _escalate_review_exhausted(root, now, session)
-    elif task.task_kind == "review" and task.id is not None and (
+    elif task.task_kind in {"review", "test"} and task.id is not None and (
         body.status in {"failed", "canceled"}
         or (
             gate_verdict is not None
             and gate_verdict.get("verdict") == "blocked"
         )
     ):
-        _release_review_version_lock(task.id, session)
+        relation_type = "reviews" if task.task_kind == "review" else "tests"
+        _release_quality_version_lock(task.id, relation_type, session)
+
+    session.expire_all()
+    completed_task = _get_task(task_id, session)
+    current_root = _get_root_task(completed_task, session)
+    if body.status == "succeeded":
+        _maybe_checkpoint_completed_batch(
+            completed_task,
+            current_root,
+            now,
+            session,
+        )
 
     if instance is not None:
         instance.status = "error" if body.status == "failed" else "idle"

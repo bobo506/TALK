@@ -203,7 +203,7 @@ CREATE TABLE agent_task_schedules (
 
 ## 当前前端交互约定
 
-> 当前 Web UI 仍是全局消息流 + Group Hall 的已实现形态。Task Hall 数据 / API 地基已落地，但目标态 Project Blackboard 与 Task Halls / Discussion Halls 分区尚未实现，见 `spec/MODULE_tasks.md`。
+> 当前 Web UI 已实现 Project Blackboard、独立 Task Hall、任务树控制、质量门禁摘要与里程碑人工验收入口；Discussion Halls、Members / Activity 独立页面仍按后续切片推进，见 `spec/MODULE_tasks.md`。
 
 - Web UI 登录后会显示“全局消息流”和可进入的 Group Hall 切换条；全局流继续读取不带 `group_id` 的旧消息，Group Hall 读取 `GET /api/messages?group_id=<id>`
 - Web UI 可创建 Group 并选择初始成员；创建后自动进入该 Group 的 Hall
@@ -300,7 +300,7 @@ TALK/
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
-| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | Task Hall、任务树治理、有限授权 / 中断、澄清与 runner 预检已落地；TH-6c 已补任务类型 / 关系、结构化 Review、两轮返工门禁和角色发现，里程碑 Test / 人工验收待 TH-6d |
+| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | TH-6a1 至 TH-6d 已落地任务树治理、有限授权 / 中断、澄清、runner 预检、Review / Test / 返工门禁、Blackboard 控制与里程碑人工验收；当前等待 TH-6d 人工验收 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段

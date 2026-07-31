@@ -68,9 +68,11 @@ let projectAgents = [];
 let projectTasks = [];
 let blackboardOpen = false;
 let selectedTaskId = null;
+let selectedTaskTree = null;
 let taskCreateOpen = false;
 let taskCreateSaving = false;
 let taskActionSaving = false;
+let taskCreateParentRoot = null;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -199,6 +201,18 @@ const taskCreateProject = document.getElementById("task-create-project");
 const taskCreateAgent = document.getElementById("task-create-agent");
 const taskCreateTitle = document.getElementById("task-create-title");
 const taskCreateContent = document.getElementById("task-create-content");
+const taskCreateGovernance = document.getElementById("task-create-governance");
+const taskCreateDelegation = document.getElementById("task-create-delegation");
+const taskCreateSliceBudget = document.getElementById("task-create-slice-budget");
+const taskCreateMilestone = document.getElementById("task-create-milestone");
+const taskCreateQuality = document.getElementById("task-create-quality");
+const taskCreateKind = document.getElementById("task-create-kind");
+const taskCreateReviewPolicyField = document.getElementById("task-create-review-policy-field");
+const taskCreateReviewPolicy = document.getElementById("task-create-review-policy");
+const taskCreateRelatedField = document.getElementById("task-create-related-field");
+const taskCreateRelated = document.getElementById("task-create-related");
+const taskCreateTriggerField = document.getElementById("task-create-trigger-field");
+const taskCreateTrigger = document.getElementById("task-create-trigger");
 const taskCreateError = document.getElementById("task-create-error");
 const closeTaskCreateBtn = document.getElementById("close-task-create-btn");
 const cancelTaskCreateBtn = document.getElementById("cancel-task-create-btn");
@@ -619,6 +633,12 @@ taskDetailsRefreshBtn.addEventListener("click", () => loadProjectTasks());
 closeTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
 cancelTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
 taskCreatePanel.addEventListener("submit", createTaskFromPanel);
+taskCreateKind.addEventListener("change", renderTaskCreateMode);
+taskCreateDelegation.addEventListener("change", renderTaskCreateMode);
+taskCreateMilestone.addEventListener("change", () => {
+  if (taskCreateMilestone.checked) taskCreateDelegation.checked = true;
+  renderTaskCreateMode();
+});
 taskCreateOverlay.addEventListener("mousedown", (event) => {
   if (event.target === taskCreateOverlay && !taskCreateSaving) setTaskCreateOpen(false);
 });
@@ -702,6 +722,7 @@ async function loadProjects() {
       projectAgents = [];
       projectTasks = [];
       selectedTaskId = null;
+      selectedTaskTree = null;
       blackboardOpen = false;
     }
     renderProjectStrip();
@@ -711,6 +732,7 @@ async function loadProjects() {
     activeProjectId = null;
     projectAgents = [];
     projectTasks = [];
+    selectedTaskTree = null;
     blackboardOpen = false;
     console.error(err);
   }
@@ -732,6 +754,7 @@ async function loadProjectTasks({ silent = false } = {}) {
   if (!activeProjectId) {
     projectTasks = [];
     selectedTaskId = null;
+    selectedTaskTree = null;
     renderProjectStrip();
     renderBlackboard();
     renderGroupMembersPanel();
@@ -747,6 +770,7 @@ async function loadProjectTasks({ silent = false } = {}) {
     projectTasks.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     if (!projectTasks.some((task) => Number(task.id) === Number(selectedTaskId))) {
       selectedTaskId = projectTasks[0]?.id ?? null;
+      selectedTaskTree = null;
     }
     const hasUnknownHall = projectTasks.some(
       (task) => task.hall_group_id && !groups.some((group) => group.id === task.hall_group_id)
@@ -754,6 +778,7 @@ async function loadProjectTasks({ silent = false } = {}) {
     if (hasUnknownHall) {
       await loadGroups();
     }
+    await loadSelectedTaskTree({ silent: true });
     renderProjectStrip();
     renderRoomStrip();
     renderBlackboard();
@@ -766,6 +791,25 @@ async function loadProjectTasks({ silent = false } = {}) {
   }
 }
 
+async function loadSelectedTaskTree({ silent = false } = {}) {
+  const task = projectTasks.find((item) => Number(item.id) === Number(selectedTaskId));
+  if (!task) {
+    selectedTaskTree = null;
+    return;
+  }
+  try {
+    const res = await apiFetch(`/api/tasks/${encodeURIComponent(task.id)}/tree`);
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `任务树加载失败: ${res.status}`));
+    }
+    selectedTaskTree = await res.json();
+  } catch (err) {
+    selectedTaskTree = null;
+    if (!silent) showTaskDetailsError(err.message);
+    console.error(err);
+  }
+}
+
 async function setActiveProject(projectId) {
   if (!projectId || projectId === activeProjectId) {
     if (projectId) setBlackboardOpen(true);
@@ -774,6 +818,7 @@ async function setActiveProject(projectId) {
   activeProjectId = projectId;
   localStorage.setItem(activeProjectStorageKey(), activeProjectId);
   selectedTaskId = null;
+  selectedTaskTree = null;
   blackboardOpen = true;
   try {
     await Promise.all([loadProjectAgents(), loadProjectTasks({ silent: true })]);
@@ -867,6 +912,8 @@ function taskStatusMeta(task) {
   const mapping = {
     assigned: ["待执行者确认", "attention"],
     clarification_requested: ["待请求者澄清", "attention"],
+    clarification_answered: ["澄清已提交 · 待确认", "attention"],
+    needs_decision: ["需要人工决策", "danger"],
     accepted: ["已接受 · 待领取", ""],
     in_progress: ["执行中", "running"],
     submitted: ["结果待收取", "attention"],
@@ -879,7 +926,7 @@ function taskStatusMeta(task) {
 }
 
 function taskBoardColumn(task) {
-  if (["assigned", "clarification_requested", "accepted"].includes(task.workflow_status)) return "attention";
+  if (["assigned", "clarification_requested", "clarification_answered", "needs_decision", "accepted"].includes(task.workflow_status)) return "attention";
   if (task.workflow_status === "in_progress") return "running";
   if (task.workflow_status === "submitted") return "submitted";
   return "finished";
@@ -976,9 +1023,12 @@ function renderTaskCard(task) {
   card.appendChild(status);
   card.appendChild(people);
   card.appendChild(footer);
-  card.addEventListener("click", () => {
+  card.addEventListener("click", async () => {
     selectedTaskId = task.id;
+    selectedTaskTree = null;
     renderBlackboard();
+    renderTaskDetailsPanel();
+    await loadSelectedTaskTree();
     renderTaskDetailsPanel();
   });
   card.addEventListener("dblclick", () => openTaskHall(task));
@@ -1007,6 +1057,70 @@ function taskActionButton(label, className, handler) {
   return button;
 }
 
+function currentMemberIsHuman() {
+  return members.find((member) => member.id === myId)?.kind === "human";
+}
+
+function taskKindLabel(kind) {
+  return {
+    general: "普通任务",
+    development: "开发切片",
+    review: "Review",
+    test: "Test",
+    rework: "返工",
+  }[kind] || kind || "普通任务";
+}
+
+function checkpointReasonLabel(reason) {
+  return {
+    batch_limit: "本批额度已安全收尾",
+    risk_boundary: "风险边界",
+    milestone: "里程碑待人工验收",
+    time_limit: "授权时间到期",
+    usage_limit: "用量门禁",
+    review_exhausted: "返工轮次耗尽",
+    needs_decision: "澄清需要人工决策",
+    manual_pause: "人工暂停",
+  }[reason] || reason || "无";
+}
+
+function appendTaskGovernanceCard(tree) {
+  if (!tree?.root) return;
+  const card = document.createElement("div");
+  card.className = "task-governance-card";
+  const title = document.createElement("strong");
+  title.textContent = "任务树控制与质量门禁";
+  card.appendChild(title);
+  const control = document.createElement("div");
+  control.textContent = `控制：${tree.root.control_status || "—"} · 检查点：${checkpointReasonLabel(tree.root.checkpoint_reason)}`;
+  card.appendChild(control);
+  const budget = document.createElement("div");
+  budget.textContent = `授权 epoch ${tree.root.authorization_epoch || 0} · 剩余切片 ${tree.remaining_slice_budget} · 非终态后代 ${tree.nonterminal_descendants}`;
+  card.appendChild(budget);
+
+  const reviewList = document.createElement("div");
+  reviewList.className = "task-gate-list";
+  for (const gate of tree.review_gates || []) {
+    const row = document.createElement("div");
+    const verdict = gate.current_verdict?.verdict || "pending";
+    row.textContent = `Review · 开发 #${gate.development_task_id} → 当前 #${gate.current_subject_task_id}：${verdict}`;
+    reviewList.appendChild(row);
+  }
+  const testGate = tree.test_gate;
+  if (testGate?.required) {
+    const row = document.createElement("div");
+    row.textContent = `里程碑 Test · 冻结版本 ${testGate.frozen_task_ids.map((id) => `#${id}`).join("、") || "尚未形成"}：${testGate.current_verdict?.verdict || "pending"}`;
+    reviewList.appendChild(row);
+  }
+  if (!reviewList.childElementCount) {
+    const row = document.createElement("div");
+    row.textContent = "当前任务树没有强制质量门禁。";
+    reviewList.appendChild(row);
+  }
+  card.appendChild(reviewList);
+  taskDetailsContent.insertAdjacentElement("afterend", card);
+}
+
 function renderTaskDetailsPanel() {
   const task = getContextTask();
   taskDetailsPanel.classList.toggle("hidden", !task);
@@ -1023,6 +1137,7 @@ function renderTaskDetailsPanel() {
   taskDetailsMeta.innerHTML = "";
   const rows = [
     `任务 ID：${task.id}`,
+    `类型：${taskKindLabel(task.task_kind)}`,
     `请求者：${task.created_by}`,
     `执行者：${task.target_member_id}`,
     `执行状态：${task.status}`,
@@ -1035,6 +1150,8 @@ function renderTaskDetailsPanel() {
     taskDetailsMeta.appendChild(row);
   }
   taskDetailsContent.textContent = task.content || "";
+  taskDetailsPanel.querySelectorAll(".task-governance-card").forEach((node) => node.remove());
+  appendTaskGovernanceCard(selectedTaskTree);
   showTaskDetailsError("");
   taskDetailsActions.innerHTML = "";
 
@@ -1043,12 +1160,12 @@ function renderTaskDetailsPanel() {
       taskActionButton("进入 Task Hall", "task-action-primary", () => openTaskHall(task))
     );
   }
-  if (task.target_member_id === myId && task.workflow_status === "assigned") {
+  if (task.target_member_id === myId && ["assigned", "clarification_answered"].includes(task.workflow_status)) {
     taskDetailsActions.appendChild(
       taskActionButton("标记为待澄清", "task-action-secondary", () => runTaskAction(task, "request-clarification"))
     );
   }
-  if (task.target_member_id === myId && ["assigned", "clarification_requested"].includes(task.workflow_status)) {
+  if (task.target_member_id === myId && ["assigned", "clarification_answered"].includes(task.workflow_status)) {
     taskDetailsActions.appendChild(
       taskActionButton("接受任务", "task-action-secondary", () => runTaskAction(task, "accept"))
     );
@@ -1058,10 +1175,53 @@ function renderTaskDetailsPanel() {
       taskActionButton("收取并完成", "task-action-primary", () => runTaskAction(task, "collect-result"))
     );
   }
+  if (task.created_by === myId && task.workflow_status === "clarification_requested") {
+    taskDetailsActions.appendChild(
+      taskActionButton("提交 Hall 中最新澄清答复", "task-action-primary", () => submitLatestClarificationAnswer(task))
+    );
+  }
+  if (currentMemberIsHuman() && task.workflow_status === "needs_decision") {
+    taskDetailsActions.appendChild(
+      taskActionButton("释放人工决策", "task-action-secondary", () => resolveTaskDecision(task))
+    );
+  }
   if (task.created_by === myId && task.status === "queued") {
     taskDetailsActions.appendChild(
       taskActionButton("取消未领取任务", "task-action-danger", () => runTaskAction(task, "cancel", { confirmCancel: true }))
     );
+  }
+
+  const tree = selectedTaskTree;
+  const root = tree?.root;
+  if (currentMemberIsHuman() && root) {
+    if (root.status === "running" && root.control_status === "active" && root.may_delegate) {
+      taskDetailsActions.appendChild(
+        taskActionButton("创建开发 / Review / Test 子任务", "task-action-primary", () => setTaskCreateOpen(true, { parentRoot: root }))
+      );
+    }
+    if (root.control_status === "active") {
+      taskDetailsActions.appendChild(
+        taskActionButton("暂停整棵任务树", "task-action-secondary", () => runTaskTreeAction(root, "pause-tree"))
+      );
+      taskDetailsActions.appendChild(
+        taskActionButton("在风险边界暂停", "task-action-secondary", () => runTaskTreeAction(root, "checkpoint", { reason: "risk_boundary" }))
+      );
+    }
+    if (["paused", "awaiting_human"].includes(root.control_status) && root.checkpoint_reason !== "milestone") {
+      taskDetailsActions.appendChild(
+        taskActionButton("授权继续一批", "task-action-primary", () => resumeTaskTreeFromBlackboard(root))
+      );
+    }
+    if (root.control_status === "awaiting_human" && root.checkpoint_reason === "milestone" && tree.test_gate?.satisfied) {
+      taskDetailsActions.appendChild(
+        taskActionButton("人工验收通过", "task-action-primary", () => runTaskTreeAction(root, "accept-milestone"))
+      );
+    }
+    if (root.control_status !== "canceled") {
+      taskDetailsActions.appendChild(
+        taskActionButton("终止整棵任务树", "task-action-danger", () => runTaskTreeAction(root, "cancel-tree", null, { confirmCancel: true }))
+      );
+    }
   }
 }
 
@@ -1088,8 +1248,107 @@ async function runTaskAction(task, action, { confirmCancel = false } = {}) {
     const updated = await res.json();
     projectTasks = projectTasks.map((item) => Number(item.id) === Number(updated.id) ? updated : item);
     selectedTaskId = updated.id;
+    await loadSelectedTaskTree({ silent: true });
     renderProjectStrip();
     renderBlackboard();
+  } catch (err) {
+    showTaskDetailsError(err.message);
+  } finally {
+    taskActionSaving = false;
+    renderTaskDetailsPanel();
+  }
+}
+
+async function runTaskTreeAction(root, action, body = null, { confirmCancel = false } = {}) {
+  if (taskActionSaving) return;
+  if (confirmCancel && !window.confirm("这会终止整棵任务树，未完成任务不能恢复。确定继续吗？")) return;
+  taskActionSaving = true;
+  showTaskDetailsError("");
+  renderTaskDetailsPanel();
+  try {
+    const options = { method: "POST" };
+    if (body !== null) {
+      options.headers = { "Content-Type": "application/json" };
+      options.body = JSON.stringify(body);
+    }
+    const res = await apiFetch(`/api/tasks/${encodeURIComponent(root.id)}/${action}`, options);
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `任务树操作失败: ${res.status}`));
+    }
+    selectedTaskTree = await res.json();
+    await loadProjectTasks({ silent: true });
+  } catch (err) {
+    showTaskDetailsError(err.message);
+  } finally {
+    taskActionSaving = false;
+    renderTaskDetailsPanel();
+  }
+}
+
+function resumeTaskTreeFromBlackboard(root) {
+  const raw = window.prompt("下一批允许启动多少个开发切片？请输入 1–3。", "1");
+  if (raw === null) return;
+  const sliceBudget = Number(raw);
+  if (!Number.isInteger(sliceBudget) || sliceBudget < 1 || sliceBudget > 3) {
+    showTaskDetailsError("切片额度必须是 1–3 的整数。");
+    return;
+  }
+  runTaskTreeAction(root, "resume-tree", {
+    slice_budget: sliceBudget,
+    authorization_ttl_seconds: 5400,
+  });
+}
+
+async function submitLatestClarificationAnswer(task) {
+  if (!task.hall_group_id || taskActionSaving) return;
+  taskActionSaving = true;
+  showTaskDetailsError("");
+  renderTaskDetailsPanel();
+  try {
+    const params = new URLSearchParams({ group_id: task.hall_group_id, limit: "100" });
+    const history = await apiFetch(`/api/messages?${params.toString()}`);
+    if (!history.ok) {
+      throw new Error(await readErrorDetail(history, `Hall 消息读取失败: ${history.status}`));
+    }
+    const latest = (await history.json())
+      .filter((message) => message.from_id === myId && !message.revoked_at)
+      .sort((a, b) => Number(b.id) - Number(a.id))[0];
+    if (!latest) {
+      throw new Error("请先进入 Task Hall 发送完整澄清答复，再提交边界。");
+    }
+    const res = await apiFetch(`/api/tasks/${encodeURIComponent(task.id)}/submit-clarification-answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer_message_id: latest.id }),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `澄清答复提交失败: ${res.status}`));
+    }
+    await loadProjectTasks({ silent: true });
+  } catch (err) {
+    showTaskDetailsError(err.message);
+  } finally {
+    taskActionSaving = false;
+    renderTaskDetailsPanel();
+  }
+}
+
+async function resolveTaskDecision(task) {
+  const allowAdditionalRound = window.confirm("是否额外开放一轮澄清？选择“取消”会仅按当前补充继续。 ");
+  if (taskActionSaving) return;
+  taskActionSaving = true;
+  showTaskDetailsError("");
+  renderTaskDetailsPanel();
+  try {
+    const res = await apiFetch(`/api/tasks/${encodeURIComponent(task.id)}/resolve-clarification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allow_additional_round: allowAdditionalRound }),
+    });
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res, `人工决策释放失败: ${res.status}`));
+    }
+    await loadProjectTasks({ silent: true });
   } catch (err) {
     showTaskDetailsError(err.message);
   } finally {
@@ -1123,17 +1382,77 @@ function renderTaskCreateAgentOptions() {
   submitTaskCreateBtn.disabled = taskCreateSaving || !agents.length;
 }
 
-function setTaskCreateOpen(open) {
+function taskOptionLabel(task) {
+  return `#${task.id} · ${taskKindLabel(task.task_kind)} · ${task.title || task.content || "未命名"}`;
+}
+
+function renderTaskCreateMode() {
+  const childMode = Boolean(taskCreateParentRoot);
+  taskCreateGovernance.classList.toggle("hidden", childMode);
+  taskCreateQuality.classList.toggle("hidden", !childMode);
+  taskCreateSliceBudget.disabled = !taskCreateDelegation.checked;
+  taskCreateMilestone.disabled = !taskCreateDelegation.checked;
+  if (!childMode) return;
+
+  const kind = taskCreateKind.value;
+  taskCreateReviewPolicyField.classList.toggle("hidden", kind !== "development");
+  taskCreateRelatedField.classList.toggle("hidden", !["review", "test", "rework"].includes(kind));
+  taskCreateTriggerField.classList.toggle("hidden", kind !== "rework");
+  taskCreateRelated.innerHTML = "";
+  taskCreateTrigger.innerHTML = "";
+
+  const tasks = selectedTaskTree?.tasks || [];
+  let related = [];
+  if (["review", "test"].includes(kind)) {
+    const frozenIds = new Set(selectedTaskTree?.test_gate?.frozen_task_ids || []);
+    related = tasks.filter((task) => frozenIds.has(Number(task.id)));
+  } else if (kind === "rework") {
+    related = tasks.filter((task) => task.task_kind === "development");
+  }
+  for (const task of related) {
+    const option = document.createElement("option");
+    option.value = String(task.id);
+    option.textContent = taskOptionLabel(task);
+    option.selected = kind === "test" || (kind === "rework" && related.length === 1);
+    taskCreateRelated.appendChild(option);
+  }
+
+  if (kind === "rework") {
+    const triggers = tasks.filter((task) => {
+      const verdict = task.gate_verdict?.verdict;
+      return (task.task_kind === "review" && verdict === "changes_requested")
+        || (task.task_kind === "test" && verdict === "failed");
+    });
+    for (const task of triggers) {
+      const option = document.createElement("option");
+      option.value = String(task.id);
+      option.textContent = `${taskOptionLabel(task)} · ${task.gate_verdict.verdict}`;
+      taskCreateTrigger.appendChild(option);
+    }
+  }
+}
+
+function setTaskCreateOpen(open, { parentRoot = null } = {}) {
   taskCreateOpen = Boolean(open && activeProjectId);
   showTaskCreateError("");
   taskCreateOverlay.classList.toggle("hidden", !taskCreateOpen);
   if (!taskCreateOpen) {
     taskCreatePanel.reset();
+    taskCreateParentRoot = null;
     return;
   }
+  taskCreateParentRoot = parentRoot;
   const project = getActiveProject();
-  taskCreateProject.textContent = project ? `${project.display_name} · ${project.project_id}` : "";
+  taskCreateProject.textContent = project
+    ? `${project.display_name} · ${project.project_id}${parentRoot ? ` · 根任务 #${parentRoot.id}` : ""}`
+    : "";
+  taskCreateDelegation.checked = false;
+  taskCreateMilestone.checked = false;
+  taskCreateSliceBudget.value = "1";
+  taskCreateKind.value = "development";
+  taskCreateReviewPolicy.value = "required";
   renderTaskCreateAgentOptions();
+  renderTaskCreateMode();
   taskCreateTitle.focus();
 }
 
@@ -1146,8 +1465,36 @@ async function createTaskFromPanel(event) {
     title: taskCreateTitle.value.trim() || null,
     content: taskCreateContent.value.trim(),
   };
+  if (taskCreateParentRoot) {
+    payload.parent_task_id = taskCreateParentRoot.id;
+    payload.authorization_epoch = taskCreateParentRoot.authorization_epoch;
+    payload.task_kind = taskCreateKind.value;
+    if (payload.task_kind === "development") {
+      payload.review_policy = taskCreateReviewPolicy.value;
+    }
+    if (["review", "test", "rework"].includes(payload.task_kind)) {
+      payload.related_task_ids = Array.from(taskCreateRelated.selectedOptions, (option) => Number(option.value));
+    }
+    if (payload.task_kind === "rework") {
+      payload.trigger_task_id = Number(taskCreateTrigger.value) || null;
+    }
+  } else {
+    payload.may_delegate = taskCreateDelegation.checked;
+    payload.milestone_test_required = taskCreateMilestone.checked;
+    if (payload.may_delegate) {
+      payload.slice_budget = Number(taskCreateSliceBudget.value);
+    }
+  }
   if (!payload.target_member_id || !payload.content) {
     showTaskCreateError("请选择执行 Agent，并填写任务正文。");
+    return;
+  }
+  if (taskCreateParentRoot && ["review", "test", "rework"].includes(payload.task_kind) && !payload.related_task_ids.length) {
+    showTaskCreateError("请选择质量任务要覆盖的最新冻结任务。");
+    return;
+  }
+  if (payload.task_kind === "rework" && !payload.trigger_task_id) {
+    showTaskCreateError("请选择触发返工的 Review 或 Test。");
     return;
   }
   taskCreateSaving = true;

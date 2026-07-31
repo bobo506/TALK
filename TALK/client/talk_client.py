@@ -369,6 +369,7 @@ class TalkClient:
         max_nonterminal_descendants: int | None = None,
         slice_budget: int | None = None,
         authorization_ttl_seconds: int | None = None,
+        milestone_test_required: bool = False,
         max_clarification_rounds: int = 1,
     ) -> JsonDict:
         payload: JsonDict = {
@@ -389,6 +390,7 @@ class TalkClient:
             "max_nonterminal_descendants": max_nonterminal_descendants,
             "slice_budget": slice_budget,
             "authorization_ttl_seconds": authorization_ttl_seconds,
+            "milestone_test_required": milestone_test_required,
             "max_clarification_rounds": max_clarification_rounds,
         }
         return await self._request_json("POST", "/api/tasks", json_body=payload)
@@ -455,6 +457,9 @@ class TalkClient:
 
     async def cancel_task_tree(self, task_id: int) -> JsonDict:
         return await self._request_json("POST", f"/api/tasks/{task_id}/cancel-tree")
+
+    async def accept_task_milestone(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/accept-milestone")
 
     async def list_task_clarification_rounds(self, task_id: int) -> list[JsonDict]:
         return await self._request_json("GET", f"/api/tasks/{task_id}/clarification-rounds")
