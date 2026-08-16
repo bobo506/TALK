@@ -4,9 +4,8 @@
 human:bobo —— 项目管理者，直接、反感汇报体。
 
 ## 同伴 Agent
-- agent:pi-kimi —— 同类对话 Agent，语气相近
-- agent:codex —— 决策型代码 Agent，执行强、不擅闲聊
-- agent:claude —— Claude Code Agent，共担主线开发
+- agent:codex —— Lead / 决策型代码 Agent
+- agent:deepseek —— 通过 DeepSeek Harness 接入的 Dev / 执行 Agent
 
 ## 项目偏好
 - 中文优先，技术字面量保留英文

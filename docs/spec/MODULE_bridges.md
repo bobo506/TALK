@@ -10,7 +10,7 @@
 ## 负责范围
 
 - 桥接脚本：`bridges/`
-- 当前已实现：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/pi_bridge.py`
+- 当前已实现：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/pi_bridge.py`；DeepSeek Harness 通过通用 bridge 接入
 - 依赖 SDK：`TALK/client/`
 
 ## 当前实现
@@ -21,7 +21,7 @@
 - 默认要求通过 `--command` 传入本地 CLI 命令；该命令应把最终回复写到 `stdout`。
 - prompt 传递支持两种方式：`--prompt-transport stdin` 会通过标准输入传入任务 prompt；`--prompt-transport argv` 会把任务 prompt 追加为最后一个命令行参数。
 - 可通过 `--name` 设置 Agent 成员名，例如 `pi` 会注册为 `agent:pi`；也可直接传完整 `agent:*`。
-- 可通过 `--runtime` 设置实例上报 runtime，例如 `pi`、`codex`、`claude`。
+- 可通过 `--runtime` 设置实例上报 runtime，例如 `pi`、`codex`、`dsh`。
 - 可通过 `--bridge-label` 设置错误回复中的桥接名称，例如 `pi bridge`。
 - 通用桥与 Codex 桥共享消息过滤、运行锁、任务队列、超时、回复截断和状态上报语义。
 - 子进程输出会逐行优先按 UTF-8 解码，并在 Windows 下兜底尝试系统代码页，避免本地 CLI / 系统工具输出中文时出现替换字符乱码或不同输出行互相拖累编码判断。
@@ -74,11 +74,11 @@ codex exec --skip-git-repo-check --sandbox workspace-write --color never -
 
 - `bridges/pi_bridge.py` 会自注册为 `agent:pi`（可通过 `--name` 修改）。
 - `bridges/pi_bridge.py` 复用通用 CLI bridge 实现，默认 runtime 为 `pi`，默认错误标签为 `pi bridge`。
-- 本机已确认 `pi` CLI 支持 `--print` 非交互模式，版本为 `0.74.1`。
+- 本机已确认 `pi` CLI 支持 `--print` 非交互模式，当前版本为 `0.84.1`。
 - 默认 pi 命令为：
 
 ```bash
-pi --print --mode text --no-context-files --no-tools --no-session --thinking off --system-prompt "<short TALK chat boundary>"
+pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --tools <TALK tools> --no-session --thinking off --system-prompt "<TALK boundary>"
 ```
 
 - 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
@@ -90,23 +90,43 @@ pi --print --mode text --no-context-files --no-tools --no-session --thinking off
 - 默认 system prompt 要求 pi 是 TALK Group Hall 参与者，可与人类和其他 agent 交流、评审方案、提出优化/分歧，并在需要时输出 `TALK_ACTION` 安全行协议；默认讨论模式下不声称能读取项目文件、执行命令或编辑文件。
 - 默认 system prompt 不再包含原始 `<talk-action ...>` 示例、斜杠、竖线、尖括号或 `&`，避免 Windows 下 `pi.cmd` 启动链把 prompt 误解释为命令管道或重定向。
 - 可通过 `--pi-execution-profile tools` 在使用默认命令时显式启用 `read,grep,find,ls,bash,edit,write` 工具，让 pi CLI 子进程具备可施工能力；默认 `discussion` 档不启用工具。
+- 可通过 `--pi-provider` 与 `--pi-model` 在不覆盖 bridge 默认命令的前提下锁定 provider / model；消息处理、Task runner 与预检命令会使用同一组锁定值。
 - 当 pi 在中文能力/自我介绍问题上成功返回明显非中文、阿拉伯语语言标签或错误声称自己可读文件/执行命令时，通用 bridge 会把回复兜底替换为中文能力说明；正常中文回复或用户明确要求英文时不干预。
 - 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。
 - 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
 - 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留等价上下文、session、工具权限和 `--system-prompt` 边界；否则 pi 可能重新读取项目上下文、错误启用工具或重新把自己当成 coding assistant。
 
+### DeepSeek Harness 接入
+
+- 当前使用官方 `@deepseek-ai/dsh` `0.1.0-rc.6` 的 `headless` profile，其行为是接受一次性任务并把最终 assistant 消息写到 stdout。
+- TALK 通过 `bridges/cli_bridge.py --prompt-transport argv --command "dsh.cmd --profile headless"` 调用，不需要新建专用 bridge。
+- TALK member 固定为 `agent:deepseek`，runtime 上报为 `dsh`；具体 DeepSeek 模型由 Harness profile 管理，不写死在 member ID 中。
+- `headless` profile 首次使用可能初始化 `$DSH_HOME/profiles/headless`；Harness 的登录、模型与工具权限属于 Harness 配置边界。
+
+## 当前本地固定拓扑（2026-08-16）
+
+| TALK member | 运行时 | 业务角色 | 决策分级 |
+|---|---|---|---|
+| `agent:codex` | Codex CLI | lead | decision |
+| `agent:deepseek` | DeepSeek Harness / `dsh` | dev | execution |
+| `agent:pi` | pi + `moonshotai-cn/kimi-k3` | reviewer | execution |
+
+Claude Code 暂不加入本地 dogfood 拓扑；重复的 `agent:pi-kimi` 配置不再使用。当前仍没有独立的全能 Tester，里程碑 Test 由 Kimi3 执行可自动检查的部分，项目管理者完成浏览器人工验收。
+
 ## 运行示例
 
 ```bash
-python bridges/codex_bridge.py --key codex-key --base-url http://127.0.0.1:8000
-python bridges/pi_bridge.py --key pi-key --base-url http://127.0.0.1:8000
+python bridges/codex_bridge.py --name codex --key codex-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --codex-execution-profile discussion
+python bridges/pi_bridge.py --name pi --key pi-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --pi-provider moonshotai-cn --pi-model kimi-k3 --pi-execution-profile tools
+python bridges/cli_bridge.py --name deepseek --runtime dsh --bridge-label "DeepSeek Harness bridge" --key deepseek-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --prompt-transport argv --command "dsh.cmd --profile headless"
 ```
 
 Web UI 中发送：
 
 ```text
 @agent:codex 总结一下当前项目结构
-@agent:pi 总结一下当前项目结构
+@agent:pi 评审一下当前方案
+@agent:deepseek 运行当前切片的定向测试
 ```
 
 ## 后续计划

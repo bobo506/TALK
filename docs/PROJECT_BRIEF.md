@@ -143,7 +143,7 @@ CREATE TABLE files (
 CREATE TABLE agent_instances (
   id              TEXT PRIMARY KEY,       -- bridge 进程实例 id
   member_id       TEXT NOT NULL REFERENCES members(id), -- 所属 agent:* 成员
-  runtime         TEXT NOT NULL,          -- codex | claude | pi | ...
+  runtime         TEXT NOT NULL,          -- codex | pi | dsh | ...
   status          TEXT NOT NULL,          -- starting | online | idle | busy | stopping | offline | error
   host            TEXT,
   pid             INTEGER,
@@ -318,7 +318,7 @@ TALK/
 ## 2026-05-15 Agent Workflow Addendum
 
 - `AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源；每次项目开始必须先读取并确认当前角色。
-- 当前角色：Codex 为决策 Agent，Claude 为执行 Agent；项目管理者可通过修改 `AGENTS.md` 调整后续 Agent 行为。
+- 当前角色：Codex 为决策 Agent；本地 bridge 使用 Kimi3（pi runtime）与 DeepSeek（DeepSeek Harness）作为执行 Agent，不启动 Claude Code。项目管理者可通过修改 `AGENTS.md` 调整后续 Agent 行为。
 - 决策 Agent 在方向明确且无重大不确定项时，可自主连续开发多个切片；执行 Agent 每次只开发一个切片，完成后必须等待确认。
 - 任意角色每完成一个可能影响功能的开发切片，都必须执行“汇总进度”，并记录验证、变更文件、待确认问题和下一步。
 - `docs/PROGRESS.md` 只保存当前快照，保持长度可控；已完成切片完整记录归入 `docs/PROGRESS_HISTORY.md`。
@@ -328,8 +328,8 @@ TALK/
 ## 2026-05-13 Local Lab Addendum
 
 - 新增 `docs/spec/LOCAL_LAB_DESIGN.md`，用于收敛本地多 Agent 实验室阶段的设计边界。
-- local-lab 阶段已确认方向：Codex / Claude Code 走本地 CLI bridge；DeepSeek / Kimi 走本地 `pi` 框架 bridge；后续加入 Group、Hall、SSE、实例/调度 API 与文档编辑协调协议。
-- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 保留 Codex 兼容入口与默认 `codex exec` 命令，`bridges/pi_bridge.py` 保留 pi 兼容入口与默认 `pi --print --mode text` 命令。
+- local-lab 当前固定为 3 个 Agent：Codex 走专用 CLI bridge；Kimi3 走 `pi` bridge 并显式锁定 `moonshotai-cn/kimi-k3`；DeepSeek 各类模型走 DeepSeek Harness `dsh --profile headless` + 通用 CLI bridge。Claude Code 暂不纳入本地拓扑。
+- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 保留 Codex 专用入口，`bridges/pi_bridge.py` 保留 pi 专用入口，DeepSeek Harness 通过通用 bridge 的 `argv` prompt transport 接入。
 - `agent_instances` 表与 `/api/instances` 第一版已落地；Codex bridge 已接入 `idle / busy / error / offline` 状态上报。
 - `agent_tasks` 表与 `/api/tasks` 第一版已落地：支持创建任务、按可见性列出任务、Agent 领取任务、完成/失败/取消任务，并联动 `agent_instances.current_task_id` 与实例状态；当前不由 TALK 自动启动 bridge 进程。
 - `agent_task_schedules` 表与 `/api/tasks/schedules` 第一版已落地：支持一次性 / 周期性 schedule 记录、状态暂停/取消、显式 `run-due` 物化为 queued task；当前不内置后台调度循环。

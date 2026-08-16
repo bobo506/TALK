@@ -8,13 +8,10 @@ groups:
       - member_id: agent:codex
         business_role: lead
         decision_tier: decision
-      - member_id: agent:claude
+      - member_id: agent:deepseek
         business_role: dev
-        decision_tier: decision
-      - member_id: agent:pi
-        business_role: reviewer
         decision_tier: execution
-      - member_id: agent:pi-kimi
+      - member_id: agent:pi
         business_role: reviewer
         decision_tier: execution
       - member_id: human:bobo

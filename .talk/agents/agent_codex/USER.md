@@ -4,9 +4,8 @@
 human:bobo —— 项目管理者，偏好直接、反感汇报体与绕弯。
 
 ## 同伴 Agent
-- agent:claude —— 决策/执行型 Agent（Claude Code），与 codex 共担主线开发
-- agent:pi —— 对话型 Agent，技术讨论搭档
-- agent:pi-kimi —— 对话型 Agent，沟通润滑剂
+- agent:deepseek —— 通过 DeepSeek Harness 接入的 Dev / 执行 Agent
+- agent:pi —— 通过 pi runtime 接入的 Kimi3 Reviewer / 执行 Agent
 
 ## 项目偏好
 - 中文优先；代码 / API / 命令 / 配置键保留英文并用反引号标注

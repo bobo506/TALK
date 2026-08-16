@@ -184,6 +184,45 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-16 本地 Agent 拓扑收敛：Codex + Kimi3 + DeepSeek Harness
+
+**背景**：项目管理者明确后续本地暂时只使用 3 个 Agent：Codex、通过 pi 接入的 Kimi3、通过 DeepSeek Harness 接入的 DeepSeek 各类模型；Claude Code 不再纳入当前本地拓扑。本片仅收敛 bridge 模型锁定、项目配置和相关文档，不调用真实模型。
+
+### 完成事项
+
+- 本地拓扑固定为：`agent:codex` = Lead / decision，`agent:deepseek` = DeepSeek Harness / Dev / execution，`agent:pi` = Kimi3 / Reviewer / execution。
+- `.talk/groups.yaml` 移除 `agent:claude` 与 `agent:pi-kimi`，新增 `agent:deepseek`；保留 `agent:pi` member ID，避免现有 TALK Key 与历史消息迁移。
+- 删除重复的 `agent_pi-kimi` profile，将 `agent_pi` 身份收敛为 Kimi3，新增 `agent_deepseek` 四件套 profile，并同步 Codex 的同伴 Agent 说明。
+- `bridges/pi_bridge.py` 新增 `--pi-provider / --pi-model`；默认命令、Task runner 命令与领取前预检命令会统一注入锁定的 provider / model，且自定义 `--pi-command` 的原有覆盖语义保持不变。
+- 本机 pi 全局默认仍是 DeepSeek，因此 TALK 启动命令显式锁定 `--pi-provider moonshotai-cn --pi-model kimi-k3`，不修改用户级 pi 配置。
+- 确认已安装官方 `@deepseek-ai/dsh 0.1.0-rc.6`；使用通用 bridge 的 `argv` transport 调用 `dsh.cmd --profile headless`，无需新建专用 bridge。
+- `AGENTS.md`、`PROJECT_BRIEF.md` 与 `MODULE_bridges.md` 已同步新拓扑、身份、命令和已知边界。
+
+### 验证
+
+- `codex.cmd --version` → `0.144.4`；`pi.cmd --version` → `0.84.1`；`dsh.cmd --version` → `0.1.0-rc.6`。
+- `dsh.cmd --profile headless --help` 在隔离的临时 `DSH_HOME` 中确认接受 argv 任务并输出最终 assistant 消息。
+- `pi.cmd --list-models kimi` 确认 `moonshotai-cn/kimi-k3`；`pi.cmd auth check --provider moonshotai-cn --model kimi-k3 --json --no-refresh` 返回 `status=ready`。
+- 项目 profile 扫描结果精确为 `agent:codex / agent:deepseek / agent:pi`。
+- `.venv\Scripts\python.exe -m unittest tests.test_pi_bridge tests.test_cli_bridge tests.test_talk_cli -q` → `Ran 145 tests in 9.073s ... OK`。
+- `.venv\Scripts\python.exe -m py_compile bridges\pi_bridge.py tests\test_pi_bridge.py` 与 `git diff --check` 通过。
+
+### 边界 / 待验收
+
+- 未实际调用 Kimi3 或 DeepSeek 模型，未运行真实 TALK 消息 / Task Hall 往返；避免未经确认消耗模型额度。
+- `talk sync` 只全量替换项目 Agent 索引，不会删除运行中 Group 的旧成员关系；启动 `agent:deepseek` 并同步索引后，仍需在 `group:talk-dev` 成员面板人工移除 Claude / pi-kimi、加入 DeepSeek。
+- 当前无独立全能 Tester；Kimi3 可做 API / 日志 / 自动化检查，浏览器操作由项目管理者完成。
+- TH-6d 里程碑仍保持 `awaiting_human`，不进入 TH-7。
+
+### 变更文件
+
+- `bridges/pi_bridge.py`、`tests/test_pi_bridge.py`
+- `.talk/groups.yaml`、`.talk/agents/`
+- `AGENTS.md`、`docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_bridges.md`
+- `docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-07-31 TH-6d：里程碑 Test 门禁、Blackboard 控制与人工验收
 
 **背景**：TH-6c 已落地任务类型、冻结关系、结构化 Review 与两轮返工，但 Test 尚未成为根任务完成门禁，批次安全收尾和里程碑通过后也不会自动暂停。项目管理者确认继续 TH-6d。该切片同时涉及数据库、任务协议和前端真实交互，按决策 Agent 高风险单切片刹车完成后暂停等待人工验收，不进入 TH-7。

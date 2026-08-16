@@ -80,6 +80,27 @@ class PiBridgeTests(unittest.TestCase):
 
         self.assertEqual(args.pi_command, "pi --provider deepseek --print --mode text")
 
+    def test_provider_and_model_are_pinned_across_runtime_commands(self):
+        args = pi_bridge.build_parser().parse_args([
+            "--key",
+            "pi-key",
+            "--pi-provider",
+            "moonshotai-cn",
+            "--pi-model",
+            "kimi-k3",
+            "--pi-execution-profile",
+            "tools",
+        ])
+
+        for command in (
+            pi_bridge.resolve_pi_command(args),
+            pi_bridge.resolve_pi_task_command(args),
+            pi_bridge.resolve_pi_task_preflight_command(args),
+        ):
+            command_args = shlex.split(command, posix=True)
+            self.assertEqual(command_args[command_args.index("--provider") + 1], "moonshotai-cn")
+            self.assertEqual(command_args[command_args.index("--model") + 1], "kimi-k3")
+
     def test_default_pi_command_disables_auto_discovered_extensions(self):
         """plan-mode 在 rebindSession 里硬编码 setActiveTools 会覆盖我们注册的 talk_send。
         -ne 禁用所有自动发现扩展(包括 plan-mode),`-e <path>` 显式加载的不受影响。"""

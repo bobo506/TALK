@@ -65,7 +65,23 @@ DEFAULT_PI_COMMAND_LEGACY = (
 )
 
 
-def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussion") -> str:
+def _pi_model_args(*, provider: str | None = None, model: str | None = None) -> str:
+    """Build optional provider/model arguments for the pi CLI command."""
+    args: list[str] = []
+    if provider:
+        args.extend(("--provider", shlex.quote(provider)))
+    if model:
+        args.extend(("--model", shlex.quote(model)))
+    return f"{' '.join(args)} " if args else ""
+
+
+def _build_pi_command(
+    system_prompt: str,
+    *,
+    execution_profile: str = "discussion",
+    provider: str | None = None,
+    model: str | None = None,
+) -> str:
     """Build the pi CLI command for a given system prompt + execution profile.
 
     The system prompt is the system layer (PROJECT_INTEGRATION §5.4). Phase 2
@@ -79,10 +95,12 @@ def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussio
     real IDENTITY/SOUL markdown, and also passed newlines as literal ``\\n``.
     """
     system_prompt = _single_line(system_prompt)
+    model_args = _pi_model_args(provider=provider, model=model)
     if execution_profile == "tools":
         # 施工档命令（文件工具 + TALK Task Hall 工具）
         return (
-            "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
+            f"pi {model_args}--print --mode text --no-context-files --no-extensions "
+            "--no-session --thinking off "
             f"--tools read,grep,find,ls,bash,edit,write,{TALK_TOOL_CSV} "
             f"--extension {_TALK_EXTENSION_PATH} "
             f"--system-prompt {shlex.quote(system_prompt)}"
@@ -93,24 +111,32 @@ def _build_pi_command(system_prompt: str, *, execution_profile: str = "discussio
     #                     setActiveTools(NORMAL_MODE_TOOLS) 覆盖 talk_send 的 bug)
     # --extension <path>  显式加载我们自己的 talk_tools_extension.ts 不受 -ne 影响
     return (
-        f"pi --print --mode text --no-context-files --no-builtin-tools --no-extensions "
+        f"pi {model_args}--print --mode text --no-context-files --no-builtin-tools --no-extensions "
         f"--tools {TALK_TOOL_CSV} --no-session --thinking off "
         f"--extension {_TALK_EXTENSION_PATH} "
         f"--system-prompt {shlex.quote(system_prompt)}"
     )
 
 
-def _build_pi_task_command(system_prompt: str, *, execution_profile: str = "discussion") -> str:
+def _build_pi_task_command(
+    system_prompt: str,
+    *,
+    execution_profile: str = "discussion",
+    provider: str | None = None,
+    model: str | None = None,
+) -> str:
     """Build a queue-worker command without TALK result-delivery tools."""
     system_prompt = _single_line(system_prompt)
+    model_args = _pi_model_args(provider=provider, model=model)
     if execution_profile == "tools":
         return (
-            "pi --print --mode text --no-context-files --no-extensions --no-session --thinking off "
+            f"pi {model_args}--print --mode text --no-context-files --no-extensions "
+            "--no-session --thinking off "
             "--tools read,grep,find,ls,bash,edit,write "
             f"--system-prompt {shlex.quote(system_prompt)}"
         )
     return (
-        "pi --print --mode text --no-context-files --no-tools --no-extensions "
+        f"pi {model_args}--print --mode text --no-context-files --no-tools --no-extensions "
         f"--no-session --thinking off --system-prompt {shlex.quote(system_prompt)}"
     )
 
@@ -140,7 +166,12 @@ def resolve_pi_command(args: argparse.Namespace) -> str:
         member_id = cli_bridge.member_id_from_name(args.name)
         profile = load_profile(args.project, member_id)
         system_prompt = compose_system_prompt(DEFAULT_SYSTEM_PROMPT, profile)
-    return _build_pi_command(system_prompt, execution_profile=args.pi_execution_profile)
+    return _build_pi_command(
+        system_prompt,
+        execution_profile=args.pi_execution_profile,
+        provider=args.pi_provider,
+        model=args.pi_model,
+    )
 
 
 def resolve_pi_task_command(args: argparse.Namespace) -> str:
@@ -152,7 +183,12 @@ def resolve_pi_task_command(args: argparse.Namespace) -> str:
         member_id = cli_bridge.member_id_from_name(args.name)
         profile = load_profile(args.project, member_id)
         system_prompt = compose_system_prompt(TASK_SYSTEM_PROMPT, profile)
-    return _build_pi_task_command(system_prompt, execution_profile=args.pi_execution_profile)
+    return _build_pi_task_command(
+        system_prompt,
+        execution_profile=args.pi_execution_profile,
+        provider=args.pi_provider,
+        model=args.pi_model,
+    )
 
 
 def resolve_pi_task_preflight_command(args: argparse.Namespace) -> str:
@@ -167,7 +203,12 @@ def resolve_pi_task_preflight_command(args: argparse.Namespace) -> str:
         member_id = cli_bridge.member_id_from_name(args.name)
         profile = load_profile(args.project, member_id)
         system_prompt = compose_system_prompt(cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT, profile)
-    return _build_pi_task_command(system_prompt, execution_profile="discussion")
+    return _build_pi_task_command(
+        system_prompt,
+        execution_profile="discussion",
+        provider=args.pi_provider,
+        model=args.pi_model,
+    )
 
 
 DEFAULT_TIMEOUT_SEC = cli_bridge.DEFAULT_TIMEOUT_SEC
@@ -204,6 +245,16 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("discussion", "tools"),
         default="discussion",
         help="pi runtime permission profile. 'discussion' keeps tools disabled; 'tools' enables local read/bash/edit/write tools when using the default command.",
+    )
+    parser.add_argument(
+        "--pi-provider",
+        default=None,
+        help="Optional pi provider pinned on the generated default command, for example moonshotai-cn.",
+    )
+    parser.add_argument(
+        "--pi-model",
+        default=None,
+        help="Optional pi model pinned on the generated default command, for example kimi-k3.",
     )
     return parser
 
