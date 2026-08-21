@@ -184,6 +184,44 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-21 限制任务预检最多连续尝试 3 次
+
+**背景**：TH-6d 真实验收曾观察到 DeepSeek 预检协议输出无效后，worker 在每个轮询中执行正常提示和协议修复提示，两次均失败后仍在后续轮询继续调用，数分钟内生成至少 24 个无效 DSH session。项目管理者明确要求本切片只增加 3 次限制，不连续处理前端问题。
+
+### 完成事项
+
+- 将预检命令、超时、非零退出和无效协议结果统一包装为 `TaskPreflightError`；同一轮正常输出无效时仍保留一次协议修复机会。
+- 任务 worker 按 task id 记录连续预检失败，最多进入 3 个轮询尝试；前两次上报实例错误，第 3 次不再等待下一轮。
+- 达到上限后，bridge 领取 poison task，在对应 Task Hall 写入“已停止重试”的用户可见说明，并以 `failed` + `last_error` 完成任务，使终态持久化且不会进入第 4 次模型调用。
+- 任一预检成功会清除该任务此前的失败计数；某个任务预检失败不会阻止 worker 继续处理同轮其它排队任务。
+- 当前失败计数保存在 worker 进程内：达到第 3 次后的 `failed` 状态持久化；若在达到上限前人为重启 bridge，未完成计数不会跨进程继承。本切片未增加数据库字段或任务 API。
+- 用户手册补充“自动预检连续失败 3 次”的恢复说明。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py`：通过。
+- 3 条新增定向用例：协议修复仍失败会抛出专用错误；连续失败严格停在第 3 次并持久化任务失败；成功预检会清零先前计数。结果为 `Ran 3 tests in 0.005s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 143 tests in 0.543s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 376 tests in 105.860s`，`OK`。
+- 测试使用受控 fake runner 精确统计预检次数，确认没有第 4 次调用；本切片没有调用真实 DeepSeek 模型。
+- `git diff --check`：通过，仅有 Git 对工作区 LF/CRLF 转换的提示。
+
+### 当前结论与下一步
+
+- DeepSeek 多行 prompt 丢失与预检无限重试两个 bridge 阻断项均已完成代码修复和自动化验证。
+- 下一切片建议单独修复委派任务弹窗背景及根任务/子任务上下文标签，等待项目管理者确认后开始。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/spec/MODULE_bridges.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-08-21 修复 DeepSeek Windows 多行 prompt 丢失
 
 **背景**：TH-6d 真实验收确认 TALK 以多行最终 argv 调用全局 `dsh.cmd` 时，Windows npm shim 的 `%*` 转发只把首行送入 Harness。升级 `@deepseek-ai/dsh` 至 `0.1.0-rc.8` 后问题仍在，因此本切片只修复命令启动边界；项目管理者明确要求逐项处理，本次没有顺带修改预检重试或前端问题。

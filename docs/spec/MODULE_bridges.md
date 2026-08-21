@@ -59,6 +59,7 @@ python bridges/cli_bridge.py --name pi --runtime pi --bridge-label "pi bridge" -
 - 处理任务时状态从 `idle` 切到 `busy`，完成后回到 `idle`；命令失败、超时或异常时上报 `error`，进程退出前上报 `offline`。
 - 默认同时轮询 `/api/tasks?target_member_id=<member_id>&status=queued`，按 `id` 从小到大认领属于自己的排队任务。
 - 任务队列模式下，bridge 会通过 `/api/tasks/{id}/claim` 认领任务，调用 Codex CLI 后用直接文本消息把结果发给 `created_by`，再通过 `/api/tasks/{id}/complete` 写入 `succeeded / failed` 与 `result_message_id / last_error`。
+- 任务领取前预检若在正常输出和同轮协议修复后仍无法得到有效 `TALK_TASK_PREFLIGHT`，worker 会按任务累计连续失败；同一 bridge 进程最多执行 3 个预检轮询，第 3 次仍失败时会领取该任务、在 Task Hall 写入停止提示并以 `failed` 完成，避免进入第 4 次轮询。一次成功预检会清除先前失败计数；达到上限前重启 bridge 时内存计数不会跨进程继承。
 - 消息触发与任务队列触发共用同一把运行锁，同一 bridge 实例不会并发启动多个 Codex CLI 进程。
 - Codex 入口收到任务后调用可配置的 Codex CLI 命令，默认：
 
@@ -145,6 +146,7 @@ Web UI 中发送：
 - [x] 通用 CLI bridge 已抽出，可通过 `--name / --runtime / --command` 接入新的本地 CLI Agent。
 - [x] 通用 CLI bridge 支持 `stdin` 与 `argv` 两种 prompt 传递方式。
 - [x] Windows 下官方 `dsh.cmd` 会被安全解析为对应的 `@deepseek-ai/dsh` Node 入口，多行 prompt 作为单个最终 argv 完整送入 Harness；非 DSH `.cmd` 不受影响。
+- [x] 任务预检连续失败最多进入 3 个轮询尝试；第 3 次失败后任务持久化为 `failed` 并停止模型调用，成功预检会清零失败计数。
 - [x] Codex bridge 已接入任务队列 helper：可认领 queued task、运行 Codex、发送结果消息并完成任务状态。
 - [x] pi bridge 已落地：默认调用 `pi --print --mode text`，通过 argv 传入 TALK prompt。
 - [x] `python bridges/cli_bridge.py --help` 可正常输出参数说明。

@@ -76,6 +76,7 @@ DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_TASK_LEASE_SECONDS = 120
 DEFAULT_TASK_HEARTBEAT_INTERVAL = 5.0
+TASK_PREFLIGHT_MAX_ATTEMPTS = 3
 MAX_TASK_CONTROL_CHECK_INTERVAL = 5.0
 TASK_HALL_HISTORY_PAGE_SIZE = 500
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
@@ -2451,6 +2452,10 @@ class TaskLeaseLostError(RuntimeError):
     """Raised when a runner can no longer prove ownership of a task claim."""
 
 
+class TaskPreflightError(RuntimeError):
+    """Raised when one Task Hall preflight attempt cannot produce a decision."""
+
+
 def _effective_task_claim_check_interval(*, lease_seconds: int, heartbeat_interval: float) -> float:
     """Keep claim/control probes frequent enough to honor the five-second stop contract."""
     if lease_seconds <= 0 or heartbeat_interval <= 0:
@@ -2659,31 +2664,36 @@ async def _prepare_task_before_claim(
         decision_tier=decision_tier,
         hall_history=replay_context,
     )
-    result = await command_runner(
-        preflight_command,
-        prompt,
-        cwd=workdir,
-        timeout=timeout,
-        prompt_transport=prompt_transport,
-    )
     try:
-        decision = parse_task_preflight_result(result)
-    except RuntimeError:
-        if result.timed_out or result.returncode != 0:
-            raise
-        repair_prompt = (
-            f"{prompt}\n\n"
-            "你上一次的输出没有遵守协议。请重新判断，并且禁止解释、禁止 Markdown "
-            "代码围栏、禁止嵌套 JSON；只输出上面约定的一行 TALK_TASK_PREFLIGHT。"
-        )
-        repaired_result = await command_runner(
+        result = await command_runner(
             preflight_command,
-            repair_prompt,
+            prompt,
             cwd=workdir,
             timeout=timeout,
             prompt_transport=prompt_transport,
         )
-        decision = parse_task_preflight_result(repaired_result)
+        try:
+            decision = parse_task_preflight_result(result)
+        except RuntimeError:
+            if result.timed_out or result.returncode != 0:
+                raise
+            repair_prompt = (
+                f"{prompt}\n\n"
+                "你上一次的输出没有遵守协议。请重新判断，并且禁止解释、禁止 Markdown "
+                "代码围栏、禁止嵌套 JSON；只输出上面约定的一行 TALK_TASK_PREFLIGHT。"
+            )
+            repaired_result = await command_runner(
+                preflight_command,
+                repair_prompt,
+                cwd=workdir,
+                timeout=timeout,
+                prompt_transport=prompt_transport,
+            )
+            decision = parse_task_preflight_result(repaired_result)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        raise TaskPreflightError(f"task {task_id} preflight failed: {exc}") from exc
     if decision.action == "accept":
         try:
             accepted = await client.accept_task(task_id)
@@ -2876,6 +2886,70 @@ async def handle_queued_task(
         return False
     finally:
         await _stop_task_heartbeat(heartbeat_task)
+
+
+async def _fail_task_after_preflight_limit(
+    task: dict[str, Any],
+    *,
+    client: Any,
+    instance_id: str,
+    attempts: int,
+    error: TaskPreflightError,
+    lease_seconds: int,
+) -> bool:
+    """Persistently fail a poison task after its bounded preflight attempts."""
+    from TALK.client.exceptions import TalkValidationError
+
+    task_id = int(task["id"])
+    last_error = (
+        f"task {task_id} preflight failed after {attempts} attempts; "
+        f"automatic retries stopped: {error}"
+    )
+    try:
+        await client.accept_task(task_id)
+    except TalkValidationError as exc:
+        if exc.status_code != 409:
+            raise
+        current = await client.get_task(task_id)
+        if str(current.get("workflow_status") or "") != "accepted":
+            return False
+    try:
+        claimed = await client.claim_task(
+            task_id,
+            instance_id=instance_id,
+            lease_seconds=lease_seconds,
+        )
+    except TalkValidationError as exc:
+        if exc.status_code == 409:
+            return False
+        raise
+
+    result_message_id: int | None = None
+    creator = str(claimed.get("created_by") or task.get("created_by") or "").strip()
+    if creator:
+        try:
+            result_message = await client.send_text(
+                (
+                    f"自动预检连续失败 {attempts} 次，已停止重试并将任务标记为失败。"
+                    "请检查 Agent 的 TALK_TASK_PREFLIGHT 输出协议后重新创建任务。"
+                ),
+                to=[creator],
+                group_id=claimed.get("hall_group_id") or task.get("hall_group_id"),
+            )
+            result_message_id = int(result_message["id"])
+        except Exception as exc:
+            last_error = f"{last_error}; could not post preflight failure result: {exc}"
+
+    completion_kwargs: dict[str, Any] = {
+        "status": "failed",
+        "result_message_id": result_message_id,
+        "last_error": last_error,
+    }
+    claim_token = str(claimed.get("claim_token") or "").strip()
+    if claim_token:
+        completion_kwargs["claim_token"] = claim_token
+    await client.complete_task(task_id, **completion_kwargs)
+    return True
 
 
 async def handle_incoming_message(
@@ -3235,6 +3309,7 @@ async def run_task_queue_worker(
     run_lock: asyncio.Lock,
     report_status: Any,
 ) -> None:
+    preflight_failures: dict[int, tuple[int, TaskPreflightError]] = {}
     while True:
         try:
             requeue_expired = getattr(client, "requeue_expired_tasks", None)
@@ -3250,32 +3325,83 @@ async def run_task_queue_worker(
                 key=lambda item: int(item["id"]),
             )
             for task in queued:
+                task_id = int(task["id"])
                 async with run_lock:
-                    await handle_queued_task(
-                        task,
-                        client=client,
-                        member_id=member_id,
-                        workdir=workdir,
-                        instance_id=instance_id,
-                        command=getattr(args, "task_command", args.command),
-                        timeout=args.timeout,
-                        max_reply_chars=args.max_reply_chars,
-                        runtime=args.runtime,
-                        bridge_label=args.bridge_label,
-                        prompt_transport=args.prompt_transport,
-                        decision_tier=args.decision_tier,
-                        preflight_command=getattr(
-                            args,
-                            "task_preflight_command",
-                            getattr(args, "task_command", args.command),
-                        ),
-                        lease_seconds=getattr(args, "task_lease_seconds", DEFAULT_TASK_LEASE_SECONDS),
-                        heartbeat_interval=getattr(
-                            args,
-                            "task_heartbeat_interval",
-                            DEFAULT_TASK_HEARTBEAT_INTERVAL,
-                        ),
-                    )
+                    failure = preflight_failures.get(task_id)
+                    if failure is not None and failure[0] >= TASK_PREFLIGHT_MAX_ATTEMPTS:
+                        terminal = await _fail_task_after_preflight_limit(
+                            task,
+                            client=client,
+                            instance_id=instance_id,
+                            attempts=failure[0],
+                            error=failure[1],
+                            lease_seconds=getattr(
+                                args,
+                                "task_lease_seconds",
+                                DEFAULT_TASK_LEASE_SECONDS,
+                            ),
+                        )
+                        if terminal:
+                            preflight_failures.pop(task_id, None)
+                        continue
+                    try:
+                        await handle_queued_task(
+                            task,
+                            client=client,
+                            member_id=member_id,
+                            workdir=workdir,
+                            instance_id=instance_id,
+                            command=getattr(args, "task_command", args.command),
+                            timeout=args.timeout,
+                            max_reply_chars=args.max_reply_chars,
+                            runtime=args.runtime,
+                            bridge_label=args.bridge_label,
+                            prompt_transport=args.prompt_transport,
+                            decision_tier=args.decision_tier,
+                            preflight_command=getattr(
+                                args,
+                                "task_preflight_command",
+                                getattr(args, "task_command", args.command),
+                            ),
+                            lease_seconds=getattr(
+                                args,
+                                "task_lease_seconds",
+                                DEFAULT_TASK_LEASE_SECONDS,
+                            ),
+                            heartbeat_interval=getattr(
+                                args,
+                                "task_heartbeat_interval",
+                                DEFAULT_TASK_HEARTBEAT_INTERVAL,
+                            ),
+                        )
+                    except TaskPreflightError as exc:
+                        attempts = (failure[0] if failure is not None else 0) + 1
+                        preflight_failures[task_id] = (attempts, exc)
+                        if attempts >= TASK_PREFLIGHT_MAX_ATTEMPTS:
+                            terminal = await _fail_task_after_preflight_limit(
+                                task,
+                                client=client,
+                                instance_id=instance_id,
+                                attempts=attempts,
+                                error=exc,
+                                lease_seconds=getattr(
+                                    args,
+                                    "task_lease_seconds",
+                                    DEFAULT_TASK_LEASE_SECONDS,
+                                ),
+                            )
+                            if terminal:
+                                preflight_failures.pop(task_id, None)
+                        elif report_status is not None:
+                            await report_status(
+                                "error",
+                                last_error=(
+                                    f"task {task_id} preflight attempt "
+                                    f"{attempts}/{TASK_PREFLIGHT_MAX_ATTEMPTS} failed: {exc}"
+                                ),
+                            )
+                    else:
+                        preflight_failures.pop(task_id, None)
         except asyncio.CancelledError:
             raise
         except Exception as exc:

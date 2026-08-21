@@ -11,7 +11,7 @@ Updated: 2026-08-21 (Asia/Shanghai)
 - 人工验收已创建根任务 `#10`（Codex）和 Development 子任务 `#11`（DeepSeek）；DeepSeek 未认领 `#11`。当前所有 bridge 进程均已停止，数据库仍保留 `#10 running/in_progress`、`#11 queued/assigned` 的现场快照。
 - 验收发现两个前端问题：委派任务弹窗卡片透明；根任务与子任务共用“执行 Agent”标签，未清楚说明两阶段分配关系。
 - DeepSeek Windows 多行 prompt 丢失问题已修复：通用 bridge 识别并校验官方 `dsh.cmd` npm shim 后，直接以 Node 启动 Harness；配置命令保持不变，非 DSH `.cmd` 不受影响。
-- DeepSeek 仍有一个独立阻断项：预检协议失败后 bridge 会跨轮询无限重试并重复调用模型；按项目管理者要求，本切片没有顺带修复。
+- DeepSeek 预检跨轮询无限重试已修复：同一任务最多 3 个连续预检轮询，第 3 次仍失败时写入 Task Hall 提示并持久化为 `failed`，不会进入第 4 次；预检成功会清零此前失败计数。
 
 ## Current Snapshot
 
@@ -26,22 +26,23 @@ Updated: 2026-08-21 (Asia/Shanghai)
 - `.modal-card` 只定义尺寸与滚动，没有卡片背景、边框和阴影；视觉卡片样式只覆盖 `.group-create-panel` 等选择器，导致 `.task-create-panel.modal-card` 透明。
 - 根任务和子任务弹窗共用静态“执行 Agent”标签；建议按上下文改为“根任务负责人”和“子任务执行 Agent”，并补充两阶段说明。
 - DeepSeek Harness `0.1.0-rc.8` 的 `headless` profile、登录和 `deepseek-v4-pro` 调用本身可用；Windows npm `dsh.cmd` 多行参数边界已由 Node 入口直启方案修复，并有 shim 识别、非 DSH 保持原样和多行单 argv 回归覆盖。
-- 一个预检轮询会先运行正常提示，再运行一次协议修复提示；两次输出都无效后，worker 仅上报 error 并在下一轮继续，曾在数分钟内生成至少 24 个无效 DSH session。必须增加失败上限、退避或 poison-task 隔离，避免重复计费/消耗额度。
+- 一个预检轮询仍包含正常提示和最多一次协议修复，因此 3 个轮询上限最多触发 6 次预检 CLI 调用；上限由 worker 进程内计数，达到第 3 次后的 `failed` 终态会持久化，但达到上限前若人为重启 bridge，未完成计数不会跨进程继承。
 - 当前仍没有正式的全能力 Tester；Kimi3 可执行 API、日志和自动化检查，浏览器仍由项目管理者人工验收。
 - 附件正文注入、跨实例消息级原子去重、普通 Codex Desktop 自动注册 TALK MCP、项目级 Members / Activity 页面仍未完成。
 
 ## Next Slice
 
-1. 下一切片单独修复 DeepSeek 预检跨轮询无限重试：设计有界失败、退避或 poison-task 隔离，并补失败保护测试；开始前等待项目管理者确认。
-2. 修复委派任务弹窗背景和上下文标签，使用 Codex Browser 验证根任务/子任务两阶段流程与可访问名称。
-3. 修复验证通过后，安全处理旧 `#10/#11` 现场，从新根任务开始重新执行 Codex → DeepSeek → Kimi3 的 Development / Review / Test / 人工验收完整闭环。
-4. 只有真实三 Agent 人工验收通过后才进入 TH-7；之后再处理正式 Tester、附件正文注入、跨实例去重等债务。
+1. 下一切片单独修复委派任务弹窗背景和上下文标签，使用 Codex Browser 验证根任务/子任务两阶段流程与可访问名称；开始前等待项目管理者确认。
+2. 修复验证通过后，安全处理旧 `#10/#11` 现场，从新根任务开始重新执行 Codex → DeepSeek → Kimi3 的 Development / Review / Test / 人工验收完整闭环。
+3. 只有真实三 Agent 人工验收通过后才进入 TH-7；之后再处理正式 Tester、附件正文注入、跨实例去重等债务。
 
 ## Verification
 
-- 本切片定向回归：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q` → `Ran 140 tests in 0.574s`，`OK`。
-- 本切片全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 373 tests in 105.003s`，`OK`。
+- 多行 prompt 切片定向回归：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q` → `Ran 140 tests in 0.574s`，`OK`。
+- 多行 prompt 切片全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 373 tests in 105.003s`，`OK`。
 - 本机命令解析确认 `dsh.cmd --profile headless` 被转换为 `node.exe ...\@deepseek-ai\dsh\lib\bin.js --profile headless`；受控真实四行 prompt 同时携带首行、中文正文与末行约束，模型只返回 `DSH_MULTILINE_OK`。
+- 预检重试切片定向回归：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q` → `Ran 143 tests in 0.543s`，`OK`。
+- 预检重试切片全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 376 tests in 105.860s`，`OK`；模拟失败严格停在第 3 次，没有调用真实模型。
 - `dsh --version` 与 `npm list -g @deepseek-ai/dsh --depth=0` 均确认 `0.1.0-rc.8`；`dsh --profile headless --help` 正常加载现有 profile。
 - npm 全局安装的 6 个生命周期脚本结果均为退出码 0；`node-pty` 与 `koffi` 原生模块可加载，最小真实请求返回 `DSH_RC8_OK`。
 - `.dsh` 临时备份曾校验 121 个真实文件 SHA-256 与 510 个 Junction 结构；升级验证通过后已安全删除，`NODE_OPTIONS` 未持久化且无残留 Node/DSH 进程。

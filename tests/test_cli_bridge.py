@@ -1298,6 +1298,57 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.requests, [(12, 2)])
         self.assertEqual(client.sent, [])
 
+    def test_handle_queued_task_wraps_failed_preflight_attempt_after_repair(self):
+        class FakeClient:
+            def __init__(self):
+                self.claimed = []
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                return []
+
+            async def claim_task(self, task_id, **kwargs):
+                self.claimed.append(task_id)
+                raise AssertionError("failed preflight must not claim the task")
+
+        runner_calls = 0
+
+        async def invalid_runner(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            nonlocal runner_calls
+            runner_calls += 1
+            return CliRunResult(returncode=0, stdout="没有输出协议 JSON", stderr="")
+
+        async def scenario():
+            client = FakeClient()
+            with self.assertRaises(cli_bridge.TaskPreflightError) as raised:
+                await handle_queued_task(
+                    {
+                        "id": 12,
+                        "created_by": "human:bobo",
+                        "content": "实现服务",
+                        "hall_group_id": "group:task-12",
+                        "workflow_status": "assigned",
+                    },
+                    client=client,
+                    member_id="agent:deepseek",
+                    workdir=Path.cwd(),
+                    instance_id="agent:deepseek:test",
+                    command=["execute"],
+                    preflight_command=["preflight"],
+                    command_runner=invalid_runner,
+                    timeout=5,
+                    max_reply_chars=100,
+                    runtime="dsh",
+                    prompt_transport="argv",
+                )
+            return client, str(raised.exception)
+
+        client, error = asyncio.run(scenario())
+
+        self.assertEqual(runner_calls, 2)
+        self.assertEqual(client.claimed, [])
+        self.assertIn("task 12 preflight failed", error)
+        self.assertIn("valid TALK_TASK_PREFLIGHT decision", error)
+
     def test_handle_queued_task_claims_runs_replies_and_completes(self):
         class FakeClient:
             def __init__(self):
@@ -1537,6 +1588,186 @@ class CliBridgeTests(unittest.TestCase):
         asyncio.run(scenario())
 
         self.assertEqual(seen, [(3, "read-only-preflight-command")])
+
+    def test_task_worker_fails_task_after_three_preflight_attempts(self):
+        class FakeClient:
+            def __init__(self):
+                self.accepted = []
+                self.claimed = []
+                self.sent = []
+                self.completed = []
+
+            async def requeue_expired_tasks(self):
+                return []
+
+            async def list_tasks(self, **kwargs):
+                if self.completed:
+                    raise asyncio.CancelledError
+                return [
+                    {
+                        "id": 12,
+                        "created_by": "human:bobo",
+                        "hall_group_id": "group:task-12",
+                        "workflow_status": "clarification_answered",
+                    }
+                ]
+
+            async def accept_task(self, task_id):
+                self.accepted.append(task_id)
+                return {"id": task_id, "workflow_status": "accepted"}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                self.claimed.append((task_id, instance_id, lease_seconds))
+                return {
+                    "id": task_id,
+                    "created_by": "human:bobo",
+                    "hall_group_id": "group:task-12",
+                    "claim_token": "lease-12",
+                }
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
+                return {"id": 91}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id, "status": kwargs["status"]}
+
+        class Args:
+            command = "interactive-command"
+            task_command = "runner-owned-task-command"
+            task_preflight_command = "read-only-preflight-command"
+            timeout = 5
+            max_reply_chars = 100
+            runtime = "dsh"
+            bridge_label = "DeepSeek Harness bridge"
+            prompt_transport = "argv"
+            decision_tier = "execution"
+            task_lease_seconds = 30
+            task_heartbeat_interval = 5
+            task_poll_interval = 0
+
+        attempts = 0
+        reports = []
+
+        async def failed_preflight(task, **kwargs):
+            nonlocal attempts
+            attempts += 1
+            raise cli_bridge.TaskPreflightError("invalid preflight envelope")
+
+        async def report_status(status, **kwargs):
+            reports.append((status, kwargs))
+
+        async def scenario():
+            client = FakeClient()
+            original = cli_bridge.handle_queued_task
+            cli_bridge.handle_queued_task = failed_preflight
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=client,
+                    member_id="agent:deepseek",
+                    workdir=Path.cwd(),
+                    instance_id="agent:deepseek:test",
+                    args=Args(),
+                    run_lock=asyncio.Lock(),
+                    report_status=report_status,
+                )
+            except asyncio.CancelledError:
+                pass
+            finally:
+                cli_bridge.handle_queued_task = original
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(attempts, 3)
+        self.assertEqual(client.accepted, [12])
+        self.assertEqual(client.claimed, [(12, "agent:deepseek:test", 30)])
+        self.assertEqual(len(client.sent), 1)
+        self.assertIn("连续失败 3 次", client.sent[0][0])
+        self.assertEqual(client.sent[0][1:], (["human:bobo"], "group:task-12"))
+        self.assertEqual(len(client.completed), 1)
+        completion = client.completed[0][1]
+        self.assertEqual(completion["status"], "failed")
+        self.assertEqual(completion["result_message_id"], 91)
+        self.assertEqual(completion["claim_token"], "lease-12")
+        self.assertIn("failed after 3 attempts", completion["last_error"])
+        self.assertEqual(len(reports), 2)
+        self.assertIn("attempt 1/3 failed", reports[0][1]["last_error"])
+        self.assertIn("attempt 2/3 failed", reports[1][1]["last_error"])
+
+    def test_task_worker_clears_preflight_failures_after_success(self):
+        class FakeClient:
+            def __init__(self):
+                self.completed = []
+
+            async def requeue_expired_tasks(self):
+                return []
+
+            async def list_tasks(self, **kwargs):
+                if self.completed:
+                    raise asyncio.CancelledError
+                return [{"id": 12, "workflow_status": "assigned"}]
+
+            async def accept_task(self, task_id):
+                return {"id": task_id, "workflow_status": "accepted"}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return {"id": task_id, "claim_token": "lease-12"}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id, "status": kwargs["status"]}
+
+        class Args:
+            command = "command"
+            timeout = 5
+            max_reply_chars = 100
+            runtime = "dsh"
+            bridge_label = "DeepSeek Harness bridge"
+            prompt_transport = "argv"
+            decision_tier = "execution"
+            task_lease_seconds = 30
+            task_heartbeat_interval = 5
+            task_poll_interval = 0
+
+        calls = 0
+
+        async def alternating_preflight(task, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                return True
+            raise cli_bridge.TaskPreflightError(f"failure {calls}")
+
+        async def report_status(status, **kwargs):
+            return None
+
+        async def scenario():
+            client = FakeClient()
+            original = cli_bridge.handle_queued_task
+            cli_bridge.handle_queued_task = alternating_preflight
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=client,
+                    member_id="agent:deepseek",
+                    workdir=Path.cwd(),
+                    instance_id="agent:deepseek:test",
+                    args=Args(),
+                    run_lock=asyncio.Lock(),
+                    report_status=report_status,
+                )
+            except asyncio.CancelledError:
+                pass
+            finally:
+                cli_bridge.handle_queued_task = original
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(calls, 6)
+        self.assertEqual(len(client.completed), 1)
+        self.assertIn("failure 6", client.completed[0][1]["last_error"])
 
     def test_task_worker_uses_task_specific_command(self):
         class FakeClient:
