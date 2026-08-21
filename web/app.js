@@ -197,7 +197,10 @@ const taskDetailsActions = document.getElementById("task-details-actions");
 const taskDetailsRefreshBtn = document.getElementById("task-details-refresh-btn");
 const taskCreateOverlay = document.getElementById("task-create-overlay");
 const taskCreatePanel = document.getElementById("task-create-panel");
+const taskCreateHeading = document.getElementById("task-create-heading");
 const taskCreateProject = document.getElementById("task-create-project");
+const taskCreateContext = document.getElementById("task-create-context");
+const taskCreateAgentLabel = document.getElementById("task-create-agent-label");
 const taskCreateAgent = document.getElementById("task-create-agent");
 const taskCreateTitle = document.getElementById("task-create-title");
 const taskCreateContent = document.getElementById("task-create-content");
@@ -1388,6 +1391,12 @@ function taskOptionLabel(task) {
 
 function renderTaskCreateMode() {
   const childMode = Boolean(taskCreateParentRoot);
+  taskCreateHeading.textContent = childMode ? "创建子任务" : "委派根任务";
+  taskCreateContext.textContent = childMode
+    ? "为当前子任务选择执行 Agent；根任务负责人继续负责拆分、协调和汇总。"
+    : "先选择根任务负责人；根任务开始后，再从详情创建子任务并分别选择执行 Agent。";
+  taskCreateAgentLabel.textContent = childMode ? "子任务执行 Agent" : "根任务负责人";
+  submitTaskCreateBtn.textContent = childMode ? "创建子任务 Hall" : "创建根任务 Hall";
   taskCreateGovernance.classList.toggle("hidden", childMode);
   taskCreateQuality.classList.toggle("hidden", !childMode);
   taskCreateSliceBudget.disabled = !taskCreateDelegation.checked;
@@ -1486,7 +1495,9 @@ async function createTaskFromPanel(event) {
     }
   }
   if (!payload.target_member_id || !payload.content) {
-    showTaskCreateError("请选择执行 Agent，并填写任务正文。");
+    showTaskCreateError(
+      `请选择${taskCreateParentRoot ? "子任务执行 Agent" : "根任务负责人"}，并填写任务正文。`
+    );
     return;
   }
   if (taskCreateParentRoot && ["review", "test", "rework"].includes(payload.task_kind) && !payload.related_task_ids.length) {

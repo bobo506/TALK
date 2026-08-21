@@ -497,6 +497,11 @@ button:disabled {
   width: min(460px, 94vw);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow);
 }
 
 .modal-card.agent-profile-panel {
@@ -989,6 +994,14 @@ input.auth-input:-webkit-autofill:focus,
   padding: 18px;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.task-create-context {
+  max-width: 500px;
+  margin: 6px 0 0;
+  color: var(--muted-strong);
+  font-size: var(--font-control);
+  line-height: 1.5;
 }
 
 .task-create-advanced {

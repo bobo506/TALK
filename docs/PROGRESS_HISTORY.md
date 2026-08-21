@@ -184,6 +184,45 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-21 修复委派弹窗卡片与两阶段上下文
+
+**背景**：TH-6d 真实验收发现 `.task-create-panel.modal-card` 没有背景、边框和阴影，页面内容会透过弹窗；根任务与子任务又复用静态“执行 Agent”标签，无法直观看出先选根负责人、再为各子任务选执行者的两阶段关系。项目管理者要求本切片单独修复该前端问题。
+
+### 完成事项
+
+- 为通用 `.modal-card` 补齐实体背景、边框、圆角、文字颜色和阴影，任务创建弹窗不再透明；Group 创建和 Agent 人设等现有 modal 同时获得一致的卡片壳。
+- 任务弹窗新增 dialog 语义及标题、上下文说明和 Agent 标签锚点；根模式显示“委派根任务 / 根任务负责人 / 创建根任务 Hall”，子模式显示“创建子任务 / 子任务执行 Agent / 创建子任务 Hall”。
+- 根模式说明“根任务开始后再从详情创建子任务”，子模式说明“当前 Agent 只执行子任务，根负责人继续协调和汇总”；缺少 Agent 时的校验提示也随模式切换。
+- 更新前端资源 cache-busting 版本，避免浏览器继续使用旧 CSS / JS。
+- 前端静态测试新增卡片视觉属性、dialog / 可访问名称和动态两阶段文案断言；模块合同与用户手册同步当前按钮和字段名称。
+
+### 验证
+
+- `node --check web\app.js`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_task_web_ui -q`：`Ran 2 tests in 0.707s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 376 tests in 106.338s`，`OK`。
+- Codex Browser 使用隔离临时 TALK 服务真实登录并分别打开根任务和子任务弹窗：两种模式计算背景均为 `rgb(255, 254, 250)`，具有实线边框、`14px` 圆角和阴影；DOM 中标题、说明、Agent 标签、下拉框可访问名称和提交按钮全部与模式一致，控制台无 error / warning。
+- 隔离服务仅使用临时成员、项目、根任务和数据库；验证后关闭页面与服务并清理全部临时文件，现有 `talk.db` 和旧 `#10/#11` 现场未修改。
+- `git diff --check`：通过，仅有 Git 对工作区 LF/CRLF 转换的提示。
+
+### 当前结论与下一步
+
+- DeepSeek 多行 prompt、预检无限重试和委派弹窗两个前端问题均已完成修复及自动化 / Browser 验证。
+- 下一步等待项目管理者确认后安全处理旧 `#10/#11` 现场，并从新根任务重新执行真实三 Agent 完整验收；本切片不继续该操作。
+
+### 变更文件
+
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `tests/test_task_web_ui.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-08-21 限制任务预检最多连续尝试 3 次
 
 **背景**：TH-6d 真实验收曾观察到 DeepSeek 预检协议输出无效后，worker 在每个轮询中执行正常提示和协议修复提示，两次均失败后仍在后续轮询继续调用，数分钟内生成至少 24 个无效 DSH session。项目管理者明确要求本切片只增加 3 次限制，不连续处理前端问题。

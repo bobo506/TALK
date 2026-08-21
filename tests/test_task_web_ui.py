@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from tests.test_support import RouteTestCase
@@ -19,6 +20,9 @@ class TaskWebUiTests(RouteTestCase):
             "blackboard-columns",
             "task-details-panel",
             "task-create-overlay",
+            "task-create-heading",
+            "task-create-context",
+            "task-create-agent-label",
             "task-create-agent",
             "task-create-content",
             "task-create-milestone",
@@ -26,7 +30,10 @@ class TaskWebUiTests(RouteTestCase):
             "task-create-related",
         ):
             self.assertIn(f'id="{element_id}"', html)
-        self.assertIn("20260731-th6d-milestone-1", html)
+        self.assertIn("20260821-task-modal-context-1", html)
+        self.assertIn('role="dialog"', html)
+        self.assertIn('aria-labelledby="task-create-heading"', html)
+        self.assertIn('aria-labelledby="task-create-agent-label"', html)
 
     def test_task_ui_script_uses_project_scoped_api_and_safe_text_rendering(self):
         script = (PROJECT_ROOT / "web" / "app.js").read_text(encoding="utf-8")
@@ -42,5 +49,15 @@ class TaskWebUiTests(RouteTestCase):
         self.assertIn('payload.milestone_test_required = taskCreateMilestone.checked', script)
         self.assertIn("taskDetailsContent.textContent = task.content", script)
         self.assertIn("function renderBlackboard()", script)
+        self.assertIn('childMode ? "创建子任务" : "委派根任务"', script)
+        self.assertIn('childMode ? "子任务执行 Agent" : "根任务负责人"', script)
+        self.assertIn("根任务负责人继续负责拆分、协调和汇总", script)
         self.assertIn(".blackboard-columns", stylesheet)
         self.assertIn(".task-details-panel", stylesheet)
+        self.assertRegex(
+            stylesheet,
+            re.compile(
+                r"\.modal-card\s*\{[^}]*background:\s*var\(--card\);[^}]*box-shadow:\s*var\(--shadow\);",
+                re.DOTALL,
+            ),
+        )
