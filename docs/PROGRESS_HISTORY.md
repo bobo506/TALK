@@ -184,6 +184,54 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-21 TH-6d 真实三 Agent 人工验收中断与故障诊断
+
+**背景**：`c01a6a9` 已把本地拓扑收敛为 Codex、DeepSeek Harness、Kimi3，但此前未调用真实模型。项目管理者按 TH-6d 人工验收说明启动 TALK Server 与三个 bridge，并从 Project Blackboard 创建真实任务树。本轮未修改功能代码；只完成现场复核、故障诊断、验收结论纠正和上下文交接。
+
+### 实际验收进展
+
+- 本地项目 Agent 索引确认包含 `agent:codex`（Lead / decision）、`agent:deepseek`（Dev / execution）、`agent:pi`（Reviewer / execution），三个 member 曾成功注册实例。
+- 首次 `talk sync` 受本机 SOCKS proxy 环境影响，`httpx` 报缺少 `socksio`；通过在当前 PowerShell 清除 `ALL_PROXY / HTTP_PROXY / HTTPS_PROXY` 并为 localhost 设置 `NO_PROXY` 后恢复。这是本机启动环境问题，不是 TH-6d 协议缺陷。
+- 核对数据库后确认 `group:talk-dev` 从未创建；`.talk/groups.yaml` 只保存本地角色/profile 元数据。此前要求去该 Hall 成员面板删除 Claude / pi-kimi、加入 DeepSeek 的指引错误，后续人工验收不再包含该步骤。
+- Human 创建根任务 `#10` 并分配给 `agent:codex`；根任务成功 claim 并进入 `running/in_progress`。随后从根详情创建 Development 子任务 `#11` 并分配给 `agent:deepseek`。
+- 截止收尾复核，旧 bridge 进程均已停止；数据库保留 `#10 running/in_progress` 与 `#11 queued/assigned` 现场，作为后续故障修复与清理依据。
+
+### 验收发现 1：委派任务弹窗与流程文案
+
+- Codex in-app Browser 真实复现：委派任务遮罩存在，但 `.task-create-panel.modal-card` 本身透明，标题和标签直接叠在 Blackboard 上。
+- 计算样式确认卡片为 `background: rgba(0,0,0,0)`、`border: 0`、`box-shadow: none`。CSS 中卡片外观仅应用于 `.group-create-panel / .details-card / #composer / .auth-card`，`.modal-card` 只定义尺寸和滚动，导致任务弹窗漏掉背景层。
+- 根任务与子任务共用静态标签“执行 Agent”。实际流程是两阶段：首次“＋委派任务”选择根任务负责人；根运行后再从详情点击“创建开发 / Review / Test 子任务”选择子任务执行 Agent。旧验收说明虽分别写了 Codex / DeepSeek，却未说明选择发生在两个窗口，造成误导。
+- 后续修复应补齐 modal card 背景/边框/阴影，并按上下文显示“根任务负责人”与“子任务执行 Agent”及必要帮助文案。
+
+### 验收发现 2：DeepSeek Harness 未接收 Development
+
+- `#11` 始终保持 `queued/assigned`、`attempt=0`、无 claim；DeepSeek instance 进入 `error`，错误为 `task queue worker failed: task preflight did not return a valid TALK_TASK_PREFLIGHT decision`。
+- `headless` profile 为官方默认空覆盖，实际 provider/model 为 `deepseek-official/deepseek-v4-pro`，证明 Harness 登录和模型调用可用；不是 API Key、模型或任务正文配置错误。
+- 只读解码 `$DSH_HOME` 的持久 session 后确认，TALK 生成的完整多行预检 prompt 经 Windows `dsh.cmd` 后，模型实际只收到第一行“你是 agent:deepseek，通过 dsh CLI bridge 接入 TALK。”；任务编号、标题、正文和 `TALK_TASK_PREFLIGHT` 输出合同全部丢失。DeepSeek 因此把调用当成接入握手并返回就绪说明。
+- 根因位于 TALK `--prompt-transport argv` 与 Windows npm `.cmd/cmd.exe` 包装的多行参数兼容边界。Harness 已在 Windows profile 内默认使用 `pwsh`，但这发生在模型工具层，不能修复进入 Harness 之前的 `dsh.cmd` 参数损失。
+- 首选修复：原生 Windows 继续运行 TALK，但 bridge 绕过 `dsh.cmd`，直接调用 Harness Node 入口并添加多行 prompt 回归；WSL/Linux 可作为后备环境，不作为第一修复路径。
+
+### 验收发现 3：预检失败无限重试
+
+- `_prepare_task_before_claim()` 每次轮询先调用一次预检，协议解析失败后再调用一次 repair prompt；两次仍失败会抛错。
+- `run_task_queue_worker()` 捕获异常后只上报 instance error，随后继续下一轮轮询同一 queued task，没有任务级失败计数、退避或 poison-task 隔离。
+- 真实现场数分钟内生成至少 24 个 DSH 一次性 session，存在重复计费、额度消耗与日志膨胀风险。项目管理者已被提示立即停止 DeepSeek bridge；2026-08-21 复核时相关进程均不存在。
+- 后续必须增加跨轮询有界失败策略，并让相同阻断任务进入可观察、可人工恢复的状态；不能仅依靠一次调用内的 repair retry。
+
+### 当前结论与下一步
+
+- TH-6d 实现层的自动化与隔离浏览器闭环仍有效，但真实 Codex → DeepSeek → Kimi3 人工验收未完成，里程碑不能判定通过，也不能进入 TH-7。
+- 项目管理者决定先修复验收阻断项：优先处理 DeepSeek Windows 多行 prompt 与预检重试保护，再修复任务弹窗视觉和两阶段标签。
+- 修复完成后先安全处理旧 `#10/#11` 现场，从干净根任务重新跑 Development、Review、Test、自动暂停和人工验收完整闭环。
+
+### 验证与变更文件
+
+- 只读验证：Codex Browser DOM/截图/计算样式、SQLite 任务与 instance 状态、DSH Zstandard session 解码、官方 Harness 本地包源码与文档、Git 状态与进程状态。
+- 未修改功能代码、数据库或 Harness 用户配置；未继续执行 Review / Test。
+- 变更文件：`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+
+---
+
 ## 2026-08-16 本地 Agent 拓扑收敛：Codex + Kimi3 + DeepSeek Harness
 
 **背景**：项目管理者明确后续本地暂时只使用 3 个 Agent：Codex、通过 pi 接入的 Kimi3、通过 DeepSeek Harness 接入的 DeepSeek 各类模型；Claude Code 不再纳入当前本地拓扑。本片仅收敛 bridge 模型锁定、项目配置和相关文档，不调用真实模型。
