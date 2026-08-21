@@ -2,13 +2,13 @@
 
 ## Latest
 
-Updated: 2026-08-21 (Asia/Shanghai)
+Updated: 2026-08-22 (Asia/Shanghai)
 
-- 当前分支：`codex/task-hall`；当前 Codex 为决策 Agent。
+- 当前分支：`codex/task-hall`；当前 Codex 为决策 Agent。`cf12e8f` 及此前 4 个本地提交已推送到 `origin/codex/task-hall`。
 - TH-6d 代码、自动化回归与隔离浏览器闭环保持完成，但 2026-08-16 开始的本地三 Agent 真实人工验收**尚未通过**，当前暂停验收且不进入 TH-7。
 - 本地 dogfood 拓扑固定为 `agent:codex`（Lead / decision）、`agent:deepseek`（DeepSeek Harness / Dev / execution）、`agent:pi`（pi + `moonshotai-cn/kimi-k3` / Reviewer / execution）；Claude Code 与重复的 `agent:pi-kimi` 不再使用。
 - DeepSeek Harness 本机全局版本已从 `0.1.0-rc.6` 固定升级至 `0.1.0-rc.8`；CLI、`headless` profile、原生模块与最小真实模型调用均通过，临时备份已在验证成功后清理。
-- 人工验收已创建根任务 `#10`（Codex）和 Development 子任务 `#11`（DeepSeek）；DeepSeek 未认领 `#11`。当前所有 bridge 进程均已停止，数据库仍保留 `#10 running/in_progress`、`#11 queued/assigned` 的现场快照。
+- 旧人工验收树 `#10/#11` 已通过 `POST /api/tasks/10/cancel-tree` 安全收束为 `canceled/canceled`；claim、租约和实例占用均已清除，两个 Task Hall 与 3 条历史消息保留。操作前备份为 `backups/backup_2026-08-22.db`。
 - 验收发现的两个前端问题已修复：委派弹窗现在使用实体卡片；根任务与子任务模式分别显示“根任务负责人”和“子任务执行 Agent”，并补充两阶段说明。
 - DeepSeek Windows 多行 prompt 丢失问题已修复：通用 bridge 识别并校验官方 `dsh.cmd` npm shim 后，直接以 Node 启动 Harness；配置命令保持不变，非 DSH `.cmd` 不受影响。
 - DeepSeek 预检会话膨胀已修复：`runtime=dsh` 默认只允许 1 个跨轮询尝试，并自动加载项目内非持久化 patch；预检及同轮协议修复不再生成 DSH 会话窗口，正式执行仍保留一个正常会话。通用 runtime 默认 3 次上限，可由 CLI 显式覆盖。
@@ -19,7 +19,7 @@ Updated: 2026-08-21 (Asia/Shanghai)
 - `group:talk-dev` 实际不存在于 `talk.db`；`.talk/groups.yaml` 只提供本地角色/profile 元数据，不代表服务端已有同名 Hall。此前要求在该群成员面板删除/添加 Agent 的人工指引无效，已从后续计划移除。
 - TH-6d 服务端合同仍包含任务树控制、有限授权、澄清、Development / Review / Test / rework 关系、结构化质量门禁和里程碑人工验收。
 - `pi_bridge.py` 已能显式锁定 `moonshotai-cn/kimi-k3`；DeepSeek Harness 已升级到 `0.1.0-rc.8`。DeepSeek 配置仍写作通用 bridge + `dsh.cmd --profile headless`，Windows 实际子进程由 bridge 安全解析为官方 Harness Node 入口；Task Hall 预检会额外使用 `.talk/dsh/preflight-ephemeral.cordis.yml`，正式执行不加载该补丁。
-- 2026-08-21 只读复核时，本地 Server 与三个 bridge 均未运行；旧任务树 `#10/#11` 仅作为故障证据保留，修复后应先安全清理或另建验收任务树。
+- 2026-08-22 收束后，本地 Server 与三个 bridge 仍未运行；旧 `#10/#11` 不再可能被 bridge 领取，历史 Hall 和故障证据仍可回看。下一轮验收必须新建任务树。
 
 ## Current Boundaries
 
@@ -30,11 +30,16 @@ Updated: 2026-08-21 (Asia/Shanghai)
 
 ## Next Slice
 
-1. 等待项目管理者确认后，安全处理旧 `#10/#11` 现场，从新根任务开始重新执行 Codex → DeepSeek → Kimi3 的 Development / Review / Test / 人工验收完整闭环。
+1. 等待项目管理者确认后，从新根任务开始重新执行 Codex → DeepSeek → Kimi3 的 Development / Review / Test / 人工验收完整闭环；不得复用已取消的 `#10/#11`。
 2. 只有真实三 Agent 人工验收通过后才进入 TH-7；之后再处理正式 Tester、附件正文注入、跨实例去重等债务。
 
 ## Verification
 
+- GitHub 推送：`5583bad..cf12e8f  codex/task-hall -> codex/task-hall`；本地 `HEAD` 与 `origin/codex/task-hall` 均为 `cf12e8fdcef84dfc7e6a7d679d85be79b2d3665d`。
+- 旧树收束前运行 `scripts/backup_db.py`，生成 `backups/backup_2026-08-22.db`；备份与当前数据库 `PRAGMA quick_check` 均为 `ok`。
+- 无 lifespan 的本地 ASGI 调用以根请求者身份先读取 `/api/tasks/10/tree`，确认范围严格为 `[10, 11]`，再调用 `/api/tasks/10/cancel-tree` 返回 `200`；复核两项任务均为 `canceled/canceled`、根控制为 `canceled/manual_cancel`，claim / instance / token / lease 全部为空。
+- 只读复核确认两个旧 Task Hall 均保留且共有 3 条历史消息；8000 端口无监听，未启动任何 bridge，也未创建新验收任务。
+- 取消树合同定向回归：`.venv\Scripts\python.exe -m unittest tests.test_tasks.AgentTaskTests.test_checkpoint_and_cancel_tree_enforce_roles_and_preserve_history -q` → `Ran 1 test in 1.842s`，`OK`。
 - DSH 非持久化预检定向回归：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q` → `Ran 147 tests in 1.139s`，`OK`；覆盖项目 patch 自动注入、显式命令优先、缺失 patch 回退、runtime 默认上限以及 DeepSeek 一轮失败终止。
 - DSH `--dump-config` 合成配置确认 `session-persistence-jsonl` 与 `session-checkpoint-policy` 均被项目 patch 设为 `disabled: true`。
 - DSH 真实最小预检调用退出码为 0；调用前后 `C:\Users\Administrator\.dsh\sessions` 都是 55 个文件，新增或改写记录为 0。未启动 TALK bridge、未读取或修改旧 `#10/#11`。
@@ -63,7 +68,7 @@ Updated: 2026-08-21 (Asia/Shanghai)
 
 ## References
 
-- 当前模块合同：`docs/spec/MODULE_bridges.md`
+- 当前模块合同：`docs/spec/MODULE_tasks.md`
 - 用户操作手册：`docs/guides/USER_MANUAL.md`
 - 平台集成设计：`docs/spec/PROJECT_INTEGRATION.md`
 - 完整历史：`docs/PROGRESS_HISTORY.md`

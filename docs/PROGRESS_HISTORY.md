@@ -184,6 +184,42 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-22 推送修复并安全收束旧验收任务树
+
+**背景**：DeepSeek 非持久化预检切片已经提交但尚未推送；真实三 Agent 验收遗留根任务 `#10` 与 Development 子任务 `#11`，分别停在 `running/in_progress` 和 `queued/assigned`。项目管理者要求先提交 GitHub 并继续。本切片只处理推送和旧树收束，不启动 bridge、不创建新验收任务。
+
+### 完成事项
+
+- 将本地领先的 5 个提交推送到 GitHub `origin/codex/task-hall`；本地与远端均指向 `cf12e8f`。
+- 只读确认旧树范围严格为 `#10/#11`，无 Review/Test 关系或澄清记录；`#11` 从未 claim，`#10` 的旧租约早已过期。
+- 按项目脚本创建操作前 SQLite 在线备份 `backups/backup_2026-08-22.db`，并通过完整性检查。
+- 使用无 lifespan 的本地 ASGI 请求走正式鉴权和 `cancel-tree` API：先读取树并验证任务 id 为 `[10, 11]`，再由根请求者取消整树。
+- `#10/#11` 均进入 `canceled/canceled`，根控制为 `canceled`、检查点原因为 `manual_cancel`；claim、实例、token 与租约全部清除。
+- 两个 Task Hall 与其中 3 条历史消息保持不变；未启动 Server/bridge，未创建新任务。临时操作脚本已删除。
+- 顺手纠正 `MODULE_tasks.md` 中已经过时的预检重试和本地 `pi-kimi` 拓扑描述，使其与已落地 bridge 行为和当前三 Agent 配置一致。
+
+### 验证
+
+- GitHub push：`5583bad..cf12e8f  codex/task-hall -> codex/task-hall`；本地与远端 SHA 均为 `cf12e8fdcef84dfc7e6a7d679d85be79b2d3665d`。
+- 操作前备份与操作后 `talk.db` 的 `PRAGMA quick_check` 均返回 `ok`。
+- `GET /api/tasks/10/tree` 与 `POST /api/tasks/10/cancel-tree` 均返回 `200`。
+- SQLite 只读复核：`#10/#11 = canceled/canceled`，根 `control_status=canceled`，Hall 数为 2、Hall 历史消息数为 3。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks.AgentTaskTests.test_checkpoint_and_cancel_tree_enforce_roles_and_preserve_history -q`：`Ran 1 test in 1.842s`，`OK`。首次把测试类名误写为不存在的 `TaskApiTests`，该次未执行任何用例；更正为真实类名后通过。
+- 8000 端口无监听；Git 工作树在文档更新前保持干净。
+
+### 当前结论与下一步
+
+- 旧验收树已经永久停止，不会在重新启动 bridge 后被误领；历史证据和恢复备份仍保留。
+- 下一切片从全新根任务开始真实三 Agent 验收，依次验证 Codex 根协调、DeepSeek Development、Kimi3 Review/Test 与项目管理者人工验收；等待项目管理者确认后开始。
+
+### 变更文件
+
+- `docs/spec/MODULE_tasks.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-08-21 避免 DeepSeek 预检会话持久化
 
 **背景**：此前给预检增加 3 轮上限后，DeepSeek Harness 每次 `headless` 调用仍会创建持久会话；单轮又可能包含正常判断和协议修复，因此出错时仍会生成多个无效对话窗口。项目管理者决定保留领取前澄清，但要求预检不产生窗口，并把 DeepSeek 跨轮询限制为 1 轮。本切片只处理该 bridge 行为，不启动现有 bridge、不处理旧 `#10/#11`、不进入三 Agent 验收。
