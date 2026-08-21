@@ -99,10 +99,10 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 ### DeepSeek Harness 接入
 
 - 当前使用官方 `@deepseek-ai/dsh` `0.1.0-rc.8` 的 `headless` profile，其行为是接受一次性任务并把最终 assistant 消息写到 stdout。
-- TALK 通过 `bridges/cli_bridge.py --prompt-transport argv --command "dsh.cmd --profile headless"` 调用，不需要新建专用 bridge。
+- TALK 仍通过 `bridges/cli_bridge.py --prompt-transport argv --command "dsh.cmd --profile headless"` 配置，不需要新建专用 bridge；Windows 下通用 bridge 会校验该 shim 对应的官方 `@deepseek-ai/dsh` 包及其 `bin` 入口，再绕过 `.cmd`，直接以 Node 启动 Harness，避免 npm shim 的 `%*` 边界截断多行 argv。
 - TALK member 固定为 `agent:deepseek`，runtime 上报为 `dsh`；具体 DeepSeek 模型由 Harness profile 管理，不写死在 member ID 中。
 - `headless` profile 首次使用可能初始化 `$DSH_HOME/profiles/headless`；Harness 的登录、模型与工具权限属于 Harness 配置边界。
-- 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；这次依赖升级不等于修复 TALK 经 Windows `dsh.cmd` 传递多行 argv 的既有缺陷，bridge 启动边界仍需后续切片调整。
+- 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；随后已在 TALK bridge 启动边界完成上述 Windows shim 绕过，受控真实多行探针同时收到首行、中文行和末行令牌并返回 `DSH_MULTILINE_OK`。
 
 ## 当前本地固定拓扑（2026-08-16）
 
@@ -144,6 +144,7 @@ Web UI 中发送：
 - [x] bridge helper 逻辑有单元测试覆盖。
 - [x] 通用 CLI bridge 已抽出，可通过 `--name / --runtime / --command` 接入新的本地 CLI Agent。
 - [x] 通用 CLI bridge 支持 `stdin` 与 `argv` 两种 prompt 传递方式。
+- [x] Windows 下官方 `dsh.cmd` 会被安全解析为对应的 `@deepseek-ai/dsh` Node 入口，多行 prompt 作为单个最终 argv 完整送入 Harness；非 DSH `.cmd` 不受影响。
 - [x] Codex bridge 已接入任务队列 helper：可认领 queued task、运行 Codex、发送结果消息并完成任务状态。
 - [x] pi bridge 已落地：默认调用 `pi --print --mode text`，通过 argv 传入 TALK prompt。
 - [x] `python bridges/cli_bridge.py --help` 可正常输出参数说明。

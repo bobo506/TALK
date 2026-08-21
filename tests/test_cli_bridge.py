@@ -73,6 +73,49 @@ class CliBridgeTests(unittest.TestCase):
         self.assertTrue(Path(resolved[0]).is_absolute())
         self.assertEqual(resolved[1], "--version")
 
+    def test_resolve_command_executable_bypasses_official_windows_dsh_npm_shim(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            npm_root = Path(temp_dir)
+            package_root = npm_root / "node_modules" / "@deepseek-ai" / "dsh"
+            entry_path = package_root / "lib" / "bin.js"
+            entry_path.parent.mkdir(parents=True)
+            entry_path.write_text("// fake dsh entry\n", encoding="utf-8")
+            (package_root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "@deepseek-ai/dsh",
+                        "bin": {"dsh": "lib/bin.js"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            shim_path = npm_root / "dsh.cmd"
+            shim_path.write_text("@echo off\n", encoding="utf-8")
+            node_path = npm_root / "node.exe"
+            node_path.write_bytes(b"fake node")
+
+            resolved = resolve_command_executable(
+                [str(shim_path), "--profile", "headless"],
+                platform="nt",
+            )
+
+        self.assertEqual(
+            resolved,
+            [str(node_path), str(entry_path.resolve()), "--profile", "headless"],
+        )
+
+    def test_resolve_command_executable_keeps_non_dsh_windows_cmd(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            shim_path = Path(temp_dir) / "other.cmd"
+            shim_path.write_text("@echo off\n", encoding="utf-8")
+
+            resolved = resolve_command_executable(
+                [str(shim_path), "--version"],
+                platform="nt",
+            )
+
+        self.assertEqual(resolved, [str(shim_path), "--version"])
+
     def test_build_cli_task_prompt_for_pi_uses_raw_content(self):
         prompt = build_cli_task_prompt(
             {
@@ -798,10 +841,16 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "PI:hello")
 
     def test_run_cli_command_can_pass_prompt_as_final_argv(self):
+        prompt = "first line\nsecond line\n第三行"
+
         async def scenario():
             return await run_cli_command(
-                [sys.executable, "-c", "import sys; print('ARGV:' + sys.argv[1])"],
-                "hello argv",
+                [
+                    sys.executable,
+                    "-c",
+                    "import json, sys; print(json.dumps(sys.argv[1:]))",
+                ],
+                prompt,
                 cwd=Path.cwd(),
                 timeout=5,
                 prompt_transport="argv",
@@ -810,7 +859,7 @@ class CliBridgeTests(unittest.TestCase):
         result = asyncio.run(scenario())
 
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.strip(), "ARGV:hello argv")
+        self.assertEqual(json.loads(result.stdout), [prompt])
 
     def test_task_claim_checks_are_capped_at_five_seconds(self):
         self.assertEqual(

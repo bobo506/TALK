@@ -184,6 +184,41 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-21 修复 DeepSeek Windows 多行 prompt 丢失
+
+**背景**：TH-6d 真实验收确认 TALK 以多行最终 argv 调用全局 `dsh.cmd` 时，Windows npm shim 的 `%*` 转发只把首行送入 Harness。升级 `@deepseek-ai/dsh` 至 `0.1.0-rc.8` 后问题仍在，因此本切片只修复命令启动边界；项目管理者明确要求逐项处理，本次没有顺带修改预检重试或前端问题。
+
+### 完成事项
+
+- 通用 bridge 在 Windows 解析到 `dsh.cmd` 后，会读取同目录全局 npm 树中的 `@deepseek-ai/dsh/package.json`，校验包名、`bin` 配置、入口存在且未逃逸包目录。
+- 校验通过后，bridge 使用 npm 目录内的 `node.exe` 或系统 Node 直接启动 Harness JavaScript 入口，并保留原命令其余参数；任务预检和正式执行因共用 `run_cli_command` 均获得相同修复。
+- 识别范围严格限定为官方 `dsh.cmd`；manifest 无效、入口异常、Node 不可用或命令为其他 `.cmd` 时保持原命令，不改变其他 CLI 行为。
+- 新增官方 DSH shim 解析、非 DSH `.cmd` 保持原样以及中文多行 prompt 作为单个最终 argv 完整传输的回归测试。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 140 tests in 0.574s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 373 tests in 105.003s`，`OK`。
+- 本机解析探针确认配置中的 `dsh.cmd --profile headless` 实际转换为 `node.exe ...\@deepseek-ai\dsh\lib\bin.js --profile headless`。
+- 通过修复后的 `run_cli_command` 执行一次受控真实四行模型探针，DeepSeek 同时识别两行令牌并只返回 `DSH_MULTILINE_OK`，证明首行之后的正文和末行约束均未丢失。
+- `git diff --check`：通过，仅有 Git 对工作区 LF/CRLF 转换的提示。
+
+### 当前结论与下一步
+
+- DeepSeek Windows 多行 prompt 丢失已修复，现有 bridge 启动配置无需改写。
+- 预检协议失败后的跨轮询无限重试仍是独立阻断项；下一切片建议只处理该问题，等待项目管理者确认后开始。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/spec/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-08-21 DeepSeek Harness `0.1.0-rc.8` 受控升级与验证
 
 **背景**：TH-6d 真实三 Agent 人工验收已确认本机 `@deepseek-ai/dsh 0.1.0-rc.6` 经 Windows `dsh.cmd` 接收 TALK 多行 prompt 时只保留首行。项目管理者发现上游已发布 `0.1.0-rc.8`，决定先升级运行时基线，再进入 bridge 修复切片。

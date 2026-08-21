@@ -275,19 +275,59 @@ def parse_command(command: str) -> list[str]:
     return parsed
 
 
-def resolve_command_executable(args: Sequence[str]) -> list[str]:
+def _resolve_windows_dsh_npm_shim(args: Sequence[str], *, platform: str) -> list[str]:
+    resolved = list(args)
+    if platform != "nt" or not resolved:
+        return resolved
+
+    shim_path = Path(resolved[0])
+    if shim_path.name.lower() != "dsh.cmd":
+        return resolved
+
+    package_root = shim_path.parent / "node_modules" / "@deepseek-ai" / "dsh"
+    manifest_path = package_root / "package.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("name") != "@deepseek-ai/dsh":
+            return resolved
+        bin_config = manifest.get("bin")
+        bin_entry = bin_config.get("dsh") if isinstance(bin_config, dict) else bin_config
+        if not isinstance(bin_entry, str) or not bin_entry:
+            return resolved
+        package_root = package_root.resolve(strict=True)
+        entry_path = (package_root / bin_entry).resolve(strict=True)
+        entry_path.relative_to(package_root)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return resolved
+
+    sibling_node = shim_path.parent / "node.exe"
+    node_executable = str(sibling_node) if sibling_node.is_file() else None
+    if node_executable is None:
+        node_executable = shutil.which("node.exe") or shutil.which("node")
+    if node_executable is None:
+        return resolved
+
+    return [node_executable, str(entry_path), *resolved[1:]]
+
+
+def resolve_command_executable(
+    args: Sequence[str],
+    *,
+    platform: str | None = None,
+) -> list[str]:
     resolved = list(args)
     if not resolved:
         raise ValueError("CLI command cannot be empty")
 
     executable = resolved[0]
-    if Path(executable).parent != Path("."):
-        return resolved
-
-    found = shutil.which(executable)
-    if found:
-        resolved[0] = found
-    return resolved
+    if Path(executable).parent == Path("."):
+        found = shutil.which(executable)
+        if found:
+            resolved[0] = found
+    return _resolve_windows_dsh_npm_shim(
+        resolved,
+        platform=os.name if platform is None else platform,
+    )
 
 
 def strip_leading_mentions(text: str, *, member_id: str | None = None) -> str:
