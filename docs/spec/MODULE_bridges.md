@@ -59,7 +59,7 @@ python bridges/cli_bridge.py --name pi --runtime pi --bridge-label "pi bridge" -
 - 处理任务时状态从 `idle` 切到 `busy`，完成后回到 `idle`；命令失败、超时或异常时上报 `error`，进程退出前上报 `offline`。
 - 默认同时轮询 `/api/tasks?target_member_id=<member_id>&status=queued`，按 `id` 从小到大认领属于自己的排队任务。
 - 任务队列模式下，bridge 会通过 `/api/tasks/{id}/claim` 认领任务，调用 Codex CLI 后用直接文本消息把结果发给 `created_by`，再通过 `/api/tasks/{id}/complete` 写入 `succeeded / failed` 与 `result_message_id / last_error`。
-- 任务领取前预检若在正常输出和同轮协议修复后仍无法得到有效 `TALK_TASK_PREFLIGHT`，worker 会按任务累计连续失败；同一 bridge 进程最多执行 3 个预检轮询，第 3 次仍失败时会领取该任务、在 Task Hall 写入停止提示并以 `failed` 完成，避免进入第 4 次轮询。一次成功预检会清除先前失败计数；达到上限前重启 bridge 时内存计数不会跨进程继承。
+- 任务领取前预检若在正常输出和同轮协议修复后仍无法得到有效 `TALK_TASK_PREFLIGHT`，worker 会按任务累计连续失败。通用 runtime 默认最多 3 个预检轮询；`runtime=dsh` 默认只执行 1 个轮询，失败后立即领取该任务、在 Task Hall 写入停止提示并以 `failed` 完成，避免 DeepSeek Harness 重复调用膨胀。可用 `--task-preflight-max-attempts 1..3` 显式覆盖；一次成功预检会清除先前失败计数，达到上限前重启 bridge 时内存计数不会跨进程继承。
 - 消息触发与任务队列触发共用同一把运行锁，同一 bridge 实例不会并发启动多个 Codex CLI 进程。
 - Codex 入口收到任务后调用可配置的 Codex CLI 命令，默认：
 
@@ -101,6 +101,8 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 
 - 当前使用官方 `@deepseek-ai/dsh` `0.1.0-rc.8` 的 `headless` profile，其行为是接受一次性任务并把最终 assistant 消息写到 stdout。
 - TALK 仍通过 `bridges/cli_bridge.py --prompt-transport argv --command "dsh.cmd --profile headless"` 配置，不需要新建专用 bridge；Windows 下通用 bridge 会校验该 shim 对应的官方 `@deepseek-ai/dsh` 包及其 `bin` 入口，再绕过 `.cmd`，直接以 Node 启动 Harness，避免 npm shim 的 `%*` 边界截断多行 argv。
+- 当 `runtime=dsh` 且 `--project` 指向包含 `.talk/dsh/preflight-ephemeral.cordis.yml` 的项目时，通用 bridge 会只给领取前预检命令追加该 `--patch`。补丁关闭 `session-persistence-jsonl` 与 `session-checkpoint-policy`，所以正常预检及同轮协议修复都不会出现在 DSH 会话列表中；正式任务命令保持原始 `headless` 配置，一次正式执行仍只持久化一个会话。
+- 显式传入 `--task-preflight-command` 时以调用方配置为准，不再自动追加项目补丁；自定义命令需要自行保证只读权限与非持久化语义。DeepSeek 的跨轮询上限默认是 1，仍保留单轮内最多一次协议修复以及信息不足时的 Task Hall 澄清流程。
 - TALK member 固定为 `agent:deepseek`，runtime 上报为 `dsh`；具体 DeepSeek 模型由 Harness profile 管理，不写死在 member ID 中。
 - `headless` profile 首次使用可能初始化 `$DSH_HOME/profiles/headless`；Harness 的登录、模型与工具权限属于 Harness 配置边界。
 - 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；随后已在 TALK bridge 启动边界完成上述 Windows shim 绕过，受控真实多行探针同时收到首行、中文行和末行令牌并返回 `DSH_MULTILINE_OK`。
@@ -146,7 +148,8 @@ Web UI 中发送：
 - [x] 通用 CLI bridge 已抽出，可通过 `--name / --runtime / --command` 接入新的本地 CLI Agent。
 - [x] 通用 CLI bridge 支持 `stdin` 与 `argv` 两种 prompt 传递方式。
 - [x] Windows 下官方 `dsh.cmd` 会被安全解析为对应的 `@deepseek-ai/dsh` Node 入口，多行 prompt 作为单个最终 argv 完整送入 Harness；非 DSH `.cmd` 不受影响。
-- [x] 任务预检连续失败最多进入 3 个轮询尝试；第 3 次失败后任务持久化为 `failed` 并停止模型调用，成功预检会清零失败计数。
+- [x] 任务预检跨轮询有界：通用 runtime 默认最多 3 次，DeepSeek 默认 1 次；达到上限后任务持久化为 `failed`，成功预检会清零失败计数。
+- [x] DeepSeek 领取前预检自动使用项目内非持久化 DSH patch；真实最小调用验证没有新增或改写会话文件，正式执行命令不受影响。
 - [x] Codex bridge 已接入任务队列 helper：可认领 queued task、运行 Codex、发送结果消息并完成任务状态。
 - [x] pi bridge 已落地：默认调用 `pi --print --mode text`，通过 argv 传入 TALK prompt。
 - [x] `python bridges/cli_bridge.py --help` 可正常输出参数说明。

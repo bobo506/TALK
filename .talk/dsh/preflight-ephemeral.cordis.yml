@@ -1,0 +1,7 @@
+# Task Hall 领取前预检只需要本轮结构化判断，不应出现在 DeepSeek Harness
+# 的会话列表中。正式任务执行仍使用 headless profile 的默认持久化配置。
+- id: session-persistence-jsonl
+  disabled: true
+
+- id: session-checkpoint-policy
+  disabled: true

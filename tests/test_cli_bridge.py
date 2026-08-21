@@ -32,6 +32,8 @@ from bridges.cli_bridge import (
     parse_talk_actions,
     resolve_decision_tier,
     resolve_command_executable,
+    resolve_task_preflight_command,
+    resolve_task_preflight_max_attempts,
     run_cli_command,
 )
 
@@ -61,11 +63,14 @@ class CliBridgeTests(unittest.TestCase):
             "pi",
             "--command",
             "pi run -",
+            "--task-preflight-max-attempts",
+            "2",
         ])
 
         self.assertEqual(args.name, "pi")
         self.assertEqual(args.runtime, "pi")
         self.assertEqual(args.command, "pi run -")
+        self.assertEqual(args.task_preflight_max_attempts, 2)
 
     def test_resolve_command_executable_uses_path_lookup(self):
         resolved = resolve_command_executable([Path(sys.executable).name, "--version"])
@@ -115,6 +120,77 @@ class CliBridgeTests(unittest.TestCase):
             )
 
         self.assertEqual(resolved, [str(shim_path), "--version"])
+
+    def test_resolve_task_preflight_command_adds_project_dsh_ephemeral_patch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir)
+            patch_path = (
+                project_root
+                / ".talk"
+                / "dsh"
+                / "preflight-ephemeral.cordis.yml"
+            )
+            patch_path.parent.mkdir(parents=True)
+            patch_path.write_text("- id: fake\n", encoding="utf-8")
+
+            class Args:
+                runtime = "dsh"
+                project = str(project_root)
+                command = "dsh.cmd --profile headless"
+                task_preflight_command = None
+
+            resolved = resolve_task_preflight_command(Args())
+
+        self.assertEqual(
+            resolved,
+            [
+                "dsh.cmd",
+                "--profile",
+                "headless",
+                "--patch",
+                str(patch_path.resolve()),
+            ],
+        )
+
+    def test_resolve_task_preflight_command_respects_explicit_override(self):
+        class Args:
+            runtime = "dsh"
+            project = str(Path.cwd())
+            command = "dsh.cmd --profile headless"
+            task_preflight_command = "custom-preflight"
+
+        self.assertEqual(
+            resolve_task_preflight_command(Args()),
+            "custom-preflight",
+        )
+
+    def test_resolve_task_preflight_command_falls_back_without_patch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class Args:
+                runtime = "dsh"
+                project = temp_dir
+                command = "dsh.cmd --profile headless"
+                task_preflight_command = None
+
+            self.assertEqual(
+                resolve_task_preflight_command(Args()),
+                "dsh.cmd --profile headless",
+            )
+
+    def test_resolve_task_preflight_max_attempts_uses_runtime_defaults_and_override(self):
+        class DeepSeekArgs:
+            runtime = "dsh"
+
+        class PiArgs:
+            runtime = "pi"
+
+        class OverrideArgs:
+            runtime = "dsh"
+            task_preflight_max_attempts = 2
+
+        self.assertEqual(resolve_task_preflight_max_attempts(DeepSeekArgs()), 1)
+        self.assertEqual(resolve_task_preflight_max_attempts(PiArgs()), 3)
+        self.assertEqual(resolve_task_preflight_max_attempts(OverrideArgs()), 2)
 
     def test_build_cli_task_prompt_for_pi_uses_raw_content(self):
         prompt = build_cli_task_prompt(
@@ -1589,7 +1665,7 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertEqual(seen, [(3, "read-only-preflight-command")])
 
-    def test_task_worker_fails_task_after_three_preflight_attempts(self):
+    def test_task_worker_fails_dsh_task_after_one_preflight_attempt(self):
         class FakeClient:
             def __init__(self):
                 self.accepted = []
@@ -1680,21 +1756,19 @@ class CliBridgeTests(unittest.TestCase):
 
         client = asyncio.run(scenario())
 
-        self.assertEqual(attempts, 3)
+        self.assertEqual(attempts, 1)
         self.assertEqual(client.accepted, [12])
         self.assertEqual(client.claimed, [(12, "agent:deepseek:test", 30)])
         self.assertEqual(len(client.sent), 1)
-        self.assertIn("连续失败 3 次", client.sent[0][0])
+        self.assertIn("连续失败 1 次", client.sent[0][0])
         self.assertEqual(client.sent[0][1:], (["human:bobo"], "group:task-12"))
         self.assertEqual(len(client.completed), 1)
         completion = client.completed[0][1]
         self.assertEqual(completion["status"], "failed")
         self.assertEqual(completion["result_message_id"], 91)
         self.assertEqual(completion["claim_token"], "lease-12")
-        self.assertIn("failed after 3 attempts", completion["last_error"])
-        self.assertEqual(len(reports), 2)
-        self.assertIn("attempt 1/3 failed", reports[0][1]["last_error"])
-        self.assertIn("attempt 2/3 failed", reports[1][1]["last_error"])
+        self.assertIn("failed after 1 attempts", completion["last_error"])
+        self.assertEqual(reports, [])
 
     def test_task_worker_clears_preflight_failures_after_success(self):
         class FakeClient:
@@ -1730,6 +1804,7 @@ class CliBridgeTests(unittest.TestCase):
             task_lease_seconds = 30
             task_heartbeat_interval = 5
             task_poll_interval = 0
+            task_preflight_max_attempts = 3
 
         calls = 0
 

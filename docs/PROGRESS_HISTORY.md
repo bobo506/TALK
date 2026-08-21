@@ -184,6 +184,43 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-21 避免 DeepSeek 预检会话持久化
+
+**背景**：此前给预检增加 3 轮上限后，DeepSeek Harness 每次 `headless` 调用仍会创建持久会话；单轮又可能包含正常判断和协议修复，因此出错时仍会生成多个无效对话窗口。项目管理者决定保留领取前澄清，但要求预检不产生窗口，并把 DeepSeek 跨轮询限制为 1 轮。本切片只处理该 bridge 行为，不启动现有 bridge、不处理旧 `#10/#11`、不进入三 Agent 验收。
+
+### 完成事项
+
+- 新增项目内 `.talk/dsh/preflight-ephemeral.cordis.yml`，只关闭 DSH 的 `session-persistence-jsonl` 和 `session-checkpoint-policy`。
+- 通用 bridge 在 `runtime=dsh`、使用官方 `dsh / dsh.cmd / dsh.exe` 启动命令且 `--project` 下存在补丁时，只为 Task Hall 预检追加 `--patch`；正式任务命令保持原样，因此成功执行仍只保留一个正常 DSH 会话。
+- 显式 `--task-preflight-command` 继续优先，自定义命令与缺失补丁时保持旧行为，避免隐式改写第三方命令。
+- 新增 `--task-preflight-max-attempts 1..3`；DeepSeek 默认 1 轮，其他 runtime 默认 3 轮。单轮内的协议修复和信息不足时的澄清流程均保留。
+- 新增自动注入、显式覆盖、缺失补丁回退、runtime 默认上限和 DeepSeek 一轮失败终止回归测试。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 147 tests in 1.139s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 380 tests in 156.709s`，`OK`。
+- `python bridges/cli_bridge.py --help`：正常展示 `--task-preflight-max-attempts {1,2,3}`。
+- DSH `--dump-config` 确认补丁后的 `session-persistence-jsonl` 与 `session-checkpoint-policy` 均为 `disabled: true`。
+- 真实最小 DSH 调用退出码为 0；调用前后用户级 sessions 目录均为 55 个文件，新增或改写为 0。此次未启动 TALK bridge，旧 `#10/#11` 现场未变。
+
+### 当前结论与下一步
+
+- DeepSeek 的澄清判断仍在，但预检与同轮协议修复不再出现在 DSH 会话列表；失败至多 1 轮，成功后只有正式执行会保留一个会话。
+- 下一切片仍需先安全处理旧 `#10/#11`，再从新根任务执行 Codex → DeepSeek → Kimi3 的 Development / Review / Test / 人工验收完整闭环；等待项目管理者确认后开始。
+
+### 变更文件
+
+- `.talk/dsh/preflight-ephemeral.cordis.yml`
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/spec/MODULE_bridges.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-08-21 修复委派弹窗卡片与两阶段上下文
 
 **背景**：TH-6d 真实验收发现 `.task-create-panel.modal-card` 没有背景、边框和阴影，页面内容会透过弹窗；根任务与子任务又复用静态“执行 Agent”标签，无法直观看出先选根负责人、再为各子任务选执行者的两阶段关系。项目管理者要求本切片单独修复该前端问题。

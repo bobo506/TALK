@@ -77,6 +77,8 @@ DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_TASK_LEASE_SECONDS = 120
 DEFAULT_TASK_HEARTBEAT_INTERVAL = 5.0
 TASK_PREFLIGHT_MAX_ATTEMPTS = 3
+DSH_TASK_PREFLIGHT_MAX_ATTEMPTS = 1
+DSH_PREFLIGHT_PATCH_RELATIVE_PATH = Path(".talk") / "dsh" / "preflight-ephemeral.cordis.yml"
 MAX_TASK_CONTROL_CHECK_INTERVAL = 5.0
 TASK_HALL_HISTORY_PAGE_SIZE = 500
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
@@ -329,6 +331,51 @@ def resolve_command_executable(
         resolved,
         platform=os.name if platform is None else platform,
     )
+
+
+def _is_dsh_launcher_command(command_args: Sequence[str]) -> bool:
+    if not command_args:
+        return False
+    return Path(command_args[0]).name.lower() in {"dsh", "dsh.cmd", "dsh.exe"}
+
+
+def resolve_task_preflight_command(args: argparse.Namespace) -> str | list[str]:
+    """Resolve the Task Hall preflight command, including the DSH overlay."""
+    configured = getattr(args, "task_preflight_command", None)
+    if configured:
+        return configured
+
+    task_command = getattr(args, "task_command", None) or args.command
+    if str(getattr(args, "runtime", "")).strip().lower() != "dsh":
+        return task_command
+
+    project_root = getattr(args, "project", None)
+    if not project_root:
+        return task_command
+    patch_path = (
+        Path(project_root).expanduser().resolve()
+        / DSH_PREFLIGHT_PATCH_RELATIVE_PATH
+    )
+    if not patch_path.is_file():
+        return task_command
+
+    command_args = (
+        parse_command(task_command)
+        if isinstance(task_command, str)
+        else list(task_command)
+    )
+    if not _is_dsh_launcher_command(command_args):
+        return task_command
+    return [*command_args, "--patch", str(patch_path)]
+
+
+def resolve_task_preflight_max_attempts(args: argparse.Namespace) -> int:
+    configured = getattr(args, "task_preflight_max_attempts", None)
+    if configured is not None:
+        return int(configured)
+    if str(getattr(args, "runtime", "")).strip().lower() == "dsh":
+        return DSH_TASK_PREFLIGHT_MAX_ATTEMPTS
+    return TASK_PREFLIGHT_MAX_ATTEMPTS
 
 
 def strip_leading_mentions(text: str, *, member_id: str | None = None) -> str:
@@ -3310,6 +3357,7 @@ async def run_task_queue_worker(
     report_status: Any,
 ) -> None:
     preflight_failures: dict[int, tuple[int, TaskPreflightError]] = {}
+    max_preflight_attempts = resolve_task_preflight_max_attempts(args)
     while True:
         try:
             requeue_expired = getattr(client, "requeue_expired_tasks", None)
@@ -3328,7 +3376,7 @@ async def run_task_queue_worker(
                 task_id = int(task["id"])
                 async with run_lock:
                     failure = preflight_failures.get(task_id)
-                    if failure is not None and failure[0] >= TASK_PREFLIGHT_MAX_ATTEMPTS:
+                    if failure is not None and failure[0] >= max_preflight_attempts:
                         terminal = await _fail_task_after_preflight_limit(
                             task,
                             client=client,
@@ -3377,7 +3425,7 @@ async def run_task_queue_worker(
                     except TaskPreflightError as exc:
                         attempts = (failure[0] if failure is not None else 0) + 1
                         preflight_failures[task_id] = (attempts, exc)
-                        if attempts >= TASK_PREFLIGHT_MAX_ATTEMPTS:
+                        if attempts >= max_preflight_attempts:
                             terminal = await _fail_task_after_preflight_limit(
                                 task,
                                 client=client,
@@ -3397,7 +3445,7 @@ async def run_task_queue_worker(
                                 "error",
                                 last_error=(
                                     f"task {task_id} preflight attempt "
-                                    f"{attempts}/{TASK_PREFLIGHT_MAX_ATTEMPTS} failed: {exc}"
+                                    f"{attempts}/{max_preflight_attempts} failed: {exc}"
                                 ),
                             )
                     else:
@@ -3417,6 +3465,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
     args.decision_tier = resolve_decision_tier(args, member_id)
     configure_talk_tool_environment(args, member_id)
     workdir = Path(args.workdir).expanduser().resolve()
+    args.task_preflight_command = resolve_task_preflight_command(args)
     client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval)
     await client.register(member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})")
     instance_id = args.instance_id or f"{member_id}:{uuid4()}"
@@ -3540,6 +3589,13 @@ def build_parser(
         "--task-preflight-command",
         default=None,
         help="Optional read-only CLI command used for Task Hall preflight; defaults to the task execution command",
+    )
+    parser.add_argument(
+        "--task-preflight-max-attempts",
+        type=int,
+        choices=range(1, TASK_PREFLIGHT_MAX_ATTEMPTS + 1),
+        default=None,
+        help="Maximum consecutive Task Hall preflight polling attempts; defaults to 1 for dsh and 3 for other runtimes",
     )
     parser.add_argument("--task-lease-seconds", type=int, default=DEFAULT_TASK_LEASE_SECONDS)
     parser.add_argument(
