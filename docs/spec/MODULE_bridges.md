@@ -98,10 +98,11 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 
 ### DeepSeek Harness 接入
 
-- 当前使用官方 `@deepseek-ai/dsh` `0.1.0-rc.6` 的 `headless` profile，其行为是接受一次性任务并把最终 assistant 消息写到 stdout。
+- 当前使用官方 `@deepseek-ai/dsh` `0.1.0-rc.8` 的 `headless` profile，其行为是接受一次性任务并把最终 assistant 消息写到 stdout。
 - TALK 通过 `bridges/cli_bridge.py --prompt-transport argv --command "dsh.cmd --profile headless"` 调用，不需要新建专用 bridge。
 - TALK member 固定为 `agent:deepseek`，runtime 上报为 `dsh`；具体 DeepSeek 模型由 Harness profile 管理，不写死在 member ID 中。
 - `headless` profile 首次使用可能初始化 `$DSH_HOME/profiles/headless`；Harness 的登录、模型与工具权限属于 Harness 配置边界。
+- 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；这次依赖升级不等于修复 TALK 经 Windows `dsh.cmd` 传递多行 argv 的既有缺陷，bridge 启动边界仍需后续切片调整。
 
 ## 当前本地固定拓扑（2026-08-16）
 

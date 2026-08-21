@@ -184,6 +184,39 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-21 DeepSeek Harness `0.1.0-rc.8` 受控升级与验证
+
+**背景**：TH-6d 真实三 Agent 人工验收已确认本机 `@deepseek-ai/dsh 0.1.0-rc.6` 经 Windows `dsh.cmd` 接收 TALK 多行 prompt 时只保留首行。项目管理者发现上游已发布 `0.1.0-rc.8`，决定先升级运行时基线，再进入 bridge 修复切片。
+
+### 完成事项
+
+- 两次手工 `npx @deepseek-ai/dsh@next --version` 尝试都在 npm `idealTree` 依赖解析阶段触及约 2 GiB 的 V8 堆上限；日志确认 DSH 尚未启动，全局版本仍为 `0.1.0-rc.6`。
+- 在没有 DSH 进程运行时，为 `C:\Users\Administrator\.dsh` 建立临时结构化备份：121 个真实文件逐一校验 SHA-256，510 个 Junction 的相对路径、类型与目标全部一致。
+- 通过仅对单次安装进程设置 `NODE_OPTIONS=--max-old-space-size=4096`，执行固定版本全局安装；npm 完成 `added 23 / removed 100 / changed 428 packages`，全局 DSH 升级为 `0.1.0-rc.8`。
+- npm 11.16 的 `allow-scripts` 提示仅表示尚未记录审批；安装日志确认 6 个生命周期脚本均已执行且退出码为 0，没有再次执行或放宽全局脚本策略。
+- 全部升级验证通过后，先移除备份内 510 个 Junction 本身，再递归删除唯一临时备份目录；复核确认目录不存在。
+
+### 验证
+
+- `dsh --version` 与 `npm list -g @deepseek-ai/dsh --depth=0` 均返回 `0.1.0-rc.8`。
+- `dsh --help` 与 `dsh --profile headless --help` 正常，现有 `headless` profile 可加载。
+- Node 直接加载 `node-pty` 与 `koffi`，分别确认 `spawn` 与 `load` 导出可用。
+- 最小真实模型请求 `dsh --profile headless '只回复 DSH_RC8_OK，不要使用工具。'` 返回 `DSH_RC8_OK`，验证现有登录、模型调用与会话存储链路。
+- 临时 `NODE_OPTIONS` 未持久化；收尾时无 Node/npm/npx/DSH 残留进程，项目工作区在文档同步前保持干净。
+
+### 当前结论与下一步
+
+- DeepSeek Harness 运行时升级完成，但上游发行说明没有声明修复外部 npm `.cmd` 多行 argv 边界；本次也未修改 TALK bridge，因此不能把升级视为验收阻断项已修复。
+- 下一切片继续绕过 `dsh.cmd` 调用 Harness Node 入口，并为预检失败增加跨轮询有界重试/退避与回归测试；完成后再做受控真实多行 prompt 探针。
+
+### 变更文件
+
+- `docs/spec/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-08-21 TH-6d 真实三 Agent 人工验收中断与故障诊断
 
 **背景**：`c01a6a9` 已把本地拓扑收敛为 Codex、DeepSeek Harness、Kimi3，但此前未调用真实模型。项目管理者按 TH-6d 人工验收说明启动 TALK Server 与三个 bridge，并从 Project Blackboard 创建真实任务树。本轮未修改功能代码；只完成现场复核、故障诊断、验收结论纠正和上下文交接。
