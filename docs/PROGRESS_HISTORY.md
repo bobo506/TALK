@@ -2,7 +2,34 @@
 
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-06-02 5.x agent-to-agent 通信主线关闭（黑盒复测通过）
+最后更新：2026-08-27 Kimi Code prompt mode 参数修复与首次真实验收中断收尾
+
+## 2026-08-27 Kimi Code prompt mode 参数修复与首次真实验收中断收尾
+
+**背景**：项目管理者完成 Kimi Code 登录后，启动 `agent:codex / agent:deepseek / agent:kimi` 原生拓扑执行 TH-6d 真实验收。第一次任务树为根任务 `#12`、Development `#13`、Review `#14`。
+
+**真实验收结果**：
+
+- DeepSeek 真实领取并完成 `#13`，结果消息 `#2473`；生成 `.tmp/th6d-native-kimi-acceptance.txt`，内容为三行受控 marker，UTF-8 无 BOM、CRLF、61 bytes，SHA-256 为 `CC4B2278EDFEB377BA3B32575BBE8168D66F2F8F311D5E48612C52116F897B3F`。
+- Kimi 在 `#14` 领取前预检阶段连续三次安全失败，错误为 `Cannot combine --prompt with --auto.`，结果消息 `#2474`；任务没有被误认领，证明领取前门禁按设计止损。
+- 根任务 `#12` 随后因嵌套 Codex CLI workspace 额度耗尽失败，结果消息 `#2475`。该失败属于运行额度限制，不是 TALK 协议、Kimi 登录或 DeepSeek 执行缺陷；旧树保留现场，不再复用。
+
+**根因与修复**：
+
+- Kimi Code CLI `0.38.0` 的 prompt mode（`-p/--prompt`）本身就是非交互执行，并明确拒绝与 `--auto` 同时使用。
+- `bridges/kimi_bridge.py` 的默认命令移除 `--auto`；讨论、预检与任务执行的能力边界继续由临时 Agent 文件的工具白名单控制。
+- `tests/test_kimi_bridge.py` 增加反向锁定，确保所有 prompt mode 命令都不含 `--auto`；`docs/spec/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 同步真实 CLI 合同。
+- 使用临时 Read-only Agent 文件执行真实 Kimi 工具调用，成功读取受控 marker 并返回 `KIMI_PROMPT_TOOL_OK`，退出码为 `0`；临时 Agent 文件随后删除。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge -q` → `Ran 119 tests in 0.913s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 389 tests in 170.772s`，`OK`。
+- `py_compile` 与 `git diff --check` 通过；仅有 Windows LF/CRLF 提示。
+
+**恢复决策**：新的干净验收树不再启动嵌套 Codex bridge，由当前 Codex Desktop 会话直接以 `agent:codex` Lead 身份通过 SDK/API 协调 DeepSeek 与 Kimi。Test 门禁通过后保留 `awaiting_human`，等待项目管理者人工验收。
+
+---
 
 ## 2026-06-07 5.7+ 对话质量打磨 + PROJECT_INTEGRATION 长期方向沉淀
 

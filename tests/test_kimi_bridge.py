@@ -36,7 +36,7 @@ class KimiBridgeTests(unittest.TestCase):
         for command in (message, task, preflight):
             command_args = shlex.split(command, posix=True)
             self.assertEqual(command_args[0], "kimi")
-            self.assertIn("--auto", command_args)
+            self.assertNotIn("--auto", command_args)
             self.assertEqual(command_args[command_args.index("--output-format") + 1], "stream-json")
             self.assertIn("--agent-file", command_args)
             self.assertIn("--skills-dir", command_args)

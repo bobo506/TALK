@@ -84,7 +84,6 @@ def _build_kimi_command(
 ) -> str:
     args = [
         "kimi",
-        "--auto",
         "--output-format",
         "stream-json",
         "--agent-file",

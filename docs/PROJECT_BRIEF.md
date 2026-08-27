@@ -320,7 +320,7 @@ TALK/
 
 - 项目管理者确认：固定 Kimi Reviewer 从 `agent:pi` + pi runtime 迁移为 `agent:kimi` + 官方 Kimi Code CLI；旧成员只保留历史消息与任务归属，不再启动。
 - `bridges/kimi_bridge.py` 复用通用 bridge 的 TALK 消息、任务队列、租约与动作协议，使用 Kimi `stream-json` 的最后一条 Assistant 消息作为可见输出。
-- Kimi 讨论与任务预检固定无工具；任务默认 Review 档只开放 `Read / Grep / Glob / Bash`，显式 `tools` 档才开放 `Edit / Write`，且三个运行档都禁止自行派生 subagent。CLI 使用 `--auto` 避免无人值守权限交互，但不能突破上述工具白名单。
+- Kimi 讨论与任务预检固定无工具；任务默认 Review 档只开放 `Read / Grep / Glob / Bash`，显式 `tools` 档才开放 `Edit / Write`，且三个运行档都禁止自行派生 subagent。Kimi prompt mode 不追加与 `-p` 冲突的 `--auto`，能力边界由上述工具白名单控制。
 - Kimi Code CLI 会保留官方 session 记录；当前把它视为本地审计事实，不自动删除或续接。下一次 TH-6d 人工验收必须使用新的 `agent:kimi` 拓扑重新跑完整任务树。
 
 ## 2026-05-15 Agent Workflow Addendum

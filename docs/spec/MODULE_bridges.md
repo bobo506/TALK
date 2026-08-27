@@ -100,7 +100,7 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 ### Kimi Code 原生入口
 
 - `bridges/kimi_bridge.py` 默认注册为 `agent:kimi`，runtime 上报为 `kimi-code`，使用本机官方 Kimi Code CLI；pi bridge 继续作为通用多 provider 兼容入口，但不再承载当前 dogfood 的 Kimi 成员。
-- 默认使用 `argv` 传递 prompt，实际命令形态为 `kimi --auto --output-format stream-json --agent-file <临时 Agent 文件> --skills-dir <受控空目录> -p <prompt>`；`--auto` 避免无人值守 bridge 卡在交互式权限询问，实际能力仍由 Agent 文件工具白名单限制。可通过 `--kimi-model` 临时锁定 Kimi Code 模型别名。
+- 默认使用 `argv` 传递 prompt，实际命令形态为 `kimi --output-format stream-json --agent-file <临时 Agent 文件> --skills-dir <受控空目录> -p <prompt>`。Kimi Code `0.38.0` 的 prompt mode 本身是非交互执行，且明确拒绝 `--prompt` 与 `--auto` 同用；实际能力继续由 Agent 文件工具白名单限制。可通过 `--kimi-model` 临时锁定 Kimi Code 模型别名。
 - bridge 每次启动会从 `.talk/agents/agent_kimi/` 读取 IDENTITY / SOUL / USER，并在临时目录生成三个 Kimi Agent 文件：普通 Group Hall 讨论无工具，Task Hall 预检无工具，任务执行默认 `review` 档只开放 `Read / Grep / Glob / Bash`。
 - `--kimi-task-profile tools` 只给任务执行 Agent 额外开放 `Edit / Write`；讨论与预检仍保持无工具。三个 Agent 文件都设置 `subagents: []`，避免 Kimi 在 TALK 的单执行 Agent 合同外自行展开子 Agent。
 - 通用 bridge 会解析 Kimi `stream-json`，忽略 Tool / meta 事件，只把最后一条有文本的 Assistant 消息交给 TALK 动作协议、门禁解析和可见回复。
@@ -163,7 +163,7 @@ Web UI 中发送：
 - [x] DeepSeek 领取前预检自动使用项目内非持久化 DSH patch；真实最小调用验证没有新增或改写会话文件，正式执行命令不受影响。
 - [x] Codex bridge 已接入任务队列 helper：可认领 queued task、运行 Codex、发送结果消息并完成任务状态。
 - [x] pi bridge 已落地：默认调用 `pi --print --mode text`，通过 argv 传入 TALK prompt。
-- [x] Kimi Code 原生 bridge 已落地：默认调用 `kimi --auto -p --output-format stream-json`，通过临时 Agent 文件隔离讨论 / 预检 / Review 工具面并提取最终 Assistant 输出。
+- [x] Kimi Code 原生 bridge 已落地：默认调用 `kimi -p --output-format stream-json`，通过临时 Agent 文件隔离讨论 / 预检 / Review 工具面并提取最终 Assistant 输出；回归锁定 prompt mode 不追加不兼容的 `--auto`。
 - [x] `python bridges/cli_bridge.py --help` 可正常输出参数说明。
 - [x] `python bridges/codex_bridge.py --help` 可正常输出参数说明。
 - [x] `python bridges/pi_bridge.py --help` 可正常输出参数说明。
