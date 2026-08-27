@@ -2,7 +2,40 @@
 
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-08-27 Kimi Code prompt mode 参数修复与首次真实验收中断收尾
+最后更新：2026-08-27 TH-6d 原生三 Agent V2 自动门禁通过，等待人工验收
+
+## 2026-08-27 TH-6d 原生三 Agent V2 自动门禁通过，等待人工验收
+
+**目标**：在 Kimi prompt mode 参数修复提交 `921fbb1` 上，用当前 Codex Desktop 会话作为 Lead、DeepSeek Harness 作为 Dev、官方 Kimi Code CLI 作为 Reviewer/Tester，重新执行一棵不复用旧失败任务的完整验收树。
+
+**运行拓扑**：
+
+- TALK Server：`http://127.0.0.1:8000`
+- Lead：当前 Codex Desktop 会话，以 `agent:codex` SDK/API 身份协调；没有启动额度耗尽的嵌套 Codex bridge。
+- Dev：`agent:deepseek`，DeepSeek Harness bridge。
+- Reviewer/Tester：`agent:kimi`，官方 Kimi Code CLI `0.38.0`，`review` 工具档。
+- 项目档案同步结果精确为 `agent:codex / agent:deepseek / agent:kimi` 三个活动成员。
+
+**任务树与证据**：
+
+- 根任务 `#15`：`TH-6d 三 Agent 验收 V2（Kimi Code）`，`may_delegate=true`、里程碑 Test 必需、授权批次仅 1 个 Development 切片。当前 Task Hall 为 `group:task-2d0cf86216b742f3adc157a3695ebeef`。
+- Development `#16`：DeepSeek 只创建 `.tmp/th6d-native-kimi-acceptance-v2.txt`，未改 tracked 文件；任务结果消息 `#2476`。文件为 65 bytes、UTF-8 无 BOM、末尾 LF，SHA-256 为 `602FBC88D523943F2798942F0F898B354834372C1BC53AEECBF3233FAC2743DF`。
+- Review `#17`：Kimi 原生 bridge 真实领取并完成，relation `reviews -> #16`；独立核对三行内容、编码、字节、哈希、Git 状态和 Development 结果消息，门禁 `approved`、`findings=[]`，结果消息 `#2477`。
+- Test `#18`：Kimi 原生 bridge 真实领取并完成，relation `tests -> #16`；独立运行 `119` 项 Kimi/通用 bridge 定向回归，`1.052s`、`OK`，并完成 marker/Git/Review 黑盒核验，门禁 `passed`、`findings=[]`，结果消息 `#2478`。
+- Lead 在根 Task Hall 写入汇总消息 `#2479`，明确自动门禁通过但不代替项目管理者宣告里程碑完成。
+
+**服务端门禁状态**：
+
+- Review gate 当前 verdict=`approved`，覆盖冻结 Development `#16`。
+- Test gate 的 `frozen_task_ids=[16]`、verdict=`passed`、`satisfied=true`。
+- 根任务 `#15` 已自动撤销 Lead claim 并进入 `control_status=awaiting_human`、`checkpoint_reason=milestone`；这是预期的人工作业门禁，不是失败或阻塞。
+- Test `#18` 已由 Lead 收集为 `succeeded/completed`；当前 Codex Desktop instance 回报 `idle`。
+
+**额外验证**：修复后 Lead 全量回归为 `389 tests in 170.772s`、`OK`；Kimi 独立定向回归为 `119 tests in 1.052s`、`OK`。
+
+**待人工验收**：打开 `http://127.0.0.1:8000`，进入任务 `#15`，检查三项子任务与质量门禁后点击“人工验收通过”。当前 Server、DeepSeek bridge 与 Kimi bridge 保持运行；V1/V2 两个 `.tmp` 验收文件保持 untracked，不进入 Git。
+
+---
 
 ## 2026-08-27 Kimi Code prompt mode 参数修复与首次真实验收中断收尾
 
