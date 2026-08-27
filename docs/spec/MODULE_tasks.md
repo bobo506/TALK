@@ -232,7 +232,7 @@
 - 正式执行 prompt 会复用预检阶段按时间顺序分页取得的完整 Hall 上下文，包含 B 的问题、A 的显式答复以及可见文件元数据；附件正文仍不会自动下载或注入。
 - runner 默认申请 120 秒租约；claim 心跳同时承担根控制探针，默认及硬上限均为每 5 秒一次，即使显式传入更长的 `--task-heartbeat-interval` 也不会放宽控制检查上限。每轮队列轮询仍会先回收属于自己的过期 claim，再领取 queued task。
 - runner 在本地命令执行期间持续验证 token。服务端因暂停、检查点、整树终止或其它 claim 失效原因返回 `404 / 409` 时，通用 CLI 与 Codex runner 都会取消执行协程；`run_cli_command` 收到取消后终止并回收本地子进程，不发送结果、不调用 `complete`。正常完成时仍携带 token 回写，由服务端再次做原子校验。
-- Codex / pi bridge 为队列 worker 使用独立任务命令：保留所选 read-only / workspace-write 能力，但不向嵌套模型暴露 TALK 结果投递工具；Task Hall 的结果消息只由 runner 写入，避免模型工具调用与 runner 可见输出形成重复结果。
+- Codex / Kimi 活动 bridge 与 pi 兼容 bridge 都为队列 worker 使用独立任务命令：保留所选 read-only / workspace-write 能力，但不向嵌套模型暴露 TALK 结果投递工具；Task Hall 的结果消息只由 runner 写入，避免模型工具调用与 runner 可见输出形成重复结果。
 - 旧任务若没有 `hall_group_id`，runner 会保留原有全局时间线回传行为，服务端继续接受这类兼容结果。
 
 ### 终端工具
@@ -459,7 +459,7 @@ TH-6d 已把 Test 纳入服务端强门禁：里程碑 Test 只能覆盖根任�
 - `talk_list_agents` 与项目 Agent API 应返回项目业务角色、`decision_tier`、实例状态和能力摘要，便于主 Agent 建议开发者、Reviewer 与 Tester。
 - `business_role` 仍是项目自定义自由文本，服务端不把 `dev / reviewer / tester` 固化成全局枚举；质量任务通过 `task_kind` 与门禁结论获得强语义。
 - 主 Agent 可选择合适成员，但服务端仍强制 Reviewer 与被审开发者分离、根任务控制权限、门禁完整性和暂停传播。
-- 当前 `.talk/groups.yaml` 只保留 `agent:codex`（lead）、`agent:deepseek`（dev）与 `agent:pi`（reviewer）；Kimi3 可承担自动化检查，但尚无独立具备完整浏览器黑盒能力的 `tester`，里程碑浏览器验收仍由项目管理者完成。
+- 当前 `.talk/groups.yaml` 只保留 `agent:codex`（lead）、`agent:deepseek`（dev）与 `agent:kimi`（reviewer）；Kimi 通过官方 Kimi Code CLI 承担自动化检查，但尚无独立具备完整浏览器黑盒能力的 `tester`，里程碑浏览器验收仍由项目管理者完成。
 
 ### 兼容、非目标与实施顺序
 
@@ -483,7 +483,7 @@ TH-6d 已把 Test 纳入服务端强门禁：里程碑 Test 只能覆盖根任�
 - TH-6a3 已实现每任务 1–2 轮澄清额度、显式问题 / 答复边界账本、`clarification_answered / needs_decision`、人工释放动作和 claim 原子门禁；TH-6b 已让 bundled runner 在 claim 前自动预检、等待显式答复、分页重放完整 Hall，并通过稳定问题标记恢复发送后未登记的中断窗口。
 - 预检只接受显式 `TALK_TASK_PREFLIGHT` JSON，兼容单行、显式标记后的多行 JSON 和已观察到的嵌套 `ready` 变体；纯自然语言不会被猜测为结论。成功命令首次格式无效时会用同一只读 / 无工具命令纠正一次；模型超时、命令失败或再次无效均不会 claim，也不会消耗澄清轮次。跨轮询已有有界上限：DeepSeek 默认 1 轮，其它 runtime 默认 3 轮；达到上限会把任务持久化为 `failed`，当前计数不跨 bridge 进程继承。
 - 类型化质量任务树在存在非终态后代、最新开发 / 返工未成功、必需 Review 未获 `approved` 或里程碑最新冻结集未获 `passed` Test 时不能成功完成；纯 `general` 旧任务树继续保持旧流程兼容。
-- `task_kind`、Review / Test 结构化结论、独立关系、质量上下文、Review / 返工 / Test 门禁和人工验收暂停均已落地；现有 `agent:pi` profile 仍不具备完整浏览器黑盒测试能力，正式流水线需配置能启动隔离服务、调用 API、控制浏览器和读取日志的 Tester，当前 dogfood 由 Kimi3 做自动化检查、项目管理者做浏览器人工验收。
+- `task_kind`、Review / Test 结构化结论、独立关系、质量上下文、Review / 返工 / Test 门禁和人工验收暂停均已落地；现有 `agent:kimi` profile 仍不具备完整浏览器黑盒测试能力，正式流水线需配置能启动隔离服务、调用 API、控制浏览器和读取日志的 Tester，当前 dogfood 由 Kimi 做自动化检查、项目管理者做浏览器人工验收。
 - 无租约字段的历史 `running` 任务不会被自动回收，避免升级时误判仍在执行的旧 runner。
 - Project Blackboard 与 Task Hall Web UI 已覆盖创建、查看、Hall 协作、接受 / 澄清、质量子任务、根控制、结果收取、人工验收和安全取消；项目级 `Members / Activity` 独立页面与 observer 尚未实现。
 - 服务端能验证任务类型、冻结关系、Reviewer 分离和结构化结论，但无法仅凭自由文本业务角色证明第三方 Tester 具备操作系统级工具权限；实际隔离与浏览器 / 日志能力仍由 runner 配置和人工选择保证。

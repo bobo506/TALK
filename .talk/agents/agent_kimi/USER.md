@@ -1,4 +1,4 @@
-# agent:pi — USER（在项目「TALK」中）
+# agent:kimi — USER（在项目「TALK」中）
 
 ## 项目所有者
 human:bobo —— 项目管理者，直接、反感汇报体。

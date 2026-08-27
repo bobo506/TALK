@@ -26,9 +26,9 @@
 ## 当前本地 Agent 拓扑
 
 - `agent:codex`：Codex CLI，Lead，`decision_tier=decision`。
-- `agent:pi`：pi runtime 固定使用 `moonshotai-cn/kimi-k3`，Reviewer，`decision_tier=execution`。
+- `agent:kimi`：官方 Kimi Code CLI，Reviewer，`decision_tier=execution`。
 - `agent:deepseek`：DeepSeek Harness（`dsh`）承载 DeepSeek 各类模型，Dev，`decision_tier=execution`。
-- 项目管理者于 2026-08-16 确认：本地 dogfood 暂时只使用上述 3 个 Agent，不再启动 Claude Code，也不再保留重复的 `agent:pi-kimi`。
+- 项目管理者于 2026-08-27 确认：本地 dogfood 暂时只使用上述 3 个 Agent；Kimi 从 pi runtime 迁移到官方 Kimi Code CLI，不再启动 Claude Code，也不再保留 `agent:pi` / `agent:pi-kimi` 作为活动成员。
 
 ## Agent 决策分级（抽象字典）
 

@@ -2,73 +2,54 @@
 
 ## Latest
 
-Updated: 2026-08-22 (Asia/Shanghai)
+Updated: 2026-08-27 (Asia/Shanghai)
 
-- 当前分支：`codex/task-hall`；当前 Codex 为决策 Agent。`cf12e8f` 及此前 4 个本地提交已推送到 `origin/codex/task-hall`。
-- TH-6d 代码、自动化回归与隔离浏览器闭环保持完成，但 2026-08-16 开始的本地三 Agent 真实人工验收**尚未通过**，当前暂停验收且不进入 TH-7。
-- 本地 dogfood 拓扑固定为 `agent:codex`（Lead / decision）、`agent:deepseek`（DeepSeek Harness / Dev / execution）、`agent:pi`（pi + `moonshotai-cn/kimi-k3` / Reviewer / execution）；Claude Code 与重复的 `agent:pi-kimi` 不再使用。
-- DeepSeek Harness 本机全局版本已从 `0.1.0-rc.6` 固定升级至 `0.1.0-rc.8`；CLI、`headless` profile、原生模块与最小真实模型调用均通过，临时备份已在验证成功后清理。
-- 旧人工验收树 `#10/#11` 已通过 `POST /api/tasks/10/cancel-tree` 安全收束为 `canceled/canceled`；claim、租约和实例占用均已清除，两个 Task Hall 与 3 条历史消息保留。操作前备份为 `backups/backup_2026-08-22.db`。
-- 验收发现的两个前端问题已修复：委派弹窗现在使用实体卡片；根任务与子任务模式分别显示“根任务负责人”和“子任务执行 Agent”，并补充两阶段说明。
-- DeepSeek Windows 多行 prompt 丢失问题已修复：通用 bridge 识别并校验官方 `dsh.cmd` npm shim 后，直接以 Node 启动 Harness；配置命令保持不变，非 DSH `.cmd` 不受影响。
-- DeepSeek 预检会话膨胀已修复：`runtime=dsh` 默认只允许 1 个跨轮询尝试，并自动加载项目内非持久化 patch；预检及同轮协议修复不再生成 DSH 会话窗口，正式执行仍保留一个正常会话。通用 runtime 默认 3 次上限，可由 CLI 显式覆盖。
+- 当前分支：`codex/task-hall`；当前 Codex 为决策 Agent。本切片已创建中文本地提交 `迁移 Kimi 到官方 CLI bridge`，`origin/codex/task-hall` 仍为 `14bd3d8`；外部推送等待项目管理者明确授权。
+- Kimi 活动成员已从 `agent:pi`（pi + Kimi3）迁移为 `agent:kimi`（官方 Kimi Code CLI）；当前本地 dogfood 固定拓扑为 `agent:codex`（Lead / decision）、`agent:deepseek`（DeepSeek Harness / Dev / execution）、`agent:kimi`（Kimi Code / Reviewer / execution）。
+- 新增 `bridges/kimi_bridge.py`：讨论与领取前预检无工具，任务默认 `review` 档开放 `Read / Grep / Glob / Bash`，显式 `tools` 档才额外开放 `Edit / Write`；所有档位禁用子 Agent，并用受控空 `--skills-dir` 隔离自动发现的 Skills。CLI 显式使用 `--auto` 避免无人值守权限询问，能力范围仍由工具白名单限制。
+- 通用 bridge 已接入 Kimi `stream-json` 最终 Assistant 文本提取，Group Hall、任务预检、正式执行和 Review/Test 门禁均走统一归一化。
+- pi bridge 及其测试仍保留为兼容入口，但 `agent:pi` / `agent:pi-kimi` 不再是当前活动成员；旧数据库历史不迁移、不删除。
+- TH-6d 的实现层自动化与隔离浏览器闭环仍有效，但新三 Agent 真实人工验收尚未执行，不进入 TH-7。
 
 ## Current Snapshot
 
-- Web UI 的两阶段委派已显式呈现：根入口显示“委派根任务 / 根任务负责人”，根详情入口显示“创建子任务 / 子任务执行 Agent”，并同步切换说明、提交按钮和可访问名称。
-- `group:talk-dev` 实际不存在于 `talk.db`；`.talk/groups.yaml` 只提供本地角色/profile 元数据，不代表服务端已有同名 Hall。此前要求在该群成员面板删除/添加 Agent 的人工指引无效，已从后续计划移除。
-- TH-6d 服务端合同仍包含任务树控制、有限授权、澄清、Development / Review / Test / rework 关系、结构化质量门禁和里程碑人工验收。
-- `pi_bridge.py` 已能显式锁定 `moonshotai-cn/kimi-k3`；DeepSeek Harness 已升级到 `0.1.0-rc.8`。DeepSeek 配置仍写作通用 bridge + `dsh.cmd --profile headless`，Windows 实际子进程由 bridge 安全解析为官方 Harness Node 入口；Task Hall 预检会额外使用 `.talk/dsh/preflight-ephemeral.cordis.yml`，正式执行不加载该补丁。
-- 2026-08-22 收束后，本地 Server 与三个 bridge 仍未运行；旧 `#10/#11` 不再可能被 bridge 领取，历史 Hall 和故障证据仍可回看。下一轮验收必须新建任务树。
+- `.talk/groups.yaml` 与项目角色档案已切换到 `agent:kimi`；旧 `.talk/agents/agent_pi/` 活动档案已移除，新增 `.talk/agents/agent_kimi/`。
+- Kimi Code CLI 本机版本为 `0.38.0`，命令与受控 Agent 文件可被 CLI 正确解析；真实模型冒烟在调用前被本机配置门禁拦截：`No model configured`。
+- 项目管理者需在本机执行 `kimi login`（或在 Kimi Code 中配置 `default_model`）后，才能启动真实 Kimi bridge 并完成三 Agent 验收。
+- 当前 TALK Server 与三个 bridge 均未启动；本切片没有创建新任务、没有改动旧 `#10/#11`。旧树保持 `canceled/canceled`，不得复用。
 
 ## Current Boundaries
 
-- DeepSeek Harness `0.1.0-rc.8` 的 `headless` profile、登录和 `deepseek-v4-pro` 调用本身可用；Windows npm `dsh.cmd` 多行参数边界已由 Node 入口直启方案修复，并有 shim 识别、非 DSH 保持原样和多行单 argv 回归覆盖。
-- 一个预检轮询仍包含正常提示和最多一次协议修复；DeepSeek 默认只进入 1 个轮询，且两次潜在 CLI 调用都使用非持久化 patch，因此不会产生可见 DSH 会话。通用 runtime 仍默认最多 3 个轮询；上限可由 `--task-preflight-max-attempts 1..3` 覆盖，计数不跨 bridge 进程继承。
-- 当前仍没有正式的全能力 Tester；Kimi3 可执行 API、日志和自动化检查，浏览器仍由项目管理者人工验收。
+- Kimi `review` 档没有 `Edit / Write`，但包含 `Bash` 以运行检查与测试；这是 TALK 系统合同和 Kimi 工具白名单约束，不是操作系统级只读沙箱。
+- Kimi Code CLI 当前没有本切片已验证的无会话开关；每次 `-p` 调用可能保留官方会话记录。本项目不自动删除这些记录，后续再评估归档策略。
+- 当前仍没有正式的全能力 Tester；Kimi 可执行 API、日志和自动化检查，真实浏览器人工验收仍由项目管理者完成。
 - 附件正文注入、跨实例消息级原子去重、普通 Codex Desktop 自动注册 TALK MCP、项目级 Members / Activity 页面仍未完成。
 
 ## Next Slice
 
-1. 等待项目管理者确认后，从新根任务开始重新执行 Codex → DeepSeek → Kimi3 的 Development / Review / Test / 人工验收完整闭环；不得复用已取消的 `#10/#11`。
-2. 只有真实三 Agent 人工验收通过后才进入 TH-7；之后再处理正式 Tester、附件正文注入、跨实例去重等债务。
+1. 项目管理者完成 `kimi login` 或默认模型配置，并确认 Kimi CLI 可返回一次最小真实结果。
+2. 同步 `.talk/groups.yaml` 到 TALK Server，启动 Server、Codex、DeepSeek、Kimi 三个 bridge，从全新根任务重新执行 Development / Review / Test / 人工验收完整闭环。
+3. 只有真实三 Agent 人工验收通过后才进入 TH-7；不得复用已取消的 `#10/#11`。
 
 ## Verification
 
-- GitHub 推送：`5583bad..cf12e8f  codex/task-hall -> codex/task-hall`；本地 `HEAD` 与 `origin/codex/task-hall` 均为 `cf12e8fdcef84dfc7e6a7d679d85be79b2d3665d`。
-- 旧树收束前运行 `scripts/backup_db.py`，生成 `backups/backup_2026-08-22.db`；备份与当前数据库 `PRAGMA quick_check` 均为 `ok`。
-- 无 lifespan 的本地 ASGI 调用以根请求者身份先读取 `/api/tasks/10/tree`，确认范围严格为 `[10, 11]`，再调用 `/api/tasks/10/cancel-tree` 返回 `200`；复核两项任务均为 `canceled/canceled`、根控制为 `canceled/manual_cancel`，claim / instance / token / lease 全部为空。
-- 只读复核确认两个旧 Task Hall 均保留且共有 3 条历史消息；8000 端口无监听，未启动任何 bridge，也未创建新验收任务。
-- 取消树合同定向回归：`.venv\Scripts\python.exe -m unittest tests.test_tasks.AgentTaskTests.test_checkpoint_and_cancel_tree_enforce_roles_and_preserve_history -q` → `Ran 1 test in 1.842s`，`OK`。
-- DSH 非持久化预检定向回归：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q` → `Ran 147 tests in 1.139s`，`OK`；覆盖项目 patch 自动注入、显式命令优先、缺失 patch 回退、runtime 默认上限以及 DeepSeek 一轮失败终止。
-- DSH `--dump-config` 合成配置确认 `session-persistence-jsonl` 与 `session-checkpoint-policy` 均被项目 patch 设为 `disabled: true`。
-- DSH 真实最小预检调用退出码为 0；调用前后 `C:\Users\Administrator\.dsh\sessions` 都是 55 个文件，新增或改写记录为 0。未启动 TALK bridge、未读取或修改旧 `#10/#11`。
-- DSH 非持久化预检全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 380 tests in 156.709s`，`OK`。
-- 多行 prompt 切片定向回归：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q` → `Ran 140 tests in 0.574s`，`OK`。
-- 多行 prompt 切片全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 373 tests in 105.003s`，`OK`。
-- 本机命令解析确认 `dsh.cmd --profile headless` 被转换为 `node.exe ...\@deepseek-ai\dsh\lib\bin.js --profile headless`；受控真实四行 prompt 同时携带首行、中文正文与末行约束，模型只返回 `DSH_MULTILINE_OK`。
-- 预检重试切片定向回归：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q` → `Ran 143 tests in 0.543s`，`OK`。
-- 预检重试切片全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 376 tests in 105.860s`，`OK`；模拟失败严格停在第 3 次，没有调用真实模型。
-- 弹窗切片静态验证：`node --check web\app.js` 通过；`.venv\Scripts\python.exe -m unittest tests.test_task_web_ui -q` → `Ran 2 tests in 0.707s`，`OK`。
-- 弹窗切片全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 376 tests in 106.338s`，`OK`。
-- Codex Browser 连接隔离临时 TALK 服务实测根/子两种弹窗：计算样式均为实体背景 `rgb(255, 254, 250)`、实线边框、`14px` 圆角和阴影；DOM 可访问名称分别为“根任务负责人 / 子任务执行 Agent”，标题、说明和提交按钮同步切换，控制台无 error / warning。隔离服务、临时数据库和验收脚本均已清理，未修改现有 `talk.db`。
-- `dsh --version` 与 `npm list -g @deepseek-ai/dsh --depth=0` 均确认 `0.1.0-rc.8`；`dsh --profile headless --help` 正常加载现有 profile。
-- npm 全局安装的 6 个生命周期脚本结果均为退出码 0；`node-pty` 与 `koffi` 原生模块可加载，最小真实请求返回 `DSH_RC8_OK`。
-- `.dsh` 临时备份曾校验 121 个真实文件 SHA-256 与 510 个 Junction 结构；升级验证通过后已安全删除，`NODE_OPTIONS` 未持久化且无残留 Node/DSH 进程。
-- SQLite 只读核对：`#10 = running/in_progress -> agent:codex`，`#11 = queued/assigned -> agent:deepseek` 且从未 claim；最新 DeepSeek instance error 为 `task preflight did not return a valid TALK_TASK_PREFLIGHT decision`。
-- 修复前 DSH 持久 session 只读解码曾确认：provider/model 为 `deepseek-official/deepseek-v4-pro`，但实际用户消息仅保留 prompt 第一行；该根因现已修复，旧 session 仍只作为历史证据保留。
-- `group:talk-dev` 数据库查询返回空；2026-08-21 进程核对确认旧 Server/bridge 进程均已停止。
-- `git status --short --branch` 在汇总前为干净的 `codex/task-hall...origin/codex/task-hall`；仅出现无法读取用户级 global ignore 的沙箱警告，不影响仓库状态判断。
+- Kimi / 通用 bridge 定向回归：`.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge -q` → `Ran 119 tests`，`OK`。
+- Bridge / profile / CLI 组合回归：`.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge tests.test_profiles tests.test_talk_cli -q` → `Ran 196 tests in 9.713s`，`OK`。
+- 全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 389 tests in 109.913s`，`OK`。
+- `python bridges/kimi_bridge.py --help`、`py_compile` 和 `git diff --check` 均通过；`git diff --check` 只有 Windows LF/CRLF 提示。
+- 本机真实 Kimi 命令正确读取受控无工具 Agent 文件并输出 `stream-json` meta，随后因未登录/未配置默认模型退出码为 1；未产生模型答案，不能记为端到端通过。
+- 本切片没有前端改动，因此未重复执行 Browser 验证。
+- 本地 Git 提交已创建；首次沙箱内 push 因无可用凭据失败，外部凭据 push 又被授权门禁拒绝，因此本轮没有把提交推送到 GitHub。
 
 ## Known Debt
 
 - 双通道输出仍可能让 Agent 的 visible reply 退化，结构化输出块方案延后处理。
-- pi 的 `--no-extensions` 仍是临时规避，等待 upstream 修复后移除。
-- Tester 操作系统级硬隔离、附件正文注入和跨实例消息级去重仍需后续加强。
+- pi 的 `--no-extensions` 仍是兼容入口的临时规避，等待 upstream 修复后移除。
+- Tester 操作系统级硬隔离、Kimi 会话保留策略、附件正文注入和跨实例消息级去重仍需后续加强。
 
 ## References
 
-- 当前模块合同：`docs/spec/MODULE_tasks.md`
+- 当前 bridge 合同：`docs/spec/MODULE_bridges.md`
+- 当前任务合同：`docs/spec/MODULE_tasks.md`
 - 用户操作手册：`docs/guides/USER_MANUAL.md`
-- 平台集成设计：`docs/spec/PROJECT_INTEGRATION.md`
 - 完整历史：`docs/PROGRESS_HISTORY.md`

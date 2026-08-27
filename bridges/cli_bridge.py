@@ -84,6 +84,8 @@ TASK_HALL_HISTORY_PAGE_SIZE = 500
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
 _HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] | None = None
 PROMPT_TRANSPORTS = {"stdin", "argv"}
+COMPACT_PROMPT_RUNTIMES = {"pi", "codex", "kimi", "kimi-code", "kimi_code"}
+COMPACT_PROMPT_MEMBERS = {"agent:pi", "agent:codex", "agent:kimi"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
 
@@ -1966,6 +1968,74 @@ def clean_cli_output(text: str) -> str:
     return "\n".join(kept).strip()
 
 
+def _kimi_content_text(content: Any) -> str:
+    """Extract visible text from one Kimi Code stream-json content value."""
+    if isinstance(content, str):
+        return content.strip()
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, str):
+            text = item.strip()
+        elif isinstance(item, dict) and str(item.get("type") or "") == "text":
+            text = str(item.get("text") or "").strip()
+        else:
+            text = ""
+        if text:
+            parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def extract_kimi_final_assistant(output: str) -> str | None:
+    """Return the final Assistant text from Kimi Code JSONL.
+
+    ``None`` means the output was not stream-json and should be left untouched.
+    An empty string means valid JSONL was received but contained no visible
+    Assistant message.
+    """
+    parsed_json = False
+    assistant_messages: list[str] = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        parsed_json = True
+        if str(payload.get("role") or "").lower() != "assistant":
+            continue
+        visible = _kimi_content_text(payload.get("content"))
+        if visible:
+            assistant_messages.append(visible)
+    if not parsed_json:
+        return None
+    return assistant_messages[-1] if assistant_messages else ""
+
+
+def normalize_runtime_result(result: CliRunResult, *, runtime: str) -> CliRunResult:
+    """Normalize runtime-specific stdout into the bridge's final-text contract."""
+    if runtime.strip().lower() not in {"kimi", "kimi-code", "kimi_code"}:
+        return result
+    extracted = extract_kimi_final_assistant(result.stdout)
+    if extracted is None:
+        return result
+    return CliRunResult(
+        returncode=result.returncode,
+        stdout=extracted,
+        stderr=result.stderr,
+        timed_out=result.timed_out,
+    )
+
+
+def _uses_compact_prompt(runtime: str, member_id: str) -> bool:
+    return runtime.strip().lower() in COMPACT_PROMPT_RUNTIMES or member_id in COMPACT_PROMPT_MEMBERS
+
+
 def should_handle_message(
     message: dict[str, Any],
     member_id: str,
@@ -2136,7 +2206,7 @@ def build_cli_task_preflight_prompt(
         '信息充分时只输出一行: TALK_TASK_PREFLIGHT {"action":"accept"}\n'
         '信息不足时只输出一行: TALK_TASK_PREFLIGHT {"action":"clarify","question":"集中后的必要问题"}'
     )
-    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
+    if _uses_compact_prompt(runtime, member_id):
         return (
             f"你是 {member_id}（{tier_line}）。请对任务 #{task_id} 做领取前预检，不要执行任务或修改文件。\n"
             f"请求者: {creator}\n"
@@ -2240,8 +2310,8 @@ def build_cli_prompt(
     tier_line = _decision_tier_line(decision_tier)
     sender = message.get("from") or "unknown"
 
-    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
-        # 身份在 per-call 注入,系统层是静态文本无法区分 pi / pi-kimi 等同进程不同实例。
+    if _uses_compact_prompt(runtime, member_id):
+        # 身份在 per-call 注入,系统层是静态文本无法区分同一 runtime 的不同实例。
         # 写法刻意紧凑:身份和任务同一行,避免占据独立首行让模型陷入"自我介绍"模式,
         # 把"对你说"的动词淡化(2026-06-06 黑盒实测:独立首行 + 括号注释会让 pi 忽略任务,
         # 改成"已就位,有什么需要帮忙"式空回应)。
@@ -2317,7 +2387,7 @@ def build_cli_task_prompt(
             "`failed` 或 `blocked` 的 findings 不得为空；不要从自然语言暗示结论。"
         )
 
-    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
+    if _uses_compact_prompt(runtime, member_id):
         creator = task.get("created_by") or "unknown"
         task_text = f"{title}\n{content}" if title else content
         # 任务路径同样注入身份(紧凑写法,理由同 build_cli_prompt)。
@@ -2719,6 +2789,7 @@ async def _prepare_task_before_claim(
             timeout=timeout,
             prompt_transport=prompt_transport,
         )
+        result = normalize_runtime_result(result, runtime=runtime)
         try:
             decision = parse_task_preflight_result(result)
         except RuntimeError:
@@ -2736,6 +2807,7 @@ async def _prepare_task_before_claim(
                 timeout=timeout,
                 prompt_transport=prompt_transport,
             )
+            repaired_result = normalize_runtime_result(repaired_result, runtime=runtime)
             decision = parse_task_preflight_result(repaired_result)
     except asyncio.CancelledError:
         raise
@@ -2854,6 +2926,7 @@ async def handle_queued_task(
                 ),
                 heartbeat_task,
             )
+            result = normalize_runtime_result(result, runtime=runtime)
             if task_kind in {"review", "test"} and not result.timed_out and result.returncode == 0:
                 try:
                     gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
@@ -2873,6 +2946,7 @@ async def handle_queued_task(
                         ),
                         heartbeat_task,
                     )
+                    result = normalize_runtime_result(result, runtime=runtime)
                     gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
                 gate_verdict_payload = gate_verdict.as_payload()
             reply = format_cli_reply(
@@ -3198,6 +3272,7 @@ async def handle_incoming_message(
             timeout=timeout,
             prompt_transport=prompt_transport,
         )
+        result = normalize_runtime_result(result, runtime=runtime)
         # 诊断：function-calling 模式下，工具调用由 LLM 扩展内部处理
         # bridge 只读取 stdout 作为可见回复；TALK_ACTION 文本协议解析继续共存
         if os.environ.get("TALK_DUMP_PROMPT") == "1" and result.returncode == 0:

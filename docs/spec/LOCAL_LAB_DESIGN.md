@@ -32,7 +32,8 @@ Planned bridge families:
 
 - `Codex CLI -> codex bridge -> TALK`
 - `Claude Code -> claude bridge -> TALK`
-- `DeepSeek / Kimi -> pi bridge -> TALK`
+- `DeepSeek Harness -> generic CLI bridge -> TALK`
+- `Kimi Code CLI -> kimi bridge -> TALK`
 
 Common bridge responsibilities:
 
@@ -165,7 +166,7 @@ Open implementation details:
 Current scheduler boundary:
 
 - TALK records and routes tasks to already-running Agent bridge processes.
-- TALK does not automatically start Codex / Claude / pi bridge processes in this slice.
+- TALK does not automatically start Codex / Claude / Kimi bridge processes in this slice.
 
 ## Document Editing Coordination
 
@@ -245,7 +246,7 @@ This gives the project a real bridge to test before the deeper Group / Hall / SS
        "lead":   "agent:codex@projA",
        "ui":     "agent:claude@projA",
        "dev":    "agent:codex@projB",
-       "tester": "agent:pi@global"
+       "tester": "agent:kimi@global"
      },
      "escalation_chain": ["assignee", "requester", "lead", "human:bobo"]
    }
@@ -354,7 +355,7 @@ bridge 在 spawn LLM CLI 时注册以下工具，LLM 通过原生 function-calli
 
 ### 关键代码层面观察
 
-`bridges/pi_bridge.py:22-23` 显示 pi CLI 当前以 `--no-tools` 启动，**明确禁用了 pi 原生的 function-calling 能力**。这就是为什么我们必须用文本协议 —— 是我们自己关掉了更好的路径。同行 `--tools` profile（第 31-32 行 `DEFAULT_PI_TOOLS_COMMAND`）已经证明 pi CLI 是支持工具调用的。
+早期 dogfood 由 `bridges/pi_bridge.py` 承载 Kimi，并通过 pi extension 注入 TALK 工具。2026-08-27 起活动 Kimi 成员改走 `bridges/kimi_bridge.py`；pi 入口继续保留兼容，但不再代表当前固定拓扑。Kimi 原生 bridge 仍保留 `TALK_ACTION` 文本协议作为跨 runtime 的统一动作面，Kimi 自带工具只按讨论 / 预检 / Review 运行档受控开放。
 
 ### 落地阶段（暂定为切片 5.5）
 

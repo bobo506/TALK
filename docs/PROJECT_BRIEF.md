@@ -257,6 +257,7 @@ TALK/
 ├── bridges/
 │   ├── cli_bridge.py      # 通用 CLI bridge（local-lab Agent CLI 接入骨架）
 │   ├── codex_bridge.py    # Codex CLI bridge 兼容入口
+│   ├── kimi_bridge.py     # 官方 Kimi Code CLI bridge
 │   └── pi_bridge.py       # pi CLI bridge 兼容入口
 ├── scripts/
 │   └── backup_db.py       # SQLite 在线热备脚本
@@ -298,7 +299,7 @@ TALK/
 | [MODULE_files.md](spec/MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
 | [MODULE_webui.md](spec/MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
-| [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
+| [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
 | [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | TH-6a1 至 TH-6d 已落地任务树治理、有限授权 / 中断、澄清、runner 预检、Review / Test / 返工门禁、Blackboard 控制与里程碑人工验收；当前等待 TH-6d 人工验收 |
 
@@ -315,10 +316,17 @@ TALK/
 
 修改这些公共文件时需评估对所有模块的影响。
 
+## 2026-08-27 Kimi Runtime Addendum
+
+- 项目管理者确认：固定 Kimi Reviewer 从 `agent:pi` + pi runtime 迁移为 `agent:kimi` + 官方 Kimi Code CLI；旧成员只保留历史消息与任务归属，不再启动。
+- `bridges/kimi_bridge.py` 复用通用 bridge 的 TALK 消息、任务队列、租约与动作协议，使用 Kimi `stream-json` 的最后一条 Assistant 消息作为可见输出。
+- Kimi 讨论与任务预检固定无工具；任务默认 Review 档只开放 `Read / Grep / Glob / Bash`，显式 `tools` 档才开放 `Edit / Write`，且三个运行档都禁止自行派生 subagent。CLI 使用 `--auto` 避免无人值守权限交互，但不能突破上述工具白名单。
+- Kimi Code CLI 会保留官方 session 记录；当前把它视为本地审计事实，不自动删除或续接。下一次 TH-6d 人工验收必须使用新的 `agent:kimi` 拓扑重新跑完整任务树。
+
 ## 2026-05-15 Agent Workflow Addendum
 
 - `AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源；每次项目开始必须先读取并确认当前角色。
-- 当前角色：Codex 为决策 Agent；本地 bridge 使用 Kimi3（pi runtime）与 DeepSeek（DeepSeek Harness）作为执行 Agent，不启动 Claude Code。项目管理者可通过修改 `AGENTS.md` 调整后续 Agent 行为。
+- 当前角色：Codex 为决策 Agent；本地 bridge 使用 Kimi（官方 Kimi Code CLI）与 DeepSeek（DeepSeek Harness）作为执行 Agent，不启动 Claude Code。项目管理者可通过修改 `AGENTS.md` 调整后续 Agent 行为。
 - 决策 Agent 在方向明确且无重大不确定项时，可自主连续开发多个切片；执行 Agent 每次只开发一个切片，完成后必须等待确认。
 - 任意角色每完成一个可能影响功能的开发切片，都必须执行“汇总进度”，并记录验证、变更文件、待确认问题和下一步。
 - `docs/PROGRESS.md` 只保存当前快照，保持长度可控；已完成切片完整记录归入 `docs/PROGRESS_HISTORY.md`。
@@ -328,8 +336,8 @@ TALK/
 ## 2026-05-13 Local Lab Addendum
 
 - 新增 `docs/spec/LOCAL_LAB_DESIGN.md`，用于收敛本地多 Agent 实验室阶段的设计边界。
-- local-lab 当前固定为 3 个 Agent：Codex 走专用 CLI bridge；Kimi3 走 `pi` bridge 并显式锁定 `moonshotai-cn/kimi-k3`；DeepSeek 各类模型走 DeepSeek Harness `dsh --profile headless` + 通用 CLI bridge。Claude Code 暂不纳入本地拓扑。
-- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 保留 Codex 专用入口，`bridges/pi_bridge.py` 保留 pi 专用入口，DeepSeek Harness 通过通用 bridge 的 `argv` prompt transport 接入。
+- local-lab 当前固定为 3 个 Agent：Codex 走专用 CLI bridge；Kimi 走官方 Kimi Code CLI bridge；DeepSeek 各类模型走 DeepSeek Harness `dsh --profile headless` + 通用 CLI bridge。Claude Code 暂不纳入本地拓扑，旧 `agent:pi` 只保留历史事实。
+- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 与 `bridges/kimi_bridge.py` 保留专用入口，`bridges/pi_bridge.py` 保留多 provider 兼容入口，DeepSeek Harness 通过通用 bridge 的 `argv` prompt transport 接入。
 - `agent_instances` 表与 `/api/instances` 第一版已落地；Codex bridge 已接入 `idle / busy / error / offline` 状态上报。
 - `agent_tasks` 表与 `/api/tasks` 第一版已落地：支持创建任务、按可见性列出任务、Agent 领取任务、完成/失败/取消任务，并联动 `agent_instances.current_task_id` 与实例状态；当前不由 TALK 自动启动 bridge 进程。
 - `agent_task_schedules` 表与 `/api/tasks/schedules` 第一版已落地：支持一次性 / 周期性 schedule 记录、状态暂停/取消、显式 `run-due` 物化为 queued task；当前不内置后台调度循环。

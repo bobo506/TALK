@@ -184,6 +184,61 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
 
+## 2026-08-27 Kimi 迁移到官方 Kimi Code CLI
+
+**背景**：当前固定拓扑中的 Reviewer 名义上是 Kimi，但实际由 pi runtime 加载 `moonshotai-cn/kimi-k3`。项目管理者已经在本机安装 Kimi Code CLI，并确认改用本家 CLI。本切片只完成 bridge、活动成员拓扑和项目文档迁移；不启动 Server/bridge，不创建新验收任务，不进入 TH-7。
+
+### 完成事项
+
+- 新增 `bridges/kimi_bridge.py`，默认成员为 `agent:kimi`、runtime 为 `kimi-code`，使用官方 `kimi --auto --output-format stream-json ... -p` 和 argv prompt 传输；`--auto` 避免无人值守 bridge 卡在权限询问，实际能力仍受 Agent 文件工具白名单约束。
+- bridge 启动时在临时目录生成三份受控 Kimi Agent 文件：Group Hall 讨论无工具、Task Hall 领取前预检无工具、任务执行默认 `review` 档开放 `Read / Grep / Glob / Bash`；显式 `--kimi-task-profile tools` 才额外开放 `Edit / Write`。
+- 三份 Agent 文件均设置 `subagents: []`，并把 `--skills-dir` 指向受控空目录；项目 `.talk/agents/agent_kimi/` 的 IDENTITY / SOUL / USER 通过既有 profile 机制注入系统提示词。
+- 通用 bridge 新增 Kimi `stream-json` 解析与结果归一化，忽略 Tool / meta 事件，提取最后一条非空 Assistant 文本；覆盖消息处理、任务预检、协议修复、任务执行和 Review/Test 门禁。
+- Kimi 纳入紧凑身份 prompt 规则；pi 专属中文最终答复归一化保持不变。
+- `.talk/groups.yaml`、`AGENTS.md` 与各 Agent 角色档案切换到 `agent:kimi`；移除旧活动档案 `.talk/agents/agent_pi/`，但不迁移或删除数据库中的旧成员历史。
+- `docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_bridges.md`、`docs/spec/MODULE_tasks.md`、`docs/spec/LOCAL_LAB_DESIGN.md` 已同步官方 Kimi CLI 入口、当前拓扑、权限档位和已知会话边界。pi bridge 仍保留为兼容入口。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge -q`：`Ran 119 tests`，`OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge tests.test_profiles tests.test_talk_cli -q`：`Ran 196 tests in 9.713s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 389 tests in 109.913s`，`OK`。
+- `python bridges/kimi_bridge.py --help` 正常；`py_compile bridges/cli_bridge.py bridges/kimi_bridge.py tests/test_kimi_bridge.py` 通过；`git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+- 本机 Kimi Code CLI `0.38.0` 能正确解析 `--output-format stream-json`、受控 `--agent-file` 和 `--skills-dir`，并输出 JSON meta；随后因本机尚未登录或配置默认模型返回 `No model configured`、退出码 1。该调用没有模型答案，因此真实端到端验收仍待完成。
+- 本切片无前端改动，未重复 Browser 验证；未启动 TALK Server/bridge，未创建任务，也未触碰已取消的 `#10/#11`。
+- 已创建中文本地提交 `迁移 Kimi 到官方 CLI bridge`；沙箱内 push 因无可用凭据失败，外部凭据 push 被授权门禁拒绝。`origin/codex/task-hall` 暂停在本切片开始前的 `14bd3d8`，等待项目管理者明确授权后再推送。
+
+### 当前结论与下一步
+
+- 官方 Kimi Code CLI bridge 的实现与自动化回归完成，当前活动 Reviewer 身份统一为 `agent:kimi`。
+- 项目管理者先执行 `kimi login` 或配置 Kimi Code 默认模型；随后同步项目 profile 并从全新根任务启动 Codex → DeepSeek → Kimi 的真实 TH-6d 验收。
+- 本切片涉及 bridge 与跨模块配置，按决策 Agent 批次刹车暂停；真实三 Agent 人工验收通过前不进入 TH-7。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `bridges/kimi_bridge.py`
+- `tests/test_kimi_bridge.py`
+- `.talk/groups.yaml`
+- `.talk/agents/README.md`
+- `.talk/agents/agent_codex/IDENTITY.md`
+- `.talk/agents/agent_codex/USER.md`
+- `.talk/agents/agent_deepseek/USER.md`
+- `.talk/agents/agent_kimi/IDENTITY.md`
+- `.talk/agents/agent_kimi/SOUL.md`
+- `.talk/agents/agent_kimi/USER.md`
+- `.talk/agents/agent_kimi/MEMORY.md`
+- 删除 `.talk/agents/agent_pi/` 下四份旧活动档案
+- `AGENTS.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/spec/MODULE_bridges.md`
+- `docs/spec/MODULE_tasks.md`
+- `docs/spec/LOCAL_LAB_DESIGN.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
 ## 2026-08-22 推送修复并安全收束旧验收任务树
 
 **背景**：DeepSeek 非持久化预检切片已经提交但尚未推送；真实三 Agent 验收遗留根任务 `#10` 与 Development 子任务 `#11`，分别停在 `running/in_progress` 和 `queued/assigned`。项目管理者要求先提交 GitHub 并继续。本切片只处理推送和旧树收束，不启动 bridge、不创建新验收任务。

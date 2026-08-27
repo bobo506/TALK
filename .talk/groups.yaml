@@ -11,7 +11,7 @@ groups:
       - member_id: agent:deepseek
         business_role: dev
         decision_tier: execution
-      - member_id: agent:pi
+      - member_id: agent:kimi
         business_role: reviewer
         decision_tier: execution
       - member_id: human:bobo
