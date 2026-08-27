@@ -4,7 +4,7 @@
 
 Updated: 2026-08-27 (Asia/Shanghai)
 
-- 当前分支：`codex/task-hall`；当前 Codex 为决策 Agent。本切片已创建中文本地提交 `迁移 Kimi 到官方 CLI bridge`，`origin/codex/task-hall` 仍为 `14bd3d8`；外部推送等待项目管理者明确授权。
+- 当前分支：`codex/task-hall`；当前 Codex 为决策 Agent。迁移提交 `522635d`（`迁移 Kimi 到官方 CLI bridge`）已推送到 `origin/codex/task-hall`；本地与远端在本轮收尾后保持同步。
 - Kimi 活动成员已从 `agent:pi`（pi + Kimi3）迁移为 `agent:kimi`（官方 Kimi Code CLI）；当前本地 dogfood 固定拓扑为 `agent:codex`（Lead / decision）、`agent:deepseek`（DeepSeek Harness / Dev / execution）、`agent:kimi`（Kimi Code / Reviewer / execution）。
 - 新增 `bridges/kimi_bridge.py`：讨论与领取前预检无工具，任务默认 `review` 档开放 `Read / Grep / Glob / Bash`，显式 `tools` 档才额外开放 `Edit / Write`；所有档位禁用子 Agent，并用受控空 `--skills-dir` 隔离自动发现的 Skills。CLI 显式使用 `--auto` 避免无人值守权限询问，能力范围仍由工具白名单限制。
 - 通用 bridge 已接入 Kimi `stream-json` 最终 Assistant 文本提取，Group Hall、任务预检、正式执行和 Review/Test 门禁均走统一归一化。
@@ -39,7 +39,7 @@ Updated: 2026-08-27 (Asia/Shanghai)
 - `python bridges/kimi_bridge.py --help`、`py_compile` 和 `git diff --check` 均通过；`git diff --check` 只有 Windows LF/CRLF 提示。
 - 本机真实 Kimi 命令正确读取受控无工具 Agent 文件并输出 `stream-json` meta，随后因未登录/未配置默认模型退出码为 1；未产生模型答案，不能记为端到端通过。
 - 本切片没有前端改动，因此未重复执行 Browser 验证。
-- 本地 Git 提交已创建；首次沙箱内 push 因无可用凭据失败，外部凭据 push 又被授权门禁拒绝，因此本轮没有把提交推送到 GitHub。
+- 项目管理者明确授权后，GitHub push 成功：`14bd3d8..522635d  codex/task-hall -> codex/task-hall`。
 
 ## Known Debt
 

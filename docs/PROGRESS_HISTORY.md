@@ -206,7 +206,7 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 - `python bridges/kimi_bridge.py --help` 正常；`py_compile bridges/cli_bridge.py bridges/kimi_bridge.py tests/test_kimi_bridge.py` 通过；`git diff --check` 通过，仅有 Windows LF/CRLF 提示。
 - 本机 Kimi Code CLI `0.38.0` 能正确解析 `--output-format stream-json`、受控 `--agent-file` 和 `--skills-dir`，并输出 JSON meta；随后因本机尚未登录或配置默认模型返回 `No model configured`、退出码 1。该调用没有模型答案，因此真实端到端验收仍待完成。
 - 本切片无前端改动，未重复 Browser 验证；未启动 TALK Server/bridge，未创建任务，也未触碰已取消的 `#10/#11`。
-- 已创建中文本地提交 `迁移 Kimi 到官方 CLI bridge`；沙箱内 push 因无可用凭据失败，外部凭据 push 被授权门禁拒绝。`origin/codex/task-hall` 暂停在本切片开始前的 `14bd3d8`，等待项目管理者明确授权后再推送。
+- 已创建中文提交 `522635d`（`迁移 Kimi 到官方 CLI bridge`）。首次沙箱内 push 因无可用凭据失败，外部凭据 push 曾被授权门禁拒绝；项目管理者随后明确授权该远端与分支，推送成功：`14bd3d8..522635d  codex/task-hall -> codex/task-hall`。
 
 ### 当前结论与下一步
 
