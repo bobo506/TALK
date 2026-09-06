@@ -301,7 +301,7 @@ TALK/
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
-| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | TH-6a1 至 TH-6d 已落地任务树治理、有限授权 / 中断、澄清、runner 预检、Review / Test / 返工门禁、Blackboard 控制与里程碑人工验收；当前等待 TH-6d 人工验收 |
+| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | TH-6a1 至 TH-6d 已落地任务树治理、有限授权 / 中断、澄清、runner 预检、Review / Test / 返工门禁、Blackboard 控制与里程碑人工验收；TH-6d 已于 2026-09-06 通过人工验收并完成根任务收尾，TH-7 尚未启动 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段
@@ -321,7 +321,7 @@ TALK/
 - 项目管理者确认：固定 Kimi Reviewer 从 `agent:pi` + pi runtime 迁移为 `agent:kimi` + 官方 Kimi Code CLI；旧成员只保留历史消息与任务归属，不再启动。
 - `bridges/kimi_bridge.py` 复用通用 bridge 的 TALK 消息、任务队列、租约与动作协议，使用 Kimi `stream-json` 的最后一条 Assistant 消息作为可见输出。
 - Kimi 讨论与任务预检固定无工具；任务默认 Review 档只开放 `Read / Grep / Glob / Bash`，显式 `tools` 档才开放 `Edit / Write`，且三个运行档都禁止自行派生 subagent。Kimi prompt mode 不追加与 `-p` 冲突的 `--auto`，能力边界由上述工具白名单控制。
-- Kimi Code CLI 会保留官方 session 记录；当前把它视为本地审计事实，不自动删除或续接。下一次 TH-6d 人工验收必须使用新的 `agent:kimi` 拓扑重新跑完整任务树。
+- Kimi Code CLI 会保留官方 session 记录；当前把它视为本地审计事实，不自动删除或续接。TH-6d 已使用新的 `agent:kimi` 拓扑跑通完整任务树 `#15/#16/#17/#18`，并于 2026-09-06 通过人工验收完成收尾。
 
 ## 2026-05-15 Agent Workflow Addendum
 

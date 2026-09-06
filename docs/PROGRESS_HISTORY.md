@@ -1,8 +1,47 @@
 # 开发历史 · TALK
 
+## 2026-09-06 TH-6d 人工验收通过与根任务收尾
+
+**角色与授权**：当前 Codex 为 `AGENTS.md` 指定的决策 Agent。项目管理者确认“16，17，18都是已完成的状态，已验收，继续收尾”，本轮完成既有里程碑收尾，不开启 TH-7。
+
+**人工验收核对**：
+
+- 本轮恢复时 `http://127.0.0.1:8000` 无服务响应；项目管理者启动 TALK Server 后，`GET /healthz` 返回 `status/db/storage=ok`。
+- 页面人工验收由项目管理者完成；SDK/API 核对根任务 `#15` 从此前的 `awaiting_human/milestone` 变为 `active`、`checkpoint_reason=null`、`authorization_epoch=2`。
+- Review `#17` 仍为 `approved`，Test `#18` 仍为 `passed`、`satisfied=true`，冻结集为 `[16]`；Development `#16`、Review `#17`、Test `#18` 都已 `succeeded/completed`。本轮没有重新调用人工验收接口。
+
+**根任务最终收尾**：
+
+- 沿用 `agent:codex` 与 `codex-desktop-th6d-v2`，通过正式 SDK/API 重新领取根任务 `#15`（attempt=`2`），在原 Task Hall 写入最终汇总消息 `#2480`，提交为 `succeeded/submitted`。
+- 依据项目管理者本次验收及收尾授权，以原请求者 `human:bobo` 身份调用结果收取接口；根任务最终为 `succeeded/completed`。
+- 最终任务树 `#15/#16/#17/#18` 全部为 `succeeded/completed`；运行中和非终态后代均为 `0`，剩余开发切片额度为 `0`，最新 Review/Test 门禁保持有效。
+- 根任务的 `control_status=active` 表示人工验收检查点已释放，不表示根任务仍运行；完成状态以 `status/workflow_status` 为准。Codex Desktop instance 回到 `idle`。
+- 本轮未启动或重跑其它 Agent bridge，未新增子任务、未扩大开发授权；旧失败任务和 V1/V2 两个 untracked 验收文件保留。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks.AgentTaskTests.test_passed_milestone_test_pauses_for_human_acceptance_before_root_completion tests.test_tasks.AgentTaskTests.test_task_workflow_clarification_accept_submit_and_collect -q` → `Ran 2 tests in 1.219s`，`OK`。覆盖里程碑人工验收后根任务重新领取和提交、结果收取及请求者权限。
+- V2 产物重新核对：65 bytes、UTF-8 无 BOM、LF、SHA-256=`602FBC88D523943F2798942F0F898B354834372C1BC53AEECBF3233FAC2743DF`，通过。
+- 真实 SDK/API 完成根任务提交、收取与最终树断言；没有直接修改数据库状态。
+- 文档检查：5 份变更文件 UTF-8 正常，16 个本地 Markdown 链接有效，进度快照少于 90 行；`git diff --check` 通过。
+- 2026-08-27 的 `389` 项全量回归与 Kimi `119` 项独立定向回归为既有通过证据，本轮未重跑全量回归。本轮无代码或前端交互改动，浏览器验收由项目管理者完成。
+
+**文档同步与变更文件**：
+
+- `docs/PROGRESS.md`：替换等待验收快照，记录最终状态、角色、证据、边界与 TH-7 建议。
+- `docs/PROGRESS_HISTORY.md`：归档本轮授权、验收、收尾与验证事实。
+- `docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_tasks.md`：TH-6d 状态同步为人工验收通过，保留完整浏览器 Tester 等未完成边界。
+- `docs/guides/USER_MANUAL.md`：说明人工验收解除检查点后，根负责人提交最终汇总、根请求者收取结果的既有流程，不把人工验收等同于自动提交根结果。
+
+**提交与推送限制**：已创建本地验收收尾提交。首次推送被自动审批以未验证目标归属为由拒绝；随后通过只读 GitHub API 确认登录账号与仓库 owner 均为 `bobo506`，admin/push 权限为 true。补齐证据后再次审批仍拒绝，理由为目标 `bobo506/TALK` 是公开仓库，本轮 5 份项目进度、模块和用户手册文档的公开披露需要用户明确授权。未通过其它通道绕过；待项目管理者明确授权后再推送 `codex/task-hall`。
+
+**待确认与下一步**：TH-6d 无待验收问题；剩余收尾事项为取得上述公开推送授权并核对推送结果。TH-7 尚未启动，后续再确认 Codex Desktop / 通用终端接入包装的最小范围。完整浏览器 Tester 能力、操作系统级硬隔离、Kimi 会话策略与既有技术债继续保留。
+
+---
+
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-08-27 TH-6d 原生三 Agent V2 自动门禁通过，等待人工验收
+最后更新：2026-09-06 TH-6d 人工验收通过并完成根任务收尾
 
 ## 2026-08-27 TH-6d 原生三 Agent V2 自动门禁通过，等待人工验收
 
