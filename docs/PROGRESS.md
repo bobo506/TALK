@@ -2,14 +2,14 @@
 
 ## Latest
 
-Updated: 2026-09-06 20:15 (Asia/Shanghai)
+Updated: 2026-09-06 20:21 (Asia/Shanghai)
 
 - 当前项目：TALK；当前分支：`codex/task-hall`；本轮 Codex 为决策 Agent，角色来源为 `AGENTS.md`。
 - **TH-6d 已通过人工验收并完成任务树收尾**。项目管理者于 2026-09-06 确认“16，17，18都是已完成的状态，已验收，继续收尾”；服务端核对人工验收检查点已解除，`authorization_epoch=2`。
 - 根任务 `#15` 与 Development `#16`、Review `#17`、Test `#18` 均为 `succeeded/completed`；Review=`approved`、Test=`passed`，最新冻结集仍为 `[16]`。
 - 当前 Codex Desktop 会话通过 SDK/API 重新领取根任务、提交最终汇总消息 `#2480`，并依据项目管理者本次验收及收尾授权，以原请求者身份完成根结果收取。
 - 本轮仅处理验收收尾与文档同步，未新增开发任务、未增加开发额度、未进入 TH-7。收尾基线为已推送的 `dd1f682`（记录 Kimi 三 Agent 真实验收结果）。
-- GitHub 推送待明确授权：本轮收尾已创建本地提交。已核验登录账号和仓库 owner 均为 `bobo506`，具备 admin/push 权限；自动审批仍因目标 `bobo506/TALK` 为公开仓库，要求项目管理者明确授权公开发布这 5 份验收收尾文档，推送尚未执行。
+- GitHub 已推送：项目管理者明确回复“推送吧”后，验收收尾提交 `272b50b` 已推送到公开仓库 `bobo506/TALK` 的 `codex/task-hall` 分支；`git ls-remote` 核对远端与该提交一致。本次公开推送授权已满足，未修改 GitHub 权限或 Codex 自动审批策略。
 
 ## Current Snapshot
 
@@ -30,7 +30,7 @@ Updated: 2026-09-06 20:15 (Asia/Shanghai)
 
 ## Next Slice
 
-1. TH-6d 产品验收与任务树已收尾，无待验收事项；先取得向公开仓库 `bobo506/TALK` 的 `codex/task-hall` 分支推送本轮 5 份文档的明确授权，再推送并核对远端。后续建议确认 TH-7 最小范围：Codex Desktop / 通用终端接入包装。
+1. TH-6d 产品验收、任务树收尾与 GitHub 推送均已完成，无待验收或待授权推送事项。后续建议确认 TH-7 最小范围：Codex Desktop / 通用终端接入包装。
 2. 当前未开始 TH-7。后续需要实际开发或重新跑三 Agent 任务时，再按任务范围启动 DeepSeek / Kimi bridge；Lead 可继续由当前 Codex Desktop 会话协调。
 3. 完整历史见 `docs/PROGRESS_HISTORY.md`；下次输入 `继续项目` 可恢复。
 
