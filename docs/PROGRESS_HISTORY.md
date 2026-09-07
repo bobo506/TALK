@@ -11,6 +11,7 @@
 - 验证：`node --check web/app.js`、`node --check web/workspace.js`；`node --test tests/workspace_ui.test.cjs` 11 项通过；Python 页面契约与两条任务工作流共 4 项通过。没有重跑完整后台回归，也没有在真实项目中提交测试任务或消息。
 - 变更文件：`web/index.html`、`web/app.js`、`web/workspace.js`、`web/workspace.css`、`tests/test_task_web_ui.py`、`tests/workspace_ui.test.cjs`、`design-qa.md`、本快照/历史、Web UI 模块、项目简报、用户手册。
 - 本地服务在中断后重启，最终保留内置浏览器预览。已有 API Key 可登录；仅验收已完成任务视图无需启动其它角色的 bridge。截图/生成图/临时验收文件不进入公开提交。
+- 提交 `15874ba` 已完成；推送 `origin codex/ui-workspace-v1` 被 Codex 自动审批拒绝，理由为缺少本次具体内容与公开目的地的明确授权。没有绕过拦截、修改权限或创建 PR；等待项目管理者明确授权后继续远端同步。
 - 待验收：双栏信息层级与易读性。创建弹窗仍保留高级任务配置术语，角色页不是进程管理器；下一轮如需继续简化，先确认弹窗方向。TH-7 暂缓。
 
 ---

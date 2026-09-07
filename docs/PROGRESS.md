@@ -11,7 +11,7 @@ Updated: 2026-09-07 (Asia/Shanghai)
 ## Current Snapshot
 
 - 当前分支：`codex/ui-workspace-v1`，从 `codex/task-hall` 的 `f60c077` 创建；Codex 为决策 Agent。用户已确认预览并明确授权只做一个可完成切片。
-- 额度中断期间代码保留在工作区；本轮恢复并完成必要验证。提交及远端同步正在收尾，恢复时先核对 `git status`、`git log -3`。
+- 额度中断期间代码保留在工作区；本轮已验证并提交 `15874ba`（实现任务角色双栏工作台并修复任务上下文串用）。公开推送被 Codex 自动审批拒绝，尚未创建 PR；需要项目管理者明确授权本次界面代码、测试和相关文档公开推送到 `bobo506/TALK` 的 `codex/ui-workspace-v1`。不是 GitHub 权限错误，不尝试绕过审批。
 - TH-6d 根任务 #15 与子任务 #16/#17/#18 仍为已验收、已完成基线；本切片未修改这些任务、发送消息或启动新的任务执行。
 - 当前拓扑仍为 Codex / DeepSeek Harness / 官方 Kimi Code CLI。只查看历史页面不需要启动其它角色服务；交办新的执行任务时才需要相应 bridge。
 - 本地服务已后台启动，入口 `http://127.0.0.1:8000/`。若端口已停止：`.venv\Scripts\python.exe -m uvicorn server.main:app --host 127.0.0.1 --port 8000`。
@@ -34,7 +34,7 @@ Updated: 2026-09-07 (Asia/Shanghai)
 
 ## Next
 
-1. 完成本切片提交和 GitHub 同步，提供验收入口；不自动合并 `codex/task-hall` 或新分支。
+1. 等待本次具体公开推送授权；收到后推送 `codex/ui-workspace-v1`，创建以 `codex/task-hall` 为 base 的中文 PR，核对远端提交。中文 PR 草稿已保存在 `.tmp/workspace-qa-20260907/pr-body.md`。不自动合并分支。
 2. 项目管理者人工验收任务/角色双栏与信息清晰度。验收前不开展新切片；若仍觉得繁杂，优先反馈具体屏幕与内容。
 3. 后续候选为创建任务弹窗的普通用语与高级设置收纳；方向经确认后再开发。TH-7、完整 Members / Activity、Tester 隔离等继续待办。
 4. 恢复指令：`继续项目`；先读取本文件与相关 Web UI 模块文档，不重做已通过的页面审计。
