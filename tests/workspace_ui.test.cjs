@@ -88,3 +88,43 @@ test('角色索引响应不能写入另一个项目',async()=>{
   c.projectAgents=[]; const request=c.loadProjectAgents(); c.activeProjectId='p2';
   reply(0,[{member_id:'agent:old'}]); await request; assert.equal(c.projectAgents.length,0);
 });
+
+test('群聊只列本项目和历史无项目房间，排除任务专属房间',()=>{
+  const items=[{id:'task',type:'task',project_id:'p1'},{id:'chat',type:'group',project_id:'p1'},
+    {id:'legacy',project_id:null},{id:'other',type:'discussion',project_id:'p2'}];
+  assert.deepEqual(helpers.workspaceChatRooms(items,'p1').map(g=>g.id),['chat','legacy']);
+});
+test('群聊页不会沿用之前选中的任务详情',()=>{
+  const {context:c}=harness('getContextTask');
+  c.workspaceUI.mode='chats'; c.blackboardOpen=false; c.activeGroupId='chat';
+  assert.equal(c.getContextTask(),null);
+});
+for(const name of ['loadHistory','pollMessages']) test(`${name} 的旧房间响应不进入新房间`,async()=>{
+  const {context:c,reply}=harness('captureTimelineContext',name);
+  Object.assign(c,{timelineRevision:1,activeGroupId:'old',workspaceHasConversation:()=>true,
+    renderHistoryToolbar(){},buildHistoryRequestPath:()=>'/messages',buildPollRequestPath:()=>'/messages',
+    clearComposerStatus(){},showComposerStatus(){throw Error('不应显示旧房间提示');},
+    renderMessagesInChunks(){throw Error('不应渲染旧消息');},appendMessages(){throw Error('不应追加旧消息');},
+    historyLoading:false});
+  const request=c[name](); c.activeGroupId='new'; ++c.timelineRevision;
+  reply(0,[{id:1,group_id:'old'}]); await request;
+});
+test('没有选中群聊时不会请求全局消息',async()=>{
+  const {context:c,pending}=harness('loadHistory','pollMessages');
+  c.workspaceHasConversation=()=>false;
+  await c.loadHistory(); await c.pollMessages(); assert.equal(pending.length,0);
+});
+
+test('创建群聊携带当前项目并进入新房间',async()=>{
+  const {context:c}=harness('createGroupFromPanel'); let submitted;
+  Object.assign(c,{groupCreateSaving:false,groupCreateName:{value:'协作群'},groupCreateId:{value:''},
+    groupCreateDescription:{value:''},selectedCreateMemberIds:new Set(['human:alice']),
+    submitGroupCreateBtn:{},cancelGroupCreateBtn:{},groups:[],
+    clearComposerStatus(){},showGroupCreateError(message){throw Error(message);},
+    setGroupCreateOpen(open){c.modalOpen=open;},setActiveGroup(id){c.entered=id;},
+    apiFetch:async(url,options)=>{submitted={url,body:JSON.parse(options.body)};return {ok:true,json:async()=>({id:'new-room',project_id:'p1'})};}});
+  await c.createGroupFromPanel({preventDefault(){}});
+  assert.equal(submitted.url,'/api/groups'); assert.equal(submitted.body.project_id,'p1');
+  assert.deepEqual(submitted.body.member_ids,['human:alice']);
+  assert.equal(c.entered,'new-room'); assert.equal(c.modalOpen,false);
+});

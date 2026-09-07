@@ -67,6 +67,7 @@ let activeProjectId = null;
 let projectAgents = [];
 let projectTasks = [];
 let blackboardOpen = false;
+let timelineRevision = 0;
 let selectedTaskId = null;
 let selectedTaskTree = null;
 let taskTreeRequest = 0;
@@ -118,7 +119,6 @@ const blackboardEmpty = document.getElementById("blackboard-empty");
 const hallHeader = document.getElementById("hall-header");
 const roomTitle = document.getElementById("room-title");
 const roomDescription = document.getElementById("room-description");
-const globalRoomBtn = document.getElementById("global-room-btn");
 const groupRoomList = document.getElementById("group-room-list");
 const hallFilterInput = document.getElementById("hall-filter-input");
 const refreshGroupsBtn = document.getElementById("refresh-groups-btn");
@@ -628,7 +628,6 @@ logoutBtn.addEventListener("click", () => {
 loadOlderBtn.addEventListener("click", loadOlderMessages);
 historySearchBtn.addEventListener("click", applyHistorySearch);
 historyClearBtn.addEventListener("click", clearHistorySearch);
-globalRoomBtn.addEventListener("click", () => setActiveGroup(null));
 projectSelect.addEventListener("change", () => setActiveProject(projectSelect.value));
 projectBlackboardBtn.addEventListener("click", () => setBlackboardOpen(true));
 refreshProjectBtn.addEventListener("click", refreshProjectWorkspace);
@@ -840,6 +839,7 @@ async function setActiveProject(projectId) {
     return;
   }
   activeProjectId = projectId;
+  workspaceUI.mode = "tasks";
   workspaceUI.selectedRole = null;
   workspaceUI.query = "";
   document.getElementById("workspace-search").value = "";
@@ -860,6 +860,7 @@ async function setActiveProject(projectId) {
 }
 
 async function refreshProjectWorkspace() {
+  if (workspaceUI.mode === "chats") { await refreshGroups(); return; }
   if (!activeProjectId) return;
   refreshProjectBtn.disabled = true;
   blackboardRefreshBtn.disabled = true;
@@ -931,11 +932,16 @@ function setBlackboardOpen(open) {
 
 function renderWorkspaceMode() {
   syncWorkspaceLayout();
-  blackboardView.classList.toggle("hidden", !blackboardOpen);
-  hallHeader.classList.toggle("hidden", blackboardOpen);
-  messagesEl.classList.toggle("hidden", blackboardOpen);
-  composerFooter.classList.toggle("hidden", blackboardOpen);
-  if (blackboardOpen) renderBlackboard();
+  const chats = workspaceUI.mode === "chats";
+  const conversation = workspaceHasConversation();
+  blackboardView.classList.toggle("hidden", chats);
+  roomStrip.classList.toggle("hidden", !chats);
+  hallHeader.classList.toggle("hidden", !conversation);
+  messagesEl.classList.toggle("hidden", !conversation);
+  composerFooter.classList.toggle("hidden", !conversation);
+  document.getElementById("workspace-chat-empty").classList.toggle("hidden", !chats || conversation);
+  if (!chats) renderBlackboard();
+  else renderRoomStrip();
   renderGroupMembersPanel();
 }
 
@@ -976,7 +982,7 @@ function renderBlackboard() { renderWorkspaceList(); }
 function renderTaskCard(task) { return workspaceTaskRow(task); }
 
 function getContextTask() {
-  if (blackboardOpen && workspaceUI.mode === "roles") return null;
+  if (workspaceUI.mode !== "tasks") return null;
   if (!blackboardOpen && activeGroupId) {
     return projectTasks.find((task) => task.hall_group_id === activeGroupId) || null;
   }
@@ -1433,6 +1439,7 @@ async function createTaskFromPanel(event) {
     }
     const created = await res.json();
     selectedTaskId = created.id;
+    workspaceUI.mode = "tasks";
     setTaskCreateOpen(false);
     blackboardOpen = true;
     await Promise.all([loadGroups(), loadProjectTasks()]);
@@ -1471,7 +1478,9 @@ async function refreshGroups() {
   try {
     const previousGroupId = activeGroupId;
     await loadGroups();
+    if (workspaceUI.mode === "chats" && !workspaceHasConversation()) { openWorkspaceChats(); return; }
     renderRoomStrip();
+    renderWorkspaceMode();
     renderPresenceStrip();
     renderMentionDropdownIfOpen();
     if (previousGroupId !== activeGroupId) {
@@ -1535,8 +1544,11 @@ function setActiveGroup(groupId) {
   if (activeGroupId === nextGroupId && !blackboardOpen) return;
 
   blackboardOpen = false;
+  const nextGroup = groups.find(group => group.id === nextGroupId);
+  workspaceUI.mode = nextGroup?.type === "task" ? "tasks" : "chats";
+  if (nextGroup && nextGroup.type !== "task") workspaceUI.lastChatId = nextGroupId;
   const hallTask = projectTasks.find((task) => task.hall_group_id === nextGroupId);
-  selectedTaskId = hallTask?.id ?? null;
+  if (hallTask) selectedTaskId = hallTask.id;
   selectedTaskTree = null;
   taskTreeError = "";
   ++taskTreeRequest;
@@ -1564,27 +1576,22 @@ function setActiveGroup(groupId) {
 function renderRoomStrip() {
   if (!myId) return;
 
-  roomStrip.classList.remove("hidden");
+  roomStrip.classList.toggle("hidden", workspaceUI.mode !== "chats");
   const activeGroup = getActiveGroup();
   groupMembersOpen = Boolean(activeGroup);
-  globalRoomBtn.classList.toggle("active", !blackboardOpen && !activeGroupId);
   groupRoomList.innerHTML = "";
 
-  roomTitle.textContent = activeGroup ? `${activeGroup.name} Hall` : "全局消息流";
+  roomTitle.textContent = activeGroup ? activeGroup.name : "群聊";
   roomTitle.classList.toggle("editable", Boolean(activeGroup));
-  roomDescription.textContent = activeGroup
-    ? `${activeGroup.id} · Hall 在线同步中 · @ 开头提醒成员，同组可见${activeGroup.description ? ` · ${activeGroup.description}` : ""}`
-    : "旧全局聊天与私聊时间线";
+  roomDescription.textContent = activeGroup ? (activeGroup.description || "群内成员可以查看消息，使用 @ 提醒对方。") : "";
   const hallGroupId = document.getElementById("hall-group-id");
   if (hallGroupId) {
     hallGroupId.textContent = activeGroup ? activeGroup.id : "";
-    hallGroupId.classList.toggle("hidden", !activeGroup);
+    hallGroupId.classList.add("hidden");
   }
 
   const hallQuery = hallFilterInput.value.trim().toLowerCase();
-  const projectGroups = activeProjectId
-    ? groups.filter((group) => group.project_id === activeProjectId || !group.project_id)
-    : groups;
+  const projectGroups = workspaceChatRooms(groups, activeProjectId);
   const visibleGroups = hallQuery
     ? projectGroups.filter((group) => groupMatchesHallQuery(group, hallQuery))
     : projectGroups;
@@ -1592,12 +1599,12 @@ function renderRoomStrip() {
   if (projectGroups.length === 0) {
     const empty = document.createElement("span");
     empty.className = "group-room-empty";
-    empty.textContent = activeProjectId ? "当前项目暂无 Hall" : "暂无 Group";
+    empty.textContent = "还没有群聊，点击“新建群聊”开始。";
     groupRoomList.appendChild(empty);
   } else if (visibleGroups.length === 0) {
     const empty = document.createElement("span");
     empty.className = "group-room-empty";
-    empty.textContent = "没有匹配的 Hall";
+    empty.textContent = "没有匹配的群聊";
     groupRoomList.appendChild(empty);
   } else {
     for (const group of visibleGroups) {
@@ -1605,9 +1612,9 @@ function renderRoomStrip() {
       const isActive = !blackboardOpen && group.id === activeGroupId;
       const canEnter = getGroupMemberIds(group).has(myId);
       button.type = "button";
-      button.className = `room-chip ${isActive ? "active" : ""}`;
-      const typeLabel = group.type === "task" ? "任务" : group.type === "discussion" ? "讨论" : "Hall";
-      button.textContent = `${typeLabel} · ${group.name}`;
+      button.className = `room-chip group-chat-row ${isActive ? "active" : ""}`;
+      button.setAttribute("aria-pressed", String(isActive));
+      button.append(workspaceEl("strong", "", group.name), workspaceEl("span", "", `${getGroupMemberIds(group).size} 位成员${canEnter ? "" : " · 尚未加入"}`));
       button.title = canEnter
         ? `${group.name} (${group.id})`
         : `${group.name} (${group.id}) · 你还不是成员`;
@@ -1617,7 +1624,7 @@ function renderRoomStrip() {
     }
   }
 
-  toggleGroupCreateBtn.textContent = groupCreateOpen ? "×" : "＋";
+  toggleGroupCreateBtn.textContent = "新建群聊";
   toggleGroupMembersBtn.classList.toggle(
     "hidden",
     !activeGroup || blackboardOpen || activeGroup.type === "task" || Boolean(getContextTask())
@@ -1645,6 +1652,7 @@ function groupMatchesHallQuery(group, query) {
 }
 
 function setGroupCreateOpen(open) {
+  if (open && !groupCreateOpen) workspaceUI.groupCreateTrigger = document.activeElement;
   groupCreateOpen = open;
   showGroupCreateError("");
   if (open) {
@@ -1653,11 +1661,12 @@ function setGroupCreateOpen(open) {
   if (open) {
     selectedCreateMemberIds = new Set();
     renderGroupCreateMembers();
-    groupCreateName.focus();
   } else {
     groupCreatePanel.reset();
   }
   renderRoomStrip();
+  if (open) groupCreateName.focus();
+  else if (workspaceUI.groupCreateTrigger?.isConnected) workspaceUI.groupCreateTrigger.focus();
 }
 
 function setGroupMembersOpen(open) {
@@ -1722,7 +1731,7 @@ async function createGroupFromPanel(event) {
 
   const name = groupCreateName.value.trim();
   if (!name) {
-    showGroupCreateError("请填写 Group 名称。");
+    showGroupCreateError("请填写群聊名称。");
     groupCreateName.focus();
     return;
   }
@@ -1733,6 +1742,7 @@ async function createGroupFromPanel(event) {
   const body = {
     name,
     member_ids: selectedMemberIds,
+    project_id: activeProjectId || null,
   };
   const id = groupCreateId.value.trim();
   const description = groupCreateDescription.value.trim();
@@ -1754,17 +1764,9 @@ async function createGroupFromPanel(event) {
 
     const group = await res.json();
     groups = [group, ...groups.filter((item) => item.id !== group.id)];
-    activeGroupId = group.id;
-    localStorage.setItem(activeGroupStorageKey(), activeGroupId);
-    groupCreateOpen = false;
-    groupCreatePanel.reset();
     clearComposerStatus("room");
-    resetTimelineState();
-    renderRoomStrip();
-    renderPresenceStrip();
-    renderMentionDropdownIfOpen();
-    updateComposerPlaceholder();
-    await loadHistory();
+    setGroupCreateOpen(false);
+    setActiveGroup(group.id);
   } catch (err) {
     console.error(err);
     showGroupCreateError(err.message);
@@ -2306,9 +2308,7 @@ function getScopedMembers() {
 }
 
 function messageBelongsToActiveRoom(message) {
-  return activeGroupId
-    ? message.group_id === activeGroupId
-    : !message.group_id;
+  return workspaceHasConversation() && message.group_id === activeGroupId;
 }
 
 function addActiveGroupToParams(params) {
@@ -2324,7 +2324,15 @@ function applyActiveGroupToPayload(body) {
   return body;
 }
 
+function captureTimelineContext() {
+  const revision = timelineRevision;
+  const groupId = activeGroupId;
+  const memberId = myId;
+  return () => revision === timelineRevision && groupId === activeGroupId && memberId === myId && workspaceHasConversation();
+}
+
 function resetTimelineState({ clearSearch = true } = {}) {
+  ++timelineRevision;
   lastId = 0;
   oldestLoadedId = null;
   hasMoreHistory = false;
@@ -2369,18 +2377,23 @@ function startChat() {
 }
 
 async function loadHistory() {
+  if (!workspaceHasConversation()) return;
+  const current = captureTimelineContext();
   try {
     historyLoading = true;
     renderHistoryToolbar();
     const res = await apiFetch(buildHistoryRequestPath());
+    if (!current()) return;
     if (!res.ok) {
       showComposerStatus("历史消息加载失败，请稍后重试。", "error", { source: "load", timeoutMs: 0 });
       return;
     }
     clearComposerStatus("load");
     const msgs = await res.json();
+    if (!current()) return;
     if (msgs.length > 0) {
-      await renderMessagesInChunks(msgs, HISTORY_RENDER_CHUNK);
+      await renderMessagesInChunks(msgs, HISTORY_RENDER_CHUNK, current);
+      if (!current()) return;
       oldestLoadedId = msgs[0].id;
       lastId = Math.max(lastId, msgs[msgs.length - 1].id);
       hasMoreHistory = msgs.length === HISTORY_PAGE_SIZE;
@@ -2393,22 +2406,26 @@ async function loadHistory() {
       renderHistoryToolbar();
     }
   } catch (err) {
+    if (!current()) return;
     showComposerStatus(`历史消息加载失败: ${err.message}`, "error", { source: "load", timeoutMs: 0 });
   } finally {
-    historyLoading = false;
-    renderHistoryToolbar();
+    if (current()) { historyLoading = false; renderHistoryToolbar(); }
   }
 }
 
 async function pollMessages() {
+  if (!workspaceHasConversation()) return;
+  const current = captureTimelineContext();
   try {
     const res = await apiFetch(buildPollRequestPath());
+    if (!current()) return;
     if (!res.ok) {
       showComposerStatus("消息同步失败，正在继续轮询。", "error", { source: "load", timeoutMs: 0 });
       return;
     }
     clearComposerStatus("load");
     const msgs = await res.json();
+    if (!current()) return;
     if (msgs.length > 0) {
       const freshMessages = msgs.filter((message) => !renderedMessageIds.has(message.id));
       const visibleMessages = freshMessages.filter(matchesActiveHistoryQuery);
@@ -2420,6 +2437,7 @@ async function pollMessages() {
       }
     }
   } catch (err) {
+    if (!current()) return;
     showComposerStatus(`消息同步失败: ${err.message}`, "error", { source: "load", timeoutMs: 0 });
   }
 }
@@ -2578,7 +2596,7 @@ msgInput.addEventListener("keydown", (e) => {
 });
 
 async function sendMessage() {
-  if (sending) return;
+  if (sending || !workspaceHasConversation()) return;
 
   const rawText = msgInput.value.trim();
   if (!rawText && !pendingFile) return;
@@ -2621,6 +2639,7 @@ async function sendMessage() {
 }
 
 async function sendFileMessage(caption = null) {
+  if (!workspaceHasConversation()) return;
   if (!pendingFile) return;
 
   sending = true;
@@ -2859,8 +2878,9 @@ function prependMessages(messages) {
   return upsertMessages(messages, "prepend");
 }
 
-async function renderMessagesInChunks(messages, chunkSize = HISTORY_RENDER_CHUNK) {
+async function renderMessagesInChunks(messages, chunkSize = HISTORY_RENDER_CHUNK, current = () => true) {
   for (let index = 0; index < messages.length; index += chunkSize) {
+    if (!current()) return;
     appendMessages(messages.slice(index, index + chunkSize));
     if (index + chunkSize < messages.length) {
       await nextFrame();
@@ -2898,6 +2918,8 @@ function buildPollRequestPath() {
 async function loadOlderMessages() {
   if (historyLoading || !hasMoreHistory || oldestLoadedId === null) return;
 
+  if (!workspaceHasConversation()) return;
+  const current = captureTimelineContext();
   historyLoading = true;
   renderHistoryToolbar();
   const previousScrollHeight = messagesEl.scrollHeight;
@@ -2905,11 +2927,13 @@ async function loadOlderMessages() {
 
   try {
     const res = await apiFetch(buildHistoryRequestPath(oldestLoadedId));
+    if (!current()) return;
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `历史分页加载失败: ${res.status}`));
     }
 
     const msgs = await res.json();
+    if (!current()) return;
     if (msgs.length === 0) {
       hasMoreHistory = false;
       renderHistoryToolbar();
@@ -2923,15 +2947,16 @@ async function loadOlderMessages() {
 
     if (prependedCount > 0) {
       requestAnimationFrame(() => {
+        if (!current()) return;
         const heightDelta = messagesEl.scrollHeight - previousScrollHeight;
         messagesEl.scrollTop = previousScrollTop + heightDelta;
       });
     }
   } catch (err) {
+    if (!current()) return;
     showComposerStatus(err.message, "error", { source: "load", timeoutMs: 0 });
   } finally {
-    historyLoading = false;
-    renderHistoryToolbar();
+    if (current()) { historyLoading = false; renderHistoryToolbar(); }
   }
 }
 

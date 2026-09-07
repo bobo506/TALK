@@ -6,8 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260907-density-1">
-  <link rel="stylesheet" href="/workspace.css?v=20260907-density-1">
+  <link rel="stylesheet" href="/style.css?v=20260908-chats-1">
+  <link rel="stylesheet" href="/workspace.css?v=20260908-chats-1">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -99,8 +99,9 @@
         <section id="project-strip" class="project-strip hidden">
           <div class="workspace-tabs" aria-label="工作台视图">
             <button id="project-blackboard-btn" type="button" aria-pressed="true">任务<span id="project-task-count" class="hidden"></span></button>
+            <button id="workspace-chats-btn" type="button" aria-pressed="false">群聊</button>
             <button id="workspace-roles-btn" type="button" aria-pressed="false">角色</button>
-            <button id="refresh-project-btn" type="button" class="workspace-refresh" aria-label="刷新项目任务">刷新</button>
+            <button id="refresh-project-btn" type="button" class="workspace-refresh" aria-label="刷新当前列表">刷新</button>
           </div>
           <p id="project-empty-note" class="project-empty-note hidden">还没有已注册项目。先用 <code>talk init</code> 建立项目上下文。</p>
         </section>
@@ -125,28 +126,24 @@
           </div>
         </section>
 
-        <details class="room-disclosure"><summary>对话与房间</summary>
-        <section id="room-strip" class="room-strip hidden">
+        <section id="room-strip" class="room-strip workspace-chats hidden">
           <div class="sidebar-heading">
-            <h2>Hall 列表</h2>
+            <h2>群聊房间</h2>
             <div class="sidebar-actions">
-              <button id="toggle-group-create-btn" type="button" class="icon-action" title="新建 Hall" aria-label="新建 Hall">＋</button>
-              <button id="refresh-groups-btn" type="button" class="icon-action subtle hidden" title="刷新 Hall 列表" aria-label="刷新 Hall 列表">↻</button>
+              <button id="toggle-group-create-btn" type="button" class="room-primary-btn" title="新建群聊" aria-label="新建群聊">新建群聊</button>
+              <button id="refresh-groups-btn" type="button" class="icon-action subtle hidden" title="刷新群聊" aria-label="刷新群聊">↻</button>
             </div>
           </div>
           <div class="hall-filter-shell">
             <span aria-hidden="true">⌕</span>
-            <input id="hall-filter-input" type="text" placeholder="搜索 Hall / Agent / 人类成员" autocomplete="off">
-          </div>
-          <div class="quick-actions">
-            <button id="global-room-btn" type="button" class="room-chip active">全局消息流</button>
+            <input id="hall-filter-input" type="text" placeholder="搜索群聊" aria-label="搜索群聊" autocomplete="off">
           </div>
           <div id="group-room-list" class="group-room-list"></div>
         </section>
-        </details>
       </aside>
 
       <section class="timeline-workspace">
+        <div id="workspace-chat-empty" class="workspace-chat-empty hidden"><h2>选择一个群聊房间</h2><p>从左侧进入已有群聊，或新建一个房间开始交流。</p></div>
         <header id="hall-header" class="hall-header">
           <div class="hall-title-row">
             <div>
@@ -290,9 +287,9 @@
   </div>
 
   <div id="group-create-overlay" class="modal-overlay hidden">
-    <form id="group-create-panel" class="group-create-panel modal-card">
+    <form id="group-create-panel" class="group-create-panel modal-card" role="dialog" aria-modal="true" aria-labelledby="group-create-heading">
       <div class="modal-header">
-        <h3>新建 Hall</h3>
+        <h3 id="group-create-heading">新建群聊</h3>
         <button id="close-group-create-btn" type="button" class="modal-close" aria-label="关闭">×</button>
       </div>
       <div class="group-create-grid">
@@ -306,12 +303,12 @@
         </label>
         <label class="group-create-field wide">
           <span>描述（可选）</span>
-          <input id="group-create-description" type="text" placeholder="这个 Hall 用来同步哪类工作">
+          <input id="group-create-description" type="text" placeholder="这个群聊用来交流什么">
         </label>
       </div>
       <div class="group-create-members-wrap">
         <div class="group-create-label">初始成员</div>
-        <select id="group-create-member-select" class="group-member-select">
+        <select id="group-create-member-select" class="group-member-select" aria-label="添加群聊成员">
           <option value="">添加成员…</option>
         </select>
         <div id="group-create-member-chips" class="group-create-chips"></div>
@@ -442,7 +439,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/workspace.js?v=20260907-density-1"></script>
-  <script src="/app.js?v=20260907-density-1"></script>
+  <script src="/workspace.js?v=20260908-chats-1"></script>
+  <script src="/app.js?v=20260908-chats-1"></script>
 </body>
 </html>

@@ -29,8 +29,6 @@
 .task-card-meta {grid-column:1/-1; font-size:14px; color:#656d76; line-height:1.5;}
 .task-status-badge {background:transparent!important; padding:0; align-self:start; font-size:14px; white-space:normal; line-height:1.7; font-weight:500;}
 .task-status-badge.success {color:#26753c;} .task-status-badge.danger {color:#a83232;} .task-status-badge.attention {color:#8d580d;}
-.room-disclosure {margin:28px; font-size:14px; color:#606a76;}
-.room-disclosure>summary {cursor:pointer;} .room-disclosure .room-strip {margin-top:20px;}
 .role-row {border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; background:transparent; padding:24px 28px; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left;}
 .role-row strong {font-size:22px;} .role-row span {font-size:15px;} .role-row small {font-size:14px; color:#626b76;}
 .workspace-empty {padding:20px 28px; color:#626b76; font-size:15px;}
@@ -93,3 +91,23 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
   .modal-card { max-height:calc(100vh / var(--interface-scale) - 48px); }
   .task-create-panel { max-height:calc(90vh / var(--interface-scale)); }
 }
+
+/* 群聊使用同级导航，普通房间与任务专属对话分别进入。 */
+.workspace-tabs {gap:18px;}
+.workbench:not(.project-mode) {grid-template-columns:minmax(270px,32%) minmax(0,1fr) 244px;}
+.workbench .workspace-tools {padding:28px 0 16px;}
+.workspace-chats .sidebar-heading,.workspace-chats .hall-filter-shell {margin:0 28px 20px;}
+.workspace-chats .sidebar-heading {flex-wrap:wrap; gap:12px;}
+.workspace-chats .sidebar-heading h2 {font-size:17px;}
+.workspace-chats .room-primary-btn {font-size:14px; padding:8px 12px;}
+.workspace-chats .group-room-list {gap:0;}
+.workspace-chats .group-chat-row {display:flex; flex-direction:column; gap:8px; border:0; border-bottom:1px solid var(--line); border-left:3px solid transparent; border-radius:0; padding:20px 28px; white-space:normal; box-shadow:none;}
+.group-chat-row strong {font-size:17px; overflow-wrap:anywhere;}
+.group-chat-row span {font-size:14px; font-weight:400;}
+.workspace-chats .group-chat-row.active {border-left-color:var(--blue-strong); background:#edf5fc;}
+.workspace-chats .group-room-empty {padding:20px 28px; font-size:15px;}
+.workspace-chat-empty {grid-row:1/-1; padding:48px 32px; text-align:center; color:#65717d;}
+.workspace-chat-empty h2 {font-size:24px; margin-bottom:12px; color:var(--text);}
+.workbench.empty-chat-mode {grid-template-columns:minmax(270px,32%) minmax(0,1fr);}
+.empty-chat-mode .details-panel {display:none;}
+@media(max-width:1000px){.workbench:not(.project-mode) {grid-template-columns:280px minmax(0,1fr) 244px;} .workbench.empty-chat-mode {grid-template-columns:280px minmax(0,1fr);}}

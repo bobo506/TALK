@@ -12,6 +12,25 @@ function workspaceNeedsMe(task, memberId, human) {
   return (task.created_by === memberId && ["submitted", "clarification_requested"].includes(task.workflow_status))
     || (task.target_member_id === memberId && ["assigned", "clarification_answered"].includes(task.workflow_status));
 }
+// 普通群聊沿用项目与历史无项目房间的范围，任务房间只从任务详情进入。
+function workspaceChatRooms(items, projectId) {
+  return items.filter(group => group.type !== "task" && (!projectId || !group.project_id || group.project_id === projectId));
+}
+function workspaceHasConversation() {
+  return ["tasks", "chats"].includes(workspaceUI.mode) && !blackboardOpen && Boolean(getActiveGroup()) && canEnterGroup(activeGroupId)
+    && (workspaceUI.mode !== "chats" || workspaceChatRooms([getActiveGroup()], activeProjectId).length > 0);
+}
+function openWorkspaceChats() {
+  const rooms = workspaceChatRooms(groups, activeProjectId);
+  const next = rooms.find(group => group.id === workspaceUI.lastChatId && canEnterGroup(group.id))
+    || rooms.find(group => group.id === activeGroupId && canEnterGroup(group.id))
+    || rooms.find(group => canEnterGroup(group.id));
+  workspaceUI.mode = "chats";
+  hallFilterInput.value = "";
+  // 空群聊不回落到旧全局消息流；由页面显示空状态。
+  setActiveGroup(next?.id || null);
+  renderWorkspaceMode();
+}
 function workspaceEl(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -43,7 +62,9 @@ function workspaceWorkSummary(id) {
 function workspaceTitle(task) { return task.title || task.content?.split("\n")[0] || "未命名任务"; }
 function syncWorkspaceLayout() {
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
-  document.getElementById("project-blackboard-btn").setAttribute("aria-pressed", String(blackboardOpen && workspaceUI.mode === "tasks"));
+  document.querySelector(".workbench").classList.toggle("empty-chat-mode", workspaceUI.mode === "chats" && !workspaceHasConversation());
+  document.getElementById("project-blackboard-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "tasks"));
+  document.getElementById("workspace-chats-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "chats"));
   document.getElementById("workspace-roles-btn").setAttribute("aria-pressed", String(blackboardOpen && workspaceUI.mode === "roles"));
   if (myId) userBadge.textContent = workspaceMemberName(myId);
 }
@@ -212,6 +233,7 @@ async function showWorkspaceResult(task) {
   } catch (err) { if (current()) panel.textContent = err.message; }
 }
 if (typeof document !== "undefined") {
+  document.getElementById("workspace-chats-btn").addEventListener("click", openWorkspaceChats);
   document.getElementById("workspace-roles-btn").addEventListener("click", () => {
     workspaceUI.mode = "roles"; blackboardOpen = Boolean(activeProjectId); selectedTaskTree = null; ++taskTreeRequest;
     workspaceUI.query = ""; document.getElementById("workspace-search").value = "";
@@ -219,4 +241,4 @@ if (typeof document !== "undefined") {
   });
   document.getElementById("workspace-search").addEventListener("input", event => { workspaceUI.query = event.target.value; renderWorkspaceList(); });
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms};
