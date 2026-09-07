@@ -1,5 +1,32 @@
 # 开发历史 · TALK
 
+## 2026-09-08 稳定基线合并与 TH-7a 增量接入
+
+- 用户确认群聊 Codex 回复及前述 UI 问题全部修正，并明确授权按“已验收分支链合入稳定基线 → 接入 5781ee6 → 单独验证再合并”收尾。
+- PR #3 以 merge 方式合入 task-hall（3e2483d），再通过 PR #4 合入 main（541e668）；旧 PR #2 随其提交进入默认分支自动标记 merged，未丢弃历史或强推。
+- 合并前稳定基线 383 项非 WebSocket Python 测试、10 项逐个独立进程 WebSocket 测试、20 项 Node 测试全部通过。首次单进程完整 discover 在 WebSocket 连接状态检查长时间阻塞，停止的仅是本轮测试子进程；拆分复测通过，未修改功能代码。日志仅保留 .tmp。
+- 从 main 的 541e668 创建 codex/th7-terminal-integration，cherry-pick -x 原 5781ee6。功能代码无冲突，仅 PROGRESS / PROGRESS_HISTORY 有冲突，人工整合保留 UI 验收修复、TH-7a 原开发记录及最新产品决定。
+- 集成后终端/任务工具 13 项通过；从其它工作目录以现有 QA 账号运行真实 --check，返回 ok=true，项目与 Codex / DeepSeek / Kimi 角色正确。没有创建生产任务、发送群消息、安装用户级 MCP 或操作现有 bridge。
+- 下一步将此独立切片合入 main，然后补记最终合并版本与头脑风暴产品约定交接；本轮不开始新功能。原 5781ee6 分支及旧工作树保留，避免误清理本地资料。
+
+---
+
+## 2026-09-08 TH-7a：复制验收基线并完成普通终端接入入口
+
+- 用户明确要求“先复制一个当前分支，然后在这个基础上先做一个最小开发切片”，原分支由用户明天验收合并。Codex 按已获授权的决策 Agent 开发一片后收尾。
+- 从 `codex/ui-workspace-v1` 的已推送版本 `6affa86f2c2db0b3d011e7db2f5e5cf49b0ad5ba` 创建 `codex/th7-terminal-v1`，独立 worktree 为 `D:/claude-test/TALK/.tmp/th7-terminal-v1`。原目录继续保持原分支，原 PR #3 和浏览器页面未改动。
+- 新增 `bridges/talk_terminal_mcp.py`：任意工作目录可通过绝对路径启动；服务/项目来源按显式参数、环境变量、已有 `.talk/project.yaml` 排序；要求项目与环境密钥，忽略继承的成员身份提示。输入、输出、错误统一 UTF-8。
+- 新增 `--check`，只读核对成员身份、项目角色和可用状态，结果不打印密钥；配置缺失、非法地址、无效 YAML、HTTP 错误与连接错误通过退出码和 stderr 反馈。
+- 复用原 MCP 循环和八个 HTTP 任务工具；给原循环添加默认开启的延迟发送开关。独立入口关闭 `talk_send` 的目录展示与调用，防止登记无人回收的延迟消息；原 bridge 九工具合同保持兼容。
+- `python -X utf8 -m unittest tests.test_talk_terminal_mcp tests.test_talk_task_tools -q`：13 项全部通过，其中新入口 8 项、既有工具 5 项。隔离真实 HTTP 服务 + MCP 子进程覆盖中文/空格目录、只读检查无写入、错误诊断、工具目录及委派→提交→查询→收取；目标角色执行由测试 API 模拟，没有消耗模型额度或写入生产数据。
+- `--help` 与 `git diff --check` 通过。没有重跑无关 Web 或全量后端测试；没有声称已完成具体桌面客户端安装或真实模型验收。
+- 变更文件：`bridges/talk_terminal_mcp.py`、`bridges/talk_send_mcp.py`、`tests/test_talk_terminal_mcp.py`；接入指南 `docs/guides/TERMINAL_MCP.md` 与快速开始链接、任务模块、简报、进度快照与本历史。
+- 本轮只提交新分支的局部代码与文档，未推送新分支、更新旧 PR、合并或修改用户级 MCP 配置。本片是 TH-7 的技术接入入口，完整客户端接入里程碑留待下一片。
+- 下一步：用户先验收合并原界面分支，再对齐新分支到稳定基线；如使用 squash，基于 `6affa86` 仅迁移本片增量。随后确认具体客户端安装与一次真实委派流程。
+
+
+---
+
 ## 2026-09-08 Codex 普通终端 PATH 补修
 
 - 用户重启后群聊仍报错。只读检查最新实例确认进程已更换，但 stderr 仍为 Codex 0.144.4 / gpt-6-astra HTTP 400。核对启动命令没有显式 CLI 覆盖；普通终端的持久化 PATH 缺少 Desktop 的原生 CLI 目录，而 Codex 应用工具环境包含它。

@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 已于 2026-09-06 通过项目管理者人工验收，根任务 `#15` 与子任务 `#16/#17/#18` 均已完成；TH-7 尚未启动
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 已于 2026-09-06 通过项目管理者人工验收，根任务 `#15` 与子任务 `#16/#17/#18` 均已完成；TH-7a 普通终端 stdio MCP 入口与只读连接检查已实现，具体客户端安装与真实模型验收待后续推进
 
 ## 目标
 
@@ -236,6 +236,10 @@
 - 旧任务若没有 `hall_group_id`，runner 会保留原有全局时间线回传行为，服务端继续接受这类兼容结果。
 
 ### 终端工具
+
+- TH-7a 新增 `bridges/talk_terminal_mcp.py`，可从任意目录用绝对路径启动普通终端 stdio MCP；`--check` 只读核对 API Key 对应身份、项目角色与可用状态。
+- 独立入口配置优先级为显式 `--server / --project`、环境变量、项目 `.talk/project.yaml`；服务缺省为本机 8000，项目和 `TALK_API_KEY` 必须有效提供。默认项目允许工具参数覆盖，服务端继续负责权限校验。
+- 独立入口忽略继承的 `TALK_MEMBER_ID`，只暴露下述八个 Task Hall 工具；依赖 bridge 回收的延迟 `talk_send` 仅保留在原 bridge 入口。启动与验收见 `docs/guides/TERMINAL_MCP.md`。
 
 - Codex 使用 `bridges/talk_send_mcp.py`，pi 使用 `bridges/talk_tools_extension.ts`；两端共同提供 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result` 八个 Task Hall 工具，原有 deferred `talk_send` 保持兼容。
 - bridge 会从项目目录的 `.talk/project.yaml` 注入默认 `TALK_PROJECT_ID`；调用方仍可在工具参数中显式覆盖项目。
@@ -505,7 +509,7 @@ TH-6d 已把 Test 纳入服务端强门禁：里程碑 Test 只能覆盖根任�
 12. [x] TH-6b：实现 runner 领取前预检、同 Hall 自动澄清、完整分页上下文重放和重复唤醒幂等保护。
 13. [x] TH-6c：实现任务类型 / 关系、结构化 Review 结论、批量 Review、返工与角色发现。
 14. [x] TH-6d：实现里程碑测试门禁、Blackboard 控制入口、最新版本失效规则与人工验收暂停；2026-09-06 原生三 Agent 任务树 `#15/#16/#17/#18` 通过人工验收并完成根结果收取。
-15. TH-7：补 Codex Desktop / 通用终端接入包装，再评估 schedule 项目化、长任务事件等待、document lock 等后续能力。
+15. TH-7：TH-7a 普通终端入口与只读检查已实现并通过隔离 stdio/HTTP 验证；下一片再完成具体客户端安装配置与真实模型委派验收。schedule 项目化、长任务事件等待、document lock 继续后置。
 
 ## 验收点
 
