@@ -84,3 +84,12 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 }
 
 .app-header {flex-shrink:0; align-items:center;} .app-header .header-actions {height:auto;}
+
+/* 桌面默认密度约等于原界面的 80%；vh 仍取物理视口，需补偿以铺满高度。 */
+@media (min-width:701px) {
+  :root { --interface-scale:0.8; zoom:var(--interface-scale); }
+  body.app-shell { height:calc(100vh / var(--interface-scale)); }
+  .workbench { height:calc(100vh / var(--interface-scale) - 70px); }
+  .modal-card { max-height:calc(100vh / var(--interface-scale) - 48px); }
+  .task-create-panel { max-height:calc(90vh / var(--interface-scale)); }
+}

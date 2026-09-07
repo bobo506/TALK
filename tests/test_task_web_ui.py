@@ -30,7 +30,7 @@ class TaskWebUiTests(RouteTestCase):
             "task-create-related",
         ):
             self.assertIn(f'id="{element_id}"', html)
-        self.assertIn("20260907-workspace-3", html)
+        self.assertIn("20260907-density-1", html)
         self.assertIn('role="dialog"', html)
         self.assertIn('aria-labelledby="task-create-heading"', html)
         self.assertIn('aria-labelledby="task-create-agent-label"', html)
