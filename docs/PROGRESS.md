@@ -2,62 +2,46 @@
 
 ## Latest
 
-- **当前优先事项改为界面评估与简化，TH-7 暂缓**。用户要求非编程人员也能看懂任务交接、完成状态与下一步；本次审计已完成，尚未修改产品代码或批准具体布局。
-- 本次真实浏览器发现：从黑板 #15 经侧栏切换 Hall #9 后，标题变为 #9，但质量门禁与树操作仍沿用 #15 的任务树。另有完成态仍显示暂停/终止、无权限入口缺少可见反馈、主子任务平铺、技术信息过多与窄窗口横向溢出。
+- **UI-WORKSPACE-1 已实现，等待人工验收**：按用户确认的任务 / 角色预览落地一个前端切片。TH-7 暂缓，不继续开启下一切片。
+- 左侧“任务 / 角色”同级切换，右侧跟随选中项展示；主任务归组、成果与下一步优先、原始说明收进“任务要求”，普通详情移除内部技术字段。
+- 已修复 #15 黑板切到 #9 Hall 后沿用旧树的问题，以及完成态显示暂停/终止、受限成果入口无反馈、移动端标题栏遮挡和刷新丢焦点等问题。
 
-Updated: 2026-09-06 21:24 (Asia/Shanghai)
-
-- 当前项目：TALK；当前分支：`codex/task-hall`；本轮 Codex 为决策 Agent，角色来源为 `AGENTS.md`。
-- **TH-6d 已通过人工验收并完成任务树收尾**。项目管理者于 2026-09-06 确认“16，17，18都是已完成的状态，已验收，继续收尾”；服务端核对人工验收检查点已解除，`authorization_epoch=2`。
-- 根任务 `#15` 与 Development `#16`、Review `#17`、Test `#18` 均为 `succeeded/completed`；Review=`approved`、Test=`passed`，最新冻结集仍为 `[16]`。
-- 当前 Codex Desktop 会话通过 SDK/API 重新领取根任务、提交最终汇总消息 `#2480`，并依据项目管理者本次验收及收尾授权，以原请求者身份完成根结果收取。
-- 本轮仅处理验收收尾与文档同步，未新增开发任务、未增加开发额度、未进入 TH-7。收尾基线为已推送的 `dd1f682`（记录 Kimi 三 Agent 真实验收结果）。
-- GitHub 已推送：项目管理者明确回复“推送吧”后，验收收尾提交 `272b50b` 已推送到公开仓库 `bobo506/TALK` 的 `codex/task-hall` 分支；`git ls-remote` 核对远端与该提交一致。本次公开推送授权已满足，未修改 GitHub 权限或 Codex 自动审批策略。
+Updated: 2026-09-07 (Asia/Shanghai)
 
 ## Current Snapshot
 
-- 本地 dogfood 固定拓扑：`agent:codex`（Lead / decision）、`agent:deepseek`（DeepSeek Harness / Dev / execution）、`agent:kimi`（官方 Kimi Code CLI / Reviewer / execution）。旧 `agent:pi` / `agent:pi-kimi` 仅保留兼容入口和历史。
-- 根任务 `#15`：`TH-6d 三 Agent 验收 V2（Kimi Code）`；项目 `prj_e8fe7066bbec`；Task Hall 为 `group:task-2d0cf86216b742f3adc157a3695ebeef`。最终结果 `#2480`，验收前汇总 `#2479`。
-- 子任务结果：Development `#16` → `#2476`；Review `#17` → `#2477`；Test `#18` → `#2478`。Review/Test 都绑定冻结的 `#16`，门禁仍有效。
-- 根树运行中 / 非终态后代均为 `0`，剩余开发切片额度为 `0`。根任务已完成；`control_status=active` 是验收释放检查点后的控制字段，不表示仍有任务运行。
-- `.tmp/th6d-native-kimi-acceptance-v2.txt`：65 bytes、UTF-8 无 BOM、LF，SHA-256 为 `602FBC88D523943F2798942F0F898B354834372C1BC53AEECBF3233FAC2743DF`。V1/V2 两个验收文件保持 untracked，不进入提交。
-- 本轮恢复时 `8000` 端口未运行；项目管理者启动后，`GET /healthz` 返回 `status/db/storage=ok`。收尾没有启动 DeepSeek / Kimi / 嵌套 Codex bridge；既有结果可直接验收。`codex-desktop-th6d-v2` 在根任务完成后回到 `idle`。
-
-## Current Boundaries
-
-- Kimi `review` 档开放 `Read / Grep / Glob / Bash`，没有 `Edit / Write`；工具白名单不是操作系统级只读沙箱。
-- Kimi Code CLI `0.38.0` prompt mode 参数冲突已在 `921fbb1` 修复；官方会话可能保留，不自动删除或续接。
-- Kimi 已完成自动化、文件和 API 检查；完整浏览器 Tester 能力与操作系统级硬隔离仍未完成。本次浏览器人工验收由项目管理者完成。
-- 普通 Codex Desktop 自动注册 TALK MCP、附件正文注入、跨实例消息级原子去重、项目级 Members / Activity 独立页面仍未完成。
-- 旧任务 `#10/#11/#12/#13/#14` 保留历史，不复用；旧 `#12` 的嵌套 Codex CLI 额度失败是 2026-08-27 的运行事实，不代表本日额度状态。
-
-## Next Slice
-
-1. 先评审面向普通使用者的“任务总览—任务详情—新建任务”简化方案。建议制作三屏可点击原型，再按单个前端交互切片开发；不能把审计建议当作具体布局已批准。
-2. 优先修复任务切换后旧任务树残留、操作目标错配，以及完成态/访问权限提示不一致。详情先回答成果、当前阶段、是否需要人操作；技术信息按需展开。
-3. TH-6d 已验收并推送，补充推送记录 b15be87 也已到远端。本次查询 codex/task-hall 无 PR、尚未合并 main；功能里程碑完成不等于分支已合并结束。TH-7 暂不开始，后续开发再按需启动 bridge。
-4. 完整本地审计含 5 步截图与建议：`.tmp/ui-audit-20260906/report.md`（本机未跟踪产物）；关键结论已写入本快照与历史。下次输入 `继续项目` 从界面简化恢复。
+- 当前分支：`codex/ui-workspace-v1`，从 `codex/task-hall` 的 `f60c077` 创建；Codex 为决策 Agent。用户已确认预览并明确授权只做一个可完成切片。
+- 额度中断期间代码保留在工作区；本轮恢复并完成必要验证。提交及远端同步正在收尾，恢复时先核对 `git status`、`git log -3`。
+- TH-6d 根任务 #15 与子任务 #16/#17/#18 仍为已验收、已完成基线；本切片未修改这些任务、发送消息或启动新的任务执行。
+- 当前拓扑仍为 Codex / DeepSeek Harness / 官方 Kimi Code CLI。只查看历史页面不需要启动其它角色服务；交办新的执行任务时才需要相应 bridge。
+- 本地服务已后台启动，入口 `http://127.0.0.1:8000/`。若端口已停止：`.venv\Scripts\python.exe -m uvicorn server.main:app --host 127.0.0.1 --port 8000`。
 
 ## Verification
 
-- 2026-09-06 界面审计：Codex 内置浏览器 769px/1280px 截图已保存并逐张核对；检查创建弹窗、Escape 退出、成果入口、跨 Hall 切换，并只读核对 web/app.js。窗口尺寸已恢复。未创建任务、发送消息或执行树控制；未做完整无障碍/端到端回归，未进入当前账号无权限的 #15 消息记录。以下为此前验收收尾的验证记录。
+- JavaScript 语法检查通过；Node 原生回归 11 项通过，覆盖跨任务迟到响应、错误响应、跨项目/账号、错误树操作拦截和操作后保持选择。
+- Python 定向回归 4 项通过：页面契约 2 项，里程碑验收与提交/收取流程 2 项；隔离测试数据库运行。本轮没有重跑历史 389 项全量测试。
+- Codex 内置浏览器实测：任务筛选/搜索、角色切换/搜索、项目空状态、角色交办自动选人、Escape 关闭和焦点恢复、成果读取、非成员提示保留、#15→#9 Hall 状态一致、子任务返回主任务。
+- 1488×1056 桌面与批准的两张预览分别放入同一次对照输入；390px 任务/角色/弹窗及 769px 对话页核对通过，无页面横向溢出。修复过程中发现的手机标题栏遮挡已复测。
+- QA 说明见根目录 `design-qa.md`；本地截图在 `.tmp/workspace-qa-20260907/`，不进入公开提交。最终页面控制台未捕获错误。
 
-- 项目管理者已完成页面人工验收；本轮 SDK/API 核对验收后 `active`、`checkpoint_reason=null`、`authorization_epoch=2`，没有代替用户调用验收接口。
-- 真实根任务完成与收取：`#15` 重新领取（attempt=`2`）→ 最终消息 `#2480` → `succeeded/submitted` → 原请求者收取后 `succeeded/completed`。整树 `#15/#16/#17/#18` 均完成，Test 门禁 `satisfied=true`，无非终态后代，剩余额度为 `0`。
-- 本轮定向回归：`.venv\Scripts\python.exe -m unittest tests.test_tasks.AgentTaskTests.test_passed_milestone_test_pauses_for_human_acceptance_before_root_completion tests.test_tasks.AgentTaskTests.test_task_workflow_clarification_accept_submit_and_collect -q` → `Ran 2 tests in 1.219s`，`OK`。
-- 受控 V2 产物重新核对字节数、UTF-8、无 BOM、LF 与 SHA-256，全部通过。
-- 文档检查：5 份变更文件的 UTF-8 解码、16 个本地 Markdown 链接、进度快照长度与变更范围检查通过；`git diff --check` 通过。
-- 2026-08-27 的既有全量回归 `389 tests / OK` 与 Kimi 独立定向回归 `119 tests / OK` 继续保留为历史证据，本轮未重跑全量回归。
-- 本轮无代码或前端交互改动；用户手册补充“人工验收后由根负责人提交，再由请求者收取”的既有步骤。
+## Current Boundaries
 
-## Known Debt
+- 创建任务弹窗和完整对话沿用现有流程；任务树高级配置仍有开发术语，本切片没有重做该流程。
+- 角色来自项目配置，“正在参与任务 / 当前没有进行中的任务”表示工作状态，不表示 bridge 在线或有可用额度。角色页面没有增加启动服务、改权限或成员管理功能。
+- 历史任务的标题、正文保持原始数据；预览中的简短示例名称没有替换真实任务。列表可搜索，完整任务要求默认折叠。
+- 当前 QA Tester 账号不是 #15 Hall 成员：可以核对工作进度，查看成果会显示访问提示；已用有权限的 #9 验证真实成果读取。
+- 历史审计、生成预览、验收标记与临时辅助文件保留本地，不打包到代码提交。
 
-- 双通道 visible reply 质量、pi 兼容入口的 `--no-extensions` 临时规避仍需后续处理。
-- Tester 硬隔离、Kimi 会话保留策略、附件正文注入和跨实例消息级去重仍需后续加强。
+## Next
+
+1. 完成本切片提交和 GitHub 同步，提供验收入口；不自动合并 `codex/task-hall` 或新分支。
+2. 项目管理者人工验收任务/角色双栏与信息清晰度。验收前不开展新切片；若仍觉得繁杂，优先反馈具体屏幕与内容。
+3. 后续候选为创建任务弹窗的普通用语与高级设置收纳；方向经确认后再开发。TH-7、完整 Members / Activity、Tester 隔离等继续待办。
+4. 恢复指令：`继续项目`；先读取本文件与相关 Web UI 模块文档，不重做已通过的页面审计。
 
 ## References
 
-- 当前任务合同：`docs/spec/MODULE_tasks.md`
-- 当前 bridge 合同：`docs/spec/MODULE_bridges.md`
-- 用户操作手册：`docs/guides/USER_MANUAL.md`
-- 完整历史：`docs/PROGRESS_HISTORY.md`
+- 项目简报：`docs/PROJECT_BRIEF.md`
+- 当前模块：`docs/spec/MODULE_webui.md`
+- 用户手册：`docs/guides/USER_MANUAL.md`
+- 历史记录：`docs/PROGRESS_HISTORY.md`

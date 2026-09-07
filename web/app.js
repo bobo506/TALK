@@ -69,6 +69,9 @@ let projectTasks = [];
 let blackboardOpen = false;
 let selectedTaskId = null;
 let selectedTaskTree = null;
+let taskTreeRequest = 0;
+let projectTaskRequest = 0;
+let taskTreeError = "";
 let taskCreateOpen = false;
 let taskCreateSaving = false;
 let taskActionSaving = false;
@@ -746,14 +749,21 @@ async function loadProjectAgents() {
     projectAgents = [];
     return;
   }
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(activeProjectId)}/agents`);
+  const projectId = activeProjectId;
+  const memberId = myId;
+  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/agents`);
   if (!res.ok) {
     throw new Error(await readErrorDetail(res, `项目 Agent 加载失败: ${res.status}`));
   }
-  projectAgents = await res.json();
+  const loaded = await res.json();
+  if (projectId === activeProjectId && memberId === myId) projectAgents = loaded;
 }
 
 async function loadProjectTasks({ silent = false } = {}) {
+  const before = JSON.stringify([projectTasks, selectedTaskTree, taskTreeError]);
+  const request = ++projectTaskRequest;
+  const projectId = activeProjectId;
+  const memberId = myId;
   if (!activeProjectId) {
     projectTasks = [];
     selectedTaskId = null;
@@ -769,10 +779,12 @@ async function loadProjectTasks({ silent = false } = {}) {
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `项目任务加载失败: ${res.status}`));
     }
-    projectTasks = await res.json();
+    const loaded = await res.json();
+    if (request !== projectTaskRequest || projectId !== activeProjectId || memberId !== myId) return;
+    projectTasks = loaded;
     projectTasks.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     if (!projectTasks.some((task) => Number(task.id) === Number(selectedTaskId))) {
-      selectedTaskId = projectTasks[0]?.id ?? null;
+      selectedTaskId = projectTasks.find(task => !task.parent_task_id)?.id ?? null;
       selectedTaskTree = null;
     }
     const hasUnknownHall = projectTasks.some(
@@ -782,6 +794,9 @@ async function loadProjectTasks({ silent = false } = {}) {
       await loadGroups();
     }
     await loadSelectedTaskTree({ silent: true });
+    if (request !== projectTaskRequest || projectId !== activeProjectId || memberId !== myId) return;
+    // 未变化的轮询保留焦点、展开内容及用户正在阅读的提示。
+    if (silent && before === JSON.stringify([projectTasks, selectedTaskTree, taskTreeError])) return;
     renderProjectStrip();
     renderRoomStrip();
     renderBlackboard();
@@ -795,21 +810,27 @@ async function loadProjectTasks({ silent = false } = {}) {
 }
 
 async function loadSelectedTaskTree({ silent = false } = {}) {
-  const task = projectTasks.find((item) => Number(item.id) === Number(selectedTaskId));
-  if (!task) {
-    selectedTaskTree = null;
-    return;
-  }
+  const request = ++taskTreeRequest;
+  const task = getContextTask();
+  const projectId = activeProjectId;
+  const memberId = myId;
+  const current = () => request === taskTreeRequest && projectId === activeProjectId
+    && memberId === myId && Number(getContextTask()?.id) === Number(task?.id);
+  if (!task) { selectedTaskTree = null; taskTreeError = ""; return; }
+  if (!workspaceTreeMatches(task, selectedTaskTree)) selectedTaskTree = null;
+  taskTreeError = "";
   try {
     const res = await apiFetch(`/api/tasks/${encodeURIComponent(task.id)}/tree`);
-    if (!res.ok) {
-      throw new Error(await readErrorDetail(res, `任务树加载失败: ${res.status}`));
-    }
-    selectedTaskTree = await res.json();
+    if (!res.ok) throw new Error(await readErrorDetail(res, `任务进度加载失败: ${res.status}`));
+    const tree = await res.json();
+    if (!current()) return;
+    if (!workspaceTreeMatches(task, tree)) throw new Error("任务进度与当前任务不一致，请刷新重试。");
+    selectedTaskTree = tree;
   } catch (err) {
+    if (!current()) return;
     selectedTaskTree = null;
-    if (!silent) showTaskDetailsError(err.message);
-    console.error(err);
+    taskTreeError = err.message;
+    if (!silent) showTaskDetailsError(err.message, false);
   }
 }
 
@@ -819,10 +840,15 @@ async function setActiveProject(projectId) {
     return;
   }
   activeProjectId = projectId;
+  workspaceUI.selectedRole = null;
+  workspaceUI.query = "";
+  document.getElementById("workspace-search").value = "";
   localStorage.setItem(activeProjectStorageKey(), activeProjectId);
   selectedTaskId = null;
   selectedTaskTree = null;
   blackboardOpen = true;
+  projectTasks = []; projectAgents = []; taskTreeError = "";
+  renderProjectStrip(); renderWorkspaceMode();
   try {
     await Promise.all([loadProjectAgents(), loadProjectTasks({ silent: true })]);
   } catch (err) {
@@ -889,6 +915,8 @@ function eligibleProjectAgents() {
 }
 
 function setBlackboardOpen(open) {
+  workspaceUI.query = ""; document.getElementById("workspace-search").value = "";
+  workspaceUI.mode = "tasks";
   blackboardOpen = Boolean(open && activeProjectId);
   setGroupCreateOpen(false);
   renderProjectStrip();
@@ -902,6 +930,7 @@ function setBlackboardOpen(open) {
 }
 
 function renderWorkspaceMode() {
+  syncWorkspaceLayout();
   blackboardView.classList.toggle("hidden", !blackboardOpen);
   hallHeader.classList.toggle("hidden", blackboardOpen);
   messagesEl.classList.toggle("hidden", blackboardOpen);
@@ -942,110 +971,22 @@ function formatTaskTime(value) {
   return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-function renderBlackboard() {
-  const project = getActiveProject();
-  blackboardTitle.textContent = project ? `${project.display_name} · 任务黑板` : "任务黑板";
-  blackboardDescription.textContent = project?.description || "按协作状态查看项目任务，点击卡片可查看 Task Hall 与可执行动作。";
-  blackboardSummary.innerHTML = "";
-  blackboardColumns.innerHTML = "";
+function renderBlackboard() { renderWorkspaceList(); }
 
-  const columns = [
-    { key: "attention", label: "待响应" },
-    { key: "running", label: "执行中" },
-    { key: "submitted", label: "结果待收取" },
-    { key: "finished", label: "已结束" },
-  ];
-  for (const column of columns) {
-    const count = projectTasks.filter((task) => taskBoardColumn(task) === column.key).length;
-    const chip = document.createElement("span");
-    chip.className = "blackboard-summary-chip";
-    const label = document.createElement("span");
-    label.textContent = column.label;
-    const number = document.createElement("strong");
-    number.textContent = String(count);
-    chip.appendChild(label);
-    chip.appendChild(number);
-    blackboardSummary.appendChild(chip);
-  }
-
-  blackboardEmpty.classList.toggle("hidden", projectTasks.length > 0);
-  blackboardColumns.classList.toggle("hidden", projectTasks.length === 0);
-  for (const column of columns) {
-    const tasks = projectTasks.filter((task) => taskBoardColumn(task) === column.key);
-    const columnEl = document.createElement("section");
-    columnEl.className = "blackboard-column";
-    const header = document.createElement("div");
-    header.className = "blackboard-column-header";
-    const title = document.createElement("span");
-    title.textContent = column.label;
-    const count = document.createElement("span");
-    count.className = "blackboard-column-count";
-    count.textContent = String(tasks.length);
-    header.appendChild(title);
-    header.appendChild(count);
-    const list = document.createElement("div");
-    list.className = "blackboard-card-list";
-    if (!tasks.length) {
-      const empty = document.createElement("div");
-      empty.className = "blackboard-column-empty";
-      empty.textContent = "暂无任务";
-      list.appendChild(empty);
-    }
-    for (const task of tasks) {
-      list.appendChild(renderTaskCard(task));
-    }
-    columnEl.appendChild(header);
-    columnEl.appendChild(list);
-    blackboardColumns.appendChild(columnEl);
-  }
-}
-
-function renderTaskCard(task) {
-  const card = document.createElement("button");
-  card.type = "button";
-  card.className = `task-card ${Number(task.id) === Number(selectedTaskId) ? "selected" : ""}`;
-  const title = document.createElement("div");
-  title.className = "task-card-title";
-  title.textContent = task.title || task.content || `任务 #${task.id}`;
-  const status = document.createElement("span");
-  const meta = taskStatusMeta(task);
-  status.className = `task-status-badge ${meta.className}`;
-  status.textContent = meta.label;
-  const people = document.createElement("div");
-  people.className = "task-card-meta";
-  people.textContent = `${shortName(task.created_by)} → ${shortName(task.target_member_id)}`;
-  const footer = document.createElement("div");
-  footer.className = "task-card-footer";
-  const attempt = document.createElement("span");
-  attempt.textContent = `#${task.id} · attempt ${task.attempt || 0}`;
-  const updated = document.createElement("span");
-  updated.textContent = formatTaskTime(task.updated_at);
-  footer.appendChild(attempt);
-  footer.appendChild(updated);
-  card.appendChild(title);
-  card.appendChild(status);
-  card.appendChild(people);
-  card.appendChild(footer);
-  card.addEventListener("click", async () => {
-    selectedTaskId = task.id;
-    selectedTaskTree = null;
-    renderBlackboard();
-    renderTaskDetailsPanel();
-    await loadSelectedTaskTree();
-    renderTaskDetailsPanel();
-  });
-  card.addEventListener("dblclick", () => openTaskHall(task));
-  return card;
-}
+function renderTaskCard(task) { return workspaceTaskRow(task); }
 
 function getContextTask() {
+  if (blackboardOpen && workspaceUI.mode === "roles") return null;
   if (!blackboardOpen && activeGroupId) {
     return projectTasks.find((task) => task.hall_group_id === activeGroupId) || null;
   }
   return projectTasks.find((task) => Number(task.id) === Number(selectedTaskId)) || null;
 }
 
-function showTaskDetailsError(message) {
+function taskContextKey() { return `${activeProjectId}/${myId}/${getContextTask()?.id ?? ""}`; }
+
+function showTaskDetailsError(message, remember = true) {
+  if (remember) workspaceUI.actionError = { key: taskContextKey(), message };
   taskDetailsError.textContent = message || "";
   taskDetailsError.classList.toggle("hidden", !message);
 }
@@ -1067,9 +1008,9 @@ function currentMemberIsHuman() {
 function taskKindLabel(kind) {
   return {
     general: "普通任务",
-    development: "开发切片",
-    review: "Review",
-    test: "Test",
+    development: "执行工作",
+    review: "检查",
+    test: "测试",
     rework: "返工",
   }[kind] || kind || "普通任务";
 }
@@ -1087,47 +1028,11 @@ function checkpointReasonLabel(reason) {
   }[reason] || reason || "无";
 }
 
-function appendTaskGovernanceCard(tree) {
-  if (!tree?.root) return;
-  const card = document.createElement("div");
-  card.className = "task-governance-card";
-  const title = document.createElement("strong");
-  title.textContent = "任务树控制与质量门禁";
-  card.appendChild(title);
-  const control = document.createElement("div");
-  control.textContent = `控制：${tree.root.control_status || "—"} · 检查点：${checkpointReasonLabel(tree.root.checkpoint_reason)}`;
-  card.appendChild(control);
-  const budget = document.createElement("div");
-  budget.textContent = `授权 epoch ${tree.root.authorization_epoch || 0} · 剩余切片 ${tree.remaining_slice_budget} · 非终态后代 ${tree.nonterminal_descendants}`;
-  card.appendChild(budget);
-
-  const reviewList = document.createElement("div");
-  reviewList.className = "task-gate-list";
-  for (const gate of tree.review_gates || []) {
-    const row = document.createElement("div");
-    const verdict = gate.current_verdict?.verdict || "pending";
-    row.textContent = `Review · 开发 #${gate.development_task_id} → 当前 #${gate.current_subject_task_id}：${verdict}`;
-    reviewList.appendChild(row);
-  }
-  const testGate = tree.test_gate;
-  if (testGate?.required) {
-    const row = document.createElement("div");
-    row.textContent = `里程碑 Test · 冻结版本 ${testGate.frozen_task_ids.map((id) => `#${id}`).join("、") || "尚未形成"}：${testGate.current_verdict?.verdict || "pending"}`;
-    reviewList.appendChild(row);
-  }
-  if (!reviewList.childElementCount) {
-    const row = document.createElement("div");
-    row.textContent = "当前任务树没有强制质量门禁。";
-    reviewList.appendChild(row);
-  }
-  card.appendChild(reviewList);
-  taskDetailsContent.insertAdjacentElement("afterend", card);
-}
-
 function renderTaskDetailsPanel() {
+  renderWorkspaceRoleDetails();
   const task = getContextTask();
   taskDetailsPanel.classList.toggle("hidden", !task);
-  groupMembersPanel.classList.toggle("hidden", Boolean(task));
+  groupMembersPanel.classList.toggle("hidden", blackboardOpen || Boolean(task) || !getActiveGroup() || getActiveGroup().type === "task");
   if (!task) return;
 
   taskDetailsTitle.textContent = task.title || `任务 #${task.id}`;
@@ -1138,29 +1043,20 @@ function renderTaskDetailsPanel() {
   badge.textContent = meta.label;
   taskDetailsStatus.appendChild(badge);
   taskDetailsMeta.innerHTML = "";
-  const rows = [
-    `任务 ID：${task.id}`,
-    `类型：${taskKindLabel(task.task_kind)}`,
-    `请求者：${task.created_by}`,
-    `执行者：${task.target_member_id}`,
-    `执行状态：${task.status}`,
-    `attempt：${task.attempt || 0}`,
-    task.lease_expires_at ? `租约截止：${formatTaskTime(task.lease_expires_at)}` : "当前无活动租约",
-  ];
-  for (const value of rows) {
-    const row = document.createElement("div");
-    row.textContent = value;
-    taskDetailsMeta.appendChild(row);
-  }
+  const people = document.createElement("div");
+  people.textContent = `负责人 ${workspaceMemberName(task.target_member_id)} · ${task.created_by === myId ? "由你发起" : `${workspaceMemberName(task.created_by)} 发起`}`;
+  taskDetailsMeta.appendChild(people);
   taskDetailsContent.textContent = task.content || "";
   taskDetailsPanel.querySelectorAll(".task-governance-card").forEach((node) => node.remove());
-  appendTaskGovernanceCard(selectedTaskTree);
-  showTaskDetailsError("");
+  renderWorkspaceTaskStory(task);
+  const actionError = workspaceUI.actionError?.key === taskContextKey() ? workspaceUI.actionError.message : "";
+  showTaskDetailsError(actionError || taskTreeError, false);
   taskDetailsActions.innerHTML = "";
 
+  if (task.result_message_id) taskDetailsActions.appendChild(taskActionButton("查看成果", "task-action-primary", () => showWorkspaceResult(task)));
   if (task.hall_group_id) {
     taskDetailsActions.appendChild(
-      taskActionButton("进入 Task Hall", "task-action-primary", () => openTaskHall(task))
+      taskActionButton("查看完整对话", "task-action-secondary", () => openTaskHall(task))
     );
   }
   if (task.target_member_id === myId && ["assigned", "clarification_answered"].includes(task.workflow_status)) {
@@ -1194,9 +1090,9 @@ function renderTaskDetailsPanel() {
     );
   }
 
-  const tree = selectedTaskTree;
+  const tree = workspaceTreeMatches(task, selectedTaskTree) ? selectedTaskTree : null;
   const root = tree?.root;
-  if (currentMemberIsHuman() && root) {
+  if (currentMemberIsHuman() && root && !["succeeded", "failed", "canceled"].includes(root.status)) {
     if (root.status === "running" && root.control_status === "active" && root.may_delegate) {
       taskDetailsActions.appendChild(
         taskActionButton("创建开发 / Review / Test 子任务", "task-action-primary", () => setTaskCreateOpen(true, { parentRoot: root }))
@@ -1230,6 +1126,7 @@ function renderTaskDetailsPanel() {
 
 async function openTaskHall(task) {
   if (!task?.hall_group_id) return;
+  if (!canEnterGroup(task.hall_group_id)) { showTaskDetailsError("当前账号尚未加入这个任务对话，请联系任务负责人确认访问权限。"); return; }
   if (!groups.some((group) => group.id === task.hall_group_id)) {
     await loadGroups();
   }
@@ -1240,6 +1137,9 @@ async function openTaskHall(task) {
 async function runTaskAction(task, action, { confirmCancel = false } = {}) {
   if (taskActionSaving) return;
   if (confirmCancel && !window.confirm("取消后该任务不能重新领取。确定取消吗？")) return;
+  const contextKey = taskContextKey();
+  const projectId = activeProjectId;
+  const memberId = myId;
   taskActionSaving = true;
   showTaskDetailsError("");
   renderTaskDetailsPanel();
@@ -1249,13 +1149,14 @@ async function runTaskAction(task, action, { confirmCancel = false } = {}) {
       throw new Error(await readErrorDetail(res, `任务操作失败: ${res.status}`));
     }
     const updated = await res.json();
+    if (projectId !== activeProjectId || memberId !== myId) return;
     projectTasks = projectTasks.map((item) => Number(item.id) === Number(updated.id) ? updated : item);
-    selectedTaskId = updated.id;
+    // 更新数据，但不改变用户在等待期间选中的任务。
     await loadSelectedTaskTree({ silent: true });
     renderProjectStrip();
     renderBlackboard();
   } catch (err) {
-    showTaskDetailsError(err.message);
+    if (contextKey === taskContextKey()) showTaskDetailsError(err.message);
   } finally {
     taskActionSaving = false;
     renderTaskDetailsPanel();
@@ -1263,8 +1164,14 @@ async function runTaskAction(task, action, { confirmCancel = false } = {}) {
 }
 
 async function runTaskTreeAction(root, action, body = null, { confirmCancel = false } = {}) {
+  if (!workspaceTreeMatches(getContextTask(), selectedTaskTree) || Number(root.id) !== Number(selectedTaskTree.root.id)) {
+    showTaskDetailsError("任务已切换，请在当前任务中重新选择操作。"); return;
+  }
   if (taskActionSaving) return;
   if (confirmCancel && !window.confirm("这会终止整棵任务树，未完成任务不能恢复。确定继续吗？")) return;
+  const contextKey = taskContextKey();
+  const projectId = activeProjectId;
+  const memberId = myId;
   taskActionSaving = true;
   showTaskDetailsError("");
   renderTaskDetailsPanel();
@@ -1278,10 +1185,12 @@ async function runTaskTreeAction(root, action, body = null, { confirmCancel = fa
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `任务树操作失败: ${res.status}`));
     }
-    selectedTaskTree = await res.json();
+    const tree = await res.json();
+    if (projectId !== activeProjectId || memberId !== myId) return;
+    if (contextKey === taskContextKey() && workspaceTreeMatches(getContextTask(), tree)) selectedTaskTree = tree;
     await loadProjectTasks({ silent: true });
   } catch (err) {
-    showTaskDetailsError(err.message);
+    if (contextKey === taskContextKey()) showTaskDetailsError(err.message);
   } finally {
     taskActionSaving = false;
     renderTaskDetailsPanel();
@@ -1442,12 +1351,14 @@ function renderTaskCreateMode() {
 }
 
 function setTaskCreateOpen(open, { parentRoot = null } = {}) {
+  if (open) workspaceUI.createReturnFocus = document.activeElement;
   taskCreateOpen = Boolean(open && activeProjectId);
   showTaskCreateError("");
   taskCreateOverlay.classList.toggle("hidden", !taskCreateOpen);
   if (!taskCreateOpen) {
     taskCreatePanel.reset();
     taskCreateParentRoot = null;
+    workspaceUI.createReturnFocus?.focus();
     return;
   }
   taskCreateParentRoot = parentRoot;
@@ -1624,6 +1535,11 @@ function setActiveGroup(groupId) {
   if (activeGroupId === nextGroupId && !blackboardOpen) return;
 
   blackboardOpen = false;
+  const hallTask = projectTasks.find((task) => task.hall_group_id === nextGroupId);
+  selectedTaskId = hallTask?.id ?? null;
+  selectedTaskTree = null;
+  taskTreeError = "";
+  ++taskTreeRequest;
   activeGroupId = nextGroupId;
   if (activeGroupId) {
     localStorage.setItem(activeGroupStorageKey(), activeGroupId);
@@ -1640,6 +1556,7 @@ function setActiveGroup(groupId) {
   updateComposerPlaceholder();
   renderProjectStrip();
   renderWorkspaceMode();
+  loadSelectedTaskTree().then(() => renderTaskDetailsPanel());
   loadHistory();
   msgInput.focus();
 }

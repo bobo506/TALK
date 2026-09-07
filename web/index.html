@@ -6,7 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260821-task-modal-context-1">
+  <link rel="stylesheet" href="/style.css?v=20260907-workspace-3">
+  <link rel="stylesheet" href="/workspace.css?v=20260907-workspace-3">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -83,7 +84,9 @@
         <h1>TALK</h1>
       </div>
     </div>
+    <select id="project-select" class="project-select" aria-label="选择项目"></select>
     <div class="header-actions">
+      <button id="delegate-task-btn" type="button" class="project-delegate-btn">新建任务</button>
       <span id="connection-status" class="hidden"></span>
       <span id="user-badge" class="user-badge"></span>
       <button id="logout-btn" class="logout-btn">退出</button>
@@ -94,21 +97,35 @@
     <div class="workbench">
       <aside id="workspace-tools" class="workspace-tools">
         <section id="project-strip" class="project-strip hidden">
-          <div class="sidebar-heading project-heading">
-            <div>
-              <div class="sidebar-kicker">Project</div>
-              <h2>项目工作台</h2>
-            </div>
-            <button id="refresh-project-btn" type="button" class="icon-action subtle" title="刷新项目任务" aria-label="刷新项目任务">↻</button>
+          <div class="workspace-tabs" aria-label="工作台视图">
+            <button id="project-blackboard-btn" type="button" aria-pressed="true">任务<span id="project-task-count" class="hidden"></span></button>
+            <button id="workspace-roles-btn" type="button" aria-pressed="false">角色</button>
+            <button id="refresh-project-btn" type="button" class="workspace-refresh" aria-label="刷新项目任务">刷新</button>
           </div>
-          <select id="project-select" class="project-select" aria-label="选择项目"></select>
-          <button id="project-blackboard-btn" type="button" class="project-nav-btn">
-            <span>任务黑板</span>
-            <span id="project-task-count" class="project-task-count">0</span>
-          </button>
-          <button id="delegate-task-btn" type="button" class="project-delegate-btn">＋ 委派任务</button>
           <p id="project-empty-note" class="project-empty-note hidden">还没有已注册项目。先用 <code>talk init</code> 建立项目上下文。</p>
         </section>
+        <section id="blackboard-view" class="blackboard-view hidden">
+          <header class="blackboard-header">
+            <div>
+
+              <h2 id="blackboard-title" class="hidden">任务</h2>
+              <p id="blackboard-description">按协作状态查看项目任务</p>
+            </div>
+            <div class="blackboard-actions hidden">
+              <button id="blackboard-refresh-btn" type="button" class="room-secondary-btn">刷新</button>
+              <button id="blackboard-delegate-btn" type="button" class="room-primary-btn">委派任务</button>
+            </div>
+          </header>
+          <input id="workspace-search" type="search" placeholder="搜索任务" aria-label="搜索任务">
+          <div id="blackboard-summary" class="blackboard-summary"></div>
+          <div id="blackboard-columns" class="blackboard-columns"></div>
+          <div id="blackboard-empty" class="blackboard-empty hidden">
+            <strong>这个项目还没有任务</strong>
+            <span>点击“新建任务”开始委派工作。</span>
+          </div>
+        </section>
+
+        <details class="room-disclosure"><summary>对话与房间</summary>
         <section id="room-strip" class="room-strip hidden">
           <div class="sidebar-heading">
             <h2>Hall 列表</h2>
@@ -126,29 +143,10 @@
           </div>
           <div id="group-room-list" class="group-room-list"></div>
         </section>
+        </details>
       </aside>
 
       <section class="timeline-workspace">
-        <section id="blackboard-view" class="blackboard-view hidden">
-          <header class="blackboard-header">
-            <div>
-              <div class="blackboard-kicker">Project Blackboard</div>
-              <h2 id="blackboard-title">任务黑板</h2>
-              <p id="blackboard-description">按协作状态查看项目任务</p>
-            </div>
-            <div class="blackboard-actions">
-              <button id="blackboard-refresh-btn" type="button" class="room-secondary-btn">刷新</button>
-              <button id="blackboard-delegate-btn" type="button" class="room-primary-btn">委派任务</button>
-            </div>
-          </header>
-          <div id="blackboard-summary" class="blackboard-summary"></div>
-          <div id="blackboard-columns" class="blackboard-columns"></div>
-          <div id="blackboard-empty" class="blackboard-empty hidden">
-            <strong>这个项目还没有任务</strong>
-            <span>从这里委派第一项工作，TALK 会自动创建对应 Task Hall。</span>
-          </div>
-        </section>
-
         <header id="hall-header" class="hall-header">
           <div class="hall-title-row">
             <div>
@@ -229,18 +227,23 @@
           <div class="details-card task-details-card">
             <div class="task-details-heading">
               <div>
-                <div class="sidebar-kicker">Task Hall</div>
+                <div class="sidebar-kicker">任务详情</div>
                 <h3 id="task-details-title">任务详情</h3>
               </div>
               <button id="task-details-refresh-btn" type="button" class="icon-action subtle" title="刷新任务" aria-label="刷新任务">↻</button>
             </div>
             <div id="task-details-status" class="task-details-status"></div>
             <div id="task-details-meta" class="task-details-meta"></div>
-            <p id="task-details-content" class="task-details-content"></p>
+            <p id="task-notice" class="task-notice" role="status"></p>
+            <section class="task-outcome"><h4>成果与进展</h4><p id="task-outcome-summary"></p></section>
             <p id="task-details-error" class="group-create-error hidden"></p>
             <div id="task-details-actions" class="task-details-actions"></div>
+            <div id="task-result-body" class="task-result-body hidden" role="region" aria-label="任务成果"></div>
+            <section class="task-flow"><h4>分工与流转</h4><div id="task-flow-list"></div></section>
+            <details id="task-requirements"><summary>任务要求</summary><p id="task-details-content" class="task-details-content"></p></details>
           </div>
         </section>
+        <section id="role-details-panel" class="role-details-panel hidden" aria-label="角色详情"></section>
         <section id="group-members-panel" class="group-members-panel hidden">
           <div class="details-card">
             <div class="details-card-header">
@@ -439,6 +442,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/app.js?v=20260821-task-modal-context-1"></script>
+  <script src="/workspace.js?v=20260907-workspace-3"></script>
+  <script src="/app.js?v=20260907-workspace-3"></script>
 </body>
 </html>
