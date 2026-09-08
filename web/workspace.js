@@ -41,12 +41,19 @@ function workspaceButton(text, handler, className = "workspace-text-button") {
   const button = workspaceEl("button", className, text);
   button.type = "button"; button.addEventListener("click", handler); return button;
 }
-function workspaceMemberName(id) {
-  const member = members.find(item => item.id === id);
-  // Bridge 自注册名称是运行信息；保留人工昵称，自动名称用成员短名。
+function chatMemberName(member) {
+  const id = String(member?.id || "未指定");
+  const short = id.replace(/^(agent|human):/, "");
   const name = member?.display_name;
-  return name && !/CLI Bridge|agent:/i.test(name) ? name : String(id || "未指定").replace(/^(agent|human):/, "");
+  return name && !/CLI Bridge|agent:/i.test(name) ? name : ({codex:"Codex",deepseek:"DeepSeek",kimi:"Kimi"}[short] || short);
 }
+function workspaceMemberName(id) { return chatMemberName(members.find(item => item.id === id) || {id}); }
+function workspaceChatCandidates(items, roles, projectId, selfId) {
+  const roleIds = new Set(roles.map(role => role.member_id));
+  return items.filter(member => member.id !== selfId && !member.disabled_at
+    && (member.kind !== "agent" || !projectId || roleIds.has(member.id)));
+}
+function workspaceMentionCandidates(items, selfId) { return items.filter(member => member.id !== selfId && !member.disabled_at); }
 function workspaceRoleLabel(role) {
   return ({ lead: "统筹任务", dev: "执行工作", developer: "执行工作", reviewer: "检查工作", tester: "测试验证", ui: "界面设计" })[role] || role || "项目助手";
 }
@@ -241,4 +248,4 @@ if (typeof document !== "undefined") {
   });
   document.getElementById("workspace-search").addEventListener("input", event => { workspaceUI.query = event.target.value; renderWorkspaceList(); });
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates};

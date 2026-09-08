@@ -6,8 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260908-chats-1">
-  <link rel="stylesheet" href="/workspace.css?v=20260908-chats-1">
+  <link rel="stylesheet" href="/style.css?v=20260908-members-2">
+  <link rel="stylesheet" href="/workspace.css?v=20260908-members-2">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -245,15 +245,16 @@
           <div class="details-card">
             <div class="details-card-header">
               <div>
-                <h3>当前 Hall 成员</h3>
+                <h3>群聊成员</h3>
                 <div id="group-members-subtitle" class="group-members-subtitle"></div>
               </div>
               <button id="toggle-group-members-btn" type="button" class="icon-action" title="添加成员" aria-label="添加成员">＋</button>
+              <button id="manage-group-members-btn" type="button" class="workspace-text-button" aria-pressed="false">管理</button>
               <button id="close-group-members-btn" type="button" class="room-secondary-btn hidden">收起</button>
             </div>
             <form id="group-meta-form" class="group-meta-form hidden">
               <label class="group-create-field">
-                <span>Hall 名称</span>
+                <span>群聊名称</span>
                 <input id="group-meta-name" type="text" maxlength="80">
               </label>
               <label class="group-create-field">
@@ -264,22 +265,16 @@
             </form>
             <div id="group-members-list" class="group-members-list"></div>
             <form id="group-member-add-form" class="group-member-add-form hidden">
-              <select id="group-member-add-select" class="group-member-select" aria-label="选择要加入 Hall 的成员"></select>
+              <select id="group-member-add-select" class="group-member-select" aria-label="选择要加入群聊的成员"></select>
               <select id="group-member-add-role" class="group-member-role-select" aria-label="选择成员角色">
-                <option value="member">member</option>
-                <option value="moderator">moderator</option>
-                <option value="owner">owner</option>
+                <option value="member">普通成员</option>
+                <option value="moderator">管理员</option>
+                <option value="owner">群主</option>
               </select>
               <button id="group-member-add-btn" type="submit" class="room-primary-btn">添加成员</button>
             </form>
             <p id="group-members-error" class="group-create-error hidden"></p>
-            <button id="delete-group-btn" type="button" class="room-danger-btn hidden">删除此 Hall</button>
-          </div>
-          <div class="details-card all-members-card">
-            <div class="details-card-header compact">
-              <h3>所有 Agent</h3>
-            </div>
-            <div id="all-members-list" class="all-members-list"></div>
+            <button id="delete-group-btn" type="button" class="room-danger-btn hidden">删除群聊</button>
           </div>
         </section>
       </aside>
@@ -307,7 +302,8 @@
         </label>
       </div>
       <div class="group-create-members-wrap">
-        <div class="group-create-label">初始成员</div>
+        <div class="group-create-label">邀请成员</div>
+        <p class="group-invite-hint">你会自动加入群聊，无需选择自己。</p>
         <select id="group-create-member-select" class="group-member-select" aria-label="添加群聊成员">
           <option value="">添加成员…</option>
         </select>
@@ -439,7 +435,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/workspace.js?v=20260908-chats-1"></script>
-  <script src="/app.js?v=20260908-chats-1"></script>
+  <script src="/workspace.js?v=20260908-members-2"></script>
+  <script src="/app.js?v=20260908-members-2"></script>
 </body>
 </html>

@@ -3406,7 +3406,8 @@ async def handle_incoming_message(
         if report_status is not None:
             await report_status(
                 "error" if result.timed_out or result.returncode != 0 else "idle",
-                last_error=reply if result.timed_out or result.returncode != 0 else None,
+                last_error=(clean_cli_output(result.stderr) or clean_cli_output(result.stdout) or reply)[-4000:]
+                if result.timed_out or result.returncode != 0 else None,
             )
     except Exception as exc:
         if report_status is not None:

@@ -650,10 +650,14 @@ taskCreateOverlay.addEventListener("mousedown", (event) => {
 refreshGroupsBtn.addEventListener("click", refreshGroups);
 toggleGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(!groupCreateOpen));
 toggleGroupMembersBtn.addEventListener("click", () => {
-  setGroupMembersOpen(true);
+  setGroupMembersOpen(!groupMembersOpen);
   if (groupMemberAddSelect && !groupMemberAddSelect.disabled) {
     groupMemberAddSelect.focus();
   }
+});
+document.getElementById("manage-group-members-btn").addEventListener("click", () => {
+  workspaceUI.manageMembers = !workspaceUI.manageMembers;
+  renderGroupMembersPanel();
 });
 cancelGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
 closeGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
@@ -1543,6 +1547,8 @@ function setActiveGroup(groupId) {
   }
   if (activeGroupId === nextGroupId && !blackboardOpen) return;
 
+  workspaceUI.manageMembers = false;
+  groupMembersOpen = false;
   blackboardOpen = false;
   const nextGroup = groups.find(group => group.id === nextGroupId);
   workspaceUI.mode = nextGroup?.type === "task" ? "tasks" : "chats";
@@ -1578,7 +1584,6 @@ function renderRoomStrip() {
 
   roomStrip.classList.toggle("hidden", workspaceUI.mode !== "chats");
   const activeGroup = getActiveGroup();
-  groupMembersOpen = Boolean(activeGroup);
   groupRoomList.innerHTML = "";
 
   roomTitle.textContent = activeGroup ? activeGroup.name : "群聊";
@@ -1630,7 +1635,8 @@ function renderRoomStrip() {
     !activeGroup || blackboardOpen || activeGroup.type === "task" || Boolean(getContextTask())
   );
   toggleGroupMembersBtn.classList.toggle("active", groupMembersOpen && Boolean(activeGroup));
-  toggleGroupMembersBtn.textContent = "＋";
+  toggleGroupMembersBtn.textContent = groupMembersOpen ? "收起" : "添加";
+  toggleGroupMembersBtn.setAttribute("aria-expanded", String(groupMembersOpen));
   groupCreateOverlay.classList.toggle("hidden", !groupCreateOpen);
   renderGroupCreateMembers();
   renderGroupMembersPanel();
@@ -1686,14 +1692,10 @@ function renderGroupCreateMembers() {
   placeholder.value = "";
   placeholder.textContent = members.length ? "添加成员…" : "成员列表尚未加载";
   groupCreateMemberSelect.appendChild(placeholder);
-  for (const member of members) {
-    if (member.id === myId || selectedCreateMemberIds.has(member.id)) continue;
-    const option = document.createElement("option");
-    option.value = member.id;
-    option.textContent = `${shortName(member.id)} · ${member.display_name}`;
-    groupCreateMemberSelect.appendChild(option);
-  }
-  groupCreateMemberSelect.disabled = !members.length;
+  const candidates = workspaceChatCandidates(members, projectAgents, activeProjectId, myId)
+    .filter(member => !selectedCreateMemberIds.has(member.id));
+  appendChatMemberOptions(groupCreateMemberSelect, candidates);
+  groupCreateMemberSelect.disabled = !candidates.length;
 
   // Chips show the selected members, each removable.
   groupCreateMemberChips.innerHTML = "";
@@ -1702,12 +1704,12 @@ function renderGroupCreateMembers() {
     chip.className = "group-create-chip";
 
     const text = document.createElement("span");
-    text.textContent = shortName(memberId);
+    text.textContent = workspaceMemberName(memberId);
 
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "group-create-chip-remove";
-    remove.setAttribute("aria-label", `移除 ${memberId}`);
+    remove.setAttribute("aria-label", `移除 ${workspaceMemberName(memberId)}`);
     remove.textContent = "×";
     remove.addEventListener("click", () => {
       selectedCreateMemberIds.delete(memberId);
@@ -1717,6 +1719,21 @@ function renderGroupCreateMembers() {
     chip.appendChild(text);
     chip.appendChild(remove);
     groupCreateMemberChips.appendChild(chip);
+  }
+}
+
+function appendChatMemberOptions(select, candidates) {
+  for (const kind of ["agent", "human"]) {
+    const group = document.createElement("optgroup");
+    group.label = kind === "agent" ? "项目角色" : "其他用户";
+    for (const member of candidates.filter(item => item.kind === kind)) {
+      const option = document.createElement("option");
+      option.value = member.id;
+      const name = chatMemberName(member);
+      option.textContent = candidates.filter(item => chatMemberName(item) === name).length > 1 ? `${name} (${member.id})` : name;
+      group.appendChild(option);
+    }
+    if (group.children.length) select.appendChild(group);
   }
 }
 
@@ -1801,7 +1818,12 @@ function renderGroupMembersPanel() {
 
   const canManage = canManageGroups();
   const memberIds = getGroupMemberIds(activeGroup);
-  groupMembersSubtitle.textContent = "";
+  groupMembersSubtitle.textContent = `${memberIds.size} 位成员`;
+  const manageButton = document.getElementById("manage-group-members-btn");
+  manageButton.classList.toggle("hidden", !canManage);
+  manageButton.textContent = workspaceUI.manageMembers ? "完成" : "管理";
+  manageButton.setAttribute("aria-pressed", String(Boolean(workspaceUI.manageMembers)));
+  const managing = canManage && workspaceUI.manageMembers;
   groupMetaForm.classList.toggle("hidden", !canManage || !groupMetaEditing);
   if (canManage && groupMetaEditing) {
     groupMetaName.value = activeGroup.name || "";
@@ -1829,14 +1851,15 @@ function renderGroupMembersPanel() {
     const name = document.createElement("div");
     name.className = "group-member-name";
     name.textContent = membership.member_id === myId
-      ? `${shortName(membership.member_id)} (我)`
-      : shortName(membership.member_id);
+      ? `${workspaceMemberName(membership.member_id)}（我）`
+      : workspaceMemberName(membership.member_id);
 
     const meta = document.createElement("div");
     meta.className = "group-member-meta";
     const onlineText = onlineMemberIds.has(membership.member_id) ? "在线" : "离线";
-    const metaParts = [membership.role];
-    if (membership.business_role) metaParts.push(membership.business_role);
+    const roleLabel = {owner:"群主",moderator:"管理员",member:"成员"}[membership.role] || "成员";
+    const profileRole = projectAgents.find(item => item.member_id === membership.member_id)?.business_role;
+    const metaParts = [membership.role === "member" && (membership.business_role || profileRole) ? workspaceRoleLabel(membership.business_role || profileRole) : roleLabel];
     metaParts.push(onlineText);
     meta.textContent = metaParts.join(" · ");
 
@@ -1849,12 +1872,13 @@ function renderGroupMembersPanel() {
 
     const controls = document.createElement("div");
     controls.className = "group-member-controls";
+    controls.classList.toggle("hidden", !managing);
 
     if (member?.kind === "agent" && canManage && activeGroup.project_id) {
       const editProfileButton = document.createElement("button");
       editProfileButton.type = "button";
       editProfileButton.className = "group-member-remove-btn";
-      editProfileButton.textContent = "编辑人设";
+      editProfileButton.textContent = "角色设置";
       editProfileButton.disabled = groupMemberSaving || agentProfileSaving;
       editProfileButton.title = "编辑该 agent 的 IDENTITY / SOUL / USER 与业务角色";
       editProfileButton.addEventListener("click", () => openAgentProfileEditor(membership));
@@ -1869,7 +1893,7 @@ function renderGroupMembersPanel() {
     removeButton.title = membership.member_id === myId ? "不能在当前界面移除自己" : "移出 Group";
     removeButton.addEventListener("click", () => removeGroupMemberFromPanel(membership.member_id));
 
-    controls.appendChild(removeButton);
+    if (membership.member_id !== myId) controls.appendChild(removeButton);
     row.appendChild(identity);
     row.appendChild(controls);
     groupMembersList.appendChild(row);
@@ -1882,11 +1906,12 @@ function renderGroupMembersPanel() {
     groupMembersList.appendChild(empty);
   }
 
-  groupMemberAddForm.classList.add("hidden");
+  groupMemberAddForm.classList.toggle("hidden", !canManage || !groupMembersOpen);
   groupMemberAddBtn.disabled = groupMemberSaving;
+  const previouslySelected = groupMemberAddSelect.value;
   groupMemberAddSelect.innerHTML = "";
   if (canManage) {
-    const availableMembers = members
+    const availableMembers = workspaceChatCandidates(members, projectAgents, activeProjectId, myId)
       .filter((member) => !memberIds.has(member.id))
       .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
 
@@ -1899,21 +1924,17 @@ function renderGroupMembersPanel() {
       groupMemberAddBtn.disabled = true;
     } else {
       groupMemberAddSelect.disabled = groupMemberSaving;
-      for (const member of availableMembers) {
-        const option = document.createElement("option");
-        option.value = member.id;
-        option.textContent = `${member.id} · ${member.display_name}`;
-        groupMemberAddSelect.appendChild(option);
-      }
+      appendChatMemberOptions(groupMemberAddSelect, availableMembers);
+      if (availableMembers.some(member => member.id === previouslySelected)) groupMemberAddSelect.value = previouslySelected;
     }
     groupMemberAddRole.disabled = groupMemberSaving;
   }
   if (deleteGroupBtn) {
-    deleteGroupBtn.classList.toggle("hidden", !canManage);
+    deleteGroupBtn.classList.toggle("hidden", !managing);
     deleteGroupBtn.disabled = groupMemberSaving;
   }
 
-  renderAllMembersPanel(activeGroup, canManage);
+
 }
 
 function memberKindFromId(memberId) {
@@ -3794,7 +3815,7 @@ msgInput.addEventListener("input", () => {
     mentionStart = before.lastIndexOf("@");
     const activeGroup = getActiveGroup();
 
-    const filtered = getScopedMembers().filter(
+    const filtered = workspaceMentionCandidates(getScopedMembers(), myId).filter(
       (m) => m.id.toLowerCase().includes(query) || m.display_name.toLowerCase().includes(query)
     );
     const canMentionAll = Boolean(activeGroup) && (query === "" || ALL_MENTION_ID.includes(query) || "all".includes(query));
@@ -3803,7 +3824,7 @@ msgInput.addEventListener("input", () => {
       mentionDropdown.innerHTML = "";
       if (canMentionAll) {
         const li = document.createElement("li");
-        li.textContent = "所有人（全体成员）";
+        li.textContent = "所有人";
         li.dataset.id = ALL_MENTION_ID;
         li.addEventListener("mousedown", (event) => event.preventDefault());
         li.addEventListener("click", () => completeMention(ALL_MENTION_ID));
@@ -3811,7 +3832,7 @@ msgInput.addEventListener("input", () => {
       }
       for (const m of filtered) {
         const li = document.createElement("li");
-        li.textContent = `${m.id} (${m.display_name})`;
+        li.textContent = chatMemberName(m);
         li.dataset.id = m.id;
         li.addEventListener("mousedown", (event) => event.preventDefault());
         li.addEventListener("click", () => completeMention(m.id));

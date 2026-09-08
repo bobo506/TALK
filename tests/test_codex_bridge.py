@@ -5,6 +5,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from bridges import codex_bridge
@@ -49,15 +50,18 @@ class CodexBridgeTests(unittest.TestCase):
             else:
                 os.environ["TALK_CODEX_COMMAND"] = old_value
 
-    def test_default_codex_command_uses_path_cli(self):
-        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
-        try:
-            command_args = shlex.split(default_codex_command(), posix=True)
-        finally:
-            if old_value is not None:
-                os.environ["TALK_CODEX_COMMAND"] = old_value
+    def test_windows_prefers_native_cli_over_npm_shim(self):
+        native = "C:/Codex App/bin/codex.exe"
+        with patch.dict(os.environ, {}, clear=True), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=native):
+            self.assertEqual(shlex.split(default_codex_command())[0], native)
+            self.assertEqual(shlex.split(codex_bridge.default_codex_task_command())[0], native)
 
-        self.assertEqual(command_args[0], "codex")
+    def test_native_cli_falls_back_without_exe_or_for_windows_alias(self):
+        for native in (None, "C:/Users/Test/AppData/Local/Microsoft/WindowsApps/codex.exe"):
+            with self.subTest(native=native), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=native):
+                self.assertEqual(codex_bridge._default_codex_exe(), "codex")
+        with patch.object(codex_bridge.os, "name", "posix"):
+            self.assertEqual(codex_bridge._default_codex_exe(), "codex")
 
     def test_default_codex_command_injects_system_instructions(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)

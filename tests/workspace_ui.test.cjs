@@ -128,3 +128,25 @@ test('创建群聊携带当前项目并进入新房间',async()=>{
   assert.deepEqual(submitted.body.member_ids,['human:alice']);
   assert.equal(c.entered,'new-room'); assert.equal(c.modalOpen,false);
 });
+
+
+test('群聊邀请按项目角色筛选，排除自己和禁用成员，保留其他真人账号',()=>{
+  const members=[{id:'human:qa',kind:'human'}, {id:'human:bobo',kind:'human'},
+    {id:'agent:codex',kind:'agent'},{id:'agent:pi',kind:'agent'},
+    {id:'agent:off',kind:'agent',disabled_at:'2026-09-08'}];
+  const roles=[{member_id:'agent:codex'},{member_id:'agent:off'}];
+  assert.deepEqual(helpers.workspaceChatCandidates(members,roles,'p1','human:qa').map(m=>m.id),['human:bobo','agent:codex']);
+  assert.deepEqual(helpers.workspaceChatCandidates(members,[], 'p2','human:bobo').map(m=>m.id),['human:qa']);
+  assert.deepEqual(helpers.workspaceChatCandidates(members,[],null,'human:qa').map(m=>m.id),['human:bobo','agent:codex','agent:pi']);
+});
+test('@ 候选排除自己与禁用成员，不改变房间成员关系',()=>{
+  const members=[{id:'human:qa'},{id:'agent:codex'},{id:'agent:disabled',disabled_at:'yes'}];
+  assert.deepEqual(helpers.workspaceMentionCandidates(members,'human:qa').map(m=>m.id),['agent:codex']);
+  assert.equal(members.length,3);
+});
+test('自动 bridge 昵称显示简短名称，人工昵称保留',()=>{
+  assert.equal(helpers.chatMemberName({id:'agent:codex',display_name:'codex CLI Bridge (agent:codex)'}),'Codex');
+  assert.equal(helpers.chatMemberName({id:'agent:deepseek',display_name:'dsh CLI Bridge (agent:deepseek)'}),'DeepSeek');
+  assert.equal(helpers.chatMemberName({id:'agent:kimi',display_name:'审查助手'}),'审查助手');
+  assert.equal(helpers.chatMemberName({id:'human:bobo',display_name:'bobo'}),'bobo');
+});

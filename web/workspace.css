@@ -111,3 +111,26 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .workbench.empty-chat-mode {grid-template-columns:minmax(270px,32%) minmax(0,1fr);}
 .empty-chat-mode .details-panel {display:none;}
 @media(max-width:1000px){.workbench:not(.project-mode) {grid-template-columns:280px minmax(0,1fr) 244px;} .workbench.empty-chat-mode {grid-template-columns:280px minmax(0,1fr);}}
+
+/* 群聊成员沿用工作台的简洁列表，操作按需展开。 */
+#group-members-panel .details-card {background:transparent;border:0;border-radius:0;box-shadow:none;padding:20px 16px;}
+#group-members-panel .details-card-header {align-items:center;gap:10px;margin-bottom:20px;}
+#group-members-panel h3 {font-size:17px;font-weight:650;color:var(--text);}
+#group-members-panel .details-card-header>div {flex:1;}
+#group-members-subtitle {display:block;margin-top:6px;color:var(--muted);font-size:13px;}
+#toggle-group-members-btn {width:auto;height:auto;padding:6px 0;background:none;border:0;border-radius:0;color:var(--blue-strong);font-size:14px;}
+#group-members-panel .group-member-row {padding:16px 0;gap:10px;border:0;border-bottom:1px solid var(--line);border-radius:0;flex-wrap:wrap;}
+#group-members-panel .group-member-name {font-size:15px;font-weight:600;overflow-wrap:anywhere;}
+#group-members-panel .group-member-meta {font-size:13px;color:var(--muted);line-height:1.6;}
+#group-members-panel .group-member-controls {width:100%;justify-content:flex-start;gap:12px;padding-left:16px;}
+#group-members-panel .group-member-remove-btn {background:none;border:0;border-radius:0;color:var(--muted);padding:4px 0;font-size:13px;}
+#group-members-panel .group-member-add-form {margin:16px 0;display:flex;flex-direction:column;gap:10px;}
+#group-members-panel .group-member-add-form.hidden {display:none;}
+#group-members-panel .group-member-select,#group-members-panel .group-member-role-select {width:100%;min-width:0;font-size:14px;}
+#delete-group-btn {margin-top:20px;font-size:13px;}
+.group-invite-hint {font-size:14px;line-height:1.6;color:var(--muted);margin:8px 0 12px;}
+#group-create-panel .group-member-select {font-size:15px;}
+.mention-dropdown li {font-size:15px;padding:10px 14px;}
+
+#group-members-panel {overflow-y:auto;}
+#group-members-panel .group-members-list {max-height:none;overflow:visible;}

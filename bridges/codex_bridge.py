@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import shlex
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Sequence
@@ -86,6 +87,12 @@ should_handle_message = cli_bridge.should_handle_message
 
 
 def _default_codex_exe() -> str:
+    # Windows 上 npm 的 codex.cmd 可能遮蔽 Desktop 提供的新版原生 CLI。
+    # 从 PATH 选择真正的 exe；不扫描版本目录，也不覆盖用户的命令配置。
+    if os.name == "nt":
+        native = shutil.which("codex.exe")
+        if native and "/windowsapps/" not in native.replace("\\", "/").lower():
+            return shlex.quote(native)
     return "codex"
 
 
