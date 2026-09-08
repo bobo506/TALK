@@ -122,7 +122,7 @@ _TOOL_SCHEMA = {
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def main(*, include_deferred_send: bool = True) -> None:
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -147,11 +147,11 @@ def main() -> None:
                 # MCP 初始化完成通知，无需响应
                 pass
             elif method == "tools/list":
-                _write_response(req_id, {"tools": [_TOOL_SCHEMA, *TOOL_SCHEMAS]})
+                _write_response(req_id, {"tools": ([_TOOL_SCHEMA] if include_deferred_send else []) + TOOL_SCHEMAS})
             elif method == "tools/call":
                 tool_name = params.get("name", "")
                 tool_args: dict[str, Any] = params.get("arguments", {})
-                if tool_name == "talk_send":
+                if tool_name == "talk_send" and include_deferred_send:
                     target = str(tool_args.get("target", "")).strip()
                     body = str(tool_args.get("body", "")).strip()
                     stance = str(tool_args.get("stance", "greeting")).strip()

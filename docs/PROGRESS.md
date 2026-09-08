@@ -2,36 +2,30 @@
 
 Updated: 2026-09-08 (Asia/Shanghai)
 
-## 当前状态
+## Latest
 
-- 当前 Codex 为决策 Agent。主工作区在 `codex/ui-workspace-v1`，PR #3（base `codex/task-hall`）：https://github.com/bobo506/TALK/pull/3 。本批完成用户验收反馈修复，等待复验，不开启新切片。
-- 用户已验收任务 #19：DeepSeek 回复“验收通过”，确认成果后完成。#15/#16/#17/#18 仍为已完成、已验收基线。
-- 新建/添加群成员按当前项目角色筛选，自己不进入邀请或 @ 候选，名称简短。右侧统一“群聊成员”，添加/管理按需展开。当前登录 QA Tester，bobo 是其他真人账号；旧 pi 不再作为项目邀请候选，历史数据保留。
-- Codex 复验仍失败的原因已确认：普通终端 PATH 没有 Desktop 原生 CLI，上批仅从 PATH 查找的修复不完整。现补充从当前用户 Desktop 安装目录查找最近更新的可用 exe，并在启动时输出 CLI 路径。使用用户同款 Python 3.12、移除 Desktop PATH 的真实调用返回 TALK_ORDINARY_TERMINAL_OK（CLI 0.153.4）。需再次重启现有 bridge 加载本次补丁，群聊端到端回复仍待复验。
-- UI 保留任务 / 群聊 / 角色导航、主任务归组、成果/下一步优先、任务要求折叠，以及桌面 80% 默认密度。资源版本 `20260908-members-2`。
+- 用户已确认群聊 Codex 正常回复，前述界面问题全部修正；已明确授权合并已验收分支、接入并验证独立 TH-7a，然后汇总交接。
+- PR #3 已合入 task-hall，PR #4 已把完整前置链合入 main，稳定基线为 `541e668`；旧 PR #2 随提交进入 main 自动标记 merged。
+- 当前正在 `codex/th7-terminal-integration` 接入原 `5781ee6`；代码无冲突，仅两份进度文档冲突，已合并保留双方记录。原分支和 `.tmp/th7-terminal-v1` 仍保留。
+- 本次只做集成与进度收尾，不实现新确认的头脑风暴功能。
 
-## 验证与边界
+## 验证
 
-- 群聊 UI 批次 Node 20 项、Python 页面与 bridge 137 项通过；本次普通终端路径补丁另跑两份 bridge 测试 137 项通过，未重跑未改动的 UI 或全量后端测试。
-- 内置浏览器实测邀请候选、@ 自己排除与成员 ID 插入、管理展开/收起、添加表单可见性。1440px / 390px 没有横向溢出，控制台未捕获错误。
-- 没有替用户发送群消息、创建群聊或增删真实成员，也没有重启用户运行中的 bridge。CLI 真实探针只请求固定文本，不使用工具。
-- UI QA 见 `design-qa.md`；截图在 `.tmp/group-members-20260908/`，不提交截图、数据库、日志或临时文件。
+- 稳定基线：383 项非 WebSocket Python 测试、10 项逐一独立进程 WebSocket 测试、20 项 Node 测试通过。
+- 全套单进程首次在 WebSocket 连接状态测试长时间阻塞，已停止本轮测试进程并拆分验证；不能写成单进程全套通过。未终止用户服务或 bridge。
+- 任务 #15/#16/#17/#18 与 #19、群聊界面及 Codex 实际回复均已获用户人工验收。
+- TH-7a 集成后 13 项独立测试通过，覆盖配置、只读检查、stdio 工具目录与委派/提交/收取；从其它工作目录连接当前真实服务 --check 返回 ok=true，身份 human:qa、项目及三角色正确。没有创建生产任务或发送群消息；完整终端客户端安装与真实模型任务验收尚未进行。
 
-## 独立下一切片
+## 下一阶段已确认
 
-- 用户已授权复制分支并开发最小 TH-7：工作树 `.tmp/th7-terminal-v1`，分支 `codex/th7-terminal-v1`，提交 `5781ee6`，本地完成、未推送。
-- 已有普通终端 MCP 入口和 `--check`，13 项测试通过；指南在该工作树的 `docs/guides/TERMINAL_MCP.md`。不要重复开发或混入 UI PR。
-- UI 合并后再对齐 TH-7；若采用 squash，只迁移从 `6affa86` 起的 TH-7 增量，避免重带界面历史。
+- 群聊统一定义为头脑风暴；人工主持和原 code 终端 Agent 主持两种方式。Agent 主持后要把总结返回发起会议的原终端/原任务上下文，不产生两个独立主持人。
+- 同项目、基本相同团队默认复用群；不同项目、信息隔离或显著不同团队才新群。群内一轮一议题，一次只有一轮进行中。
+- 无进行中会议时人工 @所有人 开新轮并担任主持；进行中再次 @所有人 是追问。明确结束才收口，不能只按“总结”关键字推断。
+- 消息、回复、迟到结果严格属于原轮；旧轮结束后如需继续，明确开启关联新轮。完整产品约定将在本次交接文档中整理，尚未实现。
+- 普通群聊上下文、回复按钮自动提醒、按轮引用原文及原终端结果回传是下一阶段；服务自动管理/桌面客户端未实现。切换 DeepSeek 模型通过 Harness profile，不需要新角色。
 
-## 下一步
+## 恢复
 
-1. 用户刷新 `http://127.0.0.1:8000/?ui=members-final-2` 检查邀请、@ 和右侧群聊成员；在 Codex bridge 原终端 Ctrl+C 后重跑原启动命令，核对新出现的 `[Codex bridge] CLI:` 指向 `AppData/Local/OpenAI/Codex/bin/.../codex.exe`，再 @ Codex 验证正常回复。DeepSeek/Kimi 无需因本次 Codex 修复重启。
-2. 复验通过后整理 PR #3 及其前置分支链。此前核对 `codex/task-hall` 比 `main` 领先 64 个提交，旧 PR #2 head 是其祖先；尚未获授权自动合并或关闭 PR。
-3. 收尾 UI 基线后再继续独立 TH-7。桌面客户端尚未开始。
-4. 恢复指令：`继续项目`。先核对本工作区和独立 TH-7 工作树，保留已完成验收与修复。
-
-## 启动与参考
-
-- 服务：`.venv\Scripts\python.exe -m uvicorn server.main:app --host 127.0.0.1 --port 8000`。
-- 活动角色：Codex / DeepSeek Harness / 官方 Kimi Code CLI。查看历史无需启动所有 bridge。
-- 项目简报 `docs/PROJECT_BRIEF.md`；模块 `docs/spec/MODULE_webui.md`、`docs/spec/MODULE_bridges.md`；完整记录 `docs/PROGRESS_HISTORY.md`。
+- 本轮完成后以 main 为稳定基线，新窗口说 `继续项目`；先读本快照与头脑风暴约定，再规划下一最小切片。
+- 服务启动：`.venv\Scripts\python.exe -m uvicorn server.main:app --host 127.0.0.1 --port 8000`；角色仍为 Codex / Kimi Code / DeepSeek Harness。
+- 不提交或清理真实数据库、日志、截图、旧 worktree 和 .tmp 文件。完整历史见 docs/PROGRESS_HISTORY.md。

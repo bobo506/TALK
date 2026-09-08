@@ -301,7 +301,7 @@ TALK/
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
-| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | TH-6a1 至 TH-6d 已落地任务树治理、有限授权 / 中断、澄清、runner 预检、Review / Test / 返工门禁、Blackboard 控制与里程碑人工验收；TH-6d 已于 2026-09-06 通过人工验收并完成根任务收尾，TH-7 尚未启动 |
+| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | TH-6a1 至 TH-6d 已落地任务树治理、有限授权 / 中断、澄清、runner 预检、Review / Test / 返工门禁、Blackboard 控制与里程碑人工验收；TH-6d 已于 2026-09-06 通过人工验收并完成根任务收尾，TH-7a 已新增普通终端 stdio MCP 入口与只读连接检查 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段

@@ -2,6 +2,8 @@
 
 这份文档给会命令行、准备接 TALK SDK 的开发者。目标是：在本机用 Python bare metal 跑起服务，再用一个最小 Agent 脚本接入。
 
+已有 TALK 服务、准备从普通终端委派任务时，可直接阅读 [普通终端 MCP 接入](TERMINAL_MCP.md)。
+
 ## 1. 前置条件
 
 - Python 3.11 或更高版本
