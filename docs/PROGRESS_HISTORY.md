@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-09-08 Codex 普通终端 PATH 补修
+
+- 用户重启后群聊仍报错。只读检查最新实例确认进程已更换，但 stderr 仍为 Codex 0.144.4 / gpt-6-astra HTTP 400。核对启动命令没有显式 CLI 覆盖；普通终端的持久化 PATH 缺少 Desktop 的原生 CLI 目录，而 Codex 应用工具环境包含它。
+- 修正上批验证遗漏：Windows 在 PATH 没有可用原生 exe 时，进一步查找当前用户 LOCALAPPDATA/OpenAI/Codex/bin 下根目录及一层版本目录中的 codex.exe，按文件更新时间选择；空/不完整/不可读安装安全回退。PATH 原生 CLI 和显式命令的优先级不变，不修改系统 PATH、不安装或更改模型。
+- 启动时向 stderr 输出 `[Codex bridge] CLI:` 和实际可执行文件，便于用户确认加载情况，不输出完整命令或凭证。
+- 两份 bridge 测试 137 项通过，新增普通终端查找、多个安装/不完整目录与缺失/不可读目录回归；diff 检查通过。使用用户 bridge 同款 Python 3.12，移除 Desktop PATH，真实调用找到原生 0.153.4 并返回 TALK_ORDINARY_TERMINAL_OK，退出码 0。
+- 没有发送真实 TALK 消息、操作群成员或终止用户进程。用户需再重启一次 bridge 加载本次补丁；群聊回复仍待复验。变更仅 codex_bridge.py、对应测试、bridge 模块与快照/历史；不推进 TH-7。
+
+---
+
 ## 2026-09-08 群聊验收修复与 Codex CLI 兼容
 
 - 用户已人工验收任务 #19：DeepSeek 回复“验收通过”，查看成果并确认后状态变为完成。此前 #15/#16/#17/#18 的完成基线继续保留。

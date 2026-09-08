@@ -7,12 +7,12 @@ Updated: 2026-09-08 (Asia/Shanghai)
 - 当前 Codex 为决策 Agent。主工作区在 `codex/ui-workspace-v1`，PR #3（base `codex/task-hall`）：https://github.com/bobo506/TALK/pull/3 。本批完成用户验收反馈修复，等待复验，不开启新切片。
 - 用户已验收任务 #19：DeepSeek 回复“验收通过”，确认成果后完成。#15/#16/#17/#18 仍为已完成、已验收基线。
 - 新建/添加群成员按当前项目角色筛选，自己不进入邀请或 @ 候选，名称简短。右侧统一“群聊成员”，添加/管理按需展开。当前登录 QA Tester，bobo 是其他真人账号；旧 pi 不再作为项目邀请候选，历史数据保留。
-- Codex 群聊失败源于 npm CLI 0.144.4 不支持所选 gpt-6-astra；默认优先 PATH 原生 codex.exe，现有 0.153.4 实测返回 TALK_CODEX_PROBE_OK。现有 Codex bridge 进程必须重启才能加载修改，群聊端到端回复仍待用户复验。
+- Codex 复验仍失败的原因已确认：普通终端 PATH 没有 Desktop 原生 CLI，上批仅从 PATH 查找的修复不完整。现补充从当前用户 Desktop 安装目录查找最近更新的可用 exe，并在启动时输出 CLI 路径。使用用户同款 Python 3.12、移除 Desktop PATH 的真实调用返回 TALK_ORDINARY_TERMINAL_OK（CLI 0.153.4）。需再次重启现有 bridge 加载本次补丁，群聊端到端回复仍待复验。
 - UI 保留任务 / 群聊 / 角色导航、主任务归组、成果/下一步优先、任务要求折叠，以及桌面 80% 默认密度。资源版本 `20260908-members-2`。
 
 ## 验证与边界
 
-- 本批 Node 20 项、Python 页面与 bridge 137 项通过，JS 语法与 diff 检查通过；没有重跑全量后端测试。
+- 群聊 UI 批次 Node 20 项、Python 页面与 bridge 137 项通过；本次普通终端路径补丁另跑两份 bridge 测试 137 项通过，未重跑未改动的 UI 或全量后端测试。
 - 内置浏览器实测邀请候选、@ 自己排除与成员 ID 插入、管理展开/收起、添加表单可见性。1440px / 390px 没有横向溢出，控制台未捕获错误。
 - 没有替用户发送群消息、创建群聊或增删真实成员，也没有重启用户运行中的 bridge。CLI 真实探针只请求固定文本，不使用工具。
 - UI QA 见 `design-qa.md`；截图在 `.tmp/group-members-20260908/`，不提交截图、数据库、日志或临时文件。
@@ -25,7 +25,7 @@ Updated: 2026-09-08 (Asia/Shanghai)
 
 ## 下一步
 
-1. 用户刷新 `http://127.0.0.1:8000/?ui=members-final-2` 检查邀请、@ 和右侧群聊成员；在 Codex bridge 原终端 Ctrl+C 后重跑原启动命令，再 @ Codex 验证正常回复。DeepSeek/Kimi 无需因本次 Codex 修复重启。
+1. 用户刷新 `http://127.0.0.1:8000/?ui=members-final-2` 检查邀请、@ 和右侧群聊成员；在 Codex bridge 原终端 Ctrl+C 后重跑原启动命令，核对新出现的 `[Codex bridge] CLI:` 指向 `AppData/Local/OpenAI/Codex/bin/.../codex.exe`，再 @ Codex 验证正常回复。DeepSeek/Kimi 无需因本次 Codex 修复重启。
 2. 复验通过后整理 PR #3 及其前置分支链。此前核对 `codex/task-hall` 比 `main` 领先 64 个提交，旧 PR #2 head 是其祖先；尚未获授权自动合并或关闭 PR。
 3. 收尾 UI 基线后再继续独立 TH-7。桌面客户端尚未开始。
 4. 恢复指令：`继续项目`。先核对本工作区和独立 TH-7 工作树，保留已完成验收与修复。

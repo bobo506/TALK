@@ -58,10 +58,35 @@ class CodexBridgeTests(unittest.TestCase):
 
     def test_native_cli_falls_back_without_exe_or_for_windows_alias(self):
         for native in (None, "C:/Users/Test/AppData/Local/Microsoft/WindowsApps/codex.exe"):
-            with self.subTest(native=native), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=native):
+            with self.subTest(native=native), patch.dict(os.environ, {}, clear=True), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=native):
                 self.assertEqual(codex_bridge._default_codex_exe(), "codex")
         with patch.object(codex_bridge.os, "name", "posix"):
             self.assertEqual(codex_bridge._default_codex_exe(), "codex")
+
+    def test_ordinary_terminal_discovers_latest_installed_desktop_cli(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "OpenAI" / "Codex" / "bin"
+            old = root / "codex.exe"
+            new = root / "new build" / "codex.exe"
+            new.parent.mkdir(parents=True)
+            old.write_text("old", encoding="utf-8")
+            new.write_text("new", encoding="utf-8")
+            os.utime(old, (100, 100))
+            os.utime(new, (200, 200))
+            (root / "incomplete").mkdir()
+            with patch.dict(os.environ, {"LOCALAPPDATA": directory}, clear=True):
+                self.assertEqual(codex_bridge._desktop_codex_exe(), str(new))
+            with patch.dict(os.environ, {}, clear=True), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=None), patch.object(codex_bridge, "_desktop_codex_exe", return_value=str(new)):
+                for command in (default_codex_command(), codex_bridge.default_codex_task_command(), codex_bridge.default_codex_task_preflight_command()):
+                    self.assertEqual(shlex.split(command)[0], str(new))
+                with patch.dict(os.environ, {"TALK_CODEX_COMMAND": "custom codex command"}):
+                    self.assertEqual(default_codex_command(), "custom codex command")
+
+    def test_desktop_discovery_handles_missing_or_unreadable_install(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"LOCALAPPDATA": directory}, clear=True):
+            self.assertIsNone(codex_bridge._desktop_codex_exe())
+            with patch.object(codex_bridge.Path, "glob", side_effect=PermissionError):
+                self.assertIsNone(codex_bridge._desktop_codex_exe())
 
     def test_default_codex_command_injects_system_instructions(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)

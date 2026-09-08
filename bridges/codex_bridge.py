@@ -86,12 +86,34 @@ strip_leading_mentions = cli_bridge.strip_leading_mentions
 should_handle_message = cli_bridge.should_handle_message
 
 
+def _desktop_codex_exe() -> str | None:
+    """Find an installed Desktop CLI when an ordinary terminal lacks its PATH."""
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    root = Path(local_app_data) / "OpenAI" / "Codex" / "bin"
+    try:
+        candidates = [root / "codex.exe", *root.glob("*/codex.exe")]
+    except OSError:
+        return None
+    available = []
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                available.append((candidate.stat().st_mtime_ns, str(candidate)))
+        except OSError:
+            continue
+    return max(available)[1] if available else None
+
+
 def _default_codex_exe() -> str:
-    # Windows 上 npm 的 codex.cmd 可能遮蔽 Desktop 提供的新版原生 CLI。
-    # 从 PATH 选择真正的 exe；不扫描版本目录，也不覆盖用户的命令配置。
+    # 优先尊重 PATH 内的原生 CLI；普通终端可能没有 Desktop 注入的 PATH，
+    # 此时从当前用户的 Desktop 安装目录选择最近更新的可用 exe。
     if os.name == "nt":
         native = shutil.which("codex.exe")
-        if native and "/windowsapps/" not in native.replace("\\", "/").lower():
+        if not native or "/windowsapps/" in native.replace("\\", "/").lower():
+            native = _desktop_codex_exe()
+        if native:
             return shlex.quote(native)
     return "codex"
 
@@ -330,6 +352,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
     args.command = args.codex_command
     args.runtime = "codex"
     args.bridge_label = "Codex bridge"
+    print(f"[Codex bridge] CLI: {parse_command(args.codex_command)[0]}", file=sys.stderr, flush=True)
     cli_bridge.configure_talk_tool_environment(args, cli_bridge.member_id_from_name(args.name))
     await cli_bridge.run_bridge(args)
 

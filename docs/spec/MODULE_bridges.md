@@ -181,6 +181,6 @@ Web UI 中发送：
 
 ## 2026-09-08 Codex CLI 路径与群聊错误记录
 
-- Windows 默认先通过 PATH 查找原生 `codex.exe`，排除 WindowsApps 别名；无可用原生路径或非 Windows 时继续调用 `codex`。显式命令和环境覆盖配置仍优先，不扫描版本目录、不更改模型与执行权限参数。
-- 本机 npm CLI 0.144.4 遇 gpt-6-astra 返回“需要新版 CLI”；现有原生 0.153.4 的真实固定文本探针通过。更新代码后须重启已有 bridge 进程。
+- Windows 默认先通过 PATH 查找原生 `codex.exe`，排除 WindowsApps 别名；普通终端 PATH 缺失时，扫描当前用户 `LOCALAPPDATA/OpenAI/Codex/bin/codex.exe` 与一层版本目录中的 `codex.exe`，选择文件更新时间最近的可用文件。没有安装或非 Windows 时回退 `codex`。显式命令和环境覆盖配置仍优先，不更改系统 PATH、模型与执行权限参数。启动时输出实际 CLI 路径，便于核对。
+- 本机 npm CLI 0.144.4 遇 gpt-6-astra 返回“需要新版 CLI”；现有原生 0.153.4 的真实固定文本探针通过，包括 Python 3.12 与去掉 Desktop PATH 的普通终端模拟。更新代码后须重启已有 bridge 进程。
 - 群聊 CLI 失败时，实例 `last_error` 优先记录清理后的 stderr，回退 stdout / 通用提示并截取末尾 4000 字符；群聊消息仍使用简短失败提示。日志可能包含运行上下文，不将其放入公开验收记录。
