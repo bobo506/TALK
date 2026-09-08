@@ -203,7 +203,7 @@ CREATE TABLE agent_task_schedules (
 
 ## 当前前端交互约定
 
-> 当前 Web UI 已实现 Project Blackboard、独立 Task Hall、任务树控制、质量门禁摘要与里程碑人工验收入口；Discussion Halls、Members / Activity 独立页面仍按后续切片推进，见 `spec/MODULE_tasks.md`。
+> 当前 Web UI 已实现任务 / 群聊 / 角色工作台（主任务归组、成果与流转优先、项目角色只读列表和交办入口）、独立 Task Hall、任务树控制、质量门禁摘要与里程碑人工验收入口；Discussion Halls、Members / Activity 独立页面仍按后续切片推进，见 `spec/MODULE_tasks.md`。
 
 - Web UI 登录后会显示“全局消息流”和可进入的 Group Hall 切换条；全局流继续读取不带 `group_id` 的旧消息，Group Hall 读取 `GET /api/messages?group_id=<id>`
 - Web UI 可创建 Group 并选择初始成员；创建后自动进入该 Group 的 Hall
@@ -297,7 +297,7 @@ TALK/
 | [MODULE_discussions.md](spec/MODULE_discussions.md) | 可记录多 Agent 讨论协议 | `server/routes/discussions.py`, `server/models.py`, `TALK/client/`, `bridges/` | `DISCUSSION-SCOPE-1` 已落地：session/turn 记录、请求者局部范围锚点、SDK helper、bridge TALK 动作协议与 pi 可选施工档 |
 | [MODULE_websocket.md](spec/MODULE_websocket.md) | WebSocket / SSE 实时事件连接管理与推送 | `server/ws_hub.py`, `server/main.py`(WS/SSE端点) | WS 已实现；SSE 只读事件流第一版已落地 |
 | [MODULE_files.md](spec/MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
-| [MODULE_webui.md](spec/MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
+| [MODULE_webui.md](spec/MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css`, `web/workspace.js`, `web/workspace.css` | 已支持任务 / 群聊 / 角色导航、成果与分工流转，及 Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
 | [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |

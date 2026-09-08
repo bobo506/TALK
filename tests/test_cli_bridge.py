@@ -1950,6 +1950,64 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(statuses[0][0], "busy")
         self.assertEqual(statuses[-1][0], "idle")
 
+    def test_failed_chat_records_diagnostic_without_posting_it(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:pi"}]}
+
+        statuses = []
+
+        async def fake_report_status(status, **kwargs):
+            statuses.append((status, kwargs))
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            self.assertIn("group task", prompt)
+            # identity no longer in prompt
+            return CliRunResult(returncode=1, stdout="", stderr="ERROR: model requires a newer CLI")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:bobo",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi group task",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=100,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                    report_status=fake_report_status,
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.replies, [(40, "pi bridge 运行失败，错误详情已记录。", ["human:bobo"], "group:lab")])
+        self.assertEqual(statuses[0][0], "busy")
+        self.assertEqual(statuses[-1][0], "error")
+        self.assertIn("model requires a newer CLI", statuses[-1][1]["last_error"])
+
     def test_handle_incoming_message_executes_send_message_action(self):
         class FakeClient:
             def __init__(self):

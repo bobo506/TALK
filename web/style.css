@@ -1719,9 +1719,6 @@ pre {
   color: #8f98a3;
 }
 
-.group-member-add-form {
-  display: none !important;
-}
 
 .auth-card {
   width: min(420px, calc(100vw - 32px));

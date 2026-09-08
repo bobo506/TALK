@@ -67,8 +67,12 @@ let activeProjectId = null;
 let projectAgents = [];
 let projectTasks = [];
 let blackboardOpen = false;
+let timelineRevision = 0;
 let selectedTaskId = null;
 let selectedTaskTree = null;
+let taskTreeRequest = 0;
+let projectTaskRequest = 0;
+let taskTreeError = "";
 let taskCreateOpen = false;
 let taskCreateSaving = false;
 let taskActionSaving = false;
@@ -115,7 +119,6 @@ const blackboardEmpty = document.getElementById("blackboard-empty");
 const hallHeader = document.getElementById("hall-header");
 const roomTitle = document.getElementById("room-title");
 const roomDescription = document.getElementById("room-description");
-const globalRoomBtn = document.getElementById("global-room-btn");
 const groupRoomList = document.getElementById("group-room-list");
 const hallFilterInput = document.getElementById("hall-filter-input");
 const refreshGroupsBtn = document.getElementById("refresh-groups-btn");
@@ -625,7 +628,6 @@ logoutBtn.addEventListener("click", () => {
 loadOlderBtn.addEventListener("click", loadOlderMessages);
 historySearchBtn.addEventListener("click", applyHistorySearch);
 historyClearBtn.addEventListener("click", clearHistorySearch);
-globalRoomBtn.addEventListener("click", () => setActiveGroup(null));
 projectSelect.addEventListener("change", () => setActiveProject(projectSelect.value));
 projectBlackboardBtn.addEventListener("click", () => setBlackboardOpen(true));
 refreshProjectBtn.addEventListener("click", refreshProjectWorkspace);
@@ -648,10 +650,14 @@ taskCreateOverlay.addEventListener("mousedown", (event) => {
 refreshGroupsBtn.addEventListener("click", refreshGroups);
 toggleGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(!groupCreateOpen));
 toggleGroupMembersBtn.addEventListener("click", () => {
-  setGroupMembersOpen(true);
+  setGroupMembersOpen(!groupMembersOpen);
   if (groupMemberAddSelect && !groupMemberAddSelect.disabled) {
     groupMemberAddSelect.focus();
   }
+});
+document.getElementById("manage-group-members-btn").addEventListener("click", () => {
+  workspaceUI.manageMembers = !workspaceUI.manageMembers;
+  renderGroupMembersPanel();
 });
 cancelGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
 closeGroupCreateBtn.addEventListener("click", () => setGroupCreateOpen(false));
@@ -746,14 +752,21 @@ async function loadProjectAgents() {
     projectAgents = [];
     return;
   }
-  const res = await apiFetch(`/api/projects/${encodeURIComponent(activeProjectId)}/agents`);
+  const projectId = activeProjectId;
+  const memberId = myId;
+  const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/agents`);
   if (!res.ok) {
     throw new Error(await readErrorDetail(res, `项目 Agent 加载失败: ${res.status}`));
   }
-  projectAgents = await res.json();
+  const loaded = await res.json();
+  if (projectId === activeProjectId && memberId === myId) projectAgents = loaded;
 }
 
 async function loadProjectTasks({ silent = false } = {}) {
+  const before = JSON.stringify([projectTasks, selectedTaskTree, taskTreeError]);
+  const request = ++projectTaskRequest;
+  const projectId = activeProjectId;
+  const memberId = myId;
   if (!activeProjectId) {
     projectTasks = [];
     selectedTaskId = null;
@@ -769,10 +782,12 @@ async function loadProjectTasks({ silent = false } = {}) {
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `项目任务加载失败: ${res.status}`));
     }
-    projectTasks = await res.json();
+    const loaded = await res.json();
+    if (request !== projectTaskRequest || projectId !== activeProjectId || memberId !== myId) return;
+    projectTasks = loaded;
     projectTasks.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
     if (!projectTasks.some((task) => Number(task.id) === Number(selectedTaskId))) {
-      selectedTaskId = projectTasks[0]?.id ?? null;
+      selectedTaskId = projectTasks.find(task => !task.parent_task_id)?.id ?? null;
       selectedTaskTree = null;
     }
     const hasUnknownHall = projectTasks.some(
@@ -782,6 +797,9 @@ async function loadProjectTasks({ silent = false } = {}) {
       await loadGroups();
     }
     await loadSelectedTaskTree({ silent: true });
+    if (request !== projectTaskRequest || projectId !== activeProjectId || memberId !== myId) return;
+    // 未变化的轮询保留焦点、展开内容及用户正在阅读的提示。
+    if (silent && before === JSON.stringify([projectTasks, selectedTaskTree, taskTreeError])) return;
     renderProjectStrip();
     renderRoomStrip();
     renderBlackboard();
@@ -795,21 +813,27 @@ async function loadProjectTasks({ silent = false } = {}) {
 }
 
 async function loadSelectedTaskTree({ silent = false } = {}) {
-  const task = projectTasks.find((item) => Number(item.id) === Number(selectedTaskId));
-  if (!task) {
-    selectedTaskTree = null;
-    return;
-  }
+  const request = ++taskTreeRequest;
+  const task = getContextTask();
+  const projectId = activeProjectId;
+  const memberId = myId;
+  const current = () => request === taskTreeRequest && projectId === activeProjectId
+    && memberId === myId && Number(getContextTask()?.id) === Number(task?.id);
+  if (!task) { selectedTaskTree = null; taskTreeError = ""; return; }
+  if (!workspaceTreeMatches(task, selectedTaskTree)) selectedTaskTree = null;
+  taskTreeError = "";
   try {
     const res = await apiFetch(`/api/tasks/${encodeURIComponent(task.id)}/tree`);
-    if (!res.ok) {
-      throw new Error(await readErrorDetail(res, `任务树加载失败: ${res.status}`));
-    }
-    selectedTaskTree = await res.json();
+    if (!res.ok) throw new Error(await readErrorDetail(res, `任务进度加载失败: ${res.status}`));
+    const tree = await res.json();
+    if (!current()) return;
+    if (!workspaceTreeMatches(task, tree)) throw new Error("任务进度与当前任务不一致，请刷新重试。");
+    selectedTaskTree = tree;
   } catch (err) {
+    if (!current()) return;
     selectedTaskTree = null;
-    if (!silent) showTaskDetailsError(err.message);
-    console.error(err);
+    taskTreeError = err.message;
+    if (!silent) showTaskDetailsError(err.message, false);
   }
 }
 
@@ -819,10 +843,16 @@ async function setActiveProject(projectId) {
     return;
   }
   activeProjectId = projectId;
+  workspaceUI.mode = "tasks";
+  workspaceUI.selectedRole = null;
+  workspaceUI.query = "";
+  document.getElementById("workspace-search").value = "";
   localStorage.setItem(activeProjectStorageKey(), activeProjectId);
   selectedTaskId = null;
   selectedTaskTree = null;
   blackboardOpen = true;
+  projectTasks = []; projectAgents = []; taskTreeError = "";
+  renderProjectStrip(); renderWorkspaceMode();
   try {
     await Promise.all([loadProjectAgents(), loadProjectTasks({ silent: true })]);
   } catch (err) {
@@ -834,6 +864,7 @@ async function setActiveProject(projectId) {
 }
 
 async function refreshProjectWorkspace() {
+  if (workspaceUI.mode === "chats") { await refreshGroups(); return; }
   if (!activeProjectId) return;
   refreshProjectBtn.disabled = true;
   blackboardRefreshBtn.disabled = true;
@@ -889,6 +920,8 @@ function eligibleProjectAgents() {
 }
 
 function setBlackboardOpen(open) {
+  workspaceUI.query = ""; document.getElementById("workspace-search").value = "";
+  workspaceUI.mode = "tasks";
   blackboardOpen = Boolean(open && activeProjectId);
   setGroupCreateOpen(false);
   renderProjectStrip();
@@ -902,11 +935,17 @@ function setBlackboardOpen(open) {
 }
 
 function renderWorkspaceMode() {
-  blackboardView.classList.toggle("hidden", !blackboardOpen);
-  hallHeader.classList.toggle("hidden", blackboardOpen);
-  messagesEl.classList.toggle("hidden", blackboardOpen);
-  composerFooter.classList.toggle("hidden", blackboardOpen);
-  if (blackboardOpen) renderBlackboard();
+  syncWorkspaceLayout();
+  const chats = workspaceUI.mode === "chats";
+  const conversation = workspaceHasConversation();
+  blackboardView.classList.toggle("hidden", chats);
+  roomStrip.classList.toggle("hidden", !chats);
+  hallHeader.classList.toggle("hidden", !conversation);
+  messagesEl.classList.toggle("hidden", !conversation);
+  composerFooter.classList.toggle("hidden", !conversation);
+  document.getElementById("workspace-chat-empty").classList.toggle("hidden", !chats || conversation);
+  if (!chats) renderBlackboard();
+  else renderRoomStrip();
   renderGroupMembersPanel();
 }
 
@@ -942,110 +981,22 @@ function formatTaskTime(value) {
   return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-function renderBlackboard() {
-  const project = getActiveProject();
-  blackboardTitle.textContent = project ? `${project.display_name} · 任务黑板` : "任务黑板";
-  blackboardDescription.textContent = project?.description || "按协作状态查看项目任务，点击卡片可查看 Task Hall 与可执行动作。";
-  blackboardSummary.innerHTML = "";
-  blackboardColumns.innerHTML = "";
+function renderBlackboard() { renderWorkspaceList(); }
 
-  const columns = [
-    { key: "attention", label: "待响应" },
-    { key: "running", label: "执行中" },
-    { key: "submitted", label: "结果待收取" },
-    { key: "finished", label: "已结束" },
-  ];
-  for (const column of columns) {
-    const count = projectTasks.filter((task) => taskBoardColumn(task) === column.key).length;
-    const chip = document.createElement("span");
-    chip.className = "blackboard-summary-chip";
-    const label = document.createElement("span");
-    label.textContent = column.label;
-    const number = document.createElement("strong");
-    number.textContent = String(count);
-    chip.appendChild(label);
-    chip.appendChild(number);
-    blackboardSummary.appendChild(chip);
-  }
-
-  blackboardEmpty.classList.toggle("hidden", projectTasks.length > 0);
-  blackboardColumns.classList.toggle("hidden", projectTasks.length === 0);
-  for (const column of columns) {
-    const tasks = projectTasks.filter((task) => taskBoardColumn(task) === column.key);
-    const columnEl = document.createElement("section");
-    columnEl.className = "blackboard-column";
-    const header = document.createElement("div");
-    header.className = "blackboard-column-header";
-    const title = document.createElement("span");
-    title.textContent = column.label;
-    const count = document.createElement("span");
-    count.className = "blackboard-column-count";
-    count.textContent = String(tasks.length);
-    header.appendChild(title);
-    header.appendChild(count);
-    const list = document.createElement("div");
-    list.className = "blackboard-card-list";
-    if (!tasks.length) {
-      const empty = document.createElement("div");
-      empty.className = "blackboard-column-empty";
-      empty.textContent = "暂无任务";
-      list.appendChild(empty);
-    }
-    for (const task of tasks) {
-      list.appendChild(renderTaskCard(task));
-    }
-    columnEl.appendChild(header);
-    columnEl.appendChild(list);
-    blackboardColumns.appendChild(columnEl);
-  }
-}
-
-function renderTaskCard(task) {
-  const card = document.createElement("button");
-  card.type = "button";
-  card.className = `task-card ${Number(task.id) === Number(selectedTaskId) ? "selected" : ""}`;
-  const title = document.createElement("div");
-  title.className = "task-card-title";
-  title.textContent = task.title || task.content || `任务 #${task.id}`;
-  const status = document.createElement("span");
-  const meta = taskStatusMeta(task);
-  status.className = `task-status-badge ${meta.className}`;
-  status.textContent = meta.label;
-  const people = document.createElement("div");
-  people.className = "task-card-meta";
-  people.textContent = `${shortName(task.created_by)} → ${shortName(task.target_member_id)}`;
-  const footer = document.createElement("div");
-  footer.className = "task-card-footer";
-  const attempt = document.createElement("span");
-  attempt.textContent = `#${task.id} · attempt ${task.attempt || 0}`;
-  const updated = document.createElement("span");
-  updated.textContent = formatTaskTime(task.updated_at);
-  footer.appendChild(attempt);
-  footer.appendChild(updated);
-  card.appendChild(title);
-  card.appendChild(status);
-  card.appendChild(people);
-  card.appendChild(footer);
-  card.addEventListener("click", async () => {
-    selectedTaskId = task.id;
-    selectedTaskTree = null;
-    renderBlackboard();
-    renderTaskDetailsPanel();
-    await loadSelectedTaskTree();
-    renderTaskDetailsPanel();
-  });
-  card.addEventListener("dblclick", () => openTaskHall(task));
-  return card;
-}
+function renderTaskCard(task) { return workspaceTaskRow(task); }
 
 function getContextTask() {
+  if (workspaceUI.mode !== "tasks") return null;
   if (!blackboardOpen && activeGroupId) {
     return projectTasks.find((task) => task.hall_group_id === activeGroupId) || null;
   }
   return projectTasks.find((task) => Number(task.id) === Number(selectedTaskId)) || null;
 }
 
-function showTaskDetailsError(message) {
+function taskContextKey() { return `${activeProjectId}/${myId}/${getContextTask()?.id ?? ""}`; }
+
+function showTaskDetailsError(message, remember = true) {
+  if (remember) workspaceUI.actionError = { key: taskContextKey(), message };
   taskDetailsError.textContent = message || "";
   taskDetailsError.classList.toggle("hidden", !message);
 }
@@ -1067,9 +1018,9 @@ function currentMemberIsHuman() {
 function taskKindLabel(kind) {
   return {
     general: "普通任务",
-    development: "开发切片",
-    review: "Review",
-    test: "Test",
+    development: "执行工作",
+    review: "检查",
+    test: "测试",
     rework: "返工",
   }[kind] || kind || "普通任务";
 }
@@ -1087,47 +1038,11 @@ function checkpointReasonLabel(reason) {
   }[reason] || reason || "无";
 }
 
-function appendTaskGovernanceCard(tree) {
-  if (!tree?.root) return;
-  const card = document.createElement("div");
-  card.className = "task-governance-card";
-  const title = document.createElement("strong");
-  title.textContent = "任务树控制与质量门禁";
-  card.appendChild(title);
-  const control = document.createElement("div");
-  control.textContent = `控制：${tree.root.control_status || "—"} · 检查点：${checkpointReasonLabel(tree.root.checkpoint_reason)}`;
-  card.appendChild(control);
-  const budget = document.createElement("div");
-  budget.textContent = `授权 epoch ${tree.root.authorization_epoch || 0} · 剩余切片 ${tree.remaining_slice_budget} · 非终态后代 ${tree.nonterminal_descendants}`;
-  card.appendChild(budget);
-
-  const reviewList = document.createElement("div");
-  reviewList.className = "task-gate-list";
-  for (const gate of tree.review_gates || []) {
-    const row = document.createElement("div");
-    const verdict = gate.current_verdict?.verdict || "pending";
-    row.textContent = `Review · 开发 #${gate.development_task_id} → 当前 #${gate.current_subject_task_id}：${verdict}`;
-    reviewList.appendChild(row);
-  }
-  const testGate = tree.test_gate;
-  if (testGate?.required) {
-    const row = document.createElement("div");
-    row.textContent = `里程碑 Test · 冻结版本 ${testGate.frozen_task_ids.map((id) => `#${id}`).join("、") || "尚未形成"}：${testGate.current_verdict?.verdict || "pending"}`;
-    reviewList.appendChild(row);
-  }
-  if (!reviewList.childElementCount) {
-    const row = document.createElement("div");
-    row.textContent = "当前任务树没有强制质量门禁。";
-    reviewList.appendChild(row);
-  }
-  card.appendChild(reviewList);
-  taskDetailsContent.insertAdjacentElement("afterend", card);
-}
-
 function renderTaskDetailsPanel() {
+  renderWorkspaceRoleDetails();
   const task = getContextTask();
   taskDetailsPanel.classList.toggle("hidden", !task);
-  groupMembersPanel.classList.toggle("hidden", Boolean(task));
+  groupMembersPanel.classList.toggle("hidden", blackboardOpen || Boolean(task) || !getActiveGroup() || getActiveGroup().type === "task");
   if (!task) return;
 
   taskDetailsTitle.textContent = task.title || `任务 #${task.id}`;
@@ -1138,29 +1053,20 @@ function renderTaskDetailsPanel() {
   badge.textContent = meta.label;
   taskDetailsStatus.appendChild(badge);
   taskDetailsMeta.innerHTML = "";
-  const rows = [
-    `任务 ID：${task.id}`,
-    `类型：${taskKindLabel(task.task_kind)}`,
-    `请求者：${task.created_by}`,
-    `执行者：${task.target_member_id}`,
-    `执行状态：${task.status}`,
-    `attempt：${task.attempt || 0}`,
-    task.lease_expires_at ? `租约截止：${formatTaskTime(task.lease_expires_at)}` : "当前无活动租约",
-  ];
-  for (const value of rows) {
-    const row = document.createElement("div");
-    row.textContent = value;
-    taskDetailsMeta.appendChild(row);
-  }
+  const people = document.createElement("div");
+  people.textContent = `负责人 ${workspaceMemberName(task.target_member_id)} · ${task.created_by === myId ? "由你发起" : `${workspaceMemberName(task.created_by)} 发起`}`;
+  taskDetailsMeta.appendChild(people);
   taskDetailsContent.textContent = task.content || "";
   taskDetailsPanel.querySelectorAll(".task-governance-card").forEach((node) => node.remove());
-  appendTaskGovernanceCard(selectedTaskTree);
-  showTaskDetailsError("");
+  renderWorkspaceTaskStory(task);
+  const actionError = workspaceUI.actionError?.key === taskContextKey() ? workspaceUI.actionError.message : "";
+  showTaskDetailsError(actionError || taskTreeError, false);
   taskDetailsActions.innerHTML = "";
 
+  if (task.result_message_id) taskDetailsActions.appendChild(taskActionButton("查看成果", "task-action-primary", () => showWorkspaceResult(task)));
   if (task.hall_group_id) {
     taskDetailsActions.appendChild(
-      taskActionButton("进入 Task Hall", "task-action-primary", () => openTaskHall(task))
+      taskActionButton("查看完整对话", "task-action-secondary", () => openTaskHall(task))
     );
   }
   if (task.target_member_id === myId && ["assigned", "clarification_answered"].includes(task.workflow_status)) {
@@ -1194,9 +1100,9 @@ function renderTaskDetailsPanel() {
     );
   }
 
-  const tree = selectedTaskTree;
+  const tree = workspaceTreeMatches(task, selectedTaskTree) ? selectedTaskTree : null;
   const root = tree?.root;
-  if (currentMemberIsHuman() && root) {
+  if (currentMemberIsHuman() && root && !["succeeded", "failed", "canceled"].includes(root.status)) {
     if (root.status === "running" && root.control_status === "active" && root.may_delegate) {
       taskDetailsActions.appendChild(
         taskActionButton("创建开发 / Review / Test 子任务", "task-action-primary", () => setTaskCreateOpen(true, { parentRoot: root }))
@@ -1230,6 +1136,7 @@ function renderTaskDetailsPanel() {
 
 async function openTaskHall(task) {
   if (!task?.hall_group_id) return;
+  if (!canEnterGroup(task.hall_group_id)) { showTaskDetailsError("当前账号尚未加入这个任务对话，请联系任务负责人确认访问权限。"); return; }
   if (!groups.some((group) => group.id === task.hall_group_id)) {
     await loadGroups();
   }
@@ -1240,6 +1147,9 @@ async function openTaskHall(task) {
 async function runTaskAction(task, action, { confirmCancel = false } = {}) {
   if (taskActionSaving) return;
   if (confirmCancel && !window.confirm("取消后该任务不能重新领取。确定取消吗？")) return;
+  const contextKey = taskContextKey();
+  const projectId = activeProjectId;
+  const memberId = myId;
   taskActionSaving = true;
   showTaskDetailsError("");
   renderTaskDetailsPanel();
@@ -1249,13 +1159,14 @@ async function runTaskAction(task, action, { confirmCancel = false } = {}) {
       throw new Error(await readErrorDetail(res, `任务操作失败: ${res.status}`));
     }
     const updated = await res.json();
+    if (projectId !== activeProjectId || memberId !== myId) return;
     projectTasks = projectTasks.map((item) => Number(item.id) === Number(updated.id) ? updated : item);
-    selectedTaskId = updated.id;
+    // 更新数据，但不改变用户在等待期间选中的任务。
     await loadSelectedTaskTree({ silent: true });
     renderProjectStrip();
     renderBlackboard();
   } catch (err) {
-    showTaskDetailsError(err.message);
+    if (contextKey === taskContextKey()) showTaskDetailsError(err.message);
   } finally {
     taskActionSaving = false;
     renderTaskDetailsPanel();
@@ -1263,8 +1174,14 @@ async function runTaskAction(task, action, { confirmCancel = false } = {}) {
 }
 
 async function runTaskTreeAction(root, action, body = null, { confirmCancel = false } = {}) {
+  if (!workspaceTreeMatches(getContextTask(), selectedTaskTree) || Number(root.id) !== Number(selectedTaskTree.root.id)) {
+    showTaskDetailsError("任务已切换，请在当前任务中重新选择操作。"); return;
+  }
   if (taskActionSaving) return;
   if (confirmCancel && !window.confirm("这会终止整棵任务树，未完成任务不能恢复。确定继续吗？")) return;
+  const contextKey = taskContextKey();
+  const projectId = activeProjectId;
+  const memberId = myId;
   taskActionSaving = true;
   showTaskDetailsError("");
   renderTaskDetailsPanel();
@@ -1278,10 +1195,12 @@ async function runTaskTreeAction(root, action, body = null, { confirmCancel = fa
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `任务树操作失败: ${res.status}`));
     }
-    selectedTaskTree = await res.json();
+    const tree = await res.json();
+    if (projectId !== activeProjectId || memberId !== myId) return;
+    if (contextKey === taskContextKey() && workspaceTreeMatches(getContextTask(), tree)) selectedTaskTree = tree;
     await loadProjectTasks({ silent: true });
   } catch (err) {
-    showTaskDetailsError(err.message);
+    if (contextKey === taskContextKey()) showTaskDetailsError(err.message);
   } finally {
     taskActionSaving = false;
     renderTaskDetailsPanel();
@@ -1442,12 +1361,14 @@ function renderTaskCreateMode() {
 }
 
 function setTaskCreateOpen(open, { parentRoot = null } = {}) {
+  if (open) workspaceUI.createReturnFocus = document.activeElement;
   taskCreateOpen = Boolean(open && activeProjectId);
   showTaskCreateError("");
   taskCreateOverlay.classList.toggle("hidden", !taskCreateOpen);
   if (!taskCreateOpen) {
     taskCreatePanel.reset();
     taskCreateParentRoot = null;
+    workspaceUI.createReturnFocus?.focus();
     return;
   }
   taskCreateParentRoot = parentRoot;
@@ -1522,6 +1443,7 @@ async function createTaskFromPanel(event) {
     }
     const created = await res.json();
     selectedTaskId = created.id;
+    workspaceUI.mode = "tasks";
     setTaskCreateOpen(false);
     blackboardOpen = true;
     await Promise.all([loadGroups(), loadProjectTasks()]);
@@ -1560,7 +1482,9 @@ async function refreshGroups() {
   try {
     const previousGroupId = activeGroupId;
     await loadGroups();
+    if (workspaceUI.mode === "chats" && !workspaceHasConversation()) { openWorkspaceChats(); return; }
     renderRoomStrip();
+    renderWorkspaceMode();
     renderPresenceStrip();
     renderMentionDropdownIfOpen();
     if (previousGroupId !== activeGroupId) {
@@ -1623,7 +1547,17 @@ function setActiveGroup(groupId) {
   }
   if (activeGroupId === nextGroupId && !blackboardOpen) return;
 
+  workspaceUI.manageMembers = false;
+  groupMembersOpen = false;
   blackboardOpen = false;
+  const nextGroup = groups.find(group => group.id === nextGroupId);
+  workspaceUI.mode = nextGroup?.type === "task" ? "tasks" : "chats";
+  if (nextGroup && nextGroup.type !== "task") workspaceUI.lastChatId = nextGroupId;
+  const hallTask = projectTasks.find((task) => task.hall_group_id === nextGroupId);
+  if (hallTask) selectedTaskId = hallTask.id;
+  selectedTaskTree = null;
+  taskTreeError = "";
+  ++taskTreeRequest;
   activeGroupId = nextGroupId;
   if (activeGroupId) {
     localStorage.setItem(activeGroupStorageKey(), activeGroupId);
@@ -1640,6 +1574,7 @@ function setActiveGroup(groupId) {
   updateComposerPlaceholder();
   renderProjectStrip();
   renderWorkspaceMode();
+  loadSelectedTaskTree().then(() => renderTaskDetailsPanel());
   loadHistory();
   msgInput.focus();
 }
@@ -1647,27 +1582,21 @@ function setActiveGroup(groupId) {
 function renderRoomStrip() {
   if (!myId) return;
 
-  roomStrip.classList.remove("hidden");
+  roomStrip.classList.toggle("hidden", workspaceUI.mode !== "chats");
   const activeGroup = getActiveGroup();
-  groupMembersOpen = Boolean(activeGroup);
-  globalRoomBtn.classList.toggle("active", !blackboardOpen && !activeGroupId);
   groupRoomList.innerHTML = "";
 
-  roomTitle.textContent = activeGroup ? `${activeGroup.name} Hall` : "全局消息流";
+  roomTitle.textContent = activeGroup ? activeGroup.name : "群聊";
   roomTitle.classList.toggle("editable", Boolean(activeGroup));
-  roomDescription.textContent = activeGroup
-    ? `${activeGroup.id} · Hall 在线同步中 · @ 开头提醒成员，同组可见${activeGroup.description ? ` · ${activeGroup.description}` : ""}`
-    : "旧全局聊天与私聊时间线";
+  roomDescription.textContent = activeGroup ? (activeGroup.description || "群内成员可以查看消息，使用 @ 提醒对方。") : "";
   const hallGroupId = document.getElementById("hall-group-id");
   if (hallGroupId) {
     hallGroupId.textContent = activeGroup ? activeGroup.id : "";
-    hallGroupId.classList.toggle("hidden", !activeGroup);
+    hallGroupId.classList.add("hidden");
   }
 
   const hallQuery = hallFilterInput.value.trim().toLowerCase();
-  const projectGroups = activeProjectId
-    ? groups.filter((group) => group.project_id === activeProjectId || !group.project_id)
-    : groups;
+  const projectGroups = workspaceChatRooms(groups, activeProjectId);
   const visibleGroups = hallQuery
     ? projectGroups.filter((group) => groupMatchesHallQuery(group, hallQuery))
     : projectGroups;
@@ -1675,12 +1604,12 @@ function renderRoomStrip() {
   if (projectGroups.length === 0) {
     const empty = document.createElement("span");
     empty.className = "group-room-empty";
-    empty.textContent = activeProjectId ? "当前项目暂无 Hall" : "暂无 Group";
+    empty.textContent = "还没有群聊，点击“新建群聊”开始。";
     groupRoomList.appendChild(empty);
   } else if (visibleGroups.length === 0) {
     const empty = document.createElement("span");
     empty.className = "group-room-empty";
-    empty.textContent = "没有匹配的 Hall";
+    empty.textContent = "没有匹配的群聊";
     groupRoomList.appendChild(empty);
   } else {
     for (const group of visibleGroups) {
@@ -1688,9 +1617,9 @@ function renderRoomStrip() {
       const isActive = !blackboardOpen && group.id === activeGroupId;
       const canEnter = getGroupMemberIds(group).has(myId);
       button.type = "button";
-      button.className = `room-chip ${isActive ? "active" : ""}`;
-      const typeLabel = group.type === "task" ? "任务" : group.type === "discussion" ? "讨论" : "Hall";
-      button.textContent = `${typeLabel} · ${group.name}`;
+      button.className = `room-chip group-chat-row ${isActive ? "active" : ""}`;
+      button.setAttribute("aria-pressed", String(isActive));
+      button.append(workspaceEl("strong", "", group.name), workspaceEl("span", "", `${getGroupMemberIds(group).size} 位成员${canEnter ? "" : " · 尚未加入"}`));
       button.title = canEnter
         ? `${group.name} (${group.id})`
         : `${group.name} (${group.id}) · 你还不是成员`;
@@ -1700,13 +1629,14 @@ function renderRoomStrip() {
     }
   }
 
-  toggleGroupCreateBtn.textContent = groupCreateOpen ? "×" : "＋";
+  toggleGroupCreateBtn.textContent = "新建群聊";
   toggleGroupMembersBtn.classList.toggle(
     "hidden",
     !activeGroup || blackboardOpen || activeGroup.type === "task" || Boolean(getContextTask())
   );
   toggleGroupMembersBtn.classList.toggle("active", groupMembersOpen && Boolean(activeGroup));
-  toggleGroupMembersBtn.textContent = "＋";
+  toggleGroupMembersBtn.textContent = groupMembersOpen ? "收起" : "添加";
+  toggleGroupMembersBtn.setAttribute("aria-expanded", String(groupMembersOpen));
   groupCreateOverlay.classList.toggle("hidden", !groupCreateOpen);
   renderGroupCreateMembers();
   renderGroupMembersPanel();
@@ -1728,6 +1658,7 @@ function groupMatchesHallQuery(group, query) {
 }
 
 function setGroupCreateOpen(open) {
+  if (open && !groupCreateOpen) workspaceUI.groupCreateTrigger = document.activeElement;
   groupCreateOpen = open;
   showGroupCreateError("");
   if (open) {
@@ -1736,11 +1667,12 @@ function setGroupCreateOpen(open) {
   if (open) {
     selectedCreateMemberIds = new Set();
     renderGroupCreateMembers();
-    groupCreateName.focus();
   } else {
     groupCreatePanel.reset();
   }
   renderRoomStrip();
+  if (open) groupCreateName.focus();
+  else if (workspaceUI.groupCreateTrigger?.isConnected) workspaceUI.groupCreateTrigger.focus();
 }
 
 function setGroupMembersOpen(open) {
@@ -1760,14 +1692,10 @@ function renderGroupCreateMembers() {
   placeholder.value = "";
   placeholder.textContent = members.length ? "添加成员…" : "成员列表尚未加载";
   groupCreateMemberSelect.appendChild(placeholder);
-  for (const member of members) {
-    if (member.id === myId || selectedCreateMemberIds.has(member.id)) continue;
-    const option = document.createElement("option");
-    option.value = member.id;
-    option.textContent = `${shortName(member.id)} · ${member.display_name}`;
-    groupCreateMemberSelect.appendChild(option);
-  }
-  groupCreateMemberSelect.disabled = !members.length;
+  const candidates = workspaceChatCandidates(members, projectAgents, activeProjectId, myId)
+    .filter(member => !selectedCreateMemberIds.has(member.id));
+  appendChatMemberOptions(groupCreateMemberSelect, candidates);
+  groupCreateMemberSelect.disabled = !candidates.length;
 
   // Chips show the selected members, each removable.
   groupCreateMemberChips.innerHTML = "";
@@ -1776,12 +1704,12 @@ function renderGroupCreateMembers() {
     chip.className = "group-create-chip";
 
     const text = document.createElement("span");
-    text.textContent = shortName(memberId);
+    text.textContent = workspaceMemberName(memberId);
 
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "group-create-chip-remove";
-    remove.setAttribute("aria-label", `移除 ${memberId}`);
+    remove.setAttribute("aria-label", `移除 ${workspaceMemberName(memberId)}`);
     remove.textContent = "×";
     remove.addEventListener("click", () => {
       selectedCreateMemberIds.delete(memberId);
@@ -1791,6 +1719,21 @@ function renderGroupCreateMembers() {
     chip.appendChild(text);
     chip.appendChild(remove);
     groupCreateMemberChips.appendChild(chip);
+  }
+}
+
+function appendChatMemberOptions(select, candidates) {
+  for (const kind of ["agent", "human"]) {
+    const group = document.createElement("optgroup");
+    group.label = kind === "agent" ? "项目角色" : "其他用户";
+    for (const member of candidates.filter(item => item.kind === kind)) {
+      const option = document.createElement("option");
+      option.value = member.id;
+      const name = chatMemberName(member);
+      option.textContent = candidates.filter(item => chatMemberName(item) === name).length > 1 ? `${name} (${member.id})` : name;
+      group.appendChild(option);
+    }
+    if (group.children.length) select.appendChild(group);
   }
 }
 
@@ -1805,7 +1748,7 @@ async function createGroupFromPanel(event) {
 
   const name = groupCreateName.value.trim();
   if (!name) {
-    showGroupCreateError("请填写 Group 名称。");
+    showGroupCreateError("请填写群聊名称。");
     groupCreateName.focus();
     return;
   }
@@ -1816,6 +1759,7 @@ async function createGroupFromPanel(event) {
   const body = {
     name,
     member_ids: selectedMemberIds,
+    project_id: activeProjectId || null,
   };
   const id = groupCreateId.value.trim();
   const description = groupCreateDescription.value.trim();
@@ -1837,17 +1781,9 @@ async function createGroupFromPanel(event) {
 
     const group = await res.json();
     groups = [group, ...groups.filter((item) => item.id !== group.id)];
-    activeGroupId = group.id;
-    localStorage.setItem(activeGroupStorageKey(), activeGroupId);
-    groupCreateOpen = false;
-    groupCreatePanel.reset();
     clearComposerStatus("room");
-    resetTimelineState();
-    renderRoomStrip();
-    renderPresenceStrip();
-    renderMentionDropdownIfOpen();
-    updateComposerPlaceholder();
-    await loadHistory();
+    setGroupCreateOpen(false);
+    setActiveGroup(group.id);
   } catch (err) {
     console.error(err);
     showGroupCreateError(err.message);
@@ -1882,7 +1818,12 @@ function renderGroupMembersPanel() {
 
   const canManage = canManageGroups();
   const memberIds = getGroupMemberIds(activeGroup);
-  groupMembersSubtitle.textContent = "";
+  groupMembersSubtitle.textContent = `${memberIds.size} 位成员`;
+  const manageButton = document.getElementById("manage-group-members-btn");
+  manageButton.classList.toggle("hidden", !canManage);
+  manageButton.textContent = workspaceUI.manageMembers ? "完成" : "管理";
+  manageButton.setAttribute("aria-pressed", String(Boolean(workspaceUI.manageMembers)));
+  const managing = canManage && workspaceUI.manageMembers;
   groupMetaForm.classList.toggle("hidden", !canManage || !groupMetaEditing);
   if (canManage && groupMetaEditing) {
     groupMetaName.value = activeGroup.name || "";
@@ -1910,14 +1851,15 @@ function renderGroupMembersPanel() {
     const name = document.createElement("div");
     name.className = "group-member-name";
     name.textContent = membership.member_id === myId
-      ? `${shortName(membership.member_id)} (我)`
-      : shortName(membership.member_id);
+      ? `${workspaceMemberName(membership.member_id)}（我）`
+      : workspaceMemberName(membership.member_id);
 
     const meta = document.createElement("div");
     meta.className = "group-member-meta";
     const onlineText = onlineMemberIds.has(membership.member_id) ? "在线" : "离线";
-    const metaParts = [membership.role];
-    if (membership.business_role) metaParts.push(membership.business_role);
+    const roleLabel = {owner:"群主",moderator:"管理员",member:"成员"}[membership.role] || "成员";
+    const profileRole = projectAgents.find(item => item.member_id === membership.member_id)?.business_role;
+    const metaParts = [membership.role === "member" && (membership.business_role || profileRole) ? workspaceRoleLabel(membership.business_role || profileRole) : roleLabel];
     metaParts.push(onlineText);
     meta.textContent = metaParts.join(" · ");
 
@@ -1930,12 +1872,13 @@ function renderGroupMembersPanel() {
 
     const controls = document.createElement("div");
     controls.className = "group-member-controls";
+    controls.classList.toggle("hidden", !managing);
 
     if (member?.kind === "agent" && canManage && activeGroup.project_id) {
       const editProfileButton = document.createElement("button");
       editProfileButton.type = "button";
       editProfileButton.className = "group-member-remove-btn";
-      editProfileButton.textContent = "编辑人设";
+      editProfileButton.textContent = "角色设置";
       editProfileButton.disabled = groupMemberSaving || agentProfileSaving;
       editProfileButton.title = "编辑该 agent 的 IDENTITY / SOUL / USER 与业务角色";
       editProfileButton.addEventListener("click", () => openAgentProfileEditor(membership));
@@ -1950,7 +1893,7 @@ function renderGroupMembersPanel() {
     removeButton.title = membership.member_id === myId ? "不能在当前界面移除自己" : "移出 Group";
     removeButton.addEventListener("click", () => removeGroupMemberFromPanel(membership.member_id));
 
-    controls.appendChild(removeButton);
+    if (membership.member_id !== myId) controls.appendChild(removeButton);
     row.appendChild(identity);
     row.appendChild(controls);
     groupMembersList.appendChild(row);
@@ -1963,11 +1906,12 @@ function renderGroupMembersPanel() {
     groupMembersList.appendChild(empty);
   }
 
-  groupMemberAddForm.classList.add("hidden");
+  groupMemberAddForm.classList.toggle("hidden", !canManage || !groupMembersOpen);
   groupMemberAddBtn.disabled = groupMemberSaving;
+  const previouslySelected = groupMemberAddSelect.value;
   groupMemberAddSelect.innerHTML = "";
   if (canManage) {
-    const availableMembers = members
+    const availableMembers = workspaceChatCandidates(members, projectAgents, activeProjectId, myId)
       .filter((member) => !memberIds.has(member.id))
       .sort((a, b) => a.id.localeCompare(b.id, "zh-CN"));
 
@@ -1980,21 +1924,17 @@ function renderGroupMembersPanel() {
       groupMemberAddBtn.disabled = true;
     } else {
       groupMemberAddSelect.disabled = groupMemberSaving;
-      for (const member of availableMembers) {
-        const option = document.createElement("option");
-        option.value = member.id;
-        option.textContent = `${member.id} · ${member.display_name}`;
-        groupMemberAddSelect.appendChild(option);
-      }
+      appendChatMemberOptions(groupMemberAddSelect, availableMembers);
+      if (availableMembers.some(member => member.id === previouslySelected)) groupMemberAddSelect.value = previouslySelected;
     }
     groupMemberAddRole.disabled = groupMemberSaving;
   }
   if (deleteGroupBtn) {
-    deleteGroupBtn.classList.toggle("hidden", !canManage);
+    deleteGroupBtn.classList.toggle("hidden", !managing);
     deleteGroupBtn.disabled = groupMemberSaving;
   }
 
-  renderAllMembersPanel(activeGroup, canManage);
+
 }
 
 function memberKindFromId(memberId) {
@@ -2389,9 +2329,7 @@ function getScopedMembers() {
 }
 
 function messageBelongsToActiveRoom(message) {
-  return activeGroupId
-    ? message.group_id === activeGroupId
-    : !message.group_id;
+  return workspaceHasConversation() && message.group_id === activeGroupId;
 }
 
 function addActiveGroupToParams(params) {
@@ -2407,7 +2345,15 @@ function applyActiveGroupToPayload(body) {
   return body;
 }
 
+function captureTimelineContext() {
+  const revision = timelineRevision;
+  const groupId = activeGroupId;
+  const memberId = myId;
+  return () => revision === timelineRevision && groupId === activeGroupId && memberId === myId && workspaceHasConversation();
+}
+
 function resetTimelineState({ clearSearch = true } = {}) {
+  ++timelineRevision;
   lastId = 0;
   oldestLoadedId = null;
   hasMoreHistory = false;
@@ -2452,18 +2398,23 @@ function startChat() {
 }
 
 async function loadHistory() {
+  if (!workspaceHasConversation()) return;
+  const current = captureTimelineContext();
   try {
     historyLoading = true;
     renderHistoryToolbar();
     const res = await apiFetch(buildHistoryRequestPath());
+    if (!current()) return;
     if (!res.ok) {
       showComposerStatus("历史消息加载失败，请稍后重试。", "error", { source: "load", timeoutMs: 0 });
       return;
     }
     clearComposerStatus("load");
     const msgs = await res.json();
+    if (!current()) return;
     if (msgs.length > 0) {
-      await renderMessagesInChunks(msgs, HISTORY_RENDER_CHUNK);
+      await renderMessagesInChunks(msgs, HISTORY_RENDER_CHUNK, current);
+      if (!current()) return;
       oldestLoadedId = msgs[0].id;
       lastId = Math.max(lastId, msgs[msgs.length - 1].id);
       hasMoreHistory = msgs.length === HISTORY_PAGE_SIZE;
@@ -2476,22 +2427,26 @@ async function loadHistory() {
       renderHistoryToolbar();
     }
   } catch (err) {
+    if (!current()) return;
     showComposerStatus(`历史消息加载失败: ${err.message}`, "error", { source: "load", timeoutMs: 0 });
   } finally {
-    historyLoading = false;
-    renderHistoryToolbar();
+    if (current()) { historyLoading = false; renderHistoryToolbar(); }
   }
 }
 
 async function pollMessages() {
+  if (!workspaceHasConversation()) return;
+  const current = captureTimelineContext();
   try {
     const res = await apiFetch(buildPollRequestPath());
+    if (!current()) return;
     if (!res.ok) {
       showComposerStatus("消息同步失败，正在继续轮询。", "error", { source: "load", timeoutMs: 0 });
       return;
     }
     clearComposerStatus("load");
     const msgs = await res.json();
+    if (!current()) return;
     if (msgs.length > 0) {
       const freshMessages = msgs.filter((message) => !renderedMessageIds.has(message.id));
       const visibleMessages = freshMessages.filter(matchesActiveHistoryQuery);
@@ -2503,6 +2458,7 @@ async function pollMessages() {
       }
     }
   } catch (err) {
+    if (!current()) return;
     showComposerStatus(`消息同步失败: ${err.message}`, "error", { source: "load", timeoutMs: 0 });
   }
 }
@@ -2661,7 +2617,7 @@ msgInput.addEventListener("keydown", (e) => {
 });
 
 async function sendMessage() {
-  if (sending) return;
+  if (sending || !workspaceHasConversation()) return;
 
   const rawText = msgInput.value.trim();
   if (!rawText && !pendingFile) return;
@@ -2704,6 +2660,7 @@ async function sendMessage() {
 }
 
 async function sendFileMessage(caption = null) {
+  if (!workspaceHasConversation()) return;
   if (!pendingFile) return;
 
   sending = true;
@@ -2942,8 +2899,9 @@ function prependMessages(messages) {
   return upsertMessages(messages, "prepend");
 }
 
-async function renderMessagesInChunks(messages, chunkSize = HISTORY_RENDER_CHUNK) {
+async function renderMessagesInChunks(messages, chunkSize = HISTORY_RENDER_CHUNK, current = () => true) {
   for (let index = 0; index < messages.length; index += chunkSize) {
+    if (!current()) return;
     appendMessages(messages.slice(index, index + chunkSize));
     if (index + chunkSize < messages.length) {
       await nextFrame();
@@ -2981,6 +2939,8 @@ function buildPollRequestPath() {
 async function loadOlderMessages() {
   if (historyLoading || !hasMoreHistory || oldestLoadedId === null) return;
 
+  if (!workspaceHasConversation()) return;
+  const current = captureTimelineContext();
   historyLoading = true;
   renderHistoryToolbar();
   const previousScrollHeight = messagesEl.scrollHeight;
@@ -2988,11 +2948,13 @@ async function loadOlderMessages() {
 
   try {
     const res = await apiFetch(buildHistoryRequestPath(oldestLoadedId));
+    if (!current()) return;
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `历史分页加载失败: ${res.status}`));
     }
 
     const msgs = await res.json();
+    if (!current()) return;
     if (msgs.length === 0) {
       hasMoreHistory = false;
       renderHistoryToolbar();
@@ -3006,15 +2968,16 @@ async function loadOlderMessages() {
 
     if (prependedCount > 0) {
       requestAnimationFrame(() => {
+        if (!current()) return;
         const heightDelta = messagesEl.scrollHeight - previousScrollHeight;
         messagesEl.scrollTop = previousScrollTop + heightDelta;
       });
     }
   } catch (err) {
+    if (!current()) return;
     showComposerStatus(err.message, "error", { source: "load", timeoutMs: 0 });
   } finally {
-    historyLoading = false;
-    renderHistoryToolbar();
+    if (current()) { historyLoading = false; renderHistoryToolbar(); }
   }
 }
 
@@ -3852,7 +3815,7 @@ msgInput.addEventListener("input", () => {
     mentionStart = before.lastIndexOf("@");
     const activeGroup = getActiveGroup();
 
-    const filtered = getScopedMembers().filter(
+    const filtered = workspaceMentionCandidates(getScopedMembers(), myId).filter(
       (m) => m.id.toLowerCase().includes(query) || m.display_name.toLowerCase().includes(query)
     );
     const canMentionAll = Boolean(activeGroup) && (query === "" || ALL_MENTION_ID.includes(query) || "all".includes(query));
@@ -3861,7 +3824,7 @@ msgInput.addEventListener("input", () => {
       mentionDropdown.innerHTML = "";
       if (canMentionAll) {
         const li = document.createElement("li");
-        li.textContent = "所有人（全体成员）";
+        li.textContent = "所有人";
         li.dataset.id = ALL_MENTION_ID;
         li.addEventListener("mousedown", (event) => event.preventDefault());
         li.addEventListener("click", () => completeMention(ALL_MENTION_ID));
@@ -3869,7 +3832,7 @@ msgInput.addEventListener("input", () => {
       }
       for (const m of filtered) {
         const li = document.createElement("li");
-        li.textContent = `${m.id} (${m.display_name})`;
+        li.textContent = chatMemberName(m);
         li.dataset.id = m.id;
         li.addEventListener("mousedown", (event) => event.preventDefault());
         li.addEventListener("click", () => completeMention(m.id));
