@@ -9,7 +9,7 @@ from pathlib import Path
 import uvicorn
 
 import server.main as main
-from TALK.client import TalkClient
+from TALK.client import TalkClient, TalkClientSync
 from tests.test_support import RouteTestCase
 
 
@@ -55,6 +55,15 @@ class TalkClientTests(RouteTestCase):
         main.WS_PING_TIMEOUT = 3.0
         self.addCleanup(setattr, main, "WS_PING_INTERVAL", self._old_ping_interval)
         self.addCleanup(setattr, main, "WS_PING_TIMEOUT", self._old_ping_timeout)
+
+    def register_project(self, project_id: str) -> None:
+        with self.make_client() as client:
+            response = client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": project_id, "display_name": project_id},
+            )
+        self.assertEqual(response.status_code, 201)
 
     def test_me_and_members(self):
         async def scenario(base_url: str) -> None:
@@ -238,26 +247,382 @@ class TalkClientTests(RouteTestCase):
             asyncio.run(scenario(base_url))
 
     def test_task_helpers(self):
+        self.register_project("prj_sdk_async")
+
         async def scenario(base_url: str) -> None:
             async with TalkClient(base_url, "bobo-key") as human_client:
                 created = await human_client.create_task(
                     "agent:demo",
                     "Run from SDK",
                     title="SDK task",
+                    project_id="prj_sdk_async",
+                    may_delegate=True,
+                    slice_budget=2,
+                    authorization_ttl_seconds=60,
+                )
+                control_root = await human_client.create_task(
+                    "agent:demo",
+                    "Exercise async task-tree controls",
+                    may_delegate=True,
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
                 )
 
             async with TalkClient(base_url, "demo-key") as agent_client:
                 await agent_client.report_instance_status("demo-instance-1", runtime="codex", status="idle")
-                queued = await agent_client.list_tasks(status="queued")
-                claimed = await agent_client.claim_task(created["id"], instance_id="demo-instance-1")
-                completed = await agent_client.complete_task(claimed["id"], status="succeeded")
+                queued = await agent_client.list_tasks(
+                    status="queued",
+                    workflow_status="assigned",
+                    project_id="prj_sdk_async",
+                )
+                fetched = await agent_client.get_task(created["id"])
+                question = await agent_client.send_text(
+                    "Which format?",
+                    to=["human:bobo"],
+                    group_id=created["hall_group_id"],
+                )
+                clarification = await agent_client.request_task_clarification(
+                    created["id"],
+                    question_message_id=question["id"],
+                )
+                async with TalkClient(base_url, "bobo-key") as clarification_manager:
+                    await clarification_manager.send_text(
+                        "Use Markdown.",
+                        to=["agent:demo"],
+                        group_id=created["hall_group_id"],
+                    )
+                    answer_end = await clarification_manager.send_text(
+                        "Keep it concise.",
+                        to=["agent:demo"],
+                        group_id=created["hall_group_id"],
+                    )
+                    answered = await clarification_manager.submit_task_clarification_answer(
+                        created["id"],
+                        answer_message_id=answer_end["id"],
+                    )
+                clarification_rounds = await agent_client.list_task_clarification_rounds(created["id"])
+                accepted = await agent_client.accept_task(created["id"])
+                requeued = await agent_client.requeue_expired_tasks()
+                claimed = await agent_client.claim_task(
+                    created["id"],
+                    instance_id="demo-instance-1",
+                    lease_seconds=30,
+                )
+                child = await agent_client.create_task(
+                    "agent:other",
+                    "Delegated from async SDK",
+                    parent_task_id=claimed["id"],
+                    authorization_epoch=claimed["authorization_epoch"],
+                )
+                canceled_child = await agent_client.cancel_task(child["id"])
+                heartbeat = await agent_client.heartbeat_task(
+                    claimed["id"],
+                    claim_token=claimed["claim_token"],
+                    lease_seconds=30,
+                )
+                result = await agent_client.send_text(
+                    "SDK async result",
+                    to=["human:bobo"],
+                    group_id=claimed["hall_group_id"],
+                )
+                submitted = await agent_client.complete_task(
+                    claimed["id"],
+                    status="succeeded",
+                    result_message_id=result["id"],
+                    claim_token=claimed["claim_token"],
+                )
+                await agent_client.claim_task(control_root["id"])
+                paused_tree = await agent_client.pause_task_tree(control_root["id"])
+                async with TalkClient(base_url, "bobo-key") as control_manager:
+                    resumed_tree = await control_manager.resume_task_tree(
+                        control_root["id"],
+                        slice_budget=1,
+                        authorization_ttl_seconds=60,
+                    )
+                await agent_client.claim_task(control_root["id"])
+                checkpointed_tree = await agent_client.checkpoint_task_tree(
+                    control_root["id"],
+                    reason="milestone",
+                )
+
+            async with TalkClient(base_url, "bobo-key") as human_client:
+                collected = await human_client.collect_task_result(created["id"])
+                cancelable = await human_client.create_task(
+                    "agent:demo",
+                    "Cancel from async SDK",
+                    project_id="prj_sdk_async",
+                )
+                canceled = await human_client.cancel_task(cancelable["id"])
+                tree = await human_client.get_task_tree(control_root["id"])
+                await human_client.resume_task_tree(
+                    control_root["id"],
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
+                )
+                canceled_tree = await human_client.cancel_task_tree(control_root["id"])
 
             self.assertEqual(queued[0]["id"], created["id"])
+            self.assertEqual(fetched["project_id"], "prj_sdk_async")
+            self.assertEqual(clarification["workflow_status"], "clarification_requested")
+            self.assertEqual(answered["workflow_status"], "clarification_answered")
+            self.assertEqual(clarification_rounds[0]["question_message_id"], question["id"])
+            self.assertEqual(clarification_rounds[0]["answer_end_message_id"], answer_end["id"])
+            self.assertEqual(accepted["workflow_status"], "accepted")
+            self.assertEqual(requeued, [])
             self.assertEqual(claimed["status"], "running")
-            self.assertEqual(completed["status"], "succeeded")
+            self.assertEqual(claimed["attempt"], 1)
+            self.assertEqual(child["parent_task_id"], created["id"])
+            self.assertEqual(child["root_task_id"], created["id"])
+            self.assertEqual(child["delegation_depth"], 1)
+            self.assertEqual(child["project_id"], "prj_sdk_async")
+            self.assertEqual(canceled_child["status"], "canceled")
+            self.assertIsNotNone(heartbeat["heartbeat_at"])
+            self.assertEqual(submitted["workflow_status"], "submitted")
+            self.assertEqual(collected["workflow_status"], "completed")
+            self.assertIsNotNone(collected["result_collected_at"])
+            self.assertEqual(canceled["workflow_status"], "canceled")
+            self.assertEqual(paused_tree["root"]["control_status"], "paused")
+            self.assertEqual(resumed_tree["root"]["authorization_epoch"], 2)
+            self.assertEqual(checkpointed_tree["root"]["checkpoint_reason"], "milestone")
+            self.assertEqual(tree["root"]["control_status"], "awaiting_human")
+            self.assertEqual(canceled_tree["root"]["control_status"], "canceled")
 
         with LiveTalkServer(main.app) as base_url:
             asyncio.run(scenario(base_url))
+
+    def test_async_quality_task_helpers_and_structured_verdict(self):
+        self.register_project("prj_sdk_quality")
+        self.add_member(
+            "agent:reviewer",
+            api_key="reviewer-key",
+            display_name="Reviewer",
+        )
+
+        async def scenario(base_url: str) -> None:
+            async with TalkClient(base_url, "bobo-key") as human_client:
+                root = await human_client.create_task(
+                    "agent:demo",
+                    "Coordinate one reviewed slice",
+                    project_id="prj_sdk_quality",
+                    may_delegate=True,
+                    slice_budget=2,
+                    authorization_ttl_seconds=60,
+                )
+
+            async with TalkClient(base_url, "demo-key") as lead_client:
+                claimed_root = await lead_client.claim_task(root["id"])
+                development = await lead_client.create_task(
+                    "agent:other",
+                    "Implement a reviewable slice",
+                    parent_task_id=claimed_root["id"],
+                    authorization_epoch=claimed_root["authorization_epoch"],
+                    task_kind="development",
+                    review_policy="required",
+                )
+
+            async with TalkClient(base_url, "other-key") as developer_client:
+                claimed_development = await developer_client.claim_task(
+                    development["id"]
+                )
+                development_result = await developer_client.send_text(
+                    "Development result",
+                    to=["agent:demo"],
+                    group_id=development["hall_group_id"],
+                )
+                await developer_client.complete_task(
+                    development["id"],
+                    status="succeeded",
+                    result_message_id=development_result["id"],
+                    claim_token=claimed_development["claim_token"],
+                )
+
+            async with TalkClient(base_url, "demo-key") as lead_client:
+                await lead_client.collect_task_result(development["id"])
+                review = await lead_client.create_task(
+                    "agent:reviewer",
+                    "Review the frozen development result",
+                    parent_task_id=claimed_root["id"],
+                    authorization_epoch=claimed_root["authorization_epoch"],
+                    task_kind="review",
+                    related_task_ids=[development["id"]],
+                )
+
+            async with TalkClient(base_url, "reviewer-key") as reviewer_client:
+                claimed_review = await reviewer_client.claim_task(review["id"])
+                review_result = await reviewer_client.send_text(
+                    "Review approved",
+                    to=["agent:demo"],
+                    group_id=review["hall_group_id"],
+                )
+                completed_review = await reviewer_client.complete_task(
+                    review["id"],
+                    status="succeeded",
+                    result_message_id=review_result["id"],
+                    claim_token=claimed_review["claim_token"],
+                    gate_verdict={
+                        "verdict": "approved",
+                        "summary": "No blocking findings",
+                        "findings": [],
+                    },
+                )
+
+            async with TalkClient(base_url, "demo-key") as lead_client:
+                review_tasks = await lead_client.list_tasks(
+                    project_id="prj_sdk_quality",
+                    task_kind="review",
+                )
+                relations = await lead_client.list_task_relations(review["id"])
+                quality_context = await lead_client.get_task_quality_context(
+                    review["id"]
+                )
+
+            self.assertEqual(development["task_kind"], "development")
+            self.assertEqual(development["review_policy"], "required")
+            self.assertEqual([task["id"] for task in review_tasks], [review["id"]])
+            self.assertEqual(relations[0]["relation_type"], "reviews")
+            self.assertEqual(relations[0]["target_task_id"], development["id"])
+            self.assertEqual(quality_context["task_id"], review["id"])
+            self.assertEqual(
+                completed_review["gate_verdict"]["verdict"],
+                "approved",
+            )
+
+        with LiveTalkServer(main.app) as base_url:
+            asyncio.run(scenario(base_url))
+
+    def test_sync_task_helpers(self):
+        self.register_project("prj_sdk_sync")
+
+        with LiveTalkServer(main.app) as base_url:
+            human_client = TalkClientSync(base_url, "bobo-key")
+            agent_client = TalkClientSync(base_url, "demo-key")
+            try:
+                created = human_client.create_task(
+                    "agent:demo",
+                    "Run from sync SDK",
+                    title="Sync SDK task",
+                    project_id="prj_sdk_sync",
+                    may_delegate=True,
+                    slice_budget=2,
+                    authorization_ttl_seconds=60,
+                )
+                control_root = human_client.create_task(
+                    "agent:demo",
+                    "Exercise sync task-tree controls",
+                    may_delegate=True,
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
+                )
+                queued = agent_client.list_tasks(
+                    target_member_id="agent:demo",
+                    status="queued",
+                    workflow_status="assigned",
+                    project_id="prj_sdk_sync",
+                    task_kind="general",
+                )
+                fetched = agent_client.get_task(created["id"])
+                relations = agent_client.list_task_relations(created["id"])
+                question = agent_client.send_text(
+                    "Which format?",
+                    to=["human:bobo"],
+                    group_id=created["hall_group_id"],
+                )
+                clarification = agent_client.request_task_clarification(
+                    created["id"],
+                    question_message_id=question["id"],
+                )
+                answer_end = human_client.send_text(
+                    "Use Markdown and keep it concise.",
+                    to=["agent:demo"],
+                    group_id=created["hall_group_id"],
+                )
+                answered = human_client.submit_task_clarification_answer(
+                    created["id"],
+                    answer_message_id=answer_end["id"],
+                )
+                clarification_rounds = agent_client.list_task_clarification_rounds(created["id"])
+                accepted = agent_client.accept_task(created["id"])
+                requeued = agent_client.requeue_expired_tasks()
+                claimed = agent_client.claim_task(created["id"], lease_seconds=30)
+                child = agent_client.create_task(
+                    "agent:other",
+                    "Delegated from sync SDK",
+                    parent_task_id=claimed["id"],
+                    authorization_epoch=claimed["authorization_epoch"],
+                )
+                canceled_child = agent_client.cancel_task(child["id"])
+                heartbeat = agent_client.heartbeat_task(
+                    claimed["id"],
+                    claim_token=claimed["claim_token"],
+                    lease_seconds=30,
+                )
+                result = agent_client.send_text(
+                    "SDK sync result",
+                    to=["human:bobo"],
+                    group_id=claimed["hall_group_id"],
+                )
+                submitted = agent_client.complete_task(
+                    claimed["id"],
+                    status="succeeded",
+                    result_message_id=result["id"],
+                    claim_token=claimed["claim_token"],
+                    gate_verdict=None,
+                )
+                collected = human_client.collect_task_result(created["id"])
+                cancelable = human_client.create_task(
+                    "agent:demo",
+                    "Cancel from sync SDK",
+                    project_id="prj_sdk_sync",
+                )
+                canceled = human_client.cancel_task(cancelable["id"])
+                agent_client.claim_task(control_root["id"])
+                paused_tree = agent_client.pause_task_tree(control_root["id"])
+                resumed_tree = human_client.resume_task_tree(
+                    control_root["id"],
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
+                )
+                agent_client.claim_task(control_root["id"])
+                checkpointed_tree = agent_client.checkpoint_task_tree(
+                    control_root["id"],
+                    reason="needs_decision",
+                )
+                tree = human_client.get_task_tree(control_root["id"])
+                human_client.resume_task_tree(
+                    control_root["id"],
+                    slice_budget=1,
+                    authorization_ttl_seconds=60,
+                )
+                canceled_tree = human_client.cancel_task_tree(control_root["id"])
+            finally:
+                agent_client.close()
+                human_client.close()
+
+        self.assertEqual([task["id"] for task in queued], [created["id"]])
+        self.assertEqual(fetched["project_id"], "prj_sdk_sync")
+        self.assertEqual(fetched["task_kind"], "general")
+        self.assertEqual(relations, [])
+        self.assertEqual(clarification["workflow_status"], "clarification_requested")
+        self.assertEqual(answered["workflow_status"], "clarification_answered")
+        self.assertEqual(clarification_rounds[0]["question_message_id"], question["id"])
+        self.assertEqual(clarification_rounds[0]["answer_end_message_id"], answer_end["id"])
+        self.assertEqual(accepted["workflow_status"], "accepted")
+        self.assertEqual(requeued, [])
+        self.assertEqual(claimed["attempt"], 1)
+        self.assertEqual(child["parent_task_id"], created["id"])
+        self.assertEqual(child["root_task_id"], created["id"])
+        self.assertEqual(child["delegation_depth"], 1)
+        self.assertEqual(child["project_id"], "prj_sdk_sync")
+        self.assertEqual(canceled_child["status"], "canceled")
+        self.assertIsNotNone(heartbeat["heartbeat_at"])
+        self.assertEqual(submitted["workflow_status"], "submitted")
+        self.assertEqual(collected["workflow_status"], "completed")
+        self.assertEqual(canceled["workflow_status"], "canceled")
+        self.assertEqual(paused_tree["root"]["control_status"], "paused")
+        self.assertEqual(resumed_tree["root"]["authorization_epoch"], 2)
+        self.assertEqual(checkpointed_tree["root"]["checkpoint_reason"], "needs_decision")
+        self.assertEqual(tree["root"]["control_status"], "awaiting_human")
+        self.assertEqual(canceled_tree["root"]["control_status"], "canceled")
 
     def test_task_schedule_helpers(self):
         async def scenario(base_url: str) -> None:

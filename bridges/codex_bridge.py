@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import shlex
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Sequence
@@ -85,10 +86,35 @@ strip_leading_mentions = cli_bridge.strip_leading_mentions
 should_handle_message = cli_bridge.should_handle_message
 
 
+def _desktop_codex_exe() -> str | None:
+    """Find an installed Desktop CLI when an ordinary terminal lacks its PATH."""
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    root = Path(local_app_data) / "OpenAI" / "Codex" / "bin"
+    try:
+        candidates = [root / "codex.exe", *root.glob("*/codex.exe")]
+    except OSError:
+        return None
+    available = []
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                available.append((candidate.stat().st_mtime_ns, str(candidate)))
+        except OSError:
+            continue
+    return max(available)[1] if available else None
+
+
 def _default_codex_exe() -> str:
-    windows_codex = Path.home() / "AppData" / "Local" / "OpenAI" / "Codex" / "bin" / "codex.exe"
-    if windows_codex.exists():
-        return windows_codex.as_posix()
+    # 优先尊重 PATH 内的原生 CLI；普通终端可能没有 Desktop 注入的 PATH，
+    # 此时从当前用户的 Desktop 安装目录选择最近更新的可用 exe。
+    if os.name == "nt":
+        native = shutil.which("codex.exe")
+        if not native or "/windowsapps/" in native.replace("\\", "/").lower():
+            native = _desktop_codex_exe()
+        if native:
+            return shlex.quote(native)
     return "codex"
 
 
@@ -119,10 +145,38 @@ def _build_codex_command(
     )
 
 
+def _build_codex_task_command(
+    codex_exe: str,
+    *,
+    profile: str = "discussion",
+    system_instructions: str = cli_bridge.TASK_RUNNER_SYSTEM_PROMPT,
+) -> str:
+    """Build a queue-worker command without the TALK MCP catalog."""
+    sandbox = "workspace-write" if profile == "tools" else "read-only"
+    return (
+        f"{codex_exe} exec --skip-git-repo-check --ignore-rules --sandbox {sandbox} --color never "
+        f"{_CODEX_APPROVAL_BYPASS_FLAG} "
+        f"-c {_codex_config_arg('base_instructions', system_instructions)} "
+        f"-"
+    )
+
+
 def default_codex_command(profile: str = "discussion") -> str:
     if os.environ.get("TALK_CODEX_COMMAND"):
         return os.environ["TALK_CODEX_COMMAND"]
     return _build_codex_command(_default_codex_exe(), profile=profile)
+
+
+def default_codex_task_command(profile: str = "discussion") -> str:
+    return _build_codex_task_command(_default_codex_exe(), profile=profile)
+
+
+def default_codex_task_preflight_command() -> str:
+    return _build_codex_task_command(
+        _default_codex_exe(),
+        profile="discussion",
+        system_instructions=cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT,
+    )
 
 
 def resolve_codex_command(args: argparse.Namespace) -> str:
@@ -149,6 +203,47 @@ def resolve_codex_command(args: argparse.Namespace) -> str:
     return _build_codex_command(
         _default_codex_exe(),
         profile=args.codex_execution_profile,
+        system_instructions=system_instructions,
+    )
+
+
+def resolve_codex_task_command(args: argparse.Namespace) -> str:
+    """Resolve a task command whose visible output is posted only by the runner."""
+    if os.environ.get("TALK_CODEX_COMMAND"):
+        return args.codex_command
+    resolved_default = _build_codex_command(_default_codex_exe(), profile="discussion")
+    if args.codex_command not in (resolved_default, DEFAULT_CODEX_COMMAND_DISCUSSION):
+        return args.codex_command
+    system_instructions = cli_bridge.TASK_RUNNER_SYSTEM_PROMPT
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_instructions = compose_system_prompt(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT, profile)
+    return _build_codex_task_command(
+        _default_codex_exe(),
+        profile=args.codex_execution_profile,
+        system_instructions=system_instructions,
+    )
+
+
+def resolve_codex_task_preflight_command(args: argparse.Namespace) -> str:
+    """Resolve the read-only command used before accepting a Task Hall task."""
+    configured = getattr(args, "task_preflight_command", None)
+    if configured:
+        return configured
+    if os.environ.get("TALK_CODEX_COMMAND"):
+        return args.codex_command
+    resolved_default = _build_codex_command(_default_codex_exe(), profile="discussion")
+    if args.codex_command not in (resolved_default, DEFAULT_CODEX_COMMAND_DISCUSSION):
+        return args.codex_command
+    system_instructions = cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT
+    if getattr(args, "project", None):
+        member_id = cli_bridge.member_id_from_name(args.name)
+        profile = load_profile(args.project, member_id)
+        system_instructions = compose_system_prompt(cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT, profile)
+    return _build_codex_task_command(
+        _default_codex_exe(),
+        profile="discussion",
         system_instructions=system_instructions,
     )
 
@@ -189,52 +284,39 @@ async def handle_queued_task(
     codex_command: str | Sequence[str],
     timeout: int,
     max_reply_chars: int,
+    preflight_command: str | Sequence[str] | None = None,
+    lease_seconds: int = cli_bridge.DEFAULT_TASK_LEASE_SECONDS,
+    heartbeat_interval: float = cli_bridge.DEFAULT_TASK_HEARTBEAT_INTERVAL,
 ) -> bool:
-    """Claim and execute one queued task. Returns False when another worker claimed it first."""
-    from TALK.client.exceptions import TalkValidationError
+    """Codex compatibility wrapper around the shared Task Hall runner."""
+    async def command_runner(
+        command: str | Sequence[str],
+        prompt: str,
+        *,
+        cwd: Path,
+        timeout: int,
+        prompt_transport: str = "stdin",
+    ) -> CodexRunResult:
+        del prompt_transport
+        return await run_codex_command(command, prompt, cwd=cwd, timeout=timeout)
 
-    task_id = int(task["id"])
-    try:
-        claimed = await client.claim_task(task_id, instance_id=instance_id)
-    except TalkValidationError as exc:
-        if exc.status_code == 409:
-            return False
-        raise
-
-    prompt = build_codex_task_prompt(claimed, member_id=member_id, workdir=workdir)
-    result_message_id: int | None = None
-    completion_status = "succeeded"
-    last_error: str | None = None
-
-    try:
-        result = await run_codex_command(codex_command, prompt, cwd=workdir, timeout=timeout)
-        reply = format_codex_reply(result, max_chars=max_reply_chars)
-        completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
-        if completion_status == "failed":
-            last_error = "\n".join(
-                part for part in (cli_bridge.clean_cli_output(result.stderr), cli_bridge.clean_cli_output(result.stdout)) if part
-            ) or reply
-    except Exception as exc:
-        reply = "Codex bridge 运行失败，错误详情已记录。"
-        completion_status = "failed"
-        last_error = f"Codex bridge failed before completing task {task_id}: {exc}"
-
-    creator = claimed.get("created_by")
-    if creator:
-        try:
-            result_message = await client.send_text(reply, to=[str(creator)])
-            result_message_id = int(result_message["id"])
-        except Exception as exc:
-            completion_status = "failed"
-            last_error = f"Codex bridge could not post task result: {exc}"
-
-    await client.complete_task(
-        task_id,
-        status=completion_status,
-        result_message_id=result_message_id,
-        last_error=last_error,
+    return await cli_bridge.handle_queued_task(
+        task,
+        client=client,
+        member_id=member_id,
+        workdir=workdir,
+        instance_id=instance_id,
+        command=codex_command,
+        timeout=timeout,
+        max_reply_chars=max_reply_chars,
+        runtime="codex",
+        bridge_label="Codex bridge",
+        prompt_transport="stdin",
+        preflight_command=preflight_command,
+        command_runner=command_runner,
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
     )
-    return True
 
 
 async def run_task_queue_worker(
@@ -264,15 +346,14 @@ async def run_task_queue_worker(
 async def run_bridge(args: argparse.Namespace) -> None:
     # resolve_codex_command applies the execution profile AND (opt-in) the
     # --project identity-layer injection in one place.
+    args.task_preflight_command = resolve_codex_task_preflight_command(args)
+    args.task_command = resolve_codex_task_command(args)
     args.codex_command = resolve_codex_command(args)
     args.command = args.codex_command
     args.runtime = "codex"
     args.bridge_label = "Codex bridge"
-    # 把 TALK 连接信息注入环境变量，供 talk_send_mcp.py 使用
-    # 每个 bridge 实例必须用自己的 key/url/id
-    os.environ["TALK_API_KEY"] = args.key
-    os.environ["TALK_BASE_URL"] = args.base_url
-    os.environ["TALK_MEMBER_ID"] = cli_bridge.member_id_from_name(args.name)
+    print(f"[Codex bridge] CLI: {parse_command(args.codex_command)[0]}", file=sys.stderr, flush=True)
+    cli_bridge.configure_talk_tool_environment(args, cli_bridge.member_id_from_name(args.name))
     await cli_bridge.run_bridge(args)
 
 

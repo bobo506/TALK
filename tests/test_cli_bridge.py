@@ -4,31 +4,49 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 from bridges import cli_bridge
-from TALK.client.exceptions import TalkNotFoundError
+from TALK.client.exceptions import TalkNotFoundError, TalkValidationError
+from server.hall_types import HALL_TYPE_TEMPLATES
 from bridges.cli_bridge import (
     _build_group_member_context,
     CliRunResult,
     build_cli_prompt,
+    build_cli_task_preflight_prompt,
     build_cli_task_prompt,
     clean_cli_output,
     decode_subprocess_output,
+    fetch_complete_task_hall_history,
     first_sentence,
     build_parser,
     format_cli_reply,
+    format_task_quality_context,
     handle_incoming_message,
     handle_queued_task,
     normalize_pi_reply_language,
+    parse_task_gate_verdict,
+    parse_task_preflight_result,
     parse_talk_actions,
+    resolve_decision_tier,
     resolve_command_executable,
+    resolve_task_preflight_command,
+    resolve_task_preflight_max_attempts,
     run_cli_command,
 )
 
 
 class CliBridgeTests(unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        cli_bridge._HALL_TYPE_TEMPLATES = None
+
+    def tearDown(self):
+        cli_bridge._HALL_TYPE_TEMPLATES = None
+        super().tearDown()
+
     def test_parser_requires_command_for_generic_cli(self):
         parser = build_parser()
 
@@ -45,17 +63,134 @@ class CliBridgeTests(unittest.TestCase):
             "pi",
             "--command",
             "pi run -",
+            "--task-preflight-max-attempts",
+            "2",
         ])
 
         self.assertEqual(args.name, "pi")
         self.assertEqual(args.runtime, "pi")
         self.assertEqual(args.command, "pi run -")
+        self.assertEqual(args.task_preflight_max_attempts, 2)
 
     def test_resolve_command_executable_uses_path_lookup(self):
         resolved = resolve_command_executable([Path(sys.executable).name, "--version"])
 
         self.assertTrue(Path(resolved[0]).is_absolute())
         self.assertEqual(resolved[1], "--version")
+
+    def test_resolve_command_executable_bypasses_official_windows_dsh_npm_shim(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            npm_root = Path(temp_dir)
+            package_root = npm_root / "node_modules" / "@deepseek-ai" / "dsh"
+            entry_path = package_root / "lib" / "bin.js"
+            entry_path.parent.mkdir(parents=True)
+            entry_path.write_text("// fake dsh entry\n", encoding="utf-8")
+            (package_root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "@deepseek-ai/dsh",
+                        "bin": {"dsh": "lib/bin.js"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            shim_path = npm_root / "dsh.cmd"
+            shim_path.write_text("@echo off\n", encoding="utf-8")
+            node_path = npm_root / "node.exe"
+            node_path.write_bytes(b"fake node")
+
+            resolved = resolve_command_executable(
+                [str(shim_path), "--profile", "headless"],
+                platform="nt",
+            )
+
+        self.assertEqual(
+            resolved,
+            [str(node_path), str(entry_path.resolve()), "--profile", "headless"],
+        )
+
+    def test_resolve_command_executable_keeps_non_dsh_windows_cmd(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            shim_path = Path(temp_dir) / "other.cmd"
+            shim_path.write_text("@echo off\n", encoding="utf-8")
+
+            resolved = resolve_command_executable(
+                [str(shim_path), "--version"],
+                platform="nt",
+            )
+
+        self.assertEqual(resolved, [str(shim_path), "--version"])
+
+    def test_resolve_task_preflight_command_adds_project_dsh_ephemeral_patch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir)
+            patch_path = (
+                project_root
+                / ".talk"
+                / "dsh"
+                / "preflight-ephemeral.cordis.yml"
+            )
+            patch_path.parent.mkdir(parents=True)
+            patch_path.write_text("- id: fake\n", encoding="utf-8")
+
+            class Args:
+                runtime = "dsh"
+                project = str(project_root)
+                command = "dsh.cmd --profile headless"
+                task_preflight_command = None
+
+            resolved = resolve_task_preflight_command(Args())
+
+        self.assertEqual(
+            resolved,
+            [
+                "dsh.cmd",
+                "--profile",
+                "headless",
+                "--patch",
+                str(patch_path.resolve()),
+            ],
+        )
+
+    def test_resolve_task_preflight_command_respects_explicit_override(self):
+        class Args:
+            runtime = "dsh"
+            project = str(Path.cwd())
+            command = "dsh.cmd --profile headless"
+            task_preflight_command = "custom-preflight"
+
+        self.assertEqual(
+            resolve_task_preflight_command(Args()),
+            "custom-preflight",
+        )
+
+    def test_resolve_task_preflight_command_falls_back_without_patch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            class Args:
+                runtime = "dsh"
+                project = temp_dir
+                command = "dsh.cmd --profile headless"
+                task_preflight_command = None
+
+            self.assertEqual(
+                resolve_task_preflight_command(Args()),
+                "dsh.cmd --profile headless",
+            )
+
+    def test_resolve_task_preflight_max_attempts_uses_runtime_defaults_and_override(self):
+        class DeepSeekArgs:
+            runtime = "dsh"
+
+        class PiArgs:
+            runtime = "pi"
+
+        class OverrideArgs:
+            runtime = "dsh"
+            task_preflight_max_attempts = 2
+
+        self.assertEqual(resolve_task_preflight_max_attempts(DeepSeekArgs()), 1)
+        self.assertEqual(resolve_task_preflight_max_attempts(PiArgs()), 3)
+        self.assertEqual(resolve_task_preflight_max_attempts(OverrideArgs()), 2)
 
     def test_build_cli_task_prompt_for_pi_uses_raw_content(self):
         prompt = build_cli_task_prompt(
@@ -123,7 +258,7 @@ class CliBridgeTests(unittest.TestCase):
         # 身份必须出现,且明确告诉模型"你是 agent:pi-kimi"
         self.assertIn("你是 agent:pi-kimi", prompt)
         # 任务必须直接跟在身份后(同一行),让动词获得焦点
-        self.assertIn("你是 agent:pi-kimi。human:qa 对你说:你忙不忙", prompt)
+        self.assertIn("你是 agent:pi-kimi（执行 Agent）。human:qa 对你说:你忙不忙", prompt)
 
     def test_build_cli_task_prompt_for_pi_injects_identity(self):
         """任务路径同样要注入身份,跟 build_cli_prompt 一致(同一行紧凑写法)。"""
@@ -132,7 +267,197 @@ class CliBridgeTests(unittest.TestCase):
             "created_by": "human:qa",
             "content": "整理一下今天的进度",
         }, member_id="agent:pi-kimi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
-        self.assertIn("你是 agent:pi-kimi。human:qa 对你说:整理一下今天的进度", prompt)
+        self.assertIn("你是 agent:pi-kimi（执行 Agent）。human:qa 对你说:整理一下今天的进度", prompt)
+
+    def test_task_preflight_prompt_replays_hall_and_requires_structured_decision(self):
+        prompt = build_cli_task_preflight_prompt(
+            {
+                "id": 7,
+                "created_by": "human:qa",
+                "title": "实现接口",
+                "content": "完成任务队列预检",
+            },
+            member_id="agent:codex",
+            workdir=Path("D:/claude-test/TALK"),
+            runtime="codex",
+            decision_tier="decision",
+            hall_history="[消息 #1] human:qa: 原始范围\n[消息 #2] human:qa: 补充验收标准",
+        )
+
+        self.assertIn("agent:codex（决策 Agent）", prompt)
+        self.assertIn("补充验收标准", prompt)
+        self.assertIn('TALK_TASK_PREFLIGHT {"action":"accept"}', prompt)
+        self.assertIn('"action":"clarify"', prompt)
+        self.assertIn("不要执行任务或修改文件", prompt)
+        self.assertIn("不要要求请求者重复任务", prompt)
+
+    def test_parse_task_preflight_result_accepts_only_explicit_envelope(self):
+        accepted = parse_task_preflight_result(
+            CliRunResult(
+                returncode=0,
+                stdout='TALK_TASK_PREFLIGHT {"action":"accept"}',
+                stderr="",
+            )
+        )
+        clarification = parse_task_preflight_result(
+            CliRunResult(
+                returncode=0,
+                stdout='分析完成\nTALK_TASK_PREFLIGHT {"action":"clarify","question":"请提供目标端口。"}',
+                stderr="",
+            )
+        )
+        nested_accepted = parse_task_preflight_result(
+            CliRunResult(
+                returncode=0,
+                stdout=(
+                    "```json\n"
+                    '{"TALK_TASK_PREFLIGHT":{"task_id":"#7","ready":true,"decision":"可以开始"}}\n'
+                    "```"
+                ),
+                stderr="",
+            )
+        )
+        nested_clarification = parse_task_preflight_result(
+            CliRunResult(
+                returncode=0,
+                stdout=(
+                    "```json\n"
+                    '{"TALK_TASK_PREFLIGHT":{"ready":false,"decision":"请提供 API Key。"}}\n'
+                    "```"
+                ),
+                stderr="",
+            )
+        )
+        multiline_clarification = parse_task_preflight_result(
+            CliRunResult(
+                returncode=0,
+                stdout=(
+                    "预检结论如下：\nTALK_TASK_PREFLIGHT\n"
+                    "{\n"
+                    '  "task_id": 7,\n'
+                    '  "ready": false,\n'
+                    '  "question": "请提供测试 API Key。"\n'
+                    "}"
+                ),
+                stderr="",
+            )
+        )
+
+        self.assertEqual(accepted.action, "accept")
+        self.assertIsNone(accepted.question)
+        self.assertEqual(clarification.action, "clarify")
+        self.assertEqual(clarification.question, "请提供目标端口。")
+        self.assertEqual(nested_accepted.action, "accept")
+        self.assertEqual(nested_clarification.action, "clarify")
+        self.assertEqual(nested_clarification.question, "请提供 API Key。")
+        self.assertEqual(multiline_clarification.action, "clarify")
+        self.assertEqual(multiline_clarification.question, "请提供测试 API Key。")
+        with self.assertRaises(RuntimeError):
+            parse_task_preflight_result(CliRunResult(returncode=0, stdout="看起来可以开始", stderr=""))
+
+    def test_task_gate_prompt_and_parser_require_explicit_structured_verdict(self):
+        prompt = build_cli_task_prompt(
+            {
+                "id": 18,
+                "created_by": "agent:lead",
+                "task_kind": "review",
+                "title": "审查实现",
+                "content": "只读检查关联开发任务。",
+            },
+            member_id="agent:pi",
+            workdir=Path.cwd(),
+            runtime="pi",
+            hall_history="关联任务 #12 已完成。",
+        )
+        approved = parse_task_gate_verdict(
+            CliRunResult(
+                returncode=0,
+                stdout=(
+                    "审查完成。\n"
+                    'TALK_GATE_VERDICT {"verdict":"approved","summary":"未发现阻塞问题",'
+                    '"findings":[]}'
+                ),
+                stderr="",
+            ),
+            task_kind="review",
+        )
+        changes = parse_task_gate_verdict(
+            CliRunResult(
+                returncode=0,
+                stdout=(
+                    "TALK_GATE_VERDICT\n"
+                    '{"verdict":"changes_requested","summary":"需要修正",'
+                    '"findings":["缺少并发保护"]}'
+                ),
+                stderr="",
+            ),
+            task_kind="review",
+        )
+
+        self.assertIn("这是只读 Review 任务", prompt)
+        self.assertIn("关联任务 #12 已完成", prompt)
+        self.assertEqual(approved.as_payload()["verdict"], "approved")
+        self.assertEqual(changes.findings, ("缺少并发保护",))
+        with self.assertRaises(RuntimeError):
+            parse_task_gate_verdict(
+                CliRunResult(
+                    returncode=0,
+                    stdout=(
+                        'TALK_GATE_VERDICT {"verdict":"changes_requested",'
+                        '"summary":"需要修正","findings":[]}'
+                    ),
+                    stderr="",
+                ),
+                task_kind="review",
+            )
+
+    def test_format_task_quality_context_keeps_related_hall_separate(self):
+        rendered = format_task_quality_context(
+            {
+                "related_tasks": [
+                    {
+                        "relation": {"relation_type": "reviews"},
+                        "task": {
+                            "id": 12,
+                            "task_kind": "development",
+                            "title": "实现队列",
+                            "content": "增加队列原子门禁",
+                        },
+                        "messages": [
+                            {
+                                "id": 91,
+                                "from": "agent:dev",
+                                "type": "text",
+                                "content": "测试 42 项通过。",
+                            }
+                        ],
+                    }
+                ],
+                "trigger_tasks": [],
+            }
+        )
+
+        self.assertIn("关联任务 #12（development，关系 reviews）", rendered)
+        self.assertIn("测试 42 项通过", rendered)
+
+    def test_resolve_decision_tier_reads_project_groups_for_codex(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            talk_dir = Path(tmp) / ".talk"
+            talk_dir.mkdir()
+            (talk_dir / "groups.yaml").write_text(
+                "groups:\n"
+                "  - id: group:test\n"
+                "    members:\n"
+                "      - member_id: agent:codex\n"
+                "        decision_tier: decision\n",
+                encoding="utf-8",
+            )
+
+            args = type("Args", (), {"decision_tier": None, "project": tmp})()
+            override = type("Args", (), {"decision_tier": "execution", "project": tmp})()
+            self.assertEqual(resolve_decision_tier(args, "agent:codex"), "decision")
+            self.assertEqual(resolve_decision_tier(override, "agent:codex"), "execution")
+            self.assertEqual(resolve_decision_tier(args, "agent:pi"), "execution")
 
     def test_build_cli_prompt_strips_leading_mention_cluster_for_pi(self):
         prompt = build_cli_prompt({
@@ -226,6 +551,127 @@ class CliBridgeTests(unittest.TestCase):
         self.assertTrue("human:qa 对你说:" in prompt)
         self.assertIn("human:qa", prompt)
         self.assertIn("本群无角色约定", prompt)
+
+    def test_group_member_context_injects_self_business_role(self):
+        """P3-2：群成员上下文带上"我在本群的业务角色"（business_role 来自群成员数据）。"""
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:lab", "agent:pi"))
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+
+    def test_group_member_context_omits_role_when_absent(self):
+        """无 business_role 时不注入角色行（保持现状字节）。"""
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:lab", "agent:pi"))
+        self.assertIn("群成员：", ctx)
+        self.assertNotIn("你在本群的业务角色", ctx)
+
+    def test_group_member_context_injects_review_type_and_matching_role_norm(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertIn("本群类型：评审（review）。", ctx)
+        self.assertIn("流程指引：评审 Hall：作者提交标的产物", ctx)
+        self.assertIn("你的角色职责：针对产物给出收敛式批评与改进建议", ctx)
+
+    def test_group_member_context_injects_brainstorm_type_and_matching_role_norm(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "brainstorm", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "Contributor"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:ideas", "agent:pi"))
+
+        self.assertIn("你在本群的业务角色：Contributor。", ctx)
+        self.assertIn("本群类型：头脑风暴（brainstorm）。", ctx)
+        self.assertIn("流程指引：头脑风暴 Hall，流程分四步", ctx)
+        self.assertIn("你的角色职责：给出具体想法（answer）；被点名表态时", ctx)
+
+    def test_group_member_context_injects_type_without_role_norm_when_role_unmatched(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "lead"},
+                ]}
+
+            async def get_hall_types(self):
+                return [{"type": t, **template} for t, template in HALL_TYPE_TEMPLATES.items()]
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("你在本群的业务角色：lead。", ctx)
+        self.assertIn("本群类型：评审（review）。", ctx)
+        self.assertNotIn("你的角色职责", ctx)
+
+    def test_group_member_context_omits_type_block_for_free_hall(self):
+        class FakeClient:
+            def __init__(self):
+                self.hall_type_calls = 0
+
+            async def get_group(self, group_id):
+                return {"type": "free", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                self.hall_type_calls += 1
+                raise AssertionError("free hall must not fetch hall type templates")
+
+        client = FakeClient()
+        ctx = asyncio.run(_build_group_member_context(client, "group:free", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertNotIn("本群类型", ctx)
+        self.assertEqual(client.hall_type_calls, 0)
+
+    def test_group_member_context_skips_type_block_when_template_fetch_fails(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {"type": "review", "members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:pi", "business_role": "reviewer"},
+                ]}
+
+            async def get_hall_types(self):
+                raise RuntimeError("hall type endpoint unavailable")
+
+        ctx = asyncio.run(_build_group_member_context(FakeClient(), "group:review", "agent:pi"))
+
+        self.assertIn("群成员：human:qa, agent:pi。", ctx)
+        self.assertIn("你在本群的业务角色：reviewer。", ctx)
+        self.assertNotIn("本群类型", ctx)
+        self.assertNotIn("你的角色职责", ctx)
 
     def test_function_calling_prompt_is_minimal(self):
         message = {
@@ -351,6 +797,17 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(actions[1].to, "human:bobo")
         self.assertEqual(actions[1].body, "人类是长期演化来的。")
 
+    def test_parse_talk_actions_preserves_decision_stance(self):
+        visible, actions = parse_talk_actions(
+            "定论如下。\n"
+            "TALK_ACTION mark_stance stance=decision"
+        )
+
+        self.assertEqual(visible, "定论如下。")
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0].action_type, "mark_stance")
+        self.assertEqual(actions[0].stance, "decision")
+
     def test_parse_talk_actions_cleans_protocol_fragments_from_visible_text(self):
         visible, actions = parse_talk_actions(
             "mark_stance 动作已记录，当前立场为 agree。\n\n"
@@ -460,10 +917,16 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "PI:hello")
 
     def test_run_cli_command_can_pass_prompt_as_final_argv(self):
+        prompt = "first line\nsecond line\n第三行"
+
         async def scenario():
             return await run_cli_command(
-                [sys.executable, "-c", "import sys; print('ARGV:' + sys.argv[1])"],
-                "hello argv",
+                [
+                    sys.executable,
+                    "-c",
+                    "import json, sys; print(json.dumps(sys.argv[1:]))",
+                ],
+                prompt,
                 cwd=Path.cwd(),
                 timeout=5,
                 prompt_transport="argv",
@@ -472,29 +935,532 @@ class CliBridgeTests(unittest.TestCase):
         result = asyncio.run(scenario())
 
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout.strip(), "ARGV:hello argv")
+        self.assertEqual(json.loads(result.stdout), [prompt])
+
+    def test_task_claim_checks_are_capped_at_five_seconds(self):
+        self.assertEqual(
+            cli_bridge._effective_task_claim_check_interval(
+                lease_seconds=120,
+                heartbeat_interval=30,
+            ),
+            5,
+        )
+        self.assertEqual(
+            cli_bridge._effective_task_claim_check_interval(
+                lease_seconds=120,
+                heartbeat_interval=2,
+            ),
+            2,
+        )
+        self.assertEqual(
+            cli_bridge._effective_task_claim_check_interval(
+                lease_seconds=6,
+                heartbeat_interval=30,
+            ),
+            2,
+        )
+
+    def test_run_cli_command_cancellation_stops_the_local_process(self):
+        async def scenario():
+            operation = asyncio.create_task(
+                run_cli_command(
+                    [sys.executable, "-c", "import time; time.sleep(30)"],
+                    "",
+                    cwd=Path.cwd(),
+                    timeout=60,
+                )
+            )
+            await asyncio.sleep(0.1)
+            started = asyncio.get_running_loop().time()
+            operation.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await asyncio.wait_for(operation, timeout=2)
+            return asyncio.get_running_loop().time() - started
+
+        elapsed = asyncio.run(scenario())
+
+        self.assertLess(elapsed, 2)
+
+    def test_fetch_complete_task_hall_history_paginates_oldest_to_newest(self):
+        class FakeClient:
+            def __init__(self):
+                self.calls = []
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                self.calls.append((group_id, before, limit))
+                if before is None:
+                    return [
+                        {"id": 3, "from": "human:bobo", "type": "text", "content": "third"},
+                        {"id": 4, "from": "agent:codex", "type": "text", "content": "fourth"},
+                    ]
+                if before == 3:
+                    return [
+                        {"id": 1, "from": "human:bobo", "type": "text", "content": "first"},
+                        {"id": 2, "from": "agent:codex", "type": "text", "content": "second"},
+                    ]
+                return []
+
+        async def scenario():
+            client = FakeClient()
+            history = await fetch_complete_task_hall_history(client, "group:task-12", page_size=2)
+            return history, client.calls
+
+        history, calls = asyncio.run(scenario())
+
+        self.assertEqual([message["id"] for message in history], [1, 2, 3, 4])
+        self.assertEqual(
+            calls,
+            [
+                ("group:task-12", None, 2),
+                ("group:task-12", 3, 2),
+                ("group:task-12", 1, 2),
+            ],
+        )
+
+    def test_handle_queued_task_preflights_answered_context_before_claim(self):
+        class FakeClient:
+            def __init__(self):
+                self.calls = []
+                self.sent = []
+                self.completed = []
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                self.calls.append(("history", group_id, before, limit))
+                return [
+                    {"id": 1, "from": "human:bobo", "type": "text", "content": "原始任务"},
+                    {"id": 2, "from": "agent:codex", "type": "text", "content": "需要哪个端口？"},
+                    {"id": 3, "from": "human:bobo", "type": "text", "content": "使用 8123 端口。"},
+                ]
+
+            async def accept_task(self, task_id):
+                self.calls.append(("accept", task_id))
+                return {"id": task_id, "workflow_status": "accepted"}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                self.calls.append(("claim", task_id, instance_id, lease_seconds))
+                return {
+                    "id": task_id,
+                    "created_by": "human:bobo",
+                    "content": "实现服务",
+                    "hall_group_id": "group:task-12",
+                    "workflow_status": "in_progress",
+                    "claim_token": "lease-12",
+                }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                return {"id": task_id, "status": "running"}
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
+                return {"id": 99}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id}
+
+        prompts = []
+        preflight_attempts = 0
+
+        async def fake_command_runner(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            nonlocal preflight_attempts
+            prompts.append((command, prompt))
+            if command == ["preflight"]:
+                preflight_attempts += 1
+                if preflight_attempts == 1:
+                    return CliRunResult(returncode=0, stdout="信息充分，可以开始。", stderr="")
+                return CliRunResult(
+                    returncode=0,
+                    stdout='TALK_TASK_PREFLIGHT {"action":"accept"}',
+                    stderr="",
+                )
+            return CliRunResult(returncode=0, stdout="已按 8123 端口完成。", stderr="")
+
+        async def scenario():
+            client = FakeClient()
+            handled = await handle_queued_task(
+                {
+                    "id": 12,
+                    "created_by": "human:bobo",
+                    "content": "实现服务",
+                    "hall_group_id": "group:task-12",
+                    "workflow_status": "clarification_answered",
+                    "clarification_round_count": 1,
+                },
+                client=client,
+                member_id="agent:codex",
+                workdir=Path.cwd(),
+                instance_id="agent:codex:test",
+                command=["execute"],
+                preflight_command=["preflight"],
+                command_runner=fake_command_runner,
+                timeout=5,
+                max_reply_chars=100,
+                runtime="codex",
+                decision_tier="decision",
+                lease_seconds=5,
+                heartbeat_interval=1,
+            )
+            return handled, client
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertTrue(handled)
+        self.assertEqual(client.calls[1][0], "accept")
+        self.assertEqual(client.calls[2][0], "claim")
+        self.assertEqual(
+            [item[0] for item in prompts],
+            [["preflight"], ["preflight"], ["execute"]],
+        )
+        self.assertTrue(all("使用 8123 端口" in prompt for _, prompt in prompts))
+        self.assertIn("agent:codex（决策 Agent）", prompts[0][1])
+        self.assertIn("禁止嵌套 JSON", prompts[1][1])
+        self.assertEqual(client.sent, [("已按 8123 端口完成。", ["human:bobo"], "group:task-12")])
+        self.assertEqual(client.completed[0][1]["claim_token"], "lease-12")
+
+    def test_handle_review_task_replays_quality_context_and_submits_gate_verdict(self):
+        class FakeClient:
+            def __init__(self, *, fail_send: bool = False):
+                self.completed = []
+                self.sent = []
+                self.fail_send = fail_send
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                return []
+
+            async def get_task_quality_context(self, task_id):
+                return {
+                    "task_id": task_id,
+                    "relations": [
+                        {
+                            "id": 1,
+                            "source_task_id": task_id,
+                            "target_task_id": 12,
+                            "relation_type": "reviews",
+                        }
+                    ],
+                    "related_tasks": [
+                        {
+                            "relation": {"relation_type": "reviews"},
+                            "task": {
+                                "id": 12,
+                                "task_kind": "development",
+                                "content": "实现并发门禁",
+                            },
+                            "messages": [
+                                {
+                                    "id": 50,
+                                    "from": "agent:dev",
+                                    "type": "text",
+                                    "content": "并发测试 42 项通过。",
+                                }
+                            ],
+                        }
+                    ],
+                    "trigger_tasks": [],
+                }
+
+            async def accept_task(self, task_id):
+                return {"id": task_id, "workflow_status": "accepted"}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return {
+                    "id": task_id,
+                    "created_by": "agent:lead",
+                    "target_member_id": "agent:reviewer",
+                    "task_kind": "review",
+                    "content": "只读审查关联开发任务。",
+                    "hall_group_id": "group:task-18",
+                    "workflow_status": "in_progress",
+                    "claim_token": "lease-18",
+                }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                return {"id": task_id, "status": "running"}
+
+            async def send_text(self, text, to=None, group_id=None):
+                if self.fail_send:
+                    raise RuntimeError("Task Hall unavailable")
+                self.sent.append((text, to, group_id))
+                return {"id": 99}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id}
+
+        prompts = []
+
+        async def fake_command_runner(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            prompts.append((command, prompt))
+            if command == ["preflight"]:
+                return CliRunResult(
+                    returncode=0,
+                    stdout='TALK_TASK_PREFLIGHT {"action":"accept"}',
+                    stderr="",
+                )
+            return CliRunResult(
+                returncode=0,
+                stdout=(
+                    "审查通过。\n"
+                    'TALK_GATE_VERDICT {"verdict":"approved","summary":"并发门禁完整",'
+                    '"findings":[]}'
+                ),
+                stderr="",
+            )
+
+        async def scenario(*, fail_send: bool = False):
+            client = FakeClient(fail_send=fail_send)
+            handled = await handle_queued_task(
+                {
+                    "id": 18,
+                    "created_by": "agent:lead",
+                    "target_member_id": "agent:reviewer",
+                    "task_kind": "review",
+                    "content": "只读审查关联开发任务。",
+                    "hall_group_id": "group:task-18",
+                    "workflow_status": "assigned",
+                    "clarification_round_count": 0,
+                },
+                client=client,
+                member_id="agent:reviewer",
+                workdir=Path.cwd(),
+                instance_id="agent:reviewer:test",
+                command=["execute"],
+                preflight_command=["preflight"],
+                command_runner=fake_command_runner,
+                timeout=5,
+                max_reply_chars=500,
+                runtime="pi",
+                lease_seconds=5,
+                heartbeat_interval=1,
+            )
+            return handled, client
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertTrue(handled)
+        self.assertEqual([command for command, _ in prompts], [["preflight"], ["execute"]])
+        self.assertTrue(all("并发测试 42 项通过" in prompt for _, prompt in prompts))
+        self.assertIn("这是只读 Review 任务", prompts[1][1])
+        self.assertEqual(
+            client.completed[0][1]["gate_verdict"],
+            {"verdict": "approved", "summary": "并发门禁完整", "findings": []},
+        )
+        self.assertEqual(client.completed[0][1]["claim_token"], "lease-18")
+
+        failed_handled, failed_client = asyncio.run(scenario(fail_send=True))
+        self.assertTrue(failed_handled)
+        failed_completion = failed_client.completed[0][1]
+        self.assertEqual(failed_completion["status"], "failed")
+        self.assertNotIn("gate_verdict", failed_completion)
+        self.assertIn("could not post task result", failed_completion["last_error"])
+
+    def test_handle_queued_task_posts_clarification_without_claim(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.requests = []
+                self.claimed = []
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                return [{"id": 1, "from": "human:bobo", "type": "text", "content": "部署服务"}]
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
+                return {"id": 2}
+
+            async def request_task_clarification(self, task_id, *, question_message_id=None):
+                self.requests.append((task_id, question_message_id))
+                return {"id": task_id, "workflow_status": "clarification_requested"}
+
+            async def claim_task(self, task_id, **kwargs):
+                self.claimed.append(task_id)
+                raise AssertionError("clarification must happen before claim")
+
+        async def fake_command_runner(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(
+                returncode=0,
+                stdout='TALK_TASK_PREFLIGHT {"action":"clarify","question":"请确认目标端口和健康检查路径。"}',
+                stderr="",
+            )
+
+        async def scenario():
+            client = FakeClient()
+            handled = await handle_queued_task(
+                {
+                    "id": 12,
+                    "created_by": "human:bobo",
+                    "content": "部署服务",
+                    "hall_group_id": "group:task-12",
+                    "workflow_status": "assigned",
+                    "clarification_round_count": 0,
+                },
+                client=client,
+                member_id="agent:codex",
+                workdir=Path.cwd(),
+                instance_id="agent:codex:test",
+                command=["execute"],
+                preflight_command=["preflight"],
+                command_runner=fake_command_runner,
+                timeout=5,
+                max_reply_chars=100,
+                runtime="codex",
+            )
+            return handled, client
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertTrue(handled)
+        self.assertEqual(client.claimed, [])
+        self.assertEqual(client.requests, [(12, 2)])
+        self.assertEqual(client.sent[0][1:], (["human:bobo"], "group:task-12"))
+        self.assertTrue(client.sent[0][0].startswith("【TALK 自动预检｜任务 #12｜澄清轮次 1】"))
+        self.assertIn("目标端口和健康检查路径", client.sent[0][0])
+
+    def test_handle_queued_task_recovers_unregistered_preflight_question_without_duplicate(self):
+        marker = "【TALK 自动预检｜任务 #12｜澄清轮次 1】"
+
+        class FakeClient:
+            def __init__(self):
+                self.requests = []
+                self.sent = []
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                return [
+                    {"id": 1, "from": "human:bobo", "type": "text", "content": "部署服务"},
+                    {
+                        "id": 2,
+                        "from": "agent:codex",
+                        "type": "text",
+                        "content": f"{marker}\n请确认端口。",
+                    },
+                ]
+
+            async def request_task_clarification(self, task_id, *, question_message_id=None):
+                self.requests.append((task_id, question_message_id))
+                return {"id": task_id, "workflow_status": "clarification_requested"}
+
+            async def send_text(self, *args, **kwargs):
+                self.sent.append((args, kwargs))
+                raise AssertionError("existing preflight question must be reused")
+
+        async def forbidden_runner(*args, **kwargs):
+            raise AssertionError("model preflight must not rerun after the question was posted")
+
+        async def scenario():
+            client = FakeClient()
+            handled = await handle_queued_task(
+                {
+                    "id": 12,
+                    "created_by": "human:bobo",
+                    "content": "部署服务",
+                    "hall_group_id": "group:task-12",
+                    "workflow_status": "assigned",
+                    "clarification_round_count": 0,
+                },
+                client=client,
+                member_id="agent:codex",
+                workdir=Path.cwd(),
+                instance_id="agent:codex:test",
+                command=["execute"],
+                command_runner=forbidden_runner,
+                timeout=5,
+                max_reply_chars=100,
+            )
+            return handled, client
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertTrue(handled)
+        self.assertEqual(client.requests, [(12, 2)])
+        self.assertEqual(client.sent, [])
+
+    def test_handle_queued_task_wraps_failed_preflight_attempt_after_repair(self):
+        class FakeClient:
+            def __init__(self):
+                self.claimed = []
+
+            async def fetch_history(self, *, group_id, before=None, limit=50):
+                return []
+
+            async def claim_task(self, task_id, **kwargs):
+                self.claimed.append(task_id)
+                raise AssertionError("failed preflight must not claim the task")
+
+        runner_calls = 0
+
+        async def invalid_runner(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            nonlocal runner_calls
+            runner_calls += 1
+            return CliRunResult(returncode=0, stdout="没有输出协议 JSON", stderr="")
+
+        async def scenario():
+            client = FakeClient()
+            with self.assertRaises(cli_bridge.TaskPreflightError) as raised:
+                await handle_queued_task(
+                    {
+                        "id": 12,
+                        "created_by": "human:bobo",
+                        "content": "实现服务",
+                        "hall_group_id": "group:task-12",
+                        "workflow_status": "assigned",
+                    },
+                    client=client,
+                    member_id="agent:deepseek",
+                    workdir=Path.cwd(),
+                    instance_id="agent:deepseek:test",
+                    command=["execute"],
+                    preflight_command=["preflight"],
+                    command_runner=invalid_runner,
+                    timeout=5,
+                    max_reply_chars=100,
+                    runtime="dsh",
+                    prompt_transport="argv",
+                )
+            return client, str(raised.exception)
+
+        client, error = asyncio.run(scenario())
+
+        self.assertEqual(runner_calls, 2)
+        self.assertEqual(client.claimed, [])
+        self.assertIn("task 12 preflight failed", error)
+        self.assertIn("valid TALK_TASK_PREFLIGHT decision", error)
 
     def test_handle_queued_task_claims_runs_replies_and_completes(self):
         class FakeClient:
             def __init__(self):
                 self.claimed = []
+                self.heartbeats = []
                 self.sent = []
                 self.completed = []
 
-            async def claim_task(self, task_id, *, instance_id=None):
-                self.claimed.append((task_id, instance_id))
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                self.claimed.append((task_id, instance_id, lease_seconds))
                 return {
                     "id": task_id,
                     "created_by": "human:bobo",
                     "content": "say ok",
+                    "hall_group_id": "group:task-12",
+                    "claim_token": "lease-12",
                 }
 
-            async def send_text(self, text, to=None):
-                self.sent.append((text, to))
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                self.heartbeats.append((task_id, claim_token, lease_seconds))
+                return {"id": task_id, "status": "running"}
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
                 return {"id": 99}
 
-            async def complete_task(self, task_id, *, status, result_message_id=None, last_error=None):
-                self.completed.append((task_id, status, result_message_id, last_error))
+            async def complete_task(
+                self,
+                task_id,
+                *,
+                status,
+                result_message_id=None,
+                last_error=None,
+                claim_token=None,
+            ):
+                self.completed.append((task_id, status, result_message_id, last_error, claim_token))
                 return {"id": task_id, "status": status}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
@@ -502,6 +1468,7 @@ class CliBridgeTests(unittest.TestCase):
             self.assertIn("say ok", prompt)
             # identity no longer in prompt
             self.assertEqual(prompt_transport, "argv")
+            await asyncio.sleep(0.01)
             return CliRunResult(returncode=0, stdout="OK", stderr="")
 
         async def scenario():
@@ -521,6 +1488,8 @@ class CliBridgeTests(unittest.TestCase):
                     runtime="pi",
                     bridge_label="pi bridge",
                     prompt_transport="argv",
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
                 )
                 return handled, client
             finally:
@@ -529,9 +1498,400 @@ class CliBridgeTests(unittest.TestCase):
         handled, client = asyncio.run(scenario())
 
         self.assertTrue(handled)
-        self.assertEqual(client.claimed, [(12, "agent:pi:test")])
-        self.assertEqual(client.sent, [("OK", ["human:bobo"])])
-        self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
+        self.assertEqual(client.claimed, [(12, "agent:pi:test", 5)])
+        self.assertTrue(client.heartbeats)
+        self.assertEqual(client.sent, [("OK", ["human:bobo"], "group:task-12")])
+        self.assertEqual(client.completed, [(12, "succeeded", 99, None, "lease-12")])
+
+    def test_handle_queued_task_stops_for_task_tree_control_revocations(self):
+        async def scenario(control_status):
+            class FakeClient:
+                def __init__(self):
+                    self.sent = []
+                    self.completed = []
+
+                async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                    return {
+                        "id": task_id,
+                        "created_by": "human:bobo",
+                        "content": "long task",
+                        "claim_token": "lease-12",
+                    }
+
+                async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                    raise TalkValidationError(
+                        "claim revoked",
+                        status_code=409,
+                        payload={"control_status": control_status},
+                    )
+
+                async def send_text(self, text, to=None, group_id=None):
+                    self.sent.append(text)
+                    return {"id": 99}
+
+                async def complete_task(self, task_id, **kwargs):
+                    self.completed.append((task_id, kwargs))
+                    return {"id": task_id}
+
+            command_cancelled = False
+
+            async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+                nonlocal command_cancelled
+                try:
+                    await asyncio.sleep(1)
+                except asyncio.CancelledError:
+                    command_cancelled = True
+                    raise
+                return CliRunResult(returncode=0, stdout="late", stderr="")
+
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                handled = await handle_queued_task(
+                    {"id": 12},
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    instance_id="agent:pi:test",
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=100,
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
+                )
+                return handled, client, command_cancelled
+            finally:
+                cli_bridge.run_cli_command = original
+
+        for control_status in ("paused", "awaiting_human", "canceled"):
+            with self.subTest(control_status=control_status):
+                handled, client, command_cancelled = asyncio.run(scenario(control_status))
+                self.assertFalse(handled)
+                self.assertTrue(command_cancelled)
+                self.assertEqual(client.sent, [])
+                self.assertEqual(client.completed, [])
+
+    def test_task_worker_requeues_expired_claims_before_listing(self):
+        class FakeClient:
+            def __init__(self):
+                self.calls = []
+
+            async def requeue_expired_tasks(self):
+                self.calls.append("requeue")
+                return []
+
+            async def list_tasks(self, **kwargs):
+                self.calls.append(("list", kwargs))
+                raise asyncio.CancelledError
+
+        async def scenario():
+            client = FakeClient()
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    instance_id="agent:pi:test",
+                    args=object(),
+                    run_lock=asyncio.Lock(),
+                    report_status=None,
+                )
+            except asyncio.CancelledError:
+                pass
+            return client.calls
+
+        calls = asyncio.run(scenario())
+
+        self.assertEqual(
+            calls,
+            [
+                "requeue",
+                ("list", {"target_member_id": "agent:pi", "status": "queued"}),
+            ],
+        )
+
+    def test_task_worker_does_not_wake_tasks_waiting_for_human(self):
+        class FakeClient:
+            async def requeue_expired_tasks(self):
+                return []
+
+            async def list_tasks(self, **kwargs):
+                return [
+                    {"id": 1, "workflow_status": "clarification_requested"},
+                    {"id": 2, "workflow_status": "needs_decision"},
+                    {"id": 3, "workflow_status": "accepted"},
+                ]
+
+        class Args:
+            command = "interactive-command"
+            task_command = "runner-owned-task-command"
+            task_preflight_command = "read-only-preflight-command"
+            timeout = 5
+            max_reply_chars = 100
+            runtime = "pi"
+            bridge_label = "pi bridge"
+            prompt_transport = "argv"
+            decision_tier = "execution"
+            task_lease_seconds = 30
+            task_heartbeat_interval = 5
+            task_poll_interval = 1
+
+        seen = []
+
+        async def fake_handle_queued_task(task, **kwargs):
+            seen.append((task["id"], kwargs["preflight_command"]))
+            raise asyncio.CancelledError
+
+        async def scenario():
+            original = cli_bridge.handle_queued_task
+            cli_bridge.handle_queued_task = fake_handle_queued_task
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=FakeClient(),
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    instance_id="agent:pi:test",
+                    args=Args(),
+                    run_lock=asyncio.Lock(),
+                    report_status=None,
+                )
+            except asyncio.CancelledError:
+                pass
+            finally:
+                cli_bridge.handle_queued_task = original
+
+        asyncio.run(scenario())
+
+        self.assertEqual(seen, [(3, "read-only-preflight-command")])
+
+    def test_task_worker_fails_dsh_task_after_one_preflight_attempt(self):
+        class FakeClient:
+            def __init__(self):
+                self.accepted = []
+                self.claimed = []
+                self.sent = []
+                self.completed = []
+
+            async def requeue_expired_tasks(self):
+                return []
+
+            async def list_tasks(self, **kwargs):
+                if self.completed:
+                    raise asyncio.CancelledError
+                return [
+                    {
+                        "id": 12,
+                        "created_by": "human:bobo",
+                        "hall_group_id": "group:task-12",
+                        "workflow_status": "clarification_answered",
+                    }
+                ]
+
+            async def accept_task(self, task_id):
+                self.accepted.append(task_id)
+                return {"id": task_id, "workflow_status": "accepted"}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                self.claimed.append((task_id, instance_id, lease_seconds))
+                return {
+                    "id": task_id,
+                    "created_by": "human:bobo",
+                    "hall_group_id": "group:task-12",
+                    "claim_token": "lease-12",
+                }
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
+                return {"id": 91}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id, "status": kwargs["status"]}
+
+        class Args:
+            command = "interactive-command"
+            task_command = "runner-owned-task-command"
+            task_preflight_command = "read-only-preflight-command"
+            timeout = 5
+            max_reply_chars = 100
+            runtime = "dsh"
+            bridge_label = "DeepSeek Harness bridge"
+            prompt_transport = "argv"
+            decision_tier = "execution"
+            task_lease_seconds = 30
+            task_heartbeat_interval = 5
+            task_poll_interval = 0
+
+        attempts = 0
+        reports = []
+
+        async def failed_preflight(task, **kwargs):
+            nonlocal attempts
+            attempts += 1
+            raise cli_bridge.TaskPreflightError("invalid preflight envelope")
+
+        async def report_status(status, **kwargs):
+            reports.append((status, kwargs))
+
+        async def scenario():
+            client = FakeClient()
+            original = cli_bridge.handle_queued_task
+            cli_bridge.handle_queued_task = failed_preflight
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=client,
+                    member_id="agent:deepseek",
+                    workdir=Path.cwd(),
+                    instance_id="agent:deepseek:test",
+                    args=Args(),
+                    run_lock=asyncio.Lock(),
+                    report_status=report_status,
+                )
+            except asyncio.CancelledError:
+                pass
+            finally:
+                cli_bridge.handle_queued_task = original
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(attempts, 1)
+        self.assertEqual(client.accepted, [12])
+        self.assertEqual(client.claimed, [(12, "agent:deepseek:test", 30)])
+        self.assertEqual(len(client.sent), 1)
+        self.assertIn("连续失败 1 次", client.sent[0][0])
+        self.assertEqual(client.sent[0][1:], (["human:bobo"], "group:task-12"))
+        self.assertEqual(len(client.completed), 1)
+        completion = client.completed[0][1]
+        self.assertEqual(completion["status"], "failed")
+        self.assertEqual(completion["result_message_id"], 91)
+        self.assertEqual(completion["claim_token"], "lease-12")
+        self.assertIn("failed after 1 attempts", completion["last_error"])
+        self.assertEqual(reports, [])
+
+    def test_task_worker_clears_preflight_failures_after_success(self):
+        class FakeClient:
+            def __init__(self):
+                self.completed = []
+
+            async def requeue_expired_tasks(self):
+                return []
+
+            async def list_tasks(self, **kwargs):
+                if self.completed:
+                    raise asyncio.CancelledError
+                return [{"id": 12, "workflow_status": "assigned"}]
+
+            async def accept_task(self, task_id):
+                return {"id": task_id, "workflow_status": "accepted"}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return {"id": task_id, "claim_token": "lease-12"}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id, "status": kwargs["status"]}
+
+        class Args:
+            command = "command"
+            timeout = 5
+            max_reply_chars = 100
+            runtime = "dsh"
+            bridge_label = "DeepSeek Harness bridge"
+            prompt_transport = "argv"
+            decision_tier = "execution"
+            task_lease_seconds = 30
+            task_heartbeat_interval = 5
+            task_poll_interval = 0
+            task_preflight_max_attempts = 3
+
+        calls = 0
+
+        async def alternating_preflight(task, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                return True
+            raise cli_bridge.TaskPreflightError(f"failure {calls}")
+
+        async def report_status(status, **kwargs):
+            return None
+
+        async def scenario():
+            client = FakeClient()
+            original = cli_bridge.handle_queued_task
+            cli_bridge.handle_queued_task = alternating_preflight
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=client,
+                    member_id="agent:deepseek",
+                    workdir=Path.cwd(),
+                    instance_id="agent:deepseek:test",
+                    args=Args(),
+                    run_lock=asyncio.Lock(),
+                    report_status=report_status,
+                )
+            except asyncio.CancelledError:
+                pass
+            finally:
+                cli_bridge.handle_queued_task = original
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(calls, 6)
+        self.assertEqual(len(client.completed), 1)
+        self.assertIn("failure 6", client.completed[0][1]["last_error"])
+
+    def test_task_worker_uses_task_specific_command(self):
+        class FakeClient:
+            async def requeue_expired_tasks(self):
+                return []
+
+            async def list_tasks(self, **kwargs):
+                return [{"id": 1}]
+
+        class Args:
+            command = "interactive-command"
+            task_command = "runner-owned-task-command"
+            timeout = 5
+            max_reply_chars = 100
+            runtime = "pi"
+            bridge_label = "pi bridge"
+            prompt_transport = "argv"
+            decision_tier = "execution"
+            task_lease_seconds = 30
+            task_heartbeat_interval = 5
+            task_poll_interval = 1
+
+        seen_commands = []
+
+        async def fake_handle_queued_task(task, **kwargs):
+            seen_commands.append(kwargs["command"])
+            raise asyncio.CancelledError
+
+        async def scenario():
+            original = cli_bridge.handle_queued_task
+            cli_bridge.handle_queued_task = fake_handle_queued_task
+            try:
+                await cli_bridge.run_task_queue_worker(
+                    client=FakeClient(),
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    instance_id="agent:pi:test",
+                    args=Args(),
+                    run_lock=asyncio.Lock(),
+                    report_status=None,
+                )
+            except asyncio.CancelledError:
+                pass
+            finally:
+                cli_bridge.handle_queued_task = original
+
+        asyncio.run(scenario())
+
+        self.assertEqual(seen_commands, ["runner-owned-task-command"])
 
     def test_handle_incoming_message_replies_inside_same_group(self):
         class FakeClient:
@@ -589,6 +1949,64 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.replies, [(40, "group reply", ["human:bobo"], "group:lab")])
         self.assertEqual(statuses[0][0], "busy")
         self.assertEqual(statuses[-1][0], "idle")
+
+    def test_failed_chat_records_diagnostic_without_posting_it(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 41}
+
+            async def get_group(self, group_id):
+                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:pi"}]}
+
+        statuses = []
+
+        async def fake_report_status(status, **kwargs):
+            statuses.append((status, kwargs))
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            self.assertIn("group task", prompt)
+            # identity no longer in prompt
+            return CliRunResult(returncode=1, stdout="", stderr="ERROR: model requires a newer CLI")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 40,
+                        "from": "human:bobo",
+                        "to": ["agent:pi"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:pi group task",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=100,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                    report_status=fake_report_status,
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.replies, [(40, "pi bridge 运行失败，错误详情已记录。", ["human:bobo"], "group:lab")])
+        self.assertEqual(statuses[0][0], "busy")
+        self.assertEqual(statuses[-1][0], "error")
+        self.assertIn("model requires a newer CLI", statuses[-1][1]["last_error"])
 
     def test_handle_incoming_message_executes_send_message_action(self):
         class FakeClient:
@@ -1055,10 +2473,58 @@ class CliBridgeTests(unittest.TestCase):
             {"stance": "greeting"},
             {"stance": "closure"},
             {"stance": "answer"},
+            {"stance": "decision"},
             {"stance": ""},
         ]
 
-        self.assertEqual(cli_bridge._substantive_discussion_turns(turns), [{"stance": "answer"}, {"stance": ""}])
+        self.assertEqual(
+            cli_bridge._substantive_discussion_turns(turns),
+            [{"stance": "answer"}, {"stance": "decision"}, {"stance": ""}],
+        )
+
+    def test_deferred_decision_talk_send_bypasses_turn_limit(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": len(self.sent)}
+
+        fd, path = tempfile.mkstemp(suffix=".jsonl", prefix="talk-decision-test-")
+        os.close(fd)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    "tool": "talk_send",
+                    "target": "agent:pi",
+                    "body": "普通回答应被跳过",
+                    "stance": "answer",
+                }, ensure_ascii=False) + "\n")
+                f.write(json.dumps({
+                    "tool": "talk_send",
+                    "target": "agent:lead",
+                    "body": "最终定论",
+                    "stance": "decision",
+                }, ensure_ascii=False) + "\n")
+
+            client = FakeClient()
+            results = asyncio.run(cli_bridge._read_and_execute_deferred_actions(
+                path,
+                client=client,
+                group_id="group:lab",
+                reply_to=40,
+                current_turn_count=3,
+                max_auto_turns=3,
+            ))
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(client.sent, [("@agent:lead 最终定论", ["agent:lead"], 40, "group:lab")])
+        self.assertEqual(results[0]["skipped"], True)
+        self.assertEqual(results[0]["stance"], "answer")
+        self.assertEqual(results[1]["ok"], True)
+        self.assertEqual(results[1]["stance"], "decision")
 
     def test_send_message_action_to_missing_group_agent_is_blocked(self):
         class FakeClient:
@@ -1299,7 +2765,12 @@ class CliBridgeTests(unittest.TestCase):
                 return self.turns
 
             async def get_group(self, group_id):
-                return {"members": [{"member_id": "human:bobo"}, {"member_id": "agent:codex"}, {"member_id": "agent:pi"}]}
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
 
             async def send_text(self, text, to=None, reply_to=None, group_id=None):
                 self.sent.append((text, to, reply_to, group_id))
@@ -1345,8 +2816,117 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.replies, [(50, "我仍然不同意，建议先补协议测试。", ["agent:codex"], "group:lab")])
         self.assertEqual(
             client.sent,
+            [("@agent:lead 我和对方连续两轮仍有不同判断，请你做最终决定。", ["agent:lead"], 51, "group:lab")],
+        )
+
+    def test_disagreement_escalation_falls_back_to_human_without_decision_maker(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.turns = [
+                    {"speaker_id": "agent:codex", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                ]
+                self.updated = []
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 52}
+
+            async def append_discussion_turn(
+                self,
+                discussion_id,
+                *,
+                message_id,
+                stance,
+                target_member_id=None,
+                turn_kind="reply",
+                round_index=1,
+            ):
+                self.turns.append({
+                    "speaker_id": "agent:pi",
+                    "stance": stance,
+                    "target_member_id": target_member_id,
+                    "turn_kind": turn_kind,
+                })
+                return {"id": 3}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._maybe_escalate_disagreement(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                reply_to=51,
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(
+            client.sent,
             [("@human:bobo 我和对方连续两轮仍有不同判断，请你做最终决定。", ["human:bobo"], 51, "group:lab")],
         )
+        self.assertEqual(client.turns[-1]["target_member_id"], "human:bobo")
+        self.assertEqual(client.updated, [(9, "escalated", None)])
+
+    def test_explicit_escalate_to_human_stays_human_only(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                ]}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 52}
+
+            async def append_discussion_turn(self, *args, **kwargs):
+                return {"id": 3}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            summaries = await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(action_type="escalate_to_human", body="请裁决")],
+                client=client,
+                source_message={"id": 50, "from": "agent:pi", "group_id": "group:lab"},
+                member_id="agent:codex",
+                task_text="请裁决这个分歧",
+            )
+            return client, summaries
+
+        client, summaries = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@human:bobo 请裁决", ["human:bobo"], 50, "group:lab")])
+        self.assertEqual(summaries, ["escalated to human:bobo"])
+        self.assertEqual(client.updated, [])
 
     def test_final_to_human_action_resolves_discussion(self):
         class FakeClient:
@@ -1385,9 +2965,9 @@ class CliBridgeTests(unittest.TestCase):
                 self.turns.append({"speaker_id": "agent:codex", "stance": stance})
                 return {"id": 3}
 
-            async def update_discussion(self, discussion_id, *, status):
-                self.updated.append((discussion_id, status))
-                return {"id": discussion_id, "status": status}
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             return CliRunResult(
@@ -1433,7 +3013,338 @@ class CliBridgeTests(unittest.TestCase):
             client.sent,
             [("@human:bobo 人类是从远古灵长类分支长期演化来的。", ["human:bobo"], 50, "group:lab")],
         )
-        self.assertEqual(client.updated, [(9, "resolved")])
+        self.assertEqual(client.updated, [(9, "resolved", None)])
+
+    def test_decision_maker_send_message_decision_resolves_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.created = []
+                self.turns = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 80}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                self.created.append((group_id, topic, participant_ids, max_rounds, kwargs))
+                return {"id": 9}
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(
+                    action_type="send_message",
+                    to="agent:pi",
+                    body="最终定论",
+                    stance="decision",
+                )],
+                client=client,
+                source_message={"id": 50, "from": "human:bobo", "group_id": "group:lab"},
+                member_id="agent:lead",
+                task_text="请给出定论",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.sent, [("@agent:pi 最终定论", ["agent:pi"], 50, "group:lab")])
+        self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
+        self.assertEqual(client.updated, [(9, "resolved", "consensus")])
+
+    def test_decision_maker_decision_after_escalate_resolves_as_deadlock(self):
+        class FakeClient:
+            def __init__(self):
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def list_discussion_turns(self, discussion_id):
+                return [
+                    {"speaker_id": "agent:codex", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                    {"speaker_id": "agent:pi", "stance": "escalate"},
+                    {"speaker_id": "agent:lead", "stance": "decision"},
+                ]
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._resolve_if_decision_maker(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                member_id="agent:lead",
+                stance="decision",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.updated, [(9, "resolved", "deadlock")])
+
+    def test_decision_maker_decision_turn_lookup_failure_resolves_as_consensus(self):
+        class FakeClient:
+            def __init__(self):
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def list_discussion_turns(self, discussion_id):
+                raise RuntimeError("turn lookup failed")
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge._resolve_if_decision_maker(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                member_id="agent:lead",
+                stance="decision",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.updated, [(9, "resolved", "consensus")])
+
+    def test_non_decision_maker_decision_does_not_resolve_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.turns = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 80}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                return {"id": 9}
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(
+                    action_type="send_message",
+                    to="agent:pi",
+                    body="我认为这是定论",
+                    stance="decision",
+                )],
+                client=client,
+                source_message={"id": 50, "from": "human:bobo", "group_id": "group:lab"},
+                member_id="agent:codex",
+                task_text="请给出定论",
+            )
+            return client
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
+        self.assertEqual(client.updated, [])
+
+    def test_decision_maker_falls_back_to_human_without_decision_tier(self):
+        class FakeClient:
+            def __init__(self):
+                self.turns = []
+                self.updated = []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                return {"id": 80}
+
+            async def list_discussions(self, *, group_id=None):
+                return []
+
+            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
+                return {"id": 9}
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def scenario():
+            client = FakeClient()
+            decision_maker = await cli_bridge._find_decision_maker(client, "group:lab")
+            await cli_bridge.execute_talk_actions(
+                [cli_bridge.TalkAction(
+                    action_type="send_message",
+                    to="agent:pi",
+                    body="我认为这是定论",
+                    stance="decision",
+                )],
+                client=client,
+                source_message={"id": 50, "from": "human:bobo", "group_id": "group:lab"},
+                member_id="agent:codex",
+                task_text="请给出定论",
+            )
+            return client, decision_maker
+
+        client, decision_maker = asyncio.run(scenario())
+
+        self.assertEqual(decision_maker, "human:bobo")
+        self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
+        self.assertEqual(client.updated, [])
+
+    def test_decision_maker_mark_stance_resolves_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.turns = []
+                self.updated = []
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 9,
+                    "status": "active",
+                    "topic": "最终定论",
+                    "participant_ids": ["agent:lead", "agent:pi"],
+                    "root_message_id": 50,
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:bobo"},
+                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:pi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 51}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
+                return {"id": len(self.turns)}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(
+                returncode=0,
+                stdout="定论如下。\nTALK_ACTION mark_stance stance=decision",
+                stderr="",
+            )
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 50,
+                        "from": "agent:pi",
+                        "to": ["agent:lead"],
+                        "group_id": "group:lab",
+                        "type": "text",
+                        "content": "@agent:lead 请给出最终判断",
+                    },
+                    client=client,
+                    member_id="agent:lead",
+                    workdir=Path.cwd(),
+                    command=["codex", "exec", "-"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="Codex",
+                    bridge_label="Codex bridge",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertEqual(client.replies, [(50, "定论如下。", ["agent:pi"], "group:lab")])
+        self.assertEqual(client.turns, [(9, 51, "decision", "agent:pi", "reply", 1)])
+        self.assertEqual(client.updated, [(9, "resolved", "consensus")])
 
     def test_agent_message_after_extension_answer_closes_without_running_model(self):
         class FakeClient:
@@ -1474,9 +3385,9 @@ class CliBridgeTests(unittest.TestCase):
                 self.turns.append({"speaker_id": "agent:pi", "stance": stance})
                 return {"id": 4}
 
-            async def update_discussion(self, discussion_id, *, status):
-                self.updated.append((discussion_id, status))
-                return {"id": discussion_id, "status": status}
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             raise AssertionError("model should not run after turn budget is exhausted")
@@ -1516,8 +3427,458 @@ class CliBridgeTests(unittest.TestCase):
             [(50, cli_bridge._pick_closure_line("agent:pi"), ["agent:codex"], "group:lab")],
         )
         self.assertEqual(client.sent, [])
-        self.assertEqual(client.updated, [(9, "resolved")])
+        self.assertEqual(client.updated, [(9, "resolved", None)])
         self.assertEqual(client.turns[-1]["stance"], "closure")
+
+    def test_shared_history_builds_block_for_multiparty(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [
+                    {"id": 10, "from": "human:qa", "content": "@所有人 想 3 个团建点子"},
+                    {"id": 11, "from": "agent:codex", "content": "城市闯关赛、共创工作坊"},
+                    {"id": 12, "from": "agent:pi", "content": "密室逃脱、桌游夜"},
+                    {"id": 20, "from": "human:qa", "content": "@agent:pi 请表态"},
+                    {"id": 13, "from": "agent:x", "content": ""},
+                ]
+
+        discussion = {
+            "root_message_id": 10,
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+        }
+        block = asyncio.run(
+            cli_bridge._shared_discussion_history(
+                FakeClient(), group_id="g", discussion=discussion, current_message_id=20, self_id="agent:pi"
+            )
+        )
+        self.assertIn("本场已有发言", block)
+        self.assertIn("agent:codex：城市闯关赛、共创工作坊", block)
+        self.assertIn("agent:pi：密室逃脱、桌游夜", block)
+        self.assertNotIn("请表态", block)  # 当前触发消息剔除
+        self.assertNotIn("agent:x：", block)  # 空内容剔除
+
+    def test_shared_history_empty_for_pair_or_missing(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [{"id": 1, "from": "agent:a", "content": "hi"}]
+
+        pair = {"root_message_id": 1, "participant_ids": ["agent:a", "agent:b"]}
+        self.assertEqual(
+            asyncio.run(
+                cli_bridge._shared_discussion_history(
+                    FakeClient(), group_id="g", discussion=pair, current_message_id=9, self_id="agent:a"
+                )
+            ),
+            "",
+        )
+        # 无 discussion / 无 group → 空
+        self.assertEqual(
+            asyncio.run(
+                cli_bridge._shared_discussion_history(
+                    FakeClient(), group_id="g", discussion=None, current_message_id=9, self_id="agent:a"
+                )
+            ),
+            "",
+        )
+
+    def test_build_cli_prompt_injects_shared_history_for_pi(self):
+        prompt = cli_bridge.build_cli_prompt(
+            {"from": "human:qa", "content": "@agent:pi 请对 codex 的想法表态", "group_id": "g", "id": 20},
+            member_id="agent:pi",
+            workdir=Path("."),
+            runtime="pi",
+            shared_history="【本场已有发言（供你表态/汇总参考，请勿逐条复述）】\nagent:codex：城市闯关赛",
+        )
+        self.assertIn("本场已有发言", prompt)
+        self.assertIn("agent:codex：城市闯关赛", prompt)
+
+    def test_summary_grounding_uses_each_agents_first_answer_including_decision_maker(self):
+        class FakeClient:
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [
+                    {"id": 11, "from": "agent:pi", "content": "pi 的首条意见"},
+                    {"id": 12, "from": "agent:pi-kimi", "content": "pi-kimi 的首条意见"},
+                    {"id": 13, "from": "agent:codex", "content": "codex 作为决策人的首条意见"},
+                    {"id": 14, "from": "agent:pi", "content": "pi 后续闲聊噪声"},
+                ]
+
+        discussion = {
+            "root_message_id": 10,
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+        }
+        turns = [
+            {"message_id": 11, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 12, "speaker_id": "agent:pi-kimi", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 13, "speaker_id": "agent:codex", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 14, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+        ]
+
+        block = asyncio.run(
+            cli_bridge._brainstorm_summary_grounding(
+                FakeClient(), group_id="group:bs", discussion=discussion, turns=turns
+            )
+        )
+
+        self.assertIn("必须据此形成最终结论", block)
+        self.assertIn("pi 的首条意见", block)
+        self.assertIn("pi-kimi 的首条意见", block)
+        self.assertIn("codex 作为决策人的首条意见", block)
+        self.assertNotIn("pi 后续闲聊噪声", block)
+
+    def test_summary_grounding_requires_first_answer_from_every_agent(self):
+        class FakeClient:
+            async def fetch_history(self, **kwargs):
+                raise AssertionError("意见未取齐时不应读取消息历史")
+
+        discussion = {
+            "root_message_id": 10,
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+        }
+        turns = [
+            {"message_id": 11, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+            {"message_id": 13, "speaker_id": "agent:codex", "turn_kind": "reply", "stance": "answer"},
+        ]
+
+        block = asyncio.run(
+            cli_bridge._brainstorm_summary_grounding(
+                FakeClient(), group_id="group:bs", discussion=discussion, turns=turns
+            )
+        )
+
+        self.assertEqual(block, "")
+
+    def test_brainstorm_summary_request_requires_direct_human_targeting_of_decision_maker(self):
+        class FakeClient:
+            async def get_group(self, group_id):
+                return {
+                    "type": "brainstorm",
+                    "members": [
+                        {"member_id": "human:qa"},
+                        {"member_id": "agent:codex", "decision_tier": "decision"},
+                        {"member_id": "agent:pi"},
+                    ],
+                }
+
+        discussion = {
+            "status": "active",
+            "participant_ids": ["human:qa", "agent:codex", "agent:pi"],
+        }
+
+        async def scenario():
+            direct = await cli_bridge._is_brainstorm_summary_request(
+                FakeClient(),
+                message={"to": ["agent:codex"]},
+                group_id="group:bs",
+                discussion=discussion,
+                member_id="agent:codex",
+                sender_id="human:qa",
+                task_text="请汇总并给出最终结论",
+            )
+            multi_target = await cli_bridge._is_brainstorm_summary_request(
+                FakeClient(),
+                message={"to": ["agent:codex", "agent:pi"]},
+                group_id="group:bs",
+                discussion=discussion,
+                member_id="agent:codex",
+                sender_id="human:qa",
+                task_text="请汇总并给出最终结论",
+            )
+            ordinary_request = await cli_bridge._is_brainstorm_summary_request(
+                FakeClient(),
+                message={"to": ["agent:codex"]},
+                group_id="group:bs",
+                discussion=discussion,
+                member_id="agent:codex",
+                sender_id="human:qa",
+                task_text="请再补充一条意见",
+            )
+            return direct, multi_target, ordinary_request
+
+        self.assertEqual(asyncio.run(scenario()), (True, False, False))
+
+    def test_human_summary_to_decision_maker_infers_decision_and_resolves(self):
+        captured_prompts = []
+
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.appended = []
+                self.updated = []
+                self.turns = [
+                    {"message_id": 11, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+                    {"message_id": 12, "speaker_id": "agent:pi-kimi", "turn_kind": "reply", "stance": "answer"},
+                    {"message_id": 13, "speaker_id": "agent:codex", "turn_kind": "reply", "stance": "answer"},
+                    {"message_id": 14, "speaker_id": "agent:pi", "turn_kind": "reply", "stance": "answer"},
+                ]
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 7,
+                    "status": "active",
+                    "root_message_id": 10,
+                    "topic": "单位捐款方案",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {
+                    "type": "brainstorm",
+                    "members": [
+                        {"member_id": "human:qa"},
+                        {"member_id": "agent:codex", "decision_tier": "decision"},
+                        {"member_id": "agent:pi"},
+                        {"member_id": "agent:pi-kimi"},
+                    ],
+                }
+
+            async def fetch_history(self, *, group_id=None, since=None, limit=50):
+                return [
+                    {"id": 11, "from": "agent:pi", "content": "pi：不应组织摊派。"},
+                    {"id": 12, "from": "agent:pi-kimi", "content": "pi-kimi：改成自愿倡议。"},
+                    {"id": 13, "from": "agent:codex", "content": "codex：给出合规替代方案。"},
+                    {"id": 14, "from": "agent:pi", "content": "这是一条后续闲聊。"},
+                ]
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 61}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind))
+                self.turns.append({
+                    "message_id": message_id,
+                    "speaker_id": "agent:codex",
+                    "target_member_id": target_member_id,
+                    "turn_kind": turn_kind,
+                    "stance": stance,
+                })
+                return {"id": 5}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            captured_prompts.append(prompt)
+            return CliRunResult(returncode=0, stdout="最终结论：停止摊派，改为公开、自愿且有上限的倡议。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 60,
+                        "from": "human:qa",
+                        "to": ["agent:codex"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@agent:codex 请汇总全部意见并产出最终结论",
+                    },
+                    client=client,
+                    member_id="agent:codex",
+                    workdir=Path.cwd(),
+                    command=["codex", "exec"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="codex",
+                    bridge_label="codex bridge",
+                    prompt_transport="stdin",
+                    decision_tier="decision",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        self.assertIn("本轮汇总材料", captured_prompts[0])
+        self.assertIn("pi：不应组织摊派。", captured_prompts[0])
+        self.assertIn("pi-kimi：改成自愿倡议。", captured_prompts[0])
+        self.assertIn("codex：给出合规替代方案。", captured_prompts[0])
+        self.assertNotIn("这是一条后续闲聊。", captured_prompts[0])
+        self.assertEqual(client.appended, [(7, 61, "decision", "human:qa", "reply")])
+        self.assertEqual(client.updated, [(7, "resolved", "consensus")])
+
+    def test_discussion_auto_turn_budget_scales_for_multiparty(self):
+        # 1:1 / 无 discussion：保持常量
+        self.assertEqual(cli_bridge._discussion_auto_turn_budget(None), 3)
+        self.assertEqual(
+            cli_bridge._discussion_auto_turn_budget({"participant_ids": ["agent:a", "agent:b"]}),
+            3,
+        )
+        # 多方（3 agent + 1 human）：N²+1 = 10
+        self.assertEqual(
+            cli_bridge._discussion_auto_turn_budget(
+                {"participant_ids": ["human:qa", "agent:a", "agent:b", "agent:c"]}
+            ),
+            10,
+        )
+
+    def test_human_broadcast_reply_records_turn_on_multiparty_discussion(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.appended = []
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 7,
+                    "status": "active",
+                    "topic": "帮部门想团建点子",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return []
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                    {"member_id": "agent:pi-kimi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 61}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.appended.append((discussion_id, message_id, stance, target_member_id, turn_kind))
+                return {"id": 5}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(returncode=0, stdout="我的点子：密室逃脱、轻徒步、桌游夜。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 60,
+                        "from": "human:qa",
+                        "to": ["agent:pi", "agent:codex", "agent:pi-kimi"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@所有人 帮部门想 3 个团建点子",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        # human 发起的广播回复记账到多方场（想法 = answer）
+        self.assertEqual(client.appended, [(7, 61, "answer", "human:qa", "reply")])
+
+    def test_agent_message_in_multiparty_discussion_uses_scaled_budget(self):
+        class FakeClient:
+            def __init__(self):
+                self.replies = []
+                self.sent = []
+                self.updated = []
+                self.turns = [
+                    {"speaker_id": "agent:codex", "stance": "answer"},
+                    {"speaker_id": "agent:pi", "stance": "answer"},
+                    {"speaker_id": "agent:pi-kimi", "stance": "answer"},
+                    {"speaker_id": "agent:codex", "stance": "agree"},
+                    {"speaker_id": "agent:pi", "stance": "disagree"},
+                ]
+
+            async def list_discussions(self, *, group_id=None):
+                return [{
+                    "id": 8,
+                    "status": "active",
+                    "topic": "帮部门想团建点子",
+                    "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
+                }]
+
+            async def list_discussion_turns(self, discussion_id):
+                return self.turns
+
+            async def get_group(self, group_id):
+                return {"members": [
+                    {"member_id": "human:qa"},
+                    {"member_id": "agent:codex"},
+                    {"member_id": "agent:pi"},
+                    {"member_id": "agent:pi-kimi"},
+                ]}
+
+            async def reply(self, message_id, *, text, to=None, group_id=None):
+                self.replies.append((message_id, text, to, group_id))
+                return {"id": 71}
+
+            async def send_text(self, text, to=None, reply_to=None, group_id=None):
+                self.sent.append((text, to, reply_to, group_id))
+                return {"id": 72}
+
+            async def append_discussion_turn(
+                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
+            ):
+                self.turns.append({"speaker_id": "agent:pi", "stance": stance})
+                return {"id": 6}
+
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
+
+        async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
+            return CliRunResult(returncode=0, stdout="我觉得桌游夜更稳。", stderr="")
+
+        async def scenario():
+            original = cli_bridge.run_cli_command
+            cli_bridge.run_cli_command = fake_run_cli_command
+            try:
+                client = FakeClient()
+                await handle_incoming_message(
+                    {
+                        "id": 70,
+                        "from": "agent:codex",
+                        "to": ["agent:pi"],
+                        "group_id": "group:bs",
+                        "type": "text",
+                        "content": "@agent:pi 你觉得哪个点子最好？",
+                    },
+                    client=client,
+                    member_id="agent:pi",
+                    workdir=Path.cwd(),
+                    command=["pi", "run"],
+                    timeout=5,
+                    max_reply_chars=400,
+                    runtime="pi",
+                    bridge_label="pi bridge",
+                    prompt_transport="argv",
+                )
+                return client
+            finally:
+                cli_bridge.run_cli_command = original
+
+        client = asyncio.run(scenario())
+
+        # 5 条实质轮次 ≥ 1:1 阈值(4)，但多方预算=10+1，模型应正常运行、不触发收尾/升级
+        self.assertEqual(client.replies, [(70, "我觉得桌游夜更稳。", ["agent:codex"], "group:bs")])
+        self.assertEqual(client.updated, [])
+        self.assertEqual(client.turns[-1]["stance"], "answer")
 
     def test_non_substantive_greeting_turns_do_not_trigger_closure(self):
         class FakeClient:
@@ -1553,9 +3914,9 @@ class CliBridgeTests(unittest.TestCase):
                 self.turns.append({"speaker_id": "agent:pi", "stance": stance})
                 return {"id": 5}
 
-            async def update_discussion(self, discussion_id, *, status):
-                self.updated.append((discussion_id, status))
-                return {"id": discussion_id, "status": status}
+            async def update_discussion(self, discussion_id, *, status, end_reason=None):
+                self.updated.append((discussion_id, status, end_reason))
+                return {"id": discussion_id, "status": status, "end_reason": end_reason}
 
         async def fake_run_cli_command(command, prompt, *, cwd, timeout, prompt_transport="stdin"):
             return CliRunResult(returncode=0, stdout="你好，我在线。", stderr="")

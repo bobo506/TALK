@@ -243,6 +243,81 @@ class TalkCliTests(RouteTestCase):
         entry = talk.scan_agents(root)[0]
         self.assertIsNone(entry["user_path"])
         self.assertEqual(entry["identity_path"], ".talk/agents/agent_codex/IDENTITY.md")
+        self.assertIsNone(entry["business_role"])
+        self.assertIsNone(entry["decision_tier"])
+        self.assertEqual(entry["capability_summary"], [])
+
+    def test_scan_agents_aggregates_group_roles_tier_and_capabilities(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        talk.scaffold_agent(root, "agent:codex")
+        groups = {
+            "groups": [
+                {
+                    "id": "group:dev",
+                    "members": [
+                        {
+                            "member_id": "agent:codex",
+                            "business_role": "lead",
+                            "decision_tier": "Decision",
+                            "capabilities": ["代码实现", "API 测试"],
+                        }
+                    ],
+                },
+                {
+                    "id": "group:review",
+                    "members": [
+                        {
+                            "member_id": "agent:codex",
+                            "business_role": "reviewer",
+                            "decision_tier": "decision",
+                            "capabilities": ["API 测试", "只读审查"],
+                        }
+                    ],
+                },
+            ]
+        }
+        (root / ".talk" / "groups.yaml").write_text(
+            yaml.safe_dump(groups, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        entry = talk.scan_agents(root)[0]
+
+        self.assertEqual(entry["business_role"], "lead / reviewer")
+        self.assertEqual(entry["decision_tier"], "decision")
+        self.assertEqual(
+            entry["capability_summary"],
+            ["代码实现", "API 测试", "只读审查"],
+        )
+
+    def test_scan_agents_rejects_conflicting_decision_tiers(self):
+        root = self._root()
+        talk.scaffold_project(root, display_name="P")
+        talk.scaffold_agent(root, "agent:codex")
+        groups = {
+            "groups": [
+                {
+                    "id": "group:a",
+                    "members": [
+                        {"member_id": "agent:codex", "decision_tier": "decision"}
+                    ],
+                },
+                {
+                    "id": "group:b",
+                    "members": [
+                        {"member_id": "agent:codex", "decision_tier": "execution"}
+                    ],
+                },
+            ]
+        }
+        (root / ".talk" / "groups.yaml").write_text(
+            yaml.safe_dump(groups, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ValueError, "conflicting decision_tier"):
+            talk.scan_agents(root)
 
     def test_scan_agents_empty_without_profiles(self):
         root = self._root()

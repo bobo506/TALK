@@ -1,8 +1,205 @@
 # 开发历史 · TALK
 
+## 2026-09-08 Codex 普通终端 PATH 补修
+
+- 用户重启后群聊仍报错。只读检查最新实例确认进程已更换，但 stderr 仍为 Codex 0.144.4 / gpt-6-astra HTTP 400。核对启动命令没有显式 CLI 覆盖；普通终端的持久化 PATH 缺少 Desktop 的原生 CLI 目录，而 Codex 应用工具环境包含它。
+- 修正上批验证遗漏：Windows 在 PATH 没有可用原生 exe 时，进一步查找当前用户 LOCALAPPDATA/OpenAI/Codex/bin 下根目录及一层版本目录中的 codex.exe，按文件更新时间选择；空/不完整/不可读安装安全回退。PATH 原生 CLI 和显式命令的优先级不变，不修改系统 PATH、不安装或更改模型。
+- 启动时向 stderr 输出 `[Codex bridge] CLI:` 和实际可执行文件，便于用户确认加载情况，不输出完整命令或凭证。
+- 两份 bridge 测试 137 项通过，新增普通终端查找、多个安装/不完整目录与缺失/不可读目录回归；diff 检查通过。使用用户 bridge 同款 Python 3.12，移除 Desktop PATH，真实调用找到原生 0.153.4 并返回 TALK_ORDINARY_TERMINAL_OK，退出码 0。
+- 没有发送真实 TALK 消息、操作群成员或终止用户进程。用户需再重启一次 bridge 加载本次补丁；群聊回复仍待复验。变更仅 codex_bridge.py、对应测试、bridge 模块与快照/历史；不推进 TH-7。
+
+---
+
+## 2026-09-08 群聊验收修复与 Codex CLI 兼容
+
+- 用户已人工验收任务 #19：DeepSeek 回复“验收通过”，查看成果并确认后状态变为完成。此前 #15/#16/#17/#18 的完成基线继续保留。
+- 按本轮反馈修复同一 UI 分支：创建和添加群成员只列当前项目角色与其他真人账号，排除当前账号、禁用成员；旧 pi / pi-kimi 不属于当前项目角色，不再作为邀请候选，没有删除历史成员。当前登录 QA Tester，bobo 是另一个账号，归入“其他用户”。创建者继续由服务端自动入组。
+- 邀请、成员列表与 @ 候选统一简短名称；人工昵称保留，@ 候选排除自己，实际插入的成员 ID 和路由协议不变。右侧合并为一份“群聊成员”，展示人数、职责与在线状态；添加表单可展开/收起，管理按钮再显示角色设置、移除与删除群聊。修复旧 CSS 强制隐藏添加表单的问题。
+- Codex 真实失败原因：PATH 优先找到 npm CLI 0.144.4，模型 gpt-6-astra 返回 HTTP 400，要求新版 CLI。Windows 默认命令改为优先 PATH 内原生 codex.exe（排除 WindowsApps 别名），保留用户显式命令与环境配置。现有原生 CLI 0.153.4 使用相同模型实际返回 TALK_CODEX_PROBE_OK；未改变模型或执行权限参数，也没有代发 TALK 群消息。
+- 群聊 CLI 失败时，实例 last_error 记录清理后的 stderr（回退 stdout / 通用提示），最多 4000 字符；群内继续显示简短错误，便于定位原因。
+- 验证：Node 20 项、Python 页面与两类 bridge 137 项通过；JS 语法及 git diff --check 通过。内置浏览器验证新建邀请候选、@ 候选/插入、管理折叠、添加表单展开收起、1440px 桌面与 390px 无横向溢出；控制台未捕获错误。未提交真实成员增删或新群聊，未替用户重启现有 bridge；真实群聊回复仍需重启 Codex bridge 后复验。
+- 变更文件：web 下 5 份页面/样式/脚本、两份 bridge、4 份测试、Web/bridge 模块文档、用户手册、design-qa.md 和进度快照/历史。资源版本 20260908-members-2。临时截图只保留本地，不提交数据库、日志或聊天内容。
+- 并行分支连续性：此前按用户要求复制到 .tmp/th7-terminal-v1，分支 codex/th7-terminal-v1，提交 5781ee6，已完成普通终端 MCP 入口与连接检查，13 项测试通过，尚未推送。当前修复仅在 codex/ui-workspace-v1；待 UI 验收合并后再对齐 TH-7，避免混入当前 PR。
+- 下一步：用户刷新页面并重启 Codex bridge，复验群聊后收尾 PR #3；暂不开始桌面客户端或下一个功能切片。
+
+---
+
+## 2026-09-08 界面批次公开推送与 PR 收尾
+
+- 用户明确回复“可以推送，然后下一步做什么”，授权将前述界面代码、测试及相关文档公开推送到 `bobo506/TALK` 的 `codex/ui-workspace-v1`。本次自动审批通过，无需更改 GitHub 权限或本机审批策略。
+- `git push -u origin codex/ui-workspace-v1` 成功，`git ls-remote` 核对功能 head 为 `df3877a4eae32914eb2a47ac239068fccd77a620`。临时截图、数据库、验收标记与本地辅助文件没有进入提交。
+- 创建中文 PR #3「简化任务、群聊与角色工作台并修复上下文串用」：`https://github.com/bobo506/TALK/pull/3`，head `codex/ui-workspace-v1`，base `codex/task-hall`；创建时包含 5 个前置界面提交、12 个文件。
+- `gh pr list` 返回鉴权 401，使用已有 GitHub 连接器完成查询与 PR 创建。没有要求用户重新登录或改变权限；Git 推送正常。
+- 分支核对：远端 `main` 为 `6e8fcec`，`codex/task-hall` 为 `b15be87`，后者领先主分支 64 个提交。旧 PR #2 仍 open，其 head `1da4797` 已被 `codex/task-hall` 包含。没有合并分支、关闭旧 PR 或开启新切片。
+- 下一步建议：先检查前置分支链，在集成分支完成完整回归与真实新建任务到完成、普通群聊创建/收发验收，再统一合入 `main`，之后确定 TH-7 的最小切片。当前只补记进度，不重跑此前已通过测试。
+
+---
+
+## 2026-09-08 群聊导航切片
+
+- 用户明确要求在任务和角色之间增加“群聊”标签，点击显示群聊房间列表，并移除底部“对话与房间”。额度中断后继续同一切片，未重启其它 Agent 服务或另开切片。
+- 左侧统一“任务 / 群聊 / 角色”；复用现有普通群聊、成员管理、消息搜索与收发。群聊只列当前项目和历史无项目普通房间，任务专属对话保留在任务详情“查看完整对话”。移除旧列表及全局消息流的前端入口，没有删除历史数据或后端 API。
+- 群聊标签恢复最近可进入的普通房间，否则选首个可进入房间；没有房间则显示空状态，不请求/发送旧全局消息。新增群聊携带当前项目，创建后进入新房间；新建弹窗关闭时恢复入口焦点。
+- 任务、群聊、角色各自显示对应列表与内容。历史加载、轮询、分页和分批渲染绑定房间/账号/时间线版本，切换后丢弃迟到响应，避免旧房间消息混入新房间。
+- 验证：Node 17 项通过（含群聊过滤、无全局回落、旧房间响应隔离、创建项目归属与导航），Python 页面契约 2 项及群聊创建/项目关联 2 项通过；JS 语法与 diff 检查通过。
+- 真实浏览器验证：现有 test-run20 群聊、搜索空结果、新建弹窗/Escape/焦点恢复、任务 #9 完整对话、角色页不显示旧列表、群聊刷新、768px 与 390px 无横向溢出；控制台无捕获错误。真实项目中未创建房间或发送消息；没有声称完成浏览器真实创建提交或完整聊天回归。
+- 变更文件：`web/index.html`、`web/app.js`、`web/workspace.js`、`web/workspace.css`、两份 UI 测试、项目简报、Web UI 模块、用户手册、快照/历史与 `design-qa.md`。静态资源版本 `20260908-chats-1`，截图仅保留 `.tmp/group-chat-20260908/`。
+- 同一 `codex/ui-workspace-v1` 分支本地提交；此前公开推送审批仍待明确授权，本轮没有重试推送或创建 PR。等待用户验收本次导航，不继续 TH-7。
+
+---
+
+## 2026-09-07 UI-WORKSPACE-1 验收微调：默认显示密度 80%
+
+- 项目管理者已查看双栏版本，表示唯一需要调整的是页面内容大小，浏览器缩放到原来的 80% 较合适。
+- `web/workspace.css` 对宽度至少 701px 的桌面界面统一缩放为 0.8，并补偿页面、工作台和弹窗视口高度；窄屏保留现有尺寸。没有修改信息内容、数据或操作流程。
+- 资源版本更新为 `20260907-density-1`；在浏览器 100% 下即可查看新密度，避免与用户原先的 80% 浏览器缩放叠加。
+- 浏览器实测 1488×1056：标题栏 70→56，搜索框 44→35.2，标题行高 42→33.6，工作台仍铺满窗口；弹窗 496px 宽且遮罩覆盖视口。769px 角色页无横向溢出，390px 的缩放仍为 1、搜索框仍为 44px。
+- 页面契约 2 项通过，diff 检查通过；未重复无关后台回归。截图在 `.tmp/workspace-density-20260907/`，仅保留本地。
+- 本次变更文件：`web/workspace.css`、`web/index.html`、`tests/test_task_web_ui.py`、进度快照/历史、Web UI 模块、`design-qa.md`。同分支本地提交；前次公开推送审批仍待明确授权，本轮没有重试推送。
+
+---
+
+## 2026-09-07 UI-WORKSPACE-1：任务 / 角色双栏工作台
+
+- 用户在界面审计后要求先看预览，确认“任务要求”保留原始目标/限制/完成标准、普通页面移除技术详情，并增加同级“角色”入口。任务与角色两张预览获得确认后，用户授权开发一个切片；额度中断后本轮继续验证收尾。
+- 从 `f60c077` 创建 `codex/ui-workspace-v1`。新增 `web/workspace.js`、`web/workspace.css`，调整页面骨架及现有 JS 事件；没有改变 API、数据库、bridge 或 TH-6d 任务状态。
+- 任务模式仅在左侧列主任务，支持全部/进行中/待我处理/已结束筛选与搜索；右侧显示负责人、状态、成果入口、分工流转及默认折叠的原始任务要求。子任务从流转中进入，可返回主任务。
+- 角色模式读取当前项目配置，展示职责、实际参与任务和工作状态，支持过滤、任务跳转、交办时预选该角色。统筹者已归入根任务的委派子项不重复占据角色列表。
+- 修复跨 Hall/任务/项目/账号的异步树响应污染，树按钮执行前验证根归属，异步操作完成不抢回用户当前选择；完成态不显示暂停/终止。成果访问失败在详情内可见，静默刷新不抹除提示或无故重建未变化的页面。
+- 实际浏览器覆盖：#15→左侧 Hall #9、#9 文本成果、受限 #15、角色预选/搜索/筛选、空项目、子任务返回、Escape/焦点。390px 与 769px 无横向页面溢出，手机标题栏遮挡修复并复测。生成预览与实现分别同输入并列核对，未将不同任务的示例文案写入真实数据。
+- 验证：`node --check web/app.js`、`node --check web/workspace.js`；`node --test tests/workspace_ui.test.cjs` 11 项通过；Python 页面契约与两条任务工作流共 4 项通过。没有重跑完整后台回归，也没有在真实项目中提交测试任务或消息。
+- 变更文件：`web/index.html`、`web/app.js`、`web/workspace.js`、`web/workspace.css`、`tests/test_task_web_ui.py`、`tests/workspace_ui.test.cjs`、`design-qa.md`、本快照/历史、Web UI 模块、项目简报、用户手册。
+- 本地服务在中断后重启，最终保留内置浏览器预览。已有 API Key 可登录；仅验收已完成任务视图无需启动其它角色的 bridge。截图/生成图/临时验收文件不进入公开提交。
+- 提交 `15874ba` 已完成；推送 `origin codex/ui-workspace-v1` 被 Codex 自动审批拒绝，理由为缺少本次具体内容与公开目的地的明确授权。没有绕过拦截、修改权限或创建 PR；等待项目管理者明确授权后继续远端同步。
+- 待验收：双栏信息层级与易读性。创建弹窗仍保留高级任务配置术语，角色页不是进程管理器；下一轮如需继续简化，先确认弹窗方向。TH-7 暂缓。
+
+---
+
+## 2026-09-06 面向非编程使用者的界面评估
+
+- 用户在 TH-6d 验收后要求重新评估界面：减少无意义数据，让非编程人员看懂任务转交、完成状态和下一步；中断后继续本次评估。TH-7 在界面方向明确前暂缓，具体布局尚未批准。
+- 使用 Product Design audit 与项目进度框架完成 5 步真实浏览器审计：窄窗口总览、桌面总览及 #15 详情、创建弹窗、受限成果入口、可访问的 #9 Hall。原始截图与完整报告在 `.tmp/ui-audit-20260906/`，仅保留本地。
+- 优先缺陷：从 #15 黑板经侧栏进入 #9 Hall，详情更新为 #9，门禁仍显示上一任务树 #16 的 Review/Test。源码确认 getContextTask 与 selectedTaskTree 使用不同上下文，树按钮可能指向旧任务；未执行控制操作验证服务端结果。
+- 其它问题：完成态仍显示 active/暂停/终止；非成员 Hall 在侧栏禁用但详情入口仍可点，点击后无可见反馈；主子任务平铺；技术字段、重复 Hall 列表与空列挤占空间；769px 详情横向截断。创建弹窗底色与焦点显示良好，Escape 可关闭，但焦点未返回入口。
+- 建议按“先修状态及操作一致性，再做总览/详情/创建三屏简化”推进。主任务组织工作，子任务展开查看；成果与下一步优先，内部 ID/租约/epoch 收入技术详情。必须保留提交、验收、收取、整体完成的真实语义，不能隐式扩大委派授权。
+- 本次只读页面导航及源码核对，无产品代码、任务、消息或授权额度变更；恢复原始浏览器尺寸并返回 #15 黑板。没有重跑功能全量测试或宣称完整无障碍合规。
+- 分支状态核对：远端补充推送记录 b15be87 已成功，codex/task-hall 相对 main ahead 64/behind 0，未查到 PR、尚未合并；TH-6d 仍为已验收基线。此次仅维护两份进度文档与本地审计产物，未发布截图。
+- 下一步：评审简化方案并制作可点击原型；代码开发按前端交互切片推进。
+
+---
+
+## 2026-09-06 公开推送授权与远端核验
+
+- 项目管理者针对上一轮说明的公开仓库 `bobo506/TALK`、`codex/task-hall` 分支和 5 份验收收尾文档明确回复“推送吧”。
+- 重新执行 `git push origin codex/task-hall` 成功，远端从 `dd1f682` 前进至 `272b50b`（完成 TH-6d 人工验收与任务树收尾）。
+- `git ls-remote origin refs/heads/codex/task-hall` 返回 `272b50bab74ab62f6f01e9181d5826bfa0baa4d4`，与本地 HEAD 一致；tracked 工作区干净，仅保留 V1/V2 两个 untracked 验收产物。
+- 更新 `docs/PROGRESS.md` 与本历史记录，清除已解决的推送待授权状态；本轮仅补记推送结果，不修改代码、不重跑已通过测试、不进入 TH-7。
+- 上轮拒绝来自 Codex 自动审批，GitHub 账号和仓库权限已足够；本轮未修改 GitHub 权限、仓库可见性、Codex 审批策略或项目长期授权规则。此次授权仅记录为本次验收文档及其推送收尾。
+
+---
+
+## 2026-09-06 TH-6d 人工验收通过与根任务收尾
+
+**角色与授权**：当前 Codex 为 `AGENTS.md` 指定的决策 Agent。项目管理者确认“16，17，18都是已完成的状态，已验收，继续收尾”，本轮完成既有里程碑收尾，不开启 TH-7。
+
+**人工验收核对**：
+
+- 本轮恢复时 `http://127.0.0.1:8000` 无服务响应；项目管理者启动 TALK Server 后，`GET /healthz` 返回 `status/db/storage=ok`。
+- 页面人工验收由项目管理者完成；SDK/API 核对根任务 `#15` 从此前的 `awaiting_human/milestone` 变为 `active`、`checkpoint_reason=null`、`authorization_epoch=2`。
+- Review `#17` 仍为 `approved`，Test `#18` 仍为 `passed`、`satisfied=true`，冻结集为 `[16]`；Development `#16`、Review `#17`、Test `#18` 都已 `succeeded/completed`。本轮没有重新调用人工验收接口。
+
+**根任务最终收尾**：
+
+- 沿用 `agent:codex` 与 `codex-desktop-th6d-v2`，通过正式 SDK/API 重新领取根任务 `#15`（attempt=`2`），在原 Task Hall 写入最终汇总消息 `#2480`，提交为 `succeeded/submitted`。
+- 依据项目管理者本次验收及收尾授权，以原请求者 `human:bobo` 身份调用结果收取接口；根任务最终为 `succeeded/completed`。
+- 最终任务树 `#15/#16/#17/#18` 全部为 `succeeded/completed`；运行中和非终态后代均为 `0`，剩余开发切片额度为 `0`，最新 Review/Test 门禁保持有效。
+- 根任务的 `control_status=active` 表示人工验收检查点已释放，不表示根任务仍运行；完成状态以 `status/workflow_status` 为准。Codex Desktop instance 回到 `idle`。
+- 本轮未启动或重跑其它 Agent bridge，未新增子任务、未扩大开发授权；旧失败任务和 V1/V2 两个 untracked 验收文件保留。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks.AgentTaskTests.test_passed_milestone_test_pauses_for_human_acceptance_before_root_completion tests.test_tasks.AgentTaskTests.test_task_workflow_clarification_accept_submit_and_collect -q` → `Ran 2 tests in 1.219s`，`OK`。覆盖里程碑人工验收后根任务重新领取和提交、结果收取及请求者权限。
+- V2 产物重新核对：65 bytes、UTF-8 无 BOM、LF、SHA-256=`602FBC88D523943F2798942F0F898B354834372C1BC53AEECBF3233FAC2743DF`，通过。
+- 真实 SDK/API 完成根任务提交、收取与最终树断言；没有直接修改数据库状态。
+- 文档检查：5 份变更文件 UTF-8 正常，16 个本地 Markdown 链接有效，进度快照少于 90 行；`git diff --check` 通过。
+- 2026-08-27 的 `389` 项全量回归与 Kimi `119` 项独立定向回归为既有通过证据，本轮未重跑全量回归。本轮无代码或前端交互改动，浏览器验收由项目管理者完成。
+
+**文档同步与变更文件**：
+
+- `docs/PROGRESS.md`：替换等待验收快照，记录最终状态、角色、证据、边界与 TH-7 建议。
+- `docs/PROGRESS_HISTORY.md`：归档本轮授权、验收、收尾与验证事实。
+- `docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_tasks.md`：TH-6d 状态同步为人工验收通过，保留完整浏览器 Tester 等未完成边界。
+- `docs/guides/USER_MANUAL.md`：说明人工验收解除检查点后，根负责人提交最终汇总、根请求者收取结果的既有流程，不把人工验收等同于自动提交根结果。
+
+**提交与推送限制**：已创建本地验收收尾提交。首次推送被自动审批以未验证目标归属为由拒绝；随后通过只读 GitHub API 确认登录账号与仓库 owner 均为 `bobo506`，admin/push 权限为 true。补齐证据后再次审批仍拒绝，理由为目标 `bobo506/TALK` 是公开仓库，本轮 5 份项目进度、模块和用户手册文档的公开披露需要用户明确授权。未通过其它通道绕过；待项目管理者明确授权后再推送 `codex/task-hall`。
+
+**待确认与下一步**：TH-6d 无待验收问题；剩余收尾事项为取得上述公开推送授权并核对推送结果。TH-7 尚未启动，后续再确认 Codex Desktop / 通用终端接入包装的最小范围。完整浏览器 Tester 能力、操作系统级硬隔离、Kimi 会话策略与既有技术债继续保留。
+
+---
+
 <!--
 项目根：d:\claude-test\TALK
-最后更新：2026-06-02 5.x agent-to-agent 通信主线关闭（黑盒复测通过）
+最后更新：2026-09-06 TH-6d 收尾文档公开推送成功并核对远端
+
+## 2026-08-27 TH-6d 原生三 Agent V2 自动门禁通过，等待人工验收
+
+**目标**：在 Kimi prompt mode 参数修复提交 `921fbb1` 上，用当前 Codex Desktop 会话作为 Lead、DeepSeek Harness 作为 Dev、官方 Kimi Code CLI 作为 Reviewer/Tester，重新执行一棵不复用旧失败任务的完整验收树。
+
+**运行拓扑**：
+
+- TALK Server：`http://127.0.0.1:8000`
+- Lead：当前 Codex Desktop 会话，以 `agent:codex` SDK/API 身份协调；没有启动额度耗尽的嵌套 Codex bridge。
+- Dev：`agent:deepseek`，DeepSeek Harness bridge。
+- Reviewer/Tester：`agent:kimi`，官方 Kimi Code CLI `0.38.0`，`review` 工具档。
+- 项目档案同步结果精确为 `agent:codex / agent:deepseek / agent:kimi` 三个活动成员。
+
+**任务树与证据**：
+
+- 根任务 `#15`：`TH-6d 三 Agent 验收 V2（Kimi Code）`，`may_delegate=true`、里程碑 Test 必需、授权批次仅 1 个 Development 切片。当前 Task Hall 为 `group:task-2d0cf86216b742f3adc157a3695ebeef`。
+- Development `#16`：DeepSeek 只创建 `.tmp/th6d-native-kimi-acceptance-v2.txt`，未改 tracked 文件；任务结果消息 `#2476`。文件为 65 bytes、UTF-8 无 BOM、末尾 LF，SHA-256 为 `602FBC88D523943F2798942F0F898B354834372C1BC53AEECBF3233FAC2743DF`。
+- Review `#17`：Kimi 原生 bridge 真实领取并完成，relation `reviews -> #16`；独立核对三行内容、编码、字节、哈希、Git 状态和 Development 结果消息，门禁 `approved`、`findings=[]`，结果消息 `#2477`。
+- Test `#18`：Kimi 原生 bridge 真实领取并完成，relation `tests -> #16`；独立运行 `119` 项 Kimi/通用 bridge 定向回归，`1.052s`、`OK`，并完成 marker/Git/Review 黑盒核验，门禁 `passed`、`findings=[]`，结果消息 `#2478`。
+- Lead 在根 Task Hall 写入汇总消息 `#2479`，明确自动门禁通过但不代替项目管理者宣告里程碑完成。
+
+**服务端门禁状态**：
+
+- Review gate 当前 verdict=`approved`，覆盖冻结 Development `#16`。
+- Test gate 的 `frozen_task_ids=[16]`、verdict=`passed`、`satisfied=true`。
+- 根任务 `#15` 已自动撤销 Lead claim 并进入 `control_status=awaiting_human`、`checkpoint_reason=milestone`；这是预期的人工作业门禁，不是失败或阻塞。
+- Test `#18` 已由 Lead 收集为 `succeeded/completed`；当前 Codex Desktop instance 回报 `idle`。
+
+**额外验证**：修复后 Lead 全量回归为 `389 tests in 170.772s`、`OK`；Kimi 独立定向回归为 `119 tests in 1.052s`、`OK`。
+
+**待人工验收**：打开 `http://127.0.0.1:8000`，进入任务 `#15`，检查三项子任务与质量门禁后点击“人工验收通过”。当前 Server、DeepSeek bridge 与 Kimi bridge 保持运行；V1/V2 两个 `.tmp` 验收文件保持 untracked，不进入 Git。
+
+---
+
+## 2026-08-27 Kimi Code prompt mode 参数修复与首次真实验收中断收尾
+
+**背景**：项目管理者完成 Kimi Code 登录后，启动 `agent:codex / agent:deepseek / agent:kimi` 原生拓扑执行 TH-6d 真实验收。第一次任务树为根任务 `#12`、Development `#13`、Review `#14`。
+
+**真实验收结果**：
+
+- DeepSeek 真实领取并完成 `#13`，结果消息 `#2473`；生成 `.tmp/th6d-native-kimi-acceptance.txt`，内容为三行受控 marker，UTF-8 无 BOM、CRLF、61 bytes，SHA-256 为 `CC4B2278EDFEB377BA3B32575BBE8168D66F2F8F311D5E48612C52116F897B3F`。
+- Kimi 在 `#14` 领取前预检阶段连续三次安全失败，错误为 `Cannot combine --prompt with --auto.`，结果消息 `#2474`；任务没有被误认领，证明领取前门禁按设计止损。
+- 根任务 `#12` 随后因嵌套 Codex CLI workspace 额度耗尽失败，结果消息 `#2475`。该失败属于运行额度限制，不是 TALK 协议、Kimi 登录或 DeepSeek 执行缺陷；旧树保留现场，不再复用。
+
+**根因与修复**：
+
+- Kimi Code CLI `0.38.0` 的 prompt mode（`-p/--prompt`）本身就是非交互执行，并明确拒绝与 `--auto` 同时使用。
+- `bridges/kimi_bridge.py` 的默认命令移除 `--auto`；讨论、预检与任务执行的能力边界继续由临时 Agent 文件的工具白名单控制。
+- `tests/test_kimi_bridge.py` 增加反向锁定，确保所有 prompt mode 命令都不含 `--auto`；`docs/spec/MODULE_bridges.md` 与 `docs/PROJECT_BRIEF.md` 同步真实 CLI 合同。
+- 使用临时 Read-only Agent 文件执行真实 Kimi 工具调用，成功读取受控 marker 并返回 `KIMI_PROMPT_TOOL_OK`，退出码为 `0`；临时 Agent 文件随后删除。
+
+**验证**：
+
+- `.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge -q` → `Ran 119 tests in 0.913s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q` → `Ran 389 tests in 170.772s`，`OK`。
+- `py_compile` 与 `git diff --check` 通过；仅有 Windows LF/CRLF 提示。
+
+**恢复决策**：新的干净验收树不再启动嵌套 Codex bridge，由当前 Codex Desktop 会话直接以 `agent:codex` Lead 身份通过 SDK/API 协调 DeepSeek 与 Kimi。Test 门禁通过后保留 `awaiting_human`，等待项目管理者人工验收。
+
+---
 
 ## 2026-06-07 5.7+ 对话质量打磨 + PROJECT_INTEGRATION 长期方向沉淀
 
@@ -183,6 +380,1639 @@ git diff --check: 通过（仅 Windows CRLF 提示）
 最后更新：2026-06-01 5.5 方案 D：discussion_turns 显式交互账本
 最新条目在顶部。条目数 > 30 时，最旧条目自动归档到 PROGRESS_archive.md
 -->
+
+## 2026-08-27 Kimi 迁移到官方 Kimi Code CLI
+
+**背景**：当前固定拓扑中的 Reviewer 名义上是 Kimi，但实际由 pi runtime 加载 `moonshotai-cn/kimi-k3`。项目管理者已经在本机安装 Kimi Code CLI，并确认改用本家 CLI。本切片只完成 bridge、活动成员拓扑和项目文档迁移；不启动 Server/bridge，不创建新验收任务，不进入 TH-7。
+
+### 完成事项
+
+- 新增 `bridges/kimi_bridge.py`，默认成员为 `agent:kimi`、runtime 为 `kimi-code`，使用官方 `kimi --auto --output-format stream-json ... -p` 和 argv prompt 传输；`--auto` 避免无人值守 bridge 卡在权限询问，实际能力仍受 Agent 文件工具白名单约束。
+- bridge 启动时在临时目录生成三份受控 Kimi Agent 文件：Group Hall 讨论无工具、Task Hall 领取前预检无工具、任务执行默认 `review` 档开放 `Read / Grep / Glob / Bash`；显式 `--kimi-task-profile tools` 才额外开放 `Edit / Write`。
+- 三份 Agent 文件均设置 `subagents: []`，并把 `--skills-dir` 指向受控空目录；项目 `.talk/agents/agent_kimi/` 的 IDENTITY / SOUL / USER 通过既有 profile 机制注入系统提示词。
+- 通用 bridge 新增 Kimi `stream-json` 解析与结果归一化，忽略 Tool / meta 事件，提取最后一条非空 Assistant 文本；覆盖消息处理、任务预检、协议修复、任务执行和 Review/Test 门禁。
+- Kimi 纳入紧凑身份 prompt 规则；pi 专属中文最终答复归一化保持不变。
+- `.talk/groups.yaml`、`AGENTS.md` 与各 Agent 角色档案切换到 `agent:kimi`；移除旧活动档案 `.talk/agents/agent_pi/`，但不迁移或删除数据库中的旧成员历史。
+- `docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_bridges.md`、`docs/spec/MODULE_tasks.md`、`docs/spec/LOCAL_LAB_DESIGN.md` 已同步官方 Kimi CLI 入口、当前拓扑、权限档位和已知会话边界。pi bridge 仍保留为兼容入口。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge -q`：`Ran 119 tests`，`OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_kimi_bridge tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge tests.test_profiles tests.test_talk_cli -q`：`Ran 196 tests in 9.713s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 389 tests in 109.913s`，`OK`。
+- `python bridges/kimi_bridge.py --help` 正常；`py_compile bridges/cli_bridge.py bridges/kimi_bridge.py tests/test_kimi_bridge.py` 通过；`git diff --check` 通过，仅有 Windows LF/CRLF 提示。
+- 本机 Kimi Code CLI `0.38.0` 能正确解析 `--output-format stream-json`、受控 `--agent-file` 和 `--skills-dir`，并输出 JSON meta；随后因本机尚未登录或配置默认模型返回 `No model configured`、退出码 1。该调用没有模型答案，因此真实端到端验收仍待完成。
+- 本切片无前端改动，未重复 Browser 验证；未启动 TALK Server/bridge，未创建任务，也未触碰已取消的 `#10/#11`。
+- 已创建中文提交 `522635d`（`迁移 Kimi 到官方 CLI bridge`）。首次沙箱内 push 因无可用凭据失败，外部凭据 push 曾被授权门禁拒绝；项目管理者随后明确授权该远端与分支，推送成功：`14bd3d8..522635d  codex/task-hall -> codex/task-hall`。
+
+### 当前结论与下一步
+
+- 官方 Kimi Code CLI bridge 的实现与自动化回归完成，当前活动 Reviewer 身份统一为 `agent:kimi`。
+- 项目管理者先执行 `kimi login` 或配置 Kimi Code 默认模型；随后同步项目 profile 并从全新根任务启动 Codex → DeepSeek → Kimi 的真实 TH-6d 验收。
+- 本切片涉及 bridge 与跨模块配置，按决策 Agent 批次刹车暂停；真实三 Agent 人工验收通过前不进入 TH-7。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `bridges/kimi_bridge.py`
+- `tests/test_kimi_bridge.py`
+- `.talk/groups.yaml`
+- `.talk/agents/README.md`
+- `.talk/agents/agent_codex/IDENTITY.md`
+- `.talk/agents/agent_codex/USER.md`
+- `.talk/agents/agent_deepseek/USER.md`
+- `.talk/agents/agent_kimi/IDENTITY.md`
+- `.talk/agents/agent_kimi/SOUL.md`
+- `.talk/agents/agent_kimi/USER.md`
+- `.talk/agents/agent_kimi/MEMORY.md`
+- 删除 `.talk/agents/agent_pi/` 下四份旧活动档案
+- `AGENTS.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/spec/MODULE_bridges.md`
+- `docs/spec/MODULE_tasks.md`
+- `docs/spec/LOCAL_LAB_DESIGN.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-08-22 推送修复并安全收束旧验收任务树
+
+**背景**：DeepSeek 非持久化预检切片已经提交但尚未推送；真实三 Agent 验收遗留根任务 `#10` 与 Development 子任务 `#11`，分别停在 `running/in_progress` 和 `queued/assigned`。项目管理者要求先提交 GitHub 并继续。本切片只处理推送和旧树收束，不启动 bridge、不创建新验收任务。
+
+### 完成事项
+
+- 将本地领先的 5 个提交推送到 GitHub `origin/codex/task-hall`；本地与远端均指向 `cf12e8f`。
+- 只读确认旧树范围严格为 `#10/#11`，无 Review/Test 关系或澄清记录；`#11` 从未 claim，`#10` 的旧租约早已过期。
+- 按项目脚本创建操作前 SQLite 在线备份 `backups/backup_2026-08-22.db`，并通过完整性检查。
+- 使用无 lifespan 的本地 ASGI 请求走正式鉴权和 `cancel-tree` API：先读取树并验证任务 id 为 `[10, 11]`，再由根请求者取消整树。
+- `#10/#11` 均进入 `canceled/canceled`，根控制为 `canceled`、检查点原因为 `manual_cancel`；claim、实例、token 与租约全部清除。
+- 两个 Task Hall 与其中 3 条历史消息保持不变；未启动 Server/bridge，未创建新任务。临时操作脚本已删除。
+- 顺手纠正 `MODULE_tasks.md` 中已经过时的预检重试和本地 `pi-kimi` 拓扑描述，使其与已落地 bridge 行为和当前三 Agent 配置一致。
+
+### 验证
+
+- GitHub push：`5583bad..cf12e8f  codex/task-hall -> codex/task-hall`；本地与远端 SHA 均为 `cf12e8fdcef84dfc7e6a7d679d85be79b2d3665d`。
+- 操作前备份与操作后 `talk.db` 的 `PRAGMA quick_check` 均返回 `ok`。
+- `GET /api/tasks/10/tree` 与 `POST /api/tasks/10/cancel-tree` 均返回 `200`。
+- SQLite 只读复核：`#10/#11 = canceled/canceled`，根 `control_status=canceled`，Hall 数为 2、Hall 历史消息数为 3。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks.AgentTaskTests.test_checkpoint_and_cancel_tree_enforce_roles_and_preserve_history -q`：`Ran 1 test in 1.842s`，`OK`。首次把测试类名误写为不存在的 `TaskApiTests`，该次未执行任何用例；更正为真实类名后通过。
+- 8000 端口无监听；Git 工作树在文档更新前保持干净。
+
+### 当前结论与下一步
+
+- 旧验收树已经永久停止，不会在重新启动 bridge 后被误领；历史证据和恢复备份仍保留。
+- 下一切片从全新根任务开始真实三 Agent 验收，依次验证 Codex 根协调、DeepSeek Development、Kimi3 Review/Test 与项目管理者人工验收；等待项目管理者确认后开始。
+
+### 变更文件
+
+- `docs/spec/MODULE_tasks.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-08-21 避免 DeepSeek 预检会话持久化
+
+**背景**：此前给预检增加 3 轮上限后，DeepSeek Harness 每次 `headless` 调用仍会创建持久会话；单轮又可能包含正常判断和协议修复，因此出错时仍会生成多个无效对话窗口。项目管理者决定保留领取前澄清，但要求预检不产生窗口，并把 DeepSeek 跨轮询限制为 1 轮。本切片只处理该 bridge 行为，不启动现有 bridge、不处理旧 `#10/#11`、不进入三 Agent 验收。
+
+### 完成事项
+
+- 新增项目内 `.talk/dsh/preflight-ephemeral.cordis.yml`，只关闭 DSH 的 `session-persistence-jsonl` 和 `session-checkpoint-policy`。
+- 通用 bridge 在 `runtime=dsh`、使用官方 `dsh / dsh.cmd / dsh.exe` 启动命令且 `--project` 下存在补丁时，只为 Task Hall 预检追加 `--patch`；正式任务命令保持原样，因此成功执行仍只保留一个正常 DSH 会话。
+- 显式 `--task-preflight-command` 继续优先，自定义命令与缺失补丁时保持旧行为，避免隐式改写第三方命令。
+- 新增 `--task-preflight-max-attempts 1..3`；DeepSeek 默认 1 轮，其他 runtime 默认 3 轮。单轮内的协议修复和信息不足时的澄清流程均保留。
+- 新增自动注入、显式覆盖、缺失补丁回退、runtime 默认上限和 DeepSeek 一轮失败终止回归测试。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 147 tests in 1.139s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 380 tests in 156.709s`，`OK`。
+- `python bridges/cli_bridge.py --help`：正常展示 `--task-preflight-max-attempts {1,2,3}`。
+- DSH `--dump-config` 确认补丁后的 `session-persistence-jsonl` 与 `session-checkpoint-policy` 均为 `disabled: true`。
+- 真实最小 DSH 调用退出码为 0；调用前后用户级 sessions 目录均为 55 个文件，新增或改写为 0。此次未启动 TALK bridge，旧 `#10/#11` 现场未变。
+
+### 当前结论与下一步
+
+- DeepSeek 的澄清判断仍在，但预检与同轮协议修复不再出现在 DSH 会话列表；失败至多 1 轮，成功后只有正式执行会保留一个会话。
+- 下一切片仍需先安全处理旧 `#10/#11`，再从新根任务执行 Codex → DeepSeek → Kimi3 的 Development / Review / Test / 人工验收完整闭环；等待项目管理者确认后开始。
+
+### 变更文件
+
+- `.talk/dsh/preflight-ephemeral.cordis.yml`
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/spec/MODULE_bridges.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-08-21 修复委派弹窗卡片与两阶段上下文
+
+**背景**：TH-6d 真实验收发现 `.task-create-panel.modal-card` 没有背景、边框和阴影，页面内容会透过弹窗；根任务与子任务又复用静态“执行 Agent”标签，无法直观看出先选根负责人、再为各子任务选执行者的两阶段关系。项目管理者要求本切片单独修复该前端问题。
+
+### 完成事项
+
+- 为通用 `.modal-card` 补齐实体背景、边框、圆角、文字颜色和阴影，任务创建弹窗不再透明；Group 创建和 Agent 人设等现有 modal 同时获得一致的卡片壳。
+- 任务弹窗新增 dialog 语义及标题、上下文说明和 Agent 标签锚点；根模式显示“委派根任务 / 根任务负责人 / 创建根任务 Hall”，子模式显示“创建子任务 / 子任务执行 Agent / 创建子任务 Hall”。
+- 根模式说明“根任务开始后再从详情创建子任务”，子模式说明“当前 Agent 只执行子任务，根负责人继续协调和汇总”；缺少 Agent 时的校验提示也随模式切换。
+- 更新前端资源 cache-busting 版本，避免浏览器继续使用旧 CSS / JS。
+- 前端静态测试新增卡片视觉属性、dialog / 可访问名称和动态两阶段文案断言；模块合同与用户手册同步当前按钮和字段名称。
+
+### 验证
+
+- `node --check web\app.js`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_task_web_ui -q`：`Ran 2 tests in 0.707s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 376 tests in 106.338s`，`OK`。
+- Codex Browser 使用隔离临时 TALK 服务真实登录并分别打开根任务和子任务弹窗：两种模式计算背景均为 `rgb(255, 254, 250)`，具有实线边框、`14px` 圆角和阴影；DOM 中标题、说明、Agent 标签、下拉框可访问名称和提交按钮全部与模式一致，控制台无 error / warning。
+- 隔离服务仅使用临时成员、项目、根任务和数据库；验证后关闭页面与服务并清理全部临时文件，现有 `talk.db` 和旧 `#10/#11` 现场未修改。
+- `git diff --check`：通过，仅有 Git 对工作区 LF/CRLF 转换的提示。
+
+### 当前结论与下一步
+
+- DeepSeek 多行 prompt、预检无限重试和委派弹窗两个前端问题均已完成修复及自动化 / Browser 验证。
+- 下一步等待项目管理者确认后安全处理旧 `#10/#11` 现场，并从新根任务重新执行真实三 Agent 完整验收；本切片不继续该操作。
+
+### 变更文件
+
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `tests/test_task_web_ui.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-08-21 限制任务预检最多连续尝试 3 次
+
+**背景**：TH-6d 真实验收曾观察到 DeepSeek 预检协议输出无效后，worker 在每个轮询中执行正常提示和协议修复提示，两次均失败后仍在后续轮询继续调用，数分钟内生成至少 24 个无效 DSH session。项目管理者明确要求本切片只增加 3 次限制，不连续处理前端问题。
+
+### 完成事项
+
+- 将预检命令、超时、非零退出和无效协议结果统一包装为 `TaskPreflightError`；同一轮正常输出无效时仍保留一次协议修复机会。
+- 任务 worker 按 task id 记录连续预检失败，最多进入 3 个轮询尝试；前两次上报实例错误，第 3 次不再等待下一轮。
+- 达到上限后，bridge 领取 poison task，在对应 Task Hall 写入“已停止重试”的用户可见说明，并以 `failed` + `last_error` 完成任务，使终态持久化且不会进入第 4 次模型调用。
+- 任一预检成功会清除该任务此前的失败计数；某个任务预检失败不会阻止 worker 继续处理同轮其它排队任务。
+- 当前失败计数保存在 worker 进程内：达到第 3 次后的 `failed` 状态持久化；若在达到上限前人为重启 bridge，未完成计数不会跨进程继承。本切片未增加数据库字段或任务 API。
+- 用户手册补充“自动预检连续失败 3 次”的恢复说明。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py`：通过。
+- 3 条新增定向用例：协议修复仍失败会抛出专用错误；连续失败严格停在第 3 次并持久化任务失败；成功预检会清零先前计数。结果为 `Ran 3 tests in 0.005s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 143 tests in 0.543s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 376 tests in 105.860s`，`OK`。
+- 测试使用受控 fake runner 精确统计预检次数，确认没有第 4 次调用；本切片没有调用真实 DeepSeek 模型。
+- `git diff --check`：通过，仅有 Git 对工作区 LF/CRLF 转换的提示。
+
+### 当前结论与下一步
+
+- DeepSeek 多行 prompt 丢失与预检无限重试两个 bridge 阻断项均已完成代码修复和自动化验证。
+- 下一切片建议单独修复委派任务弹窗背景及根任务/子任务上下文标签，等待项目管理者确认后开始。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/spec/MODULE_bridges.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-08-21 修复 DeepSeek Windows 多行 prompt 丢失
+
+**背景**：TH-6d 真实验收确认 TALK 以多行最终 argv 调用全局 `dsh.cmd` 时，Windows npm shim 的 `%*` 转发只把首行送入 Harness。升级 `@deepseek-ai/dsh` 至 `0.1.0-rc.8` 后问题仍在，因此本切片只修复命令启动边界；项目管理者明确要求逐项处理，本次没有顺带修改预检重试或前端问题。
+
+### 完成事项
+
+- 通用 bridge 在 Windows 解析到 `dsh.cmd` 后，会读取同目录全局 npm 树中的 `@deepseek-ai/dsh/package.json`，校验包名、`bin` 配置、入口存在且未逃逸包目录。
+- 校验通过后，bridge 使用 npm 目录内的 `node.exe` 或系统 Node 直接启动 Harness JavaScript 入口，并保留原命令其余参数；任务预检和正式执行因共用 `run_cli_command` 均获得相同修复。
+- 识别范围严格限定为官方 `dsh.cmd`；manifest 无效、入口异常、Node 不可用或命令为其他 `.cmd` 时保持原命令，不改变其他 CLI 行为。
+- 新增官方 DSH shim 解析、非 DSH `.cmd` 保持原样以及中文多行 prompt 作为单个最终 argv 完整传输的回归测试。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 140 tests in 0.574s`，`OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 373 tests in 105.003s`，`OK`。
+- 本机解析探针确认配置中的 `dsh.cmd --profile headless` 实际转换为 `node.exe ...\@deepseek-ai\dsh\lib\bin.js --profile headless`。
+- 通过修复后的 `run_cli_command` 执行一次受控真实四行模型探针，DeepSeek 同时识别两行令牌并只返回 `DSH_MULTILINE_OK`，证明首行之后的正文和末行约束均未丢失。
+- `git diff --check`：通过，仅有 Git 对工作区 LF/CRLF 转换的提示。
+
+### 当前结论与下一步
+
+- DeepSeek Windows 多行 prompt 丢失已修复，现有 bridge 启动配置无需改写。
+- 预检协议失败后的跨轮询无限重试仍是独立阻断项；下一切片建议只处理该问题，等待项目管理者确认后开始。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/spec/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-08-21 DeepSeek Harness `0.1.0-rc.8` 受控升级与验证
+
+**背景**：TH-6d 真实三 Agent 人工验收已确认本机 `@deepseek-ai/dsh 0.1.0-rc.6` 经 Windows `dsh.cmd` 接收 TALK 多行 prompt 时只保留首行。项目管理者发现上游已发布 `0.1.0-rc.8`，决定先升级运行时基线，再进入 bridge 修复切片。
+
+### 完成事项
+
+- 两次手工 `npx @deepseek-ai/dsh@next --version` 尝试都在 npm `idealTree` 依赖解析阶段触及约 2 GiB 的 V8 堆上限；日志确认 DSH 尚未启动，全局版本仍为 `0.1.0-rc.6`。
+- 在没有 DSH 进程运行时，为 `C:\Users\Administrator\.dsh` 建立临时结构化备份：121 个真实文件逐一校验 SHA-256，510 个 Junction 的相对路径、类型与目标全部一致。
+- 通过仅对单次安装进程设置 `NODE_OPTIONS=--max-old-space-size=4096`，执行固定版本全局安装；npm 完成 `added 23 / removed 100 / changed 428 packages`，全局 DSH 升级为 `0.1.0-rc.8`。
+- npm 11.16 的 `allow-scripts` 提示仅表示尚未记录审批；安装日志确认 6 个生命周期脚本均已执行且退出码为 0，没有再次执行或放宽全局脚本策略。
+- 全部升级验证通过后，先移除备份内 510 个 Junction 本身，再递归删除唯一临时备份目录；复核确认目录不存在。
+
+### 验证
+
+- `dsh --version` 与 `npm list -g @deepseek-ai/dsh --depth=0` 均返回 `0.1.0-rc.8`。
+- `dsh --help` 与 `dsh --profile headless --help` 正常，现有 `headless` profile 可加载。
+- Node 直接加载 `node-pty` 与 `koffi`，分别确认 `spawn` 与 `load` 导出可用。
+- 最小真实模型请求 `dsh --profile headless '只回复 DSH_RC8_OK，不要使用工具。'` 返回 `DSH_RC8_OK`，验证现有登录、模型调用与会话存储链路。
+- 临时 `NODE_OPTIONS` 未持久化；收尾时无 Node/npm/npx/DSH 残留进程，项目工作区在文档同步前保持干净。
+
+### 当前结论与下一步
+
+- DeepSeek Harness 运行时升级完成，但上游发行说明没有声明修复外部 npm `.cmd` 多行 argv 边界；本次也未修改 TALK bridge，因此不能把升级视为验收阻断项已修复。
+- 下一切片继续绕过 `dsh.cmd` 调用 Harness Node 入口，并为预检失败增加跨轮询有界重试/退避与回归测试；完成后再做受控真实多行 prompt 探针。
+
+### 变更文件
+
+- `docs/spec/MODULE_bridges.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-08-21 TH-6d 真实三 Agent 人工验收中断与故障诊断
+
+**背景**：`c01a6a9` 已把本地拓扑收敛为 Codex、DeepSeek Harness、Kimi3，但此前未调用真实模型。项目管理者按 TH-6d 人工验收说明启动 TALK Server 与三个 bridge，并从 Project Blackboard 创建真实任务树。本轮未修改功能代码；只完成现场复核、故障诊断、验收结论纠正和上下文交接。
+
+### 实际验收进展
+
+- 本地项目 Agent 索引确认包含 `agent:codex`（Lead / decision）、`agent:deepseek`（Dev / execution）、`agent:pi`（Reviewer / execution），三个 member 曾成功注册实例。
+- 首次 `talk sync` 受本机 SOCKS proxy 环境影响，`httpx` 报缺少 `socksio`；通过在当前 PowerShell 清除 `ALL_PROXY / HTTP_PROXY / HTTPS_PROXY` 并为 localhost 设置 `NO_PROXY` 后恢复。这是本机启动环境问题，不是 TH-6d 协议缺陷。
+- 核对数据库后确认 `group:talk-dev` 从未创建；`.talk/groups.yaml` 只保存本地角色/profile 元数据。此前要求去该 Hall 成员面板删除 Claude / pi-kimi、加入 DeepSeek 的指引错误，后续人工验收不再包含该步骤。
+- Human 创建根任务 `#10` 并分配给 `agent:codex`；根任务成功 claim 并进入 `running/in_progress`。随后从根详情创建 Development 子任务 `#11` 并分配给 `agent:deepseek`。
+- 截止收尾复核，旧 bridge 进程均已停止；数据库保留 `#10 running/in_progress` 与 `#11 queued/assigned` 现场，作为后续故障修复与清理依据。
+
+### 验收发现 1：委派任务弹窗与流程文案
+
+- Codex in-app Browser 真实复现：委派任务遮罩存在，但 `.task-create-panel.modal-card` 本身透明，标题和标签直接叠在 Blackboard 上。
+- 计算样式确认卡片为 `background: rgba(0,0,0,0)`、`border: 0`、`box-shadow: none`。CSS 中卡片外观仅应用于 `.group-create-panel / .details-card / #composer / .auth-card`，`.modal-card` 只定义尺寸和滚动，导致任务弹窗漏掉背景层。
+- 根任务与子任务共用静态标签“执行 Agent”。实际流程是两阶段：首次“＋委派任务”选择根任务负责人；根运行后再从详情点击“创建开发 / Review / Test 子任务”选择子任务执行 Agent。旧验收说明虽分别写了 Codex / DeepSeek，却未说明选择发生在两个窗口，造成误导。
+- 后续修复应补齐 modal card 背景/边框/阴影，并按上下文显示“根任务负责人”与“子任务执行 Agent”及必要帮助文案。
+
+### 验收发现 2：DeepSeek Harness 未接收 Development
+
+- `#11` 始终保持 `queued/assigned`、`attempt=0`、无 claim；DeepSeek instance 进入 `error`，错误为 `task queue worker failed: task preflight did not return a valid TALK_TASK_PREFLIGHT decision`。
+- `headless` profile 为官方默认空覆盖，实际 provider/model 为 `deepseek-official/deepseek-v4-pro`，证明 Harness 登录和模型调用可用；不是 API Key、模型或任务正文配置错误。
+- 只读解码 `$DSH_HOME` 的持久 session 后确认，TALK 生成的完整多行预检 prompt 经 Windows `dsh.cmd` 后，模型实际只收到第一行“你是 agent:deepseek，通过 dsh CLI bridge 接入 TALK。”；任务编号、标题、正文和 `TALK_TASK_PREFLIGHT` 输出合同全部丢失。DeepSeek 因此把调用当成接入握手并返回就绪说明。
+- 根因位于 TALK `--prompt-transport argv` 与 Windows npm `.cmd/cmd.exe` 包装的多行参数兼容边界。Harness 已在 Windows profile 内默认使用 `pwsh`，但这发生在模型工具层，不能修复进入 Harness 之前的 `dsh.cmd` 参数损失。
+- 首选修复：原生 Windows 继续运行 TALK，但 bridge 绕过 `dsh.cmd`，直接调用 Harness Node 入口并添加多行 prompt 回归；WSL/Linux 可作为后备环境，不作为第一修复路径。
+
+### 验收发现 3：预检失败无限重试
+
+- `_prepare_task_before_claim()` 每次轮询先调用一次预检，协议解析失败后再调用一次 repair prompt；两次仍失败会抛错。
+- `run_task_queue_worker()` 捕获异常后只上报 instance error，随后继续下一轮轮询同一 queued task，没有任务级失败计数、退避或 poison-task 隔离。
+- 真实现场数分钟内生成至少 24 个 DSH 一次性 session，存在重复计费、额度消耗与日志膨胀风险。项目管理者已被提示立即停止 DeepSeek bridge；2026-08-21 复核时相关进程均不存在。
+- 后续必须增加跨轮询有界失败策略，并让相同阻断任务进入可观察、可人工恢复的状态；不能仅依靠一次调用内的 repair retry。
+
+### 当前结论与下一步
+
+- TH-6d 实现层的自动化与隔离浏览器闭环仍有效，但真实 Codex → DeepSeek → Kimi3 人工验收未完成，里程碑不能判定通过，也不能进入 TH-7。
+- 项目管理者决定先修复验收阻断项：优先处理 DeepSeek Windows 多行 prompt 与预检重试保护，再修复任务弹窗视觉和两阶段标签。
+- 修复完成后先安全处理旧 `#10/#11` 现场，从干净根任务重新跑 Development、Review、Test、自动暂停和人工验收完整闭环。
+
+### 验证与变更文件
+
+- 只读验证：Codex Browser DOM/截图/计算样式、SQLite 任务与 instance 状态、DSH Zstandard session 解码、官方 Harness 本地包源码与文档、Git 状态与进程状态。
+- 未修改功能代码、数据库或 Harness 用户配置；未继续执行 Review / Test。
+- 变更文件：`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+
+---
+
+## 2026-08-16 本地 Agent 拓扑收敛：Codex + Kimi3 + DeepSeek Harness
+
+**背景**：项目管理者明确后续本地暂时只使用 3 个 Agent：Codex、通过 pi 接入的 Kimi3、通过 DeepSeek Harness 接入的 DeepSeek 各类模型；Claude Code 不再纳入当前本地拓扑。本片仅收敛 bridge 模型锁定、项目配置和相关文档，不调用真实模型。
+
+### 完成事项
+
+- 本地拓扑固定为：`agent:codex` = Lead / decision，`agent:deepseek` = DeepSeek Harness / Dev / execution，`agent:pi` = Kimi3 / Reviewer / execution。
+- `.talk/groups.yaml` 移除 `agent:claude` 与 `agent:pi-kimi`，新增 `agent:deepseek`；保留 `agent:pi` member ID，避免现有 TALK Key 与历史消息迁移。
+- 删除重复的 `agent_pi-kimi` profile，将 `agent_pi` 身份收敛为 Kimi3，新增 `agent_deepseek` 四件套 profile，并同步 Codex 的同伴 Agent 说明。
+- `bridges/pi_bridge.py` 新增 `--pi-provider / --pi-model`；默认命令、Task runner 命令与领取前预检命令会统一注入锁定的 provider / model，且自定义 `--pi-command` 的原有覆盖语义保持不变。
+- 本机 pi 全局默认仍是 DeepSeek，因此 TALK 启动命令显式锁定 `--pi-provider moonshotai-cn --pi-model kimi-k3`，不修改用户级 pi 配置。
+- 确认已安装官方 `@deepseek-ai/dsh 0.1.0-rc.6`；使用通用 bridge 的 `argv` transport 调用 `dsh.cmd --profile headless`，无需新建专用 bridge。
+- `AGENTS.md`、`PROJECT_BRIEF.md` 与 `MODULE_bridges.md` 已同步新拓扑、身份、命令和已知边界。
+
+### 验证
+
+- `codex.cmd --version` → `0.144.4`；`pi.cmd --version` → `0.84.1`；`dsh.cmd --version` → `0.1.0-rc.6`。
+- `dsh.cmd --profile headless --help` 在隔离的临时 `DSH_HOME` 中确认接受 argv 任务并输出最终 assistant 消息。
+- `pi.cmd --list-models kimi` 确认 `moonshotai-cn/kimi-k3`；`pi.cmd auth check --provider moonshotai-cn --model kimi-k3 --json --no-refresh` 返回 `status=ready`。
+- 项目 profile 扫描结果精确为 `agent:codex / agent:deepseek / agent:pi`。
+- `.venv\Scripts\python.exe -m unittest tests.test_pi_bridge tests.test_cli_bridge tests.test_talk_cli -q` → `Ran 145 tests in 9.073s ... OK`。
+- `.venv\Scripts\python.exe -m py_compile bridges\pi_bridge.py tests\test_pi_bridge.py` 与 `git diff --check` 通过。
+
+### 边界 / 待验收
+
+- 未实际调用 Kimi3 或 DeepSeek 模型，未运行真实 TALK 消息 / Task Hall 往返；避免未经确认消耗模型额度。
+- `talk sync` 只全量替换项目 Agent 索引，不会删除运行中 Group 的旧成员关系；启动 `agent:deepseek` 并同步索引后，仍需在 `group:talk-dev` 成员面板人工移除 Claude / pi-kimi、加入 DeepSeek。
+- 当前无独立全能 Tester；Kimi3 可做 API / 日志 / 自动化检查，浏览器操作由项目管理者完成。
+- TH-6d 里程碑仍保持 `awaiting_human`，不进入 TH-7。
+
+### 变更文件
+
+- `bridges/pi_bridge.py`、`tests/test_pi_bridge.py`
+- `.talk/groups.yaml`、`.talk/agents/`
+- `AGENTS.md`、`docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_bridges.md`
+- `docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-07-31 TH-6d：里程碑 Test 门禁、Blackboard 控制与人工验收
+
+**背景**：TH-6c 已落地任务类型、冻结关系、结构化 Review 与两轮返工，但 Test 尚未成为根任务完成门禁，批次安全收尾和里程碑通过后也不会自动暂停。项目管理者确认继续 TH-6d。该切片同时涉及数据库、任务协议和前端真实交互，按决策 Agent 高风险单切片刹车完成后暂停等待人工验收，不进入 TH-7。
+
+### 数据与服务端状态机
+
+- 根任务新增 `milestone_test_required`，仅可委派根任务可开启；旧库迁移回填 `false` 并建立索引。
+- `GET /api/tasks/{id}/tree` 新增 `test_gate`，返回是否必需、当前完整冻结版本 id 集、覆盖它的 Test、结构化结论和满足状态。
+- 里程碑 Test 只能在全部最新必需 Review 通过后创建，并且必须精确覆盖根任务的完整最新冻结版本集；质量任务使用版本语义槽阻止重复或并发终结结论。
+- `failed` Test 可作为返工触发器；返工成功后冻结版本切换，旧 Review / Test 结论不再覆盖新版本，必须重新取得门禁。
+- 根任务成功完成前统一检查非终态后代、最新冻结结果、必需 Review 与里程碑 Test；旧 `general` 根任务保持兼容。
+- 非里程碑批次额度耗尽后，既有开发与 Review 安全收尾即自动进入 `awaiting_human / batch_limit`。
+- 里程碑 Test 得到 `passed` 后，根任务原子进入 `awaiting_human / milestone` 并撤销活动 claim；Human 新入口 `POST /api/tasks/{id}/accept-milestone` 验收后递增授权 epoch、清除检查点，但不自动增加开发额度。
+- Review / Test 的 `blocked`、runner 失败或取消会释放未形成终结结论的版本槽，允许安全重试。
+
+### SDK 与 Project Blackboard
+
+- async / sync `create_task()` 增加 `milestone_test_required`，新增 `accept_task_milestone()`。
+- 根任务创建表单增加委派开关、1–3 个切片额度和里程碑 Test 标记。
+- 类型化子任务表单支持 `development / review / test / rework / general`、Review 策略、冻结任务多选和返工触发任务。
+- 任务详情新增治理卡，展示根控制状态、检查点、授权 epoch、剩余切片、非终态后代、Review 门禁和 Test 门禁。
+- 页面补齐提交最新澄清答复、释放人工决策、暂停整树、风险检查点、授权继续一批、人工验收通过、终止整树等动作。
+- 质量任务下拉框增加稳定的可访问名称；Web 资源更新缓存版本。
+
+### 验证
+
+- Python `py_compile` 覆盖模型、迁移、任务路由、async / sync SDK 和相关测试文件；`node --check web/app.js` 通过。
+- 新增自动化覆盖：里程碑 Test 通过后暂停且根任务不能提前完成、Human 人工验收、非里程碑批次安全检查点、Test 失败触发返工、返工后旧 Test 失效、旧库字段回填和 Web 控制入口。
+- 全量回归：`.venv\Scripts\python.exe -m unittest discover -s tests -q`，`Ran 370 tests in 122.729s ... OK`。
+- Codex in-app Browser 真实贯通：Human 创建带里程碑 Test 的根任务并从页面创建开发子任务；Review 与完整 Test 通过后，页面显示 `awaiting_human / milestone`、Review `approved`、Test `passed` 和“人工验收通过”；验收后根恢复 `active`、epoch `1 -> 2`、剩余开发额度保持 0。
+- 页面控制台没有 `error / warning`；临时隔离服务与浏览器验收数据库已停止并清理。
+- `usage-gate.cmd guard --provider codex --json` 返回 `decision=continue`；session / weekly 精确百分比均为 `null`，本轮仍按高风险单切片与里程碑门禁停止。
+
+### 文档与边界
+
+- 同步 `docs/spec/MODULE_tasks.md`、`docs/PROJECT_BRIEF.md`、`docs/guides/USER_MANUAL.md` 和当前进度快照。
+- 服务端可强制冻结关系和结构化门禁，但无法从自由文本角色证明第三方 Tester 的操作系统级工具能力；正式运行仍需配置能启动隔离服务、调用 API、控制浏览器和读取日志的 Tester。
+- TH-6d 当前等待项目管理者人工验收；验收通过前不进入 TH-7。
+
+### 变更文件
+
+- `server/models.py`
+- `server/db.py`
+- `server/routes/tasks.py`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `web/index.html`
+- `web/app.js`
+- `web/style.css`
+- `tests/test_tasks.py`
+- `tests/test_task_web_ui.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+---
+
+## 2026-07-26 TH-6c：结构化 Review、返工关系门禁与角色发现
+
+**背景**：TH-6b 已让 bundled runner 在领取前完成预检与澄清，但任务仍缺少开发 / Review / Test / 返工的强类型、显式关系和服务端质量门禁。项目管理者授权继续下一切片，并说明暂时无暇人工验收。由于本轮涉及数据库、任务协议与跨模块 runner，按决策 Agent 的高风险批次刹车只推进 TH-6c，不进入 TH-6d。
+
+### 数据与服务端合同
+
+- `agent_tasks` 新增 `task_kind`、`review_policy`、JSON `gate_verdict`；旧任务迁移为 `general`。
+- 新增 `agent_task_relations`，记录 `reviews / tests / reworks`、触发任务和冻结版本轮次；迁移补齐索引与唯一约束。
+- 类型化任务只允许作为子任务；同根、同项目、当前 `authorization_epoch`、授权有效期和非终态后代上限由服务端校验。
+- `general / development` 消耗授权切片；`review / test / rework` 不消耗新的开发切片。
+- `development` 默认 `required` Review；低风险 `batch` 一次覆盖同批次 2–3 项；`exempt` 仅 Human 或项目 `decision_tier=decision` 的 Agent 可授权。
+- Reviewer 必须与所有被审任务执行者不同。开发 / 返工成功必须引用结果消息；Review / Test 成功必须提交匹配类型的结构化 verdict，负向结论必须带 findings。
+- `GET /api/tasks/{id}/relations` 返回显式关系；`quality-context` 向质量任务创建者 / 执行者只读开放关联任务、触发任务及完整 Task Hall。
+- 类型化任务树只有在所有非终态后代结束、最新开发 / 返工成功且必需 Review 为 `approved` 时才能完成；纯 `general` 旧流程不被追溯阻断。
+- 同一质量问题最多自动返工两轮；第 2 轮返工再次得到 `changes_requested` 时，根任务在同一事务进入 `awaiting_human / review_exhausted` 并撤销其它 claim。
+
+### Review 冻结版本语义槽
+
+独立集成审查发现，若允许同一冻结版本重复创建 Review，后续 `approved` 可以覆盖先前 `changes_requested`，并绕过返工上限。最终合同收敛为：
+
+- Review relation 按当前冻结版本轮次 `0 / 1 / 2` 占用唯一语义槽，并发创建只能一条成功。
+- `approved / changes_requested` 是终结语义，保留槽位；原版本不能再次 Review。
+- runner `failed`、任务 `canceled` 或结构化 `blocked` 不形成批准 / 变更结论，会在完成或取消事务中释放槽位，允许同一冻结版本重试。
+- 根门禁因此不会把未变化版本上的后续结论当作对既有变更请求的覆盖。
+
+### Runner、SDK 与工具
+
+- bundled runner 为 Review / Test 注入显式 `TALK_GATE_VERDICT` 合同，读取关系授权的完整质量上下文，首次格式错误有界纠正一次。
+- runner 只把解析出的结构化结论传给 `complete`；若 Task Hall 结果回写失败，任务按 `failed` 完成且不携带 verdict，避免服务端 422 后卡在 `running`。
+- async / sync SDK 支持类型、Review 策略、关联任务、触发任务、结构化 verdict，以及 relations / quality-context helper。
+- CLI 从 `.talk/groups.yaml` 聚合自由业务角色、决策分级和能力列表；跨群组角色稳定去重，分级冲突显式报错。
+- 项目 Agent API 与 `talk_list_agents` 返回 `business_role`、`decision_tier`、`capability_summary`、实例列表和聚合可用状态。
+- Python MCP 与 Pi extension 保持原有八个工具名，扩展 typed delegate、类型过滤、关系读取和项目 Agent 富化结果。
+
+### 验证与审查
+
+- Python `py_compile` 覆盖服务端模型 / 迁移 / 路由、CLI、async / sync SDK、runner 与 Python 工具；Pi TypeScript 通过 Node 语法检查。
+- 服务端 + runner 定向回归：`Ran 166 tests in 39.405s ... OK`。
+- CLI / SDK / Python MCP / Pi 工具联合回归：`Ran 48 tests ... OK`。
+- 最终全量回归：`Ran 366 tests in 147.008s ... OK`。
+- 首次全量命令因外部 5 分钟工具时限被终止，没有最终结果；提高时限后从头完整重跑通过。
+- 独立只读集成审查覆盖权限 / epoch / 项目范围、切片非消费、批量 Review、两轮返工原子暂停、结构化 verdict、关系上下文、并发唯一性、旧 `general` 兼容与角色发现；修复上述两个失败路径后无剩余阻断项。
+- `usage-gate.cmd` 返回 `decision=continue`，但没有提供 session / weekly 精确百分比；未臆测具体额度，仍按数据库 / 协议高风险单切片规则停止。
+- 本切片未修改 Web，按 Browser 约定无需页面验证。
+
+### 当前边界
+
+- `test` 类型、关系和结构化 verdict 已持久化，但根任务 Test 门禁、最新冻结版本失效、Blackboard 质量控制与测试通过后的人工验收暂停属于 TH-6d。
+- Review 的“只读”由 bundled runner prompt 约束；服务端不能替代第三方 Reviewer 的操作系统文件写权限隔离。
+- Web 尚无 Review / 返工创建、关系查看、结构化结论和质量检查点入口。
+- 项目管理者本轮暂时无暇人工验收；自动化与代码审查完成后按高风险单切片规则暂停，未把验收门禁永久取消。
+
+### 变更文件
+
+- 服务端：`server/models.py`、`server/db.py`、`server/routes/tasks.py`、`server/routes/projects.py`
+- SDK / CLI / 工具：`TALK/client/talk_client.py`、`TALK/client/talk_client_sync.py`、`cli/talk.py`、`bridges/cli_bridge.py`、`bridges/talk_task_tools.py`、`bridges/talk_tools_extension.ts`
+- 测试：`tests/test_tasks.py`、`tests/test_projects.py`、`tests/test_cli_bridge.py`、`tests/test_talk_cli.py`、`tests/test_talk_client.py`、`tests/test_talk_task_tools.py`
+- 文档：`docs/PROJECT_BRIEF.md`、`docs/spec/MODULE_tasks.md`、`docs/guides/USER_MANUAL.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. 暂停并提交 / 推送 TH-6c 可回溯版本。
+2. 项目管理者恢复后进入 TH-6d：里程碑 Test 门禁、最新冻结版本、Blackboard 控制、批次自动检查点与人工验收暂停。
+3. TH-6d 构成下一处里程碑门禁，完成后必须提供人工验收说明并等待确认。
+
+## 2026-07-26 TH-6b：runner 领取前预检、自动澄清与完整 Hall 重放
+
+**背景**：TH-6a3 已建立澄清轮次和服务端状态门禁，但 bundled runner 仍会从 `assigned` 直接 claim，正式执行也只获得任务标题 / 正文。本轮属于 runner / 协议高风险切片，按批次刹车只完成 TH-6b，并同步落实项目管理者确认的 Codex 决策 Agent 身份，不进入 TH-6c Review 门禁。
+
+### Agent 分级
+
+- `AGENTS.md` 明确当前普通 Codex 项目会话按决策 Agent 工作；bridge 内成员继续以启动时注入的 `decision_tier` 为权威，未声明的其它成员仍按执行 Agent。
+- `.talk/groups.yaml` 已有 `agent:codex = lead + decision`。通用 CLI bridge 在传入 `--project` 且没有显式 `--decision-tier` 时会从项目配置解析分级；显式命令行覆盖保持最高优先级。
+- Codex / pi 的普通任务和预检 prompt 都携带解析后的决策分级，避免模型只看到业务角色而不知道行为边界。
+
+### 实现
+
+- 对带 Task Hall 的 `assigned / clarification_answered` 任务，runner 会先分页读取完整 Hall，再以独立只读 / 无工具命令做领取前预检；Codex 预检不挂载 TALK MCP，pi 预检不启用本地工具或 extension。
+- 预检信息充分时先 `accept`，随后才 `claim`；信息不足时把一批集中问题写入同一个 Task Hall，并以问题消息 id 原子登记澄清轮次。`clarification_requested / needs_decision` 不会重复唤醒。
+- 自动问题使用稳定的任务 / 澄清轮次标记。若进程在“问题消息已发送、澄清动作尚未登记”之间退出，下次轮询会复用已有问题完成登记，不重复调用模型或再发一条消息。
+- `accepted` 表示预检已完成，runner 重启后可以直接 claim；`clarification_answered` 会携带 A 的显式答复重新预检。
+- Hall 以 500 条为一页向前分页，去重后按消息 id / 时间顺序重放。正式执行 prompt 复用同一份完整上下文，包含任务原文、问题、答复和可见文件元数据；附件正文仍不自动下载。
+- 解析器只接受显式结构化结论，兼容单行 `TALK_TASK_PREFLIGHT`、显式标记后的多行 JSON 以及真实 Pi 出现的嵌套 / `ready` 变体；纯自然语言不会被猜测为接受。
+- 成功命令首次返回无效格式时，runner 会用同一个只读 / 无工具命令纠正一次；超时、非零退出或再次无效都不会 claim，也不会消耗澄清轮次。
+- Codex 重复任务执行实现收敛为共享 `cli_bridge.handle_queued_task`，保留 Codex command adapter 和原测试替换点，减少两套 runner 行为漂移。
+
+### 测试
+
+- 单元测试覆盖项目分级解析与显式覆盖、预检 prompt 合同、结构化变体解析、首次格式纠正、完整分页顺序、充分后先 accept 再 claim、同 Hall 澄清、等待状态过滤和中断窗口恢复。
+- Codex / pi 测试锁定预检命令始终为只读 / 无工具配置，即使正式执行选择 tools profile 也不会在领取前修改项目或调用 TALK 投递工具。
+- 活服务 E2E 覆盖 `created -> 自动提问 -> clarification_requested -> Human 回答并显式提交 -> 重新预检 -> accept -> claim -> execute -> complete`；正式执行 prompt 断言能看到答复中的 `8123`。
+- Python `py_compile` 通过。
+- 定向回归：`Ran 168 tests in 28.697s ... OK`。
+- 全量回归：`Ran 348 tests in 154.472s ... OK`。
+- 较早的一次混合定向命令误含不存在的测试模块，并命中既有 WebSocket 降级用例的固定 2 秒退出超时；该用例随后连续单跑两次通过，最终全量回归也通过。本切片没有修改 WebSocket 降级路径。
+- 真实 Codex 只读预检返回可解析的显式结构化结论。真实 Pi 返回显式多行 `ready=false`，基础设施安全阻止 claim；但它忽略了正文中已给出的信息并要求重复任务，记录为模型理解质量残余，不伪造成语义验收通过。
+- 本切片没有修改 Web 页面，按 Browser 验证约定无需做页面验证。
+
+### 用户手册影响
+
+- `docs/guides/USER_MANUAL.md` 已用非技术语言说明 Agent 会在领取前检查完整 Task Hall；信息不足会在原 Hall 提问并保持待响应，Human 明确提交答复后 Agent 会重新读取全部上下文。
+
+### 变更文件
+
+- `AGENTS.md`
+- `bridges/cli_bridge.py`
+- `bridges/codex_bridge.py`
+- `bridges/pi_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_codex_bridge.py`
+- `tests/test_pi_bridge.py`
+- `tests/test_task_hall_e2e.py`
+- `docs/PROJECT_BRIEF.md`
+- `docs/spec/MODULE_tasks.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. 暂停等待项目管理者确认本切片。
+2. 确认后进入 TH-6c：任务类型、任务关系、结构化 Review / 返工门禁与业务角色发现。
+3. 后续 TH-6d 再实现里程碑黑盒测试、Blackboard 控制、批次自动检查点与人工验收暂停。
+
+## 2026-07-20 TH-6a3：Task Hall 有界澄清轮次与决策阻塞
+
+**背景**：TH-6a0 已冻结“一批集中问题 + 一批完整答复”按轮计数、默认 1 轮、绝对上限 2 轮的合同；旧实现只有 `clarification_requested` 状态，普通回复与完整答复无法区分，也没有额度耗尽后的阻塞。由于本轮涉及数据库、协议和根控制传播，按高风险切片刹车只完成 TH-6a3，不进入 runner 自动预检或 Web 控制入口。
+
+### 实现
+
+- `agent_tasks` 新增 `max_clarification_rounds / clarification_round_count`；旧库默认回填 1 / 0。创建任务只接受 1–2 轮，schedule 物化任务保持默认 1 轮。
+- 新增 `agent_task_clarification_rounds` 账本，按任务和轮次保存问题消息、答复起止消息与时间；`task_id + round_index` 唯一，配合条件更新保证并发请求只建立一轮。
+- B 必须先在 Task Hall 发送问题，再调用 `request-clarification` 登记边界；A 可连续补充多条，最后调用 `submit-clarification-answer` 明确结束答复。普通 Hall 回复不会改变状态。
+- 新增 `clarification_answered / needs_decision`。显式答复后仍禁止直接 claim，B 必须 `accept`；额度耗尽时任务进入 `needs_decision`，根任务进入 `awaiting_human / needs_decision`，活动 claim 被撤销。
+- 新增 `resolve-clarification`：Human、当前任务请求者或根请求者可补充范围后释放，或增加一轮额度；绝对上限仍为 2。根控制保持等待，需单独 `resume-tree` 恢复，防止解决局部澄清时意外放开全树。
+- async / sync SDK 新增轮次查询、问题登记、答复提交和人工释放 helper；Python MCP 与 pi extension 的 `talk_reply_task` 使用当前 Hall 消息 id 作为问题 / 答复边界，并支持人工释放动作。
+- 旧无 Hall / 无轮次账本的澄清任务保留兼容接受路径；旧客户端从 `assigned` 直接 claim 继续兼容，但新澄清三态均受服务端 claim 门禁约束。
+
+### 测试
+
+- 覆盖 1–2 轮创建边界、错误发送者边界、普通回复不推进、重复问题 / 答复幂等、多条答复起止边界和明确接受后才能 claim。
+- 覆盖额度耗尽进入 `needs_decision / awaiting_human`、错误解决者拒绝、增加一轮、显式恢复根控制、绝对上限 2 和再次耗尽。
+- 使用两个并发客户端同时登记不同问题，验证仅一个请求成功、计数为 1 且只有一条账本记录。
+- 迁移测试验证旧任务字段回填及轮次唯一索引；async / sync SDK 与 Task Hall 工具活服务流程均贯通新协议。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -q`：`Ran 32 tests in 17.814s ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 337 tests in 118.141s ... OK`。
+- Python `py_compile`、TypeScript `node --experimental-strip-types --check` 与 `git diff --check`：通过。
+- 本切片无 Web 代码改动，不需要 Browser 验证。
+
+### 用户手册影响
+
+- 已同步 `docs/guides/USER_MANUAL.md`：使用非技术语言说明普通消息不会自动结束澄清、默认一轮 / 最多两轮和额度耗尽会暂停；页面尚无提交答复或人工决策入口，因此只说明需项目负责人协助，不写启动服务、API 或开发命令。
+
+### 变更文件
+
+- `server/models.py`
+- `server/db.py`
+- `server/routes/tasks.py`
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `bridges/talk_task_tools.py`
+- `bridges/talk_tools_extension.ts`
+- `tests/test_tasks.py`
+- `tests/test_talk_client.py`
+- `tests/test_talk_task_tools.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/guides/USER_MANUAL.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. TH-6b：让 bundled runner 在 claim 前预检任务充分性，自动进入同 Hall 澄清、等待显式答复，并分页重放完整任务 / Hall 上下文。
+2. TH-6c / TH-6d：再进入 Review / Test 门禁与 Blackboard 最终用户控制入口；本高风险切片完成后先暂停汇总，不连续开启下一切片。
+
+---
+
+## 2026-07-20 TH-6a2.2：bundled runner 最长 5 秒协作中断
+
+**背景**：TH-6a2.1 已能在服务端持久化暂停 / 检查点 / 整树终止并立即撤销运行 claim，但 bundled runner 默认每 30 秒才续租一次，导致本地 CLI 进程不能在合同要求的 5 秒窗口内感知控制。本轮按 runner 高风险切片只补协作中断，不进入澄清轮次、Web 控制入口或 Review/Test 门禁。
+
+### 实现
+
+- `bridges/cli_bridge.py` 将 bundled runner 默认 claim heartbeat 调整为 5 秒，并新增 5 秒硬上限；即使启动参数显式传入更长的 `--task-heartbeat-interval`，有效 claim / 控制探针也不会被放宽。
+- claim heartbeat 继续由服务端原子校验根控制状态。暂停、检查点、整树终止或其它 claim 失效返回 `404 / 409` 时，runner 抛出 `TaskLeaseLostError` 并取消正在等待的命令。
+- 通用 CLI runner 与 Codex 兼容 runner 共用上述守卫；命令协程取消会进入 `run_cli_command` 的既有清理路径，终止并回收本地子进程。
+- 控制中断后 runner 不发送 Task Hall 结果消息、不调用 `complete`；暂停 / 检查点的 `queued / accepted` 回队和整树终止的 `canceled` 状态继续由服务端作为唯一真相源。
+- 服务不可达时 runner 无法接收新的控制事实，仍由现有本地租约截止时间提供最终失效保护；第三方 runner 也仍需自行实现相同协议。
+
+### 测试
+
+- 新增有效 claim / 控制探针间隔测试，覆盖默认 30 秒配置被硬性收敛到 5 秒、显式更短间隔和短租约自适应。
+- 新增真实 Python 子进程取消测试，确认取消执行协程会及时终止本地进程。
+- 通用 CLI runner 覆盖 `paused / awaiting_human / canceled` 三类控制撤销，Codex runner 单独覆盖共享守卫接入；均断言本地命令被取消，且没有发送结果或调用 `complete`。
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py bridges\codex_bridge.py tests\test_cli_bridge.py tests\test_codex_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_codex_bridge -q`：`Ran 112 tests in 0.643s ... OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks tests.test_cli_bridge tests.test_codex_bridge tests.test_pi_bridge -q`：`Ran 153 tests in 15.782s ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 334 tests in 97.578s ... OK`。
+- 本切片无 Web 改动，不需要 Browser 验证。
+
+### 用户手册影响
+
+- 已检查 `docs/guides/USER_MANUAL.md`：暂停 / 继续 / 整树终止尚无最终用户页面入口，仍不能写成可操作步骤，因此本轮不修改用户手册；模块合同和进度文档记录后台能力已完成。
+
+### 变更文件
+
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `tests/test_codex_bridge.py`
+- `docs/spec/MODULE_tasks.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+1. TH-6a3：实现澄清轮次账本、显式答复提交、`clarification_answered / needs_decision` 与服务端 claim 门禁。
+2. TH-6b：在轮次合同落地后接 runner 领取前预检、完整 Hall 上下文重放和自动澄清闭环。
+
+---
+
+## 2026-07-20 TH-6a2.1：根控制状态与有限批次授权服务端落地
+
+**背景**：项目管理者确认 TH-6a0 的有限批次与随时喊停合同，并授权以决策 Agent 身份推进下一切片。由于本轮涉及数据库 / 协议和权限边界，按批次刹车只完成 TH-6a2.1 服务端控制面，不进入 bundled runner 协作中断或 Web 控制按钮。
+
+### 已完成
+
+- `agent_tasks` 根任务新增 `control_status`、`authorization_epoch`、`authorized_slice_budget`、`reserved_slice_count`、`authorization_expires_at`、`checkpoint_reason`；控制状态与到期时间补齐索引。
+- 新建可委派根任务默认获得 2 个切片、90 分钟授权，Human 可显式设为 1–3 个切片与 60–5400 秒；恢复会递增 epoch、重置本批次预留数并生成新到期时间。
+- 新后代创建必须提交当前 `authorization_epoch`，并在同一条条件更新中原子检查根仍在运行、控制状态为 `active`、授权未过期、epoch 未陈旧、切片额度和非终态后代硬预算均有余额；并发创建只有预算内请求成功。
+- claim 已把根控制状态与授权到期加入原子条件；过期创建 / claim 会把根任务推进到 `awaiting_human / time_limit`。旧 epoch 即使在恢复后晚到，也不能消费新批次授权。
+- 新增 `pause-tree / resume-tree / checkpoint / cancel-tree / tree` 五个接口，传入任一后代 id 均解析到根任务，并分别约束根请求者、Human 管理者和根执行者权限。
+- 暂停 / 检查点立即把运行任务安全回到 `queued / accepted`，清除 claim token、lease 与实例占用；整树终止取消全部非终态任务；Hall、消息、attempt、完成结果与历史任务行均保留。陈旧 runner 的心跳和完成写回由现有状态 / token 门禁拒绝。
+- async / sync SDK 的 `create_task` 新增授权额度、有效期与 epoch 参数，并新增五个任务树控制 helper；活服务测试贯通暂停、恢复、检查点、查询和终止。
+
+### 迁移与兼容
+
+- 历史根任务回填为 `active`；历史不可委派任务使用 `epoch=0 / budget=0`，旧完成与结果收取不变。
+- 历史可委派根任务使用 `epoch=1 / budget=2`，当前已有后代数计入 `reserved_slice_count`，避免升级后凭空获得额外切片；后代不复制根控制字段。
+- 当前还没有 `task_kind`，所以每个新后代暂统一消费 1 个切片；`review / test / rework` 的免计与批次安全收尾后自动 `batch_limit` 检查点留待 TH-6c 的任务关系实现。
+- 服务端现已立即撤销本地 runner 的执行与写回资格，但不会强杀正在运行的未知进程；bundled runner 最长 5 秒检查和本地子进程停止留待 TH-6a2.2。
+
+### 验证
+
+- `python -m py_compile server/models.py server/db.py server/routes/tasks.py TALK/client/talk_client.py TALK/client/talk_client_sync.py tests/test_tasks.py tests/test_talk_client.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -q`：`Ran 29 tests ... OK`；覆盖旧库迁移、历史委派树回填、并发切片预留、权限、暂停 / 恢复、检查点、整树终止、到期、陈旧 epoch，以及控制状态持久化后心跳 / 完成立即失效。
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client -q`：`Ran 12 tests in 17.354s ... OK`；async / sync 活服务控制流程通过。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 331 tests in 71.979s ... OK`。
+- `git diff --check`：通过，仅有 Windows 工作区既有 LF / CRLF 转换提示。本切片没有前端改动，不需要 Browser 验证。
+
+### 用户手册影响
+
+- 已复核 `docs/guides/USER_MANUAL.md`：本轮只有服务端 API 与 SDK，还没有普通用户可见按钮，runner 也未完成主动中断，因此不把暂停 / 继续 / 整树终止提前写成正式操作步骤；手册现有“当前版本边界”保持正确。
+
+### 变更文件
+
+- 功能：`server/models.py`、`server/db.py`、`server/routes/tasks.py`、`TALK/client/talk_client.py`、`TALK/client/talk_client_sync.py`。
+- 测试：`tests/test_tasks.py`、`tests/test_talk_client.py`。
+- 文档：`docs/spec/MODULE_tasks.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+
+### 下一步
+
+- TH-6a2.2：实现 bundled runner 最长 5 秒控制检查、本地子进程协作中断与服务端暂停 / 终止状态联动。该切片涉及真实执行中断，完成后应暂停汇总并进行独立人工 / 黑盒验收准备。
+
+## 2026-07-20 用户手册骨架与项目内同步规则
+
+**背景**：项目管理者提出，任务暂停、澄清、Review 等机制最终都需要用非技术语言告诉普通使用者，同时确认不应让 TALK 的项目特有规则影响其它项目，也不应把开发环境启动命令混入最终产品操作手册。
+
+### 已确认并完成
+
+- 保持用户级全局 `project-framework` skill 不变；用户手册同步规则只落在 TALK 的 `docs/PROJECT_BRIEF.md`。
+- 新增 `docs/guides/USER_MANUAL.md`，明确以“系统已经部署完成”为前提，只面向日常使用 TALK 的家庭成员或项目成员。
+- 手册首版记录当前已验证的登录、项目黑板、任务委派、Task Hall 沟通、澄清补充、结果收取、未开始任务取消，以及全局消息流 / Group Hall 的使用方式。
+- 尚未提供最终用户入口的暂停、继续、整树终止、澄清轮次和 Review/Test 只作为当前版本边界，不提前写成可操作步骤。
+- `QUICKSTART_USER.md` 继续负责家庭管理员首次安装与启动，`DEPLOY.md` 负责部署运维，`QUICKSTART_AGENT.md` 负责开发者和 Agent 接入；普通用户手册不包含 Docker、Python、API、测试或本地开发启动命令。
+- `docs/guides/QUICKSTART.md` 已增加日常用户手册入口；`PROJECT_BRIEF.md` 目录结构已登记新文档。
+- 后续每个用户可见功能切片都要检查手册影响；只有真实入口落地并完成验证后才转写为正式操作步骤，里程碑人工验收需按手册从头复现。
+
+### 验证
+
+- `git diff --check`：通过，仅有现有 Windows LF / CRLF 转换提示。
+- 用户手册技术命令关键词扫描：未发现开发步骤；`Python / Docker / API / 数据库` 只出现在“普通用户无需了解”的范围声明中。
+- `USER_MANUAL.md`、`QUICKSTART.md`、`PROJECT_BRIEF.md` 的本地 Markdown 链接检查：全部可解析。
+- 未运行功能测试：本切片只修改 Markdown 文档，没有修改产品代码。
+
+### 变更文件
+
+- `docs/guides/USER_MANUAL.md`
+- `docs/guides/QUICKSTART.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- TH-6a2.1：实现根任务控制状态、有限批次授权和服务端暂停 / 继续 / 检查点 / 整树终止控制面；完成时继续按本规则判断哪些内容可进入用户手册。
+
+## 2026-07-18 TH-6a1：任务树与服务端硬预算落地
+
+**背景**：项目管理者确认 TH-6a0 合同后，授权开始第一个数据库 / 协议代码切片。由于本轮未注入 `decision_tier`，按 `AGENTS.md` 兜底作为执行 Agent，只完成 TH-6a1 并在验证、进度落盘后暂停。
+
+### 已完成
+
+- `agent_tasks` 新增 `parent_task_id`、`root_task_id`、`delegation_depth`、`may_delegate`，以及根任务保存的 `max_delegation_depth`、`max_running_descendants`、`max_running_per_target`、`max_nonterminal_descendants`。
+- 新根任务创建后 `root_task_id` 指向自身；旧数据库升级时，每个历史任务回填为独立根、深度 0、`may_delegate=false`，默认治理值为 1 / 3 / 1 / 8，并补齐父任务、根任务和深度索引。
+- 顶层自定义治理仅允许 Human 设置；普通 Agent 仍可按旧接口创建顶层任务，但不能为自己授予委派能力或放宽根预算。
+- 创建子任务要求父任务处于 `running / in_progress`、父任务已获 `may_delegate`，调用者是父执行者、根请求者或 Human；项目从父任务继承，深度和非终态后代预算由服务端事务校验。
+- 非终态后代预留通过更新根任务的条件语句串行化并发创建；子任务 claim 通过同一条件更新原子校验根仍在运行、根运行后代和单目标运行预算，直接 REST API 与第三方客户端无法绕过。
+- `TalkClient` / `TalkClientSync.create_task` 新增父任务、委派权限和四项根预算参数；活服务测试分别用异步和同步 SDK 创建一层子任务并验证父根关联、深度与项目继承。
+- `docs/spec/MODULE_tasks.md` 已同步当前实现、迁移兼容、已知边界与后续实施顺序；TH-6a2 的控制状态、有限授权和 runner 协作中断没有提前实现。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py TALK\client\talk_client.py TALK\client\talk_client_sync.py tests\test_tasks.py tests\test_talk_client.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -v`：`Ran 23 tests ... OK`；覆盖旧库迁移、委派权限、深度 / 项目继承、非终态创建竞争、根运行并发和单目标 claim 竞争。
+- `.venv\Scripts\python.exe -m unittest tests.test_talk_client -q`：`Ran 12 tests ... OK`。
+- Task Hall / SDK / runner / 工具 / bridge 跨模块回归：`Ran 128 tests ... OK`。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 325 tests in 103.757s ... OK`。
+
+### 变更文件
+
+- 功能：`server/models.py`、`server/db.py`、`server/routes/tasks.py`、`TALK/client/talk_client.py`、`TALK/client/talk_client_sync.py`。
+- 测试：`tests/test_tasks.py`、`tests/test_talk_client.py`。
+- 文档：`docs/spec/MODULE_tasks.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+
+### 已知边界与下一步
+
+- 当前根任务尚无 `control_status`、授权 epoch 或切片额度；Human 仍不能通过服务端暂停整棵树，bundled runner 也没有最长 5 秒的暂停 / 终止轮询。
+- 根任务当前仍可在后代未结束时自行完成，整树汇总与质量门禁要在后续控制、Review/Test 切片中收敛。
+- 下一候选切片是 TH-6a2；按执行 Agent 规则，本轮不提交、不推送、不自动继续，等待项目管理者或决策 Agent 确认。
+
+## 2026-07-18 TH-6a0：任务治理、可中断推进与质量门禁合同冻结
+
+**背景**：TH-5 已贯通“页面委派 → bundled runner → Task Hall 结果 → Human 收取”的基础链路。项目管理者随后确认，下一阶段不能只补递归委派和澄清，还要把开发后的独立 Review、里程碑黑盒测试、人工验收，以及“主 Agent 有限自主推进、Human 可随时喊停”纳入正式流程。本切片只冻结协议和实施顺序，没有修改功能代码。
+
+### 已确认的总体流程
+
+```text
+Human 有限批次授权
+  -> 主 Agent 分配 development
+  -> 开发 Agent 实现并自测
+  -> 独立 review（不通过则 rework，最多自动两轮）
+  -> 未到检查点时在剩余额度内继续
+  -> 里程碑完整自动化回归 + 黑盒 / E2E test
+  -> 根任务 awaiting_human
+  -> Human 验收、调整、继续一批或终止
+```
+
+- 主 Agent 获得有限批次授权而非无限自治：普通小切片默认 2 个，纯文档 / 配置可显式授权到 3 个，高风险 / 跨模块默认 1 个。
+- 批次、时间、风险、额度、Review、澄清或里程碑边界会自动暂停；Human 也可随时撤销尚未消费的授权。
+- Review 覆盖每个功能切片，但低风险同模块任务允许 2–3 个批量审查；黑盒测试只在可独立体验的里程碑运行。
+- 里程碑测试通过不等于自动进入下一阶段，根任务必须等待 Human 显式确认。
+
+### 冻结的任务树与预算合同
+
+- 新增 `parent_task_id / root_task_id / delegation_depth / may_delegate` 语义，旧任务迁移后各自成为独立根并保持兼容。
+- 根任务统一保存最大深度、根运行并发、单目标并发和非终态后代预算；默认分别为 1、3、1、8。
+- 创建子任务时校验调用者、父任务、根控制状态、委派权限、深度和非终态预算；claim 时再次原子校验根与单目标并发。
+- 子任务默认不能继续委派，只有根控制者显式提高深度并授权具体任务后才能突破默认能力边界。
+- 直接 REST API、TALK 自带工具和第三方客户端适用相同拒绝规则，不能依赖 runner 工具裁剪或进程内锁。
+
+### 冻结的有限授权与暂停合同
+
+- 根任务使用独立 `control_status`：`active / pause_requested / paused / awaiting_human / cancel_requested / canceled`，不污染现有执行五态和协作状态。
+- 每次 Human “继续一批”生成新的 `authorization_epoch`、切片预算和有效期；陈旧主 Agent 不能使用旧授权继续创建任务。
+- `pause-tree` 立即禁止新建后代和 claim；bundled runner 最多每 5 秒检查控制指令，安全终止本地子进程并失效 claim token。
+- 暂停后的任务保留 Hall、消息、attempt 与现场，可恢复为 `queued / accepted` 后重新领取；整树终止与可恢复暂停严格区分。
+- 第三方 runner 若不支持协作中断，服务端至少撤销写回资格并依靠租约回收，不承诺跨机器强杀未知进程。
+
+### 冻结的澄清与质量门禁合同
+
+- 澄清默认最多 1 轮、显式可提高到 2 轮；一轮是 B 的集中问题批次与 A 的完整答复，不按消息数计数。
+- A 可连续补充多条消息，以 `submit-clarification-answer` 显式结束答复；额度耗尽仍不足时进入 `needs_decision` 并暂停根任务。
+- 新增 `general / development / review / test / rework` 任务类型；Review / Test 使用独立 Task Hall 和结构化 `gate_verdict`，不能从自然语言猜测通过结论。
+- Review 结论为 `approved / changes_requested / blocked`，测试结论为 `passed / failed / blocked`；返工产生新任务并保留旧结果。
+- 旧冻结版本的 Review / 测试结论在新返工后失效；必需 Review 或里程碑最新测试未通过时，服务端拒绝根任务提交成功结果。
+- `business_role` 保持项目自定义自由文本；工具和项目 API 返回角色与能力摘要，但质量强语义由 `task_kind`、任务关系和门禁结论提供。
+
+### 实施顺序
+
+1. TH-6a1：任务树字段、迁移和服务端硬预算。
+2. TH-6a2：有限批次授权、暂停 / 继续 / 整树终止与 runner 协作中断。
+3. TH-6a3：澄清轮次账本、答复提交和 `needs_decision`。
+4. TH-6b：runner 领取前预检、完整 Hall 上下文与自动澄清。
+5. TH-6c：Review / 返工门禁和角色发现。
+6. TH-6d：里程碑测试、Blackboard 控制和人工验收暂停。
+7. TH-7：Codex Desktop / 通用终端接入。
+
+### 验证与变更
+
+- 验证：仅文档切片；完成 Markdown 结构、关键合同覆盖和 `git diff --check` 检查，未运行功能测试。
+- 变更文件：`docs/spec/MODULE_tasks.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+- 提交状态：当前按执行 Agent 规则未提交，等待项目管理者确认是否进入 TH-6a1 或先提交文档切片。
+- 下一步：TH-6a1，实现任务树字段、旧库迁移和服务端硬预算并发测试。
+
+---
+
+## 2026-07-16 Task Hall 委派深度、并发预算与澄清轮次决策
+
+**背景**：项目管理者在准备切换上下文前，确认需要为跨终端委派加入类似 Codex 子 Agent 的递归与并发保护，并讨论任务执行者领取前是否只允许一次澄清机会。本轮只核对现状、冻结产品规则和更新进度，没有修改功能代码。
+
+### 现状核对
+
+- bundled runner 的嵌套任务命令默认不向执行模型暴露 TALK 委派工具，因此标准路径近似默认委派深度 1；但这是客户端 / runner 软保护。
+- `POST /api/tasks` 仍允许任意已认证成员创建任务，`agent_tasks` 尚无父任务、根任务、委派深度、委派授权或任务树预算字段；自定义客户端仍可能递归创建任务。
+- 单个 bridge 进程使用共享运行锁串行调用模型，但多个 bridge 实例之间没有根任务级 / 项目级并发上限；claim 只防止同一任务被重复执行，不限制任务树扇出。
+- Task Hall 已有 `clarification_requested`、Hall 消息、`accept` 和待澄清禁止 claim 的基础状态，但没有澄清轮次、明确的答复提交动作或额度耗尽后的阻塞状态。Discussion Hall 的 `max_rounds` 与该流程无关。
+
+### 已确认的硬保护默认值
+
+- 服务端默认最大委派深度为 1；子任务默认不能继续委派，只有主控显式授权时才能获得继续拆分能力。
+- 单个根任务同时执行的子任务上限为 3；单个目标 Agent 同时执行上限为 1；单个根任务累计非终态子任务上限为 8。
+- 保护必须在任务创建、领取等服务端入口原子校验，覆盖 TALK 自带工具、直接 REST API 和第三方客户端，不能只依赖 bundled runner 的工具裁剪或进程内锁。
+- 实现需要补父任务 / 根任务关联、委派深度与授权、并发 / 扇出预算等字段；具体字段名可在 TH-6a 收敛，但已确认的默认行为保持不变。
+
+### 已确认的澄清规则
+
+- 默认最多 1 个澄清轮次；复杂任务可由主控在委派时显式提高到 2 轮，不允许无限追问。
+- 一轮表示“B 的一批集中问题 + A 的完整答复”，而不是只能写一个问句或一条消息。B 应一次汇总所有已知疑问，可在同一 Hall 消息中使用多个编号问题。
+- A 可以在同一 Hall 连续补充多条说明，最后通过显式“提交澄清答复”动作结束该轮并唤醒 B；普通回复消息不应过早触发 B 重新判断。
+- B 被唤醒后携带任务原文和按时间排序的完整 Hall 上下文重新预检；信息充分才 `accept → claim → execute`。
+- 澄清额度耗尽后仍无法执行时，任务必须进入 `blocked / needs_decision`（最终状态名在实现时收敛）并交回主控修改、取消或显式授权，禁止强制领取或猜测执行。
+
+### 下次恢复顺序
+
+1. TH-6a：先落服务端任务树、深度 / 并发预算和澄清轮次协议及数据库迁移、SDK / 工具契约与并发测试。
+2. TH-6b：再接 bundled runner 领取前预检、同 Hall 提问 / 等待 / 唤醒、完整分页上下文重放和幂等保护。
+3. TH-7：最后补 Codex Desktop / 通用终端接入包装并做完整跨终端验收。
+
+### 验证与变更
+
+- 验证：完成代码与协议的只读核对；本轮没有功能代码变更，因此未运行测试套件。
+- 变更文件：`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+- 待确认：无；产品默认值和失败 / 阻塞原则已由项目管理者确认。
+
+---
+
+## 2026-07-16 TH-5 人工验收反馈与后续澄清 / 终端接入决策
+
+**人工反馈**：项目管理者已通过页面委派任务并成功拿到返回结果，确认 Project Blackboard → bundled runner → 对应 Task Hall → 结果收取的基础链路可用。本轮未继续开发，只沉淀下一阶段需求与当前边界。
+
+### 已确认的澄清流程
+
+- 一项任务始终使用创建时生成的同一个 Task Hall，请求者 A 与执行者 B 的成员关系固定。
+- B 在领取前发现信息不足时，应先把问题写入该 Hall，并将任务置为 `queued / clarification_requested`；“停止领取”只表示暂不 claim / 执行，runner 仍继续监听任务和 Hall。
+- A 在同一 Hall 回复后，B 应携带原始任务和按时间排序的全部问答重新判断；信息充分则 `accept → claim → execute`，仍不足则继续在同一 Hall 提问。
+- 当前服务端已有提问、回复、`clarification_requested`、`accept` 和待澄清禁止 claim 的基础能力，但 bundled runner 仍会直接领取 `assigned` 任务，尚无领取前预检、等待答复和重新唤醒闭环。
+
+### 上下文边界
+
+- Hall 消息会完整持久化，A / B 都有读取权限；Web 和 async client 支持分页读取。
+- `talk_get_task` 当前只返回最近 50 条 Hall 消息，正式 runner prompt 目前仅包含任务标题 / 正文，因此“消息已保存”不等于“执行模型已获得完整上下文”。
+- TH-6 必须在每次预检和正式执行前分页读取 Hall，并按顺序注入任务原文、B 的问题、A 的回答及后续多轮澄清；还需覆盖重复唤醒幂等与等待期间不 claim。
+- 文件消息可保留附件元数据，但附件正文自动下载 / 注入策略仍待后续确定。
+
+### 终端委派方向
+
+- 通过 TALK bridge 启动的 Codex CLI 和 pi 已提供 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result`。
+- CLI 已具备直接自然语言委派的底层能力；普通 Codex Desktop 会话尚未自动注册 TALK MCP，需要增加项目上下文、成员身份、API Key 与工具注册的接入包装。
+- TH-7 目标链路：终端 A 委派 → B 在 Hall 澄清 → 终端 A 读取并回复 → B 执行 → 结果回同一 Hall → 终端 A 收取。
+
+### 下次恢复顺序
+
+1. 先开发 TH-6 领取前预检、自动澄清和完整 Hall 上下文重放。
+2. TH-6 通过自动化与真实模型验收后，再进入 TH-7 Codex Desktop / 通用终端接入包装。
+
+---
+
+## 2026-07-16 TH-5：Project Blackboard、Task Hall Web UI 与真实跨模型链路
+
+**背景**：项目管理者明确表示逐片确认缺少直观价值，希望等“任务创建 → runner 执行 → 结果写入 Task Hall → 人类收取”整个流程可见后再介入。本轮因此把 Web 可视化、bundled runner 活服务链路和真实 Codex / pi CLI 冒烟作为同一个里程碑收口。
+
+### Project Blackboard / Task Hall Web UI
+
+- Web UI 登录后以 Project 为一级工作范围，默认打开项目任务黑板；当前项目按成员保存在本地浏览器。
+- 黑板按“待响应 / 执行中 / 结果待收取 / 已结束”四列聚合任务，并在详情面板保留待确认、待澄清、已接受等精确协作状态。
+- 新增页面委派表单，可选择项目 Agent、填写标题与正文；创建后服务端自动生成的 Task Hall 会出现在项目 Hall 列表。
+- 任务详情显示请求者、执行者、运行状态、attempt 与租约，并按权限提供进入 Hall、请求澄清、接受、收取结果和取消未领取任务动作。
+- Task Hall 继续复用既有消息时间线、回复和文件能力；任务状态每 5 秒刷新，runner 回写后黑板自动进入“结果待收取”。
+
+### runner 输出所有权修复
+
+- 真实 pi 冒烟首次发现：嵌套模型调用 TALK 工具写入 Hall 后，runner 又回写 visible reply，单任务产生 3 条重复结果。
+- Codex / pi bridge 现在为队列 worker 解析独立 `task_command`：保留 discussion / tools 权限档，但不暴露 TALK 结果投递工具；交互消息继续使用原命令，不影响终端 Task Hall 工具。
+- 新增任务专用 system prompt，明确单轮执行、优先遵循任务正文、避免无必要反问，并由 runner 独占 Hall 结果写入与 complete。
+- 真实 pi 复测结果从 3 条收敛为 1 条；Codex 当前任务命令同样只写一条结果。
+
+### 自动化与真实验收
+
+- 新增 `tests/test_task_web_ui.py`，锁定 Project Blackboard / Task Hall 静态结构、项目任务 API 与安全 `textContent` 渲染。
+- 新增 `tests/test_task_hall_e2e.py`，在活 FastAPI 服务上贯通 SDK 创建、runner claim / 执行、Hall 结果、complete 和请求者 collect。
+- Browser 真实交互贯通登录、空黑板、页面委派、进入 Hall、发送协作消息、runner 结果出现、收取完成与“已结束”分栏；1280px 四列布局修正后无多余横向滚动，控制台 error / warning 为 0。
+- 真实 Codex 0.144.4 使用当前无 TALK MCP 的任务命令返回 `Codex Task Hall connected.`，单条 Hall 结果并完成收取。
+- 真实 pi 0.80.3 使用当前无 TALK 工具的任务命令完成 claim、单条 Hall 回写与收取；模型会把逐字回复要求改写为简短确认，记录为模型输出质量边界，不视为基础设施链路失败。
+
+### 验证
+
+- Python `py_compile`、`node --check web\app.js`、`node --experimental-strip-types --check bridges\talk_tools_extension.ts` 与 `git diff --check`：通过。
+- 定向 Web / runner / client：`Ran 124 tests ... OK`。
+- 全量回归：清理真实验收服务后 `Ran 321 tests in 98.917s ... OK`。
+- 首次全量运行时一个既有 WebSocket 降级测试在固定 2 秒清理窗口超时；关闭并行真实服务后该用例连续两次单测通过，第二轮全量也通过。
+
+### 下一步
+
+- 当前已达到人工验收门禁：项目管理者可只通过页面完成一次真实委派、观察结果进入对应 Hall 并收取。
+- 人工验收通过后关闭 Task Hall 当前里程碑，再决定运行中协作取消、返工 / observer、后台 schedule 或项目级 Members / Activity 的优先级。
+
+---
+
+## 2026-07-16 TH-4：claim lease / attempt 与 runner 过期回收
+
+**背景**：项目管理者接受 TH-3，并明确逐片人工验收缺少直观价值，后续人工介入点应放在完整委派流程里程碑。本轮先提交 TH-3 为 `ff8f8a8`，再补齐同一任务只能由一个有效 runner 持有的可靠性协议。
+
+### 实现
+
+- `AgentTask` 新增 `attempt`、私有 `claim_token`、`lease_expires_at` 与 `heartbeat_at`；旧库通过 `init_db()` 增量迁移并建立租约截止索引。
+- claim 改为数据库条件更新，多个实例并发领取只有一个成功；同一实例重复 claim 保持 attempt / token 不变。
+- 新增 `POST /api/tasks/{id}/heartbeat` 与 `POST /api/tasks/requeue-expired`。过期 claim 回到 `queued / accepted`，旧实例进入 `error`，下一次领取递增 attempt 并生成新 token。
+- complete 原子校验当前 token 和未过期租约；陈旧 token 与重领后缺少 token 的提交均被拒绝。首次 attempt 暂时允许省略 token，兼容尚未升级的第三方 runner。
+- async / sync client 新增 heartbeat 与过期回收 helper，并扩展 claim / complete 参数。
+- bundled runner 默认使用 120 秒 lease、30 秒心跳；轮询前先回收自己的过期任务。租约丢失时取消本地子进程，不发送 Hall 结果，也不提交陈旧完成状态。
+- 运行中取消的错误提示同步调整：lease 基础已经存在，剩余缺口是请求者触发的 runner 协作中断协议。
+
+### 验证
+
+- Python `py_compile` 覆盖模型、迁移、路由、client、runner 与相关测试：通过。
+- `node --experimental-strip-types --check bridges\talk_tools_extension.ts`：通过。
+- 定向 tasks / client / CLI bridge / Codex bridge / Task Hall tools：`Ran 141 tests ... OK`。
+- 全量 `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 313 tests ... OK`。
+- 新测试覆盖真实并发 claim、幂等重试、心跳续租、过期回队、attempt 递增、陈旧完成拒绝、SDK 活服务和 runner 租约丢失取消。
+- `git diff --check`：通过；本切片无前端改动，不需要 Browser 验证。
+
+### 边界与下一步
+
+- 无 lease 字段的历史 `running` 任务不会被自动回收，避免升级时误终止旧 runner。
+- 当前仍只允许取消未领取任务；运行中取消需要协作中断状态与 runner 主动停止协议。
+- 下一切片进入 Project Blackboard + Task Hall Web UI，让项目管理者第一次可以从页面直观看到并操作完整任务流程。
+
+---
+
+## 2026-07-15 TH-3：终端 MCP / pi Task Hall 工具闭环
+
+**背景**：TH-2 已完成 async / sync client 与 bundled runner Hall 回传，并提交为 `99e8a28`。本轮按项目管理者确认推进一个终端接入切片，让 Codex 与 pi 的实际操作终端可以发现 Agent、委派任务、处理澄清并收取结果。
+
+### 实现
+
+- 新增 `bridges/talk_task_tools.py`，统一实现 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result` 八个 HTTP-backed Task Hall 工具及 schema / dispatch。
+- `bridges/talk_send_mcp.py` 在保留 deferred `talk_send` 的基础上注册全部 Task Hall 工具；`bridges/talk_tools_extension.ts` 为 pi 提供同名工具面。
+- Codex discussion profile 与 pi 的 discussion / tools profile 均获得对应工具；bridge 从项目目录 `.talk/project.yaml` 注入默认 `TALK_PROJECT_ID`。
+- Agent 发现结合项目 profile、成员与实例状态；等待采用最长 30 秒的有界轮询；Hall 回复可同时推进请求澄清或接受动作。
+- 服务端及 async / sync client 新增取消动作。只有原请求者可幂等取消未领取任务；运行中取消返回 `409`，避免在没有 lease / runner 中断协议时伪造停止。
+- 新增 MCP 真实工具调用、桥接项目上下文、pi 工具面一致性与活服务完整委派流程测试；现有 task、client 和 bridge 测试同步扩展。
+
+### 验证
+
+- Python `py_compile` 覆盖服务端、两套 client、bridge、Task Hall 工具和相关测试：通过。
+- `node --experimental-strip-types --check bridges\talk_tools_extension.ts`：通过。
+- `tests.test_talk_task_tools`：`Ran 4 tests ... OK`；`tests.test_talk_client`：`Ran 12 tests ... OK`。
+- `tests.test_pi_bridge + tests.test_codex_bridge`：`Ran 29 tests ... OK`。
+- 全量 `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 309 tests ... OK`。
+- `git diff --check`：通过；本切片无前端改动，不需要 Browser 验证。
+
+### 边界与下一步
+
+- `talk_wait_tasks` 当前是客户端有界轮询，不是服务端事件流；Agent 发现结果尚未带项目业务角色。
+- 取消当前只覆盖未领取任务；运行中取消、超时回收和重领需要 claim lease / attempt 与 runner 中断协议。
+- 按执行 Agent 单切片门禁暂停，等待验收后再进入 claim lease / attempt，不提前开发 Project Blackboard / Task Hall Web UI。
+
+---
+
+## 2026-07-15 TH-2：async / sync client 与 bundled runner Task Hall 接入
+
+**背景**：TH-1 已完成 Task Hall 数据 / API 地基。本轮按项目管理者确认，只推进一个 SDK / runner 切片：让实际终端 client 能使用项目化任务与协作动作，并让 bundled runner 的最终结果落到任务专属 Hall。
+
+### 实现
+
+- `TalkClient` 与 `TalkClientSync.create_task()` 新增可选 `project_id`；`list_tasks()` 新增 `workflow_status` 与 `project_id` 过滤。
+- async / sync client 新增 `get_task()`、`request_task_clarification()`、`accept_task()` 与 `collect_task_result()`，覆盖 TH-1 已落地的单任务查询和协作动作 API。
+- 通用 `cli_bridge` runner 与 `codex_bridge` 兼容任务处理入口会从 claim 响应读取 `hall_group_id`，将成功或失败的可见结果写入对应 Task Hall，再用消息 id 完成任务。
+- 旧任务没有 `hall_group_id` 时继续写入全局时间线，保持服务端与 runner 的兼容路径。
+- `tests/test_talk_client.py` 新增 sync 活服务全流程，并扩展 async 流程覆盖项目过滤、澄清、接受、Hall 结果、提交和收取；bridge 测试分别覆盖 Task Hall 回传与旧任务兼容。
+
+### 验证
+
+- `py_compile` 覆盖两套 client、两条 bridge 入口和三份相关测试文件：通过。
+- `tests.test_talk_client`：`Ran 12 tests ... OK`。
+- `tests.test_cli_bridge`：`Ran 85 tests ... OK`；`tests.test_codex_bridge`：`Ran 19 tests ... OK`。
+- `tests.test_tasks + tests.test_pi_bridge`：`Ran 26 tests ... OK`。
+- 全量 `.venv\Scripts\python.exe -m unittest discover -s tests -q`：`Ran 304 tests ... OK`。
+- 本切片无前端改动，不需要 Browser 验证。
+
+### 边界与下一步
+
+- 当前 client 已具备项目化创建、查询与协作动作；终端 MCP 仍缺 Agent 发现、委派、等待、纠偏 / 取消和批量结果收集工具。
+- observer、返工、lease / attempt、Project Blackboard 与 Task Hall Web UI 仍未进入实现。
+- 按执行 Agent 单切片门禁暂停，等待项目管理者或决策 Agent 验收后再进入终端 MCP 切片。
+
+---
+
+## 2026-07-15 TH-1：Task Hall 数据 / API 地基
+
+**背景**：项目管理者确认先实现 Task Hall，并批准首个数据库 / 协议切片采用“复用 Group + 双状态”方案：不新增 thread 表，`AgentTask.status` 继续服务现有 runner，另设协作状态表达澄清、接受、提交和结果收取。
+
+### 决策与实现
+
+- `AgentTask` 新增可选 `project_id`、唯一 `hall_group_id`、`workflow_status` 和 `result_collected_at`；`init_db()` 为旧库补列、建索引，并把旧五态回填为对应协作状态。
+- `POST /api/tasks` 原子创建 `groups.type=task` Hall，请求者与执行者固定为不同成员；请求者是 `owner`、执行者是 `member`。schedule 每次物化也建立独立无项目 Hall。
+- 保留执行五态 `queued/running/succeeded/failed/canceled`；协作状态新增 `assigned/clarification_requested/accepted/in_progress/submitted/completed/failed/canceled`。
+- 新增 `GET /api/tasks/{id}`、`workflow_status/project_id` 列表过滤，以及 `request-clarification`、`accept`、`collect-result` 三类动作；澄清状态阻止 claim，成功 complete 只到 `submitted`，请求者收取后才到 `completed`。
+- 关联 Task Hall 不能通过普通 Group API增删成员或独立删除，避免一任务一 Hall 的 1 对 1 结构被拆散。
+- 为兼容现有外部客户端，`project_id` 暂时可为空；结果消息接受对应 Hall 或旧全局时间线，但拒绝其它 Hall。bundled runner 改为 Hall 回传留到下一切片。
+
+### 测试与验证
+
+- `tests/test_tasks.py` 从 11 个扩展到 16 个测试，新增项目关联 / 自动建 Hall、完整协作流程、权限、结构保护、schedule Hall 和旧库迁移覆盖。
+- `.venv\Scripts\python.exe -m py_compile server\models.py server\db.py server\routes\tasks.py server\routes\groups.py tests\test_tasks.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_tasks -v`：`Ran 16 tests ... OK`。
+- 任务相关七模块最终回归：`Ran 200 tests ... OK`；其余十四模块：`Ran 103 tests ... OK`，最终代码合计 303 项通过。
+- 核心实现完成后的单次 unittest discovery 曾 `Ran 303 tests ... OK`。最后一次单进程复跑在活服务测试退出阶段未结束而被工具超时终止，无断言失败；随后以上述 200 + 103 分批复跑覆盖全部模块，不把超时轮次记为通过。
+- 纯后端数据库 / API 切片，无前端或 Browser 验证。
+
+### 文档与下一步
+
+- 更新 `docs/spec/MODULE_tasks.md`、`docs/PROJECT_BRIEF.md`、`docs/PROGRESS.md` 和本历史记录，使实现态、兼容边界和后续顺序一致。
+- 下一切片扩展 async / sync client 与 bundled runner：支持项目化委派、协作动作和 Task Hall 结果回传；完成后仍按单切片暂停验收。
+
+---
+
+## 2026-07-15 Task Hall 开工前清理
+
+**完成**
+
+- 明确 `agent-docs/BLACKBOARD.md` 为本地协作文件；保留本地文件和 `.gitignore` 规则，从 Git 索引移除，不再作为项目文件维护。
+- 将 `docs/PROGRESS.md` 从混合历史记录精简为当前快照，仅保留 Task Hall 目标、待决实现选择、下一切片、验证基线和有效技术债。
+- 已完成切片、历史测试和长期方向未删除，仍由本文件及 `docs/spec/PROJECT_INTEGRATION.md` 保存。
+
+**下一步**
+
+- 进入 Task Hall 数据 / API 地基切片；先复核现有任务、Group、消息和成员模型，再确定一任务一 Hall 的最小兼容关联方案。
+
+---
+
+## 2026-07-15 BS-3a：汇总 grounding + bridge 推断 decision（Discussion 分支收尾）
+
+**背景**：BS-3 真机 v2 证明 BS-2b 的通用历史块在技术上已注入，但模型仍可能忽略实际意见、引用旧成见或私信重问；汇总纯 prose 又统一被记为 `answer`，导致 session 虽可能被 closure 收掉，却留下 `end_reason=null`。项目管理者确认先做一个限定范围的 Discussion 收尾切片，再关闭当前分支并转入 Task Hall。
+
+### 决策
+
+- **D-i 采用内联 grounding**：汇总触发时按 `discussion_turns` 为每个 `agent:*` 参与者选择首条 `answer` reply，再按 `message_id` 取回原文。决策人的前置意见与其他 Agent 一样纳入；后续闲聊 / 重复 answer 不进入材料。
+- **D-ii 采用 bridge 推断**：仅在 active 多方 brainstorm、human 单独定向当前决策人、文本明确要求汇总、全部 Agent 意见取齐、CLI 成功并返回非空回复时，把回复强制记为 `decision`，再复用 `_resolve_if_decision_maker` 收口。
+- **D-iii 保持原协议**：决策人先贡献一条普通 `answer`，最终再单独产出 `decision`。
+
+### 实现
+
+- `bridges/cli_bridge.py`
+  - 新增汇总意图 markers 与 `_is_brainstorm_summary_request`，校验 Hall 类型、human 来源、单目标、决策人身份和 active 多方参与关系。
+  - 新增 `_brainstorm_summary_grounding`：必须取齐每位 Agent 的首条意见原文，单条最多 4000 字；撤回、正文缺失或成员不全时返回空，不自动收口。
+  - 汇总轮使用专用材料块替代通用 BS-2b 历史；其它多方轮次保持原行为。
+  - 成功汇总 prose 或错误 mark stance 均归一为 `decision`；CLI 超时 / 失败或无可见回复不触发。
+- `tests/test_cli_bridge.py`
+  - 覆盖首条意见选择、决策人意见包含、后续噪声剔除、成员未齐拒绝、直接点名守卫，以及完整的 prose → `decision` → `resolved+consensus` 路径。
+
+### 文档
+
+- `docs/spec/MODULE_discussions.md`：补当前 `decision/end_reason` 能力、BS-3a 行为合同和验收点。
+- `docs/spec/DELIBERATION.md`：登记 D-i / D-ii / D-iii 决策、严格守卫、BS-3 与 BS-3a 状态。
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`：登记分支收尾、验证和残余人工验收。
+
+### 验证
+
+- `.venv\Scripts\python.exe -m py_compile bridges\cli_bridge.py tests\test_cli_bridge.py`：通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge`：`Ran 85 tests ... OK`。
+- `.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge`：`Ran 147 tests ... OK`。
+- 真实模型最终汇总质量未在本切片重跑：检查时 8000 / 8001 / 8010 均无 server 监听，存在此前留下的 bridge 重连进程；未擅自终止这些进程或把自动化结果写成真机通过。
+
+### 分支交接
+
+- `claude/phase3-collab-and-ui` 在本片提交并推送后关闭开发。
+- 已从最终提交 `1da4797` 创建并切换到 `codex/task-hall`，进入 Task Hall 数据 / API 最小闭环；本轮只完成分支接力，不提前开发下一切片。
+
+---
+
+## 2026-07-15 Task Hall 产品方向收敛（文档切片）
+
+**背景**：项目管理者重新确认 TALK 的实际使用方式：用户在 Codex、Claude Code 等真实终端中推进总目标，主 Agent 在过程中按角色把子任务通过 TALK 分给其他模型 Agent；任务完成后，结果必须回到 TALK，来源终端再查询 / 等待并整合。Desktop 与 CLI 不共享同一对话上下文可以接受，TALK 承担跨入口持久化真相源。
+
+### 已确认决策
+
+- 产品级 Hall 分为 **Task Halls** 与 **Discussion Halls**。当前先完成 Task Hall，Discussion Hall 的多角色讨论效果后续继续。
+- 一项委派任务自动建立一个独立 Task Hall；执行关系固定为请求者 A ↔ 执行者 B 1 对 1。项目所有者 / 决策 Agent 可观察、介入和验收，但不成为第三个执行参与者。
+- 标准流程为：A 指派 → B 可选提问 → B 接受 → 执行 → 提交结果 → A 的终端获取并验收。提交结果与来源终端已收取结果需要可区分。
+- 任一接入 TALK MCP / client 的交互终端都获得跨模型“子 Agent 委派”能力，不依赖终端原生 subagent 功能。
+- bridge / runner 是独占领取并驱动目标模型执行的基础设施，不是第三类 Agent，也不代表额外订阅；TALK 通过 claim / lease 防止同一任务被多个 runner 重复执行。
+- Web UI 按 Project 组织，默认提供 Blackboard 聚合 Task Hall 状态；Task Halls 与 Discussion Halls 分区，点击黑板任务进入对应独立 Hall。
+
+### 文档落盘
+
+- `docs/spec/POSITIONING.md`：更新产品定位、Hall 两类结构、混合终端 / runner 模型和当前优先级。
+- `docs/spec/MODULE_tasks.md`：新增 Task Hall 产品合同、标准流程、终端能力、数据关联草案与 Web 信息架构；明确区分现有实现和目标态。
+- `docs/spec/PROJECT_INTEGRATION.md`：补充项目级任务关联、终端接入、路线调整和关键决策记录。
+- `docs/PROJECT_BRIEF.md`：同步公共上下文、当前前端与目标态差异、模块索引状态。
+- `docs/spec/PRODUCT.md`：标记为历史 MVP 基线，避免“多房间不做”继续覆盖当前方向。
+- `docs/spec/DELIBERATION.md`：保留已有 Discussion Hall 设计与代码，标记 BS-3 等后续工作在 Task Hall 里程碑后恢复。
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`：登记方向、当前状态、实现待决项与下一步。
+
+### 实现待决项
+
+- Task Hall 最终直接复用 `groups.type=task`，还是新增专用 thread 实体。
+- 目标流程如何兼容现有 `queued/running/succeeded/failed/canceled`，是否引入独立 `submitted` / `result_collected` 状态。
+
+这些是首个实现切片需要定稿的技术选择，不改变“一任务一 Hall、1 对 1 执行、项目聚合、结果可收取”的产品合同。
+
+### 验证
+
+- `git diff --check`：通过。
+- Markdown 本地链接校验：通过。
+- 关键术语一致性检查：通过。
+- 纯文档切片，未运行代码测试或 Browser 验证。
+
+### 下一步
+
+- 由决策 Agent / 项目管理者验收本次方向文档。
+- 下一开发切片从 Task Hall 数据模型与 API 最小闭环开始；涉及数据库 / 协议，完成后暂停验收。
+
+---
+
+## 2026-07-15 BS-2b：多方场发言可见性（真机 v2 卡第二步的修复，决策 Agent 自行开发）
+
+**背景**：BS-3 真机验收 v2 第一步（各自想法）正常，但第二步"逐一表态"时 agent 反馈"不知道对方发了哪条"——卡住。诊断根因：pi/codex 的 prompt（`build_cli_prompt` 紧凑分支）**只含触发消息 + 角色注入**，无任何 Hall 历史；`discussion_context`（带 turns 的那段）对 pi/codex 是 5.x 时故意砍掉的（防"已经XX啦"元叙述），且它本就不含 turn 的正文内容。→ 表态/汇总这类"对别人发言的反应"结构上拿不到别人说了什么。
+
+### 完成事项（仅 `bridges/cli_bridge.py` + `tests/test_cli_bridge.py`）
+
+- `_shared_discussion_history(client, group_id, discussion, current_message_id, self_id)`：只对 >2 参与者的多方场生效；`client.fetch_history(group_id, since=root-1)` 拉本场从开场起的群发言，拼成"speaker：内容（截 240）"回顾块（剔除当前触发消息/空内容/撤回，最多 24 条），框成"【本场已有发言…请勿逐条复述】"。1:1/free/无场 → 空串；拉历史失败（无方法/404）降级空串不阻断。
+- `build_cli_prompt` 加 `shared_history` 参数：pi/codex 紧凑分支在"任务行"后注入该块；通用分支也注入。默认空串 → 非多方场行为不变。
+- `handle_incoming_message`：build prompt 前计算 `shared_history`（discussion 已由 BS-2 解析，含 agent 触发与 human 触发两路）。
+
+### 为什么这次注入是安全的（对照 5.x 教训）
+
+5.x 砍 `discussion_context` 是因为那段是**协议字段**（assignee_id/requester_id/remaining_auto_turns…），模型会把它当"任务完成状态"复述。本片注入的是**真实发言内容**（人读 Hall 看到的东西），且明确框为"仅供参考、勿复述"，且**只在多方 brainstorm 场**注入——1:1/free 的既有紧凑 prompt 一字未动。真机行为仍需重测确认（BS-3 v2 重跑）。
+
+### 验证
+
+- **自验（2026-07-15）**：`unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge` → `Ran 143 tests ... OK`（`test_cli_bridge` +3：多方拼块/1:1 空/prompt 注入）。另跑临时脚本验降级与剔除逻辑。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- 重跑 BS-3 真机 v2：第二步表态应能看到彼此想法；继续验到第四步 decision 收口。
+
+---
+
+## 2026-07-15 BS-2：bridge 多方场记账 + 回合预算按 N 放大（决策 Agent 继续自行开发）
+
+**背景**：编排 v1（`spec/DELIBERATION.md §8`）第二片，管理者授权决策 Agent 继续直接开发。BS-1 建好"场"后，本片让 bridge 把真实头脑风暴流量记进这个场，并解除 1:1 回合预算对多方场的误伤。
+
+### 完成事项（仅 `bridges/cli_bridge.py` + `tests/test_cli_bridge.py`）
+
+- `_discussion_auto_turn_budget(discussion)`：多方场（>2 参与者）预算 = agent 数²+1（想法 N + 表态 N×(N-1) + decision 1）；1:1/无场保持常量 3。接入四处：agent 发送者刹车阈值（固定 `DISCUSSION_EXTENSION_CLOSE_TURNS` → `预算+1`，1:1 阈值仍为 4 不变）、deferred talk_send 预算、控制上下文 `remaining_auto_turns`。
+- `_active_multiparty_discussion`：只匹配 active 且 >2 参与者的场——human 的普通消息不会被记进 1:1 讨论（既有流程零污染）。
+- **human 发送者记账**：human 发起/点名（人驱动编排）时，agent 的可见回复记 turn 到多方场（`infer_reply_stance` → answer）；显式 `mark_stance`/talk_send 的 agree/disagree/decision 走原有路径落**同一场**（`_resolve_discussion_id` 的 participants 匹配可命中），D3-3a decision 收口链路依旧生效。human 发送者不注入 discussion 上下文、不受刹车（prompt 与 1:1 行为零变化）。
+
+### 验证
+
+- **自验（2026-07-15）**：`unittest tests.test_cli_bridge tests.test_messages tests.test_discussions tests.test_hall_types tests.test_codex_bridge` → `Ran 140 tests ... OK`（`test_cli_bridge` 78 = 75+3：预算缩放、human 广播回复记账到多方场、agent 消息在多方场 5 实质轮不触发 1:1 阈值收尾）。
+- **已知观察点（留 BS-3 真机）**：表态/汇总的 stance 依赖 agent 实际用带 stance 的工具（模板文案已教）；纯口头回复会被记为 `answer`。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `agent-docs/BLACKBOARD.md`（执行记录）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- **BS-3 真机验收 v2**：重启 server + 三 bridge，人按四阶段驱动一轮，验 turns 落账 + `resolved+end_reason=consensus`。
+
+---
+
+## 2026-07-14 BS-1：@所有人 × brainstorm 自动建多方 discussion + 模板四阶段（决策 Agent 获授权自行开发）
+
+**背景**：编排 v1（`spec/DELIBERATION.md §8`）第一片。真机验收 v1 证实 @所有人 广播建不出 1:1 discussion、收口无处挂；BS-1 给后续 turns/decision 一个挂载点。**管理者本轮明确授权决策 Agent 直接开发本片**（工单仍走黑板留痕）。
+
+### 完成事项
+
+- `server/routes/messages.py`：
+  - `_resolve_recipients` 返回 `(resolved_to, mention_all)`（唯一调用方 `create_message` 同步解包）。
+  - 新增 `_maybe_create_brainstorm_discussion`：@所有人 且群 `type=brainstorm` → 消息落库后自动建多方 `DiscussionSession`（`root_message_id`=开场消息、`participant_ids`=全体群成员含发送者、`topic`=去 mention 正文截 80（空则"头脑风暴"）、`requester_id`=发送者、`max_rounds=agent 数+2`）。
+  - 幂等守卫：该群已有 `active` 且参与者=全体成员的场次 → 跳过（一群同时一场）。
+  - 容错：全程 `try/except`+`logger.warning`，建场失败不影响消息发送。
+- `server/hall_types.py`：brainstorm `protocol_guidance` 改为四阶段协议（①需求 ②各自想法含决策人 ③点名表态 agree/disagree(否决附看法) ④决策人 decision 收口；未轮到不抢跑）；facilitator norm=「先贡献，等指示后汇总产出 decision」、contributor norm=「给想法；被点名时明确 agree/disagree」。
+- 测试：`tests/test_messages.py` +4（建场字段断言含 max_rounds=4 / 幂等 / free 群不建 / 定向不建）；`tests/test_cli_bridge.py` 2 处文案断言同步。
+
+### 验证
+
+- **自验（2026-07-14）**：`unittest tests.test_messages tests.test_discussions tests.test_hall_types tests.test_cli_bridge` → `Ran 118 tests ... OK`；`tests.test_groups` 16/16。diff 自检（单调用方 / 挂钩位置 / 幂等 / 异常不阻断）。
+- 限制：真机上 agent 回复是否落 turns 依赖 BS-2（bridge 侧），本片只建"场"。
+
+### 变更文件
+
+- `server/routes/messages.py` / `server/hall_types.py`
+- `tests/test_messages.py` / `tests/test_cli_bridge.py`
+- `agent-docs/BLACKBOARD.md`（工单 + 执行回贴）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`
+
+### 下一步
+
+- BS-2（bridge：广播 turns 落账 + 表态透传 + 多方回合预算）；执行者待管理者定。
+
+---
+
+## 2026-07-14 真机验收 v1（三 agent 头脑风暴）+ 编排 v1 设计定稿
+
+**背景**：D3-1~3c 落地并推 GitHub（`8e1f029`）后，按黑板验收指南真机跑第一轮头脑风暴：「验收测试群」（brainstorm），codex=决策人(facilitator)、pi/pi-kimi=contributor，人（qa）发 `@所有人 …想 3 个点子…codex 最后收敛成结论`。
+
+### 结果与发现
+
+- **通过项**：三个 agent 均直接给出实质想法（消息 2412/2413/2416/2417/2418），氛围贴合头脑风暴——**D2 的 Hall 类型注入真机生效**；@所有人 展开/触发正常。
+- **缺口 ①（结构）**：整轮**未创建任何 `discussion_session`**——现有创建路径是 1:1（`_resolve_discussion_id` 依赖 `peer_id`，requester↔assignee），@所有人 的 N 方广播建不出讨论 → turns/decision 收口（D3-3a）无处可挂。
+- **缺口 ②（行为）**：无"该你归纳"的信号，codex（决策人）表现同普通贡献者，只报自己的点子、未汇总。
+- **环境修复（codex 两层）**：`~/.codex/config.toml` 的 `service_tier="default"` 非法（删除后过配置解析）→ 又暴露老 CLI(v0.130.0-alpha.5) 不支持 `gpt-5.6-sol`（API 400）→ 管理者重装独立新 CLI，`_default_codex_exe()` 改走 PATH（删除写死的旧安装路径）。修复后 codex 正常回复。
+
+### 决策（管理者 2026-07-14 定稿）
+
+头脑风暴编排 v1 = **人驱动 + 四阶段**：① 人发需求（server 自动建多方 discussion）→ ② 每个 agent **含决策人**各给想法(answer) → ③ 人逐一点名，其他角色对每个想法一次表态（agree / disagree+自己的看法）→ ④ 人请决策人汇总(decision) → D3-3a 自动收口。已写入 `spec/DELIBERATION.md §8`；切片 **BS-1(server)/BS-2(bridge)/BS-3(真机 v2)**；D3-3d、timeout/manual、自动编排推迟。
+
+### 变更文件
+
+- `bridges/codex_bridge.py` + `tests/test_codex_bridge.py`（管理者改 codex 路径，随 BS-1 一并收口提交）
+- `docs/spec/DELIBERATION.md`（§8 编排 v1）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+---
+
+## 2026-07-14 D3-3c：收口 `end_reason` 归一（deadlock vs consensus）
+
+**背景**：D3-3 第三片。修掉 D3-3b 的临时不精确——决策人收口时按讨论是否经 deadlock 移交，落 `deadlock` 或 `consensus`。`timeout`（轮次阈值语义待定）/ `manual`（缺人类"停"指令机制）本片刻意不做、显式 defer。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `bridges/cli_bridge.py` `_resolve_if_decision_maker`：确认「决策人 + stance=decision」后取讨论 turns（`_list_discussion_turns`，`try/except` 包裹）；若有 `stance="escalate"` 的 turn → `end_reason="deadlock"`，否则 `consensus`；取 turns 失败退化 `consensus`（收口不因此失败）。`stance!=decision` 早返回仍在最前（普通轮次零开销）；加 `isinstance(turn, dict)` 防御。
+- `tests/test_cli_bridge.py`：+2（含 escalate turn → deadlock 收口、取 turns 失败 → consensus 退化）；既有 consensus / 非决策人不收口用例保持覆盖。
+
+### 明确未做（defer）
+
+- `timeout` / `manual` 两种 `end_reason` 未接入。
+- 未删 / 未改 `escalated` 状态（D3-3d）。未改 server / prompt / 显式动作 / 其它切片。
+
+### 验证
+
+- **决策 Agent 复核（2026-07-14）**：`git diff` 仅 `_resolve_if_decision_maker` 内改动；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 75 tests ... OK`。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- **D3-3d（破坏性）**：`escalated` 下线——旧 `escalated`→`resolved+deadlock` 迁移、从 `_DISCUSSION_STATUSES` 移除、bridge 改写不再写 `escalated`。**做前请管理者确认**（唯一有回滚风险的一片）。
+
+---
+
+## 2026-07-14 D3-3b：自动 handoff 目标从"只找 human"扩到"决策人"
+
+**背景**：D3-3 第二片。把系统**自动**发起 handoff 的移交目标从"群里第一个 human"改为"本群决策人"（复用 D3-3a 的 `_find_decision_maker`，decision_tier=decision agent 优先、否则回退 human）。这样 deadlock 能交给 agent 决策人，它随后产出 `decision` → D3-3a 自动收口，闭环。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `bridges/cli_bridge.py`：
+  - `_maybe_escalate_disagreement`（连续两轮 disagree 触发）自动目标 `_find_human_reviewer` → `_find_decision_maker`（消息文案/turn/target 一并更新；仍记 `escalate` turn + `status=escalated`）。
+  - `_send_human_escalation` 的 fallback（未显式传 `human_id` 时）`_find_human_reviewer` → `_find_decision_maker`；显式传入 `human_id` 行为不变。
+- **未动**（复核确认）：显式 `escalate_to_human` / `final_to_human`（agent 主动要人类裁决）保持 human-only；`escalated` 状态、`end_reason`、server、prompt 均未碰。
+- `tests/test_cli_bridge.py`：更新 disagree 自动 handoff 用例断言 agent 决策人目标；+2（无决策人回退 human、显式 escalate_to_human 仍 human-only）。
+
+### 已知临时不精确（留 D3-3c）
+
+- deadlock 触发的收口目前仍被 D3-3a 标成 `end_reason=consensus`（D3-3a 对决策人 decision 一律 consensus）。D3-3c 会按触发原因归一（deadlock/timeout/manual）。
+
+### 验证
+
+- **决策 Agent 复核（2026-07-14）**：`git diff bridges/cli_bridge.py` 仅两处自动路径改目标；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 73 tests ... OK`。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-3c：`end_reason` 归一到 deadlock/timeout/manual 各触发点。
+
+---
+
+## 2026-07-05 D3-3a：决策人 `decision` 收口 → `resolved`+`end_reason=consensus`
+
+**背景**：D3-3（头脑风暴协议编排）拆 4 片，本片 D3-3a 是第一片——新增"决策人产出定论则收口"的路径，不碰现有 escalate/final 流程、不删 `escalated`。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- SDK `update_discussion` 加可选 `end_reason`（`talk_client.py` async + `talk_client_sync.py`）：未传时 body 只含 `status`（向后兼容，服务端 `model_fields_set` 不动 end_reason）。
+- `bridges/cli_bridge.py`：
+  - 新增 `_find_decision_maker(client, group_id)`：先找 `decision_tier=="decision"` 成员，否则回退第一个 `human:`。
+  - `_update_discussion_status` 加 `end_reason` 透传（现有调用零变化）。
+  - 新增 `_resolve_if_decision_maker`：`stance!="decision"` 先早返回（普通轮次不查 group，零开销）；决策人发 `decision` → `resolved`+`end_reason=consensus`；**非决策人不收口**。
+  - 三落点挂钩：`_record_deferred_demand_turns`（deferred talk_send）、`execute_talk_actions` 的 send_message 分支、`handle_incoming_message` 回复路径。
+- `tests/test_cli_bridge.py`：所有 `FakeClient.update_discussion` 加 `end_reason=None` 形参；+4 用例（决策人 send 收口、非决策人不收口、无 decision_tier 时 human 回退不收口、决策人 mark_stance 收口）。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-07-05）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge tests.test_discussions` → `Ran 80 tests ... OK`（test_cli_bridge 71 + test_discussions 9）；bridge diff 逐条复核，护栏（非决策人不收口 / 现有 escalate/final/escalated 未动）确认。
+
+### 变更文件
+
+- `TALK/client/talk_client.py` / `TALK/client/talk_client_sync.py`
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-3b：handoff 目标从"只找 human"扩到"决策人（decision_tier=decision 优先）"。
+
+---
+
+## 2026-07-04 D3-2：bridge 接 `decision` 立场（plumbing，纯加法）
+
+**背景**：承接 D3-1（`afc1eb7`，server 已认 `decision`）。本片让 bridge 也把 `decision` 当合法、实质、不受轮次刹车的立场正确接住。纯机械改动，不碰编排/prompt/escalated（D3-3）。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `bridges/cli_bridge.py`：仅 `ACTION_STANCES` 加 `decision` → 动作解析（`stance not in ACTION_STANCES → None`）不再把 `stance=decision` 抹掉。
+- **护栏未破**（复核确认）：`NON_SUBSTANTIVE_STANCES`（仍 `{greeting, closure}`）→ `decision` 被 `_substantive_discussion_turns` 当实质轮次；自动轮次刹车元组（仍 `{greeting, answer, agree, closure}`）→ `decision` 不受 turn limit skip；`infer_*`/prompt/`escalated` 均未动。
+- `tests/test_cli_bridge.py`：+2 —— `decision` `TALK_ACTION` 解析后 stance 保留（不被置 None）+ 计入实质轮次；轮次预算耗尽时 `decision` deferred talk_send 不被 skip（对照 `answer` 被 skip）。
+
+### 验证
+
+- **决策 Agent 复核（2026-07-04）**：`git diff bridges/cli_bridge.py` 仅 1 行；`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge` → `Ran 67 tests ... OK`（原 65 + 2 D3-2）。
+
+### 变更文件
+
+- `bridges/cli_bridge.py` / `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-3（重头）：结束归一 + 决策人 `decision` 收口 + 轻编排 + prompt 指引 + `escalated`→`resolved+deadlock` 迁移下线。
+
+---
+
+## 2026-07-04 D3-1：审议数据层地基（stance `decision` + `end_reason`，纯加法）
+
+**背景**：进入审议主线 D3（头脑风暴协议）。因改动面大（stance/status 迁移 + 结束归一 + 决策人收口 + 轻编排），拆为 3 片：D3-1 数据层、D3-2 bridge stance、D3-3 结束归一/编排/escalated 下线。本片 D3-1 只做数据层地基，**纯加法、零回归**。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+**现状对齐**：`DELIBERATION §7` 的 stance 迁移点（去 `idea`、`synthesis`→`decision`）是设计期写法、与现状不符——当前 `_DISCUSSION_STANCES` 早已无 `idea`/`synthesis`，故本片对 stance 只新增 `decision`。`escalated` 仍被 bridge 使用，本片不删（迁移/下线留 D3-3）。
+
+### 完成事项
+
+- `server/models.py`：`_DISCUSSION_STANCES` 加 `decision`；新增 `_DISCUSSION_END_REASONS = {consensus, deadlock, timeout, manual}`；`_DISCUSSION_STATUSES` 未动。`DiscussionSession` 加 `end_reason`（可空、索引）；`DiscussionSessionOut`(+`from_orm_session`) 回显；`DiscussionSessionUpdate` 加可选 `end_reason` + 校验（非 None 时须 ∈ 集合，否则 422）。
+- `server/db.py`：`init_db()` 为旧 `discussion_sessions` 补 `end_reason` 列 + `ix_discussion_sessions_end_reason` 索引。
+- `server/routes/discussions.py`：`update_discussion` 仅当 `end_reason` 在 `body.model_fields_set` 时更新该字段（status-only PATCH 保留原 end_reason）。
+- `tests/test_discussions.py`：+5 组（`decision` stance turn、end_reason PATCH round-trip、非法 end_reason 422、status-only 保留、`escalated` 零回归 + 旧 schema 迁移补列）。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-07-04）**：`.venv\Scripts\python.exe -m unittest tests.test_discussions tests.test_cli_bridge` → `Ran 74 tests ... OK`（9 discussion + 65 cli_bridge）；diff 逐条吻合工单、纯加法未破 `_DISCUSSION_STATUSES`/`escalated`。
+
+### 变更文件
+
+- `server/models.py` / `server/db.py` / `server/routes/discussions.py`
+- `tests/test_discussions.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3-2：bridge `ACTION_STANCES` / stance 推断接 `decision`（仍不删 escalated）。
+
+---
+
+## 2026-06-28 真机黑盒验收（A/B/C）+ BUGFIX-1
+
+**背景**：D1/D2/@所有人/人设编辑(a) 落地后，真机黑盒验收前端 3 项已开发功能。由**无项目经验的 agent 当黑盒测试者**（真·黑盒：只按 Web UI 行为测、不看代码），决策 Agent 出验收工单 + 复核。fixture 用 `scripts/seed_acceptance.py` 种入（隔离临时项目根 `.tmp-acceptance`，建 brainstorm 类型 Hall「验收测试群」+ 设 business_role），避免污染仓库已提交的 `.talk/` profile。注入行为（D2/P3-2）本轮主动不验——头脑风暴协议引擎（D3）尚未开发，那部分留待 D3 连同结构化流程一起真机验。
+
+### 验收结果（测试者）
+
+- **A=@所有人**：FAIL —— `@` 下拉不弹、`@所有人` 未高亮。
+- **B=禁用/启用开关**：PASS —— 禁用出"已禁用"标记 + 不可加入，启用还原。
+- **C=编辑人设**：PASS —— 读已有/从空白新建/持久化/business_role 改 reviewer 均正常；附带发现保存后"编辑人设"按钮卡 disabled。
+
+### 根因定位（决策 Agent 复核代码）
+
+- **A 下拉**：`@所有人` 提交（`6e645bb`）在 `msgInput` 输入处理器写了 `Boolean(activeGroup)`，但该作用域无 `activeGroup`（模块级只有 `activeGroupId`）→ 输入 `@` 即 `ReferenceError`，整段下拉构建抛错，所有 mention 下拉全废。**决策 Agent 当时 diff 复核漏判作用域**——黑盒补上了静态复核盲区。
+- **A 高亮**：`buildMentionFragment`+`isAllMentionToken` 静态看正确；疑测试环境（消息绕过正常渲染注入）。
+- **C 按钮**：`saveAgentProfileEditor` 成功路径在 `try` 内、清 `agentProfileSaving`（在 `finally`）之前就 `renderGroupMembersPanel()` → 按钮以 saving 态渲染成 disabled 后无人再刷新。
+
+### BUGFIX-1（执行 Agent 修，仅 `web/app.js`）
+
+- Bug 1：输入处理器 mention 块内加 `const activeGroup = getActiveGroup();`。
+- Bug 3：保存成功路径在重渲染前调 `setAgentProfileSaving(false)`。
+- Bug 2：无代码改动；真机 Chrome 复现确认 `@所有人` 已渲染为 `<span class="mention">` → 原现象=测试环境，非缺陷。
+
+### 验证
+
+- **决策 Agent 复核（2026-06-28）**：`git diff web/app.js` 仅 2 处确定性修复、与根因吻合；`node --check web/app.js` 通过；执行 Agent 用真机系统 Chrome 复验三条（下拉出现所有人+成员、`@pi` 过滤、`@所有人` 高亮、保存后按钮即恢复）。前端运行时 bug 无单测覆盖，以 diff 复核 + 真机为准。
+- **结论**：A/B/C 三项前端真机验收闭环。
+
+### 变更文件
+
+- `web/app.js`（BUGFIX-1）
+- `scripts/seed_acceptance.py`（fixture 种子，新增·未提交）
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 备注（架构对齐 2026-06-28）
+
+管理者确认 TALK 架构理解：TALK 是中转 hub，背后真正干活的是 agent 框架（codex/pi/claude 这类，经 bridge 以 CLI 子进程接入）；codex 与 Claude Code 是同类不同厂的框架，CLI 是接入面。衍生候选「`claude_bridge`」（让 Claude Code/Codex 成为一等公民 worker）记入 PROGRESS Next Plan，暂不排期。
+
+### 下一步
+
+- 进 D3（头脑风暴协议）。
+
+---
+
+## 2026-06-25 人设编辑(a)：网页读写 `.talk/*.md` + business_role
+
+**背景**：承接 D1（`f20811a`）/ D2（`411269f`）/ @所有人（`6e645bb`）。按 `agent-docs/BLACKBOARD.md` 的"人设编辑(a)"工单，让 human 在 Web UI 编辑某 agent 在某项目的人设文件（`<project_root>/.talk/agents/<dir>/{IDENTITY,SOUL,USER}.md`）与其在当前 Hall 的 `business_role`。文件即唯一真相源、**bridge 不变**（仍用 `cli/profiles.py` 读同一批文件）。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `cli/profiles.py`（只新增写侧，读侧不动）：`PROFILE_FILES` 映射；`resolve_profile_path`（**双层路径穿越防御**：member 目录必须单段 + `resolve()` 后 `is_relative_to(agents_root)`）；`write_profile_file`（`mkdir parents` + `encoding="utf-8"` 写）。
+- `server/models.py`：`AgentProfileOut`（project_id/member_id/identity/soul/user）+ `AgentProfileUpdate`（三字段 Optional，按 `model_fields_set` 选择性写）。
+- `server/routes/projects.py`：human-only `GET`/`PUT /api/projects/{project_id}/agents/{member_id:path}/profile`；无 `project_root_path`→400；路径穿越 `ValueError`→400；PUT 仅写 body 出现的字段、写后重读返回。（用 `{member_id:path}` 让含 `/` 的穿越 member_id 进到校验而非 404。）
+- `web/index.html` / `web/app.js` / `web/style.css`：Hall 成员行（agent + 可管理 + 群有 `project_id`）显示"编辑人设"；模态编辑 IDENTITY/SOUL/USER + business_role；保存人设走新 `PUT .../profile`，business_role 变化时复用 `PUT /api/groups/{id}/members/{member_id}`（保留原 role/decision_tier）。
+- `tests/test_projects.py`：缺文件读取→null、三件套 round-trip（含落盘断言）、局部更新、无 root→400、路径穿越→400（断言外部无文件）、agent 禁止读写→403。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-06-25）**：`.venv\Scripts\python.exe -m unittest tests.test_projects tests.test_profiles -v` → `Ran 32 tests ... OK`；`node --check web/app.js` 通过；diff 逐条对齐、双层穿越防御复核。
+- 前端"编辑人设"弹窗真机点选 + 保存持久化**未起服务真机点选**（待后续攒一次前端真机）。
+
+### 变更文件
+
+- `cli/profiles.py`
+- `server/models.py`
+- `server/routes/projects.py`
+- `web/index.html` / `web/app.js` / `web/style.css`
+- `tests/test_projects.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- 审议主线进 D3（头脑风暴协议）；改动面大，按 `spec/DELIBERATION.md §7` 迁移点实施。
+
+---
+
+## 2026-06-24 @所有人：mention 解析"所有人/all" + 前端下拉
+
+**背景**：承接 D1（`f20811a`）/ D2（`411269f`）。按 `agent-docs/BLACKBOARD.md` 的"@所有人"工单，让 Hall 里 `@所有人`/`@all` 把消息 `to_ids` 展开为全体群成员（每个 agent 因此被 mention 触发），是头脑风暴（D3）的前置依赖。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `server/routes/messages.py`：
+  - 新增 `_ALL_MENTION_TOKENS = {"所有人", "all"}` + `_is_all_token`（`所有人` 精确、`all` 大小写不敏感）。
+  - `_extract_leading_mentions` 改为返回三元组 `(recipients, invalid_mention, mention_all)`；遇 all-token 不按具体成员校验、置 `mention_all`、继续消费。
+  - `_resolve_recipients` 加 `sender_id`；`mention_all` 时仅群作用域允许（legacy/全局 → `400 "所有人 mention is only allowed in a group"`），返回 `sorted(全体群成员 - 发送者)`。
+  - `create_message` 传 `sender_id=current.id`。
+- `web/app.js`：`ALL_MENTION_ID="所有人"` + `isAllMentionToken`；`@` 下拉在群作用域（query 命中）顶部 prepend"所有人（全体成员）"项 → `completeMention("所有人")`；`@所有人`/`@all` 放行为 `.mention` 高亮。
+- `tests/test_messages.py`：+4 用例（`@所有人` 展开除发送者、`@ALL` 大小写、混用具体 mention 时全体优先、全局 `@所有人`→400）；既有单 mention/广播/非法 mention 回归由原测试覆盖。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_messages -v` → `Ran 27 tests ... OK`；`node --check web/app.js` 通过；diff 与工单逐条对齐。
+- 前端"所有人"下拉点选 + 发出后全体高亮**未起服务真机点选**（待后续攒一次前端真机）。
+
+### 变更文件
+
+- `server/routes/messages.py`
+- `web/app.js`
+- `tests/test_messages.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- D3（头脑风暴协议）或 人设编辑(a) 二选一（新会话再定）。
+
+---
+
+## 2026-06-24 D2：bridge 注入 Hall `type` + 角色规范
+
+**背景**：承接 D1（`f20811a`）。按 `agent-docs/BLACKBOARD.md` 的 D2 工单，让 bridge 在每条消息上下文里按本群 Hall `type` 注入流程指引 + 当前 agent 的角色职责（软预设、纯追加，不引入硬状态机）。执行 Agent 实现，决策 Agent 复核验证后落库。
+
+### 完成事项
+
+- `TALK/client/talk_client.py`：新增异步 SDK helper `get_hall_types()`（`GET /api/hall-types`）；`talk_client_sync.py` 加同步 parity。
+- `bridges/cli_bridge.py`：
+  - 模块级缓存 `_HALL_TYPE_TEMPLATES` + `_get_hall_type_templates(client)`（取一次复用；任何异常含 `AttributeError` → 返回 `{}` 不写缓存，绝不抛）。
+  - 扩展 `_build_group_member_context`：`free`/缺省 `type` 不注入（保 P3-2 字节不变）；非 `free` 注入 `本群类型：{label}（{type}）。流程指引：…`；`business_role` 与模板 `roles[].role` 大小写不敏感匹配则追加 `你的角色职责：{norm}`；模板不可用 / client 无 `get_hall_types` → 降级为成员清单 + business_role。
+- `tests/test_cli_bridge.py`：`setUp/tearDown` reset 缓存防串扰；新增 5 个 D2 用例（review+reviewer、brainstorm+Contributor 大小写、role 不匹配、free 不取模板、模板接口异常降级），P3-2 两个用例零回归。
+
+### 验证
+
+- **决策 Agent 独立复跑（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_cli_bridge -v` → `Ran 65 tests ... OK`；diff 与工单逐条对齐。
+- 注入行为（agent 是否实际遵循）属黑盒，待真机攒一次（与 P3-2 同桶）。
+
+### 变更文件
+
+- `TALK/client/talk_client.py`
+- `TALK/client/talk_client_sync.py`
+- `bridges/cli_bridge.py`
+- `tests/test_cli_bridge.py`
+- `docs/PROGRESS.md` / `docs/PROGRESS_HISTORY.md`（决策 Agent 收口）
+
+### 下一步
+
+- 在 @所有人 / 人设编辑(a) 间二选一，再进 D3/D4。
+
+---
+
+## 2026-06-24 D1：Hall `type` + 模板地基（纯 server）
+
+**背景**：按 `agent-docs/BLACKBOARD.md` 中 Claude（决策 Agent）给执行 Agent 的 D1 工单推进。目标是给 Hall 增加 `type` 维度，并建立服务端内置、数据驱动的 Hall 类型模板注册表，作为后续 D2/D3/D5 的协议地基。本切片严格不改 bridge、不改 discussion stance/状态机、不做前端。
+
+### 完成事项
+
+- 新增 `server/hall_types.py` 作为 Hall 类型模板单一来源：
+  - `free`
+  - `task`
+  - `brainstorm`
+  - `review`
+  - 每项包含 `label` / `protocol_guidance` / `roles:[{role,norm}]`
+  - 暴露 `HALL_TYPES` 与 `DEFAULT_HALL_TYPE`
+- `server.models.Group` 增加 `type` 字段，默认 `free` 并建索引。
+- `GroupCreate` 支持可选 `type`，创建时默认 `free`，输入会 `.strip().lower()`，非法值返回 `422`。
+- `GroupOut` 回显 `type`。
+- `server.db.init_db()` 增加旧库迁移：若 `groups.type` 不存在则 `ALTER TABLE` 加 `TEXT NOT NULL DEFAULT 'free'`，并创建 `ix_groups_type`。
+- `server.routes.groups` 创建与输出路径均带上 `type`。
+- 新增认证只读 API `GET /api/hall-types`，返回 4 类内置模板。
+- 增加测试覆盖：
+  - 默认创建 Hall 回显 `type="free"`
+  - 创建时指定 `"type":"BrainStorm"` 归一为 `brainstorm`
+  - 非法 `type` 返回 `422`
+  - `GET /api/hall-types` 返回结构与认证要求
+  - 旧 schema 迁移后老 Hall 自动获得 `type="free"` 并创建索引
+
+### 验证
+
+- **决策 Agent（Claude）独立复核（2026-06-24）**：`.venv\Scripts\python.exe -m unittest tests.test_hall_types tests.test_groups tests.test_member_disable -v` → `Ran 23 tests ... OK`，确认执行 Agent 自测结论；代码与工单逐条对齐。
+- `python -m pytest tests/test_groups.py -q`：未运行；全局 Python 无 `pytest`。
+- `.venv\Scripts\python.exe -m pytest tests/test_groups.py -q`：未运行；项目 `.venv` 也无 `pytest`。
+- `.venv\Scripts\python.exe -m unittest tests.test_groups -v`：16/16 通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_hall_types -v`：3/3 通过。
+- `.venv\Scripts\python.exe -m unittest tests.test_member_disable -v`：4/4 通过。
+- 验证噪声：测试期间 `TimedRotatingFileHandler` 在 Windows 上尝试重命名被占用的 `logs/talk.log`，出现 `PermissionError` 日志噪声；测试退出码仍为 0，本切片未处理该日志轮转问题。
+
+### 变更文件
+
+- `server/hall_types.py`
+- `server/models.py`
+- `server/db.py`
+- `server/routes/groups.py`
+- `server/routes/hall_types.py`
+- `server/main.py`
+- `tests/test_groups.py`
+- `tests/test_hall_types.py`
+- `docs/PROGRESS.md`
+- `docs/PROGRESS_HISTORY.md`
+- `agent-docs/BLACKBOARD.md`
+
+### 待确认 / 下一步
+
+- 待决策 Agent/项目管理者确认是否 `git commit`。
+- 确认后下一片按设计进入 D2：Hall `type` → bridge prompt 注入；本轮执行 Agent 已按规则暂停。
+
+## 2026-06-20（下午）定位再校准 + 审议方向设计定稿（仅文档，无代码）
+
+与管理者多轮讨论后,把 Phase 3 的剩余方向从"server 端 MEMORY"转向"审议类协议",并沉淀两份 spec:
+
+- **`spec/POSITIONING.md`**:TALK 定位为审议层,**TALK ⊇ CCB**（任务委派 TALK 也能做,CCB 仅作机制借鉴）;4 类使用场景（单次任务协作 / 任务分配 / 头脑风暴 / 评审）+ 升级横切;Hall 类型/RolePack（软预设、数据驱动、可自定义）;通用化（领域无关,非编程项目亦可）+ 受众分层（非技术受众/Web 低门槛接入列为远期）。
+- **`spec/DELIBERATION.md`**:信息类型 stance 终集（去 `idea`、`synthesis`→`decision`、`closure` 降级）；**结束归一模型**——单一出口 `handoff` → 决策人（= `decision_tier`/human）,4 种 `end_reason`（consensus/deadlock/timeout/manual）,仅 `deadlock` 有参与者断路器 `escalate`,成功收敛靠决策人 `decision` 收口；Hall 类型；@所有人（展开全体、直接回内容不回执）；人设网页编辑走方案 (a)（改 `.talk/*.md` 文件、bridge 不变）；切片方案 D1–D5。
+
+**关键决策**:① MEMORY 方向关闭（连续性靠项目 `PROGRESS.md` + 身份注入）；② 人设网页编辑 = 方案 (a)；③ 结束机制 = 单一 handoff + 仅 deadlock 有 escalate（"给出错打标不给成功打标"）。
+**下一步**:从 D1（Hall `type` + 模板地基,纯 server）开写。
+
+## 2026-06-20 Phase 3 协作层（前两片）+ Web UI #2/#3（全栈）+ 测试数据清理
+
+分支 `claude/phase3-collab-and-ui`（基于已合入 main 的 Phase 1+2，PR #1）。决策 Agent 在管理者授权下自主连续开发。
+
+### Phase 3 协作层
+- **P3-1（`533bc5d`）群成员业务角色/决策分级存储**：`GroupMember` 加 `business_role`（自由文本）/ `decision_tier`（`decision`|`execution`）两列；`PUT /api/groups/{id}/members/{member_id}` 接收并全量替换，`GroupOut.members` 返回；`GroupMemberUpdate` 校验 decision_tier 枚举（大小写归一）；`db.py` 幂等列迁移 + 索引。+3 单测。对齐 `PROJECT_INTEGRATION.md` §5.2 groups.yaml 角色模型。
+- **P3-2（`51da887`）bridge 注入业务角色**：`bridges/cli_bridge._build_group_member_context` 在群成员清单后追加"你在本群的业务角色：{business_role}。"（取自 P3-1 群成员数据中当前 member 条目）；`decision_tier` 维持由 bridge 启动参数 `--decision-tier` 注入，避免双源冲突。纯追加，无 business_role 时字节不变。+2 单测。**行为黑盒待真机**（pi/codex）。
+
+### Web UI #2 删 Hall（全栈）
+- 后端（`53846b8`）：`DELETE /api/groups/{id}`，仅人类；子表先删后删群（group_members / 该群 messages / discussion_sessions / discussion_turns），顺序保证无论 SQLite FK 是否启用都正确（运行时未开 FK）。+3 单测。
+- 前端（`5578ac2`）：群成员面板红色"删除此 Hall"按钮（仅人类）→ `window.confirm` 二次确认 → `DELETE` → 本地 `groups` 移除 + 若当前群则 `setActiveGroup(null)`。新增 `.room-danger-btn`。
+- 收尾（`a54e4d3`）：移除左侧 Hall 列表从未接线的 `::after content:"删除"` 残留（`padding-right:78px` 致名称换 2 行），`.room-chip` 改 `nowrap`/省略号。
+- **管理者真机验收：右侧删除点选通过。**
+
+### Web UI #3 全局禁用 agent（全栈）
+- 后端（`4cec246`）：`Member.disabled_at` 软删（保留行 + `messages.from_id` 归属 + 群成员关系，不自动退群）；`get_current_member` 对已禁用成员返回 403；`PATCH /api/members/{id}`（仅人类、仅 agent 目标）切换启用/禁用；`MemberOut` 暴露 `disabled_at`；`db.py` 幂等列迁移 + 索引。+4 单测；鉴权子集 69 测无回归。
+- 前端（`dea5ff9`）：右侧列表只列 agent（不展示 human）；每行禁用/启用开关（仅人类）→ `PATCH`；已禁用置灰 + "已禁用"徽标、"加入"禁用。新增 `toggleMemberDisabled` + 样式。
+- 收尾（`05db723`）：列表既已 agent-only，移除每行冗余 `agent` 标签 + 过时"点角色筛选"提示，标题改"所有 Agent"，按钮加 `nowrap`（解决名字被挤 / "已在 Hall"换行）。
+- **管理者真机验收：功能通过。**（端到端"禁用→403"需重启 server 加载 `PATCH` 端点后验。）
+
+### 测试数据清理（管理者授权）
+- API 删 30 个老测试群，仅留 `test-run20`（`group:843d8433bae1`），群 31→1。
+- 直接删 DB 清掉 5 个测试成员（agent：ui52226 / testpi / pi@projA:tester；human：tester / ui52226），仅 0 消息者才删以保归属。现存 5 成员 = agent `codex`/`pi`/`pi-kimi` + human `bobo`/`qa`。
+
+### 验证
+- 子集全绿：groups 14/14、member_disable 4、cli_bridge 60、鉴权子集（messages/discussions/instances/tasks/files/projects）69；唯一偶发 = `test_websocket` presence 过载时序（隔离 10/10，与改动无关）。
+- 前端：JS 语法 / CSS 配平 / ID 一致 / 逻辑复核 + 运行中 server 实测服务新文件。
+
+### 下一步
+- P3-3 MEMORY（完整 server 端 COLD/WARM/RESUME，独立子阶段）在本分支做；先出切片拆分方案。
 
 ## 2026-06-20 Phase 2 闭环 · 切片 10：CLI `talk sync`（本地 `.talk/agents/` → server 索引）
 

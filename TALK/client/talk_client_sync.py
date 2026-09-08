@@ -107,6 +107,9 @@ class TalkClientSync:
     def get_group(self, group_id: str) -> dict[str, Any]:
         return self._submit(self._client.get_group(group_id))
 
+    def get_hall_types(self) -> list[dict[str, Any]]:
+        return self._submit(self._client.get_hall_types())
+
     def update_group(
         self,
         group_id: str,
@@ -159,8 +162,14 @@ class TalkClientSync:
     def get_discussion(self, discussion_id: int) -> dict[str, Any]:
         return self._submit(self._client.get_discussion(discussion_id))
 
-    def update_discussion(self, discussion_id: int, *, status: str) -> dict[str, Any]:
-        return self._submit(self._client.update_discussion(discussion_id, status=status))
+    def update_discussion(
+        self,
+        discussion_id: int,
+        *,
+        status: str,
+        end_reason: str | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(self._client.update_discussion(discussion_id, status=status, end_reason=end_reason))
 
     def append_discussion_turn(
         self,
@@ -223,19 +232,174 @@ class TalkClientSync:
         content: str,
         *,
         title: str | None = None,
+        project_id: str | None = None,
+        task_kind: str = "general",
+        review_policy: str | None = None,
+        related_task_ids: list[int] | tuple[int, ...] | None = None,
+        trigger_task_id: int | None = None,
+        parent_task_id: int | None = None,
+        authorization_epoch: int | None = None,
+        may_delegate: bool = False,
+        max_delegation_depth: int | None = None,
+        max_running_descendants: int | None = None,
+        max_running_per_target: int | None = None,
+        max_nonterminal_descendants: int | None = None,
+        slice_budget: int | None = None,
+        authorization_ttl_seconds: int | None = None,
+        milestone_test_required: bool = False,
+        max_clarification_rounds: int = 1,
     ) -> dict[str, Any]:
-        return self._submit(self._client.create_task(target_member_id, content, title=title))
+        return self._submit(
+            self._client.create_task(
+                target_member_id,
+                content,
+                title=title,
+                project_id=project_id,
+                task_kind=task_kind,
+                review_policy=review_policy,
+                related_task_ids=related_task_ids,
+                trigger_task_id=trigger_task_id,
+                parent_task_id=parent_task_id,
+                authorization_epoch=authorization_epoch,
+                may_delegate=may_delegate,
+                max_delegation_depth=max_delegation_depth,
+                max_running_descendants=max_running_descendants,
+                max_running_per_target=max_running_per_target,
+                max_nonterminal_descendants=max_nonterminal_descendants,
+                slice_budget=slice_budget,
+                authorization_ttl_seconds=authorization_ttl_seconds,
+                milestone_test_required=milestone_test_required,
+                max_clarification_rounds=max_clarification_rounds,
+            )
+        )
 
     def list_tasks(
         self,
         *,
         target_member_id: str | None = None,
         status: str | None = None,
+        workflow_status: str | None = None,
+        project_id: str | None = None,
+        task_kind: str | None = None,
     ) -> list[dict[str, Any]]:
-        return self._submit(self._client.list_tasks(target_member_id=target_member_id, status=status))
+        return self._submit(
+            self._client.list_tasks(
+                target_member_id=target_member_id,
+                status=status,
+                workflow_status=workflow_status,
+                project_id=project_id,
+                task_kind=task_kind,
+            )
+        )
 
-    def claim_task(self, task_id: int, *, instance_id: str | None = None) -> dict[str, Any]:
-        return self._submit(self._client.claim_task(task_id, instance_id=instance_id))
+    def get_task(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_task(task_id))
+
+    def get_task_tree(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_task_tree(task_id))
+
+    def list_task_relations(self, task_id: int) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_task_relations(task_id))
+
+    def get_task_quality_context(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_task_quality_context(task_id))
+
+    def pause_task_tree(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.pause_task_tree(task_id))
+
+    def checkpoint_task_tree(self, task_id: int, *, reason: str) -> dict[str, Any]:
+        return self._submit(self._client.checkpoint_task_tree(task_id, reason=reason))
+
+    def resume_task_tree(
+        self,
+        task_id: int,
+        *,
+        slice_budget: int,
+        authorization_ttl_seconds: int = 90 * 60,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.resume_task_tree(
+                task_id,
+                slice_budget=slice_budget,
+                authorization_ttl_seconds=authorization_ttl_seconds,
+            )
+        )
+
+    def cancel_task_tree(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.cancel_task_tree(task_id))
+
+    def accept_task_milestone(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.accept_task_milestone(task_id))
+
+    def list_task_clarification_rounds(self, task_id: int) -> list[dict[str, Any]]:
+        return self._submit(self._client.list_task_clarification_rounds(task_id))
+
+    def request_task_clarification(
+        self,
+        task_id: int,
+        *,
+        question_message_id: int | None = None,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.request_task_clarification(
+                task_id,
+                question_message_id=question_message_id,
+            )
+        )
+
+    def submit_task_clarification_answer(
+        self,
+        task_id: int,
+        *,
+        answer_message_id: int,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.submit_task_clarification_answer(
+                task_id,
+                answer_message_id=answer_message_id,
+            )
+        )
+
+    def resolve_task_clarification(
+        self,
+        task_id: int,
+        *,
+        allow_additional_round: bool = False,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.resolve_task_clarification(
+                task_id,
+                allow_additional_round=allow_additional_round,
+            )
+        )
+
+    def accept_task(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.accept_task(task_id))
+
+    def collect_task_result(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.collect_task_result(task_id))
+
+    def cancel_task(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.cancel_task(task_id))
+
+    def claim_task(
+        self,
+        task_id: int,
+        *,
+        instance_id: str | None = None,
+        lease_seconds: int = 120,
+    ) -> dict[str, Any]:
+        return self._submit(
+            self._client.claim_task(task_id, instance_id=instance_id, lease_seconds=lease_seconds)
+        )
+
+    def heartbeat_task(self, task_id: int, *, claim_token: str, lease_seconds: int = 120) -> dict[str, Any]:
+        return self._submit(
+            self._client.heartbeat_task(task_id, claim_token=claim_token, lease_seconds=lease_seconds)
+        )
+
+    def requeue_expired_tasks(self) -> list[dict[str, Any]]:
+        return self._submit(self._client.requeue_expired_tasks())
 
     def complete_task(
         self,
@@ -244,6 +408,8 @@ class TalkClientSync:
         status: str,
         result_message_id: int | None = None,
         last_error: str | None = None,
+        claim_token: str | None = None,
+        gate_verdict: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.complete_task(
@@ -251,6 +417,8 @@ class TalkClientSync:
                 status=status,
                 result_message_id=result_message_id,
                 last_error=last_error,
+                claim_token=claim_token,
+                gate_verdict=gate_verdict,
             )
         )
 

@@ -11,25 +11,38 @@
 
 ## Agent 角色与协作约束
 
-`AGENTS.md` 是本项目**抽象角色字典**的权威来源：只定义"决策 Agent / 执行 Agent"两类**行为分级**的规则，以及"未声明分级时按执行 Agent 处理"的兜底规则。
+`AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源：定义"决策 Agent / 执行 Agent"两类**行为分级**的规则、当前项目会话的明确角色，以及"未声明分级时按执行 Agent 处理"的兜底规则。
 
-本文件**不再点名"某具体模型 = 哪一类"**。具体某个 member 属于哪一类，由 bridge 启动时根据自身配置（`decision_tier`）在 system prompt 里注入；agent 模型在读本文件之前已被 bridge 告知"你是 X 类"，再来本文件查规则即可对号入座。
+通过 bridge 运行的具体 member 属于哪一类，由 bridge 启动时根据自身配置（`decision_tier`）在 system prompt 里注入；普通 Codex 项目会话不经过 bridge 时，则读取下方"当前 Agent 角色"确定身份。
 
-每次会话开始，agent 应先读取 bridge 注入的身份事实（`member_id / decision_tier / 业务角色`），再读本文件确认其行为规则。
+每次会话开始，agent 应先读取 bridge 注入的身份事实（`member_id / decision_tier / 业务角色`）；若当前会话没有 bridge 注入，再读取本文件的"当前 Agent 角色"，随后按对应分级确认行为规则。
+
+## 当前 Agent 角色
+
+- 当前 Codex 角色：**决策 Agent**（项目管理者于 2026-07-26 明确确认）。
+- 通过 TALK bridge 运行的其它 member 继续以其注入的 `decision_tier` 为准，不因模型名称自动继承 Codex 的项目会话角色。
+- 如项目管理者人工修改本节，后续 Agent 必须按最新角色执行。
+
+## 当前本地 Agent 拓扑
+
+- `agent:codex`：Codex CLI，Lead，`decision_tier=decision`。
+- `agent:kimi`：官方 Kimi Code CLI，Reviewer，`decision_tier=execution`。
+- `agent:deepseek`：DeepSeek Harness（`dsh`）承载 DeepSeek 各类模型，Dev，`decision_tier=execution`。
+- 项目管理者于 2026-08-27 确认：本地 dogfood 暂时只使用上述 3 个 Agent；Kimi 从 pi runtime 迁移到官方 Kimi Code CLI，不再启动 Claude Code，也不再保留 `agent:pi` / `agent:pi-kimi` 作为活动成员。
 
 ## Agent 决策分级（抽象字典）
 
 ### 决策 Agent
 
-默认不进行具体的切片开发，仅提供决策和方案。当项目管理者提出要求后可进行具体开发，详细规则见下方"开发节奏与确认规则"。
+默认不进行具体的切片开发，仅提供决策和方案以及负责更新进度文档。当项目管理者提出要求后可进行具体开发，详细规则见下方"开发节奏与确认规则"。
 
 ### 执行 Agent
 
-每次只开发一个已确认切片，完成后必须暂停等待确认。详细规则见下方"开发节奏与确认规则"。
+负责开发，每次只开发一个已确认切片，完成后必须暂停等待确认，不负责更新进度文档。详细规则见下方"开发节奏与确认规则"。
 
 ### 默认分级
 
-bridge 未在配置中明确声明 `decision_tier=decision` 的 agent，一律按**执行 Agent** 处理。
+普通 Codex 项目会话按"当前 Agent 角色"处理。除此之外，bridge 未在配置中明确声明 `decision_tier=decision`、且本文件也未明确记录角色的 agent，一律按**执行 Agent** 处理。
 
 ## Agent 业务角色
 
@@ -43,7 +56,7 @@ bridge 未在配置中明确声明 `decision_tier=decision` 的 agent，一律�
 - 决策 Agent 连续开发必须带批次刹车：每次恢复默认最多连续推进 2 个明确切片；若都是小型文档/配置切片，可最多 3 个；若涉及前端真实交互、数据库/协议、部署/权限或跨模块协作，默认 1 个切片后暂停汇总。
 - 决策 Agent 连续工作约 60-90 分钟后，不应开启新切片；应先完成当前切片的必要验证、汇总进度、提交/推送，并输出下一步建议。
 - 若后续任务需要重新读取另一个模块文档，或 Agent 明显开始依赖“回忆前文”才能继续判断，应在完成当前切片收尾后暂停，不再开启新切片。
-- 执行 Agent：每次只开发一个已确认切片；切片完成后必须暂停，汇总进度，并提交给决策 Agent 或项目管理者确认后，才能进入下一个切片。
+- 执行 Agent：每次只开发一个已确认切片；切片完成后必须暂停，并提交给决策 Agent 或项目管理者确认后，才能进入下一个切片。
 - “不确定项”包括：需求理解不明确、实现路径有多种可选方案、Agent 认为存在更优替代方案、可能影响现有行为或接口的改动。
 - 对未获授权的执行 Agent：除 `docs/PROGRESS.md` 和必要的本切片局部文档外，其它项目文档默认不得擅自修改；如需改动，必须先得到项目管理者或决策 Agent 明确许可。
 - 对已授权的决策 Agent：可以直接维护与当前工作相关的项目文档、模块文档、进度记录与必要决策说明，但应保持改动聚焦、可追溯，不顺手扩写无关内容。

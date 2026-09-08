@@ -28,5 +28,11 @@ def get_current_member(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
         )
+    if member.disabled_at is not None:
+        # Globally disabled (UI #3): the key is valid but the account is turned off.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="member is disabled",
+        )
     request.state.member_id = member.id
     return member

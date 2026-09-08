@@ -5,6 +5,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from bridges import codex_bridge
@@ -22,6 +23,7 @@ from bridges.codex_bridge import (
     strip_leading_mentions,
 )
 from cli.profiles import SYSTEM_PROMPT_PROFILE_HEADER, agent_profile_dir
+from TALK.client.exceptions import TalkValidationError
 
 
 def _base_instructions_value(command: str) -> str:
@@ -47,6 +49,44 @@ class CodexBridgeTests(unittest.TestCase):
                 os.environ.pop("TALK_CODEX_COMMAND", None)
             else:
                 os.environ["TALK_CODEX_COMMAND"] = old_value
+
+    def test_windows_prefers_native_cli_over_npm_shim(self):
+        native = "C:/Codex App/bin/codex.exe"
+        with patch.dict(os.environ, {}, clear=True), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=native):
+            self.assertEqual(shlex.split(default_codex_command())[0], native)
+            self.assertEqual(shlex.split(codex_bridge.default_codex_task_command())[0], native)
+
+    def test_native_cli_falls_back_without_exe_or_for_windows_alias(self):
+        for native in (None, "C:/Users/Test/AppData/Local/Microsoft/WindowsApps/codex.exe"):
+            with self.subTest(native=native), patch.dict(os.environ, {}, clear=True), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=native):
+                self.assertEqual(codex_bridge._default_codex_exe(), "codex")
+        with patch.object(codex_bridge.os, "name", "posix"):
+            self.assertEqual(codex_bridge._default_codex_exe(), "codex")
+
+    def test_ordinary_terminal_discovers_latest_installed_desktop_cli(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "OpenAI" / "Codex" / "bin"
+            old = root / "codex.exe"
+            new = root / "new build" / "codex.exe"
+            new.parent.mkdir(parents=True)
+            old.write_text("old", encoding="utf-8")
+            new.write_text("new", encoding="utf-8")
+            os.utime(old, (100, 100))
+            os.utime(new, (200, 200))
+            (root / "incomplete").mkdir()
+            with patch.dict(os.environ, {"LOCALAPPDATA": directory}, clear=True):
+                self.assertEqual(codex_bridge._desktop_codex_exe(), str(new))
+            with patch.dict(os.environ, {}, clear=True), patch.object(codex_bridge.os, "name", "nt"), patch.object(codex_bridge.shutil, "which", return_value=None), patch.object(codex_bridge, "_desktop_codex_exe", return_value=str(new)):
+                for command in (default_codex_command(), codex_bridge.default_codex_task_command(), codex_bridge.default_codex_task_preflight_command()):
+                    self.assertEqual(shlex.split(command)[0], str(new))
+                with patch.dict(os.environ, {"TALK_CODEX_COMMAND": "custom codex command"}):
+                    self.assertEqual(default_codex_command(), "custom codex command")
+
+    def test_desktop_discovery_handles_missing_or_unreadable_install(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"LOCALAPPDATA": directory}, clear=True):
+            self.assertIsNone(codex_bridge._desktop_codex_exe())
+            with patch.object(codex_bridge.Path, "glob", side_effect=PermissionError):
+                self.assertIsNone(codex_bridge._desktop_codex_exe())
 
     def test_default_codex_command_injects_system_instructions(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
@@ -105,6 +145,43 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertNotIn("TALK_API_KEY", cmd)
         self.assertNotIn("TALK_DEFERRED_FILE", cmd)
         self.assertNotIn("TALK_GROUP_ID", cmd)
+
+    def test_default_task_command_omits_talk_mcp_catalog(self):
+        command = codex_bridge.default_codex_task_command(profile="discussion")
+
+        self.assertIn("--sandbox read-only", command)
+        self.assertNotIn("mcp_servers.talk_send", command)
+        self.assertIn("优先严格遵循请求者给出的任务正文", _base_instructions_value(command))
+
+    def test_tools_profile_task_command_keeps_workspace_write_without_talk_mcp(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(
+                ["--key", "codex-key", "--codex-execution-profile", "tools"]
+            )
+            command = codex_bridge.resolve_codex_task_command(args)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertIn("--sandbox workspace-write", command)
+        self.assertNotIn("mcp_servers.talk_send", command)
+
+    def test_task_preflight_command_stays_read_only_for_tools_profile(self):
+        old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
+        try:
+            args = codex_bridge.build_parser().parse_args(
+                ["--key", "codex-key", "--codex-execution-profile", "tools"]
+            )
+            command = codex_bridge.resolve_codex_task_preflight_command(args)
+        finally:
+            if old_value is not None:
+                os.environ["TALK_CODEX_COMMAND"] = old_value
+
+        self.assertIn("--sandbox read-only", command)
+        self.assertNotIn("--sandbox workspace-write", command)
+        self.assertNotIn("mcp_servers.talk_send", command)
+        self.assertIn("领取前预检", _base_instructions_value(command))
 
     def test_resolve_codex_command_without_project_is_default(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
@@ -294,30 +371,45 @@ class CodexBridgeTests(unittest.TestCase):
         class FakeClient:
             def __init__(self):
                 self.claimed = []
+                self.heartbeats = []
                 self.sent = []
                 self.completed = []
 
-            async def claim_task(self, task_id, *, instance_id=None):
-                self.claimed.append((task_id, instance_id))
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                self.claimed.append((task_id, instance_id, lease_seconds))
                 return {
                     "id": task_id,
                     "created_by": "human:bobo",
                     "title": "Queue smoke",
                     "content": "say ok",
+                    "claim_token": "lease-12",
                 }
 
-            async def send_text(self, text, to=None):
-                self.sent.append((text, to))
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                self.heartbeats.append((task_id, claim_token, lease_seconds))
+                return {"id": task_id, "status": "running"}
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append((text, to, group_id))
                 return {"id": 99}
 
-            async def complete_task(self, task_id, *, status, result_message_id=None, last_error=None):
-                self.completed.append((task_id, status, result_message_id, last_error))
+            async def complete_task(
+                self,
+                task_id,
+                *,
+                status,
+                result_message_id=None,
+                last_error=None,
+                claim_token=None,
+            ):
+                self.completed.append((task_id, status, result_message_id, last_error, claim_token))
                 return {"id": task_id, "status": status}
 
         async def fake_run_codex_command(command, prompt, *, cwd, timeout):
             self.assertEqual(command, ["codex", "exec"])
             self.assertIn("say ok", prompt)
             self.assertEqual(timeout, 5)
+            await asyncio.sleep(0.01)
             return CodexRunResult(returncode=0, stdout="OK", stderr="")
 
         async def scenario():
@@ -334,6 +426,8 @@ class CodexBridgeTests(unittest.TestCase):
                     codex_command=["codex", "exec"],
                     timeout=5,
                     max_reply_chars=100,
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
                 )
                 return handled, client
             finally:
@@ -342,9 +436,78 @@ class CodexBridgeTests(unittest.TestCase):
         handled, client = asyncio.run(scenario())
 
         self.assertTrue(handled)
-        self.assertEqual(client.claimed, [(12, "agent:codex:test")])
-        self.assertEqual(client.sent, [("OK", ["human:bobo"])])
-        self.assertEqual(client.completed, [(12, "succeeded", 99, None)])
+        self.assertEqual(client.claimed, [(12, "agent:codex:test", 5)])
+        self.assertTrue(client.heartbeats)
+        self.assertEqual(client.sent, [("OK", ["human:bobo"], None)])
+        self.assertEqual(client.completed, [(12, "succeeded", 99, None, "lease-12")])
+
+    def test_handle_queued_task_stops_when_tree_control_revokes_claim(self):
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.completed = []
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return {
+                    "id": task_id,
+                    "created_by": "human:bobo",
+                    "content": "long task",
+                    "claim_token": "lease-12",
+                }
+
+            async def heartbeat_task(self, task_id, *, claim_token, lease_seconds=120):
+                raise TalkValidationError(
+                    "claim revoked",
+                    status_code=409,
+                    payload={"control_status": "paused"},
+                )
+
+            async def send_text(self, text, to=None, group_id=None):
+                self.sent.append(text)
+                return {"id": 99}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed.append((task_id, kwargs))
+                return {"id": task_id}
+
+        command_cancelled = False
+
+        async def fake_run_codex_command(command, prompt, *, cwd, timeout):
+            nonlocal command_cancelled
+            try:
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                command_cancelled = True
+                raise
+            return CodexRunResult(returncode=0, stdout="late", stderr="")
+
+        async def scenario():
+            original = codex_bridge.run_codex_command
+            codex_bridge.run_codex_command = fake_run_codex_command
+            try:
+                client = FakeClient()
+                handled = await handle_queued_task(
+                    {"id": 12},
+                    client=client,
+                    member_id="agent:codex",
+                    workdir=Path.cwd(),
+                    instance_id="agent:codex:test",
+                    codex_command=["codex", "exec"],
+                    timeout=5,
+                    max_reply_chars=100,
+                    lease_seconds=5,
+                    heartbeat_interval=0.001,
+                )
+                return handled, client
+            finally:
+                codex_bridge.run_codex_command = original
+
+        handled, client = asyncio.run(scenario())
+
+        self.assertFalse(handled)
+        self.assertTrue(command_cancelled)
+        self.assertEqual(client.sent, [])
+        self.assertEqual(client.completed, [])
 
 
 if __name__ == "__main__":

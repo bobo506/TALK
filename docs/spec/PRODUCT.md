@@ -3,6 +3,8 @@
 > 项目代号：TALK
 > 版本：v0.1（MVP 定义）
 > 日期：2026-04-11
+>
+> **历史基线说明（2026-07-15）**：本文保留最初 MVP 范围，不再作为当前多 Hall 产品方向的权威来源。当前产品分为 **Task Halls**（一任务一 Hall、1 对 1 委派，优先实施）与 **Discussion Halls**（多角色讨论，后续继续）；以 [`POSITIONING.md`](POSITIONING.md)、[`PROJECT_INTEGRATION.md`](PROJECT_INTEGRATION.md) 和 [`MODULE_tasks.md`](MODULE_tasks.md) 为准。本文中“多房间 / 频道不做”等表述仅指 2026-04-11 的 v0.1 边界。
 
 ---
 

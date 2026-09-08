@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-TALK talk_send MCP server — Codex bridge 专用（方案 D function-calling）
+TALK MCP server — Codex bridge 专用。
 
-最小 stdio MCP server，暴露 talk_send 工具，行为与 talk_tools_extension.ts 完全镜像：
-- 从 os.environ 读 TALK_DEFERRED_FILE / TALK_GROUP_ID / TALK_API_KEY
-- 把 {tool: "talk_send", target, body, stance, group_id} 追加到 JSONL
-- 返回"talk_send 已登记"
+暴露两组工具：
+- ``talk_send``：保留既有延迟 JSONL 行为，用于当前 Discussion Hall 发消息。
+- Task Hall 工具：直接调用 TALK HTTP API，提供发现、委派、查询、等待、回复、取消和结果收取。
 
 协议：MCP (Model Context Protocol) JSON-RPC 2.0 over stdin/stdout。
 MCP 子进程从 Codex 父进程继承环境变量，bridge 每次 handle_incoming_message
@@ -17,10 +16,17 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any
 
-SERVER_NAME = "talk_send_mcp"
-SERVER_VERSION = "1.0.0"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from bridges.talk_task_tools import TOOL_SCHEMAS, TalkToolError, dispatch_tool
+
+SERVER_NAME = "talk_tools_mcp"
+SERVER_VERSION = "2.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +147,7 @@ def main() -> None:
                 # MCP 初始化完成通知，无需响应
                 pass
             elif method == "tools/list":
-                _write_response(req_id, {"tools": [_TOOL_SCHEMA]})
+                _write_response(req_id, {"tools": [_TOOL_SCHEMA, *TOOL_SCHEMAS]})
             elif method == "tools/call":
                 tool_name = params.get("name", "")
                 tool_args: dict[str, Any] = params.get("arguments", {})
@@ -161,6 +167,21 @@ def main() -> None:
                         _write_response(req_id, {
                             "content": [{"type": "text", "text": text}],
                             "isError": is_error,
+                        })
+                elif any(schema["name"] == tool_name for schema in TOOL_SCHEMAS):
+                    try:
+                        result = dispatch_tool(tool_name, tool_args)
+                        _write_response(req_id, {
+                            "content": [{
+                                "type": "text",
+                                "text": json.dumps(result, ensure_ascii=False),
+                            }],
+                            "isError": False,
+                        })
+                    except (KeyError, TypeError, ValueError, TalkToolError) as exc:
+                        _write_response(req_id, {
+                            "content": [{"type": "text", "text": f"{tool_name} 失败：{exc}"}],
+                            "isError": True,
                         })
                 else:
                     _write_error(req_id, -32601, f"未知工具: {tool_name}")

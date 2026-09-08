@@ -18,7 +18,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Awaitable, Sequence
 from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +42,21 @@ FUNCTION_CALLING_SYSTEM_PROMPT = (
     "不要写'已经XX了/已经打过招呼了/已经回复了/已经发送了'这类元叙述——"
     "你说出口就是动作本身,无需汇报。也不要在 visible reply 里复述刚才发生的事。"
 )
+TASK_RUNNER_SYSTEM_PROMPT = (
+    "你是 TALK bundled runner 中执行单个已领取任务的 Agent。"
+    "本会话只有一轮,优先严格遵循请求者给出的任务正文,完成后只输出最终交付内容。"
+    "除非缺少完成任务必需的信息,否则不要反问、闲聊或改写任务。"
+    "不要调用任何 TALK 工具;runner 会把你的可见输出写入对应 Task Hall 并完成任务。"
+)
+TASK_PREFLIGHT_SYSTEM_PROMPT = (
+    "你是 TALK bundled runner 的领取前预检 Agent。"
+    "本会话只能判断任务信息是否足以开始执行,不得修改文件、运行任务或产出最终交付。"
+    "runner 给出的标题和任务原文已经是完整权威输入,Task Hall 没有补充消息本身不算信息缺失;"
+    "不得要求请求者重复标题、任务原文或上下文,只能询问执行必需且当前确实没有给出的具体事实。"
+    "信息充分时只输出 TALK_TASK_PREFLIGHT JSON;信息不足时把同一轮必须回答的问题集中到一个 question 字段。"
+    "不要调用任何 TALK 工具;runner 会原子推进任务状态并把问题写入对应 Task Hall。"
+)
+TASK_GATE_VERDICT_MARKER = "TALK_GATE_VERDICT"
 DISCUSSION_PROTOCOL_INSTRUCTIONS = (
     "You are a participant in a TALK Group Hall, not a TALK administrator or user manual. "
     "You may talk with humans and other agents. If the user asks you to contact another agent, "
@@ -59,10 +74,77 @@ DISCUSSION_PROTOCOL_INSTRUCTIONS = (
 DEFAULT_TIMEOUT_SEC = 600
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
+DEFAULT_TASK_LEASE_SECONDS = 120
+DEFAULT_TASK_HEARTBEAT_INTERVAL = 5.0
+TASK_PREFLIGHT_MAX_ATTEMPTS = 3
+DSH_TASK_PREFLIGHT_MAX_ATTEMPTS = 1
+DSH_PREFLIGHT_PATCH_RELATIVE_PATH = Path(".talk") / "dsh" / "preflight-ephemeral.cordis.yml"
+MAX_TASK_CONTROL_CHECK_INTERVAL = 5.0
+TASK_HALL_HISTORY_PAGE_SIZE = 500
 DEFAULT_COMMAND = os.environ.get("TALK_CLI_COMMAND", "")
+_HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] | None = None
 PROMPT_TRANSPORTS = {"stdin", "argv"}
+COMPACT_PROMPT_RUNTIMES = {"pi", "codex", "kimi", "kimi-code", "kimi_code"}
+COMPACT_PROMPT_MEMBERS = {"agent:pi", "agent:codex", "agent:kimi"}
 ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sentence")
 SENTENCE_ENDINGS = "。！？.!?"
+
+
+def configure_talk_tool_environment(args: argparse.Namespace, member_id: str) -> None:
+    """Expose bridge identity and optional project id to runtime-injected TALK tools."""
+    os.environ["TALK_API_KEY"] = args.key
+    os.environ["TALK_BASE_URL"] = args.base_url
+    os.environ["TALK_MEMBER_ID"] = member_id
+    os.environ.pop("TALK_PROJECT_ID", None)
+    project_root = getattr(args, "project", None)
+    if not project_root:
+        return
+    try:
+        from cli.talk import load_project
+
+        project = load_project(Path(project_root).expanduser().resolve())
+    except (FileNotFoundError, OSError, ValueError):
+        return
+    project_id = str(project.get("project_id") or "").strip()
+    if project_id:
+        os.environ["TALK_PROJECT_ID"] = project_id
+
+
+def resolve_decision_tier(args: argparse.Namespace, member_id: str) -> str:
+    """Resolve an explicit tier or the member's project-local groups.yaml tier."""
+    explicit = str(getattr(args, "decision_tier", "") or "").strip().lower()
+    if explicit:
+        return explicit
+
+    project_root = getattr(args, "project", None)
+    if not project_root:
+        return "execution"
+    try:
+        from cli.talk import load_groups
+
+        groups_doc = load_groups(Path(project_root).expanduser().resolve())
+    except (FileNotFoundError, OSError, ValueError):
+        return "execution"
+
+    configured_tiers = {
+        str(member.get("decision_tier") or "").strip().lower()
+        for group in groups_doc.get("groups") or []
+        if isinstance(group, dict)
+        for member in group.get("members") or []
+        if isinstance(member, dict) and str(member.get("member_id") or "").strip() == member_id
+    }
+    configured_tiers.discard("")
+    if not configured_tiers:
+        return "execution"
+    if len(configured_tiers) > 1:
+        raise ValueError(
+            f"{member_id} has conflicting decision_tier values in .talk/groups.yaml: "
+            f"{sorted(configured_tiers)}"
+        )
+    tier = configured_tiers.pop()
+    if tier not in {"decision", "execution"}:
+        raise ValueError(f"unsupported decision_tier for {member_id}: {tier}")
+    return tier
 CHINESE_REQUEST_MARKERS = ("中文", "汉语", "普通话", "简体中文", "用中文")
 ENGLISH_REQUEST_MARKERS = ("英文", "英语", "用英语", "用英文", "in english", "english")
 CAPABILITY_QUESTION_MARKERS = (
@@ -97,7 +179,7 @@ SAFE_ACTION_RE = re.compile(
 )
 SAFE_ACTION_ATTR_RE = re.compile(r"\b([a-zA-Z_][\w-]*)=([^\s]+)")
 ACTION_TYPES = {"send_message", "mark_stance", "escalate_to_human", "final_to_human"}
-ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure"}
+ACTION_STANCES = {"question", "answer", "agree", "optimize", "disagree", "escalate", "greeting", "closure", "decision"}
 DISCUSSION_MAX_AUTO_TURNS = 3
 DISCUSSION_EXTENSION_CLOSE_TURNS = DISCUSSION_MAX_AUTO_TURNS + 1
 NON_SUBSTANTIVE_STANCES = {"greeting", "closure"}
@@ -111,6 +193,20 @@ CLOSURE_LINES = (
 )
 GREETING_SCOPE_MARKERS = ("打招呼", "打个招呼", "打声招呼", "问好", "确认在线", "在线状态", "互相认识", "认识一下")
 GREETING_REPLY_MARKERS = ("你好", "在线", "收到", "见到你", "认识你")
+BRAINSTORM_SUMMARY_MARKERS = (
+    "汇总",
+    "总结",
+    "归纳",
+    "形成结论",
+    "给出结论",
+    "产出结论",
+    "最终结论",
+    "最终决定",
+    "summarize",
+    "synthesi",
+    "final decision",
+    "conclusion",
+)
 INTERNAL_SCOPE_MARKERS = (
     "discussion_id",
     "root_message_id",
@@ -133,6 +229,26 @@ class CliRunResult:
     stdout: str
     stderr: str
     timed_out: bool = False
+
+
+@dataclass(frozen=True)
+class TaskPreflightDecision:
+    action: str
+    question: str | None = None
+
+
+@dataclass(frozen=True)
+class TaskGateVerdict:
+    verdict: str
+    summary: str
+    findings: tuple[str, ...]
+
+    def as_payload(self) -> dict[str, Any]:
+        return {
+            "verdict": self.verdict,
+            "summary": self.summary,
+            "findings": list(self.findings),
+        }
 
 
 @dataclass(frozen=True)
@@ -164,19 +280,104 @@ def parse_command(command: str) -> list[str]:
     return parsed
 
 
-def resolve_command_executable(args: Sequence[str]) -> list[str]:
+def _resolve_windows_dsh_npm_shim(args: Sequence[str], *, platform: str) -> list[str]:
+    resolved = list(args)
+    if platform != "nt" or not resolved:
+        return resolved
+
+    shim_path = Path(resolved[0])
+    if shim_path.name.lower() != "dsh.cmd":
+        return resolved
+
+    package_root = shim_path.parent / "node_modules" / "@deepseek-ai" / "dsh"
+    manifest_path = package_root / "package.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("name") != "@deepseek-ai/dsh":
+            return resolved
+        bin_config = manifest.get("bin")
+        bin_entry = bin_config.get("dsh") if isinstance(bin_config, dict) else bin_config
+        if not isinstance(bin_entry, str) or not bin_entry:
+            return resolved
+        package_root = package_root.resolve(strict=True)
+        entry_path = (package_root / bin_entry).resolve(strict=True)
+        entry_path.relative_to(package_root)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return resolved
+
+    sibling_node = shim_path.parent / "node.exe"
+    node_executable = str(sibling_node) if sibling_node.is_file() else None
+    if node_executable is None:
+        node_executable = shutil.which("node.exe") or shutil.which("node")
+    if node_executable is None:
+        return resolved
+
+    return [node_executable, str(entry_path), *resolved[1:]]
+
+
+def resolve_command_executable(
+    args: Sequence[str],
+    *,
+    platform: str | None = None,
+) -> list[str]:
     resolved = list(args)
     if not resolved:
         raise ValueError("CLI command cannot be empty")
 
     executable = resolved[0]
-    if Path(executable).parent != Path("."):
-        return resolved
+    if Path(executable).parent == Path("."):
+        found = shutil.which(executable)
+        if found:
+            resolved[0] = found
+    return _resolve_windows_dsh_npm_shim(
+        resolved,
+        platform=os.name if platform is None else platform,
+    )
 
-    found = shutil.which(executable)
-    if found:
-        resolved[0] = found
-    return resolved
+
+def _is_dsh_launcher_command(command_args: Sequence[str]) -> bool:
+    if not command_args:
+        return False
+    return Path(command_args[0]).name.lower() in {"dsh", "dsh.cmd", "dsh.exe"}
+
+
+def resolve_task_preflight_command(args: argparse.Namespace) -> str | list[str]:
+    """Resolve the Task Hall preflight command, including the DSH overlay."""
+    configured = getattr(args, "task_preflight_command", None)
+    if configured:
+        return configured
+
+    task_command = getattr(args, "task_command", None) or args.command
+    if str(getattr(args, "runtime", "")).strip().lower() != "dsh":
+        return task_command
+
+    project_root = getattr(args, "project", None)
+    if not project_root:
+        return task_command
+    patch_path = (
+        Path(project_root).expanduser().resolve()
+        / DSH_PREFLIGHT_PATCH_RELATIVE_PATH
+    )
+    if not patch_path.is_file():
+        return task_command
+
+    command_args = (
+        parse_command(task_command)
+        if isinstance(task_command, str)
+        else list(task_command)
+    )
+    if not _is_dsh_launcher_command(command_args):
+        return task_command
+    return [*command_args, "--patch", str(patch_path)]
+
+
+def resolve_task_preflight_max_attempts(args: argparse.Namespace) -> int:
+    configured = getattr(args, "task_preflight_max_attempts", None)
+    if configured is not None:
+        return int(configured)
+    if str(getattr(args, "runtime", "")).strip().lower() == "dsh":
+        return DSH_TASK_PREFLIGHT_MAX_ATTEMPTS
+    return TASK_PREFLIGHT_MAX_ATTEMPTS
 
 
 def strip_leading_mentions(text: str, *, member_id: str | None = None) -> str:
@@ -258,6 +459,11 @@ def infer_reply_stance(task_text: str, visible_reply: str) -> str:
     return "answer"
 
 
+def _is_summary_request(text: str) -> bool:
+    lowered = _compact_text(text).lower()
+    return bool(lowered) and any(marker.lower() in lowered for marker in BRAINSTORM_SUMMARY_MARKERS)
+
+
 def infer_discussion_stance(task_text: str, visible_reply: str, *, default: str = "answer") -> str:
     if infer_reply_stance(task_text, visible_reply) == "greeting":
         return "greeting"
@@ -326,6 +532,19 @@ def sanitize_visible_reply(text: str) -> str:
 
 def _substantive_discussion_turns(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [turn for turn in turns if str(turn.get("stance") or "") not in NON_SUBSTANTIVE_STANCES]
+
+
+def _discussion_auto_turn_budget(discussion: dict[str, Any] | None) -> int:
+    """自动回合预算：多方场（>2 参与者，如 brainstorm）按参与者规模放大（DELIBERATION §8.3）。
+
+    N 个 agent 的头脑风暴预期实质轮次 ≈ N(想法) + N×(N-1)(表态) + 1(decision) = N²+1；
+    1:1 讨论保持原常量 DISCUSSION_MAX_AUTO_TURNS。
+    """
+    participants = list((discussion or {}).get("participant_ids") or [])
+    if len(participants) <= 2:
+        return DISCUSSION_MAX_AUTO_TURNS
+    agent_count = sum(1 for participant in participants if str(participant).startswith("agent:"))
+    return max(agent_count * agent_count + 1, DISCUSSION_MAX_AUTO_TURNS)
 
 
 def _max_demand_round(turns: list[dict[str, Any]]) -> int:
@@ -669,6 +888,34 @@ async def _find_human_reviewer(client: Any, group_id: str | None) -> str | None:
     return None
 
 
+async def _find_decision_maker(client: Any, group_id: str | None) -> str | None:
+    if not group_id:
+        return None
+    try:
+        group = await client.get_group(group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
+    return _decision_maker_from_group(group)
+
+
+def _decision_maker_from_group(group: dict[str, Any]) -> str | None:
+    members = group.get("members") or []
+    for member in members:
+        member_id = str(member.get("member_id") or "")
+        decision_tier = str(member.get("decision_tier") or "").strip().lower()
+        if member_id and decision_tier == "decision":
+            return member_id
+    for member in members:
+        member_id = str(member.get("member_id") or "")
+        if member_id.startswith("human:"):
+            return member_id
+    return None
+
+
 async def _group_member_ids(client: Any, group_id: str | None) -> set[str] | None:
     if not group_id:
         return None
@@ -851,14 +1098,22 @@ async def _record_deferred_demand_turns(
                         "assignee_id": target,
                         "scope_text": task_text,
                     }
+        stance = str(result.get("stance") or "question")
         appended = await _append_discussion_turn(
             client,
             discussion_id=discussion_id,
             message_id=int(message_id),
-            stance=str(result.get("stance") or "question"),
+            stance=stance,
             target_member_id=target,
             turn_kind="demand",
             round_index=demand_round,
+        )
+        await _resolve_if_decision_maker(
+            client,
+            discussion_id=discussion_id,
+            group_id=group_id,
+            member_id=member_id,
+            stance=stance,
         )
         if appended:
             current_turns.append(
@@ -867,11 +1122,33 @@ async def _record_deferred_demand_turns(
                     "speaker_id": member_id,
                     "target_member_id": target,
                     "turn_kind": "demand",
-                    "stance": str(result.get("stance") or "question"),
+                    "stance": stance,
                     "round_index": demand_round,
                 }
             )
     return current_discussion, current_turns
+
+
+async def _get_hall_type_templates(client: Any) -> dict[str, dict[str, Any]]:
+    global _HALL_TYPE_TEMPLATES
+    if _HALL_TYPE_TEMPLATES is not None:
+        return _HALL_TYPE_TEMPLATES
+
+    try:
+        payload = await client.get_hall_types()
+    except Exception:
+        return {}
+
+    templates: dict[str, dict[str, Any]] = {}
+    for item in payload or []:
+        if not isinstance(item, dict):
+            continue
+        hall_type = str(item.get("type") or "").strip()
+        if hall_type:
+            templates[hall_type] = item
+
+    _HALL_TYPE_TEMPLATES = templates
+    return templates
 
 
 async def _build_group_member_context(
@@ -945,19 +1222,90 @@ async def _build_group_member_context(
     # 正常路径：返回紧凑逗号分隔名单，同时写入环境变量供扩展使用
     mids = [str(m.get("member_id") or "") for m in members]
     os.environ["TALK_GROUP_MEMBERS"] = ",".join(mids)
-    return f"群成员：{', '.join(mids)}。\n"
+    context = f"群成员：{', '.join(mids)}。\n"
+    # 协作层（PROJECT_INTEGRATION §5.2 / P3-2）：注入"我在本群的业务角色"，让 agent 知道
+    # 自己在这一群里的岗位（lead / reviewer / ...）。decision_tier 由 bridge 启动参数注入
+    # （见 _decision_tier_line），此处只补 business_role，避免双源冲突。
+    self_role = next(
+        (
+            str(m.get("business_role") or "").strip()
+            for m in members
+            if str(m.get("member_id") or "") == member_id
+        ),
+        "",
+    )
+    if self_role:
+        context += f"你在本群的业务角色：{self_role}。\n"
+    group_type = str(group.get("type") or "free").strip().lower() or "free"
+    if group_type == "free":
+        return context
+
+    templates = await _get_hall_type_templates(client)
+    template = templates.get(group_type)
+    if not template:
+        return context
+
+    label = str(template.get("label") or group_type).strip()
+    protocol_guidance = str(template.get("protocol_guidance") or "").strip()
+    if protocol_guidance:
+        context += f"本群类型：{label}（{group_type}）。流程指引：{protocol_guidance}\n"
+
+    if self_role:
+        self_role_normalized = self_role.lower()
+        for role in template.get("roles") or []:
+            if not isinstance(role, dict):
+                continue
+            if str(role.get("role") or "").strip().lower() != self_role_normalized:
+                continue
+            norm = str(role.get("norm") or "").strip()
+            if norm:
+                context += f"你的角色职责：{norm}\n"
+            break
+    return context
 
 
-async def _update_discussion_status(client: Any, discussion_id: int | None, status: str) -> None:
+async def _update_discussion_status(
+    client: Any,
+    discussion_id: int | None,
+    status: str,
+    *,
+    end_reason: str | None = None,
+) -> None:
     if discussion_id is None:
         return
     try:
-        await client.update_discussion(discussion_id, status=status)
+        if end_reason is None:
+            await client.update_discussion(discussion_id, status=status)
+        else:
+            await client.update_discussion(discussion_id, status=status, end_reason=end_reason)
     except AttributeError:
         pass
     except Exception as exc:
         if not _is_talk_not_found(exc):
             raise
+
+
+async def _resolve_if_decision_maker(
+    client: Any,
+    *,
+    discussion_id: int | None,
+    group_id: str | None,
+    member_id: str,
+    stance: str,
+) -> None:
+    if stance != "decision":
+        return
+    decision_maker = await _find_decision_maker(client, group_id)
+    if decision_maker != member_id:
+        return
+    end_reason = "consensus"
+    try:
+        turns = await _list_discussion_turns(client, discussion_id)
+    except Exception:
+        turns = []
+    if any(str(turn.get("stance") or "") == "escalate" for turn in turns if isinstance(turn, dict)):
+        end_reason = "deadlock"
+    await _update_discussion_status(client, discussion_id, "resolved", end_reason=end_reason)
 
 
 async def _maybe_escalate_disagreement(
@@ -980,17 +1328,17 @@ async def _maybe_escalate_disagreement(
     if not _last_two_turns_disagree(turns):
         return
 
-    human_id = await _find_human_reviewer(client, group_id)
-    if human_id is None:
+    decision_maker_id = await _find_decision_maker(client, group_id)
+    if decision_maker_id is None:
         return
-    text = f"@{human_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
-    message = await client.send_text(text, to=[human_id], reply_to=reply_to, group_id=group_id)
+    text = f"@{decision_maker_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
+    message = await client.send_text(text, to=[decision_maker_id], reply_to=reply_to, group_id=group_id)
     await _append_discussion_turn(
         client,
         discussion_id=discussion_id,
         message_id=int(message["id"]),
         stance="escalate",
-        target_member_id=human_id,
+        target_member_id=decision_maker_id,
         turn_kind="demand",
         round_index=2,
     )
@@ -1020,6 +1368,195 @@ async def _active_discussion_for_peer(
         if discussion.get("status") == "active" and {member_id, peer_id}.issubset(participants):
             return discussion
     return None
+
+
+async def _active_multiparty_discussion(
+    client: Any,
+    *,
+    group_id: str | None,
+    member_id: str,
+    peer_id: str | None,
+) -> dict[str, Any] | None:
+    """找包含双方的 active 多方（>2 参与者）discussion——人驱动编排（DELIBERATION §8）的记账场。
+
+    只匹配多方场，避免把 human 的普通消息记进 1:1 讨论（保持既有 1:1 流程零变化）。
+    """
+    if not group_id or not peer_id:
+        return None
+    try:
+        discussions = await client.list_discussions(group_id=group_id)
+    except AttributeError:
+        return None
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return None
+        raise
+
+    for discussion in discussions:
+        participants = set(discussion.get("participant_ids") or [])
+        if (
+            discussion.get("status") == "active"
+            and len(participants) > 2
+            and {member_id, peer_id}.issubset(participants)
+        ):
+            return discussion
+    return None
+
+
+# 多方场（brainstorm）发言可见性（DELIBERATION §8）：拉本场发言喂进 prompt，
+# 让 agent 能对彼此的想法表态/汇总。仅 >2 参与者的场生效；1:1/free 不注入。
+_SHARED_HISTORY_MAX_MESSAGES = 24
+_SHARED_HISTORY_MAX_CHARS_EACH = 240
+_SUMMARY_OPINION_MAX_CHARS_EACH = 4000
+
+
+async def _is_brainstorm_summary_request(
+    client: Any,
+    *,
+    message: dict[str, Any],
+    group_id: str | None,
+    discussion: dict[str, Any] | None,
+    member_id: str,
+    sender_id: str,
+    task_text: str,
+) -> bool:
+    if not group_id or not sender_id.startswith("human:") or not discussion or not _is_summary_request(task_text):
+        return False
+    recipients = message.get("to")
+    if not isinstance(recipients, list) or {str(recipient) for recipient in recipients} != {member_id}:
+        return False
+    participants = set(discussion.get("participant_ids") or [])
+    if discussion.get("status") != "active" or len(participants) <= 2 or {member_id, sender_id} - participants:
+        return False
+    try:
+        group = await client.get_group(group_id)
+    except AttributeError:
+        return False
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return False
+        raise
+    return group.get("type") == "brainstorm" and _decision_maker_from_group(group) == member_id
+
+
+async def _brainstorm_summary_grounding(
+    client: Any,
+    *,
+    group_id: str,
+    discussion: dict[str, Any],
+    turns: list[dict[str, Any]],
+) -> str:
+    """取齐每位 Agent 的首条意见原文，给最终汇总者一个有边界的事实块。"""
+    agent_ids = {
+        str(participant)
+        for participant in discussion.get("participant_ids") or []
+        if str(participant).startswith("agent:")
+    }
+    first_opinions: list[tuple[str, int]] = []
+    seen: set[str] = set()
+    for turn in turns:
+        if not isinstance(turn, dict) or str(turn.get("stance") or "") != "answer":
+            continue
+        if turn.get("turn_kind") not in (None, "reply"):
+            continue
+        speaker = str(turn.get("speaker_id") or "")
+        if speaker not in agent_ids or speaker in seen:
+            continue
+        try:
+            message_id = int(turn["message_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        seen.add(speaker)
+        first_opinions.append((speaker, message_id))
+
+    if not agent_ids or seen != agent_ids:
+        return ""
+
+    root_id = discussion.get("root_message_id")
+    try:
+        since = int(root_id) - 1 if root_id is not None else None
+        messages = await client.fetch_history(group_id=group_id, since=since, limit=500)
+    except AttributeError:
+        return ""
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return ""
+        raise
+
+    messages_by_id = {
+        str(message.get("id")): message
+        for message in messages or []
+        if isinstance(message, dict) and not message.get("revoked_at") and not message.get("revoked")
+    }
+    blocks: list[str] = []
+    for index, (speaker, message_id) in enumerate(first_opinions, start=1):
+        message = messages_by_id.get(str(message_id))
+        if not message or str(message.get("from") or "") != speaker:
+            return ""
+        content = str(message.get("content") or "").strip()
+        if not content:
+            return ""
+        if len(content) > _SUMMARY_OPINION_MAX_CHARS_EACH:
+            content = content[:_SUMMARY_OPINION_MAX_CHARS_EACH] + "…（原文过长，已截断）"
+        blocks.append(f"[{index}] {speaker}（message_id={message_id}）\n{content}")
+
+    return (
+        "【本轮汇总材料（必须据此形成最终结论）】\n"
+        "以下是每位 Agent 在本场的首条意见原文，你此前的意见也在其中。"
+        "现在不要再补一条并列意见；请综合全部意见，直接产出唯一的最终结论。\n\n"
+        + "\n\n".join(blocks)
+    )
+
+
+async def _shared_discussion_history(
+    client: Any,
+    *,
+    group_id: str | None,
+    discussion: dict[str, Any] | None,
+    current_message_id: int | None,
+    self_id: str,
+) -> str:
+    """多方场里，把本场（从 root 消息起）的群发言拼成回顾块，供 agent 表态/汇总参考。
+
+    只对 >2 参与者的 discussion 生效（brainstorm）；1:1/free/无场 → 空串，行为不变。
+    拉历史失败（无该方法 / 404）也返回空串，绝不阻断回复。
+    """
+    if not group_id or not discussion:
+        return ""
+    participants = list(discussion.get("participant_ids") or [])
+    if len(participants) <= 2:
+        return ""
+    root_id = discussion.get("root_message_id")
+    try:
+        since = int(root_id) - 1 if root_id is not None else None
+        messages = await client.fetch_history(
+            group_id=group_id, since=since, limit=_SHARED_HISTORY_MAX_MESSAGES
+        )
+    except AttributeError:
+        return ""
+    except Exception as exc:
+        if _is_talk_not_found(exc):
+            return ""
+        raise
+
+    lines: list[str] = []
+    for msg in messages or []:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("revoked_at") or msg.get("revoked"):
+            continue
+        if current_message_id is not None and str(msg.get("id")) == str(current_message_id):
+            continue  # 当前触发消息已在 prompt 里，不重复
+        content = str(msg.get("content") or "").strip()
+        if not content:
+            continue
+        speaker = str(msg.get("from") or "?")
+        lines.append(f"{speaker}：{content[:_SHARED_HISTORY_MAX_CHARS_EACH]}")
+
+    if not lines:
+        return ""
+    body = "\n".join(lines[-_SHARED_HISTORY_MAX_MESSAGES:])
+    return "【本场已有发言（供你表态/汇总参考，请勿逐条复述）】\n" + body
 
 
 async def _discussion_for_message_id(
@@ -1167,7 +1704,7 @@ def _discussion_context_text(
     discussion_id = discussion.get("id")
     root_message_id = discussion.get("root_message_id")
     latest = turns[-1].get("stance") if turns else "question"
-    remaining = max(0, DISCUSSION_MAX_AUTO_TURNS - len(turns))
+    remaining = max(0, _discussion_auto_turn_budget(discussion) - len(turns))
     return (
         "TALK 控制上下文，以下内容只用于约束回复，不要在可见回复中复述字段名或 ID：\n"
         f"discussion_id: {discussion_id}\n"
@@ -1197,7 +1734,7 @@ async def _send_human_escalation(
     text: str,
     human_id: str | None = None,
 ) -> bool:
-    target = human_id or await _find_human_reviewer(client, group_id)
+    target = human_id or await _find_decision_maker(client, group_id)
     if target is None:
         return False
     message = await client.send_text(f"@{target} {text}".strip(), to=[target], reply_to=reply_to, group_id=group_id)
@@ -1294,14 +1831,22 @@ async def execute_talk_actions(
                 )
             existing_turns = await _list_discussion_turns(client, discussion_id)
             demand_round = action.round_index or min(_next_demand_round(existing_turns), 2)
+            effective_stance = infer_discussion_stance(task_text, action_body, default=action.stance or "question")
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
                 message_id=int(sent["id"]),
-                stance=infer_discussion_stance(task_text, action_body, default=action.stance or "question"),
+                stance=effective_stance,
                 target_member_id=target,
                 turn_kind="demand",
                 round_index=demand_round,
+            )
+            await _resolve_if_decision_maker(
+                client,
+                discussion_id=discussion_id,
+                group_id=group_id,
+                member_id=member_id,
+                stance=effective_stance,
             )
             summaries.append(f"sent message to {target}")
         elif action.action_type == "escalate_to_human":
@@ -1423,6 +1968,74 @@ def clean_cli_output(text: str) -> str:
     return "\n".join(kept).strip()
 
 
+def _kimi_content_text(content: Any) -> str:
+    """Extract visible text from one Kimi Code stream-json content value."""
+    if isinstance(content, str):
+        return content.strip()
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, str):
+            text = item.strip()
+        elif isinstance(item, dict) and str(item.get("type") or "") == "text":
+            text = str(item.get("text") or "").strip()
+        else:
+            text = ""
+        if text:
+            parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def extract_kimi_final_assistant(output: str) -> str | None:
+    """Return the final Assistant text from Kimi Code JSONL.
+
+    ``None`` means the output was not stream-json and should be left untouched.
+    An empty string means valid JSONL was received but contained no visible
+    Assistant message.
+    """
+    parsed_json = False
+    assistant_messages: list[str] = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        parsed_json = True
+        if str(payload.get("role") or "").lower() != "assistant":
+            continue
+        visible = _kimi_content_text(payload.get("content"))
+        if visible:
+            assistant_messages.append(visible)
+    if not parsed_json:
+        return None
+    return assistant_messages[-1] if assistant_messages else ""
+
+
+def normalize_runtime_result(result: CliRunResult, *, runtime: str) -> CliRunResult:
+    """Normalize runtime-specific stdout into the bridge's final-text contract."""
+    if runtime.strip().lower() not in {"kimi", "kimi-code", "kimi_code"}:
+        return result
+    extracted = extract_kimi_final_assistant(result.stdout)
+    if extracted is None:
+        return result
+    return CliRunResult(
+        returncode=result.returncode,
+        stdout=extracted,
+        stderr=result.stderr,
+        timed_out=result.timed_out,
+    )
+
+
+def _uses_compact_prompt(runtime: str, member_id: str) -> bool:
+    return runtime.strip().lower() in COMPACT_PROMPT_RUNTIMES or member_id in COMPACT_PROMPT_MEMBERS
+
+
 def should_handle_message(
     message: dict[str, Any],
     member_id: str,
@@ -1448,6 +2061,238 @@ def _decision_tier_line(tier: str) -> str:
     return "决策 Agent" if tier == "decision" else "执行 Agent"
 
 
+def _task_hall_message_text(message: dict[str, Any]) -> str:
+    message_id = message.get("id") or "unknown"
+    sender = message.get("from") or "unknown"
+    if message.get("revoked"):
+        return f"[消息 #{message_id}] {sender}: [已撤回]"
+
+    message_type = str(message.get("type") or "text")
+    if message_type == "file":
+        filename = message.get("filename") or message.get("content") or "未命名文件"
+        mime = message.get("mime") or "unknown"
+        size = message.get("size_bytes")
+        size_text = f", {size} bytes" if size is not None else ""
+        caption = str(message.get("caption") or "").strip()
+        caption_text = f"\n  附言: {caption}" if caption else ""
+        return f"[消息 #{message_id}] {sender}: [文件: {filename}, {mime}{size_text}]{caption_text}"
+
+    content = str(message.get("content") or "").strip() or "[空消息]"
+    return f"[消息 #{message_id}] {sender}: {content}"
+
+
+def format_task_hall_history(messages: Sequence[dict[str, Any]]) -> str:
+    """Render the complete, chronological Task Hall transcript for model replay."""
+    if not messages:
+        return "（Task Hall 暂无消息）"
+    return "\n".join(_task_hall_message_text(message) for message in messages)
+
+
+def format_task_quality_context(context: dict[str, Any] | None) -> str:
+    """Render relation-granted, read-only context for review/test/rework tasks."""
+    if not context:
+        return ""
+
+    sections: list[str] = []
+    for heading, key in (
+        ("关联任务", "related_tasks"),
+        ("触发门禁任务", "trigger_tasks"),
+    ):
+        entries = context.get(key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            relation = entry.get("relation") if isinstance(entry.get("relation"), dict) else {}
+            task = entry.get("task") if isinstance(entry.get("task"), dict) else {}
+            messages = entry.get("messages") if isinstance(entry.get("messages"), list) else []
+            task_id = task.get("id") or "unknown"
+            task_kind = task.get("task_kind") or "general"
+            relation_type = relation.get("relation_type") or "related"
+            title = str(task.get("title") or "").strip()
+            title_line = f"\n标题: {title}" if title else ""
+            verdict = task.get("gate_verdict")
+            verdict_line = (
+                f"\n结构化门禁结论: {json.dumps(verdict, ensure_ascii=False)}"
+                if isinstance(verdict, dict)
+                else ""
+            )
+            sections.append(
+                f"{heading} #{task_id}（{task_kind}，关系 {relation_type}）"
+                f"{title_line}\n任务原文:\n{str(task.get('content') or '').strip()}"
+                f"{verdict_line}\nTask Hall 完整上下文:\n"
+                f"{format_task_hall_history(messages)}"
+            )
+    if not sections:
+        return ""
+    return "\n\n".join(sections)
+
+
+async def fetch_task_quality_context(client: Any, task: dict[str, Any]) -> str:
+    task_kind = str(task.get("task_kind") or "general").strip().lower()
+    if task_kind not in {"review", "test", "rework"}:
+        return ""
+    context = await client.get_task_quality_context(int(task["id"]))
+    return format_task_quality_context(context)
+
+
+async def fetch_complete_task_hall_history(
+    client: Any,
+    group_id: str | None,
+    *,
+    page_size: int = TASK_HALL_HISTORY_PAGE_SIZE,
+) -> list[dict[str, Any]]:
+    """Fetch every visible Task Hall message through stable backward pagination."""
+    if not group_id:
+        return []
+
+    pages: list[list[dict[str, Any]]] = []
+    before: int | None = None
+    seen_first_ids: set[int] = set()
+    while True:
+        batch = await client.fetch_history(group_id=group_id, before=before, limit=page_size)
+        if not batch:
+            break
+        normalized = [message for message in batch if isinstance(message, dict)]
+        if not normalized:
+            break
+        pages.append(normalized)
+        first_ids = [int(message["id"]) for message in normalized if message.get("id") is not None]
+        if not first_ids or len(normalized) < page_size:
+            break
+        first_id = min(first_ids)
+        if first_id in seen_first_ids:
+            raise RuntimeError(f"Task Hall pagination did not advance before message {first_id}")
+        seen_first_ids.add(first_id)
+        before = first_id
+
+    messages: list[dict[str, Any]] = []
+    seen_message_ids: set[int] = set()
+    for page in reversed(pages):
+        for message in page:
+            message_id = message.get("id")
+            if message_id is None:
+                messages.append(message)
+                continue
+            normalized_id = int(message_id)
+            if normalized_id in seen_message_ids:
+                continue
+            seen_message_ids.add(normalized_id)
+            messages.append(message)
+    messages.sort(key=lambda message: int(message.get("id") or 0))
+    return messages
+
+
+def build_cli_task_preflight_prompt(
+    task: dict[str, Any],
+    *,
+    member_id: str,
+    workdir: Path,
+    runtime: str = "cli",
+    decision_tier: str = "execution",
+    hall_history: str = "",
+) -> str:
+    content = str(task.get("content") or "").strip()
+    title = str(task.get("title") or "").strip()
+    task_id = task.get("id") or "unknown"
+    creator = task.get("created_by") or "unknown"
+    tier_line = _decision_tier_line(decision_tier)
+    title_block = f"标题: {title}\n" if title else ""
+    history = hall_history.strip() or "（Task Hall 暂无消息）"
+    output_contract = (
+        "判断规则: 上面的标题和任务原文已经完整提供；Task Hall 没有补充消息本身不构成缺失。"
+        "不要要求请求者重复任务，只能询问执行所必需且当前确实没有给出的具体事实。\n"
+        '信息充分时只输出一行: TALK_TASK_PREFLIGHT {"action":"accept"}\n'
+        '信息不足时只输出一行: TALK_TASK_PREFLIGHT {"action":"clarify","question":"集中后的必要问题"}'
+    )
+    if _uses_compact_prompt(runtime, member_id):
+        return (
+            f"你是 {member_id}（{tier_line}）。请对任务 #{task_id} 做领取前预检，不要执行任务或修改文件。\n"
+            f"请求者: {creator}\n"
+            f"{title_block}任务原文:\n{content}\n\n"
+            f"Task Hall 完整上下文（按消息顺序）:\n{history}\n\n"
+            f"{output_contract}"
+        )
+    return (
+        f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
+        f"{tier_line}\n"
+        f"Project root: {workdir}\n"
+        f"请对任务 #{task_id} 做领取前预检，不要执行任务或修改文件。\n"
+        f"请求者: {creator}\n"
+        f"{title_block}任务原文:\n{content}\n\n"
+        f"Task Hall 完整上下文（按消息顺序）:\n{history}\n\n"
+        f"{output_contract}\n"
+    )
+
+
+def parse_task_preflight_result(result: CliRunResult) -> TaskPreflightDecision:
+    if result.timed_out:
+        raise RuntimeError("task preflight timed out")
+    if result.returncode != 0:
+        detail = clean_cli_output(result.stderr) or clean_cli_output(result.stdout)
+        raise RuntimeError(f"task preflight failed: {detail or f'exit code {result.returncode}'}")
+
+    output = clean_cli_output(result.stdout).strip()
+    candidates: list[str] = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("TALK_TASK_PREFLIGHT "):
+            candidates.append(stripped.removeprefix("TALK_TASK_PREFLIGHT ").strip())
+    decoder = json.JSONDecoder()
+    for marker_match in re.finditer(r"TALK_TASK_PREFLIGHT(?:\s+|$)", output):
+        marked_output = output[marker_match.end() :].lstrip()
+        if not marked_output.startswith("{"):
+            continue
+        try:
+            marked_payload, _ = decoder.raw_decode(marked_output)
+        except json.JSONDecodeError:
+            continue
+        candidates.append(json.dumps(marked_payload, ensure_ascii=False))
+    candidates.extend(
+        match.group(1).strip()
+        for match in re.finditer(
+            r"```(?:json)?\s*(\{.*?\})\s*```",
+            output,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if "TALK_TASK_PREFLIGHT" in match.group(1)
+    )
+    if output.startswith("{") and output.endswith("}"):
+        candidates.append(output)
+
+    for candidate in reversed(candidates):
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        decision_payload = payload
+        nested = payload.get("TALK_TASK_PREFLIGHT")
+        if isinstance(nested, dict):
+            decision_payload = nested
+        action = str(decision_payload.get("action") or "").strip().lower()
+        if action == "accept":
+            return TaskPreflightDecision(action="accept")
+        if action == "clarify":
+            question = str(decision_payload.get("question") or "").strip()
+            if question:
+                return TaskPreflightDecision(action="clarify", question=question)
+        if isinstance(decision_payload.get("ready"), bool):
+            if decision_payload["ready"]:
+                return TaskPreflightDecision(action="accept")
+            question = str(
+                decision_payload.get("question")
+                or decision_payload.get("decision")
+                or decision_payload.get("reason")
+                or ""
+            ).strip()
+            if question:
+                return TaskPreflightDecision(action="clarify", question=question)
+    raise RuntimeError("task preflight did not return a valid TALK_TASK_PREFLIGHT decision")
+
+
 def build_cli_prompt(
     message: dict[str, Any],
     *,
@@ -1457,6 +2302,7 @@ def build_cli_prompt(
     discussion_context: str | None = None,
     decision_tier: str = "execution",
     group_member_context: str = "",
+    shared_history: str = "",
 ) -> str:
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
@@ -1464,8 +2310,8 @@ def build_cli_prompt(
     tier_line = _decision_tier_line(decision_tier)
     sender = message.get("from") or "unknown"
 
-    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
-        # 身份在 per-call 注入,系统层是静态文本无法区分 pi / pi-kimi 等同进程不同实例。
+    if _uses_compact_prompt(runtime, member_id):
+        # 身份在 per-call 注入,系统层是静态文本无法区分同一 runtime 的不同实例。
         # 写法刻意紧凑:身份和任务同一行,避免占据独立首行让模型陷入"自我介绍"模式,
         # 把"对你说"的动词淡化(2026-06-06 黑盒实测:独立首行 + 括号注释会让 pi 忽略任务,
         # 改成"已就位,有什么需要帮忙"式空回应)。
@@ -1478,7 +2324,10 @@ def build_cli_prompt(
         # 实测:注入这段会让闲聊场景产生"已经XX啦"式元叙述(模型把寒暄当成 assignee
         # 完成的 request),信噪比被 10x 压垮。其他 runtime(legacy 文本协议)仍保留,
         # 兼容由下方分支承担。
-        parts = [f"你是 {member_id}。{sender} 对你说:{task}"]
+        parts = [f"你是 {member_id}（{tier_line}）。{sender} 对你说:{task}"]
+        history_line = shared_history.strip()
+        if history_line:
+            parts.append(history_line)
         member_line = group_member_context.strip()
         if member_line:
             parts.append(member_line)
@@ -1488,6 +2337,7 @@ def build_cli_prompt(
     message_id = message.get("id") or "unknown"
     group_id = message.get("group_id")
     group_line = f"TALK group id: {group_id}\n" if group_id else ""
+    history_block = f"{shared_history.strip()}\n\n" if shared_history.strip() else ""
     return (
         f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
         f"{tier_line}\n"
@@ -1500,6 +2350,7 @@ def build_cli_prompt(
         f"Sender: {sender}\n"
         f"TALK message id: {message_id}\n\n"
         f"{group_line}"
+        f"{history_block}"
         "Task:\n"
         f"{task}{context_block}\n"
     )
@@ -1512,16 +2363,38 @@ def build_cli_task_prompt(
     workdir: Path,
     runtime: str = "cli",
     decision_tier: str = "execution",
+    hall_history: str = "",
 ) -> str:
     content = str(task.get("content") or "").strip()
     title = str(task.get("title") or "").strip()
+    task_kind = str(task.get("task_kind") or "general").strip().lower()
     tier_line = _decision_tier_line(decision_tier)
+    history = hall_history.strip()
+    history_block = f"\n\nTask Hall 完整上下文（按消息顺序）:\n{history}" if history else ""
+    gate_contract = ""
+    if task_kind == "review":
+        gate_contract = (
+            "\n\n这是只读 Review 任务：不得修改被审结果。完成审查后，最终输出必须包含且只包含一个"
+            '显式结构化结论行：TALK_GATE_VERDICT {"verdict":"approved|changes_requested|blocked",'
+            '"summary":"审查摘要","findings":["具体发现"]}。'
+            "`changes_requested` 或 `blocked` 的 findings 不得为空；不要从自然语言暗示结论。"
+        )
+    elif task_kind == "test":
+        gate_contract = (
+            "\n\n这是 Test 任务。完成验证后，最终输出必须包含且只包含一个显式结构化结论行："
+            'TALK_GATE_VERDICT {"verdict":"passed|failed|blocked","summary":"测试摘要",'
+            '"findings":["具体发现"]}。'
+            "`failed` 或 `blocked` 的 findings 不得为空；不要从自然语言暗示结论。"
+        )
 
-    if runtime.lower() in ("pi", "codex") or member_id in ("agent:pi", "agent:codex"):
+    if _uses_compact_prompt(runtime, member_id):
         creator = task.get("created_by") or "unknown"
         task_text = f"{title}\n{content}" if title else content
         # 任务路径同样注入身份(紧凑写法,理由同 build_cli_prompt)。
-        return f"你是 {member_id}。{creator} 对你说:{task_text}"
+        return (
+            f"你是 {member_id}（{tier_line}）。{creator} 对你说:"
+            f"{task_text}{history_block}{gate_contract}"
+        )
 
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"
@@ -1539,7 +2412,79 @@ def build_cli_task_prompt(
         f"{title_block}\n"
         "Task:\n"
         f"{content}\n"
+        f"{history_block}\n"
+        f"{gate_contract}\n"
     )
+
+
+def parse_task_gate_verdict(result: CliRunResult, *, task_kind: str) -> TaskGateVerdict:
+    if result.timed_out:
+        raise RuntimeError("task gate command timed out")
+    if result.returncode != 0:
+        detail = clean_cli_output(result.stderr) or clean_cli_output(result.stdout)
+        raise RuntimeError(f"task gate command failed: {detail or f'exit code {result.returncode}'}")
+
+    output = clean_cli_output(result.stdout).strip()
+    candidates: list[str] = []
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(f"{TASK_GATE_VERDICT_MARKER} "):
+            candidates.append(stripped.removeprefix(f"{TASK_GATE_VERDICT_MARKER} ").strip())
+
+    decoder = json.JSONDecoder()
+    for marker_match in re.finditer(r"TALK_GATE_VERDICT(?:\s+|$)", output):
+        marked_output = output[marker_match.end() :].lstrip()
+        if not marked_output.startswith("{"):
+            continue
+        try:
+            marked_payload, _ = decoder.raw_decode(marked_output)
+        except json.JSONDecodeError:
+            continue
+        candidates.append(json.dumps(marked_payload, ensure_ascii=False))
+    candidates.extend(
+        match.group(1).strip()
+        for match in re.finditer(
+            r"```(?:json)?\s*(\{.*?\})\s*```",
+            output,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if TASK_GATE_VERDICT_MARKER in match.group(1)
+    )
+    if output.startswith("{") and output.endswith("}"):
+        candidates.append(output)
+
+    normalized_kind = task_kind.strip().lower()
+    allowed = {
+        "review": {"approved", "changes_requested", "blocked"},
+        "test": {"passed", "failed", "blocked"},
+    }.get(normalized_kind)
+    if allowed is None:
+        raise RuntimeError(f"task kind {task_kind!r} does not accept a gate verdict")
+
+    for candidate in reversed(candidates):
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        nested = payload.get(TASK_GATE_VERDICT_MARKER)
+        if isinstance(nested, dict):
+            payload = nested
+        verdict = str(payload.get("verdict") or "").strip().lower()
+        summary = str(payload.get("summary") or "").strip()
+        raw_findings = payload.get("findings", [])
+        if verdict not in allowed or not summary or not isinstance(raw_findings, list):
+            continue
+        findings = tuple(
+            str(finding).strip()
+            for finding in raw_findings
+            if str(finding).strip()
+        )
+        if verdict in {"changes_requested", "blocked", "failed"} and not findings:
+            continue
+        return TaskGateVerdict(verdict=verdict, summary=summary, findings=findings)
+    raise RuntimeError("task gate output did not return a valid TALK_GATE_VERDICT decision")
 
 
 def format_cli_reply(
@@ -1614,6 +2559,294 @@ async def run_cli_command(
             stderr=decode_subprocess_output(stderr),
             timed_out=True,
         )
+    except asyncio.CancelledError:
+        process.kill()
+        await process.communicate()
+        raise
+
+
+class TaskLeaseLostError(RuntimeError):
+    """Raised when a runner can no longer prove ownership of a task claim."""
+
+
+class TaskPreflightError(RuntimeError):
+    """Raised when one Task Hall preflight attempt cannot produce a decision."""
+
+
+def _effective_task_claim_check_interval(*, lease_seconds: int, heartbeat_interval: float) -> float:
+    """Keep claim/control probes frequent enough to honor the five-second stop contract."""
+    if lease_seconds <= 0 or heartbeat_interval <= 0:
+        raise ValueError("task lease and heartbeat intervals must be positive")
+    return min(
+        heartbeat_interval,
+        MAX_TASK_CONTROL_CHECK_INTERVAL,
+        max(0.5, lease_seconds / 3),
+    )
+
+
+async def _task_heartbeat_loop(
+    *,
+    client: Any,
+    task_id: int,
+    claim_token: str,
+    lease_seconds: int,
+    heartbeat_interval: float,
+) -> None:
+    from TALK.client.exceptions import TalkValidationError
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + lease_seconds
+    # The heartbeat endpoint also validates the root control state atomically.
+    # A pause/checkpoint/cancel revokes the claim with 409, so this probe doubles
+    # as the runner's bounded control check while the local command is running.
+    interval = _effective_task_claim_check_interval(
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
+    )
+    last_error: Exception | None = None
+    while True:
+        await asyncio.sleep(min(interval, max(0.05, deadline - loop.time())))
+        try:
+            await client.heartbeat_task(
+                task_id,
+                claim_token=claim_token,
+                lease_seconds=lease_seconds,
+            )
+        except TalkValidationError as exc:
+            if exc.status_code in {404, 409}:
+                raise TaskLeaseLostError(f"task {task_id} claim is no longer active") from exc
+            last_error = exc
+        except Exception as exc:
+            last_error = exc
+        else:
+            deadline = loop.time() + lease_seconds
+            last_error = None
+            continue
+
+        if loop.time() >= deadline:
+            raise TaskLeaseLostError(f"task {task_id} heartbeat failed until its local lease deadline") from last_error
+
+
+def _start_task_heartbeat(
+    *,
+    client: Any,
+    task_id: int,
+    claim_token: str | None,
+    lease_seconds: int,
+    heartbeat_interval: float,
+) -> asyncio.Task[None] | None:
+    if not claim_token:
+        return None
+    _effective_task_claim_check_interval(
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
+    )
+    return asyncio.create_task(
+        _task_heartbeat_loop(
+            client=client,
+            task_id=task_id,
+            claim_token=claim_token,
+            lease_seconds=lease_seconds,
+            heartbeat_interval=heartbeat_interval,
+        )
+    )
+
+
+async def _raise_if_task_lease_lost(heartbeat_task: asyncio.Task[None] | None) -> None:
+    if heartbeat_task is not None and heartbeat_task.done():
+        await heartbeat_task
+
+
+async def _run_while_task_lease_active(
+    operation: Awaitable[Any],
+    heartbeat_task: asyncio.Task[None] | None,
+) -> Any:
+    if heartbeat_task is None:
+        return await operation
+    operation_task = asyncio.create_task(operation)
+    done, _ = await asyncio.wait({operation_task, heartbeat_task}, return_when=asyncio.FIRST_COMPLETED)
+    if heartbeat_task in done:
+        operation_task.cancel()
+        try:
+            await operation_task
+        except asyncio.CancelledError:
+            pass
+        await heartbeat_task
+    return await operation_task
+
+
+async def _stop_task_heartbeat(heartbeat_task: asyncio.Task[None] | None) -> None:
+    if heartbeat_task is None:
+        return
+    if heartbeat_task.done():
+        try:
+            await heartbeat_task
+        except TaskLeaseLostError:
+            pass
+        return
+    heartbeat_task.cancel()
+    try:
+        await heartbeat_task
+    except asyncio.CancelledError:
+        pass
+
+
+_TASK_RUNNER_ACTIONABLE_WORKFLOWS = {"assigned", "clarification_answered", "accepted"}
+
+
+def _task_preflight_question_marker(task: dict[str, Any]) -> str:
+    task_id = int(task["id"])
+    round_index = int(task.get("clarification_round_count") or 0) + 1
+    return f"【TALK 自动预检｜任务 #{task_id}｜澄清轮次 {round_index}】"
+
+
+def _find_pending_preflight_question(
+    messages: Sequence[dict[str, Any]],
+    *,
+    member_id: str,
+    marker: str,
+) -> dict[str, Any] | None:
+    for message in reversed(messages):
+        if message.get("revoked") or message.get("type") != "text":
+            continue
+        if str(message.get("from") or "") != member_id:
+            continue
+        if str(message.get("content") or "").startswith(marker):
+            return message
+    return None
+
+
+async def _prepare_task_before_claim(
+    task: dict[str, Any],
+    *,
+    client: Any,
+    member_id: str,
+    workdir: Path,
+    preflight_command: str | Sequence[str],
+    timeout: int,
+    runtime: str,
+    prompt_transport: str,
+    decision_tier: str,
+    command_runner: Any,
+) -> tuple[dict[str, Any] | None, str, bool]:
+    """Run Task Hall preflight and return (ready_task, replay_context, workflow_advanced)."""
+    from TALK.client.exceptions import TalkValidationError
+
+    hall_group_id = str(task.get("hall_group_id") or "").strip()
+    if not hall_group_id:
+        return task, "", False
+
+    history = await fetch_complete_task_hall_history(client, hall_group_id)
+    quality_context = await fetch_task_quality_context(client, task)
+    replay_context = format_task_hall_history(history)
+    if quality_context:
+        replay_context = (
+            f"{replay_context}\n\n"
+            "关系授权的只读质量上下文：\n"
+            f"{quality_context}"
+        )
+    workflow_status = str(task.get("workflow_status") or "assigned")
+    if workflow_status == "accepted":
+        return task, replay_context, False
+    if workflow_status not in {"assigned", "clarification_answered"}:
+        return None, replay_context, False
+
+    task_id = int(task["id"])
+    marker = _task_preflight_question_marker(task)
+    pending_question = _find_pending_preflight_question(
+        history,
+        member_id=member_id,
+        marker=marker,
+    )
+    if pending_question is not None and pending_question.get("id") is not None:
+        try:
+            await client.request_task_clarification(
+                task_id,
+                question_message_id=int(pending_question["id"]),
+            )
+            return None, replay_context, True
+        except TalkValidationError as exc:
+            if exc.status_code != 409:
+                raise
+            current = await client.get_task(task_id)
+            if str(current.get("workflow_status") or "") in {"clarification_requested", "needs_decision"}:
+                return None, replay_context, True
+            return None, replay_context, False
+
+    prompt = build_cli_task_preflight_prompt(
+        task,
+        member_id=member_id,
+        workdir=workdir,
+        runtime=runtime,
+        decision_tier=decision_tier,
+        hall_history=replay_context,
+    )
+    try:
+        result = await command_runner(
+            preflight_command,
+            prompt,
+            cwd=workdir,
+            timeout=timeout,
+            prompt_transport=prompt_transport,
+        )
+        result = normalize_runtime_result(result, runtime=runtime)
+        try:
+            decision = parse_task_preflight_result(result)
+        except RuntimeError:
+            if result.timed_out or result.returncode != 0:
+                raise
+            repair_prompt = (
+                f"{prompt}\n\n"
+                "你上一次的输出没有遵守协议。请重新判断，并且禁止解释、禁止 Markdown "
+                "代码围栏、禁止嵌套 JSON；只输出上面约定的一行 TALK_TASK_PREFLIGHT。"
+            )
+            repaired_result = await command_runner(
+                preflight_command,
+                repair_prompt,
+                cwd=workdir,
+                timeout=timeout,
+                prompt_transport=prompt_transport,
+            )
+            repaired_result = normalize_runtime_result(repaired_result, runtime=runtime)
+            decision = parse_task_preflight_result(repaired_result)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        raise TaskPreflightError(f"task {task_id} preflight failed: {exc}") from exc
+    if decision.action == "accept":
+        try:
+            accepted = await client.accept_task(task_id)
+            return accepted, replay_context, True
+        except TalkValidationError as exc:
+            if exc.status_code != 409:
+                raise
+            current = await client.get_task(task_id)
+            if str(current.get("workflow_status") or "") == "accepted":
+                return current, replay_context, True
+            return None, replay_context, False
+
+    creator = str(task.get("created_by") or "").strip()
+    if not creator or not decision.question:
+        raise RuntimeError(f"task {task_id} preflight clarification is missing a requester or question")
+    question = await client.send_text(
+        f"{marker}\n{decision.question}",
+        to=[creator],
+        group_id=hall_group_id,
+    )
+    question_message_id = int(question["id"])
+    try:
+        await client.request_task_clarification(
+            task_id,
+            question_message_id=question_message_id,
+        )
+        return None, replay_context, True
+    except TalkValidationError as exc:
+        if exc.status_code != 409:
+            raise
+        current = await client.get_task(task_id)
+        if str(current.get("workflow_status") or "") in {"clarification_requested", "needs_decision"}:
+            return None, replay_context, True
+        return None, replay_context, False
 
 
 async def handle_queued_task(
@@ -1630,64 +2863,213 @@ async def handle_queued_task(
     bridge_label: str = "CLI bridge",
     prompt_transport: str = "stdin",
     decision_tier: str = "execution",
+    preflight_command: str | Sequence[str] | None = None,
+    command_runner: Any | None = None,
+    lease_seconds: int = DEFAULT_TASK_LEASE_SECONDS,
+    heartbeat_interval: float = DEFAULT_TASK_HEARTBEAT_INTERVAL,
 ) -> bool:
-    """Claim and execute one queued task. Returns False when another worker claimed it first."""
+    """Preflight, claim, and execute one task; return False when no action was acquired."""
     from TALK.client.exceptions import TalkValidationError
 
     task_id = int(task["id"])
+    runner = command_runner or run_cli_command
+    ready_task, replay_context, workflow_advanced = await _prepare_task_before_claim(
+        task,
+        client=client,
+        member_id=member_id,
+        workdir=workdir,
+        preflight_command=preflight_command or command,
+        timeout=timeout,
+        runtime=runtime,
+        prompt_transport=prompt_transport,
+        decision_tier=decision_tier,
+        command_runner=runner,
+    )
+    if ready_task is None:
+        return workflow_advanced
+
     try:
-        claimed = await client.claim_task(task_id, instance_id=instance_id)
+        claimed = await client.claim_task(task_id, instance_id=instance_id, lease_seconds=lease_seconds)
     except TalkValidationError as exc:
         if exc.status_code == 409:
             return False
         raise
 
-    task_text = str(claimed.get("content") or "")
-    prompt = build_cli_task_prompt(claimed, member_id=member_id, workdir=workdir, runtime=runtime, decision_tier=decision_tier)
-    result_message_id: int | None = None
-    completion_status = "succeeded"
-    last_error: str | None = None
-
+    claim_token = str(claimed.get("claim_token") or "") or None
+    heartbeat_task = _start_task_heartbeat(
+        client=client,
+        task_id=task_id,
+        claim_token=claim_token,
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
+    )
+    gate_verdict_payload: dict[str, Any] | None = None
     try:
-        result = await run_cli_command(
-            command,
-            prompt,
-            cwd=workdir,
-            timeout=timeout,
-            prompt_transport=prompt_transport,
-        )
-        reply = format_cli_reply(
-            result,
-            max_chars=max_reply_chars,
-            bridge_label=bridge_label,
-            force_one_sentence=wants_one_sentence(task_text),
-        )
-        if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
-            reply = normalize_pi_reply_language(task_text, reply)
-        completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
-        if completion_status == "failed":
-            detail = "\n".join(part for part in (clean_cli_output(result.stderr), clean_cli_output(result.stdout)) if part)
-            last_error = detail or reply
-    except Exception as exc:
-        reply = f"{bridge_label} 运行失败，错误详情已记录。"
-        completion_status = "failed"
-        last_error = f"{bridge_label} failed before completing task {task_id}: {exc}"
+        try:
+            task_text = str(claimed.get("content") or "")
+            task_kind = str(claimed.get("task_kind") or "general").strip().lower()
+            prompt = build_cli_task_prompt(
+                claimed,
+                member_id=member_id,
+                workdir=workdir,
+                runtime=runtime,
+                decision_tier=decision_tier,
+                hall_history=replay_context,
+            )
+            result = await _run_while_task_lease_active(
+                runner(
+                    command,
+                    prompt,
+                    cwd=workdir,
+                    timeout=timeout,
+                    prompt_transport=prompt_transport,
+                ),
+                heartbeat_task,
+            )
+            result = normalize_runtime_result(result, runtime=runtime)
+            if task_kind in {"review", "test"} and not result.timed_out and result.returncode == 0:
+                try:
+                    gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
+                except RuntimeError:
+                    repair_prompt = (
+                        f"{prompt}\n\n"
+                        "你上一次的门禁输出没有遵守协议。不要修改任何文件，也不要解释格式；"
+                        "请重新检查现有结论，只输出一行约定的 TALK_GATE_VERDICT JSON。"
+                    )
+                    result = await _run_while_task_lease_active(
+                        runner(
+                            command,
+                            repair_prompt,
+                            cwd=workdir,
+                            timeout=timeout,
+                            prompt_transport=prompt_transport,
+                        ),
+                        heartbeat_task,
+                    )
+                    result = normalize_runtime_result(result, runtime=runtime)
+                    gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
+                gate_verdict_payload = gate_verdict.as_payload()
+            reply = format_cli_reply(
+                result,
+                max_chars=max_reply_chars,
+                bridge_label=bridge_label,
+                force_one_sentence=wants_one_sentence(task_text),
+            )
+            if (
+                task_kind not in {"review", "test"}
+                and (runtime.lower() == "pi" or member_id == "agent:pi")
+                and not result.timed_out
+                and result.returncode == 0
+            ):
+                reply = normalize_pi_reply_language(task_text, reply)
+            completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
+            last_error = None
+            if completion_status == "failed":
+                detail = "\n".join(
+                    part for part in (clean_cli_output(result.stderr), clean_cli_output(result.stdout)) if part
+                )
+                last_error = detail or reply
+        except TaskLeaseLostError:
+            raise
+        except Exception as exc:
+            reply = f"{bridge_label} 运行失败，错误详情已记录。"
+            completion_status = "failed"
+            last_error = f"{bridge_label} failed before completing task {task_id}: {exc}"
 
-    creator = claimed.get("created_by")
+        await _raise_if_task_lease_lost(heartbeat_task)
+        result_message_id: int | None = None
+        creator = claimed.get("created_by")
+        if creator:
+            try:
+                result_message = await client.send_text(
+                    reply,
+                    to=[str(creator)],
+                    group_id=claimed.get("hall_group_id"),
+                )
+                result_message_id = int(result_message["id"])
+            except Exception as exc:
+                completion_status = "failed"
+                last_error = f"{bridge_label} could not post task result: {exc}"
+
+        await _raise_if_task_lease_lost(heartbeat_task)
+        completion_kwargs: dict[str, Any] = {
+            "status": completion_status,
+            "result_message_id": result_message_id,
+            "last_error": last_error,
+        }
+        if claim_token is not None:
+            completion_kwargs["claim_token"] = claim_token
+        if completion_status == "succeeded" and gate_verdict_payload is not None:
+            completion_kwargs["gate_verdict"] = gate_verdict_payload
+        await client.complete_task(task_id, **completion_kwargs)
+        return True
+    except TaskLeaseLostError:
+        return False
+    finally:
+        await _stop_task_heartbeat(heartbeat_task)
+
+
+async def _fail_task_after_preflight_limit(
+    task: dict[str, Any],
+    *,
+    client: Any,
+    instance_id: str,
+    attempts: int,
+    error: TaskPreflightError,
+    lease_seconds: int,
+) -> bool:
+    """Persistently fail a poison task after its bounded preflight attempts."""
+    from TALK.client.exceptions import TalkValidationError
+
+    task_id = int(task["id"])
+    last_error = (
+        f"task {task_id} preflight failed after {attempts} attempts; "
+        f"automatic retries stopped: {error}"
+    )
+    try:
+        await client.accept_task(task_id)
+    except TalkValidationError as exc:
+        if exc.status_code != 409:
+            raise
+        current = await client.get_task(task_id)
+        if str(current.get("workflow_status") or "") != "accepted":
+            return False
+    try:
+        claimed = await client.claim_task(
+            task_id,
+            instance_id=instance_id,
+            lease_seconds=lease_seconds,
+        )
+    except TalkValidationError as exc:
+        if exc.status_code == 409:
+            return False
+        raise
+
+    result_message_id: int | None = None
+    creator = str(claimed.get("created_by") or task.get("created_by") or "").strip()
     if creator:
         try:
-            result_message = await client.send_text(reply, to=[str(creator)])
+            result_message = await client.send_text(
+                (
+                    f"自动预检连续失败 {attempts} 次，已停止重试并将任务标记为失败。"
+                    "请检查 Agent 的 TALK_TASK_PREFLIGHT 输出协议后重新创建任务。"
+                ),
+                to=[creator],
+                group_id=claimed.get("hall_group_id") or task.get("hall_group_id"),
+            )
             result_message_id = int(result_message["id"])
         except Exception as exc:
-            completion_status = "failed"
-            last_error = f"{bridge_label} could not post task result: {exc}"
+            last_error = f"{last_error}; could not post preflight failure result: {exc}"
 
-    await client.complete_task(
-        task_id,
-        status=completion_status,
-        result_message_id=result_message_id,
-        last_error=last_error,
-    )
+    completion_kwargs: dict[str, Any] = {
+        "status": "failed",
+        "result_message_id": result_message_id,
+        "last_error": last_error,
+    }
+    claim_token = str(claimed.get("claim_token") or "").strip()
+    if claim_token:
+        completion_kwargs["claim_token"] = claim_token
+    await client.complete_task(task_id, **completion_kwargs)
     return True
 
 
@@ -1754,10 +3136,12 @@ async def handle_incoming_message(
             latest_stance = str(turns[-1].get("stance") or "") if turns else ""
             substantive_turns = _substantive_discussion_turns(turns)
             discussion_turn_count = len(substantive_turns)
+            # 多方场（如 brainstorm）预算按参与者规模放大；1:1 阈值不变（DELIBERATION §8.3）
+            close_threshold = _discussion_auto_turn_budget(discussion) + 1
             if (
                 discussion_id is not None
                 and latest_stance == "disagree"
-                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+                and len(substantive_turns) >= close_threshold
             ):
                 await _send_human_escalation(
                     client,
@@ -1772,7 +3156,7 @@ async def handle_incoming_message(
             if (
                 discussion_id is not None
                 and latest_stance != "disagree"
-                and len(substantive_turns) >= DISCUSSION_EXTENSION_CLOSE_TURNS
+                and len(substantive_turns) >= close_threshold
             ):
                 await _send_agent_scope_closure(
                     client,
@@ -1794,6 +3178,18 @@ async def handle_incoming_message(
                 direct_requester_id=sender_id,
                 human_id=await _find_human_reviewer(client, group_id),
             )
+        elif group_id:
+            # 人驱动编排（DELIBERATION §8）：human 发起/点名时，把本次回复记账到已开的多方场
+            # （如 brainstorm 自动开的场）。只解析多方场，1:1 流程与 prompt 保持零变化。
+            discussion = await _active_multiparty_discussion(
+                client,
+                group_id=group_id,
+                member_id=member_id,
+                peer_id=sender_id,
+            )
+            if discussion is not None and discussion.get("id") is not None:
+                turns = await _list_discussion_turns(client, int(discussion["id"]))
+                discussion_turn_count = len(_substantive_discussion_turns(turns))
 
         group_member_context = await _build_group_member_context(client, group_id, member_id, sender=str(sender))
 
@@ -1819,6 +3215,35 @@ async def handle_incoming_message(
             os.environ["TALK_DEFERRED_FILE"] = deferred_path
             deferred_file = deferred_path
 
+        summary_request = await _is_brainstorm_summary_request(
+            client,
+            message=message,
+            group_id=group_id,
+            discussion=discussion,
+            member_id=member_id,
+            sender_id=sender_id,
+            task_text=task_text,
+        )
+        summary_grounding = ""
+        if summary_request and discussion is not None:
+            summary_grounding = await _brainstorm_summary_grounding(
+                client,
+                group_id=group_id or "",
+                discussion=discussion,
+                turns=turns,
+            )
+
+        # 汇总轮只注入每位 Agent 的首条意见原文；其它多方轮次沿用 BS-2b 历史回顾。
+        shared_history = summary_grounding
+        if not shared_history:
+            shared_history = await _shared_discussion_history(
+                client,
+                group_id=group_id,
+                discussion=discussion,
+                current_message_id=_message_id(message),
+                self_id=member_id,
+            )
+
         prompt = build_cli_prompt(
             message,
             member_id=member_id,
@@ -1827,6 +3252,7 @@ async def handle_incoming_message(
             discussion_context=discussion_context,
             decision_tier=decision_tier,
             group_member_context=group_member_context,
+            shared_history=shared_history,
         )
         if os.environ.get("TALK_DUMP_PROMPT") == "1":
             _dump_prompt(
@@ -1846,6 +3272,7 @@ async def handle_incoming_message(
             timeout=timeout,
             prompt_transport=prompt_transport,
         )
+        result = normalize_runtime_result(result, runtime=runtime)
         # 诊断：function-calling 模式下，工具调用由 LLM 扩展内部处理
         # bridge 只读取 stdout 作为可见回复；TALK_ACTION 文本协议解析继续共存
         if os.environ.get("TALK_DUMP_PROMPT") == "1" and result.returncode == 0:
@@ -1866,22 +3293,35 @@ async def handle_incoming_message(
         visible_reply = sanitize_visible_reply(visible_reply)
         mark_actions = [action for action in actions if action.action_type == "mark_stance"]
         has_final_action = any(action.action_type == "final_to_human" for action in actions)
+        summary_reply_is_decision = bool(
+            summary_grounding and visible_reply and not result.timed_out and result.returncode == 0
+        )
 
         # Reply to sender FIRST, before executing any TALK_ACTION side effects
         reply_message_id: int | None = None
         if visible_reply:
             reply_message = await client.reply(int(message["id"]), text=visible_reply, to=[sender], group_id=group_id)
             reply_message_id = int(reply_message["id"]) if reply_message and reply_message.get("id") is not None else None
-            if sender_id.startswith("agent:") and discussion and not mark_actions:
-                await _append_discussion_turn(
+            # agent 发送者：沿用原记账；human 发送者：仅当解析到多方场（人驱动编排）时记账
+            if discussion and not mark_actions:
+                reply_stance = "decision" if summary_reply_is_decision else infer_reply_stance(task_text, visible_reply)
+                appended = await _append_discussion_turn(
                     client,
                     discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
                     message_id=reply_message_id,
-                    stance=infer_reply_stance(task_text, visible_reply),
+                    stance=reply_stance,
                     target_member_id=sender_id,
                     turn_kind="reply",
                     round_index=1,
                 )
+                if appended:
+                    await _resolve_if_decision_maker(
+                        client,
+                        discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
+                        group_id=group_id,
+                        member_id=member_id,
+                        stance=reply_stance,
+                    )
 
         # 5.5 方案 D：执行延迟的 talk_send（visible reply 之后、TALK_ACTION 之前）。
         # reply_to 只保留 UI 引用；需求轮次写入 discussion_turns 账本。
@@ -1894,6 +3334,7 @@ async def handle_incoming_message(
                 group_id=group_id,
                 reply_to=current_msg_id,
                 current_turn_count=discussion_turn_count,
+                max_auto_turns=_discussion_auto_turn_budget(discussion),
             )
             discussion, turns = await _record_deferred_demand_turns(
                 deferred_results,
@@ -1936,7 +3377,7 @@ async def handle_incoming_message(
                     topic=_discussion_topic_from_text(task_text),
                     create_if_missing=group_id is not None,
                 )
-            stance = action.stance or "answer"
+            stance = "decision" if summary_reply_is_decision else action.stance or "answer"
             await _append_discussion_turn(
                 client,
                 discussion_id=discussion_id,
@@ -1945,6 +3386,13 @@ async def handle_incoming_message(
                 target_member_id=peer_id,
                 turn_kind="reply",
                 round_index=action.round_index or 1,
+            )
+            await _resolve_if_decision_maker(
+                client,
+                discussion_id=discussion_id,
+                group_id=group_id,
+                member_id=member_id,
+                stance=stance,
             )
             if stance == "agree" and not has_final_action:
                 await _update_discussion_status(client, discussion_id, "resolved")
@@ -1958,7 +3406,8 @@ async def handle_incoming_message(
         if report_status is not None:
             await report_status(
                 "error" if result.timed_out or result.returncode != 0 else "idle",
-                last_error=reply if result.timed_out or result.returncode != 0 else None,
+                last_error=(clean_cli_output(result.stderr) or clean_cli_output(result.stdout) or reply)[-4000:]
+                if result.timed_out or result.returncode != 0 else None,
             )
     except Exception as exc:
         if report_status is not None:
@@ -1983,26 +3432,100 @@ async def run_task_queue_worker(
     run_lock: asyncio.Lock,
     report_status: Any,
 ) -> None:
+    preflight_failures: dict[int, tuple[int, TaskPreflightError]] = {}
+    max_preflight_attempts = resolve_task_preflight_max_attempts(args)
     while True:
         try:
+            requeue_expired = getattr(client, "requeue_expired_tasks", None)
+            if requeue_expired is not None:
+                await requeue_expired()
             tasks = await client.list_tasks(target_member_id=member_id, status="queued")
-            queued = sorted(tasks, key=lambda item: int(item["id"]))
+            queued = sorted(
+                (
+                    task
+                    for task in tasks
+                    if str(task.get("workflow_status") or "assigned") in _TASK_RUNNER_ACTIONABLE_WORKFLOWS
+                ),
+                key=lambda item: int(item["id"]),
+            )
             for task in queued:
+                task_id = int(task["id"])
                 async with run_lock:
-                    await handle_queued_task(
-                        task,
-                        client=client,
-                        member_id=member_id,
-                        workdir=workdir,
-                        instance_id=instance_id,
-                        command=args.command,
-                        timeout=args.timeout,
-                        max_reply_chars=args.max_reply_chars,
-                        runtime=args.runtime,
-                        bridge_label=args.bridge_label,
-                        prompt_transport=args.prompt_transport,
-                        decision_tier=args.decision_tier,
-                    )
+                    failure = preflight_failures.get(task_id)
+                    if failure is not None and failure[0] >= max_preflight_attempts:
+                        terminal = await _fail_task_after_preflight_limit(
+                            task,
+                            client=client,
+                            instance_id=instance_id,
+                            attempts=failure[0],
+                            error=failure[1],
+                            lease_seconds=getattr(
+                                args,
+                                "task_lease_seconds",
+                                DEFAULT_TASK_LEASE_SECONDS,
+                            ),
+                        )
+                        if terminal:
+                            preflight_failures.pop(task_id, None)
+                        continue
+                    try:
+                        await handle_queued_task(
+                            task,
+                            client=client,
+                            member_id=member_id,
+                            workdir=workdir,
+                            instance_id=instance_id,
+                            command=getattr(args, "task_command", args.command),
+                            timeout=args.timeout,
+                            max_reply_chars=args.max_reply_chars,
+                            runtime=args.runtime,
+                            bridge_label=args.bridge_label,
+                            prompt_transport=args.prompt_transport,
+                            decision_tier=args.decision_tier,
+                            preflight_command=getattr(
+                                args,
+                                "task_preflight_command",
+                                getattr(args, "task_command", args.command),
+                            ),
+                            lease_seconds=getattr(
+                                args,
+                                "task_lease_seconds",
+                                DEFAULT_TASK_LEASE_SECONDS,
+                            ),
+                            heartbeat_interval=getattr(
+                                args,
+                                "task_heartbeat_interval",
+                                DEFAULT_TASK_HEARTBEAT_INTERVAL,
+                            ),
+                        )
+                    except TaskPreflightError as exc:
+                        attempts = (failure[0] if failure is not None else 0) + 1
+                        preflight_failures[task_id] = (attempts, exc)
+                        if attempts >= max_preflight_attempts:
+                            terminal = await _fail_task_after_preflight_limit(
+                                task,
+                                client=client,
+                                instance_id=instance_id,
+                                attempts=attempts,
+                                error=exc,
+                                lease_seconds=getattr(
+                                    args,
+                                    "task_lease_seconds",
+                                    DEFAULT_TASK_LEASE_SECONDS,
+                                ),
+                            )
+                            if terminal:
+                                preflight_failures.pop(task_id, None)
+                        elif report_status is not None:
+                            await report_status(
+                                "error",
+                                last_error=(
+                                    f"task {task_id} preflight attempt "
+                                    f"{attempts}/{max_preflight_attempts} failed: {exc}"
+                                ),
+                            )
+                    else:
+                        preflight_failures.pop(task_id, None)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -2015,7 +3538,10 @@ async def run_bridge(args: argparse.Namespace) -> None:
     from TALK.client import TalkClient
 
     member_id = member_id_from_name(args.name)
+    args.decision_tier = resolve_decision_tier(args, member_id)
+    configure_talk_tool_environment(args, member_id)
     workdir = Path(args.workdir).expanduser().resolve()
+    args.task_preflight_command = resolve_task_preflight_command(args)
     client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval)
     await client.register(member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})")
     instance_id = args.instance_id or f"{member_id}:{uuid4()}"
@@ -2135,6 +3661,25 @@ def build_parser(
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SEC)
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--task-poll-interval", type=float, default=DEFAULT_TASK_POLL_INTERVAL)
+    parser.add_argument(
+        "--task-preflight-command",
+        default=None,
+        help="Optional read-only CLI command used for Task Hall preflight; defaults to the task execution command",
+    )
+    parser.add_argument(
+        "--task-preflight-max-attempts",
+        type=int,
+        choices=range(1, TASK_PREFLIGHT_MAX_ATTEMPTS + 1),
+        default=None,
+        help="Maximum consecutive Task Hall preflight polling attempts; defaults to 1 for dsh and 3 for other runtimes",
+    )
+    parser.add_argument("--task-lease-seconds", type=int, default=DEFAULT_TASK_LEASE_SECONDS)
+    parser.add_argument(
+        "--task-heartbeat-interval",
+        type=float,
+        default=DEFAULT_TASK_HEARTBEAT_INTERVAL,
+        help="Task claim heartbeat interval; effective control checks are capped at 5 seconds",
+    )
     parser.add_argument("--disable-task-queue", action="store_true")
     parser.add_argument("--max-reply-chars", type=int, default=DEFAULT_MAX_REPLY_CHARS)
     parser.add_argument("--respond-to-broadcast", action="store_true")
@@ -2142,8 +3687,8 @@ def build_parser(
     parser.add_argument(
         "--decision-tier",
         choices=["decision", "execution"],
-        default="execution",
-        help="Agent decision tier for role injection. Default: %(default)s",
+        default=None,
+        help="Agent decision tier override; otherwise read from project .talk/groups.yaml and fall back to execution",
     )
     parser.add_argument(
         "--project",

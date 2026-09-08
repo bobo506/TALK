@@ -1,5 +1,6 @@
 import json
 
+import server.db as db
 from tests.test_support import RouteTestCase
 from server.models import Group, GroupMember
 
@@ -130,6 +131,152 @@ class DiscussionRouteTests(RouteTestCase):
         payload = turn.json()
         self.assertEqual(payload["turn_kind"], "demand")
         self.assertEqual(payload["round_index"], 2)
+
+    def test_append_turn_accepts_decision_stance(self):
+        message = self.add_message(
+            from_id=self.agent_codex.id,
+            to_ids=json.dumps([self.agent_pi.id]),
+            group_id="group:lab",
+            message_type="text",
+            content="@agent:pi final call",
+        )
+
+        with self.make_client() as client:
+            created = client.post(
+                "/api/discussions",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "group_id": "group:lab",
+                    "topic": "decision stance",
+                    "participant_ids": ["agent:codex", "agent:pi"],
+                    "root_message_id": message.id,
+                },
+            )
+            self.assertEqual(created.status_code, 201)
+            discussion_id = created.json()["id"]
+
+            turn = client.post(
+                f"/api/discussions/{discussion_id}/turns",
+                headers={"X-API-Key": "codex-key"},
+                json={
+                    "message_id": message.id,
+                    "target_member_id": "agent:pi",
+                    "stance": "decision",
+                    "round_index": 1,
+                },
+            )
+
+        self.assertEqual(turn.status_code, 201)
+        self.assertEqual(turn.json()["stance"], "decision")
+
+    def test_update_discussion_end_reason_and_preserve_on_status_only_patch(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/discussions",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "group_id": "group:lab",
+                    "topic": "end reason",
+                    "participant_ids": ["agent:codex", "agent:pi"],
+                },
+            )
+            self.assertEqual(created.status_code, 201)
+            discussion_id = created.json()["id"]
+            self.assertIsNone(created.json()["end_reason"])
+
+            resolved = client.patch(
+                f"/api/discussions/{discussion_id}",
+                headers={"X-API-Key": "bobo-key"},
+                json={"status": "resolved", "end_reason": "consensus"},
+            )
+            self.assertEqual(resolved.status_code, 200)
+            self.assertEqual(resolved.json()["status"], "resolved")
+            self.assertEqual(resolved.json()["end_reason"], "consensus")
+
+            fetched = client.get(
+                f"/api/discussions/{discussion_id}",
+                headers={"X-API-Key": "bobo-key"},
+            )
+            self.assertEqual(fetched.status_code, 200)
+            self.assertEqual(fetched.json()["end_reason"], "consensus")
+
+            escalated = client.patch(
+                f"/api/discussions/{discussion_id}",
+                headers={"X-API-Key": "bobo-key"},
+                json={"status": "escalated"},
+            )
+
+        self.assertEqual(escalated.status_code, 200)
+        self.assertEqual(escalated.json()["status"], "escalated")
+        self.assertEqual(escalated.json()["end_reason"], "consensus")
+
+    def test_update_discussion_rejects_invalid_end_reason(self):
+        with self.make_client() as client:
+            created = client.post(
+                "/api/discussions",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "group_id": "group:lab",
+                    "topic": "bad end reason",
+                    "participant_ids": ["agent:codex", "agent:pi"],
+                },
+            )
+            self.assertEqual(created.status_code, 201)
+            discussion_id = created.json()["id"]
+
+            patched = client.patch(
+                f"/api/discussions/{discussion_id}",
+                headers={"X-API-Key": "bobo-key"},
+                json={"status": "resolved", "end_reason": "bogus"},
+            )
+
+        self.assertEqual(patched.status_code, 422)
+
+    def test_init_db_adds_end_reason_to_legacy_discussion_sessions(self):
+        with self.engine.begin() as conn:
+            conn.exec_driver_sql("DROP TABLE discussion_sessions")
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE discussion_sessions (
+                    id INTEGER NOT NULL,
+                    group_id TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    topic TEXT NOT NULL,
+                    participant_ids TEXT NOT NULL,
+                    root_message_id INTEGER,
+                    requester_id TEXT,
+                    assignee_id TEXT,
+                    scope_text TEXT,
+                    status TEXT NOT NULL,
+                    max_rounds INTEGER NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
+                    PRIMARY KEY (id)
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                INSERT INTO discussion_sessions (
+                    id, group_id, created_by, topic, participant_ids, status,
+                    max_rounds, created_at, updated_at
+                ) VALUES (
+                    1, 'group:lab', 'human:bobo', 'legacy', '["agent:codex","agent:pi"]',
+                    'resolved', 2, '2026-06-28 00:00:00', '2026-06-28 00:00:00'
+                )
+                """
+            )
+
+        db.init_db()
+
+        with self.engine.connect() as conn:
+            columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(discussion_sessions)").fetchall()}
+            end_reason = conn.exec_driver_sql(
+                "SELECT end_reason FROM discussion_sessions WHERE id = 1"
+            ).scalar_one()
+
+        self.assertIn("end_reason", columns)
+        self.assertIsNone(end_reason)
 
     def test_non_group_member_cannot_create_or_read_discussion(self):
         with self.make_client() as client:

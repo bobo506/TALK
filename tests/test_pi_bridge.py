@@ -19,11 +19,12 @@ class PiBridgeTests(unittest.TestCase):
         command_args = shlex.split(args.pi_command, posix=True)
         self.assertEqual(command_args[:4], ["pi", "--print", "--mode", "text"])
         self.assertIn("--no-context-files", command_args)
-        # 5.5 function-calling：禁用内置工具与自动发现扩展，只显式保留 talk_send
+        # function-calling：禁用内置工具与自动发现扩展，只显式保留 TALK 工具面
         self.assertIn("--no-builtin-tools", command_args)
         self.assertIn("--no-extensions", command_args)
         self.assertIn("--tools", command_args)
-        self.assertIn("talk_send", command_args)
+        tool_names = command_args[command_args.index("--tools") + 1].split(",")
+        self.assertEqual(set(tool_names), set(pi_bridge.TALK_TOOL_NAMES))
         self.assertIn("--extension", command_args)
         self.assertIn("--no-session", command_args)
         self.assertIn("--thinking", command_args)
@@ -62,9 +63,12 @@ class PiBridgeTests(unittest.TestCase):
         resolved = pi_bridge.resolve_pi_command(args)
         command_args = shlex.split(resolved, posix=True)
         self.assertIn("--tools", command_args)
-        self.assertIn("read,grep,find,ls,bash,edit,write", command_args)
+        tool_names = command_args[command_args.index("--tools") + 1].split(",")
+        for name in ("read", "grep", "find", "ls", "bash", "edit", "write", *pi_bridge.TALK_TOOL_NAMES):
+            self.assertIn(name, tool_names)
         self.assertNotIn("--no-tools", command_args)
         self.assertIn("--no-extensions", command_args)
+        self.assertIn("--extension", command_args)
 
     def test_parser_accepts_custom_pi_command(self):
         args = pi_bridge.build_parser().parse_args([
@@ -76,12 +80,34 @@ class PiBridgeTests(unittest.TestCase):
 
         self.assertEqual(args.pi_command, "pi --provider deepseek --print --mode text")
 
+    def test_provider_and_model_are_pinned_across_runtime_commands(self):
+        args = pi_bridge.build_parser().parse_args([
+            "--key",
+            "pi-key",
+            "--pi-provider",
+            "moonshotai-cn",
+            "--pi-model",
+            "kimi-k3",
+            "--pi-execution-profile",
+            "tools",
+        ])
+
+        for command in (
+            pi_bridge.resolve_pi_command(args),
+            pi_bridge.resolve_pi_task_command(args),
+            pi_bridge.resolve_pi_task_preflight_command(args),
+        ):
+            command_args = shlex.split(command, posix=True)
+            self.assertEqual(command_args[command_args.index("--provider") + 1], "moonshotai-cn")
+            self.assertEqual(command_args[command_args.index("--model") + 1], "kimi-k3")
+
     def test_default_pi_command_disables_auto_discovered_extensions(self):
         """plan-mode 在 rebindSession 里硬编码 setActiveTools 会覆盖我们注册的 talk_send。
         -ne 禁用所有自动发现扩展(包括 plan-mode),`-e <path>` 显式加载的不受影响。"""
         cmd = pi_bridge.DEFAULT_PI_COMMAND
         self.assertIn("--no-extensions", cmd)
         self.assertIn("--tools talk_send", cmd)
+        self.assertIn("talk_delegate_task", cmd)
         self.assertIn("--extension", cmd)  # 我们的扩展仍然显式加载
 
     def test_default_pi_tools_command_disables_auto_discovered_extensions(self):
@@ -89,6 +115,42 @@ class PiBridgeTests(unittest.TestCase):
         但保留 -ne 让工具表面完全由 bridge 控制,避免未来 plan-mode 改成员时炸我们。"""
         cmd = pi_bridge.DEFAULT_PI_TOOLS_COMMAND
         self.assertIn("--no-extensions", cmd)
+        self.assertIn("talk_delegate_task", cmd)
+        self.assertIn("--extension", cmd)
+
+    def test_default_task_command_leaves_result_delivery_to_runner(self):
+        command_args = shlex.split(pi_bridge.DEFAULT_PI_TASK_COMMAND, posix=True)
+        system_prompt = command_args[command_args.index("--system-prompt") + 1]
+
+        self.assertIn("--no-tools", command_args)
+        self.assertIn("--no-extensions", command_args)
+        self.assertNotIn("--extension", command_args)
+        self.assertFalse(any(name in command_args for name in pi_bridge.TALK_TOOL_NAMES))
+        self.assertIn("优先严格遵循请求者给出的任务正文", system_prompt)
+        self.assertIn("runner 会把你的可见输出写入对应 Task Hall", system_prompt)
+
+    def test_tools_profile_task_command_keeps_local_tools_only(self):
+        args = pi_bridge.build_parser().parse_args(
+            ["--key", "pi-key", "--pi-execution-profile", "tools"]
+        )
+        command_args = shlex.split(pi_bridge.resolve_pi_task_command(args), posix=True)
+        tool_names = command_args[command_args.index("--tools") + 1].split(",")
+
+        self.assertEqual(set(tool_names), {"read", "grep", "find", "ls", "bash", "edit", "write"})
+        self.assertNotIn("--extension", command_args)
+        self.assertTrue(set(tool_names).isdisjoint(pi_bridge.TALK_TOOL_NAMES))
+
+    def test_task_preflight_command_disables_tools_for_tools_profile(self):
+        args = pi_bridge.build_parser().parse_args(
+            ["--key", "pi-key", "--pi-execution-profile", "tools"]
+        )
+        command_args = shlex.split(pi_bridge.resolve_pi_task_preflight_command(args), posix=True)
+        system_prompt = command_args[command_args.index("--system-prompt") + 1]
+
+        self.assertIn("--no-tools", command_args)
+        self.assertNotIn("--tools", command_args)
+        self.assertNotIn("--extension", command_args)
+        self.assertIn("领取前预检", system_prompt)
 
 
 class PiBridgeProfileInjectionTests(unittest.TestCase):
@@ -130,6 +192,11 @@ class PiBridgeProfileInjectionTests(unittest.TestCase):
         self.assertNotIn("\n", system_prompt)
         # the rest of the command is untouched (still function-calling shape)
         self.assertIn("--tools talk_send", resolved)
+        self.assertIn("talk_delegate_task", resolved)
+
+        task_system_prompt = self._system_prompt_of(pi_bridge.resolve_pi_task_command(args))
+        self.assertIn("优先严格遵循请求者给出的任务正文", task_system_prompt)
+        self.assertIn("绝不写汇报体", task_system_prompt)
 
     def test_project_without_matching_profile_is_byte_identical(self):
         # .talk/ exists but no profile for agent:pi → opt-in stays a no-op

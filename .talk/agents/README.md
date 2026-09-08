@@ -11,8 +11,8 @@
 | member_id | 目录名 |
 |-----------|--------|
 | `agent:codex` | `agent_codex/` |
-| `agent:pi` | `agent_pi/` |
-| `agent:pi-kimi` | `agent_pi-kimi/` |
+| `agent:kimi` | `agent_kimi/` |
+| `agent:deepseek` | `agent_deepseek/` |
 
 > bridge 按 member_id 查 profile 时需做同样的净化映射（Phase 2 落地）。
 > server 端 `project_agents` 表存的是显式相对路径，不依赖目录名等于 member_id。

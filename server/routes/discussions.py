@@ -166,6 +166,8 @@ def update_discussion(
     discussion = _get_visible_discussion(discussion_id, current, session)
     now = datetime.now(timezone.utc)
     discussion.status = body.status
+    if "end_reason" in body.model_fields_set:
+        discussion.end_reason = body.end_reason
     discussion.updated_at = now
     session.add(discussion)
     session.commit()

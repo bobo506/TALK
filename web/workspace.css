@@ -1,0 +1,136 @@
+/* 已确认的任务 / 角色双栏工作台。旧聊天入口继续保留。 */
+.app-header {min-width:0!important; height:70px; min-height:70px; display:flex; gap:32px; padding:0 28px; border-bottom:1px solid var(--line);}
+.window-brand {padding:0; flex-shrink:0;} .header-actions {margin-left:auto; padding:0; gap:18px;}
+.app-header .project-select {width:180px; margin:0; font-size:16px;}
+.app-header .project-delegate-btn {width:auto; margin:0; padding:9px 20px; background:transparent; color:var(--blue-strong); border:1px solid var(--blue-strong); box-shadow:none;}
+.app-header .user-badge,.app-header .logout-btn {display:inline-block!important; font-size:14px;}
+.workbench {min-width:0; height:calc(100vh - 70px);}
+.workbench.project-mode {grid-template-columns:minmax(270px,32%) minmax(0,1fr);}
+.project-mode .timeline-workspace {display:none;}
+.project-mode .workspace-tools {padding:28px 0 16px; background:#faf9f6;}
+.project-mode .details-panel {padding:30px 40px; background:#fff; overflow-y:auto;}
+.project-strip {margin:0; padding:0 28px;}
+.workspace-tabs {display:flex; align-items:center; gap:32px; margin-bottom:18px;}
+.workspace-tabs>button {border:0; background:transparent; color:var(--text); font-size:21px; padding:8px 2px 12px; border-bottom:3px solid transparent; font-weight:650; cursor:pointer;}
+.workspace-tabs>button[aria-pressed="true"] {color:var(--blue-strong); border-bottom-color:var(--blue-strong);}
+.workspace-tabs .workspace-refresh {margin-left:auto; font-size:13px; font-weight:400; color:#636b74;}
+.blackboard-view {display:block; padding:0; overflow:visible; height:auto; background:transparent;}
+.blackboard-header {padding:0 28px 16px; border:0; min-height:0; display:block;}
+.blackboard-header p {margin:0; color:#626b76; font-size:15px;}
+#workspace-search {display:block; width:calc(100% - 56px); margin:0 28px 20px; height:44px; border:1px solid #d6d6d2; border-radius:6px; background:white; padding:10px 12px; font-size:15px;}
+.blackboard-summary {padding:0 28px; margin:0; gap:20px; border-bottom:1px solid #deded9; display:flex; flex-wrap:wrap;}
+.blackboard-summary button,.role-task-filters button {padding:10px 0 12px; border-bottom:3px solid transparent; color:#616875;}
+.blackboard-summary button[aria-pressed="true"],.role-task-filters button[aria-pressed="true"] {color:var(--blue-strong); border-bottom-color:var(--blue-strong); font-weight:600;}
+.blackboard-columns {display:block!important; padding:12px 0; overflow:visible;}
+.task-card {position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; width:100%; margin:0; border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; border-radius:0; box-shadow:none; padding:22px 28px; text-align:left; background:transparent;}
+.task-card.selected,.role-row.selected {background:#edf5fc; border-left-color:#337ec0;}
+.task-card:hover,.role-row:hover {background:#f0f5f8;}
+.task-card-title {font-size:17px; line-height:1.5; font-weight:650; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere;}
+.task-card-meta {grid-column:1/-1; font-size:14px; color:#656d76; line-height:1.5;}
+.task-status-badge {background:transparent!important; padding:0; align-self:start; font-size:14px; white-space:normal; line-height:1.7; font-weight:500;}
+.task-status-badge.success {color:#26753c;} .task-status-badge.danger {color:#a83232;} .task-status-badge.attention {color:#8d580d;}
+.role-row {border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; background:transparent; padding:24px 28px; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left;}
+.role-row strong {font-size:22px;} .role-row span {font-size:15px;} .role-row small {font-size:14px; color:#626b76;}
+.workspace-empty {padding:20px 28px; color:#626b76; font-size:15px;}
+.task-details-card {background:transparent; border:0; box-shadow:none; padding:0; border-radius:0;}
+.task-details-heading {align-items:flex-start; gap:18px;}
+.task-details-heading h3 {color:#202a35; font-size:30px; line-height:1.4; font-weight:700; overflow-wrap:anywhere;}
+.task-details-heading .sidebar-kicker {font-size:14px; color:#69737c; font-weight:400; letter-spacing:0; margin-bottom:22px;}
+.task-details-status {margin:12px 0;} .task-details-status .task-status-badge {font-size:17px;}
+.task-details-meta {font-size:15px; color:#626b76; line-height:1.6; margin:0 0 24px; padding:0; border:0;}
+.task-notice {padding:15px 20px; border:1px solid #d4dce3; border-radius:6px; background:#f5f7f9; font-size:16px; line-height:1.6; margin:20px 0 24px;}
+.task-notice.success {color:#286c39; background:#f3f8f3; border-color:#d1e1d1;}
+.task-notice.danger {color:#9d3434; background:#fcf5f5;}
+.task-outcome h4,.task-flow h4,.role-task-section h3 {font-size:21px; font-weight:650; color:#26323d; margin:0 0 14px;}
+.task-outcome p {font-size:16px; line-height:1.8; color:#414b57; overflow-wrap:anywhere;}
+.task-details-actions {display:flex; flex-wrap:wrap; gap:12px; padding:20px 0 0; margin:0;}
+.task-details-actions button {width:auto; min-height:42px; padding:8px 18px; font-size:15px; border-radius:6px;}
+.task-action-primary {background:var(--blue-strong); color:white; padding:10px 24px; border:1px solid var(--blue-strong); border-radius:6px; font-size:16px; cursor:pointer;}
+.task-flow {margin-top:26px; padding:24px 0; border-top:1px solid #ddd;}
+.handoff-list {margin:0; padding-left:24px; list-style:decimal;}
+.handoff-list li {padding:7px 0 10px 10px; font-size:16px; line-height:1.7; overflow-wrap:anywhere;}
+.handoff-list li::marker {color:#5c7184;} .handoff-list p {margin:3px 0 0; font-size:14px; color:#65717d;}
+.handoff-list .workspace-empty {padding-left:10px;}
+.workspace-text-button {background:transparent; border:0; color:var(--blue-strong); font-size:15px; cursor:pointer; text-align:left; line-height:1.6;}
+#task-requirements {border-top:1px solid #ddd; padding:20px 0; font-size:17px;}
+#task-requirements summary {cursor:pointer; font-weight:550;} .task-details-content {font-size:15px; line-height:1.9; white-space:pre-wrap; overflow-wrap:anywhere; padding-top:16px;}
+.task-result-body {white-space:pre-wrap; overflow-wrap:anywhere; padding:20px; background:#f6f8fa; margin-top:18px; border:1px solid #d8e0e6; border-radius:6px; font-size:15px; line-height:1.8;}
+.role-details-panel {color:#303741;} .workspace-breadcrumb {font-size:14px; margin:0 0 24px;}
+.role-details-panel h2 {font-size:42px; line-height:1.3; font-weight:650; margin:0 0 20px;}
+.role-description {font-size:18px; margin-bottom:24px;} .role-current {font-size:16px; margin-bottom:28px;}
+.role-task-section {border-top:1px solid #ddd; margin-top:34px; padding-top:28px;}
+.role-task-filters {display:flex; gap:28px; margin-bottom:20px;}
+.role-task-table {width:100%; border-collapse:collapse; font-size:15px; table-layout:fixed;}
+.role-task-table th,.role-task-table td {padding:17px 12px; border-bottom:1px solid #dedede; text-align:left; vertical-align:top; overflow-wrap:anywhere;}
+.role-task-table th {font-weight:500; color:#596572;} .role-task-table th:first-child {width:43%;} .role-task-table th:last-child {width:18%;}
+.role-task-name {display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.7;}
+button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible {outline:2px solid #2f6fb1; outline-offset:3px;}
+@media(max-width:1000px){.workbench.project-mode {grid-template-columns:280px minmax(0,1fr);} .project-mode .details-panel {padding:28px 24px;} .project-mode .task-details-heading h3 {font-size:26px;} .blackboard-summary {gap:14px;} .app-header {gap:18px;} .app-header .project-select {width:155px;}}
+@media(max-width:700px){html,body {overflow:auto;} .app-header {height:auto; min-height:70px; flex-wrap:wrap; padding:12px 18px; gap:12px;} .app-header .header-actions {gap:12px;} .app-header .project-select {width:135px;} .app-header .project-delegate-btn {padding:8px 12px;} .app-header .user-badge {display:none!important;} .workbench.project-mode {display:flex; flex-direction:column; height:auto; overflow:visible;} .project-mode .workspace-tools {max-height:440px; overflow-y:auto; width:100%; border-bottom:1px solid #ddd;} .project-mode .details-panel {overflow:visible; padding:24px 20px; width:100%; border-left:0;} .role-task-table th,.role-task-table td {padding:12px 5px; font-size:13px;} .role-task-table .workspace-text-button {font-size:13px;} .task-details-heading h3 {font-size:24px;} .task-card-title {font-size:16px;} .task-details-actions button {font-size:14px;} }
+
+.window-brand h1 {font-size:24px;}
+.app-header .project-delegate-btn {font-size:15px;}
+.role-explanation {font-size:16px; color:#626b76; line-height:1.8; margin:-8px 0 24px;}
+
+.workbench:not(.project-mode) .task-details-heading h3 {font-size:20px;}
+.workbench:not(.project-mode) .task-outcome h4,.workbench:not(.project-mode) .task-flow h4 {font-size:18px;}
+@media(max-width:700px){
+  .workbench:not(.project-mode) {display:flex; flex-direction:column; height:auto; overflow:visible;}
+  .workbench:not(.project-mode) .workspace-tools {width:100%; max-height:280px; overflow-y:auto;}
+  .workbench:not(.project-mode) .timeline-workspace {width:100%; height:75vh; min-height:480px; flex:none;}
+  .workbench:not(.project-mode) .details-panel {width:100%; overflow:visible; padding:24px 20px;}
+}
+
+.app-header {flex-shrink:0; align-items:center;} .app-header .header-actions {height:auto;}
+
+/* 桌面默认密度约等于原界面的 80%；vh 仍取物理视口，需补偿以铺满高度。 */
+@media (min-width:701px) {
+  :root { --interface-scale:0.8; zoom:var(--interface-scale); }
+  body.app-shell { height:calc(100vh / var(--interface-scale)); }
+  .workbench { height:calc(100vh / var(--interface-scale) - 70px); }
+  .modal-card { max-height:calc(100vh / var(--interface-scale) - 48px); }
+  .task-create-panel { max-height:calc(90vh / var(--interface-scale)); }
+}
+
+/* 群聊使用同级导航，普通房间与任务专属对话分别进入。 */
+.workspace-tabs {gap:18px;}
+.workbench:not(.project-mode) {grid-template-columns:minmax(270px,32%) minmax(0,1fr) 244px;}
+.workbench .workspace-tools {padding:28px 0 16px;}
+.workspace-chats .sidebar-heading,.workspace-chats .hall-filter-shell {margin:0 28px 20px;}
+.workspace-chats .sidebar-heading {flex-wrap:wrap; gap:12px;}
+.workspace-chats .sidebar-heading h2 {font-size:17px;}
+.workspace-chats .room-primary-btn {font-size:14px; padding:8px 12px;}
+.workspace-chats .group-room-list {gap:0;}
+.workspace-chats .group-chat-row {display:flex; flex-direction:column; gap:8px; border:0; border-bottom:1px solid var(--line); border-left:3px solid transparent; border-radius:0; padding:20px 28px; white-space:normal; box-shadow:none;}
+.group-chat-row strong {font-size:17px; overflow-wrap:anywhere;}
+.group-chat-row span {font-size:14px; font-weight:400;}
+.workspace-chats .group-chat-row.active {border-left-color:var(--blue-strong); background:#edf5fc;}
+.workspace-chats .group-room-empty {padding:20px 28px; font-size:15px;}
+.workspace-chat-empty {grid-row:1/-1; padding:48px 32px; text-align:center; color:#65717d;}
+.workspace-chat-empty h2 {font-size:24px; margin-bottom:12px; color:var(--text);}
+.workbench.empty-chat-mode {grid-template-columns:minmax(270px,32%) minmax(0,1fr);}
+.empty-chat-mode .details-panel {display:none;}
+@media(max-width:1000px){.workbench:not(.project-mode) {grid-template-columns:280px minmax(0,1fr) 244px;} .workbench.empty-chat-mode {grid-template-columns:280px minmax(0,1fr);}}
+
+/* 群聊成员沿用工作台的简洁列表，操作按需展开。 */
+#group-members-panel .details-card {background:transparent;border:0;border-radius:0;box-shadow:none;padding:20px 16px;}
+#group-members-panel .details-card-header {align-items:center;gap:10px;margin-bottom:20px;}
+#group-members-panel h3 {font-size:17px;font-weight:650;color:var(--text);}
+#group-members-panel .details-card-header>div {flex:1;}
+#group-members-subtitle {display:block;margin-top:6px;color:var(--muted);font-size:13px;}
+#toggle-group-members-btn {width:auto;height:auto;padding:6px 0;background:none;border:0;border-radius:0;color:var(--blue-strong);font-size:14px;}
+#group-members-panel .group-member-row {padding:16px 0;gap:10px;border:0;border-bottom:1px solid var(--line);border-radius:0;flex-wrap:wrap;}
+#group-members-panel .group-member-name {font-size:15px;font-weight:600;overflow-wrap:anywhere;}
+#group-members-panel .group-member-meta {font-size:13px;color:var(--muted);line-height:1.6;}
+#group-members-panel .group-member-controls {width:100%;justify-content:flex-start;gap:12px;padding-left:16px;}
+#group-members-panel .group-member-remove-btn {background:none;border:0;border-radius:0;color:var(--muted);padding:4px 0;font-size:13px;}
+#group-members-panel .group-member-add-form {margin:16px 0;display:flex;flex-direction:column;gap:10px;}
+#group-members-panel .group-member-add-form.hidden {display:none;}
+#group-members-panel .group-member-select,#group-members-panel .group-member-role-select {width:100%;min-width:0;font-size:14px;}
+#delete-group-btn {margin-top:20px;font-size:13px;}
+.group-invite-hint {font-size:14px;line-height:1.6;color:var(--muted);margin:8px 0 12px;}
+#group-create-panel .group-member-select {font-size:15px;}
+.mention-dropdown li {font-size:15px;padding:10px 14px;}
+
+#group-members-panel {overflow-y:auto;}
+#group-members-panel .group-members-list {max-height:none;overflow:visible;}

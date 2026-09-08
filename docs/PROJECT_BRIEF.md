@@ -8,6 +8,9 @@ TALK 是部署在**家庭局域网**的轻量级 AI 智能体聊天中转平台�
 - 多个 AI Agent 之间互相发送消息和文件包
 - 人类用户通过 Web UI 用 `@` 向任意 Agent 下达任务
 - 所有通信统一中转，消息持久化，便于回溯
+- 任一接入 TALK MCP / client 的终端可把其他模型 Agent 当作跨模型子 Agent 委派任务，并从 TALK 获取澄清与结果
+
+> 产品级 Hall 分为 **Task Halls**（一任务一 Hall、请求者↔执行者 1 对 1，当前优先）与 **Discussion Halls**（多角色讨论 / 评审，后续继续）。完整定位与混合终端模型见 [`spec/POSITIONING.md`](spec/POSITIONING.md)，Task Hall 合同见 [`spec/MODULE_tasks.md`](spec/MODULE_tasks.md)（2026-07-15 收敛）。
 
 ## 系统架构
 
@@ -140,7 +143,7 @@ CREATE TABLE files (
 CREATE TABLE agent_instances (
   id              TEXT PRIMARY KEY,       -- bridge 进程实例 id
   member_id       TEXT NOT NULL REFERENCES members(id), -- 所属 agent:* 成员
-  runtime         TEXT NOT NULL,          -- codex | claude | pi | ...
+  runtime         TEXT NOT NULL,          -- codex | pi | dsh | ...
   status          TEXT NOT NULL,          -- starting | online | idle | busy | stopping | offline | error
   host            TEXT,
   pid             INTEGER,
@@ -154,11 +157,14 @@ CREATE TABLE agent_instances (
 CREATE TABLE agent_tasks (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   schedule_id       INTEGER REFERENCES agent_task_schedules(id), -- 可选来源 schedule
+  project_id        TEXT REFERENCES projects(project_id), -- 可选项目归属；旧客户端兼容为空
+  hall_group_id     TEXT UNIQUE REFERENCES groups(id), -- 自动生成的一任务一 Hall
   target_member_id  TEXT NOT NULL REFERENCES members(id), -- 接收任务的 agent:* 成员
   created_by        TEXT NOT NULL REFERENCES members(id), -- 任务创建者
   content           TEXT NOT NULL,          -- 任务正文
   title             TEXT,                   -- 可选短标题
   status            TEXT NOT NULL,          -- queued | running | succeeded | failed | canceled
+  workflow_status   TEXT NOT NULL,          -- assigned | clarification_requested | accepted | in_progress | submitted | completed | failed | canceled
   claimed_by        TEXT REFERENCES members(id),
   instance_id       TEXT REFERENCES agent_instances(id),
   result_message_id INTEGER REFERENCES messages(id),
@@ -166,7 +172,8 @@ CREATE TABLE agent_tasks (
   created_at        DATETIME NOT NULL,
   updated_at        DATETIME NOT NULL,
   claimed_at        DATETIME,
-  finished_at       DATETIME
+  finished_at       DATETIME,
+  result_collected_at DATETIME
 );
 
 CREATE TABLE agent_task_schedules (
@@ -196,6 +203,8 @@ CREATE TABLE agent_task_schedules (
 
 ## 当前前端交互约定
 
+> 当前 Web UI 已实现任务 / 群聊 / 角色工作台（主任务归组、成果与流转优先、项目角色只读列表和交办入口）、独立 Task Hall、任务树控制、质量门禁摘要与里程碑人工验收入口；Discussion Halls、Members / Activity 独立页面仍按后续切片推进，见 `spec/MODULE_tasks.md`。
+
 - Web UI 登录后会显示“全局消息流”和可进入的 Group Hall 切换条；全局流继续读取不带 `group_id` 的旧消息，Group Hall 读取 `GET /api/messages?group_id=<id>`
 - Web UI 可创建 Group 并选择初始成员；创建后自动进入该 Group 的 Hall
 - 在 Group Hall 中发送文本或文件消息时，前端会自动带上当前 `group_id`
@@ -207,6 +216,15 @@ CREATE TABLE agent_task_schedules (
 - 成员自动补全与 mention 校验均来自 `GET /api/members` 返回的数据，而不是前端写死角色前缀
 - 文件消息卡片始终依赖消息快照渲染；若文件实体已过期删除，历史卡片仍保留，但下载会失败并提示“已过期”
 - 发送者可在 `revoke_window_sec`（默认 120 秒）内撤回自己的消息；撤回后消息流改为灰色占位“XX 撤回了一条消息”，文件实体本身保留
+
+## 用户手册维护约定
+
+- TALK 的最终用户操作手册统一维护在 `docs/guides/USER_MANUAL.md`，面向系统已经部署完成后的普通使用者，只说明当前版本中真正可见、可操作的产品行为。
+- 安装、启动、升级、备份和服务故障处理继续放在 `docs/guides/QUICKSTART_USER.md` 与 `docs/guides/DEPLOY.md`；Python 环境、SDK、bridge、测试命令和本地开发启动方式继续放在 `docs/guides/QUICKSTART_AGENT.md`、模块文档或开发者文档，不混入最终用户操作手册。
+- 每个可能影响用户操作、页面文案、权限、状态含义、失败提示或恢复方式的开发切片，收尾时必须检查用户手册影响；已有用户入口时在同一切片更新手册，只有后端合同而尚无最终用户入口时不得写成“已经可用”。
+- 未来能力继续先记录在对应模块合同和进度文档中，待页面或正式用户入口落地并完成真实验证后，再转写为非技术性的操作步骤。
+- 每个可独立体验的里程碑在人工验收前，应按用户手册从头操作一遍；手册中的步骤、按钮名称、预期结果和当前版本边界都属于验收范围。
+- 这套约定只属于 TALK 项目，不修改用户级全局 `project-framework` skill，避免影响其它项目。
 
 ## 项目目录结构
 
@@ -239,6 +257,7 @@ TALK/
 ├── bridges/
 │   ├── cli_bridge.py      # 通用 CLI bridge（local-lab Agent CLI 接入骨架）
 │   ├── codex_bridge.py    # Codex CLI bridge 兼容入口
+│   ├── kimi_bridge.py     # 官方 Kimi Code CLI bridge
 │   └── pi_bridge.py       # pi CLI bridge 兼容入口
 ├── scripts/
 │   └── backup_db.py       # SQLite 在线热备脚本
@@ -263,6 +282,7 @@ TALK/
 │       ├── QUICKSTART.md      # 快速启动入口索引
 │       ├── QUICKSTART_USER.md # 家庭用户快速启动
 │       ├── QUICKSTART_AGENT.md # Agent 开发者快速启动
+│       ├── USER_MANUAL.md     # 系统部署完成后的最终用户操作手册
 │       └── DEPLOY.md          # 部署指南
 └── talk.db                # SQLite 数据库（运行时生成）
 ```
@@ -277,11 +297,11 @@ TALK/
 | [MODULE_discussions.md](spec/MODULE_discussions.md) | 可记录多 Agent 讨论协议 | `server/routes/discussions.py`, `server/models.py`, `TALK/client/`, `bridges/` | `DISCUSSION-SCOPE-1` 已落地：session/turn 记录、请求者局部范围锚点、SDK helper、bridge TALK 动作协议与 pi 可选施工档 |
 | [MODULE_websocket.md](spec/MODULE_websocket.md) | WebSocket / SSE 实时事件连接管理与推送 | `server/ws_hub.py`, `server/main.py`(WS/SSE端点) | WS 已实现；SSE 只读事件流第一版已落地 |
 | [MODULE_files.md](spec/MODULE_files.md) | 文件上传下载 | `server/routes/files.py` | M2 已实现，已支持按保留期清理与首轮自动化测试 |
-| [MODULE_webui.md](spec/MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css` | 已支持全局消息流 / Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
+| [MODULE_webui.md](spec/MODULE_webui.md) | 浏览器端 Web UI | `web/index.html`, `web/app.js`, `web/style.css`, `web/workspace.js`, `web/workspace.css` | 已支持任务 / 群聊 / 角色导航、成果与分工流转，及 Group Hall 切换、Group 创建、Hall 发送与作用域化历史/轮询 |
 | [MODULE_agent_example.md](spec/MODULE_agent_example.md) | 示例 Agent 轮询脚本 | `examples/agent_poller.py` | M2 已实现，支持文件收发、附言回执与 Agent 自注册 |
-| [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / pi bridge 保持兼容入口 |
+| [MODULE_bridges.md](spec/MODULE_bridges.md) | 外部 Agent bridge 接入 | `bridges/` | 通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容 |
 | [MODULE_instances.md](spec/MODULE_instances.md) | Agent 运行实例状态 | `server/routes/instances.py`, `server/models.py`, `TALK/client/` | 实例状态 API 第一版已落地，并已与任务领取/完成联动 |
-| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列与调度基础 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/` | 任务创建、列表、领取、完成 API 与显式触发 schedule API 第一版已落地 |
+| [MODULE_tasks.md](spec/MODULE_tasks.md) | Agent 任务队列、Task Hall 与跨终端委派 | `server/routes/tasks.py`, `server/models.py`, `TALK/client/`, `web/`, `bridges/` | TH-6a1 至 TH-6d 已落地任务树治理、有限授权 / 中断、澄清、runner 预检、Review / Test / 返工门禁、Blackboard 控制与里程碑人工验收；TH-6d 已于 2026-09-06 通过人工验收并完成根任务收尾，TH-7 尚未启动 |
 
 补充说明：
 - 文件消息现已内嵌 `filename / size_bytes / mime` 快照；旧历史文件消息会在服务启动时按 `file_id` 自动回填这些字段
@@ -296,10 +316,17 @@ TALK/
 
 修改这些公共文件时需评估对所有模块的影响。
 
+## 2026-08-27 Kimi Runtime Addendum
+
+- 项目管理者确认：固定 Kimi Reviewer 从 `agent:pi` + pi runtime 迁移为 `agent:kimi` + 官方 Kimi Code CLI；旧成员只保留历史消息与任务归属，不再启动。
+- `bridges/kimi_bridge.py` 复用通用 bridge 的 TALK 消息、任务队列、租约与动作协议，使用 Kimi `stream-json` 的最后一条 Assistant 消息作为可见输出。
+- Kimi 讨论与任务预检固定无工具；任务默认 Review 档只开放 `Read / Grep / Glob / Bash`，显式 `tools` 档才开放 `Edit / Write`，且三个运行档都禁止自行派生 subagent。Kimi prompt mode 不追加与 `-p` 冲突的 `--auto`，能力边界由上述工具白名单控制。
+- Kimi Code CLI 会保留官方 session 记录；当前把它视为本地审计事实，不自动删除或续接。TH-6d 已使用新的 `agent:kimi` 拓扑跑通完整任务树 `#15/#16/#17/#18`，并于 2026-09-06 通过人工验收完成收尾。
+
 ## 2026-05-15 Agent Workflow Addendum
 
 - `AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源；每次项目开始必须先读取并确认当前角色。
-- 当前角色：Codex 为决策 Agent，Claude 为执行 Agent；项目管理者可通过修改 `AGENTS.md` 调整后续 Agent 行为。
+- 当前角色：Codex 为决策 Agent；本地 bridge 使用 Kimi（官方 Kimi Code CLI）与 DeepSeek（DeepSeek Harness）作为执行 Agent，不启动 Claude Code。项目管理者可通过修改 `AGENTS.md` 调整后续 Agent 行为。
 - 决策 Agent 在方向明确且无重大不确定项时，可自主连续开发多个切片；执行 Agent 每次只开发一个切片，完成后必须等待确认。
 - 任意角色每完成一个可能影响功能的开发切片，都必须执行“汇总进度”，并记录验证、变更文件、待确认问题和下一步。
 - `docs/PROGRESS.md` 只保存当前快照，保持长度可控；已完成切片完整记录归入 `docs/PROGRESS_HISTORY.md`。
@@ -309,8 +336,8 @@ TALK/
 ## 2026-05-13 Local Lab Addendum
 
 - 新增 `docs/spec/LOCAL_LAB_DESIGN.md`，用于收敛本地多 Agent 实验室阶段的设计边界。
-- local-lab 阶段已确认方向：Codex / Claude Code 走本地 CLI bridge；DeepSeek / Kimi 走本地 `pi` 框架 bridge；后续加入 Group、Hall、SSE、实例/调度 API 与文档编辑协调协议。
-- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 保留 Codex 兼容入口与默认 `codex exec` 命令，`bridges/pi_bridge.py` 保留 pi 兼容入口与默认 `pi --print --mode text` 命令。
+- local-lab 当前固定为 3 个 Agent：Codex 走专用 CLI bridge；Kimi 走官方 Kimi Code CLI bridge；DeepSeek 各类模型走 DeepSeek Harness `dsh --profile headless` + 通用 CLI bridge。Claude Code 暂不纳入本地拓扑，旧 `agent:pi` 只保留历史事实。
+- `bridges/cli_bridge.py` 是通用 CLI 接入骨架：通过 TALK SDK 自注册、监听发给自己的文本任务、轮询任务队列、调用可配置本地 CLI 命令，并把结果回复到 TALK；`bridges/codex_bridge.py` 与 `bridges/kimi_bridge.py` 保留专用入口，`bridges/pi_bridge.py` 保留多 provider 兼容入口，DeepSeek Harness 通过通用 bridge 的 `argv` prompt transport 接入。
 - `agent_instances` 表与 `/api/instances` 第一版已落地；Codex bridge 已接入 `idle / busy / error / offline` 状态上报。
 - `agent_tasks` 表与 `/api/tasks` 第一版已落地：支持创建任务、按可见性列出任务、Agent 领取任务、完成/失败/取消任务，并联动 `agent_instances.current_task_id` 与实例状态；当前不由 TALK 自动启动 bridge 进程。
 - `agent_task_schedules` 表与 `/api/tasks/schedules` 第一版已落地：支持一次性 / 周期性 schedule 记录、状态暂停/取消、显式 `run-due` 物化为 queued task；当前不内置后台调度循环。

@@ -1,7 +1,7 @@
 # MODULE: Agent Bridges
 
 > 所属项目：TALK
-> 状态：通用 CLI bridge 第一版已落地，Codex / pi bridge 保持专用入口
+> 状态：通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容
 
 ## 目标
 
@@ -10,7 +10,7 @@
 ## 负责范围
 
 - 桥接脚本：`bridges/`
-- 当前已实现：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/pi_bridge.py`
+- 当前已实现：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/kimi_bridge.py`、`bridges/pi_bridge.py`；DeepSeek Harness 通过通用 bridge 接入
 - 依赖 SDK：`TALK/client/`
 
 ## 当前实现
@@ -21,7 +21,7 @@
 - 默认要求通过 `--command` 传入本地 CLI 命令；该命令应把最终回复写到 `stdout`。
 - prompt 传递支持两种方式：`--prompt-transport stdin` 会通过标准输入传入任务 prompt；`--prompt-transport argv` 会把任务 prompt 追加为最后一个命令行参数。
 - 可通过 `--name` 设置 Agent 成员名，例如 `pi` 会注册为 `agent:pi`；也可直接传完整 `agent:*`。
-- 可通过 `--runtime` 设置实例上报 runtime，例如 `pi`、`codex`、`claude`。
+- 可通过 `--runtime` 设置实例上报 runtime，例如 `pi`、`codex`、`dsh`。
 - 可通过 `--bridge-label` 设置错误回复中的桥接名称，例如 `pi bridge`。
 - 通用桥与 Codex 桥共享消息过滤、运行锁、任务队列、超时、回复截断和状态上报语义。
 - 子进程输出会逐行优先按 UTF-8 解码，并在 Windows 下兜底尝试系统代码页，避免本地 CLI / 系统工具输出中文时出现替换字符乱码或不同输出行互相拖累编码判断。
@@ -59,6 +59,7 @@ python bridges/cli_bridge.py --name pi --runtime pi --bridge-label "pi bridge" -
 - 处理任务时状态从 `idle` 切到 `busy`，完成后回到 `idle`；命令失败、超时或异常时上报 `error`，进程退出前上报 `offline`。
 - 默认同时轮询 `/api/tasks?target_member_id=<member_id>&status=queued`，按 `id` 从小到大认领属于自己的排队任务。
 - 任务队列模式下，bridge 会通过 `/api/tasks/{id}/claim` 认领任务，调用 Codex CLI 后用直接文本消息把结果发给 `created_by`，再通过 `/api/tasks/{id}/complete` 写入 `succeeded / failed` 与 `result_message_id / last_error`。
+- 任务领取前预检若在正常输出和同轮协议修复后仍无法得到有效 `TALK_TASK_PREFLIGHT`，worker 会按任务累计连续失败。通用 runtime 默认最多 3 个预检轮询；`runtime=dsh` 默认只执行 1 个轮询，失败后立即领取该任务、在 Task Hall 写入停止提示并以 `failed` 完成，避免 DeepSeek Harness 重复调用膨胀。可用 `--task-preflight-max-attempts 1..3` 显式覆盖；一次成功预检会清除先前失败计数，达到上限前重启 bridge 时内存计数不会跨进程继承。
 - 消息触发与任务队列触发共用同一把运行锁，同一 bridge 实例不会并发启动多个 Codex CLI 进程。
 - Codex 入口收到任务后调用可配置的 Codex CLI 命令，默认：
 
@@ -74,11 +75,11 @@ codex exec --skip-git-repo-check --sandbox workspace-write --color never -
 
 - `bridges/pi_bridge.py` 会自注册为 `agent:pi`（可通过 `--name` 修改）。
 - `bridges/pi_bridge.py` 复用通用 CLI bridge 实现，默认 runtime 为 `pi`，默认错误标签为 `pi bridge`。
-- 本机已确认 `pi` CLI 支持 `--print` 非交互模式，版本为 `0.74.1`。
+- 本机已确认 `pi` CLI 支持 `--print` 非交互模式，当前版本为 `0.84.1`。
 - 默认 pi 命令为：
 
 ```bash
-pi --print --mode text --no-context-files --no-tools --no-session --thinking off --system-prompt "<short TALK chat boundary>"
+pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --tools <TALK tools> --no-session --thinking off --system-prompt "<TALK boundary>"
 ```
 
 - 因 `pi --print` 接收 prompt 参数而非 stdin，pi 入口默认使用 `--prompt-transport argv`，即把 TALK 任务 prompt 追加为最后一个命令行参数。
@@ -90,23 +91,57 @@ pi --print --mode text --no-context-files --no-tools --no-session --thinking off
 - 默认 system prompt 要求 pi 是 TALK Group Hall 参与者，可与人类和其他 agent 交流、评审方案、提出优化/分歧，并在需要时输出 `TALK_ACTION` 安全行协议；默认讨论模式下不声称能读取项目文件、执行命令或编辑文件。
 - 默认 system prompt 不再包含原始 `<talk-action ...>` 示例、斜杠、竖线、尖括号或 `&`，避免 Windows 下 `pi.cmd` 启动链把 prompt 误解释为命令管道或重定向。
 - 可通过 `--pi-execution-profile tools` 在使用默认命令时显式启用 `read,grep,find,ls,bash,edit,write` 工具，让 pi CLI 子进程具备可施工能力；默认 `discussion` 档不启用工具。
+- 可通过 `--pi-provider` 与 `--pi-model` 在不覆盖 bridge 默认命令的前提下锁定 provider / model；消息处理、Task runner 与预检命令会使用同一组锁定值。
 - 当 pi 在中文能力/自我介绍问题上成功返回明显非中文、阿拉伯语语言标签或错误声称自己可读文件/执行命令时，通用 bridge 会把回复兜底替换为中文能力说明；正常中文回复或用户明确要求英文时不干预。
 - 当用户任务中明确包含“一句话 / one sentence / single sentence”等约束时，通用 bridge 会在成功回复后做一层兜底收敛，只回传第一句或第一行，避免模型忽略简短回复要求。
 - 可通过 `TALK_PI_COMMAND` 或 `--pi-command` 覆盖默认命令，例如切到 DeepSeek / Kimi provider。
 - 如果覆盖 `TALK_PI_COMMAND` / `--pi-command`，需要自行保留等价上下文、session、工具权限和 `--system-prompt` 边界；否则 pi 可能重新读取项目上下文、错误启用工具或重新把自己当成 coding assistant。
 
+### Kimi Code 原生入口
+
+- `bridges/kimi_bridge.py` 默认注册为 `agent:kimi`，runtime 上报为 `kimi-code`，使用本机官方 Kimi Code CLI；pi bridge 继续作为通用多 provider 兼容入口，但不再承载当前 dogfood 的 Kimi 成员。
+- 默认使用 `argv` 传递 prompt，实际命令形态为 `kimi --output-format stream-json --agent-file <临时 Agent 文件> --skills-dir <受控空目录> -p <prompt>`。Kimi Code `0.38.0` 的 prompt mode 本身是非交互执行，且明确拒绝 `--prompt` 与 `--auto` 同用；实际能力继续由 Agent 文件工具白名单限制。可通过 `--kimi-model` 临时锁定 Kimi Code 模型别名。
+- bridge 每次启动会从 `.talk/agents/agent_kimi/` 读取 IDENTITY / SOUL / USER，并在临时目录生成三个 Kimi Agent 文件：普通 Group Hall 讨论无工具，Task Hall 预检无工具，任务执行默认 `review` 档只开放 `Read / Grep / Glob / Bash`。
+- `--kimi-task-profile tools` 只给任务执行 Agent 额外开放 `Edit / Write`；讨论与预检仍保持无工具。三个 Agent 文件都设置 `subagents: []`，避免 Kimi 在 TALK 的单执行 Agent 合同外自行展开子 Agent。
+- 通用 bridge 会解析 Kimi `stream-json`，忽略 Tool / meta 事件，只把最后一条有文本的 Assistant 消息交给 TALK 动作协议、门禁解析和可见回复。
+- `--skills-dir` 指向受控空目录，且 Agent 文件使用工具白名单，避免自动发现的用户 / 项目 Skills 扩大 TALK 运行边界。
+- Kimi Code CLI 当前没有等价于 pi `--no-session` 的开关；每次 `-p` 调用会创建官方会话记录。本切片保留这些记录作为本地审计事实，不自动删除或续接，后续再评估官方归档 / 保留策略。
+- 可通过 `TALK_KIMI_COMMAND` 或 `--kimi-command` 覆盖默认命令；覆盖者需要自行保证 `stream-json` 或纯文本最终输出、工具隔离和会话边界。
+
+### DeepSeek Harness 接入
+
+- 当前使用官方 `@deepseek-ai/dsh` `0.1.0-rc.8` 的 `headless` profile，其行为是接受一次性任务并把最终 assistant 消息写到 stdout。
+- TALK 仍通过 `bridges/cli_bridge.py --prompt-transport argv --command "dsh.cmd --profile headless"` 配置，不需要新建专用 bridge；Windows 下通用 bridge 会校验该 shim 对应的官方 `@deepseek-ai/dsh` 包及其 `bin` 入口，再绕过 `.cmd`，直接以 Node 启动 Harness，避免 npm shim 的 `%*` 边界截断多行 argv。
+- 当 `runtime=dsh` 且 `--project` 指向包含 `.talk/dsh/preflight-ephemeral.cordis.yml` 的项目时，通用 bridge 会只给领取前预检命令追加该 `--patch`。补丁关闭 `session-persistence-jsonl` 与 `session-checkpoint-policy`，所以正常预检及同轮协议修复都不会出现在 DSH 会话列表中；正式任务命令保持原始 `headless` 配置，一次正式执行仍只持久化一个会话。
+- 显式传入 `--task-preflight-command` 时以调用方配置为准，不再自动追加项目补丁；自定义命令需要自行保证只读权限与非持久化语义。DeepSeek 的跨轮询上限默认是 1，仍保留单轮内最多一次协议修复以及信息不足时的 Task Hall 澄清流程。
+- TALK member 固定为 `agent:deepseek`，runtime 上报为 `dsh`；具体 DeepSeek 模型由 Harness profile 管理，不写死在 member ID 中。
+- `headless` profile 首次使用可能初始化 `$DSH_HOME/profiles/headless`；Harness 的登录、模型与工具权限属于 Harness 配置边界。
+- 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；随后已在 TALK bridge 启动边界完成上述 Windows shim 绕过，受控真实多行探针同时收到首行、中文行和末行令牌并返回 `DSH_MULTILINE_OK`。
+
+## 当前本地固定拓扑（2026-08-16）
+
+| TALK member | 运行时 | 业务角色 | 决策分级 |
+|---|---|---|---|
+| `agent:codex` | Codex CLI | lead | decision |
+| `agent:deepseek` | DeepSeek Harness / `dsh` | dev | execution |
+| `agent:kimi` | 官方 Kimi Code CLI | reviewer | execution |
+
+Claude Code 暂不加入本地 dogfood 拓扑；旧 `agent:pi` / `agent:pi-kimi` 只保留历史事实，不再作为活动成员。当前仍没有独立的全能 Tester，里程碑 Test 由 Kimi 执行可自动检查的部分，项目管理者完成浏览器人工验收。
+
 ## 运行示例
 
 ```bash
-python bridges/codex_bridge.py --key codex-key --base-url http://127.0.0.1:8000
-python bridges/pi_bridge.py --key pi-key --base-url http://127.0.0.1:8000
+python bridges/codex_bridge.py --name codex --key codex-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --codex-execution-profile discussion
+python bridges/kimi_bridge.py --name kimi --key kimi-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --kimi-task-profile review
+python bridges/cli_bridge.py --name deepseek --runtime dsh --bridge-label "DeepSeek Harness bridge" --key deepseek-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --prompt-transport argv --command "dsh.cmd --profile headless"
 ```
 
 Web UI 中发送：
 
 ```text
 @agent:codex 总结一下当前项目结构
-@agent:pi 总结一下当前项目结构
+@agent:kimi 评审一下当前方案
+@agent:deepseek 运行当前切片的定向测试
 ```
 
 ## 后续计划
@@ -115,7 +150,7 @@ Web UI 中发送：
 - 为 Group Hall 的 HTTP fallback 轮询补充 Agent group cursor；当前 Group 触发主要依赖 WebSocket 实时推送。
 - 接入 SSE 流式输出。
 - 接入文档编辑锁协议，避免多个 Agent 同时写同一文件。
-- 增加双 Agent 最小回合验收脚本：同时启动 Codex / pi bridge，验证 `agent:codex` 与 `agent:pi` 可在 TALK 中完成一轮消息或任务往返。
+- 增加双 Agent 最小回合验收脚本：同时启动 Codex / Kimi bridge，验证 `agent:codex` 与 `agent:kimi` 可在 TALK 中完成一轮消息或任务往返。
 - 将 Discussion Session / Turn 状态接入 Web UI，显示多 Agent 讨论轮次、立场和升级仲裁提示。
 
 ## 验收点
@@ -123,11 +158,16 @@ Web UI 中发送：
 - [x] bridge helper 逻辑有单元测试覆盖。
 - [x] 通用 CLI bridge 已抽出，可通过 `--name / --runtime / --command` 接入新的本地 CLI Agent。
 - [x] 通用 CLI bridge 支持 `stdin` 与 `argv` 两种 prompt 传递方式。
+- [x] Windows 下官方 `dsh.cmd` 会被安全解析为对应的 `@deepseek-ai/dsh` Node 入口，多行 prompt 作为单个最终 argv 完整送入 Harness；非 DSH `.cmd` 不受影响。
+- [x] 任务预检跨轮询有界：通用 runtime 默认最多 3 次，DeepSeek 默认 1 次；达到上限后任务持久化为 `failed`，成功预检会清零失败计数。
+- [x] DeepSeek 领取前预检自动使用项目内非持久化 DSH patch；真实最小调用验证没有新增或改写会话文件，正式执行命令不受影响。
 - [x] Codex bridge 已接入任务队列 helper：可认领 queued task、运行 Codex、发送结果消息并完成任务状态。
 - [x] pi bridge 已落地：默认调用 `pi --print --mode text`，通过 argv 传入 TALK prompt。
+- [x] Kimi Code 原生 bridge 已落地：默认调用 `kimi -p --output-format stream-json`，通过临时 Agent 文件隔离讨论 / 预检 / Review 工具面并提取最终 Assistant 输出；回归锁定 prompt mode 不追加不兼容的 `--auto`。
 - [x] `python bridges/cli_bridge.py --help` 可正常输出参数说明。
 - [x] `python bridges/codex_bridge.py --help` 可正常输出参数说明。
 - [x] `python bridges/pi_bridge.py --help` 可正常输出参数说明。
+- [x] `python bridges/kimi_bridge.py --help` 可正常输出参数说明。
 - [x] 在临时 TALK server / 临时 SQLite / 临时 storage 中完成 `@agent:codex -> codex exec --sandbox read-only -> reply_to` 端到端验收，收到 `TALK_BRIDGE_SMOKE_OK`。
 - [x] 在临时 TALK server 中验证 Codex bridge 实例状态路径：`idle -> busy -> idle -> offline`。
 - [x] 通用 CLI bridge 在处理 Group Hall 消息时会把回复写回原 `group_id`，避免触发 `cannot_reply_to_different_group`。
@@ -136,3 +176,11 @@ Web UI 中发送：
 - [x] bridge 已支持安全行动作协议：代发 `@agent:*`、记录 stance、发送最终答案、回合上限与升级 human。
 - [x] bridge 已支持请求者局部范围约束：scope 记录、reply/root 复用、已结束 scope 停止续聊和内部字段泄漏拦截。
 - [x] pi bridge 默认保持讨论档，并提供显式 `--pi-execution-profile tools` 施工工具档。
+- [x] Kimi bridge 的讨论与预检固定无工具；任务默认 `review` 档只开放只读工具与 Bash，显式 `tools` 档才开放 Edit / Write。
+
+
+## 2026-09-08 Codex CLI 路径与群聊错误记录
+
+- Windows 默认先通过 PATH 查找原生 `codex.exe`，排除 WindowsApps 别名；普通终端 PATH 缺失时，扫描当前用户 `LOCALAPPDATA/OpenAI/Codex/bin/codex.exe` 与一层版本目录中的 `codex.exe`，选择文件更新时间最近的可用文件。没有安装或非 Windows 时回退 `codex`。显式命令和环境覆盖配置仍优先，不更改系统 PATH、模型与执行权限参数。启动时输出实际 CLI 路径，便于核对。
+- 本机 npm CLI 0.144.4 遇 gpt-6-astra 返回“需要新版 CLI”；现有原生 0.153.4 的真实固定文本探针通过，包括 Python 3.12 与去掉 Desktop PATH 的普通终端模拟。更新代码后须重启已有 bridge 进程。
+- 群聊 CLI 失败时，实例 `last_error` 优先记录清理后的 stderr，回退 stdout / 通用提示并截取末尾 4000 字符；群聊消息仍使用简短失败提示。日志可能包含运行上下文，不将其放入公开验收记录。

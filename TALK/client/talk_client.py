@@ -218,6 +218,9 @@ class TalkClient:
     async def get_group(self, group_id: str) -> JsonDict:
         return await self._request_json("GET", f"/api/groups/{group_id}")
 
+    async def get_hall_types(self) -> list[JsonDict]:
+        return await self._request_json("GET", "/api/hall-types")
+
     async def update_group(
         self,
         group_id: str,
@@ -280,11 +283,14 @@ class TalkClient:
     async def get_discussion(self, discussion_id: int) -> JsonDict:
         return await self._request_json("GET", f"/api/discussions/{discussion_id}")
 
-    async def update_discussion(self, discussion_id: int, *, status: str) -> JsonDict:
+    async def update_discussion(self, discussion_id: int, *, status: str, end_reason: str | None = None) -> JsonDict:
+        payload: JsonDict = {"status": status}
+        if end_reason is not None:
+            payload["end_reason"] = end_reason
         return await self._request_json(
             "PATCH",
             f"/api/discussions/{discussion_id}",
-            json_body={"status": status},
+            json_body=payload,
         )
 
     async def append_discussion_turn(
@@ -349,8 +355,44 @@ class TalkClient:
         content: str,
         *,
         title: str | None = None,
+        project_id: str | None = None,
+        task_kind: str = "general",
+        review_policy: str | None = None,
+        related_task_ids: list[int] | tuple[int, ...] | None = None,
+        trigger_task_id: int | None = None,
+        parent_task_id: int | None = None,
+        authorization_epoch: int | None = None,
+        may_delegate: bool = False,
+        max_delegation_depth: int | None = None,
+        max_running_descendants: int | None = None,
+        max_running_per_target: int | None = None,
+        max_nonterminal_descendants: int | None = None,
+        slice_budget: int | None = None,
+        authorization_ttl_seconds: int | None = None,
+        milestone_test_required: bool = False,
+        max_clarification_rounds: int = 1,
     ) -> JsonDict:
-        payload: JsonDict = {"target_member_id": target_member_id, "content": content, "title": title}
+        payload: JsonDict = {
+            "target_member_id": target_member_id,
+            "content": content,
+            "title": title,
+            "project_id": project_id,
+            "task_kind": task_kind,
+            "review_policy": review_policy,
+            "related_task_ids": list(related_task_ids or []),
+            "trigger_task_id": trigger_task_id,
+            "parent_task_id": parent_task_id,
+            "authorization_epoch": authorization_epoch,
+            "may_delegate": may_delegate,
+            "max_delegation_depth": max_delegation_depth,
+            "max_running_descendants": max_running_descendants,
+            "max_running_per_target": max_running_per_target,
+            "max_nonterminal_descendants": max_nonterminal_descendants,
+            "slice_budget": slice_budget,
+            "authorization_ttl_seconds": authorization_ttl_seconds,
+            "milestone_test_required": milestone_test_required,
+            "max_clarification_rounds": max_clarification_rounds,
+        }
         return await self._request_json("POST", "/api/tasks", json_body=payload)
 
     async def list_tasks(
@@ -358,16 +400,138 @@ class TalkClient:
         *,
         target_member_id: str | None = None,
         status: str | None = None,
+        workflow_status: str | None = None,
+        project_id: str | None = None,
+        task_kind: str | None = None,
     ) -> list[JsonDict]:
         params: dict[str, Any] = {}
         if target_member_id:
             params["target_member_id"] = target_member_id
         if status:
             params["status"] = status
+        if workflow_status:
+            params["workflow_status"] = workflow_status
+        if project_id:
+            params["project_id"] = project_id
+        if task_kind:
+            params["task_kind"] = task_kind
         return await self._request_json("GET", "/api/tasks", params=params)
 
-    async def claim_task(self, task_id: int, *, instance_id: str | None = None) -> JsonDict:
-        return await self._request_json("POST", f"/api/tasks/{task_id}/claim", json_body={"instance_id": instance_id})
+    async def get_task(self, task_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/tasks/{task_id}")
+
+    async def get_task_tree(self, task_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/tree")
+
+    async def list_task_relations(self, task_id: int) -> list[JsonDict]:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/relations")
+
+    async def get_task_quality_context(self, task_id: int) -> JsonDict:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/quality-context")
+
+    async def pause_task_tree(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/pause-tree")
+
+    async def checkpoint_task_tree(self, task_id: int, *, reason: str) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/checkpoint",
+            json_body={"reason": reason},
+        )
+
+    async def resume_task_tree(
+        self,
+        task_id: int,
+        *,
+        slice_budget: int,
+        authorization_ttl_seconds: int = 90 * 60,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/resume-tree",
+            json_body={
+                "slice_budget": slice_budget,
+                "authorization_ttl_seconds": authorization_ttl_seconds,
+            },
+        )
+
+    async def cancel_task_tree(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/cancel-tree")
+
+    async def accept_task_milestone(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/accept-milestone")
+
+    async def list_task_clarification_rounds(self, task_id: int) -> list[JsonDict]:
+        return await self._request_json("GET", f"/api/tasks/{task_id}/clarification-rounds")
+
+    async def request_task_clarification(
+        self,
+        task_id: int,
+        *,
+        question_message_id: int | None = None,
+    ) -> JsonDict:
+        body = None if question_message_id is None else {"question_message_id": question_message_id}
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/request-clarification",
+            json_body=body,
+        )
+
+    async def submit_task_clarification_answer(
+        self,
+        task_id: int,
+        *,
+        answer_message_id: int,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/submit-clarification-answer",
+            json_body={"answer_message_id": answer_message_id},
+        )
+
+    async def resolve_task_clarification(
+        self,
+        task_id: int,
+        *,
+        allow_additional_round: bool = False,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/resolve-clarification",
+            json_body={"allow_additional_round": allow_additional_round},
+        )
+
+    async def accept_task(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/accept")
+
+    async def collect_task_result(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/collect-result")
+
+    async def cancel_task(self, task_id: int) -> JsonDict:
+        return await self._request_json("POST", f"/api/tasks/{task_id}/cancel")
+
+    async def claim_task(
+        self,
+        task_id: int,
+        *,
+        instance_id: str | None = None,
+        lease_seconds: int = 120,
+    ) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/claim",
+            json_body={"instance_id": instance_id, "lease_seconds": lease_seconds},
+        )
+
+    async def heartbeat_task(self, task_id: int, *, claim_token: str, lease_seconds: int = 120) -> JsonDict:
+        return await self._request_json(
+            "POST",
+            f"/api/tasks/{task_id}/heartbeat",
+            json_body={"claim_token": claim_token, "lease_seconds": lease_seconds},
+        )
+
+    async def requeue_expired_tasks(self) -> list[JsonDict]:
+        return await self._request_json("POST", "/api/tasks/requeue-expired")
 
     async def complete_task(
         self,
@@ -376,11 +540,15 @@ class TalkClient:
         status: str,
         result_message_id: int | None = None,
         last_error: str | None = None,
+        claim_token: str | None = None,
+        gate_verdict: JsonDict | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "status": status,
             "result_message_id": result_message_id,
             "last_error": last_error,
+            "claim_token": claim_token,
+            "gate_verdict": gate_verdict,
         }
         return await self._request_json("POST", f"/api/tasks/{task_id}/complete", json_body=payload)
 
