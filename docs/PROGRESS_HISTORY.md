@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-09-09 当前 Codex 经 TALK 委派 DeepSeek 的首次真实试运行
+
+- 用户确认 DeepSeek 暂时使用 DSH 保存的默认模型，并希望后续由 Codex 编写明确任务、通过 TALK 交给 DeepSeek 执行。Codex 继续承担决策、复核和进度维护；执行 Agent 一次一片。
+- 用户在本机配置当前 Codex 的 TALK stdio MCP；实际发现八个工具。服务启动后，--check 和 talk_list_agents 均成功，派发身份为 human:bobo、项目为 prj_e8fe7066bbec。用户级配置和密钥不进入项目仓库。
+- 用户授权“小任务试试水”。创建任务 #20「试运行：只读勘察会议轮次隔离」，范围为读取必需项目/讨论文档与相关代码、报告实际 cwd/main/a1b5cf3、三个带定位的发现和最小切片建议；禁止改文件、运行测试、启动服务和自行委派。
+- 首次真实派发停在 queued/assigned。发现项目角色列表按保存的状态汇总，未判断 last_seen_at；最新历史 DeepSeek idle 心跳仍停在 2026-09-08。只读进程检查确认仅 Harness 在运行，TALK bridge 未运行。server/routes/projects.py 与 bridges/talk_task_tools.py 的 _availability 都只看状态；该问题未在本轮修复，旧的 available/busy 不能证明当前在线。
+- 为完成已授权试运行，临时运行现有 run_bridge，固定实例 agent:deepseek:codex-smoke-task-20，使用现有成员与 dsh --profile headless；预检/任务沿用现有逻辑。14:39:57 UTC 领取，14:40:58 UTC 提交，真实执行约 61 秒。监督程序在任务提交后取消自身 bridge 并正常退出，没有终止用户服务或已有 Harness。
+- DeepSeek 交回实际环境与三项缺口：Message 无直接会议字段，同群 active discussion 无唯一约束，已结束 discussion 仍可经 API 追加 turn。Codex 对照 models/discussions/db 复核，并在任务 Hall 补充：已有 message_id 普通索引；当前 discussion 也承载请求者局部 scope；消息归属唯一不能代替显式跨轮引用规则，草案须先做兼容性设计，尚未授权实施。
+- 结果消息 #2491，复核消息 #2492；原请求者调用 talk_collect_result 后任务 #20 变为 completed，收取时间 14:41:58 UTC。确认委派 → 领取 → 真实模型读取项目 → 提交 → 本会话复核/收取的闭环通过。
+- 验证：执行前后 git status 相同，无 tracked diff，原有未跟踪 .tmp 保留；未运行单元测试，未声称完成代码开发/返工、Kimi 调用、其它客户端接入或无人值守验收。Codex 随后只更新本快照/历史并检查文档差异。
+- 后续建议：先评估修正历史实例误报在线，再收敛会议轮次与原终端请求合同。当前小任务已完成，不自动开始下一片。查看入口为现有 TALK 页面中的任务 #20。
+
+---
+
 ## 2026-09-08 最终合并完成与头脑风暴方向交接
 
 - 用户于额度中断后要求继续同一收尾任务；恢复时确认 2a1d007 已提交且工作区无已跟踪变更，没有重复开发或重复跑已通过测试。
