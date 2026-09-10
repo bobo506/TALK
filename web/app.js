@@ -850,6 +850,9 @@ async function setActiveProject(projectId) {
   localStorage.setItem(activeProjectStorageKey(), activeProjectId);
   selectedTaskId = null;
   selectedTaskTree = null;
+  // 切换项目时明确清空成果展开状态并作废旧请求；切到无任务项目再返回也不会复活旧展开。
+  resetWorkspaceResult();
+  workspaceUI.renderedContext = null;
   blackboardOpen = true;
   projectTasks = []; projectAgents = []; taskTreeError = "";
   renderProjectStrip(); renderWorkspaceMode();
@@ -1041,6 +1044,14 @@ function checkpointReasonLabel(reason) {
 function renderTaskDetailsPanel() {
   renderWorkspaceRoleDetails();
   const task = getContextTask();
+  // 先捕获完整上下文（项目/账号/任务）；上下文变化时统一清理成果展开状态，包括 task=null，避免旧展开状态复活。
+  const contextKey = taskContextKey();
+  if (workspaceUI.renderedContext !== contextKey) {
+    workspaceUI.renderedContext = contextKey;
+    resetWorkspaceResult();
+    const resultPanel = document.getElementById("task-result-body");
+    resultPanel.classList.add("hidden"); resultPanel.textContent = "";
+  }
   taskDetailsPanel.classList.toggle("hidden", !task);
   groupMembersPanel.classList.toggle("hidden", blackboardOpen || Boolean(task) || !getActiveGroup() || getActiveGroup().type === "task");
   if (!task) return;
@@ -1063,7 +1074,13 @@ function renderTaskDetailsPanel() {
   showTaskDetailsError(actionError || taskTreeError, false);
   taskDetailsActions.innerHTML = "";
 
-  if (task.result_message_id) taskDetailsActions.appendChild(taskActionButton("查看成果", "task-action-primary", () => showWorkspaceResult(task)));
+  if (task.result_message_id) {
+    const resultOpen = workspaceResultOpen(task);
+    const resultButton = taskActionButton(resultOpen ? "收起成果" : "查看成果", "task-action-primary", () => showWorkspaceResult(task));
+    resultButton.setAttribute("aria-controls", "task-result-body");
+    resultButton.setAttribute("aria-expanded", String(resultOpen));
+    taskDetailsActions.appendChild(resultButton);
+  }
   if (task.hall_group_id) {
     taskDetailsActions.appendChild(
       taskActionButton("查看完整对话", "task-action-secondary", () => openTaskHall(task))

@@ -193,10 +193,10 @@ function renderWorkspaceTaskStory(task) {
   document.getElementById("task-outcome-summary").textContent = task.last_error || (task.result_message_id ? "负责人已提交成果，可查看具体内容或完整对话。" : "尚未提交最终成果。任务要求与分工记录保留在下方。");
   if (workspaceUI.renderedTask !== task.id) {
     document.getElementById("task-requirements").open = false;
-    workspaceUI.result = null; ++workspaceUI.resultRequest; workspaceUI.renderedTask = task.id;
+    resetWorkspaceResult(); workspaceUI.renderedTask = task.id;
   }
   const result = document.getElementById("task-result-body");
-  if (!workspaceUI.result || workspaceUI.result.taskId !== task.id || workspaceUI.result.memberId !== myId) { result.classList.add("hidden"); result.textContent = ""; }
+  if (!workspaceResultOpen(task)) { result.classList.add("hidden"); result.textContent = ""; }
   const flow = document.getElementById("task-flow-list"); flow.replaceChildren();
   const list = workspaceEl("ol", "handoff-list");
   const assigned = workspaceEl("li"); assigned.append(workspaceEl("strong", "", "交办任务"), workspaceEl("p", "", `${workspaceMemberName(task.created_by)} → ${workspaceMemberName(task.target_member_id)}`)); list.appendChild(assigned);
@@ -221,14 +221,41 @@ function renderWorkspaceTaskStory(task) {
   flow.appendChild(list);
   if (task.parent_task_id && tree) flow.appendChild(workspaceButton("返回主任务", () => selectWorkspaceTask(tree.root)));
 }
+// 成果展开状态以 workspaceUI.result 为准，并绑定 项目/账号/任务 完整上下文；切换时由详情重绘与请求序号共同作废旧状态。
+function workspaceResultOpen(task) {
+  const result = workspaceUI.result;
+  return Boolean(task && result && Number(result.taskId) === Number(task.id)
+    && result.memberId === myId && result.projectId === activeProjectId);
+}
+// 上下文切换（含切到无任务项目、task=null 的空详情）时统一清空成果状态并作废旧请求。
+function resetWorkspaceResult() {
+  workspaceUI.result = null; ++workspaceUI.resultRequest;
+}
+function syncWorkspaceResultButton() {
+  const button = document.querySelector('[aria-controls="task-result-body"]');
+  if (!button) return;
+  const open = workspaceResultOpen(getContextTask());
+  button.textContent = open ? "收起成果" : "查看成果";
+  button.setAttribute("aria-expanded", String(open));
+}
 async function showWorkspaceResult(task) {
+  const panel = document.getElementById("task-result-body");
+  // 已展开（含加载中）时再次点击：立即收起、清空内容并作废未完成的请求。
+  if (workspaceResultOpen(task)) {
+    resetWorkspaceResult();
+    panel.classList.add("hidden"); panel.textContent = "";
+    syncWorkspaceResultButton();
+    return;
+  }
   const request = ++workspaceUI.resultRequest;
   const memberId = myId;
-  const panel = document.getElementById("task-result-body");
+  const projectId = activeProjectId;
   if (!canEnterGroup(task.hall_group_id)) { showTaskDetailsError("当前账号尚未加入这个任务对话，无法查看成果。请联系任务负责人确认访问权限。"); return; }
   panel.classList.remove("hidden"); panel.textContent = "正在加载成果…";
-  const current = () => request === workspaceUI.resultRequest && memberId === myId && getContextTask()?.id === task.id;
-  workspaceUI.result = { taskId: task.id, memberId };
+  const current = () => request === workspaceUI.resultRequest && memberId === myId
+    && projectId === activeProjectId && getContextTask()?.id === task.id;
+  workspaceUI.result = { taskId: task.id, memberId, projectId };
+  syncWorkspaceResultButton();
   try {
     const params = new URLSearchParams({group_id: task.hall_group_id, before: String(task.result_message_id + 1), limit: "1"});
     const res = await apiFetch(`/api/messages?${params}`);
@@ -248,4 +275,4 @@ if (typeof document !== "undefined") {
   });
   document.getElementById("workspace-search").addEventListener("input", event => { workspaceUI.query = event.target.value; renderWorkspaceList(); });
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult};
