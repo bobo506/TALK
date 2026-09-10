@@ -9,7 +9,7 @@
 - 最终实现：成果按钮在查看/收起之间切换；加载中可关闭并作废请求；旧成功/错误不回填。状态绑定项目/账号/任务，空项目切换与返回也清除旧展开；详情刷新保留用户状态。补无障碍属性，保持权限、文件、撤回与错误内容。未改第二项完整对话侧栏、CSS、后端、bridge或协议。
 - Codex 独立验证32项Node、2项Python页面契约、两份JS语法及diff检查通过。真实页面#19开关/键盘/刷新、#19↔#9任务切换、空项目往返、#20无权限提示通过；浏览器实际379×577无横向溢出，未声称宽屏与真实账号切换验证。详细证据见design-qa.md。
 - 变更：web/workspace.js、web/app.js、web/index.html、tests/workspace_result_ui.test.cjs、tests/test_task_web_ui.py；Codex同步docs/guides/USER_MANUAL.md、docs/spec/MODULE_webui.md、design-qa.md、docs/PROGRESS.md、docs/PROGRESS_HISTORY.md。
-- 已在独立分支准备保存受测版本；main未合并。gh查询PR返回HTTP401，远端收尾另据实际结果记录，不声称PR已创建。用户验收第一项后再处理第二项；在线状态误报与会议语义仍单列。
+- 受测版本已本地提交37d88c7，main未合并。gh查询PR返回HTTP401；随后git push被自动审批拒绝，理由为尚未明确授权把非公开代码/文档发送到具体远端https://github.com/bobo506/TALK.git。未推送、未创建PR、不通过其它渠道绕过；等待用户批准目的地。用户验收第一项后再处理第二项；在线状态误报与会议语义仍单列。
 
 ---
 

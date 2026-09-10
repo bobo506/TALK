@@ -29,5 +29,5 @@ Updated: 2026-09-10 (Asia/Shanghai)
 - 项目根D:/claude-test/TALK；服务 `.venv\Scripts\python.exe -m uvicorn server.main:app --host 127.0.0.1 --port 8000`。本地角色Codex / 官方Kimi Code / DeepSeek Harness。
 - TALK本地stdio MCP已实测，以human:bobo派发。桥接命令与配置见docs/guides/TERMINAL_MCP.md及现有启动指南；密钥不入库。
 - #20 DeepSeek只读试运行已completed；#22 Kimi开发成果已completed。不要把#21失败当作未完成而重复整项。
-- gh查询PR返回HTTP401；当前先完成本地提交，远端推送/PR按实际后续结果补记。人工验收前不合并main。
+- 第一项受测版本已本地提交 `37d88c7`。gh查询PR返回HTTP401；推送 `origin/codex/ui-result-toggle` 被自动审批拒绝，原因为未明确授权向具体远端 `https://github.com/bobo506/TALK.git` 发送非公开代码/文档。未推送、未创建PR、未绕过；等待用户明确授权该目的地。人工验收前不合并main。
 - 旧.tmp/th7-terminal-v1等工作树保留，不在旧基线上续开发。完整历史见PROGRESS_HISTORY.md。恢复指令：`继续项目`。
