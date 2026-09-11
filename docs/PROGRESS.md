@@ -4,6 +4,10 @@ Updated: 2026-09-11 (Asia/Shanghai)
 
 ## Latest
 
+- Codex回传首片#28/#29已完成可行性核验：PASS_WITH_LIMITATIONS。准确结论为未验证当前Desktop原会话的受支持外部入口；本机daemon仅Unix受限不等于所有入口不存在。无功能代码、无模型/原会话调用。待用户选择保持Desktop人工续办，或接受单独设计TALK受管Codex入口；禁止另起宿主resume冒充原会话回传。当前分支codex/terminal-return-codex。
+
+- 最新：用户授权先试Codex回传，强调信息连续不割裂。分支codex/terminal-return-codex从6bdf380建立，#28已交DeepSeek做受支持原会话接入验证；无确定入口不得新建替代会话或伪造适配。后续Kimi复核。当前尚未完成回传。
+
 - 最新优先项：统一终端成果回传，仅设计未实施。适用Codex/Kimi/DSH，先验证原会话续接能力，再做通用通知与适配器。方案见spec/TERMINAL_RETURN_DRAFT.md。本轮MCP实测1322字符、每角色1实例且无last_error，确认输出修复已加载；未派发新任务。
 
 - 页面第二项已完成并本地提交9a4c0d7：Kimi #23开发，DeepSeek #25独立审查PASS，39项Node、2项Python通过。任务完整对话移除重复详情栏，页面效果仍待用户验收；Codex没有做本轮浏览器验证。
