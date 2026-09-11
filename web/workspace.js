@@ -20,6 +20,10 @@ function workspaceHasConversation() {
   return ["tasks", "chats"].includes(workspaceUI.mode) && !blackboardOpen && Boolean(getActiveGroup()) && canEnterGroup(activeGroupId)
     && (workspaceUI.mode !== "chats" || workspaceChatRooms([getActiveGroup()], activeProjectId).length > 0);
 }
+// 任务完整对话：任务模式下进入任务 Hall 对话时，右侧不再重复任务详情栏，聊天占用腾出的空间。
+function workspaceTaskChatActive() {
+  return workspaceUI.mode === "tasks" && !blackboardOpen && workspaceHasConversation();
+}
 function openWorkspaceChats() {
   const rooms = workspaceChatRooms(groups, activeProjectId);
   const next = rooms.find(group => group.id === workspaceUI.lastChatId && canEnterGroup(group.id))
@@ -69,6 +73,7 @@ function workspaceWorkSummary(id) {
 function workspaceTitle(task) { return task.title || task.content?.split("\n")[0] || "未命名任务"; }
 function syncWorkspaceLayout() {
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
+  document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
   document.querySelector(".workbench").classList.toggle("empty-chat-mode", workspaceUI.mode === "chats" && !workspaceHasConversation());
   document.getElementById("project-blackboard-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "tasks"));
   document.getElementById("workspace-chats-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "chats"));
@@ -275,4 +280,4 @@ if (typeof document !== "undefined") {
   });
   document.getElementById("workspace-search").addEventListener("input", event => { workspaceUI.query = event.target.value; renderWorkspaceList(); });
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive};

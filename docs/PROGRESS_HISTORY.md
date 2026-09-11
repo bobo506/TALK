@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-09-11 第二项独立复核完成
+
+- DSH默认模型改为deepseek-flash后，#25成功审查#23，结论PASS。DeepSeek独立核对CSS级联、DOM结构和模式切换，实际39项Node、2项Python通过；Node测试首次沙箱派生受限后逐文件执行，无真实浏览器验收。Codex仅读取审查摘要，不重复审查代码和测试。
+- Kimi改动workspace.js、workspace.css、index.html及新增workspace_task_chat_layout.test.cjs；同步webui模块说明。页面由用户验收，未推送。新增测试含弱字符串断言、缺少实际CSS渲染覆盖的限制保留。
+
+---
+
 ## 2026-09-11 第二项开发已交付、审查被过期模型阻塞
 
 - 用户要求继续昨日额度中断的工作，并调查Codex消耗。新规则为执行Agent承担开发/自测/独立审查，Codex默认不做computer use，页面交用户验收；已同步AGENTS。

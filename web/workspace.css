@@ -134,3 +134,8 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 
 #group-members-panel {overflow-y:auto;}
 #group-members-panel .group-members-list {max-height:none;overflow:visible;}
+
+/* 任务完整对话：右侧不再重复任务详情栏，聊天占用腾出的空间；返回任务页后详情布局不变。 */
+.workbench.task-chat-mode {grid-template-columns:minmax(270px,32%) minmax(0,1fr);}
+.task-chat-mode .details-panel {display:none;}
+@media(max-width:1000px){.workbench.task-chat-mode {grid-template-columns:280px minmax(0,1fr);}}
