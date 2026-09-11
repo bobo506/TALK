@@ -74,3 +74,11 @@
 - 使用已连接MCP，对已完成任务#30等待不会自然出现的clarification_requested状态；只读，无任务/服务修改。functions执行单元内部组合现有最长30秒talk_wait_tasks，运行305秒，9次请求均超时，末态仍completed；摘要回到当前会话。
 - 宿主初次约1秒即返回running cell，Codex随后进行了5次functions.wait续等，且按当前运行环境要求发送检查点说明。因此证明的是执行单元可存活并回传，不是5分钟无模型参与，也不是单个MCP请求可持续300秒；不能据此承诺额度节省。
 - 尚未验证：单请求300秒的客户端/stdio超时、取消、断线恢复、真实成果提前返回。下一步应以独立测试入口验证单请求长等待，避免直接改生产逻辑或将短请求组合误报为零回合等待。
+
+## 2026-09-12 独立长请求探针已准备，待重连
+
+- 用户授权再试一次，报告5小时剩余23%，本轮不重复组合等待。新增本地临时探针.tmp/mcp-long-wait-probe/server.py（标准库stdio MCP，不连接TALK/网络/模型）。long_wait_probe参数seconds=0..300、marker，等待后仅返回标记/耗时。
+- 本地子进程seconds=0验证initialize、tools/list、tools/call通过；不是实际客户端300秒测试，也未验证取消/断线。
+- 用户级C:/Users/Administrator/.codex/config.toml新增mcp_servers.talk_wait_probe，tool_timeout_sec=360；现有MCP配置/密钥保持不变。官方配置参考https://developers.openai.com/codex/config-reference/说明默认单工具超时60秒。
+- 当前工具目录未加载新工具，需用户重连MCP或重启Desktop并回本对话。下一步只发现long_wait_probe并发起一次seconds=300、唯一marker请求，不读角色历史，不用9次短等待替代；如宿主外层仍yield须记录，不能宣称零模型回合。记录实际请求成功/超时、回同一会话和宿主续等次数。
+- 探针暂留本地.tmp和用户级配置，不提交。实验完成移除独立配置块（不修改talk/node_repl），不要误删其它文件。仍未修改生产等待上限。
