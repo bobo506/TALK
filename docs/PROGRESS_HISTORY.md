@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 同类工具等待机制调研（#30）
+
+- 用户指定D:/claude-test/调研，DeepSeek完成只读相关章节调研并提交；LLM-Wiki-Gist未读完。Codex未重复阅读报告全集，仅取摘要并核对wait_tasks的30秒硬上限与程序循环。
+- 首选转向单次工具调用持续等待，先验证当前Desktop的长调用预算；服务端task事件不是最小验证前提，外部唤醒/受管终端保留后续选项。详细报告在.tmp，主要结论及修正写入TERMINAL_RETURN_DRAFT。
+- 未进行等待实验、未改功能/配置/服务、未浏览器操作；无节省比例或自动回传成功声明。
+
+---
+
 ## 2026-09-11 Codex原会话回传接入核验
 
 - 用户授权Codex首片并要求会话信息准确连续。从6bdf380建立codex/terminal-return-codex，DeepSeek #28探索，Kimi #29只读复核PASS_WITH_LIMITATIONS。
