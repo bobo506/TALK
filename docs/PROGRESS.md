@@ -4,6 +4,8 @@ Updated: 2026-09-11 (Asia/Shanghai)
 
 ## Latest
 
+- 最新优先项：统一终端成果回传，仅设计未实施。适用Codex/Kimi/DSH，先验证原会话续接能力，再做通用通知与适配器。方案见spec/TERMINAL_RETURN_DRAFT.md。本轮MCP实测1322字符、每角色1实例且无last_error，确认输出修复已加载；未派发新任务。
+
 - 页面第二项已完成并本地提交9a4c0d7：Kimi #23开发，DeepSeek #25独立审查PASS，39项Node、2项Python通过。任务完整对话移除重复详情栏，页面效果仍待用户验收；Codex没有做本轮浏览器验证。
 - 角色列表输出修复已完成：DeepSeek #26开发，Kimi #27独立复核PASS，16/16定向Python测试通过，双方成果已收取。默认每角色最多一条最新实例摘要，不返回完整历史实例/last_error日志；实例数组形状保留，availability_note说明未核验心跳。
 - 当前分支codex/task-chat-layout；本轮工具修复保存本地，不推送。第一项成果开关提交37d88c7，协作/额度规则提交9b86cfd。尚未合并main。
