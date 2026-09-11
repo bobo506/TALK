@@ -4,6 +4,8 @@ Updated: 2026-09-11 (Asia/Shanghai)
 
 ## Latest
 
+- 最新实验：程序组合等待305秒正常回当前会话，9次短MCP等待、5次宿主续等；无业务写入。不是单个300秒MCP请求，也没有证实等待期零模型回合。先验证独立长调用入口，再决定生产改动；详见设计草案末节。
+
 - #30同类工具调研已收取：优先验证“单次MCP调用持续等待至成果或300秒”，保留当前Desktop，区别于回合结束后的外部唤醒。当前wait_tasks已有程序轮询但上限30秒；新增服务端事件非首轮前提。仅调研/方案修订，未做长调用实验或改代码；详细报告.tmp/terminal-return-research/REPORT.md。
 
 - Codex回传首片#28/#29已完成可行性核验：PASS_WITH_LIMITATIONS。准确结论为未验证当前Desktop原会话的受支持外部入口；本机daemon仅Unix受限不等于所有入口不存在。无功能代码、无模型/原会话调用。待用户选择保持Desktop人工续办，或接受单独设计TALK受管Codex入口；禁止另起宿主resume冒充原会话回传。当前分支codex/terminal-return-codex。
