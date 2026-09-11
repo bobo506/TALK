@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 from argparse import Namespace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,10 +12,14 @@ import httpx
 
 import server.main as main
 from bridges.cli_bridge import configure_talk_tool_environment
-from bridges.talk_task_tools import dispatch_tool
+from bridges.talk_task_tools import dispatch_tool, latest_instance_summary
 from cli.talk import scaffold_project
+from server.models import AgentInstance
 from tests.test_support import RouteTestCase
 from tests.test_talk_client import LiveTalkServer
+
+LEAKED_LOG_MARKER = "LEAKED_CLI_LOG_MARKER"
+INSTANCE_SUMMARY_KEYS = {"id", "runtime", "status", "current_task_id", "last_seen_at", "pid"}
 
 
 class TalkTaskToolTests(RouteTestCase):
@@ -60,6 +65,150 @@ class TalkTaskToolTests(RouteTestCase):
             "TALK_MEMBER_ID": member_id,
             "TALK_PROJECT_ID": "prj_tools",
         }
+
+    def seed_instance_history(
+        self,
+        *,
+        member_id: str = "agent:worker",
+        history_count: int = 240,
+        error_length: int = 4000,
+    ) -> str:
+        """写入数百条历史实例（含超长 last_error），并追加一条真正最新的实例。"""
+        now = datetime.now(timezone.utc)
+        long_error = LEAKED_LOG_MARKER + "旧 CLI 日志" * error_length
+        prefix = member_id.split(":", 1)[-1]
+        with self.session() as session:
+            for index in range(history_count):
+                seen = now - timedelta(minutes=index + 5)
+                session.add(
+                    AgentInstance(
+                        id=f"{prefix}-old-{index:04d}",
+                        member_id=member_id,
+                        runtime="pi",
+                        status="error",
+                        host="lab-host",
+                        pid=1000 + index,
+                        current_task_id=f"task-{index}",
+                        last_error=long_error,
+                        created_at=now - timedelta(days=30),
+                        updated_at=seen,
+                        last_seen_at=seen,
+                    )
+                )
+            session.add(
+                AgentInstance(
+                    id=f"{prefix}-latest",
+                    member_id=member_id,
+                    runtime="dsh",
+                    status="busy",
+                    host="lab-host",
+                    pid=4321,
+                    current_task_id="42",
+                    last_error=long_error,
+                    created_at=now - timedelta(days=1),
+                    updated_at=now,
+                    last_seen_at=now,
+                )
+            )
+            session.commit()
+        return long_error
+
+    def test_list_agents_project_path_returns_bounded_latest_instance(self):
+        long_error = self.seed_instance_history()
+        with LiveTalkServer(main.app) as base_url:
+            human_env = self._environment(base_url, "bobo-key", "human:bobo")
+            with patch.dict(os.environ, human_env, clear=False):
+                result = dispatch_tool("talk_list_agents", {})
+
+        payload = json.dumps(result, ensure_ascii=False)
+        self.assertGreater(len(long_error), 20000)
+        self.assertEqual([agent["member_id"] for agent in result["agents"]], ["agent:worker"])
+        agent = result["agents"][0]
+        self.assertEqual(agent["business_role"], "developer")
+        self.assertEqual(agent["decision_tier"], "execution")
+        self.assertEqual(agent["capability_summary"], ["代码实现", "API 测试"])
+        self.assertEqual(agent["display_name"], "Worker")
+        self.assertEqual(agent["availability"], "busy")
+        self.assertEqual(len(agent["instances"]), 1)
+        instance = agent["instances"][0]
+        self.assertEqual(instance["id"], "worker-latest")
+        self.assertEqual(instance["runtime"], "dsh")
+        self.assertEqual(instance["status"], "busy")
+        self.assertEqual(instance["current_task_id"], "42")
+        self.assertEqual(instance["pid"], 4321)
+        self.assertEqual(set(instance), INSTANCE_SUMMARY_KEYS)
+        self.assertIn("availability_note", result)
+        self.assertLess(len(payload), 1500)
+        self.assertNotIn(LEAKED_LOG_MARKER, payload)
+        self.assertNotIn("last_error", payload)
+        self.assertNotIn("worker-old-", payload)
+
+    def test_list_agents_without_project_path_still_bounds_instances(self):
+        long_error = self.seed_instance_history()
+        with LiveTalkServer(main.app) as base_url:
+            human_env = self._environment(base_url, "bobo-key", "human:bobo")
+            # 空 project_id 等同 bridge 未设置 TALK_PROJECT_ID，走非项目路径。
+            human_env["TALK_PROJECT_ID"] = ""
+            with patch.dict(os.environ, human_env, clear=False):
+                result = dispatch_tool("talk_list_agents", {})
+
+        payload = json.dumps(result, ensure_ascii=False)
+        self.assertIsNone(result["project_id"])
+        agents = {agent["member_id"]: agent for agent in result["agents"]}
+        self.assertEqual(sorted(agents), ["agent:other", "agent:worker"])
+        worker = agents["agent:worker"]
+        self.assertEqual(worker["availability"], "busy")
+        self.assertEqual(len(worker["instances"]), 1)
+        self.assertEqual(worker["instances"][0]["id"], "worker-latest")
+        self.assertEqual(set(worker["instances"][0]), INSTANCE_SUMMARY_KEYS)
+        self.assertEqual(worker["display_name"], "Worker")
+        other = agents["agent:other"]
+        self.assertEqual(other["instances"], [])
+        self.assertEqual(other["availability"], "offline")
+        self.assertLess(len(payload), 1500)
+        self.assertNotIn(LEAKED_LOG_MARKER, payload)
+        self.assertNotIn("last_error", payload)
+        self.assertNotIn(long_error[:20], payload)
+
+    def test_latest_instance_summary_orders_by_last_seen_at(self):
+        summary = latest_instance_summary(
+            [
+                {
+                    "id": "b",
+                    "runtime": "dsh",
+                    "status": "idle",
+                    "last_seen_at": "2026-09-11T10:00:00+00:00",
+                    "last_error": LEAKED_LOG_MARKER,
+                },
+                {
+                    "id": "c",
+                    "runtime": "codex",
+                    "status": "busy",
+                    "pid": 7,
+                    "last_seen_at": "2026-09-11T12:00:00Z",
+                    "last_error": LEAKED_LOG_MARKER,
+                },
+                {
+                    "id": "a",
+                    "runtime": "pi",
+                    "status": "offline",
+                    "last_seen_at": "2026-09-11T08:00:00+00:00",
+                },
+                {
+                    "id": "broken",
+                    "runtime": "pi",
+                    "status": "error",
+                    "last_seen_at": "not-a-timestamp",
+                },
+            ]
+        )
+
+        self.assertEqual(len(summary), 1)
+        self.assertEqual(summary[0]["id"], "c")
+        self.assertEqual(summary[0]["pid"], 7)
+        self.assertEqual(set(summary[0]), INSTANCE_SUMMARY_KEYS)
+        self.assertNotIn(LEAKED_LOG_MARKER, json.dumps(summary, ensure_ascii=False))
+        self.assertEqual(latest_instance_summary([]), [])
 
     def test_mcp_catalog_exposes_task_hall_tools(self):
         with LiveTalkServer(main.app) as base_url:

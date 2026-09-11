@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -20,6 +21,13 @@ DEFAULT_WAIT_WORKFLOW_STATUSES = [
     "failed",
     "canceled",
 ]
+# 实例摘要只保留短字段（id / runtime / status / current_task_id / last_seen_at / pid），
+# 不含 last_error 与历史实例；availability 仍需消费者结合 last_seen_at 判断心跳新鲜度。
+AVAILABILITY_NOTE = (
+    "availability 仅依据 agent_instances 上报状态，未做心跳核验，"
+    "可能滞后于真实在线状态，使用前请按 last_seen_at 判断新鲜度。"
+)
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
 class TalkToolError(RuntimeError):
@@ -98,6 +106,49 @@ def _availability(statuses: list[str]) -> str:
     return "offline"
 
 
+def _timestamp_key(value: Any) -> datetime:
+    """把实例时间戳归一化成可比较的 aware datetime；无法解析时按最早时间处理。"""
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str):
+        text = value.strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return _EPOCH
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+    return _EPOCH
+
+
+def _summary_timestamp(value: Any) -> Any:
+    return value.isoformat() if isinstance(value, datetime) else value
+
+
+def latest_instance_summary(instances: list[JsonDict]) -> list[JsonDict]:
+    """按 last_seen_at 只保留最新一个实例摘要，避免历史实例与错误日志进入模型上下文。"""
+    latest: JsonDict | None = None
+    latest_key = _EPOCH
+    for instance in instances:
+        key = _timestamp_key(instance.get("last_seen_at"))
+        if latest is None or key >= latest_key:
+            latest = instance
+            latest_key = key
+    if latest is None:
+        return []
+    return [
+        {
+            "id": str(latest.get("id") or ""),
+            "runtime": latest.get("runtime"),
+            "status": str(latest.get("status") or "offline"),
+            "current_task_id": latest.get("current_task_id"),
+            "last_seen_at": _summary_timestamp(latest.get("last_seen_at")),
+            "pid": latest.get("pid"),
+        }
+    ]
+
+
 def list_agents(*, project_id: str | None = None) -> JsonDict:
     effective_project_id = _project_id(project_id)
     if effective_project_id is not None:
@@ -130,10 +181,14 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
                     ),
                     "availability": agent.get("availability")
                     or _availability(statuses),
-                    "instances": member_instances,
+                    "instances": latest_instance_summary(member_instances),
                 }
             )
-        return {"project_id": effective_project_id, "agents": agents}
+        return {
+            "project_id": effective_project_id,
+            "availability_note": AVAILABILITY_NOTE,
+            "agents": agents,
+        }
 
     members = _api_request("GET", "/api/members")
     instances = _api_request("GET", "/api/instances")
@@ -154,10 +209,14 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
                 "member_id": member_id,
                 "display_name": member.get("display_name"),
                 "availability": _availability(statuses),
-                "instances": member_instances,
+                "instances": latest_instance_summary(member_instances),
             }
         )
-    return {"project_id": effective_project_id, "agents": agents}
+    return {
+        "project_id": effective_project_id,
+        "availability_note": AVAILABILITY_NOTE,
+        "agents": agents,
+    }
 
 
 def delegate_task(
@@ -352,7 +411,14 @@ def wait_tasks(
 TOOL_SCHEMAS: list[JsonDict] = [
     {
         "name": "talk_list_agents",
-        "description": "列出当前项目可委派的 Agent 及其实例忙闲状态。project_id 省略时使用 bridge 项目上下文。",
+        "description": (
+            "列出当前项目可委派的 Agent 及其最新实例状态。返回有界摘要："
+            "每个角色最多一个按 last_seen_at 取最新的实例，且只含 "
+            "id / runtime / status / current_task_id / last_seen_at / pid，"
+            "不返回历史实例、last_error 或既有 CLI 日志。"
+            "availability 仅依据实例上报，未做心跳核验，可能滞后，使用时请参考 last_seen_at。"
+            "project_id 省略时使用 bridge 项目上下文。"
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {"project_id": {"type": "string"}},

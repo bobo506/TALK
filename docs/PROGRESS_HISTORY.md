@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-09-11 MCP角色列表有界输出完成
+
+- 用户要求修正完整历史角色列表造成上下文浪费。DeepSeek #26开发、Kimi #27独立复核PASS，双方已收取；Codex只协调和维护文档，未重复开发/代码审查/测试。
+- bridges/talk_task_tools.py默认每角色按last_seen_at只返回最新一条实例及6个必要字段，项目与非项目来源均覆盖，去除历史实例和last_error。保留instances数组及既有availability语义，新增未核验心跳提示与工具描述。
+- tests/test_talk_task_tools.py新增3项行为回归。Kimi独立实测工具8/8+终端8/8通过（含stdio）；DeepSeek环境CreatePipe限制下缺测已被补齐。大历史/长日志测试验证payload<1500字符并无日志标记；开发者另有13.6MB→约0.6KB样例，后者并非真实计费token指标。
+- 未改后端接口、数据库、前端、用户配置；旧pi扩展和check提示完善留作非阻断后续。驻留旧MCP进程需重连加载，未由Codex操作重启。
+- 工具修复两文件与进度文档本地保存；临时证据/.tmp/预览不提交，不推送。前一页面切片9a4c0d7待用户页面验收。到此停止新切片。
+
+---
+
 ## 2026-09-11 第二项独立复核完成
 
 - DSH默认模型改为deepseek-flash后，#25成功审查#23，结论PASS。DeepSeek独立核对CSS级联、DOM结构和模式切换，实际39项Node、2项Python通过；Node测试首次沙箱派生受限后逐文件执行，无真实浏览器验收。Codex仅读取审查摘要，不重复审查代码和测试。
