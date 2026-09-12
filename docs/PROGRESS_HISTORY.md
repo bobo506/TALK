@@ -1,4 +1,17 @@
 # 开发历史 · TALK
+
+## 2026-09-12 使用流程第一片：本地交付校验与摘要
+
+- 用户要求逐项优化协调消耗，先调整使用流程，并指出只靠提示词可能不可靠。Codex 将本片限制为本地脚本、短模板及调用约定，不改生产 MCP/HTTP/SDK/bridge/数据库/任务状态或等待配置。
+- 基线 `aa90682`。DeepSeek #38 新增脚本、指南、测试；Kimi #39 独立复核原版 44 项通过，发现深嵌套 JSON 未捕获异常。Codex 另要求完成声明与 fail 验证互斥，并增加显式任务号核对。DeepSeek #40 返修，Kimi #41 最终 PASS_WITH_LIMITATIONS，独立运行 `python -m unittest tests.test_talk_workflow tests.test_encoding` 共 63 项通过，并自行构造失败夹具验证。
+- 本地 `validate` / `summary` 使用 UTF-8、严格字段与自报一致性校验；complete 不能带未完成/阻塞或 fail 验证。`--expect-task-id` 支持 `38`/`#38` 等价匹配，不匹配短错误非零；深嵌套输入短错误非零，无 traceback/原文回显。摘要默认硬上限 1200 字符，关键阻塞优先并标记截断。没有联网或自动收取副作用。
+- 已在本轮实际使用摘要读取：开发报告 1033/1200 字符未截断，返修及最终复核各 1110/1200 字符且已截断。#40 报告一处“未截断”证据措辞过时，命令 exit 0 属实，正式汇总以实测与 #41 为准；不据此扩大代码返修。Codex 未重复全量代码审查/测试，仅运行摘要和必要文档/Git核对。
+- 两次派发因顶层子任务类型/质量任务参数组合不合规遭 422；修正后正常创建 #38/#39，后续 #40/#41 直接使用最小字段成功。指南固定顶层 `project_id/target_member_id/title/content`，不把内部 quality 称谓当作新增 task_kind。用户询问重复标题时，列表核对仅一条复核 #39，标题 #38 指复核对象；界面重复显示原因未验证。
+- 开发等待 429.422 秒，初审等待 223.781 秒；返修一次 600.032 秒等待超时但任务仍 running，随后 88.032 秒等待命中；最终复核等待 278.906 秒。这些是各工具调用等待耗时，不是 Agent 完整工时或计费耗时。仍有宿主续行、无变化更新和必要的状态查询，未证明减少用量；用户观察的此前 10 个百分点无法从现有工具读数精确分摊。
+- #38/#39/#40/#41 成果均已收取。指南分工保持前端 Kimi/DeepSeek 复核、后端相反；执行者准备进度草稿、Codex维护正式进度，验证与文档结束后统一提交推送。AGENTS 已链接本地入口；校验仍由调用者显式执行，未接入 bridge/MCP 自动强制，不能证明事实或内容归属，启发式脱敏不保证覆盖所有密钥形态。
+- 变更文件：`scripts/talk_workflow.py`、`tests/test_talk_workflow.py`、`docs/guides/TASK_WORKFLOW.md`、`AGENTS.md`、`docs/spec/MODULE_bridges.md`、`docs/spec/TERMINAL_RETURN_DRAFT.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。临时交付报告不入库；无用户界面变化，检查后不修改最终用户手册；不启停服务、不操作浏览器、不改用户配置。
+- 本片收尾统一提交并推送既有授权分支 `codex/terminal-return-codex`，不合并 main；到此暂停，下一片先确定 MCP 交付摘要/业务完成信息合同，不同时实施其它优化。
+
 ## 2026-09-12 临时材料清理与指定分支推送完成
 
 - 用户确认目标分支 `codex/terminal-return-codex`，并明确要求派 DeepSeek 操作。任务 #37 负责本地 Git 整理及正常推送；Codex 负责结果核对、必要推送补办与进度收尾。
