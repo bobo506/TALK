@@ -82,3 +82,11 @@
 - 用户级C:/Users/Administrator/.codex/config.toml新增mcp_servers.talk_wait_probe，tool_timeout_sec=360；现有MCP配置/密钥保持不变。官方配置参考https://developers.openai.com/codex/config-reference/说明默认单工具超时60秒。
 - 当前工具目录未加载新工具，需用户重连MCP或重启Desktop并回本对话。下一步只发现long_wait_probe并发起一次seconds=300、唯一marker请求，不读角色历史，不用9次短等待替代；如宿主外层仍yield须记录，不能宣称零模型回合。记录实际请求成功/超时、回同一会话和宿主续等次数。
 - 探针暂留本地.tmp和用户级配置，不提交。实验完成移除独立配置块（不修改talk/node_repl），不要误删其它文件。仍未修改生产等待上限。
+
+## 2026-09-12 单个300秒MCP请求验证通过
+
+- 重连后仅调用一次long_wait_probe(seconds=300, marker=single-mcp-300s-20260912)。工具返回elapsed_seconds=300.0，标记一致，结果进入当前原对话；配置单工具超时360秒。确认此条件下单个stdio MCP请求可持续5分钟，没有用多个短MCP请求拼接。
+- 纠正前次实验解释：两次实验均由Codex显式设置外层functions.exec yield_time_ms=1000，因此早期返回running cell及随后续等不能证明宿主强制每分钟唤醒模型。本次外层仍有续等和模型回合，不能声称已实现等待期零模型消耗，也没有量化节省比例。
+- 未验证取消、断线补领、真实任务完成提前返回、回合结束后的外部主动唤醒；探针只是同步sleep。返回server_tool_calls=1为探针固定字段，单次调用结论依据实际工具调用轨迹，不将该字段冒充独立计数。
+- 已移除用户级配置中本次添加的talk_wait_probe独立块，并用TOML解析比较确认其它配置保持不变；已加载工具可能留到下次重连。临时脚本保留在.tmp/mcp-long-wait-probe/，未提交。生产TALK等待上限和超时配置未修改。
+- 下一步建议单独授权一个小切片：DeepSeek放宽现有wait_tasks的有界等待至300秒，匹配客户端超时并保留任务/成果引用及短摘要；Kimi独立复核。外层等待策略也须避免主动设置过短yield；当前环境有定期沟通要求，尚不能承诺整个等待零模型回合。断线/取消/提前完成与信息连续性须专项验证，不因本次探针通过而视为完成。

@@ -1,24 +1,19 @@
 # Project Progress
 
-Updated: 2026-09-11 (Asia/Shanghai)
+Updated: 2026-09-12 (Asia/Shanghai)
 
 ## Latest
 
-- 2026-09-12：独立talk_wait_probe已注册用户级MCP，超时360秒，临时脚本.tmp/mcp-long-wait-probe/server.py；零秒stdio冒烟通过。当前会话尚未加载工具，等用户重连后只试一次seconds=300。尚未执行真正长请求，生产TALK未改；详见设计末节。
-
-- 最新实验：程序组合等待305秒正常回当前会话，9次短MCP等待、5次宿主续等；无业务写入。不是单个300秒MCP请求，也没有证实等待期零模型回合。先验证独立长调用入口，再决定生产改动；详见设计草案末节。
-
-- #30同类工具调研已收取：优先验证“单次MCP调用持续等待至成果或300秒”，保留当前Desktop，区别于回合结束后的外部唤醒。当前wait_tasks已有程序轮询但上限30秒；新增服务端事件非首轮前提。仅调研/方案修订，未做长调用实验或改代码；详细报告.tmp/terminal-return-research/REPORT.md。
-
-- Codex回传首片#28/#29已完成可行性核验：PASS_WITH_LIMITATIONS。准确结论为未验证当前Desktop原会话的受支持外部入口；本机daemon仅Unix受限不等于所有入口不存在。无功能代码、无模型/原会话调用。待用户选择保持Desktop人工续办，或接受单独设计TALK受管Codex入口；禁止另起宿主resume冒充原会话回传。当前分支codex/terminal-return-codex。
-
-- 最新：用户授权先试Codex回传，强调信息连续不割裂。分支codex/terminal-return-codex从6bdf380建立，#28已交DeepSeek做受支持原会话接入验证；无确定入口不得新建替代会话或伪造适配。后续Kimi复核。当前尚未完成回传。
-
-- 最新优先项：统一终端成果回传，仅设计未实施。适用Codex/Kimi/DSH，先验证原会话续接能力，再做通用通知与适配器。方案见spec/TERMINAL_RETURN_DRAFT.md。本轮MCP实测1322字符、每角色1实例且无last_error，确认输出修复已加载；未派发新任务。
+- 单个300秒stdio MCP实验已通过：一次long_wait_probe调用，elapsed_seconds=300.0，唯一标记回原对话，单工具超时360秒。临时配置已移除且其它配置保持不变；生产TALK未改。不能据此声称零模型回合或确定额度节省。
+- 纠正此前宿主推断：外层提前yield是Codex主动设置yield_time_ms=1000导致，不证明宿主必须每分钟唤醒。本轮仍有外层续等。取消、断线、真实任务提前完成及回合结束后主动唤醒未验证。
+- 下一步建议由DeepSeek实现一个300秒有界等待小切片、Kimi独立复核，匹配MCP超时；保留原需求/补充/任务版本/成果引用，验证连续性。尚未派发，等待用户确认下一步。
+- #30同类工具调研已收取；当前wait_tasks已有程序轮询、上限30秒，服务端事件/SSE不是首次放宽上限的前提。详见spec/TERMINAL_RETURN_DRAFT.md末节。
+- #28/#29仅验证原会话接入能力，PASS_WITH_LIMITATIONS：未验证当前Desktop受支持的外部回传入口，不等于不存在入口；不另起宿主冒充原会话。当前分支codex/terminal-return-codex。
+- 角色输出修复已在当前MCP验证：1322字符、每角色最多1实例，无last_error；不需再次读取历史列表。
 
 - 页面第二项已完成并本地提交9a4c0d7：Kimi #23开发，DeepSeek #25独立审查PASS，39项Node、2项Python通过。任务完整对话移除重复详情栏，页面效果仍待用户验收；Codex没有做本轮浏览器验证。
 - 角色列表输出修复已完成：DeepSeek #26开发，Kimi #27独立复核PASS，16/16定向Python测试通过，双方成果已收取。默认每角色最多一条最新实例摘要，不返回完整历史实例/last_error日志；实例数组形状保留，availability_note说明未核验心跳。
-- 当前分支codex/task-chat-layout；本轮工具修复保存本地，不推送。第一项成果开关提交37d88c7，协作/额度规则提交9b86cfd。尚未合并main。
+- 早期页面/工具修复保存在本地提交，不推送。第一项成果开关提交37d88c7，协作/额度规则提交9b86cfd。尚未合并main。
 - DeepSeek默认deepseek-flash已通过#25/#26真实执行。#24过期型号预检失败为历史，不需重试。用户模型目录仍可同步去掉过期型号id，避免误选。
 
 ## 默认协作与消耗控制
@@ -37,7 +32,7 @@ Updated: 2026-09-11 (Asia/Shanghai)
 ## 下一步
 
 1. 用户刷新页面验收完整对话：无右侧重复任务信息，点击任务返回详情；普通群聊成员与成果开关应正常。
-2. 必要时重连TALK MCP加载输出修复。后续可单独处理心跳在线判断；旧pi路径有界化仅在恢复使用pi时考虑。
+2. 待确认300秒生产等待切片；角色输出修复已加载，心跳在线判断另列。
 3. 会议轮次与原终端返回仍未实现，见既有BRAINSTORM_NEXT；本轮不继续新切片。
 4. GitHub远端推送此前被审批拒绝，具体目的地授权仍待用户确认；不绕过，不自动重试。
 
