@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from datetime import datetime, timezone
@@ -12,6 +13,8 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 JsonDict = dict[str, Any]
+# 提前返回的协作状态：成果提交 / 完成 / 失败 / 需澄清（含澄清已答复、需决策、取消）。
+# 这些状态一旦出现即可结束等待，不需要等满整个超时窗口。
 DEFAULT_WAIT_WORKFLOW_STATUSES = [
     "clarification_requested",
     "clarification_answered",
@@ -21,6 +24,48 @@ DEFAULT_WAIT_WORKFLOW_STATUSES = [
     "failed",
     "canceled",
 ]
+WAIT_MAX_TIMEOUT_SECONDS = 600.0
+WAIT_DEFAULT_TIMEOUT_SECONDS = 600.0
+# 客户端单工具超时必须比最长等待更长，留出网络与序列化余量；低于该值会让 600 秒等待
+# 被客户端提前取消或超时。
+WAIT_RECOMMENDED_CLIENT_TIMEOUT_SECONDS = 660.0
+# 程序轮询节奏：先密后疏，长等待的 HTTP 次数保持有界（600 秒约 120 余次）。
+WAIT_INITIAL_POLL_INTERVAL_SECONDS = 0.5
+WAIT_MAX_POLL_INTERVAL_SECONDS = 5.0
+# 等待结果只回传任务与成果引用所需的短字段，不回传任务正文、消息历史或实例历史。
+_WAIT_TASK_REFERENCE_FIELDS = (
+    "id",
+    "title",
+    "project_id",
+    "task_kind",
+    "status",
+    "workflow_status",
+    "created_by",
+    "target_member_id",
+    "hall_group_id",
+    "result_message_id",
+    "updated_at",
+)
+# tasks 引用的数量上限：项目级等待会轮询到项目内全部可见任务，输出必须保持有界；
+# 超出上限的条目以计数 + ID 标记，不静默丢弃结果引用。
+WAIT_MAX_TASK_REFERENCES = 20
+WAIT_TASKS_NOTE = (
+    "tasks 只含引用字段：提前返回时是命中集合，超时返回时是本轮轮询到的任务，两者最多 "
+    f"{WAIT_MAX_TASK_REFERENCES} 条；超出上限的条目以 tasks_truncated / tasks_omitted_count / "
+    "omitted_task_ids 明确标记，不静默漏报；matched_task_ids 始终给出完整命中集合，"
+    "任务 ID 引用不因截断丢失。"
+)
+WAIT_COUNTING_NOTE = (
+    "query_stats 只含本工具内部实测的程序级计数（poll_rounds / http_requests / elapsed_seconds / "
+    "return_reason）；模型侧的 talk_get_task/talk_list_tasks 调用数与客户端外层等待回合不由本工具"
+    "统计，本工具也无法观测，需由主控在外部实测。"
+)
+# 取消/断线边界（工具描述与 --check 共用，避免被读成"取消会立即终止服务端等待"）。
+WAIT_CANCELLATION_NOTE = (
+    "talk_wait_tasks 是同步阻塞轮询：程序内部不调用模型，但本工具无法保证宿主外层零回合；"
+    "客户端取消（notifications/cancelled）不会立即终止程序侧等待，等待仍会跑到命中或超时截止；"
+    "Windows 下客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。"
+)
 # 实例摘要只保留短字段（id / runtime / status / current_task_id / last_seen_at / pid），
 # 不含 last_error 与历史实例；availability 仍需消费者结合 last_seen_at 判断心跳新鲜度。
 AVAILABILITY_NOTE = (
@@ -48,6 +93,7 @@ def _api_request(
     *,
     json_body: JsonDict | None = None,
     params: JsonDict | None = None,
+    stats: JsonDict | None = None,
 ) -> Any:
     base_url, api_key = _config()
     query = urlencode({key: value for key, value in (params or {}).items() if value is not None})
@@ -57,6 +103,8 @@ def _api_request(
     if data is not None:
         headers["Content-Type"] = "application/json; charset=utf-8"
     request = Request(url, data=data, headers=headers, method=method.upper())
+    if stats is not None:
+        stats["http_requests"] = int(stats.get("http_requests", 0)) + 1
 
     try:
         with urlopen(request, timeout=10) as response:
@@ -260,6 +308,7 @@ def list_tasks(
     workflow_status: str | None = None,
     project_id: str | None = None,
     task_kind: str | None = None,
+    stats: JsonDict | None = None,
 ) -> JsonDict:
     effective_project_id = _project_id(project_id)
     tasks = _api_request(
@@ -272,6 +321,7 @@ def list_tasks(
             "project_id": effective_project_id,
             "task_kind": task_kind,
         },
+        stats=stats,
     )
     return {"project_id": effective_project_id, "tasks": tasks}
 
@@ -371,41 +421,213 @@ def collect_result(*, task_id: int) -> JsonDict:
     return get_task(task_id, include_messages=True)
 
 
+def _normalize_wait_timeout(value: Any) -> tuple[float, float]:
+    """把调用方给的超时归一化为 (请求值, 生效值)；生效值落在 0..600 秒。"""
+    if value is None:
+        return WAIT_DEFAULT_TIMEOUT_SECONDS, WAIT_DEFAULT_TIMEOUT_SECONDS
+    if isinstance(value, bool):
+        raise TalkToolError("timeout_seconds 必须是数字，不能是布尔值")
+    try:
+        requested = float(value)
+    except (TypeError, ValueError) as exc:
+        raise TalkToolError(f"timeout_seconds 必须是数字，收到 {value!r}") from exc
+    if math.isnan(requested) or math.isinf(requested):
+        raise TalkToolError("timeout_seconds 必须是有限数字")
+    return requested, min(max(requested, 0.0), WAIT_MAX_TIMEOUT_SECONDS)
+
+
+def _normalize_task_ids(values: Any) -> list[int]:
+    """校验并去重 task_ids；非法输入直接报错，不退化成项目全量查询。"""
+    if values is None:
+        return []
+    if isinstance(values, (str, bytes)) or not isinstance(values, (list, tuple, set, frozenset)):
+        raise TalkToolError("task_ids 必须是整数数组")
+    task_ids: list[int] = []
+    for raw in values:
+        if isinstance(raw, bool):
+            raise TalkToolError(f"task_ids 含非法值：{raw!r}")
+        try:
+            parsed = int(raw)
+        except (TypeError, ValueError) as exc:
+            raise TalkToolError(f"task_ids 含非法值：{raw!r}") from exc
+        if parsed not in task_ids:
+            task_ids.append(parsed)
+    return task_ids
+
+
+def _wait_task_reference(task: JsonDict) -> JsonDict:
+    """任务进入模型上下文的有界摘要：只保留状态与引用字段，不含正文和历史。"""
+    return {field: task.get(field) for field in _WAIT_TASK_REFERENCE_FIELDS}
+
+
+def _monotonic() -> float:
+    """单调时钟间接层：生产用 time.monotonic，测试可替换为模拟时钟。"""
+    return time.monotonic()
+
+
+def _sleep(seconds: float) -> None:
+    """轮询间隔间接层：生产用 time.sleep，测试可替换为模拟推进。"""
+    time.sleep(seconds)
+
+
+def _record_wait_stats(record: JsonDict) -> None:
+    """可选程序级计数落盘：设置 TALK_WAIT_STATS_FILE 时每次等待追加一行 JSON。"""
+    path = str(os.environ.get("TALK_WAIT_STATS_FILE") or "").strip()
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        # 统计写入失败不影响等待结果本身。
+        return
+
+
 def wait_tasks(
     *,
     task_ids: list[int] | None = None,
     workflow_statuses: list[str] | None = None,
     project_id: str | None = None,
-    timeout_seconds: float = 10,
+    timeout_seconds: float = WAIT_DEFAULT_TIMEOUT_SECONDS,
 ) -> JsonDict:
+    """有界等待任务进入目标协作状态。
+
+    - 最长 600 秒、默认 600 秒；超出上限按 600 秒生效并在返回值中标注请求值。
+    - 成果提交（submitted）、完成（completed）、失败（failed）、需澄清
+      （clarification_requested 等）等状态一旦出现立即返回，不等满超时。
+    - 等待全部由程序轮询完成，等待期间不产生新的模型回合、也不经工具分发新增 get/list
+      调用（实现声明，非计数）；但本工具无法保证宿主外层零回合。
+    - tasks 与成果只回传引用字段（id / hall_group_id / result_message_id 等）和状态，
+      不回传任务正文、消息历史或实例历史；提前返回时 tasks 即命中集合（兼容原契约），
+      超时返回时是本轮轮询到的任务，两者最多 WAIT_MAX_TASK_REFERENCES 条，超出部分以
+      tasks_truncated / tasks_omitted_count / omitted_task_ids 标记，matched_task_ids 完整。
+    - TALK API 错误（含 4xx/5xx/网络错误）直接抛出错误，绝不复用超时返回结构。
+    - 同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），Windows 下
+      客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。
+    - query_stats 给出本次调用的程序级实测计数（轮询轮次、HTTP 请求数、耗时、返回原因）。
+    """
     effective_project_id = _project_id(project_id)
     desired = {
         str(status).strip().lower()
         for status in (workflow_statuses or DEFAULT_WAIT_WORKFLOW_STATUSES)
         if str(status).strip()
     }
-    timeout = max(0.0, min(float(timeout_seconds), 30.0))
-    deadline = time.monotonic() + timeout
+    requested_timeout, effective_timeout = _normalize_wait_timeout(timeout_seconds)
+    selected_task_ids = _normalize_task_ids(task_ids)
+    stats: JsonDict = {"http_requests": 0}
+    started_monotonic = _monotonic()
+    started_at = datetime.now(timezone.utc)
+    deadline = started_monotonic + effective_timeout
+    poll_rounds = 0
+    poll_interval = WAIT_INITIAL_POLL_INTERVAL_SECONDS
+
+    def finish(
+        *,
+        timed_out: bool,
+        reason: str,
+        polled: list[JsonDict],
+        matched: list[JsonDict],
+    ) -> JsonDict:
+        elapsed = max(0.0, _monotonic() - started_monotonic)
+        # 兼容原契约：提前返回时 tasks 就是命中集合；超时路径保留本轮轮询到的全部任务。
+        selected = matched if matched else polled
+        references = [_wait_task_reference(task) for task in selected]
+        returned = references[:WAIT_MAX_TASK_REFERENCES]
+        omitted = references[WAIT_MAX_TASK_REFERENCES:]
+        payload: JsonDict = {
+            "timed_out": timed_out,
+            "return_reason": reason,
+            "workflow_statuses": sorted(desired),
+            "project_id": effective_project_id,
+            "task_ids": selected_task_ids or None,
+            "requested_timeout_seconds": requested_timeout,
+            "timeout_seconds": effective_timeout,
+            "max_timeout_seconds": WAIT_MAX_TIMEOUT_SECONDS,
+            "elapsed_seconds": round(elapsed, 3),
+            "task_count": len(polled),
+            "tasks_returned": len(returned),
+            "tasks_truncated": bool(omitted),
+            "tasks_omitted_count": len(omitted),
+            "omitted_task_ids": [task.get("id") for task in omitted],
+            "matched_task_ids": [task.get("id") for task in matched],
+            "tasks": returned,
+            "tasks_note": WAIT_TASKS_NOTE,
+            "query_stats": {
+                "poll_rounds": poll_rounds,
+                "http_requests": int(stats["http_requests"]),
+                "elapsed_seconds": round(elapsed, 3),
+                "return_reason": reason,
+            },
+            "counting_note": WAIT_COUNTING_NOTE,
+        }
+        _record_wait_stats(
+            {
+                "event": "talk_wait_tasks",
+                "started_at": started_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "project_id": effective_project_id,
+                "task_ids": selected_task_ids or None,
+                "workflow_statuses": sorted(desired),
+                "requested_timeout_seconds": requested_timeout,
+                "timeout_seconds": effective_timeout,
+                "elapsed_seconds": round(elapsed, 3),
+                "return_reason": reason,
+                "timed_out": timed_out,
+                "poll_rounds": poll_rounds,
+                "http_requests": int(stats["http_requests"]),
+                "matched_task_ids": [task.get("id") for task in matched],
+                "task_count": len(polled),
+                "tasks_returned": len(returned),
+                "tasks_truncated": bool(omitted),
+                "tasks_omitted_count": len(omitted),
+            }
+        )
+        return payload
 
     while True:
-        if task_ids:
-            tasks = [_api_request("GET", f"/api/tasks/{int(task_id)}") for task_id in task_ids]
-        else:
-            tasks = list_tasks(project_id=effective_project_id)["tasks"]
-        matched = [task for task in tasks if str(task.get("workflow_status") or "") in desired]
+        poll_rounds += 1
+        try:
+            if selected_task_ids:
+                tasks = [
+                    _api_request("GET", f"/api/tasks/{int(task_id)}", stats=stats)
+                    for task_id in selected_task_ids
+                ]
+            else:
+                tasks = list_tasks(project_id=effective_project_id, stats=stats)["tasks"]
+        except TalkToolError as exc:
+            elapsed = max(0.0, _monotonic() - started_monotonic)
+            _record_wait_stats(
+                {
+                    "event": "talk_wait_tasks",
+                    "started_at": started_at.isoformat(),
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "project_id": effective_project_id,
+                    "task_ids": selected_task_ids or None,
+                    "workflow_statuses": sorted(desired),
+                    "requested_timeout_seconds": requested_timeout,
+                    "timeout_seconds": effective_timeout,
+                    "elapsed_seconds": round(elapsed, 3),
+                    "return_reason": "api_error",
+                    "timed_out": False,
+                    "poll_rounds": poll_rounds,
+                    "http_requests": int(stats["http_requests"]),
+                    "error": str(exc),
+                }
+            )
+            raise TalkToolError(
+                "等待任务状态时 TALK API 调用失败（这不是超时）："
+                f"{exc}；已等待 {elapsed:.1f} 秒，轮询 {poll_rounds} 次"
+            ) from exc
+        matched = [
+            task for task in tasks if str(task.get("workflow_status") or "") in desired
+        ]
         if matched:
-            return {
-                "timed_out": False,
-                "workflow_statuses": sorted(desired),
-                "tasks": matched,
-            }
-        if time.monotonic() >= deadline:
-            return {
-                "timed_out": True,
-                "workflow_statuses": sorted(desired),
-                "tasks": tasks,
-            }
-        time.sleep(min(0.5, max(0.0, deadline - time.monotonic())))
+            return finish(timed_out=False, reason="matched", polled=tasks, matched=matched)
+        if _monotonic() - started_monotonic >= effective_timeout:
+            return finish(timed_out=True, reason="timeout", polled=tasks, matched=[])
+        sleep_seconds = min(poll_interval, max(0.0, deadline - _monotonic()))
+        _sleep(sleep_seconds)
+        poll_interval = min(poll_interval * 2, WAIT_MAX_POLL_INTERVAL_SECONDS)
 
 
 TOOL_SCHEMAS: list[JsonDict] = [
@@ -488,14 +710,33 @@ TOOL_SCHEMAS: list[JsonDict] = [
     },
     {
         "name": "talk_wait_tasks",
-        "description": "等待任务进入澄清、已提交、完成或失败等指定协作状态，最长 30 秒。",
+        "description": (
+            "等待任务进入需澄清、成果已提交、已完成或失败等协作状态，最长 600 秒、默认 600 秒；"
+            "命中目标状态立即提前返回，不必等满超时。等待由程序轮询完成：程序内部不调用模型，"
+            "也不经工具分发新增 get/list 调用（实现声明，非计数），但不保证宿主外层零回合。"
+            "返回有界摘要：tasks 只含状态与引用字段（id / project_id / status / workflow_status / "
+            "hall_group_id / result_message_id 等），不含任务正文、消息历史或实例历史；"
+            "提前返回时 tasks 即命中集合（兼容原契约），超时返回本轮轮询到的任务，"
+            f"两者最多 {WAIT_MAX_TASK_REFERENCES} 条，超出部分以 tasks_truncated / tasks_omitted_count / "
+            "omitted_task_ids 标记，matched_task_ids 始终是完整命中集合。"
+            "query_stats 只含本工具内部实测计数（轮询轮次、HTTP 请求数、耗时、返回原因）。"
+            "TALK API 错误会直接返回错误，不会被当成超时。"
+            "本工具同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），"
+            "Windows 下客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。"
+            "客户端单工具超时必须大于最长等待，建议 >= 660 秒。"
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "project_id": {"type": "string"},
                 "task_ids": {"type": "array", "items": {"type": "integer"}},
                 "workflow_statuses": {"type": "array", "items": {"type": "string"}},
-                "timeout_seconds": {"type": "number", "minimum": 0, "maximum": 30},
+                "timeout_seconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": WAIT_MAX_TIMEOUT_SECONDS,
+                    "default": WAIT_DEFAULT_TIMEOUT_SECONDS,
+                },
             },
         },
     },
@@ -594,7 +835,7 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             project_id=arguments.get("project_id"),
             task_ids=arguments.get("task_ids"),
             workflow_statuses=arguments.get("workflow_statuses"),
-            timeout_seconds=float(arguments.get("timeout_seconds", 10)),
+            timeout_seconds=arguments.get("timeout_seconds"),
         )
     if name == "talk_reply_task":
         return reply_task(

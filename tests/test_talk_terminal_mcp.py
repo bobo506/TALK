@@ -12,6 +12,7 @@ import httpx
 from sqlmodel import select
 
 import server.main as server_main
+from bridges import talk_task_tools
 from bridges import talk_terminal_mcp as terminal
 from bridges.talk_task_tools import TOOL_SCHEMAS, TalkToolError
 from cli.talk import scaffold_project
@@ -20,6 +21,68 @@ from tests.test_support import RouteTestCase
 from tests.test_talk_client import LiveTalkServer
 
 ENTRY = Path(__file__).resolve().parents[1] / "bridges" / "talk_terminal_mcp.py"
+STDIO_FALLBACK_MARKER = "STDIO_FALLBACK_FILE_STDIO"
+
+
+def run_stdio_process(command, *, input_text, env, cwd=None, timeout=15, check=False):
+    """运行 stdio MCP 子进程并取回输出。
+
+    首选匿名管道，与真实 MCP 客户端一致；当运行沙箱禁止 CreatePipe
+    （Windows 报 PermissionError / WinError 5，例如 DSH 的受限文件沙箱）时，
+    退化为临时文件型 stdio。两种通道喂入同一份 JSON-RPC 文本、断言完全相同，
+    只有传输方式不同；退化会在 stderr 留下 STDIO_FALLBACK_MARKER 以便如实记录。
+    """
+    pipe_kwargs = {
+        "input": input_text,
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+        "env": env,
+        "timeout": timeout,
+        "check": check,
+    }
+    if cwd is not None:
+        pipe_kwargs["cwd"] = cwd
+    try:
+        return subprocess.run(list(command), **pipe_kwargs)
+    except PermissionError:
+        return run_stdio_process_with_files(
+            command, input_text=input_text, env=env, cwd=cwd, timeout=timeout, check=check
+        )
+
+
+def run_stdio_process_with_files(command, *, input_text, env, cwd, timeout, check):
+    """文件型 stdio 退化通道：stdin/stdout/stderr 都用普通文件，不创建任何管道。"""
+    command = [str(part) for part in command]
+    with tempfile.TemporaryDirectory(prefix="talk-stdio-") as tmp_name:
+        workdir = Path(tmp_name)
+        stdin_path = workdir / "stdin.jsonl"
+        stdout_path = workdir / "stdout.jsonl"
+        stderr_path = workdir / "stderr.log"
+        stdin_path.write_text(input_text, encoding="utf-8")
+        with stdin_path.open("r", encoding="utf-8") as stdin_handle, stdout_path.open(
+            "w", encoding="utf-8"
+        ) as stdout_handle, stderr_path.open("w", encoding="utf-8") as stderr_handle:
+            process = subprocess.Popen(
+                command,
+                stdin=stdin_handle,
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+                env=env,
+                cwd=cwd,
+            )
+            try:
+                returncode = process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=10)
+                raise
+        stdout = stdout_path.read_text(encoding="utf-8")
+        stderr = stderr_path.read_text(encoding="utf-8")
+    print(f"{STDIO_FALLBACK_MARKER} {command[1] if len(command) > 1 else command[0]}", file=sys.stderr)
+    if check and returncode != 0:
+        raise subprocess.CalledProcessError(returncode, command, output=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(command, returncode, stdout, stderr)
 
 
 class TerminalConfigTests(unittest.TestCase):
@@ -83,6 +146,40 @@ class TerminalConfigTests(unittest.TestCase):
         self.assertIn("无法连接", errors.getvalue())
         self.assertNotIn("private-key", errors.getvalue())
 
+    def test_wait_defaults_report_600_second_bound_and_client_timeout_hint(self):
+        defaults = terminal.wait_defaults()
+        self.assertEqual(defaults["default_timeout_seconds"], 600.0)
+        self.assertEqual(defaults["max_timeout_seconds"], 600.0)
+        self.assertGreaterEqual(defaults["recommended_client_tool_timeout_seconds"], 660.0)
+        self.assertIn("660", defaults["note"])
+        self.assertEqual(
+            defaults["max_task_references_per_call"],
+            talk_task_tools.WAIT_MAX_TASK_REFERENCES,
+        )
+        # 取消边界必须如实说明：同步等待不会被客户端取消立即终止，也不保证子进程随之退出。
+        self.assertIn("不会立即终止程序侧等待", defaults["cancellation_note"])
+        self.assertIn("不保证带走 MCP 子进程", defaults["cancellation_note"])
+        self.assertIn("不改变任务状态", defaults["cancellation_note"])
+
+    def test_wait_stats_file_sets_env_and_rejects_missing_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stats").mkdir()
+            target = root / "stats" / "wait.jsonl"
+            with patch.dict(os.environ, {"TALK_API_KEY": "test-secret"}, clear=True):
+                args = terminal.build_parser().parse_args([
+                    "--project", "prj_test", "--wait-stats-file", str(target),
+                ])
+                self.assertEqual(terminal.configure(args), ("http://127.0.0.1:8000", "prj_test"))
+                self.assertEqual(os.environ["TALK_WAIT_STATS_FILE"], str(target.resolve()))
+            with patch.dict(os.environ, {"TALK_API_KEY": "test-secret"}, clear=True):
+                args = terminal.build_parser().parse_args([
+                    "--project", "prj_test",
+                    "--wait-stats-file", str(root / "missing" / "wait.jsonl"),
+                ])
+                with self.assertRaises(TalkToolError):
+                    terminal.configure(args)
+
 
 class TerminalLiveTests(RouteTestCase):
     def setUp(self):
@@ -104,11 +201,12 @@ class TerminalLiveTests(RouteTestCase):
         env.update(TALK_API_KEY=key, TALK_MEMBER_ID="agent:stale", PYTHONUTF8="1")
         # 即使继承了 bridge 环境，普通入口也不能登记无人处理的延迟消息。
         env["TALK_DEFERRED_FILE"] = str(self._tmpdir / "unexpected.jsonl")
-        return subprocess.run(
+        return run_stdio_process(
             [sys.executable, str(ENTRY), "--project-root", str(self.project_root), *extra_args],
-            input="".join(json.dumps(request, ensure_ascii=False) + "\n" for request in requests),
-            capture_output=True, text=True, encoding="utf-8", env=env,
-            cwd=self.project_root, timeout=15,
+            input_text="".join(json.dumps(request, ensure_ascii=False) + "\n" for request in requests),
+            env=env,
+            cwd=self.project_root,
+            timeout=15,
         )
 
     def configure_project(self, base_url):

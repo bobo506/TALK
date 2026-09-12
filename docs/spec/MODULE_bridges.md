@@ -132,7 +132,7 @@ Claude Code 暂不加入本地 dogfood 拓扑；旧 `agent:pi` / `agent:pi-kimi`
 
 ```bash
 python bridges/codex_bridge.py --name codex --key codex-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --codex-execution-profile discussion
-python bridges/kimi_bridge.py --name kimi --key kimi-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --kimi-task-profile review
+python bridges/kimi_bridge.py --name kimi --timeout 3600 --key kimi-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --kimi-task-profile review
 python bridges/cli_bridge.py --name deepseek --runtime dsh --timeout 3600 --bridge-label "DeepSeek Harness bridge" --key deepseek-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --prompt-transport argv --command "dsh.cmd --profile headless"
 ```
 
@@ -188,3 +188,9 @@ Web UI 中发送：
 ### 本地开发与等待超时（2026-09-12）
 
 DeepSeek本地开发启动示例显式使用`--timeout 3600`，这是整轮执行预算；通用bridge默认值仍为600秒。TALK主控等待目标600秒、Codex用户级MCP调用预算660秒，彼此独立：等待超时不会取消执行者任务。用户已授权本机DeepSeek bridge按3600秒重启；其它终端未改。
+
+2026-09-12 本地复核预算同步：Kimi与DeepSeek启动均显式指定`--timeout 3600`，用户重启后已核对生效；通用默认值未改。
+
+### 十分钟任务等待合同（2026-09-12）
+
+`talk_wait_tasks`默认/上限600秒，命中目标状态提前返回；客户端超时建议至少660秒。等待API错误独立报错。返回最多20条任务摘要，提前返回只列命中集合，超时列轮询集合的摘要；截断计数和完整ID列表可追溯，ID列表随任务数O(N)，不是整体固定上限。日常主控应显式传当前`task_ids`。`query_stats`仅为程序轮询/HTTP/耗时/原因；模型及外层续等次数由调用方记录。同步等待不监听取消，客户端取消不保证立即结束程序，Windows不保证子进程随客户端退出；只读等待不修改任务状态，断线后需重新调用。不可声称已实现外部唤醒或等待期间零模型回合。

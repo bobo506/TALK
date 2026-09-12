@@ -17,7 +17,16 @@ if str(PROJECT_ROOT) not in sys.path:
 import yaml
 
 from bridges import talk_send_mcp
-from bridges.talk_task_tools import TalkToolError, _api_request, list_agents
+from bridges.talk_task_tools import (
+    WAIT_CANCELLATION_NOTE,
+    WAIT_DEFAULT_TIMEOUT_SECONDS,
+    WAIT_MAX_TASK_REFERENCES,
+    WAIT_MAX_TIMEOUT_SECONDS,
+    WAIT_RECOMMENDED_CLIENT_TIMEOUT_SECONDS,
+    TalkToolError,
+    _api_request,
+    list_agents,
+)
 from cli.talk import load_project
 
 
@@ -26,6 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project-root", type=Path, help="包含 .talk/project.yaml 的项目目录")
     parser.add_argument("--project", help="默认 project_id；覆盖环境变量及项目文件")
     parser.add_argument("--server", help="TALK 服务地址；覆盖环境变量及项目文件")
+    parser.add_argument(
+        "--wait-stats-file",
+        type=Path,
+        help="可选：把每次 talk_wait_tasks 的程序级计数（轮询轮次/HTTP 数/耗时/返回原因）追加写入该 JSONL 文件",
+    )
     parser.add_argument("--check", action="store_true", help="只读检查身份、项目及可用角色，然后退出")
     return parser
 
@@ -64,7 +78,28 @@ def configure(args: argparse.Namespace) -> tuple[str, str]:
     os.environ.update(TALK_BASE_URL=server, TALK_PROJECT_ID=project_id, TALK_API_KEY=api_key)
     # 独立终端以 API Key 的真实身份为准，避免继承另一个 bridge 的成员提示。
     os.environ.pop("TALK_MEMBER_ID", None)
+    stats_file = getattr(args, "wait_stats_file", None)
+    if stats_file is not None:
+        resolved = Path(stats_file).expanduser().resolve()
+        if not resolved.parent.is_dir():
+            raise TalkToolError("--wait-stats-file 所在目录不存在，请先创建目录")
+        os.environ["TALK_WAIT_STATS_FILE"] = str(resolved)
     return server, project_id
+
+
+def wait_defaults() -> dict:
+    """等待上限、客户端超时建议与取消边界；供 --check 输出，避免客户端误读长等待语义。"""
+    return {
+        "default_timeout_seconds": WAIT_DEFAULT_TIMEOUT_SECONDS,
+        "max_timeout_seconds": WAIT_MAX_TIMEOUT_SECONDS,
+        "recommended_client_tool_timeout_seconds": WAIT_RECOMMENDED_CLIENT_TIMEOUT_SECONDS,
+        "max_task_references_per_call": WAIT_MAX_TASK_REFERENCES,
+        "note": (
+            "talk_wait_tasks 默认/最长 600 秒；MCP 客户端单工具超时必须大于它，"
+            f"建议 >= {WAIT_RECOMMENDED_CLIENT_TIMEOUT_SECONDS:.0f} 秒，否则长等待会被客户端提前取消。"
+        ),
+        "cancellation_note": WAIT_CANCELLATION_NOTE,
+    }
 
 
 def check_connection(server: str, project_id: str) -> dict:
@@ -76,6 +111,7 @@ def check_connection(server: str, project_id: str) -> dict:
         "project_id": project_id,
         "member_id": me["id"],
         "display_name": me.get("display_name"),
+        "wait_defaults": wait_defaults(),
         "agents": [
             {key: agent.get(key) for key in ("member_id", "display_name", "availability")}
             for agent in discovered["agents"]
