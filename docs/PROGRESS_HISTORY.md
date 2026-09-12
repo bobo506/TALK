@@ -1,4 +1,13 @@
 # 开发历史 · TALK
+## 2026-09-12 临时材料清理与指定分支推送完成
+
+- 用户确认目标分支 `codex/terminal-return-codex`，并明确要求派 DeepSeek 操作。任务 #37 负责本地 Git 整理及正常推送；Codex 负责结果核对、必要推送补办与进度收尾。
+- 操作前 `HEAD=7b6fbcf`，仅新增 414 个 `.tmp` 文件和两个 `web/.preview-*.html`。操作前远端目标分支不存在；DeepSeek 报告同时核对该提交尚未发布。
+- DeepSeek 建立仅本地备份 `backup/pre-cleanup-7b6fbcf`，安全整理未发布末端提交；新 `HEAD=d323c91`，父提交仍为 `4c09544`。新提交仅修改 `.gitignore`，完整保留用户已有 `.tmp/th7-terminal-v1/` 规则，补充 `.tmp/` 与 `web/.preview-*.html`。
+- Codex 独立核对：原 416 个路径缺失 0；`a1b5cf3..HEAD` 内新增临时路径 0；排除临时路径与 `.gitignore` 后，业务文件差异 0。原已发布历史中的 `.tmp/mem1_e2e/talk-test.db` 未纳入本次改写，不声称仓库所有历史均无临时文件。
+- DeepSeek 的 push 因沙箱无法创建 `remote-https` 子进程管道失败。Codex 按用户既有明确目标授权执行正常 `git push origin HEAD:refs/heads/codex/terminal-return-codex` 成功；随后 `ls-remote` 核对远端为 `d323c91fbd9cce9c1842a4524e859ef9c0c42ba5`。任务 #37 成果已收取，工作流为 completed。
+- 未删除本地文件、未强推、未推送备份引用、未合并 main、未重写已发布历史。业务代码无变化，未重跑业务测试或操作浏览器、服务。清理后工作区干净；随后由 Codex 更新本条历史与当前快照，随收尾提交推送。
+- 变更文件：`.gitignore`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。当前版本继续先使用，消耗优化维持暂缓；下一功能方向仍为会议轮次与原终端往返最小合同，本轮未展开开发。
 
 ## 2026-09-12 使用决策与优化暂缓
 
