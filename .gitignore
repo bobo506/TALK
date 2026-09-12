@@ -200,3 +200,8 @@ backups/
 /.tmp-acceptance/
 /agent-docs/blackbox-screenshots/
 agent-docs/BLACKBOARD.md
+.tmp/th7-terminal-v1/
+
+# 临时工作材料与页面预览稿(本机,不入库)
+.tmp/
+web/.preview-*.html
