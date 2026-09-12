@@ -133,7 +133,7 @@ Claude Code 暂不加入本地 dogfood 拓扑；旧 `agent:pi` / `agent:pi-kimi`
 ```bash
 python bridges/codex_bridge.py --name codex --key codex-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --codex-execution-profile discussion
 python bridges/kimi_bridge.py --name kimi --key kimi-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --kimi-task-profile review
-python bridges/cli_bridge.py --name deepseek --runtime dsh --bridge-label "DeepSeek Harness bridge" --key deepseek-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --prompt-transport argv --command "dsh.cmd --profile headless"
+python bridges/cli_bridge.py --name deepseek --runtime dsh --timeout 3600 --bridge-label "DeepSeek Harness bridge" --key deepseek-key --base-url http://127.0.0.1:8000 --project D:/claude-test/TALK --workdir D:/claude-test/TALK --prompt-transport argv --command "dsh.cmd --profile headless"
 ```
 
 Web UI 中发送：
@@ -184,3 +184,7 @@ Web UI 中发送：
 - Windows 默认先通过 PATH 查找原生 `codex.exe`，排除 WindowsApps 别名；普通终端 PATH 缺失时，扫描当前用户 `LOCALAPPDATA/OpenAI/Codex/bin/codex.exe` 与一层版本目录中的 `codex.exe`，选择文件更新时间最近的可用文件。没有安装或非 Windows 时回退 `codex`。显式命令和环境覆盖配置仍优先，不更改系统 PATH、模型与执行权限参数。启动时输出实际 CLI 路径，便于核对。
 - 本机 npm CLI 0.144.4 遇 gpt-6-astra 返回“需要新版 CLI”；现有原生 0.153.4 的真实固定文本探针通过，包括 Python 3.12 与去掉 Desktop PATH 的普通终端模拟。更新代码后须重启已有 bridge 进程。
 - 群聊 CLI 失败时，实例 `last_error` 优先记录清理后的 stderr，回退 stdout / 通用提示并截取末尾 4000 字符；群聊消息仍使用简短失败提示。日志可能包含运行上下文，不将其放入公开验收记录。
+
+### 本地开发与等待超时（2026-09-12）
+
+DeepSeek本地开发启动示例显式使用`--timeout 3600`，这是整轮执行预算；通用bridge默认值仍为600秒。TALK主控等待目标600秒、Codex用户级MCP调用预算660秒，彼此独立：等待超时不会取消执行者任务。用户已授权本机DeepSeek bridge按3600秒重启；其它终端未改。

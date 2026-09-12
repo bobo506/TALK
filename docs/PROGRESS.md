@@ -4,6 +4,12 @@ Updated: 2026-09-12 (Asia/Shanghai)
 
 ## Latest
 
+- 用户已批准60分钟开发执行时限：仅重启闲置DeepSeek bridge并加--timeout 3600，进程参数已验证；用户另开的DSH对话未操作。原#31部分代码保留，续接#32已running/in_progress，负责补测及DEV_REPORT，随后Kimi复核。主控600秒目标/MCP660秒不变，未完成正式验收。启动示例已更新MODULE_bridges。
+
+- #31失败原因已定位为bridge执行600秒超时：claimed 00:59:50.908202 UTC至finished 01:09:51.010842 UTC，600.10秒；错误提示对应cli_bridge.py timed_out分支。已有4个代码/测试文件改动，未审查，不能认定完成。test-output记录26项、5 errors均需排查（尾部显示WinError5管道权限）；5秒stdio冒烟成功，600秒真实验证未见完成报告。没有证据支持另开DSH对话直接致错。下一步应保留差异，安排续接补测/报告后Kimi复核，不重复开发；整项开发任务执行预算必须大于600秒测试加开发收尾时间，区别于TALK等待600及MCP超时660。
+
+- 最新查询：#31已failed/failed，结果2507仅报告DeepSeek Harness bridge未返回结果；并非仍在开发。失败原因及是否存在未完成代码尚未核验，不自动重派。协调状态查询累计3次，外层续等1次。
+
 - #31最新查询仍running/in_progress，开发未收取、Kimi未派发。用户级talk tool_timeout_sec已设660（其它配置不变，待重连）。计数见spec/WAIT_TEST_RECORDS.md：MCP状态查询2、外层续等1，正式600秒测试未开始。持续自动检查被审批拒绝，未创建；下次从#31恢复，禁止重复派发。
 
 - 用户已授权目标改为600秒，并要求每次测试记录Codex查询次数。DeepSeek #31已派发开发（基线be45b2d），完成后Kimi独立复核。当前连接仍为旧版30秒工具；需要代码/配置完成后重连做真实验证。
