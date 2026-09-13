@@ -16,8 +16,6 @@ from bridges import talk_delivery
 from bridges.talk_delivery import (
     DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
     DELIVERY_DETAIL_MAX_PAGE_CHARS,
-    DELIVERY_SUMMARY_JSON_LIMIT,
-    DELIVERY_SUMMARY_TEXT_LIMIT,
     TOP_LEVEL_FIELDS,
     DeliveryParamError,
 )
@@ -465,7 +463,7 @@ def get_delivery(
 ) -> JsonDict:
     """只读交付摘要（summary）与可追溯分页补读（detail）。
 
-    - summary：按 task_id 定位最新结果消息，返回有界摘要；业务结论只来自通过本地
+    - summary：按 task_id 定位最新结果消息，返回默认不做机械裁剪的完整摘要；业务结论只来自通过本地
       talk-delivery-1 校验的结构化自报，自由文本 / 无效结构化报告一律 unknown / invalid。
     - detail：必须带 result_message_id 稳定引用，按 offset / limit 分页读取完整结果原文，
       或用 fields 读取交付包顶层字段；引用变化时返回 stale_reference 并要求重置。
@@ -975,27 +973,37 @@ TOOL_SCHEMAS: list[JsonDict] = [
         "name": "talk_get_delivery",
         "description": (
             "只读读取一个任务的交付摘要，并可按稳定引用分页补读完整结果。"
-            "summary 模式（默认）按 task_id 定位结果消息，返回有界摘要：task_ref / "
-            "runner_status（runner 状态与协作状态）/ delivery_conclusion（业务结论，"
+            "summary 模式（默认）按 task_id 定位结果消息，返回**默认不做机械裁剪**的完整摘要："
+            "task_ref / runner_status（runner 状态与协作状态）/ delivery_conclusion（业务结论，"
             "只来自结果消息中通过本地 talk-delivery-1 校验、且**自身 task_id 与本任务号一致**"
             "的结构化自报，delivery_conclusion.task_id_check 会如实回显 declared/expected/matches；"
             "自由文本、无效结构化报告或错号自报一律 unknown / invalid，绝不从 succeeded 或正文词汇"
-            "推断 complete）/ counts / "
-            "preview（阻塞优先）/ summary_text / limits / read_more。"
-            f"summary_text 上限 {DELIVERY_SUMMARY_TEXT_LIMIT} 字符，整个 JSON 响应上限 "
-            f"{DELIVERY_SUMMARY_JSON_LIMIT} 字符，是两个独立预算，"
-            f"不承诺把整份交付报告无损压进 {DELIVERY_SUMMARY_TEXT_LIMIT} 字符；"
-            "所有省略都会在 read_more.omitted 与摘要截断标记里显式列出，不会静默丢弃，"
-            "更不会在隐藏阻塞项的同时只报完成。"
+            "推断 complete）/ counts / preview（阻塞优先）/ summary_text / limits / read_more。"
+            "合法结构化交付的必要字段与全部条目均按原文完整返回，不丢列表后项、不切字符串尾部、"
+            "不用省略号替代；但必要内容在同一响应里只出现一次、由两个载体分工承载："
+            "阻塞 / 未完成 / 已完成三类明细原文只在 preview.<区块>.items（含 total/shown/omitted），"
+            "summary_text 只给任务号、业务结论、计数与清楚的 preview 定位提示，"
+            "外加 preview 未承载的必要内容（验证结果与证据、限制、下一步、变更文件、基线）。"
+            "因此**完整摘要 = 同一响应中的核心字段整体，不能只读 summary_text**。"
+            "limits.text_limit_chars / limits.json_limit_chars 为 null 表示默认未启用长度上限，"
+            "此时 limits.text_truncated=false、preview.<区块>.omitted=0、read_more.omitted=[]，"
+            "summary_text 里也不会出现 [摘要截断]；显式限长时 text_truncated 只按 summary_text 是否"
+            "真的被裁剪取值、json_truncated 只按 JSON 预算取值，两者分别如实反映，"
+            "省略项在 read_more.omitted 里以 source=preview / source=summary_text 区分。"
+            "自由文本旧结果不做结论推断，只给 unknown + 明确标记 truncated 的有界原文预览（≤300 字符）"
+            "与 detail 补读入口，既不把巨大旧正文塞进默认结果，也不把短预览说成完整摘要；"
+            "64 KiB 等超规格输入是**明确拒收**的保护，不转成静默截断。"
             "detail 模式必须提供 result_message_id（取自 summary），按 offset / limit 分页读取"
             f"完整结果原文（单页上限 {DELIVERY_DETAIL_MAX_PAGE_CHARS} 字符），"
-            "或用 fields 指定 talk-delivery-1 顶层字段读取结构化值；按 offset 顺序拼接各页可无损重建完整结果。"
+            "或用 fields 指定 talk-delivery-1 顶层字段读取结构化值；按 offset 顺序拼接各页可无损重建完整结果；"
+            "该分页属于按需补读，不属于摘要裁剪。"
             "fields 只接受通过校验且 task_id 与本任务号一致的结构化自报，错号时返回 unavailable，"
             "但按 result_message_id 读取完整原文始终不受该核对影响。"
             "结果引用变化（result_message_id 改变，或 expect_sha256 与当前内容不一致）时返回 "
             "status=stale_reference 并要求从 offset=0 重新开始，绝不把两份结果拼在一起。"
             "本工具完全只读：不自动 collect / accept，不改变任务状态，不扫描整个 Hall 历史，"
             "也不按结果正文里的路径读取本机文件；runner 结束不等于用户目标完成。"
+            "摘要仍只是执行者自报的索引，不代表独立验收通过。"
         ),
         "inputSchema": {
             "type": "object",

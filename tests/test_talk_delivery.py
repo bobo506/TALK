@@ -1,7 +1,8 @@
 """MCP 层只读交付摘要与可追溯补读（talk_get_delivery）的定向测试。
 
 覆盖：结构化自报 / 自由文本 / 无效或截断结构化报告、runner 与业务结论分离、
-长阻塞与超大结果的严格有界、分页无损重建、非法游标、引用变化重置、
+默认摘要完整不裁剪（超旧 1200/6000 预算、单项超 80 字符、列表后项与末尾阻塞均保留）、
+显式 text_limit / json_limit 的 opt-in 有界模式、分页无损重建、非法游标、引用变化重置、
 不读本机文件、只读无副作用，以及既有工具的兼容面。
 """
 
@@ -23,6 +24,7 @@ from bridges.talk_delivery import (
     parse_delivery_report,
 )
 from bridges.talk_task_tools import TOOL_SCHEMAS, TalkToolError, dispatch_tool, get_delivery
+from scripts import talk_workflow
 from server.models import AgentTask
 from tests.test_support import RouteTestCase
 from tests.test_talk_client import LiveTalkServer
@@ -31,6 +33,15 @@ TASK_CONTENT_MARKER = "TASK_BODY_MUST_NOT_LEAK"
 # 本文件默认任务记录 id，同时也是结构化自报必须声明的“实际任务号”。
 TASK_ID = 7
 WRONG_TASK_ID = "42"
+# 去重 / 必要内容断言的唯一标记：这些字符串在正常序列化 JSON 中只应出现一次。
+TAIL_BLOCKER_MARKER = "KEY-BLOCKER-TAIL-77：列表末尾的关键阻塞"
+COMPLETED_MARKER = "COMPLETED-UNIQUE-77"
+UNFINISHED_MARKER = "UNFINISHED-UNIQUE-77"
+CHANGED_FILE_MARKER = "CHANGED-FILE-UNIQUE-77.py"
+CHECK_MARKER = "CHECK-UNIQUE-77"
+EVIDENCE_MARKER = "EVIDENCE-UNIQUE-77"
+LIMITATION_MARKER = "LIMITATION-UNIQUE-77"
+NEXT_MARKER = "NEXT-UNIQUE-77"
 
 
 def delivery_report(**overrides):
@@ -49,6 +60,30 @@ def delivery_report(**overrides):
         "limitations": ["摘要不代表业务验收通过"],
         "progress_draft": {"summary": "本片开发完成，等待独立复核", "next": "复核通过后由 Codex 统一收尾"},
     }
+    report.update(overrides)
+    return report
+
+
+def marker_report(**overrides):
+    """带唯一标记的合法交付包：用于断言“三类正文只出现一次 + 必要内容不丢”。"""
+    report = delivery_report(
+        conclusion="blocked",
+        completed=[f"已完成条目 {index}：" + "内容" * 20 for index in range(3)]
+        + [COMPLETED_MARKER],
+        unfinished=[f"未完成条目 {index}：" + "待办" * 20 for index in range(2)]
+        + [UNFINISHED_MARKER],
+        blocked=[f"次要阻塞 {index}" for index in range(3)] + [TAIL_BLOCKER_MARKER],
+        changed_files=["bridges/talk_delivery.py", CHANGED_FILE_MARKER],
+        verification=[
+            {
+                "check": CHECK_MARKER,
+                "result": "pass",
+                "evidence": EVIDENCE_MARKER + "：" + "证据" * 60,
+            }
+        ],
+        limitations=[LIMITATION_MARKER + "：" + "限制" * 60],
+        progress_draft={"summary": "本片开发完成", "next": NEXT_MARKER + "：交回复核 Agent"},
+    )
     report.update(overrides)
     return report
 
@@ -236,62 +271,292 @@ class DeliverySummaryTests(unittest.TestCase):
         self.assertEqual(summary["read_more"]["params"], {"task_id": 7, "mode": "detail"})
         self.assertIn("talk_get_task", summary["read_more"]["hint"])
 
-    def test_long_blocked_list_stays_bounded_and_marks_every_omission(self):
+    def test_long_blocked_list_is_returned_complete_by_default(self):
         blocked = [f"阻塞项 {index} " + "长" * 280 for index in range(20)]
         report = delivery_report(conclusion="blocked", blocked=blocked, unfinished=[], completed=[])
         summary = build_delivery_summary(
             task_record(), message_record(json.dumps(report, ensure_ascii=False))
         )
-        serialized = json.dumps(summary, ensure_ascii=False)
-        self.assertLessEqual(len(serialized), DELIVERY_SUMMARY_JSON_LIMIT)
-        self.assertLessEqual(len(summary["summary_text"]), DELIVERY_SUMMARY_TEXT_LIMIT)
         self.assertEqual(summary["counts"]["blocked"], 20)
-        self.assertEqual(summary["preview"]["blocked"]["shown"], 3)
-        self.assertEqual(summary["preview"]["blocked"]["omitted"], 17)
-        self.assertEqual(summary["read_more"]["omitted"], [{"field": "blocked", "omitted_items": 17}])
+        # 默认不裁剪：全部条目、完整文本，条数既不被截也不被省略。
+        self.assertEqual(summary["preview"]["blocked"]["shown"], 20)
+        self.assertEqual(summary["preview"]["blocked"]["omitted"], 0)
+        self.assertEqual(summary["preview"]["blocked"]["items"], blocked)
+        self.assertEqual(summary["read_more"]["omitted"], [])
         self.assertIn("阻塞=20", summary["summary_text"])
-        self.assertIn("摘要截断", summary["summary_text"])
-        self.assertIn("mode=detail", summary["summary_text"])
+        self.assertNotIn("摘要截断", summary["summary_text"])
         self.assertEqual(summary["delivery_conclusion"]["value"], "blocked")
 
-    def test_text_and_json_limits_are_reported_separately(self):
+    def test_default_summary_is_complete_beyond_old_text_and_json_budgets(self):
+        """合法核心内容超过旧的 1200 字符 / 6000 字符预算时也必须完整（同一响应整体承载）。"""
+        tail_blocker = "关键阻塞位于列表末尾：" + "卡住" * 140
+        evidence = "证据" * 60
+        next_step = "交回复核 Agent：按同一响应各字段核对完整摘要"
+        completed = [f"已完成条目 {index}：" + "内容" * 60 for index in range(20)]
+        unfinished = [f"未完成条目 {index}：" + "待办" * 40 for index in range(10)]
+        blocked = [f"次要阻塞条目（{index}）" for index in range(19)] + [tail_blocker]
+        report = delivery_report(
+            conclusion="blocked",
+            completed=completed,
+            unfinished=unfinished,
+            blocked=blocked,
+            limitations=["限制：" + "说明" * 60],
+            verification=[
+                {"check": f"检查项 {index}", "result": "pass", "evidence": evidence}
+                for index in range(5)
+            ],
+            progress_draft={"summary": "本片开发完成", "next": next_step},
+        )
+        summary = build_delivery_summary(
+            task_record(), message_record(json.dumps(report, ensure_ascii=False))
+        )
+        serialized = json.dumps(summary, ensure_ascii=False)
+        # 超过旧上限本身不构成裁剪理由：默认不上限、不裁剪、不标截断。
+        self.assertGreater(len(serialized), 6000)
+        self.assertIsNone(summary["limits"]["text_limit_chars"])
+        self.assertIsNone(summary["limits"]["json_limit_chars"])
+        self.assertFalse(summary["limits"]["text_truncated"])
+        self.assertFalse(summary["limits"]["json_truncated"])
+        self.assertNotIn("摘要截断", summary["summary_text"])
+        # 列表后项、字符串尾部与关键阻塞都在。
+        self.assertEqual(summary["preview"]["completed"]["items"], completed)
+        self.assertEqual(summary["preview"]["completed"]["shown"], 20)
+        self.assertEqual(summary["preview"]["blocked"]["items"][-1], tail_blocker)
+        for section in ("blocked", "unfinished", "completed"):
+            entry = summary["preview"][section]
+            self.assertEqual(entry["shown"] + entry["omitted"], summary["counts"][section])
+            self.assertEqual(entry["omitted"], 0)
+        # 三类正文只在 preview.items 出现一次，不再逐字重复进 summary_text。
+        for item in completed + unfinished + blocked:
+            self.assertEqual(serialized.count(item), 1, item[:32])
+        # preview 未承载的必要内容（验证证据 / 限制 / 下一步 / 变更文件 / 基线）仍完整在同一响应里。
+        self.assertEqual(serialized.count(evidence), 5)
+        self.assertIn(evidence, summary["summary_text"])
+        self.assertIn("限制：" + "说明" * 60, summary["summary_text"])
+        self.assertIn(next_step, summary["summary_text"])
+        self.assertIn("bridges/talk_delivery.py", summary["summary_text"])
+        self.assertIn("881ce12", summary["summary_text"])
+
+    def test_default_summary_deduplicates_preview_bodies_but_keeps_necessary_content(self):
+        """默认路径：三类正文只由 preview.items 承载，summary_text 给定位提示 + 其余必要内容。"""
+        report = marker_report()
+        summary = build_delivery_summary(
+            task_record(), message_record(json.dumps(report, ensure_ascii=False))
+        )
+        serialized = json.dumps(summary, ensure_ascii=False)
+        text = summary["summary_text"]
+        for section in ("blocked", "unfinished", "completed"):
+            self.assertEqual(summary["preview"][section]["items"], report[section])
+            self.assertEqual(summary["preview"][section]["omitted"], 0)
+            for item in report[section]:
+                self.assertNotIn(item, text)
+                self.assertEqual(serialized.count(item), 1, item[:32])
+        # summary_text 仍给任务号 / 业务结论 / 计数与清楚的 preview 定位提示。
+        self.assertIn("task=7", text)
+        self.assertIn("业务结论=blocked", text)
+        self.assertIn("阻塞=4 未完成=3 已完成=4", text)
+        for pointer in ("preview.blocked", "preview.unfinished", "preview.completed"):
+            self.assertIn(pointer, text)
+        self.assertIn("本段不重复正文", text)
+        # preview 未承载的必要内容必须完整出现在同一响应里，不能只留 head + counts。
+        for marker in (
+            CHECK_MARKER,
+            EVIDENCE_MARKER,
+            LIMITATION_MARKER,
+            NEXT_MARKER,
+            CHANGED_FILE_MARKER,
+        ):
+            self.assertIn(marker, text)
+            self.assertEqual(serialized.count(marker), 1, marker)
+        self.assertIn("881ce12", text)
+        self.assertIn("下一步: " + NEXT_MARKER, text)
+        # 默认路径不引入截断 / 省略号，且元数据与正文一致。
+        self.assertNotIn("摘要截断", text)
+        self.assertNotIn("…", text)
+        self.assertEqual(summary["read_more"]["omitted"], [])
+        self.assertFalse(summary["limits"]["text_truncated"])
+        self.assertFalse(summary["limits"]["json_truncated"])
+        self.assertIn("完整摘要 = 同一响应中的核心字段整体", summary["read_more"]["hint"])
+
+    def test_cli_text_path_is_not_affected_by_mcp_dedup(self):
+        """本地 CLI 没有 JSON preview：同一夹具下 CLI 文本必须仍逐字含三类正文与必要内容。"""
+        report = marker_report()
+        cli_text = talk_workflow.build_summary(report)["text"]
+        summary = build_delivery_summary(
+            task_record(), message_record(json.dumps(report, ensure_ascii=False))
+        )
+        for section in ("blocked", "unfinished", "completed"):
+            for item in report[section]:
+                self.assertIn(item, cli_text)
+                self.assertNotIn(item, summary["summary_text"])
+        for marker in (CHECK_MARKER, EVIDENCE_MARKER, LIMITATION_MARKER, NEXT_MARKER):
+            self.assertIn(marker, cli_text)
+        self.assertIn("未截断", cli_text)
+
+    def test_single_item_longer_than_80_chars_is_kept_whole(self):
+        long_item = "长条目：" + "细节" * 80  # 远超旧的 80 字符单项预览上限
+        report = delivery_report(blocked=[long_item])
+        summary = build_delivery_summary(
+            task_record(), message_record(json.dumps(report, ensure_ascii=False))
+        )
+        self.assertEqual(summary["delivery_conclusion"]["value"], "partial")
+        # 原文完整（不切尾、不加省略号），且只由 preview.items 承载一次，不在 summary_text 里重复。
+        self.assertEqual(summary["preview"]["blocked"]["items"], [long_item])
+        self.assertNotIn("…", summary["preview"]["blocked"]["items"][0])
+        self.assertNotIn(long_item, summary["summary_text"])
+        self.assertEqual(json.dumps(summary, ensure_ascii=False).count(long_item), 1)
+
+    def test_limits_report_no_default_clipping(self):
         summary = build_delivery_summary(
             task_record(), message_record(json.dumps(delivery_report(), ensure_ascii=False))
         )
         limits = summary["limits"]
-        self.assertEqual(limits["text_limit_chars"], DELIVERY_SUMMARY_TEXT_LIMIT)
-        self.assertEqual(limits["json_limit_chars"], DELIVERY_SUMMARY_JSON_LIMIT)
+        self.assertIsNone(limits["text_limit_chars"])
+        self.assertIsNone(limits["json_limit_chars"])
+        self.assertFalse(limits["text_truncated"])
+        self.assertFalse(limits["json_truncated"])
         self.assertEqual(limits["text_chars"], len(summary["summary_text"]))
         self.assertEqual(limits["json_chars"], len(json.dumps(summary, ensure_ascii=False)))
-        self.assertIn("两个独立预算", limits["note"])
-        self.assertIn("不承诺", limits["note"])
+        self.assertIn("默认不做机械裁剪", limits["note"])
+        self.assertIn("null", limits["note"])
+
+    def test_explicit_text_and_json_limits_are_reported_separately(self):
+        report = delivery_report(blocked=[f"阻塞 {index} " + "长" * 200 for index in range(20)])
+        summary = build_delivery_summary(
+            task_record(),
+            message_record(json.dumps(report, ensure_ascii=False)),
+            text_limit=800,
+            json_limit=4000,
+        )
+        limits = summary["limits"]
+        self.assertEqual(limits["text_limit_chars"], 800)
+        self.assertEqual(limits["json_limit_chars"], 4000)
+        self.assertEqual(limits["text_chars"], len(summary["summary_text"]))
+        self.assertLessEqual(limits["text_chars"], 800)
+        self.assertEqual(limits["json_truncated"], limits["json_chars"] > 4000)
 
     def test_oversized_free_text_result_is_previewed_not_copied(self):
         payload = "长文本" * 100_000
         summary = build_delivery_summary(task_record(), message_record(payload))
-        self.assertLessEqual(len(json.dumps(summary, ensure_ascii=False)), DELIVERY_SUMMARY_JSON_LIMIT)
         self.assertEqual(summary["result_preview"]["kind"], "too_large")
         self.assertEqual(summary["result_preview"]["chars"], len(payload))
+        # 自由文本旧结果不做结论推断、也不把巨大旧正文塞进默认结果：只给有界预览 + 补读入口。
         self.assertTrue(summary["result_preview"]["truncated"])
         self.assertLessEqual(len(summary["result_preview"]["text"]), 300)
+        self.assertEqual(summary["delivery_conclusion"]["value"], "unknown")
+        self.assertEqual(summary["read_more"]["mode"], "detail")
+        self.assertEqual(summary["read_more"]["params"]["result_message_id"], 11)
+        self.assertFalse(summary["result_preview"]["trusted"])
+
+    def test_explicit_text_limit_reports_truncation_and_omissions_honestly(self):
+        """回归：文本带 [摘要截断] 时元数据必须同样如实（旧缺陷：text_truncated=false、omitted=[]）。"""
+        report = marker_report()
+        summary = build_delivery_summary(
+            task_record(),
+            message_record(json.dumps(report, ensure_ascii=False)),
+            text_limit=600,
+        )
+        text = summary["summary_text"]
+        limits = summary["limits"]
+        omitted = summary["read_more"]["omitted"]
+        self.assertLessEqual(len(text), 600)
+        self.assertIn("[摘要截断", text)
+        # 旧的矛盾点：正文说截断、元数据说未截断 / 省略清单为空。
+        self.assertTrue(limits["text_truncated"])
+        self.assertEqual(limits["text_limit_chars"], 600)
+        self.assertEqual(limits["text_chars"], len(text))
+        self.assertIsNone(limits["json_limit_chars"])
+        self.assertFalse(limits["json_truncated"])
+        text_omissions = [entry for entry in omitted if entry.get("source") == "summary_text"]
+        self.assertTrue(text_omissions)
+        label_by_field = {
+            "verification": "验证",
+            "limitations": "限制",
+            "changed_files": "变更文件",
+            "baseline": "基线",
+        }
+        for entry in text_omissions:
+            self.assertEqual(entry["reason"], "text_limit")
+            self.assertIn(entry["field"], label_by_field)
+            # 正文标记里点名的区块与 read_more.omitted 逐项对应，并给出可执行的补读方式。
+            self.assertIn(label_by_field[entry["field"]], text)
+            self.assertIn("read_more.params", entry["note"])
+        # 未被压缩的部分照常保留：结论 / 计数 / 下一步不因文本预算消失。
+        self.assertIn("业务结论=blocked", text)
+        self.assertIn("阻塞=4 未完成=3 已完成=4", text)
+        self.assertIn("下一步: " + NEXT_MARKER, text)
+        self.assertNotIn(EVIDENCE_MARKER, text)  # 该区块确实被显式牺牲，而不是伪装成完整
+
+    def test_explicit_text_limit_without_overflow_is_not_marked_truncated(self):
+        """显式 text_limit 未真正触发裁剪时不得谎报截断（元数据与正文都不出现标记）。"""
+        summary = build_delivery_summary(
+            task_record(),
+            message_record(json.dumps(marker_report(), ensure_ascii=False)),
+            text_limit=4000,
+        )
+        self.assertLessEqual(summary["limits"]["text_chars"], 4000)
+        self.assertFalse(summary["limits"]["text_truncated"])
+        self.assertEqual(summary["read_more"]["omitted"], [])
+        self.assertNotIn("摘要截断", summary["summary_text"])
+        self.assertIn(EVIDENCE_MARKER, summary["summary_text"])
+
+    def test_json_budget_shrink_does_not_claim_text_truncation(self):
+        """JSON 预算收缩预览条目时，不得冒充文本截断（两个预算分别如实反映）。"""
+        report = marker_report(
+            completed=[f"已完成条目 {index}：" + "内容" * 20 for index in range(20)],
+            unfinished=[f"未完成条目 {index}：" + "待办" * 20 for index in range(20)],
+            blocked=[f"次要阻塞 {index}：" + "阻塞" * 20 for index in range(20)],
+        )
+        message = message_record(json.dumps(report, ensure_ascii=False))
+        base = build_delivery_summary(task_record(), message)
+        base_chars = len(json.dumps(base, ensure_ascii=False))
+        summary = build_delivery_summary(
+            task_record(), message, json_limit=base_chars - 200
+        )
+        limits = summary["limits"]
+        self.assertFalse(summary.get("minimal", False))
+        self.assertLessEqual(limits["json_chars"], limits["json_limit_chars"])
+        self.assertFalse(limits["json_truncated"])
+        # 没有 text_limit：summary_text 的必要内容一字未动，也就不得报 text_truncated 或文本截断标记。
+        self.assertFalse(limits["text_truncated"])
+        self.assertIsNone(limits["text_limit_chars"])
+        self.assertNotIn("摘要截断", summary["summary_text"])
+        for marker in (EVIDENCE_MARKER, LIMITATION_MARKER, NEXT_MARKER):
+            self.assertIn(marker, summary["summary_text"])
+        # 省略只发生在 preview，逐条可追溯，并在正文定位提示里如实说明原因。
+        omitted = summary["read_more"]["omitted"]
+        self.assertTrue(omitted)
+        self.assertTrue(all(entry.get("source") == "preview" for entry in omitted))
+        self.assertTrue(all(entry.get("reason") == "json_limit" for entry in omitted))
+        self.assertIn("因 JSON 预算未展开", summary["summary_text"])
+        for entry in omitted:
+            self.assertEqual(
+                entry["omitted_items"], summary["preview"][entry["field"]]["omitted"]
+            )
 
     def test_json_budget_shrink_keeps_blocked_priority_and_markers(self):
         report = delivery_report(
             conclusion="blocked",
-            blocked=[f"阻塞 {index}" for index in range(8)],
-            unfinished=[f"未完成 {index}" for index in range(8)],
-            completed=[f"已完成 {index}" for index in range(8)],
+            blocked=[f"阻塞 {index}：" + "长" * 200 for index in range(8)],
+            unfinished=[f"未完成 {index}：" + "长" * 200 for index in range(8)],
+            completed=[f"已完成 {index}：" + "长" * 200 for index in range(8)],
+        )
+        message = message_record(json.dumps(report, ensure_ascii=False))
+        base_chars = len(
+            json.dumps(build_delivery_summary(task_record(), message), ensure_ascii=False)
         )
         summary = build_delivery_summary(
-            task_record(),
-            message_record(json.dumps(report, ensure_ascii=False)),
-            json_limit=2000,
+            task_record(), message, json_limit=base_chars - 400
         )
-        self.assertLessEqual(len(json.dumps(summary, ensure_ascii=False)), 2000)
+        self.assertFalse(summary.get("minimal", False))
+        self.assertLessEqual(len(json.dumps(summary, ensure_ascii=False)), base_chars - 400)
         self.assertEqual(summary["delivery_conclusion"]["value"], "blocked")
         # 收缩顺序：先牺牲"已完成"，最后才牺牲"阻塞"。
         self.assertGreaterEqual(
             summary["preview"]["blocked"]["shown"], summary["preview"]["completed"]["shown"]
+        )
+        self.assertLess(
+            summary["preview"]["completed"]["shown"], summary["counts"]["completed"]
         )
         # 省略必须可见：每个区块的 shown + omitted 恒等于总数，且 read_more 列出被省略字段。
         for section in ("blocked", "unfinished", "completed"):
@@ -542,8 +807,10 @@ class DeliveryToolTests(unittest.TestCase):
         self.assertFalse(properties & {"path", "file", "file_path", "filename", "local_path", "cwd"})
         self.assertIn("只读", schema["description"])
         self.assertIn("stale_reference", schema["description"])
-        self.assertIn(str(DELIVERY_SUMMARY_TEXT_LIMIT), schema["description"])
-        self.assertIn(str(DELIVERY_SUMMARY_JSON_LIMIT), schema["description"])
+        # 目录描述必须说明默认不裁剪，而不是继续宣传旧的字数上限。
+        self.assertIn("默认不做机械裁剪", schema["description"])
+        self.assertNotIn("1200 字符", schema["description"])
+        self.assertNotIn("6000 字符", schema["description"])
 
     def test_summary_and_detail_only_issue_get_requests(self):
         api = FakeApi(task_record(), message_record("自由文本结果"))
@@ -667,7 +934,11 @@ class DeliveryToolTests(unittest.TestCase):
         )
         self.assertEqual(page["page"]["page_chars"], DELIVERY_DETAIL_MAX_PAGE_CHARS)
         self.assertEqual(page["page"]["total_chars"], len(content))
-        self.assertLessEqual(len(json.dumps(page, ensure_ascii=False)), DELIVERY_SUMMARY_JSON_LIMIT)
+        # 单页上限是可复算的：正文长度不超过 limit，信封只有固定开销。
+        self.assertLessEqual(len(page["page"]["text"]), DELIVERY_DETAIL_MAX_PAGE_CHARS)
+        self.assertLessEqual(
+            len(json.dumps(page, ensure_ascii=False)), DELIVERY_DETAIL_MAX_PAGE_CHARS * 2
+        )
 
     def test_detail_fields_mode_on_free_text_reports_unavailable(self):
         api = FakeApi(task_record(), message_record("自由文本结果，没有 structured 自报"))
@@ -989,9 +1260,11 @@ class DeliveryCompatibilityTests(unittest.TestCase):
         collect = next(tool for tool in TOOL_SCHEMAS if tool["name"] == "talk_collect_result")
         self.assertEqual(collect["inputSchema"]["required"], ["task_id"])
 
-    def test_delivery_limits_are_unchanged_defaults(self):
-        self.assertEqual(DELIVERY_SUMMARY_TEXT_LIMIT, 1200)
-        self.assertEqual(DELIVERY_SUMMARY_JSON_LIMIT, 6000)
+    def test_delivery_default_limits_are_disabled_and_paging_is_unchanged(self):
+        # 默认摘要不再机械裁剪：两个上限默认是 None（未启用），而不是旧的具体数字。
+        self.assertIsNone(DELIVERY_SUMMARY_TEXT_LIMIT)
+        self.assertIsNone(DELIVERY_SUMMARY_JSON_LIMIT)
+        # detail 显式分页不属于摘要截断，合同与默认值不变。
         self.assertEqual(DELIVERY_DETAIL_DEFAULT_PAGE_CHARS, 2000)
         self.assertEqual(DELIVERY_DETAIL_MAX_PAGE_CHARS, 4000)
 

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""TALK 使用流程本地辅助：交付包校验 + 有界摘要（仅标准库，无第三方依赖）。
+"""TALK 使用流程本地辅助：交付包校验 + 摘要（仅标准库，无第三方依赖）。
 
 用法：
     python scripts/talk_workflow.py validate .tmp/workflow-usage-1/development.json --expect-task-id 38
     python scripts/talk_workflow.py summary  .tmp/workflow-usage-1/development.json --expect-task-id 38
     python scripts/talk_workflow.py summary  <交付包> --expect-task-id 38 --max-chars 800 --json
+
+`summary` 默认**不做机械裁剪**：通过校验的合法结构化交付，其必要字段（任务号与业务结论、
+已完成、未完成、阻塞、验证结果与证据、限制、下一步等）与全部条目按原文完整输出，
+不丢列表后项、不切字符串尾部、不用省略号替代，元数据也如实标注"未截断"。
+只有显式传入 `--max-chars` 时才进入有界模式（opt-in 兼容），被压缩的内容一律显式标注。
 
 `--expect-task-id` 可选：传入后核对交付包 task_id 是否为本次任务（`38` 与 `#38` 等价），
 用于防止旧文件或别的任务的报告被当成当前交付；不带参数时行为与旧版一致。
@@ -20,6 +25,7 @@
     - 不访问 TALK 数据库、HTTP、MCP 或 bridge，不改变任何任务状态。
     - 不把 runner / 任务状态 succeeded 推断为交付结论 complete。
     - 报错与摘要都不回显原任务正文、Hall 历史、未知字段与长日志原文。
+    - 64 KiB 等输入上限是**明确拒收**的保护，不是静默截断；超限直接报错，不裁剪成摘要。
 """
 
 from __future__ import annotations
@@ -41,12 +47,12 @@ MAX_REPORT_BYTES = 64 * 1024
 # 不输出 traceback，也不回显任何原输入片段。
 DEEP_NESTING_MESSAGE = "JSON 嵌套层级过深，超出解析上限；请确认交付包是结构化短文本"
 
-# 有界摘要：默认总长度上限（字符），可用 --max-chars 调整，但会被夹到下面的区间。
-DEFAULT_SUMMARY_LIMIT = 1200
+# 摘要默认**不设长度上限**（`max_chars=None`）：合法结构化交付的字段与条目按原文完整输出，
+# 不做机械裁剪。下面的预算只在调用者显式传入 --max-chars 时启用（opt-in 兼容），
+# 且被压缩的内容一律显式标注。
 MIN_SUMMARY_LIMIT = 600
 MAX_SUMMARY_LIMIT = 4000
 NOTICE_RESERVE = 160
-ITEM_PREVIEW_CHARS = 80
 MIN_ITEM_CHARS = 24
 SECTION_ITEM_LIMIT = 6
 
@@ -543,7 +549,7 @@ def load_report(path: Path) -> Any:
 
 
 # --------------------------------------------------------------------------
-# 有界摘要
+# 摘要
 # --------------------------------------------------------------------------
 
 
@@ -557,24 +563,22 @@ def _text_list(value: Any) -> list[str]:
     return [item for item in value if isinstance(item, str)]
 
 
-def build_summary(data: dict[str, Any], *, max_chars: int = DEFAULT_SUMMARY_LIMIT) -> dict[str, Any]:
-    """生成有界摘要：只输出允许字段，总长受限，被截断一定可见。"""
-    limit = _clamp_limit(max_chars)
+def build_summary(data: dict[str, Any], *, max_chars: int | None = None) -> dict[str, Any]:
+    """生成交付摘要。
+
+    默认（``max_chars is None``）**不做机械裁剪**：必要字段与全部条目按原文完整输出，
+    不丢列表后项、不切字符串尾部、不用省略号替代；``limit=None``、``truncated=False``。
+
+    只有显式传入 ``max_chars`` 时才启用有界模式（opt-in 兼容）；该模式下被省略或被
+    压缩的内容一律显式标注，绝不静默丢弃。
+    """
+    limit = None if max_chars is None else _clamp_limit(max_chars)
     redactions = 0
-    clipped_items = 0
 
     def clean(value: str) -> str:
         nonlocal redactions
         text, hits = redact_secrets(value)
         redactions += hits
-        return text
-
-    def preview(value: str) -> str:
-        nonlocal clipped_items
-        text = clean(value)
-        if len(text) > ITEM_PREVIEW_CHARS:
-            clipped_items += 1
-            return text[: ITEM_PREVIEW_CHARS - 1] + "…"
         return text
 
     task_id = data.get("task_id")
@@ -599,32 +603,74 @@ def build_summary(data: dict[str, Any], *, max_chars: int = DEFAULT_SUMMARY_LIMI
             if not isinstance(item, dict):
                 continue
             check = item.get("check")
-            result = item.get("result")
-            if isinstance(check, str) and check:
-                verification_lines.append(f"{preview(check)}={clean(result) if isinstance(result, str) else '?'}")
+            if not (isinstance(check, str) and check):
+                continue
+            result = clean(item.get("result")) if isinstance(item.get("result"), str) else "?"
+            evidence = clean(item.get("evidence")) if isinstance(item.get("evidence"), str) else ""
+            line = f"{clean(check)}={result}"
+            if evidence:
+                line += f"（证据：{evidence}）"
+            verification_lines.append(line)
 
-    # 区块按优先级排列：摘要头/基线 > 阻塞 > 未完成 > 已完成 > 变更文件 > 限制 > 验证 > 进度草稿。
+    # 区块按优先级排列：阻塞 > 未完成 > 已完成 > 变更文件 > 限制 > 验证。
+    # 这里保留完整条目文本；是否需要压缩只由显式上限决定。
     sections: list[tuple[str, list[str], int | None]] = [
-        ("阻塞", [preview(x) for x in _text_list(data.get("blocked"))], None),
-        ("未完成", [preview(x) for x in _text_list(data.get("unfinished"))], None),
-        ("已完成", [preview(x) for x in _text_list(data.get("completed"))], SECTION_ITEM_LIMIT),
-        ("变更文件", [preview(x) for x in _text_list(data.get("changed_files"))], SECTION_ITEM_LIMIT),
-        ("限制", [preview(x) for x in _text_list(data.get("limitations"))], SECTION_ITEM_LIMIT),
+        ("阻塞", [clean(x) for x in _text_list(data.get("blocked"))], None),
+        ("未完成", [clean(x) for x in _text_list(data.get("unfinished"))], None),
+        ("已完成", [clean(x) for x in _text_list(data.get("completed"))], SECTION_ITEM_LIMIT),
+        ("变更文件", [clean(x) for x in _text_list(data.get("changed_files"))], SECTION_ITEM_LIMIT),
+        ("限制", [clean(x) for x in _text_list(data.get("limitations"))], SECTION_ITEM_LIMIT),
         ("验证", verification_lines, SECTION_ITEM_LIMIT),
     ]
 
-    progress_text = preview(progress_summary) if isinstance(progress_summary, str) and progress_summary else "(未填)"
-    next_text = preview(progress_next) if isinstance(progress_next, str) and progress_next else "(未填)"
+    progress_text = clean(progress_summary) if isinstance(progress_summary, str) and progress_summary else "(未填)"
+    next_text = clean(progress_next) if isinstance(progress_next, str) and progress_next else "(未填)"
 
-    # (标签, 固定行或 None, 条目预览, 条目总数, 展示上限)
+    head_line = f"交付包摘要 schema={SCHEMA_ID} task_id={task_id_text} 结论={conclusion_text}"
+    baseline_line = f"基线={baseline_ref_text} 差异说明={diff_note_text}"
+    progress_line = f"进度草稿: {progress_text}｜下一步: {next_text}"
+
+    def with_footer(body: str, *, truncated: bool) -> str:
+        """页脚长度只依赖字符数的位数，多次迭代收敛后：显示值 == 实际长度。"""
+        chars = len(body) + 1
+        text = body
+        for _ in range(4):
+            if limit is None:
+                footer = f"— 摘要 {chars} 字符｜未截断（默认完整输出，无长度上限）"
+            else:
+                footer = f"— 摘要 {chars}/{limit} 字符｜已截断：{'是' if truncated else '否'}"
+            text = f"{body}\n{footer}"
+            chars = len(text)
+        return text
+
+    if limit is None:
+        # 默认路径：所有必要字段与全部条目原样输出，不压缩、不省略、不加截断标记。
+        lines = [head_line, baseline_line]
+        for label, items, _cap in sections:
+            if items:
+                lines.append(f"{label}({len(items)}): " + "；".join(items))
+        lines.append(progress_line)
+        text = with_footer("\n".join(lines), truncated=False)
+        return {
+            "text": text,
+            "chars": len(text),
+            "limit": None,
+            "truncated": False,
+            "redactions": redactions,
+        }
+
+    # 显式上限（opt-in 兼容）：按剩余空间渲染，放不下的内容一律留下可见标记。
+    # (标签, 固定行或 None, 条目, 条目总数, 展示上限)
     blocks: list[tuple[str, str | None, list[str], int, int | None]] = [
-        ("摘要头", f"交付包摘要 schema={SCHEMA_ID} task_id={task_id_text} 结论={conclusion_text}", [], 0, None),
-        ("基线", f"基线={baseline_ref_text} 差异说明={diff_note_text}", [], 0, None),
+        ("摘要头", head_line, [], 0, None),
+        ("基线", baseline_line, [], 0, None),
     ]
     for label, items, cap in sections:
         if items:
             blocks.append((label, None, items, len(items), cap))
-    blocks.append(("进度草稿", f"进度草稿: {progress_text}｜下一步: {next_text}", [], 0, None))
+    blocks.append(("进度草稿", progress_line, [], 0, None))
+
+    clipped_items = 0
 
     def fit_section(label: str, items: list[str], total: int, remaining: int) -> tuple[str | None, int, int]:
         """按剩余空间渲染区块行：返回 (行文本, 展示条数, 被压缩条数)。"""
@@ -695,14 +741,7 @@ def build_summary(data: dict[str, Any], *, max_chars: int = DEFAULT_SUMMARY_LIMI
             notes.append(f"[{clipped_items} 项文本超出预览长度已截断]")
         lines.extend(notes)
         truncated = bool(notes)
-        body = "\n".join(lines)
-        # 页脚长度只依赖字符数的位数，多次迭代收敛后：显示值 == 实际长度。
-        chars = len(body) + 1
-        text = body
-        for _ in range(4):
-            text = f"{body}\n— 摘要 {chars}/{limit} 字符｜已截断：{'是' if truncated else '否'}"
-            chars = len(text)
-        return text, truncated
+        return with_footer("\n".join(lines), truncated=truncated), truncated
 
     text, truncated = compose(taken, omitted)
     while len(text) > limit and len(taken) > 2:
@@ -795,7 +834,9 @@ def _emit_validation(result: ValidationResult, *, as_json: bool, source: str) ->
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="talk_workflow.py",
-        description="TALK 交付包本地校验与有界摘要（仅标准库；不代表业务验收通过）。",
+        description=(
+            "TALK 交付包本地校验与摘要（仅标准库；摘要默认完整输出不做机械裁剪；不代表业务验收通过）。"
+        ),
         epilog="退出码：0 通过 / 1 交付包不合法 / 2 用法或读取错误。",
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -810,13 +851,18 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument("--expect-task-id", metavar="TASK_ID", help=expect_help)
     validate_parser.add_argument("--json", action="store_true", help="输出机器可读结果")
 
-    summary_parser = sub.add_parser("summary", help="输出有界摘要（只含允许字段，超长会显式标注截断）")
+    summary_parser = sub.add_parser(
+        "summary", help="输出交付摘要；默认完整输出不做机械裁剪，显式传 --max-chars 才进入有界模式"
+    )
     summary_parser.add_argument("report", help="交付包 JSON 路径")
     summary_parser.add_argument(
         "--max-chars",
         type=int,
-        default=DEFAULT_SUMMARY_LIMIT,
-        help=f"摘要总长上限（字符），默认 {DEFAULT_SUMMARY_LIMIT}，夹取区间 [{MIN_SUMMARY_LIMIT}, {MAX_SUMMARY_LIMIT}]",
+        default=None,
+        help=(
+            "可选：显式设置摘要总长上限（字符）。省略＝默认完整输出，不裁剪字段与条目；"
+            f"显式传入时夹取区间 [{MIN_SUMMARY_LIMIT}, {MAX_SUMMARY_LIMIT}]，被省略的内容一律显式标注"
+        ),
     )
     summary_parser.add_argument("--expect-task-id", metavar="TASK_ID", help=expect_help)
     summary_parser.add_argument("--json", action="store_true", help="输出机器可读结果")

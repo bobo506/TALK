@@ -112,7 +112,12 @@ def wait_defaults() -> dict:
 
 
 def delivery_defaults() -> dict:
-    """交付摘要 / 补读的公开边界；供 --check 输出，避免把摘要误读成完整交付或验收结论。"""
+    """交付摘要 / 补读的公开边界；供 --check 输出，避免把摘要误读成完整交付或验收结论。
+
+    ``summary_text_limit_chars`` / ``summary_json_limit_chars`` 为 ``None`` 表示**默认未启用
+    长度上限**：合法结构化交付的必要字段与全部条目完整返回，不做机械裁剪。这不是"未配置"，
+    而是本版默认行为；需要显式有界摘要的调用方自行传 ``text_limit`` / ``json_limit``。
+    """
     return {
         "summary_text_limit_chars": DELIVERY_SUMMARY_TEXT_LIMIT,
         "summary_json_limit_chars": DELIVERY_SUMMARY_JSON_LIMIT,

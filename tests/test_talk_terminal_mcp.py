@@ -264,10 +264,11 @@ class TerminalLiveTests(RouteTestCase):
             process = self.run_terminal(base_url, extra_args=["--check"])
         report = self.results(process)[0]
         defaults = report["delivery_defaults"]
-        self.assertEqual(defaults["summary_text_limit_chars"], 1200)
-        self.assertEqual(defaults["summary_json_limit_chars"], 6000)
+        # 默认摘要不机械裁剪：两个上限是 null（未启用），而不是旧的具体数字。
+        self.assertIsNone(defaults["summary_text_limit_chars"])
+        self.assertIsNone(defaults["summary_json_limit_chars"])
         self.assertEqual(defaults["detail_max_page_chars"], 4000)
-        self.assertIn("两个独立预算", defaults["note"])
+        self.assertIn("默认不做机械裁剪", defaults["note"])
         self.assertIn("不是独立验收证明", defaults["trust_note"])
         self.assertIn("stale_reference", defaults["paging_note"])
 

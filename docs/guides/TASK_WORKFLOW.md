@@ -2,19 +2,22 @@
 
 本指南覆盖项目本地的交付流程：交付时写一份固定结构的 JSON 交付包，用本地脚本做机械校验，
 聊天/TALK 回复只报短结论和文件路径；另外说明本片新增的 MCP 只读交付摘要工具
-`talk_get_delivery`（有界摘要 + 可追溯按需补读）。
+`talk_get_delivery`（默认完整摘要 + 可追溯按需补读）。
 
 配套脚本：`scripts/talk_workflow.py`（仅标准库，无需额外依赖）。
 配套工具：`talk_get_delivery`（只读；不自动收取结果、不改变任务状态，第 6 节）。
+
+本片起，**摘要默认不再做机械裁剪**：合法结构化交付的必要字段与全部条目按原文完整返回，
+不丢列表后项、不切字符串尾部、不用省略号替代。摘要仍不等于验收结论，也不代替执行者写重点。
 
 ## 1. 为什么这样做
 
 | 旧痛点 | 现在的做法 |
 | --- | --- |
-| `get_task` 与 `collect_result` 重复取全文 | 交付包固定路径 + 固定字段，取一次就够；MCP 侧用 `talk_get_delivery` 只取有界摘要 |
+| `get_task` 与 `collect_result` 重复取全文 | 交付包固定路径 + 固定字段，取一次就够；MCP 侧用 `talk_get_delivery` 取只读摘要 |
 | runner 报 succeeded，但推送失败只能读正文才发现 | 交付结论由执行者显式声明 `complete/partial/blocked`，脚本和 MCP 摘要都拒绝把 runner 状态当结论 |
 | 交付后 Codex 再拼进度、重复提交推送 | 执行者写进度草稿，Codex 只做收尾；详细证据留在交付包文件里 |
-| 长报告被截断后要点丢失 | 摘要显式标注所有省略并给出补读参数，detail 模式按稳定引用分页重建全文 |
+| 摘要按字数机械截断，要点和阻塞项丢在列表后部 | 默认完整输出必要字段与全部条目；detail 模式仍按稳定引用分页补读完整原文 |
 
 目标是在正常收尾路径上减少往返次数。**不承诺**固定工具轮数，也不承诺计费或额度节省。
 
@@ -24,16 +27,19 @@
 # 1) 校验交付包（带上本次任务号，防止旧文件/别的任务报告被当成当前交付）
 python scripts/talk_workflow.py validate .tmp/workflow-usage-1/development.json --expect-task-id 38
 
-# 2) 需要时输出有界摘要（同样带 --expect-task-id）
+# 2) 输出摘要（默认完整，不做机械裁剪；同样带 --expect-task-id）
 python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json --expect-task-id 38
 
-# 3) 机器可读输出 / 收紧摘要上限
+# 3) 确实需要短摘要时，显式收紧上限（opt-in）／机器可读输出
 python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json --expect-task-id 38 --max-chars 800 --json
 ```
 
 `--expect-task-id` 是可选参数：**默认调用都要传**，省略时行为与旧版一致（只做格式校验）。
 它只做一件事——核对“这份包是不是本次任务的交付”：`38` 与 `#38` 视为同一个任务号，
 不一致就非零退出并给短错误，不吐报告内容。
+
+`--max-chars` 也是可选参数，**省略即默认完整输出**（不裁剪字段与条目）。只有显式传入时才进入
+有界模式，取值会夹到 600–4000，并如实标注被压缩的内容。调用者传了参数就一定生效，不会静默忽略。
 
 退出码：
 
@@ -78,18 +84,24 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 ## 5. 摘要规则
 
 - 只输出交付包里的允许字段，原始 JSON、未知字段、日志正文都不会出现。
-- 总长有固定上限：默认 1200 字符，`--max-chars` 可调，但会被夹到 600–4000。
-- 展示优先级：摘要头/基线 → 阻塞 → 未完成 → 已完成 → 变更文件 → 限制 → 验证 → 进度草稿。
-- 被截断一定可见：页脚固定显示 `— 摘要 N/上限 字符｜已截断：是/否`；条目未展开时追加
-  `[摘要截断：未完成7项、变更文件50项 未展开，详见交付包文件]`，**不会静默丢弃** blocked/partial 与未完成项。
-- 单条文本超过预览长度（80 字符）会截断并计数提示。
+- **默认完整输出，不做机械裁剪**：必要字段（任务号与业务结论、基线、已完成、未完成、阻塞、
+  变更文件、限制、验证结果与证据、进度草稿与下一步）与全部条目按原文完整保留，
+  不丢列表后项、不切字符串尾部、不用省略号替代，页脚如实写 `— 摘要 N 字符｜未截断（默认完整输出，无长度上限）`。
+- 展示优先级：摘要头/基线 → 阻塞 → 未完成 → 已完成 → 变更文件 → 限制 → 验证 → 进度草稿；
+  默认路径下所有区块都会展开，不存在“放不下而省略”。
+- 只有在显式传 `--max-chars` 时才进入有界模式：该模式按剩余空间排布，放不下的内容一定可见
+  （页脚 `— 摘要 N/上限 字符｜已截断：是/否`，条目未展开时追加
+  `[摘要截断：未完成7项、变更文件50项 未展开，详见交付包文件]`），**不会静默丢弃** blocked/partial 与未完成项。
+- 执行者仍要写重点：完整输出不等于鼓励无限罗列；`completed`/`unfinished`/`blocked` 等字段的使用规则
+  见第 3、4 节，超规格仍然按字段上限**明确拒收**，不会转换成静默截断。
 - 摘要里的“字符数”只是长度指标，**不能当计费 token 或额度**使用。
+- `--max-chars` 之外没有隐藏的默认上限；元数据 `limit` / `truncated` 默认是 `null` / `false`。
 
 ## 6. MCP 只读交付摘要与补读（`talk_get_delivery`）
 
-本片在既有任务工具集里新增**一个**只读工具 `talk_get_delivery`：按 `task_id` 读取交付摘要，
-并按稳定引用分页补读完整结果。既有 `talk_get_task` / `talk_collect_result` 等工具的默认合同不变；
-本工具**不会**为了摘要自动 collect / accept，也不改变任何任务状态，不读本机文件。
+`talk_get_delivery` 是既有的**只读**工具：按 `task_id` 读取交付摘要，并按稳定引用分页补读完整结果。
+当前默认摘要是**完整摘要**（不再做机械裁剪）；既有 `talk_get_task` / `talk_collect_result` 等工具的
+默认合同不变。本工具**不会**为了摘要自动 collect / accept，也不改变任何任务状态，不读本机文件。
 
 ### 6.1 三种状态必须分开看
 
@@ -112,15 +124,38 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 
 ### 6.2 summary 模式（默认）
 
-- 返回有界摘要：`task_ref`、`runner_status`、`delivery_conclusion`、`counts`、`preview`
+- 返回完整摘要：`task_ref`、`runner_status`、`delivery_conclusion`、`counts`、`preview`
   （顺序固定为 阻塞 → 未完成 → 已完成）、`summary_text`、`limits`、`read_more`。
-- 正常情况下 `summary_text` ≤ **1200 字符**、整个 JSON 响应 ≤ **6000 字符**；这是两个独立预算，
-  `limits` 会同时给出两个实测值，**不承诺**把整份交付报告无损压进 1200 字符。
-- 所有省略都显式可见：`preview.<区块>.omitted`、`read_more.omitted` 和 `summary_text` 末尾的
-  `[摘要截断：...]` 都会列出被省略的字段，`counts` 始终是真实数量；收缩顺序是
-  已完成 → 未完成 → 阻塞，**不会**在隐藏阻塞项的同时只报完成。
-- 旧任务没有结构化报告时，摘要仍给 `unknown` 加一段带 `trusted=false` 的短预览（≤300 字符），
-  并指向 `read_more` 的补读参数。
+- **默认不做机械裁剪**：合法 `talk-delivery-1` 结构化交付的必要字段（任务号与业务结论、已完成、
+  未完成、阻塞、验证结果与证据、限制、下一步）与全部条目按原文完整返回；既不丢列表后项，
+  也不切字符串尾部，更不用省略号替代。内容超过旧的 1200 / 6000 字符预算本身不构成裁剪理由。
+- **完整摘要 = 同一响应中的核心字段整体，不能只读 `summary_text`**：必要内容在同一响应里
+  **只出现一次**，由两个载体分工承载：
+  - `preview.blocked / preview.unfinished / preview.completed` 的 `items`：三类明细原文
+    （每个条目在响应里只出现一次，含 `total / shown / omitted`）。
+  - `summary_text`：任务号、业务结论、`counts`、清楚的 preview 定位提示，外加 preview **未承载**的
+    必要内容——验证结果与证据、限制、下一步、变更文件、基线。因此 `summary_text` 不再逐字重复三类正文，
+    但也**不是**“只留 head + counts”（那会丢掉验证证据 / 限制 / 下一步）。
+  - 本地 CLI（`scripts/talk_workflow.py summary`）没有 JSON preview，文本路径**照旧完整展开全部区块**，
+    不受这项去重影响。
+- 元数据如实反映“本次没有裁剪”：`limits.text_limit_chars` 与 `limits.json_limit_chars` 为 `null`
+  表示默认未启用长度上限，此时 `limits.text_truncated=false`、`preview.<区块>.omitted=0`、
+  `preview.<区块>.shown == total`、`read_more.omitted=[]`，`summary_text` 里也不会出现 `[摘要截断：…]`。
+- 显式传 `text_limit` / `json_limit` 时才会变成“有省略”，且两个预算**分别如实反映**：
+  - `limits.text_truncated` 只按 `summary_text` 是否**真的被裁剪**取值；文本里一旦出现
+    `[摘要截断：…]`，`text_truncated` 必须为 `true` 且 `read_more.omitted` 必须有对应条目
+    （不会再出现“文本说截断、元数据说没截断 / 省略清单为空”的矛盾）。
+  - `limits.json_truncated` 只按最终 JSON 是否仍超出 `json_limit` 取值；只收缩 `preview` 条目时
+    不会谎报 `text_truncated`。
+  - `read_more.omitted` 汇总所有省略，每条都带 `source` / `reason`：`source=preview` 是该区块
+    被 JSON 预算省略的条目数，`source=summary_text` 是被文本预算省略的必要区块
+    （`field` 可直接用于 `fields=[…]` 补读）。
+- `text_limit` 下的保留优先级（越靠后越先被牺牲）：计数 / 结论头部与“下一步”行固定保留 →
+  基线 → 变更文件 → 限制 → 验证；被牺牲的区块在 `summary_text` 里留下可见标记，绝不静默丢弃。
+- 自由文本旧结果不做结论推断：给 `unknown` + 一段明确标记 `truncated=true` 的有界原文预览（≤300 字符）
+  与 `read_more` 补读参数。既不把巨大旧正文塞进默认结果，也不把这段短预览说成完整摘要。
+- 结构化交付的单条文本仍然受交付包 schema 自身上限约束（`completed` 等 ≤300 字符/条、`changed_files` ≤200、
+  验证 `evidence` ≤300）。这些超限是**校验拒收**，不是摘要裁剪；交付包整体超过 64 KiB 同样直接拒收。
 
 ### 6.3 detail 模式（按需补读）
 
@@ -140,6 +175,8 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
   必须按 `next_params` 从 `offset=0` 重新开始，禁止拼接两份结果。
 - 无结果引用、结果消息不可见时返回 `status=unavailable`，不会退回扫描整个 Hall 历史。
 - 非法游标直接报错：`offset` 为负或超过结果长度、`limit` 越界、`fields` 含未知字段都会被拒绝。
+- detail 的显式分页是**按需补读完整原文**，不属于摘要裁剪，本片不撤销；它主要用于自由文本旧结果、
+  结果正文超过 64 KiB，或调用方想单独取某个结构化字段的场景。
 
 ### 6.4 怎么把结构化交付写成结果消息
 
@@ -162,13 +199,17 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 
 ### 6.5 降级行为（不要假装旧报告已经迁移）
 
-- 旧任务的结果消息仍是自由文本：摘要只给 `unknown` + 短预览 + 补读入口，**不会**自动改写旧消息，
-  也**不会**声称旧报告已迁移成结构化交付。
+- 旧任务的结果消息仍是自由文本：摘要只给 `unknown` + 明确标记 `truncated=true` 的短预览 + 补读入口，
+  **不会**自动改写旧消息，也**不会**声称旧报告已迁移成结构化交付；这段短预览不是完整摘要，
+  要全文必须走 detail 分页。
 - bridge 会对过长回复做截断（默认 `--max-reply-chars 12000`，截断处追加 `[truncated N chars]`）；
   被截断的交付 JSON 不再合法，摘要会判 `invalid` 或按自由文本给 `unknown`，需要重新提交完整结果；分页只能恢复服务器已保存的正文，不能恢复上传前已经缺失的部分。
 - 结果正文超过 64 KiB 时按 `too_large` 处理，不按结构化自报解析，但原文仍可用 detail 模式分页补读。
+  这是**明确拒收**，不是把超限内容静默截成摘要。
 - 摘要里的 `chars` 只是字符数指标，不是计费 token，也不是额度。
-- 普通终端入口 `--check` 会输出 `delivery_defaults`，把上述上限、可信来源与补读合同一并打印出来。
+- 普通终端入口 `--check` 会输出 `delivery_defaults`；其中 `summary_text_limit_chars` /
+  `summary_json_limit_chars` 为 `null` 表示默认未启用长度上限（默认完整输出），
+  同时打印可信来源、同次响应整体完整性（`note`）与补读合同。
 
 ## 7. 可复制模板
 
@@ -279,10 +320,20 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 - `--expect-task-id` 只核对任务号字符串，不证明内容归属；防的是“旧文件 / 别的任务报告”这类明显错配。
 - 派发约束只记录已实测的最小调用；本片不新增服务端分支、不猜测子任务权限。
 - 密钥脱敏是启发式，覆盖不了所有形态；硬要求是不要把密钥正文写进交付包。
-- 摘要上限用字符数衡量，与计费 token、模型额度无关。
+- 摘要默认按字符数**完整**返回，不需要用户配置任何上限；只有显式传 `--max-chars`（CLI）
+  或 `text_limit` / `json_limit`（MCP 层）时才进入有界模式。字符数仍与计费 token、模型额度无关。
+- MCP 默认摘要在同一响应内去重但**不丢内容**：三类明细正文只在 `preview.<区块>.items`
+  （原文完整、每项只出现一次），验证证据 / 限制 / 下一步等 preview 未承载的必要内容仍完整写在
+  `summary_text`；判断完整性看整份响应，不能只截取 `summary_text`。本地 CLI 没有 JSON preview，
+  仍旧完整展开所有区块，不受该去重影响。
+- 本片不解除宿主侧的限制：宿主 functions 的续行/截断行为、上层沟通节奏不由 TALK 摘要配置控制，
+  本地摘要完整也不代表宿主一定把所有内容送入模型上下文。
 - `talk_get_delivery` 只是**只读**入口：不 collect、不 accept、不改任务状态，也不读本机文件；
   它的可信结论只等于“结果消息里有一份通过 schema 校验且与实际任务号匹配的结构化自报”，不等于独立验收通过。
-- 本指南不改变 TALK 服务端、数据库与任务状态语义；MCP 任务工具集只新增上述一个只读工具，
-  既有工具输出未改。新增工具需要 MCP 客户端重连后才会出现在工具目录里，未重连前不能声称宿主已加载。
+- 摘要默认完整只是把交付内容如实返回，**不代替验收**：执行者仍要写重点，调用者仍应独立复核，
+  遇到 `invalid` / `unknown` 或 `stale_reference` 时按第 6 节补读，不能只凭摘要认定目标已完成。
+- 本指南不改变 TALK 服务端、数据库与任务状态语义；MCP 任务工具集未新增工具，本片只调整
+  `talk_get_delivery` 的默认摘要行为（去掉机械裁剪、三类正文在响应内去重、限长标志如实反映），
+  `talk_get_task` / `talk_collect_result` 等既有工具输出未改。工具描述变更需要 MCP 客户端重连后才会刷新，未重连前不能声称宿主已加载新描述。
 
 - 当前入口必须由执行者/主控显式调用，尚未在 bridge 或 MCP 内自动强制执行；文件校验不能防止漏报事实，也不能保证所有调用者遵守流程。

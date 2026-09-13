@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-09-13 默认完整摘要、去重与真实重连验证
+
+- 用户要求优先减少外层续等与无变化更新，并取消摘要默认机械截断。只读核对 MCP 超时仍为 660 秒，它不控制外层 functions.wait；公开配置参考本轮未找到可确认关闭外层续行/进度的开关，当前宿主还有更高优先级沟通约束。项目规则要求避免无变化播报，但未实现或证实配置级消除；两项等待问题仍待解决，不把摘要变更算作已完成等待优化。未修改用户配置、模型、权限或服务。
+- 前版 b02127e 已提交推送；用户重连后，真实 talk_get_delivery 对 #45/结果2521 返回旧文本 unknown；两页 773 字符与整页内容一致，hash 一致，收取时间/状态未变。完成的是旧版入口冒烟；本次新合同仍需再次重连后验证，未重跑长等待实验。
+- 本片基线 b02127e。DeepSeek #46 开发、Kimi #47 初审，发现显式限长时可见裁剪与 text_truncated 不一致，并指出重复正文；DeepSeek #48 返修去重，同时补齐此前 MCP 响应缺少的验证证据、限制及下一步。Kimi #49 最终独立复核 PASS：155 项定向测试（47.220s）+17 项独立断言全过。
+- 合法结构化摘要默认不设 1200/6000 总字符上限、不按条目机械裁剪。CLI 完整输出；MCP 三类正文只在 preview.items，其它核心内容完整保留在同次响应 summary_text。独立夹具末尾阻塞/完成/未完成、证据、限制、next 均保留，6 个 sentinel 各出现一次。保留 schema/任务号绑定/64 KiB 拒收、只读、stable reference 与 detail 分页；格式通过仍不代表业务验收。
+- 显式 text_limit=600 的独立夹具裁到486，标志与 omitted 一致；仅 json_limit=3586 缩 preview、正文未裁，文本标志 false；极小 json_limit=200 可触发可见最小兜底，JSON 仍可能超预算并明确报告。旧文本仍 unknown+300字符预览，省略可补读。默认无机械裁剪不等于接受无限输入，也不补回上传前丢失内容。
+- 同夹具返修前后 JSON 3990→4466，重复条目13→0，原缺失验证/限制/next 从0→1；信息补齐导致总长度增加，不把字符数当 token 或额度。本轮中途共享额度五小时51%、周33%，不可分摊为本片成本；完成当前片后暂停。
+- 用户发现 dsh 历史 pwsh 调用显示结果未持久化/unknown。核对 #48 已提交，#49 派给 Kimi且已完成；独立复核重新运行155项测试通过，未因该旧记录盲目重复测试、终止进程或重派任务。unknown 本身不是测试失败证据。
+- 修改文件：scripts/talk_workflow.py；bridges/talk_delivery.py、talk_task_tools.py、talk_terminal_mcp.py；tests/test_talk_workflow.py、test_talk_delivery.py、test_talk_terminal_mcp.py；docs/guides/TASK_WORKFLOW.md；AGENTS.md；docs/spec/MODULE_bridges.md、TERMINAL_RETURN_DRAFT.md；docs/PROGRESS.md、PROGRESS_HISTORY.md。临时报告不入库，页面与用户手册未变化。
+- #46–#49 已全部收取 completed，收尾3项编码测试与 git diff --check 通过。本片统一提交/推送 codex/terminal-return-codex，不合并 main；新版本重连后只需一个已有合法结构化结果的真实完整性冒烟。等待/唤醒能力仍为后续问题，不扩展下一片。
+
+
 ## 2026-09-13 恢复并补齐第二片 Git 收尾
 
 - 用户指出昨日停在收尾承诺处。实际核对 HEAD 仍为 881ce12，本片12个文件已落盘但未提交；不能把昨日“统一提交推送”的收尾计划当成已完成事实。

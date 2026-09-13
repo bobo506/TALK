@@ -293,7 +293,82 @@ class SummaryBoundaryTests(CliMixin, unittest.TestCase):
             ],
         )
 
-    def test_never_exceeds_limit_for_several_limits(self):
+    # ---- 默认摘要：完整输出，不做机械裁剪 ----
+
+    def test_default_summary_is_complete_and_untruncated(self):
+        summary = talk_workflow.build_summary(self.big_report())
+        text = summary["text"]
+        self.assertIsNone(summary["limit"])
+        self.assertFalse(summary["truncated"])
+        self.assertEqual(len(text), summary["chars"])
+        # 远超旧的 1200 字符 "上限"：默认不再是机械裁剪，而是完整输出。
+        self.assertGreater(len(text), 1200)
+        self.assertNotIn("摘要截断", text)
+        self.assertIn("未截断", text)
+
+    def test_default_summary_keeps_every_item_and_text_tail(self):
+        report = self.big_report()
+        text = talk_workflow.build_summary(report)["text"]
+        for section in ("completed", "unfinished", "blocked", "changed_files", "limitations"):
+            for item in report[section]:
+                self.assertIn(item, text, f"{section} 条目必须完整保留：{item[:24]}")
+        # 不切字符串尾部、不用省略号替代。
+        self.assertNotIn("…", text)
+
+    def test_default_summary_keeps_long_item_beyond_80_chars(self):
+        long_item = "长条目：" + "内容" * 60  # 183 字符，远超旧的 80 字符单项预览上限
+        text = talk_workflow.build_summary(sample_report(limitations=[long_item]))["text"]
+        self.assertIn(long_item, text)
+        self.assertTrue(text.rstrip().endswith("字符｜未截断（默认完整输出，无长度上限）"))
+
+    def test_default_summary_keeps_blocked_item_at_list_end(self):
+        key_blocker = "关键阻塞位于列表末尾：远端凭据缺失，需人工确认"
+        report = sample_report(
+            conclusion="partial",
+            completed=["已完成条目"],
+            unfinished=[],
+            blocked=[f"次要阻塞 {index}" for index in range(19)] + [key_blocker],
+            progress_draft={"summary": "部分完成", "next": "等待人工确认凭据"},
+        )
+        text = talk_workflow.build_summary(report)["text"]
+        self.assertIn("阻塞(20)", text)
+        self.assertIn(key_blocker, text)
+
+    def test_default_summary_keeps_verification_result_and_evidence(self):
+        evidence = "证据：" + "运行输出" * 20
+        report = sample_report(
+            verification=[{"check": "定向测试", "result": "pass", "evidence": evidence}]
+        )
+        text = talk_workflow.build_summary(report)["text"]
+        self.assertIn("定向测试=pass", text)
+        self.assertIn(evidence, text)
+
+    def test_cli_default_summary_has_no_truncation_marker(self):
+        path = self.write_json(self.big_report())
+        code, out, _ = self.run_cli(["summary", str(path), "--expect-task-id", "38"])
+        self.assertEqual(0, code)
+        self.assertGreater(len(out), 1200)
+        self.assertNotIn("摘要截断", out)
+        self.assertNotIn("已截断：是", out)
+        self.assertIn("未截断", out)
+
+    def test_cli_default_json_reports_no_clipping(self):
+        path = self.write_json(self.big_report())
+        code, out, _ = self.run_cli(["summary", str(path), "--json"])
+        payload = json.loads(out)
+        self.assertEqual(0, code)
+        self.assertIsNone(payload["limit"])
+        self.assertFalse(payload["truncated"])
+        self.assertGreater(payload["chars"], 1200)
+
+    def test_small_report_is_not_truncated(self):
+        summary = talk_workflow.build_summary(sample_report())
+        self.assertFalse(summary["truncated"])
+        self.assertEqual(0, summary["redactions"])
+
+    # ---- 显式 --max-chars：opt-in 有界模式，省略必须可见 ----
+
+    def test_explicit_max_chars_still_bounds_output(self):
         report = self.big_report()
         for limit in (600, 700, 1200, 2000, 4000):
             summary = talk_workflow.build_summary(report, max_chars=limit)
@@ -301,39 +376,39 @@ class SummaryBoundaryTests(CliMixin, unittest.TestCase):
             self.assertEqual(len(summary["text"]), summary["chars"])
             self.assertEqual(limit, summary["limit"])
 
-    def test_limit_is_clamped(self):
+    def test_max_chars_is_clamped(self):
         report = sample_report()
-        self.assertEqual(talk_workflow.MIN_SUMMARY_LIMIT, talk_workflow.build_summary(report, max_chars=10)["limit"])
-        self.assertEqual(talk_workflow.MAX_SUMMARY_LIMIT, talk_workflow.build_summary(report, max_chars=99999)["limit"])
+        self.assertEqual(
+            talk_workflow.MIN_SUMMARY_LIMIT,
+            talk_workflow.build_summary(report, max_chars=10)["limit"],
+        )
+        self.assertEqual(
+            talk_workflow.MAX_SUMMARY_LIMIT,
+            talk_workflow.build_summary(report, max_chars=99999)["limit"],
+        )
 
-    def test_truncation_is_visible(self):
+    def test_explicit_truncation_is_visible(self):
         summary = talk_workflow.build_summary(self.big_report(), max_chars=700)
         self.assertTrue(summary["truncated"])
         self.assertIn("[摘要截断", summary["text"])
         self.assertIn("已截断：是", summary["text"])
 
-    def test_unfinished_items_are_not_silently_dropped(self):
+    def test_explicit_limit_keeps_blocked_section(self):
         summary = talk_workflow.build_summary(self.big_report(), max_chars=600)
-        text = summary["text"]
-        self.assertTrue(
-            "未完成条目 0" in text or "未完成" in text,
-            "未完成项必须出现在摘要或被显式标注未展开",
-        )
-        self.assertIn("未完成", text)
+        self.assertIn("阻塞", summary["text"])
+        self.assertNotIn("已截断：否", summary["text"])
 
-    def test_section_item_cap_is_reported(self):
-        summary = talk_workflow.build_summary(self.big_report(), max_chars=2000)
-        self.assertIn("已完成", summary["text"])
-        self.assertTrue(summary["truncated"])
-        self.assertIn("未展开", summary["text"])
-
-    def test_small_report_is_not_truncated(self):
-        summary = talk_workflow.build_summary(sample_report())
+    def test_explicit_limit_without_overflow_is_marked_untruncated(self):
+        summary = talk_workflow.build_summary(sample_report(), max_chars=1200)
         self.assertFalse(summary["truncated"])
         self.assertIn("已截断：否", summary["text"])
-        self.assertEqual(0, summary["redactions"])
 
     def test_footer_reports_actual_length(self):
+        default_text = talk_workflow.build_summary(self.big_report())["text"]
+        default_match = re.search(r"— 摘要 (\d+) 字符｜未截断", default_text)
+        self.assertIsNotNone(default_match)
+        self.assertEqual(len(default_text), int(default_match.group(1)))
+
         for limit in (600, 1200):
             summary = talk_workflow.build_summary(self.big_report(), max_chars=limit)
             match = re.search(r"— 摘要 (\d+)/(\d+) 字符", summary["text"])

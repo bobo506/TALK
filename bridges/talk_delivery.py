@@ -1,8 +1,9 @@
 """交付摘要与可追溯补读的共享逻辑（只读）。
 
 职责边界：
-- 本模块只做纯计算：把**已经取回**的任务记录与结果消息整形为有界摘要，并按稳定引用
-  分页读取完整结果原文或指定结构化字段。
+- 本模块只做纯计算：把**已经取回**的任务记录与结果消息整形为交付摘要（默认完整返回
+  必要字段与全部条目，不做机械裁剪；同一响应内每个条目只出现一次），并按稳定引用分页读取
+  完整结果原文或指定结构化字段。
 - 不发起 HTTP（网络读取留在 ``bridges/talk_task_tools.py``）、不读本机任何文件、
   不改变任务状态，也不自动收取 / accept 结果。
 
@@ -35,31 +36,42 @@ from scripts.talk_workflow import (  # noqa: E402  (需要先修正 sys.path)
 
 JsonDict = dict[str, Any]
 
-# 摘要正文（给人读的文本）上限；与整个 JSON 上限是两个独立预算，互不替代。
-DELIVERY_SUMMARY_TEXT_LIMIT = 1200
-# 整个摘要 JSON 响应上限；保证正常响应有界，而不是只约束正文。
-DELIVERY_SUMMARY_JSON_LIMIT = 6000
-# detail 分页：单页字符数默认值与上限。
+# 摘要默认**不做机械裁剪**：合法结构化交付的必要字段与全部条目按原文完整返回，
+# 不丢列表后项、不切字符串尾部、不用省略号替代。下面两个预算为 None 即表示未启用上限，
+# 只有调用方显式传入 text_limit / json_limit 时才进入有界模式（opt-in）。
+DELIVERY_SUMMARY_TEXT_LIMIT: int | None = None
+DELIVERY_SUMMARY_JSON_LIMIT: int | None = None
+# detail 分页：单页字符数默认值与上限。分页是"按需补读完整原文"，不属于摘要裁剪。
 DELIVERY_DETAIL_DEFAULT_PAGE_CHARS = 2000
 DELIVERY_DETAIL_MAX_PAGE_CHARS = 4000
-# 预览条目数与单条预览长度上限。
-DELIVERY_MAX_PREVIEW_ITEMS = 3
-DELIVERY_PREVIEW_ITEM_CHARS = 80
-# 自由文本结果预览长度上限（旧任务只给带 unknown 的短预览 + 补读入口）。
+# 自由文本旧结果的原文预览长度上限（只给 unknown + 有界预览 + detail 补读入口，
+# 既不把巨大旧正文塞进默认结果，也不把短预览说成完整摘要）。
 DELIVERY_TEXT_PREVIEW_CHARS = 300
 # 校验问题回显条数上限（避免无效结构化报告把整份 JSON 撑爆）。
 DELIVERY_MAX_VALIDATION_ISSUES = 5
-# 结构化自报的长度上限复用本地交付包上限（64 KiB）。
+# 结构化自报的长度上限复用本地交付包上限（64 KiB）：这是**明确拒收**的保护，不转成静默截断。
 DELIVERY_STRUCTURED_MAX_CHARS = MAX_REPORT_BYTES
 
 CONCLUSION_UNKNOWN = "unknown"
 CONCLUSION_INVALID = "invalid"
 
-# 摘要文本与 JSON 的边界说明：明确"不承诺无损压到 1200 字符"。
+# 摘要承载分工（默认路径）：完整摘要是**同一响应中的核心字段整体**，不只看 summary_text。
+# - preview.<区块>.items：阻塞 / 未完成 / 已完成三类明细原文，每个条目在响应里只出现一次；
+# - summary_text：任务号 / 业务结论 / 计数 + preview 定位提示，以及 preview **未承载**的必要内容
+#   （验证结果与证据、限制、下一步、变更文件、基线），同样只出现一次。
+# 本片不做"只留 head+counts"的机械收缩，那会丢掉验证证据 / 限制 / 下一步。
 DELIVERY_LIMITS_NOTE = (
-    f"summary_text 是给人读的摘要文本，上限 {DELIVERY_SUMMARY_TEXT_LIMIT} 字符；"
-    f"整个 JSON 响应另有 {DELIVERY_SUMMARY_JSON_LIMIT} 字符上限。两者是两个独立预算，"
-    "不承诺把整份交付报告无损压进 1200 字符；完整内容必须用 detail 模式分页补读。"
+    "summary 默认不做机械裁剪：合法 talk-delivery-1 结构化交付的必要字段与全部条目均按原文完整返回，"
+    "不丢列表后项、不切字符串尾部、不用省略号替代。"
+    "完整摘要 = 同一响应中的核心字段整体，不只看 summary_text：阻塞 / 未完成 / 已完成三类明细原文只由 "
+    "preview.<区块>.items 承载（每个条目只出现一次），summary_text 承载任务号、业务结论、计数、"
+    "preview 定位提示，以及 preview 未承载的必要内容（验证结果与证据、限制、下一步、变更文件、基线）。"
+    "两个上限为 null 表示默认未启用；limits.text_truncated 只按 summary_text 是否真的被裁剪取值"
+    "（显式 text_limit 收缩、或 JSON 预算触底收缩为最小摘要时如实为 true），"
+    "limits.json_truncated 只按最终 JSON 是否仍超出 json_limit 取值，两者分别如实反映、不互相冒充；"
+    "read_more.omitted 汇总全部省略（source=preview 为条目省略，source=summary_text 为文本省略，"
+    "reason 说明真实原因）。detail 模式仍按 result_message_id + offset 分页补读完整原文；"
+    "分页属于按需补读，不属于摘要裁剪。"
 )
 DELIVERY_TRUST_NOTE = (
     "业务结论只来自结果消息中通过本地 talk-delivery-1 校验的结构化自报，"
@@ -335,7 +347,7 @@ def conclusion_for(
 
 
 # ---------------------------------------------------------------------------
-# 有界摘要
+# 摘要（默认完整，不做机械裁剪）
 # ---------------------------------------------------------------------------
 
 
@@ -344,16 +356,17 @@ def task_reference(task: JsonDict) -> JsonDict:
     return {field: task.get(field) for field in DELIVERY_TASK_REF_FIELDS}
 
 
-def _preview_item(value: str, limit: int = DELIVERY_PREVIEW_ITEM_CHARS) -> str:
-    text = _redact(value)
-    return text if len(text) <= limit else text[: limit - 1] + "…"
+def _preview_item(value: str) -> str:
+    """只做脱敏与空白过滤：默认摘要不裁剪条目文本，完整保留字符串尾部。"""
+    return _redact(value)
 
 
-def _preview_values(values: Any, cap: int) -> tuple[list[str], int]:
+def _preview_values(values: Any) -> tuple[list[str], int]:
+    """返回 (完整条目, 条目总数)；默认不设条目数上限，不丢列表后项。"""
     if not isinstance(values, list):
         return [], 0
     items = [_preview_item(value) for value in values if isinstance(value, str) and value.strip()]
-    return items[:cap], len(items)
+    return items, len(items)
 
 
 def _dump(payload: JsonDict) -> str:
@@ -364,10 +377,23 @@ def build_delivery_summary(
     task: JsonDict,
     message: JsonDict | None,
     *,
-    text_limit: int = DELIVERY_SUMMARY_TEXT_LIMIT,
-    json_limit: int = DELIVERY_SUMMARY_JSON_LIMIT,
+    text_limit: int | None = DELIVERY_SUMMARY_TEXT_LIMIT,
+    json_limit: int | None = DELIVERY_SUMMARY_JSON_LIMIT,
 ) -> JsonDict:
-    """生成有界摘要：区分 runner / workflow / 业务结论，所有省略都显式标记。
+    """生成交付摘要：区分 runner / workflow / 业务结论。
+
+    默认（``text_limit`` / ``json_limit`` 均为 None）**不做机械裁剪**：合法结构化交付的
+    必要字段与全部条目按原文完整返回，既不丢列表后项也不切字符串尾部；
+    ``limits`` / ``preview.*.omitted`` / ``truncated`` 只如实反映实际发生的省略（默认没有）。
+
+    必要内容在同一响应内**只出现一次**、由两个载体分工承载（完整摘要 = 核心字段整体）：
+    阻塞 / 未完成 / 已完成三类明细原文只放 ``preview.<区块>.items``；``summary_text`` 只给
+    任务号、业务结论、计数与清楚的 preview 定位提示，外加 preview 未承载的必要内容
+    （验证结果与证据、限制、下一步、变更文件、基线）。因此 ``summary_text`` 不能单独当完整摘要读。
+
+    只有调用方显式传入 ``text_limit`` / ``json_limit`` 时才进入有界模式（opt-in 兼容），
+    该模式下被省略的内容一律显式标记，绝不静默丢弃；``limits.text_truncated`` 按
+    ``summary_text`` 是否真的被裁剪取值，``limits.json_truncated`` 按 JSON 预算取值，两者互不冒充。
 
     实际任务号只从 ``task`` 记录自身取（``task["id"]``），调用方无法省略这一核对：
     结构化自报的 task_id 与它不一致时一律 invalid / 不可信。
@@ -387,7 +413,7 @@ def build_delivery_summary(
         "verification": len(source.get("verification") or []),
     }
     raw_preview: dict[str, tuple[list[str], int]] = {
-        section: _preview_values(source.get(section), DELIVERY_MAX_PREVIEW_ITEMS)
+        section: _preview_values(source.get(section))
         for section in DELIVERY_PREVIEW_SECTIONS
     }
 
@@ -401,6 +427,14 @@ def build_delivery_summary(
         "note": "runner_status / workflow_status 只表示流程位置；runner 结束不等于用户目标完成",
     }
 
+    def preview_note(section: str, total: int, shown: int) -> str:
+        if total <= shown:
+            return ""
+        return (
+            f"{section} 共 {total} 条，本摘要展示 {shown} 条；"
+            "被省略条目必须用 read_more 指向的 detail 模式补读"
+        )
+
     preview: JsonDict = {}
     for section in DELIVERY_PREVIEW_SECTIONS:
         items, total = raw_preview[section]
@@ -409,12 +443,7 @@ def build_delivery_summary(
             "total": total,
             "shown": len(items),
             "omitted": total - len(items),
-            "note": (
-                f"{section} 共 {total} 条，本摘要展示 {len(items)} 条；"
-                "被省略条目必须用 read_more 指向的 detail 模式补读"
-                if total > len(items)
-                else ""
-            ),
+            "note": preview_note(section, total, len(items)),
         }
 
     payload: JsonDict = {
@@ -445,12 +474,114 @@ def build_delivery_summary(
             "note": "此处只是结果正文的截断预览，不可作为业务结论来源",
         }
 
+    def redacted_list(values: Any) -> list[str]:
+        """必要区块的条目文本：只脱敏，不裁剪、不去尾、不丢后项。"""
+        if not isinstance(values, list):
+            return []
+        return [
+            _redact(value) for value in values if isinstance(value, str) and value.strip()
+        ]
+
+    def optional_text(value: Any, placeholder: str) -> str:
+        return _redact(value) if isinstance(value, str) and value.strip() else placeholder
+
+    verification_items: list[str] = []
+    raw_verification = source.get("verification")
+    if isinstance(raw_verification, list):
+        for entry in raw_verification:
+            if not isinstance(entry, dict):
+                continue
+            check = entry.get("check")
+            if not isinstance(check, str) or not check.strip():
+                continue
+            result = entry.get("result")
+            line = f"{_redact(check)}={result if isinstance(result, str) else '?'}"
+            evidence = entry.get("evidence")
+            if isinstance(evidence, str) and evidence.strip():
+                line += f"（证据：{_redact(evidence)}）"
+            verification_items.append(line)
+
+    # summary_text 承载的必要内容：preview 没有承载的字段（基线 / 变更文件 / 限制 / 验证）。
+    # 顺序即"显式 text_limit 下的保留优先级"，越靠后越先被牺牲：验证 → 限制 → 变更文件 → 基线。
+    # 计数与结论头部、"下一步"行始终保留（它们是唯一的行动指向）。
+    necessary_sections: list[tuple[str, str, list[str]]] = []
+    if report.kind == "valid":
+        raw_baseline = source.get("baseline")
+        if isinstance(raw_baseline, dict):
+            necessary_sections.append(
+                (
+                    "baseline",
+                    "基线",
+                    [
+                        "基线="
+                        + optional_text(raw_baseline.get("ref"), "(未填)")
+                        + " 差异说明="
+                        + optional_text(raw_baseline.get("diff_note"), "(未填)")
+                    ],
+                )
+            )
+        changed_files = redacted_list(source.get("changed_files"))
+        if changed_files:
+            necessary_sections.append(("changed_files", "变更文件", changed_files))
+        limitations = redacted_list(source.get("limitations"))
+        if limitations:
+            necessary_sections.append(("limitations", "限制", limitations))
+        if verification_items:
+            necessary_sections.append(("verification", "验证", verification_items))
+
+    raw_progress = source.get("progress_draft")
+    progress = raw_progress if isinstance(raw_progress, dict) else {}
+    progress_line = (
+        "进度草稿: "
+        + optional_text(progress.get("summary"), "(未填)")
+        + "｜下一步: "
+        + optional_text(progress.get("next"), "(未填)")
+        if report.kind == "valid"
+        else ""
+    )
+
+    # JSON 预算收缩开关：收缩必须写进状态，否则下一次 refresh_view 会把被收缩的内容重新渲染回来。
+    view_state: JsonDict = {"compact_read_more": False, "drop_result_preview": False}
+    # render_text 记录本次 summary_text 真实发生的省略；read_more 与 limits 都必须与它一致。
+    text_state: JsonDict = {"omitted": []}
+
+    def text_omission_entry(
+        field: str,
+        label: str,
+        omitted_items: int,
+        *,
+        reason: str = "text_limit",
+        detail: str | None = None,
+    ) -> JsonDict:
+        """summary_text 省略记录：给出字段名、真实原因与补读方式，避免元数据与正文自相矛盾。"""
+        if detail is None:
+            trigger = (
+                "显式 text_limit" if reason == "text_limit" else "显式 JSON 预算收缩"
+            )
+            detail = (
+                f"summary_text 因{trigger}未展开「{label}」区块（{omitted_items} 条）；"
+                f"该内容不在 preview 中，请用 read_more.params 调 detail 模式，"
+                f'或用 fields=["{field}"] 补读'
+            )
+        return {
+            "field": field,
+            "source": "summary_text",
+            "omitted_items": omitted_items,
+            "reason": reason,
+            "note": detail,
+        }
+
     def render_read_more() -> JsonDict:
         omitted = [
-            {"field": section, "omitted_items": preview[section]["omitted"]}
+            {
+                "field": section,
+                "source": "preview",
+                "omitted_items": preview[section]["omitted"],
+                "reason": "json_limit",
+            }
             for section in DELIVERY_PREVIEW_SECTIONS
             if preview[section]["omitted"]
-        ]
+        ] + list(text_state["omitted"])
         if result_message_id is None:
             params_hint = {"task_id": task_ref.get("id"), "mode": "detail"}
             hint = "该任务当前没有结果消息引用，detail 模式不可用；需要 Hall 上下文请用既有 talk_get_task。"
@@ -462,11 +593,21 @@ def build_delivery_summary(
                 "offset": 0,
                 "limit": DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
             }
-            hint = (
-                "用 read_more.params 调用 talk_get_delivery 的 detail 模式，"
-                "按 offset 顺序翻页可无损重建完整结果；也可用 fields 参数单独补读结构化字段。"
-            )
-        return {
+            if omitted:
+                hint = (
+                    "摘要本次有被省略的内容（条目省略见 source=preview 项，summary_text 文本省略见 "
+                    "source=summary_text 项）：用 read_more.params 调用 talk_get_delivery 的 detail 模式，"
+                    "按 offset 顺序翻页可无损重建完整结果；也可用 fields 参数单独补读结构化字段。"
+                )
+            else:
+                hint = (
+                    "摘要默认不做机械裁剪：三类明细原文完整承载于本响应 preview.<区块>.items，"
+                    "summary_text 承载任务号 / 业务结论 / 计数 / preview 定位提示，以及 preview 未承载的"
+                    "必要内容（验证结果与证据、限制、下一步、变更文件、基线）；"
+                    "完整摘要 = 同一响应中的核心字段整体，不只看 summary_text。"
+                    "需要结果原文或单独的结构化字段时，仍可用 read_more.params 调 detail 模式按 offset 补读。"
+                )
+        rendered = {
             "tool": "talk_get_delivery",
             "mode": "detail",
             "params": params_hint,
@@ -478,146 +619,256 @@ def build_delivery_summary(
             "omitted": omitted,
             "hint": hint,
         }
+        if view_state["compact_read_more"]:
+            # JSON 预算收缩：先牺牲冗余说明，但补读入口与省略清单必须保留。
+            rendered.pop("fields_param", None)
+        return rendered
 
     def render_text() -> str:
-        """渲染摘要文本：预算内按优先级排布，放不下的区块一律留下显式标记。"""
+        """渲染 summary_text。
+
+        默认（``text_limit is None``）完整输出全部必要内容，不加省略标记、不重复 preview 正文；
+        三类明细原文只由 ``preview.<区块>.items`` 承载，这里只给计数与清楚的 preview 定位提示，
+        以及 preview 未承载的必要内容（验证证据 / 限制 / 下一步 / 变更文件 / 基线）。
+        只有显式设置了 ``text_limit`` 时才按预算收缩，且放不下的区块一律留下显式标记，
+        省略事实同时写进 ``read_more.omitted`` 与 ``limits.text_truncated``，不静默也不谎报。
+        """
+        counts_line = (
+            f"阻塞={counts['blocked']} 未完成={counts['unfinished']} 已完成={counts['completed']}"
+        )
+        labels = {"blocked": "阻塞", "unfinished": "未完成", "completed": "已完成"}
+        omitted_preview = [
+            section for section in DELIVERY_PREVIEW_SECTIONS if preview[section]["omitted"]
+        ]
+        if omitted_preview:
+            pointer = (
+                "preview 定位：三类明细原文由本响应 preview.<区块>.items 承载；本次 "
+                + "、".join(
+                    f"{labels[section]} {preview[section]['omitted']} 项" for section in omitted_preview
+                )
+                + " 因 JSON 预算未展开（见 read_more.omitted 的 source=preview 项，"
+                "用 detail 补读）；本段不重复正文"
+            )
+        else:
+            pointer = (
+                "preview 定位：阻塞/未完成/已完成三类明细原文完整承载于本响应 "
+                "preview.blocked / preview.unfinished / preview.completed 的 items（本段不重复正文）"
+            )
         head = [
             f"交付摘要 task={task_ref.get('id')} "
             f"runner={runner_status['status']}/{runner_status['workflow_status']}",
             f"业务结论={conclusion['value']}（来源：{conclusion['source_label']}；非独立验收证明）",
-            f"阻塞={counts['blocked']} 未完成={counts['unfinished']} 已完成={counts['completed']}",
+            counts_line,
+            pointer,
         ]
-        labels = {"blocked": "阻塞", "unfinished": "未完成", "completed": "已完成"}
-        detail_lines: list[tuple[str, str]] = []
-        omitted_notes: list[str] = []
-        for section in DELIVERY_PREVIEW_SECTIONS:
-            label = labels[section]
-            entry = preview[section]
-            if entry["omitted"]:
-                omitted_notes.append(f"{label}{entry['omitted']}项")
-            if not entry["items"]:
-                continue
-            shown = "；".join(entry["items"])
-            if entry["omitted"]:
-                shown += f"…（另 {entry['omitted']} 项未展开）"
-            detail_lines.append((label, f"{label}({entry['total']}): {shown}"))
         caution = (
             f"[注意] {conclusion['reason']}"
             if conclusion["value"] != "complete"
             else None
         )
 
-        def compose(dropped: list[str]) -> str:
-            notes = list(omitted_notes) + list(dropped)
-            tail = [caution] if caution else []
-            if notes:
-                tail.append(
-                    "[摘要截断：" + "、".join(notes[:4]) + " 未展开，"
+        def compose(
+            kept: list[tuple[str, str, list[str]]],
+            dropped: list[tuple[str, str, list[str], str]],
+        ) -> str:
+            lines = list(head)
+            if progress_line:
+                lines.append(progress_line)
+            for _field, label, items in kept:
+                lines.append(f"{label}({len(items)}): " + "；".join(items))
+            if caution:
+                lines.append(caution)
+            if dropped:
+                dropped_labels = "、".join(label for _field, label, _items, _reason in dropped)
+                lines.append(
+                    f"[摘要截断：{dropped_labels} 未展开，"
                     "请用 talk_get_delivery mode=detail 补读，勿据本摘要认定目标已完成]"
                 )
-            return "\n".join(head + [line for _label, line in detail_lines] + tail)
+            return "\n".join(lines)
 
-        dropped: list[str] = []
-        text = compose(dropped)
-        while len(text) > text_limit and detail_lines:
-            label, _line = detail_lines.pop()
-            dropped.append(f"{label}明细")
-            text = compose(dropped)
+        kept = list(necessary_sections)
+        # 省略记录带真实原因，元数据与正文标记必须永远一致。
+        dropped: list[tuple[str, str, list[str], str]] = []
+        if text_limit is None:
+            # 默认路径：全部必要内容原样输出，不压缩、不省略、不加截断标记。
+            text_state["omitted"] = []
+            return compose(kept, dropped)
+
+        text = compose(kept, dropped)
+        while len(text) > text_limit and kept:
+            field, label, items = kept.pop()
+            dropped.insert(0, (field, label, items, "text_limit"))
+            text = compose(kept, dropped)
+        hard_cut = False
         if len(text) > text_limit:
             # 极端参数下的最后兜底：仍然保留可见的截断标记，绝不静默丢内容。
-            marker = "\n[摘要文本超限，请用 detail 补读]"
+            marker = "\n[摘要文本已按显式 text_limit 截断末尾，请用 detail 补读]"
             text = text[: max(text_limit - len(marker), 1)] + marker
+            hard_cut = True
+        text_state["omitted"] = [
+            text_omission_entry(field, label, len(items), reason=reason)
+            for field, label, items, reason in dropped
+        ]
+        if hard_cut:
+            text_state["omitted"].append(
+                {
+                    "field": "summary_text",
+                    "source": "summary_text",
+                    "omitted_items": 1,
+                    "reason": "text_limit_hard_cap",
+                    "note": (
+                        "summary_text 已按显式 text_limit 截断末尾（保留可见标记）；"
+                        "被截断内容请用 detail 模式补读"
+                    ),
+                }
+            )
         return text
 
-    shrink_stage = 0
-    while True:
-        payload["read_more"] = render_read_more()
-        payload["summary_text"] = render_text()
-        json_chars = len(_dump(payload))
+    def refresh_limits() -> None:
+        """metadata 如实反映本次是否真的发生了裁剪。
+
+        默认两个上限都是 None；``text_truncated`` 只按 summary_text 实际是否被裁剪取值
+        （由 ``render_text`` 记录的真实省略决定），``json_truncated`` 只按 JSON 预算取值。
+        两个预算分别如实反映，既不出现"文本带截断标记却报未截断"，也不互相冒充。
+        """
         payload["limits"] = {
             "text_limit_chars": text_limit,
             "text_chars": len(payload["summary_text"]),
-            "text_truncated": bool(payload["read_more"]["omitted"]),
+            "text_truncated": bool(text_state["omitted"]),
             "json_limit_chars": json_limit,
-            "json_chars": json_chars,
+            "json_chars": len(_dump(payload)),
             "json_truncated": False,
             "note": DELIVERY_LIMITS_NOTE,
         }
-        if len(_dump(payload)) <= json_limit:
-            break
-        # 分阶段收缩，先牺牲冗余说明，最后才牺牲"阻塞"预览；被牺牲的条目一律留计数与补读指引。
-        if shrink_stage == 0:
-            shrunk = False
-            for section in ("completed", "unfinished", "blocked"):
-                entry = preview[section]
-                if entry["items"]:
-                    entry["items"].pop()
-                    entry["omitted"] += 1
-                    entry["shown"] -= 1
-                    entry["note"] = (
-                        f"{section} 共 {entry['total']} 条，本摘要展示 {entry['shown']} 条；"
-                        "被省略条目必须用 read_more 指向的 detail 模式补读"
-                    )
-                    shrunk = True
-                    break
-            if shrunk:
-                continue
-            shrink_stage = 1
-            continue
-        if shrink_stage == 1:
-            payload["read_more"].pop("fields_param", None)
-            payload["notes"] = [DELIVERY_TRUST_NOTE]
-            shrink_stage = 2
-            continue
-        if shrink_stage == 2 and payload.get("result_preview"):
+
+    def refresh_view() -> None:
+        """按当前 preview / 收缩状态重算 summary_text、read_more、limits、notes，保证同一响应自洽。"""
+        payload["summary_text"] = render_text()
+        payload["read_more"] = render_read_more()
+        payload["notes"] = (
+            [DELIVERY_TRUST_NOTE]
+            if view_state["compact_read_more"]
+            else [DELIVERY_TRUST_NOTE, DELIVERY_STITCH_NOTE]
+        )
+        if view_state["drop_result_preview"]:
             payload["result_preview"] = None
-            shrink_stage = 3
-            continue
-        break
-    if len(_dump(payload)) > json_limit:
-        # 下限兜底：即使极端参数也给出可辨认的最小摘要（保留计数与预览结构），并如实报告是否仍超限。
-        payload = {
-            "mode": "summary",
-            "task_ref": {"id": task_ref.get("id")},
-            "runner_status": {
-                "status": runner_status["status"],
-                "workflow_status": runner_status["workflow_status"],
-                "result_message_id": result_message_id,
-            },
-            "delivery_conclusion": {
-                "value": conclusion["value"],
-                "trusted_source": conclusion["trusted_source"],
-                "source": conclusion["source"],
-            },
-            "counts": counts,
-            "preview": preview,
-            "summary_text": (
-                f"交付摘要 task={task_ref.get('id')} 结论={conclusion['value']} "
-                f"阻塞={counts['blocked']} 未完成={counts['unfinished']}"
-            ),
-            "limits": {
-                "text_limit_chars": text_limit,
-                "text_chars": 0,
-                "json_limit_chars": json_limit,
-                "note": DELIVERY_LIMITS_NOTE,
-            },
-            "read_more": {
-                "tool": "talk_get_delivery",
-                "mode": "detail",
-                "params": {"task_id": task_ref.get("id"), "mode": "detail"},
-                "omitted": [
-                    {"field": section, "omitted_items": preview[section]["omitted"]}
-                    for section in DELIVERY_PREVIEW_SECTIONS
-                    if preview[section]["omitted"]
-                ],
-                "hint": "摘要 JSON 已达上限并收缩，请用 detail 模式补读完整结果，勿据本摘要认定目标已完成。",
-            },
-            "minimal": True,
-            "notes": [DELIVERY_TRUST_NOTE],
-        }
+        refresh_limits()
+
+    refresh_view()
+
+    if json_limit is not None:
+        # 显式上限（opt-in 兼容）：分阶段收缩，先牺牲冗余说明，最后才牺牲"阻塞"预览；
+        # 被牺牲的条目一律留计数与补读指引。收缩一律写进 view_state，
+        # 否则下一次 refresh_view 会把它们重新渲染回来，收缩失效直接掉进最小摘要。
+        shrink_stage = 0
+        while True:
+            refresh_view()
+            if len(_dump(payload)) <= json_limit:
+                break
+            if shrink_stage == 0:
+                shrunk = False
+                for section in ("completed", "unfinished", "blocked"):
+                    entry = preview[section]
+                    if entry["items"]:
+                        entry["items"].pop()
+                        entry["omitted"] += 1
+                        entry["shown"] -= 1
+                        entry["note"] = preview_note(section, entry["total"], entry["shown"])
+                        shrunk = True
+                        break
+                if shrunk:
+                    continue
+                shrink_stage = 1
+                continue
+            if shrink_stage == 1:
+                view_state["compact_read_more"] = True
+                shrink_stage = 2
+                continue
+            if shrink_stage == 2:
+                if payload.get("result_preview"):
+                    view_state["drop_result_preview"] = True
+                    shrink_stage = 3
+                    continue
+                shrink_stage = 3
+                continue
+            break
+        if len(_dump(payload)) > json_limit:
+            # 下限兜底：即使极端参数也给出可辨认的最小摘要（保留计数与预览结构），并如实报告是否仍超限。
+            # summary_text 收缩为最小摘要属于"真的丢了内容"，因此 text_truncated 也如实为 true。
+            text_state["omitted"] = [
+                text_omission_entry(
+                    field,
+                    label,
+                    len(items),
+                    reason="json_limit_minimal",
+                    detail=(
+                        f"JSON 预算已触底，summary_text 收缩为最小摘要，未展开「{label}」区块"
+                        f"（{len(items)} 条）；请用 read_more.params 调 detail 模式，"
+                        f'或用 fields=["{field}"] 补读'
+                    ),
+                )
+                for field, label, items in necessary_sections
+            ] + [
+                {
+                    "field": "summary_text",
+                    "source": "summary_text",
+                    "omitted_items": 1,
+                    "reason": "json_limit_minimal",
+                    "note": "JSON 预算已触底，summary_text 收缩为最小摘要；必要内容请用 detail 模式补读",
+                }
+            ]
+            payload = {
+                "mode": "summary",
+                "task_ref": {"id": task_ref.get("id")},
+                "runner_status": {
+                    "status": runner_status["status"],
+                    "workflow_status": runner_status["workflow_status"],
+                    "result_message_id": result_message_id,
+                },
+                "delivery_conclusion": {
+                    "value": conclusion["value"],
+                    "trusted_source": conclusion["trusted_source"],
+                    "source": conclusion["source"],
+                },
+                "counts": counts,
+                "preview": preview,
+                "summary_text": (
+                    f"交付摘要 task={task_ref.get('id')} 结论={conclusion['value']} "
+                    f"阻塞={counts['blocked']} 未完成={counts['unfinished']}"
+                ),
+                "limits": {
+                    "text_limit_chars": text_limit,
+                    "text_chars": 0,
+                    "text_truncated": True,
+                    "json_limit_chars": json_limit,
+                    "json_chars": 0,
+                    "json_truncated": False,
+                    "note": DELIVERY_LIMITS_NOTE,
+                },
+                "read_more": {
+                    "tool": "talk_get_delivery",
+                    "mode": "detail",
+                    "params": {"task_id": task_ref.get("id"), "mode": "detail"},
+                    "omitted": [
+                        {
+                            "field": section,
+                            "source": "preview",
+                            "omitted_items": preview[section]["omitted"],
+                            "reason": "json_limit",
+                        }
+                        for section in DELIVERY_PREVIEW_SECTIONS
+                        if preview[section]["omitted"]
+                    ] + list(text_state["omitted"]),
+                    "hint": "摘要 JSON 已达上限并收缩，请用 detail 模式补读完整结果，勿据本摘要认定目标已完成。",
+                },
+                "minimal": True,
+                "notes": [DELIVERY_TRUST_NOTE],
+            }
     payload["limits"]["text_chars"] = len(payload["summary_text"])
     payload["limits"]["json_chars"] = len(_dump(payload))
-    payload["limits"]["json_truncated"] = bool(payload["limits"]["json_chars"] > json_limit)
+    payload["limits"]["json_truncated"] = bool(
+        json_limit is not None and payload["limits"]["json_chars"] > json_limit
+    )
     return payload
 
 
