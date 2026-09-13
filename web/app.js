@@ -29,6 +29,7 @@ let ws = null;
 let eventSource = null;
 let pollTimer = null;
 let taskPollTimer = null;
+let taskDurationTimer = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let pendingFile = null;
@@ -612,6 +613,10 @@ logoutBtn.addEventListener("click", () => {
     clearInterval(taskPollTimer);
     taskPollTimer = null;
   }
+  if (taskDurationTimer) {
+    clearInterval(taskDurationTimer);
+    taskDurationTimer = null;
+  }
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -982,6 +987,16 @@ function formatTaskTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+// 统一轻量计时器：每秒只刷新执行中任务条目的耗时文案，不重建列表、不请求接口、不影响滚动与焦点。
+// 耗时按任务真实 claimed_at 与当前时间重新计算，不累加 tick 误差；终态条目渲染时已冻结，不在此更新。
+function tickTaskDurations(nowMs = Date.now()) {
+  if (typeof document === "undefined") return;
+  for (const el of document.querySelectorAll(".task-card-duration[data-running='1']")) {
+    const task = projectTasks.find((item) => Number(item.id) === Number(el.dataset.taskId));
+    if (task) el.textContent = workspaceTaskDuration(task, nowMs);
+  }
 }
 
 function renderBlackboard() { renderWorkspaceList(); }
@@ -2412,6 +2427,8 @@ function startChat() {
   pollTimer = setInterval(pollMessages, 3000);
   if (taskPollTimer) clearInterval(taskPollTimer);
   taskPollTimer = setInterval(() => loadProjectTasks({ silent: true }), 5000);
+  if (taskDurationTimer) clearInterval(taskDurationTimer);
+  taskDurationTimer = setInterval(tickTaskDurations, 1000);
 }
 
 async function loadHistory() {

@@ -71,6 +71,32 @@ function workspaceWorkSummary(id) {
   return count ? `正在参与 ${count} 项任务` : "当前没有进行中的任务";
 }
 function workspaceTitle(task) { return task.title || task.content?.split("\n")[0] || "未命名任务"; }
+// 执行耗时起止：claimed_at 是角色实际领取（重试会刷新为最新一次领取），finished_at 是执行结束（成功提交/失败/取消），均不含排队与待收取时间。
+// 后端时间可能是 UTC 无时区字符串（如 2026-09-13T09:18:20.702888）或带明确偏移，统一按真实时间戳解析，无效返回 null。
+function workspaceParseTime(value) {
+  if (value === null || value === undefined) return null;
+  let text = String(value).trim();
+  if (!text) return null;
+  if (!/(?:z|[+-]\d{2}:?\d{2})$/i.test(text)) text += "Z";
+  const ms = Date.parse(text.includes("T") ? text : text.replace(" ", "T"));
+  return Number.isNaN(ms) ? null : ms;
+}
+// HH:MM:SS；小时超过 24 不回卷，超过 99 自然扩展位数。
+function workspaceFormatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const total = Math.floor(ms / 1000);
+  const pad = n => String(n).padStart(2, "0");
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}`;
+}
+// 终态用 finished_at 冻结；执行中按传入的当前时间实时计算；缺少/无效起止或负值显示 —。
+function workspaceTaskDuration(task, nowMs = Date.now()) {
+  const start = workspaceParseTime(task?.claimed_at);
+  if (start === null) return "—";
+  const finished = workspaceParseTime(task?.finished_at);
+  const end = finished !== null ? finished : (task?.workflow_status === "in_progress" ? nowMs : null);
+  if (end === null || end < start) return "—";
+  return workspaceFormatDuration(end - start);
+}
 function syncWorkspaceLayout() {
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
   document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
@@ -99,7 +125,16 @@ function workspaceTaskRow(task) {
   button.appendChild(workspaceEl("div", "task-card-title", workspaceTitle(task)));
   const status = taskStatusMeta(task);
   button.appendChild(workspaceEl("span", `task-status-badge ${status.className}`, status.label));
-  button.appendChild(workspaceEl("div", "task-card-meta", `负责人 ${workspaceMemberName(task.target_member_id)} · ${formatTaskTime(task.updated_at)}`));
+  const meta = workspaceEl("div", "task-card-meta");
+  meta.appendChild(document.createTextNode(`负责人 ${workspaceMemberName(task.target_member_id)} · ${formatTaskTime(task.updated_at)} · 耗时 `));
+  const duration = workspaceEl("span", "task-card-duration", workspaceTaskDuration(task));
+  duration.dataset.taskId = String(task.id);
+  // 只有执行中的条目由统一计时器逐秒刷新；终态在渲染时冻结，列表轮询不重绘时也不变。
+  if (task.workflow_status === "in_progress" && workspaceParseTime(task.claimed_at) !== null && workspaceParseTime(task.finished_at) === null) {
+    duration.dataset.running = "1";
+  }
+  meta.appendChild(duration);
+  button.appendChild(meta);
   return button;
 }
 function renderWorkspaceList() {
@@ -280,4 +315,4 @@ if (typeof document !== "undefined") {
   });
   document.getElementById("workspace-search").addEventListener("input", event => { workspaceUI.query = event.target.value; renderWorkspaceList(); });
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration};

@@ -861,6 +861,11 @@ input.auth-input:-webkit-autofill:focus,
   line-height: 1.45;
 }
 
+.task-card-duration {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .task-card-footer {
   display: flex;
   justify-content: space-between;
