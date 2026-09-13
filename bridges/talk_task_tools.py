@@ -12,6 +12,16 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+from bridges import talk_delivery
+from bridges.talk_delivery import (
+    DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
+    DELIVERY_DETAIL_MAX_PAGE_CHARS,
+    DELIVERY_SUMMARY_JSON_LIMIT,
+    DELIVERY_SUMMARY_TEXT_LIMIT,
+    TOP_LEVEL_FIELDS,
+    DeliveryParamError,
+)
+
 JsonDict = dict[str, Any]
 # 提前返回的协作状态：成果提交 / 完成 / 失败 / 需澄清（含澄清已答复、需决策、取消）。
 # 这些状态一旦出现即可结束等待，不需要等满整个超时窗口。
@@ -421,6 +431,183 @@ def collect_result(*, task_id: int) -> JsonDict:
     return get_task(task_id, include_messages=True)
 
 
+# 只读边界说明：交付摘要不代替业务验收，也不触发任何状态流转。
+DELIVERY_READ_ONLY_NOTE = (
+    "talk_get_delivery 完全只读：不自动 collect / accept，不改变任务状态，不扫描整个 Hall 历史，"
+    "也不按结果正文里的路径读取本机文件。"
+)
+
+
+def _delivery_result_message(task: JsonDict) -> tuple[JsonDict | None, str]:
+    """按 result_message_id 精确取回结果消息（最多一条），不拉取整个 Hall 时间线。"""
+    reference = task.get("result_message_id")
+    if reference is None:
+        return None, "no_result_reference"
+    params: JsonDict = {"since": int(reference) - 1, "limit": 1}
+    if task.get("hall_group_id"):
+        params["group_id"] = task["hall_group_id"]
+    messages = _api_request("GET", "/api/messages", params=params)
+    for message in messages or []:
+        if int(message.get("id", -1)) == int(reference):
+            return message, "ok"
+    return None, "result_message_unavailable"
+
+
+def get_delivery(
+    *,
+    task_id: int,
+    mode: str = "summary",
+    result_message_id: int | None = None,
+    offset: int = 0,
+    limit: int | None = None,
+    fields: list[str] | None = None,
+    expect_sha256: str | None = None,
+) -> JsonDict:
+    """只读交付摘要（summary）与可追溯分页补读（detail）。
+
+    - summary：按 task_id 定位最新结果消息，返回有界摘要；业务结论只来自通过本地
+      talk-delivery-1 校验的结构化自报，自由文本 / 无效结构化报告一律 unknown / invalid。
+    - detail：必须带 result_message_id 稳定引用，按 offset / limit 分页读取完整结果原文，
+      或用 fields 读取交付包顶层字段；引用变化时返回 stale_reference 并要求重置。
+    - 两种模式都不自动 collect / accept，不改变任务状态，不读任何本机文件。
+    """
+    normalized_mode = str(mode or "summary").strip().lower()
+    if normalized_mode not in {"summary", "detail"}:
+        raise TalkToolError("mode 必须是 summary 或 detail")
+    if normalized_mode == "summary" and (
+        fields is not None or limit is not None or offset not in (0, None)
+    ):
+        raise TalkToolError("summary 模式不接受 offset / limit / fields；补读请显式使用 mode=detail")
+    try:
+        page_offset, page_limit, selected_fields = talk_delivery.normalize_detail_params(
+            offset=offset, limit=limit, fields=fields
+        )
+    except DeliveryParamError as exc:
+        raise TalkToolError(str(exc)) from exc
+
+    task = _api_request("GET", f"/api/tasks/{int(task_id)}")
+    task_ref_id = task.get("id")
+    current_reference = task.get("result_message_id")
+    requested_reference = (
+        None if result_message_id is None else int(result_message_id)
+    )
+    if (
+        requested_reference is not None
+        and current_reference is not None
+        and requested_reference != current_reference
+    ):
+        return talk_delivery.build_stale_payload(
+            mode=normalized_mode,
+            task_id=task_ref_id,
+            reason="result_reference_changed",
+            requested_result_message_id=requested_reference,
+            current_result_message_id=current_reference,
+            current_content_sha256=None,
+            page_limit=page_limit,
+        )
+
+    message: JsonDict | None = None
+    message_state = "no_result_reference"
+    if current_reference is not None:
+        message, message_state = _delivery_result_message(task)
+
+    if normalized_mode == "summary":
+        return talk_delivery.build_delivery_summary(task, message)
+
+    if requested_reference is None:
+        raise TalkToolError(
+            "detail 模式必须提供 result_message_id（取自 summary 的 runner_status.result_message_id），"
+            "用于防止把两份结果拼在一起"
+        )
+    if current_reference is None:
+        return talk_delivery.build_unavailable_payload(
+            mode="detail",
+            task_id=task_ref_id,
+            reason="no_result_reference",
+            message="该任务当前没有结果消息引用，无法分页补读；任务正文与 Hall 历史请用既有 talk_get_task。",
+        )
+    if message is None:
+        return talk_delivery.build_unavailable_payload(
+            mode="detail",
+            task_id=task_ref_id,
+            reason=message_state,
+            message="按 result_message_id 未能取回结果消息（可能不可见或已删除）；本工具不会退回扫描 Hall 历史。",
+        )
+
+    raw_content = message.get("content")
+    full_text = raw_content if isinstance(raw_content, str) else ""
+    digest = talk_delivery.text_sha256(full_text)
+    if expect_sha256 is not None and str(expect_sha256).strip() != digest:
+        return talk_delivery.build_stale_payload(
+            mode="detail",
+            task_id=task_ref_id,
+            reason="content_changed",
+            requested_result_message_id=requested_reference,
+            current_result_message_id=current_reference,
+            current_content_sha256=digest,
+            page_limit=page_limit,
+        )
+
+    report = talk_delivery.parse_delivery_report(raw_content, expect_task_id=task_ref_id)
+    if selected_fields is not None:
+        if report.kind != "valid" or not isinstance(report.report, dict):
+            return talk_delivery.build_unavailable_payload(
+                mode="detail",
+                task_id=task_ref_id,
+                reason=f"structured_report_{report.kind}",
+                message=(
+                    f"结果消息没有通过 {talk_delivery.SCHEMA_ID} 校验的结构化自报（{report.detail}）；"
+                    "请省略 fields，用原文分页补读。"
+                ),
+            )
+        document = json.dumps(
+            {name: report.report.get(name) for name in selected_fields}, ensure_ascii=False
+        )
+        source = "field:" + ",".join(selected_fields)
+    else:
+        document = full_text
+        source = "raw_text"
+
+    try:
+        page = talk_delivery.page_document(document, offset=page_offset, limit=page_limit)
+    except DeliveryParamError as exc:
+        raise TalkToolError(str(exc)) from exc
+
+    next_params = None
+    if page["next_offset"] is not None:
+        next_params = {
+            "task_id": task_ref_id,
+            "mode": "detail",
+            "result_message_id": requested_reference,
+            "offset": page["next_offset"],
+            "limit": page_limit,
+            "expect_sha256": digest,
+        }
+        if selected_fields is not None:
+            next_params["fields"] = list(selected_fields)
+    return {
+        "mode": "detail",
+        "status": "ok",
+        "task_ref": talk_delivery.task_reference(task),
+        "reference": {
+            "result_message_id": requested_reference,
+            "content_sha256": digest,
+            "from_id": message.get("from_id"),
+            "created_at": message.get("created_at"),
+            "chars": len(full_text),
+        },
+        "delivery_conclusion": talk_delivery.conclusion_for(
+            message, report, expect_task_id=task_ref_id
+        ),
+        "structured_available": report.kind == "valid",
+        "source": source,
+        "page": page,
+        "next_params": next_params,
+        "read_only_note": DELIVERY_READ_ONLY_NOTE,
+        "notes": [talk_delivery.DELIVERY_STITCH_NOTE, DELIVERY_READ_ONLY_NOTE],
+    }
+
+
 def _normalize_wait_timeout(value: Any) -> tuple[float, float]:
     """把调用方给的超时归一化为 (请求值, 生效值)；生效值落在 0..600 秒。"""
     if value is None:
@@ -784,6 +971,71 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "required": ["task_id"],
         },
     },
+    {
+        "name": "talk_get_delivery",
+        "description": (
+            "只读读取一个任务的交付摘要，并可按稳定引用分页补读完整结果。"
+            "summary 模式（默认）按 task_id 定位结果消息，返回有界摘要：task_ref / "
+            "runner_status（runner 状态与协作状态）/ delivery_conclusion（业务结论，"
+            "只来自结果消息中通过本地 talk-delivery-1 校验、且**自身 task_id 与本任务号一致**"
+            "的结构化自报，delivery_conclusion.task_id_check 会如实回显 declared/expected/matches；"
+            "自由文本、无效结构化报告或错号自报一律 unknown / invalid，绝不从 succeeded 或正文词汇"
+            "推断 complete）/ counts / "
+            "preview（阻塞优先）/ summary_text / limits / read_more。"
+            f"summary_text 上限 {DELIVERY_SUMMARY_TEXT_LIMIT} 字符，整个 JSON 响应上限 "
+            f"{DELIVERY_SUMMARY_JSON_LIMIT} 字符，是两个独立预算，"
+            f"不承诺把整份交付报告无损压进 {DELIVERY_SUMMARY_TEXT_LIMIT} 字符；"
+            "所有省略都会在 read_more.omitted 与摘要截断标记里显式列出，不会静默丢弃，"
+            "更不会在隐藏阻塞项的同时只报完成。"
+            "detail 模式必须提供 result_message_id（取自 summary），按 offset / limit 分页读取"
+            f"完整结果原文（单页上限 {DELIVERY_DETAIL_MAX_PAGE_CHARS} 字符），"
+            "或用 fields 指定 talk-delivery-1 顶层字段读取结构化值；按 offset 顺序拼接各页可无损重建完整结果。"
+            "fields 只接受通过校验且 task_id 与本任务号一致的结构化自报，错号时返回 unavailable，"
+            "但按 result_message_id 读取完整原文始终不受该核对影响。"
+            "结果引用变化（result_message_id 改变，或 expect_sha256 与当前内容不一致）时返回 "
+            "status=stale_reference 并要求从 offset=0 重新开始，绝不把两份结果拼在一起。"
+            "本工具完全只读：不自动 collect / accept，不改变任务状态，不扫描整个 Hall 历史，"
+            "也不按结果正文里的路径读取本机文件；runner 结束不等于用户目标完成。"
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "integer",
+                    "description": (
+                        "实际任务号；结果消息里的结构化自报必须自带与之规范化一致的 task_id，"
+                        "否则 delivery_conclusion 判 invalid / 不可信"
+                    ),
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["summary", "detail"],
+                    "default": "summary",
+                },
+                "result_message_id": {
+                    "type": "integer",
+                    "description": "detail 模式必填的稳定结果引用；summary 模式下传入则作为引用一致性断言",
+                },
+                "offset": {"type": "integer", "minimum": 0, "default": 0},
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": DELIVERY_DETAIL_MAX_PAGE_CHARS,
+                    "default": DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": list(TOP_LEVEL_FIELDS)},
+                    "description": "detail 模式下按结构化字段补读；省略表示补读完整结果原文",
+                },
+                "expect_sha256": {
+                    "type": "string",
+                    "description": "可选：上一页返回的 content_sha256，用于拒绝内容已变化的结果",
+                },
+            },
+            "required": ["task_id"],
+        },
+    },
 ]
 
 
@@ -851,4 +1103,18 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
         )
     if name == "talk_collect_result":
         return collect_result(task_id=int(arguments["task_id"]))
+    if name == "talk_get_delivery":
+        return get_delivery(
+            task_id=int(arguments["task_id"]),
+            mode=str(arguments.get("mode") or "summary"),
+            result_message_id=(
+                int(arguments["result_message_id"])
+                if arguments.get("result_message_id") is not None
+                else None
+            ),
+            offset=arguments.get("offset", 0),
+            limit=arguments.get("limit"),
+            fields=arguments.get("fields"),
+            expect_sha256=arguments.get("expect_sha256"),
+        )
     raise TalkToolError(f"未知 Task Hall 工具: {name}")

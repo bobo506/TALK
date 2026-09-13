@@ -1,5 +1,27 @@
 # 开发历史 · TALK
 
+## 2026-09-13 恢复并补齐第二片 Git 收尾
+
+- 用户指出昨日停在收尾承诺处。实际核对 HEAD 仍为 881ce12，本片12个文件已落盘但未提交；不能把昨日“统一提交推送”的收尾计划当成已完成事实。
+- 当前用量工具读数五小时已用1%、周已用25%；昨日96%门禁已过期。沿用Kimi已完成的140项定向测试、13项专项断言及真实管道证据，不重复完整代码审查/测试；仅对收尾文档做编码和Git差异检查，并补办统一commit/push到已授权分支。
+- 当前宿主工具目录仍不含talk_get_delivery；真实入口冒烟仍待用户重连后执行。未重启服务、未改用户配置、未开新优化片。
+
+
+## 2026-09-12 MCP 只读交付摘要与可追溯补读
+
+- 用户授权下一片，并担心 1200 字符截断影响含义。Codex 限定新增单一只读工具，保留旧默认合同；摘要作为索引，省略必须可见，按结果引用与内容 hash 分页补读，不能猜业务成功。
+- 基线 881ce12。DeepSeek #42 开发、Kimi #43 全面独立复核，129 项测试与真实匿名管道通过，但发现 parse_delivery_report 未传 expect_task_id，别的任务报告可能被当有效自报。DeepSeek #44 返修；Kimi #45 针对性复核通过：交付测试51项+任务工具/MCP/原CLI共89项=140项，另13项独立断言通过；真实匿名管道stdio退化0次。开发环境管道受限的缺测已由独立复核补齐。
+- 结构化解析、结论和detail字段三条路径均绑定实际task.id；错号complete/partial/blocked为invalid/untrusted，错号内容不进入结构化预览；合法7/#7规范化通过，自由文本unknown，完整服务器原文分页仍可读取。只读查看无collect/accept副作用，服务端API/数据库/旧工具/角色列表/等待未改。
+- 摘要文本上限1200字符，正常JSON响应上限6000字符，显式显示计数/省略/补读；detail默认2000、上限4000字符，可选择结构化字段。携带结果消息ID和expect_sha256发现引用或内容变化，stale不返回正文，需从头读取；仅ID不能识别同ID内容改变。源按结果ID及Hall作用域定位，不扫描完整历史或根据消息路径读本地文件。
+- 开发样例9451字符报告：摘要文本901/1200、JSON4004/6000；阻塞与未完成各20项、各3显示17省略；10页重建hash一致。25万字符自由文本：JSON2710、preview300、结论unknown；Kimi检查分页无损与限制。字符指标不代表额度节省，分页只能取已存内容，不能补回bridge上传前已截断的部分。
+- 本轮主控按期望任务号校验报告，实际拦截#43误写review-42。核对TALK任务43的结果消息明确指向review.json后，保留原件，另写review-task43.json更正元数据并记来源，审查FAIL证据未改。#44/#45报告实际任务号正确。截断时只补读verification、unfinished、blocked、limitations必要字段。
+- #42–#45已收取完成。当前宿主工具目录不含talk_get_delivery，未重连、不宣称真实宿主已加载；隔离LiveTalkServer与stdio测试不替代宿主端到端冒烟。pi TypeScript扩展未改。
+- 等待工具调用：#42为600秒超时仍running，后404.297秒命中；#43为298.875秒；#44为434.485秒；#45为600.031秒超时仍running，后72.891秒命中。这是调用等待时间，不是完整Agent工时或计费时间；仍有宿主续行和无变化消息，本片没有解决等待成本。
+- 用量工具前后读数：五小时59%→96%、周19%→25%，仅账号共享窗口快照，不足以证明独占归因或节省。usage-gate返回continue但session/weekly读数为null，实际额度以可用应用工具为准。>=90%触发收尾：本片必要文档/验证/提交推送后暂停，不启新片。
+- 变更文件：bridges/talk_delivery.py、bridges/talk_task_tools.py、bridges/talk_terminal_mcp.py、tests/test_talk_delivery.py、tests/test_talk_task_tools.py、tests/test_talk_terminal_mcp.py、docs/guides/TASK_WORKFLOW.md、AGENTS.md、docs/spec/MODULE_bridges.md、docs/spec/TERMINAL_RETURN_DRAFT.md、docs/PROGRESS.md、docs/PROGRESS_HISTORY.md。用户页面无变化，最终用户手册不变；临时报告不入库。Codex仅文档和必要Git核对，不重复完整代码审查。
+- 收尾统一commit/push到已授权codex/terminal-return-codex，不合并main；额度恢复和MCP重连后只补一次只读宿主冒烟，再决定下一优化片。恢复指令：继续项目。
+
+
 ## 2026-09-12 使用流程第一片：本地交付校验与摘要
 
 - 用户要求逐项优化协调消耗，先调整使用流程，并指出只靠提示词可能不可靠。Codex 将本片限制为本地脚本、短模板及调用约定，不改生产 MCP/HTTP/SDK/bridge/数据库/任务状态或等待配置。

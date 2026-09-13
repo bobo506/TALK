@@ -1,17 +1,20 @@
-# TALK 使用流程：固定交付包与本地校验
+# TALK 使用流程：固定交付包、本地校验与只读交付摘要
 
-本指南只覆盖**项目本地的使用流程**：交付时写一份固定结构的 JSON 交付包，用本地脚本做机械校验，
-聊天/TALK 回复只报短结论和文件路径。不改 TALK 服务端、MCP/HTTP/SDK/bridge 实现、数据库或任务状态语义。
+本指南覆盖项目本地的交付流程：交付时写一份固定结构的 JSON 交付包，用本地脚本做机械校验，
+聊天/TALK 回复只报短结论和文件路径；另外说明本片新增的 MCP 只读交付摘要工具
+`talk_get_delivery`（有界摘要 + 可追溯按需补读）。
 
 配套脚本：`scripts/talk_workflow.py`（仅标准库，无需额外依赖）。
+配套工具：`talk_get_delivery`（只读；不自动收取结果、不改变任务状态，第 6 节）。
 
 ## 1. 为什么这样做
 
 | 旧痛点 | 现在的做法 |
 | --- | --- |
-| `get_task` 与 `collect_result` 重复取全文 | 交付包固定路径 + 固定字段，取一次就够 |
-| runner 报 succeeded，但推送失败只能读正文才发现 | 交付结论由执行者显式声明 `complete/partial/blocked`，脚本拒绝把 runner 状态当结论 |
+| `get_task` 与 `collect_result` 重复取全文 | 交付包固定路径 + 固定字段，取一次就够；MCP 侧用 `talk_get_delivery` 只取有界摘要 |
+| runner 报 succeeded，但推送失败只能读正文才发现 | 交付结论由执行者显式声明 `complete/partial/blocked`，脚本和 MCP 摘要都拒绝把 runner 状态当结论 |
 | 交付后 Codex 再拼进度、重复提交推送 | 执行者写进度草稿，Codex 只做收尾；详细证据留在交付包文件里 |
+| 长报告被截断后要点丢失 | 摘要显式标注所有省略并给出补读参数，detail 模式按稳定引用分页重建全文 |
 
 目标是在正常收尾路径上减少往返次数。**不承诺**固定工具轮数，也不承诺计费或额度节省。
 
@@ -82,9 +85,94 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 - 单条文本超过预览长度（80 字符）会截断并计数提示。
 - 摘要里的“字符数”只是长度指标，**不能当计费 token 或额度**使用。
 
-## 6. 可复制模板
+## 6. MCP 只读交付摘要与补读（`talk_get_delivery`）
 
-### 6.1 短任务包模板（发给执行 Agent）
+本片在既有任务工具集里新增**一个**只读工具 `talk_get_delivery`：按 `task_id` 读取交付摘要，
+并按稳定引用分页补读完整结果。既有 `talk_get_task` / `talk_collect_result` 等工具的默认合同不变；
+本工具**不会**为了摘要自动 collect / accept，也不改变任何任务状态，不读本机文件。
+
+### 6.1 三种状态必须分开看
+
+| 字段 | 含义 | 不能当成什么 |
+| --- | --- | --- |
+| `runner_status.status` | `agent_tasks.status`：`queued/running/succeeded/failed/canceled` | 不是业务结论；`succeeded` 只表示 runner 已结束 |
+| `runner_status.workflow_status` | 协作流转：`assigned/in_progress/submitted/completed/...` | 不是业务结论；`submitted` 只表示成果已提交 |
+| `delivery_conclusion.value` | 业务结论：`complete/partial/blocked`，只认通过本地 `talk-delivery-1` 校验的结构化自报 | `invalid`/`unknown` 时不得推断完成 |
+
+- `delivery_conclusion.trusted_source=true` 只有一个来源：结果消息正文是合法 `talk-delivery-1` JSON，
+  并且通过 `scripts/talk_workflow.py` 的同一套校验；它仍然只是执行者自报，**不是独立验收证明**。
+- 除此之外还必须**核对报告自身声明的任务号**：工具取任务记录自身的 `id`，与自报 `task_id` 规范化后
+  比对（`38` 与 `#38` 等价，沿用 CLI 规则）；错号、缺号或无法比对一律 `value=invalid`、
+  `trusted_source=false`，`delivery_conclusion.task_id_check` 会回显 `declared / expected / matches`，
+  且错号报告的结构化内容不会进入 `counts` 与 `preview`。
+  这只约束结构化字段与业务结论，**不影响**按 `result_message_id` 分页补读完整原文。
+- 自由文本旧报告 → `value=unknown`、`source=unstructured_text`；能解析成 JSON 但校验不过 →
+  `value=invalid`，并给出至多 5 条校验问题（例如 `complete` 与 `result: "fail"` 自报矛盾）。
+- runner 结束**不等于**用户目标完成；结果正文里出现“完成 / complete”这类词不会被拿来猜结论。
+
+### 6.2 summary 模式（默认）
+
+- 返回有界摘要：`task_ref`、`runner_status`、`delivery_conclusion`、`counts`、`preview`
+  （顺序固定为 阻塞 → 未完成 → 已完成）、`summary_text`、`limits`、`read_more`。
+- 正常情况下 `summary_text` ≤ **1200 字符**、整个 JSON 响应 ≤ **6000 字符**；这是两个独立预算，
+  `limits` 会同时给出两个实测值，**不承诺**把整份交付报告无损压进 1200 字符。
+- 所有省略都显式可见：`preview.<区块>.omitted`、`read_more.omitted` 和 `summary_text` 末尾的
+  `[摘要截断：...]` 都会列出被省略的字段，`counts` 始终是真实数量；收缩顺序是
+  已完成 → 未完成 → 阻塞，**不会**在隐藏阻塞项的同时只报完成。
+- 旧任务没有结构化报告时，摘要仍给 `unknown` 加一段带 `trusted=false` 的短预览（≤300 字符），
+  并指向 `read_more` 的补读参数。
+
+### 6.3 detail 模式（按需补读）
+
+```json
+{"task_id": 42, "mode": "detail", "result_message_id": 411, "offset": 0, "limit": 2000}
+```
+
+- `result_message_id` 必填（取自 summary 的 `runner_status.result_message_id` 或 `read_more.params`），
+  它是**稳定引用**，用来防止把两份结果拼在一起。
+- `offset` 从 0 开始，`limit` 默认 2000、上限 4000 字符；按 `offset` 顺序拼接各页可**无损重建**完整结果，
+  每页都能核对 `page.total_chars` 与 `reference.content_sha256`，末页 `page.done=true`、`next_offset=null`。
+- `fields` 可指定 `talk-delivery-1` 顶层字段（如 `blocked`、`verification`）只读结构化值；
+  结果不是合法结构化自报时返回 `status=unavailable`，不会猜内容。
+- 调用者补读时应保留 summary/上一页返回的完整参数，包括 `result_message_id` 与 `expect_sha256`；仅携带消息 ID 不能发现同一消息正文发生变化。
+- 数据变化会**拒绝旧引用**：`result_message_id` 已改变，或 `expect_sha256` 与当前内容不一致时，
+  返回 `status=stale_reference` + `reset_required=true` + `next_params`，**且不返回任何正文**；
+  必须按 `next_params` 从 `offset=0` 重新开始，禁止拼接两份结果。
+- 无结果引用、结果消息不可见时返回 `status=unavailable`，不会退回扫描整个 Hall 历史。
+- 非法游标直接报错：`offset` 为负或超过结果长度、`limit` 越界、`fields` 含未知字段都会被拒绝。
+
+### 6.4 怎么把结构化交付写成结果消息
+
+执行者完成任务时，把交付包 JSON **原样作为结果消息正文**（TALK 结果消息即 `result_message_id` 指向的那条）：
+
+```text
+{"task_id":"42","conclusion":"partial","completed":["..."],"unfinished":["..."],"blocked":[],
+ "changed_files":["bridges/talk_delivery.py"],
+ "baseline":{"ref":"881ce12","diff_note":"只新增只读工具与测试"},
+ "verification":[{"check":"python -m unittest tests.test_talk_delivery","result":"pass","evidence":"全部通过"}],
+ "limitations":["..."],"progress_draft":{"summary":"...","next":"..."}}
+```
+
+- 正文整体可以套一层 ```` ```json ```` 围栏，摘要会剥掉围栏再校验；围栏之外不要混入解释文字。
+- `task_id` 必须是**这份报告自身所属任务**的真实 TALK 任务号（不是被复核的开发任务号、不是
+  `review-42` 这类自造标签）：工具会拿它与任务记录的实际 `id` 比对，错号即判 `invalid`/不可信。
+  关联的开发/复核任务号写在 `baseline.diff_note` 等说明文字里。
+- 正文必须是**完整**的 JSON 对象；字段与上限见第 3、4 节，本地校验通过的结构化自报才会被摘要认作可信来源。
+- 也可以额外把同一份 JSON 写到 `.tmp/<切片>/development.json`，两条路径内容保持一致即可。
+
+### 6.5 降级行为（不要假装旧报告已经迁移）
+
+- 旧任务的结果消息仍是自由文本：摘要只给 `unknown` + 短预览 + 补读入口，**不会**自动改写旧消息，
+  也**不会**声称旧报告已迁移成结构化交付。
+- bridge 会对过长回复做截断（默认 `--max-reply-chars 12000`，截断处追加 `[truncated N chars]`）；
+  被截断的交付 JSON 不再合法，摘要会判 `invalid` 或按自由文本给 `unknown`，需要重新提交完整结果；分页只能恢复服务器已保存的正文，不能恢复上传前已经缺失的部分。
+- 结果正文超过 64 KiB 时按 `too_large` 处理，不按结构化自报解析，但原文仍可用 detail 模式分页补读。
+- 摘要里的 `chars` 只是字符数指标，不是计费 token，也不是额度。
+- 普通终端入口 `--check` 会输出 `delivery_defaults`，把上述上限、可信来源与补读合同一并打印出来。
+
+## 7. 可复制模板
+
+### 7.1 短任务包模板（发给执行 Agent）
 
 ```text
 【任务】<一句话目标>
@@ -98,7 +186,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 【收尾】开发完成即暂停等独立复核；不自行 commit/push
 ```
 
-### 6.2 审查任务包模板（发给复核 Agent）
+### 7.2 审查任务包模板（发给复核 Agent）
 
 ```text
 【复核对象】<交付包路径> + <变更文件清单>
@@ -110,9 +198,11 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 【交付物】复核结论（agree / disagree + 具体问题 + 建议），发现问题交回开发者修正后再复核
 ```
 
-### 6.3 交付包 JSON 模板（partial 示例，按需替换内容）
+### 7.3 交付包 JSON 模板（partial 示例，按需替换内容）
 
-`task_id` 换成**提交者本次的 TALK 任务号**；复核要关联的开发任务号写在 `baseline.diff_note` 等说明文字里。
+`task_id` 必须写**报告自身（本次提交）的 TALK 任务号**，不能写被复核/被关联的开发任务号；
+复核要关联的开发任务号写在 `baseline.diff_note` 等说明文字里。复核者尤其注意：报告是你本次任务的报告，
+`task_id` 不是你在复核的那个任务号，也不是 `review-42` 这类自造标签。
 
 ```json
 {
@@ -133,7 +223,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 
 写完后两条命令都要跑，并带上本次任务号：`validate ... --expect-task-id <本次任务号>` 通过、`summary ... --expect-task-id <本次任务号>` 能给出短结论。
 
-### 6.4 短结论回复模板（聊天/TALK 只报这些）
+### 7.4 短结论回复模板（聊天/TALK 只报这些）
 
 ```text
 结论：complete | partial | blocked
@@ -143,7 +233,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 测试：<命令> → <结果一行>
 ```
 
-### 6.5 派发调用约束（已实测，直接照抄）
+### 7.5 派发调用约束（已实测，直接照抄）
 
 派发**独立顶层任务**（没有父任务的单发任务）时只传最小字段：
 
@@ -159,7 +249,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 - 需要复核时，单独派发一条独立顶层任务，在 `content` 里写明复核对象路径与验收标准，不要靠 `related_task_ids` 挂靠。
 - 本片不实现新的服务端分支，也不猜测子任务权限；固定用上面这组最小调用即可。
 
-## 7. 分工与收尾节奏
+## 8. 分工与收尾节奏
 
 - 默认分工沿用 AGENTS.md：后端及本地脚本由 DeepSeek 开发、Kimi 独立复核；前端由 Kimi 开发、DeepSeek 独立复核。Codex 只做范围、摘要、分歧裁决与文档/Git 收尾。
 - 开发完成即**暂停**，等独立复核，不在复核期间并行改码。
@@ -168,7 +258,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 - 已知权限障碍（例如推送凭据被拒）：**一次**明确报 `partial`/`blocked`，不重复试探、不申请用户级权限。
 - Codex 不把原任务正文与 Hall 历史回灌上下文；需要细节时按路径按段展开交付包文件。
 
-## 8. 常见错误与修法
+## 9. 常见错误与修法
 
 | 报错字段 | 含义 | 修法 |
 | --- | --- | --- |
@@ -183,13 +273,16 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 | `ERROR 文件不是合法 UTF-8` | 文件是 GBK 或二进制 | 用 `encoding="utf-8"` 重写 |
 | `ERROR 交付包过大` | 超过 64 KiB | 只保留结构化字段，日志留在文件系统里 |
 
-## 9. 限制与非目标
+## 10. 限制与非目标
 
 - 只做本地格式与自报一致性校验，不做业务正确性判断，不自动收取/accept 任务。
 - `--expect-task-id` 只核对任务号字符串，不证明内容归属；防的是“旧文件 / 别的任务报告”这类明显错配。
 - 派发约束只记录已实测的最小调用；本片不新增服务端分支、不猜测子任务权限。
 - 密钥脱敏是启发式，覆盖不了所有形态；硬要求是不要把密钥正文写进交付包。
 - 摘要上限用字符数衡量，与计费 token、模型额度无关。
-- 本指南不改变 TALK 服务端、bridge、数据库与任务状态语义；这些属于后续独立切片。
+- `talk_get_delivery` 只是**只读**入口：不 collect、不 accept、不改任务状态，也不读本机文件；
+  它的可信结论只等于“结果消息里有一份通过 schema 校验且与实际任务号匹配的结构化自报”，不等于独立验收通过。
+- 本指南不改变 TALK 服务端、数据库与任务状态语义；MCP 任务工具集只新增上述一个只读工具，
+  既有工具输出未改。新增工具需要 MCP 客户端重连后才会出现在工具目录里，未重连前不能声称宿主已加载。
 
 - 当前入口必须由执行者/主控显式调用，尚未在 bridge 或 MCP 内自动强制执行；文件校验不能防止漏报事实，也不能保证所有调用者遵守流程。

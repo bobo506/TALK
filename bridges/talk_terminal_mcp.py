@@ -17,6 +17,15 @@ if str(PROJECT_ROOT) not in sys.path:
 import yaml
 
 from bridges import talk_send_mcp
+from bridges.talk_delivery import (
+    DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
+    DELIVERY_DETAIL_MAX_PAGE_CHARS,
+    DELIVERY_LIMITS_NOTE,
+    DELIVERY_STITCH_NOTE,
+    DELIVERY_SUMMARY_JSON_LIMIT,
+    DELIVERY_SUMMARY_TEXT_LIMIT,
+    DELIVERY_TRUST_NOTE,
+)
 from bridges.talk_task_tools import (
     WAIT_CANCELLATION_NOTE,
     WAIT_DEFAULT_TIMEOUT_SECONDS,
@@ -102,6 +111,19 @@ def wait_defaults() -> dict:
     }
 
 
+def delivery_defaults() -> dict:
+    """交付摘要 / 补读的公开边界；供 --check 输出，避免把摘要误读成完整交付或验收结论。"""
+    return {
+        "summary_text_limit_chars": DELIVERY_SUMMARY_TEXT_LIMIT,
+        "summary_json_limit_chars": DELIVERY_SUMMARY_JSON_LIMIT,
+        "detail_default_page_chars": DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
+        "detail_max_page_chars": DELIVERY_DETAIL_MAX_PAGE_CHARS,
+        "note": DELIVERY_LIMITS_NOTE,
+        "trust_note": DELIVERY_TRUST_NOTE,
+        "paging_note": DELIVERY_STITCH_NOTE,
+    }
+
+
 def check_connection(server: str, project_id: str) -> dict:
     me = _api_request("GET", "/api/members/me")
     discovered = list_agents(project_id=project_id)
@@ -112,6 +134,7 @@ def check_connection(server: str, project_id: str) -> dict:
         "member_id": me["id"],
         "display_name": me.get("display_name"),
         "wait_defaults": wait_defaults(),
+        "delivery_defaults": delivery_defaults(),
         "agents": [
             {key: agent.get(key) for key in ("member_id", "display_name", "availability")}
             for agent in discovered["agents"]
@@ -129,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.check:
             print(json.dumps(check_connection(server, project_id), ensure_ascii=False))
         else:
-            # 普通终端仅开放八个 HTTP 任务工具，不暴露依赖 bridge 回收的延迟发送。
+            # 普通终端仅开放九个只读/写入明确的 HTTP 任务工具，不暴露依赖 bridge 回收的延迟发送。
             talk_send_mcp.main(include_deferred_send=False)
     except (TalkToolError, OSError, ValueError) as exc:
         message = str(exc)

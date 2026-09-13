@@ -19,6 +19,7 @@ from cli.talk import scaffold_project
 from server.models import AgentTask, Message
 from tests.test_support import RouteTestCase
 from tests.test_talk_client import LiveTalkServer
+from tests.test_talk_delivery import delivery_report
 
 ENTRY = Path(__file__).resolve().parents[1] / "bridges" / "talk_terminal_mcp.py"
 STDIO_FALLBACK_MARKER = "STDIO_FALLBACK_FILE_STDIO"
@@ -256,6 +257,119 @@ class TerminalLiveTests(RouteTestCase):
                     self.assertIn(status, process.stderr)
                     self.assertNotIn(key, process.stderr)
                     self.assertNotIn("Traceback", process.stderr)
+
+    def test_check_reports_delivery_limits_without_claiming_loaded(self):
+        with LiveTalkServer(server_main.app) as base_url:
+            self.configure_project(base_url)
+            process = self.run_terminal(base_url, extra_args=["--check"])
+        report = self.results(process)[0]
+        defaults = report["delivery_defaults"]
+        self.assertEqual(defaults["summary_text_limit_chars"], 1200)
+        self.assertEqual(defaults["summary_json_limit_chars"], 6000)
+        self.assertEqual(defaults["detail_max_page_chars"], 4000)
+        self.assertIn("两个独立预算", defaults["note"])
+        self.assertIn("不是独立验收证明", defaults["trust_note"])
+        self.assertIn("stale_reference", defaults["paging_note"])
+
+    def test_stdio_delivery_summary_paging_and_catalog_are_read_only(self):
+        with LiveTalkServer(server_main.app) as base_url:
+            self.configure_project(base_url)
+            created = self.payload(
+                self.results(
+                    self.run_terminal(
+                        base_url,
+                        requests=[
+                            self.call(
+                                "talk_delegate_task",
+                                {
+                                    "target_member_id": "agent:worker",
+                                    "title": "只读交付摘要",
+                                    "content": "产出结构化交付结果",
+                                },
+                            )
+                        ],
+                    )
+                )[0]
+            )
+            # 结构化自报必须自带这个真实任务号，否则交付结论判 invalid / 不可信。
+            content = json.dumps(delivery_report(task_id=str(created["id"])), ensure_ascii=False)
+            with httpx.Client(base_url=base_url, headers={"X-API-Key": "worker-key"}, trust_env=False) as client:
+                claimed = client.post(f"/api/tasks/{created['id']}/claim", json={}).json()
+                result = client.post(
+                    "/api/messages",
+                    json={"type": "text", "content": content, "group_id": created["hall_group_id"]},
+                )
+                result.raise_for_status()
+                client.post(
+                    f"/api/tasks/{created['id']}/complete",
+                    json={
+                        "status": "succeeded",
+                        "result_message_id": result.json()["id"],
+                        "claim_token": claimed["claim_token"],
+                    },
+                ).raise_for_status()
+
+            responses = self.results(
+                self.run_terminal(
+                    base_url,
+                    requests=[
+                        {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                        self.call("talk_get_delivery", {"task_id": created["id"]}, 2),
+                        self.call(
+                            "talk_get_delivery",
+                            {
+                                "task_id": created["id"],
+                                "mode": "detail",
+                                "result_message_id": result.json()["id"],
+                                "limit": 128,
+                            },
+                            3,
+                        ),
+                    ],
+                )
+            )
+            tools = responses[0]["result"]["tools"]
+            self.assertEqual({tool["name"] for tool in tools}, {tool["name"] for tool in TOOL_SCHEMAS})
+            self.assertIn("talk_get_delivery", {tool["name"] for tool in tools})
+            summary = self.payload(responses[1])
+            self.assertEqual(summary["runner_status"]["status"], "succeeded")
+            self.assertEqual(summary["runner_status"]["workflow_status"], "submitted")
+            self.assertEqual(summary["delivery_conclusion"]["value"], "partial")
+            self.assertTrue(summary["delivery_conclusion"]["trusted_source"])
+            self.assertEqual(summary["counts"]["blocked"], 1)
+
+            chunks = []
+            page_payload = self.payload(responses[2])
+            while True:
+                self.assertEqual(page_payload["status"], "ok")
+                chunks.append(page_payload["page"]["text"])
+                if page_payload["page"]["done"]:
+                    break
+                followup = self.results(
+                    self.run_terminal(
+                        base_url,
+                        requests=[
+                            self.call(
+                                "talk_get_delivery",
+                                {
+                                    "task_id": created["id"],
+                                    "mode": "detail",
+                                    "result_message_id": result.json()["id"],
+                                    "offset": page_payload["page"]["next_offset"],
+                                    "limit": 128,
+                                },
+                            )
+                        ],
+                    )
+                )
+                page_payload = self.payload(followup[0])
+            self.assertEqual("".join(chunks), content)
+            self.assertEqual(json.loads("".join(chunks))["conclusion"], "partial")
+
+            with httpx.Client(base_url=base_url, headers={"X-API-Key": "requester-key"}, trust_env=False) as client:
+                after = client.get(f"/api/tasks/{created['id']}").json()
+            self.assertEqual(after["workflow_status"], "submitted")
+            self.assertIsNone(after["result_collected_at"])
 
     def test_stdio_catalog_and_delegation_to_result_collection(self):
         with LiveTalkServer(server_main.app) as base_url:

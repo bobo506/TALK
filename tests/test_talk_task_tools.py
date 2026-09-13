@@ -323,6 +323,7 @@ class TalkTaskToolTests(RouteTestCase):
                 "talk_reply_task",
                 "talk_cancel_task",
                 "talk_collect_result",
+                "talk_get_delivery",
             },
         )
         delegate_schema = next(
