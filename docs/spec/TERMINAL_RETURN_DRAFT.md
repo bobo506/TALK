@@ -1,5 +1,7 @@
 # 统一终端成果回传方案（Codex首片已授权探索）
 
+> 2026-09-14：保留原生终端主控；TALK桌面版只做Web容器与本地服务管理，不重建模型执行框架。多终端主控验证、WorkBuddy与运行器适配、工作区隔离的当前顺序见 [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md)。下文受管主控/自动回传方案为历史探索，不是当前已批准的替代Desktop路线。
+
 日期：2026-09-11。初版仅设计；用户随后授权先推进Codex首片，DeepSeek开发探索、Kimi独立复核。覆盖Codex、官方Kimi Code、DeepSeek Harness作为发起终端的场景；模型名称不决定终端职责。
 
 ## 已验证与目标
