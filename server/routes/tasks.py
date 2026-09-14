@@ -1358,6 +1358,30 @@ def _task_hall_name(title: str | None, content: str) -> str:
     return source[:80] or "Task"
 
 
+_TASK_TITLE_FALLBACK = "未命名任务"
+
+
+def _normalize_task_title(task_id: int, title: str | None) -> str:
+    """把新任务的对外标题统一归一化为“<真实编号>-<任务名称>”。
+
+    - 编号只使用服务端已分配的真实 task.id，在创建事务内取得，不预测下一个 ID；
+    - 已带当前编号前缀的规范标题原样返回，重复归一化幂等，不会叠加前缀；
+    - 不删除任务名称中的数字、连字符或中文内容，只折叠首尾与中间空白；
+    - 空白标题回退为可辨识占位名“未命名任务”，不复用正文，保证对外标题
+      不会出现 undefined/null，也不会把任务正文带进只回传短引用字段的
+      结果协议载荷（如 talk_wait_tasks）。
+    """
+    base = " ".join((title or "").split())
+    prefix = f"{task_id}-"
+    if base.startswith(prefix):
+        return base
+    # 纯数字名称（即使恰好等于当前编号）也是合法任务名称，原样保留，
+    # 只有空白标题才回退占位名；例如 task_id=60、title="60" 归一化为“60-60”。
+    if not base:
+        base = _TASK_TITLE_FALLBACK
+    return f"{prefix}{base}"
+
+
 def _task_hall_messages(
     task: AgentTask,
     session: Session,
@@ -1470,7 +1494,14 @@ def _create_task_with_hall(
     session.flush()
     if task.root_task_id is None:
         task.root_task_id = task.id
-        session.add(task)
+    # 取得服务端真实 task.id 后，在同一创建事务内原子归一化对外标题，
+    # 并让 Task Hall 名称复用同一标题，避免各入口重复拼接编号。
+    task.title = _normalize_task_title(task.id, title)
+    session.add(task)
+    hall = session.get(Group, hall_group_id)
+    if hall is not None:
+        hall.name = (task.title or "")[:80] or "Task"
+        session.add(hall)
     return task
 
 

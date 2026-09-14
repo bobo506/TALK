@@ -1337,7 +1337,12 @@ function renderTaskCreateAgentOptions() {
 }
 
 function taskOptionLabel(task) {
-  return `#${task.id} · ${taskKindLabel(task.task_kind)} · ${task.title || task.content || "未命名"}`;
+  // 新任务的 title 已由服务端归一化为“编号-任务名称”，直接复用不再重复拼编号；
+  // 旧任务没有编号前缀时保持原有“#编号 · 名称”的兼容展示，不回写历史数据。
+  const title = String(task.title || "").trim();
+  const name = title || String(task.content || "").split("\n")[0].trim() || "未命名";
+  const numbered = title.startsWith(`${task.id}-`) ? name : `#${task.id} · ${name}`;
+  return `${numbered} · ${taskKindLabel(task.task_kind)}`;
 }
 
 function renderTaskCreateMode() {

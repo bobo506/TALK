@@ -210,7 +210,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(hall.status_code, 200)
         self.assertEqual(hall.json()["type"], "task")
         self.assertEqual(hall.json()["project_id"], "prj_talk")
-        self.assertEqual(hall.json()["name"], "Task Hall foundation")
+        self.assertEqual(hall.json()["name"], f"{task['id']}-Task Hall foundation")
         self.assertEqual(
             {member["member_id"]: member["role"] for member in hall.json()["members"]},
             {"human:bobo": "owner", "agent:codex": "member"},

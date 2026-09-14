@@ -39,7 +39,7 @@
 - `target_member_id`：目标 Agent 成员，例如 `agent:codex`
 - `created_by`：任务创建者
 - `content`：任务正文
-- `title`：可选短标题
+- `title`：对外短标题。N1 起，创建时服务端在取得真实自增 `id` 后，于同一事务内把标题原子归一化为“`编号-任务名称`”（例如 `58-主控模式切换`），Task Hall 名称复用同一归一化标题；已带当前编号前缀的标题幂等保留，空白标题回退为“未命名任务”（不复用正文，避免正文进入只携带短引用字段的结果协议载荷），名称中的数字、连字符与中文内容原样保留；历史任务不批量改名，无标题旧数据继续按前端兼容格式展示
 - `status`：runner 执行五态，保持 `queued`、`running`、`succeeded`、`failed`、`canceled`
 - `workflow_status`：协作流程状态，支持 `assigned`、`clarification_requested`、`clarification_answered`、`needs_decision`、`accepted`、`in_progress`、`submitted`、`completed`、`failed`、`canceled`
 - `attempt`：成功 claim 的递增次数；首次领取为 1，租约过期重领后递增

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-09-14 N1 统一任务标题开发、返工与独立复核收尾
+
+- 用户授权 Kimi 开发 N1；基线 `ca2b40857c11d5850e1d8ebc2d0fc6fd128b7ea4`，分支 `codex/terminal-return-codex`。#58 开发，#59 独立复核后，Codex 收尾发现 `base == str(task_id)` 错误吞掉合法数字名称；#60 最小修复，#61 再次独立复核 PASS。四项均已收取，页面人工验收待完成。
+- 创建唯一入口 `_create_task_with_hall` 在 flush 后同事务写“真实编号-任务名称”及 Hall 名，Web/MCP/SDK/schedule 复用；前端下拉避免重复拼编号。空白统一“未命名任务”，不以正文回退，保持 wait 短引用不携带任务正文的合同。历史标题不迁移。
+- 返工删除吞名条件，纠正一个错误测试预期、增加两个测试（标题用例 10→12）；同值纯数字保留为 `60-60`。#61 独立检查实际函数、API/列表/详情/Hall及测试断言；旧逻辑等价复现可触发三个失败向量，不声称取得已覆盖的 #58 原始工作区快照。
+- 验证：#61 独立运行 `tests.test_task_title` 12 项，`tests.test_tasks/tests.test_talk_task_tools/tests.test_talk_client` 76 项，Node 标题测试 4 项、独立 API 探针 6 项全部通过；未改部分继承 #59 的 50 项 Node 及其它定向证据。Codex `git diff --check` 通过，未重复完整审查/全量测试。
+- 限制：真实浏览器未验收；子进程管道 E2E 受复核沙箱 spawn/WinError 5 限制未运行，Node 使用进程内执行。人工复制已带旧编号标题可产生双编号，现有产品无自动复制路径，本片不扩展任意标题清洗；Hall 名沿用80字符截断。共享服务未重启，线上加载新代码需另确认。
+- 交付：#58/#60/#61 为合法完整 JSON 结果；#59 的说明与代码围栏导致 MCP 判 unknown，按本地 `.tmp/n1-task-title/review.json` 经 `summary --expect-task-id 59` 校验获取完整报告，未凭 runner succeeded 验收。#61 复核前后关键文件哈希一致。
+- 变更文件：`server/routes/tasks.py`、`web/app.js`、`tests/test_tasks.py`、`tests/test_task_title.py`、`tests/workspace_task_title.test.cjs`、`docs/spec/MODULE_tasks.md`、`docs/guides/USER_MANUAL.md`；Codex 同步 `docs/PROGRESS.md`、本历史、路线及简报入口。
+- Git 收尾：已创建本地提交；向 `origin` 的推送被自动审批拒绝（目的地归属与外发敏感性信任不足）。未绕过，需用户确认远端与推送授权。
+- 下一步：用户验收新任务标题与已有耗时页面；再按路线推进 L1，当前不自动派发下一片。默认被动等待约定不变。
+
 ## 2026-09-14 群聊前移与桌面开发顺序调整
 
 - 用户要求群聊后续功能前移到第7阶段，桌面端在基本功能完成后再开发。路线与当前进度已同步：第1–6阶段为任务名、主控验证、模式、工作区、隔离及角色管理；第7阶段群聊，第8阶段起桌面封装及整体验收。
