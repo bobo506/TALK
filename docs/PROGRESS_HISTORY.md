@@ -9,7 +9,7 @@
 - 限制：真实浏览器未验收；子进程管道 E2E 受复核沙箱 spawn/WinError 5 限制未运行，Node 使用进程内执行。人工复制已带旧编号标题可产生双编号，现有产品无自动复制路径，本片不扩展任意标题清洗；Hall 名沿用80字符截断。共享服务未重启，线上加载新代码需另确认。
 - 交付：#58/#60/#61 为合法完整 JSON 结果；#59 的说明与代码围栏导致 MCP 判 unknown，按本地 `.tmp/n1-task-title/review.json` 经 `summary --expect-task-id 59` 校验获取完整报告，未凭 runner succeeded 验收。#61 复核前后关键文件哈希一致。
 - 变更文件：`server/routes/tasks.py`、`web/app.js`、`tests/test_tasks.py`、`tests/test_task_title.py`、`tests/workspace_task_title.test.cjs`、`docs/spec/MODULE_tasks.md`、`docs/guides/USER_MANUAL.md`；Codex 同步 `docs/PROGRESS.md`、本历史、路线及简报入口。
-- Git 收尾：已创建本地提交；向 `origin` 的推送被自动审批拒绝（目的地归属与外发敏感性信任不足）。未绕过，需用户确认远端与推送授权。
+- Git 收尾：首次推送因远端归属与外发信任未验证被自动审批拒绝；随后用户明确确认 `bobo506/TALK` 为其仓库并授权推送。N1 提交 `2b917ce` 已成功推送至 `origin/codex/terminal-return-codex`，阻塞解除。
 - 下一步：用户验收新任务标题与已有耗时页面；再按路线推进 L1，当前不自动派发下一片。默认被动等待约定不变。
 
 ## 2026-09-14 群聊前移与桌面开发顺序调整
