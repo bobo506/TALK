@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-09-15 Kimi 原生主控单任务闭环实测收尾（#64–#69）
+
+- 基线 `29e5021`。#64 两次会话未加载MCP，首次还发生未授权的原生子代理派生；#65 用0.38.0实现和真实cwd/信任状态确认隔离目录未受信，第二次只换配置位置未换cwd。前序失败/partial保留，不伪报通过。根目录临时MCP已由Codex撤回，避免共享bridge副作用。
+- 用户明确授权后，仅新增隔离目录信任 `workspace-trust/wd_session-workspace_d9ad240fdb6a`。#66以受控agent-file（3只读+9MCP、subagents空）启动原生session_e7d95ad9-b799-4593-a8cf-19da479d780d，真实调用list_agents和delegate，恰好创建#67给DeepSeek。首次PowerShell引号失败未进入模型，改subprocess列表argv后跑通。Codex明确授权一次顶层general作为测试例外，不授予全局委派预算。
+- #67只读核验N1数字保留、空白回退、幂等，结果消息2542。Codex通过MCP读Hall遭403，不绕过权限；#68由原请求者agent:kimi合法转交原文和结构化包。正文SHA256 `6d64c0120142b9a7e520f8dc1ddfc4652dca972e804d6055d48e99c7034f7299`，本地task67-delivery校验通过。Codex独立读实际函数及flush调用点，从源码AST提取函数执行4输入向量和重复归一化断言全部通过；不是完整API/E2E测试。
+- #69恢复同一原生session（`-S`，不是另开会话），真实调用get_delivery summary→消息2542的detail→collect_result(67)。Codex在工具执行层解析原始session4-stream.jsonl，确认三次工具调用、同session标识及收取返回 `workflow_status=completed`、`result_collected_at=2026-09-15T14:12:22.756535`。白名单恢复维持12工具，无新派发/派生；引擎429自动重试不算另一个会话，不声称只有一次底层推理请求。
+- #64/#65/#66/#68/#69已统一收取，#67已由原Kimi模型收取。#66服务器消息有围栏、#68服务器单字段超长使摘要unknown/invalid，主控使用合法本地包按实际任务号核对；#69最终JSON已合法。收取流程状态不覆盖每份原始业务结论。
+- 结论：Kimi Code 0.38.0在受信隔离目录、单项目、一次显式授权顶层任务、人工异身份检查及唤回下完成真实主控闭环。未验证全自动审查/唤回、正式根目录启用、外部密钥文件、跨工作区、DSH或WorkBuddy。保留用户授权的隔离信任、配置和.tmp审计，不清理/重启服务。
+- 本片功能源码零改动，更新进度、简报、路线、TERMINAL_MCP信任/恢复/权限说明；下一片按用户最新顺序继续DSH再WorkBuddy。开发要求UI（只保存最新无版本）保留待办，不抢先切换路线。
+
 ## 2026-09-15 L1-1 Kimi 独立主控入口准备与复核
 
 - 基线 `eeea11d`，DeepSeek #62 开发、Kimi #63 独立只读复核，均已收取。#62 原自报 partial：缺本人凭证、沙箱不能启动 CLI；#63 在自身环境补齐相应证据，在本片声明范围内 PASS。收取的是入口准备成果，不是全部 L1 主控能力验收。

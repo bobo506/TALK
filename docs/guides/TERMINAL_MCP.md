@@ -122,7 +122,7 @@ python scripts/kimi_talk_precheck.py probe --config D:/claude-test/TALK/.kimi-co
 
 - **工作区/会话**：在 `D:\claude-test\TALK` 新开独立 Kimi 会话，不复用 bridge worker 会话，也不复用本次准备片所用的会话。
 - **身份**：`agent:kimi`（`decision_tier=execution`，见 `AGENTS.md`）；按明确项目与任务授权，不因模型名称升权，不改 `groups.yaml` 角色等级、不新建管理员。
-- **有限协调授权**：由项目管理者显式授予本次“主控协调”职责；本片无 `may_delegate` 授权，下一片也不得绕过 parent / 预算门禁自派顶层任务，不新增预算。
+- **有限协调授权**：由项目管理者显式授予本次“主控协调”职责；子任务须遵守服务端 parent / epoch / 预算门禁；单次独立顶层测试需明确业务授权，不能只因 API 允许创建就视为获得授权。本次 #67 经 Codex 明确授权为唯一顶层 general，不增加子任务预算。
 - **1 个无破坏性委派**：委派 `agent:deepseek` 完成一个只读、范围明确、可回滚的切片（顶层任务、省略 `task_kind` 即 `general`），正文写清范围、验收标准和交付包路径。
 - **不同角色复核**：由与被委派者不同的身份（`agent:codex` 或人工）独立复核实际代码/交付，不只采信执行者结论。
 - **原会话读取与汇总**：回到发起会话，`talk_wait_tasks` 等状态 → `talk_get_delivery` 读取完整交付摘要（按 `read_more` 分页补读）→ `talk_collect_result` 收取 → 在会话内给出汇总。
@@ -158,3 +158,13 @@ python -X utf8 -m unittest tests.test_kimi_talk_entry tests.test_talk_terminal_m
 - 上文“本片未测”描述 #62 开发环境的限制。#63 已实测 Kimi CLI `0.38.0 --version/--help`，并以真实匿名管道发现九个工具；本人 `agent:kimi` 环境变量凭证对项目 `prj_e8fe7066bbec` 的只读身份检查通过。没有把占位凭证的工具探针当作身份验证。
 - 运行 `check` 时显式指定 `--expect-project`，才能与独立给定的期望项目比较；省略时使用配置解析的项目，不能额外证明选择的是操作者期望项目。
 - 激活前应明确本机 `.kimi-code/` 配置的 Git 忽略策略，当前不自动添加忽略项或激活配置。外部本人密钥文件实测、真实会话加载配置、模型委派与收取闭环仍未完成。
+
+
+### 2026-09-15 Kimi 0.38.0 真实闭环实测（#64–#69）
+
+- **信任是加载前提**：该版本仅在可信工作区加载项目级MCP配置。未受信的 headless `-p` 会话会跳过配置；配置生成/stdio探针通过不代表原生会话已加载。用户应在指定目录的Kimi信任提示中确认；`/mcp` 可用于无模型状态自检（本次未实测TUI路径，实际通过模型工具清单及调用确认加载）。不要为了诊断而信任更大目录或覆盖用户级配置。
+- 本次用户授权信任 `D:/claude-test/TALK/.tmp/l1-kimi-live/session-workspace`，该目录仅保存无密钥MCP配置，启动器绑定实际TALK项目根。仓库根 `.kimi-code/mcp.json` 已撤回；信任与隔离配置保留，未推广到所有工作区。API Key从本人runner环境继承，不落盘。
+- 用 `--agent-file` 新开会话，白名单仅 Read/Grep/Glob 与9个TALK工具，禁用子代理。实际 `wire.jsonl` 工具集为12个；不能只靠prompt禁止派生。首次启动和恢复以 `subprocess` 列表argv传参，避免PowerShell原生命令引号截断。
+- 同会话续接使用本机help支持的 `kimi --output-format stream-json -S <session_id> -p <提示正文>`，cwd保持一致；不要同时传 `--agent-file`。本次实测 profile 白名单在恢复后保持不变，仍需每次核对，不保证其它版本/会话相同。
+- 真实链路：Kimi创建#67→DeepSeek交付→Codex独立检查→原session读取消息2542并收取。当前主控直接读该Hall会403，必须由原请求者合法转交成果，不能读取数据库或借用其它身份绕过。成果有JSON围栏导致summary为unknown时，按稳定结果引用读取detail并校验原文；不能仅凭runner成功验收。
+- #67收取返回completed，时间为2026-09-15T14:12:22.756535Z。此结论覆盖单项目、单次显式授权委派、人工独立验收/唤回；不是连续无人值守、多工作区、DSH/WorkBuddy或页面进程管理验收。此前“未运行”小节保留为准备阶段记录，以本次补充为最新状态。
