@@ -149,7 +149,7 @@ python scripts/kimi_talk_precheck.py probe --config D:/claude-test/TALK/.kimi-co
 回归命令（TALK 仓库根目录）：
 
 ```powershell
-python -X utf8 -m unittest tests.test_kimi_talk_entry tests.test_talk_terminal_mcp tests.test_talk_task_tools -q
+python -X utf8 -m unittest tests.test_kimi_talk_entry tests.test_dsh_talk_entry tests.test_talk_terminal_mcp tests.test_talk_task_tools -q
 ```
 
 
@@ -168,3 +168,56 @@ python -X utf8 -m unittest tests.test_kimi_talk_entry tests.test_talk_terminal_m
 - 同会话续接使用本机help支持的 `kimi --output-format stream-json -S <session_id> -p <提示正文>`，cwd保持一致；不要同时传 `--agent-file`。本次实测 profile 白名单在恢复后保持不变，仍需每次核对，不保证其它版本/会话相同。
 - 真实链路：Kimi创建#67→DeepSeek交付→Codex独立检查→原session读取消息2542并收取。当前主控直接读该Hall会403，必须由原请求者合法转交成果，不能读取数据库或借用其它身份绕过。成果有JSON围栏导致summary为unknown时，按稳定结果引用读取detail并校验原文；不能仅凭runner成功验收。
 - #67收取返回completed，时间为2026-09-15T14:12:22.756535Z。此结论覆盖单项目、单次显式授权委派、人工独立验收/唤回；不是连续无人值守、多工作区、DSH/WorkBuddy或页面进程管理验收。此前“未运行”小节保留为准备阶段记录，以本次补充为最新状态。
+
+
+## DeepSeek Harness（DSH）独立会话入口（L1-2；#70 开发、#71 复核、#72 返工）
+
+DSH 是 `@deepseek-ai/dsh` 承载的独立会话入口，与上面“普通终端”和“Kimi Code”两节是并列关系。**本节只做到“配置可生成 + 组合树可核对 + 工具可发现”，真实模型主控闭环仍未运行**（三层结论见 Kimi 一节同一写法）。
+
+### 入口组成（新增文件，未改任务协议）
+
+| 文件 | 作用 |
+|---|---|
+| `deploy/dsh/talk-mcp.patch.template.yml` | 无密钥 `--patch` 覆盖层模板；占位符必须由生成命令替换，模板本身不能被 DSH 直接读取 |
+| `scripts/dsh_talk_precheck.py` | `config` 渲染/写盘覆盖层；`dump` 让 DSH 组合覆盖层并导出配置树；`probe` 按覆盖层拉起 stdio MCP 核对工具目录；`check` 做只读身份与项目核对 |
+| `scripts/dsh_talk_mcp_launch.py` | DSH 侧 `command` 指向的无密钥启动器：先在自身进程内解析密钥（环境变量优先，其次仓库外密钥文件），再交给既有终端入口 |
+| `bridges/talk_terminal_mcp.py` | 既有普通终端入口，未修改；工具集与只读边界仍由它决定 |
+
+覆盖层同时做两件事：注册 `mcp-talk`（九个 TALK 工具）与收窄原生工具（13 条 `disabled` 行 + `read-only` 沙箱 + `approval: never`）。这些是**组合层事实**，不是提示词约定。
+
+### 生成与预检步骤
+
+```powershell
+# 1) 在仓库外准备本人密钥（启动器默认读 ~/.talk/agent-deepseek.key；不回显、不写进仓库）
+# 2) 生成覆盖层：默认只打印；--write 默认拒绝写进仓库与已存在文件
+python scripts/dsh_talk_precheck.py config
+python scripts/dsh_talk_precheck.py config --write "<隔离目录>/talk-mcp.patch.yml"     # 仓库外
+python scripts/dsh_talk_precheck.py config --write ".tmp/<切片>/talk-mcp.patch.yml" --allow-in-repo
+
+# 3) 零模型预检：组合树 / 工具目录 / 只读身份
+python scripts/dsh_talk_precheck.py dump --patch "<覆盖层>" --dsh-home "<隔离 DSH_HOME>" --out "<dump 输出路径>"
+python scripts/dsh_talk_precheck.py probe --patch "<覆盖层>"
+python scripts/dsh_talk_precheck.py check --server http://127.0.0.1:8000 --project prj_e8fe7066bbec `
+    --expect-member agent:deepseek --expect-project prj_e8fe7066bbec
+```
+
+边界：
+
+- `dump`/`probe`/`check` 的路径参数一律按**调用者当前目录**解析成绝对路径后再传下游。`dump` 的子进程 cwd 固定为 `dsh_home.parent`，而 DSH 会把 `--patch` 原样拼在自己的 cwd 上，所以相对 `--patch` 必须由脚本先解析；否则 DSH 会去 `<dsh_home.parent>/<相对路径>` 找覆盖层并报 `failed to read overlay`（#71 定位、#72 修复并补回归）。
+- `dump` 在覆盖层不存在、子进程无法启动或超时时，输出中文短错误并返回 1，不再抛 traceback；`--out` 的父目录会自动创建。
+- `probe` 只用占位密钥、只发 `initialize` + `tools/list`，不访问服务端：`tools_match=true` 只证明“配置可解析、进程可启动、工具目录正确”，不代表身份核对或真实主控通过。
+- `check` 需要**本人 `agent:deepseek` 凭证**；显式给出 `--expect-project` 时按它核对，避免只比较“实际请求的项目”。
+
+### 已核对事实与对 #70 诊断偏差的纠正（#71 复核、#72 返工）
+
+- 版本与环境：本机 DSH `0.1.5-rc.1`。修复后按**相对** `--patch`（含中文与空格目录）运行 `dump` 退出码 0，组合树含 `mcp-talk` 行、`read-only` 与 13 条 `disabled` 行；同一命令在修复前返回 1，stderr 显示被拼成 `<dsh_home.parent>/<相对路径>` 的 ENOENT。
+- 凭证传递（纠正 #70）：**只在启动环境注入 `TALK_API_KEY` 不足以通过 `dsh-mcp-client` 的基座过滤**——DSH 子进程 seam 按 `/KEY|PASSWORD|SECRET|TOKEN/i` 与 `DSH_*` 清洗父环境，`mcp-client` 又以清洗结果为基座。可行做法只有：覆盖层 `config.env` 给出**求值为 string** 的值，或让启动器在自身进程内读**仓库外密钥文件**；后者的真实可读性尚未经真实被测会话验证。
+- 会话恢复（纠正 #70）：`headless` **没有** resume；`dsh-agent-loop` 的声明式 `resumeSessionId` 只在启动时恢复“配置 agent”，而 `headless run()` 不使用配置 agent、自造新会话，因此 patch 无法让新会话变成旧会话。`dsh-sdk-jsonrpc-server` 无持久会话恢复（只有 `initialize/session/prompt/shutdown`）；原生续接能力在 ACP（`session/resume`），该方案**尚未实测**，属后续切片。
+- 权限（纠正 #70）：不要把 `danger-full-access` 写成默认建议；受限沙箱里的 EPERM 属嵌套执行现象，普通受控终端即可复核 spawn，并保持 `read-only` 沙箱与 `approval: never` 不变，不修改安全控制。
+- 仍未验证：DSH 原生主控链路（模型侧工具可见、委派 `agent:kimi`、异身份验收、同会话收取）**未发生**；上述 `dump`/`probe` 证据停在配置层与进程层。
+
+### 回归命令
+
+```powershell
+python -X utf8 -m unittest tests.test_dsh_talk_entry -q
+```

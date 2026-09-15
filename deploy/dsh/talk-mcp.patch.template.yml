@@ -1,0 +1,76 @@
+# DSH 独立会话的 TALK 主控入口覆盖层模板（无密钥，占位符由脚本替换）。
+#
+# 用法（不改 profile、不改用户全局配置，配置只落在隔离目录）：
+#   dsh --profile headless --patch <本文件的实际生成副本> "<任务正文>"
+#
+# 生成与写入由 `scripts/dsh_talk_precheck.py config --write <隔离目录>` 负责；
+# 本模板本身不会被 DSH 读取，也不能直接用于启动（占位符不是真实路径）。
+#
+# 契约：本覆盖层只做“接入 + 收窄”，不修改 bridges/ 下任何工具合同。
+
+# 1) 把既有普通终端入口注册成原生 MCP 服务器 talk，工具名形如 mcp__talk__talk_list_agents。
+- insert:
+    - id: mcp-talk
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: talk
+        transport: stdio
+        command: __PYTHON__
+        args:
+          - -X
+          - utf8
+          - __REPO__/scripts/dsh_talk_mcp_launch.py
+          - --server
+          - __SERVER__
+          - --project
+          - __PROJECT__
+        cwd: __REPO__
+        env:
+          # 这里刻意不放 TALK_API_KEY：dsh-mcp-client 以 scrubbedParentEnv() 为基座，
+          # 而 DSH 子进程 seam 会按 /KEY|PASSWORD|SECRET|TOKEN/i 清洗环境名，
+          # 因此 `!!js process.env.TALK_API_KEY` 只会求值成 undefined，
+          # 让整棵树因 "env 必须是 string" 校验失败而无法加载。
+          # 密钥改由启动器自己在进程内解析（环境变量优先，其次仓库外密钥文件）。
+          PYTHONUTF8: '1'
+        failOnStartupError: true
+        toolCallTimeoutMs: 65000
+        reconnect:
+          enabled: true
+
+# 2) 配置层收窄：被测会话只保留只读文件工具 + 9 个 TALK 工具。
+#    这些行是 dsh-base 提供的原生工具行；禁用它们不是 prompt 约束，而是组合层事实。
+- id: tool-subagent
+  disabled: true
+- id: tool-subagent-fork
+  disabled: true
+- id: tool-subagent-control
+  disabled: true
+- id: tool-subagent-list-agents
+  disabled: true
+- id: tool-workflow
+  disabled: true
+- id: tool-ralph
+  disabled: true
+- id: tool-pwsh
+  disabled: true
+- id: tool-bash
+  disabled: true
+- id: tool-jobs
+  disabled: true
+- id: tool-web
+  disabled: true
+- id: tool-todo
+  disabled: true
+- id: tool-skill
+  disabled: true
+- id: tool-goal
+  disabled: true
+
+# 3) 文件效果边界：只读沙箱；即使模型尝试写入也会被拒绝，而不是靠提示词自律。
+- id: sandbox-policy
+  config:
+    mode: read-only
+    workspaceRoot: !!js process.cwd()
+- id: approval
+  config:
+    policy: never

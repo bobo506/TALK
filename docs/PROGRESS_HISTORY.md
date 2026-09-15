@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-09-16 DSH 入口准备、返工与独立复核收尾（#70–#73）
+
+- 用户先授权主动接收结果，随后明确恢复被动模式；主控已停止主动等待，#72/#73由用户通知收取。四任务均已收取。基线 `9423d02`，分支 `codex/terminal-return-codex`。
+- DeepSeek #70交付模板和两个预检/启动脚本；Kimi #71独立发现dump相对patch错误及缺少入库测试；DeepSeek #72修正并新增18项，Kimi #73独立复跑18项/61项组合回归、真实DSH中文空格相对路径dump通过，确认未改模板/启动器hash及冻结范围。Codex差异空白检查通过，不重复全量审查。
+- 变更：`deploy/dsh/talk-mcp.patch.template.yml`、`scripts/dsh_talk_mcp_launch.py`、`scripts/dsh_talk_precheck.py`、`tests/test_dsh_talk_entry.py`、`docs/guides/TERMINAL_MCP.md`。新增无密钥MCP配置覆盖层、调用方cwd绝对化、身份/项目检查与错误处理；目录探针含九工具，13行disabled仅为配置层证据。正式进度、路线和简报同步由Codex完成。
+- 真实DSH模型未运行，零任务委派。0.1.5-rc.1 headless硬编码新session、不能靠resumeSessionId patch恢复；sdk-jsonrpc不提供持久会话恢复；原生ACP session/resume可作后续方案，尚未实测。不是DSH主控验收通过。
+- 凭证边界：子进程基座过滤KEY/TOKEN等，普通启动仅注入环境变量仍需MCP config显式转发，或使用仓库外本人密钥文件；执行者当前拿不到凭证，不代表服务器没有该成员密钥。未读取生产密钥/写外部文件/禁用沙箱。文件真实可读、原生模型工具清单、ACP同会话能力仍待验证。
+- #71在不同上下文复跑spawn成功，嵌套EPERM不等同产品不支持；无需将danger-full-access作为默认路径。#73次要观察：期望项目CLI默认值保守拒绝、异常短错误不含详细路径/秒数、非UTF-8控制台中文显示，记录为限制，不因此再返工。
+- 用户手册影响：仅开发者终端入口，无新增最终用户页面；更新TERMINAL_MCP，不把尚未可用的主控流程写成页面操作。下一片DSH真实身份/ACP接入，再WorkBuddy；开发要求UI只保存最新内容仍待办。
+
 ## 2026-09-15 Kimi 原生主控单任务闭环实测收尾（#64–#69）
 
 - 基线 `29e5021`。#64 两次会话未加载MCP，首次还发生未授权的原生子代理派生；#65 用0.38.0实现和真实cwd/信任状态确认隔离目录未受信，第二次只换配置位置未换cwd。前序失败/partial保留，不伪报通过。根目录临时MCP已由Codex撤回，避免共享bridge副作用。
