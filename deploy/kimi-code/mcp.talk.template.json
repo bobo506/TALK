@@ -1,0 +1,20 @@
+{
+  "_说明": "Kimi Code CLI 独立会话入口模板（L1-1）。这是模板文件，不会被 Kimi Code CLI 读取；占位符 <...> 必须由 scripts/kimi_talk_precheck.py config 生成的真实绝对路径替换后再放到工作区的 .kimi-code/mcp.json。密钥正文不要写进本文件。",
+  "mcpServers": {
+    "talk": {
+      "command": "<TALK_PYTHON_ABSOLUTE_PATH>",
+      "args": [
+        "<TALK_REPO_ABSOLUTE_PATH>/scripts/kimi_talk_mcp_launch.py",
+        "--project-root",
+        "<TALK_PROJECT_WORKSPACE_ABSOLUTE_PATH>"
+      ],
+      "cwd": "<TALK_PROJECT_WORKSPACE_ABSOLUTE_PATH>",
+      "env": {
+        "TALK_KIMI_KEY_FILE": "<OUTSIDE_REPO_KEY_FILE_ABSOLUTE_PATH>"
+      },
+      "startupTimeoutMs": 30000,
+      "toolTimeoutMs": 660000,
+      "enabled": true
+    }
+  }
+}

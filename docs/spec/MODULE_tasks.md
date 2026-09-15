@@ -1,7 +1,7 @@
 # MODULE: Agent Tasks
 
 > 所属项目：TALK
-> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 已于 2026-09-06 通过项目管理者人工验收，根任务 `#15` 与子任务 `#16/#17/#18` 均已完成；TH-7a 普通终端 stdio MCP 入口与只读连接检查已实现，具体客户端安装与真实模型验收待后续推进
+> 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 已于 2026-09-06 通过项目管理者人工验收，根任务 `#15` 与子任务 `#16/#17/#18` 均已完成；TH-7a 普通终端 stdio MCP 入口与只读连接检查已实现；L1-1 已交付 Kimi Code 独立会话入口的模板/预检/无密钥启动器（配置可用与工具目录已验证，真实身份预检缺本人凭证、真实模型主控闭环未运行），具体客户端安装与真实模型验收待后续推进
 
 ## 目标
 
@@ -239,7 +239,8 @@
 
 - TH-7a 新增 `bridges/talk_terminal_mcp.py`，可从任意目录用绝对路径启动普通终端 stdio MCP；`--check` 只读核对 API Key 对应身份、项目角色与可用状态。
 - 独立入口配置优先级为显式 `--server / --project`、环境变量、项目 `.talk/project.yaml`；服务缺省为本机 8000，项目和 `TALK_API_KEY` 必须有效提供。默认项目允许工具参数覆盖，服务端继续负责权限校验。
-- 独立入口忽略继承的 `TALK_MEMBER_ID`，只暴露下述八个 Task Hall 工具；依赖 bridge 回收的延迟 `talk_send` 仅保留在原 bridge 入口。启动与验收见 `docs/guides/TERMINAL_MCP.md`。
+- 独立入口忽略继承的 `TALK_MEMBER_ID`，只暴露下述九个 Task Hall 工具（八个任务工具加只读交付摘要 `talk_get_delivery`）；依赖 bridge 回收的延迟 `talk_send` 仅保留在原 bridge 入口。启动与验收见 `docs/guides/TERMINAL_MCP.md`。
+- L1-1 为 Kimi Code 增加独立主控入口准备：`deploy/kimi-code/mcp.talk.template.json` 模板、`scripts/kimi_talk_precheck.py`（`config` / `check` / `probe`）与 `scripts/kimi_talk_mcp_launch.py`（无密钥启动器）复用既有 `bridges/talk_terminal_mcp.py`，未改工具合同。按官方文档，Kimi 只支持用户级 `~/.kimi-code/mcp.json` 与工作区级 `.kimi-code/mcp.json`，且只对新会话生效；密钥只从环境变量或仓库外文件读取，`check` 会拒绝用他人凭证冒充 `agent:kimi`。bridge worker 由 `--agent-file` 的工具白名单限制，不获得 `mcp__talk__*`，与独立入口分离。本片只验证“配置可用 + 工具目录”，真实模型主控闭环与工作区级配置激活留给下一片。
 
 - Codex 使用 `bridges/talk_send_mcp.py`，pi 使用 `bridges/talk_tools_extension.ts`；两端共同提供 `talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result` 八个 Task Hall 工具，原有 deferred `talk_send` 保持兼容。
 - bridge 会从项目目录的 `.talk/project.yaml` 注入默认 `TALK_PROJECT_ID`；调用方仍可在工具参数中显式覆盖项目。

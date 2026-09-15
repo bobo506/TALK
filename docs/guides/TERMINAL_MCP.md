@@ -52,10 +52,87 @@
 
 身份由 API Key 对应的服务端成员决定；独立入口忽略继承的 `TALK_MEMBER_ID`。它不需要 `TALK_GROUP_ID` 或 `TALK_DEFERRED_FILE`。
 
+## Kimi Code 独立会话入口（L1-1 准备）
+
+上面是通用说明；本节是官方 Kimi Code CLI 的独立主控入口准备。**它只做到“配置可用 + 工具可发现”，真实模型主控闭环尚未运行**，三层结论见本节末尾。
+
+### 本机已核对事实（2026-09-15 只读检查）
+
+| 项 | 结果 | 依据 |
+|---|---|---|
+| CLI 路径 | `C:\Users\Administrator\.kimi-code\bin\kimi.exe` | 文件系统只读检查；它是单文件 Node 运行时（内部名 `node`，文件版本 24.15.0 是内置 Node 版本，不是 CLI 版本） |
+| CLI 版本 | 已安装 `0.38.0`；更新通道最新 `0.43.0` | CLI 自身更新日志 `~/.kimi-code/updates/rollout.log` 的 `current` / `latest` 字段 |
+| 用户级配置 | `~/.kimi-code/config.toml` 仅有 `providers` / `models` / `thinking` / `services` 段 | 只读解析段名，未输出任何值 |
+| 用户级 MCP | **不存在** `~/.kimi-code/mcp.json` | 目录枚举；新增工作区级配置不会覆盖已有用户级 MCP 配置 |
+| 工作区可信 | `D:\claude-test\TALK` 已登记为可信目录 | `~/.kimi-code/workspace-trust/wd_talk_59d2e3395d35` |
+| 会话隔离 | Kimi 会话按工作区分目录保存 | `~/.kimi-code/sessions/wd_talk_59d2e3395d35/...` |
+| 本片未测 | `kimi --version`、`kimi doctor`、`/mcp` 均未执行 | 当前沙箱拒绝启动工作区外程序（`Access is denied`）且无审批通道；这是环境限制，不是 Kimi 或 TALK 的产品失败 |
+
+官方一手文档（2026-09-15 抓取；已安装 CLI 为 `0.38.0`，与文档不保证逐条对应）：
+
+- MCP 配置：<https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp.html> —— `mcp.json` 分用户级 `~/.kimi-code/mcp.json`（`$KIMI_CODE_HOME/mcp.json`）与工作区级 `<工作目录>/.kimi-code/mcp.json` 两级，同名条目工作区级覆盖用户级；stdio 条目支持 `command` / `args` / `env` / `cwd` / `enabled` / `startupTimeoutMs` / `toolTimeoutMs` / `enabledTools` / `disabledTools`；**会话进行中修改 `mcp.json` 不会注册进已打开的会话**，只对新会话生效；MCP 工具名为 `mcp__<server>__<tool>`。
+- 命令参考：<https://www.kimi.com/code/docs/en/kimi-code-cli/reference/kimi-command.html> —— 主命令参数为 `-p` / `--session` / `--continue` / `--model` / `--agent` / `--agent-file` / `--skills-dir` / `--add-dir` 等，**没有** `--mcp-config` 这类“按会话指定 MCP 文件”的参数，所以本项目的“按会话加载”只能靠工作区级 `.kimi-code/mcp.json`（且只影响新会话）。
+- Agents：<https://www.kimi.com/code/docs/en/kimi-code-cli/customization/agents.html> —— agent 文件的 `tools` 白名单同时决定“模型可见工具”和“执行前复核”，MCP 工具按 `mcp__<server>__*` 匹配。
+
+### 入口组成（本片新增，未改任务协议）
+
+| 文件 | 作用 |
+|---|---|
+| `deploy/kimi-code/mcp.talk.template.json` | 无密钥配置模板；占位符必须用下面的命令替换，模板本身不会被 CLI 读取 |
+| `scripts/kimi_talk_precheck.py` | `config` 生成/写入配置；`check` 用真实身份做只读连接检查；`probe` 按配置真实拉起 stdio MCP 并核对工具目录 |
+| `scripts/kimi_talk_mcp_launch.py` | Kimi 侧 `command` 指向的无密钥启动器：先取 `TALK_API_KEY`（环境变量优先，其次仓库外密钥文件），再交给既有终端入口 |
+| `bridges/talk_terminal_mcp.py` | 既有普通终端入口，本片未修改；工具集与只读边界仍由它决定 |
+
+### 三步接入
+
+```powershell
+# 1) 在仓库外准备本人密钥（不回显、不写进仓库；-Encoding ascii 避免写入 BOM）
+$k = Read-Host '粘贴 agent:kimi 的 TALK API Key'
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.talk" | Out-Null
+Set-Content -Path "$env:USERPROFILE\.talk\agent-kimi.key" -Value $k -NoNewline -Encoding ascii
+Remove-Variable k
+
+# 2) 生成配置（默认只打印；确认后再写入工作区）
+python scripts/kimi_talk_precheck.py config
+python scripts/kimi_talk_precheck.py config --write D:/claude-test/TALK --allow-git-workspace
+
+# 3) 预检：真实身份（只读）与工具目录
+python scripts/kimi_talk_precheck.py check --project-root D:/claude-test/TALK --expect-member agent:kimi --expect-project prj_e8fe7066bbec
+python scripts/kimi_talk_precheck.py probe --config D:/claude-test/TALK/.kimi-code/mcp.json
+```
+
+- 密钥只从环境变量或那个仓库外文件读取；`mcp.json` 里只有真实绝对路径与该文件位置，**没有任何密钥正文**。密钥文件若落在仓库内，启动器会直接拒绝并提示改到仓库外。
+- 密钥文件只应包含一行可打印 ASCII：写入了 BOM（PowerShell 5.1 的 `-Encoding utf8` 会写）会被容忍并剥掉，但混入空格、换行以外的多余内容会被明确拒绝，避免真正调用时只得到难懂的编码错误。
+- `check` 会用 `GET /api/members/me` 核对“凭证对应的成员与项目”；身份不是 `--expect-member`（默认 `agent:kimi`）时判失败，避免拿 `human:bobo` 等他人凭证冒充本人身份通过。
+- `probe` 只发 `initialize` + `tools/list`，用占位密钥、不访问服务端，因此输出里 `identity_verified=false`；它证明的是“配置可解析、进程可启动、工具目录正确”。
+- 写入 `D:/claude-test/TALK/.kimi-code/mcp.json` 会让**该工作区的新 Kimi 会话**多出这九个工具；是否提交到 Git 由操作者决定（本片未改 `.gitignore`），用完可删除该文件即回到原状。
+
+### 与 bridge worker 的分离
+
+- bridge 的任务会话由 `bridges/kimi_bridge.py` 用 `--agent-file` 启动，生成的 agent 文件只列 `Read / Grep / Glob / Bash`（`tools` 档加 `Edit / Write`）且 `subagents: []`；按官方 agents 文档的 `tools` 白名单语义，`mcp__talk__*` 不在其中，因此 bridge worker 不会拿到主控工具。
+- 普通终端入口（本节入口）与 bridge worker 是两套独立启动：前者由工作区级 `mcp.json` 拉起一个只含 TALK 任务工具的 stdio 进程，后者由 bridge 拉起并隐藏主控工具。`probe` 的输出可用于核对独立入口的工具目录，不代表 bridge worker 的可见工具。
+
+### 三层结论（必须分开表述）
+
+1. **配置可用**：本片已验证——生成/写入的配置是合法 JSON、只含真实绝对路径，按其中 `command`/`args`/`cwd` 能真实拉起 stdio MCP 并返回 `serverInfo`。
+2. **连接预检**：依赖**本人 `agent:kimi` 凭证**。本片执行环境没有该凭证（`check` 返回中文失败原因），因此真实项目/身份核对在本片是**阻塞项**，需由凭证持有人按上面第 1、3 步执行。
+3. **真实模型主控闭环**：**未运行**。本片不派发嵌套任务、不启动额外模型 Agent、不做等待实验；闭环属于下一片。
+
+### 下一片：Kimi 真实主控闭环的有限任务包（本片未执行）
+
+- **工作区/会话**：在 `D:\claude-test\TALK` 新开独立 Kimi 会话，不复用 bridge worker 会话，也不复用本次准备片所用的会话。
+- **身份**：`agent:kimi`（`decision_tier=execution`，见 `AGENTS.md`）；按明确项目与任务授权，不因模型名称升权，不改 `groups.yaml` 角色等级、不新建管理员。
+- **有限协调授权**：由项目管理者显式授予本次“主控协调”职责；本片无 `may_delegate` 授权，下一片也不得绕过 parent / 预算门禁自派顶层任务，不新增预算。
+- **1 个无破坏性委派**：委派 `agent:deepseek` 完成一个只读、范围明确、可回滚的切片（顶层任务、省略 `task_kind` 即 `general`），正文写清范围、验收标准和交付包路径。
+- **不同角色复核**：由与被委派者不同的身份（`agent:codex` 或人工）独立复核实际代码/交付，不只采信执行者结论。
+- **原会话读取与汇总**：回到发起会话，`talk_wait_tasks` 等状态 → `talk_get_delivery` 读取完整交付摘要（按 `read_more` 分页补读）→ `talk_collect_result` 收取 → 在会话内给出汇总。
+- **成功证据**：工具调用记录、真实任务号、交付摘要中的 `delivery_conclusion` 与验证证据、`collect` 后 `workflow_status=completed`；同时确认未串项目、未自派递归、未重复主控、未越权新增预算。
+- **失败清理**：未领取任务用 `talk_cancel_task` 取消；已运行任务由原请求者或人工走既有 `cancel-tree`；不删除历史任务与服务数据；Kimi 会话记录删除或保留由操作者决定。
+
 ## 首轮验收
 
 1. 用 `--check` 确认身份和默认项目正确。
-2. 在 MCP 客户端中检查能看到八个工具：`talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result`。
+2. 在 MCP 客户端中检查能看到九个工具：`talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result`、`talk_get_delivery`。
 3. 调用 `talk_list_agents` 确认目标角色；经用户授权后委派一个范围明确的任务。
 4. 目标 bridge 在线时执行任务；终端通过查询或有界等待读取进展，需要补充信息时在同一任务中回复并提交澄清答复。
 5. 任务进入 `submitted` 后先检查成果，再调用 `talk_collect_result`；预期变为 `completed`，并可在现有任务页面看到结果。
@@ -63,12 +140,21 @@
 ## 当前范围与验证
 
 - 这是 TH-7 的第一片接入包装，没有修改任务协议、页面、数据库或 bridge 的执行方式。
-- 新入口只暴露八个任务工具；旧 `talk_send` 依赖 bridge 在当前轮结束后处理延迟记录，因此普通终端不展示也不接受它。原 `talk_send_mcp.py` bridge 入口继续保留原有九工具行为。
+- 入口暴露九个工具：八个 Task Hall 工具加只读交付摘要 `talk_get_delivery`（完整结果按 `result_message_id` 分页补读）；旧 `talk_send` 依赖 bridge 在当前轮结束后处理延迟记录，因此普通终端不展示也不接受它。原 `talk_send_mcp.py` bridge 入口继续保留原有九工具行为。
 - 没有自动安装到任何桌面客户端、编辑用户级 MCP 配置、启动角色服务或开放远程 MCP 服务；具体客户端安装与真实模型验收属于下一片。
+- L1-1 只新增 Kimi 独立会话的模板、生成/预检脚本与启动器，并核对既有入口的工具目录；没有修改 `bridges/` 下任何工具合同，没有激活任何工作区级 `mcp.json`（避免影响现有与新开的 bridge 会话）。
 - 自动化已在隔离服务和数据库中验证：中文与空格目录启动、配置优先级、只读检查、错误诊断、stdio 工具目录、委派→提交→查询→收取。执行方通过测试 API 模拟，没有调用真实模型或修改现有验收数据。
+- Kimi 相关新增验证在隔离环境完成：配置生成/写盘边界、密钥来源与仓库外约束、身份不符拒绝、按生成的配置真实拉起 stdio MCP 得到九个工具。受限沙箱禁止匿名管道时，stdio 探针退化为文件型通道并在 stderr 留下 `STDIO_FALLBACK_FILE_STDIO` 标记。
 
 回归命令（TALK 仓库根目录）：
 
 ```powershell
-python -X utf8 -m unittest tests.test_talk_terminal_mcp tests.test_talk_task_tools -q
+python -X utf8 -m unittest tests.test_kimi_talk_entry tests.test_talk_terminal_mcp tests.test_talk_task_tools -q
 ```
+
+
+### 2026-09-15 独立复核补充（#63）
+
+- 上文“本片未测”描述 #62 开发环境的限制。#63 已实测 Kimi CLI `0.38.0 --version/--help`，并以真实匿名管道发现九个工具；本人 `agent:kimi` 环境变量凭证对项目 `prj_e8fe7066bbec` 的只读身份检查通过。没有把占位凭证的工具探针当作身份验证。
+- 运行 `check` 时显式指定 `--expect-project`，才能与独立给定的期望项目比较；省略时使用配置解析的项目，不能额外证明选择的是操作者期望项目。
+- 激活前应明确本机 `.kimi-code/` 配置的 Git 忽略策略，当前不自动添加忽略项或激活配置。外部本人密钥文件实测、真实会话加载配置、模型委派与收取闭环仍未完成。

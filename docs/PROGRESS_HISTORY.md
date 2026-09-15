@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-09-15 L1-1 Kimi 独立主控入口准备与复核
+
+- 基线 `eeea11d`，DeepSeek #62 开发、Kimi #63 独立只读复核，均已收取。#62 原自报 partial：缺本人凭证、沙箱不能启动 CLI；#63 在自身环境补齐相应证据，在本片声明范围内 PASS。收取的是入口准备成果，不是全部 L1 主控能力验收。
+- 新增 `deploy/kimi-code/mcp.talk.template.json`、`scripts/kimi_talk_precheck.py`、`scripts/kimi_talk_mcp_launch.py`、`tests/test_kimi_talk_entry.py`，更新 `docs/guides/TERMINAL_MCP.md` 和 `docs/spec/MODULE_tasks.md`；复用既有普通终端 MCP，未修改 bridge 工具合同/任务协议/数据库/用户级认证。
+- 独立验证：14 项新测试、29 项终端入口与任务工具回归通过；生成配置无密钥；真实匿名管道 `initialize/tools/list` 返回九工具含 `talk_get_delivery`，明确 `identity_verified=false/network_calls=0`。另用 runner 注入的本人 `agent:kimi` 凭证，对真实项目 `prj_e8fe7066bbec` 只读 check 得 `identity_verified=true`；无效凭证 401 且不回显。CLI `--version/--help` 实测 `0.38.0`、无 `--mcp-config`。Codex 完成差异空白检查，不重复全量审查。
+- 限制：未激活工作区配置、未启动模型闭环；两级 mcp.json 加载/新会话生效仍据官方文档，需下一片真实会话验证。真实本人外部密钥文件未走通（隔离测试覆盖读取，真实身份用环境变量）；开发的文件型 stdio 退化与复核的正常管道证据分开保留。
+- 轻微待办：显式 `--expect-project` 才有独立期望项目断言，缺省与解析项目相同；激活前决定 `.kimi-code/` Git 忽略策略。复核认为不阻塞本片，主控接受并记录，未顺手改实现。
+- 用户新需求已记入路线与进度：角色列表项目级开发要求，面向主控保存职责/交叉复核等，仅最新内容，不设版本号/历史；派发前读取，已派发任务按原包执行。以后替代 AGENTS 相应分工部分，当前未实施，不改变当前规则。
+- 本轮收尾更新正式进度、路线及简报；下一片建议开发要求，Kimi 真实主控闭环仍为待办，不自动激活配置、不新增任务、不启停共享服务。
+
 ## 2026-09-14 N1 统一任务标题开发、返工与独立复核收尾
 
 - 用户授权 Kimi 开发 N1；基线 `ca2b40857c11d5850e1d8ebc2d0fc6fd128b7ea4`，分支 `codex/terminal-return-codex`。#58 开发，#59 独立复核后，Codex 收尾发现 `base == str(task_id)` 错误吞掉合法数字名称；#60 最小修复，#61 再次独立复核 PASS。四项均已收取，页面人工验收待完成。
