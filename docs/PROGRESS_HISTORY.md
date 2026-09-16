@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-09-16 DSH真实模型单任务主控闭环（#80–#84）
+
+- 基线1bf186b。用户提供本人TALK凭证，Codex仅保存到仓库外约定路径，不入版本库。#80身份/配置通过，但执行宿主CreatePipe被拒，未发起模型；#81切换到Kimi已验证可运行环境作为操作员，受测模型仍是DSH deepseek-v4-flash（deepseek-official）。保持read-only+ask、默认拒绝权限、13项工具禁用，无权限询问。
+- #81原生ACP session `730ca24f-50d7-4bb3-b5cc-895d6097bdb6` 真实调用list_agents与delegate，服务端#82 created_by=agent:deepseek，target=agent:kimi；操作员未代替模型委派。#82只读核对resume代码和已有测试，不改代码、不重跑测试，交付行号存在偏移，以函数/用例名为准。Codex核对互斥resume/new分支、拒绝异常链及断言，认可源码级结论。
+- Codex读取82 Hall遇403，由合法目标成员Kimi获取服务器结果快照：消息2563，正文SHA256 `f55696a8a3c77109ecc629a33130ea2ab41267962d7f018675adc0ab5ce27407`；本地已审文件SHA256 `ab0f9ed8356127db2f4ae4399ff0933ecc3277d47f9f0b085fb6bb347d1cd5b5`。主控本轮独立重算服务器哈希与JSON逐字段相等，差异仅末尾换行。
+- #84一次驱动prompt恢复同session/cwd/DSH_HOME，原始取证requests为initialize→session/resume→session/prompt→session/close，无session/new；原生模型get_delivery两次（含detail）、collect_result(82)一次，退出码0。复核者服务器读回completed与result_collected_at=`2026-09-16T08:14:18.429954`。Codex核对原始驱动记录，不把agentText单独当证据。model_calls=1仅指一次驱动prompt，不推断底层模型请求次数。
+- 80/81/83/84由Codex收取；82由DSH原模型收取。80早期blocked与83归属核查partial不因流程completed改写。
+- 插曲：共享工作区四文件出现标为#80资源告警清理的额外改动，报告声称Kimi Hall同意；#83新会话无法确认旧会话作者。用户选择不继续追溯，允许备份并恢复1bf186b。已保存四文件、SHA256清单与patch于 `.tmp/l1-dsh-live/resource-cleanup-backup/`，不纳入本片修复。ResourceWarning仍待后续独立处理。
+- 证据：`.tmp/l1-dsh-live/execution-kimi.json`、`kimi-readonly.json`、`codex-review82.json`、`server-82-result-body.txt`、`resume-delivery.json`、`live80/evidence/acp-prompt.json`、`resume82/evidence/acp-resume-collect82.json`。试验结束仅删除隔离DSH_HOME内模型凭证副本，保留会话与证据，不动原模型配置及外部本人TALK凭证。
+- 结论限于有人值守、单工作区、一次委派、人工独立验收与原会话收取。无人值守、多工作区、页面启停和运行器适配未验收；无新增页面，无需重启TALK服务。下一片WorkBuddy验证，再角色列表开发要求UI；本轮不继续新片。
+
+
 ## 2026-09-16 DSH ACP薄驱动及两轮修正收尾（#74–#79）
 
 - 基线 `3fcbf44`，分支 `codex/terminal-return-codex`。六任务均于本轮收取，保留早期partial与not_run事实；#79最终独立复核通过。本片无真实模型请求、无真实委派，不是DSH主控闭环验收。
