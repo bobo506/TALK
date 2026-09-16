@@ -216,8 +216,115 @@ python scripts/dsh_talk_precheck.py check --server http://127.0.0.1:8000 --proje
 - 权限（纠正 #70）：不要把 `danger-full-access` 写成默认建议；受限沙箱里的 EPERM 属嵌套执行现象，普通受控终端即可复核 spawn，并保持 `read-only` 沙箱与 `approval: never` 不变，不修改安全控制。
 - 仍未验证：DSH 原生主控链路（模型侧工具可见、委派 `agent:kimi`、异身份验收、同会话收取）**未发生**；上述 `dump`/`probe` 证据停在配置层与进程层。
 
+### ACP 原生会话入口（L1-2 续；#74）
+
+`headless` 不能恢复原会话，原生续接能力在 ACP。本片新增一个**薄驱动**（验证工具，不是正式页面功能），
+它只做 ACP 传输、会话控制与输出取证，不实现模型推理循环、不代替模型调用 TALK 工具。
+
+| 文件 | 作用 |
+|---|---|
+| `scripts/dsh_acp_drive.py` | ACP v1 薄驱动：`spec` 渲染无密钥会话规格；`handshake` 零模型真实握手；`lifecycle` 零模型建会话→持久化→同 ID 恢复→失配/未知/重复拒绝；`prompt` 单条提示（需 `--allow-model`） |
+| `deploy/dsh/acp-session.template.json` | 无密钥会话规格模板：`session/new` / `session/resume` 的 `mcpServers` 只含 TALK 启动器绝对路径与 `TALK_DSH_KEY_FILE`（路径，不是密钥） |
+| `deploy/dsh/acp-overlay.template.yml` | ACP profile 的 `--patch` 覆盖层（**无占位符、可直接使用**）：仍禁 13 条原生/派生工具、只读沙箱；**不再覆盖 `approval`**（#76：`read-only + policy: never` 不匹配任何 preset），**不再 insert MCP**（ACP 的 MCP 是按会话声明的） |
+| `scripts/dsh_talk_precheck.py` | `dump` 新增 `--profile`（默认 `headless`，行为不变）；ACP 覆盖层的组合树用 `--profile acp` 核对 |
+| `tests/test_dsh_acp_drive.py` | 模拟 ACP 进程 + 隔离 TALK 服务的针对性测试（传输/下游参数/失败/恢复语义/权限/超时/凭证遮蔽/工具可达） |
+
+#### 从本机原生代码核对的 ACP 契约（只读核对，非实测）
+
+本机 `dsh` 核心为 `0.1.5-rc.1`（与 #71 一致），它自带并挂载的 ACP 插件
+`@deepseek-ai/dsh-acp` / `@deepseek-ai/dsh-acp-app` 为 `0.1.5-rc.2`，ACP SDK 为 `1.4.0`；
+ACP 协议版本为 `1`：
+
+- 方法：`initialize` / `session/new` / `session/list` / `session/resume` / `session/close` /
+  `session/prompt` / `session/cancel`；服务端反向请求 `session/request_permission`，通知 `session/update`。
+- `initialize` 返回 `agentCapabilities.sessionCapabilities = {close, list, resume}`；
+  `session/new` 参数为 `{cwd, mcpServers}`，返回 `{sessionId, configOptions}`；
+  `session/resume` 参数为 `{sessionId, cwd, mcpServers?}`，**返回结果里没有 sessionId**——
+  所以“同 ID 恢复”不能靠返回值自证，驱动改用四条证据：服务端接受该 ID、工作区不符被拒、
+  **重复 resume（会话已在活动中）被拒**、恢复后该 ID 不再出现在 `session/list`。
+- `session/list` **过滤活动会话**（#75 真机实证）：新建后该 ID 应不可见，`session/close`
+  之后才作为持久化条目可见；驱动据此把“close 后可见”当作持久化证据（#76 D3）。
+- `session/resume` 的错误分支（工作区不符 / 会话不可恢复 / 已在活动中）都是 `invalidParams`。
+- stdio MCP 条目的 `env` 是 `{name, value}` 数组；`dsh-mcp-client` 的子进程环境 =
+  `{...scrubbedParentEnv(), ...声明的 env}`，而 `scrubbedParentEnv()` 会按
+  `/KEY|PASSWORD|SECRET|TOKEN/i` 与 `DSH_*` 清洗父环境——这正是 #70 记录的过滤现象，
+  也是本片把 TALK 凭证改成“**声明 env 里只放密钥文件路径**”的原因。
+- `dsh --profile acp` 由 `@deepseek-ai/dsh-acp-app` 提供：无额外参数，占用 stdio，stdin EOF 触发退出。
+
+#### 使用步骤（零模型优先）
+
+```powershell
+# 1) 仓库外准备本人密钥（不回显、不写进仓库）
+$k = Read-Host '粘贴 agent:deepseek 的 TALK API Key'
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.talk" | Out-Null
+Set-Content -Path "$env:USERPROFILE\.talk\agent-deepseek.key" -Value $k -NoNewline -Encoding ascii
+Remove-Variable k
+
+# 2) 渲染无密钥会话规格（只打印；写盘需显式 --write）
+#    ACP 覆盖层无占位符，可直接用仓库内文件；下表命令统一用变量 $overlay 指代。
+$overlay = 'D:/claude-test/TALK/deploy/dsh/acp-overlay.template.yml'
+python -X utf8 scripts/dsh_acp_drive.py spec --cwd D:/claude-test/TALK `
+    --key-file "$env:USERPROFILE\.talk\agent-deepseek.key"
+
+# 3) 零模型：真实 ACP 握手（不发起任何模型请求）
+python -X utf8 scripts/dsh_acp_drive.py handshake --with-list `
+    --dsh-home "<隔离或真实 DSH_HOME>" --patch $overlay `
+    --cwd "<会话工作区>" --out "<取证 JSON>"
+
+# 4) 零模型：建会话 → 持久化 → 同 ID 恢复 → 失配/未知/重复拒绝（模型调用数为 0）
+python -X utf8 scripts/dsh_acp_drive.py lifecycle `
+    --dsh-home "<DSH_HOME>" --patch $overlay --cwd "<会话工作区>" `
+    --session-ref-out "<会话引用 JSON>"
+
+# 5) 配置层：让 DSH 组合 acp profile + 覆盖层并导出配置树
+python -X utf8 scripts/dsh_talk_precheck.py dump --profile acp `
+    --patch $overlay --dsh-home "<DSH_HOME>" --out "<dump 输出>"
+
+# 6) 模型阶段（**条件允许时才跑**）：单条提示，最多一次
+python -X utf8 scripts/dsh_acp_drive.py prompt `
+    --dsh-home "<DSH_HOME>" --patch $overlay --cwd "<会话工作区>" `
+    --session-spec "<会话规格>" --allow-model --prompt-timeout 600 `
+    --prompt-text "<任务正文>"
+```
+
+边界：
+
+- `--patch` / `--dsh-home` 与 #72 一样先按调用者目录解析成绝对路径；ACP 服务进程的 cwd 固定为
+  会话工作区，因此覆盖层里的 `!!js process.cwd()` 与会话工作区一致。
+- 驱动**不会**把 `session/resume` 退化成 `session/new`，也不伪造同 ID；服务端拒绝时按失败退出。
+- 下游参数（`--server-arg` / `--mcp-server-arg`，#76 D1）：**等号写法总是可用**
+  （`--server-arg=-X`、`--server-arg=--profile`）；分离写法 `--server-arg -X` 也可用，但值不得与本
+  驱动已注册的选项同名（如 `--cwd`），否则按用法错误退出（退出码 2），不把驱动选项静默传给下游。
+- 权限请求默认按最保守的 `reject-once` 应答（`--permission allow` 才放行），应答内容进取证；
+  覆盖层保留 DSH 默认的 `ask`，不存在自动批准路径。
+- 超时、进程中途退出、MCP 启动失败都不会被记成成功；取证的 `model_calls` 如实区分 0/1。
+- 驱动只把 `mcpServers` 原样交给 ACP 服务端：工具目录由被测会话内的模型可见性决定，
+  **`probe` 式的“工具可发现”不等于模型已能委派**。
+- ACP 服务进程的 stderr 默认写到系统临时目录的 `talk-dsh-acp-server.stderr.log`（可用
+  `--stderr-log` 改到别处），取证里只带最后一段并做凭据遮蔽；stdout 只承载协议流量。
+
+#### #76 返工：D1–D3 的结论与证据
+
+- **D1（下游参数）**：`--server-arg` 现在接受前导连字符值，`-X utf8` 与 DSH `--profile` 都能传下去；
+  测试用真实子进程的 `sys.orig_argv` 核对参数确实到达下游，并保留“缺值 / 与驱动选项同名”两个负例。
+- **D2（覆盖层权限组合）**：真机 `dump --profile acp` 显示原生 preset 表为
+  `read-only→ask`、`workspace-write→ask`、`danger-full-access→never`；原覆盖层强制
+  `policy: never` 却保持只读沙箱，两个值不构成任何 preset，真实 `session/new` 报 `-32603 match no preset`。
+  现覆盖层**不再覆盖 `approval`**，组合树里该行回落到 profile 默认表达式，在只读沙箱下求值为 `ask`
+  （不自动放行，也不放宽沙箱）；**最终有效组合 = sandbox `read-only` + approval `ask`**，
+  权限拒绝仍由驱动 `--permission reject`（默认）承担。未改全局 profile 与 headless 覆盖层。
+- **D3（会话列表语义）**：`session/list` 过滤活动会话，因此 lifecycle 改为
+  “活动期隐藏 → close 后可见 → resume 同 ID 后再次隐藏”，并新增重复 resume 负例与
+  “持久化条目数正好少一条”的身份证据；模拟进程在 `session/new` 时即登记 active，不再按驱动预期伪造协议。
+
+#### 三层结论（#79独立复核后的当前状态）
+
+1. **配置层**：D1–D3修正已核验，ACP采用 `read-only + ask`，驱动默认拒绝权限；13条原生/派生工具禁用，规格只传密钥文件路径。headless配置未改。
+2. **零模型ACP生命周期与回归**：#77在隔离DSH_HOME中实测真实初始化、建会话、关闭持久化、列表及同ID恢复通过，错误工作区/未知ID/重复恢复拒绝符合协议。#79独立复跑ACP 30项、入口18项全部通过，补齐开发环境因CreatePipe拒绝而未运行的18项。假密钥夹具显式放在仓库外并清理，缺密钥负例隔离HOME，不弱化仓库内凭证禁令。九工具可达与环境传递证据来自模拟ACP服务进程，不能等同真实模型工具可见。模拟管道仍有一条ResourceWarning（unclosed file），未影响用例结果，后续处理。
+3. **模型阶段**：未运行；合法本人凭证来源仍待准备。真实模型工具可见、委派与同会话收取尚未验证。零模型会话恢复成功不代表真实主控闭环已通过。
+
 ### 回归命令
 
 ```powershell
-python -X utf8 -m unittest tests.test_dsh_talk_entry -q
+python -X utf8 -m unittest tests.test_dsh_talk_entry tests.test_dsh_acp_drive -q
 ```

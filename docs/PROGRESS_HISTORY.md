@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-09-16 DSH ACP薄驱动及两轮修正收尾（#74–#79）
+
+- 基线 `3fcbf44`，分支 `codex/terminal-return-codex`。六任务均于本轮收取，保留早期partial与not_run事实；#79最终独立复核通过。本片无真实模型请求、无真实委派，不是DSH主控闭环验收。
+- #74新增ACP传输/会话薄驱动、两个无密钥模板、30项测试，扩展precheck dump的profile选项并维护终端指南。#75独立发现下游前导连字符参数、read-only+never不匹配preset、列表过滤活动会话三问题；#76修复为参数等号/无冲突分离形式、ACP read-only+ask并默认拒绝权限、活动隐藏→close可见→resume隐藏的真实语义，原headless不变。
+- #77独立验证真实DSH 0.1.5-rc.1与内置ACP rc.2：零模型initialize/new/list/close/resume、错误cwd/未知ID/重复恢复拒绝通过，隔离DSH_HOME持久化成立。ACP30例29过，唯一失败是假密钥落入共享test_support设置的仓库内.tmp-tests，触发正确的凭证保护。
+- #78仅改测试夹具：显式解析TMPDIR/TEMP/TMP、resolve确保仓库外、finally清理；缺密钥负例隔离HOME/USERPROFILE，不读取正式凭证。不改共享test_support、安全拒绝代码，不跳过测试、不mock拒绝逻辑。开发宿主CreatePipe拒绝导致18例not_run。
+- #79 Kimi独立核对实际增量与快照一致，运行 `python -X utf8 -m unittest tests.test_dsh_acp_drive -v` 30项全部通过（26.349秒），`python -X utf8 -m unittest tests.test_dsh_talk_entry -v` 18项全部通过（6.499秒）。模拟ACP进程下验证父环境密钥清洗、声明路径传递、九工具目录与talk_list_agents可达，外部临时目录清理、缺密钥响亮失败；未重复无疑点的真实生命周期。证据 `.tmp/l1-dsh-acp/review2.json`、`rework-review.json`、`rework2.json`。
+- 限制：真实模型工具可见性、真实委派及同会话收取未测，需合法本人凭证来源。测试模拟管道有一条ResourceWarning（unclosed file），记录后续处理，不再次自动返工。未启停共享服务、未修改全局信任/权限、未推断服务器无凭证。
+- 变更文件：`scripts/dsh_acp_drive.py`、`scripts/dsh_talk_precheck.py`、`deploy/dsh/acp-overlay.template.yml`、`deploy/dsh/acp-session.template.json`、`tests/test_dsh_acp_drive.py`、`docs/guides/TERMINAL_MCP.md`；Codex同步进度、简报和路线。无最终用户页面变化，无需为本片重启TALK服务。下一片DSH真实模型验证，再WorkBuddy；开发要求UI仍排后。
+
+
 ## 2026-09-16 DSH 入口准备、返工与独立复核收尾（#70–#73）
 
 - 用户先授权主动接收结果，随后明确恢复被动模式；主控已停止主动等待，#72/#73由用户通知收取。四任务均已收取。基线 `9423d02`，分支 `codex/terminal-return-codex`。

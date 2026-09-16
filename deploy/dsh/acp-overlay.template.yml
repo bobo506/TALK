@@ -1,0 +1,58 @@
+# DSH 原生 ACP 会话的覆盖层（无密钥、无占位符，可直接作为 --patch 使用）。
+#
+# 用法（不改 profile、不改用户全局配置）：
+#   dsh --profile acp --patch <本文件>
+#
+# 与 headless 版 `talk-mcp.patch.template.yml` 的差别有两点：
+#   1. 本文件**没有占位符**（唯一动态值是 DSH 自己求值的 `!!js process.cwd()`），
+#      所以既可以直接指向仓库内的本文件，也可以先复制到隔离目录；
+#   2. ACP 的 MCP 服务器**按会话**由客户端在 `session/new` / `session/resume` 的
+#      `mcpServers` 里声明（见 deploy/dsh/acp-session.template.json），
+#      因此本覆盖层**不再 insert mcp-talk**，只做配置层收窄。
+#      这样同一个 ACP 进程的不同会话可以挂不同的 MCP 条目，也避免把 TALK 入口
+#      硬编码进 profile。
+#
+# 契约：本覆盖层只做“收窄”，不修改 bridges/ 下任何工具合同，不新增密钥字段。
+
+# 1) 配置层收窄：禁派生 / 高风险原生工具。
+#    这些行是 dsh-base 提供的原生工具行；禁用它们不是 prompt 约束，而是组合层事实。
+- id: tool-subagent
+  disabled: true
+- id: tool-subagent-fork
+  disabled: true
+- id: tool-subagent-control
+  disabled: true
+- id: tool-subagent-list-agents
+  disabled: true
+- id: tool-workflow
+  disabled: true
+- id: tool-ralph
+  disabled: true
+- id: tool-pwsh
+  disabled: true
+- id: tool-bash
+  disabled: true
+- id: tool-jobs
+  disabled: true
+- id: tool-web
+  disabled: true
+- id: tool-todo
+  disabled: true
+- id: tool-skill
+  disabled: true
+- id: tool-goal
+  disabled: true
+
+# 2) 文件效果边界：只读沙箱；即使模型尝试写入也会被拒绝，而不是靠提示词自律。
+#    `process.cwd()` 在这里是 ACP 服务进程的工作目录，本驱动固定把它设成会话工作区。
+- id: sandbox-policy
+  config:
+    mode: read-only
+    workspaceRoot: !!js process.cwd()
+
+# 3) 权限请求：**不再覆盖 approval**（#76 修正）。
+#    真机证据（#75 复核）：`mode: read-only` + `policy: never` 不匹配任何 ACP preset，
+#    真实 `session/new` 直接报 -32603 `match no preset`；ACP 侧只支持
+#    read-only→ask 与 danger-full-access→never 这两种组合。因此这里保留 DSH 默认的
+#    ask（不自动放行、也不放宽沙箱），权限请求仍由驱动按 --permission（默认 reject）
+#    在 `session/request_permission` 上显式拒绝；禁止自动批准、禁止 danger-full-access。

@@ -1,0 +1,31 @@
+{
+  "_comment": "DSH 原生 ACP 会话规格模板（无密钥）。占位符由 `python scripts/dsh_acp_drive.py spec --key-file <仓库外密钥文件>` 替换；本模板本身不能被驱动直接读取使用。",
+  "_contract": "驱动只把本文件的 cwd 与 mcpServers 原样放进 session/new / session/resume 的 ACP 参数；它不读取、不打印、不落盘任何凭据正文。",
+  "_credentials": "这里只出现密钥**文件路径**（TALK_DSH_KEY_FILE），不出现密钥。真正的密钥由 scripts/dsh_talk_mcp_launch.py 在它自己的进程内读取；ACP 的 mcpServers.env 是客户端显式授权的条目，会覆盖 DSH 子进程 seam 清洗过的父环境。",
+  "cwd": "__CWD__",
+  "mcpServers": [
+    {
+      "name": "talk",
+      "command": "__PYTHON__",
+      "args": [
+        "-X",
+        "utf8",
+        "__REPO__/scripts/dsh_talk_mcp_launch.py",
+        "--server",
+        "__SERVER__",
+        "--project",
+        "__PROJECT__"
+      ],
+      "env": [
+        {
+          "name": "PYTHONUTF8",
+          "value": "1"
+        },
+        {
+          "name": "TALK_DSH_KEY_FILE",
+          "value": "__KEY_FILE__"
+        }
+      ]
+    }
+  ]
+}

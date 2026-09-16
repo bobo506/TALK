@@ -337,12 +337,13 @@ def resolve_dsh_command() -> list[str]:
     raise DshPrecheckError(f"找到 dsh shim（{shim}）但解析不到官方 bin.js；请检查 npm 全局安装")
 
 
-def run_dump(*, patch_path: Path, dsh_home: Path, out_path: Path) -> dict:
+def run_dump(*, patch_path: Path, dsh_home: Path, out_path: Path, profile: str = "headless") -> dict:
     """让 DSH 组合 ``--patch`` 覆盖层并导出配置树；三个路径先解析成绝对路径。
 
     DSH 会把 ``--patch`` 原样拼在自己的 cwd 上，而这里为了隔离把子进程 cwd 设成
     ``dsh_home.parent``；因此相对路径必须在传下游之前按调用者 cwd 定死，否则 DSH
     会去 ``<dsh_home.parent>/<相对路径>`` 找覆盖层并报 ``failed to read overlay``。
+    ``profile`` 默认为 ``headless``（#72 行为不变）；#74 的 ACP 覆盖层用 ``acp``。
     """
     patch_path = resolve_caller_path(patch_path)
     if not patch_path.is_file():
@@ -354,7 +355,7 @@ def run_dump(*, patch_path: Path, dsh_home: Path, out_path: Path) -> dict:
     env["DSH_HOME"] = str(dsh_home)
     env["PYTHONUTF8"] = "1"
     stderr_path = out_path.with_suffix(".stderr.log")
-    command = [*resolve_dsh_command(), "--profile", "headless", "--patch", str(patch_path), "--dump-config"]
+    command = [*resolve_dsh_command(), "--profile", str(profile), "--patch", str(patch_path), "--dump-config"]
     with out_path.open("w", encoding="utf-8") as handle, stderr_path.open(
         "w", encoding="utf-8"
     ) as err_handle:
@@ -379,6 +380,7 @@ def run_dump(*, patch_path: Path, dsh_home: Path, out_path: Path) -> dict:
         "out_path": str(out_path),
         "patch_path": str(patch_path),
         "dsh_home": str(dsh_home),
+        "profile": str(profile),
     }
 
 
@@ -404,6 +406,11 @@ def build_parser() -> argparse.ArgumentParser:
     dump.add_argument("--patch", type=Path, required=True)
     dump.add_argument("--dsh-home", type=Path, required=True)
     dump.add_argument("--out", type=Path, required=True)
+    dump.add_argument(
+        "--profile",
+        default="headless",
+        help="要组合的 DSH profile；默认 headless，#74 的 ACP 覆盖层用 acp",
+    )
     return parser
 
 
@@ -435,7 +442,12 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=False))
             return 0 if result["tools_match"] else 1
         if args.command == "dump":
-            result = run_dump(patch_path=args.patch, dsh_home=args.dsh_home, out_path=args.out)
+            result = run_dump(
+                patch_path=args.patch,
+                dsh_home=args.dsh_home,
+                out_path=args.out,
+                profile=getattr(args, "profile", "headless"),
+            )
             # 用解析后的绝对路径读取覆盖层，避免与下游 DSH 的 cwd 语义分叉。
             result["disabled_rows"] = disabled_row_ids(Path(result["patch_path"]))
             print(json.dumps(result, ensure_ascii=False))
