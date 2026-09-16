@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-09-16 WorkBuddy接入准备调查与独立复核（#85–#86）
+
+- 基线e4adf2a。DeepSeek调查、Kimi独立复核，均为partial，主控已收取调研成果，未运行桌面连接/模型/委派收取。确认桌面WorkBuddy5.5.6与包内CodeBuddy Code2.137.1；包内headless/ACP入口不能代替桌面验收。配置中kimi-k3/deepseek-v4-pro不等于账号或工具调用可用。
+- 采纳复核修正：项目级隔离配置优先，不要求用户选择另一产品，不预设必须重启；官方项目级.workbuddy/mcp.json与引擎.mcp.json存在差异，实际通过桌面配置入口及状态灯判定。直接env模板参数与现有MCP入口匹配，但“无需改代码”仅为配置方案，未经真实连接实测。仓库外密钥文件方案仍有启动器复用与文件访问待验证项。
+- 复核查无WorkBuddy专用成员，下一步准备agent:workbuddy及项目权限和独立凭证，不复用现有kimi/deepseek身份。用户按最短GUI步骤完成连接与两模型各自验证；未授权本轮修改全局配置/启停应用。模型委派及收取须分阶段经主控验收，不自动一次全跑。
+- #86原报告task_id误写talk-delivery-1，MCP及本地expect-task-id86均拒绝。Codex保留原件，另存review-normalized-by-codex.json仅改任务号，validate通过；review-normalization-note.json记录原哈希和消息2578。收取不改写服务器invalid事实，不冒充执行者已正确交付。
+- 证据均在.tmp/l2-workbuddy/：discovery.json、capability-matrix.md、isolation-plan.md、无密钥模板、review.json、review-notes.md及主控整理副本。本轮不改代码，不重跑已有无关测试；后续真实连接待凭证与用户操作。
+
+
 ## 2026-09-16 DSH真实模型单任务主控闭环（#80–#84）
 
 - 基线1bf186b。用户提供本人TALK凭证，Codex仅保存到仓库外约定路径，不入版本库。#80身份/配置通过，但执行宿主CreatePipe被拒，未发起模型；#81切换到Kimi已验证可运行环境作为操作员，受测模型仍是DSH deepseek-v4-flash（deepseek-official）。保持read-only+ask、默认拒绝权限、13项工具禁用，无权限询问。
