@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-09-16 WorkBuddy连接、88收取调查（#87–#89）
+
+- #87 Kimi注册专用agent:workbuddy，外部凭证及workbuddy-validation配置核对通过；Codex再次核对两配置一致与/me身份后收取。未登记进项目agent索引，不影响本次读取及已发生的顶层委派。用户截图显示界面编辑用户级~/.workbuddy/mcp.json，按主控指导导入；不能宣称项目级加载已通过。用户回传kimi-k3与deepseek-v4-pro的list_agents成功结果。
+- WorkBuddy DeepSeek对话创建#88，created_by=agent:workbuddy、target=agent:kimi，结果msg2580为135字符自由文本（任务号/请求者/只读完成）。人工验收内容满足连通性要求，不把unknown结构化结论当失败。Codex读Hall403，由用户从原对话转交正文。发现completed和收取时间早于预期，未让用户重复collect。
+- #89 DeepSeek只读调查，预检因任务号疑问请求澄清；Codex明确89后状态clarification_answered，22:49:00启动预检子进程，最终正常交付。没有发现WorkBuddy占用导致不领取；不把预检中尚未claim误判为答复无效。
+- 原始logs/talk.log证明：北京时间22:28:35，member_id=agent:workbuddy，POST /api/tasks/88/collect-result，status=200；22:28:37，human:bobo GET /api/messages 403。Codex亲自抽查这两条和collect_result源码，确认收取发生在自身失败读取之前。只读接口代码无收取写入，明确收取接口写result_collected_at；#89已收取。
+- 归因边界：足以确认WorkBuddy凭证发起显式收取HTTP请求，排除本次Codex读取造成收取；请求序列吻合MCP collect_result。未读取WorkBuddy具体会话轨迹，不能确认模型还是客户端自动化，也不能确认同一对话按批准执行。当前HEAD与运行中MCP代码版本未交叉验证。无需继续泛查或立即改代码，后续受控补测保留真实工具轨迹。
+- 证据：.tmp/l2-workbuddy/task88-investigation/report.json及脱敏证据；不复制私人对话/凭证入库。调查未改88、未新建复现任务、未实施修复。当前仍有Kimi委派收取及DeepSeek受控收取验证未完成；正式运行器适配与无人值守不在本次结论内。
+
+
 ## 2026-09-16 WorkBuddy接入准备调查与独立复核（#85–#86）
 
 - 基线e4adf2a。DeepSeek调查、Kimi独立复核，均为partial，主控已收取调研成果，未运行桌面连接/模型/委派收取。确认桌面WorkBuddy5.5.6与包内CodeBuddy Code2.137.1；包内headless/ACP入口不能代替桌面验收。配置中kimi-k3/deepseek-v4-pro不等于账号或工具调用可用。

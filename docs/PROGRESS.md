@@ -4,6 +4,8 @@ Updated: 2026-09-16 (Asia/Shanghai)
 
 ## 当前状态
 
+- WorkBuddy #87配置准备已收取：专用agent:workbuddy注册并核对/me，仓库外配置/凭证已准备；用户通过用户级MCP界面加载，两模型只读list_agents均返回成功（用户回传证据）。DeepSeek经此身份委派#88，Kimi交付内容已验收。#89调查已收取：服务器日志确认22:28:35 agent:workbuddy POST /api/tasks/88/collect-result 200，早于Codex22:28:37 GET消息403；不是Codex读取副作用。WorkBuddy内部具体触发来源与同对话受控收取尚未证实，不标完整闭环通过。
+
 - WorkBuddy准备调查#85与独立复核#86已收取（partial，不是连接验收）：本机桌面5.5.6、包内引擎2.137.1，配置含kimi-k3/deepseek-v4-pro但未验证可用。项目级MCP优先，不预设必须重启；官方.workbuddy/mcp.json与引擎.mcp.json路径差异待GUI实测。下一步准备专用agent:workbuddy身份/凭证，再由用户验证桌面连接。86误填task_id，主控仅在独立副本修正并校验，服务器原报告仍invalid。
 
 - DSH ACP 薄驱动与测试已完成：#74开发→#75复核→#76返工→#77复核→#78夹具修正→#79最终复核，六项已正式收取；基线 `3fcbf44`。#77真实零模型握手、建会话/关闭/列表/同ID恢复及拒绝分支通过；#79独立复跑ACP 30项、入口18项全部通过。
