@@ -1,8 +1,10 @@
 # Project Progress
 
-Updated: 2026-09-16 (Asia/Shanghai)
+Updated: 2026-09-17 (Asia/Shanghai)
 
 ## 当前状态
+
+- WorkBuddy＋Kimi单任务受控闭环通过（#90）：用户在原kimi-k3对话委派给DeepSeek，转交msg2585全文；Codex验收后用户明确指令同对话collect一次。服务端日志2026-09-17 15:39:30（UTC+8）确认agent:workbuddy POST /api/tasks/90/collect-result 200；用户回报completed、result_collected_at=2026-09-17T07:39:30.617132。同对话/模型选择证据来自用户回传，服务端独立确认身份/收取请求。尚需补WorkBuddy＋DeepSeek受控收取；多工作区、无人值守、页面运行器适配不在本轮结论内。
 
 - WorkBuddy #87配置准备已收取：专用agent:workbuddy注册并核对/me，仓库外配置/凭证已准备；用户通过用户级MCP界面加载，两模型只读list_agents均返回成功（用户回传证据）。DeepSeek经此身份委派#88，Kimi交付内容已验收。#89调查已收取：服务器日志确认22:28:35 agent:workbuddy POST /api/tasks/88/collect-result 200，早于Codex22:28:37 GET消息403；不是Codex读取副作用。WorkBuddy内部具体触发来源与同对话受控收取尚未证实，不标完整闭环通过。
 

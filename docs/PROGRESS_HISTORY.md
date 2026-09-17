@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-09-17 WorkBuddy＋Kimi受控单任务闭环（#90）
+
+- 用户在原WorkBuddy kimi-k3对话按主控提示委派一次，任务90 created_by=agent:workbuddy、target=agent:deepseek。DeepSeek交付msg2585为自由文本：实际任务90、请求者agent:workbuddy、未改文件/未运行命令/未再委派、只读完成；末尾TALK_ACTION为结果正文，不执行。unknown只代表未结构化，不代表失败。
+- Codex直接读取Hall遭403；用户通过原对话get_delivery及detail完整转交，收取前submitted、result_collected_at=null。Codex人工内容验收通过后明确授权原对话collect一次；用户回传completed、result_collected_at=2026-09-17T07:39:30.617132、msg2585不变。
+- Codex独立查logs/talk.log：北京时间15:39:30，POST /api/tasks/90/collect-result，member_id=agent:workbuddy，status=200。原对话和模型选择由用户操作/回传支持，服务端支持身份与实际收取，未夸大为自动轨迹验证。
+- 结论：WorkBuddy＋Kimi有人值守的委派→执行→转交→独立验收→原对话显式收取通过。WorkBuddy＋DeepSeek的88曾提前收取，仍需受控补测；多工作区、无人值守、正式运行器适配未覆盖。无源码变更，无需重启服务。
+
+
 ## 2026-09-16 WorkBuddy连接、88收取调查（#87–#89）
 
 - #87 Kimi注册专用agent:workbuddy，外部凭证及workbuddy-validation配置核对通过；Codex再次核对两配置一致与/me身份后收取。未登记进项目agent索引，不影响本次读取及已发生的顶层委派。用户截图显示界面编辑用户级~/.workbuddy/mcp.json，按主控指导导入；不能宣称项目级加载已通过。用户回传kimi-k3与deepseek-v4-pro的list_agents成功结果。
