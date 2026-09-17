@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-09-17 WorkBuddy＋DeepSeek受控收取补测及终端验证收尾（#91）
+
+- 用户在原WorkBuddy DeepSeek对话委派91给Kimi；只读交付msg2586包含实际任务号、agent:workbuddy请求者和只读完成声明。用户转交summary/detail时submitted、result_collected_at=null。Codex内容验收后明确授权原对话collect一次，用户回传completed、msg2586不变、result_collected_at=2026-09-17T07:45:18.107869。
+- 主控独立核对原始服务器日志：北京时间15:45:18，POST /api/tasks/91/collect-result，member_id=agent:workbuddy，status=200。结合用户原对话工具回传，91受控闭环通过。该证据不反推88的具体模型/会话触发来源；88只确认WorkBuddy凭证发起收取，而非只读副作用。
+- 本轮范围内Kimi Code CLI、DeepSeek Harness、WorkBuddy桌面kimi-k3与deepseek-v4-pro均完成有人值守单任务委派/执行/人工独立验收/原会话收取。WorkBuddy实际采用用户级MCP，模型与同对话由用户操作记录支持；后端日志只证明身份及收取请求，不证明具体模型。两模型共用专用agent:workbuddy，不冒充原生kimi/deepseek成员。
+- 项目级自动加载、跨重启恢复、多工作区、无人值守、页面启停/运行器适配仍未验证；不把包内CodeBuddy引擎视为桌面自动化验收。配置与凭证继续保留供用户使用，未启停服务或变更全局配置。无代码变更，仅同步进度/简报/路线/使用指南；后续按既定计划安排角色列表开发要求（只保留最新）。
+
+
 ## 2026-09-17 WorkBuddy＋Kimi受控单任务闭环（#90）
 
 - 用户在原WorkBuddy kimi-k3对话按主控提示委派一次，任务90 created_by=agent:workbuddy、target=agent:deepseek。DeepSeek交付msg2585为自由文本：实际任务90、请求者agent:workbuddy、未改文件/未运行命令/未再委派、只读完成；末尾TALK_ACTION为结果正文，不执行。unknown只代表未结构化，不代表失败。

@@ -328,3 +328,12 @@ python -X utf8 scripts/dsh_acp_drive.py prompt `
 ```powershell
 python -X utf8 -m unittest tests.test_dsh_talk_entry tests.test_dsh_acp_drive -q
 ```
+
+
+### WorkBuddy桌面验证结果（2026-09-17）
+
+WorkBuddy5.5.6通过用户级MCP界面导入TALK条目，复用现有 `bridges/talk_terminal_mcp.py`，无需本轮修改业务代码。专用身份为 `agent:workbuddy`，凭证与准备配置留在仓库外；请勿将含密钥配置提交版本库。项目级文件自动读取尚未验证，不把包内CodeBuddy CLI/ACP能力等同桌面能力。
+
+用户在桌面选kimi-k3完成任务90、选deepseek-v4-pro完成任务91：一次委派→执行者交付→原对话只读读取→Codex人工验收→明确指令原对话收取。服务端日志分别于北京时间15:39:30与15:45:18确认专用身份POST collect-result返回200；同对话及模型选择由用户回传支持。88提前收取的具体会话来源仍未定位，91补测不改变这一历史边界。
+
+结论仅覆盖有人值守的单任务流程，不覆盖跨重启会话恢复、多工作区、无人值守和TALK页面运行器适配。连接先看实际MCP状态与只读工具调用，不预设必须重启。
