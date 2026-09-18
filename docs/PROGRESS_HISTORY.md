@@ -2,7 +2,7 @@
 
 ## 2026-09-18 REQ-1 项目级开发要求后端与主控工具（#92/#93）
 
-- Git收尾：本地提交成功；向 `origin` 的 `codex/terminal-return-codex` 推送被自动审批拒绝，未执行。拒绝理由为远程归属及推送授权证据未获认可，目标 `https://github.com/bobo506/TALK.git`；等待用户明确确认，不绕过审批。
+- Git收尾：本地提交成功；向 `origin` 的 `codex/terminal-return-codex` 推送被自动审批拒绝，未执行。拒绝理由为远程归属及推送授权证据未获认可，目标 `https://github.com/bobo506/TALK.git`；随后用户明确授权本次及今后该项目推送，按新授权重试成功：`ada3b71..b32ef7c` 已推送至 `codex/terminal-return-codex`。持续授权同步AGENTS.md。
 
 - 用户于2026-09-17授权继续，按后端/工具与前端拆片；DeepSeek #92开发后暂停，Kimi #93只读独立审查，Codex据审查与测试证据验收。基线 `ada3b71bf2ae8e2fd8f12fbf7a39fa95b9be4851`，分支 `codex/terminal-return-codex`。
 - Project新增 `development_requirements` 最新纯文本（20000字符、默认NULL、保留换行）；老库通过幂等ALTER增列保留数据。项目API沿用human写、认证成员读；省略不改、空白/null清空；CLI只在显式字段时透传，SDK没有项目helper未凭空扩展。

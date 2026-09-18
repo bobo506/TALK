@@ -4,7 +4,7 @@ Updated: 2026-09-18 (Asia/Shanghai)
 
 ## 当前状态
 
-- REQ-1已完成本地提交，推送尚未完成：2026-09-18自动审批拒绝 `git push origin codex/terminal-return-codex`，理由为未认可对外部目标 `https://github.com/bobo506/TALK.git` 的明确授权/归属证据；需用户明确确认后再推送，不绕过。
+- REQ-1提交 `b32ef7c` 已于2026-09-18推送至 `bobo506/TALK` 的 `codex/terminal-return-codex`。此前自动审批拒绝后，用户明确确认本次及今后本项目常规推送授权，重试成功；持续授权已记录AGENTS.md。
 - REQ-1 后端/主控工具已完成：DeepSeek #92 开发、Kimi #93 独立复核通过，Codex 已于 2026-09-18 正式收取两项（msg2587/msg2588）。基线 `ada3b71`；新增项目最新开发要求字段、兼容迁移/API/CLI、角色清单读取与 MCP 新任务正文快照，旧任务不追溯修改。
 - Kimi 在独立环境分批复跑全部638项通过（162+319+67+90），补齐开发者环境24项管道限制。开发报告含失败组标pass及基线计数不一致保留为记录，不采信其全量通过表述。#92服务端正文因说明/围栏为unknown，本地包任务号校验通过；验收依据独立代码复核与复跑。
 - 前端编辑区未实现，AGENTS分工暂保留；直接REST/schedule/旧pi扩展不自动写快照。共享服务未重启、真实库未迁移，MCP宿主新描述未验证加载，不能宣称线上已生效。交付证据在 `.tmp/req-1/`，正式接口见 `docs/spec/PROJECT_INTEGRATION.md` 的REQ-1节。
