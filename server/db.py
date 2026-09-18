@@ -269,6 +269,12 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE group_members ADD COLUMN business_role TEXT")
         if "decision_tier" not in group_member_columns:
             conn.exec_driver_sql("ALTER TABLE group_members ADD COLUMN decision_tier TEXT")
+        project_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(projects)").fetchall()
+        }
+        if "development_requirements" not in project_columns:
+            conn.exec_driver_sql("ALTER TABLE projects ADD COLUMN development_requirements TEXT")
         project_agent_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(project_agents)").fetchall()

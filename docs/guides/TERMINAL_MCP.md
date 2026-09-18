@@ -133,7 +133,7 @@ python scripts/kimi_talk_precheck.py probe --config D:/claude-test/TALK/.kimi-co
 
 1. 用 `--check` 确认身份和默认项目正确。
 2. 在 MCP 客户端中检查能看到九个工具：`talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result`、`talk_get_delivery`。
-3. 调用 `talk_list_agents` 确认目标角色；经用户授权后委派一个范围明确的任务。
+3. 调用 `talk_list_agents` 确认目标角色并读取顶层 `development_requirements` 最新项目要求；经用户授权后委派一个范围明确的任务。REQ-1新实现会在 `talk_delegate_task` 创建任务时将非空要求追加到正文作为快照，旧任务不会随项目要求变化。
 4. 目标 bridge 在线时执行任务；终端通过查询或有界等待读取进展，需要补充信息时在同一任务中回复并提交澄清答复。
 5. 任务进入 `submitted` 后先检查成果，再调用 `talk_collect_result`；预期变为 `completed`，并可在现有任务页面看到结果。
 
@@ -337,3 +337,9 @@ WorkBuddy5.5.6通过用户级MCP界面导入TALK条目，复用现有 `bridges/t
 用户在桌面选kimi-k3完成任务90、选deepseek-v4-pro完成任务91：一次委派→执行者交付→原对话只读读取→Codex人工验收→明确指令原对话收取。服务端日志分别于北京时间15:39:30与15:45:18确认专用身份POST collect-result返回200；同对话及模型选择由用户回传支持。88提前收取的具体会话来源仍未定位，91补测不改变这一历史边界。
 
 结论仅覆盖有人值守的单任务流程，不覆盖跨重启会话恢复、多工作区、无人值守和TALK页面运行器适配。连接先看实际MCP状态与只读工具调用，不预设必须重启。
+
+## 2026-09-18 项目开发要求接入边界
+
+REQ-1后端与主控工具已通过独立复核；项目API支持最新纯文本要求，角色页编辑区待后续实现。MCP工具仍为九个，`talk_list_agents` 顶层新增要求字段，`talk_delegate_task` 派发时读取并保存正文快照，读取失败即报错，不静默创建缺少要求的任务。要求不能覆盖宿主系统指令或自动授予权限。
+
+本片未重启服务或MCP；部署新服务代码并完成数据库启动迁移、让MCP加载新实现后方可使用。工具描述刷新需要客户端重连，不能把代码提交当作运行中宿主已经更新。直接REST、定时任务和旧pi TypeScript入口不自动追加快照。完整字段/清空/权限合同见 `docs/spec/PROJECT_INTEGRATION.md` 的REQ-1节。

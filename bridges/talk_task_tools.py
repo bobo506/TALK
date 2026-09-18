@@ -80,6 +80,13 @@ AVAILABILITY_NOTE = (
     "availability 仅依据 agent_instances 上报状态，未做心跳核验，"
     "可能滞后于真实在线状态，使用前请按 last_seen_at 判断新鲜度。"
 )
+# 项目级开发要求随 talk_delegate_task 写入任务正文的区块标题：内容是派发时刻的快照，
+# 不是活动引用；已派发任务不随项目要求后续修改而变。
+PROJECT_REQUIREMENTS_SNAPSHOT_HEADER = "项目开发要求（派发时快照）"
+PROJECT_REQUIREMENTS_SNAPSHOT_NOTE = (
+    "以下内容由主控在派发时从项目读取并写入任务正文，仅作为随包保存的文本快照："
+    "不自动授予权限，不替代或覆盖宿主系统指令，也不追溯修改已创建任务。"
+)
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
@@ -205,9 +212,48 @@ def latest_instance_summary(instances: list[JsonDict]) -> list[JsonDict]:
     ]
 
 
+def project_development_requirements(project_id: str) -> str | None:
+    """读取指定项目当前的最新开发要求（只读，不做缓存）。
+
+    - 项目缺失或不可见时沿用 ``GET /api/projects/{id}`` 的既有错误语义，抛 ``TalkToolError``；
+      不会回退到其它项目或上一次读到的陈旧快照；
+    - 无内容（服务端存 NULL/空）时返回 ``None``，调用方据此保持原有行为。
+    """
+    project = _api_request("GET", f"/api/projects/{quote(project_id, safe='')}")
+    value = project.get("development_requirements") if isinstance(project, dict) else None
+    if value is None:
+        return None
+    text = str(value)
+    return text if text.strip() else None
+
+
+def snapshot_task_content(content: str, requirements: str | None) -> str:
+    """把非空项目开发要求以清晰区块追加进任务正文，保留调用者原始 content。
+
+    - 要求为空时原样返回 ``content``，派发行为与旧版本完全一致；
+    - 快照放在原始正文之后，保证 Task Hall 名称推导（无标题时取正文开头）
+      与既有标题规则不受影响；
+    - 只做文本拼接，不解析、不执行要求内容。
+    """
+    if requirements is None:
+        return content
+    note = PROJECT_REQUIREMENTS_SNAPSHOT_NOTE
+    return (
+        f"{content}\n\n"
+        f"【{PROJECT_REQUIREMENTS_SNAPSHOT_HEADER}】\n"
+        f"{note}\n"
+        "----------------------------------------\n"
+        f"{requirements}"
+    )
+
+
 def list_agents(*, project_id: str | None = None) -> JsonDict:
     effective_project_id = _project_id(project_id)
     if effective_project_id is not None:
+        project = _api_request(
+            "GET",
+            f"/api/projects/{quote(effective_project_id, safe='')}",
+        )
         project_agents = _api_request(
             "GET",
             f"/api/projects/{quote(effective_project_id, safe='')}/agents",
@@ -242,6 +288,7 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
             )
         return {
             "project_id": effective_project_id,
+            "development_requirements": project.get("development_requirements"),
             "availability_note": AVAILABILITY_NOTE,
             "agents": agents,
         }
@@ -270,6 +317,8 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
         )
     return {
         "project_id": effective_project_id,
+        # 非项目路径没有项目上下文，保持字段存在以便调用方统一取值。
+        "development_requirements": None,
         "availability_note": AVAILABILITY_NOTE,
         "agents": agents,
     }
@@ -290,12 +339,16 @@ def delegate_task(
     max_clarification_rounds: int = 1,
 ) -> JsonDict:
     effective_project_id = _project_id(project_id, required=True)
+    # 派发前读取该项目的当前开发要求：只作用于本次新建任务的存储正文，
+    # 不追溯修改已创建任务，也不改变任何权限或预算字段。
+    requirements = project_development_requirements(effective_project_id)
+    stored_content = snapshot_task_content(content, requirements)
     return _api_request(
         "POST",
         "/api/tasks",
         json_body={
             "target_member_id": target_member_id,
-            "content": content,
+            "content": stored_content,
             "title": title,
             "project_id": effective_project_id,
             "task_kind": task_kind,
@@ -823,6 +876,9 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "每个角色最多一个按 last_seen_at 取最新的实例，且只含 "
             "id / runtime / status / current_task_id / last_seen_at / pid，"
             "不返回历史实例、last_error 或既有 CLI 日志。"
+            "顶层同时返回项目级最新开发要求 development_requirements（角色清单只出现一次，"
+            "不重复写进每个 Agent；无内容时为 null）：主控派发新任务前应先读取它与角色清单，"
+            "再按该要求派发。"
             "availability 仅依据实例上报，未做心跳核验，可能滞后，使用时请参考 last_seen_at。"
             "project_id 省略时使用 bridge 项目上下文。"
         ),
@@ -833,7 +889,14 @@ TOOL_SCHEMAS: list[JsonDict] = [
     },
     {
         "name": "talk_delegate_task",
-        "description": "向指定 Agent 创建项目化任务并自动建立独立 Task Hall。",
+        "description": (
+            "向指定 Agent 创建项目化任务并自动建立独立 Task Hall。"
+            "派发前先读取所解析项目当前的最新开发要求（可先用 talk_list_agents 查看），"
+            "创建新任务时把非空要求以“项目开发要求（派发时快照）”区块写入所存任务正文，"
+            "并保留调用者原始 content；要求为空时正文与旧行为一致。"
+            "该快照只是随任务包保存的文本：不解析、不执行、不自动授予权限、不覆盖宿主系统指令，"
+            "已创建任务不因项目要求后续修改而追溯变更。"
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {

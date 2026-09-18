@@ -350,6 +350,10 @@ def register_project(
         "project_root_path": project_meta.get("project_root_path"),
         "maintainer_member_id": project_meta.get("maintainer"),
     }
+    # 项目级开发要求：只在调用方显式提供时随注册写入，旧调用载荷保持逐字不变。
+    requirements = project_meta.get("development_requirements")
+    if requirements is not None:
+        payload["development_requirements"] = requirements
 
     owns_client = http is None
     if http is None:

@@ -178,6 +178,7 @@ def register_project(
         display_name=body.display_name,
         description=body.description,
         project_root_path=body.project_root_path,
+        development_requirements=body.development_requirements,
         maintainer_member_id=maintainer_id,
         created_at=now,
         last_seen_at=now,
@@ -335,7 +336,7 @@ def update_project(
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
-    """Update project metadata (display name / description / root path)."""
+    """Update project metadata (display name / description / root path / development requirements)."""
     _require_human(current)
     project = _get_project(project_id, session)
     fields_set = body.model_fields_set
@@ -345,6 +346,9 @@ def update_project(
         project.description = body.description
     if "project_root_path" in fields_set:
         project.project_root_path = body.project_root_path
+    if "development_requirements" in fields_set:
+        # 省略即保持原值；显式空文本或 null 归一为 None（清空）。
+        project.development_requirements = body.development_requirements
     session.add(project)
     session.commit()
     session.refresh(project)

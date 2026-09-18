@@ -1,5 +1,20 @@
 # 开发历史 · TALK
 
+## 2026-09-18 REQ-1 项目级开发要求后端与主控工具（#92/#93）
+
+- Git收尾：本地提交成功；向 `origin` 的 `codex/terminal-return-codex` 推送被自动审批拒绝，未执行。拒绝理由为远程归属及推送授权证据未获认可，目标 `https://github.com/bobo506/TALK.git`；等待用户明确确认，不绕过审批。
+
+- 用户于2026-09-17授权继续，按后端/工具与前端拆片；DeepSeek #92开发后暂停，Kimi #93只读独立审查，Codex据审查与测试证据验收。基线 `ada3b71bf2ae8e2fd8f12fbf7a39fa95b9be4851`，分支 `codex/terminal-return-codex`。
+- Project新增 `development_requirements` 最新纯文本（20000字符、默认NULL、保留换行）；老库通过幂等ALTER增列保留数据。项目API沿用human写、认证成员读；省略不改、空白/null清空；CLI只在显式字段时透传，SDK没有项目helper未凭空扩展。
+- `talk_list_agents` 顶层实时返回要求一次；`talk_delegate_task` 将非空要求追加到原任务正文，读取失败不派发、空要求保留旧行为，旧任务不追改；执行bridge从claim存储正文取快照。无新MCP工具/版本历史/前端变更。
+- Kimi独立检查实际代码并审查测试runner，在Windows Python3.12.1环境分批覆盖638项（162+319+67+90）全部通过，其中新增21项已包含在162项内；补齐DeepSeek环境24项WinError5限制。主控未重复全量运行，执行git diff --check完成收尾检查。
+- 开发者把含失败的319/638组标pass、基线4模块169项与复核67项计数不一致，保留原报告作审计，不将其视为全量通过证据；以独立复核复跑为准。#92 msg2587因说明/JSON围栏被MCP识别unknown，本地development.json经summary --expect-task-id 92通过；#93 msg2588为合法结构化交付。
+- 正式收取：#92于2026-09-18T01:52:18.241690、#93于01:52:20.924785，均completed。交付/接口/复核证据位于 `.tmp/req-1/development.json`、`interface.md`、`review.json`、`review-notes.md`。
+- 代码变更：`server/models.py`、`server/db.py`、`server/routes/projects.py`、`bridges/talk_task_tools.py`、`cli/talk.py`、`tests/test_project_development_requirements.py`；正式同步进度/历史/简报/路线/项目集成接口/终端指南。
+- 限制：未改真实库、未重启共享服务或重连MCP，运行中旧进程不能宣称已生效；直接REST/schedule/旧pi TS不自动写快照；快照最多新增20000字符及区块说明（字节数取决于UTF-8编码，并非固定20KB）。测试临时目录残留为既有清理问题，本片未清理。
+- 下一步REQ-2由Kimi做角色页编辑区、DeepSeek复核；本片收尾后暂停，AGENTS分工暂保留，待整项完成再消除双重维护。
+
+
 ## 2026-09-17 WorkBuddy＋DeepSeek受控收取补测及终端验证收尾（#91）
 
 - 用户在原WorkBuddy DeepSeek对话委派91给Kimi；只读交付msg2586包含实际任务号、agent:workbuddy请求者和只读完成声明。用户转交summary/detail时submitted、result_collected_at=null。Codex内容验收后明确授权原对话collect一次，用户回传completed、msg2586不变、result_collected_at=2026-09-17T07:45:18.107869。

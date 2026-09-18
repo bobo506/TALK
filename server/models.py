@@ -103,6 +103,9 @@ class Project(SQLModel, table=True):
     display_name: str
     description: Optional[str] = None
     project_root_path: Optional[str] = None
+    # 项目级“开发要求”：只保存最新纯文本，无版本号/历史；NULL 表示无内容。
+    # 主控派发新任务前读取，并把派发时快照写进任务正文。
+    development_requirements: Optional[str] = None
     maintainer_member_id: str = Field(foreign_key="members.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -161,6 +164,30 @@ TASK_AUTHORIZATION_TTL_MIN_SECONDS = 60
 TASK_AUTHORIZATION_TTL_MAX_SECONDS = 90 * 60
 TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT = 1
 TASK_MAX_CLARIFICATION_ROUNDS_LIMIT = 2
+
+# 项目级“开发要求”纯文本上限：用于创建与更新的同一套校验（按字符数计算）。
+PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS = 20000
+
+
+def normalize_development_requirements(value: Optional[str]) -> Optional[str]:
+    """归一化项目级开发要求：保留原文与换行，只做长度校验和空值归一。
+
+    - ``None`` 或全空白文本（含 ``""``）统一归一为 ``None``，表示“无内容/清空”；
+    - 非空文本原样保留（不 strip、不折叠换行），仅校验字符数上限；
+    - 超长直接抛 ``ValueError``，由 FastAPI 转成 422，创建与更新语义一致。
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("development_requirements must be a string or null")
+    if len(value) > PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS:
+        raise ValueError(
+            "development_requirements must be at most "
+            f"{PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS} characters"
+        )
+    if not value.strip():
+        return None
+    return value
 
 
 class AgentTask(SQLModel, table=True):
@@ -1144,6 +1171,7 @@ class ProjectCreate(BaseModel):
     display_name: str
     description: Optional[str] = None
     project_root_path: Optional[str] = None
+    development_requirements: Optional[str] = None
     maintainer_member_id: Optional[str] = None  # defaults to the registering member
 
     @model_validator(mode="after")
@@ -1159,6 +1187,9 @@ class ProjectCreate(BaseModel):
             self.description = self.description.strip() or None
         if self.project_root_path is not None:
             self.project_root_path = self.project_root_path.strip() or None
+        self.development_requirements = normalize_development_requirements(
+            self.development_requirements
+        )
         if self.maintainer_member_id is not None:
             self.maintainer_member_id = self.maintainer_member_id.strip() or None
         return self
@@ -1170,6 +1201,7 @@ class ProjectUpdate(BaseModel):
     display_name: Optional[str] = None
     description: Optional[str] = None
     project_root_path: Optional[str] = None
+    development_requirements: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_project_update(self) -> "ProjectUpdate":
@@ -1181,6 +1213,11 @@ class ProjectUpdate(BaseModel):
             self.description = self.description.strip() or None
         if "project_root_path" in self.model_fields_set and self.project_root_path is not None:
             self.project_root_path = self.project_root_path.strip() or None
+        # 只有显式提供该字段才校验；“明确空文本或 null”视为清空，省略则保持原值。
+        if "development_requirements" in self.model_fields_set:
+            self.development_requirements = normalize_development_requirements(
+                self.development_requirements
+            )
         return self
 
 
@@ -1189,6 +1226,7 @@ class ProjectOut(BaseModel):
     display_name: str
     description: Optional[str]
     project_root_path: Optional[str]
+    development_requirements: Optional[str] = None
     maintainer_member_id: str
     created_at: datetime
     last_seen_at: datetime
@@ -1200,6 +1238,7 @@ class ProjectOut(BaseModel):
             display_name=project.display_name,
             description=project.description,
             project_root_path=project.project_root_path,
+            development_requirements=project.development_requirements,
             maintainer_member_id=project.maintainer_member_id,
             created_at=project.created_at,
             last_seen_at=project.last_seen_at,
