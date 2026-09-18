@@ -287,6 +287,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 | `review_policy` | **不要传** | 只用于 `development` / `rework` |
 
 - `development` / `review` / `test` / `rework` 这几种 `task_kind` 只用于**已有明确 parent 的既有子任务合同**，独立顶层任务不要用。
+- 2026-09-18 用户明确确认：现阶段独立顶层任务继续使用默认 `general`，包括开发、检查与返工；实际工作写清在标题/正文即可。按真实工作分类的需求已记入 `docs/spec/DEVELOPMENT_ROADMAP.md` 暂缓项，未来评估流程兼容后再实现，当前不改类型或历史记录。
 - 需要复核时，单独派发一条独立顶层任务，在 `content` 里写明复核对象路径与验收标准，不要靠 `related_task_ids` 挂靠。
 - 本片不实现新的服务端分支，也不猜测子任务权限；固定用上面这组最小调用即可。
 
