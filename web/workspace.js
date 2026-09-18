@@ -137,8 +137,197 @@ function workspaceTaskRow(task) {
   button.appendChild(meta);
   return button;
 }
+// ── REQ-2 项目级“开发要求”编辑区（角色页，不绑定单个角色） ─────────────
+// 上限与后端 PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS 一致；字符数按 Unicode
+// 码点计数（JS 展开迭代与 Python len 对成形文本一致），不用 maxlength 误拒 emoji。
+const REQUIREMENTS_MAX_CHARS = 20000;
+function workspaceRequirementsLength(text) { return [...String(text ?? "")].length; }
+// 与后端 normalize_development_requirements 对齐：null/全空白（含空串）归一为 null，其它原文保留。
+// 空白集合按 Python str.isspace() 合同（server/models.py 用 value.strip() 判空）：
+// U+0009–U+000D、U+001C–U+001F、U+0020、U+0085、U+00A0、U+1680、U+2000–U+200A、U+2028/U+2029、
+// U+202F、U+205F、U+3000。不用 JS trim()：它会多算 U+FEFF、漏算 U+001C–U+001F/U+0085，与后端分叉。
+const REQUIREMENTS_BLANK = /^[\u0009-\u000d\u001c-\u001f\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$/u;
+function normalizeRequirementsValue(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value);
+  return REQUIREMENTS_BLANK.test(text) ? null : text;
+}
+// 读写状态绑定 项目/账号/请求序号；草稿只存内存（按 账号+项目 隔离），不写 localStorage，不跨账号共享。
+const requirementsUI = { projectId: null, memberId: null, supported: false, loaded: false, saving: false, request: 0, saved: null, error: "", notice: "" };
+const requirementsDrafts = new Map();
+function requirementsEl(id) { return typeof document === "undefined" ? null : document.getElementById(id); }
+function requirementsDraftKey(projectId, memberId) { return `${memberId}/${projectId}`; }
+function renderRequirementsPanel() {
+  const panel = requirementsEl("requirements-panel");
+  if (!panel) return;
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && Boolean(activeProjectId) && Boolean(myId);
+  panel.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  const projectId = activeProjectId, memberId = myId;
+  if (requirementsUI.projectId !== projectId || requirementsUI.memberId !== memberId) {
+    // 上下文切换（含往返 A→B→A）：递增请求序号使旧读写作废，新上下文重新读取。
+    ++requirementsUI.request;
+    Object.assign(requirementsUI, { projectId, memberId, supported: false, loaded: false, saving: false, saved: null, error: "", notice: "" });
+    const draft = requirementsDrafts.get(requirementsDraftKey(projectId, memberId));
+    const input = requirementsEl("requirements-input");
+    if (input) input.value = draft ?? "";
+    if (draft !== undefined) requirementsUI.notice = "已恢复上次未保存的草稿。";
+    return loadProjectRequirements();
+  }
+  syncRequirementsEditor();
+}
+function syncRequirementsEditor() {
+  const panel = requirementsEl("requirements-panel");
+  const input = requirementsEl("requirements-input");
+  if (!panel || !input || panel.classList.contains("hidden")) return;
+  const status = requirementsEl("requirements-status");
+  const count = requirementsEl("requirements-count");
+  const saveBtn = requirementsEl("requirements-save-btn");
+  const discardBtn = requirementsEl("requirements-discard-btn");
+  const retryBtn = requirementsEl("requirements-retry-btn");
+  const human = currentMemberIsHuman();
+  const ready = requirementsUI.loaded && requirementsUI.supported;
+  // 保存期间允许继续编辑；迟到的保存响应只按提交时文本对齐，不覆盖新草稿。
+  input.readOnly = !human;
+  input.disabled = !human || !ready;
+  const dirty = ready && input.value !== (requirementsUI.saved ?? "");
+  const length = workspaceRequirementsLength(input.value);
+  const overLimit = length > REQUIREMENTS_MAX_CHARS;
+  count.textContent = `${length} / ${REQUIREMENTS_MAX_CHARS} 字符`;
+  count.classList.toggle("over", overLimit);
+  saveBtn.disabled = requirementsUI.saving || !ready || !dirty || overLimit;
+  discardBtn.disabled = requirementsUI.saving || !ready || !dirty;
+  retryBtn.classList.toggle("hidden", !(!requirementsUI.loaded && requirementsUI.error && !requirementsUI.saving));
+  let message = "", kind = "";
+  if (!requirementsUI.loaded && requirementsUI.error) { message = requirementsUI.error; kind = "error"; }
+  else if (requirementsUI.saving) message = "正在保存…";
+  else if (requirementsUI.error) { message = requirementsUI.error; kind = "error"; }
+  else if (!requirementsUI.loaded) message = "正在读取项目开发要求…";
+  else if (overLimit) { message = `已超出 ${REQUIREMENTS_MAX_CHARS} 字符上限，请精简后再保存。`; kind = "error"; }
+  else if (requirementsUI.notice) { message = requirementsUI.notice; kind = "success"; }
+  else if (!human) message = "当前账号是 Agent，只能查看，不能修改。";
+  else if (dirty) message = "有未保存的修改，尚未保存。";
+  else message = requirementsUI.saved === null ? "当前还没有内容；保存后仅保留最新一份。" : "当前内容与服务端一致。";
+  status.textContent = message;
+  status.className = `requirements-status${kind ? ` ${kind}` : ""}`;
+}
+function recordRequirementsDraft() {
+  const input = requirementsEl("requirements-input");
+  if (!input) return;
+  requirementsUI.notice = "";
+  if (requirementsUI.projectId && requirementsUI.memberId) {
+    const key = requirementsDraftKey(requirementsUI.projectId, requirementsUI.memberId);
+    if (requirementsUI.loaded && input.value === (requirementsUI.saved ?? "")) requirementsDrafts.delete(key);
+    else requirementsDrafts.set(key, input.value);
+  }
+  syncRequirementsEditor();
+}
+async function loadProjectRequirements() {
+  const request = ++requirementsUI.request;
+  const projectId = requirementsUI.projectId, memberId = requirementsUI.memberId;
+  requirementsUI.error = "";
+  syncRequirementsEditor();
+  const current = () => request === requirementsUI.request
+    && projectId === activeProjectId && projectId === requirementsUI.projectId
+    && memberId === myId && memberId === requirementsUI.memberId;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`);
+    if (!res.ok) throw new Error(await readErrorDetail(res, `项目开发要求读取失败（${res.status}），请稍后重试。`));
+    const data = await res.json();
+    if (!current()) return;
+    if (!data || !("development_requirements" in data)) {
+      // 旧后端没有该字段：明确提示不支持并禁用保存，不把缺失当成 null 后再 PATCH。
+      requirementsUI.supported = false;
+      requirementsUI.loaded = false;
+      requirementsUI.error = "当前服务尚未支持项目开发要求，暂时只能查看角色，不能编辑保存。";
+    } else {
+      requirementsUI.supported = true;
+      requirementsUI.loaded = true;
+      requirementsUI.saved = typeof data.development_requirements === "string" ? data.development_requirements : null;
+      const key = requirementsDraftKey(projectId, memberId);
+      const draft = requirementsDrafts.get(key);
+      const input = requirementsEl("requirements-input");
+      if (draft === undefined || draft === (requirementsUI.saved ?? "")) {
+        requirementsDrafts.delete(key);
+        if (input) input.value = requirementsUI.saved ?? "";
+      }
+      // 同步当前项目缓存，保持刷新前其它读取也是最新值。
+      const project = projects.find(item => item.project_id === projectId);
+      if (project) project.development_requirements = requirementsUI.saved;
+    }
+  } catch (err) {
+    if (!current()) return;
+    requirementsUI.loaded = false;
+    requirementsUI.error = err.message || "项目开发要求读取失败，请重试。";
+  }
+  if (current()) syncRequirementsEditor();
+}
+async function saveProjectRequirements() {
+  const input = requirementsEl("requirements-input");
+  if (!input) return;
+  const projectId = activeProjectId, memberId = myId;
+  if (!projectId || requirementsUI.saving || !requirementsUI.loaded || !requirementsUI.supported) return;
+  if (requirementsUI.projectId !== projectId || requirementsUI.memberId !== memberId) return;
+  if (!currentMemberIsHuman()) return;
+  const submitted = input.value;
+  if (submitted === (requirementsUI.saved ?? "")) return;
+  if (workspaceRequirementsLength(submitted) > REQUIREMENTS_MAX_CHARS) { syncRequirementsEditor(); return; }
+  requirementsUI.saving = true;
+  requirementsUI.error = ""; requirementsUI.notice = "";
+  const request = ++requirementsUI.request;
+  const normalized = normalizeRequirementsValue(submitted);
+  syncRequirementsEditor();
+  const current = () => request === requirementsUI.request
+    && projectId === activeProjectId && projectId === requirementsUI.projectId
+    && memberId === myId && memberId === requirementsUI.memberId;
+  try {
+    // 只显式提交这一个字段，不携带名称/路径等其它项目元数据；URL 绑定发起时项目。
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ development_requirements: submitted }),
+    });
+    if (!res.ok) throw new Error(await readErrorDetail(res, `保存失败（${res.status}），草稿已保留，请重试。`));
+    const data = await res.json().catch(() => null);
+    if (!current()) return;
+    // 必须核实同项目响应确实带回字段且值与规范化提交一致，才算保存成功（防旧后端静默忽略字段）。
+    if (!data || data.project_id !== projectId || !("development_requirements" in data)
+        || data.development_requirements !== normalized) {
+      throw new Error("服务未确认本次保存（响应未带回一致的 development_requirements），草稿已保留，请重试。");
+    }
+    requirementsUI.saved = data.development_requirements;
+    const project = projects.find(item => item.project_id === projectId);
+    if (project) project.development_requirements = requirementsUI.saved;
+    const key = requirementsDraftKey(projectId, memberId);
+    if (input.value === submitted) {
+      requirementsDrafts.delete(key);
+      // 全空白提交已被服务端归一为 null，编辑区同步成空文本，避免残留的空白被误当未保存修改。
+      input.value = requirementsUI.saved ?? "";
+      requirementsUI.notice = "已保存。";
+    } else {
+      // 保存期间继续编辑：保留新草稿，不把新草稿误标为已保存。
+      requirementsDrafts.set(key, input.value);
+      requirementsUI.notice = "先前内容已保存；当前仍有未保存的修改。";
+    }
+  } catch (err) {
+    if (!current()) return;
+    requirementsUI.error = err.message || "保存失败，草稿已保留，请重试。";
+  } finally {
+    if (current()) { requirementsUI.saving = false; syncRequirementsEditor(); }
+  }
+}
+function discardProjectRequirements() {
+  const input = requirementsEl("requirements-input");
+  if (!input || requirementsUI.saving || !requirementsUI.loaded) return;
+  requirementsDrafts.delete(requirementsDraftKey(requirementsUI.projectId, requirementsUI.memberId));
+  input.value = requirementsUI.saved ?? "";
+  requirementsUI.error = "";
+  requirementsUI.notice = "已恢复为已保存的内容。";
+  syncRequirementsEditor();
+}
 function renderWorkspaceList() {
   const rolesMode = workspaceUI.mode === "roles";
+  // 开发要求编辑区的可见性统一由 renderTaskDetailsPanel() 同步（app.js），覆盖群聊等不经本函数的导航路径。
   syncWorkspaceLayout();
   blackboardTitle.textContent = rolesMode ? "角色" : "任务";
   blackboardDescription.textContent = rolesMode ? "参与协作的助手" : "按你委派的工作整理";
@@ -314,5 +503,12 @@ if (typeof document !== "undefined") {
     renderWorkspaceMode();
   });
   document.getElementById("workspace-search").addEventListener("input", event => { workspaceUI.query = event.target.value; renderWorkspaceList(); });
+  const requirementsInput = document.getElementById("requirements-input");
+  if (requirementsInput) {
+    requirementsInput.addEventListener("input", recordRequirementsDraft);
+    document.getElementById("requirements-save-btn").addEventListener("click", saveProjectRequirements);
+    document.getElementById("requirements-discard-btn").addEventListener("click", discardProjectRequirements);
+    document.getElementById("requirements-retry-btn").addEventListener("click", () => loadProjectRequirements());
+  }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS};

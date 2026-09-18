@@ -1058,6 +1058,9 @@ function checkpointReasonLabel(reason) {
 
 function renderTaskDetailsPanel() {
   renderWorkspaceRoleDetails();
+  // 开发要求编辑区与角色详情共用同一可见性同步点：任务/群聊/角色导航与详情刷新都经过这里，
+  // 群聊分支（renderWorkspaceMode → renderGroupMembersPanel）也会覆盖，不依赖任务轮询。
+  renderRequirementsPanel();
   const task = getContextTask();
   // 先捕获完整上下文（项目/账号/任务）；上下文变化时统一清理成果展开状态，包括 task=null，避免旧展开状态复活。
   const contextKey = taskContextKey();

@@ -30,8 +30,10 @@ class TaskWebUiTests(RouteTestCase):
             "task-create-related",
         ):
             self.assertIn(f'id="{element_id}"', html)
-        self.assertIn("20260913-task-duration", html)
-        self.assertIn("20260910-task-chat-layout", html)
+        self.assertIn("20260918-req2-rework", html)
+        self.assertNotIn("20260918-req2-requirements", html)
+        self.assertNotIn("20260913-task-duration", html)
+        self.assertNotIn("20260910-task-chat-layout", html)
         self.assertIn('role="dialog"', html)
         self.assertIn('aria-labelledby="task-create-heading"', html)
         self.assertIn('aria-labelledby="task-create-agent-label"', html)

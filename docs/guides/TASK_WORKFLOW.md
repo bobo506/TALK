@@ -292,7 +292,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 
 ## 8. 分工与收尾节奏
 
-- 默认分工沿用 AGENTS.md：后端及本地脚本由 DeepSeek 开发、Kimi 独立复核；前端由 Kimi 开发、DeepSeek 独立复核。Codex 只做范围、摘要、分歧裁决与文档/Git 收尾。
+- 角色职责与交叉复核分工以角色页当前项目的“开发要求”为准，主控派发前读取并纳入任务包；已派发任务保持原包。字段未加载或内容未配置时，不推断分工、不自动保存示例；本次会话有明确分工可沿用，否则由项目管理者配置。仓库规则见AGENTS.md，Codex负责范围、摘要、分歧裁决与文档/Git收尾。
 - 开发完成即**暂停**，等独立复核，不在复核期间并行改码。
 - 执行者可准备 `progress_draft`；正式进度文档仍由 Codex 维护。
 - 必要验证与进度整理结束后，统一由 Codex 提交/推送，避免“边做边推、重复 push”。

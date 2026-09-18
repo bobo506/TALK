@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-09-18 REQ-2角色页项目开发要求编辑区（#94–#97）
+
+- 基线 `cdc8416c77d919cb14acc17b6bfb98bcd4732a64`，分支 `codex/terminal-return-codex`。Kimi #94开发，DeepSeek #95独立复核partial，Kimi #96返工，DeepSeek #97独立复审通过；Codex据实际代码独立复核证据验收，不把最初测试通过等同功能无缺陷。
+- 编辑区为项目级、仅角色页出现；human可编辑保存/清空、agent只读；保存仅PATCH要求字段且核实响应同项目/字段存在/值一致。项目账号隔离内存草稿、迟到响应/保存中编辑防护、Unicode20000码点、旧后端缺字段禁止保存，不自动保存placeholder。退出登录/刷新会失去未保存内存草稿。
+- #95发现R1群聊路径面板漏隐藏、R2 JS trim/Python strip特殊空白不一致导致真实保存误报失败；R3职责提示文案建议。#96将可见性调用移入app.js统一详情刷新点、判空对齐Python集合、调整文案；资源版本 `20260918-req2-rework`。
+- #97独立复跑Node7文件78/78、Python49+95通过（页面5项包含在49中）。隔离副本还原旧调用图时nav测试4过2失败、修复控制组6过；两失败实际是群聊及群聊返回角色场景，已在返工笔记追加更正。全Unicode判空集合29码点与Python零分歧，25例真实隔离PATCH原4例误报清零；审查更新后的探针未掩盖问题。主控仅做范围与收尾检查，不重复全量测试。
+- 正式收取：94/msg2589于11:56:32.654359Z、95/msg2590于11:56:35.499319Z、96/msg2591于11:56:39.210416Z、97/msg2592于11:56:43.120937Z，均为2026-09-18。#95保留partial结论，completed只是流程收取，不改写历史验收事实。
+- 代码/测试：web/index.html、web/workspace.js、web/workspace.css、web/app.js、tests/test_task_web_ui.py、新增tests/test_requirements_web_ui.py、tests/workspace_requirements_ui.test.cjs、tests/workspace_requirements_nav.test.cjs。证据在 `.tmp/req-2/`；正式同步AGENTS、TASK_WORKFLOW、模块/接口/简报/路线/终端指南、当前/历史进度及新增人工验收指南。
+- 职责分工按已确认需求改为角色页项目开发要求单一维护；AGENTS保留角色分级、规范、审查与收尾，并规定派发前读取。真实项目要求未写入，字段不可读/未配置时不能默认为已配置，有会话明确分工则按该分工，否则请用户配置。
+- 限制：没有真实浏览器验证，未重启共享服务/MCP、未操作真实库；UI/部署生效待用户人工验收。直接REST/schedule/pi TS不自动快照属既定范围。孤立代理码点经转义JSON使后端SQLite编码500为既有待办，本片未修；Node --test受EPERM时逐文件运行同断言。验收前不开始下一片。
+
+
 ## 2026-09-18 REQ-1 项目级开发要求后端与主控工具（#92/#93）
 
 - Git收尾：本地提交成功；向 `origin` 的 `codex/terminal-return-codex` 推送被自动审批拒绝，未执行。拒绝理由为远程归属及推送授权证据未获认可，目标 `https://github.com/bobo506/TALK.git`；随后用户明确授权本次及今后该项目推送，按新授权重试成功：`ada3b71..b32ef7c` 已推送至 `codex/terminal-return-codex`。持续授权同步AGENTS.md。
