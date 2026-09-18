@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-09-18 ROLE-1角色说明与参与任务耗时（#98/#99）
+
+- 基线 `0fd58aad2903adc3303a3fc10e8ba5a6fae19d04`，Kimi #98开发、DeepSeek #99独立复核通过。Codex确认无阻塞后正式收取：98/msg2593于14:07:23.831854Z、99/msg2594于14:07:26.613949Z（2026-09-18）。
+- 显示映射统一：lead保持统筹与原说明；dev/developer/reviewer显示执行工作，说明为执行分配工作、提交结果、交叉验证其他角色成果。tester/ui不变，不改business_role/decision_tier/权限。
+- 参与任务表替换“承担工作”为“执行耗时”，参与集合、发起/委派关系、筛选和查看操作不变；task_kind/general及其它页面类型展示保留。复用workspaceTaskDuration与唯一计时器，列表/角色表双处逐秒更新textContent，不增加网络或重建表，claimed_at至finished_at不计排队/待收取。
+- DeepSeek独立复跑新增Node6+既有78=84项、Python页面契约5项通过，另有9项真实函数/DOM探针，补强双处渲染、生命周期/登出清理、REQ-2草稿焦点不受影响的证据。主控做git diff --check与收尾，未重复全量测试。
+- 低级别非阻塞发现：自由文本角色为constructor/toString/valueOf/__proto__等原型键时对象字面量查找命中原型，可能显示异常文案；label为旧问题，description路径同类风险；现有角色不受影响，仅展示，无权限变化。接受本片并登记未来加固，不声称问题不存在。
+- 在线状态：98一度queued/assigned未领取，用户重启执行bridge后自动领取完成，无重复派发。用户重启MCP后list_agents新字段与工具说明已加载；按最新要求派99，创建返回及get_task均确认真实存储正文包含快照（含DeepSeek“其他未提及内容”），没有额外测试任务。旧任务不追改在线实验未做，保留隔离测试证据。
+- 变更文件：web/workspace.js、web/index.html、tests/workspace_role_duration.test.cjs、tests/test_task_web_ui.py、tests/test_requirements_web_ui.py；主控同步当前/历史进度、模块、路线、简报及验收指南。资源版本20260918-role-1，交付/复核/探针在 `.tmp/role-1/`。
+- 限制：未做真实浏览器/HTTP端到端或窄屏视觉；终态最多约5秒轮询后反映，沿用既有口径；超99小时窄列观感留用户验收。本片收尾后暂停，用户Ctrl+F5刷新检查说明/列/走秒与固定值。
+
+
 ## 2026-09-18 独立任务类型暂缓决策
 
 - 用户理解当前独立派发统一登记general，并明确选择继续沿用，未来可能需要按检查/执行/返工实际工作分类，仅先记录。

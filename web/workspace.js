@@ -58,8 +58,19 @@ function workspaceChatCandidates(items, roles, projectId, selfId) {
     && (member.kind !== "agent" || !projectId || roleIds.has(member.id)));
 }
 function workspaceMentionCandidates(items, selfId) { return items.filter(member => member.id !== selfId && !member.disabled_at); }
+// 角色展示映射仅决定界面文案，不授予任何权限；真实职责以项目开发要求和具体任务包为准。
+// developer 与 dev 同义归一，标签与说明共用同一映射，不散落硬编码。
+function workspaceRoleKey(role) { return role === "developer" ? "dev" : role; }
 function workspaceRoleLabel(role) {
-  return ({ lead: "统筹任务", dev: "执行工作", developer: "执行工作", reviewer: "检查工作", tester: "测试验证", ui: "界面设计" })[role] || role || "项目助手";
+  return ({ lead: "统筹任务", dev: "执行工作", reviewer: "执行工作", tester: "测试验证", ui: "界面设计" })[workspaceRoleKey(role)] || role || "项目助手";
+}
+function workspaceRoleDescription(role) {
+  return ({
+    lead: "负责分配工作、跟进进度，并汇总最终成果。",
+    dev: "负责执行分配的工作、提交完成结果，并交叉验证其他角色的成果。",
+    reviewer: "负责执行分配的工作、提交完成结果，并交叉验证其他角色的成果。",
+    tester: "负责验证成果是否符合要求，并提交测试结论。",
+  })[workspaceRoleKey(role)];
 }
 function workspaceRoles() { return projectAgents.filter(agent => !members.find(member => member.id === agent.member_id)?.disabled_at); }
 function workspaceRoleTasks(id) {
@@ -97,6 +108,16 @@ function workspaceTaskDuration(task, nowMs = Date.now()) {
   if (end === null || end < start) return "—";
   return workspaceFormatDuration(end - start);
 }
+// 统一耗时单元：终态渲染时冻结；执行中挂上既有单计时器识别的 data-running 标识，
+// 由 tickTaskDurations 逐秒只刷新 textContent，不为每行新增 timer。
+function workspaceTaskDurationEl(task) {
+  const el = workspaceEl("span", "task-card-duration", workspaceTaskDuration(task));
+  el.dataset.taskId = String(task.id);
+  if (task?.workflow_status === "in_progress" && workspaceParseTime(task.claimed_at) !== null && workspaceParseTime(task.finished_at) === null) {
+    el.dataset.running = "1";
+  }
+  return el;
+}
 function syncWorkspaceLayout() {
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
   document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
@@ -127,13 +148,8 @@ function workspaceTaskRow(task) {
   button.appendChild(workspaceEl("span", `task-status-badge ${status.className}`, status.label));
   const meta = workspaceEl("div", "task-card-meta");
   meta.appendChild(document.createTextNode(`负责人 ${workspaceMemberName(task.target_member_id)} · ${formatTaskTime(task.updated_at)} · 耗时 `));
-  const duration = workspaceEl("span", "task-card-duration", workspaceTaskDuration(task));
-  duration.dataset.taskId = String(task.id);
   // 只有执行中的条目由统一计时器逐秒刷新；终态在渲染时冻结，列表轮询不重绘时也不变。
-  if (task.workflow_status === "in_progress" && workspaceParseTime(task.claimed_at) !== null && workspaceParseTime(task.finished_at) === null) {
-    duration.dataset.running = "1";
-  }
-  meta.appendChild(duration);
+  meta.appendChild(workspaceTaskDurationEl(task));
   button.appendChild(meta);
   return button;
 }
@@ -373,7 +389,7 @@ function renderWorkspaceRoleDetails() {
   const role = workspaceRoles().find(item => item.member_id === workspaceUI.selectedRole);
   if (!role) { panel.appendChild(workspaceEl("p", "workspace-empty", "选择一个角色，查看他的工作。")); return; }
   panel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), workspaceEl("h2", "", workspaceMemberName(role.member_id)), workspaceEl("p", "role-description", workspaceRoleLabel(role.business_role)), workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
-  const description = ({ lead: "负责分配工作、跟进进度，并汇总最终成果。", dev: "负责执行分配的工作，并提交完成结果。", reviewer: "负责检查工作成果，指出问题并给出检查结论。", tester: "负责验证成果是否符合要求，并提交测试结论。" })[role.business_role];
+  const description = workspaceRoleDescription(role.business_role);
   if (description) panel.insertBefore(workspaceEl("p", "role-explanation", description), panel.lastChild);
   const assign = workspaceButton("交办任务", () => { setTaskCreateOpen(true); taskCreateAgent.value = role.member_id; }, "task-action-primary");
   assign.disabled = !eligibleProjectAgents().some(member => member.id === role.member_id);
@@ -388,17 +404,18 @@ function renderWorkspaceRoleDetails() {
   section.appendChild(filters);
   const table = workspaceEl("table", "role-task-table");
   const head = workspaceEl("thead"); const tr = workspaceEl("tr");
-  for (const title of ["任务", "承担工作", "任务状态", "操作"]) { const th = workspaceEl("th", "", title); th.scope = "col"; tr.appendChild(th); }
+  // 参与任务表：耗时替代原“承担工作”列；任务关系与筛选不变。
+  for (const title of ["任务", "执行耗时", "任务状态", "操作"]) { const th = workspaceEl("th", "", title); th.scope = "col"; tr.appendChild(th); }
   head.appendChild(tr); table.appendChild(head);
   const body = workspaceEl("tbody");
   const tasks = workspaceRoleTasks(role.member_id).filter(task => workspaceFinished(task) === (workspaceUI.roleFilter === "finished"));
   for (const task of tasks) {
     const row = workspaceEl("tr");
     const name = workspaceEl("td"); name.appendChild(workspaceEl("span", "role-task-name", workspaceTitle(task)));
-    const work = task.target_member_id === role.member_id ? (task.may_delegate ? "统筹与汇总" : taskKindLabel(task.task_kind)) : "委派与跟进";
+    const duration = workspaceEl("td"); duration.appendChild(workspaceTaskDurationEl(task));
     const state = taskStatusMeta(task); const status = workspaceEl("td"); status.appendChild(workspaceEl("span", `task-status-badge ${state.className}`, state.label));
     const action = workspaceEl("td"); const button = workspaceButton("查看任务", () => selectWorkspaceTask(task)); button.setAttribute("aria-label", `查看任务：${workspaceTitle(task)}`); action.appendChild(button);
-    row.append(name, workspaceEl("td", "", work), status, action); body.appendChild(row);
+    row.append(name, duration, status, action); body.appendChild(row);
   }
   table.appendChild(body); section.appendChild(table);
   if (!tasks.length) section.appendChild(workspaceEl("p", "workspace-empty", "当前没有这类任务。"));
@@ -511,4 +528,4 @@ if (typeof document !== "undefined") {
     document.getElementById("requirements-retry-btn").addEventListener("click", () => loadProjectRequirements());
   }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS};
