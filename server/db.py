@@ -285,6 +285,14 @@ def init_db() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE projects ADD COLUMN controller_mode_version INTEGER NOT NULL DEFAULT 0"
             )
+        # C1b-S1 长期主控指定/版本：同样按列存在性幂等增列。旧项目保持“未指定 / 0”，
+        # 不自动指定 lead / Codex，也不改写既有数据。
+        if "controller_member_id" not in project_columns:
+            conn.exec_driver_sql("ALTER TABLE projects ADD COLUMN controller_member_id TEXT")
+        if "controller_assignment_version" not in project_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE projects ADD COLUMN controller_assignment_version INTEGER NOT NULL DEFAULT 0"
+            )
         project_agent_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(project_agents)").fetchall()

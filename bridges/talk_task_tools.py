@@ -104,6 +104,37 @@ CONTROLLER_MODE_EFFECTIVE_STATUS_UNSUPPORTED = "unsupported"
 # 只读白名单：与 server.models.PROJECT_CONTROLLER_MODES 对齐；服务端返回未知值时
 # 只报 null，不把意外取值当成合法模式透传给模型。
 CONTROLLER_MODES = ("passive", "active")
+# C1b-S1 长期主控指定的只读状态：member_id/version 是项目保存的指定，status 是
+# 服务端按当前名册与成员事实实时算出的**配置有效性**，不表示在线、ACK、会话归属或授权。
+CONTROLLER_ASSIGNMENT_NOTE = (
+    "controller_assignment 是项目长期保存的主控指定（member_id + version）及其配置有效性："
+    "status=assigned 只表示该成员已注册、未禁用、在该项目名册中且为 agent 角色，"
+    "不代表在线、已确认(ACK)、会话已生效或已获得任何额外权限；本版本没有会话 token、"
+    "租约、心跳或后台线程，指定也不自动唤醒任何进程。"
+    "status=unassigned 表示未指定；not_in_roster / member_disabled / member_missing / not_agent "
+    "是读取瞬间实测到的无效原因，指定不会被自动解除或转给其他成员，仍由 human 显式清空。"
+    "指定与 business_role / decision_tier 分开：不改变派发、领取、完成、收取等既有任务权限。"
+)
+CONTROLLER_ASSIGNMENT_UNSUPPORTED_NOTE = (
+    "当前后端未返回主控指定字段（旧后端）：controller_assignment 为 supported=false / "
+    "status=unsupported，member_id 与 version 均为 null；不得把缺失当成未指定，"
+    "也不得据此声称项目已指定主控或无人指定。"
+)
+CONTROLLER_ASSIGNMENT_UNKNOWN_STATUS_NOTE = (
+    "后端返回了主控指定成员，但没有可识别的有效性状态：status=unknown，"
+    "无法判断该指定当前是否有效，需读取方自行核对名册与成员状态，不得假定有效。"
+)
+CONTROLLER_ASSIGNMENT_EFFECTIVE_STATUS_UNSUPPORTED = "unsupported"
+# 只读白名单：与 server.models.PROJECT_ASSIGNMENT_STATUSES 对齐；未知取值只报 unknown。
+CONTROLLER_ASSIGNMENT_STATUSES = (
+    "unassigned",
+    "assigned",
+    "member_missing",
+    "member_disabled",
+    "not_in_roster",
+    "not_agent",
+)
+CONTROLLER_ASSIGNMENT_STATUS_UNKNOWN = "unknown"
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
@@ -304,6 +335,62 @@ def controller_mode_summary(project: JsonDict) -> JsonDict:
     }
 
 
+def controller_assignment_summary(project: JsonDict) -> JsonDict:
+    """把项目详情里的长期主控指定整理成只读状态对象（C1b-S1，不做任何网络请求）。
+
+    调用方必须传入**同一次** ``GET /api/projects/{id}`` 的结果：与
+    ``development_requirements`` / ``controller_mode`` 复用同一份响应，不新增请求。
+
+    - 后端已支持（响应含 ``controller_member_id`` 与 ``controller_assignment_version``）：
+      回显 ``member_id`` / ``version``，``status`` 取服务端实时计算的配置有效性；
+      成员为 null 时恒为 ``unassigned``（这一条不需要额外信息即可如实判定）；
+      后端未给可识别状态而成员非 null 时只报 ``unknown``，不猜测有效性；
+    - 旧后端缺字段：``supported=false`` / ``status=unsupported``，两个值均为 null，
+      不回退猜测成“未指定”；
+    - 非项目路径不调用本函数（``talk_list_agents`` 明确返回 ``controller_assignment: null``）。
+    """
+    if "controller_member_id" not in project or "controller_assignment_version" not in project:
+        return {
+            "project_id": project.get("project_id"),
+            "supported": False,
+            "member_id": None,
+            "version": None,
+            "status": CONTROLLER_ASSIGNMENT_EFFECTIVE_STATUS_UNSUPPORTED,
+            "note": CONTROLLER_ASSIGNMENT_UNSUPPORTED_NOTE,
+        }
+
+    raw_member_id = project.get("controller_member_id")
+    member_id = (
+        raw_member_id.strip() or None if isinstance(raw_member_id, str) else None
+    )
+    raw_version = project.get("controller_assignment_version")
+    version = (
+        raw_version
+        if isinstance(raw_version, int) and not isinstance(raw_version, bool)
+        else None
+    )
+    raw_status = project.get("controller_assignment_status")
+    if isinstance(raw_status, str) and raw_status in CONTROLLER_ASSIGNMENT_STATUSES:
+        status = raw_status
+    elif member_id is None:
+        status = "unassigned"
+    else:
+        status = CONTROLLER_ASSIGNMENT_STATUS_UNKNOWN
+
+    if status == CONTROLLER_ASSIGNMENT_STATUS_UNKNOWN:
+        note = CONTROLLER_ASSIGNMENT_UNKNOWN_STATUS_NOTE
+    else:
+        note = CONTROLLER_ASSIGNMENT_NOTE
+    return {
+        "project_id": project.get("project_id"),
+        "supported": True,
+        "member_id": member_id,
+        "version": version,
+        "status": status,
+        "note": note,
+    }
+
+
 def list_agents(*, project_id: str | None = None) -> JsonDict:
     effective_project_id = _project_id(project_id)
     if effective_project_id is not None:
@@ -348,6 +435,7 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
             "project_id": effective_project_id,
             "development_requirements": project.get("development_requirements"),
             "controller_mode": controller_mode_summary(project),
+            "controller_assignment": controller_assignment_summary(project),
             "availability_note": AVAILABILITY_NOTE,
             "agents": agents,
         }
@@ -380,6 +468,8 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
         "development_requirements": None,
         # 非项目路径没有项目模式意向：明确 null，不伪造 passive。
         "controller_mode": None,
+        # 非项目路径同样没有主控指定上下文：明确 null，不伪造“未指定”。
+        "controller_assignment": None,
         "availability_note": AVAILABILITY_NOTE,
         "agents": agents,
     }
@@ -947,6 +1037,15 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "派发或推进；默认协作仍是派发后结束、由用户通知后再取件，不得据此字段声称已唤回会话。"
             "非项目路径 controller_mode 为 null；旧后端缺模式字段时为 supported=false / "
             "effective_status=unsupported，不能当成 passive 或已支持。"
+            "顶层还返回只读的 controller_assignment（同样复用这一次项目读取）："
+            "member_id / version 是项目长期保存的主控指定与独立版本，status 是服务端按当前名册与"
+            "成员事实算出的配置有效性（unassigned / assigned / not_in_roster / member_disabled / "
+            "member_missing / not_agent）。assigned 只表示该成员已注册、未禁用、在该项目名册中且为 "
+            "agent，**不代表在线、已确认(ACK)、会话已生效或获得任何额外权限**；本版本没有会话 "
+            "token、租约、心跳或后台线程，指定不自动唤醒进程，也不改变派发/领取/完成/收取权限。"
+            "无效状态不会自动解除或转给他人，仍由 human 显式清空；只有 human 能写入该指定，"
+            "agent 侧为只读。非项目路径 controller_assignment 为 null；旧后端缺字段时为 "
+            "supported=false / status=unsupported，不能当成未指定或已指定。"
             "availability 仅依据实例上报，未做心跳核验，可能滞后，使用时请参考 last_seen_at。"
             "project_id 省略时使用 bridge 项目上下文。"
         ),

@@ -8,7 +8,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
 from sqlalchemy import Column, Index, JSON
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Session, SQLModel
 
 from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
 
@@ -114,6 +114,14 @@ class Project(SQLModel, table=True):
     # 写入必须走专用 CAS 入口（PATCH /api/projects/{id}/controller-mode），
     # 普通元数据 PATCH / 注册 / CLI 重注册都不得旁路修改。
     controller_mode_version: int = Field(default=0)
+    # 长期项目主控指定（C1b-S）：项目内具体 member_id 为身份，NULL = 未指定。
+    # 长期保存、无期限、不续租；名册 sync / 成员禁用 / 服务重启都不自动清除或转移，
+    # 只能由 human 经专用 CAS 入口（PATCH /api/projects/{id}/controller-assignment）解除或更换。
+    # 刻意不加外键：成员行缺失时要能如实报告 member_missing，而不是写入失败或静默置空。
+    controller_member_id: Optional[str] = Field(default=None)
+    # 指定版本：非负整数，初始 0；只在指定实际变化时 +1（同值幂等不增）。
+    # 与 controller_mode_version 相互独立，不复用。
+    controller_assignment_version: int = Field(default=0)
     maintainer_member_id: str = Field(foreign_key="members.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -184,6 +192,25 @@ PROJECT_CONTROLLER_MODE_DEFAULT = "passive"
 # 版本类入参在请求校验层就用它做上界，避免异常输入变成 HTTP 500。
 SQLITE_SIGNED_INTEGER_MAX = 9223372036854775807
 
+# 项目主控指定的配置有效性状态（C1b-S1）。只描述“保存的指定 + 当前名册/成员事实”，
+# 与在线状态、会话确认、任务授权无关：`assigned` 也不代表在线或已 ACK。
+PROJECT_ASSIGNMENT_UNASSIGNED = "unassigned"  # 未指定
+PROJECT_ASSIGNMENT_ASSIGNED = "assigned"  # 已指定且成员已注册、未禁用、在项目名册中且为 agent
+PROJECT_ASSIGNMENT_MEMBER_MISSING = "member_missing"  # 指定成员已不存在（members 行缺失）
+PROJECT_ASSIGNMENT_MEMBER_DISABLED = "member_disabled"  # 指定成员已被全局禁用
+PROJECT_ASSIGNMENT_NOT_IN_ROSTER = "not_in_roster"  # 指定成员不在该项目名册（project_agents）
+PROJECT_ASSIGNMENT_NOT_AGENT = "not_agent"  # 指定指向的不是 agent 成员
+# 状态判定优先级（同一指定可能同时命中多个问题，取第一条如实报告）：
+# member_missing → member_disabled → not_in_roster → not_agent → assigned。
+PROJECT_ASSIGNMENT_STATUSES = (
+    PROJECT_ASSIGNMENT_UNASSIGNED,
+    PROJECT_ASSIGNMENT_ASSIGNED,
+    PROJECT_ASSIGNMENT_MEMBER_MISSING,
+    PROJECT_ASSIGNMENT_MEMBER_DISABLED,
+    PROJECT_ASSIGNMENT_NOT_IN_ROSTER,
+    PROJECT_ASSIGNMENT_NOT_AGENT,
+)
+
 
 def normalize_development_requirements(value: Optional[str]) -> Optional[str]:
     """归一化项目级开发要求：保留原文与换行，只做长度校验和空值归一。
@@ -204,6 +231,43 @@ def normalize_development_requirements(value: Optional[str]) -> Optional[str]:
     if not value.strip():
         return None
     return value
+
+
+def normalize_controller_member_id(value: Optional[str]) -> Optional[str]:
+    """归一化主控指定成员 ID：``None`` 保持 ``None``（解除指定），字符串去首尾空白。
+
+    空字符串或全空白字符串不视为“解除”，直接抛 ``ValueError``（由 FastAPI 转 422）：
+    解除必须显式传 ``null``，避免客户端把“没填”和“清空”混为一谈。
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("member_id must be a string or null")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("member_id must be a non-empty string, or null to clear the assignment")
+    return normalized
+
+
+def resolve_controller_assignment_status(project: Project, session: "Session") -> str:
+    """按当前库内事实计算项目主控指定的配置有效性状态（只读，不修改任何数据）。
+
+    判定优先级见 ``PROJECT_ASSIGNMENT_STATUSES`` 上方的说明。本函数只回答
+    “保存的指定现在是否有效”，不回答在线、ACK、会话归属或授权。
+    """
+    member_id = (project.controller_member_id or "").strip()
+    if not member_id:
+        return PROJECT_ASSIGNMENT_UNASSIGNED
+    member = session.get(Member, member_id)
+    if member is None:
+        return PROJECT_ASSIGNMENT_MEMBER_MISSING
+    if member.disabled_at is not None:
+        return PROJECT_ASSIGNMENT_MEMBER_DISABLED
+    if session.get(ProjectAgent, (project.project_id, member_id)) is None:
+        return PROJECT_ASSIGNMENT_NOT_IN_ROSTER
+    if member.kind != "agent":
+        return PROJECT_ASSIGNMENT_NOT_AGENT
+    return PROJECT_ASSIGNMENT_ASSIGNED
 
 
 class AgentTask(SQLModel, table=True):
@@ -1246,12 +1310,22 @@ class ProjectOut(BaseModel):
     # 模式“意向”与版本（C1a）：只读暴露保存值，不表示会话已生效/已授权。
     controller_mode: str = PROJECT_CONTROLLER_MODE_DEFAULT
     controller_mode_version: int = 0
+    # 长期主控指定（C1b-S1）：保存的成员 ID 与独立版本，外加**实时计算**的配置有效性状态。
+    # 状态只反映名册/成员事实，不表示在线、ACK、会话生效或授权。
+    controller_member_id: Optional[str] = None
+    controller_assignment_version: int = 0
+    controller_assignment_status: str = PROJECT_ASSIGNMENT_UNASSIGNED
     maintainer_member_id: str
     created_at: datetime
     last_seen_at: datetime
 
     @classmethod
-    def from_orm_project(cls, project: Project) -> "ProjectOut":
+    def from_orm_project(cls, project: Project, *, session: Session) -> "ProjectOut":
+        """构造项目输出。
+
+        ``session`` 必须由调用方传入：``controller_assignment_status`` 需要按当前
+        名册与成员事实实时计算，不能靠项目行自己推断（否则会谎报“已指定有效”）。
+        """
         return cls(
             project_id=project.project_id,
             display_name=project.display_name,
@@ -1260,6 +1334,11 @@ class ProjectOut(BaseModel):
             development_requirements=project.development_requirements,
             controller_mode=project.controller_mode or PROJECT_CONTROLLER_MODE_DEFAULT,
             controller_mode_version=project.controller_mode_version or 0,
+            controller_member_id=project.controller_member_id or None,
+            controller_assignment_version=project.controller_assignment_version or 0,
+            controller_assignment_status=resolve_controller_assignment_status(
+                project, session
+            ),
             maintainer_member_id=project.maintainer_member_id,
             created_at=project.created_at,
             last_seen_at=project.last_seen_at,
@@ -1290,6 +1369,30 @@ class ProjectControllerModeUpdate(BaseModel):
             raise ValueError(
                 f"mode must be one of {list(PROJECT_CONTROLLER_MODES)}"
             )
+        return self
+
+
+class ProjectControllerAssignmentUpdate(BaseModel):
+    """`PATCH /api/projects/{project_id}/controller-assignment` 请求体（C1b-S1）。
+
+    专用配置入口，与普通项目元数据 ``ProjectUpdate`` 分离：
+
+    - ``member_id``：**必填键**，取值是项目内具体成员 ID（字符串，去首尾空白）或显式 ``null``；
+      ``null`` 表示解除指定，空字符串/全空白不是解除而是 422，缺失该键同样 422；
+    - ``expected_version``：调用者读到的 ``controller_assignment_version``，必须显式提供，
+      取值非负且不超过 SQLite 有符号 64 位上界，超界在请求校验层 422。
+
+    服务端在数据库写入层按 ``expected_version`` 做条件更新（CAS）：版本不匹配返回 409，
+    合法同值请求返回 200 且不递增版本；已有其他非 null 指定时不能直接覆盖，必须先显式解除。
+    """
+
+    # 无默认值 = 必填键，但允许显式 null（Pydantic v2 中 Optional 无默认即 required but nullable）。
+    member_id: Optional[str]
+    expected_version: int = PydField(ge=0, le=SQLITE_SIGNED_INTEGER_MAX, strict=True)
+
+    @model_validator(mode="after")
+    def validate_controller_assignment(self) -> "ProjectControllerAssignmentUpdate":
+        self.member_id = normalize_controller_member_id(self.member_id)
         return self
 
 

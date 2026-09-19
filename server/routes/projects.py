@@ -19,6 +19,7 @@ from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.auth import get_current_member
 from server.db import get_session
 from server.models import (
+    SQLITE_SIGNED_INTEGER_MAX,
     AgentInstance,
     AgentInstanceOut,
     AgentProfileOut,
@@ -30,6 +31,7 @@ from server.models import (
     Project,
     ProjectAgent,
     ProjectAgentOut,
+    ProjectControllerAssignmentUpdate,
     ProjectControllerModeUpdate,
     ProjectCreate,
     ProjectOut,
@@ -112,6 +114,31 @@ def _instance_out(instance: AgentInstance) -> AgentInstanceOut:
     )
 
 
+def _require_controller_candidate(project_id: str, member_id: str, session: Session) -> None:
+    """校验“新指定”的候选成员：已注册、未禁用、在项目名册中且为 agent。
+
+    - 只校验候选事实，**不要求在线**：指定是长期职责，不是运行实例绑定；
+    - 本函数只读，任何失败都在写入前抛出，不会改变既有指定或版本；
+    - 前端的置灰/过滤只是体验优化，真正的候选约束由这里（以及 CAS 写入）保证。
+    """
+    member = _get_member(member_id, session)  # 未注册 → 400 member not found
+    if member.kind != "agent":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"controller candidate is not an agent member: {member_id}",
+        )
+    if member.disabled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"controller candidate is disabled: {member_id}",
+        )
+    if session.get(ProjectAgent, (project_id, member_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"controller candidate is not in the project roster: {member_id}",
+        )
+
+
 def _project_agent_outs(
     agents: list[ProjectAgent],
     session: Session,
@@ -188,7 +215,7 @@ def register_project(
     session.add(project)
     session.commit()
     session.refresh(project)
-    return ProjectOut.from_orm_project(project)
+    return ProjectOut.from_orm_project(project, session=session)
 
 
 @router.get("", response_model=list[ProjectOut])
@@ -198,7 +225,7 @@ def list_projects(
 ):
     """List all registered projects."""
     projects = session.exec(select(Project).order_by(Project.created_at.desc())).all()
-    return [ProjectOut.from_orm_project(project) for project in projects]
+    return [ProjectOut.from_orm_project(project, session=session) for project in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectOut)
@@ -209,7 +236,7 @@ def get_project(
 ):
     """Return one registered project."""
     project = _get_project(project_id, session)
-    return ProjectOut.from_orm_project(project)
+    return ProjectOut.from_orm_project(project, session=session)
 
 
 @router.get("/{project_id}/groups", response_model=list[GroupOut])
@@ -354,7 +381,7 @@ def update_project(
     session.add(project)
     session.commit()
     session.refresh(project)
-    return ProjectOut.from_orm_project(project)
+    return ProjectOut.from_orm_project(project, session=session)
 
 
 @router.patch("/{project_id}/controller-mode", response_model=ProjectOut)
@@ -408,7 +435,114 @@ def update_project_controller_mode(
                 f"current_version={project.controller_mode_version}"
             ),
         )
-    return ProjectOut.from_orm_project(project)
+    return ProjectOut.from_orm_project(project, session=session)
+
+
+@router.patch("/{project_id}/controller-assignment", response_model=ProjectOut)
+def update_project_controller_assignment(
+    project_id: str,
+    body: ProjectControllerAssignmentUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """指定或解除项目长期主控（C1b-S1 专用入口；human 可写、agent 只读）。
+
+    - ``member_id`` 必填键：项目内具体成员 ID（必须是已注册、未禁用、在该项目名册中的
+      agent；不要求在线）或显式 ``null`` 表示解除；
+    - ``expected_version`` 必填且为严格整数：读写分离的 CAS 依据；
+    - 版本匹配且指定实际变化 → 原子条件 UPDATE 并 +1；版本匹配且同值 → 200 不写库、不增版本；
+      版本陈旧（即使同值）→ 409；已有其他非 null 指定 → 409，必须先显式解除再另选；
+    - 指定长期保存、无期限：名册 sync 移除成员、成员被禁用、服务重启都不会自动清除或转移，
+      只影响读取时 ``controller_assignment_status``；human 仍可随时解除；
+    - 本入口只保存职责指定，与 business_role / decision_tier 分开，不改变任何任务授权、
+      派发、领取、完成或收取规则，也不创建任务/实例/会话。
+
+    冲突（409）后应重新 ``GET`` 项目取最新 ``controller_assignment_version`` 再决定是否重试。
+    """
+    _require_human(current)
+    project = _get_project(project_id, session)  # 项目不存在 → 404（先于任何写入）
+
+    requested = body.member_id
+    stored = project.controller_member_id or None
+    if requested is not None and stored not in (None, requested):
+        # 已有其他非 null 指定：禁止直接覆盖，避免"悄悄换人"绕过人工确认。
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "project already has a controller assignment: "
+                f"current_member_id={stored}; clear it first (member_id=null)"
+            ),
+        )
+    if requested is not None and stored != requested:
+        # 只对"新指定"做候选校验；同值重试是纯 no-op，不因期间失效而改变语义。
+        # 诚实说明竞态窗口：候选事实（已注册 / 未禁用 / 在名册）是写入前的读校验，与下面的
+        # 条件 UPDATE 不在同一事务里；并发的 sync / 禁用可能正好落在这中间。那时指定仍会写入，
+        # 但读取状态会如实报 not_in_roster / member_disabled，不会伪装成有效主控，human 可解除。
+        _require_controller_candidate(project_id, requested, session)
+
+    conditions = [
+        Project.project_id == project_id,
+        Project.controller_assignment_version == body.expected_version,
+        # 版本耗尽保护：实际变化需要 +1，已达 SQLite 有符号 64 位上界时不再写入，
+        # 让上界请求得到可控的 409，而不是绑定溢出导致的 500。
+        Project.controller_assignment_version < SQLITE_SIGNED_INTEGER_MAX,
+    ]
+    if requested is None:
+        conditions.append(Project.controller_member_id.is_not(None))  # 确实已指定才需要写
+    else:
+        conditions.append(Project.controller_member_id.is_(None))  # 无指定才可设
+
+    result = session.execute(
+        update(Project)
+        .where(*conditions)
+        .values(
+            controller_member_id=requested,
+            controller_assignment_version=Project.controller_assignment_version + 1,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    session.commit()
+
+    # 复读最新已提交状态：end 上一个事务，避免拿旧快照下结论。
+    project = session.get(Project, project_id, populate_existing=True)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+    if result.rowcount == 0:
+        if project.controller_assignment_version != body.expected_version:
+            # 条件更新未命中且版本已被推进：陈旧版本请求，不写入、不覆盖。
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "controller assignment version conflict: "
+                    f"expected_version={body.expected_version}, "
+                    f"current_version={project.controller_assignment_version}"
+                ),
+            )
+        if (project.controller_member_id or None) == requested:
+            # 合法同值请求：版本正确且指定未变，200 返回当前状态，无任何副作用。
+            return ProjectOut.from_orm_project(project, session=session)
+        if project.controller_assignment_version >= SQLITE_SIGNED_INTEGER_MAX:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "controller assignment version exhausted: "
+                    f"current_version={project.controller_assignment_version}"
+                ),
+            )
+        if requested is not None and project.controller_member_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "project already has a controller assignment: "
+                    f"current_member_id={project.controller_member_id}; clear it first (member_id=null)"
+                ),
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="controller assignment conflict: state changed concurrently; re-read and retry",
+        )
+    return ProjectOut.from_orm_project(project, session=session)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
