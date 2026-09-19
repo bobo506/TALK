@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-09-19 C1a项目主控模式配置基础（#100–#103）
+
+- 基线 `a23b6443f5d1fae3db01292bfc921381b27c87aa`，分支codex/terminal-return-codex；DeepSeek #100开发，Kimi #101复核partial，DeepSeek #102修正，Kimi #103独立复验通过，Codex确认收尾。
+- Project新增controller_mode/controller_mode_version默认passive/0；老库幂等增列，保留数据。human专用PATCH controller-mode须mode和expected_version，数据库条件UPDATE实现CAS，实际变化才+1，同值合法不增，陈旧版本即使同值也409。普通注册/PATCH/sync不旁路修改。
+- MCP talk_list_agents复用一次项目GET返回controller_mode摘要，与开发要求同源；requested为配置意向，effective_mode恒null/not_bound。非项目null、旧后端unsupported，工具仍9个；active不自动执行/等待/授权/唤回，没有会话所有权或前端。
+- #101独立178项通过但探针发现expected_version=2**63导致SQLite绑定OverflowError/HTTP500。#102加有符号64位上界并补2测试；#103复验31+44项及原探针9/开发新探针4/独立新探针4全部通过，真实422及拒绝后库不变，上界正常409、合法CAS200、陈旧409，原29项保留完整。未把测试计数重复叠加为全量运行，未改变原partial结论。
+- 正式收取（2026-09-19 UTC）：100/msg2595于01:23:15.478475，101/msg2596于01:23:18.454528，102/msg2597于01:23:21.093970，103/msg2598于01:23:23.993394；流程completed不改写#101历史验收未通过。
+- 变更：server/models.py、server/db.py、server/routes/projects.py、bridges/talk_task_tools.py、新增tests/test_project_controller_mode.py；主控同步进度/历史/简报/路线/项目集成/终端指南。原交付与复验保留.tmp/c1a/；主控未重复执行完整代码审查或全量测试。
+- 限制：仅隔离测试，未启停共享服务/MCP、未改真实库/模式；并发为单进程多线程HTTP+SQLite WAL，跨进程未验证。异常后端负版本透传、实际存储版本耗尽处理未扩大修复；不宣称生效/自动执行。下一片C1b身份/生效合同、C2按钮待用户指示。
+
+
 ## 2026-09-18 ROLE-1人工验收通过
 
 - 用户在代码 `ff656b7` 推送后明确回复“可以，验收通过”，确认本片角色说明与参与任务耗时页面验收完成。与#99独立复核证据分开记录；未推断逐个窄屏尺寸或其它早期里程碑已覆盖。

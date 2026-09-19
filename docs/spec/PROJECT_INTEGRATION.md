@@ -764,3 +764,15 @@ D:\claude-test\TALK\
 - `talk_delegate_task` 在原始content后追加非空要求，区块名为“项目开发要求（派发时快照）”；空要求保持旧正文不变，读取失败不创建任务。要求A派发任务后改B，旧任务仍A、新任务才B；执行bridge从claim取得存储正文。快照不自动授权、不覆盖宿主指令。
 - 直接REST任务创建、schedule/run-due、旧pi TypeScript扩展不自动加入快照；本片未扩大这些入口。最多增加20000字符及说明，UTF-8字节数随内容变化。
 - 运行部署须加载新服务代码以完成迁移，并让MCP进程加载新实现；工具描述需客户端重连刷新。本片仅隔离验证，未重启共享服务或迁移真实库，不宣称在线已生效。AGENTS固定模型分工已去重，派发前读取项目要求；真实项目要求尚需用户配置，不能将字段缺失或空值当作有效分工。
+
+## 2026-09-19 C1a：项目主控模式配置基础
+
+#100开发/#101复核/#102返工/#103复验已收取。只实现配置意向，不实现会话所有权、ACK或自动推进。
+
+- Project新增controller_mode（passive/active，默认passive）与controller_mode_version（默认0）；老库按列存在性增列，不重建表。详情/列表返回两字段。
+- `PATCH /api/projects/{project_id}/controller-mode`：沿用human写权限，请求 `{ "mode": "active", "expected_version": 0 }`。mode必填且仅两值；expected_version为严格整数0..9223372036854775807，拒绝bool/string/float，缺失或非法/超界422；不存在项目404、越权403、版本冲突409。
+- 数据库单条条件UPDATE按project_id+版本+意向变化判断更新，实际改变才版本+1；同版本同值200不增，陈旧版本即使同值也409。合法no-op先于竞争写入时两次200符合语义，不能要求所有同版本竞争都恰有一次409。冲突后先GET最新状态再决定是否重试。
+- 普通项目PATCH/注册/sync不接受模式写入，额外模式字段按原未知字段语义忽略，不可绕过CAS。此CAS只保证配置写入，不等于同项目主控执行互斥。
+- MCP `talk_list_agents.controller_mode` 为只读对象：project_id/supported/requested_mode/requested_version/effective_mode/effective_status/note。与development_requirements共用一次项目GET，非项目为null；旧后端缺模式字段则supported=false、requested两值null、effective_status=unsupported。支持时effective_mode仍null、effective_status=not_bound，不能称active已生效。
+- 保存active不会生成任务/实例/消息/授权，不开始等待或唤回任何会话。C1b身份绑定/所有权/生效确认、C2按钮后续实现；既有被动协作保持。
+- 上线需新服务代码启动迁移及MCP重载，本轮未执行。验证：#101独立178项，修复后#103定向75项+17探针通过；并发仅单进程多线程SQLite WAL，跨进程未验证。异常后端负版本透传和实际存储版本耗尽为已知边界。

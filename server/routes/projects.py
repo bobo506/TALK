@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import update
 from sqlmodel import Session, select
 
 from cli.profiles import load_profile, resolve_profile_path, write_profile_file
@@ -29,6 +30,7 @@ from server.models import (
     Project,
     ProjectAgent,
     ProjectAgentOut,
+    ProjectControllerModeUpdate,
     ProjectCreate,
     ProjectOut,
     ProjectSyncRequest,
@@ -352,6 +354,60 @@ def update_project(
     session.add(project)
     session.commit()
     session.refresh(project)
+    return ProjectOut.from_orm_project(project)
+
+
+@router.patch("/{project_id}/controller-mode", response_model=ProjectOut)
+def update_project_controller_mode(
+    project_id: str,
+    body: ProjectControllerModeUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """更新项目主控模式“意向”（C1a 专用配置入口；human 可写、agent 只读）。
+
+    - 与普通元数据 ``PATCH /api/projects/{id}`` 分离，模式字段不能由后者修改；
+    - 版本校验与写入是同一条**条件 UPDATE**（CAS 落在数据库写入层）：只有
+      ``controller_mode_version == expected_version`` 且意向确实变化的请求会写入并 +1；
+    - 版本不匹配返回 409（无论请求模式是否与当前相同都先验证版本）；
+      合法同值请求返回 200、不写库、不递增版本；缺 ``expected_version`` 或非法 mode → 422；
+    - 项目不存在 → 404。
+
+    本片只保存配置意向：不创建任务、不调度、不等待、不唤醒或授权任何会话。
+    """
+    _require_human(current)
+    _get_project(project_id, session)  # 项目不存在 → 404（先于任何写入）
+
+    result = session.execute(
+        update(Project)
+        .where(
+            Project.project_id == project_id,
+            Project.controller_mode_version == body.expected_version,
+            Project.controller_mode != body.mode,
+        )
+        .values(
+            controller_mode=body.mode,
+            controller_mode_version=Project.controller_mode_version + 1,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    session.commit()
+
+    # 复读最新已提交状态：end 上一个事务，避免拿旧快照下结论。
+    project = session.get(Project, project_id, populate_existing=True)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+
+    if result.rowcount == 0 and project.controller_mode_version != body.expected_version:
+        # 条件更新未命中且版本已被推进：陈旧版本请求，不写入、不覆盖。
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "controller mode version conflict: "
+                f"expected_version={body.expected_version}, "
+                f"current_version={project.controller_mode_version}"
+            ),
+        )
     return ProjectOut.from_orm_project(project)
 
 

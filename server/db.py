@@ -275,6 +275,16 @@ def init_db() -> None:
         }
         if "development_requirements" not in project_columns:
             conn.exec_driver_sql("ALTER TABLE projects ADD COLUMN development_requirements TEXT")
+        # C1a 主控模式意向/版本：老库兼容幂等增列，旧行由 DEFAULT 得到 passive / 0，
+        # 不重建表、不删除或改写既有数据。
+        if "controller_mode" not in project_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE projects ADD COLUMN controller_mode TEXT NOT NULL DEFAULT 'passive'"
+            )
+        if "controller_mode_version" not in project_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE projects ADD COLUMN controller_mode_version INTEGER NOT NULL DEFAULT 0"
+            )
         project_agent_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(project_agents)").fetchall()

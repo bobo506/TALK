@@ -106,6 +106,14 @@ class Project(SQLModel, table=True):
     # 项目级“开发要求”：只保存最新纯文本，无版本号/历史；NULL 表示无内容。
     # 主控派发新任务前读取，并把派发时快照写进任务正文。
     development_requirements: Optional[str] = None
+    # 项目主控模式“意向”（C1a）：passive（默认）/ active。
+    # 只表示项目保存的配置意向，**不代表任何会话已生效**；生效状态见 MCP 只读输出的
+    # effective_mode / effective_status（本片恒为 null / not_bound）。
+    controller_mode: str = Field(default="passive")
+    # 模式版本：非负整数，初始 0；只在意向实际变化时 +1（同值幂等不增）。
+    # 写入必须走专用 CAS 入口（PATCH /api/projects/{id}/controller-mode），
+    # 普通元数据 PATCH / 注册 / CLI 重注册都不得旁路修改。
+    controller_mode_version: int = Field(default=0)
     maintainer_member_id: str = Field(foreign_key="members.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -167,6 +175,14 @@ TASK_MAX_CLARIFICATION_ROUNDS_LIMIT = 2
 
 # 项目级“开发要求”纯文本上限：用于创建与更新的同一套校验（按字符数计算）。
 PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS = 20000
+
+# 项目主控模式意向（C1a）：只允许这两个枚举；新建/旧项目一律默认 passive。
+PROJECT_CONTROLLER_MODES = ("passive", "active")
+PROJECT_CONTROLLER_MODE_DEFAULT = "passive"
+
+# SQLite INTEGER 为有符号 64 位：超出该范围的值无法绑定，会在写入层抛 OverflowError。
+# 版本类入参在请求校验层就用它做上界，避免异常输入变成 HTTP 500。
+SQLITE_SIGNED_INTEGER_MAX = 9223372036854775807
 
 
 def normalize_development_requirements(value: Optional[str]) -> Optional[str]:
@@ -1227,6 +1243,9 @@ class ProjectOut(BaseModel):
     description: Optional[str]
     project_root_path: Optional[str]
     development_requirements: Optional[str] = None
+    # 模式“意向”与版本（C1a）：只读暴露保存值，不表示会话已生效/已授权。
+    controller_mode: str = PROJECT_CONTROLLER_MODE_DEFAULT
+    controller_mode_version: int = 0
     maintainer_member_id: str
     created_at: datetime
     last_seen_at: datetime
@@ -1239,10 +1258,39 @@ class ProjectOut(BaseModel):
             description=project.description,
             project_root_path=project.project_root_path,
             development_requirements=project.development_requirements,
+            controller_mode=project.controller_mode or PROJECT_CONTROLLER_MODE_DEFAULT,
+            controller_mode_version=project.controller_mode_version or 0,
             maintainer_member_id=project.maintainer_member_id,
             created_at=project.created_at,
             last_seen_at=project.last_seen_at,
         )
+
+
+class ProjectControllerModeUpdate(BaseModel):
+    """`PATCH /api/projects/{project_id}/controller-mode` 请求体（C1a）。
+
+    专用配置入口，与普通项目元数据 ``ProjectUpdate`` 分离：
+
+    - ``mode``：保存的模式意向，只接受 ``passive`` / ``active``；
+    - ``expected_version``：调用者读到的模式版本，必须显式提供（缺省即拒绝），
+      取值非负且不超过 SQLite 有符号 64 位上界，超界在请求校验层 422。
+
+    服务端在数据库写入层按 ``expected_version`` 做条件更新（CAS）：
+    版本不匹配返回 409，合法同值请求返回 200 且不递增版本。
+    """
+
+    mode: str
+    # strict：字符串 "0"、小数、布尔等一律拒绝，避免"类型不合法"被静默强转后当成有效版本。
+    # le：加 SQLite 64 位上界，超界值（如 2**63）在进入写入层前就 422，而不是绑定报 500。
+    expected_version: int = PydField(ge=0, le=SQLITE_SIGNED_INTEGER_MAX, strict=True)
+
+    @model_validator(mode="after")
+    def validate_controller_mode(self) -> "ProjectControllerModeUpdate":
+        if self.mode not in PROJECT_CONTROLLER_MODES:
+            raise ValueError(
+                f"mode must be one of {list(PROJECT_CONTROLLER_MODES)}"
+            )
+        return self
 
 
 class ProjectAgentEntry(BaseModel):

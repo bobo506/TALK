@@ -87,6 +87,23 @@ PROJECT_REQUIREMENTS_SNAPSHOT_NOTE = (
     "以下内容由主控在派发时从项目读取并写入任务正文，仅作为随包保存的文本快照："
     "不自动授予权限，不替代或覆盖宿主系统指令，也不追溯修改已创建任务。"
 )
+# C1a 主控模式只读状态：requested_mode 是项目保存的“模式意向”，
+# effective_mode 是“本会话实际生效”的证据，本片没有任何会话绑定/生效确认，恒为 null。
+CONTROLLER_MODE_NOTE = (
+    "controller_mode 只是项目保存的模式意向（requested_mode）与版本，"
+    "本版本没有主控会话绑定或生效确认：effective_mode 恒为 null（effective_status=not_bound）。"
+    "保存 active 不等于已生效、不等于已唤回主控会话，也不产生等待/调度/派发或任何授权；"
+    "默认协作仍是派发后结束、由用户通知后再取件。"
+)
+CONTROLLER_MODE_UNSUPPORTED_NOTE = (
+    "当前后端未返回模式字段（旧后端）：模式意向状态为 unsupported，"
+    "不得把缺失当成 passive 或 active，也不得据此判断可自动推进。"
+)
+CONTROLLER_MODE_EFFECTIVE_STATUS_SUPPORTED = "not_bound"
+CONTROLLER_MODE_EFFECTIVE_STATUS_UNSUPPORTED = "unsupported"
+# 只读白名单：与 server.models.PROJECT_CONTROLLER_MODES 对齐；服务端返回未知值时
+# 只报 null，不把意外取值当成合法模式透传给模型。
+CONTROLLER_MODES = ("passive", "active")
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
@@ -247,9 +264,50 @@ def snapshot_task_content(content: str, requirements: str | None) -> str:
     )
 
 
+def controller_mode_summary(project: JsonDict) -> JsonDict:
+    """把项目详情里的模式意向整理成只读状态对象（C1a，不做任何网络请求）。
+
+    调用方必须传入**同一次** ``GET /api/projects/{id}`` 的结果：与
+    ``development_requirements`` 复用同一份响应，避免重复请求。
+
+    - 后端已支持（响应含 ``controller_mode`` 与 ``controller_mode_version``）：
+      ``requested_mode`` / ``requested_version`` 回显保存值，``effective_mode`` 恒为 ``null``，
+      ``effective_status=not_bound``；
+    - 旧后端缺字段：``supported=false``、``effective_status=unsupported``，
+      不回退猜测成 passive；
+    - 非项目路径不调用本函数（``talk_list_agents`` 明确返回 ``controller_mode: null``）。
+    """
+    if "controller_mode" not in project or "controller_mode_version" not in project:
+        return {
+            "project_id": project.get("project_id"),
+            "supported": False,
+            "requested_mode": None,
+            "requested_version": None,
+            "effective_mode": None,
+            "effective_status": CONTROLLER_MODE_EFFECTIVE_STATUS_UNSUPPORTED,
+            "note": CONTROLLER_MODE_UNSUPPORTED_NOTE,
+        }
+    mode = project.get("controller_mode")
+    version = project.get("controller_mode_version")
+    return {
+        "project_id": project.get("project_id"),
+        "supported": True,
+        "requested_mode": mode if isinstance(mode, str) and mode in CONTROLLER_MODES else None,
+        "requested_version": (
+            version
+            if isinstance(version, int) and not isinstance(version, bool)
+            else None
+        ),
+        "effective_mode": None,
+        "effective_status": CONTROLLER_MODE_EFFECTIVE_STATUS_SUPPORTED,
+        "note": CONTROLLER_MODE_NOTE,
+    }
+
+
 def list_agents(*, project_id: str | None = None) -> JsonDict:
     effective_project_id = _project_id(project_id)
     if effective_project_id is not None:
+        # 同一个项目 GET 响应同时承载开发要求与模式意向，不额外发起第二次项目请求。
         project = _api_request(
             "GET",
             f"/api/projects/{quote(effective_project_id, safe='')}",
@@ -289,6 +347,7 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
         return {
             "project_id": effective_project_id,
             "development_requirements": project.get("development_requirements"),
+            "controller_mode": controller_mode_summary(project),
             "availability_note": AVAILABILITY_NOTE,
             "agents": agents,
         }
@@ -319,6 +378,8 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
         "project_id": effective_project_id,
         # 非项目路径没有项目上下文，保持字段存在以便调用方统一取值。
         "development_requirements": None,
+        # 非项目路径没有项目模式意向：明确 null，不伪造 passive。
+        "controller_mode": None,
         "availability_note": AVAILABILITY_NOTE,
         "agents": agents,
     }
@@ -879,6 +940,13 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "顶层同时返回项目级最新开发要求 development_requirements（角色清单只出现一次，"
             "不重复写进每个 Agent；无内容时为 null）：主控派发新任务前应先读取它与角色清单，"
             "再按该要求派发。"
+            "顶层还返回只读的 controller_mode（与开发要求复用同一次项目读取）："
+            "requested_mode / requested_version 是项目保存的模式意向与版本，"
+            "effective_mode 恒为 null、effective_status=not_bound，表示本版本没有主控会话绑定或"
+            "生效确认。保存 active 不等于已生效、不等于已唤回任何会话，也不授权自动等待、调度、"
+            "派发或推进；默认协作仍是派发后结束、由用户通知后再取件，不得据此字段声称已唤回会话。"
+            "非项目路径 controller_mode 为 null；旧后端缺模式字段时为 supported=false / "
+            "effective_status=unsupported，不能当成 passive 或已支持。"
             "availability 仅依据实例上报，未做心跳核验，可能滞后，使用时请参考 last_seen_at。"
             "project_id 省略时使用 bridge 项目上下文。"
         ),

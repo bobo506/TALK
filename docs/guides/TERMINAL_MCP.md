@@ -345,3 +345,9 @@ REQ-1后端与主控工具已通过独立复核；项目API支持最新纯文本
 本片未重启服务或MCP；部署新服务代码并完成数据库启动迁移、让MCP加载新实现后方可使用。工具描述刷新需要客户端重连，不能把代码提交当作运行中宿主已经更新。直接REST、定时任务和旧pi TypeScript入口不自动追加快照。完整字段/清空/权限合同见 `docs/spec/PROJECT_INTEGRATION.md` 的REQ-1节。
 
 角色页使用与人工验收见 [项目开发要求验收指南](PROJECT_REQUIREMENTS_ACCEPTANCE.md)。主控派发前读取项目最新要求；没有有效分工且本次会话无明确指定时，先请用户配置，不自动套用示例。
+
+## 2026-09-19 主控模式只读状态（C1a）
+
+新实现的talk_list_agents顶层controller_mode读取项目保存的requested_mode/requested_version；这只是配置意向。effective_mode当前恒为null、effective_status为not_bound，不表示主控已自动推进或会话已被唤回。旧后端缺字段时明确unsupported，无项目时null；与开发要求复用同一项目读取。
+
+human可经专用 `PATCH /api/projects/{project_id}/controller-mode` 配置mode及expected_version；版本冲突409后须先重新读取，超出0..2**63-1的整数422。模式不改变任务授权或派发/收取流程，当前仍按用户通知后取件。C1b身份/生效与C2按钮尚未实现，本片未重启服务/MCP，不能把代码提交当作当前连接已经支持该字段。完整合同见PROJECT_INTEGRATION.md的C1a节。
