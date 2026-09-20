@@ -346,7 +346,9 @@ function renderWorkspaceList() {
   // 开发要求编辑区的可见性统一由 renderTaskDetailsPanel() 同步（app.js），覆盖群聊等不经本函数的导航路径。
   syncWorkspaceLayout();
   blackboardTitle.textContent = rolesMode ? "角色" : "任务";
-  blackboardDescription.textContent = rolesMode ? "参与协作的助手" : "按你委派的工作整理";
+  blackboardDescription.textContent = rolesMode
+    ? `参与协作的助手 · ${activeProjectId ? workspaceControllerSummary() : "项目主控：无项目"}`
+    : "按你委派的工作整理";
   const search = document.getElementById("workspace-search");
   search.placeholder = rolesMode ? "搜索角色" : "搜索任务";
   search.setAttribute("aria-label", search.placeholder);
@@ -361,6 +363,9 @@ function renderWorkspaceList() {
       row.classList.toggle("selected", role.member_id === workspaceUI.selectedRole);
       row.setAttribute("aria-pressed", String(role.member_id === workspaceUI.selectedRole));
       row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleLabel(role.business_role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
+      // 被指定角色带“项目主控”标记；同名角色用 member_id 消歧（写请求始终使用 ID）。
+      if (workspaceControllerBadge(role.member_id)) row.appendChild(workspaceEl("span", "role-controller-badge", "项目主控"));
+      row.appendChild(workspaceEl("small", "role-row-id", role.member_id));
       blackboardColumns.appendChild(row);
     }
   } else {
@@ -394,6 +399,25 @@ function renderWorkspaceRoleDetails() {
   const assign = workspaceButton("交办任务", () => { setTaskCreateOpen(true); taskCreateAgent.value = role.member_id; }, "task-action-primary");
   assign.disabled = !eligibleProjectAgents().some(member => member.id === role.member_id);
   panel.appendChild(assign);
+  // C1b-S2 项目主控：同名角色用 member_id 消歧；被指定角色带“项目主控”标记，
+  // human 可指定/解除，已有非 null 指定时其它角色入口置灰并给出可读理由。
+  panel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
+  const controllerEntry = workspaceControllerEntry(role);
+  if (controllerEntry.badge || controllerEntry.action || controllerEntry.reason) {
+    const controllerSection = workspaceEl("section", "role-controller-section");
+    controllerSection.appendChild(workspaceEl("h3", "", "项目主控"));
+    if (controllerEntry.badge) controllerSection.appendChild(workspaceEl("p", "role-controller-badge", "项目主控（当前指定）"));
+    if (controllerEntry.action) {
+      const assigning = controllerEntry.action === "assign";
+      const button = workspaceButton(assigning ? "设为项目主控" : "解除主控", () => saveControllerAssignment(assigning ? role.member_id : null), assigning ? "task-action-primary" : "task-action-secondary");
+      button.dataset.controllerAction = controllerEntry.action;
+      button.disabled = controllerEntry.enabled === false;
+      if (controllerEntry.reason) button.title = controllerEntry.reason;
+      controllerSection.appendChild(button);
+    }
+    if (controllerEntry.reason) controllerSection.appendChild(workspaceEl("p", "role-controller-reason", controllerEntry.reason));
+    panel.appendChild(controllerSection);
+  }
   const section = workspaceEl("section", "role-task-section");
   section.appendChild(workspaceEl("h3", "", "参与的任务"));
   const filters = workspaceEl("div", "role-task-filters");
@@ -420,6 +444,334 @@ function renderWorkspaceRoleDetails() {
   table.appendChild(body); section.appendChild(table);
   if (!tasks.length) section.appendChild(workspaceEl("p", "workspace-empty", "当前没有这类任务。"));
   panel.appendChild(section);
+}
+// ── C1b-S2 项目主控指定（角色页，唯一长期指定） ─────────────────────────
+// 数据源是服务端返回的 controller_member_id / controller_assignment_version /
+// controller_assignment_status：不自动指定 lead/Codex，不从业务角色标签推导；
+// assigned 只表示职责配置有效，不代表在线、已确认（ACK）或会话已生效。
+// 指定长期保存，无期限/续租，离线不自动解除；失效成员（移出名册/禁用/不存在）仍在
+// 项目级面板保留名称或 ID、无效原因与 human 解除入口。写操作只走专用
+// PATCH /api/projects/{id}/controller-assignment，携带上次读取的版本，不用普通项目 PATCH。
+const CONTROLLER_STATUSES = {
+  unassigned: { label: "未指定" },
+  assigned: { label: "已指定" },
+  not_in_roster: { label: "已指定 · 当前不可用", reason: "该成员当前不在项目名册中" },
+  member_disabled: { label: "已指定 · 当前不可用", reason: "该成员已被禁用" },
+  member_missing: { label: "已指定 · 当前不可用", reason: "该成员已不存在" },
+  not_agent: { label: "已指定 · 当前不可用", reason: "该成员不是 Agent" },
+};
+// 未知/缺失状态明确降级为“无法识别”，不假定有效，也不虚构成功。
+function controllerStatusMeta(status) {
+  return CONTROLLER_STATUSES[status] || { label: "指定状态无法识别", reason: `服务返回了无法识别的状态：${String(status)}` };
+}
+// 状态绑定 项目/账号/请求序号；只存内存，不写 localStorage，不新增轮询或独立 timer。
+// saving 的清理权按请求所有权（saveToken）判定：只有发起当前这次保存的请求可以清理
+// saving、回焦或同步相关视图；A→B→A 往返或切账号期间迟到的旧请求即使上下文重新“活着”，
+// 也不拥有新请求的保存状态，不得提前清零。token 独立于请求序号 —— 409/400 的内部重读会
+// 递增序号，若用序号当所有权，当前请求在重读后反而永远无法清理自己的保存状态。
+const controllerUI = { projectId: null, memberId: null, supported: false, loaded: false, saving: false, saveToken: null, request: 0, assignedId: null, version: null, status: null, error: "", notice: "" };
+function controllerEl(id) { return typeof document === "undefined" ? null : document.getElementById(id); }
+function controllerContextValid() {
+  return controllerUI.projectId !== null && controllerUI.projectId === activeProjectId && controllerUI.memberId === myId;
+}
+// 指定展示始终带 member_id 消歧（同项目可有多个同名 Kimi/DeepSeek 角色）。
+function controllerAssignedLabel(memberId) { return `${workspaceMemberName(memberId)}（${memberId}）`; }
+// 版本要作为 expected_version 原样回传；JS number 无法安全表示时禁止发送失真的版本号。
+function controllerVersionSafe() { return Number.isSafeInteger(controllerUI.version) && controllerUI.version >= 0; }
+function workspaceControllerBadge(memberId) {
+  return controllerContextValid() && controllerUI.loaded && controllerUI.supported && controllerUI.assignedId === memberId;
+}
+function workspaceControllerSummary() {
+  if (!controllerContextValid()) return "项目主控：读取中…";
+  if (!controllerUI.loaded) return controllerUI.error ? "项目主控：读取失败" : "项目主控：读取中…";
+  if (!controllerUI.supported) return "项目主控：当前服务不支持";
+  return controllerUI.assignedId ? `项目主控：${controllerAssignedLabel(controllerUI.assignedId)}` : "项目主控：未指定";
+}
+// 候选只取项目名册内、已注册、未禁用的 agent（不要求在线）；前端过滤只影响体验，服务端仍独立校验。
+function controllerCandidate(memberId) {
+  if (!workspaceRoles().some(role => role.member_id === memberId)) return false;
+  const member = members.find(item => item.id === memberId);
+  return Boolean(member) && member.kind === "agent" && !member.disabled_at;
+}
+// 角色详情入口：徽标 + 设为/解除/置灰理由。已有非 null 指定时其它角色一律置灰并给出可读理由。
+function workspaceControllerEntry(role) {
+  const id = role?.member_id;
+  if (!controllerContextValid()) return { badge: false, action: null, reason: "" };
+  if (!controllerUI.loaded || !controllerUI.supported) {
+    return { badge: false, action: null, reason: !controllerUI.loaded && !controllerUI.error ? "正在读取项目主控指定…" : "" };
+  }
+  const badge = controllerUI.assignedId === id;
+  if (!currentMemberIsHuman()) return { badge, action: null, reason: "当前账号是 Agent，只能查看。" };
+  if (controllerUI.saving) return { badge, action: badge ? "clear" : "assign", enabled: false, reason: "正在保存…" };
+  if (!controllerVersionSafe()) return { badge, action: null, reason: "服务返回的主控版本超出页面可安全表示的范围，已暂停指定与解除操作。" };
+  if (badge) return { badge, action: "clear", enabled: true, reason: "" };
+  if (controllerUI.assignedId) return { badge, action: null, reason: `已指定 ${controllerAssignedLabel(controllerUI.assignedId)}，请先解除。` };
+  if (!controllerCandidate(id)) return { badge, action: null, reason: "只有项目名册内已注册、未禁用的 Agent 才能设为项目主控。" };
+  return { badge, action: "assign", enabled: true, reason: "" };
+}
+// 项目级面板可见性统一由 renderTaskDetailsPanel() 同步（app.js），与开发要求编辑区同一同步点；
+// 任务/群聊导航都会经过该同步点，不会残留管理区。
+function renderControllerPanel() {
+  const panel = controllerEl("controller-panel");
+  if (!panel) return;
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && Boolean(activeProjectId) && Boolean(myId);
+  panel.classList.toggle("hidden", !visible);
+  if (!visible) { controllerFocusMemory = null; return; }
+  if (controllerUI.projectId !== activeProjectId || controllerUI.memberId !== myId) {
+    // 上下文切换（含往返）：递增请求序号作废旧读写，新上下文重新读取。
+    ++controllerUI.request;
+    controllerFocusMemory = null;
+    Object.assign(controllerUI, { projectId: activeProjectId, memberId: myId, supported: false, loaded: false, saving: false, saveToken: null, assignedId: null, version: null, status: null, error: "", notice: "" });
+    return loadControllerAssignment();
+  }
+  syncControllerPanel();
+}
+function syncControllerPanel() {
+  const panel = controllerEl("controller-panel");
+  if (!panel || panel.classList.contains("hidden")) return;
+  const current = controllerEl("controller-current");
+  const detail = controllerEl("controller-detail");
+  const clearBtn = controllerEl("controller-clear-btn");
+  const retryBtn = controllerEl("controller-retry-btn");
+  const status = controllerEl("controller-status");
+  const human = currentMemberIsHuman();
+  current.textContent = workspaceControllerSummary();
+  let detailText = "";
+  if (controllerUI.loaded && controllerUI.supported) {
+    if (!controllerVersionSafe()) detailText = "服务返回的主控版本超出页面可安全表示的范围；为避免写错版本，已暂停指定与解除操作，请刷新或联系管理员。";
+    else if (controllerUI.assignedId) {
+      const meta = controllerStatusMeta(controllerUI.status);
+      detailText = meta.reason
+        ? `${meta.reason}；指定仍长期保存，不会自动解除或转移，可解除后另选。`
+        : "已指定仅表示职责配置有效，不代表在线、已确认或会话已生效；指定长期保存，直到人工解除。";
+    } else {
+      detailText = "还没有指定主控；可在下方角色详情中把一名名册内的 Agent 设为项目主控。指定长期保存，直到人工解除。";
+    }
+  }
+  detail.textContent = detailText;
+  const showClear = human && controllerUI.loaded && controllerUI.supported && Boolean(controllerUI.assignedId);
+  clearBtn.classList.toggle("hidden", !showClear);
+  clearBtn.disabled = controllerUI.saving || (showClear && !controllerVersionSafe());
+  retryBtn.classList.toggle("hidden", !(!controllerUI.loaded && controllerUI.error && !controllerUI.saving));
+  let message = "", kind = "";
+  if (!controllerUI.loaded && controllerUI.error) { message = controllerUI.error; kind = "error"; }
+  else if (controllerUI.saving) message = "正在保存…";
+  else if (controllerUI.error) { message = controllerUI.error; kind = "error"; }
+  else if (controllerUI.notice) { message = controllerUI.notice; kind = "success"; }
+  else if (!controllerUI.loaded) message = "正在读取项目主控指定…";
+  else if (controllerUI.supported && !controllerVersionSafe()) { message = "主控版本无法安全表示，写入已暂停。"; kind = "error"; }
+  else if (controllerUI.supported && !human) message = "当前账号是 Agent，只能查看；主控指定由项目负责人管理。";
+  status.textContent = message;
+  status.className = `controller-status${kind ? ` ${kind}` : ""}`;
+}
+async function loadControllerAssignment() {
+  const request = ++controllerUI.request;
+  const projectId = controllerUI.projectId, memberId = controllerUI.memberId;
+  controllerUI.error = "";
+  syncControllerPanel();
+  const current = () => request === controllerUI.request
+    && projectId === activeProjectId && projectId === controllerUI.projectId
+    && memberId === myId && memberId === controllerUI.memberId;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`);
+    if (!res.ok) throw new Error(await readErrorDetail(res, `项目主控读取失败（${res.status}），请稍后重试。`));
+    const data = await res.json();
+    if (!current()) return;
+    if (!data || data.project_id !== projectId || !("controller_member_id" in data)
+        || !("controller_assignment_version" in data) || !("controller_assignment_status" in data)) {
+      // 旧后端没有主控字段：明确提示不支持并禁用写入，不把缺失当成“未指定”。
+      controllerUI.loaded = true;
+      controllerUI.supported = false;
+      controllerUI.assignedId = null; controllerUI.version = null; controllerUI.status = null;
+      controllerUI.error = "当前服务尚未支持项目主控指定，暂时只能查看角色。";
+    } else {
+      applyControllerRead(projectId, data);
+    }
+  } catch (err) {
+    if (!current()) return;
+    controllerUI.loaded = false;
+    controllerUI.error = err.message || "项目主控读取失败，请重试。";
+  }
+  if (current()) syncControllerViews();
+}
+function applyControllerRead(projectId, data) {
+  controllerUI.supported = true;
+  controllerUI.loaded = true;
+  controllerUI.assignedId = typeof data.controller_member_id === "string" && data.controller_member_id ? data.controller_member_id : null;
+  controllerUI.version = data.controller_assignment_version;
+  controllerUI.status = typeof data.controller_assignment_status === "string" ? data.controller_assignment_status : "";
+  // 只回写主控三个字段到项目缓存；其它项目字段一律不碰，避免影响开发要求草稿等状态。
+  const project = projects.find(item => item.project_id === projectId);
+  if (project) {
+    project.controller_member_id = controllerUI.assignedId;
+    project.controller_assignment_version = data.controller_assignment_version;
+    project.controller_assignment_status = data.controller_assignment_status;
+  }
+}
+// 焦点去向按动作语义推导：失败时原按钮仍在则回焦原按钮；指定成功后“设为项目主控”消失，
+// 落到同一上下文对应的“解除主控”（下一步可操作元素）；解除成功后解除入口隐藏，
+// 落到稳定可聚焦的面板状态行（tabindex=-1，仅程序化聚焦，不进 Tab 序）。
+// 保存中间态（同动作按钮被置灰但未消失）不动焦点，靠焦点动作记忆在完成时恢复；
+// 用户已主动移焦到其它可见控件、或切角色/项目/账号/导航后不抢焦；永不聚焦 hidden/disabled 节点。
+let controllerFocusMemory = null;
+function controllerFocusable(node) {
+  return Boolean(node && typeof node.focus === "function" && !node.disabled
+    && !(node.classList && node.classList.contains("hidden")));
+}
+function controllerFocusTarget(action) {
+  const same = document.querySelector(`[data-controller-action="${action}"]`);
+  if (controllerFocusable(same)) return same;
+  // 同动作按钮仍在但只是被置灰（保存中间态）：不动焦点，等完成后的最终状态再恢复。
+  if (same && !(same.classList && same.classList.contains("hidden"))) return null;
+  // 同动作节点已消失或隐藏（动作已变）：指定成功的下一步是解除主控；否则回到稳定的面板状态行。
+  if (action === "assign") {
+    const clear = document.querySelector('[data-controller-action="clear"]');
+    if (controllerFocusable(clear)) return clear;
+  }
+  const status = controllerEl("controller-current");
+  return controllerFocusable(status) ? status : null;
+}
+// 读取/保存完成后刷新列表徽标与角色详情按钮；尽量恢复原焦点，避免键盘操作被重绘打断。
+function syncControllerViews() {
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  const action = active && active.dataset ? active.dataset.controllerAction || null : null;
+  if (action) {
+    // 记录焦点动作意图：真实浏览器中重绘会把焦点带回 body，靠记忆在完成时恢复。
+    // 记忆绑定保存发起时选中的角色：保存期间用户点击其它角色行（行重绘会把焦点打回 body）
+    // 属于新的交互意图，完成后取消回焦，不把焦点跨角色拉回主控区。
+    controllerFocusMemory = { action, projectId: activeProjectId, memberId: myId, role: workspaceUI.selectedRole };
+  } else if (active && active !== document.body) {
+    controllerFocusMemory = null; // 焦点在其它可见控件上：用户已主动移焦，不再为主控回焦
+  }
+  syncControllerPanel();
+  // 只在角色页（黑板打开的管理上下文仍在）重绘列表与角色详情；离开角色页或黑板关闭后，
+  // 迟到的读取/保存响应只维护 controllerUI 与项目缓存状态，由返回角色页时的正常导航渲染
+  // 呈现服务器最终状态，避免主控请求重绘任务/群聊页面造成焦点与滚动位置丢失。
+  const inRoles = blackboardOpen && workspaceUI.mode === "roles";
+  if (inRoles) {
+    renderWorkspaceList();
+    renderWorkspaceRoleDetails();
+  }
+  if (inRoles && typeof document !== "undefined") {
+    const memory = controllerFocusMemory;
+    const plan = action || (memory && memory.projectId === activeProjectId && memory.memberId === myId
+      && memory.role === workspaceUI.selectedRole ? memory.action : null);
+    if (plan) {
+      const next = controllerFocusTarget(plan);
+      if (next) { next.focus(); controllerFocusMemory = null; }
+    }
+  }
+}
+// 角色页“刷新”复用既有刷新生命周期：只重读当前上下文的主控状态，不新增高频轮询。
+function reloadControllerAssignment() {
+  if (!(blackboardOpen && workspaceUI.mode === "roles" && activeProjectId && myId)) return;
+  if (!controllerContextValid() || controllerUI.saving) return;
+  loadControllerAssignment();
+}
+async function saveControllerAssignment(targetId) {
+  const projectId = activeProjectId, memberId = myId;
+  if (!projectId || controllerUI.saving || !controllerUI.loaded || !controllerUI.supported) return;
+  if (controllerUI.projectId !== projectId || controllerUI.memberId !== memberId) return;
+  if (!currentMemberIsHuman()) return;
+  if (targetId !== null && typeof targetId !== "string") return;
+  // 只能从空指定新角色；已有指定时须先解除再另选，不直接覆盖（服务端对覆盖返回 409）。
+  if (targetId !== null && controllerUI.assignedId && controllerUI.assignedId !== targetId) return;
+  if (targetId === controllerUI.assignedId) return;
+  if (!controllerVersionSafe()) {
+    controllerUI.error = "主控版本无法安全表示，已取消本次写入，请刷新后重试。";
+    syncControllerViews();
+    return;
+  }
+  if (targetId !== null && !controllerCandidate(targetId)) {
+    controllerUI.error = "该角色当前不在可指定范围内（须为项目名册内已注册、未禁用的 Agent）。";
+    syncControllerViews();
+    return;
+  }
+  const expected = controllerUI.version;
+  const saveToken = {};
+  controllerUI.saving = true;
+  controllerUI.saveToken = saveToken;
+  controllerUI.error = ""; controllerUI.notice = "";
+  const request = ++controllerUI.request;
+  syncControllerViews();
+  const contextAlive = () => projectId === activeProjectId && projectId === controllerUI.projectId
+    && memberId === myId && memberId === controllerUI.memberId;
+  const current = () => request === controllerUI.request && contextAlive();
+  // 只有仍拥有当前保存状态的请求可在 finally 清理 saving 并同步视图；
+  // 不用请求序号判断所有权（内部重读会递增序号，见 controllerUI 声明处注释）。
+  const ownsSave = () => controllerUI.saveToken === saveToken;
+  try {
+    // 写请求始终使用 member_id（解除为显式 null）；expected_version 原样回传上次读取的版本，不自己 +1。
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/controller-assignment`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ member_id: targetId, expected_version: expected }),
+    });
+    if (!current()) return;
+    if (res.status === 409 || res.status === 400) {
+      const detail = await readErrorDetail(res, res.status === 409 ? "主控指定状态已变化。" : "候选角色已变化。");
+      if (!current()) return;
+      // 冲突/候选变化：只重新读取最新状态，不自动替用户重试写。
+      await rereadControllerState(projectId, memberId);
+      if (!contextAlive()) return;
+      controllerUI.error = res.status === 409
+        ? `${detail} 已为你刷新到最新状态，请确认后再操作。`
+        : `${detail} 请刷新角色列表后重试。`;
+    } else if (res.status === 404) {
+      // 旧服务没有该接口：明确不支持，不假报保存。
+      controllerUI.loaded = true;
+      controllerUI.supported = false;
+      controllerUI.error = "当前服务尚未支持项目主控指定（接口返回 404），本次未保存。";
+    } else if (!res.ok) {
+      controllerUI.error = await readErrorDetail(res, `保存失败（${res.status}），请重试。`);
+    } else {
+      const data = await res.json().catch(() => null);
+      if (!current()) return;
+      // 必须核实同项目响应带回三个字段且 member 与本次请求一致，才算保存成功。
+      if (!data || data.project_id !== projectId || !("controller_member_id" in data)
+          || !("controller_assignment_version" in data) || !("controller_assignment_status" in data)
+          || data.controller_member_id !== targetId) {
+        controllerUI.error = "服务未确认本次保存（响应未带回一致的主控指定），请刷新后重试。";
+      } else {
+        applyControllerRead(projectId, data);
+        if (targetId === null) {
+          controllerUI.notice = "已解除主控指定。";
+        } else if (controllerUI.status === "assigned") {
+          controllerUI.notice = "已保存。已指定仅表示职责配置有效，不代表在线或已确认。";
+        } else {
+          // S1 已披露竞态：提交期间候选被禁用/移出名册时可能 200 但配置无效，如实提示真实状态。
+          const meta = controllerStatusMeta(controllerUI.status);
+          controllerUI.notice = `已保存，但当前不可用：${meta.reason || meta.label}。指定仍长期保存，可解除后另选。`;
+        }
+      }
+    }
+  } catch (err) {
+    if (!current()) return;
+    controllerUI.error = err.message || "保存失败，请检查网络后重试。";
+  } finally {
+    // 上下文活着但所有权已易手（A→B→A / 切账号往返期间有新保存接管）时：
+    // 旧请求到达只结束自己，不清新请求的 saving、不回焦、不同步视图、不再发写请求。
+    if (contextAlive() && ownsSave()) {
+      controllerUI.saveToken = null;
+      controllerUI.saving = false;
+      syncControllerViews();
+    }
+  }
+}
+// 409/400 后只重读最新主控状态（自带请求序号），不自动重试写。
+async function rereadControllerState(projectId, memberId) {
+  const request = ++controllerUI.request;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`);
+    if (!res.ok) return;
+    const data = await res.json().catch(() => null);
+    if (request !== controllerUI.request || projectId !== activeProjectId || projectId !== controllerUI.projectId
+        || memberId !== myId || memberId !== controllerUI.memberId) return;
+    if (data && data.project_id === projectId && "controller_member_id" in data
+        && "controller_assignment_version" in data && "controller_assignment_status" in data) {
+      applyControllerRead(projectId, data);
+    }
+  } catch (_) { /* 重读失败保持原状态，错误文案已提示 */ }
 }
 function workspaceTaskNotice(task, tree) {
   if (task.workflow_status === "completed") return "成果已收取，本任务已完成。无需继续操作。";
@@ -527,5 +879,10 @@ if (typeof document !== "undefined") {
     document.getElementById("requirements-discard-btn").addEventListener("click", discardProjectRequirements);
     document.getElementById("requirements-retry-btn").addEventListener("click", () => loadProjectRequirements());
   }
+  const controllerClearBtn = document.getElementById("controller-clear-btn");
+  if (controllerClearBtn) {
+    controllerClearBtn.addEventListener("click", () => saveControllerAssignment(null));
+    document.getElementById("controller-retry-btn").addEventListener("click", () => { if (controllerContextValid()) loadControllerAssignment(); });
+  }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, controllerStatusMeta};

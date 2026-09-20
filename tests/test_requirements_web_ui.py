@@ -6,7 +6,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20260918-role-1"
+STATIC_VERSION = "20260919-c1b-s2-owner"
 
 
 class RequirementsWebUiTests(RouteTestCase):
@@ -37,6 +37,7 @@ class RequirementsWebUiTests(RouteTestCase):
         self.assertNotIn("不替代 AGENTS 既定职责", html)
         # 静态资源版本同步刷新缓存。
         self.assertEqual(html.count(STATIC_VERSION), 4)
+        self.assertNotIn("20260918-role-1", html)
         self.assertNotIn("20260918-req2-rework", html)
         self.assertNotIn("20260918-req2-requirements", html)
         self.assertNotIn("20260913-task-duration", html)

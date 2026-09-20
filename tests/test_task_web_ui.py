@@ -30,7 +30,10 @@ class TaskWebUiTests(RouteTestCase):
             "task-create-related",
         ):
             self.assertIn(f'id="{element_id}"', html)
-        self.assertIn("20260918-role-1", html)
+        self.assertIn("20260919-c1b-s2-owner", html)
+        self.assertNotIn("20260919-c1b-s2-focus", html)
+        self.assertNotIn('v=20260919-c1b-s2"', html)
+        self.assertNotIn("20260918-role-1", html)
         self.assertNotIn("20260918-req2-rework", html)
         self.assertNotIn("20260918-req2-requirements", html)
         self.assertNotIn("20260913-task-duration", html)
