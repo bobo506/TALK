@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-09-23 #121补正核查收尾，派#122清理已确认残留
+
+- #121/msg2616为合法partial自报：R1/R2/R3调查已补正，未完成项为调查范围外的实际删除、未做真实浏览器及可选保留说明。Codex按只读调查范围验收，保留partial和未测试边界，不强行改写为完整实现。#120/msg2615与#121/msg2616于03:37:44.126206Z、03:37:48.230983Z收取，均workflow completed；#120原错误报告不覆盖。
+- Codex独立复核当前web引用、刷新函数、human授权路径、同步SDK参数，并实际读取git show 15874ba -- web/index.html：确认隐藏组在双栏改版时被可见新建/刷新入口替代，不依赖执行者临时脚本来推断历史。当前HEAD3c24017相对fdc6c4b仅进度文档差异，web仍eb45298。
+- 正式结论：保留共享创建/公共后端；删除候选仅index.html隐藏blackboard-actions容器及两个按钮、style.css该规则、app.js两个常量/两个绑定/三处disabled同步。核心human根创建七参数与MCP/SDK能力区分成立。附带纠正#121表格：resume-tree允许human或根请求者（_require_tree_manager），列表按身份过滤，不能称“三个human-only端点”；accept-milestone才是明确human-only。此旁支表述不影响清理范围，主控记录裁决，不再为报告措辞循环返工。
+- 按用户之前确认无用即清理的授权，主控批准纯前端重复残留清理，未扩大为删除手动创建能力或破坏性API变更。重新读取项目开发要求，按临时分工派DeepSeek顶层general #122“122-清理旧黑板隐藏刷新与委派控件”，queued/assigned，基线3c24017。
+- #122范围限制为3个web文件、资源缓存版本与3份Python页面契约期望；保留可见入口/共享函数/后端权限，要求语法、既有Node与页面契约验证。执行者不改正式文档或提交，Codex后续检查。证据.tmp/manual-task-audit-1/与.tmp/manual-task-cleanup-1/。
+
 ## 2026-09-23 #120独立检查发现报告漏项，派#121定向补正
 
 - #120结果msg2615为有效结构化complete自报、runner succeeded/workflow submitted；工作区无跟踪文件变动。Codex读取audit.md并独立检查eb45298删除diff、前端DOM/CSS/调用点、公共任务路由、MCP委派、SDK及schedule实现；未重复跑无代码改动的全量测试。

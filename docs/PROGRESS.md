@@ -4,7 +4,8 @@ Updated: 2026-09-23 (Asia/Shanghai)
 
 ## 当前状态
 
-- MANUAL-TASK-AUDIT-1：#120已交付（msg2615，structured complete，succeeded/submitted），Codex独立核对后发现报告漏项，尚未验收/收取。公共任务API/MCP/SDK与共享弹窗应保留；但报告把永久hidden的旧黑板委派按钮当正常入口，不能据此断言无残留。已派DeepSeek #121定向补正（queued/assigned，基线fdc6c4b），核查隐藏刷新/委派控件及专属绑定/样式清理边界，并纠正“移除人类页面等于无法给任务树授权”的过度结论（human REST/SDK仍在）。仅写.tmp/manual-task-audit-1/audit-revised.md与delivery-revised.json，不实际删码；#120原报告保留。临时DeepSeek执行、Codex检查、不派Kimi；用户通知#121完成再取件。
+- MANUAL-TASK-AUDIT-1核查收尾：Codex确认公共任务API/MCP/SDK、共享弹窗与可见入口保留；旧黑板隐藏刷新/委派控件为可清理重复残留。#120/#121已正式收取（msg2615/msg2616，completed），保留#120原报告错误及#121自报partial，不将调查未执行删除/浏览器改称测试通过。主控另纠正#121“resume-tree仅human”附带误述：实际也允许根请求者，列表按身份过滤。正式裁决见DEVELOPMENT_ROADMAP代码取舍节。
+- MANUAL-TASK-CLEANUP-1已派DeepSeek #122（queued/assigned，基线3c24017）：只删除黑板隐藏容器/两个按钮、专属CSS和7处JS常量/绑定/状态同步，更新四处资源版本及三份Python契约期望。可见新建/刷新/子任务、共享函数、后端权限保持；不改正式文档、不commit/push，交付.tmp/manual-task-cleanup-1/。按用户既有“确认无用后清理”授权执行；临时DeepSeek开发、Codex检查，用户通知后取件。
 
 - ROLE-SETTINGS-1已完成且用户于2026-09-23确认页面验收通过（代码eb45298已推送）：#118 Kimi开发、#119 DeepSeek独立复核complete通过（msg2614）；2026-09-23用户明确授权Codex直接处理剩余工作、暂不派任务。Codex将已有主控时的候选隐藏改为可见置灰，指定后焦点到解除、解除后回候选，原覆盖保护不变；实际复跑Node127、页面契约7通过。#119独立证据Node127/页面7/探针21只覆盖修正前版本，最新小改未另派独立复核，Codex未操作真实浏览器；用户随后确认验证通过，不扩称逐项键盘/时序场景全覆盖。资源20260923-role-settings-1，正式验收见docs/guides/CONTROLLER_ASSIGNMENT_ACCEPTANCE.md。#118/#119已在服务恢复后于2026-09-23正式收取（msg2613/msg2614，workflow_status=completed）；保留#118服务器unknown与本地包complete差异。本轮无新派发。
 
@@ -61,7 +62,7 @@ Updated: 2026-09-23 (Asia/Shanghai)
 
 - 自动转审已按用户要求详细登记于DEVELOPMENT_ROADMAP“自动转审与检查要求配置”节：默认检查角色、固定规范+任务验收标准+实际交付证据、独立判断、异常返回主控及去重/授权边界；未排期，不改变#110或当前手动转审流程。
 
-1. 等用户通知#121完成，Codex核对隐藏控件可达性、最小清理边界及human授权路径；通过后收取#120/#121并给出保留/删除清单。未批准实际删除，公共创建能力保持。ROLE-SETTINGS-1已验收收尾。
+1. 等用户通知#122完成，Codex独立检查删除边界、空DOM引用与可见创建/刷新回归；验证后提交推送并收尾，再回到主动/被动模式行为细化主线，不自动扩展本片。ROLE-SETTINGS-1已验收收尾。
 2. 当前项目开发要求已由MCP实际读取；后续派发继续每次读取最新要求并按既定一次一片/交叉复核流程推进。用户明确独立任务继续general，分类改造仅路线待办。
 3. 低级别原型键显示加固、孤立代理码点后端500、既有临时目录残留为独立待办；多工作区/页面运行器/无人值守/群聊后续阶段仍按路线，不借本轮结果宣称完成。
 4. 本项目常规推送持续授权目标 `bobo506/TALK`，分支 `codex/terminal-return-codex`；ROLE-SETTINGS-1人工验收已通过，本轮不自动开启新片。
