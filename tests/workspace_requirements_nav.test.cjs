@@ -191,12 +191,39 @@ function harness({ projectId = 'A', memberId = 'human:qa', withTask = false } = 
 const enterRoles = h => { h.el('workspace-roles-btn').fire('click'); return h.tick(); };
 const enterChats = h => { h.el('workspace-chats-btn').fire('click'); return h.tick(); };
 
-test('R1 角色页显示编辑区与角色详情（真实按钮 → renderWorkspaceMode 全链路）', async () => {
+test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐藏；点角色后互斥切换（真实按钮 → renderWorkspaceMode 全链路）', async () => {
   const h = harness();
   await enterRoles(h);
+  // 首次进入无有效选择：默认固定首项“项目设置”，右侧只显示项目级面板
   assert.equal(h.hidden('requirements-panel'), false);
-  assert.equal(h.hidden('role-details-panel'), false);
+  assert.equal(h.hidden('role-details-panel'), true);
   assert.ok(h.requests.some(url => /\/api\/projects\/A$/.test(url)));
+  const settingsRow = h.el('blackboard-columns').children[0];
+  assert.ok(settingsRow.className.includes('role-settings-row'), '首项是“项目设置”导航行');
+  assert.equal(settingsRow.classList.contains('selected'), true);
+  assert.equal(settingsRow.children[0].textContent, '项目设置');
+  // 点击具体角色：右侧互斥切换为角色详情，项目级面板隐藏
+  const roleRow = h.el('blackboard-columns').children[1];
+  assert.equal(roleRow.children[0].textContent, 'Kimi');
+  roleRow.fire('click');
+  await h.tick();
+  assert.equal(h.ui.workspaceUI.roleSelection, 'role');
+  assert.equal(h.ui.workspaceUI.selectedRole, 'agent:kimi');
+  assert.equal(h.hidden('role-details-panel'), false);
+  assert.equal(h.hidden('requirements-panel'), true);
+  assert.equal(h.hidden('controller-panel'), true);
+  // 行重绘后重新取节点：新选中态落在重建后的角色行上
+  const roleRow2 = h.el('blackboard-columns').children[1];
+  assert.equal(roleRow2.children[0].textContent, 'Kimi');
+  assert.equal(roleRow2.classList.contains('selected'), true);
+  // 回到“项目设置”：再次互斥切换；同项目不重新读取开发要求
+  const before = h.requests.length;
+  const settingsRow2 = h.el('blackboard-columns').children[0];
+  settingsRow2.fire('click');
+  await h.tick();
+  assert.equal(h.hidden('requirements-panel'), false);
+  assert.equal(h.hidden('role-details-panel'), true);
+  assert.equal(h.requests.length, before);
 });
 
 test('R1 角色 → 群聊 → 普通房间：编辑区与角色详情都隐藏（原缺陷路径）', async () => {

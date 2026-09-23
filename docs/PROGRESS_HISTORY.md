@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-09-23 ROLE-SETTINGS-1由Codex直接完成余项，待页面验收
+
+- 用户因Kimi额度未恢复，明确要求本次不派任务，由Codex直接处理。未给Kimi、DeepSeek或子Agent派新任务；#118/#119既有开发/独立复核证据保留，不把Codex自测写成新的独立复核。
+- 修正#119 F1：human已指定主控时，候选框和指定按钮保持可见且禁用；失效指定仍占用唯一主控位并可解除。指定成功焦点从禁用按钮移到解除按钮，解除后回候选框；保存中不提前移动焦点、用户切走不抢焦，直接覆盖保护不变。
+- 本轮实际Node127/127、Python页面契约7/7通过；已有用例更新并加强禁用处理器不能覆盖、解除后恢复可选断言。未复跑后端全量，未操作真实浏览器；#119既有21项探针仅为修正前证据。Node使用--test-isolation=none。日志.tmp/role-settings-1/codex-node-20260923.log。
+- 整片合入#118项目设置独立首项/角色详情精简与专属交办入口移除；保留共享任务创建系统和所有后端权限。同步MODULE_webui、USER_MANUAL与CONTROLLER_ASSIGNMENT_ACCEPTANCE；资源统一20260923-role-settings-1。修改文件为web/app.js、index.html、workspace.js、workspace.css，7份既有测试与新增workspace_role_settings.test.cjs，以及上述3份说明和2份进度。
+- 本轮只读MCP检查#118/#119均连接拒绝（WinError10061），未能正式收取；历史结果分别msg2613/msg2614，保留118服务端unknown/本地包complete差异。服务恢复后补收取，不启动新任务。页面代码完成提交推送后交用户验收；不重启共享服务、不更改真实主控/凭证。
+
 ## 2026-09-21 ROLE-SETTINGS-1独立复核完成，因Kimi额度暂停
 
 - #118由Kimi交付项目设置独立页、候选选择器和角色详情交办快捷入口移除，基线485bc94；msg2613含引言使MCP结论unknown，本地development.json实际任务号118校验complete。后端/API/MCP及共享任务创建能力未改。

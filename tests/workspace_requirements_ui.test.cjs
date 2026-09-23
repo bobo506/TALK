@@ -35,6 +35,8 @@ function harness({ human = true } = {}) {
   const context = vm.createContext({
     workspaceUI: { mode: 'roles' }, blackboardOpen: true,
     activeProjectId: 'A', myId: 'human:qa',
+    // ROLE-SETTINGS-1：REQ-2 代码块只在“项目设置”选中时可见；本 harness 默认停留在项目设置页。
+    workspaceSettingsSelected: () => true,
     projects: [{ project_id: 'A', development_requirements: null }, { project_id: 'B', development_requirements: null }],
     currentMemberIsHuman: () => human,
     apiFetch: (url, opts) => new Promise((resolve, reject) => pending.push({ url, opts, resolve, reject })),

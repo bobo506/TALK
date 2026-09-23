@@ -6,7 +6,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20260919-c1b-s2-owner"
+STATIC_VERSION = "20260923-role-settings-1"
 
 
 class ControllerWebUiTests(RouteTestCase):
@@ -20,11 +20,17 @@ class ControllerWebUiTests(RouteTestCase):
             "controller-panel",
             "controller-current",
             "controller-detail",
+            "controller-assign-row",
+            "controller-candidate-select",
+            "controller-assign-btn",
             "controller-clear-btn",
             "controller-retry-btn",
             "controller-status",
         ):
             self.assertIn(f'id="{element_id}"', html)
+        # ROLE-SETTINGS-1：指定走面板候选选择器 + 设为按钮（带动作标识供焦点解算）
+        self.assertIn('aria-label="选择要设为项目主控的角色"', html)
+        self.assertIn('id="controller-assign-btn" type="button" class="room-primary-btn" data-controller-action="assign">设为项目主控</button>', html)
         self.assertIn('aria-label="项目主控"', html)
         self.assertIn('role="status"', html)
         # 语义文案：长期保存、人工解除、离线不自动解除、assigned 不冒充在线/已确认/生效，
@@ -38,6 +44,7 @@ class ControllerWebUiTests(RouteTestCase):
         self.assertLess(html.index('id="controller-panel"'), html.index('id="role-details-panel"'))
         # 静态资源版本同步刷新缓存。
         self.assertEqual(html.count(STATIC_VERSION), 4)
+        self.assertNotIn("20260919-c1b-s2-owner", html)
         self.assertNotIn("20260918-role-1", html)
         self.assertNotIn("20260918-req2-rework", html)
         # #114：旧版本不得以完整缓存串残留（新串含旧串前缀，需带终止引号判定）。
@@ -98,8 +105,17 @@ class ControllerWebUiTests(RouteTestCase):
         # 列表/详情同步与消歧：徽标、摘要与 member_id 辅助。
         self.assertIn("workspaceControllerSummary()", script)
         self.assertIn("workspaceControllerBadge(role.member_id)", script)
-        self.assertIn("workspaceControllerEntry(role)", script)
         self.assertIn("role.member_id", script)
+        # ROLE-SETTINGS-1：主控管理集中在“项目设置”页；逐角色管理入口（workspaceControllerEntry）已移除。
+        self.assertNotIn("workspaceControllerEntry", script)
+        # 候选选择器：名册候选、签名不变不重建、写请求始终用 select.value 的 member_id。
+        self.assertIn("function syncControllerCandidates(select, candidates)", block)
+        self.assertIn('controllerEl("controller-candidate-select")', block)
+        self.assertIn("saveControllerAssignment(select.value)", script)
+        # 已有指定时不再提供候选指定入口，详情显示先解除理由。
+        self.assertIn("请先解除当前指定，再另选", block)
+        # 面板可见性绑定“项目设置”选中态，与具体角色互斥。
+        self.assertIn("workspaceSettingsSelected()", block)
         # 可见性统一由 renderTaskDetailsPanel 同步；刷新复用既有生命周期，不新增 timer。
         details_fn = app_script[app_script.index("function renderTaskDetailsPanel()"):app_script.index("async function openTaskHall(")]
         self.assertIn("renderControllerPanel();", details_fn)
@@ -125,12 +141,18 @@ class ControllerWebUiTests(RouteTestCase):
         self.assertIn("controllerUI.saveToken = saveToken;", block)
         self.assertIn("controllerUI.saveToken === saveToken", block)
         self.assertIn("contextAlive() && ownsSave()", block)
-        # #116 F2：焦点记忆绑定保存发起时选中的角色；保存期间切到其它角色行即取消回焦意图。
-        self.assertIn("role: workspaceUI.selectedRole", block)
-        self.assertIn("memory.role === workspaceUI.selectedRole", block)
+        # ROLE-SETTINGS-1：焦点记忆绑定项目/账号；保存期间切到具体角色或离开设置页即取消回焦。
+        self.assertIn("controllerFocusMemory = { action, projectId: activeProjectId, memberId: myId }", block)
+        self.assertIn("const inSettings = inRoles && workspaceSettingsSelected();", block)
+        # 解除成功后焦点落到可见候选选择器（下一步是另选），再到稳定状态行。
+        focus_fn = block[block.index("function controllerFocusTarget(action)"):block.index("// 读取/保存完成后刷新列表徽标")]
+        self.assertIn('controllerEl("controller-candidate-select")', focus_fn)
         # 样式复用浅色工作台并含窄屏覆盖与可读禁用样式。
         self.assertIn("#controller-panel", stylesheet)
         self.assertIn(".controller-status", stylesheet)
         self.assertIn(".role-controller-badge", stylesheet)
-        self.assertIn(".role-controller-section", stylesheet)
+        # ROLE-SETTINGS-1：角色详情管理面板样式随入口一并移除；设置首项与候选选择器有新样式。
+        self.assertNotIn(".role-controller-section", stylesheet)
+        self.assertIn(".role-settings-row", stylesheet)
+        self.assertIn(".controller-assign-row", stylesheet)
         self.assertIn("@media(max-width:700px)", stylesheet)

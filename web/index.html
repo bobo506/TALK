@@ -6,8 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260919-c1b-s2-owner">
-  <link rel="stylesheet" href="/workspace.css?v=20260919-c1b-s2-owner">
+  <link rel="stylesheet" href="/style.css?v=20260923-role-settings-1">
+  <link rel="stylesheet" href="/workspace.css?v=20260923-role-settings-1">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -268,6 +268,10 @@
           <p class="controller-hint">主控用于明确本项目职责，供 Agent 读取遵守；指定长期保存，直到人工解除后另选，离线不会自动解除。已指定只表示职责配置有效，不代表在线、已确认或会话已生效，也不改变现有的派发 / 领取 / 完成 / 收取权限。</p>
           <p id="controller-current" class="controller-current" tabindex="-1">项目主控：读取中…</p>
           <p id="controller-detail" class="controller-detail"></p>
+          <div id="controller-assign-row" class="controller-assign-row hidden">
+            <select id="controller-candidate-select" class="group-member-select" aria-label="选择要设为项目主控的角色"></select>
+            <button id="controller-assign-btn" type="button" class="room-primary-btn" data-controller-action="assign">设为项目主控</button>
+          </div>
           <div class="controller-toolbar">
             <button id="controller-clear-btn" type="button" class="room-secondary-btn hidden" data-controller-action="clear">解除主控</button>
             <button id="controller-retry-btn" type="button" class="workspace-text-button hidden">重试</button>
@@ -469,7 +473,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/workspace.js?v=20260919-c1b-s2-owner"></script>
-  <script src="/app.js?v=20260919-c1b-s2-owner"></script>
+  <script src="/workspace.js?v=20260923-role-settings-1"></script>
+  <script src="/app.js?v=20260923-role-settings-1"></script>
 </body>
 </html>

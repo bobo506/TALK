@@ -850,6 +850,8 @@ async function setActiveProject(projectId) {
   activeProjectId = projectId;
   workspaceUI.mode = "tasks";
   workspaceUI.selectedRole = null;
+  // 切项目不串选：角色选择不回带到新项目，回到角色页时默认“项目设置”。
+  workspaceUI.roleSelection = "settings";
   workspaceUI.query = "";
   document.getElementById("workspace-search").value = "";
   localStorage.setItem(activeProjectStorageKey(), activeProjectId);

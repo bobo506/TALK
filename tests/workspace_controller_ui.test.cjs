@@ -1,7 +1,9 @@
-// C1b-S2 角色页唯一项目主控指定：状态/DOM 异步测试。
+// C1b-S2/ROLE-SETTINGS-1 角色页项目主控：状态/DOM 异步测试。
 // 通过 vm 抽取 workspace.js 中 C1b-S2 代码块，用 DOM 存根验证 human/agent、同名角色、
-// 空/有指定、置灰理由、解除再指定、失效成员仍可解除、旧后端/无项目/错误、double submit、
-// 409/400 重读不自动写、切项目/账号迟到响应、版本安全边界与 REQ-2 草稿隔离。
+// 空/有指定、候选选择器、先解除理由、解除再指定、失效成员仍可解除、旧后端/无项目/错误、
+// double submit、409/400 重读不自动写、切项目/账号迟到响应、版本安全边界与 REQ-2 草稿隔离。
+// ROLE-SETTINGS-1 起主控管理集中在“项目设置”页：指定走面板候选选择器 + 设为按钮，
+// 角色详情不再提供管理入口；焦点去向相应落在面板控件上。
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -18,7 +20,7 @@ function fakeEl(id, onFocus) {
   const classes = new Set(id === 'controller-panel' ? [] : []);
   const el = {
     id, value: '', textContent: '', className: '', disabled: false, title: '',
-    dataset: {}, focusCalls: 0,
+    dataset: {}, children: [], focusCalls: 0,
     classList: {
       add: c => classes.add(c),
       remove: c => classes.delete(c),
@@ -26,6 +28,8 @@ function fakeEl(id, onFocus) {
       contains: c => classes.has(c),
     },
     addEventListener() {},
+    appendChild(child) { el.children.push(child); return child; },
+    replaceChildren() { el.children.length = 0; },
     // 浏览器行为近似：hidden/disabled 元素不可聚焦。
     focus() { if (classes.has('hidden') || el.disabled) return; el.focusCalls++; if (onFocus) onFocus(el); },
   };
@@ -50,20 +54,31 @@ const ROSTER = [
 function harness({ human = true, projectId = 'A' } = {}) {
   const pending = [];
   const elements = new Map();
-  // 角色详情里的主控按钮由真实 renderWorkspaceRoleDetails 重建；本 harness 中该函数为计数桩，
-  // 因此用 actionButtons 模拟“重绘后的按钮集合”：测试在响应到达前后按真实重绘结果增删按钮。
+  // ROLE-SETTINGS-1：主控控件固定在“项目设置”页（controller-assign-btn/controller-clear-btn）。
+  // actionButtons 仅用于个别用例模拟“同动作节点被置灰/隐藏”的覆盖层；默认 querySelector
+  // 命中真实面板元素，焦点断言直接落在面板控件上，不再需要模拟角色详情按钮的增删。
   const actionButtons = [];
+  let settingsSelected = true; // 本项目设置页为选中状态；用例可切换为具体角色选择
   const document = {
     getElementById: id => {
-      if (!elements.has(id)) elements.set(id, fakeEl(id, el => { document.activeElement = el; }));
+      if (!elements.has(id)) {
+        const node = fakeEl(id, el => { document.activeElement = el; });
+        if (id === 'controller-assign-btn') node.dataset.controllerAction = 'assign';
+        if (id === 'controller-clear-btn') node.dataset.controllerAction = 'clear';
+        elements.set(id, node);
+      }
       return elements.get(id);
     },
+    createElement: tag => fakeEl(tag),
     activeElement: null,
     body: fakeEl('body'),
     querySelector: sel => {
       const m = /^\[data-controller-action="(.+)"\]$/.exec(sel);
       if (!m) return null;
-      return actionButtons.find(n => !n._removed && n.dataset.controllerAction === m[1]) || null;
+      const override = actionButtons.find(n => !n._removed && n.dataset.controllerAction === m[1]);
+      if (override) return override;
+      const id = m[1] === 'assign' ? 'controller-assign-btn' : m[1] === 'clear' ? 'controller-clear-btn' : null;
+      return id ? document.getElementById(id) : null;
     },
   };
   const addActionButton = (action, { disabled = false, hidden = false } = {}) => {
@@ -74,8 +89,6 @@ function harness({ human = true, projectId = 'A' } = {}) {
     actionButtons.push(btn);
     return btn;
   };
-  // 模拟真实重绘把旧按钮从文档移除（对应真实 DOM 中节点被 replaceChildren 置换）。
-  const removeActionButton = btn => { btn._removed = true; };
   const calls = { list: 0, details: 0 };
   const context = vm.createContext({
     workspaceUI: { mode: 'roles' }, blackboardOpen: true,
@@ -86,6 +99,8 @@ function harness({ human = true, projectId = 'A' } = {}) {
       { project_id: 'B', development_requirements: 'B要求', controller_member_id: null },
     ],
     currentMemberIsHuman: () => human,
+    // ROLE-SETTINGS-1：面板只在“项目设置”选中时可见；本 harness 用闭包开关模拟选中具体角色。
+    workspaceSettingsSelected: () => settingsSelected,
     apiFetch: (url, opts) => new Promise((resolve, reject) => pending.push({ url, opts, resolve, reject })),
     readErrorDetail: async (res, fallback) => {
       try { const body = await res.json(); if (typeof body?.detail === 'string' && body.detail) return body.detail; } catch (_) {}
@@ -107,7 +122,7 @@ function harness({ human = true, projectId = 'A' } = {}) {
   const reply = (index, data, { ok = true, status = 200 } = {}) =>
     pending[index].resolve({ ok, status, json: async () => data });
   const fail = (index, err) => pending[index].reject(err);
-  // 进入角色页（首次触发上下文加载）；project 响应带主控三字段。
+  // 进入角色页项目设置（首次触发上下文加载）；project 响应带主控三字段。
   async function enter(project = projectId, read = {}) {
     context.activeProjectId = project;
     const request = context.renderControllerPanel();
@@ -121,7 +136,8 @@ function harness({ human = true, projectId = 'A' } = {}) {
     });
     await request;
   }
-  return { context, pending, reply, fail, el, ui, calls, enter, document, actionButtons, addActionButton, removeActionButton };
+  const setSettingsSelected = value => { settingsSelected = value; };
+  return { context, pending, reply, fail, el, ui, calls, enter, document, actionButtons, addActionButton, setSettingsSelected };
 }
 
 test('状态映射：六种已知状态如实呈现，未知状态降级为无法识别', () => {
@@ -148,19 +164,25 @@ test('无项目或未登录时面板隐藏且不发起请求', () => {
   assert.equal(pending.length, 0);
 });
 
-test('human 未指定：显示未指定，名册内角色可设为项目主控，写请求用 member_id 与读取版本', async () => {
+test('human 未指定：显示未指定，候选选择器列出名册内角色，写请求用 member_id 与读取版本', async () => {
   const { context, pending, reply, el, ui, enter } = harness();
   await enter('A');
   assert.equal(el('controller-panel').classList.contains('hidden'), false);
   assert.equal(el('controller-current').textContent, '项目主控：未指定');
   assert.match(el('controller-detail').textContent, /长期保存/);
-  const entry = context.workspaceControllerEntry({ member_id: 'agent:kimi' });
-  assert.deepEqual({ badge: entry.badge, action: entry.action, enabled: entry.enabled }, { badge: false, action: 'assign', enabled: true });
+  // 候选选择器：名册内已注册未禁用的 agent（kimi/kimi2/deepseek），禁用成员不出现，带 member_id 消歧
+  assert.equal(el('controller-assign-row').classList.contains('hidden'), false);
+  const select = el('controller-candidate-select');
+  assert.deepEqual(select.children.map(o => o.value), ['agent:kimi', 'agent:kimi2', 'agent:deepseek']);
+  assert.match(select.children[0].textContent, /助手（agent:kimi）/);
+  assert.equal(select.disabled, false);
+  assert.equal(el('controller-assign-btn').disabled, false);
   // 同值 no-op 不发请求；版本 0 正常可用
   const before = context.__ui.request;
   await context.saveControllerAssignment(null);
   assert.equal(context.__ui.request, before);
-  const save = context.saveControllerAssignment('agent:kimi');
+  select.value = 'agent:kimi';
+  const save = context.saveControllerAssignment(select.value);
   assert.equal(ui.saving, true);
   assert.match(pending[pending.length - 1].url, /\/api\/projects\/A\/controller-assignment$/);
   assert.deepEqual(JSON.parse(pending[pending.length - 1].opts.body), { member_id: 'agent:kimi', expected_version: 0 });
@@ -168,6 +190,10 @@ test('human 未指定：显示未指定，名册内角色可设为项目主控�
   await save;
   assert.equal(ui.saving, false);
   assert.match(el('controller-current').textContent, /助手（agent:kimi）/);
+  // 已有指定后候选行可见但置灰，不能再直接指定他人
+  assert.equal(el('controller-assign-row').classList.contains('hidden'), false);
+  assert.equal(el('controller-candidate-select').disabled, true);
+  assert.equal(el('controller-assign-btn').disabled, true);
 });
 
 test('agent 账号只读：无写入入口并给出说明，但仍能看到指定状态', async () => {
@@ -175,27 +201,26 @@ test('agent 账号只读：无写入入口并给出说明，但仍能看到指�
   await enter('A', { controller_member_id: 'agent:deepseek', controller_assignment_version: 3, controller_assignment_status: 'assigned' });
   assert.match(el('controller-current').textContent, /DeepSeek（agent:deepseek）/);
   assert.equal(el('controller-clear-btn').classList.contains('hidden'), true);
+  assert.equal(el('controller-assign-row').classList.contains('hidden'), true);
   assert.match(el('controller-status').textContent, /Agent，只能查看/);
-  const entry = context.workspaceControllerEntry({ member_id: 'agent:kimi' });
-  assert.equal(entry.action, null);
-  assert.match(entry.reason, /只能查看/);
   // 指定角色的徽标对 agent 同样可见
-  assert.equal(context.workspaceControllerEntry({ member_id: 'agent:deepseek' }).badge, true);
+  assert.equal(context.workspaceControllerBadge('agent:deepseek'), true);
+  assert.equal(context.workspaceControllerBadge('agent:kimi'), false);
 });
 
-test('已有指定：其它角色入口置灰并带可读理由；同名角色按 member_id 消歧', async () => {
+test('已有指定：候选选择器可见但置灰并显示先解除理由；同名角色按 member_id 消歧', async () => {
   const { context, el, enter } = harness();
   await enter('A', { controller_member_id: 'agent:kimi2', controller_assignment_version: 5, controller_assignment_status: 'assigned' });
   assert.match(el('controller-current').textContent, /助手（agent:kimi2）/);
   assert.match(el('controller-detail').textContent, /不代表在线、已确认或会话已生效/);
+  // 先解除理由明确，指定入口保留但不可用
+  assert.match(el('controller-detail').textContent, /请先解除当前指定，再另选/);
+  assert.equal(el('controller-assign-row').classList.contains('hidden'), false);
+  assert.equal(el('controller-candidate-select').disabled, true);
+  assert.equal(el('controller-assign-btn').disabled, true);
   // 同名角色 kimi 与 kimi2：徽标只落在被指定的 member_id 上
   assert.equal(context.workspaceControllerBadge('agent:kimi2'), true);
   assert.equal(context.workspaceControllerBadge('agent:kimi'), false);
-  const other = context.workspaceControllerEntry({ member_id: 'agent:kimi' });
-  assert.equal(other.action, null);
-  assert.match(other.reason, /已指定 助手（agent:kimi2），请先解除/);
-  const self = context.workspaceControllerEntry({ member_id: 'agent:kimi2' });
-  assert.deepEqual({ badge: self.badge, action: self.action, enabled: self.enabled }, { badge: true, action: 'clear', enabled: true });
   // 面板解除入口对 human 可用
   assert.equal(el('controller-clear-btn').classList.contains('hidden'), false);
   assert.equal(el('controller-clear-btn').disabled, false);
@@ -242,8 +267,10 @@ test('失效成员（禁用/移出名册/不存在）仍显示名称或 ID、无
     assert.match(el('controller-current').textContent, /ghost（agent:ghost）/);
     assert.match(el('controller-detail').textContent, reason);
     assert.match(el('controller-detail').textContent, /仍长期保存/);
-    // 失效不伪装成就绪；其它角色入口仍被非 null 指定置灰
-    assert.equal(context.workspaceControllerEntry({ member_id: 'agent:kimi' }).action, null);
+    // 失效指定仍占用唯一主控位，候选指定入口保持可见但禁用
+    assert.equal(el('controller-assign-row').classList.contains('hidden'), false);
+    assert.equal(el('controller-candidate-select').disabled, true);
+    assert.equal(el('controller-assign-btn').disabled, true);
     // human 解除入口可用
     assert.equal(el('controller-clear-btn').classList.contains('hidden'), false);
     const clear = context.saveControllerAssignment(null);
@@ -344,7 +371,7 @@ test('旧后端读取缺字段：明确不支持并禁用写入，不误当未�
   assert.equal(h2.ui.supported, false);
   assert.match(h2.el('controller-current').textContent, /当前服务不支持/);
   assert.match(h2.el('controller-status').textContent, /尚未支持/);
-  assert.equal(h2.context.workspaceControllerEntry({ member_id: 'agent:kimi' }).action, null);
+  assert.equal(h2.el('controller-assign-row').classList.contains('hidden'), true); // 不支持时不出现指定入口
   const before = h2.pending.length;
   await h2.context.saveControllerAssignment('agent:kimi');
   assert.equal(h2.pending.length, before); // 不发出任何写请求
@@ -359,13 +386,13 @@ test('读取失败：显示错误与重试入口，不启用写入', async () =>
   assert.equal(ui.loaded, false);
   assert.match(el('controller-current').textContent, /读取失败/);
   assert.equal(el('controller-retry-btn').classList.contains('hidden'), false);
-  assert.equal(context.workspaceControllerEntry({ member_id: 'agent:kimi' }).action, null);
+  assert.equal(el('controller-assign-row').classList.contains('hidden'), true);
   // 加载中也一样：无写入口可用
   const h2 = harness();
   h2.context.activeProjectId = 'A';
   h2.context.renderControllerPanel();
   assert.match(h2.el('controller-current').textContent, /读取中/);
-  assert.equal(h2.context.workspaceControllerEntry({ member_id: 'agent:kimi' }).action, null);
+  assert.equal(h2.el('controller-assign-row').classList.contains('hidden'), true);
 });
 
 test('切项目/账号后迟到响应不能污染新上下文', async () => {
@@ -402,9 +429,7 @@ test('版本安全边界：无法安全表示的版本禁止发送失真 expecte
   for (const version of [9223372036854775807, Number.MAX_SAFE_INTEGER + 1, 1.5, '3', null]) {
     const { context, pending, el, ui, enter } = harness();
     await enter('A', { controller_member_id: 'agent:kimi', controller_assignment_version: version, controller_assignment_status: 'assigned' });
-    const entry = context.workspaceControllerEntry({ member_id: 'agent:kimi' });
-    assert.equal(entry.action, null, String(version));
-    assert.match(entry.reason, /安全表示/);
+    assert.match(el('controller-detail').textContent, /安全表示/, String(version));
     assert.match(el('controller-status').textContent, /无法安全表示/);
     assert.equal(el('controller-clear-btn').disabled, true);
     const before = pending.length;
@@ -412,6 +437,12 @@ test('版本安全边界：无法安全表示的版本禁止发送失真 expecte
     assert.equal(pending.length, before); // 未发出失真版本
     assert.match(ui.error, /无法安全表示/);
   }
+  // 未指定但版本不可安全表示：候选选择器出现但写入控件禁用
+  const unsafe = harness();
+  await unsafe.enter('A', { controller_member_id: null, controller_assignment_version: Number.MAX_SAFE_INTEGER + 1, controller_assignment_status: 'unassigned' });
+  assert.equal(unsafe.el('controller-assign-row').classList.contains('hidden'), false);
+  assert.equal(unsafe.el('controller-assign-btn').disabled, true);
+  assert.equal(unsafe.el('controller-candidate-select').disabled, true);
   // 安全整数边界（MAX_SAFE_INTEGER）照常可用
   const { context, pending, reply, ui, enter } = harness();
   await enter('A', { controller_member_id: 'agent:kimi', controller_assignment_version: Number.MAX_SAFE_INTEGER, controller_assignment_status: 'assigned' });
@@ -463,7 +494,7 @@ test('同项目重复重绘不重发请求；读取完成触发列表与详情�
 });
 
 test('任务/群聊导航不残留管理区：离开角色页即隐藏，返回不重复读取', async () => {
-  const { context, pending, el, enter } = harness();
+  const { context, pending, el, enter, setSettingsSelected } = harness();
   await enter('A');
   assert.equal(el('controller-panel').classList.contains('hidden'), false);
   context.workspaceUI.mode = 'chats';
@@ -475,6 +506,14 @@ test('任务/群聊导航不残留管理区：离开角色页即隐藏，返回�
   // 返回角色页：同上下文不重新读取，面板恢复
   const before = pending.length;
   context.workspaceUI.mode = 'roles';
+  context.renderControllerPanel();
+  assert.equal(el('controller-panel').classList.contains('hidden'), false);
+  assert.equal(pending.length, before);
+  // 选中具体角色时项目设置页互斥：主控面板隐藏；回到项目设置恢复且不重新读取
+  setSettingsSelected(false);
+  context.renderControllerPanel();
+  assert.equal(el('controller-panel').classList.contains('hidden'), true);
+  setSettingsSelected(true);
   context.renderControllerPanel();
   assert.equal(el('controller-panel').classList.contains('hidden'), false);
   assert.equal(pending.length, before);
@@ -490,51 +529,55 @@ test('REQ-2 隔离：主控代码块不触碰开发要求字段、localStorage �
 });
 
 // ── #114 定向修正回归（R1 焦点去向 / R2 迟到响应不重绘新页面） ─────────────
-// 以下用例驱动真实代码块中的 syncControllerViews/controllerFocusTarget；DOM 存根只模拟
-// 真实重绘造成的按钮增删。修改前的实现中：成功路径焦点落 body（无 fallback）、
-// syncControllerViews 无条件 renderWorkspaceList，这两组用例在修改前会失败。
+// 以下用例驱动真实代码块中的 syncControllerViews/controllerFocusTarget。
+// ROLE-SETTINGS-1 起主控控件固定在“项目设置”面板（不再随角色详情重建），
+// 因此焦点断言直接落在真实面板元素上：指定成功→解除主控，解除成功→候选选择器，
+// 失败→回原按钮；hidden/disabled 不作为目标，用户移焦/切视图后不抢焦。
 
 test('R1 指定成功后焦点落到同一上下文的“解除主控”控件，不落 body', async () => {
-  const { context, pending, reply, document, addActionButton, removeActionButton, enter } = harness();
+  const { context, pending, reply, document, el, enter } = harness();
   await enter('A');
-  const assignBtn = addActionButton('assign');
-  document.activeElement = assignBtn;
+  const assignBtn = el('controller-assign-btn');
+  const clearBtn = el('controller-clear-btn');
+  assignBtn.focus();
+  assert.equal(document.activeElement, assignBtn);
   const save = context.saveControllerAssignment('agent:kimi');
-  // 保存开始的重绘：同动作按钮仍在（保存中置灰由真实详情渲染负责），焦点回到同动作按钮
-  assert.ok(assignBtn.focusCalls >= 1, '保存开始时焦点保留在同动作按钮');
-  // 模拟真实重绘结果：指定成功后“设为项目主控”消失，出现对应的“解除主控”
-  removeActionButton(assignBtn);
-  const clearBtn = addActionButton('clear');
+  // 保存中间态：同动作按钮被置灰但仍在，焦点不动（无额外 focus 调用）
+  assert.equal(assignBtn.disabled, true);
+  assert.equal(assignBtn.focusCalls, 1, '保存中间态不重复聚焦同动作按钮');
   reply(pending.length - 1, { project_id: 'A', controller_member_id: 'agent:kimi', controller_assignment_version: 1, controller_assignment_status: 'assigned' });
   await save;
+  assert.equal(assignBtn.classList.contains('hidden'), false, '指定成功后“设为项目主控”保持可见');
+  assert.equal(assignBtn.disabled, true, '指定成功后按钮置灰');
   assert.ok(clearBtn.focusCalls >= 1, '成功后应显式聚焦“解除主控”');
   assert.equal(document.activeElement, clearBtn, '焦点应落到同一上下文下一步可操作的“解除主控”');
   assert.notEqual(document.activeElement, document.body, '焦点不应落回 body');
 });
 
-test('R1 解除成功后解除入口隐藏，焦点落到稳定可聚焦的面板状态行', async () => {
-  const { context, pending, reply, document, el, addActionButton, removeActionButton, enter } = harness();
+test('R1 解除成功后解除入口隐藏，焦点落到可见的候选选择器（下一步是另选）', async () => {
+  const { context, pending, reply, document, el, enter } = harness();
   await enter('A', { controller_member_id: 'agent:kimi', controller_assignment_version: 1, controller_assignment_status: 'assigned' });
-  const clearBtn = addActionButton('clear');
-  document.activeElement = clearBtn;
+  const clearBtn = el('controller-clear-btn');
+  clearBtn.focus();
+  assert.equal(document.activeElement, clearBtn);
   const save = context.saveControllerAssignment(null);
-  assert.ok(clearBtn.focusCalls >= 1);
-  // 模拟真实重绘结果：解除成功后角色详情不再提供解除入口，面板解除按钮被隐藏
-  removeActionButton(clearBtn);
-  const panelClear = addActionButton('clear', { hidden: true });
+  assert.equal(clearBtn.disabled, true, '保存中间态解除按钮置灰');
   reply(pending.length - 1, { project_id: 'A', controller_member_id: null, controller_assignment_version: 2, controller_assignment_status: 'unassigned' });
   await save;
-  assert.equal(panelClear.focusCalls, 0, '不能把焦点放到 hidden 的面板解除按钮');
-  assert.ok(el('controller-current').focusCalls >= 1, '应聚焦稳定的面板状态行');
-  assert.equal(document.activeElement, el('controller-current'));
+  assert.equal(clearBtn.classList.contains('hidden'), true, '解除成功后解除入口隐藏');
+  assert.equal(clearBtn.focusCalls, 1, '不能把焦点放回已隐藏的解除按钮');
+  const select = el('controller-candidate-select');
+  assert.equal(select.classList.contains('hidden'), false);
+  assert.ok(select.focusCalls >= 1, '应聚焦候选选择器，便于立即另选');
+  assert.equal(document.activeElement, select);
   assert.notEqual(document.activeElement, document.body);
 });
 
 test('R1 失败路径保留原按钮并回焦；disabled/hidden 节点不作为焦点目标', async () => {
-  const { context, pending, reply, document, addActionButton, enter } = harness();
+  const { context, pending, reply, document, el, enter } = harness();
   await enter('A');
-  const assignBtn = addActionButton('assign');
-  document.activeElement = assignBtn;
+  const assignBtn = el('controller-assign-btn');
+  assignBtn.focus();
   const save = context.saveControllerAssignment('agent:kimi');
   reply(pending.length - 1, { detail: 'permission denied' }, { ok: false, status: 403 });
   await save;
@@ -554,39 +597,37 @@ test('R1 失败路径保留原按钮并回焦；disabled/hidden 节点不作为�
 });
 
 test('R1 用户在保存期间主动移焦到其它控件时不抢焦', async () => {
-  const { context, pending, reply, document, addActionButton, removeActionButton, enter } = harness();
+  const { context, pending, reply, document, el, addActionButton, enter } = harness();
   await enter('A');
-  const assignBtn = addActionButton('assign');
-  document.activeElement = assignBtn;
+  const assignBtn = el('controller-assign-btn');
+  assignBtn.focus();
   const save = context.saveControllerAssignment('agent:kimi');
   // 用户在响应返回前主动把焦点移到搜索框（非主控控件）
   const search = addActionButton('none');
   delete search.dataset.controllerAction;
   search.focus();
   assert.equal(document.activeElement, search);
-  removeActionButton(assignBtn);
-  const clearBtn = addActionButton('clear');
   reply(pending.length - 1, { project_id: 'A', controller_member_id: 'agent:kimi', controller_assignment_version: 1, controller_assignment_status: 'assigned' });
   await save;
   assert.equal(document.activeElement, search, '用户已主动移焦，不抢回焦点');
-  assert.equal(clearBtn.focusCalls, 0);
+  assert.equal(assignBtn.focusCalls, 1);
+  assert.equal(el('controller-clear-btn').focusCalls, 0);
 });
 
 test('R1 离开角色页后迟到响应不执行回焦（不抢新页面焦点）', async () => {
-  const { context, pending, reply, document, addActionButton, removeActionButton, enter } = harness();
+  const { context, pending, reply, document, el, enter } = harness();
   await enter('A');
-  const assignBtn = addActionButton('assign');
-  document.activeElement = assignBtn;
+  const assignBtn = el('controller-assign-btn');
+  assignBtn.focus();
   const save = context.saveControllerAssignment('agent:kimi');
-  // 响应返回前切到任务页：真实导航会重建工作台，原按钮被移除
+  // 响应返回前切到任务页：真实导航会重建工作台，面板隐藏
   context.workspaceUI.mode = 'tasks';
   context.renderControllerPanel();
-  removeActionButton(assignBtn);
-  const clearBtn = addActionButton('clear'); // 即使存在可聚焦目标也不应聚焦
   document.activeElement = document.body;
   reply(pending.length - 1, { project_id: 'A', controller_member_id: 'agent:kimi', controller_assignment_version: 1, controller_assignment_status: 'assigned' });
   await save;
-  assert.equal(clearBtn.focusCalls, 0, '离开角色页后不抢焦');
+  assert.equal(el('controller-clear-btn').focusCalls, 0, '离开角色页后不抢焦');
+  assert.equal(document.activeElement, document.body);
 });
 
 test('R2 PATCH 成功/失败晚于角色→任务/群聊切换：列表与角色详情不被额外重建，状态仍维护、不卡 saving', async () => {
@@ -783,73 +824,53 @@ test('F1 当前请求各路径均可结束：409 内部重读递增序号后仍�
   assert.equal(ui.assignedId, null);
 });
 
-// 让渲染桩忠实模拟真实重绘（与 r116 探针的真实渲染对照同一语义）：旧动作按钮被移除
-// （浏览器语义：焦点回落 body），并按当前状态重建 —— 保存中为同动作置灰按钮（中间态），
-// 已指定为“解除主控”，未指定为“设为项目主控”。这样保存开始时的回焦解算与真实 DOM 一致：
-// 同动作按钮存在但 disabled → 不动焦点、保留焦点记忆，等完成后的最终状态再恢复。
-function withRenderSimulation(h) {
-  const rebuild = () => {
-    const stale = new Set(h.actionButtons);
-    for (const btn of h.actionButtons) h.removeActionButton(btn);
-    h.actionButtons.length = 0;
-    if (stale.has(h.document.activeElement)) h.document.activeElement = h.document.body;
-    const ui = h.ui;
-    if (!ui.loaded || !ui.supported) return;
-    if (ui.saving) h.addActionButton(ui.assignedId ? 'clear' : 'assign', { disabled: true });
-    else if (ui.assignedId) h.addActionButton('clear');
-    else h.addActionButton('assign');
-  };
-  h.context.renderWorkspaceList = rebuild;
-  h.context.renderWorkspaceRoleDetails = () => {};
-  return h;
-}
+// ── #116 定向修正回归（F2 焦点恢复意图绑定当前视图） ─────────────
+// ROLE-SETTINGS-1 起主控控件固定在“项目设置”面板：保存期间用户切到具体角色（或离开
+// 项目设置页）属于新的交互意图，完成后不回焦主控区；仍在项目设置页时按记忆恢复。
 
-test('F2 保存中点击其它角色行：完成后取消回焦不跨角色抢焦，保存清理与服务器结果更新不受影响', async () => {
-  const h = withRenderSimulation(harness());
-  const { context, pending, reply, ui, document, enter } = h;
+test('F2 保存中切到具体角色：完成后取消回焦不抢焦，保存清理与服务器结果更新不受影响', async () => {
+  const { context, pending, reply, ui, document, el, enter, setSettingsSelected } = harness();
   await enter('A');
-  context.workspaceUI.selectedRole = 'agent:kimi';
-  // 角色详情渲染出的“设为项目主控”，用户点击（真实浏览器点击按钮即聚焦）
-  context.renderWorkspaceList();
-  const assignBtn = h.actionButtons.find(btn => btn.dataset.controllerAction === 'assign');
+  const assignBtn = el('controller-assign-btn');
   assignBtn.focus();
   assert.equal(document.activeElement, assignBtn);
   const save = context.saveControllerAssignment('agent:kimi');
-  // 保存中间态重绘：同动作按钮被置灰，焦点回落 body，焦点记忆保留（与真实 DOM 一致）
-  assert.equal(document.activeElement, document.body);
-  const midBtn = h.actionButtons.find(btn => btn.dataset.controllerAction === 'assign');
-  assert.equal(midBtn.disabled, true);
-  assert.equal(midBtn.focusCalls, 0, '保存中间态不动焦点');
-  // 真实角色行点击的效果：切换选中角色并重绘列表（行重绘同样把焦点打回 body）
-  context.workspaceUI.selectedRole = 'agent:deepseek';
-  context.renderWorkspaceList();
-  assert.equal(document.activeElement, document.body);
+  // 保存中间态：同动作按钮置灰但未消失，不动焦点
+  assert.equal(assignBtn.disabled, true);
+  assert.equal(assignBtn.focusCalls, 1);
+  // 用户点击具体角色行：真实导航经过 renderTaskDetailsPanel → renderControllerPanel，面板隐藏
+  setSettingsSelected(false);
+  context.renderControllerPanel();
+  assert.equal(el('controller-panel').classList.contains('hidden'), true);
+  document.activeElement = document.body; // 行重绘把焦点打回 body
   reply(pending.length - 1, { project_id: 'A', controller_member_id: 'agent:kimi', controller_assignment_version: 1, controller_assignment_status: 'assigned' });
   await save;
-  const clearBtn = h.actionButtons.find(btn => btn.dataset.controllerAction === 'clear');
-  assert.ok(clearBtn, '完成后按服务器结果重建出“解除主控”（必要刷新未受影响）');
-  assert.equal(clearBtn.focusCalls, 0, '切角色后不把焦点拉回主控区控件');
-  assert.equal(document.activeElement, document.body, '不跨角色抢焦');
+  assert.equal(el('controller-clear-btn').focusCalls, 0, '切到具体角色后不把焦点拉回主控区控件');
+  assert.equal(document.activeElement, document.body, '不跨视图抢焦');
   assert.equal(ui.saving, false, '保存状态照常清理');
   assert.equal(ui.assignedId, 'agent:kimi', '服务器结果照常更新');
   assert.equal(ui.version, 1);
+  // 回到项目设置页：呈现服务器最终状态（已指定 + 解除入口），不重复读取
+  const before = pending.length;
+  setSettingsSelected(true);
+  context.renderControllerPanel();
+  assert.equal(pending.length, before);
+  assert.match(el('controller-current').textContent, /agent:kimi/);
+  assert.equal(el('controller-clear-btn').classList.contains('hidden'), false);
 });
 
-test('F2 未切角色时既有焦点恢复不回退：重绘打回 body 仍按记忆恢复到下一步控件', async () => {
-  const h = withRenderSimulation(harness());
-  const { context, pending, reply, ui, document, enter } = h;
+test('F2 保存期间未离开项目设置：焦点记忆恢复到下一步可见控件', async () => {
+  const { context, pending, reply, ui, document, el, enter } = harness();
   await enter('A');
-  context.workspaceUI.selectedRole = 'agent:kimi';
-  context.renderWorkspaceList();
-  const assignBtn = h.actionButtons.find(btn => btn.dataset.controllerAction === 'assign');
+  const assignBtn = el('controller-assign-btn');
   assignBtn.focus();
   const save = context.saveControllerAssignment('agent:kimi');
-  assert.equal(document.activeElement, document.body, '保存中间态重绘把焦点打回 body');
-  // 角色未切换（selectedRole 不变）：既有恢复行为保持（含已披露的 body 空窗边界）
+  // 模拟真实浏览器把控件置灰/隐藏时焦点回落 body 的空窗
+  document.activeElement = document.body;
   reply(pending.length - 1, { project_id: 'A', controller_member_id: 'agent:kimi', controller_assignment_version: 1, controller_assignment_status: 'assigned' });
   await save;
-  const clearBtn = h.actionButtons.find(btn => btn.dataset.controllerAction === 'clear');
-  assert.ok(clearBtn.focusCalls >= 1, '未切角色时仍恢复到可见“解除主控”');
+  const clearBtn = el('controller-clear-btn');
+  assert.ok(clearBtn.focusCalls >= 1, '未离开项目设置时仍按记忆恢复到可见“解除主控”');
   assert.equal(document.activeElement, clearBtn);
   assert.equal(ui.saving, false);
 });

@@ -74,10 +74,8 @@ function workspaceContext({ roles, membersList, tasks, selectedRole, roleFilter 
     members: membersList,
     projectAgents: roles,
     projectTasks: tasks,
-    workspaceUI: { mode: 'roles', selectedRole, roleFilter, result: null, resultRequest: 0, renderedTask: null },
-    eligibleProjectAgents: () => [],
-    setTaskCreateOpen: () => {},
-    taskCreateAgent: { value: '' },
+    // ROLE-SETTINGS-1：选中具体角色（非“项目设置”）才渲染角色详情。
+    workspaceUI: { mode: 'roles', selectedRole, roleSelection: 'role', roleFilter, result: null, resultRequest: 0, renderedTask: null },
     window: { matchMedia: () => ({ matches: false }) },
   });
   vm.runInContext(wsSource.replace(/const workspaceUI = \{[^}]*\};/, ''), context);

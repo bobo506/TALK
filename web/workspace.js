@@ -1,5 +1,5 @@
 /* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
-const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null };
+const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null };
 function workspaceRootId(task) { return task?.root_task_id || task?.id; }
 function workspaceFinished(task) { return ["completed", "failed", "canceled"].includes(task?.workflow_status); }
 function workspaceTreeMatches(task, tree) {
@@ -73,6 +73,14 @@ function workspaceRoleDescription(role) {
   })[workspaceRoleKey(role)];
 }
 function workspaceRoles() { return projectAgents.filter(agent => !members.find(member => member.id === agent.member_id)?.disabled_at); }
+// ROLE-SETTINGS-1：角色列表固定首项“项目设置”是独立导航项，不是伪造 Agent——
+// 不计入角色数量、不进入名册/主控候选，其选中状态也不会作为 member_id 传给任何任务或 API。
+// 选择状态：roleSelection === "role" 且 selectedRole 命中当前名册时查看具体角色；
+// 其余一律回落到“项目设置”（首次进入、选择失效、切项目后均是如此）。
+function workspaceSettingsSelected() {
+  return workspaceUI.roleSelection !== "role"
+    || !workspaceRoles().some(role => role.member_id === workspaceUI.selectedRole);
+}
 function workspaceRoleTasks(id) {
   return projectTasks.filter(task => task.target_member_id === id || (task.created_by === id
     && !projectTasks.some(root => root.id === workspaceRootId(task) && root.id !== task.id && root.target_member_id === id)));
@@ -176,7 +184,8 @@ function requirementsDraftKey(projectId, memberId) { return `${memberId}/${proje
 function renderRequirementsPanel() {
   const panel = requirementsEl("requirements-panel");
   if (!panel) return;
-  const visible = blackboardOpen && workspaceUI.mode === "roles" && Boolean(activeProjectId) && Boolean(myId);
+  // ROLE-SETTINGS-1：开发要求只属于“项目设置”页；选中具体角色或离开角色页时隐藏，草稿状态不受影响。
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && workspaceSettingsSelected() && Boolean(activeProjectId) && Boolean(myId);
   panel.classList.toggle("hidden", !visible);
   if (!visible) return;
   const projectId = activeProjectId, memberId = myId;
@@ -357,17 +366,30 @@ function renderWorkspaceList() {
   const query = workspaceUI.query.trim().toLocaleLowerCase();
   if (rolesMode) {
     const roles = workspaceRoles();
-    if (!roles.some(role => role.member_id === workspaceUI.selectedRole)) workspaceUI.selectedRole = roles[0]?.member_id || null;
-    for (const role of roles.filter(item => `${workspaceMemberName(item.member_id)} ${workspaceRoleLabel(item.business_role)}`.toLocaleLowerCase().includes(query))) {
-      const row = workspaceButton("", () => { workspaceUI.selectedRole = role.member_id; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row");
-      row.classList.toggle("selected", role.member_id === workspaceUI.selectedRole);
-      row.setAttribute("aria-pressed", String(role.member_id === workspaceUI.selectedRole));
+    // 选中角色失效（移出名册/禁用/切项目）时回退到“项目设置”，不保留无效选择、不自动改选其它角色。
+    if (!roles.some(role => role.member_id === workspaceUI.selectedRole)) {
+      workspaceUI.selectedRole = null;
+      if (workspaceUI.roleSelection === "role") workspaceUI.roleSelection = "settings";
+    }
+    // 固定首项“项目设置”：独立导航项，不参与角色搜索过滤，名册为空时也可达。
+    const settingsRow = workspaceButton("", () => { workspaceUI.roleSelection = "settings"; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row role-settings-row");
+    settingsRow.classList.toggle("selected", workspaceSettingsSelected());
+    settingsRow.setAttribute("aria-pressed", String(workspaceSettingsSelected()));
+    settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "项目开发要求与项目主控"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
+    blackboardColumns.appendChild(settingsRow);
+    const matchedRoles = roles.filter(item => `${workspaceMemberName(item.member_id)} ${workspaceRoleLabel(item.business_role)}`.toLocaleLowerCase().includes(query));
+    for (const role of matchedRoles) {
+      const row = workspaceButton("", () => { workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = role.member_id; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row");
+      row.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
+      row.setAttribute("aria-pressed", String(!workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole));
       row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleLabel(role.business_role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
       // 被指定角色带“项目主控”标记；同名角色用 member_id 消歧（写请求始终使用 ID）。
       if (workspaceControllerBadge(role.member_id)) row.appendChild(workspaceEl("span", "role-controller-badge", "项目主控"));
       row.appendChild(workspaceEl("small", "role-row-id", role.member_id));
       blackboardColumns.appendChild(row);
     }
+    // “项目设置”不计入角色数量：空名册/无匹配的提示只针对真实角色行。
+    if (!matchedRoles.length) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", roles.length ? "没有匹配的角色" : "这个项目还没有配置角色。"));
   } else {
     for (const [value, label] of [["all", "全部"], ["running", "进行中"], ["mine", "待我处理"], ["finished", "已结束"]]) {
       const button = workspaceButton(label, () => { workspaceUI.filter = value; renderWorkspaceList(); });
@@ -387,37 +409,20 @@ function renderWorkspaceList() {
 }
 function renderWorkspaceRoleDetails() {
   const panel = document.getElementById("role-details-panel");
-  const visible = blackboardOpen && workspaceUI.mode === "roles";
+  // ROLE-SETTINGS-1：项目设置与具体角色互斥——选中“项目设置”时角色详情整体隐藏，不残留空白面板。
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && !workspaceSettingsSelected();
   panel.classList.toggle("hidden", !visible);
   if (!visible) return;
   panel.replaceChildren();
   const role = workspaceRoles().find(item => item.member_id === workspaceUI.selectedRole);
-  if (!role) { panel.appendChild(workspaceEl("p", "workspace-empty", "选择一个角色，查看他的工作。")); return; }
+  if (!role) { panel.classList.add("hidden"); return; } // 防御：失效选择由 workspaceSettingsSelected 回退到项目设置
   panel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), workspaceEl("h2", "", workspaceMemberName(role.member_id)), workspaceEl("p", "role-description", workspaceRoleLabel(role.business_role)), workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
   const description = workspaceRoleDescription(role.business_role);
   if (description) panel.insertBefore(workspaceEl("p", "role-explanation", description), panel.lastChild);
-  const assign = workspaceButton("交办任务", () => { setTaskCreateOpen(true); taskCreateAgent.value = role.member_id; }, "task-action-primary");
-  assign.disabled = !eligibleProjectAgents().some(member => member.id === role.member_id);
-  panel.appendChild(assign);
-  // C1b-S2 项目主控：同名角色用 member_id 消歧；被指定角色带“项目主控”标记，
-  // human 可指定/解除，已有非 null 指定时其它角色入口置灰并给出可读理由。
+  // ROLE-SETTINGS-1：移除角色详情的“交办任务”快捷入口；任务创建仍走全局“新建任务”与任务树子任务入口。
+  // 主控管理集中在“项目设置”页；角色详情只保留当前指定标记，同名角色仍按 member_id 消歧。
   panel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
-  const controllerEntry = workspaceControllerEntry(role);
-  if (controllerEntry.badge || controllerEntry.action || controllerEntry.reason) {
-    const controllerSection = workspaceEl("section", "role-controller-section");
-    controllerSection.appendChild(workspaceEl("h3", "", "项目主控"));
-    if (controllerEntry.badge) controllerSection.appendChild(workspaceEl("p", "role-controller-badge", "项目主控（当前指定）"));
-    if (controllerEntry.action) {
-      const assigning = controllerEntry.action === "assign";
-      const button = workspaceButton(assigning ? "设为项目主控" : "解除主控", () => saveControllerAssignment(assigning ? role.member_id : null), assigning ? "task-action-primary" : "task-action-secondary");
-      button.dataset.controllerAction = controllerEntry.action;
-      button.disabled = controllerEntry.enabled === false;
-      if (controllerEntry.reason) button.title = controllerEntry.reason;
-      controllerSection.appendChild(button);
-    }
-    if (controllerEntry.reason) controllerSection.appendChild(workspaceEl("p", "role-controller-reason", controllerEntry.reason));
-    panel.appendChild(controllerSection);
-  }
+  if (workspaceControllerBadge(role.member_id)) panel.appendChild(workspaceEl("p", "role-controller-badge", "项目主控（当前指定）"));
   const section = workspaceEl("section", "role-task-section");
   section.appendChild(workspaceEl("h3", "", "参与的任务"));
   const filters = workspaceEl("div", "role-task-filters");
@@ -493,28 +498,14 @@ function controllerCandidate(memberId) {
   const member = members.find(item => item.id === memberId);
   return Boolean(member) && member.kind === "agent" && !member.disabled_at;
 }
-// 角色详情入口：徽标 + 设为/解除/置灰理由。已有非 null 指定时其它角色一律置灰并给出可读理由。
-function workspaceControllerEntry(role) {
-  const id = role?.member_id;
-  if (!controllerContextValid()) return { badge: false, action: null, reason: "" };
-  if (!controllerUI.loaded || !controllerUI.supported) {
-    return { badge: false, action: null, reason: !controllerUI.loaded && !controllerUI.error ? "正在读取项目主控指定…" : "" };
-  }
-  const badge = controllerUI.assignedId === id;
-  if (!currentMemberIsHuman()) return { badge, action: null, reason: "当前账号是 Agent，只能查看。" };
-  if (controllerUI.saving) return { badge, action: badge ? "clear" : "assign", enabled: false, reason: "正在保存…" };
-  if (!controllerVersionSafe()) return { badge, action: null, reason: "服务返回的主控版本超出页面可安全表示的范围，已暂停指定与解除操作。" };
-  if (badge) return { badge, action: "clear", enabled: true, reason: "" };
-  if (controllerUI.assignedId) return { badge, action: null, reason: `已指定 ${controllerAssignedLabel(controllerUI.assignedId)}，请先解除。` };
-  if (!controllerCandidate(id)) return { badge, action: null, reason: "只有项目名册内已注册、未禁用的 Agent 才能设为项目主控。" };
-  return { badge, action: "assign", enabled: true, reason: "" };
-}
+// ROLE-SETTINGS-1：主控管理集中在“项目设置”页（候选选择器 + 设为/解除）；
+// 角色详情只保留 workspaceControllerBadge 标记，不再提供逐角色管理入口。
 // 项目级面板可见性统一由 renderTaskDetailsPanel() 同步（app.js），与开发要求编辑区同一同步点；
 // 任务/群聊导航都会经过该同步点，不会残留管理区。
 function renderControllerPanel() {
   const panel = controllerEl("controller-panel");
   if (!panel) return;
-  const visible = blackboardOpen && workspaceUI.mode === "roles" && Boolean(activeProjectId) && Boolean(myId);
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && workspaceSettingsSelected() && Boolean(activeProjectId) && Boolean(myId);
   panel.classList.toggle("hidden", !visible);
   if (!visible) { controllerFocusMemory = null; return; }
   if (controllerUI.projectId !== activeProjectId || controllerUI.memberId !== myId) {
@@ -526,6 +517,29 @@ function renderControllerPanel() {
   }
   syncControllerPanel();
 }
+// 候选选择器：候选集合不变时不重建 option，避免保存中/轮询同步打断用户正在进行的下拉选择与焦点。
+function syncControllerCandidates(select, candidates) {
+  const signature = candidates.join("\n");
+  if (select.dataset.signature === signature) return;
+  const previous = select.value;
+  select.dataset.signature = signature;
+  select.replaceChildren();
+  if (!candidates.length) {
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "暂无可指定的名册内 Agent";
+    select.appendChild(empty);
+    return;
+  }
+  for (const id of candidates) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = controllerAssignedLabel(id); // 同名候选用 member_id 消歧
+    select.appendChild(option);
+  }
+  // 保留用户已选候选（仍在名册内时）；否则显式落到第一个候选，与浏览器默认选中行为一致。
+  select.value = previous && candidates.includes(previous) ? previous : candidates[0];
+}
 function syncControllerPanel() {
   const panel = controllerEl("controller-panel");
   if (!panel || panel.classList.contains("hidden")) return;
@@ -534,6 +548,9 @@ function syncControllerPanel() {
   const clearBtn = controllerEl("controller-clear-btn");
   const retryBtn = controllerEl("controller-retry-btn");
   const status = controllerEl("controller-status");
+  const assignRow = controllerEl("controller-assign-row");
+  const candidateSelect = controllerEl("controller-candidate-select");
+  const assignBtn = controllerEl("controller-assign-btn");
   const human = currentMemberIsHuman();
   current.textContent = workspaceControllerSummary();
   let detailText = "";
@@ -544,14 +561,28 @@ function syncControllerPanel() {
       detailText = meta.reason
         ? `${meta.reason}；指定仍长期保存，不会自动解除或转移，可解除后另选。`
         : "已指定仅表示职责配置有效，不代表在线、已确认或会话已生效；指定长期保存，直到人工解除。";
+      // 已有非 null 指定时不能再直接指定他人：先解除理由在此明确，候选选择器保持可见但禁用。
+      if (human) detailText += " 如需更换主控，请先解除当前指定，再另选。";
     } else {
-      detailText = "还没有指定主控；可在下方角色详情中把一名名册内的 Agent 设为项目主控。指定长期保存，直到人工解除。";
+      detailText = "还没有指定主控；可在下方选择一名名册内的 Agent 设为项目主控。指定长期保存，直到人工解除。";
     }
   }
   detail.textContent = detailText;
   const showClear = human && controllerUI.loaded && controllerUI.supported && Boolean(controllerUI.assignedId);
   clearBtn.classList.toggle("hidden", !showClear);
   clearBtn.disabled = controllerUI.saving || (showClear && !controllerVersionSafe());
+  // human 加载完成后保留指定入口；已有指定时置灰，agent 只读 / 未加载完成时整行隐藏。
+  // 行内控件同步 hidden：焦点解算按节点自身判定可聚焦性，不依赖祖先状态。
+  const showAssign = human && controllerUI.loaded && controllerUI.supported;
+  assignRow.classList.toggle("hidden", !showAssign);
+  candidateSelect.classList.toggle("hidden", !showAssign);
+  assignBtn.classList.toggle("hidden", !showAssign);
+  if (showAssign) {
+    const candidates = workspaceRoles().map(role => role.member_id).filter(controllerCandidate);
+    syncControllerCandidates(candidateSelect, candidates);
+    candidateSelect.disabled = Boolean(controllerUI.assignedId) || controllerUI.saving || !controllerVersionSafe() || !candidates.length;
+    assignBtn.disabled = candidateSelect.disabled || !candidateSelect.value;
+  }
   retryBtn.classList.toggle("hidden", !(!controllerUI.loaded && controllerUI.error && !controllerUI.saving));
   let message = "", kind = "";
   if (!controllerUI.loaded && controllerUI.error) { message = controllerUI.error; kind = "error"; }
@@ -608,11 +639,13 @@ function applyControllerRead(projectId, data) {
     project.controller_assignment_status = data.controller_assignment_status;
   }
 }
-// 焦点去向按动作语义推导：失败时原按钮仍在则回焦原按钮；指定成功后“设为项目主控”消失，
+// 焦点去向按动作语义推导：失败时原按钮仍在则回焦原按钮；指定成功后“设为项目主控”置灰，
 // 落到同一上下文对应的“解除主控”（下一步可操作元素）；解除成功后解除入口隐藏，
-// 落到稳定可聚焦的面板状态行（tabindex=-1，仅程序化聚焦，不进 Tab 序）。
+// 落到可见的候选选择器（下一步是另选），不可聚焦时落到稳定可聚焦的面板状态行
+// （tabindex=-1，仅程序化聚焦，不进 Tab 序）。
 // 保存中间态（同动作按钮被置灰但未消失）不动焦点，靠焦点动作记忆在完成时恢复；
-// 用户已主动移焦到其它可见控件、或切角色/项目/账号/导航后不抢焦；永不聚焦 hidden/disabled 节点。
+// 用户已主动移焦到其它可见控件、或切到具体角色/其它项目/账号/导航后不抢焦；
+// 永不聚焦 hidden/disabled 节点。
 let controllerFocusMemory = null;
 function controllerFocusable(node) {
   return Boolean(node && typeof node.focus === "function" && !node.disabled
@@ -622,24 +655,28 @@ function controllerFocusTarget(action) {
   const same = document.querySelector(`[data-controller-action="${action}"]`);
   if (controllerFocusable(same)) return same;
   // 同动作按钮仍在但只是被置灰（保存中间态）：不动焦点，等完成后的最终状态再恢复。
-  if (same && !(same.classList && same.classList.contains("hidden"))) return null;
-  // 同动作节点已消失或隐藏（动作已变）：指定成功的下一步是解除主控；否则回到稳定的面板状态行。
+  if (controllerUI.saving && same && !(same.classList && same.classList.contains("hidden"))) return null;
+  // 保存结束后同动作节点已禁用或隐藏（动作已变）：指定成功的下一步是解除主控；解除成功的下一步是另选候选。
   if (action === "assign") {
     const clear = document.querySelector('[data-controller-action="clear"]');
     if (controllerFocusable(clear)) return clear;
   }
+  if (action === "clear") {
+    const select = controllerEl("controller-candidate-select");
+    if (controllerFocusable(select)) return select;
+  }
   const status = controllerEl("controller-current");
   return controllerFocusable(status) ? status : null;
 }
-// 读取/保存完成后刷新列表徽标与角色详情按钮；尽量恢复原焦点，避免键盘操作被重绘打断。
+// 读取/保存完成后刷新列表徽标与角色详情；尽量恢复原焦点，避免键盘操作被重绘打断。
 function syncControllerViews() {
   const active = typeof document === "undefined" ? null : document.activeElement;
   const action = active && active.dataset ? active.dataset.controllerAction || null : null;
   if (action) {
-    // 记录焦点动作意图：真实浏览器中重绘会把焦点带回 body，靠记忆在完成时恢复。
-    // 记忆绑定保存发起时选中的角色：保存期间用户点击其它角色行（行重绘会把焦点打回 body）
-    // 属于新的交互意图，完成后取消回焦，不把焦点跨角色拉回主控区。
-    controllerFocusMemory = { action, projectId: activeProjectId, memberId: myId, role: workspaceUI.selectedRole };
+    // 记录焦点动作意图：真实浏览器中控件隐藏/重绘会把焦点带回 body，靠记忆在完成时恢复。
+    // 记忆绑定保存发起时的项目设置上下文：保存期间用户切到具体角色或其它视图属于新的
+    // 交互意图，完成后取消回焦，不把焦点拉回项目设置的主控区。
+    controllerFocusMemory = { action, projectId: activeProjectId, memberId: myId };
   } else if (active && active !== document.body) {
     controllerFocusMemory = null; // 焦点在其它可见控件上：用户已主动移焦，不再为主控回焦
   }
@@ -652,10 +689,12 @@ function syncControllerViews() {
     renderWorkspaceList();
     renderWorkspaceRoleDetails();
   }
-  if (inRoles && typeof document !== "undefined") {
+  // 主控控件只存在于“项目设置”页；用户已切到具体角色时不回焦主控区。
+  const inSettings = inRoles && workspaceSettingsSelected();
+  if (inSettings && typeof document !== "undefined") {
     const memory = controllerFocusMemory;
     const plan = action || (memory && memory.projectId === activeProjectId && memory.memberId === myId
-      && memory.role === workspaceUI.selectedRole ? memory.action : null);
+      ? memory.action : null);
     if (plan) {
       const next = controllerFocusTarget(plan);
       if (next) { next.focus(); controllerFocusMemory = null; }
@@ -884,5 +923,13 @@ if (typeof document !== "undefined") {
     controllerClearBtn.addEventListener("click", () => saveControllerAssignment(null));
     document.getElementById("controller-retry-btn").addEventListener("click", () => { if (controllerContextValid()) loadControllerAssignment(); });
   }
+  const controllerAssignBtn = document.getElementById("controller-assign-btn");
+  if (controllerAssignBtn) {
+    // 指定写请求始终使用候选选择器的 member_id；“项目设置”导航项本身不是成员，永不出现在候选中。
+    controllerAssignBtn.addEventListener("click", () => {
+      const select = document.getElementById("controller-candidate-select");
+      if (select && select.value) saveControllerAssignment(select.value);
+    });
+  }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, controllerStatusMeta};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, controllerStatusMeta, workspaceSettingsSelected};

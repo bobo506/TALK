@@ -173,8 +173,14 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-row .role-controller-badge {align-self:flex-start;}
 .role-row-id {font-size:13px; color:#8a929b;}
 .role-member-id {font-size:14px; color:#8a929b; margin:0 0 20px; overflow-wrap:anywhere;}
-.role-controller-section {border-top:1px solid #ddd; margin-top:10px; padding-top:20px; display:flex; flex-direction:column; gap:10px; align-items:flex-start;}
-.role-controller-section h3 {font-size:18px; font-weight:650; color:#26323d; margin:0;}
-.role-controller-reason {font-size:14px; color:#626b76; line-height:1.6; margin:0;}
-.role-controller-section button:disabled {opacity:0.55; cursor:not-allowed;}
 @media(max-width:700px){#controller-panel h3 {font-size:20px;} .controller-current {font-size:16px;} .controller-toolbar {gap:10px;}}
+
+/* ROLE-SETTINGS-1：角色列表固定首项“项目设置” + 项目设置页主控候选选择器。 */
+.role-settings-row {border-bottom:2px solid #d8d8d2; background:#f7f6f2;}
+.role-settings-row:hover {background:#f0f5f8;}
+.role-settings-row.selected {background:#edf5fc;}
+.controller-assign-row {display:flex; align-items:center; gap:12px; margin:14px 0 4px; flex-wrap:wrap;}
+.controller-assign-row .group-member-select {flex:1; min-width:220px; width:auto; font-size:15px;}
+.controller-assign-row .room-primary-btn {width:auto; margin:0; flex-shrink:0;}
+.controller-assign-row select:disabled,.controller-assign-row button:disabled {opacity:0.55; cursor:not-allowed;}
+@media(max-width:700px){.controller-assign-row {gap:10px;} .controller-assign-row .group-member-select {min-width:0; width:100%;}}
