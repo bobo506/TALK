@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-09-23 #120独立检查发现报告漏项，派#121定向补正
+
+- #120结果msg2615为有效结构化complete自报、runner succeeded/workflow submitted；工作区无跟踪文件变动。Codex读取audit.md并独立检查eb45298删除diff、前端DOM/CSS/调用点、公共任务路由、MCP委派、SDK及schedule实现；未重复跑无代码改动的全量测试。
+- 认可公共POST /api/tasks、Task Hall、MCP/SDK、共享弹窗仍有必要调用方，不能随角色快捷入口一起删除。角色交办按钮专属绑定确已移除。
+- R1：web/index.html:115旧blackboard-actions容器始终带hidden，style.css:67为display:none !important；app.js仍绑定旧刷新/委派按钮并更新disabled。报告把3个源码调用点都写成现网有效入口，没有检查用户可达性，因此“没有可安全清理残留”不能验收。要求核查隐藏组的专属DOM/样式/绑定及可见新入口依赖，输出最小清理候选而非直接删除。
+- R2：移除人类图形入口不等于删除授权能力；tasks.py保护human根治理参数，SDK create_task仍支持这些参数。要求区分图形入口、MCP参数面和human REST/SDK授权路径，纠正“只能general、任务树不能启动”的过度断言。R3收紧源码可达/真实使用、CLI/MCP入口、schedule有Hall但无项目归属、主控管理迁移与交办专属残留的表述。
+- 派发前重新读取项目开发要求，按用户临时分工创建DeepSeek顶层general #121“121-交办代码用途核查补正：隐藏黑板控件与授权路径”，queued/assigned，基线fdc6c4b。只写.tmp/manual-task-audit-1/audit-revised.md及delivery-revised.json，保留#120历史；不改业务代码，不操作真实权限或启停服务，不派Kimi。
+- #120暂未收取；用户通知#121后由Codex继续独立检查。此次是调查报告返工，不是业务代码缺陷修复或删除授权。
+
 ## 2026-09-23 临时改为DeepSeek执行、Codex检查，派发代码用途核查#120
 
 - 用户同意先核查交办功能代码取舍，并明确暂时所有执行工作交DeepSeek、Codex检查。临时分工已记录AGENTS；仍读取项目最新development_requirements，保留原项目要求快照，在任务包明确本次用户指令覆盖分工冲突，不修改页面配置。
