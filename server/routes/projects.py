@@ -35,8 +35,11 @@ from server.models import (
     ProjectControllerModeUpdate,
     ProjectCreate,
     ProjectOut,
+    ProjectRoleDescription,
+    ProjectRoleDescriptionOut,
     ProjectSyncRequest,
     ProjectUpdate,
+    RoleDescriptionUpdate,
 )
 from server.routes.groups import _group_out
 
@@ -142,7 +145,22 @@ def _require_controller_candidate(project_id: str, member_id: str, session: Sess
 def _project_agent_outs(
     agents: list[ProjectAgent],
     session: Session,
+    *,
+    project_id: str | None = None,
 ) -> list[ProjectAgentOut]:
+    """构造项目名册输出（GET /agents 与 POST /sync 共用）。
+
+    角色说明（ROLE-DESC-B1）在**两处共用**的这一函数内统一填充：一次 ``member_id IN (...)``
+    批量查询 ``project_role_descriptions`` 组装成 dict，避免按成员逐条查询的 N+1；无自定义
+    记录的成员一律为 ``null``，因此 GET 与 sync 响应里同一成员的 ``role_description`` 语义一致。
+
+    ``project_id`` 可显式传入；不传时从名册行自身推断（调用方两条路径都只有一个项目）。
+    空名册直接短路返回 ``[]``，不额外查库。
+    """
+    if not agents:
+        return []
+
+    project_id = project_id or agents[0].project_id
     member_ids = [agent.member_id for agent in agents]
     members = (
         session.exec(select(Member).where(Member.id.in_(member_ids))).all()
@@ -158,10 +176,23 @@ def _project_agent_outs(
         if member_ids
         else []
     )
+    role_descriptions = (
+        session.exec(
+            select(ProjectRoleDescription).where(
+                ProjectRoleDescription.project_id == project_id,
+                ProjectRoleDescription.member_id.in_(member_ids),
+            )
+        ).all()
+        if member_ids
+        else []
+    )
     members_by_id = {member.id: member for member in members}
     instances_by_member: dict[str, list[AgentInstance]] = {}
     for instance in instances:
         instances_by_member.setdefault(instance.member_id, []).append(instance)
+    descriptions_by_member = {
+        row.member_id: row.description for row in role_descriptions
+    }
 
     return [
         ProjectAgentOut.from_orm_agent(
@@ -181,6 +212,7 @@ def _project_agent_outs(
                 _instance_out(instance)
                 for instance in instances_by_member.get(agent.member_id, [])
             ],
+            role_description=descriptions_by_member.get(agent.member_id),
         )
         for agent in agents
     ]
@@ -269,7 +301,7 @@ def list_project_agents(
         .where(ProjectAgent.project_id == project_id)
         .order_by(ProjectAgent.member_id)
     ).all()
-    return _project_agent_outs(list(agents), session)
+    return _project_agent_outs(list(agents), session, project_id=project_id)
 
 
 @router.get("/{project_id}/agents/{member_id:path}/profile", response_model=AgentProfileOut)
@@ -307,6 +339,94 @@ def update_agent_profile(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return _profile_out(project_id, member_id, root)
+
+
+@router.put(
+    "/{project_id}/agents/{member_id:path}/description",
+    response_model=ProjectRoleDescriptionOut,
+)
+def update_agent_role_description(
+    project_id: str,
+    member_id: str,
+    body: RoleDescriptionUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """保存或清除某成员在本项目的角色说明（ROLE-DESC-B1，专用入口）。
+
+    合同（设计 §3.2–§3.3）：
+
+    - **仅 human 可写**（``_require_human``），agent 调用 403；
+    - ``description`` 必填键：``str`` 或显式 ``null``。请求体先经
+      :func:`server.models.normalize_role_description` 归一化——**先判空白归 null、再查 2000
+      Unicode 码点**，非空原文（含换行、``<script>`` 字面量）原样保存；
+    - 非 ``null`` 写入要求目标成员**在当前名册**（``project_agents``），否则 404；
+    - ``null``（无论来自显式 null 还是全空白归一）是"恢复默认"：删除该行；对不存在记录、
+      甚至不在名册的成员都幂等返回 200 且 ``description=null``（设计 §3.3-D7）；
+    - 响应 ``description`` 是**归一化后**的值（设计 §3.3-D6），``null`` 时 ``updated_at`` /
+      ``updated_by`` 也如实为 ``null``（当前没有自定义记录）；
+    - 并发为 last-write-wins：单一全文本字段，不引入版本号/CAS；
+    - 本入口**只写说明文本**：不读也不写 ``business_role`` / ``decision_tier`` / 主控指定 /
+      任务权限 / 名册 ``project_agents`` 行。
+    """
+    _require_human(current)
+    _get_project(project_id, session)  # 项目不存在 → 404（先于任何写入）
+
+    target_member_id = member_id.strip()
+    description = body.description
+    existing = (
+        session.get(ProjectRoleDescription, (project_id, target_member_id))
+        if target_member_id
+        else None
+    )
+
+    if description is None:
+        # 恢复默认：清理（含无记录 / 不在名册）幂等返回 200 + description=null。
+        if existing is not None:
+            session.delete(existing)
+            session.commit()
+        return ProjectRoleDescriptionOut(
+            project_id=project_id,
+            member_id=target_member_id,
+            description=None,
+            updated_at=None,
+            updated_by=None,
+        )
+
+    if session.get(ProjectAgent, (project_id, target_member_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "role description target is not in the project roster: "
+                f"{target_member_id}"
+            ),
+        )
+
+    now = datetime.now(timezone.utc)
+    if existing is None:
+        session.add(
+            ProjectRoleDescription(
+                project_id=project_id,
+                member_id=target_member_id,
+                description=description,
+                updated_by=current.id,
+                updated_at=now,
+            )
+        )
+    else:
+        existing.description = description
+        existing.updated_by = current.id
+        existing.updated_at = now
+        session.add(existing)
+    session.commit()
+
+    return ProjectRoleDescriptionOut(
+        project_id=project_id,
+        member_id=target_member_id,
+        description=description,
+        updated_at=now,
+        updated_by=current.id,
+    )
 
 
 @router.post("/{project_id}/sync", response_model=list[ProjectAgentOut])
@@ -355,7 +475,7 @@ def sync_project(
         .where(ProjectAgent.project_id == project_id)
         .order_by(ProjectAgent.member_id)
     ).all()
-    return _project_agent_outs(list(agents), session)
+    return _project_agent_outs(list(agents), session, project_id=project_id)
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
@@ -554,6 +674,16 @@ def unregister_project(
     """Unregister a project from the TALK server."""
     _require_human(current)
     project = _get_project(project_id, session)
+    # ROLE-DESC-B1（设计 §3.1-D9）：SQLite 未开启 foreign_keys PRAGMA，新表若不显式清理
+    # 就会在删项目后留下孤儿行。这里显式删除本项目全部角色说明行；既有 project_agents
+    # 的孤儿行是本片之前的既有事实，**本片不追改**（不为此扩大范围）。
+    role_descriptions = session.exec(
+        select(ProjectRoleDescription).where(
+            ProjectRoleDescription.project_id == project_id
+        )
+    ).all()
+    for row in role_descriptions:
+        session.delete(row)
     session.delete(project)
     session.commit()
     return None

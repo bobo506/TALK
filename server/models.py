@@ -153,6 +153,28 @@ class ProjectAgent(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class ProjectRoleDescription(SQLModel, table=True):
+    """项目角色说明：human 为角色名称下固定短标签/解释保存的自定义文本（ROLE-DESC-B1）。
+
+    设计事实（``.tmp/role-description-0/design.md`` §3.1）：
+
+    - **独立表**，刻意不加在 ``project_agents`` 上：名册 ``POST /sync`` 是全量替换
+      （先删后插），挂在那张表上的手工字段会被 sync 抹掉；
+    - 主键 ``(project_id, member_id)`` 天然实现同角色跨项目隔离；
+    - ``member_id`` 不加外键：名册 sync 全量增删、成员可能暂缺；成员离开名册时说明行保留
+      （“离册保留、回册恢复”是预期行为，不是脏数据），项目删除时才显式清理；
+    - 无行 = 使用前端默认文案；有行 = human 自定义说明（原文保留，不 strip、不折叠换行）。
+    """
+
+    __tablename__ = "project_role_descriptions"
+
+    project_id: str = Field(foreign_key="projects.project_id", primary_key=True)
+    member_id: str = Field(primary_key=True)
+    description: str
+    updated_by: str = Field(foreign_key="members.id")
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class AgentInstance(SQLModel, table=True):
     __tablename__ = "agent_instances"
 
@@ -183,6 +205,10 @@ TASK_MAX_CLARIFICATION_ROUNDS_LIMIT = 2
 
 # 项目级“开发要求”纯文本上限：用于创建与更新的同一套校验（按字符数计算）。
 PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS = 20000
+
+# 项目角色说明上限（ROLE-DESC-B1）：说明是短文本，不照搬开发要求的 20000。
+# 长度按 **Unicode 码点** 计算（Python ``len()`` 即码点计数，代理对在 Python 3 中只算 1）。
+PROJECT_ROLE_DESCRIPTION_MAX_CHARS = 2000
 
 # 项目主控模式意向（C1a）：只允许这两个枚举；新建/旧项目一律默认 passive。
 PROJECT_CONTROLLER_MODES = ("passive", "active")
@@ -230,6 +256,36 @@ def normalize_development_requirements(value: Optional[str]) -> Optional[str]:
         )
     if not value.strip():
         return None
+    return value
+
+
+def normalize_role_description(value: Optional[str]) -> Optional[str]:
+    """归一化项目角色说明（ROLE-DESC-B1）：先判空白归 ``None``，再查 2000 码点上限。
+
+    与 :func:`normalize_development_requirements` 的关键差异（设计 §3.2-D8，**不照搬**）：
+    那里是先查长度再判空白，会让“超长全空白”得到 422；角色说明要求“超长全空白”按
+    **恢复默认**（``None``）处理，因此本函数必须**先归空白、后查长度**。这是唯一事实，
+    前后端必须同序，不得分叉。
+
+    - ``None`` 或全空白文本（含 ``""``）→ ``None``（删除自定义说明 = 恢复默认）；
+    - 空白判定沿用 Python ``str.isspace()`` 语义（``str.strip()`` 无参时移除的字符集与
+      ``str.isspace()`` 完全一致），包含 U+001C–U+001F、U+0085、U+00A0、U+2000–U+200A、
+      U+2028/U+2029、U+202F、U+205F、U+3000 等；前端不得改用 JS ``trim()``（会多算 U+FEFF、
+      漏算 U+001C–U+001F/U+0085），否则归一化分叉会让空白保存在前端永远“未确认”；
+    - 非空白文本原样保留（不 strip、不折叠换行），只校验 Unicode 码点数上限；
+    - 非空白且超长抛 ``ValueError``，由 FastAPI 转成 422。
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("description must be a string or null")
+    if not value.strip():
+        return None
+    if len(value) > PROJECT_ROLE_DESCRIPTION_MAX_CHARS:
+        raise ValueError(
+            "description must be at most "
+            f"{PROJECT_ROLE_DESCRIPTION_MAX_CHARS} characters"
+        )
     return value
 
 
@@ -1462,6 +1518,9 @@ class ProjectAgentOut(BaseModel):
     business_role: Optional[str]
     decision_tier: Optional[str]
     capability_summary: list[str]
+    # 角色说明（ROLE-DESC-B1）：无自定义记录 = null（前端据此回退默认文案）。
+    # 纯展示文本，不参与 business_role / decision_tier / 主控指定 / 任务权限的任何判定。
+    role_description: Optional[str] = None
     display_name: Optional[str]
     availability: str
     instances: list[AgentInstanceOut]
@@ -1475,6 +1534,7 @@ class ProjectAgentOut(BaseModel):
         display_name: Optional[str] = None,
         availability: str = "offline",
         instances: Optional[list[AgentInstanceOut]] = None,
+        role_description: Optional[str] = None,
     ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
@@ -1485,11 +1545,44 @@ class ProjectAgentOut(BaseModel):
             business_role=agent.business_role,
             decision_tier=agent.decision_tier,
             capability_summary=list(agent.capability_summary or []),
+            role_description=role_description,
             display_name=display_name,
             availability=availability,
             instances=instances or [],
             updated_at=agent.updated_at,
         )
+
+
+class RoleDescriptionUpdate(BaseModel):
+    """`PUT /api/projects/{id}/agents/{member_id}/description` 请求体（ROLE-DESC-B1）。
+
+    - ``description``：**必填键**（无默认值 = required but nullable）；
+    - 校验顺序同 :func:`normalize_role_description`：先判空白归 ``None``（= 恢复默认/删除自定义），
+      再对非空文本查 2000 Unicode 码点上限，非空超限 422；
+    - 非空文本原样保留（不 strip、不折叠换行），换行与 ``<script>`` 等按字面存储。
+    """
+
+    description: Optional[str]
+
+    @model_validator(mode="after")
+    def validate_role_description(self) -> "RoleDescriptionUpdate":
+        self.description = normalize_role_description(self.description)
+        return self
+
+
+class ProjectRoleDescriptionOut(BaseModel):
+    """角色说明写入结果。
+
+    ``description`` 是**归一化后**的值（空白 → ``null``，见设计 §3.3-D6）；``null`` 表示当前
+    没有自定义记录（恢复默认），此时 ``updated_at`` / ``updated_by`` 同为 ``null``——
+    响应如实描述“操作后库里的状态”，而不是“本次请求发生过什么”。
+    """
+
+    project_id: str
+    member_id: str
+    description: Optional[str]
+    updated_at: Optional[datetime] = None
+    updated_by: Optional[str] = None
 
 
 class AgentProfileOut(BaseModel):

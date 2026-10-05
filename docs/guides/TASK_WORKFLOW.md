@@ -281,14 +281,14 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 | 参数 | 传不传 | 说明 |
 | --- | --- | --- |
 | `project_id` / `target_member_id` | 传 | 目标项目与执行者 |
-| `title` / `content` | 传 | 任务标题与正文（正文写清范围、验收标准、交付包路径） |
+| `title` / `content` | 传 | 标题只写任务名称、不手写编号；关联任务号写正文。服务端创建后自动加真实编号。正文写清范围、验收标准、交付包路径。 |
 | `task_kind` | **省略** | 省略即默认 `general`，不要显式传子任务类型 |
 | `related_task_ids` / `trigger_task_id` | **不要传** | 留给既有质量子任务合同，本流程省略 |
 | `review_policy` | **不要传** | 只用于 `development` / `rework` |
 
 - `development` / `review` / `test` / `rework` 这几种 `task_kind` 只用于**已有明确 parent 的既有子任务合同**，独立顶层任务不要用。
 - 2026-09-18 用户明确确认：现阶段独立顶层任务继续使用默认 `general`，包括开发、检查与返工；实际工作写清在标题/正文即可。按真实工作分类的需求已记入 `docs/spec/DEVELOPMENT_ROADMAP.md` 暂缓项，未来评估流程兼容后再实现，当前不改类型或历史记录。
-- 需要复核时，单独派发一条独立顶层任务，在 `content` 里写明复核对象路径与验收标准，不要靠 `related_task_ids` 挂靠。
+- 需要复核时，单独派发一条独立顶层任务，在 `content` 里写明复核对象编号、路径与验收标准；`title` 仍只写任务名称，不以被复核任务号开头，也不要靠 `related_task_ids` 挂靠。2026-10-04 已确认后续采用单一真实任务编号，既有双编号标题不回写。
 - 本片不实现新的服务端分支，也不猜测子任务权限；固定用上面这组最小调用即可。
 
 ## 8. 分工与收尾节奏

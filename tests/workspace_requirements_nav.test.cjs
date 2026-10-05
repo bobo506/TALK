@@ -91,7 +91,7 @@ function harness({ projectId = 'A', memberId = 'human:qa', withTask = false } = 
   const elements = new Map();
   const el = id => {
     if (!elements.has(id)) {
-      const initial = ['requirements-panel', 'role-details-panel', 'group-members-panel', 'task-details-panel'].includes(id) ? ['hidden'] : [];
+      const initial = ['requirements-panel', 'role-details-name-panel', 'role-details-tasks-panel', 'group-members-panel', 'task-details-panel'].includes(id) ? ['hidden'] : [];
       elements.set(id, fakeEl(id, initial));
     }
     return elements.get(id);
@@ -196,7 +196,7 @@ test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐�
   await enterRoles(h);
   // 首次进入无有效选择：默认固定首项“项目设置”，右侧只显示项目级面板
   assert.equal(h.hidden('requirements-panel'), false);
-  assert.equal(h.hidden('role-details-panel'), true);
+  assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [true, true]);
   assert.ok(h.requests.some(url => /\/api\/projects\/A$/.test(url)));
   const settingsRow = h.el('blackboard-columns').children[0];
   assert.ok(settingsRow.className.includes('role-settings-row'), '首项是“项目设置”导航行');
@@ -209,7 +209,7 @@ test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐�
   await h.tick();
   assert.equal(h.ui.workspaceUI.roleSelection, 'role');
   assert.equal(h.ui.workspaceUI.selectedRole, 'agent:kimi');
-  assert.equal(h.hidden('role-details-panel'), false);
+  assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [false, false]);
   assert.equal(h.hidden('requirements-panel'), true);
   assert.equal(h.hidden('controller-panel'), true);
   // 行重绘后重新取节点：新选中态落在重建后的角色行上
@@ -222,7 +222,7 @@ test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐�
   settingsRow2.fire('click');
   await h.tick();
   assert.equal(h.hidden('requirements-panel'), false);
-  assert.equal(h.hidden('role-details-panel'), true);
+  assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [true, true]);
   assert.equal(h.requests.length, before);
 });
 
@@ -237,7 +237,7 @@ test('R1 角色 → 群聊 → 普通房间：编辑区与角色详情都隐藏�
   assert.equal(h.context.activeGroupId, 'group:chat1');
   assert.equal(h.context.blackboardOpen, false);
   assert.equal(h.hidden('requirements-panel'), true);
-  assert.equal(h.hidden('role-details-panel'), true);
+  assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [true, true]);
   // 群聊成员面板正常显示（没有把整个详情栏误隐藏）
   assert.equal(h.hidden('group-members-panel'), false);
   // 停留期间再次刷新详情（模拟 5 秒轮询之外的重绘入口）也不会复活
@@ -280,7 +280,7 @@ test('R1 任务完整对话（任务 Hall）与返回：编辑区不残留', asy
   assert.equal(h.ui.workspaceUI.mode, 'tasks');
   assert.equal(h.context.blackboardOpen, false);
   assert.equal(h.hidden('requirements-panel'), true);
-  assert.equal(h.hidden('role-details-panel'), true);
+  assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [true, true]);
   // 返回任务页（setBlackboardOpen 路径等价于点“任务”）
   h.ui.workspaceUI.mode = 'tasks'; h.context.blackboardOpen = true;
   h.ui.renderWorkspaceMode();

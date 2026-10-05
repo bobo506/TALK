@@ -756,11 +756,6 @@ input.auth-input:-webkit-autofill:focus,
   font-size: var(--font-control);
 }
 
-.blackboard-actions {
-  display: flex;
-  gap: 8px;
-}
-
 .blackboard-summary {
   display: flex;
   gap: 8px;

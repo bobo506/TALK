@@ -30,7 +30,8 @@
 .task-status-badge {background:transparent!important; padding:0; align-self:start; font-size:14px; white-space:normal; line-height:1.7; font-weight:500;}
 .task-status-badge.success {color:#26753c;} .task-status-badge.danger {color:#a83232;} .task-status-badge.attention {color:#8d580d;}
 .role-row {border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; background:transparent; padding:24px 28px; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left;}
-.role-row strong {font-size:22px;} .role-row span {font-size:15px;} .role-row small {font-size:14px; color:#626b76;}
+/* N2 修正：列表摘要明确省略号截断（最多 2 行），长无空格字符串不撑破布局；搜索仍用有效说明全文。 */
+.role-row strong {font-size:22px;} .role-row span {font-size:15px; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere;} .role-row small {font-size:14px; color:#626b76;}
 .workspace-empty {padding:20px 28px; color:#626b76; font-size:15px;}
 .task-details-card {background:transparent; border:0; box-shadow:none; padding:0; border-radius:0;}
 .task-details-heading {align-items:flex-start; gap:18px;}
@@ -57,7 +58,7 @@
 .task-result-body {white-space:pre-wrap; overflow-wrap:anywhere; padding:20px; background:#f6f8fa; margin-top:18px; border:1px solid #d8e0e6; border-radius:6px; font-size:15px; line-height:1.8;}
 .role-details-panel {color:#303741;} .workspace-breadcrumb {font-size:14px; margin:0 0 24px;}
 .role-details-panel h2 {font-size:42px; line-height:1.3; font-weight:650; margin:0 0 20px;}
-.role-description {font-size:18px; margin-bottom:24px;} .role-current {font-size:16px; margin-bottom:28px;}
+.role-current {font-size:16px; margin-bottom:28px;}
 .role-task-section {border-top:1px solid #ddd; margin-top:34px; padding-top:28px;}
 .role-task-filters {display:flex; gap:28px; margin-bottom:20px;}
 .role-task-table {width:100%; border-collapse:collapse; font-size:15px; table-layout:fixed;}
@@ -70,7 +71,25 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 
 .window-brand h1 {font-size:24px;}
 .app-header .project-delegate-btn {font-size:15px;}
-.role-explanation {font-size:16px; color:#626b76; line-height:1.8; margin:-8px 0 24px;}
+
+/* ROLE-DESC-F1 角色说明编辑区：静态 DOM 区块，位于名称区 #role-details-name-panel 与参与任务区
+   #role-details-tasks-panel 之间（#137/N4 布局：名称区 → 说明区 → 任务区），复用 REQ2 浅色工作台层级。 */
+#role-description-panel {color:#303741; margin-top:34px; padding-top:28px; border-top:1px solid #ddd;}
+#role-details-tasks-panel {margin-top:34px; padding-top:28px; border-top:1px solid #ddd;}
+#role-description-panel .sidebar-kicker {font-size:14px; color:#69737c; margin-bottom:10px;}
+#role-description-panel h3 {font-size:24px; font-weight:650; color:#26323d; margin:0;}
+.role-description-hint {font-size:14px; color:#626b76; line-height:1.7; margin:14px 0 16px;}
+.role-description-textarea {width:100%; min-height:120px; font-size:15px; line-height:1.7; white-space:pre-wrap;}
+.role-description-textarea:disabled {background:#f5f5f2; color:#8a929b; cursor:not-allowed;}
+.role-description-textarea[readonly] {background:#f7f7f4;}
+.role-description-toolbar {display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap;}
+.role-description-toolbar .room-primary-btn,.role-description-toolbar .room-secondary-btn {width:auto; margin:0;}
+.role-description-count {margin-left:auto; font-size:13px; color:#69737c;}
+.role-description-count.over {color:#a83232; font-weight:600;}
+.role-description-status {font-size:14px; line-height:1.6; margin:12px 0 0; color:#414b57;}
+.role-description-status.error {color:#9d3434;}
+.role-description-status.success {color:#286c39;}
+@media(max-width:700px){#role-description-panel h3 {font-size:20px;} .role-description-textarea {min-height:100px; font-size:14px;} .role-description-toolbar {gap:10px;} .role-description-count {margin-left:0;}}
 
 .workbench:not(.project-mode) .task-details-heading h3 {font-size:20px;}
 .workbench:not(.project-mode) .task-outcome h4,.workbench:not(.project-mode) .task-flow h4 {font-size:18px;}

@@ -6,7 +6,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20260923-role-settings-1"
+STATIC_VERSION = "20261005-role-desc-f1-fix"
 
 
 class ControllerWebUiTests(RouteTestCase):
@@ -41,9 +41,10 @@ class ControllerWebUiTests(RouteTestCase):
         self.assertIn("解除主控", html)
         # 项目级面板位于开发要求编辑区之后、角色详情之前，不遮挡其它区域。
         self.assertLess(html.index('id="requirements-panel"'), html.index('id="controller-panel"'))
-        self.assertLess(html.index('id="controller-panel"'), html.index('id="role-details-panel"'))
+        self.assertLess(html.index('id="controller-panel"'), html.index('id="role-details-name-panel"'))
         # 静态资源版本同步刷新缓存。
         self.assertEqual(html.count(STATIC_VERSION), 4)
+        self.assertNotIn("20260923-manual-task-cleanup-1", html)
         self.assertNotIn("20260919-c1b-s2-owner", html)
         self.assertNotIn("20260918-role-1", html)
         self.assertNotIn("20260918-req2-rework", html)

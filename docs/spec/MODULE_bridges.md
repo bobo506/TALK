@@ -110,12 +110,16 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 
 ### DeepSeek Harness 接入
 
-- 当前使用官方 `@deepseek-ai/dsh` `0.1.0-rc.8` 的 `headless` profile，其行为是接受一次性任务并把最终 assistant 消息写到 stdout。
+- 当前通过官方 `@deepseek-ai/dsh` 的 `headless` profile 接受一次性任务并把最终 assistant 消息写到 stdout。2026-10-04 本机调查及独立复核确认 PATH 指向 npm `0.1.5-rc.2`；下方 `0.1.0-rc.8` 为 2026-08-21 受控升级与验证的历史版本，不代表当前安装版本，也不将旧验证覆盖自动外推到新版。
 - TALK 仍通过 `bridges/cli_bridge.py --prompt-transport argv --command "dsh.cmd --profile headless"` 配置，不需要新建专用 bridge；Windows 下通用 bridge 会校验该 shim 对应的官方 `@deepseek-ai/dsh` 包及其 `bin` 入口，再绕过 `.cmd`，直接以 Node 启动 Harness，避免 npm shim 的 `%*` 边界截断多行 argv。
 - 当 `runtime=dsh` 且 `--project` 指向包含 `.talk/dsh/preflight-ephemeral.cordis.yml` 的项目时，通用 bridge 会只给领取前预检命令追加该 `--patch`。补丁关闭 `session-persistence-jsonl` 与 `session-checkpoint-policy`，所以正常预检及同轮协议修复都不会出现在 DSH 会话列表中；正式任务命令保持原始 `headless` 配置，一次正式执行仍只持久化一个会话。
 - 显式传入 `--task-preflight-command` 时以调用方配置为准，不再自动追加项目补丁；自定义命令需要自行保证只读权限与非持久化语义。DeepSeek 的跨轮询上限默认是 1，仍保留单轮内最多一次协议修复以及信息不足时的 Task Hall 澄清流程。
 - TALK member 固定为 `agent:deepseek`，runtime 上报为 `dsh`；具体 DeepSeek 模型由 Harness profile 管理，不写死在 member ID 中。
 - `headless` profile 首次使用可能初始化 `$DSH_HOME/profiles/headless`；Harness 的登录、模型与工具权限属于 Harness 配置边界。
+- 2026-10-04 桌面兼容调查经 DeepSeek #126、Kimi #127、DeepSeek #128 补正、Kimi #129 定向复验收尾：本机桌面 `0.2.0-rc.2` 内置 `resources/runtime/cli/bin/dsh.cmd`，与当前 PATH 的 npm CLI 是不同入口；已核对打包与 bridge 静态调用链，尚未切换或实测内置 CLI 受管执行。`sharedPackages` 当时共 287 项，其中 279 项版本为 `0.2.0-rc.2`，包存在不证明运行成功。
+- 相同有效 `DSH_HOME` 下的数据共享机制不等于本机两个运行中进程已证明使用相同 home。User/Machine 未设覆盖仅是配置快照，不能排除进程级覆盖；目录并存与活动时间只能支持推断。2026-10-05 用户人工核实：桌面端最新 chat 对应 TALK #133，确认桌面 UI 能显示该 TALK 任务会话；此证据来自用户界面核对，未据此确认两个进程的实际 home 路径相同，也未验证在桌面继续该会话或内置 CLI 受管执行。TALK claim/租约与进程内运行锁只约束受管任务，不能保证桌面或其他外部入口不会同时写同一会话；单执行 owner 是使用约束。
+- 后续验证分两步：S1a 在临时 home/项目中用显式绝对路径做无凭证、无模型启动验证，先查初始化副作用并确认不会落到真实 home；S1b 再单列真实模型输出、退出及取消契约。`--dump-config`/启动可能写盘，不直接视为只读；PATH 注册非绝对路径验证前提。前述步骤均未执行，不据 npm shim 特殊分支不命中断言桌面必然不可用。调查证据见本地 `.tmp/dsh-desktop-0/report-revised.md` 与 `.tmp/dsh-desktop-rereview-0/`；这些临时证据不随 Git 跟踪，正式结论以本节及进度历史为准。
+
 - 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；随后已在 TALK bridge 启动边界完成上述 Windows shim 绕过，受控真实多行探针同时收到首行、中文行和末行令牌并返回 `DSH_MULTILINE_OK`。
 
 ## 当前本地固定拓扑（2026-08-16）

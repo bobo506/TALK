@@ -6,8 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20260923-role-settings-1">
-  <link rel="stylesheet" href="/workspace.css?v=20260923-role-settings-1">
+  <link rel="stylesheet" href="/style.css?v=20261005-role-desc-f1-fix">
+  <link rel="stylesheet" href="/workspace.css?v=20261005-role-desc-f1-fix">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -111,10 +111,6 @@
 
               <h2 id="blackboard-title" class="hidden">任务</h2>
               <p id="blackboard-description">按协作状态查看项目任务</p>
-            </div>
-            <div class="blackboard-actions hidden">
-              <button id="blackboard-refresh-btn" type="button" class="room-secondary-btn">刷新</button>
-              <button id="blackboard-delegate-btn" type="button" class="room-primary-btn">委派任务</button>
             </div>
           </header>
           <input id="workspace-search" type="search" placeholder="搜索任务" aria-label="搜索任务">
@@ -278,7 +274,30 @@
           </div>
           <p id="controller-status" class="controller-status" role="status"></p>
         </section>
-        <section id="role-details-panel" class="role-details-panel hidden" aria-label="角色详情"></section>
+        <!-- ROLE-DESC-F1 修正（#137/N4）：原动态角色详情拆成名称区与参与任务区两个动态容器，
+             静态说明编辑区居中独立，布局顺序 = 名称区 → 说明区 → 参与任务区（贴合“名称下方”原需求）。
+             说明区是静态 DOM（设计方案 A），绝不能移入任一动态容器——replaceChildren 会销毁编辑区节点，
+             导致输入内容/焦点/光标在轮询重绘时丢失。可见性由 renderTaskDetailsPanel 统一同步。 -->
+        <section id="role-details-name-panel" class="role-details-panel hidden" aria-label="角色名称"></section>
+        <section id="role-description-panel" class="role-description-panel hidden" aria-label="角色说明">
+          <div class="role-description-heading">
+            <div>
+              <div class="sidebar-kicker">纯展示文本 · 不改变职责与权限</div>
+              <h3>角色说明</h3>
+            </div>
+          </div>
+          <p class="role-description-hint">说明显示在角色名称下方与角色列表摘要中，按项目与成员分别保存；保存空白内容或点击“恢复默认”都会回到当前默认文案。它只是展示文本，不改变项目主控、职责分级（business_role / decision_tier）或任务权限。</p>
+          <textarea id="role-description-input" class="profile-textarea role-description-textarea" rows="5"
+                    placeholder="例如：负责前端交互开发与独立复核；按任务包逐片执行。"></textarea>
+          <div class="role-description-toolbar">
+            <button id="role-description-save" type="button" class="room-primary-btn">保存</button>
+            <button id="role-description-discard" type="button" class="room-secondary-btn">放弃修改</button>
+            <button id="role-description-reset" type="button" class="workspace-text-button">恢复默认</button>
+            <span id="role-description-count" class="role-description-count" aria-live="polite"></span>
+          </div>
+          <p id="role-description-status" class="role-description-status" role="status"></p>
+        </section>
+        <section id="role-details-tasks-panel" class="role-details-panel hidden" aria-label="参与的任务"></section>
         <section id="group-members-panel" class="group-members-panel hidden">
           <div class="details-card">
             <div class="details-card-header">
@@ -473,7 +492,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/workspace.js?v=20260923-role-settings-1"></script>
-  <script src="/app.js?v=20260923-role-settings-1"></script>
+  <script src="/workspace.js?v=20261005-role-desc-f1-fix"></script>
+  <script src="/app.js?v=20261005-role-desc-f1-fix"></script>
 </body>
 </html>

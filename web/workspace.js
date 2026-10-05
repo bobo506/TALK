@@ -350,6 +350,271 @@ function discardProjectRequirements() {
   requirementsUI.notice = "已恢复为已保存的内容。";
   syncRequirementsEditor();
 }
+// ── ROLE-DESC-F1 角色说明编辑区（角色页，绑定具体在册角色） ─────────────
+// 静态 DOM 区块（index.html 中位于名称区 #role-details-name-panel 与参与任务区
+// #role-details-tasks-panel 之间，三者同级），动态 replaceChildren 不触碰它：
+// 5 秒轮询/任务变化触发的重绘不会销毁 textarea，内容/焦点/光标天然保持。
+// 可见性统一由 renderTaskDetailsPanel（app.js）同步。
+// 数据来自既有 GET /api/projects/{id}/agents 响应的 role_description 字段（B1）：
+// null = 无自定义、使用默认文案；写走专用 PUT /agents/{member_id}/description（仅 human）。
+// 说明是纯展示文本：不改变主控指定、business_role / decision_tier 或任务权限。
+const ROLE_DESCRIPTION_MAX_CHARS = 2000;
+// 默认文案 = 短标签 + 换行 + 解释（无解释时只留标签行）；硬编码映射仅作为默认值生成器保留，
+// 一旦存在自定义说明，展示端不再渲染映射内容。
+function workspaceRoleDefaultDescription(businessRole) {
+  const label = workspaceRoleLabel(businessRole);
+  const explanation = workspaceRoleDescription(businessRole);
+  return explanation ? `${label}\n${explanation}` : label;
+}
+// 有效说明 = 自定义 ?? 默认。后端归一化拒绝全空白，任何非 null 自定义都含非空白行，
+// 不得把合法自定义值误回退到硬编码默认。
+function workspaceRoleDescriptionText(agent) {
+  const custom = agent?.role_description;
+  return typeof custom === "string" ? custom : workspaceRoleDefaultDescription(agent?.business_role);
+}
+// D1：列表摘要取有效说明的首个非空行。判空用与后端一致的 Python str.isspace 空白集合
+// （不得以 JS trim 判空：U+FEFF 虽非 Python 空白、可被保存为合法值，trim 会误判为空行
+// 把合法自定义摘要误回退到硬编码标签）；展示内容按同一空白集合去两端。
+const ROLE_DESCRIPTION_BLANK_EDGE = /^[\u0009-\u000d\u001c-\u001f\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\u0009-\u000d\u001c-\u001f\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/gu;
+function workspaceRoleSummary(agent) {
+  for (const line of workspaceRoleDescriptionText(agent).split("\n")) {
+    if (REQUIREMENTS_BLANK.test(line)) continue; // 空行开头不显示空白格
+    const shown = line.replace(ROLE_DESCRIPTION_BLANK_EDGE, "");
+    if (shown) return shown;
+  }
+  return workspaceRoleLabel(agent?.business_role);
+}
+// 归一化与后端 normalize_role_description 同序同集合（设计 §3.2-D8 唯一事实）：
+// 先按 Python str.isspace() 空白集合判空白归 null（复用 REQ2 REQUIREMENTS_BLANK，
+// 不得以 JS trim() 代替——它会多算 U+FEFF、漏算 U+001C–U+001F/U+0085），非空白原文保留，
+// 2000 码点上限只在非空白提交时检查。
+function normalizeRoleDescriptionValue(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value);
+  return REQUIREMENTS_BLANK.test(text) ? null : text;
+}
+// 读写状态绑定 账号/项目/角色member_id + 请求序号；草稿只存内存 Map
+// （key = 账号/项目/成员），不写 localStorage：刷新或登出（页面重载）即清空，
+// 同项目轮询/导航不覆盖，切项目往返可按 key 恢复。不复制主控 CAS/saveToken。
+const roleDescriptionUI = { projectId: null, memberId: null, accountId: null, supported: false, loaded: false, saving: false, request: 0, saved: null, error: "", notice: "" };
+const roleDescriptionDrafts = new Map();
+function roleDescriptionEl(id) { return typeof document === "undefined" ? null : document.getElementById(id); }
+function roleDescriptionDraftKey(projectId, accountId, memberId) { return `${accountId}/${projectId}/${memberId}`; }
+function roleDescriptionCurrentRole() {
+  return roleDescriptionUI.memberId
+    ? workspaceRoles().find(item => item.member_id === roleDescriptionUI.memberId) || null
+    : null;
+}
+function roleDescriptionBaseline() {
+  // 有效已保存值：自定义 ?? 默认文案；dirty 判定以此为基准。
+  return roleDescriptionUI.saved ?? workspaceRoleDefaultDescription(roleDescriptionCurrentRole()?.business_role);
+}
+// 从名册缓存采用服务端值（名册由 loadProjectAgents 统一加载/刷新，本面板不另发读请求）。
+// 有草稿或保存中不得用服务端值覆盖输入框；无草稿时跟进最新 saved，赋值前判等避免光标跳动。
+function adoptRoleDescriptionServerValue() {
+  const entry = roleDescriptionUI.projectId === activeProjectId && roleDescriptionUI.accountId === myId
+    ? projectAgents.find(item => item.member_id === roleDescriptionUI.memberId)
+    : undefined;
+  if (!entry) { roleDescriptionUI.loaded = false; roleDescriptionUI.supported = false; return; }
+  // 旧服务缺 role_description 字段：降级只读并提示，不把缺失当成 null 后再 PUT。
+  const supported = "role_description" in entry;
+  roleDescriptionUI.supported = supported;
+  roleDescriptionUI.loaded = true;
+  roleDescriptionUI.saved = supported && typeof entry.role_description === "string" ? entry.role_description : null;
+  const key = roleDescriptionDraftKey(roleDescriptionUI.projectId, roleDescriptionUI.accountId, roleDescriptionUI.memberId);
+  const draft = roleDescriptionDrafts.get(key);
+  const baseline = roleDescriptionBaseline();
+  const input = roleDescriptionEl("role-description-input");
+  if (draft !== undefined && draft !== baseline) return; // 草稿优先，输入框保持用户内容
+  roleDescriptionDrafts.delete(key);
+  if (input && !roleDescriptionUI.saving && input.value !== baseline) input.value = baseline;
+}
+function renderRoleDescriptionPanel() {
+  const panel = roleDescriptionEl("role-description-panel");
+  if (!panel) return;
+  // 与角色详情同一可见条件：角色模式 + 选中具体在册角色（非项目设置）；其余导航一律隐藏。
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && !workspaceSettingsSelected()
+    && Boolean(activeProjectId) && Boolean(myId);
+  panel.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  const projectId = activeProjectId, accountId = myId, memberId = workspaceUI.selectedRole;
+  if (roleDescriptionUI.projectId !== projectId || roleDescriptionUI.memberId !== memberId
+      || roleDescriptionUI.accountId !== accountId) {
+    // 上下文切换（含 A→B→A 往返）：递增请求序号作废旧读写，按新上下文重建状态。
+    ++roleDescriptionUI.request;
+    Object.assign(roleDescriptionUI, { projectId, memberId, accountId, supported: false, loaded: false, saving: false, saved: null, error: "", notice: "" });
+    adoptRoleDescriptionServerValue();
+    const draft = roleDescriptionDrafts.get(roleDescriptionDraftKey(projectId, accountId, memberId));
+    const input = roleDescriptionEl("role-description-input");
+    if (input && draft !== undefined && input.value !== draft) {
+      input.value = draft;
+      roleDescriptionUI.notice = "已恢复上次未保存的草稿。";
+    }
+  } else {
+    // 同上下文的名册刷新（轮询/手动刷新/sync）可能带回新服务端值：按草稿纪律跟进。
+    adoptRoleDescriptionServerValue();
+  }
+  syncRoleDescriptionEditor();
+}
+function syncRoleDescriptionEditor() {
+  const panel = roleDescriptionEl("role-description-panel");
+  const input = roleDescriptionEl("role-description-input");
+  if (!panel || !input || panel.classList.contains("hidden")) return;
+  const status = roleDescriptionEl("role-description-status");
+  const count = roleDescriptionEl("role-description-count");
+  const saveBtn = roleDescriptionEl("role-description-save");
+  const discardBtn = roleDescriptionEl("role-description-discard");
+  const resetBtn = roleDescriptionEl("role-description-reset");
+  const human = currentMemberIsHuman();
+  const ready = roleDescriptionUI.loaded && roleDescriptionUI.supported;
+  // 值来源优先级 = 草稿 ?? 已保存 ?? 默认；无草稿时判等赋值，避免无意义 value 写入导致光标跳动。
+  const key = roleDescriptionUI.projectId
+    ? roleDescriptionDraftKey(roleDescriptionUI.projectId, roleDescriptionUI.accountId, roleDescriptionUI.memberId)
+    : null;
+  const draft = key ? roleDescriptionDrafts.get(key) : undefined;
+  if (draft === undefined && !roleDescriptionUI.saving) {
+    const target = roleDescriptionUI.loaded ? roleDescriptionBaseline() : "";
+    if (input.value !== target) input.value = target;
+  }
+  const baseline = roleDescriptionBaseline();
+  const dirty = ready && input.value !== baseline;
+  const length = workspaceRequirementsLength(input.value);
+  // N1 修正：先归一化空白再判超限——全空白提交归 null（恢复默认）不受长度约束，
+  // 仅非空白值适用 2000 码点上限；计数展示仍用原始长度。
+  const overLimit = normalizeRoleDescriptionValue(input.value) !== null && length > ROLE_DESCRIPTION_MAX_CHARS;
+  count.textContent = `${length} / ${ROLE_DESCRIPTION_MAX_CHARS} 字符`;
+  count.classList.toggle("over", overLimit);
+  // agent 账号整组编辑控件隐藏、只读展示；human 在旧服务/未加载完成时禁用保存。
+  for (const btn of [saveBtn, discardBtn, resetBtn]) btn.classList.toggle("hidden", !human);
+  saveBtn.disabled = roleDescriptionUI.saving || !ready || !dirty || overLimit;
+  discardBtn.disabled = roleDescriptionUI.saving || !ready || !dirty;
+  // 恢复默认 = 填回默认文案并提交（发送 null）；已是默认且无修改时无可恢复。
+  resetBtn.disabled = roleDescriptionUI.saving || !ready || (!dirty && roleDescriptionUI.saved === null);
+  // N4 修正：agent 与旧服务只读态只用 readOnly（文本可选中复制），不再 disabled；
+  // 两种只读态都没有可操作的保存按钮（agent 隐藏、旧服务禁用）。
+  input.readOnly = !human || !ready;
+  let message = "", kind = "";
+  if (roleDescriptionUI.error) { message = roleDescriptionUI.error; kind = "error"; }
+  else if (roleDescriptionUI.saving) message = "正在保存…";
+  else if (!roleDescriptionUI.loaded) message = "正在读取角色说明…";
+  else if (!roleDescriptionUI.supported) { message = "当前服务尚未支持保存角色说明，暂时只能查看。"; kind = "error"; }
+  else if (overLimit) { message = `已超出 ${ROLE_DESCRIPTION_MAX_CHARS} 字符上限，请精简后再保存。`; kind = "error"; }
+  else if (roleDescriptionUI.notice) { message = roleDescriptionUI.notice; kind = "success"; }
+  else if (!human) message = "当前账号是 Agent，只能查看，不能修改。";
+  else if (dirty) message = "有未保存的修改，尚未保存。";
+  else message = roleDescriptionUI.saved === null ? "当前使用默认说明；保存空白内容或恢复默认都会回到默认文案。" : "当前内容与服务端一致。";
+  status.textContent = message;
+  status.className = `role-description-status${kind ? ` ${kind}` : ""}`;
+}
+function recordRoleDescriptionDraft() {
+  const input = roleDescriptionEl("role-description-input");
+  if (!input) return;
+  roleDescriptionUI.notice = "";
+  if (roleDescriptionUI.projectId && roleDescriptionUI.memberId && roleDescriptionUI.accountId) {
+    const key = roleDescriptionDraftKey(roleDescriptionUI.projectId, roleDescriptionUI.accountId, roleDescriptionUI.memberId);
+    if (roleDescriptionUI.loaded && input.value === roleDescriptionBaseline()) roleDescriptionDrafts.delete(key);
+    else roleDescriptionDrafts.set(key, input.value);
+  }
+  syncRoleDescriptionEditor();
+}
+async function saveRoleDescription() {
+  const input = roleDescriptionEl("role-description-input");
+  if (!input) return;
+  const { projectId, accountId, memberId } = roleDescriptionUI;
+  if (!projectId || !memberId || roleDescriptionUI.saving || !roleDescriptionUI.loaded || !roleDescriptionUI.supported) return;
+  if (projectId !== activeProjectId || accountId !== myId) return;
+  if (!currentMemberIsHuman()) return;
+  const defaultText = workspaceRoleDefaultDescription(roleDescriptionCurrentRole()?.business_role);
+  const submitted = input.value;
+  if (submitted === (roleDescriptionUI.saved ?? defaultText)) return;
+  // 归一化与后端同序：全空白（含 ""）或与默认文案逐字相等都发送 null（恢复默认、不落库）；
+  // 只有非空白提交才查 2000 码点上限。
+  const normalized = submitted === defaultText ? null : normalizeRoleDescriptionValue(submitted);
+  if (normalized !== null && workspaceRequirementsLength(normalized) > ROLE_DESCRIPTION_MAX_CHARS) { syncRoleDescriptionEditor(); return; }
+  roleDescriptionUI.saving = true;
+  roleDescriptionUI.error = ""; roleDescriptionUI.notice = "";
+  const request = ++roleDescriptionUI.request;
+  syncRoleDescriptionEditor();
+  const current = () => request === roleDescriptionUI.request
+    && projectId === activeProjectId && projectId === roleDescriptionUI.projectId
+    && accountId === myId && accountId === roleDescriptionUI.accountId
+    && memberId === roleDescriptionUI.memberId && memberId === workspaceUI.selectedRole;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(memberId)}/description`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description: normalized }),
+    });
+    if (!current()) return;
+    if (res.status === 404) {
+      const detail = await readErrorDetail(res, "");
+      if (!current()) return;
+      if (/not in the project roster/.test(detail)) {
+        roleDescriptionUI.error = "该角色当前不在项目名册中，说明未保存。请刷新角色列表后重试。";
+      } else if (/project not found/.test(detail)) {
+        // N3 修正：项目被并发删除只报错、保留草稿可重试，不武断判定为旧服务不支持。
+        roleDescriptionUI.error = "项目不存在或已被删除，说明未保存。草稿已保留，请确认项目后重试。";
+      } else {
+        // N3 修正：其它 404（网关/反代兜底、路由缺失等）同样不翻转 supported——旧服务缺
+        // role_description 字段的降级只读已由名册字段判定；此处只准确报错、保留草稿、可重试。
+        roleDescriptionUI.error = `保存失败（接口返回 404${detail ? `：${detail}` : ""}），本次未保存。草稿已保留，请刷新后重试。`;
+      }
+      return;
+    }
+    if (!res.ok) throw new Error(await readErrorDetail(res, `保存失败（${res.status}），草稿已保留，请重试。`));
+    const data = await res.json().catch(() => null);
+    if (!current()) return;
+    // 必须核实同项目/同成员响应带回与归一化提交一致的 description，才算保存成功（防旧服务静默忽略）。
+    if (!data || data.project_id !== projectId || data.member_id !== memberId
+        || !("description" in data) || data.description !== normalized) {
+      throw new Error("服务未确认本次保存（响应未带回一致的 description），草稿已保留，请重试。");
+    }
+    roleDescriptionUI.saved = data.description;
+    // D2：核实通过后立即更新名册缓存并显式重绘列表摘要，无需刷新页面。
+    const agent = projectAgents.find(item => item.member_id === memberId);
+    if (agent) agent.role_description = data.description;
+    const key = roleDescriptionDraftKey(projectId, accountId, memberId);
+    if (input.value === submitted) {
+      roleDescriptionDrafts.delete(key);
+      // 空白提交已被归一为 null：编辑区同步回默认文案，残留空白不被误当未保存修改。
+      const target = roleDescriptionUI.saved ?? defaultText;
+      if (input.value !== target) input.value = target;
+      roleDescriptionUI.notice = normalized === null ? "已恢复默认说明。" : "已保存。";
+    } else {
+      // 保存期间继续编辑：保留新草稿，不把新草稿误标为已保存。
+      roleDescriptionDrafts.set(key, input.value);
+      roleDescriptionUI.notice = "先前内容已保存；当前仍有未保存的修改。";
+    }
+    renderWorkspaceList();
+  } catch (err) {
+    if (!current()) return;
+    roleDescriptionUI.error = err.message || "保存失败，草稿已保留，请重试。";
+  } finally {
+    if (current()) { roleDescriptionUI.saving = false; syncRoleDescriptionEditor(); }
+  }
+}
+function discardRoleDescription() {
+  const input = roleDescriptionEl("role-description-input");
+  if (!input || roleDescriptionUI.saving || !roleDescriptionUI.loaded) return;
+  roleDescriptionDrafts.delete(roleDescriptionDraftKey(roleDescriptionUI.projectId, roleDescriptionUI.accountId, roleDescriptionUI.memberId));
+  const target = roleDescriptionBaseline();
+  if (input.value !== target) input.value = target;
+  roleDescriptionUI.error = "";
+  roleDescriptionUI.notice = "已恢复为已保存的内容。";
+  syncRoleDescriptionEditor();
+}
+// 恢复默认 = 把编辑区填回默认文案并提交（判等后发送 null），与保存空白同效。
+function resetRoleDescription() {
+  const input = roleDescriptionEl("role-description-input");
+  if (!input || roleDescriptionUI.saving || !roleDescriptionUI.loaded || !roleDescriptionUI.supported) return;
+  if (!currentMemberIsHuman()) return;
+  const defaultText = workspaceRoleDefaultDescription(roleDescriptionCurrentRole()?.business_role);
+  if (input.value !== defaultText) {
+    input.value = defaultText;
+    recordRoleDescriptionDraft();
+  }
+  saveRoleDescription();
+}
 function renderWorkspaceList() {
   const rolesMode = workspaceUI.mode === "roles";
   // 开发要求编辑区的可见性统一由 renderTaskDetailsPanel() 同步（app.js），覆盖群聊等不经本函数的导航路径。
@@ -377,12 +642,14 @@ function renderWorkspaceList() {
     settingsRow.setAttribute("aria-pressed", String(workspaceSettingsSelected()));
     settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "项目开发要求与项目主控"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
     blackboardColumns.appendChild(settingsRow);
-    const matchedRoles = roles.filter(item => `${workspaceMemberName(item.member_id)} ${workspaceRoleLabel(item.business_role)}`.toLocaleLowerCase().includes(query));
+    // ROLE-DESC-F1：搜索范围 = 成员名 + 有效说明全文（自定义 ?? 默认）+ 原始 business_role。
+    const matchedRoles = roles.filter(item => `${workspaceMemberName(item.member_id)} ${workspaceRoleDescriptionText(item)} ${item.business_role || ""}`.toLocaleLowerCase().includes(query));
     for (const role of matchedRoles) {
       const row = workspaceButton("", () => { workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = role.member_id; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row");
       row.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
       row.setAttribute("aria-pressed", String(!workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole));
-      row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleLabel(role.business_role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
+      // 摘要列取有效说明的首个非空行：自定义后不再显示过时的硬编码短标签。
+      row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleSummary(role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
       // 被指定角色带“项目主控”标记；同名角色用 member_id 消歧（写请求始终使用 ID）。
       if (workspaceControllerBadge(role.member_id)) row.appendChild(workspaceEl("span", "role-controller-badge", "项目主控"));
       row.appendChild(workspaceEl("small", "role-row-id", role.member_id));
@@ -408,21 +675,27 @@ function renderWorkspaceList() {
   if (!blackboardColumns.childElementCount) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", query ? "没有匹配的结果" : rolesMode ? "这个项目还没有配置角色。" : "当前筛选下没有任务。"));
 }
 function renderWorkspaceRoleDetails() {
-  const panel = document.getElementById("role-details-panel");
+  // ROLE-DESC-F1 修正（#137/N4）：角色详情拆为名称区与参与任务区两个动态容器，
+  // 静态说明编辑区（index.html 居中独立）位于两者之间；replaceChildren 只触碰这两个容器，
+  // 绝不经过说明区——编辑区节点、内容与焦点在轮询重绘时天然保持。
+  const namePanel = document.getElementById("role-details-name-panel");
+  const tasksPanel = document.getElementById("role-details-tasks-panel");
   // ROLE-SETTINGS-1：项目设置与具体角色互斥——选中“项目设置”时角色详情整体隐藏，不残留空白面板。
   const visible = blackboardOpen && workspaceUI.mode === "roles" && !workspaceSettingsSelected();
-  panel.classList.toggle("hidden", !visible);
+  namePanel.classList.toggle("hidden", !visible);
+  tasksPanel.classList.toggle("hidden", !visible);
   if (!visible) return;
-  panel.replaceChildren();
+  namePanel.replaceChildren();
+  tasksPanel.replaceChildren();
   const role = workspaceRoles().find(item => item.member_id === workspaceUI.selectedRole);
-  if (!role) { panel.classList.add("hidden"); return; } // 防御：失效选择由 workspaceSettingsSelected 回退到项目设置
-  panel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), workspaceEl("h2", "", workspaceMemberName(role.member_id)), workspaceEl("p", "role-description", workspaceRoleLabel(role.business_role)), workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
-  const description = workspaceRoleDescription(role.business_role);
-  if (description) panel.insertBefore(workspaceEl("p", "role-explanation", description), panel.lastChild);
+  if (!role) { namePanel.classList.add("hidden"); tasksPanel.classList.add("hidden"); return; } // 防御：失效选择由 workspaceSettingsSelected 回退到项目设置
+  namePanel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), workspaceEl("h2", "", workspaceMemberName(role.member_id)), workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
+  // ROLE-DESC-F1：原硬编码的短标签行（role-description）与解释行（role-explanation）从动态面板移除；
+  // 说明统一由居中静态编辑区 #role-description-panel 呈现（自定义 ?? 默认），映射仅作默认值生成器。
   // ROLE-SETTINGS-1：移除角色详情的“交办任务”快捷入口；任务创建仍走全局“新建任务”与任务树子任务入口。
   // 主控管理集中在“项目设置”页；角色详情只保留当前指定标记，同名角色仍按 member_id 消歧。
-  panel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
-  if (workspaceControllerBadge(role.member_id)) panel.appendChild(workspaceEl("p", "role-controller-badge", "项目主控（当前指定）"));
+  namePanel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
+  if (workspaceControllerBadge(role.member_id)) namePanel.appendChild(workspaceEl("p", "role-controller-badge", "项目主控（当前指定）"));
   const section = workspaceEl("section", "role-task-section");
   section.appendChild(workspaceEl("h3", "", "参与的任务"));
   const filters = workspaceEl("div", "role-task-filters");
@@ -448,7 +721,7 @@ function renderWorkspaceRoleDetails() {
   }
   table.appendChild(body); section.appendChild(table);
   if (!tasks.length) section.appendChild(workspaceEl("p", "workspace-empty", "当前没有这类任务。"));
-  panel.appendChild(section);
+  tasksPanel.appendChild(section);
 }
 // ── C1b-S2 项目主控指定（角色页，唯一长期指定） ─────────────────────────
 // 数据源是服务端返回的 controller_member_id / controller_assignment_version /
@@ -931,5 +1204,12 @@ if (typeof document !== "undefined") {
       if (select && select.value) saveControllerAssignment(select.value);
     });
   }
+  const roleDescriptionInput = document.getElementById("role-description-input");
+  if (roleDescriptionInput) {
+    roleDescriptionInput.addEventListener("input", recordRoleDescriptionDraft);
+    document.getElementById("role-description-save").addEventListener("click", saveRoleDescription);
+    document.getElementById("role-description-discard").addEventListener("click", discardRoleDescription);
+    document.getElementById("role-description-reset").addEventListener("click", resetRoleDescription);
+  }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, controllerStatusMeta, workspaceSettingsSelected};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, controllerStatusMeta, workspaceSettingsSelected};

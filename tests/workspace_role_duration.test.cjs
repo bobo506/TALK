@@ -60,8 +60,9 @@ function findAll(node, pred, out = []) {
 // 在 vm 中运行整份 workspace.js（剥掉顶层 workspaceUI 常量，改用可控实例），
 // 使 renderWorkspaceRoleDetails 以其真实依赖做真实渲染。
 function workspaceContext({ roles, membersList, tasks, selectedRole, roleFilter }) {
+  // #137/N4：角色详情拆为名称区与参与任务区两个动态容器；本文件的断言面向参与任务表，取任务区容器。
   const panel = fakeElement('div');
-  const elements = { 'role-details-panel': panel };
+  const elements = { 'role-details-name-panel': fakeElement('div'), 'role-details-tasks-panel': panel };
   const documentStub = {
     createElement: tag => fakeElement(tag),
     getElementById: id => elements[id] || (elements[id] = fakeElement('div')),
@@ -162,9 +163,11 @@ test('角色详情真实渲染：表头为 任务/执行耗时/任务状态/操�
   for (const gone of ['承担工作', '统筹与汇总', '委派与跟进', '检查工作']) {
     assert.ok(!texts.some(t => t.includes(gone)), `不应再出现：${gone}`);
   }
-  // reviewer/Kimi 显示执行工作标签与统一说明；原始 business_role 不被改写
-  assert.ok(texts.includes(EXEC_LABEL));
-  assert.ok(texts.includes(EXEC_DESC));
+  // ROLE-DESC-F1：硬编码标签/解释行从动态角色详情移除，说明改由同级静态编辑区呈现；
+  // 映射仅作默认值生成器保留，原始 business_role 不被改写
+  assert.ok(!texts.includes(EXEC_LABEL));
+  assert.ok(!texts.includes(EXEC_DESC));
+  assert.equal(helpers.workspaceRoleDefaultDescription('reviewer'), `${EXEC_LABEL}\n${EXEC_DESC}`);
   assert.equal(roles.find(r => r.member_id === 'agent:kimi').business_role, 'reviewer');
   // 进行中筛选：执行中任务挂 running 标识，状态与操作列保留
   const durations = findAll(panel, n => n.className === 'task-card-duration');
@@ -181,21 +184,27 @@ test('角色详情真实渲染：表头为 任务/执行耗时/任务状态/操�
   assert.equal(done[0].dataset.running, undefined);
 });
 
-test('真实角色渲染：lead 保持统筹原文，dev/developer 与 reviewer 说明一致', () => {
+test('默认文案生成器：lead 保持统筹原文，dev/developer 与 reviewer 说明一致，详情面板不再渲染硬编码行', () => {
   const { membersList, roles, tasks } = roleFixture();
   const { context, panel } = workspaceContext({ roles, membersList, tasks, selectedRole: 'agent:codex', roleFilter: 'running' });
   context.renderWorkspaceRoleDetails();
   let texts = allTexts(panel);
-  assert.ok(texts.includes('统筹任务'));
-  assert.ok(texts.includes('负责分配工作、跟进进度，并汇总最终成果。'));
+  // ROLE-DESC-F1：详情面板不再渲染短标签/解释行（由静态编辑区接管），默认生成器保持原文
+  assert.ok(!texts.includes('统筹任务'));
+  assert.ok(!texts.includes('负责分配工作、跟进进度，并汇总最终成果。'));
   assert.ok(!texts.includes(EXEC_DESC));
-  // developer 与 dev 同义：altdev(developer) 显示与执行角色相同的标签和说明
-  context.workspaceUI.selectedRole = 'agent:altdev';
-  context.renderWorkspaceRoleDetails();
-  texts = allTexts(panel);
-  assert.ok(texts.includes(EXEC_LABEL));
-  assert.ok(texts.includes(EXEC_DESC));
+  assert.equal(helpers.workspaceRoleDefaultDescription('lead'), '统筹任务\n负责分配工作、跟进进度，并汇总最终成果。');
+  // developer 与 dev 同义：默认文案与执行角色相同；有效说明在无自定义时即默认文案
+  assert.equal(helpers.workspaceRoleDefaultDescription('developer'), helpers.workspaceRoleDefaultDescription('dev'));
+  const altdev = roles.find(r => r.member_id === 'agent:altdev');
+  assert.equal(helpers.workspaceRoleDescriptionText(altdev), `${EXEC_LABEL}\n${EXEC_DESC}`);
+  assert.equal(helpers.workspaceRoleSummary(altdev), EXEC_LABEL);
+  // 有自定义说明时有效说明取自定义且不回退硬编码；摘要取首个非空行
+  const custom = { member_id: 'agent:altdev', business_role: 'developer', role_description: '\n自定义第一行\n第二行' };
+  assert.equal(helpers.workspaceRoleDescriptionText(custom), custom.role_description);
+  assert.equal(helpers.workspaceRoleSummary(custom), '自定义第一行');
   // 无参与任务的角色保持空状态
+  context.workspaceUI.selectedRole = 'agent:altdev';
   context.renderWorkspaceRoleDetails();
   assert.ok(allTexts(panel).includes('当前没有这类任务。'));
 });
@@ -227,7 +236,10 @@ test('源码契约：参与集合逻辑不变，taskKindLabel 保留给其他页
   assert.ok(!roleFn.includes('委派与跟进'));
   assert.ok(!roleFn.includes('taskKindLabel'));
   assert.match(roleFn, /workspaceTaskDurationEl\(task\)/);
-  assert.match(roleFn, /workspaceRoleDescription\(role\.business_role\)/);
+  // ROLE-DESC-F1：详情面板不再引用硬编码说明映射（映射仅作默认值生成器保留在模块级）
+  assert.ok(!roleFn.includes('workspaceRoleDescription('));
+  assert.ok(!roleFn.includes('workspaceRoleLabel('));
+  assert.match(wsSource, /function workspaceRoleDefaultDescription\(/);
   // 参与任务集合与委派关系筛选逻辑保持不变
   assert.match(wsSource, /task\.target_member_id === id \|\| \(task\.created_by === id/);
   // taskKindLabel 能力保留（任务流转等其它页面继续使用）

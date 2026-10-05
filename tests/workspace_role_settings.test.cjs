@@ -1,7 +1,7 @@
 // ROLE-SETTINGS-1：角色页“项目设置”独立首项 + 主控管理集中 + 移除角色交办入口。
 // 在 vm 中加载整份真实 web/workspace.js（含真实 renderWorkspaceList/renderWorkspaceRoleDetails/
-// renderRequirementsPanel/renderControllerPanel 与顶部事件绑定），renderTaskDetailsPanel 桩
-// 按 app.js 的真实顺序调用三个真实面板函数；setActiveProject 从 app.js 按函数边界真实抽取。
+// renderRequirementsPanel/renderControllerPanel/renderRoleDescriptionPanel 与顶部事件绑定），
+// renderTaskDetailsPanel 桩按 app.js 的真实顺序调用四个真实面板函数；setActiveProject 从 app.js 按函数边界真实抽取。
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -63,9 +63,9 @@ const MEMBERS = [
   { id: 'agent:banned', kind: 'agent', display_name: 'Banned', disabled_at: '2026-09-20T00:00:00' },
 ];
 const ROSTER = [
-  { member_id: 'agent:kimi', business_role: 'reviewer' },
-  { member_id: 'agent:kimi2', business_role: 'reviewer' },
-  { member_id: 'agent:deepseek', business_role: 'dev' },
+  { member_id: 'agent:kimi', business_role: 'reviewer', role_description: null },
+  { member_id: 'agent:kimi2', business_role: 'reviewer', role_description: null },
+  { member_id: 'agent:deepseek', business_role: 'dev', role_description: null },
 ];
 
 function harness({ human = true, projectId = 'A', roster = ROSTER } = {}) {
@@ -136,11 +136,12 @@ function harness({ human = true, projectId = 'A', roster = ROSTER } = {}) {
     blackboardEmpty: getEl('blackboard-empty'),
     userBadge: getEl('user-badge'),
   });
-  // renderTaskDetailsPanel 桩按 app.js 真实顺序调用三个真实面板同步函数。
+  // renderTaskDetailsPanel 桩按 app.js 真实顺序调用四个真实面板同步函数（含 ROLE-DESC-F1 说明编辑区）。
   context.renderTaskDetailsPanel = () => {
     context.renderWorkspaceRoleDetails();
     context.renderRequirementsPanel();
     context.renderControllerPanel();
+    context.renderRoleDescriptionPanel();
   };
   vm.runInContext(wsSource, context);
   // const 声明不挂到 context 对象，显式暴露引用便于断言与驱动选择状态。
@@ -196,7 +197,8 @@ test('固定首项：首次进入角色页默认“项目设置”，不计入�
   // 右侧互斥：项目级面板显示，角色详情隐藏
   assert.equal(h.hidden('requirements-panel'), false);
   assert.equal(h.hidden('controller-panel'), false);
-  assert.equal(h.hidden('role-details-panel'), true);
+  assert.equal(h.hidden('role-details-name-panel'), true);
+  assert.equal(h.hidden('role-details-tasks-panel'), true);
 });
 
 test('搜索过滤角色行时“项目设置”保持可达，且不受过滤影响', async () => {
@@ -252,17 +254,20 @@ test('互斥切换：点角色只显示角色详情，点项目设置只显示�
   await h.flush();
   assert.equal(h.ui.roleSelection, 'role');
   assert.equal(h.ui.selectedRole, 'agent:deepseek');
-  assert.equal(h.hidden('role-details-panel'), false);
+  assert.equal(h.hidden('role-details-name-panel'), false);
+  assert.equal(h.hidden('role-details-tasks-panel'), false);
+  assert.equal(h.hidden('role-description-panel'), false, '选中具体角色时静态说明编辑区显示');
   assert.equal(h.hidden('requirements-panel'), true);
   assert.equal(h.hidden('controller-panel'), true);
-  // 角色详情确实渲染了内容（不是残留空白面板）
-  const details = h.el('role-details-panel');
-  assert.ok(allTexts(details).some(t => t.includes('DeepSeek')));
-  assert.ok(allTexts(details).some(t => t.includes('参与的任务')));
-  // 回到项目设置：角色详情整体隐藏
+  // 角色详情确实渲染了内容（不是残留空白面板）：名称区显示角色名，任务区显示参与任务
+  assert.ok(allTexts(h.el('role-details-name-panel')).some(t => t.includes('DeepSeek')));
+  assert.ok(allTexts(h.el('role-details-tasks-panel')).some(t => t.includes('参与的任务')));
+  // 回到项目设置：角色详情与说明编辑区整体隐藏
   h.settingsRow().fire('click');
   await h.flush();
-  assert.equal(h.hidden('role-details-panel'), true);
+  assert.equal(h.hidden('role-details-name-panel'), true);
+  assert.equal(h.hidden('role-details-tasks-panel'), true);
+  assert.equal(h.hidden('role-description-panel'), true);
   assert.equal(h.hidden('requirements-panel'), false);
   assert.equal(h.hidden('controller-panel'), false);
   assert.equal(h.ui.selectedRole, 'agent:deepseek', '角色选择保留，仅切换查看对象');
@@ -277,10 +282,10 @@ test('角色详情不再提供“交办任务”入口；参与任务“查看�
   await h.enterRoles();
   h.roleRow('agent:deepseek').fire('click');
   await h.flush();
-  const details = h.el('role-details-panel');
-  const texts = allTexts(details);
+  const details = h.el('role-details-tasks-panel');
+  const texts = [...allTexts(h.el('role-details-name-panel')), ...allTexts(details)];
   assert.ok(!texts.some(t => t.includes('交办任务')), '角色详情不再有“交办任务”快捷入口');
-  assert.ok(!findAll(details, n => n.tagName === 'button').some(b => (b.textContent || '').includes('交办')));
+  assert.ok(![...findAll(h.el('role-details-name-panel'), n => n.tagName === 'button'), ...findAll(details, n => n.tagName === 'button')].some(b => (b.textContent || '').includes('交办')));
   const viewButtons = findAll(details, n => n.tagName === 'button' && n.textContent === '查看任务');
   assert.equal(viewButtons.length, 1, '参与任务“查看任务”保留');
   viewButtons[0].fire('click');
@@ -326,7 +331,7 @@ test('主控集中在项目设置页：候选选择器指定、列表徽标与�
   // 角色详情只保留标记，没有指定/解除管理控件
   h.roleRow('agent:kimi2').fire('click');
   await h.flush();
-  const details = h.el('role-details-panel');
+  const details = h.el('role-details-name-panel');
   assert.ok(allTexts(details).some(t => t.includes('项目主控（当前指定）')));
   const buttons = findAll(details, n => n.tagName === 'button').map(b => b.textContent || '');
   assert.ok(!buttons.some(t => /设为项目主控|解除主控/.test(t)), '角色详情不再重复主控管理面板');

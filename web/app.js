@@ -112,8 +112,6 @@ const projectEmptyNote = document.getElementById("project-empty-note");
 const blackboardView = document.getElementById("blackboard-view");
 const blackboardTitle = document.getElementById("blackboard-title");
 const blackboardDescription = document.getElementById("blackboard-description");
-const blackboardRefreshBtn = document.getElementById("blackboard-refresh-btn");
-const blackboardDelegateBtn = document.getElementById("blackboard-delegate-btn");
 const blackboardSummary = document.getElementById("blackboard-summary");
 const blackboardColumns = document.getElementById("blackboard-columns");
 const blackboardEmpty = document.getElementById("blackboard-empty");
@@ -636,9 +634,7 @@ historyClearBtn.addEventListener("click", clearHistorySearch);
 projectSelect.addEventListener("change", () => setActiveProject(projectSelect.value));
 projectBlackboardBtn.addEventListener("click", () => setBlackboardOpen(true));
 refreshProjectBtn.addEventListener("click", refreshProjectWorkspace);
-blackboardRefreshBtn.addEventListener("click", refreshProjectWorkspace);
 delegateTaskBtn.addEventListener("click", () => setTaskCreateOpen(true));
-blackboardDelegateBtn.addEventListener("click", () => setTaskCreateOpen(true));
 taskDetailsRefreshBtn.addEventListener("click", () => loadProjectTasks());
 closeTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
 cancelTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
@@ -877,7 +873,6 @@ async function refreshProjectWorkspace() {
   if (workspaceUI.mode === "chats") { await refreshGroups(); return; }
   if (!activeProjectId) return;
   refreshProjectBtn.disabled = true;
-  blackboardRefreshBtn.disabled = true;
   taskDetailsRefreshBtn.disabled = true;
   try {
     await loadProjectAgents();
@@ -888,7 +883,6 @@ async function refreshProjectWorkspace() {
     renderRoomStrip();
   } finally {
     refreshProjectBtn.disabled = false;
-    blackboardRefreshBtn.disabled = false;
     taskDetailsRefreshBtn.disabled = false;
   }
 }
@@ -917,7 +911,6 @@ function renderProjectStrip() {
   projectTaskCount.textContent = String(projectTasks.length);
   const canDelegate = Boolean(activeProjectId && eligibleProjectAgents().length);
   delegateTaskBtn.disabled = !canDelegate;
-  blackboardDelegateBtn.disabled = !canDelegate;
   projectEmptyNote.classList.toggle("hidden", projects.length > 0);
 }
 
@@ -1067,6 +1060,10 @@ function renderTaskDetailsPanel() {
   renderRequirementsPanel();
   // C1b-S2 项目主控面板沿用同一同步点：任务/群聊导航不残留管理区。
   renderControllerPanel();
+  // ROLE-DESC-F1 角色说明编辑区沿用同一同步点；面板是静态 DOM，位于名称区与参与任务区两个动态
+  // 容器之间（#137/N4 布局），动态 replaceChildren 与 5 秒轮询重绘都不触碰 textarea，
+  // 内容/焦点/光标天然保持。
+  renderRoleDescriptionPanel();
   const task = getContextTask();
   // 先捕获完整上下文（项目/账号/任务）；上下文变化时统一清理成果展开状态，包括 task=null，避免旧展开状态复活。
   const contextKey = taskContextKey();
