@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #158 F-1修正交付收到，派#159定向复核
+
+- 用户通知“158完成了”。talk_get_delivery #158/msg2660合法完整talk-delivery-1，task_id匹配、自报complete、无省略；completed10/unfinished0/blocked0、changed_files2/verification6/limitations7，runner succeeded/workflow submitted。开发者已暂停，格式有效不等于业务验收，#156/#158均未收取；#157复核工作已在前轮收取，原partial与MCPunknown自由文本不追改。
+- 开工e01d78ae75c1b9c078c140a0c71cd1b2c1553ce3→当前6d0a5f32f5e1143a5abc48a2b628af24e639d146仅主控3份进度文档变化，分支codex/terminal-return-codex。主控核对修正前snapshot-before/talk_task_tools.py 99644字节/hashbb59cf9b1d7c690b50cf65faab2138f1b3394d33f48e6382bcfa9d5c1ad85715、test_talk_controlled_wait.py 57408/hashf8ec6040cde9b3371893df4ac92686e5ba6b2b755e3850e1796ffbf54ed6fe45，与#156/#157冻结值一致。
+- 修正后对象主控实测：bridges/talk_task_tools.py 101189字节/SHA256 a98ac7a2878938c47337bc00cfa4364d275cfe185021a9efea1f6ac23e5c3a85；tests/test_talk_controlled_wait.py 67002/hash5745c5f31399d338caa4542e8684432ce9435c78dfe55939152fe5fe14edac7e；terminal8642/hash0a197814da98673956982788343b78db61e04e9946e527b361aeb5427d08f0b2保持不变。相对修正前git diff --no-index --numstat工具+49/-28、测试+189/0（返回1表示有差异）；累计git diff --numstat实际工具+752/-59、terminal+18/0，新测试未跟踪。开发者累计+812/-59是笔误，本次修正增量正确，正式记录用实测。交付progress_draft的#157未收取亦为旧状态笔误，以前轮completed为准，不因此重复收取或改原件。
+- 实现自报：新增fail_as_api_error(exc, stage)统一运行期错误出口，poll/recheck except均接入；重读失败显式TalkToolError含真实elapsed/rounds，恰好一条api_error JSONL，失败GET只计一次http_requests、controlled_rechecks仍仅成功重读计入。JSONL新failure_stage=poll/recheck仅内部记录，不进返回/query_stats四键；退出次序/分类/9工具/其他门禁与旧false路径保持。实际代码与新增直接风险交Kimi定向审，Codex不重复完整审查或测试。
+- 新增2测试方法：假时钟矩阵HTTP500/超时/已有一次成功重读后失败，以及真实_api_request+假urlopen的HTTP500/read TimeoutError计数链。自报controlled_wait29 OK/14.334s、task_tools/terminal29 OK/43.243s、controller_mode31 OK/13.617s；新probe_recheck_fix.py HTTP500/超时两例record1/api_error/stage recheck、HTTP13/项目GET2、失败为最后请求/无非GET；原#157探针False/0→True/1，api_error。原probe脚本3558/hash05aa2d982996536cc0628aa6945303ebca39862c240f9b8d81beecc9867c5cb3、旧txt179/hash0cc673f3acb2bef36d3986ece6e54fcfcee9f7764dbfa2f0613e0bd0e013ccad，主控核对仍保持。
+- 本地目录.tmp/controller-mode-c2-a1-fix/，notes.md 9598字节/hashb7a4c8c387857721585e3a073ac1297e61cb086bc2b438d7f2c4d3bed6c6fe3f、development.json 6776/hash608bdaeb81cb9d41b7d2db887c9da9478964a5c41f9dba929ddd03fa575d6a6a。新probe_recheck_fix.txt和probe_original_review_after_fix.txt为开发者记录实际控制台输出的逐字转录，stdout/stderr重定向受沙箱拒绝，不能称自动原始日志。ACP整套现成WinError5未重跑、不算通过，未重跑全库。
+- 派前读取最新development_requirements仍按双方交叉复核、Kimi文字设计交互前端/DeepSeek后端其他；mode passive/version0、effective null/not_bound仅配置事实。最小独立顶层派#159“受控等待重读错误修正定向复核”给agent:kimi，queued/assigned；不手写标题编号，无子任务字段。开发者暂停，复核期间不并行改业务码。
+- #159包包含原需求/正式合同hash、F-1原定位与修正目标、修正前快照/后源码完整hash及本次/累计增量区别、测试/转录日志/沙箱限制、历史任务状态纠正；仅审F-1实际增量与共用poll错误出口兼容、准确一次统计/计数、stage内部字段及直接统计读取兼容、正常次序/无新增泄密等具体新增风险，必要新测试/旧探针和controlled_wait关键回归；不重做#157 A–H完整审查/设计/216项全库。复核执行与业务通过分开，通过后主控合看原片独立审查与定向结论收尾。
+- #159只写.tmp/controller-mode-c2-a1-fix-review/完整review/development及必要证据，显式UTF-8/实际任务号校验；TALK结果正文只能完整裸JSON，避免#157说明+JSON混排。原件/快照/业务源码/正式文档不改，未授权启停/重载/真实模型/长等/浏览器/凭据/mode/指定/权限/派发或收取他人任务/commit/push。S-1–S-3、pi旧wait、C2-A2/B/C/D不扩片，双横线仅下一C2-B；没有新用户入口，不称开关可用，取消无源/同步排队/总预算仅约定/硬deadline限制保留。
+- 本轮仅PROGRESS/HISTORY/路线图收件/派发记录，明确暂存3份文档并diff --check后中文提交常规推送，3份业务差异保持未提交待复核。派后结束，由用户通知#159完成，不主动轮询；通过再处理#156/#158收取、模块/说明及业务Git收尾，MCP重载和真实主动链路未验收如实分开。
+
 ## 2026-10-05 #157复核发现F-1，收取复核并派#158定向修正
 
 - 用户通知“157完成了”。talk_get_delivery #157/msg2659为unknown自由文本，不从succeeded推断业务通过；按稳定结果引用完整补读3028字符（SHA256 f7e56ebacf5ba20af397aa9db4f6fed75510dc3e7721abebd04e2ac55638f6dc），正文是“说明+JSON”混排，未因包含JSON而追改MCP结论。旧入口summary .tmp/controller-mode-c2-a1-review/development.json --expect-task-id157有效talk-delivery-1、partial，无截断；6完成/1未完成/0阻塞，6验证/4限制。未完成指F-1需开发者修正，独立复核执行本身已完成。
