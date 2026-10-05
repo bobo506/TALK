@@ -288,8 +288,7 @@ button:disabled {
   font-size: var(--font-control);
 }
 
-.project-nav-btn,
-.project-delegate-btn {
+.project-nav-btn {
   width: 100%;
   min-height: 38px;
   border-radius: 8px;
@@ -320,13 +319,6 @@ button:disabled {
   padding: 2px 7px;
   text-align: center;
   font-size: 10px;
-}
-
-.project-delegate-btn {
-  margin-top: 8px;
-  border: 1px solid transparent;
-  background: var(--blue-strong);
-  color: #fff;
 }
 
 .project-empty-note {

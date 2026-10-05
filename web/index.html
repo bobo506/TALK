@@ -6,8 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261005-role-desc-f1-fix">
-  <link rel="stylesheet" href="/workspace.css?v=20261005-role-desc-f1-fix">
+  <link rel="stylesheet" href="/style.css?v=20261005-role-desc-f2">
+  <link rel="stylesheet" href="/workspace.css?v=20261005-role-desc-f2">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -86,7 +86,6 @@
     </div>
     <select id="project-select" class="project-select" aria-label="选择项目"></select>
     <div class="header-actions">
-      <button id="delegate-task-btn" type="button" class="project-delegate-btn">新建任务</button>
       <span id="connection-status" class="hidden"></span>
       <span id="user-badge" class="user-badge"></span>
       <button id="logout-btn" class="logout-btn">退出</button>
@@ -118,7 +117,7 @@
           <div id="blackboard-columns" class="blackboard-columns"></div>
           <div id="blackboard-empty" class="blackboard-empty hidden">
             <strong>这个项目还没有任务</strong>
-            <span>点击“新建任务”开始委派工作。</span>
+            <span>任务由主控分配；选中任务后可在详情中创建子任务。</span>
           </div>
         </section>
 
@@ -492,7 +491,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/workspace.js?v=20261005-role-desc-f1-fix"></script>
-  <script src="/app.js?v=20261005-role-desc-f1-fix"></script>
+  <script src="/workspace.js?v=20261005-role-desc-f2"></script>
+  <script src="/app.js?v=20261005-role-desc-f2"></script>
 </body>
 </html>

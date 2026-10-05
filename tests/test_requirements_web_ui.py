@@ -6,7 +6,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261005-role-desc-f1-fix"
+STATIC_VERSION = "20261005-role-desc-f2"
 
 
 class RequirementsWebUiTests(RouteTestCase):

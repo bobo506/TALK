@@ -2,7 +2,6 @@
 .app-header {min-width:0!important; height:70px; min-height:70px; display:flex; gap:32px; padding:0 28px; border-bottom:1px solid var(--line);}
 .window-brand {padding:0; flex-shrink:0;} .header-actions {margin-left:auto; padding:0; gap:18px;}
 .app-header .project-select {width:180px; margin:0; font-size:16px;}
-.app-header .project-delegate-btn {width:auto; margin:0; padding:9px 20px; background:transparent; color:var(--blue-strong); border:1px solid var(--blue-strong); box-shadow:none;}
 .app-header .user-badge,.app-header .logout-btn {display:inline-block!important; font-size:14px;}
 .workbench {min-width:0; height:calc(100vh - 70px);}
 .workbench.project-mode {grid-template-columns:minmax(270px,32%) minmax(0,1fr);}
@@ -67,10 +66,9 @@
 .role-task-name {display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.7;}
 button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible {outline:2px solid #2f6fb1; outline-offset:3px;}
 @media(max-width:1000px){.workbench.project-mode {grid-template-columns:280px minmax(0,1fr);} .project-mode .details-panel {padding:28px 24px;} .project-mode .task-details-heading h3 {font-size:26px;} .blackboard-summary {gap:14px;} .app-header {gap:18px;} .app-header .project-select {width:155px;}}
-@media(max-width:700px){html,body {overflow:auto;} .app-header {height:auto; min-height:70px; flex-wrap:wrap; padding:12px 18px; gap:12px;} .app-header .header-actions {gap:12px;} .app-header .project-select {width:135px;} .app-header .project-delegate-btn {padding:8px 12px;} .app-header .user-badge {display:none!important;} .workbench.project-mode {display:flex; flex-direction:column; height:auto; overflow:visible;} .project-mode .workspace-tools {max-height:440px; overflow-y:auto; width:100%; border-bottom:1px solid #ddd;} .project-mode .details-panel {overflow:visible; padding:24px 20px; width:100%; border-left:0;} .role-task-table th,.role-task-table td {padding:12px 5px; font-size:13px;} .role-task-table .workspace-text-button {font-size:13px;} .task-details-heading h3 {font-size:24px;} .task-card-title {font-size:16px;} .task-details-actions button {font-size:14px;} }
+@media(max-width:700px){html,body {overflow:auto;} .app-header {height:auto; min-height:70px; flex-wrap:wrap; padding:12px 18px; gap:12px;} .app-header .header-actions {gap:12px;} .app-header .project-select {width:135px;} .app-header .user-badge {display:none!important;} .workbench.project-mode {display:flex; flex-direction:column; height:auto; overflow:visible;} .project-mode .workspace-tools {max-height:440px; overflow-y:auto; width:100%; border-bottom:1px solid #ddd;} .project-mode .details-panel {overflow:visible; padding:24px 20px; width:100%; border-left:0;} .role-task-table th,.role-task-table td {padding:12px 5px; font-size:13px;} .role-task-table .workspace-text-button {font-size:13px;} .task-details-heading h3 {font-size:24px;} .task-card-title {font-size:16px;} .task-details-actions button {font-size:14px;} }
 
 .window-brand h1 {font-size:24px;}
-.app-header .project-delegate-btn {font-size:15px;}
 
 /* ROLE-DESC-F1 角色说明编辑区：静态 DOM 区块，位于名称区 #role-details-name-panel 与参与任务区
    #role-details-tasks-panel 之间（#137/N4 布局：名称区 → 说明区 → 任务区），复用 REQ2 浅色工作台层级。 */

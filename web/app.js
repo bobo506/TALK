@@ -107,7 +107,6 @@ const projectSelect = document.getElementById("project-select");
 const refreshProjectBtn = document.getElementById("refresh-project-btn");
 const projectBlackboardBtn = document.getElementById("project-blackboard-btn");
 const projectTaskCount = document.getElementById("project-task-count");
-const delegateTaskBtn = document.getElementById("delegate-task-btn");
 const projectEmptyNote = document.getElementById("project-empty-note");
 const blackboardView = document.getElementById("blackboard-view");
 const blackboardTitle = document.getElementById("blackboard-title");
@@ -634,7 +633,6 @@ historyClearBtn.addEventListener("click", clearHistorySearch);
 projectSelect.addEventListener("change", () => setActiveProject(projectSelect.value));
 projectBlackboardBtn.addEventListener("click", () => setBlackboardOpen(true));
 refreshProjectBtn.addEventListener("click", refreshProjectWorkspace);
-delegateTaskBtn.addEventListener("click", () => setTaskCreateOpen(true));
 taskDetailsRefreshBtn.addEventListener("click", () => loadProjectTasks());
 closeTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
 cancelTaskCreateBtn.addEventListener("click", () => setTaskCreateOpen(false));
@@ -909,8 +907,6 @@ function renderProjectStrip() {
   projectBlackboardBtn.disabled = !activeProjectId;
   projectBlackboardBtn.classList.toggle("active", blackboardOpen && Boolean(activeProjectId));
   projectTaskCount.textContent = String(projectTasks.length);
-  const canDelegate = Boolean(activeProjectId && eligibleProjectAgents().length);
-  delegateTaskBtn.disabled = !canDelegate;
   projectEmptyNote.classList.toggle("hidden", projects.length > 0);
 }
 

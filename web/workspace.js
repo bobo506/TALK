@@ -692,7 +692,8 @@ function renderWorkspaceRoleDetails() {
   namePanel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), workspaceEl("h2", "", workspaceMemberName(role.member_id)), workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
   // ROLE-DESC-F1：原硬编码的短标签行（role-description）与解释行（role-explanation）从动态面板移除；
   // 说明统一由居中静态编辑区 #role-description-panel 呈现（自定义 ?? 默认），映射仅作默认值生成器。
-  // ROLE-SETTINGS-1：移除角色详情的“交办任务”快捷入口；任务创建仍走全局“新建任务”与任务树子任务入口。
+  // ROLE-SETTINGS-1：移除角色详情的“交办任务”快捷入口；ROLE-DESC-F2 已移除顶部“新建任务”入口，
+  // 任务创建只保留任务详情子任务入口与主控派发（公共 POST /api/tasks / MCP / SDK）。
   // 主控管理集中在“项目设置”页；角色详情只保留当前指定标记，同名角色仍按 member_id 消歧。
   namePanel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
   if (workspaceControllerBadge(role.member_id)) namePanel.appendChild(workspaceEl("p", "role-controller-badge", "项目主控（当前指定）"));
