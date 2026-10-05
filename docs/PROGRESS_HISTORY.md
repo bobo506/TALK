@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #148候选复核通过，落地保护先修，派#149
+
+- 用户通知“148已完成”。#148/msg2645有前言和Markdown围栏，MCP自由文本unknown且预览截断，不据此验收；按项目本地回退执行 `python -X utf8 scripts/talk_workflow.py summary .tmp/dsh-desktop-mcp-2-review/delivery.json --expect-task-id 148`，合法实际号匹配、完整摘要未截断，结论partial，完成10/未完成4/阻塞0。没有把MCPunknown追改成结构化partial。
+- 独立复核确认#147事实：安装0.2.0-rc.2/Python3.12.1/PyYAML6.0.3；桌面主进程与host实际profile/cwd证明、白名单只读PEB范围可信。Kimi自写重渲染候选与开发者字节一致（1229字节/28行/hash41eeab30…f9760dea），独立从app.asar抽取stdio10字段、unknown=[]，路径6项转义通过；原目标1045字节/LF/6条/hash4366d522…02b085保持，内存合并2275字节/hash245407f8…e2398d6，前缀与原条目不变，仅增mcp-talk。
+- 权限与边界独立成立：profile目录仅原4文件，无备份或临时残留，home层不存在；ACL与backup_failed Errno13一致，仍是执行者沙箱拒绝，主控未发过require_escalated真实写入审批、无自动审查拒绝。Host路由401/404、GUI可见/派发收取及长等仍not_run；file工具目录探针不能外推真实桌面加载。
+- R1指南§3.4复核通过：行首锚定配置块、显式UTF8、PS5.1产物无BOM/CRLF、原两条保留仅一mcp-talk；其新增未写状态/回滚前置/home说明与事实一致。实际仓库差异仍仅指南（+34/-11/hashb2df2b5a…2848），复核没改仓库或开发证据，只写.tmp/dsh-desktop-mcp-2-review/。
+- 落地脚本隔离fixtures五组通过：正常追加与字节备份、初始hash拒绝、重复写后回滚、CRLF失败回滚、额外insert篡改拒绝。但Kimi另发现两项低中缺口：没有候选hash钉住（同id/serverName篡改command可过写后校验），首次目标hash到os.replace之间外部写入可能被覆盖。另有日志硬编码会覆旧证据、无重复写前预检、固定.bak-manual -Force覆盖旧备份及仅LF观察。
+- Codex裁决：候选/R1/取证已完成范围复核可信，但真实写入前必须先修两项保护，不直接运行旧脚本。按最新开发要求派DeepSeek #149“桌面TALK MCP落地保护修正”，顶层general最小参数、名称无手写编号；实际基线44c14c0，开发交付指南尚未提交。#147/#148暂不收取，保持原partial/unknown历史，待修正及定向复核统一裁决。
+- #149只在.tmp/dsh-desktop-mcp-2-fix/复制修订临时apply脚本，保留#147/#148全部原件：强制候选完整hash、保留初始原hash并在替换前重核、外部变更时不覆盖/保守回滚、显式独立日志、唯一不覆盖备份/重复写前检查；不扩写CRLF或永久安装器。唯一授权仓库文档为现指南§3.2唯一备份及相关准确说明，保留R1/所有未验项。
+- 必要隔离fixture覆盖同id候选篡改提前拒绝、初始hash变化、备份后替换前外部写入保留、写后仍本版本可回滚/已外变不覆盖、正常前缀/条目/备份、重复/备份碰撞/独立日志。双重hash降低窗口但不能宣称消除最终检查后的跨进程竞态。禁止真实profile/backup写入或该升级审批、GUI/模型/派发收取/重启/PATH/Git，只读metadata/hash允许，不复制私人原文件。
+- 修正完成交Kimi独立定向复核；通过后主控再经现有宿主审批通道尝试真实备份追加，实际目标需重新核验。Codex本轮仅正式记录格式检查/提交推送，开发指南不暂存，派发后结束由用户通知#149完成；双横线前端待办继续保留。
+
 ## 2026-10-05 #147交付候选、真实备份受沙箱阻碍，派#148独立复核
 
 - 用户通知“147完成了”。#147/msg2644合法talk-delivery-1、实际任务号匹配，完整preview/summary合读无截断：partial，completed9/unfinished4/blocked1，runner succeeded/submitted。仍需独立复核，不收取为整体接入完成。
