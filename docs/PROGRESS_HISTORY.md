@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-05 收到#154方案修订，派#155给DeepSeek定向复核
+
+- 用户通知“154 ok”。#154/msg2656为合法完整talk-delivery-1，task_id154匹配、自报complete仅修订工作完成，completed9/unfinished0/blocked0/verification7/limitations6，摘要无省略。runner succeeded/workflow submitted；未将自报完成当独立验收，#154与#152暂未收取。
+- 修订自报P1–P7逐项覆盖：controlled_wait显式opt-in默认false，旧默认/最大600、clamp与返回保持；G1–G7进入门禁/运行变化退出明确；身份唯一members/me，human:bobo与agent:codex不匹配如实处理；取消无监听/无cancelled、C2-D另记；预算重读30秒/余量5秒、HTTP min(10,remaining)与sleep/deadline、五个return_reason确定；段总预算≤5次或≤10分钟仅提示词约定无代码强制；版本耗尽低风险可选非前置；C2-C实际提示词/指南落点与约定级边界补清；所有身份/项目GET纳入wait计数与工具披露。
+- 冻结修订对象：.tmp/controller-mode-c2-plan-fix/report.md 44210字节/SHA256 20010d1880e58147d14e1a03d0f150ed81ef9a4f3b3982456f62101499ebed92；revisions.md 11965字节/SHA256 2365a505d523f17c9d4dfb2d175a895d365096ddf4d125db71dfcf45d38ed665；development.json 6775字节/SHA256 fb101a064a65fb82fdad47c56f44d0ceb310a70d998ca543b1e101d2c0842c14。原四件只读/哈希不变为开发者自报，定向复核会独立确认。
+- #154自报实际基线9689062d45895b8a8a639e660c12153afa640154，业务源码零改动，仅.tmp三文件；主控当前Git工作区干净。7项自测证据包含原件hash、实际wait/dispatch/API身份/10秒HTTP/计数/9工具/预算来源/本地validate154；真实模型/等待/页面/服务not_run。主控只读交付与§5.3预算/退出，完整设计/源码定向核对仍交独立执行者。
+- 派前重新读取development_requirements，仍为Codex决策、Kimi文字/设计/交互/前端、DeepSeek后端及其他、双方独立复核。按最小独立顶层参数派#155“主被动开关修订方案定向复核”给agent:deepseek，返回queued/assigned；不附父子任务字段、不手写标题编号，派后结束主控等待。
+- #155包包含原需求/范围/不变项、三文件完整hash、实际基线与自测证据、P1–P7逐项验收及开工判定。只查修订与直接新增风险，不重复#153全部源码或耗尽探针；重点确认旧wait请求/返回不退化、caller_identity新增GET/失败降级、参数到dispatch的实施路径、实际API/摘要字段映射、deadline与HTTP预算保证边界、matched优先时后续取件/转审节点仍复查最新模式与指定、计数披露完整。
+- DeepSeek只写.tmp/controller-mode-c2-plan-fix-review/复核及必要局部证据，原方案/修订/代码不改、不做真实服务/模型/长等/浏览器。要求完整裸talk-delivery-1、本次task_id155，复核工作完成与方案通过分开；完成暂停由Codex裁决。方案足够且未覆盖范围如实则通过，不因功能未开发否定设计，也不因self-report complete免审。
+- 本轮仅PROGRESS/HISTORY/路线图收件与派发状态同步，git diff --check后中文提交常规推送，未正式发布设计或开始实现。已验收桌面#151保持，双横线只在后续前端片修；未来受控入口身份仍需真实核验，不擅改凭据或指定。
+
 ## 2026-10-05 #153复核完成需修订，收取复核并派#154给Kimi
 
 - 用户通知“153已完成”。#153/msg2655为合法完整talk-delivery-1、task_id153匹配、schema自报complete，completed9/unfinished0/blocked0、verification10、limitations9，摘要无省略。complete仅表示独立复核完成；实际设计结论为需修订，P1–P4中等/P5–P7低，无阻塞，业务实现尚未开始。
