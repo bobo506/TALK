@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-05 用户收窄桌面目标为MCP接入，派#145配置准备
+
+- 用户明确认为已有桌面能显示历史chat/TALK任务，当前无需改动之前的执行程序，目标仅适配桌面MCP，使其可分配TALK任务。Codex据此收窄：桌面作为MCP工具客户端，既有MCP服务/launcher、TALK任务服务与npm bridge继续复用。前面S1a是已完成额外调查，不是本需求的前置；S1b/直接exec/参数运输/内置CLI替换停止当前推进，历史事实保留。
+- 主控读取最新development_requirements，派DeepSeek #145「DeepSeek桌面TALK MCP接入配置准备」，基线33e7633、派发前工作区干净；完成后Kimi独立复核。授权仅新增一种符合安装版格式的deploy/dsh桌面配置模板、docs/guides/DSH_DESKTOP_TALK_MCP.md及.tmp/dsh-desktop-mcp-1/报告/交付/验证。
+- 本片须核查实际桌面MCP配置加载入口/格式/重载方式，复用dsh_talk_mcp_launch.py与talk_terminal_mcp.py，提供具体路径/外部TALK key占位、身份/项目/工具范围和一轮手工委派/同会话收取验收；不凭历史CLI/ACP闭环外推桌面已接入，不为适配制造新服务器或worker。已有launcher/bridge/后端、真实profile/配置/权限不改。
+- 先离线/必要只读预检，不自动真实派发/collect/调用模型，不读取provider凭证或私人会话正文，不操作GUI/启停现有服务/改PATH/安装依赖。实际桌面保存/重载留配置包独立复核后的接入阶段；若需改既有代码须证据和最小建议交主控，不自行越界。双横线UI待办继续下一前端片。
+- 本轮usage-gate continue但精确百分比null，遵守一片刹车。主控只同步范围与派发记录，diff格式检查后提交推送；派发后结束，由用户通知#145完成再取件。
+
 ## 2026-10-05 #144定向复核pass，S1a正式收取与文档收尾
 
 - #144/msg2641有效task_id144结构化complete，独立结论pass；13项定向验证通过，修订报告/交付与#142已审证据逐项一致，五个补正产物哈希重算MATCH，原问题关闭。此次只核修订，不重跑原探针；主体隔离/安装版源码/真实home快照沿用#142独立审核。

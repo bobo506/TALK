@@ -122,7 +122,8 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 - 桌面内置CLI `0.2.0-rc.2` 在临时home/项目、显式shim绝对路径、隔离子进程环境下完成无凭证无模型的version/help/headless dump自省；`desktop` profile在解析阶段被拒。临时home补丁路径出现在dump层标签，headless首次dump初始化4文件、未创建desktop目录。headless `--dump-config`会初始化或重写profile文件，不能视为无副作用检查；PATH注册不是绝对路径调用前提。
 - 参数限制：原p5是三个独立参数，仅证明多参数与中文未截断。Kimi k2实测单参数内嵌LF经当前桌面`dsh.cmd`后只有`first-line`进入argv；不能用该shim形态宣称多行单参数保真。直接exec Electron exe与实际bridge参数运输未测，不能泛化所有入口均不支持多行，也不能由npm绕过分支不命中推导必须新增bridge代码。
 - 隔离证据范围：已采样的真实home profiles（跳过node_modules）/顶层/凭证元数据无变化；sessions/storages仅聚合指标，背景变化按时间窗观察，无逐条进程归因，不能证明全部文件内容字节级未写。环境keep清单21项、去重20项加新增5项、最终25变量名，未记录值；仅凭变量名正则不替代实际解析路径核验。进程数前后5仅开发者当时观察、未存证、不作为独立证据；零模型与未触发plugin/pnpm拉取有代码路径旁证，未做网络抓包。
-- 现有npm `0.1.5-rc.2 --profile headless` bridge继续使用。S1b真实模型输出/退出/取消与会话落盘、直接exec/桥参数运输、桌面GUI续聊及MCP配置加载仍未验证，须另列切片，S1a不构成切换依据。本宿主`CreateNoWindow=true`的`0xC0000142`仅为当次环境现象，无通用根因结论。
+- 2026-10-05用户收窄当前目标：桌面会话经TALK MCP发起任务，TALK仍交给现有npm `0.1.5-rc.2 --profile headless` bridge与Agent执行，桌面原会话可查看/收取结果。复用既有MCP服务与启动器，#145准备桌面配置模板/指南及必要离线或只读预检，完成独立复核后再接入实际桌面。该需求不包含内置CLI替换、S1b或直接exec/参数运输验证，不把cmd换行限制作为桌面MCP接入前置；现有执行服务与角色/权限保持。
+- S1a历史未执行项继续如实保留：真实模型输出/退出/取消/落盘、直接exec/实际桥参数运输、桌面GUI续聊与MCP配置加载均未验证。前两类停止当前排期；MCP加载属当前接入后续验收，不将桌面显示历史chat等同已加载工具。本宿主CreateNoWindow现象仍只为当次环境观察，无通用根因结论。
 - 本地证据：`.tmp/dsh-desktop-s1a/`原件、`.tmp/dsh-desktop-s1a-review/`独立证据、`.tmp/dsh-desktop-s1a-fix/report-revised.md`修订、`.tmp/dsh-desktop-s1a-fix-review/`定向复核；这些临时产物不随Git跟踪，正式结论及原错误修订关系保存在本节与PROGRESS_HISTORY。
 
 - 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；随后已在 TALK bridge 启动边界完成上述 Windows shim 绕过，受控真实多行探针同时收到首行、中文行和末行令牌并返回 `DSH_MULTILINE_OK`。
