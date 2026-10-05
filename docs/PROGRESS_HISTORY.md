@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #155定向复核认可可开工，C2-0正式合同落盘并收取
+
+- 用户通知“155 ok了”。#155/msg2657合法完整talk-delivery-1、自报complete仅复核工作，completed13/unfinished0/blocked0、verification9/limitations6，无省略。结论为修订足够作为C2-A1开工依据、无旧合同退化，但R1/R4中等与R2/R3/R5低项需回填，不是无条件通过。
+- 独立复核确认七份方案/原件hash、业务源码零改动、P1 opt-in兼容门禁、P2 Key身份与human/Agent边界、P3取消未监听、P5低风险耗尽、P7计数披露。R1来自urllib响应阶段裸TimeoutError与项目except的静态核对，非真实网络实测；R4为matched不能代表仍有active资格、各动作前仅约定级重读，检查至动作仍有竞态。复核review.md 21365字节/hash876f66a780ae11a5d52881e75a98dddd5fc359c60524c8165afc6e7767596bcf；未重跑耗尽探针/真实服务模型等待。
+- Codex裁决采用可开工并完成文本回填，正式合同docs/spec/CONTROLLER_MODE_DESIGN.md从#154已审report.md（hash20010d18…9ebed92）复制，原件及开发/复核包均保持只读。正式标题明确功能待实现/设计确认不等于active生效。
+- R1定为C2-A1必做验收：至少受控路径连接/响应头/响应体超时或网络异常归一TalkToolError/api_error，不能裸异常逃出；其它网络错误不一概标超时，旧通用错误分类不退化；socket timeout不冒充端到端硬截止。R2 strict正数排除bool/非数/NaN/inf/0/负值，仅受控新语义。R3项目caller_identity成功/失败固定member_id/kind/note三键，非项目null且不额外身份GET，失败不阻断旧清单/不泄密。
+- R4正式合同回填matched只为任务命中，每次派复核/收取/汇报前重新核对身份/kind、mode/assignment及两版本；这是提示词约定，读取至动作竞态仍存在，不引入所有权/ACK/租约。R5正常deadline早退沿用上一轮成功轮询集合，未轮询则tasks=[]/task_count0；请求已发后的网络错误不能吞成正常timeout。
+- 已收取#155（msg2657，2026-10-05T12:36:37.635549）、#154（msg2656，12:36:48.489249）、#152（msg2654，12:36:56.729585），全部workflow completed，时间为服务端记录；#153此前已收取。收取不追改#152原partial/代码块unknown，也不表示功能已实现；设计链路#152→#153→#154→#155关闭。
+- 正式方案链接同步PROJECT_BRIEF与路线图，第3阶段转C2-A1准备；C2-A2低概率耗尽为可选加固、C2-D真正取消后续，C2-B页面和C2-C真实主动链路仍需人工验收。双横线仅下一前端片处理，当前UI不改、effective_mode仍null。
+- 本轮开工前usage-gate decision continue，session/weekly百分比null如实保留；先设计正式文档/进度格式校验、中文提交常规推送，再派一个DeepSeek后端/MCP实现片、Kimi独立复核，不由Codex代实现或重复完整审查。未读取密钥/改凭据/指定/权限、启停服务、操作浏览器或真实模型等待。
+
 ## 2026-10-05 收到#154方案修订，派#155给DeepSeek定向复核
 
 - 用户通知“154 ok”。#154/msg2656为合法完整talk-delivery-1，task_id154匹配、自报complete仅修订工作完成，completed9/unfinished0/blocked0/verification7/limitations6，摘要无省略。runner succeeded/workflow submitted；未将自报完成当独立验收，#154与#152暂未收取。
