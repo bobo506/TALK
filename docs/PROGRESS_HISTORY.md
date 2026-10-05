@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #142复核发现参数误判，收取复核工作并派#143报告修订
+
+- #142/msg2639有效task_id142结构化partial，独立结论needs_changes。Kimi独立检查实际脚本/安装版源码、10份输出哈希及原始快照，确认临时home隔离、自省/初始化等主体证据成立；真实home仅profiles（跳过node_modules）与顶层/凭证元数据采样，sessions/storages为聚合指标，保留无法证明字节级零写入及逐条进程归因的限制。
+- 唯一必须修正事实：#141 p5是三个独立参数，不含单参数内嵌换行，只证明多参数/中文未截断；Kimi k2隔离探针实测单参数内嵌LF经过当前桌面dsh.cmd后仅first-line进入argv。原“多行argv未截断”结论错误，直接exec Electron exe未测，不能泛化所有入口。证据.tmp/dsh-desktop-s1a-review/logs/k2-newline-arg.console-evidence.txt，原报告/脚本/日志保留。
+- 主控采纳复核，将#142复核工作收取为completed但保留原partial/needs_changes；#141仍未收取。按最新development_requirements派DeepSeek #143「桌面CLI隔离验证报告补正」，基线057cacd、工作区干净，仅新.tmp/dsh-desktop-s1a-fix/内写修订报告/交付，不覆盖原141/142产物，不改代码/真实环境，不重跑探针。
+- 修订包要求统一p5/总论/验证/限制/进度草稿口径，核对系统环境变量计数（原22、Kimi21）、按p1–p5标记退出码0/0/1/0/1，进程数5补注为当时开发者观察未留独立证据；禁止用现在输出补造历史。真实home表述保持采样边界，npm绕过分支不命中不构成必须改代码依据。完成后再交Kimi定向复核，Codex维护正式文档/收尾。
+- 本轮不启动S1b真实模型、ACP/SDK、GUI/MCP保存配置或桥适配；双横线前端待办继续保留。派发后结束主控等待，由用户通知#143完成再取件。只更新进度文档，diff格式检查后提交推送。
+
 ## 2026-10-05 #141隔离验证交付，派#142独立复核
 
 - #141/msg2638有效结构化complete自报，task_id141匹配、无阻塞/未完成；本地.tmp/dsh-desktop-s1a/含报告、脚本、安装版抽取源码、原始快照与脱敏输出，工作区被跟踪文件未改，HEAD为Codex此前文档提交6c1a6fa。正式业务验收尚未完成，#141暂未收取。
