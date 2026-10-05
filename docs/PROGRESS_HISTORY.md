@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-05 C2-0收尾提交推送，派#156实现C2-A1
+
+- 正式实施合同与设计收尾由599f59cda844f7b71095a708931900f5bf898eea提交推送（5份文档334+/9-），C2-0形成可回溯版本后才开启实现片。CONTROLLER_MODE_DESIGN.md为48591字节/SHA256 2f9e4c1682ed840c53635d0dad15bcdb66191cb12ce4b2da106f979fe5388452，含#155 R1–R5回填；原方案/复核不改。
+- 派前再次读取最新development_requirements，职责仍为DeepSeek后端/其他、Kimi文字/设计/前端、交叉复核；当前实例仅上报available，不外推心跳或主控生效。按最小独立顶层参数派#156“主被动调度受控等待与身份核验实现”给agent:deepseek，返回queued/assigned；title不手写编号，基线599f59c。
+- 本片范围：talk_task_tools的严格bool controlled_wait默认false/旧通用兼容、G1–G7受控进入门禁、API Key服务端身份、独立模式/指定版本快照、30秒低频重读与变化退出、明确单次deadline/HTTP与sleep剩余预算、受控连接/响应超时归一、R5最近任务集合早退、新GET请求计数、项目caller_identity固定三键/非项目null/失败不阻断清单；必要terminal检查说明与相关测试。九任务工具数量保持。
+- 开发包明确门禁预算核验未完成不得开始轮询或退回普通等待，已通过门禁但尚未轮询deadline耗尽才正常timeout空集合；网络请求已发后的异常是api_error而非正常timeout，socket timeout不冒充端到端硬截止。旧非受控默认/最大600、请求次数/返回/query_stats四键/错误分类保持，不放宽payload断言掩盖输出膨胀。
+- 必要测试为模拟时钟/假HTTP的旧兼容、严格输入/各门禁、版本与字段变化、重读节奏、剩余deadline与最近/空集合、连接/getresponse/read裸超时与OSError、10秒默认/受控clamp、新GET失败尝试计数、caller_identity形状/非项目/失败降级、schema-dispatch链与目录数量/有界输出，以及现有MCP/wait/terminal相关回归。无需真实模型/长等待或全库重复，完成暂停后由Kimi独立审实际源码。
+- 不扩片：server/API/数据库/web/CSS/静态版本/launcher/桌面patch/运行器/凭据/指定/实际mode均不改；C2-A2耗尽仅登记，真正取消C2-D/约定级总预算/真实主动C2-C/UI C2-B未实施。双横线仅后续前端片。MCP重载需后续收尾，本片不启停服务或真实工具探针。
+- 交付约定.tmp/controller-mode-c2-a1/完整talk-delivery-1 development.json及必要局部日志，实际task_id156校验、裸JSON提交TALK，正式进度/Git由Codex维护；用户手册影响注明仅工具合同、不能写开关已可用。派后结束，不主动等待/轮询，由用户通知完成再收件。
+- 主控本次只改PROGRESS/HISTORY/路线图派发记录，git diff --check后中文提交常规推送；执行代码差异不混进主控文档提交。设计旧#152–#155全部收取，当前唯一待交付#156。
+
 ## 2026-10-05 #155定向复核认可可开工，C2-0正式合同落盘并收取
 
 - 用户通知“155 ok了”。#155/msg2657合法完整talk-delivery-1、自报complete仅复核工作，completed13/unfinished0/blocked0、verification9/limitations6，无省略。结论为修订足够作为C2-A1开工依据、无旧合同退化，但R1/R4中等与R2/R3/R5低项需回填，不是无条件通过。
