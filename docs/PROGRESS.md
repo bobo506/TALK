@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-05 (Asia/Shanghai)，C2-0正式合同599f59c已提交推送；已派#156给DeepSeek实现C2-A1，完成暂停后Kimi独立复核。
+Updated: 2026-10-05 (Asia/Shanghai)，#156 C2-A1实现交付已收到但未验收/收取；已派#157给Kimi独立复核实际代码，业务差异保持未提交。
 
 ## 当前工作与身份
 
@@ -19,7 +19,7 @@ Updated: 2026-10-05 (Asia/Shanghai)，C2-0正式合同599f59c已提交推送；�
 
 ## 下一步与待办
 
-1. **当前#156：主被动调度受控等待与身份核验实现（DeepSeek）。** 基线599f59cda844f7b71095a708931900f5bf898eea，正式合同hash2f9e4c16…5388452；仅talk_task_tools、必要terminal --check/描述及相关测试。显式controlled_wait默认false保留旧语义，true按Key身份/模式指定/预算门禁、30秒重读与变化退出；caller_identity项目三键/非项目null，受控网络超时归一与deadline/计数验收。当前未交付，完成后Kimi独立审实际差异；#152–#155均已收取，不将设计确认当功能已实现。
+1. **当前#157：主被动受控等待与身份核验独立复核（Kimi）。** #156/msg2658为合法完整talk-delivery-1、自报complete，runner succeeded/workflow submitted；开发者已暂停，未收取/业务验收。实际HEAD2ad9fbf，开工基线599f59c；3份业务文件未提交：talk_task_tools +731/-59、terminal +18、新controlled_wait测试27项。主控只核对差异清单/字节hash，实际源码审查交Kimi：旧false路径兼容、G1–G7 Key身份门禁、30秒重读、进入/轮询deadline区别、R1响应异常归一、R5最近成功集合、计数/身份三键与描述一致。#157最小顶层派发queued/assigned，开发/审查禁止同时改码。开发者报告新27与既有216回归通过，ACP整套受WinError5沙箱限制未取得通过，2份原始日志为空；复核须独立核对必要证据。当前工具实现待审，未重载MCP/桌面验收，不能称开关已可用。
 2. **后续前端小改动：角色页“参与任务”上方双横线仅保留一条。** 用户要求并入下一合适前端切片，不单独派片；尚未改UI，下一前端任务包必须带此项。
 3. **用户明确当前仅桌面作为TALK任务发起客户端，现有执行程序继续使用。** 复用dsh_talk_mcp_launch.py/既有TALK MCP服务与npm bridge，不新增重复worker/member。S1b、直接exec/参数运输、内置CLI替换停止作为当前路线；已完成S1a只保留历史，不作为桌面MCP接入前置。
 4. 已登记未开发：全局运行器库→项目角色绑定/添加编辑→手动启停/状态→项目加载时选择性自启动；默认检查角色/固定检查要求/自动转审；多工作区隔离与群聊阶段按路线图推进。只启动当前项目已配置且勾选的角色，软件安装不自动成为角色。
@@ -28,12 +28,13 @@ Updated: 2026-10-05 (Asia/Shanghai)，C2-0正式合同599f59c已提交推送；�
 ## Git与验证
 
 - 用户持续授权向 `bobo506/TALK` 常规推送，不包含强推、删远程分支或改写历史。
-- 桌面配置与指南收尾已由9e1bacb提交推送，配置/唯一备份在仓库外。验收记录2dbc0cf、等待说明36183b4及用户观察36ac16a已提交推送。#152派发与提示词911e117已推送。#153派发记录b7fe7ce已推送。#153复核裁决/#154派发9689062已推送。#154收件/#155派发650e662已推送。正式设计/R1–R5与收取记录599f59c已推送。本轮继续只同步#156派发进度，明确暂存文档；执行者开发差异不混入主控进度提交。
+- 桌面配置与指南收尾已由9e1bacb提交推送，配置/唯一备份在仓库外。验收记录2dbc0cf、等待说明36183b4及用户观察36ac16a已提交推送。#152派发与提示词911e117已推送。#153派发记录b7fe7ce已推送。#153复核裁决/#154派发9689062已推送。#154收件/#155派发650e662已推送。正式设计/R1–R5与收取记录599f59c已推送。#156派发记录2ad9fbf已推送。本轮只同步#156收件/#157派发进度，明确暂存3份正式文档；3份未审业务差异保留工作区，不混入主控文档提交。
 - 配置落地独立复核/受控写入/读回10检查已通过；本轮业务验收来源为用户实际桌面反馈，#151任务元数据另核实。未操作浏览器/读密钥/启停服务或重跑模型；因Hall成员权限不读取#151正文，不重复收取它。
 - 开C2-A1前usage-gate返回continue，session/weekly百分比null，不能据此声明精确用量；默认本轮只开一个后端/MCP实现片并暂停待复核。
 
 ## 证据与恢复入口
 
+- C2-A1 #156：.tmp/controller-mode-c2-a1/development.json、notes.md、measure_payload.py；msg2658结构化有效complete且无省略。主控核对talk_task_tools.py 99644字节/hashbb59cf9b…ad85715、talk_terminal_mcp.py 8642/hash0a197814…8f0b2、新tests/test_talk_controlled_wait.py 57408/hashf8ec6040…d6fe45；完整hash/自测证据和限制已写#157包与本轮历史。regress-tasktools.txt/probe.txt均0字节，不能作原始日志。#157输出约定.tmp/controller-mode-c2-a1-review/，只审代码/写局部复核证据；不改业务代码/正式文档/配置、不启停服务或主动等待。
 - C2-0原方案.tmp/controller-mode-c2-plan/report.md（hash e087793e…6c91144）与development.json（03d40926…0ea2b68d）；本地summary --expect-task-id 152有效partial，MCP msg2654代码块unknown。#153复核.tmp/controller-mode-c2-plan-review/review.md（90f2dfa0…963a499）与development.json（3568d88b…aa177e3），MCP msg2655有效complete且收取。#154修订.tmp/controller-mode-c2-plan-fix/report.md（20010d18…9ebed92）、revisions.md（2365a505…38ed665）、development.json（fb101a06…0842c14），msg2656合法complete。#155复核.tmp/controller-mode-c2-plan-fix-review/review.md（876f66a7…7596bcf）与development.json，msg2657合法complete且收取；正式合同CONTROLLER_MODE_DESIGN.md含Codex R1–R5回填，原件均保持。
 - 实际配置`C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml`（2275字节/hash245407f8…e2398d6）；同目录唯一备份尾缀`20261005-180915`（1045字节/hash4366d522…02b085）。实际执行日志`fix/logs/apply-target-20261005-codex-1.json`与独立读回`fix/logs/codex-post-apply-check.json`，fix即下述修正目录；实际落地见指南第5.3节，用户#151验收与环境反馈见第5.4节。
 - 接入原件`.tmp/dsh-desktop-mcp-2/`（#147）；初审`.tmp/dsh-desktop-mcp-2-review/delivery.json`（#148）；修正`.tmp/dsh-desktop-mcp-2-fix/`（#149）；定向复核`.tmp/dsh-desktop-mcp-2-fix-review/`（#150）。原无效包`talk-delivery-1.json`保持，主控格式副本`decision/delivery-normalized.json`及normalization.json保留来源。
@@ -43,4 +44,4 @@ Updated: 2026-10-05 (Asia/Shanghai)，C2-0正式合同599f59c已提交推送；�
 - 交付优先talk_get_delivery，同读preview与summary_text；必要时稳定引用补读。schema有效不等于验收。临时证据不随Git跟踪，核心事实/限制已写MODULE_bridges及历史。
 - 启动见AGENTS；不为恢复上下文自动重启服务。完整历史在PROGRESS_HISTORY。
 
-恢复指令：**继续项目**。当前#156已派DeepSeek实现C2-A1，用户通知完成后talk_get_delivery取完整合法摘要与必要差异，再派Kimi独立复核。不要重复派#152–#156或主动轮询；#152–#155已收取，设计合同599f59c已推送。未允许自动启停/改mode/凭据/主控指定，代码测试完成也不等于MCP已重载或主动链路已验收。下一前端片带双横线修正。
+恢复指令：**继续项目**。当前#157已派Kimi独立复核#156实际代码，用户通知完成后talk_get_delivery收取完整摘要并裁决；若发现问题交回DeepSeek修正再复核，通过后由Codex同步合同/模块说明与Git收尾。不要重复派#152–#157或主动轮询；#156仍submitted，业务3文件未提交，#152–#155已收取。未允许自动启停/改mode/凭据/主控指定，代码测试完成也不等于MCP已重载或主动链路已验收。下一前端C2-B片带双横线修正。

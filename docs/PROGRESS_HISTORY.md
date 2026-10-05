@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #156实现交付收到，派#157独立复核
+
+- 用户通知“156已完成”。talk_get_delivery #156/msg2658为合法完整talk-delivery-1、task_id匹配、自报complete且无省略，completed12/unfinished0/blocked0、verification7/limitations11；runner succeeded/workflow submitted。格式与自报有效不代表业务验收，#156未收取，开发者完成后已暂停。
+- 实际开工基线599f59cda844f7b71095a708931900f5bf898eea，主控HEAD2ad9fbfbff919e9b0315cbbf38b985bea114a850仅有派发进度文档差异。主控独立核对工作区清单与hash：bridges/talk_task_tools.py +731/-59，99644字节/SHA256 bb59cf9b1d7c690b50cf65faab2138f1b3394d33f48e6382bcfa9d5c1ad85715；bridges/talk_terminal_mcp.py +18，8642字节/hash0a197814da98673956982788343b78db61e04e9946e527b361aeb5427d08f0b2；新增tests/test_talk_controlled_wait.py 57408字节/hashf8ec6040cde9b3371893df4ac92686e5ba6b2b755e3850e1796ffbf54ed6fe45。三文件未提交；完整实际代码检查交Kimi，Codex不重复审查或重跑开发者套件。
+- 开发者自报：controlled_wait严格bool/default false、旧等待无额外HTTP/字段；true G1–G7核验项目/显式有限正timeout/Key服务端agent身份/支持完整mode与assignment/assigned/本人指定且active；30秒重读与mode/controller变化退出；deadline覆盖进入HTTP/轮询/重读/sleep，remaining<=0不发请求，HTTP min(10,remaining)；R5最近成功任务集合/空集合；R1连接/getresponse/read裸超时与网络OSError归一；caller_identity项目固定三键/失败不阻断/非项目null无额外请求；新HTTP失败尝试同样计数，schema/dispatch/描述/--check九工具同步。上述均待独立核对。
+- 自报测试：new controlled_wait 27 OK/13.7s（19假HTTP时钟+8真实隔离服务）；task_tools/terminal/controller_mode 60 OK/53.7s；assignment/development_requirements 65 OK/28.2s；delivery/dsh_entry/kimi_entry 91 OK/13.5s。既有回归216、新27，共243，不重复计数。measure_payload项目清单1407→1486字符、增79且旧<1500断言未放宽。test_dsh_acp_drive整套未取得通过：报告30项中18项Popen/CreatePipe WinError5、失败点scripts/dsh_acp_drive.py:182；不能当成通过，由复核判断影响。
+- 本地入口.tmp/controller-mode-c2-a1/development.json、notes.md、measure_payload.py；主控核对regress-tasktools.txt/probe.txt均0字节。开发者称stdout/stderr重定向受沙箱限制，原始日志未落盘，现有证据为实际退出状态与摘要；复核包明确不能把空文件当原始日志，必要复跑须独立记结果/限制。
+- 未验证/边界：未重载MCP、未重连桌面、无真实主动宿主或660秒能力验收；sockettimeout不提供任意慢响应端到端硬截止；同步stdio未消费客户端cancel、同连接请求排队；阶段≤5次/≤10分钟仅提示词约定；effective_mode仍null/not_bound，无互斥/自动唤醒/新权限。pi独立wait旧30秒无新门禁为非活动兼容路径且超范围，--check两个身份GET未去重已登记，C2-A2/C2-B/C2-C/C2-D尚未开发。仅工具合同，不能称开关已可用。
+- 派前再次读取最新development_requirements，仍按DeepSeek后端/Kimi文字设计前端/双方交叉复核。按最小顶层参数派#157“主被动受控等待与身份核验独立复核”给agent:kimi，返回queued/assigned；标题未手写编号。包含原需求、正式合同hash、实际基线/三文件hash、差异、不变项、逐项验收、开发测试及日志/沙箱限制。
+- #157须独立审实际源码及必要直接链路，重点旧false请求/返回/异常兼容，G1–G7拒绝不降级，30秒/两版本变化、matched优先边界、进入预算未核验与已核验后正常空timeout、R1响应异常归一、R5最近成功集合、计数/身份三键/保密与说明一致，必要定向测试；不做全库/真实模型/长等待/浏览器。只写.tmp/controller-mode-c2-a1-review/完整裸JSON/报告和证据，不改源码/原件/正式文档、不启停服务或改凭据/模式/指定、不commit/push。发现问题交回DeepSeek修正再审，复核工作完成与业务通过分开。
+- 本轮只同步PROGRESS/HISTORY/路线图，明确暂存这3份文档，git diff --check后中文提交常规推送，业务3文件保持未提交。派后结束主控等待，由用户通知#157完成再取件；下一前端C2-B继续带角色“参与任务”双横线保留一条。
+
 ## 2026-10-05 C2-0收尾提交推送，派#156实现C2-A1
 
 - 正式实施合同与设计收尾由599f59cda844f7b71095a708931900f5bf898eea提交推送（5份文档334+/9-），C2-0形成可回溯版本后才开启实现片。CONTROLLER_MODE_DESIGN.md为48591字节/SHA256 2f9e4c1682ed840c53635d0dad15bcdb66191cb12ce4b2da106f979fe5388452，含#155 R1–R5回填；原方案/复核不改。
