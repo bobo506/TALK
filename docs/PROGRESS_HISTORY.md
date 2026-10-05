@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #149保护修正交付，派#150定向独立复核
+
+- 用户通知“149 ok”。#149/msg2646完整裸talk-delivery-1有效，task_id149匹配，无摘要截断，self-report complete：completed9/unfinished0/blocked0、15验证（含真实GUI not_run）、8限制。complete仅指保护修正片，真实接入并未完成；主控完整读取preview/summary，仍需独立复核。
+- 修订临时脚本`.tmp/dsh-desktop-mcp-2-fix/probes/apply_target_patch.py` sha256 `ecd9235164a76d5a0f682eef3e308ded133476d1e36bbf20c641f5a7a32288f6`；原#147脚本保留。自报候选强制64位hash守卫、replace前二次重读原hash、写后仅仍本次版本才回滚；外变时停止/保留外文/manual_action_required。必填独立日志、唯一独占备份、重复写前预检与目标/候选/log路径及默认对象hash钉住一并补齐。
+- 定向fixtures A–N 14组all_pass=true，`fixture-results.json` hash6def09e1…e1cef6d；覆盖正常原条目/字节备份、同id篡改候选提前拒绝、初始hash变化、替换前外部写入保留、失败可回滚及外变不回滚、重复/备份碰撞/日志/参数/路径/真实未写/旧证据不变。D/F/H用进程内包装模块函数模拟，非测试专用分支，交复核判断是否证明确实保护路径；不重复全量测试。
+- 自报原#147/#148全部文件sha/字节/mtime前后不变；真实目标1045字节/无BOM/LF、完整hash4366d52223a9abebe1f8735d980226783a74a32fe8b927b9f187c2e1eb02b085保持，无外部backup/temp，没复制私人原文件。候选hash41eeab30…f9760dea和内存合并hash245407f8…e2398d6/2275字节不变；未请求真实写入升级权限。
+- 仓库唯一开发差异仍指南，#149相对#147 +21/-3，新hash696ee40890c0f2bd9a8fe57d1dbda9d83fe8e561f86aec153c8cc7092e53c8c3；§3.2唯一时间戳备份/禁-Force覆盖、§6同步、新§5.2保护状态/接口证据；原R1/§5.1/§7保留，未改模板/旧功能代码/正式进度或Git。
+- 保留真实限制：最终hash检查到os.replace仍非跨进程原子CAS；不扩写CRLF支持，真实目标LF。GUI/HMR工具可见、独立会话派发执行收取、长等待均未验；65秒工具超时不支持600秒长等。保护可通过不等于整个desktop接入完成。
+- 派发前读取最新项目要求，按双方交叉复核派Kimi #150“桌面TALK MCP落地保护定向复核”，顶层general最小参数，标题仅名称。#149基线44c14c0；Codex派发进度46b9faf为中间唯一提交，复核实际基线46b9faf与唯一指南差异。任务包包含原需求/范围/不变项、实际hash/接口和证据、未验限制及验收标准。
+- #150独立检查真实修订源码/fixture/指南，重点重证B候选篡改提前拒绝、D替换前外变保留、F失败时外变不覆旧备份、A正常字节保护；路径规范化/真实默认hash/日志与备份/异常路径有疑点再定向补测。提供后续主控正确命令与前置检查摘要但禁止执行对真实目标写入，不操作GUI/模型/派发收取/重启/安装/PATH/Git，仅写.tmp/dsh-desktop-mcp-2-fix-review/。
+- #147/#148/#149保持submitted，定向复核后统一裁决；通过再由主控经宿主审批通道尝试真实唯一备份+追加，当前未有此升级请求或自动审批拒绝。Codex仅更新PROGRESS/HISTORY、格式检查并常规提交推送，指南待审不暂存；派发后结束，用户通知#150完成再取件。
+
 ## 2026-10-05 #148候选复核通过，落地保护先修，派#149
 
 - 用户通知“148已完成”。#148/msg2645有前言和Markdown围栏，MCP自由文本unknown且预览截断，不据此验收；按项目本地回退执行 `python -X utf8 scripts/talk_workflow.py summary .tmp/dsh-desktop-mcp-2-review/delivery.json --expect-task-id 148`，合法实际号匹配、完整摘要未截断，结论partial，完成10/未完成4/阻塞0。没有把MCPunknown追改成结构化partial。
