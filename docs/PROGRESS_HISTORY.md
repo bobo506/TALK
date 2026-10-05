@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-05 继续主被动开关阶段，派#152给Kimi做交互/执行合同设计
+
+- 用户询问未来主被动开关是否解决持续等待、DeepSeek桌面MCP是否已适配及如何提示连接，并授权继续下一步开发。确认#151已人工验收核心接入；主被动开关会统一使用流程，主动模式还需真实消费者、等待超时/取消配套，不能承诺按钮自然消除DLL或同步阻塞问题。
+- 派发前读取最新项目development_requirements：Codex决策/分配/验收，Kimi文字/设计/交互/前端，DeepSeek后端及其他，双方交叉复核。talk_list_agents当前requested_mode=passive/requested_version=0/effective_mode=null/effective_status=not_bound；长期controller_assignment=agent:codex/version13/status assigned。两执行角色availability=available为上报摘要，不把指定等同在线/生效/新增权限。
+- 按路线图第3阶段派#152“主被动开关交互与执行合同设计”给agent:kimi，创建返回queued/assigned；最小独立顶层参数，仅project_id/target/title/content，标题不手写编号。实际派发基线36ac16a；后续主控进度提交不改变任务包冻结要求。
+- 本片C2-0只核对相关实际源码并交方案：项目设置UI/文案、C1a human CAS与陈旧响应保护、长期唯一主控与真实模式消费者、主控变更及主动转被动的生效节点、授权范围内取件/转审/收尾、同步MCP等待/取消/排队边界、外部桌面对话结束需人工唤回，给有序可实施片与必要验收。保持用户取消旧ACK/token/租约方案；不创建新模型框架或重复worker，不重新做桌面CLI适配。
+- Kimi仅写.tmp/controller-mode-c2-plan/方案/证据/完整talk-delivery-1结果；校验真实task_id152，完整裸JSON提交TALK，完成暂停。正式进度/Git由Codex维护，开发与复核顺序执行；完成后再派DeepSeek独立核对实际代码与方案。本轮不等待/轮询#152。
+- 双横线修正列入下一合适前端实现片，当前设计片不改UI；后续工作区登记/加载、角色隔离、启停/按项目自启动、群聊、桌面封装仍依路线图，不在本包并行实施。
+- 桌面指南新增日常连接提示词：独立调度对话调用已配置MCP/list_agents，限定项目、先读最新要求，用户明确交办再派发，派后结束、人通知完成再取件；当前长期主控Codex保持，提示词本身不改身份/配置或授予长期主控。TALK与需要执行的角色服务仍须运行。
+- 验证/收尾：派发前usage-gate decision=continue，百分比均null如实保留；本轮只改PROGRESS/HISTORY、路线图及桌面指南，git diff --check后中文提交并常规推送。未改业务代码、实际mode/超时/权限、启停服务、操作浏览器或跑模型探针。
+
 ## 2026-10-05 用户补充确认DeepSeek等待期间持续处于任务状态
 
 - 用户亲眼确认刚才DeepSeek一直显示处于任务状态，补充为桌面本轮持续活动的人工观察；结合已有300秒主动wait及同步MCP源码证据，进一步支持本次超时/排队与主动等待有关的判断。该显示不改变#151已完成/已收取的业务记录，也不证明pwsh DLL错误由等待造成。
