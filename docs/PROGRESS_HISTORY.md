@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #147交付候选、真实备份受沙箱阻碍，派#148独立复核
+
+- 用户通知“147完成了”。#147/msg2644合法talk-delivery-1、实际任务号匹配，完整preview/summary合读无截断：partial，completed9/unfinished4/blocked1，runner succeeded/submitted。仍需独立复核，不收取为整体接入完成。
+- 开发自报逐进程核验：运行desktop主进程3084（2026/10/4启动）环境块无DSH_HOME，host13068命令行与cwd明确指向`C:/Users/Administrator/.dsh/profiles/desktop`；User/Machine无覆盖仅补充。PEB只读探针仅回显白名单。安装0.2.0-rc.2、Python3.12.1；目标补丁6既有条目无TALK冲突，home层不存在。证据待#148独立审查，不以默认目录推测替代。
+- 候选仅配置块，28行/1229字节/sha256 `41eeab30f709afd07485d892a65a29ff11241902f479e7d790e99497f9760dea`。自报31/31实际安装schema对照、路径转义及内存合并通过（原6条/原字节前缀保留，仅新增mcp-talk）；probe九工具/rc0/serverInfo匹配、transport=file；check只读agent:deepseek/prj_e8fe7066bbec通过，外置key只记路径。file回退不是真实GUI加载证据。
+- 真实写入未发生：写前原哈希守卫通过，同目录唯一备份`cordis.patch.yml.bak-talk-mcp-2-20261005-165149`创建被PermissionError Errno13拒绝，脚本backup_failed即停。目录对沙箱用户仅ReadAndExecute；没有跳过备份、绕过沙箱或改其它目录。Host19387只读路由401/health404，GUI/HMR工具可见与真实派发收取均not_run。
+- 仓库实际差异仅`docs/guides/DSH_DESKTOP_TALK_MCP.md`（自报+34/-11）：§3.4 R1限定配置块替换并显式UTF8读写、§5.1未写状态、§6回滚前置、§7home证据；PS5.1自测无BOM/CRLF、原前缀/原2条保留、仅1个insert/mcp-talk。模板/旧功能代码/正式进度未被开发者修改；临时证据仅.tmp/dsh-desktop-mcp-2/。
+- 派发前读取最新项目开发要求，按双方交叉复核派Kimi #148“DeepSeek桌面MCP接入候选独立复核”，顶层general最小参数、名称不带手写编号。开发基线2433d34，期间Codex仅进度提交8addafe；复核实际基线8addafe与唯一指南差异。任务包包含原需求/不变项、实际差异、全部必要证据、明确验收与剩余未验范围。
+- #148必须独立审查目标进程证据/白名单、候选schema/身份工具目录、有效合并/无私人副本、指南R1和权限失败处理；额外只读审查临时apply_target_patch.py的目标限制、候选/目标哈希守卫、备份唯一性、幂等/重复冲突、写后保护/错误回滚，必要隔离fixture验证。禁止真实profile/backup/key写入、GUI/模型/派发收取/重启或Git，只写.tmp/dsh-desktop-mcp-2-review/。
+- 主控裁决路线：独立复核通过后，拟通过宿主现有require_escalated审批通道尝试真实备份与仅追加（需重新核验实际目标/原文件未变）；当前尚未请求此审批，也不存在自动审批审查的拒绝，不能把执行者无审批通道的PermissionError误报为自动审核拒绝。不跳过备份、不让用户接管本可经授权完成的动作；若审批明确拒绝则按实际原因报告限制。
+- 本轮Codex仅更新正式连续性记录、格式检查与提交推送，指南待复核不提交；#147保持submitted。派发后结束，由用户通知#148完成再收取，不轮询，不恢复内置CLI替换，角色页双横线待办保持。
+
 ## 2026-10-05 派#147桌面TALK MCP配置接入
 
 - #145/#146已收取并以2433d34提交推送6文件，暂存格式检查通过。派发前重新读取项目最新development_requirements，按DeepSeek后端/其它执行、Kimi独立复核分工，派#147“DeepSeek桌面TALK MCP配置接入”；实际基线2433d34，工作区干净，顶层general最小参数、标题只名称。
