@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-05 收到#152主被动开关设计，派#153给DeepSeek独立复核
+
+- 用户通知“152好了”。#152/msg2654 runner succeeded、workflow submitted，结果正文为说明+Markdown代码块内JSON，MCP识别unstructured_text/unknown，不能从结束状态或内容词汇推断业务完成。通过稳定结果引用detail完整读2968字符，sha256=0f1df63e7f120be20e5e1f2babc54ea842d3b7d27fadac4b36e0de4beed5a3a7；未读Hall历史或追改原消息。
+- 按旧文本/本地交付兼容路径运行python scripts/talk_workflow.py summary .tmp/controller-mode-c2-plan/development.json --expect-task-id 152，合法partial、未截断：completed8/unfinished2/blocked0、verification6（真实页面/模型/等待not_run）。partial保留独立复核和实施未做，本地合法不冒充MCP结构化有效或业务已验收。
+- 本地方案report.md为22401字节/hash e087793ebe6541965928c449f340647c44a263cdf794618de8ead53676c91144，development.json4585字节/hash03d409264e8de5878d923b2aec0577e3d7d2ce760333222455903dca0ea2b68d。自报基线36ac16adbbbdb1860ed70dee9b6640684e5ad887；主控当前业务工作区干净，911e117只为派发/提示词文档。方案与原交付不改。
+- 方案提出C2-A1等待模式消费者合同→A2模式版本耗尽保护→B项目设置开关与双横线→C真实会话主动链路。仍承认effective=null无主动执行入口；主控只按交付摘要和方案相关节做审查索引，不重复完整源码审查，顺序尚未批准进入实现。
+- 派前再次读取development_requirements，仍为Kimi文字/设计/前端、DeepSeek后端及其他、双方独立交叉复核；controller_mode passive/version0、effective null/not_bound，长期指定Codex/version13仅职责配置。按最小独立顶层参数派#153“主被动开关方案独立复核”给agent:deepseek，返回queued/assigned，未手写标题编号。
+- 复核包包含原需求/范围/不变项、实际基线与两个文件完整hash、开发者校验及not_run证据、六项验收标准。具体疑点交DeepSeek独立判断：65秒预算与报告“>60秒必掐”表述、取消通知能否在同步stdio下被读到、mode检查是否真能感知取消、通用wait变更对非主控/被动/旧服务的兼容、C2-C实际模式消费者与身份依据待定、版本耗尽风险与优先级。不是只采信自报行号，也不提前裁定方案失败。
+- DeepSeek只写.tmp/controller-mode-c2-plan-review/，不改源码/原方案/运行配置或正式进度，不做真实长等待/模型任务/浏览器；完成暂停，由Codex裁决返Kimi修订或通过后拆开发片。要求复核TALK结果完整裸JSON、本次task_id153；不得将verdict添加为未知顶层字段。
+- #152复核前暂未收取，本轮未派实施片。正式仅PROGRESS/HISTORY与路线图同步，git diff --check后中文提交常规推送；派#153后结束主控等待，由用户通知完成再取件。双横线仍留后续前端片，桌面MCP#151核心验收保持。
+
 ## 2026-10-05 继续主被动开关阶段，派#152给Kimi做交互/执行合同设计
 
 - 用户询问未来主被动开关是否解决持续等待、DeepSeek桌面MCP是否已适配及如何提示连接，并授权继续下一步开发。确认#151已人工验收核心接入；主被动开关会统一使用流程，主动模式还需真实消费者、等待超时/取消配套，不能承诺按钮自然消除DLL或同步阻塞问题。
