@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-05 用户#151桌面核心闭环验收通过，接入切片关闭
+
+- 用户确认DeepSeek桌面→TALK→Kimi→TALK→原DeepSeek桌面对话全通，Kimi正常领取、执行并交付，原桌面会话收取成功。桌面TALK MCP接入切片人工验收通过，现有npm执行bridge和身份凭据继续使用。
+- 主控只读核对任务元数据：#151“桌面连通性只读探测：仅回复 DESKTOP_TALK_OK”，created_by=agent:deepseek、target_member_id=agent:kimi、status=succeeded、workflow_status=completed、result_message_id=2648、result_collected_at=2026-10-05T10:34:20.741165（服务端记录）。该结果已由桌面请求者收取，主控不重复收取。
+- 主控talk_get_delivery因不在该Task Hall返回403，未绕过成员权限读取正文或操作GUI；元数据为主控核实，桌面实际操作和业务闭环以用户反馈为验收来源。用户未逐项提供九个工具显示/全部动作、独立新建会话步骤或HMR触发方式的证据，不扩大通过范围。
+- 用户说明Hall消息2649–2653来自先前DeepSeek桥接会话与Kimi互报在线，Kimi因无决策人在场转为待命；按此记录来源，不计入本次探测结果，不删除历史或作为新立项授权。
+- 用户反馈talk_wait_tasks(300s)超客户端工具超时后中断，服务端等待仍会跑完，随后get_task/list_tasks一度排队超时；pwsh两次0xC0000142（DLL初始化失败）。轻量状态查询最终取回结果，业务闭环完成。300秒请求超过当前配置toolCallTimeoutMs=65000的上限；取消/排队机制与DLL环境原因未独立核验，不作已证实因果归因。
+- 默认仍按“派发后结束，用户通知完成再取件”。仅在显式需要等待时考虑低于桌面客户端上限的单次有界等待（如30–45秒）并限定总预算；未修改实际timeout、启用自动高频轮询或更改项目600秒等待目标。长等待/排队与pwsh环境问题独立登记待办。
+- 正式同步PROGRESS/HISTORY、DSH_DESKTOP_TALK_MCP指南、MODULE_bridges、DEVELOPMENT_ROADMAP：核心验收通过，接入门禁关闭；跨重启、多工作区、无人值守、并发与长等待稳定性仍未验收。指南回滚说明补清复制备份会恢复目标内容，必须先核对期间其它设置，不能靠是否加Force判断覆盖行为。
+- 本轮仅文档收尾，git diff --check后中文提交并常规推送；没有派新任务、改代码或运行配置、重跑模型、启停服务或操作浏览器。角色页“参与任务”上方双横线保留一条继续并入下一合适前端切片，尚未实施。
+
 ## 2026-10-05 #150定向复核通过，真实桌面MCP配置落地，暂停人工验收
 
 - 用户通知“150已完成”。#150/msg2647是JSON但不符合talk-delivery-1：额外verdict/defects/handoff、两条completed超300字符、complete与unfinished互斥，MCP业务invalid，原件`.tmp/dsh-desktop-mcp-2-fix-review/talk-delivery-1.json`同样校验失败。主控未采信截断预览或追改原结果；保留原件与sha256，创建decision/delivery-normalized.json与normalization.json，仅长项拆分、额外元数据移入limitations，真实unfinished保留令副本conclusion=partial。按实际任务号150校验及完整摘要通过，来源/原complete与MCPinvalid明确保留。

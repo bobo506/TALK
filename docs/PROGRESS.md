@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-05 (Asia/Shanghai)，#150定向复核通过，真实桌面MCP配置已备份/追加/读回；暂停等待人工验收。
+Updated: 2026-10-05 (Asia/Shanghai)，用户#151桌面DeepSeek→TALK→Kimi→原桌面对话闭环验收通过；本切片关闭。
 
 ## 当前工作与身份
 
@@ -15,31 +15,31 @@ Updated: 2026-10-05 (Asia/Shanghai)，#150定向复核通过，真实桌面MCP�
 - DSH-DESKTOP-0调查#126–#129已收取；桌面内置CLI0.2.0-rc.2、当前npm0.1.5-rc.2并存。用户于2026-10-05确认桌面最新chat对应TALK #133，UI可显示该会话，不代表桌面续聊/进程home一致/并发写入安全已验证。
 - S1a已完成：#141/msg2638执行，#142/msg2639独立复核发现p5误判（原partial保持），#143/msg2640报告补正，#144/msg2641定向复核pass。#141/#143/#144本轮收取completed，#142此前completed；原报告和日志保留，正式结论以修订与独立复核合看。
 - 隔离home下version/help/headless dump成功，desktop profile被拒，临时补丁路径输出证明有效home落点，headless初始化4文件。原p5仅三个独立参数；单参数内嵌LF经当前桌面dsh.cmd截断，直接exec Electron exe/实际桥参数运输未测。
-- 真实home仅采样元数据相同，profiles跳过node_modules、sessions/storages聚合指标；不能证明全文件字节级未写或逐条进程归因。变量keep21/最终25已核对，进程数5为未存证观察。真实模型/GUI/MCP配置加载不属于本次已验收范围，现有npm bridge保持。
+- 真实home仅采样元数据相同，profiles跳过node_modules、sessions/storages聚合指标；不能证明全文件字节级未写或逐条进程归因。变量keep21/最终25已核对，进程数5为未存证观察。这些不属于S1a当次自省验收范围；后续桌面MCP已另由用户#151核心闭环验收，现有npm bridge继续使用。
 
 ## 下一步与待办
 
-1. **桌面TALK MCP真实配置已落盘，等用户验收。** #150修订脚本定向复核pass，原报告格式invalid已保留，主控整理副本校验partial（真实未完项保留）。已重新核对进程/脚本/候选/目标hash，经require_escalated执行唯一备份+仅追加，rc0/ok=true；独立读回10检查全过、原六项设置完整保留，仅增mcp-talk。#147/#148/#149/#150全部收取completed，原自报/格式历史不追改。
+1. **桌面TALK MCP接入已人工验收通过。** 用户确认DeepSeek→TALK→Kimi→TALK→原DeepSeek桌面对话全通，Kimi领取/执行/交付、同会话收取成功。主控元数据核对#151由agent:deepseek派给agent:kimi，succeeded/completed，msg2648，已收取；主控不在其Task Hall，正文403未绕过，实际操作以用户反馈验收。#147–#150此前已审收取，无待收件。
 2. **后续前端小改动：角色页“参与任务”上方双横线仅保留一条。** 用户要求并入下一合适前端切片，不单独派片；尚未改UI，下一前端任务包必须带此项。
 3. **用户明确当前仅桌面作为TALK任务发起客户端，现有执行程序继续使用。** 复用dsh_talk_mcp_launch.py/既有TALK MCP服务与npm bridge，不新增重复worker/member。S1b、直接exec/参数运输、内置CLI替换停止作为当前路线；已完成S1a只保留历史，不作为桌面MCP接入前置。
 4. 已登记未开发：全局运行器库→项目角色绑定/添加编辑→手动启停/状态→项目加载时选择性自启动；默认检查角色/固定检查要求/自动转审；多工作区隔离与群聊阶段按路线图推进。只启动当前项目已配置且勾选的角色，软件安装不自动成为角色。
-5. **人工验收门禁：不再开启新切片。** DeepSeek桌面新建独立调度对话，先talk_list_agents确认三角色/项目要求，再明确授权有限只读任务，旧bridge执行后同一会话get_delivery→collect。GUI/HMR工具可见与真实闭环尚未实测，不用落盘/离线工具目录替代；无自动重启/模型/测试派发。65秒工具超时与最后hash至replace残余窗口保持，默认人工通知取件。
+5. **独立待办：桌面等待/环境稳定性。** 用户反馈wait300秒超过当前65秒客户端上限被中断，随后get/list一度排队；pwsh两次0xC0000142，轻量查询后业务闭环成功。取消/排队机制与DLL原因未查。默认人通知完成再取件；显式需等可有界短等并限定预算，未改实际timeout或启用自动高频轮询。旧Hall消息2649–2653按用户说明来自先前桥接上线/待命，不作为本次结果或新立项授权。
 
 ## Git与验证
 
 - 用户持续授权向 `bobo506/TALK` 常规推送，不包含强推、删远程分支或改写历史。
-- 已审模板2433d34，最近派发进度1254838均已推送。本轮统一收尾#147+#149已审指南，并同步PROGRESS/HISTORY、MODULE_bridges、DEVELOPMENT_ROADMAP；真实profile/唯一备份留仓库外，临时脚本/证据不入Git。格式检查通过后提交推送，完成后等待用户验收。
-- 必要验证已完成：#150独立A/B/D/F+源码/哈希链通过；主控写前进程与hash重核、受控脚本实际执行和独立读回通过。未重复14组fixtures或全量测试，未操作浏览器/启停服务/读取密钥正文；仅落地配置，没有发起桌面模型或真实测试任务。
-- 本轮usage-gate返回continue，但session/weekly百分比仍null，不视为精确用量；按项目单片/上下文规则执行，不臆测百分比。
+- 桌面配置与指南收尾已由9e1bacb提交推送，配置/唯一备份在仓库外。本轮只同步PROGRESS/HISTORY、指南、MODULE_bridges、DEVELOPMENT_ROADMAP的用户验收及稳定性待办；格式检查后中文提交常规推送，不改运行配置/代码/服务。
+- 配置落地独立复核/受控写入/读回10检查已通过；本轮业务验收来源为用户实际桌面反馈，#151任务元数据另核实。未操作浏览器/读密钥/启停服务或重跑模型；因Hall成员权限不读取#151正文，不重复收取它。
+- 最近一次usage-gate返回continue，但session/weekly百分比null，不能据此声明当前精确用量；按项目单片/上下文规则执行。
 
 ## 证据与恢复入口
 
-- 实际配置`C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml`（2275字节/hash245407f8…e2398d6）；同目录唯一备份尾缀`20261005-180915`（1045字节/hash4366d522…02b085）。实际执行日志`fix/logs/apply-target-20261005-codex-1.json`与独立读回`fix/logs/codex-post-apply-check.json`，fix即下述修正目录；当前状态/回滚/验收见指南第5.3节。
+- 实际配置`C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml`（2275字节/hash245407f8…e2398d6）；同目录唯一备份尾缀`20261005-180915`（1045字节/hash4366d522…02b085）。实际执行日志`fix/logs/apply-target-20261005-codex-1.json`与独立读回`fix/logs/codex-post-apply-check.json`，fix即下述修正目录；实际落地见指南第5.3节，用户#151验收与环境反馈见第5.4节。
 - 接入原件`.tmp/dsh-desktop-mcp-2/`（#147）；初审`.tmp/dsh-desktop-mcp-2-review/delivery.json`（#148）；修正`.tmp/dsh-desktop-mcp-2-fix/`（#149）；定向复核`.tmp/dsh-desktop-mcp-2-fix-review/`（#150）。原无效包`talk-delivery-1.json`保持，主控格式副本`decision/delivery-normalized.json`及normalization.json保留来源。
-- 桌面MCP配置准备：`.tmp/dsh-desktop-mcp-1/`（#145/msg2642）；复核：`.tmp/dsh-desktop-mcp-1-review/review.json`（#146/msg2643，本地合法完整交付，MCP正文仍旧文本unknown）。安装版0.2.0-rc.2补丁数组/schema/HMR已独立核对；实际进程home、GUI工具可见/派发收取待接入与人工验收。
+- 桌面MCP配置准备：`.tmp/dsh-desktop-mcp-1/`（#145/msg2642）；复核：`.tmp/dsh-desktop-mcp-1-review/review.json`（#146/msg2643，本地合法完整交付，MCP正文仍旧文本unknown）。安装版0.2.0-rc.2补丁数组/schema/HMR已独立核对；实际进程home已在接入时核对，GUI核心派发/收取已由用户#151人工验收；九工具全部动作未逐项验证。
 - S1a原件：`.tmp/dsh-desktop-s1a/`；初审：`.tmp/dsh-desktop-s1a-review/`；当前修订：`.tmp/dsh-desktop-s1a-fix/report-revised.md`；定向复核：`.tmp/dsh-desktop-s1a-fix-review/`。
 - 桌面调查：`.tmp/dsh-desktop-0/report-revised.md`、`.tmp/dsh-desktop-rereview-0/`；F2：`.tmp/remove-top-task-entry/`及review目录；正式用户回归步骤见ROLE_DESCRIPTION_ACCEPTANCE。
 - 交付优先talk_get_delivery，同读preview与summary_text；必要时稳定引用补读。schema有效不等于验收。临时证据不随Git跟踪，核心事实/限制已写MODULE_bridges及历史。
 - 启动见AGENTS；不为恢复上下文自动重启服务。完整历史在PROGRESS_HISTORY。
 
-恢复指令：**继续项目**。当前没有待收取/待派发任务；桌面真实MCP配置已写并核验，等待用户人工确认工具可见与真实派发收取闭环。不要重复派发#135–#150或重复追加mcp-talk，不恢复内置CLI替换路线，保留双横线待办。用户未验收前不开发下一阶段。
+恢复指令：**继续项目**。桌面MCP接入已人工验收通过，无待收件或已派待完成任务。本轮验收记录提交后结束；下次按路线图选择下一明确切片，下一合适前端片带双横线修正。不要重复派发#135–#151或重复追加mcp-talk，不恢复内置CLI替换路线；长等待/环境问题单独待办，默认被动取件。

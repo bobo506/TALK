@@ -10,7 +10,7 @@
 
 一句话结论：**桌面端没有 MCP 配置表单，接入入口就是桌面 profile 的 YAML patch 层文件**；模板 `deploy/dsh/desktop-talk-mcp.patch.template.yml` 按下面的步骤落到 `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml` 即可。
 
-**本机当前状态（2026-10-05）**：主控已在独立复核通过后备份并追加桌面 profile 的 `mcp-talk` 配置，写后读回校验通过。不要重复追加；真实桌面工具可见与任务派发闭环仍待人工验收，当前结果见第 5.3 节。
+**本机当前状态（2026-10-05）**：桌面 profile 的 `mcp-talk` 配置已备份/追加并读回校验，用户已完成人工验收：DeepSeek 桌面 → TALK → Kimi → TALK → 原 DeepSeek 桌面对话派发/交付/收取闭环通过（任务 #151）。当前结果见第 5.4 节；65 秒工具超时下的长等待稳定性另列待办。
 
 ---
 
@@ -163,21 +163,21 @@ $text = $existing.TrimEnd() + "`n`n" + $block.TrimEnd() + "`n"
 
 ## 5. 手工验收步骤（含本片已执行/未执行标注）
 
-> 本片**没有**操作 GUI、没有启停桌面或 bridge、没有发起真实委派。下面第 1–6 步全部是**预期步骤**，需要在用户接入阶段人工执行；第 0 步的一部分已由本片以只读方式执行，证据见 `.tmp/dsh-desktop-mcp-1/`。
+> 主控没有操作 GUI 或自动启停桌面/bridge；配置准备的 0a–0c 证据见 `.tmp/dsh-desktop-mcp-1/`。用户已在桌面对话完成人工派发/交付/收取验收（#151，见第 5.4 节）；表内核心链路按用户确认记为通过，不表示九个工具的全部动作与长等待都已测试。
 
 | # | 步骤 | 预期结果 | 本片状态 |
 |---|---|---|---|
 | 0a | 离线校验模板结构 | 顶层数组、`mcp-talk` 行存在、config 字段全在安装版 schema 内、无密钥正文 | **已执行**（`logs/validate-template.log`，`ok=true`） |
 | 0b | 用既有入口做 stdio 工具目录核对 | `initialize` + `tools/list` 返回九个工具、`serverInfo.name=talk_tools_mcp` | **已执行**（`logs/probe-desktop-template.log`，`tools_match=true`） |
 | 0c | 用本人 `agent:deepseek` 凭据做只读身份/项目核对 | `ok=true`、member=`agent:deepseek`、project=`prj_e8fe7066bbec` | **已执行**（`logs/check-identity.log`） |
-| 1 | 在桌面新开**独立调度会话**，不复用也不续写 worker 正在写入的任务会话 | 会话正常打开，工作区是预期项目 | 未执行（需 GUI） |
-| 2 | 确认 TALK MCP 已加载（工具可见） | 九个 `mcp__talk__*` 工具可见 | 未执行（需 GUI） |
-| 3 | 用 `talk_list_agents` 列项目 Agent 并核身份 | 看到 `agent:codex` / `agent:kimi` / `agent:deepseek` 及其 `availability` | 未执行（需 GUI/模型） |
-| 4 | 由用户在桌面**明确**派一个限定任务 | 任务在 TALK 创建成功，带上范围与验收标准 | 未执行 |
-| 5 | 现有 bridge 领取并执行 | 任务从 `queued` 走到 `submitted`，结果消息落在该任务 Hall | 未执行 |
-| 6 | **用户通知后**，在同一桌面会话读取并收取 | `talk_get_delivery` 读到交付摘要 → `talk_collect_result` 后 `workflow_status=completed` | 未执行 |
+| 1 | 在桌面新开**独立调度会话**，不复用也不续写 worker 正在写入的任务会话 | 会话正常打开，工作区是预期项目 | 桌面对话核心链路已通过；新建独立会话/工作区细节未逐项记录 |
+| 2 | 确认 TALK MCP 已加载（工具可见） | 九个 `mcp__talk__*` 工具可见 | 核心工具实际调用通过；九工具逐项显示未单独记录 |
+| 3 | 用 `talk_list_agents` 列项目 Agent 并核身份 | 看到 `agent:codex` / `agent:kimi` / `agent:deepseek` 及其 `availability` | 准备阶段身份预检已通过；本次桌面调用未单独记录 |
+| 4 | 由用户在桌面**明确**派一个限定任务 | 任务在 TALK 创建成功，带上范围与验收标准 | 通过：#151，由 agent:deepseek 派给 Kimi |
+| 5 | 现有 bridge 领取并执行 | 任务从 `queued` 走到 `submitted`，结果消息落在该任务 Hall | 通过：用户确认 Kimi 领取/执行/交付；runner succeeded |
+| 6 | **用户通知后**，在同一桌面会话读取并收取 | `talk_get_delivery` 读到交付摘要 → `talk_collect_result` 后 `workflow_status=completed` | 通过：用户确认收取；#151 completed |
 
-验收支持**人工唤回**即可：本片不扩展无人值守、不启用自动转审、不做 600 秒等待改造。等待超时不会取消执行者任务，主控若用 `talk_wait_tasks`，客户端单工具超时必须大于 600 秒（建议 ≥ 660 秒）。
+验收支持**人工唤回**即可：本片不扩展无人值守、不启用自动转审、不做 600 秒等待改造。等待调用超时不等于执行者任务已取消。若单次请求 `talk_wait_tasks(600s)`，客户端单工具超时需覆盖该等待时长及通信余量；当前 65 秒配置不满足，未在本片调整。
 
 ### 5.1 #147 配置准备历史（实际写入结果见第 5.3 节）
 
@@ -202,15 +202,24 @@ $text = $existing.TrimEnd() + "`n`n" + $block.TrimEnd() + "`n"
 - **残余限制（不得当成已消除）**：最后一次核对与 `os.replace` 之间仍有跨进程写入窗口，本实现只能把窗口压到最小并保证"发现即停"，不能宣称两次哈希消除了该竞态；脚本不新增 CRLF 通用支持（CRLF 目标会在写后 `post_lf_only` 校验失败并回滚），真实目标条件明确为 UTF-8 无 BOM + LF。
 - #149 交付时真实 profile **尚未写入**；其后 #150 定向独立复核通过，主控核对对象与完整哈希后经宿主审批通道完成实际写入，结果见第 5.3 节。
 
-### 5.3 主控实际配置落地与待验收（2026-10-05）
+### 5.3 主控实际配置落地（2026-10-05；人工验收见第 5.4 节）
 
 - **已写入**：`C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml`。执行前再次核对桌面主进程 PID 3084 的启动时间与 Host PID 13068 的实际 profile 参数，仍对应此目录；脚本、候选与目标完整哈希均与独立复核一致。
 - **唯一备份**：同目录 `cordis.patch.yml.bak-talk-mcp-2-fix-20261005-180915`，1045 字节，SHA-256 `4366d52223a9abebe1f8735d980226783a74a32fe8b927b9f187c2e1eb02b085`。原文件和备份内容不复制到仓库。
 - **实际写入成功**：经宿主审批通道执行已审修订脚本，`rc=0`、`ok=true`；候选/原目标哈希、重复预检、唯一备份核验、替换前二次核对全部通过。独立读回再次核验原字节前缀和原六项设置完整保留，仅新增一个 `mcp-talk`，无临时文件残留。
 - **写后文件**：2275 字节，SHA-256 `245407f8390e5086c2bfde3f268241484028b12a183951089b2541deae2398d6`，与已审合并计划一致；显式环境仅 UTF-8 开关与 TALK 密钥文件路径。继续复用既有启动器、TALK MCP 和执行 bridge。
 - **证据**：`.tmp/dsh-desktop-mcp-2-fix/logs/apply-target-20261005-codex-1.json`、`logs/codex-post-apply-check.json`。#147–#150 的已完成交付已收取，历史 partial/无效原报告保持；这不代表桌面闭环已经验收。
-- **待用户验收**：在桌面新建独立调度对话，调用 `talk_list_agents`（项目 `prj_e8fe7066bbec`），确认工具可用和三名角色/最新开发要求；明确授权一个限定的只读任务交现有 Agent 执行；完成后在同一桌面对话先 `talk_get_delivery` 再 `talk_collect_result`。完整步骤与预期见第 5 节表格。
-- **未测范围保持**：未用 GUI 证明 HMR 或工具可见，未在桌面对话调用模型、发起/收取真实任务，未自动重启桌面或 bridge；65 秒单工具超时仍不支持 600 秒长等待。只确认配置落盘与读回，不以保存后等待或离线工具目录代替实际加载验收。
+- **落地后的验收步骤（核心闭环已通过，细项记录边界见表格与第 5.4 节）**：在桌面新建独立调度对话，调用 `talk_list_agents`（项目 `prj_e8fe7066bbec`），确认工具可用和三名角色/最新开发要求；明确授权一个限定的只读任务交现有 Agent 执行；完成后在同一桌面对话先 `talk_get_delivery` 再 `talk_collect_result`。完整步骤与预期见第 5 节表格。
+- **主控落地阶段的验证边界**：当时只确认配置落盘与读回，没有操作 GUI、调用桌面模型或派发测试；随后用户的真实调用验收另记在第 5.4 节。主控未自动重启桌面或 bridge，65 秒单工具超时仍不支持 600 秒长等待。
+
+### 5.4 用户桌面闭环验收通过（2026-10-05）
+
+- **用户确认链路全通**：DeepSeek 桌面对话 → TALK → Kimi → TALK → 原 DeepSeek 桌面对话。Kimi 正常领取、执行并交付，桌面原会话完成收取。
+- **任务证据**：#151“桌面连通性只读探测：仅回复 DESKTOP_TALK_OK”，请求者 `agent:deepseek`、目标 `agent:kimi`，runner `succeeded`、workflow `completed`、结果消息 2648、收取时间 `2026-10-05T10:34:20.741165`（服务端记录）。主控只读核对任务元数据，正文/实际桌面操作结论来自用户反馈。
+- **消息归属**：用户说明同 Hall 的 2649–2653 是此前 DeepSeek 桥接会话与 Kimi 互报在线，Kimi因没有决策人在场转为待命；这些不计入本次只读探测的结果，也不作为新立项授权。
+- **等待超时观察**：用户调用 `talk_wait_tasks(300s)` 超过当前 `toolCallTimeoutMs: 65000` 后被客户端中断，反馈服务端等待仍继续，后续 `get_task`/`list_tasks` 一度排队超时；改用轻量状态查询后完成闭环。保留当前“人通知完成后取件”默认，显式需要等待时可先选低于客户端超时的单次有界等待（例如 30–45 秒），限定总预算；长等待的超时/取消/排队行为仍需单独核验，不能视为稳定性验收通过。
+- **环境观察**：用户反馈 `pwsh` 两次以 `0xC0000142`（DLL 初始化失败）退出，未阻断最终业务闭环。仅记录现象，未查明原因，不归因于 TALK 代码或与等待超时建立已证实因果。
+- **范围收尾**：桌面 MCP 接入切片人工验收通过，继续沿用现有执行服务和身份凭据；本次未调整超时配置、未开启自动轮询/无人值守或其它运行器改造。
 
 ---
 
@@ -218,7 +227,7 @@ $text = $existing.TrimEnd() + "`n`n" + $block.TrimEnd() + "`n"
 
 > 当前真实 profile 已写入（见第 5.3 节）。回滚只针对本次追加的 `mcp-talk` 块；只有确认期间没有其它改动时才还原本次唯一备份，否则仅移除该块，保留桌面或他人随后保存的设置。
 
-1. 删掉 `cordis.patch.yml` 里追加的 `- insert:` 块，或从第 3.2 节的**唯一时间戳备份**还原（`Copy-Item -LiteralPath '<本次备份>' -Destination $patchFile`；不要加 `-Force`，那会覆盖比你手中备份更新的备份）。
+1. 优先移除 `cordis.patch.yml` 末尾本次新增的 `- insert:`（`mcp-talk`）块；只有确认目标期间没有其它改动时，才从**本次唯一备份**还原（`Copy-Item -LiteralPath '<本次备份>' -Destination $patchFile`）。复制备份会还原目标内容，操作前必须核对后续设置，不能只依赖是否加 `-Force` 判断会不会覆盖。
 2. 等 HMR 重载（约 2 秒写入稳定窗口）；不生效就重启桌面 App。
 3. 工具随之消失，其余桌面设置不受影响。若桌面已因 patch 语法错误无法启动，恢复备份后重启；桌面自身的恢复路径也会把 profile patch 备份成 `cordis.patch.yml.bak-<时间戳>`。
 
@@ -226,12 +235,12 @@ $text = $existing.TrimEnd() + "`n`n" + $block.TrimEnd() + "`n"
 
 ## 7. 限制、缺口与未验证项
 
-**本片未验证（不得当成已通过）**
+**仍未覆盖的范围**
 
-- **桌面内真实加载与工具可见**：未在 GUI 里实测；HMR 生效与 `mcp-talk` 行出现都属于预期，需要用户接入阶段人工确认。
+- **工具动作覆盖**：用户已通过实际桌面对话验证核心 MCP 派发/交付/收取链路；九个工具的全部动作、插件清单逐项截图和 HMR 具体触发方式未分别验证。
 - **桌面进程实际使用的 `DSH_HOME`**：`DSH-DESKTOP-MCP-2` 已对**当前运行中**的桌面进程逐进程确认（Host 进程命令行直接携带 `<home>\profiles\desktop`，主进程环境无 `DSH_HOME` 覆盖），并只读核对了本机默认 home 与 home 层文件。仍未覆盖的情况：桌面**重启**后若换了 `DSH_HOME`（例如从一个设置过该变量的 shell 启动），patch 文件就要放到那个 home 下；每次落地前应重新确认一次。
 - **CLI 侧的 desktop profile 组合校验**：CLI 显式拒绝该 profile，所以"桌面组合树"无法用 `--dump-config` 旁证。
-- **真实委派/收取闭环**：本片没有派发任务、没有调用模型、没有收取结果。
+- **验收规模**：一次真实限定只读任务 #151 已由用户验收通过；跨重启会话恢复、多工作区、无人值守、多任务并发和长等待稳定性不在本次通过范围。
 
 **已知限制**
 
