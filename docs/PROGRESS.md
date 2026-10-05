@@ -1,13 +1,13 @@
 # Project Progress
 
-Updated: 2026-10-05 (Asia/Shanghai)，F2人工验收通过；#141桌面内置CLI隔离验证已派发。
+Updated: 2026-10-05 (Asia/Shanghai)，#141已交付，Kimi #142独立复核已派发。
 
 ## 当前工作与身份
 
 - 根目录 `D:/claude-test/TALK`；项目 `prj_e8fe7066bbec`；分支 `codex/terminal-return-codex`；最新功能提交/已推送基线 `f743962`（F2）；前序B1/F1为 `c147d09`。Codex为决策Agent，具体实现和完整独立审查交执行Agent。
 - 最新项目要求：Codex负责建议/派发/验收；Kimi负责文字、设计、交互、前端；DeepSeek负责后端与其他内容；双方交叉复核。每次派发前重新读取 `talk_list_agents` 最新 `development_requirements`，不能只用本快照。
 - 当前默认派发后结束，由用户通知完成再取件，不轮询；独立顶层任务继续 `general` 最小参数。开发完成暂停后独立审查，禁止共享目录并行改码。Codex不操作浏览器，页面效果交用户验收。
-- 用户已确认B1/F1及F2人工验收通过，#139/#140已收取；#140原partial仅一处文档版本，补正验证关闭，历史结论保留。当前DeepSeek #141执行桌面内置CLI隔离验证，完成交Kimi独立复核。任务标题只写名称，历史双号不回写。
+- 用户已确认B1/F1及F2人工验收通过，#139/#140已收取；#140原partial仅一处文档版本，补正验证关闭，历史结论保留。DeepSeek #141已交付但暂未收取，当前Kimi #142独立复核。任务标题只写名称，历史双号不回写。
 
 ## 最近完成与未收尾成果
 
@@ -19,11 +19,11 @@ Updated: 2026-10-05 (Asia/Shanghai)，F2人工验收通过；#141桌面内置CLI
 
 ## 尚待处理的任务与需求
 
-1. **#141 DSH-DESKTOP-S1a已派发。** DeepSeek执行、Kimi独立复核；基线f731789、派发前工作区干净。仅.tmp/dsh-desktop-s1a/内验证桌面内置CLI：临时home/项目、无凭证无模型、自省命令、实际落点与初始化副作用；不改变现有npm bridge或真实环境。用户通知完成后收取交付并编写独立审查包。
+1. **#141 DSH-DESKTOP-S1a已交付，待Kimi #142独立复核。** msg2638为有效task_id141结构化complete自报；报告版本0.2.0-rc.2、help/headless dump成功、desktop profile拒绝、临时home标记与初始化4文件。基线f731789，Codex文档提交后HEAD6c1a6fa，执行者无被跟踪变更。#142重点独立重算元数据、核实采样范围/归因、凭证路径、多行参数边界与桥候选表述；自报不代表验收通过。
 2. **后续前端小改动：角色页“参与任务”上方两条横线仅保留一条。** 用户要求在后续切片顺手处理，不单独派片，不并入#141；下一合适前端任务包须带此项并由用户验收。
 3. B1/F1已提交推送c147d09，进度提交a240128；2026-10-05用户明确“验收通过，继续下一项”，人工门禁已释放。该确认不自行细化为每个极端场景逐项实测；自动化证据与历史限制保留。
 4. S1a先验证home解析再运行安全自省，子进程环境隔离且不继承凭证；真实home只采元数据，背景桌面/bridge写入不可误归因。S1b真实模型输出/退出/取消、ACP/SDK及桌面MCP配置另列范围；现有运行器不切换，不卸载CLI、不改PATH，不读凭证/私人会话。
-5. F2于2026-10-05用户明确“验收通过，继续下一项”释放人工门禁，不推断每个场景逐项实测。#141完成暂停后交叉复核，本轮只推进该一片，派发后结束主控等待。
+5. F2人工门禁已释放，不推断每个场景逐项实测。#141已暂停、#142复核已派发，本轮只推进S1a；用户通知#142完成再取件裁决，主控不轮询。S1a不外推真实执行/GUI/MCP配置全面通过。
 
 ## 仅登记的后续计划
 
@@ -37,11 +37,11 @@ Updated: 2026-10-05 (Asia/Shanghai)，F2人工验收通过；#141桌面内置CLI
 - 用户长期授权向bobo506/TALK常规推送，不含强推/改写历史。
 - 2026-10-05标准git add/commit/push成功，旧自动审批工作区额度障碍本轮未再出现。功能/相关文档c147d09已推送origin/codex/terminal-return-codex，包含B1/F1、已审隐藏控件清理与既有文档改动。
 - F2功能提交f743962“移除顶部新建任务入口并保留详情子任务流程”已推送origin/codex/terminal-return-codex（14文件，+63/-51）。本次PROGRESS/HISTORY收尾记录另作进度提交并常规推送；临时证据不受Git跟踪，正式结论与限制已落盘。
-- 主控仅补正文档版本、复跑页面契约9项及git diff --check；未重复完整代码审查/全量测试，未操作浏览器或重启真实服务。
+- F2收尾仅由主控补正文档版本、复跑页面契约9项及git diff --check。本轮只读S1a交付摘要并派交叉复核，不重复执行探针/完整代码审查，未操作浏览器或重启真实服务。
 
 ## 证据与恢复入口
 
-- S1a：`.tmp/dsh-desktop-s1a/`（#141）；此前调查方案见report-revised.md §5.1。
+- S1a：`.tmp/dsh-desktop-s1a/`（#141）；审查：`.tmp/dsh-desktop-s1a-review/`（#142）。此前调查方案见report-revised.md §5.1。
 - F2开发：`.tmp/remove-top-task-entry/delivery.json`与`logs/`；复核：`.tmp/remove-top-task-entry-review/`（#140）。
 - 清理：`.tmp/manual-task-cleanup-resume-1/`、`.tmp/manual-task-cleanup-review-1/`。
 - 桌面调查：`.tmp/dsh-desktop-0/report-revised.md`、`delivery-revised.json`（128）；原126文件保留，引用以修订为准；`.tmp/dsh-desktop-review-0/`（127）、`.tmp/dsh-desktop-rereview-0/`（129）。
@@ -49,4 +49,4 @@ Updated: 2026-10-05 (Asia/Shanghai)，F2人工验收通过；#141桌面内置CLI
 - 启动仍见AGENTS；共享开发期间优先不带 `--reload`，不为恢复上下文自动重启已有服务。
 - 本轮usage-gate返回continue，但session/weekly百分比均null，不能视为已获精确用量；继续遵守项目一片刹车，不臆测百分比。完整历史及压缩前快照在PROGRESS_HISTORY。
 
-恢复指令：**继续项目**。当前等用户通知#141完成，再取交付、派Kimi独立复核；不要重复派发#135–#141。
+恢复指令：**继续项目**。当前等用户通知#142完成，再取独立审查结果，必要时交回修正后收取/Git收尾；不要重复派发#135–#142。
