@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #146独立复核通过，收取#145/#146桌面MCP配置准备
+
+- 用户通知“146完成”。#146/msg2643为旧式自由文本+本地路径，MCP业务结论unknown，截断预览不作为完整交付。按项目允许的本地回退执行 `python -X utf8 scripts/talk_workflow.py summary .tmp/dsh-desktop-mcp-1-review/review.json --expect-task-id 146`：校验通过，完整摘要未截断，复核结论complete；同意#145原partial（配置准备完成，真实激活未验）。不把MCP unknown改写为结构化complete。
+- Kimi独立从安装版app.asar抽取代码核对：桌面0.2.0-rc.2、desktop host patchFiles=[]、bundle→profile→home→overlays层序、parsePatchList顶层数组及insert语义、MCP stdio schema九个config键、工具命名与环境合并、CLI拒绝desktop profile、HMR两份用户patch监听/2秒稳定写窗口与无MCP图形表单。现有profile patch已存在，指南要求追加保留原设置正确。
+- 复核独立重跑：schema validator rc0/ok=true/unknown_config_keys=[]；九工具tools_match=true、serverInfo=talk_tools_mcp 2.0.0、transport=pipe；key文件只读身份member=agent:deepseek及项目匹配；含空格中文路径space_path_single_arg=true。开发原探针transport=file，两种测试运输均不证明桌面真实MCP加载。
+- R1（低、非阻塞）：指南§3.4全文Replace把模板头部占位符注释一并替换；配置功能不受影响。Codex裁决配置准备通过，下一接入片限定配置块替换处理。reconnect.enabled=true与安装版默认相同为无害冗余；只读清单mcp-talk预期仍待实际GUI确认。
+- 未完成保持：实际桌面进程DSH_HOME确认、GUI/HMR工具可见、独立桌面会话有限派发→旧bridge执行→原会话读交付并收取。原模板65秒工具超时不覆盖600秒长等，默认人工通知后取件；不把原desktop调查/cmd换行/S1a当接入前置。
+- 依据独立复核收取#145/msg2642、#146/msg2643，两任务workflow_status=completed；#145原partial与#146旧式MCPunknown历史保持。此前两项未跟踪模板/指南现纳入Git，同步正式进度/桥模块/路线图，仅格式检查，不重复完整测试。
+- 下一明确片为桌面profile接入：先核验实际目标与已有配置、唯一备份、离线预检，再仅追加TALK MCP块，保留原配置与既有执行程序；不自动重启、模型调用或派测试任务，完成交Kimi独立复核后用户验收。角色页双横线待办不在本片。
+
 ## 2026-10-05 #145桌面MCP配置准备交付，派#146独立复核
 
 - 用户通知“145 ok 了”；读取#145/msg2642合法结构化完整摘要（preview及summary_text合看），任务succeeded/submitted，自报partial，已完成10项、未完成4项、阻塞0。格式/任务号有效只代表自报一致，不提前收取或视为业务验收。

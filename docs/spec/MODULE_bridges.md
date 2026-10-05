@@ -123,6 +123,7 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 - 参数限制：原p5是三个独立参数，仅证明多参数与中文未截断。Kimi k2实测单参数内嵌LF经当前桌面`dsh.cmd`后只有`first-line`进入argv；不能用该shim形态宣称多行单参数保真。直接exec Electron exe与实际bridge参数运输未测，不能泛化所有入口均不支持多行，也不能由npm绕过分支不命中推导必须新增bridge代码。
 - 隔离证据范围：已采样的真实home profiles（跳过node_modules）/顶层/凭证元数据无变化；sessions/storages仅聚合指标，背景变化按时间窗观察，无逐条进程归因，不能证明全部文件内容字节级未写。环境keep清单21项、去重20项加新增5项、最终25变量名，未记录值；仅凭变量名正则不替代实际解析路径核验。进程数前后5仅开发者当时观察、未存证、不作为独立证据；零模型与未触发plugin/pnpm拉取有代码路径旁证，未做网络抓包。
 - 2026-10-05用户收窄当前目标：桌面会话经TALK MCP发起任务，TALK仍交给现有npm `0.1.5-rc.2 --profile headless` bridge与Agent执行，桌面原会话可查看/收取结果。复用既有MCP服务与启动器，#145准备桌面配置模板/指南及必要离线或只读预检，完成独立复核后再接入实际桌面。该需求不包含内置CLI替换、S1b或直接exec/参数运输验证，不把cmd换行限制作为桌面MCP接入前置；现有执行服务与角色/权限保持。
+- 2026-10-05桌面MCP配置准备#145经Kimi #146独立源码/schema核对与只读重跑后通过并收取；正式模板为`deploy/dsh/desktop-talk-mcp.patch.template.yml`，指南为`docs/guides/DSH_DESKTOP_TALK_MCP.md`。安装版0.2.0-rc.2入口为`<DSH_HOME>/profiles/desktop/cordis.patch.yml`顶层loader补丁数组，profile用户层后加载home用户层；MCP插件以stdio复用既有启动器，key只给外置文件路径。开发file/复核pipe九工具探针不等于真实桌面激活。R1全文替换头注释为低级非阻塞问题，下一接入片处理；65秒工具超时不直接支持600秒长等。下一步先核验目标并备份后仅追加桌面配置，GUI可见与独立会话派发/收取仍待人工验收；#145原partial保留。#146的完整结构化交付在本地review.json校验，TALK正文仍旧文本unknown，不混淆两种结论来源。
 - S1a历史未执行项继续如实保留：真实模型输出/退出/取消/落盘、直接exec/实际桥参数运输、桌面GUI续聊与MCP配置加载均未验证。前两类停止当前排期；MCP加载属当前接入后续验收，不将桌面显示历史chat等同已加载工具。本宿主CreateNoWindow现象仍只为当次环境观察，无通用根因结论。
 - 本地证据：`.tmp/dsh-desktop-s1a/`原件、`.tmp/dsh-desktop-s1a-review/`独立证据、`.tmp/dsh-desktop-s1a-fix/report-revised.md`修订、`.tmp/dsh-desktop-s1a-fix-review/`定向复核；这些临时产物不随Git跟踪，正式结论及原错误修订关系保存在本节与PROGRESS_HISTORY。
 

@@ -1,0 +1,56 @@
+# TALK × DeepSeek Harness 桌面端 MCP 接入模板（无密钥；占位符必须替换后才能使用）。
+#
+# 这是「桌面 profile 用户 patch 层」的格式：顶层 YAML 数组，每项是一条 loader patch。
+# 目标文件（二选一，推荐第 1 个）：
+#   1) %USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml   只影响桌面 profile
+#   2) %USERPROFILE%\.dsh\cordis.patch.yml                    影响所有 profile（home 层）
+# 已安装桌面端（0.2.0-rc.2）启动时按 dsh-base bundle → dsh-web-app bundle → profile 用户层
+# → home 用户层 → 启动参数覆盖层 的顺序组合；桌面进程启动 profile 时 patchFiles 为空，
+# 所以对它真正生效的只有上面两份「用户 patch 文件」。
+#
+# 模板只做一件事：把既有 TALK 终端 MCP 入口注册成原生 MCP 服务器 talk，
+# 模型侧工具名形如 mcp__talk__talk_list_agents。
+# 它不新增服务器、桥适配器或运行器，也不改动原生工具、沙箱与审批设置。
+# 若目标 profile patch 文件已有内容，请把下面的 `- insert:` 整块**追加**到文件末尾，
+# 不要覆盖原文件（原文件里通常还保存着桌面自身的设置）。
+#
+# 需要替换的占位符（全部替换成真实**绝对路径**；路径统一用正斜杠 /，
+# 含空格或中文的目录必须保留单引号，见 docs/guides/DSH_DESKTOP_TALK_MCP.md）：
+#   __PYTHON__   Python 解释器绝对路径，例如 'D:/claude-test/TALK/.venv/Scripts/python.exe'
+#   __REPO__     TALK 仓库根目录，例如 'D:/claude-test/TALK'
+#   __SERVER__   TALK 服务地址，例如 'http://127.0.0.1:8000'
+#   __PROJECT__  已注册项目 id，例如 'prj_e8fe7066bbec'
+#   __KEY_FILE__ 仓库外的 TALK API Key 文件绝对路径（这里只出现**路径**，不出现密钥正文），
+#                例如 'C:/Users/your-name/.talk/agent-deepseek.key'
+#
+# 禁止在本文件任何位置写入 API Key 正文；密钥由 scripts/dsh_talk_mcp_launch.py
+# 在自己的进程内从该文件读取。
+
+- insert:
+    - id: mcp-talk
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: 'talk'
+        transport: 'stdio'
+        command: '__PYTHON__'
+        args:
+          - '-X'
+          - 'utf8'
+          - '__REPO__/scripts/dsh_talk_mcp_launch.py'
+          - '--server'
+          - '__SERVER__'
+          - '--project'
+          - '__PROJECT__'
+        cwd: '__REPO__'
+        env:
+          # 桌面/DSH 的子进程 seam 会按 /KEY|PASSWORD|SECRET|TOKEN/i 与 DSH_* 清洗父环境，
+          # 但配置里显式声明的 env 会在清洗之后合并回来，所以这里给"密钥文件路径"是有效写法。
+          PYTHONUTF8: '1'
+          TALK_DSH_KEY_FILE: '__KEY_FILE__'
+        # 首次连接或工具同步失败时拒绝该插件激活（失败可见），而不是静默缺少工具。
+        failOnStartupError: true
+        # 单次 tools/call 超时；默认 60000。talk_wait_tasks 最长等待 600 秒，
+        # 若要在桌面里用它长等待，请把这里调大（例如 660000）。
+        toolCallTimeoutMs: 65000
+        reconnect:
+          enabled: true
