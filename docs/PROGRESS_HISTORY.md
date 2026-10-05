@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #153复核完成需修订，收取复核并派#154给Kimi
+
+- 用户通知“153已完成”。#153/msg2655为合法完整talk-delivery-1、task_id153匹配、schema自报complete，completed9/unfinished0/blocked0、verification10、limitations9，摘要无省略。complete仅表示独立复核完成；实际设计结论为需修订，P1–P4中等/P5–P7低，无阻塞，业务实现尚未开始。
+- DeepSeek独立确认原方案/开发包hash与实际基线、原文件行号、模式/指定两套CAS、前端当前无mode UI、双横线实际结构、无生产侧模式执行消费者；复核期间HEAD从911e117前进到b7fe7ce仅主控docs变化，业务源码零改动。内存SQLite/pydantic探针证实MAX+1路径静默存REAL、响应校验失败、合法expected_version不能再写；未触碰业务库、服务、浏览器、模型或真实等待。
+- 主控接受独立复核工作并收取#153：workflow completed、result_message_id2655、收取时间2026-10-05T11:43:01.235806（服务端记录）。方案未通过，不收取#152为已验收；#152原partial/代码块unknown及原报告保留，独立工作完成与方案通过明确分开。
+- 冻结复核对象：.tmp/controller-mode-c2-plan-review/review.md 21548字节/SHA256 90f2dfa05790a37ec83d48311d3aeed7645b3ad6df3d14da52c111af5963a499；development.json 7614字节/SHA256 3568d88b8a895588bbd7c0de34aba61636bd1ee8cfd3a21a4c31a7f12aa177e3。原#152方案/包hash e087793e…6c91144、03d40926…0ea2b68d保持，修订写新目录不覆盖。
+- Codex裁决需修订：P1新受控wait必须明确启用与旧调用兼容边界，优先默认关闭的显式选择；P2自身身份用API Key反查/api/members/me而非环境/模型标签；P3模式变化检测不等于客户端取消检测，同步stdio取消通知未读到时不能宣称下一节点会响应；P4先确定预算规则/余量/检查节奏/枚举与HTTP/sleep剩余deadline、谁管理总预算，不能留实现者二选一；P5耗尽机制改正并降为低风险可选，不阻塞正常开关主线；P6约定级消费者与实际可验证入口/验收补清；P7身份/项目新增GET计入http_requests并披露。
+- 额外事实纳入P2修订：当前主控MCP创建#152/#153的created_by=human:bobo，与长期controller_assignment=agent:codex不同。不能将人类凭据猜成Agent身份，不能借提示词更改指定/密钥/权限；保留既有人工/通用流程，受控入口支持边界及最小核验建议需如实说明，未凭此判桌面MCP连接失败。
+- 派前读取最新development_requirements仍为Kimi文字/设计/交互/前端、DeepSeek后端及其他、双方交叉复核；usage-gate decision continue，session/weekly百分比null如实保留。按最小独立顶层参数派#154“主被动开关方案定向修订”给agent:kimi，返回queued/assigned，基线b7fe7ce（执行者记录实际HEAD）。
+- #154仅写.tmp/controller-mode-c2-plan-fix/report.md、revisions.md、development.json，逐P1–P7对应修订/证据，禁止改代码/配置/原证据/正式进度或真实模型等待；保留UI/CAS/长期指定/有限授权/桌面提示词已通过合同，双横线并入后续前端片。要求完整裸JSON、本次实际task_id154，无法裸输出则如实记录宿主包装限制。完成暂停，后续DeepSeek定向复核，确认后再拆实施。
+- 本轮只更新PROGRESS/HISTORY与路线图，git diff --check后中文提交常规推送。派#154后结束主控等待，用户通知再取件，不因active配置自动开始等待、改身份或立项。桌面#151核心验收与现有执行服务继续保持。
+
 ## 2026-10-05 收到#152主被动开关设计，派#153给DeepSeek独立复核
 
 - 用户通知“152好了”。#152/msg2654 runner succeeded、workflow submitted，结果正文为说明+Markdown代码块内JSON，MCP识别unstructured_text/unknown，不能从结束状态或内容词汇推断业务完成。通过稳定结果引用detail完整读2968字符，sha256=0f1df63e7f120be20e5e1f2babc54ea842d3b7d27fadac4b36e0de4beed5a3a7；未读Hall历史或追改原消息。
