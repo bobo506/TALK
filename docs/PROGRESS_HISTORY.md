@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #157复核发现F-1，收取复核并派#158定向修正
+
+- 用户通知“157完成了”。talk_get_delivery #157/msg2659为unknown自由文本，不从succeeded推断业务通过；按稳定结果引用完整补读3028字符（SHA256 f7e56ebacf5ba20af397aa9db4f6fed75510dc3e7721abebd04e2ac55638f6dc），正文是“说明+JSON”混排，未因包含JSON而追改MCP结论。旧入口summary .tmp/controller-mode-c2-a1-review/development.json --expect-task-id157有效talk-delivery-1、partial，无截断；6完成/1未完成/0阻塞，6验证/4限制。未完成指F-1需开发者修正，独立复核执行本身已完成。
+- Kimi独立核对合同hash/实际源码与冻结三文件hash、约790行helper变动及直接链路，认为可维护性可接受，测试为行为验证；A参数/旧语义、B G1–G7门禁、C快照/30秒/matched、D deadline/R5、E R1归一、G身份三键、H说明/check均通过。F项正常计数/返回通过，但重读GET失败错误包装与落盘不通过。复核启动基线2ad9fbf，之后主控e01d78a仅进度文档；主控本次再次核对三业务文件仍与#156冻结hash一致。
+- F-1中等：bridges/talk_task_tools.py原1580 recheck_project()位于只包poll_round_tasks的try/except之外；进入门禁后运行至30秒重读GET遇HTTP4xx/5xx或网络超时，TalkToolError直接抛出但缺已等待时长/轮询次数，且没有任何wait-stats JSONL。不是静默降级、不是普通timeout，也不是权限问题，但违反明确api_error验收/观测性合同。主控采纳独立证据，裁决需修正后定向复核，#156不能直接通过。
+- 证据冻结：review.md 16477字节/SHA256 afafef2e45233830e5e1b253489cf70261e2f2b34d761780d55eaff700a16ca8；development.json 4300/hashcc502792e0a8390ab147ca84348b82b5bca06707ebf76f1a9250607ba1edb0bb；probe_recheck_error.py 3558/hash05aa2d982996536cc0628aa6945303ebca39862c240f9b8d81beecc9867c5cb3；txt 179/hash0cc673f3acb2bef36d3986ece6e54fcfcee9f7764dbfa2f0613e0bd0e013ccad。原件目录.tmp/controller-mode-c2-a1-review/保持不改。主控读取探针txt确认HTTP500原文、has_elapsed_rounds_wrapper=False、stats_records=0，sleep0.5/1/2/4/5×5已到重读节点；不重复执行复核代码或测试。
+- 独立复跑：controlled_wait 27 OK/13.441s；task_tools+terminal29 OK/40.003s；controller_mode31 OK/12.344s，三源码ast.parse通过。原开发者空日志不能作为可读原始证据，复核以自己实际退出状态/计数为准。ACP现成WinError5未重跑、不算通过。未重载MCP/桌面/真实主动链路/660秒/模型/长等待/浏览器，取消无检测源、同连接排队、总预算仅约定等已知边界保持。S-1 HTTPError detail略少、S-2 check两身份GET、S-3 list_agents无query_stats均非阻塞，不扩整改。
+- Codex接受独立复核执行并收取#157：workflow completed、result_message_id2659、result_collected_at2026-10-05T14:24:03.464981（服务端记录）。该收取不代表#156业务验收；#156仍submitted未收取，原#157 partial/MCPunknown记录与原件保留。
+- 派前读取最新development_requirements仍为DeepSeek后端/其他、Kimi文字设计交互前端、双方交叉复核；controller_mode passive/version0，effective null/not_bound；assignment agent:codex/version13/assigned仅配置事实，不据此改变权限。按最小独立顶层参数派#158“受控等待重读错误统计定向修正”给agent:deepseek，返回queued/assigned，title不手写编号，当前HEAD e01d78ae75c1b9c078c140a0c71cd1b2c1553ce3。
+- #158包含原需求/合同、F-1定位/触发/预期/实际/探针hash、修正前3源码hash及实际基线、既有独立测试与沙箱限制。只改talk_task_tools与controlled_wait测试及.tmp/controller-mode-c2-a1-fix/，先保存修正前快照便于区分本次增量与#156累计差异，terminal hash保持；运行期重读错误须显式api_error真实elapsed/rounds、恰好一次JSONL/失败GET计数，至少HTTP错误/超时注入与定向回归，原探针保持。其它G门禁/旧路径/正常退出/deadline/身份/9工具/只读等不退化。
+- 本次不改正式合同/模块/手册/业务数据库/web/CSS/launchers/桌面配置/凭据/指定/mode/权限，不启停真实服务/重载/模型/长等/浏览器，不修S项或pi旧wait/C2-A2/B/C/D；仅工具内部错误处理，无新UI/用户入口、不称开关可用。交付正文只能完整裸JSON，不能介绍+JSON混排；显式UTF-8、实际task_id/expect-task-id、本次前后hash/增量/测试/限制/草稿齐全，完成暂停后由Kimi定向审，执行者不commit/push。
+- 本轮只同步PROGRESS/HISTORY/路线图，明确暂存3份文档，git diff --check后中文提交常规推送；业务3文件继续工作区待修正复核。派后结束，由用户通知#158完成，不主动轮询。角色“参与任务”上方双横线保留一条仍并入下一C2-B前端片。
+
 ## 2026-10-05 #156实现交付收到，派#157独立复核
 
 - 用户通知“156已完成”。talk_get_delivery #156/msg2658为合法完整talk-delivery-1、task_id匹配、自报complete且无省略，completed12/unfinished0/blocked0、verification7/limitations11；runner succeeded/workflow submitted。格式与自报有效不代表业务验收，#156未收取，开发者完成后已暂停。
