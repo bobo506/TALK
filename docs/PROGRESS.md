@@ -1,13 +1,13 @@
 # Project Progress
 
-Updated: 2026-10-05 (Asia/Shanghai)，#142复核已收取，#143修订S1a报告已派发，#141仍待验收。
+Updated: 2026-10-05 (Asia/Shanghai)，#143报告补正已交付，Kimi #144定向复核已派发。
 
 ## 当前工作与身份
 
 - 根目录 `D:/claude-test/TALK`；项目 `prj_e8fe7066bbec`；分支 `codex/terminal-return-codex`；最新功能提交/已推送基线 `f743962`（F2）；前序B1/F1为 `c147d09`。Codex为决策Agent，具体实现和完整独立审查交执行Agent。
 - 最新项目要求：Codex负责建议/派发/验收；Kimi负责文字、设计、交互、前端；DeepSeek负责后端与其他内容；双方交叉复核。每次派发前重新读取 `talk_list_agents` 最新 `development_requirements`，不能只用本快照。
 - 当前默认派发后结束，由用户通知完成再取件，不轮询；独立顶层任务继续 `general` 最小参数。开发完成暂停后独立审查，禁止共享目录并行改码。Codex不操作浏览器，页面效果交用户验收。
-- 用户已确认B1/F1及F2人工验收通过，#139/#140已收取；#140原partial仅一处文档版本，补正验证关闭，历史结论保留。DeepSeek #141暂未收取；Kimi #142为partial/needs_changes，复核工作已收取，DeepSeek #143正在补正报告，之后交Kimi定向复核。任务标题只写名称，历史双号不回写。
+- 用户已确认B1/F1及F2人工验收通过，#139/#140已收取；#140原partial仅一处文档版本，补正验证关闭，历史结论保留。DeepSeek #141暂未收取；Kimi #142为partial/needs_changes，复核工作已收取，DeepSeek #143报告补正已交付，当前Kimi #144定向复核；#141/#143均暂未收取。任务标题只写名称，历史双号不回写。
 
 ## 最近完成与未收尾成果
 
@@ -19,11 +19,11 @@ Updated: 2026-10-05 (Asia/Shanghai)，#142复核已收取，#143修订S1a报告�
 
 ## 尚待处理的任务与需求
 
-1. **#143修订DSH-DESKTOP-S1a报告已派发，#141暂未收取。** #142/msg2639为有效partial/needs_changes；主体隔离与自省证据经独立复核成立，p5“多行未截断”被否定：原测三个独立参数，Kimi k2单参数内嵌LF经当前dsh.cmd截断。DeepSeek在.tmp/dsh-desktop-s1a-fix/另写修订报告/交付，保留原始141/142报告和日志；完成后Kimi定向复核。基线057cacd、派发前工作区干净。
+1. **#143报告补正已交付，待Kimi #144定向复核。** msg2640有效task_id143结构化complete自报，仅指补正完成；修订区分p5多参数/中文与单参数内嵌LF截断，统一p1–p5退出码0/0/1/0/1、keep21/最终25变量名、元数据采样边界及进程数未存证来源。#144仅检查实际修订与原证据一致性，不重跑探针；基线86fed33、工作区干净。#141/#143暂未收取，原报告/日志保留。
 2. **后续前端小改动：角色页“参与任务”上方两条横线仅保留一条。** 用户要求在后续切片顺手处理，不单独派片，不并入#141；下一合适前端任务包须带此项并由用户验收。
 3. B1/F1已提交推送c147d09，进度提交a240128；2026-10-05用户明确“验收通过，继续下一项”，人工门禁已释放。该确认不自行细化为每个极端场景逐项实测；自动化证据与历史限制保留。
 4. 经当前桌面cmd shim的单参数内嵌LF限制仅为实测形态；直接exec Electron exe未测，不能泛化所有入口。真实home仅采样元数据、背景按时间窗观察，不能证明所有文件字节级未写。S1b真实执行、ACP/SDK、桌面MCP配置仍另片；现有npm运行器保持，不因本次报告修订开发适配器。
-5. F2人工门禁已释放。#142复核工作已收取completed，原partial报告不回写；#143只补正报告、不重跑探针、不改代码/环境。用户通知#143完成后取件并派定向复核，主控不轮询；S1a不外推真实执行/GUI/MCP配置全面通过。
+5. F2人工门禁已释放；#142复核工作completed，原partial不回写。#143已暂停、#144已派发，用户通知#144完成再取件裁决，主控不轮询。S1a不外推真实执行/GUI/MCP配置全面通过。
 
 ## 仅登记的后续计划
 
@@ -37,11 +37,11 @@ Updated: 2026-10-05 (Asia/Shanghai)，#142复核已收取，#143修订S1a报告�
 - 用户长期授权向bobo506/TALK常规推送，不含强推/改写历史。
 - 2026-10-05标准git add/commit/push成功，旧自动审批工作区额度障碍本轮未再出现。功能/相关文档c147d09已推送origin/codex/terminal-return-codex，包含B1/F1、已审隐藏控件清理与既有文档改动。
 - F2功能提交f743962“移除顶部新建任务入口并保留详情子任务流程”已推送origin/codex/terminal-return-codex（14文件，+63/-51）。本次PROGRESS/HISTORY收尾记录另作进度提交并常规推送；临时证据不受Git跟踪，正式结论与限制已落盘。
-- F2收尾已完成。本轮主控只读#142摘要、裁决收取复核工作及派#143报告修订，不重复执行探针/完整代码审查，未操作浏览器或重启真实服务。
+- F2收尾已完成。本轮主控只读#143交付摘要并派#144定向复核，不重复执行探针/完整代码审查，未操作浏览器或重启真实服务。
 
 ## 证据与恢复入口
 
-- S1a原件：`.tmp/dsh-desktop-s1a/`（#141）；审查：`.tmp/dsh-desktop-s1a-review/`（#142）；修订：`.tmp/dsh-desktop-s1a-fix/`（#143）。此前调查方案见report-revised.md §5.1。
+- S1a原件：`.tmp/dsh-desktop-s1a/`（#141）；审查：`.tmp/dsh-desktop-s1a-review/`（#142）；修订：`.tmp/dsh-desktop-s1a-fix/`（#143）；定向复核：`.tmp/dsh-desktop-s1a-fix-review/`（#144）。此前方案见report-revised.md §5.1。
 - F2开发：`.tmp/remove-top-task-entry/delivery.json`与`logs/`；复核：`.tmp/remove-top-task-entry-review/`（#140）。
 - 清理：`.tmp/manual-task-cleanup-resume-1/`、`.tmp/manual-task-cleanup-review-1/`。
 - 桌面调查：`.tmp/dsh-desktop-0/report-revised.md`、`delivery-revised.json`（128）；原126文件保留，引用以修订为准；`.tmp/dsh-desktop-review-0/`（127）、`.tmp/dsh-desktop-rereview-0/`（129）。
@@ -49,4 +49,4 @@ Updated: 2026-10-05 (Asia/Shanghai)，#142复核已收取，#143修订S1a报告�
 - 启动仍见AGENTS；共享开发期间优先不带 `--reload`，不为恢复上下文自动重启已有服务。
 - 本轮usage-gate返回continue，但session/weekly百分比均null，不能视为已获精确用量；继续遵守项目一片刹车，不臆测百分比。完整历史及压缩前快照在PROGRESS_HISTORY。
 
-恢复指令：**继续项目**。当前等用户通知#143完成，先校验修订交付，再派Kimi定向复核；不要重复派发#135–#143。
+恢复指令：**继续项目**。当前等用户通知#144完成，再读取定向复核结论、裁决收取#141/#143并同步正式文档；不要重复派发#135–#144。
