@@ -10,6 +10,8 @@
 
 一句话结论：**桌面端没有 MCP 配置表单，接入入口就是桌面 profile 的 YAML patch 层文件**；模板 `deploy/dsh/desktop-talk-mcp.patch.template.yml` 按下面的步骤落到 `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml` 即可。
 
+**本机当前状态（2026-10-05）**：主控已在独立复核通过后备份并追加桌面 profile 的 `mcp-talk` 配置，写后读回校验通过。不要重复追加；真实桌面工具可见与任务派发闭环仍待人工验收，当前结果见第 5.3 节。
+
 ---
 
 ## 1. 从已安装版本核对到的配置事实
@@ -66,12 +68,18 @@
 
 该文件是**顶层 YAML 数组**，里面通常已经有桌面自己写的设置项（例如 `ui-theme`、`agent-default-model`）。**追加**我们的 `- insert:` 块，不要覆盖整个文件。
 
-### 3.2 先备份
+### 3.2 先备份（唯一时间戳名，禁止 `-Force` 覆盖）
 
 ```powershell
 $patchFile = "$env:USERPROFILE\.dsh\profiles\desktop\cordis.patch.yml"
-Copy-Item $patchFile "$patchFile.bak-manual" -Force
+$stamp  = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backup = "$patchFile.bak-manual-$stamp"
+if (Test-Path -LiteralPath $backup) { throw "备份名已存在，停止：$backup" }
+Copy-Item -LiteralPath $patchFile -Destination $backup
+"已备份到 $backup"
 ```
+
+不要用固定名 `cordis.patch.yml.bak-manual` 加 `-Force`：那会覆盖上一次的备份，之后要核对"原始字节"就无据可依。还原时同样只从**本次**的唯一备份取，不覆盖更新的备份（见第 6 节）。
 
 ### 3.3 替换模板占位符
 
@@ -96,23 +104,33 @@ Copy-Item $patchFile "$patchFile.bak-manual" -Force
 
 用编辑器把替换好的 `- insert:` 整块贴到 `cordis.patch.yml` **末尾**（顶层列表项顶格，缩进与文件内既有的 `- id:` 项一致）。
 
-也可以用 PowerShell 一次性追加（避免 BOM）：
+也可以用 PowerShell 一次性追加。下面这段**只渲染模板里 `- insert:` 起始的配置块**：模板头部的说明注释既不会被占位符替换改写、也不会写进 patch 文件；模板与目标文件的读写都显式使用 **UTF-8（无 BOM）**：
 
 ```powershell
 $repo = 'D:/claude-test/TALK'
-$tpl  = Get-Content -Raw "$repo/deploy/dsh/desktop-talk-mcp.patch.template.yml"
-$tpl  = $tpl.Replace('__PYTHON__',   'D:/claude-test/TALK/.venv/Scripts/python.exe')
-$tpl  = $tpl.Replace('__REPO__',     $repo)
-$tpl  = $tpl.Replace('__SERVER__',   'http://127.0.0.1:8000')
-$tpl  = $tpl.Replace('__PROJECT__',  'prj_e8fe7066bbec')
-$tpl  = $tpl.Replace('__KEY_FILE__', "$env:USERPROFILE/.talk/agent-deepseek.key".Replace('\','/'))
+$tplPath = "$repo/deploy/dsh/desktop-talk-mcp.patch.template.yml"
+# 显式按 UTF-8 读取模板（File.ReadAllText 同时会剥掉可能存在的 BOM）
+$tpl = [System.IO.File]::ReadAllText($tplPath, [System.Text.UTF8Encoding]::new($false))
+# 只取行首的 `- insert:`：模板注释里也出现过该字样，所以必须按行首锚定
+$m = [regex]::Match($tpl, '(?m)^- insert:')
+if (-not $m.Success) { throw '模板里找不到行首的 - insert: 块' }
+$block = $tpl.Substring($m.Index)
+$block = $block.Replace('__PYTHON__',   'D:/claude-test/TALK/.venv/Scripts/python.exe')
+$block = $block.Replace('__REPO__',     $repo)
+$block = $block.Replace('__SERVER__',   'http://127.0.0.1:8000')
+$block = $block.Replace('__PROJECT__',  'prj_e8fe7066bbec')
+$block = $block.Replace('__KEY_FILE__', ($env:USERPROFILE + '/.talk/agent-deepseek.key').Replace('\','/'))
+if ($block -match '__[A-Z_]+__') { throw '仍有未替换的占位符' }
+# 目标文件同样显式 UTF-8 读取；原有内容原样保留，只在末尾追加
 $patchFile = "$env:USERPROFILE\.dsh\profiles\desktop\cordis.patch.yml"
-$existing  = Get-Content -Raw $patchFile
-$text = $existing.TrimEnd() + "`n`n" + $tpl
+$existing  = [System.IO.File]::ReadAllText($patchFile, [System.Text.UTF8Encoding]::new($false))
+$text = $existing.TrimEnd() + "`n`n" + $block.TrimEnd() + "`n"
 [System.IO.File]::WriteAllText($patchFile, $text, (New-Object System.Text.UTF8Encoding $false))
 ```
 
-写入前先打印 `$text` 检查一遍；模板里不能出现密钥正文。
+写入前先打印 `$block` 检查一遍；模板里不能出现密钥正文。这段脚本**只追加**，不改动原有条目，模板注释不会进入 patch 文件。
+
+> 写入前请先按第 3.2 节备份，并确认目标目录可写。若宿主文件沙箱只允许写仓库工作区（例如受限执行环境），备份与写入都会以 `PermissionError/拒绝访问` 失败；此时应按本文档流程改为人工在授权会话里落地，不要绕过沙箱。
 
 ### 3.5 重载
 
@@ -161,11 +179,46 @@ $text = $existing.TrimEnd() + "`n`n" + $tpl
 
 验收支持**人工唤回**即可：本片不扩展无人值守、不启用自动转审、不做 600 秒等待改造。等待超时不会取消执行者任务，主控若用 `talk_wait_tasks`，客户端单工具超时必须大于 600 秒（建议 ≥ 660 秒）。
 
+### 5.1 #147 配置准备历史（实际写入结果见第 5.3 节）
+
+上表 0a–0c 是 #145 的离线/只读证据；本片在它们之上补做了目标确认与候选校验，**真实 profile 文件尚未被修改**：
+
+- **目标已逐进程确认**：运行中的桌面 Host 进程命令行里直接带着 profile 路径 `C:\Users\Administrator\.dsh\profiles\desktop`（`--expose-internals .../dsh-desktop-host/lib/index.js` 之后的参数），其工作目录也是该目录；桌面主进程环境里**没有** `DSH_HOME` 覆盖，`User`/`Machine` 级也未设置，因此本次运行解析到默认 home。目标文件据此锁定为 `C:\Users\Administrator\.dsh\profiles\desktop\cordis.patch.yml`。
+- **目标层无冲突**：该文件是顶层数组、原有 6 个条目，既没有 `id: mcp-talk` 也没有 `serverName: talk`；home 层 `%USERPROFILE%\.dsh\cordis.patch.yml` 不存在。按“追加不覆盖”处理即可。
+- **候选已渲染并离线校验通过**：只渲染 `- insert:` 配置块（模板头部注释不入档），5 个占位符全部替换，含空格/中文/单引号的路径转义自测通过，字段集合与安装版 0.2.0-rc.2 的 stdio schema 一致；与真实目标文件的“内存合并”结果保持原文件字节为前缀、原有条目一条不变、只多出一个 `mcp-talk`。既有入口 `probe` 返回九个工具，只读身份核对返回 `agent:deepseek` / `prj_e8fe7066bbec`。
+- **尚未落盘**：本片所在会话的宿主文件沙箱只允许写仓库工作区，向 `%USERPROFILE%\.dsh\profiles\desktop\` 建立同目录时间戳备份即被拒绝（`PermissionError: [Errno 13]`；该目录对沙箱用户只有读+执行权限）。按“先备份再写、不绕过沙箱、不擅自扩大权限”的约束，本片停在此处并交付候选，**没有**改动真实 profile。候选块与只读证据在 `.tmp/dsh-desktop-mcp-2/`（`.tmp/` 不入库，属临时产物）：`candidate/talk-mcp-insert-block.yml` 是替换好全部占位符的 `- insert:` 块，`candidate/render-metadata.json`、`logs/validate-candidate.json`、`logs/probe-candidate.log`、`logs/check-identity.log` 是校验与探针证据。
+
+因此上表第 1–6 步仍然全部是**用户接入阶段的人工验收步骤**；配置落地需要在有该目录写权限的会话里按第 3 节执行。
+
+### 5.2 #149 落地保护修正（经 #150 独立复核通过）
+
+`#148` 独立复核在候选重渲染、安装版 schema、内存合并、R1 修正与权限处理都通过的同时，列出两项低中保护缺口：原落地脚本没有候选块哈希守卫（同 `id`/`serverName` 但改过 `command`/`env` 的候选也能通过写后校验），以及写前哈希检查与 `os.replace` 之间存在目标外部修改窗口。本片按决策裁决**先补缺口**，仍然**没有**写真实 profile：
+
+- 修订脚本（临时产物，`.tmp/` 不入库）：`.tmp/dsh-desktop-mcp-2-fix/probes/apply_target_patch.py`，sha256 `ecd9235164a76d5a0f682eef3e308ded133476d1e36bbf20c641f5a7a32288f6`。接口：`--expect-block-sha256` 与 `--expect-target-sha256` 必填且必须是 64 位十六进制，`--log` 必填（默认拒绝覆盖同名日志），其余为 `--target` / `--block` / `--log-overwrite` / `--attempts-note`。
+- 候选哈希守卫：候选字节读入后立即复算并比对钉住值，不匹配就在任何备份、临时文件、替换写入之前拒绝。
+- 替换前二次核对：写完同目录临时文件后**重新读取真实目标**复核已审哈希；目标已变即停止，只清理本次临时文件、保留备份供核对，绝不覆盖外部新内容。写后校验失败的自动回滚同样先核验"目标仍是本次写入的字节"，已被外部改动就停止交人工，不用旧备份覆盖。
+- 附带加固：写入前预检重复 `id: mcp-talk` / `serverName: talk`；备份名唯一且用独占创建，拒绝覆盖既有备份，按原始字节存；`--target` / `--block` / `--log` 走白名单，不能借参数指向任意外部目录；默认目标与默认候选各自钉住本片已审完整 sha256 —— 目标 `4366d52223a9abebe1f8735d980226783a74a32fe8b927b9f187c2e1eb02b085`，候选 `41eeab30f709afd07485d892a65a29ff11241902f479e7d790e99497f9760dea`。
+- 隔离 fixture 证据：`.tmp/dsh-desktop-mcp-2-fix/fixture-results.json`（14 组，`all_pass=true`），覆盖正常追加、篡改候选提前拒绝、目标初始哈希不符拒绝、替换前外部改动拒绝并完整保留外部内容、写后失败回滚与"外部已改则不回滚"、重复条目预检、备份名碰撞、日志目的地隔离、哈希参数与路径白名单，并复核 `#147`/`#148` 的原脚本、候选、日志与 mtime 证据未被覆写。
+- **残余限制（不得当成已消除）**：最后一次核对与 `os.replace` 之间仍有跨进程写入窗口，本实现只能把窗口压到最小并保证"发现即停"，不能宣称两次哈希消除了该竞态；脚本不新增 CRLF 通用支持（CRLF 目标会在写后 `post_lf_only` 校验失败并回滚），真实目标条件明确为 UTF-8 无 BOM + LF。
+- #149 交付时真实 profile **尚未写入**；其后 #150 定向独立复核通过，主控核对对象与完整哈希后经宿主审批通道完成实际写入，结果见第 5.3 节。
+
+### 5.3 主控实际配置落地与待验收（2026-10-05）
+
+- **已写入**：`C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml`。执行前再次核对桌面主进程 PID 3084 的启动时间与 Host PID 13068 的实际 profile 参数，仍对应此目录；脚本、候选与目标完整哈希均与独立复核一致。
+- **唯一备份**：同目录 `cordis.patch.yml.bak-talk-mcp-2-fix-20261005-180915`，1045 字节，SHA-256 `4366d52223a9abebe1f8735d980226783a74a32fe8b927b9f187c2e1eb02b085`。原文件和备份内容不复制到仓库。
+- **实际写入成功**：经宿主审批通道执行已审修订脚本，`rc=0`、`ok=true`；候选/原目标哈希、重复预检、唯一备份核验、替换前二次核对全部通过。独立读回再次核验原字节前缀和原六项设置完整保留，仅新增一个 `mcp-talk`，无临时文件残留。
+- **写后文件**：2275 字节，SHA-256 `245407f8390e5086c2bfde3f268241484028b12a183951089b2541deae2398d6`，与已审合并计划一致；显式环境仅 UTF-8 开关与 TALK 密钥文件路径。继续复用既有启动器、TALK MCP 和执行 bridge。
+- **证据**：`.tmp/dsh-desktop-mcp-2-fix/logs/apply-target-20261005-codex-1.json`、`logs/codex-post-apply-check.json`。#147–#150 的已完成交付已收取，历史 partial/无效原报告保持；这不代表桌面闭环已经验收。
+- **待用户验收**：在桌面新建独立调度对话，调用 `talk_list_agents`（项目 `prj_e8fe7066bbec`），确认工具可用和三名角色/最新开发要求；明确授权一个限定的只读任务交现有 Agent 执行；完成后在同一桌面对话先 `talk_get_delivery` 再 `talk_collect_result`。完整步骤与预期见第 5 节表格。
+- **未测范围保持**：未用 GUI 证明 HMR 或工具可见，未在桌面对话调用模型、发起/收取真实任务，未自动重启桌面或 bridge；65 秒单工具超时仍不支持 600 秒长等待。只确认配置落盘与读回，不以保存后等待或离线工具目录代替实际加载验收。
+
 ---
 
 ## 6. 回滚
 
-1. 删掉 `cordis.patch.yml` 里追加的 `- insert:` 块，或直接用第 3.2 节的备份覆盖回去。
+> 当前真实 profile 已写入（见第 5.3 节）。回滚只针对本次追加的 `mcp-talk` 块；只有确认期间没有其它改动时才还原本次唯一备份，否则仅移除该块，保留桌面或他人随后保存的设置。
+
+1. 删掉 `cordis.patch.yml` 里追加的 `- insert:` 块，或从第 3.2 节的**唯一时间戳备份**还原（`Copy-Item -LiteralPath '<本次备份>' -Destination $patchFile`；不要加 `-Force`，那会覆盖比你手中备份更新的备份）。
 2. 等 HMR 重载（约 2 秒写入稳定窗口）；不生效就重启桌面 App。
 3. 工具随之消失，其余桌面设置不受影响。若桌面已因 patch 语法错误无法启动，恢复备份后重启；桌面自身的恢复路径也会把 profile patch 备份成 `cordis.patch.yml.bak-<时间戳>`。
 
@@ -176,7 +229,7 @@ $text = $existing.TrimEnd() + "`n`n" + $tpl
 **本片未验证（不得当成已通过）**
 
 - **桌面内真实加载与工具可见**：未在 GUI 里实测；HMR 生效与 `mcp-talk` 行出现都属于预期，需要用户接入阶段人工确认。
-- **桌面进程实际使用的 `DSH_HOME`**：本片只核对了路径解析代码与本机默认目录 `%USERPROFILE%\.dsh`；没有重新确认运行中的桌面进程是否有进程级 `DSH_HOME` 覆盖。若桌面用了别的 home，patch 文件要放到那个 home 下。
+- **桌面进程实际使用的 `DSH_HOME`**：`DSH-DESKTOP-MCP-2` 已对**当前运行中**的桌面进程逐进程确认（Host 进程命令行直接携带 `<home>\profiles\desktop`，主进程环境无 `DSH_HOME` 覆盖），并只读核对了本机默认 home 与 home 层文件。仍未覆盖的情况：桌面**重启**后若换了 `DSH_HOME`（例如从一个设置过该变量的 shell 启动），patch 文件就要放到那个 home 下；每次落地前应重新确认一次。
 - **CLI 侧的 desktop profile 组合校验**：CLI 显式拒绝该 profile，所以"桌面组合树"无法用 `--dump-config` 旁证。
 - **真实委派/收取闭环**：本片没有派发任务、没有调用模型、没有收取结果。
 

@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #150定向复核通过，真实桌面MCP配置落地，暂停人工验收
+
+- 用户通知“150已完成”。#150/msg2647是JSON但不符合talk-delivery-1：额外verdict/defects/handoff、两条completed超300字符、complete与unfinished互斥，MCP业务invalid，原件`.tmp/dsh-desktop-mcp-2-fix-review/talk-delivery-1.json`同样校验失败。主控未采信截断预览或追改原结果；保留原件与sha256，创建decision/delivery-normalized.json与normalization.json，仅长项拆分、额外元数据移入limitations，真实unfinished保留令副本conclusion=partial。按实际任务号150校验及完整摘要通过，来源/原complete与MCPinvalid明确保留。
+- 独立业务结论：Kimi verdict pass仅限落地保护，defects为空，唯一轻微观察为backup_failed报告缺temp_files_created=0键、不影响保护。实际修订脚本hash ecd9235164a76d5a0f682eef3e308ded133476d1e36bbf20c641f5a7a32288f6、候选hash41eeab30…f9760dea、指南hash696ee408…53c8c3与自报一致；源码确认两项缺口补齐。独立A正常、B同id候选篡改提前拒绝、D替换前外变保留、F失败时外变不覆旧备份均通过；规范化路径边界、独立日志/唯一备份、原证据不变等静态审查无疑点，未重复14组全量。
+- 写入前主控只读复查脚本/候选/真实目标/指南完整hash都匹配，日志新路径不存在；默认沙箱CIM查询拒绝，经require_escalated只读确认主进程3084仍2026/10/4 9:32:29启动，host13068参数仍明确对应C:/Users/Administrator/.dsh/profiles/desktop。未读取完整环境/密钥正文或私人会话。
+- 经宿主require_escalated审批通道执行已审脚本（先钉住脚本hash，再显式给真实target、原候选及完整expect-target/expect-block hash、新日志，不开log-overwrite），实际rc0/ok=true，无stderr。候选hash/原文件hash/重复预检、唯一字节备份核对、同目录temp写入、replace前二次核对、原子替换和10项写后校验全部通过，原执行者沙箱备份阻碍已解决；无审批拒绝或绕过权限。
+- 真实目标`C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml`写后2275字节，SHA-256 `245407f8390e5086c2bfde3f268241484028b12a183951089b2541deae2398d6`。唯一同目录备份`cordis.patch.yml.bak-talk-mcp-2-fix-20261005-180915`为原1045字节，SHA-256 `4366d52223a9abebe1f8735d980226783a74a32fe8b927b9f187c2e1eb02b085`；没有覆盖旧备份。
+- 主控独立读回另存安全摘要`fix/logs/codex-post-apply-check.json`：10检查全过，原六项结构/字节前缀完整保留、仅新增一个mcp-talk/serverName=talk，Python/原launcher映射正确，env仅PYTHONUTF8+TALK_DSH_KEY_FILE路径，无temp残留。fix指.tmp/dsh-desktop-mcp-2-fix/，实际执行日志`logs/apply-target-20261005-codex-1.json`。真实原配置与备份不复制入仓库，只留路径/长度/hash/布尔检查证据。
+- 依据已完成范围及独立复核收取#147/msg2644、#148/msg2645、#149/msg2646、#150/msg2647，四任务workflow_status=completed。#147原partial、#148旧文本unknown、#150原invalid历史保持，不把收取当整体GUI/闭环通过；规范化副本是主控格式整理，未假称来自原MCP结构化自报。
+- 正式文档同步：指南保留已审R1与保护修订，顶部标当前已落盘避免重复追加，历史5.1/5.2标明任务阶段，新增5.3实际写入/备份/证据/待验收，回滚仅撤本次块并防覆盖期间其它改动；MODULE_bridges与DEVELOPMENT_ROADMAP更新实际阶段，PROGRESS当前快照转人工验收。仅五份授权文档入Git，外部配置/备份与临时脚本不入Git，格式检查后中文提交常规推送。
+- 人工验收门禁：暂停下一切片，用户在DeepSeek桌面新建独立调度对话，确认TALK九工具与talk_list_agents三角色/项目要求，明确授权限定只读任务，经原bridge执行后在原桌面对话get_delivery→collect；工具缺失可由用户按指南重载/重开桌面。本轮未操作GUI、自动重启/启停bridge、调用桌面模型或派测试任务；HMR实际加载/GUI工具可见/真实闭环/长等仍not_run。
+- 剩余限制：65秒工具超时不支持600秒长等，默认人通知后取件；最终hash检查至replace仍非跨进程原子CAS，保留如实声明；实际配置readback只证明落盘，不代替运行验收。角色页双横线继续并入下一合适前端切片，尚未实现；不恢复内置CLI替换路线。
+
 ## 2026-10-05 #149保护修正交付，派#150定向独立复核
 
 - 用户通知“149 ok”。#149/msg2646完整裸talk-delivery-1有效，task_id149匹配，无摘要截断，self-report complete：completed9/unfinished0/blocked0、15验证（含真实GUI not_run）、8限制。complete仅指保护修正片，真实接入并未完成；主控完整读取preview/summary，仍需独立复核。
