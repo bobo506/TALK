@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-05 #145桌面MCP配置准备交付，派#146独立复核
+
+- 用户通知“145 ok 了”；读取#145/msg2642合法结构化完整摘要（preview及summary_text合看），任务succeeded/submitted，自报partial，已完成10项、未完成4项、阻塞0。格式/任务号有效只代表自报一致，不提前收取或视为业务验收。
+- 开发派发基线33e7633；期间Codex仅提交范围文档10e314f。实际差异为两个新未跟踪文件：`deploy/dsh/desktop-talk-mcp.patch.template.yml`、`docs/guides/DSH_DESKTOP_TALK_MCP.md`；无已跟踪功能代码变动。临时报告/探针/原日志在`.tmp/dsh-desktop-mcp-1/`。
+- 开发自报：依据已安装桌面0.2.0-rc.2源码，用户配置是`~/.dsh/profiles/desktop/cordis.patch.yml`顶层loader补丁数组；模板注册mcp-talk，五项占位符，env仅外置TALK key文件路径。指南包含位置/格式、合并、重载、身份权限、人工验收与回滚。上述版本/合并/HMR断言交独立复核核实，尚非桌面实测结论。
+- 自报证据：`logs/validate-template.log`离线结构/schema ok；`logs/probe-desktop-template.log`经既有入口返回9工具、tools_match=true、serverInfo=talk_tools_mcp 2.0.0、returncode0，实际transport=file；`logs/check-identity.log`只读身份agent:deepseek及项目prj_e8fe7066bbec匹配。file回退仅证明测试入口服务可列工具，不证明真实桌面stdio接通。
+- 保留未完成/限制：实际GUI保存/加载与9个工具可见、独立桌面对话有限派发→既有bridge执行→原会话读交付/收取、实际进程DSH_HOME核验仍待人工接入；CLI拒绝desktop profile，不能拿headless dump作证明。模板toolCallTimeoutMs=65000不能直接覆盖600秒长等，当前默认人工通知后取件。同一会话并发写入仍需避开，非技术互斥保证。
+- 派发前按最新项目开发要求（Codex决策、Kimi文字/设计/交互/前端、DeepSeek后端/其它、双方交叉复核）交Kimi #146“DeepSeek桌面TALK MCP配置独立复核”。顶层最小general参数、标题无手写编号；复核实际基线10e314f，两项新文件及安装源码/原日志必须独立检查。
+- #146任务包完整包含原需求、范围/不变项、实际基线/差异、开发证据和验收标准。重点检查loader数组/层序与保留已有配置、真实MCP schema/Windows路径和launcher映射、key文件与身份项目权限、HMR版本依据、65秒超时说明、人工验收未测标记和回滚。仅离线/只读定向检查，禁止GUI、真实profile/key修改、模型、真实派发/收取、服务重启/安装/PATH、Git及全量回归；只写`.tmp/dsh-desktop-mcp-1-review/`，发现问题交开发者修复。
+- 现有npm DSH、TALK MCP与执行bridge继续使用；不恢复内置CLI替换/S1b/dsh.cmd运输调查，不新增重复worker/member。角色页双横线小改动继续并入下一合适前端切片，尚未实现。
+- Codex仅记录正式进度，不重复完整审查或操作浏览器；#145保持submitted，#146派发后结束等待，由用户通知完成再取件。两项开发交付先不提交；本轮仅进度记录格式检查并常规提交推送。
+
 ## 2026-10-05 用户收窄桌面目标为MCP接入，派#145配置准备
 
 - 用户明确认为已有桌面能显示历史chat/TALK任务，当前无需改动之前的执行程序，目标仅适配桌面MCP，使其可分配TALK任务。Codex据此收窄：桌面作为MCP工具客户端，既有MCP服务/launcher、TALK任务服务与npm bridge继续复用。前面S1a是已完成额外调查，不是本需求的前置；S1b/直接exec/参数运输/内置CLI替换停止当前推进，历史事实保留。
