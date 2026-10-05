@@ -116,9 +116,14 @@ pi --print --mode text --no-context-files --no-builtin-tools --no-extensions --t
 - 显式传入 `--task-preflight-command` 时以调用方配置为准，不再自动追加项目补丁；自定义命令需要自行保证只读权限与非持久化语义。DeepSeek 的跨轮询上限默认是 1，仍保留单轮内最多一次协议修复以及信息不足时的 Task Hall 澄清流程。
 - TALK member 固定为 `agent:deepseek`，runtime 上报为 `dsh`；具体 DeepSeek 模型由 Harness profile 管理，不写死在 member ID 中。
 - `headless` profile 首次使用可能初始化 `$DSH_HOME/profiles/headless`；Harness 的登录、模型与工具权限属于 Harness 配置边界。
-- 2026-10-04 桌面兼容调查经 DeepSeek #126、Kimi #127、DeepSeek #128 补正、Kimi #129 定向复验收尾：本机桌面 `0.2.0-rc.2` 内置 `resources/runtime/cli/bin/dsh.cmd`，与当前 PATH 的 npm CLI 是不同入口；已核对打包与 bridge 静态调用链，尚未切换或实测内置 CLI 受管执行。`sharedPackages` 当时共 287 项，其中 279 项版本为 `0.2.0-rc.2`，包存在不证明运行成功。
+- 2026-10-04 桌面兼容调查经 DeepSeek #126、Kimi #127、DeepSeek #128 补正、Kimi #129 定向复验收尾：本机桌面 `0.2.0-rc.2` 内置 `resources/runtime/cli/bin/dsh.cmd`，与当前 PATH 的 npm CLI 是不同入口；已核对打包与 bridge 静态调用链，尚未切换或验证内置 CLI 正式任务执行契约；后续隔离自省结果见下条。`sharedPackages` 当时共 287 项，其中 279 项版本为 `0.2.0-rc.2`，包存在不证明运行成功。
 - 相同有效 `DSH_HOME` 下的数据共享机制不等于本机两个运行中进程已证明使用相同 home。User/Machine 未设覆盖仅是配置快照，不能排除进程级覆盖；目录并存与活动时间只能支持推断。2026-10-05 用户人工核实：桌面端最新 chat 对应 TALK #133，确认桌面 UI 能显示该 TALK 任务会话；此证据来自用户界面核对，未据此确认两个进程的实际 home 路径相同，也未验证在桌面继续该会话或内置 CLI 受管执行。TALK claim/租约与进程内运行锁只约束受管任务，不能保证桌面或其他外部入口不会同时写同一会话；单执行 owner 是使用约束。
-- 后续验证分两步：S1a 在临时 home/项目中用显式绝对路径做无凭证、无模型启动验证，先查初始化副作用并确认不会落到真实 home；S1b 再单列真实模型输出、退出及取消契约。`--dump-config`/启动可能写盘，不直接视为只读；PATH 注册非绝对路径验证前提。前述步骤均未执行，不据 npm shim 特殊分支不命中断言桌面必然不可用。调查证据见本地 `.tmp/dsh-desktop-0/report-revised.md` 与 `.tmp/dsh-desktop-rereview-0/`；这些临时证据不随 Git 跟踪，正式结论以本节及进度历史为准。
+- 2026-10-05 S1a 已完成：DeepSeek #141执行、Kimi #142独立复核、DeepSeek #143报告补正、Kimi #144定向复核pass；#141/#143/#144已正式收取，#142此前已收取。原141自报与142 partial/needs_changes报告保持，当前结论以143修订报告和144复核为准。
+- 桌面内置CLI `0.2.0-rc.2` 在临时home/项目、显式shim绝对路径、隔离子进程环境下完成无凭证无模型的version/help/headless dump自省；`desktop` profile在解析阶段被拒。临时home补丁路径出现在dump层标签，headless首次dump初始化4文件、未创建desktop目录。headless `--dump-config`会初始化或重写profile文件，不能视为无副作用检查；PATH注册不是绝对路径调用前提。
+- 参数限制：原p5是三个独立参数，仅证明多参数与中文未截断。Kimi k2实测单参数内嵌LF经当前桌面`dsh.cmd`后只有`first-line`进入argv；不能用该shim形态宣称多行单参数保真。直接exec Electron exe与实际bridge参数运输未测，不能泛化所有入口均不支持多行，也不能由npm绕过分支不命中推导必须新增bridge代码。
+- 隔离证据范围：已采样的真实home profiles（跳过node_modules）/顶层/凭证元数据无变化；sessions/storages仅聚合指标，背景变化按时间窗观察，无逐条进程归因，不能证明全部文件内容字节级未写。环境keep清单21项、去重20项加新增5项、最终25变量名，未记录值；仅凭变量名正则不替代实际解析路径核验。进程数前后5仅开发者当时观察、未存证、不作为独立证据；零模型与未触发plugin/pnpm拉取有代码路径旁证，未做网络抓包。
+- 现有npm `0.1.5-rc.2 --profile headless` bridge继续使用。S1b真实模型输出/退出/取消与会话落盘、直接exec/桥参数运输、桌面GUI续聊及MCP配置加载仍未验证，须另列切片，S1a不构成切换依据。本宿主`CreateNoWindow=true`的`0xC0000142`仅为当次环境现象，无通用根因结论。
+- 本地证据：`.tmp/dsh-desktop-s1a/`原件、`.tmp/dsh-desktop-s1a-review/`独立证据、`.tmp/dsh-desktop-s1a-fix/report-revised.md`修订、`.tmp/dsh-desktop-s1a-fix-review/`定向复核；这些临时产物不随Git跟踪，正式结论及原错误修订关系保存在本节与PROGRESS_HISTORY。
 
 - 2026-08-21 已从 `0.1.0-rc.6` 受控升级至 `0.1.0-rc.8`，并验证 CLI、profile、原生模块和最小真实模型调用；随后已在 TALK bridge 启动边界完成上述 Windows shim 绕过，受控真实多行探针同时收到首行、中文行和末行令牌并返回 `DSH_MULTILINE_OK`。
 
