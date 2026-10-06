@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-06 用户确认C2-B，派#160给Kimi开发
+
+- 用户回复“可以”，确认项目设置调度模式界面及角色“参与任务”双横线保留一条。按当前development_requirements，Kimi开发、完成暂停后DeepSeek独立检查实际代码，Codex裁决/正式文档/Git；本次未提前派复核、未并行改业务码。
+- 派前HEAD 795dc19ff9c315d03ff72f3741f0bdefe936461d，工作区干净；按项目分别查询queued/running均为空。最新角色实例只是上报事实，未核验实时存活。当前Key human:bobo、模式passive；配置不作为主动等待授权，本轮不持续等待。
+- 已读取本片Web UI模块、C2设计§2/§6/§7和TASK_WORKFLOW派发/交付约定。最小顶层参数project/target/title/content（不手写编号、不附加子任务字段）派#160“项目设置调度模式界面与角色分隔线清理”，agent:kimi，返回queued/assigned，Hall group:task-d20c3d46e1334442a279f07ad18447f5。
+- 任务范围前端面板、单分隔线、相关Node/Python契约测试、资源版本一致；文案严格区分已保存设置和实际执行，human可保存/agent只读，旧服务/404/非法版本降级，409只重读，400/422等保留选择，账号/项目/请求序号/saveToken保护及独立CAS。不改后端/API/数据库/运行配置/真实模式或指定，不扩C2-A2/C/D，不声称自动唤醒/主动生效。
+- 允许根design-qa.md仅本片证据和.tmp/controller-mode-c2-b/完整交付/实现说明/手册草稿；正式文档由Codex收尾。开发交付须实际自身#160、合法talk-delivery-1、完整裸JSON结果正文，本地validate；要求真实命令/结果/限制与审查索引，开发完成暂停，不自行commit/push。任务包副本.tmp/controller-mode-c2-b-dispatch/task.md。
+- 本轮仅主控正式进度/路线图派发记录，以UTF-8维护并差异检查后中文提交常规推送；不浏览器验证、不启停服务、不读历史Hall或重复审查。默认派发后结束，用户通知#160完成再取件，之后派DeepSeek独立复核，页面由用户验收。
+
 ## 2026-10-06 重开窗口恢复，Codex连接C2-A1加载检查通过
 
 - 用户要求“继续项目”；恢复项目背景、当前进度与AGENTS决策身份，读取终端预算/重连验收要求。开工HEAD `11977a87ec4a10cc3e4af0cab52ccafc237d256a`，工作区干净，与origin同分支跟踪引用一致，远程为授权的bobo506/TALK。
