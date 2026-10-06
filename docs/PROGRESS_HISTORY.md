@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #166合同草稿交付，派#167独立源码与合同复核
+
+- 用户通知“166完成”。#166/msg2668完整合法结构化talk-delivery-1、自身号匹配、complete自报，7完成/0未完成/0阻塞，验证5/限制5，无省略；runner succeeded/workflow submitted，未收取。三份临时草稿不代表新规则已实现，不以格式自报代替独立业务验收。
+- Kimi仅新增.tmp/initiator-mode-design/contract_draft.md（28521B/sha a449daee4edc6425e36de4de6c1652d1469fe77356e87336e68e77012214a21e）、implementation_plan.md（8246B/sha db04be5168b74b4aadfee2f38238f77196896e4825c45ab4ebc576ccee7cc577）、development.json（4782B/sha3167554f85759ff31c004cf2571f46bb01ff6346569715b59fa14d53b9a2fa8b）。工作区干净，正式合同/业务/DB/API/运行配置/凭据无改。
+- 自报草稿覆盖created_by协调归属、新G1-G8/显式非空task_ids/同项目同creator整批核验、controller_changed退役和普通wait兼容；权限/历史human身份衔接、最小兼容退役、分步加载、预算与I-0..I-4拆分明确。D-1只读assignment暂留弃用、D-2保持human受控拒绝、D-3显式task_ids、D-4旧human PATCH暂留弃用列裁决；主控交独立审查，尚不发布/操作。
+- #166自报基线9272020，收件实际e9eed23仅六份主控验收/派发文档变化，业务零差异。报告称原派发快照目录不存在；主控收件核对目录现存在，10文件hash/bytes与当前一致，原观察/报告不追改，不因文档HEAD变化误判源码漂移。新审查13文件对象快照存.tmp/initiator-mode-design-review-dispatch/source_manifest.json。
+- 派前重读最新development_requirements仍Kimi文字设计/DeepSeek交叉复核，当前身份仍human:bobo。最小独立顶层参数派#167“167-发起者调度与固定主控退役合同独立复核”给agent:deepseek，queued/assigned，Hall group:task-66b3bee677e147c098824090256f1826；包同新目录task.md，交付.tmp/initiator-mode-design-review/，禁止修改原稿/正式文档/业务或实际切Key。
+- 独立任务要求核对真实创建/可见性/collect/Key身份事实、单多ID与混合creator/跨项目/部分不可读、门禁兼容/模式退出/统计/deadline和matched边界、历史任务收尾/分步加载、退役API与UI兼容、I-0准备到实际切换节点、预算/取消排队与能力未实测标识。仅实际源码与合同矩阵/文档检查，不重跑全功能或把未来测试称已通过；发现阻塞返Kimi，非阻塞建议单列。
+- 本轮PROGRESS/HISTORY/路线图收件派发记录UTF-8写入、范围/差异检查后中文提交常规推送；原稿/源对象保持不变，#166未收取，#164/#165验收事实保持。默认派发后结束，用户通知#167完成后裁决、正式发布再拆实施片。
+
 ## 2026-10-06 用户验收#164/#165通过，派#166发起者调度合同修订
 
 - 用户明确“验收通过，继续下一项”。Codex记录本次离页复位/去版本两条人工反馈验收通过，功能92720207702db8603f49506a15d25cf194e8b0cb已推送、工作区干净；不将该确认外推为键盘/:has/HTTP竞态/Agent密钥只读或受控GET故障全部实机通过。已收取#164/#165保持completed，不重复收取。
