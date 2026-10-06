@@ -90,3 +90,15 @@
 - Codex 独立验证：`node --test tests/workspace_ui.test.cjs tests/workspace_result_ui.test.cjs` 32/32；两份 JS 的 `node --check` 通过；`.venv/Scripts/python.exe -X utf8 -m unittest tests.test_task_web_ui -q` 2/2；`git diff --check` 通过。
 - 异步成功/失败迟到、加载中关闭、再次展开竞态和账号变化通过行为测试覆盖；没有真实切换账号、模拟网络节流、文件下载或全套后端回归。未执行新的业务任务动作，除真实 Kimi 委派/反馈/成果收取外未增删业务数据。
 - 结论：第一项定向验收通过，等待用户验收；第二项完整对话右侧重复信息栏未改。
+
+
+## 2026-10-06 C2-B 调度模式面板与单分隔线（开发与独立复核通过，页面待验收）
+
+- 范围：角色页“项目设置”新增“调度模式”面板（排在开发要求/项目主控之后、角色详情之前，radio 被动/主动 + 显式保存）；角色详情“参与任务”上方双横线只留一条（移除内部 `.role-task-section` 的 border-top/margin-top，保留 `#role-details-tasks-panel` 面板级分隔线）。409 冲突后只做 GET 重读、不自动重写；若自动重读失败，面板进入“需重读”状态：“重试”按钮可见且只发 GET、保存暂禁直到某次读取成功，恢复后按最新版本由用户明确保存。
+- 自动化证据：`node --test tests/workspace_controller_mode_ui.test.cjs` 23/23（加载/human/agent、成功核实、无主控/失效原因、缺字段/404、409 及 GET 失败恢复（含重试入口可见、保存暂禁、重试只 GET、成功后明确保存、需重读不串上下文）、400/422/500 不进入需重读、非法版本、跨项目/账号迟到、保存中续选、saveToken、可见性互斥、同上下文不重读）；九个 workspace Node 测试文件合计 153/153；Python 页面契约 test_controller_web_ui / test_task_web_ui / test_requirements_web_ui / test_role_description_web_ui 12/12（含面板结构、顺序、四处资源版本 20261006-controller-mode-c2b-f1、单分隔线 CSS 断言）；后端定向回归 test_project_controller_mode / test_project_controller_assignment / test_projects 98/98。
+- 限制：本环境无可用自动化浏览器（无 playwright/chromium），桌面 80% 密度与窄屏的真实视觉效果、radio 键盘操作未实测，由用户页面验收；409/迟到等竞态以 Node DOM 存根覆盖，未经真实网络验证。
+- `:has()` 降级事实：`:has(input:checked)` / `:has(input:disabled)` 为本项目 CSS 首次引入（web/workspace.css:207-208），且无本地降级规则；不支持 `:has()` 的旧浏览器将失去选项选中边框/底色及禁用降透明度样式，原生 radio 的勾选与禁用行为不受影响；该降级外观未在实机旧浏览器验证，本片未新增 CSS 兜底、不变更浏览器基线。
+- 独立复核：DeepSeek #161完成原片代码审查并发现F-1/F-2，Kimi #162修正后DeepSeek #163确认关闭；原恢复7/7、新恢复12/12、Node23/23与九文件153/153、集成15/15、Python页面12/12独立复跑通过。复核Node使用--test-isolation=none；默认逐文件隔离在沙箱spawn EPERM未独立确认。98后端是#160开发者自测证据，定向修正/复核未重复运行。
+- 证据归属澄清（P3-1）：集成探针仅核实id接线，真实重试事件调用loadControllerMode、只GET不PATCH由#163源码核对web/workspace.js:1503确认；未做浏览器点击验证。#162原实施说明/交付包不追改，以本收尾说明澄清该句自报。
+- P3-2非阻塞：重试GET在途状态行可能短暂显示未保存选择、同时保存禁用；结束后恢复一致，本片不扩UX打磨。
+- 结论：Codex合看原片审查和修正定向复核确认实现通过；真实页面视觉、键盘和HTTP竞态待用户验收。

@@ -58,7 +58,9 @@
 .role-details-panel {color:#303741;} .workspace-breadcrumb {font-size:14px; margin:0 0 24px;}
 .role-details-panel h2 {font-size:42px; line-height:1.3; font-weight:650; margin:0 0 20px;}
 .role-current {font-size:16px; margin-bottom:28px;}
-.role-task-section {border-top:1px solid #ddd; margin-top:34px; padding-top:28px;}
+/* C2-B 双横线清理：分隔线只保留面板容器 #role-details-tasks-panel 的一条（见下方），
+   内部 .role-task-section 不再叠加 border-top/margin-top，“参与任务”上方仅一条横线。 */
+.role-task-section {padding-top:28px;}
 .role-task-filters {display:flex; gap:28px; margin-bottom:20px;}
 .role-task-table {width:100%; border-collapse:collapse; font-size:15px; table-layout:fixed;}
 .role-task-table th,.role-task-table td {padding:17px 12px; border-bottom:1px solid #dedede; text-align:left; vertical-align:top; overflow-wrap:anywhere;}
@@ -191,6 +193,30 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-row-id {font-size:13px; color:#8a929b;}
 .role-member-id {font-size:14px; color:#8a929b; margin:0 0 20px; overflow-wrap:anywhere;}
 @media(max-width:700px){#controller-panel h3 {font-size:20px;} .controller-current {font-size:16px;} .controller-toolbar {gap:10px;}}
+
+/* C2-B 项目调度模式面板：与“项目主控”同级，复用浅色工作台层级；radio 两态 + 显式保存。 */
+#controller-mode-panel {color:#303741; margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid #ddd;}
+#controller-mode-panel .sidebar-kicker {font-size:14px; color:#69737c; margin-bottom:10px;}
+#controller-mode-panel h3 {font-size:24px; font-weight:650; color:#26323d; margin:0;}
+.controller-mode-hint {font-size:14px; color:#626b76; line-height:1.7; margin:14px 0 4px;}
+.controller-mode-saved {font-size:16px; font-weight:600; color:#26323d; margin:12px 0 4px; overflow-wrap:anywhere;}
+.controller-mode-effective {font-size:14px; color:#626b76; line-height:1.7; margin:0 0 14px; overflow-wrap:anywhere;}
+.controller-mode-options {display:flex; flex-direction:column; gap:12px; border:0; margin:0 0 14px; padding:0;}
+.controller-mode-option {display:flex; gap:10px; align-items:flex-start; padding:14px 16px; border:1px solid #d6d6d2; border-radius:6px; background:#fff; cursor:pointer;}
+.controller-mode-option:hover {border-color:#b9c6d2;}
+.controller-mode-option:has(input:checked) {border-color:#337ec0; background:#edf5fc;}
+.controller-mode-option:has(input:disabled) {opacity:0.6; cursor:default;}
+.controller-mode-option input {margin-top:4px;}
+.controller-mode-option-body {display:flex; flex-direction:column; gap:4px;}
+.controller-mode-option-body strong {font-size:16px; color:#26323d;}
+.controller-mode-option-body span {font-size:14px; color:#626b76; line-height:1.6;}
+.controller-mode-toolbar {display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+.controller-mode-toolbar .room-primary-btn {width:auto; margin:0;}
+#controller-mode-save-btn:disabled {opacity:0.55; cursor:not-allowed;}
+.controller-mode-status {font-size:14px; line-height:1.6; margin:12px 0 0; color:#414b57;}
+.controller-mode-status.error {color:#9d3434;}
+.controller-mode-status.success {color:#286c39;}
+@media(max-width:700px){#controller-mode-panel h3 {font-size:20px;} .controller-mode-saved {font-size:15px;} .controller-mode-option {padding:12px;} .controller-mode-toolbar {gap:10px;}}
 
 /* ROLE-SETTINGS-1：角色列表固定首项“项目设置” + 项目设置页主控候选选择器。 */
 .role-settings-row {border-bottom:2px solid #d8d8d2; background:#f7f6f2;}

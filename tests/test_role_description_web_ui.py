@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261005-role-desc-f2"
+STATIC_VERSION = "20261006-controller-mode-c2b-f1"
 
 
 class RoleDescriptionWebUiTests(RouteTestCase):
@@ -54,7 +54,7 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertNotIn('id="role-details-panel"', html, "旧的整体动态角色详情容器已拆分")
         # 静态资源版本同步刷新缓存（4 处）。
         self.assertEqual(html.count(STATIC_VERSION), 4)
-        self.assertEqual(len(re.findall(r"20261005-role-desc-f1", html)), 0, "旧版本串不残留")
+        self.assertEqual(len(re.findall(r"20261005-role-desc", html)), 0, "旧版本串不残留")
         self.assertNotIn("20260923-manual-task-cleanup-1", html)
         self.assertNotIn("20260919-c1b-s2-owner", html)
         self.assertNotIn("20260918-role-1", html)

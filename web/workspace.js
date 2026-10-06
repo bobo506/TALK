@@ -640,7 +640,7 @@ function renderWorkspaceList() {
     const settingsRow = workspaceButton("", () => { workspaceUI.roleSelection = "settings"; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row role-settings-row");
     settingsRow.classList.toggle("selected", workspaceSettingsSelected());
     settingsRow.setAttribute("aria-pressed", String(workspaceSettingsSelected()));
-    settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "项目开发要求与项目主控"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
+    settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "开发要求 · 主控 · 调度模式"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
     blackboardColumns.appendChild(settingsRow);
     // ROLE-DESC-F1：搜索范围 = 成员名 + 有效说明全文（自定义 ?? 默认）+ 原始 business_role。
     const matchedRoles = roles.filter(item => `${workspaceMemberName(item.member_id)} ${workspaceRoleDescriptionText(item)} ${item.business_role || ""}`.toLocaleLowerCase().includes(query));
@@ -955,6 +955,9 @@ function syncControllerViews() {
     controllerFocusMemory = null; // 焦点在其它可见控件上：用户已主动移焦，不再为主控回焦
   }
   syncControllerPanel();
+  // C2-B：主控指定变化后只刷新调度模式面板的主控可用性提示（读项目缓存事实），不写模式。
+  // typeof 防御：C1b-S2 定向测试单独抽取本代码块运行时，调度模式函数不在上下文中。
+  if (typeof syncControllerModePanel === "function") syncControllerModePanel();
   // 只在角色页（黑板打开的管理上下文仍在）重绘列表与角色详情；离开角色页或黑板关闭后，
   // 迟到的读取/保存响应只维护 controllerUI 与项目缓存状态，由返回角色页时的正常导航渲染
   // 呈现服务器最终状态，避免主控请求重绘任务/群聊页面造成焦点与滚动位置丢失。
@@ -1097,6 +1100,294 @@ function workspaceTaskNotice(task, tree) {
   if (task.workflow_status === "needs_decision") return "需要项目负责人作出决定，任务尚未继续。";
   return task.workflow_status === "in_progress" ? "负责人正在推进任务，下面可查看分工进展。" : "任务已交办，等待负责人接手。";
 }
+// ── C2-B 项目调度模式（角色页“项目设置”，仅保存设置意向） ─────────────────
+// 读取 GET /api/projects/{id} 的 controller_mode / controller_mode_version；加载中禁用控件
+// 并提示读取中。写入只走专用 PATCH /api/projects/{id}/controller-mode，expected_version
+// 原样回传上次读取的版本（不自己 +1、不走普通项目 PATCH）。保存的永远只是“意向”：
+// 本版本没有任何主动调度生效入口（effective 恒为 null），界面把“已保存设置”与
+// “实际执行”分两行如实显示，绝不把 null 伪装成启用状态。无主控或主控失效/未知仍可
+// 保存意向，保存“主动”时如实显示原因且不会因此产生任何主动调度。
+// 与主控指定面板相互独立：各自 CAS 字段，保存模式不写指定；主控变更经项目缓存只刷新
+// 本面板提示，不写模式。状态绑定 项目/账号/请求序号，保存收尾用独立 saveToken 所有权
+// （同 C1b-S2 纪律，409 内部重读递增序号不会夺走当前保存的清理权）；迟到成功/错误不
+// 回填其它上下文；用户未保存的选择存于 selection，重绘不得吞掉。不新增后台轮询。
+// 409 后标记“需重读”（reloadNeeded）：重读成功前暂禁保存以避免旧版本无效 CAS，“重试”
+// 只做 GET 重读、不自动 PATCH，任一次读取成功即解除并按原权限/版本/dirty 恢复保存。
+const CONTROLLER_MODE_LABELS = { passive: "被动", active: "主动" };
+const controllerModeUI = { projectId: null, memberId: null, supported: false, loaded: false, saving: false, saveToken: null, request: 0, saved: null, version: null, controllerId: undefined, controllerStatus: undefined, selection: null, error: "", notice: "", reloadNeeded: false };
+function controllerModeEl(id) { return typeof document === "undefined" ? null : document.getElementById(id); }
+function controllerModeContextValid() {
+  return controllerModeUI.projectId !== null && controllerModeUI.projectId === activeProjectId && controllerModeUI.memberId === myId;
+}
+// 版本要作为 expected_version 原样回传；JS number 无法安全表示时禁止发送失真的版本号。
+function controllerModeVersionSafe() { return Number.isSafeInteger(controllerModeUI.version) && controllerModeUI.version >= 0; }
+function controllerModeKnown(mode) { return Object.prototype.hasOwnProperty.call(CONTROLLER_MODE_LABELS, mode); }
+// 主控可用性只读事实来源：项目缓存（主控面板保存后已回写最新值）优先，
+// 其次本面板自己的项目读取快照；只用于提示，绝不写模式字段。
+function controllerModeControllerState() {
+  const project = projects.find(item => item.project_id === controllerModeUI.projectId);
+  const id = project && "controller_member_id" in project ? project.controller_member_id : controllerModeUI.controllerId;
+  const status = project && "controller_assignment_status" in project ? project.controller_assignment_status : controllerModeUI.controllerStatus;
+  return { id: id || null, status: typeof status === "string" ? status : "" };
+}
+// 无主控 / 主控失效 / 状态未知时的原因短句；assigned 返回空串。
+function controllerModeUnavailableReason() {
+  const { id, status } = controllerModeControllerState();
+  if (status === "assigned") return "";
+  if (!id || status === "unassigned") return "尚未指定项目主控";
+  const meta = controllerStatusMeta(status);
+  return meta.reason || meta.label;
+}
+// 仅当已保存意向为“主动”且主控不可用时常驻提示；被动或无问题不额外打扰。
+function controllerModeAvailabilityNote() {
+  if (controllerModeUI.saved !== "active") return "";
+  const reason = controllerModeUnavailableReason();
+  return reason ? `当前主控指定不可用：${reason}；保存的“主动”意向不会因此产生任何主动调度。` : "";
+}
+// 项目级面板可见性统一由 renderTaskDetailsPanel() 同步（app.js），与开发要求/主控面板同一同步点。
+function renderControllerModePanel() {
+  const panel = controllerModeEl("controller-mode-panel");
+  if (!panel) return;
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && workspaceSettingsSelected() && Boolean(activeProjectId) && Boolean(myId);
+  panel.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  if (controllerModeUI.projectId !== activeProjectId || controllerModeUI.memberId !== myId) {
+    // 上下文切换（含 A→B→A 往返与切账号）：递增请求序号作废旧读写，
+    // 重置保存所有权（旧请求迟到不得清理新上下文的保存状态），新上下文重新读取。
+    ++controllerModeUI.request;
+    Object.assign(controllerModeUI, { projectId: activeProjectId, memberId: myId, supported: false, loaded: false, saving: false, saveToken: null, saved: null, version: null, controllerId: undefined, controllerStatus: undefined, selection: null, error: "", notice: "", reloadNeeded: false });
+    return loadControllerMode();
+  }
+  syncControllerModePanel();
+}
+function syncControllerModePanel() {
+  const panel = controllerModeEl("controller-mode-panel");
+  if (!panel || panel.classList.contains("hidden")) return;
+  const savedLine = controllerModeEl("controller-mode-saved");
+  const effectiveLine = controllerModeEl("controller-mode-effective");
+  const passiveRadio = controllerModeEl("controller-mode-passive");
+  const activeRadio = controllerModeEl("controller-mode-active");
+  const saveBtn = controllerModeEl("controller-mode-save-btn");
+  const retryBtn = controllerModeEl("controller-mode-retry-btn");
+  const status = controllerModeEl("controller-mode-status");
+  const human = currentMemberIsHuman();
+  const ready = controllerModeUI.loaded && controllerModeUI.supported;
+  // 状态行一：已保存设置（含版本）。加载中/读取失败/旧服务/未知模式如实降级，
+  // 不把缺失或异常值伪装成已保存被动。
+  if (!controllerModeUI.loaded) {
+    savedLine.textContent = controllerModeUI.error ? "已保存设置：读取失败" : "已保存设置：读取中…";
+  } else if (!controllerModeUI.supported) {
+    savedLine.textContent = "已保存设置：当前服务不支持调度模式设置";
+  } else if (controllerModeKnown(controllerModeUI.saved)) {
+    savedLine.textContent = `已保存设置：${CONTROLLER_MODE_LABELS[controllerModeUI.saved]}（版本 ${controllerModeUI.version}）`;
+  } else {
+    savedLine.textContent = `已保存设置：无法识别的模式（服务返回：${String(controllerModeUI.saved)}），可选择下方模式重新保存`;
+  }
+  // 状态行二：实际执行。本版本没有主动调度的生效入口，支持读取时恒为这句话；
+  // 不支持或读取失败时如实标注无法确认，绝不写成启用状态。
+  effectiveLine.textContent = ready
+    ? "实际执行：尚无生效的主动调度（本版本不支持自动生效）"
+    : `实际执行：${controllerModeUI.loaded ? "当前服务不支持调度模式读取，无法确认" : "读取失败，无法确认"}`;
+  // 显示选择 = 用户未保存选择 ?? 已保存值（未知模式不预选任何项）。重绘只按状态回写
+  // checked，用户选择存放在 selection 中，轮询/重绘不会吞掉未保存选择。
+  const shown = controllerModeUI.selection ?? (controllerModeKnown(controllerModeUI.saved) ? controllerModeUI.saved : null);
+  const editable = human && ready;
+  passiveRadio.disabled = !editable;
+  activeRadio.disabled = !editable;
+  passiveRadio.checked = shown === "passive";
+  activeRadio.checked = shown === "active";
+  const dirty = ready && shown !== null && shown !== controllerModeUI.saved;
+  // 409 后需重读（reloadNeeded）期间暂禁保存：旧 expected_version 已被拒绝，再点保存只会重复 409；
+  // 重读成功（applyControllerModeRead）后按原权限/版本/dirty 条件恢复。
+  saveBtn.disabled = controllerModeUI.saving || controllerModeUI.reloadNeeded || !ready || !dirty || !controllerModeVersionSafe();
+  saveBtn.classList.toggle("hidden", !human);
+  // 重试入口：初读失败（!loaded）或 409 后需重读（reloadNeeded）两种错误状态可见；
+  // 点击只做 GET 重读，不发 PATCH。400/422 等普通保存失败、版本不安全、agent 只读不进入此状态。
+  retryBtn.classList.toggle("hidden", !(!controllerModeUI.saving && Boolean(controllerModeUI.error) && (!controllerModeUI.loaded || controllerModeUI.reloadNeeded)));
+  let message = "", kind = "";
+  if (!controllerModeUI.loaded && controllerModeUI.error) { message = controllerModeUI.error; kind = "error"; }
+  else if (controllerModeUI.saving) message = "正在保存…";
+  else if (controllerModeUI.error) { message = controllerModeUI.error; kind = "error"; }
+  else if (controllerModeUI.notice) { message = controllerModeUI.notice; kind = "success"; }
+  else if (!controllerModeUI.loaded) message = "正在读取调度模式…";
+  else if (!controllerModeUI.supported) { message = "当前服务尚未支持调度模式设置，暂时只能查看。"; kind = "error"; }
+  else if (!controllerModeVersionSafe()) { message = "调度模式版本超出页面可安全表示的范围；为避免写错版本，已暂停保存，请刷新或联系管理员。"; kind = "error"; }
+  else if (!human) message = "当前账号是 Agent，只能查看；调度模式由项目负责人管理。";
+  else if (controllerModeAvailabilityNote()) { message = controllerModeAvailabilityNote(); kind = "attention"; }
+  else if (dirty) message = "有未保存的选择，尚未保存。";
+  status.textContent = message;
+  status.className = `controller-mode-status${kind ? ` ${kind}` : ""}`;
+}
+// 用户切换选项只更新未保存选择，不自动提交；显式“保存”才发起写入。
+function selectControllerMode(mode) {
+  if (!controllerModeKnown(mode)) return;
+  if (controllerModeUI.selection === mode) return;
+  controllerModeUI.selection = mode;
+  controllerModeUI.notice = "";
+  syncControllerModePanel();
+}
+async function loadControllerMode() {
+  const request = ++controllerModeUI.request;
+  const projectId = controllerModeUI.projectId, memberId = controllerModeUI.memberId;
+  controllerModeUI.error = "";
+  syncControllerModePanel();
+  const current = () => request === controllerModeUI.request
+    && projectId === activeProjectId && projectId === controllerModeUI.projectId
+    && memberId === myId && memberId === controllerModeUI.memberId;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`);
+    if (!res.ok) throw new Error(await readErrorDetail(res, `调度模式读取失败（${res.status}），请稍后重试。`));
+    const data = await res.json();
+    if (!current()) return;
+    if (!data || data.project_id !== projectId || !("controller_mode" in data) || !("controller_mode_version" in data)) {
+      // 旧服务缺模式字段：明确不支持并禁用保存，不把缺失当成被动。
+      controllerModeUI.loaded = true;
+      controllerModeUI.supported = false;
+      controllerModeUI.saved = null; controllerModeUI.version = null;
+      controllerModeUI.controllerId = undefined; controllerModeUI.controllerStatus = undefined;
+      controllerModeUI.reloadNeeded = false;
+      controllerModeUI.error = "当前服务尚未支持调度模式设置，暂时只能查看角色。";
+    } else {
+      applyControllerModeRead(projectId, data);
+    }
+  } catch (err) {
+    if (!current()) return;
+    controllerModeUI.loaded = false;
+    controllerModeUI.error = err.message || "调度模式读取失败，请重试。";
+  }
+  if (current()) syncControllerModePanel();
+}
+function applyControllerModeRead(projectId, data) {
+  controllerModeUI.supported = true;
+  controllerModeUI.loaded = true;
+  controllerModeUI.reloadNeeded = false; // 任何一次成功读取都拿到最新状态，解除“409 后需重读”
+  controllerModeUI.saved = typeof data.controller_mode === "string" ? data.controller_mode : null;
+  controllerModeUI.version = data.controller_mode_version;
+  controllerModeUI.controllerId = "controller_member_id" in data ? (data.controller_member_id || null) : undefined;
+  controllerModeUI.controllerStatus = "controller_assignment_status" in data ? data.controller_assignment_status : undefined;
+  // 只回写模式两字段到项目缓存；主控字段由主控面板维护，其它项目字段一律不碰。
+  const project = projects.find(item => item.project_id === projectId);
+  if (project) {
+    project.controller_mode = controllerModeUI.saved;
+    project.controller_mode_version = data.controller_mode_version;
+  }
+}
+// 409 后只重读最新模式/版本（自带请求序号），不自动替用户重写；返回是否确实刷新成功。
+async function rereadControllerModeState(projectId, memberId) {
+  const request = ++controllerModeUI.request;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`);
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    if (request !== controllerModeUI.request || projectId !== activeProjectId || projectId !== controllerModeUI.projectId
+        || memberId !== myId || memberId !== controllerModeUI.memberId) return false;
+    if (data && data.project_id === projectId && "controller_mode" in data && "controller_mode_version" in data) {
+      applyControllerModeRead(projectId, data);
+      return true;
+    }
+  } catch (_) { /* 重读失败保持原状态，错误文案如实提示刷新失败 */ }
+  return false;
+}
+async function saveControllerMode() {
+  const projectId = activeProjectId, memberId = myId;
+  if (!projectId || controllerModeUI.saving || !controllerModeUI.loaded || !controllerModeUI.supported) return;
+  // 409 后尚未重读成功前禁止再用旧版本写入（界面同时禁用保存按钮，这里兜底）。
+  if (controllerModeUI.reloadNeeded) return;
+  if (controllerModeUI.projectId !== projectId || controllerModeUI.memberId !== memberId) return;
+  if (!currentMemberIsHuman()) return;
+  const submitted = controllerModeUI.selection ?? (controllerModeKnown(controllerModeUI.saved) ? controllerModeUI.saved : null);
+  if (!controllerModeKnown(submitted) || submitted === controllerModeUI.saved) return;
+  if (!controllerModeVersionSafe()) {
+    controllerModeUI.error = "调度模式版本无法安全表示，已取消本次写入，请刷新后重试。";
+    syncControllerModePanel();
+    return;
+  }
+  const expected = controllerModeUI.version;
+  const saveToken = {};
+  controllerModeUI.saving = true;
+  controllerModeUI.saveToken = saveToken;
+  controllerModeUI.error = ""; controllerModeUI.notice = "";
+  const request = ++controllerModeUI.request;
+  syncControllerModePanel();
+  const contextAlive = () => projectId === activeProjectId && projectId === controllerModeUI.projectId
+    && memberId === myId && memberId === controllerModeUI.memberId;
+  const current = () => request === controllerModeUI.request && contextAlive();
+  // 只有仍拥有当前保存状态的请求可在 finally 清理 saving 并同步视图；内部 409 重读会
+  // 递增请求序号，故所有权用独立 token 判定，不用请求序号（同 C1b-S2 的 saveToken 纪律）。
+  const ownsSave = () => controllerModeUI.saveToken === saveToken;
+  try {
+    // 写请求只走专用 controller-mode 入口；expected_version 原样回传上次读取的版本，不自己 +1。
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/controller-mode`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: submitted, expected_version: expected }),
+    });
+    if (!current()) return;
+    if (res.status === 409) {
+      const detail = await readErrorDetail(res, "调度模式设置已被他人修改。");
+      if (!current()) return;
+      // 409 只重新 GET 取最新模式/版本，不自动替用户重写；用户当前选择保留，便于确认后再保存。
+      // 先置“需重读”：重读成功会被 applyControllerModeRead 清除；重读失败则保持该状态，
+      // 保存暂禁（避免旧版本无效 CAS）、“重试”入口可见且只发 GET，直到某次读取成功解除。
+      controllerModeUI.reloadNeeded = true;
+      const refreshed = await rereadControllerModeState(projectId, memberId);
+      if (!contextAlive()) return;
+      controllerModeUI.error = refreshed
+        ? `${detail} 设置已被他人修改，已刷新到最新状态，请确认后再保存。`
+        : `${detail} 设置已被他人修改；自动刷新最新状态失败，已暂停保存；请点“重试”重新读取最新状态，确认后再保存。`;
+    } else if (res.status === 404) {
+      // 模式接口不存在（旧服务）：明确不支持并禁用保存，不假报成功。
+      controllerModeUI.loaded = true;
+      controllerModeUI.supported = false;
+      controllerModeUI.error = "当前服务尚未支持调度模式设置（接口返回 404），本次未保存。";
+    } else if (!res.ok) {
+      // 400/422/其它失败：展示服务端 detail，保留用户当前选择便于重试。
+      controllerModeUI.error = await readErrorDetail(res, `保存失败（${res.status}），请重试。`);
+    } else {
+      const data = await res.json().catch(() => null);
+      if (!current()) return;
+      // 必须核实同项目响应、必要字段存在、返回模式与提交值一致且版本可安全表示，才算保存成功。
+      const versionOk = Boolean(data) && Number.isSafeInteger(data.controller_mode_version) && data.controller_mode_version >= 0;
+      if (!data || data.project_id !== projectId || !("controller_mode" in data)
+          || data.controller_mode !== submitted || !versionOk) {
+        controllerModeUI.error = "服务未确认本次保存（响应未带回一致的调度模式），请刷新后重试。";
+      } else {
+        applyControllerModeRead(projectId, data);
+        if (controllerModeUI.selection !== null && controllerModeUI.selection !== submitted) {
+          // 保存期间用户又改了选择：保留新选择，不把它误标为已保存。
+          controllerModeUI.notice = "先前选择已保存；当前选择尚未保存。";
+        } else {
+          controllerModeUI.selection = null;
+          if (submitted === "active") {
+            const reason = controllerModeUnavailableReason();
+            controllerModeUI.notice = reason
+              ? `已保存“主动”，但当前主控指定不可用：${reason}，不会因此产生任何主动调度。`
+              : "已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。";
+          } else {
+            controllerModeUI.notice = "已保存“被动”。派发任务后本轮结束，由你通知完成后再读取与收取。";
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if (!current()) return;
+    controllerModeUI.error = err.message || "保存失败，请检查网络后重试。";
+  } finally {
+    // 上下文活着但所有权已易手（A→B→A / 切账号往返期间有新保存接管）时：
+    // 旧请求到达只结束自己，不清新请求的 saving、不同步视图、不再发写请求。
+    if (contextAlive() && ownsSave()) {
+      controllerModeUI.saveToken = null;
+      controllerModeUI.saving = false;
+      syncControllerModePanel();
+    }
+  }
+}
+// 角色页“刷新”复用既有刷新生命周期：只重读当前上下文的调度模式，不新增高频轮询。
+function reloadControllerMode() {
+  if (!(blackboardOpen && workspaceUI.mode === "roles" && activeProjectId && myId)) return;
+  if (!controllerModeContextValid() || controllerModeUI.saving) return;
+  loadControllerMode();
+}
 function renderWorkspaceTaskStory(task) {
   const tree = workspaceTreeMatches(task, selectedTaskTree) ? selectedTaskTree : null;
   const notice = document.getElementById("task-notice"); notice.textContent = workspaceTaskNotice(task, tree);
@@ -1204,6 +1495,17 @@ if (typeof document !== "undefined") {
       const select = document.getElementById("controller-candidate-select");
       if (select && select.value) saveControllerAssignment(select.value);
     });
+  }
+  const controllerModeSaveBtn = document.getElementById("controller-mode-save-btn");
+  if (controllerModeSaveBtn) {
+    // C2-B 调度模式：radio 只更新未保存选择，显式“保存”才提交；重试重读当前上下文。
+    controllerModeSaveBtn.addEventListener("click", saveControllerMode);
+    document.getElementById("controller-mode-retry-btn").addEventListener("click", () => { if (controllerModeContextValid()) loadControllerMode(); });
+    for (const id of ["controller-mode-passive", "controller-mode-active"]) {
+      document.getElementById(id).addEventListener("change", event => {
+        if (event.target.checked) selectControllerMode(event.target.value);
+      });
+    }
   }
   const roleDescriptionInput = document.getElementById("role-description-input");
   if (roleDescriptionInput) {

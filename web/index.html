@@ -6,8 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261005-role-desc-f2">
-  <link rel="stylesheet" href="/workspace.css?v=20261005-role-desc-f2">
+  <link rel="stylesheet" href="/style.css?v=20261006-controller-mode-c2b-f1">
+  <link rel="stylesheet" href="/workspace.css?v=20261006-controller-mode-c2b-f1">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -273,6 +273,39 @@
           </div>
           <p id="controller-status" class="controller-status" role="status"></p>
         </section>
+        <section id="controller-mode-panel" class="controller-mode-panel hidden" aria-label="调度模式">
+          <div class="controller-mode-heading">
+            <div>
+              <div class="sidebar-kicker">项目级 · 仅保存设置意向</div>
+              <h3>调度模式</h3>
+            </div>
+          </div>
+          <p class="controller-mode-hint">这里保存的是项目的调度模式意向：只记录设置，不唤醒任何会话、不自动运行任务。它与上方“项目主控”指定相互独立：保存模式不改变主控指定，更换或解除主控也不会自动改变模式。</p>
+          <p id="controller-mode-saved" class="controller-mode-saved">已保存设置：读取中…</p>
+          <p id="controller-mode-effective" class="controller-mode-effective">实际执行：尚无生效的主动调度（本版本不支持自动生效）</p>
+          <fieldset id="controller-mode-options" class="controller-mode-options">
+            <legend class="sr-only">选择要保存的调度模式</legend>
+            <label class="controller-mode-option" for="controller-mode-passive">
+              <input id="controller-mode-passive" type="radio" name="controller-mode" value="passive">
+              <span class="controller-mode-option-body">
+                <strong>被动（默认）</strong>
+                <span>派发任务后本轮结束，由你通知完成后再读取与收取。当前所有项目默认此模式。</span>
+              </span>
+            </label>
+            <label class="controller-mode-option" for="controller-mode-active">
+              <input id="controller-mode-active" type="radio" name="controller-mode" value="active">
+              <span class="controller-mode-option-body">
+                <strong>主动</strong>
+                <span>主控会话在等待期间继续取件、交独立复核并收尾。保存“主动”只是设置意向，不等于已生效：没有任何会话因此被唤醒或自动运行；已结束的桌面对话仍需人工唤回。</span>
+              </span>
+            </label>
+          </fieldset>
+          <div class="controller-mode-toolbar">
+            <button id="controller-mode-save-btn" type="button" class="room-primary-btn">保存</button>
+            <button id="controller-mode-retry-btn" type="button" class="workspace-text-button hidden">重试</button>
+          </div>
+          <p id="controller-mode-status" class="controller-mode-status" role="status"></p>
+        </section>
         <!-- ROLE-DESC-F1 修正（#137/N4）：原动态角色详情拆成名称区与参与任务区两个动态容器，
              静态说明编辑区居中独立，布局顺序 = 名称区 → 说明区 → 参与任务区（贴合“名称下方”原需求）。
              说明区是静态 DOM（设计方案 A），绝不能移入任一动态容器——replaceChildren 会销毁编辑区节点，
@@ -491,7 +524,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/workspace.js?v=20261005-role-desc-f2"></script>
-  <script src="/app.js?v=20261005-role-desc-f2"></script>
+  <script src="/workspace.js?v=20261006-controller-mode-c2b-f1"></script>
+  <script src="/app.js?v=20261006-controller-mode-c2b-f1"></script>
 </body>
 </html>

@@ -878,6 +878,8 @@ async function refreshProjectWorkspace() {
     await loadGroups();
     // 角色页刷新同时重读主控指定（名册 sync/禁用可能改变其状态）；非角色页为 no-op，不新增轮询。
     reloadControllerAssignment();
+    // C2-B：角色页刷新同时重读调度模式（主控变更可刷新其提示）；非角色页为 no-op。
+    reloadControllerMode();
     renderRoomStrip();
   } finally {
     refreshProjectBtn.disabled = false;
@@ -1056,6 +1058,8 @@ function renderTaskDetailsPanel() {
   renderRequirementsPanel();
   // C1b-S2 项目主控面板沿用同一同步点：任务/群聊导航不残留管理区。
   renderControllerPanel();
+  // C2-B 调度模式面板沿用同一同步点：与具体角色详情互斥，离开项目设置即隐藏。
+  renderControllerModePanel();
   // ROLE-DESC-F1 角色说明编辑区沿用同一同步点；面板是静态 DOM，位于名称区与参与任务区两个动态
   // 容器之间（#137/N4 布局），动态 replaceChildren 与 5 秒轮询重绘都不触碰 textarea，
   // 内容/焦点/光标天然保持。
