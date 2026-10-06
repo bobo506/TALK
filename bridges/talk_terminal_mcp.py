@@ -114,12 +114,13 @@ def wait_defaults() -> dict:
             "受控等待（controlled_wait=true）是显式 opt-in 的短预算入口，不重设上面的通用默认。"
         ),
         "cancellation_note": WAIT_CANCELLATION_NOTE,
-        # C2-A1：受控等待的公开边界，避免把 opt-in 参数误读成默认生效或"工具已强制执行宿主预算"。
+        # I-1 发起者受控等待：公开边界为 EnterGate G1–G8（G6=模式 active、G7=严格 task_ids、
+        # G8=逐任务 created_by 归属整批核验），避免把 opt-in 参数误读成默认生效或"工具已强制执行宿主预算"。
         "controlled_wait": {
             "parameter": "controlled_wait",
             "default": False,
             "opt_in": True,
-            "entry_gates": ["G1", "G2", "G3", "G4", "G5", "G6", "G7"],
+            "entry_gates": ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"],
             "recheck_interval_seconds": CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS,
             "client_margin_seconds": WAIT_CLIENT_MARGIN_SECONDS,
             "per_request_timeout_seconds": WAIT_REQUEST_TIMEOUT_SECONDS,

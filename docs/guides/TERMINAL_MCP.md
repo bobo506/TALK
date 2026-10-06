@@ -394,3 +394,16 @@ REQ-1后端与主控工具已通过独立复核；项目API支持最新纯文本
 新实现的talk_list_agents顶层controller_mode读取项目保存的requested_mode/requested_version；这只是配置意向。effective_mode当前恒为null、effective_status为not_bound，不表示主控已自动推进或会话已被唤回。旧后端缺字段时明确unsupported，无项目时null；与开发要求复用同一项目读取。
 
 human可经专用 `PATCH /api/projects/{project_id}/controller-mode` 配置mode及expected_version；版本冲突409后须先重新读取，超出0..2**63-1的整数422。模式不改变任务授权或派发/收取流程，当前仍按用户通知后取件。C1b身份/生效与C2按钮尚未实现，本片未重启服务/MCP，不能把代码提交当作当前连接已经支持该字段。完整合同见PROJECT_INTEGRATION.md的C1a节。
+
+
+## I-1加载验收（2026-10-06，源码通过、当前连接待刷新）
+
+I-1源码已独立复核通过（172/173，162项及七探针），当前连接仍返回旧G1–G7/controller_changed和旧指定说明。因此目录与运行时加载尚未验收，I-2须在I-1加载确认之后开展。
+
+1. 按现有配置重连TALK MCP入口，让进程加载已提交源码；若现有会话工具目录没有刷新，重开会话后读取PROGRESS恢复。此步骤不修改Key、真实模式、指定或执行者在途任务。
+2. 核对当前连接仍九工具，wait描述为G1–G8、正常退出不含controller_changed；talk_list_agents实际返回assignment历史兼容/弃用注记和发起者模式说明。目录和运行时注记应一致，旧目录/旧进程不得混作已加载。
+3. 如实记录服务端caller_identity。当前human:bobo保持管理/旧任务收尾身份，不把它猜成agent:codex；effective_mode仍null/not_bound。
+4. 可用已收取任务做显式短预算（如1秒）false只读命中检查及后续查询；human的true短入口应G4拒绝，不创建生产测试任务或主动长等待。该短路径不能证明Agent G8真实主动链路或宿主长等待适配。
+5. 新I-1加载后，协调资格依据具体任务created_by/项目归属，主控指定仅兼容输出；旧连接仍受旧门禁限制。I-0自身Key、I-2 UI、I-3约定/指南就绪后再做I-4真实消费者验收。
+
+客户端实际T/W/返回余量、取消/同连接排队、socket非端到端硬截止等仍按本文通用要求分别验证。加载检查不等于真实主动宿主适配通过。

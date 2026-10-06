@@ -172,3 +172,10 @@ I-3（提示词/指南）可与 I-1/I-2 并行起草，发布不早于 I-1
 - 同步更新tests/test_talk_controlled_wait.py:1043/1046/1075的三条同源断言：工具描述G1–G8、controller_changed退役、WAIT_COUNTING_NOTE采用任务发起者（调用方）措辞；原计划仅列另一文件1056，实施时两处一并核对。
 - talk_list_agents工具描述退役清单补bridges/talk_task_tools.py:1684-1690的controller_mode段，按同一规则将固定“主控会话”说明改为“发起者会话”，字段形状及effective null/not_bound语义不变。
 - 本补充来自#171独立复核建议，不改变权限、运行机制或已确定设计选项。未来实现测试和终端实测均待执行。
+
+
+## I-1收尾与当前加载门禁（2026-10-06）
+
+- I-1开发172/独立复核173通过并收取；实际四文件，六模块162及七独立探针通过。terminal_mcp --check门禁清单G1–G8最小配套同步已纳本片范围。源码通过与实际MCP加载分开。
+- 当前工具目录/运行时注记仍旧版，I-1加载未通过；按原依赖图，I-2须晚于I-1加载。先重连当前TALK MCP，按TERMINAL_MCP的I-1加载验收核验，再派页面退役。I-1/I-2仍纳同一人工验收轮。
+- 173原消息格式导致MCP unknown、本地有效complete及实际独立证据并存，原消息/报告不追改；O1/O2非阻塞文字建议纳I-3。I-0身份切换与I-4真实链路未开展，effective null/not_bound保持。

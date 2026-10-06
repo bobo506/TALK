@@ -407,3 +407,8 @@ TALK/
 - 新增 `docs/guides/QUICKSTART_AGENT.md`：面向 Agent 开发者，只走 Python bare metal + SDK 路径
 - `docs/spec/SDK.md` 的异步示例现已补齐 `asyncio.run(main())` 包装，可直接复制到 `.py` 文件运行
 - 首次管理员引导页的 `api_key` 输入已支持浏览器端安全随机生成、显隐切换与一键复制，新手无需手动编造登录密钥
+
+
+## 2026-10-06 I-1实施状态
+
+发起者受控等待工具经DeepSeek #172开发、Kimi #173独立复核通过并收取；源码按具体任务created_by与项目核验协调资格，固定主控指定不再是受控执行依据，普通等待/服务端权限保持兼容。当前TALK MCP连接实测仍加载旧门禁，须重连核验后再做I-2页面退役；旧UI、自身Key/消费者/真实主动链路仍待后续，保存active仍只是意向。当前合同与实施顺序见CONTROLLER_MODE_DESIGN、INITIATOR_MODE_IMPLEMENTATION_PLAN及PROGRESS；旧已实现记录作为历史保留。

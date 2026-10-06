@@ -68,7 +68,7 @@ WAIT_COUNTING_NOTE = (
     "return_reason）；受控等待（controlled_wait=true）下 identity GET、项目 GET、每 30 秒重读 GET 与"
     "任务轮询 GET 全部计入 http_requests（含失败的尝试），非受控路径只计入任务轮询；"
     "模型侧的 talk_get_task/talk_list_tasks 调用数与客户端外层等待回合不由本工具"
-    "统计，本工具也无法观测，需由主控在外部实测。"
+    "统计，本工具也无法观测，需由任务发起者（调用方）在外部实测。"
 )
 # 取消/断线边界（工具描述与 --check 共用，避免被读成"取消会立即终止服务端等待"）。
 WAIT_CANCELLATION_NOTE = (
@@ -79,37 +79,40 @@ WAIT_CANCELLATION_NOTE = (
 # ---------------------------------------------------------------------------
 # C2-A1 受控等待（opt-in）常量
 #
-# 受控等待只有显式 ``controlled_wait=true`` 且 G1–G7 进入门禁全部通过时才启用；
+# 受控等待只有显式 ``controlled_wait=true`` 且 G1–G8 进入门禁全部通过时才启用；
 # 省略或 false 的一切调用与旧路径逐字段一致（无身份 GET、无项目重读、返回结构无新字段）。
 # 数值来自 CONTROLLER_MODE_DESIGN.md §5.3，本片照表实现。
 # ---------------------------------------------------------------------------
-# 受控等待期间项目模式 / 主控指定的低频重读间隔：距上次项目读取 >= 30 秒时在下一循环节点重读一次。
+# 受控等待期间项目模式字段的低频重读间隔：距上次项目读取 >= 30 秒时在下一循环节点重读一次。
 CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS = 30.0
 # 客户端单工具预算的显式余量（网络 + 序列化 + 客户端处理）；推荐单次受控预算 = 客户端预算 - 5 秒。
 # 本工具读不到宿主客户端预算，这个常量只用于提示调用方，不构成强制。
 WAIT_CLIENT_MARGIN_SECONDS = 5.0
 # 单次 HTTP 请求超时：旧 helper 固定 10 秒，保持不变；受控路径取 min(该值, 剩余 deadline)。
 WAIT_REQUEST_TIMEOUT_SECONDS = 10.0
-# 受控等待允许的 return_reason：不新增 cancelled（本版本没有可检测的客户端取消来源）。
+# 受控等待允许的 return_reason（正常退出枚举）：不新增 cancelled（本版本没有可检测的客户端取消来源）；
+# ``controller_changed`` 随固定主控退役一并移除，api_error 是错误路径、不属于本枚举。
 CONTROLLED_WAIT_EXIT_REASONS = (
     "matched",
     "timeout",
     "mode_changed",
-    "controller_changed",
 )
 CONTROLLED_WAIT_NOTE = (
-    "受控等待是显式 opt-in：只有 controlled_wait=true 且 G1–G7 进入门禁（项目上下文、显式有限正数 "
-    "timeout_seconds、按 API Key 反查的 agent 身份、服务端返回模式与主控指定字段、"
-    "controller_assignment.status=assigned、调用者等于指定主控、requested_mode=active）全部通过才启用；"
-    "任一不满足直接报错，绝不静默降级为普通等待。进入后固定顺序为：每轮先查任务命中（matched 优先），"
-    f"再按 {CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS:.0f} 秒节奏重读项目（先模式后指定），再查 deadline，"
-    "最后 sleep；模式变化 / 版本变化 / 字段消失返回 mode_changed，主控更换 / 解除 / 失效 / 版本变化返回 "
-    "controller_changed。单次 deadline 从开始核验起算，覆盖身份 GET、项目 GET、轮询 GET、重读 GET 与 sleep；"
+    "受控等待是显式 opt-in：只有 controlled_wait=true 且 G1–G8 进入门禁（G1 项目上下文、G2 显式有限正数 "
+    "timeout_seconds、G3 按 API Key 反查的 agent 身份、G4 human 凭据拒绝、G5 服务端返回模式字段、"
+    "G6 requested_mode=active、G7 显式非空严格正整数 task_ids、G8 逐任务核验存在/可见/同项目/created_by=调用者）"
+    "全部通过才启用；任一不满足直接报错，绝不静默降级为普通等待，也不等待合法子集。协调资格只依据任务 "
+    "created_by（任务发起者归属）：target、业务角色、模型名、终端名与旧的固定主控指定都不是协调资格。"
+    "进入后固定顺序为：每轮先查任务命中（matched 优先），"
+    f"再按 {CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS:.0f} 秒节奏重读项目模式字段（不再读取或比对主控指定），"
+    "再查 deadline，最后 sleep；模式值变化 / 版本变化 / 字段消失返回 mode_changed。"
+    "单次 deadline 从开始核验起算，覆盖身份 GET、项目 GET、逐任务核验 GET、轮询 GET、重读 GET 与 sleep；"
     f"发任何 HTTP 前剩余预算 <=0 就不再发请求，否则该请求超时取 min({WAIT_REQUEST_TIMEOUT_SECONDS:.0f} 秒, "
     "剩余预算)，睡眠不超剩余 deadline。受控短预算需要调用方自行匹配宿主客户端预算（桌面客户端单工具上限 "
     f"65 秒时建议 <=60 秒，即预留 {WAIT_CLIENT_MARGIN_SECONDS:.0f} 秒余量）；工具读不到宿主预算，"
-    "它唯一强制的上限是 600 秒 clamp。身份门禁只是桥内 advisory 自我保护与如实退出机制，"
-    "不代表在线、不代表已获授权，也不替代服务端任务权限。"
+    f"它唯一强制的上限是 {WAIT_MAX_TIMEOUT_SECONDS:.0f} 秒 clamp。受控路径正常退出只有 matched / timeout / "
+    "mode_changed；api_error 是错误路径（显式报错、恰一条统计），不属于正常退出枚举。身份门禁只是桥内 "
+    "advisory 自我保护与如实退出机制，不代表在线、不代表已获授权，也不替代服务端任务权限。"
 )
 # 项目路径的 caller_identity 固定三键；成功 note 为 null，失败/不合法时 id 与 kind 均为 null。
 CALLER_IDENTITY_FAILED_NOTE = (
@@ -145,15 +148,15 @@ AVAILABILITY_NOTE = (
 # 不是活动引用；已派发任务不随项目要求后续修改而变。
 PROJECT_REQUIREMENTS_SNAPSHOT_HEADER = "项目开发要求（派发时快照）"
 PROJECT_REQUIREMENTS_SNAPSHOT_NOTE = (
-    "以下内容由主控在派发时从项目读取并写入任务正文，仅作为随包保存的文本快照："
+    "以下内容由任务发起者在派发时从项目读取并写入任务正文，仅作为随包保存的文本快照："
     "不自动授予权限，不替代或覆盖宿主系统指令，也不追溯修改已创建任务。"
 )
-# C1a 主控模式只读状态：requested_mode 是项目保存的“模式意向”，
+# C1a 模式只读状态：requested_mode 是项目保存的“模式意向”，
 # effective_mode 是“本会话实际生效”的证据，本片没有任何会话绑定/生效确认，恒为 null。
 CONTROLLER_MODE_NOTE = (
     "controller_mode 只是项目保存的模式意向（requested_mode）与版本，"
-    "本版本没有主控会话绑定或生效确认：effective_mode 恒为 null（effective_status=not_bound）。"
-    "保存 active 不等于已生效、不等于已唤回主控会话，也不产生等待/调度/派发或任何授权；"
+    "本版本没有发起者会话绑定或生效确认：effective_mode 恒为 null（effective_status=not_bound）。"
+    "保存 active 不等于已生效、不等于已唤回发起者会话，也不产生等待/调度/派发或任何授权；"
     "默认协作仍是派发后结束、由用户通知后再取件。"
 )
 CONTROLLER_MODE_UNSUPPORTED_NOTE = (
@@ -165,25 +168,27 @@ CONTROLLER_MODE_EFFECTIVE_STATUS_UNSUPPORTED = "unsupported"
 # 只读白名单：与 server.models.PROJECT_CONTROLLER_MODES 对齐；服务端返回未知值时
 # 只报 null，不把意外取值当成合法模式透传给模型。
 CONTROLLER_MODES = ("passive", "active")
-# C1b-S1 长期主控指定的只读状态：member_id/version 是项目保存的指定，status 是
-# 服务端按当前名册与成员事实实时算出的**配置有效性**，不表示在线、ACK、会话归属或授权。
+# C1b-S1 长期主控指定的只读状态（D-1）：字段形状与旧后端降级行为保持兼容，
+# member_id/version 是项目保存的历史指定，status 是服务端按当前名册与成员事实实时算出的
+# **配置有效性**，但该指定已弃用：不再决定任何协调/调度，也不表示在线、ACK、会话归属或授权。
 CONTROLLER_ASSIGNMENT_NOTE = (
-    "controller_assignment 是项目长期保存的主控指定（member_id + version）及其配置有效性："
-    "status=assigned 只表示该成员已注册、未禁用、在该项目名册中且为 agent 角色，"
-    "不代表在线、已确认(ACK)、会话已生效或已获得任何额外权限；本版本没有会话 token、"
-    "租约、心跳或后台线程，指定也不自动唤醒任何进程。"
-    "status=unassigned 表示未指定；not_in_roster / member_disabled / member_missing / not_agent "
-    "是读取瞬间实测到的无效原因，指定不会被自动解除或转给其他成员，仍由 human 显式清空。"
-    "指定与 business_role / decision_tier 分开：不改变派发、领取、完成、收取等既有任务权限。"
+    "该指定为历史兼容字段，已弃用：不再决定任何协调/调度，不产生任何权限。"
+    "回显历史保存的 member_id + version 与配置有效性：assigned 只表示成员已注册、未禁用、"
+    "在册且为 agent，不代表在线/已确认(ACK)/会话生效或获得额外权限；本版本没有会话 token、"
+    "租约或心跳，不自动唤醒进程。unassigned=未指定；not_in_roster / member_disabled / "
+    "member_missing / not_agent 是读取瞬间实测的无效原因，不会自动解除或转移，仍由 human 清空。"
+    "与 business_role / decision_tier 分开，不改变派发、领取、完成、收取权限。"
 )
 CONTROLLER_ASSIGNMENT_UNSUPPORTED_NOTE = (
     "当前后端未返回主控指定字段（旧后端）：controller_assignment 为 supported=false / "
     "status=unsupported，member_id 与 version 均为 null；不得把缺失当成未指定，"
-    "也不得据此声称项目已指定主控或无人指定。"
+    "也不得据此声称项目已指定主控或无人指定。该字段已弃用，缺字段不影响任何协调资格，"
+    "受控等待也不读取它。"
 )
 CONTROLLER_ASSIGNMENT_UNKNOWN_STATUS_NOTE = (
     "后端返回了主控指定成员，但没有可识别的有效性状态：status=unknown，"
     "无法判断该指定当前是否有效，需读取方自行核对名册与成员状态，不得假定有效。"
+    "该字段已弃用，unknown 不影响任何协调资格。"
 )
 CONTROLLER_ASSIGNMENT_EFFECTIVE_STATUS_UNSUPPORTED = "unsupported"
 # 只读白名单：与 server.models.PROJECT_ASSIGNMENT_STATUSES 对齐；未知取值只报 unknown。
@@ -201,6 +206,20 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 class TalkToolError(RuntimeError):
     """A user-facing TALK tool failure."""
+
+
+class TalkApiHttpError(TalkToolError):
+    """TALK API 返回了 HTTP 错误状态码时的结构化出口（I-1）。
+
+    - 由 ``_api_request`` 的 ``HTTPError`` 分支抛出，**消息文本形态与旧版逐字一致**
+      （``TALK API HTTP <code>: <detail>``），旧调用方按文本处理不受影响；
+    - 额外携带 ``.status``，供 G8 按状态码判定业务拒绝（404），不脆弱解析整段错误文案；
+      其它 HTTP/网络失败仍按 ``api_error`` 分类。
+    """
+
+    def __init__(self, message: str, *, status: int) -> None:
+        super().__init__(message)
+        self.status = int(status)
 
 
 class _IdentityShapeError(TalkToolError):
@@ -258,7 +277,7 @@ def _api_request(
             detail = parsed.get("detail", parsed)
         except json.JSONDecodeError:
             pass
-        raise TalkToolError(f"TALK API HTTP {exc.code}: {detail}") from exc
+        raise TalkApiHttpError(f"TALK API HTTP {exc.code}: {detail}", status=exc.code) from exc
     except TimeoutError as exc:
         # 连接阶段或 getresponse/read 阶段的裸超时：归一为工具错误，不让裸异常逃出工具层。
         raise TalkToolError(_request_timeout_message(timeout)) from exc
@@ -470,7 +489,10 @@ def controller_mode_summary(project: JsonDict) -> JsonDict:
 
 
 def controller_assignment_summary(project: JsonDict) -> JsonDict:
-    """把项目详情里的长期主控指定整理成只读状态对象（C1b-S1，不做任何网络请求）。
+    """把项目详情里的历史主控指定整理成只读状态对象（C1b-S1 / D-1，不做任何网络请求）。
+
+    该字段已弃用：输出形状、status 取值与旧后端降级行为**保持不变**，供旧消费者有一个如实的
+    降级窗口，但它不再决定任何协调/调度，受控等待的门禁也不再读取它。
 
     调用方必须传入**同一次** ``GET /api/projects/{id}`` 的结果：与
     ``development_requirements`` / ``controller_mode`` 复用同一份响应，不新增请求。
@@ -607,7 +629,7 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
         "development_requirements": None,
         # 非项目路径没有项目模式意向：明确 null，不伪造 passive。
         "controller_mode": None,
-        # 非项目路径同样没有主控指定上下文：明确 null，不伪造“未指定”。
+        # 非项目路径同样没有（已弃用的）主控指定上下文：明确 null，不伪造“未指定”。
         "controller_assignment": None,
         # 非项目路径没有可靠的 Key 反查上下文：明确 null，且不额外发身份请求。
         "caller_identity": None,
@@ -985,6 +1007,45 @@ def _normalize_task_ids(values: Any) -> list[int]:
     return task_ids
 
 
+def _controlled_task_ids(values: Any) -> list[int]:
+    """受控 true 专用（D-3 / G7）的严格 task_ids 校验：先全量校验，再按首次出现顺序稳定去重。
+
+    - 必须**显式提供**（非省略/None）、为**数组**且**非空**；字符串/数字/对象整体、集合等一律拒绝；
+    - 元素必须是**严格正整数**：bool（True/False）、float（含 ``1.0`` 这类整数值浮点）、字符串
+      （含 ``"5"``）、None、0、负整数与其它类型**一律拒绝**，不做 ``int()`` 转换、不截断、不静默丢弃；
+    - **任一非法即整批报错并指明非法项**，绝不返回合法子集，也绝不退化成项目级范围查询；
+    - 全部合法后按首次出现顺序稳定去重（重复不是错误）。
+
+    调用位置固定在 G6（模式 active）之后、G8 逐任务核验之前：G3 之前的宽松归一化
+    ``_normalize_task_ids`` 只保留给 false/省略路径，旧语义不变。
+    """
+    if values is None:
+        raise TalkToolError(
+            "受控等待必须显式传入非空 task_ids（G7）：省略或 null 无法确定要跟进的具体任务"
+        )
+    if isinstance(values, (str, bytes)) or not isinstance(values, (list, tuple)):
+        raise TalkToolError(
+            "受控等待的 task_ids 必须是 JSON 数组（G7），不能是字符串/数字/对象/集合或其它类型，"
+            f"收到 {values!r}"
+        )
+    if not values:
+        raise TalkToolError("受控等待的 task_ids 不能为空数组（G7）：必须明确要跟进的具体任务")
+    invalid: list[Any] = []
+    task_ids: list[int] = []
+    for raw in values:
+        if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+            invalid.append(raw)
+            continue
+        if raw not in task_ids:
+            task_ids.append(raw)
+    if invalid:
+        raise TalkToolError(
+            "受控等待的 task_ids 必须是严格正整数数组（G7）：不接受 bool、浮点（含 1.0）、字符串、"
+            f"null、0 或负整数；非法项 {invalid!r} 整批拒绝，不等待合法子集"
+        )
+    return task_ids
+
+
 def _wait_task_reference(task: JsonDict) -> JsonDict:
     """任务进入模型上下文的有界摘要：只保留状态与引用字段，不含正文和历史。"""
     return {field: task.get(field) for field in _WAIT_TASK_REFERENCE_FIELDS}
@@ -1229,12 +1290,17 @@ def _wait_tasks_controlled(
     project_id: str | None,
     timeout_seconds: Any,
 ) -> JsonDict:
-    """受控等待（C2-A1）：G1–G7 进入门禁 + 30 秒重读 + 单次 deadline 全记账。
+    """受控等待（发起者门禁 G1–G8）：进入门禁 + 30 秒模式重读 + 单次 deadline 全记账。
 
+    进入门禁顺序固定：G1 项目上下文 → G2 显式有限正数 timeout → G3 按 API Key 反查 agent 身份
+    → G4 human 凭据拒绝 → G5 服务端返回模式字段 → G6 requested_mode=active（用 G5 同一次响应判定，
+    零新增请求）→ G7 task_ids 严格校验与稳定去重（位置固定在 G6 之后）→ G8 按去重顺序逐唯一 ID
+    各发恰好一次任务 GET，核验存在/可见/同项目/created_by==调用者，任一不符整批拒绝、不等待合法子集。
+    协调资格只依据任务 ``created_by``：target、业务角色、模型名、终端名与旧的固定主控指定都不是资格。
     失败策略只有两类：进入期=报错（不轮询、不降级），运行期=显式原因正常退出
-    （matched / mode_changed / controller_changed / timeout），API 错误=显式抛错（api_error）；
-    运行期的任务轮询节点与 30 秒重读节点走同一 api_error 出口（带真实 elapsed/rounds，
-    并落恰好一条 ``return_reason=api_error`` 统计）。
+    （matched / mode_changed / timeout；``controller_changed`` 已随固定主控退役），
+    API 错误=显式抛错（api_error）；运行期的任务轮询节点与 30 秒重读节点走同一 api_error 出口
+    （带真实 elapsed/rounds，并落恰好一条 ``return_reason=api_error`` 统计）。
     本函数全程只读：不修改任务状态、不取消在途任务、不收取，也不伪造 effective_mode 或调度互斥。
     """
     # G1 项目上下文
@@ -1250,12 +1316,15 @@ def _wait_tasks_controlled(
         for status in (workflow_statuses or DEFAULT_WAIT_WORKFLOW_STATUSES)
         if str(status).strip()
     }
-    selected_task_ids = _normalize_task_ids(task_ids)
+    # R-6 / D-3：true 路径的 selected_task_ids 初始为 None，仅在 G7 全量校验与稳定去重通过后才赋值；
+    # 因此 G3–G6 失败与 G7 非法失败的 entry JSONL 写 task_ids=null（不落原始非法输入、不部分保留合法子集），
+    # G8 失败则记录完整已合法去重列表（ID 来自调用者，不来自任务响应）。
+    selected_task_ids: list[int] | None = None
 
     stats: JsonDict = {"http_requests": 0}
     started_monotonic = _monotonic()
     started_at = datetime.now(timezone.utc)
-    # 单次 deadline 从开始核验起算：身份 GET、项目 GET、轮询 GET、重读 GET、sleep 全部计入。
+    # 单次 deadline 从开始核验起算：身份 GET、项目 GET、逐任务核验 GET、轮询 GET、重读 GET、sleep 全部计入。
     deadline = started_monotonic + effective_timeout
     poll_rounds = 0
     poll_interval = WAIT_INITIAL_POLL_INTERVAL_SECONDS
@@ -1275,8 +1344,8 @@ def _wait_tasks_controlled(
 
         - G1/G2 在发出任何 HTTP 前就直接报错，不写本记录（没有任何计数可记）；
         - ``return_reason`` 只在本次拒绝由 TALK API/网络错误引起时写 ``api_error``；
-          纯参数或配置性拒绝（G3 预算不足、G4、G5 缺字段、G6、G7）写 ``null``，
-          因为它们不产生等待返回结构，也不是 API 错误；
+          纯参数或配置性拒绝（G3 预算不足、G4、G5 缺字段、G6、G7 非法输入、G8 业务拒绝/核验预算耗尽）
+          写 ``null``，因为它们不产生等待返回结构，也不是 API 错误；
         - 记录里保留 ``entry_gate`` 与 ``entry_error``，便于按门禁号追溯为什么没有开始等待。
         """
         _record_wait_stats(
@@ -1300,7 +1369,7 @@ def _wait_tasks_controlled(
         )
         raise TalkToolError(message)
 
-    # ---- 进入门禁 G3–G7：任一不过报错，不执行任何等待，也绝不静默降级为普通等待 ----
+    # ---- 进入门禁 G3–G8：任一不过报错，不执行任何等待，也绝不静默降级为普通等待 ----
     if remaining() <= 0:
         record_entry_failure(
             "G3",
@@ -1335,7 +1404,7 @@ def _wait_tasks_controlled(
         record_entry_failure(
             "G5",
             "受控等待进入核验失败（G5）：读取项目前剩余预算已耗尽，"
-            "未完成模式/指定核验，按进入错误返回且不开始普通等待",
+            "未完成模式字段核验，按进入错误返回且不开始普通等待",
             api_error=False,
         )
     try:
@@ -1354,77 +1423,129 @@ def _wait_tasks_controlled(
     last_project_read = _monotonic()
     project_payload = project if isinstance(project, dict) else {}
     mode = controller_mode_summary(project_payload)
-    assignment = controller_assignment_summary(project_payload)
-    if not mode["supported"] or not assignment["supported"]:
+    # G5 只要求服务端返回模式字段：不再要求主控指定字段存在（旧字段缺失/无效只影响只读输出层降级）。
+    if not mode["supported"]:
         record_entry_failure(
             "G5",
-            "受控等待进入核验失败（G5）：当前服务未返回模式/主控指定字段，不支持受控等待；"
-            "缺失字段不猜测成 passive 或未指定",
+            "受控等待进入核验失败（G5）：当前服务未返回模式字段"
+            "（controller_mode / controller_mode_version），不支持受控等待；"
+            "缺失字段不猜测成 passive 或 active",
             api_error=False,
         )
-    if assignment["status"] != "assigned":
-        record_entry_failure(
-            "G6",
-            "受控等待进入核验失败（G6）：当前主控指定状态是 "
-            f"{assignment['status']}，不是 assigned",
-            api_error=False,
-        )
-    if str(assignment["member_id"]) != caller_member_id:
-        record_entry_failure(
-            "G7",
-            "受控等待进入核验失败（G7）：调用者 "
-            f"{caller_member_id} 不是当前指定主控 {assignment['member_id']}",
-            api_error=False,
-        )
+    # G6 模式必须是 active：复用 G5 的同一次项目响应判定，零新增请求，且前置到逐任务 GET 之前。
     if mode["requested_mode"] != "active":
         record_entry_failure(
-            "G7",
-            f"受控等待进入核验失败（G7）：项目 {effective_project_id} 的模式意向是 "
-            f"{mode['requested_mode']}，不是 active",
+            "G6",
+            f"受控等待进入核验失败（G6）：项目 {effective_project_id} 的模式意向是 "
+            f"{mode['requested_mode']}，不是 active；保存 active 只是模式意向，"
+            "缺失或未知取值同样按不支持处理，不猜成 active",
             api_error=False,
         )
+    # G7 严格输入校验与稳定去重：位置固定在 G6 之后、G8 之前，非法输入整批拒绝（任务 GET=0）。
+    try:
+        selected_task_ids = _controlled_task_ids(task_ids)
+    except TalkToolError as exc:
+        record_entry_failure("G7", str(exc), api_error=False)
+    # G8 逐唯一 ID 各发恰好一次任务 GET：存在、对调用者可见、同项目、created_by==调用者，任一不符整批拒绝。
+    # 核验通过的响应直接作为进入运行期后的**第一轮**任务集合，不重复 GET 同一批任务
+    # （与旧实现“身份+项目+每轮任务 GET”的计数口径一致：全部通过=2+N）。
+    verified_task_count = 0
+    verified_tasks: list[JsonDict] = []
+    total_task_ids = len(selected_task_ids)
+    for position, task_id in enumerate(selected_task_ids, start=1):
+        # 每个唯一 ID 发 GET 之前检查剩余预算；不足即按进入错误停止，绝不进入轮询。
+        if remaining() <= 0:
+            record_entry_failure(
+                "G8",
+                f"受控等待进入核验失败（G8）：任务核验进行到第 {position}/{total_task_ids} 个时剩余预算耗尽，"
+                "未完成核验，按进入错误停止且不进入轮询",
+                api_error=False,
+            )
+        try:
+            task = _api_request(
+                "GET",
+                f"/api/tasks/{int(task_id)}",
+                stats=stats,
+                timeout=next_request_timeout(),
+            )
+        except TalkApiHttpError as exc:
+            if exc.status == 404:
+                # 404：不存在与对调用者不可见同形，按业务拒绝（return_reason=null），
+                # 只回显调用者提交的 ID，不断言存在性、不泄露任务内容。
+                record_entry_failure(
+                    "G8",
+                    f"受控等待进入核验失败（G8）：任务 {task_id} 不存在或对当前调用者不可见",
+                    api_error=False,
+                )
+            record_entry_failure(
+                "G8",
+                f"受控等待进入核验失败（G8）：读取任务 {task_id} 时 TALK API 调用失败：{exc}",
+                api_error=True,
+            )
+        except TalkToolError as exc:
+            record_entry_failure(
+                "G8",
+                f"受控等待进入核验失败（G8）：读取任务 {task_id} 时 TALK API 调用失败：{exc}",
+                api_error=True,
+            )
+        if not isinstance(task, dict):
+            record_entry_failure(
+                "G8",
+                f"受控等待进入核验失败（G8）：任务 {task_id} 的响应不是任务对象，无法核验归属，整批拒绝",
+                api_error=False,
+            )
+        if task.get("project_id") != effective_project_id:
+            record_entry_failure(
+                "G8",
+                f"受控等待进入核验失败（G8）：任务 {task_id} 属于项目 {task.get('project_id')!r}，"
+                f"不是当前项目 {effective_project_id}",
+                api_error=False,
+            )
+        if task.get("created_by") != caller_member_id:
+            record_entry_failure(
+                "G8",
+                f"受控等待进入核验失败（G8）：任务 {task_id} 的发起者（created_by）是 "
+                f"{task.get('created_by')!r}，不是调用者 {caller_member_id}；"
+                "target、角色、模型与终端都不是协调资格",
+                api_error=False,
+            )
+        verified_task_count += 1
+        verified_tasks.append(task)
+    # G8 全部通过后才产生进入快照：只使用全部通过核验的事实（task_ids 来自调用者提交的合法去重列表）。
     entry_snapshot: JsonDict = {
         "requested_mode": mode["requested_mode"],
         "requested_version": mode["requested_version"],
-        "member_id": assignment["member_id"],
-        "assignment_version": assignment["version"],
-        "status": assignment["status"],
+        "caller_member_id": caller_member_id,
+        "task_ids": list(selected_task_ids),
+        "verified_task_count": verified_task_count,
     }
 
     def poll_round_tasks() -> list[JsonDict]:
-        """发请求前逐次检查剩余预算：remaining <=0 立即抛内部信号，不再发下一个 HTTP。"""
-        if selected_task_ids:
-            collected: list[JsonDict] = []
-            for task_id in selected_task_ids:
-                if remaining() <= 0:
-                    raise _WaitBudgetExhausted
-                collected.append(
-                    _api_request(
-                        "GET",
-                        f"/api/tasks/{int(task_id)}",
-                        stats=stats,
-                        timeout=next_request_timeout(),
-                    )
+        """运行期逐 ID 轮询：发每个请求前检查剩余预算，remaining <=0 抛内部信号。
+
+        受控 true 的 task_ids 已经过 G7 严格校验且非空（D-3），因此这里不再有“无 ID 时按项目拉取”
+        的分支；普通 false/省略路径的项目级轮询继续由 ``_wait_tasks_legacy`` 提供，行为不变。
+        """
+        collected: list[JsonDict] = []
+        for task_id in selected_task_ids or []:
+            if remaining() <= 0:
+                raise _WaitBudgetExhausted
+            collected.append(
+                _api_request(
+                    "GET",
+                    f"/api/tasks/{int(task_id)}",
+                    stats=stats,
+                    timeout=next_request_timeout(),
                 )
-            return collected
-        if remaining() <= 0:
-            raise _WaitBudgetExhausted
-        return _api_request(
-            "GET",
-            "/api/tasks",
-            params={
-                "target_member_id": None,
-                "status": None,
-                "workflow_status": None,
-                "project_id": effective_project_id,
-                "task_kind": None,
-            },
-            stats=stats,
-            timeout=next_request_timeout(),
-        )
+            )
+        return collected
 
     def recheck_project() -> tuple[str | None, str]:
-        """重读项目并比对进入快照：模式条件先判，指定条件后判；无变化返回 (None, "")。"""
+        """重读项目并比对进入快照：只关注模式字段存在性、模式值与版本；无变化返回 (None, "")。
+
+        不再读取、不再比对主控指定字段：created_by 创建即固定，运行期无需复核任务归属，
+        指定变化也不产生任何退出。
+        """
         nonlocal rechecks, last_project_read
         reread = _api_request(
             "GET",
@@ -1435,9 +1556,6 @@ def _wait_tasks_controlled(
         rechecks += 1
         last_project_read = _monotonic()
         current_mode = controller_mode_summary(reread if isinstance(reread, dict) else {})
-        current_assignment = controller_assignment_summary(
-            reread if isinstance(reread, dict) else {}
-        )
         if not current_mode["supported"]:
             return "mode_changed", "重读时项目响应不再包含模式字段（旧服务或字段失效）"
         if current_mode["requested_mode"] != entry_snapshot["requested_mode"]:
@@ -1450,24 +1568,6 @@ def _wait_tasks_controlled(
                 "mode_changed",
                 f"模式版本从 {entry_snapshot['requested_version']} 变为 "
                 f"{current_mode['requested_version']}",
-            )
-        if not current_assignment["supported"]:
-            return "controller_changed", "重读时项目响应不再包含主控指定字段（旧服务或字段失效）"
-        if current_assignment["version"] != entry_snapshot["assignment_version"]:
-            return (
-                "controller_changed",
-                f"主控指定版本从 {entry_snapshot['assignment_version']} 变为 "
-                f"{current_assignment['version']}",
-            )
-        if str(current_assignment["member_id"]) != str(entry_snapshot["member_id"]):
-            return (
-                "controller_changed",
-                f"主控指定从 {entry_snapshot['member_id']} 变为 {current_assignment['member_id']}",
-            )
-        if current_assignment["status"] != "assigned":
-            return (
-                "controller_changed",
-                f"主控指定状态变为 {current_assignment['status']}",
             )
         return None, ""
 
@@ -1566,27 +1666,34 @@ def _wait_tasks_controlled(
             f"也不伪装成 matched）：{exc}；已等待 {elapsed:.1f} 秒，轮询 {poll_rounds} 次"
         ) from exc
 
+    # 运行期第一轮复用 G8 核验响应；之后每轮按 task_ids 逐 ID 重新 GET。
+    pending_tasks: list[JsonDict] | None = verified_tasks
     while True:
         poll_rounds += 1
-        try:
-            tasks = poll_round_tasks()
-        except _WaitBudgetExhausted:
-            # R5：预算耗尽且未发出下一个请求 → 正常 timeout，返回最近一次成功完成的轮询集合
-            # （从未完成过任务轮询时为 tasks=[] / task_count=0）。
-            return finish(
-                timed_out=True,
-                reason="timeout",
-                polled=last_polled,
-                matched=[],
-                exit_detail="剩余预算不足，未再发出请求；返回最近一次成功完成的轮询集合",
-            )
-        except TalkToolError as exc:
-            fail_as_api_error(exc, stage="poll")
+        if pending_tasks is not None:
+            # 第一轮直接复用 G8 已核验的响应：同一批任务不在进入后立刻重复 GET。
+            tasks = pending_tasks
+            pending_tasks = None
+        else:
+            try:
+                tasks = poll_round_tasks()
+            except _WaitBudgetExhausted:
+                # R5：预算耗尽且未发出下一个请求 → 正常 timeout，返回最近一次成功完成的轮询集合
+                # （从未完成过任务轮询时为 tasks=[] / task_count=0）。
+                return finish(
+                    timed_out=True,
+                    reason="timeout",
+                    polled=last_polled,
+                    matched=[],
+                    exit_detail="剩余预算不足，未再发出请求；返回最近一次成功完成的轮询集合",
+                )
+            except TalkToolError as exc:
+                fail_as_api_error(exc, stage="poll")
         last_polled = tasks
         matched = [
             task for task in tasks if str(task.get("workflow_status") or "") in desired
         ]
-        # 固定检查顺序：任务命中（matched 优先）→ 30 秒重读（先模式后指定）→ deadline → sleep。
+        # 固定检查顺序：任务命中（matched 优先）→ 30 秒模式重读 → deadline → sleep。
         if matched:
             return finish(timed_out=False, reason="matched", polled=tasks, matched=matched)
         if (
@@ -1632,13 +1739,16 @@ def wait_tasks(
 
     - 默认（``controlled_wait`` 省略或 false）：与旧路径逐字段一致——最长/默认 600 秒、超出上限按
       600 秒生效并标注请求值，不发身份 GET、不做项目重读、返回结构无新字段。
-    - ``controlled_wait=true`` 是显式 opt-in 的受控等待：必须先通过 G1–G7 进入门禁（项目上下文、
-      显式有限正数 timeout_seconds、按 API Key 反查的 agent 身份、服务端支持模式/指定、
-      status=assigned、本人等于指定主控、requested_mode=active），任一不满足直接报错、不轮询、不降级。
-    - 受控路径进入后记录模式/指定的独立版本快照，每 30 秒重读项目一次；模式变化/版本变化/字段失效
-      返回 ``mode_changed``，主控更换/解除/失效/版本变化返回 ``controller_changed``；
-      受控路径的 ``return_reason`` 只可能是 matched / timeout / mode_changed / controller_changed，
-      API 错误照旧显式抛错，不新增 cancelled。
+    - ``controlled_wait=true`` 是显式 opt-in 的受控等待：必须先通过 G1–G8 进入门禁（G1 项目上下文、
+      G2 显式有限正数 timeout_seconds、G3 按 API Key 反查的 agent 身份、G4 human 凭据拒绝、
+      G5 服务端返回模式字段、G6 requested_mode=active、G7 显式非空严格正整数 task_ids 稳定去重、
+      G8 逐唯一 ID 核验存在/可见/同项目/created_by==调用者），任一不满足直接报错、不轮询、不降级，
+      也不等待合法子集。协调资格只依据任务 created_by（任务发起者归属），target/角色/模型/终端与
+      旧的主控指定都不是资格。
+    - 受控路径进入后记录 ``{requested_mode, requested_version, caller_member_id, task_ids,
+      verified_task_count}`` 快照，每 30 秒只重读项目模式字段一次；模式值/版本变化或字段失效返回
+      ``mode_changed``；受控路径的 ``return_reason`` 只可能是 matched / timeout / mode_changed
+      （``controller_changed`` 已随固定主控退役），API 错误照旧显式抛错（api_error），不新增 cancelled。
     - 成果提交（submitted）、完成（completed）、失败（failed）、需澄清
       （clarification_requested 等）等状态一旦出现立即返回，不等满超时。
     - 等待全部由程序轮询完成，等待期间不产生新的模型回合、也不经工具分发新增 get/list
@@ -1652,7 +1762,8 @@ def wait_tasks(
     - 同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），Windows 下
       客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态、不取消在途任务、不收取。
     - query_stats 给出本次调用的程序级实测计数（轮询轮次、HTTP 请求数、耗时、返回原因）；
-      受控路径把身份 GET、项目 GET、每 30 秒重读 GET 与任务轮询 GET（含失败尝试）全部计入。
+      受控路径把身份 GET、项目 GET、G8 逐任务核验 GET、每 30 秒重读 GET 与任务轮询 GET
+      （含失败尝试）全部计入。
     """
     controlled = _normalize_controlled_wait(controlled_wait)
     if controlled:
@@ -1679,23 +1790,26 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "id / runtime / status / current_task_id / last_seen_at / pid，"
             "不返回历史实例、last_error 或既有 CLI 日志。"
             "顶层同时返回项目级最新开发要求 development_requirements（角色清单只出现一次，"
-            "不重复写进每个 Agent；无内容时为 null）：主控派发新任务前应先读取它与角色清单，"
+            "不重复写进每个 Agent；无内容时为 null）：任务发起者派发新任务前应先读取它与角色清单，"
             "再按该要求派发。"
             "顶层还返回只读的 controller_mode（与开发要求复用同一次项目读取）："
             "requested_mode / requested_version 是项目保存的模式意向与版本，"
-            "effective_mode 恒为 null、effective_status=not_bound，表示本版本没有主控会话绑定或"
+            "effective_mode 恒为 null、effective_status=not_bound，表示本版本没有发起者会话绑定或"
             "生效确认。保存 active 不等于已生效、不等于已唤回任何会话，也不授权自动等待、调度、"
             "派发或推进；默认协作仍是派发后结束、由用户通知后再取件，不得据此字段声称已唤回会话。"
             "非项目路径 controller_mode 为 null；旧后端缺模式字段时为 supported=false / "
             "effective_status=unsupported，不能当成 passive 或已支持。"
             "顶层还返回只读的 controller_assignment（同样复用这一次项目读取）："
-            "member_id / version 是项目长期保存的主控指定与独立版本，status 是服务端按当前名册与"
+            "**该字段已弃用，不再决定任何协调或调度，也不产生任何权限**。"
+            "member_id / version 是项目历史保存的主控指定与独立版本，status 是服务端按当前名册与"
             "成员事实算出的配置有效性（unassigned / assigned / not_in_roster / member_disabled / "
             "member_missing / not_agent）。assigned 只表示该成员已注册、未禁用、在该项目名册中且为 "
             "agent，**不代表在线、已确认(ACK)、会话已生效或获得任何额外权限**；本版本没有会话 "
             "token、租约、心跳或后台线程，指定不自动唤醒进程，也不改变派发/领取/完成/收取权限。"
-            "无效状态不会自动解除或转给他人，仍由 human 显式清空；只有 human 能写入该指定，"
-            "agent 侧为只读。非项目路径 controller_assignment 为 null；旧后端缺字段时为 "
+            "协调资格只依据具体任务的 created_by（任务发起者归属），受控等待既不读取也不比对"
+            "该指定；无效状态不会自动解除或转给他人，仍由 human 显式清空；只有 human 能写入该指定，"
+            "agent 侧为只读。字段形状与旧后端降级行为保持不变，供旧消费者如实降级。"
+            "非项目路径 controller_assignment 为 null；旧后端缺字段时为 "
             "supported=false / status=unsupported，不能当成未指定或已指定。"
             "顶层还返回 caller_identity（项目路径新增一次 GET /api/members/me，按 API Key 反查，"
             "不使用 TALK_MEMBER_ID、模型名或会话标签自证）：固定三键 {member_id, kind, note}，"
@@ -1798,20 +1912,30 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "客户端单工具超时必须大于最长等待，建议 >= 660 秒（本工具读不到宿主客户端预算，"
             "唯一强制上限是 600 秒 clamp）。"
             "受控等待是显式 opt-in 参数 controlled_wait（默认 false，缺省/ false 时与旧行为逐字段一致，"
-            "不产生身份 GET、不做项目重读、返回结构无新字段）：true 时必须通过 G1–G7 进入门禁"
-            "（项目上下文 / 显式有限正数 timeout_seconds（bool、非数值、NaN、inf、0、负值一律拒绝，"
-            "不采用 600 默认值）/ 按 API Key 反查的 agent 身份 / 服务端返回模式与主控指定字段 / "
-            "controller_assignment.status=assigned / 调用者等于指定主控 / requested_mode=active），"
-            "任一不满足直接报错，不轮询、不静默降级为普通等待。门禁通过后进入快照记录模式与指定的"
-            "独立版本，先查任务命中（matched 优先），再按 30 秒节奏重读项目（先模式后指定）："
-            "模式变化/版本变化/字段失效返回 mode_changed，主控更换/解除/失效/版本变化返回 "
-            "controller_changed，预算耗尽返回 timeout。受控路径的单次 deadline 从开始核验起算，"
-            "覆盖身份 GET、项目 GET、轮询 GET、重读 GET 与 sleep：发任何 HTTP 前剩余预算 <=0 就"
-            "不再发请求并按 timeout 返回最近一次成功完成的轮询集合（从未完成轮询则 tasks=[]、"
-            "task_count=0），否则该请求超时取 min(10 秒, 剩余预算)；受控路径的连接受阻、响应头/响应体"
-            "读取阶段超时与网络 OSError 一律归一为 TalkToolError（api_error），不伪装成正常 timeout，"
-            "也不伪装成 matched；socket 单请求超时不等于任意慢速响应的端到端硬中断。"
-            "受控路径的身份/项目/重读/轮询 GET（含失败尝试）全部计入 query_stats.http_requests，"
+            "不产生身份 GET、不做项目重读、返回结构无新字段）：true 时必须通过 G1–G8 进入门禁"
+            "（G1 项目上下文 / G2 显式有限正数 timeout_seconds（bool、非数值、NaN、inf、0、负值一律拒绝，"
+            "不采用 600 默认值）/ G3 按 API Key 反查的 agent 身份 / G4 human 凭据拒绝 / "
+            "G5 服务端返回模式字段（缺字段=不支持，不猜 passive 或 active）/ "
+            "G6 requested_mode=active（用 G5 同一次项目响应判定，零新增请求；passive 时零任务 GET）/ "
+            "G7 显式非空 task_ids 且元素全为严格正整数（bool、浮点含 1.0、字符串、null、0、负整数整批拒绝，"
+            "全部合法后按首次出现顺序稳定去重）/ G8 按去重顺序逐唯一 ID 各发恰好一次 GET，"
+            "核验任务存在、对调用者可见、属于本项目且 created_by=调用者，任一不符整批拒绝、不等待合法子集），"
+            "任一不满足直接报错，不轮询、不静默降级为普通等待。协调资格只依据任务 created_by"
+            "（任务发起者归属）：target、业务角色、模型名、终端名与旧的主控指定都不是协调资格，"
+            "旧指定字段缺失/无效/变化也不影响门禁或退出。门禁通过后返回快照 controlled_entry="
+            "{requested_mode, requested_version, caller_member_id, task_ids, verified_task_count}，"
+            "先查任务命中（matched 优先），再按 30 秒节奏重读项目模式字段：模式值变化/版本变化/字段失效"
+            "返回 mode_changed；运行期只按模式字段判定退出，不再读取或比对旧主控指定；预算耗尽返回 timeout。"
+            "受控路径的单次 deadline 从开始核验起算，覆盖身份 GET、项目 GET、G8 核验 GET、轮询 GET、"
+            "重读 GET 与 sleep：发任何 HTTP 前剩余预算 <=0 就不再发请求并按 timeout 返回最近一次成功完成的"
+            "轮询集合（从未完成轮询则 tasks=[]、task_count=0），否则该请求超时取 min(10 秒, 剩余预算)；"
+            "G8 核验途中剩余预算耗尽按进入错误停止，"
+            "不进入轮询。受控路径的连接受阻、响应头/响应体读取阶段超时与网络 OSError 一律归一为 "
+            "TalkToolError（api_error），不伪装成正常 timeout，也不伪装成 matched；G8 的任务 404 是业务拒绝"
+            "（return_reason=null，措辞只说“不存在或对当前调用者不可见”并回显调用者提交的 ID，"
+            "不泄露任务存在性或内容）；其它 HTTP/网络失败按 api_error。"
+            "socket 单请求超时不等于任意慢速响应的端到端硬中断。"
+            "受控路径的身份/项目/G8 核验/重读/轮询 GET（含失败尝试）全部计入 query_stats.http_requests，"
             "并只额外返回 controlled_wait / controlled_entry / controlled_rechecks 三个字段。"
             f"受控预算需调用方自行匹配宿主客户端预算（预留 {WAIT_CLIENT_MARGIN_SECONDS:.0f} 秒余量，"
             "桌面 65 秒上限时建议 <=60 秒）。身份门禁只是桥内 advisory 自我保护，不代表在线、"
@@ -1824,7 +1948,15 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "type": "object",
             "properties": {
                 "project_id": {"type": "string"},
-                "task_ids": {"type": "array", "items": {"type": "integer"}},
+                "task_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": (
+                        "要跟进的任务 ID。非受控路径沿用旧归一化（字符串/浮点可被转换、重复静默去重）；"
+                        "controlled_wait=true 时改为严格语义：必须显式提供、非空，元素必须是严格正整数"
+                        "（bool/浮点含 1.0/字符串/null/0/负数整批拒绝），全部合法后按首次出现顺序稳定去重。"
+                    ),
+                },
                 "workflow_statuses": {"type": "array", "items": {"type": "string"}},
                 "timeout_seconds": {
                     "type": "number",
@@ -1840,8 +1972,10 @@ TOOL_SCHEMAS: list[JsonDict] = [
                     "type": "boolean",
                     "default": False,
                     "description": (
-                        "显式 opt-in 的受控等待开关（默认 false）。true 时先走 G1–G7 进入门禁并启用 "
-                        "30 秒项目重读与单次 deadline 记账；false/省略时行为与旧路径完全一致。"
+                        "显式 opt-in 的受控等待开关（默认 false）。true 时先走 G1–G8 进入门禁"
+                        "（含显式非空严格正整数 task_ids 与逐任务 created_by 归属核验）并启用 "
+                        "30 秒模式重读与单次 deadline 记账；false/省略时行为与旧路径完全一致，"
+                        "task_ids 仍是旧的宽松归一化语义。"
                     ),
                 },
             },

@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #173独立代码复核通过，收取I-1；当前MCP仍旧版待重连
+
+- 用户通知“173 ok”。msg2675含前言+完整JSON，MCP摘要为unknown/自由文本，不从runner succeeded推业务结论；按项目兼容流程读取本地development.json并summary --expect-task-id 173校验通过，complete、10完成/0未完成/0blocked、7验证/5限制。稳定result_message_id2675/SHA806e422fdde69227b48394acf82a306b3a1595047f66d14aa75f0d25674c9464分两页无损读4254字符，嵌入JSON与本地包去schema比较一致；原消息/receipt/接受记录存.tmp/initiator-mode-tools-receipt/，原MCP unknown保持不追改。
+- Kimi独立实读四份代码完整456/5/925/3行差异，六模块162项独立复跑无失败/错误/跳过，七项自写探针含宽松G7变异检出均通过。G1–G8/created_by与项目归属、严格输入/去重/日志、结构化404分类、首轮复用/模式重读/快照、false19键/query_stats/HTTP/错误文本、九工具/服务端权限和终端清单同步均通过，主控原25对象hash/大小全匹配，未重复整套测试或改代码。
+- Codex对具体预算疑点补读正式§4.4、源码局部和独立P4证据，接受末次响应已完成整批核验且无需后续GET时进入首轮正常timeout；中途未核验完成仍按入口错误。该边界与“每次GET之后、发下一请求之前核预算”和socket非硬截止一致，补文档明确，不改变实现或原复核。tuple仅内部Python可达/公开JSON不产tuple，200非对象/缺归属安全拒绝，均接受独立结论。
+- 收取173/172 completed（服务端原记录未补时区）：#173/msg2675：2026-10-06T15:55:30.704157；#172/msg2674：2026-10-06T15:55:35.028860。#173服务端unknown与本地有效complete并存，#172结构化complete自报/独立通过分开；旧设计166–171和167/169 partial原结论不追改。
+- O1 WAIT_COUNTING_NOTE未显式枚举G8 GET但计数正确、O2 timeout_seconds描述超600报错与实际clamp不符且为旧基线文本，非阻塞登记I-3文字同步，本轮不顺手改已审代码。
+- 本轮真实只读加载检查：ALL_TOOLS wait描述仍G1–G7/含controller_changed，list_agents无弃用且实际mode/assignment note仍主控会话/固定指定原说明。当前连接尚未加载I-1，不能用源码/--check自测充加载完成。caller_identity=human:bobo，effective null/not_bound、旧UI/自身Key/真实主动链路未变；client T/W/取消排队边界未新验证。
+- 同步正式合同/实施计划/模块与项目简报/终端加载说明及进度，区分源码已通过和连接未加载、I-2/I-4待验收；四已审代码与正式记录本轮统一提交常规推送，原临时交付保留。依据实施计划“I-2必须晚于I-1加载”，本片收尾后先由用户重连TALK MCP（必要时重开会话刷新目录），再核目录/运行时注记/身份/短只读路径，不越过门禁新派I-2、不额外生产等待/试派。后续角色Key/指南/模型展示/命名按原排期。
+
 ## 2026-10-06 #172工具交付，派#173独立代码复核
 
 - 用户通知“172 ok”。#172/msg2674完整合法talk-delivery-1/自身号匹配、complete自报，11完成/0未完成/0blocked，7文件/10验证/7限制，无省略；runner succeeded/submitted，finished_at=2026-10-06T14:45:27.610430（服务端原记录未补时区）。只是开发者结论，未独立验收/收取/提交。

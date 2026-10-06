@@ -1,33 +1,33 @@
 # Project Progress
 
-Updated: 2026-10-06 (Asia/Shanghai)。#172 I-1工具实现已交付，自报六模块162项通过，尚未独立验收；#173已派Kimi代码复核。四份业务/测试改动未提交，#172未收取。设计合同已发布，旧UI/生产MCP/自身Key/真实主动链路仍未验收。
+Updated: 2026-10-07 (Asia/Shanghai)。I-1代码经#173独立复核通过，#172/#173已收取；四份工具/测试代码与正式说明本轮统一收尾。当前TALK MCP仍旧G1–G7/旧指定说明，加载未通过；按实施计划，I-2页面退役须晚于I-1加载，下一步先重连核验。
 
 ## 当前身份与协作
 
-- 项目D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex。Codex决策负责范围/裁决/正式文档/Git；派前再次读取development_requirements，DeepSeek后端/其它、Kimi独立复核，caller_identity仍human:bobo。
-- 开发已暂停，审查期间业务只读，不边开发边审查；Codex不操作浏览器。默认派后结束、用户通知后取件，顶层最小参数不附子任务字段/手写编号。
+- 项目D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex。Codex决策负责范围/裁决/正式文档/Git；最新要求仍DeepSeek后端/其它、Kimi交叉复核，caller_identity仍human:bobo。
+- 默认派后结束、用户通知后取件，开发暂停后审查，Codex不操作浏览器；当前没有新派任务，不为刷新加载重复设计或生产试派。
 
-## 当前切片：#173 I-1独立代码复核待交付
+## I-1收尾结论
 
-- 用户通知“172 ok”。#172/msg2674完整合法talk-delivery-1/自身号匹配/complete自报，11完成/0未完成/0blocked，7文件/10验证/7限制，无省略，runner succeeded/submitted，不等于独立通过。开发交付.tmp/initiator-mode-tools/{implementation.md,development.json,run_tests.py,test-log.txt}，未收取/未提交。
-- 实际改四文件：bridges/talk_task_tools.py、bridges/talk_terminal_mcp.py、tests/test_talk_controlled_wait.py、tests/test_talk_task_tools.py，1074增/315删。实现G1–G8/created_by与project核验/严格ID/结构化HTTP404/日志与计数/模式重读去指定依赖/首轮响应复用/兼容弃用注记及发起者文案；全部待独立源码审查。
-- Codex实看terminal_mcp --check的G1–G8清单及注释最小同步，明确将原可写清单外这一处配套改动纳本片保留并独立复核，不扩大终端配置范围。talk_send_mcp未改，server/web/DB/权限/Key/模式/共享服务未改。
-- #173“173-发起者受控等待工具独立复核”给agent:kimi，初始queued/assigned，Hall group:task-d4b111b836824eafa7b68a66f061a71f。包.tmp/initiator-mode-tools-review-dispatch/task.md；派前25对象大小/SHA、四份Git旧源码快照及development.diff（114128B）已落盘。
-- 开发基线7ce331937a6b7eaae197cfcbd0886a14d0879f37/业务9272020；派审HEADc2283b8d69738bcf740e48dd6005eb661f20097a，7ce→c228仅三份主控派发记录，代码差异只上述四文件；原17派发来源未改项逐一匹配，主控不重复完整探索/自测。
-- 复核只新增.tmp/initiator-mode-tools-review/{review.md,development.json}及独立探针/日志，实际代码只读；按A–I独立审完整差异与证据，完整复跑六个相关模块，针对预算/错误/首轮复用/混合归属补必要探针。无缺口才complete，有问题partial交回DeepSeek，不能审查时顺手改码。
-- 特别核对G8每请求前后/最后一次响应跨deadline与进入错误边界、真实elapsed/计数/F-1；G8响应复用首轮与poll_rounds/模式重读/命中优先是否符合合同；list/tuple内部判断与公开严格数组边界、异常200响应fail-closed分类。这些为待独立判断，不从开发者理由推通过。
+- 用户通知“173 ok”。原msg2675有前言+JSON，MCP摘要unknown保持；本地development.json经talk_workflow summary --expect-task-id 173校验complete，10完成/0未完成/0blocked、7验证/5限制。原4254字符消息分两页稳定SHA读取，与本地报告去schema比较完全一致；原消息SHA806e422fdde69227b48394acf82a306b3a1595047f66d14aa75f0d25674c9464，receipt见.tmp/initiator-mode-tools-receipt/。
+- Kimi独立逐行审四份实际代码，六模块162/162通过（37/17/12/44/31/21）、七项探针通过（含G7宽松变异检出）；Codex合看接受I-1源码/隔离验证，终端--check G1–G8配套同步在已确认范围。原25对象大小/SHA收尾前全匹配，四代码未被主控改写。
+- 新受控G1–G8按created_by/project整批核验；G7严格ID/去重/计数和入口IDs日志、结构化HTTP404、模式重读去assignment依赖、首轮复用、兼容弃用/发起者文案通过。false普通等待/九工具/服务端权限/CAS不变。
+- 预算边界裁决：每次后续GET前须有剩余预算，未完成整批核验时耗尽按入口错误；末次响应已全部归属核验且不再发新GET，按已验探针P4进入首轮并正常timeout返回已核验集合，属于socket非硬截止下的完成响应边界，不扩大到未核验集合。文档补明这一路，未改代码或原复核。
+- 本轮收取completed（服务端原记录未补时区）：#173/msg2675：2026-10-06T15:55:30.704157；#172/msg2674：2026-10-06T15:55:35.028860。原173服务端unknown/本地有效complete并存，不追改；设计166–171已收取，旧167/169 partial保持。
+- 非阻塞O1计数说明未显式枚举G8核验GET、O2 timeout schema文案超600报错与实际clamp不符（基线旧文本），登记I-3文字同步，不为此重开功能返工。
 
-## 验证与限制
+## 当前加载证据与未验收
 
-- 开发者自报controlled_wait37/task_tools17/terminal_mcp12/assignment44/mode31/requirements21，合计162通过；假HTTP/模拟时钟与真实隔离SQLite服务归属和只读性、false旧19键/query_stats/错误兼容通过。主控未重复执行，Kimi需独立看测试质量/启动器发现计数退出码及复跑，不把自报ok=True当验收。
-- 程序源码与运行中MCP分开：本片未重连MCP、未改真实Key/模式、未做生产试派/长等待，旧固定主控UI仍在，effective null/not_bound，I-0/I-2/I-3/I-4未齐。DeepSeek65秒/W50、CodexW300/真实T未新核验、Kimi660000模板与取消/排队/非硬截止边界保持。
-- 设计链166–171已收取，171独立R-1..R-6通过，旧167/169 partial原记录不改；正式CONTROLLER_MODE_DESIGN/INITIATOR_MODE_IMPLEMENTATION_PLAN及旧固定主控归档是当前依据。#164/#165两条页面反馈已人工验收，不外推全部实机边界。
-- 主控本轮仅提交三份交付/范围/派审记录，四份功能改动不暂存/不提交，待独立复核后单独收尾。usage-gate此前continue但精确百分比null，不臆测具体额度。
+- 本轮实际工具目录仍G1–G7且含controller_changed；talk_list_agents实时assignment/mode note仍旧固定主控措辞，无弃用前缀。源码通过不代表该连接已加载。TERMINAL_MCP新增I-1加载验收说明，重连后需新目录G1–G8与实际弃用/发起者注记一致，再做短预算只读路径检查。
+- 当前human:bobo未换自身Agent Key、旧固定主控UI未退役，effective_mode=null/not_bound；I-0/I-2/I-3/I-4未齐，真实主动链路未验收，不自动启用主动/唤醒/续等。DeepSeek65秒/W50、CodexW300/真实T未新核验、Kimi660000模板及同步stdio/取消排队/非硬截止边界保持。
+- 173仅源码/隔离/假HTTP假时钟验证，未重连MCP/真实Key/生产等待。#164/#165两条页面反馈已人工验收，不外推全部页面和真实链路边界。
+- 功能与正式文档通过差异检查后本轮统一提交/常规推送；实际提交见Git。精确额度百分比此前null，不臆测；本片收尾后暂停等待外部连接刷新。
 
 ## 下一步与索引
 
-1. 用户通知#173完成后读取完整交付与必要代码/测试证据，裁决实际缺口；通过才收取#172/#173、更新实施状态、提交功能代码和常规推送。若有缺陷交回开发者，原失败不追改。
-2. I-1代码通过后仍需MCP加载检查，按合同I-2随后退役UI；I-1/I-2串行独立复核但同一人工验收轮，真实I-4需身份/工具/UI/指南齐备，不直接实施旧固定主控C2-C。
-3. 模型名称获取/上报/页面替代裸ID另片，member_id仍内部身份键；成员默认/自定义命名留全角色页。当前不扩自动唤醒/权限/运行器范围。
+1. 重连当前TALK MCP入口（必要时重开会话刷新目录），再说“继续项目”；先核对G1–G8/九工具/运行时新注记/服务端caller_identity，短预算只读验证及后续查询。不得把目录/短路径检查当真实主动宿主适配。
+2. I-1加载确认后再按当次开发要求派I-2给Kimi、DeepSeek独立复核；I-1/I-2同一人工验收轮。I-0身份步骤及I-3指南/约定另片，I-4需自身身份/工具/UI/指南齐备。
+3. 本片开发.tmp/initiator-mode-tools/，独立复核.tmp/initiator-mode-tools-review/，派审25对象/四基线/差异.tmp/initiator-mode-tools-review-dispatch/，原消息与接受溯源.tmp/initiator-mode-tools-receipt/；旧报告不重复取件。
+4. 模型名称获取/上报/页面替代裸ID另片，member_id仍内部身份键；默认/自定义命名留全角色页，不扩自动唤醒/权限/运行器范围。
 
-恢复指令：继续项目。当前#173待通知，#172未收取/功能未提交，不重复派发或边审边改。
+恢复指令：继续项目。I-1源码已通过并收取，当前MCP加载待重连核验；不直接越过加载门禁开启I-2。

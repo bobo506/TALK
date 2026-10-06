@@ -1053,7 +1053,8 @@ class TalkWaitTaskTests(RouteTestCase):
         )
         for removed in ("wait_tool_calls", "get_task_tool_calls", "list_tasks_tool_calls"):
             self.assertNotIn(removed, result["query_stats"])
-        self.assertIn("主控", result["counting_note"])
+        self.assertIn("任务发起者（调用方）", result["counting_note"])
+        self.assertNotIn("主控", result["counting_note"])
         self.assertGreaterEqual(wall, 2.9)
         self.assertLess(wall, 20)
         self.assertGreaterEqual(result["query_stats"]["poll_rounds"], 3)

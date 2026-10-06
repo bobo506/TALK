@@ -235,3 +235,11 @@ DeepSeek #42/#44 实现返修、Kimi #43/#45 独立复核；最终 140 项定向
 
 
 显式限长兼容路径：文本实际裁剪按 `text_truncated` 与 `read_more.omitted` 的 `source=summary_text/reason=text_limit` 标明；JSON 预算缩减预览用 `source=preview/reason=json_limit`，不等同文本裁剪。显式预算过紧可进入可见的最小摘要兜底。默认路径必要内容不因预算静默丢弃；旧自由文本仍仅作最多 300 字符预览、业务结论 unknown，完整原文可 detail 补读。分页不能恢复上传前已经丢失的内容。
+
+
+### I-1发起者受控等待（2026-10-06，源码独立复核通过；当前连接待加载）
+
+- DeepSeek #172实现经Kimi #173独立实际代码复核通过；六相关模块162项及七独立探针通过，172/173已收取。173原消息含前言，服务端摘要unknown；本地交付校验与嵌入报告一致，原记录保留。
+- 新true门禁G1–G8：服务端身份为agent、项目模式active、显式严格非空正整数IDs全量校验后稳定去重、逐任务同项目且created_by==caller整批核验。指定字段不再参与资格/重读/退出；快照五键，重读仅模式/版本，controller_changed退役。兼容assignment只读字段保留弃用注记，human PATCH权限/CAS不变。
+- G8结构化HTTP404业务拒绝/null，其它API错误独立统计；完整校验前entry.task_ids=null，通过后只记合法去重输入；false/省略旧路径、九工具、默认/上限600和服务端权限保持。末次响应已完成整批核验的迟返回按正常timeout边界处理；未完核验不得进入运行期。
+- 当前主控连接仍旧G1–G7及旧注记，实际新程序未加载；加载检查见[TERMINAL_MCP](../guides/TERMINAL_MCP.md#i-1加载验收2026-10-06源码通过当前连接待刷新)。前述C2-A1/C2-B段保留当时历史，不再作为新I-1固定指定资格依据。旧UI退役I-2/Key切换I-0/指南I-3/真实消费者I-4待后续，effective仍null/not_bound。
