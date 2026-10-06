@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-06 重开窗口恢复，Codex连接C2-A1加载检查通过
+
+- 用户要求“继续项目”；恢复项目背景、当前进度与AGENTS决策身份，读取终端预算/重连验收要求。开工HEAD `11977a87ec4a10cc3e4af0cab52ccafc237d256a`，工作区干净，与origin同分支跟踪引用一致，远程为授权的bobo506/TALK。
+- 当前TALK工具目录共九个，wait已暴露controlled_wait；真实项目list_agents返回caller_identity三键，Key身份human:bobo/kind human/note null。模式passive/version0，主控指定agent:codex/version13/assigned，effective null/not_bound。项目最新开发要求仍Kimi文字/设计/交互/前端、DeepSeek后端/其他，双方交叉复核，Codex范围与收尾；实例上报不作为已核验存活证据。
+- 用本人可读已完成#159，显式timeout_seconds=5、controlled_wait=false，返回matched、timed_out=false、workflow completed、msg2661；程序elapsed_seconds=0.016，poll_rounds=1/http_requests=1。随后相同历史任务和5秒预算、controlled_wait=true，预期按G4明确拒绝human凭据。再调用list_agents成功，确认正常返回/门禁拒绝后当前连接可查询。没有新建任务、重复收取或修改凭据/模式/指定。
+- 当前Codex连接加载卡点解除；这些短预算检查不等于真实主动等待适配通过。客户端实际长预算未重核，300秒调用、正常等待到期、网络/API错误、客户端超时/取消及排队恢复、DeepSeek桌面目录刷新均未在本轮验证；不外推660秒能力，不测试生产长等待，不启停/重载服务、不操作浏览器。
+- 本轮仅更新PROGRESS/HISTORY真实恢复证据，无业务代码修改和新任务派发。下一切片C2-B仍由Kimi实现/DeepSeek独立复核，任务包带角色“参与任务”上方双横线仅保留一条；C2-C消费者/真实主动链路等仍后续，页面效果由用户验收。
+- 两份进度按UTF-8写入，执行文档差异检查后中文提交并向授权分支常规推送；不重做代码审查或无关测试。
+
 ## 2026-10-06 按用户要求保存进度，准备重开窗口
 
 - 用户要求“先汇总下进度，我需要重开窗口”；本次仅维护进度快照与历史，不开启切片、不派任务或主动等待。
