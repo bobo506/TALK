@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-06 I-1工具实现派#172
+
+- 以正式合同提交7ce331937a6b7eaae197cfcbd0886a14d0879f37为干净基线，业务仍9272020；再次读取当前development_requirements，DeepSeek后端/其它、Kimi独立复核，caller_identity=human:bobo。
+- 派前17对象清单已保存.tmp/initiator-mode-tools-dispatch/source_manifest.json，含工具/分派、三测试、server归属证据、正式合同/计划/归档、模块/终端预算规范与171审查。最小顶层参数创建#172“172-发起者受控等待工具实现”，agent:deepseek，queued/assigned，Hall group:task-75a3a065edb045b29eb3109303e3ca22；实际server任务正文和开发要求快照存同目录task.md。
+- 范围tool主文件/controlled_wait与task_tools测试，必要时terminal_mcp断言；send_mcp预计不改。按新G1–G8/created_by+project整批核验/strict ID顺序与计数/入口日志/结构化HTTP404错误/模式重读去assignment依赖实施；false逐字段/九工具/服务端权限/CAS兼容，弃用只读输出及bridge新快照/工具措辞，171两条非阻塞清单建议一并覆盖。
+- 必要验证为完整本片受控/普通工具/terminal相关测试、假HTTP/模拟时钟与按需隔离端点，覆盖正式矩阵；不重复无关UI178/整库全量，不使用生产凭据/真实模式/长等待或重载共享服务。真实终端T/W/取消排队边界保留，不把源码单测当宿主验收。I-1/I-2后续同一人工验收轮，旧UI/自身Key/真实链路仍待后续。
+- 交付.tmp/initiator-mode-tools/{development.json,implementation.md}及必要证据，实际本号完整talk-delivery-1裸JSON/格式校验，完成暂停。由Codex收件再派Kimi独立实际代码审查，审查后裁决收取/Git/文档；开发与复核不并行。根代理只补三份正式派发记录，业务差异不入本轮文档提交，默认派后结束、用户通知#172完成再取件。
+
 ## 2026-10-06 #171六项复核通过，收取设计链并发布发起者合同
 
 - 用户通知“171完成”。#171/msg2673完整合法talk-delivery-1/自身号匹配、complete，10完成/0未完成/0blocked，2文件/9验证/5限制，无省略。DeepSeek独立实读R-1计数、R-2事件/符号、R-3常量、R-4校验位置/计数、R-5文档范围/历史、R-6日志来源均闭合，合看#167/#169已闭合部分无倒退，Codex接受设计。仅静态审查，不冒称未来实现测试或实机通过。

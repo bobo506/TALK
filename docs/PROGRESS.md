@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-06 (Asia/Shanghai)。#171独立定向复核通过，#166–#171设计链全部收取；发起者正式合同和实施计划已发布，旧固定主控合同归档。设计已确认，业务未实施；下一项I-1后端工具，待派DeepSeek。
+Updated: 2026-10-06 (Asia/Shanghai)。#171独立定向复核通过，#166–#171设计链全部收取；发起者正式合同和实施计划已发布，旧固定主控合同归档。设计已确认，业务未实施；#172已派DeepSeek实现I-1工具，待交付。
 
 ## 当前身份与协作
 
@@ -23,11 +23,17 @@ Updated: 2026-10-06 (Asia/Shanghai)。#171独立定向复核通过，#166–#171
 - DeepSeek65秒/W50、Codex现用W300/真实T未新核验、Kimi660000模板及同步stdio/取消排队/非硬截止边界保持；真实主动链路待I-4。
 - #164/#165两条页面反馈已人工验收，不外推键盘/:has/HTTP竞态/Agent只读/受控GET故障全部实机通过。
 
+## 当前切片：#172 I-1工具实现待交付
+
+- #172“172-发起者受控等待工具实现”给agent:deepseek，初始queued/assigned，Hall group:task-75a3a065edb045b29eb3109303e3ca22。派包.tmp/initiator-mode-tools-dispatch/task.md、派前17对象大小/SHA清单已落盘；干净正式合同基线7ce331937a6b7eaae197cfcbd0886a14d0879f37，业务9272020。
+- 仅tool主文件/受控与普通工具测试，必要时同步terminal_mcp测试；落实created_by/project逐任务门禁、G7严格输入/日志、404与api_error/预算分类、模式重读去指定依赖、兼容只读字段/新发起者文案及发布补充。不得改web/server/DB/API权限/Key/真实模式/共享服务。交付.tmp/initiator-mode-tools/，真实本号完整JSON、格式校验，完成暂停交Kimi独立审查。
+- 默认派后结束，用户通知#172完成再取件。不重复设计审查/预先收取或宣称程序/MCP/UI/真实消费者通过。主控随后仅补三份派发记录，执行者代码差异由下次交付/复核处理。
+
 ## 下一步与索引
 
-1. I-1按正式合同及计划派DeepSeek实现工具/测试，Kimi独立复核；只改bridge工具与相关测试，不改web/server/DB/Key/真实模式/服务。正式合同发布不要求真实Key先切换，I-4才需身份/工具加载/UI/指南齐备。
+1. #172按正式合同由DeepSeek实现，完成暂停后交Kimi独立复核；只改bridge工具与相关测试，不改web/server/DB/Key/真实模式/服务。正式合同发布不要求真实Key先切换，I-4才需身份/工具加载/UI/指南齐备。
 2. I-2在I-1复核及加载之后退役固定主控UI；I-0步骤准备、I-3指南文本可另片安排，I-1/I-2同一人工验收轮。新主动功能未验收，不直接沿旧C2-C。
 3. 旧交付.tmp/initiator-mode-design*/与对应-dispatch包原件保留；发布溯源.tmp/initiator-mode-publication/publication.json。最终源码/文本复核.tmp/initiator-mode-design-final-review/，30对象快照同名-dispatch目录。
 4. 模型名称运行端核验/上报与页面模型名替代裸ID另片，member_id仍内部身份键；默认/自定义命名留全角色页，不扩自动唤醒/权限/运行器范围。
 
-恢复指令：继续项目。设计链已收取、正式合同已发布，I-1待派；不重复设计审查。
+恢复指令：继续项目。设计链已收取、正式合同已发布，当前#172待通知；不重复派发或预先收取。
