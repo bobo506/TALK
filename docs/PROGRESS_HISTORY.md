@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-06 收到#160交付，派#161给DeepSeek独立复核
+
+- 用户通知“160已完成”。talk_get_delivery #160/msg2662为合法完整talk-delivery-1，自身task_id160匹配、自报complete、9完成/0未完成/0阻塞、验证6/限制3、10变更文件，无摘要省略；runner succeeded/workflow submitted/未收取。格式和自报通过不代表独立业务验收，#160保持未收取待复核。
+- 交付实现模式面板/意向和执行分行/human可保存-agent只读/专用CAS/409重读/旧服务降级/项目账号序号与saveToken/单分隔线/资源四处一致。开发者证据Node新增20+九文件合计150、Python四份页面契约12、后端定向98通过，JS语法检查通过；浏览器视觉/键盘、真实HTTP竞态未测。主控只读取必要交付索引/实现说明与实际差异，不重复完整审代码或测试。
+- 实际HEAD48939d2000feef5a9506855be977f2f228203105；与开发业务基线795dc19之间仅三份主控派发文档，业务源码无提交差异。implementation.md“HEAD未变/主控未补记”旧说明以Git事实为准，原件不改。当前9已跟踪业务/测试/QA文件差异+514/-11，新tests/workspace_controller_mode_ui.test.cjs未跟踪552行/28608字节；所有10文件bytes/SHA256快照保存在.tmp/controller-mode-c2-b-review-dispatch/source_manifest.json。
+- 派前重读最新development_requirements，仍Kimi前端、DeepSeek独立交叉复核，Codex裁决/收尾。最小独立顶层参数派#161“调度模式界面与角色分隔线独立复核”给agent:deepseek，返回queued/assigned，Hall group:task-425a2b43e60345628fd87d36d05ef232；未附加子任务字段或手写编号。
+- 复核包含原#160任务/范围不变项、完整验收合同、实际基线和精确差异/源码快照、开发者命令与证据/限制、A–E代码关注点（整体接线、项目账号/迟到/409/saveToken、独立CAS、旧服务权限/安全版本、视觉及语义边界）、手册草稿检查；要求独立实际代码检查及必要Node/Python回归，不只信自报/字符串测试，不为无疑点重跑98后端/全库/C2-A1。发现问题交Kimi修正，DeepSeek不得自行改业务码。
+- 复核仅可写.tmp/controller-mode-c2-b-review/报告/合法自身#161交付/隔离证据，完整裸JSON结果并validate；任务包副本.tmp/controller-mode-c2-b-review-dispatch/task.md。开发已暂停，复核期间不并行改业务码；不启停服务/改真实模式指定、不浏览器操作、不生产长等待。
+- 本轮仅正式进度/路线图收件及派发记录，以UTF-8写入、差异检查后中文提交常规推送，Kimi的10业务/测试/QA文件保持待审未暂存。默认派发后结束，用户通知#161完成再读取/裁决，通过后收取#160/#161、更新模块/手册和业务Git，用户页面验收后继续下一阶段。
+
 ## 2026-10-06 用户确认C2-B，派#160给Kimi开发
 
 - 用户回复“可以”，确认项目设置调度模式界面及角色“参与任务”双横线保留一条。按当前development_requirements，Kimi开发、完成暂停后DeepSeek独立检查实际代码，Codex裁决/正式文档/Git；本次未提前派复核、未并行改业务码。
