@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #172工具交付，派#173独立代码复核
+
+- 用户通知“172 ok”。#172/msg2674完整合法talk-delivery-1/自身号匹配、complete自报，11完成/0未完成/0blocked，7文件/10验证/7限制，无省略；runner succeeded/submitted，finished_at=2026-10-06T14:45:27.610430（服务端原记录未补时区）。只是开发者结论，未独立验收/收取/提交。
+- 实际四份工作区代码/测试差异1074增/315删：talk_task_tools（456行diff）、talk_terminal_mcp（5）、test_talk_controlled_wait（925）、test_talk_task_tools（3）；server/web/DB/API权限/Key/模式/配置/共享服务无改，talk_send_mcp核对无需改。开发交付.tmp/initiator-mode-tools/implementation、development、run_tests、test-log。
+- 自报实现G1–G8/created_by+project整批入口核验、G6同响应active/G7严格输入及稳定去重/G8各唯一ID一次GET、结构化TalkApiHttpError/404业务拒绝/其它api_error、入口IDs日志来源、五键快照、受控无ID死分支退役、模式重读去指定依赖/controller_changed退役、兼容只读弃用注记与发起者文案。判断包含G8响应复用首轮、200非对象null拒绝、Pythonlist/tuple数组适配，独立复核须评估而非照采理由。
+- 开发自报六模块37+17+12+44+31+21=162通过，无失败/错误/跳过；真实隔离SQLite+LiveTalkServer归属与只读性、普通false旧19键/query_stats/HTTP/日志兼容通过。主控只读完整交付，不重复全探索或跑全量；源码与运行中MCP分开，重连/旧UI/自身Key/真实主动链路not_run。
+- 超出原清单的一处terminal_mcp wait_defaults.entry_gates由7改8及注释同步已如实上报；Codex看实际最小差异，明确纳本片配套范围保留并独立复核，不扩终端运行配置/默认预算/生命周期。原17派发来源未改项全匹配，Git实际HEADc2283b8，7ce→c228仅三主控记录，四业务差异未提交。
+- 派前再次读取最新development_requirements，Kimi交叉复核DeepSeek开发不变、caller_identity=human:bobo。最小顶层参数派#173“173-发起者受控等待工具独立复核”给agent:kimi，queued/assigned，Hall group:task-d4b111b836824eafa7b68a66f061a71f；包.tmp/initiator-mode-tools-review-dispatch/task.md，派前25对象清单/四份Git基线源码快照/114128B development.diff已落盘。
+- 复核按A–I实际完整代码/测试审查，不只看自报，独立复跑六模块及必要关键探针；重点G8请求前后/最后响应过deadline与入口失败统计、首轮复用计数/模式重读、数组边界/异常响应、false兼容和九工具/--check/文案/权限不变。自测启动器只静音logging并用标准unittest发现/结果/退出码，Kimi仍须独立核验，不污染原日志；隔离验证允许、不启动生产/模型/浏览器/长等待。
+- 开发已暂停，审查只新增.tmp/initiator-mode-tools-review/报告/真实本号裸JSON及探针日志，不改源码/正式docs、不自行提交/收取/转派。若发现问题partial交回DeepSeek，原报告保留；通过才由Codex收取172/173并提交功能代码、检查加载后再排I-2。根代理本轮仅三份正式记录提交常规推送，四代码改动不入本轮提交；默认派后结束，用户通知173完成再取件。
+
 ## 2026-10-06 I-1工具实现派#172
 
 - 以正式合同提交7ce331937a6b7eaae197cfcbd0886a14d0879f37为干净基线，业务仍9272020；再次读取当前development_requirements，DeepSeek后端/其它、Kimi独立复核，caller_identity=human:bobo。
