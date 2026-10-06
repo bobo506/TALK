@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #168合同修订交付，派#169独立定向复核
+
+- 用户通知“168 ok”。#168/msg2670完整合法talk-delivery-1/自身号匹配，complete为结构化自报，12完成/0未完成/0blocked，4文件/6验证/5限制，无省略；runner succeeded/submitted，finished_at=2026-10-06T12:14:53.321339（服务端原记录未补时区）。不将自报当独立验收，#166/#168仍未收取，新合同未发布。
+- Kimi仅新增.tmp/initiator-mode-design-fix/四文件：contract_draft.md（44197B/c41cf55b4ffa0e8ab2020c16d8fd51169e5ef32fb385de478b48eb1237ea667b）、implementation_plan.md（23322B/1a2723fefa8995a2e27919c55db2e0184eb7f17a4934f14dc0fcb81b9e0f3c34）、changes.md（17228B/49a042505588a239966604d107e4841a58655f9c22a509236933ddf1fcc547a6）、development.json（8279B/2a7c1495e48917139a4c46eb4668f9f2f2a52b157ba437158489278ad72c4dc6）；旧#166/#167原件及正式合同保持。
+- 自报补齐两P1：I-2 load/render完整接线、模式面板controllerStatusMeta共享依赖及导出/徽标/测试去留；bridge新任务要求快照、每次等待计数说明、工具描述及注记退役。五P2：严格ID/稳定去重；任务404业务拒绝与其它API错误、预算耗尽、入口计数/信息；精确活跃文档与历史排除；工具/UI串行且共同人工验收和加载/身份前置；true无ID死分支移除及现有用例存在性。G6 active前置、G7输入、G8逐任务核验与旧编号映射，另补行号/TaskOut/api_error/入口键/目录事实等直接措辞。设计D-1..D-4不变，TalkApiHttpError为待实施建议，不称现有事实。
+- 验证仅静态源码/文档核对、15对象前后hash、自身task_id格式校验；实现测试/浏览器/模型/服务/真实任务/等待/Key均not_run。用例计数非通过数，部分UI函数区间近似已披露，原#166目录不存在观察不追改。本轮主控核对旧15对象全匹配、工作区干净、HEAD9e3e34d；#168HEAD603538b→派时9e3e34d仅三份主控记录，业务保持9272020。
+- 派前读取最新development_requirements，Kimi文字/设计/交互/前端、DeepSeek其他/后端、交叉复核要求不变，当前caller_identity=human:bobo。最小顶层参数派#169“169-发起者调度合同修订定向复核”给agent:deepseek，queued/assigned，Hall group:task-a20f356f11234398b837730fcb367eb8。包.tmp/initiator-mode-design-fix-review-dispatch/task.md和派前19对象快照（10源+#166三稿+#167两报告+#168四文件）已落盘。
+- 独立审查七项和直接回归，回源码核对新稿不能仅采信自报；沿用#167已闭合A/C/F，核对真实调用/导出依赖、输入/HTTP失败与false兼容、预算/入口信息、活跃文案精确退役、过渡/身份前置与旧用例事实，静态数量和历史通过数分开。不重复完整原审查、不跑未来实现/真实链路。仅新增.tmp/initiator-mode-design-fix-review/{review.md,development.json}，真实本号裸JSON交付、格式校验，完成暂停。
+- #167原partial已收取事实保持（2026-10-06T11:55:16.374963）；#166/#168通过#169并合看后才收取/发布合同/拆实施。当前业务/权限/DB/API/UI/配置/Key/共享服务零改动；模型名称另片、命名留全角色页。默认派发后结束，用户通知#169完成再取件，本轮三份正式记录收尾提交常规推送。
+
 ## 2026-10-06 #167合同复核发现缺口，收取partial并派#168定向修订
 
 - 用户通知“167 ok”。#167/msg2669完整合法talk-delivery-1、自身号匹配、partial，11完成/8未完成/0blocked，验证12/限制6，无省略。独立回源码抽验成立、10源+3稿hash命中、A/C/F已闭合、B/D/E/G仍有缺口；Codex接受具体发现，#166不收取、不发布有缺口草稿，不从runner succeeded推通过。
