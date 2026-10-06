@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #167合同复核发现缺口，收取partial并派#168定向修订
+
+- 用户通知“167 ok”。#167/msg2669完整合法talk-delivery-1、自身号匹配、partial，11完成/8未完成/0blocked，验证12/限制6，无省略。独立回源码抽验成立、10源+3稿hash命中、A/C/F已闭合、B/D/E/G仍有缺口；Codex接受具体发现，#166不收取、不发布有缺口草稿，不从runner succeeded推通过。
+- 两项P1：I-2未列app.js reload/renderController调用点、模式面板/导出controllerStatusMeta及指定状态依赖，照删除清单会ReferenceError/回退已验收模式；退役文案遗漏bridge PROJECT_REQUIREMENTS_SNAPSHOT_NOTE/WAIT_COUNTING_NOTE/工具“主控派发”，旧称呼继续输出和写入新任务。五项P2：非法/重复ID规则、逐任务GET失败/预算/不可见措辞、I-3精确活跃文档与历史排除、中间上线窗口、true无ID死分支与旧用例去留；另有行号/API错误口径/TaskOut/前置active/entry键等非阻塞建议。
+- 独立复核未跑测试/服务/终端/等待/Key，用例计数不代表通过；reviewer git status沙箱拒绝，主控另查实际HEAD603538b/工作区干净，e9eed23之后仅三份记录，原13对象hash一致；新返修15对象快照已在派发前落盘，包含原稿和原审查。原166/167报告/观察不追改。
+- 收取#167/msg2669于2026-10-06T11:55:16.374963，workflow completed（服务端原记录未补时区），原业务partial保持。#166/msg2668仍submitted/未收取，旧#164/#165人工验收及收取事实保持。
+- Codex按独立可行性结果确定D-1只读输出至少一兼容版本暂留弃用、D-2保持拒绝human受控主动不新开提案、D-3true严格显式正整数列表/全校验后稳定去重/唯一ID各GET一次、false旧行为不变、D-4旧human PATCH暂留兼容弃用。同时I-1/I-2串行审查并同一人工验收轮、过渡不宣称主动消费者通过；404进入业务拒绝/null与其它API错分开，不泄露不可见存在性；当前只是已定设计，不是已实现。
+- 派前读取最新development_requirements仍Kimi文字设计/DeepSeek交叉复核，当前Key身份human:bobo。最小顶层参数派#168“168-发起者调度合同缺口定向修订”给agent:kimi，queued/assigned，Hall group:task-8fd33bb4bcf7467687c5b966964bf6d1。包.tmp/initiator-mode-design-fix-dispatch/task.md、15对象快照同目录；新交付.tmp/initiator-mode-design-fix/完整合同/拆分/changes/development。全部旧稿/正式文档/业务/配置只读，未改实际Key/UI/服务。
+- 任务要求逐P1/P2及直接措辞关闭，补全部共享依赖与活跃文案清单/历史排除、输入/预算错误矩阵与可靠HTTP判码、阶段加载/回退和受控死分支旧用例退役，前置active节约任务GET；仅静态引用/源码/交付校验，不冒称未来实现测试已过。完成暂停后再交DeepSeek定向复核，合看#167已闭合内容后裁决发布与实施。
+- 本轮仅PROGRESS/HISTORY/路线图正式收件/裁决/派发记录，UTF-8、明确范围/差异检查后中文提交常规推送；源/旧稿/原审查未变。默认派后结束，由用户通知#168完成再取件；模型上报/页面名称与全角色命名仍另片。
+
 ## 2026-10-06 #166合同草稿交付，派#167独立源码与合同复核
 
 - 用户通知“166完成”。#166/msg2668完整合法结构化talk-delivery-1、自身号匹配、complete自报，7完成/0未完成/0阻塞，验证5/限制5，无省略；runner succeeded/workflow submitted，未收取。三份临时草稿不代表新规则已实现，不以格式自报代替独立业务验收。
