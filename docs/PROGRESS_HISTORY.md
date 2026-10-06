@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #171六项复核通过，收取设计链并发布发起者合同
+
+- 用户通知“171完成”。#171/msg2673完整合法talk-delivery-1/自身号匹配、complete，10完成/0未完成/0blocked，2文件/9验证/5限制，无省略。DeepSeek独立实读R-1计数、R-2事件/符号、R-3常量、R-4校验位置/计数、R-5文档范围/历史、R-6日志来源均闭合，合看#167/#169已闭合部分无倒退，Codex接受设计。仅静态审查，不冒称未来实现测试或实机通过。
+- 本轮顺序收取171/170/168/166，workflow completed（服务端原记录未补时区）：#171/msg2673：2026-10-06T14:10:23.130465；#170/msg2672：2026-10-06T14:10:26.664346；#168/msg2670：2026-10-06T14:10:29.831910；#166/msg2668：2026-10-06T14:10:34.359117。167/169原partial此前收取事实与失败原件保持，166–171设计链全部收取。
+- 发布docs/spec/CONTROLLER_MODE_DESIGN.md为#170经#171已审v3正式合同，标题/发布头明确设计确认且未实施、草拟时HEAD/本片/未收取等历史限定；完整保留已审正文。配套INITIATOR_MODE_IMPLEMENTATION_PLAN.md，原固定主控合同原正文完整归档CONTROLLER_MODE_DESIGN_FIXED_CONTROLLER_ARCHIVE.md。发布溯源与原/source SHA/收取记录存.tmp/initiator-mode-publication/publication.json，原临时稿/报告不追改。
+- #171两条非阻塞清单建议并入计划“Codex发布补充”：tests/test_talk_controlled_wait.py:1043/1046/1075同步G1–G8/controller_changed退役/任务发起者计数说明；talk_task_tools.py:1684-1690模式描述按发起者措辞同步，字段/effective语义保持。只补实施清单，不重开设计或权限。
+- 发布前主控实测30对象hash/大小一致、工作区干净/HEAD795473d；归档保留旧合同原正文校验通过。171的Git CLI受限而用只读.git对象证据，主控另查实际HEAD。33/30静态定义数不是通过数；本轮无实现测试/模型/浏览器/服务/真实等待/Key操作。
+- usage-gate返回continue，精确session/weekly百分比null；不根据reason推断具体额度，按批次约束。最新development_requirements仍DeepSeek后端/其它、Kimi文字/设计/交互/前端、交叉复核。下一项I-1工具实现可独立于I-0凭据实切开展，之后I-2退役UI，I-1/I-2串行独立复核及同一人工验收轮；I-4需自身身份/工具加载/UI/指南齐备。
+- 设计发布不改变业务基线9272020、旧固定主控门禁/UI、server/DB/权限/Key/模式/共享服务，caller_identity仍human:bobo、effective null/not_bound。历史creator不迁移，实际Key切换和真实主动链路待后续；各终端T/W/取消排队边界保持。模型展示/命名另片。正式六份文档收尾提交，随后按合同派下一工具片。
+
 ## 2026-10-06 #170六项修订交付，派#171独立定向复核
 
 - 用户通知“170完成”。#170/msg2672完整合法talk-delivery-1/自身号匹配，complete为自报，8完成/0未完成/0blocked，4文件/7验证/4限制，无省略；runner succeeded/submitted，finished_at=2026-10-06T13:38:02.574099（服务端原记录未补时区）。尚未独立确认，#166/#168/#170未收取、新合同未发布。

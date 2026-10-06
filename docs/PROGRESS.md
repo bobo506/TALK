@@ -1,34 +1,33 @@
 # Project Progress
 
-Updated: 2026-10-06 (Asia/Shanghai)。#170六项修订已交付，#171已派DeepSeek定向复核。#166/#168/#170未收取，新合同未发布；业务与凭据未改，#164/#165两条反馈已人工验收（9272020）。
+Updated: 2026-10-06 (Asia/Shanghai)。#171独立定向复核通过，#166–#171设计链全部收取；发起者正式合同和实施计划已发布，旧固定主控合同归档。设计已确认，业务未实施；下一项I-1后端工具，待派DeepSeek。
 
 ## 当前身份与协作
 
-- 项目D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex。Codex决策角色负责范围/裁决/正式文档/Git；本次派前读取最新development_requirements，仍Kimi文字设计交互/前端、DeepSeek后端其它，双方交叉复核。
-- 默认派发后结束，用户通知后取件；开发暂停再审查，禁止并行改业务码。Codex不操作浏览器。顶层最小参数，不附子任务字段/手写编号。
+- 项目D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex。Codex决策角色负责范围/裁决/正式文档/Git；最新development_requirements仍Kimi文字设计交互/前端、DeepSeek后端其它，双方交叉复核。
+- 默认派发后结束，用户通知后取件；开发暂停再审查，禁止并行改业务码。Codex不操作浏览器；顶层最小参数，不附子任务字段/手写编号。
 
-## 当前切片：#171六项修订定向复核待交付
+## 本轮设计收尾
 
-- 用户通知“170完成”。#170/msg2672完整合法talk-delivery-1/自身号匹配/complete自报，8完成/0未完成/0blocked，4文件/7验证/4限制，无省略；runner succeeded/submitted，不等于独立通过。仅新增.tmp/initiator-mode-design-final-fix/完整合同/拆分/changes/development。
-- 自报闭合#169 R-1..R-6：真实静态测试33/30与错误宽搜35/39及历史通过数分开；事件删除完整1497-1509/模式1510-1520保留、grep符号补齐；CONTROLLED_WAIT_NOTE拼写；G7严格校验位置/HTTP计数；I-3补MODULE_webui:274和MODULE_bridges历史/新规则区分；entry JSONL task_ids来源。原partial和所有旧稿不追改，闭合结论待#171源码核对。
-- Codex裁决保持：G7运行时校验在G6之后，前门禁全过到达G7的非法输入HTTP=2/任务GET0/entry_gate=G7/return_reason=null/恰一条entry，无正常返回；更早拒绝/外层schema按各自边界。true输入完整校验前selected_task_ids=None、entry.task_ids=null，通过后稳定去重，G8用调用者合法ID列表，不落非法原输入/未核验响应；false不变。
-- D-1assignment只读至少一兼容版暂留弃用、D-2本期拒human受控主动、D-3严格正整数非空数组/全校验后稳定去重、D-4旧human PATCH暂留权限/CAS不变。I-1/I-2串行独立开发/复核并纳同一人工验收轮；全部未实施。MODULE_bridges旧C2-A1/旧600与660日期事实保留，实施后补当前规则，不机械删除普通协调称谓。
-- #171“171-发起者调度合同六项修订定向复核”给agent:deepseek，初始queued/assigned，Hall group:task-2be42a04587a49d4a2d551f5ba8f30a5；包.tmp/initiator-mode-design-final-review-dispatch/task.md，派前30对象快照（原26+#170四文件）。业务基线9272020，派时HEADc8355915ff4100bc144f80e133c7e2d89b70e82c，#170开工91b2bf2；其间仅三份主控记录，业务同基线。
-- 审查仅新增.tmp/initiator-mode-design-final-review/{review.md,development.json}，逐六项及差异直接回归，沿用#167/#169已闭合内容，不重复完整旧审查/实现测试。无实际合同缺口才complete，有缺口给具体新稿位置/原因/最小修正，历史引文不误判成当前规范；完成暂停不自行收取/转派/提交。
+- 用户通知“171完成”。#171/msg2673完整合法talk-delivery-1/自身号匹配/complete，10完成/0未完成/0blocked，2文件/9验证/5限制，无省略。DeepSeek逐R-1..R-6独立回源码核对均闭合，沿用#167/#169原闭合部分，Codex合看接受设计。
+- 发布docs/spec/CONTROLLER_MODE_DESIGN.md（发起者v3，未实施）、INITIATOR_MODE_IMPLEMENTATION_PLAN.md；旧合同正文原样归档CONTROLLER_MODE_DESIGN_FIXED_CONTROLLER_ARCHIVE.md。#170草稿开工HEAD/本片/未收取等为当时快照，发布头明确当前状态；旧partial/原件不追改。
+- #171两条非阻塞清单建议已并入实施计划发布补充：controlled_wait测试1043/1046/1075同源描述断言；talk_list_agents描述1684-1690模式段。无新权限或机制提案。
+- #171/#170/#168/#166已于本轮依次收取completed（服务端原记录）：#171/msg2673：2026-10-06T14:10:23.130465；#170/msg2672：2026-10-06T14:10:26.664346；#168/msg2670：2026-10-06T14:10:29.831910；#166/msg2668：2026-10-06T14:10:34.359117。#167/#169原partial此前已收取，原业务结论保留；全部设计任务166–171已收取，不重复取件。
+- D-1assignment至少一兼容版暂留弃用、D-2本期拒human受控主动、D-3true严格非空正整数数组/全量校验后稳定去重、D-4旧human PATCH权限/CAS暂留不变。G7在G6之后，到达G7非法输入2HTTP/0任务GET/null日志；完整校验前task_ids=null、G8为调用者合法去重ID，false不变。I-1/I-2串行独立复核且同一人工验收轮，均待实现。
 
 ## 验证与限制
 
-- 主控核对旧26对象hash/大小保持、四新文件大小/hash已登记，工作区干净/HEADc835591；派前30对象清单可恢复。新contract48615B/plan28304B/changes14987B/development7473B，完整SHA见派发清单和历史。本轮仅正式收件/派发记录。
-- #170仅静态源码/文档定位、26对象前后hash与交付格式校验，实施/浏览器/模型/终端/服务/真实等待/Key操作not_run，数量不是通过数；#169当时HEAD9e3e34d观察保持，后续代码变化需重新核对。
-- #169/msg2671原partial已于2026-10-06T13:19:35.662576收取completed；#167/msg2669原partial已于2026-10-06T11:55:16.374963收取（均服务端原记录未补时区）。#166/msg2668/#168/msg2670/#170/msg2672仍未收取。
-- 当前caller_identity仍human:bobo；fixed主控门禁/active意向/effective null/not_bound未改，历史human任务不迁creator。自身Key另片；DeepSeek65秒/W50、Codex现用W300/真实T未新核验、Kimi660000模板与同步stdio/取消排队边界保持。
-- #164/#165两条反馈人工验收通过，不外推键盘/:has/HTTP竞态/Agent只读/受控GET故障全部实机通过。旧#160–#165已收取，不重复取件。
+- 发布前30对象hash/大小全匹配；主控工作区干净/HEAD795473d，旧合同已按预期替换、归档原正文保持。#171通过只代表静态合同/源码核对，无测试/模型/浏览器/服务/真实等待/Key；33/30只是静态用例数。
+- usage-gate guard --provider codex --json返回continue，但session/weekly百分比均null；精确占比不可用，不能据reason声称实际用量低于阈值，按批次约束推进。
+- 当前caller_identity仍human:bobo；旧固定主控门禁/UI、active意向/effective null/not_bound均未改。I-0只准备身份切换步骤，实际切换另按就绪核验；历史human任务不迁creator。
+- DeepSeek65秒/W50、Codex现用W300/真实T未新核验、Kimi660000模板及同步stdio/取消排队/非硬截止边界保持；真实主动链路待I-4。
+- #164/#165两条页面反馈已人工验收，不外推键盘/:has/HTTP竞态/Agent只读/受控GET故障全部实机通过。
 
-## 交付索引与后续
+## 下一步与索引
 
-1. #166 .tmp/initiator-mode-design/；#167 .tmp/initiator-mode-design-review/；#168 .tmp/initiator-mode-design-fix/；#169 .tmp/initiator-mode-design-fix-review/；#170 .tmp/initiator-mode-design-final-fix/。各对应-dispatch/task.md及10/13/15/19/26对象快照，旧报告不追改。
-2. 用户通知#171完成后读完整交付及必要证据，合看原闭合部分后裁决；通过才收取#166/#168/#170/#171，发布正式合同、拆I-0/I-1实施；若有具体缺口先修正，不直接沿旧固定主控C2-C。
-3. 模型名称运行端核验/上报与页面模型名替代裸ID另片，内部member_id仍身份关联键；默认/自定义命名留全角色页面。当前不扩自动唤醒/权限/运行器范围。
-4. 本轮仅三份正式记录，差异检查后中文提交常规推送origin codex/terminal-return-codex，默认派发后结束。
+1. I-1按正式合同及计划派DeepSeek实现工具/测试，Kimi独立复核；只改bridge工具与相关测试，不改web/server/DB/Key/真实模式/服务。正式合同发布不要求真实Key先切换，I-4才需身份/工具加载/UI/指南齐备。
+2. I-2在I-1复核及加载之后退役固定主控UI；I-0步骤准备、I-3指南文本可另片安排，I-1/I-2同一人工验收轮。新主动功能未验收，不直接沿旧C2-C。
+3. 旧交付.tmp/initiator-mode-design*/与对应-dispatch包原件保留；发布溯源.tmp/initiator-mode-publication/publication.json。最终源码/文本复核.tmp/initiator-mode-design-final-review/，30对象快照同名-dispatch目录。
+4. 模型名称运行端核验/上报与页面模型名替代裸ID另片，member_id仍内部身份键；默认/自定义命名留全角色页，不扩自动唤醒/权限/运行器范围。
 
-恢复指令：继续项目。当前#171待通知，#166/#168/#170未收取，#167/#169已收取原partial；不重复派发或擅自实施。
+恢复指令：继续项目。设计链已收取、正式合同已发布，I-1待派；不重复设计审查。
