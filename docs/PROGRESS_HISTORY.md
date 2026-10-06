@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-06 用户验收#164/#165通过，派#166发起者调度合同修订
+
+- 用户明确“验收通过，继续下一项”。Codex记录本次离页复位/去版本两条人工反馈验收通过，功能92720207702db8603f49506a15d25cf194e8b0cb已推送、工作区干净；不将该确认外推为键盘/:has/HTTP竞态/Agent密钥只读或受控GET故障全部实机通过。已收取#164/#165保持completed，不重复收取。
+- 按已确认路线，先修订按任务created_by发起者协调、项目统一主被动只影响发起侧、取消固定主控的实施合同，再拆身份/工具/UI/消费者；模型名称另案。派前读取最新development_requirements仍Kimi文字设计/DeepSeek交叉复核，当前入口caller_identity仍human:bobo，未改Key。
+- 最小独立顶层参数派#166“166-发起者调度与固定主控退役实施合同修订”给agent:kimi，queued/assigned，Hall group:task-9269233cd1da4f5a89ea88f171e0d968；包.tmp/initiator-mode-design-dispatch/task.md、源码快照与旧合同副本同目录，交付.tmp/initiator-mode-design/。Kimi仅写contract_draft/implementation_plan/development三项，完成暂停，之后DeepSeek独立核对实际源码与新旧合同，不自行开发、派发、收取或commit/push。
+- 合同必须闭合任务发起者资格/单多任务与混合creator/跨项目/字段缺失、controlled_wait=true新门禁及每30秒重读/退出/统计、普通wait兼容与agent入口限制、现有权限/历史human任务收尾、原指定字段/API/MCP/页面退役兼容、身份配置安全核验、C2-C分步加载与预算/取消排队验证矩阵。不新增会话绑定/ACK/租约，不让目标角色或模型名自证协调者。
+- 角色仅针对具体任务，授权和决策分级仍保留；active不允许执行者自行开新任务。各Agent自身API Key是后续接入目标，历史created_by不改/普通收取不扩权；模型上报与全角色命名不纳本片。TERMINAL_MCP预算段已按要求读取，任务包明确DeepSeek50/Codex现用300与未核验T/模板边界。
+- 正式PROGRESS/路线图/简报/模块及QA记录普通反馈验收与#166下一片，当前旧主控门禁/服务/凭据均未更改；完整草稿待独立复核后才发布现行合同。文档UTF-8写入，范围/差异检查后中文提交常规推送，默认派发后结束，由用户通知#166完成再取件。
+
 ## 2026-10-06 #165独立复核通过，收取#164/#165并收尾人工反馈修正
 
 - 用户通知“165好了”。#165/msg2667完整合法talk-delivery-1/自身号匹配/complete，8完成/0未完成/0阻塞，验证9/限制5，无省略；非仅runner状态判验收。独立实际源码/真实导航事件与生命周期检查、必要复跑覆盖#164两条人工反馈，0功能缺陷。Codex核对对象一致与具体争议后接受实现，页面尚待用户再验。
