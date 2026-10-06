@@ -209,6 +209,16 @@ DeepSeek本地开发启动示例显式使用`--timeout 3600`，这是整轮执�
 
 `talk_wait_tasks`默认/上限600秒，命中目标状态提前返回；客户端超时建议至少660秒。等待API错误独立报错。返回最多20条任务摘要，提前返回只列命中集合，超时列轮询集合的摘要；截断计数和完整ID列表可追溯，ID列表随任务数O(N)，不是整体固定上限。日常主控应显式传当前`task_ids`。`query_stats`仅为程序轮询/HTTP/耗时/原因；模型及外层续等次数由调用方记录。同步等待不监听取消，客户端取消不保证立即结束程序，Windows不保证子进程随客户端退出；只读等待不修改任务状态，断线后需重新调用。不可声称已实现外部唤醒或等待期间零模型回合。
 
+2026-10-06更新：上文600/660是通用合同与旧长等待建议，当前实际调用必须按[通用终端适配预算要求](../guides/TERMINAL_MCP.md#终端适配必查工具超时与等待预算2026-10-06)核验宿主工具上限、显式等待时长及余量。DeepSeek桌面65秒时wait50秒，Codex保持用户现用300秒；Kimi等其它终端按实际预算决定。未修改客户端配置/通用默认，也未自动启用续等。
+
+### C2-A1受控等待与身份核验（2026-10-06实现复核通过）
+
+- #156开发、#157原片独立审查、#158 F-1修正、#159定向复核通过，Codex合看后确认实现通过并收取#156/#158/#159，#157此前已收取。变更为talk_task_tools、terminal公开检查说明及新增controlled_wait测试；无server/API/数据库/UI/凭据/实际模式/指定/权限改动。
+- controlled_wait严格bool默认false；旧路径保持默认/上限600、请求/返回/query_stats四键。true使用Key服务端身份、显式有限正预算及G1–G7门禁，30秒重读模式/指定，deadline包含身份/项目/任务GET与sleep，HTTP剩余预算限长，新GET失败尝试也计数；变化退出/最近成功集合/进入预算错误与正常到期边界按CONTROLLER_MODE_DESIGN。
+- caller_identity项目固定三键/失败不阻断/非项目null无额外GET；schema-dispatch-wait和--check同步，九工具数量不变。F-1运行期重读错误现与poll共用api_error出口，含真实elapsed/rounds、恰好一条JSONL；failure_stage=poll/recheck仅统计记录，返回结构不变。
+- #159独立定向复跑controlled_wait29、task_tools/terminal29、controller_mode31项通过，新旧探针均通过；原#157对A–E/G/H审查合看，未把定向审宣称为重新全量审查。ACP既有沙箱WinError5未取得本轮整套通过结论，原报告与partial/MCPunknown保持。
+- 代码通过与运行中工具加载分开：本轮未重载MCP/桌面重连、真实主动宿主/660秒未验收。加载/只读验收步骤见TERMINAL_MCP；取消无检测源、同连接排队、总预算约定/非端到端硬截止、effective_mode:null/not_bound仍保留。C2-B/C/C2-D待开发，无新Web用户入口。
+
 
 ### 本地交付流程试行（2026-09-12）
 

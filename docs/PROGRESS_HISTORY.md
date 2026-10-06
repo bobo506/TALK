@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #159复核通过，C2-A1确认收取并规范全部终端超时适配
+
+- 用户新增明确要求：终端超时报错必须写进适配要求，今后每个终端都考虑；同时通知#159完成。讨论聚焦单次wait返回在客户端时限内，DeepSeek桌面工具上限65秒时选W50，Codex保持用户现用W300；未要求更改客户端配置或取消宿主进度更新规则。主动模式到期后下一轮需Agent再次调用且有资格/剩余总预算，工具不自动续等，任务执行不会因读取到期而重启/取消。
+- #159/msg2661合法完整talk-delivery-1、task_id匹配、自报complete无省略，completed8/unfinished0/blocked0、verification8/limitations5；Kimi实际定向复核结论agree/F-1已修好无新问题。独立核对合同/修正前后代码hash、+49/-28/+189增量、共用poll错误兼容与一次统计/计数、JSONL附加字段直接消费者兼容；仓库无固定键集JSONL解析入口，新增failure_stage不进返回。主控核对3业务文件仍与已审hash一致，不重复完整审代码或测试。
+- 独立复跑controlled_wait29 OK/14.202s、task_tools/terminal29 OK/41.440s、controller_mode31 OK/13.223s，原探针False/0→True/1、api_error，新探针HTTP500/超时两例恰好一条api_error记录且失败GET最后/无非GET/实际30秒重读节点，exit0。与#157对原片A–E/G/H检查合看后，Codex确认C2-A1工具实现通过，F-1关闭；本次定向审不冒充重审全片/全库，ACP旧沙箱WinError5整套不计为本轮通过。
+- 证据：.tmp/controller-mode-c2-a1-fix-review/review.md 7172字节/SHA256 cd5f971479a76cfcbbadf87e491be7a0fa3de1d92b554361369e6cd1d1c35d36，development.json4651/hashe8b05faa68f409ea3886822df9f4143aba1919ab518db063229dbb594190639f。已审源码hash：talk_task_tools101189/a98ac7a2878938c47337bc00cfa4364d275cfe185021a9efea1f6ac23e5c3a85；terminal8642/0a197814da98673956982788343b78db61e04e9946e527b361aeb5427d08f0b2；测试67002/5745c5f31399d338caa4542e8684432ce9435c78dfe55939152fe5fe14edac7e。实际累计numstat工具+752/-59、terminal+18，新测试新增另计，开发者+812笔误与#157未收取旧状态不追改原件。
+- 已依次收取#159/msg2661（2026-10-06T00:52:47.520546）、#158/msg2660（00:52:50.346496）、#156/msg2658（00:52:53.446218），workflow全部completed，时间为服务端记录；#157此前已completed，原partial/MCPunknown保持，未重复收取。设计#152–#155均此前收取，开发/复核链#156–#159关闭。
+- 用户要求写入AGENTS必读指引及跨终端预算决策、TERMINAL_MCP通用适配必查：核验实际客户端上限T与来源/单位/加载方式、显式W与余量、执行者预算分开、正常到期/命中/API错误/客户端超时/取消分类、同连接后续查询/排队边界、总预算有限续等与真实宿主证据。DeepSeek65/W50、Codex现用W300，Kimi660000仅模板不外推实际。原跨终端统一600目标按新用户决策收紧，库default/max600兼容合同不改，至少参考5秒余量允许更大，DS当前留15秒。
+- 正式合同状态更新为C2-A1已实现/其余待开发，原设计基线/临时报告保持；模块/简报/终端指南与桌面指南同步工具形状、重连验收和无新Web操作步骤。user manual日常页面不变。规范是本次落盘的要求，不表示已新增按宿主自动读取预算/自动限长或C2-C消费者，更不表示已调整真实desktop/codex配置。
+- 当前Codex MCP只读读回has_caller_identity=false，wait工具目录描述未出现controlled_wait；mode仍passive、effective null/not_bound，assignment agent:codex/version13。确认当前连接尚未暴露新合同，未通过旧连接假测新功能。当前工具集无可调用重载入口，本轮未启停服务/进程，真实桌面目录本轮未刷新核验；客户端需重连并重建/加载MCP进程与目录，按指南只读核对字段及本人可读历史任务返回，不能把源码通过写成运行中已加载。
+- 残余范围：取消无检测源/同连接排队、sockettimeout非任意慢响应端到端硬截止、阶段≤5次/≤10分钟仅提示词约定、effective_mode仍null/not_bound；真实主动宿主/660秒/模型/长等待/浏览器未测，原DLL0xC0000142根因未明。C2-B界面（带参与任务双横线保留一条）、C2-C实际约定消费者/预算/指南与主动验收后续，C2-A2低风险可选/C2-D真正取消不扩片。不改数据库/权限/凭据/mode/指定/执行CLI/外部profile，不新建测试任务或自动等待。
+- 收尾前HEAD47e8fff3beb1da43a150032922a52c3112d163a3，计划将已审3业务文件、6份正式规范/合同/指南及3份进度文档统一中文提交常规推送。进度快照缩短，完整链与新决策保存在历史；本轮结束于代码收尾和MCP加载验收说明，不开启下一实现切片，下一步C2-B由Kimi/DeepSeek交叉复核且先按人工验收/用量门禁恢复。
+
 ## 2026-10-05 #158 F-1修正交付收到，派#159定向复核
 
 - 用户通知“158完成了”。talk_get_delivery #158/msg2660合法完整talk-delivery-1，task_id匹配、自报complete、无省略；completed10/unfinished0/blocked0、changed_files2/verification6/limitations7，runner succeeded/workflow submitted。开发者已暂停，格式有效不等于业务验收，#156/#158均未收取；#157复核工作已在前轮收取，原partial与MCPunknown自由文本不追改。

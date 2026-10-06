@@ -65,7 +65,9 @@ WAIT_TASKS_NOTE = (
 )
 WAIT_COUNTING_NOTE = (
     "query_stats 只含本工具内部实测的程序级计数（poll_rounds / http_requests / elapsed_seconds / "
-    "return_reason）；模型侧的 talk_get_task/talk_list_tasks 调用数与客户端外层等待回合不由本工具"
+    "return_reason）；受控等待（controlled_wait=true）下 identity GET、项目 GET、每 30 秒重读 GET 与"
+    "任务轮询 GET 全部计入 http_requests（含失败的尝试），非受控路径只计入任务轮询；"
+    "模型侧的 talk_get_task/talk_list_tasks 调用数与客户端外层等待回合不由本工具"
     "统计，本工具也无法观测，需由主控在外部实测。"
 )
 # 取消/断线边界（工具描述与 --check 共用，避免被读成"取消会立即终止服务端等待"）。
@@ -74,6 +76,65 @@ WAIT_CANCELLATION_NOTE = (
     "客户端取消（notifications/cancelled）不会立即终止程序侧等待，等待仍会跑到命中或超时截止；"
     "Windows 下客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。"
 )
+# ---------------------------------------------------------------------------
+# C2-A1 受控等待（opt-in）常量
+#
+# 受控等待只有显式 ``controlled_wait=true`` 且 G1–G7 进入门禁全部通过时才启用；
+# 省略或 false 的一切调用与旧路径逐字段一致（无身份 GET、无项目重读、返回结构无新字段）。
+# 数值来自 CONTROLLER_MODE_DESIGN.md §5.3，本片照表实现。
+# ---------------------------------------------------------------------------
+# 受控等待期间项目模式 / 主控指定的低频重读间隔：距上次项目读取 >= 30 秒时在下一循环节点重读一次。
+CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS = 30.0
+# 客户端单工具预算的显式余量（网络 + 序列化 + 客户端处理）；推荐单次受控预算 = 客户端预算 - 5 秒。
+# 本工具读不到宿主客户端预算，这个常量只用于提示调用方，不构成强制。
+WAIT_CLIENT_MARGIN_SECONDS = 5.0
+# 单次 HTTP 请求超时：旧 helper 固定 10 秒，保持不变；受控路径取 min(该值, 剩余 deadline)。
+WAIT_REQUEST_TIMEOUT_SECONDS = 10.0
+# 受控等待允许的 return_reason：不新增 cancelled（本版本没有可检测的客户端取消来源）。
+CONTROLLED_WAIT_EXIT_REASONS = (
+    "matched",
+    "timeout",
+    "mode_changed",
+    "controller_changed",
+)
+CONTROLLED_WAIT_NOTE = (
+    "受控等待是显式 opt-in：只有 controlled_wait=true 且 G1–G7 进入门禁（项目上下文、显式有限正数 "
+    "timeout_seconds、按 API Key 反查的 agent 身份、服务端返回模式与主控指定字段、"
+    "controller_assignment.status=assigned、调用者等于指定主控、requested_mode=active）全部通过才启用；"
+    "任一不满足直接报错，绝不静默降级为普通等待。进入后固定顺序为：每轮先查任务命中（matched 优先），"
+    f"再按 {CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS:.0f} 秒节奏重读项目（先模式后指定），再查 deadline，"
+    "最后 sleep；模式变化 / 版本变化 / 字段消失返回 mode_changed，主控更换 / 解除 / 失效 / 版本变化返回 "
+    "controller_changed。单次 deadline 从开始核验起算，覆盖身份 GET、项目 GET、轮询 GET、重读 GET 与 sleep；"
+    f"发任何 HTTP 前剩余预算 <=0 就不再发请求，否则该请求超时取 min({WAIT_REQUEST_TIMEOUT_SECONDS:.0f} 秒, "
+    "剩余预算)，睡眠不超剩余 deadline。受控短预算需要调用方自行匹配宿主客户端预算（桌面客户端单工具上限 "
+    f"65 秒时建议 <=60 秒，即预留 {WAIT_CLIENT_MARGIN_SECONDS:.0f} 秒余量）；工具读不到宿主预算，"
+    "它唯一强制的上限是 600 秒 clamp。身份门禁只是桥内 advisory 自我保护与如实退出机制，"
+    "不代表在线、不代表已获授权，也不替代服务端任务权限。"
+)
+# 项目路径的 caller_identity 固定三键；成功 note 为 null，失败/不合法时 id 与 kind 均为 null。
+CALLER_IDENTITY_FAILED_NOTE = (
+    "身份核验失败：未能按 API Key 从 GET /api/members/me 取得身份，本次不猜身份"
+)
+CALLER_IDENTITY_INVALID_NOTE = (
+    "身份核验失败：GET /api/members/me 未返回合法 id/kind，本次不猜身份"
+)
+
+
+class _WaitBudgetExhausted(Exception):
+    """内部信号：受控等待剩余预算已耗尽，且尚未发出下一个请求（不外泄给调用方）。"""
+
+
+class _UnsetTimeout(float):
+    """``timeout_seconds`` 的签名默认值哨兵：数值等于 600.0，同时能区分“调用方是否显式传入”。
+
+    既有合同要求 ``wait_tasks.__kwdefaults__["timeout_seconds"] == 600.0``（非受控默认 600 秒不变），
+    而受控路径（G2）必须区分“省略 timeout_seconds”和“显式传入 600”。float 子类实例同时满足两者：
+    非受控路径取值与旧版逐字节一致，受控路径用 ``is WAIT_TIMEOUT_UNSET`` 判定“未显式传入”。
+    """
+
+
+WAIT_TIMEOUT_UNSET = _UnsetTimeout(WAIT_DEFAULT_TIMEOUT_SECONDS)
+
 # 实例摘要只保留短字段（id / runtime / status / current_task_id / last_seen_at / pid），
 # 不含 last_error 与历史实例；availability 仍需消费者结合 last_seen_at 判断心跳新鲜度。
 AVAILABILITY_NOTE = (
@@ -142,12 +203,24 @@ class TalkToolError(RuntimeError):
     """A user-facing TALK tool failure."""
 
 
+class _IdentityShapeError(TalkToolError):
+    """内部错误：身份响应存在但缺少合法 ``id`` / ``kind``（区别于身份请求本身失败）。"""
+
+
 def _config() -> tuple[str, str]:
     base_url = os.environ.get("TALK_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
     api_key = os.environ.get("TALK_API_KEY", "").strip()
     if not api_key:
         raise TalkToolError("TALK_API_KEY 未设置")
     return base_url, api_key
+
+
+def _request_timeout_message(timeout: float) -> str:
+    """单次 HTTP 请求被超时掐断时的工具错误文案（不泄露密钥，也不冒充正常 deadline timeout）。"""
+    return (
+        f"TALK API 请求超时（本次单次请求超时上限 {timeout:g} 秒）："
+        "这是 API/网络层错误，不是任务等待 deadline 的正常 timeout"
+    )
 
 
 def _api_request(
@@ -157,6 +230,7 @@ def _api_request(
     json_body: JsonDict | None = None,
     params: JsonDict | None = None,
     stats: JsonDict | None = None,
+    timeout: float = WAIT_REQUEST_TIMEOUT_SECONDS,
 ) -> Any:
     base_url, api_key = _config()
     query = urlencode({key: value for key, value in (params or {}).items() if value is not None})
@@ -167,13 +241,17 @@ def _api_request(
         headers["Content-Type"] = "application/json; charset=utf-8"
     request = Request(url, data=data, headers=headers, method=method.upper())
     if stats is not None:
+        # 计数在发请求前自增：失败的尝试同样计入 query_stats.http_requests。
         stats["http_requests"] = int(stats.get("http_requests", 0)) + 1
 
     try:
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=timeout) as response:
             payload = response.read()
     except HTTPError as exc:
-        payload = exc.read()
+        try:
+            payload = exc.read()
+        except (TimeoutError, OSError):
+            payload = b""
         detail: Any = payload.decode("utf-8", errors="replace")
         try:
             parsed = json.loads(detail)
@@ -181,8 +259,19 @@ def _api_request(
         except json.JSONDecodeError:
             pass
         raise TalkToolError(f"TALK API HTTP {exc.code}: {detail}") from exc
+    except TimeoutError as exc:
+        # 连接阶段或 getresponse/read 阶段的裸超时：归一为工具错误，不让裸异常逃出工具层。
+        raise TalkToolError(_request_timeout_message(timeout)) from exc
     except URLError as exc:
-        raise TalkToolError(f"无法连接 TALK API: {exc.reason}") from exc
+        reason = getattr(exc, "reason", None)
+        if isinstance(reason, TimeoutError):
+            raise TalkToolError(_request_timeout_message(timeout)) from exc
+        raise TalkToolError(f"无法连接 TALK API: {reason}") from exc
+    except OSError as exc:
+        # 未被 URLError 包装的网络 OSError：同样归一，但如实按网络错误报告，不统称“超时”。
+        if isinstance(exc, TimeoutError):
+            raise TalkToolError(_request_timeout_message(timeout)) from exc
+        raise TalkToolError(f"无法连接 TALK API: {exc}") from exc
 
     if not payload:
         return None
@@ -205,6 +294,51 @@ def _member_id() -> str:
         return member_id
     current = _api_request("GET", "/api/members/me")
     return str(current["id"])
+
+
+def _identity_from_api(
+    *,
+    stats: JsonDict | None = None,
+    timeout: float = WAIT_REQUEST_TIMEOUT_SECONDS,
+) -> tuple[str, str]:
+    """唯一可靠身份来源：``GET /api/members/me``（服务端按 API Key 反查），返回 (id, kind)。
+
+    - 不使用 ``TALK_MEMBER_ID``、模型名、业务角色标签或会话标题自证（C2-A1 §5.2）；
+      ``_member_id()`` 的环境变量优先语义保留给旧调用方，受控门禁与 caller_identity 都不复用它。
+    - 请求失败或响应缺合法 ``id`` / ``kind`` 时抛 ``TalkToolError``，由调用方决定是拒绝（受控门禁）
+      还是降级成 null + note（``talk_list_agents``）。
+    """
+    current = _api_request("GET", "/api/members/me", stats=stats, timeout=timeout)
+    if not isinstance(current, dict):
+        raise _IdentityShapeError("身份响应不是对象")
+    member_id = current.get("id")
+    kind = current.get("kind")
+    if not isinstance(member_id, str) or not member_id.strip():
+        raise _IdentityShapeError("身份响应缺少合法 id")
+    if kind not in {"human", "agent"}:
+        raise _IdentityShapeError("身份响应缺少合法 kind")
+    return member_id.strip(), str(kind)
+
+
+def caller_identity_summary(
+    *,
+    stats: JsonDict | None = None,
+    timeout: float = WAIT_REQUEST_TIMEOUT_SECONDS,
+) -> JsonDict:
+    """项目路径的固定三键身份披露：``{member_id, kind, note}``（C2-A1 §5.2 / R3）。
+
+    - 成功：``member_id`` / ``kind`` 来自 ``GET /api/members/me``，``note`` 为 ``null``；
+    - 失败或不合法：``member_id`` / ``kind`` 均为 ``null``，``note`` 是简短中文原因，
+      不含密钥或完整异常正文，也**不阻断**角色清单的其余内容；
+    - 非项目路径不调用本函数（``talk_list_agents`` 显式返回 ``caller_identity: null``，且不额外发身份请求）。
+    """
+    try:
+        member_id, kind = _identity_from_api(stats=stats, timeout=timeout)
+    except _IdentityShapeError:
+        return {"member_id": None, "kind": None, "note": CALLER_IDENTITY_INVALID_NOTE}
+    except TalkToolError:
+        return {"member_id": None, "kind": None, "note": CALLER_IDENTITY_FAILED_NOTE}
+    return {"member_id": member_id, "kind": kind, "note": None}
 
 
 def _availability(statuses: list[str]) -> str:
@@ -408,6 +542,10 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
             for member in _api_request("GET", "/api/members")
             if member.get("kind") == "agent" and member.get("disabled_at") is None
         }
+        # C2-A1：项目路径额外用一次 GET /api/members/me 按 Key 反查调用者身份并如实披露；
+        # 该请求失败只降级为 {id: null, kind: null, note}，不阻断角色清单，也不计入任何 query_stats
+        # （list_agents 没有 query_stats 字段，不凭空添加）。
+        caller_identity = caller_identity_summary()
         agents: list[JsonDict] = []
         for agent in project_agents:
             if str(agent["member_id"]) not in active_agent_ids:
@@ -436,6 +574,7 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
             "development_requirements": project.get("development_requirements"),
             "controller_mode": controller_mode_summary(project),
             "controller_assignment": controller_assignment_summary(project),
+            "caller_identity": caller_identity,
             "availability_note": AVAILABILITY_NOTE,
             "agents": agents,
         }
@@ -470,6 +609,8 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
         "controller_mode": None,
         # 非项目路径同样没有主控指定上下文：明确 null，不伪造“未指定”。
         "controller_assignment": None,
+        # 非项目路径没有可靠的 Key 反查上下文：明确 null，且不额外发身份请求。
+        "caller_identity": None,
         "availability_note": AVAILABILITY_NOTE,
         "agents": agents,
     }
@@ -872,29 +1013,106 @@ def _record_wait_stats(record: JsonDict) -> None:
         return
 
 
-def wait_tasks(
-    *,
-    task_ids: list[int] | None = None,
-    workflow_statuses: list[str] | None = None,
-    project_id: str | None = None,
-    timeout_seconds: float = WAIT_DEFAULT_TIMEOUT_SECONDS,
-) -> JsonDict:
-    """有界等待任务进入目标协作状态。
+def _normalize_controlled_wait(value: Any) -> bool:
+    """校验 ``controlled_wait``：只接受 true/false（含缺省 None 等价 false），其它类型直接报错。"""
+    if value is None or value is False:
+        return False
+    if value is True:
+        return True
+    raise TalkToolError(
+        f"controlled_wait 必须是布尔值 true/false（缺省等价 false），收到 {value!r}"
+    )
 
-    - 最长 600 秒、默认 600 秒；超出上限按 600 秒生效并在返回值中标注请求值。
-    - 成果提交（submitted）、完成（completed）、失败（failed）、需澄清
-      （clarification_requested 等）等状态一旦出现立即返回，不等满超时。
-    - 等待全部由程序轮询完成，等待期间不产生新的模型回合、也不经工具分发新增 get/list
-      调用（实现声明，非计数）；但本工具无法保证宿主外层零回合。
-    - tasks 与成果只回传引用字段（id / hall_group_id / result_message_id 等）和状态，
-      不回传任务正文、消息历史或实例历史；提前返回时 tasks 即命中集合（兼容原契约），
-      超时返回时是本轮轮询到的任务，两者最多 WAIT_MAX_TASK_REFERENCES 条，超出部分以
-      tasks_truncated / tasks_omitted_count / omitted_task_ids 标记，matched_task_ids 完整。
-    - TALK API 错误（含 4xx/5xx/网络错误）直接抛出错误，绝不复用超时返回结构。
-    - 同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），Windows 下
-      客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。
-    - query_stats 给出本次调用的程序级实测计数（轮询轮次、HTTP 请求数、耗时、返回原因）。
+
+def _controlled_wait_timeout(value: Any) -> tuple[float, float]:
+    """G2：受控路径必须显式传入有限正数 timeout，不采用 600 秒默认值。
+
+    bool、非数值（字符串/None/其它类型）、NaN、inf、0 与负值一律拒绝；合法值按既有上限 clamp 到 600。
+    非受控路径继续走 ``_normalize_wait_timeout``，旧语义（缺省 600、负数归零、数字字符串可接受）不变。
     """
+    if value is None or value is WAIT_TIMEOUT_UNSET:
+        raise TalkToolError(
+            "受控等待必须显式传入 timeout_seconds（有限正数，单位秒，且不超过 "
+            f"{WAIT_MAX_TIMEOUT_SECONDS:.0f}）"
+        )
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TalkToolError(
+            f"受控等待的 timeout_seconds 必须是数字（JSON number），不能是布尔值/字符串/其它类型，收到 {value!r}"
+        )
+    requested = float(value)
+    if math.isnan(requested) or math.isinf(requested):
+        raise TalkToolError("受控等待的 timeout_seconds 必须是有限数字")
+    if requested <= 0:
+        raise TalkToolError(f"受控等待的 timeout_seconds 必须大于 0，收到 {requested!r}")
+    return requested, min(requested, WAIT_MAX_TIMEOUT_SECONDS)
+
+
+def _wait_payload(
+    *,
+    timed_out: bool,
+    reason: str,
+    polled: list[JsonDict],
+    matched: list[JsonDict],
+    desired: set[str],
+    effective_project_id: str | None,
+    selected_task_ids: list[int],
+    requested_timeout: float,
+    effective_timeout: float,
+    elapsed: float,
+    poll_rounds: int,
+    stats: JsonDict,
+    controlled: bool = False,
+    controlled_entry: JsonDict | None = None,
+    controlled_rechecks: int = 0,
+) -> JsonDict:
+    """等待返回结构（受控/非受控共用）：非受控路径不加任何新字段，受控路径只追加合同允许的三个。"""
+    # 兼容原契约：提前返回时 tasks 就是命中集合；超时路径保留本轮轮询到的全部任务。
+    selected = matched if matched else polled
+    references = [_wait_task_reference(task) for task in selected]
+    returned = references[:WAIT_MAX_TASK_REFERENCES]
+    omitted = references[WAIT_MAX_TASK_REFERENCES:]
+    payload: JsonDict = {
+        "timed_out": timed_out,
+        "return_reason": reason,
+        "workflow_statuses": sorted(desired),
+        "project_id": effective_project_id,
+        "task_ids": selected_task_ids or None,
+        "requested_timeout_seconds": requested_timeout,
+        "timeout_seconds": effective_timeout,
+        "max_timeout_seconds": WAIT_MAX_TIMEOUT_SECONDS,
+        "elapsed_seconds": round(elapsed, 3),
+        "task_count": len(polled),
+        "tasks_returned": len(returned),
+        "tasks_truncated": bool(omitted),
+        "tasks_omitted_count": len(omitted),
+        "omitted_task_ids": [task.get("id") for task in omitted],
+        "matched_task_ids": [task.get("id") for task in matched],
+        "tasks": returned,
+        "tasks_note": WAIT_TASKS_NOTE,
+        "query_stats": {
+            "poll_rounds": poll_rounds,
+            "http_requests": int(stats["http_requests"]),
+            "elapsed_seconds": round(elapsed, 3),
+            "return_reason": reason,
+        },
+        "counting_note": WAIT_COUNTING_NOTE,
+    }
+    if controlled:
+        # 合同 §5.1：仅受控路径新增且仅新增这三个字段。
+        payload["controlled_wait"] = True
+        payload["controlled_entry"] = controlled_entry
+        payload["controlled_rechecks"] = controlled_rechecks
+    return payload
+
+
+def _wait_tasks_legacy(
+    *,
+    task_ids: list[int] | None,
+    workflow_statuses: list[str] | None,
+    project_id: str | None,
+    timeout_seconds: Any,
+) -> JsonDict:
+    """非受控路径：与 C2-A1 之前逐字段一致，不产生身份 GET、不做项目重读、不加新字段。"""
     effective_project_id = _project_id(project_id)
     desired = {
         str(status).strip().lower()
@@ -918,37 +1136,22 @@ def wait_tasks(
         matched: list[JsonDict],
     ) -> JsonDict:
         elapsed = max(0.0, _monotonic() - started_monotonic)
-        # 兼容原契约：提前返回时 tasks 就是命中集合；超时路径保留本轮轮询到的全部任务。
-        selected = matched if matched else polled
-        references = [_wait_task_reference(task) for task in selected]
-        returned = references[:WAIT_MAX_TASK_REFERENCES]
-        omitted = references[WAIT_MAX_TASK_REFERENCES:]
-        payload: JsonDict = {
-            "timed_out": timed_out,
-            "return_reason": reason,
-            "workflow_statuses": sorted(desired),
-            "project_id": effective_project_id,
-            "task_ids": selected_task_ids or None,
-            "requested_timeout_seconds": requested_timeout,
-            "timeout_seconds": effective_timeout,
-            "max_timeout_seconds": WAIT_MAX_TIMEOUT_SECONDS,
-            "elapsed_seconds": round(elapsed, 3),
-            "task_count": len(polled),
-            "tasks_returned": len(returned),
-            "tasks_truncated": bool(omitted),
-            "tasks_omitted_count": len(omitted),
-            "omitted_task_ids": [task.get("id") for task in omitted],
-            "matched_task_ids": [task.get("id") for task in matched],
-            "tasks": returned,
-            "tasks_note": WAIT_TASKS_NOTE,
-            "query_stats": {
-                "poll_rounds": poll_rounds,
-                "http_requests": int(stats["http_requests"]),
-                "elapsed_seconds": round(elapsed, 3),
-                "return_reason": reason,
-            },
-            "counting_note": WAIT_COUNTING_NOTE,
-        }
+        payload = _wait_payload(
+            timed_out=timed_out,
+            reason=reason,
+            polled=polled,
+            matched=matched,
+            desired=desired,
+            effective_project_id=effective_project_id,
+            selected_task_ids=selected_task_ids,
+            requested_timeout=requested_timeout,
+            effective_timeout=effective_timeout,
+            elapsed=elapsed,
+            poll_rounds=poll_rounds,
+            stats=stats,
+        )
+        returned_count = len(payload["tasks"])
+        omitted_count = payload["tasks_omitted_count"]
         _record_wait_stats(
             {
                 "event": "talk_wait_tasks",
@@ -966,9 +1169,9 @@ def wait_tasks(
                 "http_requests": int(stats["http_requests"]),
                 "matched_task_ids": [task.get("id") for task in matched],
                 "task_count": len(polled),
-                "tasks_returned": len(returned),
-                "tasks_truncated": bool(omitted),
-                "tasks_omitted_count": len(omitted),
+                "tasks_returned": returned_count,
+                "tasks_truncated": bool(omitted_count),
+                "tasks_omitted_count": omitted_count,
             }
         )
         return payload
@@ -1019,6 +1222,454 @@ def wait_tasks(
         poll_interval = min(poll_interval * 2, WAIT_MAX_POLL_INTERVAL_SECONDS)
 
 
+def _wait_tasks_controlled(
+    *,
+    task_ids: Any,
+    workflow_statuses: Any,
+    project_id: str | None,
+    timeout_seconds: Any,
+) -> JsonDict:
+    """受控等待（C2-A1）：G1–G7 进入门禁 + 30 秒重读 + 单次 deadline 全记账。
+
+    失败策略只有两类：进入期=报错（不轮询、不降级），运行期=显式原因正常退出
+    （matched / mode_changed / controller_changed / timeout），API 错误=显式抛错（api_error）；
+    运行期的任务轮询节点与 30 秒重读节点走同一 api_error 出口（带真实 elapsed/rounds，
+    并落恰好一条 ``return_reason=api_error`` 统计）。
+    本函数全程只读：不修改任务状态、不取消在途任务、不收取，也不伪造 effective_mode 或调度互斥。
+    """
+    # G1 项目上下文
+    effective_project_id = _project_id(project_id)
+    if effective_project_id is None:
+        raise TalkToolError(
+            "受控等待必须有项目上下文（G1）：请显式传入 project_id，或让 bridge 设置 TALK_PROJECT_ID"
+        )
+    # G2 显式、严格、有限、正的 timeout
+    requested_timeout, effective_timeout = _controlled_wait_timeout(timeout_seconds)
+    desired = {
+        str(status).strip().lower()
+        for status in (workflow_statuses or DEFAULT_WAIT_WORKFLOW_STATUSES)
+        if str(status).strip()
+    }
+    selected_task_ids = _normalize_task_ids(task_ids)
+
+    stats: JsonDict = {"http_requests": 0}
+    started_monotonic = _monotonic()
+    started_at = datetime.now(timezone.utc)
+    # 单次 deadline 从开始核验起算：身份 GET、项目 GET、轮询 GET、重读 GET、sleep 全部计入。
+    deadline = started_monotonic + effective_timeout
+    poll_rounds = 0
+    poll_interval = WAIT_INITIAL_POLL_INTERVAL_SECONDS
+    last_polled: list[JsonDict] = []
+    rechecks = 0
+    last_project_read = started_monotonic
+
+    def remaining() -> float:
+        return deadline - _monotonic()
+
+    def next_request_timeout() -> float:
+        """发 HTTP 前用剩余预算 clamp 单次请求超时；调用方必须先确认 remaining > 0。"""
+        return min(WAIT_REQUEST_TIMEOUT_SECONDS, max(remaining(), 0.001))
+
+    def record_entry_failure(gate: str, message: str, *, api_error: bool) -> None:
+        """进入门禁拒绝：写一条可追溯的 JSONL（``return_reason`` 置 null，明确不是等待返回结构）后报错。
+
+        - G1/G2 在发出任何 HTTP 前就直接报错，不写本记录（没有任何计数可记）；
+        - ``return_reason`` 只在本次拒绝由 TALK API/网络错误引起时写 ``api_error``；
+          纯参数或配置性拒绝（G3 预算不足、G4、G5 缺字段、G6、G7）写 ``null``，
+          因为它们不产生等待返回结构，也不是 API 错误；
+        - 记录里保留 ``entry_gate`` 与 ``entry_error``，便于按门禁号追溯为什么没有开始等待。
+        """
+        _record_wait_stats(
+            {
+                "event": "talk_wait_tasks_entry",
+                "started_at": started_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "project_id": effective_project_id,
+                "task_ids": selected_task_ids or None,
+                "workflow_statuses": sorted(desired),
+                "requested_timeout_seconds": requested_timeout,
+                "timeout_seconds": effective_timeout,
+                "elapsed_seconds": round(max(0.0, _monotonic() - started_monotonic), 3),
+                "return_reason": "api_error" if api_error else None,
+                "timed_out": False,
+                "controlled_wait": True,
+                "entry_gate": gate,
+                "http_requests": int(stats["http_requests"]),
+                "entry_error": message,
+            }
+        )
+        raise TalkToolError(message)
+
+    # ---- 进入门禁 G3–G7：任一不过报错，不执行任何等待，也绝不静默降级为普通等待 ----
+    if remaining() <= 0:
+        record_entry_failure(
+            "G3",
+            "受控等待进入核验失败（G3）：开始核验时剩余预算已耗尽，"
+            "未完成身份核验，按进入错误返回且不开始普通等待",
+            api_error=False,
+        )
+    try:
+        caller_member_id, caller_kind = _identity_from_api(
+            stats=stats, timeout=next_request_timeout()
+        )
+    except _IdentityShapeError as exc:
+        record_entry_failure(
+            "G3",
+            f"受控等待进入核验失败（G3：身份响应不合法，无法核实调用者）：{exc}",
+            api_error=False,
+        )
+    except TalkToolError as exc:
+        record_entry_failure(
+            "G3",
+            f"受控等待进入核验失败（G3：无法按 API Key 核实调用者身份）：{exc}",
+            api_error=True,
+        )
+    if caller_kind != "agent":
+        record_entry_failure(
+            "G4",
+            "受控等待仅允许 agent 身份调用（G4）：当前 API Key 的身份是 "
+            f"{caller_member_id}（kind={caller_kind}），human 凭据不能驱动受控主动等待",
+            api_error=False,
+        )
+    if remaining() <= 0:
+        record_entry_failure(
+            "G5",
+            "受控等待进入核验失败（G5）：读取项目前剩余预算已耗尽，"
+            "未完成模式/指定核验，按进入错误返回且不开始普通等待",
+            api_error=False,
+        )
+    try:
+        project = _api_request(
+            "GET",
+            f"/api/projects/{quote(effective_project_id, safe='')}",
+            stats=stats,
+            timeout=next_request_timeout(),
+        )
+    except TalkToolError as exc:
+        record_entry_failure(
+            "G5",
+            f"受控等待进入核验失败（G5：无法读取项目 {effective_project_id}）：{exc}",
+            api_error=True,
+        )
+    last_project_read = _monotonic()
+    project_payload = project if isinstance(project, dict) else {}
+    mode = controller_mode_summary(project_payload)
+    assignment = controller_assignment_summary(project_payload)
+    if not mode["supported"] or not assignment["supported"]:
+        record_entry_failure(
+            "G5",
+            "受控等待进入核验失败（G5）：当前服务未返回模式/主控指定字段，不支持受控等待；"
+            "缺失字段不猜测成 passive 或未指定",
+            api_error=False,
+        )
+    if assignment["status"] != "assigned":
+        record_entry_failure(
+            "G6",
+            "受控等待进入核验失败（G6）：当前主控指定状态是 "
+            f"{assignment['status']}，不是 assigned",
+            api_error=False,
+        )
+    if str(assignment["member_id"]) != caller_member_id:
+        record_entry_failure(
+            "G7",
+            "受控等待进入核验失败（G7）：调用者 "
+            f"{caller_member_id} 不是当前指定主控 {assignment['member_id']}",
+            api_error=False,
+        )
+    if mode["requested_mode"] != "active":
+        record_entry_failure(
+            "G7",
+            f"受控等待进入核验失败（G7）：项目 {effective_project_id} 的模式意向是 "
+            f"{mode['requested_mode']}，不是 active",
+            api_error=False,
+        )
+    entry_snapshot: JsonDict = {
+        "requested_mode": mode["requested_mode"],
+        "requested_version": mode["requested_version"],
+        "member_id": assignment["member_id"],
+        "assignment_version": assignment["version"],
+        "status": assignment["status"],
+    }
+
+    def poll_round_tasks() -> list[JsonDict]:
+        """发请求前逐次检查剩余预算：remaining <=0 立即抛内部信号，不再发下一个 HTTP。"""
+        if selected_task_ids:
+            collected: list[JsonDict] = []
+            for task_id in selected_task_ids:
+                if remaining() <= 0:
+                    raise _WaitBudgetExhausted
+                collected.append(
+                    _api_request(
+                        "GET",
+                        f"/api/tasks/{int(task_id)}",
+                        stats=stats,
+                        timeout=next_request_timeout(),
+                    )
+                )
+            return collected
+        if remaining() <= 0:
+            raise _WaitBudgetExhausted
+        return _api_request(
+            "GET",
+            "/api/tasks",
+            params={
+                "target_member_id": None,
+                "status": None,
+                "workflow_status": None,
+                "project_id": effective_project_id,
+                "task_kind": None,
+            },
+            stats=stats,
+            timeout=next_request_timeout(),
+        )
+
+    def recheck_project() -> tuple[str | None, str]:
+        """重读项目并比对进入快照：模式条件先判，指定条件后判；无变化返回 (None, "")。"""
+        nonlocal rechecks, last_project_read
+        reread = _api_request(
+            "GET",
+            f"/api/projects/{quote(effective_project_id, safe='')}",
+            stats=stats,
+            timeout=next_request_timeout(),
+        )
+        rechecks += 1
+        last_project_read = _monotonic()
+        current_mode = controller_mode_summary(reread if isinstance(reread, dict) else {})
+        current_assignment = controller_assignment_summary(
+            reread if isinstance(reread, dict) else {}
+        )
+        if not current_mode["supported"]:
+            return "mode_changed", "重读时项目响应不再包含模式字段（旧服务或字段失效）"
+        if current_mode["requested_mode"] != entry_snapshot["requested_mode"]:
+            return (
+                "mode_changed",
+                f"模式意向从 {entry_snapshot['requested_mode']} 变为 {current_mode['requested_mode']}",
+            )
+        if current_mode["requested_version"] != entry_snapshot["requested_version"]:
+            return (
+                "mode_changed",
+                f"模式版本从 {entry_snapshot['requested_version']} 变为 "
+                f"{current_mode['requested_version']}",
+            )
+        if not current_assignment["supported"]:
+            return "controller_changed", "重读时项目响应不再包含主控指定字段（旧服务或字段失效）"
+        if current_assignment["version"] != entry_snapshot["assignment_version"]:
+            return (
+                "controller_changed",
+                f"主控指定版本从 {entry_snapshot['assignment_version']} 变为 "
+                f"{current_assignment['version']}",
+            )
+        if str(current_assignment["member_id"]) != str(entry_snapshot["member_id"]):
+            return (
+                "controller_changed",
+                f"主控指定从 {entry_snapshot['member_id']} 变为 {current_assignment['member_id']}",
+            )
+        if current_assignment["status"] != "assigned":
+            return (
+                "controller_changed",
+                f"主控指定状态变为 {current_assignment['status']}",
+            )
+        return None, ""
+
+    def finish(
+        *,
+        timed_out: bool,
+        reason: str,
+        polled: list[JsonDict],
+        matched: list[JsonDict],
+        exit_detail: str = "",
+    ) -> JsonDict:
+        elapsed = max(0.0, _monotonic() - started_monotonic)
+        payload = _wait_payload(
+            timed_out=timed_out,
+            reason=reason,
+            polled=polled,
+            matched=matched,
+            desired=desired,
+            effective_project_id=effective_project_id,
+            selected_task_ids=selected_task_ids,
+            requested_timeout=requested_timeout,
+            effective_timeout=effective_timeout,
+            elapsed=elapsed,
+            poll_rounds=poll_rounds,
+            stats=stats,
+            controlled=True,
+            controlled_entry=entry_snapshot,
+            controlled_rechecks=rechecks,
+        )
+        returned_count = len(payload["tasks"])
+        omitted_count = payload["tasks_omitted_count"]
+        _record_wait_stats(
+            {
+                "event": "talk_wait_tasks",
+                "started_at": started_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "project_id": effective_project_id,
+                "task_ids": selected_task_ids or None,
+                "workflow_statuses": sorted(desired),
+                "requested_timeout_seconds": requested_timeout,
+                "timeout_seconds": effective_timeout,
+                "elapsed_seconds": round(elapsed, 3),
+                "return_reason": reason,
+                "timed_out": timed_out,
+                "poll_rounds": poll_rounds,
+                "http_requests": int(stats["http_requests"]),
+                "matched_task_ids": [task.get("id") for task in matched],
+                "task_count": len(polled),
+                "tasks_returned": returned_count,
+                "tasks_truncated": bool(omitted_count),
+                "tasks_omitted_count": omitted_count,
+                "controlled_wait": True,
+                "controlled_rechecks": rechecks,
+                "controlled_entry": entry_snapshot,
+                "exit_detail": exit_detail or None,
+            }
+        )
+        return payload
+
+    def fail_as_api_error(exc: TalkToolError, *, stage: str) -> None:
+        """运行期 API 错误统一出口：任务轮询节点与 30 秒重读节点共用同一形态。
+
+        - 与进入期门禁失败不同，这里是“等待已经启动”之后的运行期错误：落且只落一条
+          ``return_reason=api_error`` 的 ``talk_wait_tasks`` 统计记录，带真实 elapsed 与轮询轮次；
+        - 每个失败节点只在 except 里调用一次，随即抛错终止等待，不会重复落盘或重复计数；
+        - 失败的 GET 尝试由 ``_api_request`` 在发请求前计入 ``stats['http_requests']``（只计一次）；
+        - 异常形态与 #156 的任务轮询路径逐字一致（仅多一条 JSONL 专属 ``failure_stage`` 标注），
+          不重试、不降级成 timeout/matched、不写任务、不泄露密钥，只把上游错误原文作为原因。
+        """
+        elapsed = max(0.0, _monotonic() - started_monotonic)
+        _record_wait_stats(
+            {
+                "event": "talk_wait_tasks",
+                "started_at": started_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "project_id": effective_project_id,
+                "task_ids": selected_task_ids or None,
+                "workflow_statuses": sorted(desired),
+                "requested_timeout_seconds": requested_timeout,
+                "timeout_seconds": effective_timeout,
+                "elapsed_seconds": round(elapsed, 3),
+                "return_reason": "api_error",
+                "timed_out": False,
+                "poll_rounds": poll_rounds,
+                "http_requests": int(stats["http_requests"]),
+                "controlled_wait": True,
+                "controlled_rechecks": rechecks,
+                "controlled_entry": entry_snapshot,
+                # JSONL 专属可追溯信息（不进返回结构）：本次失败发生在哪个节点。
+                "failure_stage": stage,
+                "error": str(exc),
+            }
+        )
+        raise TalkToolError(
+            "受控等待期间 TALK API 调用失败（按 api_error 显式报错，不伪装成正常 timeout，"
+            f"也不伪装成 matched）：{exc}；已等待 {elapsed:.1f} 秒，轮询 {poll_rounds} 次"
+        ) from exc
+
+    while True:
+        poll_rounds += 1
+        try:
+            tasks = poll_round_tasks()
+        except _WaitBudgetExhausted:
+            # R5：预算耗尽且未发出下一个请求 → 正常 timeout，返回最近一次成功完成的轮询集合
+            # （从未完成过任务轮询时为 tasks=[] / task_count=0）。
+            return finish(
+                timed_out=True,
+                reason="timeout",
+                polled=last_polled,
+                matched=[],
+                exit_detail="剩余预算不足，未再发出请求；返回最近一次成功完成的轮询集合",
+            )
+        except TalkToolError as exc:
+            fail_as_api_error(exc, stage="poll")
+        last_polled = tasks
+        matched = [
+            task for task in tasks if str(task.get("workflow_status") or "") in desired
+        ]
+        # 固定检查顺序：任务命中（matched 优先）→ 30 秒重读（先模式后指定）→ deadline → sleep。
+        if matched:
+            return finish(timed_out=False, reason="matched", polled=tasks, matched=matched)
+        if (
+            remaining() > 0
+            and _monotonic() - last_project_read >= CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS
+        ):
+            try:
+                changed_reason, change_detail = recheck_project()
+            except TalkToolError as exc:
+                # F-1：重读节点的项目 GET 失败与任务轮询失败同形处理——显式 api_error、
+                # 带真实 elapsed/rounds、恰好一条统计记录，不重试也不降级。
+                fail_as_api_error(exc, stage="recheck")
+            if changed_reason is not None:
+                return finish(
+                    timed_out=False,
+                    reason=changed_reason,
+                    polled=tasks,
+                    matched=[],
+                    exit_detail=change_detail,
+                )
+        if remaining() <= 0:
+            return finish(
+                timed_out=True,
+                reason="timeout",
+                polled=tasks,
+                matched=[],
+                exit_detail="deadline 耗尽，未再发出请求",
+            )
+        sleep_seconds = min(poll_interval, max(0.0, remaining()))
+        _sleep(sleep_seconds)
+        poll_interval = min(poll_interval * 2, WAIT_MAX_POLL_INTERVAL_SECONDS)
+
+
+def wait_tasks(
+    *,
+    task_ids: list[int] | None = None,
+    workflow_statuses: list[str] | None = None,
+    project_id: str | None = None,
+    timeout_seconds: float = WAIT_TIMEOUT_UNSET,
+    controlled_wait: bool = False,
+) -> JsonDict:
+    """有界等待任务进入目标协作状态。
+
+    - 默认（``controlled_wait`` 省略或 false）：与旧路径逐字段一致——最长/默认 600 秒、超出上限按
+      600 秒生效并标注请求值，不发身份 GET、不做项目重读、返回结构无新字段。
+    - ``controlled_wait=true`` 是显式 opt-in 的受控等待：必须先通过 G1–G7 进入门禁（项目上下文、
+      显式有限正数 timeout_seconds、按 API Key 反查的 agent 身份、服务端支持模式/指定、
+      status=assigned、本人等于指定主控、requested_mode=active），任一不满足直接报错、不轮询、不降级。
+    - 受控路径进入后记录模式/指定的独立版本快照，每 30 秒重读项目一次；模式变化/版本变化/字段失效
+      返回 ``mode_changed``，主控更换/解除/失效/版本变化返回 ``controller_changed``；
+      受控路径的 ``return_reason`` 只可能是 matched / timeout / mode_changed / controller_changed，
+      API 错误照旧显式抛错，不新增 cancelled。
+    - 成果提交（submitted）、完成（completed）、失败（failed）、需澄清
+      （clarification_requested 等）等状态一旦出现立即返回，不等满超时。
+    - 等待全部由程序轮询完成，等待期间不产生新的模型回合、也不经工具分发新增 get/list
+      调用（实现声明，非计数）；但本工具无法保证宿主外层零回合。
+    - tasks 与成果只回传引用字段（id / hall_group_id / result_message_id 等）和状态，
+      不回传任务正文、消息历史或实例历史；提前返回时 tasks 即命中集合（兼容原契约），
+      超时返回时是最近一次轮询到的任务，两者最多 WAIT_MAX_TASK_REFERENCES 条，超出部分以
+      tasks_truncated / tasks_omitted_count / omitted_task_ids 标记，matched_task_ids 完整。
+    - TALK API 错误（含 4xx/5xx/网络错误/单次请求超时）直接抛出错误，绝不复用超时返回结构；
+      受控路径连接受阻或响应读取阶段超时同样按 api_error 报错，不伪装成正常 timeout。
+    - 同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），Windows 下
+      客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态、不取消在途任务、不收取。
+    - query_stats 给出本次调用的程序级实测计数（轮询轮次、HTTP 请求数、耗时、返回原因）；
+      受控路径把身份 GET、项目 GET、每 30 秒重读 GET 与任务轮询 GET（含失败尝试）全部计入。
+    """
+    controlled = _normalize_controlled_wait(controlled_wait)
+    if controlled:
+        return _wait_tasks_controlled(
+            task_ids=task_ids,
+            workflow_statuses=workflow_statuses,
+            project_id=project_id,
+            timeout_seconds=timeout_seconds,
+        )
+    return _wait_tasks_legacy(
+        task_ids=task_ids,
+        workflow_statuses=workflow_statuses,
+        project_id=project_id,
+        timeout_seconds=timeout_seconds,
+    )
+
+
 TOOL_SCHEMAS: list[JsonDict] = [
     {
         "name": "talk_list_agents",
@@ -1046,6 +1697,12 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "无效状态不会自动解除或转给他人，仍由 human 显式清空；只有 human 能写入该指定，"
             "agent 侧为只读。非项目路径 controller_assignment 为 null；旧后端缺字段时为 "
             "supported=false / status=unsupported，不能当成未指定或已指定。"
+            "顶层还返回 caller_identity（项目路径新增一次 GET /api/members/me，按 API Key 反查，"
+            "不使用 TALK_MEMBER_ID、模型名或会话标签自证）：固定三键 {member_id, kind, note}，"
+            "成功时 member_id / kind 来自服务端响应且 note=null；获取失败或响应缺合法 id/kind 时"
+            "member_id 与 kind 均为 null 并给出简短中文 note，且该失败不阻断角色清单。"
+            "非项目路径 caller_identity 为 null，不额外发身份请求。caller_identity 只是如实披露入口"
+            "身份，自身不构成权限，也不代表在线、已确认或已获授权。"
             "availability 仅依据实例上报，未做心跳核验，可能滞后，使用时请参考 last_seen_at。"
             "project_id 省略时使用 bridge 项目上下文。"
         ),
@@ -1138,7 +1795,30 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "TALK API 错误会直接返回错误，不会被当成超时。"
             "本工具同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），"
             "Windows 下客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。"
-            "客户端单工具超时必须大于最长等待，建议 >= 660 秒。"
+            "客户端单工具超时必须大于最长等待，建议 >= 660 秒（本工具读不到宿主客户端预算，"
+            "唯一强制上限是 600 秒 clamp）。"
+            "受控等待是显式 opt-in 参数 controlled_wait（默认 false，缺省/ false 时与旧行为逐字段一致，"
+            "不产生身份 GET、不做项目重读、返回结构无新字段）：true 时必须通过 G1–G7 进入门禁"
+            "（项目上下文 / 显式有限正数 timeout_seconds（bool、非数值、NaN、inf、0、负值一律拒绝，"
+            "不采用 600 默认值）/ 按 API Key 反查的 agent 身份 / 服务端返回模式与主控指定字段 / "
+            "controller_assignment.status=assigned / 调用者等于指定主控 / requested_mode=active），"
+            "任一不满足直接报错，不轮询、不静默降级为普通等待。门禁通过后进入快照记录模式与指定的"
+            "独立版本，先查任务命中（matched 优先），再按 30 秒节奏重读项目（先模式后指定）："
+            "模式变化/版本变化/字段失效返回 mode_changed，主控更换/解除/失效/版本变化返回 "
+            "controller_changed，预算耗尽返回 timeout。受控路径的单次 deadline 从开始核验起算，"
+            "覆盖身份 GET、项目 GET、轮询 GET、重读 GET 与 sleep：发任何 HTTP 前剩余预算 <=0 就"
+            "不再发请求并按 timeout 返回最近一次成功完成的轮询集合（从未完成轮询则 tasks=[]、"
+            "task_count=0），否则该请求超时取 min(10 秒, 剩余预算)；受控路径的连接受阻、响应头/响应体"
+            "读取阶段超时与网络 OSError 一律归一为 TalkToolError（api_error），不伪装成正常 timeout，"
+            "也不伪装成 matched；socket 单请求超时不等于任意慢速响应的端到端硬中断。"
+            "受控路径的身份/项目/重读/轮询 GET（含失败尝试）全部计入 query_stats.http_requests，"
+            "并只额外返回 controlled_wait / controlled_entry / controlled_rechecks 三个字段。"
+            f"受控预算需调用方自行匹配宿主客户端预算（预留 {WAIT_CLIENT_MARGIN_SECONDS:.0f} 秒余量，"
+            "桌面 65 秒上限时建议 <=60 秒）。身份门禁只是桥内 advisory 自我保护，不代表在线、"
+            "不代表已获授权，也不替代服务端权限；matched 只表示任务命中，不表示仍具备 active 资格。"
+            "受控等待不修改任务状态、不取消在途任务、不重复收取，也不伪造 effective_mode 或调度互斥；"
+            "本版本没有客户端取消检测源，取消消息在等待期间读不到，也不新增 cancelled 返回原因；"
+            "等待占用同一条 MCP stdio 连接，期间其它工具调用排队。"
         ),
         "inputSchema": {
             "type": "object",
@@ -1151,6 +1831,18 @@ TOOL_SCHEMAS: list[JsonDict] = [
                     "minimum": 0,
                     "maximum": WAIT_MAX_TIMEOUT_SECONDS,
                     "default": WAIT_DEFAULT_TIMEOUT_SECONDS,
+                    "description": (
+                        "等待预算（秒）。非受控路径：省略即 600，负数归零，超过 600 按 600 生效。"
+                        "controlled_wait=true 时必须显式传入有限正数且不超过 600，否则直接报错。"
+                    ),
+                },
+                "controlled_wait": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "显式 opt-in 的受控等待开关（默认 false）。true 时先走 G1–G7 进入门禁并启用 "
+                        "30 秒项目重读与单次 deadline 记账；false/省略时行为与旧路径完全一致。"
+                    ),
                 },
             },
         },
@@ -1326,6 +2018,7 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             task_ids=arguments.get("task_ids"),
             workflow_statuses=arguments.get("workflow_statuses"),
             timeout_seconds=arguments.get("timeout_seconds"),
+            controlled_wait=arguments.get("controlled_wait"),
         )
     if name == "talk_reply_task":
         return reply_task(

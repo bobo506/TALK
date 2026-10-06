@@ -27,11 +27,16 @@ from bridges.talk_delivery import (
     DELIVERY_TRUST_NOTE,
 )
 from bridges.talk_task_tools import (
+    CONTROLLED_WAIT_EXIT_REASONS,
+    CONTROLLED_WAIT_NOTE,
+    CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS,
     WAIT_CANCELLATION_NOTE,
+    WAIT_CLIENT_MARGIN_SECONDS,
     WAIT_DEFAULT_TIMEOUT_SECONDS,
     WAIT_MAX_TASK_REFERENCES,
     WAIT_MAX_TIMEOUT_SECONDS,
     WAIT_RECOMMENDED_CLIENT_TIMEOUT_SECONDS,
+    WAIT_REQUEST_TIMEOUT_SECONDS,
     TalkToolError,
     _api_request,
     list_agents,
@@ -106,8 +111,21 @@ def wait_defaults() -> dict:
         "note": (
             "talk_wait_tasks 默认/最长 600 秒；MCP 客户端单工具超时必须大于它，"
             f"建议 >= {WAIT_RECOMMENDED_CLIENT_TIMEOUT_SECONDS:.0f} 秒，否则长等待会被客户端提前取消。"
+            "受控等待（controlled_wait=true）是显式 opt-in 的短预算入口，不重设上面的通用默认。"
         ),
         "cancellation_note": WAIT_CANCELLATION_NOTE,
+        # C2-A1：受控等待的公开边界，避免把 opt-in 参数误读成默认生效或"工具已强制执行宿主预算"。
+        "controlled_wait": {
+            "parameter": "controlled_wait",
+            "default": False,
+            "opt_in": True,
+            "entry_gates": ["G1", "G2", "G3", "G4", "G5", "G6", "G7"],
+            "recheck_interval_seconds": CONTROLLED_WAIT_RECHECK_INTERVAL_SECONDS,
+            "client_margin_seconds": WAIT_CLIENT_MARGIN_SECONDS,
+            "per_request_timeout_seconds": WAIT_REQUEST_TIMEOUT_SECONDS,
+            "return_reasons": list(CONTROLLED_WAIT_EXIT_REASONS),
+            "note": CONTROLLED_WAIT_NOTE,
+        },
     }
 
 
