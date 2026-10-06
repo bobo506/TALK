@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #164交付，派#165离页复位与文案独立复核
+
+- 用户通知“164好了”。#164/msg2666完整合法结构化talk-delivery-1、自身号匹配、complete自报，5完成/0未完成/0阻塞，无省略；runner succeeded/workflow submitted、未收取。Kimi开发结束暂停，格式与测试自报不替代独立实际代码验收。
+- 实际8跟踪文件+205/-18：workspace.js +15/-4、模式Node测试+167/-6、index四资源版本+4/-4、controller Python契约+8/-1、三Python版本断言各+1/-1、design-qa+8/-0。业务稳定946490f与收件HEAD d8c3635间仅三份主控文档；8文件sha/bytes吻合实施说明，连同app.js/style.css/workspace.css快照存.tmp/controller-mode-c2-b-ux-review-dispatch/source_manifest.json，开发未改app.js/CSS。
+- 自报!visible清模式selection，未触碰request/saveToken/saving，原生命周期接线复用；同页保留，返回按确认saved，保存在途真实结果仍可入账；状态行去版本但CAS保留。静态资源20261006-controller-mode-c2b-ux。具体接线与迟到边界交独立审查，不由Codex重复完整审码。
+- 开发者自报模式30、十二份workspace Node178（默认隔离与进程内）、四Python契约12、恢复7/12和集成15及语法通过；本片后端未改未重跑98。真实浏览器视觉/键盘/HTTP竞态未测，DOM存根不外推实机通过。原集成探针仅id接线、实际重试目标须源码核对，不重复旧证据措辞。
+- 最新development_requirements已读仍Kimi前端/DeepSeek交叉复核。最小独立顶层参数派#165“165-调度模式离页复位与状态文案独立复核”给agent:deepseek，queued/assigned，Hall group:task-554148e9af934cfa9f81105159a4cda8。任务包.tmp/controller-mode-c2-b-ux-review-dispatch/task.md；独立交付.tmp/controller-mode-c2-b-ux-review/。限定新增量/真实离页接线/同页不吞选择/在途续选/迟到项目账号安全与CAS/恢复回归；复核期禁止并行改业务。
+- 草稿普通验收涵盖两方向离页复位/显式保存保持/状态行去版本。409两窗口步骤可能同值成功不触发，任务要求独立判断可靠步骤或列未测；Agent现有密钥只读/409后GET失败可跳过列人工未测，不造账号/断网/改配置。正式旧文档含版本待复核通过后同步，不提前称人工通过。
+- 用户确认主控边界：目前是长期责任指定，硬关联主要为受控主动等待；普通派发现有权限未收紧，DeepSeek桌面仍可在用户授权下派发。本次仅解释，不新增独占派发权限/主动执行。保存active仅意向、effective仍null/not_bound。
+- 本轮仅PROGRESS/PROGRESS_HISTORY/DEVELOPMENT_ROADMAP收件派发记录，明确暂存三文件中文提交常规推送；#164业务八文件不提交。默认派发后结束，用户通知#165完成再读取裁决；#164未收取，C2-C不启动。
+
 ## 2026-10-06 用户人工验收反馈，派#164离页复位与文案简化
 
 - 用户实际发现：已保存被动，选择主动未保存，切其它页再返回仍选主动，容易误判当前配置；比较保存值标记/离页重置两种方式，倾向第二种。Codex采纳离开项目设置放弃模式未保存点选、返回已确认保存模式；用户明确要求状态行去“（版本 2）”只留模式名。属于人操作发现的新反馈，不推原C2-B人工验收通过。
