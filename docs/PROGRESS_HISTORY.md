@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #169复核六处残余，收取partial并派#170定向修订
+
+- 用户通知“169好了”。#169/msg2671完整合法talk-delivery-1/自身号匹配、partial，11完成/6未完成/0blocked，2文件/6验证/5限制，无省略。独立实际源码/文档核对P1-2/P2-1/P2-2/P2-4/P2-5及A/C/F直接回归主体闭合，但P1-1未完全闭合。Codex接受六项发现，不发布新合同、不收取#166/#168。
+- R-1：contract:59、plan:68/69、changes:21用35/39计入正则.test()，实际静态test定义33/30且无循环展开，历史mode30/30须独立说明。R-2：plan:58漏workspace1497-1499清空按钮调用旧saveControllerAssignment，删除范围须1497-1509而保留模式1510-1520；grep门禁须补save/loadControllerAssignment、controllerEl、CONTROLLER_STATUSES、clear/candidate元素。R-3常量CONTROLLED_WAIT_NOTE误拼；R-4严格校验位置/计数未定；R-5遗漏MODULE_webui:274及MODULE_bridges退出方式；R-6进入日志task_ids来源未定。
+- Codex抽验静态33/30、宽搜35/39、事件边界/旧调用证据一致，主控工作区干净/HEAD91b2bf2、原19对象hash/大小匹配。#169报告旧HEAD9e3e34d保留；仅静态审查、无测试/服务/终端/模型/真实等待/Key操作，数量不是通过数；reviewer git status受限，主控另核。原报告和#166目录当时观察均不追改。
+- 收取#169/msg2671于2026-10-06T13:19:35.662576，workflow completed，原业务partial保持（服务端原记录未补时区）；#167原partial已收取事实保持，#166/msg2668/#168/msg2670仍submitted/未收取。
+- Codex明确R-4：运行时G7严格校验在G6 active之后，不保留true1253宽松正规化；前门禁全过/到达G7非法输入HTTP恰2、任务GET0、entry_gate=G7/return_reason=null/恰一条entry，无正常返回；更早门禁拒绝按各自计数，外层schema拒绝不虚构本函数日志。R-6：true selected_task_ids初始None，G7完整合法后才稳定去重赋值，之前/非法日志task_ids=null；G8记录调用者合法去重列表，不落任意非法原输入或未核验任务响应；false原行为不动。均为待实施精确裁决。
+- Codex纳MODULE_webui:274入I-3；MODULE_bridges:214-220保留旧C2-A1历史事实并新增新实施规则/替代说明，204/210旧日期与600/660沿用212现行预算覆盖，不机械删除普通协调称谓。D-1..D-4/404与API错误/预算与入口字段/true死分支/legacy保留/I-1和I-2共同人工验收轮等已闭合内容不重开。
+- 派前读取最新development_requirements仍Kimi文字设计交互/前端、DeepSeek其它/后端，交叉复核；caller_identity=human:bobo。最小顶层参数派#170“170-发起者调度合同六项残余定向修订”给agent:kimi，queued/assigned，Hall group:task-6b3b8815151a48dca6741ee6c014de3c；包.tmp/initiator-mode-design-final-fix-dispatch/task.md与派前26对象快照（原19+审查2+模块2+页面测试2+talk_send_mcp）已落盘。
+- #170只新增.tmp/initiator-mode-design-final-fix/完整合同/拆分/changes/development，六项必要定位/计数与完整性校验；旧#166–#169原件/业务/正式文档/测试/DB/API/配置/Key/共享服务只读。真实本号裸JSON、格式校验、完成暂停再交DeepSeek定向复核。新合同未发布，业务同9272020，身份切换/模型展示/命名另片。
+- 本轮仅三份正式进度/裁决/派发记录，差异检查后中文提交常规推送，默认派发后结束、用户通知#170完成再取件。
+
 ## 2026-10-06 #168合同修订交付，派#169独立定向复核
 
 - 用户通知“168 ok”。#168/msg2670完整合法talk-delivery-1/自身号匹配，complete为结构化自报，12完成/0未完成/0blocked，4文件/6验证/5限制，无省略；runner succeeded/submitted，finished_at=2026-10-06T12:14:53.321339（服务端原记录未补时区）。不将自报当独立验收，#166/#168仍未收取，新合同未发布。
