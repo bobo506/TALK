@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #170六项修订交付，派#171独立定向复核
+
+- 用户通知“170完成”。#170/msg2672完整合法talk-delivery-1/自身号匹配，complete为自报，8完成/0未完成/0blocked，4文件/7验证/4限制，无省略；runner succeeded/submitted，finished_at=2026-10-06T13:38:02.574099（服务端原记录未补时区）。尚未独立确认，#166/#168/#170未收取、新合同未发布。
+- 四文件位于.tmp/initiator-mode-design-final-fix/：contract_draft.md（48615B/f05206338b3a6be069985fb21c167b02c750ded11b62b6acf80391c5225c6011）、implementation_plan.md（28304B/b0a06caf391b7f187bf6cf13425d8ae5247f4f6fe4f2f5d58e40893dab9bcecc）、changes.md（14987B/e43d04b48c5c3a9e96460b7166f9304d3881eb2e6649ebe994fe7f16c6cb5a74）、development.json（7473B/ad4d11fcc87dbea7e6ccfa842dd81149ea51f307b12994ca1a3e005af546c7bd）。旧#166–#169原件保持，新稿在#168底稿上定向修改。
+- 自报R-1静态test定义33/30、宽搜35/39误计/无循环展开/本片未跑测试/历史mode30分开；R-2事件删1497-1509完整、保留模式1510-1520，补退役grep符号；R-3改CONTROLLED_WAIT_NOTE；R-4落实G7校验位置和到达G7非法输入恰2HTTP/0任务GET/entry null与外层schema边界；R-5补MODULE_webui:274及MODULE_bridges历史保存/新实施说明；R-6输入完整校验前None/null、通过后稳定去重ID与G8日志不泄漏响应。原D-1..D-4、预算/失败/兼容/过渡/独立复核等不回退，均待#171确认。
+- #170验证仅静态定位、26对象开工/结束hash与自身task_id格式校验，实施/浏览器/模型/终端/服务/真实等待/Key均not_run；用例静态数不是通过数。主控核对原26对象hash/大小一致、新四文件hash登记、工作区干净/HEADc835591，91b2bf2→c835591仅三份主控记录，业务保持9272020。旧审查HEAD/原partial不追改。
+- 派前读取最新development_requirements，Kimi文字设计交互/前端、DeepSeek后端/其它、双方交叉复核不变，caller_identity=human:bobo。最小顶层参数派#171“171-发起者调度合同六项修订定向复核”给agent:deepseek，queued/assigned，Hall group:task-2be42a04587a49d4a2d551f5ba8f30a5；包.tmp/initiator-mode-design-final-review-dispatch/task.md及派前30对象清单（原26+#170四文件）已落盘。
+- 审查只新增.tmp/initiator-mode-design-final-review/{review.md,development.json}，逐R-1..R-6回相关源码/文稿、差异直接回归与30对象hash，沿用#167/#169已闭合部分，不重新完整旧审查。核对校验/统计/日志/active输入顺序和false兼容；历史引文与当前规范、自报修复与旧partial区分。不运行未来实现/实机，不转派收取，真实本号裸JSON/格式校验，完成暂停由Codex裁决。
+- #167/#169原partial已收取事实保持，#166/#168/#170通过新审查并合看后才收取/发布/拆实施。当前业务/测试/DB/API/权限/UI/配置/Key/共享服务零改动，effective null/not_bound及终端实T/W证据边界保持；模型展示/命名另片。本轮三份正式记录收尾提交常规推送，默认派后结束、用户通知#171再取件。
+
 ## 2026-10-06 #169复核六处残余，收取partial并派#170定向修订
 
 - 用户通知“169好了”。#169/msg2671完整合法talk-delivery-1/自身号匹配、partial，11完成/6未完成/0blocked，2文件/6验证/5限制，无省略。独立实际源码/文档核对P1-2/P2-1/P2-2/P2-4/P2-5及A/C/F直接回归主体闭合，但P1-1未完全闭合。Codex接受六项发现，不发布新合同、不收取#166/#168。
