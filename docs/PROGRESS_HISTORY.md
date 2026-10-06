@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #161复核发现两项缺口，收取复核并派#162定向修正
+
+- 用户通知“161 ok”。talk_get_delivery #161/msg2663为合法完整talk-delivery-1、自身任务号匹配、业务partial、11完成/3未完成/0阻塞、验证10/限制7，无省略；runner succeeded/workflow submitted不推业务通过。主控采纳明确验收缺口，未因用户完成通知或主体测试通过将C2-B验收。
+- DeepSeek实际阅读全部10文件/diff/新增552行测试及整体接线/生命周期/必要后端只读合同；A/B/D agree，C/E主体agree。独立node语法通过、新增20/九文件150、Python四份12全部复现，15/15集成探针通过；409恢复探针6/7，一项失败：409自动GET失败后error提示点重试、loaded=true导致retry hidden，而旧版本保存仍可点。失败证据和源探针保留，不追改。
+- F-1为恢复入口不可用与文案不一致，涉及明文验收C，返Kimi增加最小实际GET重试入口及行为断言，恢复后用安全最新版本明确手动保存，不自动PATCH/用保存代替重读；允许需重读状态暂禁旧版本保存但不扩其他流程。F-2为design-qa未记录首次:has/无本地兜底/旧浏览器样式降级，补一句事实和未测限制，无需新CSS兜底。手册恢复分支新草稿另存，原#160/#161报告/探针不追改。
+- #161复核成果已收取，返回workflow completed、msg2663，result_collected_at=2026-10-06T02:58:18.859405（服务端原时间未补时区）；这仅收取完成的独立审查工作，业务partial/F-1/F-2仍保留，#160未收取。正式业务尚未提交。
+- 本轮开工HEAD97089b99358d58ea87e76fecebfc15ba208f9905；主控复验source_manifest 10/10 sha/bytes一致。原业务+514/-11及新增552行仍为修前基线；3个拟改文件原文本精确保存.tmp/controller-mode-c2-b-fix-dispatch/pre_fix/。复核者观察主控仅三份docs提交，不触业务事实保持。
+- 重读最新development_requirements后按Kimi开发/DeepSeek交叉复核，最小独立顶层参数派#162“调度模式冲突恢复入口与降级记录修正”给agent:kimi，queued/assigned，Hall group:task-1d731e1378bc44688506509e7702e669；任务包副本.tmp/controller-mode-c2-b-fix-dispatch/task.md，交付.tmp/controller-mode-c2-b-fix/。限定workspace.js/新增Node测试/design-qa两项修正；确需资源版本允许四处+四Python断言一致同步，不扩其它业务。完成暂停后另派DeepSeek定向复核。
+- 修正验证要求原7项恢复探针（原脚本不改）、新增控件可达/GET-only/安全最新版本/跨上下文及Node九文件必要回归；原探针若因禁旧保存出现预期语义差异，保留输出并以新探针验证正确语义，不篡改旧失败证据。仅资源版本变化才补Python页面契约，不无故重跑98后端/全库/C2-A1。
+- 限制保留：无真实浏览器视觉/键盘/:has外观或HTTP并发；复核Node默认spawn EPERM以--test-isolation=none完成（隔离语义不同、未冒充默认通过）；原控件依赖Tailwind CDN与间距56px为已披露实践/视觉待验项，不扩修。有效模式仍null/not_bound，active意向不自动唤醒。
+- 本轮仅正式进度/路线图按UTF-8维护、差异检查后中文提交常规推送，未提交业务源码；默认派后结束，由用户通知#162完成再读交付/派定向复核，通过后完成#160与修正任务收取/手册模块/业务Git及用户页面验收。
+
 ## 2026-10-06 收到#160交付，派#161给DeepSeek独立复核
 
 - 用户通知“160已完成”。talk_get_delivery #160/msg2662为合法完整talk-delivery-1，自身task_id160匹配、自报complete、9完成/0未完成/0阻塞、验证6/限制3、10变更文件，无摘要省略；runner succeeded/workflow submitted/未收取。格式和自报通过不代表独立业务验收，#160保持未收取待复核。
