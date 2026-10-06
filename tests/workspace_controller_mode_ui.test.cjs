@@ -6,7 +6,11 @@
 // 读取成功清新版本后由用户明确保存、需重读不串上下文）、400/422/普通错误保留选择且不进入
 // 需重读、非法版本禁写、未知模式如实降级、
 // 跨项目/账号迟到成功与失败不回填、保存中续选保护、saveToken 所有权不锁死、
-// 面板可见性互斥与同上下文不重读。
+// 面板可见性互斥与同上下文不重读；
+// C2-B-UX 离页复位：切任务/群聊/具体角色放弃未保存选择且全程无 PATCH、返回显示已保存
+// 模式（含已保存主动返主动）、失败未保存离开返回原已保存、同页重绘/轮询不吞选择、
+// 保存在途离开/保存中续选后离开的迟到成功展示真实保存结果、离开期间迟到失败如实显示；
+// 已保存状态行只显示模式名、不含（版本 N），expected_version/CAS 仍原样工作。
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -125,7 +129,8 @@ test('human 加载被动默认：状态两行如实显示，保存需显式选�
   const { context, pending, reply, el, ui, enter } = harness();
   await enter('A');
   assert.equal(el('controller-mode-panel').classList.contains('hidden'), false);
-  assert.equal(el('controller-mode-saved').textContent, '已保存设置：被动（版本 0）');
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：被动');
+  assert.ok(!/（版本/.test(el('controller-mode-saved').textContent), '已保存状态行不显示版本号');
   assert.equal(el('controller-mode-effective').textContent, EFFECTIVE_LINE);
   assert.ok(!/已启用/.test(el('controller-mode-effective').textContent));
   assert.equal(el('controller-mode-passive').checked, true);
@@ -152,7 +157,7 @@ test('human 加载被动默认：状态两行如实显示，保存需显式选�
   assert.equal(ui.saved, 'active');
   assert.equal(ui.version, 1);
   assert.equal(ui.selection, null, '成功后清空未保存选择');
-  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动（版本 1）');
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
   assert.equal(el('controller-mode-active').checked, true);
   // 无主控时保存主动：如实显示原因且明确不产生主动调度
   assert.match(ui.notice, /已保存“主动”，但当前主控指定不可用：尚未指定项目主控，不会因此产生任何主动调度/);
@@ -193,7 +198,7 @@ test('已保存主动且主控不可用时常驻提示；主控变更经缓存�
     controller_mode: 'active', controller_mode_version: 3,
     controller_member_id: 'agent:kimi', controller_assignment_status: 'assigned',
   });
-  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动（版本 3）');
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
   assert.ok(!/主控指定不可用/.test(el('controller-mode-status').textContent), '主控有效时不打扰');
   // 主控面板保存后会把最新指定状态回写项目缓存（applyControllerRead）；本面板只读缓存刷新提示
   context.projects[0].controller_assignment_status = 'not_in_roster';
@@ -207,7 +212,7 @@ test('已保存主动且主控不可用时常驻提示；主控变更经缓存�
 test('agent 账号只读：radio 禁用、保存隐藏、提示由项目负责人管理，但仍能看到已保存状态', async () => {
   const { el, enter } = harness({ human: false });
   await enter('A', { controller_mode: 'active', controller_mode_version: 2 });
-  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动（版本 2）');
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
   assert.equal(el('controller-mode-effective').textContent, EFFECTIVE_LINE);
   assert.equal(el('controller-mode-passive').disabled, true);
   assert.equal(el('controller-mode-active').disabled, true);
@@ -488,7 +493,7 @@ test('未知模式如实降级：显示无法识别、不预选任何项，选�
   });
   await save;
   assert.equal(ui.saved, 'passive');
-  assert.equal(el('controller-mode-saved').textContent, '已保存设置：被动（版本 8）');
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：被动');
 });
 
 test('保存响应核实：项目不符、模式不一致或版本不可用都不算保存成功', async () => {
@@ -616,6 +621,162 @@ test('double submit 防护：保存中第二次写入直接返回，只有一个
   });
   await first;
   assert.equal(ui.saved, 'active');
+});
+
+test('C2-B-UX 离页复位：切任务/群聊/具体角色放弃未保存选择，返回显示已保存被动，全程无 PATCH', async () => {
+  const { context, pending, el, ui, enter, setSettingsSelected } = harness();
+  await enter('A'); // 已保存被动 v0
+  context.selectControllerMode('active');
+  assert.equal(el('controller-mode-active').checked, true);
+  assert.match(el('controller-mode-status').textContent, /尚未保存/);
+  const before = pending.length;
+  // 切任务页：放弃未保存选择
+  context.workspaceUI.mode = 'tasks';
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null, '切任务页放弃未保存选择');
+  assert.equal(el('controller-mode-panel').classList.contains('hidden'), true);
+  // 切群聊页：同样保持放弃
+  context.workspaceUI.mode = 'chats';
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null);
+  // 返回项目设置：radio 匹配已保存被动，状态行只显示模式名
+  context.workspaceUI.mode = 'roles';
+  context.renderControllerModePanel();
+  assert.equal(el('controller-mode-panel').classList.contains('hidden'), false);
+  assert.equal(el('controller-mode-passive').checked, true, '返回显示已保存被动');
+  assert.equal(el('controller-mode-active').checked, false);
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：被动');
+  assert.equal(el('controller-mode-save-btn').disabled, true, '无未保存差异，保存不可用');
+  // 再选一次，然后选具体角色（仍在角色标签但离开项目设置）：同样放弃
+  context.selectControllerMode('active');
+  setSettingsSelected(false);
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null, '选具体角色同样放弃未保存选择');
+  setSettingsSelected(true);
+  context.renderControllerModePanel();
+  assert.equal(el('controller-mode-passive').checked, true);
+  assert.equal(el('controller-mode-save-btn').disabled, true);
+  assert.equal(pending.filter(p => p.opts?.method === 'PATCH').length, 0, '离页不发 PATCH、不自动保存');
+  assert.equal(pending.length, before, '同上下文往返不触发额外读取');
+});
+
+test('C2-B-UX 离页复位：已保存主动时未保存改选被动，离开返回显示主动', async () => {
+  const { context, el, ui, enter } = harness();
+  await enter('A', { controller_mode: 'active', controller_mode_version: 2 });
+  assert.equal(el('controller-mode-active').checked, true);
+  context.selectControllerMode('passive');
+  assert.equal(el('controller-mode-passive').checked, true);
+  assert.equal(el('controller-mode-save-btn').disabled, false);
+  context.workspaceUI.mode = 'tasks';
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null);
+  context.workspaceUI.mode = 'roles';
+  context.renderControllerModePanel();
+  assert.equal(el('controller-mode-active').checked, true, '返回显示已保存主动');
+  assert.equal(el('controller-mode-passive').checked, false);
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
+  assert.equal(el('controller-mode-save-btn').disabled, true, '未保存选择已放弃，不靠修改真实项目模式回到原值');
+});
+
+test('C2-B-UX 同页重绘/轮询同步不吞未保存选择', async () => {
+  const { context, el, ui, enter } = harness();
+  await enter('A');
+  context.selectControllerMode('active');
+  // 面板仍可见的重绘/同步（任务轮询重绘、提示刷新等同一路径）不得当成离开
+  context.renderControllerModePanel();
+  context.syncControllerModePanel();
+  context.renderControllerModePanel();
+  context.syncControllerModePanel();
+  assert.equal(ui.selection, 'active', '同页重绘保留未保存选择');
+  assert.equal(el('controller-mode-active').checked, true);
+  assert.match(el('controller-mode-status').textContent, /尚未保存/);
+  assert.equal(el('controller-mode-save-btn').disabled, false, '显式保存入口保持可用');
+});
+
+test('C2-B-UX 保存在途离开再进入：离开放弃选择但不取消在途保存，迟到成功展示真实保存结果', async () => {
+  const { context, pending, reply, el, ui, enter } = harness();
+  await enter('A');
+  context.selectControllerMode('active');
+  const save = context.saveControllerMode();
+  assert.equal(ui.saving, true);
+  // 保存请求在途即离开：选择被放弃，在途保存不取消、request/saveToken 不动
+  context.workspaceUI.mode = 'tasks';
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null);
+  assert.equal(ui.saving, true, '离开不取消在途保存');
+  reply(pending.length - 1, {
+    project_id: 'A', controller_mode: 'active', controller_mode_version: 1,
+    controller_member_id: null, controller_assignment_status: 'unassigned',
+  });
+  await save;
+  assert.equal(ui.saving, false, 'saveToken 不锁死，在途保存正常收尾');
+  assert.equal(ui.saved, 'active');
+  assert.equal(ui.version, 1);
+  // 返回：展示真实已确认保存结果，radio 为已保存主动
+  context.workspaceUI.mode = 'roles';
+  context.renderControllerModePanel();
+  assert.equal(el('controller-mode-active').checked, true);
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
+  assert.match(el('controller-mode-status').textContent, /已保存“主动”/);
+});
+
+test('C2-B-UX 保存中续选后离开：续选被放弃，迟到成功只展示真实保存值', async () => {
+  const { context, pending, reply, el, ui, enter } = harness();
+  await enter('A');
+  context.selectControllerMode('active');
+  const save = context.saveControllerMode();
+  context.selectControllerMode('passive'); // 保存期间续选
+  assert.equal(ui.selection, 'passive');
+  context.workspaceUI.mode = 'chats';
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null, '离页放弃保存期间的续选');
+  reply(pending.length - 1, {
+    project_id: 'A', controller_mode: 'active', controller_mode_version: 1,
+    controller_member_id: null, controller_assignment_status: 'unassigned',
+  });
+  await save;
+  assert.equal(ui.saved, 'active');
+  assert.equal(ui.selection, null, '迟到成功不得复活离页前的续选');
+  context.workspaceUI.mode = 'roles';
+  context.renderControllerModePanel();
+  assert.equal(el('controller-mode-active').checked, true);
+  assert.match(el('controller-mode-status').textContent, /已保存“主动”/);
+});
+
+test('C2-B-UX 保存失败未保存即离开：返回显示原已保存模式，失败信息如实保留', async () => {
+  const { context, pending, reply, el, ui, enter } = harness();
+  await enter('A');
+  context.selectControllerMode('active');
+  const save = context.saveControllerMode();
+  reply(pending.length - 1, { detail: 'mode must be one of [passive, active]' }, { ok: false, status: 422 });
+  await save;
+  assert.equal(ui.selection, 'active', '面板会话内失败保留选择可重试');
+  context.workspaceUI.mode = 'tasks';
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null, '离页放弃失败后的未保存选择');
+  context.workspaceUI.mode = 'roles';
+  context.renderControllerModePanel();
+  assert.equal(el('controller-mode-passive').checked, true, '失败未保存返回仍原已保存被动');
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：被动');
+  assert.match(el('controller-mode-status').textContent, /mode must be one of/, '失败信息如实保留');
+});
+
+test('C2-B-UX 离开期间迟到保存失败：返回如实显示错误与原已保存模式，不回填未保存选择', async () => {
+  const { context, pending, reply, el, ui, enter } = harness();
+  await enter('A');
+  context.selectControllerMode('active');
+  const save = context.saveControllerMode();
+  context.workspaceUI.mode = 'tasks';
+  context.renderControllerModePanel();
+  assert.equal(ui.selection, null);
+  reply(pending.length - 1, { detail: 'internal error' }, { ok: false, status: 500 });
+  await save;
+  assert.equal(ui.saved, 'passive', '迟到失败不改写已保存值');
+  context.workspaceUI.mode = 'roles';
+  context.renderControllerModePanel();
+  assert.equal(el('controller-mode-passive').checked, true);
+  assert.equal(el('controller-mode-saved').textContent, '已保存设置：被动');
+  assert.match(el('controller-mode-status').textContent, /internal error/, '迟到错误如实显示');
 });
 
 test('面板可见性：任务/群聊页与具体角色互斥隐藏，返回项目设置不重复读取', async () => {

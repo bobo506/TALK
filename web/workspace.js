@@ -1113,6 +1113,10 @@ function workspaceTaskNotice(task, tree) {
 // 回填其它上下文；用户未保存的选择存于 selection，重绘不得吞掉。不新增后台轮询。
 // 409 后标记“需重读”（reloadNeeded）：重读成功前暂禁保存以避免旧版本无效 CAS，“重试”
 // 只做 GET 重读、不自动 PATCH，任一次读取成功即解除并按原权限/版本/dirty 恢复保存。
+// C2-B-UX（2026-10-06 用户验收反馈）：离开“项目设置”（切任务/群聊、选具体角色、切项目/
+// 账号等使面板隐藏）即放弃未保存选择，返回时 radio 与状态行按已确认 saved 显示；离页不发
+// PATCH、不自动保存、不弹确认、不留持久化草稿。已保存状态行只显示模式名，不再显示版本号；
+// controller_mode_version / expected_version / CAS / 响应核实全部保留，仅删展示。
 const CONTROLLER_MODE_LABELS = { passive: "被动", active: "主动" };
 const controllerModeUI = { projectId: null, memberId: null, supported: false, loaded: false, saving: false, saveToken: null, request: 0, saved: null, version: null, controllerId: undefined, controllerStatus: undefined, selection: null, error: "", notice: "", reloadNeeded: false };
 function controllerModeEl(id) { return typeof document === "undefined" ? null : document.getElementById(id); }
@@ -1150,7 +1154,14 @@ function renderControllerModePanel() {
   if (!panel) return;
   const visible = blackboardOpen && workspaceUI.mode === "roles" && workspaceSettingsSelected() && Boolean(activeProjectId) && Boolean(myId);
   panel.classList.toggle("hidden", !visible);
-  if (!visible) return;
+  if (!visible) {
+    // C2-B-UX：离开“项目设置”（切任务/群聊、选具体角色、切项目/账号、关黑板等）即放弃
+    // 未保存选择：不发 PATCH、不自动保存、不弹确认、不留持久化草稿；返回时 radio 与状态行
+    // 按已确认 saved 显示。在途保存、request 序号与 saveToken 所有权不受此处影响，迟到成功/
+    // 失败仍按原上下文校验如实入账；同页重绘/轮询（面板仍可见）不进入此分支，不吞用户选择。
+    controllerModeUI.selection = null;
+    return;
+  }
   if (controllerModeUI.projectId !== activeProjectId || controllerModeUI.memberId !== myId) {
     // 上下文切换（含 A→B→A 往返与切账号）：递增请求序号作废旧读写，
     // 重置保存所有权（旧请求迟到不得清理新上下文的保存状态），新上下文重新读取。
@@ -1172,14 +1183,14 @@ function syncControllerModePanel() {
   const status = controllerModeEl("controller-mode-status");
   const human = currentMemberIsHuman();
   const ready = controllerModeUI.loaded && controllerModeUI.supported;
-  // 状态行一：已保存设置（含版本）。加载中/读取失败/旧服务/未知模式如实降级，
-  // 不把缺失或异常值伪装成已保存被动。
+  // 状态行一：已保存设置（仅模式名；版本号仍参与 expected_version/CAS 但不展示）。
+  // 加载中/读取失败/旧服务/未知模式如实降级，不把缺失或异常值伪装成已保存被动。
   if (!controllerModeUI.loaded) {
     savedLine.textContent = controllerModeUI.error ? "已保存设置：读取失败" : "已保存设置：读取中…";
   } else if (!controllerModeUI.supported) {
     savedLine.textContent = "已保存设置：当前服务不支持调度模式设置";
   } else if (controllerModeKnown(controllerModeUI.saved)) {
-    savedLine.textContent = `已保存设置：${CONTROLLER_MODE_LABELS[controllerModeUI.saved]}（版本 ${controllerModeUI.version}）`;
+    savedLine.textContent = `已保存设置：${CONTROLLER_MODE_LABELS[controllerModeUI.saved]}`;
   } else {
     savedLine.textContent = `已保存设置：无法识别的模式（服务返回：${String(controllerModeUI.saved)}），可选择下方模式重新保存`;
   }

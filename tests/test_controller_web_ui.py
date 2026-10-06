@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261006-controller-mode-c2b-f1"
+STATIC_VERSION = "20261006-controller-mode-c2b-ux"
 
 
 class ControllerWebUiTests(RouteTestCase):
@@ -203,6 +203,7 @@ class ControllerModeWebUiTests(RouteTestCase):
         self.assertLess(html.index('id="controller-mode-panel"'), html.index('id="role-details-name-panel"'))
         # 静态资源版本四处一致。
         self.assertEqual(html.count(STATIC_VERSION), 4)
+        self.assertNotIn("20261006-controller-mode-c2b-f1", html)
         self.assertNotIn("20261005-role-desc-f2", html)
 
     def test_controller_mode_script_contract(self):
@@ -254,6 +255,12 @@ class ControllerModeWebUiTests(RouteTestCase):
         self.assertNotIn("已启用", block)
         self.assertIn("不会因此产生任何主动调度", block)
         self.assertIn("尚未指定项目主控", block)
+        # C2-B-UX：已保存状态行只显示模式名，不显示（版本 N）等数字版本括号；
+        # 版本仍参与 expected_version/CAS（上方断言保留），仅删展示。
+        self.assertNotIn("（版本", block)
+        # C2-B-UX：离开“项目设置”即放弃未保存选择（不 PATCH/不自动保存/不弹确认）。
+        self.assertIn("即放弃未保存选择", block)
+        self.assertIn("controllerModeUI.selection = null;", block)
         # 两块面板独立：不写主控指定、不写普通项目字段；主控变更只读缓存刷新提示。
         self.assertNotIn("/controller-assignment", block)
         self.assertNotIn("development_requirements", block)

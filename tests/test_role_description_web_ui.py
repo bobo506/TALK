@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261006-controller-mode-c2b-f1"
+STATIC_VERSION = "20261006-controller-mode-c2b-ux"
 
 
 class RoleDescriptionWebUiTests(RouteTestCase):
