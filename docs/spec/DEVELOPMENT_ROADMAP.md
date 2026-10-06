@@ -17,7 +17,7 @@
 
 ## 2026-10-06 当前状态：C2-A1工具实现通过，待MCP加载验收
 
-C2-0设计链#152–#155已经收取，正式合同见[CONTROLLER_MODE_DESIGN.md](CONTROLLER_MODE_DESIGN.md)。C2-A1 #156开发经#157独立实际代码审查、#158 F-1修正与#159定向复核通过，Codex合看确认实现通过，#156/#158/#159已收取，#157此前已收取；原partial/MCPunknown与错误报告保留。#159独立29+29+31项及新旧探针通过，F-1关闭；无新问题，无server/数据库/UI/运行配置改动。
+C2-0设计链#152–#155已经收取，正式合同见[CONTROLLER_MODE_DESIGN.md](CONTROLLER_MODE_DESIGN.md)。C2-A1 #156开发经#157独立实际代码审查、#158 F-1修正与#159定向复核通过，Codex合看确认实现通过，#156/#158/#159已收取，#157此前已收取；原partial/MCPunknown与错误报告保留。#159独立29+29+31项及新旧探针通过，F-1关闭；无新问题，无server/数据库/UI/运行配置改动；C2-A1代码与适配规范已由9ee0ac0提交推送。
 
 当前Codex MCP连接只读读回仍无caller_identity、工具目录未提controlled_wait，本轮无MCP重载入口且未启停进程；源码通过不代表当前连接已经加载。按[终端指南](../guides/TERMINAL_MCP.md)重连/重新加载进程与目录后做只读字段验收，真实主动链路仍后续。下一C2-B前端带双横线修正，C2-C约定消费者/指南与主动验收待开发；C2-A2耗尽低风险可选，C2-D真正取消登记。effective_mode仍null/not_bound，无自动唤醒/互斥，当前默认派后结束/用户通知取件。
 
