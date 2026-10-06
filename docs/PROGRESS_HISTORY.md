@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-06 #162定向修正交付，派#163给DeepSeek定向复核
+
+- 用户通知“162 ok”。#162/msg2664 runner succeeded/workflow submitted/未收取，但结果“说明+JSON”混排，MCP unknown自由文本；未从预览或succeeded推业务complete。按稳定结果引用4000+1047完整补读5047字符，sha a6c5de382289e0bded52bdafa271f842d888afe208ff722f619b976b39e10645，提取JSON与本地development.json逐字段一致；本地summary --expect-task-id162合法complete（6完成/0未完成/0阻塞、验证10/限制4），原结果/报告保持不改。合法自报仍非独立验收，#160/#162未收取。
+- F-1自报修正以reloadNeeded状态位实现409后需重读：失败保持/重试可见，只GET恢复、需重读时按钮与函数入口暂禁保存，读成功clear/更新安全版本、用户明确保存；保持初读失败只读重试，422等非重读错误与上下文边界。F-2已在design-qa入库节记录首次:has/无本地兜底、旧浏览器失样式/原生radio不受影响、实机未测；不增CSS兜底。新手册恢复草稿单独保存，原#160草稿不追改。
+- 实测本次修前→修后精确增量：workspace.js +18/-5，105023B/sha f7cfc0fb652b64972c7a6def8fad1db45a937cba82af213f90d6b7c524647f61；新Node测试+108/-2，34786B/sha 9a2125ac28df5c7174da808be31b83b078dd4e36697db5ae1eda35002104869c；design-qa +3/-2，12126B/sha 5f5caad98fab9d9d84a8079354a59393f61119a94907b1a1d640bee169bae419。另index.html四处资源版本20261006-controller-mode-c2b-f1及四Python契约仅版本串/一NotIn同步；app.js/css与#161原10文件快照完全未变，8变更/2未变与报告吻合。现10文件sha/bytes快照.tmp/controller-mode-c2-b-fix-review-dispatch/source_manifest.json。
+- 开发者自报JS/测试语法通过、新增23/23和九文件153/153（默认逐文件隔离与--test-isolation=none两模式均过）；原7项恢复探针现7/7、新12项恢复探针12/12、接线15/15，资源版本变更后Python四契约12/12。原probe第3项恒真记录detail由saveBtn.disabled=false→true，为已授权需重读暂禁保存，不宣称语义完全相同、不改旧失败证据；新probe实断言GET-only/禁保存/新版明确保存正确。
+- 本轮实际HEAD770e08cb8b7fda2b5c3e390e9d0a6ee34b38cfec；#162开发基线97089b9与当前仅三份主控记录docs差异，业务未提交。主控只处理交付索引/必要格式补读/文件增量与快照，不重复完整审代码或测试。
+- 派前重读最新development_requirements，仍Kimi开发/DeepSeek交叉复核、Codex裁决/收尾。最小独立顶层参数派#163“调度模式冲突恢复修正定向复核”给agent:deepseek，queued/assigned，Hall group:task-8ce666fbc31347d28b0dd5f064b4b4e6。包副本.tmp/controller-mode-c2-b-fix-review-dispatch/task.md，复核交付.tmp/controller-mode-c2-b-fix-review/。限定F-1/F-2实际修前修后增量/直接生命周期与语义回归、版本同步、手册恢复草稿，独立复跑原7/新12/新增23/九文件153及版本契约12；无具体疑点不重做#161全片审查/98后端/C2-A1。
+- #163须独立看实际代码、开工/结束核对业务hash，禁止改业务/原证据/正式文档；自身真实任务号校验，完整同一裸JSON结果，不再混说明。Kimi暂停，复核期间无并行改业务码；合看原#161主体独立审与本次定向结论后才能验收。浏览器视觉/键盘/:has外观与真实HTTP竞态、端到端仍未测，留用户页面验收，未新增主控浏览器操作。
+- 本轮仅正式PROGRESS/HISTORY/路线图收件派发记录，UTF-8写入并差异检查后中文提交常规推送；10业务/测试/QA文件保持未审收尾不暂存。默认派后结束、用户通知#163完成后读取/裁决，通过再收取#160/#162/#163并同步模块/手册、业务Git与人工页面验收。
+
 ## 2026-10-06 #161复核发现两项缺口，收取复核并派#162定向修正
 
 - 用户通知“161 ok”。talk_get_delivery #161/msg2663为合法完整talk-delivery-1、自身任务号匹配、业务partial、11完成/3未完成/0阻塞、验证10/限制7，无省略；runner succeeded/workflow submitted不推业务通过。主控采纳明确验收缺口，未因用户完成通知或主体测试通过将C2-B验收。

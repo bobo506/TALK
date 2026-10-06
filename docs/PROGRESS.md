@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-06 (Asia/Shanghai)，重开窗口恢复并完成Codex当前连接加载检查。C2-A1代码独立复核通过并已提交推送，#152–#159已收取；九工具、新字段、短预算命中、人类身份门禁拒绝及后续查询已实测，真实主动链路未验收；用户通知#161完成，独立复核partial发现F-1/F-2；复核成果已收取，#160尚未业务验收/收取，已派#162给Kimi定向修正。
+Updated: 2026-10-06 (Asia/Shanghai)，重开窗口恢复并完成Codex当前连接加载检查。C2-A1代码独立复核通过并已提交推送，#152–#159已收取；九工具、新字段、短预算命中、人类身份门禁拒绝及后续查询已实测，真实主动链路未验收；用户通知#162完成，本地交付校验complete、MCP原结果因说明+JSON混排仍unknown，完整补读确认JSON一致；#163已派DeepSeek定向复核，#160/#162未业务验收收取。
 
 ## 当前身份与协作
 
@@ -11,7 +11,7 @@ Updated: 2026-10-06 (Asia/Shanghai)，重开窗口恢复并完成Codex当前连�
 
 - 稳定功能提交 `9ee0ac0`，此前进度补记提交 `4a67871`、重开窗口交接提交 `11977a8`，均已推送到 `origin/codex/terminal-return-codex`；本次交接开工时工作区干净，HEAD与该远程跟踪引用一致。当前分支未配置upstream，常规推送显式指定 `origin codex/terminal-return-codex`。
 - 当前Codex连接目录共九工具，wait暴露 `controlled_wait`；项目list_agents返回 `caller_identity={member_id: human:bobo, kind: human, note: null}`，模式passive/version0，指定agent:codex/version13/assigned，effective仍null/not_bound。以#159历史完成任务、显式5秒预算验证false路径立即matched（程序elapsed0.016秒、1轮/1HTTP）；true路径按G4拒绝human凭据，随后list_agents成功。当前连接加载检查通过，不外推DeepSeek桌面已刷新或300秒等待/取消/API错误/真实主动链路通过。
-- 用户确认C2-B范围后，按最新开发要求以最小顶层参数派#160“项目设置调度模式界面与角色分隔线清理”给agent:kimi，派发返回queued/assigned，未进一步轮询。任务包基线795dc19，副本.tmp/controller-mode-c2-b-dispatch/task.md；交付目录.tmp/controller-mode-c2-b/。DeepSeek #161已交付并收取，业务partial保留。#162已派Kimi定向修正F-1/F-2，返回queued/assigned；修正前快照/包在.tmp/controller-mode-c2-b-fix-dispatch/，交付目录.tmp/controller-mode-c2-b-fix/。完成后再派DeepSeek定向复核；默认派发后结束、用户通知完成。
+- 用户确认C2-B范围后，按最新开发要求以最小顶层参数派#160“项目设置调度模式界面与角色分隔线清理”给agent:kimi，派发返回queued/assigned，未进一步轮询。任务包基线795dc19，副本.tmp/controller-mode-c2-b-dispatch/task.md；交付目录.tmp/controller-mode-c2-b/。DeepSeek #161已收取、原partial保留；Kimi #162修正已交付并暂停。#163已派DeepSeek定向复核，返回queued/assigned；修前快照在.tmp/controller-mode-c2-b-fix-dispatch/pre_fix/，修后快照/包在.tmp/controller-mode-c2-b-fix-review-dispatch/，复核交付.tmp/controller-mode-c2-b-fix-review/；默认派发后结束、用户通知完成。
 
 ## 最近完成
 
@@ -24,7 +24,7 @@ Updated: 2026-10-06 (Asia/Shanghai)，重开窗口恢复并完成Codex当前连�
 ## 当前验收与下一步
 
 1. **Codex当前连接C2-A1加载检查通过，真实主动链路未验收。** 新目录/身份字段与历史任务短预算读取、预期G4拒绝及后续查询已实测，证据见上方；当前Key是human，不能驱动受控等待，不改凭据/指定/模式绕过。DeepSeek桌面刷新与长等待、正常到期/API错误/客户端取消排队边界未在本轮验证；各终端继续按TERMINAL_MCP预算要求分别验收。
-2. **C2-B #161业务partial，#162定向修正待交付，#160未收取。** #161/msg2663合法完整自身任务号匹配，11完成/3未完成/0阻塞；主体A/B/D及C/E其余通过，独立Node150/Python12/集成15复现，409恢复探针6/7失败1项。F-1：409后GET失败文案指向隐藏重试按钮，需实际可达GET恢复入口；F-2：design-qa缺:has旧浏览器降级事实，补记录即可。Codex采纳两项并已收取复核成果（业务partial不改），派#162给Kimi只修两项，保留原失败证据/修前快照。#162交付后读完整摘要和实际增量，另派DeepSeek定向复核恢复探针/新增断言/必要回归；通过后再收取开发成果、同步模块/手册与业务Git并请用户页面验收。浏览器视觉/键盘、真实HTTP竞态仍未测；不并行改业务码。
+2. **C2-B #162修正自报完成，#163定向复核待交付，#160/#162未收取。** #162/msg2664混排自由文本5047字符，MCPunknown；完整按稳定sha补读后提取JSON与本地development.json一致，summary --expect-task-id162合法complete（6完成/0未完成/0阻塞、验证10/限制4），不追改原件。修正增量workspace.js +18/-5、Node测试+108/-2（20→23）、design-qa +3/-2，另5文件仅资源版本/直接断言；app.js/css与#161快照未变。自报原恢复探针7/7、新恢复12/12、接线15/15、Node23/九文件153（默认与进程内两模式）、Python页面12通过，视觉/键盘/HTTP未测。#163按原#161审查合看，仅独立检查F-1/F-2实际增量/直接回归和手册恢复草稿，不重审全片；用户通知完成后读完整摘要裁决，通过后收取开发/修正/定向复核，同步模块/手册/业务Git并请用户页面验收。
 3. C2-C约定消费者/指南与真实主动链路仍后续，须实际显式带入终端预算（DeepSeek50/Codex300），逐动作核验身份/模式/指定与总预算。配置保存active仍不代表执行生效/唤醒/互斥；不通过改凭据/指定来绕过true门禁。C2-A2版本耗尽为低风险可选，C2-D真正取消未开发。
 4. 长期队列：全局运行器库→项目角色绑定/添加编辑→手动启停/状态→项目加载时选择性自启动；默认检查角色/固定要求/自动转审；多工作区隔离与群聊按路线图推进。只启动项目已配置且勾选角色，不自动启动所有已安装软件。
 
@@ -37,4 +37,4 @@ Updated: 2026-10-06 (Asia/Shanghai)，重开窗口恢复并完成Codex当前连�
 - 桌面实际配置C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml与唯一备份尾缀20261005-180915在仓库外，原六项设置保留；指南DSH_DESKTOP_TALK_MCP第5.3–5.5节记录实际落地/人工验收/新预算要求。上次300秒wait超过65秒及同步排队机制已确认，pwsh0xC0000142原因未明，缩短预算不表示已解决DLL故障。
 - 无新Web操作步骤；终端开发指南更新工具合同/重连与预算要求，USER_MANUAL日常页面流程不变。真实模型/长等待/浏览器/宿主660秒未测，未重载真实MCP或改运行配置/数据库/服务/实际mode/主控指定/权限。
 
-恢复指令：**继续项目**。#152–#159当前相关任务已收取，C2-A1代码独立复核通过，加载与真实主动验收仍分开；Codex当前连接新字段/目录及短预算加载检查已通过，C2-B #160未收取，#161已收取且业务partial保留，#162已派Kimi修正F-1/F-2，用户通知#162完成后读取交付并安排DeepSeek定向复核。终端适配先读TERMINAL_MCP预算要求；默认派发后结束，不自动唤醒/轮询或改运行配置。完整历史在PROGRESS_HISTORY。
+恢复指令：**继续项目**。#152–#159当前相关任务已收取，C2-A1代码独立复核通过，加载与真实主动验收仍分开；Codex当前连接新字段/目录及短预算加载检查已通过，C2-B #160/#162未收取，#161原partial已收取，#163已派DeepSeek定向复核，用户通知#163完成后读取结论裁决收尾。终端适配先读TERMINAL_MCP预算要求；默认派发后结束，不自动唤醒/轮询或改运行配置。完整历史在PROGRESS_HISTORY。
