@@ -211,7 +211,7 @@ test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐�
   assert.equal(h.ui.workspaceUI.selectedRole, 'agent:kimi');
   assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [false, false]);
   assert.equal(h.hidden('requirements-panel'), true);
-  assert.equal(h.hidden('controller-panel'), true);
+  assert.equal(h.hidden('controller-mode-panel'), true);
   // 行重绘后重新取节点：新选中态落在重建后的角色行上
   const roleRow2 = h.el('blackboard-columns').children[1];
   assert.equal(roleRow2.children[0].textContent, 'Kimi');

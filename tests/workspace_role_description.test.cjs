@@ -129,7 +129,7 @@ function harness({ human = true, roster = ROSTER } = {}) {
   context.renderTaskDetailsPanel = () => {
     context.renderWorkspaceRoleDetails();
     context.renderRequirementsPanel();
-    context.renderControllerPanel();
+    context.renderControllerModePanel();
     context.renderRoleDescriptionPanel();
   };
   vm.runInContext(wsSource, context);
@@ -511,13 +511,14 @@ test('源码契约：说明区不经过 innerHTML，归一化复用空白集合�
   assert.ok(!block.includes('input.disabled'), 'N4：说明编辑区不再使用 disabled');
   const appSource = fs.readFileSync(require.resolve('../web/app.js'), 'utf8');
   const detailsFn = appSource.slice(appSource.indexOf('function renderTaskDetailsPanel()'));
-  assert.ok(detailsFn.indexOf('renderRoleDescriptionPanel()') > detailsFn.indexOf('renderControllerPanel()'), 'app.js 同步点新增说明面板调用');
+  assert.ok(detailsFn.indexOf('renderRoleDescriptionPanel()') > detailsFn.indexOf('renderControllerModePanel()'), 'app.js 同步点新增说明面板调用');
   // N5：测试桩 renderTaskDetailsPanel 的面板调用顺序与真实 app.js 一致
-  const realCalls = [...detailsFn.slice(0, detailsFn.indexOf('getContextTask()')).matchAll(/\b(renderWorkspaceRoleDetails|renderRequirementsPanel|renderControllerPanel|renderRoleDescriptionPanel)\(\);/g)].map(m => m[1]);
-  assert.deepEqual(realCalls, ['renderWorkspaceRoleDetails', 'renderRequirementsPanel', 'renderControllerPanel', 'renderRoleDescriptionPanel'], '真实 app.js 面板调用顺序');
+  // （I-2：固定主控面板已退役，同步点为调度模式面板）。
+  const realCalls = [...detailsFn.slice(0, detailsFn.indexOf('getContextTask()')).matchAll(/\b(renderWorkspaceRoleDetails|renderRequirementsPanel|renderControllerModePanel|renderRoleDescriptionPanel)\(\);/g)].map(m => m[1]);
+  assert.deepEqual(realCalls, ['renderWorkspaceRoleDetails', 'renderRequirementsPanel', 'renderControllerModePanel', 'renderRoleDescriptionPanel'], '真实 app.js 面板调用顺序');
   const stubSource = fs.readFileSync(__filename, 'utf8');
   const stubFn = stubSource.slice(stubSource.indexOf('context.renderTaskDetailsPanel = () => {'));
-  const stubCalls = [...stubFn.slice(0, stubFn.indexOf('};')).matchAll(/\b(renderWorkspaceRoleDetails|renderRequirementsPanel|renderControllerPanel|renderRoleDescriptionPanel)\(\);/g)].map(m => m[1]);
+  const stubCalls = [...stubFn.slice(0, stubFn.indexOf('};')).matchAll(/\b(renderWorkspaceRoleDetails|renderRequirementsPanel|renderControllerModePanel|renderRoleDescriptionPanel)\(\);/g)].map(m => m[1]);
   assert.deepEqual(stubCalls, realCalls, '测试桩与真实 app.js 调用一致');
   assert.ok(!wsSource.includes('setInterval'), '不新增计时器/轮询');
 });

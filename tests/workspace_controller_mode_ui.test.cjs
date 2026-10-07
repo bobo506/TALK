@@ -1,7 +1,8 @@
 // C2-B 项目设置页“调度模式”面板：状态/DOM 异步测试。
 // 通过 vm 抽取 workspace.js 中 C2-B 代码块（标记 // ── C2-B 项目调度模式 到
 // renderWorkspaceTaskStory 之间），用 DOM 存根验证：加载/human/agent、成功核实、
-// 无主控/主控失效保存主动的原因提示、缺字段/404 不支持、409 只 GET 刷新不自动重写
+// I-2 起保存“主动”为固定意向提示（不再查询/依赖任何指定状态）、缺字段/404 不支持、
+// 409 只 GET 刷新不自动重写
 // （含 GET 失败恢复：409 后需重读状态下重试入口可见、保存暂禁、重试只 GET 不 PATCH、
 // 读取成功清新版本后由用户明确保存、需重读不串上下文）、400/422/普通错误保留选择且不进入
 // 需重读、非法版本禁写、未知模式如实降级、
@@ -15,7 +16,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const helpers = require('../web/workspace.js');
 
 const workspaceSource = fs.readFileSync(require.resolve('../web/workspace.js'), 'utf8');
 const blockStart = workspaceSource.indexOf('// ── C2-B 项目调度模式');
@@ -47,8 +47,8 @@ const MEMBERS = [
   { id: 'agent:kimi', kind: 'agent', display_name: 'Kimi' },
 ];
 
-// enter() 的 read 合并进默认项目响应；同时把主控两字段同步进项目缓存，
-// 模拟真实页面里 loadProjects/主控面板已填充缓存的事实（模式面板提示优先读缓存）。
+// enter() 的 read 合并进默认项目响应。服务端 ProjectOut 仍携带已弃用的指定字段
+//（兼容输出），保留在默认响应里可顺带验证模式面板完全忽略它们。
 function harness({ human = true, projectId = 'A' } = {}) {
   const pending = [];
   const elements = new Map();
@@ -72,7 +72,6 @@ function harness({ human = true, projectId = 'A' } = {}) {
     ],
     currentMemberIsHuman: () => human,
     workspaceSettingsSelected: () => settingsSelected,
-    controllerStatusMeta: helpers.controllerStatusMeta,
     apiFetch: (url, opts) => new Promise((resolve, reject) => pending.push({ url, opts, resolve, reject })),
     readErrorDetail: async (res, fallback) => {
       try { const body = await res.json(); if (typeof body?.detail === 'string' && body.detail) return body.detail; } catch (_) {}
@@ -87,12 +86,6 @@ function harness({ human = true, projectId = 'A' } = {}) {
   const reply = (index, data, { ok = true, status = 200 } = {}) =>
     pending[index].resolve({ ok, status, json: async () => data });
   const fail = (index, err) => pending[index].reject(err);
-  const syncCache = (project, read) => {
-    const entry = context.projects.find(item => item.project_id === project);
-    if (!entry) return;
-    if ('controller_member_id' in read) entry.controller_member_id = read.controller_member_id;
-    if ('controller_assignment_status' in read) entry.controller_assignment_status = read.controller_assignment_status;
-  };
   async function enter(project = projectId, read = {}) {
     context.activeProjectId = project;
     const merged = {
@@ -105,7 +98,6 @@ function harness({ human = true, projectId = 'A' } = {}) {
     };
     const request = context.renderControllerModePanel();
     reply(pending.length - 1, merged);
-    syncCache(project, merged);
     await request;
   }
   const setSettingsSelected = value => { settingsSelected = value; };
@@ -159,12 +151,13 @@ test('human 加载被动默认：状态两行如实显示，保存需显式选�
   assert.equal(ui.selection, null, '成功后清空未保存选择');
   assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
   assert.equal(el('controller-mode-active').checked, true);
-  // 无主控时保存主动：如实显示原因且明确不产生主动调度
-  assert.match(ui.notice, /已保存“主动”，但当前主控指定不可用：尚未指定项目主控，不会因此产生任何主动调度/);
+  // I-2：保存主动为固定意向提示，不再查询任何指定状态
+  assert.equal(ui.notice, '已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。');
   assert.match(el('controller-mode-effective').textContent, /尚无生效的主动调度/, '保存主动不伪装成已生效');
 });
 
-test('保存被动（含主控有效指定） notice 不冒充生效；主控失效时保存主动显示真实原因', async () => {
+test('保存主动/被动提示固定：不查询、不依赖任何指定状态（响应携带已弃用字段也无关）', async () => {
+  // 指定为有效 assigned：提示同样是固定意向文案
   const { context, pending, reply, ui, enter } = harness();
   await enter('A', { controller_member_id: 'agent:kimi', controller_assignment_status: 'assigned' });
   context.selectControllerMode('active');
@@ -173,13 +166,10 @@ test('保存被动（含主控有效指定） notice 不冒充生效；主控失
     project_id: 'A', controller_mode: 'active', controller_mode_version: 1,
     controller_member_id: 'agent:kimi', controller_assignment_status: 'assigned',
   });
-  context.projects[0].controller_member_id = 'agent:kimi';
-  context.projects[0].controller_assignment_status = 'assigned';
   await save;
-  assert.match(ui.notice, /已保存“主动”。这只是设置意向/);
-  assert.match(ui.notice, /人工唤回/);
+  assert.equal(ui.notice, '已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。');
   assert.ok(!/已生效|已启用/.test(ui.notice));
-  // 主控失效场景：原因来自真实状态，不虚构可用
+  // 指定失效（成员被禁用）：提示逐字节相同——模式保存不再有指定前置
   const h2 = harness();
   await h2.enter('A', { controller_member_id: 'agent:kimi', controller_assignment_status: 'member_disabled' });
   h2.context.selectControllerMode('active');
@@ -189,22 +179,22 @@ test('保存被动（含主控有效指定） notice 不冒充生效；主控失
     controller_member_id: 'agent:kimi', controller_assignment_status: 'member_disabled',
   });
   await save2;
-  assert.match(h2.ui.notice, /当前主控指定不可用：该成员已被禁用，不会因此产生任何主动调度/);
+  assert.equal(h2.ui.notice, '已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。');
 });
 
-test('已保存主动且主控不可用时常驻提示；主控变更经缓存刷新提示但不写模式', async () => {
+test('已保存主动无任何指定可用性提示；指定字段变化不影响模式状态与面板', async () => {
   const { context, el, ui, enter } = harness();
   await enter('A', {
     controller_mode: 'active', controller_mode_version: 3,
     controller_member_id: 'agent:kimi', controller_assignment_status: 'assigned',
   });
   assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
-  assert.ok(!/主控指定不可用/.test(el('controller-mode-status').textContent), '主控有效时不打扰');
-  // 主控面板保存后会把最新指定状态回写项目缓存（applyControllerRead）；本面板只读缓存刷新提示
+  assert.equal(el('controller-mode-status').textContent, '', '无错误/未保存差异时状态行留白，无指定提示');
+  // 项目缓存中的指定字段变化（已弃用字段仍由服务端返回）不再被本面板读取
   context.projects[0].controller_assignment_status = 'not_in_roster';
   context.syncControllerModePanel();
-  assert.match(el('controller-mode-status').textContent, /当前主控指定不可用：该成员当前不在项目名册中/);
-  assert.equal(ui.saved, 'active', '主控变更不改写已保存模式');
+  assert.ok(!/主控|指定/.test(el('controller-mode-status').textContent), '不出现任何指定可用性提示');
+  assert.equal(ui.saved, 'active');
   assert.equal(ui.version, 3);
   assert.equal(el('controller-mode-effective').textContent, EFFECTIVE_LINE);
 });
@@ -808,12 +798,16 @@ test('面板可见性：任务/群聊页与具体角色互斥隐藏，返回项�
   assert.equal(pending.length, before);
 });
 
-test('隔离纪律：模式代码块不触碰主控写字段、REQ-2 草稿、localStorage 与 innerHTML，无轮询', () => {
+test('隔离纪律：模式代码块不触碰指定字段、REQ-2 草稿、localStorage 与 innerHTML，无轮询、无已退役依赖', () => {
   assert.ok(!modeBlock.includes('localStorage.'), '状态只存内存');
   assert.ok(!modeBlock.includes('innerHTML'), '文案只走 textContent');
   assert.ok(!modeBlock.includes('setInterval'), '不新增后台轮询');
   assert.ok(!/project\.(display_name|description|development_requirements|controller_member_id|controller_assignment_version|controller_assignment_status)\s*=/.test(modeBlock), '项目缓存只回写模式两字段');
   assert.ok(modeBlock.includes('project.controller_mode ='), '模式字段回写存在');
-  assert.ok(!modeBlock.includes('/controller-assignment'), '不写主控指定');
+  assert.ok(!modeBlock.includes('/controller-assignment'), '不读写指定');
   assert.ok(!modeBlock.includes('已启用'), '绝不把 effective=null 写成已启用');
+  // I-2：模式面板对固定主控的全部依赖已解除——以下符号在代码块中不得存在
+  for (const gone of ['controllerModeControllerState', 'controllerModeUnavailableReason', 'controllerModeAvailabilityNote', 'controllerStatusMeta', 'controllerId', 'controllerStatus']) {
+    assert.ok(!modeBlock.includes(gone), `已退役依赖不得残留: ${gone}`);
+  }
 });

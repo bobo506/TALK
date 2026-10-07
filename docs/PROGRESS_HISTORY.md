@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-07 #174/#175 I-2代码独立通过并收取；模块/手册/Git收尾与同轮人工门禁
+
+- 用户通知“175好了”，读取175/msg2677完整合法自身task_id一致裸JSON，complete，13完成/0未完成/0blocked、17产物/11验证/5限制，无机械裁剪；runner succeeded/submitted，finished_at原记录2026-10-07T06:51:24.188167。独立A–H实际源码/完整差异/新删文件核验无功能缺口；主控实读O1/O2及必要验证尾，不仅凭自报摘要验收。
+- 主控确认派审43来源对象、14业务/测试变更保持逐字节一致，tracked差异157527B/sha256 fee75fe2a7cdce60804b0b118249cb6e904f31888f4b9f69403a9f22eb045f0d；HEAD2612df5与派审473fd7e只差三份正式进度，无边审边改。独立manifest/13基线/6保护对象核验ALL_OK，符号闭合removed25/added0及实际app.js导航探针通过，assignment请求0。
+- 独立Node --test-isolation=none十二套件149/149、四页面Python契约12/12及语法/diff检查通过；默认隔离单文件启动即spawn EPERM，项目用例未执行，标not_run，不能将开发者默认149通过冒充独立复现。未改后端75项核开发日志/保护哈希后无疑点未重跑，不称独立重跑75。review.md的日志路径/逐文件数量小笔误以实际存在日志与12套件计数为准，原报告保持。
+- Codex裁决175-O1非阻塞：role_settings桩未补模式调用且注释仍称真实顺序，但新真实接线/role_description/导航已有有效同步与互斥覆盖，无功能缺口；后续合适测试维护片整理桩/注释，本轮不改已审源码。175-O2角色说明hint与两条旧“主控”注释经独立确认仅文字、无运行时指定依赖，纳I-3，不宣称全UI字样归零。范围配套裁决和原未事前报告事实不追改。
+- 先收取175，再收取174，均succeeded/completed。result_collected_at原记录分别2026-10-07T07:01:51.128621与2026-10-07T07:01:53.898963；原msg2677/2676及开发/复核产物保留。裁决/来源检查/实际收取回执 .tmp/initiator-mode-ui-receipt/acceptance.json。
+- 同步MODULE_webui、USER_MANUAL、PROJECT_BRIEF、正式合同/实施计划当前状态、路线图和进度，新增INITIATOR_MODE_UI_ACCEPTANCE。实际14功能/测试文件纳统一中文收尾提交，九份正式文档聚焦现状/验收；无后端/DB/Key/MCP/配置改动，style.css未改。提交/推送结果由本轮最终回复与Git核对，不将临时报告纳正式源码。
+- 当前资源20261007-initiator-mode-ui，项目设置仅开发要求/调度模式、无固定主控功能依赖；模式只针对发起侧，human写/agent读、164/165离页/在途与CAS恢复不变，主动仅意向。I-1加载与I-2源码通过，等待同轮人工页面验收；真实浏览器/键盘/窄屏/HTTP并发仍not_run，主控未操作浏览器/复跑全量。caller仍human:bobo、passive/version4、effective null/not_bound；I-0/I-3/I-4、模型上报展示与完整角色命名后续，未派176。
+
 ## 2026-10-07 #174页面退役合法交付；派#175给DeepSeek独立代码复核
 
 - 用户先请求检查174是否工作，TALK实测running/in_progress、Kimi busy/当前174、最近心跳2026-10-07T06:29:56.400965；只是运行器状态，不推断具体模型进度。随后用户通知174完成，读取msg2676完整合法自身task_id一致talk-delivery-1、complete自报，7完成/0未完成/0blocked、14文件/7验证/4限制，无裁剪；runner succeeded/submitted，finished_at原记录2026-10-07T06:30:51.961798，不等于独立通过，未收取。

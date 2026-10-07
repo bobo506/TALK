@@ -30,8 +30,8 @@ class TaskWebUiTests(RouteTestCase):
             "task-create-related",
         ):
             self.assertIn(f'id="{element_id}"', html)
-        self.assertIn("20261006-controller-mode-c2b-ux", html)
-        self.assertNotIn("20261006-controller-mode-c2b\"", html)
+        self.assertIn("20261007-initiator-mode-ui", html)
+        self.assertNotIn("20261006-controller-mode-c2b-ux", html)
         self.assertNotIn("20261005-role-desc-f2", html)
         self.assertNotIn("20261005-role-desc-f1-fix", html)
         self.assertNotIn("20260923-manual-task-cleanup-1", html)
@@ -46,7 +46,7 @@ class TaskWebUiTests(RouteTestCase):
         # ROLE-DESC-F2：顶部“新建任务”入口已移除，共享创建弹窗与子任务入口保留。
         self.assertNotIn('id="delegate-task-btn"', html)
         self.assertNotIn("project-delegate-btn", html)
-        self.assertIn("任务由主控分配；选中任务后可在详情中创建子任务。", html)
+        self.assertIn("任务由发起者分配；选中任务后可在详情中创建子任务。", html)
         self.assertNotIn("点击“新建任务”开始委派工作", html)
         self.assertIn('id="task-create-overlay"', html)
         self.assertIn('role="dialog"', html)

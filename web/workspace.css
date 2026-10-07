@@ -175,26 +175,11 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .task-chat-mode .details-panel {display:none;}
 @media(max-width:1000px){.workbench.task-chat-mode {grid-template-columns:280px minmax(0,1fr);}}
 
-/* C1b-S2 项目主控指定：项目级面板与角色入口，复用浅色工作台层级，不遮挡角色列表与编辑区。 */
-#controller-panel {color:#303741; margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid #ddd;}
-#controller-panel .sidebar-kicker {font-size:14px; color:#69737c; margin-bottom:10px;}
-#controller-panel h3 {font-size:24px; font-weight:650; color:#26323d; margin:0;}
-.controller-hint {font-size:14px; color:#626b76; line-height:1.7; margin:14px 0 4px;}
-.controller-current {font-size:17px; font-weight:600; color:#26323d; margin:12px 0 6px; overflow-wrap:anywhere;}
-.controller-detail {font-size:14px; color:#626b76; line-height:1.7; margin:0 0 12px; overflow-wrap:anywhere;}
-.controller-toolbar {display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
-.controller-toolbar .room-secondary-btn {width:auto; margin:0;}
-#controller-clear-btn:disabled {opacity:0.55; cursor:not-allowed;}
-.controller-status {font-size:14px; line-height:1.6; margin:12px 0 0; color:#414b57;}
-.controller-status.error {color:#9d3434;}
-.controller-status.success {color:#286c39;}
-.role-controller-badge {display:inline-block; font-size:14px; color:#8d580d; font-weight:600;}
-.role-row .role-controller-badge {align-self:flex-start;}
+/* I-2：固定主控面板与徽标样式已随入口一并退役；.controller-mode-* 调度模式样式全部保留。 */
 .role-row-id {font-size:13px; color:#8a929b;}
 .role-member-id {font-size:14px; color:#8a929b; margin:0 0 20px; overflow-wrap:anywhere;}
-@media(max-width:700px){#controller-panel h3 {font-size:20px;} .controller-current {font-size:16px;} .controller-toolbar {gap:10px;}}
 
-/* C2-B 项目调度模式面板：与“项目主控”同级，复用浅色工作台层级；radio 两态 + 显式保存。 */
+/* C2-B 项目调度模式面板：项目级设置面板，复用浅色工作台层级；radio 两态 + 显式保存。 */
 #controller-mode-panel {color:#303741; margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid #ddd;}
 #controller-mode-panel .sidebar-kicker {font-size:14px; color:#69737c; margin-bottom:10px;}
 #controller-mode-panel h3 {font-size:24px; font-weight:650; color:#26323d; margin:0;}
@@ -218,12 +203,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .controller-mode-status.success {color:#286c39;}
 @media(max-width:700px){#controller-mode-panel h3 {font-size:20px;} .controller-mode-saved {font-size:15px;} .controller-mode-option {padding:12px;} .controller-mode-toolbar {gap:10px;}}
 
-/* ROLE-SETTINGS-1：角色列表固定首项“项目设置” + 项目设置页主控候选选择器。 */
+/* ROLE-SETTINGS-1：角色列表固定首项“项目设置”。 */
 .role-settings-row {border-bottom:2px solid #d8d8d2; background:#f7f6f2;}
 .role-settings-row:hover {background:#f0f5f8;}
 .role-settings-row.selected {background:#edf5fc;}
-.controller-assign-row {display:flex; align-items:center; gap:12px; margin:14px 0 4px; flex-wrap:wrap;}
-.controller-assign-row .group-member-select {flex:1; min-width:220px; width:auto; font-size:15px;}
-.controller-assign-row .room-primary-btn {width:auto; margin:0; flex-shrink:0;}
-.controller-assign-row select:disabled,.controller-assign-row button:disabled {opacity:0.55; cursor:not-allowed;}
-@media(max-width:700px){.controller-assign-row {gap:10px;} .controller-assign-row .group-member-select {min-width:0; width:100%;}}

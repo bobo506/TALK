@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261006-controller-mode-c2b-ux"
+STATIC_VERSION = "20261007-initiator-mode-ui"
 
 
 class RoleDescriptionWebUiTests(RouteTestCase):
@@ -104,7 +104,7 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertIn("`${label}\\n${explanation}`", script)
         # 角色详情动态面板不再渲染硬编码短标签/解释行（注释提及类名不算，断言元素创建与映射调用）。
         details_fn = script[script.index("function renderWorkspaceRoleDetails()"):]
-        details_fn = details_fn[:details_fn.index("\n// ── C1b-S2")]
+        details_fn = details_fn[:details_fn.index("\nfunction workspaceTaskNotice(")]
         self.assertNotIn("workspaceRoleLabel(", details_fn)
         self.assertNotIn("workspaceRoleDescription(", details_fn)
         self.assertNotIn('workspaceEl("p", "role-description"', details_fn)
@@ -114,11 +114,12 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertIn('getElementById("role-details-tasks-panel")', details_fn)
         self.assertNotIn('getElementById("role-details-panel")', details_fn)
         self.assertNotIn('role-description-input', details_fn, "说明编辑区不经动态详情渲染")
-        # N1：可见性同步点在 app.js renderTaskDetailsPanel，且排在主控面板之后。
+        # N1：可见性同步点在 app.js renderTaskDetailsPanel，且排在调度模式面板之后
+        # （I-2：原“主控面板之后”随固定主控入口退役改为调度模式面板）。
         details_panel_fn = app_script[app_script.index("function renderTaskDetailsPanel()"):]
         self.assertIn("renderRoleDescriptionPanel();", details_panel_fn)
         self.assertLess(
-            details_panel_fn.index("renderControllerPanel();"),
+            details_panel_fn.index("renderControllerModePanel();"),
             details_panel_fn.index("renderRoleDescriptionPanel();"),
         )
         # 列表摘要取首个非空行（Python 空白集合判空，不把 U+FEFF 等合法自定义误回退硬编码）。
