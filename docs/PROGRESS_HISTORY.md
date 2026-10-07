@@ -6124,3 +6124,12 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - Kimi仅在.tmp/initiator-mode-live-copy/起草USER_MANUAL:162及MODULE_webui的精准补丁/派生副本/分类清单。历史日期、引文、任务/测试/验收记录保留，采用局部替代注记区分现行；正式文档由Codex在独立通过后发布。当前负责MODULE_webui，不扩读其它模块；桥接与集成规格、175-O1另片。
 - 基线43e7b14be76f6d6d19152b3073ddf9943721544a，派发前工作区干净；12来源指纹、完整任务包及实际回执在.tmp/initiator-mode-live-copy-dispatch/。任务包预先明确Codex仅可改PROGRESS/PROGRESS_HISTORY记录派发状态；开发与完整复核不并行改码。交付需实际task_id=182、完整裸talk-delivery-1 JSON及本地校验，MCP同响应核心字段整体读取。
 - 本轮只派发和保存进度，不运行浏览器、wait、真实消费者、不切active、不改配置/Key/数据库或重启服务。I-3尚未全量完成，I-4未运行；#182完成后需独立复核、正式发布/收取/Git收尾，再给用户hint页面简验步骤。未读取精确额度，不推测比例。
+
+## 2026-10-07 20:28 I-3B #182交付读取与既有断言定向补正派发（#183）
+
+- 用户通知“182好了”。MCP完整摘要task182/msg2684：实际created_by=agent:codex，runner succeeded/submitted、业务合法partial，自身任务号一致，6完成/2未完成/0阻塞、10验证；主控本地validate --expect-task-id 182退出0。未收取，原报告/失败证据不追改。
+- 主控核最小tracked差异只有允许的三个文件8进6删；12原来源3允许变化/9保持。开发自报AST8302只两字符串、JS两整行注释、HTML一hint；工具54、发起者页面5、Node四套件65通过；ROLE-DESC页面契约2中1失败，为tests/test_role_description_web_ui.py:38仍assert“不改变项目主控、职责分级”。实际源码/测试定位与失败原因相符。正式文档仍草稿，开发者正反patch/8链接证据留给独立复核。
+- Codex裁决先修既有失败再复核：原任务明确禁止测试改动，Kimi已正确报告；本次仅授权该assertIn子串改“任务发起者归属”及36行对应注释，不新增/删减/放宽其它断言，不扩175-O1测试维护。要求实际重跑ROLE-DESC页面2项并保持三个源码/正式文档/原.tmp产物冻结。
+- 派发前重读最新development_requirements与实际caller，仍Kimi文字前端、DeepSeek交叉复核，caller agent:codex/kind agent，项目passive/version6。最小顶层参数派Kimi #183“183-同步角色说明文案的既有页面契约断言”，created_by agent:codex，Hall group:task-d50f9e6dc7d0492fb3baf8cd491d08e7，queued/assigned为派发快照。
+- 实际HEAD=98cd676341e253f26c08972656c2deea0b79da9b；13当前来源+15原182产物冻结、本次任务包/实际回执/182完整MCP摘要在.tmp/initiator-mode-live-copy-assertion-fix-dispatch/。本次产物另放.tmp/initiator-mode-live-copy-assertion-fix/，原182partial不重写。Codex仅改两份进度，完成暂停后再合并派DeepSeek独立复核。
+- 本轮未发布正式文档、未收取、未重复业务测试或操作浏览器/wait/active/config/Key/数据库/服务；I-3/I-4门禁保持。默认派发后结束，用户通知“183 ok”后取件，再独立复核、发布、收取、提交推送，并提供hint页面简验步骤。
