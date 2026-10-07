@@ -2,7 +2,7 @@
 
 > 2026-10-06 Codex发布：#166原设计经#167独立复核、#168修订、#169独立复核、#170六项修订与#171定向复核后，合看确认合同设计通过。#171逐R-1..R-6独立回源码，10完成/0未完成/0阻塞，原#167/#169的partial记录保持；#166/#168/#170/#171已收取。
 >
-> **2026-10-07当前I-1加载与I-2页面独立复核、用户验收已通过。** 用户另行授权自身身份切换：配置已备份并换既有agent:codex Key，API/独立启动通过；当前聊天仍human连接，宿主重连及新任务归属待核。消费者/文案与真实主动链路继续后续；现状以文末最新实施状态与PROGRESS为准，原正文为阶段记录。effective_mode仍null/not_bound，保存active仍是意向。
+> **2026-10-07当前I-1加载与I-2页面独立复核、用户验收已通过。** 用户另行授权自身身份切换：配置已备份并换既有agent:codex Key，API/独立启动通过；重开后当前聊天已核agent:codex/kind=agent，新任务178创建归属已核，交付/独立复核/收取待完成。消费者/文案与真实主动链路继续后续；现状以文末最新实施状态与PROGRESS为准，原正文为阶段记录。effective_mode仍null/not_bound，保存active仍是意向。
 >
 > 配套[实施拆分计划](INITIATOR_MODE_IMPLEMENTATION_PLAN.md)；[旧固定主控合同归档](CONTROLLER_MODE_DESIGN_FIXED_CONTROLLER_ARCHIVE.md)。两条非阻塞清单建议纳入实施计划“Codex发布补充”，不重开已通过的设计。
 >
@@ -323,9 +323,13 @@
 - 176经177独立全文/限定源码/指南出处复核通过并由原human入口收取。正式[切换与回退清单](../guides/CODEX_TALK_IDENTITY_SWITCH.md)由Codex发布，保留原稿/报告，补清行号、快照免责声明、执行者预算与F4恢复主体；复核窗口仅三份进度管理差异、业务/交付SHA未变的事实不扩大并行审改范围。
 - 此结论只覆盖准备步骤，§5.3的实际Key切换/备份/重连/试派均未执行；caller仍human:bobo。原I-0执行需用户确认，实施前核配置/安全Key/名册/宿主预算并刷新旧任务；不迁移历史created_by、不放宽收取、不将active意向或步骤审查当作主动消费者生效。
 
-## I-0实际Key配置进展（2026-10-07，当前宿主仍旧身份）
+## I-0实际Key配置进展（2026-10-07配置实施快照；重连结果见下节）
 
 - 用户2026-10-07明确授权“切换到codex吧”；现已备份用户配置并只替换TALK MCP的`env.TALK_API_KEY`为既有`agent:codex`凭据。服务端`/api/members/me`核`agent:codex / agent`、未禁用且在册；新凭据独立`--check`通过。当前聊天实际MCP仍返回`human:bobo / human`，宿主重连待用户操作，未创建新任务；不宣称当前会话切换成功。
 - 切换前本项目human可见返回177项/human创建164项、在途0，176/177已收取；7项旧failed（122/35/31/24/21/14/12）保持。只读核旧human凭据仍可读177，历史created_by不迁移。项目响应整体不变：passive/version6、兼容assignment agent:codex/version13；当前MCP仍effective null/not_bound。配置`tool_timeout_sec=660`已读实值，未进行长等待/取消/排队测试，不当作客户端实际预算或主动适配通过。
 - 在客户端设置的MCP服务器列表重启`talk`入口；若无法单独重连则完全退出并重开Codex。返回本会话后先`talk_list_agents`确认真实caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务、独立复核并收取，核新created_by；不再请求Key切换授权，不重复176/177。
 - 仅入口凭据配置变化，不改变任务created_by权限、assignment兼容语义、项目模式或消费者合同。原准备/审查历史不追改；I-0完整接入尚未验收，I-4前置仍待满足。
+
+## I-0重连与新任务核验进展（2026-10-07）
+
+当前聊天服务端反查caller_identity已为agent:codex/kind=agent，178只读身份核验任务创建归属实测为agent:codex、项目正确且独立Hall，DeepSeek已领取。证据.tmp/initiator-mode-identity-verify/，当前仅Phase C及Phase D创建/读取部分通过；178结构化交付、Kimi独立复核与收取未完成。项目passive/version6、effective null/not_bound保持，未进行wait/取消/排队/主动消费者实测；旧记录不追改，I-3/I-4仍待后续。

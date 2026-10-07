@@ -4,14 +4,15 @@
 > 176/177准备通过只表示步骤经过独立审查；当时未切Key/改配置/备份/重连/试派。2026-10-07用户已另行明确授权实际执行，最新状态见下节，原准备与复核记录仍按各自阶段理解。
 > 下文原记录的“本片/本轮”指#176准备或明确标注的历史证据；最新实际配置进展由下节另行记录，不追改原稿。来源分为【派发包事实】、【源码事实】、【指南事实】、【待核验】，每类均按其日期与范围理解。
 
-## 最新实际执行状态（2026-10-07）
+## 最新实际执行状态（2026-10-07，重开后身份与新任务归属已核）
 
-- 用户明确授权“切换到codex吧”。实际目标`C:/Users/Administrator/.codex/config.toml`的`[mcp_servers.talk.env].TALK_API_KEY`已换既有`agent:codex`凭据；其它配置经整体TOML比较保持。没有新建/重置账号或Key，密钥不在聊天、文档、日志或Git输出。
-- 仓库外完整备份`C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml`已核对字节；回退须恢复完整副本、重连并核原human身份。实际无密钥回执`.tmp/initiator-mode-identity-switch/execution.json`。
-- 新Key服务端`/api/members/me`核`agent:codex / kind=agent`、未禁用且在项目名册；独立新进程`--check`通过。**当前聊天实际MCP仍返回human:bobo / human**，不能把独立进程核验当作当前宿主已重连。
-- 切换前本项目原human可见返回177项/human创建164项、在途0，176177已收取；7旧failed保持。旧human凭据换Key后仍可读177，历史created_by不迁移。完整项目响应不变：passive/version6、兼容assignment agent:codex/version13；当前MCP仍effective null/not_bound。
-- 用户需在客户端设置/MCP服务器重启`talk`，或完全退出重开Codex，随后回本会话说“继续项目”。先核当前caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务，核新created_by、结构化交付、独立复核与收取；当前未派178，此步not_run，无需再次确认切换授权。
-- 当前仅配置及新凭据/API/独立入口核验完成；Phase B宿主重连、Phase C当前入口身份、Phase D新任务归属待完成。本会话无MCP重启工具，native computer APIs禁用。配置tool_timeout_sec=660已读实值，但长等待/取消/排队和主动消费者not_run，不外推预算或适配通过。
+- 用户既有“切换到codex吧”授权持续有效。前次只替换`C:/Users/Administrator/.codex/config.toml`的`[mcp_servers.talk.env].TALK_API_KEY`为既有`agent:codex`凭据，完整TOML其它字段不变，未新建/重置成员或Key。
+- 完整仓库外备份`C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml`字节核对通过；回退须恢复完整副本、重连并核human身份。配置实施无密钥回执仍为`.tmp/initiator-mode-identity-switch/execution.json`。
+- 前次新Key API反查/名册/独立`--check`通过，但当时聊天仍human；该记录保留。**本轮重开后当前聊天实际talk_list_agents已返回agent:codex/kind=agent/note=null**，补齐Phase C，证据`.tmp/initiator-mode-identity-verify/dispatch_context.json`。此结论来自当前入口服务端反查。
+- 按最新开发要求派发只读任务**178**给DeepSeek；当前聊天get_task实核`created_by=agent:codex`、项目`prj_e8fe7066bbec`、target为`agent:deepseek`及独立Hall。读取时running/in_progress、尚无结果/收取时间；快照`.tmp/initiator-mode-identity-verify/task_snapshot.json`。
+- Phase D的任务创建归属已核，**结构化交付、Kimi独立复核和由agent:codex收取仍待完成**，I-0完整闭环未验收。默认派发后结束，用户通知178完成后取件；无需重复176/177或再次请求切Key授权。
+- 前次human返回177项/human创建164项、在途0、7旧failed及旧human仍可读为实施前后历史盘点，不是本轮重测。历史created_by不迁移、权限不扩大。
+- 本轮项目passive/version6、effective null/not_bound，assignment agent:codex/version13仅兼容。此前读实配置tool_timeout_sec=660；本轮没有wait调用，长等待/取消/排队/真实主动消费者not_run，不外推G8或终端预算已验收。
 
 ## 0. 范围界定（只改一个入口的一个键）
 

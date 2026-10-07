@@ -186,4 +186,4 @@ I-3文字待办补充（174自报，175独立核实为非功能依赖，Codex裁
 - 175-O1：role_settings测试桩/注释保真度整理非阻塞，新真实接线与其它导航/模式套件已覆盖，后续合适测试维护片处理；175-O2：角色说明hint与两旧注释随I-3统一。旧I-1 O1/O2与175-O1/O2区分编号，不混淆。
 - 代码/模块/手册/实施状态与 [页面验收步骤](../guides/INITIATOR_MODE_UI_ACCEPTANCE.md) 纳本轮提交。默认Node隔离spawn EPERM为复核宿主限制，开发者通过不外推；真实浏览器/键盘/窄屏/HTTP并发未测。用户2026-10-07确认本轮页面验收通过，下一项I-0仅准备自身身份切换/核验/回退步骤；不实际换Key，不将本次页面验收宣称真实主动消费者生效。
 
-I-0当前状态：用户2026-10-07明确授权“切换到codex吧”；现已备份用户配置并只替换TALK MCP的`env.TALK_API_KEY`为既有`agent:codex`凭据。服务端`/api/members/me`核`agent:codex / agent`、未禁用且在册；新凭据独立`--check`通过。当前聊天实际MCP仍返回`human:bobo / human`，宿主重连待用户操作，未创建新任务；不宣称当前会话切换成功。 在客户端设置的MCP服务器列表重启`talk`入口；若无法单独重连则完全退出并重开Codex。返回本会话后先`talk_list_agents`确认真实caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务、独立复核并收取，核新created_by；不再请求Key切换授权，不重复176/177。 I-3/I-4仍未开展，历史任务与7旧failed保持，不外推主动消费者通过。
+I-0当前状态：176/177准备已独立通过并收取；既有授权下配置已备份并切自身Key，前次API/独立启动通过。2026-10-07重开后当前聊天真实caller已核agent:codex/kind=agent，派178给DeepSeek，get_task实核created_by=agent:codex、项目正确及独立Hall，读取时running/in_progress。178结构化交付、Kimi独立复核与收取待完成；默认派发后结束用户通知取件，不重复Key切换或176/177。I-3/I-4仍未开展，历史任务归属保持；未进行wait/取消/排队/主动消费者实测，不外推真实主动通过。

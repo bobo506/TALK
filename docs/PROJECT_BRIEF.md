@@ -6,7 +6,7 @@
 
 发起者合同 v3 已发布；I-1 #172/#173 工具代码独立通过并收取，当前 Codex MCP 加载核验通过。I-2 #174/#175 固定主控页面退役经独立实际代码复核通过并收取，当前“项目设置”只显示开发要求与调度模式；页面不再依赖固定指定，协调责任按具体任务 created_by，模式只约束任务发起侧。资源 20261007-initiator-mode-ui，独立 Node149（同进程）/Python页面12及导航/符号探针通过；默认进程隔离因宿主 spawn EPERM 为 not_run。
 
-I-1/I-2 同轮用户页面验收已于2026-10-07通过，人工门禁释放；I-0准备176/177已独立通过并收取，正式[身份切换与回退清单](guides/CODEX_TALK_IDENTITY_SWITCH.md)已发布。用户已明确授权实际切换：配置已备份并换既有agent:codex Key，API身份/名册和独立启动核验通过，但当前聊天MCP仍human:bobo，须宿主重连再核真实caller与新任务created_by；当前未试派。项目passive/version6与effective null/not_bound保持，保存active仍仅意向；I-3消费者/文案、I-4真实主动链路与模型展示后续另片。角色提示还有一处旧“主控”文字，登记I-3。当前状态见 [PROGRESS](PROGRESS.md)；以下日期较早的说明为阶段记录，与当前冲突时以本节为准。
+I-1/I-2 同轮用户页面验收已于2026-10-07通过，人工门禁释放；I-0准备176/177已独立通过并收取，正式[身份切换与回退清单](guides/CODEX_TALK_IDENTITY_SWITCH.md)已发布。用户已明确授权实际切换：配置已备份并换既有agent:codex Key，API身份/名册和独立启动核验通过，重开后当前聊天MCP已实测agent:codex/kind=agent，新任务178的created_by=agent:codex，DeepSeek只读核验已领取；交付、Kimi独立复核和收取待完成。项目passive/version6与effective null/not_bound保持，保存active仍仅意向；I-3消费者/文案、I-4真实主动链路与模型展示后续另片。角色提示还有一处旧“主控”文字，登记I-3。当前状态见 [PROGRESS](PROGRESS.md)；以下日期较早的说明为阶段记录，与当前冲突时以本节为准。
 
 ## 历史开发安排（2026-09-19，固定主控阶段）
 
@@ -417,4 +417,4 @@ TALK/
 
 ## 2026-10-07 I-1/I-2实施状态
 
-发起者受控等待工具经DeepSeek #172开发、Kimi #173独立复核通过并收取；源码按具体任务created_by与项目核验协调资格，固定主控指定不再是受控执行依据，普通等待/服务端权限保持兼容。2026-10-07当前Codex MCP连接目录/运行时加载核验已通过，I-2页面经174/175独立复核通过并收取，用户本轮页面验收通过；自身Key/消费者/真实主动链路仍待后续，保存active仍只是意向。当前合同与实施顺序见CONTROLLER_MODE_DESIGN、INITIATOR_MODE_IMPLEMENTATION_PLAN及PROGRESS；旧已实现记录作为历史保留。
+发起者受控等待工具经DeepSeek #172开发、Kimi #173独立复核通过并收取；源码按具体任务created_by与项目核验协调资格，固定主控指定不再是受控执行依据，普通等待/服务端权限保持兼容。2026-10-07当前Codex MCP连接目录/运行时加载核验已通过，I-2页面经174/175独立复核通过并收取，用户本轮页面验收通过；当前聊天自身身份与178创建归属已核，178交付/独立复核/收取和消费者/真实主动链路仍待后续，保存active仍只是意向。当前合同与实施顺序见CONTROLLER_MODE_DESIGN、INITIATOR_MODE_IMPLEMENTATION_PLAN及PROGRESS；旧已实现记录作为历史保留。

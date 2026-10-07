@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-07 17:29 (Asia/Shanghai) 重开后自身身份已核，派发只读新任务178
+
+- 用户重开后要求“继续项目”；按既有实际切换授权恢复，未再次确认、切Key或重启服务。当前聊天实际talk_list_agents项目路径返回caller_identity=agent:codex/kind=agent/note=null，证明本连接已加载本人凭据，补齐I-0 Phase C。主控角色仍为Codex决策。
+- 实读最新development_requirements：Kimi文字/设计/交互/前端，DeepSeek后端/其它，双方交叉复核。以独立顶层最小参数派发178给agent:deepseek，标题178-Codex自身身份新任务归属核验；当前聊天get_task实核project_id=prj_e8fe7066bbec、created_by=agent:codex、target_member_id=agent:deepseek、hall_group_id=group:task-b1f88e11e11f459a901af1ec12411632。读取时running/in_progress、结果和收取均为空。
+- 178范围仅只读事实与.tmp脱敏交付，禁止功能/正式文档/配置/Key/数据库写入、额外派发、收取、commit/push、浏览器或等待。须使用真实任务号完整talk-delivery-1结果JSON，本地validate/summary，完成暂停；后由Kimi独立核实际代码/服务端或只读数据库，不只采信执行者自报。
+- 现场基线aa92e23、分支codex/terminal-return-codex、恢复时git干净。主控证据.tmp/initiator-mode-identity-verify/dispatch_context.json与task_snapshot.json，无密钥。仅追加当前状态，176/177产物、前次human身份/盘点/失败原记录不追改。
+- 项目passive/version6、effective null/not_bound、assignment agent:codex/version13；身份/创建归属核验不外推主动消费者/G8/其它终端。无wait调用，长等待/取消/排队not_run；未核精确用量、不推测百分比。代码/测试/配置无改动，本轮必要验证为UTF-8文档读取、状态要点核对与git diff --check。
+- 当前仅入口身份与新任务创建归属通过；178交付、独立复核、收取未完成。默认派发后结束，由用户通知取件；下一步读取178交付并派Kimi，不开启I-3/I-4新片。正式同步PROGRESS、PROGRESS_HISTORY、PROJECT_BRIEF、身份切换指南、TERMINAL_MCP、正式合同、实施计划、路线图。
+
 ## 2026-10-07 17:17 (Asia/Shanghai) 收工交接：用户将重开窗口
 
 - 用户明确“你先汇总进度，我重开窗口”。本轮仅保存收工交接，停止新派发；没有新任务、代码/配置/密钥/模式/数据库操作，也未重复业务测试。Codex继续为决策角色，分工和默认派发后结束规则保持。

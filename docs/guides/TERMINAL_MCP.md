@@ -423,10 +423,16 @@ I-0清单经176开发/177独立复核通过并收取，正式步骤见[Codex TAL
 
 实际执行须先按已审I-0步骤确认范围，核当前宿主配置目标/安全Key来源与重载方式、刷新旧human任务并完成本链收取，然后只换目标TALK MCP的TALK_API_KEY。成功判据是服务端反查member_id=agent:codex且kind=agent、新任务created_by=agent:codex；TALK_MEMBER_ID/模型名/标签不可自证，旧human任务继续由原身份收取。T/W/返回余量与外层交还仍按本指南预算节分别核验，不将660秒常量或bridge历史3600秒误作Codex当前已验证客户端能力。
 
-## Codex TALK配置已切Key，等待宿主重连（2026-10-07）
+## Codex TALK配置已切Key（2026-10-07配置实施快照；重连结果见下节）
 
 - 用户2026-10-07明确授权“切换到codex吧”；现已备份用户配置并只替换TALK MCP的`env.TALK_API_KEY`为既有`agent:codex`凭据。服务端`/api/members/me`核`agent:codex / agent`、未禁用且在册；新凭据独立`--check`通过。当前聊天实际MCP仍返回`human:bobo / human`，宿主重连待用户操作，未创建新任务；不宣称当前会话切换成功。
 - 目标用户config.toml的[mcp_servers.talk.env].TALK_API_KEY已核；command/args/项目指向与其它配置保持。完整仓库外备份和无密钥回执见PROGRESS与正式切换清单。
 - 切换前本项目human可见返回177项/human创建164项、在途0，176/177已收取；7项旧failed（122/35/31/24/21/14/12）保持。只读核旧human凭据仍可读177，历史created_by不迁移。项目响应整体不变：passive/version6、兼容assignment agent:codex/version13；当前MCP仍effective null/not_bound。配置`tool_timeout_sec=660`已读实值，未进行长等待/取消/排队测试，不当作客户端实际预算或主动适配通过。
 - 在客户端设置的MCP服务器列表重启`talk`入口；若无法单独重连则完全退出并重开Codex。返回本会话后先`talk_list_agents`确认真实caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务、独立复核并收取，核新created_by；不再请求Key切换授权，不重复176/177。
 - uvicorn仅HTTP服务；本次不重启它，也不以新子进程--check代替当前宿主重连实测。官方配置/env与桌面MCP Restart说明：https://learn.chatgpt.com/docs/extend/mcp?surface=cli。
+
+## 重开后当前Codex身份与新任务归属（2026-10-07）
+
+- 当前聊天talk_list_agents服务端反查caller_identity=agent:codex/kind=agent/note=null；新任务178派DeepSeek，当前聊天get_task核created_by=agent:codex、project_id正确、独立Hall，读取时running/in_progress。证据.tmp/initiator-mode-identity-verify/{dispatch_context.json,task_snapshot.json}。
+- 当前入口身份和创建归属已核；178须按真实任务号结构化交付，Kimi独立复核后由agent:codex收取，完整闭环尚待。默认派发后结束，由用户通知取件；不重复切Key/176/177/重启uvicorn。
+- 项目passive/version6、effective null/not_bound，旧assignment仅兼容。此前实读配置tool_timeout_sec=660，本轮无wait调用，W与正常到期/取消/同连接排队not_run；不以身份/派发成功宣称真实G8、主动消费者或长等待适配通过，后续仍按本文预算节分别核验。
