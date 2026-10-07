@@ -6115,3 +6115,12 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - 主控按TASK_WORKFLOW摘要读取，必要时按稳定引用补读；schema匹配只是自报，不替代独立复核。执行与复核分工派发前读取当前项目开发要求；Codex维护正式文档/Git，不重复全量探索。
 
 恢复指令：继续项目。完整证据见PROGRESS_HISTORY.md。
+
+## 2026-10-07 19:37 I-3B活跃工具与页面文案同步派发（#182）
+
+- 用户确认“好的，那继续吧”。派发前重读项目development_requirements：Codex决策/分配/验收，Kimi文字/设计/交互/前端，DeepSeek后端/其它，双方交叉复核；实际caller=agent:codex/kind=agent/note=null。模式passive/version6，effective null/not_bound保持。
+- 派给Kimi #182“182-发起者工具与页面活跃文案同步”，created_by=agent:codex，Hall group:task-6bf88d2813e74661b30d041c706b53cc，queued/assigned为派发时状态；最小顶层参数，不附加parent/task_kind/review_policy等。完成暂停后再派DeepSeek独立复核，默认派发后结束、用户通知后取件。
+- 代码范围仅talk_task_tools.py的WAIT_COUNTING_NOTE补G8 GET计入与timeout_seconds schema纠正>600既有clamp描述；index.html role-description-hint改任务发起者归属；workspace.js两条注释同步归属/已退役指定面板来源。G1-G8、计数、clamp/普通wait兼容、权限/API、模式CAS/409/离页在途等运行逻辑全部保持，不扩缓存版本或测试重构。
+- Kimi仅在.tmp/initiator-mode-live-copy/起草USER_MANUAL:162及MODULE_webui的精准补丁/派生副本/分类清单。历史日期、引文、任务/测试/验收记录保留，采用局部替代注记区分现行；正式文档由Codex在独立通过后发布。当前负责MODULE_webui，不扩读其它模块；桥接与集成规格、175-O1另片。
+- 基线43e7b14be76f6d6d19152b3073ddf9943721544a，派发前工作区干净；12来源指纹、完整任务包及实际回执在.tmp/initiator-mode-live-copy-dispatch/。任务包预先明确Codex仅可改PROGRESS/PROGRESS_HISTORY记录派发状态；开发与完整复核不并行改码。交付需实际task_id=182、完整裸talk-delivery-1 JSON及本地校验，MCP同响应核心字段整体读取。
+- 本轮只派发和保存进度，不运行浏览器、wait、真实消费者、不切active、不改配置/Key/数据库或重启服务。I-3尚未全量完成，I-4未运行；#182完成后需独立复核、正式发布/收取/Git收尾，再给用户hint页面简验步骤。未读取精确额度，不推测比例。

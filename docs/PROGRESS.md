@@ -1,11 +1,11 @@
 # Project Progress
 
-Updated: 2026-10-07 19:20 (Asia/Shanghai)：I-3A消费者指南经180起草/181独立复核通过并正式发布，三份现行文本补丁已落盘；181/180均由Codex收取。I-3活跃文案及跨模块规格尚待，I-4未运行。
+Updated: 2026-10-07 19:37 (Asia/Shanghai)：I-3A已发布并收取；用户同意继续后，I-3B活跃工具/UI文案同步已派Kimi #182，待开发完成再交DeepSeek独立复核。I-3剩余桥接/集成规格与I-4未完成。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK；prj_e8fe7066bbec；分支codex/terminal-return-codex。Codex决策负责范围、裁决、正式文档与Git；最新development_requirements为Kimi文字/设计/交互/前端、DeepSeek后端/其它，双方交叉复核，后续派发前重读。
-- 默认派发后结束、用户通知后取件。180/181已收取，本轮无新任务；当前只正式文档发布与状态收尾，无业务/测试/配置/Key/数据库/真实模式改动，无浏览器、wait或真实主动消费者运行。
+- 默认派发后结束、用户通知后取件。180/181已收取；I-3B #182由agent:codex派给Kimi，queued/assigned为派发快照，完成后交DeepSeek独立复核。执行者只修正文案并起草关联文档，Codex只更新两份派发进度；无模式/配置/Key/数据库改动，无浏览器、wait或真实主动消费者运行。
 
 ## 当前完成与证据
 
@@ -20,8 +20,8 @@ Updated: 2026-10-07 19:20 (Asia/Shanghai)：I-3A消费者指南经180起草/181�
 
 ## 当前卡点与下一步
 
-1. I-3A文档范围无阻塞，当前发布收尾后暂停；不宣称完整I-3就绪，不自动切active或开启I-4。
-2. 下一片I-3B：落实S-1计数注记/S-2 timeout schema文字、175-O2 role-description-hint及workspace两旧注释，并与USER_MANUAL:162/ROLE-DESC边界等关联文本同批同步；保持全部运行逻辑、权限、clamp/普通wait兼容及已验收模式交互，按最新分工开发/独立复核。
-3. MODULE_webui/MODULE_bridges/PROJECT_INTEGRATION剩余同步按负责模块再授权定位，175-O1测试整理另片；I-3全量就绪后再I-4真实链路及预算/取消/排队验收。模型名称展示及成员命名另片。
+1. I-3B已派#182，当前待Kimi完成；用户通知“182 ok”后读取完整结构化交付、核最小差异并派DeepSeek独立复核。复核通过才由Codex发布文档、收取和Git收尾，不宣称完整I-3就绪。
+2. #182 tracked修改只允许bridges/talk_task_tools.py两处字符串、web/index.html的hint、web/workspace.js两条注释；USER_MANUAL:162与MODULE_webui对应状态只产.tmp补丁/副本。保持G1-G8、HTTP计数、clamp/普通wait兼容、权限及模式交互；旧日期/引文/任务与验收记录用局部替代注记区分现行，不机械替换。源指纹12份、派发基线43e7b14、完整包见.tmp/initiator-mode-live-copy-dispatch/。
+3. MODULE_bridges/PROJECT_INTEGRATION剩余同步留下一片，当前仅读MODULE_webui；175-O1测试整理另片。I-3全量就绪后再I-4真实链路及预算/取消/排队人工验收；本片独立通过后提供角色说明hint的简短页面验收步骤。模型名称展示及成员命名另片。
 
-恢复指令：`继续项目`。180/181已独立通过、指南/现行三文本发布收取；剩余活跃文字和跨模块规格未完成，I-4未运行；未读精确用量、不推测比例。
+恢复指令：`继续项目`。180/181已收取，#182待开发后独立复核；默认不持续等待，收到用户“182 ok”再取件。剩余跨模块规格与I-4未运行；未读精确用量、不推测比例。
