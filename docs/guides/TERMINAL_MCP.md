@@ -416,3 +416,9 @@ I-1源码已独立复核通过（172/173，162项及七探针），当前连接�
 uvicorn命令启动的是TALK HTTP服务，Codex配置的talk_terminal_mcp.py是独立stdio进程；只重启HTTP服务不会刷新该工具目录。加载检查须同时看目录和实际返回，不能仅以服务重启或源码--check认定连接刷新。
 
 当前入口仍human:bobo、模式passive/version4、effective null/not_bound；未切自身Key、未改模式/指定、未试派加载任务。只认可当前Codex入口I-1加载与短只读路径，不代表真实Agent G8、主动消费者、长等待/取消/排队或其它终端已适配；I-2已按前置条件派174，UI/身份/指南/真实验收仍按原依赖执行。
+
+## Codex自身TALK身份切换准备（2026-10-07）
+
+I-0清单经176开发/177独立复核通过并收取，正式步骤见[Codex TALK成员身份切换与回退](CODEX_TALK_IDENTITY_SWITCH.md)。当前入口仍human:bobo，尚未切Key/修改配置/备份/重连/试派，准备通过不等于真实身份或主动适配通过。
+
+实际执行须先按已审I-0步骤确认范围，核当前宿主配置目标/安全Key来源与重载方式、刷新旧human任务并完成本链收取，然后只换目标TALK MCP的TALK_API_KEY。成功判据是服务端反查member_id=agent:codex且kind=agent、新任务created_by=agent:codex；TALK_MEMBER_ID/模型名/标签不可自证，旧human任务继续由原身份收取。T/W/返回余量与外层交还仍按本指南预算节分别核验，不将660秒常量或bridge历史3600秒误作Codex当前已验证客户端能力。

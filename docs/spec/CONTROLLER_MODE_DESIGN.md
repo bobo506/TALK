@@ -317,3 +317,8 @@
 - I-2 #174 经 #175 实际代码/全部差异独立复核通过并收取，固定主控页面功能依赖已退役；模式 human 写/agent 读、CAS/409、#164/#165 行为保留，四资源版本 20261007-initiator-mode-ui。独立 149 Node（同进程）/12 Python 页面契约及符号/导航探针通过，默认进程隔离 spawn EPERM 未取得项目用例结果。当前 UI 行为与边界见 MODULE_webui、USER_MANUAL 和 [人工验收步骤](../guides/INITIATOR_MODE_UI_ACCEPTANCE.md)。
 - caller_identity 仍 human:bobo，requested passive/version4、effective null/not_bound；旧指定 agent:codex/version13 只兼容回显，不作为资格依据。I-0 实际身份切换、I-3 消费者/现行文案、I-4 真实主动链路尚未实施；本轮没有自动唤醒/生效，也未改变权限或历史发起者。
 - I-1/I-2 本轮用户页面验收已于2026-10-07通过，人工门禁释放；主控未操作浏览器，用户未逐项声明键盘/窄屏/真实 HTTP 并发等可选项，不外推覆盖。#175 O-1 测试说明/stub 整理非阻塞，O-2 角色说明 hint/两旧注释随 I-3 同步；旧正文的未实施状态及复核原件均作历史，不追改。
+
+## I-0步骤准备已通过（2026-10-07）
+
+- 176经177独立全文/限定源码/指南出处复核通过并由原human入口收取。正式[切换与回退清单](../guides/CODEX_TALK_IDENTITY_SWITCH.md)由Codex发布，保留原稿/报告，补清行号、快照免责声明、执行者预算与F4恢复主体；复核窗口仅三份进度管理差异、业务/交付SHA未变的事实不扩大并行审改范围。
+- 此结论只覆盖准备步骤，§5.3的实际Key切换/备份/重连/试派均未执行；caller仍human:bobo。原I-0执行需用户确认，实施前核配置/安全Key/名册/宿主预算并刷新旧任务；不迁移历史created_by、不放宽收取、不将active意向或步骤审查当作主动消费者生效。

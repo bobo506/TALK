@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-07 I-0准备176/177独立通过并收取；正式身份清单发布（实际切换未执行）
+
+- 用户通知“177 ok”，msg2679合法自身177一致talk-delivery-1完整裸JSON complete，8完成/0未完成/0blocked、3产物/8验证/6限制，无裁剪；runner succeeded/submitted原finished_at2026-10-07T08:26:24.649605。独立A–I全文/限定源码与约40处出处无返工缺口，原19与复核26来源SHA/大小命中、176三稿不变，原176/本人177validate退出0；实际身份/配置/重连/试派/长等待/取消排队/业务大套件not_run。
+- Codex读完整同响应字段、实际N1–N5/必要日志和准备稿，核26对象一致、工作区干净HEAD b2e44ed，接收准备结果。先177后176收取，均succeeded/completed；result_collected_at原记录分别2026-10-07T08:41:43.618575/2026-10-07T08:41:45.750729。原msg2679/2678与稿/报告保持，裁决/回执.tmp/initiator-mode-identity-prepare-receipt/acceptance.json。
+- 正式docs/guides/CODEX_TALK_IDENTITY_SWITCH.md由Codex发布：N1精确2494–2495收取权限行号；N2显式引用filters_applied非完整性保证；N3明确本机DeepSeek/Kimi bridge2026-09-12历史3600、通用600、Codex MCP入口无执行者任务预算；N4明确错误归属任务当前Agent无取消权，须实际created_by身份处理，human不是万能取消；均已审语义澄清，无功能变动。N5只记录本派包预先允许三份进度管理、业务与稿SHA不变的具体事实，不改AGENTS或扩并行审改范围。另补清--check仅辅助，完整member_id/kind以服务端反查核实。
+- 同步实施计划/正式合同/TERMINAL_MCP/项目简报/路线图与正式进度，仅文档收尾、原稿不追改，不机械复跑测试。当前重新只读caller_identity仍human:bobo/kind=human，passive/version6、effective null/not_bound；agent:codex可见名册不证明安全Key/配置就绪，未改真实Key/配置/备份/重连/模式或试派。
+- 原实施计划I-0明确“本片只交付步骤；执行需用户确认”；已审具体清单完成后才提出实际切换确认，当前未派178。配置目标/节/键名/宿主重载、安全Key、真实T/W/余量/外层与刷新后旧任务须实施前核；旧175/162与7 failed快照不外推当前/跨项目，本链已收取仍不能跳过刷新旧任务。准备通过不等于身份切换、真实G8、主动消费者或其它终端通过，I-3/I-4和模型展示后续依计划。
+
 ## 2026-10-07 #176身份准备合法交付；派#177给DeepSeek独立复核
 
 - 用户通知“176ok”，msg2678为合法自身176一致talk-delivery-1完整裸JSON complete自报，4完成/0未完成/0blocked、3文件/5验证/4限制，无裁剪；runner succeeded/submitted，finished_at原记录2026-10-07T07:39:57.675764。格式/自报通过非内容验收，176未收取。

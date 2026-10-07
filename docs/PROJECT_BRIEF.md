@@ -6,7 +6,7 @@
 
 发起者合同 v3 已发布；I-1 #172/#173 工具代码独立通过并收取，当前 Codex MCP 加载核验通过。I-2 #174/#175 固定主控页面退役经独立实际代码复核通过并收取，当前“项目设置”只显示开发要求与调度模式；页面不再依赖固定指定，协调责任按具体任务 created_by，模式只约束任务发起侧。资源 20261007-initiator-mode-ui，独立 Node149（同进程）/Python页面12及导航/符号探针通过；默认进程隔离因宿主 spawn EPERM 为 not_run。
 
-I-1/I-2 同轮用户页面验收已于2026-10-07通过，人工门禁释放；下一项I-0仅准备自身身份切换/核验/回退步骤，不执行Key切换。当前入口仍 human:bobo，effective_mode=null/not_bound，保存active仍仅意向；I-0自身Key、I-3消费者/文案、I-4真实主动链路未开展，模型展示后续另片。角色说明提示还有一处旧“主控”文字，已登记I-3，不宣称全UI字样清零。当前状态见 [PROGRESS](PROGRESS.md)、[MODULE_webui](spec/MODULE_webui.md) 和 [验收步骤](guides/INITIATOR_MODE_UI_ACCEPTANCE.md)；以下日期较早的实现说明为阶段记录，与当前状态冲突时以本节为准。
+I-1/I-2 同轮用户页面验收已于2026-10-07通过，人工门禁释放；I-0准备176/177已独立通过并收取，正式[身份切换与回退清单](guides/CODEX_TALK_IDENTITY_SWITCH.md)已发布；当前等待确认实际执行，未切Key。当前入口仍 human:bobo，effective_mode=null/not_bound，保存active仍仅意向；I-0自身Key、I-3消费者/文案、I-4真实主动链路未开展，模型展示后续另片。角色说明提示还有一处旧“主控”文字，已登记I-3，不宣称全UI字样清零。当前状态见 [PROGRESS](PROGRESS.md)、[MODULE_webui](spec/MODULE_webui.md) 和 [验收步骤](guides/INITIATOR_MODE_UI_ACCEPTANCE.md)；以下日期较早的实现说明为阶段记录，与当前状态冲突时以本节为准。
 
 ## 历史开发安排（2026-09-19，固定主控阶段）
 

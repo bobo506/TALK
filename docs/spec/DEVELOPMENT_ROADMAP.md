@@ -186,4 +186,4 @@ I-3文字待办补充（174自报，175独立核实为非功能依赖，Codex裁
 - 175-O1：role_settings测试桩/注释保真度整理非阻塞，新真实接线与其它导航/模式套件已覆盖，后续合适测试维护片处理；175-O2：角色说明hint与两旧注释随I-3统一。旧I-1 O1/O2与175-O1/O2区分编号，不混淆。
 - 代码/模块/手册/实施状态与 [页面验收步骤](../guides/INITIATOR_MODE_UI_ACCEPTANCE.md) 纳本轮提交。默认Node隔离spawn EPERM为复核宿主限制，开发者通过不外推；真实浏览器/键盘/窄屏/HTTP并发未测。用户2026-10-07确认本轮页面验收通过，下一项I-0仅准备自身身份切换/核验/回退步骤；不实际换Key，不将本次页面验收宣称真实主动消费者生效。
 
-I-0当前状态：#176/msg2678合法自身裸JSON complete自报（4完成/0未完成/0blocked、3文件/5验证/4限制），未收取；仅.tmp步骤文档，无真实Key/配置/身份操作。原19来源SHA匹配、当前4ce691d业务无差异；#177“177-Codex自身TALK身份准备独立复核”给DeepSeek，初始queued/assigned、human:bobo发起，26来源对象/实际稿/原需求/完整摘要与回执可追溯，按A–I独立核步骤权限/失败主体/预算/出处。用户通知177后裁决收取176/177，再由Codex发布指南；实际切换前刷新旧盘点并先human收取本链，不迁移created_by/自动处理旧failed。当前passive/version6、effective null/not_bound，真实身份/消费者/主动链路仍未验收。
+I-0当前状态：176/msg2678准备稿经177/msg2679独立复核A–I通过并已收取，26来源SHA命中、约40处出处核实、原稿/业务零差异。正式[身份切换与回退清单](../guides/CODEX_TALK_IDENTITY_SWITCH.md)已发布，纳N1–N4文字澄清、记录N5本次进度收尾边界；准备通过不等于真实Key切换，当前等待按原I-0门禁确认实际执行。实施前核配置/安全Key/名册/宿主预算、刷新旧盘点，历史created_by和7旧failed保持；本链176177已由human收取。当前caller仍human:bobo、passive/version6、effective null/not_bound，真实身份/G8/消费者/主动链路仍未验收。

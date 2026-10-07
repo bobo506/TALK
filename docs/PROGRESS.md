@@ -1,32 +1,31 @@
 # Project Progress
 
-Updated: 2026-10-07 (Asia/Shanghai)。I-0准备#176已合法交付complete自报、尚未收取；#177已派DeepSeek独立复核，初始queued/assigned，等待用户通知后取件。I-1/I-2共同页面用户验收已通过，当前入口仍human:bobo，未执行实际Key切换。
+Updated: 2026-10-07 (Asia/Shanghai)。I-0准备176/177独立通过并收取，正式身份切换/回退清单已发布。当前等待确认实际切换，TALK入口仍human:bobo；没有Key/配置/重连/试派操作。I-1/I-2共同页面用户验收已通过，保存主动仍仅意向。
 
 ## 当前身份与协作
 
-- D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex。Codex决策负责范围/裁决/正式文档/Git；Kimi文字/设计/交互/前端，DeepSeek后端/其它并交叉复核；派177前重读当前development_requirements确认。
-- 默认派后结束、用户通知后取件；176开发已暂停/Kimi实例idle，177只读复核，不并行审改。Codex不操作浏览器或重复完整代码审查/业务测试。
+- D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex。Codex决策负责范围/裁决/正式文档/Git；项目开发要求为Kimi文字/设计/交互/前端，DeepSeek后端/其它并交叉复核；新派发前重读。
+- 默认派后结束、用户通知后取件；本轮177已结束，未派178。Codex不操作浏览器或重复完整代码审查/业务测试，业务/原稿不并行审改。
 
-## 当前切片：I-0准备#176 / 独立复核#177
+## 当前完成：I-0准备176/177独立通过
 
-- 176/msg2678为合法自身task_id一致完整裸JSON complete自报，4完成/0未完成/0blocked、3文件/5验证/4限制，无裁剪；runner succeeded/submitted，finished_at原记录2026-10-07T07:39:57.675764。格式/自报通过不代表内容独立通过，176未收取。
-- 实际仅.tmp/initiator-mode-identity-prepare/{identity_plan.md,changes.md,development.json}三对象（17474/2737/3165B）；准备范围、旧human衔接表、分阶段切换/核验、失败矩阵、预算/限制与出处。配置目标/节/键名/重载方式待实施前核验；未读写Key/用户配置或实际备份/重连/试派/服务/模式，未跑业务套件。
-- 原19来源对象SHA全部命中、工作区干净，当前HEAD4ce691d与176派发b37b6e6只差八份正式验收/派发文档，业务零差异。原旧任务盘点为175项/human162项派前快照、7旧failed保持human管理；176及随后177不在旧快照，切换前须刷新并由原human完成本链收取，不改created_by或放宽收取。
-- #177“177-Codex自身TALK身份准备独立复核”给agent:deepseek，Hall group:task-b54dbc5c81654fde883b1f5ee1b73a1b，created_by=human:bobo，初始queued/assigned。顶层最小参数；仅新增.tmp/initiator-mode-identity-prepare-review/报告/校验，本稿与业务/正式文档只读。
-- 派审包.tmp/initiator-mode-identity-prepare-review-dispatch/有原需求、完整开发摘要/实际稿来源、26来源SHA、回执；派前/后匹配。按A–I独立全文/限定源码核步骤、权限与恢复主体、列表范围/快照、caller与created_by判据、配置/预算待核项及not_run限制。格式/来源/出处检查即可，不重复I-1/I-2套件或做真实身份/生产等待。
-- 177有缺口partial交Kimi，不代改；本人结果须自身177裸JSON并expect177。通过后Codex才裁决收取176/177并发布正式清单，实际切换另按已审步骤执行，不把准备通过当身份已切换。
+- 177/msg2679合法自身177完整裸JSON complete，8完成/0未完成/0blocked、3产物/8验证/6限制，无裁剪；runner succeeded/submitted原finished_at2026-10-07T08:26:24.649605。A–I独立全文与限定源码/约40处出处无返工缺口，原19及复核26来源命中，176三稿/业务SHA未变；原176与本人177格式校验通过，真实切换和业务大套件not_run。
+- 主控读完整交付、实际N1–N5/必要校验日志与准备稿，核26来源一致，接受步骤。176/msg2678与177/msg2679已由原human收取，result_collected_at原记录2026-10-07T08:41:45.750729/2026-10-07T08:41:43.618575，均succeeded/completed。裁决/回执.tmp/initiator-mode-identity-prepare-receipt/acceptance.json。
+- 正式docs/guides/CODEX_TALK_IDENTITY_SWITCH.md已发布：原稿不追改，N1行号、N2快照筛选非完整性保证、N3本机bridge历史3600/通用600/本入口无执行者预算、N4实际created_by才可取消均文字补清；N5记录本次派包明示三份进度管理变化、源SHA保持，不改AGENTS/扩大审改范围。--check仅辅助，member_id/kind完整判据靠服务端反查。
+- 本轮同步指南/实施状态/简报/路线图/正式进度；无源码/测试/Key/配置/模式改动。原19来源包.tmp/initiator-mode-identity-prepare-dispatch/、实际稿.tmp/initiator-mode-identity-prepare/、复核与26来源包.tmp/initiator-mode-identity-prepare-review{,-dispatch}/保留，不入Git。
 
-## 已通过与仍未实施
+## 实际实施前条件与当前边界
 
-- I-1 172/173已收取，功能1fbdf78；当前Codex九工具G1–G8/发起者与assignment弃用目录、运行时/短只读路径加载通过。W1 false匹配历史173、human true G4拒绝、后续查询正常，证据.tmp/initiator-mode-tools-loadcheck/2026-10-07-loaded.json，旧失败保留；不外推真实Agent G8/长等待/取消排队/其它终端或主动消费者。
-- I-2 174/175代码独立通过并收取，功能b37b6e6；Node149同进程、页面Python12及导航/符号探针通过。默认隔离EPERM为not_run，后端75仅核开发证据未独立重跑。用户2026-10-07确认共同页面验收通过，记录/176派发4ce691d已推送；键盘/窄屏/HTTP并发/故障等未逐项确认不外推。
-- 当前caller_identity=human:bobo，requested passive/version6、effective null/not_bound；保存主动仅意向，不自动唤醒/运行，assignment仅兼容。I-0实际身份/I-3消费者文案/I-4真实链路未开展。usage-gate continue但两精确百分比null，不推测低消耗。
-- 175-O1测试桩/注释保真度非阻塞留合适测试维护；175-O2角色说明hint/两旧注释随I-3，I-1原O1/O2文字待办亦保留，任务前缀区分。模型名称上报/替代裸ID另片，成员命名留全角色页。
+- 按实施计划I-0第116行，本片只交付步骤、实际执行需用户确认。当前仅准备已通过；配置文件/节/键名、安全提供现有agent:codex Key、宿主重载、真实T/W/余量/外层预算仍须实施前核验，不读聊天中的Key或改模型供应商登录。
+- 旧human任务175/162与7旧failed是07:23 UTC快照，不外推切换时/跨项目或全部状态筛选完整性。本链176177已收取，实际切换前仍刷新旧任务，未完成项保留human管理；不迁移created_by、不放宽Agent收取，错误归属试派只由实际记录者取消。
+- 本轮最新只读caller_identity=human:bobo/kind=human、requested passive/version6、effective null/not_bound，agent:codex在当前可见名册；可见名册不证明Key安全到位或配置正确。未变更身份/Key/模式或assignment。
+- I-1工具172/173已收取、1fbdf78与当前Codex加载/短只读路径通过；I-2页面174/175已收取、b37b6e6且用户共同验收通过。真实Agent G8/长等待取消排队/其它终端/主动消费者未验；I-3消费者文案与I-4真实链路尚未开展，active保存不唤醒或自动运行。
+- 175-O1测试说明整理、175-O2角色hint/两旧注释和I-1原O1/O2文案待办保留；模型名称核验/上报/替代裸ID另片，成员命名留完整角色页。精确额度此前null，不推测低消耗。
 
 ## 下一步
 
-1. 用户通知177完成后，读取talk_get_delivery完整摘要/必要实际证据，确认或定向返工；当前不提前收取176、不派新开发、不做Key操作。
-2. I-0准备独立通过后发布身份切换/回退清单，实际实施前核目标配置/安全Key来源、刷新旧任务并human收取本链；依就绪条件后续I-3/I-4，不直接沿旧固定主控C2-C。
-3. 当前仅三份正式进度/路线图收尾，业务/实际配置零改动；原任务报告和.tmp留存，不纳Git。
+1. 确认是否执行实际Codex→TALK自身身份切换；按已审清单先核目标/安全Key/名册/预算/刷新旧任务，再备份、仅换TALK_API_KEY、重连核caller与新任务created_by；当前不自行切换，不重复176177。
+2. I-3消费者/现行文案可依计划另片起草与交叉复核，实际主动I-4须身份、I-1加载、I-2验收、I-3就绪；不直接沿旧固定主控C2-C。
+3. 原报告/历史保持；本轮文档收尾统一中文提交/常规推送持续授权，最终版本由Git和最终回复核对。
 
-恢复指令：继续项目。当前177待用户通知、176未收取，不重复派176/177。
+恢复指令：继续项目。当前I-0准备完成，实际切换待确认；未派178。
