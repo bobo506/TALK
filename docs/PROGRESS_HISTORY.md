@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-07 恢复核验：当前TALK MCP仍旧版，I-2未派发
+
+- 用户“继续项目”后按决策角色恢复，I-1功能与正式文档1fbdf78已提交推送，工作区干净。当前目录仍九工具、wait G1–G7/controller_changed，无发起者与弃用说明；talk_list_agents实时返回旧固定主控注记，caller_identity=human:bobo、requested_mode=passive/version4、effective=null/not_bound，指定agent:codex/version13，均为读取事实，未修改。
+- 最新development_requirements仍Kimi负责文字/设计/交互/前端、DeepSeek后端/其它并交叉复核。加载未通过，未派I-2；按实施计划须先重连现有TALK MCP入口并刷新会话，再核目录/运行时及短预算只读路径。未重连、改Key/模式/指定、试派、长等待或外推实际Agent G8/宿主适配通过。
+- 只保存必要加载证据.tmp/initiator-mode-tools-loadcheck/2026-10-07.json，更新两份正式进度；源码/测试未改，不重复162项或既有审查。
+
 ## 2026-10-06 #173独立代码复核通过，收取I-1；当前MCP仍旧版待重连
 
 - 用户通知“173 ok”。msg2675含前言+完整JSON，MCP摘要为unknown/自由文本，不从runner succeeded推业务结论；按项目兼容流程读取本地development.json并summary --expect-task-id 173校验通过，complete、10完成/0未完成/0blocked、7验证/5限制。稳定result_message_id2675/SHA806e422fdde69227b48394acf82a306b3a1595047f66d14aa75f0d25674c9464分两页无损读4254字符，嵌入JSON与本地包去schema比较一致；原消息/receipt/接受记录存.tmp/initiator-mode-tools-receipt/，原MCP unknown保持不追改。
