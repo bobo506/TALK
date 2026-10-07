@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-07 #176身份准备合法交付；派#177给DeepSeek独立复核
+
+- 用户通知“176ok”，msg2678为合法自身176一致talk-delivery-1完整裸JSON complete自报，4完成/0未完成/0blocked、3文件/5验证/4限制，无裁剪；runner succeeded/submitted，finished_at原记录2026-10-07T07:39:57.675764。格式/自报通过非内容验收，176未收取。
+- 实际只新增.tmp/initiator-mode-identity-prepare/三文件：identity_plan.md17474B/134行、changes.md2737B、development.json3165B；无业务/正式文档/Key/配置差异。主控读完整交付与范围说明/关键步骤索引，核原19来源SHA全部匹配、工作区干净；当前4ce691d与原派发b37b6e6只差八份正式验收/派发记录。未重复完整源码审查或业务测试。
+- 交付包含Codex→TALK成员身份边界、旧human快照/7failed衔接、本链human先收取、阶段/成功判据/五类失败矩阵与预算，配置目标/节/键名/重载方式待安全核验；真实T/Key切换/重连/试派/长等待/取消排队全部not_run。列表无分页/人类可见性等源码自报交独立核实，不凭摘要采信；旧盘点不能当切换时或跨项目事实。
+- 最新development_requirements确认Kimi文字/前端、DeepSeek后端/其它并交叉复核；Kimi实例idle，caller仍human:bobo、passive/version6、effective null/not_bound；usage-gate continue但两精确百分比null，不推测低使用率。无实际Key/模式/配置变更或身份自证。
+- #177“177-Codex自身TALK身份准备独立复核”给agent:deepseek，初始queued/assigned、created_by=human:bobo、Hall group:task-b54dbc5c81654fde883b1f5ee1b73a1b，顶层最小参数。包.tmp/initiator-mode-identity-prepare-review-dispatch/含原完整任务、完整交付摘要/实际三稿、26来源SHA与回执，派前后核对一致；后续Codex进度不是业务基线变化。
+- 177按A–I独立全文与限定代码/指南出处核验，重点旧任务范围/权限、失败处理主体、Key安全边界/配置待核、服务端caller与created_by、T/W/外层/取消排队未验证纪律；不得读秘密/真实配置或试派/长等待，业务与稿只读，仅新增本片.tmp报告/校验。原176及本人交付格式独立validate，必要来源/范围检查，不机械重跑业务套件；缺口partial交Kimi，实际本人177裸JSON且expect177。默认派后结束，用户通知后才裁决/收取176177/发布正式步骤，实际切换不在本片执行。
+
 ## 2026-10-07 用户确认I-1/I-2本轮页面验收通过；准备I-0身份步骤片
 
 - 用户明确“验收通过”，以b37b6e6已提交推送的固定主控页面退役/发起者模式为本轮版本，I-1/I-2共同人工门禁释放。Codex未操作浏览器，不推断用户逐项验证键盘/窄屏/HTTP并发/权限与故障边界，更不外推真实主动消费者通过。
