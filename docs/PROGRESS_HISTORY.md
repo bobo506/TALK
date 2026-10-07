@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-07 17:36 (Asia/Shanghai) 收到178交付，派Kimi独立复核179
+
+- 用户已观察页面“Codex → DeepSeek”，随后通知178已ok。主控talk_get_delivery取得msg2680的完整同响应摘要，合法talk-delivery-1且自身178一致，业务partial、9完成/2未完成/0阻塞、11验证（9 pass/2 not_run）、4个.tmp产物；默认无裁剪。runner succeeded/submitted、finished_at=2026-10-07T09:31:34.138375，尚未收取。
+- 两未完成明确为下游Kimi独立复核与Codex收取，本片只读核验已自报完成，无实质阻塞。SQLite mode=ro核归属/独立Hall/名册及关键代码创建者/收取权限路径，与主控MCP快照一致；当前MCP身份仍由主控服务端真实返回支持，不把执行者SQLite或模型名作为宿主自证。
+- 本轮主控实跑178本地validate退出0；冻结六来源实际SHA/大小，核aa92e23→ca6945c仅8份状态文档、功能目录零差异、取件前工作区干净。未重复完整代码探索/业务测试，独立审查交Kimi。原178报告/脚本/证据不追改。
+- 派发前重读最新development_requirements及caller_identity=agent:codex/kind=agent，按交叉分工用独立顶层最小参数派179给Kimi，created_by=agent:codex、project_id=prj_e8fe7066bbec、hall_group_id=group:task-ee2e2b824f564a8abfc644062c44fb38；返回queued/assigned。审查包含原需求、不变项、基线/实际差异、开发测试证据及A-H独立检查标准。
+- 复核仅允许.tmp/initiator-mode-identity-review/写脱敏报告/证据，禁止业务/测试/正式文档/配置/Key/数据库写入、额外派发、收取、提交推送、浏览器或wait；Codex仅更新正式派发进度。开发已暂停，禁止复核期并行改码。派发上下文、六源指纹、178完整摘要和179引用均已保存到该.tmp目录。
+- 项目passive/version6、effective null/not_bound保持，660仅历史实读配置；W/正常到期/取消/同连接排队/主动链路均not_run，不外推I-0整体已验收或I-3/I-4就绪。下一步默认结束等待，用户通知179后收摘要，独立通过再裁决收取179/178。正式改动仅PROGRESS/PROGRESS_HISTORY，验证UTF-8读取、要点与git diff --check。
+
 ## 2026-10-07 17:29 (Asia/Shanghai) 重开后自身身份已核，派发只读新任务178
 
 - 用户重开后要求“继续项目”；按既有实际切换授权恢复，未再次确认、切Key或重启服务。当前聊天实际talk_list_agents项目路径返回caller_identity=agent:codex/kind=agent/note=null，证明本连接已加载本人凭据，补齐I-0 Phase C。主控角色仍为Codex决策。
