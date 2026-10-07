@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-07 用户确认I-1/I-2本轮页面验收通过；准备I-0身份步骤片
+
+- 用户明确“验收通过”，以b37b6e6已提交推送的固定主控页面退役/发起者模式为本轮版本，I-1/I-2共同人工门禁释放。Codex未操作浏览器，不推断用户逐项验证键盘/窄屏/HTTP并发/权限与故障边界，更不外推真实主动消费者通过。
+- 同步当前简报/模块/正式合同/实施状态/路线图/验收指南与进度；旧开发/复核/等待验收阶段记录保持历史。172–175均已收取，代码无新差异。
+- 最新development_requirements仍Kimi文字/设计/交互/前端，DeepSeek后端/其它并交叉复核。当前caller仍human:bobo，requested passive/version6、effective null/not_bound；版本6为本轮验收后只读结果，不回写旧version4历史。usage-gate返回continue但两精确百分比null，不推断低消耗。
+- 本项目talk_list_tasks只读返回175项/human创建162项，快照未见在途或submitted待收取；7项历史failed带结果消息但未收取时间（122/35/31/24/21/14/12），原失败保持，不当作在途或自动收取。实际切换前须重新盘点，包括本I-0与随后复核human发起的任务；旧任务不迁移created_by，保留human管理衔接。
+- 下一项I-0只准备Codex自身TALK身份切换/核验/回退步骤，Kimi起草、DeepSeek独立复核；不读取/输出/写入密钥，不操作真实配置/备份/重连/服务/模式/试派。正式文档/Git仍由Codex维护，已派#176“176-Codex自身TALK身份切换准备”给agent:kimi，初始queued/assigned、created_by=human:bobo、Hall group:task-c20951e7566d42bfaa13f83fe65c6dd7，默认派后结束等待用户通知。
+
+- 176顶层派发仅project/target/title/content最小参数；派包.tmp/initiator-mode-identity-prepare-dispatch/，19来源对象SHA派前后匹配，baseline b37b6e6（八份验收状态正式文档为派前限定差异，进度后续记录不构成业务变化）。任务要求只读准备、旧human任务盘点更新纪律、本人caller与新created_by验证/失败回退、密钥禁止读取输出写入及T/W/取消排队未测边界；完整自身176裸JSON并expect176，不实际试派或换配置。独立复核待用户通知后另派DeepSeek，本轮不持续等待。
+
 ## 2026-10-07 #174/#175 I-2代码独立通过并收取；模块/手册/Git收尾与同轮人工门禁
 
 - 用户通知“175好了”，读取175/msg2677完整合法自身task_id一致裸JSON，complete，13完成/0未完成/0blocked、17产物/11验证/5限制，无机械裁剪；runner succeeded/submitted，finished_at原记录2026-10-07T06:51:24.188167。独立A–H实际源码/完整差异/新删文件核验无功能缺口；主控实读O1/O2及必要验证尾，不仅凭自报摘要验收。
