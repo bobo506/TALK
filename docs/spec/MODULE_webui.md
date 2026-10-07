@@ -324,10 +324,10 @@
 
 > 2026-10-07 现行补充：上方 I-2 节“当前入口仍 human:bobo、I-0/I-3 待后续”是该片当时快照；现行 Codex 入口已实测 agent:codex/kind=agent，I-0 本人入口被动闭环 #178/#179、I-3A 消费者指南 #180/#181 均已通过并收取。真实主动消费者/I-4 未运行。
 
-## 2026-10-07 I-3B：活跃工具/UI 文案同步（独立复核通过，页面待人工验收）
+## 2026-10-07 I-3B：活跃工具/UI 文案同步（独立复核与本片提示人工验收通过）
 
 - 角色说明提示（index.html `role-description-hint`）“不改变项目主控”改为“不改变任务发起者归属”；web/workspace.js 两条注释同步：“主控指定”改为“任务发起者归属”，“不复制主控 CAS/saveToken”改为“不复制已随 I-2 退役的主控指定面板 CAS/saveToken”。仅文案与注释：职责分级（business_role / decision_tier）、权限边界与全部运行逻辑不变。
 - 上文 C1b-S2、ROLE-SETTINGS-1、ROLE-DESC-F2、C2-B 各节已加“阶段记录”局部注记：日期、历史原文引用、任务号、测试与验收事实保留；固定主控指定面板已由 I-2 退役，当前“项目设置”只有开发要求与调度模式，调度模式只约束任务发起侧，协调责任按具体任务 created_by。
 - 同片配套（bridges/talk_task_tools.py，仅描述文本，不属于本模块文件）：WAIT_COUNTING_NOTE 点名 G8 逐任务核验 GET 计入 http_requests；timeout_seconds 的 controlled_wait 描述修正为“显式有限正数，超过 600 按既有 clamp 到 600 生效”，计数与 clamp 行为不变。
 - USER_MANUAL“当前版本边界”随 hint 修复删除“角色说明提示中尚有一处旧‘主控’措辞，后续文案片统一”漏项半句。
-- 状态：Kimi #182 文案/草稿及 #183 既有断言补正，经 DeepSeek #184 独立 A–F 复核通过、0 阻塞/0 返工，Codex 已发布文档。独立页面契约 2+5 与等待合同定向 4 项通过，AST 除两个描述字符串等价；#182 原 partial/旧断言失败由后续证据闭合，原报告不改。角色说明提示待用户简验；MODULE_bridges/PROJECT_INTEGRATION 剩余同步与 I-4 真实主动链路尚未完成，本片不释放完整 I-3/I-4 门禁。
+- 状态：Kimi #182 文案/草稿及 #183 既有断言补正，经 DeepSeek #184 独立 A–F 复核通过、0 阻塞/0 返工，Codex 已发布文档。独立页面契约 2+5 与等待合同定向 4 项通过，AST 除两个描述字符串等价；#182 原 partial/旧断言失败由后续证据闭合，原报告不改。用户于2026-10-07确认本片角色说明提示简验通过，验收范围为提示文案；MODULE_bridges/PROJECT_INTEGRATION 剩余同步与 I-4 真实主动链路尚未完成，本片不释放完整 I-3/I-4 门禁。

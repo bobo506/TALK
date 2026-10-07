@@ -6154,3 +6154,10 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - 正式状态同步PROGRESS短快照、PROJECT_BRIEF、实施计划/合同/路线；回执.tmp/initiator-mode-live-copy-receipt/acceptance.json保存发布期待文本、当前身份/模式、非阻塞裁决与实际收取。184限制所列AGENTS/TERMINAL/DSH等已在I-3A完成，本轮不重复改；真正剩余MODULE_bridges/PROJECT_INTEGRATION规格及175-O1维护另片。
 - 人工简验入口：已有TALK服务和人类登录密钥，Ctrl+F5后进入角色→具体角色→角色说明，确认提示“不改变任务发起者归属、职责分级（business_role / decision_tier）或任务权限”；无需服务重启或切active。本片页面待人工确认，收尾后暂停，不开启跨模块下一片。
 - 当前caller实测agent:codex/kind agent/note null，项目passive/version6、effective null/not_bound保持，旧assignment仅兼容；本轮未改配置/Key/数据库/权限、未重启服务或运行浏览器/wait/真实消费者。MCP进程新说明重载未核；I-4真实主动/G8/长等待/取消/排队均未验收，不释放其门禁。未读取精确额度，不推测比例。
+
+## 2026-10-07 21:36 I-3B角色说明提示人工验收通过
+
+- 用户在9a66fa3发布与提示验收步骤后明确回复“验收通过”。记录范围为既有TALK服务、人类登录、强刷后角色→具体角色→角色说明中“不改变任务发起者归属、职责分级…或任务权限”的提示简验；I-3B本片人工门禁释放，182/183/184已独立通过并收取，原182 partial及失败报告保持。
+- Codex只同步PROGRESS/历史、PROJECT_BRIEF、MODULE_webui、实施计划/合同/路线的当前验收状态，并在.tmp/initiator-mode-live-copy-receipt/acceptance.json追加人类确认与文档状态快照。原已审草稿/复核报告/任务结果和9a66fa3发布快照保持。
+- 本轮无代码/配置/Key/数据库/权限/模式变更，不新派任务、不操作浏览器或等待工具；无需业务测试，核UTF-8与git diff --check。I-3还剩MODULE_bridges/PROJECT_INTEGRATION规格同步；175-O1维护、既有schema边界评估与新MCP说明重载核验另片。I-4真实主动/G8/长等待/取消/排队尚未运行，提示验收不释放其门禁。
+- 当前切片验收记录收尾后暂停；下一次“继续项目”按最新开发要求定位剩余规格切片，不重复I-3A或本片提示验收。

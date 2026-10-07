@@ -187,7 +187,7 @@ I-3（提示词/指南）可与 I-1/I-2 并行起草，发布不早于 I-1
 | I-1 工具 | 172/173代码通过并收取，功能1fbdf78；当前Codex目录/运行时及短只读路径加载通过 | 不外推其它终端、真实Agent G8/主动消费者或长等待/取消排队 |
 | I-2 页面 | 174/175独立实际代码复核通过并收取，14业务/测试文件、资源20261007-initiator-mode-ui | 与I-1同轮用户页面验收已于2026-10-07通过；后续先I-0步骤准备，再按依赖推进 |
 | I-0 | 176/177准备通过已收取；配置/API/独立启动、当前caller及178/179被动新任务闭环独立通过，两项已由Codex收取 | 当前Codex入口验收通过；旧human归属保持，I-3/I-4与其它终端自身身份另片 |
-| I-3 消费者/文案 | I-3A已发布收取；I-3B经182开发/183断言补正/184独立复核通过，四文件最小差异及USER_MANUAL/MODULE_webui已发布，三项已收取 | 角色hint待用户简验；MODULE_bridges/PROJECT_INTEGRATION剩余同步、175-O1维护另片，新MCP说明重载未核；尚不释放I-4 |
+| I-3 消费者/文案 | I-3A已发布收取；I-3B经182开发/183断言补正/184独立复核通过，四文件最小差异及USER_MANUAL/MODULE_webui已发布，三项已收取 | 角色hint人工简验已于2026-10-07通过；MODULE_bridges/PROJECT_INTEGRATION剩余同步、175-O1维护另片，新MCP说明重载未核；尚不释放I-4 |
 | I-4 真实链路 | not_run | 依身份/消费者及终端实际预算就绪后独立人工验收；effective仍null/not_bound |
 
 - 175独立Node149/149（--test-isolation=none）、四页面Python12/12及符号/导航探针通过；默认隔离宿主spawn EPERM为not_run。后端75仅核开发日志/保护哈希，未重复运行。全43来源对象与tracked差异哈希一致，主控不重复全审/全测或操作浏览器。
@@ -221,10 +221,10 @@ Kimi180起草经DeepSeek181独立A–F全文/实际源码依据复核通过、�
 
 当前只I-3A指南范围通过；S-1/S-2工具计数/schema、175-O2角色hint/workspace注释及USER_MANUAL:162关联文字仍需下一片实际实施并复核，MODULE_webui/MODULE_bridges/PROJECT_INTEGRATION剩余同步未完成、175-O1测试维护另片。181建议S-1既有子串断言无需镜像同步改测试，关联文案同批完成。项目passive/version6、effective null/not_bound；未运行主动消费者/G8/长等待/取消/排队/其它终端身份验收，完整I-3与I-4门禁未释放。
 
-## I-3B活跃文案与关联文档发布（2026-10-07，页面待简验）
+## I-3B活跃文案与关联文档发布（2026-10-07，角色提示简验通过）
 
 Kimi #182完成S-1/G8计数注记、S-2/受控timeout既有clamp描述、175-O2角色hint及workspace两注释；原任务未授权测试改动，页面契约旧断言1项失败如实报partial。#183仅同步既有assertIn子串与对应注释，#184 DeepSeek独立A–F实际代码/文档复核通过、0阻塞/0返工，独立页面2+5及等待合同定向4项通过。四tracked文件10进8删；AST8302节点除两个描述字符串等价，JS注释外、HTML hint外不变，G1-G8/权限/计数/clamp/模式交互保持。开发54/65不重复声明为独立通过，浏览器/真实链路未运行。
 
 Codex已发布USER_MANUAL与MODULE_webui，并追加I-2旧human身份快照和当前agent:codex、I-0/I-3A已完成的区别；按184→183→182收取，三项succeeded/completed、原msg2686/2685/2684与182 partial/失败保持。183自报25项数目不准，184实际核13来源中12保持+15冻结保持=27未变对象、0实际缺口；原报告不改。回执.tmp/initiator-mode-live-copy-receipt/acceptance.json，已审原稿/补正/复核证据保留。
 
-页面简验：使用既有TALK服务和人类登录密钥，Ctrl+F5刷新后进入“角色”→任一具体角色→“角色说明”，确认提示写“不改变任务发起者归属、职责分级（business_role / decision_tier）或任务权限”。保持被动即可，无需服务重启。当前未宣称用户已验收本片；I-3还需MODULE_bridges/PROJECT_INTEGRATION同步，175-O1测试维护另片。既有JSON Schema maximum=600与运行clamp关系列后续独立评估，本片只描述同步、不改关键字。当前MCP进程新说明重载未核；项目passive/version6、effective null/not_bound，I-4真实G8/主动消费者/长等待/取消/排队未运行，门禁未释放。
+页面简验：使用既有TALK服务和人类登录密钥，Ctrl+F5刷新后进入“角色”→任一具体角色→“角色说明”，确认提示写“不改变任务发起者归属、职责分级（business_role / decision_tier）或任务权限”。保持被动即可，无需服务重启。用户于2026-10-07明确确认本片角色说明提示验收通过，验收范围为上述提示简验；I-3还需MODULE_bridges/PROJECT_INTEGRATION同步，175-O1测试维护另片。既有JSON Schema maximum=600与运行clamp关系列后续独立评估，本片只描述同步、不改关键字。当前MCP进程新说明重载未核；项目passive/version6、effective null/not_bound，I-4真实G8/主动消费者/长等待/取消/排队未运行，门禁未释放。
