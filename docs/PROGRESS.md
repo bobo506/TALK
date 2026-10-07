@@ -1,11 +1,11 @@
 # Project Progress
 
-Updated: 2026-10-07 20:28 (Asia/Shanghai)：#182完成文案与文档草稿，结构化partial如实报告旧文案断言1项失败；已派Kimi #183定向补正该既有断言/注释，待通过后合并交DeepSeek独立复核。两项未收取，正式文档未发布，I-4未运行。
+Updated: 2026-10-07 20:43 (Asia/Shanghai)：#183既有断言补正交付complete，目标页面2/2为开发证据；#182原partial保持，已派DeepSeek #184合并独立复核实际四文件与两份文档草稿。三项未收取，正式文档未发布，I-3剩余规格与I-4未完成。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK；prj_e8fe7066bbec；分支codex/terminal-return-codex。Codex决策负责范围、裁决、正式文档与Git；最新development_requirements为Kimi文字/设计/交互/前端、DeepSeek后端/其它，双方交叉复核，后续派发前重读。
-- 默认派发后结束、用户通知后取件。180/181已收取；I-3B #182已succeeded/submitted，业务partial；定向补正#183由agent:codex派给Kimi，queued/assigned为派发快照，修复后再交DeepSeek合并独立复核。Codex只更新两份派发进度；无模式/配置/Key/数据库改动，无浏览器、wait或真实主动消费者运行。
+- 默认派发后结束、用户通知后取件。180/181已收取；I-3B #182原partial、#183complete均succeeded/submitted待收取；#184由agent:codex派给DeepSeek，queued/assigned为派发快照，合并独立复核中。Codex只更新两份派发进度；无模式/配置/Key/数据库改动，无浏览器、wait或真实主动消费者运行。
 
 ## 当前完成与证据
 
@@ -20,10 +20,12 @@ Updated: 2026-10-07 20:28 (Asia/Shanghai)：#182完成文案与文档草稿，�
 
 - #182/msg2684为合法自身182一致partial（6完成/2未完成/0阻塞、10验证），主控本地validate退出0；必要核心字段合读，原报告完整保留。当前差异仅3文件8进6删，12来源中3允许变化/9保持；54项工具、5项页面、65项Node为开发者通过证据，role_description页面2中1失败；失败是test_role_description_web_ui.py:38仍assert旧“项目主控”子串。原任务无权改测试，Codex已授权#183仅该断言及36行对应注释，并实际重跑本套件2项后再独立复核。patch2文档正反字节与8链接为开发证据，未经独立确认不发布。
 
+- #183/msg2685为合法自身183一致complete（6完成/0未完成/0阻塞、5验证），主控本地validate退出0、实际测试diff仅预期子串+注释两行。2/2为开发证据；补正派发包13来源只本测试变化、15原产物全保持。183自报25项（12+13）与实际全量剔本测试后27项（12+15）数目不一致，184须独立查证覆盖/遗漏并记录真实全量，原报告不追改。审查待定，不提前收取或将页面契约当人工验收。
+
 ## 当前卡点与下一步
 
-1. 当前待Kimi #183补正；用户通知“183 ok”后读取完整交付，确认唯一旧断言问题闭合，再按最新要求派DeepSeek对#182+#183实际差异/源码/文档草稿独立复核。复核通过才发布文档、收取和Git收尾，不宣称完整I-3就绪。
-2. #182三个源码文件仅文字/注释，文档仍.tmp草稿；#183仅tests/test_role_description_web_ui.py旧assertIn子串与对应注释两行，不新增/放宽断言或扩175-O1整理。原#182产物/报告不追改；当前13来源+15原产物冻结，补正包见.tmp/initiator-mode-live-copy-assertion-fix-dispatch/。保持G1-G8、计数、clamp、权限与页面交互。
+1. 当前待DeepSeek #184独立复核；用户通知“184 ok”后读取完整交付、处理分歧/阻塞与发布建议。独立通过才由Codex发布两份文档、按复核/补正/开发顺序收取并做Git收尾；原182partial/失败记录不改，不宣称完整I-3就绪。
+2. #184核四tracked文件最小diff、Python/JS/HTML等价、G1-G8与timeout描述、既有断言补正、7项受影响页面独立验证、文档patch/历史保护/UTF-8/链接/交付纪律。审查HEAD48a74ee、13来源+22只读产物冻结、combined.patch SHA3ed94645，包见.tmp/initiator-mode-live-copy-review-dispatch/。不并行改码、不发布正式文档。
 3. MODULE_bridges/PROJECT_INTEGRATION剩余同步留下一片，当前仅读MODULE_webui；175-O1测试整理另片。I-3全量就绪后再I-4真实链路及预算/取消/排队人工验收；本片独立通过后提供角色说明hint的简短页面验收步骤。模型名称展示及成员命名另片。
 
-恢复指令：`继续项目`。180/181已收取，182原partial保持，183补正待完成后合并独立复核；默认不持续等待，收到用户“183 ok”再取件。剩余跨模块规格与I-4未运行；未读精确用量、不推测比例。
+恢复指令：`继续项目`。180/181已收取，182原partial与183补正交付保持；184独立复核待完成。默认不持续等待，收到用户“184 ok”再取件。剩余跨模块规格与I-4未运行；未读精确用量、不推测比例。
