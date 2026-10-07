@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-07 #174页面退役合法交付；派#175给DeepSeek独立代码复核
+
+- 用户先请求检查174是否工作，TALK实测running/in_progress、Kimi busy/当前174、最近心跳2026-10-07T06:29:56.400965；只是运行器状态，不推断具体模型进度。随后用户通知174完成，读取msg2676完整合法自身task_id一致talk-delivery-1、complete自报，7完成/0未完成/0blocked、14文件/7验证/4限制，无裁剪；runner succeeded/submitted，finished_at原记录2026-10-07T06:30:51.961798，不等于独立通过，未收取。
+- 实际tracked13文件189增/1618删，另新增未追踪workspace_initiator_mode_ui.test.cjs，共14业务/测试文件；四web、十测试含删除33项旧面板套件与新增5项真实接线对象。19未改来源/保护对象hash匹配，无后端/Key/MCP/正式文档开发差异；style.css无需改。开发基线237dfca→当前473fd7e仅四份Codex记录，业务基线一致。
+- Codex仅读取实施说明、范围外三个Node配套及两份既有Python契约差异，接受role_settings/role_description/requirements_nav的限定主控耦合删换及切片/顺序/空态同步纳本片，不授权无关业务/削弱保留覆盖；未事前报告扩范围的事实不追改，scope_decision留存。role_settings桩省略模式同步，交独立审查判断新真实接线/模式套件能否补足，主控不自行推通过。
+- 开发自报默认/none两种Node隔离各149/149、四页面12/12、未改后端75/75；五日志存在且尾部计数一致，主控不复跑或重复全审。浏览器/键盘/HTTP并发not_run；角色说明hint/两旧注释仍“主控”由开发声明待I-3，交审查核非功能依赖。原日志/报告保持，原用户164/165验收不能外推本片页面通过。
+- 最新开发要求确认，开发已结束/Kimi实例idle后，#175“175-发起者模式页面退役独立代码复核”给agent:deepseek，初始queued/assigned、created_by=human:bobo，Hall group:task-ab90b2bc24b74adab352eb6cdfe61592。独立顶层最小参数，包.tmp/initiator-mode-ui-review-dispatch/task.md；43来源对象SHA派前匹配、157527B tracked差异、13份Git旧源码/新增完整快照/开发完整摘要/范围裁决可追溯，避免漏掉未追踪新测试。
+- 复核按A–H独立实读实际全部差异与有效测试覆盖，复跑保留Node/四页面及必要最小探针，后端75保护/日志先核、有疑点才重复；源码只读，有问题partial交回Kimi，完整自身175裸JSON且expect175。原174未收取，14功能改动未暂存/提交，主控本轮仅收尾正式进度/派审记录；175完成通知后裁决、再收取/同步模块和手册/提交推送并提供同轮人工验收。
+
 ## 2026-10-07 I-1当前Codex入口加载通过；派#174给Kimi实施I-2页面退役
 
 - 用户按重连说明后再次“继续项目”；目录实测九工具、新G1–G8与发起者/assignment弃用说明，实时list_agents注记一致。显式W=1秒false对已收取173立即matched（0.031秒、HTTP1/poll1），human true按G4拒绝，随后get173仍completed。当前入口I-1加载前置通过，原2026-10-07旧加载失败证据不覆盖，新增.tmp/initiator-mode-tools-loadcheck/2026-10-07-loaded.json。
