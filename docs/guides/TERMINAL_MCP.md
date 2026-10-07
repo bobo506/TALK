@@ -431,8 +431,14 @@ I-0清单经176开发/177独立复核通过并收取，正式步骤见[Codex TAL
 - 在客户端设置的MCP服务器列表重启`talk`入口；若无法单独重连则完全退出并重开Codex。返回本会话后先`talk_list_agents`确认真实caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务、独立复核并收取，核新created_by；不再请求Key切换授权，不重复176/177。
 - uvicorn仅HTTP服务；本次不重启它，也不以新子进程--check代替当前宿主重连实测。官方配置/env与桌面MCP Restart说明：https://learn.chatgpt.com/docs/extend/mcp?surface=cli。
 
-## 重开后当前Codex身份与新任务归属（2026-10-07）
+## 重开后Codex身份与新任务归属（2026-10-07收取前快照；验收结果见下节）
 
 - 当前聊天talk_list_agents服务端反查caller_identity=agent:codex/kind=agent/note=null；新任务178派DeepSeek，当前聊天get_task核created_by=agent:codex、project_id正确、独立Hall，读取时running/in_progress。证据.tmp/initiator-mode-identity-verify/{dispatch_context.json,task_snapshot.json}。
 - 当前入口身份和创建归属已核；178须按真实任务号结构化交付，Kimi独立复核后由agent:codex收取，完整闭环尚待。默认派发后结束，由用户通知取件；不重复切Key/176/177/重启uvicorn。
 - 项目passive/version6、effective null/not_bound，旧assignment仅兼容。此前实读配置tool_timeout_sec=660，本轮无wait调用，W与正常到期/取消/同连接排队not_run；不以身份/派发成功宣称真实G8、主动消费者或长等待适配通过，后续仍按本文预算节分别核验。
+
+## I-0 Codex被动身份闭环验收通过（2026-10-07）
+
+当前聊天实际caller为agent:codex/kind=agent；178 DeepSeek只读核验经179 Kimi独立A-H复核通过，两个新任务created_by=agent:codex、项目正确且独立Hall。Codex于2026-10-07T09:50:04.854837收取179、09:50:07.538516收取178，均succeeded/completed，原msg2681/2680保持。原partial的下游复核/收取已完成；179结果混排导致MCP默认unknown，本地合法179报告与完整消息JSON一致，按实际独立证据验收，原报告不追改。回执.tmp/initiator-mode-identity-receipt/acceptance.json。
+
+通过范围仅Codex当前入口及被动派发/读取/交付/独立复核/收取；项目passive/version6、effective null/not_bound保持，660仅前次配置实读。真实G8/主动消费者/长等待/正常到期/取消/同连接排队/其它终端身份未验收。里程碑收尾后暂停，I-3消费者/现行指南/旧主控文案及I-4真实链路另片；历史human归属和权限保持。

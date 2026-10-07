@@ -2,7 +2,7 @@
 
 > 2026-10-06 Codex发布：#166原设计经#167独立复核、#168修订、#169独立复核、#170六项修订与#171定向复核后，合看确认合同设计通过。#171逐R-1..R-6独立回源码，10完成/0未完成/0阻塞，原#167/#169的partial记录保持；#166/#168/#170/#171已收取。
 >
-> **2026-10-07当前I-1加载与I-2页面独立复核、用户验收已通过。** 用户另行授权自身身份切换：配置已备份并换既有agent:codex Key，API/独立启动通过；重开后当前聊天已核agent:codex/kind=agent，新任务178创建归属已核，交付/独立复核/收取待完成。消费者/文案与真实主动链路继续后续；现状以文末最新实施状态与PROGRESS为准，原正文为阶段记录。effective_mode仍null/not_bound，保存active仍是意向。
+> **2026-10-07当前I-1加载与I-2页面独立复核、用户验收已通过。** 用户另行授权自身身份切换：配置已备份并换既有agent:codex Key，API/独立启动通过；重开后当前聊天已核agent:codex/kind=agent，新任务178经179独立复核通过且两项均已收取，Codex当前入口被动闭环验收完成。消费者/文案与真实主动链路继续后续；现状以文末最新实施状态与PROGRESS为准，原正文为阶段记录。effective_mode仍null/not_bound，保存active仍是意向。
 >
 > 配套[实施拆分计划](INITIATOR_MODE_IMPLEMENTATION_PLAN.md)；[旧固定主控合同归档](CONTROLLER_MODE_DESIGN_FIXED_CONTROLLER_ARCHIVE.md)。两条非阻塞清单建议纳入实施计划“Codex发布补充”，不重开已通过的设计。
 >
@@ -330,6 +330,12 @@
 - 在客户端设置的MCP服务器列表重启`talk`入口；若无法单独重连则完全退出并重开Codex。返回本会话后先`talk_list_agents`确认真实caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务、独立复核并收取，核新created_by；不再请求Key切换授权，不重复176/177。
 - 仅入口凭据配置变化，不改变任务created_by权限、assignment兼容语义、项目模式或消费者合同。原准备/审查历史不追改；I-0完整接入尚未验收，I-4前置仍待满足。
 
-## I-0重连与新任务核验进展（2026-10-07）
+## I-0重连与新任务核验进展（2026-10-07收取前快照；验收结果见下节）
 
 当前聊天服务端反查caller_identity已为agent:codex/kind=agent，178只读身份核验任务创建归属实测为agent:codex、项目正确且独立Hall，DeepSeek已领取。证据.tmp/initiator-mode-identity-verify/，当前仅Phase C及Phase D创建/读取部分通过；178结构化交付、Kimi独立复核与收取未完成。项目passive/version6、effective null/not_bound保持，未进行wait/取消/排队/主动消费者实测；旧记录不追改，I-3/I-4仍待后续。
+
+## I-0 Codex被动身份闭环验收通过（2026-10-07）
+
+当前聊天实际caller为agent:codex/kind=agent；178 DeepSeek只读核验经179 Kimi独立A-H复核通过，两个新任务created_by=agent:codex、项目正确且独立Hall。Codex于2026-10-07T09:50:04.854837收取179、09:50:07.538516收取178，均succeeded/completed，原msg2681/2680保持。原partial的下游复核/收取已完成；179结果混排导致MCP默认unknown，本地合法179报告与完整消息JSON一致，按实际独立证据验收，原报告不追改。回执.tmp/initiator-mode-identity-receipt/acceptance.json。
+
+通过范围仅Codex当前入口及被动派发/读取/交付/独立复核/收取；项目passive/version6、effective null/not_bound保持，660仅前次配置实读。真实G8/主动消费者/长等待/正常到期/取消/同连接排队/其它终端身份未验收。里程碑收尾后暂停，I-3消费者/现行指南/旧主控文案及I-4真实链路另片；历史human归属和权限保持。

@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-07 17:52 (Asia/Shanghai) I-0 Codex自身身份被动闭环独立通过，收取179/178
+
+- 用户通知179好了。主控talk_get_delivery读取179/msg2681，runner succeeded/submitted，默认业务unknown/source=unstructured_text，不能从成功状态推断验收通过。完整结果5789字符按稳定消息ID/SHA（793d997cb6a1c7fab0175a8ce4ebc6715215a8ca2432bec15066e6a97c4751b0）分页补读，两页引用一致；说明文字+JSON格式导致unknown，原结果保持。
+- 本地review.json带真实179，validate/summary均退出0；与完整消息内嵌JSON逐项一致，partial、8完成/2下游未完成/0阻塞、10验证（8 pass/2 not_run）。Kimi独立A-H通过：六源指纹/真实178只读库归属与Hall/名册/实际源码创建与收取边界/零功能差异/身份来源区分/partial如实/预算边界；阻塞0，唯一建议是观测时刻提示，178已记录observed_at_utc，无需返工。
+- Codex仅核完整摘要与实际证据索引、本地schema、消息/文件一致及六源当前SHA/大小保持；未重复完整代码审查。178开发基线aa92e23、179复核基线ca6945c及其主控文档时序保留，当前取件HEAD ebdc962、工作区干净；功能代码零差异，不复跑业务大套件。
+- 当前聊天talk_list_agents再次反查caller_identity=agent:codex/kind=agent/note=null、项目passive/version6、effective null/not_bound。主控裁决I-0当前Codex入口/被动新任务闭环可验收，先179后178实际收取：collected_at分别2026-10-07T09:50:04.854837及2026-10-07T09:50:07.538516，均succeeded/completed，created_by=agent:codex、项目正确，原msg2681/2680保持。
+- 原178/179报告partial仅记录当时下游复核/收取/裁决未完成，现由主控完成，不追改报告或误称179 MCP默认结构化业务complete。179消息混排格式限制已登记，采用本地合法交付、完整消息一致及实际独立证据的既有降级路径收尾；后续派发继续要求裸完整JSON或仅JSON围栏，无前后说明文字。
+- 原human历史任务与7旧failed不迁移不重开；本轮无功能/测试/配置/Key/模式写入、无新派发/浏览器/等待。配置备份/回退保持，服务无需重启。真实G8、主动消费者、长等待/正常到期/取消/同连接排队、其它终端自身身份not_run，660仅前次配置实读，不把Codex被动闭环外推全部终端或主动生效。
+- 裁决和收取回执.tmp/initiator-mode-identity-receipt/acceptance.json（含原来源SHA、当前caller、消息引用、限制及两实际collected时间），核验/复核源保持；正式同步PROGRESS、PROGRESS_HISTORY、PROJECT_BRIEF、身份指南、TERMINAL_MCP、正式合同、实施计划与路线图。必要验证UTF-8读取/状态要点/git diff --check。
+- I-0里程碑收尾后暂停；下一片I-3现行消费者/指南/旧主控文案，按最新开发要求Kimi/DeepSeek交叉复核，再I-4真实链路预算验收。模型展示另片、成员名称留全角色页；未读精确用量、不推测百分比。
+
 ## 2026-10-07 17:36 (Asia/Shanghai) 收到178交付，派Kimi独立复核179
 
 - 用户已观察页面“Codex → DeepSeek”，随后通知178已ok。主控talk_get_delivery取得msg2680的完整同响应摘要，合法talk-delivery-1且自身178一致，业务partial、9完成/2未完成/0阻塞、11验证（9 pass/2 not_run）、4个.tmp产物；默认无裁剪。runner succeeded/submitted、finished_at=2026-10-07T09:31:34.138375，尚未收取。

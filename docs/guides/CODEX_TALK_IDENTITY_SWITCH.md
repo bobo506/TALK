@@ -4,15 +4,16 @@
 > 176/177准备通过只表示步骤经过独立审查；当时未切Key/改配置/备份/重连/试派。2026-10-07用户已另行明确授权实际执行，最新状态见下节，原准备与复核记录仍按各自阶段理解。
 > 下文原记录的“本片/本轮”指#176准备或明确标注的历史证据；最新实际配置进展由下节另行记录，不追改原稿。来源分为【派发包事实】、【源码事实】、【指南事实】、【待核验】，每类均按其日期与范围理解。
 
-## 最新实际执行状态（2026-10-07，重开后身份与新任务归属已核）
+## 最新实际执行状态（2026-10-07，Codex当前入口被动闭环验收通过）
 
-- 用户既有“切换到codex吧”授权持续有效。前次只替换`C:/Users/Administrator/.codex/config.toml`的`[mcp_servers.talk.env].TALK_API_KEY`为既有`agent:codex`凭据，完整TOML其它字段不变，未新建/重置成员或Key。
-- 完整仓库外备份`C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml`字节核对通过；回退须恢复完整副本、重连并核human身份。配置实施无密钥回执仍为`.tmp/initiator-mode-identity-switch/execution.json`。
-- 前次新Key API反查/名册/独立`--check`通过，但当时聊天仍human；该记录保留。**本轮重开后当前聊天实际talk_list_agents已返回agent:codex/kind=agent/note=null**，补齐Phase C，证据`.tmp/initiator-mode-identity-verify/dispatch_context.json`。此结论来自当前入口服务端反查。
-- 按最新开发要求派发只读任务**178**给DeepSeek；当前聊天get_task实核`created_by=agent:codex`、项目`prj_e8fe7066bbec`、target为`agent:deepseek`及独立Hall。读取时running/in_progress、尚无结果/收取时间；快照`.tmp/initiator-mode-identity-verify/task_snapshot.json`。
-- Phase D的任务创建归属已核，**结构化交付、Kimi独立复核和由agent:codex收取仍待完成**，I-0完整闭环未验收。默认派发后结束，用户通知178完成后取件；无需重复176/177或再次请求切Key授权。
-- 前次human返回177项/human创建164项、在途0、7旧failed及旧human仍可读为实施前后历史盘点，不是本轮重测。历史created_by不迁移、权限不扩大。
-- 本轮项目passive/version6、effective null/not_bound，assignment agent:codex/version13仅兼容。此前读实配置tool_timeout_sec=660；本轮没有wait调用，长等待/取消/排队/真实主动消费者not_run，不外推G8或终端预算已验收。
+- 用户既有“切换到codex吧”授权持续有效。前次只替换`C:/Users/Administrator/.codex/config.toml`的`[mcp_servers.talk.env].TALK_API_KEY`为既有`agent:codex`凭据，完整TOML其它字段保持；未新建/重置成员或Key。
+- 完整仓库外备份`C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml`字节核对通过；必要回退恢复完整副本、重连并核human身份。配置实施回执`.tmp/initiator-mode-identity-switch/execution.json`无密钥。
+- 前次API/名册/独立`--check`通过，而当时聊天仍human；重开后及本轮当前聊天`talk_list_agents`实测`agent:codex/kind=agent/note=null`，Phase C通过，当前入口已加载本人Key。
+- Phase D新任务178目标DeepSeek，实际created_by=agent:codex、项目正确、独立Hall；只读核验经Kimi179独立A-H复核通过、阻塞0。179消息含说明文字及JSON，MCP默认unknown；本地合法179报告与稳定分页完整消息中的JSON一致，按实际独立证据裁决，原报告/消息不追改。
+- Codex先179后178收取成功，collected_at分别2026-10-07T09:50:04.854837与09:50:07.538516，均succeeded/completed，原msg2681/2680保持。原报告partial记录的下游步骤已由主控完成，Phase D/E验收收尾通过，范围仅Codex当前入口与被动新任务闭环。
+- 验收回执`.tmp/initiator-mode-identity-receipt/acceptance.json`；身份/任务快照、六源指纹与开发复核证据在`.tmp/initiator-mode-identity-verify/`及`.tmp/initiator-mode-identity-review/`。无需重切Key、重复176/177或重启uvicorn。
+- 前次human177项/创建164项/在途0/7旧failed及旧human仍可读为历史盘点，本轮未重测。历史created_by与权限保持，Codex本人Key不自动获得human旧任务收取资格。
+- 项目passive/version6、effective null/not_bound，assignment仅兼容。660仅前次实读配置；本轮无wait，真实G8/主动消费者/长等待/正常到期/取消/排队/其它终端身份未验收。里程碑收尾后暂停，I-3/I-4按原依赖另片。
 
 ## 0. 范围界定（只改一个入口的一个键）
 
