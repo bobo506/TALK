@@ -6161,3 +6161,12 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - Codex只同步PROGRESS/历史、PROJECT_BRIEF、MODULE_webui、实施计划/合同/路线的当前验收状态，并在.tmp/initiator-mode-live-copy-receipt/acceptance.json追加人类确认与文档状态快照。原已审草稿/复核报告/任务结果和9a66fa3发布快照保持。
 - 本轮无代码/配置/Key/数据库/权限/模式变更，不新派任务、不操作浏览器或等待工具；无需业务测试，核UTF-8与git diff --check。I-3还剩MODULE_bridges/PROJECT_INTEGRATION规格同步；175-O1维护、既有schema边界评估与新MCP说明重载核验另片。I-4真实主动/G8/长等待/取消/排队尚未运行，提示验收不释放其门禁。
 - 当前切片验收记录收尾后暂停；下一次“继续项目”按最新开发要求定位剩余规格切片，不重复I-3A或本片提示验收。
+
+## 2026-10-07 21:45 I-3C剩余桥接/项目集成规格草稿派发（#185）
+
+- 用户在I-3B提示人工验收记录2e945a9收尾后要求“开始下一步”。先按PROJECT_BRIEF定位负责MODULE_bridges，仅读该模块和PROJECT_INTEGRATION指定公共集成节，未读其它MODULE。最新development_requirements仍Kimi文字/设计/交互/前端、DeepSeek后端/其它、双方交叉复核；caller实测agent:codex/kind agent/note null，模式passive/version6、effective null/not_bound。
+- 最小顶层参数派Kimi #185“185-桥接与项目集成发起者规格同步草稿”，created_by agent:codex，Hall group:task-b5c8a51a5f424062bb862c3140ddd632，queued/assigned为派发快照。完成后暂停再派DeepSeek独立核源码/补丁/历史保护；默认派发后结束，用户通知185完成再取件。
+- 允许只新增.tmp/initiator-mode-spec-sync/草稿：两目标docs_sync.patch/派生副本、change_inventory、closure_inventory、验证与结构化development.json。MODULE_bridges旧204/210预算及214-220 C2-A1历史保持，增加当前发起者合同/状态；实际已有240-245 I-1说明，明确允许仅加阶段标记/当时加载快照澄清，原正文/测试/旧链接保留。PROJECT_INTEGRATION仅763、768-776称呼与781-806节首D4弃用/兼容说明，历史实现不逐句改。
+- 当前加载事实区分：I-1合同已有Codex入口加载证据，I-0被动闭环、I-2页面、I-3A指南及I-3B提示均已通过收取；I-3B最新工具说明运行进程重载未核、真实主动/G8/长等待/取消/排队/I-4未验收。compat assignment不授权/不参与协调，human专用PATCH/CAS/版本/候选校验和API字段名保留；T/W/返回余量/执行者/总预算/宿主交还分开，不改实际预算。
+- 基线2e945a97219b2407fb95c43b55c3741ce88c9f7f，开工干净；15来源指纹/实际身份模式/完整派包与回执在.tmp/initiator-mode-spec-sync-dispatch/。必要D4源码只读可沿集成节定位并新增路径/SHA证据，不读其它模块；正式文档/代码/测试/Key/config/数据库/模式禁止修改，Codex预先仅允许更新两份派发进度。
+- 要求patch只dry-run/隔离正反字节校验、相对链接/锚点、现行/历史分类与完整闭合索引；原草稿/报告/回执不追改，交付自身实际task_id完整裸JSON并validate。完整I-3本次仍草稿待复核发布，175-O1/schema边界评估/新说明重载另片，不开启I-4；无浏览器、wait、真实消费者或重启服务。

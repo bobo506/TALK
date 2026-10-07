@@ -1,11 +1,11 @@
 # Project Progress
 
-Updated: 2026-10-07 21:36 (Asia/Shanghai)：I-3B经182开发/183既有断言补正/184独立复核通过，文案与文档已发布收取；用户已确认角色说明提示简验通过，本片闭环完成。I-3剩余桥接/集成规格与I-4未完成。
+Updated: 2026-10-07 21:45 (Asia/Shanghai)：I-3B人工简验已通过并收尾；用户授权开始下一步，I-3C剩余桥接/项目集成规格草稿已派Kimi #185，完成后交DeepSeek独立复核。正式两目标未改，完整I-3与I-4尚未通过。
 
 ## 当前角色与协作
 
 - D:/claude-test/TALK；项目prj_e8fe7066bbec；分支codex/terminal-return-codex。Codex决策/正式文档/Git，最新开发要求仍Kimi文字/设计/交互/前端、DeepSeek后端/其它，双方交叉复核；下次派发前重读。
-- 默认派发后结束、用户通知后取件。当前无待收取任务或新派发；本片收尾后暂停，后续切其它模块须另片。Codex不操作浏览器，页面效果由用户确认。
+- 默认派发后结束、用户通知后取件。当前#185由agent:codex派给Kimi，queued/assigned为派发快照；完成暂停后再交DeepSeek独立复核。Codex只更新两份派发进度，正式文档待独立通过后发布。Codex不操作浏览器，页面效果由用户确认。
 
 ## 当前完成与证据
 
@@ -21,7 +21,7 @@ Updated: 2026-10-07 21:36 (Asia/Shanghai)：I-3B经182开发/183既有断言补�
 ## 当前卡点与下一步
 
 1. 用户2026-10-07明确回复“验收通过”，本片角色说明提示简验通过，I-3B人工门禁释放；验收范围为已提供的hint提示步骤。暂无本片待确认项，I-4真实主动流程仍未运行。
-2. 本片收尾后暂停。下一片按模块定位MODULE_bridges/PROJECT_INTEGRATION剩余规格同步；AGENTS/TERMINAL_MCP/DSH消费者指南已在I-3A完成，不因184范围限制列举而重复改。175-O1测试维护另片；既有schema maximum=600与运行clamp关系后续独立评估，当前不扩修。
+2. 当前I-3C #185：仅.tmp/initiator-mode-spec-sync/起草MODULE_bridges和PROJECT_INTEGRATION两份精准补丁/副本、分类与闭合清单；保留旧600/660/3600与#156-#159等历史，当前说明同步G1-G8/created_by/模式重读及指定弃用、人类PATCH/CAS兼容。额外仅为MODULE_bridges既有I-1:240-245加阶段/旧加载状态澄清，不扩全模块或读取其它MODULE。15来源/基线2e945a9、完整包见.tmp/initiator-mode-spec-sync-dispatch/；用户通知“185 ok”后取件并派独立复核。AGENTS/TERMINAL/DSH/USER_MANUAL/MODULE_webui已完成，不重复改；175-O1和schema边界另片。
 3. 完整I-3就绪与终端实际预算/新说明加载核验后，再I-4真实主动链路及取消/排队人工验收；当前不自动开启。模型名称展示和成员命名另片。
 
-恢复指令：`继续项目`。182/183/184已收取，文案/文档发布；I-3B人工简验已通过，I-3剩余规格与I-4未运行。
+恢复指令：`继续项目`。I-3B人工简验已通过；#185剩余规格草稿待完成，默认派发后结束、收到用户“185 ok”再取件。完整I-3与I-4未通过，不切active或开启真实链路。
