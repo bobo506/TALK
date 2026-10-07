@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-07 17:17 (Asia/Shanghai) 收工交接：用户将重开窗口
+
+- 用户明确“你先汇总进度，我重开窗口”。本轮仅保存收工交接，停止新派发；没有新任务、代码/配置/密钥/模式/数据库操作，也未重复业务测试。Codex继续为决策角色，分工和默认派发后结束规则保持。
+- 交接事实：配置已换既有agent:codex Key并有仓库外完整备份；API member_id/kind、名册与独立--check通过。最近当前聊天实际身份检查为2026-10-07T09:12:11Z、仍human:bobo/human；本次没有再次调用MCP，不能把该检查改称重开后证据。
+- 实际实施与八份状态文档已在472f54f提交并推送；本次读取确认HEAD与origin/codex/terminal-return-codex相同，收工记录写入前工作区干净。交接仅修改PROGRESS/PROGRESS_HISTORY，必要验证为UTF-8读取、交接要点和git diff --check；无业务差异不复跑大套件。
+- 重开后说“继续项目”：先核当前talk_list_agents项目路径真实caller为agent:codex且kind=agent；成功后读取最新开发要求，派一项无破坏性身份任务，核created_by并按真实任务号交付、独立复核、收取。切换授权持续有效，176/177已收取不重复，未派178，宿主重连和新任务核验仍待完成；I-3/I-4/模型展示后续按原计划。
+
 ## 2026-10-07 用户授权实际换Codex TALK Key：配置/API已核；当前宿主重连待完成
 
 - 用户2026-10-07明确授权“切换到codex吧”；现已备份用户配置并只替换TALK MCP的`env.TALK_API_KEY`为既有`agent:codex`凭据。服务端`/api/members/me`核`agent:codex / agent`、未禁用且在册；新凭据独立`--check`通过。当前聊天实际MCP仍返回`human:bobo / human`，宿主重连待用户操作，未创建新任务；不宣称当前会话切换成功。
