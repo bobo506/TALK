@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-07 18:52 (Asia/Shanghai) 180草稿交付合法complete，派DeepSeek181独立复核
+
+- 用户通知180 ok；主控talk_get_delivery获得msg2682完整同响应摘要，合法自身180一致talk-delivery-1、complete、5完成/0未完成/0阻塞、6验证（5 pass/1 not_run），无默认裁剪。runner succeeded/submitted、finished_at=2026-10-07T10:44:39.956120，尚未收取；Kimi开发已暂停。
+- 草稿实际consumer_guide_draft.md（拟正式INITIATOR_MODE_CONSUMER.md）、current_guides.patch、sync_inventory.md、patched三副本及development.json共7文件，仅.tmp，三文件正式patch未应用。指南含完整消费者提示词/有限资格与预算/停止分类/执行复核模式边界/交付纪律；同步清单保留活跃计数/schema/UI文案与跨模块规格的后续待办，USER_MANUAL已正确项不重复改、162注记待真实hint实施后同步。
+- 主控实跑validate --expect-task-id 180退出0、git apply --check三个文件hunk均可应用（23进23删）、11原来源当前SHA/大小匹配。当前HEAD a8b0ac8，7840737→HEAD仅PROGRESS/PROGRESS_HISTORY两份状态差异，功能/正式现行来源零变化、取件前工作区干净。未做完整文本/代码审查，交执行Agent独立复核。
+- 重读最新development_requirements，当前caller_identity=agent:codex/kind=agent/note=null，项目passive/version6、effective null/not_bound；按交叉分工用独立顶层最小字段派181给agent:deepseek，created_by=agent:codex、project_id=prj_e8fe7066bbec、hall_group_id=group:task-49054b36744c4d4f8616ad9b4a63c819，返回queued/assigned。
+- 181包含原需求/已审I-3起草→复核→Codex发布流程、实际7840737/a8b0ac8基线与两进度差异、180开发验证、A-F完整草稿/当前源码/有限预算与退出/现行patch语义和历史保护/来源指纹/交付消费纪律验收，要求实际独立检查而非采信结论。11原源与7草稿实际指纹及完整180摘要保存.tmp/initiator-mode-consumer-review-dispatch/，复核产物仅.tmp/initiator-mode-consumer-review/。
+- 不改原草稿/业务/测试/正式文档/配置/Key/数据库/真实模式，不应用patch，不额外派发/收取/commit/push/浏览器/服务重启/生产wait或真实模型验证；Codex仅维护本次派发进度。业务测试/active/G8/长等待/正常到期/取消/排队均not_run，660仅前次配置事实、Kimi660000ms模板，不外推消费者已运行/完整I-3就绪。
+- 下一步默认结束等待，用户通知181后取完整摘要；发现阻塞交Kimi定向修正并复核，通过后Codex发布指南/现行三文档文本、裁决收取181/180和Git收尾；活跃说明/UI提示及跨模块规格实际同步后才I-4。原I-0证据/消息/历史归属保持。
+- 本轮正式仅PROGRESS/PROGRESS_HISTORY，验证UTF-8读取、任务引用/状态要点及git diff --check，无业务重复测试；未读精确用量、不推测比例。
+
 ## 2026-10-07 18:25 (Asia/Shanghai) 用户继续下一步，派Kimi180起草I-3A消费者与现行指南
 
 - 用户要求“继续下一步”，释放I-0当前入口被动闭环里程碑后下一片。按已审INITIATOR_MODE_IMPLEMENTATION_PLAN I-3头部“文档；Kimi起草/DeepSeek复核；正式文档Codex收尾落盘”执行，先起草、独立复核后发布，不直接把旧固定主控C2-C包继续使用。
