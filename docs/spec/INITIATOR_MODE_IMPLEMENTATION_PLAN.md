@@ -186,7 +186,7 @@ I-3（提示词/指南）可与 I-1/I-2 并行起草，发布不早于 I-1
 |---|---|---|
 | I-1 工具 | 172/173代码通过并收取，功能1fbdf78；当前Codex目录/运行时及短只读路径加载通过 | 不外推其它终端、真实Agent G8/主动消费者或长等待/取消排队 |
 | I-2 页面 | 174/175独立实际代码复核通过并收取，14业务/测试文件、资源20261007-initiator-mode-ui | 与I-1同轮用户页面验收已于2026-10-07通过；后续先I-0步骤准备，再按依赖推进 |
-| I-0 身份 | 准备176/177独立通过并收取，已发布身份切换/回退清单；当前caller仍human:bobo，实际Key切换未开展 | [实施清单](../guides/CODEX_TALK_IDENTITY_SWITCH.md)；依原I-0步骤先确认实际执行，再核配置/安全Key/刷新旧任务并切换核caller和新created_by，不追改旧任务 |
+| I-0 身份 | 176/177准备已审收取；用户已授权，配置已备份并换自身Key，API/独立启动通过；当前聊天仍human连接 | [实施清单](../guides/CODEX_TALK_IDENTITY_SWITCH.md)；用户重连talk后核实际caller，再核新任务created_by并独立复核/收取；未派178，旧归属保持 |
 | I-3 消费者/文案 | 未开展，I-1原O1/O2与175-O2登记文字待办 | 按本正式发起者合同同步约定、模块与指南；175-O1测试说明/stub在后续合适测试维护片整理 |
 | I-4 真实链路 | not_run | 依身份/消费者及终端实际预算就绪后独立人工验收；effective仍null/not_bound |
 
@@ -197,3 +197,10 @@ I-3（提示词/指南）可与 I-1/I-2 并行起草，发布不早于 I-1
 
 - 176 Kimi起草/177 DeepSeek独立复核通过并收取，26来源及实际稿SHA一致、约40处出处独立实读；无返工缺口。Codex已发布[身份切换与回退清单](../guides/CODEX_TALK_IDENTITY_SWITCH.md)，纳177-N1–N4文字澄清，N5只记录本次派包预先明示的进度管理边界，不修改AGENTS或扩并行审改。
 - 源码/测试/Key/配置/模式零改动；caller仍human:bobo、passive/version6、effective null/not_bound。准备通过不等于身份切换、真实G8或消费者通过，配置/Key安全到位/宿主重载/真实预算仍待实施前核验；实际执行继续遵守本计划I-0“本片只交付步骤；执行需用户确认”门禁。
+
+## I-0实际配置实施（2026-10-07，宿主重连未完成）
+
+- 用户2026-10-07明确授权“切换到codex吧”；现已备份用户配置并只替换TALK MCP的`env.TALK_API_KEY`为既有`agent:codex`凭据。服务端`/api/members/me`核`agent:codex / agent`、未禁用且在册；新凭据独立`--check`通过。当前聊天实际MCP仍返回`human:bobo / human`，宿主重连待用户操作，未创建新任务；不宣称当前会话切换成功。
+- 切换前本项目human可见返回177项/human创建164项、在途0，176/177已收取；7项旧failed（122/35/31/24/21/14/12）保持。只读核旧human凭据仍可读177，历史created_by不迁移。项目响应整体不变：passive/version6、兼容assignment agent:codex/version13；当前MCP仍effective null/not_bound。配置`tool_timeout_sec=660`已读实值，未进行长等待/取消/排队测试，不当作客户端实际预算或主动适配通过。
+- 在客户端设置的MCP服务器列表重启`talk`入口；若无法单独重连则完全退出并重开Codex。返回本会话后先`talk_list_agents`确认真实caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务、独立复核并收取，核新created_by；不再请求Key切换授权，不重复176/177。
+- 上节零Key/配置改动和第116行只准备约束是176/177阶段记录；本次实际执行已取得另行明确授权，不需再次确认。备份与无密钥证据索引见PROGRESS。

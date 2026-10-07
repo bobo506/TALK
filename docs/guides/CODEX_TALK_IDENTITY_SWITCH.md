@@ -1,8 +1,17 @@
-# Codex TALK 成员身份切换与回退清单（I-0准备已审，实际切换未执行）
+# Codex TALK 成员身份切换与回退清单
 
 > 2026-10-07由Codex发布：Kimi #176起草、DeepSeek #177独立复核A–I通过，176/177已收取。原稿与原复核保留；本清单纳入177-N1–N4文字澄清并记录N5复核边界，不改权限或业务实现。
-> 准备通过只表示步骤已经独立审查。当前TALK入口仍为human:bobo；尚未发生Key切换、配置备份/修改、MCP重连、试派或真实主动链路验证。根据[实施计划I-0](../spec/INITIATOR_MODE_IMPLEMENTATION_PLAN.md#i-0-身份接入准备不执行切换)，实际执行需用户确认；配置目标、Key安全到位、宿主重载与真实预算须在实施前核实。
-> 下文“本片/本轮”指#176准备或明确标注的历史证据；当前发布仅收尾文档，不把原稿事实改写为真实实施结果。来源分为【派发包事实】、【源码事实】、【指南事实】、【待核验】，每类均按其日期与范围理解。
+> 176/177准备通过只表示步骤经过独立审查；当时未切Key/改配置/备份/重连/试派。2026-10-07用户已另行明确授权实际执行，最新状态见下节，原准备与复核记录仍按各自阶段理解。
+> 下文原记录的“本片/本轮”指#176准备或明确标注的历史证据；最新实际配置进展由下节另行记录，不追改原稿。来源分为【派发包事实】、【源码事实】、【指南事实】、【待核验】，每类均按其日期与范围理解。
+
+## 最新实际执行状态（2026-10-07）
+
+- 用户明确授权“切换到codex吧”。实际目标`C:/Users/Administrator/.codex/config.toml`的`[mcp_servers.talk.env].TALK_API_KEY`已换既有`agent:codex`凭据；其它配置经整体TOML比较保持。没有新建/重置账号或Key，密钥不在聊天、文档、日志或Git输出。
+- 仓库外完整备份`C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml`已核对字节；回退须恢复完整副本、重连并核原human身份。实际无密钥回执`.tmp/initiator-mode-identity-switch/execution.json`。
+- 新Key服务端`/api/members/me`核`agent:codex / kind=agent`、未禁用且在项目名册；独立新进程`--check`通过。**当前聊天实际MCP仍返回human:bobo / human**，不能把独立进程核验当作当前宿主已重连。
+- 切换前本项目原human可见返回177项/human创建164项、在途0，176177已收取；7旧failed保持。旧human凭据换Key后仍可读177，历史created_by不迁移。完整项目响应不变：passive/version6、兼容assignment agent:codex/version13；当前MCP仍effective null/not_bound。
+- 用户需在客户端设置/MCP服务器重启`talk`，或完全退出重开Codex，随后回本会话说“继续项目”。先核当前caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务，核新created_by、结构化交付、独立复核与收取；当前未派178，此步not_run，无需再次确认切换授权。
+- 当前仅配置及新凭据/API/独立入口核验完成；Phase B宿主重连、Phase C当前入口身份、Phase D新任务归属待完成。本会话无MCP重启工具，native computer APIs禁用。配置tool_timeout_sec=660已读实值，但长等待/取消/排队和主动消费者not_run，不外推预算或适配通过。
 
 ## 0. 范围界定（只改一个入口的一个键）
 
@@ -11,7 +20,7 @@
 - 范围外且**不宣称已切换**：其它 MCP 服务、Codex 模型设置、DeepSeek/Kimi 执行入口（bridge `--key` 或启动器密钥文件）。`agent:deepseek` / `agent:kimi` 的自身身份只登记为**后续分别核验**，本清单不覆盖、不声明三方都已完成。
 - 用户配置路径（含 Codex 桌面 MCP 配置文件实际位置）只能作为**实施前核验候选**；本片未重读、未生效，一律标【待核验】。
 
-## 1. 当前事实基线
+## 1. 176准备阶段事实基线（历史）
 
 - 【派发包事实】当前 TALK 入口 `caller_identity=human:bobo / kind=human`；`requested_mode=passive / version 6`，`effective_mode=null / not_bound`（`.tmp/initiator-mode-identity-prepare-dispatch/dispatch_context.json`；版本为用户页面保存后的新读取，不回写历史 version4 记录）。
 - 【已实测（历史证据，本片未重测）】当前 Codex 目录/短只读路径 I-1 加载核验通过：九工具目录、G1–G8 运行时注记一致、human true 按 G4 拒绝（`.tmp/initiator-mode-tools-loadcheck/2026-10-07-loaded.json`，该文件快照 requested_version=4）。真实 Agent G8、主动消费者、长等待/取消排队、其它终端**均未验收**。
@@ -20,7 +29,7 @@
 - 【源码事实】任务 `created_by` 创建即固定且不可改：`create_task` 写 `created_by=current.id`（`server/routes/tasks.py:1644-1646`），`AgentTaskCreate` 无 `created_by` 请求字段（`server/models.py:906-1030`），全部任务路由无修改端点。
 - 【源码事实】协调资格边界：`collect-result` 仅 `created_by==current.id`（`server/routes/tasks.py:2486-2508`，检查在 2494-2495）；未领取取消仅 `created_by`（2511-2541）；任务可读性=human 或 `created_by`/`target_member_id`（82-85）；领取/完成仅 agent 且 target==self（`_require_agent` 67-72）。
 
-## 2. 实际实施前必须核实的事实（未安全核实一律【待核验】）
+## 2. 176准备阶段实施前检查清单（当时尚待核验；当前进展见顶部）
 
 | 事实 | 当前状态 | 说明 |
 |---|---|---|
@@ -53,7 +62,7 @@
 - 若届时仍有未能收尾的 human 任务：**保留 human 可恢复管理入口**（Web UI 或 human 凭据终端）。human 身份对自己创建的任务天然可读可收（`server/routes/tasks.py:82-85`、2494-2495）；`agent:codex` 对旧 human 任务无 `created_by` 资格，受控等待 G8 会整批拒绝——这是**预期安全行为，不是缺陷**（【指南事实】合同 §4.3 末行、§5.3 第 5 条）。
 - 明确禁止：迁移历史任务 `created_by`、放宽 Agent 对他人任务的收取、或写“以后 Codex 本人 Key 能处理所有 human 旧任务”。
 
-## 5. 分阶段步骤（本片不执行其中任何写/重连/真实任务）
+## 5. 已审分阶段步骤（176/177只准备，实际进展见顶部）
 
 **Phase A 准备（已完成）**：176交付本清单、失败矩阵与旧任务衔接表；177独立复核通过，双方已收取。仅准备步骤，未改配置。
 

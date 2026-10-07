@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-07 用户授权实际换Codex TALK Key：配置/API已核；当前宿主重连待完成
+
+- 用户2026-10-07明确授权“切换到codex吧”；现已备份用户配置并只替换TALK MCP的`env.TALK_API_KEY`为既有`agent:codex`凭据。服务端`/api/members/me`核`agent:codex / agent`、未禁用且在册；新凭据独立`--check`通过。当前聊天实际MCP仍返回`human:bobo / human`，宿主重连待用户操作，未创建新任务；不宣称当前会话切换成功。
+- 配置目标C:/Users/Administrator/.codex/config.toml、[mcp_servers.talk.env].TALK_API_KEY，现有Key只从本地注册成员数据库只读获取并在内存使用，没有新建/重置/禁用成员、修改数据库或输出密钥。只替换一项字段，完整TOML与原配置比较其它字段全同；启动命令仍项目.venv Python -X utf8 / bridges/talk_terminal_mcp.py --project-root D:/claude-test/TALK。
+- 仓库外完整备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml，字节核对通过；改前配置SHA c6ff65157b0fc2be4824e228040ee23300a2e9cd16f2987abe3928319ee50285，改后fc35ce82af340b6d8cebb2cb4b5e70496148a24671b221c73597f09c75b182f6。凭据不写Git/聊天/日志，.tmp中仅脚本和白名单元数据，无Key明文。
+- 切换前本项目human可见返回177项/human创建164项、在途0，176/177已收取；7项旧failed（122/35/31/24/21/14/12）保持。只读核旧human凭据仍可读177，历史created_by不迁移。项目响应整体不变：passive/version6、兼容assignment agent:codex/version13；当前MCP仍effective null/not_bound。配置`tool_timeout_sec=660`已读实值，未进行长等待/取消/排队测试，不当作客户端实际预算或主动适配通过。
+- 新Key独立入口check返回ok=true/member_id=agent:codex/project_id正确，另按API同时核kind=agent；这不是当前客户端重载证据。当前聊天实际talk_list_agents仍human:bobo，故未派身份验证任务/新切片，也未测试真实Agent G8或消费者；现有健康配置等待宿主加载，没有执行回退，不虚报成功。
+- 本会话无MCP重启工具，native computer APIs禁用；官方MCP文档已核config.toml/env与桌面MCP Restart方式（https://learn.chatgpt.com/docs/extend/mcp?surface=cli）。在客户端设置的MCP服务器列表重启`talk`入口；若无法单独重连则完全退出并重开Codex。返回本会话后先`talk_list_agents`确认真实caller为agent:codex且kind=agent，再按最新开发要求派一项无破坏性身份任务、独立复核并收取，核新created_by；不再请求Key切换授权，不重复176/177。
+- 证据.tmp/initiator-mode-identity-switch/pre_inventory.json与execution.json（含切换后真实宿主检查）、apply_switch.py；执行时间2026-10-07T09:11:23Z。正式文档仅同步当前事实，原176/177审查产物保持。必要验证：脚本语法、备份字节、整体TOML只差Key、API身份/名册/模式/旧human访问、独立启动、当前MCP只读身份；没有业务改动，不复跑大套件。
+- 正式变更：PROGRESS、PROGRESS_HISTORY、PROJECT_BRIEF、CODEX_TALK_IDENTITY_SWITCH、TERMINAL_MCP、CONTROLLER_MODE_DESIGN、INITIATOR_MODE_IMPLEMENTATION_PLAN、DEVELOPMENT_ROADMAP。未读精确用量，不推测占比；此配置切片后暂停，恢复“继续项目”。
+
 ## 2026-10-07 I-0准备176/177独立通过并收取；正式身份清单发布（实际切换未执行）
 
 - 用户通知“177 ok”，msg2679合法自身177一致talk-delivery-1完整裸JSON complete，8完成/0未完成/0blocked、3产物/8验证/6限制，无裁剪；runner succeeded/submitted原finished_at2026-10-07T08:26:24.649605。独立A–I全文/限定源码与约40处出处无返工缺口，原19与复核26来源SHA/大小命中、176三稿不变，原176/本人177validate退出0；实际身份/配置/重连/试派/长等待/取消排队/业务大套件not_run。
