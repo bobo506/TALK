@@ -2,7 +2,7 @@
 
 > 2026-10-06 Codex发布：#166原设计经#167独立复核、#168修订、#169独立复核、#170六项修订与#171定向复核后，合看确认合同设计通过。#171逐R-1..R-6独立回源码，10完成/0未完成/0阻塞，原#167/#169的partial记录保持；#166/#168/#170/#171已收取。
 >
-> **2026-10-07当前I-1加载与I-2页面独立复核、用户验收已通过。** 用户另行授权自身身份切换：配置已备份并换既有agent:codex Key，API/独立启动通过；重开后当前聊天已核agent:codex/kind=agent，新任务178经179独立复核通过且两项均已收取，Codex当前入口被动闭环验收完成。消费者/文案与真实主动链路继续后续；现状以文末最新实施状态与PROGRESS为准，原正文为阶段记录。effective_mode仍null/not_bound，保存active仍是意向。
+> **2026-10-07当前I-1加载与I-2页面独立复核、用户验收已通过。** 用户另行授权自身身份切换：配置已备份并换既有agent:codex Key，API/独立启动通过；重开后当前聊天已核agent:codex/kind=agent，新任务178经179独立复核通过且两项均已收取，Codex当前入口被动闭环验收完成。I-3A消费者指南经180/181独立通过已发布并收取，活跃文案/剩余规格与真实主动链路继续后续；现状以文末最新实施状态与PROGRESS为准，原正文为阶段记录。effective_mode仍null/not_bound，保存active仍是意向。
 >
 > 配套[实施拆分计划](INITIATOR_MODE_IMPLEMENTATION_PLAN.md)；[旧固定主控合同归档](CONTROLLER_MODE_DESIGN_FIXED_CONTROLLER_ARCHIVE.md)。两条非阻塞清单建议纳入实施计划“Codex发布补充”，不重开已通过的设计。
 >
@@ -339,3 +339,9 @@
 当前聊天实际caller为agent:codex/kind=agent；178 DeepSeek只读核验经179 Kimi独立A-H复核通过，两个新任务created_by=agent:codex、项目正确且独立Hall。Codex于2026-10-07T09:50:04.854837收取179、09:50:07.538516收取178，均succeeded/completed，原msg2681/2680保持。原partial的下游复核/收取已完成；179结果混排导致MCP默认unknown，本地合法179报告与完整消息JSON一致，按实际独立证据验收，原报告不追改。回执.tmp/initiator-mode-identity-receipt/acceptance.json。
 
 通过范围仅Codex当前入口及被动派发/读取/交付/独立复核/收取；项目passive/version6、effective null/not_bound保持，660仅前次配置实读。真实G8/主动消费者/长等待/正常到期/取消/同连接排队/其它终端身份未验收。里程碑收尾后暂停，I-3消费者/现行指南/旧主控文案及I-4真实链路另片；历史human归属和权限保持。
+
+## I-3A消费者指南发布（2026-10-07）
+
+Kimi180起草经DeepSeek181独立A–F全文/实际源码依据复核通过、无阻塞，已正式发布[发起者消费者指南](../guides/INITIATOR_MODE_CONSUMER.md)及AGENTS/TERMINAL_MCP/DSH_DESKTOP现行三文本补丁（23进23删），原历史/报告保留。指南明确约定级资格与有限预算、每动作前重核、正常return_reason与API错误/客户端取消/总预算耗尽的区别；9链接/锚点验证通过。181/180均已由agent:codex收取为succeeded/completed，回执.tmp/initiator-mode-consumer-receipt/acceptance.json。
+
+当前只I-3A指南范围通过；S-1/S-2工具计数/schema、175-O2角色hint/workspace注释及USER_MANUAL:162关联文字仍需下一片实际实施并复核，MODULE_webui/MODULE_bridges/PROJECT_INTEGRATION剩余同步未完成、175-O1测试维护另片。181建议S-1既有子串断言无需镜像同步改测试，关联文案同批完成。项目passive/version6、effective null/not_bound；未运行主动消费者/G8/长等待/取消/排队/其它终端身份验收，完整I-3与I-4门禁未释放。

@@ -186,4 +186,10 @@ I-3文字待办补充（174自报，175独立核实为非功能依赖，Codex裁
 - 175-O1：role_settings测试桩/注释保真度整理非阻塞，新真实接线与其它导航/模式套件已覆盖，后续合适测试维护片处理；175-O2：角色说明hint与两旧注释随I-3统一。旧I-1 O1/O2与175-O1/O2区分编号，不混淆。
 - 代码/模块/手册/实施状态与 [页面验收步骤](../guides/INITIATOR_MODE_UI_ACCEPTANCE.md) 纳本轮提交。默认Node隔离spawn EPERM为复核宿主限制，开发者通过不外推；真实浏览器/键盘/窄屏/HTTP并发未测。用户2026-10-07确认本轮页面验收通过，下一项I-0仅准备自身身份切换/核验/回退步骤；不实际换Key，不将本次页面验收宣称真实主动消费者生效。
 
-I-0当前状态：176/177准备已独立通过并收取；既有授权下配置已备份并切自身Key，API/独立启动通过，重开后当前聊天caller=agent:codex/kind=agent。178 DeepSeek核验经179 Kimi独立A-H复核通过，created_by=agent:codex、项目正确及独立Hall，179/178均已由Codex收取为succeeded/completed，当前入口被动闭环验收完成。179消息混排使MCP默认unknown，已校验本地合法报告与完整分页消息JSON一致，原报告保持；回执.tmp/initiator-mode-identity-receipt/acceptance.json。里程碑收尾后暂停，I-3消费者/现行文案与I-4真实链路另片；历史human任务归属保持。无wait/取消/排队/主动消费者实测，不外推真实主动或其它终端通过。
+I-0当前状态：176/177准备已独立通过并收取；既有授权下配置已备份并切自身Key，API/独立启动通过，重开后当前聊天caller=agent:codex/kind=agent。178 DeepSeek核验经179 Kimi独立A-H复核通过，created_by=agent:codex、项目正确及独立Hall，179/178均已由Codex收取为succeeded/completed，当前入口被动闭环验收完成。179消息混排使MCP默认unknown，已校验本地合法报告与完整分页消息JSON一致，原报告保持；回执.tmp/initiator-mode-identity-receipt/acceptance.json。里程碑收尾后暂停，I-3A指南已独立通过发布（见下节），余下活跃文案/模块规格与I-4真实链路另片；历史human任务归属保持。无wait/取消/排队/主动消费者实测，不外推真实主动或其它终端通过。
+
+## I-3A消费者指南发布（2026-10-07）
+
+Kimi180起草经DeepSeek181独立A–F全文/实际源码依据复核通过、无阻塞，已正式发布[发起者消费者指南](../guides/INITIATOR_MODE_CONSUMER.md)及AGENTS/TERMINAL_MCP/DSH_DESKTOP现行三文本补丁（23进23删），原历史/报告保留。指南明确约定级资格与有限预算、每动作前重核、正常return_reason与API错误/客户端取消/总预算耗尽的区别；9链接/锚点验证通过。181/180均已由agent:codex收取为succeeded/completed，回执.tmp/initiator-mode-consumer-receipt/acceptance.json。
+
+当前只I-3A指南范围通过；S-1/S-2工具计数/schema、175-O2角色hint/workspace注释及USER_MANUAL:162关联文字仍需下一片实际实施并复核，MODULE_webui/MODULE_bridges/PROJECT_INTEGRATION剩余同步未完成、175-O1测试维护另片。181建议S-1既有子串断言无需镜像同步改测试，关联文案同批完成。项目passive/version6、effective null/not_bound；未运行主动消费者/G8/长等待/取消/排队/其它终端身份验收，完整I-3与I-4门禁未释放。

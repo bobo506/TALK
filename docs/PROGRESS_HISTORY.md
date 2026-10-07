@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-07 19:20 (Asia/Shanghai) I-3A指南与三份现行文本发布，收取181/180
+
+- 用户通知181 ok。主控读取msg2683完整同响应摘要，合法自身181一致talk-delivery-1 complete，8完成/0未完成/0阻塞、9验证（8 pass/1 not_run），runner succeeded/submitted，finished_at=2026-10-07T10:56:30.723468。DeepSeek独立A-F检查全文/源码/有限预算/patch/历史保护/交付纪律全部通过，原18源/草稿指纹一致，0阻塞/3非阻塞建议，不要求返工。
+- 本轮主控只做必要摘要/证据索引与机械验证，validate真实181退出0、18源/草稿当前指纹一致、patch dry-run通过；当前HEAD7c61875、取件工作区干净，原7840737/a8b0ac8及主控两进度时序差异保留。181未有本人MCP反查任务号，只以平台包号自报的限制如实保持；当前主控MCP actual task_ref.id=181且合法自报一致，不冒称其已独立反查。
+- Codex发布docs/guides/INITIATOR_MODE_CONSUMER.md；AGENTS、TERMINAL_MCP、DSH_DESKTOP三个已审patched副本通过显式UTF-8写入，git diff为3/3、13/13、7/7（23进23删），只指定现行协调用词/资格/提示/预算注记，角色分级/职责/授权/历史实测记录不变。USER_MANUAL已正确项不重复改。
+- 新指南正式发布标记替换预定位置说明，标明180起草/181独立复核、文档约定级和I-4待验收；发布时passive/version6作为有日期快照。采181-N2澄清：正常return_reason仅matched/timeout/mode_changed，api_error错误路径、客户端取消宿主状态、总预算耗尽消费者决定，§5说明及§6可复制提示词同步，不改原草稿/报告或源码。
+- 181-N1采纳为后续验收说明：S-1新增G8说明已有子串断言不会受影响，无需镜像改测试；181-N3把S-3/S-4/S-5与USER_MANUAL:162留后续关联文案同批实施。本次不扩大为工具schema/UI实际修改、MODULE_webui/MODULE_bridges/PROJECT_INTEGRATION规格同步或175-O1测试整理。
+- 发布后已审文本与预期逐项一致、新指南9相对链接与预算锚点通过；合同/实施计划其后只同步状态，最终6份未改原来源+7草稿保持。主控按现行分工裁决I-3A范围通过，先181后180实际收取为succeeded/completed，collected_at=2026-10-07T11:16:20.672931/11:16:24.471388，均created_by=agent:codex、原msg2683/2682保持。
+- 回执.tmp/initiator-mode-consumer-receipt/acceptance.json含裁决、澄清/待办、发布文件指纹和收取时间；原草稿/同步清单、独立全文/源码证据、18来源指纹保持。当前项目passive/version6、effective null/not_bound，assignment仅兼容。无生产wait/真实模型/浏览器/active切换/G8/长等待/正常到期/取消/排队，真实主动链路与其它终端身份not_run，660仅前次配置实读、Kimi660000ms模板，不以文档发布冒称主动适配。
+- 正式变更AGENTS、INITIATOR_MODE_CONSUMER、TERMINAL_MCP、DSH_DESKTOP_TALK_MCP、PROGRESS、PROGRESS_HISTORY、PROJECT_BRIEF、CONTROLLER_MODE_DESIGN、INITIATOR_MODE_IMPLEMENTATION_PLAN、DEVELOPMENT_ROADMAP。仅文档，必要验证UTF-8读取、正式文案/链接/锚点/patch一致与git diff --check，功能目录零差异，不复跑业务大套件、不重启服务。
+- 当前I-3A发布收尾后暂停，下一片I-3B活跃工具/UI/关联文字实施并独立复核，剩余模块规格再按负责模块处理；完整I-3就绪后I-4真实链路及终端预算验收。原human任务、7旧failed与权限、I-0配置备份保持；未读精确用量、不推测比例。
+
 ## 2026-10-07 18:52 (Asia/Shanghai) 180草稿交付合法complete，派DeepSeek181独立复核
 
 - 用户通知180 ok；主控talk_get_delivery获得msg2682完整同响应摘要，合法自身180一致talk-delivery-1、complete、5完成/0未完成/0阻塞、6验证（5 pass/1 not_run），无默认裁剪。runner succeeded/submitted、finished_at=2026-10-07T10:44:39.956120，尚未收取；Kimi开发已暂停。

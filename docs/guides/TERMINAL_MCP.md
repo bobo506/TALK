@@ -60,7 +60,7 @@
 
 - **客户端单次工具上限 `T`**：核验实际宿主配置键、取值、单位、作用范围及重载方式，注明依据来自运行配置、模板还是用户实测。不能把另一个终端的上限直接复制过来。
 - **TALK单次等待 `W`**：调用时显式传入 `timeout_seconds`，满足 `W + 返回余量 ≤ T`；余量覆盖网络请求、序列化与客户端处理，至少参考5秒，并按终端边界留更多余量。未核验 `T` 时不启用主动长等待，不借通用默认600秒推断宿主支持600秒。
-- **执行者任务预算**：bridge执行任务的超时与主控等结果的时长分别记录。等待到期只结束当前读取，不取消、重新派发或重启执行者任务。
+- **执行者任务预算**：bridge执行任务的超时与发起者等结果的时长分别记录。等待到期只结束当前读取，不取消、重新派发或重启执行者任务。
 
 | 当前入口 | 客户端预算依据 | 等待调用策略 |
 |---|---|---|
@@ -71,7 +71,7 @@
 ### 正常到期、错误和续等
 
 1. 未完成任务等到预算到期，应正常返回 `return_reason=timeout`；任务轮询命中则提前返回 `matched`。网络/API错误显式报错，客户端超时或取消单独记录，不能把这些错误当成任务已完成或普通等待到期。
-2. 单次到期后工具不会自动续等。只有明确授权的主动模式消费者，核验最新身份/模式/主控指定与剩余总预算后，才可再次调用；任务完成、错误、模式变化或总预算耗尽时停止，不无限重试/轮询。总预算目前是提示词约定，尚无代码强制。
+2. 单次到期后工具不会自动续等。只有明确授权的主动模式消费者，核验最新身份/模式/任务发起者归属与剩余总预算后，才可再次调用；任务完成、错误、模式变化或总预算耗尽时停止，不无限重试/轮询。总预算目前是提示词约定，尚无代码强制。
 3. 同步stdio等待占用当前MCP连接；客户端超时/取消目前不会立即结束程序侧等待。适配须验证正常返回后可继续查询，以及取消/失败后是否排队、何时恢复，不能假定客户端报错就已释放程序。socket请求超时也不提供任意慢响应的端到端硬截止。
 4. 本项目默认仍被动收取：派发后结束，用户通知完成再读取。上述预算规则是有限主动等待的接入要求，不自动开启主动模式或改终端运行配置。
 
@@ -83,21 +83,21 @@
 
 #156实现经#157独立审查、#158修正F-1和#159定向复核通过；代码已具备下列能力，运行中的MCP进程和缓存工具描述须重新加载后才可使用。
 
-- `talk_wait_tasks` 新增严格布尔 `controlled_wait`，默认false。缺省/false保留旧等待默认/最大600秒、请求/返回语义；终端适配调用仍须显式传预算。true须显式有限正数预算、项目上下文、Key反查agent身份、支持完整模式/主控指定、本人为有效指定且模式active，失败明确拒绝，不静默降级。
-- true路径从身份核验起按单次deadline记账，HTTP用剩余预算，30秒重读模式/指定，变化退出；正常到期使用最近成功任务集合，无任务轮询则为空。等待全程只读，不更改任务状态/权限或伪造effective_mode。
+- `talk_wait_tasks` 新增严格布尔 `controlled_wait`，默认false。缺省/false保留旧等待默认/最大600秒、请求/返回语义；终端适配调用仍须显式传预算。true须显式有限正数预算、项目上下文、Key反查agent身份（human凭据拒绝）、服务端返回模式字段且requested_mode=active、显式非空严格正整数task_ids（非法项整批拒绝），并逐唯一ID核验任务存在/可见、属于本项目且created_by=调用者本人；任一不满足明确拒绝，不静默降级、不等待合法子集。旧的固定主控指定不再是受控门禁条件。（能力描述已按 I-1 新发起者合同 G1–G8 重写；上方 #156–#159 开发/复核结论为历史记录，不重写。）
+- true路径从身份核验起按单次deadline记账，HTTP用剩余预算，30秒只重读项目模式字段（不再读取或比对主控指定），模式值/版本变化或字段失效按mode_changed退出；正常到期使用最近成功任务集合，无任务轮询则为空。等待全程只读，不更改任务状态/权限或伪造effective_mode。
 - 项目 `talk_list_agents.caller_identity` 固定为member_id/kind/note三键；成功身份来自API Key、note为null，身份读取失败两身份字段为null加短原因但不阻断角色清单；非项目为null且不新增身份请求。
 - 运行期任务轮询/项目重读的API错误统一显式报错，带真实已等待秒数/轮询次数且只落一条api_error统计；失败HTTP尝试仍计数。failure_stage只在JSONL统计，不加入工具返回的query_stats。
 
 加载检查可按以下只读步骤进行，日常用户Web操作步骤没有变化：
 
 1. 在终端客户端重新连接并重新加载TALK MCP进程/工具目录；若只刷新目录仍无新字段，按宿主方式重建该MCP进程，必要时新开独立会话。无需为此新增worker/member或切换执行CLI；只刷新TALK网页不会重新加载Python MCP源码。
-2. 检查工具目录仍为九个，wait的schema含controlled_wait默认false；项目list_agents返回caller_identity、controller_mode和controller_assignment。返回身份应对应自己的Key，不能因提示词/模型名称猜成agent。
-3. 对本人有权读取的已提交/完成历史任务，显式短预算读取，确认能提前命中且随后查询可用；不为此新建生产任务或做300/600秒长等。human身份或未被指定/模式passive时，true门禁拒绝是预期行为，不更改凭据/指定来绕过。
+2. 检查工具目录仍为九个，wait的schema含controlled_wait默认false；项目list_agents返回caller_identity、controller_mode和controller_assignment（历史兼容字段，已弃用，不再决定任何协调/调度）。返回身份应对应自己的Key，不能因提示词/模型名称猜成agent。
+3. 对本人有权读取的已提交/完成历史任务，显式短预算读取，确认能提前命中且随后查询可用；不为此新建生产任务或做300/600秒长等。human身份、项目模式非active、或task_ids含非本人创建任务时，true门禁按新G4/G6/G7/G8拒绝是预期行为，不更改凭据或冒用他人任务来绕过。
 4. 记录工具加载和宿主实测结论。本轮代码独立复核不等于真实主动链路已验收：主被动界面C2-B、约定消费者/指南C2-C、真正取消C2-D仍待开发，effective_mode仍null/not_bound；旧连接可能继续使用旧实现。
 
 ## Kimi Code 独立会话入口（L1-1 准备）
 
-上面是通用说明；本节是官方 Kimi Code CLI 的独立主控入口准备。**它只做到“配置可用 + 工具可发现”，真实模型主控闭环尚未运行**，三层结论见本节末尾。
+上面是通用说明；本节是官方 Kimi Code CLI 的独立发起者入口准备。**它只做到“配置可用 + 工具可发现”，真实模型发起者闭环尚未运行**，三层结论见本节末尾。
 
 ### 本机已核对事实（2026-09-15 只读检查）
 
@@ -152,8 +152,8 @@ python scripts/kimi_talk_precheck.py probe --config D:/claude-test/TALK/.kimi-co
 
 ### 与 bridge worker 的分离
 
-- bridge 的任务会话由 `bridges/kimi_bridge.py` 用 `--agent-file` 启动，生成的 agent 文件只列 `Read / Grep / Glob / Bash`（`tools` 档加 `Edit / Write`）且 `subagents: []`；按官方 agents 文档的 `tools` 白名单语义，`mcp__talk__*` 不在其中，因此 bridge worker 不会拿到主控工具。
-- 普通终端入口（本节入口）与 bridge worker 是两套独立启动：前者由工作区级 `mcp.json` 拉起一个只含 TALK 任务工具的 stdio 进程，后者由 bridge 拉起并隐藏主控工具。`probe` 的输出可用于核对独立入口的工具目录，不代表 bridge worker 的可见工具。
+- bridge 的任务会话由 `bridges/kimi_bridge.py` 用 `--agent-file` 启动，生成的 agent 文件只列 `Read / Grep / Glob / Bash`（`tools` 档加 `Edit / Write`）且 `subagents: []`；按官方 agents 文档的 `tools` 白名单语义，`mcp__talk__*` 不在其中，因此 bridge worker 不会拿到发起者工具。
+- 普通终端入口（本节入口）与 bridge worker 是两套独立启动：前者由工作区级 `mcp.json` 拉起一个只含 TALK 任务工具的 stdio 进程，后者由 bridge 拉起并隐藏发起者工具。`probe` 的输出可用于核对独立入口的工具目录，不代表 bridge worker 的可见工具。
 
 ### 三层结论（必须分开表述）
 
@@ -383,15 +383,15 @@ WorkBuddy5.5.6通过用户级MCP界面导入TALK条目，复用现有 `bridges/t
 
 ## 2026-09-18 项目开发要求接入边界
 
-REQ-1后端与主控工具已通过独立复核；项目API支持最新纯文本要求，角色页编辑区REQ-2已通过独立复审，页面效果待用户验收。MCP工具仍为九个，`talk_list_agents` 顶层新增要求字段，`talk_delegate_task` 派发时读取并保存正文快照，读取失败即报错，不静默创建缺少要求的任务。要求不能覆盖宿主系统指令或自动授予权限。
+REQ-1后端与任务工具已通过独立复核；项目API支持最新纯文本要求，角色页编辑区REQ-2已通过独立复审，页面效果待用户验收。MCP工具仍为九个，`talk_list_agents` 顶层新增要求字段，`talk_delegate_task` 派发时读取并保存正文快照，读取失败即报错，不静默创建缺少要求的任务。要求不能覆盖宿主系统指令或自动授予权限。
 
 本片未重启服务或MCP；部署新服务代码并完成数据库启动迁移、让MCP加载新实现后方可使用。工具描述刷新需要客户端重连，不能把代码提交当作运行中宿主已经更新。直接REST、定时任务和旧pi TypeScript入口不自动追加快照。完整字段/清空/权限合同见 `docs/spec/PROJECT_INTEGRATION.md` 的REQ-1节。
 
-角色页使用与人工验收见 [项目开发要求验收指南](PROJECT_REQUIREMENTS_ACCEPTANCE.md)。主控派发前读取项目最新要求；没有有效分工且本次会话无明确指定时，先请用户配置，不自动套用示例。
+角色页使用与人工验收见 [项目开发要求验收指南](PROJECT_REQUIREMENTS_ACCEPTANCE.md)。任务发起者派发前读取项目最新要求；没有有效分工且本次会话无明确指定时，先请用户配置，不自动套用示例。
 
-## 2026-09-19 主控模式只读状态（C1a）
+## 2026-09-19 调度模式只读状态（C1a）
 
-新实现的talk_list_agents顶层controller_mode读取项目保存的requested_mode/requested_version；这只是配置意向。effective_mode当前恒为null、effective_status为not_bound，不表示主控已自动推进或会话已被唤回。旧后端缺字段时明确unsupported，无项目时null；与开发要求复用同一项目读取。
+新实现的talk_list_agents顶层controller_mode读取项目保存的requested_mode/requested_version；这只是配置意向。effective_mode当前恒为null、effective_status为not_bound，不表示发起者已自动推进或会话已被唤回。旧后端缺字段时明确unsupported，无项目时null；与开发要求复用同一项目读取。
 
 human可经专用 `PATCH /api/projects/{project_id}/controller-mode` 配置mode及expected_version；版本冲突409后须先重新读取，超出0..2**63-1的整数422。模式不改变任务授权或派发/收取流程，当前仍按用户通知后取件。C1b身份/生效与C2按钮尚未实现，本片未重启服务/MCP，不能把代码提交当作当前连接已经支持该字段。完整合同见PROJECT_INTEGRATION.md的C1a节。
 
@@ -442,3 +442,7 @@ I-0清单经176开发/177独立复核通过并收取，正式步骤见[Codex TAL
 当前聊天实际caller为agent:codex/kind=agent；178 DeepSeek只读核验经179 Kimi独立A-H复核通过，两个新任务created_by=agent:codex、项目正确且独立Hall。Codex于2026-10-07T09:50:04.854837收取179、09:50:07.538516收取178，均succeeded/completed，原msg2681/2680保持。原partial的下游复核/收取已完成；179结果混排导致MCP默认unknown，本地合法179报告与完整消息JSON一致，按实际独立证据验收，原报告不追改。回执.tmp/initiator-mode-identity-receipt/acceptance.json。
 
 通过范围仅Codex当前入口及被动派发/读取/交付/独立复核/收取；项目passive/version6、effective null/not_bound保持，660仅前次配置实读。真实G8/主动消费者/长等待/正常到期/取消/同连接排队/其它终端身份未验收。里程碑收尾后暂停，I-3消费者/现行指南/旧主控文案及I-4真实链路另片；历史human归属和权限保持。
+
+## I-3A发起者消费者指南（2026-10-07）
+
+已发布[发起者消费者指南](INITIATOR_MODE_CONSUMER.md)，Kimi180起草/DeepSeek181独立文本及实际源码依据复核通过，双方已由Codex收取。它提供约定级提示词与有限预算/资格/停止分类，不代表真实主动链路或终端长等待适配通过；活跃工具/UI文字和剩余模块规格仍待I-3B及后续，I-4尚未运行。
