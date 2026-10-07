@@ -6170,3 +6170,13 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - 当前加载事实区分：I-1合同已有Codex入口加载证据，I-0被动闭环、I-2页面、I-3A指南及I-3B提示均已通过收取；I-3B最新工具说明运行进程重载未核、真实主动/G8/长等待/取消/排队/I-4未验收。compat assignment不授权/不参与协调，human专用PATCH/CAS/版本/候选校验和API字段名保留；T/W/返回余量/执行者/总预算/宿主交还分开，不改实际预算。
 - 基线2e945a97219b2407fb95c43b55c3741ce88c9f7f，开工干净；15来源指纹/实际身份模式/完整派包与回执在.tmp/initiator-mode-spec-sync-dispatch/。必要D4源码只读可沿集成节定位并新增路径/SHA证据，不读其它模块；正式文档/代码/测试/Key/config/数据库/模式禁止修改，Codex预先仅允许更新两份派发进度。
 - 要求patch只dry-run/隔离正反字节校验、相对链接/锚点、现行/历史分类与完整闭合索引；原草稿/报告/回执不追改，交付自身实际task_id完整裸JSON并validate。完整I-3本次仍草稿待复核发布，175-O1/schema边界评估/新说明重载另片，不开启I-4；无浏览器、wait、真实消费者或重启服务。
+
+## 2026-10-08 I-3C #185交付读取与#186独立复核派发
+
+- 用户通知“185好了”。MCP完整必要字段合读185/msg2687：自身号一致、created_by agent:codex、runner succeeded/submitted，合法complete（5完成/0未完成/0阻塞、9验证），本地validate --expect-task-id185退出0；正式文档/代码零改动，主控核15源SHA+bytes全部保持。两文档草稿4 hunk，bridge +11/-1、integration +5/-3。
+- 开发自报隔离正反应用/正式原SHA还原、链接集合2/5与两终端锚点、19项源码文档探针通过；首次仓库内scratch被Git跳过、不曾落正式文件，原因和有效仓库外重验保留原报告。开发基线自报2e945a9；当前HEAD77288f2只两份预授权进度差异，交独立核实际基线，不追改自报。
+- 用户此前指出纯文案切片耗时过长；Codex确认I-3B任务遗漏旧断言同步权限造成额外补正，今后同模块文案/关联断言/必要文档一起纳入范围，必要验证按影响选择，保留一次独立复核，减少重复检查与中间流程。本次审查将证据合并，不新增无关测试/页面门禁或大套件。
+- 派发前重读最新development_requirements/caller，仍Kimi文字起草、DeepSeek独立复核，caller agent:codex/kind agent/note null、passive/version6。最小顶层参数派DeepSeek #186“186-桥接与项目集成规格草稿独立复核”，created_by agent:codex，Hall group:task-b7b94495a21048a19848522273be2695，queued/assigned为派发快照。
+- 审查HEAD77288f2861de5a3c34ff71c84ef97561ec780f5f；16来源（原15+只读server/routes/projects.py）及14草稿冻结、原需求/实际差异/验证/限制/闭合索引完整纳包.tmp/initiator-mode-spec-sync-review-dispatch/。独立核当前源码G1-G8/重读/字段、D4人类PATCH/CAS/候选兼容、历史预算/事实保护、patch正反/链接/UTF-8与同步状态；只内存/仓库外验证，不在主工作树apply。
+- 仅读MODULE_bridges和公共集成指定节，不读其它MODULE；正式源/原草稿冻结，Codex只更新两份派发进度，开发与审查不并行改码。186本次只写新.tmp审查成果，完整裸JSON自身号校验后交付；185未收取，独立通过才统一正式发布/收取/Git。
+- 本轮不改配置/Key/代码/测试/数据库/模式，不运行浏览器/真实等待/消费者或重启服务；纯文档无需业务测试与新增人工页面验收。新工具说明MCP重载/实际终端预算、175-O1/schema评估、I-4仍分别待核，完整I-3未提前宣称通过；默认派发后结束，用户通知186完成后取件。

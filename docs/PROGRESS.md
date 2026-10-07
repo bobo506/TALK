@@ -1,11 +1,11 @@
 # Project Progress
 
-Updated: 2026-10-07 21:45 (Asia/Shanghai)：I-3B人工简验已通过并收尾；用户授权开始下一步，I-3C剩余桥接/项目集成规格草稿已派Kimi #185，完成后交DeepSeek独立复核。正式两目标未改，完整I-3与I-4尚未通过。
+Updated: 2026-10-08 (Asia/Shanghai)：185两份剩余规格草稿交付合法complete，正式文档/代码零改动；已派DeepSeek #186独立复核。185/186未收取，待独立通过后统一发布与收尾，完整I-3与I-4尚未通过。
 
 ## 当前角色与协作
 
 - D:/claude-test/TALK；项目prj_e8fe7066bbec；分支codex/terminal-return-codex。Codex决策/正式文档/Git，最新开发要求仍Kimi文字/设计/交互/前端、DeepSeek后端/其它，双方交叉复核；下次派发前重读。
-- 默认派发后结束、用户通知后取件。当前#185由agent:codex派给Kimi，queued/assigned为派发快照；完成暂停后再交DeepSeek独立复核。Codex只更新两份派发进度，正式文档待独立通过后发布。Codex不操作浏览器，页面效果由用户确认。
+- 默认派发后结束、用户通知后取件。185已succeeded/submitted、合法complete待收取；186由agent:codex派给DeepSeek，queued/assigned为派发快照，独立复核中。Codex只更新两份派发进度，正式文档待独立通过后发布。Codex不操作浏览器，页面效果由用户确认。
 
 ## 当前完成与证据
 
@@ -18,10 +18,12 @@ Updated: 2026-10-07 21:45 (Asia/Shanghai)：I-3B人工简验已通过并收尾�
 - 项目passive/version6、effective null/not_bound；assignment agent:codex/version13仅兼容。未切active、wait、真实消费者/浏览器或改Key/config/数据库/重启服务。新MCP说明运行进程重载未核；实际预算T/W/余量/执行预算/总预算/宿主交还仍分别核验。Codex W300/660前次配置、DSH65/W50与Kimi660000ms模板不混用，真实主动/G8/长等待/取消/排队/I-4未验收。
 - 回退配置备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml；I-0回执.tmp/initiator-mode-identity-receipt/acceptance.json，旧7failed仅历史。未读取精确额度，不推测比例。
 
+- 185/msg2687合法自身185一致complete（5完成/0未完成/0阻塞、9验证），本地validate退出0；两正式目标未改，15原来源SHA+bytes均保持，当前HEAD77288f2相对185自报2e945a9只两进度差异。开发7pass/2not_run含隔离patch正反、链接/锚点及源码19项文档探针；不当独立验收。186按原完整需求/实际差异一次复核，避免无关扩审、大套件和额外补正流程。
+
 ## 当前卡点与下一步
 
 1. 用户2026-10-07明确回复“验收通过”，本片角色说明提示简验通过，I-3B人工门禁释放；验收范围为已提供的hint提示步骤。暂无本片待确认项，I-4真实主动流程仍未运行。
-2. 当前I-3C #185：仅.tmp/initiator-mode-spec-sync/起草MODULE_bridges和PROJECT_INTEGRATION两份精准补丁/副本、分类与闭合清单；保留旧600/660/3600与#156-#159等历史，当前说明同步G1-G8/created_by/模式重读及指定弃用、人类PATCH/CAS兼容。额外仅为MODULE_bridges既有I-1:240-245加阶段/旧加载状态澄清，不扩全模块或读取其它MODULE。15来源/基线2e945a9、完整包见.tmp/initiator-mode-spec-sync-dispatch/；用户通知“185 ok”后取件并派独立复核。AGENTS/TERMINAL/DSH/USER_MANUAL/MODULE_webui已完成，不重复改；175-O1和schema边界另片。
+2. 当前待#186独立复核：两目标草稿仅4 hunk，保护历史/预算，核G1-G8/created_by/模式重读与D4人类PATCH/CAS兼容、patch/副本正反/链接/UTF-8/同步清单。本次16来源（含只读项目路由）+14草稿冻结、审查HEAD77288f2，包.tmp/initiator-mode-spec-sync-review-dispatch/；用户通知“186 ok”后取件，独立通过才统一发布两文档、收取与Git收尾。纯文档无需业务测试或新增页面验收，原185报告保持；175-O1/schema边界另片。
 3. 完整I-3就绪与终端实际预算/新说明加载核验后，再I-4真实主动链路及取消/排队人工验收；当前不自动开启。模型名称展示和成员命名另片。
 
-恢复指令：`继续项目`。I-3B人工简验已通过；#185剩余规格草稿待完成，默认派发后结束、收到用户“185 ok”再取件。完整I-3与I-4未通过，不切active或开启真实链路。
+恢复指令：`继续项目`。I-3B人工简验已通过；185已交付待收取，186独立复核待完成。默认派发后结束、收到用户“186 ok”再取件；完整I-3/I-4未通过，不切active或开启真实链路。
