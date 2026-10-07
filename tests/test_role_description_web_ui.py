@@ -33,9 +33,9 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertIn('aria-label="角色说明"', html)
         self.assertIn('aria-label="参与的任务"', html)
         self.assertIn('role="status"', html)
-        # 语义文案：纯展示文本、不改变主控/职责/权限，空白或恢复默认回到默认文案
+        # 语义文案：纯展示文本、不改变任务发起者归属/职责/权限，空白或恢复默认回到默认文案
         self.assertIn("纯展示文本 · 不改变职责与权限", html)
-        self.assertIn("不改变项目主控、职责分级", html)
+        self.assertIn("不改变任务发起者归属、职责分级", html)
         self.assertIn("恢复默认", html)
         # N4 修正（#137）：布局顺序 = 名称区 → 静态说明区 → 参与任务区，三者同级 section；
         # 说明区不得置于任一动态度量内部（replaceChildren 会销毁编辑区节点）。

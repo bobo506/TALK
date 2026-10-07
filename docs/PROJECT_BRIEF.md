@@ -6,7 +6,7 @@
 
 发起者合同 v3 已发布；I-1 #172/#173 工具代码独立通过并收取，当前 Codex MCP 加载核验通过。I-2 #174/#175 固定主控页面退役经独立实际代码复核通过并收取，当前“项目设置”只显示开发要求与调度模式；页面不再依赖固定指定，协调责任按具体任务 created_by，模式只约束任务发起侧。资源 20261007-initiator-mode-ui，独立 Node149（同进程）/Python页面12及导航/符号探针通过；默认进程隔离因宿主 spawn EPERM 为 not_run。
 
-I-1/I-2 同轮用户页面验收已于2026-10-07通过，人工门禁释放；I-0准备176/177已独立通过并收取，正式[身份切换与回退清单](guides/CODEX_TALK_IDENTITY_SWITCH.md)已发布。用户已明确授权实际切换：配置已备份并换既有agent:codex Key，API身份/名册和独立启动核验通过，重开后当前聊天MCP已实测agent:codex/kind=agent，新任务178的created_by=agent:codex，DeepSeek核验经Kimi179独立A-H复核通过，179/178均由Codex收取，当前入口被动闭环验收完成；179消息混排导致MCP unknown，已核本地合法报告与完整消息一致，原报告保留。项目passive/version6与effective null/not_bound保持，保存active仍仅意向；I-3A消费者[指南](guides/INITIATOR_MODE_CONSUMER.md)经180/181独立通过并发布，两项已收取；活跃文案/剩余模块规格、I-4真实主动链路与模型展示后续另片。角色提示还有一处旧“主控”文字，登记I-3。当前状态见 [PROGRESS](PROGRESS.md)；以下日期较早的说明为阶段记录，与当前冲突时以本节为准。
+I-1/I-2 同轮用户页面验收已于2026-10-07通过，人工门禁释放；I-0准备176/177已独立通过并收取，正式[身份切换与回退清单](guides/CODEX_TALK_IDENTITY_SWITCH.md)已发布。用户已明确授权实际切换：配置已备份并换既有agent:codex Key，API身份/名册和独立启动核验通过，重开后当前聊天MCP已实测agent:codex/kind=agent，新任务178的created_by=agent:codex，DeepSeek核验经Kimi179独立A-H复核通过，179/178均由Codex收取，当前入口被动闭环验收完成；179消息混排导致MCP unknown，已核本地合法报告与完整消息一致，原报告保留。项目passive/version6与effective null/not_bound保持，保存active仍仅意向；I-3A消费者[指南](guides/INITIATOR_MODE_CONSUMER.md)经180/181独立通过并发布，两项已收取；I-3B工具计数/timeout说明、角色hint与workspace注释及对应手册/MODULE_webui，经182开发、183既有断言补正、184独立A–F复核通过并发布，184/183/182均已收取；原182 partial与失败记录由后续证据闭合，原报告保持。独立页面7项+等待合同4项通过，角色说明hint待用户简验；剩余MODULE_bridges/PROJECT_INTEGRATION规格、175-O1测试维护、I-4真实主动链路与模型展示另片。I-3B新MCP说明的运行进程重载未核，不外推真实主动适配。当前状态见 [PROGRESS](PROGRESS.md)；以下日期较早的说明为阶段记录，与当前冲突时以本节为准。
 
 ## 历史开发安排（2026-09-19，固定主控阶段）
 

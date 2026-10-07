@@ -65,8 +65,8 @@ WAIT_TASKS_NOTE = (
 )
 WAIT_COUNTING_NOTE = (
     "query_stats 只含本工具内部实测的程序级计数（poll_rounds / http_requests / elapsed_seconds / "
-    "return_reason）；受控等待（controlled_wait=true）下 identity GET、项目 GET、每 30 秒重读 GET 与"
-    "任务轮询 GET 全部计入 http_requests（含失败的尝试），非受控路径只计入任务轮询；"
+    "return_reason）；受控等待（controlled_wait=true）下 identity GET、项目 GET、G8 逐任务核验 GET、"
+    "每 30 秒重读 GET 与任务轮询 GET 全部计入 http_requests（含失败的尝试），非受控路径只计入任务轮询；"
     "模型侧的 talk_get_task/talk_list_tasks 调用数与客户端外层等待回合不由本工具"
     "统计，本工具也无法观测，需由任务发起者（调用方）在外部实测。"
 )
@@ -1965,7 +1965,9 @@ TOOL_SCHEMAS: list[JsonDict] = [
                     "default": WAIT_DEFAULT_TIMEOUT_SECONDS,
                     "description": (
                         "等待预算（秒）。非受控路径：省略即 600，负数归零，超过 600 按 600 生效。"
-                        "controlled_wait=true 时必须显式传入有限正数且不超过 600，否则直接报错。"
+                        "controlled_wait=true 时必须显式传入有限正数（bool、非数值、NaN、inf、0、负值"
+                        "直接报错，不采用 600 默认值）；超过 600 时按既有上限 clamp 到 600 生效，"
+                        "与旧 clamp 行为一致。"
                     ),
                 },
                 "controlled_wait": {

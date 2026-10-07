@@ -6143,3 +6143,14 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - 审查实际HEAD48a74eec8cb67e4327bf0cdd94ec45348c1eaea2；开发基线98cd676/原派发43e7b14之间只两份进度差异。13当前来源+22只读产物冻结，合并4文件patch SHA3ed9464559ef9148755ee1aa2b2989d60a0131c38c882a9e3b83cce2381dfd77；原需求、定向授权、实际差异、验收A-F与开发54/5/65及失败后2/2证据完整纳审查包.tmp/initiator-mode-live-copy-review-dispatch/。
 - A-F要求核基线/全指纹、文本等价和真实合同、必要7项页面独立验证、patch/副本/反向恢复/链接与历史保护、原partial失败闭合及交付纪律。文档正反验证仅隔离scratch，禁止误落主工作树；仅读MODULE_webui，不扩其它模块。Codex只更新两份派发进度，开发/审查不并行改码。
 - 当前正式文档未发布、184独立未验收、三项未收取；不操作浏览器/wait/active/config/Key/数据库/服务，不释放完整I-3/I-4。默认派发后结束，用户通知184完成再取件，独立通过后发布、收取、Git收尾并提供hint页面简验步骤。
+
+## 2026-10-07 21:09 I-3B独立通过、文案/关联文档发布与184/183/182收取（页面待简验）
+
+- 用户通知“184 ok”。MCP完整核心字段合读184/msg2686合法自身184一致complete（18完成/0未完成/0阻塞、15验证），本地validate退出0；184实际A–F源码/差异/文档独立复核通过，0阻塞/0返工。独立页面2+5、受控clamp/schema与G2/bool定向4项通过；开发54/65未重复作为独立通过，浏览器/真实主动not_run。
+- 主控发布前复算13来源+22草稿产物全部一致；combined.patch原副本SHA3ed94645经CRLF归一与当前git diff SHA dfe8ab9c逐字一致，非内容变化。实际HEAD37b5d39相对审查48a74ee只有两份进度差异；四源码/测试差异保持已审10进8删，AST8302只两个字符串，JS注释/HTML hint/既有断言最小性已独立确认。
+- Codex接受非阻塞建议1/4：以明确UTF-8发布USER_MANUAL和MODULE_webui已审副本，更新草稿状态为独立通过/已发布/页面待简验，并只追加I-2旧human快照与当前agent:codex、I-0 178/179及I-3A180/181已通过收取的区别；历史原文/原.tmp/报告不追改。期待文本相等、8相对链接及git diff --check通过。
+- 建议3更正记录：183自报25项数目不准，184核实际13来源（12保持+测试1授权变化）及15冻结全保持，27未变对象、0实际缺口；原报告保留。建议2既有schema maximum=600与运行clamp关系留后续独立评估，本片不改关键字/行为或扩终端预算适配。
+- 实际按184→183→182收取，collected_at分别2026-10-07T13:06:25.269946、13:06:32.815264、13:06:40.820656，均succeeded/completed/created_by agent:codex，原msg2686/2685/2684保持。182原partial的旧断言失败由183补正+184独立2/2闭合，文档待发布事项本轮落实，原报告不改complete。
+- 正式状态同步PROGRESS短快照、PROJECT_BRIEF、实施计划/合同/路线；回执.tmp/initiator-mode-live-copy-receipt/acceptance.json保存发布期待文本、当前身份/模式、非阻塞裁决与实际收取。184限制所列AGENTS/TERMINAL/DSH等已在I-3A完成，本轮不重复改；真正剩余MODULE_bridges/PROJECT_INTEGRATION规格及175-O1维护另片。
+- 人工简验入口：已有TALK服务和人类登录密钥，Ctrl+F5后进入角色→具体角色→角色说明，确认提示“不改变任务发起者归属、职责分级（business_role / decision_tier）或任务权限”；无需服务重启或切active。本片页面待人工确认，收尾后暂停，不开启跨模块下一片。
+- 当前caller实测agent:codex/kind agent/note null，项目passive/version6、effective null/not_bound保持，旧assignment仅兼容；本轮未改配置/Key/数据库/权限、未重启服务或运行浏览器/wait/真实消费者。MCP进程新说明重载未核；I-4真实主动/G8/长等待/取消/排队均未验收，不释放其门禁。未读取精确额度，不推测比例。

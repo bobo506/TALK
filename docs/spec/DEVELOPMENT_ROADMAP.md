@@ -193,3 +193,11 @@ I-0当前状态：176/177准备已独立通过并收取；既有授权下配置�
 Kimi180起草经DeepSeek181独立A–F全文/实际源码依据复核通过、无阻塞，已正式发布[发起者消费者指南](../guides/INITIATOR_MODE_CONSUMER.md)及AGENTS/TERMINAL_MCP/DSH_DESKTOP现行三文本补丁（23进23删），原历史/报告保留。指南明确约定级资格与有限预算、每动作前重核、正常return_reason与API错误/客户端取消/总预算耗尽的区别；9链接/锚点验证通过。181/180均已由agent:codex收取为succeeded/completed，回执.tmp/initiator-mode-consumer-receipt/acceptance.json。
 
 当前只I-3A指南范围通过；S-1/S-2工具计数/schema、175-O2角色hint/workspace注释及USER_MANUAL:162关联文字仍需下一片实际实施并复核，MODULE_webui/MODULE_bridges/PROJECT_INTEGRATION剩余同步未完成、175-O1测试维护另片。181建议S-1既有子串断言无需镜像同步改测试，关联文案同批完成。项目passive/version6、effective null/not_bound；未运行主动消费者/G8/长等待/取消/排队/其它终端身份验收，完整I-3与I-4门禁未释放。
+
+## I-3B活跃文案与关联文档发布（2026-10-07，页面待简验）
+
+Kimi #182完成S-1/G8计数注记、S-2/受控timeout既有clamp描述、175-O2角色hint及workspace两注释；原任务未授权测试改动，页面契约旧断言1项失败如实报partial。#183仅同步既有assertIn子串与对应注释，#184 DeepSeek独立A–F实际代码/文档复核通过、0阻塞/0返工，独立页面2+5及等待合同定向4项通过。四tracked文件10进8删；AST8302节点除两个描述字符串等价，JS注释外、HTML hint外不变，G1-G8/权限/计数/clamp/模式交互保持。开发54/65不重复声明为独立通过，浏览器/真实链路未运行。
+
+Codex已发布USER_MANUAL与MODULE_webui，并追加I-2旧human身份快照和当前agent:codex、I-0/I-3A已完成的区别；按184→183→182收取，三项succeeded/completed、原msg2686/2685/2684与182 partial/失败保持。183自报25项数目不准，184实际核13来源中12保持+15冻结保持=27未变对象、0实际缺口；原报告不改。回执.tmp/initiator-mode-live-copy-receipt/acceptance.json，已审原稿/补正/复核证据保留。
+
+页面简验：使用既有TALK服务和人类登录密钥，Ctrl+F5刷新后进入“角色”→任一具体角色→“角色说明”，确认提示写“不改变任务发起者归属、职责分级（business_role / decision_tier）或任务权限”。保持被动即可，无需服务重启。当前未宣称用户已验收本片；I-3还需MODULE_bridges/PROJECT_INTEGRATION同步，175-O1测试维护另片。既有JSON Schema maximum=600与运行clamp关系列后续独立评估，本片只描述同步、不改关键字。当前MCP进程新说明重载未核；项目passive/version6、effective null/not_bound，I-4真实G8/主动消费者/长等待/取消/排队未运行，门禁未释放。

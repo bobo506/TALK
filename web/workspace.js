@@ -357,7 +357,7 @@ function discardProjectRequirements() {
 // 可见性统一由 renderTaskDetailsPanel（app.js）同步。
 // 数据来自既有 GET /api/projects/{id}/agents 响应的 role_description 字段（B1）：
 // null = 无自定义、使用默认文案；写走专用 PUT /agents/{member_id}/description（仅 human）。
-// 说明是纯展示文本：不改变主控指定、business_role / decision_tier 或任务权限。
+// 说明是纯展示文本：不改变任务发起者归属、business_role / decision_tier 或任务权限。
 const ROLE_DESCRIPTION_MAX_CHARS = 2000;
 // 默认文案 = 短标签 + 换行 + 解释（无解释时只留标签行）；硬编码映射仅作为默认值生成器保留，
 // 一旦存在自定义说明，展示端不再渲染映射内容。
@@ -395,7 +395,7 @@ function normalizeRoleDescriptionValue(value) {
 }
 // 读写状态绑定 账号/项目/角色member_id + 请求序号；草稿只存内存 Map
 // （key = 账号/项目/成员），不写 localStorage：刷新或登出（页面重载）即清空，
-// 同项目轮询/导航不覆盖，切项目往返可按 key 恢复。不复制主控 CAS/saveToken。
+// 同项目轮询/导航不覆盖，切项目往返可按 key 恢复。不复制已随 I-2 退役的主控指定面板 CAS/saveToken。
 const roleDescriptionUI = { projectId: null, memberId: null, accountId: null, supported: false, loaded: false, saving: false, request: 0, saved: null, error: "", notice: "" };
 const roleDescriptionDrafts = new Map();
 function roleDescriptionEl(id) { return typeof document === "undefined" ? null : document.getElementById(id); }
