@@ -407,3 +407,12 @@ I-1源码已独立复核通过（172/173，162项及七探针），当前连接�
 5. 新I-1加载后，协调资格依据具体任务created_by/项目归属，主控指定仅兼容输出；旧连接仍受旧门禁限制。I-0自身Key、I-2 UI、I-3约定/指南就绪后再做I-4真实消费者验收。
 
 客户端实际T/W/返回余量、取消/同连接排队、socket非端到端硬截止等仍按本文通用要求分别验证。加载检查不等于真实主动宿主适配通过。
+
+
+### 2026-10-07 当前Codex入口I-1加载核验通过
+
+当前九工具目录已为G1–G8、正常退出无controller_changed，实际talk_list_agents返回assignment历史兼容/弃用与发起者note一致。显式timeout_seconds=1的false对已收取173立即matched（HTTP1/poll1），human true按G4拒绝，后续get173正常；证据.tmp/initiator-mode-tools-loadcheck/2026-10-07-loaded.json。前述“当前连接仍旧版”是2026-10-06及首次恢复时快照，此次由实测替代；原失败记录不追改。
+
+uvicorn命令启动的是TALK HTTP服务，Codex配置的talk_terminal_mcp.py是独立stdio进程；只重启HTTP服务不会刷新该工具目录。加载检查须同时看目录和实际返回，不能仅以服务重启或源码--check认定连接刷新。
+
+当前入口仍human:bobo、模式passive/version4、effective null/not_bound；未切自身Key、未改模式/指定、未试派加载任务。只认可当前Codex入口I-1加载与短只读路径，不代表真实Agent G8、主动消费者、长等待/取消/排队或其它终端已适配；I-2已按前置条件派174，UI/身份/指南/真实验收仍按原依赖执行。

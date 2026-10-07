@@ -1,33 +1,33 @@
 # Project Progress
 
-Updated: 2026-10-07 (Asia/Shanghai)。I-1代码经#173独立复核通过，#172/#173已收取，功能与正式文档已由1fbdf78提交推送；本轮恢复只读核验仍为旧G1–G7/旧指定说明，I-1加载未通过。按实施计划，I-2页面退役须晚于I-1加载，先重连入口并刷新会话。
+Updated: 2026-10-07 (Asia/Shanghai)。I-1源码与当前Codex MCP加载核验通过，#174已派Kimi开发I-2页面退役，初始queued/assigned；等待用户通知完成后读取交付并另派DeepSeek独立复核。UI改动尚未验收，当前入口仍human:bobo。
 
 ## 当前身份与协作
 
-- 项目D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex。Codex决策负责范围/裁决/正式文档/Git；最新要求仍DeepSeek后端/其它、Kimi交叉复核，caller_identity仍human:bobo。
-- 默认派后结束、用户通知后取件，开发暂停后审查，Codex不操作浏览器；当前没有新派任务，不为刷新加载重复设计或生产试派。
+- 项目D:/claude-test/TALK，prj_e8fe7066bbec，分支codex/terminal-return-codex；Codex决策负责范围/裁决/正式文档/Git，Kimi前端/设计/交互，DeepSeek后端/其它，双方交叉复核；派前已重读最新development_requirements并确认。
+- 默认派发后结束，用户通知完成再取件。开发暂停后才派审，禁止开发/审查并行改码；Codex不操作浏览器、不重复执行者完整探索/测试。
 
-## I-1收尾结论
+## 当前切片：#174 I-2页面退役待交付
 
-- 用户通知“173 ok”。原msg2675有前言+JSON，MCP摘要unknown保持；本地development.json经talk_workflow summary --expect-task-id 173校验complete，10完成/0未完成/0blocked、7验证/5限制。原4254字符消息分两页稳定SHA读取，与本地报告去schema比较完全一致；原消息SHA806e422fdde69227b48394acf82a306b3a1595047f66d14aa75f0d25674c9464，receipt见.tmp/initiator-mode-tools-receipt/。
-- Kimi独立逐行审四份实际代码，六模块162/162通过（37/17/12/44/31/21）、七项探针通过（含G7宽松变异检出）；Codex合看接受I-1源码/隔离验证，终端--check G1–G8配套同步在已确认范围。原25对象大小/SHA收尾前全匹配，四代码未被主控改写。
-- 新受控G1–G8按created_by/project整批核验；G7严格ID/去重/计数和入口IDs日志、结构化HTTP404、模式重读去assignment依赖、首轮复用、兼容弃用/发起者文案通过。false普通等待/九工具/服务端权限/CAS不变。
-- 预算边界裁决：每次后续GET前须有剩余预算，未完成整批核验时耗尽按入口错误；末次响应已全部归属核验且不再发新GET，按已验探针P4进入首轮并正常timeout返回已核验集合，属于socket非硬截止下的完成响应边界，不扩大到未核验集合。文档补明这一路，未改代码或原复核。
-- 本轮收取completed（服务端原记录未补时区）：#173/msg2675：2026-10-06T15:55:30.704157；#172/msg2674：2026-10-06T15:55:35.028860。原173服务端unknown/本地有效complete并存，不追改；设计166–171已收取，旧167/169 partial保持。
-- 非阻塞O1计数说明未显式枚举G8核验GET、O2 timeout schema文案超600报错与实际clamp不符（基线旧文本），登记I-3文字同步，不为此重开功能返工。
+- 标题“174-发起者模式页面与固定主控入口退役”，执行者agent:kimi，Hall group:task-9f7cb72a8f85454ca97934cb3a20bc4c，created_by=human:bobo；初始queued/assigned，仅派一个明确切片，未派复核或下一片。
+- 包.tmp/initiator-mode-ui-dispatch/task.md；基线237dfcacbbf41a343e206439548385d6395a18cc，I-1功能1fbdf78/UI业务9272020。派前32来源对象SHA匹配，manifest与receipt在同目录；主控随后只改进度/加载记录，不构成业务基线变更。
+- 完整移除页面固定主控面板/徽标/事件/CSS、app.js两处调用及模式对指定状态的全部依赖；保留模式设置并改为发起侧语义。四资源版本同步、旧面板测试退役/无入口反向断言、模式和真实接线/导航回归需交付。
+- #164/#165全部保留：未保存离页复位/返回saved、同页草稿、在途真实结果、内部CAS、409 GET-only/重试恢复、agent只读、其它REQ2/角色说明草稿隔离；无后端/DB/权限/Key/工具/历史数据改动，不恢复人类根任务入口。
+- 执行者只写授权web与测试及.tmp/initiator-mode-ui/；完整自身task_id=174裸JSON交付（无前言/围栏），本地workflow validate须expect174；不写正式进度/不提交推送，完成后暂停供DeepSeek独立实际代码复核。
+- 浏览器/键盘/窄屏/HTTP并发如未实测须列not_run，Node DOM存根不充浏览器证据；用户页面验收在独立复核之后。
 
-## 当前加载证据与未验收
+## 已通过与加载边界
 
-- 2026-10-07恢复实测：九工具目录仍G1–G7且含controller_changed；talk_list_agents实时assignment/mode note仍旧固定主控措辞，无弃用前缀。源码通过不代表该连接已加载。TERMINAL_MCP新增I-1加载验收说明，重连后需新目录G1–G8与实际弃用/发起者注记一致，再做短预算只读路径检查。
-- 当前human:bobo未换自身Agent Key、旧固定主控UI未退役，effective_mode=null/not_bound；I-0/I-2/I-3/I-4未齐，真实主动链路未验收，不自动启用主动/唤醒/续等。DeepSeek65秒/W50、CodexW300/真实T未新核验、Kimi660000模板及同步stdio/取消排队/非硬截止边界保持。
-- 173仅源码/隔离/假HTTP假时钟验证，未重连MCP/真实Key/生产等待。#164/#165两条页面反馈已人工验收，不外推全部页面和真实链路边界。
-- 功能与正式文档已由1fbdf78提交推送，工作区恢复时干净。本轮仅作只读加载核验，证据.tmp/initiator-mode-tools-loadcheck/2026-10-07.json；未派新任务，未重连/改Key/模式/指定。精确额度百分比此前null，不臆测。
+- I-1 #172经#173独立源码复核通过并收取，六模块162项+七探针；功能1fbdf78已推送。173原混排MCPunknown/本地有效complete与原报告保留，接受溯源.tmp/initiator-mode-tools-receipt/；设计166–171已收取，旧partial不追改。
+- 今日当前Codex入口九工具目录G1–G8、无controller_changed、list_agents弃用/发起者注记与运行时一致；W=1秒false立即matched历史已收取173（HTTP1/poll1），human true按G4拒绝，随后get173正常。加载前置通过；证据.tmp/initiator-mode-tools-loadcheck/2026-10-07-loaded.json。旧加载失败证据2026-10-07.json保留。
+- 当前caller_identity=human:bobo、requested_mode=passive/version4、effective_mode=null/not_bound，历史指定agent:codex/version13仅兼容输出；未换自身Agent Key/改模式/指定。新版工具已不以指定作为协调资格，旧UI待174退役，过渡窗口不验真实主动消费者。
+- 实机Agent G8/长等待/取消排队/真实主动链路未验，不外推其它终端已加载；此前本机配置tool_timeout_sec=660只是读取事实，当前宿主长时能力未验证。DeepSeek65秒/W50、Codex日常W300及Kimi模板边界保持。
+- 本次usage-gate返回continue但精确session/weekly百分比null，不据其理由猜低使用率；本轮只派一片。O1计数说明G8 GET/O2旧schema超600文案差异仍登记I-3，不动已审功能。
 
-## 下一步与索引
+## 下一步
 
-1. 重连当前TALK MCP入口（必要时重开会话刷新目录），再说“继续项目”；先核对G1–G8/九工具/运行时新注记/服务端caller_identity，短预算只读验证及后续查询。不得把目录/短路径检查当真实主动宿主适配。
-2. I-1加载确认后再按当次开发要求派I-2给Kimi、DeepSeek独立复核；I-1/I-2同一人工验收轮。I-0身份步骤及I-3指南/约定另片，I-4需自身身份/工具/UI/指南齐备。
-3. 本片开发.tmp/initiator-mode-tools/，独立复核.tmp/initiator-mode-tools-review/，派审25对象/四基线/差异.tmp/initiator-mode-tools-review-dispatch/，原消息与接受溯源.tmp/initiator-mode-tools-receipt/；旧报告不重复取件。
-4. 模型名称获取/上报/页面替代裸ID另片，member_id仍内部身份键；默认/自定义命名留全角色页，不扩自动唤醒/权限/运行器范围。
+1. 用户通知174完成后先读talk_get_delivery完整摘要/必要证据；合法包只是自报索引，另派DeepSeek独立看实际差异与自动化。发现缺口交回Kimi，原失败不追改；通过才收取/同步正式模块与手册、提交推送并提供页面验收。
+2. I-1/I-2同一人工验收轮；I-0身份步骤/切换、I-3指南/约定后续独立排片，I-4需身份/工具/UI/指南就绪，不能把保存active当已生效。
+3. 模型名称获取上报/页面替代裸ID另片，member_id保留内部身份键；成员命名留全角色页。
 
-恢复指令：继续项目。I-1源码已通过并收取，当前MCP加载待重连核验；不直接越过加载门禁开启I-2。
+恢复指令：继续项目。当前174待用户通知，不重复派发、不自动持续等待或跳过独立复核。

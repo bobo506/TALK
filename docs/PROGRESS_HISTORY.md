@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-07 I-1当前Codex入口加载通过；派#174给Kimi实施I-2页面退役
+
+- 用户按重连说明后再次“继续项目”；目录实测九工具、新G1–G8与发起者/assignment弃用说明，实时list_agents注记一致。显式W=1秒false对已收取173立即matched（0.031秒、HTTP1/poll1），human true按G4拒绝，随后get173仍completed。当前入口I-1加载前置通过，原2026-10-07旧加载失败证据不覆盖，新增.tmp/initiator-mode-tools-loadcheck/2026-10-07-loaded.json。
+- caller_identity仍human:bobo，requested passive/version4、effective null/not_bound，指定agent:codex/version13仅兼容回显；未改Key/模式/指定/任务状态、未新建加载测试任务。MCP stdio入口和uvicorn HTTP服务是独立进程层，单重启uvicorn不等于刷新MCP；本轮只认目录与运行时实测，不推断用户具体刷新操作。短路径不是Agent G8/主动消费者/长等待、取消排队或其它终端适配通过。
+- 最新开发要求确认Kimi负责文字/设计/交互/前端、DeepSeek后端/其它并交叉复核；usage-gate continue但两精确百分比null，不臆测低使用率。I-1/I-2串行且同人工验收轮，本轮只派一个明确切片。
+- #174“174-发起者模式页面与固定主控入口退役”给agent:kimi，初始queued/assigned，created_by=human:bobo，Hall group:task-9f7cb72a8f85454ca97934cb3a20bc4c。顶层最小参数；包.tmp/initiator-mode-ui-dispatch/task.md，基线237dfca/I-1功能1fbdf78/UI业务9272020，32来源对象SHA派前匹配，receipt/manifest留存。正式进度后续管理变化不构成业务基线更换。
+- 任务按正式合同§6/7.1与I-2调用链逐项移除面板/徽标/绑定/CSS/app.js调用/模式对指定的依赖；保留模式human写/agent读、CAS/409/重试、164/165离页与在途行为、REQ2/角色说明隔离和其它任务交互。删除退役面板测试并以无入口契约承接，保留模式和实际接线/导航回归，四资源版本同步；后端/DB/权限/Key/MCP/配置/历史零改动。模型展示/身份切换/I-3/I-4排除。
+- 执行者须完整自身174裸JSON交付并expect174校验，保留本地实现/runner/probe/日志与限制，开发后暂停、不写正式进度/不Git收尾；收到用户通知后才收取交付索引并另派DeepSeek独立实际代码审查，不在开发时并行审改、不把代码测试/DOM存根冒充用户页面验收。
+
 ## 2026-10-07 恢复核验：当前TALK MCP仍旧版，I-2未派发
 
 - 用户“继续项目”后按决策角色恢复，I-1功能与正式文档1fbdf78已提交推送，工作区干净。当前目录仍九工具、wait G1–G7/controller_changed，无发起者与弃用说明；talk_list_agents实时返回旧固定主控注记，caller_identity=human:bobo、requested_mode=passive/version4、effective=null/not_bound，指定agent:codex/version13，均为读取事实，未修改。
