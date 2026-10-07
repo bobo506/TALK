@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-07 18:25 (Asia/Shanghai) 用户继续下一步，派Kimi180起草I-3A消费者与现行指南
+
+- 用户要求“继续下一步”，释放I-0当前入口被动闭环里程碑后下一片。按已审INITIATOR_MODE_IMPLEMENTATION_PLAN I-3头部“文档；Kimi起草/DeepSeek复核；正式文档Codex收尾落盘”执行，先起草、独立复核后发布，不直接把旧固定主控C2-C包继续使用。
+- 派发前重读最新development_requirements及当前caller_identity=agent:codex/kind=agent/note=null，项目passive/version6、effective null/not_bound。基线7840737、当前分支codex/terminal-return-codex、工作区干净。独立顶层最小参数派180给agent:kimi，created_by=agent:codex，hall_group_id=group:task-02f1a35928184a6abf53f497826a79a8，返回queued/assigned。
+- 180只在.tmp/initiator-mode-consumer-draft/起草完整消费者指南（拟正式INITIATOR_MODE_CONSUMER.md）、限定现行指南/AGENTS用词的未应用patch及sync_inventory、完整真实任务号talk-delivery-1 development.json。原11份来源实际SHA/大小、最新身份/模式/要求与任务引用存.tmp/initiator-mode-consumer-draft-dispatch/；原源码/正式文档/历史材料不改。
+- 指南必须涵盖caller kind与created_by/项目/模式/版本的发起侧资格、每后续动作前重核、matched非资格凭证、严格task_ids、授权有限总预算与续等停止、正常到期/API错误/取消/模式变化区别，以及执行/复核者不读模式不受其干预、独立复核/收取和完整JSON交付纪律。代码级门禁与约定级消费者边界分清，不写自动转审/后台常驻或自动唤醒。
+- 预算草稿沿用各终端已核/模板/未验收依据区分：DeepSeek桌面65秒/W50、Codex项目W300/660仅前次实读、Kimi660000ms模板；T/W/余量/执行者任务/消费者总预算/宿主外层交还分别记录。无生产wait/主动模式修改/G8/取消排队实测，不把文本起草当主动消费者已运行。
+- 180精确同步清单纳#173 O1 G8逐唯一任务GET计数注记、O2 schema与clamp描述差异，#175 O2实际web/index.html role-description-hint及web/workspace.js两旧注释（不是app.js）；仅提案不应用代码/测试。175-O1测试说明/stub整理继续另片。跨模块规格按既有表仅列后续定位、不扩读其它MODULE，不宣称完整I-3就绪。
+- 完成后暂停，主控用户通知后收完整摘要，再按当次开发要求派DeepSeek独立文本/实际源码依据复核，正式发布由Codex；现行历史“主控”按语义分类保护，禁止全仓机械替换、改任务快照/结果/密钥/数据库/模式/配置、额外派发/收取/提交推送/浏览器/服务重启。
+- 主控本轮仅PROGRESS/PROGRESS_HISTORY派发记录，必要验证UTF-8读取、任务引用与要点、git diff --check；未重复业务/浏览器测试，未读取精确用量、不推测比例。下一步通知180后取件；后续发布、活跃文案实施和剩余模块规格同步经复核完成后再安排I-4。
+
 ## 2026-10-07 17:52 (Asia/Shanghai) I-0 Codex自身身份被动闭环独立通过，收取179/178
 
 - 用户通知179好了。主控talk_get_delivery读取179/msg2681，runner succeeded/submitted，默认业务unknown/source=unstructured_text，不能从成功状态推断验收通过。完整结果5789字符按稳定消息ID/SHA（793d997cb6a1c7fab0175a8ce4ebc6715215a8ca2432bec15066e6a97c4751b0）分页补读，两页引用一致；说明文字+JSON格式导致unknown，原结果保持。

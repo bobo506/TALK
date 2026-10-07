@@ -1,11 +1,11 @@
 # Project Progress
 
-Updated: 2026-10-07 17:52 (Asia/Shanghai)：I-0 Codex自身TALK身份切换及被动新任务闭环验收通过；178/179均由agent:codex收取。当前里程碑收尾后暂停，I-3消费者/文案与I-4真实主动链路尚未开展。
+Updated: 2026-10-07 18:25 (Asia/Shanghai)：用户要求继续下一步，已派Kimi180起草I-3A消费者提示词/现行指南与精确同步清单；后交DeepSeek独立复核、Codex正式发布。I-0被动闭环已验收，I-3尚未发布就绪、I-4未开展。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK；prj_e8fe7066bbec；分支codex/terminal-return-codex。Codex决策负责范围、裁决、正式文档与Git。最新development_requirements：Kimi文字/设计/交互/前端，DeepSeek后端/其它，双方交叉复核，后续派发前重读。
-- 默认派发后结束、用户通知后取件。当前无新任务派发；178 DeepSeek执行、179 Kimi独立复核均已完成。本轮仅只读取件、裁决、收取和正式状态文档，无功能/测试/配置/Key/模式改动，未操作浏览器或wait。
+- 默认派发后结束、用户通知后取件。178/179已完成收取；新派180由Kimi仅起草.tmp指南/补丁/同步清单，DeepSeek后独立复核，Codex正式发布。执行者不改正式文档/业务/配置/Key/模式，无浏览器或wait；本轮主控仅派发状态进度。
 
 ## 当前完成与证据
 
@@ -20,8 +20,8 @@ Updated: 2026-10-07 17:52 (Asia/Shanghai)：I-0 Codex自身TALK身份切换及�
 
 ## 当前卡点与下一步
 
-1. I-0当前Codex入口无阻塞；本轮里程碑收尾后暂停，默认不自动派发I-3/I-4。
-2. 下一片按最新development_requirements推进I-3消费者/文案；覆盖I-1 O1/O2、175-O2角色提示/旧“主控”文字及现行指南，175-O1测试维护建议继续登记。先明确范围、独立复核，通过后再做I-4真实主动链路及T/W/取消/排队验收。
-3. 模型名称展示另片、成员命名留全角色页面；DeepSeek/Kimi本人入口身份须分别核验，Codex当前通过不代表三方都完成。
+1. I-0当前Codex入口无阻塞；用户“继续下一步”释放下一片，已派180给Kimi（created_by=agent:codex、独立Hall），返回queued/assigned。等用户通知180后取合法实际任务号交付，按最新分工派DeepSeek独立复核。
+2. I-3A按已审实施计划先起草：完整consumer_guide_draft.md、现行AGENTS/TERMINAL_MCP/DSH指南/USER_MANUAL的未应用current_guides.patch、sync_inventory及完整development.json。I-1 O1计数注记/O2 schema与175-O2 index hint/workspace两注释只列精确文本方案，175-O1测试整理另片；跨模块规格仅列后续定位，本片不扩读。
+3. 180完成后独立复核、Codex发布指南，再单独落实活跃文案/剩余模块规格同步并复核，I-3全量就绪后才I-4真实主动链路及T/W/取消/排队验收。模型展示另片、成员命名留全角色页；其它本人入口身份须分别核验。
 
-恢复指令：`继续项目`。I-0当前Codex入口被动闭环已验收并收取178/179；I-3/I-4未实施。正式文档按当前事实同步，原历史/partial/自由文本结果保留；未读取精确用量、不推测百分比。
+恢复指令：`继续项目`。I-0已收取验收；I-3A已派180、正式指南发布与剩余文本实施未完成，I-4未运行。派发基线7840737、工作区干净，11份只读来源指纹及模式/身份/要求/任务引用在.tmp/initiator-mode-consumer-draft-dispatch/；180产物目录.tmp/initiator-mode-consumer-draft/。用户通知后取件；未读精确用量、不推测百分比。
