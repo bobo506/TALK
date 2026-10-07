@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-08 01:10 (Asia/Shanghai) 确认四组原生Agent/模型的分配与执行适配范围
+
+- 用户明确目标：Codex仅分配侧；WorkBuddy＋Kimi K3、DeepSeek Harness＋DeepSeek Flash、Kimi Code＋Kimi K3均分配/执行双侧，共7个方向。此为待实施清单，不是完成声明，也不要求删除现有Codex执行bridge。
+- 分配侧验身份/项目、授权派发与实际created_by、结果读取/验收后收取；主动等待按现行发起者合同分别验实际客户端T、显式W/余量、正常到期/错误/模式退出/取消/同连接排队与有限总预算，不能套其它宿主模板。
+- 执行侧验可派成员、原生运行器与实际模型/工具/工作目录、领取、实现/自测、talk-delivery-1完整交付、平台完成/失败反馈及单切片暂停。保留原生Agent，不由TALK重建推理循环；业务角色/模型与decision_tier分开，分配能力不自动改变行为分级。
+- 既有边界：Codex178/179自身身份被动闭环通过，主动I-4未验；WorkBuddy桌面Kimi K3在90作为发起者派给DeepSeek并收取，不证明WorkBuddy自己接单开发/自动唤起。当前项目名册仍Codex/DeepSeek/Kimi Code。DSH/Kimi Code有执行入口及历史分配证据，Flash/K3实际绑定与新合同按组合补核，不凭名称直接继承。
+- 顺序：保持185/186规格开发/复核范围与冻结来源，先当前片收尾；随后整理分侧证据/缺口，补WorkBuddy执行侧及其余必要适配/实测。复用现有实现，不为7方向重复开发或跑无关测试。尚未派新任务或变更成员、开发要求、凭证、模型配置、服务。
+- 本轮仅决策记录，改PROGRESS/PROGRESS_HISTORY；验证UTF-8读取、原复核来源冻结及git diff --check，未做业务/真实模型测试。精确额度未读取。
+
 ## 2026-10-07 19:20 (Asia/Shanghai) I-3A指南与三份现行文本发布，收取181/180
 
 - 用户通知181 ok。主控读取msg2683完整同响应摘要，合法自身181一致talk-delivery-1 complete，8完成/0未完成/0阻塞、9验证（8 pass/1 not_run），runner succeeded/submitted，finished_at=2026-10-07T10:56:30.723468。DeepSeek独立A-F检查全文/源码/有限预算/patch/历史保护/交付纪律全部通过，原18源/草稿指纹一致，0阻塞/3非阻塞建议，不要求返工。
