@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-08 (Asia/Shanghai)：用户启动服务并明确优先Kimi Code＋K2.8执行适配；临时DeepSeek开发、Codex独立复核，不派Kimi。187已派发；186/msg2688独立复核交付complete已读取，185/186尚未发布收取。
+Updated: 2026-10-08 (Asia/Shanghai)：用户启动服务并明确优先Kimi Code＋K2.8执行适配；临时DeepSeek开发、Codex独立复核，不派Kimi。187已派发；186/msg2688独立复核通过，186/185已实际收取；两规格正式发布待187开发暂停后处理。
 
 ## 当前角色与协作
 
@@ -45,7 +45,7 @@ Updated: 2026-10-08 (Asia/Shanghai)：用户启动服务并明确优先Kimi Code
 ## 当前卡点与下一步
 
 1. 187已派DeepSeek开发，包.tmp/kimi-k28-executor-dispatch/，基线dfd0b5f，Codex派发进度为授权例外。收到用户“187好了”后读取完整交付与实际差异，Codex按用户本次授权独立复核；不再派Kimi。未注册新角色、未应用真实配置/启动新bridge、未消耗Kimi模型额度。
-2. 186/msg2688合法自身号一致complete（7完成/0未完成/0阻塞，11验证）；独立G1-G8/D4源码、patch正反/历史/指纹/链接通过，source16+draft14匹配77288f2。185/186仍submitted待发布收取，原报告保持；其冻结对象不进入187写范围，后续Codex按原流程收尾。I-3B重载、I-4及预算未验不外推。
+2. 用户要求收取旧186：186/msg2688独立复核通过，当前16来源+14草稿保持、本地185/186 validate通过，已按186→185实际收取为succeeded/completed（UTC 2026-10-08T11:19:38.853865 / 11:19:40.985238），原消息/报告保持。回执.tmp/initiator-mode-spec-sync-receipt/acceptance.json。187仍running/in_progress且冻结两正式文档，故暂停期间再发布已审规格及状态同步；当前不改其来源，I-3文档发布尚未闭合，I-4等未验不外推。
 3. 187复核通过后再落实独立成员/项目/凭据、实际运行配置与最小生产接单验收；Kimi额度不足时不以离线/假CLI证明真实模型可用。模型source/provider/connection等全平台绑定、其它7方向和主动I-4另片。
 
-恢复指令：`继续项目`。当前优先187，临时DeepSeek开发、Codex复核；默认派后结束，收到用户完成通知再取件。185/186旧片待发布收取，真实K2.8与I-4未通过。
+恢复指令：`继续项目`。当前优先187，临时DeepSeek开发、Codex复核；默认派后结束，收到用户完成通知再取件。185/186已收取、规格待187暂停后发布，真实K2.8与I-4未通过。

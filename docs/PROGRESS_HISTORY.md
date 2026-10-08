@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-08 19:21 (Asia/Shanghai) 验收并收取186/185，规格发布待187暂停
+
+- 用户提醒昨天186未接收，要求检查。读取186/msg2688与185/msg2687完整同响应交付，均合法自身号一致complete、runner succeeded/submitted；独立复核186为7完成/0未完成/0阻塞、11验证（9pass/2not_run），已实际检查G1-G8与D4源码、两文件4hunk范围/历史/patch正反/链接/闭合清单，无返工。
+- 主控本轮机械核16来源与14草稿sha256+bytes全部保持；本地validate review.json --expect-task-id 186和development.json --expect-task-id 185均退出0。当前HEAD dc0734e相对原77288f2的后续正式变动为进度记录；187已新增未跟踪scripts/kimi_k28_executor.py，不读取/修改/暂存其开发内容。
+- 为避免并行改动冻结来源，必要只读核187当前running/in_progress、result_message_id=null；它的已派包冻结这两规格及其余旧片资料。原拟即时发布调整为先接受旧草稿成果、收取结果，等187开发暂停后再发布正式两规格/状态文档；不改变187包、原来源hash或复核证据。此处验收通过的是185草稿开发/186独立复核范围，不宣称完整I-3正式发布闭合。
+- 实际顺序186→185，均由原发起者agent:codex收取为succeeded/completed；result_collected_at分别2026-10-08T11:19:38.853865、11:19:40.985238（北京时间19:19），原result_message_id2688/2687保持。保存.tmp/initiator-mode-spec-sync-receipt/acceptance.json，包括裁决、实际收取引用和待发布文件指纹；原报告/草稿不追改。
+- 本轮仅两份进度与忽略目录回执，无业务/真实模型/生产wait/浏览器或服务重启；187继续DeepSeek开发、Codex随后独立复核，不派Kimi。I-3B工具说明重载、实际预算、I-4、175-O1与schema评估仍另项。必要验证UTF-8、交付schema/任务号、冻结指纹与git diff --check，精确额度未读取。
+
 ## 2026-10-08 19:13 (Asia/Shanghai) 服务恢复，临时DeepSeek开发/Codex复核，派187适配K2.8执行入口
 
 - 用户明确已启动服务、优先开发Kimi Code＋K2.8适配；Kimi额度不足，本次切片全部DeepSeek开发、Codex独立复核。此为本次临时分工，不修改项目开发要求/AGENTS或追改旧任务；解除此前只登记计划限制，不自动推进其它组合/主动等待。
