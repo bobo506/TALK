@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-08 22:08 (Asia/Shanghai) #190独立复核changes_requested；派#191同片定向补正
+
+- 用户通知“好了”，只读talk_get_delivery取190/msg2692完整未裁剪摘要：合法自身190一致complete自报，9完成/0未完成/0阻塞、8验证（7pass/1not_run）、7文件/9限制，runner succeeded/submitted，尚未收取。正式工作区干净，HEAD1055e4e；DeepSeek实例idle，开发暂停后才由Codex核查。
+- Codex独立读完整合同、实施计划、current_state、examples与evidence，实读models/db/projects/tasks/instances和目录扫描/MCP快照/bridge引用源码及测试索引；对全部790冻结条目重算SHA，只有两份协调方进度文件因1055e4e合法变化，其余788条一致。对3样例指纹真实重算全部正确/不同，但角色行自然身份键相同。
+- F1关键证据：当前引擎server/db.py:41只设置check_same_thread=False，隔离临时库在Python3.12.1/SQLite3.43.1+当前SQLModel配置首次SELECT后driver.in_transaction=false；第二Session同次提交更换绑定并retire旧runner，第一Session读取旧绑定+新状态并写入快照，组合从未属于同一已提交状态。原合同/计划“同Session多读不会撕裂”不能成立；建议单SQL联查所需事实并明确读取线性化点，同Task/Hall原子提交。没有生产DB或真实模型操作。
+- 六项必修：F1一致读/事务与可复现并发验证（P1）；F2只在create_task写快照漏schedule共用构造；F3离册/未注册/非agent/禁用时绑定有效性不明；F4actual对照缺provider/connection与task/attempt证据锚点，不能用最新实例上报重解释历史任务；F5内容指纹与角色行身份/版本样例混淆；F6把无密钥元数据全部禁止入文档/消息而非准确禁止凭据。F2-F6为P2设计可实施缺口，未发布/实施前补正。
+- 非阻塞事实/规范同步：L1-1独立分配侧与新增K2.8执行侧不能混为同一身份验收，实际核查HEAD与历史基线分开，全部790冻结条目包括tracked临时对象均需核验，状态优先级/null布局与校验界限补齐，B1拆分可控性重新评估。
+- Codex常规范围裁决D1不继承父目标配置、D3首期全文LWW、D4首期retired无DELETE；B1仅记录配置不改变claim/创建权限，真实mismatch行为后置，不冒充用户已批准。展示命名/schedule项目化/agent写绑定仍后置。复核记录为本地role-binding-design-review-1，不冒充190开发自报或新TALK复核任务交付。
+- 原190七稿复制到.tmp/role-model-binding-design-review/original-190/并保存hash清单，原报告不追改。独立review.json、sqlite-proof.json、independent-checks.json与可复现脚本同目录。190本地validate expect190通过仅表明格式，无业务验收含义。
+- 重读最新development_requirements与caller/模式后，按用户本次DeepSeek开发/Codex验证派最小顶层#191“191-角色运行器与模型绑定合同定向补正”，created_by=agent:codex，创建时queued/assigned，Hall group:task-8022dcb91ea84cd0b2ed6622eb0a7e5b。原需求与F1-F6源码/探针证据、范围裁决、验证和交付要求完整入包.tmp/role-model-binding-design-fix-dispatch/。
+- 补正只写.tmp/role-model-binding-design-fix/新稿、无密钥样例、真实隔离两连接探针和自身191完整JSON；原190稿/独立review、正式代码/测试/文档/.talk/凭据/生产数据全冻结，协调方仅更新进度。不启停服务、不调用真实模型/等待、不派Kimi、K2.8真实接单延期继续有效。#190未验收/收取，#191创建不代表已工作。
+- 本轮正式仅PROGRESS/PROGRESS_HISTORY；必要验证UTF-8/无BOM/任务号与git diff --check，文档独立中文提交常规推送，不将.tmp设计/假DB入仓库。默认派发后结束，用户通知191完成再定向复核，闭合后收取191/190并发布合同，再定后端实现。没有开启第二功能切片，不重跑无变动业务测试。
+
 ## 2026-10-08 21:49 (Asia/Shanghai) 恢复项目并派#190通用角色运行器／模型绑定工程设计
 
 - 用户“继续项目”后已恢复AGENTS/PROJECT_BRIEF/PROGRESS、TALK自身身份和当前最新任务状态；#187/#188/#189及前期I-3均completed，工作区干净，HEAD10555ca。本地origin分支跟踪引用与HEAD一致，但该分支未配置upstream；未把本地引用核对当作实时远端查询。
