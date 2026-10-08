@@ -1,23 +1,24 @@
 # Project Progress
 
-Updated: 2026-10-08 22:08 (Asia/Shanghai)：#190已交付，Codex独立复核发现6项必修，暂不验收/收取；已派DeepSeek #191同片定向补正，完成后由Codex再复核。生产实现尚未改，K2.8真实接单延期继续有效。
+Updated: 2026-10-08 22:43 (Asia/Shanghai)：#191补正仍未独立通过；单语句无绑定分支与字段完整性经隔离实测存在缺口，已派DeepSeek #192同设计片第二次定向补正。190/191均未收取，生产实现未改，K2.8真实接单延期保持。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
-- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。当前切片为#190工程设计的#191定向补正，完成后由Codex独立验证。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。当前切片为#190工程设计的#192第二次定向补正，完成后由Codex独立验证。
 
-## 当前切片：#190设计独立复核未通过，#191同片补正
+## 当前切片：#191补正复核仍有缺口，#192第二次定向补正
 
-- 用户本轮明确DeepSeek开发、Codex独立验证，继续覆盖一般交叉复核安排；已重读最新development_requirements，caller=agent:codex/kind=agent，项目passive/version6，不派Kimi。
-- #190/msg2692合法自身号一致talk-delivery-1 complete自报，9完成/0未完成/0阻塞，runner succeeded/submitted；该自报不是独立通过。Codex结论changes_requested，#190未收取/未发布，原稿和报告保留。
-- Codex独立阅读合同/计划/现状/样例/证据并核相关实际源码；全790指纹复核，仅两份协调方进度合法变化。3个内容指纹正确，但样例3个角色行主键完全相同。隔离Python3.12.1/SQLite3.43.1+当前SQLModel引擎参数实测：首次SELECT后driver.in_transaction=false，双Session交错可组合旧binding与新runner状态，证明原多读一致性断言不成立；未用生产DB。
-- 六项必修：F1读取线性化/事务一致性；F2共用构造覆盖schedule快照；F3离册保留与当前有效性；F4真实模型对照的来源/连接及task/attempt证据锚点；F5角色行身份与配置版本/指纹样例；F6凭据禁入与安全元数据允许范围。另纠正L1-1与K2.8证据混用、状态优先级/校验定量及已冻结tracked临时项核验。
-- #191已派agent:deepseek，created_by=agent:codex，创建时queued/assigned，Hall=group:task-8022dcb91ea84cd0b2ed6622eb0a7e5b；仅在.tmp/role-model-binding-design-fix/交付修订草稿/样例/隔离证据/changes.md与自身191合法报告，不能改原190稿、复核证据或正式生产对象。当前不代表已领取/交付。
-- 常规范围裁决：子任务按自身目标取新快照；B1只记录配置、不新增claim拒绝；完整绑定首期last-write-wins，首期无DELETE/仅retired。真实不匹配行为、完整展示命名、schedule项目化、agent写绑定继续后置，不写成用户已批准全部产品规则。
-- 依据：.tmp/role-model-binding-design-review/review.json、sqlite-proof.json、independent-checks.json、independent_probe.py、original-190/与original_manifest.json；派发包/回执.tmp/role-model-binding-design-fix-dispatch/。原源码基线10555ca，当前正式HEAD1055e4e仅协调方进度提交，790条冻结清单仍原路径。
-- 下一步：默认派发后结束，用户通知191完成后先talk_get_delivery，再定向复核F1–F6与源码/证据及冻结保护；存在缺口交回DeepSeek修正。通过后再收取191及190、发布已审合同/拆片计划并Git收尾，之后再决定后端实现片。K2.8真实接单仍延后至下次使用。
+- 本次用户分工仍DeepSeek开发、Codex独立验证；已派前重读最新development_requirements，caller=agent:codex/kind=agent，项目passive/version6，不派Kimi。
+- #190/msg2692、#191/msg2693都为合法自身号一致talk-delivery-1 complete自报、runner succeeded/submitted；两项均未独立验收/收取/发布。191自报11完成/0未完成/0阻塞、13产物/11验证，格式不等于业务通过。
+- 191已补齐F2共用构造覆盖schedule、F3离册与身份状态阶梯、F4实际对照后置B2并约束project/task/attempt与连接证据；F5并存行/版本区分和F6凭据范围已改善。B1拆为B1a登记/绑定与B1b任务快照，两者仍待审。
+- 仍需R1：合同及探针以binding行作FROM锚点，未配置角色无行时所有LEFT JOIN事实也消失。Codex直接执行原文SQL并AST提取实际probe SQL，隔离假库在入册未配置/禁用未配置/未注册未配置/human未配置四例均0行；已配置查询还遗漏来源/provider/connection/model/alias/展示名六字段。建议一行请求pair锚点联查，保留无绑定事实且全快照字段一次取得，禁止第二读或ORM缓存猜状态。
+- R2：B14把runner_missing指纹写非null，须统一为runtime/fingerprint=null；alias实际传给Kimi --model，是调用选择参数，不能当纯展示；明确partial存储必填五项与派生runtime分开。历史L1-1状态不当当前已核事实，唯一入口检查只约束生产插入路径而非测试fixture。
+- R3：TaskHall规则允许授权审查含脱敏标识，服务端不自动混入完整绑定；凭据禁令保持。Codex裁决首期不加read_receipt任务字段：常量计数不能证明执行SQL，无项目实际0SQL；方案版本/真实事件计数仅留隔离验证证据，避免额外schema。
+- #192已派agent:deepseek，created_by=agent:codex，创建时queued/assigned，Hall=group:task-90e82a1ccf8b439e95e5244d74f82531；只写.tmp/role-model-binding-design-final-fix/新稿/样例/changes/隔离探针与自身192合法报告。禁止改原190/191稿、独立review、正式代码/测试/文档/.talk/Key/生产数据，协调方仅维护进度。
+- 依据：.tmp/role-model-binding-design-fix-review/review.json、independent-probe-results.json、independent_probe.py、original-191/与original_manifest.json（13稿）；此前原190七稿/788非进度源hash通过。派发包/回执.tmp/role-model-binding-design-final-fix-dispatch/。源码基线仍10555ca，191复核时HEAD=c3ec201仅两份协调方进度变更。
+- 下一步：默认派后结束，用户通知192完成后读取完整摘要，定向核R1–R3、F1–F6与原稿/源保护；通过后按192→191→190收取、发布已审合同和拆片计划并Git收尾。本次是同设计片第二次补正，不开后端片；若仍有关键缺口先汇总由用户裁决。K2.8真实接单继续延期。
 
 ## 已完成与当前状态
 
@@ -42,7 +43,7 @@ cd D:\claude-test\TALK
 ## 后续计划与边界
 
 - 共5组合8方向：Codex仅分配；WorkBuddy＋K3、DSH＋DeepSeek Flash、Kimi Code＋K3各分配/执行；Kimi Code＋K2.8仅执行。WorkBuddy90/91仅历史分配侧，未证明其执行能力或当前可派成员。
-- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照已进入#190工程合同设计/#191补正，尚未开发到数据库/API/UI；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
+- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照已进入#190工程合同设计/#191/#192补正，尚未开发到数据库/API/UI；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
 - Codex被动I-0 #178/#179已验，I-1/I-2用户页面验收通过；I-3A #180/#181、I-3B #182/#183/#184、I-3C #185/#186已通过收取发布，I-3文档同步闭合（规格提交d474321）。I-3B最新MCP说明运行进程重载未核，真实主动I-4/G8/正常到期/取消/同连接排队未验。
 - 项目passive/version6、effective=null/not_bound；controller_assignment=agent:codex/version13仅历史兼容，不赋权或自动唤回会话。175-O1测试维护、Schema maximum=600/clamp评估另片。
 - 超时分别核验：CodexW300用户现用；DeepSeek桌面T65/W50/余量15；Kimi660000ms仅模板，实际T未知，不启用主动长等待。bridge执行预算3600秒、身份GET单次15秒，独立于宿主工具/发起者等待预算。真实质量、速度与成本优势未测。
@@ -52,4 +53,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。前次usage-gate在UTC13:16为continue（session19%/weekly23%），本轮UTC13:44 usage-gate实测continue（session29%/weekly24%），仅当时采样。
 
-恢复指令：继续项目。先恢复#190/#191当前状态；用户通知191完成后按本次DeepSeek开发／Codex独立验证分工取件。K2.8验证仍延后到下次使用，不能把任务创建或设计交付视为真实接入验收通过。
+恢复指令：继续项目。先恢复#190/#191/#192当前状态；用户通知192完成后按本次DeepSeek开发／Codex独立验证分工取件。K2.8验证仍延后到下次使用，不能把任务创建或设计交付视为真实接入验收通过。

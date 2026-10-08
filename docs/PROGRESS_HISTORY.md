@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-08 22:43 (Asia/Shanghai) #191补正复核仍changes_requested；派#192聚焦R1-R3
+
+- 用户通知“191 ok”；talk_get_delivery完整未裁剪191/msg2693，合法自身191一致complete自报，11完成/0未完成/0阻塞、13文件/10限制/11验证（8pass/3not_run），runner succeeded/submitted、未收取。工作区干净HEAD=c3ec201，DeepSeek实例idle；开发暂停后独立核查。
+- Codex实读v2合同相对190差异与关键全部段落、完整B1a/B1b实施计划和真实探针SQL，复查Kimi argv model参数及任务构造源码。认可F2共用构造、F3状态阶梯/离册保留、F4 B2独立设计六不变量、F5行身份/版本样例结构和F6精确凭据禁入方向；尚未发布/实施。
+- 独立确定性假库直接执行合同原文SQL、AST只读提取开发者JOINED_SQL（未执行/改写其探针）：入册无绑定、禁用无绑定、未注册无绑定、human无绑定四例两种查询都0行，无法满足状态阶梯。LEFT JOIN projects无法从0 binding行生出结果；已绑定例合同结果还少model_source/provider_id/connection_ref/model_id/model_alias/model_display_name六字段。没有生产DB/服务/模型操作；原文查询覆盖证明阻塞，无需重复400次压力探针。
+- R1[P1]要求以单行请求pair为锚点，一SQL独立LEFT JOIN project/member/roster/binding/runner并取得全部快照字段，合同/实际probe一致，补无绑定各身份/离册/项目不存在等行为和语句计数；禁止无行后第二查/ORM缓存猜状态。R2[P2]统一runner_missing指纹null、partial五项存储字段与runtime派生分开、alias调用选择语义及指纹局限；历史L1-1仅历史/当前未重核，生产入口静态约束不误伤fixture。R3[P2]授权审查可含安全标识，首期删除read_receipt持久字段与常量，SQL实际事件计数/版本仅留隔离证据。
+- 全790源指纹复核仅两份协调方进度合法变化，其余788一致；原190七稿hash未变。191自身development.json validate expect191通过仍只是格式。191十三份产物（含假DB）复制到.tmp/role-model-binding-design-fix-review/original-191/并保存hash，原稿/报告不追改；review.json、independent_probe.py与结果同目录。
+- 派发前重读最新development_requirements/caller/模式，按本次用户DeepSeek开发/Codex验证分工派独立最小顶层#192“192-绑定设计单语句空行分支与规格一致性补正”，created_by=agent:codex，创建时queued/assigned，Hall group:task-90e82a1ccf8b439e95e5244d74f82531。本次为同设计片第二次返工，不开B1a功能片。
+- 192仅写.tmp/role-model-binding-design-final-fix/新修订合同/计划/样例/changes/隔离假库探针/证据及自身192完整合法JSON；190/191原稿、独立review、正式代码/测试/文档/.talk/Key/生产数据冻结。禁止服务/运行器启停/真实模型/生产等待；K2.8延期、B2实际对照后置及既有身份/权限均保持。
+- 本轮正式仅PROGRESS/PROGRESS_HISTORY，UTF-8无BOM/任务号/延期与git diff --check验证后独立中文提交常规推送；不将.tmp/假DB入仓库，不复跑无变动业务测试。默认派后结束，用户通知192完成再定向核R1-R3；通过后192→191→190收取/发布合同/文档Git收尾。若第二次补正仍存在关键缺口，先汇总交用户裁决，避免无限返工。
+
 ## 2026-10-08 22:08 (Asia/Shanghai) #190独立复核changes_requested；派#191同片定向补正
 
 - 用户通知“好了”，只读talk_get_delivery取190/msg2692完整未裁剪摘要：合法自身190一致complete自报，9完成/0未完成/0阻塞、8验证（7pass/1not_run）、7文件/9限制，runner succeeded/submitted，尚未收取。正式工作区干净，HEAD1055e4e；DeepSeek实例idle，开发暂停后才由Codex核查。
