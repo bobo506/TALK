@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-08 (Asia/Shanghai)：187已交付，Codex独立复核要求定向修正，暂不收取；已派188给DeepSeek修启动边界，完成后由Codex复核。185/186规格发布d474321已推送，I-3文档同步闭合。
+Updated: 2026-10-08 (Asia/Shanghai)：188已交付，Codex独立72项测试通过；原R1/R2已修，预检与实际运行衔接/文件Key脱敏仍需补正，187/188暂不收取。已派189给DeepSeek，完成后Codex复核；185/186规格已发布推送，I-3文档同步闭合。
 
 ## 当前角色与协作
 
@@ -10,11 +10,13 @@ Updated: 2026-10-08 (Asia/Shanghai)：187已交付，Codex独立复核要求定�
 
 ## 最新交付与复核
 
-- #187/msg2689自身任务号一致、合法complete是开发者自报；实际只新增启动脚本、合同JSON/PowerShell模板、局部指南和测试共5文件（仍untracked，未提交）。基线dfd0b5f；期间dc0734e/97ed77d只两进度文档，为授权例外。
-- Codex独立完整读取5文件及相关bridge启动边界，定向运行kimi_k28_executor/kimi_bridge/kimi_talk_entry：50测试通过、0跳过（含原受限管道路径），假CLI/隔离服务，未发Kimi推理。
-- 独立复核needs_rework，三项：R1继承TALK_KIMI_COMMAND会让K2.8入口实际三档全走K3且无Agent工具隔离；R2真实launch不调用配置/项目前检，错误project.yaml仍进入bridge；R3启动无真实Key身份/项目名册只读核验，直接进入client.register，未注册任意Key可能自动注册，违背正式注册由Codex另行处理的边界。
-- 证据.tmp/kimi-k28-executor-review/review.json、launch-boundary-repro.json、original/5原文件；原187开发报告/结果保持，187暂不收取。零模型复现返回0、错误项目抵达假bridge、三个K3命令、无--agent-file；零TALK调用/生产写入。
-- 已派#188（created_by agent:codex、target agent:deepseek、独立Hall），派发时queued/assigned。基线d474321，包.tmp/kimi-k28-executor-rework-dispatch/；32冻结对象＋5待修文件指纹，Codex仅两进度例外。只修启动前失败阻断/模型及工具档/只读本人与项目执行身份核验，并处理--key-env；开发完成暂停，由Codex复核。禁止真实Kimi请求、生产注册/启停、全平台角色schema改造。收到用户“188好了”后读取新任务交付，不沿用187自报任务号，不先收取。
+- #187/msg2689与#188/msg2690均合法自身任务号一致complete，仅开发者自报；5个新增文件仍untracked、未提交。187原实现与独立三项R1/R2/R3报告保持，188只改授权5文件，Codex未改代码。
+- #188实际基线d474321；开工HEAD8539796仅Codex两进度例外。Codex独立核32冻结对象零漂移、检查修正代码与启动路径，运行kimi_k28_executor/kimi_bridge/kimi_talk_entry共72项全部通过、0跳过（含管道/loopback），完整日志.tmp/kimi-k28-executor-rework-review/independent-tests.txt。本机native只读check通过、network_calls=0，default_model仍kimi-code/k3。
+- 原R1已修：显式受控命令，环境或自定义覆盖不能绕过模型/Agent工具档；原R2已修：launch调用native/project门禁，非法类型与--key-env不再静默失效；R3新增真实本人kind＋项目dev/execution只读GET，但检查与运行对象衔接有缺口。
+- 独立复现B1：base_url指定19091时身份预检19091，实际bridge参数却仍8000；B2：远端验execution、本地groups给decision时，launch返回0且resolve_decision_tier最终decision；B3：仓库外文件提供普通ASCII Key，HTTP500 detail回显时正文进入报告，通用正则/全局环境脱敏未覆盖本次Key。均零模型、零生产TALK调用。不能以72项通过替代这些实际启动验收。
+- 证据.tmp/kimi-k28-executor-rework-review/review.json、boundary-repro.json、offline-check-live.json、original-188/5文件；原187/188报告与消息保持。188独立needs_rework，187/188都暂不收取；未生产注册新成员/改名册/启停bridge或发Kimi推理。
+- 已派实际#189（created_by agent:codex、target agent:deepseek、project prj_e8fe7066bbec、独立Hall），派发queued/assigned仅创建快照。基线8539796；包.tmp/kimi-k28-executor-final-rework-dispatch/保留原188/187完整需求、5文件SHA、42冻结对象与3项独立复现。只补B1地址透传、B2实际execution分级、B3文件Key错误脱敏及匹配模板/有意义测试；Codex仅两进度例外，禁止真实Kimi/生产写入/启停/全平台改造。
+- 默认派后结束，收到用户“189好了”后读取新实际号交付，Codex独立核预检与实际bridge一致、失败脱敏与原门禁保持。全部通过才收取189→188→187、提交代码和进度；Kimi额度不足不派Kimi，正式角色注册/配置应用与真实接单另验。
 
 ## 已完成与恢复依据
 
@@ -31,7 +33,7 @@ Updated: 2026-10-08 (Asia/Shanghai)：187已交付，Codex独立复核要求定�
 | WorkBuddy＋Kimi K3 | 需要；历史90分配闭环 | 需要、尚未验 |
 | DeepSeek Harness＋DeepSeek Flash | 需要 | 需要 |
 | Kimi Code＋Kimi K3 | 需要 | 需要 |
-| Kimi Code＋K2.8 Preview | 本次不做 | 优先，187待修正 |
+| Kimi Code＋K2.8 Preview | 本次不做 | 优先，187/188待189补正 |
 
 - 共8个方向，按运行器复用适配器；模型/连接分别验，不开发8套重复代码。WorkBuddy #90/#91是分配侧历史，未证明WorkBuddy执行角色接单，当前名册仍codex/deepseek/kimi。
 - 新K2.8角色拟独立ID agent:kimi-code-k28-preview、business_role=dev、decision_tier=execution；native别名kimi-code/kimi-for-coding、后端kimi-for-coding、provider managed:kimi-code，来源builtin/既有managed登录引用，不替换现有agent:kimi与默认kimi-code/k3。别名可滚动升级，显示名不作模型ID；未实测质量/成本优势。
@@ -45,4 +47,4 @@ Updated: 2026-10-08 (Asia/Shanghai)：187已交付，Codex独立复核要求定�
 - 未注册新成员/改Key/native配置/模型默认/启停bridge/发真实Kimi请求/操作浏览器。本机rollout.log自报CLI2.0.2未执行版本命令。普通沙箱执行器初始化失败，本轮安全读取/验证用审批执行器成功，未发生自动审批拒绝。
 - 无精确额度比例，不推测；身份配置回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。
 
-恢复指令：`继续项目`。当前已派188修正187，默认派后结束，用户通知完成后Codex复核；185/186已收取并发布，真实K2.8接单和I-4仍待验收。
+恢复指令：`继续项目`。当前已派189补正188，默认派后结束，用户通知完成后Codex复核；185/186已收取并发布，真实K2.8接单和I-4仍待验收。
