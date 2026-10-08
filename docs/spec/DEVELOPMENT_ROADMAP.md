@@ -201,3 +201,9 @@ Kimi #182完成S-1/G8计数注记、S-2/受控timeout既有clamp描述、175-O2�
 Codex已发布USER_MANUAL与MODULE_webui，并追加I-2旧human身份快照和当前agent:codex、I-0/I-3A已完成的区别；按184→183→182收取，三项succeeded/completed、原msg2686/2685/2684与182 partial/失败保持。183自报25项数目不准，184实际核13来源中12保持+15冻结保持=27未变对象、0实际缺口；原报告不改。回执.tmp/initiator-mode-live-copy-receipt/acceptance.json，已审原稿/补正/复核证据保留。
 
 页面简验：使用既有TALK服务和人类登录密钥，Ctrl+F5刷新后进入“角色”→任一具体角色→“角色说明”，确认提示写“不改变任务发起者归属、职责分级（business_role / decision_tier）或任务权限”。保持被动即可，无需服务重启。用户于2026-10-07明确确认本片角色说明提示验收通过，验收范围为上述提示简验；I-3还需MODULE_bridges/PROJECT_INTEGRATION同步，175-O1测试维护另片。既有JSON Schema maximum=600与运行clamp关系列后续独立评估，本片只描述同步、不改关键字。当前MCP进程新说明重载未核；项目passive/version6、effective null/not_bound，I-4真实G8/主动消费者/长等待/取消/排队未运行，门禁未释放。
+
+## I-3C桥接与集成规格发布（2026-10-08）
+
+#185 Kimi规格草稿经#186 DeepSeek独立复核通过，186/185已由agent:codex收取；Codex在#187开发暂停后核16来源＋14草稿零漂移，将已审两份草稿逐字节发布至MODULE_bridges与PROJECT_INTEGRATION。G1–G8／created_by门禁、五键快照、30秒模式重读及正常退出与API错误区别已同步；旧固定主控／当时C2-A1叙述以局部注记保留，human写入、CAS及任务权限保持。回执：.tmp/initiator-mode-spec-sync-receipt/acceptance.json。
+
+I-3文档同步已闭合；运行中MCP最新说明重载、客户端实际T/W及返回余量、I-4真实主动消费者/G8/长等待/取消/排队仍未验收。175-O1测试维护与Schema maximum/clamp评估另片；不将文档发布外推为真实主动适配通过。

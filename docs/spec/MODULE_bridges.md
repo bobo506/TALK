@@ -218,6 +218,7 @@ DeepSeek本地开发启动示例显式使用`--timeout 3600`，这是整轮执�
 - caller_identity项目固定三键/失败不阻断/非项目null无额外GET；schema-dispatch-wait和--check同步，九工具数量不变。F-1运行期重读错误现与poll共用api_error出口，含真实elapsed/rounds、恰好一条JSONL；failure_stage=poll/recheck仅统计记录，返回结构不变。
 - #159独立定向复跑controlled_wait29、task_tools/terminal29、controller_mode31项通过，新旧探针均通过；原#157对A–E/G/H审查合看，未把定向审宣称为重新全量审查。ACP既有沙箱WinError5未取得本轮整套通过结论，原报告与partial/MCPunknown保持。
 - 代码通过与运行中工具加载分开：本轮未重载MCP/桌面重连、真实主动宿主/660秒未验收。加载/只读验收步骤见TERMINAL_MCP；取消无检测源、同连接排队、总预算约定/非端到端硬截止、effective_mode:null/not_bound仍保留。C2-B/C/C2-D待开发，无新Web用户入口。
+- 2026-10-07阶段/替代注记：本节#156–#159实现/测试/限制为当时历史记录，完整保留、不改写为新I-1证据。现行受控合同由I-1（DeepSeek #172开发、Kimi #173独立实际代码复核通过并收取）替代：true门禁G1–G8——项目上下文可解析、显式有限正数预算（不采用600秒默认）、Key服务端反查身份且kind=agent（human凭据拒绝）、项目响应含模式字段、requested_mode=active；task_ids必须显式提供、非空数组且元素全部为严格正整数（bool/浮点含1.0/字符串/null/0/负整数一律整批拒绝，不转换不截断），先全量校验再按首次出现顺序稳定去重；G8按去重顺序逐唯一ID各发恰好一次任务GET，核验对调用者可见、属于本项目且created_by=调用者，任一不符整批拒绝、不等待合法子集。运行期每30秒只重读项目模式字段/版本，模式值或版本变化按mode_changed正常退出；旧固定主控指定（controller_assignment）不再参与进入资格、运行期重读或退出，controller_changed已退役。caller_identity固定member_id/kind/note三键，controlled_entry快照五键（requested_mode/requested_version/caller_member_id/task_ids/verified_task_count）；正常return_reason仅matched/timeout/mode_changed，api_error是显式报错路径而非正常退出枚举，两者分别记录。协调资格只按具体任务created_by判定，不凭模型名、终端名或target_member_id。逐条合同与计数口径以bridges/talk_task_tools.py现行实现及CONTROLLER_MODE_DESIGN §4为准。
 
 
 ### 本地交付流程试行（2026-09-12）
@@ -237,9 +238,22 @@ DeepSeek #42/#44 实现返修、Kimi #43/#45 独立复核；最终 140 项定向
 显式限长兼容路径：文本实际裁剪按 `text_truncated` 与 `read_more.omitted` 的 `source=summary_text/reason=text_limit` 标明；JSON 预算缩减预览用 `source=preview/reason=json_limit`，不等同文本裁剪。显式预算过紧可进入可见的最小摘要兜底。默认路径必要内容不因预算静默丢弃；旧自由文本仍仅作最多 300 字符预览、业务结论 unknown，完整原文可 detail 补读。分页不能恢复上传前已经丢失的内容。
 
 
-### I-1发起者受控等待（2026-10-06，源码独立复核通过；当前连接待加载）
+### I-1发起者受控等待（2026-10-06，源码独立复核通过；当时连接待加载）（本节为2026-10-06当时快照；现行状态见文末“2026-10-07发起者受控等待当前状态”）
 
 - DeepSeek #172实现经Kimi #173独立实际代码复核通过；六相关模块162项及七独立探针通过，172/173已收取。173原消息含前言，服务端摘要unknown；本地交付校验与嵌入报告一致，原记录保留。
 - 新true门禁G1–G8：服务端身份为agent、项目模式active、显式严格非空正整数IDs全量校验后稳定去重、逐任务同项目且created_by==caller整批核验。指定字段不再参与资格/重读/退出；快照五键，重读仅模式/版本，controller_changed退役。兼容assignment只读字段保留弃用注记，human PATCH权限/CAS不变。
 - G8结构化HTTP404业务拒绝/null，其它API错误独立统计；完整校验前entry.task_ids=null，通过后只记合法去重输入；false/省略旧路径、九工具、默认/上限600和服务端权限保持。末次响应已完成整批核验的迟返回按正常timeout边界处理；未完核验不得进入运行期。
 - 当前主控连接仍旧G1–G7及旧注记，实际新程序未加载；加载检查见[TERMINAL_MCP](../guides/TERMINAL_MCP.md#i-1加载验收2026-10-06源码通过当前连接待刷新)。前述C2-A1/C2-B段保留当时历史，不再作为新I-1固定指定资格依据。旧UI退役I-2/Key切换I-0/指南I-3/真实消费者I-4待后续，effective仍null/not_bound。
+
+## 2026-10-07发起者受控等待当前状态（I-1/I-0/I-2/I-3A/I-3B已完成；I-3C本片同步中）
+
+- 上一节（I-1发起者受控等待）为2026-10-06当时快照：当时连接仍旧G1–G7及旧注记、新程序未加载。该状态已被后续实测替代：I-1合同经#172/#173独立通过并收取，Codex当前MCP入口已实测加载新合同（九工具目录为G1–G8、正常退出无controller_changed、assignment弃用注记与运行时一致，2026-10-07加载核验通过，证据.tmp/initiator-mode-tools-loadcheck/2026-10-07-loaded.json）；不要据上一节误认为当前仍旧门禁。原2026-10-06快照正文与旧加载失败记录保留不追改。
+- I-0被动身份闭环178/179、I-2固定主控页面退役174/175、I-3A消费者指南180/181均独立通过并收取；I-3B工具计数/timeout描述与角色hint/workspace注释经182/183/184独立通过收取，9a66fa3发布，用户角色说明简验2026-10-07通过（记录2e945a9）。
+- 加载事实区分：I-3B最新两处工具说明（计数注记点名G8核验GET、timeout描述对齐既有clamp行为）在当前运行中MCP进程的重载尚未核；此前I-1加载核验通过不代表最新说明已载入，旧目录/旧进程不得混作已加载。
+- 预算事实按终端分别核验：DeepSeek桌面T=65秒（toolCallTimeoutMs:65000配置事实）/W=50秒/返回余量15秒；Codex当前项目W=300秒为用户现用值，前次配置实读tool_timeout_sec=660仅为配置读取、未验收长等待能力；Kimi模板toolTimeoutMs:660000仅为模板事实；旧通用默认/上限600秒兼容保持，本片不改任何实际预算或客户端配置。执行者任务预算（bridge现用3600秒）与等待预算分别记录，等待到期不取消/重派/重启执行者任务；消费者有限总预算为提示词约定、尚无代码强制，无明确总预算不启动主动等待；宿主外层交还控制预算由各宿主自行核验，项目配置不能覆盖宿主限制。
+- 既有JSON Schema maximum=600与运行clamp（超过600按上限截断生效）的关系为#184登记的非阻塞另片评估项；本片不改schema关键字，也不宣称客户端>600必能提交。
+- 项目仍requested_mode=passive/version6、effective_mode恒null（not_bound），保存active仅为模式意向。无真实G8/主动消费者/长等待/正常到期/取消/同连接排队/其它终端身份验收，I-4真实主动链路未运行；剩余规格同步（本片I-3C）仅文档草稿、待独立复核与正式发布，完整I-3与I-4门禁未释放。
+
+### I-3C正式发布状态（2026-10-08）
+
+上节“I-3C本片同步中”“待独立复核与正式发布”是#185起草时快照。#186已独立复核通过，186/185已实际收取；Codex在#187开发暂停后核16来源＋14草稿零漂移，按已审草稿发布本规格与PROJECT_INTEGRATION，再追加本发布状态说明。I-3文档同步已闭合；最新MCP说明重载、实际T/W及I-4真实主动/G8/长等待/取消/排队仍未验收。原草稿、原报告与历史测试保持，回执见.tmp/initiator-mode-spec-sync-receipt/acceptance.json。

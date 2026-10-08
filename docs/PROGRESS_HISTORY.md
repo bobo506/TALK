@@ -6224,3 +6224,9 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - 审查HEAD77288f2861de5a3c34ff71c84ef97561ec780f5f；16来源（原15+只读server/routes/projects.py）及14草稿冻结、原需求/实际差异/验证/限制/闭合索引完整纳包.tmp/initiator-mode-spec-sync-review-dispatch/。独立核当前源码G1-G8/重读/字段、D4人类PATCH/CAS/候选兼容、历史预算/事实保护、patch正反/链接/UTF-8与同步状态；只内存/仓库外验证，不在主工作树apply。
 - 仅读MODULE_bridges和公共集成指定节，不读其它MODULE；正式源/原草稿冻结，Codex只更新两份派发进度，开发与审查不并行改码。186本次只写新.tmp审查成果，完整裸JSON自身号校验后交付；185未收取，独立通过才统一正式发布/收取/Git。
 - 本轮不改配置/Key/代码/测试/数据库/模式，不运行浏览器/真实等待/消费者或重启服务；纯文档无需业务测试与新增人工页面验收。新工具说明MCP重载/实际终端预算、175-O1/schema评估、I-4仍分别待核，完整I-3未提前宣称通过；默认派发后结束，用户通知186完成后取件。
+
+## 2026-10-08：187独立审查要求修正；185/186规格发布
+
+用户通知“187好了”。合法自身187/msg2689 complete仅为自报；Codex按本次临时分工完整复核新增5文件及实际bridge启动路径。50项相关测试通过、0跳过（含管道路径），无真实模型请求。零模型/零TALK复现启动返回0、错误项目抵达假bridge；继承TALK_KIMI_COMMAND后生成三个K3命令且无Agent文件，模型选择与工具隔离被绕过。另发现launch未执行native/项目检查、无真实本人及项目身份只读核验就进入client.register。三项R1/R2/R3需定向返工，187暂不收取/提交，原消息/报告保持，原5文件完整冻结副本在.tmp/kimi-k28-executor-review/original，review.json与launch-boundary-repro.json为独立证据；下一任务由DeepSeek只修本片，再由Codex复核，不派Kimi、不生产注册/启停或推理。
+
+187交付暂停后16来源＋14草稿全量指纹零漂移；Codex将185经186独立审通过的MODULE_bridges/PROJECT_INTEGRATION两规格逐字节复制发布，之后仅向MODULE_bridges追加正式发布状态解释，避免把起草时“同步中”当最新事实。PROJECT_BRIEF与设计/实施计划/路线同步当前状态，旧合同快照/测试/失败报告保留。UTF-8无BOM、7相对链接/2锚点、19源码事实探针和git diff --check通过。186/185已于11:19:38.853865 / 11:19:40.985238 UTC实际收取；回执.tmp/initiator-mode-spec-sync-receipt/acceptance.json记录发布前/后分层指纹和仅状态注记。I-3文档同步闭合；MCP最新说明重载、客户端实际T/W、I-4主动/G8/长等待/取消/排队未验收。当前caller agent:codex/kind agent，passive v6，assignment v13只兼容；真实K2.8角色注册/接单待入口复核通过与额度条件。
