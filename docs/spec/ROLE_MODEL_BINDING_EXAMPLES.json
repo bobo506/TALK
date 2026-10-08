@@ -1,0 +1,1012 @@
+{
+  "schema_version": "role-binding-examples-3",
+  "task_ref": "192",
+  "supersedes": ".tmp/role-model-binding-design-fix/examples.json（#191 v2）与 .tmp/role-model-binding-design/examples.json（#190 v1）",
+  "note": "完全无密钥的合成样例，只用于说明角色运行器/模型绑定合同与任务快照结构。所出现的 runner_id / runtime / provider_id / connection_ref / model_id / model_alias 均为示意值，不证明任何运行器已适配、任何模型可用，也不代表已获得任何执行或分配能力。所有值都不含凭据正文；connection_ref/provider_id 仅是不透明标识，服务端不读取、不执行、不探测。",
+  "credential_policy_note": "按合同 §5.2：禁入的是凭据正文与含密连接资料；本文件只含脱敏标识符，属于允许出现在文档/示例/审查证据中的安全元数据；按 §5.3，审查交付（含本文件自身）允许包含这些脱敏标识。",
+  "fingerprint_rule": "binding_fingerprint = sha256( '|'.join([runner_id, runtime, model_source, provider_id, connection_ref, model_id]) ) 的 64 位小写十六进制；**仅当这六个值在读取/写入时全部可解析**时给出，否则为 null。注意 runtime 不在绑定行内存储、由 runner_registry 按 runner_id 派生（登记后不可改），因此 runner_missing（登记事实不可解析）时 runtime 无法解析 → 指纹为 null；runner_retired（登记行仍在且 runtime 可解析）仍可解析 → 指纹正常给出。指纹是**配置内容指纹**，不是绑定行的身份键：不同角色可以有相同指纹，禁止按指纹合并行。",
+  "fingerprint_scope_caveat": "六维指纹**不代表完整调用配置**。指纹不含 model_alias / model_display_name：其中 model_display_name 是纯展示字段，而 **model_alias 是原生调用选择参数**（运行器把它作为启动参数，`bridges/kimi_bridge.py:95` 把 model alias 传给 --model），属于调用配置的一部分。因此：① 六维指纹相同 **不等于** alias 未变，也 **不等于** 两次调用的原生参数相同；② 同一角色只换 alias 时指纹不变，但那是**调用选择变更**，必须逐版本保留在任务快照里（见 binding_version_examples.task_snapshots_under_alias_change）；③ alias 既不是 model_id，也不是“实际 model_id”。",
+  "snapshot_schema": {
+    "schema_version_value": "role-binding-snapshot-1",
+    "keys": [
+      "schema_version",
+      "snapshot_at",
+      "state",
+      "runner_id",
+      "runtime",
+      "model_source",
+      "provider_id",
+      "connection_ref",
+      "model_id",
+      "model_alias",
+      "model_display_name",
+      "binding_fingerprint",
+      "note"
+    ],
+    "key_count": 13,
+    "removed_keys_note": "首期**不含** read_receipt（#192 R3 范围裁决：不新增读取回执持久字段）。读取方案与 SQL 条数只作为隔离验证证据（见 fact-read-probe-results.json / evidence.md），不进快照、不进 schema。"
+  },
+  "state_null_layout": {
+    "note": "与合同 §4.4 阶梯、§4.5 partial 边界、§7.2 null 布局逐行一致。",
+    "rows": [
+      {
+        "state": "no_project",
+        "runner_model_fields": "全 null",
+        "runtime": null,
+        "binding_fingerprint": null
+      },
+      {
+        "state": "member_missing",
+        "runner_model_fields": "有行照存；无行全 null",
+        "runtime": "有行且登记事实可解析时派生",
+        "binding_fingerprint": "六值可解析则有"
+      },
+      {
+        "state": "member_disabled",
+        "runner_model_fields": "同 member_missing",
+        "runtime": "同上",
+        "binding_fingerprint": "同上"
+      },
+      {
+        "state": "not_in_roster",
+        "runner_model_fields": "同 member_missing",
+        "runtime": "同上",
+        "binding_fingerprint": "同上"
+      },
+      {
+        "state": "not_agent",
+        "runner_model_fields": "同 member_missing",
+        "runtime": "同上",
+        "binding_fingerprint": "同上"
+      },
+      {
+        "state": "unconfigured",
+        "runner_model_fields": "全 null",
+        "runtime": null,
+        "binding_fingerprint": null
+      },
+      {
+        "state": "partial",
+        "runner_model_fields": "有值照存，缺的 null",
+        "runtime": "登记事实可解析则派生",
+        "binding_fingerprint": null
+      },
+      {
+        "state": "runner_missing",
+        "runner_model_fields": "行值照存（含 runner_id）",
+        "runtime": null,
+        "binding_fingerprint": null
+      },
+      {
+        "state": "runner_retired",
+        "runner_model_fields": "行值照存",
+        "runtime": "派生自登记表",
+        "binding_fingerprint": "六值可解析则有"
+      },
+      {
+        "state": "bound",
+        "runner_model_fields": "全部按绑定行原值",
+        "runtime": "派生自登记表",
+        "binding_fingerprint": "六值齐备则有"
+      }
+    ]
+  },
+  "partial_boundary": {
+    "note": "与合同 §4.5 一致：partial 只由**绑定行存储必填五项**触发，派生 runtime 不参与，因此 runner_missing 不会被 partial 提前覆盖。",
+    "checked_stored_fields": [
+      "runner_id",
+      "model_source",
+      "provider_id",
+      "connection_ref",
+      "model_id"
+    ],
+    "not_checked_fields": [
+      "model_alias",
+      "model_display_name",
+      "runtime"
+    ],
+    "examples": [
+      {
+        "case": "行缺 model_id",
+        "binding_state": "partial",
+        "runtime": "仍可派生（登记行存在）",
+        "binding_fingerprint": null
+      },
+      {
+        "case": "行缺 runner_id",
+        "binding_state": "partial",
+        "runtime": null,
+        "binding_fingerprint": null
+      },
+      {
+        "case": "model_source 非法枚举",
+        "binding_state": "partial",
+        "runtime": "仍可派生",
+        "binding_fingerprint": null
+      },
+      {
+        "case": "runner_id 齐全但登记表查不到",
+        "binding_state": "runner_missing",
+        "runtime": null,
+        "binding_fingerprint": null,
+        "why": "存储五项齐全 → partial 不触发 → 落到序 7"
+      },
+      {
+        "case": "model_alias 超长（旧库/手工行）",
+        "binding_state": "不变（仍为 bound）",
+        "runtime": "正常派生",
+        "binding_fingerprint": "不变",
+        "why": "可选字段，不参与 partial"
+      }
+    ]
+  },
+  "fact_read_evidence_ref": "无绑定分支的读取方案、实际 SQL 条数与 SQL 哈希只作为隔离验证证据：见 fact-read-probe-results.json 与 evidence.md §2（不作为快照字段，也不作为自报常量当证明）。",
+  "identity_layers": {
+    "row_identity": "(project_id, member_id) —— 绑定行的自然身份键，行存在即身份存在",
+    "content_fingerprint": "binding_fingerprint —— 纯内容寻址，随配置变化；不代表行身份，也不代表历史任务快照，更不代表完整调用配置（不含 alias）",
+    "task_snapshot": "target_binding_snapshot —— 任务创建时冻结的副本，写入后不可变；与绑定行后续版本无关"
+  },
+  "runner_registry_examples": [
+    {
+      "runner_id": "runner:kimi-code-cli",
+      "runtime": "kimi-code",
+      "display_name": "Kimi Code CLI",
+      "adapter_status": "adapted",
+      "adapter_note": "历史入口与执行侧均有记录；登记不代表在线或可自动启动",
+      "capabilities": [
+        "prompt-argv",
+        "stream-json",
+        "task-tools"
+      ],
+      "kind": "example"
+    },
+    {
+      "runner_id": "runner:dsh-cli",
+      "runtime": "dsh",
+      "display_name": "DeepSeek Harness (CLI)",
+      "adapter_status": "discoverable",
+      "adapter_note": "入口可发现；宿主等待预算未逐项核验",
+      "capabilities": [
+        "prompt-argv"
+      ],
+      "kind": "example"
+    },
+    {
+      "runner_id": "runner:codex-cli",
+      "runtime": "codex",
+      "display_name": "Codex CLI",
+      "adapter_status": "unverified",
+      "adapter_note": "仅登记示例，未在本项目中判定接入程度",
+      "capabilities": [],
+      "kind": "example"
+    }
+  ],
+  "capability_validation_examples": [
+    {
+      "example_id": "caps-empty-array",
+      "request_capabilities": [],
+      "expected": 200,
+      "rule": "0 条合法（默认值）"
+    },
+    {
+      "example_id": "caps-max-32",
+      "request_capabilities": [
+        "c01",
+        "c02",
+        "c03",
+        "c04",
+        "c05",
+        "c06",
+        "c07",
+        "c08",
+        "c09",
+        "c10",
+        "c11",
+        "c12",
+        "c13",
+        "c14",
+        "c15",
+        "c16",
+        "c17",
+        "c18",
+        "c19",
+        "c20",
+        "c21",
+        "c22",
+        "c23",
+        "c24",
+        "c25",
+        "c26",
+        "c27",
+        "c28",
+        "c29",
+        "c30",
+        "c31",
+        "c32"
+      ],
+      "expected": 200,
+      "rule": "恰好 32 条合法（示例为占位名，非真实能力声明）"
+    },
+    {
+      "example_id": "caps-33-rejected",
+      "request_capabilities_count": 33,
+      "expected": 422,
+      "rule": "超过 32 条 → 422，不静默截断"
+    },
+    {
+      "example_id": "caps-blank-rejected",
+      "request_capabilities": [
+        "prompt-argv",
+        "   "
+      ],
+      "expected": 422,
+      "rule": "归一化后空白项 → 422，不静默丢弃"
+    },
+    {
+      "example_id": "caps-duplicate-rejected",
+      "request_capabilities": [
+        "prompt-argv",
+        "prompt-argv"
+      ],
+      "expected": 422,
+      "rule": "归一化后重复 → 422，不静默去重"
+    },
+    {
+      "example_id": "caps-too-long-rejected",
+      "request_capabilities_single_item_codepoints": 65,
+      "expected": 422,
+      "rule": "单条超 64 码点 → 422"
+    },
+    {
+      "example_id": "caps-unknown-field-rejected",
+      "request_body_extra_key": "capabilities_v2",
+      "expected": 422,
+      "rule": "新 schema extra=forbid：未知字段 → 422"
+    }
+  ],
+  "binding_examples": {
+    "note": "并存行：四个示例的主键 (project_id, member_id) 互不相同，可同时存在；示例 E3/E4 有相同 model_id 但不同来源/连接，仍是两行。",
+    "coexisting_rows": [
+      {
+        "example_id": "row-codex-builtin",
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:codex",
+        "request": {
+          "binding": {
+            "runner_id": "runner:codex-cli",
+            "model_source": "builtin",
+            "provider_id": "managed:codex",
+            "connection_ref": "native-codex-managed-login",
+            "model_id": "codex-default",
+            "model_alias": null,
+            "model_display_name": "Codex 内置默认"
+          }
+        },
+        "response_binding": {
+          "runner_id": "runner:codex-cli",
+          "runtime": "codex",
+          "runner_display_name": "Codex CLI",
+          "runner_status": "unverified",
+          "model_source": "builtin",
+          "provider_id": "managed:codex",
+          "connection_ref": "native-codex-managed-login",
+          "model_id": "codex-default",
+          "model_alias": null,
+          "model_display_name": "Codex 内置默认",
+          "binding_state": "bound",
+          "binding_fingerprint": "a4fff74c79342a306817893ee6eddc9fd5a337bbfc62d864190d94c68d55c637",
+          "updated_by": "human:bobo",
+          "updated_at": "2026-10-08T13:47:43.283389+00:00"
+        }
+      },
+      {
+        "example_id": "row-deepseek-builtin",
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:deepseek",
+        "request": {
+          "binding": {
+            "runner_id": "runner:dsh-cli",
+            "model_source": "builtin",
+            "provider_id": "managed:deepseek",
+            "connection_ref": "native-deepseek-managed-login",
+            "model_id": "deepseek-flash",
+            "model_alias": null,
+            "model_display_name": "DeepSeek Flash"
+          }
+        },
+        "response_binding": {
+          "runner_id": "runner:dsh-cli",
+          "runtime": "dsh",
+          "runner_display_name": "DeepSeek Harness (CLI)",
+          "runner_status": "discoverable",
+          "model_source": "builtin",
+          "provider_id": "managed:deepseek",
+          "connection_ref": "native-deepseek-managed-login",
+          "model_id": "deepseek-flash",
+          "model_alias": null,
+          "model_display_name": "DeepSeek Flash",
+          "binding_state": "bound",
+          "binding_fingerprint": "33499d057832b11971b95d0a1f05c9646c3183936a3f32af3d8c7ac400358c9f",
+          "updated_by": "human:bobo",
+          "updated_at": "2026-10-08T13:48:10.000000+00:00"
+        }
+      },
+      {
+        "example_id": "row-k28-builtin",
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:kimi-code-k28-preview",
+        "request": {
+          "binding": {
+            "runner_id": "runner:kimi-code-cli",
+            "model_source": "builtin",
+            "provider_id": "managed:kimi-code",
+            "connection_ref": "native-kimi-code-managed-login",
+            "model_id": "kimi-for-coding",
+            "model_alias": "kimi-code/kimi-for-coding",
+            "model_display_name": "K2.8 Preview"
+          }
+        },
+        "response_binding": {
+          "runner_id": "runner:kimi-code-cli",
+          "runtime": "kimi-code",
+          "runner_display_name": "Kimi Code CLI",
+          "runner_status": "adapted",
+          "model_source": "builtin",
+          "provider_id": "managed:kimi-code",
+          "connection_ref": "native-kimi-code-managed-login",
+          "model_id": "kimi-for-coding",
+          "model_alias": "kimi-code/kimi-for-coding",
+          "model_display_name": "K2.8 Preview",
+          "binding_state": "bound",
+          "binding_fingerprint": "66b03e3f5124d36bed4ca4a229088f8294f5e1a609053c1b3dce2fd3a5dadd1f",
+          "updated_by": "human:bobo",
+          "updated_at": "2026-10-08T13:49:00.000000+00:00"
+        }
+      },
+      {
+        "example_id": "row-kimi-agent-custom-connection",
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:kimi",
+        "request": {
+          "binding": {
+            "runner_id": "runner:kimi-code-cli",
+            "model_source": "custom_api",
+            "provider_id": "user:moonshot-openai",
+            "connection_ref": "user-moonshot-conn-2",
+            "model_id": "kimi-for-coding",
+            "model_alias": "kimi-code/kimi-for-coding",
+            "model_display_name": "用户 API · K2.8"
+          }
+        },
+        "response_binding": {
+          "runner_id": "runner:kimi-code-cli",
+          "runtime": "kimi-code",
+          "runner_display_name": "Kimi Code CLI",
+          "runner_status": "adapted",
+          "model_source": "custom_api",
+          "provider_id": "user:moonshot-openai",
+          "connection_ref": "user-moonshot-conn-2",
+          "model_id": "kimi-for-coding",
+          "model_alias": "kimi-code/kimi-for-coding",
+          "model_display_name": "用户 API · K2.8",
+          "binding_state": "bound",
+          "binding_fingerprint": "20ec88edcad90c11b7bf1a64dffc629d7f021e0c232b82569013c746f15e846c",
+          "updated_by": "human:bobo",
+          "updated_at": "2026-10-08T13:49:30.000000+00:00"
+        }
+      }
+    ],
+    "row_key_count": 4,
+    "model_id_collision_note": "E3（agent:kimi-code-k28-preview，builtin/native-kimi-code-managed-login）与 E4（agent:kimi，custom_api/user-moonshot-conn-2）具有**相同 model_id='kimi-for-coding'**，但来源与连接不同 → 两条不同角色行、两个不同指纹，合同禁止按 model_id 聚合或去重。"
+  },
+  "binding_version_examples": {
+    "note": "同一角色 (prj_e8fe7066bbec, agent:kimi-code-k28-preview) 只有一行，下面 v1→v2 是同一行的先后版本，不是两条并存行；旧任务快照保留 v1。",
+    "versions": [
+      {
+        "version": "v1",
+        "put_sequence": 1,
+        "request_binding": {
+          "runner_id": "runner:kimi-code-cli",
+          "model_source": "builtin",
+          "provider_id": "managed:kimi-code",
+          "connection_ref": "native-kimi-code-managed-login",
+          "model_id": "kimi-for-coding",
+          "model_alias": "kimi-code/kimi-for-coding",
+          "model_display_name": "K2.8 Preview"
+        },
+        "binding_fingerprint": "66b03e3f5124d36bed4ca4a229088f8294f5e1a609053c1b3dce2fd3a5dadd1f",
+        "row_count_after_put": 1
+      },
+      {
+        "version": "v2",
+        "put_sequence": 2,
+        "request_binding": {
+          "runner_id": "runner:kimi-code-cli",
+          "model_source": "custom_api",
+          "provider_id": "user:moonshot-openai",
+          "connection_ref": "user-moonshot-conn-1",
+          "model_id": "kimi-for-coding",
+          "model_alias": "kimi-code/kimi-for-coding",
+          "model_display_name": "用户 API · K2.8"
+        },
+        "binding_fingerprint": "3dfb55fd7102aa49166a640dcb5cd7537035f189ab2d971e9562e236bcc4b10a",
+        "row_count_after_put": 1,
+        "discrimination_note": "与 v1 同 runner_id、同 model_id，但 model_source 与 connection_ref 不同 → 指纹变化。这是**同一行的第二个版本**；合同禁止把“指纹不同”解读成“新增了角色行”。"
+      }
+    ],
+    "task_snapshots_under_versions": [
+      {
+        "example_id": "task-created-under-v1",
+        "task_id": 901,
+        "created_before_version": "v1",
+        "target_binding_state": "bound",
+        "target_binding_snapshot_fingerprint": "66b03e3f5124d36bed4ca4a229088f8294f5e1a609053c1b3dce2fd3a5dadd1f",
+        "read_after_v2_put": "快照不变（仍是 v1 内容）；配置变更只影响新任务"
+      },
+      {
+        "example_id": "task-created-under-v2",
+        "task_id": 902,
+        "created_after_version": "v2",
+        "target_binding_state": "bound",
+        "target_binding_snapshot_fingerprint": "3dfb55fd7102aa49166a640dcb5cd7537035f189ab2d971e9562e236bcc4b10a",
+        "read_note": "新任务取新版本；task-901 与 task-902 两个快照各自冻结，互不覆盖"
+      }
+    ],
+    "same_role_alias_change": {
+      "example_id": "same-role-alias-only-change",
+      "v1_alias": "kimi-code/kimi-for-coding",
+      "v2_alias": "kimi-code/k3",
+      "v2_model_id": "kimi-for-coding",
+      "fingerprint_unchanged": true,
+      "change_kind": "原生调用选择变更（不是展示层调整）",
+      "explanation": "alias 不参与六维指纹（指纹只含 runner_id|runtime|model_source|provider_id|connection_ref|model_id），所以只换 alias 时指纹不变。但 **alias 是原生调用选择参数**（运行器把它作为启动参数，`bridges/kimi_bridge.py:95` 把 model alias 传给 --model），因此这次改动会改变运行器实际被要求加载的模型：① 不得写成“配置未变”或“纯展示调整”；② 不得把 alias 当 model_id 或“实际 model_id”；③ 六维指纹相同**不代表**完整调用配置相同。",
+      "must_not_conclude": [
+        "『指纹相同 ⇒ 配置没有变化』——错，alias 变了",
+        "『指纹相同 ⇒ 两次调用的原生参数相同』——错",
+        "『alias 变了就是新增/删除了角色行』——错，仍是同一行的版本变化"
+      ],
+      "history_requirement": "任务快照必须逐版本保存 alias：新建任务写入新 alias，旧任务快照保持旧 alias 逐字节不变（合同 §7.4）。见 task_snapshots_under_alias_change。"
+    },
+    "task_snapshots_under_alias_change": [
+      {
+        "example_id": "task-created-under-alias-v1",
+        "task_id": 903,
+        "created_when_alias": "kimi-code/kimi-for-coding",
+        "target_binding_state": "bound",
+        "snapshot_model_id": "kimi-for-coding",
+        "snapshot_model_alias": "kimi-code/kimi-for-coding",
+        "target_binding_snapshot_fingerprint": "66b03e3f5124d36bed4ca4a229088f8294f5e1a609053c1b3dce2fd3a5dadd1f"
+      },
+      {
+        "example_id": "task-created-under-alias-v2",
+        "task_id": 904,
+        "created_when_alias": "kimi-code/k3",
+        "target_binding_state": "bound",
+        "snapshot_model_id": "kimi-for-coding",
+        "snapshot_model_alias": "kimi-code/k3",
+        "target_binding_snapshot_fingerprint": "66b03e3f5124d36bed4ca4a229088f8294f5e1a609053c1b3dce2fd3a5dadd1f",
+        "read_note": "task-903 与 task-904 的六维指纹**相同**，但 alias 不同、调用参数不同；两份快照各自冻结、互不覆盖。系统不得凭指纹相同就声称两者调用配置一致。"
+      }
+    ]
+  },
+  "same_fingerprint_different_role": {
+    "example_id": "two-roles-identical-content",
+    "note": "agent:workbuddy-k3-demo 是**纯合成示例角色**，不在当前项目名册中；只用于演示行身份与内容指纹分离。",
+    "rows": [
+      {
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:codex",
+        "binding_fingerprint": "a4fff74c79342a306817893ee6eddc9fd5a337bbfc62d864190d94c68d55c637"
+      },
+      {
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:workbuddy-k3-demo",
+        "binding_fingerprint": "a4fff74c79342a306817893ee6eddc9fd5a337bbfc62d864190d94c68d55c637"
+      }
+    ],
+    "row_key_count": 2,
+    "rule": "两行内容相同 → 指纹相同，但主键不同 → 仍是两行，GET 返回两条；禁止按指纹去重/合并，也禁止把同一指纹当作“同一个角色”。"
+  },
+  "task_snapshot_examples": [
+    {
+      "example_id": "new-task-bound",
+      "task_path": "POST /api/tasks (project_id=prj_e8fe7066bbec, target=agent:kimi-code-k28-preview, 绑定 v1)",
+      "target_binding_state": "bound",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "bound",
+        "runner_id": "runner:kimi-code-cli",
+        "runtime": "kimi-code",
+        "model_source": "builtin",
+        "provider_id": "managed:kimi-code",
+        "connection_ref": "native-kimi-code-managed-login",
+        "model_id": "kimi-for-coding",
+        "model_alias": "kimi-code/kimi-for-coding",
+        "model_display_name": "K2.8 Preview",
+        "binding_fingerprint": "66b03e3f5124d36bed4ca4a229088f8294f5e1a609053c1b3dce2fd3a5dadd1f",
+        "note": null
+      }
+    },
+    {
+      "example_id": "new-task-unconfigured",
+      "task_path": "POST /api/tasks (成员在名册但该角色无绑定行)",
+      "target_binding_state": "unconfigured",
+      "null_layout": "绑定字段全 null；指纹 null；快照仍写入（13 键，无 read_receipt）",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "unconfigured",
+        "runner_id": null,
+        "runtime": null,
+        "model_source": null,
+        "provider_id": null,
+        "connection_ref": null,
+        "model_id": null,
+        "model_alias": null,
+        "model_display_name": null,
+        "binding_fingerprint": null,
+        "note": "角色尚未配置运行器/模型绑定；不猜测默认值"
+      }
+    },
+    {
+      "example_id": "new-task-partial",
+      "task_path": "POST /api/tasks (绑定行存在但缺 model_id)",
+      "target_binding_state": "partial",
+      "null_layout": "有值照存；model_id/model_alias/model_display_name 为 null；指纹为 null；runtime 仍可由登记表派生（派生字段不参与 partial 判定）",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "partial",
+        "runner_id": "runner:dsh-cli",
+        "runtime": "dsh",
+        "model_source": "builtin",
+        "provider_id": "managed:deepseek",
+        "connection_ref": "native-deepseek-managed-login",
+        "model_id": null,
+        "model_alias": null,
+        "model_display_name": null,
+        "binding_fingerprint": null,
+        "note": "绑定存储必填字段不完整；有值的字段照存，缺的为 null"
+      }
+    },
+    {
+      "example_id": "new-task-no-project",
+      "task_path": "POST /api/tasks (project_id 省略，或 schedule 物化)",
+      "target_binding_state": "no_project",
+      "null_layout": "绑定字段全 null；两列仍非 NULL；**不执行事实读取 SQL（语句数 0）**",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "no_project",
+        "runner_id": null,
+        "runtime": null,
+        "model_source": null,
+        "provider_id": null,
+        "connection_ref": null,
+        "model_id": null,
+        "model_alias": null,
+        "model_display_name": null,
+        "binding_fingerprint": null,
+        "note": "任务无项目归属；无绑定上下文。普通无项目任务与 schedule 物化都走这里。"
+      }
+    },
+    {
+      "example_id": "new-task-not-in-roster",
+      "task_path": "POST /api/tasks (该角色已离册，绑定行保留)",
+      "target_binding_state": "not_in_roster",
+      "null_layout": "行值照存（含 runner/model 标识与 alias）；运行器派生字段仍可给；指纹按内容规则给出",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "not_in_roster",
+        "runner_id": "runner:dsh-cli",
+        "runtime": "dsh",
+        "model_source": "builtin",
+        "provider_id": "managed:deepseek",
+        "connection_ref": "native-deepseek-managed-login",
+        "model_id": "deepseek-flash",
+        "model_alias": null,
+        "model_display_name": "DeepSeek Flash",
+        "binding_fingerprint": "33499d057832b11971b95d0a1f05c9646c3183936a3f32af3d8c7ac400358c9f",
+        "note": "角色已离册，绑定行保留但不有效；不报 bound、不自动删除、不猜模型"
+      }
+    },
+    {
+      "example_id": "new-task-not-in-roster-without-row",
+      "task_path": "POST /api/tasks (该角色已离册，且没有绑定行)",
+      "target_binding_state": "not_in_roster",
+      "null_layout": "无行 → 绑定字段全 null；指纹 null；状态仍是 not_in_roster（序 3 优先于序 5 unconfigured）",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "not_in_roster",
+        "runner_id": null,
+        "runtime": null,
+        "model_source": null,
+        "provider_id": null,
+        "connection_ref": null,
+        "model_id": null,
+        "model_alias": null,
+        "model_display_name": null,
+        "binding_fingerprint": null,
+        "note": "离册优先于未配置；这是 #192 R1 明确要求覆盖的分支（旧稿 SQL 在此返回 0 行）"
+      }
+    },
+    {
+      "example_id": "new-task-member-missing",
+      "task_path": "POST /api/tasks (目标 member 已从 members 删除，绑定行保留)",
+      "target_binding_state": "member_missing",
+      "null_layout": "行值照存；指纹按内容规则给出",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "member_missing",
+        "runner_id": "runner:dsh-cli",
+        "runtime": "dsh",
+        "model_source": "custom_api",
+        "provider_id": "user:deepseek-openai",
+        "connection_ref": "user-deepseek-conn-2",
+        "model_id": "deepseek-chat",
+        "model_alias": null,
+        "model_display_name": null,
+        "binding_fingerprint": "892430b02b2190112b75f4faddb4d4f6e39a3e2abafea276cb6b0bc345e66a00",
+        "note": "身份已不存在；保留存储但记录失效原因"
+      }
+    },
+    {
+      "example_id": "new-task-member-disabled",
+      "task_path": "POST /api/tasks (目标成员 disabled_at 非空)",
+      "target_binding_state": "member_disabled",
+      "null_layout": "行值照存；指纹按内容规则给出",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "member_disabled",
+        "runner_id": "runner:codex-cli",
+        "runtime": "codex",
+        "model_source": "custom_api",
+        "provider_id": "user:openai",
+        "connection_ref": "user-openai-conn-9",
+        "model_id": "gpt-5-codex",
+        "model_alias": null,
+        "model_display_name": null,
+        "binding_fingerprint": "c9805b8e91af600620d48667c696d6fe0c5808931f612fdef2b984755522e121",
+        "note": "成员被全局禁用；绑定存储保留但不有效"
+      }
+    },
+    {
+      "example_id": "new-task-not-agent",
+      "task_path": "POST /api/tasks (member_id 现在指向 human)",
+      "target_binding_state": "not_agent",
+      "null_layout": "行值照存；指纹按内容规则给出",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "not_agent",
+        "runner_id": "runner:dsh-cli",
+        "runtime": "dsh",
+        "model_source": "builtin",
+        "provider_id": "managed:deepseek",
+        "connection_ref": "native-deepseek-managed-login",
+        "model_id": "deepseek-flash",
+        "model_alias": null,
+        "model_display_name": "DeepSeek Flash",
+        "binding_fingerprint": "33499d057832b11971b95d0a1f05c9646c3183936a3f32af3d8c7ac400358c9f",
+        "note": "kind != agent；保留存储但不有效"
+      }
+    },
+    {
+      "example_id": "new-task-runner-missing",
+      "task_path": "POST /api/tasks (绑定行的 runner_id 已不在登记表)",
+      "target_binding_state": "runner_missing",
+      "null_layout": "行值照存（含 runner_id）；runtime/runner_display_name/runner_status 为 null；因 runtime 无法解析，指纹为 **null**",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "runner_missing",
+        "runner_id": "runner:gone",
+        "runtime": null,
+        "model_source": "builtin",
+        "provider_id": "managed:somewhere",
+        "connection_ref": "native-somewhere-login",
+        "model_id": "some-model-id",
+        "model_alias": null,
+        "model_display_name": null,
+        "binding_fingerprint": null,
+        "note": "登记表中找不到该 runner_id；runtime 无法解析，故内容指纹也为 null；存储必填五项齐全，所以不会被 partial 提前覆盖"
+      }
+    },
+    {
+      "example_id": "new-task-runner-retired",
+      "task_path": "POST /api/tasks (绑定行的运行器已 retired)",
+      "target_binding_state": "runner_retired",
+      "null_layout": "行值照存；运行器派生字段来自登记表；六值可解析 → 指纹给出",
+      "target_binding_snapshot": {
+        "schema_version": "role-binding-snapshot-1",
+        "snapshot_at": "2026-10-08T13:52:10.100000+00:00",
+        "state": "runner_retired",
+        "runner_id": "runner:kimi-code-cli",
+        "runtime": "kimi-code",
+        "model_source": "builtin",
+        "provider_id": "managed:kimi-code",
+        "connection_ref": "native-kimi-code-managed-login-alt",
+        "model_id": "kimi-for-coding",
+        "model_alias": "kimi-code/kimi-for-coding",
+        "model_display_name": "K2.8 Preview",
+        "binding_fingerprint": "7061e3302b8e8a9cdef3898e7e542a98ea4a6faddfc26dfc92a4fee71c1ce9cf",
+        "note": "运行器登记为 retired；不用于新绑定，但历史快照保留"
+      }
+    },
+    {
+      "example_id": "legacy-task-not-recorded",
+      "task_path": "历史任务（本能力启用前创建）",
+      "target_binding_state": null,
+      "target_binding_snapshot": null,
+      "read_note": "target_binding_state IS NULL 表示“未记录（legacy_unrecorded）”。不得推断成 unconfigured，也不得回填任何模型值。"
+    }
+  ],
+  "role_binding_read_examples": [
+    {
+      "example_id": "legacy-role-unconfigured",
+      "request": "GET /api/projects/prj_e8fe7066bbec/agents",
+      "response_item": {
+        "member_id": "agent:codex",
+        "business_role": "lead",
+        "decision_tier": "decision",
+        "binding": null,
+        "binding_state": "unconfigured"
+      },
+      "read_note": "旧角色未配置绑定 → binding: null + binding_state=unconfigured。业务角色与决策分级不受影响；不伪造默认运行器或模型。"
+    },
+    {
+      "example_id": "orphan-binding-after-offboard",
+      "request": "GET /api/projects/prj_e8fe7066bbec/agents/agent:deepseek/binding",
+      "response": {
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:deepseek",
+        "binding": {
+          "runner_id": "runner:dsh-cli",
+          "runtime": "dsh",
+          "runner_display_name": "DeepSeek Harness (CLI)",
+          "runner_status": "discoverable",
+          "model_source": "builtin",
+          "provider_id": "managed:deepseek",
+          "connection_ref": "native-deepseek-managed-login",
+          "model_id": "deepseek-flash",
+          "model_alias": null,
+          "model_display_name": "DeepSeek Flash",
+          "binding_state": "not_in_roster",
+          "binding_fingerprint": "33499d057832b11971b95d0a1f05c9646c3183936a3f32af3d8c7ac400358c9f",
+          "updated_by": "human:bobo",
+          "updated_at": "2026-10-08T13:48:10.000000+00:00"
+        },
+        "binding_state": "not_in_roster"
+      },
+      "read_note": "离册后行**保留**，返回存储值 + 失效状态；不 404、不自动删除、不报 bound。"
+    },
+    {
+      "example_id": "unknown-identity",
+      "request": "GET /api/projects/prj_e8fe7066bbec/agents/agent:ghost/binding",
+      "response": {
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:ghost",
+        "binding": null,
+        "binding_state": "member_missing"
+      },
+      "read_note": "成员不存在且无绑定行：binding=null，状态回答原因（member_missing），不是 unconfigured。R1 明确：单条事实 SQL 在此必须返回 1 行（旧稿返回 0 行）。"
+    },
+    {
+      "example_id": "unknown-project",
+      "request": "GET /api/projects/prj_not_registered/agents/agent:codex/binding",
+      "response_status": 404,
+      "read_note": "项目不存在 → **404**，保持原 API 错误语义；事实读取的 project_exists=0 只用来判 404，**不**造出任何 binding_state。"
+    },
+    {
+      "example_id": "disabled-member-with-row",
+      "request": "GET /api/projects/prj_e8fe7066bbec/agents/agent:parked/binding",
+      "response": {
+        "project_id": "prj_e8fe7066bbec",
+        "member_id": "agent:parked",
+        "binding": {
+          "runner_id": "runner:codex-cli",
+          "runtime": "codex",
+          "runner_status": "unverified",
+          "model_source": "custom_api",
+          "provider_id": "user:openai",
+          "connection_ref": "user-openai-conn-9",
+          "model_id": "gpt-5-codex",
+          "model_alias": null,
+          "model_display_name": null,
+          "binding_state": "member_disabled",
+          "binding_fingerprint": "c9805b8e91af600620d48667c696d6fe0c5808931f612fdef2b984755522e121",
+          "updated_by": "human:bobo",
+          "updated_at": "2026-10-08T13:48:30.000000+00:00"
+        },
+        "binding_state": "member_disabled"
+      },
+      "read_note": "禁用成员仍可看到保留的绑定与其失效原因。"
+    },
+    {
+      "example_id": "priority-order-example",
+      "combinations": [
+        {
+          "facts": "离册 + runner retired",
+          "state": "not_in_roster",
+          "why": "身份/名册事实（序 3）优先于运行器事实（序 8）"
+        },
+        {
+          "facts": "禁用 + 离册",
+          "state": "member_disabled",
+          "why": "序 2 优先于序 3"
+        },
+        {
+          "facts": "未注册 + 无绑定行",
+          "state": "member_missing",
+          "why": "身份失效优先于“无行”"
+        },
+        {
+          "facts": "在册 + 无绑定行",
+          "state": "unconfigured",
+          "why": "序 5"
+        },
+        {
+          "facts": "离册 + 无绑定行",
+          "state": "not_in_roster",
+          "why": "序 3 优先于序 5；R1 要求单条 SQL 在此仍返回 1 行"
+        },
+        {
+          "facts": "在册 + 行缺 model_id",
+          "state": "partial",
+          "why": "序 6"
+        },
+        {
+          "facts": "在册 + 行完整但登记表查不到 runner_id",
+          "state": "runner_missing",
+          "why": "存储五项齐全 → 不被 partial 抢先，落到序 7"
+        }
+      ]
+    }
+  ],
+  "offboarding_lifecycle_example": {
+    "scenario": "角色离册 → 新任务 → 回册（F3）",
+    "steps": [
+      {
+        "step": 1,
+        "action": "同步前：agent:kimi-code-k28-preview 在册且有完整绑定 v1",
+        "get_binding_state": "bound",
+        "row_exists": true
+      },
+      {
+        "step": 2,
+        "action": "POST /api/projects/{id}/sync 全量替换，名册不再包含该成员",
+        "get_binding_state": "not_in_roster",
+        "row_exists": true,
+        "note": "绑定行**保留**；不自动删除"
+      },
+      {
+        "step": 3,
+        "action": "此时创建新任务（任务权限不变，仍可创建）",
+        "task_state": "not_in_roster",
+        "snapshot_fields": "行值照存（含 runner/model 标识与 alias）",
+        "note": "不报 bound；不猜默认模型"
+      },
+      {
+        "step": 4,
+        "action": "POST /sync 再次包含该成员（回册）",
+        "get_binding_state": "bound",
+        "row_exists": true,
+        "note": "同一行自动恢复有效，无需重建绑定"
+      },
+      {
+        "step": 5,
+        "action": "回册后创建新任务",
+        "task_state": "bound",
+        "note": "步骤 3 的历史任务快照逐字节不变（not_in_roster 记录保留）"
+      }
+    ],
+    "invariants": [
+      "任何步骤都不自动删除绑定行，也不修改历史任务快照",
+      "任何步骤都不改变既有任务创建/claim 权限",
+      "任何步骤都不猜模型；失效状态如实报告"
+    ],
+    "credential_free": true
+  },
+  "actual_vs_config_examples": {
+    "availability": "本片（B1a/B1b）只做**配置记录**；下列实际值字段与对照算法属于 B2，必须另开设计片；B1/B3 禁止输出任何 binding_match* 字段。",
+    "examples": [
+      {
+        "example_id": "alias-is-not-model-id",
+        "reported_model_alias": "kimi-code/k3",
+        "reported_model_id": null,
+        "interpretation": "kimi-code/k3 是运行器侧 **alias**（同时是原生调用选择参数），不是 model_id；没有 model_id 时实际模型为 unknown。禁止把 alias 填进 model_id，也禁止拿 alias 与配置 model_id 比较后声称 match。",
+        "actual_match": "unknown",
+        "availability": "B2"
+      },
+      {
+        "example_id": "config-only",
+        "report_evidence_kind": "config_only",
+        "reported_model_id": "kimi-for-coding",
+        "interpretation": "只知道“按配置启动”，没有运行期证据说明本次会话实际用了哪个模型。",
+        "actual_match": "unknown",
+        "availability": "B2"
+      },
+      {
+        "example_id": "no-report-at-all",
+        "report_evidence_kind": "unknown",
+        "reported_model_id": null,
+        "interpretation": "未上报：显示“实际模型未上报”，不得回退显示配置值并声称是本次实际模型。",
+        "actual_match": "unknown",
+        "availability": "B2"
+      },
+      {
+        "example_id": "same-model-different-connection",
+        "configured": {
+          "model_source": "builtin",
+          "provider_id": "managed:kimi-code",
+          "connection_ref": "native-kimi-code-managed-login",
+          "model_id": "kimi-for-coding"
+        },
+        "reported_without_connection": {
+          "model_id": "kimi-for-coding"
+        },
+        "interpretation": "缺 provider_id/connection_ref 时无法判断是否同一条连接，即使 model_id 相同也**不能**判 match；必须保持 unknown。完整比较需要 运行器/来源/provider/连接/模型 全部维度。",
+        "actual_match": "unknown",
+        "availability": "B2"
+      },
+      {
+        "example_id": "instance-reuse-must-not-rewrite-history",
+        "task_901_snapshot_model_id": "kimi-for-coding",
+        "instance_latest_reported_model_id_after_task_902": "kimi-k3-latest",
+        "rule": "agent_instances 是原地覆盖最新值（server/routes/instances.py:50-57）。task-901 的实际结论必须由 task-901 自己 attempt 的不可变证据回答；用“实例最新值”反推历史 attempt 是错误来源，必须禁止。",
+        "actual_match_for_task_901": "unknown（除非有 task-901 自己的 attempt 证据）",
+        "availability": "B2"
+      },
+      {
+        "example_id": "reclaim-same-instance",
+        "scenario": "同一实例领到 task-903 后又被重领/续接",
+        "rule": "重领/续接各 attempt 各自留证；不能把后一次 attempt 的实际模型套到前一次 attempt。",
+        "actual_match": "unknown",
+        "availability": "B2"
+      }
+    ],
+    "b2_prerequisites": [
+      "R-B2-1 关联锚点：project_id + task_id + attempt 可保存证据",
+      "R-B2-2 维度完整：runner/runtime、model_source/provider_id、connection_ref、model_id（alias 是调用参数，只作展示/辅助，不作比较基准）",
+      "R-B2-3 不可变证据：按 attempt 留存，禁用实例最新值派生历史",
+      "R-B2-4 unknown 降级：不可得或 config_only → actual_match=unknown",
+      "R-B2-5 命名分离：binding_match_config 与 binding_match_actual 分开",
+      "R-B2-6 证据类型：runtime_reported / config_only / unknown"
+    ]
+  },
+  "unverified_or_unknown_examples": [
+    {
+      "example_id": "workbuddy-execution-unverified",
+      "claim": "WorkBuddy 是否具备同名绑定字段或执行侧接单能力",
+      "status": "unknown",
+      "reason": "仓库内无代码或合同字段证据；只有历史分配侧记录。未核实不作结论，也不据此排期开发。"
+    },
+    {
+      "example_id": "runtime-per-task-model-switch",
+      "claim": "任何运行器能否在运行期按任务切换运行器/模型/连接",
+      "status": "unknown",
+      "reason": "仓库内模型在启动 argv 固定（bridges/kimi_bridge.py:95），无实现也未实测。"
+    },
+    {
+      "example_id": "k28-real-acceptance",
+      "claim": "Kimi Code + K2.8 真实接单闭环",
+      "status": "deferred",
+      "reason": "成员已注册、入口代码已复核，但项目名册同步待人类完成、运行器未启动、真实模型未调用；维持延后验证。"
+    },
+    {
+      "example_id": "l1-1-identity-precheck",
+      "claim": "L1-1（agent:kimi 独立分配侧）的身份预检与真实模型主控闭环",
+      "status": "historical_record_not_reverified",
+      "recorded_in": "#190 与既有项目文档的历史记录",
+      "reason": "本片（#192）**未重核**该项，因此这里只保留“历史记录曾有该限制”这一事实，**不构成当前仍然缺失/缺凭据的断言**；也不得由 K2.8（agent:kimi-code-k28-preview）的注册状态反向推翻或替代。两者互不作证。"
+    }
+  ],
+  "publication_status": "design_reviewed_not_implemented",
+  "published_contract": "ROLE_MODEL_BINDING_DESIGN.md",
+  "publication_clarifications": "错误码由调用API映射（项目接口404、任务创建400）；单条SQL保证同一事务视图，已有事务遵守其视图/自身写入规则。原稿不追改。"
+}

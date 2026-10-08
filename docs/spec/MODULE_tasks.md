@@ -3,6 +3,8 @@
 > 所属项目：TALK
 > 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 已于 2026-09-06 通过项目管理者人工验收，根任务 `#15` 与子任务 `#16/#17/#18` 均已完成；TH-7a 普通终端 stdio MCP 入口与只读连接检查已实现；L1-1 已交付 Kimi Code 独立会话入口的模板/预检/无密钥启动器（配置可用与工具目录已验证，真实身份预检缺本人凭证、真实模型主控闭环未运行），具体客户端安装与真实模型验收待后续推进
 
+> 2026-10-08 新设计（尚未实现）：[运行器/模型角色绑定合同](ROLE_MODEL_BINDING_DESIGN.md)与[实施计划](ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)已独立复核发布；先 B1a 登记/角色绑定，再 B1b 在 `_create_task_with_hall` 统一构造新任务配置快照。当前 `agent_tasks` 尚无这些快照列；普通/子任务/schedule 覆盖、历史不追改、原任务权限及 400 错误码保持是后续 B1b 的验收义务。
+
 ## 目标
 
 提供一个服务端任务队列，让人类或其它已认证成员可以把一段工作请求记录为 task，由目标 `agent:*` 成员的 bridge 实例领取、执行并回写最终状态。当前阶段只做任务记录和分派，不由 TALK 自动启动 bridge 进程。

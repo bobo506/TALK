@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-08 23:45 运行器/模型角色绑定设计独立通过，#190–#192收取并发布
+
+- 需求与范围：用户指定DeepSeek开发、Codex验证，优先通用运行器登记/项目角色绑定与新任务配置快照设计；身份/业务职责/决策分级独立，凭据仓库外；共5组合8方向仅目标。K2.8入口已经准备，真实使用按用户要求延期。此次不改生产代码/库/配置，不启动运行器/服务，不调用模型。
+- 原#190/msg2692六项设计问题与#191/msg2693剩余R1–R3已保留在历史和独立review；#192/msg2694第二次定向补正。Codex收到完成通知后检查完整交付摘要/本地expect192格式、实际草稿/SQL/计划/样例，未只采信complete自报。
+- R1闭合：最终SQL为单行requested参数CTE，独立LEFT JOIN项目/成员/名册/绑定/登记，返回27唯一别名与六个此前遗漏字段；合同和计划原文hash a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e相同。Codex自行构造14种状态（空绑定四例、离册有/无绑定、bound、runner_missing/retired、runtime不可解析、partial及优先级）各1行/1SQL；无项目0SQL、缺项目1行且不造绑定状态。
+- R2/R3闭合：partial仅绑定存储必填五项；runner_missing的runtime/指纹均null，retired可解析才有指纹；alias是原生调用选择参数，六维指纹不表示完整调用配置，同指纹alias变更仍逐任务留存。11样例快照13键与指纹独立核算通过，无read_receipt字段；允许授权审查含脱敏标识，服务端不自动混入任务正文。历史L1-1未重核、静态检查限定server生产构造，测试fixture放行。
+- 发布澄清由Codex维护正式设计文档：原任务项目不存在400与项目API404分别保留，事实助手不固化HTTP错误；SQLite单SQL保证同一数据库视图，已有真实读/写事务沿用视图/自身写入，不无条件称最新提交。独立隔离WAL两连接实测既存读事务仍见old而另一连接已提交new，事务结束后见new；写事务见自身未提交值。子任务授权UPDATE已有真实事务，不当pending、不重复BEGIN、不提前commit；B20加入真实实施验收。修正计划把损坏快照JSON当partial和禁止读取已有快照的过宽措辞，配置算法/SQL未改。原开发报告不追改。
+- 冻结与范围：790源文件全量检查788保持，仅两份协调进度合法变化；原190七稿/191十三稿哈希保持，192十一稿冻结到original-192。发布后源变化仅五份声明的相关文档，另新增三份设计文件；正式文件UTF-8无BOM/无替换字符，SQL原文保持、diff检查通过；未涉及生产代码/测试/Key/名册/运行配置。
+- 交付文件：docs/spec/ROLE_MODEL_BINDING_DESIGN.md、ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md、ROLE_MODEL_BINDING_EXAMPLES.json；同步docs/PROJECT_BRIEF.md、docs/spec/DEVELOPMENT_ROADMAP.md、MODULE_tasks.md及两份进度。独立证据.tmp/role-model-binding-design-final-fix-review/，回执.tmp/role-model-binding-design-receipt/acceptance.json。
+- 收取：已按192→191→190调用talk_collect_result，msg2694/2693/2692均succeeded/completed。只代表设计与补正链验收，未宣称B1a/B1b已实现或真实模型/主动等待已验。没有重跑原191压力实验，本次确定性SQL/事务检查不能代替生产并发验收。
+- 下一步：本轮设计收尾后暂停，不再开片。下次读取最新开发要求，派一个B1a登记/角色绑定实施任务，DeepSeek开发、Codex独立实际代码复核；B1a收取后才派B1b快照。B2另设计真实不可变attempt证据与未知降级，页面/工具/进程生命周期各按依赖推进；K2.8下次使用再人工名册同步/在线核验/真实接单。
+
+
 ## 2026-10-08 22:43 (Asia/Shanghai) #191补正复核仍changes_requested；派#192聚焦R1-R3
 
 - 用户通知“191 ok”；talk_get_delivery完整未裁剪191/msg2693，合法自身191一致complete自报，11完成/0未完成/0阻塞、13文件/10限制/11验证（8pass/3not_run），runner succeeded/submitted、未收取。工作区干净HEAD=c3ec201，DeepSeek实例idle；开发暂停后独立核查。
