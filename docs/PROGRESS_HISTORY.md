@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-08 21:28 (Asia/Shanghai) K2.8独立成员注册与本地名册应用准备（人类同步待办）
+
+- 用户“好的，那你先操作吧”授权先准备并应用接入。Codex作为决策角色执行配置与注册，不派新开发任务；临时DeepSeek开发、Codex复核继续。usage-gate在UTC13:16返回continue，session19%/weekly23%。
+- 先以当前Codex MCP Key只读确认caller=agent:codex/kind=agent、目标成员不存在、目标外置Key文件不存在；实际三条名册与scan_agents逐字段一致。目录映射实际只把冒号替换为下划线，因此指南agent_kimi_code_k28_preview会产生错误ID，已纠正为agent_kimi-code-k28-preview。
+- 新建仓库外C:/Users/Administrator/.talk/agent-kimi-code-k28-preview.key，随机生成、UTF-8独占创建，不覆盖旧文件；ACL去继承并仅允许当前用户/SYSTEM/Administrators。POST /api/members返回201，GET /api/members/me实测agent:kimi-code-k28-preview/kind=agent、显示名正确、disabled_at=null。Key未输出、未写仓库/结果/任务/命令参数。
+- 本地三个身份档IDENTITY/SOUL/USER记录runtime/模型来源/provider/连接引用/alias/backend及dev/execution、一片一停边界；groups.yaml添加新成员配置。scan_agents得到4条；原三条全部字段保持，完整同步载荷保存在.tmp/kimi-k28-executor-application/roster-sync.json，原服务端基线baseline-roster.json。
+- 用当前agent:codex向真实sync API提交完整保留包，HTTP403；_require_human门禁在任何名册变更前拒绝，随后GET确认服务端仍原3条且所有字段保持。没有切换Codex MCP身份、读取/使用人类凭据、造人类身份或直接改数据库。
+- 入口check --require-key及launch --dry-run通过；check --require-key --online-identity唯一失败为新成员未入项目名册，identity_verified=false。Key不在stdout/stderr，dry-run正常脱敏；没有真实bridge启动、实例上报或模型推理。原native K3 default、Codex配置与既有身份档共15文件SHA保持。
+- 准备人类本地应用入口.tmp/kimi-k28-executor-application/apply_roster.py与README.md：getpass不回显本人human Key，先核验kind=human及新成员Key，hash固定准备包，写前名册严格比对基线；只新增目标、保留原角色字段，基线变动停止。以真实新agent Key独立验证错误身份仅1GET、0POST并被拒；语法编译与UTF-8读取通过。应用文件无新Key/Codex Key明文；人类成功路径尚未实际执行。
+- 本地初次httpx工具因环境SOCKS代理缺socksio在请求前失败，改为trust_env=False直连127.0.0.1完成；现有执行入口urllib只读检查正常，无项目代码或原生代理配置变更。首次验证脚本误把dry-run正常stderr提示视为失败，调整验证记录后通过；未改入口代码。
+- 变更文件：.talk/groups.yaml，.talk/agents/agent_kimi-code-k28-preview/IDENTITY.md、SOUL.md、USER.md，AGENTS.md、docs/guides/KIMI_K28_EXECUTOR.md、PROJECT_BRIEF.md、PROGRESS.md、PROGRESS_HISTORY.md。应用包/回执位于忽略目录.tmp，密钥仅仓库外。无需重跑82项代码测试；本轮未改执行代码，验证针对身份、同步范围、配置与原文件保护。
+- 待办：人类在项目根PowerShell运行`.\.venv\Scripts\python.exe -X utf8 .tmp/kimi-k28-executor-application/apply_roster.py`并输入已有本人human Key（不发聊天）。名册同步后Codex补只读在线门禁，额度允许再安排最小生产接单闭环。当前属于注册/本地准备部分完成，不宣称入册、在线或实际K2.8模型/成本/速度验收通过。常规Git提交推送结果见本次application.json。
+
 ## 2026-10-08 19:21 (Asia/Shanghai) 验收并收取186/185，规格发布待187暂停
 
 - 用户提醒昨天186未接收，要求检查。读取186/msg2688与185/msg2687完整同响应交付，均合法自身号一致complete、runner succeeded/submitted；独立复核186为7完成/0未完成/0阻塞、11验证（9pass/2not_run），已实际检查G1-G8与D4源码、两文件4hunk范围/历史/patch正反/链接/闭合清单，无返工。

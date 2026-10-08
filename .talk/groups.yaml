@@ -14,5 +14,8 @@ groups:
       - member_id: agent:kimi
         business_role: reviewer
         decision_tier: execution
+      - member_id: agent:kimi-code-k28-preview
+        business_role: dev
+        decision_tier: execution
       - member_id: human:bobo
         business_role: stakeholder

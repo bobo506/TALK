@@ -184,16 +184,18 @@ python scripts/kimi_k28_executor.py launch --dry-run --key-file "<KEY_FILE>"
   本片没有修改任何全局配置，因此不存在需要还原的 native 配置改动。
 - 本入口**不**自行注册成员、不创建任务、不改任务状态；注册由决策角色复核后处理。
 
-## 6. 正式注册与项目名册接入（待决策角色执行）
+## 6. 正式注册与项目名册接入
 
-本片**没有**注册成员，也没有改 `.talk/groups.yaml`。正式接入需要：
+入口脚本不自动首次注册成员，也不写项目名册。正式接入需要：
 
 1. 由决策角色在 TALK 注册/登记成员 `agent:kimi-code-k28-preview`
-   （`kind=agent`、`display_name="Kimi Code · K2.8 Preview 执行"`），并交付本人 API Key；
+   （`kind=agent`、`display_name="Kimi Code · K2.8 Preview 执行"`），把独立随机 API Key 保存于仓库外；不在聊天、日志或命令参数中交付明文；
 2. 把该成员加入项目 `prj_e8fe7066bbec` 的 agent 名册，`business_role=dev`、
-   `decision_tier=execution`（`.talk/groups.yaml` 或角色页，按当前流程走）；
+   `decision_tier=execution`。本地 `.talk/groups.yaml` 与独立 profile 只是同步来源；
+   `POST /api/projects/{project_id}/sync` 必须由人类身份执行，且会整体替换名册，
+   因此载荷必须保留所有现有角色及其字段，写前重新核对基线；Agent Key 会被 HTTP 403 拒绝；
    `launch` 会用只读名册核验这一步，缺失或不一致直接拒绝启动；
-3. 可选：为它准备独立身份档 `.talk/agents/agent_kimi_code_k28_preview/{IDENTITY,SOUL,USER}.md`；
+3. 可选：为它准备独立身份档 `.talk/agents/agent_kimi-code-k28-preview/{IDENTITY,SOUL,USER}.md`；
    没有档时 bridge 只是不注入该成员的 profile，不影响模型锁与工具档；
 4. 用 `check --require-key --online-identity` 确认 `member_id` / `project_id` / 名册角色就是本人；
 5. 权限不足或名册字段不支持时应在角色页/项目 API 侧配置，本入口不实现平台侧改造。
