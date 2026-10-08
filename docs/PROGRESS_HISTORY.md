@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-09 00:07 用户授权继续，派DeepSeek #193 B1a后端实施
+
+- 用户确认继续，维持DeepSeek开发、Codex独立复核；派前读取项目最新开发要求（后端DeepSeek，常规交叉复核本轮依用户指定覆盖），caller=agent:codex/kind=agent，项目passive/version6、effective null/not_bound。usage-gate continue，session55%/weekly28%是派前实际快照，不假定后续比例。
+- 源码与已审设计实际HEAD=752ea1e43ce3182c9a8891fabdb97d20444ab976，派前工作区干净。Codex澄清实施计划A19笔误：未注册member_exists=0，其余已注册三例1；最终SQL原文/合同不变。这是协调方文档修改，不由执行者改正式规格。冻结全部793 tracked工作树SHA，含tracked .tmp/.tmp-tests；基线清单记此次工作树文档修正。
+- #193已通过最小顶层参数project_id/target_member_id/title/content派发，created_by=agent:codex、target=agent:deepseek，创建时queued/assigned，Hall=group:task-ac611ede64b44471b1f0bee3a1566b79。正式合同/实施计划B1a、测试标准和用户本次覆盖分工纳入包，MCP自动保留development_requirements派发快照。
+- B1a只两表/索引/幂等迁移、运行器登记GET/POST/PATCH、角色绑定GET/PUT、GET agents附加绑定/状态、校验/六维指纹/失效阶梯/单SQL事实助手和隔离测试。源码/测试限定7路径；额外必要路径先说明。不得改任务表/快照/tasks.py、bridge/MCP、SDK/web、实例实际证据/进程管理、生产DB/Key/名册/.talk；不启动服务/运行器或调用模型。
+- 任务包明确空绑定四例仍1行、未注册member_exists=0、27唯一列/1SQL事件计数；GET agents批量联查同视图且无N+1；partial必填五项/派生runtime分离、alias调用选择不冒充实际model、离册回册保留、LWW upsert双连接收敛、认证/权限/错误码兼容及安全边界。A18只保现有开发要求单次键，不为MCP提前暴露binding而越界B3。
+- 开发交付使用.tmp/runner-role-binding-b1a/development.json自身实际193完整合法JSON作为TALK结果，必要A1–A22与现有回归、命令/数量/SQL和并发证据、真实限制与源保护；开发完成暂停，Codex独立检查实际代码后收取与正式文档/Git收尾。执行者不更新正式进度、不自行commit/push/进入B1b。
+- 派发包、开发要求快照、回执与793冻结清单保存.tmp/runner-role-binding-b1a-dispatch/。本轮默认派后结束、用户通知完成后收取，不创建等待任务或主动轮询。协调方只提交A19规格澄清和两份进度；#193开发与验收尚未完成，B1b任务快照/B2实际证据/工具页面继续后置，K2.8真实使用延期保持。
+
+
 ## 2026-10-08 23:45 运行器/模型角色绑定设计独立通过，#190–#192收取并发布
 
 - 需求与范围：用户指定DeepSeek开发、Codex验证，优先通用运行器登记/项目角色绑定与新任务配置快照设计；身份/业务职责/决策分级独立，凭据仓库外；共5组合8方向仅目标。K2.8入口已经准备，真实使用按用户要求延期。此次不改生产代码/库/配置，不启动运行器/服务，不调用模型。

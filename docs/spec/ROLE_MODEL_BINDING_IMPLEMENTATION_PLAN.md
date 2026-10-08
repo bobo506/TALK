@@ -112,7 +112,7 @@ PUT    /api/projects/{project_id}/agents/{member_id}/binding
 | A16 | 项目删除 | 绑定行被清理；名册孤儿行不追改 | `server/routes/projects.py:668-689` |
 | A17 | **upsert 并发收敛**（D3） | 两 session 并发对同一不存在的 `(project_id, member_id)` 写入 → 无 IntegrityError/409，最终 1 行且等于后提交者 | 新 |
 | A18 | 载荷计数保护 | `talk_list_agents` 响应新增 `binding`/`binding_state` 后 `development_requirements` 仍只出现 1 次 | `tests/test_project_development_requirements.py:404-419`（B3 相关，B1a 先加冒烟断言） |
-| A19 | **R1 事实读取：无绑定四例** | 已入册无绑定/禁用无绑定/未注册无绑定/非 agent 无绑定：`read_role_binding_facts` 各返回**恰好 1 行**，`project_exists=1`、`member_exists=1`、`binding_exists=0`、身份/名册字段正确 | 新（对合同 §7.3 SQL） |
+| A19 | **R1 事实读取：无绑定四例** | 已入册无绑定/禁用无绑定/未注册无绑定/非 agent 无绑定：`read_role_binding_facts` 各返回**恰好 1 行**，`project_exists=1`、`binding_exists=0`；已注册三例 `member_exists=1`，未注册例 `member_exists=0`，身份/名册字段正确 | 新（对合同 §7.3 SQL） |
 | A20 | **R1 事实读取：离册有/无绑定 + 项目不存在 + bound 全字段** | 离册有绑定→`not_in_roster` 且行值照存；离册无绑定→`not_in_roster`；项目不存在→`project_exists=0`（走 404）；bound→27 列全齐、六个快照字段非空 | 新（同上） |
 | A21 | **单语句性质（行为证据）** | SQLAlchemy `before_cursor_execute` 事件计数：带项目分支**恰好 1 条** SQL；`project_id=None` 分支 **0 条**；不得出现第二条补查询 | 新 |
 | A22 | 回归 | `test_projects.py`、`test_project_role_descriptions.py`、`test_project_development_requirements.py` 全绿 | 既有 |
