@@ -1,0 +1,76 @@
+{
+  "_说明": "Kimi Code + K2.8 Preview 独立执行入口的配置合同模板。这是模板，不会被任何程序自动读取；<...> 占位符必须替换成真实绝对路径后再按 docs/guides/KIMI_K28_EXECUTOR.md 使用。密钥正文不要写进本文件，只写仓库外的密钥文件路径。",
+  "schema_version": "kimi-k28-executor-contract-1",
+  "member": {
+    "member_id": "agent:kimi-code-k28-preview",
+    "display_name": "Kimi Code · K2.8 Preview 执行",
+    "business_role": "dev",
+    "decision_tier": "execution",
+    "project_id": "<TALK_PROJECT_ID>",
+    "project_root": "<TALK_PROJECT_WORKSPACE_ABSOLUTE_PATH>",
+    "registration_status": "not_registered_in_this_slice"
+  },
+  "runner": {
+    "entry": "bridges/kimi_bridge.py",
+    "runtime": "kimi-code",
+    "model_source": "builtin",
+    "prompt_transport": "argv",
+    "task_tool_profile": "tools",
+    "discussion_tool_profile": "none",
+    "preflight_tool_profile": "none",
+    "command_override_allowed": false,
+    "controlled_command": "kimi --output-format stream-json -p",
+    "controlled_command_source": "explicit_fixed_contract",
+    "env_command_var": "TALK_KIMI_COMMAND",
+    "env_command_ignored": true,
+    "decision_tier_argv": "execution",
+    "base_url_default": "http://127.0.0.1:8000",
+    "execution_timeout_seconds": 3600,
+    "instance_id": "agent:kimi-code-k28-preview:<uuid4>",
+    "_命令说明": "入口 argv 显式写入 controlled_command，必须等于 bridges/kimi_bridge.py 的 DEFAULT_KIMI_COMMAND；command_override_allowed=false，任何非该值的 --kimi-command 都被拒绝，TALK_KIMI_COMMAND 环境继承同样不生效。只有走该受控分支时三档才会生成带 --model 与 --agent-file 的 Agent 文件。",
+    "_分级与地址说明": "argv 同时显式写入 --decision-tier execution 与同一个 --base-url：远端名册核验的是 execution，固定执行合同不允许既有 cli_bridge 回读本地 .talk/groups.yaml 改成 decision；只读身份预检与实际 bridge argv 使用同一个服务地址，禁止“验 19091、跑 8000”。"
+  },
+  "model": {
+    "provider_id": "managed:kimi-code",
+    "connection_ref": "native-kimi-code-managed-login",
+    "config_path": "<KIMI_CODE_HOME_ABSOLUTE_PATH>/config.toml",
+    "model_config_key": "kimi-code/kimi-for-coding",
+    "model_id": "kimi-for-coding",
+    "model_version_label": "K2.8 Preview",
+    "version_pinned": false,
+    "default_model_untouched": "kimi-code/k3",
+    "display_name_is_not_model_id": true,
+    "_模型说明": "CLI --model 取本地配置别名 kimi-code/kimi-for-coding；后端 model=kimi-for-coding；显示名 K2.8 Preview 只是展示，不得当 API 模型 ID，也不能承诺永久锁后端版本。"
+  },
+  "talk_identity": {
+    "key_env": "TALK_K28_KEY",
+    "key_file": "<OUTSIDE_REPO_KEY_FILE_ABSOLUTE_PATH>",
+    "reuse_agent_kimi_key": false,
+    "_身份说明": "TALK 身份是**独立 TALK Key**：新成员必须使用本人的 `TALK_K28_KEY`（环境变量或仓库外密钥文件），不得复用 agent:kimi 的 Key、登录态或导出凭据；官方 native managed 登录凭据由官方 Kimi Code CLI 自行读取与维护，本入口不读取、不复制、不手工搬运。check 默认离线（--key-env 只接受 TALK_K28_KEY）；launch 在进入 bridge 之前做一次只读在线核验：GET /api/members/me 必须返回本人 member_id 与 kind=agent，且本人已在项目 prj_e8fe7066bbec 名册中且 business_role=dev / decision_tier=execution；未注册、他人 Key、错误项目、角色不符或网络失败都会在 client.register / 实例上报 / 模型调用之前终止，本入口不自动首次注册。HTTP 失败只回 HTTP 状态与固定短说明，不回显服务端正文（正文可能原样回显任意形态的 Key）。"
+  },
+  "budget": {
+    "client_tool_timeout_ms": {
+      "value": 660000,
+      "unit": "ms",
+      "source": "deploy/kimi-code/mcp.talk.template.json（模板事实）",
+      "loaded_on_host": false,
+      "verified_on_host": false,
+      "note": "模板值不是本机已核验的宿主上限，不得当实际能力使用"
+    },
+    "explicit_wait_seconds": {
+      "value": null,
+      "margin_seconds": null,
+      "enabled": false,
+      "reason": "宿主单次工具上限 T 未核验；未核验 T 时不启用主动长等待"
+    },
+    "bridge_execution_timeout_seconds": {
+      "value": 3600,
+      "source": "本入口合同显式值"
+    },
+    "identity_preflight_http_timeout_seconds": {
+      "value": 15.0,
+      "source": "本入口只读身份核验单次 GET 超时；最多两次 GET，与 bridge 整轮预算分开"
+    },
+    "initiator_wait_in_this_slice": false
+  }
+}

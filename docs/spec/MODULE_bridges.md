@@ -257,3 +257,11 @@ DeepSeek #42/#44 实现返修、Kimi #43/#45 独立复核；最终 140 项定向
 ### I-3C正式发布状态（2026-10-08）
 
 上节“I-3C本片同步中”“待独立复核与正式发布”是#185起草时快照。#186已独立复核通过，186/185已实际收取；Codex在#187开发暂停后核16来源＋14草稿零漂移，按已审草稿发布本规格与PROJECT_INTEGRATION，再追加本发布状态说明。I-3文档同步已闭合；最新MCP说明重载、实际T/W及I-4真实主动/G8/长等待/取消/排队仍未验收。原草稿、原报告与历史测试保持，回执见.tmp/initiator-mode-spec-sync-receipt/acceptance.json。
+
+### Kimi Code＋K2.8 Preview独立执行入口（2026-10-08，代码/零模型边界通过）
+
+- DeepSeek #187开发经#188/#189定向补正、Codex独立实际源码/启动路径复核通过；相关82项测试全部通过、0跳过（含管道与loopback HTTP）。三项原门禁与地址/分级/文件Key补正全部闭合，189→188→187已收取；原失败/自报/复核报告保留。
+- scripts/kimi_k28_executor.py复用既有kimi_bridge，拟独立成员agent:kimi-code-k28-preview、dev/execution。受控固定命令与三档Agent文件、--model kimi-code/kimi-for-coding、--decision-tier execution显式绑定；讨论/预检无工具，任务tools档，环境命令或本地decision配置不能改变合同。预检与实际bridge使用同一base_url。
+- 启动先只读核native配置及本项目绑定，再GET真实本人kind与项目dev/execution名册，全部通过才进入bridge；未注册/不一致/失败不首次注册。独立TALK Key只经环境/仓库外文件注入内存；HTTP错误正文不读取不回显，按本次Key精确脱敏。现有agent:kimi与默认kimi-code/k3保持。
+- 这是本入口局部合同，不是全平台runtime/model_source/provider/connection字段已入schema；别名是滚动模型引用，不承诺永久K2.8版本。真实新成员注册/名册/Key应用、bridge启动、生产领取交付与模型质量/耗时/额度尚未验收；宿主T未知，660000ms仅模板，不启用主动长等。bridge --timeout 3600与身份单GET 15秒、发起侧等待分别记录。
+- 准备、检查、启动/回退及最小接单步骤见[Kimi K2.8执行入口指南](../guides/KIMI_K28_EXECUTOR.md)；独立验收回执.tmp/kimi-k28-executor-receipt/acceptance.json，I-4/其它模型组合另片。

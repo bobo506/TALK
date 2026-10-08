@@ -6242,3 +6242,13 @@ Updated: 2026-10-04 (Asia/Shanghai)
 原R1环境命令/自定义覆盖已修，原R2真实launch配置/项目门禁与非法类型/key-env已修，R3虽增加GET本人kind和项目dev/execution核验，但独立needs_rework：B1指定19091预检后实际bridge仍8000；B2远端execution＋本地decision时launch返回0、实际分级decision；B3普通ASCII文件Key被HTTP500 detail回显后进入报告（通用脱敏未知道本次Key）。纯fixture证据boundary-repro.json：0模型/0生产调用，review.json记录三个实际位置/要求，旧187/188与快照保持。187/188暂不收取，不提交这5未通过文件，不注册成员/名册、不启停bridge、不消耗Kimi。
 
 派发前读取最新development_requirements与caller=agent:codex/kind=agent；按用户临时DeepSeek开发/Codex复核派实际189（title=189-Kimi K2.8预检与运行对象一致性补正，created_by agent:codex、target agent:deepseek、project prj_e8fe7066bbec、Hall group:task-edcf8c62973c4226b9e310d89ffd977b，UTC2026-10-08T12:07:57.427297，queued/assigned仅派发快照）。最小顶层参数，无子任务字段；包.tmp/kimi-k28-executor-final-rework-dispatch/含原188/187完整需求、当前基线8539796、5文件SHA/42冻结与72项独立证据。只修地址/实际职责分级/确切文件Key错误脱敏与必要测试/模板，全部既有门禁保持；正式进度由Codex两文档例外维护，不并行改码。完成暂停，由用户通知后复核，通过才收取189→188→187及Git收尾。185/186发布不变，真实K2.8生产闭环/模型表现/T/W/I-4仍待验收。
+
+## 2026-10-08：189独立通过，187/188/189入口组合验收与收取
+
+用户通知“189好了”。189/msg2691合法自身189一致complete（7完成/0未完成/0阻塞、5文件、6验证、4限制），原187/188自报与needs_rework报告保持。Codex独立读取189实际5文件相对188差异，42冻结对象全量SHA＋bytes零漂移；开发82项1skip，本轮独立运行python -X utf8 -m unittest tests.test_kimi_k28_executor tests.test_kimi_bridge tests.test_kimi_talk_entry：82项全部通过0skip，真实PIPE和loopback均运行（4.514秒）。
+
+独立再现原失败条件：base_url19091、本地groups.yaml的decision、TALK_KIMI_COMMAND K3覆盖共同存在时，真实run_launch经假HTTP/bridge返回0，预检两GET与args同19091、resolve_decision_tier=execution、三档正确alias与Agent文件；HTTP500回显普通ASCII文件Key时report和main launch stdout/stderr无Key正文，失败bridge_calls=0；错误项目在HTTP/bridge前失败。native只读check通过、hash不变、默认K3保持；0真实Kimi推理/0生产TALK调用。R1/R2/R3/B1/B2/B3六项闭合，最终组合入口验收通过，无阻塞。证据.tmp/kimi-k28-executor-final-review/含review.json、accepted最终5文件、independent-tests、independent-boundary-repro、offline-check-live；回执.tmp/kimi-k28-executor-receipt/acceptance.json记录最终SHA和限制。
+
+收取前只读核187/msg2689、188/msg2690引用未变、各自自身号一致，最新caller=agent:codex/kind=agent/note=null、项目passive v6/effective not_bound。已按189→188→187实际收取succeeded/completed，UTC12:29:14.041920 / 12:29:16.464359 / 12:29:18.988891，原消息/报告不追改；不把原自报抹成首次即正确。正式PROJECT_BRIEF/MODULE_bridges同步代码入口与局部指南，不改通用bridge/server/API/schema/AGENTS/现有角色。
+
+通过范围为独立执行入口代码、无密钥合同/启动模板/局部指南和零模型风险验证。现有真实名册仍codex/deepseek/kimi，新agent:kimi-code-k28-preview未注册/入册、未生成应用本人Key/启停bridge或安排生产任务；真实身份GET、模型后端版本/质量/耗时/额度与生产claim→交付闭环未验。rolling alias不承诺永久K2.8，CLI2.0.2仅rollout记录，宿主T未知、660000ms仅模板，主动T/W/取消/排队/I-4另验。下一步正式身份/名册/配置应用和最小接单，仍按用户临时DeepSeek开发/Codex复核、Kimi额度不足不派Kimi。完成本轮提交推送后暂停，不继续开新切片；185/186已发布与I-3文档闭合保持。
