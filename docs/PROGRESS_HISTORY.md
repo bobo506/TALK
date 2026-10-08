@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-08 09:45 (Asia/Shanghai) 角色模型绑定纳入宿主内置与用户API来源区分
+
+- 用户补充：WorkBuddy除内置模型外可使用用户API接入模型，TALK应有字段区分。结合本轮角色固定配置讨论，后续角色绑定须涵盖运行器、指定模型、模型来源与具体连接配置；同名模型的内置/API或不同连接不混为一条绑定，成员身份与职责仍独立。
+- 字段建议为runtime、model_source（builtin/custom_api）、provider_id、connection_ref、model_id和可选展示名，作为待设计条目，不宣称数据库/API已支持或WorkBuddy有同名字段。connection_ref引用宿主/外部连接，凭据保留原生运行器或安全存储，不进入角色名称/任务快照/仓库。
+- 运行核验与配置值分开；未能读取实际模型时如实未核实。显式配置变更作用于新任务，任务保存来源/连接/模型绑定快照，历史归属不追改；来源/提供商不产生额外TALK权限。适配仍以运行器共用入口、模型/连接分别兼容验证组织。
+- 本轮仅PROGRESS/PROGRESS_HISTORY需求记录，未派新任务或改schema、角色/API连接、凭证及服务；185/186原包与冻结资料保持。必要检查为UTF-8读取与git diff --check，无业务/真实模型测试。
+
 ## 2026-10-08 01:10 (Asia/Shanghai) 确认四组原生Agent/模型的分配与执行适配范围
 
 - 用户明确目标：Codex仅分配侧；WorkBuddy＋Kimi K3、DeepSeek Harness＋DeepSeek Flash、Kimi Code＋Kimi K3均分配/执行双侧，共7个方向。此为待实施清单，不是完成声明，也不要求删除现有Codex执行bridge。
