@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-08 21:35 (Asia/Shanghai) 用户收工交接：K2.8验证延后至下次使用
+
+- 用户在收到启动命令后明确“下次用的时候再验证，先汇总下进度，我要新开窗口”。本次仅整理交接，不启动bridge/服务、不调用模型、不发新任务、不补做生产接入验证。
+- 当前Git HEAD=abab3cb，工作区原本干净。入口187/188/189的独立82项测试与收取已完成，代码a4757c3已推送；注册/配置准备abab3cb已推送。读取本地应用回执status=registered_roster_pending、project_roster_applied=false、bridge_started=false、model_calls=0。未收到人类同步成功确认；不把用户“下次再验证”写成名册已同步或验收通过。
+- 汇总快照保留独立身份/仓库外Key位置、原三角色保护、agent同步HTTP403、人类安全应用步骤、原生模型绑定和未验边界，补记用户要求的实际启动命令`.\.venv\Scripts\python.exe -X utf8 scripts\kimi_k28_executor.py launch`（cwd=D:/claude-test/TALK）。下次使用先确认人类名册同步，再只读在线检查，条件允许后启动并做最小接单闭环；停止Ctrl+C。
+- 恢复分工保持用户临时DeepSeek开发、Codex独立复核、不派额度不足的Kimi；8适配方向、通用模型来源/连接绑定待开发、I-4与其它既有待验事项不丢失。PROGRESS.md保持当前快照，完整开发证据继续留在历史及原回执。
+- 本次变更仅docs/PROGRESS.md、docs/PROGRESS_HISTORY.md；验证UTF-8无BOM、启动命令/延期/名册pending字段存在及git diff --check，不重跑代码测试。正式提交后常规推送，Git结果存.tmp/kimi-k28-executor-application/window-handoff.json。未开启新切片，未重查用量，前次19%/23%仅历史采样。
+- 新窗口恢复指令：继续项目。先读当前进度和AGENTS角色规则；K2.8验证延期有效，除用户明确安排，不自动启动/派单/验收。宿主不支持在本轮自动清除上下文，由用户新开窗口。
+
 ## 2026-10-08 21:28 (Asia/Shanghai) K2.8独立成员注册与本地名册应用准备（人类同步待办）
 
 - 用户“好的，那你先操作吧”授权先准备并应用接入。Codex作为决策角色执行配置与注册，不派新开发任务；临时DeepSeek开发、Codex复核继续。usage-gate在UTC13:16返回continue，session19%/weekly23%。

@@ -1,41 +1,44 @@
 # Project Progress
 
-Updated: 2026-10-08 (Asia/Shanghai)：K2.8入口187/188/189已通过并收取（a4757c3）；本轮已注册独立成员、创建仓库外Key/本地身份档并准备完整名册同步包。agent:codex写名册实测403，等待人类本地执行一次安全同步；运行器与真实模型接单未测。
+Updated: 2026-10-08 21:35 (Asia/Shanghai)：用户要求汇总并新开窗口，K2.8真实接入/使用验证延后到下次使用；本轮不启动运行器、不派新任务。代码与接入准备均已提交推送，名册人类同步仍待确认。
 
 ## 当前角色与协作
 
-- D:/claude-test/TALK；项目prj_e8fe7066bbec；分支codex/terminal-return-codex，常规推送已持续授权。Codex决策/最终裁决/正式文档/Git，当前用户临时要求DeepSeek开发、Codex独立复核，不派额度不足的Kimi。
-- 页面常规要求仍Kimi文字/设计/交互/前端、DeepSeek后端/其它与交叉复核；新派发前重读，不追改旧包。默认派发后结束、用户通知后取件；Codex不操作浏览器，开发完成暂停后复核。
-- 最新本人身份GET实测caller=agent:codex/kind=agent/note=null。当前服务端项目名册仍codex/deepseek/kimi；agent:kimi-code-k28-preview已正式注册（kind=agent），本地名册扫描4条，服务端入册待人类同步。
+- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
+- 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。当前没有新派发的开发任务。
 
-## 最新完成与证据
+## 已完成与当前状态
 
-- 接入应用：新成员POST /api/members返回201，本人Key GET /api/members/me核验通过；Key=C:/Users/Administrator/.talk/agent-kimi-code-k28-preview.key，随机生成并限制ACL，未输出明文。独立profile=.talk/agents/agent_kimi-code-k28-preview/{IDENTITY,SOUL,USER}.md，groups.yaml新增dev/execution；纠正指南原错误下划线目录。
-- 同步包.tmp/kimi-k28-executor-application/roster-sync.json完整保留原三角色所有字段；当前Codex POST sync实际403，服务端仍3条且原字段保持。离线check与dry-run通过；在线check唯一失败为本人未在项目名册，门禁如实生效。应用入口apply_roster.py验证agent身份被拒且仅1GET/0POST，包hash与名册基线检查、Key不落文件/日志/参数；15个原native/Codex/既有profile文件SHA保持。回执application.json与application-helper-verification.json。
+- #187/msg2689入口开发、#188/msg2690与#189/msg2691补正，经Codex独立82项测试（0跳过）、六项启动边界及冻结文件核验通过，已189→188→187验收收取。入口代码与指南提交a4757c3，接入准备提交abab3cb，均已推送；原失败/开发报告保留。
+- 新成员agent:kimi-code-k28-preview已POST注册201，独立Key的GET /api/members/me确认kind=agent。Key在C:/Users/Administrator/.talk/agent-kimi-code-k28-preview.key，随机生成并限制ACL；Key明文不入仓库、聊天、日志或命令参数。
+- 本地groups.yaml和独立profile=.talk/agents/agent_kimi-code-k28-preview/{IDENTITY,SOUL,USER}.md已准备dev/execution；scan_agents共4条，原三条字段保持。服务端项目名册最后实测仍codex/deepseek/kimi三条：agent:codex同步请求HTTP403，需要人类身份。未收到人类同步成功确认，不把名册已配置/在线/验收通过作为既定事实。
+- check --require-key与launch --dry-run已通过；在线check唯一失败为新成员未入册。原native K3默认值、Codex入口与既有profile共15文件SHA保持。运行器尚未启动，真实模型/claim→执行→结果→complete→收取闭环未验；用户已明确延后到下次使用。
 
-- #187/msg2689原入口开发，#188/msg2690补正R1/R2/R3，#189/msg2691补正B1/B2/B3；三份合法自身号一致complete仅自报，Codex已独立检查实际5文件差异、原失败复现与相关bridge路径。原187/188needs_rework报告及原结果不改，以最终组合验收闭合。
-- 本轮独立kimi_k28_executor/kimi_bridge/kimi_talk_entry共82项通过、0跳过（含PIPE/loopback）。42冻结对象零漂移，仅授权5新增文件变化。原任务基线dfd0b5f、188基线d474321、189基线8539796；期间dc0734e/97ed77d/8539796/fa32065进度例外与d474321规格发布均留痕。
-- 六项闭合：受控固定命令阻止K3环境/自定义覆盖；真实launch执行native/项目门禁；本人kind＋项目dev/execution在线GET门禁；同一base_url贯通预检/argv/bridge；显式execution使本地decision不生效；HTTP错误正文不读取不回显且按确切文件Key脱敏。
-- 独立非默认19091＋本地decision＋K3环境覆盖成功对照仍同地址/execution/三档正确alias与Agent文件；错误项目在HTTP/bridge前退出；HTTP500回显文件Key时report与main launch stderr均隐藏，失败bridge_calls=0。本机native只读check通过、SHA保持，default_model仍kimi-code/k3；0真实模型/0生产TALK调用。
-- 原始最终代码快照与验证：.tmp/kimi-k28-executor-final-review/accepted/、review.json、independent-tests.txt/json、independent-boundary-repro.json、offline-check-live.json。收取回执.tmp/kimi-k28-executor-receipt/acceptance.json，原187/188/189开发报告与各dispatch保持。
-- 已实际189→188→187收取为succeeded/completed，UTC 2026-10-08T12:29:14.041920 / 12:29:16.464359 / 12:29:18.988891，原消息2691/2690/2689保持。正式PROJECT_BRIEF/MODULE_bridges记录入口代码通过及生产未测，指南docs/guides/KIMI_K28_EXECUTOR.md。
-- 入口只做独立执行侧：scripts/kimi_k28_executor.py、部署合同/PowerShell模板、局部指南和测试共5文件，复用kimi_bridge，无通用bridge/server/API/schema/角色页或现有角色改动。JSON模板是说明合同，不被程序读取；真实Key仓库外或TALK_K28_KEY，native managed认证由CLI自读。
+## 下次使用K2.8时
 
-## 下一步与边界
+1. 先确认人类名册同步是否完成；完整保留原角色的准备包和说明在.tmp/kimi-k28-executor-application/。人类本地应用命令：`.\.venv\Scripts\python.exe -X utf8 .tmp/kimi-k28-executor-application/apply_roster.py`，终端getpass输入已有本人human Key。脚本核身份、包hash和当前完整名册基线，漂移停止；已验证agent身份仅1GET/0POST并拒绝。
+2. 名册同步后，再运行只读`check --require-key --online-identity`。通过后启动下方入口，额度允许时安排最小读文件任务，记录真实模型版本、耗时与额度。当前没有执行这些后续步骤。
+3. 用户要求保留K2.8启动命令；PowerShell先进入项目目录，TALK后端需已运行：
 
-1. 人类在项目根PowerShell执行`.\.venv\Scripts\python.exe -X utf8 .tmp/kimi-k28-executor-application/apply_roster.py`，终端输入本人TALK human Key（不回显、不发聊天）；同步前核对完整现有名册，基线漂移停止。成功后说“名册已同步”，Codex再执行只读在线门禁检查；当前不启动bridge、不调用模型。
-2. Kimi额度条件允许后安排最小生产任务（读文件回报）：claim→原生Kimi Code执行→结构化结果→complete→发起者验收收取，再记录真实版本/耗时/额度；本轮假CLI/隔离HTTP不能证明真实推理/接单已通过。
-3. full角色绑定尚需runtime、model_source(builtin/custom_api)、provider_id、connection_ref、model_id/展示名与新任务快照；模型来源/连接与身份/业务角色/决策分级分开。此数据库/API/UI未开发；相同运行器按配置复用适配，不复制八套代码。
-4. 用户确认共8适配方向：Codex分配侧；WorkBuddy＋K3、DSH＋DeepSeek Flash、Kimi Code＋K3各分配/执行；Kimi Code＋K2.8仅执行。Codex被动178/179已验、主动I-4未验；WorkBuddy90/91是历史分配侧，未证明WorkBuddy执行/当前可派成员；其它组合按实际绑定另核。
-5. 新入口native alias=kimi-code/kimi-for-coding，provider=managed:kimi-code、backend=kimi-for-coding，展示K2.8 Preview；rolling alias不承诺永久后端版本。K3既有default_model保持；CLI2.0.2只来自rollout.log，未执行版本命令，真实质量/成本优势未测。
+```powershell
+cd D:\claude-test\TALK
+.\.venv\Scripts\python.exe -X utf8 scripts\kimi_k28_executor.py launch
+```
 
-## 近期恢复依据
+入口自动读取本人外置Key，固定alias=kimi-code/kimi-for-coding，runtime=kimi-code、model_source=builtin、provider=managed:kimi-code、connection_ref=native-kimi-code-managed-login、backend=kimi-for-coding，dev/execution。展示K2.8 Preview，alias滚动升级、不承诺永久后端版本；停止Ctrl+C。K3原生default_model仍kimi-code/k3。正式指南docs/guides/KIMI_K28_EXECUTOR.md。
 
-- I-1 #172/#173、I-2 #174/#175独立通过收取，用户2026-10-07页面验收通过；I-0 #178/#179以当前agent:codex/kind=agent完成被动闭环，历史human归属/权限保持。179混排降级与旧报告不改，回执.tmp/initiator-mode-identity-receipt/acceptance.json。
-- I-3A #180/#181消费者指南/三现行文本、I-3B #182/#183/#184活跃文案/对应断言/手册/MODULE_webui均已独立通过发布收取，原partial/失败/数量错误记录保留，用户hint简验通过。回执.tmp/initiator-mode-consumer-receipt/与initiator-mode-live-copy-receipt/。
-- I-3C #185/#186独立通过收取并发布两规格（d474321）；16来源＋14草稿发布前零漂移，精确已审正文＋MODULE_bridges发布注记，I-3文档同步已闭合。回执.tmp/initiator-mode-spec-sync-receipt/acceptance.json。175-O1测试维护、Schema maximum=600/clamp评估另片。
-- 项目passive/version6、effective null/not_bound；assignment agent:codex/version13只兼容。I-1加载通过不代表I-3B最新说明已重载（后者未核）；真实主动/G8/长等待/正常到期/取消/同连接排队及I-4未验收。
-- 各预算分开：CodexW300用户现用，前次tool_timeout_sec=660仅配置；DeepSeek桌面T65/W50/余量15；Kimi660000ms仅模板，实际T未知不长等。bridge --timeout3600与本入口身份GET15秒、等待/总预算/宿主交还分别核验。
-- 本轮只新建K2.8成员与本人外置Key、本地身份/名册准备；原Key/native/default/Codex入口、服务端项目名册与模式保持。不启停真实bridge/服务、不发Kimi推理、不操作浏览器。身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。usage-gate实测continue（session19%/weekly23%，UTC13:16），不外推后续用量。
+## 后续计划与边界
 
-恢复指令：继续项目。当前K2.8入口代码与零模型验证已通过并收取，成员与本地配置已应用，下一步人类同步项目名册；真实K2.8接单和I-4待验。
+- 共5组合8方向：Codex仅分配；WorkBuddy＋K3、DSH＋DeepSeek Flash、Kimi Code＋K3各分配/执行；Kimi Code＋K2.8仅执行。WorkBuddy90/91仅历史分配侧，未证明其执行能力或当前可派成员。
+- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照尚未开发到数据库/API/UI；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
+- Codex被动I-0 #178/#179已验，I-1/I-2用户页面验收通过；I-3A #180/#181、I-3B #182/#183/#184、I-3C #185/#186已通过收取发布，I-3文档同步闭合（规格提交d474321）。I-3B最新MCP说明运行进程重载未核，真实主动I-4/G8/正常到期/取消/同连接排队未验。
+- 项目passive/version6、effective=null/not_bound；controller_assignment=agent:codex/version13仅历史兼容，不赋权或自动唤回会话。175-O1测试维护、Schema maximum=600/clamp评估另片。
+- 超时分别核验：CodexW300用户现用；DeepSeek桌面T65/W50/余量15；Kimi660000ms仅模板，实际T未知，不启用主动长等待。bridge执行预算3600秒、身份GET单次15秒，独立于宿主工具/发起者等待预算。真实质量、速度与成本优势未测。
+
+## 恢复依据
+
+- 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。前次usage-gate在UTC13:16为continue（session19%/weekly23%），本次未重查，不外推当前比例。
+
+恢复指令：继续项目。先恢复以上状态；K2.8验证按用户安排延后到下次使用，不能把当前汇总当作验收通过或自动开工授权。
