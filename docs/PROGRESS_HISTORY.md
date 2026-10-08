@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-08 19:13 (Asia/Shanghai) 服务恢复，临时DeepSeek开发/Codex复核，派187适配K2.8执行入口
+
+- 用户明确已启动服务、优先开发Kimi Code＋K2.8适配；Kimi额度不足，本次切片全部DeepSeek开发、Codex独立复核。此为本次临时分工，不修改项目开发要求/AGENTS或追改旧任务；解除此前只登记计划限制，不自动推进其它组合/主动等待。
+- 派发前talk_list_agents成功：caller=agent:codex/kind=agent，DeepSeek最新实例agent:deepseek:105dde72-3874-4614-b904-2631471c357f runtime=dsh/idle；Kimi新实例idle仅上报不派任务。读取最新要求仍Kimi前端/文字、DeepSeek后端/其它、双方复核，任务包明确用户本次覆盖复核安排。
+- 基线dfd0b5f47a73141487cde98f23c528b9e3157b6c，工作区干净。独立顶层最小四参数派187（title=187-Kimi Code K2.8独立执行入口适配）给agent:deepseek，created_by=agent:codex，hall=group:task-415406a10e7e47ef91e91b4ad969498a，queued/assigned为派发快照，created_at=2026-10-08T11:11:57.663992。包.tmp/kimi-k28-executor-dispatch/含完整原需求、实际基线/7来源指纹、证据与临时分工、验收/允许范围和元数据；Codex仅两进度文件例外。
+- 187目标为可检查/可应用的独立执行入口与无密钥模板、显式kimi-code/kimi-for-coding、execution/tools档、身份/项目与工具隔离、必要风险回归及本片新指南；复用原生Kimi bridge，不另建推理循环。相关测试/局部必要文件同片授权，既有K3默认与全局模型配置不改。正式生产注册/启停/配置应用由Codex审后处理。
+- 必读TERMINAL_MCP 55–80实际T/W/余量/执行预算/取消排队合同，本片执行侧不包括分配/主动长等；未知/模板预算如实未验。Kimi额度不足不发任何Kimi/K2.8/K3真实推理，离线/假CLI不能外推真实模型、接单、质量/费用；数据库/API/全角色页面、通用合同、其它运行环境不在本片。
+- 同轮读取186/msg2688完整合法交付：自身186一致complete，7完成/0未完成/0阻塞、11验证（9pass/2not_run），独立实际源码/patch正反/历史保护/链接与16来源+14草稿均通过。其当时HEAD77288f2相对2e945a9仅授权进度；当前后续提交也是进度记录，正式来源待收尾。未发布/收取185/186，本片冻结其16+14对象，禁止187改旧片来源与报告。
+- 当前宿主普通exec仍setup refresh失败；审批入口只读/任务包写入成功，不归因项目代码或自动审批拒绝。只读项目背景与当前负责MODULE_bridges及预算节，未做代码完整探索/复核、无浏览器/真实wait/生产测试或新角色启停。
+- 下一步默认派后结束，用户通知187完成后由Codex独立审实际实现/差异与测试，必要问题交DeepSeek修正；通过后再接入/最小真实验收和Git收尾。纯派发正式仅PROGRESS/PROGRESS_HISTORY，UTF-8与git diff --check；精确额度未读取，不推测比例。
+
 ## 2026-10-08 18:08 (Asia/Shanghai) 新增Kimi Code＋K2.8 Preview执行角色目标与接入准备
 
 - 用户明确新增Kimi Code＋K2.8 Preview作为执行角色，以常规执行成本为主要考虑。新增独立成员目标agent:kimi-code-k28-preview（名称为接入建议，未注册），execution/dev；本次只增加执行侧，不替换K3、不自动更改现有项目分工或让模型名称提升decision_tier。目标从四组合7方向扩为五组合8方向，原历史清单保持。
