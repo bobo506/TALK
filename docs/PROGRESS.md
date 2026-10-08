@@ -1,12 +1,21 @@
 # Project Progress
 
-Updated: 2026-10-08 21:35 (Asia/Shanghai)：用户要求汇总并新开窗口，K2.8真实接入/使用验证延后到下次使用；本轮不启动运行器、不派新任务。代码与接入准备均已提交推送，名册人类同步仍待确认。
+Updated: 2026-10-08 21:49 (Asia/Shanghai)：用户授权继续通用运行器／模型绑定，指定DeepSeek开发、Codex独立验证。已派#190工程合同与后端首片方案，未改生产实现；K2.8真实接单仍延后到下次使用，名册人类同步仍待确认。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
-- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。当前没有新派发的开发任务。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。当前切片为#190工程设计，完成后由Codex独立验证。
+
+## 当前切片：#190通用角色运行器与模型绑定工程合同
+
+- 用户本轮明确“可以继续，仍旧是deepseek开发，你来验证”；覆盖项目一般交叉复核安排的本次分工。已读取最新development_requirements，项目仍passive/version6，caller=agent:codex/kind=agent；不派Kimi。
+- #190已派agent:deepseek，created_by=agent:codex，创建时queued/assigned，Hall=group:task-5091b385bd2040b2aa652fa3e1e711b9。此为任务创建状态，不代表已领取或交付。默认派发后结束，用户通知完成再取件。
+- 本片先核查实际代码、形成可审合同与后端首片实施方案。绑定包括runtime、来源builtin/custom_api、provider/connection引用、model与展示名；明确项目身份/权限、旧角色与数据库兼容、新任务快照原子性/不可变性、配置值与实际模型证据区分。具体字段与API尚待设计/独立验证，不宣称已实现。
+- DeepSeek仅写.tmp/role-model-binding-design/草稿、无密钥样例和talk-delivery-1报告；禁止改正式代码/测试/文档/.talk配置、生产DB/角色/凭据/默认模型，禁止启动服务/运行器、调用真实模型或生产等待。Codex可聚焦维护正式进度；完成后开发暂停再验证。
+- 实际基线10555ca2a54fdafa56300b999921d7831bb41518，790份tracked文件指纹在.tmp/role-model-binding-design-dispatch/source_manifest.json；任务包task_content.md、dispatch_context.json与dispatch_result.json同目录。首片合同验收后再决定后端实现，不把设计交付视为运行器适配通过。
+- 下一步：收到190完成通知后用talk_get_delivery核对自身任务号和完整摘要，独立核查实际代码/合同/证据；问题交回DeepSeek修正。通过后收取、发布已审合同/拆片计划并完成文档Git收尾。K2.8真实接单延期继续有效。
 
 ## 已完成与当前状态
 
@@ -31,7 +40,7 @@ cd D:\claude-test\TALK
 ## 后续计划与边界
 
 - 共5组合8方向：Codex仅分配；WorkBuddy＋K3、DSH＋DeepSeek Flash、Kimi Code＋K3各分配/执行；Kimi Code＋K2.8仅执行。WorkBuddy90/91仅历史分配侧，未证明其执行能力或当前可派成员。
-- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照尚未开发到数据库/API/UI；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
+- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照已进入#190工程合同设计，尚未开发到数据库/API/UI；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
 - Codex被动I-0 #178/#179已验，I-1/I-2用户页面验收通过；I-3A #180/#181、I-3B #182/#183/#184、I-3C #185/#186已通过收取发布，I-3文档同步闭合（规格提交d474321）。I-3B最新MCP说明运行进程重载未核，真实主动I-4/G8/正常到期/取消/同连接排队未验。
 - 项目passive/version6、effective=null/not_bound；controller_assignment=agent:codex/version13仅历史兼容，不赋权或自动唤回会话。175-O1测试维护、Schema maximum=600/clamp评估另片。
 - 超时分别核验：CodexW300用户现用；DeepSeek桌面T65/W50/余量15；Kimi660000ms仅模板，实际T未知，不启用主动长等待。bridge执行预算3600秒、身份GET单次15秒，独立于宿主工具/发起者等待预算。真实质量、速度与成本优势未测。
@@ -39,6 +48,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。前次usage-gate在UTC13:16为continue（session19%/weekly23%），本次未重查，不外推当前比例。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。前次usage-gate在UTC13:16为continue（session19%/weekly23%），本轮UTC13:44 usage-gate实测continue（session29%/weekly24%），仅当时采样。
 
-恢复指令：继续项目。先恢复以上状态；K2.8验证按用户安排延后到下次使用，不能把当前汇总当作验收通过或自动开工授权。
+恢复指令：继续项目。先恢复#190当前状态；用户通知完成后按本次DeepSeek开发／Codex独立验证分工取件。K2.8验证仍延后到下次使用，不能把任务创建或设计交付视为真实接入验收通过。

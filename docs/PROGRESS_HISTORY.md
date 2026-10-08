@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-08 21:49 (Asia/Shanghai) 恢复项目并派#190通用角色运行器／模型绑定工程设计
+
+- 用户“继续项目”后已恢复AGENTS/PROJECT_BRIEF/PROGRESS、TALK自身身份和当前最新任务状态；#187/#188/#189及前期I-3均completed，工作区干净，HEAD10555ca。本地origin分支跟踪引用与HEAD一致，但该分支未配置upstream；未把本地引用核对当作实时远端查询。
+- 用户明确“可以继续，仍旧是deepseek开发，你来验证”，本轮DeepSeek执行、Codex独立实际代码／设计／证据验证，不派额度不足的Kimi；已读取项目development_requirements，实际caller=agent:codex/kind=agent，passive/version6。未修改项目开发要求、模式或历史主控指定。
+- 当前通用绑定字段仅此前确认的待设计条目，没有已批准的数据库/API实施合同；据此首片限定实际源码核查、可实施合同和后端拆片方案。模型来源builtin/custom_api、provider/connection_ref、模型标识与展示名分开；凭据外置、身份／decision_tier独立、新任务绑定快照／历史不变、未知实际模型如实降级均列验收标准。
+- 派发前usage-gate实测continue，UTC13:44 session29%/weekly24%，不外推后续额度；实际基线10555ca2a54fdafa56300b999921d7831bb41518。冻结790份tracked指纹，仅写忽略目录任务包。模块仅读MODULE_tasks，决策历史只取相关索引；TERMINAL_MCP预算／取消／排队约束列入任务边界，不做真实等待。
+- #190“190-通用角色运行器与模型绑定合同及后端实施方案”已通过最小顶层字段派agent:deepseek，created_by=agent:codex，创建时queued/assigned，Hall group:task-5091b385bd2040b2aa652fa3e1e711b9；未claim／交付／验收／收取。完整任务与API回执在.tmp/role-model-binding-design-dispatch/，草稿／报告目标.tmp/role-model-binding-design/。
+- DeepSeek仅允许在本片.tmp目录产出current_state.md、contract_draft.md、implementation_plan.md、examples.json、验证证据与自身190合法交付JSON；禁止正式源／测试／文档／配置改动、DB／生产操作、真实模型、原生运行器启停、凭据读取和自行下一片／subagent／commit。Codex允许同步当前正式进度；开发结束暂停后独立验证。
+- K2.8项目名册同步和真实接单继续按用户上次安排延后至下次使用；本轮未运行K2.8、不注册成员、不改角色名册/Key/default_model、不启主动模式。I-4与其它待办保持。
+- 本轮正式变更仅PROGRESS/PROGRESS_HISTORY派发记录；必要验证UTF-8无BOM、190／分工／延期字段与git diff --check，不重跑无变动业务测试。正式文档单独中文提交常规推送，避免纳执行者产物；普通exec仍宿主setup refresh失败，审批入口已可完成文件操作，未遭自动审批拒绝，不归因产品代码。
+- 默认派发后结束，由用户通知190完成再读取talk_get_delivery、独立核代码/合同/证据；问题交DeepSeek修正，通过后收取并发布合同/实施计划，必要验证与Git收尾后再定后端实现片。本片创建不代表目标八方向已通过。
+
 ## 2026-10-08 21:35 (Asia/Shanghai) 用户收工交接：K2.8验证延后至下次使用
 
 - 用户在收到启动命令后明确“下次用的时候再验证，先汇总下进度，我要新开窗口”。本次仅整理交接，不启动bridge/服务、不调用模型、不发新任务、不补做生产接入验证。
