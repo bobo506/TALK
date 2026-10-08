@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-08 18:08 (Asia/Shanghai) 新增Kimi Code＋K2.8 Preview执行角色目标与接入准备
+
+- 用户明确新增Kimi Code＋K2.8 Preview作为执行角色，以常规执行成本为主要考虑。新增独立成员目标agent:kimi-code-k28-preview（名称为接入建议，未注册），execution/dev；本次只增加执行侧，不替换K3、不自动更改现有项目分工或让模型名称提升decision_tier。目标从四组合7方向扩为五组合8方向，原历史清单保持。
+- 核官方模型配置文档：K2.8 Preview当前model_id=kimi-for-coding，定位常规开发；该ID可原地升级，展示名不等于调用ID。核本机模型元数据：config alias=kimi-code/kimi-for-coding已存在，provider=managed:kimi-code、声明tool_use；default_model仍kimi-code/k3。kimi与bridge的--help确认--model、--kimi-model及tools档参数；仅发现/配置证据，不证明实际模型响应与完整执行。
+- 保存无密钥接入准备包.tmp/kimi-k28-executor-preparation/role_proposal.json，含拟身份/来源/模型与配置别名、独立启动参数、证据、限制和下一步。native-kimi-code-managed-login仅拟连接引用；独立TALK Key待接入时落实，不复制凭据，不改变原生默认模型、K3会话或运行配置。
+- talk_list_agents返回TALK API WinError10061拒绝连接。用户随后说明尚未启动服务，并明确“先别急着开工，列入计划就行”；据此只登记计划，不把未启动记为产品故障，不恢复/启动服务、不派新任务、不注册或启动角色。前述普通exec setup refresh错误仅宿主入口限制，审批后的只读检查成功，不是自动审批拒绝。
+- 官方会员权益说明登录设备/API Key共享配额；没有取得相对K3的具体优惠比例，也未做实测。质量/速度/额度比较待一个明确执行小片验证，不能把模型定位直接当验收或成本结论。
+- 后续待用户明确推进，再按最新要求/名册核ID、角色接入及独立模型配置，交执行Agent实施/另一Agent复核并单片验收；服务恢复本身不自动触发本项开工。185/186仍待原流程收尾，不修改原任务包/冻结来源。正式仅PROGRESS/PROGRESS_HISTORY和忽略目录准备JSON，UTF-8/JSON解析与git diff --check，未运行真实推理或业务测试。
+
 ## 2026-10-08 09:45 (Asia/Shanghai) 角色模型绑定纳入宿主内置与用户API来源区分
 
 - 用户补充：WorkBuddy除内置模型外可使用用户API接入模型，TALK应有字段区分。结合本轮角色固定配置讨论，后续角色绑定须涵盖运行器、指定模型、模型来源与具体连接配置；同名模型的内置/API或不同连接不混为一条绑定，成员身份与职责仍独立。
