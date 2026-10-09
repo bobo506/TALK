@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-09 20:51 用户授权下一切片，派DeepSeek #201 B4角色页只读绑定展示
+
+- 用户明确“继续下一切片”；B3当前MCP重连加载验收已通过，源码/进度HEAD26e163c482671fecb3b741f2471c2a9d5450acac、工作区干净。按实施计划§3.3选择B4，D-5只展示已有值，B2实际证据与B5进程合同不扩入。
+- 读取最新项目开发要求与角色，保存真实前端Kimi/双方交叉复核要求快照；本轮仍执行用户明确的DeepSeek开发/Codex独立复核，AGENTS当前拓扑亦重申。最新DeepSeek实例idle来自旧上报，未宣称实时在线。
+- task#201创建2026-10-09T12:49:46.615103、queued/assigned，target=agent:deepseek、created_by=agent:codex，Hall=group:task-39113fc86ad045bea7b05ea11ebaa2bb；目标配置快照unconfigured。使用已验证最小顶层参数，无子任务/门禁字段，无额外模型加载测试。
+- 冻结800跟踪文件SHA/大小和16份参照；.tmp/runner-role-binding-b4/保存baseline-manifest.json、baseline/、dispatch-requirements.json、task-package.txt和dispatch-receipt.json。协调方后续仅维护两份进度，执行者共享目录完成暂停后独立复核。
+- 包含原需求/基线差异/不变项/8条验收标准/开发测试与完整结构化交付要求；允许聚焦角色展示及必要刷新/缓存版本/前端契约，禁止后端/SDK/MCP/生产身份与配置改动。复用agents原响应，诚实状态/缺字段、安全文本、无实际匹配、编辑、探测或启停，保护草稿/选择/切换与静默刷新。
+- 本轮usage-gate guard --provider codex --json采样12:46:56.698120 UTC：session22%/weekly40%，decision=continue；不将旧采样视为实时值。B4为本次唯一前端切片；派发后结束，用户通知完成再取件，无主动等待/浏览器操作，不把尚未交付当作验收通过。
+- 正式PROGRESS/HISTORY同步并独立中文提交常规推送；开发中源码不读取/提交，后续收取须合法JSON实际字符串任务号并完成独立复核。
+
 ## 2026-10-09 20:41 用户重启后，#200 B3当前MCP只读加载验收通过
 
 - 用户通知“重启好了”；在当前连接检查talk_list_agents工具描述并只读获取项目prj_e8fe7066bbec角色列表，描述已含binding_state，caller_identity为agent:codex/agent。
