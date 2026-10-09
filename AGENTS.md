@@ -30,7 +30,7 @@
 - `agent:kimi`：官方 Kimi Code CLI，Reviewer，`decision_tier=execution`。
 - `agent:deepseek`：DeepSeek Harness（`dsh`）承载 DeepSeek 各类模型，Dev，`decision_tier=execution`。
 - 项目管理者于 2026-08-27 确认：本地 dogfood 暂时只使用上述 3 个 Agent；Kimi 从 pi runtime 迁移到官方 Kimi Code CLI，不再启动 Claude Code，也不再保留 `agent:pi` / `agent:pi-kimi` 作为活动成员。
-- 2026-10-08 用户新增独立执行角色 `agent:kimi-code-k28-preview`：官方 Kimi Code CLI，Dev，`decision_tier=execution`，显式 alias=`kimi-code/kimi-for-coding`（展示 K2.8 Preview）。成员已注册，仓库外本人 Key 与本地身份档已准备；2026-10-09已由人类完成项目名册同步，MCP核实dev/execution及kimi-code实例上报idle；真实模型接单闭环与宿主主动等待仍未验收。当前本轮分工仍为 DeepSeek 开发、Codex 独立复核。
+- 2026-10-08 用户新增独立执行角色 `agent:kimi-code-k28-preview`：官方 Kimi Code CLI，Dev，`decision_tier=execution`，显式 alias=`kimi-code/kimi-for-coding`（展示 K2.8 Preview）。成员已注册，仓库外本人 Key 与本地身份档已准备；2026-10-09已由人类完成项目名册同步，MCP核实dev/execution及kimi-code实例上报idle；2026-10-09最小收件/回传任务#195已通过Codex核验并收取；实际后端模型版本、开发能力与宿主主动等待仍未验收。当前本轮分工仍为 DeepSeek 开发、Codex 独立复核。
 
 ## 项目开发要求与复核分工（2026-09-18）
 

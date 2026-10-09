@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-09 09:55 K2.8最小收件回传#195独立核验并收取
+
+- 用户明确授权发最简单任务查看接收。派前读取最新development_requirements/caller=agent:codex，用户指定此次target为agent:kimi-code-k28-preview，既有开发/复核分工不变。任务不开发、不用工具、不读写文件、不更改配置/Key/名册/进程，不派子任务，返回固定串后暂停。
+- 按最小顶层字段派#195“195-K2.8最小收件回传测试”，created_by=agent:codex，Hall group:task-f180152f9e0245738c7ae04dc57d7e7c。01:53:31.348338 UTC创建，01:53:48.583424由本人instance64b7f891-309c-4b07-a739-934adf8ab901领取，attempt1，01:53:57.263019完成；claim延迟17.235秒、总25.915秒、领取到完成8.680秒，不能把这些时间当模型纯推理时长。
+- 单次显式30秒非受控观察用于本次用户要求的接收检查，1轮/1GET/0.031秒立即命中submitted；没有有限续等、开启active/controlled_wait或改变项目passive，等待预算不构成主动适配验收。
+- delivery msg2697为合法自身195一致complete JSON，completed唯一K28_RECEIVED_20261009，0未完成/阻塞/改文件；完整原正文复制本地delivery-195.json，经validate expect195通过。独立对照服务端claimed_by/instance_id、result.from、nonce与时序，业务源码git工作区仍干净HEAD85b0aa9，非仅采信自报succeeded。
+- talk_collect_result195成功，succeeded/completed，01:54:59.592610 UTC收取。证据.tmp/kimi-k28-receipt-smoke/{dispatch,delivery-195,review,acceptance}.json；原结果不改。该最小领取→执行回传→收取链路通过，实际后端模型版本、开发能力/质量/成本与主动宿主T/W仍未验，不扩大为八方向接入已验。
+- 仅更新AGENTS与相关简报/路线图/K2.8指南/进度六文档，UTF-8无BOM、范围及diff-check后中文提交常规推送；B1a人工API门禁、B1b未派保持，不新增模型任务。本次不重跑未变业务测试。
+
 ## 2026-10-09 09:48 K2.8人类同步入册与闲置上报已核，明确角色添加自动化
 
 - 用户启动K2.8提示不在项目名册；Codex只读核实本人Key身份正确，当前三角色名册与已冻结同步基线一致，准备包hash正确，0写入/0启动/0模型调用。提供已有apply_roster人类本地入口，不绕过human写入权限，Key经getpass不进入聊天。
