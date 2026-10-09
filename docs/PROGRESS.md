@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-09 19:52 (Asia/Shanghai)：用户授权下一步，已派DeepSeek #200 B3角色名单只读绑定消费；实际基线3438ee3，派发queued/assigned，待交付后由Codex独立复核。B2/B4未派。
+Updated: 2026-10-09 19:57 (Asia/Shanghai)：#200 B3已派，待DeepSeek交付后独立复核；按用户明确要求补收197/198归档为completed，原invalid报告保持，最终快照验收仍以199为准。B2/B4未派。
 
 ## 当前角色与协作
 
@@ -22,7 +22,7 @@ Updated: 2026-10-09 19:52 (Asia/Shanghai)：用户授权下一步，已派DeepSe
 ## 已完成与当前状态
 
 - B1b #196后端独立177项及真实并发/回滚/原文探针通过，9d90726发布；用户重启后授权代验收，两列/索引/WAL、旧195 NULL、新13键与API/SQLite一致，199合法回传收取succeeded/completed，3438ee3进度发布。198/199 queued到完成以及199收取后原文保持；4业务源/测试SHA不变。实服目标未绑定故unconfigured预期，实际bound态/绑定变更未做；881/pristine/真实模型版本/页面/主动宿主等待未新增验证。证据.tmp/runner-role-binding-b1b-live-acceptance/。
-- 197执行者误填197-B1b、198协调方误要求整数的invalid报告原样保留且未收取，199合法补验为最终依据；不继续等待这两条历史测试、不追改为合法。
+- 197执行者误填197-B1b、198协调方误要求整数的invalid报告原样保留；用户后续明确要求收取，已补收两条归档为succeeded/completed（msg2699/2700），原文/快照不变、MCP业务结论仍invalid。199合法补验仍为最终验收依据；不继续等待、不追改历史为合法。补充回执supplemental-collection-197-198.json与checks保存在B1b实服证据目录。
 - B1a #193/#194经Codex独立124项测试及原失败边界复验通过，已194→193收取、2dd2ec7推送；两表/登记绑定API、单SQL事实读取及阶梯已实现。原26个全量非零/报告保持；881及pristine未重跑，不宣称全量通过。194混排原JSON与合法本地报告一致，MCP结构化unknown保持；证据.tmp/runner-role-binding-b1a-fix-review/。人工API逐项测试未由用户报告，本次继续授权进入B1b。
 - K2.8 #195最小无工具回传由本人instance领取、17.235秒claim/25.915秒总完成，固定串K28_RECEIVED_20261009正确，msg2697合法195一致，已收取succeeded/completed；.tmp/kimi-k28-receipt-smoke/保存证据。实际后端版本/开发能力/主动等待仍待验。
 - 运行器/模型角色绑定设计#190/msg2692、#191/msg2693、#192/msg2694已独立通过并收取，正式合同/实施计划/样例752ea1e已推送；14状态/27列/1SQL、11快照13键/指纹、790源保护与WAL已有事务视图证据通过。原失败/草稿/报告保持，实际证据B2后置。本次A19纯文档笔误澄清不改变已审设计。
@@ -57,4 +57,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；本轮未读取精确额度，不外推此前使用比例。
 
-恢复指令：继续项目。当前#200 B3已派，按用户完成通知收取和独立复核，不重复派发或自行开启B2/B4。#197/#198只保留格式失败历史、不继续等待；#199与B1b实服核心已通过。B1a human写入/绑定变更与bound态实服对比未做，最小回传不扩大为实际模型版本/开发能力或主动适配验收。
+恢复指令：继续项目。当前#200 B3已派，按用户完成通知收取和独立复核，不重复派发或自行开启B2/B4。#197/#198已按用户要求收取归档，格式失败历史保留、不继续等待；#199与B1b实服核心已通过。B1a human写入/绑定变更与bound态实服对比未做，最小回传不扩大为实际模型版本/开发能力或主动适配验收。
