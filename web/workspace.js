@@ -650,6 +650,8 @@ function renderWorkspaceList() {
       row.setAttribute("aria-pressed", String(!workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole));
       // 摘要列取有效说明的首个非空行：自定义后不再显示过时的硬编码短标签。
       row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleSummary(role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
+      // ROLE-BINDING-B4：绑定摘要复用同一次名册读取的结果，不加请求、不参与搜索匹配范围。
+      row.appendChild(workspaceEl("small", "role-binding-summary", workspaceRoleBindingSummary(role)));
       row.appendChild(workspaceEl("small", "role-row-id", role.member_id));
       blackboardColumns.appendChild(row);
     }
@@ -671,6 +673,141 @@ function renderWorkspaceList() {
     for (const task of tasks) blackboardColumns.appendChild(workspaceTaskRow(task));
   }
   if (!blackboardColumns.childElementCount) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", query ? "没有匹配的结果" : rolesMode ? "这个项目还没有配置角色。" : "当前筛选下没有任务。"));
+}
+// ── ROLE-BINDING-B4 角色运行器/模型绑定（角色页只读展示，合同 §4.3–4.4） ─────
+// 数据来源：同一次 GET /api/projects/{id}/agents 响应里已有的 binding / binding_state
+// （B1a 后端、B3 工具只读消费）。本片不新增任何每角色 GET/PUT，也不从 instances.runtime、
+// 运行中的模型或成员展示名回填绑定——绑定只认这两个字段。
+// 只消费公开白名单字段：runtime / runner_display_name / model_source / provider_id /
+// connection_ref / model_id / model_alias / model_display_name + binding_state；
+// 未知字段一律不读不显示，凭据与日志不进入 UI。全部值走 textContent（workspaceEl）渲染，
+// connection_ref / provider_id 只作普通文本，不解析、不跳转、不探测、不拼命令。
+// 合同 §4.4 阶梯：unconfigured（"未配置"）、not_in_roster（"已离册（保留配置）"）、行内缺值
+// （"模型未上报"）与旧服务未提供字段（未知）四类严格区分；未知不伪装成未配置，未配置不当接入失败。
+// 产品展示名规则（D-5）未决：只展示 API 已有值，不制定命名规则、不批量改名；B2 证据片未落地，
+// 本片不输出 binding_match*、不写任何一致性结论、不推断型号。
+const ROLE_BINDING_STATES = {
+  no_project: ["无项目上下文", "unknown"],
+  member_missing: ["成员不存在（保留配置）", "invalid"],
+  member_disabled: ["成员已禁用（保留配置）", "invalid"],
+  not_in_roster: ["已离册（保留配置）", "invalid"],
+  not_agent: ["非 Agent 成员（保留配置）", "invalid"],
+  unconfigured: ["未配置", "neutral"],
+  partial: ["配置不完整（无效）", "invalid"],
+  runner_missing: ["运行器未登记（无效）", "invalid"],
+  runner_retired: ["运行器已退役（无效）", "invalid"],
+  bound: ["已绑定", "ok"],
+};
+const ROLE_BINDING_MODEL_SOURCES = { builtin: "运行器内置（builtin）", custom_api: "自定义 API（custom_api）" };
+function roleBindingSource(agent) { return agent && typeof agent === "object" && !Array.isArray(agent) ? agent : null; }
+// 「没有 binding 字段」（旧服务）与「binding 为 null」（没有存储行）是两件事，必须分开判断。
+function roleBindingRow(agent) {
+  const source = roleBindingSource(agent);
+  if (!source || !Object.prototype.hasOwnProperty.call(source, "binding")) return { supported: false, present: false, row: null };
+  const row = source.binding;
+  if (row && typeof row === "object" && !Array.isArray(row)) return { supported: true, present: true, row };
+  return { supported: true, present: false, row: null };
+}
+function roleBindingText(value) { return typeof value === "string" && value.trim() ? value : null; }
+// binding_state 优先取顶层字段（合同 §4.3 始终存在）；顶层缺失且行内自带非空状态时复用同一事实，
+// 两者都没有才算“当前服务未提供”；空值记“未记录”；服务返回的枚举不在白名单时如实标为未知原值。
+function roleBindingStateInfo(agent, row) {
+  const source = roleBindingSource(agent);
+  let provided = false;
+  let raw;
+  if (source && Object.prototype.hasOwnProperty.call(source, "binding_state")) { provided = true; raw = source.binding_state; }
+  else if (row && typeof row.binding_state === "string" && row.binding_state.trim()) { provided = true; raw = row.binding_state; }
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!provided) return { provided: false, known: false, key: null, label: "当前服务未提供绑定状态", text: "当前服务未提供绑定状态", kind: "unknown" };
+  if (!value) return { provided: true, known: false, key: null, label: "绑定状态未记录", text: "绑定状态未记录", kind: "unknown" };
+  // F1 修正：两张枚举映射都是普通对象，直接下标会把 constructor/__proto__/toString 等继承键
+  // 当成已知枚举（label/kind 变 undefined）。这里只接受自有白名单键，继承键与任意未知值一律按
+  // “未知绑定状态（原值）”降级；不引入新的安全框架，也不改合法枚举与未提供/未记录的既有分支。
+  if (!Object.prototype.hasOwnProperty.call(ROLE_BINDING_STATES, value)) return { provided: true, known: false, key: value, label: "未知绑定状态", text: `未知绑定状态（${value}）`, kind: "unknown" };
+  const known = ROLE_BINDING_STATES[value];
+  return { provided: true, known: true, key: value, label: known[0], text: known[0], kind: known[1] };
+}
+// 运行器列只合并两个既有派生字段；登记事实不可解析时两者都为 null，如实写“运行器未上报”。
+function roleBindingRunnerText(row, missing) {
+  const name = roleBindingText(row.runner_display_name);
+  const runtime = roleBindingText(row.runtime);
+  if (name && runtime) return `${name}（${runtime}）`;
+  return name || runtime || missing;
+}
+// 紧凑摘要的取值优先级仅为压缩显示，不改写字段含义：模型展示名 → 模型别名 → 模型 ID。
+function roleBindingModelText(row, missing) {
+  return roleBindingText(row.model_display_name) || roleBindingText(row.model_alias) || roleBindingText(row.model_id) || missing;
+}
+function roleBindingModelSourceText(value) {
+  const text = roleBindingText(value);
+  if (!text) return "来源未上报";
+  const key = text.trim().toLowerCase();
+  // F1 修正：与 binding_state 同一处理，只认自有白名单键；constructor/__proto__ 等继承键必须返回
+  // 纯文本“未识别的来源值（原值）”，不能把原型函数/原型对象文本交给 textContent。
+  if (!Object.prototype.hasOwnProperty.call(ROLE_BINDING_MODEL_SOURCES, key)) return `未识别的来源值（${text}）`;
+  return ROLE_BINDING_MODEL_SOURCES[key];
+}
+function workspaceRoleBindingSummary(agent) {
+  const row = roleBindingRow(agent);
+  const state = roleBindingStateInfo(agent, row.row);
+  if (!row.supported) return "绑定：当前服务未提供绑定信息";
+  const parts = [state.label];
+  if (row.present) {
+    parts.push(roleBindingRunnerText(row.row, "运行器未上报"));
+    parts.push(roleBindingModelText(row.row, "模型未上报"));
+  }
+  return `绑定：${parts.join(" · ")}`;
+}
+function workspaceRoleBindingRows(agent) {
+  const row = roleBindingRow(agent);
+  const state = roleBindingStateInfo(agent, row.row);
+  if (!row.present) return [["绑定状态", state.text]];
+  const data = row.row;
+  // 必填字段缺失（partial）与可选字段未填一律如实写“未上报”，不补默认值、不猜型号。
+  // runtime（登记表派生的运行器类型）与 runner_display_name（展示名）分列，都能单独缺失降级。
+  return [
+    ["运行器", roleBindingText(data.runner_display_name) || "运行器未上报"],
+    ["运行器类型", roleBindingText(data.runtime) || "运行器类型未上报"],
+    ["模型来源", roleBindingModelSourceText(data.model_source)],
+    ["提供方标识", roleBindingText(data.provider_id) || "提供方未上报"],
+    ["连接标识", roleBindingText(data.connection_ref) || "连接标识未上报"],
+    ["模型 ID", roleBindingText(data.model_id) || "模型未上报"],
+    ["模型别名", roleBindingText(data.model_alias) || "模型别名未上报"],
+    ["模型展示名", roleBindingText(data.model_display_name) || "模型展示名未上报"],
+    ["绑定状态", state.text],
+  ];
+}
+function workspaceRoleBindingNote(agent) {
+  const row = roleBindingRow(agent);
+  const state = roleBindingStateInfo(agent, row.row);
+  if (!row.supported) return "当前服务未返回绑定信息，页面无法判断绑定状态；这不等于“未配置”。";
+  if (!row.present) {
+    if (state.key === "unconfigured") return "该角色还没有保存运行器/模型绑定；这只是缺少配置，并不表示接入有问题。";
+    return "该角色没有存储的绑定行；上面是名册与成员事实，页面不会自动补默认模型。";
+  }
+  if (!state.known && state.provided) return "服务返回了页面还不认识的绑定状态，此处按原值显示，不按“未配置”处理。";
+  if (state.key === "bound") return "以上都是已保存的配置值；页面不判断运行结果是否与之一致。";
+  if (state.kind === "invalid") return "该绑定行按存储值原样展示，当前状态不可用；页面不会自动清理或改写它。";
+  return "以上都是已保存的配置值。";
+}
+function workspaceRoleBindingPanel(agent) {
+  const row = roleBindingRow(agent);
+  const state = roleBindingStateInfo(agent, row.row);
+  const section = workspaceEl("section", "role-binding-section");
+  section.setAttribute("aria-label", "运行器与模型绑定（只读）");
+  const head = workspaceEl("div", "role-binding-head");
+  head.appendChild(workspaceEl("h3", "", "运行器与模型绑定"));
+  head.appendChild(workspaceEl("span", `role-binding-state ${state.kind}`, state.label));
+  section.appendChild(head);
+  section.appendChild(workspaceEl("p", "role-binding-hint", "只读展示已保存的配置值；不改变职责与权限，也不推断型号。"));
+  const list = workspaceEl("dl", "role-binding-list");
+  for (const [label, text] of workspaceRoleBindingRows(agent)) {
+    list.appendChild(workspaceEl("dt", "", label));
+    list.appendChild(workspaceEl("dd", "", text));
+  }
+  section.appendChild(list);
+  section.appendChild(workspaceEl("p", "role-binding-note", workspaceRoleBindingNote(agent)));
+  return section;
 }
 function renderWorkspaceRoleDetails() {
   // ROLE-DESC-F1 修正（#137/N4）：角色详情拆为名称区与参与任务区两个动态容器，
@@ -694,6 +831,8 @@ function renderWorkspaceRoleDetails() {
   // 任务创建只保留任务详情子任务入口与任务发起者派发（公共 POST /api/tasks / MCP / SDK）。
   // 固定主控标记已随 I-2 退役：角色详情不再显示“项目主控”徽标。
   namePanel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
+  // ROLE-BINDING-B4：绑定只读区随名称区动态重绘，来自同一次名册读取；静态说明编辑区不在其中。
+  namePanel.appendChild(workspaceRoleBindingPanel(role));
   const section = workspaceEl("section", "role-task-section");
   section.appendChild(workspaceEl("h3", "", "参与的任务"));
   const filters = workspaceEl("div", "role-task-filters");
@@ -1117,4 +1256,4 @@ if (typeof document !== "undefined") {
     document.getElementById("role-description-reset").addEventListener("click", resetRoleDescription);
   }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, workspaceSettingsSelected};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, workspaceSettingsSelected, ROLE_BINDING_STATES, workspaceRoleBindingSummary, workspaceRoleBindingRows, workspaceRoleBindingNote};

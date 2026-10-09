@@ -1,22 +1,22 @@
 # Project Progress
 
-Updated: 2026-10-09 21:10 (Asia/Shanghai)：#201 B4格式/范围/独立163项Node+12项页面契约通过，但7项继承键探针复现F1，业务needs_rework、暂不收取；已派DeepSeek #202 定向修正，完成暂停后Codex再复核。
+Updated: 2026-10-09 22:05 (Asia/Shanghai)：#202 F1闭合，B4独立165项Node/12项页面契约及原7反例通过，202→201已收取；实服新静态文件核验通过，页面待用户验收。按用户要求先完成当前角色绑定功能再进入下一功能。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
-- 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
-- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201已独立读代码/测试并复现F1，交DeepSeek #202定向修正；Codex未改业务源码。
+- 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；Codex只改正式文档、未改业务源码。
 
-## 当前切片：B4 #201复核需返修，#202已派发
+## 当前切片：B4代码通过并收取，待页面验收
 
-- #201/msg2703合法talk-delivery-1，task_id字符串201一致complete；稳定SHA e4a5430667066bdf02cb7962bff7216afd381410c7d41cecf745fe2aa713f010两页4204字符补读，与本地JSON逐对象一致、validate通过。格式通过不代表业务验收通过，#201尚未收取。
-- 实际基线26e163c、审查HEAD2eb7827；800跟踪文件范围核验，变化仅3个web+6个测试，协调方两进度排除。原5个既有测试仅缓存版本断言，app.js/server/SDK/MCP/身份/生产绑定不变；原201源码与开发全部原证据冻结在.tmp/runner-role-binding-b4-review/original-201/、delivery-201/。
-- Codex独立默认进程隔离node --test：163通过、0失败/取消/跳过；4页面契约12项OK，JS语法/diff/UTF-8通过。开发者default spawn EPERM与Chrome命名管道失败仍保留；Codex未操作浏览器，真实窄屏/视觉/后端联调未新增验证。
-- F1/P2：workspace.js两张普通对象枚举表直接索引，constructor/__proto__/toString等继承键被误当已知状态，label/text/kind缺失；来源constructor/__proto__返回函数/对象。独立实际消费者7项探针全复现；review.json=needs_rework，不能据175项常规通过收取。
-- #202仅修上述白名单自有键判断及tests/workspace_role_binding.test.cjs真实渲染回归。当前基线为HEAD2eb7827 + 原201未提交内容，801文件SHA/大小与两源码副本冻结在.tmp/runner-role-binding-b4-rework/；原201其余7文件必须保持SHA，不重启/改真实绑定/改版本或正式文档。
-- 创建#202，target=agent:deepseek、created_by=agent:codex，Hall=group:task-6131d8f00a2046bb8d8fd52cfe14ad79，创建时queued/assigned；派发前再次读取最新开发要求，保留页面原分工快照，按用户本轮DeepSeek开发/Codex独立复核。原201 JSON/失败/日志不覆盖，返修用实际新任务号字符串另包交付。
-- 默认派发后结束，用户通知完成再取件，开发暂停前不继续读diff/改业务代码。当前仅提交两进度，尚未通过的9业务/测试文件不提交；B2/B5未派，B3当前MCP加载已通过。
+- #202/msg2704合法字符串任务号202一致complete；稳定SHA 7a7d214ba18c19712ed4244249caa0b347c28afa7a2ad3c92ccaf44237d82be9两页5147字符补读与本地逐对象相等、validate通过。原201/msg2703、needs_rework与7失败证据保持。
+- 审查HEADa0544d7；801文件冻结核验，返修仅workspace.js两处自有白名单门禁和测试新增2项真实VM列表/详情回归，原201其余7文件SHA不变。F1闭合、0 open，未改后端/SDK/MCP/身份/生产绑定。
+- 独立Node默认进程隔离165项0失败/取消/跳过，4页面契约12项OK；同一16项测试指向原201源码时原14通过/新增2预期失败，原7探针修正后全通过；JS/测试语法、diff与UTF-8通过。开发者EPERM/Chrome原失败不追改为其已做默认隔离或浏览器验收。
+- 已202→201收取，均succeeded/completed；202/msg2704收取14:00:45.242634 UTC、201/msg2703收取14:00:48.579649 UTC。原201复核失败由202最终版本闭合，原JSON与失败历史保留。
+- 实服127.0.0.1:8000的/、新workspace.js/css GET均200，字节与已审源码一致；只证明静态文件加载。MCP再次核4角色null/unconfigured，未写生产绑定/重启服务或试派模型；浏览器/窄屏与bound态联调仍未验。
+- .tmp/runner-role-binding-b4-rework-review/保存202完整交付/日志、accepted-source、scope/review/独立回归、原码负向测试、7探针、实服静态与收取回执；原201/202失败证据保持。
+- B1a/B1b/B3/B4已批准代码范围均通过。先按ROLE_BINDING_PAGE_ACCEPTANCE验页面，并完成必要API写入/变更验收；B2实际证据与B5生命周期各需独立合同，不扩称已实现。按用户要求不切回主被动、不自动新增其它功能。
 
 ## 已完成与当前状态
 
@@ -47,7 +47,7 @@ cd D:\claude-test\TALK
 ## 后续计划与边界
 
 - 共5组合8方向：Codex仅分配；WorkBuddy＋K3、DSH＋DeepSeek Flash、Kimi Code＋K3各分配/执行；Kimi Code＋K2.8仅执行。WorkBuddy90/91仅历史分配侧，未证明其执行能力或当前可派成员。
-- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照设计已由#190–#192复核发布，B1a数据库/API代码已独立验收并收取，实服表/字段已加载，human写入/变更步骤待实测；B1b任务快照已发布并通过实服核心代验收，MCP角色消费B3已验收，页面B4后置；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
+- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照设计已由#190–#192复核发布，B1a数据库/API代码已独立验收并收取，实服表/字段已加载，human写入/变更步骤待实测；B1b任务快照已发布并通过实服核心代验收，MCP角色消费B3已验收，页面B4代码通过收取、待人工验收；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
 - Codex被动I-0 #178/#179已验，I-1/I-2用户页面验收通过；I-3A #180/#181、I-3B #182/#183/#184、I-3C #185/#186已通过收取发布，I-3文档同步闭合（规格提交d474321）。I-3B最新MCP说明运行进程重载未核，真实主动I-4/G8/正常到期/取消/同连接排队未验。
 - 项目passive/version6、effective=null/not_bound；controller_assignment=agent:codex/version13仅历史兼容，不赋权或自动唤回会话。175-O1测试维护、Schema maximum=600/clamp评估另片。
 - 超时分别核验：CodexW300用户现用；DeepSeek桌面T65/W50/余量15；Kimi660000ms仅模板，实际T未知，不启用主动长等待。bridge执行预算3600秒、身份GET单次15秒，独立于宿主工具/发起者等待预算。真实质量、速度与成本优势未测。
@@ -57,4 +57,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于12:46:56 UTC读得session22%/weekly40%、decision=continue；只代表该次采样，不外推实时用量。
 
-恢复指令：继续项目。#201业务needs_rework未收取，#202 F1定向返修已派DeepSeek；用户通知后按原201与返修冻结基线独立再验，通过再统一收取/源码Git收尾。原201证据和Chrome/默认spawn失败保持；页面/B2实际模型/主动适配尚未验收。
+恢复指令：继续项目。#201/#202已独立通过收取，先完成当前角色绑定页面及必要API验收，不重复派发、不切换其它功能。四角色未配置为真实状态；B2实际模型、主被动真实链路和B5生命周期未验收。指南docs/guides/ROLE_BINDING_PAGE_ACCEPTANCE.md。

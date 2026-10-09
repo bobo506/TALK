@@ -207,3 +207,20 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-settings-row {border-bottom:2px solid #d8d8d2; background:#f7f6f2;}
 .role-settings-row:hover {background:#f0f5f8;}
 .role-settings-row.selected {background:#edf5fc;}
+
+/* ROLE-BINDING-B4：角色列表紧凑绑定摘要 + 角色详情只读绑定区（浅色工作台层级，与既有面板一致）。 */
+.role-binding-summary {overflow-wrap:anywhere;}
+.role-binding-section {color:#303741; margin:0 0 26px;}
+.role-binding-head {display:flex; align-items:baseline; flex-wrap:wrap; gap:12px; margin-bottom:10px;}
+.role-binding-head h3 {font-size:21px; font-weight:650; color:#26323d; margin:0;}
+.role-binding-state {font-size:14px; line-height:1.5; padding:3px 10px; border-radius:11px; border:1px solid #d6d6d2; background:#f7f6f2; color:#5b6470; overflow-wrap:anywhere;}
+.role-binding-state.ok {border-color:#cbe0cc; background:#f3f8f3; color:#286c39;}
+.role-binding-state.invalid {border-color:#e6cfcf; background:#fcf5f5; color:#9d3434;}
+.role-binding-state.unknown {border-color:#e2d9c2; background:#fdf8ec; color:#8d580d;}
+.role-binding-hint {font-size:14px; color:#626b76; line-height:1.7; margin:0 0 14px;}
+/* 长连接标识/模型名/别名一律可换行，窄屏不横向撑破。 */
+.role-binding-list {display:grid; grid-template-columns:minmax(104px,auto) minmax(0,1fr); gap:9px 18px; margin:0; font-size:15px;}
+.role-binding-list dt {color:#69737c;}
+.role-binding-list dd {margin:0; color:#303741; overflow-wrap:anywhere; word-break:break-word;}
+.role-binding-note {font-size:14px; color:#626b76; line-height:1.7; margin:14px 0 0;}
+@media(max-width:700px){.role-binding-head h3 {font-size:19px;} .role-binding-list {grid-template-columns:minmax(86px,auto) minmax(0,1fr); gap:8px 12px; font-size:14px;}}
