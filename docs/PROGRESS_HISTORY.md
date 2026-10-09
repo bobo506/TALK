@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-09 23:41 #204设计独立复核四点未闭合，派#205定向补正并裁定实施边界
+
+- 用户“好了”通知204完成。只读get_delivery取得succeeded/submitted、msg2706；前置说明与JSON混排被MCP归unstructured、业务unknown，未伪改为可信自报。稳定SHA23e41b275d87f2288869ea7047baab05a4fbc519bcbac4545682cda4d14db37a、三页9817字符重建，JSON提取与本地development.json一致、workflow validate合法partial；未完成与blocked真实保留。203/204均未collect。
+- 原204九产物SHA冻结.tmp/adapter-binding-design-rework-review/original/与scope.json；原203实际交付与其review冻结七文件重新核SHA保持。074bc32当前基线，802tracked相对204冻结仅两Codex进度变，800其它逐SHA相同、工作区干净；开发者未改tracked业务源。
+- Codex读实际返修合同/计划/映射/矩阵/参考helper、真实schema与源码依据；独立重跑真实router+SQLite内存探针正例通过，203 TypeError负对照仍命中。另四组剩余反例全部复现，negative-probes.json/review.json=needs_rework。首次独立fixture错误假设文件有ok键触发KeyError，仅修协调方读取为实际findings后重跑，fixture-first-failure.txt记录，不混为业务缺陷。
+- R1：不同host_scope同workspace都生成runner:kimi-code-talk，host未编码；ledger默认None或新空ledger无法得全局映射，真实registry亦无scope列。要求显式稳定元组规范JSON摘要编码ID且<=64，跨host/workspace独立调用不依赖台账；同scope多模型复用。
+- R2：other-compatible与固定K28相同provider/model，hard.model_alias虽为固定值却未比较，仍允许不同alias；相同backend id不足以替代固定调用alias。要求profile/hard直接引用MODEL_ALIAS，明确缺失/冲突与native default有效来源确认。
+- R3：解析fields(value/source)作为sources传build，疑似凭据alias虽blocked，raw合成canary仍留sources；missing-entry错误亦可拼原alias。要求来源白名单/候选与验证后公开值分离、blocked无raw递归canary，并定源指纹非秘密输入；不以硬编码False证明脱敏。
+- R4：注入PATCH200但登记旧display_name，helper未GET runners重判即PUT并written_and_verified、errors为空；要求POST201/PATCH200/409/未知分支实际GET完整schema/同ID/runtime/retired/四字段核对，不一致停止binding，残余竞争不伪称消除。
+- Codex收敛实施边界：D8不加CAS/新API/权限，保留单写者前置、最近读+写后核及外部写残余窗口，强保证另合同；D9共享scripts/adapter_closeout.py::run_closeout由K28显式closeout调用（非二选一），不挂launch/心跳/领取/MCP，不绕首次注册/名册。真实C3 apply拿具体dry-run后再处理；本轮无生产授权。scope建议已给可直接实施的非秘密元组SHA256固定摘要方案，不扩所有权系统。
+- 最新development_requirements与caller agent:codex/kind=agent读得，保留原页面分工、按用户DeepSeek执行/Codex独立复核；DeepSeek实例idle15:18:32.280036为旧报告，不认定实时领取。usage-gate15:38:00.984876 UTC session57%/weekly46%、continue，采样非实时。
+- #205 title=205-适配登记设计定向补正：scope与来源隐私，创建2026-10-09T15:40:14.442661、queued/assigned，target=agent:deepseek、created_by=agent:codex、Hall=group:task-8e0e2ca2b53b4b7491f14e6efa63de5a。最小顶层参数、无自动转审；802基线SHA/大小及任务包/回执在.tmp/adapter-binding-design-final-fix/。
+- 新片仅该.tmp目录返修设计与内存隔离证据，R1–R4闭合及声明来源/预算来源/JSON交付补正；禁止改原203/204/review、tracked源/正式合同/API权限/真实库/profile/Key/名册/历史任务/模型/启停/长wait，不实现C1–C4，不切功能。协调方仅两进度校验/中文提交常规推送，默认人通知#205再验，无等待与未通过收取。
+
 ## 2026-10-09 23:06 BA-1 #203独立设计复核未通过，派DeepSeek #204返修
 
 - 用户“好了”通知203完成；read-only get_delivery取得succeeded/submitted、msg2705、合法task_id字符串203/self complete，默认摘要必要字段齐全；稳定SHA77b5449d001f2afd9f2e909143886c63d4e9c04716da3749dc64caba2ed0e635、两页4071字符原文与本地JSON一致，workflow summary格式通过。原203尚未collect，未把格式/自报当业务通过。

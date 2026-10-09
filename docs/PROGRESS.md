@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-09 23:06 (Asia/Shanghai)：203设计独立复核needs_rework，六组反例已复现；已派DeepSeek #204返修，仍同一角色绑定功能，未收取203/未实现C1–C4/未生产登记。
+Updated: 2026-10-09 23:41 (Asia/Shanghai)：204设计独立needs_rework，四组剩余反例已复现；已派DeepSeek #205定向补正，Codex裁定现API无CAS边界和共享helper+显式closeout接线；203/204未收取，仍仅设计。
 
 ## 当前角色与协作
 
@@ -8,15 +8,16 @@ Updated: 2026-10-09 23:06 (Asia/Shanghai)：203设计独立复核needs_rework，
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；Codex只改正式文档、未改业务源码。
 
-## 当前切片：BA-1 #203未通过，#204设计返修已派
+## 当前切片：BA-1 #204四点未闭合，#205定向设计补正已派
 
-- 用户通知203完成；合法203自报complete/succeeded/submitted，结果2705两页4071字符、SHA77b5449d001f2afd9f2e909143886c63d4e9c04716da3749dc64caba2ed0e635与本地development.json一致。仅格式/自报成立，独立needs_rework，203未收取。
-- Codex复核实际合同/计划/探针与既有API/选模源码：开发者8场景独立重跑8绿，但新增六组反例全部命中：真实数组响应TypeError；native默认压显式argv/声明伪造固定入口；登记差异被no_op、PATCH非法字段失败仍写绑定；409未核runtime；无CAS交错覆盖；非法可选alias误ready。
-- 实际FastAPI路由+SQLite内存库/假HTTP证明，0生产HTTP/真实Key/模型/长wait/进程操作；首次fixture DetachedInstanceError修refresh后重跑，独立记录，不混为项目错误。未修改业务源，802旧冻结仅2份Codex派发进度差异，800其余逐SHA相同；ee5df80是两进度已推送基线。
-- 原203七产物/消息与SHA冻结在.tmp/adapter-binding-design-review/，negative-probes.json与review.json索引全部反例。返修不改原203目录/原失败/原结果；不发布未通过草案为正式合同。
-- #204 title=204-适配自动登记设计返修：真实API与来源冲突闭合，target=agent:deepseek、created_by=agent:codex、Hall=group:task-3010d89129d34a9f83772503137782c2，创建时queued/assigned（不认定实时领取/完成）。最新开发要求原快照保留，按用户DeepSeek执行/Codex复核。
-- 仅.tmp/adapter-binding-design-rework/改设计与隔离证据，六问题及scope命名/plan-apply服务目标来源重核/自动closeout具体接线须逐项闭合；现API无CAS不得承诺原子防覆盖，若需新增接口先列未定。human写门禁/名册/历史快照/CLI默认/外置Key不变。
-- 不进入C1–C4实现/主被动/B2/B5，不做人工作为默认技术录入，不生产登记。默认派发后结束，用户通知#204完成再按新实际包独立复核，通过前不收取203。
+- 用户通知204完成；runner succeeded/submitted、msg2706三页9817字符SHA23e41b275d87f2288869ea7047baab05a4fbc519bcbac4545682cda4d14db37a。正文前置说明+JSON导致MCP业务unknown/unstructured；其中完整JSON与本地development.json一致、schema合法partial，原报告未宣称全部实现完成。203/204均未收取。
+- Codex独立复核实际返修合同/计划/探针，重跑真实router+内存SQLite正例通过；203原TypeError负对照保留。额外四组反例：R1 host_scope未入ID，无台账跨host同workspace碰撞；R2同backend不同alias绕过K28硬alias；R3blocked sources仍带合成敏感原值；R4PATCH200后未GET完整重判，登记仍旧字段却写绑定并报成功。当前needs_rework，不进入实现。
+- 证据.tmp/adapter-binding-design-rework-review/冻结原204九文件、完整消息、scope/review/negative-probes、独立脚本及重跑输出。首次独立fixture误读文件ok键导致KeyError，协调方修读实际findings后重跑，单独保留，不当项目错误。
+- 802冻结仅两份Codex派发进度差异，800其余逐SHA不变；原203交付目录与review冻结七文件SHA仍同。未用真实profile/Key/生产库/HTTP/模型/长wait/进程，未改业务源码。
+- Codex边界裁决：D8保留现API/无CAS/单写者前置与残余窗口，不为此改权限或接口；D9共享adapter_closeout helper由K28显式closeout调用，非二选一、非launch挂钩。K3/K28同scope同runtime复用、不同member绑定；来源缺失诚实blocked，真实apply待具体dry-run。
+- #205 target=agent:deepseek、created_by=agent:codex、Hall=group:task-8e0e2ca2b53b4b7491f14e6efa63de5a，创建queued/assigned；不从旧idle推断实时领取。最新开发要求原快照保留，按用户DeepSeek开发/Codex独立复核。
+- 新基线074bc32、802文件SHA/大小冻结.tmp/adapter-binding-design-final-fix/。仅该目录设计/隔离证据：R1–R4逐项闭合，非秘密来源白名单/指纹、default确认与预算已知/本轮未知区分；最终消息只完整JSON，禁止改203/204原目录或正式源/合同/生产。
+- 默认派发后结束，用户通知#205后独立复核，不等待、不收取未通过203/204、不启动C1–C4或切其它功能。
 
 ## 已完成与当前状态
 
@@ -56,6 +57,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于15:02:50 UTC读得session50%/weekly44%、decision=continue；只代表该次采样，不外推实时用量。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于15:38:00 UTC读得session57%/weekly46%、decision=continue；只代表该次采样，不外推实时用量。
 
-恢复指令：继续项目。203未通过独立复核且未收取，#204设计返修已派，六组反例及三项合同缺口见.tmp/adapter-binding-design-review/。用户通知完成后独立复核新包，未通过前不进入实现/真实绑定，不切其它功能；原203及B4交付/失败/部分页面反馈保持。
+恢复指令：继续项目。203/204未独立通过且未收取，#205定向设计补正已派；四反例见.tmp/adapter-binding-design-rework-review/，D8/D9已在本任务包收敛。用户通知完成后核实际包/隔离证据，未通过前不实现/真实绑定，不切其它功能，原报告与失败保持。
