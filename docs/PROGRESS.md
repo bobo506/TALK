@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-09 22:05 (Asia/Shanghai)：#202 F1闭合，B4独立165项Node/12项页面契约及原7反例通过，202→201已收取；实服新静态文件核验通过，页面待用户验收。按用户要求先完成当前角色绑定功能再进入下一功能。
+Updated: 2026-10-09 22:40 (Asia/Shanghai)：用户确认配置应随适配完成自动登记关联，已派DeepSeek #203 BA-1设计、Codex独立复核；仅本角色绑定功能，不改生产/权限/真实绑定，不推进人工填写表单。
 
 ## 当前角色与协作
 
@@ -8,18 +8,19 @@ Updated: 2026-10-09 22:05 (Asia/Shanghai)：#202 F1闭合，B4独立165项Node/1
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；Codex只改正式文档、未改业务源码。
 
-## 当前切片：B4代码通过并收取，待页面验收
+## 当前切片：BA-1 #203适配收尾自动登记/角色绑定设计已派
 
-- #202/msg2704合法字符串任务号202一致complete；稳定SHA 7a7d214ba18c19712ed4244249caa0b347c28afa7a2ad3c92ccaf44237d82be9两页5147字符补读与本地逐对象相等、validate通过。原201/msg2703、needs_rework与7失败证据保持。
-- 审查HEADa0544d7；801文件冻结核验，返修仅workspace.js两处自有白名单门禁和测试新增2项真实VM列表/详情回归，原201其余7文件SHA不变。F1闭合、0 open，未改后端/SDK/MCP/身份/生产绑定。
-- 独立Node默认进程隔离165项0失败/取消/跳过，4页面契约12项OK；同一16项测试指向原201源码时原14通过/新增2预期失败，原7探针修正后全通过；JS/测试语法、diff与UTF-8通过。开发者EPERM/Chrome原失败不追改为其已做默认隔离或浏览器验收。
-- 已202→201收取，均succeeded/completed；202/msg2704收取14:00:45.242634 UTC、201/msg2703收取14:00:48.579649 UTC。原201复核失败由202最终版本闭合，原JSON与失败历史保留。
-- 实服127.0.0.1:8000的/、新workspace.js/css GET均200，字节与已审源码一致；只证明静态文件加载。MCP再次核4角色null/unconfigured，未写生产绑定/重启服务或试派模型；浏览器/窄屏与bound态联调仍未验。
-- .tmp/runner-role-binding-b4-rework-review/保存202完整交付/日志、accepted-source、scope/review/独立回归、原码负向测试、7探针、实服静态与收取回执；原201/202失败证据保持。
-- B1a/B1b/B3/B4已批准代码范围均通过。先按ROLE_BINDING_PAGE_ACCEPTANCE验页面，并完成必要API写入/变更验收；B2实际证据与B5生命周期各需独立合同，不扩称已实现。按用户要求不切回主被动、不自动新增其它功能。
+- 用户看到B4绑定面板及4角色未配置，只确认这些页面现象，未扩大为全部视觉/窄屏或bound态验收。用户认为重复人工填写无意义且易误填，明确同意改为适配→核验→自动登记/关联项目角色→页面查看；多条已适配链路只选择结果，未知实际版本不伪造。
+- 不实施此前人工技术字段表单建议，继续同一角色/模型绑定功能；先定真实来源、受信写入和旧角色补登记合同，不切主被动/B2/B5或另开功能。
+- 派发前HEADcf92e28fa0ebe014c1329ba629d6cc0b3a25496b、工作区干净；802跟踪文件SHA/大小与18份参考冻结在.tmp/adapter-binding-design/。最新项目开发要求保留原快照，本轮按用户DeepSeek开发/Codex独立复核；实际caller agent:codex。
+- 任务#203 target=agent:deepseek、created_by=agent:codex，Hall=group:task-2f27d9c3ec48402686f64056b297933f，创建时queued/assigned；不据旧idle上报认定实时领取或完成。
+- 设计须定元数据生成/应用精确入口、4角色可核实来源和覆盖优先级、全局运行器与项目绑定隔离、human写权限不放宽、幂等/并发/冲突/部分失败恢复、既有角色dry-run补登记、最小实现切片与功能完成标准。不从实例/名称猜模型，不回写CLI默认或历史任务。
+- 仅.tmp合同/实施计划/验证矩阵/样例与纯隔离探针，禁止tracked源/正式文档/外部profile/真实库/API写、模型调用或进程启停。终端T/W/余量/bridge预算与取消排队证据分别列，工具可发现和配置登记不等于主动适配通过。
+- 当前仅维护两进度并提交推送。执行者完成暂停、实际任务号字符串完整JSON交付，用户通知后独立读设计/源码依据/隔离证据再决定实现，不等待/重复派发。
 
 ## 已完成与当前状态
 
+- B4 #201/#202最终版本独立165项Node/12页面契约及原7反例通过收取，cf92e28发布；原201失败与新增2用例对原码负向命中保持，实服新静态字节已核。用户确认看见面板/未配置，完整页面及bound态联调待验，原证据.tmp/runner-role-binding-b4-rework-review/。
 - B3 #200已独立106项/13探针与新进程真实匿名管道通过收取，f858c67发布；用户重启后当前MCP描述/4角色binding字段已只读核验加载（null/unconfigured），26e163c进度发布。完整原失败、基线和验收记录见历史及.tmp/runner-role-binding-b3-review/，未扩大实际模型或主动等待结论。
 - B1b #196后端独立177项及真实并发/回滚/原文探针通过，9d90726发布；用户重启后授权代验收，两列/索引/WAL、旧195 NULL、新13键与API/SQLite一致，199合法回传收取succeeded/completed，3438ee3进度发布。198/199 queued到完成以及199收取后原文保持；4业务源/测试SHA不变。实服目标未绑定故unconfigured预期，实际bound态/绑定变更未做；881/pristine/真实模型版本/页面/主动宿主等待未新增验证。证据.tmp/runner-role-binding-b1b-live-acceptance/。
 - 197执行者误填197-B1b、198协调方误要求整数的invalid报告原样保留；用户后续明确要求收取，已补收两条归档为succeeded/completed（msg2699/2700），原文/快照不变、MCP业务结论仍invalid。199合法补验仍为最终验收依据；不继续等待、不追改历史为合法。补充回执supplemental-collection-197-198.json与checks保存在B1b实服证据目录。
@@ -55,6 +56,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于12:46:56 UTC读得session22%/weekly40%、decision=continue；只代表该次采样，不外推实时用量。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于14:34:00 UTC读得session40%/weekly43%、decision=continue；只代表该次采样，不外推实时用量。
 
-恢复指令：继续项目。#201/#202已独立通过收取，先完成当前角色绑定页面及必要API验收，不重复派发、不切换其它功能。四角色未配置为真实状态；B2实际模型、主被动真实链路和B5生命周期未验收。指南docs/guides/ROLE_BINDING_PAGE_ACCEPTANCE.md。
+恢复指令：继续项目。BA-1 #203已派DeepSeek，仅设计同一角色绑定功能的适配自动登记联动；用户通知后独立复核再实现，不做人工作为默认录入、不改生产/权限、不切主被动或其它功能。B4原实现/失败/部分页面反馈保持，B2实际模型与B5生命周期另合同。
