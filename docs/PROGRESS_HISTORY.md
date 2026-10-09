@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-09 10:15 用户继续下一项，派DeepSeek #196 B1b新任务配置快照
+
+- 用户在195最小回传通过后明确“继续下一项”，按既定B1a→B1b后端顺序推进；此次继续授权作为进入B1b的依据，原B1a人工API逐项测试无已测报告，不追记为通过。195接收链路通过不改变本轮DeepSeek开发/Codex独立验证分工。
+- 派前usage-gate真实continue，2026-10-09T02:11:52.897338 UTC，session27%/weekly33%；读取最新项目development_requirements及caller agent:codex/kind agent、passive/version6、DeepSeek最新idle（上报可能滞后）。按用户当前指定分工覆盖页面常规Kimi/DeepSeek交叉审查，不派Kimi/K2.8。
+- 实际基线21553e6cb5ba2a8079072bb8b895939b67065964、派前工作区干净，冻结全部797 tracked文件含跟踪临时对象；仅读既有MODULE_tasks与已审合同/计划B1b相关节，不读其它模块。B1a193/194已复核收取、2dd2ec7推送，原报告/失败/冻结保持。
+- #196“196-B1b新任务目标角色模型绑定快照”经独立顶层最小project/target/title/content参数派发，target agent:deepseek、created_by agent:codex，创建queued/assigned，Hall group:task-1c34ebe1a4ff4c229669d4194de24bf1。未主动等待/查询claim；创建不代表已开发或验收。
+- 允许models/db/tasks及新test_task_binding_snapshot；旧test_tasks仅新响应字段必要适配。AgentTask/Out两列、13键快照、唯一构造共用助手、1/0事实SQL、三路径四情况、旧NULL与不可变/alias留证、同任务/Hall/关系原子回滚与原400/权限保持完整入包。复用原SQL hash a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e，不复制、不修改B1a状态合同。
+- 测试要求计划B1–B20、实际SQL事件计数、两连接撕裂负对照及同交错单SQL、已有事务旧/自写视图与子授权回滚，相关7模块回归、正常logger与失败如实；不重复全量881，无pristine不能宣称均非回归。
+- 不改桥接/MCP/SDK/web/项目绑定接口/角色或实例/凭据/生产库/运行器/原native默认，不启动服务或调用真实模型，不加B2 match/读取回执/SQL自报计数字段。执行者仅本片.tmp证据及实际196完整纯JSON报告，完成冻结不提交/推送/下一片；协调方只维护PROGRESS/HISTORY，不并行改源。
+- 本轮任务包/context/回执/source_manifest在.tmp/runner-role-binding-b1b-dispatch/，执行者交付目标.tmp/runner-role-binding-b1b/。仅两份正式进度UTF-8无BOM/diff-check后中文提交常规推送，避免纳入开发中代码；默认派后结束，用户通知196完成再独立审查、通过收取同步规格Git收尾。
+
 ## 2026-10-09 09:55 K2.8最小收件回传#195独立核验并收取
 
 - 用户明确授权发最简单任务查看接收。派前读取最新development_requirements/caller=agent:codex，用户指定此次target为agent:kimi-code-k28-preview，既有开发/复核分工不变。任务不开发、不用工具、不读写文件、不更改配置/Key/名册/进程，不派子任务，返回固定串后暂停。
