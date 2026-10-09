@@ -1,27 +1,28 @@
 # Project Progress
 
-Updated: 2026-10-09 11:32 (Asia/Shanghai)：用户授权Codex代验收，重启后的B1b核心路径通过；#199/msg2701合法回传已收取，#197/#198格式失败历史保留。B2/B3/B4未派。
+Updated: 2026-10-09 19:52 (Asia/Shanghai)：用户授权下一步，已派DeepSeek #200 B3角色名单只读绑定消费；实际基线3438ee3，派发queued/assigned，待交付后由Codex独立复核。B2/B4未派。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
-- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。本轮#193/#194开发已暂停，Codex独立复核通过；用户授权若仍失败可由Codex补修，本次无须补改代码。用户本次继续指令允许进入B1b，人工API逐项步骤仍无已测报告；#196开发暂停后Codex独立复核通过并收取；本轮无Codex业务代码补修。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；本次只派#200，Codex仅维护派发记录，尚未审查B3代码。
 
-## 当前切片：B1b #196已收尾，重启后核心路径代验收通过
+## 当前切片：B3 #200已派发，待DeepSeek交付
 
-- DeepSeek #196/msg2698纯JSON合法自身196一致complete，完整10字段与本地报告逐对象一致、validate通过；Codex实读实际diff/关键断言并独立验证，已收取succeeded/completed。代码3改1增：models/db/tasks、新test_task_binding_snapshot；旧test_tasks保持。
-- 新任务两列/13键在_create_task_with_hall开头统一构造，复用B1a事实/阶梯/指纹，普通/子/schedule均覆盖，无项目no_project；旧NULL不回填，客户端不能写，原权限/错误码/事务边界保持。
-- 独立7模块177项0失败/错误/跳过，正常日志；WAL双线程100提交/400快照（one198/two202）无撕裂，最终事实前删项目400无任务/Hall，真实关系唯一冲突409同次回滚且不mock commit。
-- 子授权事务内预扣1，快照失败400后0、父快照不变，无子任务/Hall；SQLite JSON原文直接比较，claim/heartbeat/到期重排/重领/改绑定/complete/cancel均原文字节和状态保持。首轮探针误用human遭原403拒绝，改目标agent后通过，非产品修正。
-- 797源核验无缺失/越界，审查期间4代码/测试冻结保持；SQL hash a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e不变。原报告/失败历史不追改；.tmp/runner-role-binding-b1b-review/保存original-196、delivery-196、独立tests/edges/raw-lifecycle/scope/review/acceptance，approved/0 open。
-- #196代码复核阶段未重载生产服务或调用模型；本次用户重启后明确授权Codex代验收，MCP身份仍agent:codex。实服返回新增字段，只读SQLite确认两列可空/状态索引/WAL和旧#195两项NULL；197/198/199新快照13键与API/数据库一致。当前目标无TALK绑定，unconfigured及配置NULL为预期。
-- #199/msg2701纯数字字符串任务号合法、固定串B1B_SNAPSHOT_FINAL_20261009正确，由K28本人实例930cf90c领取，11.626秒claim/21.914秒总完成，已收取succeeded/completed。198/199在queued时冻结的SQLite JSON原文到完成不变，199收取后仍原文字节/状态一致；4业务源/测试SHA保持9d90726，无业务代码补修。
-- #197执行者误填197-B1b，#198协调方误要求JSON整数（合同为字符串），两次报告invalid原样保留且未收取，以合法#199为最终回传验收依据。实服证据.tmp/runner-role-binding-b1b-live-acceptance/含initial、dispatch、原报告、review、acceptance与post-collect；不会把格式失败追改为通过。
-- 本次未改实际项目绑定、名册或Key，未操作浏览器；bound态及改绑定新旧对比沿用先前隔离测试，不冒充实服已测。B1a human写入/变更步骤仍未实服执行；881/pristine、实际模型版本、页面/专门MCP消费与主动宿主等待未新增验证。当前核心验收已完成，下一片待新的明确授权。
+- 用户明确“开始下一步”，按已批准实施计划§3.2推进B3；B2实际运行证据仍需另开设计，B4页面后置。本次明确分工仍DeepSeek开发/Codex独立复核，不派Kimi。
+- 已读取当前development_requirements与服务端身份agent:codex/kind=agent。任务200目标agent:deepseek，created_by=agent:codex，Hall=group:task-405a2f323b1c46139f07b0a3fdb2cea2；创建时queued/assigned，实例availability仅历史上报，不保证实时在线。
+- 实际基线3438ee399b371965bff9055a5263a974ab975ebd、工作区干净，799跟踪文件SHA/大小与6份源码测试参照冻结于.tmp/runner-role-binding-b3/baseline-manifest.json和baseline/；之后协调方PROGRESS/HISTORY派发记录不作为开发者源码差异。
+- 唯一业务改动限定bridges/talk_task_tools.py：talk_list_agents每角色返回只读binding/binding_state，复用既有项目agents响应，保留公开配置/派生值及异常状态；旧后端缺字段与全局无项目保持null，不猜unconfigured/bound。无额外角色GET、写请求、实际匹配字段或秘密元数据。
+- 允许新tests/test_role_binding_tool_consumer.py，必要时调整三个既有MCP/开发要求测试；保持九工具目录、全部输入schema/默认值/等待策略、顶层开发要求只一次和有界实例摘要。get_task快照透传、server/SDK/web/runtime/Key/名册/正式文档不改。
+- 任务包要求自动化角色绑定/旧服务/全局/敏感未知键/HTTP数量及九工具回归、新进程stdio证据；工具描述需宿主重连才生效，不把子进程验证冒充当前宿主已加载。TERMINAL_MCP的T/W/余量/执行预算/取消排队分别报告来源与限制，未实测不宣称主动适配。
+- usage-gate guard本次continue，weekly37%，session比例未提供；不外推准确session用量。完整任务包/门禁记录在.tmp/runner-role-binding-b3/dispatch-200.json与usage-gate.json。
+- 默认派发后结束，不进行持续等待、不在开发时审查或并行改码。收到“200好了”后先收合法完整交付摘要，再独立检查实际代码、验收证据、冻结范围及兼容性；开发者完成暂停，不提交或更新正式进度。
 
 ## 已完成与当前状态
 
+- B1b #196后端独立177项及真实并发/回滚/原文探针通过，9d90726发布；用户重启后授权代验收，两列/索引/WAL、旧195 NULL、新13键与API/SQLite一致，199合法回传收取succeeded/completed，3438ee3进度发布。198/199 queued到完成以及199收取后原文保持；4业务源/测试SHA不变。实服目标未绑定故unconfigured预期，实际bound态/绑定变更未做；881/pristine/真实模型版本/页面/主动宿主等待未新增验证。证据.tmp/runner-role-binding-b1b-live-acceptance/。
+- 197执行者误填197-B1b、198协调方误要求整数的invalid报告原样保留且未收取，199合法补验为最终依据；不继续等待这两条历史测试、不追改为合法。
 - B1a #193/#194经Codex独立124项测试及原失败边界复验通过，已194→193收取、2dd2ec7推送；两表/登记绑定API、单SQL事实读取及阶梯已实现。原26个全量非零/报告保持；881及pristine未重跑，不宣称全量通过。194混排原JSON与合法本地报告一致，MCP结构化unknown保持；证据.tmp/runner-role-binding-b1a-fix-review/。人工API逐项测试未由用户报告，本次继续授权进入B1b。
 - K2.8 #195最小无工具回传由本人instance领取、17.235秒claim/25.915秒总完成，固定串K28_RECEIVED_20261009正确，msg2697合法195一致，已收取succeeded/completed；.tmp/kimi-k28-receipt-smoke/保存证据。实际后端版本/开发能力/主动等待仍待验。
 - 运行器/模型角色绑定设计#190/msg2692、#191/msg2693、#192/msg2694已独立通过并收取，正式合同/实施计划/样例752ea1e已推送；14状态/27列/1SQL、11快照13键/指纹、790源保护与WAL已有事务视图证据通过。原失败/草稿/报告保持，实际证据B2后置。本次A19纯文档笔误澄清不改变已审设计。
@@ -56,4 +57,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；本轮未读取精确额度，不外推此前使用比例。
 
-恢复指令：继续项目。#196已独立复核收取，重启后核心代验收及#199回传收取已完成；#197/#198仅保留格式失败历史、不继续等待。B1a human写入/绑定变更与bound态实服对比未做。新的明确继续授权后按最新要求定B3工具/角色添加/实际证据设计的下一片；最小回传不扩大为实际模型版本/开发能力或主动适配验收。
+恢复指令：继续项目。当前#200 B3已派，按用户完成通知收取和独立复核，不重复派发或自行开启B2/B4。#197/#198只保留格式失败历史、不继续等待；#199与B1b实服核心已通过。B1a human写入/绑定变更与bound态实服对比未做，最小回传不扩大为实际模型版本/开发能力或主动适配验收。

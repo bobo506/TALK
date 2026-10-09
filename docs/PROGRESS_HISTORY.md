@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-09 19:52 用户授权下一步，派DeepSeek #200 B3工具角色绑定消费
+
+- 用户明确要求开始下一步；按实施计划§3.2选择已批准的B3，只做talk_list_agents只读配置消费，B2实际证据须另开设计，B4页面后置。读取最新开发要求，保留角色页原交叉复核要求为派发快照，但本次执行用户明确的DeepSeek开发/Codex独立复核分工。
+- 派发前实际HEAD3438ee399b371965bff9055a5263a974ab975ebd/分支codex/terminal-return-codex、工作区干净；799跟踪文件SHA/大小及六份代码测试参照冻结。首次写基线脚本时临时目录尚未创建，已先创建目录再执行，无项目文件影响。
+- #200已创建，target=agent:deepseek、created_by=agent:codex，Hall=group:task-405a2f323b1c46139f07b0a3fdb2cea2，创建11:49:51.903085 UTC、queued/assigned、目标绑定快照unconfigured。实例可用性来自旧上报，不声称实时在线或任务已领取。
+- 包含原需求、范围/不变项、实际基线与原函数丢字段差异、九条验收标准、明确测试模块/交付要求及暂停规则。允许业务源仅bridges/talk_task_tools.py，新增consumer测试，必要时三既有测试；禁止server/SDK/web/入口/runtime/生产配置/Key/名册/正式文档改动。
+- 配置字段从既有项目agents同次响应读取，旧字段缺失与无项目诚实null、无binding_match*、无凭据/未知敏感键，不增加HTTP或写请求；九工具名/输入schema/默认值/等待预算、身份/模式兼容、开发要求单次、有界实例摘要保持。get_task已有快照透传无需扩写。
+- 要求自动化bound/异常/未配置/旧服务/全局/敏感键/读次数和九工具回归、新进程stdio证据；客户端重连加载与T/W/余量/取消排队/执行预算分层报告，不凭目录发现宣称真实主动适配。未核事项如实记录，不制造生产长等待。
+- 本次usage-gate guard=continue，weekly37%、session比例null，来源codexbar；captured_at按工具原值2026-10-09T11:43:34.577586+00:00保存，不臆测session比例。完整本地包.tmp/runner-role-binding-b3/dispatch-200.json、baseline-manifest.json、baseline/、usage-gate.json。
+- 派发后结束，由用户通知“200好了”再收合法结构化交付、检查实际代码与开发证据；开发者完成后暂停、不提交/更新正式进度。Codex只提交当前派发记录，未执行B3独立审查、未宣称源码/宿主加载已通过。
+
 ## 2026-10-09 11:32 用户授权代验收：重启后B1b核心路径与#199回传通过
 
 - 用户明确要求Codex代替人工验收；以已推送9d90726为基线，只读实服/SQLite检查，不替用户再次启停服务，不操作浏览器、不改Key/名册/实际角色绑定。MCP GET确认agent:codex/kind=agent及最新项目要求；本次仅K28最小验收回传，既定DeepSeek开发/Codex复核分工保持。
