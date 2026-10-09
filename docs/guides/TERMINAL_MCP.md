@@ -446,3 +446,13 @@ I-0清单经176开发/177独立复核通过并收取，正式步骤见[Codex TAL
 ## I-3A发起者消费者指南（2026-10-07）
 
 已发布[发起者消费者指南](INITIATOR_MODE_CONSUMER.md)，Kimi180起草/DeepSeek181独立文本及实际源码依据复核通过，双方已由Codex收取。它提供约定级提示词与有限预算/资格/停止分类，不代表真实主动链路或终端长等待适配通过；活跃工具/UI文字和剩余模块规格仍待I-3B及后续，I-4尚未运行。
+
+## 2026-10-09 B3角色绑定只读消费与重连验收
+
+- #200已独立106项与13项合同探针通过收取。共享工具每角色返回binding/binding_state，binding仅RoleBindingOut的14个公开键；读取来自同次项目agents响应，无额外绑定请求或写请求。九工具名字/输入参数/默认值/等待策略保持。
+- 先重连TALK MCP，再读工具目录：talk_list_agents说明应含binding_state。随后调用项目角色列表，角色对象应有binding与binding_state；未配置角色为null/unconfigured，已配置角色如实展示bound或partial/runner_missing/runner_retired等状态。原生模型配置不自动变成TALK项目绑定。
+- 旧后端缺字段或非项目路径为null，不伪造unconfigured/bound；连接标识不解析/执行，配置不代表在线、主动等待适配或实际模型一致。本片不输出binding_match*。
+- 当前Codex旧MCP连接实测4角色缺新增键、目录说明无binding_state；必须重连后再核加载。新进程通过不能冒充当前宿主已更新，不能把旧进程缺键误判为角色未配置。
+- 独立运行14次真实匿名管道子进程成功、0文件退化；开发者其宿主文件型stdio退化历史保持。新进程目录/角色读取证据见.tmp/runner-role-binding-b3-review/，本机忽略产物不随Git复制。
+- 只读配置核toolCallTimeoutMs=65000ms来源为桌面cordis.patch.yml；实际客户端版本/是否重载、运行中bridge --timeout仍未核。本片未调用wait，W50/余量15仅既有约定；代码默认执行预算600秒不是运行配置证明，取消/排队/真实主动等待未测，不扩大主动适配结论。
+- 本机历史目录逐对象补充测试依赖B3冻结文件，缺文件时该补充用例skip；固定目录摘要断言仍执行。881/pristine未跑；页面B4、实际证据B2与实服绑定写入/变更不在本片。

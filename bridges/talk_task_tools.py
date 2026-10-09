@@ -547,6 +547,52 @@ def controller_assignment_summary(project: JsonDict) -> JsonDict:
     }
 
 
+# B3（ROLE-BINDING-B3）：角色摘要只读消费 B1a 已公开的绑定事实（合同 §4.3）。
+# 白名单 = ``server.models.RoleBindingOut`` 的公开键；角色摘要只透传这些键，
+# 未知键（凭据正文/凭据路径/实例日志/未来 B2 的 binding_match*）一律不带入摘要，
+# 也不在 bridge 侧新增字段，或从模型名、业务角色、环境、native 配置、最新实例推断绑定值。
+ROLE_BINDING_PUBLIC_FIELDS = (
+    "runner_id",
+    "runtime",
+    "runner_display_name",
+    "runner_status",
+    "model_source",
+    "provider_id",
+    "connection_ref",
+    "model_id",
+    "model_alias",
+    "model_display_name",
+    "binding_state",
+    "binding_fingerprint",
+    "updated_by",
+    "updated_at",
+)
+
+
+def role_binding_summary(raw_binding: Any) -> JsonDict | None:
+    """把同次角色读取里的 ``binding`` 整理成只读公开字段字典；无存储行 = ``None``。
+
+    - 只按 :data:`ROLE_BINDING_PUBLIC_FIELDS` 白名单取键，值**原样透传**（含 ``null``）：
+      不解析/执行/探测 ``connection_ref``，不猜运行器或模型，不生成任何实际匹配结论；
+    - 后端缺该键或不是对象（旧后端 / 异常载荷）→ ``None``：不伪造默认绑定，
+      也不把缺失填成 ``unconfigured`` 或某个运行器。
+    """
+    if not isinstance(raw_binding, dict):
+        return None
+    return {field: raw_binding.get(field) for field in ROLE_BINDING_PUBLIC_FIELDS}
+
+
+def role_binding_state_value(raw_state: Any) -> str | None:
+    """把同次角色读取里的 ``binding_state`` 原样透传；缺失 / 非字符串 → ``None``。
+
+    缺失时保持 ``null``（不猜 ``unconfigured`` 或 ``bound``）；服务器实测的保留配置或异常状态
+    （``partial`` / ``runner_missing`` / ``runner_retired`` 等）同样照原样传出，**不压成** ``bound``。
+    """
+    if isinstance(raw_state, str) and raw_state.strip():
+        return raw_state
+    return None
+
+
 def list_agents(*, project_id: str | None = None) -> JsonDict:
     effective_project_id = _project_id(project_id)
     if effective_project_id is not None:
@@ -589,6 +635,12 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
                     "availability": agent.get("availability")
                     or _availability(statuses),
                     "instances": latest_instance_summary(member_instances),
+                    # B3：绑定事实与角色清单来自**同一次** GET /projects/{id}/agents 响应，
+                    # 不额外发绑定/身份请求，不做写入，也不从实例 runtime 推断绑定值。
+                    "binding": role_binding_summary(agent.get("binding")),
+                    "binding_state": role_binding_state_value(
+                        agent.get("binding_state")
+                    ),
                 }
             )
         return {
@@ -621,6 +673,10 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
                 "display_name": member.get("display_name"),
                 "availability": _availability(statuses),
                 "instances": latest_instance_summary(member_instances),
+                # B3：非项目路径没有项目绑定上下文，两个字段都明确为 null，
+                # 且不额外发项目/角色绑定/身份请求（全局路径读取边界保持原样）。
+                "binding": None,
+                "binding_state": None,
             }
         )
     return {
@@ -1818,6 +1874,18 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "非项目路径 caller_identity 为 null，不额外发身份请求。caller_identity 只是如实披露入口"
             "身份，自身不构成权限，也不代表在线、已确认或已获授权。"
             "availability 仅依据实例上报，未做心跳核验，可能滞后，使用时请参考 last_seen_at。"
+            "每个角色还返回只读的 binding 与 binding_state，取自已有的同一次项目角色读取响应"
+            "（不新增绑定请求、不新增工具或参数）：binding 只透传 B1a 公开绑定字段"
+            "（runner_id / runtime / runner_display_name / runner_status / model_source / provider_id / "
+            "connection_ref / model_id / model_alias / model_display_name / binding_state / "
+            "binding_fingerprint / updated_by / updated_at），没有存储行时为 null；"
+            "binding_state 是服务器读取时实测的状态：未配置为 unconfigured，另有 partial / "
+            "runner_missing / runner_retired 等保留配置或异常状态，只有全部通过才是 bound，"
+            "不得把异常状态当成 bound。旧后端缺这两个键时两者均为 null，不得猜成 unconfigured 或 "
+            "bound；非项目路径两者均为 null。connection_ref 只是不透明连接标识，本工具不解析、"
+            "不执行、不探测，也不透传凭据、凭据路径或实例日志。binding 只是派发配置事实："
+            "不代表运行器在线、已适配主动等待或能按任务切换模型，也不代表实际使用的模型与配置一致；"
+            "本版本不输出任何实际匹配（binding_match*）结论。"
             "project_id 省略时使用 bridge 项目上下文。"
         ),
         "inputSchema": {

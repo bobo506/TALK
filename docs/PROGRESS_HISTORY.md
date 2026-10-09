@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-09 20:29 #200 B3独立复核通过并收取，当前宿主待重连加载
+
+- 用户通知200 ok；DeepSeek msg2702纯JSON合法task_id字符串200一致complete。按稳定SHA70ebd990c5a97ad7a36a116ea8b42b31a73ba797b5b9810355a4bcbcc666ea35两页补读10字段，与本地development.json逐对象一致、validate通过；原开发日志/报告均复制保存，不只采信自报。
+- 实际审查HEADcf438ac，开发基线3438ee3；799跟踪文件SHA核验无缺失/越界，差异仅共享工具+68行与新增consumer测试，协调方PROGRESS/HISTORY已有改动保持归属。实读全部业务diff与关键合成/实服隔离/stdio断言；公开白名单14键等于RoleBindingOut，真实状态/null透传、不推断实际匹配，项目/全局读次数及原权限/身份/模式摘要保持。
+- Codex独立16+17+12+21+40=106项，0失败/错误/跳过，约71.593秒、正常日志。首轮从.tmp文件启动缺sys.path项目根，5项仅导入失败；保留attempt1日志/JSON后修正本机入口重跑通过，无业务源码补修、不把失败追改为产品通过。
+- 13项独立合同探针：九工具名/全inputSchema逐对象等于冻结原版，其它八工具描述不变；25角色剥离新增两字段后旧响应与原版逐对象相等，项目4 GET/全局2 GET相同、无写请求；半缺字段/异常载荷null、运行器不从实例猜、要求单次与每角色最新实例保持。
+- 独立记录14次真实stdin/stdout/stderr匿名管道子进程均创建成功，0失败、0文件退化标记，包括新进程tools/list和绑定角色读取。开发者其宿主匿名管道受限/文件型stdio退化原报告保持，协调方新增证据不能追改为开发者做过。
+- 当前Codex MCP只读实测身份agent:codex/agent，4角色都缺binding/binding_state键，工具目录说明无binding_state：当前旧进程未加载，源码/新子进程通过不等于宿主更新。重连TALK MCP后再只读核目录与字段，无需为加载另派真实模型任务。
+- 仅读非敏感配置键核65000ms来源；实际终端版本/配置是否重载未知，本片未调用wait，W50/15秒余量仅既有文档事实。bridge DEFAULT_TIMEOUT_SEC=600为代码默认，实际运行中--timeout未知；真实取消/排队/主动等待未测、不改配置。
+- 补充历史目录对象比较读取本机忽略B3基线，缺失时该补充用例skip，固定目录摘要断言仍执行；未单独验证干净检出16项0skip。全量881/pristine、B1a实服绑定变更、实际模型/B2/B4未新增验证，不扩称全仓或宿主主动适配通过。
+- review approved_code_and_new_process_stdio/0 open，200已收取succeeded/completed，msg2702、12:23:53.586517 UTC；两业务源/测试冻结SHA审查后保持。.tmp/runner-role-binding-b3-review/保存原代码/交付/原日志、独立tests/probe/scope/review/budget/current-host/acceptance。
+- 正式PROGRESS/HISTORY、MODULE_tasks、实施计划、TERMINAL_MCP、PROJECT_BRIEF、DEVELOPMENT_ROADMAP和两份API指南同步实测范围/加载限制；197/198指南中的旧未收取状态同步为用户已归档，原invalid保持。代码/测试与文档统一中文提交常规推送，暂停新片，待客户端重连核加载或新的明确继续授权。
+
 ## 2026-10-09 19:57 用户要求补收#197/#198，归档完成且原格式错误保持
 
 - 用户明确“198和197记得收下”，授权收取这两条历史验收测试；不重新开发、派任务或改写交付。依次collect197/198成功，均succeeded/completed；197/msg2699收取11:56:20.711594 UTC，198/msg2700收取11:56:22.979636 UTC。

@@ -1,23 +1,24 @@
 # Project Progress
 
-Updated: 2026-10-09 19:57 (Asia/Shanghai)：#200 B3已派，待DeepSeek交付后独立复核；按用户明确要求补收197/198归档为completed，原invalid报告保持，最终快照验收仍以199为准。B2/B4未派。
+Updated: 2026-10-09 20:29 (Asia/Shanghai)：#200 B3独立106项及13项合同探针通过，msg2702已收取succeeded/completed；9工具/参数保持，实际当前MCP旧连接缺新字段和描述，待重连核加载。B2/B4未派。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
-- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；本次只派#200，Codex仅维护派发记录，尚未审查B3代码。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；本次#200开发完成暂停后，Codex已实读代码/测试并独立复核通过收取；本轮无业务源码补修。
 
-## 当前切片：B3 #200已派发，待DeepSeek交付
+## 当前切片：B3 #200复核通过收取，待当前MCP重连加载
 
-- 用户明确“开始下一步”，按已批准实施计划§3.2推进B3；B2实际运行证据仍需另开设计，B4页面后置。本次明确分工仍DeepSeek开发/Codex独立复核，不派Kimi。
-- 已读取当前development_requirements与服务端身份agent:codex/kind=agent。任务200目标agent:deepseek，created_by=agent:codex，Hall=group:task-405a2f323b1c46139f07b0a3fdb2cea2；创建时queued/assigned，实例availability仅历史上报，不保证实时在线。
-- 实际基线3438ee399b371965bff9055a5263a974ab975ebd、工作区干净，799跟踪文件SHA/大小与6份源码测试参照冻结于.tmp/runner-role-binding-b3/baseline-manifest.json和baseline/；之后协调方PROGRESS/HISTORY派发记录不作为开发者源码差异。
-- 唯一业务改动限定bridges/talk_task_tools.py：talk_list_agents每角色返回只读binding/binding_state，复用既有项目agents响应，保留公开配置/派生值及异常状态；旧后端缺字段与全局无项目保持null，不猜unconfigured/bound。无额外角色GET、写请求、实际匹配字段或秘密元数据。
-- 允许新tests/test_role_binding_tool_consumer.py，必要时调整三个既有MCP/开发要求测试；保持九工具目录、全部输入schema/默认值/等待策略、顶层开发要求只一次和有界实例摘要。get_task快照透传、server/SDK/web/runtime/Key/名册/正式文档不改。
-- 任务包要求自动化角色绑定/旧服务/全局/敏感未知键/HTTP数量及九工具回归、新进程stdio证据；工具描述需宿主重连才生效，不把子进程验证冒充当前宿主已加载。TERMINAL_MCP的T/W/余量/执行预算/取消排队分别报告来源与限制，未实测不宣称主动适配。
-- usage-gate guard本次continue，weekly37%，session比例未提供；不外推准确session用量。完整任务包/门禁记录在.tmp/runner-role-binding-b3/dispatch-200.json与usage-gate.json。
-- 默认派发后结束，不进行持续等待、不在开发时审查或并行改码。收到“200好了”后先收合法完整交付摘要，再独立检查实际代码、验收证据、冻结范围及兼容性；开发者完成暂停，不提交或更新正式进度。
+- DeepSeek #200/msg2702合法纯JSON、自身字符串任务号200一致complete；按稳定SHA70ebd990c5a97ad7a36a116ea8b42b31a73ba797b5b9810355a4bcbcc666ea35两页补读完整10字段，与本地development.json逐对象相等、validate通过。校验不代替独立复核。
+- 实际基线3438ee3、审查HEADcf438ac；799跟踪源无缺失/越界，开发差异仅bridges/talk_task_tools.py +68行、新tests/test_role_binding_tool_consumer.py 16项；协调方先前两份进度变化已排除。两业务源/测试审查冻结SHA保持，server/SDK/web/入口/配置未改。
+- 每角色只读binding/binding_state复用同次项目agents响应，14白名单与RoleBindingOut完全一致；旧后端缺键和全局无项目诚实null，异常/保留配置原样、无match/凭据未知键/日志，不从实例或原生模型配置猜绑定。
+- Codex独立五模块106项0失败/错误/跳过，正常日志，约71.593秒；13项独立合同探针确认九工具名/全inputSchema逐对象不变、其它八描述原文不变、25角色旧字段逐对象等于基线、项目4次/全局2次GET不变、缺单键降级/最新实例/要求单次保持。
+- 独立运行真实匿名管道子进程14次成功，0失败/文件退化标记，含新进程目录/绑定调用；不追改开发者其宿主文件型stdio退化历史。首轮本机验证脚本未加项目根导致5项导入错误，保留attempt1后修正验证入口，无产品代码修正。
+- 已收取200，succeeded/completed、msg2702、收取12:23:53.586517 UTC。当前Codex MCP角色列表实测4角色缺新增键，当前工具描述无binding_state；这是旧进程未加载，不能据子进程通过宣称当前宿主已更新。先重连TALK MCP再只读核目录与角色字段，不为加载再派模型任务。
+- 只读核T来源C:/Users/Administrator/.dsh/profiles/desktop/cordis.patch.yml为65000ms；实际宿主版本/是否重载未知。本片无wait，文档W50/余量15未实测；bridge代码默认600秒不代表运行中--timeout。真实取消/排队/主动等待未验，参数不改。
+- 历史目录逐对象补充测试依赖本机B3冻结文件，缺文件时该补充用例skip，固定目录摘要断言仍执行；不宣称干净检出全部16项0skip。全量881/pristine、实际模型/B2/B4、实服绑定写入/变更未新增验证。
+- .tmp/runner-role-binding-b3-review/保存original-200、delivery-200、MCP包、106项日志、13项probe、scope/review/预算/当前加载与收取回执。正式任务模块/计划/指南/简报/路线图/进度同步，统一Git收尾后暂停；下一片待重连核加载或新的明确授权。
 
 ## 已完成与当前状态
 
@@ -57,4 +58,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；本轮未读取精确额度，不外推此前使用比例。
 
-恢复指令：继续项目。当前#200 B3已派，按用户完成通知收取和独立复核，不重复派发或自行开启B2/B4。#197/#198已按用户要求收取归档，格式失败历史保留、不继续等待；#199与B1b实服核心已通过。B1a human写入/绑定变更与bound态实服对比未做，最小回传不扩大为实际模型版本/开发能力或主动适配验收。
+恢复指令：继续项目。#200 B3已独立通过收取发布；当前TALK MCP旧连接未加载，先重连后只读核新描述/角色binding字段，不重复派发200或自行开启B2/B4。#197/#198已归档且原invalid保持；#199与B1b实服核心通过。B1a实服绑定写入/变更未做，不扩大为实际模型或主动适配验收。

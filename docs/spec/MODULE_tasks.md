@@ -3,7 +3,7 @@
 > 所属项目：TALK
 > 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 已于 2026-09-06 通过项目管理者人工验收，根任务 `#15` 与子任务 `#16/#17/#18` 均已完成；TH-7a 普通终端 stdio MCP 入口与只读连接检查已实现；L1-1 已交付 Kimi Code 独立会话入口的模板/预检/无密钥启动器（配置可用与工具目录已验证，真实身份预检缺本人凭证、真实模型主控闭环未运行），具体客户端安装与真实模型验收待后续推进
 
-> 2026-10-09：B1a #193/#194与B1b #196后端已独立复核收取；[合同](ROLE_MODEL_BINDING_DESIGN.md)与[实施计划](ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)为依据，待[绑定API](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)与[任务快照API](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)人工验收。B1b独立177项及并发/回滚/原文不可变性探针通过；`agent_tasks`新增两列，普通/子/schedule在`_create_task_with_hall`统一构造13键，旧NULL不回填，原权限/任务侧400保持。MCP/页面/实际对照后置。
+> 2026-10-09：B1a #193/#194与B1b #196后端已独立复核收取；[合同](ROLE_MODEL_BINDING_DESIGN.md)与[实施计划](ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)为依据，[任务快照API](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)实服核心已代验通过；[绑定API](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)实服写入/变更步骤未做。B1b独立177项及并发/回滚/原文不可变性探针通过；`agent_tasks`新增两列，普通/子/schedule在`_create_task_with_hall`统一构造13键，旧NULL不回填，原权限/任务侧400保持。B3 #200工具只读绑定消费经Codex独立106项及13项合同探针通过并收取，14公开键、九工具/参数保持；当前MCP旧连接需重连加载。页面/B2实际对照后置。
 
 ## 目标
 
@@ -241,6 +241,7 @@
 
 ### 终端工具
 
+- 2026-10-09 B3 #200已实现：`talk_list_agents` 每角色新增只读 `binding`/`binding_state`，复用同次项目角色读取、14公开键白名单；旧后端缺字段/非项目路径为null，不输出match。目录与输入schema保持，加载需MCP重连；106项/13探针及真实匿名管道验证通过，当前宿主尚未加载。
 - TH-7a 新增 `bridges/talk_terminal_mcp.py`，可从任意目录用绝对路径启动普通终端 stdio MCP；`--check` 只读核对 API Key 对应身份、项目角色与可用状态。
 - 独立入口配置优先级为显式 `--server / --project`、环境变量、项目 `.talk/project.yaml`；服务缺省为本机 8000，项目和 `TALK_API_KEY` 必须有效提供。默认项目允许工具参数覆盖，服务端继续负责权限校验。
 - 独立入口忽略继承的 `TALK_MEMBER_ID`，只暴露下述九个 Task Hall 工具（八个任务工具加只读交付摘要 `talk_get_delivery`）；依赖 bridge 回收的延迟 `talk_send` 仅保留在原 bridge 入口。启动与验收见 `docs/guides/TERMINAL_MCP.md`。

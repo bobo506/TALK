@@ -1,6 +1,6 @@
 # 实施计划：通用角色运行器与模型绑定
 
-> 状态：**B1a/B1b后端已实现、独立复核通过并收取**（2026-10-09）。依据 [正式合同](ROLE_MODEL_BINDING_DESIGN.md)；设计 #190–#192 和开发 #193 的原始交付/失败记录保持，#194 定向修正闭合问题。
+> 状态：**B1a/B1b后端与B3工具消费已实现、独立复核通过并收取**（2026-10-09）。依据 [正式合同](ROLE_MODEL_BINDING_DESIGN.md)；设计 #190–#192 和开发 #193 的原始交付/失败记录保持，#194 定向修正闭合问题。
 > B1a经Codex独立124项与原失败边界复验通过，193/194已收取；B1b #196经独立177项及并发/回滚/原文探针通过并收取。2026-10-09用户重启后明确授权Codex代验收，实服表/新任务字段/旧NULL与当前unconfigured快照核心通过，#199/msg2701合法回传已收取。197/198格式失败历史保留；实际项目human写入/绑定变更及bound态新旧对比未做，见[绑定指南](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)与[快照指南](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)。未重跑全量881/pristine，不宣称所有人工步骤已测。
 > 设计独立验证与本地证据索引见合同开头；单条 SQL 原文与 #192 草稿一致。实际运行证据 B2、页面、进程管理和真实宿主能力仍各自待后续。
 
@@ -11,7 +11,7 @@
 | **B1a** | 存储与契约面：`runner_registry` + `project_role_bindings` 两表、幂等增量迁移、全局登记 API、角色绑定 API、`GET /agents` 附加 `binding`/`binding_state`（含 §4.4 有效性阶梯）、**单语句事实读取助手 `read_role_binding_facts`**、校验与错误码 | 本合同 §3–§6、§10 被批准 | ✅ 后端复核/收取通过；待人工 API 验收 |
 | **B1b** | 任务侧：`agent_tasks` 两列 + 唯一写入点（`_create_task_with_hall`）复用 B1a 的单语句事实读取、快照状态阶梯、不可变性 | B1a 的同名助手与状态枚举 | ✅ 后端复核/收取与重启后核心代验收通过；实服绑定变更对比未做 |
 | B2 | **实际运行证据 + 配置/实际对照**：字段、attempt 证据锚点、`binding_match_config` / `binding_match_actual` | **必须另开设计片**（见 §3.1 的 R-B2-1…6）；B1a/B1b 只提供配置侧 | ❌ 本设计不定义字段 |
-| B3 | MCP/工具消费：`talk_list_agents` 只读暴露 `binding`/`binding_state`；不新增工具、不输出任何 match | B1a | ⏳ B1a 已收取，本片尚未派发 |
+| B3 | MCP/工具消费：`talk_list_agents` 只读暴露 `binding`/`binding_state`；不新增工具、不输出任何 match | B1a | ✅ #200独立106项/13探针及新进程stdio通过并收取；当前宿主待重连 |
 | B4 | 页面：角色页只读展示运行器/来源/连接标识/模型与 `unknown` 降级 | B1a（+B2 才有实际值） | ⏳ 待 B1a；产品展示名 D-5 未决 |
 | B5 | 手动启停 / 随项目自动启动 / 桌面生命周期 | 进程所有权合同（未批准）+ B1a | ❌ 本设计不承诺 |
 | B6 | schedule 项目化并携带项目绑定快照 | B1a/B1b + 独立合同 | ❌ 后置 |
@@ -270,12 +270,13 @@ LEFT JOIN runner_registry       AS r  ON r.runner_id   = b.runner_id;
 - 已知障碍：`agent_instances` 无 `project_id`/`task_id`（G8）且原地覆盖（`server/routes/instances.py:50-57`），因此**不能**用实例最新值派生历史 attempt 结论；`kimi-code/k3` 是 alias（且是原生调用选择参数）不是 `model_id`。
 - 本片**不**定字段、**不**排期到 B1；B1/B3 不得输出任何 `binding_match*`。
 
-### 3.2 B3 MCP/工具消费
+### 3.2 B3 MCP/工具消费（#200已通过收取，宿主待重连）
 
 - `bridges/talk_task_tools.py`：`talk_list_agents` 每个 agent 增加只读 `binding`/`binding_state`（不含凭据、不含 match）。
 - 不新增工具、不改既有工具名/参数；保持九工具目录（`docs/spec/MODULE_tasks.md:242`）。
 - 必须守护 `development_requirements` 单次出现断言（A18）。
 - 工具描述变更需 MCP 客户端**重连**后才生效，未重连前不得声称宿主已加载。
+- 2026-10-09：只改共享工具+新增consumer测试，14键与RoleBindingOut一致；独立五模块106项0失败/错误/跳过，13探针和14次真实匿名管道子进程通过。当前Codex旧连接目录/角色字段实测未更新，待重连核加载；本机历史目录补充比较依赖忽略冻结文件，固定摘要断言仍可在缺该文件时执行，不冒称干净检出16项0skip。
 
 ### 3.3 B4 页面
 
