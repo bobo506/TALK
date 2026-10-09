@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-09 20:41 用户重启后，#200 B3当前MCP只读加载验收通过
+
+- 用户通知“重启好了”；在当前连接检查talk_list_agents工具描述并只读获取项目prj_e8fe7066bbec角色列表，描述已含binding_state，caller_identity为agent:codex/agent。
+- agent:codex、agent:deepseek、agent:kimi与agent:kimi-code-k28-preview均具有binding与binding_state键，值为null/unconfigured；development_requirements仅1份，每角色最多1实例。与重启前缺键/旧描述的实测形成加载前后证据，当前加载验收通过。
+- unconfigured表示尚未保存TALK项目角色绑定，原生CLI模型配置不自动形成该绑定。本次只读0写请求、0新模型任务、未调用wait；不外推实际后端模型版本、开发能力、取消/排队或主动等待验收。
+- .tmp/runner-role-binding-b3-review/current-host-reconnected.json保存本次筛选证据，原current-host-loading.json、开发者失败/本机测试入口失败及原Git回执保持。源码基线f858c67fc6402fcc06909faf5e5cfd7db55b275b不变；仅同步当前文档状态，中文提交常规推送后暂停，B2/B4未派。
+
 ## 2026-10-09 20:29 #200 B3独立复核通过并收取，当前宿主待重连加载
 
 - 用户通知200 ok；DeepSeek msg2702纯JSON合法task_id字符串200一致complete。按稳定SHA70ebd990c5a97ad7a36a116ea8b42b31a73ba797b5b9810355a4bcbcc666ea35两页补读10字段，与本地development.json逐对象一致、validate通过；原开发日志/报告均复制保存，不只采信自报。

@@ -9,7 +9,7 @@
 
 DeepSeek #190–#192 设计与补正经 Codex 独立复核，正式 [合同](ROLE_MODEL_BINDING_DESIGN.md)、[实施计划](ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md) 与 [合成样例](ROLE_MODEL_BINDING_EXAMPLES.json) 已发布。单行请求 CTE 联查覆盖空绑定和身份/名册失效；alias 为调用选择参数，六维指纹不代表完整调用配置；任务快照不含读取回执字段。
 
-实施顺序为 **B1a登记/角色绑定 → B1b任务快照 → B3只读工具消费**，各片独立复核收取。B1a #193/#194独立124项通过，B1b #196独立177项及并发/回滚/原文探针通过；用户重启后#199实服核心代验收通过，实际human绑定写入/变更仍未做。B3 #200独立106项/13探针与新进程匿名管道验证通过并收取，九工具/参数保持，当前MCP旧连接需重连加载。B2实际证据必须另开设计按project/task/attempt留存，未知不得报匹配；B4页面、进程启停/自动启动和目标八方向依各自合同推进。项目404/任务创建400、原事务视图及回滚保持；[绑定指南](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)、[快照指南](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)。
+实施顺序为 **B1a登记/角色绑定 → B1b任务快照 → B3只读工具消费**，各片独立复核收取。B1a #193/#194独立124项通过，B1b #196独立177项及并发/回滚/原文探针通过；用户重启后#199实服核心代验收通过，实际human绑定写入/变更仍未做。B3 #200独立106项/13探针与新进程匿名管道验证通过并收取，九工具/参数保持，用户重启后当前MCP描述与4角色绑定字段已只读核验加载（null/unconfigured）。B2实际证据必须另开设计按project/task/attempt留存，未知不得报匹配；B4页面、进程启停/自动启动和目标八方向依各自合同推进。项目404/任务创建400、原事务视图及回滚保持；[绑定指南](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)、[快照指南](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)。
 
 K2.8 于2026-10-09由人类完成名册同步，当前MCP确认dev/execution并有kimi-code实例上报idle；最小任务#195已领取/回传并收取，实际模型版本、开发能力与主动等待仍未验收。B1a开发/复核期间没有重载生产服务、迁移生产库、启动运行器或调用模型。原设计及 #193 失败报告保留，相关测试通过不代表全量 881 项通过或真实接入能力已验。
 
