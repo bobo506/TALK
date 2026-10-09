@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-09 21:10 #201独立复核复现F1，派DeepSeek #202定向返修
+
+- 用户通知201完成。msg2703/succeeded/submitted结构化自报complete、task_id字符串201一致；稳定SHA e4a5430667066bdf02cb7962bff7216afd381410c7d41cecf745fe2aa713f010两页完整4204字符，与本地development.json逐对象一致、validate通过，不从runner推定业务完成。
+- 实读workspace.js新增134行、CSS17行、index四处版本与5既有测试缓存差异、新VM渲染用例及app.js原名册加载/上下文保护；800跟踪范围核验无越界，原9文件冻结及开发日志/报告/Chrome失败拷贝保存。app.js和后端/SDK/MCP/生产身份绑定保持，原说明静态节点/名册读/刷新路径未改。
+- Codex独立默认进程隔离Node163项0失败/取消/跳过，四Python页面契约12项OK，语法/diff/UTF-8通过；开发者其宿主default spawn EPERM/Chrome命名管道拒绝记录保留，不冒称开发者做过默认隔离。结果聚合初版未识别Node默认spec报告和CRLF，读取原日志修正计数解析，无重跑/产品修改；原日志保持。浏览器/真实窄屏及后端联调本轮未做。
+- F1/P2独立复现：workspace.js:723 ROLE_BINDING_STATES[value]、:741 ROLE_BINDING_MODEL_SOURCES[key]无自有键门禁。constructor/__proto__/toString/valueOf/hasOwnProperty被误当已知状态且label/text/kind缺失；来源constructor返回原型函数、__proto__返回原型对象。实际消费者原文执行7探针全失败，违反已批准未知状态/白名单文本降级，不把问题夸作已证XSS。
+- review verdict=needs_rework/open F1。#201暂不收取，未提交原9业务/测试文件；.tmp/runner-role-binding-b4-review/保留original-201、delivery-201、MCP全文/引用、scope-and-freeze、independent日志、prototype-boundary-probe.json与review.json。
+- 派发前再读最新development_requirements，真实页面要求原快照保持；用户本轮明确DeepSeek开发/Codex独立复核优先。仅同一B4定向修正，不开启新切片。
+- 新任务#202创建2026-10-09T13:09:12.843776、queued/assigned，target=agent:deepseek、created_by=agent:codex，Hall=group:task-6131d8f00a2046bb8d8fd52cfe14ad79。按最小顶层参数派发；仅workspace.js与新增role_binding测试可改，原201其它7文件冻结保持；补真实渲染继承键回归及相关原回归，原7失败证据另存不覆盖。
+- 返修基线HEAD2eb7827 + 原201未提交冻结内容，共801文件SHA/大小，两源码副本、任务包/要求/回执在.tmp/runner-role-binding-b4-rework/。本轮仅维护/提交两进度，暂停等待用户通知#202完成再独立复核；不主动续等、启动模型试验/浏览器或生产绑定写入。
+
 ## 2026-10-09 20:51 用户授权下一切片，派DeepSeek #201 B4角色页只读绑定展示
 
 - 用户明确“继续下一切片”；B3当前MCP重连加载验收已通过，源码/进度HEAD26e163c482671fecb3b741f2471c2a9d5450acac、工作区干净。按实施计划§3.3选择B4，D-5只展示已有值，B2实际证据与B5进程合同不扩入。
