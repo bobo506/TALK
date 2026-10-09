@@ -1,5 +1,21 @@
 # 开发历史 · TALK
 
+## 2026-10-09 23:06 BA-1 #203独立设计复核未通过，派DeepSeek #204返修
+
+- 用户“好了”通知203完成；read-only get_delivery取得succeeded/submitted、msg2705、合法task_id字符串203/self complete，默认摘要必要字段齐全；稳定SHA77b5449d001f2afd9f2e909143886c63d4e9c04716da3749dc64caba2ed0e635、两页4071字符原文与本地JSON一致，workflow summary格式通过。原203尚未collect，未把格式/自报当业务通过。
+- 读取实际草案/计划/矩阵/样例/探针及负责MODULE_bridges、TERMINAL_MCP预算段与真实路由/选模函数。203原七交付冻结到.tmp/adapter-binding-design-review/original/，SHA在scope.json；802旧跟踪仅两进度因协调方ee5df80不同，800其它逐SHA相同且工作区干净，源无开发改动。
+- 独立重跑原8场景8绿，不构成设计正确证明；另用实际FastAPI路由+内存SQLite与原探针注入六组反例，negative-probes.json记录完整实测，decision=needs_rework。首次fixture commit后human未refresh导致DetachedInstanceError，协调方仅修自己fixture并重跑通过，失败阶段留fixture-first-failure.txt；原产物未改。
+- F1：GET runners/agents实际list、原fake dict；原apply遇真实list TypeError；缺成员binding GET实际200/null/unconfigured，名册有效性须另外核，不把GET虚构成404。
+- F2：native默认K3压过显式argv K28，prefer-declared又可覆写固定K28事实为K3；需先定最终选择alias再解析同一元组、缺源阻塞，不用声明覆盖已核实入口。
+- F3：登记差异无授权被no_op；PATCH带runner_id/runtime被422仍写绑定且errors为空；adapter_note差异未比较。要求复用RunnerUpdate正确白名单、失败停条目、retired不借普通变更静默复启。
+- F4：POST409未完整回读，注入同ID/dsh与期望kimi-code不符仍bind成功；所有201/409/未知结果读回须同规则检查形状/状态/runtime/字段/retired，不盲重写。
+- F5：真实PUT last-write-wins无CAS；GET后其它human写入可被accept_change=false覆盖，写后读仍成功。修并发保证，单写者前置不能冒充全局锁，若强保证需新CAS先列未定决策。
+- F6：疑似凭据optional model_alias条目误ready，原RoleBindingInput拒绝；须完整schema验证/归一化model_dump且拒绝时不回显秘密input。
+- 补三项实施前置：host/workspace明确稳定scope与碰撞拒绝；apply服务/项目/member与清单一致、非秘密来源漂移重plan、human凭据只进本次受信进程；C3精确适配closeout调用入口而非重复人工declare+CLI默认流程。登记不同于注册/入册/启动，不开放Agent写。
+- 派前读取最新development_requirements及真实caller=agent:codex/agent，保持用户DeepSeek开发/Codex独立复核；DeepSeek实例idle时间为旧14:46:12.543715，不当实时领取。usage-gate15:02:50.892123 UTC session50%/weekly44%、continue，采样非实时保证。
+- #204创建2026-10-09T15:05:27.589822，title=204-适配自动登记设计返修：真实API与来源冲突闭合，target=agent:deepseek、created_by=agent:codex、Hall=group:task-3010d89129d34a9f83772503137782c2，创建queued/assigned；最小独立顶层参数，无自动转审/并发改源。新基线ee5df80、802跟踪SHA/大小冻结.tmp/adapter-binding-design-rework/baseline-manifest.json，完整任务包/回执留该目录。
+- 本片只.tmp设计返修与隔离证据，不改tracked源/正式合同/API权限/生产库/profile/模型/名册/历史任务/Key，不实现C1–C4，不切主被动。协调方两进度必要校验后中文提交常规推送；默认用户通知#204后取件，203原消息/自报/失败均保留，未collect。
+
 ## 2026-10-09 22:40 用户确认适配阶段自动登记绑定，派DeepSeek #203 BA-1设计
 
 - 用户看到运行器/模型绑定面板且全未配置，询问配置方式；Codex只读指南/实际代码并从配置本地库查runner登记空、项目绑定0行，现有写入human专用。绑定字段目前仅记录/快照/展示，不驱动CLI选模；格式校验不能证明实际模型。
