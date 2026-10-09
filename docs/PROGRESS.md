@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-09 09:32 (Asia/Shanghai)：#193/#194 B1a 后端独立复核通过、已194→193收取；124项相关测试和原失败边界通过，正式文档同步。统一Git收尾，待人工API验收，B1b未派，K2.8真实使用继续延期。
+Updated: 2026-10-09 09:48 (Asia/Shanghai)：B1a已复核收取并推送2dd2ec7，待人工API验收；K2.8人类同步已完成，dev/execution与kimi-code闲置实例上报已核。项目添加角色保存后的自动入册列入后续流程，未开发。
 
 ## 当前角色与协作
 
@@ -24,13 +24,13 @@ Updated: 2026-10-09 09:32 (Asia/Shanghai)：#193/#194 B1a 后端独立复核通�
 - 运行器/模型角色绑定设计#190/msg2692、#191/msg2693、#192/msg2694已独立通过并收取，正式合同/实施计划/样例752ea1e已推送；14状态/27列/1SQL、11快照13键/指纹、790源保护与WAL已有事务视图证据通过。原失败/草稿/报告保持，实际证据B2后置。本次A19纯文档笔误澄清不改变已审设计。
 - #187/msg2689入口开发、#188/msg2690与#189/msg2691补正，经Codex独立82项测试（0跳过）、六项启动边界及冻结文件核验通过，已189→188→187验收收取。入口代码与指南提交a4757c3，接入准备提交abab3cb，均已推送；原失败/开发报告保留。
 - 新成员agent:kimi-code-k28-preview已POST注册201，独立Key的GET /api/members/me确认kind=agent。Key在C:/Users/Administrator/.talk/agent-kimi-code-k28-preview.key，随机生成并限制ACL；Key明文不入仓库、聊天、日志或命令参数。
-- 本地groups.yaml和独立profile=.talk/agents/agent_kimi-code-k28-preview/{IDENTITY,SOUL,USER}.md已准备dev/execution；scan_agents共4条，原三条字段保持。服务端项目名册最后实测仍codex/deepseek/kimi三条：agent:codex同步请求HTTP403，需要人类身份。未收到人类同步成功确认，不把名册已配置/在线/验收通过作为既定事实。
-- check --require-key与launch --dry-run已通过；在线check唯一失败为新成员未入册。原native K3默认值、Codex入口与既有profile共15文件SHA保持。运行器尚未启动，真实模型/claim→执行→结果→complete→收取闭环未验；用户已明确延后到下次使用。
+- 本地groups.yaml和独立profile=.talk/agents/agent_kimi-code-k28-preview/{IDENTITY,SOUL,USER}.md已准备dev/execution；scan_agents共4条，原三条字段保持。2026-10-09人类同步已完成，apply_roster回执human_sync_verified/project_roster_applied均true；MCP实测名册codex/deepseek/kimi/kimi-code-k28-preview四条，新角色dev/execution。原agent身份403保持历史，不修改权限。
+- check --require-key与launch --dry-run已通过；在线check唯一失败为新成员未入册。原native K3默认值、Codex入口与既有profile共15文件SHA保持。用户本次已启动入口，MCP最新kimi-code实例上报idle（2026-10-09T01:46:05.488125 UTC，pid22828，current_task_id=null）；实例上报可能滞后，不能据此宣称实时心跳或实际模型。真实模型/claim→执行→结果→complete→收取闭环及主动宿主T/W仍未验。
 
-## 下次使用K2.8时
+## K2.8当前使用与后续验收
 
-1. 先确认人类名册同步是否完成；完整保留原角色的准备包和说明在.tmp/kimi-k28-executor-application/。人类本地应用命令：`.\.venv\Scripts\python.exe -X utf8 .tmp/kimi-k28-executor-application/apply_roster.py`，终端getpass输入已有本人human Key。脚本核身份、包hash和当前完整名册基线，漂移停止；已验证agent身份仅1GET/0POST并拒绝。
-2. 名册同步后，再运行只读`check --require-key --online-identity`。通过后启动下方入口，额度允许时安排最小读文件任务，记录真实模型版本、耗时与额度。当前没有执行这些后续步骤。
+1. 名册同步已完成，无需重复执行.tmp/kimi-k28-executor-application/apply_roster.py。原包、回执与只读roster-preflight-20261009.json保留；该脚本为临时human入口，不是未来添加角色产品流程。
+2. 当前实例已上报idle；下一步在用户授权与模型额度允许时安排最小读文件任务，核实模型版本、耗时和claim→结果→收取闭环。未验真实接单，不把闲置上报当闭环通过。
 3. 用户要求保留K2.8启动命令；PowerShell先进入项目目录，TALK后端需已运行：
 
 ```powershell
@@ -53,4 +53,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；本轮未读取精确额度，不外推此前使用比例。
 
-恢复指令：继续项目。先核B1a人工API验收是否完成；通过后按当前development_requirements与用户指定分工派B1b任务配置快照。K2.8真实使用仍延后，不能把登记/绑定配置事实视为真实接入验收通过。
+恢复指令：继续项目。先核B1a人工API验收是否完成；通过后按当前development_requirements与用户指定分工派B1b任务配置快照。K2.8名册/闲置实例已核，真实模型任务闭环仍待验；项目内添加角色保存后自动入册与配置校验为后续已明确方向，当前尚未实现。

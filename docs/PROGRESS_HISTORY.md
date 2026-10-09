@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-09 09:48 K2.8人类同步入册与闲置上报已核，明确角色添加自动化
+
+- 用户启动K2.8提示不在项目名册；Codex只读核实本人Key身份正确，当前三角色名册与已冻结同步基线一致，准备包hash正确，0写入/0启动/0模型调用。提供已有apply_roster人类本地入口，不绕过human写入权限，Key经getpass不进入聊天。
+- 用户报告同步应成功；本轮talk_list_agents确认项目prj_e8fe7066bbec已包含agent:kimi-code-k28-preview/business_role=dev/decision_tier=execution，原codex/deepseek/kimi三角色保留。application回执project_roster_applied/human_sync_verified均true。
+- 最新单实例agent:kimi-code-k28-preview:64b7f891-309c-4b07-a739-934adf8ab901，runtime=kimi-code、status=idle、pid22828、current_task_id=null，last_seen_at=2026-10-09T01:46:05.488125 UTC；这是上报事实，可能滞后，非实际模型或任务执行证明。真实模型接单闭环与宿主主动T/W仍待验收。
+- 用户提出适配后入册自动化；明确触发点为人类在当前项目添加角色并保存，同一流程自动办理所需身份/Key/本地身份档、模型绑定、入册及启动前校验，不再另跑同步脚本。全局适配只登记可选能力，由项目选择角色，沿用human写权限；具体接口/失败恢复/凭据保管另片设计，当前未开发。
+- 仅同步AGENTS拓扑现状、PROJECT_BRIEF、DEVELOPMENT_ROADMAP、K2.8指南与PROGRESS/HISTORY；不改业务代码、现有Key/名册/进程/全局默认模型，不派任务。UTF-8无BOM、diff-check、受保护源码保持后中文提交常规推送；B1a已推送2dd2ec7，人工API门禁与B1b未派保持。
+
 ## 2026-10-09 09:32 #194定向修正通过，194→193收取；B1a后端收尾
 
 - 用户通知“194好了，如果这次还没通过，你可以自己进行修改”；沿用DeepSeek开发/Codex独立验证，明确获得剩余问题直接补修授权。本次实际复核通过，无须Codex补改业务代码，不再转派，不开启B1b。
