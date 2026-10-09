@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-09 08:35 #193独立复核发现漏测边界，派#194同B1a定向修正
+
+- 用户通知完成后，读取193/msg2695完整交付摘要：合法自身号一致talk-delivery-1 complete自报、succeeded/submitted，7文件实际范围正确，4改3增；未收取。实际HEAD=fb9a51166fa5345f1a0ca03c956f2ad3b0c70913，193功能仍未提交。开发自报47新测试、相关回归通过，full881有26非零却字段标pass，不能作为独立验收。
+- Codex直接读新增ORM/schema/标识与状态/指纹/单SQL/批量助手、登记/绑定API、共享ProjectAgentOut/sync/删除接线、迁移/router和真实测试；6模块独立116项0失败/0错误/0跳过（新47+既有项目/说明/要求+files9），没有global logging.disable。基于实际RouteTestCase隔离临时库另构确定性边界，未动生产数据/凭据/服务/模型。
+- R1[P2]隔离两连接在_get_project后、facts前删除项目：单角色200/binding_state=null，批量200/[null,null]，违反最终不存在项目404且不构造状态。要求API按最终project_exists判断，单角色/批量/PUT读回统一、不第二读或用ORM缓存猜；通用助手只事实，任务原400不改。
+- R2[P2]登记runtime空，真实GET报告runner_missing与指纹null，但返回runtime空字符串、旧display及adapted status。合同要求不可解析登记三派生字段全部null；要求共用输出规范化并覆盖缺登记/空/空白、单角色/批量，存储照留，身份优先不遮蔽正常运行器事实。
+- R3[P2]Python正则$在尾换行前匹配，is_safe_identifier_token(model:test加末尾换行)=true；手工绑定真实GET仍bound/有指纹。要求相关slug/token严格全串匹配，非法必填存储字段partial/指纹null，runner slug不能错报runner_missing；API合法归一化、五必填与可选损坏语义保持。
+- R4[P2]原881全量非零不能字段pass；开发者未pristine对照24环境失败，Codex也没运行全量/该对照，不把116通过外推全量。原193完整报告/消息保留，新任务按自身真实命令/结果写验证，保留未甄别历史限制，未跑not_run，若重跑失败仍fail/partial。
+- 冻结/范围：7源码测试精确UTF-8/原换行快照在.tmp/runner-role-binding-b1a-review/original-193/，SHA清单source_manifest.json；全部193交付备份delivery-193/。review.json、independent-tests.json/.log、independent-edge-probe-results.json/probe_edges.py、scope-check.json记录独立证据。793冻结tracked（含tracked临时文件）无缺失，变化仅4允许源码及2协调方进度，7源hash与开发冻结一致，diff检查通过。
+- 重读最新开发要求后派194同B1a第一次定向修正，最小顶层参数，created_by=agent:codex/target=agent:deepseek，创建时queued/assigned，Hall=group:task-08c7886fea2e4b66b3650964b1f5ca0f。caller自身agent与passive6核验；用户当前指定DeepSeek开发/Codex独立验证，不派Kimi，原项目要求快照保留。原需求、真实未提交193基线、范围不变项、R1–R4/验收/原测试证据都纳入包。
+- 默认只改models/projects和必要两份新test回归，原193其他db/main/runners保持，额外文件先说明；禁止原193报告/review/快照/正式文档/进度/Key/名册/.talk/生产数据改动，无B1b/bridge/web/SDK/真实模型。新.tmp/runner-role-binding-b1a-fix/自身194合法JSON/changes/相对193冻结修正diff，完成暂停等独立复验；派发包与回执.tmp/runner-role-binding-b1a-fix-dispatch/。
+- 此次只提交两份审查与派发进度，功能代码仍待复核。默认派后结束，用户通知194完成再取件，通过后194→193收取、正式文档同步和整B1a功能提交/推送；不得把三个漏测问题写为已修。B1b仍另派，K2.8真实使用继续延期。
+
+
 ## 2026-10-09 00:07 用户授权继续，派DeepSeek #193 B1a后端实施
 
 - 用户确认继续，维持DeepSeek开发、Codex独立复核；派前读取项目最新开发要求（后端DeepSeek，常规交叉复核本轮依用户指定覆盖），caller=agent:codex/kind=agent，项目passive/version6、effective null/not_bound。usage-gate continue，session55%/weekly28%是派前实际快照，不假定后续比例。

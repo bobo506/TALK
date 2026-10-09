@@ -1,22 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-09 00:07 (Asia/Shanghai)：用户授权继续，已派DeepSeek #193 B1a登记与角色绑定后端；Codex独立复核，默认派后结束。设计#190–#192已收取，K2.8真实使用延期保持。
+Updated: 2026-10-09 08:35 (Asia/Shanghai)：#193独立116测试通过但额外探针复现3个漏测边界，未验收/收取；已派DeepSeek #194同B1a定向修正，原代码与报告冻结。K2.8真实使用继续延期。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
-- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。当前#193只开发B1a登记/绑定；DeepSeek开发完成暂停后Codex独立复核，不并行改业务代码。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。当前#193待#194同B1a定向修正；DeepSeek开发暂停后Codex独立复核，协调方只维护进度，不并行改业务代码。
 
-## 当前切片：#193 B1a登记与项目角色绑定后端已派发
+## 当前切片：#193未通过独立复核，#194定向修正已派发
 
-- 用户2026-10-09“可以，继续开发”，沿用DeepSeek开发、Codex独立验证，不派Kimi。派前读取最新development_requirements，后端分工一致；其常规交叉复核本轮依用户指定覆盖。caller=agent:codex/kind=agent，项目passive/version6，effective仍null/not_bound。usage-gate允许continue（本次session55%/weekly28%，这是派前快照）。
-- #193 created_by=agent:codex，target=agent:deepseek；派发时queued/assigned，Hall=group:task-ac611ede64b44471b1f0bee3a1566b79。只用project_id/target/title/content最小顶层参数；没有等待或派B1b。实际后续状态以工具查询为准。
-- 范围：RunnerRegistry/ProjectRoleBinding两表、幂等迁移/索引、human写认证读的登记与角色绑定API、GET agents附加绑定/状态、校验/指纹/失效阶梯、单SQL事实助手和隔离测试。只允许server/{models.py,db.py,main.py,routes/projects.py,routes/runners.py}及新test_runners/test_project_role_bindings两文件；额外必需文件先说明。禁止任务表/快照/tasks.py、bridge/MCP、SDK/web、实际证据/进程管理、Key/名册/.talk/生产数据。
-- 权威依据[正式合同](spec/ROLE_MODEL_BINDING_DESIGN.md)与[实施计划](spec/ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)B1a。本次Codex仅澄清A19表笔误：无绑定未注册member_exists=0，其余已注册三例=1；既有合同SQL不变。任务包强调27列/1SQL/空绑定保留事实、批量GET agents避免N+1且同视图判态、LWW单upsert、离册保留、错误码/权限兼容、隔离生产库。
-- 派前实际HEAD=752ea1e43ce3182c9a8891fabdb97d20444ab976；全部793 tracked工作树SHA冻结（含tracked临时文件），清单记录协调方A19修正。随后仅协调方两份进度及此规格澄清提交/推送，不并行改业务代码。任务包/开发要求快照/创建回执/source_manifest均在.tmp/runner-role-binding-b1a-dispatch/。
-- 交付要求：.tmp/runner-role-binding-b1a/development.json自身实际193合法talk-delivery-1，完整JSON作为TALK结果；A1–A22及必要现有回归的真实命令/结果、查询数/并发证据、差异/限制/进度草稿；开发完成暂停，不自行提交/推送/改正式进度/进入下一片。
-- 下一步：派后结束，由用户通知193完成后优先talk_get_delivery完整摘要并校验，Codex独立读实际diff和关键路径/隔离证据；有问题交回DeepSeek修正，通过后收取/同步正式文档与Git。B1b须B1a独立验收后另派；K2.8真实使用继续延期。
+- #193/msg2695为合法自身号一致complete自报，succeeded/submitted，未收取；实际7文件在约定范围，4改3增，功能代码未提交。新登记/绑定API、单角色原文SQL/批量助手/状态阶梯/迁移候选已实现，但独立验收尚未通过，不进入B1b。
+- Codex独立读实际模型/接口/校验/SQL/迁移和测试，6模块116项0失败/0错误/0跳过（含47新测试、既有项目/角色说明/开发要求和test_files9）。未用全局logging.disable，未重跑全量881或24环境失败pristine对照，不能宣称全量通过或均非回归。
+- R1[P2]：在前置项目检查后、事实SQL前另一连接删除项目，单角色GET仍200/binding_state=null，GET agents仍200/[null,null]。API应以最终project_exists映射404，不靠先前ORM缓存；成功项目状态不可null，单角色/批量/PUT读回需统一，事实助手不固化HTTP错误、任务原400保持。
+- R2[P2]：登记runtime为空时真实GET状态runner_missing/指纹null，但runtime空字符串、display为旧名、status=adapted；合同要求三派生字段均null。统一输出可解析性，覆盖空/全空白/登记缺失及单角色/批量，不写回存储或因身份优先误遮蔽可解析值。
+- R3[P2]：正则$允许末尾换行前匹配，真实存储model_id含末尾换行被当安全token，GET bound且指纹非null。应全串匹配，必填字段非法=>partial/指纹null，runner slug同类检查；API归一化与五必填/可选字段边界不变。
+- R4[P2]：原193报告把881例非零结果标pass（24 WinError5+2测试入口日志伪失败，无pristine对照）；原文保留，不追改。新交付如实记录自身验证和原全量限制，不跑就not_run，不能替全量下已通过/全部非回归结论。
+- 原193源码/测试7文件冻结.tmp/runner-role-binding-b1a-review/original-193/，全部交付备份delivery-193/；review.json、independent-tests.json/.log、independent-edge-probe-results.json/probe_edges.py、scope-check.json供定向复验。793源核验仅4允许源码+2协调方进度变化、无缺失；diff-check通过，原任务/bridge/web/SDK等保持。
+- #194已派agent:deepseek，created_by=agent:codex，创建时queued/assigned，Hall=group:task-08c7886fea2e4b66b3650964b1f5ca0f。派前重读最新development_requirements/caller=agent:codex/kind=agent/passive6；用户本次DeepSeek开发/Codex验证覆盖常规交叉审查，不派Kimi。实际后续状态以工具查询为准。
+- #194默认只动models/projects与两份新test中的必要回归；不改原193 db/main/runners，不扩B1a，不改任务表/快照/tasks.py/bridge/MCP/SDK/web/正式文档/.talk/Key/生产数据。报告只写.tmp/runner-role-binding-b1a-fix/自身194完整合法JSON；完成暂停不提交/推送。原193冻结与review只读，派发包/快照/回执.tmp/runner-role-binding-b1a-fix-dispatch/。
+- 下一步：默认派后结束，用户通知194完成后取完整摘要，独立核R1–R4的修正diff/交错回归/输出布局/全串匹配和真实测试，原报告与范围保护；通过才194→193收取、同步正式文档/进度并统一提交功能。B1b须B1a独立验收后另派；K2.8真实使用继续延期。
 
 ## 已完成与当前状态
 
@@ -42,7 +45,7 @@ cd D:\claude-test\TALK
 ## 后续计划与边界
 
 - 共5组合8方向：Codex仅分配；WorkBuddy＋K3、DSH＋DeepSeek Flash、Kimi Code＋K3各分配/执行；Kimi Code＋K2.8仅执行。WorkBuddy90/91仅历史分配侧，未证明其执行能力或当前可派成员。
-- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照设计已由#190–#192复核发布，当前#193开发B1a；尚未验收数据库/API实现，任务快照/UI仍后置；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
+- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照设计已由#190–#192复核发布，当前#193经审查待#194修正；尚未验收数据库/API实现，任务快照/UI仍后置；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
 - Codex被动I-0 #178/#179已验，I-1/I-2用户页面验收通过；I-3A #180/#181、I-3B #182/#183/#184、I-3C #185/#186已通过收取发布，I-3文档同步闭合（规格提交d474321）。I-3B最新MCP说明运行进程重载未核，真实主动I-4/G8/正常到期/取消/同连接排队未验。
 - 项目passive/version6、effective=null/not_bound；controller_assignment=agent:codex/version13仅历史兼容，不赋权或自动唤回会话。175-O1测试维护、Schema maximum=600/clamp评估另片。
 - 超时分别核验：CodexW300用户现用；DeepSeek桌面T65/W50/余量15；Kimi660000ms仅模板，实际T未知，不启用主动长等待。bridge执行预算3600秒、身份GET单次15秒，独立于宿主工具/发起者等待预算。真实质量、速度与成本优势未测。
