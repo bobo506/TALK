@@ -163,6 +163,16 @@ def init_db() -> None:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN review_policy TEXT")
         if "gate_verdict" not in task_columns:
             conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN gate_verdict JSON")
+        # ROLE-BINDING-B1b（合同 §7.1/§10）：按列存在性幂等增列，只 ADD COLUMN、
+        # 不重建表、不改列类型、不删除列，**不回填旧任务**（旧行的两列保持 NULL）。
+        if "target_binding_snapshot" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN target_binding_snapshot JSON"
+            )
+        if "target_binding_state" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN target_binding_state TEXT"
+            )
         conn.exec_driver_sql(
             """
             UPDATE agent_tasks
@@ -382,6 +392,11 @@ def init_db() -> None:
         )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_workflow_status ON agent_tasks (workflow_status)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_lease_expires_at ON agent_tasks (lease_expires_at)")
+        # ROLE-BINDING-B1b：仅新增任务快照状态索引；不新增任何回执/计数列。
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_tasks_target_binding_state "
+            "ON agent_tasks (target_binding_state)"
+        )
         conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_agent_task_clarification_rounds_task_id "
             "ON agent_task_clarification_rounds (task_id)"

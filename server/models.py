@@ -380,6 +380,26 @@ ROLE_BINDING_STATES = (
     ROLE_BINDING_BOUND,
 )
 
+# 任务绑定快照（B1b，合同 §7.1）：schema 版本与固定 13 键。
+# 键顺序与合同 §7.1 / 样例 ``snapshot_schema.keys`` 逐项一致；**不含** read_receipt，
+# 也不含任何“读取回执/语句计数/版本哈希”字段（合同 §7.1、R3/D8）。
+ROLE_BINDING_SNAPSHOT_SCHEMA_VERSION = "role-binding-snapshot-1"
+TARGET_BINDING_SNAPSHOT_KEYS = (
+    "schema_version",
+    "snapshot_at",
+    "state",
+    "runner_id",
+    "runtime",
+    "model_source",
+    "provider_id",
+    "connection_ref",
+    "model_id",
+    "model_alias",
+    "model_display_name",
+    "binding_fingerprint",
+    "note",
+)
+
 # 定量规则（合同 §3.1、§3.3、§4.2）。
 # 只用 ``\Z`` 而不是 ``$`` 收尾：``$`` 允许在末尾换行符**之前**匹配（R3 定向修正），
 # 会让 ``model:test\n`` 之类的存储值被误判为合法；写入侧仍先 ``strip()`` 归一化合法输入。
@@ -930,6 +950,97 @@ def read_role_binding_facts_batch(
     return [dict(row) for row in rows]
 
 
+# ── 任务绑定快照（B1b，合同 §7.2/§7.3；复用 B1a 单语句事实助手） ──────
+
+
+class TargetBindingSnapshotProjectMissing(LookupError):
+    """``project_exists = 0``：事实助手不固定 HTTP 错误码，只把“项目不存在”交给调用方。
+
+    项目名册/绑定接口把它映射为 **404**，任务创建映射为 **400**（合同 §7.3、§11）。
+    本异常**不带** HTTP 语义，``server/models.py`` 不依赖 FastAPI。
+    """
+
+    def __init__(self, project_id: Optional[str]) -> None:
+        super().__init__(f"project not found: {project_id}")
+        self.project_id = project_id
+
+
+# 每个状态的 note 文案（合同 §7.1 只固定 key 与 schema_version，note 是自由文本；
+# 这里按 `ROLE_MODEL_BINDING_EXAMPLES.json` 的合成样例给出确定性说明）。
+# note 与快照其它字段一样**永不**包含凭据正文（合同 §5.2/§5.3）。
+_TARGET_BINDING_SNAPSHOT_NOTES: dict[str, Optional[str]] = {
+    ROLE_BINDING_NO_PROJECT: "任务无项目归属；无绑定上下文。普通无项目任务与 schedule 物化都走这里。",
+    ROLE_BINDING_MEMBER_MISSING: "身份已不存在；保留存储但记录失效原因",
+    ROLE_BINDING_MEMBER_DISABLED: "成员被全局禁用；绑定存储保留但不有效",
+    ROLE_BINDING_NOT_IN_ROSTER: "角色已离册，绑定行保留但不有效；不报 bound、不自动删除、不猜模型",
+    ROLE_BINDING_NOT_AGENT: "kind != agent；保留存储但不有效",
+    ROLE_BINDING_UNCONFIGURED: "角色尚未配置运行器/模型绑定；不猜测默认值",
+    ROLE_BINDING_PARTIAL: "绑定存储必填字段不完整；有值的字段照存，缺的为 null",
+    ROLE_BINDING_RUNNER_MISSING: (
+        "登记事实不可解析（登记行缺失或 runtime 不可解析）；runtime 与内容指纹均为 null"
+    ),
+    ROLE_BINDING_RUNNER_RETIRED: "运行器登记为 retired；不用于新绑定，但历史快照保留",
+    ROLE_BINDING_BOUND: None,
+}
+
+
+def build_target_binding_snapshot(facts: Optional[dict], state: str) -> dict:
+    """按合同 §7.1/§7.2 构造固定 13 键的任务快照对象（纯计算，不查库、不写库）。
+
+    - 键顺序与 :data:`TARGET_BINDING_SNAPSHOT_KEYS` 一致，**无** ``read_receipt``；
+    - ``state`` 由调用方给出（``no_project`` 只属于任务快照），并写入同一个对象；
+    - 行值**照存**（``runner_id`` / ``model_source`` / ``provider_id`` / ``connection_ref`` /
+      ``model_id`` / ``model_alias`` / ``model_display_name``）；没有绑定行时这些值为 ``null``；
+    - ``runtime`` 走与 B1a 相同的派生规则：登记事实不可解析时如实为 ``null``（R2）；
+    - ``binding_fingerprint`` 复用 :func:`binding_fingerprint`（六值全部可解析才给出）；
+    - ``snapshot_at`` 是 UTC ISO8601；**任何状态都不猜运行器或模型**。
+    """
+    snapshot_source = facts or {}
+    runtime, _runner_display_name, _runner_status = _derived_runner_fields(snapshot_source)
+    return {
+        "schema_version": ROLE_BINDING_SNAPSHOT_SCHEMA_VERSION,
+        "snapshot_at": datetime.now(timezone.utc).isoformat(),
+        "state": state,
+        "runner_id": snapshot_source.get("runner_id"),
+        "runtime": runtime,
+        "model_source": snapshot_source.get("model_source"),
+        "provider_id": snapshot_source.get("provider_id"),
+        "connection_ref": snapshot_source.get("connection_ref"),
+        "model_id": snapshot_source.get("model_id"),
+        "model_alias": snapshot_source.get("model_alias"),
+        "model_display_name": snapshot_source.get("model_display_name"),
+        "binding_fingerprint": binding_fingerprint(snapshot_source),
+        "note": _TARGET_BINDING_SNAPSHOT_NOTES.get(state),
+    }
+
+
+def resolve_target_binding_snapshot(
+    *,
+    project_id: Optional[str],
+    target_member_id: str,
+    session: Session,
+) -> dict:
+    """解析任务创建时的目标角色绑定快照（合同 §7.3，B1b 唯一快照构造入口）。
+
+    - ``project_id is None``：**不执行任何 SQL**（语句数 0），直接 ``state="no_project"``、
+      绑定字段全 ``null``，两列仍写非 NULL（合同 §7.6）；
+    - 带项目：复用 B1a 的 :func:`read_role_binding_facts`（**同一条 SQL、同一个助手**，
+      不复制第二份 SQL、不做 ORM 补查），``project_exists = 0`` 时抛
+      :class:`TargetBindingSnapshotProjectMissing`，由调用 API 保持原错误码（任务创建 400）；
+    - 状态按 §4.4 阶梯现算；snapshot 与 state 同源，``snapshot["state"]`` 即列值；
+    - 只读：不 UPDATE 任何行，不自动清理绑定行，也不用早先 ORM 缓存推断状态。
+    """
+    facts = read_role_binding_facts(
+        session, project_id=project_id, member_id=target_member_id
+    )
+    if project_id is None:
+        return build_target_binding_snapshot(facts, ROLE_BINDING_NO_PROJECT)
+    state = resolve_role_binding_state(facts)
+    if state is None:
+        raise TargetBindingSnapshotProjectMissing(project_id)
+    return build_target_binding_snapshot(facts, state)
+
+
 class AgentTask(SQLModel, table=True):
     __tablename__ = "agent_tasks"
 
@@ -976,6 +1087,13 @@ class AgentTask(SQLModel, table=True):
     claimed_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     result_collected_at: Optional[datetime] = None
+    # ROLE-BINDING-B1b（合同 §7.1）：任务创建时冻结的绑定快照与状态。
+    # 仅旧任务/旧库为 NULL（= 未记录）；新任务一律写入对象与非 NULL 状态，
+    # 写入后不可变（claim/heartbeat/complete/cancel/requeue/重领都不改这两列）。
+    target_binding_snapshot: Optional[dict] = Field(
+        default=None, sa_column=Column(JSON)
+    )
+    target_binding_state: Optional[str] = Field(default=None, index=True)
 
 
 class AgentTaskClarificationRound(SQLModel, table=True):
@@ -1794,6 +1912,10 @@ class AgentTaskOut(BaseModel):
     claimed_at: Optional[datetime]
     finished_at: Optional[datetime]
     result_collected_at: Optional[datetime]
+    # ROLE-BINDING-B1b：只读输出；旧任务为 None 表示“未记录（legacy_unrecorded）”，
+    # 不接收客户端写入，也不得推断成 unconfigured 或某个模型值（合同 §7.4/§10）。
+    target_binding_snapshot: Optional[dict]
+    target_binding_state: Optional[str]
 
 
 class AgentTaskClaimOut(AgentTaskOut):

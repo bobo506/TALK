@@ -3,7 +3,7 @@
 > 所属项目：TALK
 > 状态：Task Hall 数据 / API、SDK、bundled runner、终端工具、claim lease / attempt 与 Project Blackboard / Task Hall Web UI 已实现，基础可视化链路已通过人工验收；TH-6a1 至 TH-6d 的任务树、有限授权、中断、澄清、Review / Test 门禁、Blackboard 控制和里程碑人工验收闭环均已落地，TH-6d 已于 2026-09-06 通过项目管理者人工验收，根任务 `#15` 与子任务 `#16/#17/#18` 均已完成；TH-7a 普通终端 stdio MCP 入口与只读连接检查已实现；L1-1 已交付 Kimi Code 独立会话入口的模板/预检/无密钥启动器（配置可用与工具目录已验证，真实身份预检缺本人凭证、真实模型主控闭环未运行），具体客户端安装与真实模型验收待后续推进
 
-> 2026-10-09：B1a 登记/角色绑定后端已由 #193/#194 开发修正，经 Codex 独立复核通过并收取，等待 [API 人工验收](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)；[合同](ROLE_MODEL_BINDING_DESIGN.md)与[实施计划](ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)为后续依据。B1b 尚未开发，当前 `agent_tasks` 无绑定快照列，任务创建代码保持；普通/子任务/schedule 经 `_create_task_with_hall` 统一构造、历史不追改、原权限及项目不存在 400 保持是后续 B1b 的验收义务。
+> 2026-10-09：B1a #193/#194与B1b #196后端已独立复核收取；[合同](ROLE_MODEL_BINDING_DESIGN.md)与[实施计划](ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)为依据，待[绑定API](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)与[任务快照API](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)人工验收。B1b独立177项及并发/回滚/原文不可变性探针通过；`agent_tasks`新增两列，普通/子/schedule在`_create_task_with_hall`统一构造13键，旧NULL不回填，原权限/任务侧400保持。MCP/页面/实际对照后置。
 
 ## 目标
 
@@ -52,6 +52,8 @@
 - `result_message_id`：任务完成后对应的 TALK 消息，可为空
 - `last_error`：失败原因摘要
 - `created_at` / `updated_at` / `claimed_at` / `finished_at` / `result_collected_at`
+- `target_binding_snapshot`：创建时冻结13键配置，schema=`role-binding-snapshot-1`，含alias/指纹，无读取回执/实际模型；新任务对象、旧任务NULL。
+- `target_binding_state`：与快照state一致，无项目为no_project，否则按绑定阶梯。两列只读，客户端不能写；生命周期/改绑定不改旧快照。
 
 即时任务和 schedule 物化任务都会原子创建一个独立 Task Hall。Hall 当前只包含请求者与执行者：请求者为 `owner`，执行者为 `member`。关联 Task Hall 不能通过普通 Group API 增删成员或独立删除。
 

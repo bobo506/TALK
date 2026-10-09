@@ -52,12 +52,14 @@ from server.models import (
     TASK_MAX_NONTERMINAL_DESCENDANTS_DEFAULT,
     TASK_MAX_RUNNING_DESCENDANTS_DEFAULT,
     TASK_MAX_RUNNING_PER_TARGET_DEFAULT,
+    TargetBindingSnapshotProjectMissing,
     _SCHEDULE_STATUSES,
     _TASK_KINDS,
     _TASK_STATUSES,
     _TASK_REVIEW_VERDICTS,
     _TASK_TEST_VERDICTS,
     _TASK_WORKFLOW_STATUSES,
+    resolve_target_binding_snapshot,
 )
 from server.routes.messages import _build_reply_lookup
 
@@ -1434,6 +1436,22 @@ def _create_task_with_hall(
     now: datetime,
     session: Session,
 ) -> AgentTask:
+    # ROLE-BINDING-B1b（合同 §7.3/§7.5）：本函数是新任务绑定快照的**唯一**构造/写入点，
+    # 位于构造 Group/GroupMember/AgentTask **之前**，因此普通任务、子任务与 schedule
+    # 物化三条路径都被覆盖，快照与任务/Hall/关系同一次 commit 落库。
+    # 无项目分支不执行任何事实 SQL；带项目分支复用 B1a 的单条事实读取助手。
+    try:
+        binding_snapshot = resolve_target_binding_snapshot(
+            project_id=project_id,
+            target_member_id=target_member_id,
+            session=session,
+        )
+    except TargetBindingSnapshotProjectMissing as exc:
+        # 项目不存在时保持任务创建原有 400（合同 §11）；事实助手本身不固定 HTTP 错误码。
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_id not found",
+        ) from exc
     hall_group_id = f"group:task-{uuid4().hex}"
     session.add(
         Group(
@@ -1487,6 +1505,8 @@ def _create_task_with_hall(
         gate_verdict=None,
         status="queued",
         workflow_status="assigned",
+        target_binding_snapshot=binding_snapshot,
+        target_binding_state=binding_snapshot["state"],
         created_at=now,
         updated_at=now,
     )

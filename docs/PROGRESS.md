@@ -1,24 +1,21 @@
 # Project Progress
 
-Updated: 2026-10-09 10:15 (Asia/Shanghai)：用户继续下一项，已派DeepSeek #196 B1b新任务目标角色绑定快照，Codex独立验证；派发时queued/assigned，未验收。B1a已收取推送，195最小回传通过；B1a人工步骤未自报已测。
+Updated: 2026-10-09 11:03 (Asia/Shanghai)：#196 B1b独立177项及并发/回滚/原文不可变探针通过，已收取succeeded/completed；正式规格和API验收同步，统一Git收尾。B2/B3/B4未派。
 
 ## 当前角色与协作
 
 - 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取。
-- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。本轮#193/#194开发已暂停，Codex独立复核通过；用户授权若仍失败可由Codex补修，本次无须补改代码。用户本次继续指令允许进入B1b，人工API逐项步骤仍无已测报告；#196开发完成暂停后由Codex独立复核，不并行改码。
+- Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。本轮#193/#194开发已暂停，Codex独立复核通过；用户授权若仍失败可由Codex补修，本次无须补改代码。用户本次继续指令允许进入B1b，人工API逐项步骤仍无已测报告；#196开发暂停后Codex独立复核通过并收取；本轮无Codex业务代码补修。
 
-## 当前切片：#196 B1b已派发，等待开发交付
+## 当前切片：B1b #196已复核通过并收取，待API人工验收
 
-- 用户授权“继续下一项”，按既定后端顺序推进B1b；未把此指令写成B1a人工API步骤已测。派前读取最新development_requirements/caller=agent:codex/kind=agent，passive/version6；本次沿用用户DeepSeek开发/Codex独立验证覆盖常规交叉审查，不派Kimi/K2.8开发。
-- #196“196-B1b新任务目标角色模型绑定快照”，target=agent:deepseek、created_by=agent:codex，Hall group:task-1c34ebe1a4ff4c229669d4194de24bf1，创建时queued/assigned，未claim/交付/验收；后续实际状态以工具结果为准。默认派后结束，由用户通知完成再收取，不主动等待。
-- 实际基线21553e6cb5ba2a8079072bb8b895939b67065964，派前工作区干净；冻结797 tracked文件（含tracked临时对象），source_manifest.json。允许models/db/tasks+新tests/test_task_binding_snapshot.py；旧test_tasks仅新增响应字段所必要精确适配，其它源冻结，协调方仅维护本两份进度。
-- 新任务target_binding_snapshot/target_binding_state两列、固定13键/schema role-binding-snapshot-1，在_create_task_with_hall共用构造一次写入，普通/无项目/子/schedule均非NULL；旧任务NULL不回填，快照不可变，不因状态拒绝派发/领取。
-- 复用B1a原文单SQL事实助手与身份/名册阶梯/指纹；带项目事实1SQL、无项目0SQL/no_project；最终项目不存在由任务侧映射原400，项目API404保持；沿用已有事务，无新增BEGIN/引擎配置/提前commit，任务/Hall/关系同次回滚。
-- 必验计划B1–B20：迁移/旧行、四情况创建、固定13键/null布局、事件计数、真实两连接撕裂负对照与单SQL一致性、已有读/写事务与子授权回滚、旧任务与alias逐版本不可变/原权限保持。相关7模块回归，正常日志，不重复全量881；非零如实，不跑not_run，不凭无pristine对照宣称非回归。
-- 不改bridge/MCP/SDK/web/项目绑定接口/实际对照/读取回执字段，不改生产库/名册/Key/native默认/运行器/模式，不启动服务或真实模型；K2.8既有实例/195保持。执行者仅.tmp/runner-role-binding-b1b/证据和实际196纯JSON交付，完成冻结，不写正式文档、不提交推送、不继续。
-- 完整任务/派时requirements/回执/797冻结清单.tmp/runner-role-binding-b1b-dispatch/。usage-gate在2026-10-09T02:11:52.897338 UTC实测continue，session27%/weekly33%，仅当时采样。
-- 下一步：用户通知196完成后优先talk_get_delivery、本地validate expect196；按实际差异独立复核、必要定向验证，通过才收取/同步正式规格进度/统一提交推送。B1a原失败和报告保持；不把任务创建当已实施。
+- DeepSeek #196/msg2698纯JSON合法自身196一致complete，完整10字段与本地报告逐对象一致、validate通过；Codex实读实际diff/关键断言并独立验证，已收取succeeded/completed。代码3改1增：models/db/tasks、新test_task_binding_snapshot；旧test_tasks保持。
+- 新任务两列/13键在_create_task_with_hall开头统一构造，复用B1a事实/阶梯/指纹，普通/子/schedule均覆盖，无项目no_project；旧NULL不回填，客户端不能写，原权限/错误码/事务边界保持。
+- 独立7模块177项0失败/错误/跳过，正常日志；WAL双线程100提交/400快照（one198/two202）无撕裂，最终事实前删项目400无任务/Hall，真实关系唯一冲突409同次回滚且不mock commit。
+- 子授权事务内预扣1，快照失败400后0、父快照不变，无子任务/Hall；SQLite JSON原文直接比较，claim/heartbeat/到期重排/重领/改绑定/complete/cancel均原文字节和状态保持。首轮探针误用human遭原403拒绝，改目标agent后通过，非产品修正。
+- 797源核验无缺失/越界，审查期间4代码/测试冻结保持；SQL hash a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e不变。原报告/失败历史不追改；.tmp/runner-role-binding-b1b-review/保存original-196、delivery-196、独立tests/edges/raw-lifecycle/scope/review/acceptance，approved/0 open。
+- 未重载生产服务、执行生产迁移、读凭据、调用模型或操作浏览器；881/pristine未重跑，不宣称全仓回归通过。正式规格与[快照API人工验收](guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)同步：加载后核旧NULL、新13键、改绑定只影响新任务及生命周期不变；人工步骤仍未自报已测，B2/B3/B4另片，本轮收尾后暂停。
 
 ## 已完成与当前状态
 
@@ -56,4 +53,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；本轮未读取精确额度，不外推此前使用比例。
 
-恢复指令：继续项目。优先恢复#196状态；用户通知完成后按DeepSeek开发/Codex独立验证取交付、核新任务快照/事务/不可变性再收取。K2.8最小回传已通过，不扩大为开发能力或主动适配验收。
+恢复指令：继续项目。#196已独立复核收取；先核B1a/B1b人工API验收或新的明确继续授权，再按最新要求定B3工具/角色添加/实际证据设计的下一明确片。K2.8最小回传已通过，不扩大为实际模型版本/开发能力或主动适配验收。

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-09 11:03 #196 B1b独立复核通过收取，快照后端收尾
+
+- 用户通知196好了；msg2698纯JSON合法自身196一致complete，实际3改1增、自报27新测试/7模块177。按sha2753522aa4f9ebdcef14314d067d58f15873005b646240490854f3b4ec7e1cd5分页取完整10字段，与本地报告逐对象一致、validate expect196通过，格式不替代业务验收。
+- 实际HEAD0e41029；独立实读models/db/tasks的157行差异与新测试关键断言：唯一共用构造开头13键/UTC、复用B1a原SQL/阶梯/指纹、幂等两列旧NULL与索引、任务/Hall同次落库、LookupError任务侧400，不改权限/原事务/生命周期；旧test_tasks保持。
+- Codex独立7模块177项0失败/错误/跳过，正常logger；原事件计数1/0、受控撕裂负对照/已有事务旧与自写视图、四情况创建、alias/离册留证/旧NULL兼容等通过。881/pristine未重跑，不宣称全仓通过。
+- 补充WAL真实双线程100提交/400快照（one198/two202），13键/六维指纹独立核算无撕裂；前置通过后事实前删项目400无任务/Hall；真实SQLite关系唯一索引冲突（不mock commit）409完整回滚。
+- 子开发授权当前事务内reserved1，快照失败400后0、父快照不变、仅原任务/Hall；SQLite JSON列原文直接比对，claim/heartbeat/requeue-expired/reclaim/绑定更改/complete/cancel全部原文字节/状态保持。首轮human误用requeue-expired被原403拒绝，改目标agent后通过，业务代码无补修。
+- 797冻结源无缺失/越界，复核前仅3允许源+2协调进度变化，4代码/测试冻结hash保持；SQL hash a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e不变。冻结原源/全部交付、独立review/tests/edges/raw-lifecycle/scope/acceptance在.tmp/runner-role-binding-b1b-review/，原报告限制不追改。
+- review approved/0 open，talk_collect_result196成功，succeeded/completed，msg2698、收取03:03:03.026194 UTC；源码测试与原开发报告保持原状。
+- 正式同步BRIEF任务示意列、MODULE_tasks、合同/计划/ROADMAP、B1a指南、PROGRESS/HISTORY；新增TASK_BINDING_SNAPSHOT_ACCEPTANCE（已有human Key/启动加载/旧NULL/13键/改绑定只影响新任务/生命周期/限制）。生产加载和人工步骤仍未验，B2/B3/B4未派，未启停生产/改Key名册/调用真实模型。
+- 必要UTF8无BOM、链接/范围/diff-check后统一中文提交常规推送4代码/测试+9文档，收尾后暂停。最近usage仅10:11采样continue/session27/weekly33，不外推当前；恢复继续项目，核人工验收或明确后续授权再定下一片。
+
 ## 2026-10-09 10:15 用户继续下一项，派DeepSeek #196 B1b新任务配置快照
 
 - 用户在195最小回传通过后明确“继续下一项”，按既定B1a→B1b后端顺序推进；此次继续授权作为进入B1b的依据，原B1a人工API逐项测试无已测报告，不追记为通过。195接收链路通过不改变本轮DeepSeek开发/Codex独立验证分工。

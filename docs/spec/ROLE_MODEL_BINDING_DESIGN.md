@@ -1,6 +1,7 @@
 # 通用角色运行器与模型绑定合同
 
-> 状态：**设计已发布，B1a 后端已实现并通过独立复核；B1b/B2 尚未实现**（2026-10-09）。B1a 由 DeepSeek #193/#194 开发修正，Codex 独立 124 项相关测试与边界探针通过，两项已收取；[API 人工验收](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)待用户执行，生产加载未验。
+> 状态：**设计已发布，B1a/B1b后端已实现并通过独立复核；B2尚未实现**（2026-10-09）。B1a 由 DeepSeek #193/#194 开发修正，Codex 独立 124 项相关测试与边界探针通过，两项已收取；[API 人工验收](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)待用户执行，生产加载未验。
+> B1b #196已由Codex独立177项及WAL双线程100提交/400快照、真实关系冲突/子授权回滚、SQLite JSON原文生命周期不变探针通过并收取，待[快照API人工验收](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)。未重载生产服务/执行生产迁移，未重跑881/pristine；原报告保持，证据本机.tmp/runner-role-binding-b1b-review/。
 > 配套：[实施计划](ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)、[合成样例](ROLE_MODEL_BINDING_EXAMPLES.json)。先 B1a 登记/绑定，再 B1b 任务快照；下列原设计复核基线与证据保留为历史，B1a 实现范围见实施计划和验收指南。
 > 实际源码基线 `10555ca2a54fdafa56300b999921d7831bb41518`；复核时 `HEAD=3436bbfca674150c9e2b82f6991e9234c31cbfa3`，其间仅协调方进度变化。
 > Codex 直接执行原文 SQL：14 种状态均恰好 1 行/1 SQL、27 个唯一列别名；无项目 0 SQL、项目不存在仍保留请求事实；11 个样例快照固定 13 键，指纹核算通过。790 个冻结文件中仅两份进度有合法变化，原 #190 七稿、#191 十三稿保持。

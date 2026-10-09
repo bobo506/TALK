@@ -1,7 +1,7 @@
 # 实施计划：通用角色运行器与模型绑定
 
-> 状态：**B1a 后端已实现、独立复核通过并收取；B1b 尚未实施**（2026-10-09）。依据 [正式合同](ROLE_MODEL_BINDING_DESIGN.md)；设计 #190–#192 和开发 #193 的原始交付/失败记录保持，#194 定向修正闭合问题。
-> B1a 经 Codex 独立 124 项相关测试及原失败边界探针通过，193/194 已收取，等待 [API 人工验收](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)。本轮未重载生产服务、迁移生产库或调用模型；人工门禁释放后再派 B1b。未重跑全量 881 项或环境失败的 pristine 对照。
+> 状态：**B1a/B1b后端已实现、独立复核通过并收取**（2026-10-09）。依据 [正式合同](ROLE_MODEL_BINDING_DESIGN.md)；设计 #190–#192 和开发 #193 的原始交付/失败记录保持，#194 定向修正闭合问题。
+> B1a 经 Codex 独立 124 项相关测试及原失败边界探针通过，193/194 已收取，等待 [API 人工验收](../guides/ROLE_MODEL_BINDING_ACCEPTANCE.md)。用户明确继续后推进B1b #196，已独立177项及并发/回滚/原文不可变性探针通过并收取，待[快照API人工验收](../guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)。本轮未重载生产服务、迁移生产库或调用模型；人工API步骤仍未自报已测。未重跑全量 881 项或环境失败的 pristine 对照。
 > 设计独立验证与本地证据索引见合同开头；单条 SQL 原文与 #192 草稿一致。实际运行证据 B2、页面、进程管理和真实宿主能力仍各自待后续。
 
 ## 0. 拆片总览（v3：B1 拆为 B1a + B1b）
@@ -9,7 +9,7 @@
 | 片 | 范围 | 依赖 | 当前状态 |
 |---|---|---|---|
 | **B1a** | 存储与契约面：`runner_registry` + `project_role_bindings` 两表、幂等增量迁移、全局登记 API、角色绑定 API、`GET /agents` 附加 `binding`/`binding_state`（含 §4.4 有效性阶梯）、**单语句事实读取助手 `read_role_binding_facts`**、校验与错误码 | 本合同 §3–§6、§10 被批准 | ✅ 后端复核/收取通过；待人工 API 验收 |
-| **B1b** | 任务侧：`agent_tasks` 两列 + 唯一写入点（`_create_task_with_hall`）复用 B1a 的单语句事实读取、快照状态阶梯、不可变性 | B1a 的同名助手与状态枚举 | ⏳ 设计通过；B1a 人工验收后派 |
+| **B1b** | 任务侧：`agent_tasks` 两列 + 唯一写入点（`_create_task_with_hall`）复用 B1a 的单语句事实读取、快照状态阶梯、不可变性 | B1a 的同名助手与状态枚举 | ✅ 后端独立复核/收取通过；待快照API人工验收 |
 | B2 | **实际运行证据 + 配置/实际对照**：字段、attempt 证据锚点、`binding_match_config` / `binding_match_actual` | **必须另开设计片**（见 §3.1 的 R-B2-1…6）；B1a/B1b 只提供配置侧 | ❌ 本设计不定义字段 |
 | B3 | MCP/工具消费：`talk_list_agents` 只读暴露 `binding`/`binding_state`；不新增工具、不输出任何 match | B1a | ⏳ B1a 已收取，本片尚未派发 |
 | B4 | 页面：角色页只读展示运行器/来源/连接标识/模型与 `unknown` 降级 | B1a（+B2 才有实际值） | ⏳ 待 B1a；产品展示名 D-5 未决 |
@@ -119,7 +119,7 @@ PUT    /api/projects/{project_id}/agents/{member_id}/binding
 
 ---
 
-## 2. B1b：任务绑定快照（设计通过，B1a 后派）
+## 2. B1b：任务绑定快照（已实现，独立复核通过并收取）
 
 ### 2.1 目标（可机械验收）
 
