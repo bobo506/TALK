@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-09 11:32 用户授权代验收：重启后B1b核心路径与#199回传通过
+
+- 用户明确要求Codex代替人工验收；以已推送9d90726为基线，只读实服/SQLite检查，不替用户再次启停服务，不操作浏览器、不改Key/名册/实际角色绑定。MCP GET确认agent:codex/kind=agent及最新项目要求；本次仅K28最小验收回传，既定DeepSeek开发/Codex复核分工保持。
+- 实服GET旧#195返回新增两字段且均null；数据库只读确认两列nullable、状态索引存在、WAL、旧195无回填。新197/198/199的13键、schema_version、UTC、状态/配置null、创建API与完成数据库逐对象一致；实际角色没有绑定行，unconfigured是预期，不等于Kimi运行器失败。
+- #197/msg2699由K28实例930cf90c领取完成，固定串正确，但执行者将task_id写成197-B1b，MCP判invalid。#198/msg2700由同本人实例完成，协调方补验包误要求JSON整数，合同要求字符串，MCP再次判invalid；明确承认并纠正任务包，原报告/状态保留，不追改为通过、不收取这两个无效报告。
+- #199/msg2701 task_id为字符串199，talk-delivery-1校验且自身号匹配，固定串B1B_SNAPSHOT_FINAL_20261009/消息from/claimed_by/instance均独立核实，attempt1、11.626秒claim/21.914秒总完成；无文件修改，作为最终回传验收依据。
+- 独立review的32个实际断言均通过：迁移/旧NULL、三次创建/完成对象和状态、一致13键/UTC、真实领取身份、合法最终报告、4业务源/测试SHA与HEAD保持。198/199在queued阶段读取的SQLite JSON原文到完成字节不变；197原文首读时已完成，仅证明创建API到完成对象相等，不冒充197有queued原文证据。
+- 199经复核后收取succeeded/completed，03:30:05.673133 UTC；收取后额外4断言确认API/数据库一致与原文/状态不变。initial额外4项迁移预检、32项review、4项post-collect属于本次检查，不混称为重新运行先前177项或全量881。
+- 实服证据`.tmp/runner-role-binding-b1b-live-acceptance/`保存initial、三个dispatch/created、197/198原错误报告、199结果与review/acceptance/post-collect；忽略产物不随Git发行。报告invalid历史保持，199合法结果不能追溯使旧报告合法。
+- 本次未修改实际角色绑定，bound态/改alias只影响新任务仍沿用先前隔离测试证据；B1a human写入/变更步骤未实服执行。实际后端模型版本、前端/专门MCP消费、主动宿主等待和881/pristine未验。正式快照/B1a指南、实施计划和进度同步实测范围，文档单独提交常规推送，暂停扩展新片。
+
 ## 2026-10-09 11:03 #196 B1b独立复核通过收取，快照后端收尾
 
 - 用户通知196好了；msg2698纯JSON合法自身196一致complete，实际3改1增、自报27新测试/7模块177。按sha2753522aa4f9ebdcef14314d067d58f15873005b646240490854f3b4ec7e1cd5分页取完整10字段，与本地报告逐对象一致、validate expect196通过，格式不替代业务验收。
