@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-09 09:32 #194定向修正通过，194→193收取；B1a后端收尾
+
+- 用户通知“194好了，如果这次还没通过，你可以自己进行修改”；沿用DeepSeek开发/Codex独立验证，明确获得剩余问题直接补修授权。本次实际复核通过，无须Codex补改业务代码，不再转派，不开启B1b。
+- #194/msg2696 succeeded/submitted，MCP摘要因intro/TALK_ACTION/JSON混排为unknown、structured_available=false；按reference sha256完整读取5106字符（6f326169c1a3b06955bf2d614ad56daa0916f80118773f5891f9897a973f6e55），嵌入JSON与本地development.json逐对象一致，本地validate expect194通过。原消息/报告保持，格式校验不代替业务复核。
+- 独立审查193→194实际模型/项目路由及8个新增回归：单角色GET直接认事实project_exists，PUT/清空读回和GET agents/sync批量共同映射最终404；runtime严格可解析性共用派生输出，异常时三字段与指纹null；slug/token全串匹配，不把存储末尾换行认作bound。原193 db/main/runners逐字保持，五必填/可选字段/身份阶梯/请求归一化保持。
+- Codex在独立日志目录实际运行6模块124项，0失败/错误/跳过，正常logger、未全局disable（含55新增及既有test_files9）；重跑原独立edge脚本并改为正确断言，实际假库/API末尾换行partial/指纹null、空runtime三派生字段/指纹null、并发删除项目单角色/批量404均通过。没有操作生产服务/库/Key/模型或浏览器。
+- 原R4通过如实报告闭合：194全量881与24 WinError5 pristine均not_run；193原26非零和不准确pass字段保留历史，不能从本次124通过推导全量通过或均非回归。空名册无批量事实行沿用既有边界，已有事务读取同自身视图。
+- 793冻结源核验无缺失，收尾文档修改前仅4允许源+2协调进度变化；原文SQL与合同/计划逐字符一致，sha256 a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e。194七文件冻结保持，任务表/创建/bridge/MCP/SDK/web/.talk等受保护文件未改。
+- review approved、R1–R4 closed，talk_collect_result按194→193成功，两项均succeeded/completed（结果2696/2695）。复核.tmp/runner-role-binding-b1a-fix-review/保存original-194、delivery-194、原2696、source_manifest、review、独立测试/探针/scope-check/acceptance。原193冻结/失败报告和派发快照不追改。
+- 正式同步PROJECT_BRIEF、MODULE_tasks、DEVELOPMENT_ROADMAP、绑定合同/计划状态和进度；新增ROLE_MODEL_BINDING_ACCEPTANCE指南（现有human Key、加载方式、测试标识、登记/绑定/retired/清空/鉴权及限制）。B1a配置事实与真实模型/后续快照严格分开，K2.8延期保持。
+- 必要验证后统一中文提交/常规推送全部7代码/测试与8文档；生产加载和人工API门禁仍待用户，不开启后续片。精确额度本轮未采样，不外推此前使用比例；恢复指令“继续项目”，先核B1a人工验收。
+
 ## 2026-10-09 08:35 #193独立复核发现漏测边界，派#194同B1a定向修正
 
 - 用户通知完成后，读取193/msg2695完整交付摘要：合法自身号一致talk-delivery-1 complete自报、succeeded/submitted，7文件实际范围正确，4改3增；未收取。实际HEAD=fb9a51166fa5345f1a0ca03c956f2ad3b0c70913，193功能仍未提交。开发自报47新测试、相关回归通过，full881有26非零却字段标pass，不能作为独立验收。

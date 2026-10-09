@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
-from sqlalchemy import Column, Index, JSON
+from sqlalchemy import Column, Index, JSON, text
 from sqlmodel import Field, Session, SQLModel
 
 from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
@@ -324,6 +326,608 @@ def resolve_controller_assignment_status(project: Project, session: "Session") -
     if member.kind != "agent":
         return PROJECT_ASSIGNMENT_NOT_AGENT
     return PROJECT_ASSIGNMENT_ASSIGNED
+
+
+# ════════════════════════════════════════════════════════════════════
+# 全局运行器登记 + 项目角色绑定（ROLE-BINDING-B1a）
+#
+# 实施依据：``docs/spec/ROLE_MODEL_BINDING_DESIGN.md`` §2–§6、§7.3、§10–§11 与
+# ``docs/spec/ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md`` §1(B1a)。
+#
+# 本片只做“登记 + 绑定 + 单语句事实读取”：不启动进程、不调用模型、不读凭据、
+# 不探测连接、不改任务表/任务权限、不输出任何 binding_match（B2 才定义实际证据）。
+# ════════════════════════════════════════════════════════════════════
+
+# 枚举：运行器接入程度（合同 §3.2）。登记 ≠ 加入项目 ≠ 允许启动。
+RUNNER_ADAPTER_ADAPTED = "adapted"
+RUNNER_ADAPTER_DISCOVERABLE = "discoverable"
+RUNNER_ADAPTER_UNVERIFIED = "unverified"
+RUNNER_ADAPTER_RETIRED = "retired"
+RUNNER_ADAPTER_STATUSES = (
+    RUNNER_ADAPTER_ADAPTED,
+    RUNNER_ADAPTER_DISCOVERABLE,
+    RUNNER_ADAPTER_UNVERIFIED,
+    RUNNER_ADAPTER_RETIRED,
+)
+RUNNER_ADAPTER_STATUS_DEFAULT = RUNNER_ADAPTER_UNVERIFIED
+
+# 枚举：模型来源（合同 §4.1）。
+MODEL_SOURCE_BUILTIN = "builtin"
+MODEL_SOURCE_CUSTOM_API = "custom_api"
+MODEL_SOURCES = (MODEL_SOURCE_BUILTIN, MODEL_SOURCE_CUSTOM_API)
+
+# 绑定有效性阶梯（合同 §4.4，先命中先返回）。``no_project`` 只属于任务快照。
+ROLE_BINDING_NO_PROJECT = "no_project"
+ROLE_BINDING_MEMBER_MISSING = "member_missing"
+ROLE_BINDING_MEMBER_DISABLED = "member_disabled"
+ROLE_BINDING_NOT_IN_ROSTER = "not_in_roster"
+ROLE_BINDING_NOT_AGENT = "not_agent"
+ROLE_BINDING_UNCONFIGURED = "unconfigured"
+ROLE_BINDING_PARTIAL = "partial"
+ROLE_BINDING_RUNNER_MISSING = "runner_missing"
+ROLE_BINDING_RUNNER_RETIRED = "runner_retired"
+ROLE_BINDING_BOUND = "bound"
+ROLE_BINDING_STATES = (
+    ROLE_BINDING_NO_PROJECT,
+    ROLE_BINDING_MEMBER_MISSING,
+    ROLE_BINDING_MEMBER_DISABLED,
+    ROLE_BINDING_NOT_IN_ROSTER,
+    ROLE_BINDING_NOT_AGENT,
+    ROLE_BINDING_UNCONFIGURED,
+    ROLE_BINDING_PARTIAL,
+    ROLE_BINDING_RUNNER_MISSING,
+    ROLE_BINDING_RUNNER_RETIRED,
+    ROLE_BINDING_BOUND,
+)
+
+# 定量规则（合同 §3.1、§3.3、§4.2）。
+# 只用 ``\Z`` 而不是 ``$`` 收尾：``$`` 允许在末尾换行符**之前**匹配（R3 定向修正），
+# 会让 ``model:test\n`` 之类的存储值被误判为合法；写入侧仍先 ``strip()`` 归一化合法输入。
+RUNNER_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._:\-]{0,63}\Z")
+RUNNER_RUNTIME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._\-]{0,31}\Z")
+SAFE_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9._:/@\-]+\Z")
+# 有限启发式（合同 §5.4）：只挡常见形态，不承诺识别任意真实 Key；看到“不疑似”不等于已证明安全。
+CREDENTIAL_LIKE_PATTERN = re.compile(r"[A-Za-z0-9+/=_\-]{40,}")
+CREDENTIAL_URL_PATTERN = re.compile(r"://[^/\s]*:[^/\s]*@")
+RUNNER_DISPLAY_NAME_MAX_CHARS = 64
+RUNNER_ADAPTER_NOTE_MAX_CHARS = 500
+RUNNER_CAPABILITIES_MAX_ITEMS = 32
+RUNNER_CAPABILITY_MAX_CHARS = 64
+SAFE_TOKEN_MAX_CHARS = 128
+MODEL_DISPLAY_NAME_MAX_CHARS = 64
+
+
+class RunnerRegistry(SQLModel, table=True):
+    """全局运行器登记事实（B1a，合同 §3.1）。
+
+    - ``runner_id`` 是人工指定的稳定 slug，``runtime`` 是运行器族标识；两者登记后
+      **不可改**（PATCH 只允许 display_name / adapter_status / adapter_note /
+      capabilities），避免已冻结的配置快照与登记事实分叉；
+    - ``adapter_status`` 只描述接入程度，**不代表在线、可用或已获授权**；
+    - ``capabilities`` 只描述登记事实，不参与任何权限、路由或执行判定；
+    - 不读取、不搬运、不校验任何凭据正文；登记不自动加入项目，也不启动任何进程。
+    """
+
+    __tablename__ = "runner_registry"
+
+    runner_id: str = Field(primary_key=True)
+    runtime: str = Field(index=True)
+    display_name: str
+    adapter_status: str = Field(default=RUNNER_ADAPTER_STATUS_DEFAULT, index=True)
+    adapter_note: Optional[str] = None
+    capabilities: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    # 登记人 member_id：刻意不加外键，沿用 project_agents.member_id 先例。
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectRoleBinding(SQLModel, table=True):
+    """项目角色 → 运行器/模型绑定行（B1a，合同 §4.1）。
+
+    - 主键 ``(project_id, member_id)``；**独立于 ``project_agents``**，因为项目名册
+      ``POST /sync`` 是全量替换（先删后插），挂在那张表上的人工配置会被抹掉；
+    - ``member_id`` 刻意不加外键：成员离册/被删后行保留，读取时按 §4.4 阶梯如实报告
+      ``not_in_roster`` / ``member_missing``，**不自动删除、不猜默认模型**；
+    - ``model_alias`` 是原生运行器的**调用选择参数**（不是展示字段，也不是 ``model_id``）；
+      ``model_display_name`` 才是纯展示字段；两者都不参与六维内容指纹；
+    - 五个存储必填字段（``runner_id`` / ``model_source`` / ``provider_id`` /
+      ``connection_ref`` / ``model_id``）在**存储层可空**：写入 API 一律要求非空（§4.2），
+      但旧库/手工行可能缺失或留下非法值，读取时按 §4.5 如实报 ``partial``，而不是
+      让整次读取 500。唯一允许为 NULL 的语义就是“这一行内容不完整”。
+    """
+
+    __tablename__ = "project_role_bindings"
+
+    project_id: str = Field(foreign_key="projects.project_id", primary_key=True)
+    member_id: str = Field(primary_key=True)
+    runner_id: Optional[str] = Field(default=None, index=True)
+    model_source: Optional[str] = None
+    provider_id: Optional[str] = None
+    connection_ref: Optional[str] = None
+    model_id: Optional[str] = None
+    model_alias: Optional[str] = None
+    model_display_name: Optional[str] = None
+    updated_by: str
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def looks_like_credential(value: str) -> bool:
+    """有限启发式凭据形态检查（合同 §4.2、§5.4）。
+
+    只覆盖 ``sk-`` 前缀、``Bearer ``、``scheme://user:pass@`` 与连续 ≥ 40 位
+    base64/hex 风格串；**不是**安全证明，只用于尽早 422 降低误入概率。
+    """
+    if not isinstance(value, str):
+        return False
+    lowered = value.lower()
+    if lowered.startswith("sk-") or "bearer " in lowered:
+        return True
+    if CREDENTIAL_URL_PATTERN.search(value):
+        return True
+    return bool(CREDENTIAL_LIKE_PATTERN.search(value))
+
+
+def is_safe_identifier_token(
+    value: Optional[str], *, max_chars: int = SAFE_TOKEN_MAX_CHARS
+) -> bool:
+    """安全 token 规则（合同 §4.2）：字符白名单 + 长度 + 有限凭据启发式。
+
+    匹配是**整串**判定（``fullmatch`` + 结尾锚点）：存储值末尾的换行/制表等控制字符
+    一律判为不可解析，不做 ``strip()`` 掩盖坏值（R3）。
+    """
+    if not isinstance(value, str):
+        return False
+    if not value or len(value) > max_chars:
+        return False
+    if not SAFE_TOKEN_PATTERN.fullmatch(value):
+        return False
+    return not looks_like_credential(value)
+
+
+def normalize_safe_identifier_token(
+    value: Optional[str],
+    *,
+    field: str,
+    max_chars: int = SAFE_TOKEN_MAX_CHARS,
+    required: bool = True,
+) -> Optional[str]:
+    """归一化并校验安全 token；可选字段全空白归 ``None``，不静默截断、不静默丢弃。"""
+    if value is None:
+        if required:
+            raise ValueError(f"{field} is required")
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    normalized = value.strip()
+    if not normalized:
+        if required:
+            raise ValueError(f"{field} must be a non-empty string")
+        return None
+    if not is_safe_identifier_token(normalized, max_chars=max_chars):
+        raise ValueError(f"{field} is not a safe identifier token")
+    return normalized
+
+
+def normalize_runner_id(value: Optional[str]) -> str:
+    """``runner_id`` slug 规则（合同 §3.1）。"""
+    if not isinstance(value, str):
+        raise ValueError("runner_id must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("runner_id is required")
+    if not RUNNER_ID_PATTERN.fullmatch(normalized):
+        raise ValueError("runner_id must match ^[a-z0-9][a-z0-9._:\\-]{0,63}$")
+    return normalized
+
+
+def normalize_runner_runtime(value: Optional[str]) -> str:
+    """``runtime`` 族标识规则（合同 §3.1）。"""
+    if not isinstance(value, str):
+        raise ValueError("runtime must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("runtime is required")
+    if not RUNNER_RUNTIME_PATTERN.fullmatch(normalized):
+        raise ValueError("runtime must match ^[a-z0-9][a-z0-9._\\-]{0,31}$")
+    return normalized
+
+
+def normalize_runner_display_name(value: Optional[str]) -> str:
+    if not isinstance(value, str):
+        raise ValueError("display_name must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("display_name is required")
+    if len(normalized) > RUNNER_DISPLAY_NAME_MAX_CHARS:
+        raise ValueError(
+            f"display_name must be at most {RUNNER_DISPLAY_NAME_MAX_CHARS} characters"
+        )
+    return normalized
+
+
+def normalize_runner_adapter_status(value: Optional[str]) -> str:
+    if not isinstance(value, str):
+        raise ValueError("adapter_status must be a string")
+    normalized = value.strip().lower()
+    if normalized not in RUNNER_ADAPTER_STATUSES:
+        raise ValueError(
+            f"adapter_status must be one of {list(RUNNER_ADAPTER_STATUSES)}"
+        )
+    return normalized
+
+
+def normalize_runner_adapter_note(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("adapter_note must be a string or null")
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if len(normalized) > RUNNER_ADAPTER_NOTE_MAX_CHARS:
+        raise ValueError(
+            f"adapter_note must be at most {RUNNER_ADAPTER_NOTE_MAX_CHARS} characters"
+        )
+    return normalized
+
+
+def normalize_runner_capabilities(value: Optional[list[str]]) -> list[str]:
+    """``capabilities`` 定量规则（合同 §3.3）：不静默截断、不静默丢弃空白项、不去重。"""
+    if value is None:
+        raise ValueError("capabilities must be an array of strings")
+    if not isinstance(value, list):
+        raise ValueError("capabilities must be an array of strings")
+    if len(value) > RUNNER_CAPABILITIES_MAX_ITEMS:
+        raise ValueError(
+            f"capabilities must contain at most {RUNNER_CAPABILITIES_MAX_ITEMS} items"
+        )
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError("capabilities items must be strings")
+        stripped = item.strip()
+        if not stripped:
+            raise ValueError("capabilities items must not be blank")
+        if len(stripped) > RUNNER_CAPABILITY_MAX_CHARS:
+            raise ValueError(
+                "capabilities items must be at most "
+                f"{RUNNER_CAPABILITY_MAX_CHARS} characters"
+            )
+        if stripped in seen:
+            raise ValueError("capabilities items must be unique after normalization")
+        seen.add(stripped)
+        normalized.append(stripped)
+    return normalized
+
+
+def normalize_model_source(value: Optional[str]) -> str:
+    if not isinstance(value, str):
+        raise ValueError("model_source must be a string")
+    normalized = value.strip().lower()
+    if normalized not in MODEL_SOURCES:
+        raise ValueError(f"model_source must be one of {list(MODEL_SOURCES)}")
+    return normalized
+
+
+def normalize_model_display_name(value: Optional[str]) -> Optional[str]:
+    """``model_display_name`` 是纯展示字段（合同 §4.1），只做长度与空白归一。"""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("model_display_name must be a string or null")
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if len(normalized) > MODEL_DISPLAY_NAME_MAX_CHARS:
+        raise ValueError(
+            f"model_display_name must be at most {MODEL_DISPLAY_NAME_MAX_CHARS} characters"
+        )
+    return normalized
+
+
+def is_parseable_stored_runner_id(value: Optional[str]) -> bool:
+    """``partial`` 判定用：绑定行存储的 ``runner_id`` 是否可解析（合同 §4.5）。
+
+    整串匹配（``fullmatch`` + 结尾锚点）：``runner:dsh-cli\\n`` 这类带末尾控制字符的
+    存储值不可解析，不 ``strip()`` 掩盖（R3）。
+    """
+    return isinstance(value, str) and bool(RUNNER_ID_PATTERN.fullmatch(value))
+
+
+def is_parseable_stored_runtime(value: Optional[str]) -> bool:
+    """派生 ``runtime`` 的可解析判定（合同 §4.4 序 7、§4.5）。
+
+    登记行存在但 ``runtime`` 为空/全空白/不匹配 §3.1 slug（含末尾控制字符）时不可解析，
+    读取侧一律落到 ``runner_missing``，并让三个派生字段同为空（R2）。
+    """
+    return isinstance(value, str) and bool(RUNNER_RUNTIME_PATTERN.fullmatch(value))
+
+
+def is_parseable_stored_model_source(value: Optional[str]) -> bool:
+    return (
+        isinstance(value, str)
+        and value.strip().lower() in MODEL_SOURCES
+    )
+
+
+def binding_fingerprint(facts: Optional[dict]) -> Optional[str]:
+    """配置内容指纹（合同 §2）：六值全部可解析才给出，否则 ``null``。
+
+    ``sha256('runner_id|runtime|model_source|provider_id|connection_ref|model_id')``；
+    - ``runtime`` 由登记表派生；登记事实不可解析（``runner_missing``）时 ``runtime`` 不可
+      解析 → 指纹为 ``null``；
+    - 指纹与“当前是否有效”无关：无效行只要六值可解析就有指纹；
+    - 指纹**不含** ``model_alias`` / ``model_display_name``，因此指纹相同 **不等于**
+      完整调用配置相同（alias 是原生调用选择参数）。
+    """
+    if not facts:
+        return None
+    runner_id = facts.get("runner_id")
+    runtime = facts.get("runtime")
+    model_source = facts.get("model_source")
+    provider_id = facts.get("provider_id")
+    connection_ref = facts.get("connection_ref")
+    model_id = facts.get("model_id")
+    if not is_parseable_stored_runner_id(runner_id):
+        return None
+    if not is_parseable_stored_runtime(runtime):
+        return None
+    if not is_parseable_stored_model_source(model_source):
+        return None
+    if not is_safe_identifier_token(provider_id):
+        return None
+    if not is_safe_identifier_token(connection_ref):
+        return None
+    if not is_safe_identifier_token(model_id):
+        return None
+    payload = "|".join(
+        [runner_id, runtime, model_source, provider_id, connection_ref, model_id]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _stored_required_fields_parseable(facts: dict) -> bool:
+    """``partial`` 只由绑定行**存储必填五项**触发（合同 §4.5）。
+
+    派生 ``runtime`` 不参与：登记表查不到 ``runner_id`` 时若五项齐全，仍应落到序 7
+    ``runner_missing``，不能被 ``partial`` 抢先。
+    """
+    if not is_parseable_stored_runner_id(facts.get("runner_id")):
+        return False
+    if not is_parseable_stored_model_source(facts.get("model_source")):
+        return False
+    if not is_safe_identifier_token(facts.get("provider_id")):
+        return False
+    if not is_safe_identifier_token(facts.get("connection_ref")):
+        return False
+    if not is_safe_identifier_token(facts.get("model_id")):
+        return False
+    return True
+
+
+def resolve_role_binding_state(facts: Optional[dict]) -> Optional[str]:
+    """按合同 §4.4 阶梯计算绑定状态（读取时现算，只读，不修改任何数据）。
+
+    优先级严格按序，先命中先返回：
+    ``member_missing → member_disabled → not_in_roster → not_agent → unconfigured →
+    partial → runner_missing → runner_retired → bound``。
+
+    - 身份/名册事实先于绑定内容事实（“离册 + runner retired”报 ``not_in_roster``）；
+    - ``project_exists = 0`` **不是**一种 ``binding_state``：返回 ``None``，由调用 API
+      映射原错误码（项目接口 404、任务创建 400），事实助手本身不固定 HTTP 状态码；
+    - 不自动清理行、不用成员名/模型名/历史惯例猜出运行器或模型。
+    """
+    if not facts:
+        return None
+    if not facts.get("project_exists"):
+        return None
+    if not facts.get("member_exists"):
+        return ROLE_BINDING_MEMBER_MISSING
+    if facts.get("member_disabled_at") is not None:
+        return ROLE_BINDING_MEMBER_DISABLED
+    if not facts.get("in_roster"):
+        return ROLE_BINDING_NOT_IN_ROSTER
+    if facts.get("member_kind") != "agent":
+        return ROLE_BINDING_NOT_AGENT
+    if not facts.get("binding_exists"):
+        return ROLE_BINDING_UNCONFIGURED
+    if not _stored_required_fields_parseable(facts):
+        return ROLE_BINDING_PARTIAL
+    runtime = facts.get("runtime")
+    if not facts.get("runner_exists") or not is_parseable_stored_runtime(runtime):
+        return ROLE_BINDING_RUNNER_MISSING
+    if facts.get("runner_status") == RUNNER_ADAPTER_RETIRED:
+        return ROLE_BINDING_RUNNER_RETIRED
+    return ROLE_BINDING_BOUND
+
+
+def _derived_runner_fields(
+    facts: dict,
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """运行器三个派生字段（``runtime`` / ``runner_display_name`` / ``runner_status``）。
+
+    合同 §4.2/§4.4 序 7（R2 定向修正）：登记事实不可解析（登记行缺失，或登记行存在但
+    ``runtime`` 为空/全空白/不合法）时**三者一律 ``null``**，不能只把 ``runtime`` 清空而
+    照返展示名与状态。判定只看**登记事实可解析性**，不看成员身份/名册：离册、禁用、非
+    agent 的保留行只要登记事实可解析，仍照常派生出运行器字段（§7.2）。
+    """
+    if not facts.get("runner_exists") or not is_parseable_stored_runtime(
+        facts.get("runtime")
+    ):
+        return None, None, None
+    return (
+        facts.get("runtime"),
+        facts.get("runner_display_name"),
+        facts.get("runner_status"),
+    )
+
+
+def build_role_binding_out(facts: Optional[dict]) -> Optional["RoleBindingOut"]:
+    """把事实行转成 ``RoleBindingOut``；没有存储行（``binding_exists = 0``）返回 ``None``。
+
+    行存在时**按存储值照返**（即使当前无效）：有效性写在 ``binding_state``，
+    运行器派生字段来自登记表，并统一经 :func:`_derived_runner_fields` 规范化——
+    登记事实不可解析时三者如实为 ``null``。
+    """
+    if not facts or not facts.get("binding_exists"):
+        return None
+    runtime, runner_display_name, runner_status = _derived_runner_fields(facts)
+    return RoleBindingOut(
+        runner_id=facts.get("runner_id"),
+        runtime=runtime,
+        runner_display_name=runner_display_name,
+        runner_status=runner_status,
+        model_source=facts.get("model_source"),
+        provider_id=facts.get("provider_id"),
+        connection_ref=facts.get("connection_ref"),
+        model_id=facts.get("model_id"),
+        model_alias=facts.get("model_alias"),
+        model_display_name=facts.get("model_display_name"),
+        binding_state=resolve_role_binding_state(facts),
+        binding_fingerprint=binding_fingerprint(facts),
+        updated_by=facts.get("updated_by"),
+        updated_at=facts.get("updated_at"),
+    )
+
+
+# ── 单语句事实读取（合同 §7.3；B1b 复用同一助手，不复制第二份） ──────
+
+_BINDING_FACTS_SQL_ANCHOR = (
+    "WITH requested(project_id, member_id) AS (\n"
+    "    SELECT :project_id AS project_id, :member_id AS member_id\n"
+    ")"
+)
+
+# 以下 SQL 原文与合同 §7.3 / 计划 §2.3 的 fenced SQL 逐字符一致
+# （sha256 = a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e，2484 字符）。
+_BINDING_FACTS_SQL_BODY = """
+SELECT
+    req.project_id                                   AS requested_project_id,
+    req.member_id                                    AS requested_member_id,
+    p.project_id                                     AS project_id,
+    (p.project_id IS NOT NULL)                       AS project_exists,
+    m.id                                             AS member_id,
+    (m.id IS NOT NULL)                               AS member_exists,
+    m.kind                                           AS member_kind,
+    m.disabled_at                                    AS member_disabled_at,
+    pa.member_id                                     AS roster_member_id,
+    (pa.member_id IS NOT NULL)                       AS in_roster,
+    b.project_id                                     AS binding_project_id,
+    b.member_id                                      AS binding_member_id,
+    (b.project_id IS NOT NULL)                       AS binding_exists,
+    b.runner_id                                      AS runner_id,
+    r.runner_id                                      AS registry_runner_id,
+    (r.runner_id IS NOT NULL)                        AS runner_exists,
+    r.runtime                                        AS runtime,
+    r.display_name                                   AS runner_display_name,
+    r.adapter_status                                 AS runner_status,
+    b.model_source                                   AS model_source,
+    b.provider_id                                    AS provider_id,
+    b.connection_ref                                 AS connection_ref,
+    b.model_id                                       AS model_id,
+    b.model_alias                                    AS model_alias,
+    b.model_display_name                             AS model_display_name,
+    b.updated_by                                     AS updated_by,
+    b.updated_at                                     AS updated_at
+FROM requested AS req
+LEFT JOIN projects              AS p  ON p.project_id  = req.project_id
+LEFT JOIN members               AS m  ON m.id          = req.member_id
+LEFT JOIN project_agents        AS pa ON pa.project_id = req.project_id AND pa.member_id = req.member_id
+LEFT JOIN project_role_bindings AS b  ON b.project_id  = req.project_id AND b.member_id  = req.member_id
+LEFT JOIN runner_registry       AS r  ON r.runner_id   = b.runner_id;"""
+
+BINDING_FACTS_SQL = _BINDING_FACTS_SQL_ANCHOR + _BINDING_FACTS_SQL_BODY
+
+# 27 个唯一列别名（顺序与 SQL 一致）；无项目分支用它构造全 null 事实。
+BINDING_FACTS_COLUMNS = (
+    "requested_project_id",
+    "requested_member_id",
+    "project_id",
+    "project_exists",
+    "member_id",
+    "member_exists",
+    "member_kind",
+    "member_disabled_at",
+    "roster_member_id",
+    "in_roster",
+    "binding_project_id",
+    "binding_member_id",
+    "binding_exists",
+    "runner_id",
+    "registry_runner_id",
+    "runner_exists",
+    "runtime",
+    "runner_display_name",
+    "runner_status",
+    "model_source",
+    "provider_id",
+    "connection_ref",
+    "model_id",
+    "model_alias",
+    "model_display_name",
+    "updated_by",
+    "updated_at",
+)
+
+
+def read_role_binding_facts(
+    session: Session, *, project_id: Optional[str], member_id: str
+) -> dict:
+    """一条 SQL 取齐项目/成员/名册/绑定/登记事实（合同 §7.3）。
+
+    - 带项目：``session.execute(text(BINDING_FACTS_SQL), {...}).mappings().one()``，
+      **恰好 1 行**（五个 LEFT JOIN 右表都是主键等值连接），无绑定行时仍返回 1 行；
+    - ``project_id is None``：**不执行 SQL**（语句数 0），返回全 ``null`` 事实，只有
+      ``requested_member_id`` 是请求值；``state`` 由调用方按 ``no_project`` 处理（B1b）；
+    - 本助手**不固定 HTTP 错误码**：``project_exists = 0`` 只作为事实返回；
+    - 不追加第二条补查询，也不用早先 ORM 缓存/成员对象推断状态。
+    """
+    if project_id is None:
+        facts = {column: None for column in BINDING_FACTS_COLUMNS}
+        facts["requested_member_id"] = member_id
+        return facts
+    row = session.execute(
+        text(BINDING_FACTS_SQL),
+        {"project_id": project_id, "member_id": member_id},
+    ).mappings().one()
+    return dict(row)
+
+
+def build_binding_facts_batch_sql(member_count: int) -> str:
+    """批量事实读取 SQL：与单条助手**同一段 SELECT/JOIN**，只把请求 CTE 换成多行。
+
+    列集合、别名、空行语义、状态语义与单条严格一致；仍是一条语句、每个请求 pair
+    恰好 1 行（含无绑定行）。
+    """
+    if member_count < 1:
+        raise ValueError("member_count must be >= 1")
+    values = ", ".join(f"(:p{index}, :m{index})" for index in range(member_count))
+    anchor = f"WITH requested(project_id, member_id) AS (\n    VALUES {values}\n)"
+    return anchor + BINDING_FACTS_SQL[len(_BINDING_FACTS_SQL_ANCHOR):]
+
+
+def read_role_binding_facts_batch(
+    session: Session, *, project_id: str, member_ids: list[str]
+) -> list[dict]:
+    """一次 SQL 批量取多个角色的绑定事实（GET /agents 用，避免逐角色 N+1）。
+
+    空请求直接返回 ``[]``（不查库、不改数据）；返回顺序不保证，调用方按
+    ``requested_member_id`` 建索引。
+    """
+    if not member_ids:
+        return []
+    sql = build_binding_facts_batch_sql(len(member_ids))
+    params: dict[str, str] = {}
+    for index, member_id in enumerate(member_ids):
+        params[f"p{index}"] = project_id
+        params[f"m{index}"] = member_id
+    rows = session.execute(text(sql), params).mappings().all()
+    return [dict(row) for row in rows]
 
 
 class AgentTask(SQLModel, table=True):
@@ -1509,6 +2113,177 @@ class ProjectSyncRequest(BaseModel):
         return self
 
 
+class RunnerCreate(BaseModel):
+    """``POST /api/runners`` 请求体（合同 §3.4）。
+
+    ``extra="forbid"``：出现未知字段 → 422，不做静默忽略；``runner_id`` / ``runtime``
+    在此登记后不可改（更新走 ``RunnerUpdate``，出现这两个键同样 422）。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    runner_id: str
+    runtime: str
+    display_name: str
+    adapter_status: str = RUNNER_ADAPTER_STATUS_DEFAULT
+    adapter_note: Optional[str] = None
+    capabilities: list[str] = PydField(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_runner_create(self) -> "RunnerCreate":
+        self.runner_id = normalize_runner_id(self.runner_id)
+        self.runtime = normalize_runner_runtime(self.runtime)
+        self.display_name = normalize_runner_display_name(self.display_name)
+        self.adapter_status = normalize_runner_adapter_status(self.adapter_status)
+        self.adapter_note = normalize_runner_adapter_note(self.adapter_note)
+        self.capabilities = normalize_runner_capabilities(list(self.capabilities))
+        return self
+
+
+class RunnerUpdate(BaseModel):
+    """``PATCH /api/runners/{runner_id}`` 请求体（合同 §3.4）。
+
+    只允许改 ``display_name`` / ``adapter_status`` / ``adapter_note`` / ``capabilities``；
+    出现 ``runner_id`` 或 ``runtime``（或任何未知字段）→ 422，避免已冻结快照与登记事实分叉。
+    省略的字段保持原值；显式 ``null`` 的 ``adapter_note`` 表示清空说明。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: Optional[str] = None
+    adapter_status: Optional[str] = None
+    adapter_note: Optional[str] = None
+    capabilities: Optional[list[str]] = None
+
+    @model_validator(mode="after")
+    def validate_runner_update(self) -> "RunnerUpdate":
+        fields = self.model_fields_set
+        if "display_name" in fields:
+            if self.display_name is None:
+                raise ValueError("display_name cannot be null")
+            self.display_name = normalize_runner_display_name(self.display_name)
+        if "adapter_status" in fields:
+            if self.adapter_status is None:
+                raise ValueError("adapter_status cannot be null")
+            self.adapter_status = normalize_runner_adapter_status(self.adapter_status)
+        if "adapter_note" in fields:
+            self.adapter_note = normalize_runner_adapter_note(self.adapter_note)
+        if "capabilities" in fields:
+            if self.capabilities is None:
+                raise ValueError("capabilities cannot be null")
+            self.capabilities = normalize_runner_capabilities(list(self.capabilities))
+        return self
+
+
+class RunnerOut(BaseModel):
+    """运行器登记输出（合同 §3.4）。只描述登记事实，不代表在线或可用。"""
+
+    runner_id: str
+    runtime: str
+    display_name: str
+    adapter_status: str
+    adapter_note: Optional[str]
+    capabilities: list[str]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_orm_runner(cls, runner: RunnerRegistry) -> "RunnerOut":
+        return cls(
+            runner_id=runner.runner_id,
+            runtime=runner.runtime,
+            display_name=runner.display_name,
+            adapter_status=runner.adapter_status,
+            adapter_note=runner.adapter_note,
+            capabilities=list(runner.capabilities or []),
+            created_by=runner.created_by,
+            created_at=runner.created_at,
+            updated_at=runner.updated_at,
+        )
+
+
+class RoleBindingInput(BaseModel):
+    """绑定写入体（合同 §4.1–§4.2）：行存在时必填键全部必填且非空白。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    runner_id: str
+    model_source: str
+    provider_id: str
+    connection_ref: str
+    model_id: str
+    model_alias: Optional[str] = None
+    model_display_name: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_role_binding(self) -> "RoleBindingInput":
+        self.runner_id = normalize_runner_id(self.runner_id)
+        self.model_source = normalize_model_source(self.model_source)
+        self.provider_id = normalize_safe_identifier_token(
+            self.provider_id, field="provider_id"
+        )
+        self.connection_ref = normalize_safe_identifier_token(
+            self.connection_ref, field="connection_ref"
+        )
+        self.model_id = normalize_safe_identifier_token(self.model_id, field="model_id")
+        self.model_alias = normalize_safe_identifier_token(
+            self.model_alias, field="model_alias", required=False
+        )
+        self.model_display_name = normalize_model_display_name(self.model_display_name)
+        return self
+
+
+class RoleBindingUpdate(BaseModel):
+    """``PUT /api/projects/{project_id}/agents/{member_id}/binding`` 请求体。
+
+    ``binding`` 是**必填键**（无默认值 = required but nullable）：缺失 → 422；
+    显式 ``null`` = 解除绑定（删除该行）；未知字段 → 422。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    binding: Optional[RoleBindingInput]
+
+
+class RoleBindingOut(BaseModel):
+    """绑定读取输出（合同 §4.3）。
+
+    ``runtime`` / ``runner_display_name`` / ``runner_status`` 从登记表读取时派生；
+    ``binding_state`` 按 §4.4 阶梯读取时实时计算；``binding_fingerprint`` 是六维内容指纹
+    （与有效性无关，登记事实不可解析时为 ``null``）。
+    """
+
+    runner_id: Optional[str] = None
+    runtime: Optional[str] = None
+    runner_display_name: Optional[str] = None
+    runner_status: Optional[str] = None
+    model_source: Optional[str] = None
+    provider_id: Optional[str] = None
+    connection_ref: Optional[str] = None
+    model_id: Optional[str] = None
+    model_alias: Optional[str] = None
+    model_display_name: Optional[str] = None
+    binding_state: Optional[str] = None
+    binding_fingerprint: Optional[str] = None
+    updated_by: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class RoleBindingResponse(BaseModel):
+    """``GET`` / ``PUT`` 单角色绑定的统一响应：存储行 + 读取时实时有效性状态。
+
+    ``binding: null`` 表示**没有存储行**（不伪造默认运行器或模型）；``binding_state``
+    回答“为什么没有可用绑定”（``unconfigured`` / 身份类状态 / ``partial`` / 运行器类状态）。
+    成员已离册/已删除/被禁用/非 agent 时仍返回存储行与状态（不 404、不自动清理）。
+    """
+
+    project_id: str
+    member_id: str
+    binding: Optional[RoleBindingOut] = None
+    binding_state: Optional[str] = None
+
+
 class ProjectAgentOut(BaseModel):
     member_id: str
     identity_path: Optional[str]
@@ -1521,6 +2296,11 @@ class ProjectAgentOut(BaseModel):
     # 角色说明（ROLE-DESC-B1）：无自定义记录 = null（前端据此回退默认文案）。
     # 纯展示文本，不参与 business_role / decision_tier / 主控指定 / 任务权限的任何判定。
     role_description: Optional[str] = None
+    # 角色运行器/模型绑定（ROLE-BINDING-B1a）：附加字段，旧客户端忽略未知字段即可。
+    # binding = null 表示没有存储行（不伪造默认模型）；binding_state 按合同 §4.4 阶梯
+    # 读取时实时计算，只描述配置事实，不改变 business_role / decision_tier / 任务权限。
+    binding: Optional[RoleBindingOut] = None
+    binding_state: Optional[str] = None
     display_name: Optional[str]
     availability: str
     instances: list[AgentInstanceOut]
@@ -1535,6 +2315,8 @@ class ProjectAgentOut(BaseModel):
         availability: str = "offline",
         instances: Optional[list[AgentInstanceOut]] = None,
         role_description: Optional[str] = None,
+        binding: Optional[RoleBindingOut] = None,
+        binding_state: Optional[str] = None,
     ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
@@ -1546,6 +2328,8 @@ class ProjectAgentOut(BaseModel):
             decision_tier=agent.decision_tier,
             capability_summary=list(agent.capability_summary or []),
             role_description=role_description,
+            binding=binding,
+            binding_state=binding_state,
             display_name=display_name,
             availability=availability,
             instances=instances or [],

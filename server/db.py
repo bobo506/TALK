@@ -327,6 +327,26 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS ix_project_agents_decision_tier "
             "ON project_agents (decision_tier)"
         )
+        # ROLE-BINDING-B1a：runner_registry / project_role_bindings 两张新表由
+        # ``SQLModel.metadata.create_all`` 建表（旧库同样只新增表）。这里按列存在性之外
+        # 的幂等索引补齐（表已存在时 create_all 不会补索引）；只增量、不重建表、
+        # 不改列类型、不删除列，也不改全局 SQLite 引擎参数。
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_runner_registry_runtime "
+            "ON runner_registry (runtime)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_runner_registry_adapter_status "
+            "ON runner_registry (adapter_status)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_project_role_bindings_project_id "
+            "ON project_role_bindings (project_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_project_role_bindings_runner_id "
+            "ON project_role_bindings (runner_id)"
+        )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_member_id ON group_members (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_business_role ON group_members (business_role)")

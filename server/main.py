@@ -32,7 +32,7 @@ from server.db import (
 )
 from server.logging_config import configure_logging
 from server.models import GroupMember, Member, Message, MessageCreate, MessageOut
-from server.routes import discussions, files, groups, hall_types, instances, members, messages, projects, tasks
+from server.routes import discussions, files, groups, hall_types, instances, members, messages, projects, runners, tasks
 from server.ws_hub import hub
 
 configure_logging()
@@ -250,6 +250,7 @@ app.include_router(members.setup_router)
 app.include_router(groups.router)
 app.include_router(hall_types.router)
 app.include_router(projects.router)
+app.include_router(runners.router)
 app.include_router(discussions.router)
 app.include_router(instances.router)
 app.include_router(tasks.router)
