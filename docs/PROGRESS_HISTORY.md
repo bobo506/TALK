@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-10 17:05 #208复验闭合原22反例，409方法特例仍漏两分支，派#209定向补正
+
+- 用户再次通知“好了”；Codex按#208包只读收交付摘要、核实际差异与边界，未推进C3/C4或其它功能，不操作浏览器。当前临时分工DeepSeek开发/Codex复核保持。
+- #208/msg2712为合法208/complete、succeeded/submitted；原文两页6206字符、SHAe72bb8f96e301e223a2a7edab1c943434de63bb4cebf3379a453a5aaaf84632c与本地development.json逐对象一致。自报/开发者212回归的一skip/冻结原207源码均保持，207/208均未验收收取。
+- 当前HEAD94b6fd874fba6b5928507efef94460a364c798f6，只有两个C2文件未跟踪，804旧protected逐SHA保持；208源码0517d32c14165e0e5e2c525841908e6bf74090acd9f0b8ff8624b8e8a4ae0a86、测试0f227fe2983578148198a404cc85a0578b8a56c8397340e787ad30255a7c51d5冻结review/original。原207冻结原件两SHA独立核保持。
+- 阅读完整修复diff和针对测试F2矩阵；148 C2＋98 C1＋15 runner＋40 project_role_bindings＋59 K28独立360项全通过、0失败/错误/跳过，原22探针独立复制到新review目录复验22/22，不覆盖原207失败证据。F1/F3/F4/F5及原F2401/422/500六反例闭合。
+- 发现剩余F2-method：_write_outcome_explicit_failure只根据字符串排除409，未带HTTP方法；_confirm_runner_step和_confirm_binding_step共用，导致POST409已存在同事实特例误用于PATCH/PUT，违背函数注释/正式§6及208任务要求。
+- 额外verify_409.py使用真实router/TestClient/内存SQLite正常请求，故障传输模拟写409而最新GET一致：POST409正例保持成功；PATCH409实际PATCH=1/PUT=1/result complete，PUT409实际PUT=1/outcome bound/result complete，两个验收断言失败。3探针1通过/2失败，无fixture异常；结果method-409-probes.json，原22全通过不替代这一新边界。
+- 208复核needs_changes，仅F2方法边界未闭合；修复要求只POST登记允许409重分类，PATCH409止本条PUT、PUT409不能称本次写成功，仍最新GET保留观察/恢复索引、不盲写重试；正常POST409/超时/已关闭问题保持。
+- 原208基线文字称相对41e有“两次协调方提交”不准确：git rev-list count独立核为1，diff仅两进度文件；baseline.ref94b6和实际文件范围正确。原自报不追改，此处记录独立事实。
+- 派前重新读取最新development_requirements与agent:codex身份，仍按会话临时分工；最小顶层四字段派#209，2026-10-10T09:03:16.564466 UTC创建queued/assigned、target=agent:deepseek、created_by=agent:codex、Hall=group:task-14cf9398e173419cb1ad07b682ad9219。只修同一C2两文件/少量针对测试，冻结208负向验证与方法3/3、原22/22、新模块完整测试要求写包，未变更212旧回归可沿用本次独立证据，不声称新跑。
+- .tmp/adapter-registry-c2-rework-review/保存完整服务器报告、scope/original、五套日志、22复验/新3方法探针和review.json；.tmp/adapter-registry-c2-method-fix/保存task-package、requirements、scope、dispatch。交付要求本次实际号JSON原文，完成暂停，默认派发后结束等待，用户通知“209 ok”再复验。
+- 本轮没有业务源码修改或生产HTTP/SQLite写、真实Key/native读取、模型/长wait/服务或Agent启停；隔离测试写允许且不外推真实bound/C3/C4/宿主T/W。只更新两正式进度，经UTF-8/范围/空白校验后中文提交常规推送；C2源码待边界闭合才发布，当前207/208不提前collect。
+
 ## 2026-10-10 16:34 #207 C2独立复核发现五项边界问题，派#208定向返修
 
 - 用户“好了”通知完成；Codex按已派任务包独立核交付、实际代码与验证，不从runner succeeded或complete自报推断验收，不开发下一片、不操作浏览器。
