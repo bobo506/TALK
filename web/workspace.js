@@ -686,6 +686,7 @@ function renderWorkspaceList() {
 // （"模型未上报"）与旧服务未提供字段（未知）四类严格区分；未知不伪装成未配置，未配置不当接入失败。
 // 产品展示名规则（D-5）未决：只展示 API 已有值，不制定命名规则、不批量改名；B2 证据片未落地，
 // 本片不输出 binding_match*、不写任何一致性结论、不推断型号。
+// ROLE-BINDING-C4：面板下方补一段随状态变化的中文收尾指引；不新增每角色请求、按钮或表单。
 const ROLE_BINDING_STATES = {
   no_project: ["无项目上下文", "unknown"],
   member_missing: ["成员不存在（保留配置）", "invalid"],
@@ -790,6 +791,27 @@ function workspaceRoleBindingNote(agent) {
   if (state.kind === "invalid") return "该绑定行按存储值原样展示，当前状态不可用；页面不会自动清理或改写它。";
   return "以上都是已保存的配置值。";
 }
+// ROLE-BINDING-C4：面板补一段随状态变化的简短中文收尾指引，只写人类下一步需要知道的事实，
+// 不出现内部路径、完整 CLI 命令、密钥/密钥路径或未验断言（详细入口与命令留在正式验收指南）；
+// 仍全部走 textContent，不生成按钮/表单/链接，不新增请求，也不自动改实际模型或权限。
+const ROLE_BINDING_GUIDES = {
+  unconfigured: "收尾指引：先核验对应终端的运行器、模型与连接事实，再显式生成收尾计划；经人类确认后由受信 human 凭据入口登记，完成后刷新本页读取结果。并非所有终端都已有可用适配来源：当前入口可以生成计划，缺少来源或存在未知覆盖层时计划会 blocked，补齐并重新核验后再生成计划。",
+  bound: "收尾指引：以上只是已保存的配置值。改动配置后需要重新核验来源并生成新的收尾计划，再由受权 human 入口收尾；页面不会自动改动实际模型或权限。已绑定不代表运行器已验证、实际模型一致、在线或支持主动等待。",
+  invalid: "收尾指引：当前存储的绑定不可用，请先核验并补齐对应的适配来源或成员资格，重新生成收尾计划后再由受权 human 入口收尾；页面不会自动清理或改写该配置，也不提供绕过人工确认的入口。",
+  unknown: "收尾指引：请在受支持的服务或入口确认该状态含义，重新核验事实后再生成收尾计划；页面不会据此自动写入或改动配置。",
+  unsupported: "收尾指引：当前服务未上报绑定字段，请确认服务与接口版本支持该字段后再刷新本页核对。",
+};
+// 指引只按已判定的状态枚举选文案，不由 agent 载荷里的任意值索引进映射；未覆盖分支按未知降级。
+function workspaceRoleBindingGuide(agent) {
+  const row = roleBindingRow(agent);
+  const state = roleBindingStateInfo(agent, row.row);
+  if (!row.supported) return ROLE_BINDING_GUIDES.unsupported;
+  if (state.key === "unconfigured") return ROLE_BINDING_GUIDES.unconfigured;
+  if (!row.present) return ROLE_BINDING_GUIDES.unknown;
+  if (state.key === "bound") return ROLE_BINDING_GUIDES.bound;
+  if (state.kind === "invalid") return ROLE_BINDING_GUIDES.invalid;
+  return ROLE_BINDING_GUIDES.unknown;
+}
 function workspaceRoleBindingPanel(agent) {
   const row = roleBindingRow(agent);
   const state = roleBindingStateInfo(agent, row.row);
@@ -807,6 +829,8 @@ function workspaceRoleBindingPanel(agent) {
   }
   section.appendChild(list);
   section.appendChild(workspaceEl("p", "role-binding-note", workspaceRoleBindingNote(agent)));
+  // ROLE-BINDING-C4：收尾指引跟在事实说明之后，纯文本段落，不引入任何控件或入口。
+  section.appendChild(workspaceEl("p", "role-binding-guide", workspaceRoleBindingGuide(agent)));
   return section;
 }
 function renderWorkspaceRoleDetails() {
@@ -1256,4 +1280,4 @@ if (typeof document !== "undefined") {
     document.getElementById("role-description-reset").addEventListener("click", resetRoleDescription);
   }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, workspaceSettingsSelected, ROLE_BINDING_STATES, workspaceRoleBindingSummary, workspaceRoleBindingRows, workspaceRoleBindingNote};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, workspaceSettingsSelected, ROLE_BINDING_STATES, workspaceRoleBindingSummary, workspaceRoleBindingRows, workspaceRoleBindingNote, workspaceRoleBindingGuide};

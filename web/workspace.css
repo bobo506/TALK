@@ -223,4 +223,5 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-binding-list dt {color:#69737c;}
 .role-binding-list dd {margin:0; color:#303741; overflow-wrap:anywhere; word-break:break-word;}
 .role-binding-note {font-size:14px; color:#626b76; line-height:1.7; margin:14px 0 0;}
-@media(max-width:700px){.role-binding-head h3 {font-size:19px;} .role-binding-list {grid-template-columns:minmax(86px,auto) minmax(0,1fr); gap:8px 12px; font-size:14px;}}
+.role-binding-guide {font-size:14px; color:#4c5560; line-height:1.7; margin:10px 0 0; padding:10px 12px; border-left:3px solid #d8d3c4; background:#faf9f5; overflow-wrap:anywhere;}
+@media(max-width:700px){.role-binding-head h3 {font-size:19px;} .role-binding-list {grid-template-columns:minmax(86px,auto) minmax(0,1fr); gap:8px 12px; font-size:14px;} .role-binding-guide {padding:9px 10px;}}

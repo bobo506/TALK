@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261009-role-binding-b4"
+STATIC_VERSION = "20261010-adapter-closeout-c4"
 
 
 class RoleDescriptionWebUiTests(RouteTestCase):
