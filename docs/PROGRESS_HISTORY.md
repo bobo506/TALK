@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-10 14:39 发布445b33f后派DeepSeek #206 C1离线适配事实模块
+
+- #205设计合同/计划及索引、验收进度共7正式文档完成UTF-8/范围/diff校验，提交445b33f4dee92decffe4c1d5735a62871482f6d3、常规推送，ls-remote精确相等、派前工作区干净；未改业务源码。
+- 派前读取当前项目development_requirements/本人身份，按人类本次DeepSeek开发/Codex独立复核；最新原快照保存，MCP工具自动写派发时要求。usage-gate 2026-10-10T06:36:34 UTC采样session6%/weekly62%、continue，非实时保证。
+- #206创建2026-10-10T06:36:50.203280 UTC，queued/assigned，target=agent:deepseek、created_by=agent:codex、Hall=group:task-29ee4896634241d9a649397f5657ca0f；最小顶层参数，无子任务/额外自动审查字段，不推断已领取，不主动等待。
+- .tmp/adapter-binding-facts-c1/冻结804tracked SHA/大小、实际445b33f基线、任务包/要求/usage/创建回执。仅scripts/adapter_binding_facts.py、tests/test_adapter_binding_facts.py两新文件；正式合同的公开投影/内部provenance分开、confirmed默认False、内存配置与原schema复用优先于参考探针。
+- Task Hall补充workflow_action=none说明：Codex派后两进度改动为已知协调方例外，其余802旧tracked SHA不变；开发者仍不得改两进度或其它旧文件，原任务正文/消息不追改。Codex仅两进度中文收尾推送，不审查并行开发中的代码。
+- 要求实际新模块测试、直接相关既有K28回归、行为隔离/递归canary/指纹稳定与漂移/四profile来源/严格scope与标志/schema/连接边界；完整本次实际号JSON交付、原失败证据保存，开发一片后暂停。
+- C1不是实际绑定。C2/C3/C4、真实human apply、页面bound/实际模型与主动等待均未验；不切I-4/B2/B5。默认派发结束，用户通知#206完成再Codex独立复核。
+
 ## 2026-10-10 14:33 #205设计最终通过，收取设计链；中断后恢复正式合同发布
 
 - 用户205好了；msg2707合法自身205/partial，稳定SHA cc0dad302b5fc4b5d782d057bfbd9cd23070445a0ed7f24351ae927afca3f181三页9237字符与本地JSON一致，C1–C4/真实来源/模型/凭据漂移/宿主预算后置如实保持。

@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-10 14:33 (Asia/Shanghai)：#205设计独立通过，205→204→203已收取；中断后恢复正式合同/Git收尾，C1离线事实模块待派，真实绑定仍后置。
+Updated: 2026-10-10 14:39 (Asia/Shanghai)：#205设计通过收取，正式合同445b33f已推送；已派DeepSeek #206 C1离线事实模块，Codex复核，默认用户通知取件。
 
 ## 当前角色与协作
 
@@ -8,7 +8,7 @@ Updated: 2026-10-10 14:33 (Asia/Shanghai)：#205设计独立通过，205→204�
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；Codex只改正式文档、未改业务源码。
 
-## 当前切片：适配收尾设计已通过，准备C1离线事实模块
+## 当前切片：C1 #206离线事实模块已派
 
 - 用户通知205完成。msg2707合法自身号partial，完整三页9237字符SHA cc0dad302b5fc4b5d782d057bfbd9cd23070445a0ed7f24351ae927afca3f181与本地JSON一致；后置C1–C4与真实来源/能力不改称实现完成。
 - Codex读实际合同与参考实现，独立重跑真实router+内存SQLite探针六组原问题/四组定向补正通过：20harness、140请求、47内存写；另独立四反例与正例通过。203 TypeError负对照保持，原203/204失败/自报不追改。
@@ -17,7 +17,10 @@ Updated: 2026-10-10 14:33 (Asia/Shanghai)：#205设计独立通过，205→204�
 - 上次发布命令被自动审批因workspace credits不足拒绝，未执行写入；本次用户要求继续后exec恢复。TALK API一度WinError10061，用户亲自启动服务后恢复；Codex未启停服务/Agent。
 - 正式docs/spec/ADAPTER_BINDING_CLOSEOUT_DESIGN.md与IMPLEMENTATION_PLAN发布：scope摘要、固定alias/default来源确认、白名单、写后完整重判、现API无CAS窗口、共享helper+显式closeout。发布澄清仅公开投影导出指纹、provenance不自动confirmed、C1内存配置对象不读真实文件。
 - 当前MCP本人agent:codex/kind=agent，4角色binding_state=unconfigured；不写生产登记/绑定/Key/profile/名册，不调用模型/长wait。真实default/凭据/漂移与bound页面联调待C3/C4。
-- 已读本次最新development_requirements，按用户DeepSeek开发/Codex独立复核。usage-gate 2026-10-10T06:28:18 UTC session2%/weekly62%、continue（阈值85/80），只代表该次采样。准备C1仅两个新文件，尚未派发。
+- 已读本次最新development_requirements，按用户DeepSeek开发/Codex独立复核。usage-gate 2026-10-10T06:36:34 UTC session6%/weekly62%、continue（阈值85/80），只代表该次采样。C1仅两个新文件，已派发。
+- #206 target=agent:deepseek、created_by=agent:codex、Hall=group:task-29ee4896634241d9a649397f5657ca0f，创建2026-10-10T06:36:50.203280 UTC为queued/assigned；不从实例idle推定已领取。
+- C1基线445b33f4dee92decffe4c1d5735a62871482f6d3、804tracked SHA/大小冻结.tmp/adapter-binding-facts-c1/；仅新增scripts/adapter_binding_facts.py和tests/test_adapter_binding_facts.py，源码/测试不依赖.tmp，按正式合同离线提取/优先级/scope/白名单/公开投影/profiles与真实模块测试。
+- 已在本Task Hall补充workflow_action=none：协调方将仅更新两进度，作为基线已知例外，其余802旧tracked不变；开发者仍不得改正式进度或其它旧文件。不实现C2–C4、不写生产绑定、Key/profile/名册、不调用模型/长wait/启停；完成后提交实际号JSON并暂停。
 - C1–C4一次一片，默认派发后结束，用户通知完成后取件；当前功能完成前不切I-4/B2/B5。真实apply待具体dry-run审阅。
 
 ## 已完成与当前状态
@@ -58,6 +61,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于2026-10-10T06:28:18 UTC读得session2%/weekly62%、decision=continue；只代表该次采样，不外推实时用量。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于2026-10-10T06:36:34 UTC读得session6%/weekly62%、decision=continue；只代表该次采样，不外推实时用量。
 
-恢复指令：继续项目。#203–#205最终设计已收取，正式合同/计划发布；C1离线事实模块下一片，仅scripts/adapter_binding_facts.py与tests/test_adapter_binding_facts.py。按当前分工和用户通知取件，真实登记后置，不切其它功能。
+恢复指令：继续项目。#206已派DeepSeek开发C1，默认用户通知完成后Codex独立取件复核；包/基线在.tmp/adapter-binding-facts-c1/，仅两新文件及本片证据，协调方两进度为已知基线例外。设计/收取/Git已收尾，真实绑定后置，先完成同一功能。
