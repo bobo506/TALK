@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-10 20:12 (Asia/Shanghai)：C3 #210独立复核有四组问题，已派#211定向返修；210未收取，生产登记未执行。
+Updated: 2026-10-10 20:40 (Asia/Shanghai)：C3 #211独立复核通过，211→210已收取；代码/只读申请包收尾，生产两项登记待人类确认。
 
 ## 当前角色与协作
 
@@ -8,17 +8,16 @@ Updated: 2026-10-10 20:12 (Asia/Shanghai)：C3 #210独立复核有四组问题�
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前切片：C3 #210需返修，#211已派
+## 当前切片：C3代码及只读申请已通过，生产apply待确认
 
-- 用户“好了”后只读核210/msg2714合法210/complete、5600字符/SHA cccba8a9…与本地JSON一致；执行者已暂停，Codex独立读实际四文件/差异，未从自报推断验收，210未收取。
-- Codex独立74 C3＋64 K28＋98 C1＋153 C2共389项全通过、0失败/错误/跳过；新增12真实router/TestClient/内存SQLite探针2正例通过、10反例失败，0fixture异常。当前needs_changes四组，原报告/失败/冻结源保持。
-- F1：任意未被原生选择的--native-config仍confirmed；argv只核alias，受控command或execution分级不匹配仍ready。F2：apply显式另一项目仍向原plan项目写2次且产物报另一项目，缺scope静默补齐亦写2次。
-- F3：申请包target/scope未知嵌套canary回流，改summary/proposed后包报0写、apply实际2写。F4：agent门禁拒绝且来源未核仍confirmed，apply成功产物仍称本次只读。
-- DeepSeek #211“211-C3来源与应用门禁定向返修”，2026-10-10T12:11:36.248589 UTC创建queued/assigned、created_by=agent:codex；Hall=group:task-39f710ac006c49aaabc0591580b7d525。仍四C3文件、保持C1/C2与原K28行为，临时DeepSeek开发/Codex复核，Kimi暂不派。
-- 审查HEAD5ae9051，仅较原9a4多两进度；804旧保护源未变。210完整报告、四源冻结、389日志、12探针/review在.tmp/adapter-closeout-c3-review/；211包/最新要求/scope/dispatch在.tmp/adapter-closeout-c3-rework/。
-- 211要求冻结210负向命中、修后同批闭合、C3/K28完整回归与真实只读计划/申请包重生成；未变更C1/C2可沿用本次251项独立证据，不称新增测试。原native/profile/Key保持，四文件源/测试不依赖.tmp。
-- 本机显式scope仍host_scope=talk-local-01/workspace_scope=talk-project，CLI缺失必须blocked、非隐式默认。本次仅kimi --help只读查入口，无模型/bridge启动；生产登记、真实bound、宿主T/W/取消/排队仍未验，无CAS窗口保留。
-- 默认派发后结束，用户通知“好了”或“211 ok”再核交付；只提交两进度，C3业务源待通过再发布。具体包独立通过后再交人类确认生产apply，不重复派210/211、不开展C4/I-4/B2/B5。
+- 用户“211完成”通知后核211/msg2715合法211/complete、6499字符/SHA2cd7a52e…与本地JSON一致；DeepSeek完成暂停，Codex独立读实际修复及必要C2调用边界，未仅采信自报。
+- 本轮103 C3＋64 K28独立167项零失败/错误/跳过；原12探针全部闭合。原missing-scope探针仅适配新夹具默认，显式传None仍零写blocked；原210的10失败/2正例、389项日志与冻结源不覆盖。
+- F1实际选中配置＋完整alias/command/execution核验，F2显式逐项目标＋scope门禁，F3完整白名单申请包＋条目动作重算，F4未核来源not_run＋按实际动作描述均通过。804旧保护逐SHA未变，K28两文件与210相同；C1/C2沿用前轮独立251项，不计本轮新跑。
+- 收取前再核稳定引用，211于12:39:43.151337 UTC、210于12:40:03.155648 UTC收取，两项succeeded/completed；原报告字节保持。211源SHA161338b8…/测试23e5f092…；本机review/scope.json含完整SHA。
+- 真实只读计划ready/confirmed，申请包独立重建与开发产物相同，目标/条目/scope一致、展示元数据对照通过。目标仅agent:kimi-code-k28-preview，项目prj_e8fe7066bbec，显式host_scope=talk-local-01/workspace_scope=talk-project，不设host-shared。
+- 拟POST runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33（kimi-code、unverified）一次，PUT K28角色绑定一次，共2写；alias=kimi-code/kimi-for-coding、builtin/managed:kimi-code/native-kimi-code-managed-login。具体参数、命令、读回/恢复与凭据方式见docs/guides/KIMI_K28_EXECUTOR.md§11和本机application.json。
+- 生产apply仍未授权/执行，不查找human Key；按正式收尾合同§7将具体两写包交人类确认，再由human凭据受权入口执行并verify。真实bound、实际模型版本/开发能力、宿主T/W/取消/排队未验；无CAS窗口保持。
+- 正式源码/测试不依赖.tmp；当前同步合同/实施计划/桥接模块/简报/指南/两进度并统一提交推送。未开始C4/I-4/B2/B5。下一步仅处理本C3生产申请确认，不重复派211/210。
 
 ## C2已完成，保持的恢复依据
 
@@ -72,6 +71,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3独立复核.tmp/adapter-closeout-c3-review/与211返修包.tmp/adapter-closeout-c3-rework/；210原包及C2所有证据保持。最新usage-gate于2026-10-10T11:26:59.107325 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3最终复核.tmp/adapter-closeout-c3-rework-review/（review/167项日志/12探针/申请包独立核验/收取回执/Git回执），211返修包.tmp/adapter-closeout-c3-rework/；210原失败与C2所有证据保持。最新usage-gate于2026-10-10T11:26:59.107325 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。当前C3 #211返修已派，210尚未收取；用户通知完成后先核211交付与原12反例闭合，再独立复核收尾。不得重复派发或提前生产apply；C2已收取，不切其它功能。
+恢复指令：继续项目。C3 #211→#210已独立通过收取，具体K28两项生产登记待人类确认；先核确认与受信human凭据来源，再执行既有显式入口/读回/verify。未获确认不得生产apply，不重复派任务、不提前开始C4或切其它功能。

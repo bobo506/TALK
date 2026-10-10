@@ -1287,6 +1287,17 @@ def build_parser() -> argparse.ArgumentParser:
     launch_parser.add_argument("--key-file", type=Path, default=None)
     launch_parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     launch_parser.add_argument("--dry-run", action="store_true", help="只做离线检查并打印脱敏 argv，不启动")
+
+    # C3 显式收尾入口：只做参数转发，不在本入口内实现登记逻辑，也不挂在 launch/心跳/claim 上。
+    closeout_parser = sub.add_parser(
+        "closeout",
+        help="适配收尾（C3）：转交 scripts/adapter_closeout.py 的 plan/dry-run/apply/verify/package",
+    )
+    closeout_parser.add_argument(
+        "closeout_argv",
+        nargs=argparse.REMAINDER,
+        help="closeout 参数（例如 plan --project-id ... --host-scope ... --workspace-scope ...）",
+    )
     return parser
 
 
@@ -1324,6 +1335,11 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=args.dry_run,
                 base_url=args.base_url,
             )
+        if args.mode == "closeout":
+            # 显式子命令才进入收尾入口；launch/check/render/contract 不触发任何 closeout。
+            import adapter_closeout  # noqa: PLC0415 - 延迟导入保持其它子命令的旧行为与开销
+
+            return int(adapter_closeout.main(list(args.closeout_argv)))
         identity_report = None
         if args.identity_report is not None:
             try:

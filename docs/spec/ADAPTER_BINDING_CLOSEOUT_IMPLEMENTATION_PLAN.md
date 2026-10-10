@@ -1,6 +1,6 @@
 # 适配收尾登记实施计划（C1–C4）
 
-2026-10-10：依据 ADAPTER_BINDING_CLOSEOUT_DESIGN.md。#203–#205最终设计已复核收取；#206 C1离线实现、#207→#208→#209 C2受信应用工具已独立复核收取。C3真实来源接线/受权登记与C4页面验收待后续，真实登记尚未实施。B1a/B1b/B3/B4现有代码和权限保持；当前先完成角色绑定收尾，不切其它功能。
+2026-10-10：依据 ADAPTER_BINDING_CLOSEOUT_DESIGN.md。#203–#205最终设计已复核收取；#206 C1离线实现、#207→#208→#209 C2受信应用工具已独立复核收取。C3 #210/#211共享入口与真实只读申请包已独立通过收取，生产登记待人类确认；C4页面验收待后续，真实登记尚未实施。B1a/B1b/B3/B4现有代码和权限保持；当前先完成角色绑定收尾，不切其它功能。
 
 ## 1. C1：离线事实模块
 
@@ -51,7 +51,15 @@ Codex本轮独立运行C2完整153项，0失败/错误/跳过；原22边界与3�
 
 ## 3. C3：明确收尾接线与真实验收
 
-共享 adapter_closeout.py::run_closeout 加K28显式closeout子命令，届时任务明确文件范围。显式加载native有效来源，核选择/覆盖层/scope，先输出可审阅补登记dry-run与离线接线证据；真实应用再交人类确认，由human凭据受权进程执行。
+已实现 `scripts/adapter_closeout.py::run_closeout` 与 K28 显式 `closeout` 子命令；仅四个授权源码/测试文件。#210 初稿四组问题经 #211 修正，Codex 独立读实际代码、运行103项C3＋64项K28（167项零失败/错误/跳过）并闭合原12探针；未变更C1/C2沿用前轮独立251项，不计本轮新跑。211→210已收取，原初稿自报与失败证据保持。
+
+- `plan` / `dry-run` / `verify` 只读；`apply` 复用C2 human身份、来源重读/漂移、写后核验与零盲写重试。未核来源返回 `not_run`，受权写与只读动作结论分开。
+- native 文件必须与当前入口实际选择路径一致（`KIMI_CODE_HOME` 或默认home）；自定义路径未生效即blocked。最终argv必须同时匹配固定alias、受控command与execution分级，未知覆盖层不确认。
+- apply逐项核显式目标与计划一致；host必显式，workspace除显式host-shared外必显式且与已审scope一致，不静默补。申请包对白名单输入重算计划条目/动作与写计数，summary/proposed仅为展示对照。
+- 本机只读计划目标 `agent:kimi-code-k28-preview`，显式 `host_scope=talk-local-01` / `workspace_scope=talk-project`；runner ID为 `runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33`，runtime=`kimi-code`、model alias=`kimi-code/kimi-for-coding`。当前ready/confirmed，拟新增runner一次与绑定PUT一次，共2写；runner初始 `adapter_status=unverified`。
+- 实际申请包已独立重建并核目标/条目/scope一致；本轮生产apply未执行、不查找human Key。按合同§7交人类确认后再由human凭据受权入口执行；发生来源/状态漂移重新plan，不扩大为接受差异。
+
+本机证据 `.tmp/adapter-closeout-c3-rework-review/`、原失败 `.tmp/adapter-closeout-c3-review/`；正式运行与测试不依赖这些忽略文件。使用入口与本次申请见 [K28指南§11](../guides/KIMI_K28_EXECUTOR.md)。
 
 读回、恢复、原profile/Key/名册/旧快照保护留证。至少一条真实链路bound后才能说绑定完成；其它来源不足blocked。不得挂launch/心跳/claim或首次自动注册。
 

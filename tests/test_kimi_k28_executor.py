@@ -1281,5 +1281,86 @@ class LoopbackIdentityTests(K28ExecutorTestCase):
         self.assertNotIn("loop-key", json.dumps(report, ensure_ascii=False))
 
 
+class CloseoutSubcommandTests(K28ExecutorTestCase):
+    """C3 显式收尾子命令：只做参数转发；旧子命令不触发收尾入口。"""
+
+    def test_closeout_subcommand_is_registered_and_forwarded(self):
+        seen: dict = {}
+
+        def fake_main(argv=None):
+            seen["argv"] = list(argv or [])
+            return 7
+
+        import adapter_closeout  # noqa: PLC0415 - 只在用例内导入，避免影响其它子命令用例
+
+        with patch.object(adapter_closeout, "main", fake_main):
+            code = k28.main(
+                ["closeout", "plan", "--project-id", "prj_x", "--host-scope", "h"]
+            )
+        self.assertEqual(code, 7)
+        self.assertEqual(
+            seen["argv"], ["plan", "--project-id", "prj_x", "--host-scope", "h"]
+        )
+
+    def test_top_level_help_lists_closeout(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr), self.assertRaises(
+            SystemExit
+        ) as ctx:
+            k28.main(["--help"])
+        self.assertEqual(ctx.exception.code, 0)
+        self.assertIn("closeout", stdout.getvalue())
+
+    def test_old_subcommands_never_call_the_closeout_entry(self):
+        import adapter_closeout  # noqa: PLC0415
+
+        invocations = [
+            ["contract", "--kimi-config", str(self.config_path)],
+            ["render"],
+            [
+                "check",
+                "--project-root", str(PROJECT_ROOT),
+                "--kimi-config", str(self.config_path),
+                "--key-file", str(self.key_file),
+            ],
+            # 缺省密钥文件：launch 在配置/身份门禁前就失败，仍然不得触碰收尾入口。
+            ["launch", "--key-file", str(self.key_file), "--dry-run"],
+        ]
+        with patch.object(
+            adapter_closeout, "main", side_effect=AssertionError("closeout must not run")
+        ) as mocked:
+            for argv in invocations:
+                with self.subTest(argv=argv):
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with redirect_stdout(stdout), redirect_stderr(stderr):
+                        code = k28.main(argv)
+                    self.assertIsInstance(code, int)
+        self.assertFalse(mocked.called)
+
+    def test_closeout_without_action_is_a_usage_error(self):
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), self.assertRaises(SystemExit) as ctx:
+            k28.main(["closeout"])
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_closeout_plan_requires_an_explicit_credential_source(self):
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            code = k28.main(
+                [
+                    "closeout",
+                    "plan",
+                    "--project-id",
+                    "prj_x",
+                    "--host-scope",
+                    "h",
+                    "--workspace-scope",
+                    "w",
+                ]
+            )
+        self.assertEqual(code, 2)
+        self.assertIn("E_CREDENTIAL_SOURCE_MISSING", stderr.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

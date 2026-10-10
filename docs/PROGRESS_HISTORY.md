@@ -1,5 +1,22 @@
 # 开发历史 · TALK
 
+## 2026-10-10 20:40 C3 #211闭合四组问题，211→210收取，生产两写申请待确认
+
+- 用户“211完成”通知后，Codex按临时DeepSeek开发/Codex独立复核分工处理同一C3；执行者已暂停，无共享目录并行改码、无C4或其它功能新任务。
+- #211/msg2715合法自身211/complete、6499字符，SHA `2cd7a52e81670fa82b3438cf2a65711bac0ab29c6668aafad21054d947b64fd2` 与本地development.json一致。自报103 C3、64 K28（原一skip）、251 C1/C2；自报保持，最终验收依据为独立实际代码/测试/探针。
+- 审查HEAD `fe67fbc4c3f384a557ffb0907a5f6984e86fcb97`；804旧保护逐SHA保持，原210四源冻结/报告/失败仍原样。211仅改新增C3源码/测试；K28两文件与210一致。最终源码SHA `161338b8b497e54c2e0a2836a07abd96d1e319f8979647f03d3427b4c5f31ce4`、测试 `23e5f092fda3dcb63c7e094837972e1ae63c90d181ccb760004d129cbf4084dc`；K28源/测试SHA见最终scope.json。
+- 独立阅读来源选择与覆盖层、完整argv、apply显式目标/scope、native未执行状态、申请包白名单/条目动作重算和相关C2边界。F1–F4均闭合，未改C1/C2或API/权限/模型/native默认/Key/名册/旧快照，原launch行为保持。
+- 独立 `python .tmp/adapter-closeout-c3-rework-review/run_tests.py` 调用 `tests.test_adapter_closeout` 103项与 `tests.test_kimi_k28_executor` 64项，退出0，167项零失败/错误/跳过。C1/C2源未变，沿用210阶段独立98＋153=251项，不声称本轮新跑418项。
+- 复制原12探针到新review目录并独立复验12/12；新共享test apply夹具默认补显式scope，missing-scope探针仅改为显式传host_scope=None/workspace_scope=None，保证仍测真实缺参、零写blocked；其余逻辑保持。原210只有2正例/10真实失败的证据不覆盖，开发者冻结负向测试另保留。
+- 开发者新真实只读plan ready/confirmed、原Key/native/profile保护布尔均保持；Codex独立重建application与保存产物逐对象相同，核目标/条目/scope/runner关联、summary/projection一致，预期runner_create1/binding_create1共2写。plan SHA `e354ebf78247a39df91b09aa245e2900a4b2530ef0ddb1157833a605ae826b3c`，application SHA `e83dce35068d5a5b831517dc9dc0aa100d2d73ce5b300564ba5f601954308cab`；不把执行者只读调用称本轮主控重新执行真实GET。
+- 独立申请检查脚本两次fixture修正：argv公开状态实际为ok而非confirmed；runner使用adapter_status而非status。只修review脚本并保留原日志，不修改业务代码、不把检查脚本异常计为产品失败。UTF-8输出显式设置，产物文字已核正确。
+- 收取前用msg2715/2714与各自expect_sha256核引用；211于12:39:43.151337 UTC、210于12:40:03.155648 UTC依次收取，两项succeeded/completed。收取正文与冻结原报告完全相同，原210初稿自报/失败保持；仅当前最终C3代码与只读申请结论approved。
+- 正式变更四C3源码/测试：新增adapter_closeout.py/test_adapter_closeout.py，既有kimi_k28_executor.py/test_kimi_k28_executor.py显式接线与回归；同步合同/实施计划/MODULE_bridges/PROJECT_BRIEF/K28指南与两进度，共11文件。指南§11提供当前两写具体参数、显式作用域、凭据方式、命令、读回/verify/恢复，不扩写其它模块。
+- 本机当前目标为项目prj_e8fe7066bbec的agent:kimi-code-k28-preview；scope talk-local-01/talk-project，runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33、runtime kimi-code、初始unverified。绑定builtin、managed:kimi-code、native-kimi-code-managed-login、backend kimi-for-coding、alias kimi-code/kimi-for-coding、展示K2.8 Preview，拟POST runner一次＋PUT绑定一次，无更新/接受差异。
+- 尚未获本次生产apply批准、不查找human Key，当前所有生产登记写为0；正式合同§7要求具体包经人类确认后human凭据受权应用，下一步仅交付这两写申请。真实bound、C4页面指引/人工验收、实际模型版本/开发能力、宿主主动等待T/W/取消/排队均待后续；最新读→PUT无CAS窗口保持。
+- 本机.tmp/adapter-closeout-c3-rework-review/保存最终冻结源、独立167项日志/12探针、申请包检查、review、211/210收取回执和publication；.tmp/adapter-closeout-c3-review/保存原失败。正式源码/测试不依赖忽略目录。精确用量仍不可读，不外推旧百分比。
+- 完成UTF-8/语法/暂存差异/范围核验后统一中文提交并常规推送，具体commit/remote_equal写本机publication并告知用户。发布后暂停于人类确认门禁，不启动模型/服务/Agent，不提前开展C4/I-4/B2/B5。
+
 ## 2026-10-10 20:12 C3 #210独立复核四组问题，派#211定向返修
 
 - 用户“好了”通知210完成；当前DeepSeek开发/Codex独立复核分工，执行者已暂停。只处理同一C3，不开启C4/I-4/B2/B5、不浏览器验证或生产apply。
