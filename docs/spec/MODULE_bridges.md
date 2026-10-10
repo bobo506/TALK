@@ -19,21 +19,21 @@
 
 - `scripts/adapter_binding_facts.py` 接受内存配置与显式 scope，提取来源、稳定运行器 ID、公开投影和指纹；复用既有模型解析与 schema，不读取真实配置/Key，不访问服务或数据库，也不启动模型。
 - #206 经 Codex 审查、用户授权修复三组问题并定向复验，212 项测试零失败/跳过：K3 按自身选择核验；条目必须闭合完整 ready 选择结果与绑定/投影；native/runner 能力拒绝疑似凭据。原交付和失败证据保留。
-- 该模块的 ready 仅表示离线事实自洽。C2 受信应用与C3显式收尾入口已实现；C3生产受权登记、真实 bound 验收及C4页面指引待后续；正式依据为 [收尾合同](ADAPTER_BINDING_CLOSEOUT_DESIGN.md) 和 [实施计划](ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)。
+- 该模块的 ready 仅表示离线事实自洽。C2 受信应用与C3显式收尾入口已实现；C3 K28生产受权登记与真实bound/只读verify已通过，C4页面指引/人工验收待后续；正式依据为 [收尾合同](ADAPTER_BINDING_CLOSEOUT_DESIGN.md) 和 [实施计划](ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)。
 
 ### 适配收尾登记：C2 受信应用
 
 - `scripts/talk_adapter_registry.py` 提供 plan/apply/verify CLI 与 helper。plan/verify 只读；apply 核 human 身份、显式外置凭据、目标资格与当前来源指纹，按最新完整读回判断新增/no_op/冲突/明确接受差异。
 - 登记读回复用完整 `RunnerOut`，绑定核七字段与 bound；只有POST409允许同事实重分类，PATCH/PUT明确失败不能被一致读回升级为本次写成功。失败止本条后续写，超时先只读确认，不盲重试。
 - #207经#208/#209定向返修后由Codex独立复核、209→208→207收取；本轮153项模块测试零失败/跳过，原22＋方法409三组共25探针通过；前轮212项未变更回归保持，未重跑冒充新增证据。
-- 未新增服务API/权限，未接自动启动/心跳/claim；C3真实来源加载已接线，人类受权应用待确认。C2隔离测试不证明生产角色已bound、实际模型或宿主主动等待，最新读→PUT无CAS窗口保留。
+- 未新增服务API/权限，未接自动启动/心跳/claim；C3真实来源加载与K28人类受权应用已完成。C2隔离测试不证明生产角色已bound、实际模型或宿主主动等待，最新读→PUT无CAS窗口保留。
 
 ### 适配收尾登记：C3 显式入口
 
 - `scripts/adapter_closeout.py::run_closeout` 与 `kimi_k28_executor.py closeout` 提供plan/dry-run/apply/verify/package；仅显式子命令触发，launch/心跳/claim保持原行为。plan/verify只读，apply复用C2 human门禁、来源重核、写后读回与恢复索引。
 - 真实有效配置按当前入口选择解析，未被选中的自定义路径blocked；完整argv核alias/受控command/execution，未知覆盖层不确认。apply目标逐项匹配，scope必显式且与计划一致；申请包白名单投影并从计划条目重算动作，不用展示元数据授权。
 - #210经#211闭合四组问题后独立167项模块测试与原12探针全通过、0skip，211→210收取；C1/C2未变更，沿用前轮251项独立证据。804旧保护文件逐SHA保持，原初稿/失败不追改。
-- 本机K28只读申请ready/confirmed，scope=`talk-local-01` / `talk-project`，拟runner POST一次、绑定PUT一次，初始unverified；生产apply待人类确认，真实bound/C4/页面人工验收未完成。未验后端模型版本、开发能力或宿主主动等待，最新读→PUT无CAS窗口保持。使用见 [K28指南](../guides/KIMI_K28_EXECUTOR.md)。
+- 本机K28只读申请ready/confirmed，scope=`talk-local-01` / `talk-project`，拟runner POST一次、绑定PUT一次，初始unverified；用户同意后已由human:bobo受权POST201/PUT200，角色读回bound、只读verify=verified，当前MCP读回同事实；C4/页面人工验收待后续。未验后端模型版本、开发能力或宿主主动等待，最新读→PUT无CAS窗口保持。使用见 [K28指南](../guides/KIMI_K28_EXECUTOR.md)。
 
 ### 通用 CLI bridge
 

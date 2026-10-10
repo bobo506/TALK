@@ -1,6 +1,6 @@
 # 适配收尾登记实施计划（C1–C4）
 
-2026-10-10：依据 ADAPTER_BINDING_CLOSEOUT_DESIGN.md。#203–#205最终设计已复核收取；#206 C1离线实现、#207→#208→#209 C2受信应用工具已独立复核收取。C3 #210/#211共享入口与真实只读申请包已独立通过收取，生产登记待人类确认；C4页面验收待后续，真实登记尚未实施。B1a/B1b/B3/B4现有代码和权限保持；当前先完成角色绑定收尾，不切其它功能。
+2026-10-10：依据 ADAPTER_BINDING_CLOSEOUT_DESIGN.md。#203–#205最终设计已复核收取；#206 C1离线实现、#207→#208→#209 C2受信应用工具已独立复核收取。C3 #210/#211共享入口与真实只读申请包已独立通过收取，用户同意后K28受权生产登记/只读verify已通过、角色bound；C4页面验收待后续。B1a/B1b/B3/B4现有代码和权限保持；当前先完成角色绑定收尾，不切其它功能。
 
 ## 1. C1：离线事实模块
 
@@ -57,7 +57,9 @@ Codex本轮独立运行C2完整153项，0失败/错误/跳过；原22边界与3�
 - native 文件必须与当前入口实际选择路径一致（`KIMI_CODE_HOME` 或默认home）；自定义路径未生效即blocked。最终argv必须同时匹配固定alias、受控command与execution分级，未知覆盖层不确认。
 - apply逐项核显式目标与计划一致；host必显式，workspace除显式host-shared外必显式且与已审scope一致，不静默补。申请包对白名单输入重算计划条目/动作与写计数，summary/proposed仅为展示对照。
 - 本机只读计划目标 `agent:kimi-code-k28-preview`，显式 `host_scope=talk-local-01` / `workspace_scope=talk-project`；runner ID为 `runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33`，runtime=`kimi-code`、model alias=`kimi-code/kimi-for-coding`。当前ready/confirmed，拟新增runner一次与绑定PUT一次，共2写；runner初始 `adapter_status=unverified`。
-- 实际申请包已独立重建并核目标/条目/scope一致；本轮生产apply未执行、不查找human Key。按合同§7交人类确认后再由human凭据受权入口执行；发生来源/状态漂移重新plan，不扩大为接受差异。
+- 实际申请包经独立重建/核目标、条目、scope一致后，用户于2026-10-10明确同意两写。既有外置身份备份只读取凭据，服务/me核human:bobo；使用已复核C3/C2 helper，真实POST runner=201、PUT K28绑定=200，累计2次网络写。运行器仍unverified，绑定由human:bobo更新。
+- 临时请求校验器首次遗漏PUT的binding外层而在联网前拦截，原failed/unverified与请求证据保持；修正临时校验后先GET/重新plan，runner=no_op、绑定=create，仅恢复剩余PUT一次。未改生产源码/重做POST/盲重试未知结果。
+- apply最终complete，使用既有K28 agent Key只读verify=verified；当前Codex MCP再读bound与固定alias/运行器，caller仍agent:codex。Key/native/profile、其它角色/绑定/运行器及原申请包比较未变，未发项目设置/名册写；最新GET→PUT无CAS窗口保持。具体回执在本机.tmp/adapter-closeout-c3-live-application/。
 
 本机证据 `.tmp/adapter-closeout-c3-rework-review/`、原失败 `.tmp/adapter-closeout-c3-review/`；正式运行与测试不依赖这些忽略文件。使用入口与本次申请见 [K28指南§11](../guides/KIMI_K28_EXECUTOR.md)。
 

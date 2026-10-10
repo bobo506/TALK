@@ -1,5 +1,24 @@
 # 开发历史 · TALK
 
+## 2026-10-10 21:00 用户同意C3两写，K28实服bound/verify通过，保留首次部分结果与定向恢复
+
+- 用户在已审两写具体包/合同§7确认问题后明确“同意”，授权范围仅项目prj_e8fe7066bbec的agent:kimi-code-k28-preview：POST既定runner一次、PUT既定七字段绑定一次及读回/verify。不扩为其它成员、接受差异、名册/Key/native默认修改或模型启动。
+- 实施基线为已推送c45d6bf88ad52fba3b0da0536206b6dbf55f9a75，11文件C3代码/文档与工作区保持；四业务源与独立review完整SHA逐项一致，原plan/application SHA e354ebf7…/e83dce35…未变。实际使用已复核run_closeout→C2受信helper，无生产业务代码改动。
+- 本机TALK_HUMAN_KEY环境变量未提供；按已有正式身份切换清单中明确的仓库外备份，仅只读解析talk凭据至受信进程内存，服务/me核human:bobo/kind=human，K28仓库外本人Key核agent:kimi-code-k28-preview/kind=agent。未复制/创建/改Key、ACL或Codex MCP身份；当前MCP再核仍agent:codex。备份和真实Key全文/哈希均不输出。
+- 默认沙箱读取K28 Key为E_KEY_FILE_UNREADABLE，宿主审批通道随后允许只读使用；无自动审核拒绝。临时请求包装器最初漏base_url而被E_CLIENT_SERVER_UNKNOWN零写阻断，修正包装器接口后只读预检通过，源/目标/scope/指纹和两create动作与已审包相同。
+- 首次实际apply于12:57:01 UTC只发POST /api/runners，HTTP201且完整runner读回一致；第二项PUT被临时包装器的body校验在联网前拦截（遗漏binding外层），C2依其收到的transport_error保留unknown、result_status=failed，verify=unverified，绑定仍unconfigured。原application-started/apply-result/verify-result/application-receipt/requests文件保留，不追改为首次成功；helper尝试PUT1与实际网络PUT0分别记录。
+- Codex明确修正自己的临时校验为实际RoleBindingUpdate envelope，仅改.tmp实施脚本，生产四源不变。按恢复索引及显式resume-binding入口先GET/重新plan，核runner no_op/绑定create、来源与七字段/scope未变，只允许剩余PUT一次，禁止再次POST；不是盲重试未知网络请求，也不扩大为全批重写。
+- 恢复于12:59:12 UTC PUT /api/projects/prj_e8fe7066bbec/agents/agent:kimi-code-k28-preview/binding返回200；apply=complete，使用K28 agent Key只读verify=verified。累计网络写恰为POST1＋PUT1，共2次；无PATCH、无名册或任务写。
+- runner为runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33，runtime kimi-code、adapter_status unverified、非retired。绑定builtin、managed:kimi-code、native-kimi-code-managed-login、backend kimi-for-coding、alias kimi-code/kimi-for-coding、展示K2.8 Preview；project/member/七字段一致，binding_state=bound、updated_by=human:bobo。项目角色列表同为bound。
+- 当前聊天talk_list_agents只取目标/必要身份，确认K28 dev/execution、binding_state=bound、同runner/alias/连接，updated_at=2026-10-10T12:59:12.173883，六维公开指纹c9edb392…；caller_identity=agent:codex/kind=agent/note=null。不读旧Hall或重复交付正文，不改变其它MCP/主控模式。
+- 四项实际保护比较均true：tracked业务源/Key/native/profile保持，其它角色与绑定、其它runners、原已审plan/application保持；初稿回执project_metadata_unchanged比较的是ProjectOut未提供的metadata键，此bool不作为metadata逐字段证明。最终acceptance.json排除该标签；实际请求记录只有已审两个网络写，不调用任务/名册/项目设置API写，接口边界仅写两表。未声明完整DB/所有历史任务快照重扫描，旧快照由既有API只写绑定表合同保持。
+- 临时首次回执曾从绑定响应外层取模型字段、retired缺键为null，原记录保留；最终回执改按实际binding内层七字段/runtime/updated_by投影，retired由adapter_status判读，并核七字段与原expected一致。这是实施记录脚本修正，不是生产API/schema变更。
+- 本机.tmp/adapter-closeout-c3-live-application/保存只读preflight、原失败/请求、resume-preflight/marker/apply/verify/实际PUT、保护回执、当前MCP读回、最终acceptance与publication。所有写文件显式UTF-8；凭据仅进程内存，产物递归检查无凭据值。代码独立167项/12探针与未变更C1/C2前轮251项沿用，本轮不机械重跑或称新增测试；本轮新证据为实服API/helper/MCP路径。
+- 正式同步八文档：合同、C1–C4实施计划、MODULE_bridges、PROJECT_BRIEF、K28指南、B4页面验收指南与两进度；B4指南顶部只补当前实服已绑定入口，原2026-10-09全部未配置阶段记录保留。未改前端或其它模块文档，C4产品指引切片未开始。
+- 人工验收入口为现有http://127.0.0.1:8000/，既有human账号登录，刷新→TALK项目→角色→K2.8执行角色，应“已绑定”、kimi-code/固定alias/展示K2.8 Preview，runner仍unverified。无需服务/MCP重启或重做登记；Codex未操作浏览器，页面视觉/窄屏/真实bound态人工核对仍待用户。
+- 当前C3真实配置登记/关联/只读verify已完成；bound不证明实际模型后端版本、开发能力或宿主主动等待，T/W/返回余量/取消排队未新增验收，最新GET→PUT无CAS窗口保持。下一步先收角色页人工核对，再明确同功能C4必要指引/收尾，不切I-4/B2/B5。精确用量仍不可读。
+- 完成仅八授权文档的UTF-8/差异/空白/范围检查后中文提交并常规推送；具体commit/remote_equal写本机publication并告知用户，原代码发布回执不追改。
+
 ## 2026-10-10 20:40 C3 #211闭合四组问题，211→210收取，生产两写申请待确认
 
 - 用户“211完成”通知后，Codex按临时DeepSeek开发/Codex独立复核分工处理同一C3；执行者已暂停，无共享目录并行改码、无C4或其它功能新任务。

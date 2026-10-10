@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-10 20:40 (Asia/Shanghai)：C3 #211独立复核通过，211→210已收取；代码/只读申请包收尾，生产两项登记待人类确认。
+Updated: 2026-10-10 21:00 (Asia/Shanghai)：用户同意C3具体两写，实服K28登记/绑定与只读verify已通过、API/MCP均bound；C4页面指引/人工验收待后续。
 
 ## 当前角色与协作
 
@@ -8,16 +8,18 @@ Updated: 2026-10-10 20:40 (Asia/Shanghai)：C3 #211独立复核通过，211→21
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前切片：C3代码及只读申请已通过，生产apply待确认
+## 当前切片：C3代码与实服绑定已通过，C4/页面人工验收待后续
 
 - 用户“211完成”通知后核211/msg2715合法211/complete、6499字符/SHA2cd7a52e…与本地JSON一致；DeepSeek完成暂停，Codex独立读实际修复及必要C2调用边界，未仅采信自报。
 - 本轮103 C3＋64 K28独立167项零失败/错误/跳过；原12探针全部闭合。原missing-scope探针仅适配新夹具默认，显式传None仍零写blocked；原210的10失败/2正例、389项日志与冻结源不覆盖。
 - F1实际选中配置＋完整alias/command/execution核验，F2显式逐项目标＋scope门禁，F3完整白名单申请包＋条目动作重算，F4未核来源not_run＋按实际动作描述均通过。804旧保护逐SHA未变，K28两文件与210相同；C1/C2沿用前轮独立251项，不计本轮新跑。
 - 收取前再核稳定引用，211于12:39:43.151337 UTC、210于12:40:03.155648 UTC收取，两项succeeded/completed；原报告字节保持。211源SHA161338b8…/测试23e5f092…；本机review/scope.json含完整SHA。
 - 真实只读计划ready/confirmed，申请包独立重建与开发产物相同，目标/条目/scope一致、展示元数据对照通过。目标仅agent:kimi-code-k28-preview，项目prj_e8fe7066bbec，显式host_scope=talk-local-01/workspace_scope=talk-project，不设host-shared。
-- 拟POST runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33（kimi-code、unverified）一次，PUT K28角色绑定一次，共2写；alias=kimi-code/kimi-for-coding、builtin/managed:kimi-code/native-kimi-code-managed-login。具体参数、命令、读回/恢复与凭据方式见docs/guides/KIMI_K28_EXECUTOR.md§11和本机application.json。
-- 生产apply仍未授权/执行，不查找human Key；按正式收尾合同§7将具体两写包交人类确认，再由human凭据受权入口执行并verify。真实bound、实际模型版本/开发能力、宿主T/W/取消/排队未验；无CAS窗口保持。
-- 正式源码/测试不依赖.tmp；当前同步合同/实施计划/桥接模块/简报/指南/两进度并统一提交推送。未开始C4/I-4/B2/B5。下一步仅处理本C3生产申请确认，不重复派211/210。
+- 已POST runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33（kimi-code、unverified）一次，PUT K28角色绑定一次，共2写；alias=kimi-code/kimi-for-coding、builtin/managed:kimi-code/native-kimi-code-managed-login。具体参数、命令、读回/恢复与凭据方式见docs/guides/KIMI_K28_EXECUTOR.md§11和本机application.json。
+- 用户于2026-10-10明确“同意”两写申请。既有外置身份备份只读取凭据，服务核human:bobo；原Key/native/profile/MCP配置保持。当前调用既有helper实际POST201＋PUT200累计2次网络写，apply最终complete、K28 agent Key只读verify=verified。
+- 临时包装器先补base_url完成预检；首次apply的PUT因包装器漏binding外层在联网前被拦，原failed/unverified与实际POST1/PUT0证据保持。修正临时校验后重新GET/plan确认runner no_op、绑定create，仅恢复剩余PUT一次；生产四源SHA不变，无重复POST/盲重试。
+- API绑定/角色列表及当前Codex MCP均读回bound、updated_by=human:bobo，alias和runner与已审包一致；caller仍agent:codex。其它角色/绑定/运行器和原申请包比较未变；请求边界仅写runner/绑定表，未发名册/项目设置写。运行器仍unverified，实际模型版本/开发能力、宿主T/W/取消/排队未验，无CAS窗口保持。
+- C3代码/七文档已提交c45d6bf并推送；本轮仅同步八份相关正式文档与实服记录后提交推送，业务源码/测试未改，不机械重跑167项。人工页面入口为http://127.0.0.1:8000/→TALK项目→角色→K2.8执行角色（应已绑定）。未开始C4/I-4/B2/B5，不重复派211/210或重做登记。
 
 ## C2已完成，保持的恢复依据
 
@@ -71,6 +73,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3最终复核.tmp/adapter-closeout-c3-rework-review/（review/167项日志/12探针/申请包独立核验/收取回执/Git回执），211返修包.tmp/adapter-closeout-c3-rework/；210原失败与C2所有证据保持。最新usage-gate于2026-10-10T11:26:59.107325 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-10T11:26:59.107325 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。C3 #211→#210已独立通过收取，具体K28两项生产登记待人类确认；先核确认与受信human凭据来源，再执行既有显式入口/读回/verify。未获确认不得生产apply，不重复派任务、不提前开始C4或切其它功能。
+恢复指令：继续项目。C3 #211→#210已收取发布，用户同意后真实K28两写/读回/verify与当前MCP bound已通过；无需重做登记或切换身份。先收用户角色页核对结果，再明确同功能C4必要页面指引/人工收尾，不重复派旧任务、不切I-4/B2/B5。

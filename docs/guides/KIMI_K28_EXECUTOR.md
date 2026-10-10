@@ -277,9 +277,9 @@ python scripts/kimi_k28_executor.py launch --dry-run --key-file "<KEY_FILE>"
   不触碰冻结中的 185/186 对象与草稿。
 - 本入口不做首次注册写入；启动前的身份核验全部是只读 GET。
 
-## 11. 显式适配收尾与当前生产申请（2026-10-10）
+## 11. 显式适配收尾与生产执行记录（2026-10-10）
 
-本节记录C3当前实现，前面第9–10节仍为原入口切片的历史边界。#210经#211返修后代码及只读申请包已独立通过并收取；成员与名册已有登记，无需重复首次注册或sync。生产运行器/角色绑定尚未写入，C4页面指引和人工验收待后续。
+本节记录C3当前实现，前面第9–10节仍为原入口切片的历史边界。#210经#211返修后代码及只读申请包已独立通过并收取；成员与名册已有登记，无需重复首次注册或sync。用户同意具体两写包后，生产运行器/角色绑定已写入并通过只读verify；C4页面指引和人工验收待后续。
 
 共享入口 `scripts/adapter_closeout.py::run_closeout` 接受 `plan` / `dry-run` / `apply` / `verify`；CLI另有离线 `package`。K28入口通过显式 `closeout` 转发这些动作。原launch/check/render/contract不会触发登记。
 
@@ -292,16 +292,16 @@ python -X utf8 scripts/kimi_k28_executor.py closeout plan --server http://127.0.
 python -X utf8 scripts/adapter_closeout.py package --plan .tmp/adapter-closeout-c3-rework/real-k28-plan.json --out .tmp/adapter-closeout-c3-rework/application.json
 ```
 
-当前申请包已独立重建核对，目标项目 `prj_e8fe7066bbec`、成员 `agent:kimi-code-k28-preview`，原生来源confirmed、计划ready：
+本次已审申请目标为项目 `prj_e8fe7066bbec`、成员 `agent:kimi-code-k28-preview`；写前重新只读核原生来源confirmed、scope/指纹/两项动作不变，实际已完成：
 
-| 拟写入 | 具体内容 |
+| 已写入（本轮累计2次网络写） | 具体内容 |
 | --- | --- |
 | `POST /api/runners` 一次 | ID=`runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33`，runtime=`kimi-code`，display_name=`Kimi Code · K2.8 Preview 执行`，初始 `adapter_status=unverified`；能力为当前native公开声明，未升级为已验适配 |
 | `PUT /api/projects/prj_e8fe7066bbec/agents/agent:kimi-code-k28-preview/binding` 一次 | 同runner；model_source=`builtin`，provider_id=`managed:kimi-code`，connection_ref=`native-kimi-code-managed-login`，model_id=`kimi-for-coding`，model_alias=`kimi-code/kimi-for-coding`，model_display_name=`K2.8 Preview` |
 
 这两写只登记当前事实和关联角色；不会创建Key、替换名册、修改native默认、启动模型或启用主动等待。申请总计2写、无runner/绑定更新；本次申请不包含 `--accept-change`。来源或服务状态变化时重新plan并审阅，不沿用旧ready或自动接受差异。
 
-**尚未批准生产apply。** [收尾合同§7](../spec/ADAPTER_BINDING_CLOSEOUT_DESIGN.md)要求具体可审阅包经人类确认，再由human凭据受权入口执行。批准后用既有human Key的显式环境变量 `TALK_HUMAN_KEY` 或仓库外文件；Agent Key不可代替。下列命令是待批准步骤，凭据值不在产物中，也不需要创建或复制Key：
+用户于2026-10-10在本对话明确同意后，按[收尾合同§7](../spec/ADAPTER_BINDING_CLOSEOUT_DESIGN.md)用既有外置身份备份只读解析的凭据在受信进程中执行，服务 `/api/members/me` 核为 `human:bobo`。原备份/Key/当前MCP配置均保持，凭据仅内存使用；当前MCP仍为 `agent:codex`。CLI也支持既有human Key的显式环境变量 `TALK_HUMAN_KEY` 或仓库外文件，Agent Key不可代替。以下是相同参数的入口参考，当前登记已完成：
 
 ```powershell
 python -X utf8 scripts/adapter_closeout.py apply --plan .tmp/adapter-closeout-c3-rework/real-k28-plan.json --server http://127.0.0.1:8000 --project-id prj_e8fe7066bbec --member-id agent:kimi-code-k28-preview --adapter agent:kimi-code-k28-preview --host-scope talk-local-01 --workspace-scope talk-project --key-env TALK_HUMAN_KEY
@@ -309,3 +309,9 @@ python -X utf8 scripts/adapter_closeout.py verify --plan .tmp/adapter-closeout-c
 ```
 
 验收要求apply逐条写后读回，最终verify=`verified`，角色读回 `binding_state=bound`；完整runner核runtime/retired/四可变字段，绑定核七字段/project/member。超时或未知结果先只读确认，不盲重试写；失败保留恢复索引，仅恢复失败条目。首次runner仍unverified，bound仅表示配置关联有效。最新GET→PUT无CAS窗口，模型版本/开发能力、宿主T/W/取消/排队、C4页面人工验收均未新增通过结论。
+
+本轮实际通过已复核helper执行：runner POST返回201。协调方临时请求校验遗漏PUT的外层 `binding` 键，导致第一次PUT在联网前被拦；原partial/failed与unverified记录保持。修正临时校验后重新GET/plan确认runner完全一致为no_op、绑定仍未配置，仅恢复绑定PUT一次（200）。没有重复POST或盲重试未知网络请求，未改生产源码。
+
+最终apply=complete，既有K28 agent Key只读verify=verified，绑定与角色列表均为bound、updated_by=human:bobo；当前Codex MCP读回同runner/固定alias。其它角色/绑定/运行器、旧native默认、profile、Key和原申请包比较均通过；请求边界仅写runner/绑定表，未发名册或项目设置写。原计划/申请包未覆盖，证据在本机 `.tmp/adapter-closeout-c3-live-application/`。
+
+人工核对：沿用已运行TALK，浏览器打开 `http://127.0.0.1:8000/`，用已有human账号登录，刷新→TALK项目→角色→K2.8执行角色。绑定状态应显示“已绑定”，运行器类型kimi-code、模型别名kimi-code/kimi-for-coding、展示K2.8 Preview；运行器状态仍unverified。无需重启服务/MCP或重做登记。页面视觉与C4必要指引尚待验收；API/MCP通过不替代页面人工检查。
