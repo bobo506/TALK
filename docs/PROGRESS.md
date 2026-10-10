@@ -1,21 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-10 22:19 (Asia/Shanghai)：用户确认C4页面可用，当前C1–C4角色绑定功能验收收尾闭合；下一步建议I-4主被动真实链路，尚未派发。
+Updated: 2026-10-11 00:00 (Asia/Shanghai)：用户确认角色新增/配置/删除与服务启停方向；取消决策/执行固定分级，保留发起者主动/被动；本轮仅文档，下一步先补实施合同，尚未派发。
 
 ## 当前角色与协作
 
-- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex为决策Agent，MCP实测agent:codex/kind=agent。
+- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex承担本次协调、独立复核与收尾职责，MCP实测agent:codex/kind=agent；固定分级方向已取消，代码/身份档兼容字段尚未迁移。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：角色绑定C1–C4已完成，准备下一功能
+## 当前状态：绑定基础已完成，角色创建/接入与生命周期待设计
+
+- 用户更正“不需要主被动”为“不需要决策和执行”：取消角色固定分级，保留发起者主动/被动。项目按运行器/模型创建多份独立角色，保存并配置TALK身份，支持删除、全部启动、单独启动/关闭服务；主要显示名称、运行器、模型、介绍及启动成功/失败，任务状态在任务列表。
+- 原生运行器安装/账号授权与项目角色配置分开。登录建议走原生客户端/官方授权，WorkBuddy实际可控启动、多角色会话隔离、共享账号/宿主归属及退出清理仍待验证；未启动/人工关闭不记作失败。详见DEVELOPMENT_ROADMAP最新节。
+- 本轮仅修改AGENTS、PROJECT_BRIEF、路线和两进度共5文档，记录需求/建议/现状边界；不修改业务源码、测试、生产配置或旧任务/回执，不创建角色/派任务/登录或启停服务。原生订阅密码不进入角色配置。
 
 - 用户在#212代码发布与新指引验收说明后回复“可以了”，记录C4页面整体人工验收通过、本功能页面门禁释放。不凭短确认补写逐项截图/操作日志，生产失效态联调、实际模型后端版本/开发能力、宿主主动等待仍未验。
 - #212/msg2716合法212/complete、4896字符/SHA b6f7a488…与本地JSON一致，独立复核后已收取succeeded/completed。代码/测试/七正式文档提交096f4f9114bb5efbafaf4589a65102f3b4ac0711已推送，发布当次remote_equal/工作区干净通过，原交付与失败不追改。
 - C4独立默认隔离Node171项、四Python契约12项零失败/跳过；新6项用例对原码预期失败、原16项通过，修后通过；独立22边界场景（1测试）、语法/UTF-8/差异/保护及三静态GET通过。这些是上轮已有证据，本次文档收尾不重跑/不计新增测试，Codex未操作浏览器。
 - 只读字段/状态化指引/安全文本保留，无新每角色/写请求或控件、模型调用。额外Node版本契约只同步唯一字面量，经Codex准予必要配套；源/测试不依赖.tmp。K28 C3受权两写与verify/API/MCP bound、已绑定/alias人工核对及C4页面确认闭合，runner仍unverified。
-- 本次同步七份正式文档的当前验收状态与下一步，业务源码/测试、C3原申请/实施产物、C4原交付/审查/收取/发布回执保持；新人工确认与发布回执保存在.tmp/adapter-closeout-c4-human-acceptance/。
-- 下一步建议I-4主被动真实链路验收：先明确本次终端/身份及实际客户端T/W/返回余量与取消/排队边界，按最新开发要求派一个可审阅切片。当前未读取其它模块/未派任务/未启动主动等待，模式意向仍不等于会话生效。B2实际模型证据、B5生命周期各自后置。
+- 上轮同步七份正式文档的C4验收状态与当时下一步，业务源码/测试、C3原申请/实施产物、C4原交付/审查/收取/发布回执保持；新人工确认与发布回执保存在.tmp/adapter-closeout-c4-human-acceptance/。
+- 下一步先形成角色创建、原生接入与服务生命周期实施合同，明确固定分级兼容迁移和各运行器启动/登录/隔离能力，再按最新开发要求派单片。I-4主动真实链路与B2实际模型证据保留，当前不交叉推进；模式意向仍不等于会话生效，终端T/W/返回余量/取消排队继续独立验收。
 
 ## C3已完成，保持的恢复依据
 
@@ -70,7 +74,7 @@ cd D:\claude-test\TALK
 ## 后续计划与边界
 
 - 共5组合8方向：Codex仅分配；WorkBuddy＋K3、DSH＋DeepSeek Flash、Kimi Code＋K3各分配/执行；Kimi Code＋K2.8仅执行。WorkBuddy90/91仅历史分配侧，未证明其执行能力或当前可派成员。
-- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照设计已由#190–#192复核发布，B1a数据库/API代码已独立验收并收取，实服表/字段已加载，C3 K28 human登记/绑定两写与只读verify通过；B1b任务快照已发布并通过实服核心代验收，MCP角色消费B3已验收，页面B4代码通过收取，K28已绑定/固定alias人工核对通过，C4指引#212独立通过收取，用户页面整体验收通过，本功能门禁释放；身份、职责、决策分级独立。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
+- 通用角色绑定runtime/model_source(builtin/custom_api)/provider_id/connection_ref/model_id/展示名和新任务快照设计已由#190–#192复核发布，B1a数据库/API代码已独立验收并收取，实服表/字段已加载，C3 K28 human登记/绑定两写与只读verify通过；B1b任务快照已发布并通过实服核心代验收，MCP角色消费B3已验收，页面B4代码通过收取，K28已绑定/固定alias人工核对通过，C4指引#212独立通过收取，用户页面整体验收通过，本功能门禁释放；身份、任务职责与模型绑定独立，固定决策分级已确认取消方向、代码待迁移。相同运行器复用适配，模型与连接分别核验；用户API凭据不进入角色名或任务快照。
 - Codex被动I-0 #178/#179已验，I-1/I-2用户页面验收通过；I-3A #180/#181、I-3B #182/#183/#184、I-3C #185/#186已通过收取发布，I-3文档同步闭合（规格提交d474321）。I-3B最新MCP说明运行进程重载未核，真实主动I-4/G8/正常到期/取消/同连接排队未验。
 - 项目passive/version6、effective=null/not_bound；controller_assignment=agent:codex/version13仅历史兼容，不赋权或自动唤回会话。175-O1测试维护、Schema maximum=600/clamp评估另片。
 - 超时分别核验：CodexW300用户现用；DeepSeek桌面T65/W50/余量15；Kimi660000ms仅模板，实际T未知，不启用主动长等待。bridge执行预算3600秒、身份GET单次15秒，独立于宿主工具/发起者等待预算。真实质量、速度与成本优势未测。
@@ -80,4 +84,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-10T13:35:46.598733 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。当前C1–C4角色绑定批准功能已完成：C3 #211→#210与C4 #212独立通过收取，K28两写/读回/verify及C3/C4页面人工确认闭合。下一步建议I-4真实主动链路，先明确终端预算/范围再派单片；不重复派旧任务、重做登记或将bound扩大为实际模型/主动等待通过。最新收尾见.tmp/adapter-closeout-c4-human-acceptance/，详细代码证据.tmp/adapter-closeout-c4-review/。
+恢复指令：继续项目。当前C1–C4绑定基础已验收完成；最新确认角色新增/配置/删除、原生接入与服务生命周期方向已落盘，代码尚未实施。下一步先补实施合同与运行器能力验证，保留发起者主动/被动，不恢复固定决策/执行分级；不重复旧任务/登记或把bound扩大为模型/主动等待通过。新方向回执.tmp/project-role-lifecycle-direction/，C4证据仍见.tmp/adapter-closeout-c4-review/与人工验收目录。
