@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-10 15:49 恢复项目并派DeepSeek #207 C2受信应用工具
+
+- 使用project-framework恢复，确认AGENTS当前Codex为决策Agent；读取PROJECT_BRIEF、当前进度及唯一负责模块MODULE_bridges，按正式BA-1合同/C1–C4计划准备C2任务包，不读其它模块文档，不改业务代码或启动服务。
+- 当前TALK身份agent:codex/kind=agent，项目prj_e8fe7066bbec；最新development_requirements已读取并保存原快照，仍按当前会话DeepSeek开发、Codex独立复核；不因旧Kimi实例上报idle宣称额度恢复或改临时分工。四角色binding=null/unconfigured，模式passive/version6/effective null/not_bound。
+- 基线HEAD7f1706e85557099797e1b14919f9c400bd352031、分支codex/terminal-return-codex；派前工作区干净，806 tracked逐SHA保存scope.json，允许两新增文件及两协调方进度例外。queued/running查询均为空，C2两个文件不存在；不重复开发C1或派发既有任务。
+- usage-gate于2026-10-10T07:44:12.209588 UTC返回ok/continue，但session与weekly百分比均null、reset也空。精确用量不可用，不能宣称实时低于阈值，按无法获取有效用量规则仅推进一个明确切片；旧16%/64%保持历史。
+- 独立顶层最小四字段派#207，创建于2026-10-10T07:47:09.766632 UTC，target=agent:deepseek、created_by=agent:codex、Hall=group:task-a41dd0dff13147e1a162af9ce3fd5573，创建状态queued/assigned；只记录创建响应，不推断领取/完成。派发工具自动保存项目要求快照，本次会话临时分工写入正文。
+- 文件范围只新增scripts/talk_adapter_registry.py、tests/test_talk_adapter_registry.py；实现plan/apply/verify、human凭据/目标资格、当前来源重核与漂移、schema/公开白名单、登记四字段/绑定七字段差异与完整读回、冲突/no_op/部分恢复，禁止盲写重试。真实native加载和C3入口/生产应用/页面C4仍后置。
+- 必要测试使用真实runners/projects router＋TestClient＋内存SQLite；覆盖POST201/409/未知或超时、PATCH200/未知或超时的最新GET完整重判和失败PUT=0，目标四阶梯、七字段/bound/no_op、PUT超时读回、部分恢复、隐私合成canary及必要回归。无生产HTTP/DB写、真实Key/native读取、模型调用、服务/Agent启停、长wait或浏览器验证；本轮只准备任务包，不运行C2业务验证，不外推通过。
+- .tmp/adapter-registry-c2/保存task-package、scope、requirements及dispatch回执；要求本次实际任务号207的合法完整JSON作为结果消息、development.json副本，交付后停止改码。正式两进度/Git由Codex处理，开发与复核不并行；不自动继续C3/C4。
+- 当前按默认被动协作结束派发，不调用等待或读取Hall历史。用户通知“207 ok”后先talk_get_delivery，独立核实际代码/证据再决定收取。两进度以UTF-8/范围/diff检查后单独中文提交、常规推送，回执留本片目录；本次没有功能验收或真实bound新增结论。
+
 ## 2026-10-10 15:40 用户要求先汇总进度，确认C1发布并保存C2恢复入口
 
 - 用户先说“继续”，随后中断并改为“先汇总进度”；本轮按最新指示只汇总，不派C2或新任务、不开发业务代码。Codex继续作为决策Agent，使用project-framework维护交接记录。
