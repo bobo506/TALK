@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-10 17:20 (Asia/Shanghai)：C2 #207→#208→#209全部复核通过并收取，正式文档与Git收尾；C3真实登记尚未实施。
+Updated: 2026-10-10 19:30 (Asia/Shanghai)：用户授权继续，C3 #210已派DeepSeek；先显式接线与真实只读dry-run，生产登记待具体包复核和人类确认。
 
 ## 当前角色与协作
 
@@ -8,14 +8,20 @@ Updated: 2026-10-10 17:20 (Asia/Shanghai)：C2 #207→#208→#209全部复核通
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前切片：C2受信应用已闭合
+## 当前切片：C3 #210已派，待交付
 
-- 用户“好了”后核#209/msg2713合法自身号complete与本地JSON一致；独立读取最终差异，只有POST登记409允许同事实重分类，PATCH/PUT明确失败不升级成功。原207五组问题及208两方法反例全部闭合，原失败/报告不追改。
-- Codex本轮C2完整153项测试零失败/错误/跳过，原22＋方法409三组独立探针共25/25通过。前轮212项C1/runner/项目绑定/K28回归全通过且804旧保护文件逐SHA保持，本轮未重复运行，不称365项新跑。
-- 209→208→207已顺序收取，均succeeded/completed；三份结果消息SHA与收取前完全一致。原任务号与基线记录保留，收取依据是最终修复链，不能将初稿曾失败改写为初次通过。
-- 两个C2文件为 `scripts/talk_adapter_registry.py` 与 `tests/test_talk_adapter_registry.py`；正式合同/计划/MODULE_bridges/PROJECT_BRIEF及两进度同步。独立审查基线caffb10，发布源码SHA0698dd79…（EOF纯格式清理、AST不变）、测试5e2f6a0d…；完整日志、scope、源码冻结、review及收取回执见 `.tmp/adapter-registry-c2-method-fix-review/`。
-- 未做生产登记/绑定、真实Key/native读取、模型调用、服务/Agent启停、浏览器或宿主长等待；无CAS窗口保持。C1/C2只证明离线事实和受信工具，真实bound仍待C3；C4页面与人工验收尚待实施。
-- 本片完成收尾后暂停；下一片C3需按实施计划明确真实native有效来源、覆盖层与scope，先可审阅dry-run，生产应用仍须人类对具体包确认。未自动派发C3，不切主被动I-4/B2/B5。
+- 用户“那就继续吧”授权继续同一角色/模型绑定功能；当前MCP身份agent:codex/kind=agent与项目development_requirements已重新读取。按会话临时分工，DeepSeek开发、Codex独立复核，Kimi暂不派。
+- #210“210-C3显式适配收尾接线与可审阅登记计划”，2026-10-10T11:29:54.852838 UTC创建queued/assigned，target=agent:deepseek、created_by=agent:codex、Hall=group:task-09c373a99bb34e50b66384fbf4567178。原执行实例上报可能滞后，不从available推断当前在线。
+- 基线9a421c8c1f16dc4dde6965165ec45f5df41d0b74；限新增scripts/adapter_closeout.py、tests/test_adapter_closeout.py，定向改kimi_k28_executor.py及其测试，复用C1/C2。真实目标仅agent:kimi-code-k28-preview；不改其它业务/API/权限或正式文档，完成暂停。
+- 共享run_closeout＋K28显式closeout入口，核真实native有效来源/选择/覆盖层；plan/dry-run只读，apply仅隔离测试。本机此项目显式安装host_scope=talk-local-01、workspace_scope=talk-project由协调方分配并在此保存，非hostname/路径推断或CLI隐式默认，不设host-shared。
+- 交真实公开只读计划及具体application包/恢复/verify说明；来源不足诚实blocked/partial，不自动找human Key。生产apply需具体包独立通过后交人类确认；未挂launch/心跳/claim，不声称真实bound、实际模型版本或宿主主动等待已验。
+- 包/最新开发要求/808旧tracked范围manifest/派发回执见.tmp/adapter-closeout-c3/。默认派发后结束，由用户通知“好了”或“210 ok”再取交付与复核，不重复派发或主动等待，不开启C4/I-4/B2/B5。
+
+## C2已完成，保持的恢复依据
+
+- #209→#208→#207独立通过并收取，原初稿失败和报告保持；源码/测试＋六正式文档提交9a421c8已推送、当次remote_equal/工作区干净已核，完整记录见历史。
+- C2模块153项零失败/错误/跳过，原22＋三方法409探针25/25；前轮212项旧回归已独立通过且源未变，本轮未重跑。只有POST409同事实重分类可继续，PATCH/PUT明确失败不升级成功、不盲重试。
+- 发布源SHA0698dd79…（仅EOF空行清理，AST不变）、测试5e2f6a0d…；完整证据.tmp/adapter-registry-c2-method-fix-review/。未生产登记，C3/C4及无CAS窗口限制保持。
 
 ## C1已完成，保持的恢复依据
 
@@ -63,6 +69,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C2最终证据.tmp/adapter-registry-c2-method-fix-review/；209开发包、208复验与207原审查均保持。最新usage-gate于2026-10-10T07:44:12.209588 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3派发包.tmp/adapter-closeout-c3/；C2最终证据与209/208/207原审查保持。最新usage-gate于2026-10-10T11:26:59.107325 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。C2已复核收取并完成本片收尾；先核Git状态与当前计划，再明确C3真实来源接线任务。不要重复派207/208/209，不自动做生产apply或切换其它功能。
+恢复指令：继续项目。当前C3 #210已派；用户通知完成后先读talk_get_delivery并独立复核实际代码，处理本片收尾，不重复派210或提前生产apply。C2已收取无需重新验收，不切其它功能。

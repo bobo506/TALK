@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-10 19:30 用户授权继续C3，派#210显式接线与可审阅只读计划
+
+- 用户“那就继续吧”接续C2收尾，明确继续同一角色/模型绑定功能；本轮仅开启C3一片，不启动C4或I-4/B2/B5。Codex为决策Agent，DeepSeek开发/Codex独立复核临时分工继续，未按模型名更改其它成员decision_tier。
+- 先读当前简报/进度、唯一MODULE_bridges、正式收尾合同/计划、终端预算与最小派发要求；读取最新development_requirements保存快照与caller_identity=agent:codex/kind=agent。页面默认Kimi/DeepSeek交叉复核要求保留，任务包明确本会话临时分工，不修改项目设置。
+- 使用usage-gate guard --provider codex --json；2026-10-10T11:26:59.107325 UTC工具返回ok/continue，但session/weekly百分比均null，精确用量不可读，不据reason文字声称低于阈值；按一片批次控制。
+- 派前HEAD9a421c8c1f16dc4dde6965165ec45f5df41d0b74、分支codex/terminal-return-codex、工作区干净，808tracked逐SHA保存。C2原153＋25独立通过、三任务已收取和当次远程等值保持，本轮无理由重复测试C2。
+- C3只新增scripts/adapter_closeout.py/tests/test_adapter_closeout.py、定向改scripts/kimi_k28_executor.py/tests/test_kimi_k28_executor.py；复用C1/C2，不改其它API/数据库/权限/配置/Key/profile/名册/旧快照/原launch行为。其它问题先报告，正式文档由Codex后续收尾；源/测试不得依赖.tmp。
+- 范围包括共享run_closeout、K28显式closeout入口、实际native来源/选择/覆盖层核验、plan→apply来源重读与漂移检查、只读真实K28计划与可审阅application/verify/恢复包。缺来源/未知覆盖层blocked，读取文件或fixture不自动confirmed；不外推K3/DSH/Codex来源或实际模型版本。
+- 协调方为本机此项目明确分配稳定安装标签host_scope=talk-local-01、workspace_scope=talk-project，在当前进度保存；CLI仍显式传入，不从hostname/实例/绝对路径/模型猜，不设host-shared，不代表已证明跨工作区能力。真实计划目标仅agent:kimi-code-k28-preview。
+- 本任务只真实GET/只读native核验与隔离apply测试；不生产写、不查找/复制human Key、不改ACL。准备具体application包并由Codex独立审查后，再按正式合同交人类确认生产apply；未做真实bound、不接启动/心跳/claim，最新读→PUT无CAS窗口保持。
+- 顶层仅project_id/target_member_id/title/content四参数派#210“210-C3显式适配收尾接线与可审阅登记计划”，2026-10-10T11:29:54.852838 UTC，queued/assigned、target agent:deepseek、created_by agent:codex，Hall group:task-09c373a99bb34e50b66384fbf4567178。DeepSeek末次idle上报09:11:40可能滞后，不据availability可派宣称当前在线。
+- .tmp/adapter-closeout-c3/保存task-package、requirements、scope、dispatch；要求结果为本次实际号talk-delivery-1完整JSON、本地校验、真实计数/限制/进度草稿。未做宿主等待/取消/排队新验；历史T65/W50与CodexW300只是既有事实，Kimi模板不是运行验收。
+- 默认派发后结束，用户“好了”或“210 ok”再取件，执行者完成暂停、复核期间不并行改码。当前只提交两正式进度；待源独立通过再统一实现/文档/Git收尾，未提前收取210。
+
 ## 2026-10-10 17:20 C2最终409方法边界独立通过，209→208→207收取并同步正式文档
 
 - 用户“好了”通知#209完成；当前DeepSeek开发/Codex独立复核，执行者已暂停。仅收同一C2最终交付，无C3/C4或其它功能新派发、无浏览器操作。
