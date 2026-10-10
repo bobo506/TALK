@@ -1,5 +1,22 @@
 # 开发历史 · TALK
 
+## 2026-10-10 20:12 C3 #210独立复核四组问题，派#211定向返修
+
+- 用户“好了”通知210完成；当前DeepSeek开发/Codex独立复核分工，执行者已暂停。只处理同一C3，不开启C4/I-4/B2/B5、不浏览器验证或生产apply。
+- 210/msg2714合法210/complete、succeeded/submitted，完整两页5600字符、SHA `cccba8a9ef6f0c377a9539a2cb461fceb043d308abe69678d5379e39d203164e` 与本地development.json逐对象一致；自报仍为执行者结论，未验收收取210。原真实只读plan自报ready/default_home、runner_create=1/binding_create=1保留，未外推真实bound。
+- 审查HEAD5ae905106241d7a688696aea6b66e39e8ac30df1，只比派发9a421c8多两进度；808原tracked减授权既有两源和两进度，804保护逐SHA保持。四C3文件冻结original，新模块源SHAf083c1ec…、测试96773071…、K28源697bd396…、测试553815cd…；全部完整SHA见review/scope.json，不改原文件。
+- 独立阅读新增1590行模块及K28接线+16/测试+81实际差异，核plan/apply/verify、来源边界、申请包与CLI。独立run_tests.py调用74 C3＋64 K28＋98 C1＋153 C2，共389项全通过、0失败/错误/跳过；开发者K28原1skip报告保持，本轮不追改。
+- 额外probes.py使用真实members/runners/projects router、TestClient与内存SQLite，12项中正常显式plan/apply/verify与原生实际选定路径两个正例通过、10个验收断言失败，零fixture异常。脚本退出0只代表探针执行结束，按逐项pass判断，不能报全绿。
+- F1高：load_effective_native_source以explicit_argument优先读任意文件即confirmed，但build_bridge_argv未将其设置为原生生效路径；decoy与runtime resolver路径不同仍confirmed。argv_selection_evidence仅alias决定ok，受控command不匹配或decision-tier=decision仍ready，未闭合完整执行契约。
+- 本轮只读 `kimi --help` 退出0，不启动模型/bridge；实际help有-m模型选择，未列本入口--native-config。另核[官方配置位置](https://moonshotai.github.io/kimi-code/en/configuration/config-files.html)与[官方覆盖层说明](https://github.com/MoonshotAI/kimi-code/blob/main/docs/en/configuration/overrides.md)：原生根由KIMI_CODE_HOME/default home定位。自定义参数不会自行变成原生有效选择是依据本地argv与文档作的推断；修复仍须核本机实际入口，不用线上版本代替。
+- F2高：显式target.project_id=empty-project，apply仍向plan的talk项目POST+PUT两写且产物target报empty-project；target为空project时整包丢弃，存在忽略其它显式参数路径。apply缺host/workspace仍从plan补且写2次，违背显式scope缺失blocked合同。须目标逐项一致、缺失/错配零写。
+- F3高：build_application_package只核外壳schema，target/scope未知嵌套api_key合成canary原样回流；将summary写数归零并清proposed.items，包称0写而apply实际2写。须整包白名单/稳定拒绝、从有效C2条目重新计算事实/计数/命令，不采信可编辑展示元数据。
+- F4中：agent凭据apply门禁拒绝、parsed=false仍native_source.status=confirmed；隔离apply成功写2次，limits却称本次apply只读。未核状态须not_run/unknown，动作与来源结论按实际事实给出。
+- reviewed_sources与原消息/报告/失败证据保存在.tmp/adapter-closeout-c3-review/；未修改业务代码，未生产HTTP/SQLite登记绑定写、未读取真实Key/native正文或做模型/宿主长wait/服务启停。隔离探针写不算生产写；真实模型版本/主动等待/无CAS窗口限制保持。
+- 派前再读最新development_requirements及caller_identity=agent:codex/kind=agent，仍按会话临时分工；顶层四参数派211“211-C3来源与应用门禁定向返修”，2026-10-10T12:11:36.248589 UTC，queued/assigned、target agent:deepseek、created_by agent:codex、Hall group:task-39f710ac006c49aaabc0591580b7d525。
+- 返修限同四文件；要求冻结210真实负向命中、修后同批闭合/正例保持、完整C3/K28测试与真实只读计划/申请包重生成。C3新增测试的错误期望允许按正确合同调整并解释，不削弱旧K28 59/C1/C2断言。未变C1/C2可沿用本次251项独立回归，不机械重复计新跑。
+- .tmp/adapter-closeout-c3-rework/保存最新要求、task-package、scope、dispatch；210未collect、原自报/真实计划不覆盖。执行者完成暂停，默认发起者结束等待、用户“211 ok”再复核；本轮仅两正式进度中文提交常规推送，C3源码待闭合才发布，具体生产申请包仍须后续人类确认。
+
 ## 2026-10-10 19:30 用户授权继续C3，派#210显式接线与可审阅只读计划
 
 - 用户“那就继续吧”接续C2收尾，明确继续同一角色/模型绑定功能；本轮仅开启C3一片，不启动C4或I-4/B2/B5。Codex为决策Agent，DeepSeek开发/Codex独立复核临时分工继续，未按模型名更改其它成员decision_tier。
