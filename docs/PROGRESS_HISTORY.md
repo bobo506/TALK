@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-10 21:44 C3角色页人工核对通过，C4 #212派发
+
+- 用户“已核对，可以继续”响应上一轮K28角色页验收说明，确认“已绑定”及固定alias核对通过，授权继续角色/模型绑定同一功能。实际模型后端版本/开发能力/主动等待及其它B4状态、窄屏未由这句话完成验收。
+- 派发前读取最新development_requirements，沿用本次用户明确临时分工：DeepSeek开发，Codex独立复核，不派Kimi。先读当前webui模块及B4约束，未切其它模块或I-4/B2/B5。
+- talk_delegate_task仅用独立顶层四参数创建一次；实际任务212，标题212-C4角色绑定页面收尾指引与验收，created_by agent:codex、target agent:deepseek、Hall group:task-3b7aec1ec587482ea88a8c878b489d1e，创建2026-10-10T13:39:46.131213，初始queued/assigned，不把派发状态当开发完成。
+- 派发基线9ff3277f3f9df4fe57796c9ddd0fe178e9e62a07，派发前工作区干净/暂存为空。准许web/workspace.js、web/workspace.css、web/index.html、tests/workspace_role_binding.test.cjs、docs/guides/ROLE_BINDING_PAGE_ACCEPTANCE.md及四Python页面契约仅静态版本字面量修改，共9文件；协调者两PROGRESS为例外，799其它跟踪文件保护。C3原plan/application及首次、恢复、最终验收共5产物冻结保护。
+- 本机准备脚本首次把工作区CRLF文本读取规范化为LF后错误比较raw SHA而失败；未改业务源，未将这次失败当冻结成功。派发仍仅发生一次；随后用git show指定9ff HEAD的原始blob字节建立9份基线，补齐保护清单与真实scope.json，保持实际派发基线，未重派任务。
+- 产品范围为只读未配置/来源不足/失效状态收尾指引、已绑定仅代表保存事实的说明及验收指南；沿用角色GET，无新写控件/接口/数据库/身份/Key/native/profile/名册/模型调用，不宣称unverified运行器已适配。预计静态版本20261010-adapter-closeout-c4。长命令/本机临时路径/凭据路径留指南，不塞入页面。
+- 任务包包含原需求、范围/不变项、实际9ff基线/冻结差异、验收标准及上一阶段测试证据；要求有意义的渲染/安全文本/继承键/请求数与无写行为/草稿设置生命周期测试、全部workspace Node（前轮165）/四Python页面契约（前轮12）与语法/UTF-8/差异/保护检查，报告本轮实际数量及未验限制。Codex不浏览器验证，开发者尽可能给页面证据，人工验收在复核后暂停进行。
+- 执行者仅本片，完整结构化talk-delivery-1 JSON以实际212回传并暂停，本机副本.tmp/adapter-closeout-c4/development.json；正式进度由Codex维护。当前只派发，未收交付、未复核、未收取，不复用其它任务号或覆盖原失败。
+- .tmp/adapter-closeout-c4/保存task-package.txt、requirements.json、dispatch.json、scope.json及指定HEAD基线；默认派发后结束，由用户通知“212完成”再取件，不主动等待/轮询，不因外层续行重复派发。
+- 最新usage-gate采样2026-10-10T13:35:46.598733 UTC为continue、两窗口百分比null，精确用量不可读；本轮仅推进一个前端切片，C3实服记录与已推送9ff证据保持。本次只验证并提交/常规推送两进度文档，不暂存执行者正在开发的文件；具体发布回执见本机publication.json。
+
 ## 2026-10-10 21:00 用户同意C3两写，K28实服bound/verify通过，保留首次部分结果与定向恢复
 
 - 用户在已审两写具体包/合同§7确认问题后明确“同意”，授权范围仅项目prj_e8fe7066bbec的agent:kimi-code-k28-preview：POST既定runner一次、PUT既定七字段绑定一次及读回/verify。不扩为其它成员、接受差异、名册/Key/native默认修改或模型启动。
