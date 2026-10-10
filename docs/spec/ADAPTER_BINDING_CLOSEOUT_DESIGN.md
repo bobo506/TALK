@@ -1,6 +1,6 @@
 # 适配收尾登记与角色绑定合同（BA-1）
 
-2026-10-10：#203–#205 最终设计已由 Codex 独立复核通过；C1–C4 尚未实现。本合同和配套实施计划是正式依据，忽略目录中的草稿/探针仅作为本机审查证据。原角色绑定合同的表、API、权限、六维绑定指纹和历史任务快照保持。
+2026-10-10：#203–#205 最终设计已由 Codex 独立复核通过；#206 的 C1 离线事实模块经 Codex 审查、用户授权定向修复和复验通过，C2–C4 尚未实现。本合同和配套实施计划是正式依据，忽略目录中的草稿/探针仅作为本机审查证据。原角色绑定合同的表、API、权限、六维绑定指纹和历史任务快照保持。
 
 ## 1. 目标与边界
 
@@ -32,6 +32,8 @@
 GET binding 对 member_missing/member_disabled/not_in_roster/not_agent 仍可200，但这些状态阻止 apply。unconfigured 本身不表示目标无资格。GET 状态与 PUT 的404/422分开，不更改服务器语义。
 
 ready 前实例化 RunnerCreate/RoleBindingInput，且 binding.runner_id 必须等于 runner.runner_id。产物由验证后的 model_dump 白名单生成；错误仅回稳定原因码、已知字段名，不回候选原值、ValidationError/解析器异常正文、配置正文或 HTTP raw body。
+
+`build_entry` 还必须接收完整的 `resolve_model_selection` ready 结果，归一化后核对绑定六字段、选中 alias 与来源投影。缺失、blocked、不完整结果或任何冲突均阻断，不生成候选或指纹；schema 合法本身不代表来源已核。泛用 K3 不要求不存在的固定 provider/model 硬常量，仍须核选中条目及合法补充声明，不能借 K28 代填。
 
 ## 3. 稳定 scope 和标识
 
@@ -81,6 +83,8 @@ source_fingerprint 用于 plan→apply 来源漂移检查，与原 binding_finge
 发布澄清：config_identity.content_sha256 只对选中链路公开事实投影生成，不将整份 config/providers/凭据配置作为导出指纹输入。投影固定为：
 {"schema":"adapter-public-config-v1","selected_alias_sha256":...,"default_alias_sha256":...,"native":{provider_id,model_id,model_display_name,capabilities},"hard":{model_source,provider_id,connection_ref,model_id,model_alias_sha256},"declared":{model_source,connection_ref}}。
 上述 native/hard/declared 字段逐键固定，缺失为 null，存在值先经已有规则验证；capabilities 复用归一化。default_alias_sha256 仅默认来源已确认时有值，hard alias 仅放摘要；未知额外键、providers、api_key/token/密码、路径和环境变量不进入投影。
+
+能力列表另复用 `looks_like_credential` 拒绝疑似凭据：native 事实、ready 条目中的 native/runner 能力均阻断且不回显；单独构造公开投影时非法能力置 null。此收窄只在 C1 模块执行，不改变既有服务器 schema。
 
 相同公开事实指纹稳定；选中 alias、公开元组、hard/声明、scope 或来源变化改变指纹；仅凭据配置变化不作为本功能公开漂移结论。native provenance 匹配所需内部摘要仅在内存核验，与公开投影摘要分开，不写清单/日志。blocked 可以不生成指纹，不能为取得指纹而导出非法候选。
 

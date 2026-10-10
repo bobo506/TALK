@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### 适配收尾登记：C1 离线事实
+
+- `scripts/adapter_binding_facts.py` 接受内存配置与显式 scope，提取来源、稳定运行器 ID、公开投影和指纹；复用既有模型解析与 schema，不读取真实配置/Key，不访问服务或数据库，也不启动模型。
+- #206 经 Codex 审查、用户授权修复三组问题并定向复验，212 项测试零失败/跳过：K3 按自身选择核验；条目必须闭合完整 ready 选择结果与绑定/投影；native/runner 能力拒绝疑似凭据。原交付和失败证据保留。
+- 该模块的 ready 仅表示离线事实自洽。C2 受信应用、C3 显式收尾入口和真实 bound 验收、C4 页面指引尚未实现；正式依据为 [收尾合同](ADAPTER_BINDING_CLOSEOUT_DESIGN.md) 和 [实施计划](ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)。
+
 ### 通用 CLI bridge
 
 - `bridges/cli_bridge.py` 是通用 CLI bridge：负责 TALK 成员注册、实例状态上报、消息触发、任务队列轮询、任务认领、调用本地 CLI 命令、发送结果与完成任务状态。

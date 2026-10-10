@@ -1,5 +1,22 @@
 # 开发历史 · TALK
 
+## 2026-10-10 15:34 #206 C1独立审查发现三组缺陷，用户授权Codex修复后验收收取
+
+- 恢复用户“206 ok”，应用project-framework恢复要求，先读取当前进度、负责的MODULE_bridges与已批准收尾合同/计划，不读取其它模块文档。最新开发要求已读取，用户本轮DeepSeek开发/Codex复核仍优先；usage-gate于2026-10-10T07:15:00.403866 UTC采样session16%/weekly64%、continue（阈值85/80），不外推实时额度。
+- #206/msg2709：succeeded/submitted、合法自身号206/complete，完整两页4112字符SHA 1409f1e1ebf7d10d5784c5a40bbc14d7edff4925ac4dfd2e7868854e1ac8dcdf与development.json、talk-delivery-1.json逐对象一致。自报仅为索引，收取前核实际代码，不从runner完成推定验收。
+- 基线445b33f4dee92decffe4c1d5735a62871482f6d3、审查HEAD155ef936badc0ace9b8faf6365a161207e40270d，804 tracked逐SHA仅两协调方进度例外，其余802旧文件保持；只有两个新C1文件未跟踪。原源码/测试及22交付/日志文件冻结到review/original，原失败记录、自报和测试跳过说明保持。
+- 读实际源码/测试、既有native_model_binding与schema使用路径，Codex独立跑86项新模块+59项K28+15项runner+40项角色绑定共200项，零失败/错误/跳过。开发者原K28一项WinError5 Pipe跳过保持，本次审批环境成功不追改其旧报告。初始测试工具输出因已有日志handler过大，后续runner静默并保留完整日志，未为清理输出重复测试。
+- F1：真实K3 profile.hard为空却要求provider/model硬常量，confirmed native默认来源仍blocked；原正例手工代填hard绕过实际profile，同配置去掉硬要求则ready。F2：build_entry不检查selection.status/六字段/alias/投影与载荷一致性，blocked选择和不同model载荷仍ready，无选择时公开模型变化指纹不变。F3：能力schema只校格式，合成凭据进入native capabilities并导出到公开投影。原三缺陷与四控制项保存negative-probes.json、original-review.json。
+- 原计划准备返修范围后，用户明确“你先自己修吧”；Codex直接修复本片，未创建#207、未发送返修/主动等待任务。未扩大到C2–C4、页面、数据库/服务API或权限。
+- 修复scripts/adapter_binding_facts.py：泛用K3无固定provider/model硬常量，仍按自身选中条目、来源确认及合法补充声明校验；build_entry必须有完整ready选择结果，复用RoleBindingInput归一化核绑定六字段/alias/已知native-hard-declared投影，缺失、blocked、格式错误或冲突无候选/指纹；capabilities复用归一化及looks_like_credential，native/runner/选择能力阻断且无原值回流，单独公开投影非法能力置null。不修改服务器校验器。
+- tests/test_adapter_binding_facts.py新增12项有实际路径的回归，既有K3用例改用真实profile.hard，取消无来源即ready的旧断言并测试阻断；旧K3 profile必需常量断言同步。14项针对用例在冻结原源码上出现22处预期失败断言、零异常/跳过，确保不是仅新增通过用例。第一轮修后97项只剩旧K3断言失败，原日志保留，修正后最终98项通过。
+- 最终四套测试98+59+15+40=212项，零失败/错误/跳过；命令.venv/Scripts/python.exe -X utf8 .tmp/adapter-binding-facts-c1-review/run_final_tests.py，完整各套日志与计数repair-tests.json。语法/UTF-8/无BOM/空白通过；最终源SHA 7554939199c683587f94e7734519cf6861e271b4ae2d4701d6ef496217bd75be，测试SHA 17cc8c4ca27992f6a0a1785b69cf20408f4b25d3ccf6f0d5426642f39d491576。
+- 另用独立内存夹具同跑16组边界探针：冻结原码6正例通过/10缺陷检查失败，修后16组全部通过；涵盖实际K3默认/显式/未核来源、K28正例、六字段/投影闭合、blocked/缺选择、native/runner能力凭据、合法能力保留、仅凭据漂移、固定alias和scope。命令verify_repair.py original/repaired与两JSON保存；非真实凭据，不联网/写库/调用模型或模型进程。
+- review=approved_code_after_authorized_repair、F1/F2/F3全关闭，accepted-source冻结最终两文件，正式源码/测试没有.tmp依赖。最终修复由Codex自测/定向复验，不声称另一个Agent审查了Codex改动。收取前再次核msg2709引用/SHA；#206于2026-10-10T07:32:05.423453 UTC收取succeeded/completed，原内容SHA不变，collection-206.json只留本任务与结果、未回灌Hall历史。
+- 正式收尾更新收尾合同/实施计划、MODULE_bridges、PROJECT_BRIEF及两进度，记录ready前置、K3来源和能力隐私收窄，不追改203–205设计验收或206原报告。两个源码/测试及6正式文档统一中文提交常规推送，精确提交/远端/工作区回执在本片publication.json。
+- 当前只有C1离线事实自洽完成，没有读取真实native/Key、生产登记绑定/名册/profile变更、模型调用/真实宿主等待或启停服务/Agent。DSH/Codex真实模型与连接不足仍blocked，实际K2.8版本未知，未把C1 ready称为bound/主动适配成功。
+- 下一片仍在同一功能内：C2受信plan/apply/verify与human授权边界，真实router+内存SQLite及写后最新GET完整重判；C3明确入口和真实dry-run/至少一条bound、C4页面指引与人工验收尚未完成。当前切片收尾后暂停，续做再读开发要求派C2，不切回I-4/B2/B5。
+
 ## 2026-10-10 14:39 发布445b33f后派DeepSeek #206 C1离线适配事实模块
 
 - #205设计合同/计划及索引、验收进度共7正式文档完成UTF-8/范围/diff校验，提交445b33f4dee92decffe4c1d5735a62871482f6d3、常规推送，ls-remote精确相等、派前工作区干净；未改业务源码。
