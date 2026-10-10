@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-10 15:34 (Asia/Shanghai)：#206 C1经审查、用户授权Codex定向修复和复验通过，已收取；离线事实完成，下一片C2受信应用。
+Updated: 2026-10-10 15:40 (Asia/Shanghai)：按用户要求先汇总进度；#206 C1已验收收取并发布363505c，C2尚未派发，本轮仅维护进度。
 
 ## 当前角色与协作
 
@@ -10,6 +10,7 @@ Updated: 2026-10-10 15:34 (Asia/Shanghai)：#206 C1经审查、用户授权Codex
 
 ## 当前切片：C1 #206已修复、验收收取
 
+- 代码/测试及6正式文档已提交363505ce637b90b33458f6e8d329c336f053451c并推送；2026-10-10 15:40重新核对远端精确相等、开始汇总时工作区干净。本轮只更新PROGRESS/PROGRESS_HISTORY，沿用已通过的测试记录，不重跑业务测试或改变代码。
 - 原DeepSeek交付msg2709合法自身号206/complete；两页完整4112字符SHA 1409f1e1ebf7d10d5784c5a40bbc14d7edff4925ac4dfd2e7868854e1ac8dcdf与本地两JSON一致，原自报/失败日志未追改。原代码独立200项全绿仍不能替代边界审查。
 - Codex独立复现三组缺陷：K3实际profile无固定hard却要求provider/model硬常量；build_entry可提升blocked选择、允许载荷与事实不一致、无选择时生成空事实指纹；capabilities可导出合成凭据。
 - 用户“你先自己修吧”明确授权Codex直接返修；未创建#207、未派返修/等待任务。修复限两个C1文件：K3核自身native/合法声明；ready必须有完整选择结果，归一化核六字段/alias/来源投影，缺失/blocked/冲突均拒绝；native/runner能力复用归一化与looks_like_credential，阻断且不回显。
@@ -63,4 +64,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于2026-10-10T07:15:00.403866 UTC读得session16%/weekly64%、decision=continue；只代表该次采样，不外推实时用量。
 
-恢复指令：继续项目。#206 C1已修复验收收取；代码、证据与进度收尾后下一片C2受信应用。按最新开发要求及会话分工一次一片，真实绑定尚未完成，先完成同一功能。
+恢复指令：继续项目。#206 C1已验收收取，源码发布363505c；当前没有C2执行任务。下次先读取最新开发要求与用量门禁，按会话DeepSeek开发/Codex复核的分工派C2受信应用，一次一片；真实绑定尚未完成，先完成同一功能，不切主被动I-4/B2/B5。
