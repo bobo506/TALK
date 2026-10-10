@@ -299,4 +299,5 @@ LEFT JOIN runner_registry       AS r  ON r.runner_id   = b.runner_id;
 - 执行者交付本次实际任务号一致的结构化包，包含实际差异、测试证据、未完成与限制；协调方独立核实，不只采信自报。
 - 正式进度与 Git 由 Codex 收尾；按已授权常规推送，不改写远程历史。
 - B1a/B1b 通过不等于目标八方向或真实模型能力通过；真实宿主 T/W、取消/排队、K2.8 接单继续分别验收。
-- 本计划当前仅为已审实施依据，仓库尚无这里规划的表、API 或快照字段实现。
+- B1a/B1b/B3/B4代码已按各节落地验收；实际绑定写入和完整页面仍待验，后续排期不能当成已实现。
+- 适配登记/角色绑定收尾按[新合同](ADAPTER_BINDING_CLOSEOUT_DESIGN.md)与[C1–C4计划](ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)推进；#203–#205设计通过，实施待逐片验收。

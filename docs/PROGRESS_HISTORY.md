@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-10 14:33 #205设计最终通过，收取设计链；中断后恢复正式合同发布
+
+- 用户205好了；msg2707合法自身205/partial，稳定SHA cc0dad302b5fc4b5d782d057bfbd9cd23070445a0ed7f24351ae927afca3f181三页9237字符与本地JSON一致，C1–C4/真实来源/模型/凭据漂移/宿主预算后置如实保持。
+- Codex实读合同/计划/参考helper，重跑真实runners/projects router+TestClient+内存SQLite，F1–F6/A–C/R1–R4通过：20harness、140请求、47内存写；另独立重放204四反例与必要正例：跨host ID分开且无ledger稳定；相同backend不同固定alias阻断、未确认/过期default阻断；ready/blocked递归canary无原值；PATCH200登记仍旧字段时GET发现差异、绑定PUT=0，真实PATCH正例通过。
+- 802冻结仅原Codex两进度差异、800其它逐SHA相同，原203/204与205十二交付文件保持。协调方两次fixture错误（副本ROOT偏移、generic漏model_source/connection_ref）仅修review脚本，原失败保存；开发者fixture失败保持。
+- review=design_accepted_implementation_pending；205→204→203于02:46:16/19/21 UTC收取succeeded/completed，原203六失败/204四失败、MCP unknown与原自报不追改。收取不等于实现或真实登记验收。
+- 上次写正式文档被自动审批因workspace credits不足拦下，命令未执行，未Git/未派下一片；用户“前面断了，继续看下”后确认HEAD4ff7be5/工作区干净/证据回执均存。执行恢复后发现TALK连接拒绝，用户自行启动服务，MCP读取恢复。Codex不启停进程、不绕审批。
+- 发布正式收尾合同/计划，旧角色合同/计划及简报加索引，纠正旧计划“无表/API实现”的过期句。不照抄草稿204已独立闭合的错误历史；明确scope规范载荷、K28同源常量/default来源、sources无value、公开投影与内部provenance分开、C1内存输入零真实文件加载、无CAS残余窗口、共享helper显式closeout。
+- 本次最新开发要求快照保持，按用户DeepSeek开发/Codex独立复核；MCP本人agent:codex/agent、四角色unconfigured。usage-gate 06:28:18 UTC采样session2%/weekly62%、continue，非实时保证。
+- 审查证据.tmp/adapter-binding-design-final-fix-review/，正式代码/测试不依赖忽略目录。当前只正式文档，无生产登记/绑定写、真实Key/profile变更、模型/长wait/进程启停。下一片C1仅两新文件，默认派发结束、用户通知取件，同一功能继续。
+- 正式文档UTF-8与必要diff/范围校验后中文提交常规推送，后续C2/C3/C4待逐片独立验收，真实应用待具体dry-run审阅。
+
 ## 2026-10-09 23:41 #204设计独立复核四点未闭合，派#205定向补正并裁定实施边界
 
 - 用户“好了”通知204完成。只读get_delivery取得succeeded/submitted、msg2706；前置说明与JSON混排被MCP归unstructured、业务unknown，未伪改为可信自报。稳定SHA23e41b275d87f2288869ea7047baab05a4fbc519bcbac4545682cda4d14db37a、三页9817字符重建，JSON提取与本地development.json一致、workflow validate合法partial；未完成与blocked真实保留。203/204均未collect。

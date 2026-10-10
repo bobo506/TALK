@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-09 23:41 (Asia/Shanghai)：204设计独立needs_rework，四组剩余反例已复现；已派DeepSeek #205定向补正，Codex裁定现API无CAS边界和共享helper+显式closeout接线；203/204未收取，仍仅设计。
+Updated: 2026-10-10 14:33 (Asia/Shanghai)：#205设计独立通过，205→204→203已收取；中断后恢复正式合同/Git收尾，C1离线事实模块待派，真实绑定仍后置。
 
 ## 当前角色与协作
 
@@ -8,16 +8,17 @@ Updated: 2026-10-09 23:41 (Asia/Shanghai)：204设计独立needs_rework，四组
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；Codex只改正式文档、未改业务源码。
 
-## 当前切片：BA-1 #204四点未闭合，#205定向设计补正已派
+## 当前切片：适配收尾设计已通过，准备C1离线事实模块
 
-- 用户通知204完成；runner succeeded/submitted、msg2706三页9817字符SHA23e41b275d87f2288869ea7047baab05a4fbc519bcbac4545682cda4d14db37a。正文前置说明+JSON导致MCP业务unknown/unstructured；其中完整JSON与本地development.json一致、schema合法partial，原报告未宣称全部实现完成。203/204均未收取。
-- Codex独立复核实际返修合同/计划/探针，重跑真实router+内存SQLite正例通过；203原TypeError负对照保留。额外四组反例：R1 host_scope未入ID，无台账跨host同workspace碰撞；R2同backend不同alias绕过K28硬alias；R3blocked sources仍带合成敏感原值；R4PATCH200后未GET完整重判，登记仍旧字段却写绑定并报成功。当前needs_rework，不进入实现。
-- 证据.tmp/adapter-binding-design-rework-review/冻结原204九文件、完整消息、scope/review/negative-probes、独立脚本及重跑输出。首次独立fixture误读文件ok键导致KeyError，协调方修读实际findings后重跑，单独保留，不当项目错误。
-- 802冻结仅两份Codex派发进度差异，800其余逐SHA不变；原203交付目录与review冻结七文件SHA仍同。未用真实profile/Key/生产库/HTTP/模型/长wait/进程，未改业务源码。
-- Codex边界裁决：D8保留现API/无CAS/单写者前置与残余窗口，不为此改权限或接口；D9共享adapter_closeout helper由K28显式closeout调用，非二选一、非launch挂钩。K3/K28同scope同runtime复用、不同member绑定；来源缺失诚实blocked，真实apply待具体dry-run。
-- #205 target=agent:deepseek、created_by=agent:codex、Hall=group:task-8e0e2ca2b53b4b7491f14e6efa63de5a，创建queued/assigned；不从旧idle推断实时领取。最新开发要求原快照保留，按用户DeepSeek开发/Codex独立复核。
-- 新基线074bc32、802文件SHA/大小冻结.tmp/adapter-binding-design-final-fix/。仅该目录设计/隔离证据：R1–R4逐项闭合，非秘密来源白名单/指纹、default确认与预算已知/本轮未知区分；最终消息只完整JSON，禁止改203/204原目录或正式源/合同/生产。
-- 默认派发后结束，用户通知#205后独立复核，不等待、不收取未通过203/204、不启动C1–C4或切其它功能。
+- 用户通知205完成。msg2707合法自身号partial，完整三页9237字符SHA cc0dad302b5fc4b5d782d057bfbd9cd23070445a0ed7f24351ae927afca3f181与本地JSON一致；后置C1–C4与真实来源/能力不改称实现完成。
+- Codex读实际合同与参考实现，独立重跑真实router+内存SQLite探针六组原问题/四组定向补正通过：20harness、140请求、47内存写；另独立四反例与正例通过。203 TypeError负对照保持，原203/204失败/自报不追改。
+- 802冻结仅旧Codex两进度差异，800其它逐SHA保持；原203/204和205十二交付文件冻结保持。协调方两次fixture错误（副本导入ROOT偏移、generic漏必需事实）只修review脚本并保留，非产品缺陷。
+- review=design_accepted_implementation_pending；205/204/203分别于2026-10-10T02:46:16/19/21 UTC收取succeeded/completed，204 MCP unknown及原报告保持。证据.tmp/adapter-binding-design-final-fix-review/包含消息/引用、original、scope、独立脚本/重跑/反例、review、fixture失败与回执。
+- 上次发布命令被自动审批因workspace credits不足拒绝，未执行写入；本次用户要求继续后exec恢复。TALK API一度WinError10061，用户亲自启动服务后恢复；Codex未启停服务/Agent。
+- 正式docs/spec/ADAPTER_BINDING_CLOSEOUT_DESIGN.md与IMPLEMENTATION_PLAN发布：scope摘要、固定alias/default来源确认、白名单、写后完整重判、现API无CAS窗口、共享helper+显式closeout。发布澄清仅公开投影导出指纹、provenance不自动confirmed、C1内存配置对象不读真实文件。
+- 当前MCP本人agent:codex/kind=agent，4角色binding_state=unconfigured；不写生产登记/绑定/Key/profile/名册，不调用模型/长wait。真实default/凭据/漂移与bound页面联调待C3/C4。
+- 已读本次最新development_requirements，按用户DeepSeek开发/Codex独立复核。usage-gate 2026-10-10T06:28:18 UTC session2%/weekly62%、continue（阈值85/80），只代表该次采样。准备C1仅两个新文件，尚未派发。
+- C1–C4一次一片，默认派发后结束，用户通知完成后取件；当前功能完成前不切I-4/B2/B5。真实apply待具体dry-run审阅。
 
 ## 已完成与当前状态
 
@@ -57,6 +58,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于15:38:00 UTC读得session57%/weekly46%、decision=continue；只代表该次采样，不外推实时用量。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。历史usage采样见PROGRESS_HISTORY；最近usage-gate于2026-10-10T06:28:18 UTC读得session2%/weekly62%、decision=continue；只代表该次采样，不外推实时用量。
 
-恢复指令：继续项目。203/204未独立通过且未收取，#205定向设计补正已派；四反例见.tmp/adapter-binding-design-rework-review/，D8/D9已在本任务包收敛。用户通知完成后核实际包/隔离证据，未通过前不实现/真实绑定，不切其它功能，原报告与失败保持。
+恢复指令：继续项目。#203–#205最终设计已收取，正式合同/计划发布；C1离线事实模块下一片，仅scripts/adapter_binding_facts.py与tests/test_adapter_binding_facts.py。按当前分工和用户通知取件，真实登记后置，不切其它功能。
