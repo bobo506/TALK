@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-10 15:49 (Asia/Shanghai)：C1已收尾；已派DeepSeek #207开发C2受信应用工具，等待交付，默认不持续等待。
+Updated: 2026-10-10 16:34 (Asia/Shanghai)：#207 C2独立复核needs_changes，已派#208定向返修；未验收收取207，默认派发后结束等待。
 
 ## 当前角色与协作
 
@@ -8,16 +8,18 @@ Updated: 2026-10-10 15:49 (Asia/Shanghai)：C1已收尾；已派DeepSeek #207开
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前切片：C2 #207已派发，等待开发交付
+## 当前切片：C2 #207复核未通过，#208等待返修交付
 
-- 本轮按用户“继续项目”恢复；读取最新development_requirements/本人身份，沿用当前会话DeepSeek开发、Codex独立复核；Kimi暂不派。只推进同一角色/模型绑定功能，不切主被动I-4/B2/B5。
-- 派前HEAD7f1706e85557099797e1b14919f9c400bd352031、工作区干净，806 tracked逐SHA清单已保存；queued/running查询均空，两个C2文件均不存在。源码C1发布363505c保持。
-- #207于2026-10-10T07:47:09.766632 UTC创建，target=agent:deepseek、created_by=agent:codex、Hall=group:task-a41dd0dff13147e1a162af9ce3fd5573；创建响应queued/assigned，不推断已领取或完成。独立顶层最小四字段，无子任务/审查策略字段。
-- 只授权新增scripts/talk_adapter_registry.py与tests/test_talk_adapter_registry.py；Codex两进度为协调方例外。实现plan/apply/verify、human/外置凭据边界、当前来源重核与漂移、冲突/no_op、完整写后读回、部分恢复；复用C1/schema与既有API，不改权限或旧快照。真实来源加载/C3接线和生产应用仍后置。
-- 验收包要求真实runners/projects router＋TestClient＋内存SQLite；POST201/409/超时、PATCH200/超时各自最新GET完整schema/runtime/retired/四字段重判，失败binding PUT=0；目标阶梯/七字段读回/零盲写重试/隐私canary/部分恢复。无生产HTTP或DB写、真实Key/native读取、模型调用、服务/Agent启停或长wait。
-- 本机.tmp/adapter-registry-c2/保存task-package.txt、scope.json、dispatch-requirements.json与dispatch-receipt.json；要求development.json完整自身号207的talk-delivery-1 JSON作为TALK结果消息，完成后暂停；正式进度/Git由Codex处理，开发与复核不并行改码。
-- usage-gate于2026-10-10T07:44:12.209588 UTC返回ok/continue，但session/weekly百分比均null；不能据此宣称当前精确额度可读或低于阈值，按无法获取有效用量规则仅开这一片。历史16%/64%不外推。
-- 默认派发结束，由用户通知“207 ok”后优先talk_get_delivery只读摘要，核任务号/证据并独立查实际代码，再决定收取与进度/Git。当前不调用talk_wait_tasks、不取完整Hall、不重复派发。下次恢复先处理207，不能另开C3或主被动功能。
+- 用户通知“好了”后处理207，无新功能。当前DeepSeek开发、Codex独立复核；最新development_requirements与本人agent:codex身份已在返修前读取，仍按会话临时分工，Kimi暂不派。
+- #207/msg2711为succeeded/submitted、合法207/complete自报；稳定引用字段补读与本地development.json一致，原文SHA874512f0eddf21d96e8d40d256f6eac12804193695c78c29a42f8468b88792ba。自报未被追改，Codex业务复核needs_changes，未collect/accept。
+- 原开发基线7f1706e、当前审查HEAD41e7067ca70c80b63573231aeae23c50b372c379；范围只有两个未跟踪C2文件，804 protected旧文件SHA保持，两进度为协调方例外。原两文件冻结.tmp/adapter-registry-c2-review/original/。
+- Codex独立120新模块＋98 C1＋15 runner＋40项目角色绑定＋59 K28共332项通过、0失败/跳过；最初误用不存在tests.test_role_binding产生的ModuleNotFoundError日志保留，纠正为tests.test_project_role_bindings后仅补跑40项。开发者原K28 skip不追改。
+- 独立22组实际路径探针：1正常控制通过、21验收断言不满足。F1：RunnerOut无完整schema验证，POST/PATCH读回非法日期仍PUT=1/complete；F2：明确401/422/500写错误仍凭GET一致继续PUT并报成功；F3：未知HTTP binding_state和篡改plan index/blocked可回流合成凭据；F4：argparse回显argv、JSON坏根未捕获；F5：字符串false经bool变True并实际PATCH+PUT。普通测试全绿不替代这些边界。
+- 已派DeepSeek #208修同一C2五项，于2026-10-10T08:33:05.380199 UTC创建、queued/assigned、created_by=agent:codex，Hall=group:task-7f6d1da2403e4c398bd68030abd161f5。只修改scripts/talk_adapter_registry.py与tests/test_talk_adapter_registry.py，要求原码负向命中、修后全通过、正常409/确认超时/恢复保留，不修改207原报告或协调方审查证据。
+- 审查证据.tmp/adapter-registry-c2-review/含server-report、scope、original、独立5套日志、入口错误日志、probes.py、negative-probes.json、review.json；返修.tmp/adapter-registry-c2-rework/含task-package、requirements、scope与dispatch回执。正式代码/测试不得依赖.tmp。
+- 返修完成暂停，用户通知“208 ok”后优先talk_get_delivery核本次号及交付，再独立复验实际代码。207仍submitted等待补正，不提前收取；不主动等待/重复派发、不继续C3/C4或I-4/B2/B5，不把隔离实现称真实bound。
+- 本轮只读/冻结源码与隔离TestClient＋内存SQLite测试、写审查证据/两正式进度和派208；无生产登记/绑定/DB写、真实Key/native读取、模型调用、服务/Agent启停、浏览器或宿主长wait。无CAS竞争窗口保持。
+- 精确用量最近有效状态不可读：本轮沿用前次门禁返回continue但两窗口百分比null的限制，不外推历史16%/64%；仍在同一C2返修，不新开功能或额外切片。
 
 ## C1已完成，保持的恢复依据
 
@@ -65,6 +67,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前207恢复证据.tmp/adapter-registry-c2/。最新usage-gate于2026-10-10T07:44:12.209588 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前208恢复证据.tmp/adapter-registry-c2-rework/；207独立审查.tmp/adapter-registry-c2-review/。最新usage-gate于2026-10-10T07:44:12.209588 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目；用户确认完成后可说“207 ok”。C2 #207已派发，先处理该任务交付与独立复核，不重复派发或开启新片；真实绑定尚未完成，继续先完成同一功能，不切主被动I-4/B2/B5。
+恢复指令：继续项目；用户确认返修完成后可说“208 ok”。#207复核needs_changes、未收取，先处理#208返修交付与独立复验，不重复派发或开启C3/新功能；真实绑定尚未完成，当前继续只完成同一功能。

@@ -1,5 +1,21 @@
 # 开发历史 · TALK
 
+## 2026-10-10 16:34 #207 C2独立复核发现五项边界问题，派#208定向返修
+
+- 用户“好了”通知完成；Codex按已派任务包独立核交付、实际代码与验证，不从runner succeeded或complete自报推断验收，不开发下一片、不操作浏览器。
+- #207/msg2711为合法自身号207/complete、succeeded/submitted，原文4501字符、SHA874512f0eddf21d96e8d40d256f6eac12804193695c78c29a42f8468b88792ba；十字段稳定引用两页重建JSON与本地development.json一致。字段投影4123字符，区别于原文长度，未混作原文SHA。原报告完整保持，未验收/收取207。
+- 当前HEAD41e7067ca70c80b63573231aeae23c50b372c379、原开发基线7f1706e；only两新C2文件未跟踪。804旧protected文件逐SHA不变，原scope806减去两协调方进度例外；源码5a56f51333cd28d78313ffb6dcc6e90883cbcbb04b5a19a986fd461982ad8f7b、测试60e9debaea0a1041b829d5a95a70b9b3b3da105ae500d8c792c3a6436834b862已冻结到review/original。
+- 独立120新模块＋98 C1＋15 runner＋40 project_role_bindings＋59 K28共332项全通过、零skip。协调方第一轮错误使用不存在tests.test_role_binding导致一ModuleNotFoundError，修正入口为tests.test_project_role_bindings仅補跑40项通过；原入口错误日志保持，不归因为业务故障。开发者原K28管道skip报告保持，本次独立零skip不追改其证据。
+- 阅读完整正式实现及测试关键夹具/矩阵后，以真实router、TestClient及内存SQLite额外运行22组独立行为探针：1正常控制通过、21验收断言未满足、零fixture异常（CLI坏根AttributeError本身为复现项）。探针退出0仅代表执行结束；negative-probes.json以逐项pass判断，不误报全绿。
+- F1：_runner_schema_error只核键与字符串类型，未实例化RunnerOut；POST201/PATCH200的最新GET created_at/updated_at非法仍接受，4反例均PUT=1/result complete，RunnerOut.model_validate实拒该响应。
+- F2：_confirm_runner_step忽略写结果，POST/PATCH401/422/500只因最新GET一致就报告created/patched，6反例均继续PUT=1/complete；返修要求完整读回保留观察事实但明确失败仍止写/不报成功，保留已批准409重分类与确认超时，不盲重试。
+- F3：未知binding_state原样入reason/state，plan/apply/verify三反例回流合成凭据；plan index可为任意dict、blocked可为任意code/detail，又在apply/verify反射，共4反例；index篡改时实际写2次。要求状态、index、原因和冲突字段白名单，不回原值。
+- F4：argparse非法子命令/timeout默认错误把合成canary打印stderr，两反例；合法JSON根[]触发未捕获AttributeError，一反例。要求保留help/退出码而稳定处理CLI/schema/IO错误，拒有限性或类型坏输入，不打印原argv/路径/raw异常。
+- F5：公开apply_plan把accept_change='false'经bool转换为True，在明确有差异计划上实际PATCH+PUT=2/complete；要求None或严格bool，其余零写，保持正常明确授权与漂移合同。
+- 审查结论needs_changes，完整原始/新日志及review.json保存.tmp/adapter-registry-c2-review/；未改业务源码、C1、server/API/权限/native/profile/Key/名册或生产DB。无真实模型/宿主T/W/长wait/服务启停，也无真实bound新增结论。
+- 派前重新读当前development_requirements/本人agent:codex，沿用DeepSeek开发/Codex独立复核的会话临时分工，不派Kimi。最小顶层四字段派#208，2026-10-10T08:33:05.380199 UTC创建queued/assigned、target=agent:deepseek、created_by=agent:codex、Hall=group:task-7f6d1da2403e4c398bd68030abd161f5；只返修同一C2两文件，完成暂停，范围/原失败与正例要求全部写包，不自派或继续C3/C4。
+- .tmp/adapter-registry-c2-rework/保存task-package、scope、requirements与dispatch回执。默认派发后结束等待，用户通知“208 ok”后再核摘要/实际代码；207原submitted保留等待返修闭合，不先collect。两进度UTF-8/范围/空白校验后单独中文提交常规推送，不提交未通过C2源码。
+
 ## 2026-10-10 15:49 恢复项目并派DeepSeek #207 C2受信应用工具
 
 - 使用project-framework恢复，确认AGENTS当前Codex为决策Agent；读取PROJECT_BRIEF、当前进度及唯一负责模块MODULE_bridges，按正式BA-1合同/C1–C4计划准备C2任务包，不读其它模块文档，不改业务代码或启动服务。
