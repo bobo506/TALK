@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-10 17:05 (Asia/Shanghai)：#208原五项反例复验通过，F2仍漏PATCH/PUT409边界；已派#209小范围补正，207/208未收取。
+Updated: 2026-10-10 17:20 (Asia/Shanghai)：C2 #207→#208→#209全部复核通过并收取，正式文档与Git收尾；C3真实登记尚未实施。
 
 ## 当前角色与协作
 
@@ -8,18 +8,14 @@ Updated: 2026-10-10 17:05 (Asia/Shanghai)：#208原五项反例复验通过，F2
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前先完成角色/模型绑定。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前切片：C2 #208复验仍有一项遗漏，#209等待补正
+## 当前切片：C2受信应用已闭合
 
-- 用户再次通知“好了”后收208只读摘要；Codex独立复核，当前会话仍DeepSeek开发/Codex复核，Kimi暂不派。返修前最新development_requirements与agent:codex身份已读；只处理同一C2，不新开功能。
-- #208/msg2712合法208/complete、succeeded/submitted；完整两页6206字符、SHAe72bb8f96e301e223a2a7edab1c943434de63bb4cebf3379a453a5aaaf84632c与本地development.json一致，原报告保持。207/208尚未验收收取。
-- 当前审查HEAD94b6fd874fba6b5928507efef94460a364c798f6；only两个C2文件未跟踪，804 protected旧源不变，207冻结源码/测试保持。208源码SHA0517d32c14165e0e5e2c525841908e6bf74090acd9f0b8ff8624b8e8a4ae0a86，测试SHA0f227fe2983578148198a404cc85a0578b8a56c8397340e787ad30255a7c51d5冻结于.tmp/adapter-registry-c2-rework-review/original/。
-- Codex独立148新模块＋98 C1＋15 runner＋40项目角色绑定＋59 K28共360项通过、0失败/错误/跳过；原22组独立探针22/22。F1完整RunnerOut读回、F3状态/plan元数据隐私、F4稳定CLI错误、F5严格bool及F2原401/422/500反例已闭合；开发者原skip和207/208报告不追改。
-- 读实际diff发现F2-method：_write_outcome_explicit_failure统一豁免409，未按请求方法区分。额外3组真实router/TestClient/内存SQLite探针：POST409正例通过；PATCH409仍PUT=1/complete，PUT409读回一致仍报bound/complete，两反例失败。仅POST409是已批准特例，PATCH/PUT明确失败须保留观察事实而不得成功。
-- 已派DeepSeek #209仅补409方法边界，2026-10-10T09:03:16.564466 UTC创建queued/assigned、created_by=agent:codex、Hall=group:task-14cf9398e173419cb1ad07b682ad9219。限两C2文件和少量针对测试，保持POST409/确认超时/已关闭边界；要求冻结208负向命中、修后新模块/原22/新3探针通过，不重复无变更旧回归。
-- 208独立证据.tmp/adapter-registry-c2-rework-review/含server-report、scope、original、360项各套日志、原22复验、verify_409.py/method-409-probes.json及review.json；209包/requirements/scope/dispatch在.tmp/adapter-registry-c2-method-fix/。源码测试不依赖忽略目录。
-- 208自报基线文字称相对41e有“两次协调方提交”；实际git核41e→94b6只有一次提交、仅两进度文件变更，不影响其实际baseline.ref或源范围。原报告不追改，以独立Git核验为准。
-- 当前结论needs_changes仅剩F2方法边界；默认派发后结束等待，用户通知“209 ok”后核本次交付与实际代码，闭合后再208/207收取及源码/正式文档/Git收尾。当前只提交两进度，不提交未通过C2源码。
-- 本轮无生产登记/绑定/DB写、真实Key/native读取、模型调用、服务/Agent启停、浏览器/宿主长wait；无CAS窗口、C3真实来源/人类受权应用、C4页面指引/验收仍后置，不能说真实bound。精确用量最近不可读，历史采样不外推。
+- 用户“好了”后核#209/msg2713合法自身号complete与本地JSON一致；独立读取最终差异，只有POST登记409允许同事实重分类，PATCH/PUT明确失败不升级成功。原207五组问题及208两方法反例全部闭合，原失败/报告不追改。
+- Codex本轮C2完整153项测试零失败/错误/跳过，原22＋方法409三组独立探针共25/25通过。前轮212项C1/runner/项目绑定/K28回归全通过且804旧保护文件逐SHA保持，本轮未重复运行，不称365项新跑。
+- 209→208→207已顺序收取，均succeeded/completed；三份结果消息SHA与收取前完全一致。原任务号与基线记录保留，收取依据是最终修复链，不能将初稿曾失败改写为初次通过。
+- 两个C2文件为 `scripts/talk_adapter_registry.py` 与 `tests/test_talk_adapter_registry.py`；正式合同/计划/MODULE_bridges/PROJECT_BRIEF及两进度同步。独立审查基线caffb10，发布源码SHA0698dd79…（EOF纯格式清理、AST不变）、测试5e2f6a0d…；完整日志、scope、源码冻结、review及收取回执见 `.tmp/adapter-registry-c2-method-fix-review/`。
+- 未做生产登记/绑定、真实Key/native读取、模型调用、服务/Agent启停、浏览器或宿主长等待；无CAS窗口保持。C1/C2只证明离线事实和受信工具，真实bound仍待C3；C4页面与人工验收尚待实施。
+- 本片完成收尾后暂停；下一片C3需按实施计划明确真实native有效来源、覆盖层与scope，先可审阅dry-run，生产应用仍须人类对具体包确认。未自动派发C3，不切主被动I-4/B2/B5。
 
 ## C1已完成，保持的恢复依据
 
@@ -67,6 +63,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前209恢复证据.tmp/adapter-registry-c2-method-fix/；208复验.tmp/adapter-registry-c2-rework-review/，207原审查保持。最新usage-gate于2026-10-10T07:44:12.209588 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C2最终证据.tmp/adapter-registry-c2-method-fix-review/；209开发包、208复验与207原审查均保持。最新usage-gate于2026-10-10T07:44:12.209588 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目；用户确认补正完成后可说“209 ok”。#207/#208未收取，先处理209的409方法边界交付与独立复验，不重复派发或开启C3/其它功能；闭合当前C2后统一源码/正式文档/进度/Git收尾。
+恢复指令：继续项目。C2已复核收取并完成本片收尾；先核Git状态与当前计划，再明确C3真实来源接线任务。不要重复派207/208/209，不自动做生产apply或切换其它功能。

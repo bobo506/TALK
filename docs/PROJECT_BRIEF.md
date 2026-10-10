@@ -2,7 +2,7 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
-## 当前实施状态（2026-10-09）
+## 当前实施状态（2026-10-10）
 
 发起者合同 v3 已发布；I-1 #172/#173 工具代码独立通过并收取，当前 Codex MCP 加载核验通过。I-2 #174/#175 固定主控页面退役经独立实际代码复核通过并收取，当前“项目设置”只显示开发要求与调度模式；页面不再依赖固定指定，协调责任按具体任务 created_by，模式只约束任务发起侧。资源 20261007-initiator-mode-ui，独立 Node149（同进程）/Python页面12及导航/符号探针通过；默认进程隔离因宿主 spawn EPERM 为 not_run。
 
@@ -10,7 +10,7 @@ I-1/I-2 同轮用户页面验收已于2026-10-07通过，人工门禁释放；I-
 
 运行器/模型角色绑定设计#190–#192已复核发布[通用合同](spec/ROLE_MODEL_BINDING_DESIGN.md)与[实施计划](spec/ROLE_MODEL_BINDING_IMPLEMENTATION_PLAN.md)。B1a #193/#194两表/登记绑定API经独立124项通过收取；B1b #196任务不可变快照经独立177项及并发/回滚/原文探针通过收取，用户重启后授权[核心代验收](guides/TASK_BINDING_SNAPSHOT_ACCEPTANCE.md)与#199合法回传通过；实服绑定写入/变更未做。B3 #200角色名单只读binding/binding_state经独立106项与13探针、新进程真实匿名管道验证通过并收取，九工具/参数保持，用户重启后当前MCP描述与4角色绑定字段已只读核验加载（null/unconfigured），见[终端指南](guides/TERMINAL_MCP.md)。B4 #201/#202独立165项Node/12契约及原7反例通过收取，实服静态字节已核，[页面验收](guides/ROLE_BINDING_PAGE_ACCEPTANCE.md)待用户；实际证据B2、进程管理与八方向真实能力后置。按用户要求先完成当前角色绑定功能及验收，再进入下一功能；K2.8最小回传通过不代表实际模型版本或开发能力已验。
 
-2026-10-10：用户确认适配收尾自动核验并登记/绑定，页面读取结果；#203–#205最终设计已复核收取，正式[收尾合同](spec/ADAPTER_BINDING_CLOSEOUT_DESIGN.md)与[C1–C4计划](spec/ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)已发布。#206 C1离线事实模块经审查、用户授权Codex定向修复和212项测试通过收取；下一片C2受信应用，真实登记尚未实施，先完成当前功能。
+2026-10-10：用户确认适配收尾自动核验并登记/绑定，页面读取结果；#203–#205最终设计已复核收取，正式[收尾合同](spec/ADAPTER_BINDING_CLOSEOUT_DESIGN.md)与[C1–C4计划](spec/ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)已发布。#206 C1离线事实模块已通过；#207经#208/#209返修的C2受信plan/apply/verify工具独立153项模块测试与25边界探针通过，209→208→207已收取，明确写失败与POST专属409重分类边界闭合。C3真实native来源接线/人类受权登记、C4页面指引与验收待后续；本轮未生产登记，不宣称真实bound或主动等待已验，先完成当前功能。
 
 ## 历史开发安排（2026-09-19，固定主控阶段）
 

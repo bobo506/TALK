@@ -19,7 +19,14 @@
 
 - `scripts/adapter_binding_facts.py` 接受内存配置与显式 scope，提取来源、稳定运行器 ID、公开投影和指纹；复用既有模型解析与 schema，不读取真实配置/Key，不访问服务或数据库，也不启动模型。
 - #206 经 Codex 审查、用户授权修复三组问题并定向复验，212 项测试零失败/跳过：K3 按自身选择核验；条目必须闭合完整 ready 选择结果与绑定/投影；native/runner 能力拒绝疑似凭据。原交付和失败证据保留。
-- 该模块的 ready 仅表示离线事实自洽。C2 受信应用、C3 显式收尾入口和真实 bound 验收、C4 页面指引尚未实现；正式依据为 [收尾合同](ADAPTER_BINDING_CLOSEOUT_DESIGN.md) 和 [实施计划](ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)。
+- 该模块的 ready 仅表示离线事实自洽。C2 受信应用已实现；C3 显式收尾入口和真实 bound 验收、C4 页面指引尚未实现；正式依据为 [收尾合同](ADAPTER_BINDING_CLOSEOUT_DESIGN.md) 和 [实施计划](ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md)。
+
+### 适配收尾登记：C2 受信应用
+
+- `scripts/talk_adapter_registry.py` 提供 plan/apply/verify CLI 与 helper。plan/verify 只读；apply 核 human 身份、显式外置凭据、目标资格与当前来源指纹，按最新完整读回判断新增/no_op/冲突/明确接受差异。
+- 登记读回复用完整 `RunnerOut`，绑定核七字段与 bound；只有POST409允许同事实重分类，PATCH/PUT明确失败不能被一致读回升级为本次写成功。失败止本条后续写，超时先只读确认，不盲重试。
+- #207经#208/#209定向返修后由Codex独立复核、209→208→207收取；本轮153项模块测试零失败/跳过，原22＋方法409三组共25探针通过；前轮212项未变更回归保持，未重跑冒充新增证据。
+- 未新增服务API/权限，未接自动启动/心跳/claim；C3真实来源加载和人类受权应用待实施。C2隔离测试不证明生产角色已bound、实际模型或宿主主动等待，最新读→PUT无CAS窗口保留。
 
 ### 通用 CLI bridge
 

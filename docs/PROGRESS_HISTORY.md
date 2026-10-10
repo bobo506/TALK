@@ -1,5 +1,21 @@
 # 开发历史 · TALK
 
+## 2026-10-10 17:20 C2最终409方法边界独立通过，209→208→207收取并同步正式文档
+
+- 用户“好了”通知#209完成；当前DeepSeek开发/Codex独立复核，执行者已暂停。仅收同一C2最终交付，无C3/C4或其它功能新派发、无浏览器操作。
+- #209/msg2713合法自身号209/complete，succeeded/submitted；稳定原文2975字符、SHA `b32fbf7489adcd0b805d40d0b6df2a8a71969c9975102071e5362dd623229062` 与本地development.json逐对象一致。开发者冻结208上的五项新针对测试命中两真实失败后同批修后5/5；原自报/冻结207与208文件均不修改。
+- 独立读209实际diff：源码+17/-6，以显式allow_existing_409参数限定POST登记，_confirm_binding_step的PUT不豁免；测试+161闭合POST正例、PATCH/PUT一致读回与失败读回、不重试与PUT次数断言。非新增API/权限或实现范围扩展。
+- 审查HEAD `caffb10a8de9ec7387f3f597e6ce779ccf27b245`；原manifest806减两协调方进度例外，804旧protected逐SHA未变。审查时源码SHA `7ef2a43acdffb8b126bbf2a8d26927e7ab6d88c99c151fe3c48b392d622a08cb`，测试SHA `5e2f6a0d3b2994d86a9647d2399a060e5e3629e4443d9bd3e5aeb7a93d81fa74`；UTF-8无BOM/AST通过，已冻结accepted-source。
+- 本轮命令 `python .tmp/adapter-registry-c2-method-fix-review/run_tests.py` 独立运行 `tests.test_talk_adapter_registry` 153项（148＋新5），退出0，0失败/错误/跳过。前轮独立98 C1＋15 runners＋40 project_role_bindings＋59 K28共212项全通过、零跳过，源逐SHA未变，本轮沿用而非重复跑；不声称365项本轮新运行。
+- 复制原探针到新review目录，不覆盖旧失败证据；`probes.py` 原22边界22/22，`verify_409.py` 三方法3/3，均退出0：POST409 complete/PUT1保留；PATCH409 failed/PUT0；PUT409 failed/PUT1且不重试。夹具调用真实members/runners/projects router、TestClient/内存SQLite，无fixture异常；按逐项通过判断，不把脚本退出0单独当验收证明。
+- F1完整RunnerOut日期schema、F2明确HTTP写失败与409方法边界、F3状态/plan元数据隐私、F4稳定CLI错误、F5严格accept-change bool全部闭合。最初207失败、208遗漏、开发者原skip与协调方早期错误测试入口均保留；最终approved基于209修后实际代码与独立证据。
+- 收取前再按msg2713/2712/2711与各自expect_sha256核稳定引用；于09:18:39/09:18:59/09:19:01 UTC依次209→208→207收取，三项succeeded/completed。收取结果原文SHA均与原报告完全一致；原208基线提交计数笔误仍按前条独立Git事实记录，不改自报。
+- 变更文件：新增 `scripts/talk_adapter_registry.py` / `tests/test_talk_adapter_registry.py`；同步 `docs/spec/ADAPTER_BINDING_CLOSEOUT_DESIGN.md`、`docs/spec/ADAPTER_BINDING_CLOSEOUT_IMPLEMENTATION_PLAN.md`、`docs/spec/MODULE_bridges.md`、`docs/PROJECT_BRIEF.md`、`docs/PROGRESS.md` 与本历史。正式文档只更新C2当前实现/边界/证据，C3/C4保持待实施。
+- 发布前暂存检查发现源码EOF多余空行；协调方仅删除这一空行，AST逐结构完全相同，发布源码SHA `0698dd79990211694c24ec2071f5d5dda340bb832fffbdcefc84212d16664f27`，原209冻结源和业务测试证据保持。该格式清理不改变行为，未重复153项测试；重新按暂存差异核空白与范围。
+- 本机 `.tmp/adapter-registry-c2-method-fix-review/` 保存服务器原报告、scope、最终两源冻结、153项日志、原22/新3独立探针、review.json、collection-209/208/207和Gitpublication；正式源码/测试不依赖忽略目录。
+- 本轮生产HTTP/SQLite登记绑定写、真实Key/native读取、模型/宿主长wait、服务或Agent启停均未执行；不新增真实bound或主动等待结论。首期无CAS“最新读→PUT”窗口保留；C3真实有效来源/覆盖层确认及具体人类受权应用、C4页面指引/验收待后续。精确用量不可读，旧采样不外推。
+- 完成必要范围/UTF-8/空白检查后统一中文提交、常规推送授权分支；具体commit/remote_equal写本机publication回执并对用户报告。本片结束暂停，下一步为明确C3任务，不自动生产apply或切换I-4/B2/B5。
+
 ## 2026-10-10 17:05 #208复验闭合原22反例，409方法特例仍漏两分支，派#209定向补正
 
 - 用户再次通知“好了”；Codex按#208包只读收交付摘要、核实际差异与边界，未推进C3/C4或其它功能，不操作浏览器。当前临时分工DeepSeek开发/Codex复核保持。

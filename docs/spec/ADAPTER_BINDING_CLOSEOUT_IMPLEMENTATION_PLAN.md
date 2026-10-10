@@ -1,6 +1,6 @@
 # 适配收尾登记实施计划（C1–C4）
 
-2026-10-10：依据 ADAPTER_BINDING_CLOSEOUT_DESIGN.md。#203–#205最终设计已复核收取；#206 C1离线实现已验收收取，受信应用和真实登记尚未实现。B1a/B1b/B3/B4现有代码和权限保持；当前先完成角色绑定收尾，不切其它功能。
+2026-10-10：依据 ADAPTER_BINDING_CLOSEOUT_DESIGN.md。#203–#205最终设计已复核收取；#206 C1离线实现、#207→#208→#209 C2受信应用工具已独立复核收取。C3真实来源接线/受权登记与C4页面验收待后续，真实登记尚未实施。B1a/B1b/B3/B4现有代码和权限保持；当前先完成角色绑定收尾，不切其它功能。
 
 ## 1. C1：离线事实模块
 
@@ -39,9 +39,15 @@
 
 ## 2. C2：受信应用CLI/helper
 
-下一片再授权 scripts/talk_adapter_registry.py 与 tests/test_talk_adapter_registry.py：plan/apply/verify、human身份/外置凭据、目标/来源重核、差异/no_op、完整写后读回、零盲写重试。无生产写，不新增服务API/权限。
+已实现并复核通过：仅新增 `scripts/talk_adapter_registry.py` 与 `tests/test_talk_adapter_registry.py`；#207初稿由#208修正五项问题，#209闭合409方法边界，三项已按209→208→207收取。原失败、自报和冻结源码保留，不改写初稿验收结论。
 
-测试挂真实 runners/projects router、TestClient与内存SQLite，不虚构HTTP形状；覆盖POST201/409/超时和PATCH200/超时的最新GET分支、坏形状/HTTP/缺行/runtime/retired/四字段冲突均PUT=0，目标阶梯/七字段回读/部分恢复。完整重判按schema，不能仅检查键存在；无CAS残余窗口如实保留。
+- helper 提供 `build_plan` / `plan_spec` / `apply_plan` / `verify_plan`；CLI 提供 `plan --spec --out`、`apply --plan --spec`、`verify --plan`。凭据显式选 `--key-env` 或仓库外 `--key-file`，无隐式来源或明文 Key 参数；apply 必须反查 human 身份。
+- plan/verify 只读，apply 重核服务/目标、资格、schema、来源指纹和显式接受差异；来源清单自带 ready/指纹不采信。当前传入内存事实不代表真实 native 已生效，C3负责有效来源与覆盖层确认。
+- 登记写后完整 `RunnerOut` 校验（含日期）、目标/runtime/retired/四个可变字段重判；绑定核 project/member、七字段及合法 `binding_state=bound`。部分成功保留恢复索引，零盲写重试。
+- 仅 POST409 同事实重分类可继续绑定；PATCH/PUT409或其它明确写失败即使最新GET一致也保留失败，PATCH失败的本条PUT为0。写结果与观察事实分开。
+- 未知状态和plan元数据严格白名单；CLI参数/IO/坏JSON错误不回显敏感候选；`accept_change` 必须严格bool，字符串 `"false"` 不授权变更。
+
+Codex本轮独立运行C2完整153项，0失败/错误/跳过；原22边界与3方法409探针共25/25通过。前轮独立98 C1＋15 runner＋40项目绑定＋59 K28共212项通过、0跳过，804旧保护文件逐SHA未变，本轮不重复计为新跑。夹具挂真实router、TestClient与内存SQLite，正式代码/测试不依赖 `.tmp/`。完整证据本机 `.tmp/adapter-registry-c2-method-fix-review/`；未执行生产登记、真实Key/native读取或宿主长等待，无CAS竞争窗口保留。
 
 ## 3. C3：明确收尾接线与真实验收
 
