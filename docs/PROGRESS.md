@@ -1,22 +1,23 @@
 # Project Progress
 
-Updated: 2026-10-11 14:43 (Asia/Shanghai)：用户“218好了”后独立复核未通过；#219 已派发 DeepSeek 定向补正，等待开发完成通知。
+Updated: 2026-10-11 18:53 (Asia/Shanghai)：用户“好了”按 #219 完成处理；独立复核仍未通过，#220 已派发定向补正，等待开发完成通知。
 
 ## 当前角色与协作
 
-- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex承担本次协调、独立复核与收尾职责，MCP实测agent:codex/kind=agent；固定分级方向已取消，代码/身份档兼容字段尚未迁移。
+- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，常规推送持续授权。当前Codex承担本次协调、独立复核与收尾职责，MCP实测agent:codex/kind=agent；固定分级方向已取消；迁移代码随 R1-2 待验收发布，旧兼容字段不再承担产品分级。
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：R1-2 #218 未验收，#219 补正已派发
+## 当前状态：R1-2 #218/#219 未验收，#220 补正已派发
 
-- 用户“218好了”后已读取 #218/msg2722 完整交付，9006 字符、SHA 591107c40560e3e9ada785589ec8f355f4a4b02609c1b042534c70641582cb2b，单一 JSON 围栏与本地 JSON 一致；合法 218/complete 只代表自报。runner succeeded、workflow submitted 为本次读取状态，尚未收取。
-- Codex 独立实读实际代码并冻结 31 正式文件（14 源/17 测试）及 28 worker 产物；原保护跟踪/1190 旧产物/17 本人档 SHA 无漂移。必要 Python 101 新项＋376 相关项、Node 59，共 536 项零失败/错误/跳过；原开发者 376 中 4 错误/1 跳过误标 pass 的报告保持，本机没重现该管道错误。不声称全量测试或业务验收已通过。
-- 独立隔离反例 F1–F8：旧 Key/旧成果在轮换与 resume 后套入新 attempt，最终作业成功但 Key 401；项目删除 204 后仍创建 201；重复成功 apply 返回 ack_failed；缺三档/retired 绑定预检仍成功；年龄抢活锁/旧 owner 删除新锁；Windows Key 继承普通用户读权限；公开旧分级字段未标弃用；根 junction 与跨角色三档路径隔离失效。git diff --check 另发现 projects.py 多 EOF 空行（子进程退出 2）。
-- 复核 needs_rework，#218 不收取，31 业务文件不提交。原报告/代码快照/探针与失败保留于 .tmp/role-lifecycle-r1-2-review/；path_probe 首轮自身观察函数遇 junction 异常已修正观察逻辑再复现，不把它算业务失败。无生产 DB/Key/模型/登录/服务或浏览器操作。
-- 派发前已重新实读 latest development_requirements，caller=agent:codex/kind=agent；按用户临时 DeepSeek 开发/Codex 独立复核、不派 Kimi。以最小独立顶层参数创建真实 #219，标题 219-角色生命周期R1-2配置恢复与隔离边界补正，target=agent:deepseek、created_by=agent:codex、Hall=group:task-624c0bb24ec448b18423f6299c5e3490，创建 UTC 2026-10-11T06:40:49.477901；general、queued/assigned 仅派发快照，不开启主动等待。
-- #219 只修上述 R1-2 边界及必要测试；允许 6 源/5 测试（含可选新 test_role_provision_rework），其它迁移/页面与旧产物保持。包/原 #218 全文/31 代码副本/818 跟踪/1345 旧产物/17 本人档 SHA/完整派发回执在 .tmp/role-lifecycle-r1-2-rework-dispatch/；产物 .tmp/project-role-lifecycle-r1-2-rework/development.json。开发完成暂停，用户通知“219好了”后 Codex 独立复核，闭合后才收取补正链并提交业务。
-- 当前 HEAD c0e88910c078391bee488524217533def50c73f3（上轮派发文档），业务发布基线 0bb280b；本轮只提交两 PROGRESS 的复核/补正派发记录，业务仍未发布。usage-gate 2026-10-11T06:37:16.045654+00:00 continue，两窗口百分比 null，精确用量不可读；终端预算不改，R1-3/R1-4/I-4 未开始。
+- 用户“好了”按 #219 完成通知处理。#219/msg2723 自报 partial，7794 字符/SHA 55ed750d6e6c688449712a9d753f43851774ac9a4516acff3961524427492903，单一 JSON 围栏与本地报告一致；runner succeeded/workflow submitted、尚未收取。原 #218/msg2722 自报与八组失败、#219 的 partial/环境错误/限制均保留，不追改为首次通过。
+- #219 实际只改允许集内五源/两测试，新增 test_role_provision_rework.py；原 31 中 24 文件保持，组合 R1-2 现 32 正式文件（14 源/18 测试）。32 源/测试＋37 可读 worker 产物共 69 对象冻结，原 1345 旧产物/17 本人档及范围外跟踪 SHA 无漂移；排除私有假 Key/实验文件，不读取 Key 正文。
+- Codex 独立 5 切片模块 160＋8 相关模块 376＝536 Python 实际通过，零失败/错误/跳过，含原 bridge/K28 管道路径；原开发 3 bridge error/1 K28 skip 在本机未复现，旧失败保留。#218 59 Node 已通过且相关文件未变，沿用而不计本轮新增；UTF-8/语法与实际 git diff --check 退出0。非全量，测试通过不等于业务验收。
+- 独立 G1–G4 未闭合：G1 成功 v1→真实轮换 v2 后重复 apply 仍 not_required/applied、作业旧 v1 succeeded；实际 409 provision_member_disabled 被误认 terminal，profile 子集亦 applied。G2 两真实进程已判断同一死锁后交错，第二 unlink 新活锁，两 owner 同时存活。G3 两 GET 之间真实 PUT connection_ref200，当前 choice_binding_mismatch=true 仍 preflight/三个 ACK 成功。G4 真实私有 ACL CreateFile 后/WriteFile 前终止自己的受控子进程，正式 Key 留0字节，同原操作 resume 拒绝覆盖/partial。
+- #219 needs_rework，218/219均不收取，32业务文件不提交。已修的写锁内引用守卫、公开弃用、静态链接/跨角色路径等保留；反例与冻结/日志 .tmp/role-lifecycle-r1-2-rework-review/。连接探针初试用过长 token 被422拒绝，不当业务失败；合法 native-alt-login 后真实200才构成反例。仅测试受控子进程，无生产 DB/Key/模型/登录/服务或浏览器操作。
+- 派发前实读最新项目要求、caller=agent:codex/kind=agent，按用户临时 DeepSeek 开发/Codex 独立复核、不派 Kimi。最小顶层参数创建真实 #220，标题 220-角色生命周期R1-2成功判定与并发恢复补正，target=agent:deepseek、created_by=agent:codex、Hall=group:task-58ca856e800749deb67a0b22381cc286，UTC 2026-10-11T10:51:54.627140；general/queued/assigned仅创建快照，默认由用户通知完成，不持续等待。
+- #220只修G1–G4，允许四源/四测试（含可选新followup），其它迁移/页面/旧证据保持；包/原218与219完整需求/当前32文件副本/818跟踪/1531旧产物/17本人档SHA/完整派发回执 .tmp/role-lifecycle-r1-2-followup-dispatch/，产物 .tmp/project-role-lifecycle-r1-2-followup/development.json。开发完成暂停，用户“220好了”后独立复核，闭合后收取补正链与业务/正式合同收尾。
+- 本次派发 HEAD=d59d008672e56d7cd5714522be087b55a17535f7（上一轮两进度），业务发布基线0bb280b；本轮仍仅提交两PROGRESS记录。usage-gate 2026-10-11T10:47:16.057781+00:00 continue、两窗口百分比null，精确用量不可读；终端预算不改，R1-3/R1-4/I-4仍未开始。
 
 ## 上一片：R1-1 后端基础已独立验收并收取
 
@@ -103,4 +104,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-11T02:38:15.078820 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目；#219 已派发，默认由用户通知“219好了”后取交付独立复核。#218 needs_rework，原报告不追改；不要重复派发/提前收取 #218/#219，不开启 R1-3/I-4。证据 .tmp/role-lifecycle-r1-2-review/ 与 .tmp/role-lifecycle-r1-2-rework-dispatch/；R1-1 已发布 0bb280b。
+恢复指令：继续项目；#220 已派发，默认由用户通知“220好了”后取交付独立复核。#218/#219 needs_rework，原报告不追改，不重复派发/提前收取，不开始 R1-3/I-4。证据 .tmp/role-lifecycle-r1-2-rework-review/ 与 .tmp/role-lifecycle-r1-2-followup-dispatch/；R1-1 已发布0bb280b。

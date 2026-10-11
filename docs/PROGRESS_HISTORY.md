@@ -1,5 +1,21 @@
 # 开发历史 · TALK
 
+## 2026-10-11 18:53 (Asia/Shanghai) #219 独立复核仍未通过，#220 恢复/并发定向补正派发
+
+- 用户“好了”按当前 #219 已完成通知处理，不重复问确认。只读取219交付，不提前collect；msg2723自报partial、7794字符/SHA55ed750d6e6c688449712a9d753f43851774ac9a4516acff3961524427492903，两页4000/3794带稳定expect_sha256完整获取，单一JSON围栏与本地development.json一致。合法自身219匹配只为自报；11完成/3未完成/0阻塞、8文件、16验证/5限制，runner succeeded/submitted、未收取。原218自报与needs_rework、219管道失败/跳过/partial不追改。
+- 冻结32正式文件（14源/18测试）及37可读worker源码/交付/日志共69对象；实际219七旧文件修改（五源/两测试）＋一新测试，31中其余24保持。原818跟踪保护（允许片内/两进度例外）、1345旧产物、17人工身份档 SHA均匹配。初次采集遇私有假Key及临时Key PermissionError，保留采集脚本并排除10个Key/实验日志对象，不降低ACL/复制Key正文；可读代码与交付证据完整冻结。
+- 独立5模块160项、8相关376项，共536 Python0失败/错误/跳过，真实bridge/K28匿名PIPE路径通过。本机未复现开发原3bridge error/1K28 skip，补齐环境未完成项，但不追改旧结果。218已独立59Node因JS/测试SHA未变沿用、不计新运行；UTF-8/语法/实际git diff --check退出0，非全量。测试日志与实际差异rework-diff.patch在 .tmp/role-lifecycle-r1-2-rework-review/。
+- G1-a实际API：先run_provision完成v1作业，真实rotate-key200到v2，提供有效新Key并换新Key根再次apply，exit0/applied/not_required，job仍succeeded且credential_version1、三步旧成功。代码只在ACK校验版本，no-op旁路不验证当前版本，旧成功证明未失效。历史审计可保留，有效配置判断必须明确版本失效/resume_required，再按显式恢复重做受影响步骤。
+- G1-b实际409：GET曾见succeeded后在临时DB禁用目标，真实resume POST409 provision_member_disabled；脚本profile子集exit0/applied、action terminal/not_required。_ensure_job把所有409都当终态同事实，只能精确provision_job_terminal且当前事实匹配才no-op，其它权限/角色/名册/归档错误必须拒绝。两反例 independent-boundaries.json / terminal-conflict.json，无生产动作。
+- G2实际多进程：一真实已退出PID的过期锁，两个实际子进程都完成真实reclaimability判定后，屏障安排B在A删除旧锁/创建新活锁后继续；B凭旧判定unlinkA的新锁并创建B锁，双方仍存活、均acquired/reclaimed，磁盘只剩B token。屏障只控制交错，OpenProcess/PID/unlink/open/写入均实际；旧owner token释放改良不足以保护回收。须原子互斥协议，不靠第二次读token再unlink；证据dead_lock_two_reclaimers与两child日志。
+- G3实际绑定漂移：GET角色投影creation_operation后，真实PUT binding200仅改合法connection_ref=native-alt-login、保留runner/model/alias；接着GET binding仍bound。脚本succeeded/指纹verified/apply0及3ACK200，当前角色读回creation_operation_mismatch/choice_binding_mismatch=true。初试过长token获422且未变绑定，不构成反例；保留初试，合法值后复现存binding-probe-final.json。须所选choice完整事实/预期指纹与本次绑定一致比较，不能只检存在/64hex或旧角色choice_source。
+- G4实际中断：真实私有DACL CreateFile已创建正式Key，在WriteFile前挂起，只terminate本测试启动的受控子进程；目标保留0字节，真实同一原操作resume提供已知有效假Key仍role_key_stale/拒绝覆盖，partial。Windows以直接CREATE_NEW正式目标代替安全发布，不能满足原包“中断与重试/可恢复”要求；宿主不能安全提交须如实受阻，不把沙箱rename/delete限制外推所有Windows或降级成功。保持创建即私有ACL，不增持久明文重放/自动rotate/reissue；证据key-interruption.json。
+- 219 needs_rework，G1–G4四组（五反例）详见review.json。F2写锁内守卫/expire_all、F7公开弃用、F8静态root/ancestor与跨角色路径由代码与160项测试正向核验；原F3同凭据幂等、F4缺档/非bound、F5单owner/token释放、F6私有ACL已改善，本轮只交回新实际恢复/并发缺口，不抹去已完成证据。未改业务源码、未浏览器；无生产DB/角色Key/模型/原生登录/服务控制，未收取218/219、不提交32业务文件。
+- 派新补正前实读development_requirements与caller=agent:codex/kind=agent；按用户临时DeepSeek开发/Codex独立复核覆盖旧常规分工，不派Kimi。usage-gate 2026-10-11T10:47:16.057781+00:00 continue但两窗口百分比null，精确用量不可读，未臆测。终端等待预算/active模式不改，无续等。
+- 以最小project_id/target/title/content创建实际#220，title=220-角色生命周期R1-2成功判定与并发恢复补正、target agent:deepseek、created_by agent:codex、project prj_e8fe7066bbec、hall group:task-58ca856e800749deb67a0b22381cc286、UTC 2026-10-11T10:51:54.627140，general/queued/assigned仅派发快照，无parent/task_kind/review/related字段，未手写编号或重复派发。
+- .tmp/role-lifecycle-r1-2-followup-dispatch/含原218/219完整包、G1–G4精确复现/验收、32文件baseline-219、818跟踪/1531旧产物/17本人档SHA、要求/门禁/回执；15个Key/实验非文本或无扩展名对象显式排除，不递归跟随reparse。限制四源/四测试（可选新followup），允许范围外正式文件与证据保持；需G3最小新公开预期事实可限定现有无密只读角色/作业投影，保持13键任务快照与权限，不扩新模块/真实服务。
+- 派发时HEAD=d59d008672e56d7cd5714522be087b55a17535f7，业务发布基线0bb280b；本轮仅更新/提交/推送两PROGRESS，未验收32业务文件保持工作树。220完成暂停，由用户“220好了”后独立复核，通过后收取220→219→218并作正式合同/Git收尾；单功能节奏保持，不进R1-3/R1-4/I-4或实际宿主验收。原partial不改写为开发当时complete。
+
 ## 2026-10-11 14:43 (Asia/Shanghai) #218 独立复核未通过，#219 定向补正已派发
 
 - 用户通知“218好了”。原 #218/msg2722 完整 9006 字符/SHA 591107c40560e3e9ada785589ec8f355f4a4b02609c1b042534c70641582cb2b、三页带 expect_sha256 读回，单一 JSON 围栏去除后与 .tmp/project-role-lifecycle-r1-2/development.json 一致；合法自身 218/complete 为自报，runner succeeded、workflow submitted 尚未收取。原 20 完成/0 未完成/0 阻塞、45 自报文件含 14 .tmp 项、17 验证/10 限制保持；实际正式 31 文件是 14 源＋17 测试，四个版本断言包含在 17 中，不重复计数。
