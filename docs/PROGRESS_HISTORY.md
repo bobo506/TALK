@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-11 13:12 (Asia/Shanghai) R1-2 #218 已按用户授权派发
+- 用户在 #217 复核通过、#216/#217 收取与 0bb280b 推送后明确“好的，继续”。沿已发布 R0 v4/实施计划 R1-2 单片推进；本轮协调仅定义具体包、派发和记录进度，未代开发者实现业务或验证未完成代码。
+- 当前入口 AGENTS.md 已确认固定分级取消与按任务授权；读 PROJECT_BRIEF、当前 PROGRESS、负责模块 MODULE_bridges、正式合同/计划、TASK_WORKFLOW 和 TERMINAL_MCP 超时预算。最初模块路径误写单数 MODULE_bridge 不存在，随实际索引更正为 MODULE_bridges；未据此读取其他模块。项目 skill 开工规则已应用，用户本次继续即按上轮明确下一片推进，无重复批准。
+- 本次 MCP 最新项目开发要求实读，caller_identity=agent:codex/kind=agent。原要求仍写 Kimi 前端/DeepSeek 后端与交叉复核；当前已确认临时 DeepSeek 开发/Codex 独立复核、Kimi 额度不足期间不派 Kimi 保持，原文与本次分工均写入包，旧“决策角色”字面不恢复产品固定分级。
+- 以最小独立顶层参数 project_id/target/title/content 派发，服务端返回真实 #218，标题 218-角色生命周期R1-2一键配置与固定分级迁移，task_kind=general、created_by=agent:codex、target=agent:deepseek、hall=group:task-0e02ff8621274df99bc5e28b5be48a71、UTC 创建 2026-10-11T05:11:03.195659，派发时 queued/assigned；未手写编号、未附父/子任务字段，未开启主动等待或额外生产测试任务。
+- 范围：新增持久 role_provision_jobs 与 human-only 作业/读取、默认 dry-run/显式 apply 的宿主脚本、同操作锚点幂等/故障恢复、身份档人工修改保持与外置 Key 验证；迁移 bridge/scan_agents/K28/adapter_closeout/hall 模板/页面的固定分级行为。保持独立 review_exempt、created_by 模式/target 权限、13 键绑定快照、旧列/接口/参数兼容、旧任务/消息字节及全部安全门禁；R1-3/R1-4/I-4、阶段 B/D1–D7 排除。
+- 任务包要求临时 DB/隔离文件树/假 HTTP，无实际生产文件/Key/认证/模型/服务动作。验收包括每步中断/续跑/并发/跨项目角色/凭据身份与版本、路径与链接保护、旧分级差异反例、K28 同 argv 有无旧参数一致、有效 C1–C4 门禁保持和旧任务快照 SHA；dry-run/preflight 不外推原生登录/真实模型或服务就绪。
+- 派发业务 HEAD=0bb280b3542eb3ef07f62136e4a69800efc6b871、工作区干净；14 候选源/17 候选测试、27 存在文件基线、818 跟踪文件 SHA、1190 相关历史产物 SHA、17 本地身份档/名册 SHA 已冻结 .tmp/role-lifecycle-r1-2-dispatch/。首轮全量 .tmp 扫描过长，已只中止自身准备脚本并改为相关历史目录与无 reparse 遍历，未杀生产进程；无新业务改动。
+- usage-gate 2026-10-11T05:07:33.814767+00:00 continue、两百分比 null，不推断精确余量；DeepSeek T65/W50/余量15、Codex 当前 W300/T未重核、Kimi 660000ms 仅模板的来源边界入包。真实取消/到期/同连接排队未新增验证；不调用长等待。
+- 原要求/门禁/task-package、完整 dispatch 回执与基线/保护清单已落盘；开发交付 .tmp/project-role-lifecycle-r1-2/development.json 必须自身真实 task_id=218、完整合法 JSON 作为 TALK 结果正文，完成暂停待 Codex 独立复核，不自行提交/推送或进入下一片。正式文档仅本轮两 PROGRESS 记录，派发后结束，由用户完成通知再取件。
+
 ## 2026-10-11 R1-1 #217独立复核通过，217→216收取，后端基础收尾
 
 - 用户“217好了”后获取#217/msg2721完整默认摘要与稳定三页原文（8916字符/SHA d84e73fdd65ee321319d0b51c2972161fef5bb79528a138841f24d39ac787214）。原消息为单一JSON代码块，不冒称裸JSON；MCP校验合法自身217/complete，去外层围栏后与本地development.json逐结构一致。原文、代码、全部worker证据冻结46文件，无追改原报告。
