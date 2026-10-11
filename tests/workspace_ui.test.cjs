@@ -150,3 +150,18 @@ test('自动 bridge 昵称显示简短名称，人工昵称保留',()=>{
   assert.equal(helpers.chatMemberName({id:'agent:kimi',display_name:'审查助手'}),'审查助手');
   assert.equal(helpers.chatMemberName({id:'human:bobo',display_name:'bobo'}),'bobo');
 });
+
+// R1-2：页面主显示取消固定“决策/执行”分级，旧字段只在接口层兼容且明确 deprecated。
+test('R1-2：页面主显示无固定分级字段，也不渲染任何分级控件',()=>{
+  const wsSource = fs.readFileSync(require.resolve('../web/workspace.js'), 'utf8');
+  const indexHtml = fs.readFileSync(require.resolve('../web/index.html'), 'utf8');
+  assert.ok(!wsSource.includes('decision_tier') && !wsSource.includes('decisionTier'), 'workspace.js 不含固定分级字段');
+  assert.ok(!/决策人|决策 Agent|执行 Agent/.test(wsSource), 'workspace.js 不含固定分级文案');
+  assert.ok(!indexHtml.includes('decision_tier') && !indexHtml.includes('decisionTier'), 'index.html 不含固定分级字段');
+  assert.ok(!indexHtml.includes('决策人'), 'index.html 不含固定分级文案');
+  assert.ok(!/(?:id|name|aria-label)="[^"]*decision[-_]?tier[^"]*"/i.test(indexHtml), 'index.html 无固定分级控件');
+  // app.js 只保留明确标注 deprecated 的非行为性兼容透传，不再有分级展示/编辑控件。
+  assert.match(source, /已弃用（deprecated）兼容透传/);
+  assert.ok(!/decisionTier[^:]*:\s*[^,}]*\.value/.test(source), 'app.js 不把分级接入表单控件值');
+  assert.ok(!/decision_tier[^,}\n]*\.value/.test(source), 'app.js 不把分级接入表单控件值');
+});

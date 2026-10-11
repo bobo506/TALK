@@ -544,9 +544,11 @@ class ArgvEvidenceTests(unittest.TestCase):
         evidence = closeout.argv_selection_evidence(facts.K28_ADAPTER)
         self.assertEqual(evidence["status"], "ok")
         self.assertTrue(evidence["public"]["matches_fixed_alias"])
-        self.assertEqual(evidence["public"]["decision_tier"], "execution")
         self.assertFalse(evidence["public"]["starts_process"])
         self.assertEqual(evidence["public"]["native_cli_probe"], "not_run")
+        # 分级门禁已移除:公开证据里不再有 decision_tier* 键
+        for key in ("decision_tier", "decision_tier_expected", "decision_tier_matches"):
+            self.assertNotIn(key, evidence["public"])
         self.assertNotIn(str(PROJECT_ROOT), blob_of(evidence))
 
     def test_alias_constant_drift_is_blocked(self):
@@ -564,15 +566,17 @@ class ArgvEvidenceTests(unittest.TestCase):
         self.assertFalse(evidence["public"]["command_matches_controlled"])
         self.assertTrue(evidence["public"]["matches_fixed_alias"])
 
-    def test_decision_tier_drift_is_blocked(self):
-        """F1：执行分级被改成 decision 必须 blocked。"""
+    def test_decision_tier_difference_does_not_block(self):
+        """分级门禁已移除:argv 里的 --decision-tier 不再影响 argv 证据结论。"""
         argv = k28.build_bridge_argv()
         argv[argv.index("--decision-tier") + 1] = "decision"
         with mock.patch.object(k28, "build_bridge_argv", return_value=argv):
             evidence = closeout.argv_selection_evidence(facts.K28_ADAPTER)
-        self.assertEqual(evidence["status"], "blocked")
-        self.assertFalse(evidence["public"]["decision_tier_matches"])
-        self.assertEqual(evidence["public"]["decision_tier"], "decision")
+        self.assertEqual(evidence["status"], "ok")
+        self.assertTrue(evidence["public"]["matches_fixed_alias"])
+        self.assertTrue(evidence["public"]["command_matches_controlled"])
+        for key in ("decision_tier", "decision_tier_expected", "decision_tier_matches"):
+            self.assertNotIn(key, evidence["public"])
 
     def test_config_selector_in_argv_is_blocked(self):
         """F1：桥接 argv 若夹带配置路径选择器，入口假定的生效来源不再成立。"""
@@ -762,17 +766,19 @@ class NativeBlockingTests(CloseoutTestCase):
         )
         self.assertEqual(client.writes(), 0)
 
-    def test_argv_decision_tier_drift_blocks_plan(self):
-        """F1：执行分级被改成 decision 时不得 ready。"""
+    def test_argv_decision_tier_difference_does_not_block_plan(self):
+        """分级门禁已移除:argv 分级不同不再 blocked，也不作为 readiness 要求。"""
         argv = k28.build_bridge_argv()
         argv[argv.index("--decision-tier") + 1] = "decision"
         with mock.patch.object(k28, "build_bridge_argv", return_value=argv):
             document, client = self.plan()
-        self.assertEqual(document["closeout_status"], "blocked")
-        self.assertIn(
+        self.assertEqual(document["closeout_status"], "ready", document)
+        self.assertNotIn(
             "E_CLOSEOUT_ARGV_COMMAND_MISMATCH",
             blob_of(document["native_source"]["blocked"]),
         )
+        for key in ("decision_tier", "decision_tier_expected", "decision_tier_matches"):
+            self.assertNotIn(key, blob_of(document["native_source"]["argv_selection"]))
         self.assertEqual(client.writes(), 0)
 
     def test_unselected_explicit_native_config_blocks_plan(self):

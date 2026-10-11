@@ -679,3 +679,27 @@ test('C4：指引不引入控件与请求；切换角色/项目设置、说明�
     assert.ok(!/\/binding(\?|$)/.test(request.url) && !/\/agents\/agent:/.test(request.url), `不得按角色新增请求：${request.url}`);
   }
 });
+
+// ── R1-2：角色/绑定主显示去固定“决策/执行”分级 ────────────────────────────────
+test('R1-2：名册带历史分级值也不进入角色主显示与绑定只读区，且不影响绑定状态', async () => {
+  const h = harness({
+    roster: [{
+      member_id: 'agent:kimi', business_role: 'reviewer', role_description: null,
+      decision_tier: 'decision', binding: boundRow(), binding_state: 'bound',
+    }],
+  });
+  await h.enterRoles();
+  const listTexts = allTexts(h.el('blackboard-columns')).join('\n');
+  for (const leak of ['decision_tier', 'decision', 'execution', '决策人', '决策 Agent']) {
+    assert.ok(!listTexts.includes(leak), `角色列表不得展示固定分级：${leak}`);
+  }
+  await h.selectRole('agent:kimi');
+  const detailTexts = [...allTexts(h.el('role-details-name-panel')), ...h.bindingTexts()].join('\n');
+  for (const leak of ['decision_tier', 'decision', 'execution', '决策人']) {
+    assert.ok(!detailTexts.includes(leak), `角色详情/绑定区不得展示固定分级：${leak}`);
+  }
+  // 历史分级不参与绑定状态判定，也不产生分级控件。
+  assert.equal(h.stateBadge().textContent, '已绑定');
+  const controls = findAll(h.bindingSection(), n => ['button', 'input', 'textarea', 'select', 'a'].includes(n.tagName));
+  assert.deepEqual(controls, [], '绑定区不得新增固定分级控件');
+});

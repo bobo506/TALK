@@ -932,13 +932,22 @@ class LaunchConsistencyTests(K28ExecutorTestCase):
         argv = rendered["bridge_argv"]
         self.assertEqual(argv[argv.index("--base-url") + 1], self.BASE_URL)
 
-    def test_check_rejects_argv_that_does_not_pin_execution(self):
-        report = self.run_offline_check(decision_tier="decision")
+    def test_check_ignores_decision_tier_input(self):
+        """固定执行分级门禁已移除:decision/execution/缺省都不再影响离线检查结果。"""
+        baseline = self.run_offline_check()
+        self.assertTrue(baseline["ok"], baseline["problems"])
+        baseline_names = sorted(check["name"] for check in baseline["checks"])
+        self.assertNotIn("decision_tier_binding", baseline_names)
 
-        self.assertFalse(report["ok"])
-        names = {check["name"]: check for check in report["checks"]}
-        self.assertFalse(names["decision_tier_binding"]["ok"])
-        self.assertTrue(any("执行分级" in item for item in report["problems"]), report["problems"])
+        for tier in ("decision", "execution", None):
+            with self.subTest(decision_tier=tier):
+                report = self.run_offline_check(decision_tier=tier)
+                self.assertEqual(report["ok"], baseline["ok"])
+                self.assertEqual(
+                    sorted(check["name"] for check in report["checks"]),
+                    baseline_names,
+                )
+                self.assertEqual(report["problems"], baseline["problems"])
 
     def test_check_rejects_empty_base_url(self):
         report = self.run_offline_check(base_url="")
@@ -947,19 +956,37 @@ class LaunchConsistencyTests(K28ExecutorTestCase):
         names = {check["name"]: check for check in report["checks"]}
         self.assertFalse(names["base_url_contract"]["ok"])
 
-    def test_argv_pins_execution_over_local_decision_groups_yaml(self):
-        for tier in ("decision", None):
+    def test_check_ignores_local_groups_decision_tier(self):
+        """K28 同 argv 带不带 --decision-tier 一致:本地 groups.yaml 分级不再是来源。"""
+        for tier in ("decision", "execution", None, "unknown-tier"):
             with self.subTest(local_tier=tier):
                 root = self._project_with_local_tier(tier)
-                argv = k28.build_bridge_argv(project_root=root)
+                report = self.run_offline_check(project_root=root)
+                self.assertTrue(report["ok"], report["problems"])
+                names = {check["name"]: check for check in report["checks"]}
+                self.assertNotIn("decision_tier_binding", names)
 
-                self.assertEqual(argv[argv.index("--decision-tier") + 1], "execution")
-                parsed = kimi_bridge.build_parser().parse_args(argv)
+                with_flag = k28.build_bridge_argv(project_root=root, decision_tier="decision")
+                plain_argv = k28.build_bridge_argv(project_root=root)
+                without_flag = [
+                    item
+                    for index, item in enumerate(plain_argv)
+                    if item != "--decision-tier"
+                    and (index == 0 or plain_argv[index - 1] != "--decision-tier")
+                ]
+                with_report = self.run_offline_check(
+                    project_root=root, decision_tier="decision"
+                )
+                without_report = self.run_offline_check(project_root=root)
+                self.assertNotIn("--decision-tier", without_flag)
+                self.assertIn("--decision-tier", with_flag)
+                self.assertEqual(with_report["ok"], without_report["ok"])
                 self.assertEqual(
-                    cli_bridge.resolve_decision_tier(parsed, k28.MEMBER_ID), "execution"
+                    sorted(check["name"] for check in with_report["checks"]),
+                    sorted(check["name"] for check in without_report["checks"]),
                 )
 
-    def test_launch_runs_as_execution_despite_local_decision_tier(self):
+    def test_launch_ignores_local_decision_tier(self):
         root = self._project_with_local_tier("decision")
         captured = {}
 
@@ -975,10 +1002,9 @@ class LaunchConsistencyTests(K28ExecutorTestCase):
                 )
 
         self.assertEqual(code, 0)
-        args = captured["args"]
-        self.assertEqual(args.decision_tier, "execution")
-        # 既有 bridge 真正使用的解析函数面对本地 decision 也必须给出 execution
-        self.assertEqual(cli_bridge.resolve_decision_tier(args, k28.MEMBER_ID), "execution")
+        self.assertIn("args", captured)
+        # 分级不再是行为来源：启动不再因本地 decision 而阻断
+        self.assertFalse(hasattr(cli_bridge, "resolve_decision_tier"))
 
 
 class IdentityPreflightTests(K28ExecutorTestCase):
@@ -1076,7 +1102,7 @@ class IdentityPreflightTests(K28ExecutorTestCase):
         self.assertFalse(report["ok"])
         self.assertTrue(any("名册" in item for item in report["problems"]), report["problems"])
 
-    def test_role_or_tier_mismatch_is_rejected(self):
+    def test_business_role_mismatch_is_rejected(self):
         roster = [
             {
                 "member_id": k28.MEMBER_ID,
@@ -1091,7 +1117,22 @@ class IdentityPreflightTests(K28ExecutorTestCase):
         self.assertFalse(report["ok"])
         joined = " ".join(report["problems"])
         self.assertIn("business_role", joined)
-        self.assertIn("decision_tier", joined)
+        self.assertNotIn("decision_tier", joined)
+
+    def test_roster_decision_tier_does_not_gate_launch(self):
+        """远端名册分级不再是门禁:decision/execution/缺失都必须通过。"""
+        for tier in ("decision", "execution", None, "unknown-tier"):
+            with self.subTest(tier=tier):
+                entry = {
+                    "member_id": k28.MEMBER_ID,
+                    "business_role": k28.BUSINESS_ROLE,
+                }
+                if tier is not None:
+                    entry["decision_tier"] = tier
+                report, _calls = self._run(
+                    {"me": {"id": k28.MEMBER_ID, "kind": "agent"}, "roster": [entry]}
+                )
+                self.assertTrue(report["ok"], report["problems"])
 
     def test_network_failure_is_rejected_before_any_write(self):
         report, _calls = self._run(

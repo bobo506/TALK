@@ -57,12 +57,12 @@ def _agents_md(display_name: str) -> str:
 > 个人语气/风格/边界属于各 Agent 自己的 `SOUL.md`，不写在这里
 > （见 `agents/<member_id>/SOUL.md`，PROJECT_INTEGRATION §5.3.1）。
 
-## Agent 决策分级
+## 任务职责与协作
 
-- **决策 Agent**：方向明确、无重大不确定项时可自主连续推进多个切片；遇产品方向、
-  破坏性接口/数据变更、部署/权限风险或重大体验分歧时先确认。
-- **执行 Agent**：每个切片完成后暂停、汇总进度，等决策 Agent 或项目管理者确认。
-- 未明确声明分级的 Agent，默认按**执行 Agent** 处理。
+- 固定"决策 / 执行"分级已取消；协调责任由具体任务发起者按任务包确定。
+- 开发、独立复核与收尾职责由项目开发要求、本次明确授权及任务包确定，
+  同一角色可在不同任务承担不同职责。
+- 业务角色标签只说明人工定义的工作定位，不决定协调责任、永久分级或任务权限。
 
 ## 切片节奏与提交
 
@@ -78,7 +78,7 @@ def _agents_md(display_name: str) -> str:
 ## 业务角色
 
 业务角色（lead / dev / ui / tester / reviewer 等）在 `groups.yaml` 按群定义，
-与决策分级是两个正交维度。
+仅说明人工定义的职责定位，不决定权限、路由或协调责任。
 """
 
 
@@ -236,9 +236,14 @@ def _group_agent_metadata(root: Path) -> dict[str, dict[str, Any]]:
 
     ``business_role`` remains free text and may legitimately vary across
     project groups, so distinct values are kept in declaration order and joined
-    for the project-level discovery summary. Decision tier is a behavioral
-    boundary and therefore must be consistent across all groups. Capabilities
-    are explicit strings, de-duplicated in declaration order.
+    for the project-level discovery summary. Capabilities are explicit strings,
+    de-duplicated in declaration order.
+
+    ``decision_tier`` is a **deprecated** compatibility field: the fixed
+    decision/execution tier was removed and no longer constrains anything. The
+    key is still echoed for older callers (first declared value), but missing,
+    conflicting or unknown values are accepted as-is and never raise, never route
+    and never grant/deny permissions.
     """
 
     aggregated: dict[str, dict[str, list[str]]] = {}
@@ -260,6 +265,7 @@ def _group_agent_metadata(root: Path) -> dict[str, dict[str, Any]]:
             if business_role and business_role not in record["business_roles"]:
                 record["business_roles"].append(business_role)
 
+            # Deprecated compatibility echo only; intentionally never validated.
             decision_tier = str(member.get("decision_tier") or "").strip().lower()
             if decision_tier and decision_tier not in record["decision_tiers"]:
                 record["decision_tiers"].append(decision_tier)
@@ -279,17 +285,11 @@ def _group_agent_metadata(root: Path) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for member_id, record in aggregated.items():
         tiers = record["decision_tiers"]
-        if len(tiers) > 1:
-            raise ValueError(
-                f"{member_id} has conflicting decision_tier values in .talk/groups.yaml: "
-                f"{tiers}"
-            )
-        if tiers and tiers[0] not in {"decision", "execution"}:
-            raise ValueError(
-                f"unsupported decision_tier for {member_id}: {tiers[0]}"
-            )
         result[member_id] = {
             "business_role": " / ".join(record["business_roles"]) or None,
+            # Deprecated: retained for backward compatibility with older sync
+            # payloads; conflicting/unknown/missing values are all accepted and
+            # the value never influences behavior.
             "decision_tier": tiers[0] if tiers else None,
             "capability_summary": record["capabilities"],
         }
@@ -304,6 +304,10 @@ def scan_agents(root: Path) -> list[dict[str, Any]]:
     are relative to ``root`` with forward slashes so they are stable across OSes;
     a missing profile file yields ``None`` for that field. Returns entries sorted
     by ``member_id`` to match the server's index ordering.
+
+    The ``decision_tier`` key is kept only for backward compatibility and is
+    deprecated: it is a passive echo of ``.talk/groups.yaml`` (see
+    :func:`_group_agent_metadata`) and never affects sync, routing or permissions.
     """
     agents_dir = Path(root) / ".talk" / "agents"
     if not agents_dir.exists():

@@ -16,8 +16,8 @@
   显式动作 + human 凭据触发，并完整复用 C2 的 ``apply_plan``（human 身份、参数/来源重核、
   写后最新读回、零盲重试）；
 - native 来源由本入口**显式只读加载**：只有当前运行入口实际会解析到的文件（``KIMI_CODE_HOME``
-  或默认 home），叠加不可证明的覆盖层检查与真实 argv 的完整受控契约（alias、受控命令、
-  执行分级），全部成立才把来源标记为 ``confirmed``。显式 ``--native-config`` 指向未被
+  或默认 home），叠加不可证明的覆盖层检查与真实 argv 的受控契约（alias、受控命令），
+  全部成立才把来源标记为 ``confirmed``。显式 ``--native-config`` 指向未被
   入口选中的文件时一律 ``blocked``；读到文件、摘要正确或传入 fixture 本身都不构成 confirmed；
 - ``plan`` 只输出可审阅计划、公开来源证据、拟新增/no_op/差异/冲突与恢复索引，以及供人工
   审批的 application 包草稿。该包只按白名单投影输入，写计数与条目从有效 C2 计划条目重算；
@@ -129,7 +129,7 @@ _REASON_DETAILS: dict[str, str] = {
     "E_CLOSEOUT_SOURCE_UNSELECTED": "显式给出的 native 配置未被当前运行入口的实际解析规则选中；读到文件不等于生效来源",
     "E_CLOSEOUT_OVERRIDE_UNKNOWN": "存在无法证明生效顺序的覆盖层；不把读到文件当作已确认来源",
     "E_CLOSEOUT_ARGV_MISMATCH": "真实 argv 的最终模型选择与固定 alias 常量不一致",
-    "E_CLOSEOUT_ARGV_COMMAND_MISMATCH": "真实 argv 的受控命令或执行分级与固定契约不一致",
+    "E_CLOSEOUT_ARGV_COMMAND_MISMATCH": "真实 argv 的受控命令与固定契约不一致",
     "E_CLOSEOUT_ALIAS_MISSING": "原生配置里没有该 alias 条目，无法核对公开元组",
     "E_CLOSEOUT_PLAN_REQUIRED": "apply/verify 必须显式给出计划文档",
     "E_CLOSEOUT_PLAN_INVALID": "计划不是本入口或 C2 生成的合法计划文档",
@@ -364,11 +364,13 @@ def argv_selection_evidence(adapter: Any) -> dict[str, Any]:
     """真实 argv 的最终模型选择证据（检查对象 == 执行对象）。
 
     只用 ``kimi_k28_executor.build_bridge_argv`` 生成、再用 ``bridges.kimi_bridge`` 的
-    parser 解析同一份 argv，核对**完整受控契约**：最终 ``--kimi-model`` alias、受控
-    ``--kimi-command`` 与显式执行分级三项同时成立才算 ``ok``；任一项缺失/不匹配即
-    ``blocked``。另外确认桥接 argv 没有夹带配置路径选择器（本入口假定原生 CLI 按
-    ``KIMI_CODE_HOME`` / 默认 home 解析来源）。不启动 bridge/服务/模型，也不使用原生 CLI
-    的 ``--version`` / ``--help`` 解析模型配置。
+    parser 解析同一份 argv，核对**受控契约**：最终 ``--kimi-model`` alias 与受控
+    ``--kimi-command`` 两项同时成立才算 ``ok``；任一项缺失/不匹配即 ``blocked``。
+    固定"决策/执行"分级门禁已移除：argv 里的 ``--decision-tier`` 只是一个被 bridge
+    忽略的历史兼容参数，不再作为就绪条件，也不出现在公开证据里。另外确认桥接 argv
+    没有夹带配置路径选择器（本入口假定原生 CLI 按 ``KIMI_CODE_HOME`` / 默认 home
+    解析来源）。不启动 bridge/服务/模型，也不使用原生 CLI 的 ``--version`` /
+    ``--help`` 解析模型配置。
     """
     public: dict[str, Any] = {
         "argv_builder": "kimi_k28_executor.build_bridge_argv",
@@ -395,12 +397,10 @@ def argv_selection_evidence(adapter: Any) -> dict[str, Any]:
                     "config_selector_flags": selector_flags,
                     "matches_fixed_alias": False,
                     "command_matches_controlled": False,
-                    "decision_tier_matches": False,
                 }
             )
             return {"status": "blocked", "public": public}
         parsed_model, parsed_command = _parse_bridge_argv(argv)
-        decision_tier = k28.resolve_argv_decision_tier(argv)
     except Exception:  # noqa: BLE001 - 解析/导入失败不回流正文
         return {"status": "blocked", "public": {**public, "status": "blocked"}}
 
@@ -409,9 +409,7 @@ def argv_selection_evidence(adapter: Any) -> dict[str, Any]:
     command_matches = (
         bool(parsed_command) and parsed_command == k28.CONTROLLED_KIMI_COMMAND
     )
-    tier_expected = k28.DECISION_TIER
-    tier_matches = decision_tier == tier_expected
-    matches = alias_matches and command_matches and tier_matches
+    matches = alias_matches and command_matches
     public.update(
         {
             "status": "ok" if matches else "blocked",
@@ -421,9 +419,6 @@ def argv_selection_evidence(adapter: Any) -> dict[str, Any]:
             "matches_fixed_alias": alias_matches,
             "command_contract": "explicit_fixed_contract",
             "command_matches_controlled": command_matches,
-            "decision_tier": decision_tier,
-            "decision_tier_expected": tier_expected,
-            "decision_tier_matches": tier_matches,
             "config_selector_forwarded": bool(selector_flags),
             "config_selector_flags": selector_flags,
         }
@@ -510,9 +505,7 @@ class _SourceBoundary:
             argv = argv_selection_evidence(profile.adapter)
             public["argv_selection"] = argv["public"]
             if argv["status"] != "ok":
-                if not argv["public"].get("command_matches_controlled", True) or not argv[
-                    "public"
-                ].get("decision_tier_matches", True):
+                if not argv["public"].get("command_matches_controlled", True):
                     blocked.append(
                         _reason("E_CLOSEOUT_ARGV_COMMAND_MISMATCH", field="kimi_command")
                     )
@@ -1385,9 +1378,6 @@ _NATIVE_ARGV_KEYS: tuple[str, ...] = (
     "matches_fixed_alias",
     "command_contract",
     "command_matches_controlled",
-    "decision_tier",
-    "decision_tier_expected",
-    "decision_tier_matches",
     "config_selector_forwarded",
     "argv_alias_sha256",
     "profile_alias_sha256",

@@ -6,7 +6,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261010-adapter-closeout-c4"
+STATIC_VERSION = "20261011-role-lifecycle-r1-2"
 
 
 class RequirementsWebUiTests(RouteTestCase):

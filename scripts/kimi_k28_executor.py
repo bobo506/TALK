@@ -10,8 +10,8 @@
 - 受控固定命令：本入口与 `command_override_allowed=false` 一致，argv 里**显式**写入
   固定命令 `kimi --output-format stream-json -p`，因此 `TALK_KIMI_COMMAND` 等环境
   继承与任何显式自定义命令都不能绕过模型锁与工具档隔离；
-- 固定执行分级：argv 显式写入 `--decision-tier execution`；远端名册核验的是 execution，
-  本地 `.talk/groups.yaml` 的 `decision`/缺省不得让实际运行按 decision 执行；
+- 执行分级已取消：不再把 `execution` 当作固定合同，也不再因 argv/本地配置/远端名册的
+  分级差异阻断；`--decision-tier` 仅为历史兼容转发，bridge 接受并忽略该参数；
 - 单一服务地址：只读身份预检与实际 bridge argv 使用同一个 `--base-url`。
 - 工具档：任务执行 `tools`（Edit/Write），讨论与领取前预检保持无工具；
 - 凭据安全：只从环境变量或**仓库外**密钥文件读取，绝不打印、不落盘到仓库；
@@ -62,6 +62,9 @@ CONTRACT_SCHEMA = "kimi-k28-executor-contract-1"
 MEMBER_ID = "agent:kimi-code-k28-preview"
 DISPLAY_NAME = "Kimi Code · K2.8 Preview 执行"
 BUSINESS_ROLE = "dev"
+# Deprecated compatibility constant: the fixed "decision/execution" tier contract was
+# removed. The value is no longer a gate anywhere; it is only echoed in the historical
+# contract/dry-run fields and forwarded as an ignored ``--decision-tier`` argv value.
 DECISION_TIER = "execution"
 PROJECT_ID = "prj_e8fe7066bbec"
 DEFAULT_PROJECT_ROOT = "D:/claude-test/TALK"
@@ -437,11 +440,16 @@ def build_bridge_argv(
     task_profile: str = TASK_TOOL_PROFILE,
     model: str = MODEL_ALIAS,
     kimi_command: str = CONTROLLED_KIMI_COMMAND,
-    decision_tier: str = DECISION_TIER,
+    decision_tier: str | None = DECISION_TIER,
     timeout: int = EXECUTION_TIMEOUT_SECONDS,
     instance_id: str | None = None,
 ) -> list[str]:
-    """生成 bridge argv：显式携带受控固定命令与**固定执行分级**，环境/本地来源不生效。"""
+    """生成 bridge argv：显式携带受控固定命令，环境/本地来源不生效。
+
+    ``--decision-tier`` 仅为历史兼容而**可选**转发：固定"决策/执行"分级已取消，
+    该参数在 bridge 侧被接受并忽略，本地 ``.talk/groups.yaml`` 不再被读取。
+    ``decision_tier=None`` 时完全不输出该 flag，行为与显式输出时一致。
+    """
     argv = [
         "--name", name,
         "--key", key_placeholder,
@@ -454,28 +462,15 @@ def build_bridge_argv(
         "--kimi-task-profile", task_profile,
         "--kimi-model", model,
         "--kimi-command", kimi_command,
-        # 固定执行分级：远端名册核验的是 execution，argv 必须显式注入同一个值，
-        # 否则既有 cli_bridge 会回读本地 .talk/groups.yaml，出现“验 execution、跑 decision”。
-        "--decision-tier", decision_tier,
         "--timeout", str(timeout),
     ]
+    if decision_tier in {"decision", "execution"}:
+        # 兼容转发：该值不再参与任何合同判定，也不再触发本地配置回读。
+        # 非历史取值一律不输出，保证任意输入都不会生成非法 argv。
+        argv += ["--decision-tier", decision_tier]
     if instance_id:
         argv += ["--instance-id", instance_id]
     return argv
-
-
-def resolve_argv_decision_tier(argv: list[str], *, member_id: str = MEMBER_ID) -> str:
-    """用**既有 bridge parser**解析真实 argv，再走 bridge 的 `resolve_decision_tier`。
-
-    这是“检查对象 == 执行对象”的证据路径：解析的是本入口真正传给 bridge 的 argv，
-    解析函数也是既有 bridge 使用的那一个。
-    """
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
-    from bridges import cli_bridge, kimi_bridge  # noqa: PLC0415 - 延迟导入保持离线轻量
-
-    parsed = kimi_bridge.build_parser().parse_args(argv)
-    return str(cli_bridge.resolve_decision_tier(parsed, member_id))
 
 
 def render_launch(
@@ -545,7 +540,7 @@ def run_check(
     task_profile: str = TASK_TOOL_PROFILE,
     model: str = MODEL_ALIAS,
     kimi_command: str | None = None,
-    decision_tier: str = DECISION_TIER,
+    decision_tier: str | None = DECISION_TIER,
     timeout: int = EXECUTION_TIMEOUT_SECONDS,
     identity_report: dict | None = None,
     online_identity: bool = False,
@@ -744,30 +739,9 @@ def run_check(
         timeout=timeout,
     )
 
-    # 4) 执行分级合同：argv 显式固定 execution；用既有 bridge parser + resolve_decision_tier
-    #    解析**同一份 argv**，本地 .talk/groups.yaml 的 decision 不得覆盖固定执行合同。
-    tier_resolved = ""
-    tier_error = None
-    try:
-        tier_resolved = resolve_argv_decision_tier(argv)
-    except Exception as exc:  # noqa: BLE001 - 解析失败按门禁失败处理，不回显原文
-        tier_error = redact(exc)
-    tier_ok = tier_error is None and tier_resolved == DECISION_TIER
-    _add(
-        checks,
-        "decision_tier_binding",
-        tier_ok,
-        (
-            f"argv 显式 --decision-tier {decision_tier}；bridge resolve_decision_tier → "
-            f"{tier_resolved or '无法解析'}（本地 groups.yaml 不得覆盖固定 {DECISION_TIER}）"
-        ),
-    )
-    if not tier_ok:
-        problems.append(
-            tier_error
-            or f"执行分级必须是 {DECISION_TIER}，bridge 实际解析为 {tier_resolved or '未知'}；"
-            "固定执行合同不允许改按本地 decision 执行"
-        )
+    # 执行分级合同已移除：不再解析 argv/本地配置/远端名册的分级漂移，也不再有
+    # ``decision_tier_binding`` 门禁。``decision_tier`` 只是历史兼容入参，被接受并忽略；
+    # 同一条 argv 带不带 ``--decision-tier`` 行为完全一致。
 
     materialize_ok = False
     materialize_detail = "参数未通过前置检查，未生成运行命令"
@@ -1014,7 +988,7 @@ def identity_preflight(
     expect_project: str = PROJECT_ID,
     expect_kind: str = "agent",
     expect_business_role: str = BUSINESS_ROLE,
-    expect_decision_tier: str = DECISION_TIER,
+    expect_decision_tier: str | None = None,
     http_timeout: float = HTTP_TIMEOUT_SECONDS,
     get_json=None,
 ) -> dict:
@@ -1025,13 +999,17 @@ def identity_preflight(
     1. `GET /api/members/me`：Key 必须对应**已存在**的本人（`id == expect_member`）
        且 `kind == agent`；未注册 Key（HTTP 401）、其它成员 Key（id 不符）直接失败。
     2. `GET /api/projects/{project_id}/agents`：本人必须在项目名册中，且
-       `business_role` / `decision_tier` 与本入口分级一致；错误项目（HTTP 404）、
-       非 agent、名册缺失或角色不一致都失败。
+       `business_role` 与本入口一致；错误项目（HTTP 404）、非 agent、名册缺失或
+       业务角色不一致都失败。
     3. 任一网络错误都在此返回失败；调用方必须在 `client.register` 之前终止。
+
+    ``expect_decision_tier`` 是已弃用的历史兼容参数：固定"决策/执行"分级已取消，
+    该参数被接受并忽略，名册里的任何分级值都不再参与门禁（仍作为只读信息回显）。
 
     返回结构化报告（不抛异常给调用方，便于记录与测试）；`problems` 为短中文，
     不含任何 Key 正文。
     """
+    del expect_decision_tier
     getter = get_json or _http_get_json
     base = str(base_url or "").rstrip("/")
     checks: list[dict] = []
@@ -1098,14 +1076,9 @@ def identity_preflight(
                     )
                 else:
                     actual_role = roster_entry.get("business_role")
-                    actual_tier = roster_entry.get("decision_tier")
                     if str(actual_role or "") != expect_business_role:
                         problems.append(
                             f"身份核验失败：名册 business_role 期望 {expect_business_role}，实际 {actual_role!r}"
-                        )
-                    if str(actual_tier or "") != expect_decision_tier:
-                        problems.append(
-                            f"身份核验失败：名册 decision_tier 期望 {expect_decision_tier}，实际 {actual_tier!r}"
                         )
         _add(
             checks,
@@ -1156,10 +1129,10 @@ def run_launch(
     env = os.environ if environ is None else environ
     key, source = resolve_api_key(environ=env, key_file=key_file)
 
-    # 1) 启动前检查：与 bridge 同一条路径（固定受控命令 + 固定执行分级 + 本次实际 native
-    #    配置 + 项目绑定 + **同一个 base_url**）。这里默认 kimi_config=None，即读取 CLI 真正
+    # 1) 启动前检查：与 bridge 同一条路径（固定受控命令 + 本次实际 native 配置 +
+    #    项目绑定 + **同一个 base_url**）。这里默认 kimi_config=None，即读取 CLI 真正
     #    使用的那份 config.toml；不接受“检查一个、启动另一个”。任何一项失败都在任何
-    #    bridge/模型/生产写操作之前退出。
+    #    bridge/模型/生产写操作之前退出。固定执行分级合同已移除，检查不再核对分级。
     gate = run_check(
         project_root=project_root,
         key_file=key_file,
@@ -1180,7 +1153,7 @@ def run_launch(
     print(
         f"Kimi K2.8 独立执行入口：成员 {MEMBER_ID}；密钥来源 {source}；"
         f"模型 alias {MODEL_ALIAS}；任务档 {TASK_PROFILE_SUMMARY}；"
-        f"执行分级 {DECISION_TIER}；服务地址 {base_url}；"
+        f"服务地址 {base_url}；"
         f"受控命令 {CONTROLLED_KIMI_COMMAND!r}",
         file=sys.stderr,
     )
@@ -1192,7 +1165,6 @@ def run_launch(
                     "mode": "launch-dry-run",
                     "argv": redacted,
                     "base_url": base_url,
-                    "decision_tier": DECISION_TIER,
                     "controlled_command": CONTROLLED_KIMI_COMMAND,
                     "identity_verified": False,
                     "online_identity_checked": False,
@@ -1215,24 +1187,19 @@ def run_launch(
         )
     print(
         f"在线身份核验通过（只读）：member_id={identity['member_id']} kind={identity['kind']} "
-        f"business_role={identity['business_role']} decision_tier={identity['decision_tier']}",
+        f"business_role={identity['business_role']}",
         file=sys.stderr,
     )
 
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
-    from bridges import cli_bridge, kimi_bridge  # noqa: PLC0415
+    from bridges import kimi_bridge  # noqa: PLC0415
 
     args = kimi_bridge.build_parser().parse_args(argv)
     # 密钥只在内存里替换占位符：不进入命令行、日志或仓库文件。
     args.key = key
-    # B2 双保险：既有 bridge 会用同一个 resolve_decision_tier 解析 argv；固定执行合同
-    # 必须解析为 execution，任何本地来源都不能让实际运行按 decision 执行。
-    resolved_tier = cli_bridge.resolve_decision_tier(args, MEMBER_ID)
-    if resolved_tier != DECISION_TIER:
-        raise K28ExecutorError(
-            f"执行分级解析为 {resolved_tier}，固定合同要求 {DECISION_TIER}；拒绝以 decision 启动"
-        )
+    # 固定的执行分级双重校验已移除：bridge 接受并忽略 --decision-tier，本地
+    # .talk/groups.yaml 不再被读取，不再存在分级漂移拒绝路径。
     asyncio.run(kimi_bridge.run_bridge(args))
     return 0
 

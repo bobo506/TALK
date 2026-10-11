@@ -14,6 +14,8 @@ Profile layout (PROJECT_INTEGRATION §5.3)::
 
 from __future__ import annotations
 
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
@@ -93,6 +95,46 @@ def write_profile_file(root: PathLike, member_id: str, kind: str, content: str) 
     path = resolve_profile_path(root, member_id, kind)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def atomic_write_text(path: PathLike, content: str, *, encoding: str = "utf-8") -> Path:
+    """Write ``content`` to ``path`` atomically (same-dir temp file + ``os.replace``).
+
+    The temp file lives in the destination directory (same filesystem, so
+    ``os.replace`` is atomic) and is removed on any failure, so an interrupted or
+    failing write never leaves a half-written target file behind. ``os.fsync``
+    flushes the bytes before the swap.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    handle_fd, temp_name = tempfile.mkstemp(
+        prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent)
+    )
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(handle_fd, "w", encoding=encoding, newline="") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, target)
+    except BaseException:
+        try:
+            temp_path.unlink()
+        except OSError:
+            pass
+        raise
+    return target
+
+
+def write_profile_file_atomic(root: PathLike, member_id: str, kind: str, content: str) -> Path:
+    """Atomically write one profile file under ``<root>/.talk/agents/<member>/``.
+
+    Same layout and path-traversal guard as :func:`write_profile_file`, but the
+    write is atomic so an interrupted provisioning run cannot leave a truncated
+    IDENTITY/SOUL/USER file.
+    """
+    path = resolve_profile_path(root, member_id, kind)
+    return atomic_write_text(path, content)
 
 
 def load_profile(root: PathLike, member_id: str) -> AgentProfile:

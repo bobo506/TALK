@@ -7,7 +7,8 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261010-adapter-closeout-c4"
+# R1-2：本片改动 workspace.js/app.js，四处静态资源版本整体 bump（仓库约定“四处一致”）。
+STATIC_VERSION = "20261011-role-lifecycle-r1-2"
 
 
 class RoleDescriptionWebUiTests(RouteTestCase):
@@ -33,10 +34,14 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertIn('aria-label="角色说明"', html)
         self.assertIn('aria-label="参与的任务"', html)
         self.assertIn('role="status"', html)
-        # 语义文案：纯展示文本、不改变任务发起者归属/职责/权限，空白或恢复默认回到默认文案
+        # 语义文案：纯展示文本、不改变任务发起者归属/业务角色/权限，空白或恢复默认回到默认文案
         self.assertIn("纯展示文本 · 不改变职责与权限", html)
-        self.assertIn("不改变任务发起者归属、职责分级", html)
+        self.assertIn("不改变任务发起者归属、业务角色", html)
         self.assertIn("恢复默认", html)
+        # R1-2：页面主显示不再出现固定“决策/执行”分级，说明文案也不再宣传 decision_tier。
+        self.assertNotIn("decision_tier", html)
+        self.assertNotIn("决策人", html)
+        self.assertNotRegex(html, re.compile(r"职责分级"))
         # N4 修正（#137）：布局顺序 = 名称区 → 静态说明区 → 参与任务区，三者同级 section；
         # 说明区不得置于任一动态度量内部（replaceChildren 会销毁编辑区节点）。
         self.assertRegex(
@@ -52,7 +57,7 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertLess(html.index('id="role-description-panel"'), html.index('id="role-details-tasks-panel"'))
         self.assertLess(html.index('id="role-details-tasks-panel"'), html.index('id="group-members-panel"'))
         self.assertNotIn('id="role-details-panel"', html, "旧的整体动态角色详情容器已拆分")
-        # 静态资源版本同步刷新缓存（4 处）。
+        # 静态资源版本同步刷新缓存（四处一致）。
         self.assertEqual(html.count(STATIC_VERSION), 4)
         self.assertEqual(len(re.findall(r"20261005-role-desc", html)), 0, "旧版本串不残留")
         self.assertNotIn("20260923-manual-task-cleanup-1", html)
@@ -63,6 +68,7 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         script = (PROJECT_ROOT / "web" / "workspace.js").read_text(encoding="utf-8")
         app_script = (PROJECT_ROOT / "web" / "app.js").read_text(encoding="utf-8")
         stylesheet = (PROJECT_ROOT / "web" / "workspace.css").read_text(encoding="utf-8")
+        html = (PROJECT_ROOT / "web" / "index.html").read_text(encoding="utf-8")
 
         start = script.index("const ROLE_DESCRIPTION_MAX_CHARS")
         end = script.index("function renderWorkspaceList()")
@@ -136,3 +142,12 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertRegex(stylesheet, re.compile(r"\.role-row span \{[^}]*overflow-wrap:\s*anywhere"))
         # N4 修正：名称区 / 参与任务区两个动态容器样式存在。
         self.assertIn("#role-details-tasks-panel", stylesheet)
+        # R1-2：角色展示/说明/搜索静态源码不含固定分级；app.js 只保留非行为性的已弃用透传。
+        self.assertNotIn("decision_tier", script)
+        self.assertNotIn("decisionTier", script)
+        self.assertNotIn("决策人", script)
+        self.assertIn("已弃用（deprecated）兼容透传", app_script)
+        self.assertIn("decision_tier: editing.decisionTier", app_script)
+        # 页面不再渲染任何固定分级控件（无 decision_tier / decision-tier 的 id/name）。
+        self.assertNotRegex(html, re.compile(r'(?:id|name)="[^"]*decision[-_]?tier[^"]*"', re.IGNORECASE))
+        self.assertNotIn("decision_tier", html)

@@ -17,11 +17,11 @@ HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] = {
         "label": "任务",
         "protocol_guidance": (
             "任务协调 Hall：目标 -> 拆解 -> 分派 -> 执行 -> 收口。"
-            "决策人（群内 decision_tier=decision 的成员或 human）负责拍板与验收；"
-            "执行成员认领切片、完成后在 Hall 汇报。"
+            "由任务发起者（发起人/需求方）负责拆解、分派、验收与收口；"
+            "被分派的成员认领切片，完成后在 Hall 汇报。"
         ),
         "roles": [
-            {"role": "lead", "norm": "拆解任务、分派、把控验收与收口"},
+            {"role": "lead", "norm": "任务发起者：拆解任务、分派切片，把控验收与收口"},
             {"role": "executor", "norm": "认领分派的执行切片，完成后在 Hall 汇报"},
         ],
     },
@@ -29,9 +29,10 @@ HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] = {
         "label": "头脑风暴",
         "protocol_guidance": (
             "头脑风暴 Hall，流程分四步：① 发起人提出需求；"
-            "② 每位成员（包括决策人）各给出一条具体想法（answer），被 @所有人 时直接给实质想法、不回'收到'；"
+            "② 每位成员各给出一条具体想法（answer），被 @所有人 时直接给实质想法、不回'收到'；"
             "③ 按发起人指示，对指定成员的想法逐一表态：同意用 agree，否决用 disagree 且必须给出你自己的看法；"
-            "④ 全部想法表态完成后，由决策人汇总全场想法与表态，产出唯一结论（decision）收口。"
+            "④ 全部想法表态完成后，由发起人（或发起人显式 escalate_to_human 交给人类）收口，"
+            "由承担收口职责的成员汇总全场想法与表态，产出唯一结论（decision）。"
             "未轮到表态或汇总时不要抢跑。"
         ),
         "roles": [
@@ -44,7 +45,8 @@ HALL_TYPE_TEMPLATES: dict[str, dict[str, Any]] = {
         "protocol_guidance": (
             "评审 Hall：作者提交标的产物，评审人针对产物给出收敛式批评与改进意见"
             "（disagree / optimize，对事不对人）；作者据此修订。"
-            "最后由决策人产出结论（decision）收口。先收敛、给可执行意见。"
+            "最后由发起人（或发起人显式 escalate_to_human 交给人类）收口，"
+            "由承担收口职责的成员汇总评审意见并产出结论（decision）。先收敛、给可执行意见。"
         ),
         "roles": [
             {"role": "author", "norm": "提交标的产物、回应评审意见并修订"},

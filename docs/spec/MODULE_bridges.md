@@ -15,6 +15,14 @@
 
 ## 当前实现
 
+### 角色生命周期 R1-2：配置与固定分级迁移已完成
+
+- 2026-10-11，218–221补正后Codex按用户授权修复链接检查定序/Windows测试实际PID，222由DeepSeek独立只读复核，整链已收取；原失败/自报保持。
+- `scripts/role_provision.py` 复用创建操作，默认离线计划；apply配置本人档案/仓库外私有Key/精确绑定并回报三步作业。human-only、版本/revision/attempt CAS、choice指纹、双锁永久OSguard、完整记录原子发布与静态链接拒绝已验。见[配置合同](ROLE_PROVISION_CONTRACT.md)/[验收指南](../guides/ROLE_PROVISION_ACCEPTANCE.md)。
+- 通用CLI bridge、身份生成/扫描、K28、adapter closeout、Hall与页面不再注入/校验固定决策/执行；旧字段/参数兼容弃用，不决定权限/协调/执行/提示。原任务/人工档案保持；review_exempt与created_by发起侧主动/被动保持。
+- Codex684项Python最终证据集合通过；222独立143项零失败/错误/跳过，不叠加；原Node59未变沿用。真实junction/PID/中断已验，文件symlink权限受限未运行；不承诺恶意动态路径替换防护。
+- 当前API/脚本基础已完成；页面一键配置、服务启停、删除/退出仍在R1-3/R1-4。无生产重载/配置、原生登录/模型/就绪/主动等待验收。下文较早说明冲突时以本节为准。
+
 ### 适配收尾登记：C1 离线事实
 
 - `scripts/adapter_binding_facts.py` 接受内存配置与显式 scope，提取来源、稳定运行器 ID、公开投影和指纹；复用既有模型解析与 schema，不读取真实配置/Key，不访问服务或数据库，也不启动模型。

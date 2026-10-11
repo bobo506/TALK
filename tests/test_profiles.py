@@ -2,15 +2,18 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from cli.profiles import (
     SYSTEM_PROMPT_PROFILE_HEADER,
     AgentProfile,
     agent_profile_dir,
+    atomic_write_text,
     compose_identity_block,
     compose_system_prompt,
     load_profile,
     member_dir_name,
+    write_profile_file_atomic,
 )
 
 
@@ -104,6 +107,47 @@ class ProfileLoaderTests(unittest.TestCase):
         self.assertFalse(profile.is_empty)
         self.assertIn("决策型代码 Agent", profile.identity)
         self.assertIn("汇报体", profile.soul)  # SOUL carries the anti-meta rule
+
+
+class AtomicProfileWriteTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="talk-profiles-atomic-"))
+        self.addCleanup(lambda: shutil.rmtree(self._tmp, ignore_errors=True))
+
+    def test_write_profile_file_atomic_writes_and_replaces(self):
+        path = write_profile_file_atomic(self._tmp, "agent:codex", "identity", "first")
+        self.assertTrue(path.is_file())
+        self.assertEqual(path.read_text(encoding="utf-8"), "first")
+        self.assertEqual(
+            path,
+            (agent_profile_dir(self._tmp, "agent:codex") / "IDENTITY.md").resolve(),
+        )
+
+        write_profile_file_atomic(self._tmp, "agent:codex", "identity", "second")
+        self.assertEqual(path.read_text(encoding="utf-8"), "second")
+
+    def test_write_profile_file_atomic_no_temp_leftovers(self):
+        write_profile_file_atomic(self._tmp, "agent:codex", "soul", "soul text")
+        agent_dir = agent_profile_dir(self._tmp, "agent:codex")
+        self.assertEqual(sorted(item.name for item in agent_dir.iterdir()), ["SOUL.md"])
+
+    def test_write_profile_file_atomic_rejects_escape(self):
+        with self.assertRaises(ValueError):
+            write_profile_file_atomic(self._tmp, "agent:../escape", "identity", "x")
+
+    def test_atomic_write_text_creates_parents(self):
+        target = self._tmp / "nested" / "file.txt"
+        result = atomic_write_text(target, "内容", encoding="utf-8")
+        self.assertEqual(result, target)
+        self.assertEqual(target.read_text(encoding="utf-8"), "内容")
+
+    def test_atomic_write_text_failure_leaves_no_half_file(self):
+        target = self._tmp / "out.txt"
+        with mock.patch("cli.profiles.os.replace", side_effect=OSError("injected")):
+            with self.assertRaises(OSError):
+                atomic_write_text(target, "partial")
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self._tmp.iterdir()), [])
 
 
 if __name__ == "__main__":

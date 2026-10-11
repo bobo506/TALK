@@ -357,7 +357,7 @@ function discardProjectRequirements() {
 // 可见性统一由 renderTaskDetailsPanel（app.js）同步。
 // 数据来自既有 GET /api/projects/{id}/agents 响应的 role_description 字段（B1）：
 // null = 无自定义、使用默认文案；写走专用 PUT /agents/{member_id}/description（仅 human）。
-// 说明是纯展示文本：不改变任务发起者归属、business_role / decision_tier 或任务权限。
+// 说明是纯展示文本：不改变任务发起者归属、business_role 或任务权限。
 const ROLE_DESCRIPTION_MAX_CHARS = 2000;
 // 默认文案 = 短标签 + 换行 + 解释（无解释时只留标签行）；硬编码映射仅作为默认值生成器保留，
 // 一旦存在自定义说明，展示端不再渲染映射内容。

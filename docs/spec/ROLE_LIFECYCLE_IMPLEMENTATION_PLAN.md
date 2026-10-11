@@ -1,9 +1,9 @@
 # 项目角色创建与服务生命周期：实施计划（R0 正式实施计划 v4）
 
-> 状态：**R0 v4 已发布，R1-1 后端基础已实现并独立复核通过**（2026-10-11，#216 经 #217 补正并收取）。下一片 R1-2 为宿主一键配置与固定分级迁移；仍逐片派发/复核，真实运行器能力待验。
+> 状态：**R0 v4、R1-1 与 R1-2 已发布并独立复核通过**（2026-10-11）。R1-2 经 #218–#221 补正、Codex 定向修复及 #222 独立复核整链收取，配置API/宿主脚本与固定分级迁移完成。单片收尾暂停，下一片R1-3受管CLI服务生命周期；真实运行器能力待验。
 > 正式位置：`docs/spec/ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md`；合同见同目录 [ROLE_LIFECYCLE_DESIGN.md](ROLE_LIFECYCLE_DESIGN.md)。
 > 修订基线：`5b18c8e7c2eb85fb6737d7c9c89713adf6021ef7`（#215 派发时实际 HEAD，工作区干净，正式源码未变）。
-> R0 发布时仅修改文档；原213/214/215草稿、结果与失败记录保持。R1-1 已按既有开发授权完成代码；本次没有执行生产角色配置、数据库迁移/重载或运行器操作。
+> R0 发布时仅修改文档；原213–222草稿、结果与失败保持。R1-1/R1-2代码已独立通过；未执行生产角色配置、数据库迁移/重载或运行器操作。
 > #215 修正点（详见 `R1_R5_CLOSURE_INDEX.md`）：R1-1 创建改为**单写事务 TX-ALL**（无 `pending`/`failed` 残行）；权限读路径加名册/角色门控（R2）；`rotate-key` 加独占证明（R3）；宿主协议补齐 action/token/`expected_instance_id`/`launch_expires_at`（R4）；第一片保持 `server/` 范围、`cli/talk.py scan_agents` 移 R1-2、claim 守卫归属写清、`choice_id` 投影来源定死（R5）。
 
 ---
@@ -203,14 +203,15 @@ GET  /api/instances?project_id=...     // 附加过滤，缺省行为不变
 
 ---
 
-## 4. 后续切片概要
+## 4. R1-2 已完成与后续切片
 
 ### R1-2 一键配置作业与分级迁移收尾
 
-- 新增 `role_provision_jobs`（设计 §7.6）+ 宿主脚本 `scripts/role_provision.py`（离线检查/`--dry-run` 默认，`--apply` 才写身份档与仓库外 Key 文件）；作业以 R1-1 的 `operation_key` 为恢复锚点，**不重建成员、不重新发行 Key**。
-- 服务端：`POST /api/projects/{id}/roles/{member_id}/provision`（human）与作业读取；步骤幂等与续跑。
+- 已新增 `role_provision_jobs` 与 `scripts/role_provision.py`；默认离线dry-run（无 `--dry-run` 参数），apply才写身份档/仓库外Key。复用原operation_key，不重建身份/重发Key。最终[配置合同](ROLE_PROVISION_CONTRACT.md)/[验收指南](../guides/ROLE_PROVISION_ACCEPTANCE.md)已发布。
+- 服务端四个human-only入口：作业创建/读取、ACK、本人档案路径登记。凭据版本/revision/attempt CAS、轮换后显式重开、精确409白名单、choice指纹及原子Key/锁发布已验证。
 - 分级迁移收尾：`bridges/cli_bridge.py`（移除分级注入、`--decision-tier` 弃用兼容、不再注入 `TALK_DECISION_TIER`、讨论收口人规则调整）、**`cli/talk.py`（`scan_agents` 不再因缺失/冲突分级报错——由 R1-1 移入本片，R5）**、`scripts/kimi_k28_executor.py`、`scripts/adapter_closeout.py`、`server/hall_types.py`、`web/workspace.js`（主显示去分级）。
-- 验收：设计 §6.4 的 R1-2 四条；K28 同 argv 有无 `--decision-tier` 行为一致；旧 `.talk/groups.yaml` 仍可加载不报错。
+- 独立验收：Codex最终684项Python证据集合通过；#222另重点143项通过，零失败/错误/跳过，不叠加；原Node59项未变沿用。junction缺失父目录零副作用、原221负向敏感性、Windows实际owner PID与中断恢复闭合，固定分级不再影响行为/提示。
+- 业务14源/20测试；本次仅调整两处源码正式合同引用，无执行逻辑变化。页面一键配置/启停/删除尚未实现；文件symlink权限受限not_run，恶意动态路径替换防护与实际运行器能力未验。§3.7保留R1-1当时限制，当前配置/分级状态以本节为准。
 
 ### R1-3 CLI 受管服务生命周期
 

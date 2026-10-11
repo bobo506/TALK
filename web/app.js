@@ -2117,6 +2117,10 @@ async function openAgentProfileEditor(membership) {
     memberId: membership.member_id,
     role: membership.role,
     businessRole: membership.business_role || "",
+    // 已弃用（deprecated）兼容透传：固定“决策/执行”分级不再是本页模型的一部分，
+    // 表单不展示、不提供编辑控件、不参与任何展示/路由/权限判定。这里只是把群成员当前的
+    // 历史存量原样带入，避免保存业务角色时把它清空（服务器 PUT 会无条件写入 decision_tier）。
+    // 待阶段 B 确认无消费者后随旧字段一并物理清理。
     decisionTier: membership.decision_tier || null,
   };
   agentProfileTitle.textContent = "编辑人设";
@@ -2185,6 +2189,8 @@ async function saveAgentProfileEditor(event) {
           body: JSON.stringify({
             role: editing.role,
             business_role: nextBusinessRole,
+            // 已弃用（deprecated）兼容透传，非页面模型、无行为：原样回传历史存量，
+            // 既不新增控件也不展示，更不参与任何权限判定；仅用于避免服务器无条件写入时清空旧值。
             decision_tier: editing.decisionTier,
           }),
         }

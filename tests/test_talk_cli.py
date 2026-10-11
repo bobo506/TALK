@@ -291,7 +291,8 @@ class TalkCliTests(RouteTestCase):
             ["代码实现", "API 测试", "只读审查"],
         )
 
-    def test_scan_agents_rejects_conflicting_decision_tiers(self):
+    def test_scan_agents_loads_conflicting_decision_tiers_without_behavior(self):
+        """固定分级已取消:冲突/缺失/未知的 decision_tier 都不再报错。"""
         root = self._root()
         talk.scaffold_project(root, display_name="P")
         talk.scaffold_agent(root, "agent:codex")
@@ -300,13 +301,21 @@ class TalkCliTests(RouteTestCase):
                 {
                     "id": "group:a",
                     "members": [
-                        {"member_id": "agent:codex", "decision_tier": "decision"}
+                        {
+                            "member_id": "agent:codex",
+                            "decision_tier": "decision",
+                            "business_role": "lead",
+                        }
                     ],
                 },
                 {
                     "id": "group:b",
                     "members": [
-                        {"member_id": "agent:codex", "decision_tier": "execution"}
+                        {
+                            "member_id": "agent:codex",
+                            "decision_tier": "execution",
+                            "business_role": "reviewer",
+                        }
                     ],
                 },
             ]
@@ -316,8 +325,37 @@ class TalkCliTests(RouteTestCase):
             encoding="utf-8",
         )
 
-        with self.assertRaisesRegex(ValueError, "conflicting decision_tier"):
-            talk.scan_agents(root)
+        entry = talk.scan_agents(root)[0]
+
+        # 兼容字段仍在（首个声明值），但只是历史回显，不报错、不影响业务角色/能力
+        self.assertEqual(entry["decision_tier"], "decision")
+        self.assertEqual(entry["business_role"], "lead / reviewer")
+        self.assertEqual(entry["capability_summary"], [])
+
+    def test_scan_agents_accepts_missing_and_unknown_decision_tiers(self):
+        for index, tier in enumerate((None, "unknown-tier", "DECISION")):
+            with self.subTest(tier=tier):
+                root = self._tmpdir / f"proj-tier-{index}"
+                root.mkdir(parents=True, exist_ok=True)
+                talk.scaffold_project(root, display_name="P")
+                talk.scaffold_agent(root, "agent:codex")
+                member: dict = {"member_id": "agent:codex", "business_role": "dev"}
+                if tier is not None:
+                    member["decision_tier"] = tier
+                (root / ".talk" / "groups.yaml").write_text(
+                    yaml.safe_dump(
+                        {"groups": [{"id": "group:a", "members": [member]}]},
+                        allow_unicode=True,
+                        sort_keys=False,
+                    ),
+                    encoding="utf-8",
+                )
+
+                entry = talk.scan_agents(root)[0]
+
+                expected = tier.strip().lower() if tier else None
+                self.assertEqual(entry["decision_tier"], expected)
+                self.assertEqual(entry["business_role"], "dev")
 
     def test_scan_agents_empty_without_profiles(self):
         root = self._root()

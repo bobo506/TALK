@@ -190,6 +190,16 @@ CONTROLLER_ASSIGNMENT_UNKNOWN_STATUS_NOTE = (
     "无法判断该指定当前是否有效，需读取方自行核对名册与成员状态，不得假定有效。"
     "该字段已弃用，unknown 不影响任何协调资格。"
 )
+# R1-2 补正 F7：固定“决策/执行”分级已在产品方向取消。为了兼容旧数据/旧消费者，
+# `decision_tier` 仍按存储值原样回显（不物理删列），但必须在**公开说明**里明确弃用，
+# 并说明它不参与任何身份/权限/协调/派发/领取/完成/收取判断。
+DECISION_TIER_DEPRECATION_NOTE = (
+    "项目路径下每个角色回显的 decision_tier 是**已弃用的历史兼容字段**："
+    "固定“决策/执行”分级已取消，该值不再参与身份、权限、路由、协调、派发、领取、"
+    "完成或收取的任何判断，也不要据此挑选任务发起者或复核者；同一条目同时给出 "
+    "decision_tier_deprecated=true 作为机器可读标记。旧数据与旧客户端兼容：字段保留、"
+    "列不物理删除，取值原样回显；非项目路径本就没有该字段，不额外补齐。"
+)
 CONTROLLER_ASSIGNMENT_EFFECTIVE_STATUS_UNSUPPORTED = "unsupported"
 # 只读白名单：与 server.models.PROJECT_ASSIGNMENT_STATUSES 对齐；未知取值只报 unknown。
 CONTROLLER_ASSIGNMENT_STATUSES = (
@@ -628,7 +638,14 @@ def list_agents(*, project_id: str | None = None) -> JsonDict:
                     "member_id": str(agent["member_id"]),
                     "display_name": agent.get("display_name"),
                     "business_role": agent.get("business_role"),
+                    # Deprecated compatibility echo: the fixed decision/execution tier was
+                    # removed and this value never changes dispatch, claim, completion,
+                    # collection, routing or permissions. Kept so existing consumers do not
+                    # break; do not treat it as a coordination/permission fact.
+                    # R1-2 补正 F7：公开说明中同样标注弃用（见 DECISION_TIER_DEPRECATION_NOTE），
+                    # 并给出机器可读标记 decision_tier_deprecated=true。
                     "decision_tier": agent.get("decision_tier"),
+                    "decision_tier_deprecated": True,
                     "capability_summary": list(
                         agent.get("capability_summary") or []
                     ),
@@ -1886,7 +1903,8 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "不执行、不探测，也不透传凭据、凭据路径或实例日志。binding 只是派发配置事实："
             "不代表运行器在线、已适配主动等待或能按任务切换模型，也不代表实际使用的模型与配置一致；"
             "本版本不输出任何实际匹配（binding_match*）结论。"
-            "project_id 省略时使用 bridge 项目上下文。"
+            + DECISION_TIER_DEPRECATION_NOTE
+            + "project_id 省略时使用 bridge 项目上下文。"
         ),
         "inputSchema": {
             "type": "object",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import unittest
@@ -40,6 +41,42 @@ class HallTypeRouteTests(RouteTestCase):
             response = client.get("/api/hall-types", headers={"X-API-Key": "bad-key"})
 
         self.assertEqual(response.status_code, 401)
+
+
+class HallTypeTemplateResponsibilityTests(unittest.TestCase):
+    """R1-2：软预设模板按任务职责描述，不出现固定“决策/执行”分级。"""
+
+    def test_no_template_text_mentions_fixed_decision_tier(self):
+        serialized = json.dumps(HALL_TYPE_TEMPLATES, ensure_ascii=False)
+        self.assertNotIn("decision_tier", serialized)
+        for forbidden in ("决策人", "决策 Agent", "执行 Agent", "decision Agent", "execution Agent"):
+            self.assertNotIn(forbidden, serialized)
+
+    def test_task_template_describes_initiator_and_assigned_members(self):
+        guidance = HALL_TYPE_TEMPLATES["task"]["protocol_guidance"]
+        # 发起者/需求方驱动拆解/分派/验收/收口
+        for token in ("发起者", "拆解", "分派", "验收", "收口"):
+            self.assertIn(token, guidance)
+        # 被分派成员认领切片并回报
+        for token in ("分派", "认领", "汇报"):
+            self.assertIn(token, guidance)
+
+    def test_brainstorm_and_review_close_by_responsibility(self):
+        for hall_type in ("brainstorm", "review"):
+            guidance = HALL_TYPE_TEMPLATES[hall_type]["protocol_guidance"]
+            self.assertIn("发起人", guidance)
+            self.assertIn("escalate_to_human", guidance)
+            self.assertIn("收口", guidance)
+            self.assertIn("decision", guidance)
+            self.assertNotIn("决策人", guidance)
+
+    def test_roles_entries_stay_duty_based_without_tier_fields(self):
+        for template in HALL_TYPE_TEMPLATES.values():
+            for role in template["roles"]:
+                self.assertEqual(set(role), {"role", "norm"})
+                for value in role.values():
+                    self.assertNotIn("decision_tier", str(value))
+                    self.assertNotIn("决策人", str(value))
 
 
 class HallTypeMigrationTests(unittest.TestCase):

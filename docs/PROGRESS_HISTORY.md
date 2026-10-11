@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-11 21:10 (Asia/Shanghai) R1-2独立验收通过，218–222整链收取与发布收尾
+
+- 用户“好了”按222完成处理；msg2726原文5743字符/SHA a35fc1a36def8645ffb8188a35bd69f619839bbe9c6a124cc0f64d3098452d04，本地development.json与MCP逐结构一致。50冻结对象（34业务/16复核产物）全部SHA保持；此前818范围外跟踪/1756旧产物/17本机档独立检查保持。
+- 222独立143项=role_provision59＋followup34＋rework40＋lock_recovery10，零失败/错误/跳过；J1真实junction/missing父目录symlink_refused，外部仅marker、无newdir/lock/guard/temp；正常缺失父目录取得/释放成功。新增回归原221上1预期失败、修后通过。J2独立venv Popen14384≠实际21376，基础解释器19532=实际19532，kill/自然退出皆死无孤儿，未放宽owner/PID/死亡/恢复断言。H1/H2精确409/原子锁回归保持。
+- 222 scope-check对26旧worker相对路径用了错误基目录，输出now:null；不采信其完整保护结论。协调方另核1756旧产物与50冻结SHA全部保持，补足证据。327/354两死PID夹具等进程退出后使用venv启动器不涉及实际owner断言，非阻塞。真实文件symlink因1314未运行；静态链接/junction已验，不承诺恶意动态路径TOCTOU防护。
+- 原发起者222→221→220→219→218顺序收取，UTC13:00:52.601734至13:01:00.833342全部succeeded/completed；msg2726–2722原SHA再核未变。旧任务收取表示补正链最终闭合，不把原失败/partial改成当时通过；全回执本地保存、工具只输出必要字段。
+- 本轮34业务文件（14源/20测试），218–221与Codex两文件修复缺口闭合：持久三步/版本CAS/本人档案登记/精确指纹、私有Key原子发布、永久OSguard/完整owner记录/已死过期回收、mkdir前链接拒绝；bridge/扫描/启动校验/Hall/页面固定分级停用。独立权限、created_by模式、target流程/13键快照保持。
+- Codex最终684Python证据集合=204切片＋未改376相关＋104投影，全通过；222重点143不叠加为827，原Node59沿用。旧失败/错误自报/敏感性日志不追改；本轮文档收尾不机械重跑未变大套件。
+- 同步9正式文档：配置合同/验收指南、设计/计划、BRIEF/ROADMAP、MODULE_bridges、两PROGRESS。models注释/role_provision模块说明仅把忽略目录引用指向正式文档，执行AST保持；原34最终副本/SHA仍在本轮审查根。
+- 本轮审查/收取/范围/Git回执 .tmp/role-lifecycle-r1-2-final-acceptance/；按持续授权常规提交推送34业务＋9文档，准确发布SHA以HEAD/同目录publication.json为准，不预填未知hash。
+- 配置基础里程碑收尾暂停人工验收，页面一键配置/启停/删除/退出未实现；下一片R1-3，不开启R1-4/I-4。无生产DB/真实Key/配置/登录/模型/服务/浏览器动作；隔离证据不外推运行器能力。临时DeepSeek开发/Codex复核，本次Codex修复/DeepSeek复核授权已执行，不派额度不足Kimi；新派发前读要求，精确用量未知不臆测。
+
 ## 2026-10-11 20:49 (Asia/Shanghai) R1-2 #221仍需修复，Codex已按用户授权定向修复，#222独立复核派发
 
 - 用户“221好了”后读取msg2725，单JSON围栏7140字符/SHA56f817759ae15b7c1a4fe66e8a26599ccea7ba89164477c269ab0a8440a6b544；合法221/partial，与本地副本一致。完整默认摘要与两稳定分页原文/raw/normalized保存，原218/219/220/221的自报与失败不追改。221在8相关376含4error/1skip却标pass的不一致记录；本机独立376均通过不代表旧自报当时通过。

@@ -425,6 +425,29 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_role_creation_operations_identity "
             "ON role_creation_operations (project_id, member_id)"
         )
+        # 角色生命周期 R1-2（PROVISION_CONTRACT §1）：跨宿主作业表由 create_all 建，
+        # 这里补齐幂等索引；只增量、不重建表、不新增迁移回填，重复 init_db() 不改旧行。
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_provision_jobs_project "
+            "ON role_provision_jobs (project_id, member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_provision_jobs_status "
+            "ON role_provision_jobs (status)"
+        )
+        # R1-2 补正 F1：作业代际需要绑定角色凭据版本快照。表已存在时只增量补列，
+        # 不改旧行（旧行按默认 1 解释），重复 init_db() 无副作用。
+        provision_job_columns = {
+            row[1]
+            for row in conn.exec_driver_sql(
+                "PRAGMA table_info(role_provision_jobs)"
+            ).fetchall()
+        }
+        if "credential_version" not in provision_job_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE role_provision_jobs "
+                "ADD COLUMN credential_version INTEGER NOT NULL DEFAULT 1"
+            )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_target_member_id ON agent_tasks (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_created_by ON agent_tasks (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_status ON agent_tasks (status)")

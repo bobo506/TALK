@@ -90,12 +90,28 @@ ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sen
 SENTENCE_ENDINGS = "。！？.!?"
 
 
+def _clear_deprecated_decision_tier_env() -> None:
+    """Drop any inherited ``TALK_DECISION_TIER`` so CLI children never observe it.
+
+    The fixed decision/execution tier was removed. The environment variable is
+    no longer written by this bridge, but a stale value inherited from the parent
+    process must not leak into the CLI child's environment either.
+    """
+    os.environ.pop("TALK_DECISION_TIER", None)
+
+
 def configure_talk_tool_environment(args: argparse.Namespace, member_id: str) -> None:
-    """Expose bridge identity and optional project id to runtime-injected TALK tools."""
+    """Expose bridge identity and optional project id to runtime-injected TALK tools.
+
+    ``args.decision_tier`` (deprecated ``--decision-tier`` argv) may still be present
+    on the namespace, but it is accepted and ignored: it is never exported and any
+    inherited value is cleared.
+    """
     os.environ["TALK_API_KEY"] = args.key
     os.environ["TALK_BASE_URL"] = args.base_url
     os.environ["TALK_MEMBER_ID"] = member_id
     os.environ.pop("TALK_PROJECT_ID", None)
+    _clear_deprecated_decision_tier_env()
     project_root = getattr(args, "project", None)
     if not project_root:
         return
@@ -110,41 +126,6 @@ def configure_talk_tool_environment(args: argparse.Namespace, member_id: str) ->
         os.environ["TALK_PROJECT_ID"] = project_id
 
 
-def resolve_decision_tier(args: argparse.Namespace, member_id: str) -> str:
-    """Resolve an explicit tier or the member's project-local groups.yaml tier."""
-    explicit = str(getattr(args, "decision_tier", "") or "").strip().lower()
-    if explicit:
-        return explicit
-
-    project_root = getattr(args, "project", None)
-    if not project_root:
-        return "execution"
-    try:
-        from cli.talk import load_groups
-
-        groups_doc = load_groups(Path(project_root).expanduser().resolve())
-    except (FileNotFoundError, OSError, ValueError):
-        return "execution"
-
-    configured_tiers = {
-        str(member.get("decision_tier") or "").strip().lower()
-        for group in groups_doc.get("groups") or []
-        if isinstance(group, dict)
-        for member in group.get("members") or []
-        if isinstance(member, dict) and str(member.get("member_id") or "").strip() == member_id
-    }
-    configured_tiers.discard("")
-    if not configured_tiers:
-        return "execution"
-    if len(configured_tiers) > 1:
-        raise ValueError(
-            f"{member_id} has conflicting decision_tier values in .talk/groups.yaml: "
-            f"{sorted(configured_tiers)}"
-        )
-    tier = configured_tiers.pop()
-    if tier not in {"decision", "execution"}:
-        raise ValueError(f"unsupported decision_tier for {member_id}: {tier}")
-    return tier
 CHINESE_REQUEST_MARKERS = ("中文", "汉语", "普通话", "简体中文", "用中文")
 ENGLISH_REQUEST_MARKERS = ("英文", "英语", "用英语", "用英文", "in english", "english")
 CAPABILITY_QUESTION_MARKERS = (
@@ -888,31 +869,29 @@ async def _find_human_reviewer(client: Any, group_id: str | None) -> str | None:
     return None
 
 
-async def _find_decision_maker(client: Any, group_id: str | None) -> str | None:
-    if not group_id:
+async def _discussion_initiator(client: Any, discussion_id: int | None) -> str | None:
+    """Return the discussion initiator (``requester_id`` / ``created_by``), if known.
+
+    Close-out is decided by the initiator and the existing stance rules; the removed
+    fixed decision tier is no longer consulted anywhere.
+    """
+    if discussion_id is None:
+        return None
+    getter = getattr(client, "get_discussion", None)
+    if getter is None:
         return None
     try:
-        group = await client.get_group(group_id)
-    except AttributeError:
-        return None
+        discussion = await getter(discussion_id)
     except Exception as exc:
         if _is_talk_not_found(exc):
             return None
         raise
-    return _decision_maker_from_group(group)
-
-
-def _decision_maker_from_group(group: dict[str, Any]) -> str | None:
-    members = group.get("members") or []
-    for member in members:
-        member_id = str(member.get("member_id") or "")
-        decision_tier = str(member.get("decision_tier") or "").strip().lower()
-        if member_id and decision_tier == "decision":
-            return member_id
-    for member in members:
-        member_id = str(member.get("member_id") or "")
-        if member_id.startswith("human:"):
-            return member_id
+    if not isinstance(discussion, dict):
+        return None
+    for key in ("requester_id", "created_by"):
+        value = str(discussion.get(key) or "").strip()
+        if value:
+            return value
     return None
 
 
@@ -956,7 +935,6 @@ def _dump_prompt(
     group_id: str | None,
     group_member_context: str,
     runtime: str,
-    decision_tier: str,
     prompt: str,
 ) -> None:
     """Append the full prompt that's about to be sent to the LLM CLI. Best-effort, never raises."""
@@ -968,7 +946,6 @@ def _dump_prompt(
             f.write(f"timestamp        : {datetime.now().isoformat(timespec='seconds')}\n")
             f.write(f"member_id        : {member_id}\n")
             f.write(f"runtime          : {runtime}\n")
-            f.write(f"decision_tier    : {decision_tier}\n")
             f.write(f"incoming msg id  : {message_id}\n")
             f.write(f"sender           : {sender}\n")
             f.write(f"group_id         : {group_id!r}\n")
@@ -1108,7 +1085,7 @@ async def _record_deferred_demand_turns(
             turn_kind="demand",
             round_index=demand_round,
         )
-        await _resolve_if_decision_maker(
+        await _resolve_if_discussion_initiator(
             client,
             discussion_id=discussion_id,
             group_id=group_id,
@@ -1224,8 +1201,8 @@ async def _build_group_member_context(
     os.environ["TALK_GROUP_MEMBERS"] = ",".join(mids)
     context = f"群成员：{', '.join(mids)}。\n"
     # 协作层（PROJECT_INTEGRATION §5.2 / P3-2）：注入"我在本群的业务角色"，让 agent 知道
-    # 自己在这一群里的岗位（lead / reviewer / ...）。decision_tier 由 bridge 启动参数注入
-    # （见 _decision_tier_line），此处只补 business_role，避免双源冲突。
+    # 自己在这一群里的岗位（lead / reviewer / ...）。业务角色只是人工定义的职责说明；
+    # 固定"决策/执行"分级已移除，此处不再注入任何分级文本。
     self_role = next(
         (
             str(m.get("business_role") or "").strip()
@@ -1285,7 +1262,7 @@ async def _update_discussion_status(
             raise
 
 
-async def _resolve_if_decision_maker(
+async def _resolve_if_discussion_initiator(
     client: Any,
     *,
     discussion_id: int | None,
@@ -1293,10 +1270,17 @@ async def _resolve_if_decision_maker(
     member_id: str,
     stance: str,
 ) -> None:
+    """Close a discussion on an explicit ``decision`` stance from its initiator.
+
+    ``group_id`` is kept for call-site compatibility only. Close-out no longer picks a
+    person by the removed fixed decision tier: it follows the discussion initiator
+    (``requester_id`` / ``created_by``) plus the existing stance rules
+    (``escalate`` -> deadlock, otherwise consensus).
+    """
     if stance != "decision":
         return
-    decision_maker = await _find_decision_maker(client, group_id)
-    if decision_maker != member_id:
+    initiator = await _discussion_initiator(client, discussion_id)
+    if initiator is None or initiator != member_id:
         return
     end_reason = "consensus"
     try:
@@ -1328,17 +1312,17 @@ async def _maybe_escalate_disagreement(
     if not _last_two_turns_disagree(turns):
         return
 
-    decision_maker_id = await _find_decision_maker(client, group_id)
-    if decision_maker_id is None:
+    human_id = await _find_human_reviewer(client, group_id)
+    if human_id is None:
         return
-    text = f"@{decision_maker_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
-    message = await client.send_text(text, to=[decision_maker_id], reply_to=reply_to, group_id=group_id)
+    text = f"@{human_id} 我和对方连续两轮仍有不同判断，请你做最终决定。"
+    message = await client.send_text(text, to=[human_id], reply_to=reply_to, group_id=group_id)
     await _append_discussion_turn(
         client,
         discussion_id=discussion_id,
         message_id=int(message["id"]),
         stance="escalate",
-        target_member_id=decision_maker_id,
+        target_member_id=human_id,
         turn_kind="demand",
         round_index=2,
     )
@@ -1436,7 +1420,7 @@ async def _is_brainstorm_summary_request(
         if _is_talk_not_found(exc):
             return False
         raise
-    return group.get("type") == "brainstorm" and _decision_maker_from_group(group) == member_id
+    return group.get("type") == "brainstorm"
 
 
 async def _brainstorm_summary_grounding(
@@ -1734,7 +1718,7 @@ async def _send_human_escalation(
     text: str,
     human_id: str | None = None,
 ) -> bool:
-    target = human_id or await _find_decision_maker(client, group_id)
+    target = human_id or await _find_human_reviewer(client, group_id)
     if target is None:
         return False
     message = await client.send_text(f"@{target} {text}".strip(), to=[target], reply_to=reply_to, group_id=group_id)
@@ -1841,7 +1825,7 @@ async def execute_talk_actions(
                 turn_kind="demand",
                 round_index=demand_round,
             )
-            await _resolve_if_decision_maker(
+            await _resolve_if_discussion_initiator(
                 client,
                 discussion_id=discussion_id,
                 group_id=group_id,
@@ -2057,10 +2041,6 @@ def should_handle_message(
     return recipients is None and respond_to_broadcast
 
 
-def _decision_tier_line(tier: str) -> str:
-    return "决策 Agent" if tier == "decision" else "执行 Agent"
-
-
 def _task_hall_message_text(message: dict[str, Any]) -> str:
     message_id = message.get("id") or "unknown"
     sender = message.get("from") or "unknown"
@@ -2190,14 +2170,20 @@ def build_cli_task_preflight_prompt(
     member_id: str,
     workdir: Path,
     runtime: str = "cli",
-    decision_tier: str = "execution",
+    decision_tier: str | None = None,
     hall_history: str = "",
 ) -> str:
+    """Build the pre-claim preflight prompt.
+
+    ``decision_tier`` is accepted for backward compatibility with older callers and
+    ``--decision-tier`` argv, but it is deprecated and ignored: the removed fixed
+    decision/execution tier is never rendered into the prompt.
+    """
+    del decision_tier
     content = str(task.get("content") or "").strip()
     title = str(task.get("title") or "").strip()
     task_id = task.get("id") or "unknown"
     creator = task.get("created_by") or "unknown"
-    tier_line = _decision_tier_line(decision_tier)
     title_block = f"标题: {title}\n" if title else ""
     history = hall_history.strip() or "（Task Hall 暂无消息）"
     output_contract = (
@@ -2208,7 +2194,7 @@ def build_cli_task_preflight_prompt(
     )
     if _uses_compact_prompt(runtime, member_id):
         return (
-            f"你是 {member_id}（{tier_line}）。请对任务 #{task_id} 做领取前预检，不要执行任务或修改文件。\n"
+            f"你是 {member_id}。请对任务 #{task_id} 做领取前预检，不要执行任务或修改文件。\n"
             f"请求者: {creator}\n"
             f"{title_block}任务原文:\n{content}\n\n"
             f"Task Hall 完整上下文（按消息顺序）:\n{history}\n\n"
@@ -2216,7 +2202,6 @@ def build_cli_task_preflight_prompt(
         )
     return (
         f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
-        f"{tier_line}\n"
         f"Project root: {workdir}\n"
         f"请对任务 #{task_id} 做领取前预检，不要执行任务或修改文件。\n"
         f"请求者: {creator}\n"
@@ -2300,14 +2285,20 @@ def build_cli_prompt(
     workdir: Path,
     runtime: str = "cli",
     discussion_context: str | None = None,
-    decision_tier: str = "execution",
+    decision_tier: str | None = None,
     group_member_context: str = "",
     shared_history: str = "",
 ) -> str:
+    """Build the group/direct-message prompt.
+
+    ``decision_tier`` is accepted for backward compatibility with older callers and
+    ``--decision-tier`` argv, but it is deprecated and ignored: no fixed
+    decision/execution identity is injected into the prompt.
+    """
+    del decision_tier
     content = str(message.get("content") or "")
     task = strip_leading_mentions(content, member_id=member_id) or content.strip()
     context_block = f"\n\n{discussion_context}" if discussion_context else ""
-    tier_line = _decision_tier_line(decision_tier)
     sender = message.get("from") or "unknown"
 
     if _uses_compact_prompt(runtime, member_id):
@@ -2324,7 +2315,7 @@ def build_cli_prompt(
         # 实测:注入这段会让闲聊场景产生"已经XX啦"式元叙述(模型把寒暄当成 assignee
         # 完成的 request),信噪比被 10x 压垮。其他 runtime(legacy 文本协议)仍保留,
         # 兼容由下方分支承担。
-        parts = [f"你是 {member_id}（{tier_line}）。{sender} 对你说:{task}"]
+        parts = [f"你是 {member_id}。{sender} 对你说:{task}"]
         history_line = shared_history.strip()
         if history_line:
             parts.append(history_line)
@@ -2340,7 +2331,6 @@ def build_cli_prompt(
     history_block = f"{shared_history.strip()}\n\n" if shared_history.strip() else ""
     return (
         f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
-        f"{tier_line}\n"
         f"{group_member_context}"
         f"Project root: {workdir}\n"
         "Answer the user's task. Keep the final response suitable for posting back into TALK.\n"
@@ -2362,13 +2352,19 @@ def build_cli_task_prompt(
     member_id: str,
     workdir: Path,
     runtime: str = "cli",
-    decision_tier: str = "execution",
+    decision_tier: str | None = None,
     hall_history: str = "",
 ) -> str:
+    """Build the queued-task prompt.
+
+    ``decision_tier`` is accepted for backward compatibility with older callers and
+    ``--decision-tier`` argv, but it is deprecated and ignored: no fixed
+    decision/execution identity is injected into the prompt.
+    """
+    del decision_tier
     content = str(task.get("content") or "").strip()
     title = str(task.get("title") or "").strip()
     task_kind = str(task.get("task_kind") or "general").strip().lower()
-    tier_line = _decision_tier_line(decision_tier)
     history = hall_history.strip()
     history_block = f"\n\nTask Hall 完整上下文（按消息顺序）:\n{history}" if history else ""
     gate_contract = ""
@@ -2392,7 +2388,7 @@ def build_cli_task_prompt(
         task_text = f"{title}\n{content}" if title else content
         # 任务路径同样注入身份(紧凑写法,理由同 build_cli_prompt)。
         return (
-            f"你是 {member_id}（{tier_line}）。{creator} 对你说:"
+            f"你是 {member_id}。{creator} 对你说:"
             f"{task_text}{history_block}{gate_contract}"
         )
 
@@ -2401,7 +2397,6 @@ def build_cli_task_prompt(
     title_block = f"Title: {title}\n" if title else ""
     return (
         f"你是 {member_id}，通过 {runtime} CLI bridge 接入 TALK。\n"
-        f"{tier_line}\n"
         f"Project root: {workdir}\n"
         "Answer the queued Agent task. Keep the final response suitable for posting back into TALK.\n"
         f"{RESPONSE_STYLE_INSTRUCTIONS}"
@@ -2726,10 +2721,15 @@ async def _prepare_task_before_claim(
     timeout: int,
     runtime: str,
     prompt_transport: str,
-    decision_tier: str,
+    decision_tier: str | None = None,
     command_runner: Any,
 ) -> tuple[dict[str, Any] | None, str, bool]:
-    """Run Task Hall preflight and return (ready_task, replay_context, workflow_advanced)."""
+    """Run Task Hall preflight and return (ready_task, replay_context, workflow_advanced).
+
+    ``decision_tier`` is a deprecated compatibility parameter: it is accepted and
+    ignored and never reaches the prompt.
+    """
+    del decision_tier
     from TALK.client.exceptions import TalkValidationError
 
     hall_group_id = str(task.get("hall_group_id") or "").strip()
@@ -2778,7 +2778,6 @@ async def _prepare_task_before_claim(
         member_id=member_id,
         workdir=workdir,
         runtime=runtime,
-        decision_tier=decision_tier,
         hall_history=replay_context,
     )
     try:
@@ -2862,15 +2861,21 @@ async def handle_queued_task(
     runtime: str = "cli",
     bridge_label: str = "CLI bridge",
     prompt_transport: str = "stdin",
-    decision_tier: str = "execution",
+    decision_tier: str | None = None,
     preflight_command: str | Sequence[str] | None = None,
     command_runner: Any | None = None,
     lease_seconds: int = DEFAULT_TASK_LEASE_SECONDS,
     heartbeat_interval: float = DEFAULT_TASK_HEARTBEAT_INTERVAL,
 ) -> bool:
-    """Preflight, claim, and execute one task; return False when no action was acquired."""
+    """Preflight, claim, and execute one task; return False when no action was acquired.
+
+    ``decision_tier`` is a deprecated compatibility parameter: accepted and ignored
+    (the removed fixed tier never changes preflight, prompt or execution behavior).
+    """
+    del decision_tier
     from TALK.client.exceptions import TalkValidationError
 
+    _clear_deprecated_decision_tier_env()
     task_id = int(task["id"])
     runner = command_runner or run_cli_command
     ready_task, replay_context, workflow_advanced = await _prepare_task_before_claim(
@@ -2882,7 +2887,6 @@ async def handle_queued_task(
         timeout=timeout,
         runtime=runtime,
         prompt_transport=prompt_transport,
-        decision_tier=decision_tier,
         command_runner=runner,
     )
     if ready_task is None:
@@ -2913,7 +2917,6 @@ async def handle_queued_task(
                 member_id=member_id,
                 workdir=workdir,
                 runtime=runtime,
-                decision_tier=decision_tier,
                 hall_history=replay_context,
             )
             result = await _run_while_task_lease_active(
@@ -3087,8 +3090,15 @@ async def handle_incoming_message(
     prompt_transport: str = "stdin",
     send_ack: bool = False,
     report_status: Any | None = None,
-    decision_tier: str = "execution",
+    decision_tier: str | None = None,
 ) -> None:
+    """Handle one incoming group/direct message.
+
+    ``decision_tier`` is a deprecated compatibility parameter: accepted and ignored
+    (never placed in the prompt or the child environment).
+    """
+    del decision_tier
+    _clear_deprecated_decision_tier_env()
     sender = message.get("from")
     if not sender:
         return
@@ -3198,7 +3208,7 @@ async def handle_incoming_message(
             os.environ["TALK_GROUP_ID"] = group_id
         else:
             os.environ.pop("TALK_GROUP_ID", None)
-        os.environ["TALK_DECISION_TIER"] = decision_tier
+        _clear_deprecated_decision_tier_env()
 
         # 5.5 方案 D：reply_to 只作为 UI 引用；需求轮次由 discussion_turns.turn_kind 账本判断。
         # 整个 active discussion 最多允许 round_index=2 的 demand，之后不再暴露 talk_send。
@@ -3250,7 +3260,6 @@ async def handle_incoming_message(
             workdir=workdir,
             runtime=runtime,
             discussion_context=discussion_context,
-            decision_tier=decision_tier,
             group_member_context=group_member_context,
             shared_history=shared_history,
         )
@@ -3262,7 +3271,6 @@ async def handle_incoming_message(
                 group_id=group_id,
                 group_member_context=group_member_context,
                 runtime=runtime,
-                decision_tier=decision_tier,
                 prompt=prompt,
             )
         result = await run_cli_command(
@@ -3315,7 +3323,7 @@ async def handle_incoming_message(
                     round_index=1,
                 )
                 if appended:
-                    await _resolve_if_decision_maker(
+                    await _resolve_if_discussion_initiator(
                         client,
                         discussion_id=int(discussion["id"]) if discussion.get("id") is not None else None,
                         group_id=group_id,
@@ -3387,7 +3395,7 @@ async def handle_incoming_message(
                 turn_kind="reply",
                 round_index=action.round_index or 1,
             )
-            await _resolve_if_decision_maker(
+            await _resolve_if_discussion_initiator(
                 client,
                 discussion_id=discussion_id,
                 group_id=group_id,
@@ -3481,7 +3489,8 @@ async def run_task_queue_worker(
                             runtime=args.runtime,
                             bridge_label=args.bridge_label,
                             prompt_transport=args.prompt_transport,
-                            decision_tier=args.decision_tier,
+                            # Deprecated compat: accepted and ignored by handle_queued_task.
+                            decision_tier=getattr(args, "decision_tier", None),
                             preflight_command=getattr(
                                 args,
                                 "task_preflight_command",
@@ -3538,7 +3547,11 @@ async def run_bridge(args: argparse.Namespace) -> None:
     from TALK.client import TalkClient
 
     member_id = member_id_from_name(args.name)
-    args.decision_tier = resolve_decision_tier(args, member_id)
+    # ``--decision-tier`` stays accepted on the parser but is deprecated and ignored:
+    # no project-local tier is read, no fallback to "execution" happens, and the value
+    # is never injected into prompts or the child environment.
+    args.decision_tier = getattr(args, "decision_tier", None)
+    _clear_deprecated_decision_tier_env()
     configure_talk_tool_environment(args, member_id)
     workdir = Path(args.workdir).expanduser().resolve()
     args.task_preflight_command = resolve_task_preflight_command(args)
@@ -3688,7 +3701,11 @@ def build_parser(
         "--decision-tier",
         choices=["decision", "execution"],
         default=None,
-        help="Agent decision tier override; otherwise read from project .talk/groups.yaml and fall back to execution",
+        help=(
+            "DEPRECATED and ignored: the fixed decision/execution tier was removed. "
+            "Accepted only so older launch argv keeps working; it never changes prompts, "
+            "environment, routing or permissions."
+        ),
     )
     parser.add_argument(
         "--project",

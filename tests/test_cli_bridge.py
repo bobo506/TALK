@@ -30,7 +30,6 @@ from bridges.cli_bridge import (
     parse_task_gate_verdict,
     parse_task_preflight_result,
     parse_talk_actions,
-    resolve_decision_tier,
     resolve_command_executable,
     resolve_task_preflight_command,
     resolve_task_preflight_max_attempts,
@@ -258,7 +257,10 @@ class CliBridgeTests(unittest.TestCase):
         # 身份必须出现,且明确告诉模型"你是 agent:pi-kimi"
         self.assertIn("你是 agent:pi-kimi", prompt)
         # 任务必须直接跟在身份后(同一行),让动词获得焦点
-        self.assertIn("你是 agent:pi-kimi（执行 Agent）。human:qa 对你说:你忙不忙", prompt)
+        self.assertIn("你是 agent:pi-kimi。human:qa 对你说:你忙不忙", prompt)
+        # 固定"决策 Agent / 执行 Agent"分级已移除:prompt 里不得再出现分级文本
+        self.assertNotIn("决策 Agent", prompt)
+        self.assertNotIn("执行 Agent", prompt)
 
     def test_build_cli_task_prompt_for_pi_injects_identity(self):
         """任务路径同样要注入身份,跟 build_cli_prompt 一致(同一行紧凑写法)。"""
@@ -267,7 +269,7 @@ class CliBridgeTests(unittest.TestCase):
             "created_by": "human:qa",
             "content": "整理一下今天的进度",
         }, member_id="agent:pi-kimi", workdir=Path("D:/claude-test/TALK"), runtime="pi")
-        self.assertIn("你是 agent:pi-kimi（执行 Agent）。human:qa 对你说:整理一下今天的进度", prompt)
+        self.assertIn("你是 agent:pi-kimi。human:qa 对你说:整理一下今天的进度", prompt)
 
     def test_task_preflight_prompt_replays_hall_and_requires_structured_decision(self):
         prompt = build_cli_task_preflight_prompt(
@@ -284,7 +286,9 @@ class CliBridgeTests(unittest.TestCase):
             hall_history="[消息 #1] human:qa: 原始范围\n[消息 #2] human:qa: 补充验收标准",
         )
 
-        self.assertIn("agent:codex（决策 Agent）", prompt)
+        self.assertIn("agent:codex", prompt)
+        self.assertNotIn("决策 Agent", prompt)
+        self.assertNotIn("执行 Agent", prompt)
         self.assertIn("补充验收标准", prompt)
         self.assertIn('TALK_TASK_PREFLIGHT {"action":"accept"}', prompt)
         self.assertIn('"action":"clarify"', prompt)
@@ -440,7 +444,8 @@ class CliBridgeTests(unittest.TestCase):
         self.assertIn("关联任务 #12（development，关系 reviews）", rendered)
         self.assertIn("测试 42 项通过", rendered)
 
-    def test_resolve_decision_tier_reads_project_groups_for_codex(self):
+    def test_decision_tier_argv_and_groups_yaml_do_not_change_prompts(self):
+        """固定分级已移除:旧 --decision-tier 与 groups.yaml 分级都不改变 prompt。"""
         with tempfile.TemporaryDirectory() as tmp:
             talk_dir = Path(tmp) / ".talk"
             talk_dir.mkdir()
@@ -453,11 +458,52 @@ class CliBridgeTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            args = type("Args", (), {"decision_tier": None, "project": tmp})()
-            override = type("Args", (), {"decision_tier": "execution", "project": tmp})()
-            self.assertEqual(resolve_decision_tier(args, "agent:codex"), "decision")
-            self.assertEqual(resolve_decision_tier(override, "agent:codex"), "execution")
-            self.assertEqual(resolve_decision_tier(args, "agent:pi"), "execution")
+            message = {"id": 5, "from": "human:qa", "content": "@agent:codex 请自查"}
+            baseline = build_cli_prompt(
+                message,
+                member_id="agent:codex",
+                workdir=Path(tmp),
+                runtime="codex",
+            )
+            for tier in ("decision", "execution", None):
+                with self.subTest(tier=tier):
+                    prompt = build_cli_prompt(
+                        message,
+                        member_id="agent:codex",
+                        workdir=Path(tmp),
+                        runtime="codex",
+                        decision_tier=tier,
+                    )
+                    self.assertEqual(prompt, baseline)
+                    self.assertNotIn("决策 Agent", prompt)
+                    self.assertNotIn("执行 Agent", prompt)
+
+    def test_parser_accepts_and_ignores_decision_tier_argv(self):
+        parser = build_parser()
+        base = parser.parse_args(["--key", "k", "--command", "run"])
+        for value in ("decision", "execution"):
+            with self.subTest(value=value):
+                parsed = parser.parse_args(
+                    ["--key", "k", "--command", "run", "--decision-tier", value]
+                )
+                # 解析层仍接受旧 argv,但分级值不进入任何行为路径
+                self.assertEqual(parsed.decision_tier, value)
+                self.assertEqual(
+                    build_cli_prompt(
+                        {"id": 1, "from": "human:qa", "content": "@agent:pi 你好"},
+                        member_id="agent:pi",
+                        workdir=Path("."),
+                        runtime="pi",
+                        decision_tier=parsed.decision_tier,
+                    ),
+                    build_cli_prompt(
+                        {"id": 1, "from": "human:qa", "content": "@agent:pi 你好"},
+                        member_id="agent:pi",
+                        workdir=Path("."),
+                        runtime="pi",
+                    ),
+                )
+        self.assertIsNone(base.decision_tier)
 
     def test_build_cli_prompt_strips_leading_mention_cluster_for_pi(self):
         prompt = build_cli_prompt({
@@ -1112,7 +1158,9 @@ class CliBridgeTests(unittest.TestCase):
             [["preflight"], ["preflight"], ["execute"]],
         )
         self.assertTrue(all("使用 8123 端口" in prompt for _, prompt in prompts))
-        self.assertIn("agent:codex（决策 Agent）", prompts[0][1])
+        self.assertIn("agent:codex", prompts[0][1])
+        self.assertNotIn("决策 Agent", prompts[0][1])
+        self.assertNotIn("执行 Agent", prompts[0][1])
         self.assertIn("禁止嵌套 JSON", prompts[1][1])
         self.assertEqual(client.sent, [("已按 8123 端口完成。", ["human:bobo"], "group:task-12")])
         self.assertEqual(client.completed[0][1]["claim_token"], "lease-12")
@@ -2767,7 +2815,7 @@ class CliBridgeTests(unittest.TestCase):
             async def get_group(self, group_id):
                 return {"members": [
                     {"member_id": "human:bobo"},
-                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:lead"},
                     {"member_id": "agent:codex"},
                     {"member_id": "agent:pi"},
                 ]}
@@ -2814,12 +2862,13 @@ class CliBridgeTests(unittest.TestCase):
         client = asyncio.run(scenario())
 
         self.assertEqual(client.replies, [(50, "我仍然不同意，建议先补协议测试。", ["agent:codex"], "group:lab")])
+        # 收口不再按分级选人:连续两轮 disagree 直接升级给群里的人类成员
         self.assertEqual(
             client.sent,
-            [("@agent:lead 我和对方连续两轮仍有不同判断，请你做最终决定。", ["agent:lead"], 51, "group:lab")],
+            [("@human:bobo 我和对方连续两轮仍有不同判断，请你做最终决定。", ["human:bobo"], 51, "group:lab")],
         )
 
-    def test_disagreement_escalation_falls_back_to_human_without_decision_maker(self):
+    def test_disagreement_escalation_targets_human_member(self):
         class FakeClient:
             def __init__(self):
                 self.sent = []
@@ -2893,7 +2942,7 @@ class CliBridgeTests(unittest.TestCase):
             async def get_group(self, group_id):
                 return {"members": [
                     {"member_id": "human:bobo"},
-                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:lead"},
                     {"member_id": "agent:codex"},
                 ]}
 
@@ -3015,7 +3064,7 @@ class CliBridgeTests(unittest.TestCase):
         )
         self.assertEqual(client.updated, [(9, "resolved", None)])
 
-    def test_decision_maker_send_message_decision_resolves_discussion(self):
+    def test_initiator_send_message_decision_resolves_discussion(self):
         class FakeClient:
             def __init__(self):
                 self.sent = []
@@ -3026,7 +3075,7 @@ class CliBridgeTests(unittest.TestCase):
             async def get_group(self, group_id):
                 return {"members": [
                     {"member_id": "human:bobo"},
-                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:lead"},
                     {"member_id": "agent:pi"},
                 ]}
 
@@ -3040,6 +3089,9 @@ class CliBridgeTests(unittest.TestCase):
             async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
                 self.created.append((group_id, topic, participant_ids, max_rounds, kwargs))
                 return {"id": 9}
+
+            async def get_discussion(self, discussion_id):
+                return {"id": discussion_id, "requester_id": "agent:lead"}
 
             async def list_discussion_turns(self, discussion_id):
                 return self.turns
@@ -3076,17 +3128,13 @@ class CliBridgeTests(unittest.TestCase):
         self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
         self.assertEqual(client.updated, [(9, "resolved", "consensus")])
 
-    def test_decision_maker_decision_after_escalate_resolves_as_deadlock(self):
+    def test_initiator_decision_after_escalate_resolves_as_deadlock(self):
         class FakeClient:
             def __init__(self):
                 self.updated = []
 
-            async def get_group(self, group_id):
-                return {"members": [
-                    {"member_id": "human:bobo"},
-                    {"member_id": "agent:lead", "decision_tier": "decision"},
-                    {"member_id": "agent:pi"},
-                ]}
+            async def get_discussion(self, discussion_id):
+                return {"id": discussion_id, "requester_id": "agent:lead"}
 
             async def list_discussion_turns(self, discussion_id):
                 return [
@@ -3102,7 +3150,7 @@ class CliBridgeTests(unittest.TestCase):
 
         async def scenario():
             client = FakeClient()
-            await cli_bridge._resolve_if_decision_maker(
+            await cli_bridge._resolve_if_discussion_initiator(
                 client,
                 discussion_id=9,
                 group_id="group:lab",
@@ -3115,17 +3163,13 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertEqual(client.updated, [(9, "resolved", "deadlock")])
 
-    def test_decision_maker_decision_turn_lookup_failure_resolves_as_consensus(self):
+    def test_initiator_decision_turn_lookup_failure_resolves_as_consensus(self):
         class FakeClient:
             def __init__(self):
                 self.updated = []
 
-            async def get_group(self, group_id):
-                return {"members": [
-                    {"member_id": "human:bobo"},
-                    {"member_id": "agent:lead", "decision_tier": "decision"},
-                    {"member_id": "agent:pi"},
-                ]}
+            async def get_discussion(self, discussion_id):
+                return {"id": discussion_id, "requester_id": "agent:lead"}
 
             async def list_discussion_turns(self, discussion_id):
                 raise RuntimeError("turn lookup failed")
@@ -3136,7 +3180,7 @@ class CliBridgeTests(unittest.TestCase):
 
         async def scenario():
             client = FakeClient()
-            await cli_bridge._resolve_if_decision_maker(
+            await cli_bridge._resolve_if_discussion_initiator(
                 client,
                 discussion_id=9,
                 group_id="group:lab",
@@ -3149,39 +3193,16 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertEqual(client.updated, [(9, "resolved", "consensus")])
 
-    def test_non_decision_maker_decision_does_not_resolve_discussion(self):
+    def test_non_initiator_decision_does_not_resolve_discussion(self):
         class FakeClient:
             def __init__(self):
-                self.sent = []
-                self.turns = []
                 self.updated = []
 
-            async def get_group(self, group_id):
-                return {"members": [
-                    {"member_id": "human:bobo"},
-                    {"member_id": "agent:lead", "decision_tier": "decision"},
-                    {"member_id": "agent:codex"},
-                    {"member_id": "agent:pi"},
-                ]}
-
-            async def send_text(self, text, to=None, reply_to=None, group_id=None):
-                self.sent.append((text, to, reply_to, group_id))
-                return {"id": 80}
-
-            async def list_discussions(self, *, group_id=None):
-                return []
-
-            async def create_discussion(self, group_id, topic, participant_ids, *, max_rounds=2, **kwargs):
-                return {"id": 9}
+            async def get_discussion(self, discussion_id):
+                return {"id": discussion_id, "requester_id": "agent:pi"}
 
             async def list_discussion_turns(self, discussion_id):
-                return self.turns
-
-            async def append_discussion_turn(
-                self, discussion_id, *, message_id, stance, target_member_id=None, turn_kind="reply", round_index=1
-            ):
-                self.turns.append((discussion_id, message_id, stance, target_member_id, turn_kind, round_index))
-                return {"id": len(self.turns)}
+                return []
 
             async def update_discussion(self, discussion_id, *, status, end_reason=None):
                 self.updated.append((discussion_id, status, end_reason))
@@ -3189,26 +3210,20 @@ class CliBridgeTests(unittest.TestCase):
 
         async def scenario():
             client = FakeClient()
-            await cli_bridge.execute_talk_actions(
-                [cli_bridge.TalkAction(
-                    action_type="send_message",
-                    to="agent:pi",
-                    body="我认为这是定论",
-                    stance="decision",
-                )],
-                client=client,
-                source_message={"id": 50, "from": "human:bobo", "group_id": "group:lab"},
-                member_id="agent:codex",
-                task_text="请给出定论",
+            await cli_bridge._resolve_if_discussion_initiator(
+                client,
+                discussion_id=9,
+                group_id="group:lab",
+                member_id="agent:lead",
+                stance="decision",
             )
             return client
 
         client = asyncio.run(scenario())
 
-        self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
         self.assertEqual(client.updated, [])
 
-    def test_decision_maker_falls_back_to_human_without_decision_tier(self):
+    def test_find_human_reviewer_returns_first_human_member(self):
         class FakeClient:
             def __init__(self):
                 self.turns = []
@@ -3245,7 +3260,7 @@ class CliBridgeTests(unittest.TestCase):
 
         async def scenario():
             client = FakeClient()
-            decision_maker = await cli_bridge._find_decision_maker(client, "group:lab")
+            human = await cli_bridge._find_human_reviewer(client, "group:lab")
             await cli_bridge.execute_talk_actions(
                 [cli_bridge.TalkAction(
                     action_type="send_message",
@@ -3258,15 +3273,16 @@ class CliBridgeTests(unittest.TestCase):
                 member_id="agent:codex",
                 task_text="请给出定论",
             )
-            return client, decision_maker
+            return client, human
 
-        client, decision_maker = asyncio.run(scenario())
+        client, human = asyncio.run(scenario())
 
-        self.assertEqual(decision_maker, "human:bobo")
+        self.assertEqual(human, "human:bobo")
         self.assertEqual(client.turns, [(9, 80, "decision", "agent:pi", "demand", 1)])
+        # 讨论发起者未知（get_discussion 不可用）时不自动收口，也不按分级选人
         self.assertEqual(client.updated, [])
 
-    def test_decision_maker_mark_stance_resolves_discussion(self):
+    def test_initiator_mark_stance_resolves_discussion(self):
         class FakeClient:
             def __init__(self):
                 self.replies = []
@@ -3282,13 +3298,16 @@ class CliBridgeTests(unittest.TestCase):
                     "root_message_id": 50,
                 }]
 
+            async def get_discussion(self, discussion_id):
+                return {"id": discussion_id, "requester_id": "agent:lead"}
+
             async def list_discussion_turns(self, discussion_id):
                 return self.turns
 
             async def get_group(self, group_id):
                 return {"members": [
                     {"member_id": "human:bobo"},
-                    {"member_id": "agent:lead", "decision_tier": "decision"},
+                    {"member_id": "agent:lead"},
                     {"member_id": "agent:pi"},
                 ]}
 
@@ -3546,14 +3565,14 @@ class CliBridgeTests(unittest.TestCase):
 
         self.assertEqual(block, "")
 
-    def test_brainstorm_summary_request_requires_direct_human_targeting_of_decision_maker(self):
+    def test_brainstorm_summary_request_requires_direct_human_targeting(self):
         class FakeClient:
             async def get_group(self, group_id):
                 return {
                     "type": "brainstorm",
                     "members": [
                         {"member_id": "human:qa"},
-                        {"member_id": "agent:codex", "decision_tier": "decision"},
+                        {"member_id": "agent:codex"},
                         {"member_id": "agent:pi"},
                     ],
                 }
@@ -3570,6 +3589,16 @@ class CliBridgeTests(unittest.TestCase):
                 group_id="group:bs",
                 discussion=discussion,
                 member_id="agent:codex",
+                sender_id="human:qa",
+                task_text="请汇总并给出最终结论",
+            )
+            # 分级已移除:被 human 直接点名的另一位 agent 同样可以承担汇总
+            other_agent = await cli_bridge._is_brainstorm_summary_request(
+                FakeClient(),
+                message={"to": ["agent:pi"]},
+                group_id="group:bs",
+                discussion=discussion,
+                member_id="agent:pi",
                 sender_id="human:qa",
                 task_text="请汇总并给出最终结论",
             )
@@ -3591,11 +3620,11 @@ class CliBridgeTests(unittest.TestCase):
                 sender_id="human:qa",
                 task_text="请再补充一条意见",
             )
-            return direct, multi_target, ordinary_request
+            return direct, other_agent, multi_target, ordinary_request
 
-        self.assertEqual(asyncio.run(scenario()), (True, False, False))
+        self.assertEqual(asyncio.run(scenario()), (True, True, False, False))
 
-    def test_human_summary_to_decision_maker_infers_decision_and_resolves(self):
+    def test_human_summary_to_agent_infers_decision_and_resolves(self):
         captured_prompts = []
 
         class FakeClient:
@@ -3619,6 +3648,9 @@ class CliBridgeTests(unittest.TestCase):
                     "participant_ids": ["human:qa", "agent:codex", "agent:pi", "agent:pi-kimi"],
                 }]
 
+            async def get_discussion(self, discussion_id):
+                return {"id": discussion_id, "requester_id": "agent:codex"}
+
             async def list_discussion_turns(self, discussion_id):
                 return self.turns
 
@@ -3627,7 +3659,7 @@ class CliBridgeTests(unittest.TestCase):
                     "type": "brainstorm",
                     "members": [
                         {"member_id": "human:qa"},
-                        {"member_id": "agent:codex", "decision_tier": "decision"},
+                        {"member_id": "agent:codex"},
                         {"member_id": "agent:pi"},
                         {"member_id": "agent:pi-kimi"},
                     ],

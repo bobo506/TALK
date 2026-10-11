@@ -430,6 +430,60 @@ ROLE_IDENTITY_LEGACY = "legacy"
 
 IDENTITY_EXCLUSIVE_REFERENCE_REFUSED = "identity_exclusive_reference_refused"
 
+# 角色生命周期 R1-2：跨宿主配置作业（`docs/spec/ROLE_PROVISION_CONTRACT.md` §1）。
+# 作业只承接已有服务端身份的宿主三步（身份档 / Key 文件 / 启动前检查）；服务端**不保存、
+# 不返回、不记录**任何 Key、凭据路径、绝对路径、argv 或原始异常文本。
+PROVISION_STEP_PROFILE = "profile"
+PROVISION_STEP_KEY_FILE = "key_file"
+PROVISION_STEP_PREFLIGHT = "preflight"
+PROVISION_STEP_ORDER = (
+    PROVISION_STEP_PROFILE,
+    PROVISION_STEP_KEY_FILE,
+    PROVISION_STEP_PREFLIGHT,
+)
+
+PROVISION_STEP_STATE_PENDING = "pending"
+PROVISION_STEP_STATE_SUCCEEDED = "succeeded"
+PROVISION_STEP_STATE_FAILED = "failed"
+PROVISION_STEP_STATE_SKIPPED = "skipped"
+PROVISION_STEP_STATES = (
+    PROVISION_STEP_STATE_PENDING,
+    PROVISION_STEP_STATE_SUCCEEDED,
+    PROVISION_STEP_STATE_FAILED,
+    PROVISION_STEP_STATE_SKIPPED,
+)
+
+PROVISION_JOB_STATUS_PENDING = "pending"
+PROVISION_JOB_STATUS_RUNNING = "running"
+PROVISION_JOB_STATUS_SUCCEEDED = "succeeded"
+PROVISION_JOB_STATUS_PARTIAL = "partial"
+PROVISION_JOB_STATUS_FAILED = "failed"
+PROVISION_JOB_STATUSES = (
+    PROVISION_JOB_STATUS_PENDING,
+    PROVISION_JOB_STATUS_RUNNING,
+    PROVISION_JOB_STATUS_SUCCEEDED,
+    PROVISION_JOB_STATUS_PARTIAL,
+    PROVISION_JOB_STATUS_FAILED,
+)
+
+# ACK 只接受终态；`failed` 之外不允许携带 error_code；error_code 是 ≤64 的安全 token。
+PROVISION_ACK_STATES = (
+    PROVISION_STEP_STATE_SUCCEEDED,
+    PROVISION_STEP_STATE_FAILED,
+    PROVISION_STEP_STATE_SKIPPED,
+)
+PROVISION_ERROR_CODE_MAX_CHARS = 64
+
+# 本作业登记的单角色档案路径：固定根 ``.talk/agents/<role_dir>/`` + 固定 basename。
+# 只允许登记**仓库相对路径**；拒绝绝对路径/``..``/控制字符/混合目录（见
+# ``normalize_provision_roster_paths``）。
+PROVISION_ROSTER_PATH_ROOT = (".talk", "agents")
+PROVISION_ROSTER_PATH_BASENAMES = {
+    "identity_path": "IDENTITY.md",
+    "soul_path": "SOUL.md",
+    "user_path": "USER.md",
+}
+
 # 绑定有效性阶梯（合同 §4.4，先命中先返回）。``no_project`` 只属于任务快照。
 ROLE_BINDING_NO_PROJECT = "no_project"
 ROLE_BINDING_MEMBER_MISSING = "member_missing"
@@ -704,6 +758,229 @@ class SchemaMigration(SQLModel, table=True):
 
     key: str = Field(primary_key=True)
     applied_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleProvisionJob(SQLModel, table=True):
+    """跨宿主配置作业（角色生命周期 R1-2，PROVISION_CONTRACT §1）。
+
+    - ``operation_key`` 直接复用 R1-1 ``role_creation_operations.operation_key``
+      作为**唯一**恢复锚点，因此同时是本表主键；
+    - 只记录宿主三步 ``profile`` / ``key_file`` / ``preflight`` 的状态机事实；
+    - 本表**不存** Key、凭据路径、绝对路径、argv 或原始异常文本；
+    - ``revision`` 是 ACK 的 CAS 版本：每次状态变更 +1，迟到/旧尝试回报一律拒绝；
+    - ``credential_version`` 是**本次作业代际**绑定的角色凭据版本快照（R1-2 补正 F1）：
+      创建/续跑时从 ``project_roles.credential_version`` 取当前值写入；ACK 必须同时命中
+      快照与角色当前值，因此凭据轮换后旧成功证明立即失效。轮换本身不改作业行，
+      续跑时若发现版本已变，服务端强制重置 ``key_file``/``preflight`` 两个凭据相关步骤；
+    - 行本身的创建/续跑只写本表，**不**重建 ``Member``/``ProjectRole``、不重发 Key、
+      不改绑定/说明/权限策略/名册（合同 §0）。
+    """
+
+    __tablename__ = "role_provision_jobs"
+    __table_args__ = (
+        Index("ix_role_provision_jobs_project", "project_id", "member_id"),
+        Index("ix_role_provision_jobs_status", "status"),
+    )
+
+    operation_key: str = Field(primary_key=True)
+    project_id: str
+    member_id: str
+    status: str = Field(default=PROVISION_JOB_STATUS_PENDING)
+    steps: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    resume_of: Optional[str] = None
+    revision: int = Field(default=1)
+    credential_version: int = Field(default=1)
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def new_provision_step(*, attempts: int = 1) -> dict:
+    """单步初值（合同 §1）：启动即 ``pending``、``error_code``/``updated_at`` 为空。"""
+    return {
+        "state": PROVISION_STEP_STATE_PENDING,
+        "attempts": attempts,
+        "error_code": None,
+        "updated_at": None,
+    }
+
+
+def build_fresh_provision_steps() -> dict:
+    """新建作业的三步初值：全部 ``pending`` 且 ``attempts=1``（首次创建即一次尝试）。"""
+    return {step: new_provision_step(attempts=1) for step in PROVISION_STEP_ORDER}
+
+
+def normalize_provision_steps(raw: Optional[dict]) -> dict:
+    """把存储/入参 ``steps`` 归一为固定三步 × 白名单四字段。
+
+    返回**全新** dict（不原地改调用方的对象），并丢弃任何多余键：公开响应因此天然
+    不可能夹带 Key/路径/argv/异常文本等额外字段（合同 §2.4 白名单）。
+    """
+    source = raw if isinstance(raw, dict) else {}
+    normalized: dict = {}
+    for step in PROVISION_STEP_ORDER:
+        entry = source.get(step)
+        if not isinstance(entry, dict):
+            entry = {}
+        state = entry.get("state")
+        if state not in PROVISION_STEP_STATES:
+            state = PROVISION_STEP_STATE_PENDING
+        attempts = entry.get("attempts")
+        if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 0:
+            attempts = 0
+        error_code = entry.get("error_code")
+        if not isinstance(error_code, str):
+            error_code = None
+        updated_at = entry.get("updated_at")
+        if not isinstance(updated_at, str):
+            updated_at = None
+        normalized[step] = {
+            "state": state,
+            "attempts": attempts,
+            "error_code": error_code,
+            "updated_at": updated_at,
+        }
+    return normalized
+
+
+def compute_provision_job_status(steps: Optional[dict]) -> str:
+    """按合同 §1.1 **唯一算法**从三步状态聚合出作业状态（纯函数）。
+
+    服务端（A 端）实现、宿主脚本（B 端）只读消费；这里不引入任何“上次动作/百分比”
+    之类的猜测状态。
+    """
+    normalized = normalize_provision_steps(steps)
+    states = [normalized[step]["state"] for step in PROVISION_STEP_ORDER]
+    if PROVISION_STEP_STATE_FAILED in states:
+        if PROVISION_STEP_STATE_PENDING in states:
+            return PROVISION_JOB_STATUS_PARTIAL
+        if all(state == PROVISION_STEP_STATE_FAILED for state in states):
+            return PROVISION_JOB_STATUS_FAILED
+        return PROVISION_JOB_STATUS_PARTIAL
+    if all(state == PROVISION_STEP_STATE_PENDING for state in states):
+        return PROVISION_JOB_STATUS_PENDING
+    if PROVISION_STEP_STATE_PENDING in states:
+        return PROVISION_JOB_STATUS_RUNNING
+    return PROVISION_JOB_STATUS_SUCCEEDED
+
+
+def serialize_provision_job(
+    job: RoleProvisionJob,
+    *,
+    role_credential_version: Optional[int] = None,
+    expected_binding_fingerprint: Optional[str] = None,
+) -> dict:
+    """公开响应白名单（合同 §2.4）：固定字段 + 归一后的三步，绝不夹带凭据。
+
+    ``credential_version`` 只是作业代际绑定的凭据版本**计数**（不是凭据本身），
+    供宿主脚本在本地副作用前捕获并在 ACK 时回传做原子校验（补正 F1）。
+
+    ``role_credential_version``（R1-2 followup 补正 G1）是**读取时角色行当前**的凭据版本
+    计数（仍不是凭据本身）：宿主脚本据此判断作业代际是否已被轮换作废，从而不再把
+    “旧成功”无条件当成免 ACK 的 no-op。作业快照与当前值不一致时必须显式续跑。
+    调用方未提供时如实为 ``null``，不猜等于快照值。
+
+    ``expected_binding_fingerprint``（R1-2 followup 补正 G3）是**本作业锚定的创建操作**
+    所选 choice 的六维事实指纹（与 ``GET .../binding`` 的 ``binding_fingerprint`` 同一
+    算法/维度，只是内容哈希，不含凭据/路径/argv）。宿主脚本据此把“不可变的预期来源”
+    与**本次读取**的绑定逐对比较，而不是只看形状或采信另一次投影的 ``choice_source``。
+    """
+    return {
+        "operation_key": job.operation_key,
+        "project_id": job.project_id,
+        "member_id": job.member_id,
+        "status": job.status,
+        "revision": job.revision,
+        "credential_version": int(job.credential_version or 1),
+        "role_credential_version": (
+            None if role_credential_version is None else int(role_credential_version)
+        ),
+        "expected_binding_fingerprint": expected_binding_fingerprint,
+        "resume_of": job.resume_of,
+        "steps": normalize_provision_steps(job.steps),
+        "created_by": job.created_by,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+    }
+
+
+def provision_member_dir_name(member_id: object) -> str:
+    """``.talk/agents/<dir>`` 的目录名（与 ``cli.profiles.member_dir_name`` 同一映射）。
+
+    R1-2 补正 F8：``provision/roster-paths`` 必须把三条路径绑定到**目标角色自己**的
+    目录，不能借用另一个角色的档案路径。
+    """
+    return str(member_id).replace(":", "_")
+
+
+def normalize_provision_roster_paths(
+    identity_path: object,
+    soul_path: object,
+    user_path: object,
+    *,
+    expected_member_dir: Optional[str] = None,
+) -> dict:
+    """校验并归一化本作业登记的三个**单角色目录**相对路径。
+
+    规则（任一不满足即 ``ValueError``，API 层映射 ``422 provision_roster_path_invalid``）：
+
+    - 必须是字符串、非空、且不含任何控制字符（``ord < 32`` 或 DEL）；
+    - 反斜杠统一归一为 ``/``，并去掉首尾空白；
+    - 拒绝绝对路径（Windows 盘符 ``X:\\``/``X:/``、前导 ``/`` 或 ``\\\\``）；
+    - 拒绝任何 ``..`` 段；
+    - 三条路径必须**恰好**是 ``.talk/agents/<role_dir>/<BASENAME>``：同一
+      ``<role_dir>``，且 ``identity_path``/``soul_path``/``user_path`` 的 basename
+      分别为 ``IDENTITY.md``/``SOUL.md``/``USER.md``（多一层子目录同样拒绝）；
+    - 给了 ``expected_member_dir`` 时（补正 F8），``<role_dir>`` 必须**恰好**等于
+      目标角色自己的目录名，拒绝把 A 角色的档案路径登记给 B 角色。
+
+    返回**全新** dict，只含三个白名单字段；不读文件、不写文件、不触网。
+    """
+    values = {
+        "identity_path": identity_path,
+        "soul_path": soul_path,
+        "user_path": user_path,
+    }
+    normalized: dict = {}
+    directories: set[str] = set()
+    for field, basename in PROVISION_ROSTER_PATH_BASENAMES.items():
+        value = values[field]
+        if not isinstance(value, str):
+            raise ValueError(f"{field} must be a string")
+        if not value or any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError(
+                f"{field} must not be empty or contain control characters"
+            )
+        candidate = value.replace("\\", "/").strip()
+        if not candidate:
+            raise ValueError(f"{field} must be a non-empty relative path")
+        if candidate.startswith("/") or re.match(r"^[A-Za-z]:", candidate):
+            raise ValueError(f"{field} must not be an absolute path")
+        segments = candidate.split("/")
+        if any(segment == ".." for segment in segments):
+            raise ValueError(f"{field} must not contain a '..' segment")
+        if (
+            len(segments) != 4
+            or segments[0] != PROVISION_ROSTER_PATH_ROOT[0]
+            or segments[1] != PROVISION_ROSTER_PATH_ROOT[1]
+            or not segments[2]
+            or segments[2] in (".", "..")
+            or segments[3] != basename
+        ):
+            raise ValueError(
+                f"{field} must be exactly .talk/agents/<role_dir>/{basename}"
+            )
+        directories.add(segments[2])
+        normalized[field] = "/".join(segments)
+    if len(directories) != 1:
+        raise ValueError(
+            "roster paths must share the same .talk/agents/<role_dir>/ prefix"
+        )
+    if expected_member_dir is not None and next(iter(directories)) != expected_member_dir:
+        raise ValueError(
+            "roster paths must bind to the target member's own .talk/agents/<role_dir>/"
+        )
+    return normalized
 
 
 def looks_like_credential(value: str) -> bool:
@@ -1615,7 +1892,9 @@ class GroupMemberOut(BaseModel):
     member_id: str
     role: str
     business_role: Optional[str] = None
-    decision_tier: Optional[str] = None
+    # 固定“决策/执行”分级已取消：本字段仅为旧数据/旧客户端兼容保留，公开 schema 明确
+    # 标记 deprecated，且不参与身份、权限、协调或任何判定（R1-2 补正 F7）。
+    decision_tier: Optional[str] = PydField(default=None, deprecated=True)
     created_at: datetime
 
 
@@ -1667,7 +1946,8 @@ class GroupUpdate(BaseModel):
 class GroupMemberUpdate(BaseModel):
     role: str = "member"
     business_role: Optional[str] = None
-    decision_tier: Optional[str] = None
+    # 已弃用兼容入参：接受旧值并原样存储，但不再参与身份/权限/协调判定（R1-2 补正 F7）。
+    decision_tier: Optional[str] = PydField(default=None, deprecated=True)
 
     @model_validator(mode="after")
     def validate_group_member_update(self) -> "GroupMemberUpdate":
@@ -2483,7 +2763,9 @@ class ProjectAgentEntry(BaseModel):
     user_path: Optional[str] = None
     memory_pointer: Optional[str] = None
     business_role: Optional[str] = None
-    decision_tier: Optional[str] = None
+    # 已弃用兼容字段：旧名册同步仍可携带并原样存储，但不再参与身份/权限/协调判定
+    # （R1-2 补正 F7）。
+    decision_tier: Optional[str] = PydField(default=None, deprecated=True)
     capability_summary: list[str] = PydField(default_factory=list)
 
     @model_validator(mode="after")
@@ -2833,6 +3115,106 @@ class ProjectRoleTaskSummaryOut(BaseModel):
     created_at: Optional[datetime] = None
 
 
+class RoleProvisionRequest(BaseModel):
+    """``POST .../roles/{member_id}/provision`` 请求体（PROVISION_CONTRACT §2.1）。
+
+    ``extra="forbid"``；``operation_key`` 是 R1-1 创建操作的复用锚点，字段值的归一化
+    与稳定错误码映射放在路由层（沿用 R1-1 ``create_project_role`` 的风格）。
+    ``steps`` 只在 ``resume=true`` 时有意义：``null`` = 全部失败/待跑步骤。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation_key: str
+    resume: bool = False
+    steps: Optional[list[str]] = None
+
+
+class RoleProvisionAckRequest(BaseModel):
+    """``POST .../roles/{member_id}/provision/ack`` 宿主回报体（PROVISION_CONTRACT §2.3）。
+
+    本模型只做结构约束（``extra="forbid"``）；固定校验顺序与稳定错误码全部由路由层实现，
+    乱序回报（旧 revision / 旧 attempt / 非 pending 步骤 / 旧凭据代际）必须被显式拒绝。
+
+    ``credential_version``（补正 F1）是宿主在**本地副作用之前**捕获的作业代际凭据版本；
+    服务端在写事务内同时比对作业快照与角色当前值，二者任一不符 → 409
+    ``provision_credential_stale``，旧成功证明不得套到新代际。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation_key: str
+    step: str
+    attempt: int
+    revision: int
+    credential_version: int
+    state: str
+    error_code: Optional[str] = None
+
+
+class RoleProvisionStepOut(BaseModel):
+    """作业单步公开投影（合同 §1/§2.4）：不含凭据、路径、argv 或异常文本。"""
+
+    state: str
+    attempts: int
+    error_code: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class RoleProvisionJobOut(BaseModel):
+    """作业响应白名单（PROVISION_CONTRACT §2.4）。
+
+    ``credential_version`` 是作业代际绑定的凭据版本计数（非凭据本身），宿主脚本据此在
+    ACK 中回传同一代际事实。
+
+    ``role_credential_version``（R1-2 followup 补正 G1）是**本次读取时角色行当前**的凭据
+    版本计数（同样不是凭据本身）。两者不等即“作业快照已被轮换作废”：宿主脚本必须显式
+    ``resume`` 重开凭据相关步骤，不能把旧成功当成免 ACK 的 no-op。
+
+    ``expected_binding_fingerprint``（R1-2 followup 补正 G3）是本作业锚定的创建操作所选
+    choice 的六维事实指纹（内容哈希，不含凭据/路径/argv）：宿主脚本把“不可变预期”与
+    本次读取的绑定指纹逐对比较，避免分次 GET 之间的连接漂移被报成精确绑定通过。
+    """
+
+    operation_key: str
+    project_id: str
+    member_id: str
+    status: str
+    revision: int
+    credential_version: int = 1
+    role_credential_version: Optional[int] = None
+    expected_binding_fingerprint: Optional[str] = None
+    resume_of: Optional[str] = None
+    steps: dict[str, RoleProvisionStepOut]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class RoleProvisionRosterPathsRequest(BaseModel):
+    """``POST .../provision/roster-paths`` 请求体（单角色路径登记）。
+
+    ``extra="forbid"``；三个路径值的归一化与稳定错误码由路由层
+    （``normalize_provision_roster_paths``）实现，这里只做结构约束。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation_key: str
+    identity_path: str
+    soul_path: str
+    user_path: str
+
+
+class RoleProvisionRosterPathsOut(BaseModel):
+    """单角色路径登记响应白名单：只回写三个相对路径，不含 Key/绝对路径/argv。"""
+
+    member_id: str
+    identity_path: str
+    soul_path: str
+    user_path: str
+
+
 class RoleBindingInput(BaseModel):
     """绑定写入体（合同 §4.1–§4.2）：行存在时必填键全部必填且非空白。"""
 
@@ -2921,7 +3303,9 @@ class ProjectAgentOut(BaseModel):
     user_path: Optional[str]
     memory_pointer: Optional[str]
     business_role: Optional[str]
-    decision_tier: Optional[str]
+    # 已弃用兼容字段：只回显旧存储值，不参与身份、权限、协调或绑定判定；
+    # 公开 schema 明确标记 deprecated（R1-2 补正 F7），列本身不物理删除。
+    decision_tier: Optional[str] = PydField(default=None, deprecated=True)
     capability_summary: list[str]
     # 角色说明（ROLE-DESC-B1）：无自定义记录 = null（前端据此回退默认文案）。
     # 纯展示文本，不参与 business_role / decision_tier / 主控指定 / 任务权限的任何判定。

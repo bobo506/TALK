@@ -357,3 +357,34 @@ test('页面结构断言：设置首项导航独立于名册，源码中角色�
   // 不新增高频轮询/计时器
   assert.ok(!wsSource.includes('setInterval'));
 });
+
+test('R1-2：角色主显示/说明/搜索不渲染固定“决策/执行”分级，源码无 decision_tier', async () => {
+  // 名册显式带上历史分级值：页面主显示与搜索都不得把它当成字段或文案。
+  const h = harness({ roster: [
+    { member_id: 'agent:kimi', business_role: 'reviewer', role_description: null, decision_tier: 'decision' },
+    { member_id: 'agent:deepseek', business_role: 'dev', role_description: null, decision_tier: 'execution' },
+  ] });
+  await h.enterRoles();
+  const listTexts = allTexts(h.el('blackboard-columns')).join('\n');
+  for (const leak of ['decision_tier', 'decision', 'execution', '决策人', '决策 Agent', '执行 Agent']) {
+    assert.ok(!listTexts.includes(leak), `角色列表不得展示固定分级：${leak}`);
+  }
+  // 角色详情（名称区 + 参与任务区）同样不出现分级。
+  h.roleRow('agent:kimi').fire('click');
+  await h.flush();
+  const detailTexts = [...allTexts(h.el('role-details-name-panel')), ...allTexts(h.el('role-details-tasks-panel'))].join('\n');
+  for (const leak of ['decision_tier', 'decision', 'execution', '决策人']) {
+    assert.ok(!detailTexts.includes(leak), `角色详情不得展示固定分级：${leak}`);
+  }
+  // 搜索不按分级值匹配：分级不是页面模型的一部分。
+  const roleRows = () => h.rows().filter(row => row.className.includes('role-row') && !row.className.includes('role-settings-row'));
+  h.ui.query = 'execution';
+  h.context.renderWorkspaceList();
+  assert.equal(roleRows().length, 0, '分级值不进入搜索匹配范围');
+  h.ui.query = '';
+  h.context.renderWorkspaceList();
+  assert.equal(roleRows().length, 2);
+  // 静态源码：角色展示/说明/搜索使用的 workspace.js 完全不出现该字段，也没有分级控件或文案。
+  assert.ok(!wsSource.includes('decision_tier') && !wsSource.includes('decisionTier'), 'workspace.js 无分级字段');
+  assert.ok(!/决策人|决策 Agent/.test(wsSource), 'workspace.js 无固定分级文案');
+});

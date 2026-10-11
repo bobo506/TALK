@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy import text, update
@@ -29,6 +29,17 @@ from server.models import (
     PROJECT_ROLE_ORIGIN_IMPORTED,
     PROJECT_ROLE_ORIGIN_MANAGED,
     PROJECT_ROLE_POLICY_SOURCE_HUMAN,
+    PROVISION_ACK_STATES,
+    PROVISION_ERROR_CODE_MAX_CHARS,
+    PROVISION_JOB_STATUS_PENDING,
+    PROVISION_JOB_STATUS_SUCCEEDED,
+    PROVISION_STEP_KEY_FILE,
+    PROVISION_STEP_ORDER,
+    PROVISION_STEP_PREFLIGHT,
+    PROVISION_STEP_STATE_FAILED,
+    PROVISION_STEP_STATE_PENDING,
+    PROVISION_STEP_STATE_SKIPPED,
+    PROVISION_STEP_STATE_SUCCEEDED,
     ROLE_IDENTITY_LEGACY,
     RUNNER_ADAPTER_RETIRED,
     SQLITE_SIGNED_INTEGER_MAX,
@@ -66,16 +77,28 @@ from server.models import (
     RoleCreationOperation,
     RoleCredentialRotateOut,
     RoleDescriptionUpdate,
+    RoleProvisionAckRequest,
+    RoleProvisionJob,
+    RoleProvisionJobOut,
+    RoleProvisionRequest,
+    RoleProvisionRosterPathsOut,
+    RoleProvisionRosterPathsRequest,
     RunnerModelChoice,
     RunnerRegistry,
+    binding_fingerprint,
+    build_fresh_provision_steps,
     build_role_binding_out,
     build_role_creation_fingerprint,
     build_role_member_id,
+    compute_provision_job_status,
     ensure_identity_exclusive_reference_allowed,
     model_choice_dimension_facts,
     new_role_api_key,
     new_role_member_id_suffix,
     normalize_operation_key,
+    normalize_provision_roster_paths,
+    normalize_provision_steps,
+    provision_member_dir_name,
     normalize_role_description,
     normalize_role_name,
     normalize_safe_identifier_token,
@@ -83,6 +106,7 @@ from server.models import (
     read_role_binding_facts,
     read_role_binding_facts_batch,
     resolve_role_binding_state,
+    serialize_provision_job,
 )
 from server.routes.groups import _group_out
 
@@ -1692,3 +1716,614 @@ def list_project_role_tasks(
         for row in rows
         if row.id is not None
     ]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 角色生命周期 R1-2：跨宿主配置作业（PROVISION_CONTRACT §1/§2）
+#
+# 三个入口全部 **human-only**，只作用于已有服务端身份的宿主三步
+# （profile / key_file / preflight）。作业**不**重建 Member / ProjectRole、
+# **不**重发 Key、**不**改绑定/说明/权限策略/名册，也**不**返回或存储任何 Key、
+# 凭据路径、绝对路径、argv 或原始异常文本。
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _normalize_provision_operation_key(value: object) -> str:
+    """归一化作业锚点 key；缺失/非法 → 422 ``operation_key_invalid``。"""
+    if not isinstance(value, str):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="operation_key_invalid",
+        )
+    try:
+        return normalize_operation_key(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="operation_key_invalid",
+        ) from exc
+
+
+def _normalize_provision_step_subset(
+    steps: object,
+) -> tuple[str, ...] | None:
+    """``steps`` 只允许 ``null`` 或三步的**非空子集**（不重复）；否则 422。"""
+    if steps is None:
+        return None
+    if not isinstance(steps, list) or not steps:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="provision_step_invalid",
+        )
+    subset: list[str] = []
+    for step in steps:
+        if (
+            not isinstance(step, str)
+            or step not in PROVISION_STEP_ORDER
+            or step in subset
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="provision_step_invalid",
+            )
+        subset.append(step)
+    return tuple(subset)
+
+
+def _require_provision_identity(
+    project_id: str, member_id: str, operation_key: str, session: Session
+) -> None:
+    """四个入口共用的前置校验（PROVISION_CONTRACT §2.1 第 1 条，顺序固定）。
+
+    - imported/legacy（有 ``project_roles`` 或 ``project_agents`` 行但没有创建操作）
+      一律拒绝 ``provision_imported_identity_unsupported``，**绝不**伪造创建操作；
+    - 传入的 ``operation_key`` 必须命中该 ``(project_id, member_id)`` 的创建操作，
+      否则 ``provision_operation_mismatch``（含 key 不存在的情况）；
+    - 不写库、不改任何身份事实，只做读取判定。
+
+    R1-2 补正 F2：三个**写入**入口都在 :func:`_begin_provision_write` 之后调用本函数，
+    因此这里的可变引用读取（项目/角色/成员/名册）落在真实 ``BEGIN IMMEDIATE`` 写事务内；
+    配合 ``session.expire_all()`` 不会命中 ORM identity map 的陈旧值。
+    """
+    if session.get(Project, project_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="project_not_found"
+        )
+
+    identity_operation = session.exec(
+        select(RoleCreationOperation)
+        .where(RoleCreationOperation.project_id == project_id)
+        .where(RoleCreationOperation.member_id == member_id)
+    ).first()
+    if identity_operation is None:
+        has_role = session.get(ProjectRole, (project_id, member_id)) is not None
+        has_roster = session.get(ProjectAgent, (project_id, member_id)) is not None
+        if has_role or has_roster:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="provision_imported_identity_unsupported",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="provision_operation_not_found",
+        )
+
+    anchor = session.get(RoleCreationOperation, operation_key)
+    if (
+        anchor is None
+        or anchor.project_id != project_id
+        or anchor.member_id != member_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="provision_operation_mismatch",
+        )
+
+    role = session.get(ProjectRole, (project_id, member_id))
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="role_not_found"
+        )
+    if role.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="role_archived"
+        )
+    member = session.get(Member, member_id)
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="provision_member_missing"
+        )
+    if member.kind != "agent":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="provision_member_not_agent"
+        )
+    if member.disabled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="provision_member_disabled"
+        )
+    if session.get(ProjectAgent, (project_id, member_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="provision_roster_missing"
+        )
+
+
+def _begin_provision_write(session: Session) -> None:
+    """取得真实 SQLite 写锁并清空 ORM identity map（R1-2 补正 F2）。
+
+    ``BEGIN IMMEDIATE`` 之后的引用守卫读取都落在同一物理写事务内；``expire_all()``
+    保证随后 ``session.get(...)`` 重新走 SELECT，而不是命中同一 Session 里已加载的
+    陈旧 ORM 对象。只作用于本请求自己的连接。
+    """
+    begin_immediate_write(session)
+    session.expire_all()
+
+
+def _provision_role_credential_version(
+    project_id: str, member_id: str, session: Session
+) -> int:
+    """读当前角色的凭据版本（写事务内调用；行缺失 → 404 ``role_not_found``）。"""
+    role = session.get(ProjectRole, (project_id, member_id))
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="role_not_found"
+        )
+    return int(role.credential_version or 1)
+
+
+def _normalize_provision_error_code(
+    state: str, error_code: object
+) -> str | None:
+    """ACK 的 ``error_code`` 白名单（PROVISION_CONTRACT §2.3）。
+
+    只有 ``failed`` 允许携带非空 ``error_code``，且必须是 ≤64 的安全 token；
+    非 ``failed`` 携带任何非 ``null`` 值、或 ``failed`` 携带非法值 → 422。
+    """
+    if state != PROVISION_STEP_STATE_FAILED:
+        if error_code is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="provision_error_code_invalid",
+            )
+        return None
+    if error_code is None:
+        return None
+    if not isinstance(error_code, str) or not error_code.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="provision_error_code_invalid",
+        )
+    try:
+        return normalize_safe_identifier_token(
+            error_code,
+            field="error_code",
+            max_chars=PROVISION_ERROR_CODE_MAX_CHARS,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="provision_error_code_invalid",
+        ) from exc
+
+
+def _provision_expected_binding_fingerprint(
+    job: RoleProvisionJob, session: Session
+) -> str | None:
+    """本作业锚定的创建操作所选 choice 的绑定内容指纹（只读、无密、可核对）。
+
+    R1-2 followup 补正 G3：``job.operation_key`` 就是创建操作 ``operation_key``
+    （``_require_provision_identity`` 已校验其 project/member 锚点），因此这里取得的
+    choice 六维是**不可变预期来源**。消费者把它与 ``GET .../binding`` 本次读取的
+    ``binding_fingerprint`` 逐对比较，就能发现分次投影之间的连接/来源/provider 漂移。
+    choice 或运行器登记不可解析时如实为 ``null``（消费方 fail closed），不猜。
+    """
+    operation = session.get(RoleCreationOperation, job.operation_key)
+    if operation is None:
+        return None
+    choice = session.get(RunnerModelChoice, operation.choice_id)
+    if choice is None:
+        return None
+    runner = session.get(RunnerRegistry, choice.runner_id)
+    return binding_fingerprint(
+        {
+            "runner_id": choice.runner_id,
+            "runtime": runner.runtime if runner is not None else None,
+            "model_source": choice.model_source,
+            "provider_id": choice.provider_id,
+            "connection_ref": choice.connection_ref,
+            "model_id": choice.model_id,
+        }
+    )
+
+
+def _provision_job_out(
+    job: RoleProvisionJob,
+    session: Session,
+    role_credential_version: int | None = None,
+) -> RoleProvisionJobOut:
+    return RoleProvisionJobOut(
+        **serialize_provision_job(
+            job,
+            role_credential_version=role_credential_version,
+            expected_binding_fingerprint=_provision_expected_binding_fingerprint(
+                job, session
+            ),
+        )
+    )
+
+
+@router.post(
+    "/{project_id}/roles/{member_id}/provision",
+    response_model=RoleProvisionJobOut,
+)
+def provision_project_role(
+    project_id: str,
+    member_id: str,
+    body: RoleProvisionRequest,
+    response: Response,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """创建 / 幂等读取 / 定向续跑跨宿主配置作业（**仅 human**；§2.1）。
+
+    - 新建：全部三步 ``pending``、``attempts=1``、``status=pending``、``revision=1``、
+      ``resume_of=null``，返回 **201**；若只是想读现有作业，用 ``GET``；
+    - ``resume=false`` 且作业已存在：**原样返回**，不写库（幂等，200）；
+    - 有作业行：
+      - ``resume=false`` → **原样返回现有作业**（幂等，不写库）。
+      - ``resume=true``：
+        - ``status == "succeeded"`` 且凭据版本未变 → 409 ``provision_job_terminal``；
+          凭据版本已变（轮换后旧证明失效）则允许重开：强制重置凭据相关的
+          ``key_file`` / ``preflight``；
+        - 否则：把 ``steps``（默认 = 全部 ``state in {"failed","pending"}`` 的步骤）重置为
+          ``pending/attempts+=1/error_code=null``；``resume_of=operation_key``；
+          ``revision+=1``；重算 ``status``。
+        - ``steps`` 子集里若有步骤当前为 ``succeeded``/``skipped`` → 不重置它，仍计入响应
+          （定向续跑不改已完成步骤）；但凭据版本已变时 ``key_file``/``preflight`` 例外。
+    - 4. 响应状态码：创建 201，已存在未变 200，续跑 200。响应体 ``RoleProvisionJobOut``。
+    - 补正 F1：创建/续跑都把当前 ``project_roles.credential_version`` 快照进作业
+      （``credential_version`` 列），ACK 用它做代际校验。
+    - 补正 F2：引用守卫（项目/角色/成员/名册/创建操作）在 ``BEGIN IMMEDIATE`` 写锁内执行，
+      并对并发注销/离册/禁用/归档零脏写。
+    """
+    _require_human(current)
+    target_member_id = member_id.strip()
+    operation_key = _normalize_provision_operation_key(body.operation_key)
+    target_steps = _normalize_provision_step_subset(body.steps)
+
+    _begin_provision_write(session)
+    try:
+        _require_provision_identity(project_id, target_member_id, operation_key, session)
+        current_credential_version = _provision_role_credential_version(
+            project_id, target_member_id, session
+        )
+        job = session.get(RoleProvisionJob, operation_key)
+        if job is None:
+            now = datetime.now(timezone.utc)
+            job = RoleProvisionJob(
+                operation_key=operation_key,
+                project_id=project_id,
+                member_id=target_member_id,
+                status=PROVISION_JOB_STATUS_PENDING,
+                steps=build_fresh_provision_steps(),
+                resume_of=None,
+                revision=1,
+                credential_version=current_credential_version,
+                created_by=current.id,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+            response.status_code = status.HTTP_201_CREATED
+            return _provision_job_out(job, session, current_credential_version)
+
+        if not body.resume:
+            # 幂等读取：先构造响应，再释放写锁，不留任何未提交写入。
+            payload = _provision_job_out(job, session, current_credential_version)
+            session.rollback()
+            return payload
+
+        previous_credential_version = int(job.credential_version or 1)
+        credential_changed = previous_credential_version != current_credential_version
+        if job.status == PROVISION_JOB_STATUS_SUCCEEDED and not credential_changed:
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="provision_job_terminal"
+            )
+
+        steps = normalize_provision_steps(job.steps)
+        if target_steps is None:
+            resume_steps = tuple(
+                step
+                for step in PROVISION_STEP_ORDER
+                if steps[step]["state"]
+                in (PROVISION_STEP_STATE_FAILED, PROVISION_STEP_STATE_PENDING)
+            )
+        else:
+            resume_steps = target_steps
+        if credential_changed:
+            # 凭据轮换使旧 key_file/preflight 证明失效：无论之前成功与否都强制重置，
+            # 否则作业会带着一个已经无法通过身份核验的 Key 报成功（补正 F1）。
+            resume_steps = tuple(
+                dict.fromkeys(
+                    tuple(resume_steps)
+                    + (PROVISION_STEP_KEY_FILE, PROVISION_STEP_PREFLIGHT)
+                )
+            )
+        for step in resume_steps:
+            entry = steps[step]
+            if not credential_changed and entry["state"] in (
+                PROVISION_STEP_STATE_SUCCEEDED,
+                PROVISION_STEP_STATE_SKIPPED,
+            ):
+                continue
+            entry["state"] = PROVISION_STEP_STATE_PENDING
+            entry["attempts"] = int(entry["attempts"]) + 1
+            entry["error_code"] = None
+            entry["updated_at"] = None
+
+        now = datetime.now(timezone.utc)
+        job.steps = steps
+        job.resume_of = operation_key
+        job.revision = (job.revision or 1) + 1
+        job.credential_version = current_credential_version
+        job.status = compute_provision_job_status(steps)
+        job.updated_at = now
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        return _provision_job_out(job, session, current_credential_version)
+    except HTTPException:
+        if session.in_transaction():
+            session.rollback()
+        raise
+    except IntegrityError as exc:
+        session.rollback()
+        existing = session.get(RoleProvisionJob, operation_key)
+        if existing is not None and not body.resume:
+            return _provision_job_out(
+                existing,
+                session,
+                _provision_role_credential_version(
+                    project_id, target_member_id, session
+                ),
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="provision_job_failed",
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - 失败整体回滚，不留半截作业
+        if session.in_transaction():
+            session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="provision_job_failed",
+        ) from exc
+
+
+@router.get(
+    "/{project_id}/roles/{member_id}/provision",
+    response_model=RoleProvisionJobOut,
+)
+def get_project_role_provision(
+    project_id: str,
+    member_id: str,
+    operation_key: str | None = Query(default=None),
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """读取一份跨宿主配置作业（**仅 human**；§2.2）。
+
+    ``operation_key`` 缺失或非法 → 422；前置校验同 POST（imported/离册/归档等照样拒绝），
+    但**不**要求作业一定存在：没有作业行 → 404 ``provision_job_not_found``。
+    只读，不写任何表，响应白名单同 §2.4。
+
+    同时回传**读取时**角色行的当前凭据版本（``role_credential_version``，补正 G1），
+    让宿主能判定作业快照是否已被轮换作废。
+    """
+    _require_human(current)
+    target_member_id = member_id.strip()
+    key = _normalize_provision_operation_key(operation_key)
+    _require_provision_identity(project_id, target_member_id, key, session)
+    job = session.get(RoleProvisionJob, key)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="provision_job_not_found"
+        )
+    return _provision_job_out(
+        job,
+        session,
+        _provision_role_credential_version(project_id, target_member_id, session),
+    )
+
+
+@router.post(
+    "/{project_id}/roles/{member_id}/provision/ack",
+    response_model=RoleProvisionJobOut,
+)
+def ack_project_role_provision(
+    project_id: str,
+    member_id: str,
+    body: RoleProvisionAckRequest,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """宿主单步 ACK / 回报（**仅 human**；§2.3），只写本作业。
+
+    校验顺序与稳定错误码固定（先角色/成员/项目前置校验；再作业存在性；再 ``step``/
+    ``state`` 合法；再 ``revision`` CAS；再该步必须 ``pending``；再 ``attempt`` CAS；
+    再 ``credential_version`` 代际 CAS；最后 ``error_code`` 白名单），因此迟到或旧尝试的
+    回报**不可能**把已完成步骤翻成成功：``revision``/``attempt``/``credential_version``
+    任一过期即 409。成功时写步骤终态、``revision+=1``、重算 ``status``。
+    本入口**不**触碰 R1-3 服务 claim/report。
+
+    R1-2 补正 F1：``credential_version`` 必须同时等于作业快照与角色**当前**值；任一轮换
+    都会让在途的旧成功证明失效（409 ``provision_credential_stale``），服务端不再允许
+    用回报时的新 attempt 套旧工作。
+
+    R1-2 补正 F2：引用守卫在 ``BEGIN IMMEDIATE`` 写锁内执行，并在锁内重读作业与角色。
+    """
+    _require_human(current)
+    target_member_id = member_id.strip()
+    operation_key = _normalize_provision_operation_key(body.operation_key)
+
+    _begin_provision_write(session)
+    try:
+        _require_provision_identity(project_id, target_member_id, operation_key, session)
+        job = session.get(RoleProvisionJob, operation_key)
+        if job is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="provision_job_not_found",
+            )
+        if body.step not in PROVISION_STEP_ORDER:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="provision_step_invalid",
+            )
+        if body.state not in PROVISION_ACK_STATES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="provision_ack_state_invalid",
+            )
+        if body.revision != job.revision:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="provision_revision_conflict",
+            )
+        steps = normalize_provision_steps(job.steps)
+        entry = steps[body.step]
+        if entry["state"] != PROVISION_STEP_STATE_PENDING:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="provision_step_not_pending",
+            )
+        if body.attempt != entry["attempts"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="provision_stale_attempt",
+            )
+        current_credential_version = _provision_role_credential_version(
+            project_id, target_member_id, session
+        )
+        if (
+            body.credential_version != int(job.credential_version or 1)
+            or body.credential_version != current_credential_version
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="provision_credential_stale",
+            )
+        error_code = _normalize_provision_error_code(body.state, body.error_code)
+
+        now = datetime.now(timezone.utc)
+        entry["state"] = body.state
+        entry["error_code"] = error_code
+        entry["updated_at"] = now.isoformat()
+        job.steps = steps
+        job.status = compute_provision_job_status(steps)
+        job.revision = (job.revision or 1) + 1
+        job.updated_at = now
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        return _provision_job_out(job, session, current_credential_version)
+    except HTTPException:
+        if session.in_transaction():
+            session.rollback()
+        raise
+    except Exception as exc:  # noqa: BLE001 - 失败整体回滚，步骤状态保持原样
+        if session.in_transaction():
+            session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="provision_ack_failed",
+        ) from exc
+
+
+@router.post(
+    "/{project_id}/roles/{member_id}/provision/roster-paths",
+    response_model=RoleProvisionRosterPathsOut,
+)
+def register_project_role_roster_paths(
+    project_id: str,
+    member_id: str,
+    body: RoleProvisionRosterPathsRequest,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """登记本作业所属**单角色**的三条档案相对路径（**仅 human**）。
+
+    为什么需要：``PUT /agents/{id}/profile`` 只写档案文件内容，从不回写
+    ``project_agents`` 的 ``identity_path``/``soul_path``/``user_path``，宿主脚本因此
+    无法让“档案与名册路径指向同一独立角色”成立。本入口是该作业范围内**唯一**的路径
+    登记通道，且只作用于显式 ``(project_id, member_id)``。
+
+    - 前置校验复用 ``_normalize_provision_operation_key`` + ``_require_provision_identity``：
+      human-only 403、imported/离册/归档/禁用/策略不一致等稳定拒绝码与 POST /provision 相同；
+    - 三条路径必须是**非空仓库相对路径**，归一化反斜杠为 ``/``，拒绝绝对路径（盘符/
+      前导 ``/`` 或 ``\\\\``）、任何 ``..`` 段与控制字符，且必须恰好落在同一个
+      ``.talk/agents/<role_dir>/`` 下、basename 分别为 ``IDENTITY.md``/``SOUL.md``/
+      ``USER.md``；否则 422 ``provision_roster_path_invalid``；
+    - 补正 F8：``<role_dir>`` 必须**恰好**等于目标 ``member_id`` 自己的目录名，拒绝把
+      另一个角色的档案路径登记到本角色（跨角色路径一律 422）；
+    - 成功时**只**更新该 ``ProjectAgent(project_id, member_id)`` 行的三条路径列与
+      ``updated_at``：不动 ``business_role``/``decision_tier``/``capability_summary``、
+      不动 Member/ProjectRole/绑定/说明/权限策略，也不动任何其它名册行；
+    - 补正 F2：引用守卫与名册行复查都在 ``BEGIN IMMEDIATE`` 写锁内，与并发注销/离册/
+      禁用/归档零脏写；
+    - 不调用 ``/sync``、不写任何文件、不触网；响应只含
+      ``{member_id, identity_path, soul_path, user_path}``。
+    """
+    _require_human(current)
+    target_member_id = member_id.strip()
+    operation_key = _normalize_provision_operation_key(body.operation_key)
+
+    _begin_provision_write(session)
+    try:
+        _require_provision_identity(project_id, target_member_id, operation_key, session)
+        try:
+            paths = normalize_provision_roster_paths(
+                body.identity_path,
+                body.soul_path,
+                body.user_path,
+                expected_member_dir=provision_member_dir_name(target_member_id),
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="provision_roster_path_invalid",
+            ) from exc
+
+        # 同一写锁内复查名册行仍然存在（并发 sync/注销不可能插进守卫与写入之间）。
+        roster = session.get(ProjectAgent, (project_id, target_member_id))
+        if roster is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="provision_roster_missing",
+            )
+        roster.identity_path = paths["identity_path"]
+        roster.soul_path = paths["soul_path"]
+        roster.user_path = paths["user_path"]
+        roster.updated_at = datetime.now(timezone.utc)
+        session.add(roster)
+        session.commit()
+        session.refresh(roster)
+        return RoleProvisionRosterPathsOut(
+            member_id=target_member_id,
+            identity_path=roster.identity_path,
+            soul_path=roster.soul_path,
+            user_path=roster.user_path,
+        )
+    except HTTPException:
+        if session.in_transaction():
+            session.rollback()
+        raise
+    except Exception as exc:  # noqa: BLE001 - 失败整体回滚，名册行保持原样
+        if session.in_transaction():
+            session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="provision_roster_path_failed",
+        ) from exc
