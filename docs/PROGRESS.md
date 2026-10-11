@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 21:22 (Asia/Shanghai)：用户明确“验收通过”，R1-2页面基础人工门禁释放；准备按既定计划派发R1-3服务启停切片。
+Updated: 2026-10-11 21:29 (Asia/Shanghai)：R1-2三项页面基础人工验收通过，记录已推送；R1-3服务启停 #223 已派发，开发完成后独立复核。
 
 ## 当前角色与协作
 
@@ -9,7 +9,17 @@ Updated: 2026-10-11 21:22 (Asia/Shanghai)：用户明确“验收通过”，R1-
 - 临时DeepSeek开发/Codex独立复核，Kimi额度不足不派。用户“再不过Codex自己修改”用于221失败后两文件修复；222 DeepSeek独立只读复核。新派发前实读development_requirements。
 - 默认派发后结束/用户通知后取件；开发暂停后审查不并行改码。Codex维护正式进度/Git，不默认操作浏览器。
 
-## 当前状态：R1-2独立与页面基础人工验收通过
+## 当前任务：R1-3 #223 受管CLI服务启停已派发
+
+- 实际任务 #223，标题 223-角色生命周期R1-3受管CLI服务启停，target=agent:deepseek，created_by=agent:codex，Hall=group:task-47b0e98094664c9ba8df8f422cc414ee，创建UTC 2026-10-11T13:28:00.987718。queued/assigned仅派发快照，本轮不轮询、不读旧Hall。
+- 基线cb61338317e398ad0ebb5e02097f493846df13db（R1-2人工验收十文档提交，远程一致/工作区干净）；任务默认general，独立顶层最小参数，未传parent/related/trigger/review_policy。
+- 范围31指定源/测试，R0合同服务状态/launch两表、六API、claim/report与本次实例就绪、宿主管理器、页面单独启动/关闭/全部启动。服务端不spawn，所有权不能只靠PID；停服不能伤及其它角色，未知归属拒绝。
+- 配置不自动启动，管理器启动不拉起全部Agent；真实运行器/login/多角色原生隔离未验能力不得靠bound/control_kind自证。仅临时DB/假Key/固定文本受控子进程/Node契约，真实模型/配置/服务与主动等待not_run。完整新增/一键配置/外部桌面/删除/退出集成仍R1-4。
+- .tmp/role-lifecycle-r1-3-dispatch/保存完整任务包/实际回执/元数据/31范围及原基线；冻结827跟踪/1884旧产物/17本机档，PROGRESS两文档为协调方唯一例外。产物 .tmp/project-role-lifecycle-r1-3/development.json（实际task_id=223），整JSON交付，开发者不改正式文档/Git。
+- 已读最新development_requirements/caller=agent:codex/kind=agent；临时DeepSeek开发/Codex独立复核、Kimi额度不足不派。本次usage-gate UTC2026-10-11T13:19:44.342750 continue，百分比null不代表0；默认派发后结束，用户“223好了”后取件，不先收取。
+- 原R1-2通过/失败/测试证据保持，无生产重载/真实Key/原生登录/模型/启停或browser；本轮仅验收文档/Git和授权任务派发。
+
+## 上一片：R1-2独立与页面基础人工验收通过
 
 - 222/msg2726合法complete，与本地逐结构一致；原文5743字符/SHA a35fc1a36def8645ffb8188a35bd69f619839bbe9c6a124cc0f64d3098452d04，50冻结对象复查无漂移。
 - DeepSeek独立143项重点零失败/错误/跳过，真实junction缺失父目录零副作用/原221负向敏感性/实际owner PID与中断恢复闭合。Codex最终684项Python证据集合通过；143不叠加，原Node59未变沿用，非全量新运行。
@@ -35,5 +45,5 @@ Updated: 2026-10-11 21:22 (Asia/Shanghai)：用户明确“验收通过”，R1-
 ## 下一步
 
 1. R1-2三项页面基础人工验收已通过，当前门禁释放；不把它外推完整角色创建/真实配置/启停。
-2. 单独推进R1-3受管CLI协议/宿主/页面启停；隔离测试与真实运行器证据分别记录，不自动写生产配置或启停实际角色。
+2. 等待用户通知#223完成后取交付摘要/实际代码，Codex独立复核；通过后收取、正式文档/Git与人工页面验收。
 3. R1-4外部桌面/删除/退出随后，I-4主动真实链路后置；一次完成一个功能及验收/收尾。

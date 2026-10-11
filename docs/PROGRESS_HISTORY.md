@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-11 21:29 (Asia/Shanghai) R1-3受管CLI服务启停 #223 派发
+
+- R1-2三项页面人工验收确认已十文档提交cb61338317e398ad0ebb5e02097f493846df13db并推送，远程一致/干净；本轮gate continue但session/weekly用量均null不可据此报0。BRIEF/AGENTS/当前MODULE_bridges/服务R0合同与实施计划已核，预算节T/W/余量/取消排队边界已读。
+- 最新项目开发要求实读；caller agent:codex/kind=agent，project passive/version6、effective null/not_bound保持只读。沿用户临时DeepSeek全片开发/Codex独立复核、不派额度不足Kimi；实例available不被当作额度恢复。默认general顶层，最小project/target/title/content四参数，没有子任务字段。
+- 实际#223，223-角色生命周期R1-3受管CLI服务启停，project prj_e8fe7066bbec，target agent:deepseek，created_by agent:codex，Hall group:task-47b0e98094664c9ba8df8f422cc414ee，UTC 2026-10-11T13:28:00.987718，queued/assigned仅派发快照。单一真实任务号，任务包保存原需求、范围、不变项、31允许文件与独立可复验证据要求，未启动自动轮询/等待。
+- 切片按已发布R1-3：两服务表/六API/写事务世代CAS、原start所有权、claim/report token、预分配本次实例双证据/超时/幂等与旧动作隔离、真实关联bridge、显式宿主管理器/活句柄安全停服、页面单独/全部启动和定向重试。控制不足如实门控，不由bound/idle假就绪。
+- 本次只隔离临时DB/假Key/固定文本子进程/Node交互证据；不得原生模型/真实Key/生产配置/重载/服务启停/浏览器。不改R1-2关键脚本/旧报告、review_exempt/created_by/target/13键快照/MCP预算/模式；完整创建配置页面、外部桌面、删除/退出与I-4后置。
+- 基线/冻结：827跟踪、1884旧产物、17本机档；原31允许文件可读副本（已存在者）、完整包/回执/meta存 .tmp/role-lifecycle-r1-3-dispatch/。两PROGRESS只协调方可写，执行者产物 .tmp/project-role-lifecycle-r1-3/，交付整talk-delivery-1实际task_id=223后暂停，不Git/派任务。
+- 默认派发后结束，用户“223好了”后取件；本轮仅两PROGRESS完成派发收尾提交推送，实际SHA由publication.json记录，不声明开发已开始/完成。共享目录代码审查待开发暂停后开展。
+
 ## 2026-10-11 21:22 (Asia/Shanghai) R1-2页面基础人工验收通过，准备R1-3
 
 - 用户先问“我需要验收哪些？”，协调方明确本次人工范围：重载后角色页去决策/执行，既有角色/已存模型绑定/介绍保持，项目设置发起者主动/被动保留。底层配置/重复/恢复已由隔离自动化独立验证，页面新增/一键配置/启停/删除待后续。
