@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-11 #216 R1-1独立复核needs_rework，#217定向补正派发
+
+- 用户“好了”后收取交付原文（非collect）：#216/msg2720裸talk-delivery-1、自身号216匹配、7429字符/SHA e53ac8c870e403713089910c62ef28a494eddb9a33a53944037053ab7e562423，与本地JSON逐结构一致。runner succeeded/submitted与原自报complete保留；独立needs_rework，尚未业务验收/收取。
+- 审查HEAD3f034721fffa557483a7c8c430647ba9ee9044b5，代码基线cae9b0a；实际七server源＋test_runners改动/六新测试，796保护跟踪＋212原产物SHA无变化，原source/tests/worker证据30文件冻结。Codex核实际代码而非采信自报，未运行collect_evidence覆盖原日志；共享目录开发暂停后审查。
+- 独立相关447实际项通过（首批命令3个模块名导入错误，351实际通过/354计数/exit1原日志保留；仅正确三个模块96项补跑成功），另4WAL现有并发0失败/错误/跳过。真实SQLite journal_mode=wal下六表每个after_cursor_execute实际INSERT后注入异常，全部500 role_creation_failed且已执行写入整体回滚；未把只在session.add排队前抛错当作实际数据库写入故障证明。
+- 三项必须补正：F1同一NULL项目实例两连接声明不同合法项目，两200并覆盖；F2六类引用守卫SQLAlchemy in_transaction=True而DBAPI SQLite in_transaction=False，不满足v4同一写事务；F3角色创建初读项目后，第二TestClient经真实DELETE注销204，创建仍201且projects已无。证据independent-probes.json与extra-probes-api.json；首个说明探针误用路径405及修正后的description200物理事务false均如实保留，初次额外探针列名错误为审查脚本问题，不归因业务源码。
+- 本轮完整复核、原消息/引用SHA、冻结、首批非零与补跑日志、WAL/SQL故障与定向探针、review needs_rework在.tmp/role-lifecycle-r1-1-review/。未collect216、不业务提交、不生产迁移/重载/启停/登录/模型/浏览器/主动链路；开发者task_hall_e2e两项WinError5未运行限制保持，本轮未重试。
+- 新任务前读最新项目开发要求与caller agent:codex/kind agent，继续本次临时DeepSeek开发/Codex独立复核、不派Kimi，passive/version6/effective not_bound。usage-gate 2026-10-11T03:37:55.247174+00:00 continue，两百分比null，精确用量不可读。
+- 四最小参数派实际#217、title=217-角色生命周期R1-1并发与事务边界补正、target=agent:deepseek、created_by=agent:codex、Hall=group:task-11ec9eee180744c89fdf9ec495f84bf2、UTC创建2026-10-11T03:38:07.287304，queued/assigned为派发快照、target_binding_state unconfigured，不当作领取/完成证据。无parent/trigger/子任务专用参数，不重复派216。
+- 补正允许七源、六新/七必要旧测试，实际起点20文件冻结，796非片跟踪＋294原产物保护、两PROGRESS协调例外；新交付.tmp/project-role-lifecycle-r1-1-rework/，包/范围/用量/要求/派发.tmp/role-lifecycle-r1-1-rework-dispatch/。要求物理写锁/原子校验、WAL两序并发、实例冲突稳定409、项目注销先行404无六表新增、已有幂等/回滚/鉴权/旧模型快照不退化，避免持锁双向Barrier死锁；禁止改合同/旧报告/正式文档/bridge/cli/client/web/config/Key/profile/native/模式、生产动作或主动等待。
+- 原#216complete、本次needs_rework与原失败不追改；开发者修完暂停，默认派发后结束、由用户通知再收取，角色功能不与R1-2/服务/页面/I-4交叉。本轮协调仅提交两PROGRESS，不将未审七源/测试纳入提交。记录时间UTC 2026-10-11 03:38:59 UTC。
+
 ## 2026-10-11 10:41 R1-1后端基础#216派发，正式合同代码落地阶段开始
 
 - R0独立复核/澄清后的六文档已提交cae9b0abab4ff835a049f3763005e7531eb9ac60并常规推送origin/codex/terminal-return-codex，远程ls-remote实读同提交、派发前工作区干净。原正式代码未变，215→214→213已收取及原失败保持；首片按用户既有开发授权推进，无重复一般审批。
