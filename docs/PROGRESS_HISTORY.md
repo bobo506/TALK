@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-12 00:50（Asia/Shanghai）— #224取件与Codex亲自修正，派发#225独立只读复核
+
+- 用户“224好了”触发取件。原msg2728两页6722字符/SHA `8d81b2ea89d0296d9e722f570b041e271109b20d93a1c080f0a98925626a10f5`，self-report partial，MCP与本地JSON逐结构一致。原verification[1]虽标pass但360项3 errors/1 skip，按失败记录，原partial/矛盾/失败不追改。#223/#224保持submitted/未收取，业务未提交。
+- #224实读9文件改动均在原34指定允许范围，原827跟踪/1961保护产物/17本机身份档无越界漂移，HEAD5ac42db→3194e32→cd79142均协调方进度提交。不存在的test_instance_project_context.py为scope笔误，不创建伪文件。33正式源文件、37可读worker共70对象冻结；原ACL五个不可读路径中两个为空目录、三个为文件，授权只读SHA成功，不复制原文、不放宽ACL、不删除，旧`.tmp-tests/`残留保持。
+- 原F1–F7已有实质返修，但发现未发布记录的原活进程停止仍unknown_owner、runner控制类型变化后原stop丢失、存储原始异常/退出后失败报告确认边界、批量被新世代取代仍pending/关闭后不能重试、supervisor状态读取错误退出等遗漏。Codex按用户2026-10-11“后续不通过仍然可以由你亲自修改”的持续授权接手，开发者已暂停；只改scripts/role_service_host.py、tests/test_role_service_host.py、web/workspace.js、tests/workspace_role_services.test.cjs。
+- 修正只对明确未发布记录且磁盘真实缺失的原进程使用完整内存证明；成功发布后的丢失/不可读/篡改仍拒绝，原Popen/实际OS创建时刻/项目成员host/owner/控制路径核对保持。记录写入OSError/ProvisionError稳定失败并保留活进程；已退出但失败回报未ACK不丢句柄；原stop不受当前control_kind变化影响，新start仍managed_cli门控；异代动作结束旧批量pending且不冒认新成功，关闭后可重试/计数不重复；暂时读取错误保留监督器并恢复，重复日志有界去重。
+- 负向修正前真实临时HTTP/Popen两项失败、Node两项失败、poll一项错误，修正后相应通过；原篡改拒绝/还原后停止继续通过。中间一次测试插入位置造成断言错位，已恢复原位置且通过，中间失败日志保持。旧Popen退出句柄本已保留，未当作新增缺陷；错误早期判断已纠正。
+- 必要验证：13允许Python模块实际364项零失败/错误/跳过，最后监督器修正后host22项零失败/错误/跳过；按实际用例ID重合21，最终证据集合365，非单次365项运行。独立R1-2五provision模块169项全部通过；14 Node文件194项零失败/取消/跳过，最终角色计数改动20项契约通过，不机械相加成214。早期关联五模块201项/新增三模块82项通过仅作独立阶段证据，不重复累计。git diff --check实际0。原3个bridge管道错误本次未重现，不篡改原失败。
+- 本轮证据`.tmp/role-lifecycle-r1-3-rework1-review/`含原文/冻结/负向/中间失败/最终日志及review-and-fix.md；`.tmp/project-role-lifecycle-r1-3-codex-fix/`保留四文件逐字节before/after/SHA、evidence.json及经summary --expect-task-id 224格式校验的自身十字段交付包，不替换原TALK msg2728。70原冻结对象除四正式源文件外无漂移。未运行生产DB/真实Key/账号/模型/CLI服务/真实主动等待/浏览器；真实原生能力not_run，不以固定文本受控子进程外推。
+- 重新实读当前development_requirements与caller agent:codex/kind=agent，常规要求仍Kimi前端/DeepSeek后端交叉复核，Kimi额度不足临时安排保持；本次Codex实现后由DeepSeek独立实读四文件及必要#224后端集成，不能仅采信自报或自己原开发结论。实际账户5小时已用7%/周21%、ordinaryUsageAllowed=true，不把旧58%/19%反写成当前或本任务消耗。
+- 实际派发#225，标题225-角色生命周期R1-3：Codex修正后独立只读复核，target=agent:deepseek，created_by=agent:codex，Hall `group:task-966cc32cf16644f1937420f67a7fe2e2`，创建UTC2026-10-11T16:49:53.656305，queued/assigned仅派发快照。独立顶层最小四参数，不带parent/related/trigger/review_policy。默认派发后结束，由用户通知再取件，未轮询/等待/收取。
+- 派发HEAD cd7914281b10b363a523a2c578600cba3e5d1a9f，源基线cb61338317e398ad0ebb5e02097f493846df13db；当前未提交业务作为实际基线，不reset。新`.tmp/role-lifecycle-r1-3-codex-fix-review-dispatch/`保存原包/完整回执/实读要求/scope/33最终源码副本，827跟踪/2100保护产物/3私有文件SHA/17本机档冻结；源码全部只读，新复核worker仅`.tmp/project-role-lifecycle-r1-3-codex-fix-review/`。AGENTS/两PROGRESS仅协调方文档例外，随后文档提交不改变业务冻结；复核者不改正式文件或Git。AGENTS本轮同步此前用户持续修正授权。
+- 下一门禁：等用户225完成，独立结论/实际证据通过后才收取225/224/223，更新R1-3正式合同/验收，提交推送业务并人工页面验收。本轮仅提交协调方三文档。R1-4外部桌面/删除/退出和I-4后置，保留原owner/CAS/四条件/截止重放、R1-2配置/DACL/锁、created_by主动被动/review_exempt，不生产重载或并行改码。
+
 
 
 ## 2026-10-11 22:35（Asia/Shanghai）— Codex亲自修正的持续授权
