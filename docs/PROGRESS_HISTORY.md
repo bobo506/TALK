@@ -1,5 +1,20 @@
 # 开发历史 · TALK
 
+## 2026-10-11 19:52 (Asia/Shanghai) R1-2 #220 独立复核仍未通过，#221 定向补正派发
+
+- 用户“220好了”触发取交付；#220/msg2724 单JSON围栏6542字符/SHA e17e0210be0e02ced80dd5071842c727969c57186c2b69b384d0a789c09a7cfe，自身任务号220、合法partial，与本地副本一致。本地summary入口校验通过；MCP默认完整摘要及两稳定4000字符页无损重建，原raw/normalized/paged回执保持。runner succeeded/workflow submitted仅流程位置，无业务验收推断。
+- 实际授权变更三源（role_provision/models/projects）、两既有测试、一个新followup测试；server/db和其它正式文件保持。33组合正式文件（14源/19测试）＋25可读worker共58对象冻结；818范围外跟踪、1531旧产物、17本人档SHA全保持，冻结审查后无漂移。原218/219的自报/错误、220的partial/环境错误和限制不追改。
+- 独立6切片180＋8相关376＋5投影104=660 Python实际通过，0失败/error/skip；包括真实进程/WindowsACL与原pipe路径。220开发原376有4匿名管道WinError5与1skip在本环境未复现，原记录保留。218的59Node文件未变沿用、不计新增，不把660当全量测试；6改动文件UTF-8/语法与实际git diff --check退出0。
+- 正向闭合：凭据轮换无resume明确失败/显式resume按新代际；OSguard确实阻止双/多回收者、可见锁外部删除后仍互斥、正常释放及完整占有后进程死亡可重开、跨Key根profile串行；expected_binding_fingerprint源于作业锚定choice并与本次绑定比较，真实connection_ref读间200漂移拒绝；Windows私有ACL临时文件写/flush/回读/ACL核验后replace原子发布，写前受控kill正式目标不存在，同原Key/操作resume成功及故障注入通过。不外推真实登录/模型/服务就绪。
+- H1仍失败：真实临时作业已succeeded，在resume POST前禁用member，实际API409 provision_member_disabled；响应后恢复enabled，fresh GET200/版本一致。脚本仍exit0/applied/action terminal/not_required，fresh project写3身份档。源码1835附近只看status409和后续事实，未核具体错误码；默认UrlLibTransport381附近HTTPError丢body，无法区分。验收要求精确provision_job_terminal且当前事实吻合，其他/未知/缺失码409零配置副作用；随后事实恢复不能抹掉当次拒绝。证据 independent-boundaries.json#specific_409 / probe.py。
+- H2仍失败：真实本人受控子进程已拿OS字节守卫并O_EXCL创建lock，在fdopen.write前屏障仅终止此Popen子进程；实际PID已死、0字节record=None、guard可再拿、mtime过期/stale_seconds0重试仍provision_lock_busy。要求记录完整原子发布或等价恢复，覆盖创建/写/flush/回收/发布中断，同时不删永久guard、不按年龄抢活/未知owner；完整正常创建后kill的旧测试不足以证明创建阶段恢复。证据 lock-create-interruption.json / lock_interruption_probe.py / child.log。
+- H3静态新增保护补齐：guard直接os.open(O_CREAT|O_RDWR)未在任何open/write前检查guard自身reparse/symlink，原路径守卫只覆盖lock。实际文件symlink创建OSError errno22，guard_link not_run；没有宣称已实际重现外部写。要求新guard同样按声明根/祖先/自身保护，补正常/链接证据，能力受限如实记录。
+- 审查报告needs_rework、稳定原报告、实际diff、58冻结对象和660日志/两反例在.tmp/role-lifecycle-r1-2-followup-review/；本轮Codex没有改业务源码、生产数据库/真实Key、配置、登录、模型、服务或浏览器。两个独立probe只终止自己的受控子进程，均已结束；源测试不依赖.tmp。218/219/220均不收取、不提交33业务文件。
+- 新任务前实读development_requirements、caller agent:codex/kind agent；用户临时DeepSeek开发/Codex独立复核优先、Kimi额度不足不派。usage-gate UTC2026-10-11T11:48:05.006281 continue，两百分比null精确余量未知。DeepSeek T65/W50/余量15与Codex W300预算边界保持，不调用等待测试。
+- 服务实际创建#221，title=221-角色生命周期R1-2错误码与锁中断恢复补正、Hall=group:task-e2caf572305a4cb9bc4c7cb779c3a1df、target agent:deepseek/created_by agent:codex/project prj_e8fe7066bbec、UTC2026-10-11T11:51:10.160362，general/queued/assigned仅创建快照。最小project_id/target/title/content无parent/task_kind/review/related字段，不手写新号。完整原218–220包、本轮H1/H2/H3反例/验收、33当前baseline副本、818跟踪/1631旧产物/17本人档SHA与要求/门禁/派发回执在.tmp/role-lifecycle-r1-2-recovery-dispatch/。
+- 源允许集缩为role_provision.py；测试限role_provision/rework/followup和可选新lock_recovery；公开后端、固定分级迁移、页面和旧证据保持，产物仅.tmp/project-role-lifecycle-r1-2-recovery/。要求本次真实号完整talk-delivery-1交付、开发后暂停、不commit/push、不改正式文档。只有链独立闭合才收取221→220→219→218与业务/正式合同收尾，R1-3/R1-4/I-4继续后置。
+- 本次派发前HEAD143d79ce22c18d05a5c5f72af599a97c7e36592b、业务发布基线0bb280b；本轮仅两PROGRESS收尾。默认派发后结束，由用户“221好了”再复核，无新功能派发、无主动续等；业务工作树仍未提交，不声称干净。
+
 ## 2026-10-11 18:53 (Asia/Shanghai) #219 独立复核仍未通过，#220 恢复/并发定向补正派发
 
 - 用户“好了”按当前 #219 已完成通知处理，不重复问确认。只读取219交付，不提前collect；msg2723自报partial、7794字符/SHA55ed750d6e6c688449712a9d753f43851774ac9a4516acff3961524427492903，两页4000/3794带稳定expect_sha256完整获取，单一JSON围栏与本地development.json一致。合法自身219匹配只为自报；11完成/3未完成/0阻塞、8文件、16验证/5限制，runner succeeded/submitted、未收取。原218自报与needs_rework、219管道失败/跳过/partial不追改。
