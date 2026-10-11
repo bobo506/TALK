@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 09:33 (Asia/Shanghai)：#213合同草稿独立复核需补正；#214已派DeepSeek，原213未收取/未正式发布；默认派发后结束，用户通知后再取件。
+Updated: 2026-10-11 09:55 (Asia/Shanghai)：#214合同修订独立复核仍需补正；#215已派DeepSeek，213/214未收取、合同未正式发布；默认派发后结束，用户通知后再取件。
 
 ## 当前角色与协作
 
@@ -8,23 +8,23 @@ Updated: 2026-10-11 09:33 (Asia/Shanghai)：#213合同草稿独立复核需补�
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：角色生命周期R0 #213需补正，#214已派发
+## 当前状态：角色生命周期R0 #214仍需补正，#215已派发
 
-- 用户通知“213好了”。原msg2717为Markdown+JSON混排，MCP business unknown；两页4784字符/SHA a293663c3f76f3e2d40f0190a5831b0b53b5175b54724d1cc724560fb23263cf稳定重建，嵌入JSON与本地合法213/complete完全一致。格式/自报不代替验收，原消息/11草稿冻结保持。
-- Codex独立读两草稿并核实际代码，808正式保护文件、91旧产物、28引用源指纹及7最终位置链接通过；开发自报808/806计数不同，按原派包实际808条全核，无源码漂移。无业务测试/模型/启停/浏览器操作。
-- 六组补正：F1部分创建/幂等/丢响应后的Key交付恢复；F2共享成员全局禁用、在途任务及归档后派发边界；F3宿主执行授权/报告协议、本次启动实例/世代与项目/PID归属；F4全量名册sync后保留原权限；F5同runner/model不同连接目录并存；F6事实/重复确认门禁/保护计数与裸JSON交付。当前needs_rework，213未收取、两合同未正式发布，不开启功能实现。
-- 读取最新开发要求/caller agent:codex/kind agent与passive/version6/effective not_bound，按用户临时DeepSeek补正/Codex独立复核，不派Kimi。一次四最小参数实际派#214、title=214-角色生命周期R0合同定向补正、created_by agent:codex、Hall group:task-67819f26fc634ffcaca6bb002e140ffc，queued/assigned为派发快照。
-- #214仅新写.tmp/project-role-lifecycle-design-rework/修订稿/闭合索引/局部证据与合法实际新号交付；基线439807b、808正式文件＋118旧原产物冻结，两PROGRESS为预先协调例外。当前原草稿/独立报告.tmp/role-lifecycle-r0-review/，包/回执.tmp/role-lifecycle-r0-rework-dispatch/；默认派发后结束，通知“214完成”再取件复核。
-- 用户更正“不需要主被动”为“不需要决策和执行”：取消角色固定分级，保留发起者主动/被动。项目按运行器/模型创建多份独立角色，保存并配置TALK身份，支持删除、全部启动、单独启动/关闭服务；主要显示名称、运行器、模型、介绍及启动成功/失败，任务状态在任务列表。
-- 原生运行器安装/账号授权与项目角色配置分开。登录建议走原生客户端/官方授权，WorkBuddy实际可控启动、多角色会话隔离、共享账号/宿主归属及退出清理仍待验证；未启动/人工关闭不记作失败。详见DEVELOPMENT_ROADMAP最新节。
-- 上轮仅修改AGENTS、PROJECT_BRIEF、路线和两进度共5文档，记录需求/建议/现状边界；不修改业务源码、测试、生产配置或旧任务/回执，不创建角色/派任务/登录或启停服务。原生订阅密码不进入角色配置。
+- 用户通知“已完成”，按当前#214收件。msg2718为合法裸talk-delivery-1、自身214/complete，succeeded/submitted未收取；两页4000+1433字符完整5433，SHA bcba8ffab495f2e15fef57ac2d8d259e9fac5412a8eac48d6bc7780e2f82e753与本地development.json相等。格式与自报不代替业务验收。
+- 独立核合同重点和实际源码：808正式保护文件＋118旧产物零漂移、29引用源指纹/7最终位置链接/13份交付UTF-8与冻结均通过。原213/msg2717混排unknown及原稿/失败不改；本轮新独立证据.tmp/role-lifecycle-r0-rework-review/，未执行会覆盖开发报告的脚本、未跑未变业务套件/浏览器/模型/生产启停或登录。
+- #214补齐连接维度目录、软下架、项目局部删除、独立权限表及基本宿主路径，但review.json结论仍needs_rework：R1 pending中断恢复与failed并发不闭合；R2离册仍读持久policy扩大豁免；R3共享/旧名册身份的全局Key轮换与独占证明不完整；R4令牌/宿主核验、预期新实例和停止回报协议仍缺；R5首片源/守卫/choice投影及引用不一致。213/214均未验收/收取，两合同未正式发布，不开启R1-1实现。
+- 派发前实读最新开发要求、caller agent:codex/kind agent、passive/version6/effective not_bound；仍按用户临时DeepSeek补正/Codex独立复核，不派Kimi。usage-gate于2026-10-11T01:53:05.905587+00:00返回continue，两百分比null，精确用量不可读。
+- 四最小参数一次派实际#215，title=215-角色生命周期R0剩余合同缺口定向补正、created_by agent:codex、target agent:deepseek、Hall group:task-7444aa76c7274f13916e93cdf03c4ddc、UTC创建2026-10-11T01:54:50.503939，queued/assigned仅派发快照。基线5b18c8e7c2eb85fb6737d7c9c89713adf6021ef7，808正式＋156旧产物冻结，两PROGRESS协调例外；包/回执.tmp/role-lifecycle-r0-final-dispatch/。
+- #215只允许新写.tmp/project-role-lifecycle-design-final/两合同完整稿/闭合与差异/验证/实际号裸JSON。全部原草稿/交付/审查、正式源码/测试/配置/Key/profile/native/生产状态保持；禁止以纸面稿宣称实现/真实能力已通过。完成暂停，默认派发后结束，用户通知“215完成”再独立复核。
+- 用户确认方向不变：运行器→模型→名称/介绍，多份独立角色；保存并配置TALK身份、删除、全部启动、逐角色启动/关闭；主界面名称/运行器/模型/介绍及启动成功/失败，任务状态留任务列表，未启动/人工关闭不算失败。取消固定决策/执行分级，保留只作用created_by发起侧的主动/被动。
+- 原生安装/账号授权与项目配置分开，密码不进入TALK；只管理自身受管服务。WorkBuddy无人值守/多角色隔离、共享宿主归属与退出清理、实际模型与终端T/W/返回余量/取消排队仍需真实证据。I-4主动真实链路待此功能收尾，当前不交叉推进；一般保守实现选择不重复请求P1-P8批准。
 
 - 用户在#212代码发布与新指引验收说明后回复“可以了”，记录C4页面整体人工验收通过、本功能页面门禁释放。不凭短确认补写逐项截图/操作日志，生产失效态联调、实际模型后端版本/开发能力、宿主主动等待仍未验。
 - #212/msg2716合法212/complete、4896字符/SHA b6f7a488…与本地JSON一致，独立复核后已收取succeeded/completed。代码/测试/七正式文档提交096f4f9114bb5efbafaf4589a65102f3b4ac0711已推送，发布当次remote_equal/工作区干净通过，原交付与失败不追改。
 - C4独立默认隔离Node171项、四Python契约12项零失败/跳过；新6项用例对原码预期失败、原16项通过，修后通过；独立22边界场景（1测试）、语法/UTF-8/差异/保护及三静态GET通过。这些是上轮已有证据，本次文档收尾不重跑/不计新增测试，Codex未操作浏览器。
 - 只读字段/状态化指引/安全文本保留，无新每角色/写请求或控件、模型调用。额外Node版本契约只同步唯一字面量，经Codex准予必要配套；源/测试不依赖.tmp。K28 C3受权两写与verify/API/MCP bound、已绑定/alias人工核对及C4页面确认闭合，runner仍unverified。
 - 上轮同步七份正式文档的C4验收状态与当时下一步，业务源码/测试、C3原申请/实施产物、C4原交付/审查/收取/发布回执保持；新人工确认与发布回执保存在.tmp/adapter-closeout-c4-human-acceptance/。
-- 下一步先收#214并独立核F1-F6闭合，确认合同后再发布/收取及明确第一片；原已确认方向与一般保守实现选项不重复索要P1-P8审批。I-4主动真实链路与B2实际模型证据保留，当前不交叉推进；模式意向仍不等于会话生效，终端T/W/返回余量/取消排队继续独立验收。
+- 下一步收#215并独立核R1-R5和原F1-F6闭合，确认后统一发布合同/收取并明确首片。213/214原未通过状态与证据保持；既有C1–C4功能和主被动合同不重做。
 
 ## C3已完成，保持的恢复依据
 
@@ -87,6 +87,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-10T13:35:46.598733 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-11T01:53:05.905587 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。#213草稿独立needs_rework未收取，#214合同定向补正已派DeepSeek；默认派发后结束，用户通知后读取实际214完整合法裸JSON并独立核F1-F6/源码/冻结保护，通过后统一发布/收取，再推进明确代码片。主被动规则不变、I-4后置保留；不重复派214/旧任务、不追改原消息/草稿或重做登记。恢复包.tmp/role-lifecycle-r0-rework-dispatch/，原审查.tmp/role-lifecycle-r0-review/。
+恢复指令：继续项目。#214裸JSON格式已修复，独立合同仍needs_rework；#215剩余合同缺口补正已派DeepSeek，默认派发后结束。用户通知后读取实际215完整合法裸JSON并独立核R1-R5/原F1-F6/实际源码/冻结保护，通过后统一发布收取，再进入明确代码片。213/214均未收取，不重复派215或旧任务，不追改原消息/稿/失败、不开启生产操作。恢复包.tmp/role-lifecycle-r0-final-dispatch/，本轮独立审查.tmp/role-lifecycle-r0-rework-review/，主被动规则不变、I-4后置。

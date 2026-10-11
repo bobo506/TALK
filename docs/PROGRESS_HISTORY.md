@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-11 09:55 #214合法修订仍需补正，#215剩余合同缺口派发
+
+- 用户通知“已完成”，处理既有#214。MCP/msg2718 succeeded/submitted未收取、合法裸talk-delivery-1且task_id214匹配，自报10完成/0未完/0阻塞、13文件/12验证/8限制。detail两页4000+1433字符完整5433、SHA bcba8ffab495f2e15fef57ac2d8d259e9fac5412a8eac48d6bc7780e2f82e753稳定，与本地development.json逐结构一致；开发complete只表示草稿自报，不代替验收。
+- 本次13份交付冻结.tmp/role-lifecycle-r0-rework-review/original/，原消息/引用与summary保持。独立按#214派包全部808正式保护文件、118旧产物SHA/bytes逐项保持，29引用源匹配、7未来正式位置链接/锚点及UTF-8通过。原213/msg2717混排unknown、原11稿/自报差异/失败与此前独立报告均不覆盖。未执行会覆盖开发证据的脚本。
+- 独立核实际Member全局凭据/认证、tasks名册权限条件、两稿新增事务/策略/宿主协议与切片映射；review.json结论needs_rework。F5多连接目录已闭合；F6裸JSON和无需重复八项审批已修，仍有少量范围口径不一。F1–F4有实际未闭合点，不机械采信闭合索引的全部closed。
+- 五组具体补正：R1 TX1后或失败标记前崩溃导致永久pending、failed并发恢复无执行权规则；R2独立policy读路径遗漏当前名册条件、离册仍可豁免；R3rotate-key改全局Member凭据而未限制共享/imported/在用身份，独占引用须包含旧名册，凭据明文存储口径须尊重现有列；R4claim token/host验证未入report、预期实例可空且launch关联可被重贴、stop回报及过期字段/条件缺失；R5scan_agents/claim守卫所属片和确切文件不一、choice_id投影来源与索引不存在章节需明确。
+- 这些是待实现合同缺口，不宣称当前代码已经产生运行时漏洞。两合同仍未正式发布，213/214未业务验收或收取；R1-1源码实现、真实原生授权/模型/服务/主动等待均未启动。只要求集中补具体矛盾，保留已确认目录/删除保守边界/固定分级取消和发起者主动被动，不新增自动整树取消/全局凭据管理/物理删旧列。
+- 派发前实读最新development_requirements、caller agent:codex/kind agent/note null、passive/version6/effective not_bound；按会话临时DeepSeek修订/Codex独立复核，不因实例上报available改派Kimi。usage-gate guard于2026-10-11T01:53:05.905587+00:00返回continue，两窗口百分比null，精确用量不可读。
+- 四最小参数一次派实际#215，title=215-角色生命周期R0剩余合同缺口定向补正、target agent:deepseek、created_by agent:codex、Hall group:task-7444aa76c7274f13916e93cdf03c4ddc、UTC创建2026-10-11T01:54:50.503939、queued/assigned为派发快照、target_binding_state unconfigured，不假称已领取或实际模型。基线5b18c8e7c2eb85fb6737d7c9c89713adf6021ef7，全部808正式＋156旧产物冻结，两PROGRESS预先协调例外。
+- 新包.tmp/role-lifecycle-r0-final-dispatch/含五项实际发现/源码定位/原需求与#213/#214完整包、最新要求、usage-gate与派发/保护回执。只允许新写.tmp/project-role-lifecycle-design-final/完整两稿/闭合清单/差异/验证/本次真实215裸JSON，完成暂停；不改正式源/测试/配置/Key/profile/native/模式/旧历史、不做生产操作或真实模型/启停/登录。默认派发后结束，用户通知215完成后再取件独立核，闭合才正式发布/收取并进入已授权代码片。
+- 本轮正式只更新两进度，完成UTF-8/空白差异/全部冻结检查后中文提交常规推送，发布回执保存在新dispatch/publication.json。未重跑未变业务套件/浏览器、未收取或重复派旧任务；恢复指令继续项目。
+
 ## 2026-10-11 09:33 #213合同草稿独立复核需补正，#214定向修订派发
 
 - 用户通知“213好了”。原任务213/msg2717 runner succeeded/submitted，MCP结论unknown/unstructured；detail两页4000+784字符、SHA a293663c3f76f3e2d40f0190a5831b0b53b5175b54724d1cc724560fb23263cf稳定且完整4784。本地talk_workflow summary --expect-task-id213通过，原消息嵌入JSON与本地合法213/complete逐结构一致；这只证明格式/自报，原消息混排与本地报告保持，不假称MCP合法complete。
