@@ -1,5 +1,20 @@
 # 开发历史 · TALK
 
+## 2026-10-11 20:49 (Asia/Shanghai) R1-2 #221仍需修复，Codex已按用户授权定向修复，#222独立复核派发
+
+- 用户“221好了”后读取msg2725，单JSON围栏7140字符/SHA56f817759ae15b7c1a4fe66e8a26599ccea7ba89164477c269ab0a8440a6b544；合法221/partial，与本地副本一致。完整默认摘要与两稳定分页原文/raw/normalized保存，原218/219/220/221的自报与失败不追改。221在8相关376含4error/1skip却标pass的不一致记录；本机独立376均通过不代表旧自报当时通过。
+- 实际221授权改变role_provision.py、followup测试及新增lock_recovery，34组合正式（14源/20测试）＋26可读worker共60对象冻结；818范围外跟踪/1631旧产物/17本机档全部SHA保持，未读取真实Key。221 H1固定白名单409与同revision/version判定、真实disabled/archived→409→恢复事实反例拒绝通过；H2完整锁记录临时写flush/fsync后link/replace原子发布与guard互斥已检查；H3自身/原有祖先链接/junction拒绝通过，真实文件symlink能力限制not_run仍保留。
+- Codex初验203切片有1失败、定向9锁模块同1失败：after-publish record.pid分别5440/18328与Popen21152/12472不等，零error/skip。独立PID探针venv启动器Popen21460、实际正文19472同时活，自然退出后实际死；role_provision锁记录用实际os.getpid正确，测试控制启动器PID不等于实际owner。原两失败日志/探针保存.tmp/role-lifecycle-r1-2-recovery-review/，两个旧测试实际PID随后只读确认均已退出，不扫描/kill用户进程。
+- J1真实路径副作用：Windowsjunction linked-parent→owned outside，lock=linked-parent/newdir/target.lock，outside原空，acquire先mkdir经链接给outside创建newdir再symlink_refused。虽正式锁/guard未写，零副作用合同未闭合，实际guard-parent-mkdir.json和guard_parent_probe.py保存。J2测试PID问题与J1分别记录，未把测试启动器差异归为锁记录业务错误。
+- 用户此前已明确“如果再验收不过的话，要不你自己来动手修改好了”；本轮条件成立后Codex直接修复J1/J2，没有再次交回DeepSeek开发或请求重复许可。源只在acquire mkdir前增加_assert_lock_paths_safe，原guard内复查保持；测试Windows固定文本/仅stdlib+仓库cli.profiles用sys._base_executable，POSIX原解释器保持，_spawn与死PID夹具统一。未改真实CLI/bridge/模型，未放宽PID/死亡/中断/恢复断言。
+- Codex新增test_linked_ancestor_is_refused_before_missing_parent_is_created真实junction＋缺失父目录回归：原221只运行该项1预期失败、0error/skip，修后通过；外部marker内容及目录列表完整不变。两Codex文件原221副本/SHA/差异/授权/自报/范围验证保存在.tmp/project-role-lifecycle-r1-2-codex-fix/，未覆盖任何原开发报告或审查失败。
+- 修后七模块切片204全部pass，最终锁模块10全部pass；含五真实进程中断边界record-write/flush/before-publish/after-publish/after-reclaim，直接Popen控制实际owner、after-publish PID一致/实际死亡/guard释放与同路径恢复。旧不可解析锁fail closed、活/死publisher临时清理差异、多contender及链接保护保持。最终684证据集合=204＋本轮376相关＋104投影，各0failure/error/skip；两后者涉及模块未改故复用不机械重跑，10复验与负向敏感性不重复叠加。218Node59未变沿用，不计新增，非全量或684个新方法。
+- 两Codex文件UTF8/AST通过，实际git diff --check退出0；1631旧产物/17本机档无漂移，60冻结对象除两修复文件保持，原221消息SHA/本地结构再次确认。只有受控临时文件/DB/假Key/HTTP和自己子进程，未用生产DB/Key/原生配置、登录、模型、服务或浏览器，无业务TALK收取。
+- 派发前最新development_requirements/caller agent:codex/kind=agent实读；本次明确Codex修复/DeepSeek独立复核优先于常规页分工，Kimi不足不派。usage-gate UTC2026-10-11T12:46:29.663283 continue、两百分比null，精确余量未知，不臆测百分比；终端预算不改，无主动等待。
+- 实际创建#222，title=222-角色生命周期R1-2 Codex定向修复独立复核、target agent:deepseek、created_by agent:codex/project prj_e8fe7066bbec、Hall group:task-abe76d8aefaa461b9cc51ddc3ad591c4、UTC 2026-10-11T12:47:55.985817，general/queued/assigned仅创建快照。最小project_id/target/title/content，无parent/task_kind/review/related字段，未手写新号。任务为纯只读独立审查，不再开发；必须实际检查两文件和J1/J2反例、必要原H1/H2不变项，不能只采信自报，也不能自行改码。
+- 新包原218–221完整需求、34当前最终baseline副本/SHA、818跟踪/1756历史产物/17本机档SHA、原221消息引用、两文件精确差异、Codex验证证据、严格只读范围和完整回执保存.tmp/role-lifecycle-r1-2-codex-review-dispatch/。审查产物仅.tmp/project-role-lifecycle-r1-2-independent-review/，完整talk-delivery-1必须自身真实222，完成暂停。Codex也停止改业务代码、无共享并行改码。
+- 派发前HEAD2d04876c7cbe3042beac5b4e89dab92f4f97956c、业务发布基线0bb280b；本轮仅两PROGRESS提交/推送，不提交未独立验收34业务文件。默认用户“222好了”后取交付，闭合后才收取222→221→220→219→218与正式合同/业务/进度/Git统一收尾；R1-3/R1-4/I-4未开始。工作树仍有业务未提交，不声称干净。
+
 ## 2026-10-11 19:52 (Asia/Shanghai) R1-2 #220 独立复核仍未通过，#221 定向补正派发
 
 - 用户“220好了”触发取交付；#220/msg2724 单JSON围栏6542字符/SHA e17e0210be0e02ced80dd5071842c727969c57186c2b69b384d0a789c09a7cfe，自身任务号220、合法partial，与本地副本一致。本地summary入口校验通过；MCP默认完整摘要及两稳定4000字符页无损重建，原raw/normalized/paged回执保持。runner succeeded/workflow submitted仅流程位置，无业务验收推断。

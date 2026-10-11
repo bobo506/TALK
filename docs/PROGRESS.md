@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 19:52 (Asia/Shanghai)：#220 独立复核660项通过，错误码与锁创建中断边界仍未通过；#221已派发，等待开发完成通知。
+Updated: 2026-10-11 20:49 (Asia/Shanghai)：#221复核发现路径副作用与测试PID问题，Codex按用户授权直接修复；最终684项证据通过，#222独立只读复核已派发。
 
 ## 当前角色与协作
 
@@ -8,17 +8,17 @@ Updated: 2026-10-11 19:52 (Asia/Shanghai)：#220 独立复核660项通过，错�
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：R1-2 #218/#219/#220 未验收，#221 定向补正已派发
+## 当前状态：R1-2 #221 未通过，Codex已修复，#222 独立复核已派发
 
-- 用户“220好了”后读取 #220/msg2724 完整交付：6542 字符，SHA e17e0210be0e02ced80dd5071842c727969c57186c2b69b384d0a789c09a7cfe，单一 JSON 围栏，与本地 development.json 结构一致。自报 partial、runner succeeded/workflow submitted，尚未收取；原 #218/#219/#220 的交付、自报、失败与限制不追改。
-- #220 实际只改授权五个既有文件并新增 test_role_provision_followup.py；组合 R1-2 共33正式文件（14源/19测试），33正式＋25可读worker共58对象冻结。818范围外跟踪、1531旧产物、17本机档案SHA无漂移，审查前后冻结对象均保持；未读取真实Key正文。
-- Codex独立6切片模块180＋8相关模块376＋5投影模块104＝660 Python实际通过，零失败/错误/跳过。开发者原4管道error/1skip本环境未复现，原日志保持；#218的59 Node因相关文件未变沿用、不计本轮新增。UTF-8/语法及实际git diff --check退出0，非全量；普通测试通过不等于边界验收。
-- 已通过子项：G1作业/当前凭据版本不等时无resume拒绝、显式恢复；G2正常双/多进程OS守卫互斥、正常释放/完整创建后kill恢复、外部删可见锁仍互斥；G3本次绑定指纹与创建choice预期比对，真实读间connection_ref200漂移拒绝；G4私有ACL临时文件＋原子replace、写前受控中断/原Key恢复及故障注入。保持已有写事务/弃用迁移/路径和角色隔离保证。
-- 仍needs_rework两项真实反例：H1 resume POST前禁用member、POST后恢复enabled，实际409 provision_member_disabled被随后GET200倒推terminal，exit0/applied/not_required且fresh project写3身份档；必须安全识别精确provision_job_terminal，未知/其它错误码拒绝。H2拿OSguard后实际O_EXCL创建锁、写JSON前仅终止自己子进程；lock0字节、PID已死/guard已释放、mtime过期仍provision_lock_busy，须完整原子记录/安全恢复。
-- H3新增guard路径保护为静态补正项：直接os.open未检查guard自身链接，旧lock检查不覆盖.guard后缀；本机创建文件symlink报errno22，探针not_run，不冒称已重现外部写入。报告/原文/冻结/diff/独立日志/反例 .tmp/role-lifecycle-r1-2-followup-review/；没有改业务源码、生产DB/Key/登录/模型/服务或浏览器，测试子进程均自行清理。
-- 新派发前实读项目要求与caller=agent:codex/kind=agent，按用户临时DeepSeek开发/Codex独立复核、不派Kimi。最小顶层参数创建真实#221，标题221-角色生命周期R1-2错误码与锁中断恢复补正，target=agent:deepseek、created_by=agent:codex、Hall=group:task-e2caf572305a4cb9bc4c7cb779c3a1df、UTC 2026-10-11T11:51:10.160362；general/queued/assigned仅创建快照。默认由用户完成通知再取件，不持续等待或重复派发。
-- #221仅scripts/role_provision.py及三既有/一可选新测试，修H1/H2并补H3保护；其它后端/模型/迁移/页面与旧报告保持。包/原218–220需求/33文件baseline-220副本/818跟踪/1631旧产物/17本机档SHA/派发回执 .tmp/role-lifecycle-r1-2-recovery-dispatch/，开发交付 .tmp/project-role-lifecycle-r1-2-recovery/development.json。完成暂停，用户“221好了”后独立复核，闭合前218/219/220/221均不收取、不提交33业务文件。
-- 本次派发HEAD=143d79ce22c18d05a5c5f72af599a97c7e36592b（上一轮两进度），业务发布基线0bb280b；本轮仅两PROGRESS收尾。usage-gate 2026-10-11T11:48:05.006281+00:00 continue但两百分比null，精确余量不可读；终端预算不改，R1-3/R1-4/I-4未开始。
+- 用户“221好了”后取#221/msg2725完整交付：7140字符/SHA 56f817759ae15b7c1a4fe66e8a26599ccea7ba89164477c269ab0a8440a6b544，单JSON围栏/合法partial，与本地副本一致；runner succeeded/workflow submitted尚未收取。原218–221交付/失败/自报不一致均保留，不追改首次通过。
+- #221实际只改role_provision.py与followup测试，新增lock_recovery测试；组合R1-2现34正式文件（14源/20测试）。34正式＋26可读worker共60冻结对象，818范围外跟踪/1631旧产物/17本机档无漂移。Codex初验203项有1失败、定向9项同1失败；376相关与104投影全部0失败/错误/跳过。221原376有4error/1skip却标pass的不一致保持；非全量测试，不抹掉失败。
+- H1精确白名单409/同revision与凭据版本及真实disabled/archived恢复反例拒绝已通过；H2完整锁记录临时写/flush/fsync后原子发布与OSguard、旧未知坏锁fail closed；H3guard自身/原有链接祖先保护已实现。新发现J1：acquire_lock在链接检查前mkdir，经真实junction给外部新建newdir后才symlink_refused；J2：Windowsvenv启动器Popen PID与实际正文PID不同，after-publish断言失败，独立PID探针已确认。
+- 用户此前明确“如果再验收不过的话，要不你自己来动手修改好了”；本轮失败后Codex直接修复两个文件：mkdir前先检查锁/guard及祖先，保留创建后复查；固定文本测试子进程Windows直接用同版本基础解释器，让Popen控制实际owner，未改弱PID/死亡/恢复断言。新增真实junction缺失父目录回归，原221上1项=1预期失败，修后通过。源码/最终测试差异仅两文件，原221基线和授权 .tmp/project-role-lifecycle-r1-2-codex-fix/。
+- 最终7切片204＋本轮未改相关376＋投影104＝684 Python证据集合全通过，零失败/错误/跳过；最终锁模块10复验与负向敏感性不再叠加到684。五真实中断边界含after-publish已通过，永久guard/旧坏锁/多contender保持。UTF8/AST/实际git diff --check退出0，原60冻结对象除两Codex文件无变化，1631旧产物/17本机档保持。218Node59未变沿用；真实文件symlink创建仍not_run，真实junction与形状定序分别说明。
+- 原221复核/两失败日志/PID探针/真实junction副作用 .tmp/role-lifecycle-r1-2-recovery-review/；Codex两文件原基线/差异/验证/交付 .tmp/project-role-lifecycle-r1-2-codex-fix/。原失败测试实际子PID已只读确认均退出；仅受控固定文本进程，无生产DB/真实Key/配置/模型/登录/服务或浏览器动作。
+- 最新development_requirements/caller=agent:codex/kind=agent实读；本次按用户明确授权改为Codex修复、DeepSeek独立复核，Kimi不足不派。最小顶层参数创建真实#222，标题222-角色生命周期R1-2 Codex定向修复独立复核，target agent:deepseek、created_by agent:codex、Hall group:task-abe76d8aefaa461b9cc51ddc3ad591c4、UTC 2026-10-11T12:47:55.985817，general/queued/assigned仅派发快照。正式源/测试/文档纯只读审查，发现问题交回Codex；不再派开发者代修本次缺口。
+- #222包/原218–221完整需求/34最终副本/818跟踪/1756旧产物/17本机档SHA/回执 .tmp/role-lifecycle-r1-2-codex-review-dispatch/，审查交付 .tmp/project-role-lifecycle-r1-2-independent-review/development.json。Codex停止改业务码，默认派发后结束，用户“222好了”后取件。整链独立闭合前218/219/220/221/222均不收取，34业务文件仍未提交。
+- 本次派发HEAD2d04876c7cbe3042beac5b4e89dab92f4f97956c（上一轮两进度），业务发布基线0bb280b；本轮仅两PROGRESS收尾。usage-gate UTC2026-10-11T12:46:29.663283 continue但两百分比null，精确余量未知；终端预算保持，R1-3/R1-4/I-4未开始。
 
 ## 上一片：R1-1 后端基础已独立验收并收取
 
@@ -105,4 +105,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-11T02:38:15.078820 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目；#221 已派发，默认由用户通知“221好了”后取交付独立复核。#218/#219/#220 needs_rework，原报告不追改，不重复派发/提前收取，不开始 R1-3/I-4。证据 .tmp/role-lifecycle-r1-2-followup-review/ 与 .tmp/role-lifecycle-r1-2-recovery-dispatch/；R1-1 已发布0bb280b。
+恢复指令：继续项目；#222为DeepSeek独立审查Codex已修复的J1/J2，默认用户“222好了”后取件。218–221原失败保持，全部通过前不收取/不提交34业务文件，不重复派发或开始R1-3/I-4。证据 .tmp/role-lifecycle-r1-2-recovery-review/、.tmp/project-role-lifecycle-r1-2-codex-fix/ 和 .tmp/role-lifecycle-r1-2-codex-review-dispatch/；R1-1已发布0bb280b。
