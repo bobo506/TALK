@@ -321,6 +321,28 @@ def init_db() -> None:
         }
         if "disabled_at" not in member_columns:
             conn.exec_driver_sql("ALTER TABLE members ADD COLUMN disabled_at TIMESTAMP")
+        # 角色生命周期 R1-1（合同 §4.2）：只增列、只加索引，不重建表、不改旧行。
+        # 旧运行器一律 control_kind='unknown'（页面不提供启动按钮）。
+        runner_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(runner_registry)").fetchall()
+        }
+        if "control_kind" not in runner_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE runner_registry ADD COLUMN control_kind TEXT NOT NULL DEFAULT 'unknown'"
+            )
+        instance_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(agent_instances)").fetchall()
+        }
+        if "project_id" not in instance_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_instances ADD COLUMN project_id TEXT")
+        if "process_started_at" not in instance_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_instances ADD COLUMN process_started_at TIMESTAMP"
+            )
+        if "launch_id" not in instance_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_instances ADD COLUMN launch_id TEXT")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_files_sha256 ON files (sha256)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_from_id ON messages (from_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_group_id ON messages (group_id)")
@@ -365,6 +387,44 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_member_id ON agent_instances (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_runtime ON agent_instances (runtime)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_instances_status ON agent_instances (status)")
+        # 角色生命周期 R1-1（合同 §4.1.1/§4.1.3/§4.1.4/§4.4）：新表由 create_all 建，
+        # 这里补齐幂等索引（表已存在时 create_all 不会补索引）；只增量、不重建表。
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_runner_registry_control_kind "
+            "ON runner_registry (control_kind)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_instances_project_id "
+            "ON agent_instances (project_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_instances_launch_id "
+            "ON agent_instances (launch_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_runner_model_choices_dim "
+            "ON runner_model_choices (runner_id, model_id, model_source, provider_id, "
+            "connection_ref, model_alias)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_runner_model_choices_runner "
+            "ON runner_model_choices (runner_id, retired_at)"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_project_roles_active_name "
+            "ON project_roles (project_id, role_name) WHERE archived_at IS NULL"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_project_roles_member ON project_roles (member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_creation_operations_member "
+            "ON role_creation_operations (member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_role_creation_operations_identity "
+            "ON role_creation_operations (project_id, member_id)"
+        )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_target_member_id ON agent_tasks (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_created_by ON agent_tasks (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_status ON agent_tasks (status)")
@@ -468,6 +528,34 @@ def init_db() -> None:
             WHERE type = 'file' AND file_id IS NOT NULL
             """
         )
+        # 角色生命周期 R1-1 一次性权限策略迁移（合同 §8.3）：
+        # 仅当迁移标记不存在时，把当时的 decision_tier='decision' 名册行回填为
+        # review_exempt=1 / source='migration_decision_tier'；回填与标记**同一事务**。
+        # 标记存在即跳过，因此重复 init_db() 不会重跑，也不会覆盖 human 后续的人工改权；
+        # 迁移只改“策略来源”，不扩大权限（非 decision 行不产生策略行）。
+        migration_key = server.models.ROLE_POLICY_MIGRATION_KEY
+        migration_applied = conn.exec_driver_sql(
+            "SELECT key FROM schema_migrations WHERE key = ?", (migration_key,)
+        ).fetchone()
+        if migration_applied is None:
+            conn.exec_driver_sql(
+                """
+                INSERT OR IGNORE INTO project_role_policies (
+                    project_id, member_id, review_exempt, source,
+                    granted_by, granted_at, updated_at
+                )
+                SELECT
+                    project_id, member_id, 1, ?,
+                    NULL, datetime('now'), datetime('now')
+                FROM project_agents
+                WHERE decision_tier = 'decision'
+                """,
+                (server.models.PROJECT_ROLE_POLICY_SOURCE_MIGRATION,),
+            )
+            conn.exec_driver_sql(
+                "INSERT OR IGNORE INTO schema_migrations (key, applied_at) VALUES (?, datetime('now'))",
+                (migration_key,),
+            )
         conn.commit()
 
 
@@ -475,3 +563,30 @@ def get_session() -> Generator[Session, None, None]:
     """FastAPI dependency that yields a SQLModel session."""
     with Session(engine) as session:
         yield session
+
+
+def begin_immediate_write(session: Session) -> bool:
+    """把当前 ``Session`` 提升为**真实 SQLite 写事务**（``BEGIN IMMEDIATE``）。
+
+    角色生命周期 R1-1 的引用守卫（合同 §7.5 第 3 条）与 TX-ALL（§7.2）要求
+    “校验读取”和“新增写入”落在**同一个实际写事务**里。但 SQLAlchemy 的
+    ``Session.in_transaction`` 只是 ORM 逻辑事务：pysqlite 在首个 DML 之前不会真正
+    ``BEGIN``，因此守卫读取时 ``driver_connection.in_transaction`` 仍是 ``False``，
+    读校验并不在写锁内（这正是独立探针 F2 观察到的事实）。
+
+    本函数显式发一次 ``BEGIN IMMEDIATE`` 取得 SQLite 写锁，使同一 Session 随后的
+    读取与写入都处于同一个实际写事务；并发写者要么在锁上等待，要么在提交后读到
+    最新事实。只影响调用方自己的连接，**不修改**全局引擎参数、不做隔离级别或
+    ``get_session`` 读事务策略的全局调整。
+
+    已经处于实际事务中（同一请求里先发生过 DML）时不重复 ``BEGIN``，直接复用；
+    这种情形下写锁已由前一条写语句取得，守卫仍在同一实际写事务内。
+
+    返回 ``True`` 表示本次调用真正取得写锁，``False`` 表示复用了已存在的实际事务。
+    """
+    connection = session.connection()
+    driver = connection.connection.driver_connection
+    if driver is not None and bool(getattr(driver, "in_transaction", False)):
+        return False
+    connection.exec_driver_sql("BEGIN IMMEDIATE")
+    return True

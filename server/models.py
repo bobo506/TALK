@@ -5,12 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import secrets
+import unicodedata
 from datetime import datetime, timezone
 from typing import Optional
 
+from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
 from sqlalchemy import Column, Index, JSON, text
-from sqlmodel import Field, Session, SQLModel
+from sqlmodel import Field, Session, SQLModel, select
 
 from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
 
@@ -184,6 +187,13 @@ class AgentInstance(SQLModel, table=True):
     member_id: str = Field(foreign_key="members.id", index=True)
     runtime: str = Field(index=True)
     status: str = Field(index=True)
+    # 角色生命周期 R1-1（合同 §4.2 / §10.4）：只加列，旧行保持 NULL。
+    # ``NULL`` = 该实例未声明项目 / 无启动动作关联，**不**回填猜测值；
+    # ``project_id`` 一旦非空不可改写/清空，``launch_id`` 一旦非空不可改写/清空；
+    # 不新增 ``generation`` 列：世代由不可变 launch 行推导。
+    project_id: Optional[str] = Field(default=None, index=True)
+    launch_id: Optional[str] = Field(default=None, index=True)
+    process_started_at: Optional[datetime] = None
     host: Optional[str] = None
     pid: Optional[int] = None
     current_task_id: Optional[str] = None
@@ -351,10 +361,74 @@ RUNNER_ADAPTER_STATUSES = (
 )
 RUNNER_ADAPTER_STATUS_DEFAULT = RUNNER_ADAPTER_UNVERIFIED
 
+# 枚举：运行器控制能力（角色生命周期 R1-1，合同 §12）。只声明控制来源，
+# 不表示已核验/可启动；旧行默认 ``unknown``。
+RUNNER_CONTROL_MANAGED_CLI = "managed_cli"
+RUNNER_CONTROL_EXTERNAL_SESSION = "external_session"
+RUNNER_CONTROL_UNKNOWN = "unknown"
+RUNNER_CONTROL_KINDS = (
+    RUNNER_CONTROL_MANAGED_CLI,
+    RUNNER_CONTROL_EXTERNAL_SESSION,
+    RUNNER_CONTROL_UNKNOWN,
+)
+RUNNER_CONTROL_KIND_DEFAULT = RUNNER_CONTROL_UNKNOWN
+
 # 枚举：模型来源（合同 §4.1）。
 MODEL_SOURCE_BUILTIN = "builtin"
 MODEL_SOURCE_CUSTOM_API = "custom_api"
 MODEL_SOURCES = (MODEL_SOURCE_BUILTIN, MODEL_SOURCE_CUSTOM_API)
+
+# 角色生命周期 R1-1（合同 §4.1.1–§4.1.4 / §7 / §8）：
+# - 模型选择目录的来源等级只描述“这条登记从哪来”，**不是**能力验证；
+# - 角色来源只有 managed（新流程创建）/ imported（历史名册补录）；
+# - 权限策略来源只用于审计，判定始终只看 review_exempt；
+# - 独占身份引用守卫的稳定错误码。
+MODEL_CHOICE_SOURCE_DECLARED = "declared"
+MODEL_CHOICE_SOURCE_NATIVE_CONFIG = "native_config"
+MODEL_CHOICE_SOURCE_VERIFIED = "verified"
+MODEL_CHOICE_SOURCE_KINDS = (
+    MODEL_CHOICE_SOURCE_DECLARED,
+    MODEL_CHOICE_SOURCE_NATIVE_CONFIG,
+    MODEL_CHOICE_SOURCE_VERIFIED,
+)
+MODEL_CHOICE_SOURCE_KIND_DEFAULT = MODEL_CHOICE_SOURCE_DECLARED
+
+MODEL_CHOICE_ID_PREFIX = "rmc_"
+MODEL_CHOICE_ALIAS_MAX_CHARS = 64
+
+PROJECT_ROLE_ORIGIN_MANAGED = "managed"
+PROJECT_ROLE_ORIGIN_IMPORTED = "imported"
+PROJECT_ROLE_ORIGINS = (PROJECT_ROLE_ORIGIN_MANAGED, PROJECT_ROLE_ORIGIN_IMPORTED)
+
+ROLE_NAME_MAX_CHARS = 64
+OPERATION_KEY_MIN_CHARS = 8
+OPERATION_KEY_MAX_CHARS = 128
+ROLE_DESCRIPTION_FINGERPRINT_VERSION = 1
+
+PROJECT_ROLE_POLICY_SOURCE_MIGRATION = "migration_decision_tier"
+PROJECT_ROLE_POLICY_SOURCE_HUMAN = "human_grant"
+PROJECT_ROLE_POLICY_SOURCE_DEFAULT = "default"
+PROJECT_ROLE_POLICY_SOURCES = (
+    PROJECT_ROLE_POLICY_SOURCE_MIGRATION,
+    PROJECT_ROLE_POLICY_SOURCE_HUMAN,
+    PROJECT_ROLE_POLICY_SOURCE_DEFAULT,
+)
+
+# 一次性策略迁移标记（合同 §8.3）：写入 schema_migrations 后永不重跑，
+# 因此重复 init_db() 不会覆盖 human 后来的人工改权。
+ROLE_POLICY_MIGRATION_KEY = "r1_1_project_role_policy_backfill"
+
+# choice_id 投影来源（合同 §5.2）：只信创建操作映射，不按 model_id 反查猜测。
+CHOICE_SOURCE_CREATION_OPERATION = "creation_operation"
+CHOICE_SOURCE_CREATION_OPERATION_MISMATCH = "creation_operation_mismatch"
+CHOICE_SOURCE_LEGACY_MANUAL = "legacy_manual"
+
+# 角色身份投影（合同 §5.2）：managed / imported（有角色行）/ legacy（仅老名册）。
+ROLE_IDENTITY_MANAGED = "managed"
+ROLE_IDENTITY_IMPORTED = "imported"
+ROLE_IDENTITY_LEGACY = "legacy"
+
+IDENTITY_EXCLUSIVE_REFERENCE_REFUSED = "identity_exclusive_reference_refused"
 
 # 绑定有效性阶梯（合同 §4.4，先命中先返回）。``no_project`` 只属于任务快照。
 ROLE_BINDING_NO_PROJECT = "no_project"
@@ -439,6 +513,11 @@ class RunnerRegistry(SQLModel, table=True):
         default_factory=list,
         sa_column=Column(JSON, nullable=False),
     )
+    # 控制能力分类（角色生命周期 R1-1，合同 §12）：managed_cli / external_session /
+    # unknown。只声明“谁可能启动/停止它”，**不**代表已核验、在线或允许启动；
+    # 旧行一律 'unknown'（页面不提供启动按钮）。独立入口 PATCH .../control-kind 写入，
+    # 避免与既有 PATCH /api/runners/{id} 的四字段白名单冲突。
+    control_kind: str = Field(default=RUNNER_CONTROL_UNKNOWN, index=True)
     # 登记人 member_id：刻意不加外键，沿用 project_agents.member_id 先例。
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -473,6 +552,158 @@ class ProjectRoleBinding(SQLModel, table=True):
     model_display_name: Optional[str] = None
     updated_by: str
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RunnerModelChoice(SQLModel, table=True):
+    """已适配运行器的模型选择目录（角色生命周期 R1-1，合同 §4.1.1）。
+
+    - ``choice_id`` 是服务端生成的稳定不透明 ID（``rmc_<12hex>``），创建后**永不**重新
+      指向另一组选择维度，也不复用；
+    - 唯一键覆盖**选择维度** ``(runner_id, model_id, model_source, provider_id,
+      connection_ref, model_alias)``：同运行器同 ``model_id`` 的不同 provider/connection/
+      alias 可并存（这正是 B1a 六维事实的维度）；
+    - ``model_alias`` 属于选择维度（调用选择参数），``model_display_name`` / ``source_kind``
+      / ``capabilities`` / ``retired_at`` 只描述展示与来源，可改；
+    - ``retired_at`` 是**软下架**：只影响新选择，不回写历史绑定；
+    - ``runner_id`` 不加外键级联：运行器退役时选择行保留，读取阶梯如实报告。
+    """
+
+    __tablename__ = "runner_model_choices"
+    __table_args__ = (
+        Index(
+            "ux_runner_model_choices_dim",
+            "runner_id",
+            "model_id",
+            "model_source",
+            "provider_id",
+            "connection_ref",
+            "model_alias",
+            unique=True,
+        ),
+        Index("ix_runner_model_choices_runner", "runner_id", "retired_at"),
+    )
+
+    choice_id: str = Field(primary_key=True)
+    runner_id: str
+    model_id: str
+    model_source: str
+    provider_id: str
+    connection_ref: str
+    model_alias: str = Field(default="")
+    model_display_name: Optional[str] = None
+    source_kind: str = Field(default=MODEL_CHOICE_SOURCE_KIND_DEFAULT)
+    capabilities: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False),
+    )
+    retired_at: Optional[datetime] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectRole(SQLModel, table=True):
+    """项目角色身份与生命周期归属（角色生命周期 R1-1，合同 §4.1.2）。
+
+    - 只存“人工角色名 + 生命周期归属 + 凭据版本”：运行器/模型事实的唯一来源仍是
+      ``project_role_bindings``，本表刻意不重复存 ``runner_id``/``model_id``；
+    - ``role_name`` 仅在**未归档**时项目内唯一（部分唯一索引 ``ux_project_roles_active_name``），
+      归档后同名可重建且必然获得新 ``member_id``；
+    - ``identity_exclusive`` 是创建时记录的持久标记（创建时该 member 全局仅此一条未归档
+      角色行），一旦为 1 即受独占引用守卫保护；
+    - ``archived_at`` 是软归档：保留历史归属，不物理删除成员/任务/消息；
+    - 本表**没有** ``status`` 列：行存在即事实存在。
+    """
+
+    __tablename__ = "project_roles"
+    __table_args__ = (
+        Index(
+            "ux_project_roles_active_name",
+            "project_id",
+            "role_name",
+            unique=True,
+            sqlite_where=text("archived_at IS NULL"),
+        ),
+    )
+
+    project_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True, index=True)
+    role_name: str
+    origin: str = Field(default=PROJECT_ROLE_ORIGIN_MANAGED)
+    identity_exclusive: int = Field(default=0)
+    credential_version: int = Field(default=1)
+    key_issued_at: Optional[datetime] = None
+    key_rotated_at: Optional[datetime] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    archived_at: Optional[datetime] = None
+
+
+class RoleCreationOperation(SQLModel, table=True):
+    """创建幂等与身份分配（角色生命周期 R1-1，合同 §4.1.3 / §7.2）。
+
+    - ``operation_key`` 由调用方显式提供（禁止由名称/模型派生），是本表的唯一幂等键；
+    - **没有** ``status``/``error_code`` 列：行 = 已提交操作，失败 = 没有行，
+      因此不存在任何需要人肉回收的 ``pending``/``failed`` 残行；
+    - 行与全部身份事实在**同一个** ``BEGIN IMMEDIATE`` 事务（TX-ALL）内写入；
+    - ``UNIQUE(project_id, member_id)`` 供 ``GET roles`` 的 ``choice_id`` 反查使用。
+    """
+
+    __tablename__ = "role_creation_operations"
+    __table_args__ = (
+        Index(
+            "ux_role_creation_operations_identity",
+            "project_id",
+            "member_id",
+            unique=True,
+        ),
+    )
+
+    operation_key: str = Field(primary_key=True)
+    request_fingerprint: str
+    project_id: str = Field(index=True)
+    requested_role_name: str
+    runner_id: str
+    choice_id: str
+    member_id: str = Field(index=True)
+    committed_at: datetime
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectRolePolicy(SQLModel, table=True):
+    """独立于固定分级的权限持久源（角色生命周期 R1-1，合同 §4.1.4 / §8）。
+
+    - ``review_exempt`` ⇔ 原 ``decision_tier='decision'`` 的“可豁免复核”行为，不新增权限；
+    - 独立于 ``project_agents``：名册 sync 是全量替换，挂在那张表上的字段会被抹掉；
+    - 行是“曾获得/被授予的豁免事实”，离册/归档后**保留**（“离册保留、回册恢复”），
+      但“当前是否可用”由读路径按当前名册/角色状态现算（保留事实 ≠ 当前权限）。
+    """
+
+    __tablename__ = "project_role_policies"
+
+    project_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True)
+    review_exempt: int = Field(default=0)
+    source: str = Field(default=PROJECT_ROLE_POLICY_SOURCE_DEFAULT)
+    granted_by: Optional[str] = None
+    granted_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class SchemaMigration(SQLModel, table=True):
+    """一次性迁移标记（角色生命周期 R1-1，合同 §8.3）。
+
+    ``key`` 存在即代表该迁移已执行；因此重复 ``init_db()`` 不会重跑回填、
+    也不会覆盖 human 后续的人工改权。
+    """
+
+    __tablename__ = "schema_migrations"
+
+    key: str = Field(primary_key=True)
+    applied_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 def looks_like_credential(value: str) -> bool:
@@ -622,6 +853,58 @@ def normalize_runner_capabilities(value: Optional[list[str]]) -> list[str]:
             raise ValueError("capabilities items must be unique after normalization")
         seen.add(stripped)
         normalized.append(stripped)
+    return normalized
+
+
+def normalize_runner_control_kind(value: Optional[str]) -> str:
+    """``control_kind`` 枚举归一（合同 §12）。"""
+    if not isinstance(value, str):
+        raise ValueError("control_kind must be a string")
+    normalized = value.strip().lower()
+    if normalized not in RUNNER_CONTROL_KINDS:
+        raise ValueError(f"control_kind must be one of {list(RUNNER_CONTROL_KINDS)}")
+    return normalized
+
+
+def normalize_model_choice_source_kind(value: Optional[str]) -> str:
+    """模型选择的来源等级（合同 §4.1.1）：只描述来源，**不**表示可用。"""
+    if not isinstance(value, str):
+        raise ValueError("source_kind must be a string")
+    normalized = value.strip().lower()
+    if normalized not in MODEL_CHOICE_SOURCE_KINDS:
+        raise ValueError(
+            f"source_kind must be one of {list(MODEL_CHOICE_SOURCE_KINDS)}"
+        )
+    return normalized
+
+
+def normalize_role_name(value: Optional[str]) -> str:
+    """项目角色名规则（合同 §7.3）：先 ``strip()``，1–64 Unicode 码点，允许纯中文。
+
+    空/全空白 → ``ValueError``（API 层映射 ``422 role_name_invalid``）。
+    """
+    if not isinstance(value, str):
+        raise ValueError("role_name must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("role_name must be a non-empty string")
+    if len(normalized) > ROLE_NAME_MAX_CHARS:
+        raise ValueError(
+            f"role_name must be at most {ROLE_NAME_MAX_CHARS} characters"
+        )
+    return normalized
+
+
+def normalize_operation_key(value: Optional[str]) -> str:
+    """``operation_key`` 规则（合同 §7.3）：调用方显式提供，8–128 安全 token。"""
+    normalized = normalize_safe_identifier_token(
+        value, field="operation_key", max_chars=OPERATION_KEY_MAX_CHARS
+    )
+    assert normalized is not None  # required=True
+    if len(normalized) < OPERATION_KEY_MIN_CHARS:
+        raise ValueError(
+            f"operation_key must be at least {OPERATION_KEY_MIN_CHARS} characters"
+        )
     return normalized
 
 
@@ -1551,6 +1834,11 @@ class AgentInstanceUpdate(BaseModel):
     pid: Optional[int] = None
     current_task_id: Optional[str] = None
     last_error: Optional[str] = None
+    # 角色生命周期 R1-1（合同 §5.4 / §10.4）：全部可选，语义是“请求中显式出现的字段”。
+    # 路由只赋值 ``model_fields_set`` 里的字段，因此旧心跳省略它们时保持原值、不被抹成 NULL。
+    project_id: Optional[str] = None
+    launch_id: Optional[str] = None
+    process_started_at: Optional[datetime] = None
 
     @model_validator(mode="after")
     def validate_instance_status(self) -> "AgentInstanceUpdate":
@@ -1566,6 +1854,10 @@ class AgentInstanceUpdate(BaseModel):
             self.current_task_id = self.current_task_id.strip() or None
         if self.last_error is not None:
             self.last_error = self.last_error.strip() or None
+        if self.project_id is not None:
+            self.project_id = self.project_id.strip() or None
+        if self.launch_id is not None:
+            self.launch_id = self.launch_id.strip() or None
         return self
 
 
@@ -1581,6 +1873,10 @@ class AgentInstanceOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_seen_at: datetime
+    # 角色生命周期 R1-1 附加字段（旧客户端忽略未知键即可）。
+    project_id: Optional[str] = None
+    launch_id: Optional[str] = None
+    process_started_at: Optional[datetime] = None
 
 
 _TASK_STATUSES = {"queued", "running", "succeeded", "failed", "canceled"}
@@ -2306,6 +2602,8 @@ class RunnerOut(BaseModel):
     adapter_status: str
     adapter_note: Optional[str]
     capabilities: list[str]
+    # 角色生命周期 R1-1 附加字段：旧键一个不减/不改名，只新增控制能力分类。
+    control_kind: str = RUNNER_CONTROL_KIND_DEFAULT
     created_by: str
     created_at: datetime
     updated_at: datetime
@@ -2319,10 +2617,220 @@ class RunnerOut(BaseModel):
             adapter_status=runner.adapter_status,
             adapter_note=runner.adapter_note,
             capabilities=list(runner.capabilities or []),
+            control_kind=runner.control_kind or RUNNER_CONTROL_KIND_DEFAULT,
             created_by=runner.created_by,
             created_at=runner.created_at,
             updated_at=runner.updated_at,
         )
+
+
+class RunnerControlKindUpdate(BaseModel):
+    """``PATCH /api/runners/{runner_id}/control-kind`` 请求体（合同 §5.1）。
+
+    独立入口：避免与既有 ``PATCH /api/runners/{id}`` 的四字段白名单冲突。
+    只声明控制来源，不代表已核验或允许启动。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    control_kind: str
+
+    @model_validator(mode="after")
+    def validate_control_kind(self) -> "RunnerControlKindUpdate":
+        self.control_kind = normalize_runner_control_kind(self.control_kind)
+        return self
+
+
+class RunnerModelChoiceCreate(BaseModel):
+    """``POST /api/runners/{runner_id}/model-choices`` 请求体（合同 §4.1.1）。
+
+    ``model_alias`` 属于**选择维度**：空/缺省 = 空串（该运行器不支持或不指定显式 alias）。
+    命中既有选择维度时只更新展示/来源字段；试图改动维度由路由映射
+    ``409 choice_dimension_immutable``。
+
+    字段值归一化刻意放在路由层：路由需要读取**原始** ``model_fields_set`` 才能区分
+    “显式提供”与“缺省”，避免 pydantic 校验器赋值污染该集合。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: str
+    model_source: str
+    provider_id: str
+    connection_ref: str
+    model_alias: Optional[str] = None
+    model_display_name: Optional[str] = None
+    source_kind: Optional[str] = None
+    capabilities: Optional[list[str]] = None
+
+
+class RunnerModelChoiceUpdate(BaseModel):
+    """``PATCH /api/runners/{runner_id}/model-choices/{choice_id}`` 请求体（合同 §4.1.1）。
+
+    只允许改 ``model_display_name``/``capabilities``/``source_kind``/``retired_at``。
+    选择维度字段被**接受**但一律 409 ``choice_dimension_immutable``（客户端应改为新建
+    选择），其它未知字段 422。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: Optional[str] = None
+    model_source: Optional[str] = None
+    provider_id: Optional[str] = None
+    connection_ref: Optional[str] = None
+    model_alias: Optional[str] = None
+    model_display_name: Optional[str] = None
+    capabilities: Optional[list[str]] = None
+    source_kind: Optional[str] = None
+    retired_at: Optional[datetime] = None
+
+
+class RunnerModelChoiceOut(BaseModel):
+    """模型选择输出（合同 §4.1.1）。只描述登记事实，不代表模型在线或可用。"""
+
+    choice_id: str
+    runner_id: str
+    model_id: str
+    model_source: str
+    provider_id: str
+    connection_ref: str
+    model_alias: str
+    model_display_name: Optional[str]
+    source_kind: str
+    capabilities: list[str]
+    retired_at: Optional[datetime]
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_orm_choice(cls, choice: RunnerModelChoice) -> "RunnerModelChoiceOut":
+        return cls(
+            choice_id=choice.choice_id,
+            runner_id=choice.runner_id,
+            model_id=choice.model_id,
+            model_source=choice.model_source,
+            provider_id=choice.provider_id,
+            connection_ref=choice.connection_ref,
+            model_alias=choice.model_alias or "",
+            model_display_name=choice.model_display_name,
+            source_kind=choice.source_kind,
+            capabilities=list(choice.capabilities or []),
+            retired_at=choice.retired_at,
+            created_by=choice.created_by,
+            created_at=choice.created_at,
+            updated_at=choice.updated_at,
+        )
+
+
+class ProjectRoleCreate(BaseModel):
+    """``POST /api/projects/{project_id}/roles`` 请求体（合同 §5.2 / §7.2）。
+
+    ``role_name`` 的“非空/长度”校验与 ``operation_key`` 归一化刻意放在路由层，以便返回
+    稳定码 ``422 role_name_invalid``（而不是通用校验错误）；``operation_key`` 必填且由
+    调用方显式提供（禁止由名称/模型派生）。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    role_name: str
+    runner_id: str
+    choice_id: str
+    role_description: Optional[str] = None
+    operation_key: str
+
+
+class ProjectRoleUpdate(BaseModel):
+    """``PATCH /api/projects/{project_id}/roles/{member_id}`` 请求体（合同 §5.2）。
+
+    - ``role_name``：只改项目内角色名，**默认不动** ``members.display_name``；
+    - ``role_description``：显式 ``null`` = 清除自定义说明；缺省 = 不修改；
+    - ``review_exempt``：复核豁免**只能**由 human 经本入口授予/撤销；
+    - 未知字段 → 422（``extra="forbid"``），不接受任何 agent 自建/自授入口。
+
+    字段值归一化放在路由层：路由需要读取**原始** ``model_fields_set`` 才能区分
+    “显式 ``null``”与“缺省”。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    role_name: Optional[str] = None
+    role_description: Optional[str] = None
+    review_exempt: Optional[bool] = None
+
+
+class ProjectRoleRunnerOut(BaseModel):
+    """角色投影里的运行器部分（只读展示；不返回路径/argv/凭据）。"""
+
+    runner_id: Optional[str] = None
+    runtime: Optional[str] = None
+    display_name: Optional[str] = None
+    status: Optional[str] = None
+
+
+class ProjectRoleModelOut(BaseModel):
+    """角色投影里的模型部分（合同 §5.2 的 ``choice_id`` 可信来源）。
+
+    ``choice_id`` 只来自创建操作映射且与当前绑定六维一致；失配/老名册一律 ``null``，
+    并给出 ``choice_source`` 与 ``choice_binding_mismatch`` 说明，**不**按 model_id 猜。
+    """
+
+    choice_id: Optional[str] = None
+    choice_source: str = CHOICE_SOURCE_LEGACY_MANUAL
+    choice_binding_mismatch: bool = False
+    model_id: Optional[str] = None
+    model_alias: Optional[str] = None
+    model_display_name: Optional[str] = None
+
+
+class ProjectRoleServiceOut(BaseModel):
+    """角色服务投影（R1-1 不实现服务表 → 恒为 ``null``；合同 §3 / §11）。"""
+
+    desired: Optional[str] = None
+    observed: Optional[str] = None
+    last_action: Optional[str] = None
+    last_result: Optional[str] = None
+    error_code: Optional[str] = None
+    native_login: Optional[str] = None
+
+
+class ProjectRoleListItem(BaseModel):
+    """``GET /api/projects/{project_id}/roles`` 单条投影（合同 §5.2）。
+
+    公开只读面：**不**返回 ``api_key``、``owner_token``、``claim_token``、绝对路径或 argv。
+    """
+
+    member_id: str
+    role_name: str
+    origin: str
+    identity: str
+    archived: bool
+    identity_exclusive: bool
+    runner: ProjectRoleRunnerOut = PydField(default_factory=ProjectRoleRunnerOut)
+    model: ProjectRoleModelOut = PydField(default_factory=ProjectRoleModelOut)
+    role_description: Optional[str] = None
+    binding_state: Optional[str] = None
+    service: Optional[ProjectRoleServiceOut] = None
+
+
+class RoleCredentialRotateOut(BaseModel):
+    """``rotate-key`` 一次性响应（合同 §7.5）：``api_key`` 仅此一次出现。"""
+
+    member_id: str
+    api_key: str
+    credential_version: int
+
+
+class ProjectRoleTaskSummaryOut(BaseModel):
+    """``GET /roles/{member_id}/tasks`` 只读非终态任务摘要。"""
+
+    id: int
+    title: Optional[str] = None
+    status: str
+    workflow_status: Optional[str] = None
+    target_member_id: str
+    created_by: str
+    created_at: Optional[datetime] = None
 
 
 class RoleBindingInput(BaseModel):
@@ -2503,3 +3011,274 @@ class AgentProfileUpdate(BaseModel):
     identity: Optional[str] = None
     soul: Optional[str] = None
     user: Optional[str] = None
+
+
+# ── 角色生命周期 R1-1：共享身份/选择事实助手 ─────────────────────────────
+#
+# 这些函数是各路由（projects / tasks / groups）共用的**同一份**判定，
+# 避免“只守住了 sync 却漏掉群成员/Task Hall 自动成员”的分叉实现。
+
+
+def slugify_role_name(value: Optional[str]) -> str:
+    """把人工名称归一化为 slug（合同 §7.3）。
+
+    NFKC → 小写 → 非 ``[a-z0-9]`` 折叠为 ``-`` → 去掉首尾 ``-`` → 截断 32。
+    纯中文（折叠后为空）回退 ``role``，因此 ``member_id`` 不会退化成空 slug。
+    """
+    if not isinstance(value, str):
+        return "role"
+    normalized = unicodedata.normalize("NFKC", value).lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
+    slug = slug[:32].strip("-")
+    return slug or "role"
+
+
+def build_role_member_id(project_id: str, role_name: str, suffix: str) -> str:
+    """``agent:<project_slug>.<role_slug>-<8hex>``（合同 §7.3，P4）。"""
+    return f"agent:{slugify_role_name(project_id)}.{slugify_role_name(role_name)}-{suffix}"
+
+
+def new_role_member_id_suffix() -> str:
+    return secrets.token_hex(4)
+
+
+def new_role_api_key() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def new_model_choice_id() -> str:
+    """稳定不透明选择 ID：``rmc_<12hex>``（合同 §4.1.1）。"""
+    return f"{MODEL_CHOICE_ID_PREFIX}{secrets.token_hex(6)}"
+
+
+def build_role_creation_fingerprint(
+    *,
+    project_id: str,
+    role_name: str,
+    runner_id: str,
+    choice_id: str,
+    role_description: Optional[str],
+) -> str:
+    """创建操作请求指纹（合同 §7.2/§7.3）。
+
+    参与项固定为 ``{project_id, role_name_normalized, runner_id, choice_id,
+    role_description_or_empty, fingerprint_version}``，用规范化 JSON（键排序、紧凑分隔符、
+    非 ASCII 原样）后取 ``sha256``——同 key 改介绍即视为异载荷。
+    """
+    payload = {
+        "project_id": project_id,
+        "role_name_normalized": role_name,
+        "runner_id": runner_id,
+        "choice_id": choice_id,
+        "role_description_or_empty": role_description or "",
+        "fingerprint_version": ROLE_DESCRIPTION_FINGERPRINT_VERSION,
+    }
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def model_choice_dimension_facts(choice: Optional[RunnerModelChoice]) -> Optional[tuple]:
+    """选择的六维事实（含 ``runner_id``）：与绑定行必须逐项一致才算同一次选择。"""
+    if choice is None:
+        return None
+    return (
+        choice.runner_id,
+        choice.model_source,
+        choice.provider_id,
+        choice.connection_ref,
+        choice.model_id,
+        choice.model_alias or "",
+    )
+
+
+def role_binding_dimension_facts(binding: Optional[ProjectRoleBinding]) -> Optional[tuple]:
+    """绑定行的六维事实（含 ``runner_id``）。"""
+    if binding is None:
+        return None
+    return (
+        binding.runner_id,
+        binding.model_source,
+        binding.provider_id,
+        binding.connection_ref,
+        binding.model_id,
+        binding.model_alias or "",
+    )
+
+
+def exclusive_identity_owner_project(
+    member_id: str, session: Session
+) -> Optional[str]:
+    """返回“本流程创建的独占身份”所属项目；不适用（历史/共享成员）时返回 ``None``。
+
+    判定只看 ``project_roles.identity_exclusive=1`` 这个**持久标记**：一旦为 1，
+    该 member 只归属创建项目，跨项目/全局引用都必须拒绝（合同 §7.5 第 3 条）。
+    归档不改变归属（身份永不复用），因此这里刻意不过滤 ``archived_at``。
+    """
+    row = session.exec(
+        select(ProjectRole)
+        .where(ProjectRole.member_id == member_id)
+        .where(ProjectRole.identity_exclusive == 1)
+    ).first()
+    return row.project_id if row is not None else None
+
+
+def ensure_identity_exclusive_reference_allowed(
+    member_id: str,
+    reference_project_id: Optional[str],
+    session: Session,
+) -> None:
+    """新独占身份引用守卫（合同 §7.5 第 3 条）。
+
+    历史无 ``ProjectRole`` 或 ``identity_exclusive=0``（imported/共享）成员**完全保留旧行为**；
+    只有新独占身份被限制在创建项目内，跨项目或全局（``project_id is None``）引用一律
+    ``409 identity_exclusive_reference_refused``。调用方必须与新增写入处于同一写事务。
+    """
+    owner = exclusive_identity_owner_project(member_id, session)
+    if owner is None:
+        return
+    if reference_project_id is None or reference_project_id != owner:
+        raise HTTPException(
+            status_code=409, detail=IDENTITY_EXCLUSIVE_REFERENCE_REFUSED
+        )
+
+
+def _table_exists(session: Session, table_name: str) -> bool:
+    row = session.execute(
+        text("SELECT name FROM sqlite_master WHERE type='table' AND name=:name"),
+        {"name": table_name},
+    ).first()
+    return row is not None
+
+
+def _table_columns(session: Session, table_name: str) -> set[str]:
+    rows = session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+    return {row[1] for row in rows}
+
+
+# R1-1 尚无 role_service_state 表：**不查询不存在的表、不伪造服务证据**。
+# 一旦该表存在（R1-3 或测试构造的未来表），同一份独占证明必须补查其中的在用事实。
+FUTURE_SERVICE_STATE_TABLE = "role_service_state"
+FUTURE_SERVICE_STATE_COLUMNS = ("member_id", "desired_state", "observed_state")
+
+
+def _service_state_in_use(member_id: str, session: Session) -> bool:
+    if not _table_exists(session, FUTURE_SERVICE_STATE_TABLE):
+        return False
+    columns = _table_columns(session, FUTURE_SERVICE_STATE_TABLE)
+    if not set(FUTURE_SERVICE_STATE_COLUMNS) <= columns:
+        return False
+    row = session.execute(
+        text(
+            "SELECT 1 FROM role_service_state WHERE member_id=:member_id "
+            "AND (desired_state='running' "
+            "OR observed_state IN ('starting','running','stopping')) LIMIT 1"
+        ),
+        {"member_id": member_id},
+    ).first()
+    return row is not None
+
+
+def prove_exclusive_identity(
+    project_id: str,
+    member_id: str,
+    session: Session,
+) -> dict:
+    """独占引用证明（合同 §7.5，``rotate-key`` 与后续全局禁用共用）。
+
+    在**同一写事务内**枚举全部兼容引用路径（不能只用新表自证），目标
+    ``(project_id, member_id)`` 自身的那一行不算引用。返回分类清单：
+
+    ``{"refusal": <稳定拒绝码|None>, "references": {...}}``
+
+    判定顺序固定为：其它项目角色 → 旧 ``project_agents`` 跨项目 → 同项目名册行缺失
+    → 绑定/说明跨项目 → 跨/全局群成员 → 在用实例/服务/在途任务。
+    """
+    other_roles = list(
+        session.exec(
+            select(ProjectRole)
+            .where(ProjectRole.member_id == member_id)
+            .where(ProjectRole.project_id != project_id)
+            .where(ProjectRole.archived_at.is_(None))
+        ).all()
+    )
+    other_roster = list(
+        session.exec(
+            select(ProjectAgent)
+            .where(ProjectAgent.member_id == member_id)
+            .where(ProjectAgent.project_id != project_id)
+        ).all()
+    )
+    own_roster = session.get(ProjectAgent, (project_id, member_id))
+    other_bindings = list(
+        session.exec(
+            select(ProjectRoleBinding)
+            .where(ProjectRoleBinding.member_id == member_id)
+            .where(ProjectRoleBinding.project_id != project_id)
+        ).all()
+    )
+    other_descriptions = list(
+        session.exec(
+            select(ProjectRoleDescription)
+            .where(ProjectRoleDescription.member_id == member_id)
+            .where(ProjectRoleDescription.project_id != project_id)
+        ).all()
+    )
+    group_refs = list(
+        session.exec(
+            select(GroupMember)
+            .join(Group, Group.id == GroupMember.group_id)
+            .where(GroupMember.member_id == member_id)
+            .where(
+                (Group.project_id.is_(None)) | (Group.project_id != project_id)
+            )
+        ).all()
+    )
+    active_instances = list(
+        session.exec(
+            select(AgentInstance)
+            .where(AgentInstance.member_id == member_id)
+            .where(
+                AgentInstance.status.in_(
+                    ("starting", "online", "idle", "busy", "stopping")
+                )
+            )
+        ).all()
+    )
+    active_tasks = list(
+        session.exec(
+            select(AgentTask)
+            .where(
+                (AgentTask.target_member_id == member_id)
+                | (AgentTask.created_by == member_id)
+            )
+            .where(AgentTask.status.in_(("queued", "running")))
+        ).all()
+    )
+    service_in_use = _service_state_in_use(member_id, session)
+
+    references = {
+        "other_project_roles": [row.project_id for row in other_roles],
+        "other_project_roster": [row.project_id for row in other_roster],
+        "own_project_roster": own_roster is not None,
+        "other_project_bindings": [row.project_id for row in other_bindings],
+        "other_project_descriptions": [row.project_id for row in other_descriptions],
+        "cross_project_groups": [row.group_id for row in group_refs],
+        "active_instances": [row.id for row in active_instances],
+        "active_tasks": [row.id for row in active_tasks],
+        "service_state_in_use": service_in_use,
+    }
+
+    refusal: Optional[str] = None
+    if other_roles or other_bindings or other_descriptions:
+        refusal = "rotate_shared_identity_refused"
+    elif other_roster:
+        refusal = "rotate_legacy_roster_reference_refused"
+    elif own_roster is None:
+        refusal = "rotate_identity_off_roster"
+    elif group_refs:
+        refusal = "rotate_group_reference_refused"
+    elif active_instances or active_tasks or service_in_use:
+        refusal = "rotate_identity_in_use"
+    return {"refusal": refusal, "references": references}

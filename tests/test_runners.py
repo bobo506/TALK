@@ -83,6 +83,9 @@ class RunnerRegistryApiTests(RouteTestCase):
                 "adapter_status",
                 "adapter_note",
                 "capabilities",
+                # 角色生命周期 R1-1（合同 §5.1/§12）：只新增控制能力分类，
+                # 旧键一个不减、不改名。
+                "control_kind",
                 "created_by",
                 "created_at",
                 "updated_at",

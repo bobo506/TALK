@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 11:39 (Asia/Shanghai)：#216独立复核needs_rework，#217并发/事务补正已派DeepSeek；原报告保持，未业务提交/收取，默认用户通知完成再复核。
+Updated: 2026-10-11 12:29 (Asia/Shanghai)：#217独立复核三缺陷闭合，476项成功；217→216已收取，R1-1后端基础完成，下一片R1-2按批次暂停。
 
 ## 当前角色与协作
 
@@ -8,26 +8,27 @@ Updated: 2026-10-11 11:39 (Asia/Shanghai)：#216独立复核needs_rework，#217�
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：#216独立复核需补正，#217已派DeepSeek
+## 当前状态：R1-1 后端基础已独立验收并收取
 
-- 用户通知“好了”后读取#216/msg2720完整合法裸JSON：7429字符、SHA e53ac8c870e403713089910c62ef28a494eddb9a33a53944037053ab7e562423，声明216/complete与本地development.json一致。原自报保留，独立结论needs_rework，未collect/业务验收。
-- 实际改动七server源、tests/test_runners.py和六新测试；796其它跟踪文件＋212旧产物SHA保持。原源/测试/开发证据冻结30文件，未运行会覆盖原报告的collect_evidence脚本；复核期间不并行改码。
-- Codex独立相关447项通过，另4项实测WAL并发通过，均无业务失败/错误/跳过。首批命令误写3个模块名，354计数包含351实际通过＋3导入错误，exit1原日志保留；只补跑正确三个模块96项通过，不将首轮记为全绿。六个实际SQL INSERT之后分别注入异常，全部500 role_creation_failed且整体回滚，补强开发者只在session.add前注入的证据。
-- F1：WAL真实双连接对已有NULL项目实例同时声明两个合法项目，均200且分别返回不同project_id，后写覆盖，违反项目不可变。F2：名册sync/绑定/说明/任务Hall/群创建与成员新增六类引用守卫读取时，SQLAlchemy逻辑事务为true但SQLite物理事务为false，不满足同一写事务。F3：创建角色首次查项目后，另一TestClient调用真实DELETE项目204，创建仍201产新身份而项目已无。
-- 复核/原消息/指纹/完整差异原件/447日志/4WAL/六SQL故障/定向探针与needs_rework在.tmp/role-lifecycle-r1-1-review/，原#216产物.tmp/project-role-lifecycle-r1-1/不追改。本次Codex只写协调文档/隔离验证，没有修业务源码，七源与六新测试仍未提交。
-- 已按最新development_requirements/caller agent:codex实读，继续用户临时DeepSeek开发、Codex独立复核、不派Kimi；passive/version6/effective not_bound不授权自动等待。usage-gate 2026-10-11T03:37:55.247174+00:00 continue，两窗口百分比null，精确用量不可读。
-- 四最小参数派实际#217，title=217-角色生命周期R1-1并发与事务边界补正、target=agent:deepseek、created_by=agent:codex、Hall=group:task-11ec9eee180744c89fdf9ec495f84bf2、UTC创建2026-10-11T03:38:07.287304；queued/assigned仅派发快照，不当作实际领取/完成/模型能力。绑定unconfigured如实保留。
-- 补正仍同一R1-1切片，七源/六新测试/七必要旧测试允许，实际起点20文件另冻结，796非片跟踪＋294原产物保护，两PROGRESS协调例外。新交付只写.tmp/project-role-lifecycle-r1-1-rework/；包/范围/要求/用量/回执在.tmp/role-lifecycle-r1-1-rework-dispatch/。
-- 修正须证明实例归属原子性、全部引用守卫物理写事务、项目注销/创建两种顺序，并补WAL有界实连接测试；不得持锁点双向Barrier挂死、不拆任务/Hall原子性、不弱化旧断言/加skip、不修改合同使错误合法。修完暂停，不派下一片/提交/推送/收取216，用户通知后Codex独立核。
-- 未生产迁移/重载、原生登录/服务启停、模型/浏览器或主动真实链路。原task_hall_e2e两项WinError5未运行限制保持，本次未补跑；真实运行器/宿主能力未验。R1-2桥接/页面/删除/服务及I-4后置，角色功能先收敛。
-- 用户方向保持：多份独立项目角色、保存并配置、删除/全部及单独启停；名称/运行器/模型/介绍与启动成功/失败为主显示；未启动/人工关闭不算失败。取消角色固定分级，保留只作用created_by发起侧的主动/被动。R0 v4合同cae9b0a已发布、213/214/215已收取，原草稿/失败不追改。
+- 用户“217好了”后读取#217/msg2721完整交付：8916字符、SHA d84e73fdd65ee321319d0b51c2972161fef5bb79528a138841f24d39ac787214，单一JSON代码块，去围栏后与本地development.json逐结构一致；MCP合法217/complete为自报，Codex另核实际代码/证据。原#216第一次needs_rework和旧错误/自报保持。
+- 原796非片跟踪＋294旧产物SHA保持，无缺失；补正实际只改五源/三测试，#216模型/目录等其它源保持。当前业务交付共七源、一个必要旧测试与六新测试；46原源/测试/worker文件冻结，本机最终审查.tmp/role-lifecycle-r1-1-final-review/。
+- 三缺陷独立闭合：F1 预启动两TestClient排除startup init_db干扰，WAL双连接同一NULL项目实例竞争200/409、终值稳定，第二请求在handler写锁入口排队；F2 六类引用守卫物理事务true，每处第三连接取写锁被拒；F3 真实DELETE项目204后创建404且六表无新增。子任务/计划派生、引用/轮换两种锁顺序、创建先持锁注销后到由新测试通过。
+- 独立13必要模块278＋12附带196＋任务Hall E2E2＝476项实际运行通过，零失败/错误/跳过（含继承类复跑）；三场景中和原子化手段各预期失败、正式路径各通过，单独存证不计476。六表实际INSERT后故障注入/全回滚/同key重试、幂等不再返Key、旧Key401新Key有效、迁移幂等/人工策略、权限门控、原绑定/13键快照、无密公开面通过。
+- 原开发者E2E WinError5日志保持；Codex本次经受权工具在临时DB、随机回环端口及固定文本Python子进程补测两项成功。未使用原生模型或生产角色/真实凭据；自编探针首轮生命周期阻挡导致超时，失败脚本保留，预启动clients后通过，不修改业务源码。
+- 217→216均已由原发起者收取，succeeded/completed，原msg2721/2720保持；UTC收取2026-10-11T04:28:13.438488/04:28:17.936653。收取216表示补正链闭合，不把第一次needs_rework改为当时通过。完整回执/原消息SHA在最终审查根。
+- 数据/API已落地：精确模型目录与control_kind、独立项目角色TX-ALL原子创建/幂等与凭据恢复、持久review_exempt迁移和四条件读路径、managed独占引用守卫、实例项目/launch不可变和增量更新。首片无新非空launch许可（422）、无service表/真实就绪推断。
+- 本轮协调同步正式合同/计划、BRIEF、ROADMAP、MODULE_instances及两PROGRESS七文档；原R0草稿/失败/开发报告不追改。业务只提交本片七源/旧test_runners/六新测试，文档发布前最终UTF-8/语法/差异/范围检查；Git收尾回执存最终审查根。
+- 未执行生产角色/目录/Key/模型/配置/模式写入、生产数据库init/重载、原生登录/服务控制或浏览器验证；TALK任务收取为本轮授权收尾动作。真实版本/额度/登录/隔离/宿主等待仍未验；SQLite默认写锁等待未压力测试，项目注销保留既有清理边界。
+- R1-1数据库/协议切片按合同批次刹车收尾后暂停，本轮不派R1-2；下一片为宿主一键配置（身份档/仓库外Key/前置检查/作业幂等）与bridge/提示词/页面固定分级迁移，完整服务/删除/退出页面仍后续。角色功能先完成，不与I-4主动真实链路交叉。
+- usage-gate2026-10-11T04:26:42.542752+00:00 continue，两百分比null，精确用量不可读。当前临时DeepSeek开发/Codex独立复核、不派Kimi；新片前仍实读development_requirements/caller，默认派发后结束、用户通知再收取。
+- 用户方向不变：同一运行器/模型可创建多份独立角色，保存并配置与启动分开，单独关闭/全部启动/删除、宿主退出清理；主页面名称/运行器/模型/介绍及启动成功/失败；取消角色固定分级，保留仅created_by发起侧的主动/被动。
 
 - 用户在#212代码发布与新指引验收说明后回复“可以了”，记录C4页面整体人工验收通过、本功能页面门禁释放。不凭短确认补写逐项截图/操作日志，生产失效态联调、实际模型后端版本/开发能力、宿主主动等待仍未验。
 - #212/msg2716合法212/complete、4896字符/SHA b6f7a488…与本地JSON一致，独立复核后已收取succeeded/completed。代码/测试/七正式文档提交096f4f9114bb5efbafaf4589a65102f3b4ac0711已推送，发布当次remote_equal/工作区干净通过，原交付与失败不追改。
 - C4独立默认隔离Node171项、四Python契约12项零失败/跳过；新6项用例对原码预期失败、原16项通过，修后通过；独立22边界场景（1测试）、语法/UTF-8/差异/保护及三静态GET通过。这些是上轮已有证据，本次文档收尾不重跑/不计新增测试，Codex未操作浏览器。
 - 只读字段/状态化指引/安全文本保留，无新每角色/写请求或控件、模型调用。额外Node版本契约只同步唯一字面量，经Codex准予必要配套；源/测试不依赖.tmp。K28 C3受权两写与verify/API/MCP bound、已绑定/alias人工核对及C4页面确认闭合，runner仍unverified。
 - 上轮同步七份正式文档的C4验收状态与当时下一步，业务源码/测试、C3原申请/实施产物、C4原交付/审查/收取/发布回执保持；新人工确认与发布回执保存在.tmp/adapter-closeout-c4-human-acceptance/。
-- 下一步待用户通知“217完成”，收实际新号完整合法交付，核20起点/796保护/294原产物及三缺陷WAL并发证据；通过后再收取补正链/业务Git。原216自报与失败不追改，不重复派任务。
+- 下一步R1-2宿主一键配置与固定分级迁移；本轮R1-1按数据库/协议切片收尾后暂停，不重复派216/217或再次取件。后续新片前读最新要求与用量门禁，不启动生产角色或I-4。
 
 ## C3已完成，保持的恢复依据
 
@@ -92,4 +93,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-11T02:38:15.078820 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。R0正式v4 cae9b0a已发布，213/214/215已收取；#216 R1-1独立复核needs_rework、未collect/业务提交。#217定向并发/事务补正已派，默认派发后结束，用户通知完成再核实际代码/WAL证据及796/294保护，补正链通过后收取Git。原交付/失败保持，不重复派发/生产迁移/启停，R1-2/服务/页面/I-4后置。
+恢复指令：继续项目。R1-1 #216经#217补正已独立476项运行/WAL证据通过，217→216已收取，七源/六新测试/必要旧测试及七相关文档完成收尾。下一片R1-2宿主一键配置和bridge/提示词/页面固定分级迁移；先读当前要求/门禁，单片派发后结束。原交付/needs_rework/失败不追改，不重复派或收216/217，不启动生产服务或I-4。最终证据.tmp/role-lifecycle-r1-1-final-review/。

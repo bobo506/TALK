@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
-from server.db import get_session
+from server.db import begin_immediate_write, get_session
 from server.models import (
     AgentTask,
     DiscussionSession,
@@ -24,6 +24,7 @@ from server.models import (
     Member,
     Message,
     Project,
+    ensure_identity_exclusive_reference_allowed,
 )
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
@@ -111,6 +112,9 @@ def create_group(
     session: Session = Depends(get_session),
 ):
     """Create a discussion Group and its initial Hall membership."""
+    # F2 补正（合同 §7.5 第 3 条）：创建者/初始成员的引用守卫必须与实际
+    # Group/GroupMember 写入处于同一个 SQLite 写事务；先取写锁再读取校验。
+    begin_immediate_write(session)
     group_id = body.id or f"group:{uuid4().hex[:12]}"
     if session.get(Group, group_id) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="group id already exists")
@@ -121,6 +125,11 @@ def create_group(
     member_ids = list(dict.fromkeys([current.id, *body.member_ids]))
     for member_id in member_ids:
         _get_member(member_id, session)
+        # 角色生命周期 R1-1（合同 §7.5 第 3 条）：群创建含创建者在内都是“新增引用”，
+        # 与写入同一事务校验新独占身份的项目归属（跨项目/全局群一律拒绝）。
+        ensure_identity_exclusive_reference_allowed(
+            member_id, body.project_id, session
+        )
 
     now = datetime.now(timezone.utc)
     group = Group(
@@ -202,9 +211,14 @@ def upsert_group_member(
 ):
     """Add a member to a Group or update that member's role."""
     _require_human(current)
+    # F2 补正（合同 §7.5 第 3 条）：成员新增的引用守卫与实际 GroupMember/Group
+    # 写入处于同一个 SQLite 写事务；先取写锁再读取校验。
+    begin_immediate_write(session)
     group = _get_group(group_id, session)
     _ensure_task_hall_membership_is_managed_by_task(group_id, session)
     _get_member(member_id, session)
+    # 角色生命周期 R1-1（合同 §7.5 第 3 条）：成员新增是同事务内的“新增引用”守卫。
+    ensure_identity_exclusive_reference_allowed(member_id, group.project_id, session)
     now = datetime.now(timezone.utc)
 
     membership = session.get(GroupMember, (group_id, member_id))

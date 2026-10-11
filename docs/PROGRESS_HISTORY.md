@@ -1,5 +1,20 @@
 # 开发历史 · TALK
 
+## 2026-10-11 R1-1 #217独立复核通过，217→216收取，后端基础收尾
+
+- 用户“217好了”后获取#217/msg2721完整默认摘要与稳定三页原文（8916字符/SHA d84e73fdd65ee321319d0b51c2972161fef5bb79528a138841f24d39ac787214）。原消息为单一JSON代码块，不冒称裸JSON；MCP校验合法自身217/complete，去外层围栏后与本地development.json逐结构一致。原文、代码、全部worker证据冻结46文件，无追改原报告。
+- 审查HEAD3f4f9e882b4d9a29362a2a66c87900a200801b49；原代码cae9b0a，补正起点.tmp/role-lifecycle-r1-1-rework-dispatch/baseline/20文件。796非片跟踪＋294旧产物全部SHA保持，实际补正五源/三测试；源保护/精确diff/原消息/独立证据与review accepted在.tmp/role-lifecycle-r1-1-final-review/。
+- F1闭合：实例更新入口先取实际写锁，再读身份/名册/项目/launch；独立预启动两TestClient避免startup init_db串行混淆后，已有NULL项目实例两连接声明两个合法项目，第一200、第二409 instance_project_immutable，终值prj_alpha稳定；第二请求已到handler写锁入口排队，第三独立连接取锁失败，两个physical_transaction=true。
+- F2闭合：共用begin_immediate_write只提升调用方写事务，不改全局引擎或get_session读策略；名册sync/非空绑定/说明/群创建含creator/成员新增/任务Hall含creator和target都在守卫前持锁。独立六路径driver物理事务全true，六处第三真实连接BEGIN IMMEDIATE均被锁拒绝；正式新测试子任务/计划派生、引用先持锁/轮换先持锁两序通过。已有DML子任务复用实际事务，不拆任务/Hall/关系/快照。
+- F3闭合：创建TX-ALL已提交operation重放之后用事实SQL复查project，绕过ORM旧对象；独立真实DELETE项目204后创建404 project not found且六表无新增，创建先持锁/注销后到串行201/204通过。原注销清理边界保持，不追改旧孤儿或全局凭据。
+- 独立13必要模块278＋12附带196＋Task Hall E2E2＝476项实际运行成功，0失败/错误/跳过，包含继承类旧方法复跑；新方法9项，不把增加27次运行当作27个新方法。独立三场景原子化手段中和各1预期失败、正式各1通过单独存证，并非完整旧码回退，不计入476普通运行。
+- 476覆盖六表实际SQL INSERT后故障注入/全回滚/同key重试201、宕机放弃/同key并发/异载荷/目录下架重放、旧Key401/新Key有效/version递增、真实共享/旧名册/在用拒绝、旧形态迁移幂等/人工改权、离册回册归档门控、模型精确来源、增量字段/launch边界与公共无密面；原#216故障证据沿用而不计本轮。
+- 原开发者Task Hall两项沙箱WinError5记录保留；本次经require_escalated受权隔离临时数据库/随机回环端口与固定文本Python子进程成功补测2项，不调用原生CLI模型/生产服务或真实凭据。本轮自编探针首轮因TestClient生命周期init_db先于handler阻塞而超时，首轮脚本保留；预启动双client后通过，无业务源码变动。原消息解析首轮围栏/PowerShell转义问题为审查脚本问题，修正后SHA/结构一致，不归因业务代码。
+- 原#216/msg2720引用SHA e53ac8c870e403713089910c62ef28a494eddb9a33a53944037053ab7e562423（7429字符）再次只读核稳定。按217→216由agent:codex收取，succeeded/completed，UTC2026-10-11T04:28:13.438488与04:28:17.936653；结果原文msg2721/2720保持。收取216仅表示补正链完成，原needs_rework/自报不修改。
+- 七业务源、旧test_runners配套、六新测试完成；协调更新正式v4合同/计划实现状态、BRIEF/ROADMAP、MODULE_instances和两PROGRESS，不扩展未来协议范围。批次后暂停，下一片R1-2宿主配置与固定分级迁移；服务/删除/退出/完整页面与I-4后置，不自行派发下一片。
+- 未执行生产角色/目录/模型/Key/配置/模式写入或生产库init/重载、原生登录/服务控制/浏览器；TALK任务收取为授权收尾。真实运行器/宿主能力、默认busy timeout压测/生产多worker未验。usage-gate2026-10-11T04:26:42.542752+00:00 continue但两窗口null，精确用量不可读。临时DeepSeek开发/Codex独立复核，默认派发后结束/用户通知取件保持。
+- 先做最终UTF-8/语法/差异/保护和回执原文一致核验，再统一提交本片代码与七相关文档并常规推送，发布回执独立保存。本轮记录UTC 2026-10-11 04:31:43 UTC，收尾提交不更改旧报告/原失败。
+
 ## 2026-10-11 #216 R1-1独立复核needs_rework，#217定向补正派发
 
 - 用户“好了”后收取交付原文（非collect）：#216/msg2720裸talk-delivery-1、自身号216匹配、7429字符/SHA e53ac8c870e403713089910c62ef28a494eddb9a33a53944037053ab7e562423，与本地JSON逐结构一致。runner succeeded/submitted与原自报complete保留；独立needs_rework，尚未业务验收/收取。

@@ -12,20 +12,31 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import update
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from sqlalchemy import text, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.auth import get_current_member
-from server.db import get_session
+from server.db import begin_immediate_write, get_session
 from server.models import (
+    CHOICE_SOURCE_CREATION_OPERATION,
+    CHOICE_SOURCE_CREATION_OPERATION_MISMATCH,
+    CHOICE_SOURCE_LEGACY_MANUAL,
+    PROJECT_ROLE_ORIGIN_IMPORTED,
+    PROJECT_ROLE_ORIGIN_MANAGED,
+    PROJECT_ROLE_POLICY_SOURCE_HUMAN,
+    ROLE_IDENTITY_LEGACY,
     RUNNER_ADAPTER_RETIRED,
     SQLITE_SIGNED_INTEGER_MAX,
     AgentInstance,
     AgentInstanceOut,
     AgentProfileOut,
     AgentProfileUpdate,
+    AgentTask,
     Group,
     GroupMember,
     GroupOut,
@@ -37,16 +48,38 @@ from server.models import (
     ProjectControllerModeUpdate,
     ProjectCreate,
     ProjectOut,
+    ProjectRole,
     ProjectRoleBinding,
+    ProjectRoleCreate,
     ProjectRoleDescription,
     ProjectRoleDescriptionOut,
+    ProjectRoleListItem,
+    ProjectRoleModelOut,
+    ProjectRolePolicy,
+    ProjectRoleRunnerOut,
+    ProjectRoleTaskSummaryOut,
+    ProjectRoleUpdate,
     ProjectSyncRequest,
     ProjectUpdate,
     RoleBindingResponse,
     RoleBindingUpdate,
+    RoleCreationOperation,
+    RoleCredentialRotateOut,
     RoleDescriptionUpdate,
+    RunnerModelChoice,
     RunnerRegistry,
     build_role_binding_out,
+    build_role_creation_fingerprint,
+    build_role_member_id,
+    ensure_identity_exclusive_reference_allowed,
+    model_choice_dimension_facts,
+    new_role_api_key,
+    new_role_member_id_suffix,
+    normalize_operation_key,
+    normalize_role_description,
+    normalize_role_name,
+    normalize_safe_identifier_token,
+    prove_exclusive_identity,
     read_role_binding_facts,
     read_role_binding_facts_batch,
     resolve_role_binding_state,
@@ -66,6 +99,22 @@ def _get_project(project_id: str, session: Session) -> Project:
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
     return project
+
+
+def _project_row_exists_now(project_id: str, session: Session) -> bool:
+    """TX-ALL 写锁内按**真实 SQL** 复查项目是否存在（F3 补正）。
+
+    不能复用 ORM ``session.get(Project, ...)``：identity map 里可能已有本请求早先
+    读取的旧 ``Project`` 对象，项目已被并发注销时它仍会命中缓存。这里直接发事实
+    SQL，结果只反映当前事务快照。事实助手本身不固定 HTTP 错误码，映射由 API 层完成。
+    """
+    return (
+        session.execute(
+            text("SELECT 1 FROM projects WHERE project_id = :project_id"),
+            {"project_id": project_id},
+        ).first()
+        is not None
+    )
 
 
 def _require_facts_project(facts: dict) -> None:
@@ -138,6 +187,9 @@ def _instance_out(instance: AgentInstance) -> AgentInstanceOut:
         created_at=instance.created_at,
         updated_at=instance.updated_at,
         last_seen_at=instance.last_seen_at,
+        project_id=instance.project_id,
+        launch_id=instance.launch_id,
+        process_started_at=instance.process_started_at,
     )
 
 
@@ -452,6 +504,9 @@ def update_agent_role_description(
     """
     _require_human(current)
     _get_project(project_id, session)  # 项目不存在 → 404（先于任何写入）
+    # F2 补正（合同 §7.5 第 3 条）：说明写入的引用守卫必须与实际 INSERT/UPDATE 处于
+    # 同一个 SQLite 写事务；BEGIN IMMEDIATE 在守卫读取之前取得写锁。
+    begin_immediate_write(session)
 
     target_member_id = member_id.strip()
     description = body.description
@@ -482,6 +537,12 @@ def update_agent_role_description(
                 f"{target_member_id}"
             ),
         )
+
+    # 角色生命周期 R1-1（合同 §7.5 第 3 条）：说明写入是“新增引用”，
+    # 与写入同一事务校验新独占身份的项目归属。
+    ensure_identity_exclusive_reference_allowed(
+        target_member_id, project_id, session
+    )
 
     now = datetime.now(timezone.utc)
     if existing is None:
@@ -591,7 +652,15 @@ def put_agent_role_binding(
             session.commit()
         return _binding_response(project_id, target_member_id, session)
 
+    # F2 补正（合同 §7.5 第 3 条）：非空绑定的引用守卫与实际 upsert 处于同一
+    # SQLite 写事务；显式写锁在守卫读取之前取得。解除绑定分支不需要引用守卫。
+    begin_immediate_write(session)
     _require_binding_target(project_id, target_member_id, session)
+    # 角色生命周期 R1-1（合同 §7.5 第 3 条）：绑定写入是“新增引用”，
+    # 与写入同一事务校验新独占身份的项目归属。
+    ensure_identity_exclusive_reference_allowed(
+        target_member_id, project_id, session
+    )
     runner = session.get(RunnerRegistry, binding.runner_id)
     if runner is None:
         raise HTTPException(
@@ -654,6 +723,15 @@ def sync_project(
     """
     _require_human(current)
     project = _get_project(project_id, session)
+
+    # F2 补正（合同 §7.5 第 3 条）：名册 sync 的引用守卫与实际 delete/add 必须处于
+    # 同一个 SQLite 写事务；BEGIN IMMEDIATE 在守卫读取之前取得写锁。
+    begin_immediate_write(session)
+
+    # 角色生命周期 R1-1（合同 §7.5 第 3 条）：名册 sync 是与新增写入同一事务的引用守卫。
+    # 新独占身份只归属创建项目；历史无 ProjectRole / imported / 非独占成员完全保留旧行为。
+    for entry in body.agents:
+        ensure_identity_exclusive_reference_allowed(entry.member_id, project_id, session)
 
     existing = session.exec(
         select(ProjectAgent).where(ProjectAgent.project_id == project_id)
@@ -907,3 +985,710 @@ def unregister_project(
     session.delete(project)
     session.commit()
     return None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 角色生命周期 R1-1：项目角色读取 / 原子创建 / 改名与豁免 / 凭据恢复
+# （合同 §5.2、§7.2、§7.3、§7.5、§8）
+#
+# 本片**不**启动角色服务、不做宿主配置、不实现删除/归档入口；公开读取面
+# 永不返回 api_key / owner_token / claim_token / 绝对路径 / argv。
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _tx_add_role_fact(session: Session, row: object) -> None:
+    """TX-ALL 的唯一写入漏斗。
+
+    六个写入点全部经此函数，使“逐步故障注入”测试可以在任意一步抛异常，
+    验证单事务整体回滚后六表零残留、且没有操作行（合同 §7.7 T-R1-a）。
+    """
+    session.add(row)
+
+
+def _role_projection(
+    project_id: str, member_ids: list[str], session: Session
+) -> dict[str, ProjectRoleListItem]:
+    """构造角色列表/单角色投影（合同 §5.2）。
+
+    ``model.choice_id`` 的唯一可信来源是创建操作映射，且必须与**当前绑定**六维事实
+    完全一致；失配或老名册一律 ``null`` 并用 ``choice_source`` 如实标注，
+    **不**按 ``model_id`` 反查猜测（同 model_id 可能有多连接）。
+    """
+    if not member_ids:
+        return {}
+    roles = {
+        row.member_id: row
+        for row in session.exec(
+            select(ProjectRole)
+            .where(ProjectRole.project_id == project_id)
+            .where(ProjectRole.member_id.in_(member_ids))
+        ).all()
+    }
+    members = {
+        row.id: row
+        for row in session.exec(
+            select(Member).where(Member.id.in_(member_ids))
+        ).all()
+    }
+    descriptions = {
+        row.member_id: row.description
+        for row in session.exec(
+            select(ProjectRoleDescription)
+            .where(ProjectRoleDescription.project_id == project_id)
+            .where(ProjectRoleDescription.member_id.in_(member_ids))
+        ).all()
+    }
+    operations = {
+        row.member_id: row
+        for row in session.exec(
+            select(RoleCreationOperation)
+            .where(RoleCreationOperation.project_id == project_id)
+            .where(RoleCreationOperation.member_id.in_(member_ids))
+        ).all()
+    }
+    facts_by_member = {
+        row["requested_member_id"]: row
+        for row in read_role_binding_facts_batch(
+            session, project_id=project_id, member_ids=member_ids
+        )
+    }
+
+    projected: dict[str, ProjectRoleListItem] = {}
+    for member_id in member_ids:
+        role = roles.get(member_id)
+        member = members.get(member_id)
+        facts = facts_by_member.get(member_id) or {}
+        binding_out = build_role_binding_out(facts)
+        if role is not None:
+            role_name = role.role_name
+            origin = role.origin
+            identity = role.origin
+            archived = role.archived_at is not None
+            identity_exclusive = bool(role.identity_exclusive)
+        else:
+            # 历史老名册兼容投影：如实标 imported / legacy，不具备生命周期操作。
+            role_name = (
+                member.display_name if member is not None else member_id
+            )
+            origin = PROJECT_ROLE_ORIGIN_IMPORTED
+            identity = ROLE_IDENTITY_LEGACY
+            archived = False
+            identity_exclusive = False
+
+        operation = operations.get(member_id)
+        choice_source = CHOICE_SOURCE_LEGACY_MANUAL
+        choice_id = None
+        choice_binding_mismatch = False
+        if operation is not None:
+            choice = session.get(RunnerModelChoice, operation.choice_id)
+            current_dimensions = (
+                facts.get("runner_id"),
+                facts.get("model_source"),
+                facts.get("provider_id"),
+                facts.get("connection_ref"),
+                facts.get("model_id"),
+                facts.get("model_alias") or "",
+            )
+            if (
+                choice is None
+                or not facts.get("binding_exists")
+                or model_choice_dimension_facts(choice) != current_dimensions
+            ):
+                choice_source = CHOICE_SOURCE_CREATION_OPERATION_MISMATCH
+                choice_binding_mismatch = True
+            else:
+                choice_source = CHOICE_SOURCE_CREATION_OPERATION
+                choice_id = operation.choice_id
+
+        projected[member_id] = ProjectRoleListItem(
+            member_id=member_id,
+            role_name=role_name,
+            origin=origin,
+            identity=identity,
+            archived=archived,
+            identity_exclusive=identity_exclusive,
+            runner=ProjectRoleRunnerOut(
+                runner_id=binding_out.runner_id if binding_out else None,
+                runtime=binding_out.runtime if binding_out else None,
+                display_name=binding_out.runner_display_name if binding_out else None,
+                status=binding_out.runner_status if binding_out else None,
+            ),
+            model=ProjectRoleModelOut(
+                choice_id=choice_id,
+                choice_source=choice_source,
+                choice_binding_mismatch=choice_binding_mismatch,
+                model_id=binding_out.model_id if binding_out else None,
+                model_alias=binding_out.model_alias if binding_out else None,
+                model_display_name=binding_out.model_display_name if binding_out else None,
+            ),
+            role_description=descriptions.get(member_id),
+            binding_state=resolve_role_binding_state(facts),
+            service=None,  # R1-1 无服务表：不伪造服务状态（合同 §3.5 / §11.2）
+        )
+    return projected
+
+
+def _role_list_member_ids(project_id: str, session: Session) -> list[str]:
+    """角色列表的成员集合：本项目角色行 ∪ 当前名册成员（历史老名册兼容投影）。"""
+    role_ids = {
+        row.member_id
+        for row in session.exec(
+            select(ProjectRole).where(ProjectRole.project_id == project_id)
+        ).all()
+    }
+    roster_ids = {
+        row.member_id
+        for row in session.exec(
+            select(ProjectAgent).where(ProjectAgent.project_id == project_id)
+        ).all()
+    }
+    return sorted(role_ids | roster_ids)
+
+
+@router.get("/{project_id}/roles", response_model=list[ProjectRoleListItem])
+def list_project_roles(
+    project_id: str,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """列出项目角色（任意已认证成员可读；合同 §5.2）。
+
+    - 包含尚未补录的**历史名册**成员（``origin=imported`` / ``identity=legacy``）；
+    - ``service`` 在 R1-1 恒为 ``null``（无服务表，不推导状态）；
+    - 不返回 Key / token / 绝对路径 / argv。
+    """
+    _get_project(project_id, session)
+    member_ids = _role_list_member_ids(project_id, session)
+    if not member_ids:
+        return []
+    projected = _role_projection(project_id, member_ids, session)
+    return [projected[member_id] for member_id in member_ids]
+
+
+def _allocate_role_member_id(project_id: str, role_name: str, session: Session) -> str:
+    """分配全新 ``member_id``：主键冲突只重取随机后缀，**绝不**复用已存在成员。"""
+    for _ in range(8):
+        candidate = build_role_member_id(
+            project_id, role_name, new_role_member_id_suffix()
+        )
+        if session.get(Member, candidate) is None:
+            return candidate
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT, detail="member_id_allocation_failed"
+    )
+
+
+def _allocate_role_api_key(session: Session) -> str:
+    """分配全新 API Key（唯一列冲突重试；不落任何额外明文副本）。"""
+    for _ in range(8):
+        candidate = new_role_api_key()
+        if session.exec(select(Member).where(Member.api_key == candidate)).first() is None:
+            return candidate
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT, detail="api_key_generation_failed"
+    )
+
+
+@router.post("/{project_id}/roles")
+def create_project_role(
+    project_id: str,
+    body: ProjectRoleCreate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """创建项目角色（**仅 human**；合同 §7.2 TX-ALL 单写事务）。
+
+    - 同一 ``operation_key`` 重放：同载荷 → ``200 {reused:true}`` 且**不返回 Key**；
+      异载荷 → ``409 operation_key_conflict``；
+    - 目录后来下架/改名**不**阻断重放（命中即回原身份的当前投影）；
+    - 任一步失败整体回滚：六张表零残留、**没有操作行**，同 key 同载荷可直接重试；
+    - 原子写入 ``members`` / ``project_roles`` / ``project_agents`` /
+      ``project_role_bindings`` / ``project_role_descriptions`` / ``role_creation_operations``。
+    """
+    _require_human(current)
+    _get_project(project_id, session)
+
+    try:
+        role_name = normalize_role_name(body.role_name)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="role_name_invalid",
+        ) from exc
+    try:
+        runner_id = normalize_safe_identifier_token(body.runner_id, field="runner_id")
+        choice_id = normalize_safe_identifier_token(body.choice_id, field="choice_id")
+        operation_key = normalize_operation_key(body.operation_key)
+        role_description = normalize_role_description(body.role_description)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+    fingerprint = build_role_creation_fingerprint(
+        project_id=project_id,
+        role_name=role_name,
+        runner_id=runner_id,
+        choice_id=choice_id,
+        role_description=role_description,
+    )
+
+    # TX-ALL：BEGIN IMMEDIATE 让写事务互斥，重放判定与写入之间没有可被并发插入的窗口。
+    begin_immediate_write(session)
+    try:
+        committed = session.get(RoleCreationOperation, operation_key)
+        if committed is not None:
+            if committed.request_fingerprint != fingerprint:
+                session.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="operation_key_conflict",
+                )
+            replay_member_id = committed.member_id
+            # 未写任何事实：直接释放写锁，再按原身份的当前只读投影返回（不发 Key）。
+            session.rollback()
+            item = _role_projection(project_id, [replay_member_id], session)[
+                replay_member_id
+            ]
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=jsonable_encoder(
+                    {"role": item, "member_id": replay_member_id, "reused": True}
+                ),
+            )
+
+        # F3 补正（合同 §7.2 步骤 1）：新操作必须在 TX-ALL 写锁内复查**真实**项目，
+        # 而不是只信 begin_immediate_write 之前的 ORM 读取（identity map 会保留已被
+        # 并发注销的旧 Project 对象）。注销先提交 → 这里 404 且六表零新增；已提交
+        # operation 的重放已在上面返回，不受目录实时状态影响。
+        if not _project_row_exists_now(project_id, session):
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="project not found"
+            )
+
+        runner = session.get(RunnerRegistry, runner_id)
+        if runner is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="runner_not_found"
+            )
+        choice = session.get(RunnerModelChoice, choice_id)
+        if choice is None or choice.runner_id != runner_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="choice_not_found"
+            )
+        if runner.adapter_status == RUNNER_ADAPTER_RETIRED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="runner_retired"
+            )
+        if choice.retired_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="choice_retired"
+            )
+        conflict = session.exec(
+            select(ProjectRole)
+            .where(ProjectRole.project_id == project_id)
+            .where(ProjectRole.role_name == role_name)
+            .where(ProjectRole.archived_at.is_(None))
+        ).first()
+        if conflict is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="role_name_conflict"
+            )
+
+        member_id = _allocate_role_member_id(project_id, role_name, session)
+        api_key = _allocate_role_api_key(session)
+        now = datetime.now(timezone.utc)
+        _tx_add_role_fact(
+            session,
+            Member(
+                id=member_id,
+                kind="agent",
+                display_name=role_name,
+                api_key=api_key,
+                created_at=now,
+            ),
+        )
+        _tx_add_role_fact(
+            session,
+            ProjectRole(
+                project_id=project_id,
+                member_id=member_id,
+                role_name=role_name,
+                origin=PROJECT_ROLE_ORIGIN_MANAGED,
+                identity_exclusive=1,
+                credential_version=1,
+                key_issued_at=now,
+                key_rotated_at=None,
+                created_by=current.id,
+                created_at=now,
+                updated_at=now,
+                archived_at=None,
+            ),
+        )
+        _tx_add_role_fact(
+            session,
+            ProjectAgent(
+                project_id=project_id,
+                member_id=member_id,
+                identity_path=None,
+                soul_path=None,
+                user_path=None,
+                memory_pointer=None,
+                business_role=None,
+                decision_tier=None,
+                capability_summary=[],
+                updated_at=now,
+            ),
+        )
+        _tx_add_role_fact(
+            session,
+            ProjectRoleBinding(
+                project_id=project_id,
+                member_id=member_id,
+                runner_id=choice.runner_id,
+                model_source=choice.model_source,
+                provider_id=choice.provider_id,
+                connection_ref=choice.connection_ref,
+                model_id=choice.model_id,
+                model_alias=choice.model_alias or None,
+                model_display_name=choice.model_display_name,
+                updated_by=current.id,
+                updated_at=now,
+            ),
+        )
+        if role_description is not None:
+            _tx_add_role_fact(
+                session,
+                ProjectRoleDescription(
+                    project_id=project_id,
+                    member_id=member_id,
+                    description=role_description,
+                    updated_by=current.id,
+                    updated_at=now,
+                ),
+            )
+        _tx_add_role_fact(
+            session,
+            RoleCreationOperation(
+                operation_key=operation_key,
+                request_fingerprint=fingerprint,
+                project_id=project_id,
+                requested_role_name=role_name,
+                runner_id=runner_id,
+                choice_id=choice_id,
+                member_id=member_id,
+                committed_at=now,
+                created_by=current.id,
+                created_at=now,
+                updated_at=now,
+            ),
+        )
+        session.commit()
+    except HTTPException:
+        if session.in_transaction():
+            session.rollback()
+        raise
+    except IntegrityError as exc:
+        session.rollback()
+        committed = session.get(RoleCreationOperation, operation_key)
+        if committed is not None:
+            if committed.request_fingerprint != fingerprint:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="operation_key_conflict",
+                ) from exc
+            replay_member_id = committed.member_id
+            item = _role_projection(project_id, [replay_member_id], session)[
+                replay_member_id
+            ]
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content=jsonable_encoder(
+                    {"role": item, "member_id": replay_member_id, "reused": True}
+                ),
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="role_name_conflict"
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - 任何未预期失败都整体回滚，不留部分事实
+        if session.in_transaction():
+            session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="role_creation_failed",
+        ) from exc
+
+    item = _role_projection(project_id, [member_id], session)[member_id]
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content=jsonable_encoder(
+            {
+                "role": item,
+                "member_id": member_id,
+                "api_key": api_key,
+                "reused": False,
+                "credential_version": 1,
+            }
+        ),
+    )
+
+
+@router.patch("/{project_id}/roles/{member_id}", response_model=ProjectRoleListItem)
+def update_project_role(
+    project_id: str,
+    member_id: str,
+    body: ProjectRoleUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """改角色名 / 介绍 / 复核豁免（**仅 human**；合同 §5.2 / §8.2）。
+
+    - 改名只写 ``project_roles.role_name``，**不动** ``members.display_name``，
+      也不影响其它项目；
+    - ``role_description`` 显式 ``null`` = 恢复默认（删除自定义行）；
+    - ``review_exempt`` 只能由 human 经本入口授予/撤销，agent 403（不可自授）；
+    - 未知字段 422。
+    """
+    _require_human(current)
+    _get_project(project_id, session)
+    target_member_id = member_id.strip()
+    role = session.get(ProjectRole, (project_id, target_member_id))
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="role_not_found"
+        )
+    if role.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="role_archived"
+        )
+
+    provided = body.model_fields_set
+    now = datetime.now(timezone.utc)
+    if "role_name" in provided:
+        try:
+            new_role_name = normalize_role_name(body.role_name)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="role_name_invalid",
+            ) from exc
+        if new_role_name != role.role_name:
+            conflict = session.exec(
+                select(ProjectRole)
+                .where(ProjectRole.project_id == project_id)
+                .where(ProjectRole.role_name == new_role_name)
+                .where(ProjectRole.member_id != target_member_id)
+                .where(ProjectRole.archived_at.is_(None))
+            ).first()
+            if conflict is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="role_name_conflict",
+                )
+            role.role_name = new_role_name
+
+    if "role_description" in provided:
+        try:
+            description = normalize_role_description(body.role_description)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
+        existing_description = session.get(
+            ProjectRoleDescription, (project_id, target_member_id)
+        )
+        if description is None:
+            if existing_description is not None:
+                session.delete(existing_description)
+        elif existing_description is None:
+            session.add(
+                ProjectRoleDescription(
+                    project_id=project_id,
+                    member_id=target_member_id,
+                    description=description,
+                    updated_by=current.id,
+                    updated_at=now,
+                )
+            )
+        else:
+            existing_description.description = description
+            existing_description.updated_by = current.id
+            existing_description.updated_at = now
+            session.add(existing_description)
+
+    if "review_exempt" in provided:
+        if body.review_exempt is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="review_exempt cannot be null",
+            )
+        policy = session.get(ProjectRolePolicy, (project_id, target_member_id))
+        if policy is None:
+            policy = ProjectRolePolicy(
+                project_id=project_id,
+                member_id=target_member_id,
+                review_exempt=1 if body.review_exempt else 0,
+                source=PROJECT_ROLE_POLICY_SOURCE_HUMAN,
+                granted_by=current.id,
+                granted_at=now,
+                updated_at=now,
+            )
+        else:
+            policy.review_exempt = 1 if body.review_exempt else 0
+            policy.source = PROJECT_ROLE_POLICY_SOURCE_HUMAN
+            policy.granted_by = current.id
+            policy.granted_at = now
+            policy.updated_at = now
+        session.add(policy)
+
+    role.updated_at = now
+    session.add(role)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="role_name_conflict"
+        ) from exc
+    return _role_projection(project_id, [target_member_id], session)[target_member_id]
+
+
+@router.post(
+    "/{project_id}/roles/{member_id}/rotate-key",
+    response_model=RoleCredentialRotateOut,
+)
+def rotate_project_role_key(
+    project_id: str,
+    member_id: str,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """managed 独占身份的凭据恢复（**仅 human**；合同 §7.5）。
+
+    同一写事务内“证明独占 → 换 Key → 递增 ``credential_version``”：旧 Key 立即失效，
+    新 Key 只在本次响应出现一次。imported/共享、离册、跨项目引用、在用实例/任务
+    一律返回稳定拒绝码；R1-1 无服务表，**不查询不存在的表**（未来表存在时补查）。
+    """
+    _require_human(current)
+    _get_project(project_id, session)
+    target_member_id = member_id.strip()
+
+    begin_immediate_write(session)
+    try:
+        role = session.get(ProjectRole, (project_id, target_member_id))
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="role_not_found"
+            )
+        if role.archived_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="role_archived"
+            )
+        if role.origin != PROJECT_ROLE_ORIGIN_MANAGED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="rotate_not_managed_identity",
+            )
+        member = session.get(Member, target_member_id)
+        if member is None or member.kind != "agent":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="rotate_member_not_agent",
+            )
+        if member.disabled_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="rotate_member_disabled",
+            )
+        if not role.identity_exclusive:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="rotate_shared_identity_refused",
+            )
+        proof = prove_exclusive_identity(project_id, target_member_id, session)
+        if proof["refusal"] is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=proof["refusal"]
+            )
+
+        api_key = _allocate_role_api_key(session)
+        now = datetime.now(timezone.utc)
+        member.api_key = api_key
+        session.add(member)
+        role.credential_version = (role.credential_version or 1) + 1
+        role.key_rotated_at = now
+        role.updated_at = now
+        session.add(role)
+        try:
+            session.commit()
+        except IntegrityError as exc:
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="api_key_generation_failed",
+            ) from exc
+        credential_version = role.credential_version
+    except HTTPException:
+        if session.in_transaction():
+            session.rollback()
+        raise
+    except Exception as exc:  # noqa: BLE001 - 失败整体回滚，旧 Key 保持有效
+        if session.in_transaction():
+            session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="role_rotation_failed",
+        ) from exc
+
+    return RoleCredentialRotateOut(
+        member_id=target_member_id,
+        api_key=api_key,
+        credential_version=credential_version,
+    )
+
+
+@router.get(
+    "/{project_id}/roles/{member_id}/tasks",
+    response_model=list[ProjectRoleTaskSummaryOut],
+)
+def list_project_role_tasks(
+    project_id: str,
+    member_id: str,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """该角色在本项目内的**非终态**任务摘要（任意已认证成员可读；合同 §5.2）。
+
+    只读，不改任何任务行；创建侧与执行侧（``target_member_id`` / ``created_by``）
+    都算该角色的在途任务，作为删除前置检查的索引。
+    """
+    _get_project(project_id, session)
+    target_member_id = member_id.strip()
+    if session.get(ProjectRole, (project_id, target_member_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="role_not_found"
+        )
+    rows = session.exec(
+        select(AgentTask)
+        .where(AgentTask.project_id == project_id)
+        .where(
+            (AgentTask.target_member_id == target_member_id)
+            | (AgentTask.created_by == target_member_id)
+        )
+        .where(AgentTask.status.in_(("queued", "running")))
+        .order_by(AgentTask.id)
+    ).all()
+    return [
+        ProjectRoleTaskSummaryOut(
+            id=row.id,
+            title=row.title,
+            status=row.status,
+            workflow_status=row.workflow_status,
+            target_member_id=row.target_member_id,
+            created_by=row.created_by,
+            created_at=row.created_at,
+        )
+        for row in rows
+        if row.id is not None
+    ]

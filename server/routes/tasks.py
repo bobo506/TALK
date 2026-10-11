@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
-from server.db import get_session
+from server.db import begin_immediate_write, get_session
 from server.models import (
     AgentInstance,
     AgentTask,
@@ -44,6 +44,8 @@ from server.models import (
     MessageOut,
     Project,
     ProjectAgent,
+    ProjectRole,
+    ProjectRolePolicy,
     TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
     TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT,
     TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
@@ -59,6 +61,7 @@ from server.models import (
     _TASK_REVIEW_VERDICTS,
     _TASK_TEST_VERDICTS,
     _TASK_WORKFLOW_STATUSES,
+    ensure_identity_exclusive_reference_allowed,
     resolve_target_binding_snapshot,
 )
 from server.routes.messages import _build_reply_lookup
@@ -103,6 +106,23 @@ def _ensure_target_agent(member_id: str, session: Session) -> Member:
     return member
 
 
+def _ensure_target_role_not_archived(
+    project_id: str | None, member_id: str, session: Session
+) -> None:
+    """归档角色禁入派发（合同 §9.3，R5）：只在任务带 ``project_id`` 时生效。
+
+    不带项目的历史/全局任务保持旧边界（不新增项目级检查）；R1-1 无归档入口，
+    本守卫由直接构造归档数据的测试覆盖。
+    """
+    if project_id is None:
+        return
+    role = session.get(ProjectRole, (project_id, member_id))
+    if role is not None and role.archived_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="task_role_archived"
+        )
+
+
 def _ensure_project_exists(project_id: str | None, session: Session) -> None:
     if project_id is not None and session.get(Project, project_id) is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="project_id not found")
@@ -113,12 +133,27 @@ def _can_exempt_review(
     project_id: str | None,
     session: Session,
 ) -> bool:
+    """复核豁免读路径（合同 §8.4）：四条件合取，顺序与短路固定。
+
+    human 分支与 ``project_id is None`` 分支**保持不变**（不参与名册/角色门控）；
+    其余成员必须同时满足：① 当前是未禁用 agent；② 当前 ``ProjectAgent`` 名册行存在；
+    ③ 若存在 ``ProjectRole`` 则未归档（老名册无角色行时兼容放行）；④ 最后才读持久策略。
+    **保留策略事实 ≠ 当前可用权限**：离册/归档一律休眠，回册按原策略行恢复。
+    ``decision_tier`` 不再是任何判定输入。
+    """
     if current.kind == "human":
         return True
     if project_id is None:
         return False
-    profile = session.get(ProjectAgent, (project_id, current.id))
-    return profile is not None and profile.decision_tier == "decision"
+    if current.kind != "agent" or current.disabled_at is not None:
+        return False
+    if session.get(ProjectAgent, (project_id, current.id)) is None:
+        return False
+    role = session.get(ProjectRole, (project_id, current.id))
+    if role is not None and role.archived_at is not None:
+        return False
+    policy = session.get(ProjectRolePolicy, (project_id, current.id))
+    return policy is not None and policy.review_exempt == 1
 
 
 def _relations_for_source(
@@ -1440,6 +1475,19 @@ def _create_task_with_hall(
     # 位于构造 Group/GroupMember/AgentTask **之前**，因此普通任务、子任务与 schedule
     # 物化三条路径都被覆盖，快照与任务/Hall/关系同一次 commit 落库。
     # 无项目分支不执行任何事实 SQL；带项目分支复用 B1a 的单条事实读取助手。
+    #
+    # 角色生命周期 R1-1（合同 §7.5 第 3 条）：Task Hall 的自动成员（创建者/目标）也是
+    # “新增引用”，必须在同一写事务里核新独占身份的项目归属——不能只守住名册 sync。
+    #
+    # F2 补正：``BEGIN IMMEDIATE`` 把创建者/目标守卫、绑定快照读取与随后
+    # Group/GroupMember/AgentTask 的写入放进同一个**实际** SQLite 写事务。子任务路径
+    # 若此前已有 DML（``_reserve_authorized_descendant``），helper 复用该实际事务，
+    # 不重复 BEGIN、不中途 commit/rollback 拆开任务/Hall/关系/快照。
+    begin_immediate_write(session)
+    ensure_identity_exclusive_reference_allowed(created_by, project_id, session)
+    ensure_identity_exclusive_reference_allowed(
+        target_member_id, project_id, session
+    )
     try:
         binding_snapshot = resolve_target_binding_snapshot(
             project_id=project_id,
@@ -1660,6 +1708,10 @@ def create_task(
         authorization_expires_at = None
         checkpoint_reason = None
         milestone_test_required = False
+
+    # 角色生命周期 R1-1（合同 §9.3）：归档角色的派发禁入，使用**解析后**的实际项目
+    # （子任务继承根任务项目），不从客户端绕过。
+    _ensure_target_role_not_archived(project_id, body.target_member_id, session)
 
     task = _create_task_with_hall(
         target_member_id=body.target_member_id,
@@ -2572,6 +2624,13 @@ def claim_task(
     task = _get_task(task_id, session)
     if task.target_member_id != current.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task belongs to another agent")
+    # 角色生命周期 R1-1（合同 §9.3）：归档角色的领取禁入（与创建守卫同在 R1-1）。
+    if task.project_id is not None:
+        role = session.get(ProjectRole, (task.project_id, current.id))
+        if role is not None and role.archived_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="role_archived"
+            )
 
     instance = _ensure_instance_owner(body.instance_id, current, session)
     now = datetime.now(timezone.utc)
