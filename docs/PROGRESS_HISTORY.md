@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+
+## 2026-10-11 22:30（Asia/Shanghai）— #223 独立复核未通过，派发 #224 首轮返修
+
+- 用户“223好了”触发取件；完整MCP msg2727两页6991字符，SHA `57e8efe94202e519ef32e765d73bd3729fa516cc1d0fa64f90f49ec2d80d77a2`。自报complete不代表验收，#223仍未收取。与本地报告仅verification[7]空白检查措辞差异，原始两份保持。
+- 独立代码审查与隔离验证：新Python三模块68项/43.92秒、关联五模块201项/53.81秒、14 Node契约190项/12.42秒，均无失败/错误或取消/跳过；不机械叠加。关联模块真实counts为instances5、project_dimension25、project_roles22、rotation32、cli_bridge117；git diff --check实际0。三原允许外测试差异为R1-3必要旧断言更新，已审diff及运行相关回归，本次明确准许保留，不扩大其它范围。
+- 负向证明未被现有用例覆盖：Codex parser拒--model、DSH缺--command；无三档preflight接受；私有ACL实际false/inherited_ace；篡改pid101→999/创建时刻/control_file仍stopped并覆盖本次marker；连续失败重试覆盖owner、停新服务后原假进程仍存活/磁盘记录空；spawn后持久化故障无句柄/失败报告；API failed仍can_start=true/can_stop=false且重试200；全部启动未有宿主执行时pending却counts.started=1。探针只临时DB/假Key/假Popen/本次临时文件，真实回环E2E仅本人固定文本子进程。
+- F1–F7完整条款 `.tmp/role-lifecycle-r1-3-review/review.md`。其它实际审查包括一次性CLI执行后活句柄丢失、spawn前wall-clock不能证明实际创建时刻、默认worker根/固定temp无锁与链接检查、新operator-key明文argv、共享native环境/三档选择指纹能力门控缺失、批量后到失败收敛缺失。原声称cli_bridge单模块215/212pass/3error与实际117不符且原worker缺关键失败原日志；本次补正不得追改原223。
+- 审查前25源测试+6原产物共31对象冻结，复查无漂移；原1884保护产物/17本机身份档无漂移。独立原文/日志/probes/frozen-code均保存审查根；未读写生产DB/真实Key/本机身份内容或原生账号、未执行模型/真实服务/浏览器、未收取或提交业务。
+- 新任务实际#224，224-角色生命周期R1-3首轮返修：启动入口与所有权闭环，target agent:deepseek，creator agent:codex，Hall group:task-7d7b179a3c5145aaa77216dfc5cfdb3a，UTC2026-10-11T14:30:31.930806 queued派发快照。独立顶层最小四参数，无parent/related/trigger/review_policy；默认派发后结束，用户通知再取件，不额外等待。
+- 返修以HEAD5ac42db8bd07074411d360aabaac9bc55fb5c8c1上的未提交223实现为基线，源原基线cb61338317e398ad0ebb5e02097f493846df13db；dispatch/baseline保存33现存文件，允许原31+明确批准三测试共34路径，827跟踪/1961旧产物/17档冻结，PROGRESS两文档仅协调方例外。任务包SHA `15a886eb2b998d62437d3a797edb3795bea64b31fa922438e82c86b437e32018`，新worker `.tmp/project-role-lifecycle-r1-3-rework1/`；原worker/审查/派发/失败证据只读。
+- 派发前重新读取当前项目development_requirements与caller。常规要求仍Kimi前端/DeepSeek后端互审，按人类临时明确授权DeepSeek开发、Codex独立复核，Kimi额度不足不派；available不证明额度。实际账户工具已暴露5小时58%/周19%、ordinaryUsageAllowed=true，未达90%门槛；此前null历史不追改、不反推为0。
+- 仍只完成已批准R1-3，不进入R1-4/I-4；旧实例四条件/真实CAS/原owner/报告指纹/截止、R1-2私有发布与锁、created_by主动被动/review_exempt保持。修正须原入口真实接线及负向敏感性/原日志，开发完成立即暂停；#224闭合后再收取#223、正式业务/Git与人工验收。
+
 ## 2026-10-11 21:29 (Asia/Shanghai) R1-3受管CLI服务启停 #223 派发
 
 - R1-2三项页面人工验收确认已十文档提交cb61338317e398ad0ebb5e02097f493846df13db并推送，远程一致/干净；本轮gate continue但session/weekly用量均null不可据此报0。BRIEF/AGENTS/当前MODULE_bridges/服务R0合同与实施计划已核，预算节T/W/余量/取消排队边界已读。

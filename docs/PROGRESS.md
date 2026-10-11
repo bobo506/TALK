@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 21:29 (Asia/Shanghai)：R1-2三项页面基础人工验收通过，记录已推送；R1-3服务启停 #223 已派发，开发完成后独立复核。
+Updated: 2026-10-11 22:30 (Asia/Shanghai)：#223 独立复核未通过，原交付/代码冻结保留；#224 首轮返修已派发，等待用户通知后复核。
 
 ## 当前角色与协作
 
@@ -9,15 +9,16 @@ Updated: 2026-10-11 21:29 (Asia/Shanghai)：R1-2三项页面基础人工验收�
 - 临时DeepSeek开发/Codex独立复核，Kimi额度不足不派。用户“再不过Codex自己修改”用于221失败后两文件修复；222 DeepSeek独立只读复核。新派发前实读development_requirements。
 - 默认派发后结束/用户通知后取件；开发暂停后审查不并行改码。Codex维护正式进度/Git，不默认操作浏览器。
 
-## 当前任务：R1-3 #223 受管CLI服务启停已派发
+## 当前任务：R1-3 #224 首轮返修已派发，#223 未收取
 
-- 实际任务 #223，标题 223-角色生命周期R1-3受管CLI服务启停，target=agent:deepseek，created_by=agent:codex，Hall=group:task-47b0e98094664c9ba8df8f422cc414ee，创建UTC 2026-10-11T13:28:00.987718。queued/assigned仅派发快照，本轮不轮询、不读旧Hall。
-- 基线cb61338317e398ad0ebb5e02097f493846df13db（R1-2人工验收十文档提交，远程一致/工作区干净）；任务默认general，独立顶层最小参数，未传parent/related/trigger/review_policy。
-- 范围31指定源/测试，R0合同服务状态/launch两表、六API、claim/report与本次实例就绪、宿主管理器、页面单独启动/关闭/全部启动。服务端不spawn，所有权不能只靠PID；停服不能伤及其它角色，未知归属拒绝。
-- 配置不自动启动，管理器启动不拉起全部Agent；真实运行器/login/多角色原生隔离未验能力不得靠bound/control_kind自证。仅临时DB/假Key/固定文本受控子进程/Node契约，真实模型/配置/服务与主动等待not_run。完整新增/一键配置/外部桌面/删除/退出集成仍R1-4。
-- .tmp/role-lifecycle-r1-3-dispatch/保存完整任务包/实际回执/元数据/31范围及原基线；冻结827跟踪/1884旧产物/17本机档，PROGRESS两文档为协调方唯一例外。产物 .tmp/project-role-lifecycle-r1-3/development.json（实际task_id=223），整JSON交付，开发者不改正式文档/Git。
-- 已读最新development_requirements/caller=agent:codex/kind=agent；临时DeepSeek开发/Codex独立复核、Kimi额度不足不派。本次usage-gate UTC2026-10-11T13:19:44.342750 continue，百分比null不代表0；默认派发后结束，用户“223好了”后取件，不先收取。
-- 原R1-2通过/失败/测试证据保持，无生产重载/真实Key/原生登录/模型/启停或browser；本轮仅验收文档/Git和授权任务派发。
+- #223/msg2727 自报complete，Codex独立复核未通过；原文6991字符/SHA `57e8efe94202e519ef32e765d73bd3729fa516cc1d0fa64f90f49ec2d80d77a2`，完整原文/本地报告/25源测试+6产物冻结保留。仅verification[7]空白检查措辞与本地不同，不追改。#223保持submitted/未收取，业务实现未提交。
+- 独立实际运行：新增三Python模块68项、关联五模块201项、14 Node文件190项，均零失败/错误或取消/跳过；git diff --check退出0。各套件独立统计，不机械相加。负向探针另行证明当前缺陷；不是因为这些正向用例通过就验收。
+- 必修F1–F7：Codex/DSH真实bridge argv不兼容；失败后关闭被禁而重试覆盖旧活进程owner、落盘异常/一次性CLI丢生命周期；停止未核实际PID/创建时刻并信任可改控制路径；owner记录私有ACL/路径/并发与新operator-key明文argv；三档/选择指纹/实际入口及原生隔离能力预检缺失；批量pending显示“已启动”且后到失败不收敛；自报cli_bridge215项而当前实际117项，关键失败日志缺失。
+- `.tmp/role-lifecycle-r1-3-review/review.md`与boundary-probes.json保存逐问题/复现；仅临时DB/假Key/假句柄及固定文本受控子进程，无生产或真实模型/原生账号/浏览器。原1884旧产物/17身份档无漂移，31冻结对象复核无漂移。三原清单外测试已检查diff及回归，属必要阶段断言更新，本次准许保留。
+- 实际返修任务#224，标题224-角色生命周期R1-3首轮返修：启动入口与所有权闭环，target=agent:deepseek，created_by=agent:codex，Hall=group:task-7d7b179a3c5145aaa77216dfc5cfdb3a，创建UTC2026-10-11T14:30:31.930806；queued仅派发快照，未轮询/等待/收取。
+- HEAD `5ac42db8bd07074411d360aabaac9bc55fb5c8c1`，源基线cb61338317e398ad0ebb5e02097f493846df13db，当前未提交#223实现为返修基线；不得reset覆盖。`.tmp/role-lifecycle-r1-3-rework1-dispatch/`保存实际回执、原包/本次完整包、scope和33现存允许基线。34指定允许路径，827跟踪/1961旧产物/17档冻结；PROGRESS两文档仅协调方例外。新worker只能 `.tmp/project-role-lifecycle-r1-3-rework1/`，原#223/review/派发根只读。
+- 重新实读development_requirements/caller；仍临时DeepSeek全部实现/Codex独立复核、Kimi额度不足不派。账户用量实际可读：5小时已用58%、周已用19%、ordinaryUsageAllowed=true，均未达90%门槛；不把百分比当本任务用量。
+- 原R1-3合同/原owner/世代CAS/四条件/截止重放、R1-2配置/DACL/锁、created_by主动被动/review_exempt保持；真实运行器控制能力仍未验，不靠bound/control_kind自证。不开始R1-4/I-4，不重载生产或操作真实服务。
 
 ## 上一片：R1-2独立与页面基础人工验收通过
 
@@ -40,10 +41,10 @@ Updated: 2026-10-11 21:29 (Asia/Shanghai)：R1-2三项页面基础人工验收�
 - K28角色 `agent:kimi-code-k28-preview`，runner `runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33`，alias=`kimi-code/kimi-for-coding`；bound人工/API/MCP核实，不能外推原生登录/隔离/模型/启动成功。
 - I-1/I-2页面与被动身份链路已验，I-3A/B/C已发布；project passive/version6、effective null/not_bound为最后核实，本轮未改/重读。只created_by决定协调，主动/被动只影响它；target保持，I-4后置。
 - DeepSeek等待T65s/W50s/余量15s；Codex当前W300s未外推客户端上限；其它终端先核。未为本轮收尾运行真实等待/模型任务。
-- 精确用量百分比不可读不臆测；历史完整记录见PROGRESS_HISTORY，旧证据在忽略目录保持。
+- 最新账户用量可读为5小时58%/周19%；此前不可读的历史记录保持，未反推。历史完整记录见PROGRESS_HISTORY，旧证据在忽略目录保持。
 
 ## 下一步
 
 1. R1-2三项页面基础人工验收已通过，当前门禁释放；不把它外推完整角色创建/真实配置/启停。
-2. 等待用户通知#223完成后取交付摘要/实际代码，Codex独立复核；通过后收取、正式文档/Git与人工页面验收。
+2. 等待用户“224好了”后取本次完整交付/实际差异，按F1–F7独立复核；#224及#223闭合后才收取链、提交业务/正式文档并安排人工页面验收。
 3. R1-4外部桌面/删除/退出随后，I-4主动真实链路后置；一次完成一个功能及验收/收尾。
