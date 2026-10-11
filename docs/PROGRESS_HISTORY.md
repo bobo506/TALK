@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-11 10:37 角色生命周期R0 #215复核与定向合同澄清通过，正式v4发布收取
+
+- 用户“215好了”后读取#215/msg2719完整默认摘要与稳定detail两页4000+2203字符，6203/SHA82dc93f3ff2d3f2f21d923d8919655e4fbbba3c866711635fd959fadc4c7e7e1，合法自身215/complete，与本地development.json一致。自报12完成/0未完/0阻塞、14文件/12验证/8限制保持；格式自报不代替独立验收。
+- 实际复核HEAD36aaf288bd75d8dfd7065a61282d5aeef362663f，相对派发5b18仅两进度变化。独立按215原清单808正式文件、156旧产物逐SHA/bytes保持、29引用源匹配、7未来位置链接/锚点及14交付UTF-8通过；原稿冻结original/，未执行会覆盖开发者报告的脚本。
+- 核实际全局Member/API Key、名册权限、Group.project_id与群成员写入、任务created_by/target/Task Hall路径及两稿协议。215已把F1创建收敛TX-ALL原子提交、R2离册权限门控修正；目录多连接/软下架与历史13键继续复用。原R3/R4仍有范围/时序一致性细节，Codex以协调文档权限定向澄清，最终review=accepted_with_coordinator_contract_clarifications，不把原稿闭合自报当成无条件通过。
+- 正式v4澄清：重放先查已提交操作、不被目录下架重新阻断；新独占身份引用守卫覆盖名册/绑定/说明、任务发起与目标、群创建/成员新增且在同一写事务，首片七源含groups.py；轮换在用证明含created_by，服务表尚未实施不查不存在表，保留既有明文认证列但无额外Key重放存储。
+- 宿主合同澄清：stop指向原process_launch_id，须原start owner token/host/活句柄证明，不能发新stop owner token认领旧进程；正常退出按原进程记录。启动成功同时需合法ready回报与匹配新实例截止前齐备，ready无实例也必须超时，不跳过回报鉴权；原launch关联不得清空绕过不可变。R1-1只预留launch列，新的非空关联422，真实launch核验R1-3才开放。
+- 发布两正式合同及PROJECT_BRIEF/DEVELOPMENT_ROADMAP/两进度共六文档；原21514文件、213/214原稿/失败/原消息、自报与旧复核保持。accepted两稿及相对原215逐行publication.diff在.tmp/role-lifecycle-r0-final-review/，不声称另一个Agent复核Codex这些文档澄清。业务代码/测试/生产库/Key/profile/native/模式未改；真实模型/启停/登录/主动等待/浏览器均not_run，不重跑未变业务大套件。
+- 以最终补正合同为依据按215→214→213由原发起者收取，全部succeeded/completed，msg2719/2718/2717及原内容保持；原213混排unknown、214历史needs_rework与报告不追改。215收取UTC02:35:30.425165，21402:35:35.376018，21302:35:38.526984；回执collection-*.json保留完整原文，工具层仅输出状态。
+- 最新项目要求及API caller agent:codex/kind agent/note null、passive/version6/effective not_bound已核。临时分工DeepSeek开发/Codex独立复核不变；usage-gate 2026-10-11T02:32:26.944877+00:00 continue，但两用量百分比null，精确占比不可读。首片R1-1将另以明确包派发，完成暂停；I-4及真实服务/页面后置，不再次索要已授权一般实现批准。
+- 本轮仅六正式文档，完成链接/UTF-8/差异/范围和源码/冻结保护后中文提交常规推送，发布回执publication.json。恢复指令继续项目；当前代码未实施，派下一片前再核用量/具体基线并保留原证据。
+
 ## 2026-10-11 09:55 #214合法修订仍需补正，#215剩余合同缺口派发
 
 - 用户通知“已完成”，处理既有#214。MCP/msg2718 succeeded/submitted未收取、合法裸talk-delivery-1且task_id214匹配，自报10完成/0未完/0阻塞、13文件/12验证/8限制。detail两页4000+1433字符完整5433、SHA bcba8ffab495f2e15fef57ac2d8d259e9fac5412a8eac48d6bc7780e2f82e753稳定，与本地development.json逐结构一致；开发complete只表示草稿自报，不代替验收。
