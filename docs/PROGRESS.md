@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 10:37 (Asia/Shanghai)：角色生命周期R0合同已复核并发布，215→214→213已收取；下一步按已授权方向派R1-1后端基础，业务代码/生产状态尚未变化。
+Updated: 2026-10-11 10:41 (Asia/Shanghai)：R0合同已提交推送cae9b0a、215→214→213已收取；#216 R1-1后端基础已派DeepSeek，默认派发后结束，用户通知完成再独立复核。
 
 ## 当前角色与协作
 
@@ -8,14 +8,17 @@ Updated: 2026-10-11 10:37 (Asia/Shanghai)：角色生命周期R0合同已复核�
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：角色生命周期R0正式合同发布，R1-1待派发
+## 当前状态：R0正式合同已发布，#216 R1-1后端基础已派发
 
 - 用户通知“215好了”。#215/msg2719合法裸JSON、task_id215匹配，完整6203字符/SHA82dc93f3ff2d3f2f21d923d8919655e4fbbba3c866711635fd959fadc4c7e7e1与本地交付逐结构一致；独立808正式/156原产物/29引用源指纹/7链接及14交付UTF-8与冻结通过。
 - 原稿修正单写事务TX-ALL（无pending残行）、权限名册门控、共享身份轮换拒绝、预期实例/回报令牌及首片映射。Codex独立核实际源后，在正式v4定向澄清原start进程所有权的stop验证、双证据截止收敛、七源引用守卫、任务发起側在用证明及R1-1服务协议未实施时非空launch拒绝；不冒称另一个Agent复核Codex这部分合同澄清。
 - 正式docs/spec/ROLE_LIFECYCLE_DESIGN.md与ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md已发布内容，PROJECT_BRIEF/DEVELOPMENT_ROADMAP同步；代码尚未实施，未迁移生产库/服务/角色或修改Key/native/profile/模式。213/214/215原稿/失败/自报不追改，原214审查needs_rework保持历史；原213 MCP unknown混排保持。
 - 按最终补正合同215→214→213均由原发起者收取，succeeded/completed，结果msg2719/2718/2717和原文一致；具体回执.tmp/role-lifecycle-r0-final-review/collection-*.json。收取旧任务代表补正链已闭合，不把旧自报改成独立通过。
 - 本轮独立原稿/原消息/保护报告、定向发布差异、accepted两文档与review.json在.tmp/role-lifecycle-r0-final-review/。合同首片R1-1：七份server源＋对应测试，目录/原子角色创建与凭据恢复、独立权限源/迁移、实例项目维度；不含bridge/页面/宿主启停/删除入口。
-- 已实读最新开发要求/caller agent:codex/kind agent、passive/version6/effective not_bound，继续本次DeepSeek开发/Codex独立复核，不派Kimi。一般保守实现无需重复P1-P8审批；首片明确派发完成后暂停、用户通知再独立复核。
+- 已实读最新开发要求/caller agent:codex/kind agent、passive/version6/effective not_bound，继续本次DeepSeek开发/Codex独立复核，不派Kimi。一般保守实现无需重复P1-P8审批；首片#216已明确派发，开发完成后暂停、用户通知再独立复核。
+- #216实际派发title=216-角色生命周期R1-1后端基础开发、target agent:deepseek、created_by agent:codex、Hall group:task-f867f0c72c5d4ac187ceebd64be9a4f0、UTC创建2026-10-11T02:40:34.755654；queued/assigned为派发快照，未取交付/收取，不凭快照宣称已领取或实现。target_binding_state unconfigured保持，不猜模型。
+- 代码基线cae9b0abab4ff835a049f3763005e7531eb9ac60（正式合同六文档已提交推送、远程实读一致）。允许七server源、六新测试与七必要旧测试配套；796其它跟踪文件＋212原产物冻结，两PROGRESS协调例外，允许十四旧源/测试冻结baseline。包/最新要求/usage-gate/派发/保护在.tmp/role-lifecycle-r1-1-dispatch/。
+- #216仅新本地交付根.tmp/project-role-lifecycle-r1-1/，完成六新模块＋七相关回归及故障注入/双连接并发/迁移/权限证据后暂停。正式文档/bridge/cli/client/web/Key/profile/native/模式/旧历史禁止改，不能重载生产或运行生产init；Codex在用户通知后独立核实际代码，不与开发并行改码。usage-gate 2026-10-11T02:38:15.078820+00:00 continue，两百分比null，精确用量不可读。
 - 用户方向不变：多份独立项目角色、保存并配置、删除/全部及单独启停；名称/运行器/模型/介绍与启动成功/失败为主显示；未启动/人工关闭不算失败。取消角色固定分级，保留只作用created_by发起侧的主动/被动。
 - WorkBuddy无人值守/多角色隔离、原生授权复用、真实模型/终端T-W/取消排队、进程与异常退出清理未验。当前不与I-4主动真实链路交叉推进；下一步R1-1只隔离测试，不做生产动作。
 
@@ -24,7 +27,7 @@ Updated: 2026-10-11 10:37 (Asia/Shanghai)：角色生命周期R0合同已复核�
 - C4独立默认隔离Node171项、四Python契约12项零失败/跳过；新6项用例对原码预期失败、原16项通过，修后通过；独立22边界场景（1测试）、语法/UTF-8/差异/保护及三静态GET通过。这些是上轮已有证据，本次文档收尾不重跑/不计新增测试，Codex未操作浏览器。
 - 只读字段/状态化指引/安全文本保留，无新每角色/写请求或控件、模型调用。额外Node版本契约只同步唯一字面量，经Codex准予必要配套；源/测试不依赖.tmp。K28 C3受权两写与verify/API/MCP bound、已绑定/alias人工核对及C4页面确认闭合，runner仍unverified。
 - 上轮同步七份正式文档的C4验收状态与当时下一步，业务源码/测试、C3原申请/实施产物、C4原交付/审查/收取/发布回执保持；新人工确认与发布回执保存在.tmp/adapter-closeout-c4-human-acceptance/。
-- 下一步按正式v4合同派R1-1后端基础；完成后用户通知，再独立核代码/故障注入/迁移/权限和范围，验收后Git收尾。既有C1–C4与主被动合同保持，不做生产迁移或角色服务启停。
+- 下一步待用户通知“216完成”，按完整合法实际号交付和原基线独立核代码、迁移/故障注入/并发/权限及范围，必要补正后验收Git收尾。角色功能继续单片，不与服务/页面/I-4交叉推进；不重复派216。
 
 ## C3已完成，保持的恢复依据
 
@@ -87,6 +90,6 @@ cd D:\claude-test\TALK
 ## 恢复依据
 
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
-- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-11T01:53:05.905587 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
+- .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-11T02:38:15.078820 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。R0合同v4已独立复核并发布、215→214→213已收取；首片R1-1按已授权方向待明确派发。原稿/原消息/失败不追改，不重派旧任务或重做登记，业务代码及生产状态未改变。本轮证据.tmp/role-lifecycle-r0-final-review/；未来真实服务/页面/I-4仍逐片验证。
+恢复指令：继续项目。R0正式v4合同已发布推送cae9b0a、215→214→213已收取；#216 R1-1后端基础已派DeepSeek，默认派发后结束。用户通知后收实际216完整裸JSON、核冻结基线与实际源/测试后独立验收，原稿/原消息/失败不追改。不重复派216/旧任务、重做登记或生产迁移/启停。本次包.tmp/role-lifecycle-r1-1-dispatch/，R0终稿证据.tmp/role-lifecycle-r0-final-review/；后续服务/页面/I-4仍单片另排。

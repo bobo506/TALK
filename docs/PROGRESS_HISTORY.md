@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-11 10:41 R1-1后端基础#216派发，正式合同代码落地阶段开始
+
+- R0独立复核/澄清后的六文档已提交cae9b0abab4ff835a049f3763005e7531eb9ac60并常规推送origin/codex/terminal-return-codex，远程ls-remote实读同提交、派发前工作区干净。原正式代码未变，215→214→213已收取及原失败保持；首片按用户既有开发授权推进，无重复一般审批。
+- 首片派发前再次读最新development_requirements和caller agent:codex/kind agent/note null、passive/version6/effective not_bound，仍本次临时DeepSeek开发/Codex独立复核、不派Kimi。usage-gate2026-10-11T02:38:15.078820+00:00 continue，两窗口百分比null，精确用量不可读。
+- 四最小参数一次派实际#216，title=216-角色生命周期R1-1后端基础开发、target agent:deepseek、created_by agent:codex、Hall group:task-f867f0c72c5d4ac187ceebd64be9a4f0、UTC创建2026-10-11T02:40:34.755654、queued/assigned仅派发快照、binding_state unconfigured，不当作实际领取/模型/实现证据。
+- 以正式v4合同/计划§3为唯一实现依据：目录多连接/软下架、TX-ALL原子独立身份创建与幂等/Key丢响应恢复、四条件权限迁移、项目引用守卫、实例项目与增量更新及无服务协议时非空launch拒绝。任务创建/领取归档守卫落此片，删除入口/真实launch/宿主/bridge/页面后置；原任务13键/绑定阶梯/六维指纹/主被动created_by合同及旧成员行为不变。
+- 允许七源models/db/runners/projects/instances/tasks/groups，六新测试runner_model_choices/project_roles/role_creation_idempotency/role_rotation_exclusivity/role_policy_migration/instances_project_dimension和七必要旧runners/projects/tasks/groups/instances/project_role_bindings/project_role_descriptions夹具断言。非片796跟踪文件＋212旧产物冻结，十四允许旧源/测试另存baseline；两PROGRESS协调例外，不允许执行者改正式文档。
+- 明确隔离旧形态DB迁移两次、人工策略保留、六写点故障注入、放弃事务/同key并发/异载荷并发/引用并发、共享和任务发起/执行侧在用拒绝、实例省略/清空/项目与launch边界、公共输出/agent写权限；要求实际六新与七相关回归，不弱化安全断言/靠skip，不机械重跑全业务大套件。禁止生产API/库init、uvicorn/reload、原生登录/服务启停、模型/主动等待/浏览器及旧配置/Key/profile/native/模式修改。
+- 包/要求/用量/基线/派发在.tmp/role-lifecycle-r1-1-dispatch/，执行者只另写.tmp/project-role-lifecycle-r1-1/证据与自身真实216裸JSON，格式validate不代替验收。开发完成即停，Codex由用户通知再收实际交付并独立核代码；不并行改码、不派下一片、开发者不提交推送。
+- 本轮协调只提交两PROGRESS派发记录，不纳执行者在途源码变化。默认派发后结束、不等待/反复查状态、不重复派216；尚无本片开发交付或验收，不宣称新API已可用或生产服务加载。恢复指令继续项目。
+
 ## 2026-10-11 10:37 角色生命周期R0 #215复核与定向合同澄清通过，正式v4发布收取
 
 - 用户“215好了”后读取#215/msg2719完整默认摘要与稳定detail两页4000+2203字符，6203/SHA82dc93f3ff2d3f2f21d923d8919655e4fbbba3c866711635fd959fadc4c7e7e1，合法自身215/complete，与本地development.json一致。自报12完成/0未完/0阻塞、14文件/12验证/8限制保持；格式自报不代替独立验收。
