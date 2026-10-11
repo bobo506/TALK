@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-11 09:33 #213合同草稿独立复核需补正，#214定向修订派发
+
+- 用户通知“213好了”。原任务213/msg2717 runner succeeded/submitted，MCP结论unknown/unstructured；detail两页4000+784字符、SHA a293663c3f76f3e2d40f0190a5831b0b53b5175b54724d1cc724560fb23263cf稳定且完整4784。本地talk_workflow summary --expect-task-id213通过，原消息嵌入JSON与本地合法213/complete逐结构一致；这只证明格式/自报，原消息混排与本地报告保持，不假称MCP合法complete。
+- 原两合同453/195行及11交付文件冻结到.tmp/role-lifecycle-r0-review/original/，原MCP完整内容/引用保存mcp-original.json。Codex按本次独立复核职责完整读两草稿，核Member/绑定六维/ProjectAgent/实例/任务豁免与sync/取消实际源码，未读其它MODULE、未执行开发者证据脚本以免覆盖原产物。
+- 独立原派发scope逐808正式保护文件与91旧产物SHA/bytes零漂移；28引用源SHA匹配、7最终位置链接/锚点通过。开发自报808总/806 checked与实际808已排除两协调文件的清单不同，原统计不改，新包要求纠正；不存在本轮正式源码变化。业务测试/模型/浏览器/生产服务/Key/登录/主动等待均未运行。
+- 独立review.json结论needs_rework六组：F1角色创建允许部分落库却无首片幂等持久记录，响应丢失/宿主Key写失败无法恢复；F2历史共享成员被全局禁用且force未区分整树取消影响、归档后新任务入口未闭合；F3宿主claim/report权限与本次instance/generation就绪链缺失，项目更新/PID复用隔离需明确；F4review_exempt依附全量替换名册会被重置；F5目录runner/model主键覆盖不同provider/connection选择；F6无需重复八项人类审批、阶段/源码引用/计数及裸JSON交付修正。
+- 213尚未业务验收/收取，合同未正式发布，R1-1代码未启动。原源码位置/合同问题与要求逐项存独立报告；不将纸面风险谎称为已实现运行时漏洞，不追改213原complete/验证报告。固定分级取消与发起者主被动保留方向不变，不引入自动force取消整棵树或新的权限扩张。
+- 派发前读最新development_requirements、caller agent:codex/kind agent/note null、passive/version6/effective not_bound；仍按用户临时DeepSeek补正/Codex独立复核，不派Kimi。usage-gate continue，采样2026-10-11T01:29:45.532559+00:00两百分比null，精确用量不可读，不推测比例。
+- 四最小顶层参数一次派实际#214（title=214-角色生命周期R0合同定向补正、target agent:deepseek、created_by agent:codex、Hall group:task-67819f26fc634ffcaca6bb002e140ffc、UTC创建2026-10-11T01:32:38.820313）；queued/assigned仅派发快照，未核实际领取。原需求全文、6项独立发现/代码位置/开发验证与限制一起入包.tmp/role-lifecycle-r0-rework-dispatch/，基线439807b858a7c75263652c56ab7776a82aad200e，正式808与原118产物冻结，两PROGRESS为协调例外。
+- #214只写新.tmp/project-role-lifecycle-design-rework/修订两合同、闭合/差异/验证与自身实际新号development.json，完整裸JSON上报MCP；原213/复核产物及任何正式源/测试/文档/配置/Key/native/profile/服务/模式禁止变更。修正具体合同、不自行实现；完成暂停，用户通知后Codex独立核再统一正式发布/收取/明确代码片。
+- 本轮仅两进度正式改动，验证UTF-8/差异/全冻结保持后中文提交常规推送，回执新publication.json；不重跑未变业务套件，不重复查询旧历史或派任务。恢复指令继续项目，默认派发后结束、通知214完成后取件。
+
 ## 2026-10-11 08:57 用户授权角色体系开发，R0实施合同草稿#213派发
 
 - 用户“好的，那就按照这个方向去开发，那接下来是主被动吗”。按刚确认的角色新增/配置/删除和原生接入/服务生命周期方向推进，先补实施合同，再按有限切片开发；I-4真实主动仍保留后置。再次确认主被动只作用created_by发起侧，不取target或固定决策/执行分级，既有规则无需重新设计。
