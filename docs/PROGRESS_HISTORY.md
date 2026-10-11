@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-11 08:57 用户授权角色体系开发，R0实施合同草稿#213派发
+
+- 用户“好的，那就按照这个方向去开发，那接下来是主被动吗”。按刚确认的角色新增/配置/删除和原生接入/服务生命周期方向推进，先补实施合同，再按有限切片开发；I-4真实主动仍保留后置。再次确认主被动只作用created_by发起侧，不取target或固定决策/执行分级，既有规则无需重新设计。
+- 派发前实读最新development_requirements，旧“决策角色”称呼按用户最新任务职责解释；沿用临时DeepSeek起草、Codex独立复核，Kimi额度不足不派。caller agent:codex/kind agent/note null、passive/version6/effective not_bound；实例是较早上报快照，不当作当前已执行证据。
+- talk_delegate_task只用project_id/target_member_id/title/content四最小顶层参数创建一次，实际#213、title=213-项目角色创建与服务生命周期R0实施合同草稿、target agent:deepseek、created_by agent:codex、Hall group:task-b9578f9c1e344bff8d07d0f18c1d47cd，UTC创建2026-10-11T00:55:51.307141。queued/assigned为派发时事实，target_binding_state unconfigured保持，不阻断现有派发或猜测默认模型。当前未取交付、未收取，后续不得重复派发。
+- 实际基线e7ff4694d26b3b3750623e25b1a595645e8c5e29、分支codex/terminal-return-codex、开工工作区干净；正式808跟踪文件及91旧产物保护，两PROGRESS为协调更新例外。仅读负责MODULE_instances，公共TASK_WORKFLOW与TERMINAL_MCP预算节；不读其它MODULE，不运行浏览器或重复业务大套件。
+- #213仅允许.tmp/project-role-lifecycle-design/合同/实施计划草稿、清单、验证和development.json。任务包包含已确认八组需求、当前源码缺口、旧数据/快照/权限不变项、具体失败恢复/隔离/宿主归属验收、原生能力未验边界和分工。第一片必须确切可审阅；不让草稿期间修改正式源/测试/文档、配置/Key/native/profile/模式、生产登记/启停/登录或真实等待/模型调用。
+- 固定分级取消须迁移decision_tier数据/接口/身份档/提示词/启动检查，保持任务权限与独立复核。原生登录和TALK身份配置分开；WorkBuddy无人值守/多角色控制、同账号隔离及宿主清理待核，客户端T/W/返回余量/取消排队仍需独立真实证据，不把工具发现或模板当适配通过。
+- 交付要求实际本任务号完整talk-delivery-1 JSON并validate，不自报正式实现完成；完成暂停后由Codex独立核实际代码与合同。默认派发后结束、用户通知“213完成”再取件。本轮只收尾两进度，不新开实现片，具体包/最新要求/派发/保护与发布回执在.tmp/project-role-lifecycle-design-dispatch/。
+- usage-gate guard读取continue，采样2026-10-11T00:54:12.887912+00:00两窗口百分比null，精确用量仍不可读，不推测比例。仅文档UTF-8/差异/保护验证，无新增业务测试、页面验收或主被动真实运行。
+
 ## 2026-10-11 00:00 项目角色创建/接入与生命周期新方向确认（文档同步，未实施）
 
 - 用户在C1–C4基础验收后提出项目角色完整流程：运行器→模型→名称/介绍，同运行器/模型可重复创建独立角色；保存并配置TALK身份，增加删除、全部启动、单独启动和关闭服务，退出TALK清理其自有服务；页面保留角色基本信息及启动成功/失败，任务状态留在任务列表。

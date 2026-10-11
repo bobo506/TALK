@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 00:00 (Asia/Shanghai)：用户确认角色新增/配置/删除与服务启停方向；取消决策/执行固定分级，保留发起者主动/被动；本轮仅文档，下一步先补实施合同，尚未派发。
+Updated: 2026-10-11 08:57 (Asia/Shanghai)：用户授权按角色体系方向开发；R0实施合同草稿#213已派DeepSeek，完成后Codex独立复核；默认派发后结束，待用户通知取件。
 
 ## 当前角色与协作
 
@@ -8,11 +8,14 @@ Updated: 2026-10-11 00:00 (Asia/Shanghai)：用户确认角色新增/配置/删�
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：绑定基础已完成，角色创建/接入与生命周期待设计
+## 当前状态：角色生命周期R0 #213已派发，待交付与独立复核
 
+- 用户确认按新方向开发，询问下一步主被动；本次先完成角色创建/原生接入/服务生命周期，I-4真实主动后置保留。主被动既有规则不变，只作用于任务created_by发起侧；取消固定决策/执行分级是角色体系迁移。
+- 最新开发要求已读取，caller=agent:codex/kind=agent、项目passive/version6/effective not_bound；按用户持续临时覆盖DeepSeek起草/Codex独立复核，不派Kimi。实际#213、标题213-项目角色创建与服务生命周期R0实施合同草稿，created_by agent:codex、Hall group:task-b9578f9c1e344bff8d07d0f18c1d47cd，queued/assigned为派发快照，未核实际领取或执行。
+- #213只写.tmp/project-role-lifecycle-design/两合同草稿与局部证据/结构化交付，核实际代码后提出接口/迁移/失败恢复/隔离/登录/启停及第一片明确验收；不改正式源码/测试/配置/模式/服务。任务包与808正式文件＋91旧产物保护在.tmp/project-role-lifecycle-design-dispatch/，两PROGRESS为预先协调例外。草稿完成暂停，由用户通知“213完成”再取件并独立复核，当前没有完成实现或人工验收。
 - 用户更正“不需要主被动”为“不需要决策和执行”：取消角色固定分级，保留发起者主动/被动。项目按运行器/模型创建多份独立角色，保存并配置TALK身份，支持删除、全部启动、单独启动/关闭服务；主要显示名称、运行器、模型、介绍及启动成功/失败，任务状态在任务列表。
 - 原生运行器安装/账号授权与项目角色配置分开。登录建议走原生客户端/官方授权，WorkBuddy实际可控启动、多角色会话隔离、共享账号/宿主归属及退出清理仍待验证；未启动/人工关闭不记作失败。详见DEVELOPMENT_ROADMAP最新节。
-- 本轮仅修改AGENTS、PROJECT_BRIEF、路线和两进度共5文档，记录需求/建议/现状边界；不修改业务源码、测试、生产配置或旧任务/回执，不创建角色/派任务/登录或启停服务。原生订阅密码不进入角色配置。
+- 上轮仅修改AGENTS、PROJECT_BRIEF、路线和两进度共5文档，记录需求/建议/现状边界；不修改业务源码、测试、生产配置或旧任务/回执，不创建角色/派任务/登录或启停服务。原生订阅密码不进入角色配置。
 
 - 用户在#212代码发布与新指引验收说明后回复“可以了”，记录C4页面整体人工验收通过、本功能页面门禁释放。不凭短确认补写逐项截图/操作日志，生产失效态联调、实际模型后端版本/开发能力、宿主主动等待仍未验。
 - #212/msg2716合法212/complete、4896字符/SHA b6f7a488…与本地JSON一致，独立复核后已收取succeeded/completed。代码/测试/七正式文档提交096f4f9114bb5efbafaf4589a65102f3b4ac0711已推送，发布当次remote_equal/工作区干净通过，原交付与失败不追改。
@@ -84,4 +87,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-10T13:35:46.598733 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目。当前C1–C4绑定基础已验收完成；最新确认角色新增/配置/删除、原生接入与服务生命周期方向已落盘，代码尚未实施。下一步先补实施合同与运行器能力验证，保留发起者主动/被动，不恢复固定决策/执行分级；不重复旧任务/登记或把bound扩大为模型/主动等待通过。新方向回执.tmp/project-role-lifecycle-direction/，C4证据仍见.tmp/adapter-closeout-c4-review/与人工验收目录。
+恢复指令：继续项目。当前#213角色生命周期R0实施合同草稿已派DeepSeek，默认派发后结束；用户通知完成后读取实际号完整交付、独立核源码与草稿，再统一发布/收取及推进第一片。保留既有发起者主被动规则，固定分级代码尚未迁移；不重派213/旧任务、不重做C3登记、不把bound或原生单任务证据扩大为自动启停/模型/主动等待通过。恢复证据.tmp/project-role-lifecycle-design-dispatch/，原C3/C4交付与人工验收保持。
