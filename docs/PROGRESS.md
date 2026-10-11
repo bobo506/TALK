@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-11 13:12 (Asia/Shanghai)：用户“好的，继续”后已派发 #218 R1-2；DeepSeek 开发、Codex 独立复核，等待开发完成通知。
+Updated: 2026-10-11 14:43 (Asia/Shanghai)：用户“218好了”后独立复核未通过；#219 已派发 DeepSeek 定向补正，等待开发完成通知。
 
 ## 当前角色与协作
 
@@ -8,14 +8,15 @@ Updated: 2026-10-11 13:12 (Asia/Shanghai)：用户“好的，继续”后已派
 - 用户当前临时分工：DeepSeek开发、Codex独立复核；Kimi额度不足期间不派Kimi。新任务派发前仍读取最新development_requirements，任务包保留本次明确分工；默认派发后结束，由用户通知完成再收取；一次完成一个功能及验收/收尾再进入下一功能，当前角色/模型绑定C1–C4批准范围已完成；后续按明确切片推进。
 - Codex负责范围、裁决、正式进度和Git，不默认操作浏览器。共享目录开发完成暂停后复核。#193/#194/#196已独立通过收取，用户授权代验收后的#199回传与实服核心路径通过；当前#201/#202最终版本已独立复核通过收取；本次#206按用户明确授权由Codex定向修复业务源码并复验。
 
-## 当前状态：R1-2 #218 已派发
+## 当前状态：R1-2 #218 未验收，#219 补正已派发
 
-- 用户在 #217 收尾后明确“好的，继续”，本轮只推进 R1-2。一键配置宿主作业/身份档/外置 Key/前置检查，以及 bridge、scan_agents、K28、closeout、模板和页面固定分级迁移；下一片服务启停/删除/退出与 I-4 尚未开始。
-- 已实读项目最新 development_requirements 与 caller_identity=agent:codex/kind=agent；按当前临时 DeepSeek 开发/Codex 独立复核覆盖旧常规交叉分工，不派 Kimi。任务正文保留项目要求快照；角色固定分级取消方向、created_by 发起侧主被动规则与既有权限保持。
-- #218（general、queued/assigned 为派发时状态），target=agent:deepseek、created_by=agent:codex、项目 prj_e8fe7066bbec、Hall=group:task-0e02ff8621274df99bc5e28b5be48a71，创建 UTC 2026-10-11T05:11:03.195659。默认派发后结束，收到用户“218好了”再获取交付并独立审查，不以服务模式自动持续等待。
-- 业务基线 0bb280b3542eb3ef07f62136e4a69800efc6b871；任务包/原要求/门禁/完整派发回执/27 文件代码基线及保护清单在 .tmp/role-lifecycle-r1-2-dispatch/。开发产物预期 .tmp/project-role-lifecycle-r1-2/development.json；正式进度由 Codex 维护，开发结束暂停后审查，不并行改业务源码。
-- 本次仅派发并更新两份进度，未进行 R1-2 业务实现/测试或生产配置。宿主文件/模型/Key/登录/服务、旧任务与历史产物保持；开发须用临时库、隔离文件树与假 HTTP，并给出恢复/并发/权限/迁移及无密证据。
-- usage-gate 于 2026-10-11T05:07:33.814767+00:00 返回 continue，但两窗口百分比均 null，精确用量不可读；协议/权限/前端切片完成后按单片刹车验收与收尾。终端预算不改，不凭 dry-run 或模板外推实际主动等待。
+- 用户“218好了”后已读取 #218/msg2722 完整交付，9006 字符、SHA 591107c40560e3e9ada785589ec8f355f4a4b02609c1b042534c70641582cb2b，单一 JSON 围栏与本地 JSON 一致；合法 218/complete 只代表自报。runner succeeded、workflow submitted 为本次读取状态，尚未收取。
+- Codex 独立实读实际代码并冻结 31 正式文件（14 源/17 测试）及 28 worker 产物；原保护跟踪/1190 旧产物/17 本人档 SHA 无漂移。必要 Python 101 新项＋376 相关项、Node 59，共 536 项零失败/错误/跳过；原开发者 376 中 4 错误/1 跳过误标 pass 的报告保持，本机没重现该管道错误。不声称全量测试或业务验收已通过。
+- 独立隔离反例 F1–F8：旧 Key/旧成果在轮换与 resume 后套入新 attempt，最终作业成功但 Key 401；项目删除 204 后仍创建 201；重复成功 apply 返回 ack_failed；缺三档/retired 绑定预检仍成功；年龄抢活锁/旧 owner 删除新锁；Windows Key 继承普通用户读权限；公开旧分级字段未标弃用；根 junction 与跨角色三档路径隔离失效。git diff --check 另发现 projects.py 多 EOF 空行（子进程退出 2）。
+- 复核 needs_rework，#218 不收取，31 业务文件不提交。原报告/代码快照/探针与失败保留于 .tmp/role-lifecycle-r1-2-review/；path_probe 首轮自身观察函数遇 junction 异常已修正观察逻辑再复现，不把它算业务失败。无生产 DB/Key/模型/登录/服务或浏览器操作。
+- 派发前已重新实读 latest development_requirements，caller=agent:codex/kind=agent；按用户临时 DeepSeek 开发/Codex 独立复核、不派 Kimi。以最小独立顶层参数创建真实 #219，标题 219-角色生命周期R1-2配置恢复与隔离边界补正，target=agent:deepseek、created_by=agent:codex、Hall=group:task-624c0bb24ec448b18423f6299c5e3490，创建 UTC 2026-10-11T06:40:49.477901；general、queued/assigned 仅派发快照，不开启主动等待。
+- #219 只修上述 R1-2 边界及必要测试；允许 6 源/5 测试（含可选新 test_role_provision_rework），其它迁移/页面与旧产物保持。包/原 #218 全文/31 代码副本/818 跟踪/1345 旧产物/17 本人档 SHA/完整派发回执在 .tmp/role-lifecycle-r1-2-rework-dispatch/；产物 .tmp/project-role-lifecycle-r1-2-rework/development.json。开发完成暂停，用户通知“219好了”后 Codex 独立复核，闭合后才收取补正链并提交业务。
+- 当前 HEAD c0e88910c078391bee488524217533def50c73f3（上轮派发文档），业务发布基线 0bb280b；本轮只提交两 PROGRESS 的复核/补正派发记录，业务仍未发布。usage-gate 2026-10-11T06:37:16.045654+00:00 continue，两窗口百分比 null，精确用量不可读；终端预算不改，R1-3/R1-4/I-4 未开始。
 
 ## 上一片：R1-1 后端基础已独立验收并收取
 
@@ -102,4 +103,4 @@ cd D:\claude-test\TALK
 - 正式历史docs/PROGRESS_HISTORY.md；最终代码审查.tmp/kimi-k28-executor-final-review/，任务收取.tmp/kimi-k28-executor-receipt/acceptance.json；本次应用.tmp/kimi-k28-executor-application/application.json、final-verification.json、application-helper-verification.json与README.md。
 - .tmp应用包与回执为本机忽略文件；外置Key不随Git复制。Codex身份回退备份C:/Users/Administrator/.codex/backups/talk-identity-20261007T091123256850Z/config.toml。当前C3实服证据.tmp/adapter-closeout-c3-live-application/（原failed/一次POST、仅绑定恢复/PUT、最终verify、保护、MCP回读与Git回执）；代码最终复核.tmp/adapter-closeout-c3-rework-review/及211返修包保持，210原失败与C2所有证据不覆盖。最新usage-gate于2026-10-11T02:38:15.078820 UTC返回continue但两窗口百分比null，精确用量不可读；历史16%/64%仅当次采样。
 
-恢复指令：继续项目；#218 已派发时按默认被动流程结束，用户通知“218好了”后读取该任务交付并独立复核。不要重复派发 #218、重复收取 #216/#217，或开始 R1-3/I-4。R1-1 发布 0bb280b、证据 .tmp/role-lifecycle-r1-1-final-review/；当前派发证据 .tmp/role-lifecycle-r1-2-dispatch/。
+恢复指令：继续项目；#219 已派发，默认由用户通知“219好了”后取交付独立复核。#218 needs_rework，原报告不追改；不要重复派发/提前收取 #218/#219，不开启 R1-3/I-4。证据 .tmp/role-lifecycle-r1-2-review/ 与 .tmp/role-lifecycle-r1-2-rework-dispatch/；R1-1 已发布 0bb280b。

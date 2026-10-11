@@ -1,5 +1,24 @@
 # 开发历史 · TALK
 
+## 2026-10-11 14:43 (Asia/Shanghai) #218 独立复核未通过，#219 定向补正已派发
+
+- 用户通知“218好了”。原 #218/msg2722 完整 9006 字符/SHA 591107c40560e3e9ada785589ec8f355f4a4b02609c1b042534c70641582cb2b、三页带 expect_sha256 读回，单一 JSON 围栏去除后与 .tmp/project-role-lifecycle-r1-2/development.json 一致；合法自身 218/complete 为自报，runner succeeded、workflow submitted 尚未收取。原 20 完成/0 未完成/0 阻塞、45 自报文件含 14 .tmp 项、17 验证/10 限制保持；实际正式 31 文件是 14 源＋17 测试，四个版本断言包含在 17 中，不重复计数。
+- Codex 冻结 31 实际源/测试与 28 worker 文件共 59 对象，原 818 跟踪保护（允许片内范围及两进度例外）/1190 旧产物/17 本人档 SHA 零漂移；原消息、代码副本和 actual-diff.patch 保存 .tmp/role-lifecycle-r1-2-review/。四额外旧页面版本断言只同步字面量，属必要配套，不归为越权业务开发。
+- 独立测试：三个新模块 101，八相关模块 376，四 Node 文件同进程 59，总 536 实际通过、0 失败/错误/跳过。开发原 376 中 4 管道错误/1 跳过被标 pass 与“376通过”的不一致保留，本机重跑无错误，未追改旧证据；必要回归通过不等于全量或边界通过。语法/UTF-8 通过，实际 git diff --check 子进程退出 2、projects.py:2193 new blank line at EOF，交补正清理。
+- F1：真实 run_provision 与临时 TestClient API 联动，在本地成果完成后 rotate-key=200/credential_version2、resume=200/attempt2；脚本 GET 新 attempt/revision 给旧成果三次 ACK=200、applied/succeeded，但落盘旧 Key GET /members/me=401。须执行前捕获代际/凭据版本并服务端原子验证，拒绝迟到重贴，凭据改变失效受影响证明，恢复不重发/自动轮换 Key。
+- F2：身份守卫结束 driver.in_transaction=false；另一真实 client DELETE project204 后 provision 仍 201，项目不存在而新增 pending 作业。create/resume/ack/roster-paths 可变事实须物理写锁内新读，排除陈旧 ORM 缓存，真实双连接/两种锁顺序且零脏写；不回退 #217 的事务保证。
+- F3：同参数第一次 apply0/succeeded revision4，第二次对完成 profile ACK skipped 返回409 step_not_pending，exit1/partial/ack_failed。重复完成验证后应 no-op，部分失败恢复只执行/回报待做项，与 F1 的当前凭据有效性共同处理。
+- F4：路径已登记但本地0/3身份档、以及真实运行器退役 binding_state=runner_retired 两种场景均 preflight succeeded/applied；角色读失败/缺目标会跳过 expected 比较。须三档可读/本人、角色事实存在、bound且精确来源/连接/模型/alias/指纹一致，缺失不能成功；不升级为登录/真实模型/服务就绪。
+- F5：首 owner 实际存活但锁 mtime 超阈值时第二 owner 回收；首 release 删除第二锁，第三也获得锁而第二仍活动。须所有权/代际互斥与安全恢复，不按年龄抢活锁、不释放别人锁，同profile不同Key根须串行。
+- F6：Windows实际假Key文件 icacls 保留 Authenticated Users:(M)/BUILTIN Users:(RX)，chmod只是属性，key_file仍succeeded/best_effort。须真实ACL限制并验证私有临时/目标文件暴露前权限，权限失败不能成功，不碰生产Key或宽泛父目录。
+- F7：四公开API模型实际 decision_tier schema无deprecated/弃用说明；MCP只增加源码注释。保留兼容字段/参数/旧列，公开schema与说明应明确弃用，不再用于权限/身份/协调。已落迁移正向回归保持，不能恢复固定分级判断。
+- F8：本机 Windows 项目根和 Key 根实际 junction 经 resolve 后被接受并写三档；真实临时 API 为角色 B 注册角色 A 三档路径返回200。须 canonicalize前根/祖先/子路径reparse检查与写入保护，managed路径按本人绑定，普通导入兼容不扩张。path_probe 首轮观察函数 raw junction 触发自身异常；首脚本保留，修正观察为已解析路径后两根/跨角色反例实际完成，不把自身错误计业务失败。
+- 独立 needs_rework/八组证据保存 review.json、independent-probes.json、path-probes.json；未收取218、不提交31业务文件、不发布未通过合同。TestClient启动日志仅临时DB，不使用生产数据库、真实本人Key、模型、原生登录/服务，也未操作浏览器。Codex仅独立复核、局部证据、正式进度和Git；不并行改业务源码。
+- 新派发前再次读取项目 development_requirements 与 caller=agent:codex/kind=agent；用户临时 DeepSeek 开发/Codex 独立复核覆盖旧常规交叉分工、不派Kimi。usage-gate 2026-10-11T06:37:16.045654+00:00 continue但两百分比null，精确余量不可读，不臆测额度。
+- 实际创建 #219，title=219-角色生命周期R1-2配置恢复与隔离边界补正、target agent:deepseek、created_by agent:codex、project prj_e8fe7066bbec、Hall group:task-624c0bb24ec448b18423f6299c5e3490、UTC 2026-10-11T06:40:49.477901，general/queued/assigned仅创建快照；仅 project_id/target/title/content，无parent/task_kind/review/related子任务字段，未手写编号、未重复派发或主动续等。
+- 包 .tmp/role-lifecycle-r1-2-rework-dispatch/ 含原218完整任务、六源/五测试限定修正、八组具体反例/验收、31文件baseline-218副本、818跟踪/1345旧产物/17本人档SHA、要求/门禁/完整派发回执。当前HEAD c0e8891只上一轮派发文档，业务基线0bb280b且31文件已在工作树，禁止把HEAD当当前开发基线；正式源/测试不得依赖.tmp，不改原报告、旧任务、模板/页面或范围外迁移。
+- 本轮只更新/提交/推送两PROGRESS；#219完成后暂停，由用户通知再独立检查，闭合后收取219→218与业务/正式合同收尾。角色功能继续单片推进，R1-3/R1-4/I-4与实际宿主登录/模型/等待仍后置；本次不要求人类批准已授权修复。
+
 ## 2026-10-11 13:12 (Asia/Shanghai) R1-2 #218 已按用户授权派发
 - 用户在 #217 复核通过、#216/#217 收取与 0bb280b 推送后明确“好的，继续”。沿已发布 R0 v4/实施计划 R1-2 单片推进；本轮协调仅定义具体包、派发和记录进度，未代开发者实现业务或验证未完成代码。
 - 当前入口 AGENTS.md 已确认固定分级取消与按任务授权；读 PROJECT_BRIEF、当前 PROGRESS、负责模块 MODULE_bridges、正式合同/计划、TASK_WORKFLOW 和 TERMINAL_MCP 超时预算。最初模块路径误写单数 MODULE_bridge 不存在，随实际索引更正为 MODULE_bridges；未据此读取其他模块。项目 skill 开工规则已应用，用户本次继续即按上轮明确下一片推进，无重复批准。
