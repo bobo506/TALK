@@ -134,6 +134,8 @@ function syncWorkspaceLayout() {
   document.getElementById("workspace-chats-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "chats"));
   document.getElementById("workspace-roles-btn").setAttribute("aria-pressed", String(blackboardOpen && workspaceUI.mode === "roles"));
   if (myId) userBadge.textContent = workspaceMemberName(myId);
+  // R1-3：每次导航/刷新都同步服务轮询上下文——离开角色页、切项目或切账号立即停表。
+  syncRoleServicePollingContext();
 }
 function selectWorkspaceTask(task) {
   workspaceUI.query = ""; document.getElementById("workspace-search").value = "";
@@ -654,9 +656,16 @@ function renderWorkspaceList() {
       row.appendChild(workspaceEl("small", "role-binding-summary", workspaceRoleBindingSummary(role)));
       row.appendChild(workspaceEl("small", "role-row-id", role.member_id));
       blackboardColumns.appendChild(row);
+      // R1-3：受管服务控制作为角色行的同级块（行本身是 <button>，不能再嵌套按钮）；未归档才显示。
+      if (role.archived !== true) {
+        const serviceControls = workspaceRoleServiceControls(role);
+        if (serviceControls) blackboardColumns.appendChild(serviceControls);
+      }
     }
     // “项目设置”不计入角色数量：空名册/无匹配的提示只针对真实角色行。
     if (!matchedRoles.length) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", roles.length ? "没有匹配的角色" : "这个项目还没有配置角色。"));
+    // R1-3：项目级“全部启动”与部分失败重试入口放在角色区域标题行（与任务筛选共用同一行容器）。
+    blackboardSummary.appendChild(workspaceRoleServiceBatchPanel());
   } else {
     for (const [value, label] of [["all", "全部"], ["running", "进行中"], ["mine", "待我处理"], ["finished", "已结束"]]) {
       const button = workspaceButton(label, () => { workspaceUI.filter = value; renderWorkspaceList(); });
@@ -673,6 +682,8 @@ function renderWorkspaceList() {
     for (const task of tasks) blackboardColumns.appendChild(workspaceTaskRow(task));
   }
   if (!blackboardColumns.childElementCount) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", query ? "没有匹配的结果" : rolesMode ? "这个项目还没有配置角色。" : "当前筛选下没有任务。"));
+  // R1-3：重绘后按最新投影决定是否（继续）轮询受管服务状态；无 starting/stopping 时不建立计时器。
+  maybeStartRoleServicePolling();
 }
 // ── ROLE-BINDING-B4 角色运行器/模型绑定（角色页只读展示，合同 §4.3–4.4） ─────
 // 数据来源：同一次 GET /api/projects/{id}/agents 响应里已有的 binding / binding_state
@@ -833,6 +844,552 @@ function workspaceRoleBindingPanel(agent) {
   section.appendChild(workspaceEl("p", "role-binding-guide", workspaceRoleBindingGuide(agent)));
   return section;
 }
+// ── R1-3 受管 CLI 服务：逐角色启动/关闭 与 项目级“全部启动” ─────────────────
+// 数据来源（不新增每角色读请求）：角色行自带的 service 投影叠加最近一次动作响应/轮询结果。
+// own property 判定沿用绑定区纪律：没有 `service` 字段（旧服务未上报）≠ `service: null`（未登记），
+// 后者仍如实渲染禁用控件，不伪装成启动失败。
+// 轮询只在该项目任一角色 observed ∈ {starting, stopping} 时启动，读取
+// GET /api/projects/{id}/role-services，全部收敛为稳定态后不再续期；离开角色页/切项目/切账号
+// 由 syncWorkspaceLayout（app.js 每次导航都会调用）停止定时器，在途响应按 token 丢弃，不泄漏计时器。
+// 状态文案严格按设计 §11.2 映射；不因 binding_state / 实例自报 idle / can_start 之外的推断放开启动，
+// 只有 control_kind === "managed_cli" 且 can_start 为真时才可能启用启动按钮。
+const ROLE_SERVICE_STATUS_HINTS = {
+  external_session: "需人工在原生客户端打开/登录；页面不提供受管启动。",
+  missing: "未声明受管控制能力；页面不提供启动。",
+  unregistered: "未登记受管服务，未声明受管控制能力；页面不提供启动。",
+  unsupported: "该角色未上报受管服务信息，页面不提供启动；这不等于启动失败。",
+};
+const roleServiceUI = {
+  projectId: null,
+  memberId: null,
+  overlay: new Map(),
+  busy: new Set(),
+  errors: new Map(),
+  batch: null,
+  pollTimer: null,
+  pollBusy: false,
+  pollToken: 0,
+  pollError: "",
+  pollDelayMs: 2000,
+};
+function roleServiceObject(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : null; }
+function roleServiceHuman() { return typeof currentMemberIsHuman === "function" ? Boolean(currentMemberIsHuman()) : true; }
+function roleServicePageActive() {
+  return typeof document !== "undefined" && blackboardOpen === true && workspaceUI.mode === "roles"
+    && Boolean(activeProjectId) && Boolean(myId);
+}
+function roleServiceDeclared(role) {
+  return Boolean(role) && typeof role === "object" && Object.prototype.hasOwnProperty.call(role, "service");
+}
+// 停止轮询并作废在途响应：递增 token 让迟到的 role-services 结果不再回写、不再续期。
+function stopRoleServicePolling() {
+  if (roleServiceUI.pollTimer !== null) {
+    if (typeof clearTimeout === "function") clearTimeout(roleServiceUI.pollTimer);
+    roleServiceUI.pollTimer = null;
+  }
+  roleServiceUI.pollBusy = false;
+  ++roleServiceUI.pollToken;
+}
+// 项目/账号切换时清空覆盖层、在途标记与批量结果；同上下文重绘不清，避免轮询结果被吞。
+function ensureRoleServiceContext() {
+  if (roleServiceUI.projectId === activeProjectId && roleServiceUI.memberId === myId) return;
+  stopRoleServicePolling();
+  roleServiceUI.projectId = activeProjectId;
+  roleServiceUI.memberId = myId;
+  roleServiceUI.overlay = new Map();
+  roleServiceUI.busy = new Set();
+  roleServiceUI.errors = new Map();
+  roleServiceUI.batch = null;
+  roleServiceUI.pollError = "";
+}
+// app.js 每次导航/刷新都会经 renderWorkspaceMode → syncWorkspaceLayout；离页即停表。
+function syncRoleServicePollingContext() {
+  if (!roleServicePageActive()) { stopRoleServicePolling(); return; }
+  ensureRoleServiceContext();
+}
+function roleServiceView(role) {
+  const memberId = role && typeof role.member_id === "string" ? role.member_id : "";
+  const declared = roleServiceDeclared(role);
+  const overlay = memberId ? roleServiceUI.overlay.get(memberId) : undefined;
+  const raw = declared ? roleServiceObject(role.service) : null;
+  return {
+    memberId,
+    declared,
+    provided: declared || Boolean(overlay),
+    service: overlay || raw,
+    error: memberId ? (roleServiceUI.errors.get(memberId) || "") : "",
+  };
+}
+function roleServiceShorten(text, max = 60) {
+  const value = String(text).replace(/\s+/g, " ").trim();
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+function roleServiceFailureReason(service) {
+  const code = typeof service.error_code === "string" && service.error_code.trim() ? service.error_code.trim() : null;
+  const message = typeof service.error_message === "string" && service.error_message.trim() ? service.error_message.trim() : null;
+  if (code && message) return `${code}：${roleServiceShorten(message)}`;
+  return code || (message ? roleServiceShorten(message) : null);
+}
+// 严格映射（设计 §11.2）：stopped = 人工关闭，不得显示失败；running 只有 readiness_service === "ready"
+// 才是“启动成功”，否则是“启动中…”；未知枚举如实标未知，不伪装。
+function roleServiceStatus(service) {
+  if (!service) return { text: "未登记受管服务", kind: "unknown" };
+  const observed = typeof service.observed === "string" ? service.observed : "";
+  const readiness = typeof service.readiness_service === "string" ? service.readiness_service : "";
+  const nativeLogin = typeof service.native_login === "string" ? service.native_login : "";
+  if (observed === "stopped") return { text: "未启动（已关闭）", kind: "neutral" };
+  if (observed === "not_started") return { text: "未启动", kind: "neutral" };
+  if (observed === "starting") return { text: "启动中…", kind: "running" };
+  if (observed === "stopping") return { text: "关闭中…", kind: "running" };
+  if (observed === "running") {
+    if (readiness !== "ready") return { text: "启动中…", kind: "running" };
+    return { text: nativeLogin === "unverified" ? "启动成功（原生登录未核验）" : "启动成功", kind: "success" };
+  }
+  if (service.ownership_held === true && observed !== "running" && observed !== "starting") {
+    return { text: "启动失败（进程仍受管，请先关闭）", kind: "danger" };
+  }
+  if (service.last_result === "failed" && service.error_code === "readiness_timeout") {
+    return { text: "启动失败（未就绪）", kind: "danger" };
+  }
+  if (observed === "failed") {
+    const reason = roleServiceFailureReason(service);
+    return { text: reason ? `启动失败（${reason}）` : "启动失败", kind: "danger" };
+  }
+  if (observed === "unknown" || !observed) return { text: "未知", kind: "unknown" };
+  return { text: `未知（${observed}）`, kind: "unknown" };
+}
+function roleServiceControl(role) {
+  const view = roleServiceView(role);
+  const status = roleServiceStatus(view.service);
+  const service = view.service;
+  const busy = Boolean(view.memberId && roleServiceUI.busy.has(view.memberId));
+  const batchBusy = Boolean(roleServiceUI.batch && roleServiceUI.batch.busy);
+  const human = roleServiceHuman();
+  const kind = service && typeof service.control_kind === "string" ? service.control_kind : "";
+  const observed = service && typeof service.observed === "string" ? service.observed : "";
+  const ownershipHeld = Boolean(service && service.ownership_held === true);
+  let hint = "";
+  if (!view.provided) hint = ROLE_SERVICE_STATUS_HINTS.unsupported;
+  else if (!service) hint = ROLE_SERVICE_STATUS_HINTS.unregistered;
+  else if (kind === "external_session") hint = ROLE_SERVICE_STATUS_HINTS.external_session;
+  else if (kind !== "managed_cli") hint = ROLE_SERVICE_STATUS_HINTS.missing;
+  const managed = kind === "managed_cli";
+  // 启动只对受管 CLI 且服务自述可启动时开放；加载态（starting/stopping）与在途请求都禁用。
+  // 原进程归属未释放（失败/过期/unknown 但仍有活进程）时**禁止**重复启动，必须先关闭。
+  const canStart = managed && service.can_start === true && !ownershipHeld && !busy && !batchBusy && human
+    && observed !== "starting" && observed !== "stopping";
+  const canStop = Boolean(service) && service.can_stop === true && !busy && !batchBusy && human
+    && observed !== "stopping";
+  if (managed && !human) hint = "当前账号是 Agent，只能查看服务状态。";
+  else if (managed && ownershipHeld && !hint) hint = "原进程归属未释放：请先「关闭」并确认已停止，再重新启动。";
+  else if (managed && service && service.can_start !== true && service.can_stop !== true && !hint) hint = "当前不可启动。";
+  if (view.error) hint = view.error;
+  return { view, status, busy, batchBusy, human, kind, observed, managed, ownershipHeld, canStart, canStop, hint };
+}
+// 列表行是 <button>，不能在内部再嵌套按钮；服务控制作为角色行的同级块渲染，保持行结构不变。
+function workspaceRoleServiceControls(role, className = "role-service-controls") {
+  const control = roleServiceControl(role);
+  if (!control.view.provided) return null;
+  const box = workspaceEl("div", className);
+  if (control.view.memberId) box.dataset.memberId = control.view.memberId;
+  const row = workspaceEl("div", "role-service-row");
+  row.appendChild(workspaceEl("span", `role-service-state ${control.status.kind}`, control.status.text));
+  const start = workspaceButton("启动", event => { event?.stopPropagation?.(); startRoleService(control.view.memberId); }, "role-service-button role-service-start");
+  start.disabled = !control.canStart;
+  start.setAttribute("aria-label", `启动 ${workspaceMemberName(control.view.memberId)} 的服务`);
+  if (control.hint) start.title = control.hint;
+  const stop = workspaceButton("关闭", event => { event?.stopPropagation?.(); stopRoleService(control.view.memberId); }, "role-service-button role-service-stop");
+  stop.disabled = !control.canStop;
+  stop.setAttribute("aria-label", `关闭 ${workspaceMemberName(control.view.memberId)} 的服务`);
+  if (control.hint) stop.title = control.hint;
+  row.append(start, stop);
+  box.appendChild(row);
+  if (control.hint) box.appendChild(workspaceEl("p", "role-service-hint", control.hint));
+  return box;
+}
+function workspaceRoleServicePanel(role) {
+  const control = roleServiceControl(role);
+  if (!control.view.provided) return null;
+  const section = workspaceEl("section", "role-service-section");
+  section.setAttribute("aria-label", "受管 CLI 服务");
+  const head = workspaceEl("div", "role-service-head");
+  head.appendChild(workspaceEl("h3", "", "受管 CLI 服务"));
+  head.appendChild(workspaceEl("span", `role-service-state ${control.status.kind}`, control.status.text));
+  section.appendChild(head);
+  section.appendChild(workspaceEl("p", "role-service-note", "只显示服务期望/观测状态与本流程启动结果；不代表模型能力或原生登录已验证，也不改变任务状态。"));
+  const controls = workspaceRoleServiceControls(role, "role-service-controls role-service-detail-controls");
+  if (controls) section.appendChild(controls);
+  return section;
+}
+function roleServiceRoleName(memberId) {
+  return workspaceRoles().some(item => item.member_id === memberId) ? workspaceMemberName(memberId) : memberId;
+}
+// 批量计数口径（返修 F6）：写入意图只算「启动请求」，**只有**本次动作真实收敛为
+// running + readiness_service=ready 才算「已启动」；failed/unknown 一律进失败集合。
+function roleServiceCountResults(results) {
+  const counts = { requested: 0, started: 0, pending: 0, skipped: 0, failed: 0 };
+  for (const item of Array.isArray(results) ? results : []) {
+    if (item?.status === "ready") counts.started += 1;
+    else if (item?.status === "requested") { counts.requested += 1; counts.pending += 1; }
+    else if (item?.status === "skipped_running" || item?.status === "skipped_ownership_held") counts.skipped += 1;
+    else if (item?.status === "failed") counts.failed += 1;
+  }
+  return counts;
+}
+// 轮询收敛：把「后到的 failed/unknown」归入本批次失败，把「真实 ready」计入已启动；
+// 仍拥有进程的失败角色只提示先关闭，不进入失败重试集合（避免重复启动）。
+function roleServiceBatchConverge(rows) {
+  const batch = roleServiceUI.batch;
+  if (!batch || batch.busy) return;
+  const byMember = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const memberId = row && typeof row.member_id === "string" ? row.member_id : "";
+    if (memberId) byMember.set(memberId, row);
+  }
+  let changed = false;
+  for (const memberId of Object.keys(batch.launches || {})) {
+    const track = batch.launches[memberId];
+    const row = byMember.get(memberId);
+    if (!row) continue;
+    const settled = batch.settled[memberId] || "pending";
+    const generation = row.generation;
+    const sameAction = track && Number.isInteger(track.generation) && generation === track.generation;
+    const observed = typeof row.observed === "string" ? row.observed : "";
+    if (settled === "failed_owned") {
+      if (row.ownership_held === false && observed === "stopped" && row.can_start === true) {
+        batch.settled[memberId] = "failed";
+        changed = true;
+      } else if (track && Number.isInteger(generation) && generation > track.generation
+        && row.ownership_held === false && observed !== "stopping") {
+        batch.settled[memberId] = "superseded";
+        changed = true;
+      }
+      continue;
+    }
+    if (settled !== "pending") continue;
+    // 人工关闭或新的动作取代本批次时，不把旧启动一直计为 pending，
+    // 也不把后一个世代的成功误计成本批次成功。
+    if (track && Number.isInteger(generation) && generation > track.generation) {
+      batch.settled[memberId] = "superseded";
+      changed = true;
+      continue;
+    }
+    if (observed === "running" && row.readiness_service === "ready" && sameAction) {
+      batch.settled[memberId] = "ready";
+      changed = true;
+    } else if ((observed === "failed" || observed === "unknown") && sameAction) {
+      batch.settled[memberId] = row.ownership_held === true ? "failed_owned" : "failed";
+      changed = true;
+    }
+  }
+  if (changed) {
+    const settled = Object.values(batch.settled || {});
+    const originalSkipped = (Array.isArray(batch.results) ? batch.results : []).filter(item =>
+      item?.status === "skipped_running" || (item?.status === "skipped_ownership_held"
+        && !Object.prototype.hasOwnProperty.call(batch.settled, item.member_id))).length;
+    batch.counts = Object.assign({}, batch.counts, {
+      started: settled.filter(v => v === "ready").length,
+      failed: (batch.requestFailures || []).length + settled.filter(v => v === "failed" || v === "failed_owned").length,
+      pending: settled.filter(v => v === "pending").length,
+      skipped: originalSkipped + settled.filter(v => v === "superseded").length,
+    });
+  }
+}
+function roleServiceBatchFailedMembers(batch) {
+  const failed = new Set(Array.isArray(batch?.requestFailures) ? batch.requestFailures : []);
+  for (const [memberId, value] of Object.entries(batch?.settled || {})) {
+    if (value === "failed") failed.add(memberId);
+  }
+  return [...failed];
+}
+function roleServiceBatchOwnedMembers(batch) {
+  return Object.entries(batch?.settled || {})
+    .filter(([, value]) => value === "failed_owned")
+    .map(([memberId]) => memberId);
+}
+function roleServiceBatchRequestFailures(results) {
+  return (Array.isArray(results) ? results : [])
+    .filter(item => item && item.status === "failed" && typeof item.member_id === "string")
+    .map(item => item.member_id);
+}
+function workspaceRoleServiceBatchPanel() {
+  const box = workspaceEl("div", "role-service-batch");
+  const human = roleServiceHuman();
+  const batch = roleServiceUI.batch;
+  const startAll = workspaceButton("全部启动", () => startAllRoleServices(), "role-service-button role-service-start-all");
+  startAll.disabled = Boolean(batch && batch.busy) || !human || !workspaceRoles().length;
+  if (!human) startAll.title = "当前账号是 Agent，只能查看服务状态。";
+  box.appendChild(startAll);
+  if (batch && batch.busy) box.appendChild(workspaceEl("span", "role-service-batch-status", "正在全部启动…"));
+  else if (batch && batch.error) box.appendChild(workspaceEl("span", "role-service-batch-status error", batch.error));
+  else if (batch) {
+    const counts = Object.assign(
+      { requested: 0, started: 0, pending: 0, skipped: 0, failed: 0 },
+      roleServiceCountResults(batch.results),
+      batch.counts || {},
+    );
+    // 口径：写入的是「启动请求」；「已启动」只在真实 ready 后出现。
+    box.appendChild(workspaceEl("span", "role-service-batch-status",
+      `启动请求 ${counts.requested ?? 0} · 已启动 ${counts.started ?? 0} · 启动中 ${counts.pending ?? 0} · 跳过 ${counts.skipped ?? 0} · 失败 ${counts.failed ?? 0}`));
+    const failed = roleServiceBatchFailedMembers(batch);
+    if (failed.length) {
+      const names = failed.map(memberId => {
+        const item = (Array.isArray(batch.results) ? batch.results : []).find(row => row && row.member_id === memberId);
+        return `${roleServiceRoleName(memberId)}${item && item.error_code ? `（${item.error_code}）` : ""}`;
+      }).join("、");
+      box.appendChild(workspaceEl("span", "role-service-batch-failed", `失败：${names}`));
+      const retry = workspaceButton("重试失败项", () => startAllRoleServices(failed), "role-service-button role-service-retry-failed");
+      retry.disabled = Boolean(batch.busy);
+      box.appendChild(retry);
+    }
+    const owned = roleServiceBatchOwnedMembers(batch);
+    if (owned.length) {
+      // 原进程归属未释放的角色不能重复启动：必须先在角色行上「关闭」。
+      const names = owned.map(memberId => roleServiceRoleName(memberId)).join("、");
+      box.appendChild(workspaceEl("span", "role-service-batch-owned", `需先关闭（原进程归属未释放）：${names}`));
+    }
+  }
+  if (roleServiceUI.pollError) box.appendChild(workspaceEl("span", "role-service-batch-status error", roleServiceUI.pollError));
+  return box;
+}
+async function roleServiceErrorDetail(res, fallback) {
+  try {
+    if (typeof readErrorDetail === "function") return await readErrorDetail(res, fallback);
+    const body = await res.json();
+    if (body && typeof body.detail === "string" && body.detail) return body.detail;
+  } catch (_) { /* 响应体不可读时退回兜底文案 */ }
+  return fallback;
+}
+// 动作响应只带回 desired/observed/generation/launch 等有限字段；合并到已有投影，不臆造其它事实。
+function roleServiceMergeAction(base, data) {
+  const merged = Object.assign({}, roleServiceObject(base) || {});
+  if (!data || typeof data !== "object") return merged;
+  if (typeof data.desired === "string") merged.desired = data.desired;
+  if (typeof data.observed === "string") merged.observed = data.observed;
+  if (Number.isInteger(data.generation)) merged.generation = data.generation;
+  if (data.idempotent_stopped === true && !("observed" in data)) merged.observed = "stopped";
+  if (data.action === "start" || data.action === "stop") {
+    merged.current_launch = {
+      launch_id: data.launch_id ?? null,
+      action: data.action,
+      state: "pending",
+      expected_instance_id: data.expected_instance_id ?? null,
+      launch_expires_at: data.launch_expires_at ?? null,
+      claimed_at: null,
+      reported_at: null,
+      outcome: null,
+      error_code: null,
+    };
+  }
+  return merged;
+}
+function roleServiceBaseFor(memberId) {
+  if (roleServiceUI.overlay.has(memberId)) return roleServiceUI.overlay.get(memberId);
+  const role = workspaceRoles().find(item => item.member_id === memberId);
+  return role && roleServiceDeclared(role) ? roleServiceObject(role.service) : null;
+}
+async function startRoleService(memberId) {
+  const role = workspaceRoles().find(item => item.member_id === memberId);
+  if (!role || role.archived === true || roleServiceUI.busy.has(memberId)) return;
+  if (!roleServiceControl(role).canStart) return;
+  if (!roleServicePageActive() || typeof apiFetch !== "function") return;
+  const projectId = activeProjectId, accountId = myId;
+  roleServiceUI.busy.add(memberId);
+  roleServiceUI.errors.delete(memberId);
+  renderWorkspaceList(); renderTaskDetailsPanel();
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(memberId)}/service/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (projectId !== activeProjectId || accountId !== myId) return;
+    if (!res.ok) {
+      roleServiceUI.errors.set(memberId, await roleServiceErrorDetail(res, `启动失败（${res.status}），请稍后重试。`));
+    } else {
+      const data = await res.json().catch(() => null);
+      roleServiceUI.overlay.set(memberId, roleServiceMergeAction(roleServiceBaseFor(memberId), data));
+    }
+  } catch (err) {
+    if (projectId === activeProjectId && accountId === myId) roleServiceUI.errors.set(memberId, (err && err.message) || "启动请求失败，请重试。");
+  } finally {
+    roleServiceUI.busy.delete(memberId);
+    if (projectId === activeProjectId && accountId === myId) { renderWorkspaceList(); renderTaskDetailsPanel(); }
+  }
+}
+async function stopRoleService(memberId) {
+  const role = workspaceRoles().find(item => item.member_id === memberId);
+  if (!role || role.archived === true || roleServiceUI.busy.has(memberId)) return;
+  if (!roleServiceControl(role).canStop) return;
+  if (!roleServicePageActive() || typeof apiFetch !== "function") return;
+  const projectId = activeProjectId, accountId = myId;
+  roleServiceUI.busy.add(memberId);
+  roleServiceUI.errors.delete(memberId);
+  renderWorkspaceList(); renderTaskDetailsPanel();
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(memberId)}/service/stop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (projectId !== activeProjectId || accountId !== myId) return;
+    if (!res.ok) {
+      roleServiceUI.errors.set(memberId, await roleServiceErrorDetail(res, `关闭失败（${res.status}），请稍后重试。`));
+    } else {
+      const data = await res.json().catch(() => null);
+      roleServiceUI.overlay.set(memberId, roleServiceMergeAction(roleServiceBaseFor(memberId), data));
+    }
+  } catch (err) {
+    if (projectId === activeProjectId && accountId === myId) roleServiceUI.errors.set(memberId, (err && err.message) || "关闭请求失败，请重试。");
+  } finally {
+    roleServiceUI.busy.delete(memberId);
+    if (projectId === activeProjectId && accountId === myId) { renderWorkspaceList(); renderTaskDetailsPanel(); }
+  }
+}
+// 批量结果逐角色合并（返修 F6）：写入意图只显示「启动中…」（进入轮询），
+// 真实 ready 由轮询收敛后计成功；failed 记稳定错误码；skipped 不伪造成功。
+function roleServiceApplyStartAll(results, batch) {
+  for (const item of Array.isArray(results) ? results : []) {
+    const memberId = item && typeof item.member_id === "string" ? item.member_id : "";
+    if (!memberId) continue;
+    const base = roleServiceBaseFor(memberId);
+    if (item.status === "failed") {
+      roleServiceUI.errors.set(memberId, item.error_code || "启动失败");
+      roleServiceUI.overlay.set(memberId, Object.assign({}, base || {}, {
+        desired: "stopped", observed: "failed", last_action: "start", last_result: "failed", error_code: item.error_code ?? null,
+      }));
+    } else if (item.status === "requested" || item.status === "ready") {
+      roleServiceUI.errors.delete(memberId);
+      roleServiceUI.overlay.set(memberId, roleServiceMergeAction(base, {
+        desired: "running", observed: "starting", generation: item.generation, action: "start",
+        launch_id: item.launch_id, expected_instance_id: item.expected_instance_id,
+      }));
+      if (batch && item.status === "requested") {
+        batch.launches[memberId] = { launch_id: item.launch_id ?? null, generation: item.generation ?? null };
+        batch.settled[memberId] = "pending";
+      }
+    } else if (item.status === "skipped_running") {
+      roleServiceUI.errors.delete(memberId);
+      const observed = base && typeof base.observed === "string" ? base.observed : "starting";
+      roleServiceUI.overlay.set(memberId, Object.assign({}, base || {}, { desired: "running", observed }));
+    } else if (item.status === "skipped_ownership_held") {
+      roleServiceUI.errors.delete(memberId);
+      const observed = base && typeof base.observed === "string" ? base.observed : "unknown";
+      roleServiceUI.overlay.set(memberId, Object.assign({}, base || {}, {
+        desired: "running", observed, ownership_held: true, can_start: false, can_stop: true,
+      }));
+      if (batch) {
+        batch.launches[memberId] = {
+          launch_id: base?.current_launch?.launch_id ?? null,
+          generation: item.generation ?? base?.generation ?? null,
+        };
+        batch.settled[memberId] = "failed_owned";
+      }
+    }
+  }
+}
+async function startAllRoleServices(memberIds) {
+  if (roleServiceUI.batch && roleServiceUI.batch.busy) return;
+  if (!roleServiceHuman() || !roleServicePageActive() || typeof apiFetch !== "function") return;
+  const projectId = activeProjectId, accountId = myId;
+  if (!projectId || !accountId) return;
+  // 省略/空 member_ids = 全部角色；给定子集只用于“重试失败项”，成功/跳过项不重复提交。
+  const subset = Array.isArray(memberIds) ? memberIds.filter(id => typeof id === "string" && id) : [];
+  roleServiceUI.batch = Object.assign({}, roleServiceUI.batch || {}, { busy: true, error: "" });
+  renderWorkspaceList(); renderTaskDetailsPanel();
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/role-services/start-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subset.length ? { member_ids: subset } : {}),
+    });
+    if (projectId !== activeProjectId || accountId !== myId) return;
+    if (!res.ok) {
+      roleServiceUI.batch = Object.assign({}, roleServiceUI.batch || {}, {
+        busy: false,
+        error: await roleServiceErrorDetail(res, `全部启动失败（${res.status}），请稍后重试。`),
+      });
+    } else {
+      const data = await res.json().catch(() => null);
+      const results = Array.isArray(data?.results) ? data.results : [];
+      const batch = {
+        requested: Array.isArray(data?.requested) ? data.requested : subset,
+        results,
+        counts: roleServiceCountResults(results),
+        requestFailures: roleServiceBatchRequestFailures(results),
+        launches: {},
+        settled: {},
+        busy: false,
+        error: "",
+      };
+      roleServiceUI.batch = batch;
+      roleServiceApplyStartAll(results, batch);
+    }
+  } catch (err) {
+    if (projectId === activeProjectId && accountId === myId) {
+      roleServiceUI.batch = Object.assign({}, roleServiceUI.batch || {}, { busy: false, error: (err && err.message) || "全部启动请求失败，请重试。" });
+    }
+  } finally {
+    if (projectId === activeProjectId && accountId === myId) { renderWorkspaceList(); renderTaskDetailsPanel(); }
+  }
+}
+function roleServiceNeedsPolling() {
+  if (!roleServicePageActive()) return false;
+  const batch = roleServiceUI.batch;
+  if (batch && Object.values(batch.settled || {}).some(value => value === "pending")) return true;
+  for (const role of workspaceRoles()) {
+    const view = roleServiceView(role);
+    if (!view.provided || !view.service) continue;
+    const observed = typeof view.service.observed === "string" ? view.service.observed : "";
+    if (observed === "starting" || observed === "stopping") return true;
+  }
+  return false;
+}
+function maybeStartRoleServicePolling() {
+  if (roleServiceUI.pollTimer !== null || roleServiceUI.pollBusy) return;
+  if (typeof setTimeout !== "function") return;
+  if (!roleServiceNeedsPolling()) return;
+  const projectId = activeProjectId, accountId = myId;
+  roleServiceUI.pollTimer = setTimeout(() => {
+    roleServiceUI.pollTimer = null;
+    pollRoleServices(projectId, accountId);
+  }, roleServiceUI.pollDelayMs);
+}
+async function pollRoleServices(projectId, accountId) {
+  if (!roleServicePageActive() || projectId !== activeProjectId || accountId !== myId) return;
+  if (roleServiceUI.pollBusy || typeof apiFetch !== "function") return;
+  const token = ++roleServiceUI.pollToken;
+  roleServiceUI.pollBusy = true;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/role-services`);
+    if (token !== roleServiceUI.pollToken || projectId !== activeProjectId || accountId !== myId) return;
+    if (!res.ok) {
+      roleServiceUI.pollError = await roleServiceErrorDetail(res, `服务状态刷新失败（${res.status}），将继续重试。`);
+    } else {
+      const list = await res.json().catch(() => null);
+      if (token !== roleServiceUI.pollToken || projectId !== activeProjectId || accountId !== myId) return;
+      roleServiceUI.pollError = "";
+      const rows = Array.isArray(list) ? list : [];
+      for (const item of rows) {
+        const memberId = item && typeof item.member_id === "string" ? item.member_id : "";
+        if (memberId) roleServiceUI.overlay.set(memberId, item);
+      }
+      // 批量收敛：后到的 failed/unknown 归入本批次失败，真实 ready 才计成功。
+      roleServiceBatchConverge(rows);
+    }
+  } catch (err) {
+    if (token === roleServiceUI.pollToken && projectId === activeProjectId && accountId === myId) {
+      roleServiceUI.pollError = (err && err.message) || "服务状态刷新失败，将继续重试。";
+    }
+  } finally {
+    if (token === roleServiceUI.pollToken) {
+      roleServiceUI.pollBusy = false;
+      // 重绘会重新评估是否需要续期：全部收敛为稳定态时不再安排下一次，轮询自然停止。
+      if (roleServicePageActive() && projectId === activeProjectId && accountId === myId) {
+        renderWorkspaceList();
+        renderTaskDetailsPanel();
+      }
+    }
+  }
+}
 function renderWorkspaceRoleDetails() {
   // ROLE-DESC-F1 修正（#137/N4）：角色详情拆为名称区与参与任务区两个动态容器，
   // 静态说明编辑区（index.html 居中独立）位于两者之间；replaceChildren 只触碰这两个容器，
@@ -857,6 +1414,11 @@ function renderWorkspaceRoleDetails() {
   namePanel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
   // ROLE-BINDING-B4：绑定只读区随名称区动态重绘，来自同一次名册读取；静态说明编辑区不在其中。
   namePanel.appendChild(workspaceRoleBindingPanel(role));
+  // R1-3：受管 CLI 服务控制区（未归档且名册带 service 字段时显示）；纯文本状态 + 启动/关闭按钮。
+  if (role.archived !== true) {
+    const servicePanel = workspaceRoleServicePanel(role);
+    if (servicePanel) namePanel.appendChild(servicePanel);
+  }
   const section = workspaceEl("section", "role-task-section");
   section.appendChild(workspaceEl("h3", "", "参与的任务"));
   const filters = workspaceEl("div", "role-task-filters");

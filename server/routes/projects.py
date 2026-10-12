@@ -109,6 +109,7 @@ from server.models import (
     serialize_provision_job,
 )
 from server.routes.groups import _group_out
+from server.role_services import project_role_service
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -291,6 +292,7 @@ def _project_agent_outs(
     if not agents:
         return []
 
+    projection_now = datetime.now(timezone.utc)
     project_id = project_id or agents[0].project_id
     member_ids = [agent.member_id for agent in agents]
     members = (
@@ -369,6 +371,11 @@ def _project_agent_outs(
             ),
             binding_state=resolve_role_binding_state(
                 binding_facts_by_member.get(agent.member_id)
+            ),
+            # R1-3：角色页真实数据源是 GET /agents，受管服务投影必须一并给出；
+            # 无状态行时不伪造（默认 stopped / not_started 由投影如实表达）。
+            service=project_role_service(
+                project_id, agent.member_id, session, now=projection_now
             ),
         )
         for agent in agents
@@ -1078,6 +1085,7 @@ def _role_projection(
     }
 
     projected: dict[str, ProjectRoleListItem] = {}
+    now = datetime.now(timezone.utc)
     for member_id in member_ids:
         role = roles.get(member_id)
         member = members.get(member_id)
@@ -1147,7 +1155,8 @@ def _role_projection(
             ),
             role_description=descriptions.get(member_id),
             binding_state=resolve_role_binding_state(facts),
-            service=None,  # R1-1 无服务表：不伪造服务状态（合同 §3.5 / §11.2）
+            # R1-3：真实服务投影（只读、无 token/argv/绝对路径；无状态行时不伪造）。
+            service=project_role_service(project_id, member_id, session, now=now),
         )
     return projected
 

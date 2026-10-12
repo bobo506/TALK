@@ -9,6 +9,7 @@ import secrets
 import unicodedata
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
@@ -791,6 +792,251 @@ class RoleProvisionJob(SQLModel, table=True):
     revision: int = Field(default=1)
     credential_version: int = Field(default=1)
     created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ── 角色生命周期 R1-3：受管 CLI 服务启停（合同 §4.1.5 / §4.1.6 / §10）──────
+
+# 人工意图（只有 human 能写）。
+ROLE_SERVICE_DESIRED_STOPPED = "stopped"
+ROLE_SERVICE_DESIRED_RUNNING = "running"
+ROLE_SERVICE_DESIRED_STATES = (
+    ROLE_SERVICE_DESIRED_STOPPED,
+    ROLE_SERVICE_DESIRED_RUNNING,
+)
+
+# 宿主证据收敛后的受管状态（页面文案见设计 §11.2）。
+ROLE_SERVICE_OBSERVED_NOT_STARTED = "not_started"
+ROLE_SERVICE_OBSERVED_STARTING = "starting"
+ROLE_SERVICE_OBSERVED_RUNNING = "running"
+ROLE_SERVICE_OBSERVED_STOPPING = "stopping"
+ROLE_SERVICE_OBSERVED_STOPPED = "stopped"
+ROLE_SERVICE_OBSERVED_FAILED = "failed"
+ROLE_SERVICE_OBSERVED_UNKNOWN = "unknown"
+ROLE_SERVICE_OBSERVED_STATES = (
+    ROLE_SERVICE_OBSERVED_NOT_STARTED,
+    ROLE_SERVICE_OBSERVED_STARTING,
+    ROLE_SERVICE_OBSERVED_RUNNING,
+    ROLE_SERVICE_OBSERVED_STOPPING,
+    ROLE_SERVICE_OBSERVED_STOPPED,
+    ROLE_SERVICE_OBSERVED_FAILED,
+    ROLE_SERVICE_OBSERVED_UNKNOWN,
+)
+
+# 本次由谁管理（合同 §4.1.5 的 manager_kind）。
+ROLE_SERVICE_MANAGER_CLI_PROCESS = "cli_process"
+ROLE_SERVICE_MANAGER_EXTERNAL_SESSION = "external_session"
+ROLE_SERVICE_MANAGER_HOST_DESKTOP = "host_desktop"
+ROLE_SERVICE_MANAGER_KINDS = (
+    ROLE_SERVICE_MANAGER_CLI_PROCESS,
+    ROLE_SERVICE_MANAGER_EXTERNAL_SESSION,
+    ROLE_SERVICE_MANAGER_HOST_DESKTOP,
+)
+
+# 动作与动作状态机（合同 §4.1.6）。
+ROLE_SERVICE_ACTION_START = "start"
+ROLE_SERVICE_ACTION_STOP = "stop"
+ROLE_SERVICE_ACTIONS = (ROLE_SERVICE_ACTION_START, ROLE_SERVICE_ACTION_STOP)
+
+ROLE_SERVICE_LAUNCH_PENDING = "pending"
+ROLE_SERVICE_LAUNCH_CLAIMED = "claimed"
+ROLE_SERVICE_LAUNCH_REPORTED = "reported"
+ROLE_SERVICE_LAUNCH_EXPIRED = "expired"
+ROLE_SERVICE_LAUNCH_STATES = (
+    ROLE_SERVICE_LAUNCH_PENDING,
+    ROLE_SERVICE_LAUNCH_CLAIMED,
+    ROLE_SERVICE_LAUNCH_REPORTED,
+    ROLE_SERVICE_LAUNCH_EXPIRED,
+)
+
+# 回报 outcome：start 只收 ready/failed，stop 只收 stopped/failed（合同 §10.2）。
+ROLE_SERVICE_OUTCOME_READY = "ready"
+ROLE_SERVICE_OUTCOME_FAILED = "failed"
+ROLE_SERVICE_OUTCOME_STOPPED = "stopped"
+ROLE_SERVICE_START_OUTCOMES = (ROLE_SERVICE_OUTCOME_READY, ROLE_SERVICE_OUTCOME_FAILED)
+ROLE_SERVICE_STOP_OUTCOMES = (ROLE_SERVICE_OUTCOME_STOPPED, ROLE_SERVICE_OUTCOME_FAILED)
+
+# last_result：人工关闭记 ``stopped``，**不是** ``failed``（合同 §4.1.5）。
+ROLE_SERVICE_RESULT_SUCCESS = "success"
+ROLE_SERVICE_RESULT_FAILED = "failed"
+ROLE_SERVICE_RESULT_STOPPED = "stopped"
+ROLE_SERVICE_RESULTS = (
+    ROLE_SERVICE_RESULT_SUCCESS,
+    ROLE_SERVICE_RESULT_FAILED,
+    ROLE_SERVICE_RESULT_STOPPED,
+)
+
+# 三独立就绪事实（合同 §10.3）：native_login / model_alias / readiness.service。
+ROLE_SERVICE_NATIVE_LOGIN_UNVERIFIED = "unverified"
+ROLE_SERVICE_NATIVE_LOGIN_VERIFIED = "verified"
+ROLE_SERVICE_NATIVE_LOGIN_NOT_APPLICABLE = "not_applicable"
+ROLE_SERVICE_MODEL_ALIAS_RESOLVED = "resolved"
+ROLE_SERVICE_MODEL_ALIAS_UNRESOLVED = "unresolved"
+ROLE_SERVICE_MODEL_ALIAS_UNCONFIGURED = "unconfigured"
+ROLE_SERVICE_READINESS_READY = "ready"
+ROLE_SERVICE_READINESS_FAILED = "failed"
+ROLE_SERVICE_READINESS_UNKNOWN = "unknown"
+ROLE_SERVICE_READINESS_PENDING = "pending"
+
+# 本片实现的服务生命周期稳定错误码（合同 §10.6，逐字一致）。
+ROLE_SERVICE_ERROR_GENERATION_CONFLICT = "generation_conflict"
+ROLE_SERVICE_ERROR_ALREADY_RUNNING = "already_running"
+ROLE_SERVICE_ERROR_ALREADY_STOPPED = "already_stopped"
+ROLE_SERVICE_ERROR_LAUNCH_NOT_FOUND = "launch_not_found"
+ROLE_SERVICE_ERROR_LAUNCH_NOT_PENDING = "launch_not_pending"
+ROLE_SERVICE_ERROR_LAUNCH_EXPIRED = "launch_expired"
+ROLE_SERVICE_ERROR_LAUNCH_ACTION_MISMATCH = "launch_action_mismatch"
+ROLE_SERVICE_ERROR_EXPECTED_INSTANCE_MISMATCH = "expected_instance_mismatch"
+ROLE_SERVICE_ERROR_STALE_REPORT = "stale_report"
+ROLE_SERVICE_ERROR_REPORT_CONFLICT = "report_conflict"
+ROLE_SERVICE_ERROR_REPORT_UNAUTHORIZED = "report_unauthorized"
+ROLE_SERVICE_ERROR_CLAIM_EXPIRED = "claim_expired"
+ROLE_SERVICE_ERROR_READINESS_TIMEOUT = "readiness_timeout"
+ROLE_SERVICE_ERROR_NATIVE_LOGIN_UNVERIFIED = "native_login_unverified"
+ROLE_SERVICE_ERROR_MODEL_ALIAS_UNRESOLVED = "model_alias_unresolved"
+ROLE_SERVICE_ERROR_CLI_MISSING = "cli_missing"
+ROLE_SERVICE_ERROR_IDENTITY_MISMATCH = "identity_mismatch"
+ROLE_SERVICE_ERROR_UNKNOWN_OWNER = "unknown_owner"
+ROLE_SERVICE_ERROR_STOP_TIMEOUT = "stop_timeout"
+ROLE_SERVICE_ERROR_INSTANCE_PROJECT_IMMUTABLE = "instance_project_immutable"
+ROLE_SERVICE_ERROR_INSTANCE_LAUNCH_IMMUTABLE = "instance_launch_immutable"
+ROLE_SERVICE_ERROR_INSTANCE_PROJECT_NOT_IN_ROSTER = "instance_project_not_in_roster"
+# 实现选择（R1-3 新增，如实登记，不改变上面合同码的语义）：
+# - ``control_kind_not_managed``：运行器未声明 ``managed_cli``，服务端在**启动**
+#   入口就如实拒绝，而不是建一个没有宿主能领取的 launch 让它挂到 readiness_timeout；
+#   停止入口**不**受此限制（已受管的进程必须始终可停）。
+# - ``role_not_in_roster`` / ``member_disabled``：角色/名册/禁用资格检查的稳定拒绝码。
+ROLE_SERVICE_ERROR_CONTROL_KIND_NOT_MANAGED = "control_kind_not_managed"
+ROLE_SERVICE_ERROR_ROLE_NOT_IN_ROSTER = "role_not_in_roster"
+ROLE_SERVICE_ERROR_MEMBER_DISABLED = "member_disabled"
+ROLE_SERVICE_ERROR_ROLE_BINDING_MISSING = "role_binding_missing"
+ROLE_SERVICE_ERROR_ROLE_NOT_FOUND = "role_not_found"
+ROLE_SERVICE_ERROR_ROLE_ARCHIVED = "role_archived"
+ROLE_SERVICE_ERROR_PROJECT_NOT_FOUND = "project_not_found"
+
+# 动作截止时间（秒）：claim 与 report 都必须落在
+# ``claimed_at ≤ report_time ≤ launch_expires_at`` 内（合同 §10.2/§10.5）。
+ROLE_SERVICE_LAUNCH_TTL_SECONDS = 120
+# 就绪实例心跳新鲜度 TTL（秒）：超过即不算“新心跳”，不产生就绪（合同 §10.3 条件 3）。
+ROLE_SERVICE_INSTANCE_FRESH_SECONDS = 90
+# 批量“全部启动”单次最多处理的角色数（防止一次请求无限扩张）。
+ROLE_SERVICE_START_ALL_MAX_MEMBERS = 200
+
+
+def new_role_service_launch_id() -> str:
+    """动作 ID：``uuid4`` 字符串（合同 §4.1.6）。"""
+    return str(uuid4())
+
+
+def new_expected_instance_id() -> str:
+    """预分配的全新实例 ID：``ins_<12hex>``（合同 §4.1.6）。"""
+    return f"ins_{secrets.token_hex(6)}"
+
+
+def new_role_service_host_token() -> str:
+    """owner/claim token 明文：只在响应里出现一次，库里只存 sha256 哈希。"""
+    return secrets.token_urlsafe(32)
+
+
+def hash_role_service_token(token: str) -> str:
+    """token → 库内哈希（与 R1-1 的 ``hashlib.sha256`` 先例一致）。"""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+class RoleServiceState(SQLModel, table=True):
+    """角色服务生命周期状态（角色生命周期 R1-3，合同 §4.1.5）。
+
+    - 主键 ``(project_id, member_id)``；默认 ``desired_state='stopped'``
+      （保存配置 ≠ 启动）；
+    - ``generation`` 是启动/停止世代号，用**条件更新**保证同一角色同一时刻只有一个
+      动作生效（后到者 ``409 generation_conflict``）；
+    - ``owner_host`` / ``process_launch_id`` 记录**原 start** 的宿主与动作归属：
+      stop 动作不覆盖它，正常停服成功后才清空；无法证明已停时保留供诊断，
+      **不重新认领**（合同 §10.7）；
+    - ``pid`` / ``process_started_at`` 只作诊断提示，不用于所有权判定；
+    - ``spawned`` 是宿主在 ``start`` 失败回报里给出的**已落盘区分事实**：
+      ``True`` = 宿主确实 spawn 过（无论是否已就绪），失败**不**释放原所有权；
+      ``False`` = 纯预检失败（没有产生进程），失败可安全释放所有权并允许重试；
+      ``None`` = 旧宿主未上报，回退按“回报是否带 pid”判断（保守：带 pid 即视为已 spawn）。
+      该列只由宿主回报写入，绝不由意图写入口直接设置。
+    - 本表不存任何 token/Key 明文。
+    """
+
+    __tablename__ = "role_service_state"
+
+    project_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True, index=True)
+    desired_state: str = Field(default=ROLE_SERVICE_DESIRED_STOPPED)
+    observed_state: str = Field(default=ROLE_SERVICE_OBSERVED_NOT_STARTED)
+    manager_kind: str = Field(default=ROLE_SERVICE_MANAGER_CLI_PROCESS)
+    control_kind: str = Field(default=RUNNER_CONTROL_UNKNOWN)
+    generation: int = Field(default=0)
+    current_launch_id: Optional[str] = Field(default=None, index=True)
+    observed_instance_id: Optional[str] = None
+    owner_host: Optional[str] = None
+    process_launch_id: Optional[str] = None
+    spawned: Optional[bool] = None
+    pid: Optional[int] = None
+    process_started_at: Optional[datetime] = None
+    last_result: Optional[str] = None
+    last_error_code: Optional[str] = None
+    last_error_message: Optional[str] = None
+    started_at: Optional[datetime] = None
+    stopped_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_by: Optional[str] = None
+
+
+class RoleServiceLaunch(SQLModel, table=True):
+    """每次启动/停止动作的 CAS/幂等记录（角色生命周期 R1-3，合同 §4.1.6）。
+
+    - ``action`` 显式区分 ``start``/``stop``；
+    - ``expected_instance_id`` 由服务端在创建动作时**预分配**（start 是全新
+      ``ins_<12hex>``，stop 沿用原 start 的实例 ID）；无 ``none_`` 占位实例，
+      所有权未知直接拒绝 ``unknown_owner``；
+    - ``launch_expires_at`` 是一等列：claim 与 report 都必须在
+      ``claimed_at ≤ report_time ≤ launch_expires_at`` 内；
+    - ``owner_token_hash`` **只在 start claim 生成**；stop 沿用原 start 的哈希并要求
+      宿主提交已持有的明文，绝不重新发行原进程所有权；
+    - ``report_fingerprint`` 用于“同一完整载荷重放只读返回原 receipt”，
+      不允许靠相同 outcome 冒充同一载荷；
+    - 库内只有 token 哈希，绝不存明文。
+    """
+
+    __tablename__ = "role_service_launches"
+    __table_args__ = (
+        Index(
+            "ux_role_service_launches_generation",
+            "project_id",
+            "member_id",
+            "generation",
+            unique=True,
+        ),
+        Index("ix_role_service_launches_state_expiry", "state", "launch_expires_at"),
+        Index("ix_role_service_launches_role", "project_id", "member_id"),
+    )
+
+    launch_id: str = Field(primary_key=True)
+    project_id: str = Field(index=True)
+    member_id: str = Field(index=True)
+    action: str
+    generation: int
+    state: str = Field(default=ROLE_SERVICE_LAUNCH_PENDING)
+    expected_instance_id: str
+    target_start_launch_id: Optional[str] = None
+    launch_expires_at: datetime
+    claim_member_id: Optional[str] = None
+    claim_host: Optional[str] = None
+    claim_token_hash: Optional[str] = None
+    owner_token_hash: Optional[str] = None
+    first_instance_seen_at: Optional[datetime] = None
+    report_fingerprint: Optional[str] = None
+    claimed_at: Optional[datetime] = None
+    reported_at: Optional[datetime] = None
+    instance_id: Optional[str] = None
+    outcome: Optional[str] = None
+    error_code: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -3065,15 +3311,239 @@ class ProjectRoleModelOut(BaseModel):
     model_display_name: Optional[str] = None
 
 
+class ProjectRoleServiceLaunchOut(BaseModel):
+    """当前动作的公开只读投影（**不含**任何 token / 哈希 / 命令正文）。"""
+
+    launch_id: str
+    action: str
+    state: str
+    expected_instance_id: str
+    launch_expires_at: datetime
+    claimed_at: Optional[datetime] = None
+    reported_at: Optional[datetime] = None
+    outcome: Optional[str] = None
+    error_code: Optional[str] = None
+
+
 class ProjectRoleServiceOut(BaseModel):
-    """角色服务投影（R1-1 不实现服务表 → 恒为 ``null``；合同 §3 / §11）。"""
+    """角色服务投影（R1-3 实现；合同 §3 / §5.2 / §11.2）。
+
+    公开只读面：**不**返回 ``owner_token``/``claim_token``、argv、绝对路径或任何 Key。
+    三个独立事实（``native_login`` / ``model_alias`` / ``readiness_service``）分列，
+    不合并成一个假的 ``ready``。
+    """
 
     desired: Optional[str] = None
     observed: Optional[str] = None
     last_action: Optional[str] = None
     last_result: Optional[str] = None
     error_code: Optional[str] = None
-    native_login: Optional[str] = None
+    error_message: Optional[str] = None
+    control_kind: Optional[str] = None
+    manager_kind: Optional[str] = None
+    generation: int = 0
+    current_launch: Optional[ProjectRoleServiceLaunchOut] = None
+    observed_instance_id: Optional[str] = None
+    native_login: str = ROLE_SERVICE_NATIVE_LOGIN_UNVERIFIED
+    model_alias: str = ROLE_SERVICE_MODEL_ALIAS_UNCONFIGURED
+    readiness_service: str = ROLE_SERVICE_READINESS_PENDING
+    can_start: bool = False
+    can_stop: bool = False
+    #: 原 start 的进程归属是否仍未释放（失败/过期/unknown 也可能仍持有活进程）。
+    #: 公开面只暴露布尔事实，不含 pid 之外的任何宿主内部记录。
+    ownership_held: bool = False
+    started_at: Optional[datetime] = None
+    stopped_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class RoleServiceLaunchCommandOut(BaseModel):
+    """claim 返回的**受限**启动事实（合同 §5.3）。
+
+    只含合同字段：``action``/``runtime``/``runner_id``/``model_alias``/``project_root``/
+    ``member_id``；**不**下发任意 shell 正文。宿主用本地登记的运行器入口组装 argv。
+    """
+
+    action: str
+    runtime: Optional[str] = None
+    runner_id: Optional[str] = None
+    model_alias: Optional[str] = None
+    project_root: Optional[str] = None
+    member_id: str
+    project_id: str
+
+
+class RoleServiceLaunchClaimOut(BaseModel):
+    """``POST /api/role-service-launches/{id}/claim`` 响应（合同 §5.3）。
+
+    ``owner_token`` 只在 **start** claim 返回一次；stop 只返回新的 ``claim_token``。
+    库里只存哈希，公共 GET/页面/日志不返回任何 token。
+    """
+
+    launch_id: str
+    project_id: str
+    member_id: str
+    action: str
+    generation: int
+    expected_instance_id: str
+    state: str
+    claimed_at: datetime
+    launch_expires_at: datetime
+    claim_host: Optional[str] = None
+    owner_token: Optional[str] = None
+    claim_token: str
+    command: RoleServiceLaunchCommandOut
+
+
+class RoleServiceLaunchReportOut(BaseModel):
+    """``POST /api/role-service-launches/{id}/report`` 的只读 receipt。
+
+    重放同一完整载荷时**只读**返回本 receipt，即使已过截止也不改当前状态。
+    """
+
+    launch_id: str
+    project_id: str
+    member_id: str
+    action: str
+    generation: int
+    state: str
+    outcome: Optional[str] = None
+    instance_id: Optional[str] = None
+    error_code: Optional[str] = None
+    reported_at: Optional[datetime] = None
+    observed_state: Optional[str] = None
+    replayed: bool = False
+
+
+class RoleServiceLaunchClaimRequest(BaseModel):
+    """claim 请求体（合同 §5.3）：``{host, expected_instance_id, owner_token?}``。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    host: str
+    expected_instance_id: str
+    owner_token: Optional[str] = None
+
+
+class RoleServiceLaunchReportRequest(BaseModel):
+    """report 请求体（合同 §5.3）。
+
+    ``extra="forbid"``；未知字段 422。校验顺序与稳定错误码全部在服务层实现。
+
+    ``spawned``（R1-3 返修新增，可选、向后兼容）是宿主对 ``start`` 失败的可验证区分：
+    ``true`` = 已 spawn（失败不释放原所有权），``false`` = 纯预检失败（可安全释放）。
+    旧宿主不传时按 ``pid is not None`` 回退判断。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    generation: int
+    action: str
+    claim_token: str
+    owner_token: Optional[str] = None
+    outcome: str
+    instance_id: Optional[str] = None
+    pid: Optional[int] = None
+    process_started_at: Optional[datetime] = None
+    host: str
+    error_code: Optional[str] = None
+    spawned: Optional[bool] = None
+
+
+class RoleServiceStartOut(BaseModel):
+    """``POST .../service/start`` 响应（合同 §5.3）：**不返回任何 token**。"""
+
+    project_id: str
+    member_id: str
+    role_name: Optional[str] = None
+    launch_id: str
+    generation: int
+    action: str = ROLE_SERVICE_ACTION_START
+    expected_instance_id: str
+    launch_expires_at: datetime
+    desired: str = ROLE_SERVICE_DESIRED_RUNNING
+    observed: str = ROLE_SERVICE_OBSERVED_STARTING
+
+
+class RoleServiceStopOut(BaseModel):
+    """``POST .../service/stop`` 响应（合同 §5.3）。"""
+
+    project_id: str
+    member_id: str
+    role_name: Optional[str] = None
+    launch_id: Optional[str] = None
+    generation: int
+    action: str = ROLE_SERVICE_ACTION_STOP
+    expected_instance_id: Optional[str] = None
+    launch_expires_at: Optional[datetime] = None
+    desired: str = ROLE_SERVICE_DESIRED_STOPPED
+    observed: str = ROLE_SERVICE_OBSERVED_STOPPING
+    idempotent_stopped: bool = False
+
+
+class RoleServiceStartAllRequest(BaseModel):
+    """``POST .../role-services/start-all`` 请求体（合同 §10.9）。
+
+    ``member_ids`` 缺省/``null`` = 本项目全部角色；给定则只处理该子集
+    （用于“只重试失败子集”）；出现跨项目或不存在 ID 时稳定拒绝。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    member_ids: Optional[list[str]] = None
+
+
+class RoleServiceStartAllMemberResult(BaseModel):
+    """批量启动的逐角色结果：部分失败不整体回滚（合同 §10.9）。
+
+    ``status`` 语义（R1-3 返修修正展示口径）：
+
+    - ``requested``：本次**成功写入启动请求**（pending launch），但还没有任何宿主执行，
+      ``observed`` 仍是 ``starting``/``readiness`` 仍是 ``pending``；
+    - ``ready``：本次检查时该角色已收敛为 ``running`` + ``readiness_service=ready``
+      （只有真实 ready 才算启动成功）；
+    - ``skipped_running``：已 ``starting/running``，不重复启动（不重复 spawn）；
+    - ``skipped_ownership_held``：失败/过期后原进程归属仍未释放，必须先关闭再重试；
+    - ``failed``：意图写被稳定拒绝（如 ``control_kind_not_managed``）。
+    """
+
+    member_id: str
+    role_name: Optional[str] = None
+    status: str
+    launch_id: Optional[str] = None
+    generation: Optional[int] = None
+    expected_instance_id: Optional[str] = None
+    error_code: Optional[str] = None
+
+
+class RoleServiceStartAllCounts(BaseModel):
+    """批量计数：``started`` 只统计**实际 ready**，``requested`` 是本次写入的启动请求数。
+
+    旧字段 ``started``/``skipped``/``failed`` 逐字保留（协议兼容），但语义按上面修正：
+    只写入意图**不**再计入 ``started``，而是计入新增的 ``requested``。
+    """
+
+    started: int = 0
+    requested: int = 0
+    skipped: int = 0
+    failed: int = 0
+
+
+class RoleServiceStartAllOut(BaseModel):
+    project_id: str
+    requested: list[str]
+    results: list[RoleServiceStartAllMemberResult]
+    counts: RoleServiceStartAllCounts = PydField(
+        default_factory=RoleServiceStartAllCounts
+    )
+
+
+class RoleServiceProjectionOut(ProjectRoleServiceOut):
+    """``GET /api/projects/{project_id}/role-services`` 的单条投影。"""
+
+    member_id: str
+    role_name: Optional[str] = None
+    archived: bool = False
 
 
 class ProjectRoleListItem(BaseModel):
@@ -3315,6 +3785,9 @@ class ProjectAgentOut(BaseModel):
     # 读取时实时计算，只描述配置事实，不改变 business_role / decision_tier / 任务权限。
     binding: Optional[RoleBindingOut] = None
     binding_state: Optional[str] = None
+    # 角色服务投影（R1-3）：附加字段，旧客户端忽略未知键即可。角色页的真实数据源是
+    # ``GET /agents``，所以受管服务状态必须在这里一并给出；未登记服务时为 ``null``。
+    service: Optional[ProjectRoleServiceOut] = None
     display_name: Optional[str]
     availability: str
     instances: list[AgentInstanceOut]
@@ -3331,6 +3804,7 @@ class ProjectAgentOut(BaseModel):
         role_description: Optional[str] = None,
         binding: Optional[RoleBindingOut] = None,
         binding_state: Optional[str] = None,
+        service: Optional[ProjectRoleServiceOut] = None,
     ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
@@ -3344,6 +3818,7 @@ class ProjectAgentOut(BaseModel):
             role_description=role_description,
             binding=binding,
             binding_state=binding_state,
+            service=service,
             display_name=display_name,
             availability=availability,
             instances=instances or [],

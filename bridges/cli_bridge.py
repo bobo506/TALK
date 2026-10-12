@@ -17,6 +17,7 @@ import socket
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Awaitable, Sequence
 from uuid import uuid4
@@ -112,6 +113,11 @@ def configure_talk_tool_environment(args: argparse.Namespace, member_id: str) ->
     os.environ["TALK_MEMBER_ID"] = member_id
     os.environ.pop("TALK_PROJECT_ID", None)
     _clear_deprecated_decision_tier_env()
+    # R1-3：受管启动时由宿主显式给出的 project_id 优先（与本次 launch 关联一致）。
+    managed_project_id = str(getattr(args, "project_id", None) or "").strip()
+    if managed_project_id:
+        os.environ["TALK_PROJECT_ID"] = managed_project_id
+        return
     project_root = getattr(args, "project", None)
     if not project_root:
         return
@@ -124,6 +130,79 @@ def configure_talk_tool_environment(args: argparse.Namespace, member_id: str) ->
     project_id = str(project.get("project_id") or "").strip()
     if project_id:
         os.environ["TALK_PROJECT_ID"] = project_id
+
+
+def resolve_bridge_api_key(args: argparse.Namespace) -> str:
+    """Resolve the bridge API key from argv, key file or environment.
+
+    角色生命周期 R1-3：受管新入口用 ``--key-file``/``TALK_ROLE_API_KEY`` 传递凭据**路径**，
+    避免把明文 Key 塞进 argv。旧 ``--key`` 兼容入口保持可用，优先级最高。
+    """
+    value = str(getattr(args, "key", None) or "").strip()
+    if value:
+        return value
+    key_file = str(getattr(args, "key_file", None) or "").strip()
+    if key_file:
+        try:
+            data = Path(key_file).expanduser().read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise SystemExit("bridge key file is not readable") from exc
+        if data:
+            return data
+    env_key = str(os.environ.get("TALK_ROLE_API_KEY") or "").strip()
+    if env_key:
+        return env_key
+    raise SystemExit("one of --key, --key-file or TALK_ROLE_API_KEY is required")
+
+
+def parse_managed_started_at(value: object) -> datetime | None:
+    """解析宿主给出的 ``--process-started-at``（受管身份提示，只作诊断/核对）。"""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed
+
+
+def build_instance_report_payload(
+    *,
+    runtime: str,
+    status: str,
+    host: str | None,
+    pid: int | None,
+    current_task_id: str | None = None,
+    last_error: str | None = None,
+    project_id: str | None = None,
+    launch_id: str | None = None,
+    process_started_at: datetime | None = None,
+) -> dict[str, Any]:
+    """实例上报载荷（R1-3 受管关联是可选的附加字段）。
+
+    **没有** ``launch_id`` 时返回与旧路径逐字段相同的载荷：现有非受管 bridge/MCP
+    的心跳行为完全不变；只有宿主显式传入 ``--launch-id`` 时才附加
+    ``launch_id``/``project_id``/``process_started_at``，供服务端做本次启动的
+    预分配实例匹配与四条件就绪判定。
+    """
+    payload: dict[str, Any] = {
+        "runtime": runtime,
+        "status": status,
+        "host": host,
+        "pid": pid,
+        "current_task_id": current_task_id,
+        "last_error": last_error,
+    }
+    if launch_id:
+        payload["launch_id"] = launch_id
+        if project_id:
+            payload["project_id"] = project_id
+        if process_started_at is not None:
+            payload["process_started_at"] = process_started_at.isoformat()
+    return payload
 
 
 CHINESE_REQUEST_MARKERS = ("中文", "汉语", "普通话", "简体中文", "用中文")
@@ -3552,6 +3631,9 @@ async def run_bridge(args: argparse.Namespace) -> None:
     # is never injected into prompts or the child environment.
     args.decision_tier = getattr(args, "decision_tier", None)
     _clear_deprecated_decision_tier_env()
+    # R1-3：``--key-file``/``TALK_ROLE_API_KEY`` 与旧 ``--key`` 统一解析成内存里的 Key；
+    # 明文 Key 不写日志、不进 argv 之外的任何输出。
+    args.key = resolve_bridge_api_key(args)
     configure_talk_tool_environment(args, member_id)
     workdir = Path(args.workdir).expanduser().resolve()
     args.task_preflight_command = resolve_task_preflight_command(args)
@@ -3559,6 +3641,11 @@ async def run_bridge(args: argparse.Namespace) -> None:
     await client.register(member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})")
     instance_id = args.instance_id or f"{member_id}:{uuid4()}"
     host = socket.gethostname()
+    # R1-3 受管关联：只有宿主显式传入 ``--launch-id`` 时才附加 project/launch/进程身份，
+    # 现有非受管 bridge 的实例上报载荷与行为完全不变。
+    managed_launch_id = str(getattr(args, "launch_id", None) or "").strip() or None
+    managed_project_id = str(getattr(args, "project_id", None) or "").strip() or None
+    managed_started_at = parse_managed_started_at(getattr(args, "process_started_at", None))
 
     async def report_status(
         status: str,
@@ -3566,6 +3653,22 @@ async def run_bridge(args: argparse.Namespace) -> None:
         current_task_id: str | None = None,
         last_error: str | None = None,
     ) -> None:
+        if managed_launch_id:
+            payload = build_instance_report_payload(
+                runtime=args.runtime,
+                status=status,
+                host=host,
+                pid=os.getpid(),
+                current_task_id=current_task_id,
+                last_error=last_error,
+                project_id=managed_project_id,
+                launch_id=managed_launch_id,
+                process_started_at=managed_started_at,
+            )
+            await client._request_json(
+                "PUT", f"/api/instances/{instance_id}", json_body=payload
+            )
+            return
         await client.report_instance_status(
             instance_id,
             runtime=args.runtime,
@@ -3650,10 +3753,34 @@ def build_parser(
 ) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--name", default=default_name, help=f"Agent name or full member id. Default: {default_name}")
-    parser.add_argument("--key", required=True, help="API key for this bridge member")
+    parser.add_argument("--key", required=False, default=None, help="API key for this bridge member")
+    parser.add_argument(
+        "--key-file",
+        default=None,
+        help="File holding this bridge member's API key (R1-3 managed entry; keeps the "
+        "plaintext key out of argv). Used only when --key is absent.",
+    )
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--display-name", default=None)
     parser.add_argument("--instance-id", default=None)
+    parser.add_argument(
+        "--project-id",
+        default=None,
+        help="TALK project_id bound to this managed launch (R1-3). Overrides the id "
+        "derived from --project when set.",
+    )
+    parser.add_argument(
+        "--launch-id",
+        default=None,
+        help="Managed role-service launch this instance belongs to (R1-3). Unset keeps "
+        "the legacy instance payload unchanged.",
+    )
+    parser.add_argument(
+        "--process-started-at",
+        default=None,
+        help="ISO timestamp of this process start, supplied by the host manager (R1-3 "
+        "managed association only).",
+    )
     parser.add_argument("--runtime", default=default_runtime, help=f"Runtime label reported to TALK. Default: {default_runtime}")
     parser.add_argument("--bridge-label", default=default_bridge_label, help="Human-readable label used in error replies")
     parser.add_argument("--workdir", default=".", help="Working directory passed to the CLI command")

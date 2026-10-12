@@ -305,7 +305,12 @@ class ProjectRoleApiTests(RoleApiTestCase):
         self.assertEqual(role["identity"], "managed")
         self.assertTrue(role["identity_exclusive"])
         self.assertFalse(role["archived"])
-        self.assertIsNone(role["service"])
+        # R1-3：``service`` 不再是 R1-1 的恒 null，而是真实只读投影；新角色无状态行时
+        # 如实报告默认 stopped / not_started，且不返回 token/argv/绝对路径。
+        self.assertEqual(role["service"]["desired"], "stopped")
+        self.assertEqual(role["service"]["observed"], "not_started")
+        self.assertIsNone(role["service"]["current_launch"])
+        self.assertFalse(role["service"]["can_start"])
         self.assertEqual(role["model"]["choice_id"], self.choice_id)
         self.assertEqual(role["model"]["choice_source"], "creation_operation")
         self.assertFalse(role["model"]["choice_binding_mismatch"])

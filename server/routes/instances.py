@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
@@ -10,13 +11,27 @@ from sqlmodel import Session, select
 from server.auth import get_current_member
 from server.db import begin_immediate_write, get_session
 from server.models import (
+    ROLE_SERVICE_ACTION_START,
+    ROLE_SERVICE_ERROR_EXPECTED_INSTANCE_MISMATCH,
+    ROLE_SERVICE_ERROR_IDENTITY_MISMATCH,
+    ROLE_SERVICE_ERROR_INSTANCE_LAUNCH_IMMUTABLE,
+    ROLE_SERVICE_ERROR_LAUNCH_ACTION_MISMATCH,
+    ROLE_SERVICE_ERROR_LAUNCH_EXPIRED,
+    ROLE_SERVICE_ERROR_LAUNCH_NOT_FOUND,
+    ROLE_SERVICE_ERROR_LAUNCH_NOT_PENDING,
+    ROLE_SERVICE_LAUNCH_CLAIMED,
+    ROLE_SERVICE_LAUNCH_EXPIRED,
+    ROLE_SERVICE_LAUNCH_PENDING,
+    ROLE_SERVICE_LAUNCH_REPORTED,
     AgentInstance,
     AgentInstanceOut,
     AgentInstanceUpdate,
     Member,
     ProjectAgent,
     ProjectRole,
+    RoleServiceLaunch,
 )
+from server.role_services import _as_utc, note_instance_launch_evidence
 
 router = APIRouter(prefix="/api/instances", tags=["instances"])
 
@@ -37,6 +52,71 @@ def _project_declaration_allowed(
         return False
     role = session.get(ProjectRole, (project_id, member_id))
     return not (role is not None and role.archived_at is not None)
+
+
+def _authorize_launch_first_binding(
+    launch_id: str,
+    instance_id: str,
+    project_id: Optional[str],
+    current: Member,
+    session: Session,
+    now: datetime,
+) -> None:
+    """R1-3：实例**首次**绑定非空 ``launch_id`` 的真实校验（合同 §10.4）。
+
+    替换 R1-1 的 ``instance_launch_not_supported`` 阶段拒绝。首次关联必须同时满足：
+
+    - launch 行真实存在，且 ``action='start'``；
+    - ``launch.expected_instance_id == instance_id``（**预分配**的新实例，不允许用
+      另一个恰好同 member 的旧实例顶替）；
+    - ``member_id``/``project_id`` 一致；
+    - 已 claim（``claim_member_id``/``claimed_at`` 已建立）且未过截止；``reported``
+      也算合法（“报告先到、实例后到”同样要能收敛）；
+    - 已存在非空 ``launch_id`` 的实例在调用方已按 ``instance_launch_immutable`` 拒绝，
+      **legacy 旧实例不能重新贴标签**；不新增 ``instance.generation`` 列。
+    """
+    launch = session.get(RoleServiceLaunch, launch_id)
+    if launch is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ROLE_SERVICE_ERROR_LAUNCH_NOT_FOUND,
+        )
+    if launch.action != ROLE_SERVICE_ACTION_START:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ROLE_SERVICE_ERROR_LAUNCH_ACTION_MISMATCH,
+        )
+    if launch.member_id != current.id or launch.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ROLE_SERVICE_ERROR_IDENTITY_MISMATCH,
+        )
+    if launch.expected_instance_id != instance_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ROLE_SERVICE_ERROR_EXPECTED_INSTANCE_MISMATCH,
+        )
+    if launch.state == ROLE_SERVICE_LAUNCH_PENDING or launch.claimed_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ROLE_SERVICE_ERROR_LAUNCH_NOT_PENDING,
+        )
+    expires_at = _as_utc(launch.launch_expires_at)
+    if launch.state == ROLE_SERVICE_LAUNCH_EXPIRED or (
+        expires_at is not None and now > expires_at
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ROLE_SERVICE_ERROR_LAUNCH_EXPIRED,
+        )
+    if launch.state not in (
+        ROLE_SERVICE_LAUNCH_CLAIMED,
+        ROLE_SERVICE_LAUNCH_REPORTED,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ROLE_SERVICE_ERROR_LAUNCH_NOT_PENDING,
+        )
 
 
 @router.put("/{instance_id}", response_model=AgentInstanceOut)
@@ -102,13 +182,25 @@ def upsert_instance_status(
             )
         effective_launch_id = existing.launch_id
     else:
-        if "launch_id" in provided and body.launch_id is not None:
-            # R1-1：服务协议与 launch 表尚未实施，不用裸字符串冒充启动证据。
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="instance_launch_not_supported",
-            )
         effective_launch_id = None
+        if "launch_id" in provided and body.launch_id is not None:
+            if existing is not None:
+                # 已经存在的实例（含 legacy 行）**不能**被重新贴上本次 launch_id：
+                # 首次关联只允许在“本次请求新建该实例行”时发生（合同 §10.4 / I49）。
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ROLE_SERVICE_ERROR_INSTANCE_LAUNCH_IMMUTABLE,
+                )
+            # R1-3：接通真实 launch 存在/领取/实例匹配校验（合同 §10.4）。
+            _authorize_launch_first_binding(
+                body.launch_id,
+                instance_id,
+                effective_project_id,
+                current,
+                session,
+                now,
+            )
+            effective_launch_id = body.launch_id
 
     instance = existing or AgentInstance(
         id=instance_id,
@@ -137,6 +229,10 @@ def upsert_instance_status(
     instance.last_seen_at = now
 
     session.add(instance)
+    # R1-3：本次预分配实例的**首次证据**（claim 之后、截止之前的新心跳）与四条件
+    # 就绪收敛都在同一写事务内完成；实例先到/报告先到都能收敛，旧心跳不产生就绪。
+    if instance.launch_id:
+        note_instance_launch_evidence(session, instance, now=now)
     session.commit()
     session.refresh(instance)
     return instance

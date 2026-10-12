@@ -7,7 +7,9 @@
 - ``project_id`` 一旦非空不可改写/清空（``409 instance_project_immutable``）；
   首次声明要求名册行存在且角色未归档（``422 instance_project_not_in_roster``）；
 - ``launch_id`` 一旦非空不可改写/清空（``409 instance_launch_immutable``）；
-  R1-1 首次非空关联统一 ``422 instance_launch_not_supported``（夹具预置值可同值重复/省略保持）；
+  R1-3 起首次非空关联走真实 launch 校验（未知 launch ``409 launch_not_found``），
+  R1-1 的阶段占位拒绝 ``instance_launch_not_supported`` 已按合同 §10.4 替换；
+  夹具预置值仍可同值重复/省略保持；
 - ``GET /api/instances?project_id=`` 附加过滤，旧参数与跨成员 403 行为不变；
 - 公共输出不含任何凭据/路径字段。
 
@@ -237,19 +239,31 @@ class InstanceProjectDimensionTests(RouteTestCase):
 
     # ── launch 关联 ────────────────────────────────────────────────
 
-    def test_first_non_empty_launch_is_unsupported_in_r1_1(self):
-        for instance_id, seeded in (("worker-1", False), ("seeded-1", True)):
-            if seeded:
-                self.seed_instance()
-            with self.subTest(instance_id=instance_id):
-                response = self.put_instance(
-                    instance_id,
-                    {"runtime": "dsh", "status": "idle", "launch_id": "launch-x"},
-                )
-                self.assertEqual(response.status_code, 422)
-                self.assertEqual(
-                    response.json()["detail"], "instance_launch_not_supported"
-                )
+    def test_first_non_empty_launch_requires_a_real_claimed_launch(self):
+        """R1-3 替换 R1-1 的阶段拒绝：首次关联必须是**本次新建**且命中真实 launch。
+
+        R1-1 曾统一 ``422 instance_launch_not_supported``；R1-3 接通真实
+        launch 存在/领取/实例匹配校验后：
+
+        - 新实例（本次请求建行）带未知 launch → ``409 launch_not_found``；
+        - **已存在**的实例（含 legacy 行）不允许重新贴标签 → ``409 instance_launch_immutable``
+          （合同 §10.4 / I49）。
+        """
+        response = self.put_instance(
+            "worker-1",
+            {"runtime": "dsh", "status": "idle", "launch_id": "launch-x"},
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"], "launch_not_found")
+
+        self.seed_instance()
+        relabel = self.put_instance(
+            "seeded-1",
+            {"runtime": "dsh", "status": "idle", "launch_id": "launch-x"},
+        )
+        self.assertEqual(relabel.status_code, 409)
+        self.assertEqual(relabel.json()["detail"], "instance_launch_immutable")
+        self.assertIsNone(self.instance_row("seeded-1").launch_id)
 
     def test_preset_non_empty_launch_is_immutable(self):
         self.seed_instance(launch_id="launch-preset-1", project_id=PROJECT_ID)

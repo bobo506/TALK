@@ -448,6 +448,50 @@ def init_db() -> None:
                 "ALTER TABLE role_provision_jobs "
                 "ADD COLUMN credential_version INTEGER NOT NULL DEFAULT 1"
             )
+        # 角色生命周期 R1-3（合同 §4.1.5/§4.1.6/§4.4）：两张服务生命周期表由
+        # ``SQLModel.metadata.create_all`` 建表（旧库同样只新增表），这里补齐幂等索引。
+        # 索引幂等、不重建表、不改列类型、不回填旧行，重复 ``init_db()`` 无副作用。
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_role_service_launches_generation "
+            "ON role_service_launches (project_id, member_id, generation)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_service_launches_state_expiry "
+            "ON role_service_launches (state, launch_expires_at)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_service_launches_role "
+            "ON role_service_launches (project_id, member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_service_launches_project_id "
+            "ON role_service_launches (project_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_service_launches_member_id "
+            "ON role_service_launches (member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_service_state_member_id "
+            "ON role_service_state (member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_service_state_current_launch_id "
+            "ON role_service_state (current_launch_id)"
+        )
+        # R1-3 返修 F2：``role_service_state`` 需要区分“宿主已 spawn 的失败”与
+        # “纯预检失败的失败”。旧库只增量补一个可空列，不回填、不改旧行；旧行按
+        # ``NULL``（未知）解释，报告时回退按 pid 判断。重复 init_db() 无副作用。
+        state_columns = {
+            row[1]
+            for row in conn.exec_driver_sql(
+                "PRAGMA table_info(role_service_state)"
+            ).fetchall()
+        }
+        if "spawned" not in state_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE role_service_state ADD COLUMN spawned BOOLEAN"
+            )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_target_member_id ON agent_tasks (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_created_by ON agent_tasks (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_status ON agent_tasks (status)")

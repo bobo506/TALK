@@ -323,21 +323,20 @@ class RoleRotationTests(RoleApiTestCase):
             session.commit()
         self.assertEqual(self.rotate_key("prj_alpha", self.member_id).status_code, 200)
 
-    def test_future_service_state_table_is_honored_when_present(self):
+    def test_service_state_in_use_is_honored(self):
+        """R1-3 起 ``role_service_state`` 是**真实表**：在用服务必须拒绝轮换。
+
+        R1-1 时该表尚不存在，所以旧用例用一条 ``CREATE TABLE`` 模拟“未来表”；
+        R1-3 已按合同 §4.1.5 建表并写入真实状态行，这里直接构造真实在用事实。
+        """
         with self.session() as session:
             session.execute(
                 text(
-                    "CREATE TABLE role_service_state ("
-                    "project_id TEXT NOT NULL, member_id TEXT NOT NULL, "
-                    "desired_state TEXT NOT NULL, observed_state TEXT NOT NULL, "
-                    "PRIMARY KEY (project_id, member_id))"
-                )
-            )
-            session.execute(
-                text(
                     "INSERT INTO role_service_state (project_id, member_id, "
-                    "desired_state, observed_state) VALUES "
-                    "('prj_alpha', :member_id, 'running', 'running')"
+                    "desired_state, observed_state, manager_kind, control_kind, "
+                    "generation, updated_at) VALUES "
+                    "('prj_alpha', :member_id, 'running', 'running', "
+                    "'cli_process', 'managed_cli', 1, datetime('now'))"
                 ),
                 {"member_id": self.member_id},
             )

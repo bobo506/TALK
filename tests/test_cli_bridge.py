@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from bridges import cli_bridge
@@ -4472,6 +4473,91 @@ class BuildGroupMemberContextTests(unittest.TestCase):
         self.assertIn(("@agent:pi 你好，Codex 向你问好", ["agent:pi"], 80, "group:lab"), client.sent)
         # demand turn 已写入账本
         self.assertEqual(client.turns, [(9, 82, "greeting", "agent:pi", "demand", 1)])
+
+
+class ManagedLaunchAssociationTests(unittest.TestCase):
+    """R1-3：受管启动关联参数与凭据文件（旧 ``--key`` 入口保持兼容）。"""
+
+    def test_legacy_key_argument_still_works(self):
+        parser = build_parser()
+        args = parser.parse_args(["--key", "k", "--command", "run"])
+        self.assertEqual(cli_bridge.resolve_bridge_api_key(args), "k")
+
+    def test_key_file_and_env_are_accepted_without_plaintext_argv(self):
+        parser = build_parser()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            key_path = Path(temp_dir) / "role.key"
+            key_path.write_text("file-key\n", encoding="utf-8")
+            args = parser.parse_args(
+                ["--key-file", str(key_path), "--command", "run"]
+            )
+            self.assertIsNone(args.key)
+            self.assertEqual(cli_bridge.resolve_bridge_api_key(args), "file-key")
+
+        with unittest.mock.patch.dict(
+            os.environ, {"TALK_ROLE_API_KEY": "env-key"}, clear=False
+        ):
+            args = parser.parse_args(["--command", "run"])
+            self.assertEqual(cli_bridge.resolve_bridge_api_key(args), "env-key")
+
+        args = parser.parse_args(["--command", "run"])
+        with self.assertRaises(SystemExit):
+            cli_bridge.resolve_bridge_api_key(args)
+
+    def test_managed_parser_options_are_exposed(self):
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "--key",
+                "k",
+                "--command",
+                "run",
+                "--project-id",
+                "prj_alpha",
+                "--launch-id",
+                "launch-1",
+                "--process-started-at",
+                "2026-10-11T00:00:00+00:00",
+            ]
+        )
+        self.assertEqual(args.project_id, "prj_alpha")
+        self.assertEqual(args.launch_id, "launch-1")
+        self.assertEqual(
+            cli_bridge.parse_managed_started_at(args.process_started_at).year, 2026
+        )
+
+    def test_report_payload_is_unchanged_without_managed_launch(self):
+        payload = cli_bridge.build_instance_report_payload(
+            runtime="dsh",
+            status="idle",
+            host="host-a",
+            pid=123,
+        )
+        self.assertEqual(
+            set(payload),
+            {"runtime", "status", "host", "pid", "current_task_id", "last_error"},
+        )
+        self.assertNotIn("launch_id", payload)
+        self.assertNotIn("project_id", payload)
+        self.assertNotIn("process_started_at", payload)
+
+    def test_report_payload_carries_managed_association_only_when_bound(self):
+        started = cli_bridge.parse_managed_started_at("2026-10-11T00:00:00+00:00")
+        payload = cli_bridge.build_instance_report_payload(
+            runtime="dsh",
+            status="idle",
+            host="host-a",
+            pid=123,
+            project_id="prj_alpha",
+            launch_id="launch-1",
+            process_started_at=started,
+        )
+        self.assertEqual(payload["launch_id"], "launch-1")
+        self.assertEqual(payload["project_id"], "prj_alpha")
+        self.assertEqual(payload["process_started_at"], "2026-10-11T00:00:00+00:00")
+        # 受管关联不改变既有字段集合。
+        self.assertEqual(payload["runtime"], "dsh")
+        self.assertEqual(payload["status"], "idle")
 
 
 if __name__ == "__main__":

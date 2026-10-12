@@ -1,9 +1,9 @@
 # 项目角色创建与服务生命周期：实施计划（R0 正式实施计划 v4）
 
-> 状态：**R0 v4、R1-1 与 R1-2 已发布并独立复核通过**（2026-10-11）。R1-2 经 #218–#221 补正、Codex 定向修复及 #222 独立复核整链收取，配置API/宿主脚本与固定分级迁移完成。用户已确认三项页面基础人工验收通过，当前门禁释放；下一片R1-3受管CLI服务生命周期；真实运行器能力待验。
+> 状态：**R0 v4、R1-1、R1-2与R1-3代码已独立通过**（2026-10-12）。R1-2基础页面人工验收通过；R1-3经#223/#224返修、Codex两轮定向修正及#225/#226独立复核，整链已收取，受管CLI/API/页面启停基础完成，当前暂停等待R1-3页面人工验收。真实原生能力未验，R1-4/I-4后置。
 > 正式位置：`docs/spec/ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md`；合同见同目录 [ROLE_LIFECYCLE_DESIGN.md](ROLE_LIFECYCLE_DESIGN.md)。
 > 修订基线：`5b18c8e7c2eb85fb6737d7c9c89713adf6021ef7`（#215 派发时实际 HEAD，工作区干净，正式源码未变）。
-> R0 发布时仅修改文档；原213–222草稿、结果与失败保持。R1-1/R1-2代码已独立通过；未执行生产角色配置、数据库迁移/重载或运行器操作。
+> R0发布时仅修改文档；原213–226草稿、结果与失败保持。R1-1至R1-3代码已独立通过；未执行生产角色配置、数据库迁移/重载或原生运行器操作。R1-3实际进程证据仅为隔离固定文本子进程。
 > #215 修正点（详见 `R1_R5_CLOSURE_INDEX.md`）：R1-1 创建改为**单写事务 TX-ALL**（无 `pending`/`failed` 残行）；权限读路径加名册/角色门控（R2）；`rotate-key` 加独占证明（R3）；宿主协议补齐 action/token/`expected_instance_id`/`launch_expires_at`（R4）；第一片保持 `server/` 范围、`cli/talk.py scan_agents` 移 R1-2、claim 守卫归属写清、`choice_id` 投影来源定死（R5）。
 
 ---
@@ -215,10 +215,11 @@ GET  /api/instances?project_id=...     // 附加过滤，缺省行为不变
 
 ### R1-3 CLI 受管服务生命周期
 
-- 新增 `role_service_state`/`role_service_launches`（设计 §4.1.5/§4.1.6）；宿主脚本 `scripts/role_service_host.py`（start/stop/start-all/status，claim/report，所有权 token，就绪轮询，活句柄 + `(pid, process_started_at)` 身份核对）。
+- 已新增 `role_service_state`/`role_service_launches`（设计 §4.1.5/§4.1.6）；宿主脚本 `scripts/role_service_host.py serve`常驻持有/执行，start/stop/start-all只写请求，status只读；claim/report、所有权token、就绪轮询、活句柄与实际OS `(pid, process_started_at)`核对已验。
 - 服务端：设计 §5.3 六个入口；权限 human-only 写、agent 只领取/回报自己的 launch；只存期望/世代/观测，不 spawn 进程。
-- 能力矩阵：只对 `control_kind=managed_cli` 且实际核验通过的运行器开放启动按钮。
+- 能力矩阵：页面按`managed_cli`与服务投影允许请求；宿主另核三档/本人Key/choice与绑定指纹、真实入口argv及能力登记，未经原生核验配方稳定拒绝。按钮可用不自证实际模型/隔离能力。
 - 验收：跳过已运行、逐角色结果、部分失败定向重试、单独停服不影响他人、`generation` 并发互斥、**本次 `expected_instance_id` + `launch_id` + 世代 + 时间窗（`claimed_at ≤ report ≤ launch_expires_at`）四条件就绪**、report 必须携带并核验 claim/owner token + 领取身份 + host、旧世代/旧动作迟到 `stale_report`、旧心跳不救场、`start`/`stop` 动作分离与停止 `stopped`/`failed` 回报闭环、实例项目与 launch 关联不可变、旧 launch 超时不污染新世代、PID 复用不误认领/不误杀；**真实运行器验证保持 `not_run`**。
+- #223/#224原失败与partial经Codex修正、#225/#226独立复核闭合，任务整链已收取。最终独立host28项/服务55项全通过，真实回环4项、旧源码负向5/6检出；Codex最终探针及原始日志互证。正式[服务合同](ROLE_SERVICE_CONTRACT.md)/[人工验收指南](../guides/ROLE_SERVICE_ACCEPTANCE.md)已同步。当前暂停人工页面验收，不开始R1-4。
 
 ### R1-4 外部桌面会话、删除与退出边界
 
