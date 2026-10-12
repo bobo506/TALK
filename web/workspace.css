@@ -240,7 +240,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 @media(max-width:700px){.role-binding-head h3 {font-size:19px;} .role-binding-list {grid-template-columns:minmax(86px,auto) minmax(0,1fr); gap:8px 12px; font-size:14px;} .role-binding-guide {padding:9px 10px;}}
 
 /* R1-3 受管 CLI 服务（2026-10-11 页面验收反馈修正）：列表条目内只有一个当前状态标签，
-   与启动/关闭操作同组；控制块是角色行的同级兄弟节点，不再用负外边距压线，也不再自带横线。
+   启动/关闭操作仅在详情提供；状态块是角色行的同级兄弟节点，不用负外边距压线，也不自带横线。
    角色行本身是 <button>，控制块不能在它内部（避免按钮嵌套）。 */
 .role-service-controls {margin:0; padding:14px 0 0; border:0;}
 .role-service-detail-controls {padding:0;}

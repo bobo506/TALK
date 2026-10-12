@@ -1003,19 +1003,16 @@ function roleServiceControl(role) {
   if (view.error) hint = view.error;
   return { view, status, busy, batchBusy, human, kind, observed, managed, ownershipHeld, canStart, canStop, hint };
 }
-// 列表行是 <button>，不能在内部再嵌套按钮；服务控制作为角色行的同级块渲染，保持行结构不变。
-// 页面验收反馈：列表每个角色只展示**一个**当前服务状态标签（不做全部可选状态并列加深），
-// 启动/关闭是与状态同组的操作按钮，不伪装成状态选项；详情区不再重复状态标签。
+// 角色列表只显示当前服务状态；启动/关闭操作仅放在角色详情。
 function workspaceRoleServiceStateLabel(status) {
   return workspaceEl("span", `role-service-state ${status.kind}`, status.text);
 }
-function workspaceRoleServiceActions(role, className, showState) {
+function workspaceRoleServiceActions(role, className) {
   const control = roleServiceControl(role);
   if (!control.view.provided) return null;
   const box = workspaceEl("div", className);
   if (control.view.memberId) box.dataset.memberId = control.view.memberId;
   const row = workspaceEl("div", "role-service-row");
-  if (showState) row.appendChild(workspaceRoleServiceStateLabel(control.status));
   const start = workspaceButton("启动", event => { event?.stopPropagation?.(); startRoleService(control.view.memberId); }, "role-service-button role-service-start");
   start.disabled = !control.canStart;
   start.setAttribute("aria-label", `启动 ${workspaceMemberName(control.view.memberId)} 的服务`);
@@ -1030,7 +1027,13 @@ function workspaceRoleServiceActions(role, className, showState) {
   return box;
 }
 function workspaceRoleServiceControls(role, className = "role-service-controls") {
-  return workspaceRoleServiceActions(role, className, true);
+  const control = roleServiceControl(role);
+  if (!control.view.provided) return null;
+  const box = workspaceEl("div", className);
+  if (control.view.memberId) box.dataset.memberId = control.view.memberId;
+  box.appendChild(workspaceRoleServiceStateLabel(control.status));
+  if (control.hint) box.appendChild(workspaceEl("p", "role-service-hint", control.hint));
+  return box;
 }
 function workspaceRoleServicePanel(role) {
   const control = roleServiceControl(role);
@@ -1040,7 +1043,7 @@ function workspaceRoleServicePanel(role) {
   const head = workspaceEl("div", "role-service-head");
   head.appendChild(workspaceEl("h3", "", "受管 CLI 服务"));
   section.appendChild(head);
-  const controls = workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls", false);
+  const controls = workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls");
   if (controls) section.appendChild(controls);
   return section;
 }

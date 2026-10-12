@@ -216,6 +216,14 @@ function harness({ human = true, roster = [] } = {}) {
   const batchFeedbackBox = () => getEl('role-service-batch-feedback');
   const roleRow = memberId => rows().find(row => String(row.className).includes('role-row')
     && !String(row.className).includes('role-settings-row') && allTexts(row).some(t => t.includes(memberId)));
+  // 沿真实角色选择入口打开详情，逐角色操作只从详情获取。
+  const actionsFor = memberId => {
+    if (context.__workspaceUI.selectedRole !== memberId || context.__workspaceUI.roleSelection !== 'role') {
+      roleRow(memberId)?.fire('click');
+    }
+    return findAll(getEl('role-details-name-panel'), node =>
+      String(node.className).includes('role-service-detail-controls') && node.dataset.memberId === memberId)[0];
+  };
 
   const api = {
     context,
@@ -227,8 +235,8 @@ function harness({ human = true, roster = [] } = {}) {
     controlsFor,
     state: memberId => stateOf(controlsFor(memberId)),
     hint: memberId => hintOf(controlsFor(memberId)),
-    startBtn: memberId => buttonIn(controlsFor(memberId), '启动'),
-    stopBtn: memberId => buttonIn(controlsFor(memberId), '关闭'),
+    startBtn: memberId => buttonIn(actionsFor(memberId), '启动'),
+    stopBtn: memberId => buttonIn(actionsFor(memberId), '关闭'),
     batchBox,
     batchFeedbackBox,
     startAllBtn: () => buttonIn(batchBox(), '全部启动'),
@@ -583,7 +591,7 @@ test('搜索框在角色重绘与任务切换后保持连接及原输入监听',
   }
 });
 
-test('列表条目：每个角色只有一个当前状态标签，启动/关闭与之同组且不并列全部状态', async () => {
+test('列表条目：只显示当前状态，不出现启动/关闭两个按钮', async () => {
   const h = harness({
     roster: [
       { member_id: 'agent:a', business_role: 'dev', service: serviceRow({ can_start: true }) },
@@ -597,12 +605,9 @@ test('列表条目：每个角色只有一个当前状态标签，启动/关闭�
     assert.ok(box, `${memberId} 渲染服务控制块`);
     const states = findAll(box, n => String(n.className).includes('role-service-state'));
     assert.equal(states.length, 1, `${memberId} 只展示一个当前状态标签`);
-    // 操作按钮与状态同组，且不被当成状态选项（没有 aria-pressed 伪装成可切换状态）。
+    // 用户所指“未启动、启动、关闭”只保留当前状态，操作仅在详情。
     const buttons = findAll(box, n => n.tagName === 'button').map(n => n.textContent);
-    assert.deepEqual(buttons, ['启动', '关闭'], `${memberId} 状态旁只有启动/关闭两个操作`);
-    for (const button of findAll(box, n => n.tagName === 'button')) {
-      assert.equal(button.attrs['aria-pressed'], undefined, '操作按钮不伪装成状态选项');
-    }
+    assert.deepEqual(buttons, [], `${memberId} 的列表状态旁不再有启动/关闭`);
     // 条目化：角色行与服务控制同属一个 .role-entry，状态标签不出现在角色行按钮内部。
     const entry = h.rows().find(node => String(node.className).includes('role-entry')
       && findAll(node, n => String(n.className).includes('role-service-controls')).length === 1

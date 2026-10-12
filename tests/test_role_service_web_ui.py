@@ -13,7 +13,7 @@ from pathlib import Path
 from tests.test_support import RouteTestCase
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261011-role-lifecycle-r1-3-ui-fix"
+STATIC_VERSION = "20261012-role-service-list-status"
 
 #: 设计 §5.3 的六个入口里，页面只允许调用 human 意图写与只读投影这四个。
 PAGE_API_PATHS = (
@@ -78,9 +78,9 @@ class RoleServiceWebUiTests(RouteTestCase):
     def test_service_status_label_only_rendered_in_the_role_list(self):
         """列表只展示一个当前状态标签；角色详情不再重复状态标签。"""
         self.assertIn('function workspaceRoleServiceStateLabel(status)', self.script)
-        self.assertIn('function workspaceRoleServiceActions(role, className, showState)', self.script)
-        self.assertIn('return workspaceRoleServiceActions(role, className, true);', self.script)
-        self.assertIn('workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls", false)', self.script)
+        self.assertIn('function workspaceRoleServiceActions(role, className)', self.script)
+        self.assertIn('box.appendChild(workspaceRoleServiceStateLabel(control.status));', self.script)
+        self.assertIn('workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls")', self.script)
         # 详情面板函数体内不得再挂状态标签（只保留标题、说明、操作与提示）。
         panel = self.script.split("function workspaceRoleServicePanel(role) {", 1)[1]
         self.assertNotIn("role-service-state", panel.split("\nfunction ", 1)[0])

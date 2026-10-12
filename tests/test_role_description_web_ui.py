@@ -8,7 +8,7 @@ from tests.test_support import RouteTestCase
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # R1-2：本片改动 workspace.js/app.js，四处静态资源版本整体 bump（仓库约定“四处一致”）。
-STATIC_VERSION = "20261011-role-lifecycle-r1-3-ui-fix"
+STATIC_VERSION = "20261012-role-service-list-status"
 
 
 class RoleDescriptionWebUiTests(RouteTestCase):
