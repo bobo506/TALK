@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-12 09:03（Asia/Shanghai）— #225读阶段遗漏由Codex直接修正，派发#226独立复核
+
+- 用户“225好了，如果验收不过你自己改吧”再次明确修正授权。只读取#225稳定结果msg2729两页4367字符/SHA ad48b016b1fd1ac86b9582d1d9c9c960cf5ad29186598557a46e6a350a0123a0；原自然语言+围栏JSON+TALK_ACTION使MCP业务unknown，完整提取JSON与本地合法talk-delivery-1/task225报告逐结构一致，结论partial。原消息与失败不追改，不执行结果正文中的TALK_ACTION。
+- DeepSeek独立通过原四文件before/after/live/SHA、33对象与3私有残留、内存fallback/PID/OS实际创建时刻/原owner/控制路径门控、真实HTTP/Popen关闭、退出报告确认、control_kind变化后原stop、前端异代收敛/计数及两负向变异。独立13模块365项0 failure/3 error/1 skip，原PIPE错误经探针判沙箱WinError5环境性，原fail保持；host22项及Node194项独立通过，非全套365通过。
+- 独立找到客户端urlopen/response.read/HTTPError正文原始TimeoutError/IncompleteRead等可逃出serve循环，关闭入口丢失。Codex实际确认；IncompleteRead不是OSError，建议仅扩OSError不足。原33源码/827跟踪/2100保护产物/17档审查前无漂移，33正式与13worker共46冻结对象保存independent-review2。原3私有SHA由复核者独立确认，本轮不再次读内容，不改权限/删残留。
+- Codex按持续授权亲自修正，原开发者已交付暂停，不并行改码。仅scripts/role_service_host.py与tests/test_role_service_host.py：客户端连接/成功正文/HTTPError正文统一URLError/OSError/HTTPException为稳定HostError并关闭响应；监督器poll/动作边界兼容原始网络异常，原HostError码与原进程句柄/owner证明保持，重复读错误去重及max_rounds/once预算不变。未改API/数据库/前端/原生控制门控。
+- 新增6项验证，真实回环HTTP成功与错误正文超时、截断、无响应断连，正常JSON/HTTP错误码语义不变；真实响应故障后管理器恢复/保原句柄；原始轮询与动作异常不退出；真实受控固定文本Popen连续两次网络中断后完成原stop并释放ownership。修正前5项8个测试/子测试错误，明确TimeoutError/IncompleteRead/RemoteDisconnected；修正后5项0失败/错误/跳过。host+服务状态82项全通过，新增真实关闭后最终host28项全通过，实际用例ID重合27、集合83而非一次83运行，不相加成110。py_compile/git diff --check实际0。此前Node194/CLI全套未变，不重复运行或伪写新运行。
+- 新证据`.tmp/role-lifecycle-r1-3-independent-review2/`保留原文/冻结/worker副本/负向/最终日志；`.tmp/project-role-lifecycle-r1-3-codex-fix2/`保留两文件before/after/diff/SHA、evidence.json与自身10字段交付（summary --expect-task-id 225退出0），不替换原#225 partial。46冻结对象除这两正式文件外无漂移。
+- 派发前重新实读development_requirements/caller agent:codex/kind=agent，常规Kimi前端/DeepSeek后端交叉复核要求未改，临时Kimi不足安排保持；DeepSeek独立审查Codex本次两文件，禁止边审边改。账户本次实读5小时6%/周24%、ordinaryUsageAllowed=true，旧7%/21%、58%/19%不追改，不当作本任务用量。
+- 实际新任务#226，226-角色生命周期R1-3：网络中断修正后独立复核，target agent:deepseek，creator agent:codex，Hall group:task-72b41a543148416e80608d5e3c7a2d38，UTC2026-10-12T01:03:19.942100 queued/assigned仅派发快照。最小四参数，不带parent/related/trigger/review_policy，不轮询/等待/收取；用户完成通知后再读。要求最终TALK交付仅原始十字段JSON，不加自然语言/围栏/TALK_ACTION，避免重复unknown。
+- 派发HEAD e10a85e3a66ac7eb2667a33b27aee605e7c233ca，源基线cb61338317e398ad0ebb5e02097f493846df13db，未提交223/224及Codex修正为实际基线。新dispatch保存原包/回执/开发要求/用量/scope/33当前副本，827跟踪/2223保护产物/3私有SHA/17档冻结；worker仅.tmp/project-role-lifecycle-r1-3-codex-fix2-review/，正式文件全只读，仅两PROGRESS为协调方例外。AGENTS不再改；本轮只提交进度文档，未提交业务。
+- #223/#224/#225均未收取，原F1–F7/partial/矛盾/失败保持。下一门禁为#226独立通过，随后收取链/更新R1-3正式合同与验收/业务Git/人类页面验收。未生产DB/真实Key/账号/原生模型/现有服务/任意PID/浏览器；原生启停/隔离/主动等待not_run。保留owner/CAS/四条件/截止、R1-2配置/DACL/锁/凭据版本、created_by主动被动/review_exempt；R1-4/I-4后置。
+
 ## 2026-10-12 00:50（Asia/Shanghai）— #224取件与Codex亲自修正，派发#225独立只读复核
 
 - 用户“224好了”触发取件。原msg2728两页6722字符/SHA `8d81b2ea89d0296d9e722f570b041e271109b20d93a1c080f0a98925626a10f5`，self-report partial，MCP与本地JSON逐结构一致。原verification[1]虽标pass但360项3 errors/1 skip，按失败记录，原partial/矛盾/失败不追改。#223/#224保持submitted/未收取，业务未提交。
