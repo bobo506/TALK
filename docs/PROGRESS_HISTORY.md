@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-12 19:44（Asia/Shanghai）— #227初版未通过，Codex修正后派发#228独立复核
+
+- 用户“好了”通知取件。227 succeeded/submitted、msg2731为2736字符自由文本，MCP业务unknown；完整原文SHA=935d99dd33b71f60ee5218bbd82ea1cc5e93c72ed4f9f416bb5a6e143f627d8e，逐字节保存复核根。本地development.json实际28个格式问题（numeric task_id/未知字段/不合法结论与结构等），不追改原自报。协调方development-normalized.json合法partial仅为规范索引，明确非开发者原生回传，不把其格式通过当验收。
+- 实际初版4前端/7测试，开发者明确完成暂停且因沙箱进程权限无node/python/git/浏览器证据。Codex冻结11源/原worker与836跟踪SHA，差异仅11允许源+两协调方进度。原源独立发现toolbar.replaceChildren移除真实搜索input，导致随后重绘placeholder访问null；新全局DOM接线未入既有桩、角色条目层级与重试位置断言漏更新。独立原7 Node108中28通过/80失败，Python24通过；失败原日志保持，不归咎为宿主环境失败。
+- 按人类持续授权Codex接手：保持静态搜索框及input监听，只重绘独立actions/反馈；移除不必要app.js新全局引用（app回退原基线）；角色与项目设置统一完整条目，以selected类替代新增:has高亮；反馈content避免父子同类双留白；详情去两状态和面向用户的实现解释段，保留操作/必要提示。门控/请求/轮询/批量收敛/readiness/后端/权限保持。
+- 为DOM层级变化，明确纳入workspace_role_binding/role_description/role_settings/requirements_nav四旧套件：只定位条目内真实按钮，保留原选择/说明/搜索/绑定/导航断言。服务桩补实际搜索/动作树、节点移除与文档查询语义；批量重试从反馈取，详情列表仍正确显示启动成功，新增搜索回归验证重复重绘、roles→tasks→roles、同节点与原监听/筛选。未新造纯样式实现镜像测试。
+- 最终7相关Node109项全通过、0失败/取消/跳过，5Python页面契约24项通过；node --check workspace.js/app.js与git diff --check退出0。新搜索回归对冻结227源码补原三globals排除ReferenceError后单项如期TypeError placeholder访问null；negative.py成功判检出。所有正/负原始stdout保持；以上是Codex实际运行，不声称DeepSeek独立运行、全仓或浏览器通过。验证只隔离DB/假身份，没有生产服务/凭据/原生模型操作。
+- `.tmp/role-service-ui-feedback-1-review/`保存完整原文/原非法报告、before与final、final-diff、最终冻结与原日志。最终业务14文件（3前端+11测试）、15允许源含不变app，Codex delta10；原836中无范围外变化。额外四测试原码从当时HEAD只读补取，协调方两PROGRESS例外；原223–226/227证据保留，不改CLAUDE/配置。
+- 再读MCP caller agent:codex/kind=agent、项目passive/version6/effective null/not_bound与development_requirements；Kimi不足临时安排保持，DeepSeek实例最后idle/current_task_id=null且原报告确认暂停，不并行改码。实际#228四参数独立顶层派发，target=agent:deepseek，creator=agent:codex，Hall group:task-08c4b41a85ed4049be2666a14b42e29a，queued/assigned仅回执。原227原创由Codex独立检查，本次DeepSeek独立检查Codex增量与整体保持；源码冻结，只可新独立review worker产物。
+- 若复核沙箱仍拒进程，允许实际源码/SHA/已存在原日志独立审查并如实not_run，不能将Codex109/24冒充其运行。要求新任务号字符串/严格10字段、完整纯JSON最终结果。未收取227、未提交业务；默认派发后结束、不轮询，用户通知“228好了”后取件，通过后收取228/227、正式指南与业务Git、页面复验。R1-3人工门禁仍保持，R1-4/I-4不开启。本轮进度两文档提交/推送与回执独立留复核根。
+
 ## 2026-10-12 19:11（Asia/Shanghai）— R1-3页面人工反馈三项，派发#227修正
 
 - 用户反馈：全部启动位置不美观；角色列表应只展示当前启动状态且不能与背景横线重叠；详情受管CLI标题旁与下方重复展示状态，不再需要详情服务状态。该反馈表示本轮未通过，R1-3人工门禁保持，不进入R1-4/I-4。
