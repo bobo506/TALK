@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-12 22:20 (Asia/Shanghai)：用户明确R1-3本轮页面基础“验收通过”，页面门禁释放；本轮只记录验收与文档/Git收尾，下一步R1-4，I-4后置。
+Updated: 2026-10-12 23:24 (Asia/Shanghai)：用户明确R1-4前端由Codex开发；已派#230只读核对创建/配置的后端与宿主依赖，当前等待前置报告，未开业务代码，I-4后置。
 
 ## 当前状态
 
@@ -19,14 +19,16 @@ Updated: 2026-10-12 22:20 (Asia/Shanghai)：用户明确R1-3本轮页面基础�
 
 ## 协作与保持规则
 
-- Codex协调/必要修正/收尾，Kimi额度不足临时安排保持，Codex修正后由DeepSeek独立复核；新派发前实读development_requirements。用户持续直接修正授权不免独立复核与人工门禁。
+- 用户本轮明确R1-4前端由Codex开发、DeepSeek独立复核；后端/宿主由DeepSeek准备与开发、Codex独立复核。Kimi额度不足临时安排保持，人类本次指定优先于实读的页面常规Kimi前端要求，不自动改写项目配置。持续直接修正授权不免独立复核与人工门禁。
 - 默认派发后结束、用户通知取件，共享目录不并行改码，不默认Browser验页。成员职责按任务包，固定决策/执行分级已取消；旧生产配置/历史任务不追改。
-- 最近实读caller=agent:codex/kind=agent；上次项目passive/version6、effective null/not_bound保持，本次文档收尾未重新读取或改模式。K28绑定不能外推模型/能力；本轮未读取账户额度。DeepSeek等待T65s/W50s，Codex现用W300s不外推客户端上限。
+- 本轮重新实读caller=agent:codex/kind=agent与development_requirements；未改模式/项目配置，旧passive/version6、effective null/not_bound不作新核验。K28绑定不能外推模型/能力；本轮未读取账户额度。DeepSeek等待T65s/W50s，Codex现用W300s不外推客户端上限。
 - bobo506/TALK普通提交后推送持续授权，禁止强推/改历史；不改凭据/生产身份与运行配置。旧.tmp-tests/私有ACL残留保留，不混提交、不宣称整个工作区全干净。
 
 ## 恢复索引与下一步
 
 - 原R1-3服务/227/228最终与独立证据根保持；新`.tmp/role-service-list-status-fix/`保存588基线/836保护/10源before/final、Codex正负验证与派发，`.tmp/role-service-list-status-review/`保存229独立报告与变异产物。
 - `.tmp/role-service-list-status-final/`保存msg2733原文/SHA/本地结构一致、冻结检查、229收取与最终Git回执。正式文档为协调方收尾例外，业务源码自独立冻结未变。
-- 本轮仅同步验收状态与AGENTS实施边界，未改源码/运行配置、未新跑测试/浏览器/服务或派发。下一步按已批准计划R1-4完整创建/配置页面、外部桌面引导、删除/归档和退出清理，实施仍一次一片并独立复核；I-4随后。不重复派发/收取223–229，不自动重启服务。
+- 本轮确认运行器/模型目录与角色创建API已有，POST provision目前仅作业入口，真实文件配置由宿主脚本执行/ACK；页面需要具体宿主执行闭环。#230只读核对实际源/字段、一次性Key恢复、最小宿主入口及归档/退出依赖，不新增接口或代做生产操作。
+- #230 target DeepSeek/creator Codex，Hall group:task-f6150d47f5464071b6381b061493240b，queued/assigned仅派发回执。包/回执在.tmp/role-lifecycle-r1-4-dispatch/，worker仅.tmp/role-lifecycle-r1-4-backend-prep/；正式源/配置/原证据不可改，协调方本轮仅分工/计划/进度文档。默认派发后结束，用户通知“230好了”后取件，再定首个明确后端/前端切片。
+- R1-4按已批准范围完整创建/配置、外部桌面、删除/归档和退出清理推进，一次一片、独立复核与人工验收保持；I-4后置。本轮未新跑测试/浏览器/服务，不重复派发/收取223–229，不自动重启服务。
 - 恢复指令：`继续项目`。完整历史见PROGRESS_HISTORY。

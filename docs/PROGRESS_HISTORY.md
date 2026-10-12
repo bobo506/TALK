@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-12 23:24（Asia/Shanghai）— 用户指定R1-4前端由Codex开发，派#230后端/宿主只读准备
+
+- 用户明确“这部分涉及前端页面的话，我建议由你来进行开发”。本次R1-4前端实施由Codex承担、DeepSeek独立复核；后端/宿主由DeepSeek准备与实施、Codex独立复核。该本轮明确指定优先于项目页面尚存的常规Kimi前端要求；不自动写项目development_requirements，不永久固定模型分级或追改旧任务，Kimi额度不足临时安排保持。
+- 已核R1-3页面人工门禁释放、当前HEAD50fedb812511464d4d90222e3137fb37cde8a2a3、跟踪/暂存干净；实读MCP caller agent:codex/kind=agent、最新项目要求与DeepSeek idle/current_task_id=null。仅读取已批准R1-4实施计划、相关生命周期/配置合同和前端已有接线索引，未重复完整代码探索/审查或启动真实环境。
+- 现有GET runners/model-choices、项目roles创建与幂等/一次性Key可作为前端基础；配置POST作业不直接执行身份档/Key/preflight，真实执行在role_provision.py及ACK。完整前端一键配置需要明确安全宿主执行入口和真实结果，故先只读核实际接口/缺口，避免页面只提交作业就假报配置完成。
+- 实际#230独立顶层四参数，target=agent:deepseek、creator=agent:codex，Hall group:task-f6150d47f5464071b6381b061493240b；queued/assigned仅派发快照。任务范围只读实际源/接口字段、一次性凭据恢复、宿主配置闭环、软归档与退出缺口及最小实施顺序；禁止改业务/正式文档/配置/Git/原证据或读Key/启停运行器/浏览器。新worker仅.tmp/role-lifecycle-r1-4-backend-prep/，原包/回执.tmp/role-lifecycle-r1-4-dispatch/。
+- 同步AGENTS当前职责、ROLE_LIFECYCLE_IMPLEMENTATION_PLAN状态与R1-4分工/前置、PROJECT_BRIEF及两进度共5文档；本轮业务代码尚未开始，未新运行测试/服务、未操作生产名册/身份/凭据。保留列表单状态与启停仅详情等当前已验收交互，D1–D7权限/部署/全局凭据待授权边界不夹带。
+- 按持续授权提交/普通推送文档交接，回执保留dispatch。默认派发后结束、不轮询等待；用户通知“230好了”后规范摘要/实际事实核对，再准备首个明确切片由对应开发者实施，完成暂停/独立复核/Git及人工验收。I-4后置，不为核验制造真实主动等待任务。
+
 ## 2026-10-12 22:20（Asia/Shanghai）— 用户确认R1-3本轮页面验收通过，释放页面门禁
 
 - 项目管理者明确“验收通过”，对应已发布版本34e9df42516536aa94216eb95d7efa8358fb5731、缓存20261012-role-service-list-status。R1-3本轮页面基础人工门禁释放：列表只显示当前服务状态、启停仅在详情、全部启动/反馈位置与详情去重复状态等已交付页面修正获确认；短确认不补写逐项窄屏/长名/权限/故障操作日志。
