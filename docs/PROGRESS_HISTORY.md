@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-12 20:54（Asia/Shanghai）— #228独立通过，页面反馈修正收取与发布，暂停人工复验
+
+- 用户“好了”触发#228取件。MCP合法talk-delivery-1/task228字符串、complete；完整msg2732为6357字符/SHA e47dcc30c768791e751524adeca5aede7e04e50256396a31f2ef8208f6a0017d，本地review.json逐结构一致，格式校验退出0。最终15源副本与实际文件逐字节一致，836保护相对冻结仅两协调方进度漂移，业务零漂移；没有新功能缺陷。
+- 独立实际源码核对搜索静态节点与单次input监听、局部actions/feedback重绘、角色/设置条目选择、单当前服务状态、详情零状态但保留操作提示、绑定/说明/任务信息保持；门控/安全失败子集/异代收敛/轮询停止未改。CSS正常流/单底线、真实selected类、无内层双留白与700px换行静态核对通过。3px历史留白差异列非阻塞观察，未改已审源码。
+- 复核者14个前端套件逐文件进程内运行197 tests/197 pass/0 fail/skip/cancelled，五Python页面契约24项OK；Codex实读14份日志计数累加一致，原搜索负向能检出placeholder访问null，语法与diff退出0。官方node --test多进程在复核沙箱spawn EPERM属not_run，原日志保留；不将进程内方式写成默认隔离，也不与Codex7套109项叠加。真实页面/窄屏/长名/键盘与原生模型能力均未新增验收证据。
+- 按228→227收取，均succeeded/completed，UTC分别2026-10-12T12:52:41.187775与12:52:44.001931。227原msg2731自由文本unknown、本地非法报告/原80失败与协调方partial规范索引保持，原SHA935d99dd33b71f60ee5218bbd82ea1cc5e93c72ed4f9f416bb5a6e143f627d8e不追改；后续修正与独立复核闭合原交付。
+- 最终3前端+11测试共14业务文件，app.js回退原样。角色搜索旁全部启动、独立批量反馈、完整列表条目单当前状态、详情去两状态；搜索重绘回归修正与必要既有四套件层级配套已经验证。后端/API/DB/MCP/服务意图/所有权/CAS/readiness/权限/任务与真实配置不改，原223–226证据保持。
+- 正式同步ROLE_SERVICE_ACCEPTANCE三项反馈/搜索复验、USER_MANUAL使用位置、MODULE_webui现行R1-3节、PROJECT_BRIEF及两PROGRESS共6文档；仅说明已实现与实际证据方式，复核期后不改源码。业务14+文档6统一中文提交/持续授权常规推送，具体SHA/远端一致保存最终根publication.json；不强推/改历史，不混入.tmp/私有ACL测试残留。
+- 最终根.tmp/role-service-ui-feedback-1-final-acceptance/保存完整原文/结构比对/SHA、日志计数核对、冻结漂移检查、两收取回执及Git回执；原dispatch/worker/Codex修正/独立review产物只读。本轮未重复运行已通过且未变的测试，也未启动浏览器/生产服务/模型或读写真实Key。
+- 当前暂停R1-3人工页面复验。人类Ctrl+F5以human进入角色页，核全部启动位置、列表单当前状态与横线留白、详情无服务状态标签且操作提示保留，以及角色/任务切换后的搜索；窄屏/长名效果待验。用户“好了”只作#228完成通知，不作为页面验收通过。未开R1-4/I-4，用户反馈不通过时可按持续授权修正并再独立复核。
+
 ## 2026-10-12 19:44（Asia/Shanghai）— #227初版未通过，Codex修正后派发#228独立复核
 
 - 用户“好了”通知取件。227 succeeded/submitted、msg2731为2736字符自由文本，MCP业务unknown；完整原文SHA=935d99dd33b71f60ee5218bbd82ea1cc5e93c72ed4f9f416bb5a6e143f627d8e，逐字节保存复核根。本地development.json实际28个格式问题（numeric task_id/未知字段/不合法结论与结构等），不追改原自报。协调方development-normalized.json合法partial仅为规范索引，明确非开发者原生回传，不把其格式通过当验收。

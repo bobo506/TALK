@@ -13,7 +13,7 @@ from pathlib import Path
 from tests.test_support import RouteTestCase
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261011-role-lifecycle-r1-3"
+STATIC_VERSION = "20261011-role-lifecycle-r1-3-ui-fix"
 
 #: 设计 §5.3 的六个入口里，页面只允许调用 human 意图写与只读投影这四个。
 PAGE_API_PATHS = (
@@ -47,19 +47,43 @@ class RoleServiceWebUiTests(RouteTestCase):
             "stopRoleService",
             "startAllRoleServices",
             "workspaceRoleServiceControls",
-            "workspaceRoleServiceBatchPanel",
+            "workspaceRoleServiceStartAllButton",
+            "workspaceRoleServiceBatchFeedback",
             "pollRoleServices",
             "stopRoleServicePolling",
         ):
             self.assertIn(f"function {function}", self.script)
         # 角色列表行是 <button>，服务控制必须是其同级块（不能嵌套按钮）。
         self.assertIn("workspaceRoleServiceControls(role)", self.script)
-        self.assertIn("workspaceRoleServiceBatchPanel()", self.script)
+        self.assertIn("workspaceRoleServiceStartAllButton()", self.script)
+        self.assertIn("workspaceRoleServiceBatchFeedback()", self.script)
         # 真实请求：POST 而不是空回调。
         self.assertRegex(
             self.script,
             re.compile(r'role-services/start-all`,\s*\{[^}]*method:\s*"POST"', re.DOTALL),
         )
+
+    def test_layout_containers_are_wired_separately(self):
+        """R1-3 页面验收反馈：批量入口与反馈区是独立容器，按钮不进任务筛选标签行。"""
+        self.assertIn('id="blackboard-toolbar"', self.html)
+        self.assertIn('id="role-service-batch-feedback"', self.html)
+        # 搜索与批量入口同处顶栏操作区，角色页由 workspace.js 显式隐藏任务页筛选容器。
+        self.assertIn('id="workspace-search"', self.html)
+        self.assertIn("batchActions.appendChild(workspaceRoleServiceStartAllButton())", self.script)
+        self.assertIn("batchFeedbackContainer.appendChild(batchFeedback)", self.script)
+        # 反馈区由独立容器承载，不是任务筛选标签行（.blackboard-summary）的子节点。
+        self.assertIn('workspaceEl("div", "role-service-batch-feedback-content")', self.script)
+        self.assertIn('workspaceEl("div", "role-entry")', self.script)
+
+    def test_service_status_label_only_rendered_in_the_role_list(self):
+        """列表只展示一个当前状态标签；角色详情不再重复状态标签。"""
+        self.assertIn('function workspaceRoleServiceStateLabel(status)', self.script)
+        self.assertIn('function workspaceRoleServiceActions(role, className, showState)', self.script)
+        self.assertIn('return workspaceRoleServiceActions(role, className, true);', self.script)
+        self.assertIn('workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls", false)', self.script)
+        # 详情面板函数体内不得再挂状态标签（只保留标题、说明、操作与提示）。
+        panel = self.script.split("function workspaceRoleServicePanel(role) {", 1)[1]
+        self.assertNotIn("role-service-state", panel.split("\nfunction ", 1)[0])
 
     def test_start_button_is_gated_by_control_kind_not_by_idle_instances(self):
         self.assertIn('kind !== "managed_cli"', self.script)
@@ -132,8 +156,16 @@ class RoleServiceWebUiTests(RouteTestCase):
             ".role-service-hint",
             ".role-service-section",
             ".role-service-batch",
+            ".role-service-batch-feedback",
+            ".role-entry",
+            ".blackboard-toolbar",
         ):
             self.assertIn(selector, self.styles, f"缺少样式：{selector}")
+        # 布局修正：控制块不再用负外边距压线，也不在列表条目内自带横线。
+        self.assertRegex(self.styles, re.compile(r"\.role-service-controls \{[^}]*margin:0;"))
+        self.assertNotRegex(self.styles, re.compile(r"\.role-service-controls \{[^}]*border-bottom"))
+        # 批量入口不再继承任务筛选标签的下划线样式。
+        self.assertNotIn(".blackboard-summary .role-service-batch", self.styles)
 
     def test_node_contract_test_exists(self):
         node_test = PROJECT_ROOT / "tests" / "workspace_role_services.test.cjs"

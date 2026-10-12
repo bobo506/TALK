@@ -145,7 +145,7 @@ function harness({ human = true, roster = ROSTER } = {}) {
     context.renderTaskDetailsPanel();
     await flush();
   };
-  const rows = () => el('blackboard-columns').children;
+  const rows = () => el('blackboard-columns').children.flatMap(node => String(node.className).includes('role-entry') ? node.children : [node]);
   const roleRow = memberId => rows().find(row => !row.className.includes('role-settings-row') && allTexts(row).includes(memberId));
   const selectRole = async memberId => { roleRow(memberId).fire('click'); await flush(); };
   const puts = () => pending.map((p, i) => ({ ...p, index: i })).filter(p => p.opts?.method === 'PUT');

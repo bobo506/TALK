@@ -198,12 +198,12 @@ test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐�
   assert.equal(h.hidden('requirements-panel'), false);
   assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [true, true]);
   assert.ok(h.requests.some(url => /\/api\/projects\/A$/.test(url)));
-  const settingsRow = h.el('blackboard-columns').children[0];
+  const settingsRow = h.el('blackboard-columns').children[0].children[0];
   assert.ok(settingsRow.className.includes('role-settings-row'), '首项是“项目设置”导航行');
   assert.equal(settingsRow.classList.contains('selected'), true);
   assert.equal(settingsRow.children[0].textContent, '项目设置');
   // 点击具体角色：右侧互斥切换为角色详情，项目级面板隐藏
-  const roleRow = h.el('blackboard-columns').children[1];
+  const roleRow = h.el('blackboard-columns').children[1].children[0];
   assert.equal(roleRow.children[0].textContent, 'Kimi');
   roleRow.fire('click');
   await h.tick();
@@ -213,12 +213,12 @@ test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐�
   assert.equal(h.hidden('requirements-panel'), true);
   assert.equal(h.hidden('controller-mode-panel'), true);
   // 行重绘后重新取节点：新选中态落在重建后的角色行上
-  const roleRow2 = h.el('blackboard-columns').children[1];
+  const roleRow2 = h.el('blackboard-columns').children[1].children[0];
   assert.equal(roleRow2.children[0].textContent, 'Kimi');
   assert.equal(roleRow2.classList.contains('selected'), true);
   // 回到“项目设置”：再次互斥切换；同项目不重新读取开发要求
   const before = h.requests.length;
-  const settingsRow2 = h.el('blackboard-columns').children[0];
+  const settingsRow2 = h.el('blackboard-columns').children[0].children[0];
   settingsRow2.fire('click');
   await h.tick();
   assert.equal(h.hidden('requirements-panel'), false);

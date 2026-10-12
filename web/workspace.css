@@ -16,7 +16,11 @@
 .blackboard-view {display:block; padding:0; overflow:visible; height:auto; background:transparent;}
 .blackboard-header {padding:0 28px 16px; border:0; min-height:0; display:block;}
 .blackboard-header p {margin:0; color:#626b76; font-size:15px;}
-#workspace-search {display:block; width:calc(100% - 56px); margin:0 28px 20px; height:44px; border:1px solid #d6d6d2; border-radius:6px; background:white; padding:10px 12px; font-size:15px;}
+/* R1-3 页面验收反馈：顶栏操作区让搜索占满剩余宽度，批量入口靠右对齐；
+   任务页保持原整行搜索宽度不变。 */
+.blackboard-toolbar {display:flex; align-items:center; gap:16px; padding:0 28px; margin:0 0 20px;}
+#blackboard-toolbar #workspace-search {display:block; flex:1 1 auto; min-width:0; width:auto; margin:0; height:44px; border:1px solid #d6d6d2; border-radius:6px; background:white; padding:10px 12px; font-size:15px;}
+.role-service-batch-actions {flex:0 0 auto;}
 .blackboard-summary {padding:0 28px; margin:0; gap:20px; border-bottom:1px solid #deded9; display:flex; flex-wrap:wrap;}
 .blackboard-summary button,.role-task-filters button {padding:10px 0 12px; border-bottom:3px solid transparent; color:#616875;}
 .blackboard-summary button[aria-pressed="true"],.role-task-filters button[aria-pressed="true"] {color:var(--blue-strong); border-bottom-color:var(--blue-strong); font-weight:600;}
@@ -24,10 +28,18 @@
 .task-card {position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; width:100%; margin:0; border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; border-radius:0; box-shadow:none; padding:22px 28px; text-align:left; background:transparent;}
 .task-card.selected,.role-row.selected {background:#edf5fc; border-left-color:#337ec0;}
 .task-card:hover,.role-row:hover {background:#f0f5f8;}
+/* R1-3 页面验收反馈：选中/悬停高亮覆盖整个条目（含服务控制），条目看起来是一个完整块。 */
+.role-entry:hover > .role-row {background:transparent;}
+.role-entry:hover {background:#f0f5f8;}
+.role-entry.selected {background:#edf5fc; border-left-color:#337ec0;}
 .task-card-title {font-size:17px; line-height:1.5; font-weight:650; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere;}
 .task-card-meta {grid-column:1/-1; font-size:14px; color:#656d76; line-height:1.5;}
 .task-status-badge {background:transparent!important; padding:0; align-self:start; font-size:14px; white-space:normal; line-height:1.7; font-weight:500;}
 .task-status-badge.success {color:#26753c;} .task-status-badge.danger {color:#a83232;} .task-status-badge.attention {color:#8d580d;}
+/* R1-3 页面验收反馈：角色行与服务控制同属一个 .role-entry 条目，边线和左右留白都由条目负责，
+   行/控制块只做内部排版，避免负外边距、重复横线与状态标签压线。 */
+.role-entry {display:flex; flex-direction:column; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; padding:24px 25px 20px;}
+.role-entry .role-row {border:0; background:transparent; padding:0; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left;}
 .role-row {border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; background:transparent; padding:24px 28px; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left;}
 /* N2 修正：列表摘要明确省略号截断（最多 2 行），长无空格字符串不撑破布局；搜索仍用有效说明全文。 */
 .role-row strong {font-size:22px;} .role-row span {font-size:15px; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere;} .role-row small {font-size:14px; color:#626b76;}
@@ -68,7 +80,7 @@
 .role-task-name {display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.7;}
 button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible {outline:2px solid #2f6fb1; outline-offset:3px;}
 @media(max-width:1000px){.workbench.project-mode {grid-template-columns:280px minmax(0,1fr);} .project-mode .details-panel {padding:28px 24px;} .project-mode .task-details-heading h3 {font-size:26px;} .blackboard-summary {gap:14px;} .app-header {gap:18px;} .app-header .project-select {width:155px;}}
-@media(max-width:700px){html,body {overflow:auto;} .app-header {height:auto; min-height:70px; flex-wrap:wrap; padding:12px 18px; gap:12px;} .app-header .header-actions {gap:12px;} .app-header .project-select {width:135px;} .app-header .user-badge {display:none!important;} .workbench.project-mode {display:flex; flex-direction:column; height:auto; overflow:visible;} .project-mode .workspace-tools {max-height:440px; overflow-y:auto; width:100%; border-bottom:1px solid #ddd;} .project-mode .details-panel {overflow:visible; padding:24px 20px; width:100%; border-left:0;} .role-task-table th,.role-task-table td {padding:12px 5px; font-size:13px;} .role-task-table .workspace-text-button {font-size:13px;} .task-details-heading h3 {font-size:24px;} .task-card-title {font-size:16px;} .task-details-actions button {font-size:14px;} }
+@media(max-width:700px){html,body {overflow:auto;} .app-header {height:auto; min-height:70px; flex-wrap:wrap; padding:12px 18px; gap:12px;} .app-header .header-actions {gap:12px;} .app-header .project-select {width:135px;} .app-header .user-badge {display:none!important;} .workbench.project-mode {display:flex; flex-direction:column; height:auto; overflow:visible;} .project-mode .workspace-tools {max-height:440px; overflow-y:auto; width:100%; border-bottom:1px solid #ddd;} .project-mode .details-panel {overflow:visible; padding:24px 20px; width:100%; border-left:0;} .role-task-table th,.role-task-table td {padding:12px 5px; font-size:13px;} .role-task-table .workspace-text-button {font-size:13px;} .task-details-heading h3 {font-size:24px;} .task-card-title {font-size:16px;} .task-details-actions button {font-size:14px;} .blackboard-toolbar {flex-wrap:wrap; gap:10px;} #blackboard-toolbar #workspace-search {flex:1 1 100%;} .role-entry {padding:20px 20px 16px;} }
 
 .window-brand h1 {font-size:24px;}
 
@@ -204,7 +216,8 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 @media(max-width:700px){#controller-mode-panel h3 {font-size:20px;} .controller-mode-saved {font-size:15px;} .controller-mode-option {padding:12px;} .controller-mode-toolbar {gap:10px;}}
 
 /* ROLE-SETTINGS-1：角色列表固定首项“项目设置”。 */
-.role-settings-row {border-bottom:2px solid #d8d8d2; background:#f7f6f2;}
+.role-settings-row {background:#f7f6f2;}
+.role-settings-entry {border-bottom:2px solid #d8d8d2; background:#f7f6f2;}
 .role-settings-row:hover {background:#f0f5f8;}
 .role-settings-row.selected {background:#edf5fc;}
 
@@ -226,10 +239,11 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-binding-guide {font-size:14px; color:#4c5560; line-height:1.7; margin:10px 0 0; padding:10px 12px; border-left:3px solid #d8d3c4; background:#faf9f5; overflow-wrap:anywhere;}
 @media(max-width:700px){.role-binding-head h3 {font-size:19px;} .role-binding-list {grid-template-columns:minmax(86px,auto) minmax(0,1fr); gap:8px 12px; font-size:14px;} .role-binding-guide {padding:9px 10px;}}
 
-/* R1-3 受管 CLI 服务：列表同级控制块 + 角色详情控制区 + 项目级“全部启动”行。
-   列表角色行本身是 <button>，控制块是它的同级兄弟节点，避免按钮嵌套。 */
-.role-service-controls {padding:0 28px 16px; margin:-8px 0 0; border-bottom:1px solid #dfdfda;}
-.role-service-detail-controls {padding:0; margin:0; border-bottom:0;}
+/* R1-3 受管 CLI 服务（2026-10-11 页面验收反馈修正）：列表条目内只有一个当前状态标签，
+   与启动/关闭操作同组；控制块是角色行的同级兄弟节点，不再用负外边距压线，也不再自带横线。
+   角色行本身是 <button>，控制块不能在它内部（避免按钮嵌套）。 */
+.role-service-controls {margin:0; padding:14px 0 0; border:0;}
+.role-service-detail-controls {padding:0;}
 .role-service-row {display:flex; align-items:center; flex-wrap:wrap; gap:10px;}
 .role-service-state {font-size:14px; line-height:1.5; padding:3px 10px; border-radius:11px; border:1px solid #d6d6d2; background:#f7f6f2; color:#5b6470; overflow-wrap:anywhere;}
 .role-service-state.success {border-color:#cbe0cc; background:#f3f8f3; color:#286c39;}
@@ -244,9 +258,20 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-service-head {display:flex; align-items:baseline; flex-wrap:wrap; gap:12px; margin-bottom:10px;}
 .role-service-head h3 {font-size:21px; font-weight:650; color:#26323d; margin:0;}
 .role-service-note {font-size:14px; color:#626b76; line-height:1.7; margin:0 0 14px;}
-/* 标题行内的批量入口：沿用工作台浅色层级，不占用任务筛选标签的下划线样式。 */
-.blackboard-summary .role-service-batch {display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-left:auto; padding:8px 0 10px;}
-.role-service-batch-status {font-size:13px; color:#5b6470; line-height:1.6;}
+/* 顶栏批量入口：浅色工作台按钮，不继承任务筛选标签的下划线/底边框；反馈在独立可换行区域。 */
+.blackboard-toolbar .role-service-batch {display:flex; align-items:center; flex-wrap:wrap; gap:12px; flex:0 0 auto; margin:0;}
+.blackboard-toolbar .role-service-batch .role-service-button {min-height:44px;}
+.role-service-batch-feedback {display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:0 28px; margin:0 0 14px;}
+.role-service-batch-feedback:empty {display:none; padding:0; margin:0;}
+.role-service-batch-feedback-content {display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; width:100%; min-width:0;}
+.role-service-batch-status {font-size:13px; color:#5b6470; line-height:1.6; overflow-wrap:anywhere;}
 .role-service-batch-status.error {color:#9d3434;}
 .role-service-batch-failed {font-size:13px; color:#9d3434; line-height:1.6; overflow-wrap:anywhere;}
-@media(max-width:700px){.role-service-controls {padding:0 20px 14px;} .role-service-head h3 {font-size:19px;} .blackboard-summary .role-service-batch {margin-left:0;}}
+.role-service-batch-owned {font-size:13px; color:#82651f; line-height:1.6; overflow-wrap:anywhere;}
+@media(max-width:700px){
+  .role-entry {padding:20px 20px 16px;}
+  .role-service-head h3 {font-size:19px;}
+  .blackboard-toolbar {flex-wrap:wrap; gap:10px;}
+  #blackboard-toolbar #workspace-search {flex:1 1 100%;}
+  .role-service-batch-feedback {padding:0 20px;}
+}

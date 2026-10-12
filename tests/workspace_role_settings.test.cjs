@@ -171,7 +171,7 @@ function harness({ human = true, projectId = 'A', roster = ROSTER } = {}) {
       reply(i, body);
     });
   };
-  const rows = () => el('blackboard-columns').children;
+  const rows = () => el('blackboard-columns').children.flatMap(node => String(node.className).includes('role-entry') ? node.children : [node]);
   const settingsRow = () => rows()[0];
   const roleRow = memberId => rows().find(row => !row.className.includes('role-settings-row') && allTexts(row).includes(memberId));
   return { context, ui, pending, reply, replyProjectReads, flush, hidden, el, enterRoles, rows, settingsRow, roleRow, calls };

@@ -20,9 +20,16 @@ function fakeEl(tag) {
       toggle(c, force) { const on = force === undefined ? !classes.has(c) : !!force; on ? classes.add(c) : classes.delete(c); return on; },
       contains(c) { return classes.has(c); },
     },
-    appendChild(c) { el.children.push(c); return c; },
-    append(...cs) { el.children.push(...cs); },
-    replaceChildren() { el.replaceCount += 1; el.children.length = 0; },
+    appendChild(c) {
+      if (c.parentElement) c.parentElement.children.splice(c.parentElement.children.indexOf(c), 1);
+      c.parentElement = el; el.children.push(c); return c;
+    },
+    append(...cs) { cs.forEach(c => el.appendChild(c)); },
+    replaceChildren(...cs) {
+      el.replaceCount += 1;
+      el.children.forEach(c => { c.parentElement = null; });
+      el.children.length = 0; el.append(...cs);
+    },
     insertBefore(node) { el.children.push(node); return node; },
     setAttribute(k, v) { el.attrs[k] = String(v); },
     addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
@@ -117,9 +124,16 @@ function harness({ human = true, roster = [] } = {}) {
     if (!elements.has(id)) { const node = fakeEl('div'); node.id = id; elements.set(id, node); }
     return elements.get(id);
   };
+  // 与实际 HTML 一致的搜索/操作树；getElementById 不返回已被移除的搜索框。
+  const board = getEl('blackboard-view');
+  const toolbar = getEl('blackboard-toolbar');
+  toolbar.append(getEl('workspace-search'), getEl('role-service-batch-actions'));
+  board.append(getEl('blackboard-header'), toolbar, getEl('role-service-batch-feedback'),
+    getEl('blackboard-summary'), getEl('blackboard-columns'));
   const workbench = fakeEl('div');
   const documentStub = {
-    getElementById: getEl,
+    getElementById: id => id === 'workspace-search'
+      ? findAll(board, node => node.id === id)[0] || null : getEl(id),
     createElement: tag => fakeEl(tag),
     createTextNode: text => ({ textContent: text }),
     querySelector: sel => (sel === '.workbench' ? workbench : null),
@@ -192,13 +206,14 @@ function harness({ human = true, roster = [] } = {}) {
     while (Date.now() < deadline) { if (pred()) return true; await sleep(5); }
     return pred();
   };
-  const rows = () => getEl('blackboard-columns').children;
+  const rows = () => findAll(getEl('blackboard-columns'), () => true).slice(1);
   const controlsFor = memberId => rows().find(node =>
     String(node.className).includes('role-service-controls') && node.dataset.memberId === memberId);
   const buttonIn = (node, text) => (node ? findAll(node, n => n.tagName === 'button' && n.textContent === text)[0] : undefined);
   const stateOf = box => { const n = box && findAll(box, x => String(x.className).includes('role-service-state'))[0]; return n ? n.textContent : ''; };
   const hintOf = box => { const n = box && findAll(box, x => String(x.className).includes('role-service-hint'))[0]; return n ? n.textContent : ''; };
-  const batchBox = () => findAll(getEl('blackboard-summary'), n => String(n.className).includes('role-service-batch'))[0];
+  const batchBox = () => findAll(getEl('role-service-batch-actions'), n => String(n.className) === 'role-service-batch')[0];
+  const batchFeedbackBox = () => getEl('role-service-batch-feedback');
   const roleRow = memberId => rows().find(row => String(row.className).includes('role-row')
     && !String(row.className).includes('role-settings-row') && allTexts(row).some(t => t.includes(memberId)));
 
@@ -215,8 +230,9 @@ function harness({ human = true, roster = [] } = {}) {
     startBtn: memberId => buttonIn(controlsFor(memberId), '启动'),
     stopBtn: memberId => buttonIn(controlsFor(memberId), '关闭'),
     batchBox,
+    batchFeedbackBox,
     startAllBtn: () => buttonIn(batchBox(), '全部启动'),
-    retryBtn: () => buttonIn(batchBox(), '重试失败项'),
+    retryBtn: () => buttonIn(batchFeedbackBox(), '重试失败项'),
     startRequests: () => requests.filter(r => /\/service\/start$/.test(r.url)),
     stopRequests: () => requests.filter(r => /\/service\/stop$/.test(r.url)),
     servicePolls: () => requests.filter(r => /\/role-services$/.test(r.url)),
@@ -477,7 +493,7 @@ test('全部启动部分失败：写入意图只算“启动请求”，重试 m
   });
   await h.flush();
   assert.ok(h.retryBtn(), '部分失败时出现“重试失败项”入口');
-  const texts = allTexts(h.batchBox()).join('\n');
+  const texts = allTexts(h.batchFeedbackBox()).join('\n');
   // F6 口径：写入意图是“启动请求”，绝不显示成“已启动”。
   assert.ok(texts.includes('启动请求 1'), texts);
   assert.ok(texts.includes('已启动 0'), texts);
@@ -521,8 +537,8 @@ test('全部启动：轮询把后到 ready 计成功、后到 failed 归入失�
     { member_id: 'agent:c', control_kind: 'managed_cli', observed: 'failed', readiness_service: 'failed', generation: 1, ownership_held: true, can_start: false, can_stop: true, error_code: 'readiness_timeout' },
   ]);
   await h.flush();
-  await h.waitFor(() => allTexts(h.batchBox()).join(' ').includes('已启动 1'));
-  const texts = allTexts(h.batchBox()).join('\n');
+  await h.waitFor(() => allTexts(h.batchFeedbackBox()).join(' ').includes('已启动 1'));
+  const texts = allTexts(h.batchFeedbackBox()).join('\n');
   assert.ok(texts.includes('已启动 1'), texts);
   assert.ok(texts.includes('失败 2'), texts);
   assert.ok(texts.includes('需先关闭（原进程归属未释放）'), texts);
@@ -541,12 +557,97 @@ test('全部启动整体失败：展示服务端 detail，不显示假成功', a
   await h.flush();
   h.reply(0, { detail: 'role_not_found' }, { ok: false, status: 404 });
   await h.flush();
-  assert.ok(allTexts(h.batchBox()).join(' ').includes('role_not_found'));
+  assert.ok(allTexts(h.batchFeedbackBox()).join(' ').includes('role_not_found'));
   assert.ok(!h.retryBtn(), '整体失败不出现失败项重试入口');
 });
 
+// ── R1-3 页面验收反馈布局：单状态标签、条目化、详情去重、批量入口与反馈分离 ──
+test('搜索框在角色重绘与任务切换后保持连接及原输入监听', async () => {
+  const html = fs.readFileSync(require.resolve('../web/index.html'), 'utf8');
+  assert.match(html, /id="blackboard-toolbar"[\s\S]*?id="workspace-search"[\s\S]*?id="role-service-batch-actions"/);
+  const h = harness({ roster: [{ member_id: 'agent:search', business_role: 'dev', service: serviceRow() }] });
+  const input = h.context.document.getElementById('workspace-search');
+  const originalListener = input.listeners.input[0];
+  await h.enterRoles();
+  for (const mode of ['roles', 'tasks', 'roles']) {
+    h.context.__workspaceUI.mode = mode;
+    h.context.renderWorkspaceList();
+    assert.equal(h.context.document.getElementById('workspace-search'), input);
+    assert.equal(input.parentElement, h.el('blackboard-toolbar'));
+    assert.equal(h.el('blackboard-toolbar').classList.contains('hidden'), false);
+    assert.equal(input.listeners.input[0], originalListener);
+    input.value = mode === 'roles' ? '不存在的角色' : '不存在的任务';
+    input.fire('input', { target: input });
+    assert.equal(h.context.__workspaceUI.query, input.value);
+    assert.ok(allTexts(h.el('blackboard-columns')).some(text => text.includes(mode === 'roles' ? '没有匹配的角色' : '没有匹配的结果')));
+  }
+});
+
+test('列表条目：每个角色只有一个当前状态标签，启动/关闭与之同组且不并列全部状态', async () => {
+  const h = harness({
+    roster: [
+      { member_id: 'agent:a', business_role: 'dev', service: serviceRow({ can_start: true }) },
+      { member_id: 'agent:b', business_role: 'dev', service: serviceRow({ observed: 'running', readiness_service: 'ready', native_login: 'verified', can_stop: true }) },
+    ],
+  });
+  h.setPollDelay(60000);
+  await h.enterRoles();
+  for (const memberId of ['agent:a', 'agent:b']) {
+    const box = h.controlsFor(memberId);
+    assert.ok(box, `${memberId} 渲染服务控制块`);
+    const states = findAll(box, n => String(n.className).includes('role-service-state'));
+    assert.equal(states.length, 1, `${memberId} 只展示一个当前状态标签`);
+    // 操作按钮与状态同组，且不被当成状态选项（没有 aria-pressed 伪装成可切换状态）。
+    const buttons = findAll(box, n => n.tagName === 'button').map(n => n.textContent);
+    assert.deepEqual(buttons, ['启动', '关闭'], `${memberId} 状态旁只有启动/关闭两个操作`);
+    for (const button of findAll(box, n => n.tagName === 'button')) {
+      assert.equal(button.attrs['aria-pressed'], undefined, '操作按钮不伪装成状态选项');
+    }
+    // 条目化：角色行与服务控制同属一个 .role-entry，状态标签不出现在角色行按钮内部。
+    const entry = h.rows().find(node => String(node.className).includes('role-entry')
+      && findAll(node, n => String(n.className).includes('role-service-controls')).length === 1
+      && findAll(node, n => n.dataset && n.dataset.memberId === memberId).length > 0);
+    assert.ok(entry, `${memberId} 的角色行与服务控制同属一个条目`);
+    const roleRowButton = entry.children.find(n => String(n.className).includes('role-row'));
+    assert.ok(roleRowButton && String(roleRowButton.tagName).toLowerCase() === 'button', '角色行仍是按钮');
+    assert.equal(findAll(roleRowButton, n => String(n.className).includes('role-service-state')).length, 0,
+      '状态标签不在角色行按钮内部（避免嵌套按钮与压线）');
+  }
+  assert.ok(h.state('agent:a') !== h.state('agent:b'), '两个角色的当前状态各自独立展示');
+});
+
+test('批量入口与反馈分离：按钮在顶栏操作区，进度/重试在独立反馈区', async () => {
+  const h = harness({
+    roster: ['agent:a', 'agent:b'].map(member_id => ({ member_id, business_role: 'dev', service: serviceRow({ can_start: true }) })),
+  });
+  h.setPollDelay(60000);
+  await h.enterRoles();
+  assert.ok(h.startAllBtn(), '“全部启动”在顶栏操作区');
+  assert.equal(h.batchFeedbackBox().children.length, 0, '无反馈时反馈区为空');
+  assert.equal(findAll(h.el('blackboard-summary'), n => n.tagName === 'button').length, 0, '角色页不把批量入口混进任务筛选标签行');
+  h.startAllBtn().fire('click');
+  await h.flush();
+  h.reply(0, {
+    project_id: 'A',
+    requested: ['agent:a', 'agent:b'],
+    results: [
+      { member_id: 'agent:a', role_name: 'A', status: 'requested', launch_id: 'l1', generation: 1, expected_instance_id: 'ins_1', error_code: null },
+      { member_id: 'agent:b', role_name: 'B', status: 'failed', launch_id: null, generation: null, expected_instance_id: null, error_code: 'control_kind_not_managed' },
+    ],
+    counts: { started: 0, requested: 1, skipped: 0, failed: 1 },
+  });
+  await h.flush();
+  const feedback = allTexts(h.batchFeedbackBox()).join('\n');
+  assert.ok(feedback.includes('启动请求 1') && feedback.includes('失败 1'), feedback);
+  assert.ok(h.retryBtn(), '失败重试入口在反馈区');
+  // 顶栏操作区只保留全部启动，重试与进度留在反馈区。
+  const toolbarButtons = findAll(h.batchBox(), n => n.tagName === 'button').map(n => n.textContent);
+  assert.deepEqual(toolbarButtons, ['全部启动']);
+  assert.ok(!allTexts(h.batchBox()).join(' ').includes('启动请求'), '顶栏操作区不承载进度文本');
+});
+
 // ── 角色详情 + 只读账号 ─────────────────────────────────────────────────────
-test('角色详情显示服务控制区：状态 + 启动/关闭按钮', async () => {
+test('角色详情不重复服务状态标签：保留启动/关闭与必要提示', async () => {
   const h = harness({
     roster: [{ member_id: 'agent:managed', business_role: 'dev', service: serviceRow({ observed: 'running', readiness_service: 'ready', native_login: 'verified', can_start: false, can_stop: true }) }],
   });
@@ -554,12 +655,16 @@ test('角色详情显示服务控制区：状态 + 启动/关闭按钮', async (
   await h.selectRole('agent:managed');
   const section = findAll(h.el('role-details-name-panel'), n => String(n.className).includes('role-service-section'))[0];
   assert.ok(section, '角色详情渲染服务控制区');
-  const state = findAll(section, n => String(n.className).includes('role-service-state'))[0];
-  assert.equal(state.textContent, '启动成功');
+  assert.equal(findAll(section, n => String(n.className).includes('role-service-state')).length, 0,
+    '详情区（标题旁与 controls 内）不再展示服务状态标签');
+  assert.ok(!allTexts(section).join(' ').includes('启动成功'), '详情不重复状态文案');
   const startButton = findAll(section, n => n.tagName === 'button' && n.textContent === '启动')[0];
   const stopButton = findAll(section, n => n.tagName === 'button' && n.textContent === '关闭')[0];
   assert.equal(startButton.disabled, true);
   assert.equal(stopButton.disabled, false);
+  // 列表仍是当前状态的入口：状态标签只在列表条目里出现。
+  assert.equal(h.state('agent:managed'), '启动成功', '当前状态入口保留在角色列表');
+  assert.equal(h.controlsFor('agent:managed') === undefined, false);
 });
 
 test('agent 账号只读：启动/关闭/全部启动禁用，不发写请求', async () => {

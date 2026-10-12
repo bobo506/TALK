@@ -142,7 +142,7 @@ function harness({ human = true, roster = DEFAULT_ROSTER } = {}) {
   vm.runInContext('this.__wsui = workspaceUI;', context);
 
   const flush = async () => { for (let i = 0; i < 3; i++) await new Promise(r => setTimeout(r, 0)); };
-  const rows = () => getEl('blackboard-columns').children;
+  const rows = () => getEl('blackboard-columns').children.flatMap(node => String(node.className).includes('role-entry') ? node.children : [node]);
   const roleRows = () => rows().filter(row => String(row.className).includes('role-row') && !String(row.className).includes('role-settings-row'));
   const settingsRow = () => rows().find(row => String(row.className).includes('role-settings-row'));
   const roleRow = memberId => roleRows().find(row => allTexts(row).some(t => t.includes(memberId)));

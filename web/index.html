@@ -6,8 +6,8 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261011-role-lifecycle-r1-3">
-  <link rel="stylesheet" href="/workspace.css?v=20261011-role-lifecycle-r1-3">
+  <link rel="stylesheet" href="/style.css?v=20261011-role-lifecycle-r1-3-ui-fix">
+  <link rel="stylesheet" href="/workspace.css?v=20261011-role-lifecycle-r1-3-ui-fix">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -105,14 +105,18 @@
           <p id="project-empty-note" class="project-empty-note hidden">还没有已注册项目。先用 <code>talk init</code> 建立项目上下文。</p>
         </section>
         <section id="blackboard-view" class="blackboard-view hidden">
-          <header class="blackboard-header">
+          <header id="blackboard-header" class="blackboard-header">
             <div>
 
               <h2 id="blackboard-title" class="hidden">任务</h2>
               <p id="blackboard-description">按协作状态查看项目任务</p>
             </div>
           </header>
-          <input id="workspace-search" type="search" placeholder="搜索任务" aria-label="搜索任务">
+          <div id="blackboard-toolbar" class="blackboard-toolbar">
+            <input id="workspace-search" type="search" placeholder="搜索任务" aria-label="搜索任务">
+            <div id="role-service-batch-actions" class="role-service-batch-actions hidden"></div>
+          </div>
+          <div id="role-service-batch-feedback" class="role-service-batch-feedback hidden"></div>
           <div id="blackboard-summary" class="blackboard-summary"></div>
           <div id="blackboard-columns" class="blackboard-columns"></div>
           <div id="blackboard-empty" class="blackboard-empty hidden">
@@ -504,7 +508,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
-  <script src="/workspace.js?v=20261011-role-lifecycle-r1-3"></script>
-  <script src="/app.js?v=20261011-role-lifecycle-r1-3"></script>
+  <script src="/workspace.js?v=20261011-role-lifecycle-r1-3-ui-fix"></script>
+  <script src="/app.js?v=20261011-role-lifecycle-r1-3-ui-fix"></script>
 </body>
 </html>

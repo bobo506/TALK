@@ -1,5 +1,6 @@
 /* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
 const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null };
+// R1-3：搜索框保持静态节点；角色页批量操作与结果分别重绘，避免移除搜索及其输入监听。
 function workspaceRootId(task) { return task?.root_task_id || task?.id; }
 function workspaceFinished(task) { return ["completed", "failed", "canceled"].includes(task?.workflow_status); }
 function workspaceTreeMatches(task, tree) {
@@ -629,6 +630,12 @@ function renderWorkspaceList() {
   search.placeholder = rolesMode ? "搜索角色" : "搜索任务";
   search.setAttribute("aria-label", search.placeholder);
   blackboardColumns.replaceChildren(); blackboardSummary.replaceChildren();
+  const batchActions = document.getElementById("role-service-batch-actions");
+  const batchFeedbackContainer = document.getElementById("role-service-batch-feedback");
+  batchActions.replaceChildren(); batchFeedbackContainer.replaceChildren();
+  batchActions.classList.toggle("hidden", !rolesMode);
+  batchFeedbackContainer.classList.toggle("hidden", !rolesMode);
+  blackboardSummary.classList.toggle("hidden", rolesMode);
   blackboardEmpty.classList.add("hidden"); blackboardColumns.classList.remove("hidden");
   const query = workspaceUI.query.trim().toLocaleLowerCase();
   if (rolesMode) {
@@ -643,29 +650,39 @@ function renderWorkspaceList() {
     settingsRow.classList.toggle("selected", workspaceSettingsSelected());
     settingsRow.setAttribute("aria-pressed", String(workspaceSettingsSelected()));
     settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "开发要求 · 调度模式"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
-    blackboardColumns.appendChild(settingsRow);
+    const settingsEntry = workspaceEl("div", "role-entry role-settings-entry");
+    settingsEntry.classList.toggle("selected", workspaceSettingsSelected());
+    settingsEntry.appendChild(settingsRow);
+    blackboardColumns.appendChild(settingsEntry);
     // ROLE-DESC-F1：搜索范围 = 成员名 + 有效说明全文（自定义 ?? 默认）+ 原始 business_role。
     const matchedRoles = roles.filter(item => `${workspaceMemberName(item.member_id)} ${workspaceRoleDescriptionText(item)} ${item.business_role || ""}`.toLocaleLowerCase().includes(query));
     for (const role of matchedRoles) {
+      // R1-3 布局修正：角色行与其服务控制包进同一个 .role-entry，条目自己只有一条底边线，
+      // 状态标签留在行内正常流中，不再用负外边距压到行边框上；两个子块各自负责左右留白。
+      const entry = workspaceEl("div", "role-entry");
       const row = workspaceButton("", () => { workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = role.member_id; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row");
       row.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
       row.setAttribute("aria-pressed", String(!workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole));
+      entry.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
       // 摘要列取有效说明的首个非空行：自定义后不再显示过时的硬编码短标签。
       row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleSummary(role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
       // ROLE-BINDING-B4：绑定摘要复用同一次名册读取的结果，不加请求、不参与搜索匹配范围。
       row.appendChild(workspaceEl("small", "role-binding-summary", workspaceRoleBindingSummary(role)));
       row.appendChild(workspaceEl("small", "role-row-id", role.member_id));
-      blackboardColumns.appendChild(row);
+      entry.appendChild(row);
       // R1-3：受管服务控制作为角色行的同级块（行本身是 <button>，不能再嵌套按钮）；未归档才显示。
       if (role.archived !== true) {
         const serviceControls = workspaceRoleServiceControls(role);
-        if (serviceControls) blackboardColumns.appendChild(serviceControls);
+        if (serviceControls) entry.appendChild(serviceControls);
       }
+      blackboardColumns.appendChild(entry);
     }
     // “项目设置”不计入角色数量：空名册/无匹配的提示只针对真实角色行。
     if (!matchedRoles.length) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", roles.length ? "没有匹配的角色" : "这个项目还没有配置角色。"));
-    // R1-3：项目级“全部启动”与部分失败重试入口放在角色区域标题行（与任务筛选共用同一行容器）。
-    blackboardSummary.appendChild(workspaceRoleServiceBatchPanel());
+    // R1-3：项目级“全部启动”进顶栏操作区，批量进度/失败/重试进独立反馈区；任务页筛选入口不受影响。
+    batchActions.appendChild(workspaceRoleServiceStartAllButton());
+    const batchFeedback = workspaceRoleServiceBatchFeedback();
+    if (batchFeedback) batchFeedbackContainer.appendChild(batchFeedback);
   } else {
     for (const [value, label] of [["all", "全部"], ["running", "进行中"], ["mine", "待我处理"], ["finished", "已结束"]]) {
       const button = workspaceButton(label, () => { workspaceUI.filter = value; renderWorkspaceList(); });
@@ -987,13 +1004,18 @@ function roleServiceControl(role) {
   return { view, status, busy, batchBusy, human, kind, observed, managed, ownershipHeld, canStart, canStop, hint };
 }
 // 列表行是 <button>，不能在内部再嵌套按钮；服务控制作为角色行的同级块渲染，保持行结构不变。
-function workspaceRoleServiceControls(role, className = "role-service-controls") {
+// 页面验收反馈：列表每个角色只展示**一个**当前服务状态标签（不做全部可选状态并列加深），
+// 启动/关闭是与状态同组的操作按钮，不伪装成状态选项；详情区不再重复状态标签。
+function workspaceRoleServiceStateLabel(status) {
+  return workspaceEl("span", `role-service-state ${status.kind}`, status.text);
+}
+function workspaceRoleServiceActions(role, className, showState) {
   const control = roleServiceControl(role);
   if (!control.view.provided) return null;
   const box = workspaceEl("div", className);
   if (control.view.memberId) box.dataset.memberId = control.view.memberId;
   const row = workspaceEl("div", "role-service-row");
-  row.appendChild(workspaceEl("span", `role-service-state ${control.status.kind}`, control.status.text));
+  if (showState) row.appendChild(workspaceRoleServiceStateLabel(control.status));
   const start = workspaceButton("启动", event => { event?.stopPropagation?.(); startRoleService(control.view.memberId); }, "role-service-button role-service-start");
   start.disabled = !control.canStart;
   start.setAttribute("aria-label", `启动 ${workspaceMemberName(control.view.memberId)} 的服务`);
@@ -1007,6 +1029,9 @@ function workspaceRoleServiceControls(role, className = "role-service-controls")
   if (control.hint) box.appendChild(workspaceEl("p", "role-service-hint", control.hint));
   return box;
 }
+function workspaceRoleServiceControls(role, className = "role-service-controls") {
+  return workspaceRoleServiceActions(role, className, true);
+}
 function workspaceRoleServicePanel(role) {
   const control = roleServiceControl(role);
   if (!control.view.provided) return null;
@@ -1014,10 +1039,8 @@ function workspaceRoleServicePanel(role) {
   section.setAttribute("aria-label", "受管 CLI 服务");
   const head = workspaceEl("div", "role-service-head");
   head.appendChild(workspaceEl("h3", "", "受管 CLI 服务"));
-  head.appendChild(workspaceEl("span", `role-service-state ${control.status.kind}`, control.status.text));
   section.appendChild(head);
-  section.appendChild(workspaceEl("p", "role-service-note", "只显示服务期望/观测状态与本流程启动结果；不代表模型能力或原生登录已验证，也不改变任务状态。"));
-  const controls = workspaceRoleServiceControls(role, "role-service-controls role-service-detail-controls");
+  const controls = workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls", false);
   if (controls) section.appendChild(controls);
   return section;
 }
@@ -1112,7 +1135,8 @@ function roleServiceBatchRequestFailures(results) {
     .filter(item => item && item.status === "failed" && typeof item.member_id === "string")
     .map(item => item.member_id);
 }
-function workspaceRoleServiceBatchPanel() {
+// R1-3 布局修正：批量入口只渲染按钮（进顶栏操作区）；进度/失败/重试渲染在独立反馈区。
+function workspaceRoleServiceStartAllButton() {
   const box = workspaceEl("div", "role-service-batch");
   const human = roleServiceHuman();
   const batch = roleServiceUI.batch;
@@ -1120,6 +1144,12 @@ function workspaceRoleServiceBatchPanel() {
   startAll.disabled = Boolean(batch && batch.busy) || !human || !workspaceRoles().length;
   if (!human) startAll.title = "当前账号是 Agent，只能查看服务状态。";
   box.appendChild(startAll);
+  return box;
+}
+// 反馈区：可换行、不挤占按钮位置。无任何反馈时返回 null，容器靠 CSS :empty 收起，不留空白条。
+function workspaceRoleServiceBatchFeedback() {
+  const box = workspaceEl("div", "role-service-batch-feedback-content");
+  const batch = roleServiceUI.batch;
   if (batch && batch.busy) box.appendChild(workspaceEl("span", "role-service-batch-status", "正在全部启动…"));
   else if (batch && batch.error) box.appendChild(workspaceEl("span", "role-service-batch-status error", batch.error));
   else if (batch) {
@@ -1150,7 +1180,7 @@ function workspaceRoleServiceBatchPanel() {
     }
   }
   if (roleServiceUI.pollError) box.appendChild(workspaceEl("span", "role-service-batch-status error", roleServiceUI.pollError));
-  return box;
+  return box.childElementCount ? box : null;
 }
 async function roleServiceErrorDetail(res, fallback) {
   try {
@@ -1414,7 +1444,8 @@ function renderWorkspaceRoleDetails() {
   namePanel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
   // ROLE-BINDING-B4：绑定只读区随名称区动态重绘，来自同一次名册读取；静态说明编辑区不在其中。
   namePanel.appendChild(workspaceRoleBindingPanel(role));
-  // R1-3：受管 CLI 服务控制区（未归档且名册带 service 字段时显示）；纯文本状态 + 启动/关闭按钮。
+  // R1-3：受管 CLI 服务操作区（未归档且名册带 service 字段时显示）；由 workspaceRoleServicePanel
+  // 只渲染启动/关闭与必要提示 —— 详情不再重复服务状态标签（状态入口在左侧角色列表）。
   if (role.archived !== true) {
     const servicePanel = workspaceRoleServicePanel(role);
     if (servicePanel) namePanel.appendChild(servicePanel);
