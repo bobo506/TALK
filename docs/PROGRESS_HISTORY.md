@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-13 19:59（Asia/Shanghai）— 236剩余G1/G2由Codex修正，派237独立复核
+
+- 用户“236好了”触发取件，实读caller agent:codex/kind=agent、最新development_requirements和DeepSeek available/报告暂停；用户前端指定与持续直接修正授权保持，不改项目要求或模型绑定。236 runner succeeded/submitted，但msg2740说明+围栏JSON导致MCP unknown；完整7689字符/SHA 650fe40784df1de1ffa0159f020e5b56b25f4f61988d067a461e6760ded33dfb，内嵌JSON与本地合法task236/complete一致，原消息/格式/自报不追改。235/236均未收取。
+- 实际HEAD ca4f5e49951998e6793b15b2154bc6d99cb0ae7c，作者ff40d89是派发源基线，后续两次协调方文档提交，作者未实测“实际HEAD一致”不作为事实。236实际5源/测试冻结在worker-final-review/source-snapshot，原235副本SHA不变，范围外源LF/CRLF归一比较零差异。未改生产配置/DB/名册/真实Key/CLI/模型/Browser；实际导入隔离服务会沿旧属性追加logs/talk.log，临时私有ACL/DB残留不删。
+- Codex独立实际复核并运行236原44新/相关旧11套件320/原6探针，分别全过、0fail/error/skip，44.41/161.22/5.11秒。模式入口、独立worker主循环stop、operator内存贯通、资格/本人核验、真实回环与CLI证据已核；作者报告自测数量不叠加。extra新增3探针全部行为失败、0error/skip、4.69秒：G1真实failed report变reported，两CLI仍0；G2预检GET名册后取消或预算耗尽仍POST roster-paths及3GET，函数入口的预算/检查不足以约束其内部请求。原失败记录保留。
+- 按2026-10-11持续直接修正授权，在原开发已暂停且本轮旧回归结束后Codex接手，仅改role_provision/worker/host及正式worker测试4文件，相对236模型文件不动。新增_RequestProvisionTransport仅请求驱动资格/期限存在时包传输，每次请求前核资格/停止和剩余预算，覆盖帮助函数与逐ACK；取消50ms最低超时抬升，旧run_provision语义保持。两个CLI将reported视为业务失败非零退出，保留原公开投影，不把报告送达当业务成功。正式44→50只追加6实际两CLI/预检内/首ACK后取消与预算用例，不删原保护/改server权限。
+- 修后独立new_final50/related_final320/oracle_final6/extra_after3分别全过、0fail/error/skip，61.48/164.53/5.44/3.53秒。第一次new_after/oracle_after标签被runner分派到extra3，原日志保留不算正式50/6；修分派规则后另标签正确运行。原236三失败、235六失败/25通过、作者与协调方重复证据不叠加唯一覆盖，均Python3.12/隔离SQLite与假Key临时文件，50内含实际回环uvicorn/WorkerTransport/DACL/CLI空秘密环境和慢worker下stop。候选5文件hash/原236与235副本完整、规范差异和准确统计在candidate-verified.json，已暂停源码修改。
+- 当前线程主循环非阻塞，once/max_rounds收尾最长两段有界grace、单段上限180s；完整Ctrl+C/宿主退出清理仍后续R1-4，不外推滴流网络绝对硬期限、恶意TOCTOU或跨进程/跨机原生能力。用户headless max变更晚于236提交，不把236当max效果对照；237是后续新启动任务，实际等级待记录核验，未主动模型验证/改配置/重启任务。
+- 实际#237独立顶层四参数派发，creator Codex/target DeepSeek，Hall group:task-d825fd7e75144926a27d12fb11a55f90，queued/assigned仅派发快照。完整包/回执worker-final-review，独立产物仅worker-cross-review；须查实际候选源码与G1/G2组合行为，原探针模块加载另存日志，不只采信开发者结论；禁止业务/正式测试/历史证据/正式文档/生产/Browser/Git写入，问题交回Codex而不并行改码。纯十字段talk-delivery-1 JSON交付，本次真实号字符串、MCP与本地一致，不再围栏混排。
+- 237独立通过才收取237/236/235并发布宿主，接Codex完整创建/配置前端及DeepSeek复核与人工验收；本轮不提前开前端/其它切片。原R1-3已验交互保持、外部/归档/退出后续、I-4后置。派发后Codex仅更新简报/计划/两进度4文档并中文提交常规推送，回执worker-final-review/publication.json；待审5业务文件不暂存/提交，默认派发后结束、用户“237好了”取件，不主动轮询等待或Browser操作。
+
 ## 2026-10-13 19:36（Asia/Shanghai）— 用户授权DSH headless默认推理等级max
 
 - 用户观察desktop默认max而TALK历史任务high，随后明确“headless也把配置写下”。只读核实际启动器`dsh.cmd --profile headless`、headless空patch、desktop agent-default-model max及近期TALK session modelSelection.lastUsed high；未读任务正文/凭据、未轮询236或审查返修活源码。CLI版本0.1.5-rc.2，桌面/无界面profile分别读取配置，提供商层明确推理等级适用于该headless入口。
