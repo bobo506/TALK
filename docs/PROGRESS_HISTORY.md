@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-13 14:38（Asia/Shanghai）— 233独立复核未通过，7合同探针检出缺口后派234同片返修
+
+- 用户“好了”通知233完成；最新AGENTS重申本次前端Codex/DeepSeek复核、后端DeepSeek/Codex复核，沿原任务包不改职责。实读MCP caller agent:codex/kind=agent、最新development_requirements及DeepSeek available，原开发已submitted/报告暂停，共享目录无并行改码。233合法partial/task233、msg2737完整6215字符/SHA e24a7d790c85d49b443993bfd6af4516a0b9322412420b5a2785211a0794ca4b，本地报告逐结构一致；当前HEAD c9283a3与业务基线070f930仅协调方文档差异。
+- 233新增共享规则1583行/router230行/3测试与模型366行、C1–C4/挂载/索引增量，共6server+3tests。独立读实际共享规则/router/接线与必要模型/迁移/夹具后重跑新62项全通过，0失败/错误/跳过；旧166只核作者原日志Ran166/OK，未重复运行，不叠加。9个实际源/测试字节相同副本与SHA保存新server-review根，范围外原129源中未允许项零漂移。没有真实Key/生产角色/运行器/Browser操作。
+- 新合同探针7项均行为断言失败、0error/skip：非指定host领取200；create选择退役和recover轮换后同键意图重放409；有效短假human凭据作为error_code保存并由普通agent GET取得；活动create改名后同成员recover201；failed回报改错误结果仍当精确终态重放200；携有效token但错operation_key退人工创建201。首轮长测试角色Key受长度拒绝不能证明稳定白名单，随后有效短假凭据复现，未触真实凭据；探针日志不输出秘密值。独立62全过表明原用例没有覆盖这些边界，不把7失败包装成通过。
+- 233未收取、源码未提交、完整审查和并发证据未通过；发现阻塞即交回修正，不继续宿主/前端。F1–F6源定位/实证/修正要求在server-review/review.md；原233/230–232与协调方证据保持。要求有限稳定错误码/安全映射，纯载荷重放先于新事实校验，member锚点占用，精确错误结果重放，未知来源token拒绝，指定host锁内校验且零写入；不扩大权限或弱化旧无请求路径。
+- 实际#234四参数独立顶层派发，creator Codex/target DeepSeek，Hall group:task-aae470cecc024899ac093448c929a701，queued/assigned仅快照；任务包/回执在.tmp/role-lifecycle-r1-4-server-review/，返修worker仅.tmp/role-lifecycle-r1-4-server-rework/。只允许原server片及必要新测试，禁止脚本/页面/正式文档/生产配置/数据库/名册/Key/服务/模型/浏览器/Git；完成暂停，原独立探针和证据只读。
+- 234修后跑原7探针/补正式回归、新3协议与旧6套件，并补必要隔离WAL两个独立连接claim/同recover最多一次轮换、创建提交前故障六表+请求事实零残留；不能以串行HTTP宣称并发原子性。Codex修正后继续实际独立审查，通过再收取234/233。现有业务仍未验收，不将原报告partial或原失败追改。
+- 协调方仅更新简报/计划/两进度4文档、持续授权中文提交普通推送，不混未审源码或历史.tmp-tests/ACL残留；具体回执server-review/publication.json。默认派发后结束，用户“234好了”再取件，不主动等待或Browser操作。R1-3人工通过与列表/详情已验布局保持，宿主/完整创建页面后置同一功能，外部/归档/退出仍后续，I-4后置。
+
 ## 2026-10-13 10:58（Asia/Shanghai）— 232方案补正收尾，正式请求合同与233服务端开发
 
 - 用户“好了”触发232取件。MCP合法complete/task232、runner succeeded/submitted、msg2736完整2584字符/SHA d19637431551f95e26474657791959f2db2eda280169d4931390aba37c47720a，与本地交付逐结构一致，summary退出0；129已跟踪源哈希及作者9静态事实对应5文本哈希均零漂移。一次校验shell拼接命令语法失败，随后固定verify.py与reference.json验证成功，原产物未改，未运行新业务协议/服务/数据库/Key/浏览器。
