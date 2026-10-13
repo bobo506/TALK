@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-13 09:31（Asia/Shanghai）— #230事实/方案未通过，派#231补一键配置凭据交接与宿主闭环
+
+- 用户“好了”通知230完成。runner succeeded/submitted、msg2734含TALK_ACTION与围栏JSON/说明，MCP业务unknown；完整两页4282字符/SHA dab2ecb97f6e50add5677ecf700ebe8256272e998b95bf6329d09bfd3889b5e7，内嵌JSON与本地合法talk-delivery-1/task230 partial逐结构一致。原消息/报告保持、未执行行动块，230尚未收取；格式通过不等于业务通过。
+- 只读准备正确识别已有运行器/模型选择、创建幂等/一次性返回Key、配置作业API，以及宿主尚无provision执行入口、角色软归档未实现。但其“服务端没存明文Key”错误：Member.api_key仍明文列，项目创建/轮换实际写该列；“server/routes唯一DELETE只在groups”也错误：projects.py:990已有DELETE项目，精准缺口是无DELETE项目角色。
+- 方案逐角色手工member/operation_key目标清单与预有Key输入未解决页面新建角色首次Key自动交受信宿主并私有落盘；B片页面Key显示/复制提议与既定公共页面不落Key方向不符。A只读选择器＋B创建的拆分未交付完整一键配置功能。P-2默认human resume、P-3不含原生登录已有合同依据，P-4两个动作替代一键流程建议未获采用，不作为五个重复用户审批问题。
+- 定向读实际Member模型/项目创建轮换赋值、宿主parser/导入与目标DELETE路由，源码/跟踪/暂存仍干净，HEAD5a8f876；未重复完整后端探索/测试、未开前端半流程、未修改生产/Key/服务/浏览器。MCP重新实读caller agent:codex/kind=agent、最新development_requirements与DeepSeek idle/current_task_id=null；用户Codex前端指定/临时Kimi不足安排保持。
+- 实际#231，DeepSeek只读设计补正，creator Codex，Hall group:task-279fd4f8e7fa49bcbf5c57c57532980f；独立顶层最小四参数，queued/assigned仅派发快照。要求完整创建→首次一次性凭据可信交接→宿主发现/领取→真实配置/ACK与恢复的一个推荐方案，精确接口/权限/状态/CAS/路径/DACL与新增授权点；没有新权限或生产操作实施授权。真实模型/登录不并入，保存配置不自动启动服务，删除/退出仍原范围后续。
+- 新worker仅.tmp/role-lifecycle-r1-4-provision-design/，原230worker/消息/证据只读；原文与结构对比在.tmp/role-lifecycle-r1-4-prep-review/，原2734响应JSON在.tmp/role-lifecycle-r1-4-frontend-create/（仅证据目录，无前端源码）。业务/正式文档/配置/Git禁止执行者改，协调方只更新计划/简报/两进度并提交普通推送。
+- 当前等待231完整方案，默认派发后结束、用户通知“231好了”后再核具体新增边界与实施先后；先补齐一个完整创建/配置功能，再外部/归档/退出，前端仍Codex实施且交DeepSeek独立复核。R1-3页面已验收保持，I-4后置，未宣称任何R1-4代码已完成。
+
 ## 2026-10-12 23:24（Asia/Shanghai）— 用户指定R1-4前端由Codex开发，派#230后端/宿主只读准备
 
 - 用户明确“这部分涉及前端页面的话，我建议由你来进行开发”。本次R1-4前端实施由Codex承担、DeepSeek独立复核；后端/宿主由DeepSeek准备与实施、Codex独立复核。该本轮明确指定优先于项目页面尚存的常规Kimi前端要求；不自动写项目development_requirements，不永久固定模型分级或追改旧任务，Kimi额度不足临时安排保持。

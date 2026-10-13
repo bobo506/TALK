@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-12 23:24 (Asia/Shanghai)：用户明确R1-4前端由Codex开发；已派#230只读核对创建/配置的后端与宿主依赖，当前等待前置报告，未开业务代码，I-4后置。
+Updated: 2026-10-13 09:31 (Asia/Shanghai)：#230只读报告尚未通过，发现事实错误与首次凭据交接缺口；已派#231补完整一键配置闭环方案。前端仍由Codex开发，当前未开业务代码，I-4后置。
 
 ## 当前状态
 
@@ -28,7 +28,9 @@ Updated: 2026-10-12 23:24 (Asia/Shanghai)：用户明确R1-4前端由Codex开发
 
 - 原R1-3服务/227/228最终与独立证据根保持；新`.tmp/role-service-list-status-fix/`保存588基线/836保护/10源before/final、Codex正负验证与派发，`.tmp/role-service-list-status-review/`保存229独立报告与变异产物。
 - `.tmp/role-service-list-status-final/`保存msg2733原文/SHA/本地结构一致、冻结检查、229收取与最终Git回执。正式文档为协调方收尾例外，业务源码自独立冻结未变。
-- 本轮确认运行器/模型目录与角色创建API已有，POST provision目前仅作业入口，真实文件配置由宿主脚本执行/ACK；页面需要具体宿主执行闭环。#230只读核对实际源/字段、一次性Key恢复、最小宿主入口及归档/退出依赖，不新增接口或代做生产操作。
-- #230 target DeepSeek/creator Codex，Hall group:task-f6150d47f5464071b6381b061493240b，queued/assigned仅派发回执。包/回执在.tmp/role-lifecycle-r1-4-dispatch/，worker仅.tmp/role-lifecycle-r1-4-backend-prep/；正式源/配置/原证据不可改，协调方本轮仅分工/计划/进度文档。默认派发后结束，用户通知“230好了”后取件，再定首个明确后端/前端切片。
+- #230 succeeded/submitted尚未收取，msg2734混入TALK_ACTION/说明，MCP unknown；完整4282字符/SHA dab2ecb97f6e50add5677ecf700ebe8256272e998b95bf6329d09bfd3889b5e7，内嵌JSON与本地合法partial逐结构一致。原消息/报告保持，未执行行动块。现有创建/配置作业及宿主入口缺失事实可作索引，方案尚未批准。
+- Codex定向核实members.api_key仍为明文列，GET roles不公开Key不代表服务端不保存；projects.py已有DELETE项目，缺口准确为无DELETE项目角色。原报告两处宽泛事实错误及逐角色手工目标/Key方案未覆盖新角色首次凭据自动落盘，不能作为完整一键配置方案。
+- #231 DeepSeek只读补正：推荐一个完整创建→安全首次凭据交接→宿主发现/领取→profile/key_file/preflight→ACK/失败恢复方案，明确接口/权限/幂等/路径及必要新增授权点。沿已批准一键配置方向，不将原生登录/默认人工resume等已有合同事项重复交用户批准；不先交付只读选择器半流程。前端完整流程仍Codex实施，宿主闭环先明确。
+- #231 Hall group:task-279fd4f8e7fa49bcbf5c57c57532980f，target DeepSeek/creator Codex，queued/assigned仅派发快照。包/回执及230核对在.tmp/role-lifecycle-r1-4-prep-review/，新worker仅.tmp/role-lifecycle-r1-4-provision-design/；业务/正式文档/配置/Git/原证据只读，协调方本轮只计划/简报/进度收尾。默认派发后结束，用户通知“231好了”后取件；具体新增边界待完整方案核对后再决定，未提前授权实现。
 - R1-4按已批准范围完整创建/配置、外部桌面、删除/归档和退出清理推进，一次一片、独立复核与人工验收保持；I-4后置。本轮未新跑测试/浏览器/服务，不重复派发/收取223–229，不自动重启服务。
 - 恢复指令：`继续项目`。完整历史见PROGRESS_HISTORY。
