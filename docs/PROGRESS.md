@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-13 09:31 (Asia/Shanghai)：#230只读报告尚未通过，发现事实错误与首次凭据交接缺口；已派#231补完整一键配置闭环方案。前端仍由Codex开发，当前未开业务代码，I-4后置。
+Updated: 2026-10-13 10:26 (Asia/Shanghai)：#231纠正事实并提出宿主代持创建，但事务/租约/恢复方案尚未通过；已派#232定向补闭环。前端仍由Codex开发，未开R1-4业务代码，I-4后置。
 
 ## 当前状态
 
@@ -30,7 +30,9 @@ Updated: 2026-10-13 09:31 (Asia/Shanghai)：#230只读报告尚未通过，发�
 - `.tmp/role-service-list-status-final/`保存msg2733原文/SHA/本地结构一致、冻结检查、229收取与最终Git回执。正式文档为协调方收尾例外，业务源码自独立冻结未变。
 - #230 succeeded/submitted尚未收取，msg2734混入TALK_ACTION/说明，MCP unknown；完整4282字符/SHA dab2ecb97f6e50add5677ecf700ebe8256272e998b95bf6329d09bfd3889b5e7，内嵌JSON与本地合法partial逐结构一致。原消息/报告保持，未执行行动块。现有创建/配置作业及宿主入口缺失事实可作索引，方案尚未批准。
 - Codex定向核实members.api_key仍为明文列，GET roles不公开Key不代表服务端不保存；projects.py已有DELETE项目，缺口准确为无DELETE项目角色。原报告两处宽泛事实错误及逐角色手工目标/Key方案未覆盖新角色首次凭据自动落盘，不能作为完整一键配置方案。
-- #231 DeepSeek只读补正：推荐一个完整创建→安全首次凭据交接→宿主发现/领取→profile/key_file/preflight→ACK/失败恢复方案，明确接口/权限/幂等/路径及必要新增授权点。沿已批准一键配置方向，不将原生登录/默认人工resume等已有合同事项重复交用户批准；不先交付只读选择器半流程。前端完整流程仍Codex实施，宿主闭环先明确。
-- #231 Hall group:task-279fd4f8e7fa49bcbf5c57c57532980f，target DeepSeek/creator Codex，queued/assigned仅派发快照。包/回执及230核对在.tmp/role-lifecycle-r1-4-prep-review/，新worker仅.tmp/role-lifecycle-r1-4-provision-design/；业务/正式文档/配置/Git/原证据只读，协调方本轮只计划/简报/进度收尾。默认派发后结束，用户通知“231好了”后取件；具体新增边界待完整方案核对后再决定，未提前授权实现。
+- #231 succeeded/submitted未收取，msg2735合法partial/任务号一致，完整4942字符/SHA c49ddbce3673fe4b3cf1d489e1c04cbdef97c73f8a20e2f1e58adab4e16981f5，本地报告逐结构一致。两项原事实已补正；推荐由受信宿主承接人类意图取得创建一次性Key，页面不落Key，但不代表方案完整或已获新部署授权。
+- Codex定向复核F1–F5未通过：首次create不读意图指纹、租约过期ACK旁路且副作用未守卫、recover可能重复轮换且旧Key文件拒覆盖、预检/ACK顺序与完成report事实不足、到期发现/created续跑等接口迁移未闭合。原方案/交付不追改，核对与129个已跟踪源码哈希保存在.tmp/role-lifecycle-r1-4-design-review/；d2ed18b相对5a8f876无这些源码差异。
+- #232只读定向补正，DeepSeek承接/Codex复核，Hall group:task-7e19def6b91a4f2f812e8055e879842d，queued/assigned仅派发快照。新worker仅.tmp/role-lifecycle-r1-4-provision-design-final/；任务包/回执在design-review，230/231原证据保持。先形成可直接开发的单一推荐合同，不把表/接口/一般CAS选择和已批准人工恢复变成五个用户审批；最小server/worker同机回环，跨机凭据传输/TLS不夹带。具体产品/权限边界由协调方核完整方案与既有授权后判断。
+- 默认派发后结束、用户通知“232好了”后取件；执行者不改业务/正式文档/配置/Git、不读Key或操作服务/模型/浏览器。前端以完整创建/配置流程为目标，不先交付只读选择器；本轮只复核/进度文档，未提前授权新边界实现。
 - R1-4按已批准范围完整创建/配置、外部桌面、删除/归档和退出清理推进，一次一片、独立复核与人工验收保持；I-4后置。本轮未新跑测试/浏览器/服务，不重复派发/收取223–229，不自动重启服务。
 - 恢复指令：`继续项目`。完整历史见PROGRESS_HISTORY。

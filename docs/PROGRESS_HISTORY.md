@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-13 10:26（Asia/Shanghai）— #231方案定向复核未通过，派#232补事务/租约/恢复闭环
+
+- 用户“好了”通知231完成。合法talk-delivery-1/task231字符串/partial，runner succeeded/submitted；msg2735完整两页4942字符/SHA c49ddbce3673fe4b3cf1d489e1c04cbdef97c73f8a20e2f1e58adab4e16981f5，与本地delivery.json逐结构一致，summary校验退出0。原231报告基线5a8f876到当前d2ed18b仅协调方文档推进，129个已跟踪server/scripts/bridges/web/tests文件哈希保存；未改业务源。230/231尚未收取，自报通过不等于独立通过。
+- 已认可两项事实补正：Member.api_key明文列、三个DELETE与项目角色软归档精准缺口；宿主承接人类意图直接接收一次性创建响应并私有落盘可作推荐方向。但实际create只与已提交RoleCreationOperation比对，未读取意图指纹，首次改载荷可创建；租约过期后无活跃租约会回旧ACK兼容分支，创建/轮换/provision也未受领取资格约束。recover的新request_key与原job operation_key映射未定义，不能宣称过期回报被阻止。
+- rotate-key无操作幂等/版本前置，提交后丢响应重领会再次轮换；旧脚本_run_key_step明确拒覆无效旧文件，与“rotate后复用旧规则即可落盘”不符。方案顺序先逐步ACK后本人/绑定预检，且leased可直接report provisioned、没有实际原创建/当前三步/凭据版本的完成核验。worker仅发现requested，created失联、到期/人工resume及取消禁用竞态没有完整迁移；claim CAS字段与准确接口数量亦不闭合。F1–F5证据/要求在新review.md，不重复完整后端审查。
+- 本轮实读caller=agent:codex/kind=agent与当前development_requirements、DeepSeek availability=available（不是额度证明）；用户前端Codex指定/Kimi不足临时安排保持。实际#232独立顶层最小四参数，target DeepSeek/creator Codex，Hall group:task-7e19def6b91a4f2f812e8055e879842d，queued/assigned仅派发快照；新worker仅.tmp/role-lifecycle-r1-4-provision-design-final/。须逐项补成可直接作为开发合同的事务/接口/状态/CAS/本地文件与恢复代际方案、准确范围和正负验收，完成立即暂停。
+- R0 D表末明确一般实现选择不上升人类前置批准；不直接采用231的五项逐条问卷。表/接口/CAS、默认关闭单宿主、已批准人工恢复由开发/评审确定；产品/执行主体的实际代价由协调方结合既有授权判断。推荐最小server/受信worker同机回环，页面可来自LAN，新角色Key跨机传输/TLS部署不夹带，不改凭据存储或开放任意Key读取。未提前授权新边界编码。
+- .tmp/role-lifecycle-r1-4-design-review/保存原msg2735、结构/SHA校验、源码哈希、定向复核、232包/完整派发回执；230/231证据只读。执行者禁业务/正式文档/生产配置/数据库/Git/Key/服务/模型/浏览器操作，协调方只更新简报/计划/两进度并按持续授权提交普通推送。未新跑运行测试，不把方案静态核对当能力通过。
+- 默认派发后结束、不轮询；用户通知“232好了”后取件，完整方案核实后再进入后端/宿主开发与Codex前端。R1-3页面已验收交互保持，外部/归档/退出仍后续原范围，I-4后置。本轮没有R1-4业务代码。
+
 ## 2026-10-13 09:31（Asia/Shanghai）— #230事实/方案未通过，派#231补一键配置凭据交接与宿主闭环
 
 - 用户“好了”通知230完成。runner succeeded/submitted、msg2734含TALK_ACTION与围栏JSON/说明，MCP业务unknown；完整两页4282字符/SHA dab2ecb97f6e50add5677ecf700ebe8256272e998b95bf6329d09bfd3889b5e7，内嵌JSON与本地合法talk-delivery-1/task230 partial逐结构一致。原消息/报告保持、未执行行动块，230尚未收取；格式通过不等于业务通过。
