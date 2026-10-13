@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-13 16:12（Asia/Shanghai）— server发布d5a7bbd后派235宿主配置worker
+
+- R1-4a九业务/测试+七文档统一提交d5a7bbd5e55e975ce1535f1797dc2d22247f905b并普通推送bobo506/TALK，远端一致，tracked/index干净（不含旧未跟踪.tmp-tests/ACL残留）；server-final-review/publication.json保存准确回执。测试后九源冻结零漂移、暂存精确16文件、cached diff检查通过，没有混生产配置或临时证据。
+- 派发前重新实读caller agent:codex/kind=agent、最新development_requirements与DeepSeek available，用户Codex前端指定/临时Kimi不足安排保持，不自动改项目要求或模式。实际#235四参数独立顶层，target DeepSeek/creator Codex，Hall group:task-f2b9798754534acc9491713a06b48d3d，queued/assigned仅快照；业务基线d5a7bbd，包/回执worker-dispatch，worker产物仅.tmp/role-lifecycle-r1-4-worker/。
+- 一个宿主切片：新role_provision_worker与既有serve接线，默认关闭、同机回环、只消费人类claimable请求，配置不启动；目标member/origin由请求与实际响应派生，不逐角色再写手工目标或复制Key。复用原私有发布/DACL/路径/双锁，创建/人工recover至多一次、已知旧代受限替换、metadata部分发布认证修复、真实三步与同代ACK/report；普通输出/日志/argv/env不落Key/token，回报仅有限稳定码，不泛化HTTP错误为成功。
+- 235保留R1-3服务循环/stop响应性，配置IO失败有停止与预算，未知原生能力不假适配。不改web/bridges/MCP/正式文档/config/生产DB或名册/真实Key、原档/证据，不启生产/浏览器/模型，不做Git；允许scripts必要模块及有限新server错误码/测试，完成暂停。测试只对自建虚拟项目/假凭据文件，以实际文件/权限验证闭环、锁/旧文件/过期/响应丢失等负向；不跑用户默认Key根，私有ACL残留如实保存。
+- 本轮仅两进度文件记录派发并持续授权中文提交/普通推送，回执worker-dispatch/publication.json。默认派发后结束，用户“235好了”再收件，开发期间协调方不审查/改业务代码；worker通过才接Codex完整前端/DeepSeek复核和完整创建配置人工验收。server通过不代表私有文件/原生能力，外部/归档/退出仍后续、I-4后置。
+
 ## 2026-10-13 16:02（Asia/Shanghai）— R1-4a server独立通过，234→233收取与源码收尾
 
 - 用户“好了”触发234取件，最新身份caller agent:codex/kind=agent、项目要求和DeepSeek available已核，原开发已submitted并暂停。234合法partial/task234、msg2738完整5949字符/SHA 27bee155cd02a7c8fd522bc4b1dbd9598e757f083bee834e4b5a45c26a80c2d2，本地逐结构一致。自报worker/前端/生产演练未完成保留，合法格式不是验收依据。
