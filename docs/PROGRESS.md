@@ -1,29 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-13 21:00 (Asia/Shanghai)：237独立复核通过，237→236→235已收取；server/宿主代码闭合并收尾发布。下一片Codex完整创建配置前端，DeepSeek独立复核；完整功能/原生能力未验，I-4后置。
+Updated: 2026-10-13 22:56 (Asia/Shanghai)：Codex完整创建/配置前端候选完成并暂停，已派DeepSeek独立复核#238；候选尚未发布，页面人工验收待复核后进行。
 
 ## 当前状态
 
-- 项目`D:/claude-test/TALK`，project_id=`prj_e8fe7066bbec`，分支`codex/terminal-return-codex`。server已发布d5a7bbd；本轮源基线b99773e9252f1005c5a8a10e09870d102fc975ea，宿主5文件按237已核候选统一发布，准确提交/远端回执`.tmp/role-lifecycle-r1-4-worker-closeout/publication.json`。
-- R0/R1-1/R1-2完成并有基础页面验收。R1-3服务35886b3、最终页面34e9df4发布、223–229已收取，本轮页面基础用户明确“验收通过”。列表仅当前服务状态，启停只在详情、详情无重复状态；缓存20261012-role-service-list-status保持。
-- 230–232准备链及233/234server片均已收取。三表/共享规则/10新API/4旧入口已实现，见[正式请求合同](spec/ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)；server仅存意图/事实，不写宿主文件或spawn。
-- server独立新79/旧166/原7全通过；WAL两连接/线程与提交前六表回滚证据已核，234→233已收取。原失败/partial保持，证据server-final-review，不外推多进程/生产迁移/性能。
-- 235/236原缺口经返修及Codex持续授权接手G1/G2、237独立复核闭合，237→236→235均succeeded/completed。原235六失败、236三失败/自报complete/围栏MCP unknown保持，236原消息与本地合法报告一致；证据worker-review/final-review/cross-review分别只读保留。
-- 237合法complete/task237，msg2741完整8268字符/SHA ef8ccedceb49b9e4e04ee9da14003c074746c934d3e49ba9ae63f6cefc01b1bb，与本地逐结构一致。候选5文件hash与原快照、旧失败/probes重新核对均不变，范围外跟踪变更零；最终验证/收取回执在worker-closeout。
-- DeepSeek独立50正式/320旧/原6/检出3/独立13分别0fail/error/skip；新增实证包括真实失败reported两个CLI退出1、真实子进程CLI成功0/失败1、_ensure_job内部取消/预算/租约拒后续请求。原Codex证据保持、不叠加重叠数量；本轮候选未变，未重复已通过套件。
+- 项目`D:/claude-test/TALK`，project_id=`prj_e8fe7066bbec`，分支`codex/terminal-return-codex`。已发布业务HEAD=`24f8470dcc96785b37aa94f0918ee43f78e10675`（server d5a7bbd及宿主收尾）；230–237均已收取，准确回执worker-closeout/publication.json。R1-3页面34e9df4用户明确验收通过。
+- 本片由Codex实施、DeepSeek独立复核。5web+10tests共15文件已冻结但未提交，manifest/字节副本/差异在`.tmp/role-lifecycle-r1-4-frontend/`；保护776份范围外非docs跟踪源。正式docs仅记录候选与待复核，不宣称发布/人工通过。
+- 创建弹窗接运行器→模型→名称/介绍→人类意图保存；角色详情接配置三步/失败继续/人工恢复，项目设置接宿主开关CAS。Key不进页面，配置与启动分开；列表仅当前服务状态，启停仅详情、详情无重复服务状态，全部启动/搜索/反馈保持。
+- 开发者三源语法、全部214项Node（旧197+新增17）、26项Python页面契约（旧24+新增2）均通过。隔离真实uvicorn+Node前端factory HTTP+实际worker假Key私有文件/DACL闭环1项通过；人类保存及开启仅2POST、Agent零POST，最终provisioned/三步完成且未自动启动。DOM桩/VM/HTTP不替代浏览器视觉或真实原生能力。
+- node.log原214项中资源数量4→6遗漏断言失败保持，修后node-final.log214全通过。临时live夹具导入、控制类型/安全token问题已修，最终live.log/live-evidence.json通过；node-final.py曾GBK终端打印异常，实际测试exit0和日志已落盘，不以外层异常掩盖失败。
 
-## 下一步与未完成
+## 待取件与下一步
 
-- **下一片完整创建/配置前端**：由Codex实施、DeepSeek独立复核，按现行请求合同接运行器/模型/名称介绍→保存并配置→异步进度/失败恢复；角色Key不进页面，保存配置与启动分开。列表仅当前服务状态、启停仅详情、详情不重复状态的已验布局保持；不先交付只读选择器。
-- 按单片收尾与模块切换规则，本轮先发布宿主和文档，不开启另一模块开发；恢复`继续项目`后读取唯一MODULE_webui再实施前端。完整功能人工验收后再外部桌面引导、归档/删除/退出清理；I-4后置，不新增生产配置/凭据部署授权。
-- 50套件含实际隔离uvicorn+WorkerTransport/假Key私有文件/DACL/真实CLI operator文件来源/慢worker控制循环stop。无生产凭据/原生登录/模型/CLI启停、多角色隔离或主动等待验收；生产启用/部署/迁移/重载未执行。once/max_rounds的线程收尾有最长两段有界grace，完整退出清理仍后续，不外推硬网络期限/恶意TOCTOU防御。
-- human-only、项目与worker默认关闭、server/worker同机回环、页面不落角色Key、保存配置与启动分开；跨机Key/TLS、任意Key读取和D7明文列迁移不夹带。
-- 已同步[worker使用指南](guides/ROLE_REQUEST_WORKER.md)与请求/配置/服务合同、MODULE_bridges；指南包含关闭/只读/真实处理参数、operator文件来源、恢复和实际预算限制，未运行生产启用示例。
+- 实际#238，target DeepSeek/creator Codex，派发时queued/assigned仅快照；完整审查包及回执review-package.md/review-dispatch.json。只读候选，独立证据仅`.tmp/role-lifecycle-r1-4-frontend-review/`；开发暂停，协调方仅文档/Git收尾。默认派发后结束，用户“238好了”再取件，不主动等待/轮询。
+- 238须检查实际源码、接线、重复/丢响应/项目账号切换、CAS与人工恢复、权限/文本/旧服务及原已验服务UI，不能只采信开发者。通过后按源码hash收取、发布候选并提供人工验收说明；不通过由Codex持续授权修正，再独立复核。
+- 限制：仅近期200请求；旧角色没有请求关联/当前凭据代际时不猜恢复入口；sessionStorage不可用只保证当前内存同键。真实浏览器视觉/窄屏/键盘、原生登录/模型/CLI启停/生产worker启用未验；没有重载/变更生产DB、名册、配置、真实Key。
+- 当前切片收尾后暂停，不开下一功能；本创建/配置人工验收后继续同功能的外部桌面引导、归档/删除及退出清理，I-4后置。server/worker同机回环、项目与worker默认关闭、human-only、保存配置不自动启动保持，跨机Key/TLS/D7不夹带。
 
 ## 协作与恢复
 
-- 用户要求headless也设max：实际TALK启动器为`dsh.cmd --profile headless`，desktop中的agent-default-model max未被该profile读取。已在仓库外`C:/Users/Administrator/.dsh/profiles/headless/cordis.patch.yml`设置`llm-deepseek.config.reasoningEffort: max`并UTF-8备份；DSH CLI 0.1.5-rc.2的`--dump-config`合成结果max/启用，未发送模型请求或重启现有236。下一次新启动任务核实际等级，原high历史不追改；白名单证据`.tmp/dsh-headless-effort/`，个人配置/凭据不提交仓库。
-- 本轮用户指定前端Codex/DeepSeek复核，后端宿主DeepSeek/Codex复核；Kimi不足临时安排保持，页面常规Kimi前端要求不自动改写。已核caller=agent:codex/kind=agent和最新development_requirements，availability不证明额度。
-- 当前没有待取宿主任务；后续仍共享目录开发完成暂停再审查、默认派发后结束由用户通知取件，不默认Browser验页。持续直接修正授权不免独立复核与人工门禁。
-- bobo506/TALK普通提交后推送持续授权，不强推/改远端历史；旧生产配置/身份/名册/Key与历史.tmp-tests/ACL残留保持、不混提交、不宣称全工作区干净。
-- 230/231原unknown混排/partial、232设计complete及233/234业务partial均原样保留，收取表示补正链按实际server片闭合，不表示原稿都通过或R1-4全功能完成。完整历史见PROGRESS_HISTORY，恢复指令：`继续项目`。
+- 已核实际caller=agent:codex/kind=agent、最新development_requirements。用户前端Codex/DeepSeek复核指定优先于页面常规Kimi前端；Kimi不足临时安排保持，availability不是额度证明。共享目录开发暂停再审查，独立复核/人工门禁/正式收尾保持。
+- 用户要求的DSH headless max已写仓库外profile并备份，0.1.5-rc.2 --dump-config合成max已核；新任务实际模型请求等级尚未核，旧high历史不追改，不要求TALK重启。证据`.tmp/dsh-headless-effort/`，个人配置/凭据不进Git。
+- 235原六失败、236原三失败/complete自报/围栏MCP unknown、237独立通过及原230–234结果均原样保留；宿主50/320/原6/检出3/独立13通过不叠加计数，生产原生能力未因此确认。
+- 普通提交/推送bobo506/TALK持续授权，不强推/改远端历史。候选代码待复核不混入本轮文档提交；`.tmp`、旧`.tmp-tests`/ACL残留及私有配置保持，不宣称全工作区干净。恢复指令：`继续项目`；有238结果时可直接说`238好了`。

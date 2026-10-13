@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-13 22:56（Asia/Shanghai）— Codex完整创建配置前端候选完成，派238独立复核
+
+- 用户“继续项目”恢复唯一MODULE_webui；实际caller agent:codex/kind=agent、最新项目要求已核，按用户明确前端Codex/DeepSeek复核分工实施。业务基线24f8470dcc96785b37aa94f0918ee43f78e10675，宿主237链保持，未改生产配置或追改历史。
+- 一片完整创建/配置：新role-creation.js/CSS，index创建弹窗/待创建列表/项目宿主设置，workspace入口/详情/项目角色名，app刷新接线；15候选文件为5web+10tests，新增4测试文件/既有6缓存契约更新，6资源版本20261013-role-creation。候选未提交，manifest与candidate字节副本冻结；776范围外非docs跟踪源保护，开发暂停后才派复核。
+- 页面只提交真人意图，目录限定已适配managed_cli/non-retired choice；名称Unicode64/介绍2000与Python空白同序、非空白原文保留。三配置步骤独立于服务状态；Key/token/凭据文件不进页面、普通输出或sessionStorage，不调旧create/rotate/claim/ACK/report，不自动启动。R1-3用户已验列表单状态/启停仅详情/详情无重复标签/全部启动及搜索选择保持。
+- POST重复/丢响应/不确定失败保存固定请求键和载荷，刷新会恢复上次运行器/模型标签；保存成功后禁止重复提交。账号/项目世代与目录序号挡迟到结果、离页停止未来轮询；继续/取消用当前revision，409重读不自动重写；recover人工确认、固定credential_version/同键，host启停用config_version、同值不开新代。
+- 三语法、Node214/214（旧197+新17）、Python26/26（旧24+新2）、隔离真实回环1项分别0fail/error/skip。真实uvicorn/隔离SQLite由Node实际factory发保存和开启，真实worker假Key私有文件/DACL/三步后页面GETprovisioned；人类仅2POST、Agent0POST、原生服务未启动。证据frontend/verification.json、node-final/python/live各日志与live-evidence.json；DOM桩/VM/HTTP不是浏览器视觉。
+- 原node.log214中仅旧资源计数4→6断言未同步失败保持，修后214通过。临时live导入/unknown控制类型/uuid假键安全token夹具错误均在fixture修正，实际页面32hex键合法，未削弱服务守卫。node-final.py的GBK终端打印报错发生在结果落盘后，日志214通过与实际子测试exit0保持，不重复已通过套件或伪装原失败。
+- 实际#238四最小参数顶层派发给DeepSeek，queued/assigned仅快照；完整需求/不变项/业务基线/差异与实际源manifest/验收标准/开发者证据/限制写入审查包，review-package.md和review-dispatch.json留存。只读源码，独立测试放frontend-review；不得改正式候选/tests/docs、旧证据、server/bridge/MCP/config/生产DB/.talk/名册/真实Key，不做Browser/模型/原生CLI/Git。须实际源码复核、前后SHA/范围外保护、合法本次task_id纯JSON交付，完成暂停。
+- 已知近期200请求与无请求关联旧角色恢复入口限制、storage拒绝只有内存同键；无浏览器/视觉/真实键盘、生产worker启用或原生登录模型服务验收。通过后发布+人工验收，再外部/归档/退出同功能，I-4后置。本轮仅5正式文档汇总/普通提交推送，候选15文件保持未提交；默认派发后结束，由用户“238好了”取件，进度/Git回执frontend/publication.json。
+
 ## 2026-10-13 21:00（Asia/Shanghai）— 237独立复核通过，宿主235–237收取发布
 
 - 用户“237好了”触发收件。实读caller agent:codex/kind=agent、最新development_requirements及DeepSeek available/已submitted；用户前端Codex指定/持续接手修正授权保持，不改页面分工或绑定。237合法complete/task237，msg2741完整8268字符/SHA ef8ccedceb49b9e4e04ee9da14003c074746c934d3e49ba9ae63f6cefc01b1bb，与本地逐结构一致，summary校验通过。复核源码/哈希/日志才判通过，runner和格式本身不是验收。
