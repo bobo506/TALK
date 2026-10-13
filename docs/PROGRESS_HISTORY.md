@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-13 19:36（Asia/Shanghai）— 用户授权DSH headless默认推理等级max
+
+- 用户观察desktop默认max而TALK历史任务high，随后明确“headless也把配置写下”。只读核实际启动器`dsh.cmd --profile headless`、headless空patch、desktop agent-default-model max及近期TALK session modelSelection.lastUsed high；未读任务正文/凭据、未轮询236或审查返修活源码。CLI版本0.1.5-rc.2，桌面/无界面profile分别读取配置，提供商层明确推理等级适用于该headless入口。
+- 比对原文件SHA ef189a8c27db6d63930aa3046a3040482e952eafcb7487c644d508e8d461f027未变化后，在仓库外C:/Users/Administrator/.dsh/profiles/headless/cordis.patch.yml加入llm-deepseek.config.reasoningEffort=max；原UTF-8配置备份为同路径.bak-codex-max-20261013-193554。新SHA 13cf0eaa65fbdf2f2d54d62fed27f2c432f7bb8a5003b5ce9aaca282df1351e4。仅改此推理等级，未写Key/修改其它profile/任务或重启现有进程。
+- DSH --profile headless --dump-config前后分别未设等级→max、条目启用；组合树只在内存解析，!!js按文本处理不执行，白名单前后结果在.tmp/dsh-headless-effort/before.json/after.json。第一次受限环境dump退出1，允许只读宿主执行后dump退出0；最初SafeLoader不认!!js，添加安全文本构造器后解析成功，未改DSH代码。未发模型请求、不宣称实际模型调用已max或能消除返工，下次新启动TALK任务再核记录，旧high历史保持。
+- 协调方仅同步两份进度文档并按持续授权提交普通推送；个人profile/备份、临时证据、未审宿主源码不入Git。236保持原任务包和默认派发后结束约定，用户完成通知后继续独立复核，再前端开发。
+
 ## 2026-10-13 19:00（Asia/Shanghai）— 235宿主独立复核未通过，派236同片返修
 
 - 用户“好了”通知235完成，MCP runner succeeded/submitted、自报合法complete/task235；msg2739完整5263字符/SHA 22847eb5774ab837cfda2ba7f39cf7daa766478eb055319567b01ecf6228fdfd，本地JSON逐结构一致/summary校验通过。格式不代表业务验收；235未收取，原报告保持。实读caller agent:codex/kind=agent、最新development_requirements与DeepSeek available；用户Codex前端指定、Kimi不足安排保持，不改页面要求/模式。

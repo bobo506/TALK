@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-13 19:00 (Asia/Shanghai)：235宿主独立复核未通过，原新25通过但新增6行为探针全部失败；已派236同片返修。server d5a7bbd保持，完整一键配置尚未可用，I-4后置。
+Updated: 2026-10-13 19:36 (Asia/Shanghai)：235未通过、236待用户完成通知；已按用户要求把DSH headless提供商默认推理等级设为max，组合配置验证通过，实际新任务等级待核。server d5a7bbd保持，完整一键配置尚未可用，I-4后置。
 
 ## 当前状态
 
@@ -21,6 +21,7 @@ Updated: 2026-10-13 19:00 (Asia/Shanghai)：235宿主独立复核未通过，原
 
 ## 协作与恢复
 
+- 用户要求headless也设max：实际TALK启动器为`dsh.cmd --profile headless`，desktop中的agent-default-model max未被该profile读取。已在仓库外`C:/Users/Administrator/.dsh/profiles/headless/cordis.patch.yml`设置`llm-deepseek.config.reasoningEffort: max`并UTF-8备份；DSH CLI 0.1.5-rc.2的`--dump-config`合成结果max/启用，未发送模型请求或重启现有236。下一次新启动任务核实际等级，原high历史不追改；白名单证据`.tmp/dsh-headless-effort/`，个人配置/凭据不提交仓库。
 - 本轮用户指定前端Codex/DeepSeek复核，后端宿主DeepSeek/Codex复核；Kimi不足临时安排保持，页面常规Kimi前端要求不自动改写。已核caller=agent:codex/kind=agent和最新development_requirements，availability不证明额度。
 - 共享目录开发完成暂停后再审查，236开发期间协调方仅更新文档；默认派发后结束、用户通知“236好了”再取件，不默认Browser验页。持续直接修正授权不免独立复核与人工门禁。
 - bobo506/TALK普通提交后推送持续授权，不强推/改远端历史；旧生产配置/身份/名册/Key与历史.tmp-tests/ACL残留保持、不混提交、不宣称全工作区干净。
