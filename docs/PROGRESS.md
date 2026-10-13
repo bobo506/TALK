@@ -1,25 +1,26 @@
 # Project Progress
 
-Updated: 2026-10-13 22:56 (Asia/Shanghai)：Codex完整创建/配置前端候选完成并暂停，已派DeepSeek独立复核#238；候选尚未发布，页面人工验收待复核后进行。
+Updated: 2026-10-13 23:55 (Asia/Shanghai)：238复核partial已核，Codex补正历史截断/最新请求进度并暂停，已派239独立补充复核；前端候选仍未发布，人工验收待复核后进行。
 
 ## 当前状态
 
-- 项目`D:/claude-test/TALK`，project_id=`prj_e8fe7066bbec`，分支`codex/terminal-return-codex`。已发布业务HEAD=`24f8470dcc96785b37aa94f0918ee43f78e10675`（server d5a7bbd及宿主收尾）；230–237均已收取，准确回执worker-closeout/publication.json。R1-3页面34e9df4用户明确验收通过。
-- 本片由Codex实施、DeepSeek独立复核。5web+10tests共15文件已冻结但未提交，manifest/字节副本/差异在`.tmp/role-lifecycle-r1-4-frontend/`；保护776份范围外非docs跟踪源。正式docs仅记录候选与待复核，不宣称发布/人工通过。
-- 创建弹窗接运行器→模型→名称/介绍→人类意图保存；角色详情接配置三步/失败继续/人工恢复，项目设置接宿主开关CAS。Key不进页面，配置与启动分开；列表仅当前服务状态，启停仅详情、详情无重复服务状态，全部启动/搜索/反馈保持。
-- 开发者三源语法、全部214项Node（旧197+新增17）、26项Python页面契约（旧24+新增2）均通过。隔离真实uvicorn+Node前端factory HTTP+实际worker假Key私有文件/DACL闭环1项通过；人类保存及开启仅2POST、Agent零POST，最终provisioned/三步完成且未自动启动。DOM桩/VM/HTTP不替代浏览器视觉或真实原生能力。
-- node.log原214项中资源数量4→6遗漏断言失败保持，修后node-final.log214全通过。临时live夹具导入、控制类型/安全token问题已修，最终live.log/live-evidence.json通过；node-final.py曾GBK终端打印异常，实际测试exit0和日志已落盘，不以外层异常掩盖失败。
+- 项目`D:/claude-test/TALK`，project_id=`prj_e8fe7066bbec`，分支`codex/terminal-return-codex`。业务已发布24f8470（server d5a7bbd及宿主收尾），230–237已收取；238前仅5文档提交e1d9c87，业务15候选未提交。R1-3页面34e9df4用户已验。
+- 238合法partial/task238，msg2742/SHA b7ba390813fc9f199d5dcc6acb8634903453d84fb44df3e23fce1ac46daf6da0/5035字符，与本地逐结构一致，JSON围栏原样保留。独立214Node/26Python/27新用例及15+776前后零漂移；Git沙箱不能启动、M1/M4未检出与人工/原生未验均保持，不改写原partial。
+- Codex取件核实际HEAD e1d9c87与238候选15/保护776源零漂移。发现实际A7升序前200截断会隐藏新请求，及旧失败先于新恢复显示；按持续直接修正授权只改role-creation.js和其单元测试，原13候选/776保护源不变，未改后端/生产配置/凭据/名册/服务。
+- 修正按6状态各200读取、去重；本页最近32公开request_key按账号/项目存sessionStorage，列表缺失时按A8原键补读，上轮在途也跟踪至终态；最新created_at决定角色进度，触顶提示部分记录未显示。Key/token不入页面，POST权限/CAS/恢复版本/不自动启动及已验单服务状态布局保持。
+- 新增7反例：大量历史/跨终态补读重建/最新恢复/补读迟到隔离/storage禁用提示/账号变化提交/宿主按钮安全代际。修正三源语法、221Node、26Python、隔离实际HTTP/worker闭环分别通过；真实HTTP种205 canceled+205 provisioned历史fixture，并非跑410次worker。负向冻结238原码检出4处，M1/M4副本变异各1失败。
+- 原238独立27对新码回跑26过1失败，RV22正则禁所有role-requests/键路径，误把新A8 GET当写动作；日志原样保存，239须独立确认并在新目录调整方法/路径断言，原238测试/证据不改，不宣称原27在新码全通过。
 
 ## 待取件与下一步
 
-- 实际#238，target DeepSeek/creator Codex，派发时queued/assigned仅快照；完整审查包及回执review-package.md/review-dispatch.json。只读候选，独立证据仅`.tmp/role-lifecycle-r1-4-frontend-review/`；开发暂停，协调方仅文档/Git收尾。默认派发后结束，用户“238好了”再取件，不主动等待/轮询。
-- 238须检查实际源码、接线、重复/丢响应/项目账号切换、CAS与人工恢复、权限/文本/旧服务及原已验服务UI，不能只采信开发者。通过后按源码hash收取、发布候选并提供人工验收说明；不通过由Codex持续授权修正，再独立复核。
-- 限制：仅近期200请求；旧角色没有请求关联/当前凭据代际时不猜恢复入口；sessionStorage不可用只保证当前内存同键。真实浏览器视觉/窄屏/键盘、原生登录/模型/CLI启停/生产worker启用未验；没有重载/变更生产DB、名册、配置、真实Key。
-- 当前切片收尾后暂停，不开下一功能；本创建/配置人工验收后继续同功能的外部桌面引导、归档/删除及退出清理，I-4后置。server/worker同机回环、项目与worker默认关闭、human-only、保存配置不自动启动保持，跨机Key/TLS/D7不夹带。
+- 实际239，creator Codex/target DeepSeek，Hall group:task-7b7877ef7be44f25b3e8f468f8b1e93f，queued/assigned仅快照。包/回执/15源新manifest/副本/对238两源delta与全部新证据`.tmp/role-lifecycle-r1-4-frontend-fix/`；独立证据仅frontend-fix-review，开发已暂停，协调方仅docs/Git收尾。
+- 239须独立闭合200+进度/跨终态原键/最新恢复/上下文/文本权限与旧UI、新M1/M4覆盖，核实际源码和15+776 hash。Git宿主禁用可按协调方实际基线与字节副本核对，如实记录工具限制；不为只读复核强开danger-full-access。
+- 238尚未收取，239通过后按整链收取/业务15源+正式文档统一发布并给人工验收步骤；不通过Codex补正再独立核。默认派发后结束，用户“239好了”或“好了”再取件，不主动等待/轮询/Browser。
+- 限制仍每状态200、会话最近32保存键；未观察过或较早历史可能不显示，UI触顶提示。不具请求关联/凭据代际的旧角色不猜恢复入口；storage拒绝只保证内存同键，待确认时显示刷新限制。浏览器视觉/键盘/窄屏、原生登录模型启停/生产worker启用未验。
+- 当前同片闭合，不开启另一功能。页面人工验收后外部桌面引导、删除归档与退出清理继续同功能，I-4后置；server/worker同机loopback、默认关闭/human-only/保存不启动保持，跨机Key/TLS/D7不夹带。
 
 ## 协作与恢复
 
-- 已核实际caller=agent:codex/kind=agent、最新development_requirements。用户前端Codex/DeepSeek复核指定优先于页面常规Kimi前端；Kimi不足临时安排保持，availability不是额度证明。共享目录开发暂停再审查，独立复核/人工门禁/正式收尾保持。
-- 用户要求的DSH headless max已写仓库外profile并备份，0.1.5-rc.2 --dump-config合成max已核；新任务实际模型请求等级尚未核，旧high历史不追改，不要求TALK重启。证据`.tmp/dsh-headless-effort/`，个人配置/凭据不进Git。
-- 235原六失败、236原三失败/complete自报/围栏MCP unknown、237独立通过及原230–234结果均原样保留；宿主50/320/原6/检出3/独立13通过不叠加计数，生产原生能力未因此确认。
-- 普通提交/推送bobo506/TALK持续授权，不强推/改远端历史。候选代码待复核不混入本轮文档提交；`.tmp`、旧`.tmp-tests`/ACL残留及私有配置保持，不宣称全工作区干净。恢复指令：`继续项目`；有238结果时可直接说`238好了`。
+- 已核caller agent:codex/kind=agent和最新项目development_requirements；用户前端Codex/DeepSeek复核指定优先于页面常规Kimi前端，Kimi不足安排保持，不改页面配置。独立复核、开发暂停、人工门禁、正式收尾保持。
+- headless max已设且dump-config核合成值，实际新模型请求等级未核、旧high历史不改；无TALK重启要求，个人配置/凭据不提交。原230–237失败/partial/unknown与已核证据均保持，原生能力未因隔离通过确认。
+- 普通提交推送bobo506/TALK持续授权，不强推/改历史。本轮仅5文档提交，未复核业务不混入；.tmp、旧.tmp-tests/私有ACL残留/生产配置保持，不宣称整个工作区干净。恢复：`继续项目`；结果到达：`239好了`。

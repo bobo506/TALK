@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-13 23:55（Asia/Shanghai）— 238 partial取件核对、Codex同片补正并派239独立复核
+
+- 用户“好了”取238。实际caller agent:codex/kind=agent、最新要求/DeepSeek available已核。238 succeeded/submitted仅流程，合法partial/task238，msg2742/SHA b7ba390813fc9f199d5dcc6acb8634903453d84fb44df3e23fce1ac46daf6da0/5035字符，完整只读补读与本地逐结构相同；消息围栏保留。原独立214/26/27、9变体、15+776前后零漂移、Git运行被拒/M1/M4未检出/人工原生未验原样保留，238未收取。
+- Codex核实际Git HEAD e1d9c87（仅上轮5文档）、业务基线24f8470与原候选/保护源无漂移，弥补复核者Git环境限制，不擅强开其宿主权限。实际发现A7是created_at升序限量前200而非“近期200”，旧终态挤掉新请求、旧失败先于新恢复投影不满足进度收敛，当前未发布，按持续授权亲自修正。
+- 仅相对238改web/role-creation.js与tests/workspace_role_creation.test.cjs，其余13源/保护776不变；新15源manifest/byte副本与delta在frontend-fix，原frontend及238审查证据只读保留。按六状态各200读取、去重，本页最近32公开请求键项目/账号隔离sessionStorage；列表缺失按既有A8 GET原键补读，上一轮在途也跟踪至终态，新created_at请求优先。触顶提示部分省略，storage拒绝待确认显示刷新限制；不改server分页/协议/权限/生产状态，不把Key/token存入页面，不自动启动服务。
+- 新7正式用例与原17/R1-3旧197共221Node通过，26Python及三语法通过；实际隔离uvicorn+Node factory HTTP+真实worker假Key/DACL/三步闭环通过，205 canceled与205 provisioned是DB历史fixture，不宣称410次worker。会话公开请求键由create保存→verify重建，终态截断外补读仍provisioned；人类仅2POST/Agent0POST，未启动原生CLI。新结果/原始日志frontend-fix/verification.json及node/python/live各日志，独立证据不重复相加。
+- 新23单元对冻结238旧源码可检出4新行为缺口，M1 submit human防御及M4 UI safeInt变异各1失败（候选副本），negative-results.json留存。M4业务setHost原有兜底仍正确，补的是禁用控件的可观察行为；不把冗余守卫未变异检出当成越权事实。
+- 原238独立27回跑新码26过1fail，RV22源码正则一概禁止role-requests/键路径，实际误阻止新增合法A8 GET；原独立测试不改，失败日志不覆盖。239需自己确认方法/路径、在新目录复制调整断言并保留非法POST/旧create/rotate/claim/ACK/report/凭据边界，不能把旧27回跑失败改写为通过。
+- 实际#239四最小参数顶层派DeepSeek，creator Codex、Hall group:task-7b7877ef7be44f25b3e8f468f8b1e93f，queued/assigned仅派发快照。审查包含原需求/已验不变项、238实际partial与独立证据、实际基线/完整15候选与两源delta、验收反例/开发证据/真实限制。只读源，独立产物frontend-fix-review；禁止改正式代码/tests/docs/旧证据/生产配置DBKey名册/.talk、不启Browser/模型原生CLI、不做Git，完成暂停，实际任务号纯10字段JSON本地/MCP一致。
+- 每状态200/会话32保存键是诚实有限读取，不承诺全历史分页；无请求关联旧角色不猜恢复、storage禁用刷新仍可能失去待确认键，视觉/真实键盘/原生登录模型启停/生产worker未验。239通过再整链收取+业务正式发布+人工页面验收；外部/归档/退出与I-4不启动。本轮仅5docs汇总中文提交普通推送，源码继续冻结未提交，回执frontend-fix/publication.json；默认派发后结束、用户“239好了”取件。
+
 ## 2026-10-13 22:56（Asia/Shanghai）— Codex完整创建配置前端候选完成，派238独立复核
 
 - 用户“继续项目”恢复唯一MODULE_webui；实际caller agent:codex/kind=agent、最新项目要求已核，按用户明确前端Codex/DeepSeek复核分工实施。业务基线24f8470dcc96785b37aa94f0918ee43f78e10675，宿主237链保持，未改生产配置或追改历史。
