@@ -1,6 +1,6 @@
 # 页面创建与宿主配置请求合同（R1-4a）
 
-> 2026-10-13：采用230–232补正链的宿主承接人类意图方向，经Codex定向复核及下述明确修订形成正式实施合同。**这是待实现协议，尚无R1-4业务代码或运行验证。** 原230/231/232报告保持，不将232自报全闭合当作原稿全部通过。
+> 2026-10-13：采用230–232补正链方向形成正式合同，server协议经233开发、234返修及Codex独立复核通过，234→233已收取。三表/共享守卫/10新接口/4旧入口已实现；独立新79、旧166及原7探针分别全通过，WAL两连接/线程与提交前回滚证据通过。**宿主执行/私有文件与前端尚未接线，完整创建配置未验收。** 原草稿、partial及失败证据保持，不外推生产部署/原生能力。
 > 上游：[角色生命周期](ROLE_LIFECYCLE_DESIGN.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)、[受管服务](ROLE_SERVICE_CONTRACT.md)。本合同只修订请求驱动的创建/恢复/配置路径；既有无请求来源的人工接口保持。
 
 ## 1. 用户流程与实施边界
@@ -60,7 +60,7 @@
 | POST `/roles/{member_id}/provision` | 可选request_key/lease_token；精确选择当前请求来源，job仍用原operation_key |
 | POST `/roles/{member_id}/provision/ack` | 可选request_key/lease_token；现有revision/attempt/credential_version语义和错误先后保持 |
 
-新增body使用extra=forbid；kind互斥载荷、预算边界、稳定错误码由共享规则验证。recover只接受已有原创建操作的managed角色，不借恢复扩大imported/共享/在用边界。create新意图不得占用已被旧人工创建操作使用的operation_key；同request_key同规范化载荷返回原行，不重建、不刷新快照，异载荷409。
+新增body使用extra=forbid；kind互斥载荷、预算边界、稳定错误码由共享规则验证。recover只接受已有原创建操作的managed角色，不借恢复扩大imported/共享/在用边界。create新意图不得占用已被旧人工创建操作使用的operation_key；同request_key同规范化载荷返回原行，不重建、不刷新快照，异载荷409。意图重放先做纯载荷归一化，只有新键才查实时目录/角色版本；目录退役或已轮换不阻断旧意图读取。
 
 不新增凭据读取、renew或作业侧cancel接口；不向既有只读GET要求租约。
 
@@ -79,6 +79,8 @@ claim响应另含规范化payload、choice_snapshot、当前credential_version�
 claim在写锁内校验expected_revision、标签、状态、占用、预算、有效并发数；有效租约不能被再次领取。过期、配置换代或人工resume后才能重领，签发新世代/token。成员不存在→leased；成员已存在→created（**recover领取后也是created**），不会重新创建。lease_seconds不能高于项目预算；失败/终态不能被worker自动复活。
 
 所有请求驱动的create/rotate/provision/ACK/report分别在自己的写锁内复查资格。禁用先提交则后续写拒绝；创建先提交则成员事实保留，disable不回滚或删除成员。到期判断采用服务端UTC，GET不归并写库。旧本地工作即使返回成功，也不能凭失效token写新状态。
+
+claim的稳定标签失配码为role_request_host_mismatch；参数存在按is not None处理。C1提供token但原operation_key无来源时返回provision_lease_required，不能落回旧人工创建。尚未创建同名与已创建同成员占用区分，后者以member_id锚定，PATCH改名不解除占用；claim/resume不得借supersede夺取另一活动意图。
 
 ### 5.1 永久来源与多次恢复
 
@@ -116,6 +118,8 @@ report(provisioned)写锁内核：请求已有真实成员且原创建操作的�
 
 report(failed)保留已创建成员和三步事实，仅落稳定错误码。终态同一次提交的精确重放可只读返回，不再次修改；异结果/旧代/已resume不许覆盖。终态不再有副作用写资格。实现明确保存或推导原report提交的revision/代际以区分真正回放。
 
+report和请求驱动ACK的失败码使用models.ROLE_REQUEST_HOST_ERROR_CODES有限集合（包括manual_recovery_required及已发布配置宿主码）；未知字符串422/零写入，不把安全标识串当作无凭据。以后新增宿主码须明确登记集合。原无请求ACK的≤64安全码规则保持。report回放先验证错误载荷，再核outcome/report_revision/token/实际错误结果及报告期凭据版本；异错误结果、非法输入、后续轮换或resume不算精确回放。
+
 ## 9. 人工操作与失败路径
 
 | 情形 | 行为 |
@@ -140,7 +144,7 @@ Key已发布而元数据失败：不删除当前有效Key，记录失败；下�
 
 ## 11. 切片与验收
 
-第一片只实施server三表/共享守卫/A1–A10/C1–C4及有意义的隔离测试，DeepSeek开发、Codex独立复核；完成暂停。新router与projects路由共用一个规则模块，避免循环导入或两套授权/租约规则。下一片宿主，之后Codex前端+DeepSeek独立复核，交完整创建/配置功能人工验收；不先发布只读选择器半流程。
+server片已由233/234完成并独立复核收取：9个业务/测试文件，原旧6套件未改。新router与projects共用server.role_provision_requests。下一片宿主，之后Codex前端+DeepSeek独立复核，交完整创建/配置功能人工验收；不先发布只读选择器半流程。
 
 必须检出的负向：首次意图载荷/choice替换零创建；cancel/disable/过期后的创建/轮换/ACK零写入；旧代token与再启用不复活；原人工重放不返Key且目录变更不阻断；历史create+新recover正确选源；恢复重放顺序/并发只轮换一次；新recover与旧resume互斥；跳过原创建/三步/代际不能完成；created失联可发现；耗尽可人工恢复；所有公开投影严格不含Key/token/hash/路径/argv，错误与日志哨兵Key零命中。
 

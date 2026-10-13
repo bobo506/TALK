@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-13 16:02（Asia/Shanghai）— R1-4a server独立通过，234→233收取与源码收尾
+
+- 用户“好了”触发234取件，最新身份caller agent:codex/kind=agent、项目要求和DeepSeek available已核，原开发已submitted并暂停。234合法partial/task234、msg2738完整5949字符/SHA 27bee155cd02a7c8fd522bc4b1dbd9598e757f083bee834e4b5a45c26a80c2d2，本地逐结构一致。自报worker/前端/生产演练未完成保留，合法格式不是验收依据。
+- 独立核实际返修6文件相对233源副本，另3未变；完成共享规则/router/C1–C4/模型/索引迁移及真实并发/回滚用例检查。F1写锁host核对，F2纯指纹先重放，F3有限稳定错码与请求ACK约束，F4稳定成员占用及claim/resume不supersede，F5错误结果/报告代际精确回放，F6携token未知来源拒绝均闭合，旧无请求路径/目录退役后原创建回放保持。源码部分A编号注释沿旧草稿，路径映射正确且不影响行为。
+- Codex独立run_review.py新79/旧166/原只读oracle7分别全通过、0失败/错误/跳过；原探针从旧review按非main方式加载，日志只写新final-review，不覆盖原7失败记录。两方证据不叠加，原7与正式套件的语义重叠不算新增唯一功能覆盖，实际Python3.12/进程内TestClient与隔离SQLite，未调用模型/原生服务或读真实Key。
+- 新79含显式WAL/两个不同DBAPI连接/barrier线程的同键claim与项目限额、同recover一次201/一次200/轮换记录1/版本+1；提交前apply_create_intent_created注入故障验证六表零新增，请求保持原leased/revision/attempts/member/origin、失败响应无Key。不是多进程或生产迁移演练，不能外推宿主文件/性能/原生能力。
+- 新final-review保存msg2738/ref/SHA/结构、实际9源manifest、原233字节副本不变/原oracle与返修copy一致、范围外原129源中未允许项零漂移核对、独立日志/摘要/结论。实际234→233收取succeeded/completed，UTC分别07:51:24.019554与07:51:27.159299，回执保留；233原缺口/partial与234partial不追改。
+- 同步请求合同server已实现与有限错误码/精确回放/宿主失配、配置合同新增来源守卫纪律、MODULE_bridges最新server段及R1-3本轮页面验收、简报/计划/两进度共7文档。6server+3tests共9业务文件经冻结和必要空白/范围检查后与文档统一中文提交、持续授权普通推送；准确SHA/远端回执在server-final-review/publication.json，不混历史测试/私有ACL残留。
+- server只存意图/事实，不写宿主文件、不spawn；项目默认关闭、human-only、同机回环、无新增Key读取，Member明文/D7与旧生产身份配置保持。worker真实私有Key/credential.json/预检、前端尚未接线，完整创建配置仍待实现与人工验收。下一片DeepSeek宿主/Codex复核，再Codex前端/DeepSeek复核；外部/归档/退出后续同功能，I-4后置，不因server通过开放原生能力结论。
+
 ## 2026-10-13 14:38（Asia/Shanghai）— 233独立复核未通过，7合同探针检出缺口后派234同片返修
 
 - 用户“好了”通知233完成；最新AGENTS重申本次前端Codex/DeepSeek复核、后端DeepSeek/Codex复核，沿原任务包不改职责。实读MCP caller agent:codex/kind=agent、最新development_requirements及DeepSeek available，原开发已submitted/报告暂停，共享目录无并行改码。233合法partial/task233、msg2737完整6215字符/SHA e24a7d790c85d49b443993bfd6af4516a0b9322412420b5a2785211a0794ca4b，本地报告逐结构一致；当前HEAD c9283a3与业务基线070f930仅协调方文档差异。

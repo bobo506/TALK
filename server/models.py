@@ -485,6 +485,129 @@ PROVISION_ROSTER_PATH_BASENAMES = {
     "user_path": "USER.md",
 }
 
+# ── 角色生命周期 R1-4a：请求驱动创建 / 恢复（REQUEST_CONTRACT §2–§9）──────
+# 本段只声明数据事实与稳定错误码；全部判定与写事务在
+# ``server.role_provision_requests`` 的共享守卫模块内实现，路由与既有
+# ``projects`` 入口共用同一份规则，避免两套判定。
+
+#: 请求种类：仅 create / recover。
+ROLE_REQUEST_KIND_CREATE = "create"
+ROLE_REQUEST_KIND_RECOVER = "recover"
+ROLE_REQUEST_KINDS = (ROLE_REQUEST_KIND_CREATE, ROLE_REQUEST_KIND_RECOVER)
+
+#: 请求状态机（合同 §2）：revision 每次有效变更 +1，attempts 每次领取 +1。
+ROLE_REQUEST_STATUS_REQUESTED = "requested"
+ROLE_REQUEST_STATUS_LEASED = "leased"
+ROLE_REQUEST_STATUS_CREATED = "created"
+ROLE_REQUEST_STATUS_PROVISIONED = "provisioned"
+ROLE_REQUEST_STATUS_FAILED = "failed"
+ROLE_REQUEST_STATUS_CANCELED = "canceled"
+ROLE_REQUEST_STATUSES = (
+    ROLE_REQUEST_STATUS_REQUESTED,
+    ROLE_REQUEST_STATUS_LEASED,
+    ROLE_REQUEST_STATUS_CREATED,
+    ROLE_REQUEST_STATUS_PROVISIONED,
+    ROLE_REQUEST_STATUS_FAILED,
+    ROLE_REQUEST_STATUS_CANCELED,
+)
+#: 仍**占用**同角色名额的状态（部分唯一索引 + 跨 kind 占用检查）。
+#: ``failed`` / ``canceled`` 的旧行永久保留但不再占用。
+ROLE_REQUEST_ACTIVE_STATUSES = (
+    ROLE_REQUEST_STATUS_REQUESTED,
+    ROLE_REQUEST_STATUS_LEASED,
+    ROLE_REQUEST_STATUS_CREATED,
+)
+#: worker 可通过 claim 发现的状态（合同 §4：覆盖 requested、失效 leased、失联 created）。
+ROLE_REQUEST_CLAIMABLE_STATUSES = ROLE_REQUEST_ACTIVE_STATUSES
+#: report 只接受这两个结果。
+ROLE_REQUEST_REPORT_OUTCOMES = (
+    ROLE_REQUEST_STATUS_PROVISIONED,
+    ROLE_REQUEST_STATUS_FAILED,
+)
+
+#: 宿主项目配置预算（合同 §2）：未建配置行时 GET 返回 disabled/version0。
+ROLE_PROVISION_HOST_LEASE_SECONDS_DEFAULT = 900
+ROLE_PROVISION_HOST_LEASE_SECONDS_MIN = 30
+ROLE_PROVISION_HOST_LEASE_SECONDS_MAX = 1800
+ROLE_PROVISION_HOST_MAX_ACTIVE_LEASES_DEFAULT = 2
+ROLE_PROVISION_HOST_MAX_ACTIVE_LEASES_MIN = 1
+ROLE_PROVISION_HOST_MAX_ACTIVE_LEASES_MAX = 4
+ROLE_PROVISION_HOST_MAX_ATTEMPTS_DEFAULT = 3
+ROLE_PROVISION_HOST_MAX_ATTEMPTS_MIN = 1
+ROLE_PROVISION_HOST_MAX_ATTEMPTS_MAX = 10
+ROLE_PROVISION_HOST_LABEL_MAX_CHARS = 64
+ROLE_REQUEST_PAYLOAD_VERSION = 1
+ROLE_REQUEST_LIST_LIMIT_DEFAULT = 50
+ROLE_REQUEST_LIST_LIMIT_MAX = 200
+
+# 稳定错误码白名单（合同 §3/§5/§6/§7/§9；错误响应与日志只落码，不落正文）。
+ROLE_REQUEST_ERROR_NOT_FOUND = "role_request_not_found"
+ROLE_REQUEST_ERROR_KEY_CONFLICT = "role_request_key_conflict"
+ROLE_REQUEST_ERROR_KIND_INVALID = "role_request_kind_invalid"
+ROLE_REQUEST_ERROR_PAYLOAD_INVALID = "role_request_payload_invalid"
+ROLE_REQUEST_ERROR_CONFIRM_REQUIRED = "role_request_confirm_required"
+ROLE_REQUEST_ERROR_ROLE_CONFLICT = "role_request_role_conflict"
+ROLE_REQUEST_ERROR_PAYLOAD_MISMATCH = "role_provision_payload_mismatch"
+ROLE_REQUEST_ERROR_OPERATION_CONFLICT = "operation_key_conflict"
+ROLE_REQUEST_ERROR_OPERATION_MISMATCH = "role_request_operation_mismatch"
+ROLE_REQUEST_ERROR_SOURCE_REQUIRED = "provision_lease_required"
+ROLE_REQUEST_ERROR_LEASE_INVALID = "role_request_lease_invalid"
+ROLE_REQUEST_ERROR_LEASE_SECONDS_INVALID = "role_request_lease_seconds_invalid"
+ROLE_REQUEST_ERROR_LEASE_CONFLICT = "role_request_lease_conflict"
+ROLE_REQUEST_ERROR_REVISION_CONFLICT = "role_request_revision_conflict"
+ROLE_REQUEST_ERROR_STATUS_CONFLICT = "role_request_status_conflict"
+ROLE_REQUEST_ERROR_RETRY_EXHAUSTED = "role_request_retry_exhausted"
+ROLE_REQUEST_ERROR_NOT_RESUMABLE = "role_request_not_resumable"
+ROLE_REQUEST_ERROR_CANCEL_REFUSED = "role_request_cancel_refused"
+ROLE_REQUEST_ERROR_MEMBER_CREATED = "member_created"
+ROLE_REQUEST_ERROR_CHOICE_UNAVAILABLE = "role_request_choice_unavailable"
+ROLE_REQUEST_ERROR_BINDING_MISMATCH = "role_request_binding_mismatch"
+ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH = "role_request_credential_mismatch"
+ROLE_REQUEST_ERROR_CREDENTIAL_STALE = "role_request_credential_stale"
+ROLE_REQUEST_ERROR_COMPLETION_INCOMPLETE = "role_request_completion_incomplete"
+ROLE_REQUEST_ERROR_STALE_REPORT = "role_request_stale_report"
+ROLE_REQUEST_ERROR_MANUAL_RECOVERY_REQUIRED = "manual_recovery_required"
+ROLE_REQUEST_ERROR_SUPERSEDED = "superseded"
+ROLE_REQUEST_ERROR_HOST_MISMATCH = "role_request_host_mismatch"
+ROLE_PROVISION_HOST_ERROR_DISABLED = "provision_host_disabled"
+ROLE_PROVISION_HOST_ERROR_VERSION_CONFLICT = "provision_host_version_conflict"
+ROLE_PROVISION_HOST_ERROR_BUSY = "provision_host_busy"
+ROLE_PROVISION_HOST_ERROR_CONFIG_INVALID = "provision_host_config_invalid"
+
+#: A6 ``report`` 与**请求驱动** C4 ``ACK`` 允许落库的稳定宿主错误码白名单
+#: （REQUEST_CONTRACT §2/§3/§8）：``last_error_code`` 与作业步骤 ``error_code`` 只接受
+#: 下表列出的有限稳定码；未知串（含误传假凭据/token/路径片段）一律 422 且零写入，
+#: **不**做“任意安全字符串”泛化接受，也不靠删错误信息规避泄漏。新增宿主码必须先按
+#: 合同登记到本白名单。前段是请求/恢复语义码，中段是 ``scripts/role_provision.py``
+#: 已发布的宿主稳定码，末段是既有三步作业契约已使用的步骤码。
+ROLE_REQUEST_HOST_ERROR_CODES = frozenset(
+    {
+        ROLE_REQUEST_ERROR_MANUAL_RECOVERY_REQUIRED,
+        "profile_write_failed",
+        "key_file_write_failed",
+        "key_write_failed",
+        "key_permissions_failed",
+        "preflight_failed",
+        "native_login_unverified",
+        "step_probe_failed",
+        "role_key_unknown",
+        "role_key_stale",
+        "identity_mismatch",
+        "provision_lock_busy",
+        "path_escape_refused",
+        "symlink_refused",
+        "key_root_inside_repo",
+        "profile_root_invalid",
+        "operator_key_missing",
+        "ack_failed",
+        "ack_stale",
+        "resume_required",
+        "http_error",
+        "not_apply_mode",
+        "cli_executable_missing",
+    }
+)
+
 # 绑定有效性阶梯（合同 §4.4，先命中先返回）。``no_project`` 只属于任务快照。
 ROLE_BINDING_NO_PROJECT = "no_project"
 ROLE_BINDING_MEMBER_MISSING = "member_missing"
@@ -794,6 +917,227 @@ class RoleProvisionJob(SQLModel, table=True):
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleProvisionRequestRow(SQLModel, table=True):
+    """人类创建 / 恢复**意图**（角色生命周期 R1-4a，REQUEST_CONTRACT §2）。
+
+    命名刻意带 ``Row`` 后缀：既有 ``RoleProvisionRequest`` 是
+    ``POST .../roles/{member_id}/provision`` 的**请求体 schema**，两者语义完全不同，
+    不能同名。
+
+    本表**只保存意图与租约事实**，永久保留（``failed``/``canceled`` 行不物理删除）：
+
+    - ``request_key`` 是全局主键，沿既有 8–128 安全 operation token；``kind=create``
+      时按合同 §2 等于原创建 ``operation_key``（该 ``RoleCreationOperation`` 由 create
+      意图驱动、与意图同事务提交），``kind=recover`` 使用全新键；
+    - ``payload`` 是**规范化后**的意图载荷（create 四字段 / recover 成员 + 期望版本），
+      ``request_fingerprint`` 复用既有创建指纹或恢复指纹，用于“同键同载荷幂等、异载荷 409”；
+    - ``choice_snapshot`` 是 create 提交时冻结的六维绑定快照（含内容指纹），首次创建必须
+      与当前选择逐维一致；recover 为 ``None``（其预期绑定来自原创建操作）；
+    - ``origin_operation_key`` 在 create 成功时同事务回填，recover 在提交时从实际原创建
+      操作解析，**不能**由调用者任意指定；
+    - 租约只存 ``SHA256`` 哈希：``lease_token_hash`` / ``lease_generation`` /
+      ``lease_config_version`` / ``lease_host`` / 时间窗；明文 token 只在 claim 响应出现
+      一次；``disable`` 后再 ``enable`` 换代即旧 token 永久失去写资格；
+    - ``report_outcome`` / ``report_revision`` / ``report_credential_version`` 保存
+      **本次终态提交**的精确事实，用于区分“同一次提交的只读重放”与“异结果/旧代覆盖”；
+    - 本表**不存** Key、凭据路径、绝对路径、argv 或异常正文；``last_error_code`` 只落
+      稳定白名单错误码。
+    """
+
+    __tablename__ = "role_provision_requests"
+    __table_args__ = (
+        Index("ix_role_provision_requests_project_status", "project_id", "status"),
+        Index(
+            "ix_role_provision_requests_project_origin",
+            "project_id",
+            "origin_operation_key",
+        ),
+        Index(
+            "ix_role_provision_requests_project_member", "project_id", "member_id"
+        ),
+        # 活动同名 create：项目内同一角色名同时只能有一个未终结的创建意图。
+        Index(
+            "ux_role_provision_requests_active_create_name",
+            "project_id",
+            "role_name",
+            unique=True,
+            sqlite_where=text(
+                "kind = 'create' AND status IN ('requested','leased','created')"
+            ),
+        ),
+        # 活动同成员 recover：同一成员同时只能有一个未终结的恢复意图。
+        Index(
+            "ux_role_provision_requests_active_recover_member",
+            "project_id",
+            "member_id",
+            unique=True,
+            sqlite_where=text(
+                "kind = 'recover' AND status IN ('requested','leased','created')"
+            ),
+        ),
+    )
+
+    request_key: str = Field(primary_key=True)
+    project_id: str
+    kind: str
+    payload: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    request_fingerprint: str
+    choice_snapshot: Optional[dict] = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    #: create 意图提交时的规范化角色名（活动同名部分唯一索引 + 占用检查用）；recover 为 NULL。
+    role_name: Optional[str] = None
+    #: create 成功同事务回填；recover 提交时保存目标成员。
+    member_id: Optional[str] = None
+    origin_operation_key: Optional[str] = None
+    expected_credential_version: Optional[int] = None
+    status: str = Field(default=ROLE_REQUEST_STATUS_REQUESTED)
+    revision: int = Field(default=1)
+    attempts: int = Field(default=0)
+    lease_generation: int = Field(default=0)
+    lease_token_hash: Optional[str] = None
+    lease_host: Optional[str] = None
+    lease_claimed_at: Optional[datetime] = None
+    lease_expires_at: Optional[datetime] = None
+    lease_config_version: Optional[int] = None
+    report_outcome: Optional[str] = None
+    report_revision: Optional[int] = None
+    report_credential_version: Optional[int] = None
+    last_error_code: Optional[str] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    finished_at: Optional[datetime] = None
+
+
+class RoleProvisionHostConfig(SQLModel, table=True):
+    """项目级宿主在线配置（角色生命周期 R1-4a，REQUEST_CONTRACT §2/§3）。
+
+    - 主键 ``project_id``；**未建行 = 未启用**，GET 返回 ``enabled=false`` /
+      ``config_version=0``（不伪造配置行）；
+    - 默认关闭（``enabled=0``）：没有真实部署/启用授权，测试必须显式走 enable CAS；
+    - ``lease_seconds`` / ``max_active_leases`` / ``max_attempts`` 是项目预算，
+      enable 与 claim 都按范围校验（30–1800 / 1–4 / 1–10）；
+    - ``config_version`` 初始 0，每次 enable/disable 由 CAS 成功 +1：租约记录领取时的
+      ``lease_config_version``，换代后旧租约立即失去写资格，再 enable 也不复活旧 token；
+    - 本表不含任何凭据、路径或 argv。
+    """
+
+    __tablename__ = "role_provision_host_config"
+
+    project_id: str = Field(primary_key=True)
+    enabled: int = Field(default=0)
+    host_label: Optional[str] = None
+    lease_seconds: int = Field(default=ROLE_PROVISION_HOST_LEASE_SECONDS_DEFAULT)
+    max_active_leases: int = Field(
+        default=ROLE_PROVISION_HOST_MAX_ACTIVE_LEASES_DEFAULT
+    )
+    max_attempts: int = Field(default=ROLE_PROVISION_HOST_MAX_ATTEMPTS_DEFAULT)
+    config_version: int = Field(default=0)
+    updated_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleCredentialRotation(SQLModel, table=True):
+    """一次恢复意图的**凭据轮换执行事实**（角色生命周期 R1-4a，REQUEST_CONTRACT §2/§7）。
+
+    - 主键 ``intent_key`` = 该 recover 请求的 ``request_key``：同一个恢复意图最多执行
+      一次轮换，唯一性由主键保证，重放先查本表而不是先比对当前版本；
+    - 只保存 ``before``/``after`` 版本号与操作者/时间，**不保存也不重放任何 Key**；
+    - 普通 failed resume 不删除本行，也不自动生成第二次轮换；再次轮换必须由人类新的
+      恢复意图（新 ``intent_key``）驱动。
+    """
+
+    __tablename__ = "role_credential_rotations"
+    __table_args__ = (
+        Index("ix_role_credential_rotations_member", "project_id", "member_id"),
+    )
+
+    intent_key: str = Field(primary_key=True)
+    project_id: str
+    member_id: str
+    before_credential_version: int
+    after_credential_version: int
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# 请求体 schema（全部 ``extra="forbid"``；字段值的归一化与稳定错误码由共享守卫模块决定）。
+class RoleProvisionHostEnableRequest(BaseModel):
+    """``POST /role-provision-host/enable``（合同 §3）：CAS 启用 + 预算。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    host_label: str
+    expected_version: int
+    lease_seconds: Optional[int] = None
+    max_active_leases: Optional[int] = None
+    max_attempts: Optional[int] = None
+
+
+class RoleProvisionHostDisableRequest(BaseModel):
+    """``POST /role-provision-host/disable``（合同 §3）：CAS 关闭。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_version: int
+
+
+class RoleRequestCreate(BaseModel):
+    """``POST /role-requests``（合同 §3）：创建 / 恢复意图。
+
+    ``kind`` 互斥载荷由共享规则验证：``create`` 必须且只能给四字段，``recover`` 必须且
+    只能给 ``member_id`` + ``expected_credential_version``。``confirm`` 必须显式为
+    ``true``（human 明确意图），否则 422。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_key: str
+    kind: str
+    confirm: bool = False
+    role_name: Optional[str] = None
+    runner_id: Optional[str] = None
+    choice_id: Optional[str] = None
+    role_description: Optional[str] = None
+    member_id: Optional[str] = None
+    expected_credential_version: Optional[int] = None
+
+
+class RoleRequestClaimRequest(BaseModel):
+    """``POST /role-requests/{request_key}/claim``（合同 §3/§5）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    host: str
+    expected_revision: int
+    lease_seconds: Optional[int] = None
+
+
+class RoleRequestReportRequest(BaseModel):
+    """``POST /role-requests/{request_key}/report``（合同 §3/§8）。
+
+    刻意不接受 ``member_id`` / Key / 路径 / argv：成员身份由服务端从请求事实取。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    lease_token: str
+    expected_revision: int
+    outcome: str
+    error_code: Optional[str] = None
+
+
+class RoleRequestRevisionRequest(BaseModel):
+    """``cancel`` / ``resume`` 共用的 CAS 请求体（合同 §3/§9）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int
+    confirm: bool = False
 
 
 # ── 角色生命周期 R1-3：受管 CLI 服务启停（合同 §4.1.5 / §4.1.6 / §10）──────
@@ -3266,6 +3610,9 @@ class ProjectRoleCreate(BaseModel):
     choice_id: str
     role_description: Optional[str] = None
     operation_key: str
+    #: R1-4a：`operation_key` 命中 create 意图时，必须携带该意图的当前租约 token
+    #: （见 REQUEST_CONTRACT §6）。旧调用方不传 = 不存在请求来源，保持 R1-1 行为。
+    lease_token: Optional[str] = None
 
 
 class ProjectRoleUpdate(BaseModel):
@@ -3598,6 +3945,9 @@ class RoleProvisionRequest(BaseModel):
     operation_key: str
     resume: bool = False
     steps: Optional[list[str]] = None
+    #: R1-4a：请求驱动角色必须显式给出精确来源；省略且存在来源行时拒绝旧人工旁路。
+    request_key: Optional[str] = None
+    lease_token: Optional[str] = None
 
 
 class RoleProvisionAckRequest(BaseModel):
@@ -3620,6 +3970,24 @@ class RoleProvisionAckRequest(BaseModel):
     credential_version: int
     state: str
     error_code: Optional[str] = None
+    #: R1-4a：请求驱动角色必须显式给出精确来源；既有错误顺序与错误码保持不变。
+    request_key: Optional[str] = None
+    lease_token: Optional[str] = None
+
+
+class RoleRequestRotateRequest(BaseModel):
+    """``POST .../roles/{member_id}/rotate-key`` 的可选请求体（REQUEST_CONTRACT §7）。
+
+    无 body 时保持旧 human 无请求来源路径（响应仍是 ``RoleCredentialRotateOut``）；
+    一旦携带 ``request_key``，就必须同时给出 ``lease_token``，且响应换用**不带必填
+    api_key** 的请求驱动结构（重放省略 Key），不把旧 schema 整体放宽。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_key: str
+    lease_token: str
+    expected_credential_version: Optional[int] = None
 
 
 class RoleProvisionStepOut(BaseModel):
@@ -3931,6 +4299,39 @@ def build_role_creation_fingerprint(
         "choice_id": choice_id,
         "role_description_or_empty": role_description or "",
         "fingerprint_version": ROLE_DESCRIPTION_FINGERPRINT_VERSION,
+    }
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def new_role_provision_lease_token() -> str:
+    """租约 token 明文：只在 claim 响应出现一次，库里只存 SHA256。"""
+    return secrets.token_urlsafe(32)
+
+
+def hash_role_provision_lease_token(token: str) -> str:
+    """租约 token → 库内哈希（与 R1-1/R1-3 的 ``sha256`` 先例一致）。"""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def build_role_recovery_fingerprint(
+    *,
+    project_id: str,
+    member_id: str,
+    expected_credential_version: int,
+) -> str:
+    """恢复意图请求指纹（REQUEST_CONTRACT §2）：只覆盖项目/成员/期望凭据版本。
+
+    与创建指纹同一构造方式（键排序、紧凑分隔、非 ASCII 原样、``sha256``）：同键改成员
+    或改期望版本即视为异载荷；**不含** Key、路径或 argv。
+    """
+    payload = {
+        "project_id": project_id,
+        "member_id": member_id,
+        "expected_credential_version": int(expected_credential_version),
+        "fingerprint_version": ROLE_REQUEST_PAYLOAD_VERSION,
     }
     canonical = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False

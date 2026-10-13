@@ -492,6 +492,39 @@ def init_db() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE role_service_state ADD COLUMN spawned BOOLEAN"
             )
+        # 角色生命周期 R1-4a（REQUEST_CONTRACT §2）：三张请求/配置/轮换表由
+        # ``SQLModel.metadata.create_all`` 建表（旧库只新增表），这里补齐幂等索引与
+        # 两个**部分唯一索引**。只增量、不重建表、不回填旧行，重复 ``init_db()`` 无副作用。
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_provision_requests_project_status "
+            "ON role_provision_requests (project_id, status)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_provision_requests_project_origin "
+            "ON role_provision_requests (project_id, origin_operation_key)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_provision_requests_project_member "
+            "ON role_provision_requests (project_id, member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS "
+            "ux_role_provision_requests_active_create_name "
+            "ON role_provision_requests (project_id, role_name) "
+            "WHERE kind = 'create' "
+            "AND status IN ('requested','leased','created')"
+        )
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS "
+            "ux_role_provision_requests_active_recover_member "
+            "ON role_provision_requests (project_id, member_id) "
+            "WHERE kind = 'recover' "
+            "AND status IN ('requested','leased','created')"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_credential_rotations_member "
+            "ON role_credential_rotations (project_id, member_id)"
+        )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_target_member_id ON agent_tasks (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_created_by ON agent_tasks (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_status ON agent_tasks (status)")

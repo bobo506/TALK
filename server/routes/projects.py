@@ -76,6 +76,7 @@ from server.models import (
     RoleBindingUpdate,
     RoleCreationOperation,
     RoleCredentialRotateOut,
+    RoleCredentialRotation,
     RoleDescriptionUpdate,
     RoleProvisionAckRequest,
     RoleProvisionJob,
@@ -83,6 +84,13 @@ from server.models import (
     RoleProvisionRequest,
     RoleProvisionRosterPathsOut,
     RoleProvisionRosterPathsRequest,
+    RoleRequestRotateRequest,
+    ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH,
+    ROLE_REQUEST_ERROR_KEY_CONFLICT,
+    ROLE_REQUEST_ERROR_PAYLOAD_INVALID,
+    ROLE_REQUEST_ERROR_SOURCE_REQUIRED,
+    ROLE_REQUEST_HOST_ERROR_CODES,
+    ROLE_REQUEST_KIND_RECOVER,
     RunnerModelChoice,
     RunnerRegistry,
     binding_fingerprint,
@@ -107,6 +115,12 @@ from server.models import (
     read_role_binding_facts_batch,
     resolve_role_binding_state,
     serialize_provision_job,
+)
+from server.role_provision_requests import (
+    apply_create_intent_created,
+    request_has_source_for_member,
+    require_create_intent_for_creation,
+    resolve_request_source,
 )
 from server.routes.groups import _group_out
 from server.role_services import project_role_service
@@ -1300,6 +1314,22 @@ def create_project_role(
                 status_code=status.HTTP_404_NOT_FOUND, detail="project not found"
             )
 
+        # R1-4a（REQUEST_CONTRACT §6）：`operation_key` 命中 create 意图时走首次创建守卫。
+        # 未命中任何意图时返回 None，下面继续走原有 R1-1 旧人工创建路径（行为不变）。
+        intent_row = require_create_intent_for_creation(
+            project_id,
+            operation_key,
+            fingerprinted_payload={
+                "role_name": role_name,
+                "runner_id": runner_id,
+                "choice_id": choice_id,
+                "role_description": role_description,
+            },
+            request_fingerprint=fingerprint,
+            lease_token=body.lease_token,
+            session=session,
+        )
+
         runner = session.get(RunnerRegistry, runner_id)
         if runner is None:
             raise HTTPException(
@@ -1417,6 +1447,9 @@ def create_project_role(
                 updated_at=now,
             ),
         )
+        if intent_row is not None:
+            # 同一 TX-ALL：请求 `leased`→`created` 并回填真实 member_id / origin_operation_key。
+            apply_create_intent_created(intent_row, member_id=member_id, session=session)
         session.commit()
     except HTTPException:
         if session.in_transaction():
@@ -1594,20 +1627,33 @@ def update_project_role(
 def rotate_project_role_key(
     project_id: str,
     member_id: str,
+    body: RoleRequestRotateRequest | None = None,
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
-    """managed 独占身份的凭据恢复（**仅 human**；合同 §7.5）。
+    """managed 独占身份的凭据恢复（**仅 human**；合同 §7.5 / REQUEST_CONTRACT §7）。
 
     同一写事务内“证明独占 → 换 Key → 递增 ``credential_version``”：旧 Key 立即失效，
     新 Key 只在本次响应出现一次。imported/共享、离册、跨项目引用、在用实例/任务
     一律返回稳定拒绝码；R1-1 无服务表，**不查询不存在的表**（未来表存在时补查）。
+
+    R1-4a：可选 body ``{request_key, lease_token, expected_credential_version}``。
+    请求驱动角色必须带**明确 recover 来源**；无 body 且该成员已有任何 recover 来源行
+    （含终态）时返回 ``provision_lease_required``，不退回旧旁路。请求驱动路径的重放
+    **先查已执行记录**（``role_credential_rotations``）再对新副作用做当前版本 CAS，
+    同意图最多轮换一次；重放响应省略 ``api_key``，旧无 body 响应结构保持不变。
     """
     _require_human(current)
     _get_project(project_id, session)
     target_member_id = member_id.strip()
 
+    request_key = body.request_key if body is not None else None
+    lease_token = body.lease_token if body is not None else None
+    expected_version = body.expected_credential_version if body is not None else None
+
+    source_row = None
     begin_immediate_write(session)
+    session.expire_all()
     try:
         role = session.get(ProjectRole, (project_id, target_member_id))
         if role is None:
@@ -1639,6 +1685,77 @@ def rotate_project_role_key(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="rotate_shared_identity_refused",
             )
+
+        if request_key is None:
+            if lease_token is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ROLE_REQUEST_ERROR_SOURCE_REQUIRED,
+                )
+            if request_has_source_for_member(project_id, target_member_id, session):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ROLE_REQUEST_ERROR_SOURCE_REQUIRED,
+                )
+        else:
+            operation = session.exec(
+                select(RoleCreationOperation)
+                .where(RoleCreationOperation.project_id == project_id)
+                .where(RoleCreationOperation.member_id == target_member_id)
+            ).first()
+            if operation is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="role_request_operation_mismatch",
+                )
+            source_row = resolve_request_source(
+                project_id,
+                operation_key=operation.operation_key,
+                member_id=target_member_id,
+                request_key=request_key,
+                lease_token=lease_token,
+                required_kind=ROLE_REQUEST_KIND_RECOVER,
+                session=session,
+            )
+            fixed_before = int(source_row.expected_credential_version or 0)
+            if expected_version is not None and int(expected_version) != fixed_before:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH,
+                )
+            # §7 顺序：先查该 intent_key 已执行记录（正常重放即使当前版本已是 after 也返回
+            # 200 reused 且省略 Key），只有未执行才进入下面的当前版本 CAS 与新副作用。
+            rotation = session.get(RoleCredentialRotation, source_row.request_key)
+            if rotation is not None:
+                if (
+                    rotation.project_id != project_id
+                    or rotation.member_id != target_member_id
+                    or (
+                        expected_version is not None
+                        and int(expected_version)
+                        != int(rotation.before_credential_version)
+                    )
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH,
+                    )
+                replayed_version = int(rotation.after_credential_version)
+                session.rollback()
+                return JSONResponse(
+                    status_code=status.HTTP_200_OK,
+                    content={
+                        "member_id": target_member_id,
+                        "credential_version": replayed_version,
+                        "reused": True,
+                    },
+                )
+            if int(role.credential_version or 1) != fixed_before:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH,
+                )
+
         proof = prove_exclusive_identity(project_id, target_member_id, session)
         if proof["refusal"] is not None:
             raise HTTPException(
@@ -1653,10 +1770,43 @@ def rotate_project_role_key(
         role.key_rotated_at = now
         role.updated_at = now
         session.add(role)
+        if source_row is not None:
+            session.add(
+                RoleCredentialRotation(
+                    intent_key=source_row.request_key,
+                    project_id=project_id,
+                    member_id=target_member_id,
+                    before_credential_version=int(
+                        source_row.expected_credential_version or 1
+                    ),
+                    after_credential_version=int(role.credential_version),
+                    created_by=current.id,
+                    created_at=now,
+                )
+            )
+            source_row.revision = int(source_row.revision or 1) + 1
+            source_row.updated_at = now
+            session.add(source_row)
         try:
             session.commit()
         except IntegrityError as exc:
             session.rollback()
+            if source_row is not None:
+                # 并发同意图：恰好一次轮换，另一个连接返回只读重放。
+                existing = session.get(RoleCredentialRotation, source_row.request_key)
+                if existing is not None:
+                    return JSONResponse(
+                        status_code=status.HTTP_200_OK,
+                        content={
+                            "member_id": target_member_id,
+                            "credential_version": int(existing.after_credential_version),
+                            "reused": True,
+                        },
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH,
+                ) from exc
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="api_key_generation_failed",
@@ -1674,6 +1824,16 @@ def rotate_project_role_key(
             detail="role_rotation_failed",
         ) from exc
 
+    if source_row is not None:
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content={
+                "member_id": target_member_id,
+                "credential_version": int(credential_version),
+                "reused": False,
+                "api_key": api_key,
+            },
+        )
     return RoleCredentialRotateOut(
         member_id=target_member_id,
         api_key=api_key,
@@ -1880,12 +2040,17 @@ def _provision_role_credential_version(
 
 
 def _normalize_provision_error_code(
-    state: str, error_code: object
+    state: str, error_code: object, *, strict: bool = False
 ) -> str | None:
-    """ACK 的 ``error_code`` 白名单（PROVISION_CONTRACT §2.3）。
+    """ACK 的 ``error_code`` 白名单（PROVISION_CONTRACT §2.3 / REQUEST_CONTRACT §2）。
 
     只有 ``failed`` 允许携带非空 ``error_code``，且必须是 ≤64 的安全 token；
     非 ``failed`` 携带任何非 ``null`` 值、或 ``failed`` 携带非法值 → 422。
+
+    ``strict=True``（请求驱动 ACK，即请求携带了 ``request_key``/``lease_token`` 之一）时
+    额外要求命中 ``ROLE_REQUEST_HOST_ERROR_CODES`` 有限稳定码白名单：未知串（含误传假
+    凭据 / token / 路径片段）一律 422 且零写入。旧无请求入口保持原有安全 token 语义，
+    不因本约束收窄既有行为。
     """
     if state != PROVISION_STEP_STATE_FAILED:
         if error_code is not None:
@@ -1902,7 +2067,7 @@ def _normalize_provision_error_code(
             detail="provision_error_code_invalid",
         )
     try:
-        return normalize_safe_identifier_token(
+        normalized = normalize_safe_identifier_token(
             error_code,
             field="error_code",
             max_chars=PROVISION_ERROR_CODE_MAX_CHARS,
@@ -1912,6 +2077,12 @@ def _normalize_provision_error_code(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="provision_error_code_invalid",
         ) from exc
+    if strict and normalized not in ROLE_REQUEST_HOST_ERROR_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="provision_error_code_invalid",
+        )
+    return normalized
 
 
 def _provision_expected_binding_fingerprint(
@@ -2002,6 +2173,18 @@ def provision_project_role(
     _begin_provision_write(session)
     try:
         _require_provision_identity(project_id, target_member_id, operation_key, session)
+        # R1-4a（REQUEST_CONTRACT §5.1）：请求驱动角色必须按 body.request_key 精确取源并
+        # 复查租约；省略 request_key 时若该原键存在**任何**来源行（含终态）一律拒绝，
+        # 不退回旧人工旁路；确实没有来源行才保持原行为。
+        resolve_request_source(
+            project_id,
+            operation_key=operation_key,
+            member_id=target_member_id,
+            request_key=body.request_key,
+            lease_token=body.lease_token,
+            required_kind=None,
+            session=session,
+        )
         current_credential_version = _provision_role_credential_version(
             project_id, target_member_id, session
         )
@@ -2224,7 +2407,24 @@ def ack_project_role_provision(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="provision_credential_stale",
             )
-        error_code = _normalize_provision_error_code(body.state, body.error_code)
+        # R1-4a（REQUEST_CONTRACT §2/§8）：请求驱动的 ACK 与 A6 report 共用同一份有限
+        # 稳定码白名单（参数“存在”按 is not None 判定）；旧无请求入口保持原安全 token 语义。
+        request_driven = body.request_key is not None or body.lease_token is not None
+        error_code = _normalize_provision_error_code(
+            body.state, body.error_code, strict=request_driven
+        )
+
+        # R1-4a（REQUEST_CONTRACT §5.1/§8）：既有 ACK 规则与错误顺序全部跑完之后，才复查
+        # 本请求来源与有效租约；失败零写入，旧 human 无 body 回放路径保持不变。
+        resolve_request_source(
+            project_id,
+            operation_key=operation_key,
+            member_id=target_member_id,
+            request_key=body.request_key,
+            lease_token=body.lease_token,
+            required_kind=None,
+            session=session,
+        )
 
         now = datetime.now(timezone.utc)
         entry["state"] = body.state
