@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-13 10:58（Asia/Shanghai）— 232方案补正收尾，正式请求合同与233服务端开发
+
+- 用户“好了”触发232取件。MCP合法complete/task232、runner succeeded/submitted、msg2736完整2584字符/SHA d19637431551f95e26474657791959f2db2eda280169d4931390aba37c47720a，与本地交付逐结构一致，summary退出0；129已跟踪源哈希及作者9静态事实对应5文本哈希均零漂移。一次校验shell拼接命令语法失败，随后固定verify.py与reference.json验证成功，原产物未改，未运行新业务协议/服务/数据库/Key/浏览器。
+- 232已补请求指纹守卫与创建同事务推进、来源永久保留、轮换执行记录、三事实report/正确preflight顺序和准确10新/4变更接口。Codex仍发现局部冲突：CAS先于已执行记录会拒正常重放，多origin行未选择，recover保持leased却report只收created，worker仅扫requested，effective_status未列白名单/耗尽无法resume，disable与跨kind占用不足，choice活态先于回放会破坏R1-1旧语义，来源文件部分发布恢复未明。协调方直接在正式合同澄清，不再派重复只读准备。
+- 新docs/spec/ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md规定request_key精确来源、永久守卫、先重放后新副作用CAS与单独响应、已有成员claim即created、claimable/耗尽恢复、lease_config_version失效、跨kind与旧resume占用、已提交无Key目录回放、Key已发布时认证修复元数据。本次预期代际明确create=1、recover执行记录after或固定before，不能report时套后来版本。旧无请求人工路径/错误顺序、DACL/guard、human-only和Member明文列保持。
+- 采用已批准一键配置方向，受信worker承接人类意图，限server同机回环、页面可LAN、项目/worker默认关闭；本轮只代码/隔离测试，不真实启用或部署human凭据，不夹带跨机Key/TLS/D7/agent权限扩展或新增凭据再取入口。宿主在线依赖与配置不启动如实保留，不把普通表/接口/CAS与已有恢复变成审批问卷。
+- 232→231→230依次收取，均succeeded/completed，UTC收取分别02:54:27.776746、02:54:32.821286、02:54:35.531077。这表示最终协调方协议补正链收尾，不把原230unknown混排/231partial/原事实错误改写成原稿通过，也不把232自报所有闭合算运行证据。原消息/草稿保持；新contract-review保存原文/SHA/结构验证、定向修订说明与3收取回执。
+- 派发前实读caller agent:codex/kind=agent、最新development_requirements及DeepSeek available；用户Codex前端指定/Kimi不足临时安排保持，不改页面要求/模式。实际#233，独立顶层四参数，creator Codex/target DeepSeek，Hall group:task-db4d5675105d4e6e98a8621518d2ea72，queued/assigned仅派发快照；包/回执在.tmp/role-lifecycle-r1-4-server-dispatch/，worker仅.tmp/role-lifecycle-r1-4-server-requests/。
+- 233是一个服务端协议切片：三表/共享规则/router A1–A10、projects C1–C4及相关隔离行为/必要WAL并发与旧创建/轮换/provision回归。禁止脚本/前端/正式文档/配置/生产DB/名册/Key/模型/浏览器/Git操作，完成立即暂停；Codex独立实际代码复核后才接worker，再Codex前端/DeepSeek复核与完整创建配置人工验收。共享目录协调方仅写合同/简报/计划/进度，不并行改业务代码。
+- 正式合同与简报/计划/两进度共5文档按持续授权中文提交普通推送，具体回执留server-dispatch/publication.json。默认派发后结束，用户“233好了”后收件；本轮不轮询/等待，不宣称233实现或R1-4端到端完成。R1-3人工通过/已验交互保持，外部/归档/退出后续，I-4后置。
+
 ## 2026-10-13 10:26（Asia/Shanghai）— #231方案定向复核未通过，派#232补事务/租约/恢复闭环
 
 - 用户“好了”通知231完成。合法talk-delivery-1/task231字符串/partial，runner succeeded/submitted；msg2735完整两页4942字符/SHA c49ddbce3673fe4b3cf1d489e1c04cbdef97c73f8a20e2f1e58adab4e16981f5，与本地delivery.json逐结构一致，summary校验退出0。原231报告基线5a8f876到当前d2ed18b仅协调方文档推进，129个已跟踪server/scripts/bridges/web/tests文件哈希保存；未改业务源。230/231尚未收取，自报通过不等于独立通过。
