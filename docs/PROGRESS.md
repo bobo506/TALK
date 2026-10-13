@@ -1,27 +1,27 @@
 # Project Progress
 
-Updated: 2026-10-13 16:12 (Asia/Shanghai)：R1-4a server已独立通过、233/234收取并发布d5a7bbd；已派#235宿主worker，完成后Codex复核，再Codex前端。完整一键配置尚未可用，I-4后置。
+Updated: 2026-10-13 19:00 (Asia/Shanghai)：235宿主独立复核未通过，原新25通过但新增6行为探针全部失败；已派236同片返修。server d5a7bbd保持，完整一键配置尚未可用，I-4后置。
 
 ## 当前状态
 
-- 项目`D:/claude-test/TALK`，project_id=`prj_e8fe7066bbec`，分支`codex/terminal-return-codex`。server提交d5a7bbd5e55e975ce1535f1797dc2d22247f905b/远端一致，回执server-final-review/publication.json；本次235交接文档回执在worker-dispatch/publication.json。
+- 项目`D:/claude-test/TALK`，project_id=`prj_e8fe7066bbec`，分支`codex/terminal-return-codex`。server发布d5a7bbd，235交接HEAD ff40d89cbe85bda9b185d9ffb2a8a4f2bf2ef642；本轮仅提交复核/返修进度文档，回执worker-review/publication.json，未审宿主代码不提交。
 - R0/R1-1/R1-2完成并有基础页面验收。R1-3服务35886b3、最终页面34e9df4发布、223–229已收取，本轮页面基础用户明确“验收通过”。列表仅当前服务状态，启停只在详情、详情无重复状态；缓存20261012-role-service-list-status保持。
 - 230–232准备链及233/234server片均已收取。三表/共享规则/10新API/4旧入口已实现，见[正式请求合同](spec/ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)；server仅存意图/事实，不写宿主文件或spawn。
-- 234 msg2738合法partial/任务号一致，5949字符/SHA 27bee155cd02a7c8fd522bc4b1dbd9598e757f083bee834e4b5a45c26a80c2d2，本地逐结构一致。原233缺口/partial和原7失败记录保持，后续worker/前端未完成不追改。
-- Codex独立新79、旧166、原只读7探针分别全通过，均0fail/error/skip；实际Python3.12/TestClient/隔离SQLite。新79内WAL两独立DBAPI连接/线程claim/一次轮换和提交前六表+请求零残留通过；不叠加作者证据、不外推多进程/生产迁移/性能。
-- 9个业务/测试文件冻结核对，原233字节副本与原探针保持，范围外原129源中未允许项零漂移；最终复核/原消息/SHA/日志/manifest与234→233收取回执在server-final-review，原server-review/rework/准备/R1-3证据根保持。
+- server独立新79/旧166/原7全通过；WAL两连接/线程与提交前六表回滚证据已核，234→233已收取。原失败/partial保持，证据server-final-review，不外推多进程/生产迁移/性能。
+- 235合法complete自报、msg2739完整5263字符/SHA 22847eb5774ab837cfda2ba7f39cf7daa766478eb055319567b01ecf6228fdfd，与本地逐结构一致，尚未收取。5个源/测试原字节副本、SHA、范围核对和独立结论在`.tmp/role-lifecycle-r1-4-worker-review/`；范围外源按LF/CRLF归一比较零差异。
+- Codex独立原新增25全过、0fail/error/skip，作者旧11套件320仅核原日志/统计；新增6探针全失败、0error/skip。已确认关闭/只读入口绕过、慢配置阻塞stop、显式operator到三步丢失、create后disable仍写Key/metadata、异常轮次返回dict。TestClient/隔离库与假凭据真实临时文件，不操作生产服务/CLI/模型/Browser。
 
 ## 下一步与未完成
 
-- **#235宿主worker**：DeepSeek/Codex独立复核，Hall group:task-f2b9798754534acc9491713a06b48d3d，queued/assigned仅快照。基线d5a7bbd，包/回执`.tmp/role-lifecycle-r1-4-worker-dispatch/`，执行产物仅`.tmp/role-lifecycle-r1-4-worker/`。复用role_provision私有文件/DACL/guard，消费claimable人类请求、一次性创建/人工recover/metadata恢复、三步真实执行与同版本ACK/report；默认关闭/同机回环/不阻塞R1-3控制，只配置不启动。
-- 235仅新worker模块及role_service_host/role_provision必要接线和有限新错误码/测试；禁止页面/bridge/MCP/正式文档/生产配置/DB/名册/真实Key/运行器/Git。隔离虚拟项目和假凭据真实文件/权限证据，不跑默认用户Key根；完成立即暂停，用户“235好了”后Codex实际复核。
-- server通过后才能接该worker，再Codex完整创建/配置前端、DeepSeek独立复核及完整功能人工验收；不先交付只读选择器。角色外部桌面引导、归档/删除和退出清理仍后续原范围，I-4后置。
-- 无真实私有Key文件、原生登录/模型/CLI启停、多角色隔离或主动等待验收。既有DB/假Key/固定文本进程/DOM证据不替代原生能力；生产启用/部署/迁移/服务重载未主动执行。
+- **#236宿主同片返修**：DeepSeek开发/Codex独立复核，Hall group:task-f688956858ea43bd9de6086596cab9ce，queued/assigned仅派发快照；包/回执与F1–F5在worker-review，返修产物仅`.tmp/role-lifecycle-r1-4-worker-rework/`。统一关闭/只读、独立受控worker/预算与停止、内存operator贯通、当前租约/代际与新Key本人核验、本地失效即停、统一列表/错误/退出码。
+- 沿235允许文件及必要正式回归，禁止修改server守卫/API、web/bridge/MCP/正式文档/生产配置/DB/名册/真实Key/CLI/模型/Git。原235/report/副本/失败日志只读；修后加载原探针另存日志，补实际隔离回环HTTP/WorkerTransport完整闭环，不能用假transport冒充默认传输。
+- 236完成暂停，用户“236好了”后Codex实际复核；通过才收取236/235并发布宿主，再Codex完整创建/配置前端、DeepSeek独立复核及完整功能人工验收。外部桌面引导、归档/删除和退出清理仍后续原范围，I-4后置。
+- 235有隔离假Key私有文件/DACL证据，默认真实回环传输未验证；无生产凭据/原生登录/模型/CLI启停、多角色隔离或主动等待验收。既有DB/假Key/固定文本进程/DOM证据不替代原生能力；生产启用/部署/迁移/重载未主动执行。
 - human-only、项目与worker默认关闭、server/worker同机回环、页面不落角色Key、保存配置与启动分开；跨机Key/TLS、任意Key读取和D7明文列迁移不夹带。
 
 ## 协作与恢复
 
 - 本轮用户指定前端Codex/DeepSeek复核，后端宿主DeepSeek/Codex复核；Kimi不足临时安排保持，页面常规Kimi前端要求不自动改写。已核caller=agent:codex/kind=agent和最新development_requirements，availability不证明额度。
-- 共享目录开发完成暂停后再审查；默认派发后结束、用户通知“235好了”再取件，不默认Browser验页。持续直接修正授权不免独立复核与人工门禁。
+- 共享目录开发完成暂停后再审查，236开发期间协调方仅更新文档；默认派发后结束、用户通知“236好了”再取件，不默认Browser验页。持续直接修正授权不免独立复核与人工门禁。
 - bobo506/TALK普通提交后推送持续授权，不强推/改远端历史；旧生产配置/身份/名册/Key与历史.tmp-tests/ACL残留保持、不混提交、不宣称全工作区干净。
 - 230/231原unknown混排/partial、232设计complete及233/234业务partial均原样保留，收取表示补正链按实际server片闭合，不表示原稿都通过或R1-4全功能完成。完整历史见PROGRESS_HISTORY，恢复指令：`继续项目`。

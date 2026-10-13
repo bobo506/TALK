@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-13 19:00（Asia/Shanghai）— 235宿主独立复核未通过，派236同片返修
+
+- 用户“好了”通知235完成，MCP runner succeeded/submitted、自报合法complete/task235；msg2739完整5263字符/SHA 22847eb5774ab837cfda2ba7f39cf7daa766478eb055319567b01ecf6228fdfd，本地JSON逐结构一致/summary校验通过。格式不代表业务验收；235未收取，原报告保持。实读caller agent:codex/kind=agent、最新development_requirements与DeepSeek available；用户Codex前端指定、Kimi不足安排保持，不改页面要求/模式。
+- 实际HEAD ff40d89cbe85bda9b185d9ffb2a8a4f2bf2ef642，源基线d5a7bbd；235改role_provision/role_service_host/models、新worker/新测试共5文件，原字节副本/哈希冻结于worker-review/source-snapshot。范围外Git源按LF/CRLF归一比较零差异；初次精确字节比较误报Windows行尾漂移，修正比较规则后通过，未改原文件。生产配置/DB/名册/Key/CLI/模型/Browser/Git未由执行者操作。
+- Codex独立实际读worker、provision入口/私有发布增量与host接线、必要合同/测试，原新25项全通过、0失败/错误/跳过、20.03秒；旧11套件320只核作者日志Ran320/OK与统计，未独立重跑/叠加。协调方新增6行为探针全部断言失败、0error/skip、4.97秒；隔离TestClient/SQLite、虚拟项目与仓库外系统临时假Key私有文件，未读真实凭据。停止测试用线程事件阻塞worker，替代执行动作而保留真实HostManager循环；不是原生进程测试。
+- F1两探针：disabled run_round仍18HTTP，host默认apply=false创建1角色；入口检查只在独立serve不在实际host.run_round。F2：同步整轮配置期间stop不能执行，300ms窗口失败、释放后才执行；原立即抛TimeoutError不能证明响应性，预算/取消未贯通三步边界。F3：显式operator/CLI文件来源用于claim/create而三步重新找env，空秘密环境下创建后失败。F4：真实roles201提交后disable，成员保留但仍写Key/metadata；仅最终ACK拒绝不足。F5：异常轮次返回dict，host/standalone遍历键名丢错误。具体源行/修正与限制在review.md，原通过及6失败证据保持。
+- 同片要求统一关闭/只读零写、独立受控worker不占Popen/不阻塞stop、每次IO剩余预算/阶段取消、内存operator贯穿、新Key本人核验与当前租约/期限/config/目标/凭据代际后发布；失效不写后续本地/ACK/report、不套新代；列表/错误/业务失败退出码与CLI实际参数生效。保持旧stale拒覆/DACL/guard/来源/单次恢复/metadata部分发布修复，不能修改server守卫或扩大权限。
+- 实际#236四参数独立顶层派发，creator Codex/target DeepSeek，Hall group:task-f688956858ea43bd9de6086596cab9ce，queued/assigned仅快照；task/完整回执worker-review，返修产物仅worker-rework。原235与review全只读；原探针修后模块加载另写日志、不得改原断言/覆盖失败。允许原5文件及必要正式回归，禁止server API/权限/web/bridge/MCP/正式文档/生产配置/DB/名册/.talk/真实Key/CLI/模型/Browser/Git。补隔离真实回环HTTP/WorkerTransport完整闭环，原假transport限制不伪造通过。
+- 发现阻塞后不继续前端，不提交未审宿主；236开发后暂停，Codex实际复核通过再收取236/235并发布，随后Codex完整前端/DeepSeek独立复核与完整功能人工验收。原R1-3已验交互保持、外部/归档/退出后续、I-4后置。协调方派发后不再读/审活代码，只更新简报/计划/两进度4文档并中文提交普通推送，回执worker-review/publication.json；默认派发后结束，用户“236好了”取件，不主动轮询/等待或Browser操作。
+
 ## 2026-10-13 16:12（Asia/Shanghai）— server发布d5a7bbd后派235宿主配置worker
 
 - R1-4a九业务/测试+七文档统一提交d5a7bbd5e55e975ce1535f1797dc2d22247f905b并普通推送bobo506/TALK，远端一致，tracked/index干净（不含旧未跟踪.tmp-tests/ACL残留）；server-final-review/publication.json保存准确回执。测试后九源冻结零漂移、暂存精确16文件、cached diff检查通过，没有混生产配置或临时证据。
