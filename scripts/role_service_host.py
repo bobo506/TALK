@@ -62,13 +62,14 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -94,6 +95,12 @@ DEFAULT_HTTP_TIMEOUT_SECONDS = 15.0
 DEFAULT_READY_TIMEOUT_SECONDS = 60.0
 DEFAULT_STOP_TIMEOUT_SECONDS = 20.0
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
+#: R1-4b 返修 F2：worker 轮次在宿主退出时的**有界**收集窗口。
+#: 主控制循环绝不 join 未结束的网络 IO；只在循环结束（once/上限/停止）后按 worker 自己的
+#: 单轮 IO 预算 + 单次请求超时 + 余量收集一次，并对仍然卡住的轮次显式请求停止后收尾。
+PROVISION_WORKER_SHUTDOWN_SLACK_SECONDS = 5.0
+PROVISION_WORKER_SHUTDOWN_GRACE_CAP_SECONDS = 180.0
+PROVISION_WORKER_SHUTDOWN_GRACE_DEFAULT_SECONDS = 30.0
 #: 默认状态根在**用户私有目录**（与 R1-2 的 ``~/.talk/keys`` 同级），不落在仓库工作区。
 DEFAULT_STATE_DIR = Path.home() / ".talk" / "role-service-host"
 
@@ -201,6 +208,36 @@ PUBLIC_KEYS: frozenset[str] = frozenset(
         "entry_fingerprint",
         "runtime",
         "argv_checked",
+        # R1-4b：请求 worker 的进度投影（仍是严格白名单；不含 Key/token/绝对私有路径）。
+        "stage",
+        "plan",
+        "planned",
+        "count",
+        "requests",
+        "request_key",
+        "kind",
+        "effective_status",
+        "origin_operation_key",
+        "credential_version",
+        "lease_generation",
+        "lease_config_version",
+        "expires_at",
+        "attempts",
+        "claimable",
+        "retry_exhausted",
+        "steps",
+        "ack",
+        "job",
+        "report",
+        "reused",
+        "rotation",
+        "metadata_repaired",
+        "key_published",
+        "host_label",
+        "worker_host",
+        "rounds",
+        "outcomes",
+        "results",
     }
 )
 
@@ -549,6 +586,29 @@ def redact(record: Any) -> Any:
     if isinstance(record, dict):
         return {k: redact(v) for k, v in record.items() if k in PUBLIC_KEYS}
     return record
+
+
+def _coerce_worker_outcomes(raw: Any) -> list[dict[str, Any]]:
+    """把 worker 轮次返回值收敛成 ``list[dict]``（返修 F5）。
+
+    ``run_round`` 现在恒返回 ``list[dict]``；宿主仍做最后一道收敛，避免历史 dict 返回值被
+    按键名遍历、字符串被逐个字符并进 outcomes、或非映射条目丢失错误形状。
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, dict):
+        return [dict(raw)]
+    if isinstance(raw, (list, tuple)):
+        out: list[dict[str, Any]] = []
+        for item in raw:
+            if isinstance(item, dict):
+                out.append(dict(item))
+            else:
+                out.append(
+                    {"stage": "worker", "outcome": "failed", "error_code": "http_error"}
+                )
+        return out
+    return [{"stage": "worker", "outcome": "failed", "error_code": "http_error"}]
 
 
 # ---------------------------------------------------------------------------
@@ -1750,6 +1810,53 @@ class HostManager:
             )
         return actions
 
+    def _start_worker_round(self, provision_worker: Any) -> tuple[Any, dict[str, Any]]:
+        """独立受控线程里跑一轮 worker：同一请求串行、绝不与下一轮重叠（返修 F2）。"""
+        box: dict[str, Any] = {"outcomes": None}
+
+        def run() -> None:
+            try:
+                raw = provision_worker.run_round()
+            except Exception:  # noqa: BLE001 - 配置 IO/超时不得阻塞服务控制循环
+                raw = [{"stage": "worker", "outcome": "failed", "error_code": "http_error"}]
+            box["outcomes"] = _coerce_worker_outcomes(raw)
+
+        thread = threading.Thread(
+            target=run, name="role-provision-worker", daemon=True
+        )
+        thread.start()
+        return thread, box
+
+    def _collect_worker_round(
+        self, thread: Any, box: dict[str, Any], *, grace: float
+    ) -> Optional[list[dict[str, Any]]]:
+        """有界收集一轮 worker 结果：未结束返回 ``None``，绝不无限等待。"""
+        if thread is None:
+            return None
+        thread.join(max(0.0, float(grace)))
+        if thread.is_alive():
+            return None
+        return box.get("outcomes")
+
+    def _worker_shutdown_grace(self, provision_worker: Any) -> float:
+        """退出收集窗口 = worker 单轮 IO 预算 + 单次请求超时 + 余量（有上限）。"""
+        def _positive(value: Any, fallback: float) -> float:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return fallback
+            return number if number > 0 else fallback
+
+        budget = _positive(
+            getattr(provision_worker, "io_budget_seconds", None),
+            PROVISION_WORKER_SHUTDOWN_GRACE_DEFAULT_SECONDS,
+        )
+        timeout = _positive(getattr(provision_worker, "timeout_seconds", None), 0.0)
+        return min(
+            budget + timeout + PROVISION_WORKER_SHUTDOWN_SLACK_SECONDS,
+            PROVISION_WORKER_SHUTDOWN_GRACE_CAP_SECONDS,
+        )
+
     def serve(
         self,
         project_id: str,
@@ -1757,10 +1864,22 @@ class HostManager:
         poll_interval: float = DEFAULT_POLL_INTERVAL_SECONDS,
         once: bool = False,
         max_rounds: Optional[int] = None,
+        provision_worker: Any = None,
     ) -> list[dict[str, Any]]:
-        """常驻管理循环。**启动它本身不会启动任何角色**，只执行已经存在的 pending 动作。"""
+        """常驻管理循环。**启动它本身不会启动任何角色**，只执行已经存在的 pending 动作。
+
+        R1-4b：可选的请求 worker（默认 ``None`` = 关闭）在同一循环里推进，但它
+
+        - 在**独立受控线程**里跑整轮（返修 F2）：慢网络 IO 不会阻塞本循环继续 poll/执行
+          ``stop``/阶段取消；同一时刻最多一轮在飞，绝不重叠领取；
+        - **不共享**本管理器的 Popen 句柄/所有权，也不捕获 ``BaseException``；
+        - 任何配置 IO 失败或超时都被收敛成 outcome 列表（返修 F1/F5），绝不影响服务控制
+          循环；循环结束时按有界窗口收集，仍卡住则显式请求停止并如实记录。
+        """
         outcomes: list[dict[str, Any]] = []
         rounds = 0
+        worker_thread: Any = None
+        worker_box: dict[str, Any] = {}
         while True:
             rounds += 1
             try:
@@ -1788,9 +1907,59 @@ class HostManager:
                             "error_code": exc.code if isinstance(exc, HostError) else "host_unreachable",
                         }
                     )
+            if provision_worker is not None:
+                # 先**非阻塞**收上一轮（grace=0 只在已结束时取回），再决定是否开新一轮。
+                finished = self._collect_worker_round(worker_thread, worker_box, grace=0.0)
+                if finished is not None:
+                    outcomes.extend(self._tag_worker_outcomes(finished))
+                    worker_thread, worker_box = None, {}
+                if worker_thread is None:
+                    worker_thread, worker_box = self._start_worker_round(provision_worker)
             if once or (max_rounds is not None and rounds >= max_rounds):
-                return outcomes
+                break
             time.sleep(poll_interval)
+        if provision_worker is not None and worker_thread is not None:
+            self._finish_worker_round(provision_worker, worker_thread, worker_box, outcomes)
+        return outcomes
+
+    def _tag_worker_outcomes(
+        self, items: Sequence[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        tagged: list[dict[str, Any]] = []
+        for item in items:
+            entry = dict(item)
+            entry["action"] = "provision-worker"
+            tagged.append(entry)
+        return tagged
+
+    def _finish_worker_round(
+        self,
+        provision_worker: Any,
+        thread: Any,
+        box: dict[str, Any],
+        outcomes: list[dict[str, Any]],
+    ) -> None:
+        """退出时的有界收尾：先给足预算；仍卡住则请求停止后再等一个窗口。"""
+        grace = self._worker_shutdown_grace(provision_worker)
+        finished = self._collect_worker_round(thread, box, grace=grace)
+        if finished is None:
+            stop = getattr(provision_worker, "request_stop", None)
+            if callable(stop):
+                with contextlib.suppress(Exception):
+                    stop()
+            finished = self._collect_worker_round(thread, box, grace=grace)
+        if finished is None:
+            outcomes.append(
+                {
+                    "action": "provision-worker",
+                    "stage": "worker",
+                    "outcome": "stopped",
+                    "error_code": "worker_stopped",
+                    "note": "退出时该轮仍未结束；已请求停止，绝不 join 未结束网络 IO",
+                }
+            )
+            return
+        outcomes.extend(self._tag_worker_outcomes(finished))
 
 
 # ---------------------------------------------------------------------------
@@ -1869,6 +2038,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ready-timeout", type=float, default=DEFAULT_READY_TIMEOUT_SECONDS)
     parser.add_argument("--stop-timeout", type=float, default=DEFAULT_STOP_TIMEOUT_SECONDS)
     parser.add_argument("--poll-interval", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS)
+    # R1-4b：默认关闭的请求 worker（只接线，不改变服务语义；不 spawn 角色 CLI）。
+    parser.add_argument(
+        "--provision-worker",
+        action="store_true",
+        help="在 serve 循环内接线默认关闭的角色请求 worker",
+    )
+    parser.add_argument(
+        "--provision-worker-apply",
+        action="store_true",
+        help="worker 真实领取/写入/回报（默认只读发现计划）",
+    )
+    parser.add_argument(
+        "--provision-worker-max-rounds",
+        type=int,
+        default=None,
+        help="仅用于受限运行：serve 循环与 worker 轮次共用的上限",
+    )
+    parser.add_argument("--provision-worker-io-budget-seconds", type=float, default=None)
+    parser.add_argument("--provision-worker-discovery-limit", type=int, default=None)
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -1945,9 +2133,58 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
             result = manager.start_all(args.project, members)
         elif args.mode == "serve":
+            provision_worker = None
+            if args.provision_worker:
+                # 延迟导入：未开启 worker 的 serve 完全不加载 worker 模块。
+                from scripts.role_provision_worker import (  # noqa: PLC0415
+                    RoleProvisionWorker,
+                    WorkerError,
+                )
+
+                try:
+                    provision_worker = RoleProvisionWorker(
+                        project_id=args.project,
+                        host_label=args.host or socket.gethostname(),
+                        base_url=args.base_url,
+                        project_root=Path(args.project_root),
+                        key_root=Path(args.key_root) if args.key_root else None,
+                        operator_key=operator_key,
+                        enabled=True,
+                        apply=bool(args.provision_worker_apply),
+                        discovery_limit=(
+                            args.provision_worker_discovery_limit
+                            if args.provision_worker_discovery_limit is not None
+                            else 20
+                        ),
+                        **(
+                            {
+                                "io_budget_seconds": args.provision_worker_io_budget_seconds
+                            }
+                            if args.provision_worker_io_budget_seconds is not None
+                            else {}
+                        ),
+                    )
+                except WorkerError as exc:
+                    print(
+                        json.dumps(
+                            {"schema": SCHEMA, "ok": False, "error_code": exc.code},
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        )
+                    )
+                    return EXIT_FAILED
             result = {
                 "outcomes": manager.serve(
-                    args.project, poll_interval=args.poll_interval, once=False
+                    args.project,
+                    poll_interval=args.poll_interval,
+                    once=False,
+                    # 返修 F5：CLI 的轮次上限必须真正传到宿主循环（否则是无效选项）。
+                    max_rounds=(
+                        args.provision_worker_max_rounds
+                        if args.provision_worker
+                        else None
+                    ),
+                    provision_worker=provision_worker,
                 )
             }
         elif args.mode == "start":
@@ -1991,7 +2228,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     payload = {"schema": SCHEMA, "ok": True, "mode": args.mode, "result": redact(result)}
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
-    failed = isinstance(result, dict) and result.get("outcome") == "failed"
+    # 返修 F5：serve 的结果是 ``{"outcomes": [...]}``；只要任一 outcome 是业务 failed，
+    # 宿主 CLI 必须以非零退出码反映，不能因为顶层没有 ``outcome`` 键就丢掉错误。
+    failed = False
+    if isinstance(result, Mapping):
+        rows = result.get("outcomes")
+        if isinstance(rows, (list, tuple)):
+            failed = any(
+                isinstance(item, Mapping)
+                and item.get("outcome") in ("failed", "reported")
+                for item in rows
+            )
+        else:
+            failed = result.get("outcome") in ("failed", "reported")
     return EXIT_FAILED if failed else EXIT_OK
 
 

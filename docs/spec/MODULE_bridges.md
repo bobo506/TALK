@@ -15,12 +15,14 @@
 
 ## 当前实现
 
-### 角色生命周期 R1-4a：创建配置请求server已通过，宿主/页面待接线
+### 角色生命周期 R1-4a/b：请求server与宿主已通过，完整页面待接线
 
 - 2026-10-13，233服务端初版经Codex7合同探针复现缺口、234返修后独立实际代码复核通过，234→233已收取。原partial/失败/草稿保持；权威[请求合同](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)与原配置/服务合同共同约束后续worker。
 - 三表/共享规则server.role_provision_requests、10新API和C1–C4接线实现人类意图/租约/config_version、原子创建与源精确绑定、一次恢复最多一次轮换、有限稳定错误码及真实三步完成投影；服务端不写宿主文件、不spawn，不给agent创建权限或新增Key读取。
 - Codex独立新79、旧166及原7探针分别0失败/错误/跳过；WAL两独立连接/线程并发claim/一次轮换、提交前故障六表+请求零残留通过。不是多进程或生产迁移证据，未验证实际Key/原生登录/模型/服务。
-- 下一片复用role_provision私有文件/guard与role_service_host常驻循环接worker，默认关闭、同机回环、只处理人类请求、配置不启动；之后Codex完整创建配置页面/DeepSeek复核及人工验收，外部/归档/退出后续、I-4后置。
+- 235/236宿主由DeepSeek开发，经Codex复核后接手G1/G2、237独立复核通过，整链已收取。role_provision_worker默认关闭/只读，消费人类请求，一次性Key私有落盘、metadata恢复、真实三步及ACK/report；逐请求资格/取消/预算守卫与失败reported非零退出闭合。role_service_host默认关闭的独立线程接线不占Popen、不阻塞poll/stop。
+- 237独立新50/旧320/原6/检出3/独立13分别全过，实际隔离回环/子进程CLI/私有DACL证据已核，原失败/unknown保持、不叠加重叠测试。指南[ROLE_REQUEST_WORKER](../guides/ROLE_REQUEST_WORKER.md)说明参数、恢复和有界收尾；无生产启用或原生模型/登录/完整退出能力验收。
+- 下一片Codex完整创建配置页面/DeepSeek复核及人工验收，外部/归档/退出后续、I-4后置；当前配置不启动服务，旧生产配置/名册/Key保持。
 
 ### 角色生命周期 R1-3：受管CLI基础与本轮页面验收已通过
 

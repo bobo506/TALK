@@ -62,26 +62,36 @@ for _path_entry in (str(REPO_ROOT), str(SCRIPT_DIR)):
 from cli import profiles as profile_helpers  # noqa: E402
 
 __all__ = [
+    "CREDENTIAL_METADATA_SCHEMA",
     "DEFAULT_BASE_URL",
     "DEFAULT_KEY_ROOT",
     "DEFAULT_LOCK_STALE_SECONDS",
     "DEFAULT_TIMEOUT_SECONDS",
     "HttpResponse",
     "ProvisionError",
+    "REQUEST_ENDPOINT_ERROR_WHITELIST",
     "SCHEMA",
     "STEP_ORDER",
     "UrlLibTransport",
     "acquire_lock",
+    "acquire_provision_locks",
     "assert_inside_root",
     "build_parser",
+    "create_role_for_request",
+    "credential_metadata_path",
     "key_file_path",
     "lock_path_for",
     "main",
     "parse_steps",
     "profile_lock_path_for",
     "profile_target_paths",
+    "read_credential_metadata",
     "release_lock",
+    "release_provision_locks",
+    "rotate_role_key_for_request",
     "run_provision",
+    "run_request_provision",
+    "write_credential_metadata",
 ]
 
 SCHEMA = "talk-role-provision-1"
@@ -386,7 +396,9 @@ class HttpResponse:
     error_code: Optional[str] = None
 
 
-def _extract_whitelisted_error_code(raw: Any) -> Optional[str]:
+def _extract_whitelisted_error_code(
+    raw: Any, whitelist: frozenset[str] = PROVISION_ERROR_CODE_WHITELIST
+) -> Optional[str]:
     """从**有界**错误正文里只取固定白名单错误码；其余内容立即丢弃（补正 H1）。
 
     - 只解析 ``{"detail": "<code>"}`` 或 ``{"detail": {"code": "<code>"}}``；
@@ -402,32 +414,34 @@ def _extract_whitelisted_error_code(raw: Any) -> Optional[str]:
     if not isinstance(body, Mapping):
         return None
     detail = body.get("detail")
-    if isinstance(detail, str) and detail in PROVISION_ERROR_CODE_WHITELIST:
+    if isinstance(detail, str) and detail in whitelist:
         return detail
     if isinstance(detail, Mapping):
         code = detail.get("code")
-        if isinstance(code, str) and code in PROVISION_ERROR_CODE_WHITELIST:
+        if isinstance(code, str) and code in whitelist:
             return code
     return None
 
 
-def _whitelisted_response_error_code(response: Any) -> Optional[str]:
+def _whitelisted_response_error_code(
+    response: Any, whitelist: frozenset[str] = PROVISION_ERROR_CODE_WHITELIST
+) -> Optional[str]:
     """从任意同形状传输响应安全取白名单错误码（默认 HTTP 与测试假传输共用）。
 
     默认 :class:`UrlLibTransport` 只填 ``error_code``（正文已丢弃）；注入的假传输/端到端
     传输可能把 ``detail`` 留在 ``payload`` 里，这里同样只接受白名单命中值。
     """
     code = getattr(response, "error_code", None)
-    if isinstance(code, str) and code in PROVISION_ERROR_CODE_WHITELIST:
+    if isinstance(code, str) and code in whitelist:
         return code
     payload = getattr(response, "payload", None)
     if isinstance(payload, Mapping):
         detail = payload.get("detail")
-        if isinstance(detail, str) and detail in PROVISION_ERROR_CODE_WHITELIST:
+        if isinstance(detail, str) and detail in whitelist:
             return detail
         if isinstance(detail, Mapping):
             inner = detail.get("code")
-            if isinstance(inner, str) and inner in PROVISION_ERROR_CODE_WHITELIST:
+            if isinstance(inner, str) and inner in whitelist:
                 return inner
     return None
 
@@ -1470,28 +1484,30 @@ def _windows_publish_temp_file(key_path: Path, payload: bytes) -> Path:
     return temp_path
 
 
-def _write_key_file(key_path: Path, key: str) -> str:
-    """写入 Key 文件；成功返回权限描述，正式目标任意时刻都「完整或不存在」。
+def _write_private_payload(target_path: Path, payload: bytes) -> str:
+    """把 ``payload`` 私有、原子地发布到 ``target_path``；返回权限描述。
 
-    - Windows：中断安全发布 —— 先用 ``CreateFileW(CREATE_NEW)`` + 私有 DACL 在**同目录**
-      写临时文件并回读校验，全部通过后才 ``os.replace`` 原子替换正式目标。这样在
-      CreateFile 之后、WriteFile/Flush/回读过程中的任意崩溃/短写/失败都只会留下
-      ``.tmp``，正式目标保持「不存在」，原 Key + 原操作可直接续跑。
-      宿主若拒绝 ``os.replace``（沙箱/文件系统限制），如实按能力受阻报错，**不**降级为
-      直接写正式目标。
+    正式目标任意时刻都「完整或不存在」：
+
+    - Windows：先用 ``CreateFileW(CREATE_NEW)`` + 私有 DACL 在**同目录**写临时文件并回读
+      校验，全部通过后才 ``os.replace`` 原子替换正式目标。这样在 CreateFile 之后、
+      WriteFile/Flush/回读过程中的任意崩溃/短写/失败都只会留下 ``.tmp``，正式目标保持
+      「不存在」，原内容 + 原操作可直接续跑。宿主若拒绝 ``os.replace``（沙箱/文件系统
+      限制），如实按能力受阻报错，**不**降级为直接写正式目标。
     - POSIX：同目录临时文件 + ``os.replace`` 原子落地，权限 0600。
+
+    该函数同时服务角色 Key 文件与不含 Key 的私有元数据文件（R1-4b）。
     """
-    payload = (key.rstrip("\r\n") + "\n").encode("utf-8")
     try:
-        key_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise ProvisionError("key_write_failed", "无法创建 Key 目录") from exc
+        raise ProvisionError("key_write_failed", "无法创建私有文件目录") from exc
 
     if os.name == "nt":
-        _windows_sweep_stale_key_temps(key_path)
-        temp_path = _windows_publish_temp_file(key_path, payload)
+        _windows_sweep_stale_key_temps(target_path)
+        temp_path = _windows_publish_temp_file(target_path, payload)
         try:
-            os.replace(temp_path, key_path)
+            os.replace(temp_path, target_path)
         except OSError as exc:
             try:
                 os.remove(temp_path)
@@ -1499,27 +1515,26 @@ def _write_key_file(key_path: Path, key: str) -> str:
                 pass
             raise ProvisionError(
                 "key_permissions_failed",
-                "宿主/文件系统拒绝 Windows 原子提交（移动临时 Key 文件到正式目标失败）",
+                "宿主/文件系统拒绝 Windows 原子提交（移动私有临时文件到正式目标失败）",
             ) from exc
         try:
-            written = key_path.read_bytes()
+            written = target_path.read_bytes()
         except OSError as exc:
-            # 回读失败无法证明“完整”，去掉刚提交的正式目标以恢复「完整或不存在」。
             try:
-                os.remove(key_path)
+                os.remove(target_path)
             except OSError:
                 pass
-            raise ProvisionError("key_permissions_failed", "回读 Key 文件失败") from exc
+            raise ProvisionError("key_permissions_failed", "回读私有文件失败") from exc
         if written != payload:
             try:
-                os.remove(key_path)
+                os.remove(target_path)
             except OSError:
                 pass
-            raise ProvisionError("key_write_failed", "Key 文件回读内容不一致")
-        return _enforce_private_permissions(key_path)
+            raise ProvisionError("key_write_failed", "私有文件回读内容不一致")
+        return _enforce_private_permissions(target_path)
 
     handle_fd, temp_name = tempfile.mkstemp(
-        prefix=f".{key_path.name}.", suffix=".tmp", dir=str(key_path.parent)
+        prefix=f".{target_path.name}.", suffix=".tmp", dir=str(target_path.parent)
     )
     temp_path = Path(temp_name)
     try:
@@ -1529,14 +1544,20 @@ def _write_key_file(key_path: Path, key: str) -> str:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temp_path, key_path)
+        os.replace(temp_path, target_path)
     except OSError as exc:
         try:
             temp_path.unlink()
         except OSError:
             pass
-        raise ProvisionError("key_write_failed", "写入私有权限 Key 文件失败") from exc
-    return _enforce_private_permissions(key_path)
+        raise ProvisionError("key_write_failed", "写入私有权限文件失败") from exc
+    return _enforce_private_permissions(target_path)
+
+
+def _write_key_file(key_path: Path, key: str) -> str:
+    """写入 Key 文件；成功返回权限描述，正式目标任意时刻都「完整或不存在」。"""
+    payload = (key.rstrip("\r\n") + "\n").encode("utf-8")
+    return _write_private_payload(key_path, payload)
 
 
 def _run_key_step(
@@ -2011,6 +2032,8 @@ def _ensure_job(
     resume_steps: Any,
     operator_key: str,
     timeout: float,
+    request_key: Optional[str] = None,
+    lease_token: Optional[str] = None,
 ) -> dict[str, Any]:
     """在**本地副作用之前**确保 provision 作业存在并捕获作业代际。
 
@@ -2071,6 +2094,10 @@ def _ensure_job(
             "resume": True,
             "steps": list(resume_steps) if resume_steps is not None else None,
         }
+        if request_key is not None:
+            body["request_key"] = request_key
+        if lease_token is not None:
+            body["lease_token"] = lease_token
         posted = transport.request_json(
             "POST", url, api_key=operator_key, body=body, timeout=timeout
         )
@@ -2159,6 +2186,10 @@ def _ensure_job(
         }
     if response.status == 404:
         body = {"operation_key": operation_key, "resume": False, "steps": None}
+        if request_key is not None:
+            body["request_key"] = request_key
+        if lease_token is not None:
+            body["lease_token"] = lease_token
         posted = transport.request_json(
             "POST", url, api_key=operator_key, body=body, timeout=timeout
         )
@@ -2194,6 +2225,8 @@ def _send_acks(
     generation: Mapping[str, Any],
     operator_key: str,
     timeout: float,
+    request_key: Optional[str] = None,
+    lease_token: Optional[str] = None,
 ) -> dict[str, Any]:
     """按**捕获的代际**回报单步结果（补正 F1/F3）。
 
@@ -2218,6 +2251,10 @@ def _send_acks(
             "state": result["state"],
             "error_code": result.get("error_code"),
         }
+        if request_key is not None:
+            body["request_key"] = request_key
+        if lease_token is not None:
+            body["lease_token"] = lease_token
         response = transport.request_json(
             "POST", ack_url, api_key=operator_key, body=body, timeout=timeout
         )
@@ -2705,6 +2742,640 @@ def run_provision(
         document["error_code"] = "ack_stale"
     elif ack.get("reason") == "ack_failed":
         document["error_code"] = "ack_failed"
+
+    return document, 0 if document["conclusion"] == "applied" else 1
+
+
+# ---------------------------------------------------------------------------
+# 请求驱动宿主入口（R1-4b）
+#
+# 只新增“请求来源”最小原语：一次性 Key 的创建/轮换响应解析、不含 Key 的私有
+# credential.json 元数据、以及在请求来源/租约下的三步配置入口。默认 dry-run 的旧入口、
+# 旧无请求路径、旧错误码与旧响应结构全部保持；本段不 spawn、不读原生认证目录、不做模型调用。
+# ---------------------------------------------------------------------------
+
+#: 请求驱动端点允许从**有界**错误正文里提取的稳定错误码白名单（REQUEST_CONTRACT §3/§5/§8）。
+#: 只允许逐字命中；未知/自由文本/疑似凭据一律丢弃，绝不回显正文。
+REQUEST_ENDPOINT_ERROR_WHITELIST: frozenset[str] = frozenset(
+    set(PROVISION_ERROR_CODE_WHITELIST)
+    | {
+        "role_request_not_found",
+        "role_request_key_conflict",
+        "role_request_kind_invalid",
+        "role_request_payload_invalid",
+        "role_request_confirm_required",
+        "role_request_role_conflict",
+        "role_provision_payload_mismatch",
+        "operation_key_conflict",
+        "role_request_operation_mismatch",
+        "provision_lease_required",
+        "role_request_lease_invalid",
+        "role_request_lease_seconds_invalid",
+        "role_request_lease_conflict",
+        "role_request_revision_conflict",
+        "role_request_status_conflict",
+        "role_request_not_resumable",
+        "role_request_cancel_refused",
+        "member_created",
+        "role_request_choice_unavailable",
+        "role_request_binding_mismatch",
+        "role_request_credential_mismatch",
+        "role_request_credential_stale",
+        "role_request_completion_incomplete",
+        "role_request_stale_report",
+        "role_request_host_mismatch",
+        "provision_host_disabled",
+        "provision_host_version_conflict",
+        "provision_host_busy",
+        "provision_host_config_invalid",
+        "role_name_invalid",
+        "role_name_conflict",
+        "runner_not_found",
+        "runner_retired",
+        "choice_not_found",
+        "choice_retired",
+        "role_not_found",
+        "role_archived",
+        "rotate_not_managed_identity",
+        "rotate_member_not_agent",
+        "rotate_member_disabled",
+        "rotate_shared_identity_refused",
+        "provision_imported_identity_unsupported",
+        "api_key_generation_failed",
+        "operation_key_invalid",
+    }
+)
+
+#: 私有元数据文件（仓库外、与角色 Key 同根、**不含 Key/可复用令牌**）。
+CREDENTIAL_METADATA_SUFFIX = ".credential.json"
+CREDENTIAL_METADATA_SCHEMA = "talk-role-credential-metadata-1"
+#: 元数据允许的 ``source`` 值。
+CREDENTIAL_METADATA_SOURCES: frozenset[str] = frozenset(
+    {"create", "recover", "existing_key"}
+)
+
+
+def credential_metadata_path(key_root: Any, member_id: str) -> Path:
+    """``<key-root>/<member_dir_name>.credential.json``（守卫与 Key 文件同一规则）。"""
+    name = _safe_dir_name(member_id)
+    return assert_inside_root(key_root, Path(f"{name}{CREDENTIAL_METADATA_SUFFIX}"))
+
+
+def _metadata_text(payload: Mapping[str, Any]) -> str:
+    return json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+
+
+def write_credential_metadata(
+    key_root: Any,
+    member_id: str,
+    *,
+    credential_version: int,
+    source: str,
+    intent: Optional[str] = None,
+    intent_kind: Optional[str] = None,
+    now: Optional[str] = None,
+) -> Path:
+    """私有、原子发布不含 Key 的 ``credential.json``；返回其路径。
+
+    元数据与 Key 文件**不是**一起原子提交：Key 先发布，元数据单独发布。元数据失败不回滚、
+    不删除已发布 Key，由调用方按 ``key_provenance_write_failed`` 记录并在下一次以本人当前
+    Key 与角色当前版本核验后重建。
+    """
+    if source not in CREDENTIAL_METADATA_SOURCES:
+        raise ProvisionError("key_provenance_write_failed", "元数据 source 非法")
+    if isinstance(credential_version, bool) or not isinstance(credential_version, int):
+        raise ProvisionError("key_provenance_write_failed", "元数据版本非法")
+    if credential_version < 1:
+        raise ProvisionError("key_provenance_write_failed", "元数据版本非法")
+    timestamp = now or _now_iso()
+    target = credential_metadata_path(key_root, member_id)
+    payload = {
+        "schema": CREDENTIAL_METADATA_SCHEMA,
+        "member_id": member_id,
+        "credential_version": int(credential_version),
+        "source": source,
+        "intent": intent,
+        "intent_kind": intent_kind,
+        "updated_at": timestamp,
+    }
+    _write_private_payload(target, _metadata_text(payload).encode("utf-8"))
+    return target
+
+
+def read_credential_metadata(key_root: Any, member_id: str) -> Optional[dict[str, Any]]:
+    """读回并**形状校验**私有元数据；缺失/非法/异成员一律 ``None``（调用方 fail closed）。"""
+    try:
+        target = credential_metadata_path(key_root, member_id)
+    except ProvisionError:
+        return None
+    if not target.is_file() or _is_reparse_point(target):
+        return None
+    try:
+        raw = target.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        return None
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    if payload.get("schema") != CREDENTIAL_METADATA_SCHEMA:
+        return None
+    if str(payload.get("member_id") or "") != member_id:
+        return None
+    version = payload.get("credential_version")
+    if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+        return None
+    source = payload.get("source")
+    if source not in CREDENTIAL_METADATA_SOURCES:
+        return None
+    if "api_key" in raw or ROLE_KEY_ENV in raw:
+        # 防御性：元数据里出现任何 Key 形态字段一律视为不可信，绝不据此继续。
+        return None
+    return {
+        "schema": CREDENTIAL_METADATA_SCHEMA,
+        "member_id": member_id,
+        "credential_version": int(version),
+        "source": str(source),
+        "intent": payload.get("intent"),
+        "intent_kind": payload.get("intent_kind"),
+        "updated_at": payload.get("updated_at"),
+    }
+
+
+def _response_json(response: Any) -> Mapping[str, Any]:
+    payload = getattr(response, "payload", None)
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def _optional_key(value: Any) -> Optional[str]:
+    return value if isinstance(value, str) and _is_plausible_key(value) else None
+
+
+def _optional_version(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return None
+    return int(value)
+
+
+def create_role_for_request(
+    *,
+    transport: Any,
+    base_url: str,
+    project_id: str,
+    payload: Mapping[str, Any],
+    request_key: str,
+    lease_token: str,
+    operator_key: str,
+    timeout: float,
+) -> dict[str, Any]:
+    """C1：用原 ``POST /roles`` + ``operation_key=request_key`` + ``lease_token`` 首次创建。
+
+    返回**脱敏**结果：``status/member_id/reused/credential_version/error_code``，以及仅在
+    201 响应里出现一次的 ``api_key``。调用方必须让 ``api_key`` 只留在内存里，绝不进
+    argv/env/日志/普通输出/交付；本函数不打印任何请求或响应正文。
+    """
+    body: dict[str, Any] = {
+        "role_name": payload.get("role_name"),
+        "runner_id": payload.get("runner_id"),
+        "choice_id": payload.get("choice_id"),
+        "operation_key": request_key,
+        "lease_token": lease_token,
+    }
+    if payload.get("role_description") is not None:
+        body["role_description"] = payload.get("role_description")
+    response = transport.request_json(
+        "POST",
+        _api(base_url, _roles_path(project_id)),
+        api_key=operator_key,
+        body=body,
+        timeout=timeout,
+    )
+    data = _response_json(response)
+    reused = bool(data.get("reused")) if response.status == 200 else False
+    return {
+        "status": int(getattr(response, "status", 0) or 0),
+        "member_id": str(data.get("member_id")) if data.get("member_id") else None,
+        "reused": reused,
+        "credential_version": _optional_version(data.get("credential_version")),
+        "api_key": _optional_key(data.get("api_key")) if response.status == 201 else None,
+        "error_code": _whitelisted_response_error_code(
+            response, REQUEST_ENDPOINT_ERROR_WHITELIST
+        ),
+    }
+
+
+def rotate_role_key_for_request(
+    *,
+    transport: Any,
+    base_url: str,
+    project_id: str,
+    member_id: str,
+    request_key: str,
+    lease_token: str,
+    expected_credential_version: Optional[int],
+    operator_key: str,
+    timeout: float,
+) -> dict[str, Any]:
+    """C2：请求驱动的**受限恢复**轮换（一次人类意图最多一次）。
+
+    201 返回新 Key（只在内存）；200 ``reused=true`` 不返 Key；任何拒绝只回稳定错误码。
+    """
+    body: dict[str, Any] = {"request_key": request_key, "lease_token": lease_token}
+    if expected_credential_version is not None:
+        body["expected_credential_version"] = int(expected_credential_version)
+    url = (
+        _api(base_url, _roles_path(project_id))
+        + "/"
+        + quote(member_id, safe="")
+        + "/rotate-key"
+    )
+    response = transport.request_json(
+        "POST", url, api_key=operator_key, body=body, timeout=timeout
+    )
+    data = _response_json(response)
+    return {
+        "status": int(getattr(response, "status", 0) or 0),
+        "member_id": str(data.get("member_id")) if data.get("member_id") else None,
+        "reused": bool(data.get("reused")) if response.status == 200 else False,
+        "credential_version": _optional_version(data.get("credential_version")),
+        "api_key": _optional_key(data.get("api_key")) if response.status == 201 else None,
+        "error_code": _whitelisted_response_error_code(
+            response, REQUEST_ENDPOINT_ERROR_WHITELIST
+        ),
+    }
+
+
+def acquire_provision_locks(
+    project_root: Any,
+    key_root: Any,
+    member_id: str,
+    *,
+    stale_seconds: float = DEFAULT_LOCK_STALE_SECONDS,
+) -> list[tuple[Path, dict[str, Any]]]:
+    """按固定顺序取得同一角色的身份档锁 + Key 锁（失败时反向释放自己已持有的锁）。
+
+    R1-4b：请求驱动 worker 需要在**同一临界区**内完成“核本机当前 Key / 受限轮换 / 私有
+    发布 / 三步推进”，因此复用与 :func:`run_provision` 完全相同的两把锁，而不是另造一套。
+    """
+    profile_lock_path = profile_lock_path_for(project_root, member_id)
+    target_key_path = key_file_path(key_root, member_id)
+    lock_path = lock_path_for(target_key_path)
+    handles: list[tuple[Path, dict[str, Any]]] = []
+    try:
+        for candidate in (profile_lock_path, lock_path):
+            handles.append((candidate, acquire_lock(candidate, stale_seconds)))
+    except ProvisionError:
+        for held_path, held_handle in reversed(handles):
+            release_lock(held_path, held_handle)
+        raise
+    return handles
+
+
+def release_provision_locks(handles: Any) -> None:
+    """反向释放在 :func:`acquire_provision_locks` 里取得的锁（只释放自己代际）。"""
+    for held_path, held_handle in reversed(list(handles or [])):
+        release_lock(held_path, held_handle)
+
+
+def bounded_io_timeout(
+    timeout_seconds: float, deadline: Any, clock: Any
+) -> float:
+    """把单次请求超时收敛到**本轮剩余预算**（R1-4b 返修 F2）。
+
+    调用方（宿主 worker）把单轮 IO 预算的绝对期限传进来后，每次网络请求都用
+    ``min(timeout_seconds, deadline - now)``，预算耗尽即抛 ``worker_io_budget_exceeded``，
+    绝不把「剩余预算」只留在循环外层。
+    """
+    if deadline is None:
+        return float(timeout_seconds)
+    now = float(clock()) if clock is not None else time.monotonic()
+    remaining = float(deadline) - now
+    if remaining <= 0:
+        raise ProvisionError("worker_io_budget_exceeded", "本轮 IO 预算已用完")
+    return min(float(timeout_seconds), remaining)
+
+
+class _RequestProvisionTransport:
+    """请求驱动步骤的逐请求守卫；旧脚本传输保持原行为。"""
+
+    def __init__(self, transport: Any, checkpoint: Any, timeout: Any):
+        self._transport = transport
+        self._checkpoint = checkpoint
+        self._timeout = timeout
+
+    def request_json(self, method: str, url: str, **kwargs: Any) -> HttpResponse:
+        # 帮助函数内部也可能继续登记名册或发送多个 ACK；检查必须落在每次请求前。
+        self._checkpoint()
+        remaining_timeout = self._timeout()
+        supplied_timeout = kwargs.get("timeout")
+        kwargs["timeout"] = (
+            remaining_timeout
+            if supplied_timeout is None
+            else min(float(supplied_timeout), remaining_timeout)
+        )
+        return self._transport.request_json(method, url, **kwargs)
+
+
+def run_request_provision(
+    *,
+    project_id: str,
+    member_id: str,
+    operation_key: str,
+    request_key: str,
+    lease_token: str,
+    project_root: Any,
+    key_root: Any = None,
+    base_url: str = DEFAULT_BASE_URL,
+    steps: Any = None,
+    resume: bool = False,
+    resume_steps: Any = None,
+    overwrite_profile: bool = False,
+    cli_executable: Any = None,
+    lock_stale_seconds: float = DEFAULT_LOCK_STALE_SECONDS,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    transport: Any = None,
+    environ: Any = None,
+    repo_root: Any = REPO_ROOT,
+    locks: Any = None,
+    operator_key: Optional[str] = None,
+    eligibility_check: Any = None,
+    deadline: Any = None,
+    clock: Any = None,
+) -> tuple[dict[str, Any], int]:
+    """请求驱动（C3/C4）三步配置入口：**不写 Key**，其余复用 R1-2 私有原子/锁/预检。
+
+    前置事实：Key 文件已由一次性响应私有发布、身份档目标已知、作业尚待推进。本函数只：
+    捕获作业代际 → 跑 ``profile/key_file/preflight`` → 用 ``request_key/lease_token`` 按捕获
+    代际 ACK。Key 文件在本步只做**只读身份核验**（``skipped``/``succeeded``），绝不重写、
+    绝不从服务端重取旧 Key。返回 ``(文档, 退出码)``；任何失败都只回稳定错误码。
+
+    R1-4b 返修（F2/F3/F4）新增三个可选参数，默认 ``None`` 时行为与 R1-2 完全一致：
+
+    - ``operator_key``：调用方**已解析**的 operator 凭据（只在内存里贯穿），无需重配 env，
+      也绝不写进 argv/子进程环境；为空时才回退到 ``environ`` 解析；
+    - ``eligibility_check``：在 profile/Key 核验/预检/ACK 每个副作用边界前调用；断言当前
+      请求/租约世代/期限/目标资格仍然有效，失效即抛异常，从而**不做后续写**；
+    - ``deadline``/``clock``：单轮 IO 预算的绝对期限与时钟，每次网络请求都用剩余预算。
+    """
+    env = (
+        {str(key): str(value) for key, value in os.environ.items()}
+        if environ is None
+        else {str(key): str(value) for key, value in environ.items()}
+    )
+    active_transport = transport if transport is not None else UrlLibTransport(timeout_seconds)
+    base = str(base_url or DEFAULT_BASE_URL).rstrip("/")
+    selected = parse_steps(steps)
+
+    def _io_timeout() -> float:
+        return bounded_io_timeout(timeout_seconds, deadline, clock)
+
+    def _checkpoint() -> None:
+        if eligibility_check is not None:
+            eligibility_check()
+
+    if eligibility_check is not None or deadline is not None:
+        active_transport = _RequestProvisionTransport(
+            active_transport, _checkpoint, _io_timeout
+        )
+
+    states: dict[str, dict[str, Any]] = {
+        step: _step(STATE_PENDING, 0, None, "not run") for step in STEP_ORDER
+    }
+    document: dict[str, Any] = {
+        "schema": SCHEMA,
+        "mode": MODE_APPLY,
+        "project_id": project_id,
+        "member_id": member_id,
+        "operation_key": operation_key,
+        "request_key": request_key,
+        "base_url": base,
+        "steps": states,
+        "ack": {"sent": False, "reason": None, "results": []},
+        "job": {"action": "none", "status": None, "revision": None},
+        "lock": None,
+        "identity_lock": None,
+        "error_code": None,
+        "conclusion": "failed",
+    }
+
+    try:
+        project_root_resolved = _resolve_project_root(project_root)
+    except ProvisionError as exc:
+        return _abort(document, states, selected, exc.code, exc.detail)
+    document["project_root"] = str(project_root_resolved)
+
+    key_root_value = DEFAULT_KEY_ROOT if key_root is None else key_root
+    try:
+        key_root_declared = Path(key_root_value).expanduser()
+        _assert_root_chain_has_no_reparse(key_root_declared)
+        key_root_resolved = key_root_declared.resolve()
+    except ProvisionError as exc:
+        return _abort(document, states, selected, exc.code, exc.detail)
+    except OSError:
+        return _abort(document, states, selected, "key_write_failed", "Key 根无法解析")
+    document["key_root"] = str(key_root_resolved)
+    if _path_is_within(key_root_resolved, repo_root):
+        return _abort(
+            document,
+            states,
+            selected,
+            "key_root_inside_repo",
+            _REASON_DETAILS["key_root_inside_repo"],
+        )
+
+    try:
+        profile_paths = profile_target_paths(project_root_resolved, member_id)
+        target_key_path = key_file_path(key_root_resolved, member_id)
+    except ProvisionError as exc:
+        return _abort(document, states, selected, exc.code, exc.detail)
+    document["key_file_path"] = str(target_key_path)
+
+    # R1-4b：调用方（worker）可在同一临界区里先核本机 Key 并做受限发布，再把已持有的锁
+    # 交给本函数复用；未提供时按 R1-2 原顺序自行取锁。
+    owns_locks = locks is None
+    lock_handles: list[tuple[Path, dict[str, Any]]] = [] if owns_locks else list(locks)
+    if owns_locks:
+        try:
+            lock_handles = acquire_provision_locks(
+                project_root_resolved,
+                key_root_resolved,
+                member_id,
+                stale_seconds=lock_stale_seconds,
+            )
+        except ProvisionError as exc:
+            return _abort(document, states, selected, exc.code, exc.detail)
+    if lock_handles:
+        document["lock"] = lock_handles[-1][1]
+        document["identity_lock"] = lock_handles[0][1]
+
+    try:
+        # R1-4b 返修 F3：调用方已解析的 operator 优先，且只在内存里贯穿；仅当缺省时
+        # 才回退到 environ（兼容旧脚本来源规则），绝不把 Key 写进 argv/子进程环境。
+        if operator_key is None:
+            operator_key = _resolve_operator_key(env)
+        if operator_key is None:
+            for step in selected:
+                states[step] = _step(
+                    STATE_FAILED, 0, "operator_key_missing", "缺少 operator 凭据"
+                )
+            document["error_code"] = "operator_key_missing"
+            document["conclusion"] = "failed"
+            return document, 1
+
+        _checkpoint()
+        try:
+            job_info = _ensure_job(
+                transport=active_transport,
+                base_url=base,
+                project_id=project_id,
+                member_id=member_id,
+                operation_key=operation_key,
+                resume=resume,
+                resume_steps=resume_steps,
+                operator_key=operator_key,
+                timeout=_io_timeout(),
+                request_key=request_key,
+                lease_token=lease_token,
+            )
+        except ProvisionError as exc:
+            for step in selected:
+                states[step] = _step(STATE_FAILED, 0, exc.code, exc.detail)
+            document["job"] = {
+                "action": "none",
+                "status": None,
+                "revision": None,
+                "error_code": exc.code,
+                "detail": exc.detail,
+            }
+            document["error_code"] = exc.code
+            document["conclusion"] = "failed"
+            return document, 1
+
+        generation = job_info.get("generation")
+        expected_choice_fingerprint = job_info.get("expected_binding_fingerprint")
+        document["job"] = {
+            "action": job_info["action"],
+            "status": job_info["status"],
+            "revision": job_info["revision"],
+        }
+
+        if "profile" in selected:
+            _checkpoint()
+            try:
+                states["profile"] = _run_profile_step(
+                    project_root=project_root_resolved,
+                    member_id=member_id,
+                    project_id=project_id,
+                    paths=profile_paths,
+                    overwrite=overwrite_profile,
+                )
+            except ProvisionError as exc:
+                states["profile"] = _step(STATE_FAILED, 1, exc.code, exc.detail)
+
+        if "key_file" in selected:
+            _checkpoint()
+            try:
+                states["key_file"] = _run_key_step(
+                    key_path=target_key_path,
+                    member_id=member_id,
+                    key_input_file=None,
+                    env={},
+                    transport=active_transport,
+                    base_url=base,
+                    timeout=_io_timeout(),
+                )
+            except ProvisionError as exc:
+                states["key_file"] = _step(STATE_FAILED, 1, exc.code, exc.detail)
+
+        if "preflight" in selected:
+            _checkpoint()
+            role_key = (
+                _read_key_file(target_key_path) if target_key_path.is_file() else None
+            )
+            try:
+                states["preflight"] = _run_preflight_step(
+                    project_id=project_id,
+                    member_id=member_id,
+                    operation_key=operation_key,
+                    project_root=project_root_resolved,
+                    paths=profile_paths,
+                    role_key=role_key,
+                    operator_key=operator_key,
+                    expected_choice_fingerprint=expected_choice_fingerprint,
+                    cli_executable=cli_executable,
+                    transport=active_transport,
+                    base_url=base,
+                    timeout=_io_timeout(),
+                )
+            except ProvisionError as exc:
+                states["preflight"] = _step(STATE_FAILED, 1, exc.code, exc.detail)
+
+        if generation is None:
+            document["ack"] = {"sent": False, "reason": "ack_failed", "results": []}
+        else:
+            pending_steps = [
+                step
+                for step in selected
+                if generation["steps"][step]["state"] == STATE_PENDING
+            ]
+            failed_steps = [
+                step
+                for step in selected
+                if generation["steps"][step]["state"] == STATE_FAILED
+            ]
+            if pending_steps:
+                _checkpoint()
+                document["ack"] = _send_acks(
+                    transport=active_transport,
+                    base_url=base,
+                    project_id=project_id,
+                    member_id=member_id,
+                    operation_key=operation_key,
+                    steps=pending_steps,
+                    states=states,
+                    generation=generation,
+                    operator_key=operator_key,
+                    timeout=_io_timeout(),
+                    request_key=request_key,
+                    lease_token=lease_token,
+                )
+            elif failed_steps:
+                document["ack"] = {
+                    "sent": False,
+                    "reason": "resume_required",
+                    "results": [
+                        {"step": step, "sent": False, "reason": "resume_required"}
+                        for step in failed_steps
+                    ],
+                }
+            else:
+                document["ack"] = {"sent": False, "reason": "not_required", "results": []}
+    finally:
+        if owns_locks:
+            release_provision_locks(lock_handles)
+
+    failed = [step for step in selected if states[step]["state"] == STATE_FAILED]
+    done = [
+        step
+        for step in selected
+        if states[step]["state"] in (STATE_SUCCEEDED, STATE_SKIPPED)
+    ]
+    ack = document["ack"]
+    if failed and not done:
+        document["conclusion"] = "failed"
+    elif failed:
+        document["conclusion"] = "partial"
+    elif ack.get("sent") or ack.get("reason") == "not_required":
+        document["conclusion"] = "applied"
+    else:
+        document["conclusion"] = "partial"
+
+    if failed:
+        document["error_code"] = states[failed[0]]["error_code"]
+    elif ack.get("reason") in ("ack_stale", "ack_failed", "resume_required"):
+        document["error_code"] = ack["reason"]
 
     return document, 0 if document["conclusion"] == "applied" else 1
 

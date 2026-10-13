@@ -1,6 +1,6 @@
 # 页面创建与宿主配置请求合同（R1-4a）
 
-> 2026-10-13：采用230–232补正链方向形成正式合同，server协议经233开发、234返修及Codex独立复核通过，234→233已收取。三表/共享守卫/10新接口/4旧入口已实现；独立新79、旧166及原7探针分别全通过，WAL两连接/线程与提交前回滚证据通过。**宿主执行/私有文件与前端尚未接线，完整创建配置未验收。** 原草稿、partial及失败证据保持，不外推生产部署/原生能力。
+> 2026-10-13：server协议经233/234与Codex独立复核通过，宿主235/236经Codex接手补正及237独立复核通过，整链已收取。三表/共享守卫/10新接口/4旧入口、worker真实私有文件/三步/ACK/report已实现。**完整前端尚未接线，完整创建配置未验收。** 原草稿、partial/unknown及失败证据保持，不外推生产部署/原生能力。宿主使用见[worker指南](../guides/ROLE_REQUEST_WORKER.md)。
 > 上游：[角色生命周期](ROLE_LIFECYCLE_DESIGN.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)、[受管服务](ROLE_SERVICE_CONTRACT.md)。本合同只修订请求驱动的创建/恢复/配置路径；既有无请求来源的人工接口保持。
 
 ## 1. 用户流程与实施边界
@@ -134,17 +134,19 @@ report和请求驱动ACK的失败码使用models.ROLE_REQUEST_HOST_ERROR_CODES�
 | disable后再enable | config_version换代；旧token不复活，只能新claim |
 | failed人工resume | 无成员回requested；有成员回created；占用复查、清旧资格、世代+1 |
 
-## 10. 宿主文件与执行（下一后端片）
+## 10. 宿主文件与执行（R1-4b已实现）
 
-server协议片先完成后再接worker。worker默认关闭、单个处理，只发现人类请求；只允许回环基址，默认dry-run及旧脚本参数来源规则保持。配置不spawn角色CLI。
+`scripts/role_provision_worker.py`消费claimable人类请求，包括失联created；worker默认关闭、单个处理，只允许回环基址。`--enable`仅只读计划，`--enable --apply`才领取/真实配置，所有执行入口保持该语义。可通过role_service_host.serve的默认关闭选项接入独立线程，配置不spawn角色CLI或接管Popen。
 
 Key规范路径/DACL/guard/路径边界与原子写复用R1-2。新增私有credential.json仅记录member/version/source/intent/时间，不含Key；普通路径仍拒覆无效未知文件。专用恢复替换须当前意图/代际证明、新Key本人核验、角色锁，且来源记录证明目标为本人已知旧代文件；未知/异成员不覆盖。不要声称两文件一同原子提交。
 
-Key已发布而元数据失败：不删除当前有效Key，记录失败；下次先以本人Key认证及当前角色版本核验重建同路径元数据，不能因旧元数据而再次轮换。Key响应到落盘间仅留内存，不入argv/env/日志/任务/交付/异常；锁和租约均仅按实际能力表述。详细worker实现和负向用例由下一片核实，不拿本合同当运行证据。
+Key已发布而元数据失败：不删除当前有效Key，记录失败；下次先以本人Key认证及当前角色版本核验重建同路径元数据，不能因旧元数据而再次轮换。Key响应到落盘间仅留内存，不入argv/env/日志/任务/交付/异常；锁和租约均仅按实际能力表述。
+
+请求驱动步骤通过逐HTTP资格/取消/剩余预算守卫，覆盖帮助函数内的名册路径登记、预检及逐个ACK，不仅检查函数入口。失败已report的outcome=reported仍是业务失败，两CLI退出1。预算耗尽可能未能report，请求保留created，按真实租约/人工resume恢复。新增有限宿主码role_key_foreign_refused/key_provenance_write_failed/worker_io_budget_exceeded已登记，旧无请求脚本语义保持。
 
 ## 11. 切片与验收
 
-server片已由233/234完成并独立复核收取：9个业务/测试文件，原旧6套件未改。新router与projects共用server.role_provision_requests。下一片宿主，之后Codex前端+DeepSeek独立复核，交完整创建/配置功能人工验收；不先发布只读选择器半流程。
+server片233/234与宿主235–237已独立复核收取。server新79/旧166/原7和WAL两连接/线程回滚证据保持；宿主237独立50新/320旧/原6/检出3/独立13分别全过，包含实际隔离回环、子进程CLI与私有文件/DACL，重叠证据不叠加。下一片Codex完整前端+DeepSeek独立复核，交完整创建/配置功能人工验收；不先发布只读选择器半流程。
 
 必须检出的负向：首次意图载荷/choice替换零创建；cancel/disable/过期后的创建/轮换/ACK零写入；旧代token与再启用不复活；原人工重放不返Key且目录变更不阻断；历史create+新recover正确选源；恢复重放顺序/并发只轮换一次；新recover与旧resume互斥；跳过原创建/三步/代际不能完成；created失联可发现；耗尽可人工恢复；所有公开投影严格不含Key/token/hash/路径/argv，错误与日志哨兵Key零命中。
 

@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-13 21:00（Asia/Shanghai）— 237独立复核通过，宿主235–237收取发布
+
+- 用户“237好了”触发收件。实读caller agent:codex/kind=agent、最新development_requirements及DeepSeek available/已submitted；用户前端Codex指定/持续接手修正授权保持，不改页面分工或绑定。237合法complete/task237，msg2741完整8268字符/SHA ef8ccedceb49b9e4e04ee9da14003c074746c934d3e49ba9ae63f6cefc01b1bb，与本地逐结构一致，summary校验通过。复核源码/哈希/日志才判通过，runner和格式本身不是验收。
+- DeepSeek实际检查候选相对236的逐请求守卫、50ms下限移除、两个CLI reported非零，AST证明仅指定函数/一类改变、models未动、测试只加6。独立真实选择下架业务失败→create409→failed报告200→reported→两CLI退出1，成功/停止/只读词表0；真实子进程CLI+WorkerTransport+临时回环uvicorn成功0/失败1且秘密零命中，未只注入假outcome。
+- 正式worker50/旧11套件320/原6/检出3/新独立13分别全过、0fail/error/skip，53.51/164.34/4.22/3.22/14.41秒；新探针额外覆盖_ensure_job首GET后取消/预算/租约失效的后续零业务请求、0.02秒剩余预算不抬升。守卫资格自身可多一次只读GET，预算耗尽可能无法report而请求created留待租约重试，真实限制保持。不叠加Codex、作者与重叠探针，不外推跨机/原生/生产能力。
+- Codex按收尾角色复算消息/本地JSON、5候选与candidate/cross manifests、235/236源码副本、原extra三失败/探针hash、五统计与原日志Ran/OK；全部一致，范围外跟踪变更零。237无git权限时用Python读对象树含pack/delta比842文件、157仅行尾的结论用本机Git范围核对互证；原untracked预览/seed/临时ACL文件不纳入提交。HEAD由ca4f5e4到b99773e只是协调方4文档，候选不变，不重跑已通过套件。
+- 实际237→236→235依次收取，succeeded/completed，UTC分别12:54:53.635565、12:54:57.045840、12:55:00.193090；必要回执/最终核验/原消息在.tmp/role-lifecycle-r1-4-worker-closeout/。收取表示最终宿主补正链闭合，不追改235/236complete自报、236围栏MCP unknown、原6/3失败或错标签日志。
+- 发布5业务/测试文件：role_provision/role_service_host/models、新role_provision_worker及50项正式测试；human-only/默认关闭/同机回环/一次性Key私有发布/known-old来源/metadata修复/逐HTTP守卫/失败非零与不占Popen保持。无角色CLI/登录/模型/生产DB/Key/名册/启用/重载/Browser操作；测试仍隔离SQLite/系统临时假Key/回环端口，日志全局既有句柄与临时残留保持。个人headless配置max已写，最新cache modelSelection为空，实际推理等级仍未核，不以此证明max已运行。
+- 同步worker新使用指南、请求/配置/服务合同、MODULE_bridges、简报/计划及两进度共9文档；更正服务合同本轮页面基础已验状态，保留真实原生与完整页面未验。指南实际参数取CLI parser/常量，关闭/只读/真实apply区分、operator文件来源、异步恢复、单轮预算120/超时15、两段grace上限180与完整退出后续如实说明，未运行生产示例。5业务+9文档明确暂存、必要空白/范围/冻结核验，持续授权中文提交普通推送，确切SHA/远端回执worker-closeout/publication.json。
+- 宿主内部切片完成；按一次一片/切模块先收尾规则，本轮不开MODULE_webui新开发、不派额外准备/等待任务。恢复“继续项目”后由Codex实现完整创建/配置页面、DeepSeek独立复核与人工验收；R1-3列表仅当前状态/启停仅详情/详情无重复状态保持，外部/归档/退出仍后续同范围、I-4后置。当前无待取宿主任务，默认被动取件规则保持。
+
 ## 2026-10-13 19:59（Asia/Shanghai）— 236剩余G1/G2由Codex修正，派237独立复核
 
 - 用户“236好了”触发取件，实读caller agent:codex/kind=agent、最新development_requirements和DeepSeek available/报告暂停；用户前端指定与持续直接修正授权保持，不改项目要求或模型绑定。236 runner succeeded/submitted，但msg2740说明+围栏JSON导致MCP unknown；完整7689字符/SHA 650fe40784df1de1ffa0159f020e5b56b25f4f61988d067a461e6760ded33dfb，内嵌JSON与本地合法task236/complete一致，原消息/格式/自报不追改。235/236均未收取。

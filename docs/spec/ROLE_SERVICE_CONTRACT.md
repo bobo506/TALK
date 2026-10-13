@@ -1,6 +1,6 @@
 # 角色受管服务合同（R1-3）
 
-状态：2026-10-12，经 #223/#224 开发返修、Codex两轮定向修正、#225/#226 独立复核，代码验收通过，任务链已收取。页面人工验收待完成。原设计见 [ROLE_LIFECYCLE_DESIGN.md](ROLE_LIFECYCLE_DESIGN.md)，实施顺序见 [ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md](ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md)。
+状态：2026-10-12，223–229代码复核与页面反馈补正完成并收取，用户本轮页面基础验收通过。2026-10-13，235–237默认关闭的请求worker接线独立通过，真实原生运行器及完整创建页面仍未验。原设计见 [ROLE_LIFECYCLE_DESIGN.md](ROLE_LIFECYCLE_DESIGN.md)，实施顺序见 [ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md](ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md)。
 
 ## 范围与执行者
 
@@ -44,6 +44,12 @@ R1-3实现服务意图、宿主claim/report、实例就绪、逐角色启动/关
 客户端把连接、成功响应正文、HTTPError正文读取中的`URLError`/`OSError`/`HTTPException`转换成稳定宿主错误并关闭响应；`IncompleteRead`属于`HTTPException`而非`OSError`。完整HTTP错误码保持。监督器轮询及动作边界保留原句柄，允许后续恢复，连续相同读错误去重；`once`/`max_rounds`预算保持，不捕`BaseException`或`KeyboardInterrupt`。逐动作边界的裸本地OSError可能降级为`host_unreachable`，这是当前诊断限制，内部具体错误码和归属证明不变。
 
 宿主默认HTTP超时15秒、就绪60秒、停止20秒、轮询1秒。这些是HTTP/进程预算，不能替代终端MCP等待预算；终端适配仍按 [TERMINAL_MCP.md](../guides/TERMINAL_MCP.md) 核验实际客户端上限和返回余量。
+
+## 可选请求worker（R1-4b）
+
+`serve --provision-worker`只接只读计划，另加`--provision-worker-apply`才真实消费人类配置意图；未开启时不加载worker。独立线程每次最多一轮，主循环非阻塞收集并继续poll/stop，worker不持有Popen。配置完成不自动启动角色，未知原生能力仍拒绝。使用与实际参数见[worker指南](../guides/ROLE_REQUEST_WORKER.md)。
+
+每次请求前检查当前资格/取消和剩余IO预算；outcome=reported仅表示业务失败结果已送达，宿主CLI仍退出1。once/max_rounds退出最多两段有界grace、单段上限180秒，未结束请求停止并登记；完整Ctrl+C/宿主退出清理后续，不承诺强制回收未完成线程或绝对硬网络期限。原服务所有权、停止和有限等待合同保持。
 
 ## 页面行为
 

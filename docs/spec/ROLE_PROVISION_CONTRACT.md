@@ -1,6 +1,6 @@
 # 角色宿主配置合同（R1-2）
 
-> 2026-10-13增量：请求驱动的server创建/恢复/配置守卫已由233/234及Codex独立复核通过，见[创建配置请求合同](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)。无请求来源的原人工路径保持；请求来源永久保留，C3/C4须显式request_key/lease_token，过期或终态不回旧旁路，请求驱动错误码使用有限稳定集合。宿主worker/前端尚未消费新协议，本文旧脚本不据此宣称一键配置已可用。
+> 2026-10-13增量：server233/234与宿主235–237已独立通过收取，见[创建配置请求合同](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)/[worker指南](../guides/ROLE_REQUEST_WORKER.md)。请求来源永久保留，C3/C4须显式request_key/lease_token，过期或终态不回旧旁路；请求驱动原语复用私有文件/双锁/预检并逐请求检查资格和预算，operator仅内存贯穿。原无请求人工脚本保持、普通stale不覆盖；完整前端/人工验收仍待完成。
 
 > 2026-10-11：经 #218–#221 补正、Codex 定向修复及 #222 独立复核后发布；原草稿与失败记录保留。
 > R1-2三项页面基础已人工验收通过；真实配置/运行器能力仍按本文边界另验。

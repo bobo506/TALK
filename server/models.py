@@ -605,6 +605,14 @@ ROLE_REQUEST_HOST_ERROR_CODES = frozenset(
         "http_error",
         "not_apply_mode",
         "cli_executable_missing",
+        # R1-4b 宿主 worker 有限新增码：只表示“拒绝覆盖非本人已知旧代文件”与
+        # “Key 已发布但不含 Key 的来源元数据写入失败（不回滚 Key）”。
+        "role_key_foreign_refused",
+        "key_provenance_write_failed",
+        # R1-4b 返修 F2：单轮 IO 预算在副作用/ACK/report 边界前耗尽时的精确宿主码。
+        # 合同 §8 要求新增宿主码必须登记进本集合，否则 report/ACK 会 422 并丢失错误形状；
+        # 本码与 ``scripts/role_provision_worker.WORKER_ERROR_CODES`` 保持一一对应。
+        "worker_io_budget_exceeded",
     }
 )
 
