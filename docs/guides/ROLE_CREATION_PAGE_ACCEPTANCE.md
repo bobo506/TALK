@@ -25,6 +25,8 @@ python -m uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
 
 ## 完整配置闭环的准备与验收
 
+2026-10-14当前实际进度：用户明确授权后，“Kimi k2.8”已有真实配置闭环，宿主`PC-202312301323`开启；该角色已进入列表，刷新后应能看到“配置已完成”和三步结果。私有路径已准备为`D:/claude-test/TALK-private/operator.key`与`D:/claude-test/TALK-private/keys`，无须再重复创建该角色。单请求worker按授权结束退出；以后新请求要自动处理仍需常驻worker。当前只证明身份/本机接入/配置检查，原生Kimi控制仍未核验，尚不能据此验收受管启动。
+
 完整闭环需要server和worker运行在同一台电脑。页面可以来自局域网；仅点击“开启配置”不会启动worker。管理员需已有仓库外human operator Key文件、仓库外角色Key根，以及与页面设置相同的宿主名称；准备步骤见[worker指南](ROLE_REQUEST_WORKER.md)。本片发布没有替人类启用生产worker或部署凭据。
 
 可沿用服务管理器的 `--provision-worker --provision-worker-apply`，或按指南运行独立worker。独立单轮处理示例（先替换实际宿主名和仓库外路径）：

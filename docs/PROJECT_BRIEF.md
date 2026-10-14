@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-14）
 
+最新部署反馈：用户已真人登记模型并保存“Kimi k2.8”；2026-10-14 23:19明确授权后，宿主PC-202312301323/version1开启、该请求真实配置provisioned并进入角色列表。三档/仓库外私有Key/本人身份与元数据已核，worker仅处理这条请求后退出；未部署常驻/启动CLI/调用模型，Kimi仍unverified/unknown。等待人类刷新确认详情“配置已完成”，完整功能门禁及原生能力保持。
+
 最新：#241后端由DeepSeek修正、Codex独立复核通过，241→240已收取，运行器筛选/Kimi公开模型登记/真实ID创建补正统一发布。根独立22新/166旧、真实ID隔离HTTP及生成器/64字符/worker私有假Key核验通过；240独立235Node/26Python/18新/9变异沿用且前端12源未变。原partial/失败保持，完整功能仍待[人工复验](guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)。
 
 创建允许合法已登记、未退役的运行器；Kimi空模型目录可由真人点击登记本项目已有bound K2.8公开维度，再使用actual choice保存意图。两个创建入口runner_id统一注册同源slug/64校验，未弱化其它凭据防护或改变生产ID/原绑定。生产目录准备仍需人类操作，unverified/unknown不代表原生控制就绪；先重载TALK服务并Ctrl+F5，缓存20261014-role-runner-options。

@@ -8,6 +8,8 @@
 
 ## 操作者准备
 
+当前本机部署记录（2026-10-14，用户明确授权）：项目`prj_e8fe7066bbec`、宿主`PC-202312301323`，operator文件为`D:/claude-test/TALK-private/operator.key`，角色Key根为`D:/claude-test/TALK-private/keys`，均已准备并核验私有权限。本次仅处理“Kimi k2.8”的确定请求后退出，已provisioned；宿主开关开启不代表常驻worker已运行。后续自动处理需明确启动常驻worker，仍不自动启原生CLI。三份身份档存项目`.talk/agents/`；**Key根必须在仓库外，不能指定项目根或其子目录。**
+
 - 使用现有human账号的operator Key文件，保存在仓库外；没有内置验收账号。agent Key不能创建/启用项目请求。Key正文不写命令、页面或任务。
 - 明确项目ID、项目根、宿主标签和仓库外角色Key根。宿主标签必须等于该项目role-provision-host设置，生成三档和Key的目标路径须与服务管理器一致。
 - 项目宿主配置与worker默认关闭。human通过`GET /api/projects/{id}/role-provision-host`读取版本，再通过`POST /enable`提交`host_label/expected_version`；这是部署时的显式操作。本轮未替操作者执行。

@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-14 23:19（Asia/Shanghai）— 明确授权后的首次真实Kimi角色配置闭环
+
+- 用户提供D:/claude-test/USER.md为配置凭据来源。文件是账号说明而非可直接给worker的单行Key；只在内存提取唯一“密钥”字段、GET核验human:bobo，不把其他字段/密钥或正文输出。用户期望在项目下集中放置；现有worker拒绝仓库内Key根，说明后采用相邻D:/claude-test/TALK-private，operator.key与keys/集中准备。
+- 私有目录/凭据通过沙箱批准创建，已有不同凭据拒覆。最初文件带目录继承ACE，strict ACL核验失败；仅调整本次新建目录为无子继承、operator去继承，随后私有DACL/正文一致性与human身份均核验成功，原失败事实不掩盖。真实Key均未输出、未写普通JSON证据或Git，状态产物prepared-private-paths.json只含路径/结果。
+- worker --enable --once未加apply的只读核对被自动审批拒绝，理由可能领取请求并持久化写入而未获明确授权；未用替代执行方式绕过该拒绝。完成具体目录与单请求部署计划后询问用户，用户明确选择“授权开启并处理这条请求”，范围为开启项目宿主、独立身份/私有Key/三档与检查，处理完成退出，不启Kimi CLI或调用模型。
+- 根据新授权，经批准执行apply-current-request.py：先核human:bobo与确定请求create/name/requested/member为空，再CAS启用项目host PC-202312301323/version1；调用已独立发布worker.process只处理role-a58b0b6ace84d28d61aa8ffc28f12d74，不发现或处理其它请求、不复位/轮换旧请求、不覆盖异宿主。
+- 实际生产HTTP/文件闭环成功：请求provisioned，角色agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c，name Kimi k2.8，attempts1/revision4，无错误。身份档/预检succeeded，key_file skipped源于初始私有Key已发布且核验通过；实际私有Key DACL、其GET本人身份、来源元数据member及公开角色列表bound/K2.8均通过。三档存项目.talk/agents/、私有文件存仓库外；仅保存脱敏applied-current-request.json及公开status.json。
+- worker单请求结束后已退出，无常驻进程/启动任务、没有原生CLI或模型调用。项目宿主开关保持开启；后续请求自动配置需要另部署常驻worker。运行器unverified/unknown事实未改，受管启动能力、原生登录/型号/隔离仍未验。
+- 业务代码9f5d67c与前轮docs826e372不变，本轮仅5正式docs记录真实部署/验收入口，常规提交推送回执host-acceptance/publication.json，不提交talk.db/.talk/Key/.tmp或清理旧ACL。未额外派发/改码/重跑历史测试，原partial及测试限制保持。
+- 用户刷新后核实列表新角色和详情“配置已完成”，当前只是实际配置闭环，不代替真人视觉/键盘或宣布完整人工验收通过；后续原生/外部/归档/退出/I-4不自动开展。
+
 ## 2026-10-14 22:17（Asia/Shanghai）— 人工目录登记及请求保存反馈，待部署宿主配置
 
 - 代码发布9f5d67c后，用户反馈选运行器模型不能选；其随后确认“登记项目已有模型”按钮存在且点击已代入K2.8。本轮未因该反馈另改前端或宣称完整人工验收通过。
