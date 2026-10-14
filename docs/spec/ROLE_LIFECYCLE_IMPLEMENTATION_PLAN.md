@@ -1,6 +1,7 @@
 # 项目角色创建与服务生命周期：实施计划（R0 正式实施计划 v4）
 
 > 状态：**R0 v4、R1-1、R1-2、R1-3及R1-4a/b server/宿主/完整前端代码已独立通过**（2026-10-14），R1-2/R1-3本轮页面基础人工验收通过。223–239整链已收取（原失败/partial/unknown保持）；[请求合同](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)与[worker指南](../guides/ROLE_REQUEST_WORKER.md)已同步。239独立通过，完整前端15源收尾发布；221项Node/26项Python契约/22新复核/27修正版审查/10变异及隔离HTTP历史闭环通过；[页面验收](../guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)待人类执行，完整一键配置人工/真实原生能力未验，I-4后置。
+> 2026-10-14人工反馈补正：创建筛选与真实空Kimi目录不匹配；用户选择K2.8，Codex12源候选/真人已有模型登记已自测235Node/26Python/隔离HTTP通过，#240待独立复核、补正未发布，人工门禁保持。
 > 正式位置：`docs/spec/ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md`；合同见同目录 [ROLE_LIFECYCLE_DESIGN.md](ROLE_LIFECYCLE_DESIGN.md)。
 > 修订基线：`5b18c8e7c2eb85fb6737d7c9c89713adf6021ef7`（#215 派发时实际 HEAD，工作区干净，正式源码未变）。
 > R0发布时仅修改文档；原213–226草稿、结果与失败保持。R1-1至R1-3代码已独立通过；未执行生产角色配置、数据库迁移/重载或原生运行器操作。R1-3实际进程证据仅为隔离固定文本子进程。

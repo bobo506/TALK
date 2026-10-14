@@ -1,25 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-14 20:15 (Asia/Shanghai)：239独立复核通过，239→238已收取；完整创建/配置前端代码闭合并收尾发布，等待页面与实际配置人工验收。
+Updated: 2026-10-14 20:45 (Asia/Shanghai)：用户反馈创建页运行器空目录，指定先Kimi Code K2.8 Preview。Codex补正12源已冻结并派240独立复核，补正未发布，完整功能人工门禁保持。
 
 ## 当前状态
 
-- 项目`D:/claude-test/TALK`，project_id=`prj_e8fe7066bbec`，分支`codex/terminal-return-codex`。业务基线24f8470（server d5a7bbd及宿主发布）、收件前文档HEAD e9218ac。完整前端15源与9正式文档统一收尾，准确提交/远端回执`.tmp/role-lifecycle-r1-4-frontend-closeout/publication.json`。
-- 239合法complete/task239，msg2743/7176字符/SHA 8090ebd759c1c122d09c205c44a13d1e14b7aa603ff037c975c0f8eaf5dfde28，纯JSON与本地逐结构一致。实际239→238 succeeded/completed，收取UTC 2026-10-14 12:09:22/25；238原partial/围栏及失败/工具限制保留，不追改历史结论。
-- 根协调方核15候选/776保护源与旧238副本零漂移、暂存原为空/范围外跟踪变更零。239独立221Node、26Python、22新用例、27修正旧审查用例、10变异检出及自写隔离HTTP/真实worker闭环通过；原238测试对新码26过1静态误判保留。候选未再变，不重复已通过套件，不叠加两方同套数量。
-- 页面创建接运行器→模型→名称/介绍→保存并配置；待创建列表、详情进度/继续取消/人工恢复与项目宿主设置完整接线。Key/token不入页面，配置不自动启动；角色列表仍仅当前服务状态，启停仅详情、详情无重复服务标签，搜索/选择/全部启动反馈保持。6资源版本20261013-role-creation。
-- 按6状态各200发现去重，最近32本页公开请求键项目/账号隔离保存；列表缺失及上轮在途按A8原键补读，最新created_at决定角色进度，触顶提示省略。storage禁用只保内存同键并提示刷新限制，POST权限/CAS/恢复期望版本保持。
+- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex。上片4b93119d688a40af7d68741cb09ccff26d717347已发布、239→238已收取；原源码独立通过/partial/失败不追改，不能推断真实目录或人工验收通过。
+- 只读公开目录：只有Kimi unverified/unknown且活动模型0，旧K28项目绑定bound有完整公开型号声明，其他角色unconfigured。证据.tmp/role-creation-runner-selection/catalog.json；未读取真实Key或写生产目录。
+- 原前端错误用adapted+managed_cli挡创建；创建与模型目录仅拒退役，控制能力只约束启停。用户明确先Kimi Code K2.8 Preview，Codex依持续修正授权改合法非retired枚举可选，未提升接入/控制状态。
+- 空Kimi目录读本项目bound旧绑定的完整公开选择维度，runner/runtime一致并去重，真人点击“登记项目已有模型”才写既有model-choices接口。点击前重新核绑定/含下架目录，active复用不覆、retired不复活，丢响应先查目录；真实choice才可保存role-request，不自动改原绑定、轮换Key或启动服务。
+- 12源（2web+10tests）与780范围外非docs跟踪源已冻结；缓存6处20261014-role-runner-options。235Node（旧221+新14）/26Python/三语法/隔离真实HTTP登记→choice→requested全通过；unverified/unknown保持、Agent登记403。首次临时binding夹具路径roles导致405，修为agents后通过，不改server、不伪称首过。
 
-## 人工验收与下一步
+## 待取件与下一步
 
-- **当前暂停扩展，等人工验收**：打开原TALK地址并Ctrl+F5，真人登录→项目“角色”→“创建角色”；先检查布局/选择/等待和取消，再按[完整页面验收](guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)准备同机worker与验配置闭环。使用已有真人登录/仓库外operator文件，没有新增测试账号，不在页面复制角色Key。
-- 发布没有启动/重载生产服务、启用项目/worker、部署真实凭据或改生产DB/名册/.talk；静态页面可刷新，完整配置须真实host标签/目录/operator与启用worker，准备见[worker指南](guides/ROLE_REQUEST_WORKER.md)。宿主保持关闭时请求诚实等待，配置不代表原生登录/模型或CLI服务已验。
-- 限制：每状态200/会话最近32键不是全历史分页；旧角色无request/代际时不猜恢复，storage禁用刷新可能丢未确认键。真实浏览器视觉/窄屏/键盘、原生登录模型启停/生产worker部署尚未验；测试历史205+205为直接DBfixture，不是410次配置。
-- 页面/配置人工通过后再外部桌面引导、删除归档与退出清理，仍集中完成本功能，I-4后置。不夹带跨机Key/TLS/D7或下一模块开发。
+- 实际240，creator Codex/target DeepSeek，Hall group:task-cdedb2f461a5439d834312e88afcdf01，queued/assigned仅派发快照。包/回执/12源manifest/byte/差异与证据role-creation-runner-selection；独立产物仅role-creation-runner-selection-review，开发暂停，协调方仅docs/Git收尾。
+- 240须核真实unverified/unknown+0choices+旧bound形状、创建/服务资格、human点击/公开字段/鲜活绑定/下架/已有目录/重复丢响应/跨账号项目modal守卫、旧UI回归与非法写边界。不能沿旧“仅adapted受管”“POST仅role-request”错误假设验收；旧238/239测试/结果不改，必要副本按本次范围核。
+- 通过后按12源hash收取/发布，再让真人在创建弹窗选Kimi并点击登记已有K2.8模型、填名称保存。生产目录仍需要真人页面点击，本轮未写。默认派发后结束，用户“240好了”取件，不主动轮询等待或Browser。
+- 原列表仅当前服务状态、详情启停无重复状态、搜索/选择/全部启动/配置三步/CAS保持。登记声明不证明native模型/登录/多角色隔离，unknown控制仍无启动资格，真实worker/原生/页面视觉键盘未验。外部/归档/退出和I-4后置。
 
 ## 协作与恢复
 
-- 已核caller agent:codex/kind=agent与最新项目development_requirements；用户前端Codex开发/DeepSeek独立复核指定优先于页面常规Kimi前端，Kimi不足安排保持，未改项目分工配置。共享目录暂停后审、人工门禁及Git收尾保持。
-- 230–239准备/server/宿主/前端链均已收取；各原失败/partial/unknown保留，239闭合只表示本片源码复核通过。DeepSeek Git沙箱限制由协调方真实Git/manifest/字节核对补足，不强开其宿主权限；复核记录e1d9c87文档HEAD是派包旧快照，实际e9218ac仅docs，不影响24f8470业务基线。
-- headless max已写个人profile且dump-config核合成值，实际新模型请求等级未核、旧high历史不改；个人配置/凭据不提交，无TALK重启要求。
-- bobo506/TALK普通提交推送持续授权，不强推/改历史；本轮只精确15业务+9文档，不混.tmp、旧.tmp-tests/ACL残留、私有配置或真实Key，不宣称全工作区干净。当前无待取任务；验收反馈直接描述问题，通过后说`验收通过`，恢复指令`继续项目`。
+- 已核caller agent:codex/kind=agent及最新development_requirements；用户前端Codex开发/DeepSeek复核指定优先于页面常规Kimi前端，Kimi不足安排保持，项目分工不改。共享目录暂停后审、人工门禁、Git收尾有效。
+- 所有写验证针对隔离fixture假账号；未改server/bridge/MCP/config/生产DB名册/.talk/Key，没有真人Key代用或权限绕过。新目录登记由human-only权限在页面完成；只当前Kimi已有模型，不扩通用目录管理或其它模块。
+- 230–239原交付与失败保持，4b93119源码通过不等于目录已准备。每状态200/32公开键/storage限制、headless合成max但实际请求等级未核与原生未验仍保持。
+- 普通提交推送bobo506/TALK持续授权，不强推/改历史；本轮仅5docs记录待复核，12源不混入。.tmp/旧.tmp-tests/私有ACL/配置保持，不宣称全工作区干净。准确提交/远端回执role-creation-runner-selection/publication.json；恢复“继续项目”，取件“240好了”。

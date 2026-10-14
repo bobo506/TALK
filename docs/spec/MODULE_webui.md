@@ -386,3 +386,10 @@
 - #239合法complete、实际源码/15候选及776保护源前后零漂移；独立221Node、26Python、22新用例、27修正版原审查、10变异与实际隔离HTTP/worker闭环通过。旧238 partial及原RV22在新码26过1失败保留；新断言区分合法A8 GET与POST，仍能检出旧rotate-key写/A8变POST。
 - 239→238已收取，5web+10tests按已核hash收尾发布；六资源20261013-role-creation，Key不入页面/配置不自动启动/已验服务列表单状态与详情启停保持。只维护9相关正式文档，不改生产配置/服务/名册/真实Key。
 - [创建配置页面验收](../guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)与用户手册、worker指南已同步。当前暂停等人类页面/实际配置验收；DOM桩/VM/HTTP测试不能代表视觉、键盘或原生能力。每状态200/会话32公开键及storage禁用限制保持，不宣称全历史分页或旧无关联角色恢复。
+
+### 2026-10-14运行器空目录人工反馈（#240候选待复核）
+
+- 真实仅unverified/unknown Kimi、0模型选择，旧bound K28有完整型号声明；用户选择先Kimi。原adapted+managed_cli创建筛选错误，改合法非retired枚举可选，启停资格及未核验状态独立保持。
+- 空Kimi读当前项目GET agents的bound旧模型，完整公开维度/runner/runtime一致并去重；human点击才鲜活重读绑定/含下架目录，active复用、retired不复活，沿既有human-only模型目录接口登记声明，actual choice后保存人类意图。无Key代用或新权限，不改原绑定/control，不自动写/启服务；其它空目录仍诚实需管理员准备。
+- 12源/780保护冻结，6资源20261014-role-runner-options；235Node（新14）/26Python/隔离HTTP登记→choice→requested通过，production目录未写、native不启动。#240只读独立复核，开发暂停/补正未发布；旧238/239结果不追改，必要新副本按本次合法模型元数据POST范围核。
+- 人工门禁保持；声明不代表实际模型/登录/原生多角色/服务已验，原R1-3列表单状态/详情启停/搜索批量与配置不自动启动保持，本片不扩通用目录管理或其他模块。

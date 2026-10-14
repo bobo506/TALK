@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-14）
 
+人工反馈运行器空目录：实际仅unverified/unknown Kimi且模型0，原前端把适配/启停当创建门槛有误。用户明确先Kimi Code K2.8 Preview，Codex12源修正/真人登记项目已有模型候选，235Node/26Python/隔离HTTP通过，#240待独立复核、补正未发布；生产目录未写，声明不代表native/控制就绪，当前优先闭合该人工反馈。
+
 用户明确R1-4前端由Codex开发、DeepSeek独立复核；后端/宿主由DeepSeek承接、Codex独立复核，Codex接手修正仍由DeepSeek复核。230–239准备/server/宿主/前端链均已收取：[页面创建配置请求合同](spec/ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)的三表/共享守卫/A1–A10/C1–C4及默认关闭worker已落地。server独立新79/旧166/原7与WAL回滚证据保持；宿主独立新50/旧320/原6/检出3/独立13分别通过。完整创建/配置前端经Codex补正、239独立复核通过并整链收取发布；独立221项Node、26项Python页面契约、22新用例/27修正版审查/10变异与隔离实际HTTP/worker闭环通过，[页面验收](guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)待人类执行，浏览器视觉及完整功能人工未验收，同机回环/默认关闭/human-only保持，不夹带跨机Key/TLS/D7或改写页面分工，真实原生能力仍未验。
 
 235/236宿主初版缺口经返修及Codex定向修正、237独立复核闭合，237→236→235已收取。请求驱动逐HTTP资格/取消/预算守卫、一次性Key私有发布/元数据恢复、真实三步与失败已上报非零退出已验；原失败/complete自报/236 MCP围栏unknown保持。宿主使用见[worker指南](guides/ROLE_REQUEST_WORKER.md)，当前只代码与隔离证据，生产配置/凭据/服务不动。完整前端已接线并待人工验收；通过后外部/归档/退出继续同功能，I-4后置。

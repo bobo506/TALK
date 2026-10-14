@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-14 20:45（Asia/Shanghai）— 运行器空目录反馈、Kimi模型准备候选与240复核
+
+- 用户在4b93119人工反馈“暂无可配置的受管运行器”，选择先Kimi Code K2.8 Preview。实际caller/项目要求与只读生产公开目录已核：仅Kimi unverified/unknown、模型0，K28旧绑定bound有公开型号声明。未读真实Key/写生产目录，catalog.json留存；原239复核通过和238partial保持，人工门禁未释放。
+- Codex纠正自己的筛选假设：适配/启停资格不能挡身份创建，现行创建和模型目录只拒退役。仅2web+10tests共12源补正，合法非retired枚举可选；空Kimi目录从本项目bound旧模型提完整公开维度、runner/runtime及去重。真人点击才重读绑定/含下架目录核对，active复用不覆、retired拒复活，POST登记声明，真实choice方可提交role-request；不改原绑定或控制能力，不读/代用真实Key、不自动写或启服务。
+- 新14+旧221共235Node、26Python、三语法、隔离actual HTTP目录登记→choice→requested全通过。live用unverified/unknown+0choices+旧bound事实，Node原factory实际仅目录/意图2POST，status/control保持、Agent目录写403，无原生CLI/模型/worker/Browser/生产写。首次临时binding夹具地址roles导致405，修为既有agents/binding后通过，原首败不改写。
+- 基线4b93119d688a40af7d68741cb09ccff26d717347；12源SHA/byte/差异与780范围外非docs保护冻结，缓存6处20261014-role-runner-options，开发暂停。实际#240四最小参数顶层派DeepSeek，Hall group:task-cdedb2f461a5439d834312e88afcdf01，queued/assigned仅快照；原需求/用户K28选择/错误假设和真实API事实、基线差异、不变项/验收/证据/限制写包，原238/239测试结论只读，必要新副本按本次合法元数据POST核。
+- 240只读12+780，独立产物role-creation-runner-selection-review；禁止改正式代码/tests/docs、旧证据、server/bridge/MCP/config/生产DB名册/.talk/Key、Git/Browser/原生CLI模型或强开危险宿主。须核真实未核验空目录而非预种适配fixture，human/元数据边界/鲜活核对/下架/丢响应/上下文和旧UI回归；完成暂停，实际任务号纯10字段JSON交付，本地/MCP一致。
+- 补正未发布，目录仍需真人在页面点击已有K2.8登记，不能agent调用/绕过human-only；声明不证明native/控制ready。原服务列表单状态/详情启停/搜索批量/配置不自动启动保持。通过再收取发布与本功能人工复验，外部/归档/退出/I-4不开始。
+- 本轮仅5docs汇总中文提交普通推送，12源留工作区待审，不混.tmp/旧ACL/私有配置；准确回执publication.json。默认派发后结束，用户“240好了”取件，不主动等待/Browser，原239通过不等于当前人工验收已过。
+
 ## 2026-10-14 20:15（Asia/Shanghai）— 239独立通过，完整创建配置前端收取与收尾发布
 
 - 用户“239好了”触发取件，实际caller agent:codex/kind=agent、最新development_requirements已核。239合法complete/task239、msg2743纯JSON完整7176字符/SHA 8090ebd759c1c122d09c205c44a13d1e14b7aa603ff037c975c0f8eaf5dfde28；按稳定引用两页补读与本地逐结构相同。原238 partial/围栏、Git限制/未检出与旧失败结果均保持，不从runner succeeded推断业务结论。
