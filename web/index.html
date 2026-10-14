@@ -6,9 +6,9 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261013-role-creation">
-  <link rel="stylesheet" href="/workspace.css?v=20261013-role-creation">
-  <link rel="stylesheet" href="/role-creation.css?v=20261013-role-creation">
+  <link rel="stylesheet" href="/style.css?v=20261014-role-runner-options">
+  <link rel="stylesheet" href="/workspace.css?v=20261014-role-runner-options">
+  <link rel="stylesheet" href="/role-creation.css?v=20261014-role-runner-options">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -528,14 +528,15 @@
           <label class="role-request-field wide"><span>角色名称</span><input id="role-create-name" class="profile-input" type="text" required placeholder="例如：代码审查助手"></label>
           <label class="role-request-field wide"><span>角色介绍 <small>可选，最多 2000 字</small></span><textarea id="role-create-description" class="profile-textarea" rows="4" placeholder="这个角色负责什么工作"></textarea></label>
         </div>
+        <div id="role-create-model-setup" class="role-request-card hidden"></div>
         <p id="role-create-notice" class="role-request-status" role="status"></p>
         <div id="role-create-result" aria-live="polite"></div>
         <div class="role-create-footer"><button id="role-create-submit" type="submit" class="role-service-button role-create-primary">保存并配置</button></div>
       </form>
     </section>
   </div>
-  <script src="/role-creation.js?v=20261013-role-creation"></script>
-  <script src="/workspace.js?v=20261013-role-creation"></script>
-  <script src="/app.js?v=20261013-role-creation"></script>
+  <script src="/role-creation.js?v=20261014-role-runner-options"></script>
+  <script src="/workspace.js?v=20261014-role-runner-options"></script>
+  <script src="/app.js?v=20261014-role-runner-options"></script>
 </body>
 </html>

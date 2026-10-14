@@ -108,6 +108,7 @@ from server.models import (
     normalize_provision_steps,
     normalize_role_description,
     normalize_role_name,
+    normalize_runner_id,
     normalize_safe_identifier_token,
     serialize_provision_job,
 )
@@ -401,7 +402,13 @@ def _pure_create_intent(project_id: str, body: RoleRequestCreate) -> dict:
     except ValueError as exc:
         raise _fail(_UNPROCESSABLE, "role_name_invalid") from exc
     try:
-        runner_id = normalize_safe_identifier_token(body.runner_id, field="runner_id")
+        # R1-4 补正：``runner_id`` 消费者与注册入口（``POST /api/runners`` ->
+        # ``RunnerCreate``）**同源**用 ``normalize_runner_id``（slug、≤64）。此前这里用
+        # ``normalize_safe_identifier_token``，其凭据启发式（连续 ≥40 token 字符）会命中本
+        # 仓库自己的生成规则 ``runner:<runtime[:24]>-<sha256[:32]>``，导致“登记成功、
+        # 创建恒 422”。这里仍是**纯载荷**归一（不查库、不加“已登记豁免”），首次实时资格
+        # 依旧只在新键分支的 ``_normalize_create_intent`` 里做。
+        runner_id = normalize_runner_id(body.runner_id)
         choice_id = normalize_safe_identifier_token(body.choice_id, field="choice_id")
         role_description = normalize_role_description(body.role_description)
     except ValueError as exc:

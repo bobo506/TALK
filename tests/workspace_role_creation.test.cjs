@@ -29,6 +29,7 @@ function harness({storage=new Map(),human=true,handler}={}) {
       if(path.endsWith('/role-provision-host'))return response(backend.host);
       if(path.includes('/role-requests?'))return response(backend.rows);
       if(path.endsWith('/roles'))return response(backend.roles);
+      if(path.endsWith('/agents'))return response([]);
       if(path==='/api/runners')return response([{runner_id:'r',display_name:'DSH',adapter_status:'adapted',control_kind:'managed_cli'}]);
       if(path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'Flash'}]);
       if(call.method==='POST'&&path.endsWith('/role-requests')) {const row={...call.body,status:'requested',revision:1};backend.rows.unshift(row);return response({...row,api_key:'SECRET',lease_token:'TOKEN'});}

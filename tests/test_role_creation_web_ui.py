@@ -29,9 +29,9 @@ class RoleCreationWebUiTests(RouteTestCase):
             for target in ['role-create-modal','role-create-form','role-create-runner','role-create-model','role-create-name','role-create-description','role-create-submit','role-request-list','role-request-host-panel']:
                 self.assertIn(target,parser.ids)
             self.assertEqual(len(parser.assets),6)
-            self.assertTrue(all('v=20261013-role-creation' in asset for asset in parser.assets))
-            scripts=[path for path in parser.assets if path.endswith('v=20261013-role-creation') and '.js?' in path]
-            self.assertEqual(scripts,['/role-creation.js?v=20261013-role-creation','/workspace.js?v=20261013-role-creation','/app.js?v=20261013-role-creation'])
+            self.assertTrue(all('v=20261014-role-runner-options' in asset for asset in parser.assets))
+            scripts=[path for path in parser.assets if path.endswith('v=20261014-role-runner-options') and '.js?' in path]
+            self.assertEqual(scripts,['/role-creation.js?v=20261014-role-runner-options','/workspace.js?v=20261014-role-runner-options','/app.js?v=20261014-role-runner-options'])
             for asset in ['/role-creation.js','/role-creation.css']:
                 self.assertEqual(client.get(asset).status_code,200)
 

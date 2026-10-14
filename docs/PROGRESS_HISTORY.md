@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-14 21:54（Asia/Shanghai）— 241独立通过，240真实ID阻塞闭合并发布目录/创建补正
+
+- 用户“241好了”后，Codex按后端独立复核分工取件。实际HEAD6f026b6（最近仅docs）、业务基线4b93119；241 complete/task241，msg2745/SHA12c289c0e18cbfc4dd69e907b59317041a8bae2acbce93dbe64cbfdeef96a4e9，8662字符含JSON围栏，无损分页/逐结构与本地一致，不改变原围栏或旧报告。
+- 实际仅server/role_provision_requests.py、server/routes/projects.py的runner_id归一化改注册同源normalize_runner_id，附正式22例tests/test_role_runner_id_creation.py。纯载荷不查目录、准确指纹回放先于新键实时资格、TX-ALL/来源/下游不变；models.py SHA保持2d9b4bf2…，choice/operation/model/error凭据防护未放宽，原ID生成/生产绑定未改。12前端候选无漂移，780保护源仅两允许后端漂移。
+- Codex实际审代码与正式用例，独立新22/旧角色链166全过；另在新隔离目录复跑真实uvicorn+原前端工厂：唯一unverified/unknown Kimi、0模型目录→真人登记201→actual choice→保存201 requested，页面仅2次POST、原绑定未改、Agent写403、unknown启停409。非浏览器验证，不替代真人视觉/键盘。
+- 独立补探针：64字符边界与实际生成器ID在目录/请求/直建均201，带首尾空格同键归一化重放200且无二次Key；真实IDworker单轮provisioned、仓库外私有假Key文件=服务端签发值。正式新worker用例仅检查文件存在，未改作者自报，用独立证据补足其未实际断言的内容。
+- 开发原码22中15失败日志保留，修后22通过；开发相关434/182回归证据保持，不叠加根独立计数。adapter registry原/修16失败集合逐ID一致已核，属既有问题、本轮未修，不宣称全套绿；开发166首轮live并发计时失败保留，单独与无并发重跑及根独立166均通过。
+- 240前端独立235Node/26Python/18新例/9变异、真实目录登记通过结论沿用，12源哈希未变不机械重跑；原240 partial/真实ID422/原短fixture限制不追改，闭合依本次241后端和独立真实ID证据。先241后240均已收取为completed，流程收取不等于人工验收。
+- 本轮统一15业务/测试源（12前端候选+2后端+新正式测试）与9相关docs提交、常规推送；确切暂存/源哈希/远端回执见role-runner-id-final-review/publication.json。临时/旧ACL/私有文件不混提交，无生产目录/配置/名册/真实Key/原生CLI或模型操作。
+- 人工复验：重载TALK服务，再Ctrl+F5；真人进入角色→创建→Kimi→登记项目已有模型K2.8→新名称→保存并配置。宿主关闭正常等待；完整闭环另需已有human operator文件、仓库外Key根与同机worker，验收指南已更新。生产目录人类点击准备，unverified/unknown事实不升级，保存不启动。
+- 发布后暂停等待人工结果；R1-3列表单状态、详情启停/无重复标签保持，外部桌面/归档删除/退出清理与I-4不展开。完整配置人工/生产worker/原生登录模型隔离启停仍未验。本轮按项目框架汇总落盘，不新派任务或默认主动等待。
+
 ## 2026-10-14 21:10（Asia/Shanghai）— 240 partial真实ID阻塞，派241后端同源校验修正
 
 - 用户“240好了”触发取件，实际caller agent:codex/kind=agent与最新项目要求已核。240合法partial/msg2744纯JSON8157字符/SHA c8e95e73eeccf33c15b8edf1f2724e70fddf23f0f8423daf5bb4a635bfc17db2，稳定两段补读与本地逐结构一致；12前端/780保护源零漂移，实际HEAD2047e91仅上轮docs，业务基线4b93119。原partial/失败完整保存，240未收取。

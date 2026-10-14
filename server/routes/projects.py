@@ -109,6 +109,7 @@ from server.models import (
     provision_member_dir_name,
     normalize_role_description,
     normalize_role_name,
+    normalize_runner_id,
     normalize_safe_identifier_token,
     prove_exclusive_identity,
     read_role_binding_facts,
@@ -1263,7 +1264,10 @@ def create_project_role(
             detail="role_name_invalid",
         ) from exc
     try:
-        runner_id = normalize_safe_identifier_token(body.runner_id, field="runner_id")
+        # R1-4 补正：与注册入口 ``POST /api/runners``（``RunnerCreate`` 校验器）同源，
+        # 用 ``normalize_runner_id`` 校验 ``runner_id``；``choice_id`` 仍走通用安全 token
+        # 规则（含有限凭据启发式），不放宽任何其它字段。
+        runner_id = normalize_runner_id(body.runner_id)
         choice_id = normalize_safe_identifier_token(body.choice_id, field="choice_id")
         operation_key = normalize_operation_key(body.operation_key)
         role_description = normalize_role_description(body.role_description)

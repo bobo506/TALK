@@ -4,9 +4,9 @@
 
 ## 当前实施状态（2026-10-14）
 
-最新：240独立partial，前端目录准备通过，但实际生成Kimi runner_id被创建两入口凭据启发式误拒422；已派#241 DeepSeek后端同源runner校验修正、Codex后续独立核，12前端仍暂停/补正未发布，生产目录准备与人工门禁保持。真实ID旧失败和原短fixture限制不追改。
+最新：#241后端由DeepSeek修正、Codex独立复核通过，241→240已收取，运行器筛选/Kimi公开模型登记/真实ID创建补正统一发布。根独立22新/166旧、真实ID隔离HTTP及生成器/64字符/worker私有假Key核验通过；240独立235Node/26Python/18新/9变异沿用且前端12源未变。原partial/失败保持，完整功能仍待[人工复验](guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)。
 
-人工反馈运行器空目录：实际仅unverified/unknown Kimi且模型0，原前端把适配/启停当创建门槛有误。用户明确先Kimi Code K2.8 Preview，Codex12源修正/真人登记项目已有模型候选，235Node/26Python/隔离HTTP通过，#240待独立复核、补正未发布；生产目录未写，声明不代表native/控制就绪，当前优先闭合该人工反馈。
+创建允许合法已登记、未退役的运行器；Kimi空模型目录可由真人点击登记本项目已有bound K2.8公开维度，再使用actual choice保存意图。两个创建入口runner_id统一注册同源slug/64校验，未弱化其它凭据防护或改变生产ID/原绑定。生产目录准备仍需人类操作，unverified/unknown不代表原生控制就绪；先重载TALK服务并Ctrl+F5，缓存20261014-role-runner-options。
 
 用户明确R1-4前端由Codex开发、DeepSeek独立复核；后端/宿主由DeepSeek承接、Codex独立复核，Codex接手修正仍由DeepSeek复核。230–239准备/server/宿主/前端链均已收取：[页面创建配置请求合同](spec/ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)的三表/共享守卫/A1–A10/C1–C4及默认关闭worker已落地。server独立新79/旧166/原7与WAL回滚证据保持；宿主独立新50/旧320/原6/检出3/独立13分别通过。完整创建/配置前端经Codex补正、239独立复核通过并整链收取发布；独立221项Node、26项Python页面契约、22新用例/27修正版审查/10变异与隔离实际HTTP/worker闭环通过，[页面验收](guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)待人类执行，浏览器视觉及完整功能人工未验收，同机回环/默认关闭/human-only保持，不夹带跨机Key/TLS/D7或改写页面分工，真实原生能力仍未验。
 

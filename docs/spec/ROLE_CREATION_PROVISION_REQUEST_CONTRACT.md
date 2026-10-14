@@ -1,6 +1,7 @@
 # 页面创建与宿主配置请求合同（R1-4a）
 
 > 2026-10-14：server协议233/234、宿主235–237及完整创建/配置前端238/239整链已复核闭合并收取。三表/共享守卫/10新接口/4旧入口、worker私有文件/三步/ACK/report与人类页面已接线；**完整创建配置仍待人工验收。** 页面按状态限量发现并对本页已保存/在途请求按原键只读补查，不改变本合同API。原草稿、partial/unknown及失败证据保持，不外推生产部署/原生能力。使用见[worker指南](../guides/ROLE_REQUEST_WORKER.md)与[页面验收](../guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)。
+> 2026-10-14补正：#240前端目录筛选/真人既有Kimi模型登记、#241后端真实runner_id校验已分别独立复核闭合并收取发布。运行器ID与注册入口同源；未知/下架/权限/重放及配置不启动语义保持。生产准备与完整功能人工门禁不因此释放。
 > 上游：[角色生命周期](ROLE_LIFECYCLE_DESIGN.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)、[受管服务](ROLE_SERVICE_CONTRACT.md)。本合同只修订请求驱动的创建/恢复/配置路径；既有无请求来源的人工接口保持。
 
 ## 1. 用户流程与实施边界
@@ -59,6 +60,8 @@
 | POST `/roles/{member_id}/rotate-key` | 可选body：request_key/lease_token/expected_credential_version；请求驱动角色必须带明确recover来源；无请求来源且无活动意图的旧human无body路径保持 |
 | POST `/roles/{member_id}/provision` | 可选request_key/lease_token；精确选择当前请求来源，job仍用原operation_key |
 | POST `/roles/{member_id}/provision/ack` | 可选request_key/lease_token；现有revision/attempt/credential_version语义和错误先后保持 |
+
+创建载荷的`runner_id`使用注册同源`normalize_runner_id`：去首尾空白后匹配`^[a-z0-9][a-z0-9._:\-]{0,63}$`（最多64字符），允许目录生成的长公开ID，不套用通用凭据启发式；未知但合法ID仍404，非法ID422。`choice_id`、模型维度和operation/request key等其余字段仍保留各自安全规则。纯载荷归一化不读取实时目录、不设“已登记豁免”；同键准确重放仍先于新键实时资格。
 
 新增body使用extra=forbid；kind互斥载荷、预算边界、稳定错误码由共享规则验证。recover只接受已有原创建操作的managed角色，不借恢复扩大imported/共享/在用边界。create新意图不得占用已被旧人工创建操作使用的operation_key；同request_key同规范化载荷返回原行，不重建、不刷新快照，异载荷409。意图重放先做纯载荷归一化，只有新键才查实时目录/角色版本；目录退役或已轮换不阻断旧意图读取。
 

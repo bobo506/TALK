@@ -3,7 +3,7 @@ function createRoleRequestUI(deps) {
   const state = { epoch: 0, key: "", active: false, loading: false, seq: 0, timer: null,
     host: null, rows: [], roles: [], supported: null, error: "", busy: false,
     modal: false, runners: [], choices: [], catalogSeq: 0, attempt: null, notice: "",
-    recentKeys: [], limited: false, storageUnavailable: false };
+    recentKeys: [], limited: false, storageUnavailable: false, modelSeeds: [] };
   const el = id => deps.document.getElementById(id);
   const context = () => deps.context();
   const human = () => context().human === true;
@@ -148,6 +148,7 @@ function createRoleRequestUI(deps) {
       for (const row of waiting) list.append(progress(row));
     }
     renderHost();
+    renderModelSetup();
     const form = el("role-create-form"); if (!form) return;
     const pinned = Boolean(state.attempt);
     for (const id of ["role-create-runner", "role-create-model", "role-create-name", "role-create-description"]) {
@@ -160,6 +161,35 @@ function createRoleRequestUI(deps) {
       ? " 此浏览器无法保留待确认请求，请在关闭或刷新页面前核对保存结果。" : "");
     const result = el("role-create-result"); result.replaceChildren();
     if (state.modalRow) result.append(progress(state.modalRow));
+  }
+  function modelSeeds(agents, runner) {
+    if (!Array.isArray(agents) || runner?.runtime !== "kimi-code") return [];
+    const seeds = new Map();
+    for (const agent of agents) {
+      const b = agent.binding;
+      if (agent.binding_state !== "bound" || !b || b.runner_id !== runner.runner_id || b.runtime !== runner.runtime) continue;
+      if (!["model_id", "model_source", "provider_id", "connection_ref"].every(key => typeof b[key] === "string" && b[key].trim())) continue;
+      if (!["builtin", "external"].includes(b.model_source)) continue;
+      const payload = {};
+      for (const key of ["model_id", "model_source", "provider_id", "connection_ref"]) payload[key] = b[key];
+      payload.model_alias = typeof b.model_alias === "string" ? b.model_alias : "";
+      payload.model_display_name = typeof b.model_display_name === "string" ? b.model_display_name : null;
+      const fingerprint = JSON.stringify([payload.model_source, payload.provider_id, payload.connection_ref, payload.model_id, payload.model_alias]);
+      if (!seeds.has(fingerprint)) seeds.set(fingerprint, { fingerprint, payload });
+    }
+    return [...seeds.values()];
+  }
+  function renderModelSetup() {
+    const panel = el("role-create-model-setup"); if (!panel) return;
+    panel.replaceChildren();
+    const visible = state.modal && !state.choices.length && state.modelSeeds.length > 0 && !state.attempt && !state.modalRow;
+    panel.classList.toggle("hidden", !visible); if (!visible) return;
+    panel.append(node("p", "role-request-hint", "这个运行器尚无可选模型，可以登记本项目已保存的模型配置。登记不代表原生登录或服务启动已经通过。"));
+    for (const seed of state.modelSeeds) {
+      const name = seed.payload.model_display_name || seed.payload.model_alias || seed.payload.model_id;
+      const action = button(`登记项目已有模型：${name}`, () => registerModel(seed), "role-service-button");
+      action.disabled = state.busy || !human() || state.supported !== true; panel.append(action);
+    }
   }
   function renderHost() {
     const panel = el("role-request-host-panel"); if (!panel) return;
@@ -235,7 +265,7 @@ function createRoleRequestUI(deps) {
     state.timer = null; ++state.epoch; ++state.seq; state.active = Boolean(c.active); state.key = key;
     Object.assign(state, { host: null, rows: [], roles: [], supported: null, error: "", busy: false, loading: false,
       attempt: null, modalRow: null, hostDirty: false, notice: "", runners: [], choices: [], recoveryAttempts: new Map(),
-      recentKeys: [], limited: false, storageUnavailable: false });
+      recentKeys: [], limited: false, storageUnavailable: false, modelSeeds: [] });
     close(false); render();
     if (state.active) { restoreAttempt(); restoreRecentKeys(); refresh(); }
   }
@@ -251,6 +281,7 @@ function createRoleRequestUI(deps) {
   async function open() {
     if (!state.active || !human()) return;
     state.modal = true; state.notice = ""; state.modalRow = null;
+    state.modelSeeds = [];
     el("role-create-modal").classList.remove("hidden"); el("role-create-close").focus();
     const epoch = state.epoch, seq = ++state.catalogSeq;
     if (state.attempt) {
@@ -268,16 +299,16 @@ function createRoleRequestUI(deps) {
     try {
       const rows = await api("/api/runners");
       if (!current(epoch) || !state.modal || seq !== state.catalogSeq) return;
-      state.runners = Array.isArray(rows) ? rows.filter(r => r.adapter_status === "adapted" && r.control_kind === "managed_cli")
-        .map(r => ({ runner_id: r.runner_id, display_name: r.display_name })) : [];
-      fillSelect("role-create-runner", state.runners, state.runners.length ? "选择运行器" : "暂无可配置的受管运行器", "runner_id");
+      state.runners = Array.isArray(rows) ? rows.filter(r => ["adapted", "discoverable", "unverified"].includes(r.adapter_status))
+        .map(r => ({ runner_id: r.runner_id, display_name: r.display_name, runtime: r.runtime, adapter_status: r.adapter_status, control_kind: r.control_kind })) : [];
+      fillSelect("role-create-runner", state.runners, state.runners.length ? "选择运行器" : "暂无已登记的运行器", "runner_id");
     } catch (err) { if (current(epoch) && state.modal && seq === state.catalogSeq) state.notice = err.status ? err.message : "运行器目录读取失败，请关闭后重试。"; }
     if (current(epoch) && state.modal && seq === state.catalogSeq) render();
   }
   async function chooseRunner() {
     if (!human() || state.busy || state.attempt) return;
     const runner = el("role-create-runner").value, epoch = state.epoch, seq = ++state.catalogSeq;
-    state.notice = ""; state.choices = []; fillSelect("role-create-model", [], runner ? "读取模型…" : "先选择运行器", "choice_id"); render();
+    state.notice = ""; state.choices = []; state.modelSeeds = []; fillSelect("role-create-model", [], runner ? "读取模型…" : "先选择运行器", "choice_id"); render();
     if (!runner) return;
     try {
       const choices = await api(`/api/runners/${encodeURIComponent(runner)}/model-choices`);
@@ -285,8 +316,44 @@ function createRoleRequestUI(deps) {
       state.choices = Array.isArray(choices) ? choices.filter(c => c.runner_id === runner && !c.retired_at)
         .map(c => ({ choice_id: c.choice_id, runner_id: c.runner_id, model_display_name: c.model_display_name, model_alias: c.model_alias, model_id: c.model_id })) : [];
       fillSelect("role-create-model", state.choices, state.choices.length ? "选择模型" : "暂无可选模型", "choice_id");
+      const fact = state.runners.find(r => r.runner_id === runner);
+      if (fact && (fact.adapter_status !== "adapted" || fact.control_kind !== "managed_cli")) state.notice = "运行器接入或启停能力尚未确认；创建只配置角色身份，启动服务需另行准备。";
+      if (!state.choices.length) {
+        if (fact?.runtime === "kimi-code") {
+          const agents = await api(`${base()}/agents`);
+          if (!current(epoch) || !state.modal || seq !== state.catalogSeq || el("role-create-runner").value !== runner) return;
+          state.modelSeeds = modelSeeds(agents, fact);
+        }
+        if (!state.modelSeeds.length) state.notice = "这个运行器尚未登记可选模型，请管理员先准备模型目录。";
+      }
     } catch (err) { if (current(epoch) && seq === state.catalogSeq) state.notice = err.status ? err.message : "模型目录读取失败，请重新选择运行器。"; }
     if (current(epoch) && seq === state.catalogSeq) render();
+  }
+  async function registerModel(seed) {
+    if (!state.active || !state.modal || !human() || state.busy || state.attempt || state.modalRow || state.supported !== true || !state.modelSeeds.includes(seed)) return;
+    const runnerId = el("role-create-runner").value, fact = state.runners.find(r => r.runner_id === runnerId);
+    if (!fact || fact.runtime !== "kimi-code") return;
+    const epoch = state.epoch, seq = state.catalogSeq, prefix = base(); state.busy = true; state.notice = "正在登记项目已有模型…"; render();
+    const valid = () => current(epoch) && state.modal && seq === state.catalogSeq && el("role-create-runner").value === runnerId;
+    try {
+      const [agents, choices] = await Promise.all([api(`${prefix}/agents`), api(`/api/runners/${encodeURIComponent(runnerId)}/model-choices?include_retired=true`)]);
+      if (!valid()) return;
+      if (!modelSeeds(agents, fact).some(item => item.fingerprint === seed.fingerprint)) throw new Error("项目中的模型配置已变化，请重新选择运行器。");
+      if (!Array.isArray(choices)) throw new Error("模型目录返回不完整，请重试。");
+      const matching = choices.find(c => c.runner_id === runnerId && JSON.stringify([c.model_source, c.provider_id, c.connection_ref, c.model_id, c.model_alias || ""]) === seed.fingerprint);
+      if (matching?.retired_at) throw new Error("此模型选项已下架，请联系管理员处理。");
+      const result = matching || await api(`/api/runners/${encodeURIComponent(runnerId)}/model-choices`, seed.payload);
+      if (!valid()) return;
+      if (result.runner_id !== runnerId || !result.choice_id || result.retired_at
+        || JSON.stringify([result.model_source, result.provider_id, result.connection_ref, result.model_id, result.model_alias || ""]) !== seed.fingerprint) throw new Error("登记结果尚未确认，请重新选择运行器核对模型目录。");
+      state.choices = [{ choice_id: result.choice_id, runner_id: runnerId, model_display_name: result.model_display_name, model_alias: result.model_alias, model_id: result.model_id }];
+      state.modelSeeds = []; fillSelect("role-create-model", state.choices, "选择模型", "choice_id");
+      el("role-create-model").value = result.choice_id; state.notice = "模型目录已准备，可以填写角色名称并保存配置。登记不代表服务已启动。";
+    } catch (err) { if (valid()) {
+      const messages = ["项目中的模型配置已变化，请重新选择运行器。", "此模型选项已下架，请联系管理员处理。", "登记结果尚未确认，请重新选择运行器核对模型目录。"];
+      state.notice = err.status ? err.message : messages.includes(err.message) ? err.message : "登记结果尚未确认，请重试；会先核对已有目录。";
+    }
+    } finally { if (current(epoch)) { state.busy = false; render(); } }
   }
   function close(focus = true) {
     state.modal = false; ++state.catalogSeq; el("role-create-modal")?.classList.add("hidden");
@@ -406,7 +473,7 @@ function createRoleRequestUI(deps) {
     n.disabled = state.supported === false; return n;
   }
   attach();
-  return { state, sync, refresh, open, close, chooseRunner, submit, mutate, recover, setHost, rolePanel, newButton,
+  return { state, sync, refresh, open, close, chooseRunner, registerModel, submit, mutate, recover, setHost, rolePanel, newButton,
     roleName: id => state.roles.find(r => r.member_id === id)?.role_name || "" };
 }
 
