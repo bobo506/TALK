@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-14 21:10（Asia/Shanghai）— 240 partial真实ID阻塞，派241后端同源校验修正
+
+- 用户“240好了”触发取件，实际caller agent:codex/kind=agent与最新项目要求已核。240合法partial/msg2744纯JSON8157字符/SHA c8e95e73eeccf33c15b8edf1f2724e70fddf23f0f8423daf5bb4a635bfc17db2，稳定两段补读与本地逐结构一致；12前端/780保护源零漂移，实际HEAD2047e91仅上轮docs，业务基线4b93119。原partial/失败完整保存，240未收取。
+- DeepSeek独立235Node/26Python/18新用例/9变异及真实HTTP前端目录登记通过，但真实runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33在role-requests 422 payload_invalid、旧roles422 runner_id unsafe；同库同人短ID对照201。根因两入口normalize_safe_identifier_token的连续40凭据启发式命中42字符，而注册normalize_runner_id接受同slug/64ID。原Codex短live绕开真实形状，不能以短夹具证明生产路径闭合。
+- 240 rv-gap/token/live-server原失败和前端通过均保持；旧gap产物有隔离一次性假Key，后续读/重跑先按字段过滤，不把完整Response/Key进普通输出。协调方只核索引/具体疑点，不重跑完整前端或审活代码，无生产Key读取/目录写、无原生/native能力验收。
+- 当前12前端候选冻结，注册已有K2.8模型human-only、公开字段/目录fresh与下架/已有复用/世代仍正确；生产目录准备待人类点击，补正未发布。后端按既定DeepSeek实施/Codex独立分工修复，优先闭合同一功能，不扩其它模块或伪造控制能力。
+- 实际#241四最小参数顶层派DeepSeek，Hall group:task-22a00d374b1e422aa9789b9496f78fac，queued/assigned仅快照；原需求/用户K28选择/240真实失败/实际基线与12保护、方向/允许范围/不变项/真实ID验收与证据纪律入包，产物runner-id-validation-backend，任务与回执runner-id-validation。
+- 方向同源normalize_runner_id用于创建/相关runner消费者，纯指纹无DB、先原键准确回放/后实时资格、TX-ALL与来源/作业守卫保持。不改全局credential启发式或choice/model/operation防护，不修改ID生成器或生产runner/原绑定、不扩大权限；只有限server两入口及必要runner字段/正式后端测试，禁web/正式docs/旧证据/bridge/MCP/config/生产DB名册/.talk/Key/原生CLI模型Browser/Git。
+- 必须真实生成长ID的隔离HTTP空Kimi→真人目录→actual choice→requested及claim/create/作业/必要worker三步，direct仅一次Key/幂等/退役回放/未知非法ID/下架/agent403/unknown不得启动仍成立；原码反例失败和修后通过分存，不只短ID/不删原断言。开发完成暂停交Codex独立核，合法本次号10字段纯JSON本地/MCP一致；不声称本任务自审通过。
+- 本轮仅5docs汇总中文提交普通推送，未审前端/正在开发后端不混入，回执publication.json；默认派发后结束，用户“241好了”取件，协调方不审读活后端源码。闭合再整链收取发布及人工复验；native/视觉/生产worker仍not_run，外部/归档/退出/I-4不启动，旧239代码通过与240partial均不追改。
+
 ## 2026-10-14 20:45（Asia/Shanghai）— 运行器空目录反馈、Kimi模型准备候选与240复核
 
 - 用户在4b93119人工反馈“暂无可配置的受管运行器”，选择先Kimi Code K2.8 Preview。实际caller/项目要求与只读生产公开目录已核：仅Kimi unverified/unknown、模型0，K28旧绑定bound有公开型号声明。未读真实Key/写生产目录，catalog.json留存；原239复核通过和238partial保持，人工门禁未释放。

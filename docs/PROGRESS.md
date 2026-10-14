@@ -1,25 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-14 20:45 (Asia/Shanghai)：用户反馈创建页运行器空目录，指定先Kimi Code K2.8 Preview。Codex补正12源已冻结并派240独立复核，补正未发布，完整功能人工门禁保持。
+Updated: 2026-10-14 21:10 (Asia/Shanghai)：240独立复核partial，前端通过但真实Kimi runner_id创建422；已派241由DeepSeek修正后端同源校验，Codex随后独立复核，前端继续暂停/补正未发布。
 
 ## 当前状态
 
-- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex。上片4b93119d688a40af7d68741cb09ccff26d717347已发布、239→238已收取；原源码独立通过/partial/失败不追改，不能推断真实目录或人工验收通过。
-- 只读公开目录：只有Kimi unverified/unknown且活动模型0，旧K28项目绑定bound有完整公开型号声明，其他角色unconfigured。证据.tmp/role-creation-runner-selection/catalog.json；未读取真实Key或写生产目录。
-- 原前端错误用adapted+managed_cli挡创建；创建与模型目录仅拒退役，控制能力只约束启停。用户明确先Kimi Code K2.8 Preview，Codex依持续修正授权改合法非retired枚举可选，未提升接入/控制状态。
-- 空Kimi目录读本项目bound旧绑定的完整公开选择维度，runner/runtime一致并去重，真人点击“登记项目已有模型”才写既有model-choices接口。点击前重新核绑定/含下架目录，active复用不覆、retired不复活，丢响应先查目录；真实choice才可保存role-request，不自动改原绑定、轮换Key或启动服务。
-- 12源（2web+10tests）与780范围外非docs跟踪源已冻结；缓存6处20261014-role-runner-options。235Node（旧221+新14）/26Python/三语法/隔离真实HTTP登记→choice→requested全通过；unverified/unknown保持、Agent登记403。首次临时binding夹具路径roles导致405，修为agents后通过，不改server、不伪称首过。
+- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex。业务基线4b93119、取件实际HEAD2047e91仅上轮5docs；239→238已收取，240未收取，原失败/partial/complete全部保留，人工门禁未释放。
+- 240合法partial/task240，msg2744纯JSON8157字符/SHA c8e95e73eeccf33c15b8edf1f2724e70fddf23f0f8423daf5bb4a635bfc17db2，与本地talk-delivery-240.json逐结构一致。根协调方核12前端候选/780范围外源零漂移、实际Git HEAD，补足复核者Git工具限制。
+- 240独立235Node/26Python/18新用例/9变异及真实HTTP模型目录登记通过；实际runner_id=runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33的role-requests与旧roles两个create入口均422，同库同人短ID对照201。原Codex短ID live未覆盖真实形状，证据原样保存，不宣称完整链路通过。
+- 根因是两create入口将runner_id用通用normalize_safe_identifier_token，凭据启发式命中kimi-code+32hex的连续42字符；注册normalize_runner_id按slug/64合法接受同ID。不是Key或权限问题，不修改生产ID/原绑定来绕开。
+- 12前端候选仍冻结：合法非retired运行器可选、空Kimi从本项目bound公开模型生成真人登记入口；fresh绑定/含下架目录、existing复用、retired不复活、actual choice才提交意图。尚未发布，缓存候选20261014-role-runner-options，生产目录0是取件前只读事实、准备仍需真人点击。
 
-## 待取件与下一步
+## 待开发取件与下一步
 
-- 实际240，creator Codex/target DeepSeek，Hall group:task-cdedb2f461a5439d834312e88afcdf01，queued/assigned仅派发快照。包/回执/12源manifest/byte/差异与证据role-creation-runner-selection；独立产物仅role-creation-runner-selection-review，开发暂停，协调方仅docs/Git收尾。
-- 240须核真实unverified/unknown+0choices+旧bound形状、创建/服务资格、human点击/公开字段/鲜活绑定/下架/已有目录/重复丢响应/跨账号项目modal守卫、旧UI回归与非法写边界。不能沿旧“仅adapted受管”“POST仅role-request”错误假设验收；旧238/239测试/结果不改，必要副本按本次范围核。
-- 通过后按12源hash收取/发布，再让真人在创建弹窗选Kimi并点击登记已有K2.8模型、填名称保存。生产目录仍需要真人页面点击，本轮未写。默认派发后结束，用户“240好了”取件，不主动轮询等待或Browser。
-- 原列表仅当前服务状态、详情启停无重复状态、搜索/选择/全部启动/配置三步/CAS保持。登记声明不证明native模型/登录/多角色隔离，unknown控制仍无启动资格，真实worker/原生/页面视觉键盘未验。外部/归档/退出和I-4后置。
+- 实际241，creator Codex/target DeepSeek，Hall group:task-22a00d374b1e422aa9789b9496f78fac，queued/assigned仅派发快照。后端DeepSeek实施、Codex独立复核；包/回执/240稳定引用/结构与源码核对role-runner-id-validation，开发产物仅role-runner-id-validation-backend。
+- 已明确统一runner_id消费者与注册normalize_runner_id，纯指纹/准确重放/TX-ALL/请求来源/下游job与worker不变；不改通用credential启发式，不弱化choice/模型/operation字段、不改ID生成器/生产命名或human-only。允许有限server两入口及必要runner字段/正式后端回归，不改12前端候选或正式docs。
+- 241须用真实生成ID形状重现原422、修后HTTP Kimi空目录→真人登记→actual choice→requested→claim/create/作业/必要fake worker三步闭环；旧direct create/key仅一次/replay和非法ID/未知/下架/agent拒写仍成立，不能再只用短fixture。旧失败/probe不改，输出按字段剔除隔离一次性Key。
+- 用户“241好了”再取件，开发完成暂停后Codex独立核；闭合后整链收取241/240并发布前端+后端补正，再人工K28目录准备/创建复验。默认派发后结束，不主动等待/轮询、不读审活后端源码，协调方仅docs收尾。
+- 生产目录登记仍须真人页面点击，原生登录/型号/多角色隔离/CLI启停/worker生产启用/视觉键盘未验；unknown控制无启动资格，保存配置不自动启动。当前只同功能修复，外部/归档/退出与I-4后置。
 
 ## 协作与恢复
 
-- 已核caller agent:codex/kind=agent及最新development_requirements；用户前端Codex开发/DeepSeek复核指定优先于页面常规Kimi前端，Kimi不足安排保持，项目分工不改。共享目录暂停后审、人工门禁、Git收尾有效。
-- 所有写验证针对隔离fixture假账号；未改server/bridge/MCP/config/生产DB名册/.talk/Key，没有真人Key代用或权限绕过。新目录登记由human-only权限在页面完成；只当前Kimi已有模型，不扩通用目录管理或其它模块。
-- 230–239原交付与失败保持，4b93119源码通过不等于目录已准备。每状态200/32公开键/storage限制、headless合成max但实际请求等级未核与原生未验仍保持。
-- 普通提交推送bobo506/TALK持续授权，不强推/改历史；本轮仅5docs记录待复核，12源不混入。.tmp/旧.tmp-tests/私有ACL/配置保持，不宣称全工作区干净。准确提交/远端回执role-creation-runner-selection/publication.json；恢复“继续项目”，取件“240好了”。
+- 已核caller agent:codex/kind=agent和最新development_requirements；本次用户分工前端Codex/DeepSeek核、后端DeepSeek/Codex核有效，Kimi不足安排及共享目录暂停后审/人工门禁/Git收尾保持，不改配置或固定分级。
+- 只读公开目录，无真实Key读取或真人Key代用。所有写验证仅隔离临时项目/假账号/Key，server/worker同机loopback、默认关闭、human-only保持，不声明生产目录/原生能力已完成。
+- 本轮仅5docs记录240缺口与241派发，12前端候选和开发中的后端不混提交；普通提交推送bobo506/TALK持续授权，不强推/改历史，.tmp/旧ACL/私有配置保持。准确提交/远端回执role-runner-id-validation/publication.json。恢复“继续项目”，取件“241好了”。
