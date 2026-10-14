@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-14 22:17（Asia/Shanghai）— 人工目录登记及请求保存反馈，待部署宿主配置
+
+- 代码发布9f5d67c后，用户反馈选运行器模型不能选；其随后确认“登记项目已有模型”按钮存在且点击已代入K2.8。本轮未因该反馈另改前端或宣称完整人工验收通过。
+- 用户保存“Kimi k2.8”后页面显示“等待开启宿主配置”。只读生产公开请求事实：role-a58b0b6ace84d28d61aa8ffc28f12d74=requested，member_id为空、attempts0、revision1、无错误；当前项目role_provision_host_config无行，默认关闭。最小进程探针初次权限不足，经只读提权核实uvicorn PID13904在运行、无配置worker/服务宿主进程；未输出进程完整命令或凭据。状态探针仅SELECT公开配置/请求，证据role-creation-host-acceptance/status.json。
+- 现有请求无需重复创建，需human开启项目宿主配置并启动同机worker。实际本机名PC-202312301323，仍须与worker一致；仅页面开关不启动worker。已询问用户已有human operator文件与仓库外Key根准备情况，只要路径不索取Key正文；当前未读取真实Key、启用生产配置、运行apply或操作原生服务。
+- 本轮仅进度两文档记录人工到达的位置，代码不变，无新派发；目录/请求已有用户操作反馈，身份创建/私有落盘/三步配置/模型服务及完整功能仍待后续验收。旧自测、partial与代码通过记录保持。
+
 ## 2026-10-14 21:54（Asia/Shanghai）— 241独立通过，240真实ID阻塞闭合并发布目录/创建补正
 
 - 用户“241好了”后，Codex按后端独立复核分工取件。实际HEAD6f026b6（最近仅docs）、业务基线4b93119；241 complete/task241，msg2745/SHA12c289c0e18cbfc4dd69e907b59317041a8bae2acbce93dbe64cbfdeef96a4e9，8662字符含JSON围栏，无损分页/逐结构与本地一致，不改变原围栏或旧报告。

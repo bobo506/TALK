@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-14 21:54 (Asia/Shanghai)：241后端独立复核通过，241→240整链已收取；运行器筛选、Kimi模型登记与真实ID创建修复统一发布，等待人工复验。
+Updated: 2026-10-14 22:17 (Asia/Shanghai)：修复已发布9f5d67c；用户已点击登记K2.8并保存“Kimi k2.8”请求，当前等待宿主开启与同机worker部署，完整配置验收未开始。
 
 ## 当前状态
 
@@ -11,6 +11,8 @@ Updated: 2026-10-14 21:54 (Asia/Shanghai)：241后端独立复核通过，241→
 
 ## 人工复验与下一步
 
+- 人工反馈“模型不能选”经用户确认点击登记后已代入K2.8；随后停在“等待开启宿主配置”。只读核实请求role-a58b0b6ace84d28d61aa8ffc28f12d74为requested/revision1/attempts0/member_id为空/无错误；项目宿主配置行不存在（默认关闭）。只读进程核实仅uvicorn PID13904，未发现role_service_host/role_provision_worker运行。该等待是部署准备阶段，不把请求已保存当成角色已创建。
+- 下一步先准备已有human operator Key文件与仓库外角色Key根，页面角色→项目设置→宿主配置，名称与实际worker一致（本机名PC-202312301323），再启用同机worker处理现有请求。已向用户询问是否准备及仅两个路径；不索取Key正文、不代用真人Key、不直接启用生产配置或启动worker。只读证据.tmp/role-creation-host-acceptance/status.json，待用户补充准备情况。
 - 先重载/重启原TALK服务（--reload运行时确认已加载），再原页面Ctrl+F5。真人账号：角色→创建角色→Kimi Code→“登记项目已有模型：K2.8 Preview”→模型选中→填写新名称→保存并配置。宿主关闭时正常停留“等待开启宿主配置”；完整worker准备见docs/guides/ROLE_CREATION_PAGE_ACCEPTANCE.md。
 - 本轮代码发布后暂停新功能，等待用户报告目录/创建/配置页面实际结果；R1-3列表单当前状态、详情启停且无重复标签、搜索/全部启动反馈保持。外部桌面/删除归档/退出清理和I-4后置。
 - 生产worker部署、真人浏览器视觉/键盘、原生登录/模型/多角色隔离/CLI启停未验；Kimi unverified/unknown不具受管启动资格，登记或配置成功不代表原生能力通过。
