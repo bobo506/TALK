@@ -7,8 +7,8 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# R1-2：本片改动 workspace.js/app.js，四处静态资源版本整体 bump（仓库约定“四处一致”）。
-STATIC_VERSION = "20261012-role-service-list-status"
+# R1-2：本片改动 workspace.js/app.js，六处静态资源版本整体 bump（仓库约定“六处一致”）。
+STATIC_VERSION = "20261013-role-creation"
 
 
 class RoleDescriptionWebUiTests(RouteTestCase):
@@ -57,8 +57,8 @@ class RoleDescriptionWebUiTests(RouteTestCase):
         self.assertLess(html.index('id="role-description-panel"'), html.index('id="role-details-tasks-panel"'))
         self.assertLess(html.index('id="role-details-tasks-panel"'), html.index('id="group-members-panel"'))
         self.assertNotIn('id="role-details-panel"', html, "旧的整体动态角色详情容器已拆分")
-        # 静态资源版本同步刷新缓存（四处一致）。
-        self.assertEqual(html.count(STATIC_VERSION), 4)
+        # 静态资源版本同步刷新缓存（六处一致）。
+        self.assertEqual(html.count(STATIC_VERSION), 6)
         self.assertEqual(len(re.findall(r"20261005-role-desc", html)), 0, "旧版本串不残留")
         self.assertNotIn("20260923-manual-task-cleanup-1", html)
         self.assertNotIn("20260919-c1b-s2-owner", html)

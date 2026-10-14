@@ -1,6 +1,6 @@
 # 页面创建与宿主配置请求合同（R1-4a）
 
-> 2026-10-13：server协议经233/234与Codex独立复核通过，宿主235/236经Codex接手补正及237独立复核通过，整链已收取。三表/共享守卫/10新接口/4旧入口、worker真实私有文件/三步/ACK/report已实现。**完整前端尚未接线，完整创建配置未验收。** 原草稿、partial/unknown及失败证据保持，不外推生产部署/原生能力。宿主使用见[worker指南](../guides/ROLE_REQUEST_WORKER.md)。
+> 2026-10-14：server协议233/234、宿主235–237及完整创建/配置前端238/239整链已复核闭合并收取。三表/共享守卫/10新接口/4旧入口、worker私有文件/三步/ACK/report与人类页面已接线；**完整创建配置仍待人工验收。** 页面按状态限量发现并对本页已保存/在途请求按原键只读补查，不改变本合同API。原草稿、partial/unknown及失败证据保持，不外推生产部署/原生能力。使用见[worker指南](../guides/ROLE_REQUEST_WORKER.md)与[页面验收](../guides/ROLE_CREATION_PAGE_ACCEPTANCE.md)。
 > 上游：[角色生命周期](ROLE_LIFECYCLE_DESIGN.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)、[受管服务](ROLE_SERVICE_CONTRACT.md)。本合同只修订请求驱动的创建/恢复/配置路径；既有无请求来源的人工接口保持。
 
 ## 1. 用户流程与实施边界

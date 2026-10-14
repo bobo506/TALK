@@ -6,7 +6,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261012-role-service-list-status"
+STATIC_VERSION = "20261013-role-creation"
 
 
 class RequirementsWebUiTests(RouteTestCase):
@@ -36,7 +36,7 @@ class RequirementsWebUiTests(RouteTestCase):
         self.assertIn("不覆盖 Agent 的宿主系统指令；仓库代码规范（AGENTS.md）仍然有效", html)
         self.assertNotIn("不替代 AGENTS 既定职责", html)
         # 静态资源版本同步刷新缓存。
-        self.assertEqual(html.count(STATIC_VERSION), 4)
+        self.assertEqual(html.count(STATIC_VERSION), 6)
         self.assertNotIn("20261005-role-desc-f2", html)
         self.assertNotIn("20260923-manual-task-cleanup-1", html)
         self.assertNotIn("20260919-c1b-s2-owner", html)

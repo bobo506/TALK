@@ -1,0 +1,44 @@
+"""创建配置页面的真实静态路由、HTML绑定和资源声明。"""
+from pathlib import Path
+from html.parser import HTMLParser
+from tests.test_support import RouteTestCase
+
+ROOT=Path(__file__).resolve().parents[1]
+
+class IdParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.ids=[]
+        self.assets=[]
+    def handle_starttag(self,tag,attrs):
+        values=dict(attrs)
+        if 'id' in values:
+            self.ids.append(values['id'])
+        if tag=='script' and values.get('src','').startswith('/'):
+            self.assets.append(values['src'])
+        if tag=='link' and values.get('href','').startswith('/'):
+            self.assets.append(values['href'])
+
+class RoleCreationWebUiTests(RouteTestCase):
+    def test_resources_and_html_are_served_and_bound_once(self):
+        with self.make_client() as client:
+            response=client.get('/')
+            self.assertEqual(response.status_code,200)
+            parser=IdParser();parser.feed(response.text)
+            self.assertEqual(len(parser.ids),len(set(parser.ids)))
+            for target in ['role-create-modal','role-create-form','role-create-runner','role-create-model','role-create-name','role-create-description','role-create-submit','role-request-list','role-request-host-panel']:
+                self.assertIn(target,parser.ids)
+            self.assertEqual(len(parser.assets),6)
+            self.assertTrue(all('v=20261013-role-creation' in asset for asset in parser.assets))
+            scripts=[path for path in parser.assets if path.endswith('v=20261013-role-creation') and '.js?' in path]
+            self.assertEqual(scripts,['/role-creation.js?v=20261013-role-creation','/workspace.js?v=20261013-role-creation','/app.js?v=20261013-role-creation'])
+            for asset in ['/role-creation.js','/role-creation.css']:
+                self.assertEqual(client.get(asset).status_code,200)
+
+    def test_creation_dialog_has_native_labels_and_accessibility(self):
+        html=(ROOT/'web/index.html').read_text(encoding='utf-8')
+        self.assertIn('aria-labelledby="role-create-title"',html)
+        self.assertIn('aria-modal="true"',html)
+        for field in ['role-create-runner','role-create-model','role-create-name']:
+            self.assertRegex(html,rf'id="{field}"[^>]*required')
+        self.assertNotIn('onclick=',html)

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-14 20:15（Asia/Shanghai）— 239独立通过，完整创建配置前端收取与收尾发布
+
+- 用户“239好了”触发取件，实际caller agent:codex/kind=agent、最新development_requirements已核。239合法complete/task239、msg2743纯JSON完整7176字符/SHA 8090ebd759c1c122d09c205c44a13d1e14b7aa603ff037c975c0f8eaf5dfde28；按稳定引用两页补读与本地逐结构相同。原238 partial/围栏、Git限制/未检出与旧失败结果均保持，不从runner succeeded推断业务结论。
+- 协调方实际HEAD e9218ac（前两轮仅docs）、业务基线24f8470，15候选/776保护源与238原byte副本无漂移、原index空、范围外跟踪变更零。239复核前后同样无漂移，原13文件不变、只有role-creation.js/单元相对238补正。复核包文档HEAD e1d9c87是旧快照，实际e9218ac仅进度docs；协调方真实Git补足复核者不能启动Git的工具限制，不擅强开宿主。
+- 239独立仓库221Node/26Python、22新RVF、27修正版旧审查、10单点变异全检出、三源语法与自写隔离live分别通过，不叠加开发者同套数量。真实A7升序/状态/截断和A8补读语义、32公开键/存储过滤/项目账号/迟到成功失败、最新恢复/200+历史、禁写无Key、M1/M4控件事件及R1-3回归闭合；实际worker三步/DACL/HTTP中人类只2POST、刷新和Agent0POST。
+- RV22旧断言对新码26过1败完整保留，239确认把合法A8 GET误当写；修正版按真实第二实参/方法/端点及动作白名单检查，非法rotate-key写和A8变POST分别被检出，不能以放宽全部写路径消除失败。旧码对新独立用例11失败/21项、原Codex4反例/两变异证据保持，不虚增唯一覆盖。
+- 必要证据已核后实际239→238收取，UTC分别12:09:22.846193/12:09:25.450328，均succeeded/completed。238 partial原样保留，收取表示补正整链闭合而非原初版完整通过；完整收取回执、稳定引用、结构与source验证在frontend-closeout。
+- 正式15源为5web+10tests，全部按已核hash收尾；创建/模型/名称介绍/人类意图/异步进度/取消继续/恢复/宿主CAS接线，6资源版本20261013-role-creation。按6状态各200、公开32键/上轮在途原键A8补读、最新请求排序，Key/token不入页面，不调用旧create/rotate/宿主写、不自动启服务；用户已验单服务状态/详情启停/搜索选择批量反馈保持。
+- 同步9正式文档：两进度、简报、MODULE_webui、实施计划、请求合同、worker指南、用户手册和新页面验收。提供已有真人账号入口/服务启动/静态强刷新/关闭宿主等待验收/同机worker真实配置准备及实际限制。15业务+9docs精确暂存、必要差异/UTF-8/链接/冻结检查后中文提交普通推送，准确SHA/远端回执frontend-closeout/publication.json；不混临时证据/旧测试ACL/私有配置凭据。
+- 仅源码及隔离链路通过，没有浏览器视觉/窄屏/真实键盘、原生登录模型启停/生产worker启用部署；历史205 canceled+205 provisioned直接DBfixture，不宣称410次真实worker。每状态200/会话32键是有限发现，旧无关联角色不猜恢复；storage拒绝只保内存同键与明确刷新限制，不宣称风险消除。
+- 当前人工里程碑暂停：用户Ctrl+F5进入角色→创建，先页面/等待/取消，再按ROLE_CREATION_PAGE_ACCEPTANCE准备真实worker配置闭环。发布不启用/重载生产服务或operator/Key，不以测试通过宣布用户验收通过。人工后再外部桌面/删除归档/退出清理，同功能集中收尾，I-4后置；没有新派发任务或主动等待。
+
 ## 2026-10-13 23:55（Asia/Shanghai）— 238 partial取件核对、Codex同片补正并派239独立复核
 
 - 用户“好了”取238。实际caller agent:codex/kind=agent、最新要求/DeepSeek available已核。238 succeeded/submitted仅流程，合法partial/task238，msg2742/SHA b7ba390813fc9f199d5dcc6acb8634903453d84fb44df3e23fce1ac46daf6da0/5035字符，完整只读补读与本地逐结构相同；消息围栏保留。原独立214/26/27、9变体、15+776前后零漂移、Git运行被拒/M1/M4未检出/人工原生未验原样保留，238未收取。

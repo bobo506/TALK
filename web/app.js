@@ -878,6 +878,7 @@ async function refreshProjectWorkspace() {
     await loadGroups();
     // C2-B：角色页刷新同时重读调度模式；非角色页为 no-op，不新增轮询。
     reloadControllerMode();
+    if (typeof roleRequestApp !== "undefined") await roleRequestApp?.refresh();
     renderRoomStrip();
   } finally {
     refreshProjectBtn.disabled = false;

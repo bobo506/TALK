@@ -52,7 +52,10 @@ function chatMemberName(member) {
   const name = member?.display_name;
   return name && !/CLI Bridge|agent:/i.test(name) ? name : ({codex:"Codex",deepseek:"DeepSeek",kimi:"Kimi"}[short] || short);
 }
-function workspaceMemberName(id) { return chatMemberName(members.find(item => item.id === id) || {id}); }
+function workspaceMemberName(id) {
+  const roleName = typeof roleRequestApp !== "undefined" && roleRequestApp?.roleName(id);
+  return roleName || chatMemberName(members.find(item => item.id === id) || {id});
+}
 function workspaceChatCandidates(items, roles, projectId, selfId) {
   const roleIds = new Set(roles.map(role => role.member_id));
   return items.filter(member => member.id !== selfId && !member.disabled_at
@@ -137,6 +140,7 @@ function syncWorkspaceLayout() {
   if (myId) userBadge.textContent = workspaceMemberName(myId);
   // R1-3：每次导航/刷新都同步服务轮询上下文——离开角色页、切项目或切账号立即停表。
   syncRoleServicePollingContext();
+  if (typeof roleRequestApp !== "undefined") roleRequestApp?.sync();
 }
 function selectWorkspaceTask(task) {
   workspaceUI.query = ""; document.getElementById("workspace-search").value = "";
@@ -649,7 +653,7 @@ function renderWorkspaceList() {
     const settingsRow = workspaceButton("", () => { workspaceUI.roleSelection = "settings"; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row role-settings-row");
     settingsRow.classList.toggle("selected", workspaceSettingsSelected());
     settingsRow.setAttribute("aria-pressed", String(workspaceSettingsSelected()));
-    settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "开发要求 · 调度模式"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
+    settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "开发要求 · 调度模式 · 宿主配置"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
     const settingsEntry = workspaceEl("div", "role-entry role-settings-entry");
     settingsEntry.classList.toggle("selected", workspaceSettingsSelected());
     settingsEntry.appendChild(settingsRow);
@@ -681,6 +685,9 @@ function renderWorkspaceList() {
     if (!matchedRoles.length) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", roles.length ? "没有匹配的角色" : "这个项目还没有配置角色。"));
     // R1-3：项目级“全部启动”进顶栏操作区，批量进度/失败/重试进独立反馈区；任务页筛选入口不受影响。
     batchActions.appendChild(workspaceRoleServiceStartAllButton());
+    if (typeof roleRequestApp !== "undefined") {
+      const create = roleRequestApp?.newButton(); if (create) batchActions.insertBefore(create, batchActions.firstChild);
+    }
     const batchFeedback = workspaceRoleServiceBatchFeedback();
     if (batchFeedback) batchFeedbackContainer.appendChild(batchFeedback);
   } else {
@@ -1447,6 +1454,9 @@ function renderWorkspaceRoleDetails() {
   namePanel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
   // ROLE-BINDING-B4：绑定只读区随名称区动态重绘，来自同一次名册读取；静态说明编辑区不在其中。
   namePanel.appendChild(workspaceRoleBindingPanel(role));
+  if (typeof roleRequestApp !== "undefined") {
+    const progress = roleRequestApp?.rolePanel(role); if (progress) namePanel.appendChild(progress);
+  }
   // R1-3：受管 CLI 服务操作区（未归档且名册带 service 字段时显示）；由 workspaceRoleServicePanel
   // 只渲染启动/关闭与必要提示 —— 详情不再重复服务状态标签（状态入口在左侧角色列表）。
   if (role.archived !== true) {
