@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-15 22:53（Asia/Shanghai）— 本轮页面人工验收通过，选择新Kimi k2.8执行试验并派246准备
+
+- 用户在245发布/刷新说明后明确“验收通过，可以下一项目了”，确认本轮角色创建配置/截图信息布局页面整体通过，对应5de19e8。记录整体确认，不臆造逐项窄屏/键盘/恢复/原生操作日志；245独立227Node/26Python/7变异和静态证据沿用，不重跑/叠加，旧244错误范围及报告不追改。
+- 用户另想测试K2.8实际执行能力；实时MCP两个K28角色均offline，新“Kimi k2.8”无实例。已解释任务可排队但执行器未启动，旧195固定串只属于旧agent:kimi-code-k28-preview。用户经选项明确选择新member agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c，非旧入口。
+- 新角色bound/alias kimi-code/kimi-for-coding，runner unverified/控制unknown保持。下一项先准备接单入口再实际小型代码任务/测试/回传/独立核，不能把配置成功或旧收发能力当新角色代码能力。未派新角色实际开发任务/启动真实模型或改生产数据。
+- 刚实读最新development_requirements/caller agent:codex/kind=agent及DeepSeek available/idle无current_task，按后端宿主DeepSeek准备/Codex独立核派246四参数顶层任务，Hall group:task-7168cfe8f9ae4c1aa182c719a7b8fbff；目标身份/真实基线/174源保护/原授权/命令与单任务退出/零模型验证/预算及10字段本次号交付完整入包。
+- 246只读/零模型，不改源码/正式docs/Git，不启动真实CLI/worker/模型，不改原生默认/凭据或放开服务门控；仅允许新角色本人Key必要内部只读鉴权，不输出秘密/读其他Key。T/W实际客户端依据必须区分模板和未知，不宣称主动等待适配。证据.tmp/k28-new-role-trial-prep/。
+- 当前仅8验收/进度/实施docs收尾普通推送，174非docs保护源保持，准确回执publication.json；默认结束等用户“246好了”再取件/独立核，准备好后开展用户选定新角色的受控实做，必要源码缺口另片。外部/删除归档/退出/I-4与真实原生、常驻范围保持，不把本次页面验收扩成整个R1-4完成。
+
 ## 2026-10-15 22:40（Asia/Shanghai）— 245截图纠正独立通过收取，绑定短摘要恢复发布
 
 - 用户“好了”触发245取件。实际业务基线58f8cc9，HEAD5f2f7e7仅上轮5docs；caller agent:codex/kind=agent与DeepSeek已结束/无current_task核实。245合法complete，msg2749原文5380字符/SHA5d1bb82e4937503f0507b874e2ac72f69d9c611eaaf1d447129b7a1e2d3dbc2e，稳定分页10字段与本地合法交付逐结构一致，收取completed/UTC2026-10-15T14:38:50.455444；原图和旧244错误范围/报告均保留，不把此前整行删除说成用户改需求。
