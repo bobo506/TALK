@@ -1,21 +1,24 @@
 # Project Progress
 
-Updated: 2026-10-15 22:22 (Asia/Shanghai)：用户截图纠正244的范围理解，运行器/模型短摘要恢复候选完成，245独立复核中，源码暂停/未正式发布。
+Updated: 2026-10-15 22:40 (Asia/Shanghai)：245截图纠正已独立通过并收取，绑定短摘要正式收尾，暂停等用户页面复验。
 
 ## 当前状态
 
-- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex，基线58f8cc9325ead50eabea559ef0a13e6f5c47b9b8。244已按原包独立通过/收取发布，但原包把“删冗余尾巴”误解为“删整行”，不满足用户真实需求；错误由Codex承担，旧报告/回执不追改。
-- 用户附C:/Users/Administrator/Desktop/1.PNG明确：未划线“Kimi Code · K2.8 Preview”仍要，红线后“执行（kimi-code） · K2.8 Preview”不要。候选列表精确为“绑定：已绑定 · Kimi Code · K2.8 Preview”。旧图中的列表ID与空闲提示继续隐藏，详情ID/工作提示与开关/绑定重置保持。
-- Codex恢复一行绑定短摘要/换行样式，有展示名不再拼runtime；只去掉展示名中与真实当前模型相同的尾段（可带执行），再单独显示一次模型，不截任意自定义名称。缺字段/未知/退役状态仍如实降级，不改配置/协议/权限或实际模型。
-- 11候选3web+8tests与163保护源冻结，11baseline副本字节核同，证据.tmp/role-binding-summary-fix/。既有10例回到实际DOM摘要，截图完整登记名精确断言、Custom Runner · East保留、原空闲/ID/数量/搜索/草稿保持；没有新增测试文件。
-- 作者最终17文件单进程227Node/六模块26Python、3JS语法/缓存/diff检查全过，实际PythonFileHandler隔离至本片.tmp。六资源候选20261015-role-summary-short，7缓存契约同步；视觉/窄屏/键盘未验，不等同人工验收。
+- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex。业务基线58f8cc9325ead50eabea559ef0a13e6f5c47b9b8，取件HEAD5f2f7e794eb9d692966976dea055147c9ee695cd仅5docs；发布11已核源+8相关docs，准确回执.tmp/role-binding-summary-fix/final-publication.json。
+- 用户截图澄清保留“Kimi Code · K2.8 Preview”，只删冗余尾巴。244整行删除系Codex理解错误，旧报告不追改。245恢复精确列表摘要“绑定：已绑定 · Kimi Code · K2.8 Preview”，不再拼runtime或重复模型。
+- 245合法complete/task245，msg2749原文5380字符/SHA5d1bb82e4937503f0507b874e2ac72f69d9c611eaaf1d447129b7a1e2d3dbc2e，稳定分页10字段与本地合法交付逐结构一致，收取completed/UTC2026-10-15T14:38:50.455444。根重算11候选/163保护源0漂移；独立实际代码、227Node/26Python、7隔离变异/1对照、独立DOM整行/11类降级探针、3语法/diff/缓存通过，Python实际FileHandler在本片.tmp。没有重复跑已通过同套测试或叠加计数。
+- 剥离仅匹配运行器展示名与真实模型相同的尾段（可带执行），其它自定义名称不乱截，缺字段/未知/失效仍如实降级。列表ID/空闲提示继续隐藏，有任务时数量保持；详情ID/工作提示/说明/任务/角色开关/绑定重置、单一服务状态与权限不变。无配置/协议/存储/模型更改。
+- 六资源20261015-role-summary-short，USER_MANUAL/创建与绑定验收/服务指南已纠正整行误删口径。复核非阻塞观察：展示模型缺失改用alias/id或运行器名恰与模型名相同等非当前登记形状可能不去重；当前实际Kimi完整字段精确通过，不扩范围猜型号。
+- 只读实服首页及六资源GET均200、字节与已核文件一致，首页六处新版本核同；static-publication-check.json为静态发布证据，不是浏览器验收。
 
-## 复核与下一步
+## 人工验收与下一步
 
-- 派发前重新读取最新development_requirements与caller agent:codex/kind=agent，DeepSeek available/idle无current_task；用户前端Codex/DeepSeek核分工优先，不改配置。245四最小参数派发，Hall group:task-1e9713d1cab643a59a79d74760c14013，queued只为派发快照。
-- 开发已暂停，245只读实际代码/必要复跑/截图需求对应与关键回归检出、11+163源范围。本轮仅5进度/模块/验收docs提交，11未核源保留未提交，回执.tmp/role-binding-summary-fix/publication.json。
-- 默认派发后结束，用户“245好了”后取件；通过后收取并同步正式USER_MANUAL/创建与绑定验收/服务指南，统一候选源及docs发布，再Ctrl+F5验收精确摘要。失败按持续授权修后再核，不把旧错误范围通过当成当前需求通过。
-- 不启Browser/生产worker/CLI/模型/真实恢复或服务启停，不读USER.md/真实Key/TALK-private/.talk身份档/生产DB。原生unverified/控制unknown与整体人工门禁保持，常驻/外部/归档/退出/I-4及既有adapter16失败不夹带。
-- 普通推送bobo506/TALK持续授权，精确stage相关docs或后续已核源，临时/私有/db不提交，不清理旧ACL。174保护源排除既有临时私有遗留，不宣称覆盖它们。
+- 沿用原服务和真人账号，Ctrl+F5→TALK项目→角色→Kimi k2.8，检查摘要“绑定：已绑定 · Kimi Code · K2.8 Preview”，后面不再有“执行（kimi-code） · K2.8 Preview”；列表ID与空闲仍隐藏，详情空闲保持。
+- 静态更新无需重启TALK/新Key/重建角色，不执行真实重置。Browser视觉/窄屏/键盘与原生能力未验，当前暂停等用户确认；整体人工门禁保持。
+- Kimi仍provisioned且原生unverified/控制unknown，单请求worker已退出；常驻/原生启停、外部/删除归档/退出/I-4及adapter registry16既有失败后置，不夹带修。
 
-恢复“继续项目”承接245；用户“245好了”取件，候选未正式发布/未人工验收。
+## 协作与恢复
+
+- caller agent:codex/kind=agent、245结束及DeepSeek无current_task已核；前端Codex/DeepSeek独立核分工保持，无共享目录并行改码。
+- bobo506/TALK普通提交推送持续授权，精确11已核源+8docs；私有/临时/.talk/db不提交，不清理旧ACL。174源统计排除旧临时私有遗留。
+- 恢复“继续项目”先读本快照，等截图口径的页面验收，不自动开展新模块/部署或真实恢复。

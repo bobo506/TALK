@@ -671,9 +671,10 @@ function renderWorkspaceList() {
       entry.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
       // 摘要列取有效说明的首个非空行：自定义后不再显示过时的硬编码短标签。
       row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleSummary(role)));
-      // 列表省去重复的运行器/模型摘要和空闲提示；有进行中任务时仍显示数量，详情保留完整工作提示。
+      // 列表省去空闲提示，绑定摘要只保留短名；有进行中任务时仍显示数量，详情保留完整工作提示。
       const workSummary = workspaceWorkSummary(role.member_id, { hideEmpty: true });
       if (workSummary) row.appendChild(workspaceEl("small", "", workSummary));
+      row.appendChild(workspaceEl("small", "role-binding-summary", workspaceRoleBindingSummary(role)));
       entry.appendChild(row);
       // R1-3：受管服务控制作为角色行的同级块（行本身是 <button>，不能再嵌套按钮）；未归档才显示。
       if (role.archived !== true) {
@@ -722,7 +723,7 @@ function renderWorkspaceList() {
 // （"模型未上报"）与旧服务未提供字段（未知）四类严格区分；未知不伪装成未配置，未配置不当接入失败。
 // 产品展示名规则（D-5）未决：只展示 API 已有值，不制定命名规则、不批量改名；B2 证据片未落地，
 // 本片不输出 binding_match*、不写任何一致性结论、不推断型号。
-// ROLE-BINDING-C4：面板下方补一段随状态变化的中文收尾指引；不新增每角色请求、按钮或表单。
+// 列表只展示绑定状态、运行器短名和一次模型名；详情属性区已退役。
 const ROLE_BINDING_STATES = {
   no_project: ["无项目上下文", "unknown"],
   member_missing: ["成员不存在（保留配置）", "invalid"],
@@ -763,12 +764,16 @@ function roleBindingStateInfo(agent, row) {
   const known = ROLE_BINDING_STATES[value];
   return { provided: true, known: true, key: value, label: known[0], text: known[0], kind: known[1] };
 }
-// 运行器列只合并两个既有派生字段；登记事实不可解析时两者都为 null，如实写“运行器未上报”。
+// 运行器登记名可能附有“· 当前模型 执行”，只去掉与真实模型字段相同的尾段，保留其它自定义名称。
+// 有展示名时不再拼接 runtime；缺展示名仍按已上报 runtime 如实降级。
 function roleBindingRunnerText(row, missing) {
   const name = roleBindingText(row.runner_display_name);
   const runtime = roleBindingText(row.runtime);
-  if (name && runtime) return `${name}（${runtime}）`;
-  return name || runtime || missing;
+  const model = roleBindingModelText(row, null);
+  const withoutRole = name?.replace(/\s+执行$/, "");
+  const suffix = model && ` · ${model}`;
+  const shortName = suffix && withoutRole?.endsWith(suffix) ? withoutRole.slice(0, -suffix.length).trim() : name;
+  return shortName || name || runtime || missing;
 }
 // 紧凑摘要的取值优先级仅为压缩显示，不改写字段含义：模型展示名 → 模型别名 → 模型 ID。
 function roleBindingModelText(row, missing) {

@@ -220,6 +220,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-settings-row:hover {background:#f0f5f8;}
 .role-settings-row.selected {background:#edf5fc;}
 
+.role-binding-summary {overflow-wrap:anywhere;}
 /* R1-3 受管 CLI 服务（2026-10-11 页面验收反馈修正）：列表条目内只有一个当前状态标签，
    启动/关闭操作仅在详情提供；状态块是角色行的同级兄弟节点，不用负外边距压线，也不自带横线。
    角色行本身是 <button>，控制块不能在它内部（避免按钮嵌套）。 */

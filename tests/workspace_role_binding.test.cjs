@@ -1,4 +1,4 @@
-// 2026-10-15后续精简：列表不再显示重复运行器/模型摘要和空闲提示，ID及空闲提示保留详情。
+// 2026-10-15截图纠正：列表保留绑定状态、运行器短名和一次模型名，去冗余后缀；ID/空闲提示留详情。
 // 加载真实workspace.js，验证实际角色行/详情、选择/搜索与只读行为；
 // 原属性表/C4指引专属断言随已撤销的界面要求退役，保留列表状态/安全/草稿等有效覆盖。
 const test = require('node:test');
@@ -145,8 +145,7 @@ function harness({ human = true, roster = DEFAULT_ROSTER } = {}) {
   const roleRows = () => rows().filter(row => String(row.className).includes('role-row') && !String(row.className).includes('role-settings-row'));
   const settingsRow = () => rows().find(row => String(row.className).includes('role-settings-row'));
   const roleRow = memberId => roleRows().find(row => row.dataset.memberId === memberId);
-  // 兼容格式器保留原契约；实际列表已取消渲染该摘要，下面直接核验格式器而非伪造DOM。
-  const bindingSummary = memberId => context.workspaceRoleBindingSummary(context.projectAgents.find(r => r.member_id === memberId));
+  const bindingSummary = memberId => roleRow(memberId).children.find(c => String(c.className).includes('role-binding-summary')).textContent;
   const enterRoles = async () => {
     getEl('workspace-roles-btn').fire('click');
     context.renderWorkspaceList();
@@ -163,11 +162,12 @@ function harness({ human = true, roster = DEFAULT_ROSTER } = {}) {
 }
 
 
-test('列表省去重复配置摘要和空闲提示，详情保留ID及工作提示且有任务时仍显示数量',async()=>{
-  const h=harness();await h.enterRoles();
+test('截图实际登记名只显示运行器短名和一次模型，列表空闲隐藏但详情与进行中数量保持',async()=>{
+  const h=harness({roster:[{...DEFAULT_ROSTER[0],binding:boundRow({runner_display_name:'Kimi Code · K2.8 Preview 执行'})},DEFAULT_ROSTER[1]]});await h.enterRoles();
   const row=h.roleRow('agent:kimi');assert.ok(row);assert.equal(row.dataset.memberId,'agent:kimi');
-  const list=allTexts(row).join('\n');assert.match(list,/Kimi/);assert.doesNotMatch(list,/Kimi Code|K2.8 Preview|kimi-code|绑定：|agent:kimi|当前没有进行中的任务/);
-  assert.equal(findAll(row,n=>String(n.className).includes('role-binding-summary')).length,0);
+  const list=allTexts(row).join('\n');assert.match(list,/Kimi Code/);assert.doesNotMatch(list,/（kimi-code）|agent:kimi|当前没有进行中的任务/);
+  assert.equal(h.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · K2.8 Preview');
+  assert.equal(findAll(row,n=>String(n.className).includes('role-binding-summary')).length,1);
   await h.selectRole('agent:kimi');const panel=h.el('role-details-name-panel');const detail=allTexts(panel).join('\n');
   assert.match(detail,/成员 ID：agent:kimi/);assert.doesNotMatch(detail,/Kimi Code|K2.8 Preview|运行器与模型绑定|提供方标识|连接标识|模型来源|模型 ID|收尾指引|配置进度/);
   assert.equal(findAll(panel,n=>String(n.className).includes('role-binding-section')).length,0);
@@ -181,7 +181,7 @@ test('列表省去重复配置摘要和空闲提示，详情保留ID及工作提
   assert.match(allTexts(panel).join('\n'),/当前没有进行中的任务/);
 });
 
-test('兼容摘要格式器仍区分真实绑定状态，实际列表与详情不恢复已移除的配置块',async()=>{
+test('实际列表短摘要仍区分真实绑定状态，详情不恢复已移除的属性块',async()=>{
   const cases=[
     [{binding:null,binding_state:'unconfigured'},/未配置/],
     [{binding:boundRow(),binding_state:'partial'},/不完整/],
@@ -193,19 +193,21 @@ test('兼容摘要格式器仍区分真实绑定状态，实际列表与详情�
   for(const [fields,expected] of cases) {
     const h=harness({roster:[{member_id:'agent:kimi',business_role:'dev',...fields}]});await h.enterRoles();
     const text=h.bindingSummary('agent:kimi');assert.match(text,expected);assert.doesNotMatch(text,/已绑定/);
-    assert.equal(findAll(h.roleRow('agent:kimi'),n=>String(n.className).includes('role-binding-summary')).length,0);
+    assert.equal(findAll(h.roleRow('agent:kimi'),n=>String(n.className).includes('role-binding-summary')).length,1);
     await h.selectRole('agent:kimi');assert.doesNotMatch(allTexts(h.el('role-details-name-panel')).join('\n'),/运行器与模型绑定|收尾指引/);
   }
   const legacy=harness({roster:[{member_id:'agent:kimi',business_role:'dev'}]});await legacy.enterRoles();assert.match(legacy.bindingSummary('agent:kimi'),/当前服务未提供绑定信息/);
 });
 
-test('保留兼容格式器的模型字段降级和运行器缺展示名契约',async()=>{
+test('列表模型字段降级和运行器缺展示名保持，不猜型号',async()=>{
   for(const [fields,expected] of [
     [{model_display_name:'',model_alias:'known-alias'},/known-alias/],
     [{model_display_name:null,model_alias:'',model_id:'known-model'},/known-model/],
     [{model_display_name:'',model_alias:'',model_id:''},/模型未上报/],
     [{runner_display_name:null,runtime:'kimi-code'},/kimi-code/],
     [{runner_display_name:'',runtime:''},/运行器未上报/],
+    [{runner_display_name:'Custom Runner · East'},/Custom Runner · East/],
+    [{runner_display_name:'Kimi Code · K2.8 Preview'},/绑定：已绑定 · Kimi Code · K2.8 Preview$/],
   ]) {
     const h=harness({roster:[{member_id:'agent:kimi',binding:boundRow(fields),binding_state:'bound'}]});await h.enterRoles();assert.match(h.bindingSummary('agent:kimi'),expected);
   }
@@ -214,7 +216,7 @@ test('保留兼容格式器的模型字段降级和运行器缺展示名契约',
 test('列表和详情使用公开文本，未知附加字段和属性元数据不展示',async()=>{
   const malicious='<img src=x onerror=alert(1)>';
   const h=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:malicious,model_display_name:'<script>bad()</script>',connection_ref:'private-ref-sentinel',provider_id:'provider-sentinel',api_key:'SECRET'}),binding_state:'bound'}]});
-  await h.enterRoles();assert.doesNotMatch(allTexts(h.el('blackboard-columns')).join('\n'),/onerror=alert|bad\(\)/);
+  await h.enterRoles();assert.match(h.bindingSummary('agent:kimi'),/onerror=alert/);assert.match(h.bindingSummary('agent:kimi'),/bad\(\)/);
   assert.equal(h.created.includes('img'),false);assert.equal(h.created.includes('script'),false);assert.equal(h.created.includes('a'),false);
   await h.selectRole('agent:kimi');const all=[...allTexts(h.el('blackboard-columns')),...allTexts(h.el('role-details-name-panel'))].join('\n');
   assert.doesNotMatch(all,/private-ref-sentinel|provider-sentinel|SECRET/);
@@ -233,10 +235,10 @@ test('搜索仍按名称和说明，不把模型、运行器或ID当成新搜索
   h.ui.query='Kimi';h.context.renderWorkspaceList();assert.equal(h.roleRows().length,1);
 });
 
-test('配置变化重绘不恢复已删摘要，不额外读取绑定或发出写请求',async()=>{
+test('短摘要随真实模型声明重绘，不额外读取绑定或发出写请求',async()=>{
   const h=harness();await h.enterRoles();await h.selectRole('agent:kimi');
   h.context.projectAgents[0].binding=boundRow({model_display_name:'新模型声明'});h.context.renderWorkspaceList();h.context.renderWorkspaceRoleDetails();
-  assert.doesNotMatch(allTexts(h.el('blackboard-columns')).join('\n'),/新模型声明|绑定：|kimi-code/);
+  assert.equal(h.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · 新模型声明');
   assert.equal(h.requests.some(r=>['POST','PUT','PATCH','DELETE'].includes(r.opts?.method)),false);
   assert.equal(h.requests.some(r=>/\/binding|model-choices/.test(r.url)),false);
 });
