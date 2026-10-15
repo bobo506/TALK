@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-15 22:22（Asia/Shanghai）— 截图纠正绑定摘要整行误删，245独立复核派发
+
+- 用户对244验收指出：原要求只删“执行（kimi-code） · K2.8 Preview”尾巴，截图未划线“Kimi Code · K2.8 Preview”仍要。Codex承认把范围理解成整行删除；244按错误任务包的代码通过不代表真实需求通过，旧报告不追改，不把本次纠正写成用户改变要求。
+- 基线58f8cc9，候选恢复列表摘要为“绑定：已绑定 · Kimi Code · K2.8 Preview”。原实际runner_display_name=Kimi Code · K2.8 Preview 执行、runtime=kimi-code、model_display_name=K2.8 Preview；显示时不再拼runtime，只去与真实模型相同的展示名尾段，其它自定义名称/缺字段如实保留。图中旧ID/空闲不恢复，详情与原功能保持，不改存储名称/模型/权限。
+- 11源3web+8tests/163保护源冻结，基线副本字节核同，六资源候选20261015-role-summary-short。既有10例恢复实际DOM检查，完整截图对应登记名精确断言，任意Custom Runner · East不乱截，ID/空闲/数量/状态/草稿保持；作者最终227Node/26Python、3语法/缓存/diff过，Python实际handler本片.tmp。证据.tmp/role-binding-summary-fix/，未Browser/生产操作。
+- 最新caller agent:codex/kind=agent/开发要求与DeepSeek available/idle无current_task已核，前端持续指定分工不变。245四参数派DeepSeek只读核，Hall group:task-1e9713d1cab643a59a79d74760c14013，原图/原话/精确预期/实际元数据/基线差异/SHA/验收/证据/限制与10字段本次号交付入包；开发暂停，不并行改码。
+- 默认结束等用户“245好了”，本轮仅5docs提交普通推送、11候选未核不提交，回执.tmp/role-binding-summary-fix/publication.json。核后正式指南同步/源发布再人工复验，原生/整体人工与后续范围门禁保持。
+
 ## 2026-10-15 22:14（Asia/Shanghai）— 244独立通过收取，列表两处精简正式发布
 
 - 用户“244好了”触发取件。业务基线8d953ee，实际取件HEAD b5c558e仅上轮5docs；caller agent:codex/kind=agent与DeepSeek结束/无current_task已核。244合法complete/task244，msg2748原文5418字符/SHA396c1ba095cfaf579fca0b0c42c7e4eff709add4c965d6402a1df3a9f048d61a，稳定分页10字段与本地逐结构一致。
