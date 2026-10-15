@@ -1,24 +1,22 @@
 # Project Progress
 
-Updated: 2026-10-15 22:53 (Asia/Shanghai)：用户确认本轮角色创建/配置及截图布局页面验收通过；选择刚创建的Kimi k2.8做执行能力试验，246入口准备已派发。
+Updated: 2026-10-15 23:04 (Asia/Shanghai)：用户新增“以后新角色配置成功后自动启动”要求；246原入口准备继续，247顺序方案准备已派，尚未实现或启生产服务。
 
-## 已验收状态
+## 已确认状态
 
-- 项目D:/claude-test/TALK / prj_e8fe7066bbec，分支codex/terminal-return-codex，当前业务基线5de19e8dd71b63877fb68223f682558cd2d58a2c。用户在收到245已核发布及Ctrl+F5说明后明确“验收通过，可以下一项目了”，本轮页面整体门禁释放，不补写逐项操作/窄屏/键盘日志。
-- 列表摘要“绑定：已绑定 · Kimi Code · K2.8 Preview”及ID/空闲隐藏、详情角色开关/绑定重置/信息去重复纳入本轮页面确认；245合法结果/独立227Node/26Python/7变异与静态发布证据沿用，不重跑或叠加。244范围误解及原报告保留。
-- 页面通过不等于真实绑定重置、原生启停、退出清理或主动等待通过。Kimi k2.8已有真实provisioned，单请求worker已退出，runner仍unverified/控制unknown；常驻/外部/删除归档/退出/I-4后续保持。
+- TALK / prj_e8fe7066bbec，分支codex/terminal-return-codex。页面业务版本5de19e8已获用户本轮整体验收通过，d4a9b37251cc308e93a33f416e72be7748d717ef为上轮8docs收尾；原245独立/静态证据沿用，无新代码或重复测试。
+- 用户选择刚创建“Kimi k2.8”验证实际执行能力，member=agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c。最近实例读取offline/无实例、bound、runner unverified/控制unknown；旧K28的195固定串不套给新身份，当前未启动真实模型/执行器。
+- 用户现明确要求以后配置完成自动启动。已记录已确认需求docs/spec/ROLE_AUTO_START_REQUIREMENTS.md（待实施）：新人类创建完整配置后自动走受管启动→实际ready；保留手动开关/单状态反馈，失败如实显示，人工关闭优先，旧角色/恢复不追溯自启动，原能力门控不绕过。
 
-## 当前执行能力试验
+## 当前任务
 
-- 用户明确想试K2.8执行能力，经选择指定刚创建“Kimi k2.8”，唯一member_id=agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c。最新MCP为offline/无instances，binding bound，alias kimi-code/kimi-for-coding；可创建排队任务，但目前没有运行中的新角色执行器。
-- 旧agent:kimi-code-k28-preview也offline；旧195只验证旧身份最小固定串收发，不算此新角色接单或代码开发已验。不能直接套用固定旧member的kimi_k28_executor入口，也不把显示K2.8当成实际后端版本保证。
-- 246已四最小参数派DeepSeek作后端/宿主只读零模型入口准备，Hall group:task-7168cfe8f9ae4c1aa182c719a7b8fbff，queued仅派发快照；Codex后续独立核。尚未向新角色派实际开发任务/启动模型，未改任何生产配置或能力门控。
-- 任务要求给出新身份/项目/alias/tools明确绑定的真实可用命令、单任务受控启动/退出方案、必要本人Key内部只读鉴权、零模型替身验证及T/W/任务预算依据，不能复用旧Key/旧身份、虚构once参数或把模板当实际等待上限。只写.tmp，不改源码/正式docs/Git，不读USER.md/其他角色Key/native凭据。
-- 准备证据.tmp/k28-new-role-trial-prep/，174非docs保护源SHA已冻结，排除旧临时/私有遗留。当前只8相关验收/进度docs提交普通推送，回执publication.json；无新代码/测试，本轮不重跑既有同套。
+- 246 DeepSeek新角色入口只读/零模型准备仍按原包，最后单次快照running/in_progress；已在其Hall通知新增方向而不扩大原权限。只准备命令/新身份/alias/tools/单次退出/必要本人Key内部只读核验与预算依据，Codex独立核后才试实际代码任务。
+- 247 DeepSeek“新角色配置完成后自动启动服务的后端方案准备”，Hall group:task-a0f5d3de28e84fe09dd7966c9b450efd，queued仅派发快照；明确完成246后顺序做，只写.tmp/role-auto-start-prep/，不改源码/docs/Git、不真实启动/读秘密。给真实入口、授权/幂等/世代、配置成功与服务状态分离、崩溃/重复/人工关闭/host离线边界及最小单片任务包，由Codex独立复核后开发。
+- 派发前实读latest development_requirements/caller agent:codex/kind=agent，DeepSeek busy/current_task246；未重复派246、未取消有用准备，不并行改码。用户前端Codex/DeepSeek核、后端宿主DeepSeek/Codex核分工保持，不改永久配置。
+- 当前只7相关需求/进度/合同实施提示docs提交普通推送，174非docs保护源0漂移，证据.tmp/role-auto-start-prep/及publication.json；旧临时私有遗留排除，不纳入或清理。
 
-## 下一步与协作
+## 下一步
 
-- 默认派发后结束，用户“246好了”后取合法交付并由Codex实际独立复核；准备可用后启动新角色受控单任务试验，再给一个边界清楚的实际代码切片，要求改动/测试/结构化回传，暂停后另交独立复核，不凭自报宣布执行能力通过。
-- 若入口确需源码适配，先核最小缺口与测试范围后按后端/宿主分工单片实施；不为试模型造重复功能、不改已验页面，不绕过unverified/unknown或自动开启主动长等待。
-- 最新caller agent:codex/kind=agent与development_requirements已核；常规页面Codex/DeepSeek核、后端/宿主DeepSeek/Codex核保持，本次K2.8试验为用户显式指定，不自动改永久角色配置。共享目录只读准备/协调docs，无并行改码。
-- 普通推送bobo506/TALK持续授权，精确8docs；临时/私有/.talk/db不提交，不清理旧ACL。恢复“继续项目”承接246，或用户“246好了”取件，不主动轮询等待。
+- 默认派发后结束，用户“246好了”/“247好了”后分别取合法交付及独立核；准备齐后真实新角色试验/自动启动单片实施，保留测试、独立复核、人工验收和Git收尾，不把方案complete当功能完成。
+- 当前已发布配置仍不自动启动；本次不启动CLI/模型/worker或批量历史角色，不修改生产名册/绑定/Key/原生默认模型，不放开unknown/unverified。真实自动启动/原生能力/退出清理与I-4未验，T/W按终端实际预算核，未核T不开主动长等待。
+- 常规推送bobo506/TALK持续授权，只精确相关docs/后续已核源，私有/.talk/临时/db不提交。恢复“继续项目”承接246/247，不主动轮询等待。

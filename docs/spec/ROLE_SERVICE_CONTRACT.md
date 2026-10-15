@@ -1,5 +1,7 @@
 # 角色受管服务合同（R1-3）
 
+> 2026-10-15后续需求（待实施）：[新角色配置完成后自动启动](ROLE_AUTO_START_REQUIREMENTS.md)已获用户确认，247方案准备中。当前实现仍须显式启动意图，下面世代/所有权/就绪/能力守卫保持；自动衔接不得用bound/provisioned绕过unverified/unknown，不将准备结论当真实服务已启动。
+
 状态：2026-10-12，223–229代码复核与页面反馈补正完成并收取，用户本轮页面基础验收通过。2026-10-13，235–237默认关闭的请求worker接线独立通过，真实原生运行器及完整创建页面仍未验。原设计见 [ROLE_LIFECYCLE_DESIGN.md](ROLE_LIFECYCLE_DESIGN.md)，实施顺序见 [ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md](ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md)。
 
 ## 范围与执行者
