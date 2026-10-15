@@ -1,23 +1,22 @@
 # Project Progress
 
-Updated: 2026-10-15 20:12 (Asia/Shanghai)：242独立通过已收取，详情重复查看入口补正正式收尾；用户追加角色列表/详情精简与按钮改名，下一片前端范围已提出，重置语义待澄清。
+Updated: 2026-10-15 20:35 (Asia/Shanghai)：242已收取发布；用户明确保持原修复功能，角色列表/详情精简已开发自测，243独立复核中，源码暂停/未正式发布。
 
 ## 当前状态
 
-- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex。242业务基线07fa521，取件HEAD2d1e277仅上轮5docs；本轮11已核候选+5相关docs统一提交推送，准确回执.tmp/role-view-link-fix/final-publication.json，旧partial/失败保持。
-- 242合法complete/task242，msg2746纯JSON4826字符/SHA02732e22e74b5b7bff561f84daad6bffc240a64eb33bfad5f130f038849704da，与本地逐结构相同。11候选/163保护源仍0漂移，独立236Node/26Python/52探针、3内存变异及语法/缓存/范围核对通过，已收取completed，不等于完整人工验收。
-- 本片仅详情抑制返回当前角色自身的查看按钮，创建弹窗真实点击仍关闭弹窗/选角色/详情可见，恢复入口不变。六资源20261015-role-detail-actions；已核11源正式发布，用户随后追加的新布局尚需单独开发和复核。
-- 证据限制更正：独立Node受spawn限制，以单进程跑同17文件；原作者Python日志隔离说法不准确，可能追加应用日志，独立日志隔离26项复跑通过。3个baseline副本有CRLF归一化，不宣称11项全部字节相同；原报告/日志不追改，视觉/键盘仍未验。
+- 项目D:/claude-test/TALK，project_id=prj_e8fe7066bbec，分支codex/terminal-return-codex。已核242发布基线0b71878108f026b718cbba51bc1a5db31d9a03c8，详情自指入口移除、创建弹窗跳转保留；242/msg2746已收取，原证据更正见历史，不追改旧报告。
+- 用户最新明确“绑定重置”保留现有修复功能，仅改名/补说明，不重选运行器模型。无截图附件，按其文字：运行器模型留列表、ID留详情；详情删除整块属性与已完成配置进度；服务区改“角色开关”。
+- Codex本片已实施：列表去可见ID但保留机器定位和真实绑定摘要；详情保留ID/说明/任务，移除属性块及废弃辅助代码；已完成请求仅保留真人有资格的重置，按钮放在开关下方，说明为“接入异常时修复本机配置，必要时更新接入凭据。”处理中/失败保留短提示及原处理入口。
+- 重置仍需人工确认，可能更新TALK凭据；recover意图API、原同键/固定版本重试、human/代际/revision资格、受管服务能力门控与agent只读保持。没有执行真实重置、模型重绑或生产写入。
+- 本片18候选（5web+13tests），开工174源中其余156保护源0漂移，18基线副本字节核同。证据.tmp/role-details-simplify/，candidate-manifest.json为冻结SHA；旧.tmp/.tmp-tests/.talk遗留排除，不宣称覆盖这些文件。
+- 作者同17文件单进程227Node/26Python页面契约、3JS语法/缓存/diff检查通过。旧绑定详情属性/C4测试23例已按新需求改为10例现存场景，创建单元24→28，原236总数变227，不宣称原236仍全部适用。Python导入测试前改logging_config.LOG_PATH到本次.tmp，日志留本地；Browser视觉/窄屏/真实键盘未验。
 
-## 当前新需求与下一步
+## 复核与下一步
 
-- 用户本轮文字明确：运行器/模型留列表，详情去除重复内容及整块运行器模型属性；ID留详情、列表去ID；删除详情配置进度区；原恢复入口改“绑定重置”并补简短用途，位置由Codex安排；“受管 CLI 服务”改“角色开关”。本消息未附截图，先按文字定义处理。
-- 已说明原恢复只修本机接入、必要时更新TALK凭据，不会重新选择运行器/模型；已询问是保持该功能改名还是改为重选运行器模型。涉及重置标签/说明与功能的部分待答，其他明确布局可推进；不自动扩后端重绑协议或触发实际恢复。
-- 本部分前端仍Codex实施、DeepSeek独立核；完成一个信息布局切片后冻结/派审，默认结束等用户通知再收取。保持搜索/角色选择/单服务状态/启停资格与agent只读、不新增API写、不读Key/不动生产数据。未完成或失败的配置需保留必要反馈和处理入口，不能伪装成功。
-- Kimi k2.8已有真实provisioned，member agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c，host PC-202312301323/version1开启/单次worker退出，原生unverified/unknown保持。当前只页面优化，不启常驻worker/CLI/模型，不读USER.md或TALK-private私有文件；外部/归档/退出与I-4后置。
+- 派发前实读最新项目development_requirements、caller agent:codex/kind=agent，DeepSeek上报available/idle且无current_task；用户前端Codex实施/DeepSeek核分工优先，不改页面常规配置。243按四个最小参数顶层派发，Hall group:task-2d3f7eaa55a0421894354fc198316efb，queued只是派发时快照。
+- 243只读实际代码/独立测试/范围与关键回归检出复核，开发已暂停。协调方本轮仅提交5相关docs，不提交未核18源；默认派发后结束，用户“243好了”后取件，不主动轮询。
+- 通过后核合法交付/实际SHA/独立证据、收取，再同步正式用户手册和原绑定验收指南，统一18源/相关docs提交普通推送，缓存候选20261015-role-layout；提供Ctrl+F5后列表/详情/重置说明的人工验收。失败按持续授权修后再独立核。
+- 当前Kimi k2.8真实provisioned/原生unverified、control unknown保持；单请求worker早已退出。不开常驻worker/CLI/模型，不读USER.md/真实Key/TALK-private/.talk身份档或生产DB，不扩外部/归档/退出/I-4。
+- 常规提交推送bobo506/TALK持续授权，精确stage已核源码或本轮docs，不提交临时/私有/db，不清理旧ACL。完整功能人工门禁保持；adapter registry16既有失败不夹带修。
 
-## 协作与恢复
-
-- caller agent:codex/kind=agent与本轮项目开发要求已核；用户持续指定前端Codex/DeepSeek核优先于页面常规Kimi分工，不自动改配置。共享目录开发暂停后审，本轮收取242后再新改码。
-- 常规提交推送bobo506/TALK持续授权；精确源/docs，不提交临时/私有/.talk/db或清理旧ACL，相关路径/publication回执保持。人工门禁未释放，原adapter registry16既有失败不夹带修。
-- 恢复“继续项目”，承接本轮界面精简及重置语义答复，不因242代码通过自动宣布整体角色能力通过。
+恢复“继续项目”，承接243复核；消息“243好了”触发取件，不能因作者自测宣称独立通过或正式发布。
