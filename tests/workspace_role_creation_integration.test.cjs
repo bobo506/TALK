@@ -44,12 +44,13 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   assert.equal(vm.runInContext('workspaceUI.selectedRole',ctx),'agent:new');
   assert.equal(vm.runInContext('workspaceUI.roleSelection',ctx),'role');
   assert.equal(doc.getElementById('role-details-name-panel').classList.contains('hidden'),false);
-  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/配置进度/);
+  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/正在配置/);
   assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/查看角色/);
   Object.assign(rows[0],{status:'provisioned',revision:4,lease_held:false});await controller.refresh();
-  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/配置已完成/);
-  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/恢复本机接入/);
-  assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/查看角色/);
+  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/绑定重置/);
+  assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/配置进度|配置已完成|身份档案|查看角色|运行器与模型绑定/);
+  const detailChildren=doc.getElementById('role-details-name-panel').children;
+  assert.ok(detailChildren.findIndex(n=>String(n.className).includes('role-maintenance'))>detailChildren.findIndex(n=>String(n.className).includes('role-service-section')),'重置区位于角色开关下方');
   assert.equal(requests.filter(r=>r.method==='POST').length,1);
   vm.runInContext('workspaceUI.mode="tasks";syncWorkspaceLayout();',ctx);
   assert.equal(controller.state.active,false);assert.ok(doc.getElementById('role-create-modal').classList.contains('hidden'));

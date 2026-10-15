@@ -215,7 +215,7 @@ function harness({ human = true, roster = [] } = {}) {
   const batchBox = () => findAll(getEl('role-service-batch-actions'), n => String(n.className) === 'role-service-batch')[0];
   const batchFeedbackBox = () => getEl('role-service-batch-feedback');
   const roleRow = memberId => rows().find(row => String(row.className).includes('role-row')
-    && !String(row.className).includes('role-settings-row') && allTexts(row).some(t => t.includes(memberId)));
+    && !String(row.className).includes('role-settings-row') && row.dataset.memberId === memberId);
   // 沿真实角色选择入口打开详情，逐角色操作只从详情获取。
   const actionsFor = memberId => {
     if (context.__workspaceUI.selectedRole !== memberId || context.__workspaceUI.roleSelection !== 'role') {

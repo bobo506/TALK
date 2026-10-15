@@ -1,7 +1,6 @@
-// ROLE-BINDING-B4：角色页“运行器与模型绑定”只读展示的前端聚焦测试。
-// 在 vm 中加载整份真实 web/workspace.js，走真实 renderWorkspaceList / renderWorkspaceRoleDetails /
-// workspaceRoleBindingPanel 渲染路径（不是源码字符串匹配，也不是手写 DOM 镜像），断言真实生成的
-// 文本节点、class、属性与请求记录；绑定数据只来自 projectAgents（同一次 GET agents 载荷）。
+// 2026-10-15用户要求：绑定摘要留列表，ID留详情；属性大块和重复详情不再展示。
+// 加载真实workspace.js，验证实际角色行/详情、选择/搜索与只读行为；
+// 原属性表/C4指引专属断言随已撤销的界面要求退役，保留列表状态/安全/草稿等有效覆盖。
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -145,21 +144,8 @@ function harness({ human = true, roster = DEFAULT_ROSTER } = {}) {
   const rows = () => getEl('blackboard-columns').children.flatMap(node => String(node.className).includes('role-entry') ? node.children : [node]);
   const roleRows = () => rows().filter(row => String(row.className).includes('role-row') && !String(row.className).includes('role-settings-row'));
   const settingsRow = () => rows().find(row => String(row.className).includes('role-settings-row'));
-  const roleRow = memberId => roleRows().find(row => allTexts(row).some(t => t.includes(memberId)));
+  const roleRow = memberId => roleRows().find(row => row.dataset.memberId === memberId);
   const bindingSummary = memberId => roleRow(memberId).children.find(c => String(c.className).includes('role-binding-summary'));
-  const bindingSection = () => getEl('role-details-name-panel').children.find(c => String(c.className).includes('role-binding-section'));
-  const bindingTexts = () => allTexts(bindingSection());
-  const bindingPairs = () => {
-    const pairs = [];
-    for (const dl of findAll(bindingSection(), n => n.tagName === 'dl')) {
-      for (let i = 0; i + 1 < dl.children.length; i += 2) pairs.push([dl.children[i].textContent, dl.children[i + 1].textContent]);
-    }
-    return pairs;
-  };
-  const stateBadge = () => findAll(bindingSection(), n => String(n.className).includes('role-binding-state'))[0];
-  // ROLE-BINDING-C4：收尾指引段落（真实渲染节点，不是源码字符串匹配）。
-  const guideEl = () => findAll(bindingSection(), n => String(n.className).includes('role-binding-guide'))[0];
-  const guideText = () => { const node = guideEl(); return node ? node.textContent : ''; };
   const enterRoles = async () => {
     getEl('workspace-roles-btn').fire('click');
     context.renderWorkspaceList();
@@ -170,536 +156,96 @@ function harness({ human = true, roster = DEFAULT_ROSTER } = {}) {
   const selectRole = async memberId => { roleRow(memberId).fire('click'); await flush(); };
   return {
     context, ui: context.__wsui, requests, created, pending, flush, el: getEl,
-    rows, roleRows, settingsRow, roleRow, bindingSummary, bindingSection, bindingTexts, bindingPairs, stateBadge,
-    guideEl, guideText,
+    rows, roleRows, settingsRow, roleRow, bindingSummary,
     enterRoles, selectRole,
   };
 }
 
-test('有效绑定：列表紧凑中文摘要 + 详情只读字段全部走真实渲染路径', async () => {
-  const h = harness();
-  await h.enterRoles();
-  const summary = h.bindingSummary('agent:kimi');
-  assert.ok(summary, '角色行出现绑定摘要');
-  assert.equal(summary.textContent, '绑定：已绑定 · Kimi Code（kimi-code） · K2.8 Preview');
-  // 原有列表语义保持：名称、说明摘要、参与任务仍在各自位置，绑定摘要不顶替身份。
-  const row = h.roleRow('agent:kimi');
-  assert.equal(row.children[0].textContent, 'Kimi');
-  assert.equal(row.children[1].textContent, '执行工作');
-  assert.match(row.children[2].textContent, /正在参与|当前没有进行中的任务/);
-  assert.equal(row.children[3], summary);
 
-  await h.selectRole('agent:kimi');
-  assert.equal(h.stateBadge().textContent, '已绑定');
-  assert.ok(String(h.stateBadge().className).includes('ok'));
-  const pairs = h.bindingPairs();
-  assert.deepEqual(pairs, [
-    ['运行器', 'Kimi Code'],
-    ['运行器类型', 'kimi-code'],
-    ['模型来源', '自定义 API（custom_api）'],
-    ['提供方标识', 'managed:kimi-code'],
-    ['连接标识', 'native-kimi-code-managed-login'],
-    ['模型 ID', 'kimi-for-coding'],
-    ['模型别名', 'kimi-code/kimi-for-coding'],
-    ['模型展示名', 'K2.8 Preview'],
-    ['绑定状态', '已绑定'],
-  ]);
-  // 不展示指纹/更新人/更新等非白名单字段，也不出现任何“匹配”结论。
-  const texts = h.bindingTexts().join('\n');
-  assert.ok(!texts.includes('ffff'), 'binding_fingerprint 不进入 UI');
-  assert.ok(!texts.includes('human:bobo') && !texts.includes('2026-10-09T00:00:00Z'), 'updated_* 不进入 UI');
-  assert.ok(!texts.includes('匹配') && !texts.includes('binding_match'), '不输出匹配结论');
-  // 角色说明编辑区仍是独立静态节点，未被动态绑定区替换。
-  assert.ok(!h.el('role-details-name-panel').children.includes(h.el('role-description-input')));
+test('列表保留运行器和模型，ID只在详情，详情不再重复属性大块',async()=>{
+  const h=harness();await h.enterRoles();
+  const row=h.roleRow('agent:kimi');assert.ok(row);assert.equal(row.dataset.memberId,'agent:kimi');
+  const list=allTexts(row).join('\n');assert.match(list,/Kimi Code/);assert.match(list,/K2.8 Preview/);assert.doesNotMatch(list,/agent:kimi/);
+  await h.selectRole('agent:kimi');const panel=h.el('role-details-name-panel');const detail=allTexts(panel).join('\n');
+  assert.match(detail,/成员 ID：agent:kimi/);assert.doesNotMatch(detail,/Kimi Code|K2.8 Preview|运行器与模型绑定|提供方标识|连接标识|模型来源|模型 ID|收尾指引|配置进度/);
+  assert.equal(findAll(panel,n=>String(n.className).includes('role-binding-section')).length,0);
 });
 
-test('unconfigured 明确“未配置”，不写成接入失败，也不伪造模型', async () => {
-  const h = harness();
-  await h.enterRoles();
-  assert.equal(h.bindingSummary('agent:deepseek').textContent, '绑定：未配置');
-  await h.selectRole('agent:deepseek');
-  assert.equal(h.stateBadge().textContent, '未配置');
-  assert.deepEqual(h.bindingPairs(), [['绑定状态', '未配置']]);
-  const note = h.bindingTexts().find(t => t.includes('还没有保存'));
-  assert.ok(note && note.includes('并不表示接入有问题'), '未配置按“缺少配置”解释');
-  assert.ok(!h.bindingTexts().join(' ').includes('接入失败'));
-  assert.ok(!h.bindingTexts().some(t => t.includes('kimi-code')), '未配置不猜测运行器/型号');
-});
-
-test('not_in_roster 显示“已离册（保留配置）”并保留既有字段；不与其他失效状态混淆', async () => {
-  const h = harness({
-    roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow(), binding_state: 'not_in_roster' }],
-  });
-  await h.enterRoles();
-  assert.equal(h.bindingSummary('agent:kimi').textContent, '绑定：已离册（保留配置） · Kimi Code（kimi-code） · K2.8 Preview');
-  await h.selectRole('agent:kimi');
-  assert.equal(h.stateBadge().textContent, '已离册（保留配置）');
-  const pairs = h.bindingPairs();
-  assert.ok(pairs.some(([k, v]) => k === '模型 ID' && v === 'kimi-for-coding'), '保留已存配置字段');
-  assert.equal(pairs.find(([k]) => k === '绑定状态')[1], '已离册（保留配置）');
-  assert.ok(!h.bindingTexts().includes('已绑定'), '离册不得显示为已绑定');
-});
-
-test('其余失效/身份状态按合同原文展示，无效配置不显示为已绑定', async () => {
-  const cases = [
-    ['member_missing', '成员不存在（保留配置）', 'invalid'],
-    ['member_disabled', '成员已禁用（保留配置）', 'invalid'],
-    ['not_agent', '非 Agent 成员（保留配置）', 'invalid'],
-    ['partial', '配置不完整（无效）', 'invalid'],
-    ['runner_missing', '运行器未登记（无效）', 'invalid'],
-    ['runner_retired', '运行器已退役（无效）', 'invalid'],
-    ['no_project', '无项目上下文', 'unknown'],
+test('未配置、缺字段、未知和失效状态仍在列表诚实区分，不伪造配置成功',async()=>{
+  const cases=[
+    [{binding:null,binding_state:'unconfigured'},/未配置/],
+    [{binding:boundRow(),binding_state:'partial'},/不完整/],
+    [{binding:boundRow(),binding_state:'not_in_roster'},/已离册/],
+    [{binding:boundRow(),binding_state:'runner_retired'},/运行器.*退役|运行器.*下架/],
+    [{binding:boundRow(),binding_state:'constructor'},/未知绑定状态/],
+    [{binding:boundRow(),binding_state:'__proto__'},/未知绑定状态/],
   ];
-  for (const [state, label, kind] of cases) {
-    const row = state === 'runner_missing'
-      ? boundRow({ runtime: null, runner_display_name: null, runner_status: null })
-      : boundRow();
-    const h = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: row, binding_state: state }] });
-    await h.enterRoles();
-    assert.equal(h.bindingSummary('agent:kimi').textContent.startsWith(`绑定：${label}`), true, `${state} 列表摘要`);
-    await h.selectRole('agent:kimi');
-    assert.equal(h.stateBadge().textContent, label, `${state} 详情状态`);
-    assert.ok(String(h.stateBadge().className).includes(kind), `${state} 状态样式分类`);
-    assert.ok(!h.bindingTexts().includes('已绑定'), `${state} 不得显示已绑定`);
-    if (state === 'runner_missing') {
-      assert.equal(h.bindingPairs().find(([k]) => k === '运行器')[1], '运行器未上报');
-    }
+  for(const [fields,expected] of cases) {
+    const h=harness({roster:[{member_id:'agent:kimi',business_role:'dev',...fields}]});await h.enterRoles();
+    const text=h.bindingSummary('agent:kimi').textContent;assert.match(text,expected);assert.doesNotMatch(text,/已绑定/);
+    await h.selectRole('agent:kimi');assert.doesNotMatch(allTexts(h.el('role-details-name-panel')).join('\n'),/运行器与模型绑定|收尾指引/);
+  }
+  const legacy=harness({roster:[{member_id:'agent:kimi',business_role:'dev'}]});await legacy.enterRoles();assert.match(legacy.bindingSummary('agent:kimi').textContent,/当前服务未提供绑定信息/);
+});
+
+test('模型显示名、别名和ID按真实字段降级，运行器缺展示名时保留runtime',async()=>{
+  for(const [fields,expected] of [
+    [{model_display_name:'',model_alias:'known-alias'},/known-alias/],
+    [{model_display_name:null,model_alias:'',model_id:'known-model'},/known-model/],
+    [{model_display_name:'',model_alias:'',model_id:''},/模型未上报/],
+    [{runner_display_name:null,runtime:'kimi-code'},/kimi-code/],
+    [{runner_display_name:'',runtime:''},/运行器未上报/],
+  ]) {
+    const h=harness({roster:[{member_id:'agent:kimi',binding:boundRow(fields),binding_state:'bound'}]});await h.enterRoles();assert.match(h.bindingSummary('agent:kimi').textContent,expected);
   }
 });
 
-test('旧服务缺字段、未记录、未知状态、未配置四类严格区分', async () => {
-  // 旧服务：整个 binding / binding_state 字段都没有。
-  const legacy = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer' }] });
-  await legacy.enterRoles();
-  assert.equal(legacy.bindingSummary('agent:kimi').textContent, '绑定：当前服务未提供绑定信息');
-  await legacy.selectRole('agent:kimi');
-  assert.deepEqual(legacy.bindingPairs(), [['绑定状态', '当前服务未提供绑定状态']]);
-  assert.ok(legacy.bindingTexts().some(t => t.includes('不等于“未配置”')), '旧服务缺失必须与未配置区分');
-
-  // 字段在但空值：记“未记录”，不等于未配置。
-  const empty = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: null, binding_state: null }] });
-  await empty.enterRoles();
-  assert.equal(empty.bindingSummary('agent:kimi').textContent, '绑定：绑定状态未记录');
-  await empty.selectRole('agent:kimi');
-  assert.equal(empty.stateBadge().textContent, '绑定状态未记录');
-
-  // 未知枚举值：如实显示原值，不伪装成未配置，也不当接入失败。
-  const unknown = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow({ binding_state: 'future_state' }), binding_state: 'future_state' }] });
-  await unknown.enterRoles();
-  assert.equal(unknown.bindingSummary('agent:kimi').textContent, '绑定：未知绑定状态 · Kimi Code（kimi-code） · K2.8 Preview');
-  await unknown.selectRole('agent:kimi');
-  assert.equal(unknown.stateBadge().textContent, '未知绑定状态');
-  assert.ok(unknown.bindingPairs().some(([k, v]) => k === '绑定状态' && v === '未知绑定状态（future_state）'));
-  assert.ok(!unknown.bindingTexts().includes('未配置'), '未知状态不得渲染成未配置');
+test('列表和详情使用公开文本，未知附加字段和属性元数据不展示',async()=>{
+  const malicious='<img src=x onerror=alert(1)>';
+  const h=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:malicious,model_display_name:'<script>bad()</script>',connection_ref:'private-ref-sentinel',provider_id:'provider-sentinel',api_key:'SECRET'}),binding_state:'bound'}]});
+  await h.enterRoles();assert.match(h.bindingSummary('agent:kimi').textContent,/onerror=alert/);
+  assert.equal(h.created.includes('img'),false);assert.equal(h.created.includes('script'),false);assert.equal(h.created.includes('a'),false);
+  await h.selectRole('agent:kimi');const all=[...allTexts(h.el('blackboard-columns')),...allTexts(h.el('role-details-name-panel'))].join('\n');
+  assert.doesNotMatch(all,/private-ref-sentinel|provider-sentinel|SECRET/);
 });
 
-test('半缺字段：已有值照存、缺值写“未上报”，不补默认模型', async () => {
-  const h = harness({
-    roster: [{
-      member_id: 'agent:kimi', business_role: 'reviewer', binding_state: 'partial',
-      binding: boundRow({ model_source: null, provider_id: null, connection_ref: null, model_alias: null, model_display_name: null, runtime: null, runner_display_name: null }),
-    }],
-  });
-  await h.enterRoles();
-  assert.equal(h.bindingSummary('agent:kimi').textContent, '绑定：配置不完整（无效） · 运行器未上报 · kimi-for-coding');
-  await h.selectRole('agent:kimi');
-  assert.deepEqual(h.bindingPairs(), [
-    ['运行器', '运行器未上报'],
-    ['运行器类型', '运行器类型未上报'],
-    ['模型来源', '来源未上报'],
-    ['提供方标识', '提供方未上报'],
-    ['连接标识', '连接标识未上报'],
-    ['模型 ID', 'kimi-for-coding'],
-    ['模型别名', '模型别名未上报'],
-    ['模型展示名', '模型展示名未上报'],
-    ['绑定状态', '配置不完整（无效）'],
-  ]);
+test('移除列表ID不影响真实角色选择、项目设置首项和角色计数',async()=>{
+  const h=harness();await h.enterRoles();assert.match(allTexts(h.settingsRow()).join(' '),/项目设置/);assert.equal(h.roleRows().length,2);
+  await h.selectRole('agent:deepseek');assert.equal(h.ui.selectedRole,'agent:deepseek');assert.equal(h.ui.roleSelection,'role');
+  assert.match(allTexts(h.el('role-details-name-panel')).join('\n'),/成员 ID：agent:deepseek/);
+  h.settingsRow().fire('click');assert.ok(h.el('role-details-name-panel').classList.contains('hidden'));
 });
 
-test('内置来源按 builtin 展示；未知来源值如实标为未识别', async () => {
-  const builtin = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow({ model_source: 'builtin', provider_id: 'builtin:codex', connection_ref: 'native-codex-login', model_id: 'gpt-5-codex', model_alias: null, model_display_name: null }), binding_state: 'bound' }] });
-  await builtin.enterRoles();
-  await builtin.selectRole('agent:kimi');
-  assert.equal(builtin.bindingPairs().find(([k]) => k === '模型来源')[1], '运行器内置（builtin）');
-  assert.equal(builtin.bindingSummary('agent:kimi').textContent, '绑定：已绑定 · Kimi Code（kimi-code） · gpt-5-codex');
-
-  const strange = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow({ model_source: 'hybrid_x' }), binding_state: 'bound' }] });
-  await strange.enterRoles();
-  await strange.selectRole('agent:kimi');
-  assert.equal(strange.bindingPairs().find(([k]) => k === '模型来源')[1], '未识别的来源值（hybrid_x）');
+test('搜索仍按名称和说明，不把模型、运行器或ID当成新搜索范围',async()=>{
+  const h=harness();await h.enterRoles();
+  for(const query of ['K2.8 Preview','agent:kimi','native-kimi-code-managed-login']) {h.ui.query=query;h.context.renderWorkspaceList();assert.equal(h.roleRows().length,0);}
+  h.ui.query='Kimi';h.context.renderWorkspaceList();assert.equal(h.roleRows().length,1);
 });
 
-test('配置变化后重绘即更新显示，不改名册空值语义', async () => {
-  const h = harness();
-  await h.enterRoles();
-  assert.equal(h.bindingSummary('agent:deepseek').textContent, '绑定：未配置');
-  await h.selectRole('agent:deepseek');
-  assert.deepEqual(h.bindingPairs(), [['绑定状态', '未配置']]);
-  // 同一份 projectAgents 载荷被刷新（refreshProjectWorkspace/切项目重读）后，值随之更新。
-  h.context.projectAgents[1].binding = boundRow({ runner_display_name: 'DeepSeek Harness', runtime: 'dsh', model_source: 'custom_api', provider_id: 'managed:deepseek', connection_ref: 'native-dsh-login', model_id: 'deepseek-chat', model_alias: null, model_display_name: null });
-  h.context.projectAgents[1].binding_state = 'bound';
-  h.context.renderWorkspaceList();
-  h.context.renderTaskDetailsPanel();
-  await h.flush();
-  assert.equal(h.bindingSummary('agent:deepseek').textContent, '绑定：已绑定 · DeepSeek Harness（dsh） · deepseek-chat');
-  assert.equal(h.bindingPairs().find(([k]) => k === '模型 ID')[1], 'deepseek-chat');
-  // 状态回退也如实反映
-  h.context.projectAgents[1].binding_state = 'runner_retired';
-  h.context.renderWorkspaceList();
-  h.context.renderTaskDetailsPanel();
-  assert.equal(h.stateBadge().textContent, '运行器已退役（无效）');
+test('配置读取后重绘更新列表摘要，不额外读取绑定或发出写请求',async()=>{
+  const h=harness();await h.enterRoles();await h.selectRole('agent:kimi');
+  h.context.projectAgents[0].binding=boundRow({model_display_name:'新模型声明'});h.context.renderWorkspaceList();h.context.renderWorkspaceRoleDetails();
+  assert.match(h.bindingSummary('agent:kimi').textContent,/新模型声明/);
+  assert.equal(h.requests.some(r=>['POST','PUT','PATCH','DELETE'].includes(r.opts?.method)),false);
+  assert.equal(h.requests.some(r=>/\/binding|model-choices/.test(r.url)),false);
 });
 
-test('绑定只读区不产生任何按角色请求或写请求，也不读实例字段回填', async () => {
-  const h = harness({
-    roster: [{
-      member_id: 'agent:kimi', business_role: 'reviewer', binding: null, binding_state: 'unconfigured',
-      // 与实例/运行中模型无关的额外字段：不得被当成绑定内容。
-      runtime: 'codex', model_id: 'gpt-5-codex', runner_display_name: 'Codex CLI', runner_status: 'online',
-      instances: [{ id: 'i1', runtime: 'codex', status: 'online' }],
-    }],
-  });
-  h.requests.length = 0;
-  await h.enterRoles();
-  await h.selectRole('agent:kimi');
-  h.context.renderWorkspaceList();
-  h.context.renderTaskDetailsPanel();
-  await h.flush();
-  for (const request of h.requests) {
-    assert.ok(!/\/binding(\?|$)/.test(request.url), `不得请求绑定端点：${request.url}`);
-    assert.ok(!/\/agents\/agent:/.test(request.url), `不得按角色新增请求：${request.url}`);
-    assert.ok(!request.opts || !request.opts.method || request.opts.method === 'GET', '不得发写请求');
-  }
-  assert.equal(h.bindingSummary('agent:kimi').textContent, '绑定：未配置');
-  await h.selectRole('agent:kimi');
-  const texts = h.bindingTexts().join('\n');
-  for (const leak of ['codex', 'gpt-5-codex', 'Codex CLI', 'online']) {
-    assert.ok(!texts.includes(leak), `实例/运行中字段不得回填绑定：${leak}`);
-  }
+test('重绘角色信息保持说明编辑器节点、焦点和草稿',async()=>{
+  const h=harness();await h.enterRoles();await h.selectRole('agent:kimi');
+  const input=h.el('role-description-input');input.value='尚未保存的说明';h.context.document.activeElement=input;
+  h.context.renderWorkspaceList();h.context.renderWorkspaceRoleDetails();
+  assert.equal(h.el('role-description-input'),input);assert.equal(input.value,'尚未保存的说明');assert.equal(h.context.document.activeElement,input);
 });
 
-test('恶意 runner/model/alias/connection 值只作纯文本，不产生链接或事件', async () => {
-  const evil = '<img src=x onerror="alert(1)">';
-  const evilConnection = 'javascript:alert(2)" onclick="window.x=1';
-  const evilAlias = '</dd><script>alert(3)</script>';
-  const evilUnion = 'native-kimi"><svg/onload=alert(4)>';
-  const h = harness({
-    roster: [{
-      member_id: 'agent:kimi', business_role: 'reviewer', binding_state: 'bound',
-      binding: boundRow({
-        runner_id: evil, runtime: evil, runner_display_name: evil, runner_status: evil,
-        model_source: 'custom_api', provider_id: evil, connection_ref: evilConnection,
-        model_id: evil, model_alias: evilAlias, model_display_name: evilUnion,
-      }),
-    }],
-  });
-  await h.enterRoles();
-  h.created.length = 0;
-  await h.selectRole('agent:kimi');
-  const section = h.bindingSection();
-  const nodes = [section, ...findAll(section, () => true)];
-  for (const node of nodes) {
-    assert.ok(['a', 'img', 'script', 'iframe', 'link', 'svg'].includes(node.tagName) === false, `不得生成可执行/可导航元素：${node.tagName}`);
-    for (const key of Object.keys(node.attrs)) {
-      assert.ok(!/^on/i.test(key), `不得写事件属性：${key}`);
-      assert.ok(!['href', 'src', 'action', 'srcdoc'].includes(key), `不得写可导航属性：${key}`);
-    }
-    assert.equal(Object.keys(node.listeners).length, 0, '绑定区不得注册事件监听');
-  }
-  for (const tag of h.created) {
-    assert.ok(!['a', 'img', 'script', 'iframe', 'link', 'svg'].includes(tag), `渲染期不得创建 ${tag}`);
-  }
-  const pairs = h.bindingPairs();
-  assert.equal(pairs.find(([k]) => k === '运行器')[1], evil, '恶意值原样作为文本显示');
-  assert.equal(pairs.find(([k]) => k === '运行器类型')[1], evil);
-  assert.equal(pairs.find(([k]) => k === '连接标识')[1], evilConnection);
-  assert.equal(pairs.find(([k]) => k === '模型别名')[1], evilAlias);
-  assert.equal(pairs.find(([k]) => k === '模型展示名')[1], evilUnion);
-  assert.ok(h.bindingSummary('agent:kimi').textContent.includes(evil));
+test('角色开关使用易懂标题，项目设置或任务页仍隐藏具体角色详情',async()=>{
+  const h=harness({roster:[{...DEFAULT_ROSTER[0],service:null}]});await h.enterRoles();await h.selectRole('agent:kimi');
+  const detail=allTexts(h.el('role-details-name-panel')).join('\n');assert.match(detail,/角色开关/);assert.doesNotMatch(detail,/受管 CLI 服务/);
+  h.settingsRow().fire('click');assert.ok(h.el('role-details-name-panel').classList.contains('hidden'));
+  h.ui.mode='tasks';h.context.renderWorkspaceRoleDetails();assert.ok(h.el('role-details-name-panel').classList.contains('hidden'));
 });
 
-test('列表与选择语义保持：项目设置首项、角色数量、搜索范围不含绑定值', async () => {
-  const h = harness();
-  await h.enterRoles();
-  assert.equal(h.rows()[0], h.settingsRow());
-  assert.equal(h.settingsRow().children[0].textContent, '项目设置');
-  assert.equal(h.roleRows().length, 2, '角色数量不计项目设置');
-  // 搜索仍只按成员名 + 说明 + business_role：绑定里的模型名不参与匹配。
-  h.ui.query = 'K2.8';
-  h.context.renderWorkspaceList();
-  assert.equal(h.roleRows().length, 0, '绑定值不进入搜索匹配范围');
-  assert.ok(allTexts(h.el('blackboard-columns')).some(t => t === '没有匹配的角色'));
-  h.ui.query = '';
-  h.context.renderWorkspaceList();
-  assert.equal(h.roleRows().length, 2);
-  // 选中失效角色仍回退项目设置，绑定展示不改变选择语义。
-  h.ui.roleSelection = 'role';
-  h.ui.selectedRole = 'agent:ghost';
-  h.context.renderWorkspaceList();
-  h.context.renderTaskDetailsPanel();
-  assert.ok(h.el('role-details-name-panel').classList.contains('hidden'));
-  assert.ok(!h.bindingSection(), '项目设置下不残留绑定面板');
-});
-
-test('未变化重绘不销毁角色说明编辑器、焦点与草稿', async () => {
-  const h = harness();
-  await h.enterRoles();
-  await h.selectRole('agent:kimi');
-  const inputNode = h.el('role-description-input');
-  inputNode.value = '未保存草稿 v1';
-  inputNode.fire('input');
-  inputNode.focus();
-  for (let i = 0; i < 5; i++) {
-    h.context.renderWorkspaceList();
-    h.context.renderTaskDetailsPanel();
-    await h.flush();
-  }
-  assert.equal(h.el('role-description-input'), inputNode, 'textarea 节点身份保持');
-  assert.equal(inputNode.value, '未保存草稿 v1', '草稿不被绑定重绘覆盖');
-  assert.equal(inputNode.replaceCount, 0, '说明编辑器未被 replaceChildren 触碰');
-  assert.ok(h.bindingSection(), '绑定区照常刷新');
-  assert.ok(!h.el('role-details-name-panel').children.includes(inputNode));
-});
-
-test('绑定面板可见性与角色详情一致：项目设置/非角色页不显示', async () => {
-  const h = harness();
-  await h.enterRoles();
-  await h.selectRole('agent:kimi');
-  assert.ok(h.bindingSection());
-  h.ui.roleSelection = 'settings';
-  h.context.renderTaskDetailsPanel();
-  assert.ok(h.el('role-details-name-panel').classList.contains('hidden'));
-  h.ui.mode = 'tasks';
-  h.context.renderTaskDetailsPanel();
-  assert.ok(h.el('role-details-name-panel').classList.contains('hidden'));
-  h.ui.mode = 'roles';
-  h.ui.roleSelection = 'role';
-  h.context.renderTaskDetailsPanel();
-  assert.ok(h.bindingSection(), '回到角色详情时绑定区恢复');
-});
-
-test('只读：绑定区不产生可编辑控件，不给 agent 账号额外入口', async () => {
-  const h = harness({ human: false, roster: [{ member_id: 'agent:deepseek', business_role: 'dev', binding: boundRow(), binding_state: 'bound' }] });
-  await h.enterRoles();
-  await h.selectRole('agent:deepseek');
-  const controls = findAll(h.bindingSection(), n => ['button', 'input', 'textarea', 'select', 'a'].includes(n.tagName));
-  assert.deepEqual(controls, [], '绑定区不得出现任何可编辑/可提交控件');
-  assert.ok(h.bindingTexts().includes('已绑定'));
-});
-
-// ── #202 F1 定向修正回归：枚举映射只认自有白名单键 ────────────────────────────
-// 反例来自复核探针 prototype_boundary_probe.cjs 复现的 7 项：5 个 binding_state 继承键
-// + 2 个 model_source 继承键。断言全部走真实 renderWorkspaceList / renderWorkspaceRoleDetails
-// 渲染出的列表摘要、详情字段与状态徽标，不是源码字符串匹配，也不手写映射镜像。
-const INHERITED_KEY_STATES = ['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty'];
-const INHERITED_KEY_SOURCES = ['constructor', '__proto__', 'Constructor', '__PROTO__'];
-
-test('F1：binding_state 继承键不被误认为已知枚举，列表/详情一致降级为未知原值', async () => {
-  for (const value of INHERITED_KEY_STATES) {
-    const h = harness({
-      roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow({ binding_state: value }), binding_state: value }],
-    });
-    await h.enterRoles();
-    assert.equal(h.bindingSummary('agent:kimi').textContent, '绑定：未知绑定状态 · Kimi Code（kimi-code） · K2.8 Preview', `${value} 列表摘要`);
-    await h.selectRole('agent:kimi');
-    assert.equal(h.stateBadge().textContent, '未知绑定状态', `${value} 徽标文字`);
-    const badgeClass = String(h.stateBadge().className);
-    assert.ok(badgeClass.includes('unknown'), `${value} kind 必须为 unknown`);
-    assert.ok(!badgeClass.includes('undefined'), `${value} 不得渲染 undefined 分类`);
-    assert.equal(h.bindingPairs().find(([k]) => k === '绑定状态')[1], `未知绑定状态（${value}）`, `${value} 详情保留未知原值`);
-    assert.ok(h.bindingTexts().some(t => t.includes('还不认识的绑定状态')), `${value} known=false 走未知说明`);
-    assert.ok(!h.bindingTexts().includes('未配置'), `${value} 不得降级成未配置`);
-    assert.ok(!h.bindingTexts().join('\n').includes('undefined'), `${value} 不得出现 undefined 文本`);
-  }
-});
-
-test('F1：model_source 继承键返回纯文本“未识别的来源值（原值）”，不显示原型函数/对象', async () => {
-  for (const value of INHERITED_KEY_SOURCES) {
-    const h = harness({
-      roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow({ model_source: value }), binding_state: 'bound' }],
-    });
-    await h.enterRoles();
-    await h.selectRole('agent:kimi');
-    const sourceText = h.bindingPairs().find(([k]) => k === '模型来源')[1];
-    assert.equal(typeof sourceText, 'string', `${value} 必须是纯文本字符串`);
-    assert.equal(sourceText, `未识别的来源值（${value}）`, `${value} 原值如实标注`);
-    const joined = h.bindingTexts().join('\n');
-    for (const leak of ['native code', 'Object.prototype', '[object', '=>']) {
-      assert.ok(!String(sourceText).includes(leak), `${value} 来源值不得含原型文本：${leak}`);
-      assert.ok(!joined.includes(leak), `${value} 面板不得出现原型文本：${leak}`);
-    }
-    // 合法枚举不受影响，且继承键没有被当成“未上报”。
-    assert.ok(!joined.includes('来源未上报'), `${value} 与“来源未上报”区分`);
-    assert.equal(h.stateBadge().textContent, '已绑定', `${value} 状态仍为已绑定`);
-  }
-});
-
-// ── ROLE-BINDING-C4：面板收尾指引（真实 workspaceRoleBindingPanel 渲染路径） ──────
-// 断言的是指引必须覆盖的语义与必须避免的误导，不是把手写文案照抄一遍；
-// 每个用例都经 renderWorkspaceList / renderWorkspaceRoleDetails 真实生成文本节点。
-const GUIDE_MARK = '收尾指引：';
-const GUIDE_INTERNAL_LEAKS = ['.tmp', 'scripts/', '--', '.venv', 'key_file', 'api_key', 'http://', 'D:\\'];
-
-test('C4：未配置面板给出可操作收尾指引，且不假设所有终端都已支持', async () => {
-  const h = harness();
-  await h.enterRoles();
-  await h.selectRole('agent:deepseek');
-  const guide = h.guideText();
-  assert.ok(guide.startsWith(GUIDE_MARK), '未配置角色也有收尾指引');
-  for (const step of ['核验', '运行器', '模型', '连接事实', '收尾计划', '人类确认', 'human', '登记', '刷新本页']) {
-    assert.ok(guide.includes(step), `指引包含可操作步骤：${step}`);
-  }
-  assert.ok(guide.includes('blocked'), '来源不足/未知覆盖层如实说明会 blocked');
-  assert.ok(guide.includes('补齐') && guide.includes('重新核验'), '补齐来源并重核后再生成计划');
-  // 原“还没有保存 / 不是接入失败”的说明保留，指引不与它冲突。
-  assert.ok(h.bindingTexts().some(t => t.includes('还没有保存')));
-  assert.ok(!h.bindingTexts().join(' ').includes('接入失败'));
-  assert.ok(!h.bindingTexts().some(t => t.includes('kimi-code')), '未配置不借指引猜运行器/型号');
-  for (const leak of GUIDE_INTERNAL_LEAKS) assert.ok(!guide.includes(leak), `产品文案不得含内部信息：${leak}`);
-});
-
-test('C4：已绑定指引把配置值与实际结果分开，不宣称已验证/在线/主动等待', async () => {
-  const h = harness();
-  await h.enterRoles();
-  await h.selectRole('agent:kimi');
-  const guide = h.guideText();
-  assert.ok(guide.startsWith(GUIDE_MARK));
-  assert.ok(guide.includes('只是已保存的配置值'), '指引重申面板只显示已存配置值');
-  assert.ok(guide.includes('重新核验') && guide.includes('收尾计划'), '改配置后要重核并重新生成计划');
-  assert.ok(guide.includes('不会自动改动实际模型或权限'), '页面不自动改实际模型/权限');
-  const negation = guide.split('。').find(sentence => sentence.includes('不代表'));
-  assert.ok(negation, '指引必须显式否定过度解读');
-  for (const overclaim of ['已验证', '实际模型一致', '在线', '主动等待']) {
-    assert.ok(negation.includes(overclaim), `同一句里否定：${overclaim}`);
-  }
-  assert.ok(!h.bindingTexts().join('\n').includes('匹配'), '仍不输出任何一致性结论');
-  for (const leak of GUIDE_INTERNAL_LEAKS) assert.ok(!guide.includes(leak), `产品文案不得含内部信息：${leak}`);
-});
-
-test('C4：失效/不完整/离册状态保留原字段与状态，指引要求先补齐来源或资格再重新生成计划', async () => {
-  for (const state of ['partial', 'runner_missing', 'runner_retired', 'not_in_roster', 'member_disabled', 'not_agent']) {
-    const h = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow(), binding_state: state }] });
-    await h.enterRoles();
-    await h.selectRole('agent:kimi');
-    const guide = h.guideText();
-    assert.ok(guide.startsWith(GUIDE_MARK), `${state} 指引存在`);
-    assert.ok(guide.includes('补齐'), `${state} 指引要求补齐来源/资格`);
-    assert.ok(guide.includes('收尾计划'), `${state} 指引要求重新生成计划`);
-    assert.ok(guide.includes('不会自动清理或改写'), `${state} 不做自动清理/改写`);
-    assert.ok(!guide.includes('未配置'), `${state} 不得统一成未配置`);
-    for (const forbidden of ['重启', '忽略人工', '跳过确认', '直接覆盖']) {
-      assert.ok(!guide.includes(forbidden), `${state} 不得给出危险建议：${forbidden}`);
-    }
-    // 状态与既有字段照存：不因加了指引而改写存储事实。
-    assert.notEqual(h.stateBadge().textContent, '已绑定', `${state} 不得显示为已绑定`);
-    assert.ok(h.bindingPairs().some(([k, v]) => k === '模型 ID' && v === 'kimi-for-coding'), `${state} 保留原有字段`);
-  }
-});
-
-test('C4：旧服务缺字段与未记录状态给诚实降级指引，不冒充未配置', async () => {
-  const legacy = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer' }] });
-  await legacy.enterRoles();
-  await legacy.selectRole('agent:kimi');
-  assert.ok(legacy.guideText().includes('未上报绑定字段'), '旧服务如实说未上报');
-  assert.ok(!legacy.guideText().includes('未配置'), '旧服务缺失不得写成未配置');
-
-  const empty = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: null, binding_state: null }] });
-  await empty.enterRoles();
-  await empty.selectRole('agent:kimi');
-  assert.equal(empty.stateBadge().textContent, '绑定状态未记录');
-  assert.ok(empty.guideText().includes('确认该状态含义'), '未记录状态指引不冒充未配置');
-
-  const unknown = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow({ binding_state: 'future_state' }), binding_state: 'future_state' }] });
-  await unknown.enterRoles();
-  await unknown.selectRole('agent:kimi');
-  assert.ok(unknown.guideText().startsWith(GUIDE_MARK));
-  assert.ok(unknown.guideText().includes('确认该状态含义'));
-  assert.ok(!unknown.guideText().includes('未配置'), '未知状态不降级成未配置');
-  assert.ok(!unknown.bindingTexts().includes('已绑定'), '未知状态不显示为已绑定');
-});
-
-test('C4：指引随重绘随状态切换；继承键状态不误配指引文案', async () => {
-  const h = harness();
-  await h.enterRoles();
-  await h.selectRole('agent:deepseek');
-  const unconfiguredGuide = h.guideText();
-  assert.ok(unconfiguredGuide.includes('blocked'), '未配置态指引');
-  // 同一份载荷被刷新后，指引随状态一起切换，不需要新请求。
-  h.context.projectAgents[1].binding = boundRow({ model_display_name: 'DeepSeek Harness' });
-  h.context.projectAgents[1].binding_state = 'bound';
-  h.context.renderWorkspaceList();
-  h.context.renderTaskDetailsPanel();
-  const boundGuide = h.guideText();
-  assert.ok(boundGuide.includes('不代表'), '切到已绑定后改为已绑定指引');
-  assert.ok(!boundGuide.includes('blocked'));
-
-  // 继承键状态：既不能取到原型上的函数/对象，也不能误配“未配置”指引。
-  for (const value of INHERITED_KEY_STATES) {
-    const evil = harness({ roster: [{ member_id: 'agent:kimi', business_role: 'reviewer', binding: boundRow({ binding_state: value }), binding_state: value }] });
-    await evil.enterRoles();
-    await evil.selectRole('agent:kimi');
-    const guide = evil.guideText();
-    assert.equal(typeof guide, 'string', `${value} 指引必须是纯文本`);
-    assert.ok(guide.startsWith(GUIDE_MARK), `${value} 指引存在`);
-    assert.ok(!guide.includes('undefined') && !guide.includes('=>') && !guide.includes('未配置'), `${value} 不回流原型文本或未配置`);
-  }
-});
-
-test('C4：指引不引入控件与请求；切换角色/项目设置、说明草稿与焦点不受影响', async () => {
-  const h = harness();
-  await h.enterRoles();
-  await h.selectRole('agent:kimi');
-  const guide = h.guideEl();
-  assert.ok(guide, '指引段落存在');
-  assert.equal(guide.tagName, 'p', '指引是纯文本段落');
-  assert.deepEqual(findAll(guide, n => ['button', 'input', 'textarea', 'select', 'a'].includes(n.tagName)), [], '指引内不得有可编辑/可提交控件');
-  for (const key of Object.keys(guide.attrs)) assert.ok(!/^on/i.test(key), `不得写事件属性：${key}`);
-  assert.equal(Object.keys(guide.listeners).length, 0, '指引不得注册事件监听');
-
-  h.requests.length = 0;
-  const inputNode = h.el('role-description-input');
-  inputNode.value = 'C4 未保存草稿';
-  inputNode.fire('input');
-  inputNode.focus();
-  for (let i = 0; i < 4; i++) { h.context.renderWorkspaceList(); h.context.renderTaskDetailsPanel(); await h.flush(); }
-  assert.equal(h.requests.length, 0, '纯重绘不产生任何请求');
-  assert.equal(h.el('role-description-input'), inputNode, '说明编辑器节点身份保持');
-  assert.equal(inputNode.value, 'C4 未保存草稿', '草稿不被指引重绘覆盖');
-  assert.equal(inputNode.replaceCount, 0, '说明编辑器未被 replaceChildren 触碰');
-  assert.ok(h.guideText().startsWith(GUIDE_MARK), '重绘后指引照常刷新');
-
-  h.ui.roleSelection = 'settings';
-  h.context.renderTaskDetailsPanel();
-  assert.ok(h.el('role-details-name-panel').classList.contains('hidden'), '项目设置下绑定面板与指引整体隐藏');
-  h.ui.roleSelection = 'role';
-  h.context.renderTaskDetailsPanel();
-  assert.ok(h.guideText().startsWith(GUIDE_MARK), '回到角色详情指引恢复');
-  for (const request of h.requests) {
-    assert.ok(!request.opts || !request.opts.method || request.opts.method === 'GET', '不得发写请求');
-    assert.ok(!/\/binding(\?|$)/.test(request.url) && !/\/agents\/agent:/.test(request.url), `不得按角色新增请求：${request.url}`);
-  }
-});
-
-// ── R1-2：角色/绑定主显示去固定“决策/执行”分级 ────────────────────────────────
-test('R1-2：名册带历史分级值也不进入角色主显示与绑定只读区，且不影响绑定状态', async () => {
-  const h = harness({
-    roster: [{
-      member_id: 'agent:kimi', business_role: 'reviewer', role_description: null,
-      decision_tier: 'decision', binding: boundRow(), binding_state: 'bound',
-    }],
-  });
-  await h.enterRoles();
-  const listTexts = allTexts(h.el('blackboard-columns')).join('\n');
-  for (const leak of ['decision_tier', 'decision', 'execution', '决策人', '决策 Agent']) {
-    assert.ok(!listTexts.includes(leak), `角色列表不得展示固定分级：${leak}`);
-  }
-  await h.selectRole('agent:kimi');
-  const detailTexts = [...allTexts(h.el('role-details-name-panel')), ...h.bindingTexts()].join('\n');
-  for (const leak of ['decision_tier', 'decision', 'execution', '决策人']) {
-    assert.ok(!detailTexts.includes(leak), `角色详情/绑定区不得展示固定分级：${leak}`);
-  }
-  // 历史分级不参与绑定状态判定，也不产生分级控件。
-  assert.equal(h.stateBadge().textContent, '已绑定');
-  const controls = findAll(h.bindingSection(), n => ['button', 'input', 'textarea', 'select', 'a'].includes(n.tagName));
-  assert.deepEqual(controls, [], '绑定区不得新增固定分级控件');
+test('agent只读角色摘要，历史分级或实例信息不改变展示和权限',async()=>{
+  const h=harness({human:false,roster:[{...DEFAULT_ROSTER[0],decision_tier:'decision',instances:[{model:'not-a-binding-model'}]}]});await h.enterRoles();await h.selectRole('agent:kimi');
+  const text=[...allTexts(h.el('blackboard-columns')),...allTexts(h.el('role-details-name-panel'))].join('\n');assert.doesNotMatch(text,/not-a-binding-model|决策 Agent|decision_tier/);
+  assert.match(h.bindingSummary('agent:kimi').textContent,/K2.8 Preview/);assert.equal(h.requests.some(r=>r.opts?.method&&r.opts.method!=='GET'),false);
 });

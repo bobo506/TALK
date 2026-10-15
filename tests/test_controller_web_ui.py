@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261015-role-detail-actions"
+STATIC_VERSION = "20261015-role-layout"
 
 # I-2 自检符号集：退役后 web 运行时不得再出现（DOM id / 函数 / 状态 / 导出 / 按钮）。
 RETIRED_SCRIPT_SYMBOLS = (
@@ -113,8 +113,8 @@ class ControllerRetiredWebUiTests(RouteTestCase):
         self.assertIn(".controller-mode-option", stylesheet)
         self.assertIn(".controller-mode-status", stylesheet)
         self.assertIn(".role-settings-row", stylesheet)
-        # 混合/共享样式未误删：角色行 ID 与成员 ID 样式保留。
-        self.assertIn(".role-row-id", stylesheet)
+        # 用户精简要求：列表不再展示 ID，详情的成员 ID 样式保留。
+        self.assertNotIn(".role-row-id", stylesheet)
         self.assertIn(".role-member-id", stylesheet)
 
 

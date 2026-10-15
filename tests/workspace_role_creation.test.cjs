@@ -38,7 +38,7 @@ function harness({storage=new Map(),human=true,handler}={}) {
   const ui=createRoleRequestUI(deps);
   async function ready() {ui.sync();await tick();}
   async function fill(name='审查助手') {await ui.open();dom.el('role-create-runner').value='r';await ui.chooseRunner();dom.el('role-create-model').value='c';dom.el('role-create-name').value=name;dom.el('role-create-description').value='负责审查';}
-  return {...dom,ui,ctx,requests,timers,backend,storage,ready,fill,confirms:()=>confirms};
+  return {...dom,ui,ctx,requests,timers,backend,storage,deps,ready,fill,confirms:()=>confirms};
 }
 test('选择真实目录并提交单一人类意图，未知凭据字段不进入状态或存储',async()=>{
   const h=harness();await h.ready();await h.fill();await h.ui.submit();
@@ -102,10 +102,10 @@ test('超过200条历史完成请求不会挤掉新待创建进度',async()=>{
 test('本页保存后跨入已满终态列表，刷新和重建页面仍跟踪原请求',async()=>{
   const storage=new Map();const h=harness({storage,handler:limitedHistory});h.backend.rows=oldHistory();await h.ready();await h.fill();await h.ui.submit();
   const saved=h.backend.rows[0];Object.assign(saved,{status:'provisioned',member_id:'new:member',created_at:'2026-10-13T00:00:00Z',credential_version:1});
-  await h.ui.refresh();assert.match(h.texts(h.ui.rolePanel({member_id:'new:member'})),/配置已完成/);assert.equal(h.timers.size,0);
+  await h.ui.refresh();assert.match(h.texts(h.ui.rolePanel({member_id:'new:member'})),/绑定重置/);assert.equal(h.timers.size,0);
   assert.ok(h.requests.some(r=>r.method==='GET'&&r.path.endsWith('/role-requests/'+saved.request_key)));
   const reopened=harness({storage,handler:limitedHistory});reopened.backend.rows=h.backend.rows;await reopened.ready();
-  assert.match(reopened.texts(reopened.ui.rolePanel({member_id:'new:member'})),/配置已完成/);assert.equal(reopened.requests.filter(r=>r.method==='POST').length,0);
+  assert.match(reopened.texts(reopened.ui.rolePanel({member_id:'new:member'})),/绑定重置/);assert.equal(reopened.requests.filter(r=>r.method==='POST').length,0);
   reopened.ctx.accountId='human:b';reopened.ui.sync();await tick();
   assert.equal(reopened.ui.state.recentKeys.length,0);
   reopened.ctx.projectId='other';reopened.ctx.accountId='human:a';reopened.ui.sync();await tick();
@@ -115,8 +115,8 @@ test('本页保存后跨入已满终态列表，刷新和重建页面仍跟踪�
 test('同一角色以最新配置请求展示，历史失败不盖住新恢复结果',async()=>{
   const h=harness({handler:limitedHistory});h.backend.rows=[
     {request_key:'role-earlier-00000000',member_id:'m',status:'failed',revision:2,created_at:'2026-10-12T00:00:00Z'},
-    {request_key:'role-recover-00000000',member_id:'m',status:'provisioned',revision:3,created_at:'2026-10-13T00:00:00Z'}];
-  await h.ready();const text=h.texts(h.ui.rolePanel({member_id:'m'}));assert.match(text,/配置已完成/);assert.doesNotMatch(text,/配置未完成/);
+    {request_key:'role-recover-00000000',member_id:'m',status:'provisioned',revision:3,credential_version:2,created_at:'2026-10-13T00:00:00Z'}];
+  await h.ready();const text=h.texts(h.ui.rolePanel({member_id:'m'}));assert.match(text,/绑定重置/);assert.doesNotMatch(text,/配置未完成/);
 });
 
 test('截断外按原键读取的迟到结果不能污染新项目',async()=>{
@@ -172,26 +172,68 @@ test('旧服务不支持时禁止保存，不回退到返回Key的创建接口',
 });
 test('陌生状态与恶意文本按纯文本展示，无继承键假状态',async()=>{
   const h=harness();h.backend.rows=[{request_key:'x',status:'__proto__',member_id:'a',role_name:'<img src=x onerror=alert(1)>'}];await h.ready();
-  const text=h.texts(h.ui.rolePanel({member_id:'a'}));assert.match(text,/配置状态未知/);assert.match(text,/<img src=x/);assert.doesNotMatch(text,/\[object Object\]/);
+  const text=h.texts(h.ui.rolePanel({member_id:'a'}));assert.match(text,/配置状态未知/);assert.doesNotMatch(text,/<img src=x/);assert.doesNotMatch(text,/\[object Object\]/);
 });
 test('目录切换时晚到模型结果不覆盖当前选择，已下架模型不可选择',async()=>{
   const d=deferred();const h=harness({handler:c=>c.path.includes('/r/model-choices')?d.promise:undefined});await h.ready();await h.ui.open();
   h.el('role-create-runner').value='r';const old=h.ui.chooseRunner();h.el('role-create-runner').value='new';await h.ui.chooseRunner();
   d.resolve(response([{runner_id:'r',choice_id:'late'}]));await old;assert.equal(h.ui.state.choices.length,0);
 });
-test('完成配置只展示配置步骤，不产生服务启动POST或列表三状态',async()=>{
-  const h=harness();h.backend.rows=[{request_key:'x',member_id:'a',role_name:'助手',status:'provisioned',revision:8,provision_job:{steps:{profile:{state:'succeeded'},key_file:{state:'skipped'},preflight:{state:'succeeded'}}}}];await h.ready();
-  const text=h.texts(h.ui.rolePanel({member_id:'a'}));assert.match(text,/配置已完成/);assert.match(text,/身份档案 · 完成/);assert.doesNotMatch(text,/未启动|启动成功|关闭中/);
+
+test('完成配置的详情不再重复成功状态或三步，仅保留有资格的绑定重置',async()=>{
+  const h=harness();h.backend.rows=[{request_key:'x',member_id:'a',role_name:'助手',status:'provisioned',revision:8,credential_version:1,provision_job:{steps:{profile:{state:'succeeded'},key_file:{state:'skipped'},preflight:{state:'succeeded'}}}}];await h.ready();
+  const text=h.texts(h.ui.rolePanel({member_id:'a'}));assert.match(text,/绑定重置/);assert.match(text,/必要时更新接入凭据/);assert.doesNotMatch(text,/配置已完成|配置进度|身份档案|配置检查|未启动|启动成功|关闭中/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,0);assert.equal(h.timers.size,0);
 });
 
-test('角色详情配置卡不提供返回自身的查看角色入口，恢复接入仍按原资格显示',async()=>{
+test('角色详情没有返回自身入口，agent和无代际旧记录没有可用重置操作',async()=>{
   for(const human of [true,false]) {
     const h=harness({human});h.backend.rows=[{request_key:'role-completed-00000000',member_id:'agent:ready',role_name:'Kimi k2.8',status:'provisioned',revision:4,credential_version:1}];
     await h.ready();const panel=h.ui.rolePanel({member_id:'agent:ready'});
+    if(!human){assert.equal(panel,null);continue;}
     const actions=panel.querySelectorAll().filter(n=>n.tagName==='BUTTON').map(n=>n.textContent);
-    assert.match(h.texts(panel),/配置已完成/);assert.equal(actions.includes('查看角色'),false);
-    assert.equal(actions.includes('恢复本机接入'),human);
-    assert.equal(h.requests.some(r=>r.method==='POST'),false);
+    assert.deepEqual(actions,['绑定重置']);assert.equal(h.requests.some(r=>r.method==='POST'),false);
+  }
+});
+
+test('绑定重置实际点击保留人工确认和recover载荷，不重选模型或直接轮换Key',async()=>{
+  const h=harness();h.backend.rows=[{request_key:'role-ready-00000000',member_id:'agent:ready',status:'provisioned',revision:4,credential_version:2}];await h.ready();
+  let confirmation='';h.deps.confirm=text=>{confirmation=text;return true;};
+  const panel=h.ui.rolePanel({member_id:'agent:ready'});const button=panel.querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='绑定重置');
+  await button.fire('click');const posts=h.requests.filter(r=>r.method==='POST');assert.equal(posts.length,1);
+  assert.match(confirmation,/必要时更新 TALK 凭据并使旧凭据失效/);assert.match(confirmation,/不更换运行器或模型/);
+  assert.equal(posts[0].body.kind,'recover');assert.equal(posts[0].body.member_id,'agent:ready');assert.equal(posts[0].body.expected_credential_version,2);
+  assert.deepEqual(Object.keys(posts[0].body).sort(),['confirm','expected_credential_version','kind','member_id','request_key']);
+  assert.equal(posts[0].path.endsWith('/role-requests'),true);assert.doesNotMatch(posts[0].path,/binding|rotate-key|service/);
+});
+
+test('绑定重置取消确认不发写请求，缺代际的已完成记录不提供操作',async()=>{
+  const h=harness();h.backend.rows=[{request_key:'role-ready-00000000',member_id:'a',status:'provisioned',revision:4,credential_version:1}];await h.ready();
+  h.deps.confirm=()=>false;const panel=h.ui.rolePanel({member_id:'a'});await panel.querySelectorAll().find(n=>n.tagName==='BUTTON').fire('click');
+  assert.equal(h.requests.some(r=>r.method==='POST'),false);
+  delete h.backend.rows[0].credential_version;await h.ui.refresh();assert.equal(h.ui.rolePanel({member_id:'a'}),null);
+});
+
+test('请求处理中详情和创建结果的绑定重置按钮均禁用，不产生重复恢复',async()=>{
+  const d=deferred();const h=harness({handler:c=>c.method==='POST'?d.promise:undefined});
+  const row={request_key:'role-ready-00000000',member_id:'a',status:'provisioned',revision:4,credential_version:1};
+  h.backend.rows=[row];await h.ready();h.ui.state.modalRow={...row};
+  const pending=h.ui.recover(row);
+  const detail=h.ui.rolePanel({member_id:'a'});const result=h.el('role-create-result');
+  for(const container of [detail,result]) {
+    const reset=container.querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='绑定重置');
+    assert.ok(reset);assert.equal(reset.disabled,true);
+  }
+  await h.ui.recover(row);assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+  d.resolve(response({...row,status:'requested'}));await pending;
+});
+
+test('详情移除进度大块后，处理中与失败仍有简短反馈及原继续或重置资格',async()=>{
+  for(const human of [true,false])for(const kind of ['created','failed','manual']) {
+    const h=harness({human});h.backend.rows=[{request_key:'role-state-00000000',member_id:'a',status:kind==='created'?'created':'failed',revision:4,credential_version:1,last_error_code:kind==='manual'?'manual_recovery_required':'preflight_failed'}];await h.ready();
+    const panel=h.ui.rolePanel({member_id:'a'});const text=h.texts(panel);assert.doesNotMatch(text,/配置进度|身份档案|本机接入配置 ·|配置检查 ·/);
+    const labels=panel.querySelectorAll().filter(n=>n.tagName==='BUTTON').map(n=>n.textContent);
+    if(kind==='created'){assert.match(text,/等待宿主|正在配置/);assert.deepEqual(labels,[]);}
+    else {assert.match(text,/配置未完成/);assert.equal(labels.includes(kind==='manual'?'绑定重置':'继续配置'),human);}
   }
 });

@@ -665,6 +665,7 @@ function renderWorkspaceList() {
       // 状态标签留在行内正常流中，不再用负外边距压到行边框上；两个子块各自负责左右留白。
       const entry = workspaceEl("div", "role-entry");
       const row = workspaceButton("", () => { workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = role.member_id; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row");
+      row.dataset.memberId = role.member_id;
       row.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
       row.setAttribute("aria-pressed", String(!workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole));
       entry.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
@@ -672,7 +673,6 @@ function renderWorkspaceList() {
       row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleSummary(role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
       // ROLE-BINDING-B4：绑定摘要复用同一次名册读取的结果，不加请求、不参与搜索匹配范围。
       row.appendChild(workspaceEl("small", "role-binding-summary", workspaceRoleBindingSummary(role)));
-      row.appendChild(workspaceEl("small", "role-row-id", role.member_id));
       entry.appendChild(row);
       // R1-3：受管服务控制作为角色行的同级块（行本身是 <button>，不能再嵌套按钮）；未归档才显示。
       if (role.archived !== true) {
@@ -734,7 +734,6 @@ const ROLE_BINDING_STATES = {
   runner_retired: ["运行器已退役（无效）", "invalid"],
   bound: ["已绑定", "ok"],
 };
-const ROLE_BINDING_MODEL_SOURCES = { builtin: "运行器内置（builtin）", custom_api: "自定义 API（custom_api）" };
 function roleBindingSource(agent) { return agent && typeof agent === "object" && !Array.isArray(agent) ? agent : null; }
 // 「没有 binding 字段」（旧服务）与「binding 为 null」（没有存储行）是两件事，必须分开判断。
 function roleBindingRow(agent) {
@@ -774,15 +773,6 @@ function roleBindingRunnerText(row, missing) {
 function roleBindingModelText(row, missing) {
   return roleBindingText(row.model_display_name) || roleBindingText(row.model_alias) || roleBindingText(row.model_id) || missing;
 }
-function roleBindingModelSourceText(value) {
-  const text = roleBindingText(value);
-  if (!text) return "来源未上报";
-  const key = text.trim().toLowerCase();
-  // F1 修正：与 binding_state 同一处理，只认自有白名单键；constructor/__proto__ 等继承键必须返回
-  // 纯文本“未识别的来源值（原值）”，不能把原型函数/原型对象文本交给 textContent。
-  if (!Object.prototype.hasOwnProperty.call(ROLE_BINDING_MODEL_SOURCES, key)) return `未识别的来源值（${text}）`;
-  return ROLE_BINDING_MODEL_SOURCES[key];
-}
 function workspaceRoleBindingSummary(agent) {
   const row = roleBindingRow(agent);
   const state = roleBindingStateInfo(agent, row.row);
@@ -793,80 +783,6 @@ function workspaceRoleBindingSummary(agent) {
     parts.push(roleBindingModelText(row.row, "模型未上报"));
   }
   return `绑定：${parts.join(" · ")}`;
-}
-function workspaceRoleBindingRows(agent) {
-  const row = roleBindingRow(agent);
-  const state = roleBindingStateInfo(agent, row.row);
-  if (!row.present) return [["绑定状态", state.text]];
-  const data = row.row;
-  // 必填字段缺失（partial）与可选字段未填一律如实写“未上报”，不补默认值、不猜型号。
-  // runtime（登记表派生的运行器类型）与 runner_display_name（展示名）分列，都能单独缺失降级。
-  return [
-    ["运行器", roleBindingText(data.runner_display_name) || "运行器未上报"],
-    ["运行器类型", roleBindingText(data.runtime) || "运行器类型未上报"],
-    ["模型来源", roleBindingModelSourceText(data.model_source)],
-    ["提供方标识", roleBindingText(data.provider_id) || "提供方未上报"],
-    ["连接标识", roleBindingText(data.connection_ref) || "连接标识未上报"],
-    ["模型 ID", roleBindingText(data.model_id) || "模型未上报"],
-    ["模型别名", roleBindingText(data.model_alias) || "模型别名未上报"],
-    ["模型展示名", roleBindingText(data.model_display_name) || "模型展示名未上报"],
-    ["绑定状态", state.text],
-  ];
-}
-function workspaceRoleBindingNote(agent) {
-  const row = roleBindingRow(agent);
-  const state = roleBindingStateInfo(agent, row.row);
-  if (!row.supported) return "当前服务未返回绑定信息，页面无法判断绑定状态；这不等于“未配置”。";
-  if (!row.present) {
-    if (state.key === "unconfigured") return "该角色还没有保存运行器/模型绑定；这只是缺少配置，并不表示接入有问题。";
-    return "该角色没有存储的绑定行；上面是名册与成员事实，页面不会自动补默认模型。";
-  }
-  if (!state.known && state.provided) return "服务返回了页面还不认识的绑定状态，此处按原值显示，不按“未配置”处理。";
-  if (state.key === "bound") return "以上都是已保存的配置值；页面不判断运行结果是否与之一致。";
-  if (state.kind === "invalid") return "该绑定行按存储值原样展示，当前状态不可用；页面不会自动清理或改写它。";
-  return "以上都是已保存的配置值。";
-}
-// ROLE-BINDING-C4：面板补一段随状态变化的简短中文收尾指引，只写人类下一步需要知道的事实，
-// 不出现内部路径、完整 CLI 命令、密钥/密钥路径或未验断言（详细入口与命令留在正式验收指南）；
-// 仍全部走 textContent，不生成按钮/表单/链接，不新增请求，也不自动改实际模型或权限。
-const ROLE_BINDING_GUIDES = {
-  unconfigured: "收尾指引：先核验对应终端的运行器、模型与连接事实，再显式生成收尾计划；经人类确认后由受信 human 凭据入口登记，完成后刷新本页读取结果。并非所有终端都已有可用适配来源：当前入口可以生成计划，缺少来源或存在未知覆盖层时计划会 blocked，补齐并重新核验后再生成计划。",
-  bound: "收尾指引：以上只是已保存的配置值。改动配置后需要重新核验来源并生成新的收尾计划，再由受权 human 入口收尾；页面不会自动改动实际模型或权限。已绑定不代表运行器已验证、实际模型一致、在线或支持主动等待。",
-  invalid: "收尾指引：当前存储的绑定不可用，请先核验并补齐对应的适配来源或成员资格，重新生成收尾计划后再由受权 human 入口收尾；页面不会自动清理或改写该配置，也不提供绕过人工确认的入口。",
-  unknown: "收尾指引：请在受支持的服务或入口确认该状态含义，重新核验事实后再生成收尾计划；页面不会据此自动写入或改动配置。",
-  unsupported: "收尾指引：当前服务未上报绑定字段，请确认服务与接口版本支持该字段后再刷新本页核对。",
-};
-// 指引只按已判定的状态枚举选文案，不由 agent 载荷里的任意值索引进映射；未覆盖分支按未知降级。
-function workspaceRoleBindingGuide(agent) {
-  const row = roleBindingRow(agent);
-  const state = roleBindingStateInfo(agent, row.row);
-  if (!row.supported) return ROLE_BINDING_GUIDES.unsupported;
-  if (state.key === "unconfigured") return ROLE_BINDING_GUIDES.unconfigured;
-  if (!row.present) return ROLE_BINDING_GUIDES.unknown;
-  if (state.key === "bound") return ROLE_BINDING_GUIDES.bound;
-  if (state.kind === "invalid") return ROLE_BINDING_GUIDES.invalid;
-  return ROLE_BINDING_GUIDES.unknown;
-}
-function workspaceRoleBindingPanel(agent) {
-  const row = roleBindingRow(agent);
-  const state = roleBindingStateInfo(agent, row.row);
-  const section = workspaceEl("section", "role-binding-section");
-  section.setAttribute("aria-label", "运行器与模型绑定（只读）");
-  const head = workspaceEl("div", "role-binding-head");
-  head.appendChild(workspaceEl("h3", "", "运行器与模型绑定"));
-  head.appendChild(workspaceEl("span", `role-binding-state ${state.kind}`, state.label));
-  section.appendChild(head);
-  section.appendChild(workspaceEl("p", "role-binding-hint", "只读展示已保存的配置值；不改变职责与权限，也不推断型号。"));
-  const list = workspaceEl("dl", "role-binding-list");
-  for (const [label, text] of workspaceRoleBindingRows(agent)) {
-    list.appendChild(workspaceEl("dt", "", label));
-    list.appendChild(workspaceEl("dd", "", text));
-  }
-  section.appendChild(list);
-  section.appendChild(workspaceEl("p", "role-binding-note", workspaceRoleBindingNote(agent)));
-  // ROLE-BINDING-C4：收尾指引跟在事实说明之后，纯文本段落，不引入任何控件或入口。
-  section.appendChild(workspaceEl("p", "role-binding-guide", workspaceRoleBindingGuide(agent)));
-  return section;
 }
 // ── R1-3 受管 CLI 服务：逐角色启动/关闭 与 项目级“全部启动” ─────────────────
 // 数据来源（不新增每角色读请求）：角色行自带的 service 投影叠加最近一次动作响应/轮询结果。
@@ -1046,9 +962,9 @@ function workspaceRoleServicePanel(role) {
   const control = roleServiceControl(role);
   if (!control.view.provided) return null;
   const section = workspaceEl("section", "role-service-section");
-  section.setAttribute("aria-label", "受管 CLI 服务");
+  section.setAttribute("aria-label", "角色开关");
   const head = workspaceEl("div", "role-service-head");
-  head.appendChild(workspaceEl("h3", "", "受管 CLI 服务"));
+  head.appendChild(workspaceEl("h3", "", "角色开关"));
   section.appendChild(head);
   const controls = workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls");
   if (controls) section.appendChild(controls);
@@ -1452,16 +1368,14 @@ function renderWorkspaceRoleDetails() {
   // 任务创建只保留任务详情子任务入口与任务发起者派发（公共 POST /api/tasks / MCP / SDK）。
   // 固定主控标记已随 I-2 退役：角色详情不再显示“项目主控”徽标。
   namePanel.appendChild(workspaceEl("p", "role-member-id", `成员 ID：${role.member_id}`));
-  // ROLE-BINDING-B4：绑定只读区随名称区动态重绘，来自同一次名册读取；静态说明编辑区不在其中。
-  namePanel.appendChild(workspaceRoleBindingPanel(role));
-  if (typeof roleRequestApp !== "undefined") {
-    const progress = roleRequestApp?.rolePanel(role); if (progress) namePanel.appendChild(progress);
-  }
   // R1-3：受管 CLI 服务操作区（未归档且名册带 service 字段时显示）；由 workspaceRoleServicePanel
   // 只渲染启动/关闭与必要提示 —— 详情不再重复服务状态标签（状态入口在左侧角色列表）。
   if (role.archived !== true) {
     const servicePanel = workspaceRoleServicePanel(role);
     if (servicePanel) namePanel.appendChild(servicePanel);
+  }
+  if (typeof roleRequestApp !== "undefined") {
+    const actions = roleRequestApp?.rolePanel(role); if (actions) namePanel.appendChild(actions);
   }
   const section = workspaceEl("section", "role-task-section");
   section.appendChild(workspaceEl("h3", "", "参与的任务"));
@@ -1886,4 +1800,4 @@ if (typeof document !== "undefined") {
     document.getElementById("role-description-reset").addEventListener("click", resetRoleDescription);
   }
 }
-if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, workspaceSettingsSelected, ROLE_BINDING_STATES, workspaceRoleBindingSummary, workspaceRoleBindingRows, workspaceRoleBindingNote, workspaceRoleBindingGuide};
+if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, workspaceSettingsSelected, ROLE_BINDING_STATES, workspaceRoleBindingSummary};

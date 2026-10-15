@@ -112,6 +112,18 @@ function createRoleRequestUI(deps) {
     return lookup({ requested: state.host?.enabled === false ? "等待开启宿主配置" : "等待宿主", leased: "宿主已领取",
       created: row.lease_held ? "正在配置" : "等待宿主继续配置", provisioned: "配置已完成", failed: "配置未完成", canceled: "已取消" }, row.status, "配置状态未知");
   }
+  function canRecover(row) {
+    return human() && safeInt(row.revision) && Boolean(row.member_id)
+      && (row.status === "provisioned" || (row.status === "failed" && row.last_error_code === "manual_recovery_required"))
+      && safeInt(row.credential_version) && row.credential_version > 0;
+  }
+  function resetControl(row) {
+    const box = node("div", "role-reset-control");
+    box.append(button("绑定重置", () => recover(row)),
+      node("p", "role-reset-hint", "接入异常时修复本机配置，必要时更新接入凭据。"));
+    box.children[0].disabled = state.busy;
+    return box;
+  }
   function progress(row, { showRoleLink = true } = {}) {
     const box = node("section", "role-request-card");
     box.append(node("strong", "", row.role_name || "角色配置"), node("p", "role-request-status", label(row)));
@@ -130,9 +142,7 @@ function createRoleRequestUI(deps) {
       if ((row.status === "failed" && row.last_error_code !== "manual_recovery_required") || (row.retry_exhausted === true && row.lease_held !== true)) {
         actions.append(button("继续配置", () => mutate(row, "resume")));
       }
-      if (row.member_id && (row.status === "provisioned" || (row.status === "failed" && row.last_error_code === "manual_recovery_required")) && safeInt(row.credential_version) && row.credential_version > 0) {
-        actions.append(button("恢复本机接入", () => recover(row)));
-      }
+      if (canRecover(row)) actions.append(resetControl(row));
     }
     if (row.member_id && showRoleLink) actions.append(button("查看角色", () => { close(false); deps.selectRole(row.member_id); }));
     for (const child of actions.children) child.disabled = state.busy;
@@ -414,7 +424,7 @@ function createRoleRequestUI(deps) {
       if (saved && /^role-[a-zA-Z0-9_-]{8,120}$/.test(saved.key) && safeInt(saved.version) && saved.version > 0) intent = saved;
     } catch (_) {}
     intent ||= state.recoveryAttempts?.get(row.member_id);
-    if (!intent && !deps.confirm("恢复本机接入可能轮换角色的 TALK 凭据，旧凭据将失效。确认恢复？")) return;
+    if (!intent && !deps.confirm("绑定重置将修复本机接入，必要时更新 TALK 凭据并使旧凭据失效，不更换运行器或模型。确认重置？")) return;
     intent ||= { key: deps.newKey(), version: row.credential_version };
     state.recoveryAttempts ||= new Map(); state.recoveryAttempts.set(row.member_id, intent);
     try { deps.storage?.setItem(savedKey, JSON.stringify({ key: intent.key, version: intent.version })); } catch (_) {}
@@ -447,7 +457,16 @@ function createRoleRequestUI(deps) {
     if (!state.active) return null;
     const row = state.rows.find(r => r.member_id === role.member_id);
     if (!row) return null;
-    const panel = node("section", "role-request-detail"); panel.append(node("h3", "", "配置进度"), progress(row, { showRoleLink: false })); return panel;
+    const panel = node("section", "role-maintenance");
+    if (row.status !== "provisioned") {
+      panel.append(node("p", row.status === "failed" ? "role-request-error" : "role-request-status", label(row)));
+      if (row.status === "failed") panel.append(node("p", "role-request-error", lookup(codes, row.last_error_code, "本机配置未完成，请检查环境后继续。")));
+      if (human() && safeInt(row.revision) && ((row.status === "failed" && row.last_error_code !== "manual_recovery_required") || (row.retry_exhausted === true && row.lease_held !== true))) {
+        const resume = button("继续配置", () => mutate(row, "resume")); resume.disabled = state.busy; panel.append(resume);
+      }
+    }
+    if (canRecover(row)) panel.append(resetControl(row));
+    return panel.children.length ? panel : null;
   }
   function attach() {
     el("role-create-form")?.addEventListener("submit", submit);
