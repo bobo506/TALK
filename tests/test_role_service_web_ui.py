@@ -13,7 +13,7 @@ from pathlib import Path
 from tests.test_support import RouteTestCase
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261014-role-runner-options"
+STATIC_VERSION = "20261015-role-detail-actions"
 
 #: 设计 §5.3 的六个入口里，页面只允许调用 human 意图写与只读投影这四个。
 PAGE_API_PATHS = (

@@ -112,7 +112,7 @@ function createRoleRequestUI(deps) {
     return lookup({ requested: state.host?.enabled === false ? "等待开启宿主配置" : "等待宿主", leased: "宿主已领取",
       created: row.lease_held ? "正在配置" : "等待宿主继续配置", provisioned: "配置已完成", failed: "配置未完成", canceled: "已取消" }, row.status, "配置状态未知");
   }
-  function progress(row) {
+  function progress(row, { showRoleLink = true } = {}) {
     const box = node("section", "role-request-card");
     box.append(node("strong", "", row.role_name || "角色配置"), node("p", "role-request-status", label(row)));
     if (row.provision_job) {
@@ -134,7 +134,7 @@ function createRoleRequestUI(deps) {
         actions.append(button("恢复本机接入", () => recover(row)));
       }
     }
-    if (row.member_id) actions.append(button("查看角色", () => { close(false); deps.selectRole(row.member_id); }));
+    if (row.member_id && showRoleLink) actions.append(button("查看角色", () => { close(false); deps.selectRole(row.member_id); }));
     for (const child of actions.children) child.disabled = state.busy;
     box.append(actions); return box;
   }
@@ -447,7 +447,7 @@ function createRoleRequestUI(deps) {
     if (!state.active) return null;
     const row = state.rows.find(r => r.member_id === role.member_id);
     if (!row) return null;
-    const panel = node("section", "role-request-detail"); panel.append(node("h3", "", "配置进度"), progress(row)); return panel;
+    const panel = node("section", "role-request-detail"); panel.append(node("h3", "", "配置进度"), progress(row, { showRoleLink: false })); return panel;
   }
   function attach() {
     el("role-create-form")?.addEventListener("submit", submit);

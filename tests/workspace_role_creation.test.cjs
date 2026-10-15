@@ -184,3 +184,14 @@ test('完成配置只展示配置步骤，不产生服务启动POST或列表三�
   const text=h.texts(h.ui.rolePanel({member_id:'a'}));assert.match(text,/配置已完成/);assert.match(text,/身份档案 · 完成/);assert.doesNotMatch(text,/未启动|启动成功|关闭中/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,0);assert.equal(h.timers.size,0);
 });
+
+test('角色详情配置卡不提供返回自身的查看角色入口，恢复接入仍按原资格显示',async()=>{
+  for(const human of [true,false]) {
+    const h=harness({human});h.backend.rows=[{request_key:'role-completed-00000000',member_id:'agent:ready',role_name:'Kimi k2.8',status:'provisioned',revision:4,credential_version:1}];
+    await h.ready();const panel=h.ui.rolePanel({member_id:'agent:ready'});
+    const actions=panel.querySelectorAll().filter(n=>n.tagName==='BUTTON').map(n=>n.textContent);
+    assert.match(h.texts(panel),/配置已完成/);assert.equal(actions.includes('查看角色'),false);
+    assert.equal(actions.includes('恢复本机接入'),human);
+    assert.equal(h.requests.some(r=>r.method==='POST'),false);
+  }
+});

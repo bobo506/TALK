@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261014-role-runner-options"
+STATIC_VERSION = "20261015-role-detail-actions"
 
 # I-2 自检符号集：退役后 web 运行时不得再出现（DOM id / 函数 / 状态 / 导出 / 按钮）。
 RETIRED_SCRIPT_SYMBOLS = (
