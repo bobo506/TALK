@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-15 21:51（Asia/Shanghai）— 列表重复摘要与空闲提示精简候选，244独立复核派发
+
+- 用户在243发布后追加两点：列表运行器/模型重复说明去除，空闲“当前没有进行中的任务”只留详情。本片基线8d953ee7c2c08229c8dbec8714b4a4442b05c52a；整行绑定摘要移除、列表只隐藏空闲提示，有任务时数量保持，该实施口径已说明。
+- Codex仅修改列表摘要构造、workspaceWorkSummary可选hideEmpty（默认详情原文不变）、删除无用CSS规则/注释；原绑定格式器兼容导出/数据、ID定位、说明/搜索/选择/服务状态和详情重置无变化。既有10例按当前UI调整，格式器兼容断言改为直接调用，无新测试文件或数量膨胀。
+- 11候选3web+8tests与163保护源冻结，11baseline副本字节核同，六资源候选20261015-role-list-trim，7缓存契约同步。证据.tmp/role-list-trim/；旧临时/私有遗留排除，不纳入或清理。
+- 作者17文件单进程227Node/六模块26Python、3JS语法/缓存/空白通过，实际FileHandler路径为本片.tmp。随后仅删旧CSS注释并重新空白/最终冻结；未Browser/生产DB/真实Key/worker/CLI/模型/真实恢复或服务启停，原证据不追改。
+- 派发前实读最新development_requirements/caller agent:codex/kind=agent，DeepSeek available/idle无current_task；用户前端指定优先。244四最小参数独立只读复核，Hall group:task-9c54f5be03ff462a80acebb64f57d39a，原需求/实际基线差异/SHA/验收/测试证据/限制及10字段本次号交付入包，源码暂停。
+- 默认派发后结束，用户“244好了”再取件；本轮5docs收尾提交普通推送、11未核源不提交，回执.tmp/role-list-trim/publication.json。核后同步正式使用/验收说明再发布人工复验；功能/原生能力与后续范围门禁保持。
+
 ## 2026-10-15 21:16（Asia/Shanghai）— 243独立通过收取，角色列表/详情精简正式发布
 
 - 用户“好了”触发243取件；实际业务基线0b71878，当前HEAD2909806仅上一轮5docs。最新caller为agent:codex/kind=agent，DeepSeek已succeeded/submitted且无current_task，开发/复核已暂停，无共享目录并行改码。
