@@ -89,9 +89,9 @@ function workspaceRoleTasks(id) {
   return projectTasks.filter(task => task.target_member_id === id || (task.created_by === id
     && !projectTasks.some(root => root.id === workspaceRootId(task) && root.id !== task.id && root.target_member_id === id)));
 }
-function workspaceWorkSummary(id) {
+function workspaceWorkSummary(id, { hideEmpty = false } = {}) {
   const count = workspaceRoleTasks(id).filter(task => !workspaceFinished(task)).length;
-  return count ? `正在参与 ${count} 项任务` : "当前没有进行中的任务";
+  return count ? `正在参与 ${count} 项任务` : hideEmpty ? "" : "当前没有进行中的任务";
 }
 function workspaceTitle(task) { return task.title || task.content?.split("\n")[0] || "未命名任务"; }
 // 执行耗时起止：claimed_at 是角色实际领取（重试会刷新为最新一次领取），finished_at 是执行结束（成功提交/失败/取消），均不含排队与待收取时间。
@@ -670,9 +670,10 @@ function renderWorkspaceList() {
       row.setAttribute("aria-pressed", String(!workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole));
       entry.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
       // 摘要列取有效说明的首个非空行：自定义后不再显示过时的硬编码短标签。
-      row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleSummary(role)), workspaceEl("small", "", workspaceWorkSummary(role.member_id)));
-      // ROLE-BINDING-B4：绑定摘要复用同一次名册读取的结果，不加请求、不参与搜索匹配范围。
-      row.appendChild(workspaceEl("small", "role-binding-summary", workspaceRoleBindingSummary(role)));
+      row.append(workspaceEl("strong", "", workspaceMemberName(role.member_id)), workspaceEl("span", "", workspaceRoleSummary(role)));
+      // 列表省去重复的运行器/模型摘要和空闲提示；有进行中任务时仍显示数量，详情保留完整工作提示。
+      const workSummary = workspaceWorkSummary(role.member_id, { hideEmpty: true });
+      if (workSummary) row.appendChild(workspaceEl("small", "", workSummary));
       entry.appendChild(row);
       // R1-3：受管服务控制作为角色行的同级块（行本身是 <button>，不能再嵌套按钮）；未归档才显示。
       if (role.archived !== true) {

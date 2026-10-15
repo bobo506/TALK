@@ -29,9 +29,9 @@ class RoleCreationWebUiTests(RouteTestCase):
             for target in ['role-create-modal','role-create-form','role-create-runner','role-create-model','role-create-name','role-create-description','role-create-submit','role-request-list','role-request-host-panel']:
                 self.assertIn(target,parser.ids)
             self.assertEqual(len(parser.assets),6)
-            self.assertTrue(all('v=20261015-role-layout' in asset for asset in parser.assets))
-            scripts=[path for path in parser.assets if path.endswith('v=20261015-role-layout') and '.js?' in path]
-            self.assertEqual(scripts,['/role-creation.js?v=20261015-role-layout','/workspace.js?v=20261015-role-layout','/app.js?v=20261015-role-layout'])
+            self.assertTrue(all('v=20261015-role-list-trim' in asset for asset in parser.assets))
+            scripts=[path for path in parser.assets if path.endswith('v=20261015-role-list-trim') and '.js?' in path]
+            self.assertEqual(scripts,['/role-creation.js?v=20261015-role-list-trim','/workspace.js?v=20261015-role-list-trim','/app.js?v=20261015-role-list-trim'])
             for asset in ['/role-creation.js','/role-creation.css']:
                 self.assertEqual(client.get(asset).status_code,200)
 

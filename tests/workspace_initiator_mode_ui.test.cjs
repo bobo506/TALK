@@ -16,7 +16,7 @@ const workspaceSource = fs.readFileSync(require.resolve('../web/workspace.js'), 
 const appSource = fs.readFileSync(require.resolve('../web/app.js'), 'utf8');
 const indexHtml = fs.readFileSync(require.resolve('../web/index.html'), 'utf8');
 
-const STATIC_VERSION = '20261015-role-layout';
+const STATIC_VERSION = '20261015-role-list-trim';
 const RETIRED_SYMBOLS = [
   'controllerUI', 'controllerStatusMeta', 'reloadControllerAssignment', 'renderControllerPanel',
   'workspaceControllerBadge', 'workspaceControllerSummary', 'controllerCandidate',
