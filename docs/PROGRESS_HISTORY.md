@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-15 23:34（Asia/Shanghai）— 246/247独立复核未通过，248/249顺序补正
+
+- 用户确认新角色配置成功后自动打开一次开关，可手动关/再开；不新增默认未勾选的启动选项，不隐含勾选既有“随项目自动启动”。项目加载选择性启动仍为独立后续规划，存量入口不自动接管。
+- 用户“好了”触发246/247取件，均succeeded/submitted且合法complete自报；本地summary校验通过。246/msg2751/SHA b48ce641b8fde25b2237557fea015701a9ca89deca9e6839fea85c90466db21d，247/msg2754/SHA 30b17c29828a6ba8ef4ba1f6db31dbe236715d96a77e3b986145206d831c3b1a，稳定分页10字段与本地等同。独立复核未通过，原结果/证据保持，暂不collect。
+- Codex实核入口/bridge及服务/请求/创建源码。246：task-id只监视但bridge处理全队列/消息、execute缺ID或GET非对象仍放行、强停父bridge缺Windows在途CLI回收证据；独立3假API/Popen/handler探针复现前两组。247：默认不自动的产品偏差与246依赖误解、stop-before-report缺守卫、共享指纹升级遗漏C1/completion相等约束、吞入队异常与事务失效/回滚语义矛盾。独立隔离API stop gen1后start gen2合法，证明CAS本身不足挡晚到自动启动，未把既有手动重启标作产品bug。
+- .tmp/role-start-review/含review.md、probe.py、evidence.json和两份MCP引用。3入口探针+1隔离服务探针，174保护源逐SHA无漂移；开发者原26/13只索引不重跑合计。没有读真实Key/USER.md、启动真实CLI/模型/服务、Browser或生产DB操作。原包MODULE_server不存在由协调方纠正，后续改读真实三合同。
+- 实读caller agent:codex/kind=agent、latest development_requirements，按本轮明确分工派248（Hall group:task-4f241f4d1faa4f9b9511d9aec1b863d7）先补.tmp单任务入口，249（Hall group:task-2ef2fc7d28464460955394137833a317）待248交付暂停后顺序补.tmp方案。四参数顶层包包含原需求、dcb56f7基线/174源保护、实际反例/差异、验收/隔离证据与本次号JSON交付；派发快照queued，不主动轮询，不扩大产品/生产权限。
+- 本轮4正式docs需求澄清/进度收尾，精确暂存普通推送；准确版本见.tmp/role-start-review/publication.json。待用户248/249完成通知后独立再核，再开展真实试用/后端产品单片，unknown/unverified保持。
+
 ## 2026-10-15 23:04（Asia/Shanghai）— 用户确认配置成功后自动启动目标，247后端方案准备排队
 
 - 用户在询问双K28角色需独立执行实例后明确“以后就是在配置完角色后就自动启动服务”。确认为新建角色配置成功后自动走启动/实际ready，保留手动开关与已验列表单状态/详情必要原因，失败不抹掉配置成功，人工关闭优先；不擅自扩成历史角色/恢复/系统重启全部自动启动。

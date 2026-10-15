@@ -1,22 +1,24 @@
 # Project Progress
 
-Updated: 2026-10-15 23:04 (Asia/Shanghai)：用户新增“以后新角色配置成功后自动启动”要求；246原入口准备继续，247顺序方案准备已派，尚未实现或启生产服务。
+Updated: 2026-10-15 23:34 (Asia/Shanghai)：246/247独立复核未通过；248、249已顺序派发仅.tmp补正，未真实启动或实施自动启动。
 
 ## 已确认状态
 
-- TALK / prj_e8fe7066bbec，分支codex/terminal-return-codex。页面业务版本5de19e8已获用户本轮整体验收通过，d4a9b37251cc308e93a33f416e72be7748d717ef为上轮8docs收尾；原245独立/静态证据沿用，无新代码或重复测试。
-- 用户选择刚创建“Kimi k2.8”验证实际执行能力，member=agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c。最近实例读取offline/无实例、bound、runner unverified/控制unknown；旧K28的195固定串不套给新身份，当前未启动真实模型/执行器。
-- 用户现明确要求以后配置完成自动启动。已记录已确认需求docs/spec/ROLE_AUTO_START_REQUIREMENTS.md（待实施）：新人类创建完整配置后自动走受管启动→实际ready；保留手动开关/单状态反馈，失败如实显示，人工关闭优先，旧角色/恢复不追溯自启动，原能力门控不绕过。
+- TALK / prj_e8fe7066bbec，codex/terminal-return-codex；caller实读agent:codex/kind=agent，Codex协调/独立复核/正式进度与Git。R1-4前端Codex/DeepSeek核、后端宿主DeepSeek/Codex核保持，latest development_requirements已读取。
+- 页面业务5de19e8已获本轮整体验收；本轮开始HEAD=dcb56f79d5ded2634728bfebc41e2cad7478807b仅前轮7docs。无本轮产品源码改动，174非docs保护源逐SHA无漂移。
+- 新试验角色agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c（Kimi k2.8）最近事实offline/无实例、bound、runner unverified/control unknown，真实执行尚未开始；旧K28的195固定串不套给新身份。
+- 用户确认新角色配置成功自动打开一次开关，随后仍可手动关/再开；不设默认关闭的额外勾选，不批量启动旧角色/恢复，不隐含开启既有“随项目自动启动”规划。关闭先于完成回报也须优先，默认初始stopped不等于人工关闭。
 
 ## 当前任务
 
-- 246 DeepSeek新角色入口只读/零模型准备仍按原包，最后单次快照running/in_progress；已在其Hall通知新增方向而不扩大原权限。只准备命令/新身份/alias/tools/单次退出/必要本人Key内部只读核验与预算依据，Codex独立核后才试实际代码任务。
-- 247 DeepSeek“新角色配置完成后自动启动服务的后端方案准备”，Hall group:task-a0f5d3de28e84fe09dd7966c9b450efd，queued仅派发快照；明确完成246后顺序做，只写.tmp/role-auto-start-prep/，不改源码/docs/Git、不真实启动/读秘密。给真实入口、授权/幂等/世代、配置成功与服务状态分离、崩溃/重复/人工关闭/host离线边界及最小单片任务包，由Codex独立复核后开发。
-- 派发前实读latest development_requirements/caller agent:codex/kind=agent，DeepSeek busy/current_task246；未重复派246、未取消有用准备，不并行改码。用户前端Codex/DeepSeek核、后端宿主DeepSeek/Codex核分工保持，不改永久配置。
-- 当前只7相关需求/进度/合同实施提示docs提交普通推送，174非docs保护源0漂移，证据.tmp/role-auto-start-prep/及publication.json；旧临时私有遗留排除，不纳入或清理。
+- 246/msg2751、247/msg2754均succeeded/submitted、自报complete合法，稳定分页10字段与本地交付等同；独立复核未通过，原结果暂未收取。证据.tmp/role-start-review/{review.md,probe.py,evidence.json,mcp-246.json,mcp-247.json}。
+- 246：指定task-id仅监视，普通bridge仍处理全队列/消息；缺ID或任务GET非对象仍放行；强停父bridge缺在途CLI回收证据。独立3探针用假API/Popen/handler复现前两组，未真实生成孤儿进程。
+- 247：默认不自动的产品偏差/误解246；缺stop-before-report守卫；共享指纹变更遗漏C1/completion交叉校验；吞入队异常与事务失效/回滚语义矛盾。独立隔离DB stop gen1后start gen2合法，故CAS本身不足以挡晚到自动启动；这是新方案缺口。
+- 248“新Kimi角色单任务入口隔离与退出边界补正”，DeepSeek，Hall group:task-4f241f4d1faa4f9b9511d9aec1b863d7，派发快照queued。仅.tmp/k28-new-role-trial-prep/revision-1/，原246证据保持，零模型/指定任务/失败拒绝/子进程回收后再核。
+- 249“配置后自动首次启动方案的人工关闭与兼容补正”，DeepSeek，Hall group:task-2ef2fc7d28464460955394137833a317，派发快照queued，248交付暂停后顺序做。仅.tmp/role-auto-start-prep/revision-1/，读真实三合同，优先保留共享指纹/独立比较auto意图，补人工世代守卫、事务故障证明与单片包，不实施源码。
 
 ## 下一步
 
-- 默认派发后结束，用户“246好了”/“247好了”后分别取合法交付及独立核；准备齐后真实新角色试验/自动启动单片实施，保留测试、独立复核、人工验收和Git收尾，不把方案complete当功能完成。
-- 当前已发布配置仍不自动启动；本次不启动CLI/模型/worker或批量历史角色，不修改生产名册/绑定/Key/原生默认模型，不放开unknown/unverified。真实自动启动/原生能力/退出清理与I-4未验，T/W按终端实际预算核，未核T不开主动长等待。
-- 常规推送bobo506/TALK持续授权，只精确相关docs/后续已核源，私有/.talk/临时/db不提交。恢复“继续项目”承接246/247，不主动轮询等待。
+- 默认派发后结束，用户“248好了”/“249好了”后分别取件、Codex独立再核；原246/247失败与证据保留，通过后才收取对应交付链。真实代码试验和自动启动产品开发不能以准备complete替代。
+- 当前配置仍不自动启动；没有生产Key/DB/名册/模型/CLI/worker/serve操作，不放开unknown/unverified。本轮仅3假入口探针+1隔离服务探针，不重跑/叠加旧26/13或页面证据；真实原生/Browser/异常退出及I-4仍未验，未核客户端T不开主动长等待。
+- 本轮4相关docs收尾，常规推送bobo506/TALK持续授权；只精确暂存docs，私有/.talk/.tmp/db不提交。准确版本见.tmp/role-start-review/publication.json。恢复“继续项目”承接248/249，不主动轮询。
