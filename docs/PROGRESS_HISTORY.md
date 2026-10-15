@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-15 09:30（Asia/Shanghai）— 详情自跳按钮补正与242独立复核派发
+
+- 用户已真实看到“Kimi k2.8”配置完成三步，随后反馈点“查看角色”没有反应；询问后确认位于角色详情，非创建弹窗。实际原胶水能选中同一ID并重绘，问题是共享progress在详情又生成返回自身的操作；Codex向用户承认此前让其点此按钮不准确，没有把它误报为创建弹窗导航失败。
+- 依据前端Codex/DeepSeek独立核持续分工，仅role-creation.js三处行补正：共享渲染默认保留查看角色，详情上下文传showRoleLink:false。恢复本机接入与human/status/version守卫不动，无新增API/权限/Key操作。六资源候选20261015-role-detail-actions及7缓存契约同步，共11源（2web+9tests）。
+- 正式新增1单元覆盖human/agent详情无自指、恢复资格保持且无POST；强化既有真实模块集成，从创建结果实际点按钮检查弹窗关闭/目标选择/详情可见、详情不再自跳、完成后恢复仍在，不再直接手工赋选择状态。旧源码强化25例23过2失败保留node-before.log，修后17文件236Node、6模块26Python、3JS语法/diff检查通过；不叠加历史代码/真实部署测试，不冒充Browser或人工视觉通过。
+- Git业务/文档基线07fa5214ee86e28ce3c491561e4a06c4a5f767bf，11候选+163非docs tracked保护源SHA/原字节/差异冻结，范围外0漂移。开发完成暂停，候选未正式提交发布；协调方随后只5docs更新，不能仅用新Git HEAD代替冻结sourceHash判断。产物role-view-link-fix；reviewer另用role-view-link-fix-review，原证据只读。
+- 派发前重新读取TALK最新项目要求/实际caller agent:codex/kind=agent，DeepSeek available且无current_task；人类前端指定优先于页面Kimi分工，未改配置。实际242按四个最小参数顶层派DeepSeek独立复核，Hall group:task-b937a2ca8a8c4fc3aa128647aaab8742，queued/assigned仅快照。原需求/人工位置/根因、范围/不变项/实际基线/验收/开发证据/限制及10字段本次号交付入包；不授权改源码或扩生产动作。
+- 当前不读真实USER.md/Key或生产数据，不启worker/CLI/模型/Browser，不重新创建/恢复已完成角色，不做无关后端回归；本轮实际业务没有生产写入。原真实角色provisioned、host version1开启/worker单次退出、未核验控制事实保持。页面三步已有用户观察，仍需去除误导入口后人工复验，不宣布完整验收通过。
+- 默认派发后结束，用户“242好了”取件；未主动等待/轮询。独立通过后收取并统一11候选及相关docs正式发布/人工复验；失败则Codex按持续授权修后再独立核。只提交5进度/模块/验收docs，候选/临时/.talk/db/私有文件不混，常规推送回执role-view-link-fix/publication.json；不自动推进常驻worker、Kimi受管启动、外部/归档/退出/I-4。
+
 ## 2026-10-14 23:19（Asia/Shanghai）— 明确授权后的首次真实Kimi角色配置闭环
 
 - 用户提供D:/claude-test/USER.md为配置凭据来源。文件是账号说明而非可直接给worker的单行Key；只在内存提取唯一“密钥”字段、GET核验human:bobo，不把其他字段/密钥或正文输出。用户期望在项目下集中放置；现有worker拒绝仓库内Key根，说明后采用相邻D:/claude-test/TALK-private，operator.key与keys/集中准备。
