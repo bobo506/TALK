@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16（Asia/Shanghai）— 任务详情发起人标签候选完成，251独立复核待250后进行
+
+- 用户指出详情顶部“负责人 DeepSeek · Codex 发起”冗余，要求仅“发起人XXX”。Codex范围锁定该元信息行，统一取created_by展示名；本人发起同样显示姓名，不改target/权限/状态/动作或全站删除负责人文字。
+- 250实读running/in_progress。先在Hall请求安全暂停，随后采用git archive 3c9d54c6ec3b992b967f18b1db0b63fdc18d3275的隔离候选，明确撤回立即暂停要求，让250继续原片、交付后暂停；Codex不改当前共享产品源，遵守不并行改码。消息2765/2766为请求与更新，未伪称收到暂停确认。
+- .tmp/task-initiator-label/candidate/改web/app.js一行people.textContent为“发起人 ”+workspaceMemberName(task.created_by)，web/index.html六资源统一20261016-task-initiator-label；7既有测试仅缓存版本替换，共9文件。changes.patch/manifest.json/原base.zip及9个base/candidate文本SHA冻结，source-check实证共享原文件未变。候选不等于生产发布。
+- node --check通过；既有两Node接线/缓存套件11/11；5场景真实渲染片段VM核人类/Agent/本人/未知/HTML文本与不读target；六模块unittest26/26，隔离TestClient不碰生产DB。pytest无模块明确not_run，改同批unittest不安装依赖；无Browser/真实视觉结论，无新增实现镜像产品测试。证据verification.json、label-check.json、unittest.log。
+- 派前实读caller agent:codex/kind=agent、latest requirements与旧K2.8 busy/task250；251四参数顶层派旧agent:kimi-code-k28-preview（Hall group:task-938c795c16f443459368db38789383e9），只读审隔离候选、原需求/真实差异/基线/验收与作者证据完整入包，必须250源写入完成暂停后再审。仅review目录输出，独立实际代码检查，不改候选/产品/docs/Git，不派DeepSeek或额外模型。
+- 本轮仅3正式进度docs收尾常规推送，准确回执.tmp/task-initiator-label/publication.json；未合入前端/提交250在途源。默认用户250/251完成通知后取件，核过再在安全暂停时合入、静态核验与人工刷新验收，当前页面仍旧显示。
+
 ## 2026-10-16（Asia/Shanghai）— 249方案通过，250交旧K2.8首次实际开发
 
 - 用户明确已启动旧K2.8，下一片由Codex与K2.8协作、先不派DeepSeek；只覆盖本片，不改永久development_requirements。派发前实读caller agent:codex/kind=agent、latest requirements，旧agent:kimi-code-k28-preview实例8ddd72cf-e145-4421-8efe-7a1fb9408b98/kimi-code/idle/无current_task、binding=bound。仅上报可用，不外推实际后端模型版本或主动等待能力；新角色本轮不启动。
