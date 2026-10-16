@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16 10:50（Asia/Shanghai）— 用户选定K2.8默认6小时，252独立复核已派
+
+- 原250约3600秒触发旧入口执行超时；用户要求取消/提高上限，选项明确“默认6小时”。本次Codex按已有返修授权实施、旧K2.8独立复核，不派DeepSeek，永久项目开发要求不改。单次CLI预算与TALK任务总时长、MCP客户端/读取等待严格分开，不热改已有进程或自动恢复失败任务。
+- 基线84b8010，5候选为scripts/kimi_k28_executor.py、tests/test_kimi_k28_executor.py、两份deploy/kimi-code/k28-executor模板与局部指南。默认21600；check/render/launch的--timeout贯通报告、门禁和实际bridge argv；PowerShell -TimeoutSeconds默认21600并同值转发；正整数覆盖允许43200/86400，0/负值拒绝。通用bridge600、HTTP15、其他角色/原生配置/模型锁/凭据/权限不变。
+- Codex196 unittest零失败/错误/跳过（K28入口/Kimi bridge/通用CLI bridge），PowerShell AST0错误/2转发/默认21600，diff --check通过。新增fixture初次清环境缺USERPROFILE报1错误，已指向临时用户目录修正，初始日志保留。本次没有真实CLI/模型/worker/服务启停、生产数据或Key内容读取、Browser、六小时实跑或主动等待能力验收。
+- .tmp/k28-timeout-six-hours/保存前后SHA、原5文件、候选patch与测试；134跟踪源码保护及250八源精确SHA记录，250八文件与原recovery-250一致，未改/提交/回滚。251已发布待人工验收状态保持；原250失败/本地未验收结果不追改。
+- 派发前读最新development_requirements/caller agent:codex/kind=agent，旧K2.8上报idle/无current_task（不把旧上报当心跳证明）。252四参数顶层派旧agent:kimi-code-k28-preview，Hall group:task-1163bdf2e0c84a1c8b7561cc98aa33be，queued快照；本次明确分工、原需求/实际基线与5文件差异/196测试及失败记录/验收与保护边界/10字段完整JSON入包。开发已停止，仅review目录可写，源码不并行改。
+- 候选5文件尚未独立通过，不提交发布；本轮只正式进度/模块说明收尾提交。默认结束等用户“252好了”再取件；通过后再发空闲重启说明，现有实例仍3600秒。准确派发/版本见本片dispatch.json/publication.json；随后继续UI人工验收和250独立审查，不另开后端片。
+
 ## 2026-10-16 10:36（Asia/Shanghai）— 250执行超时保留，251页面小修独立通过合入
 
 - 用户报告250失败/251完成。API核250 claimed UTC00:56:19.664248→finished01:56:20.197792、failed/failed、msg2767仅“Kimi Code bridge 暂时没有返回结果”；bridge format_cli_reply唯timed_out分支生成该文案，旧入口EXECUTION_TIMEOUT_SECONDS=3600，确认为执行预算到期，不能混作TALK读取等待超时或断言模型本身不行。251早已因用户新页面需求独立排队，不是250失败后自动重试。

@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### K2.8执行预算补正候选（2026-10-16，252待复核）
+
+- 用户选定旧agent:kimi-code-k28-preview默认单次CLI预算21600秒（6小时）。Codex5文件候选在check/render/launch开放--timeout正整数覆盖，检查报告/门禁/bridge argv一致；PowerShell模板-TimeoutSeconds同值转发，JSON默认同步。见[局部指南](../guides/KIMI_K28_EXECUTOR.md)。
+- 196离线unittest与PowerShell AST通过，252交旧K2.8独立只读复核，源码暂停修改；候选尚未独立通过/发布。现有实例保留启动时3600秒，需之后空闲停止原入口并重启，不自动恢复失败250或接管未知受管能力。
+- 通用bridge默认600、HTTP身份核验15秒、TALK读取/发起者等待及其它角色均未改；按每次CLI调用计时，不是任务排队到收尾总预算。没有六小时实跑、真实模型或宿主主动等待能力验收，下方历史3600秒记录不追改。
+
 ### 角色生命周期 R1-4a/b：请求server与宿主已通过，完整页面待接线
 
 - 2026-10-13，233服务端初版经Codex7合同探针复现缺口、234返修后独立实际代码复核通过，234→233已收取。原partial/失败/草稿保持；权威[请求合同](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)与原配置/服务合同共同约束后续worker。
