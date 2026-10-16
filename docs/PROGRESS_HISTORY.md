@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-16 14:25（Asia/Shanghai）— 恢复248补正，revision-2零模型通过，253独立复核已派
+
+- 读取project-framework与本地AGENTS、PROJECT_BRIEF/PROGRESS、MODULE_bridges及TERMINAL_MCP实际预算要求；MCP只读身份确认agent:codex/kind=agent、项目prj_e8fe7066bbec、lead，按前轮用户“继续下一步”与持续返修授权自主承接。本次Codex开发、旧K2.8独立复核，不派DeepSeek，不改永久development_requirements。
+- 原246入口全队列/无task-id/异常结构等由248 revision-1已有修正，但原第4/5条整体预算与孙进程边界仍未闭合；本轮原248完整任务/原稿/证据/交付均保留，在新.tmp/k28-new-role-trial-prep/revision-2/补正。开发前基线efbe9a1322dc58e878a5c361c4d4979fa618e76d，152当前源码/脚本/测试资源与280个revision-1原件保存SHA；结束全部零漂移，250八源未改/提交/回滚。
+- 候选在amain只建一次绝对Deadline，预检/注册/竞争复查/命令生成/handle受work_end=end-margin约束，Job回收、offline、终态读取、close共用end余额，消除后置独立新预算；无余额不发请求、失败如实记录。异步预算不承诺任意同步OS/磁盘阻塞的硬实时零超差。未启任何真实TALK长等待，实际客户端T未知，模板660000不作实际事实。
+- win_job.py用CreateProcess的JOB_LIST原子创建私有Job，HANDLE_LIST仅stdio，KILL_ON_JOB_CLOSE且不允许breakaway，Job句柄不继承；失败拒绝非Job回退。正常CLI根退出也终止留存后代，取消/错误/超时杀Job并同一deadline内观察ActiveProcesses=0/关句柄；从不按镜像名或外部PID结束。只支持Windows10+与本地files runner，未冒称产品pipes或真实原生退出通过，不保证broker代创建/恶意逃逸。
+- 最终开发者重跑verify-zero-model.py 35/35、verify-budget-job.py 11/11，均零失败，不同原35旧证据叠加。新增假时钟共起点；8秒整体/2秒清理下慢预检约6秒、预检+慢注册约6秒、慢offline/快照/close约8.016秒；正常/非零/超时/取消均假CLI+孙进程退出/Job计数0，独立sentinel仍活，Job属性失效不spawn，两组源码/原件SHA不变。早期smoke重复句柄列表WinError87已去重；H探针初稿7=2+5被用法门禁拒绝后改8秒，最终证据与说明分存，不把初稿错误当通过。未读取真实秘密、启动真实CLI/模型/服务或领取真实任务。
+- 9冻结候选与candidate.patch、原248任务、精确argv/README/试验模板、developer-summary.json/测试报告保留新revision目录。派发前实读最新项目要求及caller，旧K2.8无running/queued任务；旧idle上报滞后限制保持。253用最小四参数独立顶层派旧agent:kimi-code-k28-preview，Hall group:task-280a593b442149049675084c215ca975，原需求/范围/基线/差异/SHA/验收/开发测试/限制/实际10字段回传要求齐全，仅独立review目录可写。msg2773纠正包中efbe9a12短基线笔误为efbe9a1，完整SHA同baseline.json，未改冻结候选；回执in_progress，其后未轮询。
+- 共享目录开发暂停后才审查，协调方只做3份正式docs与Git收尾；默认派发后结束，等用户“253好了”读摘要/独立证据再裁决。通过后253→248→246收取，不追改原交付，再回250既有源码独立审查。252发布79096ad保持，旧实例未重启/当前3600事实不改；全角色21600、删除按钮、新角色真实试验、UI251视觉反馈仍待，不并行开下一片。准确Git/远程收尾见revision-2/publication.json。
+
 ## 2026-10-16 14:06（Asia/Shanghai）— 核246/248待确认原因，按用户要求收工并交接下一步
 
 - 用户看到246/248已完成但未确认，要求核查。MCP两项仍succeeded/submitted，原结果2751/2764均合法complete自报、result_collected_at为空；重读原任务包与revision-1代码/README，原结果/证据保持，不因runner结束直接验收收取。
