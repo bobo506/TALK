@@ -1,12 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-17 00:04 (Asia/Shanghai)：257定向复核仍需修正实例最新选择与读取监测口径，未收取；258已派DeepSeek仅修prepare-v3。5角色未实际登记/迁移。
+Updated: 2026-10-17 00:09 (Asia/Shanghai)：用户调整协作：DeepSeek只首次执行，Codex复核后直接修正并验证收尾。258继续原范围，完成后不再派同片返修；5角色仍未实际登记迁移。
 
 ## 当前身份与分工
 
 - TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead，已读当前development_requirements。
-- 用户最新要求后续DeepSeek代替旧agent:kimi-code-k28-preview；254按原包完成，不追改历史或项目永久开发要求。AGENTS同步：前端Codex实施/DeepSeek独立复核，后端/宿主DeepSeek实施/Codex独立复核，Codex负责正式docs/Git。
-- 默认派发后结束等待、用户通知完成后取件；共享目录开发暂停后审查，一次一片。本轮按新授权先补真实受管环境，256/257原交付保留未收取，258由DeepSeek定向修正准备件、Codex独立复核及收尾；仅.tmp产物开发与协调5docs，不并行改产品源码。默认用户通知258完成后取件，不轮询。
+- 用户2026-10-17最新分工：Codex派任务→DeepSeek首次执行/自测交付后暂停→Codex独立复核→有问题Codex直接修正/验证/最终验收，正式docs/Git仍Codex。不再默认派DeepSeek同片返修或追加回审，首次独立复核与修正自检分别记录；替代旧前后端固定分工，历史任务/页面旧开发要求不追改。
+- 默认派发后结束等待、用户通知完成后取件；共享目录开发暂停后审查，一次一片。本轮按新授权先补真实受管环境，256/257原交付保留未收取，258由DeepSeek定向修正准备件、Codex独立复核及收尾；当前258仅.tmp产物开发；本轮用户授权同步AGENTS，协调文档范围为原5docs+AGENTS共6份，不并行改产品源码。默认用户通知258完成后取件，不轮询。
 
 ## 250/254自动首次启动后端已独立通过
 
@@ -32,15 +32,15 @@ Updated: 2026-10-17 00:04 (Asia/Shanghai)：257定向复核仍需修正实例最
 - 现有事实仍为前三无绑定、两个K2.8已绑定但唯一runner unverified/unknown、显式project_roles仅新K2.8、受管状态为空；host设置enabled不证明常驻进程运行。旧PID/陈旧上报不作存活/可控证明。
 - 256原msg2785/complete与257原msg2788/partial均合法自报但未收取。256两P1中，257已删除旧成员经CREATE补录步骤，明确4成员blocked_product_gap；凭据盘点stat-only与公开SQL列在根假Key拒读/假库秘密列authorizer下通过。真实保ID补录产品片A、per-runtime模板/21600通道产品片B未实现，不靠人类确认改变现有CREATE语义或升级能力状态。
 - 257仍needs_changes/Hall2789：F3/P1实例SQL只过滤项目，fetchall后全局截前200，无成员限制/排序/SQL界限；根假库204行使最新busy(task999)及另一目标成员丢失，可能错判切换前提。辅助[-1]也不保证最新。F4/P2读取监测只初始化0未接线，故意加入假Key读取后仍报0；metadata计数不能代表正文读取监测。实际凭据读取路径已修，不能把本次监测问题夸大为新泄露。
-- 根仅运行定向隔离探针，未读取生产Key/DB，未重复35/81自报全套；v2部分自测默认读取生产公开列/重写原raw的限制已记录，并要求258改为显式假DB/Key和独立输出。原v1 22件、v2 25件与855保护跟踪文件审查前后SHA保持；5协调docs除外。
-- 258已最小四参交DeepSeek，Hall group:task-7f4ffa80b439430f9fc89dbdab8b248d，UTC2026-10-16T16:04:13.168720初始queued/assigned。唯一写prepare-v3：SQL层目标/最新/有界在途与历史事实、诚实读取证据、必要定向回归；不扩产品设计、不改生产/产品源码、不启停host/CLI/模型、不复制轮换Key。默认派后结束，用户通知258完成再取件。
+- 根仅运行定向隔离探针，未读取生产Key/DB，未重复35/81自报全套；v2部分自测默认读取生产公开列/重写原raw的限制已记录，并要求258改为显式假DB/Key和独立输出。原v1 22件、v2 25件与855保护跟踪文件在257审查前后SHA保持；本轮同步AGENTS后保护范围为854项，精确排除原5协调docs+AGENTS，依据workflow-20261017/coordination-amendment.json，Hall2791已通知258。
+- 258已最小四参交DeepSeek，Hall group:task-7f4ffa80b439430f9fc89dbdab8b248d，UTC2026-10-16T16:04:13.168720初始queued/assigned。唯一写prepare-v3：SQL层目标/最新/有界在途与历史事实、诚实读取证据、必要定向回归；不扩产品设计、不改生产/产品源码、不启停host/CLI/模型、不复制轮换Key。默认派后结束，用户通知258完成再取件；如复核仍有问题，改由Codex直接修正并验证，不再派同片返修。
 - 根审查/反例/25件冻结/派发证据：.tmp/legacy-role-page-control/independent-review257/{review.json,probe-issues.py,boundary-issues.json,candidate-manifest.json,rework-dispatch.json,rework-package.json,publication.json}。原256证据与coordination/保留不改。
 
 ## 下一步与人工门禁
 
 - 加载含本次前端与98beb9c后端的服务，Ctrl+F5，项目→角色，按docs/guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md验创建说明、配置/入队/实际服务状态及关闭后刷新不重启。现有human账号/Key，启动命令及已知限制见该指南。
 - 255页面人工验收未完成；按用户新授权先完成256—258受管接入准备，本片仍不执行迁移。不把DOM/VM/TestClient当视觉/键盘/原生能力通过，未受管运行器应诚实给原因。
-- 当前先258准备修正/独立审/必要产品缺口补齐/逐角色实际迁移，随后补255真实页面与启停验收；完整日志/通用预算/删除另片，不同时扩码。
+- 当前先收取258/由Codex独立复核并直接闭合剩余问题/必要产品缺口补齐/逐角色实际迁移，随后补255真实页面与启停验收；完整日志/通用预算/删除另片，不同时扩码。
 
 ## 已确认后续需求（待实施）
 

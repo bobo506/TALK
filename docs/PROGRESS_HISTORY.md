@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-17 00:09（Asia/Shanghai）— 用户调整为DeepSeek首次执行，Codex复核并直接修正
+
+- 用户明确“你派任务给deepseek，然后它做好了你复核，如果有问题就由你改掉”“它只做第一次执行”，目的是减少同片往返、加快推进。该持续明确分工优先于旧前后端固定分工、问题交回开发者及Codex修正后默认再次外部回审的项目约定。
+- 后续流程：Codex定义切片派发；DeepSeek首次实施/必要自测交付后暂停；Codex独立检查首次代码与证据，有问题确认开发者暂停后直接修正、针对性测试及最终验收，保留原始交付与失败记录，不将自己的修正自检称为他人独立复核。共享目录一次一方改码、必要验证/人工里程碑验收/docs与Git收尾继续执行。
+- 当前258已派，按原执行范围完成暂停，不重复派发或中断；之后有问题由Codex接手，不再派同片下一轮返修。默认派后结束、用户通知完成后取件保持；未轮询258，未新增开发任务、改变生产配置/能力/凭据或启停服务。
+- 本轮用户授权同步AGENTS.md，已落盘workflow-20261017/coordination-amendment.json并在258 Hall发msg2791通知：协调文档精确范围由原5docs增为AGENTS+5docs共6份，860产品保护中余854项继续保持，v1 22/v2 25原件仍不得变。不改原258任务包/旧结果，补充依据可追溯。
+- 实际改动仅AGENTS.md、PROGRESS、PROJECT_BRIEF及本历史4文档，验证UTF-8/新链接/diff和保护SHA后提交推送。未改产品或生产状态，未宣称迁移完成；本轮持续分工已落盘，页面旧development_requirements没有自动改写，后续读取时如实记录并以本次明确分工为准。审计与发布回执见.tmp/legacy-role-page-control/workflow-20261017/{coordination-amendment.json,validation.json,publication.json}。
+
 ## 2026-10-17 00:04（Asia/Shanghai）— 257凭据实际读取已修，实例选择及监测仍需修正，258已派
 
 - 用户通知好了后收取257只读完整摘要：msg2788/task257/schema合法、业务partial、runner succeeded/submitted，不当整体验收。当前caller agent:codex/lead、项目prj_e8fe7066bbec与development_requirements已实读，最新用户/AGENTS仍DeepSeek后端准备、Codex独立复核/正式docs/Git，不改永久旧要求。原256/257均未收取。
