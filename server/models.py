@@ -573,6 +573,37 @@ ROLE_PROVISION_HOST_ERROR_DISABLED = "provision_host_disabled"
 ROLE_PROVISION_HOST_ERROR_VERSION_CONFLICT = "provision_host_version_conflict"
 ROLE_PROVISION_HOST_ERROR_BUSY = "provision_host_busy"
 ROLE_PROVISION_HOST_ERROR_CONFIG_INVALID = "provision_host_config_invalid"
+# R1-4c-a 自动首次启动的四个稳定码（AUTO_START_DESIGN §6.3）：只落码、不落异常
+# 正文。原配置 disabled / 来源无效等上游拒绝仍走 ``provision_host_disabled`` 等
+# 既有码，不绕过。
+ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED = (
+    "auto_start_control_kind_not_managed"
+)
+ROLE_REQUEST_ERROR_AUTO_START_CONFIG_DISABLED = "auto_start_config_disabled"
+ROLE_REQUEST_ERROR_AUTO_START_MANUAL_INTENT_PRESENT = (
+    "auto_start_manual_intent_present"
+)
+ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED = "auto_start_enqueue_failed"
+
+# ── 角色生命周期 R1-4c-a：配置成功后自动首次启动（AUTO_START_DESIGN）────────
+
+#: 自动启动动作的审计身份：经原请求 ``created_by`` / 意图 / launch 锚点追源到
+#: 发起的人类，**不**冒充 human，也不创建任何新成员或权限入口。
+ROLE_AUTO_START_ACTOR = "system:auto-start"
+
+#: 自动启动意图状态机（AUTO_START_DESIGN §2/§6.2）。``NULL`` = 无意图（旧请求 /
+#: 旧客户端 / recover）；``pending`` 只是尚未处理；``enqueued`` 只是已投递事实，
+#: **都不等于服务 ready**；``not_eligible`` 如实未入队；``failed`` 入队内部故障。
+ROLE_AUTO_START_STATUS_PENDING = "pending"
+ROLE_AUTO_START_STATUS_ENQUEUED = "enqueued"
+ROLE_AUTO_START_STATUS_NOT_ELIGIBLE = "not_eligible"
+ROLE_AUTO_START_STATUS_FAILED = "failed"
+ROLE_AUTO_START_STATUSES = (
+    ROLE_AUTO_START_STATUS_PENDING,
+    ROLE_AUTO_START_STATUS_ENQUEUED,
+    ROLE_AUTO_START_STATUS_NOT_ELIGIBLE,
+    ROLE_AUTO_START_STATUS_FAILED,
+)
 
 #: A6 ``report`` 与**请求驱动** C4 ``ACK`` 允许落库的稳定宿主错误码白名单
 #: （REQUEST_CONTRACT §2/§3/§8）：``last_error_code`` 与作业步骤 ``error_code`` 只接受
@@ -613,6 +644,13 @@ ROLE_REQUEST_HOST_ERROR_CODES = frozenset(
         # 合同 §8 要求新增宿主码必须登记进本集合，否则 report/ACK 会 422 并丢失错误形状；
         # 本码与 ``scripts/role_provision_worker.WORKER_ERROR_CODES`` 保持一一对应。
         "worker_io_budget_exceeded",
+        # R1-4c-a 自动首次启动分类码（AUTO_START_DESIGN §6.3）：由服务端在
+        # report(provisioned) 的成功分支登记进请求行 ``auto_start_error_code``，
+        # 只落稳定码、不落异常正文。
+        ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED,
+        ROLE_REQUEST_ERROR_AUTO_START_CONFIG_DISABLED,
+        ROLE_REQUEST_ERROR_AUTO_START_MANUAL_INTENT_PRESENT,
+        ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED,
     }
 )
 
@@ -985,6 +1023,11 @@ class RoleProvisionRequestRow(SQLModel, table=True):
                 "kind = 'recover' AND status IN ('requested','leased','created')"
             ),
         ),
+        # R1-4c-a：自动启动锚点的普通索引（非唯一；幂等锚点语义由业务守卫保证）。
+        Index(
+            "ix_role_provision_requests_auto_start_launch",
+            "auto_start_launch_id",
+        ),
     )
 
     request_key: str = Field(primary_key=True)
@@ -1014,6 +1057,18 @@ class RoleProvisionRequestRow(SQLModel, table=True):
     report_revision: Optional[int] = None
     report_credential_version: Optional[int] = None
     last_error_code: Optional[str] = None
+    #: R1-4c-a（AUTO_START_DESIGN §2）：人类创建意图是否含“配置成功后自动启动一次”
+    #: 的规范布尔值。独立落列、**不进**共享创建指纹；旧行默认 0（不追溯）。同
+    #: ``request_key`` 重放时参与严格比较，异值 409 ``role_request_key_conflict``。
+    auto_start_intent: int = Field(default=0)
+    #: 意图状态（``ROLE_AUTO_START_STATUS_*``）：配置 failed/canceled 绝不产生
+    #: launch，也绝不后台重试；``pending``/``enqueued`` 都不能当服务 ready 展示。
+    auto_start_status: Optional[str] = None
+    #: 本意图唯一投递出的 start 动作锚点；非空 = 已投递（幂等锚点：重复/迟到回报、
+    #: 页面刷新、worker 重试都**不**据此产生第二次启动）。
+    auto_start_launch_id: Optional[str] = None
+    #: 稳定白名单分类码（``ROLE_REQUEST_ERROR_AUTO_START_*``），不落异常正文。
+    auto_start_error_code: Optional[str] = None
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -1097,9 +1152,10 @@ class RoleProvisionHostDisableRequest(BaseModel):
 class RoleRequestCreate(BaseModel):
     """``POST /role-requests``（合同 §3）：创建 / 恢复意图。
 
-    ``kind`` 互斥载荷由共享规则验证：``create`` 必须且只能给四字段，``recover`` 必须且
-    只能给 ``member_id`` + ``expected_credential_version``。``confirm`` 必须显式为
-    ``true``（human 明确意图），否则 422。
+    ``kind`` 互斥载荷由共享规则验证：``create`` 必须且只能给四字段（外加可选
+    ``auto_start``），``recover`` 必须且只能给 ``member_id`` +
+    ``expected_credential_version``（携带 ``auto_start`` 非 None 同样 422）。
+    ``confirm`` 必须显式为 ``true``（human 明确意图），否则 422。
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1113,6 +1169,10 @@ class RoleRequestCreate(BaseModel):
     role_description: Optional[str] = None
     member_id: Optional[str] = None
     expected_credential_version: Optional[int] = None
+    #: R1-4c-a（AUTO_START_DESIGN §2）：可选自动首次启动意图；缺省/None/false 规范为
+    #: false（旧请求/旧客户端兼容，不自动启动）。recover 携带非 None 值按互斥载荷
+    #: 422 ``role_request_payload_invalid``（恢复本身不自动启动）。
+    auto_start: Optional[bool] = None
 
 
 class RoleRequestClaimRequest(BaseModel):

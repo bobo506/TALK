@@ -79,6 +79,11 @@ PUBLIC_PROJECTION_KEYS = {
     "claimed_at",
     "expires_at",
     "last_error_code",
+    # R1-4c-a 只读投影增量（AUTO_START_DESIGN §6.4）。
+    "auto_start",
+    "auto_start_status",
+    "auto_start_launch_id",
+    "auto_start_error_code",
     "created_by",
     "created_at",
     "updated_at",
@@ -1043,6 +1048,96 @@ class ConcurrentClaimTests(RoleRequestApiTestCase):
             )
         self.assertEqual(len(leased), 1)
         self.assertEqual(leased[0].attempts, 1)
+
+
+class AutoStartReplayMatrixTests(RoleRequestApiTestCase):
+    """R1-4c-a：同 ``request_key`` 重放时 auto_start 规范布尔值的严格比较矩阵。
+
+    共享四字段 payload / 创建指纹 / ``RoleCreationOperation`` 全部不变；auto_start
+    独立落列参与同键比较（AUTO_START_DESIGN §2/§4.3）。旧行默认 0，与旧客户端
+    缺省重放兼容。
+    """
+
+    def test_same_key_auto_start_boolean_matrix(self):
+        cases = [
+            # (首次 create 的 auto_start, 重放的 auto_start, 期望状态码)
+            (None, None, 200),
+            (None, False, 200),
+            (None, True, 409),
+            (False, None, 200),
+            (False, False, 200),
+            (False, True, 409),
+            (True, None, 409),
+            (True, False, 409),
+            (True, True, 200),
+        ]
+        for index, (first, replay, expected) in enumerate(cases):
+            with self.subTest(first=first, replay=replay):
+                key = f"op-matrix-{index:04d}"
+                body: dict = {"request_key": key, "role_name": f"dev-{index}"}
+                if first is not None:
+                    body["auto_start"] = first
+                first_response = self.create_intent(**body)
+                self.assertEqual(first_response.status_code, 201, first_response.text)
+                self.assertEqual(
+                    first_response.json()["auto_start"], bool(first)
+                )
+                self.assertEqual(
+                    first_response.json()["auto_start_status"],
+                    "pending" if first else None,
+                )
+
+                replay_body: dict = {"request_key": key, "role_name": f"dev-{index}"}
+                if replay is not None:
+                    replay_body["auto_start"] = replay
+                replay_response = self.create_intent(**replay_body)
+                self.assertEqual(
+                    replay_response.status_code, expected, replay_response.text
+                )
+                if expected == 200:
+                    self.assertTrue(replay_response.json()["auto_start"] == bool(first))
+                else:
+                    self.assertEqual(
+                        replay_response.json()["detail"], "role_request_key_conflict"
+                    )
+
+    def test_auto_start_intent_passes_c1_and_exact_replay_still_reused(self):
+        """C1 守卫不被误拒：payload/指纹不变，auto_start 意图可完整走完 C1。"""
+        self.enable_host()
+        intent = self.create_intent(request_key="op-auto-c1", auto_start=True)
+        self.assertEqual(intent.status_code, 201, intent.text)
+        claimed = self.claim("op-auto-c1").json()
+        created = self.create_role(
+            operation_key="op-auto-c1", lease_token=claimed["lease_token"]
+        )
+        self.assertEqual(created.status_code, 201, created.text)
+        # 同键同四字段同租约的精确重放仍是只读 reused（auto_start 不进共享指纹）。
+        replay = self.create_role(
+            operation_key="op-auto-c1", lease_token=claimed["lease_token"]
+        )
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertTrue(replay.json()["reused"])
+        projection = self.get_request("op-auto-c1").json()
+        self.assertTrue(projection["auto_start"])
+        self.assertEqual(projection["auto_start_status"], "pending")
+
+    def test_recover_rejects_auto_start_field(self):
+        """recover 携带 auto_start（True/False 均非 None）→ 422 互斥载荷。"""
+        created, _token = self.seed_created_role_via_pipeline()
+        member_id = created["member_id"]
+        for value in (True, False):
+            response = self.create_intent(
+                request_key="op-auto-recover-x",
+                kind="recover",
+                role_name=None,
+                runner_id=None,
+                choice_id=None,
+                member_id=member_id,
+                expected_credential_version=1,
+                auto_start=value,
+            )
+            self.assertEqual(response.status_code, 422)
+            self.assertEqual(response.json()["detail"], "role_request_payload_invalid")
 
 
 if __name__ == "__main__":

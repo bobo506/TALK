@@ -1,6 +1,6 @@
 # 新角色配置完成后自动首次启动：实施合同
 
-2026-10-16，249修订方案经Codex独立复核，以下技术决策确认用于首个后端切片。**当前后端250候选已实施但未验收/发布；2026-10-16 Codex独立复核发现外层事务丢失仍200并补写失败标记的P1与external测试夹具P2，254已定向返修。以下事务/验证合同保持，前端/真实受管生命周期另验。** 原始需求见[已确认需求](ROLE_AUTO_START_REQUIREMENTS.md)；本合同只修订[创建配置请求](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)及[受管服务](ROLE_SERVICE_CONTRACT.md)中“新页面创建的完整配置成功后由人类再点启动”的目标行为，旧客户端/旧请求原样兼容。
+2026-10-16，249修订方案经Codex独立复核，以下技术决策确认用于首个后端切片。**2026-10-16，254定向返修后经Codex独立实际代码复核、63项相关回归及9项API/SQLite边界探针通过并收取，后端8源随本轮发布。原250失败历史及原P1/P2证据保留；前端auto_start载荷/文案仍未接线，生产与真实受管生命周期另验。** 原始需求见[已确认需求](ROLE_AUTO_START_REQUIREMENTS.md)；本合同只修订[创建配置请求](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)及[受管服务](ROLE_SERVICE_CONTRACT.md)中“新页面创建的完整配置成功后由人类再点启动”的目标行为，旧客户端/旧请求原样兼容。
 
 ## 1. 用户行为与范围
 
@@ -37,7 +37,7 @@
 
 1. `report_request`保留外层`BEGIN IMMEDIATE`、身份/租约/世代/版本/真实完成事实校验，先flush配置报告终态。
 2. 嵌套SAVEPOINT内复用同一受管start核心，完成全部state CAS/launch写入并实际flush；共享核心不能commit、rollback或另开BEGIN。人工start薄包装继续负责原事务和human审计，行为/错误码保持。
-3. 入队成功释放保存点，在同一外层事务记录enqueued与launch锚点；可恢复入队异常回滚保存点全部写，再记录failed/稳定码，配置仍provisioned。
+3. 入队成功释放保存点，在同一外层事务记录enqueued与launch锚点；可恢复入队异常回滚保存点全部写后，须确认driver实际写事务仍活动、同一事务内已flush的provisioned事实仍可读，才记录failed/稳定码、保留配置成功。若RAISE(ROLLBACK)等撤销外层事务或连接失效则上抛500，禁止另起事务补写auto状态，不按异常文案分类。
 4. 外层只有一个commit。外层DB写/提交失败整体回滚，按原错误协议返回并允许有效租约下安全重试；不吞失效session或承诺数据库失败仍成功。已提交回报精确重放零写入。
 5. 自动动作审计可用`system:auto-start`，通过请求created_by/意图/launch锚点追溯原human，不把宿主operator当启动授权人；不创建假human成员或新权限入口。
 
@@ -47,6 +47,6 @@
 
 - 隔离验证成功入队一次；未配置成功/旧请求/恢复/无意图零启动；同键异意图409、旧库两次迁移与旧创建重放保持。
 - 验证stop-before-report、先手动start/stop、先自动入队再stop、重复/迟到回报、精确重放无额外世代/动作；四条件ready和所有权边界不变。
-- 真实SQLite触发器验证launch插入失败、部分state更新后失败的SAVEPOINT回滚；双连接无半提交、外层失败回滚重试恰好一次。测试必须覆盖实际实施函数，不能仅复用方案原型冒充产品通过。
+- 真实SQLite触发器验证launch插入失败、部分state更新后失败的SAVEPOINT回滚；区分RAISE(ABORT)局部降级与RAISE(ROLLBACK)外层撤销500/原事实保持，去故障同token/revision重试恰好一次；双连接无半提交。测试必须覆盖实际实施函数，不能仅复用方案原型冒充产品通过。
 - 配置成功与服务就绪分开。真实运行还依赖常驻宿主、真实受管能力/已登记runtime、原生登录与实例就绪；unknown/control未登记不能绕过。pending不是实际模型工作证明。
 - 首片只后端8个白名单源码/测试文件，宿主/worker/前端不改，禁止生产DB/真实Key/native凭据操作。前端、真实原生/异常退出/主动等待仍分别待验。

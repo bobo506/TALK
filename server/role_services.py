@@ -37,12 +37,14 @@ from sqlmodel import Session, select
 
 from server.db import begin_immediate_write
 from server.models import (
+    ROLE_AUTO_START_ACTOR,
     ROLE_SERVICE_ACTION_START,
     ROLE_SERVICE_ACTION_STOP,
     ROLE_SERVICE_ERROR_ALREADY_RUNNING,
     ROLE_SERVICE_ERROR_ALREADY_STOPPED,
     ROLE_SERVICE_ERROR_CONTROL_KIND_NOT_MANAGED,
     ROLE_SERVICE_ERROR_EXPECTED_INSTANCE_MISMATCH,
+    ROLE_SERVICE_ERROR_GENERATION_CONFLICT,
     ROLE_SERVICE_ERROR_LAUNCH_ACTION_MISMATCH,
     ROLE_SERVICE_ERROR_LAUNCH_EXPIRED,
     ROLE_SERVICE_ERROR_LAUNCH_NOT_FOUND,
@@ -91,6 +93,8 @@ from server.models import (
     ROLE_SERVICE_DESIRED_STOPPED,
     ROLE_SERVICE_START_OUTCOMES,
     ROLE_SERVICE_STOP_OUTCOMES,
+    ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED,
+    ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED,
     RUNNER_CONTROL_MANAGED_CLI,
     RUNNER_CONTROL_UNKNOWN,
     AgentInstance,
@@ -257,6 +261,88 @@ def _preallocate_instance_id(session: Session) -> str:
         if existing is None:
             return candidate
     raise _fail(status.HTTP_409_CONFLICT, "expected_instance_id_allocation_failed")
+
+
+# ── 共享 start 入队核心（R1-4c-a：人工 start 与配置成功后的自动首次启动复用）──
+
+
+def _enqueue_start_launch(
+    ctx: ServiceRoleContext,
+    project_id: str,
+    member_id: str,
+    *,
+    session: Session,
+    now: datetime,
+    actor_id: str,
+    expected_generation: int,
+) -> RoleServiceLaunch:
+    """共享 start 入队核心：CAS 推进世代 + 新建 ``pending`` start launch。
+
+    R1-4c-a 从 ``start_role_service`` 抽出，供人工启动与配置成功后的自动首次启动
+    **复用同一份**真实 binding/control_kind/CAS/TTL 语义；不放宽任何守卫，也不写
+    ``can_start``（它仍是投影计算结果）。
+
+    事务边界由**调用方**负责：本核心**绝不** commit、rollback 或另开 BEGIN——
+    人工入口回滚/提交整个写事务；自动入口只在嵌套 SAVEPOINT 内调用，由调用方决定
+    回滚范围。失败抛 ``HTTPException``（世代冲突）或原始异常，均不上吞。
+    ``expected_generation`` 必须由调用方在 ``expire_due_launches`` 之后按锁内
+    事实传入；CAS 沿用 ``synchronize_session=False`` 的 Core update，调用方在
+    保存点回滚后如需读取 state 必须重新 ``session.get()``。
+    """
+    old_generation = int(expected_generation)
+    new_generation = old_generation + 1
+    launch = RoleServiceLaunch(
+        launch_id=new_role_service_launch_id(),
+        project_id=project_id,
+        member_id=member_id,
+        action=ROLE_SERVICE_ACTION_START,
+        generation=new_generation,
+        state=ROLE_SERVICE_LAUNCH_PENDING,
+        expected_instance_id=_preallocate_instance_id(session),
+        launch_expires_at=now + timedelta(seconds=ROLE_SERVICE_LAUNCH_TTL_SECONDS),
+        created_at=now,
+        updated_at=now,
+    )
+    state = _get_state(project_id, member_id, session)
+    if state is None:
+        state = RoleServiceState(
+            project_id=project_id,
+            member_id=member_id,
+            generation=0,
+            updated_at=now,
+        )
+        session.add(state)
+        session.flush()
+    result = session.execute(
+        update(RoleServiceState)
+        .where(
+            RoleServiceState.project_id == project_id,
+            RoleServiceState.member_id == member_id,
+            RoleServiceState.generation == old_generation,
+        )
+        .values(
+            generation=new_generation,
+            desired_state=ROLE_SERVICE_DESIRED_RUNNING,
+            observed_state=ROLE_SERVICE_OBSERVED_STARTING,
+            manager_kind=ROLE_SERVICE_MANAGER_CLI_PROCESS,
+            control_kind=ctx.control_kind,
+            current_launch_id=launch.launch_id,
+            last_result=state.last_result,
+            last_error_code=None,
+            last_error_message=None,
+            updated_at=now,
+            updated_by=actor_id,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        # 调用方决定回滚范围：人工入口回滚整个写事务；自动入口回滚 SAVEPOINT。
+        raise _fail(status.HTTP_409_CONFLICT, ROLE_SERVICE_ERROR_GENERATION_CONFLICT)
+    session.add(launch)
+    # 必须实际 flush：launch INSERT 的错误（唯一索引/触发器/磁盘）要在此处暴露，
+    # 让自动入口能在 SAVEPOINT 内回滚，而不是拖到外层的唯一提交点。
+    session.flush()
+    return launch
 
 
 # ── 过期收敛 ─────────────────────────────────────────────────────────────
@@ -461,6 +547,10 @@ def start_role_service(
     CAS 递增 ``generation`` 并建 ``action='start'``、``state='pending'`` 的 launch，
     **服务端预分配**全新 ``expected_instance_id`` 与 ``launch_expires_at``；
     响应**不返回任何 token**。服务端不 spawn 任何进程。
+
+    R1-4c-a：入队核心抽到 :func:`_enqueue_start_launch` 与配置成功后的自动首次
+    启动复用；本包装继续负责原事务边界与 human 审计（``updated_by=operator.id``），
+    行为/返回模型/错误码与 R1-3 逐字一致。
     """
     _write_begin(session)
     ctx = load_role_service_context(project_id, member_id, session)
@@ -480,62 +570,27 @@ def start_role_service(
     if ownership_held(state):
         raise _fail(status.HTTP_409_CONFLICT, ROLE_SERVICE_ERROR_ALREADY_RUNNING)
 
-    old_generation = state.generation if state is not None else 0
-    new_generation = old_generation + 1
-    launch = RoleServiceLaunch(
-        launch_id=new_role_service_launch_id(),
-        project_id=project_id,
-        member_id=member_id,
-        action=ROLE_SERVICE_ACTION_START,
-        generation=new_generation,
-        state=ROLE_SERVICE_LAUNCH_PENDING,
-        expected_instance_id=_preallocate_instance_id(session),
-        launch_expires_at=now + timedelta(seconds=ROLE_SERVICE_LAUNCH_TTL_SECONDS),
-        created_at=now,
-        updated_at=now,
-    )
-    if state is None:
-        state = RoleServiceState(
-            project_id=project_id,
-            member_id=member_id,
-            generation=0,
-            updated_at=now,
+    old_generation = int(state.generation) if state is not None else 0
+    try:
+        launch = _enqueue_start_launch(
+            ctx,
+            project_id,
+            member_id,
+            session=session,
+            now=now,
+            actor_id=operator.id,
+            expected_generation=old_generation,
         )
-        session.add(state)
-        session.flush()
-    result = session.execute(
-        update(RoleServiceState)
-        .where(
-            RoleServiceState.project_id == project_id,
-            RoleServiceState.member_id == member_id,
-            RoleServiceState.generation == old_generation,
-        )
-        .values(
-            generation=new_generation,
-            desired_state=ROLE_SERVICE_DESIRED_RUNNING,
-            observed_state=ROLE_SERVICE_OBSERVED_STARTING,
-            manager_kind=ROLE_SERVICE_MANAGER_CLI_PROCESS,
-            control_kind=ctx.control_kind,
-            current_launch_id=launch.launch_id,
-            last_result=state.last_result,
-            last_error_code=None,
-            last_error_message=None,
-            updated_at=now,
-            updated_by=operator.id,
-        )
-        .execution_options(synchronize_session=False)
-    )
-    if result.rowcount != 1:
+    except HTTPException:
         session.rollback()
-        raise _fail(status.HTTP_409_CONFLICT, ROLE_SERVICE_ERROR_GENERATION_CONFLICT)
-    session.add(launch)
+        raise
     session.commit()
     return RoleServiceStartOut(
         project_id=project_id,
         member_id=member_id,
         role_name=ctx.role.role_name,
         launch_id=launch.launch_id,
-        generation=new_generation,
+        generation=int(launch.generation),
         expected_instance_id=launch.expected_instance_id,
         launch_expires_at=_as_utc(launch.launch_expires_at),
     )
@@ -697,6 +752,73 @@ def stop_role_service(
         launch_expires_at=_as_utc(launch.launch_expires_at),
         observed=ROLE_SERVICE_OBSERVED_STOPPING,
     )
+
+
+# ── 自动首次启动入队（R1-4c-a，配置成功后的同事实入口）────────────────────
+
+#: ``enqueue_auto_start_launch`` 把共享核心的稳定拒绝码翻译成自动启动分类码：
+#: ``_require_managed_cli`` 的两种拒绝（绑定/运行器缺失、control_kind 非
+#: ``managed_cli``）如实归为 ``auto_start_control_kind_not_managed``；
+#: 其余意外（资格/上下文/世代冲突等）统一如实归为 ``auto_start_enqueue_failed``。
+_AUTO_START_CODE_BY_SERVICE_ERROR = {
+    ROLE_SERVICE_ERROR_CONTROL_KIND_NOT_MANAGED: (
+        ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED
+    ),
+    ROLE_SERVICE_ERROR_ROLE_BINDING_MISSING: (
+        ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED
+    ),
+}
+
+
+def enqueue_auto_start_launch(
+    project_id: str,
+    member_id: str,
+    *,
+    session: Session,
+    now: datetime,
+) -> tuple[Optional[str], Optional[str]]:
+    """配置成功后的自动首次启动入队（AUTO_START_DESIGN §3/§6）。
+
+    由 ``report_request(provisioned)`` 在**嵌套 SAVEPOINT 内**调用，复用与人工
+    ``start_role_service`` 完全相同的共享核心：真实 binding/control_kind 守卫、
+    过期收敛、ownership/运行中防御、世代 CAS 与 120 秒 launch TTL，一个守卫都
+    不放宽，也不伪造 ready。
+
+    返回 ``(launch_id, error_code)``：成功 ``(launch_id, None)``；守卫拒绝
+    ``(None, 稳定码)``。本函数**绝不** commit、rollback 或另开 BEGIN，也绝不把
+    ``HTTPException`` 抛给 report 外层；可恢复的写入异常（flush/INSERT 失败）
+    原样上抛，由调用方回滚保存点后登记 ``auto_start_enqueue_failed``。自动动作
+    的审计身份是 ``system:auto-start``（不冒充 human，不新增权限入口）。
+    """
+    try:
+        ctx = load_role_service_context(project_id, member_id, session)
+        _require_managed_cli(ctx)
+        expire_due_launches(session, now=now, project_id=project_id, member_id=member_id)
+        state = _get_state(project_id, member_id, session)
+        # 人工意图优先的防御兜底：所有权未释放或已运行中早被调用方守卫覆盖，
+        # 此处仍如实拒绝，不产生第二个世代。
+        if ownership_held(state) or (
+            state is not None
+            and state.observed_state
+            in (ROLE_SERVICE_OBSERVED_STARTING, ROLE_SERVICE_OBSERVED_RUNNING)
+            and state.desired_state == ROLE_SERVICE_DESIRED_RUNNING
+        ):
+            return None, ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED
+        launch = _enqueue_start_launch(
+            ctx,
+            project_id,
+            member_id,
+            session=session,
+            now=now,
+            actor_id=ROLE_AUTO_START_ACTOR,
+            expected_generation=int(state.generation) if state is not None else 0,
+        )
+        return launch.launch_id, None
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else ""
+        return None, _AUTO_START_CODE_BY_SERVICE_ERROR.get(
+            detail, ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED
+        )
 
 
 # ── claim / report（宿主协议）────────────────────────────────────────────

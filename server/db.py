@@ -525,6 +525,40 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS ix_role_credential_rotations_member "
             "ON role_credential_rotations (project_id, member_id)"
         )
+        # 角色生命周期 R1-4c-a（AUTO_START_DESIGN §2）：``role_provision_requests``
+        # 增量 4 列 + 1 普通索引，全部按列存在性幂等 ADD COLUMN；旧行由默认值
+        # ``0/NULL/NULL/NULL`` 得到“无意图”，不重建表、不回填、不改写旧行，
+        # 重复 init_db() 无副作用。
+        role_request_columns = {
+            row[1]
+            for row in conn.exec_driver_sql(
+                "PRAGMA table_info(role_provision_requests)"
+            ).fetchall()
+        }
+        if "auto_start_intent" not in role_request_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE role_provision_requests "
+                "ADD COLUMN auto_start_intent INTEGER NOT NULL DEFAULT 0"
+            )
+        if "auto_start_status" not in role_request_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE role_provision_requests "
+                "ADD COLUMN auto_start_status TEXT"
+            )
+        if "auto_start_launch_id" not in role_request_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE role_provision_requests "
+                "ADD COLUMN auto_start_launch_id TEXT"
+            )
+        if "auto_start_error_code" not in role_request_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE role_provision_requests "
+                "ADD COLUMN auto_start_error_code TEXT"
+            )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_provision_requests_auto_start_launch "
+            "ON role_provision_requests (auto_start_launch_id)"
+        )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_target_member_id ON agent_tasks (target_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_created_by ON agent_tasks (created_by)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_agent_tasks_status ON agent_tasks (status)")

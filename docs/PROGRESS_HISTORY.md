@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16 16:40（Asia/Shanghai）— 254事务/夹具返修独立通过收取，后端8源发布；后续改DeepSeek
+
+- 用户通知“254已经好了”，并明确后续DeepSeek代替K2.8。根MCP核caller agent:codex/kind=agent与项目当前开发要求，按既有254原包独立复核；最新分工只影响后续任务，AGENTS同步，不追改旧执行者或永久配置。
+- 254 msg2779为合法本次任务号结构化complete自报；根独立实读两文件差异及相关实际路径，F1/P1核保存点rollback后driver真实写事务仍在且同事务已flush provisioned可读才降级；外层撤销上抛500，不补写新事务。F2/P2先注册再PATCH200/核external_session，后续重复注册API409零写，不退回unknown，原unknown测试保持。
+- 根独立重跑63/63相关模块与原9/9实际API/SQLite探针，0失败/错误/跳过；RAISE(ABORT)局部失败仍200/provisioned+auto failed，RAISE(ROLLBACK)500/旧created/pending/revision3及零launch/state保持，去故障同token重试200/enqueued恰1launch+1state。锚点写/commit故障、双HTTP/WAL只入队一次、人工意图/owner/退役目录纯重放及6种旧状态迁移均通过。8源py_compile/diff通过，175基线文件复核前后SHA零漂移，173保护源及原根证据不变；开发者273/9与根旧272按各自证据沿用，不叠加为新独立测试数。
+- 根裁决Hall msg2780，UTC08:40:06.478883收取254 succeeded/completed，result_message_id仍2779。原250 failed/failed/msg2767及原超长报告、原8源before与初次失败探针保留，不收取/追改250。修正后原8源按最终冻结候选纳入本轮提交；无其它产品改码。证据.tmp/k28-autostart-slice/independent-review254/{review.json,focused/,boundary-probes.json,lost-outer-transaction.json,freeze.json,collection.json,publication.json}。
+- AGENTS/PROGRESS/本历史/PROJECT_BRIEF/MODULE_bridges/自动启动需求与实施合同/受管服务合同同步后端接受状态、事务分类及后续分工。前端auto_start载荷/文案尚未接线，下一片Codex实施/DeepSeek独立复核并交人工验收；不把入队或代码发布当生产ready。
+- 本轮不新派其它切片、不部署/重启实例、不操作生产DB/真实Key/模型/CLI/原生凭据或Browser；完整异常日志、旧角色统一受管、全角色21600/删除按钮保持后续。后端切片验证/进度/Git收尾后暂停汇总，先完成当前自动首次启动功能再推进其它需求。准确文件/Git回执见publication.json。
+
 ## 2026-10-16 15:28（Asia/Shanghai）— 确认完整异常日志留存与存量角色统一受管，正式需求/手册登记
 
 - 用户明确完整异常日志是必要留存信息，旧角色后续也应统一成为受管服务。Codex按当前协调/文档职责使用project-framework记录为后续正式需求；没有把讨论仅留在聊天，也没有扩入正在执行的254事务/测试返修包。

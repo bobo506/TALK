@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import update
 from sqlmodel import Session, select
 
 from server.db import begin_immediate_write
@@ -34,6 +35,7 @@ from server.models import (
     RoleProvisionJob,
     RoleProvisionRequestRow,
     RoleRequestCreate,
+    RoleServiceState,
     RunnerModelChoice,
     RunnerRegistry,
     PROVISION_ERROR_CODE_MAX_CHARS,
@@ -42,6 +44,10 @@ from server.models import (
     PROVISION_STEP_STATE_FAILED,
     PROVISION_STEP_STATE_PENDING,
     PROJECT_ROLE_ORIGIN_MANAGED,
+    ROLE_AUTO_START_STATUS_ENQUEUED,
+    ROLE_AUTO_START_STATUS_FAILED,
+    ROLE_AUTO_START_STATUS_NOT_ELIGIBLE,
+    ROLE_AUTO_START_STATUS_PENDING,
     ROLE_PROVISION_HOST_ERROR_BUSY,
     ROLE_PROVISION_HOST_ERROR_CONFIG_INVALID,
     ROLE_PROVISION_HOST_ERROR_DISABLED,
@@ -58,6 +64,9 @@ from server.models import (
     ROLE_PROVISION_HOST_MAX_ATTEMPTS_MIN,
     ROLE_REQUEST_ACTIVE_STATUSES,
     ROLE_REQUEST_CLAIMABLE_STATUSES,
+    ROLE_REQUEST_ERROR_AUTO_START_CONFIG_DISABLED,
+    ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED,
+    ROLE_REQUEST_ERROR_AUTO_START_MANUAL_INTENT_PRESENT,
     ROLE_REQUEST_ERROR_BINDING_MISMATCH,
     ROLE_REQUEST_ERROR_CANCEL_REFUSED,
     ROLE_REQUEST_ERROR_CHOICE_UNAVAILABLE,
@@ -112,6 +121,7 @@ from server.models import (
     normalize_safe_identifier_token,
     serialize_provision_job,
 )
+from server.role_services import enqueue_auto_start_launch
 
 _NOT_FOUND = status.HTTP_404_NOT_FOUND
 _FORBIDDEN = status.HTTP_403_FORBIDDEN
@@ -427,6 +437,9 @@ def _pure_create_intent(project_id: str, body: RoleRequestCreate) -> dict:
             choice_id=choice_id,
             role_description=role_description,
         ),
+        # R1-4c-a：意图维度的规范布尔值（None→False）。**独立落列、不进共享创建
+        # 指纹**；同 request_key 重放时严格比较，异值 409 ``role_request_key_conflict``。
+        "auto_start": bool(body.auto_start),
         "choice_snapshot": None,
         "role_name": role_name,
         "member_id": None,
@@ -489,6 +502,10 @@ def _pure_recover_intent(project_id: str, body: RoleRequestCreate) -> dict:
         for value in (body.role_name, body.runner_id, body.choice_id, body.role_description)
     ):
         raise _fail(_UNPROCESSABLE, ROLE_REQUEST_ERROR_PAYLOAD_INVALID)
+    # R1-4c-a：recover 载荷互斥——``auto_start`` 非 None 一律 422；恢复只修复，
+    # 本身不自动启动。
+    if body.auto_start is not None:
+        raise _fail(_UNPROCESSABLE, ROLE_REQUEST_ERROR_PAYLOAD_INVALID)
     if not isinstance(body.member_id, str) or not body.member_id.strip():
         raise _fail(_UNPROCESSABLE, ROLE_REQUEST_ERROR_PAYLOAD_INVALID)
     member_id = body.member_id.strip()
@@ -505,6 +522,7 @@ def _pure_recover_intent(project_id: str, body: RoleRequestCreate) -> dict:
             member_id=member_id,
             expected_credential_version=version,
         ),
+        "auto_start": False,
         "choice_snapshot": None,
         "role_name": None,
         "member_id": member_id,
@@ -689,6 +707,10 @@ def create_request_intent(
                 existing.project_id != project_id
                 or existing.kind != kind
                 or existing.request_fingerprint != pure["fingerprint"]
+                # R1-4c-a：共享四字段 payload / 指纹不变，意图维度在行内单独严格
+                # 比较；异值 409（旧行默认 0 = 缺省 false，与旧客户端重放兼容）。
+                or bool(int(existing.auto_start_intent or 0))
+                != bool(pure["auto_start"])
             ):
                 raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_KEY_CONFLICT)
             projection = request_projection(
@@ -755,6 +777,13 @@ def create_request_intent(
             report_revision=None,
             report_credential_version=None,
             last_error_code=None,
+            # R1-4c-a：有意图则记 pending（尚未到配置成功）；无意图保持 NULL。
+            auto_start_intent=1 if normalized["auto_start"] else 0,
+            auto_start_status=(
+                ROLE_AUTO_START_STATUS_PENDING if normalized["auto_start"] else None
+            ),
+            auto_start_launch_id=None,
+            auto_start_error_code=None,
             created_by=caller.id,
             created_at=now,
             updated_at=now,
@@ -920,6 +949,13 @@ def request_projection(
         "claimed_at": _as_utc(row.lease_claimed_at),
         "expires_at": _as_utc(row.lease_expires_at),
         "last_error_code": row.last_error_code,
+        # R1-4c-a（AUTO_START_DESIGN §6.4）：意图/投递事实的只读投影。只增这 4 个
+        # 白名单字段；不回显 ``auto_start_intent`` 原始 int、token/哈希/路径/argv/
+        # 异常正文。``enqueued`` 不等于 ready，``pending`` 不等于已启动。
+        "auto_start": bool(int(row.auto_start_intent or 0)),
+        "auto_start_status": row.auto_start_status,
+        "auto_start_launch_id": row.auto_start_launch_id,
+        "auto_start_error_code": row.auto_start_error_code,
         "created_by": row.created_by,
         "created_at": _as_utc(row.created_at),
         "updated_at": _as_utc(row.updated_at),
@@ -1353,6 +1389,184 @@ def require_completion_facts(
         raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_CREDENTIAL_STALE)
 
 
+# ── 配置成功后的自动首次启动（R1-4c-a，AUTO_START_DESIGN §3/§4）───────────
+
+#: ``_set_auto_start`` 的 ``launch_id`` 缺省哨兵：不覆盖既有锚点列。
+_AUTO_START_LAUNCH_KEEP = object()
+
+
+def _set_auto_start(
+    session: Session,
+    request_key: str,
+    *,
+    status: Optional[str],
+    code: Optional[str],
+    now: datetime,
+    launch_id: object = _AUTO_START_LAUNCH_KEEP,
+) -> None:
+    """Core UPDATE 写 ``auto_start_*`` 列（AUTO_START_DESIGN §4/§5.3）。
+
+    统一走 Core UPDATE + ``synchronize_session=False``，避免保存点回滚后的 ORM
+    内存脏值被误回写；报告路径在外层 ``commit`` 后 ``session.refresh(row)`` 按
+    实际落库值刷新投影，因此这里不做 ORM 赋值。
+    """
+    values: dict = {
+        "auto_start_status": status,
+        "auto_start_error_code": code,
+        "updated_at": now,
+    }
+    if launch_id is not _AUTO_START_LAUNCH_KEEP:
+        values["auto_start_launch_id"] = launch_id
+    session.execute(
+        update(RoleProvisionRequestRow)
+        .where(RoleProvisionRequestRow.request_key == request_key)
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+
+
+def _outer_write_transaction_alive(
+    session: Session, row: RoleProvisionRequestRow
+) -> bool:
+    """入队保存点失败后，确认**外层写事务与已 flush 报告事实**仍然成立。
+
+    只有同时满足才允许把入队失败降级为 ``failed/auto_start_enqueue_failed``：
+
+    1. driver 级真实事务仍活动（``BEGIN IMMEDIATE`` 取得的外层写事务未被
+       RAISE(ROLLBACK)/连接失效撤销——ORM 的 ``Session.in_transaction`` 只是
+       逻辑记账，不能证明底层连接仍持有事务，与 ``begin_immediate_write``
+       同一判定口径）；
+    2. 能在**同一事务内**读到本请求已 flush 的 ``provisioned`` 终态（读不到
+       说明外层事实已被撤销或读到的是旧已提交数据）。
+
+    任一不成立即返回 ``False``：外层损坏必须整体回滚、按错误协议 500，绝不在
+    新事务里补写任何 auto 状态再 commit。按事务真实状态判定，不按异常字符串
+    或 SQLite 错误文案分类。
+    """
+    connection = session.connection()
+    driver = connection.connection.driver_connection
+    if driver is None or not bool(getattr(driver, "in_transaction", False)):
+        return False
+    status = connection.execute(
+        select(RoleProvisionRequestRow.status).where(
+            RoleProvisionRequestRow.request_key == row.request_key
+        )
+    ).scalar_one_or_none()
+    return status == ROLE_REQUEST_STATUS_PROVISIONED
+
+
+def _auto_start_after_provision(
+    row: RoleProvisionRequestRow,
+    *,
+    session: Session,
+    config: Optional[RoleProvisionHostConfig],
+    now: datetime,
+) -> None:
+    """report(provisioned) 成功分支内的自动首次启动段（AUTO_START_DESIGN §3/§4）。
+
+    仅**新 create 意图 + 首次有效 report(provisioned)** 会到达这里（外层已 flush
+    配置终态与 report 代际，重复/迟到精确重放早在外层只读返回）。判定顺序：
+
+    1. ``auto_start_intent == 0``（旧请求/旧客户端/recover）→ 保持原行为；
+    2. 幂等锚点已存在（防御）→ 不重复入队；
+    3. 宿主配置未启用 → ``not_eligible`` + ``auto_start_config_disabled``；
+    4. **人工意图优先**：该角色已有 ``RoleServiceState`` 行且 ``generation != 0``
+       （任何已发生的人工 start/stop，含 stop-before-report）→ ``not_eligible``
+       + ``auto_start_manual_intent_present``，零 launch、不覆盖人工世代；
+    5. 其余交给共享入队核心（守卫拒绝翻译稳定码；可恢复写入异常回滚保存点后记
+       ``failed/auto_start_enqueue_failed``）。
+
+    入队的全部写（state CAS + launch INSERT，含实际 flush）都在**嵌套 SAVEPOINT**
+    内：失败只回滚自己，配置完成事实（``status=provisioned`` 与 report 代际）照常
+    随外层唯一提交点提交；外层提交失败整体回滚、按原错误协议 500，有效租约下同
+    token/同 revision 可安全重试。配置 failed/canceled 绝不进入本段。
+
+    可恢复降级有严格前提（``_outer_write_transaction_alive``）：保存点回滚后仍持有
+    同一实际写事务、且已 flush 报告事实可读，才登记 ``failed/auto_start_enqueue_failed``；
+    若保存点失败已撤销整个外层事务（如触发器 ``RAISE(ROLLBACK)``）或连接失效，
+    不得在新事务里补写 auto 状态，原样上抛由外层 500 整体回滚、零残留。
+    """
+    if not int(row.auto_start_intent or 0):
+        return  # 旧请求 / 旧客户端 / recover：无意图，行为与今日完全一致。
+    if row.auto_start_launch_id:
+        # 幂等锚点（防御分支）：已投递过，重复/迟到回报绝不产生第二次启动。
+        _set_auto_start(
+            session,
+            row.request_key,
+            status=ROLE_AUTO_START_STATUS_ENQUEUED,
+            code=None,
+            now=now,
+        )
+        return
+    if config is None or not config.enabled:
+        _set_auto_start(
+            session,
+            row.request_key,
+            status=ROLE_AUTO_START_STATUS_NOT_ELIGIBLE,
+            code=ROLE_REQUEST_ERROR_AUTO_START_CONFIG_DISABLED,
+            now=now,
+        )
+        return
+    state = session.get(RoleServiceState, (row.project_id, row.member_id))
+    if state is not None and int(state.generation or 0) != 0:
+        # 默认初始 stopped 不落状态行，与人工动作天然可区分；任何非零世代都
+        # 保持原人工/服务动作，不推进新世代。
+        _set_auto_start(
+            session,
+            row.request_key,
+            status=ROLE_AUTO_START_STATUS_NOT_ELIGIBLE,
+            code=ROLE_REQUEST_ERROR_AUTO_START_MANUAL_INTENT_PRESENT,
+            now=now,
+        )
+        return
+
+    savepoint = session.begin_nested()
+    try:
+        launch_id, code = enqueue_auto_start_launch(
+            row.project_id, row.member_id, session=session, now=now
+        )
+    except Exception:  # noqa: BLE001 - 入队写入异常：先证明外层仍有效才允许降级
+        # 降级前提：保存点回滚后仍持有同一实际写事务，且已 flush 的报告事实
+        # 未被撤销（如 SQLite 触发器 RAISE(ROLLBACK) 已撤销整个外层事务）。
+        # 外层已丢失/连接失效时不得在新事务里补写 auto 状态，原样上抛由外层
+        # 整体回滚 500。注意保存点回滚前 Session 处于 flush 失败停用态，
+        # 只能在此之后探测（同 begin_immediate_write 的 driver 级判定口径）。
+        savepoint.rollback()
+        if not _outer_write_transaction_alive(session, row):
+            raise
+        _set_auto_start(
+            session,
+            row.request_key,
+            status=ROLE_AUTO_START_STATUS_FAILED,
+            code=ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED,
+            now=now,
+        )
+        return
+    if launch_id:
+        savepoint.commit()
+        _set_auto_start(
+            session,
+            row.request_key,
+            status=ROLE_AUTO_START_STATUS_ENQUEUED,
+            code=None,
+            now=now,
+            launch_id=launch_id,
+        )
+    else:
+        savepoint.rollback()
+        _set_auto_start(
+            session,
+            row.request_key,
+            status=(
+                ROLE_AUTO_START_STATUS_FAILED
+                if code == ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED
+                else ROLE_AUTO_START_STATUS_NOT_ELIGIBLE
+            ),
+            code=code,
+            now=now,
+        )
+
+
 def _is_exact_report_replay(
     row: RoleProvisionRequestRow,
     *,
@@ -1481,6 +1695,11 @@ def report_request(
         row.updated_at = now
         row.finished_at = now
         session.add(row)
+        # R1-4c-a：先让外层配置终态与 report 代际进入同一事务，再开 SAVEPOINT
+        # 做自动启动入队——入队失败只回滚自己，不会把未 flush 的外层改动卷进去。
+        session.flush()
+        if outcome == ROLE_REQUEST_STATUS_PROVISIONED and row.kind == ROLE_REQUEST_KIND_CREATE:
+            _auto_start_after_provision(row, session=session, config=config, now=now)
         session.commit()
         session.refresh(row)
         projection = request_projection(

@@ -64,7 +64,11 @@ from server.models import (
     RoleServiceLaunch,
     RoleServiceState,
 )
-from server.role_services import start_role_service, stop_role_service
+from server.role_services import (
+    enqueue_auto_start_launch,
+    start_role_service,
+    stop_role_service,
+)
 from tests.test_project_roles import RoleApiTestCase, encode
 
 PROJECT_ID = "prj_alpha"
@@ -1382,6 +1386,95 @@ class RoleServiceProjectionTests(RoleServiceTestCase):
         self.assertTrue(row["can_start"])
         self.assertFalse(row["can_stop"])
         self.assertFalse(row["archived"])
+
+
+class SharedEnqueueCoreTests(RoleServiceTestCase):
+    """R1-4c-a：``start_role_service`` 抽共享核心后的等价回归与自动入口复用守卫。"""
+
+    def test_manual_start_wrapper_semantics_unchanged_after_refactor(self):
+        """人工 start 薄包装：返回模型/世代/审计/错误码与 R1-3 逐字一致。"""
+        started = self.start()
+        self.assertEqual(started.status_code, 200, started.text)
+        body = started.json()
+        self.assertEqual(body["generation"], 1)
+        self.assertTrue(body["launch_id"])
+        self.assertTrue(body["expected_instance_id"].startswith("ins_"))
+        self.assertNotIn("token", str(body).lower().replace("launch_id", ""))
+        state = self.state_row()
+        self.assertEqual(state.generation, 1)
+        self.assertEqual(state.desired_state, "running")
+        self.assertEqual(state.observed_state, ROLE_SERVICE_OBSERVED_STARTING)
+        self.assertEqual(state.control_kind, "managed_cli")
+        # human 审计身份保持（共享核心只改 actor 参数，不改包装语义）。
+        self.assertEqual(state.updated_by, "human:bobo")
+        # 所有权/运行中守卫保持：第二次 start 仍 409 already_running。
+        second = self.start()
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(second.json()["detail"], ROLE_SERVICE_ERROR_ALREADY_RUNNING)
+        # 默认 stopped 语义不被本片改动（无行不落行，can_start 公式不硬置）。
+        self.assertEqual(len(self.launch_rows()), 1)
+
+    def test_enqueue_auto_start_launch_uses_real_binding_and_audit(self):
+        """自动入口复用真实 binding/control_kind/CAS/TTL，审计 system:auto-start。"""
+        with self.session() as session:
+            db.begin_immediate_write(session)
+            launch_id, code = enqueue_auto_start_launch(
+                PROJECT_ID, self.role_a, session=session, now=_utc_now()
+            )
+            self.assertIsNotNone(launch_id)
+            self.assertIsNone(code)
+            session.commit()
+        launch = self.launch_row(launch_id)
+        self.assertEqual(launch.action, "start")
+        self.assertEqual(launch.state, "pending")
+        self.assertEqual(launch.generation, 1)
+        state = self.state_row()
+        self.assertEqual(state.generation, 1)
+        self.assertEqual(state.desired_state, "running")
+        self.assertEqual(state.control_kind, "managed_cli")
+        self.assertEqual(state.updated_by, "system:auto-start")
+        # 人工 stop 对自动入队的 pending 动作同样生效（世代/所有权边界保持）。
+        stopped = self.stop()
+        self.assertEqual(stopped.status_code, 200, stopped.text)
+        self.assertEqual(stopped.json()["generation"], 2)
+        launch = self.launch_row(launch_id)
+        self.assertEqual(launch.state, ROLE_SERVICE_LAUNCH_EXPIRED)
+        self.assertEqual(launch.error_code, ROLE_SERVICE_ERROR_UNKNOWN_OWNER)
+
+    def test_enqueue_auto_start_launch_refuses_unknown_control_kind(self):
+        """登记为 unknown 的运行器如实拒绝：稳定码 + 零写入，不挂 pending 等超时。"""
+        unmanaged_choice = self.register_unmanaged_runner()
+        member_id, _key = self.make_second_role(
+            runner_id=UNMANAGED_RUNNER_ID, choice_id=unmanaged_choice
+        )
+        with self.session() as session:
+            db.begin_immediate_write(session)
+            launch_id, code = enqueue_auto_start_launch(
+                PROJECT_ID, member_id, session=session, now=_utc_now()
+            )
+            session.rollback()
+        self.assertIsNone(launch_id)
+        self.assertEqual(code, "auto_start_control_kind_not_managed")
+        self.assertIsNone(self.state_row(member_id))
+        self.assertEqual(len(self.launch_rows(member_id)), 0)
+
+    def test_enqueue_auto_start_launch_conflict_returns_stable_code(self):
+        """已运行中/持有所有权时只回稳定码（auto_start_enqueue_failed），不抛 HTTP。"""
+        started = self.start()
+        self.assertEqual(started.status_code, 200, started.text)
+        with self.session() as session:
+            db.begin_immediate_write(session)
+            launch_id, code = enqueue_auto_start_launch(
+                PROJECT_ID, self.role_a, session=session, now=_utc_now()
+            )
+            session.rollback()
+        self.assertIsNone(launch_id)
+        self.assertEqual(code, "auto_start_enqueue_failed")
+        self.assertEqual(len(self.launch_rows()), 1)
+
+
+def _utc_now():
+    return datetime.now(timezone.utc)
 
 
 if __name__ == "__main__":  # pragma: no cover

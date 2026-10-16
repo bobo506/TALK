@@ -650,5 +650,159 @@ class ArchivedRoleTaskGuardTests(RoleApiTestCase):
         self.assertEqual(global_task.status_code, 201)
 
 
+class LegacyAutoStartColumnMigrationTests(unittest.TestCase):
+    """R1-4c-a：旧形态 ``role_provision_requests``（无 4 新列）经 init_db 幂等升级。
+
+    只 ADD COLUMN + 普通索引；旧行默认值 ``0/NULL/NULL/NULL``（= 无意图），
+    不重建表、不回填、不改写旧行；重复 init_db() 无副作用。
+    """
+
+    def setUp(self):
+        super().setUp()
+        tmp_root = Path(__file__).resolve().parent.parent / ".tmp-tests"
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        self._tmpdir = Path(tempfile.mkdtemp(prefix="talk-r1-4c-a-legacy-", dir=tmp_root))
+        self.db_path = self._tmpdir / "legacy_autostart.db"
+        self._write_old_shape_database()
+        self.engine = create_engine(
+            f"sqlite:///{self.db_path}",
+            echo=False,
+            connect_args={"check_same_thread": False},
+        )
+        self._old_engine = db.engine
+        self._old_main_engine = main.engine
+        db.engine = self.engine
+        main.engine = self.engine
+        self.addCleanup(self._restore_engines)
+
+    def _restore_engines(self):
+        db.engine = self._old_engine
+        main.engine = self._old_main_engine
+        self.engine.dispose()
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _write_old_shape_database(self):
+        """R1-4a 旧形态：请求表存在但还没有任何 auto_start_* 列。"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE role_provision_requests (
+                    request_key TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    payload JSON NOT NULL,
+                    request_fingerprint TEXT NOT NULL,
+                    choice_snapshot JSON,
+                    role_name TEXT,
+                    member_id TEXT,
+                    origin_operation_key TEXT,
+                    expected_credential_version INTEGER,
+                    status TEXT NOT NULL,
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    lease_generation INTEGER NOT NULL DEFAULT 0,
+                    lease_token_hash TEXT,
+                    lease_host TEXT,
+                    lease_claimed_at TIMESTAMP,
+                    lease_expires_at TIMESTAMP,
+                    lease_config_version INTEGER,
+                    report_outcome TEXT,
+                    report_revision INTEGER,
+                    report_credential_version INTEGER,
+                    last_error_code TEXT,
+                    created_by TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
+                    finished_at TIMESTAMP
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO role_provision_requests (
+                    request_key, project_id, kind, payload, request_fingerprint,
+                    status, created_by, created_at, updated_at
+                ) VALUES (
+                    'op-legacy-auto', 'prj_legacy', 'create', '{}', 'fp-legacy',
+                    'provisioned', 'human:bobo', '2026-10-01 00:00:00', '2026-10-01 00:00:00'
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO role_provision_requests (
+                    request_key, project_id, kind, payload, request_fingerprint,
+                    status, created_by, created_at, updated_at
+                ) VALUES (
+                    'op-legacy-active', 'prj_legacy', 'create', '{}', 'fp-legacy-2',
+                    'requested', 'human:bobo', '2026-10-01 00:00:00', '2026-10-01 00:00:00'
+                )
+                """
+            )
+            conn.commit()
+
+    def _columns(self) -> set[str]:
+        with self.engine.connect() as conn:
+            return {
+                row[1]
+                for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(role_provision_requests)"
+                ).fetchall()
+            }
+
+    def _indexes(self) -> set[str]:
+        with self.engine.connect() as conn:
+            return {
+                row[0]
+                for row in conn.exec_driver_sql(
+                    "SELECT name FROM sqlite_master WHERE type='index'"
+                ).fetchall()
+            }
+
+    def test_old_shape_table_gains_four_columns_and_index_idempotently(self):
+        self.assertNotIn("auto_start_intent", self._columns())
+
+        db.init_db()
+        db.init_db()  # 重复初始化必须幂等
+
+        columns = self._columns()
+        for column in (
+            "auto_start_intent",
+            "auto_start_status",
+            "auto_start_launch_id",
+            "auto_start_error_code",
+        ):
+            self.assertIn(column, columns)
+        self.assertIn(
+            "ix_role_provision_requests_auto_start_launch", self._indexes()
+        )
+
+        with self.engine.connect() as conn:
+            rows = conn.exec_driver_sql(
+                "SELECT request_key, auto_start_intent, auto_start_status,"
+                " auto_start_launch_id, auto_start_error_code"
+                " FROM role_provision_requests ORDER BY request_key"
+            ).fetchall()
+        # 旧行（各请求终态）全部保持默认：无意图、无锚点、无错误码，不被追溯启动。
+        self.assertEqual(
+            [tuple(row) for row in rows],
+            [
+                ("op-legacy-active", 0, None, None, None),
+                ("op-legacy-auto", 0, None, None, None),
+            ],
+        )
+        # 列级约束如实：PRAGMA table_info = (cid, name, type, notnull, dflt_value, pk)。
+        with self.engine.connect() as conn:
+            info = {
+                row[1]: row
+                for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(role_provision_requests)"
+                ).fetchall()
+            }
+        intent = info["auto_start_intent"]
+        self.assertEqual(intent[3], 1)  # notnull
+        self.assertEqual(intent[4], "0")  # dflt_value（SQLite 以字符串报告）
+
+
 if __name__ == "__main__":
     unittest.main()
