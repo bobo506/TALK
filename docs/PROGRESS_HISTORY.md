@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16 22:05（Asia/Shanghai）— 前端自动首次启动候选完成自测，255交DeepSeek只读复核
+
+- 用户明确继续下一切片，沿最新AGENTS的Codex前端实施/DeepSeek独立复核；MCP核agent:codex/kind=agent、项目prj_e8fe7066bbec与当前开发要求，本次明确分工优先，不改永久项目配置。基线98beb9c，产品写入前跟踪文件无未提交差异。
+- 仅11产品/测试源：web/role-creation.js与index.html，两创建Node测试及7个六资源缓存断言消费者。新create固定auto_start=true；旧缓存原键原载荷恢复，缺省/false/null不升级，recover不加字段。公开auto投影、配置/入队/实际服务状态分开，详情仅异常短反馈，不恢复配置完成大卡；刷新无额外start。六资源20261016-role-auto-start，workspace/app及后端/宿主保持。
+- 自测95/95相关Node、26/26 Python隔离静态路由契约通过，0失败/错误/跳过，初次37为95子集不累计；真实模块VM验证新payload、starting→ready→stopped及仅1次create POST。语法/diff与848范围外SHA通过。candidate/before副本、baseline/developer-summary、node-run1与web-contracts完整证据在.tmp/role-auto-start-frontend/。无Browser/视觉键盘/真实原生模型、登录或生产服务验证，不把桩/VM当真实用户验收。
+- 产品冻结暂停后，255按最小四参派DeepSeek独立只读复核；原需求/合同/实际基线与差异/验收标准/全部自测及限制入包。根不修改冻结候选或反复轮询，只维护正式docs及本次回执；通过后再收取与提交产品源码。当前默认等用户通知完成，非持续等待。
+- 更新PROGRESS/本历史/PROJECT_BRIEF/MODULE_webui/自动启动需求与合同，新增页面验收草稿，明确本轮候选尚未独立通过或发布。日志/旧角色迁移/全角色预算/删除均后续；另保留用户对TALK-private的部署决策：正式应用目录可有private子目录，开发Git仓库隔离，私有数据部署后生成且升级保留，当前路径校验不在本片修改。
+- 本轮仅上述相关docs提交/推送，11源冻结留待复核，不纳入该文档提交；没有启停/迁移/读取真实凭据或操作生产DB。准确候选、任务派发及Git回执见.tmp/role-auto-start-frontend/{developer-summary.json,dispatch.json,publication-pending-review.json}。
+
 ## 2026-10-16 16:40（Asia/Shanghai）— 254事务/夹具返修独立通过收取，后端8源发布；后续改DeepSeek
 
 - 用户通知“254已经好了”，并明确后续DeepSeek代替K2.8。根MCP核caller agent:codex/kind=agent与项目当前开发要求，按既有254原包独立复核；最新分工只影响后续任务，AGENTS同步，不追改旧执行者或永久配置。

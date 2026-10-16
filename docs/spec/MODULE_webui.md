@@ -461,3 +461,12 @@
 
 - 用户在245版本5de19e8发布/刷新说明后明确“验收通过”，本轮创建配置与截图信息布局整体页面门禁释放；没有逐项操作日志，不补写窄屏/键盘或真实恢复/原生启停通过。245独立/静态证据沿用，旧244错误范围保持历史。
 - 用户下一项指定新“Kimi k2.8”执行能力试验，当前offline/无实例；246由DeepSeek先准备接单入口，Codex独立核，不在本轮更改已验前端。外部/删除归档/退出与真实运行器能力后续保持。
+
+
+## 2026-10-16 前端自动首次启动候选（255待DeepSeek独立复核）
+
+- 基线98beb9c后端已验收；用户明确继续下一片，Codex前端实施、DeepSeek只读独立复核，正式项目development_requirements不改。仅11源：role-creation.js/index.html、两创建Node测试与7个缓存断言消费者，六资源20261016-role-auto-start；workspace.js/app.js及全部后端/宿主不改。
+- 新create固定auto_start=true，无额外勾选；未确认保存使用原键原载荷，恢复缓存保留true/false/null/缺省，不追补旧请求或recover。只读公开auto布尔/状态/launch锚点/稳定码，未知凭据字段不进入DOM或存储。
+- 创建弹窗区分配置成功与启动请求已提交；详情沿既有角色开关呈现实际服务状态，只对自动启动未执行/失败/未知给短反馈，不恢复配置成功大卡或重复服务标签。人工意图保留，配置失败/取消即使pending也不写成启动中，刷新不发第二个start。
+- 开发者95/95相关Node与26/26 Python静态路由契约通过，0失败/错误/跳过；真实模块VM验证starting→ready→stopped展示与1次create POST。848范围外文件在docs同步前逐SHA未变，11候选冻结在.tmp/role-auto-start-frontend/，原证据不覆盖；待实际独立复核，不以自测替代验收。
+- 没有Browser/视觉键盘或真实原生CLI/模型/生产宿主验证，unknown/unverified不变。复核通过后再发布及按[页面验收草稿](../guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)人工验收，本轮不同时开展日志/旧角色迁移/预算/删除或私有目录路径改造。
