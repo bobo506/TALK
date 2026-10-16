@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 07:45（Asia/Shanghai）— 258准备片独立通过并收取，259保身份补录产品片首次实施已派
+
+- 用户通知258好了，根实读MCP完整摘要：2792/task258/schema有效、partial自报，runner succeeded/submitted。caller agent:codex/lead、项目及旧development_requirements已重新读取，按用户10-17最新DeepSeek首次执行/Codex复核并直接修正的明确分工执行，不改旧项目配置。
+- 独立实读v3实际SQL实例选择/有界历史/在途聚合/门禁、Key/host/runtime辅助入口、F4状态与计划/自测驱动。21项相关隔离自测通过（SqlWhitelist/InstanceLatestSelection/CredentialInstrumentation/ApiBoundaryProbe），不重复未变产品81项；原开发46自测/12API探针保持原证据，数量不混同根新增验证。
+- 根自建5项假库/假Key探针通过：205条旧记录后的最新busy(task999)及另一目标可见、非目标/显式其它项目排除且未标项目行单独标风险、最新idle不抹去旧busy、缺时间unknown阻止切换、凭据仅元数据且正文监测诚实未接线。首次根驱动误读instances_latest.rows导致KeyError，改为真实tables.agent_instances.rows后通过；只修根驱动，原候选零改动，不归因产品或隐去该限制。
+- v1 22/v2 25/v3实际35文件逐SHA不变，854保护跟踪文件不变；根无生产DB/Key正文读取、产品或生产写/真实进程启停。Hall2795裁决pass_preparation_only，UTC2026-10-16T23:43:25.199230收取258 succeeded/completed。原partial与256/257 needs_changes结果保留，后两未收取；F1—F4由当前准备闭合，不追改历史原件。采集时task258在途快照已非当前状态，MCP实例后来报idle/task=null也不当活进程证明。
+- 根审查与收取证据independent-review258/{review.json,focused-tests.log,focused-tests.json,root-probes.py,root-probes.json,candidate-manifest.json,collection.json,publication.json}。准备验收不代表5角色实际迁移、真实原生/登录/模型/宿主/终端T-W或255页面人工验收。
+- 本轮完成准备后usage-gate实际返回continue，百分比session/weekly均null，未将null算0或臆测额度。启动一个数据库/协议产品片A：Codex写ROLE_LEGACY_ATTACH_DESIGN.md明确选择独立legacy_attach审计/来源，不伪造RoleCreationOperation；human-only保ID/Key/历史补录、锁内引用/幂等/逐步失败回滚、原事实不变与必要隔离验收。宿主模板/21600/日志/页面新交互与实际迁移不扩入。
+- 259最小四参派DeepSeek，Hall group:task-44002cd1aa4c44c386b1f3e664373bff，UTC2026-10-16T23:45:44.096001初始queued/assigned。基线55ee96e/860跟踪SHA与精确9源码测试白名单见product-attach/baseline.json；仅developer/留开发证据，正式7协调docs仅Codex维护（本轮实际改6），原准备/独立证据保护。任务仅首次执行，完成暂停，问题由Codex直接修正，默认通知259好了取件，不轮询。
+- 本轮根只开发准备复核探针/新增实施合同及6相关正式docs，验证后提交推送；共享目录259产品开发期间不审读或修改进行中源码。派发/完整包/额度/发布证据product-attach/{dispatch.json,task-package.json,usage-gate.json,publication.json}。5角色实际登记/迁移未执行，现有服务和Key保持。
+
 ## 2026-10-17 00:09（Asia/Shanghai）— 用户调整为DeepSeek首次执行，Codex复核并直接修正
 
 - 用户明确“你派任务给deepseek，然后它做好了你复核，如果有问题就由你改掉”“它只做第一次执行”，目的是减少同片往返、加快推进。该持续明确分工优先于旧前后端固定分工、问题交回开发者及Codex修正后默认再次外部回审的项目约定。

@@ -15,9 +15,11 @@
 
 ## 当前实现
 
-### 存量5角色登记与页面启停：257仍需修正，258准备件返修（2026-10-17）
+### 存量5角色登记与页面启停：258准备通过，259补录产品片开发中（2026-10-17）
 
-用户授权全部5角色保身份/Key/模型/历史迁为页面启停，255人工/真实原生能力仍待。当前前三无绑定、两个K2.8共用unverified/unknown运行器且无受管状态；host设置/PID不代表实际可控。256错误CREATE补旧身份步骤在257已去除，4成员明确blocked_product_gap；实际凭据stat-only与公开SQL列的根假输入拒读实证通过。但257实例采集fetchall后全局前200，无SQL成员限制/排序，会丢掉最新busy及其它目标；正文读取监测未接线仍报0。根独立判needs_changes/Hall2789，256/257原结果未收取。258仅写prepare-v3定向修正实例最新/有界在途事实、诚实监测与隔离输出，不改产品/生产/能力或启停。保ID补录产品片及per-runtime模板/21600通道后续另片，不能经人类确认绕过现有CREATE新身份语义。详[正式需求](ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md)。默认派后结束，用户通知258完成后再审；DeepSeek自身/协调CLI最后切换，Desktop/MCP不强行接管。
+用户授权5旧角色保身份/Key/模型/历史转页面启停。258已独立实读并通过21项定向隔离测试+5项根探针，SQL层逐成员最新/独立在途聚合与unknown阻止切换、凭据stat-only/SQL白名单及not_instrumented口径闭合；Hall2795后收取，原partial/旧失败证据保留。准备不等于实际迁移，所有角色未真实登记/启停。
+
+259交DeepSeek按[补录实施合同](ROLE_LEGACY_ATTACH_DESIGN.md)首次实施：新增human-only legacy-attach、同ID的imported/nonexclusive项目角色与独立补录审计，只在显式映射与当前绑定六维相符时给legacy_attach来源；宿主继续核choice/能力/所有权，不把旧身份伪装成新建角色或换Key。Codex在交付暂停后复核，有问题直接修正、验证收尾，不再往返派修。宿主per-runtime模板/21600参数及真实原生/模型/终端T-W、255人工验收另片；原unknown/unverified守卫保持。默认通知259完成后收取，不轮询。
 
 ### 完整异常日志与存量角色统一受管（2026-10-16，已确认待实施）
 
