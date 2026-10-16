@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 00:04（Asia/Shanghai）— 257凭据实际读取已修，实例选择及监测仍需修正，258已派
+
+- 用户通知好了后收取257只读完整摘要：msg2788/task257/schema合法、业务partial、runner succeeded/submitted，不当整体验收。当前caller agent:codex/lead、项目prj_e8fe7066bbec与development_requirements已实读，最新用户/AGENTS仍DeepSeek后端准备、Codex独立复核/正式docs/Git，不改永久旧要求。原256/257均未收取。
+- 独立读prepare-v2实际准备/host/runtime采集代码、5角色计划/迁移文档及自测驱动。F1已删除4旧成员经CREATE补录的错误步骤，blocked_product_gap/executable_step=null；F2实际私有凭据仅stat/access，秘密列SQL已白名单化。根假Key Path.open拒读与假SQLite秘密列authorizer均通过，原v1读取缺陷纠正已留痕，未发现明文泄露证据。
+- F3/P1尚未闭合“最新必要实例”要求：SQL只有WHERE project_id，fetchall后全局截前200，没有目标成员/ORDER BY/SQL LIMIT。根204行假库反例使最新busy current_task_id=999与另一目标成员丢失，返回old-199，可能错误判定可切换；辅助入口[-1]也无时间保证。要求SQL层稳定最新选择及独立有界/聚合在途风险，未知阻止切换、不凭PID接管。
+- F4/P2：“真实读取监测”仍仅初始化open/read/hash=0，未接线；test_03只核metadata递增。根故意加入假Key真实read_bytes后计数仍0。要求最小诚实方案去除该运行监测保证/标unknown，以拒读实证限定本次路径；如保留监测，须负向读取真实检出。此项不代表新实际凭据读取或泄漏。
+- 根定向探针位于independent-review257/{probe-issues.py,boundary-issues.json,review.json}，无生产Key/DB读取、无产品或生产修改；未重复35/81全套。v2自测部分默认生产公开盘点、test_32覆盖原raw限制已记录且根未执行，258要求显式假输入及独立输出，不重复产品无改的81项。
+- v2实际25文件已冻结candidate-manifest.json，根探针后25/25不变；v1原22/22与855保护跟踪文件一致，5协调docs例外。257原msg2788 partial及自报测试留原，Hall裁决2789=needs_changes，不收取或执行迁移。
+- 258最小四参交agent:deepseek，Hall group:task-7f4ffa80b439430f9fc89dbdab8b248d，UTC2026-10-16T16:04:13.168720初始queued/assigned。只写prepare-v3，定向修F3/F4与隔离测试输出，不改产品设计/源码/config/正式docs/Git/生产DB/真实Key或能力，不启停CLI/host/模型；原件与根证据保护。完成暂停，默认用户通知258好了再取件，不轮询。
+- 本轮5正式docs汇总验证提交推送。全部5角色实际登记/迁移仍未执行，255人工/原生待验；产品补录片A、per-runtime模板/21600通道片B后续再做。审查/冻结/派发/发布证据.tmp/legacy-role-page-control/independent-review257/{delivery-summary.json,review.json,boundary-issues.json,candidate-manifest.json,rework-dispatch.json,rework-package.json,publication.json}。未读取精确额度，不臆测比例。
+
 ## 2026-10-16 23:15（Asia/Shanghai）— 256初审发现保ID补录及凭据读取P1，257准备件返修已派
 
 - 用户通知256好了，根按MCP完整摘要读取msg2785：task_id=256/schema合法，complete只是本片准备自报，5角色整体迁移未执行。DeepSeek自测28项及readonly数据库/基线报告保留；原256未收取，未依据succeeded或测试数宣布迁移可执行。
