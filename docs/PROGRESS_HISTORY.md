@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16（Asia/Shanghai）— 249方案通过，250交旧K2.8首次实际开发
+
+- 用户明确已启动旧K2.8，下一片由Codex与K2.8协作、先不派DeepSeek；只覆盖本片，不改永久development_requirements。派发前实读caller agent:codex/kind=agent、latest requirements，旧agent:kimi-code-k28-preview实例8ddd72cf-e145-4421-8efe-7a1fb9408b98/kimi-code/idle/无current_task、binding=bound。仅上报可用，不外推实际后端模型版本或主动等待能力；新角色本轮不启动。
+- 248/msg2764/SHA59acca78bb39ef166b840b104404bd4737de80c0af180ecb8a5a55b275d59768、249/msg2763/SHA407db90886c268e9e8b3471563cbcd76e8a962c43f0a8bc439a69663749d60e8，本地validate与稳定分页10字段等同。Codex独立35/35零模型及五组SQLModel/真实隔离API/触发器探针，原开发者证据保持、未重写或合计旧26/13；复核产物.tmp/k28-autostart-slice/。
+- 248全队列/结构拒绝/直接子回收主问题已修，当前Codex环境pipes基础spawn成功，不泛化DSH原限制；真实新角色CLI/孙进程/优雅退出未验且deadline在执行阶段重设，不能宣称900秒全流程硬上限。248/246未收取，新角色真实准入保留，本次不再派DeepSeek修此入口，旧角色既有服务不依赖它。
+- 249方案四组缺口闭合：独立auto布尔比较而共享指纹不变、无行/gen0首次守卫、同外层事务SAVEPOINT隔离入队失败、外层失败如实回滚可重试。Codex补充共享核心不能rollback/另开BEGIN、unverified与unknown分类不能混同、意图状态不等于ready的精确合同。正式ROLE_AUTO_START_DESIGN.md发布待实现，原247错误方案不恢复。249于UTC2026-10-16T00:53:22.432914、247于00:53:24.563104收取completed，原报告保留。
+- 单片250“ K2.8首次开发实做：新角色配置成功后自动启动后端单片”四参数顶层派旧agent:kimi-code-k28-preview，Hall group:task-197cc2b481bb47d8a2e003f5b32749ad，派发快照queued。本次真实开发/原需求/正式裁决/4bf6d8a基线/174源保护/8允许源、实际SQLite故障注入与旧链回归/本次号完整JSON入包；不派DeepSeek/其它角色，不开子agent，完成暂停供Codex独立核。
+- 250只允许4 server+4 tests和.tmp/k28-autostart-slice/development/，不动web/host/worker/docs/Git/生产配置或真实秘密；Codex仅正式文档推进，不与开发者并行改产品或审查在途源码。本轮正式docs精确提交推送，准确版本/派发与收取见该.tmp下publication.json、dispatch.json、collection.json。默认结束等用户“250好了”再取件；自动启动未上线、真实受管/页面/原生/主动仍待后续证据。
+
 ## 2026-10-15 23:34（Asia/Shanghai）— 246/247独立复核未通过，248/249顺序补正
 
 - 用户确认新角色配置成功后自动打开一次开关，可手动关/再开；不新增默认未勾选的启动选项，不隐含勾选既有“随项目自动启动”。项目加载选择性启动仍为独立后续规划，存量入口不自动接管。
