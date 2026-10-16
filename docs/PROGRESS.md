@@ -1,27 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-16 (Asia/Shanghai)：250后端继续；用户补提任务详情只显示发起人，Codex已完成隔离候选，251交旧K2.8在250交付暂停后只读复核，页面尚未发布。
+Updated: 2026-10-16 10:36 (Asia/Shanghai)：250触发3600秒执行超时，代码保留未验；251页面候选复核已收取并合入，详情只显示发起人，待用户刷新验收。
 
-## 已确认状态
+## 当前事实
 
-- TALK / prj_e8fe7066bbec，codex/terminal-return-codex；caller实读agent:codex/kind=agent。Codex协调/独立复核/正式进度与Git；用户本片覆盖原分工为旧K2.8开发、Codex核，不改永久development_requirements，已实读最新要求。
-- 页面业务5de19e8已获本轮整体验收；本轮开始HEAD=4bf6d8a59b7ef2e67bbc79f1241ef85eb1e7c7eb，派250前174保护源0漂移。本轮Codex只改相关docs，250进行中不并行改产品/审查在途源码。
-- 旧agent:kimi-code-k28-preview由用户启动，最新实例8ddd72cf-e145-4421-8efe-7a1fb9408b98/kimi-code/idle/无current_task、binding=bound，派发前availability available；上报不是心跳/实际模型版本证明。新建Kimi k2.8不启动，不依赖248临时入口，不改runner unverified/control unknown。
-- 新角色配置成功自动打开一次开关，随后可手动关/再开；不另设默认未勾选选项，不追溯旧角色/恢复，不隐含“随项目自动启动”。人工动作先于完成回报仍优先，入队不是ready。
+- TALK / prj_e8fe7066bbec / codex/terminal-return-codex，caller实读agent:codex/kind=agent。当前用户授权Codex与旧agent:kimi-code-k28-preview协作，不派DeepSeek；永久development_requirements未改。
+- 页面业务5de19e8此前已获整体验收。本次小修仅详情顶部“负责人…·…发起”改为“发起人 <created_by展示名>”，本人也显姓名；角色页/列表/分工/权限/真实target不改。六资源20261016-task-initiator-label，静态无需重启。
+- 250于08:56:19→09:56:20（UTC+8）failed/failed，msg2767为桥接timed_out文案，与入口3600秒预算吻合；没有向TALK提交有效结构化结果。250不是251的前序重试链：251是用户后来提出的独立页面小修复核，失败前已排队。
+- 250本地留下4 server+4 tests（7跟踪修改、1新增），原样UTF-8副本及8源SHA见.tmp/k28-autostart-slice/recovery-250/。本地自报complete/121+151 unittest日志不等于独立通过，JSON还有verification[1].check超长（220>120），原报告/失败状态均保留，250未收取。
+- 旧K2.8实例完成251后idle/无current_task，消息2768确认暂停；最新2770明确失败后保持暂停、旧继续指令不作恢复授权，不自行重做250。Codex合入UI前后8后端SHA一致，没有提交、回滚或更改250代码。
 
-## 当前任务
+## 251页面小修已完成
 
-- 248/msg2764与249/msg2763本地validate、稳定分页10字段等同。独立证据.tmp/k28-autostart-slice/；原246/247失败与.tmp/role-start-review/证据保持。
-- 248独立35/35零模型通过单任务/结构拒绝/直接子回收，当前Codex环境pipes基础spawn成功。真实新入口孙进程/原生退出未验，deadline在执行阶段重设并非900秒全流程硬上限；248/246未收取，不作新角色实际运行准入，本次不再派DeepSeek补它。
-- 249独立五组源码/隔离路由/SQLModel真实触发器及双连接探针通过；249与原247已收取completed。正式docs/spec/ROLE_AUTO_START_DESIGN.md确认4列/独立布尔比较、共享指纹不变、无行/gen0首次守卫、SAVEPOINT入队/外层失败可重试；原247错误方案不恢复使用。
-- 250“K2.8首次开发实做：新角色配置成功后自动启动后端单片”，target agent:kimi-code-k28-preview，Hall group:task-197cc2b481bb47d8a2e003f5b32749ad，派发快照queued。只4 server+4 tests与.tmp/k28-autostart-slice/development/；宿主/worker/前端/docs/Git/生产/秘密不动，代码能力待实际交付与独立复核，完成必须暂停。
-- 本次显式分工/原需求/4bf6d8a与174源保护/8文件白名单/正式裁决/旧链兼容与真实SQLite故障注入/本次task_id完整JSON均入包。Codex仅推进正式docs，不为首测另建无关任务或主动轮询。
-- 用户新增小修：任务详情顶部“负责人 DeepSeek · Codex 发起”统一改为“发起人 <created_by展示名>”，本人发起也显示姓名；仅这一行，其他任务列表/分工、权限与数据保持。Codex未写共享产品源，git archive 3c9d54c独立快照位于.tmp/task-initiator-label/candidate/，changes.patch/manifest.json列9文件（app一行、HTML六缓存、7测试仅版本替换），候选20261016-task-initiator-label。
-- 隔离候选已通过26项unittest页面契约、11项Node真实导航/缓存与5个VM标签场景、JS语法及9源冻结/共享原样检查。pytest无模块记not_run，以同批unittest替代，未装依赖/操作Browser或生产。真实视觉未验，当前页面仍原版本。
-- 251“任务详情仅展示发起人的前端候选独立复核”，target旧agent:kimi-code-k28-preview，Hall group:task-938c795c16f443459368db38789383e9，派发快照queued。仅.tmp/task-initiator-label/review/，需250交付暂停后审，不能改产品/候选/docs/Git。早先请求250立即暂停已在Hall撤回；250原片继续，Codex只改隔离副本，不并行写共享源。
+- 251/msg2769给出通过，原MCP为前言+JSON而业务unknown，保持原文；本地合法251 JSON与提取正文verification等关键字段一致，仅completed一处说明措辞差异。独立源码/11Node/26Python/5VM材料与实际候选核同后已收取completed（UTC2026-10-16T02:35:56.323335）。
+- 原review/check_shas.log使用字节哈希混比规范文本哈希，错误初稿保留；根复核按manifest规范文本核9个base/candidate/共享源及patch，全对，174保护源中候选白名单外0业务差异，末轮tree_check/diff_check相符。后端状态描述不作250验收证据。
+- 9候选文件已合入共享源：app.js一行、index.html六缓存与7既有测试版本替换。共享实际环境重新26 unittest/11 Node与语法/diff检查通过，真实日志handler指向本片.tmp，不写生产日志；隔离候选5VM证据沿用、不重复合计。
+- 首页+六资源GET200、字节与已核源一致、六版本一致，见.tmp/task-initiator-label/final/static-check.json；未Browser，真实视觉交用户。251源与4相关docs精确提交推送，250在途源/私有/db不入提交；准确版本见该final/publication.json。
 
-## 下一步
+## 保留范围与下一步
 
-- 默认派发后结束，用户“250好了”/“251好了”后分别取件；250暂停后Codex独立核后端，251通过后在无产品写入时核基线并合入前端候选、必要验证/文档/Git/静态发布，再交用户刷新验收。两项互不扩大，独立复核不通过先修，不提前宣布K2.8能力或自动启动上线。
-- 当前页面仍不自动启动；本片不操作生产DB/名册/Key/绑定/能力登记/新角色模型。原生/真实受管/Browser/异常退出与I-4后续各验，未核T不开主动长等待。248临时入口遗留单独记录，不混入250功能范围。
-- 上轮5docs收尾见.tmp/k28-autostart-slice/publication.json；本轮仅3相关进度docs提交，候选与未复核250源不提交。前端证据/派发/准确收尾见.tmp/task-initiator-label/。恢复“继续项目”承接250/251，不重复派发。
+- 用户Ctrl+F5→任务详情，核顶部只有“发起人 XXX”、本人发起也显示姓名。先等本页面小修人工验收，不再开启新切片。
+- 随后Codex独立审250保留代码/真实测试与执行超时材料，必要修正按持续授权接手并另独立复核；不自动重派相同小时任务、不恢复旧K2.8写入，不把本地complete说成已通过。后端自动启动未验收，页面创建尚未接auto_start，真实受管/模型版本/原生/主动等待未验。
+- 249/247方案已收取、正式ROLE_AUTO_START_DESIGN.md保持；248/246新角色入口未收取（整体硬预算/孙进程边界），不作为新角色真实准入。用户已启动的是旧K2.8，TALK受管能力unverified/control unknown不改。
+- 恢复“继续项目”承接本轮UI验收及250独立审查；默认用户通知后取件，不轮询、不重复派发。精确配额本轮未读取，不臆测消耗比例。

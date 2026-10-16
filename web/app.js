@@ -1083,7 +1083,7 @@ function renderTaskDetailsPanel() {
   taskDetailsStatus.appendChild(badge);
   taskDetailsMeta.innerHTML = "";
   const people = document.createElement("div");
-  people.textContent = `负责人 ${workspaceMemberName(task.target_member_id)} · ${task.created_by === myId ? "由你发起" : `${workspaceMemberName(task.created_by)} 发起`}`;
+  people.textContent = `发起人 ${workspaceMemberName(task.created_by)}`;
   taskDetailsMeta.appendChild(people);
   taskDetailsContent.textContent = task.content || "";
   taskDetailsPanel.querySelectorAll(".task-governance-card").forEach((node) => node.remove());

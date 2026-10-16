@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16 10:36（Asia/Shanghai）— 250执行超时保留，251页面小修独立通过合入
+
+- 用户报告250失败/251完成。API核250 claimed UTC00:56:19.664248→finished01:56:20.197792、failed/failed、msg2767仅“Kimi Code bridge 暂时没有返回结果”；bridge format_cli_reply唯timed_out分支生成该文案，旧入口EXECUTION_TIMEOUT_SECONDS=3600，确认为执行预算到期，不能混作TALK读取等待超时或断言模型本身不行。251早已因用户新页面需求独立排队，不是250失败后自动重试。
+- 250本地8源候选与报告/日志完整保留，recovery-250含原样UTF-8备份/8SHA；本地自报complete、121+151 unittest日志未作独立验收，JSON verification[1].check超长220>120。250不收取、不提交、不回滚/自动重派；旧K2.8已msg2768确认暂停，完成251后idle。2770明确失败后继续保持暂停，旧继续指令不作恢复授权。
+- 251/msg2769/SHA8c9290784688be630ee699bb58b71e33072f19565daa86fd4ff596c5c8ff6287，原前言+JSON导致MCP业务unknown保留；本地合法251包与正文提取JSON关键verification相同，completed一处说明词差异留痕。原check_shas.py把字节hash与文本规范hash混比的错误初稿保留；最终tree_check/diff_check及根规范化独立复核证明9文件与base/manifest/patch完全相符、候选其余174保护源零业务漂移。报告对250状态概述不作为后端验收证据。
+- 核实际一行textContent/created_by、成员名降级/本人姓名/不读target、六资源顺序版本、独立11Node/26Python/5VM材料后收取251 completed，UTC02:35:56.323335。将已核9文件合入共享源，前后250八源SHA一致；实际共享环境再26 unittest/11 Node、语法/diff通过，真实FileHandler隔离到本片.tmp。候选5VM不重跑叠加，无Browser或生产DB/Key/worker/新角色模型操作。
+- 首页与六静态资源真实GET200、字节与已核源相等、六处20261016-task-initiator-label一致，无需静态重启；原角色页/列表/分工/权限保持。只提交本UI9源/测试与4相关docs，未审250源与私有/DB不暂存；准确回执.tmp/task-initiator-label/final/publication.json。
+- 暂停等用户Ctrl+F5→任务详情验收“发起人 XXX”，本人亦显姓名；随后Codex独立核250既有成果与日志，再决定必要补修和独立复核，不重复消耗一小时测试、不提前宣布K2.8代码能力/真实模型版本或自动启动产品完成。
+
 ## 2026-10-16（Asia/Shanghai）— 任务详情发起人标签候选完成，251独立复核待250后进行
 
 - 用户指出详情顶部“负责人 DeepSeek · Codex 发起”冗余，要求仅“发起人XXX”。Codex范围锁定该元信息行，统一取created_by展示名；本人发起同样显示姓名，不改target/权限/状态/动作或全站删除负责人文字。
