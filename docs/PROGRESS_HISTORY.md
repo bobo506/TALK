@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-16 22:50（Asia/Shanghai）— 用户授权全部存量角色登记并迁为页面启停，256准备首片已派
+
+- 用户在得知DeepSeek尚未具备页面受管前置后明确要求全部现有角色登记并转页面启动。根按新授权先补255真实自动启动验收前置，255人工/原生验收未通过事实保留，不把方向授权当人工验收。分工DeepSeek后端/宿主准备、Codex独立复核/正式进度Git，不更改永久开发要求。
+- MCP实读caller agent:codex/kind=agent、项目prj_e8fe7066bbec、最新development_requirements及5成员公开事实；只读SQLite实查仅1 Kimi runner unverified/unknown、1 K2.8 choice、无role_service_state。Codex/DeepSeek/Kimi无绑定，两个K2.8已有同精确声明绑定；显式project_roles仅新K2.8，不因此漏删legacy名册其它成员。host enabled1/label PC-202312301323/version1不证明管理器进程运行，根此前CIM拒绝访问、当前实际进程状态未知，陈旧实例/PID不当存活/可控证明。
+- 整体目标覆盖5成员保留身份/项目/模型/配置/历史，避免双实例与在途任务中断；DeepSeek自身和协调角色最后切换，Codex仅TALK CLI bridge入口，不按未知PID控制当前Desktop/MCP会话。实际登记/绑定与生产启停须走既有API/host及真实能力验证，不直接改SQLite或点亮unknown/unverified。
+- 首片256最小四参派agent:deepseek，Hall group:task-966288f93c4e44a481008253075189d6，UTC14:50:19.962994创建queued/assigned。包要求真实5成员盘点/可执行默认dry-run登记与绑定计划/host精确命令与21600覆盖核对/能力预检与逐角色正常切换和回退/隔离测试。只写prepare-v1/，不得生产写/启停/模型调用/真实apply；若缺事实列明成员与字段，不泛泛要授权或猜模型。终端等待须按TERMINAL_MCP实核T/W与取消排队，未知保持待验。
+- 基线019bb9908d41b00d6783c78681a3751d621d34aa，860跟踪文件SHA与初始diff空已存coordination/baseline.json，公开盘点initial-inventory.json，派发/完整包dispatch.json/task-package.json；原255及其它.tmp材料不覆盖。开发期间Codex只改本轮PROGRESS/本历史/PROJECT_BRIEF/MODULE_bridges/运行日志与受管需求5docs；准备完成暂停，由Codex独立复核后在原授权内逐个落地。
+- 新用户对正式应用private子目录与开发仓库隔离、部署后生成/升级保留/不随包分发的确认已同步需求，现有TALK-private不移动、当前project_root Key根校验不改；完整日志产品、删除与通用预算仍另片。256必须规避255静态探针隔离遗漏，先断言临时DB/storage再启动TestClient生命周期。
+- 本轮只读盘点/任务派发/上述5docs验证提交推送；不注册生产/改绑定/升级能力、不停现有入口、不启动manager/模型或取真实Key正文，页面Browser不操作。默认派发后结束、用户通知“256好了”取件，不为验默认模式做额外等待；准确Git与保护回执见.tmp/legacy-role-page-control/coordination/publication.json。
+
 ## 2026-10-16 22:33（Asia/Shanghai）— 255前端独立通过收取，发布并进入人工页面验收
 
 - 用户通知255完成，根核caller agent:codex/kind=agent、项目prj_e8fe7066bbec/lead，按既有包收独立交付，不新派或重复完整审查。DeepSeek已独立实读11源/合同，95Node/26Python/14自建VM探针及8项Node变异通过；根核驱动/原日志、before==98beb9c/candidate==worktree 11件SHA、842保护文件与11源差异集保持。

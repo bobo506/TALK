@@ -1,12 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-16 22:33 (Asia/Shanghai)：255前端独立通过并收取，11源本轮提交发布，六资源20261016-role-auto-start；前后端代码通过，暂停等人工页面验收。真实原生能力仍待。
+Updated: 2026-10-16 22:50 (Asia/Shanghai)：用户授权全部5存量角色登记并转页面启停，256交DeepSeek准备首片，Codex独立复核后逐角色执行。255代码019bb99已发布，人工/真实原生验收仍待；本轮仅准备未改生产。
 
 ## 当前身份与分工
 
 - TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead，已读当前development_requirements。
 - 用户最新要求后续DeepSeek代替旧agent:kimi-code-k28-preview；254按原包完成，不追改历史或项目永久开发要求。AGENTS同步：前端Codex实施/DeepSeek独立复核，后端/宿主DeepSeek实施/Codex独立复核，Codex负责正式docs/Git。
-- 默认派发后结束等待、用户通知完成后取件；共享目录开发暂停后审查，一次一片。本轮255已完成裁决与收取，源码未再改；完成Git/进度后暂停等用户页面验收，不开启其它功能。
+- 默认派发后结束等待、用户通知完成后取件；共享目录开发暂停后审查，一次一片。本轮按新授权先补真实受管环境，256由DeepSeek准备、Codex独立复核及收尾；仅.tmp产物开发与协调5docs，不并行改产品源码。默认用户通知256完成后取件，不轮询。
 
 ## 250/254自动首次启动后端已独立通过
 
@@ -26,16 +26,24 @@ Updated: 2026-10-16 22:33 (Asia/Shanghai)：255前端独立通过并收取，11�
 - 验证范围纠正：原独立run-python在suite恢复engine后直接建TestClient，未显式临时DB/storage；原日志startup_cleanup deleted=0/missing_on_disk=0，没有事前DB快照，不能声称该段完全隔离/原DB完全未写。根补验已先断言临时engine/storage再启lifespan，原报告/驱动/日志保留不改。原测试追加日志/临时目录限制保留。
 - 证据.tmp/role-auto-start-frontend/final255/{format-audit.json,acceptance-audit.json,isolated-static.json,collection.json,publication.json}；独立原件在independent-review/。11源及10相关docs本轮提交推送，不暂存其它未跟踪材料。根没有启停生产实例/操作真实Key或模型，unknown/unverified未改。
 
+## 当前：256五角色迁移准备，未执行实际迁移
+
+- 用户明确“下一步把所有现有角色登记进去、切换页面启动”，优先补真实自动启动验收前置；不把此授权当255页面人工通过。整体范围5成员：agent:codex/deepseek/kimi/kimi-code-k28-preview及agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c。
+- 实查前三unconfigured、两K2.8已有精确kimi-code/kimi-for-coding绑定；DB仅1个Kimi runner unverified/unknown、1个choice、受管服务状态0行。显式project_roles仅新K2.8，legacy名册其它成员仍保留；host配置enabled=1/PC-202312301323/version1不证明常驻进程在运行。根CIM查询拒绝访问，旧实例/PID上报陈旧，不据此认领/终止。
+- 256最小四参派DeepSeek，Hall group:task-966288f93c4e44a481008253075189d6，UTC14:50:19.962994创建，初始queued/assigned。仅写.tmp/legacy-role-page-control/prepare-v1/：5成员事实清单、精确登记/绑定计划、默认dry-run可执行入口、host配方/21600预算核对、逐角色真实核验/正常切换/回退与隔离自测。产品860跟踪文件基线019bb99，初始diff空；协调仅5docs可变。
+- 本片不得生产API写/SQLite写/实际apply、Key轮换/目录移动、真实模型调用、停旧入口/新启常驻host或直接升级能力。Codex独立审准备包后在原授权内逐个落地；缺事实按成员列具体阻塞，不猜模型/登录/命令。DeepSeek自身与协调入口最后切换；当前Desktop/MCP会话不强行接管。
+- .tmp/legacy-role-page-control/coordination/{baseline.json,initial-inventory.json,dispatch.json,task-package.json,publication.json}留痕；默认派发后结束，用户通知“256好了”后收取。不误称角色现已登记或可页面启停。完整日志仍另片，临时探针须先断言临时DB/storage再建TestClient。
+
 ## 下一步与人工门禁
 
 - 加载含本次前端与98beb9c后端的服务，Ctrl+F5，项目→角色，按docs/guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md验创建说明、配置/入队/实际服务状态及关闭后刷新不重启。现有human账号/Key，启动命令及已知限制见该指南。
-- 当前暂停等用户人工验收，不自动创建真实角色或迁移实例，不把DOM/VM/TestClient当视觉/键盘/原生能力通过。未受管运行器应诚实给原因，不能强行验成实际自动启动成功。
-- 验收反馈通过后，再安排完整日志/旧角色统一受管等后续切片；本轮不新派任务、不同时推进其它需求。
+- 255页面人工验收未完成；按用户新授权先由256准备受管接入前置，本片仍不执行迁移。不把DOM/VM/TestClient当视觉/键盘/原生能力通过，未受管运行器应诚实给原因。
+- 当前先256准备/独立审/逐角色实际迁移，随后补255真实页面与启停验收；完整日志/通用预算/删除另片，不同时扩码。
 
 ## 已确认后续需求（待实施）
 
 - 完整异常日志需脱敏持久保存异常类/消息/完整堆栈/因果链与阶段/时间/项目/角色/实例/任务关联，跨重启可追查，公共入口有界摘要/引用；定位、轮换/容量方案实施时明确。旧K2.8原记录只有task queue worker failed:，最初触发原因未知；父进程存活不代表接单循环健康。
-- 存量Codex/Kimi/DeepSeek/旧K2.8等保留member_id/绑定/历史，空闲正常停旧入口后迁入统一宿主，补真实配方/能力登记/owner和launch关联，逐个验真实启动/关闭/再启动/接单；不凭PID接管或放开unknown/unverified。详spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md。
+- 存量受管迁移已进入256准备，Codex/Kimi/DeepSeek/旧K2.8等保留member_id/绑定/历史，空闲正常停旧入口后迁入统一宿主，补真实配方/能力登记/owner和launch关联，逐个验真实启动/关闭/再启动/接单；不凭PID接管或放开unknown/unverified。详spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md。
 - 全角色默认21600秒及可显式覆盖、角色详情删除按钮待实施；删除本项目角色配置/专属材料，历史任务/消息/成果保留，删除一个K2.8不影响另一个，再需要须重新创建；共享模型/原生登录/其它项目不动。详spec/ROLE_EXECUTION_AND_DELETE_REQUIREMENTS.md。手动关闭完成→启动为恢复路径，自动重启/随项目启动另行设计。
 
 - 正式安装目录可设计private子目录保存部署后生成的本机凭据，开发Git仓库仍须隔离；升级保留、不随源码/安装包分发。当前project_root内部禁用校验尚未调整，本轮不移动TALK-private或改路径规则。

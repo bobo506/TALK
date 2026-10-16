@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-16）
 
+2026-10-16 22:50最新授权：用户要求把当前全部5角色登记并切换页面启停，作为255真实自动启动验收前置。256已派DeepSeek准备可执行迁移首片，Codex后续独立复核；当前仅盘点/默认dry-run/逐角色配方与回退，不改生产/停旧入口。实查Codex/DeepSeek/Kimi无绑定、两个K2.8已绑定但唯一Kimi运行器unverified/unknown，受管状态为空，host配置开启不证明进程运行。保留身份/模型/历史，真实能力通过后逐个切换，DeepSeek与协调入口最后；完整日志/预算/删除另片。255代码已发布019bb99、人工及原生能力仍未通过，最新状态见[进度](PROGRESS.md)与[迁移需求](spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md)。
+
 2026-10-16 22:33最新：255前端经DeepSeek独立实读、95Node/26Python/14VM及8项Node变异复核通过；根核11候选/842保护SHA及证据，Hall裁决2783后已收取，前端11源本轮提交发布，六资源20261016-role-auto-start。新create自动首次启动意图/旧缓存原样/配置与入队及实际状态分开均闭合，后端98beb9c保持；目前暂停等[页面人工验收](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)，真实原生能力另验。原MCP围栏自由文本保持unknown，根无损提取校验；原静态探针未显式绑定临时DB的范围遗漏已留痕并由根隔离补验，不能声称原DB完全未写。详[进度](PROGRESS.md)。
 
 2026-10-16 22:05最新：用户授权下一片，Codex前端自动首次启动候选完成，255交DeepSeek独立只读复核。新create显式auto_start=true，旧缓存原键载荷保持，配置/入队/真实服务状态分开；11源冻结，95Node/26Python契约自测通过，六资源20261016-role-auto-start，源码尚未独立通过或提交。后端98beb9c通过事实保持，生产服务/能力/凭据不改，真实页面与原生能力仍待验；默认派发后结束，用户通知再取件，详[进度](PROGRESS.md)。
