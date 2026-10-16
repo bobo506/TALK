@@ -1,6 +1,6 @@
 # 新角色配置完成后自动首次启动：实施合同
 
-2026-10-16，249修订方案经Codex独立复核，以下技术决策确认用于首个后端切片。**当前产品代码尚未实施，页面/真实受管生命周期另验。** 原始需求见[已确认需求](ROLE_AUTO_START_REQUIREMENTS.md)；本合同只修订[创建配置请求](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)及[受管服务](ROLE_SERVICE_CONTRACT.md)中“新页面创建的完整配置成功后由人类再点启动”的目标行为，旧客户端/旧请求原样兼容。
+2026-10-16，249修订方案经Codex独立复核，以下技术决策确认用于首个后端切片。**当前后端250候选已实施但未验收/发布；2026-10-16 Codex独立复核发现外层事务丢失仍200并补写失败标记的P1与external测试夹具P2，254已定向返修。以下事务/验证合同保持，前端/真实受管生命周期另验。** 原始需求见[已确认需求](ROLE_AUTO_START_REQUIREMENTS.md)；本合同只修订[创建配置请求](ROLE_CREATION_PROVISION_REQUEST_CONTRACT.md)、[配置作业](ROLE_PROVISION_CONTRACT.md)及[受管服务](ROLE_SERVICE_CONTRACT.md)中“新页面创建的完整配置成功后由人类再点启动”的目标行为，旧客户端/旧请求原样兼容。
 
 ## 1. 用户行为与范围
 

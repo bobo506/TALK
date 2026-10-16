@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-16 15:06（Asia/Shanghai）— 250独立复核发现事务P1及测试P2，254定向返修已派
+
+- 用户“继续”后按顺序独立审250保留成果，重新核caller agent:codex/kind=agent、项目prj_e8fe7066bbec/lead、最新开发要求；沿用户本轮明确Codex独立复核/旧K2.8开发，不派DeepSeek、不改永久要求。250仍failed/failed/msg2767，原本地报告verification[1].check220字符超限原件保留，不冒称MCP正式complete或因272测试数量直接验收。
+- 8源与recovery-250哈希全部相同；独立基线60f468c88cd5340a39c6143dc68c6ca6687c64ee与175当前保护源保存，根独立审查至派发前0漂移，before/保存8源显式UTF8/newline原样副本且SHA等同。根实读原任务/ROLE_AUTO_START_DESIGN及相关合同段、全部4server+4tests差异、真实函数与测试；8源py_compile/diff通过，共享build_role_creation_fingerprint AST与HEAD完全相同，无产品改码/生产操作。
+- 根实际分两批隔离unittest：121/121与151/151均0失败/错误/跳过，完整运行日志/JSON在independent-review250/batch1/、batch2/，文件handler定向本轮证据；首批console较多未回灌正文，后批关闭console handler，未因日志调整重复跑。Starlette弃用告警保留，batch2参数拒绝为既有负向用例，不是实际错误或真实Key。未跑全仓/启动真实模型/CLI/生产serve/uvicorn或读私有凭据。
+- 新增9项实际API/SQLite边界8通过1失败：真实external、入队后锚点写失败整体回滚、Session.commit故障回滚/重试、双HTTP/WAL报告单launch、manual start+stop前置优先、auto claimed原owner保留、true意图退役目录先重放、旧6种请求状态迁移默认均通过；SQLite启动INSERT触发RAISE(ROLLBACK)撤销外层事务时失败。仅对该1项再现，原9项日志/JSON另存-initial，不累计两次为新问题，lost-outer-transaction.json保存实际观测。
+- F1/P1阻塞：role_provision_requests.py1493–1502宽泛catch接住整个外层已撤销的入队异常，savepoint.rollback不证明真实外层有效，_set_auto_start另起事务补写后commit。实际HTTP200/status=created/revision=3/auto failed，配置provisioned终态未落库；去触发器同token/revision重试200/enqueued/1launch。必须区分局部ABORT可恢复与外层失效：后者500/旧created+pending/原revision/lease保持/无补写state-launch-anchor，不按异常字符串分类或盲重试。原D4触发器在请求初始UPDATE，未覆盖本故障边界。
+- F2/P2：test_role_auto_start.py557先PATCH未注册EXTERNAL_RUNNER、忽略404，helper随后注册成unknown，原external用例不成立。要求注册→设型→核PATCH200及实际external→完整链路；根实际external探针已通过实现not_eligible/稳定码/零launch，不能放宽业务门控掩盖夹具缺口。
+- 原开发者已暂停：派发前无running/queued任务，旧K2.8最新error/current_task_id=null（UTC06:57:48），本机PID14308存活，不当可用心跳/已领取证明，不重启。254四参数独立顶层派旧agent:kimi-code-k28-preview，Hall group:task-8eed20fe57e346c49781b4a9360d2306，初始queued/assigned；仅server/role_provision_requests.py与tests/test_role_auto_start.py可改，其余173源/原副本/根证据保护。包带原需求/不变项/基线/F1/F2/实际272+9验证/验收/原代码负向与新代码证明/10字段本任务实际号JSON要求，证据development/revision-1/，完成暂停后根独立核。派发后根停止看码/改码，只收尾正式docs，不轮询。
+- 本轮仅PROGRESS/PROGRESS_HISTORY/PROJECT_BRIEF/MODULE_bridges/ROLE_AUTO_START_DESIGN五份正式docs提交推送，未将250源暂存或发布，也未收取/恢复250。默认用户“254好了”取件，再核修正差异与必要故障/相关模块，不重复未变272证据；通过才收254与正式产品收尾。253→248→246已收取事实保持，全角色21600/删除/UI251视觉/新角色真实能力仍待。准确派发、保护、Git回执见.tmp/k28-autostart-slice/independent-review250/。
+
 ## 2026-10-16 14:50（Asia/Shanghai）— 253独立通过，留痕整理任务号后按253→248→246收取
 
 - 用户通知“好了”，按被动收取约定只读取253交付，runner succeeded/submitted、msg2774；MCP明确invalid，因为报告task_id=talk-delivery-1而非253。本地summary --expect-task-id253同样仅此1错误，未将runner结束当业务完成；原MCP无效状态和本地原始报告均完整保留。
