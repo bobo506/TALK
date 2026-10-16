@@ -147,7 +147,7 @@ class ContractTests(K28ExecutorTestCase):
         self.assertFalse(budget["client_tool_timeout_ms"]["verified_on_host"])
         self.assertFalse(budget["explicit_wait_seconds"]["enabled"])
         self.assertIsNone(budget["explicit_wait_seconds"]["value"])
-        self.assertEqual(budget["bridge_execution_timeout_seconds"]["value"], 3600)
+        self.assertEqual(budget["bridge_execution_timeout_seconds"]["value"], 21600)
         self.assertEqual(budget["identity_preflight_http_timeout_seconds"]["value"], 15.0)
         self.assertFalse(budget["initiator_wait_in_this_slice"])
 
@@ -166,6 +166,7 @@ class ContractTests(K28ExecutorTestCase):
         self.assertEqual(argv[argv.index("--name") + 1], k28.MEMBER_ID)
         self.assertEqual(argv[argv.index("--kimi-model") + 1], k28.MODEL_ALIAS)
         self.assertEqual(argv[argv.index("--kimi-task-profile") + 1], "tools")
+        self.assertEqual(argv[argv.index("--timeout") + 1], "21600")
 
 
 class NativeConfigCheckTests(K28ExecutorTestCase):
@@ -672,6 +673,60 @@ class CredentialSafetyTests(K28ExecutorTestCase):
 
 
 class CliEntryTests(K28ExecutorTestCase):
+    def test_render_cli_accepts_a_budget_longer_than_six_hours(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            code = k28.main(["render", "--timeout", "86400"])
+        self.assertEqual(code, 0, stderr.getvalue())
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(report["execution_timeout_seconds"], 86400)
+        argv = report["bridge_argv"]
+        self.assertEqual(argv[argv.index("--timeout") + 1], "86400")
+
+    def test_launch_cli_dry_run_uses_the_requested_budget_without_starting(self):
+        self.key_file.write_text("unit-timeout-token\n", encoding="utf-8")
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.dict(os.environ, {
+            "KIMI_CODE_HOME": str(self._tmp), "USERPROFILE": str(self._tmp),
+        }, clear=True):
+            with patch.object(k28, "identity_preflight") as identity:
+                with patch.object(kimi_bridge, "run_bridge") as bridge:
+                    with redirect_stdout(stdout), redirect_stderr(stderr):
+                        code = k28.main([
+                            "launch", "--timeout", "43200", "--dry-run",
+                            "--key-file", str(self.key_file),
+                        ])
+        self.assertEqual(code, 0, stderr.getvalue())
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(report["execution_timeout_seconds"], 43200)
+        self.assertIn("--timeout 43200", report["argv"])
+        self.assertNotIn("unit-timeout-token", stdout.getvalue() + stderr.getvalue())
+        identity.assert_not_called()
+        bridge.assert_not_called()
+
+    def test_nonpositive_cli_budgets_fail_before_key_or_network_access(self):
+        for mode in ("render", "launch"):
+            for timeout in ("0", "-1"):
+                with self.subTest(mode=mode, timeout=timeout):
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with patch.object(k28, "resolve_api_key") as key:
+                        with patch.object(k28, "identity_preflight") as identity:
+                            with patch.object(kimi_bridge, "run_bridge") as bridge:
+                                with redirect_stdout(stdout), redirect_stderr(stderr):
+                                    code = k28.main([mode, "--timeout", timeout])
+                    self.assertEqual(code, 1)
+                    self.assertIn("执行预算必须是显式正整数秒", stderr.getvalue())
+                    key.assert_not_called()
+                    identity.assert_not_called()
+                    bridge.assert_not_called()
+
+    def test_check_reports_the_selected_budget(self):
+        report = self.run_offline_check(timeout=43200)
+        self.assertTrue(report["ok"], report["problems"])
+        self.assertEqual(report["budget"]["bridge_execution_timeout_seconds"]["value"], 43200)
+        self.assertEqual(report["budget"]["identity_preflight_http_timeout_seconds"]["value"], 15.0)
+        self.assertFalse(report["budget"]["explicit_wait_seconds"]["enabled"])
+
     def test_contract_and_render_subcommands_print_keyless_json(self):
         for argv in (["contract"], ["render"]):
             with self.subTest(argv=argv):
@@ -870,6 +925,24 @@ class LaunchConsistencyTests(K28ExecutorTestCase):
             "problems": [],
             "network_calls": 2,
         }
+
+    def test_default_and_longer_budgets_reach_both_gate_and_bridge(self):
+        for requested, expected in ((None, 21600), (43200, 43200)):
+            with self.subTest(requested=requested):
+                overrides = {} if requested is None else {"timeout": requested}
+                bridge = AsyncMock()
+                with patch.object(k28, "run_check", wraps=k28.run_check) as gate:
+                    with patch.object(k28, "identity_preflight", return_value=self._ok_identity()):
+                        with patch.object(kimi_bridge, "run_bridge", bridge):
+                            with redirect_stderr(io.StringIO()):
+                                code = k28.run_launch(
+                                    project_root=PROJECT_ROOT, key_file=self.key_file,
+                                    environ=self.env, **overrides,
+                                )
+                self.assertEqual(code, 0)
+                self.assertEqual(gate.call_args.kwargs["timeout"], expected)
+                bridge.assert_awaited_once()
+                self.assertEqual(bridge.await_args.args[0].timeout, expected)
 
     def _project_with_local_tier(self, tier: str | None) -> Path:
         root = self._tmp / f"local-tier-{tier or 'missing'}"

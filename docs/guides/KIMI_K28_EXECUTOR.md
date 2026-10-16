@@ -8,6 +8,11 @@
 
 配套文件：
 
+2026-10-16 执行预算补正：本入口默认单次 CLI 执行预算调整为 **21600 秒（6 小时）**，
+`check`、`render`、`launch` 可通过 `--timeout <正整数秒>` 选择更长或更短的预算。
+检查报告、预览和实际 bridge argv 使用同一参数。已运行实例保留启动时的旧值，需在空闲时
+停止原入口并重新启动才生效；本项不改变 TALK 读取等待预算，也不自动恢复失败任务。
+
 | 文件 | 作用 |
 | --- | --- |
 | `scripts/kimi_k28_executor.py` | 合同 / 离线检查 / argv 渲染 / 启动门禁与只读身份核验入口 |
@@ -175,11 +180,17 @@ python scripts/kimi_k28_executor.py check --key-file "$env:USERPROFILE\.talk\age
 # 2) 启动（配置门禁 + 只读在线身份核验 + 既有 bridge）
 python scripts/kimi_k28_executor.py launch --key-file "$env:USERPROFILE\.talk\agent-kimi-code-k28-preview.key"
 
+# 大任务示例：单次 CLI 执行预算改为 12 小时（43200 秒）
+python scripts/kimi_k28_executor.py launch --timeout 43200 --key-file "$env:USERPROFILE\.talk\agent-kimi-code-k28-preview.key"
+
 # 3) 只看脱敏 argv、不联网、不启动
 python scripts/kimi_k28_executor.py launch --dry-run --key-file "<KEY_FILE>"
 ```
 
 也可以直接用 `deploy/kimi-code/k28-executor.launch.template.ps1`（模板本身不含密钥）。
+模板默认 6 小时，指定 `-TimeoutSeconds 43200` 可改为 12 小时；模板会向检查和启动传递相同值。
+`--timeout 0` 和负值会被拒绝，本次不提供无限时模式。该预算按每次 CLI 调用计算，
+并非 TALK 任务从排队到收尾的总时长上限；预检和正式执行等调用各自使用该值。
 
 - **停止**：在启动该入口的终端 `Ctrl+C`；bridge 退出前会把实例状态上报为 `offline`。
 - **回退**：直接不启动本入口即可，它不影响 `agent:kimi` / K3 与其它成员；
@@ -220,8 +231,8 @@ python scripts/kimi_k28_executor.py launch --dry-run --key-file "<KEY_FILE>"
 | 客户端单次工具上限 `T` | **未核验**。`deploy/kimi-code/mcp.talk.template.json` 里的 `toolTimeoutMs: 660000` 只是模板事实，不是本机运行中上限 |
 | 显式等待 `W` | 未启用。未核验 `T` 时不启用主动长等待，不把 600 秒通用默认当成宿主能力 |
 | 返回余量 | 无（`W` 未启用） |
-| bridge 执行预算 | 本入口显式 `--timeout 3600`（整轮执行预算，与发起者等待预算分开；到期只结束当前 CLI 调用，不等于取消任务） |
-| 只读身份核验预算 | 每次 `launch` 最多两次 GET；单次请求超时 `HTTP_TIMEOUT_SECONDS = 15s`，不复用 bridge 的 3600 秒整轮预算 |
+| bridge 执行预算 | 本入口默认 `--timeout 21600`（6 小时），可指定其它正整数秒；按单次 CLI 调用计算，与发起者等待预算分开。到期沿用既有超时退出/任务失败处理，不等于发起者主动取消任务 |
+| 只读身份核验预算 | 每次 `launch` 最多两次 GET；单次请求超时 `HTTP_TIMEOUT_SECONDS = 15s`，与可配置的 CLI 执行预算分开 |
 | 发起侧主动等待 | 不在本片范围，另片处理 |
 
 ## 9. 已验证 / 未验证边界

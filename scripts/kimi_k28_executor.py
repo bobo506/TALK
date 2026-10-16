@@ -85,7 +85,7 @@ COMMAND_OVERRIDE_ALLOWED = False
 CONTROLLED_KIMI_COMMAND = "kimi --output-format stream-json -p"
 CONTROLLED_COMMAND_SOURCE = "explicit_fixed_contract"
 ENV_COMMAND_VAR = "TALK_KIMI_COMMAND"
-EXECUTION_TIMEOUT_SECONDS = 3600
+EXECUTION_TIMEOUT_SECONDS = 21600
 
 # --- 只读在线身份核验（launch 门禁；不是注册写入） --------------------------
 HTTP_TIMEOUT_SECONDS = 15.0
@@ -401,7 +401,7 @@ def build_contract(
     }
 
 
-def budget_contract() -> dict:
+def budget_contract(*, timeout: int = EXECUTION_TIMEOUT_SECONDS) -> dict:
     return {
         "client_tool_timeout_ms": {
             "value": CLIENT_TOOL_TIMEOUT_TEMPLATE_MS,
@@ -418,8 +418,8 @@ def budget_contract() -> dict:
             "reason": "宿主单次工具上限 T 未核验；未核验 T 时不启用主动长等待",
         },
         "bridge_execution_timeout_seconds": {
-            "value": EXECUTION_TIMEOUT_SECONDS,
-            "source": "本入口合同显式值；沿用 2026-09-12 本机 Kimi/DeepSeek 启动示例的 3600 秒整轮预算",
+            "value": timeout,
+            "source": "本入口单次 CLI 执行预算；默认 21600 秒（6 小时），可通过 --timeout 指定正整数秒",
         },
         "identity_preflight_http_timeout_seconds": {
             "value": HTTP_TIMEOUT_SECONDS,
@@ -477,11 +477,14 @@ def render_launch(
     *,
     project_root: Path = REPO_ROOT,
     base_url: str = DEFAULT_BASE_URL,
+    timeout: int = EXECUTION_TIMEOUT_SECONDS,
     environ: dict | None = None,
 ) -> dict:
     """可供操作者复制的最小启动命令；密钥位置是占位符。"""
     env = os.environ if environ is None else environ
-    argv = build_bridge_argv(project_root=project_root, base_url=base_url)
+    if type(timeout) is not int or timeout <= 0:
+        raise K28ExecutorError("bridge 执行预算必须是显式正整数秒")
+    argv = build_bridge_argv(project_root=project_root, base_url=base_url, timeout=timeout)
     key_argv = ["--key", KEY_PLACEHOLDER]
     python = sys.executable or "python"
     command = " ".join(
@@ -493,6 +496,7 @@ def render_launch(
         "member_id": MEMBER_ID,
         "model_alias": MODEL_ALIAS,
         "base_url": base_url,
+        "execution_timeout_seconds": timeout,
         "key_env": KEY_ENV,
         "default_key_file": str(default_key_file(env)),
         "bridge_argv": argv,
@@ -598,7 +602,7 @@ def run_check(
     if not alias_lock_ok:
         problems.append(f"模型 alias 必须锁定为 {MODEL_ALIAS}，实际 {model}")
 
-    budget_ok = isinstance(timeout, int) and timeout > 0
+    budget_ok = type(timeout) is int and timeout > 0
     _add(
         checks,
         "execution_budget",
@@ -917,7 +921,7 @@ def run_check(
             "binding": binding,
         },
         "cli_version": kimi_cli_version(env),
-        "budget": budget_contract(),
+        "budget": budget_contract(timeout=timeout),
         "controlled_command": CONTROLLED_KIMI_COMMAND,
         "identity_verified": identity_verified,
         "online_identity_checked": bool(online_identity),
@@ -1125,7 +1129,10 @@ def run_launch(
     environ: dict | None = None,
     dry_run: bool = False,
     base_url: str = DEFAULT_BASE_URL,
+    timeout: int = EXECUTION_TIMEOUT_SECONDS,
 ) -> int:
+    if type(timeout) is not int or timeout <= 0:
+        raise K28ExecutorError("bridge 执行预算必须是显式正整数秒")
     env = os.environ if environ is None else environ
     key, source = resolve_api_key(environ=env, key_file=key_file)
 
@@ -1139,6 +1146,7 @@ def run_launch(
         require_key=True,
         environ=env,
         base_url=base_url,
+        timeout=timeout,
     )
     if not gate["ok"]:
         raise K28ExecutorError(
@@ -1146,14 +1154,14 @@ def run_launch(
         )
 
     # B1：argv 与只读预检使用**同一个** base_url，否则会出现“验 19091、跑 8000”。
-    argv = build_bridge_argv(project_root=project_root, base_url=base_url)
+    argv = build_bridge_argv(project_root=project_root, base_url=base_url, timeout=timeout)
     redacted = " ".join(
         shlex.quote("[REDACTED]" if item == KEY_PLACEHOLDER else item) for item in argv
     )
     print(
         f"Kimi K2.8 独立执行入口：成员 {MEMBER_ID}；密钥来源 {source}；"
         f"模型 alias {MODEL_ALIAS}；任务档 {TASK_PROFILE_SUMMARY}；"
-        f"服务地址 {base_url}；"
+        f"服务地址 {base_url}；单次 CLI 执行预算 {timeout} 秒；"
         f"受控命令 {CONTROLLED_KIMI_COMMAND!r}",
         file=sys.stderr,
     )
@@ -1165,6 +1173,7 @@ def run_launch(
                     "mode": "launch-dry-run",
                     "argv": redacted,
                     "base_url": base_url,
+                    "execution_timeout_seconds": timeout,
                     "controlled_command": CONTROLLED_KIMI_COMMAND,
                     "identity_verified": False,
                     "online_identity_checked": False,
@@ -1248,11 +1257,13 @@ def build_parser() -> argparse.ArgumentParser:
     render_parser = sub.add_parser("render", help="打印 bridge argv 模板（密钥为占位符）")
     render_parser.add_argument("--project-root", type=Path, default=REPO_ROOT)
     render_parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    render_parser.add_argument("--timeout", type=int, default=EXECUTION_TIMEOUT_SECONDS)
 
     launch_parser = sub.add_parser("launch", help="解析本人 Key 后在本进程内启动现有 Kimi bridge")
     launch_parser.add_argument("--project-root", type=Path, default=REPO_ROOT)
     launch_parser.add_argument("--key-file", type=Path, default=None)
     launch_parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    launch_parser.add_argument("--timeout", type=int, default=EXECUTION_TIMEOUT_SECONDS)
     launch_parser.add_argument("--dry-run", action="store_true", help="只做离线检查并打印脱敏 argv，不启动")
 
     # C3 显式收尾入口：只做参数转发，不在本入口内实现登记逻辑，也不挂在 launch/心跳/claim 上。
@@ -1289,7 +1300,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode == "render":
             print(
                 json.dumps(
-                    render_launch(project_root=args.project_root, base_url=args.base_url),
+                    render_launch(
+                        project_root=args.project_root, base_url=args.base_url, timeout=args.timeout
+                    ),
                     ensure_ascii=False,
                     indent=2,
                 )
@@ -1301,6 +1314,7 @@ def main(argv: list[str] | None = None) -> int:
                 key_file=args.key_file,
                 dry_run=args.dry_run,
                 base_url=args.base_url,
+                timeout=args.timeout,
             )
         if args.mode == "closeout":
             # 显式子命令才进入收尾入口；launch/check/render/contract 不触发任何 closeout。

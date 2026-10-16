@@ -22,6 +22,12 @@
 # 身份说明：TALK 身份是**独立 TALK Key**（本人密钥，仓库外文件或 TALK_K28_KEY）；
 # 官方 native managed 登录凭据由官方 CLI 自行读取，本入口不读取、不复制。
 
+param(
+    # 单次 CLI 执行预算（秒）；例如 -TimeoutSeconds 43200 为 12 小时。
+    [ValidateRange(1, 2147483647)]
+    [int]$TimeoutSeconds = 21600
+)
+
 $ErrorActionPreference = 'Stop'
 $repo = 'D:\claude-test\TALK'
 $keyFile = Join-Path $env:USERPROFILE '.talk\agent-kimi-code-k28-preview.key'
@@ -32,9 +38,9 @@ if (-not (Test-Path $python)) { $python = 'python' }
 
 # 1) 离线检查：固定身份 / 受控固定命令 / 固定执行分级 / native 模型 alias 与绑定 / 模型锁 / 工具档 / 项目绑定 / 凭据来源
 #    如需同时做只读在线身份核验，加 --online-identity（需要可解析的 Key）。
-& $python (Join-Path $repo 'scripts\kimi_k28_executor.py') check --key-file $keyFile --require-key --base-url $baseUrl
+& $python (Join-Path $repo 'scripts\kimi_k28_executor.py') check --key-file $keyFile --require-key --base-url $baseUrl --timeout $TimeoutSeconds
 if ($LASTEXITCODE -ne 0) { throw "K28 执行入口离线检查未通过（exit $LASTEXITCODE）" }
 
 # 2) 启动：密钥只由脚本从仓库外文件读取，不进入命令行、日志或仓库；
 #    启动前会再做一次配置门禁与只读在线身份核验，失败即退出、不注册、不调用模型。
-& $python (Join-Path $repo 'scripts\kimi_k28_executor.py') launch --key-file $keyFile --base-url $baseUrl
+& $python (Join-Path $repo 'scripts\kimi_k28_executor.py') launch --key-file $keyFile --base-url $baseUrl --timeout $TimeoutSeconds
