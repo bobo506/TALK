@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-16 15:06 (Asia/Shanghai)：250既有候选独立复核发现P1事务失效与P2测试夹具，254已交旧K2.8定向返修；250未验收/发布。253/248/246已收取事实保持。
+Updated: 2026-10-16 15:13 (Asia/Shanghai)：用户重启旧K2.8后254已在15:09由新实例领取、心跳推进，继续原包返修。旧实例14:57队列异常仅泛化错误，最初原因未定；本轮只读诊断/记录，不打断或重派。
 
 ## 当前身份与分工
 
@@ -25,9 +25,16 @@ Updated: 2026-10-16 15:06 (Asia/Shanghai)：250既有候选独立复核发现P1�
 - 派发前再读最新development_requirements/caller=agent:codex/kind=agent，旧K2.8无running/queued任务；实例最新上报error/current_task_id=null（UTC06:57:48），本机PID14308存在，不能据此说在线正常/已接单。254最小四参数独立顶层派旧agent:kimi-code-k28-preview，Hall group:task-8eed20fe57e346c49781b4a9360d2306，初始queued/assigned；本轮未重启/轮询。
 - 254只准改server/role_provision_requests.py和tests/test_role_auto_start.py，证据写development/revision-1/，其它173源及原副本/根证据保持；原需求/实际基线/精确F1/F2/272旧证据/9边界/原代码负向与新代码验证要求/纯JSON本次实际任务号交付入包。开发者完成暂停，根再独立审修正差异和必要模块/故障验证；通过才收254并收尾产品源码，原250失败历史保留。不提前新派前端或真实新角色任务。
 
+## 254重启后已接单，旧入口接单异常另记
+
+- 用户报告旧K2.8重启后已接单，MCP/只读DB确认254 running/in_progress，新实例agent:kimi-code-k28-preview:3243afbc-674e-48b0-96e8-f5cb0fb9af45 / PID12532，UTC07:09:08.214304领取，心跳持续推进。本轮不停止/重新派发，不重启任何实例，不改共享源码。
+- 旧实例8ddd72cf…/PID14308最后UTC06:57:48.398775为error、current_task_id=null，last_error恰为task queue worker failed:（后面无异常文本）。派发前进程存在只说明主进程在；当前记录不能证明当时队列仍正常运行。
+- 静态诊断发现队列异常仅记录str(exc)，未保存异常类/堆栈；run_bridge创建后台队列task后仅等待client.run，没有独立监控worker退出，error上报本身若失败可令worker退出而父进程留存。以上是可能的卡接单机制，尚未证明本次worker确已退出/阻塞/长时间持锁，最初触发是超时/连接还是其它亦未知，不能把推断写成确定根因。
+- 诊断证据.tmp/k28-runtime-diagnostic-20261016/diagnostic.json；本轮只读确切旧实例错误与当前254必要字段，未读Key/USER/native配置或输出完整日志。接单恢复/异常记录与worker监督另列后续缺口，不在254改码期间修。重启实际执行预算未从日志核实，不声称21600已实测生效。
+
 ## 保留事实与下一步
 
-- 首要等“254好了”读取交付；需同时闭合普通保存点失败与外层事务丢失分类。250自动启动后端未验收/上线，前端auto_start载荷/文案亦未接线；249/247正式ROLE_AUTO_START_DESIGN.md保持，勿改合同迁就故障。
+- 首要等“254好了”读取交付（254已由新实例领取，不重复派发）；需同时闭合普通保存点失败与外层事务丢失分类。250自动启动后端未验收/上线，前端auto_start载荷/文案亦未接线；249/247正式ROLE_AUTO_START_DESIGN.md保持，勿改合同迁就故障。
 - 253→248→246已收取，revision-2本机零模型入口准备通过；真实新Kimi/模型/开发能力/实际客户端T-W/原生退出未验，unknown/unverified保持。真实小型新角色任务需明确任务与执行授权，默认不自动开启。
 - 252旧K2.8六小时入口已发布79096ad；旧运行实例上次仍3600，空闲按原环境python scripts/kimi_k28_executor.py launch --timeout 21600重启才生效，本轮未重启，不声称真实六小时或宿主主动等待通过。
 - 全角色默认21600与删除角色按钮仍待实施，详[正式需求](spec/ROLE_EXECUTION_AND_DELETE_REQUIREMENTS.md)。删除本项目角色配置/专属接入材料，历史任务/消息/成果/归属保留，两个K2.8删除一个不影响另一个，再需要重新“创建角色”；共享模型/原生登录/其它项目不动，手册待上线区保持。

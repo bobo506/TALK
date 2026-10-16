@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-16 15:13（Asia/Shanghai）— 用户重启旧K2.8后254接单，说明旧队列错误与可观测性边界
+
+- 用户先指出254未接单并自行重启服务，随后确认已接并询问原因。根保持原任务、不重复派发/恢复250，不停止或重启实例。MCP/只读DB确认254 running/in_progress，新实例3243afbc-674e-48b0-96e8-f5cb0fb9af45/PID12532，UTC07:09:08.214304领取，后续心跳推进；原任务创建UTC07:04:24.128191。
+- 只读精确旧实例8ddd72cf-e145-4421-8efe-7a1fb9408b98必要字段：UTC06:57:48.398775 error/current_task_id=null/PID14308，错误内容恰task queue worker failed:，无异常正文；未输出完整日志或秘密。派发前旧PID存在不能证明队列正常。初次本地断言尾空格因服务端strip不符，已仅按strip比对修正诊断脚本，不是产品/任务故障证据。
+- 静态读取cli_bridge队列/生命周期发现：异常只插str(exc)，本次异常文本为空则丢掉类型/堆栈；run_bridge将队列作为后台task创建、主流程只等client.run，未独立监控worker异常退出；队列except中的report_status若再失败可直接退出worker而父进程仍存活。这是代码层可能机制，不能据此断言本次一定worker死亡/堵塞/持锁或最初一定网络超时。重启重建实例后恢复接单是已证事实，具体根因因旧错误信息不足未定。
+- 本轮诊断只读、没有源码/生产实例/凭据修改，没有在254开发期间插入修复；错误记录/worker监督/恢复列后续缺口，实际21600预算本轮也未从启动日志核实。证据.tmp/k28-runtime-diagnostic-20261016/diagnostic.json；仅PROGRESS/PROGRESS_HISTORY记录并提交推送，继续用户通知254完成后收取。
+
 ## 2026-10-16 15:06（Asia/Shanghai）— 250独立复核发现事务P1及测试P2，254定向返修已派
 
 - 用户“继续”后按顺序独立审250保留成果，重新核caller agent:codex/kind=agent、项目prj_e8fe7066bbec/lead、最新开发要求；沿用户本轮明确Codex独立复核/旧K2.8开发，不派DeepSeek、不改永久要求。250仍failed/failed/msg2767，原本地报告verification[1].check220字符超限原件保留，不冒称MCP正式complete或因272测试数量直接验收。
