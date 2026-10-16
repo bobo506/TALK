@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16 14:50（Asia/Shanghai）— 253独立通过，留痕整理任务号后按253→248→246收取
+
+- 用户通知“好了”，按被动收取约定只读取253交付，runner succeeded/submitted、msg2774；MCP明确invalid，因为报告task_id=talk-delivery-1而非253。本地summary --expect-task-id253同样仅此1错误，未将runner结束当业务完成；原MCP无效状态和本地原始报告均完整保留。
+- 通过稳定引用SHA50090146b5b02f644536853130dfc5d7bbaf23ec67842efcb6b71d25d78187aa按两页完整读取5495字符，与本地UTF8文本strip后SHA完全一致（本地原字节SHA89106ddfe32e225ab5f404b7cb74534f8e18e0420f4236b5bb1f3ed74b44ec24，区别为末尾换行）。根仅生成final253/review-normalized.json机械整理task_id=253，其余九字段逐值相同，--expect-task-id253校验通过；normalization-audit.json记录来源/单字段差异，不修改原件、不伪称复核者重新提交，不把格式校验当独立验收。
+- 253实际独立实读run-single-task.py/win_job.py等代码，检查单一起点与各阶段剩余预算、取消/finally、原子Job/HANDLE_LIST/继承和失败清理。根核run-review.py实际保持被审ENTRY_PATH/FAKE_CLI、仅输出位置隔离，独立35/35（17.44秒）及11/11真实证据全部通过；H2/H3约6秒，H4约8.015秒，四种Job+孙进程active_after=0、sentinel仍活；核152/280/9逐SHA零漂移，未重跑未变代码或改产品。原包4/5条在revision-2准备范围闭合。
+- Codex按真实独立材料裁决本次准备复核通过，Hall决策msg2776公开说明原invalid/整理副本/证据与边界。依次253→248→246收取，服务端UTC2026-10-16T06:48:30.297796、06:48:32.422051、06:48:34.237351三项均succeeded/completed，结果2774/2764/2751不变，回执final253/collection-receipts.json。原246入口缺陷、248 revision-1预算/孙进程边界不被追改为原稿正确，后续可用准备件明确是已审revision-2。
+- 真实新Kimi/模型/服务/claim、实际客户端T/W与优雅退出未验，unknown/unverified不改；files本地临时runner不是产品pipes。同步OS/磁盘任意阻塞无硬实时保证，Job只涵盖实际成员/普通后代，不承诺外部broker或恶意逃逸。临时CLI600/整体900保留，全角色21600与删除按钮另片；9候选继续冻结本机.tmp，原README开发时状态不追写，验收以本历史/模块说明与final253为准，尚未产品化或随Git发布。
+- 本轮无新开发/派发/生产实例操作，仅PROGRESS、PROGRESS_HISTORY、PROJECT_BRIEF、MODULE_bridges四份正式docs汇总/提交推送；250八源SHA不变、仍failed未独立验收且未提交/回滚/自动重派，下一步先独立审250既有成果。252已发布79096ad，旧实例重启生效、UI251视觉反馈、全角色6小时与删除按钮待办保持。收尾准确Git/远程/保护回执见revision-2/final253/publication.json。
+
 ## 2026-10-16 14:25（Asia/Shanghai）— 恢复248补正，revision-2零模型通过，253独立复核已派
 
 - 读取project-framework与本地AGENTS、PROJECT_BRIEF/PROGRESS、MODULE_bridges及TERMINAL_MCP实际预算要求；MCP只读身份确认agent:codex/kind=agent、项目prj_e8fe7066bbec、lead，按前轮用户“继续下一步”与持续返修授权自主承接。本次Codex开发、旧K2.8独立复核，不派DeepSeek，不改永久development_requirements。
