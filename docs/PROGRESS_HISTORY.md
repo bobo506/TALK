@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-16 23:15（Asia/Shanghai）— 256初审发现保ID补录及凭据读取P1，257准备件返修已派
+
+- 用户通知256好了，根按MCP完整摘要读取msg2785：task_id=256/schema合法，complete只是本片准备自报，5角色整体迁移未执行。DeepSeek自测28项及readonly数据库/基线报告保留；原256未收取，未依据succeeded或测试数宣布迁移可执行。
+- 独立实读准备入口的收集/Key/计划分支、registration-plan与真实API schema/创建/PATCH/服务资格，发现F1/P1：4旧成员被安排POST /roles补显式行。该schema无member_id且extra=forbid、分配器明确永不复用旧ID，真实路径新建身份/Key；PATCH缺行404，human确认不能改变接口语义。需查证保ID路径，缺产品能力准确列最小片，不能误建新角色或直接SQL。
+- F2/P1：key_file_fact→local_file_fact→sha256_file及inspect_host_facts.read_bytes确实读Key正文计算指纹；collect_db_facts/table_rows SELECT*把members.api_key等秘密列与全量历史读入后mask，硬编码key_body_reads=0错误。根仅在独立目录用假Key拒读、临时SQLite authorizer禁止api_key及真实ProjectRoleCreate schema复现：4旧成员创建步骤无法指定旧ID、假Key open尝试、秘密列查询被拒；未读取生产Key/DB，未重跑无关28项。无已证实明文Key泄漏，不将边界问题夸大为泄漏事件。
+- 原prepare-v1共22件已逐SHA冻结且根探针后未变；860产品基线及5协调docs边界保持。根初审needs_changes/Hall msg2786，不收取256或执行准备件。预算通道缺口经真实base_argv确认保留；另要求查旧凭据/公开模型来源，不能仅因目标Key根缺4文件就要求重建/新签Key，并明确单一cli_command_template下codex/dsh真实共存方案。
+- 257最小四参派DeepSeek，Hall group:task-47193fe8c937425bbdbeb740e33ccbd9，UTC15:15:02.077703 queued/assigned。只写prepare-v2定向闭合F1/F2与必要准备事实，禁止修改原件/根证据/产品源码或生产注册/绑定/能力/实例；新假件拒读断言须能检出旧代码，原零读取声明保留并纠正。完成暂停再由Codex独立审，不自停DeepSeek/协调入口，默认用户通知257好了后取件。
+- 本轮只根定向探针、任务派发及PROGRESS/本历史/PROJECT_BRIEF/MODULE_bridges/运行日志与受管需求5docs验证提交推送；没有实际迁移/停旧服务/启动宿主/模型或轮换Key，没有Browser或多片并行改码。255人工/原生验收待及5角色保身份/模型/历史目标保持。原256合法complete与自测不追改，准备返修不等于整体验收通过。
+- 本机审查/派发/Git证据在.tmp/legacy-role-page-control/independent-review256/{review.json,boundary-issues.json,original-manifest.json,rework-dispatch.json,rework-package.json,publication.json}；后续先修正准备件、明确必要产品缺口，再按原授权逐角色落地。
+
 ## 2026-10-16 22:50（Asia/Shanghai）— 用户授权全部存量角色登记并迁为页面启停，256准备首片已派
 
 - 用户在得知DeepSeek尚未具备页面受管前置后明确要求全部现有角色登记并转页面启动。根按新授权先补255真实自动启动验收前置，255人工/原生验收未通过事实保留，不把方向授权当人工验收。分工DeepSeek后端/宿主准备、Codex独立复核/正式进度Git，不更改永久开发要求。
