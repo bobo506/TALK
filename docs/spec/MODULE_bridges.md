@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 全角色默认执行预算与删除需求（2026-10-16，已确认待实施）
+
+用户已将默认 6 小时扩为所有 TALK 角色的启动要求，覆盖存量/新建、手动/受管入口，仍允许显式覆盖；不能保留旧脚本 3600 秒参数覆盖新默认。当前只记录方向，通用默认仍为600秒，252仍只核旧K2.8入口，不热改已有实例或MCP读取等待。删除角色按钮与清理/历史保留规则同时登记，详见[已确认需求](ROLE_EXECUTION_AND_DELETE_REQUIREMENTS.md)及[用户手册](../guides/USER_MANUAL.md#已确认的角色管理调整待上线)；删除功能另片实施。
+
 ### K2.8执行预算补正候选（2026-10-16，252待复核）
 
 - 用户选定旧agent:kimi-code-k28-preview默认单次CLI预算21600秒（6小时）。Codex5文件候选在check/render/launch开放--timeout正整数覆盖，检查报告/门禁/bridge argv一致；PowerShell模板-TimeoutSeconds同值转发，JSON默认同步。见[局部指南](../guides/KIMI_K28_EXECUTOR.md)。
