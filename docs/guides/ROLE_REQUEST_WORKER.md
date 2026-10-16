@@ -43,7 +43,7 @@
 
 worker在独立线程串行推进，不持有服务的Popen所有权；慢配置不阻塞主循环poll/stop。宿主新增选项为`--provision-worker-discovery-limit/--provision-worker-io-budget-seconds/--provision-worker-max-rounds`；后者限制serve轮次。没有单独worker轮询间隔选项，沿serve的`--poll-interval`。
 
-保存并配置不会启动角色CLI、登录原生账号或调用模型。真实启动仍由单独的人类服务意图触发，并受既有运行器能力/所有权检查约束。
+新页面create会明确携带auto_start=true；worker完整配置成功并首次报告后，服务端在同一事务内尝试投递一次受管start。worker本身不持有CLI进程或执行原生登录，实际启动仍由role_service_host按既有能力/所有权守卫消费，入队不等于ready。旧请求/无意图/recover保持原行为；人工先前启停会阻止该来源再自动启动，刷新或重放不重复投递。前后端须加载含98beb9c与255的版本，按[页面验收](ROLE_AUTO_START_PAGE_ACCEPTANCE.md)人工确认。
 
 ## 失败和恢复
 

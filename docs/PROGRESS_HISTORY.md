@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-16 22:33（Asia/Shanghai）— 255前端独立通过收取，发布并进入人工页面验收
+
+- 用户通知255完成，根核caller agent:codex/kind=agent、项目prj_e8fe7066bbec/lead，按既有包收独立交付，不新派或重复完整审查。DeepSeek已独立实读11源/合同，95Node/26Python/14自建VM探针及8项Node变异通过；根核驱动/原日志、before==98beb9c/candidate==worktree 11件SHA、842保护文件与11源差异集保持。
+- 原msg2782为说明文字+围栏JSON，MCP保持unknown/unstructured，不从succeeded推断业务完成。根按稳定引用两页无损保存4248字符，UTF8 SHA=b97d50f80bf2b1f1df08a62e1b1303fb6464b2bbff1683f2a45f6d264312a585；只剥离说明/围栏，JSON与本地delivery-255逐值相同，自身task_id=255校验通过，原MCP/原件不追改。Hall裁决msg2783，UTC14:32:40.619728收取succeeded/completed，result_message_id保持2782。
+- 验证范围发现遗漏并如实纠正：复核run-python.py在suite结束恢复engine后直接建TestClient，未显式临时DB/storage，触发lifespan；原22:12:43/44日志startup_cleanup deleted=0/missing_on_disk=0，但无事前DB快照，不能倒推原探针完全隔离或生产DB完全未写。根在final255/isolated-static.py中先绑定并断言RouteTestCase临时engine/storage，再运行生命周期，首页与六资源版本/实际字节全部通过；原独立证据未覆盖，补验不消除原执行边界限制。Python变异仅保留末轮5失败原件，首轮7失败保留为复核者自报，不叠加独立正向计数。
+- 代码通过：新create固定auto_start=true、旧缓存原样、recover不补意图，配置成功/入队/服务ready分开；详情仅异常短提示，原启停/人工意图/布局保持，刷新不发start。11源随本轮提交；六资源20261016-role-auto-start。无产品再改码，未接管或启停实例、操作真实Key/模型，原生能力unknown/unverified保持。
+- 更新PROGRESS/本历史/PROJECT_BRIEF/MODULE_webui/自动启动需求与合同/受管合同/USER_MANUAL/worker指南/页面验收共10docs，明确完整前后端代码通过、人工门禁待确认，原隔离遗漏与补验来源保留。完成必要检查/Git收尾后停止继续开发；按ROLE_AUTO_START_PAGE_ACCEPTANCE人工验创建/反馈/启停，真实视觉键盘/原生模型与退出/等待另验。
+- 本轮精确提交11源+10docs，不纳入其它未跟踪文件或原独立临时材料；未重跑无关测试、未用Browser。正式日志/旧角色受管/21600全入口/删除/私有目录校验均后续。完整接收审计与Git回执见.tmp/role-auto-start-frontend/final255/{format-audit.json,acceptance-audit.json,isolated-static.json,collection.json,publication.json}。
+
 ## 2026-10-16 22:05（Asia/Shanghai）— 前端自动首次启动候选完成自测，255交DeepSeek只读复核
 
 - 用户明确继续下一切片，沿最新AGENTS的Codex前端实施/DeepSeek独立复核；MCP核agent:codex/kind=agent、项目prj_e8fe7066bbec与当前开发要求，本次明确分工优先，不改永久项目配置。基线98beb9c，产品写入前跟踪文件无未提交差异。

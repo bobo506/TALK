@@ -10,7 +10,7 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   doc.getElementById=id=>{let n=lookup(id);if(!n){n=doc.createElement('div');n.id=id;h.elements.set(id,n);}return n;};
   doc.querySelector=selector=>doc.getElementById(selector);
   doc.addEventListener=()=>{};
-  const requests=[],storage=new Map();let rows=[];
+  const requests=[],storage=new Map();let rows=[],service=null;
   const ctx=vm.createContext({document:doc,console,crypto:webcrypto,Uint8Array,Map,Set,URLSearchParams,
     window:{confirm:()=>true,matchMedia:()=>({matches:false})},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
     setTimeout:()=>1,clearTimeout:()=>{},activeProjectId:'p',myId:'human:a',blackboardOpen:true,
@@ -18,9 +18,9 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
     currentMemberIsHuman:()=>true,getActiveGroup:()=>null,canEnterGroup:()=>false,
     blackboardTitle:doc.getElementById('title'),blackboardDescription:doc.getElementById('description'),
     blackboardColumns:doc.getElementById('columns'),blackboardSummary:doc.getElementById('summary'),blackboardEmpty:doc.getElementById('empty'),
-    loadProjectAgents:async()=>{ctx.projectAgents=rows.some(r=>r.member_id)?[{member_id:'agent:new',role_description:'负责检查',binding:null,binding_state:'unconfigured',service:null}]:[];},
+    loadProjectAgents:async()=>{ctx.projectAgents=rows.some(r=>r.member_id)?[{member_id:'agent:new',role_description:'负责检查',binding:null,binding_state:'unconfigured',service}]:[];},
     renderTaskDetailsPanel:()=>ctx.renderWorkspaceRoleDetails(),
-    apiFetch:async(path,options={})=>{requests.push({path,method:options.method||'GET'});let data;
+    apiFetch:async(path,options={})=>{requests.push({path,method:options.method||'GET',body:options.body?JSON.parse(options.body):null});let data;
       if(path.endsWith('/role-provision-host'))data={enabled:true,host_label:'local',config_version:0};
       else if(path.includes('/role-requests?'))data=rows;
       else if(path.endsWith('/roles'))data=rows.some(r=>r.member_id)?[{member_id:'agent:new',role_name:'新助手'}]:[];
@@ -37,6 +37,7 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   const controller=vm.runInContext('roleRequestApp',ctx);
   const toolbar=doc.getElementById('role-service-batch-actions');assert.match(h.texts(toolbar),/创建角色/);
   await controller.open();h.el('role-create-runner').value='r';await controller.chooseRunner();h.el('role-create-model').value='c';h.el('role-create-name').value='新助手';await controller.submit();
+  assert.equal(requests.find(r=>r.method==='POST').body.auto_start,true);
   assert.equal(ctx.projectAgents[0].member_id,'agent:new');assert.match(h.texts(ctx.blackboardColumns),/新助手/);
   const viewRole=h.el('role-create-result').querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='查看角色');
   assert.ok(viewRole,'创建结果应提供查看角色入口');await viewRole.fire('click');
@@ -46,11 +47,18 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   assert.equal(doc.getElementById('role-details-name-panel').classList.contains('hidden'),false);
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/正在配置/);
   assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/查看角色/);
-  Object.assign(rows[0],{status:'provisioned',revision:4,lease_held:false});await controller.refresh();
+  service={control_kind:'managed_cli',observed:'starting',readiness_service:'pending',native_login:'unverified',can_start:false,can_stop:true};
+  Object.assign(rows[0],{status:'provisioned',revision:4,lease_held:false,auto_start_status:'enqueued',auto_start_launch_id:'launch-auto'});await controller.refresh();
+  assert.match(h.texts(ctx.blackboardColumns),/启动中/);assert.doesNotMatch(h.texts(ctx.blackboardColumns),/启动成功/);
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/绑定重置/);
   assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/配置进度|配置已完成|身份档案|查看角色|运行器与模型绑定/);
   const detailChildren=doc.getElementById('role-details-name-panel').children;
   assert.ok(detailChildren.findIndex(n=>String(n.className).includes('role-maintenance'))>detailChildren.findIndex(n=>String(n.className).includes('role-service-section')),'重置区位于角色开关下方');
+  service={...service,observed:'running',readiness_service:'ready'};await controller.refresh();
+  assert.match(h.texts(ctx.blackboardColumns),/启动成功（原生登录未核验）/);
+  service={...service,observed:'stopped',can_start:true,can_stop:false};await controller.refresh();
+  assert.match(h.texts(ctx.blackboardColumns),/未启动（已关闭）/);
+  assert.equal(requests.some(r=>r.path.includes('/service/')),false);
   assert.equal(requests.filter(r=>r.method==='POST').length,1);
   vm.runInContext('workspaceUI.mode="tasks";syncWorkspaceLayout();',ctx);
   assert.equal(controller.state.active,false);assert.ok(doc.getElementById('role-create-modal').classList.contains('hidden'));

@@ -66,10 +66,13 @@ function createRoleRequestUI(deps) {
       const saved = JSON.parse(deps.storage?.getItem(storageKey()) || "null");
       if (saved && /^role-[a-zA-Z0-9_-]{8,120}$/.test(saved.key) && saved.payload?.kind === "create") {
         const p = saved.payload;
+        if (Object.hasOwn(p, "auto_start") && ![true, false, null].includes(p.auto_start)) return;
         state.attempt = { key: saved.key, labels: { runner: String(saved.labels?.runner || "上次选择的运行器"),
           model: String(saved.labels?.model || "上次选择的模型") }, payload: { request_key: saved.key, kind: "create", confirm: true,
           role_name: String(p.role_name || ""), role_description: p.role_description == null ? null : String(p.role_description),
-          runner_id: String(p.runner_id || ""), choice_id: String(p.choice_id || "") } };
+          runner_id: String(p.runner_id || ""), choice_id: String(p.choice_id || ""),
+          // 原键重试必须保持旧载荷；不替旧请求补上自动启动意图。
+          ...(Object.hasOwn(p, "auto_start") ? { auto_start: p.auto_start } : {}) } };
       }
     } catch (_) { state.attempt = null; }
   }
@@ -90,6 +93,10 @@ function createRoleRequestUI(deps) {
     const out = {};
     for (const key of ["request_key", "kind", "status", "effective_status", "revision", "role_name", "member_id",
       "credential_version", "lease_held", "retry_exhausted", "last_error_code", "created_at", "updated_at"]) out[key] = row[key];
+    out.auto_start = row.auto_start === true;
+    for (const key of ["auto_start_status", "auto_start_launch_id", "auto_start_error_code"]) {
+      out[key] = typeof row[key] === "string" ? row[key] : null;
+    }
     const job = row.provision_job;
     if (job && typeof job === "object") {
       out.provision_job = { status: job.status, steps: {} };
@@ -112,6 +119,24 @@ function createRoleRequestUI(deps) {
     return lookup({ requested: state.host?.enabled === false ? "等待开启宿主配置" : "等待宿主", leased: "宿主已领取",
       created: row.lease_held ? "正在配置" : "等待宿主继续配置", provisioned: "配置已完成", failed: "配置未完成", canceled: "已取消" }, row.status, "配置状态未知");
   }
+  function autoStartFeedback(row) {
+    // pending意图不能把配置失败/取消伪装成启动中；旧请求和恢复保持原反馈。
+    if (row.kind !== "create" || row.auto_start !== true || row.status !== "provisioned") return null;
+    if (row.auto_start_status === "enqueued") return {
+      text: "自动启动请求已提交，实际运行状态请查看角色开关。", attention: false,
+    };
+    const reasons = {
+      auto_start_control_kind_not_managed: "本次未执行自动启动：运行器的受管启动能力尚未确认。",
+      auto_start_config_disabled: "本次未执行自动启动：宿主配置已关闭。",
+      auto_start_manual_intent_present: "已保留手动启停操作，本次不再自动启动。",
+      auto_start_enqueue_failed: "本次自动启动请求提交失败，请在角色开关核对后手动启动。",
+    };
+    const fallback = lookup({
+      not_eligible: "本次未执行自动启动：启动条件未满足。当前状态请查看角色开关。",
+      failed: "本次自动启动未完成，请在角色开关核对当前状态。",
+    }, row.auto_start_status, "自动启动结果尚未确认，请刷新核对。" );
+    return { text: lookup(reasons, row.auto_start_error_code, fallback), attention: true };
+  }
   function canRecover(row) {
     return human() && safeInt(row.revision) && Boolean(row.member_id)
       && (row.status === "provisioned" || (row.status === "failed" && row.last_error_code === "manual_recovery_required"))
@@ -127,6 +152,8 @@ function createRoleRequestUI(deps) {
   function progress(row, { showRoleLink = true } = {}) {
     const box = node("section", "role-request-card");
     box.append(node("strong", "", row.role_name || "角色配置"), node("p", "role-request-status", label(row)));
+    const autoStart = autoStartFeedback(row);
+    if (autoStart) box.append(node("p", "role-request-status", autoStart.text));
     if (row.provision_job) {
       const steps = node("ul", "role-request-steps");
       for (const [step, title] of [["profile", "身份档案"], ["key_file", "本机接入配置"], ["preflight", "配置检查"]]) {
@@ -327,7 +354,7 @@ function createRoleRequestUI(deps) {
         .map(c => ({ choice_id: c.choice_id, runner_id: c.runner_id, model_display_name: c.model_display_name, model_alias: c.model_alias, model_id: c.model_id })) : [];
       fillSelect("role-create-model", state.choices, state.choices.length ? "选择模型" : "暂无可选模型", "choice_id");
       const fact = state.runners.find(r => r.runner_id === runner);
-      if (fact && (fact.adapter_status !== "adapted" || fact.control_kind !== "managed_cli")) state.notice = "运行器接入或启停能力尚未确认；创建只配置角色身份，启动服务需另行准备。";
+      if (fact && (fact.adapter_status !== "adapted" || fact.control_kind !== "managed_cli")) state.notice = "运行器接入或启停能力尚未确认；配置可以继续，自动启动须通过实际能力检查。";
       if (!state.choices.length) {
         if (fact?.runtime === "kimi-code") {
           const agents = await api(`${base()}/agents`);
@@ -384,7 +411,7 @@ function createRoleRequestUI(deps) {
       const selectedModel = state.choices.find(c => c.choice_id === choice);
       state.attempt = { key, labels: { runner: state.runners.find(r => r.runner_id === runner)?.display_name || "已选运行器",
         model: selectedModel.model_display_name || selectedModel.model_alias || selectedModel.model_id || "已选模型" },
-        payload: { request_key: key, kind: "create", confirm: true,
+        payload: { request_key: key, kind: "create", confirm: true, auto_start: true,
         role_name: name, role_description: description, runner_id: runner, choice_id: choice } }; keepAttempt();
     }
     const attempt = state.attempt; state.busy = true; state.notice = ""; render();
@@ -393,7 +420,9 @@ function createRoleRequestUI(deps) {
       if (!current(epoch)) return;
       if (row.request_key !== attempt.key) throw new Error("保存结果尚未确认。");
       upsert(row); state.modalRow = publicRow(row); state.attempt = null; keepAttempt();
-      state.notice = "请求已保存，宿主会完成配置；配置成功后可另行启动。";
+      state.notice = row.auto_start === true ? "请求已保存，配置完成后将尝试自动启动服务。"
+        : attempt.payload.auto_start === true ? "请求已保存，当前服务未确认自动启动意图；配置完成后请核对角色开关。"
+        : "原请求已保存，宿主会继续配置；本次未请求自动启动。";
       await refresh();
     } catch (err) {
       if (!current(epoch)) return;
@@ -465,6 +494,8 @@ function createRoleRequestUI(deps) {
         const resume = button("继续配置", () => mutate(row, "resume")); resume.disabled = state.busy; panel.append(resume);
       }
     }
+    const autoStart = autoStartFeedback(row);
+    if (autoStart?.attention) panel.append(node("p", "role-request-status", autoStart.text));
     if (canRecover(row)) panel.append(resetControl(row));
     return panel.children.length ? panel : null;
   }

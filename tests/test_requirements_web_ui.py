@@ -6,7 +6,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261016-task-initiator-label"
+STATIC_VERSION = "20261016-role-auto-start"
 
 
 class RequirementsWebUiTests(RouteTestCase):

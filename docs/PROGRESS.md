@@ -1,12 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-16 22:05 (Asia/Shanghai)：前端自动首次启动候选开发/自测完成，255交DeepSeek独立复核；11产品/测试源冻结未提交。后端98beb9c已通过，真实页面/原生服务仍待验。
+Updated: 2026-10-16 22:33 (Asia/Shanghai)：255前端独立通过并收取，11源本轮提交发布，六资源20261016-role-auto-start；前后端代码通过，暂停等人工页面验收。真实原生能力仍待。
 
 ## 当前身份与分工
 
 - TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead，已读当前development_requirements。
 - 用户最新要求后续DeepSeek代替旧agent:kimi-code-k28-preview；254按原包完成，不追改历史或项目永久开发要求。AGENTS同步：前端Codex实施/DeepSeek独立复核，后端/宿主DeepSeek实施/Codex独立复核，Codex负责正式docs/Git。
-- 默认派发后结束等待、用户通知完成后取件；共享目录开发暂停后审查，一次一片。本轮已交前端只读复核，Codex停止产品改码；仅协调docs/Git，默认用户通知完成后取件。
+- 默认派发后结束等待、用户通知完成后取件；共享目录开发暂停后审查，一次一片。本轮255已完成裁决与收取，源码未再改；完成Git/进度后暂停等用户页面验收，不开启其它功能。
 
 ## 250/254自动首次启动后端已独立通过
 
@@ -15,16 +15,22 @@ Updated: 2026-10-16 22:05 (Asia/Shanghai)：前端自动首次启动候选开发
 - F1/P1闭合：保存点rollback后核driver真实事务仍在、同事务内已flush provisioned事实可读，才允许局部failed/auto_start_enqueue_failed；RAISE(ROLLBACK)/连接失效上抛500整体回滚，不另起事务补写。F2/P2先注册再PATCH200并核external_session，重复注册409零写，unknown用例保留。
 - 本轮根独立63/63相关模块与原9/9 API/SQLite边界通过，0失败/错误/跳过；RAISE(ABORT)保留provisioned，RAISE(ROLLBACK)500/created/pending/revision3保持，去故障同token重试200/enqueued且恰1launch+1state；锚点/commit故障、双HTTP/WAL、人工意图及旧库迁移通过。8源py_compile/diff与175基线文件审查前后SHA通过。开发者273/9与根旧272分别保留，不重复累计。
 - 交付msg2779 task_id=254校验通过，独立裁决msg2780；UTC08:40:06.478883收取，succeeded/completed。证据.tmp/k28-autostart-slice/independent-review254/{review.json,focused/,boundary-probes.json,lost-outer-transaction.json,freeze.json,collection.json,publication.json}。
-- 仅后端代码验收与Git发布；前端尚未发auto_start，不将新页面保存配置声称已自动启动。没有生产DB/真实Key/CLI/模型/常驻服务启停、能力修改或Browser操作，unknown/unverified/实际ready守卫保持。
+- 254阶段仅后端代码验收与Git发布；当前255前端接受状态见下节，实际原生就绪另验。没有生产DB/真实Key/CLI/模型/常驻服务启停、能力修改或Browser操作，unknown/unverified/实际ready守卫保持。
 
-## 当前切片：前端自动首次启动候选，待独立复核
+## 255前端独立通过，等待人工页面验收
 
-- 用户明确“可以继续下一个切片开发”，按当前分工Codex实施、DeepSeek独立复核。基线98beb9ce4d9bcc60f7f59d8ddf0f7d46bbc47590，证据.tmp/role-auto-start-frontend/，源码未提交/推送，产品已暂停。
-- 新create固定auto_start=true，不增勾选；同键重试及sessionStorage恢复保留原auto布尔/空值/缺省，旧请求/recover不追补意图。只保留公开投影，配置成功/入队/实际ready分开。详情服务状态与启停保持，只补自动未执行/失败短反馈，刷新无额外启动POST。
-- 11候选：web/{role-creation.js,index.html}，两创建Node测试及7个静态缓存断言消费者；六资源20261016-role-auto-start。workspace.js/app.js、后端/宿主/生产配置不改；docs同步前848范围外跟踪文件SHA不变。
-- 开发者95/95相关Node与26/26 Python页面契约通过（0失败/错误/跳过），真实模块VM展示starting→ready→stopped且仅1次create POST；初次37聚焦例是95子集，不叠加。role-creation.js语法/diff通过。没有Browser/视觉键盘或真实CLI/模型/原生启停证据。
-- 255最小参数派DeepSeek只读审实际11源差异、合同、原需求与测试证据，输出本次实际task_id完整JSON并暂停；任务详情与候选SHA在dispatch.json/developer-summary.json。根不轮询、不并行改码，收到完成通知后按MCP交付摘要与必要证据裁决。
-- 独立通过后才收取/提交产品候选，再按docs/guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md交用户验收。当前不自动创建真实新角色、迁移旧角色或部署/启停服务。
+- 基线98beb9ce4d9bcc60f7f59d8ddf0f7d46bbc47590；255 DeepSeek独立实读11源及合同，无需返修。根核实际驱动/证据与11候选SHA、842保护文件均未变，不重复完整95/26自测，也未修改冻结源码。
+- 11源：web/{role-creation.js,index.html}、两创建Node测试及7个缓存断言消费者，六资源20261016-role-auto-start。新create固定auto_start=true；旧缓存原键/载荷保持true/false/null/缺省，recover不加意图。页面配置成功/入队/实际ready分开，详情只补异常短反馈，刷新零额外start，原启停与布局不变。
+- 独立95Node/26Python/14自建VM探针与8项Node变异检出，根核实际日志与候选来源；末轮Python变异26例/5失败原件保留，首轮7失败仅复核者自报，不额外累计。root独立临时DB/storage生命周期内补验首页+六资源字节通过。
+- 原msg2782=说明+JSON围栏，MCP保持unknown/unstructured。根按稳定SHA b97d50f8…无损保存4248字符原文，仅去说明/围栏抽JSON，逐值等同本地delivery-255.json，task255本地校验通过，不改原结果或冒称重提。Hall裁决msg2783；UTC14:32:40.619728收取succeeded/completed，result_message_id仍2782。
+- 验证范围纠正：原独立run-python在suite恢复engine后直接建TestClient，未显式临时DB/storage；原日志startup_cleanup deleted=0/missing_on_disk=0，没有事前DB快照，不能声称该段完全隔离/原DB完全未写。根补验已先断言临时engine/storage再启lifespan，原报告/驱动/日志保留不改。原测试追加日志/临时目录限制保留。
+- 证据.tmp/role-auto-start-frontend/final255/{format-audit.json,acceptance-audit.json,isolated-static.json,collection.json,publication.json}；独立原件在independent-review/。11源及10相关docs本轮提交推送，不暂存其它未跟踪材料。根没有启停生产实例/操作真实Key或模型，unknown/unverified未改。
+
+## 下一步与人工门禁
+
+- 加载含本次前端与98beb9c后端的服务，Ctrl+F5，项目→角色，按docs/guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md验创建说明、配置/入队/实际服务状态及关闭后刷新不重启。现有human账号/Key，启动命令及已知限制见该指南。
+- 当前暂停等用户人工验收，不自动创建真实角色或迁移实例，不把DOM/VM/TestClient当视觉/键盘/原生能力通过。未受管运行器应诚实给原因，不能强行验成实际自动启动成功。
+- 验收反馈通过后，再安排完整日志/旧角色统一受管等后续切片；本轮不新派任务、不同时推进其它需求。
 
 ## 已确认后续需求（待实施）
 
@@ -39,4 +45,4 @@ Updated: 2026-10-16 22:05 (Asia/Shanghai)：前端自动首次启动候选开发
 - 253→248→246已收取，revision-2本机零模型入口准备通过，详历史与.tmp/k28-new-role-trial-prep/revision-2/final253/。原稿/原失败/253 task_id格式整理来源保留；仅Windows10本地files专用runner，35/11独立验证通过，不冒充产品pipes。实际客户端T未知、W未启用，临时CLI600/整体900；真实新Kimi/模型/开发能力/原生退出及主动等待未验，不自动开真实新角色任务。
 - 252旧K2.8六小时入口已发布79096ad，旧实例实际执行预算本轮未从启动日志核实，不声称21600实测。用户此前重启后254已接单只证明本次接单恢复；外部旧CLI尚无受管owner/launch，不能当成页面已可重启该实例。
 - 251发起人标签发布84b8010、六资源20261016-task-initiator-label；静态字节已核，人工视觉反馈待。页面5de19e8此前整体通过，不外推本次小修或真实原生能力。
-- 254已收取并发布98beb9c；本轮前端候选仅本地冻结、待独立通过，不暂存其产品源码或其它未跟踪材料。精确配额未读取，不臆测比例；恢复说“继续项目”。
+- 254已收取并发布98beb9c；本轮255前端独立通过后11源本轮发布，其它未跟踪材料不纳入。精确配额未读取，不臆测比例；恢复说“继续项目”。

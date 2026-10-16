@@ -6,9 +6,9 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261016-task-initiator-label">
-  <link rel="stylesheet" href="/workspace.css?v=20261016-task-initiator-label">
-  <link rel="stylesheet" href="/role-creation.css?v=20261016-task-initiator-label">
+  <link rel="stylesheet" href="/style.css?v=20261016-role-auto-start">
+  <link rel="stylesheet" href="/workspace.css?v=20261016-role-auto-start">
+  <link rel="stylesheet" href="/role-creation.css?v=20261016-role-auto-start">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -520,7 +520,7 @@
   <div id="role-create-modal" class="role-create-backdrop hidden">
     <section class="role-create-dialog" role="dialog" aria-modal="true" aria-labelledby="role-create-title">
       <div class="role-create-heading"><h2 id="role-create-title">创建角色</h2><button id="role-create-close" type="button" class="workspace-text-button" aria-label="关闭创建角色">关闭</button></div>
-      <p class="role-request-hint">选择运行器和模型，保存后由宿主配置独立身份。配置完成后，再从角色详情启动服务。</p>
+      <p class="role-request-hint">选择运行器和模型，保存后由宿主配置独立身份，并在配置完成后尝试自动启动服务。可在角色详情查看实际状态、手动关闭或重新启动。</p>
       <form id="role-create-form">
         <div class="role-create-grid">
           <label class="role-request-field"><span>运行器</span><select id="role-create-runner" class="group-member-select" required></select></label>
@@ -535,8 +535,8 @@
       </form>
     </section>
   </div>
-  <script src="/role-creation.js?v=20261016-task-initiator-label"></script>
-  <script src="/workspace.js?v=20261016-task-initiator-label"></script>
-  <script src="/app.js?v=20261016-task-initiator-label"></script>
+  <script src="/role-creation.js?v=20261016-role-auto-start"></script>
+  <script src="/workspace.js?v=20261016-role-auto-start"></script>
+  <script src="/app.js?v=20261016-role-auto-start"></script>
 </body>
 </html>

@@ -44,7 +44,7 @@ test('选择真实目录并提交单一人类意图，未知凭据字段不进�
   const h=harness();await h.ready();await h.fill();await h.ui.submit();
   const posts=h.requests.filter(r=>r.method==='POST');assert.equal(posts.length,1);
   assert.equal(posts[0].path,'/api/projects/p/role-requests');
-  assert.deepEqual(Object.keys(posts[0].body).sort(),['choice_id','confirm','kind','request_key','role_description','role_name','runner_id'].sort());
+  assert.deepEqual(Object.keys(posts[0].body).sort(),['auto_start','choice_id','confirm','kind','request_key','role_description','role_name','runner_id'].sort());
   assert.equal(posts[0].body.role_name,'审查助手');assert.equal(posts[0].body.choice_id,'c');
   assert.equal(h.el('role-create-submit').disabled,true);
   assert.doesNotMatch(JSON.stringify(h.ui.state),/SECRET|TOKEN/);assert.doesNotMatch([...h.storage.values()].join(''),/SECRET|TOKEN/);
@@ -236,4 +236,95 @@ test('详情移除进度大块后，处理中与失败仍有简短反馈及原�
     if(kind==='created'){assert.match(text,/等待宿主|正在配置/);assert.deepEqual(labels,[]);}
     else {assert.match(text,/配置未完成/);assert.equal(labels.includes(kind==='manual'?'绑定重置':'继续配置'),human);}
   }
+});
+
+
+test('新建请求固定自动首次启动，配置尚未完成时不显示已启动或发启动POST',async()=>{
+  const h=harness();await h.ready();await h.fill();await h.ui.submit();
+  const post=h.requests.find(r=>r.method==='POST');assert.equal(post.body.auto_start,true);
+  assert.match(h.el('role-create-notice').textContent,/配置完成后将尝试自动启动/);
+  assert.doesNotMatch(h.texts(h.el('role-create-result')),/启动成功|请求已提交|启动中/);
+  assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+  assert.equal(h.requests.some(r=>r.path.includes('/service/')),false);
+});
+
+test('旧缓存缺省、false、null和新true均沿原键原载荷重试，不追补意图',async()=>{
+  for(const extra of [{},{auto_start:false},{auto_start:null},{auto_start:true}]) {
+    const key='role-pinned-00000000';
+    const payload={request_key:key,kind:'create',confirm:true,role_name:'原请求',role_description:null,runner_id:'r',choice_id:'c',...extra};
+    const storage=new Map([['talk-role-intent:["p","human:a"]',JSON.stringify({key,payload})]]);
+    const h=harness({storage});await h.ready();await h.ui.open();await h.ui.submit();
+    assert.deepEqual(h.requests.find(r=>r.method==='POST').body,payload);
+  }
+});
+
+test('自动启动新请求丢响应重建页面后仍保留true及同一请求',async()=>{
+  const storage=new Map();const h=harness({storage,handler:c=>{if(c.method==='POST')throw Error('lost');}});
+  await h.ready();await h.fill();await h.ui.submit();
+  const payload=h.requests.find(r=>r.method==='POST').body;assert.equal(payload.auto_start,true);
+  const reopened=harness({storage});await reopened.ready();await reopened.ui.open();await reopened.ui.submit();
+  assert.deepEqual(reopened.requests.find(r=>r.method==='POST').body,payload);
+});
+
+async function completedAuto(h,extra={}) {
+  await h.ready();await h.fill();await h.ui.submit();
+  Object.assign(h.backend.rows[0],{status:'provisioned',member_id:'agent:auto',revision:4,credential_version:1,
+    auto_start_status:'enqueued',auto_start_launch_id:'launch-public',auto_start_error_code:null,...extra});
+  await h.ui.refresh();
+}
+
+test('入队只显示已提交，详情沿角色开关展示实际状态且无重复配置卡',async()=>{
+  const h=harness();await completedAuto(h);
+  assert.match(h.texts(h.el('role-create-result')),/配置已完成/);
+  assert.match(h.texts(h.el('role-create-result')),/自动启动请求已提交/);
+  assert.doesNotMatch(h.texts(h.el('role-create-result')),/启动成功|已就绪|启动中/);
+  const detail=h.texts(h.ui.rolePanel({member_id:'agent:auto'}));
+  assert.match(detail,/绑定重置/);assert.doesNotMatch(detail,/配置已完成|请求已提交|身份档案|启动成功/);
+  assert.equal(h.ui.state.rows[0].auto_start_launch_id,'launch-public');
+  assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+});
+
+test('人工意图、未受管和入队失败分别有简短反馈，刷新只读不重试启动',async()=>{
+  for(const [status,code,message] of [
+    ['not_eligible','auto_start_manual_intent_present',/已保留手动启停/],
+    ['not_eligible','auto_start_control_kind_not_managed',/受管启动能力尚未确认/],
+    ['not_eligible','auto_start_config_disabled',/宿主配置已关闭/],
+    ['failed','auto_start_enqueue_failed',/自动启动请求提交失败/],
+  ]) {
+    const h=harness();await completedAuto(h,{auto_start_status:status,auto_start_error_code:code,auto_start_launch_id:null});
+    assert.match(h.texts(h.el('role-create-result')),/配置已完成/);
+    assert.match(h.texts(h.ui.rolePanel({member_id:'agent:auto'})),message);
+    assert.doesNotMatch(h.texts(h.ui.rolePanel({member_id:'agent:auto'})),/配置已完成|身份档案|查看角色|启动成功/);
+    await h.ui.refresh();assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+  }
+});
+
+test('配置失败取消不把pending意图当启动中，旧请求及恢复不显示自动启动反馈',async()=>{
+  for(const extra of [
+    {status:'failed',auto_start_status:'pending'},
+    {status:'canceled',auto_start_status:'pending'},
+    {auto_start:false},
+    {kind:'recover'},
+  ]) {
+    const h=harness();await completedAuto(h,extra);
+    assert.doesNotMatch(h.texts(h.el('role-create-result')),/自动启动请求已提交|启动成功|启动中/);
+    assert.doesNotMatch(h.texts(h.ui.rolePanel({member_id:'agent:auto'})),/自动启动/);
+  }
+});
+
+test('未知自动启动状态或错误码不冒充就绪、不展示后端任意错误正文',async()=>{
+  for(const status of ['pending','__proto__',null]) {
+    const h=harness();await completedAuto(h,{auto_start_status:status,auto_start_error_code:'<img src=x onerror=alert(1)>'});
+    const text=h.texts(h.el('role-create-result'));
+    assert.match(text,/结果尚未确认/);assert.doesNotMatch(text,/启动成功|已就绪|<img|alert\(1\)/);
+  }
+});
+
+test('旧服务未确认auto意图时诚实提示，不仅凭提交载荷承诺自动启动',async()=>{
+  const h=harness({handler:(c,b)=>{
+    if(c.method==='POST') {const row={...c.body,status:'requested',revision:1};delete row.auto_start;b.rows=[row];return response(row);}
+  }});
+  await h.ready();await h.fill();await h.ui.submit();
+  assert.match(h.el('role-create-notice').textContent,/未确认自动启动意图/);
+  assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
