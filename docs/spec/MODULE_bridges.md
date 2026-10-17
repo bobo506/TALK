@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 新Kimi设备登录重发（2026-10-17）
+
+用户报告网页完成后根核91333已Device authorization timed out after 900s退出1且无config；设备码宣称1800秒TTL不能替代CLI实际轮询窗口。已按原迁移授权重发独立登录81204待用户，源代码/原Key/绑定/其它服务未改；未模型probe/启服务。会话及有效码仅本机resume-login-session.json，旧会话不可续等，旧失败status文件须与当前新进程区分。
+
 ### 263准备收取，新页面K28独立登录待授权（2026-10-17）
 
 263原partial经实际代码核查接受：只读collector不读DB秘密或整库hash；窄入口保持固定新候选/原名Kimi k2.8/默认review/21600/原manager与私有drain。根改corrected/诊断，不再写死native目录不存在，原1失败/最终原7+根5共12通过；本机CIM核旧11920确为旧角色专属且无generic serve。文案默认隔离Node23/静态实际字节通过，原件/失败保持。

@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-17 16:15（Asia/Shanghai）— 新Kimi网页完成回报后核实旧CLI超时，重发独立登录会话
+
+- 用户确认网页登录/授权完成后根先续读exec91333，实际已退出1，回显Device authorization timed out after 900s；候选native-login-status.json同为exit1/config=false，没有登录配置。旧CLI约UTC07:38启动，网页码宣称1800秒TTL但CLI实际900秒结束轮询，用户报告与CLI落盘必须分开核验，不伪称成功。
+- 已保存native-login-first-timeout.json及旧报告事实，未复用已结束session或旧code。按已有继续迁移/独立登录授权重发新CLI会话81204，约UTC08:13:56启动，仍同候选独立HOME/KIMI_CODE_HOME/原region，无认证复制/Key或绑定变更；已向用户发新有效链接并说明CLI约15分钟实际等待。有效设备码仅聊天与忽略的本机会话记录，不写Git文档。
+- 当前新会话待用户完成；native-login-status.json在新进程退出前仍可能是旧失败，恢复须看当前session/新报告，不按旧文件假设新会话失败。模型probe、服务host/启停/接单仍未执行，原旧K28/DeepSeek服务保持用户现状。本轮无源码或新测试；沿用83978da文案/准备23默认Node与12helper证据，只同步5协调docs和会话状态后收尾。
+
 ## 2026-10-17 15:43（Asia/Shanghai）— 263文案/准备独立复核补正收取；新Kimi k2.8独立登录等待授权
 
 - 用户通知263完成后取2812完整合法partial（14完成/6未完/5阻塞），实核caller agent:codex、最新旧项目要求及DeepSeek idle/current_task=null。冻结18开发件和3候选原件；独立实读实际diff、collector558行及窄helper394行/原测试/执行包，不只凭开发自报。原Key仅可信产物窄读GET，collector显式readonly白名单、无秘密列/整DB正文hash，原事实与失败保留。
