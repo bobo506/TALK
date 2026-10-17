@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-17 23:52（Asia/Shanghai）— DeepSeek页面三步人工验收通过，保身份受管迁移正式闭合
+
+- 用户明确答复原dsh CLI Bridge (agent:deepseek)页面关闭等未启动→刷新不自启→再启动ready“三步均通过”；根只读核实际gen4 stop于UTC15:50:02.107424 outcome stopped、gen5 start于15:50:19.751667 ready，人工门禁释放。没有代用户重复启停或模型调用，不操作Browser。
+- 当前gen5/launch 4b20135f-e650-4d1d-8731-0b831a5f6458/ins_d2b05a620405/16712 idle/current_task null/无错误。原manager12536/started_at UTC15:02:39.993552及所持活句柄保持；OS实际创建UTC15:50:18.366264、父12536与headless/显式模型patch/argv/21600/本人Key文件参数吻合。旧18216已退出，268原接单ins_1251105edd64正常offline，不当作故障重跑。
+- 原TALK Key与USER.md第12行源值相同且GET本人通过；原成员/全部名册/角色/绑定及其它服务保持。268原2822合法complete内容和已收取completed记录保持；本轮无新增执行任务、Hall回评、服务或模型重触发、认证复制或PID接管。
+- 用户确认的deepseek-flash/max、原生隔离probe/28.078秒、10项Codex自检、保ID/Key补录与正常gen1→2→3生命周期事实复用；不称他人独立代码复核，不扩大固定后端版本/六小时/主动等待/完整异常日志结论。产品源码未变，本次只维护验收与恢复docs。
+- 证据位于deepseek-next/coordination/smoke268/human-first-read.json、human-page-acceptance.json、human-restart-process-proof.json与human-baseline/validation/publication；上层state同步完成态及gen5新实例。三个Kimi与DeepSeek均已正式验收，只剩旧Codex CLI；当前桌面协调聊天不可当作可接管CLI。本轮提交推送后暂停，18项顺序不变，不自动开下一角色。
+- 2026-10-18 07:50（Asia/Shanghai）中断恢复：现场仍是上述6份已验证docs待提交，HEAD755500f；只读再核gen5/新16712及原manager12536的OS创建事实与health、idle无错和268收取保持，无重复启停/模型动作。恢复记录在interruption-resume-readonly/process，重核差异与保护范围后补提交推送，不新开切片。
+
 ## 2026-10-17 23:45（Asia/Shanghai）— 268原DeepSeek受管实例最小回传核验并收取，转页面人工验收
 
 - 用户通知268完成；最新MCP caller agent:codex/lead与项目旧development_requirements已核。按本角色Codex直接迁移约定只读核实际交付与运行事实，未派返修/回审，无源码、服务或模型动作及额外Hall回评。

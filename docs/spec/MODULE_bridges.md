@@ -3,7 +3,7 @@
 > 所属项目：TALK
 > 状态：通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容
 
-> 2026-10-17 23:45迁移补充：原DeepSeek受管最小任务268/msg2822已由ins_1251105edd64实际接单回传并核验收取，gen3/18216仍归原manager12536、idle无错，headless/显式deepseek-flash模型patch/argv/21600及原Key绑定吻合，其它角色保持。仅待页面三步人验，无新源码/启停/模型重触发；此前原生与10自检保持，adapter unverified，不外推固定后端版本/六小时/主动等待，详[当前进度](../PROGRESS.md)。
+> 2026-10-17 23:52迁移补充：原DeepSeek页面关闭→刷新不自启→再启动三步人验通过；只读核gen4 stop/5ready、当前ins_d2b05a620405/16712归原manager12536、idle无错，原Key/绑定/其它服务保持。268原2822与收取保持，旧接单实例offline为正常关闭，不重跑。DeepSeek保身份迁移正式验收，无新源码/服务/模型动作；三个Kimi与DeepSeek均完成，只剩旧Codex CLI，不外推主动等待/六小时/固定后端版本，详[当前进度](../PROGRESS.md)。
 
 > 2026-10-17 22:25迁移补充：用户确认原agent:kimi页面关闭→刷新不自启→启动三步通过；根核两轮正常启停、当前generation7/ins_619c2a3c3e52/10496归原manager17672，原Key/绑定/其它角色保持。267原回传/收取及266原件/18自检保持，原接单实例offline为正常历史；原Kimi迁移正式验收，产品源码无新变化。三个Kimi均完成，下一步DeepSeek准备、Codex CLI最后，不外推后端版本/六小时/T-W，见[当前进度](../PROGRESS.md)。
 

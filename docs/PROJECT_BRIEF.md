@@ -4,7 +4,7 @@
 
 ## 当前实施状态（2026-10-17）
 
-2026-10-17 23:45最新：268/msg2822已核验收取，实际由原DeepSeek受管ins_1251105edd64接单回传，固定标记/作者/Hall/绑定快照正确；gen3/18216 idle无错仍归原manager12536，原Key/全部绑定名册/其它角色保持。本轮只读核验与收取，无服务或模型动作；仅待DeepSeek页面三步人验，Codex CLI最后，详[进度](PROGRESS.md)。
+2026-10-17 23:52最新：用户确认DeepSeek页面三步均通过，gen4正常stop→gen5ready及新ins_d2b05a620405/16712仍归原manager12536已只读核验；原Key/全部绑定名册/其它服务保持。268原2822与收取保持、旧接单实例正常offline不重跑。DeepSeek迁移正式验收，三个Kimi和DeepSeek均完成，只剩旧Codex CLI，本轮收尾暂停，详[进度](PROGRESS.md)。
 
 2026-10-17 22:25最新：用户确认原Kimi页面三步均通过，根只读核两轮正常启停及当前generation7/ins_619c2a3c3e52/10496仍由原manager17672持有，原Key/全部绑定名册/两K2.8服务保持；原Kimi迁移正式验收。267原回传/收取及266原件/18自检保持，正常关闭后的原接单实例offline不重跑。三个Kimi均已受管/人验，下一步DeepSeek准备、Codex CLI最后；本轮收尾暂停，不操作Browser或另启服务，见[进度](PROGRESS.md)。
 
