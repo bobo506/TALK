@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-17 09:20（Asia/Shanghai）— 用户收窄为先迁一个，261旧K2.8真实预检/可审执行包已派
+
+- 用户在260发布42738d9后授权“可以，保险点先移一个看看”。本轮候选固定agent:kimi-code-k28-preview：既有精确Kimi绑定/choice及已知原Key metadata存在；不自动换候选或迁其它四角色，不重建/轮换Key/改模型与历史。
+- 根实核caller agent:codex/lead、旧development_requirements及5成员必要公开信息，按10-17最新DeepSeek首次执行/Codex复核并直接修正分工。复用已复核258只读白名单收集器，显式输出pilot-one/coordination/public-facts.json，未覆盖旧件。当前runner仍unverified/unknown、service_state/launches空，旧K2.8陈旧idle、host enabled都不代表当前可控/空闲。
+- 根仅stat旧K2.8 Key与Kimi默认Key、私有根和默认host状态根；列TALK-private顶层遇WinError5并保留具体阶段，未读Key正文或秘密DB列，不把默认权限错误称自动审批拒绝。旧Kimi Key缺失不转成重建要求。
+- 261最小4参交agent:deepseek，Hall group:task-cbf35f4ba1144e16b4e60f20881b42ef，UTC2026-10-17T01:20:33.703048初始queued/assigned。仅pilot-one/developer/真实只读预检、CLI帮助/版本、原入口/隔离登录核验与可审默认dry-run执行包；不改产品源码/生产API/DB/能力/真实配置或启停/调用模型。只读认证必要原Key可窄读内存用GET核human/精确member，必须如实记录范围，不输出/存盘/哈希或从DB抄Key。
+- 服务端human-only补录/真实能力/owner守卫保持；当前serve项目级领取且--members仅start-all，执行包须解决目标前置过滤/持续原manager持有Popen/正常关闭，不开启其它角色worker或顺带claim。不自动复制原生认证目录或改共享HOME绕过隔离登录；未知退出/能力缺事实先报告精确卡点，不按PID接管。
+- 交付暂停后Codex复核并依同一已授权目标实际切换，原ID/Key/绑定/历史不变，核启动/关闭/再次启动/最小接单回传及人工页面；不再追加同片DeepSeek返修/回审。当前只派发，不把任务创建或准备通过当真实迁移完成，不轮询等待。
+- 本轮产品基线42738d9/864跟踪SHA，仅5协调docs由根维护，余859保护；完整任务/初始回执/公开盘点见pilot-one/coordination/，旧prepare与256—260原件不覆盖。usage-gate captured_at=2026-10-17T01:19:31.473191+00:00/continue，两百分比null，不当0或编造用量。完成精确5docs检查/提交推送后结束，默认用户通知261好了再取件。
+
 ## 2026-10-17 09:10（Asia/Shanghai）— 260首次交付独立复核后Codex直接修正，宿主模板/预算代码收取发布
 
 - 用户通知好了后读取260/msg2801完整合法partial摘要，runner succeeded/submitted、DeepSeek报idle/current_task_id=null后冻结3候选字节及885开发证据；caller agent:codex/lead、项目prj_e8fe7066bbec实核。旧development_requirements仍Kimi前端/交叉复核，最新10-17用户明确分工优先，不改生产要求。

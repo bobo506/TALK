@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-17）
 
+2026-10-17 09:20最新：用户要求先移一个，261已交DeepSeek仅旧agent:kimi-code-k28-preview的真实只读预检与可审执行包，交付暂停后Codex复核并在本次授权内实际切换。保原ID/Key/绑定/历史，不迁其它四角色；核旧入口空闲/正常退出与隔离登录，未验能力不盲升。当前serve无单成员过滤，执行包须保证只候选claim且同manager持有owner。仅准备，不先apply/启停或调用模型；260已发布42738d9、实际迁移仍未执行。默认通知“261好了”后取件，详[进度](PROGRESS.md)。
+
 2026-10-17 09:10最新：260宿主产品片B已收取，Codex独立复核首次实现后直接修正配置校验/预算快照问题，74项相关验证通过，本轮发布。新增逐runtime模板、内置默认21600/显式覆盖及同argv预算诊断，保旧global/custom与身份/choice/能力/owner守卫，不改claim/report或MCP/T-W。[宿主合同](spec/ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)已更新；原2801 partial/失败/开发证据保留，自修验证不称外部独立复核。259已发布ea21d81；5角色真实平移、原生/登录/模型/常驻宿主与255人工仍待，下一步核实原Key/公开模型/真实能力后逐角色切换，详[进度](PROGRESS.md)。
 
 2026-10-17 08:22最新：259保留身份补录产品片A已收取并本轮发布。Codex独立复核后直接修正双入口操作键隔离缺口及非空超长角色名静默换ID问题，162项相关回归+2项显式WAL并发探针通过；原partial/8源与失败证据保留，自修部分为Codex自检，不称外部独立复核。新增human-only legacy-attach、独立补录审计与精确legacy_attach来源，保原ID/Key/绑定/历史且不启动服务；详[补录合同](spec/ROLE_LEGACY_ATTACH_DESIGN.md)。5角色实际登记/迁移未执行，下一片宿主per-runtime模板/21600，再做真实逐角色切换；255人工/原生仍待。详[进度](PROGRESS.md)。

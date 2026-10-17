@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 单角色试迁移：261旧K2.8预检与可审执行包（2026-10-17）
+
+用户要求先移一个，候选固定agent:kimi-code-k28-preview，沿用ID/Key/模型绑定/历史。261 DeepSeek只首次真实只读预检/实际帮助核对与默认dry-run执行包，完成暂停；Codex检查后依已有授权切换，产品源码和生产状态先不改。陈旧idle/PID不能证明退出；原Key窄读仅GET身份认证必要且不输出/哈希，原生认证目录不自动复制，unknown/unverified保持到真实能力实证。serve为项目级领取、--members仅start-all，单成员窄辅助入口如必要须独立验证其它角色动作不被claim、同一manager长期持有Popen、退出不遗失owner；不消费其它角色worker/启动意图，不停DeepSeek或Desktop/MCP。共享runner能力变化影响明确，不能盲升或改绑定绕过。完整包/基线与公开事实在pilot-one/coordination/，默认通知261好了后取件；实际迁移尚未执行，日志/删除/通用预算不扩片。
+
 ### 受管宿主多运行器模板与执行预算：260已验收收取（2026-10-17）
 
 [产品片B合同](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)已实现：--runtime-command-template RUNTIME TEMPLATE可重复，显式runtime优先/旧全局回退；--cli-execution-timeout-seconds内置有效缺省21600/可覆盖，真实parser/预检/最终spawn/公开诊断同一预算事实。custom入口维持旧行为，不追加bridge预算，显式新配置组合拒绝。Codex独立复核后直接补配置类型/超长数字稳定校验与预算来源/数值快照，6新增方法在原代码17子测试失败/3错误，修正后40配置+34宿主共74项全过；原代码/失败/开发日志保留，原host测试未改。Hall2802后260已收取，修正为Codex自检，不追加外部回审。未部署/迁移/真实启停，不改终端T-W/ready/stop/租约、运行中实例或通用bridge默认600，259来源/能力/owner守卫保持。
