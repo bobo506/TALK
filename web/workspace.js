@@ -927,7 +927,7 @@ function roleServiceControl(role) {
   const canStop = Boolean(service) && service.can_stop === true && !busy && !batchBusy && human
     && observed !== "stopping";
   if (managed && !human) hint = "当前账号是 Agent，只能查看服务状态。";
-  else if (managed && ownershipHeld && !hint) hint = "原进程归属未释放：请先「关闭」并确认已停止，再重新启动。";
+  else if (managed && ownershipHeld && !hint) hint = "请先「关闭」并确认已停止，再重新启动。";
   else if (managed && service && service.can_start !== true && service.can_stop !== true && !hint) hint = "当前不可启动。";
   if (view.error) hint = view.error;
   return { view, status, busy, batchBusy, human, kind, observed, managed, ownershipHeld, canStart, canStop, hint };
@@ -1108,7 +1108,7 @@ function workspaceRoleServiceBatchFeedback() {
     if (owned.length) {
       // 原进程归属未释放的角色不能重复启动：必须先在角色行上「关闭」。
       const names = owned.map(memberId => roleServiceRoleName(memberId)).join("、");
-      box.appendChild(workspaceEl("span", "role-service-batch-owned", `需先关闭（原进程归属未释放）：${names}`));
+      box.appendChild(workspaceEl("span", "role-service-batch-owned", `需先关闭并确认已停止：${names}`));
     }
   }
   if (roleServiceUI.pollError) box.appendChild(workspaceEl("span", "role-service-batch-status error", roleServiceUI.pollError));

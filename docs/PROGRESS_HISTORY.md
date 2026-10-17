@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 15:43（Asia/Shanghai）— 263文案/准备独立复核补正收取；新Kimi k2.8独立登录等待授权
+
+- 用户通知263完成后取2812完整合法partial（14完成/6未完/5阻塞），实核caller agent:codex、最新旧项目要求及DeepSeek idle/current_task=null。冻结18开发件和3候选原件；独立实读实际diff、collector558行及窄helper394行/原测试/执行包，不只凭开发自报。原Key仅可信产物窄读GET，collector显式readonly白名单、无秘密列/整DB正文hash，原事实与失败保留。
+- 文案严格去掉内部术语，3源只改提示/已有断言/单workspace资源版本，owner/权限/按钮/动作保持。根以允许的本机环境补跑原node --test tests/workspace_role_services.test.cjs默认隔离23/23，0失败/取消/跳过；开发原默认spawn EPERM与无审批通道限制、进程内23及最初断言失败不追改。首页资源版本及实际JS字节一致，不做Browser或宣称视觉通过。用户已确认等待关闭中变未启动（已关闭）的含义，不擅加新交互。
+- 窄宿主保fixed project/member、本人Kimi k2.8/默认review/工作目录/21600、KIMI_CODE_HOME、原manager/Popen/drain，产品代码/身份/owner守卫保持。发现open_gaps写死native目录缺失，原反例1失败/0错误；根只在corrected/副本改为实时exists事实/登录另验，原18件字节保留。原7+根5共12全过，新增涵盖真实main假件中断/stop网络错误保同manager原句柄、空句柄正常退出、旧K28 start/stop排除与去重限100；修正为Codex自检，无DeepSeek往返。
+- 根本机CIM只输出公开作用范围，核10152/11920均旧K28专属、无generic project serve/新host，解决开发环境CIM受限而非认作永久阻塞。根用原候选Key GET核精确身份/显示名，generation0/not_started/无owner或在途，已有managed/exclusive/creation及精确choice，不补录/重建/改Key。新快照另见旧K28 generation9/stopped/无owner，由用户页面既有动作形成，本轮协调方没发旧角色启停，保持其当前状态，原manager仍活。
+- 准备经补正可收，Hall2813后UTC07:41:25.993704收取263 succeeded/completed，result仍2812/partial。原包P6另批措辞在根审查中澄清：用户已允许继续迁移，必要最小接单属已有授权，不要求重复总体批准；原执行包不追改。用户问是否先暂停DeepSeek，已说明它本轮已暂停且上报idle，旧服务保持，到迁移自身最后才正常退出。
+- 根在原授权内只为新角色创建独立native HOME等/显式KIMI_CODE_HOME并发起正常Kimi设备登录，原认证目录未复制。exec session91333、code 本机记录码，约UTC07:38:04开始/CLI期限1800秒；已异步请求用户，当前尚待CLI成功。只有本机隔离初始化/登录，没有模型probe/角色host或start/stop/生产角色写；不能笼统零写或视Key通过=原生通过。
+- 本轮3前端+5正式docs精确校验提交推送，其余857保护路径/开发原18件/3候选/旧26件及10根冻结保持；source实现由DS首次，根仅辅助诊断直接补正。后续只在原生探针通过后启动本候选，旧K28不动，Kimi/DeepSeek/Codex仍未配置binding、后两者最后。完整日志/删除/T-W与255其它项不扩。
+- 独立代码、原失败/23默认Node/12helper/静态资源/宿主范围、review/collection及state/resume-login-session/publication见remaining-role-next/independent-review263/。无新精确用量，不臆测百分比；登录未完成是当前必需外部操作，不重复请总体迁移许可。
+
 ## 2026-10-17 15:09（Asia/Shanghai）— 用户简化停止提示并授权继续其它角色，263首次实施/只读准备已派
 
 - 用户明确提示只需表达关闭后确认停止再重启，去掉“原进程归属未释放：”，并允许开始迁移其余角色。原旧K28单角色正式验收11bd14e保持；本次授权扩大为其余角色逐个准备/切换，不取消原ID/Key/模型/历史、原Popen、原生核验与人工验收门禁。

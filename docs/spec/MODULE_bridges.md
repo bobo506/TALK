@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### 263准备收取，新页面K28独立登录待授权（2026-10-17）
+
+263原partial经实际代码核查接受：只读collector不读DB秘密或整库hash；窄入口保持固定新候选/原名Kimi k2.8/默认review/21600/原manager与私有drain。根改corrected/诊断，不再写死native目录不存在，原1失败/最终原7+根5共12通过；本机CIM核旧11920确为旧角色专属且无generic serve。文案默认隔离Node23/静态实际字节通过，原件/失败保持。
+
+Hall2813后263已收取，原Key身份由根复核，新候选generation0无owner；已在独立native HOME/KIMI_CODE_HOME发起正常设备登录91333，等待用户，未复制旧认证/模型probe或服务启停。旧K28快照已关闭generation9，根只保其现状及原manager，不按PID接管。下一步CLI登录成功→原alias无工具probe→只新候选受管启停/最小接单及人类页面；执行corrected/入口，原package不追改，最小测试属于已有迁移授权。详independent-review263/。
+
 ### 其余角色继续授权，263只读准备下一位新K28（2026-10-17）
 
 用户在旧K28正式验收后明确可开始其余角色迁移。263由DeepSeek首次做同功能提示文字小改及只读迁移包，完成暂停后Codex核验/直接修正。下一候选固定新页面Kimi k2.8（agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c），已有managed创建登记/精确绑定，不legacy-attach/CREATE/轮换Key；窄宿主保自己的显示名/任务档和原Popen，不继承旧K28的tools身份。当前禁止真实登录/doctor/模型/native目录写/生产API写/启停，先查原Key可信来源与隔离能力；后续真实操作在用户既有继续迁移授权内执行。Kimi/DeepSeek/Codex未配置绑定，不能猜模型/命令，后两者最后；现有旧K28原owner不动。详remaining-role-next/coordination/与进度。

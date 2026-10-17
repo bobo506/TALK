@@ -549,11 +549,11 @@ test('全部启动：轮询把后到 ready 计成功、后到 failed 归入失�
   const texts = allTexts(h.batchFeedbackBox()).join('\n');
   assert.ok(texts.includes('已启动 1'), texts);
   assert.ok(texts.includes('失败 2'), texts);
-  assert.ok(texts.includes('需先关闭（原进程归属未释放）'), texts);
+  assert.ok(texts.includes('需先关闭并确认已停止：c'), texts);
   // B 未受管 → 可重试；C 仍受管 → 不能重复启动，必须先关闭。
   assert.equal(h.startBtn('agent:c').disabled, true, '仍持有进程的角色不允许重复启动');
   assert.equal(h.stopBtn('agent:c').disabled, false, '仍持有进程的角色必须先关闭');
-  assert.ok(String(h.hint('agent:c')).includes('原进程归属未释放'), h.hint('agent:c'));
+  assert.equal(h.hint('agent:c'), '请先「关闭」并确认已停止，再重新启动。');
   assert.equal(h.state('agent:c'), '启动失败（进程仍受管，请先关闭）');
 });
 

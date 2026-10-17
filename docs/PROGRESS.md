@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-17 15:09最新：用户要求去掉“原进程归属未释放：”并明确可开始其余角色迁移。263已派DeepSeek首次执行：仅3前端路径简化提示/刷新workspace资源版本及下一位新页面Kimi k2.8只读迁移准备；默认用户通知后取件。下一候选已是managed，不重复补录/重建；本片不启停/登录/模型调用，其余角色先核真实绑定/原Key，DeepSeek和协调CLI最后。旧K2.8正式验收通过事实保持。
+Updated: 2026-10-17 15:43最新：263文案/准备片已复核补正并收取，3前端改动默认隔离Node23项通过、静态资源已核一致；下一角色辅助入口原7+根5共12项通过。新Kimi k2.8原Key/创建/绑定已核，独立设备登录已发起（本机记录码/session91333），等待用户授权；只初始化候选native目录，未调模型/启服务/补录或改绑定。旧K28本次只读状态generation9已关闭，原窄manager11920保留，不由协调方启停。
 
 ## 当前身份与分工
 
@@ -8,18 +8,20 @@ Updated: 2026-10-17 15:09最新：用户要求去掉“原进程归属未释放�
 - 用户2026-10-17最新分工优先：Codex派发→DeepSeek首次实现/自测交付后暂停→Codex独立复核首次实现→发现问题由Codex直接修正、验证及docs/Git收尾；不往返派修/默认追加外部回审。自修部分的验证为Codex自检，不称他人独立复核。
 - 默认派后结束、用户通知后取件；共享目录一次一方改码。用户在260收尾后明确授权先试一个；261准备片已按通知收取并补正，根不操作Browser验证；原生CLI曾自行打开设备登录页，用户已完成专属认证。
 
-## 当前263：简化提示与下一角色迁移准备已派
+## 当前263已收取：文案完成，下一角色独立登录待用户
 
-- 用户确认提示应表达“关闭后等确认停止再启动”，要求去掉“原进程归属未释放：”；角色提示目标为“请先「关闭」并确认已停止，再重新启动。”，批量提示同样去内部术语。仅文字与workspace.js资源查询版本，不改变ownership/canStart/canStop/权限/请求或停止守卫。
-- 用户明确可开始迁移其余角色，取代先前只试旧角色的本轮范围；仍逐个保原ID/Key/模型/既有历史。当前只准备下一位agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c（Kimi k2.8），它已是managed/exclusive且绑定精确Kimi choice，不能legacy-attach/重建或套旧K28的tools/显示名。共享managed_cli已登记，adapter_status仍unverified，不等于新角色本人Key/隔离原生能力已通过。
-- 实际只读公开列核2显式角色：旧K28 imported，新K28 managed；其余Kimi/DeepSeek/Codex名册仍在但binding_state unconfigured。无任何在途任务。只核明确信息，不从旧心跳或缺目录推断空闲/从未受管；后3角色模型/原命令/本人Key源尚需查明，DeepSeek和协调CLI最后、Desktop/MCP不按PID接管。
-- 263/Task Hall group:task-7414c8d0769e4455bc28c4ce03663a27，UTC2026-10-17T07:07:56.479414初始queued/assigned，交agent:deepseek首次执行后暂停。只允许web/workspace.js、web/index.html、tests/workspace_role_services.test.cjs及remaining-role-next/developer/；正式docs由Codex维护。共享源码开发期间根不审读/改码，完成后独立核实际差异/证据，有问题直接修，不追加DeepSeek返修/回审。
-- 迁移准备须固定新候选claim前过滤、同manager/原Popen/私有drain/KIMI_CODE_HOME隔离，保本角色“Kimi k2.8”与自己任务档，未声明处如实为产品默认review；原本人Key仅可信原产物窄读认证，不从DB秘密列抄/重签。只读matrix/可审步骤/隔离假件，不能登录/doctor/模型调用/native目录写、生产API/DB写、改能力/补录/启停或接单，交付partial须明确缺口。
-- usage-gate本次continue，captured_at=2026-10-17T07:07:01.505738Z、两百分比null，不当0/臆测用量；wrapper改变cwd导致首次相对输出路径失败，改绝对路径重读保存成功。当前不主动等待/轮询，用户通知“263好了”后收取。基线865跟踪SHA、3实现/6协调docs白名单与完整派发/公开盘点见remaining-role-next/coordination/，旧261/262证据保持。
+- 263/msg2812为合法partial，任务号匹配、DeepSeek已报idle/current_task=null并暂停。根冻结18开发件及3候选，实读实际diff/两脚本/原始验证；三前端仅去“原进程归属未释放”术语、已有断言及workspace.js查询版本20261017-role-stop-hint，权限/owner/按钮/请求不改。角色提示为“请先「关闭」并确认已停止，再重新启动。”，用户已确认对应关闭中→未启动（已关闭）。
+- 本机补跑原node --test tests/workspace_role_services.test.cjs默认隔离23/23通过，开发环境spawn EPERM/无审批通道的限制与进程内23原证据保持，不当根环境永久阻塞。实际首页指向新查询版本、服务JS字节与候选一致；没有Browser验证，用户刷新可见。
+- 辅助入口确实固定新候选/project/原显示名Kimi k2.8/默认review，保产品HostManager与原Popen/drain/隔离。发现open_gaps写死native目录不存在，目录存在时仍误报；原1反例失败0错误，仅independent-review263/corrected/副本改为实时exists口径。原7+根5共12项通过，含原main apply假件、中断后stop网络错误仍保同manager原句柄、空句柄正常退出、旧K28 start/stop均过滤及有界去重；根自修为自检，不追加DeepSeek返修/回审。
+- 实际CIM核旧10152/11920都是旧成员专属pilot入口、无泛项目serve或新候选host。新候选原Key可信文件已由根窄读GET核本人/Kimi k2.8；原成员/创建/精确binding保持，现generation0/not_started/无owner/launch，无待办。它已managed/exclusive，禁止重复补录/CREATE/轮换Key；共享adapter_status仍unverified，不因按钮可用升级能力。
+- 根在既有继续迁移授权内初始化本候选自己的产品native HOME/KIMI_CODE_HOME，未复制原认证；已发起正常设备登录CLI会话91333，码本机记录码，链接本机resume-login-session.json中的有效设备链接，CLI窗口1800秒（约UTC07:38:04开始）。异步请用户完成；当前未收到CLI成功，不能启动服务或调用模型。session存在时用write_stdin续读，过期/退出后按实际状态重新发起，不复用旧code或并开重复登录。
+- Hall2813裁决文案/准备经补正可收，UTC2026-10-17T07:41:25.993704收取263 succeeded/completed，原partial/报告不改；这里只收准备，不称新角色迁移已完成。原包P6“另批”不覆盖当前明确授权：必要最小接单属于已授权迁移验证，无需重复请总体许可。DeepSeek已交付暂停，本阶段保留它的旧服务运行，迁移自身时最后正常退旧入口。
+- 本轮未对旧K28启停：只读新快照显示其generation9/stopped/无owner，原窄manager11920仍在；保用户当前状态，不自动重启它。现有API继续由原api-launcher管理，不另起8000/按PID接管。新角色尚未请求start/stop、未模型probe、未生产配置/Key/能力变更；初始化native目录与登录是已发生的本机副作用，不称零写。
+- 证据remaining-role-next/independent-review263/{review.json,collection.json,node-default-isolation.json,static-resource-verification.json,old-host-scope.json,original-diagnostic-negative.json,final-helper-tests.json,state.json,resume-login-session.json}；developer原18件/候选3件和旧261/262冻结保留。继续执行用corrected/入口，原包/开发件不改。
 
 ## 已完成与恢复所需事实
 
-- 旧agent:kimi-code-k28-preview已正式验收并发布11bd14e：保原ID/Key/模型/历史完成专属登录/探针、保ID补录、受管启停、262接单与人类页面三步。262结果2809/复核2810已收取，任务由当轮ins_b20c4078c97b完成；人类随后页面generation7正常关闭/generation8再ready，现ins_d86218c7cc0d、launch 4c72e06e-9ef9-45b2-a752-f520638c87e1。这里只保恢复摘要，完整经过与失败见PROGRESS_HISTORY及pilot-one/independent-review261/cutover/。
+- 旧agent:kimi-code-k28-preview已正式验收并发布11bd14e：保原ID/Key/模型/历史完成专属登录/探针、保ID补录、受管启停、262接单与人类页面三步。262结果2809/复核2810已收取，任务由当轮ins_b20c4078c97b完成；人类随后页面generation7正常关闭/generation8再ready，当时ins_d86218c7cc0d、launch 4c72e06e-9ef9-45b2-a752-f520638c87e1；263收取阶段已只读见generation9关闭，保用户当前状态。这里只保恢复摘要，完整经过与失败见PROGRESS_HISTORY及pilot-one/independent-review261/cutover/。
 - 旧K28常驻单成员manager诊断PID11920持原Popen，API由api-launcher.py持原Popen，二者不动；PID/磁盘记录仅诊断，不能新进程认领。角色页面关闭不结束宿主；宿主收工才用私有pilot/prj_e8fe7066bbec/agent_kimi-code-k28-preview/drain.request，先正常停角色、原handles空后退出。API私有api-service/stop.request正常退出，不另起8000或删活动状态。Key/原生登录在仓库外，不入Git。
 - c129a63补通用CLI受管停止文件监听/异步清理，9新增及CLI/Kimi/Codex共161项相关回归通过，Codex修正后自检；首次stop_timeout和原控制台普通Ctrl+C/原Popen恢复、原26开发件/副本与10根辅助源冻结均保留。本轮不重跑/重复累计，不声称完整日志、固定后端版本、六小时或主动等待通过。
 - 259保ID补录已发布ea21d81：human-only legacy-attach只补原名册但无ProjectRole的身份，保原Key/绑定/历史、不自动配置/启动，162相关回归+2WAL证据见历史。新页面K2.8已有managed登记，不能套该补录。
@@ -27,11 +29,11 @@ Updated: 2026-10-17 15:09最新：用户要求去掉“原进程归属未释放�
 
 ## 下一步与人工门禁
 
-1. 默认用户通知263完成后获取完整交付，确认DeepSeek暂停，再独立检查3前端路径/原始测试与下一候选可审包；先收尾该文案与准备片，发现问题由Codex直接修正/验证。当前不审读进行中的候选，不按任务创建宣称文案已生效。
-2. 在本次“可开始迁移其它角色”授权内，复核后继续新页面Kimi k2.8本人Key/身份档/原生隔离/原alias核验；它已有创建登记，不重复legacy-attach。真实就绪后才固定新角色宿主启动→关闭→再启动→最小接单/回传与人工页面；缺登录或原Key来源时提出精确缺口，不重复请求总体迁移许可。
-3. 新角色验收后再逐个处理agent:kimi、agent:deepseek、agent:codex，后两者最后；不得猜未配置绑定/命令或用重建替代平移。旧K28原manager/当前owner不动，所有停止保原Popen守卫，Desktop/MCP不按PID接管。完整日志/删除/T-W及255其它页面另片。
+1. 先核登录91333实际结果/候选config（仅公开模型维度），CLI成功后才做本候选无工具固定原alias native probe；凭据不输出/复制/哈希。若用户仅登录账号无授权提示，先检查CLI事实，不反复要求已完成的授权；过期则重发有效设备码。
+2. 原生探针通过后，只启动经审corrected/单成员host和该新页面Kimi k2.8，验当前launch/expected instance ready→正常关闭/归属释放→再启动→最小接单/回传及人类页面。当前已managed，不legacy-attach/CREATE/新Key，不改runner/绑定或旧K28现有状态，缺必要登录时保门禁；总体迁移许可已有。
+3. 新角色验收后再逐个处理Kimi、DeepSeek、Codex：当前均binding unconfigured，先核原模型/命令/本人Key，不猜或重建替代，后两者最后，Desktop/MCP不按PID接管。完整日志/删除/T-W及255其它页面另片。
 
-旧K28试迁移已完成并发布11bd14e；当前263首次执行已派，文案与下一候选准备尚未验收。根本轮只维护协调docs/只读盘点，未改3前端实现路径、登录/能力/绑定/角色启停或其它生产事实，不将准备/绑定/共享标记当真实迁移完成。
+文案/迁移准备263已收取，本轮前端3源及协调docs收尾；新角色独立登录尚待，不把准备或共享标记当真实迁移通过。原生native目录初始化已发生，其它角色不由协调方启停；根不操作Browser。
 
 ## 已确认待实施与保留事实
 
