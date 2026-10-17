@@ -1,5 +1,7 @@
 # 角色受管服务合同（R1-3）
 
+> 2026-10-17真实旧K2.8试迁移补正：用户明确批准共用runner改managed_cli且仍只启动旧角色。首次真实stop暴露通用CLI未监听停止文件；Codex直接补停止处理及9新测，CLI/Kimi/Codex相关共161项通过。修正后真实启动→正常控制文件关闭/释放原owner→同manager再次ready已通过；262最小接单已派待通知后核验，人类页面与其它角色/完整日志仍待。原自动拒绝/stop_timeout/正常恢复及最终结果均留痕。
+
 
 > 2026-10-17：260[宿主模板与内置执行预算](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)已收取，Codex直接修正配置校验/预算快照后74项相关验证通过，本轮发布。逐runtime模板与内置默认21600/可覆盖、旧global/custom兼容已接线；公开仅预算数值/来源，claim/report协议、ready/stop/MCP超时与身份/unknown/unverified/owner守卫保持。5角色真实平移及原生能力仍待，未启停生产。
 
@@ -43,6 +45,12 @@ R1-3实现服务意图、宿主claim/report、实例就绪、逐角色启动/关
 - 已成功发布的证明缺失、不可读、篡改或控制路径非法时，稳定拒绝`unknown_owner`，不写控制文件、不停止、不清记录。仅明确`record_persisted=false`且记录路径真实缺失、无reparse时，允许凭完整原始内存事实关闭本次进程；其余身份核对保持。
 - spawn即登记句柄，存储异常保留活进程；进程已退出但失败回报尚未确认时保留原证明。只有证明停止并完成相应确认后才回收句柄/记录。当前runner分类变化不撤销原stop，新start仍须满足受管分类。
 - 私有目录/记录复用R1-2 DACL、路径与锁保护；按项目/角色/launch保存，不互相覆盖。operator Key从环境或文件读取，角色Key只传文件路径，token/Key不新增明文argv通道。
+
+### CLI bridge正常停止处理（真实验收补正）
+
+内置CLI及复用它的Kimi/Codex bridge在显式受管project/launch且有TALK_ROLE_SERVICE_CONTROL_FILE时，监听本launch对应的绝对控制路径；文件名遵循宿主同一sanitize规则。旧手动入口或未配置控制环境不增加监听，非法明确路径拒绝启动；缺失/暂不可读/非精确shutdown内容不当停止。宿主仍是写停止文件、验证原Popen已退出并report的唯一归属持有方，bridge不清owner或采信外部PID。
+
+停止监听有界读64字节、默认0.25秒轮询；正常停止先取消并等待本bridge连接/消息任务，再沿原finally取消任务worker、上报offline并关闭客户端。连接错误及外部取消仍传播并回收监听任务，不吞失败；在途CLI沿既有取消路径回收其自持子进程。该轮询不是终端MCP预算或服务端强停保证，HTTP/原生清理仍可能超宿主20秒，此时保持原stop_timeout与owner守卫。
 
 ## 运行器能力与网络恢复
 

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-17 13:53（Asia/Shanghai）— 共享标记明确获准，旧K2.8受管启停通过；修正关闭缺口，262待通知收取
+
+- 用户明确回复“允许修改共享标记，仍只启动旧角色”，cutover/shared-marker-user-authorization.json记录精确范围。随后仅PATCH共用runner control_kind=managed_cli成功，adapter_status保持unverified、原Key及全部binding/时间不变；原自动审批拒绝证据不追改，新页面K2.8及其它角色未迁移/启停。
+- 启动固定project/member窄宿主，generation1 ready、owner存在；第一次stop generation2/launch c55c32b8-…已claim，但20秒后stop_timeout。根核实际控制文件含shutdown，而通用CLI bridge无停止监听；保原manager/Popen及owner，不伪称关闭成功。
+- 正常恢复前核宿主venv启动器8988/manager15832/bridge2040的精确创建时刻/父链、无候选任务、独占原控制台仅三者。只发送普通CTRL_C_EVENT，bridge asyncio正常清理；原manager捕获后以原Popen完成generation3 stopped/owner释放并drain退出，normal_stop证据通过。未TerminateProcess/强杀、未凭PID或记录认领；完成drain归档，不删除旧证据。
+- Codex按持续授权直接补bridges/cli_bridge.py停止处理和tests/test_cli_managed_stop.py，原桥接字节冻结stop-fix/original。仅managed project/launch和匹配绝对路径启用，有界64字节读精确shutdown，错误/暂不可读不冒认请求；停止或连接失败后取消并await watcher/transport，接既有worker取消、offline和close。无控制环境的手动入口保持旧路径。没有新协议/API/宿主所有权或强停逻辑。
+- 新增9方法，含完整run_bridge+假TalkClient/worker清理、严格路径/标记、权限错误、连接错误和外部取消。先前原实现9测缺方法错误及初期3项Windows夹具换行超时留档；夹具显式LF后独立运行冻结原run_bridge生命周期反例1项仍超时，证实实际缺口。最终CLI/Kimi/Codex/managed_stop共161项0失败/错误/跳过，含9新增；不与先前23辅助入口测试累加，自修部分准确记为Codex自检。
+- 原manager完全退出后启动修正新manager（诊断11920），generation4/ins_87973da87bd6 ready；generation5正常控制文件stop已stopped/ownership=false/原manager空句柄且继续serving，无控制台信号；同manager generation6/ins_b20c4078c97b再ready。当前真实PID15760创建UTC05:50:34.929962，launch a7692ba4-21cc-4b2b-8f95-de42f39cd144；公开argv维度实核21600/tools/原alias、key-file而非明文Key。保原ID/Key/显示/工作目录/既有历史，其它角色无启动。
+- 派前实读当前项目要求与caller agent:codex、候选idle实例及精确binding。旧页面要求不追改，当前DeepSeek首次开发/Codex独立复核后直接修正分工仍适用。UTC05:51:40最小4参派262给原K28，仅固定标记结构化回传、不运行工具/读写文件/开发；Hall group:task-1faabbaba3d743bb9187e8282df23357，初始queued/assigned。按默认通知后取件，不主动等待/轮询/提前宣称接单或回传成功。
+- 单角色真实启停通过仍待262结果/claimed instance核验及人类角色页关闭→刷新不自启→再启动验收；当前API和窄宿主常驻。其它四角色后排，DeepSeek/协调CLI最后；不扩完整异常日志/删除/T-W/全入口预算，不把最小原生探针/假件回归当开发能力或六小时通过。子进程完整异常输出持久留存仍未实现，已如实保留限制。
+- 本轮2源码+6正式docs精确验证、提交推送，857其余原保护文件、26开发件/副本和10根辅助源码冻结保持。stop-fix另存原桥接/失败/最终161日志/两源码副本，cutover状态、用户授权、真实启动关闭回执及任务派发快照完整；历史自动拒绝保留为已由人类扩大范围解决，无重复批准待办。未读取新精确额度，不臆测用量。
+
 ## 2026-10-17 13:26（Asia/Shanghai）— 原生登录/探针通过、API正常重载及旧K2.8保ID补录完成；共享标记被自动审批拒绝
 
 - 用户确认原终端正常退出，root UTC05:07:23复核旧PID8528消失；重新设备登录session39261成功（exit0/专属config生成），原alias kimi-code/kimi-for-coding/provider managed:kimi-code/model kimi-for-coding及显示能力匹配，不复制原认证目录。用无工具/子代理的独立自持Popen做固定文本native探针，UTC05:13:28完成、5.296秒/exit0、助手正文精确匹配，保存native-login-success/native-probe证据；不外推后端版本/开发质量/T-W。

@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### 单角色受管启停通过，真实停止缺口已补（2026-10-17）
+
+用户明确批准共享runner改managed_cli、仍只启动旧K2.8；登记已完成而adapter_status不改。首次真实stop暴露通用bridge未读取宿主控制文件，stop_timeout保owner；根核原独占控制台/创建时刻/无任务后普通Ctrl+C，由原manager正常完成stop并drain，无强杀或PID接管。Codex直接补通用CLI仅managed project/launch匹配绝对停止路径的监听，精确shutdown请求取消连接后走既有worker/offline/close，旧手动入口保持；9新增及CLI/Kimi/Codex共161相关回归通过，修正为自检。
+
+修正后新单成员manager同一Popen链已真实启动→控制文件关闭/归属释放→再次ready（generation6/ins_b20c4078c97b），不再用控制台信号作正常关闭；真实argv保21600/tools/原alias，未改Key/绑定/其它角色。最小任务262仅固定标记回传已派，默认用户通知后收取，当前不声称接单结果已验。完整日志、主动等待与人类页面验收保持待办，详[受管合同](ROLE_SERVICE_CONTRACT.md)与cutover/证据。
+
 ### 单角色实际切换：保ID补录成功，共享标记待明确授权（2026-10-17）
 
 旧K2.8已原终端正常退出，第二次独立native登录成功；原alias固定文本真实探针exit0/5.296秒通过，不证明后端版本固定或长等待。root发现默认recipe会丢旧tools任务档/展示，已在仅该候选辅助入口补原TASK_TOOL_PROFILE/DISPLAY_NAME/workdir，最终23项相关验证通过，不改产品通用配方/其它角色。服务端旧进程未载legacy-attach（405零写），已核独占控制台与无在途任务后普通Ctrl+C退出、同配置隐藏启动API，OpenAPI确认新接口加载。

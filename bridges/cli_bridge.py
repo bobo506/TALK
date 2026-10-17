@@ -3622,6 +3622,56 @@ async def run_task_queue_worker(
         await asyncio.sleep(args.task_poll_interval)
 
 
+def managed_stop_control_path(
+    project_id: str | None,
+    launch_id: str | None,
+    env: dict[str, str] | None = None,
+) -> Path | None:
+    """只接受本次受管 launch 的宿主停止文件；旧手动入口不增加监听。"""
+    if not project_id or not launch_id:
+        return None
+    raw = (os.environ if env is None else env).get("TALK_ROLE_SERVICE_CONTROL_FILE", "")
+    if not raw:
+        return None
+    path = Path(raw)
+    # 与宿主 OwnershipStore.control_path 的文件名规则一致。
+    launch_name = re.sub(r"[^A-Za-z0-9._-]+", "_", launch_id)[:120] or "role"
+    if not path.is_absolute() or path.name != f"{launch_name}.ctl":
+        raise ValueError("Managed stop control path must match the current launch")
+    return path
+
+
+async def wait_for_managed_stop(control_file: Path, *, poll_interval: float = .25) -> None:
+    """有界读取私有控制文件；缺失/暂不可读/错误内容均不冒认关闭请求。"""
+    while True:
+        try:
+            if not control_file.is_symlink():
+                with control_file.open("rb") as stream:
+                    if stream.read(64) == b"shutdown\n":
+                        return
+        except OSError:
+            pass
+        await asyncio.sleep(poll_interval)
+
+
+async def run_until_managed_stop(client: Any, control_file: Path | None) -> None:
+    if control_file is None:
+        await client.run()
+        return
+    transport = asyncio.create_task(client.run())
+    stop_waiter = asyncio.create_task(wait_for_managed_stop(control_file))
+    try:
+        done, _ = await asyncio.wait(
+            (transport, stop_waiter), return_when=asyncio.FIRST_COMPLETED
+        )
+        # 保留连接失败；停止请求则取消当前连接/消息，随后走 run_bridge 原清理路径。
+        await (transport if transport in done else stop_waiter)
+    finally:
+        for task in (transport, stop_waiter):
+            task.cancel()
+        await asyncio.gather(transport, stop_waiter, return_exceptions=True)
+
+
 async def run_bridge(args: argparse.Namespace) -> None:
     from TALK.client import TalkClient
 
@@ -3646,6 +3696,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
     managed_launch_id = str(getattr(args, "launch_id", None) or "").strip() or None
     managed_project_id = str(getattr(args, "project_id", None) or "").strip() or None
     managed_started_at = parse_managed_started_at(getattr(args, "process_started_at", None))
+    stop_control_file = managed_stop_control_path(managed_project_id, managed_launch_id)
 
     async def report_status(
         status: str,
@@ -3724,7 +3775,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
         )
 
     try:
-        await client.run()
+        await run_until_managed_stop(client, stop_control_file)
     finally:
         if task_worker is not None:
             task_worker.cancel()

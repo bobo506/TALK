@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-17 13:26 (Asia/Shanghai)：旧K2.8已退出、隔离登录/原模型探针通过并保ID补录；共享runner改managed_cli被自动审批拒绝，已请求用户明确授权共享影响，尚未启动角色。
+Updated: 2026-10-17 13:53最新：用户明确允许两个K2.8共用runner改managed_cli，但仍只启旧角色；标记已登记，adapter_status仍unverified。旧K2.8首次关闭暴露bridge未读停止文件，Codex直接补通用CLI停止监听，161项相关回归通过；原失败经独占控制台普通Ctrl+C/原manager正常回报恢复，无强杀。修正后同一manager启动→控制文件正常关闭/释放所有权→再启动ready通过，真实argv保21600/tools/原alias。最小任务262已派给旧角色，按默认通知后取件，尚未核接单结果；其它四角色未迁移/启停。
 
 ## 当前身份与分工
 
@@ -8,20 +8,19 @@ Updated: 2026-10-17 13:26 (Asia/Shanghai)：旧K2.8已退出、隔离登录/原�
 - 用户2026-10-17最新分工优先：Codex派发→DeepSeek首次实现/自测交付后暂停→Codex独立复核首次实现→发现问题由Codex直接修正、验证及docs/Git收尾；不往返派修/默认追加外部回审。自修部分的验证为Codex自检，不称他人独立复核。
 - 默认派后结束、用户通知后取件；共享目录一次一方改码。用户在260收尾后明确授权先试一个；261准备片已按通知收取并补正，根不操作Browser验证；原生CLI曾自行打开设备登录页，用户已完成专属认证。
 
-## 当前单角色试迁移：旧K2.8已保ID补录，共享控制标记等待明确授权
+## 当前单角色试迁移：启停已通过，262等待用户通知后收取
 
-- 用户已确认旧入口原终端Ctrl+C退出；root于UTC2026-10-17T05:07:23.5937979Z复查旧PID8528不存在。第二次专属设备登录session39261成功，CLI回显Logged in to managed:kimi-code、exit0，角色独立config已生成，未复制原认证目录。
-- 隔离native配置包含原alias kimi-code/kimi-for-coding，provider managed:kimi-code/model kimi-for-coding/显示K2.8 Preview及能力维度匹配。root用无工具/无子代理的独立原生Popen做固定文本探针，UTC05:13:28完成，exit0/5.296秒、assistant正文精确匹配标记；不推断实际后端版本固定为K2.8或主动等待通过。
-- 发现原宿主默认把旧角色tools任务档降成review且改默认展示；root在单成员corrected/入口保留旧TASK_TOOL_PROFILE=tools、原DISPLAY_NAME与工作目录，不扩到其它角色。原parser反例profile=review/display_name=null/workdir=.已留痕；新增两项后最终23项相关测试全过，原21项及3失败是先前准备阶段记录，不叠加计数。
-- 第一次legacy-attach请求HTTP405、未写角色：实际8000 API仍旧进程、无--reload，未加载259接口。root核精确API进程/创建时间/venv及独占控制台链12312/14812/3208、全库queued/running=0，普通Ctrl+C正常退出后，以同venv/项目/127.0.0.1:8000/无reload配置隐藏启动API；OpenAPI确认新增接口已加载。未强杀或接管角色。
-- 当前API由root api-launcher.py持有原Popen/独立进程组，私有控制目录C:/Users/Administrator/.talk/role-service-host/api-service，health.json仅诊断，stop.request由原launcher发CTRL_BREAK正常退出；没有自动重启。不要重复启动第二个8000服务或凭PID认领；源码在本机independent-review261/，保持证据目录以便恢复。
-- UTC05:21:57 human-only legacy-attach实际成功201/reused=false，独立operation_key=pilot-legacy-attach-k28-20261017-v1。旧member_id/原Key身份及文件mtime、全部已有绑定/其时间、目标任务历史计数/ID范围、其它角色显式配置均保持；仅新增imported/nonexclusive项目角色和独立补录审计，无新Member/新Key/配置作业或自动启动。
-- 下一步PATCH共享runner runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33/control-kind为managed_cli被自动审批在进程启动前拒绝，未发PATCH；理由是它还绑定新页面K2.8，该共享能力变更会让另一个未获本轮试迁移授权的角色也获得受管启动资格。已异步请用户选择是否允许这一个共享标记变更；不能绕过或换入口执行同一动作，未收到同意前不重试。
-- 当前control_kind仍unknown/adapter_status仍unverified；候选service generation0/desired stopped/observed not_started/无owner或launch，can_start=false。尚未启动任何受管角色或发送最小接单任务。其它四角色未迁移/启停；共享标记若获同意，本轮仍只由固定project/member宿主领取旧角色，另一个K2.8不得顺带启动。
-- 本轮实际补录不是完整迁移验收：审批同意后最小登记共享control_kind（不改adapter_status/模型）→隐藏启动经审单成员宿主→精确owner/project/launch ready与21600及原tools档→关闭→再启动→最小接单/回传→用户页面验收。已有总体迁移批准不被误用为共享影响已批准，按本次自动审批要求补明确范围。
-- root cutover证据pilot-one/independent-review261/{native-login-success.json,native-probe.json,profile-preservation-negative.json,api-normal-stop.json,api-version-ready.json,apply-attach-*.json,http-audit-*.json,cutover/state.json,cutover/automatic-approval-rejection.json}；10份根代码已冻结cutover/source/与code-manifest.json。原26开发件、初次失败及本地partial/MCP自由文本unknown保持。
+- 唯一候选仍为agent:kimi-code-k28-preview；新页面K2.8是另一身份，其它四角色不迁移/启停。用户已明确回复“允许修改共享标记，仍只启动旧角色”，原自动审批拒绝保留；随后共享control_kind→managed_cli成功，adapter_status仍unverified，模型绑定和原Key不变。不把共享标记当另一个角色已迁移或应自动启动。
+- 已完成的旧入口正常退出、专属native登录、原alias探针及human-only保ID补录沿用前次证据。当前API仍由api-launcher.py持有原Popen、同venv/项目/127.0.0.1:8000/无reload，api-service/stop.request正常退出，不重复启动8000。
+- 首次真实start generation1 ready，但stop generation2在20秒后stop_timeout：控制文件已正确写入，bridges.cli_bridge没有监听。原宿主仍持原Popen/owner，未强杀。核控制台仅8988/15832/2040及创建时刻/无任务后普通Ctrl+C，bridge正常清理、原manager请求并完成generation3 stopped/释放归属，再drain退出；不凭PID接管进程。
+- Codex按已授权验收修正直接补bridges/cli_bridge.py及tests/test_cli_managed_stop.py：仅受管project/launch及匹配绝对控制路径启用监听；缺失/不可读/错误标记不误停，精确shutdown标记取消连接/消息并沿原路径取消任务worker、上报offline/close，旧手动入口保持。9项新增测试包含真实run_bridge清理假件、错误路径/内容、连接异常与外部取消；连同CLI/Kimi/Codex套件共161项全过。原实现生命周期反例超时、初期Windows夹具换行失败及原件均留存；修正为Codex自检，未追加DeepSeek返修/回审。
+- 修正后新单成员manager（诊断PID11920）同一原Popen持有链：generation4/ins_87973da87bd6 ready→generation5正常控制文件关闭stopped/ownership=false→generation6/ins_b20c4078c97b ready，正常关闭不使用控制台信号。同manager关闭后仍常驻、可再启动；当前launch a7692ba4-21cc-4b2b-8f95-de42f39cd144、真实bridge PID15760创建UTC05:50:34.929962、argv实核21600/tools/kimi-code/kimi-for-coding及key-file无明文Key参数。
+- UTC05:51:40派发最小接单任务262，Hall group:task-1faabbaba3d743bb9187e8282df23357，初始queued/assigned。派前实读caller agent:codex及最新旧development_requirements；262仅固定标记TALK_K28_MANAGED_ACK_20261017的结构化回传，不读写文件/运行工具/开发，原ID/Key/绑定/既有历史保持。按默认派后结束、用户通知“262好了”再读交付，不轮询，不提前宣称实际接单/回传通过。
+- 单成员宿主继续常驻，只领取旧角色start/stop，原manager持有当前Popen；私有health位于.talk/role-service-host/pilot/prj_e8fe7066bbec/agent_kimi-code-k28-preview，health/PID仅诊断，正常页面关闭不结束宿主。drain.request仅用于宿主收工：先页面正常关闭角色，宿主无句柄后退出；不要删除活动状态或由新进程认领旧owner。首manager的已完成drain已归档，旧日志保持。
+- 当前只是受管启停通过，完整迁移仍待262结果核验和人类页面验收；原生固定探针/161假件不证明实际后端版本、六小时长任务、主动等待或完整异常日志。生产子进程输出留存仍是后续已确认需求，不因本次补停止而宣称完成。
+- 证据pilot-one/independent-review261/cutover/{shared-marker-user-authorization.json,state.json,manager-normal-stop-recovery.json,current-launch-public.json,smoke-dispatch.json,smoke-pre-dispatch.json,stop-fix/}；HTTP register/start/stop及逐阶段快照在其上一级。原自动拒绝、26开发件/副本、10根源码冻结保持，stop-fix/另存原bridge、负例、161日志及最终两源码副本。
 
-## 当前：259补录及260宿主配置代码完成，实际迁移待执行
+## 259补录及260宿主配置已发布，当前执行一角色真实验证
 
 - 用户要求全部现有5角色平移，保原member_id/Key/模型绑定/身份档及任务消息成果历史，两个K2.8各自保留，不通过重新创建替代迁移。
 - [259补录合同](spec/ROLE_LEGACY_ATTACH_DESIGN.md)已落地human-only legacy-attach：原子增加imported/nonexclusive项目角色、必要缺失绑定和独立补录审计，沿用原Key；既有绑定/名册/说明/策略/历史保留，不生成新身份/Key或配置作业，不自动启动。精确legacy_attach来源及mismatch投影，宿主仅扩可信来源，其余能力/owner守卫保持。
@@ -36,11 +35,11 @@ Updated: 2026-10-17 13:26 (Asia/Shanghai)：旧K2.8已退出、隔离登录/原�
 
 ## 下一步与人工门禁
 
-1. 等待用户明确是否允许修改两个K2.8共用runner的control_kind；自动审批已因共享影响拒绝，未经同意不重试。获准后只启旧K2.8，验关闭/再启动/最小接单；不同意则保留补录、暂停实际切换。其它四角色仍待这一个验收后再排。目标Key根缺文件不等于需重建身份/轮换Key；不猜模型，不把旧PID/陈旧心跳或host配置enabled当可控/空闲证明。
-2. 旧K2.8完成受管闭环并经用户验收后，再排其余角色的公开绑定/能力预检、正常退出旧入口、保ID补录及启动→关闭→再启动→最小接单/回传。DeepSeek自身及协调CLI最后切换；当前Codex Desktop/MCP不按未知PID强行接管，不放开unknown/unverified、归属或stop所有权守卫。
-3. 255前后端代码已发布，但人工页面/真实原生仍待。加载019bb99前端及98beb9c后端后Ctrl+F5，在项目→角色按[验收指南](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)验创建自动首次启动、配置/入队/实际ready区分、关闭后刷新不再启动。使用既有人类账号/Key，具体启动方式/入口/限制见指南。
+1. 用户通知262完成后，先talk_get_delivery核任务号/完整结构化结论与固定标记，再核真实claimed instance为本轮ins_b20c4078c97b、原模型执行/回传证据，确认后收取；失败则Codex直接修正，不转回DeepSeek。当前不主动等待或轮询结果。
+2. 262通过后交用户验收：打开http://127.0.0.1:8000，用既有人类账号/Key进入项目→角色，选旧Kimi Code · K2.8 Preview 执行，核启动成功/ready，关闭待“未启动（已关闭）”，刷新不自启，再启动并核新实例；不要顺带启动新页面K2.8或其它角色。当前宿主和API已启动，无需手动重新执行服务命令。人类验收通过后再排其余角色；DeepSeek及协调CLI最后。
+3. 255创建自动首次启动等页面另按[指南](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)验创建/入队/实际ready及关闭后刷新不重启；完整异常日志/删除及主动链路另片，不在本轮扩改。
 
-当前已发生候选私有登录、一次独立原生模型探针、API正常重载及保ID补录；尚未登记共享能力、启动角色或执行TALK接单测试。原生最小探针不证明真实六小时长任务、模型版本/开发质量或终端T-W通过。260宿主代码已收尾；当前旧K2.8已保ID补录，实际启动等待共享运行器标记影响的明确授权，不同时扩完整日志/删除/通用预算。
+已实际完成专属登录、原生模型探针、API正常重载、保ID补录、明确授权后的共享控制标记和旧角色真实受管启停；最小TALK任务已派未核结果。仅2产品源码/6协调docs本轮收尾，未改数据库协议、模型绑定、原Key或其它角色。无需再次登录/批准已完成的共享标记变更，不能把先前失败页/旧验证码继续当当前待办。
 
 ## 已确认待实施与保留事实
 
