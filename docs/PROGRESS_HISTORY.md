@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-17 23:45（Asia/Shanghai）— 268原DeepSeek受管实例最小回传核验并收取，转页面人工验收
+
+- 用户通知268完成；最新MCP caller agent:codex/lead与项目旧development_requirements已核。按本角色Codex直接迁移约定只读核实际交付与运行事实，未派返修/回审，无源码、服务或模型动作及额外Hall回评。
+- 原msg2822合法talk-delivery-1/自身task_id268/conclusion complete，固定TALK_DEEPSEEK_MANAGED_ACK_20261017精确，未完成/阻塞/变更文件均0；本地summary --expect-task-id 268通过。作者agent:deepseek/接收agent:codex/Hall group:task-6601751f1625414b8f1721c13b250c37正确，原结果保持。
+- 真实attempt1由ins_1251105edd64于UTC15:04:28.202235领取，15:04:51.626843完成；bound快照runner:dsh-deepseek-local/builtin/deepseek-official/native-dsh-user-env/deepseek-flash及alias正确。根核gen3/launch c6a38f0a-a1e4-41dc-97e5-78e1881761a7/18216 idle/current_task null/无错误；原manager12536/started_at UTC15:02:39.993552持同句柄，CIM唯一目标bridge、创建UTC15:03:24.472679/父12536与原记录、公开启动参数吻合。
+- 本人Key与USER.md第12行原值精确相同且GET本人身份通过；原成员/全部名册/角色/绑定、既有runner与全部其它服务保持。865跟踪文件及5本地已应用脚本SHA核验无变，未读DB秘密列/复制原认证/按PID接管。独立核运行事实不冒称迁移自检为他人代码复核。
+- 核验通过后UTC15:44:03.214107收取268，succeeded/completed、原msg2822内容及原领取实例保持。此前28.078秒原生固定响应、10自检与gen1→2→3启停证据复用，不重复模型/服务测试，不外推固定后端版本、六小时或主动等待。
+- 本轮证据deepseek-next/coordination/smoke268/包含交付/任务/agents、result及本地校验、身份/实际运行/OS证明、review、collection、基线/验证/发布；当前仍仅待原DeepSeek页面关闭等未启动→刷新不自启→启动ready人验。三个Kimi保持，Codex CLI最后，18项排期不变；文档/Git收尾后暂停，不提前下一角色。
+
 ## 2026-10-17 23:06（Asia/Shanghai）— Codex直接迁移原DeepSeek：原模型/凭据源核实，独立原生与受管生命周期通过，268已派
 
 - 用户明确“是，保留deepseek-flash / max”，根按本角色直接操作授权推进，最新caller agent:codex/lead及旧页面development_requirements实读留档。原USER.md第12行TALK Key GET本人、原名称/ID/名册/历史、headless/argv/bridge-label/目录保持；同一Key落本人私有keys/agent_deepseek.key，未轮换/重签。原手动3600与既有受管21600分别记录。
