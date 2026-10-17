@@ -1,25 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-17 09:47 (Asia/Shanghai)：261准备成果已复核/直接补正并收取，最终21项通过；旧K2.8仍未实际迁移，待原终端正常退出与本角色专属登录。260已发布42738d9。
+Updated: 2026-10-17 13:26 (Asia/Shanghai)：旧K2.8已退出、隔离登录/原模型探针通过并保ID补录；共享runner改managed_cli被自动审批拒绝，已请求用户明确授权共享影响，尚未启动角色。
 
 ## 当前身份与分工
 
 - TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead。页面development_requirements仍为旧Kimi前端/交叉复核文字，未自动修改。
 - 用户2026-10-17最新分工优先：Codex派发→DeepSeek首次实现/自测交付后暂停→Codex独立复核首次实现→发现问题由Codex直接修正、验证及docs/Git收尾；不往返派修/默认追加外部回审。自修部分的验证为Codex自检，不称他人独立复核。
-- 默认派后结束、用户通知后取件；共享目录一次一方改码。用户在260收尾后明确授权先试一个；261准备片已按通知收取并补正，根不操作Browser验证；原生CLI曾自行打开设备登录页，后续用户完成认证。
+- 默认派后结束、用户通知后取件；共享目录一次一方改码。用户在260收尾后明确授权先试一个；261准备片已按通知收取并补正，根不操作Browser验证；原生CLI曾自行打开设备登录页，用户已完成专属认证。
 
-## 当前261：准备已收取，旧入口退出与独立登录待用户操作
+## 当前单角色试迁移：旧K2.8已保ID补录，共享控制标记等待明确授权
 
-- 用户要求只先试一个，候选固定agent:kimi-code-k28-preview，保原ID/Key/模型绑定/身份档/历史；新页面Kimi k2.8是另一身份，其它四角色不迁移。DeepSeek与协调CLI最后、Desktop/MCP不接管。
-- 原261/msg2804是自由文本，MCP仍unknown/unstructured；根按稳定SHA保存完整1776字符，读取本地delivery-261.json并用summary --expect-task-id 261校验为合法partial，不追改原消息或冒称服务器结构化结论。
-- DS已交付暂停/上报idle；根冻结26开发件及副本。独立实读发现两类P2：生产DB整文件hash额外广泛读取且忽略WAL，不能凭主文件hash不变证明无写；helper.filtered_out无界累积、custom dry-run误报21600、缺明确安全退出路径，原stop夹具member#stop也未覆盖精确目标。默认目录缺失不能证明“历史从未受管”，原自报保留并纠正该推断。
-- 根只在independent-review261/corrected/改两个辅助入口，原developer/字节保留：DB只metadata且proves_no_writes=false；宿主固定本项目/成员及Kimi内置配方、诊断去重限100、明确KIMI_CODE_HOME隔离并拒绝覆盖HOME；私有drain保留同一manager/原_handles，只接stop，handles空才退出。产品源码不改，不派DeepSeek往返返修。
-- 3项新增反例在原实现3失败/0错误；最终21项（原11+根10）全过，0失败/错误/跳过，含精确目标stop在unknown分类仍保留、其它四角色/跨项目不领取、主函数apply假件/私有health、中断后stop请求失败仍持有原manager/handles及显式WAL反例。仅隔离假件，不作真实原生/宿主启停证明。
-- 根经本机已批准只读查询取得CLI 2.0.2及实际help/login-help；旧PID8528确有kimi_k28_executor.py launch，创建时间UTC2026-10-16T13:49:05.7833870Z与原实例相符，复查仍活着。不按PID终止或接管；已异步请求用户到其原终端Ctrl+C正常退出，尚未收到完成确认。候选无待办/在途、service_state/launches空，陈旧idle不作空闲/退出证明。
-- 已用产品OwnershipStore为候选建立默认私有state/native目录，并以隔离HOME等及显式KIMI_CODE_HOME运行doctor；原公开模型provider=managed:kimi-code/model=kimi-for-coding匹配。原生配置只内存解析、证据只选公开维度/字段名，不复制/哈希认证目录；doctor exit0不代表登录/alias就绪，候选专属config仍不存在。
-- 发起过一次候选隔离设备登录，240秒等待超时/exit124，没有生成专属config。旧验证码先不用；native-login.py下次可按服务公布的1800秒窗口等待，但未重发/未保留活动登录进程。待用户就绪后重新发起登录，再核alias/原生最小probe。两项异步问题已发，当前需用户原入口退出及完成专属认证，不重复索取迁移批准。
-- Hall2805初审/2807追加最终21项；UTC2026-10-17T01:44:28.130170收取261为succeeded/completed，仅准备片收取，真实迁移目标未完成。原MCP自由文本/本地partial、3失败和原开发件保留；根修正后为自检，不称外部独立复核。
-- 证据pilot-one/independent-review261/{review.json,original-negative.log,final-tests.json,current-public-facts.json,native-readiness.json,native-login-status.json,collection.json,publication.json}，执行须使用corrected/入口，禁止继续用原DB哈希采集器。实际只增加候选本机隔离目录/登录初始化；没有生产API/DB写、legacy-attach、能力提升、角色spawn/旧入口关闭或模型调用，不宣称零本机副作用。
+- 用户已确认旧入口原终端Ctrl+C退出；root于UTC2026-10-17T05:07:23.5937979Z复查旧PID8528不存在。第二次专属设备登录session39261成功，CLI回显Logged in to managed:kimi-code、exit0，角色独立config已生成，未复制原认证目录。
+- 隔离native配置包含原alias kimi-code/kimi-for-coding，provider managed:kimi-code/model kimi-for-coding/显示K2.8 Preview及能力维度匹配。root用无工具/无子代理的独立原生Popen做固定文本探针，UTC05:13:28完成，exit0/5.296秒、assistant正文精确匹配标记；不推断实际后端版本固定为K2.8或主动等待通过。
+- 发现原宿主默认把旧角色tools任务档降成review且改默认展示；root在单成员corrected/入口保留旧TASK_TOOL_PROFILE=tools、原DISPLAY_NAME与工作目录，不扩到其它角色。原parser反例profile=review/display_name=null/workdir=.已留痕；新增两项后最终23项相关测试全过，原21项及3失败是先前准备阶段记录，不叠加计数。
+- 第一次legacy-attach请求HTTP405、未写角色：实际8000 API仍旧进程、无--reload，未加载259接口。root核精确API进程/创建时间/venv及独占控制台链12312/14812/3208、全库queued/running=0，普通Ctrl+C正常退出后，以同venv/项目/127.0.0.1:8000/无reload配置隐藏启动API；OpenAPI确认新增接口已加载。未强杀或接管角色。
+- 当前API由root api-launcher.py持有原Popen/独立进程组，私有控制目录C:/Users/Administrator/.talk/role-service-host/api-service，health.json仅诊断，stop.request由原launcher发CTRL_BREAK正常退出；没有自动重启。不要重复启动第二个8000服务或凭PID认领；源码在本机independent-review261/，保持证据目录以便恢复。
+- UTC05:21:57 human-only legacy-attach实际成功201/reused=false，独立operation_key=pilot-legacy-attach-k28-20261017-v1。旧member_id/原Key身份及文件mtime、全部已有绑定/其时间、目标任务历史计数/ID范围、其它角色显式配置均保持；仅新增imported/nonexclusive项目角色和独立补录审计，无新Member/新Key/配置作业或自动启动。
+- 下一步PATCH共享runner runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33/control-kind为managed_cli被自动审批在进程启动前拒绝，未发PATCH；理由是它还绑定新页面K2.8，该共享能力变更会让另一个未获本轮试迁移授权的角色也获得受管启动资格。已异步请用户选择是否允许这一个共享标记变更；不能绕过或换入口执行同一动作，未收到同意前不重试。
+- 当前control_kind仍unknown/adapter_status仍unverified；候选service generation0/desired stopped/observed not_started/无owner或launch，can_start=false。尚未启动任何受管角色或发送最小接单任务。其它四角色未迁移/启停；共享标记若获同意，本轮仍只由固定project/member宿主领取旧角色，另一个K2.8不得顺带启动。
+- 本轮实际补录不是完整迁移验收：审批同意后最小登记共享control_kind（不改adapter_status/模型）→隐藏启动经审单成员宿主→精确owner/project/launch ready与21600及原tools档→关闭→再启动→最小接单/回传→用户页面验收。已有总体迁移批准不被误用为共享影响已批准，按本次自动审批要求补明确范围。
+- root cutover证据pilot-one/independent-review261/{native-login-success.json,native-probe.json,profile-preservation-negative.json,api-normal-stop.json,api-version-ready.json,apply-attach-*.json,http-audit-*.json,cutover/state.json,cutover/automatic-approval-rejection.json}；10份根代码已冻结cutover/source/与code-manifest.json。原26开发件、初次失败及本地partial/MCP自由文本unknown保持。
 
 ## 当前：259补录及260宿主配置代码完成，实际迁移待执行
 
@@ -36,11 +36,11 @@ Updated: 2026-10-17 09:47 (Asia/Shanghai)：261准备成果已复核/直接补�
 
 ## 下一步与人工门禁
 
-1. 本轮先完成旧K2.8试迁移：确认原终端Ctrl+C退出/OS与实例事实，再重新发起本角色原生隔离登录、核既有alias和最小native probe；实际能力具备后才保ID补录/必要能力登记和单角色受管启停。其它四角色待这一个验收后再排。目标Key根缺文件不等于需重建身份/轮换Key；不猜模型，不把旧PID/陈旧心跳或host配置enabled当可控/空闲证明。
-2. 真实能力通过后正常退旧入口，保原ID补录，再逐角色验启动→关闭→再启动→最小接单/回传。DeepSeek自身及协调CLI最后切换；当前Codex Desktop/MCP不按未知PID强行接管，不放开unknown/unverified、归属或stop所有权守卫。
+1. 等待用户明确是否允许修改两个K2.8共用runner的control_kind；自动审批已因共享影响拒绝，未经同意不重试。获准后只启旧K2.8，验关闭/再启动/最小接单；不同意则保留补录、暂停实际切换。其它四角色仍待这一个验收后再排。目标Key根缺文件不等于需重建身份/轮换Key；不猜模型，不把旧PID/陈旧心跳或host配置enabled当可控/空闲证明。
+2. 旧K2.8完成受管闭环并经用户验收后，再排其余角色的公开绑定/能力预检、正常退出旧入口、保ID补录及启动→关闭→再启动→最小接单/回传。DeepSeek自身及协调CLI最后切换；当前Codex Desktop/MCP不按未知PID强行接管，不放开unknown/unverified、归属或stop所有权守卫。
 3. 255前后端代码已发布，但人工页面/真实原生仍待。加载019bb99前端及98beb9c后端后Ctrl+F5，在项目→角色按[验收指南](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)验创建自动首次启动、配置/入队/实际ready区分、关闭后刷新不再启动。使用既有人类账号/Key，具体启动方式/入口/限制见指南。
 
-当前仍未执行legacy-attach、能力升级、生产API/DB写或角色启停/模型调用；候选私有目录初始化与必要内存认证读已分别记录，不把整个准备过程称为零写/零读。参数和隔离进程测试不证明真实六小时长任务、原生登录/模型或终端T-W通过。260宿主代码已收尾；当前261准备包已收取，实际切换待原入口正常退出和专属登录，不同时扩完整日志/删除/通用预算。
+当前已发生候选私有登录、一次独立原生模型探针、API正常重载及保ID补录；尚未登记共享能力、启动角色或执行TALK接单测试。原生最小探针不证明真实六小时长任务、模型版本/开发质量或终端T-W通过。260宿主代码已收尾；当前旧K2.8已保ID补录，实际启动等待共享运行器标记影响的明确授权，不同时扩完整日志/删除/通用预算。
 
 ## 已确认待实施与保留事实
 

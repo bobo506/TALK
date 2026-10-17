@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 13:26（Asia/Shanghai）— 原生登录/探针通过、API正常重载及旧K2.8保ID补录完成；共享标记被自动审批拒绝
+
+- 用户确认原终端正常退出，root UTC05:07:23复核旧PID8528消失；重新设备登录session39261成功（exit0/专属config生成），原alias kimi-code/kimi-for-coding/provider managed:kimi-code/model kimi-for-coding及显示能力匹配，不复制原认证目录。用无工具/子代理的独立自持Popen做固定文本native探针，UTC05:13:28完成、5.296秒/exit0、助手正文精确匹配，保存native-login-success/native-probe证据；不外推后端版本/开发质量/T-W。
+- 发现标准受管recipe会把旧K28工具档tools变成默认review、display_name空/workdir=.；root保原任务档/展示/工作目录，预算仍同argv21600、alias原样。保留parser负例，新增两项后23相关测试全过，先前准备阶段的21项不叠加计数。仅本机单成员辅助入口变更，产品源码无扩改。
+- 第一次POST legacy-attach返回405未写；实查API进程12312/parent14812（原venv）/控制台3208（交互PowerShell），无reload且未载259。核精确创建时间/模块、控制台仅该链、全库queued/running=0后普通Ctrl+C正常退出，api-normal-stop.json证实；同venv/项目/127.0.0.1:8000/无reload由新隐藏api-launcher.py持有原Popen/独立进程组启动，OpenAPI确认新接口加载。原终端正常停止，不按PID强杀角色；SDK具重连，未迁移/启停其它角色。API私有health/stop.request位于用户.talk/role-service-host/api-service，launcher不自动重启，控制只针对自持子进程组。
+- UTC05:21:57 human-only legacy-attach201/reused=false，operation_key pilot-legacy-attach-k28-20261017-v1，仅新增候选imported/nonexclusive ProjectRole及独立审计。原Key GET身份/文件mtime、所有既有binding字段及时间、目标任务历史count/min/max与其它角色显式行前后断言一致；没有新Member/新Key/配置或自动启动作业。
+- 下一步PATCH共用runner control-kind→managed_cli被自动审批拒绝：理由是它同时绑定新页面K2.8，会扩大该未授权试迁移角色的受管控制能力，当前只迁一个的授权不足。进程未创建/PATCH未发；不能改入口、直接SQL或换runner绕过。已异步询问用户是否明确允许该共享标记变更（本轮仍只启旧角色）；尚未同意，等待明确范围。按宿主要求在commentary解释自动审批拒绝及原因，最终也需如实告知。
+- 当前shared control_kind仍unknown/adapter_status仍unverified；候选generation0/not_started/无owner/current_launch、can_start=false。尚未启动role host/CLI或发送最小TALK任务，其它四角色未迁移/启动。补录已完成不是完整迁移验收；获批后仅控制标记最小变更，固定project/member宿主处理原角色，验21600/tools档、owner/launch/实例、关闭/再启动及最小接单回传，再交用户页面。
+- 完整HTTP审计/405与201事实、同配置API重载证据、原生probe、23验证、共享拒绝和当前状态见independent-review261/；cutover/保存state.json、automatic-approval-rejection.json和10份根代码冻结，原26开发件/初次失败/partial/自由文本MCP均保留。当前原生登录已完成，不再使用旧登录待办/验证码；resume-login-session.json已更新状态。
+- 本轮5正式协调docs精确验证提交推送，859原保护文件及原26件/副本保持；没有产品源码改动或Browser验证，没有新开发任务。实际生产补录/API正常重载与本机native初始化如实记录，不称零生产写/无副作用。未读取新精确额度，不臆测比例；继续前必须先取得共享影响的用户明确授权。
+
 ## 2026-10-17 09:47（Asia/Shanghai）— 261准备成果收取并由Codex补正；旧入口退出/独立登录待用户操作
 
 - 用户通知好了后根读取261/msg2804完整1776字符并保SHA444ce67d…；MCP自由文本unknown保持，本地delivery-261.json经summary --expect-task-id261为合法partial，不凭runner succeeded或文件路径宣称业务完成。实核caller agent:codex/lead/项目及旧development_requirements；按最新DS首次执行/Codex复核直接修正分工，DS已报idle并暂停。

@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### 单角色实际切换：保ID补录成功，共享标记待明确授权（2026-10-17）
+
+旧K2.8已原终端正常退出，第二次独立native登录成功；原alias固定文本真实探针exit0/5.296秒通过，不证明后端版本固定或长等待。root发现默认recipe会丢旧tools任务档/展示，已在仅该候选辅助入口补原TASK_TOOL_PROFILE/DISPLAY_NAME/workdir，最终23项相关验证通过，不改产品通用配方/其它角色。服务端旧进程未载legacy-attach（405零写），已核独占控制台与无在途任务后普通Ctrl+C退出、同配置隐藏启动API，OpenAPI确认新接口加载。
+
+human-only保ID补录已201成功，原Key/绑定及其时间/任务历史计数范围、其它角色行保持。共享runner control_kind→managed_cli被自动审批拒绝且未发PATCH：其同时影响新页面K2.8的受管启动资格，超出只迁一个的范围；已请用户明确批准共享影响，不走替代入口绕过。本次没有角色spawn/owner/launch或最小TALK任务；获准后仍只让单成员host处理旧角色，验证启动/关闭/再启动/接单。当前API原Popen由api-launcher.py持有，私有api-service/stop.request正常退出，勿凭PID接管。证据与可审代码冻结在independent-review261/cutover/。
+
 ### 单角色试迁移：261准备收取，实际切换待原入口退出/独立登录（2026-10-17）
 
 261原msg2804自由文本unknown保留，本地partial校验通过。Codex独立复核后在pilot-one/independent-review261/corrected/直接修正：移除整DB hash/零写证明，辅助宿主固定候选/项目、诊断去重限100、显式隔离KIMI_CODE_HOME、私有drain保持原manager/handles并在全部释放后退出。原3反例失败，最终21项（原11+根10）全过，含真实目标stop/跨项目/其它四角色零领取、主函数假件、中断后stop失败仍保句柄及WAL反例；修正为根自检，原26开发件不改。Hall2805/2807后已收取，仅准备完成。
