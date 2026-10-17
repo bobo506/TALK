@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### 265已收取：群内人类动作成员预检与正常恢复（2026-10-17）
+
+execute_talk_actions复用同群成员查询，向人类escalate/final的目标明确不在Group时不发送，并以中文向原请求者说明未通知/未发送；不换人/广播/假报成功，合法成员和服务端严格提及守卫保持。原message2816由模型human:user占位触发400，SDK单条异常隔离后循环仍继续；不能将error状态等同进程死。Codex独立完整129通过，提示补正后最终CLI/Kimi/受管停止/服务器守卫140通过，独立记录回放及同客户端下一条消息均正常。无Group/成员查询不可用及普通正文无效前缀仍由服务器严格拒绝，未改通用路由/prompt。
+
+新Kimi已原manager17908正常generation6关闭/释放归属，再generation7/ins_3bdcbe74bcb2/launch7ec9ae4d-0033-45a2-8ff2-d51e34253c17 ready，新进程15220 idle/无错误，在补丁落盘后启动；无手工改状态/PID接管/强停，Key/绑定/历史及旧K28gen10保持。265原2819 partial保留且实际收取，未真实模型再现、重做登录/264或人验。最新恢复以本节/PROGRESS为准，下列265待查为当时快照；完整异常日志体系仍另片。
+
 ### 新Kimi回评收件人错误265已派（2026-10-17）
 
 264/人工迁移验收闭合后，恢复盘点见ins_b587917b65ec status=error/current_task_id=2816，错误invalid recipient mention: @human:user；2816为复核留言消息号，不能当新任务或推断队列/服务已死。265交DeepSeek首次定位普通消息真实路径、隔离fake CLI/TALK及证据明确时最小补正，仅cli/kimi bridge与对应测试可写，暂停后Codex独立核并直接修正。服务端严格未知提及400/合法mention/原权限路由、Task Hall、后续消费和受管停止守卫保持，不猜收件人/改广播/吞错假成功；真实配置/三档/服务/模型不动，完整日志体系另片。原264/人验不追改，当前根因/健康未通过，下一agent:kimi暂后排。包见kimi-reply-recipient/coordination/及PROGRESS，默认用户通知265完成后取件。

@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-17 17:17（Asia/Shanghai）— 265独立复核及中文提示补正通过，原manager正常重启加载修正
+
+- 用户通知好了后合读265/msg2819完整合法partial（11完成/5未完/1阻塞/15验证），与本地delivery JSON逐字段一致，自身号校验通过；实测caller agent:codex，DeepSeek已idle/current_task=null并暂停。冻结25开发件与2候选源码，独立核实际diff、真实消息处理/成员查询/SDK异常隔离路径及复现原件，不只凭开发结论。原MCP全量JSON嵌shell超Windows命令长限的协调工具失败未启动进程，改直接文件工具存JSON，未改变生产或原报告。
+- 根因是2816普通回评中模型输出显式escalate_to_human to=human:user，群只有Agent；旧bridge只有human前缀校验，服务端未知leading mention400属正确拒绝。该条先前可见回复2817/Agent动作2818已发，第三条人类动作失败；SDK捕获单条handler异常后继续，任务轮询也有后续日志，不认定队列/进程死亡，last_seen_at只是状态上报。
+- 独立认可DeepSeek的同群成员预检：仅证明不在本群时拒绝人类escalate/final动作并通知原请求者，不改服务器/权限/合法mention、不猜人类或广播；与既有send_message缺目标处理一致，idle表示这轮处理完，非通知已成功。Codex仅把两新提示改为中文“未通知人类/未发送最终答复…该收件人不在当前群”及同步原3断言，是Codex自修自检；原候选/25件不改。
+- 根初次独立完整CLI/Kimi129项全部通过，开发原129中3个WinError5限制与排除后126原证据保持。中文补正后最终CLI/Kimi/9受管停止/2服务器严格守卫共140项0失败0错误0跳过，非累计；独立旧基线同记录模型输出复现400，最终版可见拒绝且向原发送者通知，同fake客户端真实SDK dispatcher下一条正常busy→idle；Group读取不可用/无Group仍服务器400，无广播或猜目标。真实模型未再调用，普通正文无效leading mention等剩余边界未扩。
+- 按既有迁移/修正授权，确认无待办、原manager17908持原11056后，仅新角色正常关闭generation6/stop20365cef-3d3d-478c-9198-4b9d34bee355，stopped/归属释放/原句柄空/旧进程已退；同manager再启动generation7/launch7ec9ae4d-0033-45a2-8ff2-d51e34253c17/ins_3bdcbe74bcb2，reported ready、新15220 idle/current_task=null/last_error=null，OS创建时刻、原manager started_at/所持launch及补丁落盘先后吻合。没有SQL改状态/PID接管/强停或API重启；原Key身份/mtime、全部binding/角色行/历史保持，旧K28gen10服务完整投影不变，未重启旧角色。
+- 独立复核/最终自检和正常恢复完成后UTC09:14:39.980128实际收取265 succeeded/completed，result仍2819/partial。执行者禁止部署是它的任务边界，协调方按已有授权完成必要恢复，无需重复总体许可。本轮不写额外Hall回评避免再激活旧bridge；独立review/collection/源冻结及真实恢复证据可追溯。264及两个角色的人类迁移验收历史保持，不重做登录/264/三步。
+- 本片只2源码+5协调docs收尾，原25件/2候选和旧261—264冻结保持。完整证据kimi-reply-recipient/independent-review265/与原apply审计，state同步completed；完整异常日志、固定模型版本、六小时/主动等待等仍待，未把单条可见拒绝当全日志实现。当前片收尾暂停，下一位agent:kimi原模型/命令/Key保ID迁移准备，DeepSeek与Codex最后。
+
 ## 2026-10-17 16:41（Asia/Shanghai）— 恢复发现新Kimi回评收件人错误，265已派DeepSeek首次定位补正
 
 - 用户在697cbc4收尾后说继续，本来下一位agent:kimi。读取当前身份/进度及最新项目要求，caller agent:codex/kind agent、业务lead；页面旧Kimi/DeepSeek交叉分工保持，按用户2026-10-17最新DeepSeek首次执行/Codex独立复核直接修正。默认派后结束，禁止开发/审查并行写源。

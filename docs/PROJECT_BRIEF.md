@@ -4,7 +4,7 @@
 
 ## 当前实施状态（2026-10-17）
 
-2026-10-17 16:41最新：用户继续时恢复盘点发现新Kimi回评错误invalid recipient mention: @human:user，关联复核留言2816（非任务264）；265已交DeepSeek首次定位/隔离复现及必要最小补正，暂停后Codex复核直接修正。264及新角色人工迁移验收历史保持，当前异常根因/循环健康待核，不自动启停/清状态；agent:kimi迁移待本异常澄清，DeepSeek与Codex最后。详[进度](PROGRESS.md)及[历史](PROGRESS_HISTORY.md)。
+2026-10-17 17:17最新：265已独立复核/收取，群内人类动作新增成员预检，目标不存在时不发并通知原请求者，服务器严格校验保持；Codex补中文提示，最终140项通过（含受管停止/服务器守卫）。新Kimi已同原manager正常关闭/释放归属→再启动加载修正，generation7新实例ready/idle、无错误，Key/绑定/历史及旧K28保持；未真实模型重触发。下一位agent:kimi先核原模型/命令/可信Key，DeepSeek与Codex最后，完整日志/T-W等另片。详[进度](PROGRESS.md)及[历史](PROGRESS_HISTORY.md)。
 
 2026-10-17 14:07最新：旧K2.8单角色试迁移已正式验收通过。262固定回传由本轮受管实例完成并独立核验/收取；用户随后确认页面“关闭→刷新不自启→再启动ready”三步均通过，服务端generation7 stopped/generation8 ready吻合，原manager继续持有新进程。原ID/Key/模型绑定/既有历史保持，其余四角色未迁移/启停。c129a63停止修正/161回归沿用，本轮仅文档收尾，不开新角色迁移。 详[进度](PROGRESS.md)。
 

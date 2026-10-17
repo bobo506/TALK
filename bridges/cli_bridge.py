@@ -1851,18 +1851,29 @@ async def execute_talk_actions(
     source_message_id = int(source_message["id"]) if source_message.get("id") is not None else None
     group_member_ids: set[str] | None = None
 
+    async def _group_target_known(candidate: str) -> bool:
+        """Return False only when a Group lookup proves the target is not a member.
+
+        ``None`` from ``_group_member_ids`` means the member list is unavailable;
+        keep the previous behavior and let the server's strict recipient guard
+        decide.  This helper does not choose a replacement recipient.
+        """
+        nonlocal group_member_ids
+        if not group_id or not candidate:
+            return True
+        if group_member_ids is None:
+            group_member_ids = await _group_member_ids(client, group_id)
+        return group_member_ids is None or candidate in group_member_ids
+
     for action in actions:
         target = action.to or action.target_member_id
         if action.action_type == "send_message":
             if not target or not target.startswith("agent:"):
                 summaries.append("我不能代发给这个目标；请确认要联系的 agent。")
                 continue
-            if group_id:
-                if group_member_ids is None:
-                    group_member_ids = await _group_member_ids(client, group_id)
-                if group_member_ids is not None and target not in group_member_ids:
-                    summaries.append(f"当前 Group 里没有 {target}，我不能代发；请确认是否需要我直接处理。")
-                    continue
+            if not await _group_target_known(target):
+                summaries.append(f"当前 Group 里没有 {target}，我不能代发；请确认是否需要我直接处理。")
+                continue
             action_body = sanitize_scope_leak(action.body)
             if not action_body:
                 summaries.append("我不能代发空消息；请补充要发送的内容。")
@@ -1918,6 +1929,12 @@ async def execute_talk_actions(
             if not target or not target.startswith("human:"):
                 summaries.append("escalate_to_human skipped: target must be a human member")
                 continue
+
+            if not await _group_target_known(target):
+                summaries.append(
+                    f"未通知人类 {target}：该收件人不在当前群，请确认正确成员。"
+                )
+                continue
             action_body = sanitize_scope_leak(action.body or "请你做最终判断。")
             discussion_id = action.discussion_id or await _resolve_discussion_id(
                 client,
@@ -1949,6 +1966,12 @@ async def execute_talk_actions(
                 target = await _find_human_reviewer(client, group_id)
             if not target or not target.startswith("human:"):
                 summaries.append("final_to_human skipped: target must be a human member")
+                continue
+
+            if not await _group_target_known(target):
+                summaries.append(
+                    f"未发送最终答复给 {target}：该收件人不在当前群，请确认正确成员。"
+                )
                 continue
             action_body = sanitize_scope_leak(action.body)
             if not action_body:
