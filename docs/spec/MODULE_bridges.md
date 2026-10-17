@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### 旧K2.8单角色迁移正式验收通过（2026-10-17）
+
+262合法结构化任务号/标记、实际原角色/ins_b20c4078c97b、结果2809作者/Hall已独立核验；精确实例/launch/创建时刻与原manager持有吻合，Hall2810后已收取completed。用户随后明确页面关闭→刷新不自启→再启动ready三步均通过，服务generation7 stopped/generation8 ready佐证，当前新instance ins_d86218c7cc0d仍由原manager11920持Popen。原ID/Key/绑定/历史保持，其余角色未迁移/启停。
+
+c129a63停止修正/161回归沿用，本轮仅文档收尾，不重复计新测试或开启下角色；最小回传/页面验收不证明长任务、主动等待或完整异常日志完成。证据cutover/smoke262/含原交付、独立任务/实时检查、收取、人类回复及对应服务回执，新进度见PROGRESS。
+
 ### 单角色受管启停通过，真实停止缺口已补（2026-10-17）
 
 用户明确批准共享runner改managed_cli、仍只启动旧K2.8；登记已完成而adapter_status不改。首次真实stop暴露通用bridge未读取宿主控制文件，stop_timeout保owner；根核原独占控制台/创建时刻/无任务后普通Ctrl+C，由原manager正常完成stop并drain，无强杀或PID接管。Codex直接补通用CLI仅managed project/launch匹配绝对停止路径的监听，精确shutdown请求取消连接后走既有worker/offline/close，旧手动入口保持；9新增及CLI/Kimi/Codex共161相关回归通过，修正为自检。

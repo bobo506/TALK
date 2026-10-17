@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-17 14:04（Asia/Shanghai）— 262最小接单回传独立核验收取，旧K2.8页面人工验收通过
+
+- 用户通知好了后读取262完整合法交付摘要及原result2809，task_id=262/complete、固定标记TALK_K28_MANAGED_ACK_20261017精确一致，完成1/未完成0/阻塞0/changed_files0。原结果JSON本地summary --expect-task-id262校验通过；摘要完整无截断，不只凭succeeded或执行者自报验收。
+- 实读task元数据：原agent:kimi-code-k28-preview于UTC05:51:53.839623领取，attempt1，instance ins_b20c4078c97b，05:52:02.817509完成；结果作者/Task Hall/ID与任务对应，精确绑定快照仍原runner/provider/alias。只输出本次状态与必要字段，不回灌Hall历史或完整实例日志。
+- 独立只读核当前service generation6/running/ready、原launch a7692ba4-21cc-4b2b-8f95-de42f39cd144、ownership保留；精确实例表只SELECT公开列，member/project/runtime/launch/PID匹配，任务后idle/current_task=null/无错误。原实际PID15760创建时刻与本轮记录一致，fresh health证明原manager11920仍serving并持该launch；不凭PID接管。
+- 原Key GET身份/文件mtime、全部binding字段及时间、显式角色行与补录后保持；目标历史计数只增加本次262，原最早ID保持、最大262；其它角色未启动。使用窄读认证，不输出/哈希Key、owner token或生产DB正文，不为最小接单重跑原生模型探针。
+- Hall2810写核验通过；UTC2026-10-17T06:03:06.763702收取262 succeeded/completed，result仍2809。完整结构化自报与限制保留，不外推固定后端版本、开发质量、六小时长任务、主动等待或完整日志。c129a63停止修正/161回归沿用，本轮无源码变化/新测试或角色启停。
+- 先按262好了只作完成通知，完成核验后另向用户发出页面验收；用户随后明确回复“三步均通过”：旧角色关闭→刷新仍关闭→再启动ready。只读回查generation7 stop/UTC06:04:24.615810 stopped与generation8 start/06:04:38.755614 ready对应，新instance ins_d86218c7cc0d/launch 4c72e06e-9ef9-45b2-a752-f520638c87e1，原manager11920继续持新Popen且OS创建时刻匹配。根无Browser操作或代点；该角色正式验收通过，本轮收尾暂停，其余四角色后排，DeepSeek/协调CLI最后。
+- 本轮仅6协调docs精确检查提交推送，859其余跟踪文件（含已发布bridge和9项测试）、原26开发件/副本、10辅助根代码及最终2源码冻结保持。证据cutover/smoke262/含原交付、本地校验、独立任务/实时核验、收取、基线与发布回执，cutover/state.json同步completed_and_human_accepted，另存人工回复/对应服务回执与新Popen公开事实；历史自动拒绝/失败及已解决授权事实保持。未读取新精确用量，不臆测比例。
+
 ## 2026-10-17 13:53（Asia/Shanghai）— 共享标记明确获准，旧K2.8受管启停通过；修正关闭缺口，262待通知收取
 
 - 用户明确回复“允许修改共享标记，仍只启动旧角色”，cutover/shared-marker-user-authorization.json记录精确范围。随后仅PATCH共用runner control_kind=managed_cli成功，adapter_status保持unverified、原Key及全部binding/时间不变；原自动审批拒绝证据不追改，新页面K2.8及其它角色未迁移/启停。

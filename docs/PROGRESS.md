@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-17 13:53最新：用户明确允许两个K2.8共用runner改managed_cli，但仍只启旧角色；标记已登记，adapter_status仍unverified。旧K2.8首次关闭暴露bridge未读停止文件，Codex直接补通用CLI停止监听，161项相关回归通过；原失败经独占控制台普通Ctrl+C/原manager正常回报恢复，无强杀。修正后同一manager启动→控制文件正常关闭/释放所有权→再启动ready通过，真实argv保21600/tools/原alias。最小任务262已派给旧角色，按默认通知后取件，尚未核接单结果；其它四角色未迁移/启停。
+Updated: 2026-10-17 14:07最新：旧K2.8单角色试迁移已正式验收通过。262固定回传由本轮受管实例完成并独立核验/收取；用户随后确认页面“关闭→刷新不自启→再启动ready”三步均通过，服务端generation7 stopped/generation8 ready吻合，原manager继续持有新进程。原ID/Key/模型绑定/既有历史保持，其余四角色未迁移/启停。c129a63停止修正/161回归沿用，本轮仅文档收尾，不开新角色迁移。
 
 ## 当前身份与分工
 
@@ -8,17 +8,15 @@ Updated: 2026-10-17 13:53最新：用户明确允许两个K2.8共用runner改man
 - 用户2026-10-17最新分工优先：Codex派发→DeepSeek首次实现/自测交付后暂停→Codex独立复核首次实现→发现问题由Codex直接修正、验证及docs/Git收尾；不往返派修/默认追加外部回审。自修部分的验证为Codex自检，不称他人独立复核。
 - 默认派后结束、用户通知后取件；共享目录一次一方改码。用户在260收尾后明确授权先试一个；261准备片已按通知收取并补正，根不操作Browser验证；原生CLI曾自行打开设备登录页，用户已完成专属认证。
 
-## 当前单角色试迁移：启停已通过，262等待用户通知后收取
+## 当前单角色试迁移：旧K2.8已正式验收通过
 
-- 唯一候选仍为agent:kimi-code-k28-preview；新页面K2.8是另一身份，其它四角色不迁移/启停。用户已明确回复“允许修改共享标记，仍只启动旧角色”，原自动审批拒绝保留；随后共享control_kind→managed_cli成功，adapter_status仍unverified，模型绑定和原Key不变。不把共享标记当另一个角色已迁移或应自动启动。
-- 已完成的旧入口正常退出、专属native登录、原alias探针及human-only保ID补录沿用前次证据。当前API仍由api-launcher.py持有原Popen、同venv/项目/127.0.0.1:8000/无reload，api-service/stop.request正常退出，不重复启动8000。
-- 首次真实start generation1 ready，但stop generation2在20秒后stop_timeout：控制文件已正确写入，bridges.cli_bridge没有监听。原宿主仍持原Popen/owner，未强杀。核控制台仅8988/15832/2040及创建时刻/无任务后普通Ctrl+C，bridge正常清理、原manager请求并完成generation3 stopped/释放归属，再drain退出；不凭PID接管进程。
-- Codex按已授权验收修正直接补bridges/cli_bridge.py及tests/test_cli_managed_stop.py：仅受管project/launch及匹配绝对控制路径启用监听；缺失/不可读/错误标记不误停，精确shutdown标记取消连接/消息并沿原路径取消任务worker、上报offline/close，旧手动入口保持。9项新增测试包含真实run_bridge清理假件、错误路径/内容、连接异常与外部取消；连同CLI/Kimi/Codex套件共161项全过。原实现生命周期反例超时、初期Windows夹具换行失败及原件均留存；修正为Codex自检，未追加DeepSeek返修/回审。
-- 修正后新单成员manager（诊断PID11920）同一原Popen持有链：generation4/ins_87973da87bd6 ready→generation5正常控制文件关闭stopped/ownership=false→generation6/ins_b20c4078c97b ready，正常关闭不使用控制台信号。同manager关闭后仍常驻、可再启动；当前launch a7692ba4-21cc-4b2b-8f95-de42f39cd144、真实bridge PID15760创建UTC05:50:34.929962、argv实核21600/tools/kimi-code/kimi-for-coding及key-file无明文Key参数。
-- UTC05:51:40派发最小接单任务262，Hall group:task-1faabbaba3d743bb9187e8282df23357，初始queued/assigned。派前实读caller agent:codex及最新旧development_requirements；262仅固定标记TALK_K28_MANAGED_ACK_20261017的结构化回传，不读写文件/运行工具/开发，原ID/Key/绑定/既有历史保持。按默认派后结束、用户通知“262好了”再读交付，不轮询，不提前宣称实际接单/回传通过。
-- 单成员宿主继续常驻，只领取旧角色start/stop，原manager持有当前Popen；私有health位于.talk/role-service-host/pilot/prj_e8fe7066bbec/agent_kimi-code-k28-preview，health/PID仅诊断，正常页面关闭不结束宿主。drain.request仅用于宿主收工：先页面正常关闭角色，宿主无句柄后退出；不要删除活动状态或由新进程认领旧owner。首manager的已完成drain已归档，旧日志保持。
-- 当前只是受管启停通过，完整迁移仍待262结果核验和人类页面验收；原生固定探针/161假件不证明实际后端版本、六小时长任务、主动等待或完整异常日志。生产子进程输出留存仍是后续已确认需求，不因本次补停止而宣称完成。
-- 证据pilot-one/independent-review261/cutover/{shared-marker-user-authorization.json,state.json,manager-normal-stop-recovery.json,current-launch-public.json,smoke-dispatch.json,smoke-pre-dispatch.json,stop-fix/}；HTTP register/start/stop及逐阶段快照在其上一级。原自动拒绝、26开发件/副本、10根源码冻结保持，stop-fix/另存原bridge、负例、161日志及最终两源码副本。
+- 唯一候选agent:kimi-code-k28-preview已保原ID/Key/模型绑定/身份档/既有历史完成受管迁移。新页面K2.8是另一身份，其余四角色未迁移/启停；用户明确允许共享runner改managed_cli而仍只启旧角色，原自动审批拒绝已按扩大范围解决，adapter_status保持unverified，不把共享标记当其它角色已迁移。
+- 专属native登录、原alias探针、保ID补录已完成；c129a63补通用CLI受管控制文件监听/异步清理，9新增及CLI/Kimi/Codex共161相关回归通过，修正为Codex自检。本轮沿用未重跑；原stop_timeout/普通Ctrl+C原Popen正常恢复及原件/失败保留。修正后generation4 ready→generation5正常关闭释放归属→generation6再次ready真实通过。
+- 用户通知262后独立核完整合法结构化task_id=262/complete、标记TALK_K28_MANAGED_ACK_20261017，实际由原角色/本轮ins_b20c4078c97b领取，结果2809作者/Hall匹配，UTC05:51:53.839623领取、05:52:02.817509完成。另核精确实例/launch/PID创建时刻及fresh原manager持有，任务后idle/current_task=null/无错误；原成员/Key文件mtime、全部binding/时间及角色行保持，历史计数仅增加本次262。Hall2810后UTC06:03:06.763702收取为succeeded/completed。
+- 本轮人类随后明确回复页面“三步均通过”：关闭显示已关闭→刷新不自启→再启动ready。只读回查generation7 stop于UTC06:04:24.615810正常stopped，generation8 start于06:04:38.755614 ready；当前新instance ins_d86218c7cc0d、launch 4c72e06e-9ef9-45b2-a752-f520638c87e1。原manager诊断PID11920仍serving并持新Popen，OS创建时刻/私有公开记录吻合，原角色/绑定/Key保持；根未操作Browser或代替用户点击。
+- 当前API api-launcher.py与单成员宿主常驻、旧角色running/ready，可由页面正常关闭/启动，无需手输服务命令或再次登录。角色关闭不结束宿主；宿主收工才用私有pilot/prj_e8fe7066bbec/agent_kimi-code-k28-preview/drain.request并先正常停角色、原handles空后退出。API私有api-service/stop.request正常退出，不另起8000/删除活动状态/由新进程凭PID认领。
+- 单角色启停/接单/人类页面闭环通过，本轮完成收尾暂停，不开启其余角色或其它功能。其余四角色下轮逐个，DeepSeek及协调CLI最后；完整异常日志、255其它页面、删除、实际六小时/主动等待及固定后端模型版本仍待，不能外推最小回传已覆盖。
+- 证据independent-review261/cutover/smoke262/{delivery.json,verification.json,live-verification.json,collection.json,human-page-acceptance.json,post-page-current-launch-public.json,baseline.json}；cutover/state.json标completed_and_human_accepted。原26开发件/副本、10根辅助代码及c129a63最终2源码冻结保持，私有Key/原生登录不入Git。
 
 ## 259补录及260宿主配置已发布，当前执行一角色真实验证
 
@@ -35,11 +33,11 @@ Updated: 2026-10-17 13:53最新：用户明确允许两个K2.8共用runner改man
 
 ## 下一步与人工门禁
 
-1. 用户通知262完成后，先talk_get_delivery核任务号/完整结构化结论与固定标记，再核真实claimed instance为本轮ins_b20c4078c97b、原模型执行/回传证据，确认后收取；失败则Codex直接修正，不转回DeepSeek。当前不主动等待或轮询结果。
-2. 262通过后交用户验收：打开http://127.0.0.1:8000，用既有人类账号/Key进入项目→角色，选旧Kimi Code · K2.8 Preview 执行，核启动成功/ready，关闭待“未启动（已关闭）”，刷新不自启，再启动并核新实例；不要顺带启动新页面K2.8或其它角色。当前宿主和API已启动，无需手动重新执行服务命令。人类验收通过后再排其余角色；DeepSeek及协调CLI最后。
-3. 255创建自动首次启动等页面另按[指南](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)验创建/入队/实际ready及关闭后刷新不重启；完整异常日志/删除及主动链路另片，不在本轮扩改。
+1. 本轮旧K2.8人工验收通过并完成收尾，暂停，不顺带启动其它角色。下轮继续其余四角色的逐角色预检和保ID迁移，逐项核公开绑定/本人Key/隔离登录/真实能力、正常退旧入口后再切换；DeepSeek和协调CLI最后，Desktop/MCP不凭PID接管。
+2. 下一个角色仍须正常启动→关闭→再启动→最小接单/回传及必要人类页面验收，沿用原Key/模型/历史，不通过重建替代；本次共享标记允许不扩为本轮其它角色已获启动授权。当前原manager仅服务旧K2.8，不能直接让第二宿主认领其已有owner。
+3. 255其它页面按[指南](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)另验；完整异常日志/删除及主动链路另片，不与迁移功能反复切换。
 
-已实际完成专属登录、原生模型探针、API正常重载、保ID补录、明确授权后的共享控制标记和旧角色真实受管启停；最小TALK任务已派未核结果。仅2产品源码/6协调docs本轮收尾，未改数据库协议、模型绑定、原Key或其它角色。无需再次登录/批准已完成的共享标记变更，不能把先前失败页/旧验证码继续当当前待办。
+旧K2.8试迁移已完成：原生独立登录/探针、保ID补录、共享控制登记、真实启停/262接单、人类页面三步均通过。本轮仅6协调docs变更，沿用既有161回归，无新代码/角色启停/其它角色迁移或Browser操作；页面启停由用户实际完成并由服务端回执佐证。
 
 ## 已确认待实施与保留事实
 
