@@ -1,21 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-17 09:20 (Asia/Shanghai)：用户要求保险起见先移一个，261已交DeepSeek仅旧K2.8真实只读预检/可审执行包，交付暂停后Codex复核并实际切换。260已发布42738d9；尚未真实迁移任何角色。
+Updated: 2026-10-17 09:47 (Asia/Shanghai)：261准备成果已复核/直接补正并收取，最终21项通过；旧K2.8仍未实际迁移，待原终端正常退出与本角色专属登录。260已发布42738d9。
 
 ## 当前身份与分工
 
 - TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead。页面development_requirements仍为旧Kimi前端/交叉复核文字，未自动修改。
 - 用户2026-10-17最新分工优先：Codex派发→DeepSeek首次实现/自测交付后暂停→Codex独立复核首次实现→发现问题由Codex直接修正、验证及docs/Git收尾；不往返派修/默认追加外部回审。自修部分的验证为Codex自检，不称他人独立复核。
-- 默认派后结束、用户通知后取件；共享目录一次一方改码。用户在260收尾后明确授权先试一个；本轮261先准备候选执行包，默认派后结束、通知完成再取件，不操作Browser。
+- 默认派后结束、用户通知后取件；共享目录一次一方改码。用户在260收尾后明确授权先试一个；261准备片已按通知收取并补正，根不操作Browser验证；原生CLI曾自行打开设备登录页，后续用户完成认证。
 
-## 当前261：仅旧K2.8单角色试迁移，预检/执行包准备中
+## 当前261：准备已收取，旧入口退出与独立登录待用户操作
 
-- 用户最新要求“保险点先移一个看看”，本轮仅候选agent:kimi-code-k28-preview，不迁其它四角色或自动换候选，不把新页面Kimi k2.8混为同一身份。该候选已有精确模型绑定/choice，原本人Key路径metadata存在；Kimi默认Key缺失、DeepSeek及协调入口保留到最后。
-- 新鲜公开只读盘点仍只有Kimi runner unverified/unknown、service_state/launches空；旧实例最后报idle/task空是2026-10-16陈旧上报，不能证明当前空闲/退出/可控。host enabled=1不证明常驻manager运行。根默认权限列TALK-private顶层遇WinError5，仅metadata探测失败，未读凭据，不称自动审批拒绝。
-- 261仅在.tmp/legacy-role-page-control/pilot-one/developer/做首次真实只读预检、实际CLI帮助/版本核对、原入口/原生隔离登录核验及默认dry-run可回滚执行包；如需辅助代码必须保原HostManager守卫并隔离测试。禁止未审先apply/登记/能力提升/启停/模型调用或改产品源码。只读GET认证确需原Key时可窄读内存使用并如实记录，不输出/哈希/复制Key，不读DB秘密列、不自动复制原生认证目录。
-- 当前serve按项目领取，--members仅start-all；执行包须解决只候选claim/长期持有同一Popen/正常关闭，不能顺带启动新K2.8或其它角色，不能以--once结束manager后凭PID接管。共享runner影响须明确，真实能力未验不能盲升managed/verified；身份、绑定、历史与隔离HOME保持。
-- Codex复核执行包后按同一用户授权实际切换：核旧入口空闲并正常退出→保ID legacy-attach→实证能力后最小登记→21600启动/精确owner及launch ready→关闭/再启动/最小接单回传→用户页面验收。若缺原生登录或退出事实，给具体角色/字段/核实步骤，不要求重建/重签或凭陈旧PID结束进程。
-- 261 Hall group:task-cbf35f4ba1144e16b4e60f20881b42ef，UTC2026-10-17T01:20:33.703048初始queued/assigned，尚未轮询。基线42738d9/864跟踪SHA，根只维护5协调docs；公开事实、完整任务/初始回执及保护清单见pilot-one/coordination/。usage-gate实际continue但两用量百分比null，不当0。默认用户通知“261好了”后取件。
+- 用户要求只先试一个，候选固定agent:kimi-code-k28-preview，保原ID/Key/模型绑定/身份档/历史；新页面Kimi k2.8是另一身份，其它四角色不迁移。DeepSeek与协调CLI最后、Desktop/MCP不接管。
+- 原261/msg2804是自由文本，MCP仍unknown/unstructured；根按稳定SHA保存完整1776字符，读取本地delivery-261.json并用summary --expect-task-id 261校验为合法partial，不追改原消息或冒称服务器结构化结论。
+- DS已交付暂停/上报idle；根冻结26开发件及副本。独立实读发现两类P2：生产DB整文件hash额外广泛读取且忽略WAL，不能凭主文件hash不变证明无写；helper.filtered_out无界累积、custom dry-run误报21600、缺明确安全退出路径，原stop夹具member#stop也未覆盖精确目标。默认目录缺失不能证明“历史从未受管”，原自报保留并纠正该推断。
+- 根只在independent-review261/corrected/改两个辅助入口，原developer/字节保留：DB只metadata且proves_no_writes=false；宿主固定本项目/成员及Kimi内置配方、诊断去重限100、明确KIMI_CODE_HOME隔离并拒绝覆盖HOME；私有drain保留同一manager/原_handles，只接stop，handles空才退出。产品源码不改，不派DeepSeek往返返修。
+- 3项新增反例在原实现3失败/0错误；最终21项（原11+根10）全过，0失败/错误/跳过，含精确目标stop在unknown分类仍保留、其它四角色/跨项目不领取、主函数apply假件/私有health、中断后stop请求失败仍持有原manager/handles及显式WAL反例。仅隔离假件，不作真实原生/宿主启停证明。
+- 根经本机已批准只读查询取得CLI 2.0.2及实际help/login-help；旧PID8528确有kimi_k28_executor.py launch，创建时间UTC2026-10-16T13:49:05.7833870Z与原实例相符，复查仍活着。不按PID终止或接管；已异步请求用户到其原终端Ctrl+C正常退出，尚未收到完成确认。候选无待办/在途、service_state/launches空，陈旧idle不作空闲/退出证明。
+- 已用产品OwnershipStore为候选建立默认私有state/native目录，并以隔离HOME等及显式KIMI_CODE_HOME运行doctor；原公开模型provider=managed:kimi-code/model=kimi-for-coding匹配。原生配置只内存解析、证据只选公开维度/字段名，不复制/哈希认证目录；doctor exit0不代表登录/alias就绪，候选专属config仍不存在。
+- 发起过一次候选隔离设备登录，240秒等待超时/exit124，没有生成专属config。旧验证码先不用；native-login.py下次可按服务公布的1800秒窗口等待，但未重发/未保留活动登录进程。待用户就绪后重新发起登录，再核alias/原生最小probe。两项异步问题已发，当前需用户原入口退出及完成专属认证，不重复索取迁移批准。
+- Hall2805初审/2807追加最终21项；UTC2026-10-17T01:44:28.130170收取261为succeeded/completed，仅准备片收取，真实迁移目标未完成。原MCP自由文本/本地partial、3失败和原开发件保留；根修正后为自检，不称外部独立复核。
+- 证据pilot-one/independent-review261/{review.json,original-negative.log,final-tests.json,current-public-facts.json,native-readiness.json,native-login-status.json,collection.json,publication.json}，执行须使用corrected/入口，禁止继续用原DB哈希采集器。实际只增加候选本机隔离目录/登录初始化；没有生产API/DB写、legacy-attach、能力提升、角色spawn/旧入口关闭或模型调用，不宣称零本机副作用。
 
 ## 当前：259补录及260宿主配置代码完成，实际迁移待执行
 
@@ -32,11 +36,11 @@ Updated: 2026-10-17 09:20 (Asia/Shanghai)：用户要求保险起见先移一个
 
 ## 下一步与人工门禁
 
-1. 在原授权内核实5角色的原本人Key来源、实际公开runner/model与宿主运行事实，准备真实逐角色平移。目标Key根缺文件不等于需重建身份/轮换Key；不猜模型，不把旧PID/陈旧心跳或host配置enabled当可控/空闲证明。
+1. 本轮先完成旧K2.8试迁移：确认原终端Ctrl+C退出/OS与实例事实，再重新发起本角色原生隔离登录、核既有alias和最小native probe；实际能力具备后才保ID补录/必要能力登记和单角色受管启停。其它四角色待这一个验收后再排。目标Key根缺文件不等于需重建身份/轮换Key；不猜模型，不把旧PID/陈旧心跳或host配置enabled当可控/空闲证明。
 2. 真实能力通过后正常退旧入口，保原ID补录，再逐角色验启动→关闭→再启动→最小接单/回传。DeepSeek自身及协调CLI最后切换；当前Codex Desktop/MCP不按未知PID强行接管，不放开unknown/unverified、归属或stop所有权守卫。
 3. 255前后端代码已发布，但人工页面/真实原生仍待。加载019bb99前端及98beb9c后端后Ctrl+F5，在项目→角色按[验收指南](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)验创建自动首次启动、配置/入队/实际ready区分、关闭后刷新不再启动。使用既有人类账号/Key，具体启动方式/入口/限制见指南。
 
-本轮没有真实补录/迁移、生产API/DB/config写入、真实Key正文读取、能力升级、服务启停或模型调用；参数和隔离进程测试不证明真实六小时长任务、原生登录/模型或终端T-W通过。260宿主代码已收尾；当前只准备261单角色切换包，不同时扩完整日志/删除/通用预算。
+当前仍未执行legacy-attach、能力升级、生产API/DB写或角色启停/模型调用；候选私有目录初始化与必要内存认证读已分别记录，不把整个准备过程称为零写/零读。参数和隔离进程测试不证明真实六小时长任务、原生登录/模型或终端T-W通过。260宿主代码已收尾；当前261准备包已收取，实际切换待原入口正常退出和专属登录，不同时扩完整日志/删除/通用预算。
 
 ## 已确认待实施与保留事实
 

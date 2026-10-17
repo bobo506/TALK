@@ -15,9 +15,11 @@
 
 ## 当前实现
 
-### 单角色试迁移：261旧K2.8预检与可审执行包（2026-10-17）
+### 单角色试迁移：261准备收取，实际切换待原入口退出/独立登录（2026-10-17）
 
-用户要求先移一个，候选固定agent:kimi-code-k28-preview，沿用ID/Key/模型绑定/历史。261 DeepSeek只首次真实只读预检/实际帮助核对与默认dry-run执行包，完成暂停；Codex检查后依已有授权切换，产品源码和生产状态先不改。陈旧idle/PID不能证明退出；原Key窄读仅GET身份认证必要且不输出/哈希，原生认证目录不自动复制，unknown/unverified保持到真实能力实证。serve为项目级领取、--members仅start-all，单成员窄辅助入口如必要须独立验证其它角色动作不被claim、同一manager长期持有Popen、退出不遗失owner；不消费其它角色worker/启动意图，不停DeepSeek或Desktop/MCP。共享runner能力变化影响明确，不能盲升或改绑定绕过。完整包/基线与公开事实在pilot-one/coordination/，默认通知261好了后取件；实际迁移尚未执行，日志/删除/通用预算不扩片。
+261原msg2804自由文本unknown保留，本地partial校验通过。Codex独立复核后在pilot-one/independent-review261/corrected/直接修正：移除整DB hash/零写证明，辅助宿主固定候选/项目、诊断去重限100、显式隔离KIMI_CODE_HOME、私有drain保持原manager/handles并在全部释放后退出。原3反例失败，最终21项（原11+根10）全过，含真实目标stop/跨项目/其它四角色零领取、主函数假件、中断后stop失败仍保句柄及WAL反例；修正为根自检，原26开发件不改。Hall2805/2807后已收取，仅准备完成。
+
+根已核CLI2.0.2与真实help，旧K2.8 launcher仍活且无正常退出证明，已请求原终端Ctrl+C。只为该成员创建私有native-home并运行doctor，明确HOME/KIMI_CODE_HOME隔离，不复制认证目录；独立设备登录等待超时，config/alias仍未就绪。实际补录、能力登记、受管spawn及接单未做；用户完成退出/重新登录后再核原生probe，依原授权继续单角色迁移。旧state目录缺失不证明从未受管；主DB hash不变不能证明WAL无写，旧原件保留但不再作为保证。
 
 ### 受管宿主多运行器模板与执行预算：260已验收收取（2026-10-17）
 

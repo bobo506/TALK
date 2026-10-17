@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 09:47（Asia/Shanghai）— 261准备成果收取并由Codex补正；旧入口退出/独立登录待用户操作
+
+- 用户通知好了后根读取261/msg2804完整1776字符并保SHA444ce67d…；MCP自由文本unknown保持，本地delivery-261.json经summary --expect-task-id261为合法partial，不凭runner succeeded或文件路径宣称业务完成。实核caller agent:codex/lead/项目及旧development_requirements；按最新DS首次执行/Codex复核直接修正分工，DS已报idle并暂停。
+- 冻结26开发件及原件副本；原DS必要Key认证读证明human:bobo/精确旧K2.8，未重签。独立实读发现P2：整生产DB正文hash额外广泛读取、主文件hash相同忽略WAL不能证明无写；默认目录缺失也不能证明从未受管。helper.filtered_out无界、custom计划误报内置21600、没有明确安全退出通道，原stop夹具member#stop未覆盖精确目标。
+- 根仅在independent-review261/corrected/修两辅助入口，原developer/保持：DB只metadata/proves_no_writes=false；宿主固定候选及项目/Kimi内置配方，诊断去重限100；明确KIMI_CODE_HOME，拒绝覆盖角色HOME；私有drain保持原manager/handles，只接stop，全部释放才退出。3新增断言在原实现3失败/0错误；最终21项（原11+根10）0失败/错误/跳过，覆盖WAL主文件不变而已提交插入、真实目标stop/其它角色与跨项目、apply主函数假件/私有health、中断后stop请求失败仍保原句柄。最终属Codex自检，不追加DS返修/回审。
+- 根使用本机允许的escalated只读调用取得Kimi2.0.2及help/login-help；CIM核PID8528创建UTC2026-10-16T13:49:05.7833870Z、kimi_k28_executor.py launch仍活，与原固定角色入口相符，不输出原始argv/凭据，不强停/接管。权限审批通过，不把DS宿主没有审批能力的旧限制视为本机永久阻塞或自动审批拒绝。新公共只读采集候选无在途、service_state/launches空，但陈旧idle仍不作退出证明。
+- 产品OwnershipStore为候选建立私有state/native-home，HOME等隔离并显式KIMI_CODE_HOME；仅原生doctor（exit0）/帮助，不调用模型/TALK写。原native配置在内存解析仅落盘公开模型维度/字段名，provider managed:kimi-code/model kimi-for-coding一致，不复制/哈希/输出认证内容；当前专属config/alias未就绪，doctor0不能代替登录。
+- 曾发起候选专属设备登录，初次240秒等待超时/exit124，config仍不存在；原验证码不继续使用，后续helper等待窗口调整为实际CLI公布1800秒，但未重发/未留活动登录进程。已异步请求原终端Ctrl+C和专属登录确认，未收到用户完成确认；root复查旧launcher仍活，因此本轮不实际补录、提升能力或spawn，等待外部操作后继续同一迁移授权，不再批准往返。
+- Hall2805裁决准备经补正可接受，2807补充最终21；UTC2026-10-17T01:44:28.130170收取261 succeeded/completed，只表示准备片成果收取，原msg2804 unknown/本地partial不改，实际单角色迁移目标未完成。没有生产API/DB/Key/绑定/原登录变更或旧入口关闭/真实角色启动/模型调用；候选本机新目录和登录初始化为已发生副作用，不称全机零写。
+- 仅5正式协调docs本轮更新与提交推送，859保护跟踪文件及原26开发件/副本保持；没有产品源码改动、Browser验证、新派任务或其它角色迁移。完整根审查/失败/21项验证/本机native准备/current-public-facts/collection/publication见pilot-one/independent-review261/；后续使用corrected/入口，不复跑旧全DB哈希采集器。未读取新精确额度，不臆测比例。
+
 ## 2026-10-17 09:20（Asia/Shanghai）— 用户收窄为先迁一个，261旧K2.8真实预检/可审执行包已派
 
 - 用户在260发布42738d9后授权“可以，保险点先移一个看看”。本轮候选固定agent:kimi-code-k28-preview：既有精确Kimi绑定/choice及已知原Key metadata存在；不自动换候选或迁其它四角色，不重建/轮换Key/改模型与历史。
