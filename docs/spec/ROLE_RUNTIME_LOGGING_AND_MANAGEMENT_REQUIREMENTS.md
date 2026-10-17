@@ -2,7 +2,7 @@
 
 确认日期：2026-10-16（Asia/Shanghai）。来源：项目管理者在254重启接单问题后的明确要求：完整异常日志是必要留存信息；旧角色后续也应统一成为受管服务。
 
-状态：**两个K2.8迁移/264人验保持；265群内无效人类动作补正已复核收取，最终140项通过，新Kimi原manager正常重启至generation7 ready/idle。** 原Key/绑定/历史及旧K28保持，未真实模型重触发；下一位agent:kimi准备，DeepSeek/Codex最后，完整异常日志仍待。
+状态：**两K2.8迁移/人验及265补正保持；266已派准备原agent:kimi保ID迁移。** 当前binding未配，先核原模型/命令/可信Key/登记与精确runner-choice，不猜或重建；本片无生产切换，DeepSeek/Codex最后，完整异常日志仍待。
 
 ## 1. 完整异常日志必须持久留存
 
@@ -152,3 +152,9 @@ legacy-attach已201/reused=false，旧ID/原Key身份及文件mtime/绑定及时
 265证实模型输出了群里不存在的human:user动作，服务器400正确，单条handler异常不等同队列/进程死亡。bridge新增escalate/final同Group成员预检：明确非成员不发送，向原请求者中文说明未通知/未发送，不换人或广播，不伪造送达。独立完整129通过，中文补正后最终140（含受管停止/服务器守卫）通过，隔离记录回放及同客户端下一条正常；原报告/沙箱失败/候选保留，未改通用leading mention或无Group语义。
 
 按既有授权由同原manager正常关闭新Kimi至generation6/无owner/原句柄空，再启动generation7新instance ready/idle/无错误，原Key/绑定/历史及旧K28保持，265已收取。没有SQL改状态/PID接管/强停/新模型重现，264及人工迁移验收历史不追改。可见拒绝通知只是本次错误反馈，不能当完整跨重启异常日志实现；完整日志/六小时/T-W仍待，下一位agent:kimi准备保ID迁移。最新状态以本节/PROGRESS为准。
+
+## 24. 原agent:kimi先盘点原事实与可审入口（2026-10-17）
+
+用户允许继续，266交DeepSeek首次做原agent:kimi只读盘点/迁移准备。当前unconfigured与旧runtime/心跳不能代替原模型/命令/Key来源或当前进程事实；须追溯可信原引用/本人GET身份、角色登记映射及精确runner-choice，缺失如实列，不从DB取Key/重签/抄K2.8或代码默认，不重建角色。
+
+仅专属.tmp中生成保ID计划、复用HostManager的固定单成员dry-run入口及隔离验证，claim前精确过滤、保原manager/Popen/正常drain及未来本人原生隔离。禁止生产写/补录/绑定能力/Key变更、native初始化/登录/模型或服务启停/接管，已有两K2.8保持；交付暂停后Codex核验直接修正，按既有迁移许可解决必要登录/缺口并逐项验收。总体许可不重复请，真实配置/模型/服务能力不因准备而算通过，DeepSeek及Codex最后，完整日志/T-W仍另片。

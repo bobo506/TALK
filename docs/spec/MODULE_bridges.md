@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 266原agent:kimi保ID迁移准备已派（2026-10-17）
+
+265已发布6481dce后用户继续，下一位固定agent:kimi，当前binding unconfigured，历史kimi-code/旧PID不证明原模型或当前进程。266交DeepSeek只读追溯原受控模型/alias/CLI/目录/任务档和本人可信Key、登记映射与精确runner-choice，准备default-dry-run单成员HostManager入口及隔离假件/正常退出计划。关键事实缺失交缺口，不用K2.8配置/代码默认或新Key替代；只有确缺ProjectRole才准备legacy-attach，已有managed不重复。只新增kimi-next/developer/，禁止产品/配置/生产写、native/login/模型或启停/接管；两K2.8/API保持，DeepSeek/Codex最后。交付暂停后Codex独立核并直接修正，默认用户通知266完成取件。总体迁移许可已有，真实操作仍逐前置验证；原人验/265失败原件保持，完整日志/T-W另片。
+
 ### 265已收取：群内人类动作成员预检与正常恢复（2026-10-17）
 
 execute_talk_actions复用同群成员查询，向人类escalate/final的目标明确不在Group时不发送，并以中文向原请求者说明未通知/未发送；不换人/广播/假报成功，合法成员和服务端严格提及守卫保持。原message2816由模型human:user占位触发400，SDK单条异常隔离后循环仍继续；不能将error状态等同进程死。Codex独立完整129通过，提示补正后最终CLI/Kimi/受管停止/服务器守卫140通过，独立记录回放及同客户端下一条消息均正常。无Group/成员查询不可用及普通正文无效前缀仍由服务器严格拒绝，未改通用路由/prompt。

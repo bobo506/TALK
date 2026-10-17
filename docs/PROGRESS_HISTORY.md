@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-17 20:40（Asia/Shanghai）— 266原agent:kimi保ID迁移准备已派
+
+- 用户在6481dce/265修正收尾后明确可以继续。实际HEAD6481dce51f076aa13a462e175a515c7e78d3c689且开工跟踪树干净，MCP caller agent:codex/kind agent、业务lead；最新development_requirements仍旧页面分工，原快照保留，按用户2026-10-17 DeepSeek首次实施/Codex复核直接修正，不追加往返回审。
+- 下一位固定agent:kimi，binding null/unconfigured、业务reviewer；最新旧实例runtime kimi-code、idle/current_task null、last_seen_at 2026-10-08/PID17600不当当前在线、原模型/命令或所有权证明。原模型/Key/入口仍待事实盘点，不猜默认K3/K2.8、不从DB提Key或重建身份，DeepSeek/Codex最后，另两K2.8本轮不启停。
+- usage-gate UTC12:37:08.213210确实continue，session/weekly百分比null；865跟踪SHA、5协调docs边界/无产品实现白名单、caller/项目要求冻结于kimi-next/coordination/。先前同目录usage-gate.json是265前改向遗留事实，本轮新证据usage-gate-current.json保留，不覆盖旧记录。
+- 最小4参实际派266给agent:deepseek，UTC12:39:18.806041，Hall group:task-e568008fc3bd4b96a3d3346d4ea97fca，queued/assigned仅创建快照。只新增developer/里的原受控模型/命令/可信Key及角色映射/runner-choice只读盘点、可审单成员dry-run入口与必要隔离假件、正常退出/回滚计划；关键事实缺失交partial，不以占位值启服务。用户总体迁移许可已有，计划不得强加重复总体确认，但真实必要登录/重大方向问题如实列待处理。
+- 保精确project/member过滤于claim前、本人显示/任务档/目录和同manager/Popen/drain，未来隔离HOME/KIMI_CODE_HOME不复制认证。只有确缺登记时才备legacy-attach，已有managed不得重复；禁止生产写/绑定或能力/Key变更/补录/native初始化/login/doctor/模型/服务启停/接管/强停/状态修复/新任务回评，不改产品/正式docs/原配置或旧辅助原件，CIM/目录权限限制须分开报告不能猜。
+- 本轮仅5协调docs记录派发及下一步，开发期间不审diff/并行写源，不操作Browser或主动等任务；完整派包/回执/状态/验证与发布在coordination/。默认用户通知266完成后Codex冻结、独立复核并直接修正，再按真实缺口走原入口正常退出/本人独立登录原模型探针/保ID登记绑定/受管启停/最小接单/人工页面验收。准备不等于该角色真实能力通过，完整日志/删除/T-W仍另片。
+
 ## 2026-10-17 17:17（Asia/Shanghai）— 265独立复核及中文提示补正通过，原manager正常重启加载修正
 
 - 用户通知好了后合读265/msg2819完整合法partial（11完成/5未完/1阻塞/15验证），与本地delivery JSON逐字段一致，自身号校验通过；实测caller agent:codex，DeepSeek已idle/current_task=null并暂停。冻结25开发件与2候选源码，独立核实际diff、真实消息处理/成员查询/SDK异常隔离路径及复现原件，不只凭开发结论。原MCP全量JSON嵌shell超Windows命令长限的协调工具失败未启动进程，改直接文件工具存JSON，未改变生产或原报告。
