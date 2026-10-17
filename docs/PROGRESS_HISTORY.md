@@ -1,5 +1,26 @@
 # 开发历史 · TALK
 
+## 2026-10-17 22:11（Asia/Shanghai）— 原Kimi独立K3与保ID补录/受管启停通过，267待通知
+
+- 用户完成设备授权后根先续原exec73838，实际exit0/Logged in to managed:kimi-code，自己的native配置存在。配置默认为kimi-for-coding（K2.8）但同时有K3，根始终显式kimi-code/k3；未复制全局/其它角色原生认证。独立无工具/技能/子代理固定文本探针4.579秒exit0、精确TALK_ORIGINAL_KIMI_K3_NATIVE_PROBE_OK_20261017，无TALK写或角色服务；不将alias调用当固定后端版本证明。
+- 根准备固定单角色默认dry-run补录计划，产品schema/六维与原Key GET通过。首次普通sandbox读私有operator被拒，已按只读授权提升解决，不是自动审批拒绝或未决权限问题。正式apply仅把USER.md第17行已验证的同一TALK Key存本人私有宿主文件，无重签/轮换/原源改写，不复制原生认证/其它Key；产品API新增精确K3选项rmc_80be012402f1，原两K2.8 choice及共享runner全部字段保持。
+- 首次legacy-attach HTTP422：根生成的连续40+字符operation_key触发现有凭据形态保护，角色/补录审计/服务均0行，Key宿主文件及K3 choice已生成。原计划/请求/注册前投影/choice/失败冻结在registration-first-attempt/；不回滚删现有choice或改产品校验，改用先经normalize_operation_key验证的legacy-kimi-k3-20261017后复用choice，API实际补录成功。结果origin imported/identity_exclusive false、原名称、六维K3绑定及可信legacy_attach来源正确；原成员/名册/历史、其它角色/服务保持，无直接SQL写/CREATE/Key轮换。
+- UTC14:05启动前CIM再核无精确原agent:kimi bridge，只作进程事实而不接管/强停。Hidden启动corrected专属入口：launcher17052、原manager17672/started_at UTC14:05:55.219704，只固定本人claim。同API启动generation1/launch3e62bcf6-cd30-44ba-87a3-1c0350c5b750/ins_94b0978daa9f/9740实际running/success；实际CIM白名单核父17672、精确本人/K3/tools/21600/--key-file且无inline --key。初次协调生命周期探针错用页面last_result=ready（实际success）而假超时，firststart-timeout原件保持，仅只读按正确字段核同一generation，无重复启动或产品修正。
+- 页面同源stop API正常转generation2，observed stopped/ownership false/current实例空、原9740退出，原manager句柄空且started_at不变；再次只读重载仍stopped（未做Browser）。再start generation3/launch65184d95-1ba7-44b7-8c18-6f6f6e1feaa2/ins_b1c260cb0571/924 ready、原manager持新句柄。每步核原Key身份/mtime、全部角色/绑定、候选任务聚合和两K2.8服务投影不变，无API重启/PID强停/手工改状态；真实页面人工验收仍独立待做。
+- 派发前重读caller agent:codex及最新项目development_requirements，agent:kimi当前bound/idle实例ins_b1c260cb0571、K3快照。最小4参实际派267，UTC14:10:48.528424，Hall group:task-397c6d6e94dd467a90a3d88528b823a6，queued/assigned仅创建快照；只要求合法自身号JSON与TALK_ORIGINAL_KIMI_K3_MANAGED_ACK_20261017，不准工具/文件/额外Hall通知。默认派后结束、用户通知267完成再核/收取，未主动等/轮询或宣称接单已通过。
+- 266原2820 partial/41件、根P1反例/18自检与收取保持，原开发准备和真实协调执行分开。全证据及smoke267/在kimi-next/independent-review266/，更新coordination/state。私有管理目录kimi-next/prj_e8fe7066bbec/agent_kimi/的drain.request只供同manager正常退出，不从PID/磁盘记录接管；两K2.8的pilot管理目录不混用。当前进度6协调docs收尾，产品源码未改；等待267核验及用户页面人验后再下一角色，DeepSeek/Codex最后。
+
+## 2026-10-17 21:58（Asia/Shanghai）— 266准备独立核验补正收取，原Kimi独立登录待授权
+
+- 用户通知266完成后取完整MCP摘要/任务及caller/项目要求，原msg2820合法partial（19完成/10未完/8阻塞/41文件），与本地JSON一致；DeepSeek idle/current_task=null已暂停。冻结41开发原件，独立检查实际623行入口/采集/API及计划、证据与测试，原13项通过。页面旧分工如实保存，按当前临时DeepSeek首次执行/Codex复核直接修正，不追加往返回审。
+- 根复现P1：持原Popen时KeyboardInterrupt分支写drain.request若OSError会退出管理器。原反例1 error留存；只在corrected副本保内存drain_requested、捕获标记写入失败并续原manager/正常关闭，不按PID接管/强停。测试固定parents层数在冻结后误认.tmp为根、缺Key断言依赖真实私有文件缺失也已修正。新增产品真实serve→claim边界假件核两K2.8 start/stop均排除、异项目零查询、磁盘标记失败仍排除启动；最终14+4共18项全过0失败/错误/跳过，不与独立原13累计，自修属Codex自检。
+- 开发者未知原模型/Key的partial合理保持。用户随后明确原角色K3，提供D:/claude-test/USER；目录实际不存在，定位到同目录USER.md，第17行是原--name kimi启动命令。只从该角色命令内存取原Key做GET /api/members/me，200精确agent:kimi/kind agent；未输出/复制/哈希原文件或Key，不读DB秘密列。首轮把--project误当ID而断言失败，原命令实际使用项目路径，该次在GET前退出；证据如实记录后按原路径核验。
+- 原命令明确tools档、D:/claude-test/TALK项目/工作目录、手动timeout3600，无显式模型flag；K3由用户确认，不能把全局默认或业务reviewer当模型/任务档证据。corrected入口按真实源保tools，受管预算沿已批准21600，保原显示名/身份/历史与原manager/Popen。旧开发者默认review及缺口原件不追改，根review及源核验记录新事实。
+- 根只读CIM权限核验成功：UTC13:49旧17600不在、无精确原agent:kimi bridge，仅原两K2.8进程18124/15220。明确一时观察、启动前重核，无PID控制。独立SQL mode=ro/query_only核无ProjectRole/binding/creation/attach/service；目标86任务queued0/running0，两个K2.8 generation10/7保持。865基线差异限5fb2f55/386258a的6协调docs，41开发件SHA未变，无整DB哈希或秘密列。
+- UTC13:56:01.564010实际收取266 succeeded/completed，result仍2820/partial；无额外Hall回评，避免激活旧bridge普通回复。原首次失败/交付/冻结、根18测试、review/collection和源核验/CIM在kimi-next/independent-review266/，准备通过不代表真实原生/模型/服务验收。
+- 在用户既有总体迁移授权内，仅为原agent:kimi创建独立native HOME并显式KIMI_CODE_HOME、原region，正常发起官方设备login（exec73838）；无认证复制/其它角色启停/API重启/模型调用。实际待用户设备授权及CLI退出，码仅聊天/忽略本机状态，不写Git；未将网页回报当CLI成功，真实配置/精确K3探针/choice登记/Key宿主文件/legacy-attach/受管服务/最小接单/人验均尚未完成。
+- 本轮只6协调docs维护状态与排期首项；无产品源码改动。下一步先核原生登录真实结果→精确K3无工具探针→产品API精确choice及缺登记角色保ID补录→单角色启停/回传/人验；不重建或重签，不重复总体迁移许可，两K2.8保持，DeepSeek/Codex最后。文档/保护基线/开发原件检查随收尾执行，不操作Browser。
+
 ## 2026-10-17 21:42（Asia/Shanghai）— 后续排期调整，自动转审并入主被动，登记定时唤醒候选
 
 - 用户明确跨任务复用执行会话从原第8项移至第4，原第14项取消独立排期并入主被动，其余事项保持原相对顺序；路线图顶部已记录18项顺序，序号不是TALK任务号。保每任务独立交付/验收，不把同一UI窗口当真实原生会话续用；本轮只记方向，未派会话复用实现任务。

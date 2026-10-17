@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-17 21:42（Asia/Shanghai）。本轮仅调整后续排期：跨任务执行会话复用前移第4；原第14项自动转审取消独立排期并入主被动，其余保持相对顺序。定时唤醒发起者验收记为候选场景，未启定时器或取消主动模式。完整18项见[路线图](spec/DEVELOPMENT_ROADMAP.md)。266已提交待复核（此前排期盘点所见，本轮未复查/收取），原Kimi仍只准备阶段；265已发布6481dce，两K2.8验收事实保持。
+Updated: 2026-10-17 22:11（Asia/Shanghai）。266准备已独立核验补正收取，最终18隔离项通过、原2820 partial/41件保持。原Kimi独立登录/精确K3无工具探针通过，原Key/ID/名称/历史保持，产品API补录及同manager启动→正常关闭释放→重启通过。当前generation3/ins_b1c260cb0571/进程924，manager17672；267最小回传已派，默认用户通知后取件，真实页面人验仍待。两K2.8保持，DeepSeek/Codex最后；会话复用排第4等18项顺序不变。
 
 ## 当前身份与分工
 
@@ -8,20 +8,23 @@ Updated: 2026-10-17 21:42（Asia/Shanghai）。本轮仅调整后续排期：跨
 - 默认派后结束，用户通知后取件；共享目录一次一方改码，不由Codex操作Browser。页面旧开发分工保持快照，不能覆盖用户最新明确分工。
 - 用户本轮澄清上述DeepSeek首次执行/Codex复核直接修正只是当前临时流程；产品自动回收/核验按当次分工，不能永久绑定Codex自行修正。当前约定仍适用266，不因排期讨论改变已派包或启用唤回。
 
-## 当前266：原Kimi保ID迁移准备已派
+## 当前：原Kimi受管启停通过，267最小回传待通知
 
-- 固定project prj_e8fe7066bbec/member agent:kimi，MCP实际binding=null/unconfigured、业务reviewer；最新历史instance agent:kimi:46284496-a0b4-4fa1-ae05-09d4487669c7/runtime kimi-code、idle/current_task=null、last_seen_at 2026-10-08T11:04:07.482016/PID17600只是旧上报，不据它推断当前进程/模型/命令或可接管。
-- 原模型/alias/provider/本人Key来源/实际启动配置尚未核实；任务要求追溯原受控配置/原引用，只读精确本人Key内存GET身份，不读DB秘密列/其它Key或认证，不复制/重签。先核是否缺ProjectRole及精确runner/choice，不能因unconfigured重建身份/猜模型或照抄两个K2.8。未知处明确缺口，不把代码默认值当原运行事实。
-- 266实际派agent:deepseek，UTC12:39:18.806041，Hall group:task-e568008fc3bd4b96a3d3346d4ea97fca，queued/assigned为创建快照。只可新增.tmp/legacy-role-page-control/kimi-next/developer/里的只读盘点、固定单成员default-dry-run入口、计划/正常退出及隔离假件证据；任何产品源码/正式docs/原身份档/旧辅助入口/Git均禁改。
-- 入口须复用产品HostManager，claim前精确过滤agent:kimi，保自己的原显示名/工作目录/有据任务档、同原manager/Popen/drain及未来独立HOME/KIMI_CODE_HOME；不抄K28 tools或新Kimi review/认证。关键事实缺失可先交不执行方案，禁止占位值申请启动资格。只有旧名册确缺ProjectRole时才备legacy-attach保原ID，已有managed登记不重复补录/CREATE，所有后续动作先列准确前置。
-- 准备阶段禁生产API/SQL写、绑定/能力/Key变更/补录、native目录初始化/复制/login/doctor/模型、服务启停/接管/强停/手工修状态或新任务回评。只读进程元数据/参数白名单，旧PID/owner仅诊断，查不到/权限不足不能断言没进程/没登录。另两K2.8/API保持，DeepSeek/Codex最后。
-- 基线6481dce/865跟踪SHA和5协调docs白名单在kimi-next/coordination/；当前caller agent:codex/kind agent、业务lead，页面旧开发要求如实保存，按用户已确认DeepSeek首次执行/Codex复核直接修正。usage-gate UTC12:37:08.213210确实continue，session/weekly百分比null，不推测用量。默认派后结束，开发中不读候选diff/并行改码。
+- 固定project prj_e8fe7066bbec/member agent:kimi、业务reviewer，原显示名kimi-code CLI Bridge (agent:kimi)。用户明确原模型K3；公开native配置映射kimi-code/k3→managed:kimi-code/model k3。原全局配置默认本身不是证据，后端版本/能力仍须独立探针。
+- 用户提供D:/claude-test/USER，实际为同目录USER.md；第17行原kimi_bridge命令的原Key GET精确返回agent:kimi/kind agent。明确tools档、project/workdir D:/claude-test/TALK及旧timeout3600；受管按既有21600。原文件未改/复制/哈希，原Key无轮换/重签，仅从该源内存提取同一值存本人私有TALK-private/keys/agent_kimi.key，经GET核身份；未复制原生认证或其它Key。
+- 266/msg2820合法partial与本地JSON一致，DeepSeek已idle/current_task=null；41开发原件冻结。根独立实读实际入口/采集/证据及原13测试通过，复现drain.request写入OSError导致持原Popen的管理器退出，原失败保留。corrected副本保内存drain意图和原manager/Popen、修测试根定位/假件、按新获原命令保tools，最终18项通过（不与13累计）；这是Codex自修自检，无新增返修/回审。
+- UTC13:56:01.564010收取266 succeeded/completed，原2820/partial不追改，不额外Hall回评。865跟踪基线差异仅5fb2f55/386258a的6协调docs，41开发件字节保持；实际DB无ProjectRole/binding/creation/attach/service，原任务86/queued0/running0，未读秘密列/全历史或整DB哈希。
+- 独立CIM查询成功，UTC14:05启动前再次核无原agent:kimi bridge；无PID接管/强停。用户授权后login73838实际exit0/隔离配置存在，新登录默认K2.8但显式选kimi-code/k3；独立无工具/子代理探针4.579秒exit0、固定标记精确一致。native HOME/KIMI_CODE_HOME独立；只证明原生alias调用，不宣称固定后端版本/六小时/T-W。
+- 仅新增K3 choice rmc_80be012402f1（builtin/managed:kimi-code/native-kimi-code-managed-login/k3/kimi-code/k3），既有K2.8 choice/runner全部字段不变（managed_cli/unverified保持）；human-only legacy-attach实际成功，origin imported/identity_exclusive false/choice_source legacy_attach，原ID/名称/Key/名册/历史保持，无CREATE/SQL写。首轮操作标识触发40+连续字符凭据保护422，角色/审计/服务零残留已核；保原请求后以经同校验的legacy-kimi-k3-20261017复用choice完成，不改产品校验。
+- Hidden launcher17052/实际manager17672，started_at UTC14:05:55.219704，只服务agent:kimi。首次generation1/ins_94b0978daa9f/9740实际ready→generation2正常stopped/owner释放/句柄空/原进程退出→只读重载仍stopped→generation3/launch65184d95-1ba7-44b7-8c18-6f6f6e1feaa2/ins_b1c260cb0571/924 ready。原Key mtime、绑定/角色行/历史及另两K2.8服务保持，同一manager/Popen路径，无API重启。初次协调探针误把页面last_result success写成内部ready而超时，原件保留；仅只读补核同generation，无重复start。页面效果交人类，API重读不冒称Browser刷新验证。
+- 267实际派agent:kimi，UTC14:10:48.528424，Hall group:task-397c6d6e94dd467a90a3d88528b823a6，queued/assigned为创建快照，未轮询/收取。标记TALK_ORIGINAL_KIMI_K3_MANAGED_ACK_20261017；只直接合法自身号JSON回传，无工具/文件/普通Hall留言。caller/最新项目要求已保存；默认用户通知“267好了”后核领取实例/结果，随后仅本角色人工页面验收。
+- 全部原件、review/collection、源命令/CIM/18测试/corrected入口、原生/补录/失败/启停证据及smoke267/在.tmp/legacy-role-page-control/kimi-next/independent-review266/；旧开发计划只作原始自报，按根review/当前进度恢复。当前原Kimi宿主正常收工控制目录为私有kimi-next/prj_e8fe7066bbec/agent_kimi/，不是两K2.8的pilot路径。
 
 ## 下一步与保留门禁
 
-1. 用户通知266完成后取完整自身266交付、冻结原件和实际入口/盘点证据，确认DeepSeek暂停，再由Codex独立核/直接修正及必要验证；不追加返修/回审，不把准备当真实模型/Key/服务通过。
-2. 事实齐备后按既有总体迁移授权推进：原入口若活先原终端正常退→本候选独立原生登录/无工具原模型probe→必要保ID登记/精确绑定→只本人受管启动/关闭释放/再启动→最小接单及用户页面验收。总体许可已有，不重复请；真实账号授权/重大方向缺口按事实处理。
-3. 原模型或Key缺失不猜/重建替代；DeepSeek及Codex自身最后。完整日志/删除/主动等待及255其它页面另片，历史人验/265修正不重复。
+1. 用户通知267完成后获取完整自身号交付，独立核任务号/目标/领取者/本次实例/结果作者/Hall与固定标记后收取；不只凭runner succeeded，不额外普通Hall回评激活旧入口。不再续读已结束73838或重复登录/原生probe/首次启停。
+2. 再请用户仅原Kimi（agent:kimi）页面关闭等未启动→刷新确认不自启→启动ready；记录实际generation/原manager状态，与API自动验证分别留存。人验前不推进下一位真实迁移。
+3. DeepSeek及Codex自身最后，原模型/可信Key及专属原生/宿主事实仍先准备；完整日志/删除/主动等待等另片，会话复用排第4及自动转审并入主被动不变。总体迁移许可已有，不重复请。
 
 ## 已完成与恢复所需事实
 

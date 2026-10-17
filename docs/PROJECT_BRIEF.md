@@ -4,6 +4,10 @@
 
 ## 当前实施状态（2026-10-17）
 
+2026-10-17 22:11最新：原Kimi独立登录CLI exit0、精确K3无工具探针通过，原Key身份/命令tools档保持；产品API仅新增K3 choice并legacy-attach原agent:kimi，无重建/轮换。corrected专属manager17672完成generation1启动→generation2正常关闭释放→重读不自启→generation3/ins_b1c260cb0571/924 ready，两个K2.8保持。最小回传267已派、默认用户通知后核验，页面人验仍待；266原partial/41件及根18自检保持，首次操作标识422/协调状态断言假超时原件留存，详[进度](PROGRESS.md)。
+
+2026-10-17 21:58最新：266准备已独立核验、Codex直接补正并收取，原2820 partial/41件保持。根修drain标记写入失败丢管理器及验证夹具，最终18项通过；用户确认原Kimi为K3，USER.md原命令Key内存GET身份通过，明确tools档/目录/旧3600，受管保既有21600。当前只为原agent:kimi发起独立原生登录待授权/CLI成功；精确K3探针、choice/保ID补录、受管启停/回传/人验尚未执行，两K2.8保持，详[进度](PROGRESS.md)。
+
 2026-10-17 20:40最新：用户允许继续，266已派DeepSeek准备原agent:kimi保ID受管迁移，先核原模型/命令/可信Key与登记/精确runner-choice缺口，生成可审单成员入口；当前binding unconfigured，旧实例不作当前健康/原模型证明，不猜或重建。本片只读盘点/隔离准备，无生产写/登录/模型/服务切换；交付暂停后Codex复核直接修正。265已发布6481dce、两K2.8验收/现状保持，DeepSeek及Codex最后，默认用户通知266完成取件。详[进度](PROGRESS.md)及[历史](PROGRESS_HISTORY.md)。
 
 2026-10-17 14:07最新：旧K2.8单角色试迁移已正式验收通过。262固定回传由本轮受管实例完成并独立核验/收取；用户随后确认页面“关闭→刷新不自启→再启动ready”三步均通过，服务端generation7 stopped/generation8 ready吻合，原manager继续持有新进程。原ID/Key/模型绑定/既有历史保持，其余四角色未迁移/启停。c129a63停止修正/161回归沿用，本轮仅文档收尾，不开新角色迁移。 详[进度](PROGRESS.md)。
