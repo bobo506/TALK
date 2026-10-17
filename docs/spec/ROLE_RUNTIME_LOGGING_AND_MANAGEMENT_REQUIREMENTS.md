@@ -2,7 +2,7 @@
 
 确认日期：2026-10-16（Asia/Shanghai）。来源：项目管理者在254重启接单问题后的明确要求：完整异常日志是必要留存信息；旧角色后续也应统一成为受管服务。
 
-状态：**三个Kimi角色迁移/人工验收已通过；DeepSeek自身迁移现由Codex直接准备与操作。** 首轮只读核原TALK Key/命令/headless/max，实际旧8876已不在、无精确替代，根无启停；无ProjectRole/binding/dsh runner/service，原模型待用户确认。现有产品模板可用模型覆盖patch路径接入显式alias（纯parser已核），独立DSH_HOME/原凭据引用尚未落地或原生验证，未改生产。原Kimi267/人验、全部原件及角色服务保持，Codex CLI最后，完整异常日志仍待。
+状态：**三个Kimi已人验；原DeepSeek已完成保身份补录、独立原生及受管启停，268最小回传已派待核，再页面人验。** 用户确认deepseek-flash/max；原ID/名称/Key/名册/历史保持，原用户级provider源只内存注入独立DSH环境。runner:dsh-deepseek-local/choice rmc_3a5435e0e283、当前gen3/ins_1251105edd64/18216归原manager12536；10项Codex自检、正常关闭释放/不自启/重启通过，其它角色保持。无产品源码/完整日志实现或主动等待适配结论，Codex CLI最后。
 
 ## 1. 完整异常日志必须持久留存
 

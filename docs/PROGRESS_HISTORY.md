@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-17 23:06（Asia/Shanghai）— Codex直接迁移原DeepSeek：原模型/凭据源核实，独立原生与受管生命周期通过，268已派
+
+- 用户明确“是，保留deepseek-flash / max”，根按本角色直接操作授权推进，最新caller agent:codex/lead及旧页面development_requirements实读留档。原USER.md第12行TALK Key GET本人、原名称/ID/名册/历史、headless/argv/bridge-label/目录保持；同一Key落本人私有keys/agent_deepseek.key，未轮换/重签。原手动3600与既有受管21600分别记录。
+- 原DSH.credentials.yaml只内存解析格式及目标元数据：version1、无API Key引用、两原DeepSeek account grant；无凭据值输出/复制/哈希。Windows用户级HKCU环境有DEEPSEEK_API_KEY，与协调当前值相等；原命令无env覆盖且项目/用户.env不存在。新宿主固定从该用户源读取，仅内存传本人子进程，不直接套用任意协调env，不复制原认证。旧进程已不在，不能倒推其实际环境；独立实际认证/模型探针通过另证。
+- 安装headless无--model，沿用产品dsh本地模板含{model}的模型patch路径，显式default provider/model与max。独立native HOME/DSH_HOME/会话缓存已准备；实际组合dump吻合，禁用16个tool-*行和额外标题模型的固定原生响应probe exit0/exact/28.078秒。无TALK API写的探针与后续生产动作分阶段留痕，不扩大固定后端版本/六小时结论。
+- 本地窄宿主复用产品HostManager/Popen，执行前只筛本人/项目，固定模型/入口，drain保原句柄直到正常stop及空句柄。最终10项Codex自检通过（不与早期9累计，不冒称他人独立复核）；初次投影检查错误假设model.provider_id存在而KeyError，未启动/控制服务，留痕后按实际model/runner投影和choice维度补正，补回归项。5个本地脚本SHA冻结，无产品源码改动。
+- 精确产品API登记runner:dsh-deepseek-local，control managed_cli、adapter unverified保持；choice rmc_3a5435e0e283，builtin/deepseek-official/native-dsh-user-env/deepseek-flash及alias同名、展示DeepSeek Flash · max。operation legacy-dsh-20261017 legacy-attach原agent:deepseek，origin imported/identity_exclusive false；原成员/名册/Key/任务消息历史、其它角色全部绑定服务和既有runner保持，无SQL写/重建/共享改标记。
+- 启动前CIM重查旧8876和精确替代均无，根无旧进程启停/接管。隐藏launcher5424、原manager12536（started_at UTC15:02:39.993552）创建；gen1ready/13408→gen2stop成功/释放且原进程退出→API重取不自启→gen3ready，当前launch c6a38f0a-a1e4-41dc-97e5-78e1881761a7/ins_1251105edd64/18216。实际OS创建UTC15:03:24.472679、父12536及dsh/headless/显式模型patch/argv/21600/本人Key文件白名单吻合；不把API重读叫Browser刷新。
+- 私有管理目录deepseek-next/prj_e8fe7066bbec/agent_deepseek/（与Kimi的pilot/kimi-next分开），health/drain及bridge日志；原manager持句柄是权威，不从文件/PID接管。当前是本地窄入口，不宣称开机常驻/完整异常日志已实现。安装CLI MCP源默认T60秒、候选W50仅源/方案，当前headless组合无MCP客户端；实际等待与取消排队未验，不开主动模式。
+- 实际派268/标题268-原DeepSeek受管实例最小接单回传，Hall group:task-6601751f1625414b8f1721c13b250c37；当前绑定快照吻合，要求本人实际任务号合法JSON/固定TALK_DEEPSEEK_MANAGED_ACK_20261017，无文件/服务动作。默认派后结束，不轮询/提前收取；用户通知后再核任务/真实回传/领取实例/归属/Key绑定与其它角色，再收取并交人类页面三步。三个Kimi验收保持，Codex CLI最后，18项排期不变。
+- 本轮基线72fc594/865跟踪及全部证据在.tmp/legacy-role-page-control/deepseek-next/coordination/；公开安装源、产品代码/旧证据保护及docs编码/diff验证后收尾。准确区分本轮已执行的原生/登记/启停与尚待268/人工验收，无精确额度占比。
+
 ## 2026-10-17 22:42（Asia/Shanghai）— 用户指定Codex直接迁移DeepSeek，首轮只读事实与入口方案准备
 
 - 用户指出DeepSeek自身迁移需Codex操作，根按该明确分工直接核实/准备，不再计划派本人先执行自身切换；其它切片临时DeepSeek首次执行/Codex复核修正的约定保持。caller agent:codex/kind agent、业务lead和最新旧页面development_requirements已保存；不写生产分工或追改历史任务。本轮未创建TALK任务/复核往返。

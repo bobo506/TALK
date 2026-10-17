@@ -3,7 +3,7 @@
 > 所属项目：TALK
 > 状态：通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容
 
-> 2026-10-17 22:42迁移补充：用户指定DeepSeek自身由Codex直接操作，首轮仅盘点/方案。原USER.md确认dsh/headless/argv/目录/3600与max补丁、本人Key GET通过，模型待确认；旧8876实际不在、无精确替代，无根启停。安装CLI0.1.5-rc.2 headless无--model，现有产品dsh配方通过含{model}的模型patch路径模板完成真实parser组装，未spawn/原生验证/改产品。安装MCP客户端源默认T60000ms，拟W50留10秒，仅源/方案；运行组合/取消/排队及主动适配未验。三个Kimi保持，详[当前进度](../PROGRESS.md)。
+> 2026-10-17 23:06迁移补充：原DeepSeek由Codex直接操作，用户确认deepseek-flash/max。现有dsh配方用含{model}的原生模型patch路径，独立HOME/DSH_HOME、原用户级凭据只内存注入，原生probe/10项本地边界自检及同原manager启停通过；原身份/Key/名册/历史与其它角色保持，无产品源码改动。当前gen3/ins_1251105edd64/18216归manager12536，268已派待核/收取及人验。adapter unverified，headless组合无MCP客户端，不扩大主动等待/六小时/固定后端版本，详[当前进度](../PROGRESS.md)。
 
 > 2026-10-17 22:25迁移补充：用户确认原agent:kimi页面关闭→刷新不自启→启动三步通过；根核两轮正常启停、当前generation7/ins_619c2a3c3e52/10496归原manager17672，原Key/绑定/其它角色保持。267原回传/收取及266原件/18自检保持，原接单实例offline为正常历史；原Kimi迁移正式验收，产品源码无新变化。三个Kimi均完成，下一步DeepSeek准备、Codex CLI最后，不外推后端版本/六小时/T-W，见[当前进度](../PROGRESS.md)。
 

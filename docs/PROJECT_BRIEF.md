@@ -4,7 +4,7 @@
 
 ## 当前实施状态（2026-10-17）
 
-2026-10-17 22:42最新：用户指定DeepSeek自身迁移由Codex直接操作，已完成首轮只读盘点及产品入口方案。USER.md原TALK Key GET身份通过，原headless/argv/目录/3600与max补丁明确；无ProjectRole/binding/dsh runner/service，待办0。实际旧8876已不在且无精确替代，根无启停。原模型未显式配置，已请用户确认deepseek-flash/max；仅现有配方的模型patch路径模板通过真实parser组装，未原生/模型/生产写。三个Kimi验收保持，Codex CLI最后，详[进度](PROGRESS.md)。
+2026-10-17 23:06最新：用户确认原DeepSeek deepseek-flash/max，Codex直接完成原凭据源核实、独立DSH组合/固定响应probe、保ID/Key产品补录及同原manager正常启停（当前gen3/ins_1251105edd64/18216）。runner:dsh-deepseek-local仍adapter unverified，10项自检通过，无产品源码/其它角色变更。268最小回传已派待用户通知后核验收取，再页面人验；Codex CLI最后，详[进度](PROGRESS.md)。
 
 2026-10-17 22:25最新：用户确认原Kimi页面三步均通过，根只读核两轮正常启停及当前generation7/ins_619c2a3c3e52/10496仍由原manager17672持有，原Key/全部绑定名册/两K2.8服务保持；原Kimi迁移正式验收。267原回传/收取及266原件/18自检保持，正常关闭后的原接单实例offline不重跑。三个Kimi均已受管/人验，下一步DeepSeek准备、Codex CLI最后；本轮收尾暂停，不操作Browser或另启服务，见[进度](PROGRESS.md)。
 
