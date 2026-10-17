@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 22:42（Asia/Shanghai）— 用户指定Codex直接迁移DeepSeek，首轮只读事实与入口方案准备
+
+- 用户指出DeepSeek自身迁移需Codex操作，根按该明确分工直接核实/准备，不再计划派本人先执行自身切换；其它切片临时DeepSeek首次执行/Codex复核修正的约定保持。caller agent:codex/kind agent、业务lead和最新旧页面development_requirements已保存；不写生产分工或追改历史任务。本轮未创建TALK任务/复核往返。
+- 开工HEAD e3fd195、865跟踪文件基线冻结在deepseek-next/coordination/。实际usage-gate于UTC14:31:35.723935输出continue，但session/weekly百分比null，不当0或推测额度。已读TERMINAL_MCP工具超时/等待要求，迁移不自动开启主动等待。
+- 用户已提供的USER.md第12行明确原--name deepseek、runtime dsh、bridge-label DeepSeek Harness bridge、project/workdir D:/claude-test/TALK、prompt-transport argv、command dsh.cmd --profile headless、旧timeout3600。只内存取该角色原TALK Key GET精确返回agent:deepseek/kind agent，未输出/复制/哈希原Key或源文件，不读DB秘密列。只读SQL核无ProjectRole/binding/dsh runner/service，候选queued/running为0。
+- 最新名册旧实例仍上报8876/idle/UTC13:05，但真实只读CIM旧8876已不在、无精确替代DeepSeek cli_bridge。首轮元数据脚本假定旧PID存在而访问空CreationDate退出，留痕后窄查成功；未发停止命令，不把旧上报当当前在线，也不归因于先前DSH更新。启动受管入口前仍需重核，不能据此接管未知PID。
+- 原DSH用户headless patch仅明确llm-deepseek.reasoningEffort=max，原命令没有显式模型。安装版0.1.5-rc.2/base组合默认deepseek-official/deepseek-flash、原settings.yaml不存在；默认值不直接当原模型证据，已异步请用户确认deepseek-flash/max，尚待答复。原DSH .credentials.yaml仅stat存在，未读/复制/哈希正文；协调进程有provider环境Key不等于证明原bridge使用同一来源，不能直接套用。
+- 已核安装源码：headless startup仅任务位置参数/--help，没有--model；现有产品dsh runtime配方要求含{model}本地命令模板。候选方案用原headless+模型覆盖patch的文件路径承载{model}；真实cli_bridge parser纯组装通过、外层21600、argv传输保持，无native进程/目录。拟独立HOME/DSH_HOME及会话/缓存，credentials.path支持引用原受控凭据文件是源码事实，尚未应用或证明实际认证，不复制认证目录。
+- 安装版dsh-mcp-client源默认T=60000ms，与历史桌面65000分开；候选显式W=50秒可留10秒余量，仅方案，实际组合/重载及到期/取消/排队仍待验证，不宣称主动等待通过，不制造生产长等待。版本、7份公开安装源码manifest、原档公共字段、原Key身份/DB事实、进程观察和入口方案均保存；未写产品源码/生产API或DB/原配置/runner/Key/native文件，无模型调用/启停。
+- 本轮仅7入口/协调docs记录直接分工和当前恢复状态；模型确认后再准备固定单角色宿主/隔离原生与精确注册补录、必要验证及原授权内正常切换。三个Kimi原验收/服务保持，Codex CLI最后。当前证据deepseek-next/coordination/，无新执行角色任务号，不编造268；原Kimi人验e3fd195及267收取不重复。
+
 ## 2026-10-17 22:25（Asia/Shanghai）— 原Kimi页面人工三步通过，保ID受管迁移正式验收
 
 - 用户明确确认原kimi-code CLI Bridge (agent:kimi)（K3）关闭等未启动→刷新不自启→再启动成功/ready三步均通过，人工门禁释放。根仅只读核实际记录：generation4 stop于UTC14:21:33.086826 stopped、5 start于14:21:37.744069 ready；随后6 stop于14:21:47.542753 stopped、7 start于14:23:17.958999 ready。实际有两轮正常操作，根首次只读探针预设单轮generation5而断言失败，保留说明后按实际最新pair核验；无重复启停或产品改动。
