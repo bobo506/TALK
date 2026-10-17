@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 新Kimi回评收件人错误265已派（2026-10-17）
+
+264/人工迁移验收闭合后，恢复盘点见ins_b587917b65ec status=error/current_task_id=2816，错误invalid recipient mention: @human:user；2816为复核留言消息号，不能当新任务或推断队列/服务已死。265交DeepSeek首次定位普通消息真实路径、隔离fake CLI/TALK及证据明确时最小补正，仅cli/kimi bridge与对应测试可写，暂停后Codex独立核并直接修正。服务端严格未知提及400/合法mention/原权限路由、Task Hall、后续消费和受管停止守卫保持，不猜收件人/改广播/吞错假成功；真实配置/三档/服务/模型不动，完整日志体系另片。原264/人验不追改，当前根因/健康未通过，下一agent:kimi暂后排。包见kimi-reply-recipient/coordination/及PROGRESS，默认用户通知265完成后取件。
+
 ### 新页面Kimi迁移正式验收通过（2026-10-17）
 
 264原结果2815由本轮ins_eea1a7e6dca2完成，实际task/作者/Hall/固定标记及合法报告独立匹配，原Key身份/mtime、binding/角色行/原历史保持，仅新增264。Hall2816后收取succeeded/completed；用户另确认新角色页面关闭等未启动→刷新不自启→再启动ready三步均通过。服务generation4 stopped及generation5/ins_b587917b65ec/launch 55a89cbf-34d1-4399-a496-4256dc5a8c94 ready，同原manager17908持新Popen吻合；原接单实例offline属该正常停止。协调方本轮无启停/新模型或代码变更，旧K28由用户当前正常启至generation10，保现状。下一位agent:kimi先核原模型/命令/Key，完整日志及T-W另片。最新恢复优先本节/PROGRESS，下列264待验等为当时阶段快照。

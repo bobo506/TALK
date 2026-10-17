@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-17 16:41（Asia/Shanghai）— 恢复发现新Kimi回评收件人错误，265已派DeepSeek首次定位补正
+
+- 用户在697cbc4收尾后说继续，本来下一位agent:kimi。读取当前身份/进度及最新项目要求，caller agent:codex/kind agent、业务lead；页面旧Kimi/DeepSeek交叉分工保持，按用户2026-10-17最新DeepSeek首次执行/Codex独立复核直接修正。默认派后结束，禁止开发/审查并行写源。
+- 恢复盘点新Kimi ins_b587917b65ec为error、current_task_id=2816，窄只读SQL核last_error=invalid recipient mention: @human:user、UTC08:33:52.158658/PID11056。2816是已收264的复核留言消息号，非AgentTask；原264结果2815/实际领取实例及人工三步通过事实不撤销。只定位服务端严格提及400与bridge单条异常report再raise的实际位置，不据它推断模型根因、队列死亡/服务退出或自动重启。
+- 865跟踪SHA、实际基线697cbc458da08039a17a4cf89b76341270244cd2、4代码/5协调docs边界和只读原事实/项目要求冻结于kimi-reply-recipient/coordination/。usage-gate确实continue（UTC08:38:09.112303），但session/weekly百分比null；无用量暂停或额外总体许可问题，不猜精确占比。
+- 最小4参实际派265给agent:deepseek，UTC08:40:21.205497，Hall group:task-c1e0557f3e7f46b68fc90d7408f4bd40，queued/assigned为派发快照。仅首次定位/隔离假件/证据明确时最小补正与必要回归，来源不明或产品语义不明则交具体复现与候选建议，不为消error放松校验/猜人类/改广播/吞错；保合法mention、Task Hall、后续消费/取消/受管停止。
+- 允许bridges/cli_bridge.py、bridges/kimi_bridge.py及对应两测试，其余代码/真实配置/身份档/旧原件只读；禁止生产写、SQL修状态、服务启停/接管/强停、native/login/真实模型/新Key/绑定/能力或新任务回评，完整日志体系仍另片。正式5协调docs由Codex独立维护，developer只新增专属.tmp材料。交付自身265完整JSON，暂停后用户通知取件，不主动等待/轮询。
+- 先处理已观察到的同功能异常再回agent:kimi准备，DeepSeek与Codex自身最后。仅派发/文档必要验证，不声称根因/代码修正/真实循环健康已通过；264及两角色人验原件、原失败/副本保持，上一mutable state仅加本异常恢复指引。
+
 ## 2026-10-17 16:36（Asia/Shanghai）— 264独立核验收取，新Kimi页面人工验收通过
 
 - 用户通知264完成，原结果2815及完整摘要合看：合法自身264/complete，完成1/未完0/阻塞0/文件0，固定TALK_NEW_K28_MANAGED_ACK_20261017精确匹配，本地summary --expect-task-id264退出0。实际created_by agent:codex，目标/领取者为新成员，attempt1，instance ins_eea1a7e6dca2，UTC08:21:54.935777领取、08:22:01.875908完成；作者/Hall/原binding快照一致，不只凭succeeded或自报验收。
