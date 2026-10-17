@@ -2,7 +2,7 @@
 
 确认日期：2026-10-16（Asia/Shanghai）。来源：项目管理者在254重启接单问题后的明确要求：完整异常日志是必要留存信息；旧角色后续也应统一成为受管服务。
 
-状态：**旧K28已正式验收；263文案/准备已收取发布；新Kimi k2.8独立登录/原模型探针及受管启动→正常关闭→再启动通过，264接单与页面人工验收待核。** 原ID/Key/绑定保持，旧登录超时证据留存；其它角色保持现状，DeepSeek/协调CLI最后，完整异常日志仍待。
+状态：**旧K28及新Kimi k2.8均已正式验收；264独立核验收取，用户新角色页面三步均通过。** 原ID/Key/绑定/历史保持，两个角色保用户当前运行状态；下一位agent:kimi先核原模型/命令/Key，DeepSeek及Codex最后，完整异常日志仍待。
 
 ## 1. 完整异常日志必须持久留存
 
@@ -134,3 +134,9 @@ legacy-attach已201/reused=false，旧ID/原Key身份及文件mtime/绑定及时
 新设备会话81204经用户授权后实际CLI exit0/config存在，原alias/provider/model公开字段核对及无工具固定探针通过。仅此角色Hidden窄宿主持原Popen，generation1 ready→generation2正常stopped/无owner/句柄空→generation3新instance ready，同一manager保持，原身份/Key/绑定/默认review/21600不变；已有managed登记，不重复创建/补录/重签或升级共享adapter。旧K28用户当前generation9关闭状态保持，其它角色不启停。
 
 264最小固定回传已派，默认用户通知后核本次task_id/作者/Hall/实际领取实例/固定标记并收取；ready和原生探针不替代接单。随后新角色单独人工验收关闭→刷新不自启→再启动ready，通过才迁下一位。当前没有完整异常日志、六小时或主动等待验收结论，原91333超时/263原partial和诊断失败不改写，最新恢复以PROGRESS及本节为准。
+
+## 21. 264及新角色人工验收闭合（2026-10-17）
+
+264实际本轮实例/作者/Hall/合法JSON/固定标记独立核验通过，原Key身份/mtime、全部binding/角色行保持，原历史只新增本任务，Hall2816后已收取。用户确认新「Kimi k2.8」页面关闭等未启动→刷新不自启→再启动ready三步均通过，服务generation4 stopped/generation5新实例ready及原manager持新Popen吻合。旧接单实例offline是该正常停止，状态变化/首次断言及修正核验证据留档，不自动恢复或按PID接管。
+
+该角色迁移本片正式验收通过，不替代其它角色验收或完整日志/六小时/T-W结论。旧K28由用户当前启至generation10，保当前状态，协调方本轮未启停任何角色；下一位agent:kimi先核原模型/命令/可信Key，后两位最后。当前状态优先本节/PROGRESS，前文待验为当时阶段事实。

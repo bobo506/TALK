@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-17 16:36（Asia/Shanghai）— 264独立核验收取，新Kimi页面人工验收通过
+
+- 用户通知264完成，原结果2815及完整摘要合看：合法自身264/complete，完成1/未完0/阻塞0/文件0，固定TALK_NEW_K28_MANAGED_ACK_20261017精确匹配，本地summary --expect-task-id264退出0。实际created_by agent:codex，目标/领取者为新成员，attempt1，instance ins_eea1a7e6dca2，UTC08:21:54.935777领取、08:22:01.875908完成；作者/Hall/原binding快照一致，不只凭succeeded或自报验收。
+- 首次工具非JSON使协调脚本解析退出，重试成功；随后原实例仍idle的断言在用户正常关闭/启动期间失效。只读复核generation4/stop dbc006de-10e5-46ea-9143-a3e1e830d00e于08:30:54.749324 stopped，generation5/start 55a89cbf-34d1-4399-a496-4256dc5a8c94于08:30:57.913966 ready。原接单实例offline属该正常停止；当前ins_b587917b65ec/进程11056的launch/OS创建时刻、同原manager17908/started_at/持有launch及fresh健康吻合。保初次状态断言记录，不误报运行器异常或改原结果。
+- 原Key本人GET/mtime、全部binding/角色行保持，原历史只新增264、无待办；协调方本轮没有服务启停/新模型调用或配置写。旧K28由用户正常启至generation10/ins_2f24e8a7dee3 ready，保当前状态，旧manager11920及API原launcher不动。不按PID接管/强停/修库，不重复原生探针/旧源码测试。
+- Hall2816写核验通过，UTC08:32:44.932856实际收取264 succeeded/completed，result仍2815。另请新角色页面验收后，用户明确“三步均通过”：关闭等未启动→刷新不自启→再启动ready；复查仍generation5 ready/无错误。原旧角色验收不代替本次，新Kimi正式迁移验收闭合，human-page-acceptance.json及对应stop/start证据留档。
+- 本轮仅5协调docs记录当前/历史/规格，原开发件/冻结源保持。无产品代码改动/新业务测试，验证为合法交付/实际API与只读SQL/原manager和OS公开事实/人工验收；完整日志、固定后端模型、六小时/主动等待未验。证据independent-review263/smoke264/，state.json已completed_and_human_accepted；下一位agent:kimi先由DeepSeek准备原模型/命令/可信Key，DeepSeek与Codex最后，当前片收尾暂停。
+
 ## 2026-10-17 16:25（Asia/Shanghai）— 新Kimi独立登录与受管启停通过，最小任务264待通知
 
 - 用户确认新设备链接已完成授权后，先结束原运行exec324并核原生CLI81204实际exit0、Logged in to managed:kimi-code及config_present=true；首次91333/900秒超时失败不改。自己的HOME/KIMI_CODE_HOME内核公开模型配置为原alias/provider/model，没有复制旧认证、输出/哈希凭据或发布设备码。无工具/子代理独立探针实际3.891秒、exit0、精确TALK_NEW_K28_NATIVE_PROBE_OK_20261017，未由探针写TALK/启动服务。

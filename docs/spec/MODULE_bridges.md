@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 新页面Kimi迁移正式验收通过（2026-10-17）
+
+264原结果2815由本轮ins_eea1a7e6dca2完成，实际task/作者/Hall/固定标记及合法报告独立匹配，原Key身份/mtime、binding/角色行/原历史保持，仅新增264。Hall2816后收取succeeded/completed；用户另确认新角色页面关闭等未启动→刷新不自启→再启动ready三步均通过。服务generation4 stopped及generation5/ins_b587917b65ec/launch 55a89cbf-34d1-4399-a496-4256dc5a8c94 ready，同原manager17908持新Popen吻合；原接单实例offline属该正常停止。协调方本轮无启停/新模型或代码变更，旧K28由用户当前正常启至generation10，保现状。下一位agent:kimi先核原模型/命令/Key，完整日志及T-W另片。最新恢复优先本节/PROGRESS，下列264待验等为当时阶段快照。
+
 ### 新页面Kimi原生与受管启停通过，264待验（2026-10-17）
 
 新设备授权对应CLI81204实际exit0/config落盘，原alias无工具固定探针精确匹配；91333超时原失败保留。经审corrected/窄入口在Hidden常驻原manager17908，仅领取新成员agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c；generation1 ready→generation2正常stopped/归属释放/原子进程退出→generation3 ready（ins_eea1a7e6dca2/launch 40646af4-991c-4e30-90e0-87f066e22593），同manager及原Popen链保持。公开argv核原name/Key文件/显示名/alias/工作目录、review默认档与21600秒，没有新补录/重签Key/升共享能力；原26/18开发件及辅助源冻结不变。
