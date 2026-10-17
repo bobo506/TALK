@@ -3,6 +3,8 @@
 > 所属项目：TALK
 > 状态：通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容
 
+> 2026-10-17 22:20迁移补充：原agent:kimi受管最小任务267已由ins_b1c260cb0571实际领取回传，msg2821合法complete及作者/Hall/标记/K3快照通过，Codex已收取。原manager17672/进程924归属及K3/tools/21600白名单、idle无错误、原Key及其它角色服务保持；本轮无启停/模型重触发/源码变更。仅原Kimi页面人工验收待，不扩大模型后端版本/六小时/T-W结论，见[当前进度](../PROGRESS.md)。
+
 > 2026-10-17 22:11迁移补充：原agent:kimi独立登录和显式kimi-code/k3无工具探针通过；原Key/ID/名称/历史及USER.md明确tools档保持，受管21600。新增精确K3 choice并保ID补录后，corrected专属manager17672正常启动→关闭释放→再启动generation3/ins_b1c260cb0571/924 ready，另两K2.8未动；最小回传267待通知/人验未做。原18隔离验证及失败证据保持，产品bridge源码未改，不把原生alias/服务ready当后端版本、六小时或T-W验收。恢复见[当前进度](../PROGRESS.md)。
 
 > 2026-10-17 21:58迁移补充：原agent:kimi准备266已独立核验/根补正收取，原partial保持。用户确认K3；USER.md原命令Key仅内存GET身份通过，实际tools档/项目工作目录/旧3600明确，不能沿候选原默认review。经审corrected窄入口保21600/单成员claim/独立HOME与KIMI_CODE_HOME，标记写失败保内存退出意图与原manager/Popen；最终18隔离项通过，产品bridge源码未改。当前候选独立native登录待授权/CLI退出，真实K3/补录/服务未验；两K2.8保持，详[当前进度](../PROGRESS.md)。

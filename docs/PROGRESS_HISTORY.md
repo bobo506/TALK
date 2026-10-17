@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-17 22:20（Asia/Shanghai）— 267最小回传独立核验收取，原Kimi页面人验待
+
+- 用户通知267完成后合读完整交付摘要与实际任务/结果，MCP caller agent:codex/kind agent，页面旧项目要求如实保留。msg2821合法自身267/complete，标记TALK_ORIGINAL_KIMI_K3_MANAGED_ACK_20261017精确，未完成/阻塞/文件0；原JSON保存后本地summary --expect-task-id267退出0。摘要不截断，字段合看，不把runner succeeded当业务验收。
+- 实际creator agent:codex，target/claimed_by agent:kimi，attempt1，由受管ins_b1c260cb0571在UTC14:10:54.894827领取、14:11:05.234283完成；原作者agent:kimi、接收agent:codex、Hall group:task-397c6d6e94dd467a90a3d88528b823a6及K3/provider/model快照全部一致。只证明此实例接单回传，固定后端版本、六小时/T-W及页面人验不扩大。
+- 独立只读核generation3 running、launch65184d95-1ba7-44b7-8c18-6f6f6e1feaa2、原manager17672/started_at UTC14:05:55.219704与所持句柄吻合。实际进程924/父17672/OS创建UTC14:09:19.053669、精确本人/K3/tools/21600白名单通过；实例idle/current_task null/last_error null。原USER.md本人Key与私有宿主源值精确一致且GET身份通过，无Key复制/哈希/轮换；成员/名册/角色/绑定和另两K2.8服务投影保持，待办0。未读DB秘密列/整段历史或重做原生模型调用/启停。
+- 通过后UTC14:19:46.929021实际收取267 succeeded/completed，原2821 complete保留；未额外Hall回评，避免激活普通回复。全部MCP原件/校验/独立review/实际runtime/process及collection在kimi-next/independent-review266/smoke267/。266原41件/partial、根18隔离项及旧失败原件沿用，不重跑业务测试或新增独立复核任务。
+- 当前按项目人工验收门禁，请用户仅原kimi-code CLI Bridge (agent:kimi)（K3）页面关闭等未启动→刷新不自启→再启动ready；答复待。现有API验证不替代人验，人验前不迁下一角色。若用户此后正常关闭导致原接单实例offline，按正常生命周期核新generation，不否定267或重跑最小回传。默认DeepSeek/Codex最后，其它排期保持。
+- 本轮仅6协调docs记录267及收尾，PROGRESS压缩当前快照；无产品代码/真实配置/服务变化、Browser或新模型探针。保护基线、原41开发件/3经审源及链接/UTF-8/敏感设备码与git diff检查随收尾执行；完整日志等仍待。
+
 ## 2026-10-17 22:11（Asia/Shanghai）— 原Kimi独立K3与保ID补录/受管启停通过，267待通知
 
 - 用户完成设备授权后根先续原exec73838，实际exit0/Logged in to managed:kimi-code，自己的native配置存在。配置默认为kimi-for-coding（K2.8）但同时有K3，根始终显式kimi-code/k3；未复制全局/其它角色原生认证。独立无工具/技能/子代理固定文本探针4.579秒exit0、精确TALK_ORIGINAL_KIMI_K3_NATIVE_PROBE_OK_20261017，无TALK写或角色服务；不将alias调用当固定后端版本证明。

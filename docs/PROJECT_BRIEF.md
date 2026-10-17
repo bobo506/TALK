@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-17）
 
+2026-10-17 22:20最新：267/msg2821最小回传已独立核验收取，实际attempt1由原Kimi受管ins_b1c260cb0571完成，固定标记/作者/Hall/K3快照正确，原manager17672/924 idle无错，原Key/全部角色绑定名册及两K2.8服务保持。只读核验与收取，无启停/模型重触发/额外Hall回评；原Kimi迁移目前仅待页面三步人工验收，未推进下一角色，详[进度](PROGRESS.md)。
+
 2026-10-17 22:11最新：原Kimi独立登录CLI exit0、精确K3无工具探针通过，原Key身份/命令tools档保持；产品API仅新增K3 choice并legacy-attach原agent:kimi，无重建/轮换。corrected专属manager17672完成generation1启动→generation2正常关闭释放→重读不自启→generation3/ins_b1c260cb0571/924 ready，两个K2.8保持。最小回传267已派、默认用户通知后核验，页面人验仍待；266原partial/41件及根18自检保持，首次操作标识422/协调状态断言假超时原件留存，详[进度](PROGRESS.md)。
 
 2026-10-17 21:58最新：266准备已独立核验、Codex直接补正并收取，原2820 partial/41件保持。根修drain标记写入失败丢管理器及验证夹具，最终18项通过；用户确认原Kimi为K3，USER.md原命令Key内存GET身份通过，明确tools档/目录/旧3600，受管保既有21600。当前只为原agent:kimi发起独立原生登录待授权/CLI成功；精确K3探针、choice/保ID补录、受管启停/回传/人验尚未执行，两K2.8保持，详[进度](PROGRESS.md)。
