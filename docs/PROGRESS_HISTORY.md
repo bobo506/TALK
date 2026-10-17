@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-17 22:25（Asia/Shanghai）— 原Kimi页面人工三步通过，保ID受管迁移正式验收
+
+- 用户明确确认原kimi-code CLI Bridge (agent:kimi)（K3）关闭等未启动→刷新不自启→再启动成功/ready三步均通过，人工门禁释放。根仅只读核实际记录：generation4 stop于UTC14:21:33.086826 stopped、5 start于14:21:37.744069 ready；随后6 stop于14:21:47.542753 stopped、7 start于14:23:17.958999 ready。实际有两轮正常操作，根首次只读探针预设单轮generation5而断言失败，保留说明后按实际最新pair核验；无重复启停或产品改动。
+- 当前generation7/launch edc583b3-d270-42e1-bfed-77e24f6baf73/ins_619c2a3c3e52/10496 idle/current_task null/last_error null，原manager17672及started_at UTC14:05:55.219704、所持新句柄吻合。只读CIM核新10496父17672/创建UTC14:23:16.638787、精确本人/K3/tools/21600白名单，未输出原命令/凭据。旧924退出、267原接单实例ins_b1c260cb0571 offline属正常页面关闭，不重跑或否定原267。
+- 原USER.md本人Key与私有宿主值一致且GET身份通过，成员/名册/全部角色绑定/其它两K2.8服务投影保持；无DB秘密列/整DB哈希/原Key复制哈希/模型探针/服务动作/API重启/额外Hall消息。267原2821 complete及UTC14:19:46.929021收取保持，266原41件/partial及18自检/失败原件沿用。
+- human-page-acceptance.json、human-restart-process-proof.json及首次单轮假设说明在kimi-next/independent-review266/smoke267/，coordination/state与根review同步completed_and_human_accepted。人验来自用户、运行归属来自只读证据，不冒称Codex Browser操作通过。本轮仅6协调docs收尾，保护源/原件及文档检查后提交推送，不开新片。
+- 三个Kimi角色现在均已完成受管迁移及页面人工验收。下一位DeepSeek先准备原事实、本人原生/宿主隔离与正常退出计划，当前旧DeepSeek不预先停止；Codex CLI角色最后，不把当前桌面协调聊天当可接管进程。总体迁移授权已有，不重复请；完整日志、全入口预算、删除、主动等待及第4项会话复用等18项顺序保持，实际后端版本/六小时/T-W等未外推。
+
 ## 2026-10-17 22:20（Asia/Shanghai）— 267最小回传独立核验收取，原Kimi页面人验待
 
 - 用户通知267完成后合读完整交付摘要与实际任务/结果，MCP caller agent:codex/kind agent，页面旧项目要求如实保留。msg2821合法自身267/complete，标记TALK_ORIGINAL_KIMI_K3_MANAGED_ACK_20261017精确，未完成/阻塞/文件0；原JSON保存后本地summary --expect-task-id267退出0。摘要不截断，字段合看，不把runner succeeded当业务验收。

@@ -3,6 +3,8 @@
 > 所属项目：TALK
 > 状态：通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容
 
+> 2026-10-17 22:25迁移补充：用户确认原agent:kimi页面关闭→刷新不自启→启动三步通过；根核两轮正常启停、当前generation7/ins_619c2a3c3e52/10496归原manager17672，原Key/绑定/其它角色保持。267原回传/收取及266原件/18自检保持，原接单实例offline为正常历史；原Kimi迁移正式验收，产品源码无新变化。三个Kimi均完成，下一步DeepSeek准备、Codex CLI最后，不外推后端版本/六小时/T-W，见[当前进度](../PROGRESS.md)。
+
 > 2026-10-17 22:20迁移补充：原agent:kimi受管最小任务267已由ins_b1c260cb0571实际领取回传，msg2821合法complete及作者/Hall/标记/K3快照通过，Codex已收取。原manager17672/进程924归属及K3/tools/21600白名单、idle无错误、原Key及其它角色服务保持；本轮无启停/模型重触发/源码变更。仅原Kimi页面人工验收待，不扩大模型后端版本/六小时/T-W结论，见[当前进度](../PROGRESS.md)。
 
 > 2026-10-17 22:11迁移补充：原agent:kimi独立登录和显式kimi-code/k3无工具探针通过；原Key/ID/名称/历史及USER.md明确tools档保持，受管21600。新增精确K3 choice并保ID补录后，corrected专属manager17672正常启动→关闭释放→再启动generation3/ins_b1c260cb0571/924 ready，另两K2.8未动；最小回传267待通知/人验未做。原18隔离验证及失败证据保持，产品bridge源码未改，不把原生alias/服务ready当后端版本、六小时或T-W验收。恢复见[当前进度](../PROGRESS.md)。
