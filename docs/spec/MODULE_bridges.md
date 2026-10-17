@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 其余角色继续授权，263只读准备下一位新K28（2026-10-17）
+
+用户在旧K28正式验收后明确可开始其余角色迁移。263由DeepSeek首次做同功能提示文字小改及只读迁移包，完成暂停后Codex核验/直接修正。下一候选固定新页面Kimi k2.8（agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c），已有managed创建登记/精确绑定，不legacy-attach/CREATE/轮换Key；窄宿主保自己的显示名/任务档和原Popen，不继承旧K28的tools身份。当前禁止真实登录/doctor/模型/native目录写/生产API写/启停，先查原Key可信来源与隔离能力；后续真实操作在用户既有继续迁移授权内执行。Kimi/DeepSeek/Codex未配置绑定，不能猜模型/命令，后两者最后；现有旧K28原owner不动。详remaining-role-next/coordination/与进度。
+
 ### 旧K2.8单角色迁移正式验收通过（2026-10-17）
 
 262合法结构化任务号/标记、实际原角色/ins_b20c4078c97b、结果2809作者/Hall已独立核验；精确实例/launch/创建时刻与原manager持有吻合，Hall2810后已收取completed。用户随后明确页面关闭→刷新不自启→再启动ready三步均通过，服务generation7 stopped/generation8 ready佐证，当前新instance ins_d86218c7cc0d仍由原manager11920持Popen。原ID/Key/绑定/历史保持，其余角色未迁移/启停。

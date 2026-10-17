@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 15:09（Asia/Shanghai）— 用户简化停止提示并授权继续其它角色，263首次实施/只读准备已派
+
+- 用户明确提示只需表达关闭后确认停止再重启，去掉“原进程归属未释放：”，并允许开始迁移其余角色。原旧K28单角色正式验收11bd14e保持；本次授权扩大为其余角色逐个准备/切换，不取消原ID/Key/模型/历史、原Popen、原生核验与人工验收门禁。
+- 实读caller agent:codex/lead及最新项目开发要求（仍旧Kimi前端/交叉复核），依2026-10-17明确分工派DeepSeek首次执行、Codex独立核后直接修正，不回写永久要求或追加返修/回审。角色当前状态仅上报：DeepSeek旧error/current_task=null，不以availability或陈旧心跳断言真实健康。
+- 窄读SQLite公开列确认显式role仅旧K28 imported、新页面Kimi k2.8 managed/exclusive；后者原精确binding已bound，适合作下一候选，不能legacy-attach/CREATE/新Key。Kimi/DeepSeek/Codex当前无binding，公开原模型/命令/本人Key源待盘点，不猜；五角色当时无待办/在途。没读DB api_key/token哈希/正文或整库hash，无生产写。
+- 263最小4参UTC07:07:56.479414交agent:deepseek，Hall group:task-7414c8d0769e4455bc28c4ce03663a27，初始queued/assigned。小文案只3前端路径及已有断言/单workspace缓存版本；批量同去内部术语，启停权限/owner守卫不改。下一角色只读准备只写remaining-role-next/developer/，固定agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c；其余4矩阵可只读，实际只备一位。
+- 可审辅助入口须复用产品HostManager、claim前精确过滤新候选、常驻原manager/Popen/私有drain与KIMI_CODE_HOME；本人显示名/任务档不照搬旧K28 tools，原Key只可信文件窄读GET，不抄DB/重签/复制认证目录。允许隔离假件和必要Node原始日志，不做Browser/真实登录/doctor/模型/新native目录写、生产API/DB变更、补录/能力或启停。交付可partial并分开文案完成与真实凭据/登录缺口；完成暂停后Codex复核再实际操作。
+- usage-gate确实continue（UTC07:07:01.505738，session/weekly百分比均null）；首次pipeline因wrapper改变cwd而相对输出落点不存在，未保存成功，改绝对路径后返回0并留完整JSON。不忽略失败或臆测具体用量，按一次一片及当前任务授权推进。
+- 基线11bd14e/865跟踪SHA及3实现路径、6协调docs白名单已冻结；正式docs仍由根维护，开发中不读diff/验证候选或并行改源码，不轮询/等待任务，默认用户通知263好了取件。仅5协调docs本轮精确验证提交推送，其余857保护路径与旧261/262原证据保持；不暂存开发中3前端或其它未跟踪材料。
+- 完整派发包/项目要求快照/只读盘点/用量/验证与发布回执见remaining-role-next/coordination/。当前文案仍待首次交付复核、新候选真实迁移未执行，其余角色不因授权或共用标记自动启动；DeepSeek及协调CLI最后，当前Desktop/MCP不接管。
+
 ## 2026-10-17 14:04（Asia/Shanghai）— 262最小接单回传独立核验收取，旧K2.8页面人工验收通过
 
 - 用户通知好了后读取262完整合法交付摘要及原result2809，task_id=262/complete、固定标记TALK_K28_MANAGED_ACK_20261017精确一致，完成1/未完成0/阻塞0/changed_files0。原结果JSON本地summary --expect-task-id262校验通过；摘要完整无截断，不只凭succeeded或执行者自报验收。
