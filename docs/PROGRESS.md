@@ -1,12 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-17 08:22 (Asia/Shanghai)：259补录产品片A经Codex独立复核并直接修正2项问题，162相关回归+2项WAL并发探针通过，已收取；8源及相关docs本轮发布。5角色实际补录/迁移仍待，下一片宿主模板与21600预算。
+Updated: 2026-10-17 08:45 (Asia/Shanghai)：用户确认继续平移现有角色，260宿主多运行器模板/内置六小时预算产品片B已派DeepSeek首次实施；259已发布ea21d81，实际5角色补录/迁移仍待。
 
 ## 当前身份与分工
 
 - TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead，已读当前development_requirements。
 - 用户2026-10-17最新分工：Codex派任务→DeepSeek首次执行/自测交付后暂停→Codex独立复核→有问题Codex直接修正/验证/最终验收，正式docs/Git仍Codex。不再默认派DeepSeek同片返修或追加回审，首次独立复核与修正自检分别记录；替代旧前后端固定分工，历史任务/页面旧开发要求不追改。
-- 默认派发后结束等待、用户通知完成后取件；一次一方改共享源码。259已交付暂停，Codex独立复核后按新分工直接修正并验证收尾，没有再派返修/回审。本数据库/协议切片收尾后暂停，未派下一片。
+- 默认派发后结束等待、用户通知完成后取件；一次一方改共享源码。260由DeepSeek仅首次实现/必要自测，暂停后Codex独立复核并直接修正验证，不再派返修/回审。当前Codex只维护8协调docs，不审读或修改进行中的3路径候选。
 
 ## 250/254自动首次启动后端已独立通过
 
@@ -26,25 +26,28 @@ Updated: 2026-10-17 08:22 (Asia/Shanghai)：259补录产品片A经Codex独立复
 - 验证范围纠正：原独立run-python在suite恢复engine后直接建TestClient，未显式临时DB/storage；原日志startup_cleanup deleted=0/missing_on_disk=0，没有事前DB快照，不能声称该段完全隔离/原DB完全未写。根补验已先断言临时engine/storage再启lifespan，原报告/驱动/日志保留不改。原测试追加日志/临时目录限制保留。
 - 证据.tmp/role-auto-start-frontend/final255/{format-audit.json,acceptance-audit.json,isolated-static.json,collection.json,publication.json}；独立原件在independent-review/。11源及10相关docs本轮提交推送，不暂存其它未跟踪材料。根没有启停生产实例/操作真实Key或模型，unknown/unverified未改。
 
-## 当前：259保留身份补录产品片A已完成，实际迁移仍待
+## 当前：259已发布，260宿主配置产品片B开发中，实际迁移仍待
 
 - [补录实施合同](spec/ROLE_LEGACY_ATTACH_DESIGN.md)已落地human-only legacy-attach：沿用旧member_id/Key，只增imported/nonexclusive项目角色、缺失绑定与独立补录审计；既有绑定/名册/说明/策略/历史保留，不创建新身份、换Key、配置作业或启动服务。投影精确legacy_attach来源，宿主只扩合法来源，其余能力/所有权守卫保持。
 - 原259/msg2797合法partial自报、原8候选字节和开发证据保留。Codex独立发现F1/P1反向操作键隔离缺失（含跨项目/并发可新建第二身份）、F2/P2超长非空显示名被静默换ID；新增6用例在原实现4失败，随后仅接手projects路由和补录测试修正，另补非空历史/成果保留测试。修正自检不称他人独立复核，未派DeepSeek返修。
 - 最终162相关回归（54补录/26投影/15迁移/34宿主/12创建幂等/21请求守卫）与2项显式SQLite WAL双入口并发探针全过，0失败/错误/跳过；8源compile/diff通过。其余6候选、原准备v1 22/v2 25/v3 35件保持。开发685为自报，本地未留完整原始测试日志，不作根独立证据/重复累计。
 - Hall2798裁决accepted_after_codex_corrections；UTC2026-10-17T00:22:21.735496收取259为succeeded/completed，原partial不改。证据product-attach/independent-review259/{review.json,original-negative.log,final-tests.json,wal-probes.json,candidate-manifest.json,final-manifest.json,collection.json,publication.json}。
 - 258准备通过/已收取事实保持，256/257旧needs_changes交付不追改。全部5角色本轮未实际补录/迁移或启停，原生CLI/登录/模型/常驻宿主/终端T-W与255人工页面验收仍未通过；host设置/陈旧PID或未打项目标签心跳不作归属、空闲或可控证明。
-- 下一片先补宿主per-runtime模板和受管21600执行预算，随后核实公开runner/model及原本人Key来源、正常退旧入口、逐角色登记/启动/关闭/再启动与最小接单回传。DeepSeek自身和协调CLI最后切换，当前Desktop/MCP不强行接管；unknown/unverified守卫不因补录而放开。
+- 用户明确按平移推进，无需重新创建：沿用原ID/Key/已有模型绑定/身份档/历史，两个K2.8各自保留。260按[宿主配置合同](spec/ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)补可重复--runtime-command-template及内置--cli-execution-timeout-seconds默认21600/显式覆盖；旧全局模板兼容，自定义入口不擅塞bridge预算，ready/stop/MCP/T-W等不改。模板登记不能代替真实能力验收。
+- 260最小四参交DeepSeek，Hall group:task-e754781d278e48d7a764961ed24aac30，UTC2026-10-17T00:45:23.248236初始queued/assigned。只允许scripts/role_service_host.py、tests/test_role_service_host.py及新增tests/test_role_host_runtime_configuration.py，证据仅product-host-config/developer/，不改bridge/server/DB/前端/真实配置或启停服务。产品基线ea21d81/862跟踪SHA及8协调docs白名单见product-host-config/baseline.json；原3版准备与259证据不覆盖。
+- 派发/完整包/额度与发布证据product-host-config/{dispatch.json,task-package.json,usage-gate.json,publication.json}。usage-gate返回continue但两用量百分比null，不当0；本轮仅派一个宿主片，默认用户通知260好了后取件，未主动轮询。
+- 260通过后核实公开runner/model及原本人Key来源、正常退旧入口、逐角色补录/启动/关闭/再启动与最小接单回传。DeepSeek自身和协调CLI最后切换，Desktop/MCP不强行接管；未验能力、未知owner/陈旧PID守卫保持。通用bridge默认600及旧手动入口并未由本片统一改成六小时。
 
 ## 下一步与人工门禁
 
 - 加载含本次前端与98beb9c后端的服务，Ctrl+F5，项目→角色，按docs/guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md验创建说明、配置/入队/实际服务状态及关闭后刷新不重启。现有human账号/Key，启动命令及已知限制见该指南。
 - 255页面人工验收未完成；受管接入准备258及产品片A已完成，宿主前置仍待，不将本片代码通过当实际迁移。不把DOM/VM/TestClient当视觉/键盘/原生能力通过，未受管运行器应诚实给原因。
-- 259产品片A已完成；接下来补宿主模板和执行预算，再逐角色实际登记/迁移，随后补255真实页面与启停验收；完整日志/通用预算/删除另片，不同时扩码。
+- 259产品片A已发布；当前先260宿主模板/预算首次实现、Codex复核并直接修正，再逐角色实际登记/迁移，随后补255真实页面与启停验收；完整日志/通用预算/删除另片，不同时扩码。
 
 ## 已确认后续需求（待实施）
 
 - 完整异常日志需脱敏持久保存异常类/消息/完整堆栈/因果链与阶段/时间/项目/角色/实例/任务关联，跨重启可追查，公共入口有界摘要/引用；定位、轮换/容量方案实施时明确。旧K2.8原记录只有task queue worker failed:，最初触发原因未知；父进程存活不代表接单循环健康。
-- 存量受管迁移准备258与259保身份补录代码已完成，宿主配方/预算和实际迁移待，Codex/Kimi/DeepSeek/旧K2.8等保留member_id/绑定/历史，空闲正常停旧入口后迁入统一宿主，补真实配方/能力登记/owner和launch关联，逐个验真实启动/关闭/再启动/接单；不凭PID接管或放开unknown/unverified。详spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md。
+- 存量受管迁移准备258与259保身份补录代码已完成，260宿主配方/预算正在首次实现，实际迁移待，Codex/Kimi/DeepSeek/旧K2.8等保留member_id/绑定/历史，空闲正常停旧入口后迁入统一宿主，补真实配方/能力登记/owner和launch关联，逐个验真实启动/关闭/再启动/接单；不凭PID接管或放开unknown/unverified。详spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md。
 - 全角色默认21600秒及可显式覆盖、角色详情删除按钮待实施；删除本项目角色配置/专属材料，历史任务/消息/成果保留，删除一个K2.8不影响另一个，再需要须重新创建；共享模型/原生登录/其它项目不动。详spec/ROLE_EXECUTION_AND_DELETE_REQUIREMENTS.md。手动关闭完成→启动为恢复路径，自动重启/随项目启动另行设计。
 
 - 正式安装目录可设计private子目录保存部署后生成的本机凭据，开发Git仓库仍须隔离；升级保留、不随源码/安装包分发。当前project_root内部禁用校验尚未调整，本轮不移动TALK-private或改路径规则。

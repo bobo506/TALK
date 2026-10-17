@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-17）
 
+2026-10-17 08:45最新：用户确认继续平移现有5角色，不重建身份。260已派DeepSeek按[宿主配置合同](spec/ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)首次实现per-runtime模板与内置21600预算通道，Codex交付后复核并直接修正；旧全局模板/自定义入口兼容，身份/choice/能力/owner守卫保持，不改MCP等待或热改旧进程。只改host与两测试路径，尚未实际补录/迁移或启停，259已发布ea21d81、原生/255人工仍待。默认用户通知260好了后取件，详[进度](PROGRESS.md)。
+
 2026-10-17 08:22最新：259保留身份补录产品片A已收取并本轮发布。Codex独立复核后直接修正双入口操作键隔离缺口及非空超长角色名静默换ID问题，162项相关回归+2项显式WAL并发探针通过；原partial/8源与失败证据保留，自修部分为Codex自检，不称外部独立复核。新增human-only legacy-attach、独立补录审计与精确legacy_attach来源，保原ID/Key/绑定/历史且不启动服务；详[补录合同](spec/ROLE_LEGACY_ATTACH_DESIGN.md)。5角色实际登记/迁移未执行，下一片宿主per-runtime模板/21600，再做真实逐角色切换；255人工/原生仍待。详[进度](PROGRESS.md)。
 
 2026-10-17 07:45最新：258准备片经Codex实际代码复核、21项相关隔离测试和5项新增探针通过，Hall2795后已收取；原partial/旧256/257报告保留，5角色实际登记与页面启停未执行。259已派DeepSeek首次实施[保留身份补录产品片A](spec/ROLE_LEGACY_ATTACH_DESIGN.md)：human-only legacy-attach、原ID/Key/绑定/历史保留、独立补录来源与宿主精确准入；不伪造创建操作、不启动服务或升能力。完成后Codex复核并直接修正，宿主模板/21600及真实迁移另片；默认通知“259好了”后取件。详[进度](PROGRESS.md)。

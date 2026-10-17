@@ -1,5 +1,8 @@
 # 角色受管服务合同（R1-3）
 
+
+> 2026-10-17：260已派首次实施[宿主模板与内置执行预算](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)，尚未验收。只在宿主接多runtime模板和默认21600/可覆盖预算，旧global/custom兼容，不扩claim/report协议、ready/stop/MCP超时，不改unknown/unverified、身份与owner校验或启停生产。当前5角色真实平移仍待。
+
 > 2026-10-17：259已完成[旧身份补录产品片A](ROLE_LEGACY_ATTACH_DESIGN.md)。宿主仅将精确legacy_attach加入可信选择来源，保留choice_id/六维匹配、归档/绑定/能力/归属与owner检查；补录接口不生成配置作业或start动作，不代表真实原生就绪。反向操作键冲突与非法名称由Codex直接修正，162项相关回归及2项WAL探针通过；5角色真实登记/启停仍待。
 
 > 2026-10-16新增已确认需求（待实施）：[完整异常日志与旧角色统一受管](ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md)。详细错误须持久留存并可跨重启追溯，旧角色保留身份/历史迁入同一宿主启停；以下所有权、能力登记与真实验收守卫保持。本需求仍待实施，不接管外部PID、改变能力或启停实例；254事务返修已独立通过，未扩入本需求。

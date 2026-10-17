@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-17 08:45（Asia/Shanghai）— 用户继续平移，260宿主模板/执行预算产品片B首次实施已派
+
+- 用户问迁移方式后确认继续：按平移保原ID/Key/已有模型绑定/身份档与历史，两个K2.8各自保留、不重建。259已发布ea21d81/收取/162相关回归+2WAL通过；本轮不重验已完成片，不修改其原8候选/失败/开发自报证据。
+- 根先核caller agent:codex/lead、项目prj_e8fe7066bbec与旧development_requirements，按10-17最新DeepSeek首次执行/Codex复核并直接修正的明确分工派发，不改页面旧开发要求。当前DS仅实例上报idle，不将陈旧上报当实时活进程证明。
+- usage-gate实际continue，captured_at=2026-10-17T00:41:59.561991Z，session/weekly百分比均null，不当0或编造精度；本次只派一个宿主配置片。根按MODULE_bridges/真实host配方/parser事实确认全局单模板与未传--timeout的两个缺口，不读其它MODULE、不查真实Key/原生模型。
+- Codex落盘ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md裁定新增可重复--runtime-command-template RUNTIME TEMPLATE、runtime优先/旧全局回退/冲突拒绝；内置--cli-execution-timeout-seconds缺省21600且正整数覆盖，预检/真实parser/spawn/有界数值摘要一致。custom入口不自动加bridge预算，显式新配置组合拒绝，不静默忽略；保持旧global/custom兼容与runtime-verified/身份/choice/owner守卫。不改ready/stop/HTTP/T-W/MCP/租约、运行中实例或通用bridge默认600。
+- 260最小四参交DeepSeek，Hall group:task-e754781d278e48d7a764961ed24aac30，UTC2026-10-17T00:45:23.248236初始queued/assigned。只允许scripts/role_service_host.py、tests/test_role_service_host.py及新增tests/test_role_host_runtime_configuration.py；需要其它源码先澄清，不扩server/DB/bridge/前端或真实配置。完成暂停由Codex复核/直接修正，不返修往返或自开下一片。
+- 产品基线ea21d817d0dbe24c2d2a76b6b9a069d2c76bf17a，862跟踪SHA、3实现路径与8协调docs白名单在product-host-config/baseline.json；开发证据仅developer/，完整stdout/stderr/逐用例日志必须落盘，不能重演259只有自报总数的证据限制。旧3版准备及256—259各独立证据保持；根开发期间只维护8docs，不审读/修改进行中的候选。
+- 本轮只首次实现任务派发与8正式docs校验提交推送，未操作生产API/DB/实际Key/服务或模型，未派发后的轮询/主动等待。5角色真实平移、真实原生/登录/模型/宿主/T-W与255人工仍待；260只是产品能力代码片，不把模板/参数测试当全入口六小时或真实服务通过。恢复默认用户通知260好了取件。
+- 派发/完整包/预算/验证/发布回执位于.tmp/legacy-role-page-control/product-host-config/{dispatch.json,task-package.json,usage-gate.json,validation.json,publication.json}。
+
 ## 2026-10-17 08:22（Asia/Shanghai）— 259首次实现独立复核后由Codex直接修正，产品片A收取发布
 
 - 用户通知259好了，根读取msg2797合法task259/partial完整摘要，runner succeeded/submitted；caller agent:codex/lead、项目与旧development_requirements实读，最新用户分工优先。DeepSeek已交付暂停/MCP报idle，根保留8候选字节副本与SHA后实读4产品源及4测试差异/夹具/合同，不派返修或额外回审。

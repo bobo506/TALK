@@ -15,6 +15,10 @@
 
 ## 当前实现
 
+### 受管宿主多运行器模板与执行预算：260首次实现中（2026-10-17）
+
+用户继续5角色平移，260交DeepSeek按[产品片B合同](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)首次实现：新增可重复--runtime-command-template RUNTIME TEMPLATE，显式runtime优先/旧全局回退；内置配方新增--cli-execution-timeout-seconds，有效缺省21600且可覆盖，真实parser/预检/最终spawn/公开数值诊断一致。显式自定义入口保持旧行为，新配置不适用组合明确拒绝，不能静默加bridge参数或冒称六小时。只改host及相关测试，Codex完成后复核并直接修正；当前仍未部署/迁移/真实启停，不改终端T-W/ready/stop/租约或运行中实例，也不改通用bridge默认600。259来源与能力/owner守卫保持，默认通知260好了后取件。
+
 ### 存量5角色登记与页面启停：259补录产品片A完成，宿主前置仍待（2026-10-17）
 
 [补录实施合同](ROLE_LEGACY_ATTACH_DESIGN.md)在259落地：human-only legacy-attach沿用原ID/Key，原子登记imported/nonexclusive角色、必要缺失绑定和独立审计；既有绑定/名册/说明/策略/历史保持，不造创建身份事实/新Key、不自动配置或启动。投影新增精确legacy_attach与mismatch，宿主接受creation_operation/legacy_attach且其余守卫保持。
