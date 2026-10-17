@@ -1,7 +1,7 @@
 # 角色受管服务合同（R1-3）
 
 
-> 2026-10-17：260已派首次实施[宿主模板与内置执行预算](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)，尚未验收。只在宿主接多runtime模板和默认21600/可覆盖预算，旧global/custom兼容，不扩claim/report协议、ready/stop/MCP超时，不改unknown/unverified、身份与owner校验或启停生产。当前5角色真实平移仍待。
+> 2026-10-17：260[宿主模板与内置执行预算](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)已收取，Codex直接修正配置校验/预算快照后74项相关验证通过，本轮发布。逐runtime模板与内置默认21600/可覆盖、旧global/custom兼容已接线；公开仅预算数值/来源，claim/report协议、ready/stop/MCP超时与身份/unknown/unverified/owner守卫保持。5角色真实平移及原生能力仍待，未启停生产。
 
 > 2026-10-17：259已完成[旧身份补录产品片A](ROLE_LEGACY_ATTACH_DESIGN.md)。宿主仅将精确legacy_attach加入可信选择来源，保留choice_id/六维匹配、归档/绑定/能力/归属与owner检查；补录接口不生成配置作业或start动作，不代表真实原生就绪。反向操作键冲突与非法名称由Codex直接修正，162项相关回归及2项WAL探针通过；5角色真实登记/启停仍待。
 

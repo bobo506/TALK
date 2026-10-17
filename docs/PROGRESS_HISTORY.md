@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-17 09:10（Asia/Shanghai）— 260首次交付独立复核后Codex直接修正，宿主模板/预算代码收取发布
+
+- 用户通知好了后读取260/msg2801完整合法partial摘要，runner succeeded/submitted、DeepSeek报idle/current_task_id=null后冻结3候选字节及885开发证据；caller agent:codex/lead、项目prj_e8fe7066bbec实核。旧development_requirements仍Kimi前端/交叉复核，最新10-17用户明确分工优先，不改生产要求。
+- 实际产品改动2源（host与新增配置测试），原host测试字节保持。首次实现per-runtime模板、内置默认21600与正整数覆盖、custom旧协议兼容/新参数组合拒绝、预算来源诊断；bridge/server/DB/前端/真实配置均未改，能力/身份/choice/owner守卫保持。
+- Codex独立实读实际代码/合同/开发测试与原始证据，发现F1/P2：超4300位数字转换抛未处理ValueError（长前导零实际60也错），模板False/0/空字符串被当缺省并创建状态根；F2/P2：argv组装/核验后重读manager，使来源/公开预算可能不同于最终argv。根新增6方法在原实现17子测试失败/3错误，记录为6方法而非20测试，失败原件保留。
+- 确认开发者暂停后Codex只改host与新增配置测试：模板真值判断前校验容器类型；数字去前导零/文本判界再转换；组装时捕获预算与来源，preflight从核验argv取预算。不派DeepSeek返修或额外外部回审；对首次交付的独立复核与自己的修正/最终验收分别记录。
+- 修正6项定向全过；根最终74项（40配置/34原宿主）0失败/错误/跳过，含四内置runtime×默认/60/43200预检中途配置变化的最终spawn/真实parser/诊断一致与构造时来源快照。日志在导入app前重定向落盘；74次TestClient和11次回环服务启动前显式断言临时DB/storage，仅假Key/假API或随机回环固定文本进程，无真实CLI/模型。
+- 开发原新增34/host34/worker50/role_services59逐例与raw日志核对成功，作为开发自测不与根74重复累计；baseline完整树/raw、原始空重定向文件与限制保持。根3候选compile/diff通过，原host测试、853保护文件、885开发证据和冻结3候选原件逐SHA保持。旧3版准备及259原始证据不覆盖。
+- Hall2802裁决accepted_after_codex_corrections，UTC2026-10-17T01:09:51.256720收取260为succeeded/completed，result_message_id仍2801/partial不追改。证据.tmp/legacy-role-page-control/product-host-config/independent-review260/含review、原失败、修正及最终日志/清单/collection/publication。
+- 汇总PROGRESS/本历史/PROJECT_BRIEF/MODULE_bridges/宿主配置合同/受管合同/日志与迁移需求/预算删除需求共8docs，精确2源+8docs本轮提交推送。原259产品基线ea21d81、派发协调df600c8保持可回溯，不暂存旧未跟踪材料。本宿主片完成暂停，不开下一功能；未读取新的精确额度，不臆测比例。
+- 当前5角色真实补录/迁移、原生登录/模型/宿主/T-W、255人工仍待。下一步在原授权内核实本人Key原来源、公开runner/model与真实能力，正常空闲退旧入口后逐角色保ID/Key/绑定/历史切换，DeepSeek及协调CLI最后；不凭PID接管Desktop/MCP、不升unknown/unverified。通用bridge600/其它手动入口、完整异常日志及删除另片，现有实例未重启/热改，参数通过不作真实六小时长任务证明。
+
 ## 2026-10-17 08:45（Asia/Shanghai）— 用户继续平移，260宿主模板/执行预算产品片B首次实施已派
 
 - 用户问迁移方式后确认继续：按平移保原ID/Key/已有模型绑定/身份档与历史，两个K2.8各自保留、不重建。259已发布ea21d81/收取/162相关回归+2WAL通过；本轮不重验已完成片，不修改其原8候选/失败/开发自报证据。

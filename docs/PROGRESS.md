@@ -1,60 +1,41 @@
 # Project Progress
 
-Updated: 2026-10-17 08:45 (Asia/Shanghai)：用户确认继续平移现有角色，260宿主多运行器模板/内置六小时预算产品片B已派DeepSeek首次实施；259已发布ea21d81，实际5角色补录/迁移仍待。
+Updated: 2026-10-17 09:10 (Asia/Shanghai)：260宿主多运行器模板/内置六小时预算已收取；Codex复核首次实现后直接修正并验证通过，本轮发布。259保身份补录已发布ea21d81；5角色真实平移仍待。
 
 ## 当前身份与分工
 
-- TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead，已读当前development_requirements。
-- 用户2026-10-17最新分工：Codex派任务→DeepSeek首次执行/自测交付后暂停→Codex独立复核→有问题Codex直接修正/验证/最终验收，正式docs/Git仍Codex。不再默认派DeepSeek同片返修或追加回审，首次独立复核与修正自检分别记录；替代旧前后端固定分工，历史任务/页面旧开发要求不追改。
-- 默认派发后结束等待、用户通知完成后取件；一次一方改共享源码。260由DeepSeek仅首次实现/必要自测，暂停后Codex独立复核并直接修正验证，不再派返修/回审。当前Codex只维护8协调docs，不审读或修改进行中的3路径候选。
+- TALK / prj_e8fe7066bbec / codex/terminal-return-codex；本轮MCP实读caller agent:codex/kind=agent，业务lead。页面development_requirements仍为旧Kimi前端/交叉复核文字，未自动修改。
+- 用户2026-10-17最新分工优先：Codex派发→DeepSeek首次实现/自测交付后暂停→Codex独立复核首次实现→发现问题由Codex直接修正、验证及docs/Git收尾；不往返派修/默认追加外部回审。自修部分的验证为Codex自检，不称他人独立复核。
+- 默认派后结束、用户通知后取件；共享目录一次一方改码。本轮只收尾260宿主片，不开下一片或操作Browser。
 
-## 250/254自动首次启动后端已独立通过
+## 当前：259补录及260宿主配置代码完成，实际迁移待执行
 
-- 原250仍failed/failed、msg2767/原3600秒超时与不合规本地报告保留；不收取/追改250。修正后8源为server/{models,db,role_services,role_provision_requests}.py与tests/test_role_{auto_start,services,provision_requests,policy_migration}.py。
-- 根已在250轮独立实读全部8源与合同、完成121/151隔离回归；254仅两白名单源定向修正，其余173源逐SHA不变，原8源副本/旧根失败证据保持。
-- F1/P1闭合：保存点rollback后核driver真实事务仍在、同事务内已flush provisioned事实可读，才允许局部failed/auto_start_enqueue_failed；RAISE(ROLLBACK)/连接失效上抛500整体回滚，不另起事务补写。F2/P2先注册再PATCH200并核external_session，重复注册409零写，unknown用例保留。
-- 本轮根独立63/63相关模块与原9/9 API/SQLite边界通过，0失败/错误/跳过；RAISE(ABORT)保留provisioned，RAISE(ROLLBACK)500/created/pending/revision3保持，去故障同token重试200/enqueued且恰1launch+1state；锚点/commit故障、双HTTP/WAL、人工意图及旧库迁移通过。8源py_compile/diff与175基线文件审查前后SHA通过。开发者273/9与根旧272分别保留，不重复累计。
-- 交付msg2779 task_id=254校验通过，独立裁决msg2780；UTC08:40:06.478883收取，succeeded/completed。证据.tmp/k28-autostart-slice/independent-review254/{review.json,focused/,boundary-probes.json,lost-outer-transaction.json,freeze.json,collection.json,publication.json}。
-- 254阶段仅后端代码验收与Git发布；当前255前端接受状态见下节，实际原生就绪另验。没有生产DB/真实Key/CLI/模型/常驻服务启停、能力修改或Browser操作，unknown/unverified/实际ready守卫保持。
-
-## 255前端独立通过，等待人工页面验收
-
-- 基线98beb9ce4d9bcc60f7f59d8ddf0f7d46bbc47590；255 DeepSeek独立实读11源及合同，无需返修。根核实际驱动/证据与11候选SHA、842保护文件均未变，不重复完整95/26自测，也未修改冻结源码。
-- 11源：web/{role-creation.js,index.html}、两创建Node测试及7个缓存断言消费者，六资源20261016-role-auto-start。新create固定auto_start=true；旧缓存原键/载荷保持true/false/null/缺省，recover不加意图。页面配置成功/入队/实际ready分开，详情只补异常短反馈，刷新零额外start，原启停与布局不变。
-- 独立95Node/26Python/14自建VM探针与8项Node变异检出，根核实际日志与候选来源；末轮Python变异26例/5失败原件保留，首轮7失败仅复核者自报，不额外累计。root独立临时DB/storage生命周期内补验首页+六资源字节通过。
-- 原msg2782=说明+JSON围栏，MCP保持unknown/unstructured。根按稳定SHA b97d50f8…无损保存4248字符原文，仅去说明/围栏抽JSON，逐值等同本地delivery-255.json，task255本地校验通过，不改原结果或冒称重提。Hall裁决msg2783；UTC14:32:40.619728收取succeeded/completed，result_message_id仍2782。
-- 验证范围纠正：原独立run-python在suite恢复engine后直接建TestClient，未显式临时DB/storage；原日志startup_cleanup deleted=0/missing_on_disk=0，没有事前DB快照，不能声称该段完全隔离/原DB完全未写。根补验已先断言临时engine/storage再启lifespan，原报告/驱动/日志保留不改。原测试追加日志/临时目录限制保留。
-- 证据.tmp/role-auto-start-frontend/final255/{format-audit.json,acceptance-audit.json,isolated-static.json,collection.json,publication.json}；独立原件在independent-review/。11源及10相关docs本轮提交推送，不暂存其它未跟踪材料。根没有启停生产实例/操作真实Key或模型，unknown/unverified未改。
-
-## 当前：259已发布，260宿主配置产品片B开发中，实际迁移仍待
-
-- [补录实施合同](spec/ROLE_LEGACY_ATTACH_DESIGN.md)已落地human-only legacy-attach：沿用旧member_id/Key，只增imported/nonexclusive项目角色、缺失绑定与独立补录审计；既有绑定/名册/说明/策略/历史保留，不创建新身份、换Key、配置作业或启动服务。投影精确legacy_attach来源，宿主只扩合法来源，其余能力/所有权守卫保持。
-- 原259/msg2797合法partial自报、原8候选字节和开发证据保留。Codex独立发现F1/P1反向操作键隔离缺失（含跨项目/并发可新建第二身份）、F2/P2超长非空显示名被静默换ID；新增6用例在原实现4失败，随后仅接手projects路由和补录测试修正，另补非空历史/成果保留测试。修正自检不称他人独立复核，未派DeepSeek返修。
-- 最终162相关回归（54补录/26投影/15迁移/34宿主/12创建幂等/21请求守卫）与2项显式SQLite WAL双入口并发探针全过，0失败/错误/跳过；8源compile/diff通过。其余6候选、原准备v1 22/v2 25/v3 35件保持。开发685为自报，本地未留完整原始测试日志，不作根独立证据/重复累计。
-- Hall2798裁决accepted_after_codex_corrections；UTC2026-10-17T00:22:21.735496收取259为succeeded/completed，原partial不改。证据product-attach/independent-review259/{review.json,original-negative.log,final-tests.json,wal-probes.json,candidate-manifest.json,final-manifest.json,collection.json,publication.json}。
-- 258准备通过/已收取事实保持，256/257旧needs_changes交付不追改。全部5角色本轮未实际补录/迁移或启停，原生CLI/登录/模型/常驻宿主/终端T-W与255人工页面验收仍未通过；host设置/陈旧PID或未打项目标签心跳不作归属、空闲或可控证明。
-- 用户明确按平移推进，无需重新创建：沿用原ID/Key/已有模型绑定/身份档/历史，两个K2.8各自保留。260按[宿主配置合同](spec/ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)补可重复--runtime-command-template及内置--cli-execution-timeout-seconds默认21600/显式覆盖；旧全局模板兼容，自定义入口不擅塞bridge预算，ready/stop/MCP/T-W等不改。模板登记不能代替真实能力验收。
-- 260最小四参交DeepSeek，Hall group:task-e754781d278e48d7a764961ed24aac30，UTC2026-10-17T00:45:23.248236初始queued/assigned。只允许scripts/role_service_host.py、tests/test_role_service_host.py及新增tests/test_role_host_runtime_configuration.py，证据仅product-host-config/developer/，不改bridge/server/DB/前端/真实配置或启停服务。产品基线ea21d81/862跟踪SHA及8协调docs白名单见product-host-config/baseline.json；原3版准备与259证据不覆盖。
-- 派发/完整包/额度与发布证据product-host-config/{dispatch.json,task-package.json,usage-gate.json,publication.json}。usage-gate返回continue但两用量百分比null，不当0；本轮仅派一个宿主片，默认用户通知260好了后取件，未主动轮询。
-- 260通过后核实公开runner/model及原本人Key来源、正常退旧入口、逐角色补录/启动/关闭/再启动与最小接单回传。DeepSeek自身和协调CLI最后切换，Desktop/MCP不强行接管；未验能力、未知owner/陈旧PID守卫保持。通用bridge默认600及旧手动入口并未由本片统一改成六小时。
+- 用户要求全部现有5角色平移，保原member_id/Key/模型绑定/身份档及任务消息成果历史，两个K2.8各自保留，不通过重新创建替代迁移。
+- [259补录合同](spec/ROLE_LEGACY_ATTACH_DESIGN.md)已落地human-only legacy-attach：原子增加imported/nonexclusive项目角色、必要缺失绑定和独立补录审计，沿用原Key；既有绑定/名册/说明/策略/历史保留，不生成新身份/Key或配置作业，不自动启动。精确legacy_attach来源及mismatch投影，宿主仅扩可信来源，其余能力/owner守卫保持。
+- 259独立发现操作键反向隔离与非法非空名称回落两问题后由Codex直接修正：6原探针4失败保留，最终162相关回归+2显式WAL双入口并发探针通过，Hall2798后已收取、发布ea21d81。原2797 partial、8候选/开发证据保留；开发685只是自报，本地无完整原始日志，不作独立证据。详product-attach/independent-review259/与历史。
+- [260宿主合同](spec/ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)现已实现可重复--runtime-command-template RUNTIME TEMPLATE；只接受codex/dsh/cli，同值去重/异值拒绝，显式runtime优先、旧全局回退，kimi-code保持原生模型参数。--cli-execution-timeout-seconds缺省None、内置有效21600，正整数显式覆盖；四配方实际外层argv恰一个--timeout，真实parser/预检/最终spawn/诊断共用预算事实。
+- 显式--cli-executable维持旧cli_args/alias及旧global兼容，不自动追加bridge预算，预算None/not_applied；显式新模板或预算与custom组合稳定拒绝。模板只是配置，不代替runtime-verified/真实原生能力验收；不改claim/report协议、ready/stop/HTTP/MCP/T-W/租约或现有实例。
+- 原260/msg2801为合法partial，MCP succeeded/submitted且DeepSeek报idle后冻结3候选字节、885开发证据及853保护文件。Codex首次独立复核发现F1/P2：超长数字int转换抛ValueError、合法长前导零误拒，False/0/空字符串非集合被当缺省；F2/P2：组装/核验后重读manager使预算来源或诊断数值偏离argv。
+- 新增6方法在原产品上出现17子测试失败/3错误（不是20个独立测试），原日志保留。Codex只改host和新增测试：模板先验集合类型；数字先去前导零/按文本判范围再转int；组装时捕获预算与来源，预检从核验argv取预算。未派返修或额外回审。
+- 修正后Codex自检运行74项（40配置/34原宿主），0失败/错误/跳过；12种runtime×默认/60/43200组合在预检中改变配置仍保持最终argv/真实parser/诊断一致。74次TestClient与11次回环服务启动前均断言临时DB/storage隔离；仅假Key/固定文本进程，无真实CLI/模型。3候选compile/diff通过，原host测试、853保护文件及885开发证据SHA一致。
+- 开发原日志实查新增34/host34/worker50/role_services59成功，作为开发自测独立列示，不与根74重复合计。Hall2802裁决accepted_after_codex_corrections；UTC2026-10-17T01:09:51.256720收取260为succeeded/completed，原partial结果不改。
+- 证据.tmp/legacy-role-page-control/product-host-config/independent-review260/{delivery-summary.json,review.json,original-negative.log,fixed-regressions.log,final-tests.json,candidate-manifest.json,source-validation.json,collection.json,publication.json}。实际产品改动2源（host与新增配置测试），另8正式docs；原候选与失败记录完整保留。
 
 ## 下一步与人工门禁
 
-- 加载含本次前端与98beb9c后端的服务，Ctrl+F5，项目→角色，按docs/guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md验创建说明、配置/入队/实际服务状态及关闭后刷新不重启。现有human账号/Key，启动命令及已知限制见该指南。
-- 255页面人工验收未完成；受管接入准备258及产品片A已完成，宿主前置仍待，不将本片代码通过当实际迁移。不把DOM/VM/TestClient当视觉/键盘/原生能力通过，未受管运行器应诚实给原因。
-- 259产品片A已发布；当前先260宿主模板/预算首次实现、Codex复核并直接修正，再逐角色实际登记/迁移，随后补255真实页面与启停验收；完整日志/通用预算/删除另片，不同时扩码。
+1. 在原授权内核实5角色的原本人Key来源、实际公开runner/model与宿主运行事实，准备真实逐角色平移。目标Key根缺文件不等于需重建身份/轮换Key；不猜模型，不把旧PID/陈旧心跳或host配置enabled当可控/空闲证明。
+2. 真实能力通过后正常退旧入口，保原ID补录，再逐角色验启动→关闭→再启动→最小接单/回传。DeepSeek自身及协调CLI最后切换；当前Codex Desktop/MCP不按未知PID强行接管，不放开unknown/unverified、归属或stop所有权守卫。
+3. 255前后端代码已发布，但人工页面/真实原生仍待。加载019bb99前端及98beb9c后端后Ctrl+F5，在项目→角色按[验收指南](guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)验创建自动首次启动、配置/入队/实际ready区分、关闭后刷新不再启动。使用既有人类账号/Key，具体启动方式/入口/限制见指南。
 
-## 已确认后续需求（待实施）
+本轮没有真实补录/迁移、生产API/DB/config写入、真实Key正文读取、能力升级、服务启停或模型调用；参数和隔离进程测试不证明真实六小时长任务、原生登录/模型或终端T-W通过。260完成宿主代码前置后暂停，不同时扩完整日志/删除/通用预算。
 
-- 完整异常日志需脱敏持久保存异常类/消息/完整堆栈/因果链与阶段/时间/项目/角色/实例/任务关联，跨重启可追查，公共入口有界摘要/引用；定位、轮换/容量方案实施时明确。旧K2.8原记录只有task queue worker failed:，最初触发原因未知；父进程存活不代表接单循环健康。
-- 存量受管迁移准备258与259保身份补录代码已完成，260宿主配方/预算正在首次实现，实际迁移待，Codex/Kimi/DeepSeek/旧K2.8等保留member_id/绑定/历史，空闲正常停旧入口后迁入统一宿主，补真实配方/能力登记/owner和launch关联，逐个验真实启动/关闭/再启动/接单；不凭PID接管或放开unknown/unverified。详spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md。
-- 全角色默认21600秒及可显式覆盖、角色详情删除按钮待实施；删除本项目角色配置/专属材料，历史任务/消息/成果保留，删除一个K2.8不影响另一个，再需要须重新创建；共享模型/原生登录/其它项目不动。详spec/ROLE_EXECUTION_AND_DELETE_REQUIREMENTS.md。手动关闭完成→启动为恢复路径，自动重启/随项目启动另行设计。
+## 已确认待实施与保留事实
 
-- 正式安装目录可设计private子目录保存部署后生成的本机凭据，开发Git仓库仍须隔离；升级保留、不随源码/安装包分发。当前project_root内部禁用校验尚未调整，本轮不移动TALK-private或改路径规则。
-
-## 保留事实
-
-- 253→248→246已收取，revision-2本机零模型入口准备通过，详历史与.tmp/k28-new-role-trial-prep/revision-2/final253/。原稿/原失败/253 task_id格式整理来源保留；仅Windows10本地files专用runner，35/11独立验证通过，不冒充产品pipes。实际客户端T未知、W未启用，临时CLI600/整体900；真实新Kimi/模型/开发能力/原生退出及主动等待未验，不自动开真实新角色任务。
-- 252旧K2.8六小时入口已发布79096ad，旧实例实际执行预算本轮未从启动日志核实，不声称21600实测。用户此前重启后254已接单只证明本次接单恢复；外部旧CLI尚无受管owner/launch，不能当成页面已可重启该实例。
-- 251发起人标签发布84b8010、六资源20261016-task-initiator-label；静态字节已核，人工视觉反馈待。页面5de19e8此前整体通过，不外推本次小修或真实原生能力。
-- 254已收取并发布98beb9c；本轮255前端独立通过后11源本轮发布，其它未跟踪材料不纳入。精确配额未读取，不臆测比例；恢复说“继续项目”。
+- 258准备v3已收取/独立21项及5探针通过，原256/257 needs_changes报告不收取/不追改；v1 22/v2 25/v3 35原件及256—259审查证据保持。迁移事实只能重新核实，不能拿旧准备快照当当前状态。
+- 完整异常日志须脱敏持久保存类型/消息/完整堆栈/因果链及项目/角色/实例/任务/阶段关联，跨重启可追查。父进程活着不代表接单循环健康；旧K2.8原记录只有task queue worker failed:，初因仍未知。详[日志与受管需求](spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md)。
+- 全入口默认21600及可覆盖尚未全部落地：260仅受管宿主内置配方，通用bridge仍默认600、旧手动入口另片；252旧K2.8入口已发布79096ad，运行实例实际预算未核实。手动关闭完成→启动为恢复路径，不默认无限重启/随项目启动。
+- [执行预算与删除需求](spec/ROLE_EXECUTION_AND_DELETE_REQUIREMENTS.md)：角色详情删除按钮待做，删除本项目配置/专属材料并保历史消息任务成果，一个K2.8删除不影响另一个；以后重新需要须创建新角色，共享模型/登录/其它项目保持。
+- 254后端已收取发布98beb9c，原250失败/3600超时证据不追改；255独立95Node/26Python/14VM和8Node变异通过、发布019bb99，静态探针原隔离遗漏与后续根补验事实保留，不外推原DB零写。详历史及.tmp/role-auto-start-frontend/final255/。
+- 253→248→246已收取、revision-2仅Windows10/files零模型准备通过，真实新Kimi/模型/退出/主动等待未验；251详情发起人标签已发布84b8010、视觉反馈仍待。
+- 正式安装目录可设计private子目录保存部署生成的本机凭据，升级保留、不随源码/安装包分发；开发Git仓库仍隔离。当前内部Key根禁用规则不改，不移动TALK-private。
+- 本轮未读取新的精确额度；此前usage-gate返回continue但session/weekly百分比null，不当0或臆测比例。完整历史见[开发历史](PROGRESS_HISTORY.md)，恢复可说“继续项目”。

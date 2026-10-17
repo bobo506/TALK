@@ -15,15 +15,15 @@
 
 ## 当前实现
 
-### 受管宿主多运行器模板与执行预算：260首次实现中（2026-10-17）
+### 受管宿主多运行器模板与执行预算：260已验收收取（2026-10-17）
 
-用户继续5角色平移，260交DeepSeek按[产品片B合同](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)首次实现：新增可重复--runtime-command-template RUNTIME TEMPLATE，显式runtime优先/旧全局回退；内置配方新增--cli-execution-timeout-seconds，有效缺省21600且可覆盖，真实parser/预检/最终spawn/公开数值诊断一致。显式自定义入口保持旧行为，新配置不适用组合明确拒绝，不能静默加bridge参数或冒称六小时。只改host及相关测试，Codex完成后复核并直接修正；当前仍未部署/迁移/真实启停，不改终端T-W/ready/stop/租约或运行中实例，也不改通用bridge默认600。259来源与能力/owner守卫保持，默认通知260好了后取件。
+[产品片B合同](ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md)已实现：--runtime-command-template RUNTIME TEMPLATE可重复，显式runtime优先/旧全局回退；--cli-execution-timeout-seconds内置有效缺省21600/可覆盖，真实parser/预检/最终spawn/公开诊断同一预算事实。custom入口维持旧行为，不追加bridge预算，显式新配置组合拒绝。Codex独立复核后直接补配置类型/超长数字稳定校验与预算来源/数值快照，6新增方法在原代码17子测试失败/3错误，修正后40配置+34宿主共74项全过；原代码/失败/开发日志保留，原host测试未改。Hall2802后260已收取，修正为Codex自检，不追加外部回审。未部署/迁移/真实启停，不改终端T-W/ready/stop/租约、运行中实例或通用bridge默认600，259来源/能力/owner守卫保持。
 
-### 存量5角色登记与页面启停：259补录产品片A完成，宿主前置仍待（2026-10-17）
+### 存量5角色登记与页面启停：259/260产品代码完成，真实平移仍待（2026-10-17）
 
 [补录实施合同](ROLE_LEGACY_ATTACH_DESIGN.md)在259落地：human-only legacy-attach沿用原ID/Key，原子登记imported/nonexclusive角色、必要缺失绑定和独立审计；既有绑定/名册/说明/策略/历史保持，不造创建身份事实/新Key、不自动配置或启动。投影新增精确legacy_attach与mismatch，宿主接受creation_operation/legacy_attach且其余守卫保持。
 
-Codex独立复核后按最新分工直接修正反向操作键冲突与非法名称静默回落问题，原6探针4失败保留，最终162项相关回归及2种先后顺序WAL并发探针通过；原8源及自报保留，259 Hall2798后已收取，自修部分不称外部独立复核。258准备通过事实保持；5角色实际补录/迁移未执行，下一片宿主per-runtime命令模板/21600，再逐角色核真实Key/模型/能力、正常退旧入口与页面启停。真实原生/终端T-W、255人工验收仍待，unknown/unverified与owner守卫不放开，本数据库片收尾后暂停。
+Codex独立复核后按最新分工直接修正反向操作键冲突与非法名称静默回落问题，原6探针4失败保留，最终162项相关回归及2种先后顺序WAL并发探针通过；原8源及自报保留，259 Hall2798后已收取，自修部分不称外部独立复核。258准备通过事实保持；5角色实际补录/迁移未执行，260宿主per-runtime模板/21600代码现已完成；后续逐角色核原Key/公开模型/真实能力、正常退旧入口与页面启停。真实原生/终端T-W、255人工验收仍待，unknown/unverified与owner守卫不放开，本数据库片收尾后暂停。
 
 ### 完整异常日志与存量角色统一受管（2026-10-16，已确认待实施）
 

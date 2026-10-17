@@ -1,6 +1,6 @@
 # 受管宿主运行器模板与执行预算：产品片B实施合同
 
-状态：2026-10-17 08:45，260已派DeepSeek首次实施产品片B，Codex交付后复核并直接修正；259产品片A已发布ea21d81。用户确认继续5角色平移，当前宿主配置能力尚未验收/部署，未执行真实角色迁移。
+状态：2026-10-17 09:10，260首次实现经Codex独立复核、直接修正及74项相关验证后已收取，本轮发布。259产品片A已发布ea21d81；5角色真实补录/迁移、原生登录/模型/实际宿主与255人工仍待。修正后验证为Codex自检，不称其它执行者独立复核。
 
 ## 范围与分工
 
@@ -31,3 +31,12 @@ DeepSeek只首次实现、自测和交付后暂停；Codex独立复核，有问�
 - TALK交付为纯talk-delivery-1 JSON，自带实际任务号并先校验；代码/基线SHA、完成/未完成、测试命令与原始日志、限制和进度草稿齐备。原prepare-v1/v2/v3及各独立复核、product-attach/原证据不得覆盖。完成暂停，不开始真实迁移。
 
 真实终端适配遵循TERMINAL_MCP的T/W/返回余量与取消/排队核验。本片不改终端配置、不启用主动等待，未知项如实待验，不能以真实parser通过冒充原生/模型/终端适配通过。
+
+## 260最终实现与复核记录
+
+- 产品改动仅scripts/role_service_host.py及新增tests/test_role_host_runtime_configuration.py，原tests/test_role_service_host.py字节不变；没有bridge/server/API/DB/前端/生产配置变更。
+- F1/P2：配置校验先验None/Mapping/list/tuple类型，不把False/0/空字符串当缺省。十进制先去前导零、按文本与2^63-1上界比较，再转int，超长越界稳定execution_timeout_invalid，长前导零但实际值60可用；CLI/构造校验先于私有Key读取/客户端创建/spawn。该边界只说明当前配置/parser接线，不证明极大预算在真实CLI中运行通过。
+- F2/P2：组装argv前捕获requested_timeout与来源；预检在真实parser核验后从同一argv读取有效值，不再重读manager。四runtime×默认/60/43200的配置中途改变反例覆盖最终spawn/真实parser/诊断一致，claim/report无新增字段。
+- 根新增6方法在原代码出现17子测试失败/3错误；修正后40配置+34原宿主=74项，0失败/错误/跳过。74次TestClient、11次回环服务启动前临时DB/storage断言通过；只假Key/固定文本进程。开发34/34/50/59原始日志实查通过，单列自测不叠加根计数。
+- 原2801 partial、3候选字节副本与885开发证据保留，Hall2802裁决后UTC2026-10-17T01:09:51.256720收取260为succeeded/completed。审查与修正自检来源区分；完整证据在.tmp/legacy-role-page-control/product-host-config/independent-review260/。
+- 六小时仅当前宿主内置入口默认；通用600/旧手动入口、真实长任务和T/W仍待验证，不热改现有实例。下一步核实原Key/公开模型与真实能力后逐角色平移，DeepSeek及协调CLI最后。

@@ -45,6 +45,31 @@
 - 真实运行器能力**未验收**：内置模板还必须由人类用 ``--runtime-verified`` 显式登记才会
   被执行，否则稳定拒绝 ``runtime_unverified``。本片只用隔离固定文本 Python 子进程
   （``--cli-executable`` + 私有 ``--key-file``）证明协议闭环。
+
+运行器模板与执行预算（产品片B / 260）
+-------------------------------------
+- 新增可重复 ``--runtime-command-template RUNTIME TEMPLATE``（``nargs=2`` + ``append``）：
+  只为**确实需要 command flag** 的运行器（``codex`` / ``dsh`` / ``cli``）登记本机入口命令
+  模板。同运行器同值去重、异值稳定拒绝 ``runtime_template_conflict``；未知运行器、
+  不使用 command flag 的运行器（``kimi-code``）、空白模板与缺 ``{model}`` 一律稳定拒绝。
+  优先级为**该运行器显式模板 > 旧 ``--cli-command-template`` 全局回退 > 既有缺模板错误**；
+  旧全局参数保持单字符串语义，不被解析成新语法。模板是**本机显式登记事实**，不等于真实
+  能力验收，也不点亮 ``runtime-verified``。
+- 新增 ``--cli-execution-timeout-seconds N``：内置受管配方有效默认
+  :data:`DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS`（21600 秒），显式十进制正整数可覆盖；
+  拒绝 ``bool``/零/负值/小数/``NaN``/``Inf``/非数字字符串/超范围值。CLI 未显式给出时保留
+  ``None``，用于区分“内置默认”与“显式自定义入口兼容”，程序化构造走同一套校验。
+  内置路径的**外层 argv 恰好一个** ``--timeout N``，真实 parser 的 ``timeout`` 与该有效值
+  相等；预检把 argv 与预算一起冻结进 :class:`PreflightFacts`，最终 spawn 只用冻结快照，
+  绝不在 spawn 时重取可变 manager 值。公开启动诊断只新增有界数值/枚举
+  （``execution_timeout_seconds`` / ``execution_timeout_source`` / ``command_template_source``），
+  **不**新增服务端 claim/report 协议字段，不输出模板正文、完整 argv、Key 或私有路径。
+- 显式 ``--cli-executable`` 仍是既有自定义协议入口：保留旧 ``cli_args``/``alias_flag``
+  接线，**不**自动附加 bridge 专用 ``--timeout``，其预算事实是 ``None`` +
+  ``not_applied``（不宣称被六小时管控）；同时显式给新 per-runtime 模板或新预算参数时
+  稳定拒绝 ``cli_executable_option_unsupported``，绝不静默忽略。未给新参数时旧调用照旧。
+- 本片只闭合**宿主内置配方通道**：通用 bridge 默认 600 秒、其它旧手动入口、ready/stop/
+  HTTP/任务租约/MCP 客户端上限与 TALK 读取等待均**未**改变，也未在运行实例上热改预算。
 """
 
 from __future__ import annotations
@@ -95,6 +120,14 @@ DEFAULT_HTTP_TIMEOUT_SECONDS = 15.0
 DEFAULT_READY_TIMEOUT_SECONDS = 60.0
 DEFAULT_STOP_TIMEOUT_SECONDS = 20.0
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
+#: 产品片B：**内置受管配方**的有效执行预算默认值（六小时）。
+#: 它只作用于宿主内置配方外层 argv 的 ``--timeout``；不改变 ``bridges.cli_bridge``
+#: 自身的 600 秒默认，也不改变 ready/stop/HTTP/任务租约/MCP 上限与 TALK 读取等待。
+DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS = 21600
+#: 显式执行预算的可表达范围上界（有符号 64 位）。超过即稳定拒绝，绝不静默截断或取模；
+#: 刻意**不**设 3600/21600 这类固定上限。
+MAX_CLI_EXECUTION_TIMEOUT_SECONDS = 2**63 - 1
+
 #: R1-4b 返修 F2：worker 轮次在宿主退出时的**有界**收集窗口。
 #: 主控制循环绝不 join 未结束的网络 IO；只在循环结束（once/上限/停止）后按 worker 自己的
 #: 单轮 IO 预算 + 单次请求超时 + 余量收集一次，并对仍然卡住的轮次显式请求停止后收尾。
@@ -217,6 +250,10 @@ PUBLIC_KEYS: frozenset[str] = frozenset(
         "entry_fingerprint",
         "runtime",
         "argv_checked",
+        # 产品片B：宿主内置配方的**有界**执行预算/模板来源诊断（数值与枚举，不含正文）。
+        "execution_timeout_seconds",
+        "execution_timeout_source",
+        "command_template_source",
         # R1-4b：请求 worker 的进度投影（仍是严格白名单；不含 Key/token/绝对私有路径）。
         "stage",
         "plan",
@@ -690,6 +727,125 @@ def resolve_alias_flag(runtime: Optional[str], explicit: Optional[str] = None) -
     return "--model"
 
 
+def normalize_runtime_command_templates(
+    values: Any = None,
+    *,
+    cli_executable: Optional[str] = None,
+) -> dict[str, str]:
+    """校验并**复制**per-runtime 命令模板映射（CLI 与程序化构造共享）。
+
+    ``values`` 接受 ``None``、``{runtime: template}`` 映射，或 ``--runtime-command-template``
+    的 ``[(runtime, template), ...]`` 追加结果。只接受**确实需要 command flag** 的运行器
+    （``codex`` / ``dsh`` / ``cli``）：
+
+    - 未知运行器、空白运行器、不使用 command flag 的运行器（``kimi-code``）
+      → ``runtime_template_unsupported``；
+    - 空白模板 → ``runtime_template_empty``；缺字面量 ``{model}`` → ``runtime_template_missing_model``；
+    - 同一运行器同值重复 → 去重；同运行器异值 → ``runtime_template_conflict``（禁止后值覆盖）。
+
+    返回值是新 dict：调用方此后修改原输入不会影响已构造的 manager。显式自定义入口
+    （``--cli-executable``）不支持该参数，一旦显式给出即稳定拒绝，绝不静默忽略。
+    """
+    if values is not None and not isinstance(values, (Mapping, list, tuple)):
+        raise HostError(
+            "runtime_template_invalid", "运行器命令模板必须是映射或 RUNTIME/TEMPLATE 二元组"
+        )
+    has_values = bool(values)
+    if has_values and cli_executable:
+        raise HostError(
+            "cli_executable_option_unsupported",
+            "显式自定义入口不支持 --runtime-command-template（保留旧 cli_args/alias 接线）",
+        )
+    entries: list[tuple[Any, Any]] = []
+    if not has_values:
+        entries = []
+    elif isinstance(values, Mapping):
+        entries = list(values.items())
+    elif isinstance(values, (list, tuple)):
+        for item in values:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                raise HostError(
+                    "runtime_template_invalid",
+                    "每个运行器命令模板都必须给出 RUNTIME TEMPLATE 两项",
+                )
+            entries.append((item[0], item[1]))
+    else:
+        raise HostError(
+            "runtime_template_invalid", "运行器命令模板必须是映射或 RUNTIME/TEMPLATE 二元组"
+        )
+    resolved: dict[str, str] = {}
+    for raw_runtime, raw_template in entries:
+        key = str(raw_runtime or "").strip()
+        recipe = RUNTIME_RECIPES.get(key)
+        if recipe is None or not recipe.command_required or not recipe.command_flag:
+            raise HostError(
+                "runtime_template_unsupported",
+                "该运行器不接受命令模板（未知或不需要 command flag）",
+            )
+        template = str("" if raw_template is None else raw_template).strip()
+        if not template:
+            raise HostError("runtime_template_empty", "运行器命令模板不能为空")
+        if "{model}" not in template:
+            raise HostError(
+                "runtime_template_missing_model",
+                "运行器命令模板必须包含字面量 {model}，否则无法接入精确 alias",
+            )
+        existing = resolved.get(key)
+        if existing is None:
+            resolved[key] = template
+        elif existing != template:
+            raise HostError(
+                "runtime_template_conflict",
+                "同一运行器给出了不同的命令模板，禁止后值静默覆盖",
+            )
+    return resolved
+
+
+def normalize_execution_timeout(
+    value: Any,
+    *,
+    cli_executable: Optional[str] = None,
+) -> Optional[int]:
+    """校验执行预算：``None`` 表示 CLI 未显式给出（保留以区分内置默认与自定义入口）。
+
+    显式值**只接受十进制正整数**（1..:data:`MAX_CLI_EXECUTION_TIMEOUT_SECONDS`）；
+    ``bool``/零/负值/小数/``NaN``/``Inf``/非数字字符串/超范围值一律稳定拒绝，且不设
+    3600 或 21600 这类固定上限。显式自定义入口（``--cli-executable``）不支持该参数，
+    一旦显式给出即稳定拒绝，绝不静默忽略。
+    """
+    if value is None:
+        return None
+    if cli_executable:
+        raise HostError(
+            "cli_executable_option_unsupported",
+            "显式自定义入口不支持 --cli-execution-timeout-seconds（不附加 bridge --timeout）",
+        )
+    if isinstance(value, bool):
+        raise HostError("execution_timeout_invalid", "执行预算不接受布尔值")
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not re.fullmatch(r"[0-9]+", text):
+            raise HostError(
+                "execution_timeout_invalid", "执行预算必须是十进制正整数秒"
+            )
+        # 先按十进制文本判范围，再转换，避免超长输入触发 Python 的 int 字符数限制。
+        # 前导零不改变数值，也不能让一个实际可表达的预算被误拒绝。
+        text = text.lstrip("0") or "0"
+        maximum = str(MAX_CLI_EXECUTION_TIMEOUT_SECONDS)
+        if len(text) > len(maximum) or (len(text) == len(maximum) and text > maximum):
+            raise HostError("execution_timeout_invalid", "执行预算超出实际入口可表达范围")
+        number = int(text)
+    else:
+        raise HostError("execution_timeout_invalid", "执行预算必须是十进制正整数秒")
+    if number <= 0:
+        raise HostError("execution_timeout_invalid", "执行预算必须大于 0 秒")
+    if number > MAX_CLI_EXECUTION_TIMEOUT_SECONDS:
+        raise HostError("execution_timeout_invalid", "执行预算超出实际入口可表达范围")
+    return number
+
+
 def _python_executable() -> str:
     return getattr(sys, "_base_executable", None) or sys.executable
 
@@ -703,15 +859,19 @@ def build_runtime_argv(
     *,
     model_alias: str,
     command_template: Optional[str] = None,
+    execution_timeout: Any = None,
 ) -> list[str]:
-    """组装**真实仓库入口**的 base argv（含精确 alias 接线）；不支持则稳定失败。
+    """组装**真实仓库入口**的 base argv（含精确 alias 接线与执行预算）；不支持则稳定失败。
 
     - ``kimi-code``：``-m bridges.kimi_bridge --kimi-model <alias>``，该参数会被真实
       bridge 转成 Kimi CLI 的 ``--model <alias>``；
     - ``codex``：真实 parser **没有**模型参数，必须由本地登记的 ``--cli-command-template``
       承载 alias，否则 ``runtime_alias_unsupported``（绝不塞 ``--model`` 猜参数）；
     - ``dsh``/``cli``：真实 parser 要求 ``--command``，同样必须本地登记命令模板，
-      否则 ``cli_command_unresolved``。
+      否则 ``cli_command_unresolved``；
+    - 内置配方路径的**外层 argv 恰好一个** ``--timeout N``：``execution_timeout`` 为
+      ``None``（CLI 未显式给出）时解析成 :data:`DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS`，
+      显式正整数按原值接入；两条路径都由 :func:`normalize_execution_timeout` 共享校验。
     """
     key = str(runtime or "").strip()
     recipe = RUNTIME_RECIPES.get(key)
@@ -719,6 +879,9 @@ def build_runtime_argv(
         raise HostError("cli_missing", "该运行器没有受管入口配方，需显式 --cli-executable")
     if not model_alias:
         raise HostError("model_alias_unresolved", "绑定未提供可用的模型 alias")
+    effective_timeout = normalize_execution_timeout(execution_timeout)
+    if effective_timeout is None:
+        effective_timeout = DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS
     resolved = [
         _python_executable() if part == "{python}" else part for part in recipe.argv
     ]
@@ -738,11 +901,17 @@ def build_runtime_argv(
                 "runtime_alias_unsupported", "本地命令模板缺少 {model} 占位，无法接入精确 alias"
             )
         resolved += [str(recipe.command_flag), template.replace("{model}", model_alias)]
+    resolved += ["--timeout", str(effective_timeout)]
     return resolved
 
 
 def verify_runtime_entry(runtime: str, argv: Sequence[str]) -> str:
-    """用**真实仓库入口**的 parser 解析核验 argv；返回入口指纹（模块路径 + sha256）。"""
+    """用**真实仓库入口**的 parser 解析核验 argv；返回入口指纹（模块路径 + sha256）。
+
+    产品片B：除了解析成功，还核验外层 argv **恰好一个** ``--timeout``，且真实 parser
+    解析出的 ``timeout`` 是正整数——证明“六小时预算”确实进了真实入口，而不是只写在
+    宿主自己的诊断里。
+    """
     key = str(runtime or "").strip()
     recipe = RUNTIME_RECIPES.get(key)
     if recipe is None:
@@ -765,14 +934,25 @@ def verify_runtime_entry(runtime: str, argv: Sequence[str]) -> str:
     ):
         raise HostError("cli_incompatible", "受管 argv 必须以本解释器 + -m <真实入口模块> 开头")
     rest = [str(part) for part in argv[3:]]
+    if rest.count("--timeout") != 1:
+        raise HostError(
+            "cli_incompatible", "受管 argv 必须恰好给出一个外层 --timeout（不重复、不缺失）"
+        )
     stderr = io.StringIO()
     try:
         with contextlib.redirect_stderr(stderr):
-            builder().parse_args(rest)
+            namespace = builder().parse_args(rest)
     except SystemExit as exc:
         raise HostError(
             "cli_incompatible", "真实入口 parser 不接受该 argv（解析失败或缺少必填参数）"
         ) from exc
+    parsed_timeout = getattr(namespace, "timeout", None)
+    if (
+        isinstance(parsed_timeout, bool)
+        or not isinstance(parsed_timeout, int)
+        or parsed_timeout <= 0
+    ):
+        raise HostError("cli_incompatible", "真实入口未解析出正整数执行预算")
     digest = __import__("hashlib").sha256(
         module_file.read_bytes()
     ).hexdigest()[:16]
@@ -948,7 +1128,13 @@ def spawn_hidden(
 
 
 class PreflightFacts:
-    """启动前核验过的事实（真实入口 argv、凭据、指纹、隔离子进程环境）。"""
+    """启动前核验过的事实（真实入口 argv、凭据、指纹、隔离子进程环境）。
+
+    产品片B：``argv`` 是**已经冻结**的最终 base argv（含恰好一个 ``--timeout``），
+    ``execution_timeout_seconds`` / ``execution_timeout_source`` /
+    ``command_template_source`` 是同一份快照里的有界预算与来源诊断。最终 spawn 只使用
+    本对象，绝不在 spawn 时重取可变 manager 值。
+    """
 
     __slots__ = (
         "argv",
@@ -958,6 +1144,9 @@ class PreflightFacts:
         "profile_fingerprint",
         "child_env",
         "runtime",
+        "execution_timeout_seconds",
+        "execution_timeout_source",
+        "command_template_source",
     )
 
     def __init__(
@@ -970,6 +1159,9 @@ class PreflightFacts:
         profile_fingerprint: str,
         child_env: dict[str, str],
         runtime: str,
+        execution_timeout_seconds: Optional[int] = None,
+        execution_timeout_source: str = "unknown",
+        command_template_source: str = "unknown",
     ):
         self.argv = argv
         self.key_file = key_file
@@ -978,6 +1170,17 @@ class PreflightFacts:
         self.profile_fingerprint = profile_fingerprint
         self.child_env = child_env
         self.runtime = runtime
+        self.execution_timeout_seconds = execution_timeout_seconds
+        self.execution_timeout_source = execution_timeout_source
+        self.command_template_source = command_template_source
+
+    def diagnostics(self) -> dict[str, Any]:
+        """公开启动诊断：只有有界数值/枚举，不含模板正文、argv、Key 或私有路径。"""
+        return {
+            "execution_timeout_seconds": self.execution_timeout_seconds,
+            "execution_timeout_source": self.execution_timeout_source,
+            "command_template_source": self.command_template_source,
+        }
 
 
 class HostManager:
@@ -995,6 +1198,8 @@ class HostManager:
         cli_executable: Optional[str] = None,
         cli_args: Optional[Sequence[str]] = None,
         cli_command_template: Optional[str] = None,
+        runtime_command_templates: Any = None,
+        execution_timeout_seconds: Any = None,
         alias_flag: Optional[str] = None,
         verified_runtimes: Optional[Sequence[str]] = None,
         child_env: Optional[dict[str, str]] = None,
@@ -1003,6 +1208,14 @@ class HostManager:
         project_root: Optional[Path] = None,
         child_log_dir: Optional[Path] = None,
     ):
+        # 产品片B：非法配置必须**先于**任何私有凭据读取/API/spawn 被拒绝，且 CLI 与
+        # 程序化构造走同一套校验；这里保存的是副本，外部 dict 之后被改动不影响本实例。
+        self.runtime_command_templates = normalize_runtime_command_templates(
+            runtime_command_templates, cli_executable=cli_executable
+        )
+        self.execution_timeout_seconds = normalize_execution_timeout(
+            execution_timeout_seconds, cli_executable=cli_executable
+        )
         self.client = client
         self.host = host or socket.gethostname()
         self.store = OwnershipStore(state_dir or DEFAULT_STATE_DIR)
@@ -1038,18 +1251,70 @@ class HostManager:
             raise HostError("role_key_missing", "无法解析角色 Key 路径") from exc
         return Path(key_file_path(self.role_key_root, member_id))
 
-    def base_argv(self, runtime: Optional[str], model_alias: str) -> list[str]:
-        """真实入口 base argv：显式 ``--cli-executable`` 优先，否则用真实配方。"""
+    def resolve_command_template(self, runtime: Optional[str]) -> tuple[Optional[str], str]:
+        """本次 runtime 实际使用的命令模板与**来源枚举**。
+
+        优先级固定为：该运行器显式 per-runtime 模板 > 旧 ``--cli-command-template`` 全局
+        回退 > 既有缺模板错误。不使用 command flag 的运行器（``kimi-code``）来源是
+        ``not_applicable``，绝不复用别的 runtime 的显式模板。
+        """
+        key = str(runtime or "").strip()
+        explicit = self.runtime_command_templates.get(key)
+        if explicit is not None:
+            return explicit, "runtime_template"
+        recipe = RUNTIME_RECIPES.get(key)
+        if recipe is not None and not recipe.command_required:
+            return None, "not_applicable"
+        global_template = str(self.cli_command_template or "").strip()
+        if global_template:
+            return global_template, "global_template"
+        return None, "unresolved"
+
+    def effective_execution_timeout(self) -> Optional[int]:
+        """本次配置下内置通道的**有效执行预算**；显式自定义入口为 ``None``（不适用）。"""
+        if self.cli_executable:
+            return None
+        if self.execution_timeout_seconds is not None:
+            return int(self.execution_timeout_seconds)
+        return DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS
+
+    def build_entry_argv(
+        self, runtime: Optional[str], model_alias: str
+    ) -> tuple[list[str], str, str]:
+        """返回 ``(base argv, command_template_source, execution_timeout_source)``。
+
+        这是**唯一**会解析模板/预算的地方；预检把结果冻结进 :class:`PreflightFacts`，
+        最终 spawn 只使用冻结后的 argv。
+        """
         if self.cli_executable:
             executable = Path(self.cli_executable)
             if not executable.is_file():
                 raise HostError("cli_missing", "显式 CLI 入口不是可执行文件")
-            return [str(executable), *self.cli_args]
-        return build_runtime_argv(
+            # 既有自定义入口：保留旧 cli_args/alias 接线，不附加 bridge --timeout。
+            return (
+                [str(executable), *self.cli_args],
+                "custom_executable",
+                "not_applied",
+            )
+        template, template_source = self.resolve_command_template(runtime)
+        requested_timeout = self.execution_timeout_seconds
+        argv = build_runtime_argv(
             str(runtime or ""),
             model_alias=model_alias,
-            command_template=self.cli_command_template,
+            command_template=template,
+            execution_timeout=requested_timeout,
         )
+        timeout_source = (
+            "explicit" if requested_timeout is not None else "builtin_default"
+        )
+        return argv, template_source, timeout_source
+
+    def base_argv(self, runtime: Optional[str], model_alias: str) -> list[str]:
+        """真实入口 base argv：显式 ``--cli-executable`` 优先，否则用真实配方。"""
+        argv, _template_source, _timeout_source = self.build_entry_argv(
+            runtime, model_alias
+        )
+        return argv
 
     def _require_runtime_registered(self, runtime: str) -> None:
         """真实运行器的受管能力必须由人类在本机显式登记；未登记稳定拒绝。"""
@@ -1202,7 +1467,7 @@ class HostManager:
         if not self.cli_executable:
             # 真实运行器必须先由人类显式登记；未登记时**先**稳定拒绝，不进入入口组装。
             self._require_runtime_registered(runtime)
-        base = self.base_argv(runtime, alias)
+        base, template_source, timeout_source = self.build_entry_argv(runtime, alias)
         if not self.cli_executable:
             entry_fingerprint = verify_runtime_entry(runtime, base)
         else:
@@ -1210,6 +1475,12 @@ class HostManager:
             if not Path(base[0]).is_file():
                 raise HostError("cli_missing", "CLI 入口不可解析")
             entry_fingerprint = f"local:{Path(base[0]).name}"
+        # 预算事实与 argv 属于**同一份快照**：spawn 阶段不得再读可变 manager 值。
+        effective_timeout = (
+            None
+            if timeout_source == "not_applied"
+            else int(base[base.index("--timeout") + 1])
+        )
         facts = self._role_facts(project_id, member_id, role_key, action=action)
         runner = facts.get("runner") or {}
         model = facts.get("model") or {}
@@ -1227,6 +1498,9 @@ class HostManager:
             profile_fingerprint=self.profile_fingerprint(member_id),
             child_env=self.child_environment(project_id, member_id),
             runtime=runtime,
+            execution_timeout_seconds=effective_timeout,
+            execution_timeout_source=timeout_source,
+            command_template_source=template_source,
         )
 
     # ── 活句柄查找（所有权事实的唯一权威）────────────────────────────
@@ -1320,6 +1594,8 @@ class HostManager:
                 "error_code": exc.code,
             }
 
+        # 产品片B：公开启动诊断只带**有界**数值/枚举，且与 `facts.argv` 同属一份快照。
+        diagnostics = facts.diagnostics()
         control_file = self.store.control_path(launch_id)
         child_env = dict(facts.child_env)
         child_env[CONTROL_FILE_ENV] = str(control_file)
@@ -1359,6 +1635,7 @@ class HostManager:
                 "member_id": member_id,
                 "outcome": "failed",
                 "error_code": "cli_missing",
+                **diagnostics,
             }
         finally:
             for stream in opened:
@@ -1425,6 +1702,7 @@ class HostManager:
                     "member_id": member_id,
                     "outcome": "failed",
                     "error_code": error_code,
+                    **diagnostics,
                 }
             # 子进程仍存活：保留句柄与失败报告（服务端据此保留所有权、允许 stop）。
             self._report(
@@ -1445,6 +1723,7 @@ class HostManager:
                 "member_id": member_id,
                 "outcome": "failed",
                 "error_code": error_code,
+                **diagnostics,
             }
 
         try:
@@ -1469,6 +1748,7 @@ class HostManager:
                 "member_id": member_id,
                 "outcome": "failed",
                 "error_code": exc.code,
+                **diagnostics,
             }
 
         self._report(
@@ -1490,6 +1770,7 @@ class HostManager:
             "instance_id": instance_id,
             "pid": process.pid,
             "outcome": "ready",
+            **diagnostics,
         }
 
     def _wait_ready(
@@ -2031,6 +2312,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="本地登记的入口命令模板（必须含 {model}），用于 codex/dsh 这类无模型参数的入口",
     )
+    parser.add_argument(
+        "--runtime-command-template",
+        action="append",
+        nargs=2,
+        metavar=("RUNTIME", "TEMPLATE"),
+        default=None,
+        help=(
+            "按运行器本地登记的入口命令模板（必须含 {model}）；可重复，"
+            "只接受 codex/dsh/cli；优先于 --cli-command-template 全局回退"
+        ),
+    )
+    parser.add_argument(
+        "--cli-execution-timeout-seconds",
+        default=None,
+        help=(
+            "内置受管配方的执行预算秒数（十进制正整数；缺省 21600，可显式覆盖如 60/43200）；"
+            "显式 --cli-executable 自定义入口不支持该参数"
+        ),
+    )
     parser.add_argument("--alias-flag", default=None)
     parser.add_argument(
         "--runtime-verified",
@@ -2092,6 +2392,23 @@ def _verified_runtimes(values: Optional[Sequence[str]], env: dict[str, str]) -> 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_arg_parser().parse_args(argv)
+    # 产品片B：新增配置的校验必须先于**任何**私有凭据读取与网络/ spawn。
+    try:
+        runtime_command_templates = normalize_runtime_command_templates(
+            args.runtime_command_template, cli_executable=args.cli_executable
+        )
+        execution_timeout_seconds = normalize_execution_timeout(
+            args.cli_execution_timeout_seconds, cli_executable=args.cli_executable
+        )
+    except HostError as exc:
+        print(
+            json.dumps(
+                {"schema": SCHEMA, "ok": False, "error_code": exc.code},
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+        return EXIT_FAILED
     try:
         operator_key = load_operator_key(
             None,
@@ -2120,6 +2437,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             cli_executable=args.cli_executable,
             cli_args=args.cli_arg,
             cli_command_template=args.cli_command_template,
+            runtime_command_templates=runtime_command_templates,
+            execution_timeout_seconds=execution_timeout_seconds,
             alias_flag=args.alias_flag,
             verified_runtimes=_verified_runtimes(args.runtime_verified, os.environ),
             child_env=_parse_child_env(args.child_env),
