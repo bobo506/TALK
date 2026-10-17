@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-17 16:25（Asia/Shanghai）— 新Kimi独立登录与受管启停通过，最小任务264待通知
+
+- 用户确认新设备链接已完成授权后，先结束原运行exec324并核原生CLI81204实际exit0、Logged in to managed:kimi-code及config_present=true；首次91333/900秒超时失败不改。自己的HOME/KIMI_CODE_HOME内核公开模型配置为原alias/provider/model，没有复制旧认证、输出/哈希凭据或发布设备码。无工具/子代理独立探针实际3.891秒、exit0、精确TALK_NEW_K28_NATIVE_PROBE_OK_20261017，未由探针写TALK/启动服务。
+- fresh只读核新角色generation0/no owner/无待办，原Key GET身份/显示名正确，原managed/exclusive/创建choice及bindings保持；它已登记，不运行legacy-attach/CREATE/rotate-key。CIM仅公开作用范围核旧10152/11920均旧成员窄入口、无泛项目或重复新宿主；旧角色仍generation9/stopped，无自动重启。按原迁移授权Hidden启动经审corrected/新成员专属管理器，launcher16368/实际17908，只允许新成员claim，私有控制/日志目录由产品创建，原Popen一直由同manager持有。
+- 正常启动generation1，launch c8ffa636-f009-4870-9a27-e2f9e3d5563b/expected instance ins_6521a70730f7匹配、reported ready；通过页面同一stop API转generation2，observed stopped/ownership=false/current_launch=null，原子进程12360已退出、manager同started_at且owned_launches空。然后再启动generation3，launch 40646af4-991c-4e30-90e0-87f066e22593/expected ins_eea1a7e6dca2匹配、ready，实际子进程7184父17908。无PID接管/强停/状态修库/其它角色启停。
+- 实际子进程公开白名单核原name、新角色显示名Kimi k2.8、工作目录、原alias、review产品默认档及timeout21600，原Key只--key-file、无明文Key参数。首次白名单误查不存在的--api-key-file记false，只是诊断flag错误；保原报告，重启按产品--key-file独立核true，不改产品代码或误报凭据丢失。每次API动作前后bindings/其它显式角色行/Key文件mtime/候选原任务聚合相等，runner共享managed_cli/unverified不升级。
+- 派发前重新核caller agent:codex与项目最新development_requirements；用户当前DeepSeek首次执行/Codex复核修正约定优先旧页面分工，本轮仅最小验证无开发。最小4参派实际264给新成员，Hall group:task-0e4c4036ecfd4eadb4cfc4033fc64c1b，queued/assigned为创建快照；要求实际task_id与TALK_NEW_K28_MANAGED_ACK_20261017、无文件/工具动作。默认派后结束、用户通知后核结果；当前不轮询/收取或声称接单成功，后续仍须人类页面关闭→刷新不自启→启动ready，旧角色验收不代替它。
+- 本轮仅5协调docs收尾，产品源码/既有5helper及原263/261/262开发与冻结副本保持；无新业务测试，沿用已验证23Node/12helper/161停止回归，实际原生探针和启停证据单独记，不虚增测试。完整证据independent-review263/及smoke264/，正式进度仅保当前快照，旧失败与交付原包不追改。完整日志/固定后端版本/六小时/主动等待未通过，其余三角色保现状，DeepSeek/协调CLI最后。
+
 ## 2026-10-17 16:15（Asia/Shanghai）— 新Kimi网页完成回报后核实旧CLI超时，重发独立登录会话
 
 - 用户确认网页登录/授权完成后根先续读exec91333，实际已退出1，回显Device authorization timed out after 900s；候选native-login-status.json同为exit1/config=false，没有登录配置。旧CLI约UTC07:38启动，网页码宣称1800秒TTL但CLI实际900秒结束轮询，用户报告与CLI落盘必须分开核验，不伪称成功。

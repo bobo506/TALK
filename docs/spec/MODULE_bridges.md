@@ -15,6 +15,12 @@
 
 ## 当前实现
 
+### 新页面Kimi原生与受管启停通过，264待验（2026-10-17）
+
+新设备授权对应CLI81204实际exit0/config落盘，原alias无工具固定探针精确匹配；91333超时原失败保留。经审corrected/窄入口在Hidden常驻原manager17908，仅领取新成员agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c；generation1 ready→generation2正常stopped/归属释放/原子进程退出→generation3 ready（ins_eea1a7e6dca2/launch 40646af4-991c-4e30-90e0-87f066e22593），同manager及原Popen链保持。公开argv核原name/Key文件/显示名/alias/工作目录、review默认档与21600秒，没有新补录/重签Key/升共享能力；原26/18开发件及辅助源冻结不变。
+
+最小任务264已派新成员，要求固定回传、无项目文件/工具动作；默认用户通知后核实际task/result/领取instance再收取，不据queued或ready称接单通过。人类页面关闭→刷新不自启→启动ready仍待。旧K28generation9保持关闭且manager11920不动，其余角色未启停。后续恢复以本节和PROGRESS为准，下列准备/登录重发段为当时阶段事实；完整日志、六小时和主动等待另片。
+
 ### 新Kimi设备登录重发（2026-10-17）
 
 用户报告网页完成后根核91333已Device authorization timed out after 900s退出1且无config；设备码宣称1800秒TTL不能替代CLI实际轮询窗口。已按原迁移授权重发独立登录81204待用户，源代码/原Key/绑定/其它服务未改；未模型probe/启服务。会话及有效码仅本机resume-login-session.json，旧会话不可续等，旧失败status文件须与当前新进程区分。
