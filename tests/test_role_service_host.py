@@ -1097,5 +1097,140 @@ class RoleServiceHostArgumentTests(unittest.TestCase):
         self.assertEqual(set(cleaned["results"][0]), {"member_id", "status"})
 
 
+class FakeRoleFactsClient:
+    """只回放一份角色投影的离线客户端（不发网络请求）。"""
+
+    base_url = "http://isolated.invalid"
+
+    def __init__(self, rows: list[dict]):
+        self.rows = rows
+
+    def request(self, method, path, body=None, key=None):
+        if "/roles" in path:
+            return {"data": self.rows}
+        raise AssertionError(path)
+
+
+class RoleServiceHostChoiceSourceTests(unittest.TestCase):
+    """补录来源准入（ROLE_LEGACY_ATTACH_DESIGN §投影与宿主守卫）。
+
+    宿主只新增 ``legacy_attach`` 这一个合法来源；归档/绑定/能力/归属/unknown 守卫逐项保持，
+    未知来源与失配一律继续稳定拒绝（``choice_unverified``）。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="r13-host-choice-source-")
+        self.root = Path(self._tmp.name)
+        self.key = self.root / "role.key"
+        self.key.write_text("FAKE-KEY-FOR-ISOLATION-ONLY\n", encoding="utf-8")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    @staticmethod
+    def _row(**overrides) -> dict:
+        row = {
+            "member_id": "agent:legacy",
+            "archived": False,
+            "binding_state": "bound",
+            "runner": {"runner_id": "runner:dsh-cli", "runtime": "dsh"},
+            "model": {
+                "choice_id": "rmc_0123456789ab",
+                "choice_source": "legacy_attach",
+                "choice_binding_mismatch": False,
+                "model_id": "deepseek-flash",
+                "model_alias": "deepseek-flash",
+            },
+            "service": {"can_start": True, "can_stop": False},
+        }
+        for section in ("runner", "model", "service"):
+            if section in overrides and isinstance(overrides[section], dict):
+                provided = overrides.pop(section)
+                # 空字典 = 显式“缺该投影”，非空字典 = 局部覆盖默认字段。
+                row[section] = {**row[section], **provided} if provided else {}
+        row.update(overrides)
+        return row
+
+    def _manager(self, row: dict) -> HostManager:
+        return HostManager(
+            FakeRoleFactsClient([row]),
+            host="probe-host",
+            state_dir=self.root / "state",
+            role_key_file=self.key,
+            project_root=self.root,
+        )
+
+    def _facts(self, row: dict) -> dict:
+        return self._manager(row)._role_facts(
+            "prj_alpha", "agent:legacy", "FAKE-ROLE-KEY", action="start"
+        )
+
+    def test_legacy_attach_source_is_accepted(self):
+        facts = self._facts(self._row())
+        self.assertEqual(facts["model"]["choice_source"], "legacy_attach")
+        self.assertEqual(facts["model"]["choice_id"], "rmc_0123456789ab")
+        self.assertEqual(facts["runner"]["runner_id"], "runner:dsh-cli")
+
+    def test_creation_operation_source_still_accepted(self):
+        facts = self._facts(
+            self._row(model={"choice_source": "creation_operation"})
+        )
+        self.assertEqual(facts["model"]["choice_source"], "creation_operation")
+
+    def test_binding_fingerprint_includes_the_choice_source(self):
+        creation = self._manager(
+            self._row(model={"choice_source": "creation_operation"})
+        )
+        attach = self._manager(self._row(model={"choice_source": "legacy_attach"}))
+        command = {"runner_id": "runner:dsh-cli", "runtime": "dsh", "model_alias": "deepseek-flash"}
+        creation_facts = creation._role_facts(
+            "prj_alpha", "agent:legacy", "FAKE-ROLE-KEY", action="start"
+        )
+        attach_facts = attach._role_facts(
+            "prj_alpha", "agent:legacy", "FAKE-ROLE-KEY", action="start"
+        )
+        self.assertNotEqual(
+            creation.binding_fingerprint(creation_facts, command),
+            attach.binding_fingerprint(attach_facts, command),
+        )
+
+    def test_untrusted_sources_are_refused(self):
+        for source in (
+            "legacy_manual",
+            "creation_operation_mismatch",
+            "legacy_attach_mismatch",
+            "",
+            "unknown",
+            "shadow_attach",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaises(HostError) as ctx:
+                    self._facts(self._row(model={"choice_source": source}))
+                self.assertEqual(ctx.exception.code, "choice_unverified")
+
+    def test_missing_choice_or_mismatch_is_refused(self):
+        for overrides in (
+            {"model": {"choice_id": None}},
+            {"model": {"choice_binding_mismatch": True}},
+        ):
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(HostError) as ctx:
+                    self._facts(self._row(**overrides))
+                self.assertEqual(ctx.exception.code, "choice_unverified")
+
+    def test_existing_guards_still_apply_to_legacy_attach(self):
+        cases = (
+            ({"archived": True}, "role_facts_unavailable"),
+            ({"binding_state": "unconfigured"}, "binding_fingerprint_mismatch"),
+            ({"binding_state": None}, "binding_fingerprint_mismatch"),
+            ({"service": {}}, "role_facts_unavailable"),
+        )
+        for overrides, code in cases:
+            with self.subTest(overrides=overrides):
+                with self.assertRaises(HostError) as ctx:
+                    self._facts(self._row(**overrides))
+                self.assertEqual(ctx.exception.code, code)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

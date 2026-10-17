@@ -1,5 +1,7 @@
 # 项目角色创建、原生接入与服务生命周期合同（R0 正式实施合同 v4）
 
+> 2026-10-17增量实施：259已完成[存量身份补录产品片A](ROLE_LEGACY_ATTACH_DESIGN.md)，新增human-only legacy-attach及独立补录审计，沿用原ID/Key并与创建入口双向隔离操作键；投影来源扩展见§5.2。未执行5角色真实补录/迁移或原生验收，原创建、轮换与受管所有权边界保持。
+
 > 状态：**R0 v4、R1-1 与 R1-2 已独立复核通过**（2026-10-11）。R1-2 经218–221补正、Codex定向修复及222独立复核整链收取，配置作业/宿主脚本与固定分级迁移已实现，最终协议见[配置合同](ROLE_PROVISION_CONTRACT.md)。页面一键配置、受管启停、删除/退出仍属R1-3/R1-4；真实运行器能力未验。R1-2三项页面基础已获用户明确“验收通过”，不外推真实配置/运行器能力；原交付/失败保持。
 > 正式位置：`docs/spec/ROLE_LIFECYCLE_DESIGN.md`；配套实施计划见同目录 `ROLE_LIFECYCLE_IMPLEMENTATION_PLAN.md`。
 > 修订基线：`5b18c8e7c2eb85fb6737d7c9c89713adf6021ef7`（#215 派发时实际 HEAD，工作区干净，正式源码未变）。
@@ -327,7 +329,7 @@ R4 修正：动作必须显式区分 `start`/`stop`；`expected_instance_id` 由
 | `GET` | `/api/projects/{project_id}/roles/{member_id}/tasks` | 任意已认证 | 只读：该角色在项目内的非终态任务清单（删除前置检查的任务处理入口索引；不改任务） |
 | `DELETE` | `/api/projects/{project_id}/roles/{member_id}` | **human** | 删除角色（软归档）；在途任务或运行中服务默认拒绝。顺序、竞态与全局禁用条件见 §9 |
 
-**`model.choice_id` 投影来源（R5，唯一可信来源，不靠实现猜测）**
+**`model.choice_id` 投影来源（显式创建/补录操作映射，不靠model_id猜测）**
 
 角色表**不存** `choice_id`，绑定表也**不加**新列（保持 C1–C4 与 13 键快照语义不变）。投影按下列优先级解析，并在响应中显式给出 `choice_source`：
 
@@ -335,7 +337,9 @@ R4 修正：动作必须显式区分 `start`/`stop`；`expected_instance_id` 由
 | --- | --- | --- | --- |
 | 本流程创建的角色 | `creation_operation` | 创建操作的 `choice_id` | 按 `(project_id, member_id)` 读 `role_creation_operations`；若命中，再校验该 `choice_id` 当前行的六维事实（`runner_id`+`model_source`/`provider_id`/`connection_ref`/`model_id`/`model_alias`）与当前 `project_role_bindings` 行**完全一致** |
 | 创建操作命中但绑定已被手工改写 | `creation_operation_mismatch` | `null` | 六维事实不一致时**不**返回旧 `choice_id`（避免用过期选择冒充当前绑定），置 `null` 并置 `model.choice_binding_mismatch=true` |
-| 历史名册/手工绑定（无创建操作行） | `legacy_manual` | `null` | `origin='imported'` 或虽有 `project_roles` 但无对应操作行；如实置 `null`，不猜测、不按 `model_id` 反查唯一行（同 `model_id` 可能有多连接） |
+| 已显式补录的存量角色 | `legacy_attach` | 补录操作的 `choice_id` | 按(project_id,member_id)读取role_legacy_attach_operations，且选择行与当前绑定六维精确相等 |
+| 补录映射失配，或同身份同时出现创建/补录映射 | `legacy_attach_mismatch` | `null` | choice_binding_mismatch=true，不任选一条通过 |
+| 历史名册/手工绑定（无创建或补录操作行） | `legacy_manual` | `null` | 如实置null，不按model_id反查或猜测 |
 
 - **不做**“按 `(runner_id, model_id)` 六维反查目录取行”的猜测：同一 `model_id` 可并存多个连接，反查会命中歧义（这正是 F5 修正的维度）。宁可为 `null` 也不猜。
 - 该字段纯投影；不影响 `project_role_bindings` 的六维事实、任务 13 键快照与 `binding_fingerprint`。

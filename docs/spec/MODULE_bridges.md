@@ -15,11 +15,11 @@
 
 ## 当前实现
 
-### 存量5角色登记与页面启停：258准备通过，259补录产品片开发中（2026-10-17）
+### 存量5角色登记与页面启停：259补录产品片A完成，宿主前置仍待（2026-10-17）
 
-用户授权5旧角色保身份/Key/模型/历史转页面启停。258已独立实读并通过21项定向隔离测试+5项根探针，SQL层逐成员最新/独立在途聚合与unknown阻止切换、凭据stat-only/SQL白名单及not_instrumented口径闭合；Hall2795后收取，原partial/旧失败证据保留。准备不等于实际迁移，所有角色未真实登记/启停。
+[补录实施合同](ROLE_LEGACY_ATTACH_DESIGN.md)在259落地：human-only legacy-attach沿用原ID/Key，原子登记imported/nonexclusive角色、必要缺失绑定和独立审计；既有绑定/名册/说明/策略/历史保持，不造创建身份事实/新Key、不自动配置或启动。投影新增精确legacy_attach与mismatch，宿主接受creation_operation/legacy_attach且其余守卫保持。
 
-259交DeepSeek按[补录实施合同](ROLE_LEGACY_ATTACH_DESIGN.md)首次实施：新增human-only legacy-attach、同ID的imported/nonexclusive项目角色与独立补录审计，只在显式映射与当前绑定六维相符时给legacy_attach来源；宿主继续核choice/能力/所有权，不把旧身份伪装成新建角色或换Key。Codex在交付暂停后复核，有问题直接修正、验证收尾，不再往返派修。宿主per-runtime模板/21600参数及真实原生/模型/终端T-W、255人工验收另片；原unknown/unverified守卫保持。默认通知259完成后收取，不轮询。
+Codex独立复核后按最新分工直接修正反向操作键冲突与非法名称静默回落问题，原6探针4失败保留，最终162项相关回归及2种先后顺序WAL并发探针通过；原8源及自报保留，259 Hall2798后已收取，自修部分不称外部独立复核。258准备通过事实保持；5角色实际补录/迁移未执行，下一片宿主per-runtime命令模板/21600，再逐角色核真实Key/模型/能力、正常退旧入口与页面启停。真实原生/终端T-W、255人工验收仍待，unknown/unverified与owner守卫不放开，本数据库片收尾后暂停。
 
 ### 完整异常日志与存量角色统一受管（2026-10-16，已确认待实施）
 

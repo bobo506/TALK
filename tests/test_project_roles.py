@@ -26,6 +26,10 @@ from urllib.parse import quote
 from sqlmodel import select
 
 from server.models import (
+    CHOICE_SOURCE_CREATION_OPERATION,
+    CHOICE_SOURCE_LEGACY_ATTACH,
+    CHOICE_SOURCE_LEGACY_ATTACH_MISMATCH,
+    CHOICE_SOURCE_LEGACY_MANUAL,
     Member,
     Project,
     ProjectAgent,
@@ -34,6 +38,7 @@ from server.models import (
     ProjectRoleDescription,
     ProjectRolePolicy,
     RoleCreationOperation,
+    RoleLegacyAttachOperation,
     RunnerModelChoice,
 )
 from tests.test_support import RouteTestCase
@@ -898,6 +903,134 @@ class ProjectRoleApiTests(RoleApiTestCase):
             ).status_code,
             200,
         )
+
+
+class LegacyAttachChoiceSourceTests(RoleApiTestCase):
+    """补录映射的投影口径（259）。
+
+    ``GET roles`` 的 ``choice_id`` 只信**显式操作映射**并与**当前绑定**六维精确相等：
+    补录映射存在且对得上 → ``legacy_attach``；存在但对不上 → ``legacy_attach_mismatch``
+    且 ``choice_id=null``；创建与补录两类映射并存 → 冲突失配，不任选一条放行。这里直接
+    写入存储事实（不经过补录接口），单独核验投影读取路径。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.choice_id = self.seed_runner_and_choice()
+        self.register_project("prj_alpha")
+        self.sync_roster(
+            "prj_alpha",
+            [{"member_id": "agent:worker"}, {"member_id": "agent:other"}],
+        )
+        with self.session() as session:
+            for member_id in ("agent:worker", "agent:other"):
+                session.add(
+                    ProjectRole(
+                        project_id="prj_alpha",
+                        member_id=member_id,
+                        role_name=f"role-{member_id.split(':')[1]}",
+                        origin="imported",
+                        identity_exclusive=0,
+                        credential_version=1,
+                        created_by="human:bobo",
+                    )
+                )
+                session.add(
+                    RoleLegacyAttachOperation(
+                        operation_key=f"attach-projection-{member_id.split(':')[1]}",
+                        request_fingerprint="a" * 64,
+                        project_id="prj_alpha",
+                        member_id=member_id,
+                        runner_id=RUNNER_ID,
+                        choice_id=self.choice_id,
+                        derived_role_name=f"role-{member_id.split(':')[1]}",
+                        committed_at=datetime.now(timezone.utc),
+                        created_by="human:bobo",
+                    )
+                )
+            # 只给 agent:worker 一条与选择六维完全一致的绑定。
+            session.add(
+                ProjectRoleBinding(
+                    project_id="prj_alpha",
+                    member_id="agent:worker",
+                    runner_id=RUNNER_ID,
+                    model_source="builtin",
+                    provider_id="managed:deepseek",
+                    connection_ref="native-deepseek-managed-login",
+                    model_id="deepseek-flash",
+                    model_alias="deepseek-flash",
+                    updated_by="human:bobo",
+                )
+            )
+            session.commit()
+
+    def _row(self, member_id: str) -> dict:
+        rows = {row["member_id"]: row for row in self.get_roles().json()}
+        return rows[member_id]
+
+    def test_explicit_mapping_with_matching_binding_is_legacy_attach(self):
+        row = self._row("agent:worker")
+        self.assertEqual(row["identity"], "imported")
+        self.assertFalse(row["archived"])
+        self.assertEqual(row["model"]["choice_source"], CHOICE_SOURCE_LEGACY_ATTACH)
+        self.assertEqual(row["model"]["choice_id"], self.choice_id)
+        self.assertFalse(row["model"]["choice_binding_mismatch"])
+
+    def test_mapping_without_binding_is_mismatch_not_guessed(self):
+        row = self._row("agent:other")
+        self.assertIsNone(row["model"]["choice_id"])
+        self.assertEqual(
+            row["model"]["choice_source"], CHOICE_SOURCE_LEGACY_ATTACH_MISMATCH
+        )
+        self.assertTrue(row["model"]["choice_binding_mismatch"])
+        self.assertEqual(row["binding_state"], "unconfigured")
+
+    def test_dual_mapping_conflict_never_picks_one_side(self):
+        with self.session() as session:
+            session.add(
+                RoleCreationOperation(
+                    operation_key="dual-mapping-projection-0001",
+                    request_fingerprint="d" * 64,
+                    project_id="prj_alpha",
+                    requested_role_name="role-worker",
+                    runner_id=RUNNER_ID,
+                    choice_id=self.choice_id,
+                    member_id="agent:worker",
+                    committed_at=datetime.now(timezone.utc),
+                    created_by="human:bobo",
+                )
+            )
+            session.commit()
+        row = self._row("agent:worker")
+        self.assertIsNone(row["model"]["choice_id"])
+        self.assertEqual(
+            row["model"]["choice_source"], CHOICE_SOURCE_LEGACY_ATTACH_MISMATCH
+        )
+        self.assertTrue(row["model"]["choice_binding_mismatch"])
+
+    def test_existing_sources_are_unchanged_without_mapping(self):
+        # 未补录的老名册成员（无角色行、无映射）保持 legacy / legacy_manual。
+        self.add_member("agent:plain", api_key="plain-key", display_name="Plain")
+        self.sync_roster(
+            "prj_alpha",
+            [
+                {"member_id": "agent:worker"},
+                {"member_id": "agent:other"},
+                {"member_id": "agent:plain"},
+            ],
+        )
+        plain = self._row("agent:plain")
+        self.assertEqual(plain["identity"], "legacy")
+        self.assertEqual(plain["origin"], "imported")
+        self.assertEqual(plain["model"]["choice_source"], CHOICE_SOURCE_LEGACY_MANUAL)
+        self.assertIsNone(plain["model"]["choice_id"])
+        # 来源字面量是公开合同的一部分（宿主按同一口径准入）。
+        self.assertEqual(CHOICE_SOURCE_CREATION_OPERATION, "creation_operation")
+        self.assertEqual(CHOICE_SOURCE_LEGACY_ATTACH, "legacy_attach")
+        self.assertEqual(
+            CHOICE_SOURCE_LEGACY_ATTACH_MISMATCH, "legacy_attach_mismatch"
+        )
+        self.assertEqual(CHOICE_SOURCE_LEGACY_MANUAL, "legacy_manual")
 
 
 if __name__ == "__main__":

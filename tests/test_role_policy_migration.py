@@ -32,7 +32,9 @@ from server.models import (
     Member,
     ProjectAgent,
     ProjectRole,
+    ProjectRoleBinding,
     ProjectRolePolicy,
+    RoleLegacyAttachOperation,
     SchemaMigration,
 )
 from server.routes.tasks import _can_exempt_review
@@ -255,6 +257,37 @@ class LegacyPolicyMigrationTests(unittest.TestCase):
                 )
             ).one()
             self.assertEqual(tuple(instance), (None, None, None))
+
+    def test_legacy_upgrade_adds_legacy_attach_table_once_without_backfill(self):
+        """补录表只增量新增；重复 init_db() 不自动补录任何存量角色。"""
+        self.assertNotIn("role_legacy_attach_operations", self._tables())
+
+        db.init_db()
+        db.init_db()  # 重复初始化必须幂等
+
+        self.assertIn("role_legacy_attach_operations", self._tables())
+        indexes = self._indexes()
+        for index in (
+            "ux_role_legacy_attach_operations_identity",
+            "ix_role_legacy_attach_operations_project_id",
+            "ix_role_legacy_attach_operations_member_id",
+        ):
+            self.assertIn(index, indexes)
+
+        with Session(self.engine) as session:
+            # 迁移**不**自动补录：旧名册成员没有角色行、没有绑定、没有补录审计。
+            self.assertEqual(list(session.exec(select(RoleLegacyAttachOperation)).all()), [])
+            self.assertEqual(list(session.exec(select(ProjectRole)).all()), [])
+            self.assertEqual(list(session.exec(select(ProjectRoleBinding)).all()), [])
+            roster = list(session.exec(select(ProjectAgent)).all())
+            self.assertEqual(
+                {(row.member_id, row.decision_tier) for row in roster},
+                {("agent:worker", "decision"), ("agent:other", "execution")},
+            )
+            # 旧成员的 Key/身份事实逐字段不变。
+            worker = session.get(Member, "agent:worker")
+            self.assertEqual(worker.api_key, "worker-key")
+            self.assertEqual(worker.display_name, "Worker")
 
     def test_repeated_init_db_does_not_overwrite_human_policy_change(self):
         db.init_db()

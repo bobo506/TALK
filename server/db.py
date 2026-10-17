@@ -425,6 +425,21 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_role_creation_operations_identity "
             "ON role_creation_operations (project_id, member_id)"
         )
+        # 存量角色补录（ROLE_LEGACY_ATTACH_DESIGN §原子补录、幂等与来源）：新表由
+        # ``create_all`` 增量创建（旧库只多一张表），这里补齐幂等索引。补录**不**自动执行：
+        # 没有任何回填、不重建旧表、不改历史角色/名册/绑定，重复 init_db() 幂等。
+        conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_role_legacy_attach_operations_identity "
+            "ON role_legacy_attach_operations (project_id, member_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_legacy_attach_operations_project_id "
+            "ON role_legacy_attach_operations (project_id)"
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_role_legacy_attach_operations_member_id "
+            "ON role_legacy_attach_operations (member_id)"
+        )
         # 角色生命周期 R1-2（PROVISION_CONTRACT §1）：跨宿主作业表由 create_all 建，
         # 这里补齐幂等索引；只增量、不重建表、不新增迁移回填，重复 init_db() 不改旧行。
         conn.exec_driver_sql(

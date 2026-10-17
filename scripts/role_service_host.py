@@ -116,6 +116,15 @@ EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_USAGE = 2
 
+#: 宿主认作**可信选择来源**的投影口径（ROLE_LEGACY_ATTACH_DESIGN §投影与宿主守卫）。
+#: ``creation_operation`` = 本流程创建的新身份；``legacy_attach`` = 存量身份经 human-only
+#: 补录接口登记、且补录映射与**当前绑定**六维精确相等。其余来源（``legacy_manual``、
+#: ``creation_operation_mismatch``、``legacy_attach_mismatch``、未知/空值）继续稳定拒绝；
+#: 本片只放宽来源口径，归档/绑定/能力/归属/所有权守卫逐项保持。
+TRUSTED_CHOICE_SOURCES: frozenset[str] = frozenset(
+    {"creation_operation", "legacy_attach"}
+)
+
 #: 受管子进程允许继承的**系统必要**变量白名单（其余一律不复制，尤其原生认证目录相关）。
 CHILD_ENV_ALLOWLIST: tuple[str, ...] = (
     "PATH",
@@ -1086,11 +1095,11 @@ class HostManager:
         model = row.get("model") if isinstance(row.get("model"), dict) else {}
         runner = row.get("runner") if isinstance(row.get("runner"), dict) else {}
         service = row.get("service") if isinstance(row.get("service"), dict) else {}
-        if not model.get("choice_id") or str(model.get("choice_source") or "") != (
-            "creation_operation"
-        ):
+        choice_source = str(model.get("choice_source") or "")
+        if not model.get("choice_id") or choice_source not in TRUSTED_CHOICE_SOURCES:
             raise HostError(
-                "choice_unverified", "creation choice 缺失或已与当前绑定不一致"
+                "choice_unverified",
+                "可信 choice 缺失、来源不受支持或已与当前绑定不一致",
             )
         if model.get("choice_binding_mismatch") is True:
             raise HostError("choice_unverified", "creation choice 与当前绑定不一致")

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-17 08:22（Asia/Shanghai）— 259首次实现独立复核后由Codex直接修正，产品片A收取发布
+
+- 用户通知259好了，根读取msg2797合法task259/partial完整摘要，runner succeeded/submitted；caller agent:codex/lead、项目与旧development_requirements实读，最新用户分工优先。DeepSeek已交付暂停/MCP报idle，根保留8候选字节副本与SHA后实读4产品源及4测试差异/夹具/合同，不派返修或额外回审。
+- 开发首次实现human-only legacy-attach、imported/nonexclusive角色/缺失绑定/独立审计、原事实保留、精确legacy_attach/mismatch与宿主合法来源、加法建表/索引；原7跟踪改动+1新增测试共8源。原2797 partial及开发685自报保留；developer目录仅运行脚本/交付/源码SHA证据，没有完整本地测试原始日志，根不以685作独立通过依据或混同统计。
+- 独立F1/P1：补录检查创建操作key，但创建未反向检查补录key，导致补录后同key在本项目/跨项目或并发又新建另一身份。F2/P2：非空超长display_name被静默换member_id，与沿用角色名语义不符。根新增6回归在原产品实现实跑4失败/0错误，两个控制项原已通过，原失败日志保留。
+- 按用户10-17新流程，Codex仅接手server/routes/projects.py与tests/test_role_legacy_attach.py：创建/补录两入口均在同一真实写锁内先核另一类型key，另一类型占用一律409；只有空白名才回落ID，非空非法名422零新增。另补非空旧任务/消息/说明/策略/绑定与File元数据/文件字节保留，避免原空集合快照的验证缺口。其他6候选SHA不变；修正后的测试/最终验收属于Codex自检，不称他人独立复核。
+- 最终6模块162项全过（补录54/投影26/旧库迁移15/host34/创建幂等12/请求守卫21），0失败/错误/跳过；8源compile与diff通过。额外2个临时库明确PRAGMA journal_mode=WAL，分别强制补录先写锁/新建先写锁，另一入口均409且恰1操作/1角色提交；原Member Key保持。原6回归修后已通过，不另计入162。
+- 162项运行器全局日志静音被个别宿主用例恢复，部分临时HTTP日志进入工具输出；测试结果与逐用例日志均在根final-tests文件，未据工具输出长度推测token。用例使用临时DB/storage/假Key，根新增入口先断言隔离再建Client；没有生产API写、真实Key/CLI/模型调用或实际角色迁移，未以测试startup日志声称生产服务启动。
+- Hall2798裁决accepted_after_codex_corrections；UTC2026-10-17T00:22:21.735496收取259 succeeded/completed，原partial不改。证据product-attach/independent-review259/{review.json,candidate-manifest.json,original-candidate/,original-negative.log,final-tests.log,final-tests.json,wal-probes.json,final-manifest.json,collection.json,publication.json}。准备v1 22/v2 25/v3 35及其独立证据保持；root原代码/失败不覆盖。
+- 本轮8源及8份相关docs验证后提交推送；同步新补录合同、生命周期投影来源表与服务合同，解除“仅创建来源”的旧文字歧义，不改其它MODULE。源码保护基线product-attach/baseline.json不改，根正式协调文档授权补充生命周期/服务两合同，最终保护范围按validation精确列明。
+- 本数据库/协议片收尾后暂停，没有派下一片。下一片宿主per-runtime模板及21600执行预算，后续核既有本人Key/公开runner/model、真实能力和正常退旧入口、逐角色补录/页面启停与最小接单；DeepSeek自身和协调CLI最后，Desktop/MCP不按旧PID接管。5角色本轮实际补录/迁移未执行，255人工/原生与完整日志仍待。
+
 ## 2026-10-17 07:45（Asia/Shanghai）— 258准备片独立通过并收取，259保身份补录产品片首次实施已派
 
 - 用户通知258好了，根实读MCP完整摘要：2792/task258/schema有效、partial自报，runner succeeded/submitted。caller agent:codex/lead、项目及旧development_requirements已重新读取，按用户10-17最新DeepSeek首次执行/Codex复核并直接修正的明确分工执行，不改旧项目配置。

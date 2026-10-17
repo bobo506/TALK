@@ -405,6 +405,8 @@ ROLE_NAME_MAX_CHARS = 64
 OPERATION_KEY_MIN_CHARS = 8
 OPERATION_KEY_MAX_CHARS = 128
 ROLE_DESCRIPTION_FINGERPRINT_VERSION = 1
+#: 存量角色补录请求指纹版本（ROLE_LEGACY_ATTACH_DESIGN §原子补录、幂等与来源）。
+ROLE_LEGACY_ATTACH_PAYLOAD_VERSION = 1
 
 PROJECT_ROLE_POLICY_SOURCE_MIGRATION = "migration_decision_tier"
 PROJECT_ROLE_POLICY_SOURCE_HUMAN = "human_grant"
@@ -423,6 +425,11 @@ ROLE_POLICY_MIGRATION_KEY = "r1_1_project_role_policy_backfill"
 CHOICE_SOURCE_CREATION_OPERATION = "creation_operation"
 CHOICE_SOURCE_CREATION_OPERATION_MISMATCH = "creation_operation_mismatch"
 CHOICE_SOURCE_LEGACY_MANUAL = "legacy_manual"
+# 存量角色补录（ROLE_LEGACY_ATTACH_DESIGN §投影与宿主守卫）：独立补录映射与**当前绑定**
+# 六维精确相等时给 ``legacy_attach``；映射存在但对不上（含与创建映射并存的双映射冲突）
+# 时给 ``legacy_attach_mismatch`` 并把 ``choice_id`` 置空，**不**按 model_id 反查猜测。
+CHOICE_SOURCE_LEGACY_ATTACH = "legacy_attach"
+CHOICE_SOURCE_LEGACY_ATTACH_MISMATCH = "legacy_attach_mismatch"
 
 # 角色身份投影（合同 §5.2）：managed / imported（有角色行）/ legacy（仅老名册）。
 ROLE_IDENTITY_MANAGED = "managed"
@@ -891,6 +898,41 @@ class RoleCreationOperation(SQLModel, table=True):
     runner_id: str
     choice_id: str
     member_id: str = Field(index=True)
+    committed_at: datetime
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleLegacyAttachOperation(SQLModel, table=True):
+    """存量角色补录幂等与来源审计（ROLE_LEGACY_ATTACH_DESIGN §原子补录、幂等与来源）。
+
+    - 与 ``RoleCreationOperation`` **完全独立**：补录沿用已有身份，不能伪造“创建了新身份”
+      的事实，因此不写入、也不复用 ``role_creation_operations``；
+    - ``operation_key`` 由调用方显式提供，是本表的唯一幂等键；
+    - **没有** ``status``/``error_code`` 列：行 = 已提交补录，失败 = 没有行；
+    - 行与 ``project_roles`` / 缺失时的精确绑定在**同一个** ``BEGIN IMMEDIATE`` 事务内写入；
+    - ``UNIQUE(project_id, member_id)`` 供 ``GET roles`` 的 ``choice_id`` 反查使用；
+    - 只存公开审计元数据：**不含** Key、凭据、路径、argv 或请求原文。
+    """
+
+    __tablename__ = "role_legacy_attach_operations"
+    __table_args__ = (
+        Index(
+            "ux_role_legacy_attach_operations_identity",
+            "project_id",
+            "member_id",
+            unique=True,
+        ),
+    )
+
+    operation_key: str = Field(primary_key=True)
+    request_fingerprint: str
+    project_id: str = Field(index=True)
+    member_id: str = Field(index=True)
+    runner_id: str
+    choice_id: str
+    derived_role_name: str
     committed_at: datetime
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -3683,6 +3725,23 @@ class ProjectRoleCreate(BaseModel):
     lease_token: Optional[str] = None
 
 
+class ProjectRoleLegacyAttach(BaseModel):
+    """``POST /api/projects/{project_id}/roles/legacy-attach`` 请求体。
+
+    ROLE_LEGACY_ATTACH_DESIGN §接口与保留事实：严格只含 ``member_id`` / ``runner_id`` /
+    ``choice_id`` / ``operation_key``。``extra="forbid"`` 拒绝 ``api_key``、``auto_start``、
+    ``role_name``、``role_description`` 等任何额外字段：补录只登记**已有身份**，不生成/轮换
+    Key、不改名、不写说明、不启动服务。字段值归一化放在路由层，以便返回稳定错误码。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    member_id: str
+    runner_id: str
+    choice_id: str
+    operation_key: str
+
+
 class ProjectRoleUpdate(BaseModel):
     """``PATCH /api/projects/{project_id}/roles/{member_id}`` 请求体（合同 §5.2）。
 
@@ -4367,6 +4426,33 @@ def build_role_creation_fingerprint(
         "choice_id": choice_id,
         "role_description_or_empty": role_description or "",
         "fingerprint_version": ROLE_DESCRIPTION_FINGERPRINT_VERSION,
+    }
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def build_role_legacy_attach_fingerprint(
+    *,
+    project_id: str,
+    member_id: str,
+    runner_id: str,
+    choice_id: str,
+) -> str:
+    """补录操作请求指纹（ROLE_LEGACY_ATTACH_DESIGN §原子补录、幂等与来源）。
+
+    参与项固定为 ``{project_id, member_id, runner_id, choice_id, fingerprint_version}``，
+    与创建指纹同一构造方式（键排序、紧凑分隔符、非 ASCII 原样、``sha256``）：同
+    ``operation_key`` 改成员/运行器/选择，或跨项目重放，都会被判为异载荷并 409。
+    角色名由服务端从当前成员事实派生，**不**进入指纹（调用方无法也无需指定）。
+    """
+    payload = {
+        "project_id": project_id,
+        "member_id": member_id,
+        "runner_id": runner_id,
+        "choice_id": choice_id,
+        "fingerprint_version": ROLE_LEGACY_ATTACH_PAYLOAD_VERSION,
     }
     canonical = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False

@@ -1,6 +1,6 @@
 # 存量角色保留身份补录：产品片A实施合同
 
-状态：2026-10-17，用户已授权全部现有角色转页面受管；258仅迁移准备独立通过。本文规定下一产品片，不代表已实现、已登记或已完成真实启停。
+状态：2026-10-17产品片A已完成，259首次交付经Codex独立复核后直接修正两项问题，162项相关回归及2项临时SQLite WAL并发探针通过，259已收取；本轮发布代码。全部现有角色实际补录/服务切换、原生能力与页面验收未执行。
 
 ## 范围与分工
 
@@ -10,7 +10,7 @@ Codex定义范围、复核并直接修正问题、验证及正式文档/Git收�
 
 新增human-only `POST /api/projects/{project_id}/roles/legacy-attach`，严格请求只含 `member_id`、`runner_id`、`choice_id`、`operation_key`；沿用既有operation_key格式/长度。拒绝api_key、auto_start等额外字段。不调用现有CREATE角色接口，不接受新成员或新Key。
 
-首次仅接受当前项目名册已有、未禁用的agent，且该项目没有其ProjectRole行；项目不存在/成员不存在/非agent/离册/身份独占引用冲突按既有稳定错误语义拒绝。已有managed、已有imported或归档角色均拒绝，不借补录重新归档/恢复/改名。角色名取当前成员display_name（空值回落member_id），未归档同名冲突409，不自动加随机后缀。
+首次仅接受当前项目名册已有、未禁用的agent，且该项目没有其ProjectRole行；项目不存在/成员不存在/非agent/离册/身份独占引用冲突按既有稳定错误语义拒绝。已有managed、已有imported或归档角色均拒绝，不借补录重新归档/恢复/改名。角色名取当前成员display_name（仅空白回落member_id）；非空名称超过64字等校验不合法时422/role_name_invalid且零新增，不能静默换成member_id。未归档同名冲突409，不自动加随机后缀。
 
 请求须引用存在且未软下架的精确runner/choice，choice所属runner相符。既有绑定存在时六维必须与choice完全一致，保留原行每个字段（包括updated_at/updated_by）；缺绑定时可新增该显式选择的精确绑定。不推断模型、不替换原绑定，不修改runner能力状态。
 
@@ -28,7 +28,7 @@ Codex定义范围、复核并直接修正问题、验证及正式文档/Git收�
 
 不得改既有角色权限/名册/说明/策略，失败整体回滚、没有独立提交pending行。旧库迁移只增表/索引，不自动回填生产角色、重建旧表或修改历史；init_db重复运行幂等。
 
-同operation_key+同请求返回200/reused=true，不重复写入或重置后续事实；异载荷/跨项目/跨成员或与既有创建操作同key冲突409。首次201/reused=false。响应仅公开role/member_id/reused等元数据，绝不返回Key。后续绑定变更或归档不能被重放恢复；投影须如实显示当前失配/归档并阻止不合格启动。
+新建与补录两入口均在自己的真实写事务内先检查另一类型已提交操作，任一类型占用同key，另一类型一律409/operation_key_conflict（跨项目与并发同样成立）。同类型operation_key+同请求返回200/reused=true，不重复写入或重置后续事实；异载荷/跨项目/跨成员同key冲突409。首次201/reused=false。响应仅公开role/member_id/reused等元数据，绝不返回Key。后续绑定变更或归档不能被重放恢复；投影须如实显示当前失配/归档并阻止不合格启动。
 
 ## 投影与宿主守卫
 
@@ -45,3 +45,11 @@ Codex定义范围、复核并直接修正问题、验证及正式文档/Git收�
 - 做本片新增测试及受影响角色/生命周期/host模块必要回归，不无关全仓重复。交付纯talk-delivery-1 JSON，实际任务号校验，原需求/基线/差异/验证/限制齐备，完成暂停。
 
 原准备件与独立证据保持：prepare-v1/v2/v3及independent-review256/257/258不覆盖。实际登记、真实CLI/模型/宿主启停与255人工验收待后续。
+
+## 259复核、直接修正与验证记录
+
+- 首次交付保留：独立复核发现创建入口缺反向补录key检查（P1），补录成功后可同key再创建另一身份；非空超长display_name被静默换为member_id（P2）。根新增6用例在原代码实跑4失败/0错误，原8候选及失败日志保留。
+- Codex确认DeepSeek已交付暂停后仅修改projects路由与补录测试：双向写锁内操作键冲突、非法非空角色名422；另新增非空任务/消息/说明/策略/绑定及文件元数据/字节保留验证。修正后属于Codex自检与最终验收，不称他人独立复核，不再派同片返修。
+- 最终162项：补录54、角色投影26、旧库迁移15、宿主34、创建幂等12、创建请求守卫21；0失败/错误/跳过。另2项显式journal_mode=wal的双入口并发探针分别锁定补录先成功和新建先成功，均只有一个操作提交、另一端409。8源compile与diff检查通过。
+- 开发者685项为结构化自报，原本地目录没有完整测试原始日志；本轮不以该数字作独立验收或重复累计。原交付/代码字节/开发SHA证据与根失败、最终日志及收取回执位于.tmp/legacy-role-page-control/product-attach/independent-review259/。
+- 验证入口：项目根执行 `python -m unittest tests.test_role_legacy_attach tests.test_project_roles tests.test_role_policy_migration tests.test_role_service_host tests.test_role_creation_idempotency tests.test_role_creation_request_guard`（临时库/假Key）。生产服务尚未由本片主动部署/重启，真实补录仍需后续宿主配方/凭据就绪和逐角色计划；不据本片宣称5角色已受管或可页面启停。
