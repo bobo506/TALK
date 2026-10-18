@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-18 20:56（Asia/Shanghai）— 用户要求汇总交接，本轮停止推进
+
+- 用户明确“先汇总进度”。本轮仅核对既有进度/版本、维护两份进度文档和Git收尾；未新增代码、服务启停、模型调用、TALK任务或主动等待。当前桌面agent:codex/项目prj_e8fe7066bbec/业务lead与协作分工保持。
+- 代码1179bd0已包括271首次交付独立复核后的Codex修正及列表两段提示补正；293项Python修正后自检、26项Node/12项Python UI与静态字节验证保持。首位a962cd2、全员ae0e500加载记录已推送，20:48的五角色实例/心跳/原宿主/真实日志引用及DeepSeek旧run跨重启证据保留；本次未重测，不将旧快照冒称新一轮实时核验。
+- 271原报告2825/SHA和失败证据、269原invalid及270合法补验均不追改；列表专门视觉反馈未另收。完整异常日志整项仍待宿主显式接入、权限API/查询页面、worker健康及全根旧run/痕迹文件容量治理；256MiB仍只称本run事件文件软目标。跨Codex沙箱重启常驻、六小时和固定后端版本等限制保持。
+- 已用应用archive_worktree将角色列表隔离工作区C:/Users/Administrator/.codex/worktrees/role-list-copy/TALK归档为可恢复快照，list_artifacts确认archived_worktree且原目录已不存在；候选分支7713d2b已推送，所需原失败/最终测试日志在主目录.tmp/role-list-copy/保持。未手工递归删除，未清理主目录旧未跟踪产物。
+- 汇总前当前分支codex/terminal-return-codex与上游0/0且已跟踪文件干净。本次变更仅docs/PROGRESS.md、docs/PROGRESS_HISTORY.md，执行文档差异检查后提交/常规推送；不为文档再跑功能回归。后续恢复先按AGENTS/简报/快照读取，划定下一片再派DeepSeek，默认派后结束、用户通知后取件。本轮未读取精确用量，不臆测百分比；恢复指令“继续项目”。
+
 ## 2026-10-18 20:48（Asia/Shanghai）— 五角色日志代码全部正常重启加载核验通过
 
 - 用户报告“其余4个都重启好了”。实核五角色均新一代（含DeepSeek再次换实例），Codex本轮只读；未发启停/恢复、模型任务、重载API或修改Key/绑定/永久要求。桌面caller agent:codex/prj_e8fe7066bbec/lead保持。
