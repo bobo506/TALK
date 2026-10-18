@@ -1,6 +1,8 @@
 # MODULE: Agent Bridges
 
 > 所属项目：TALK
+
+> 2026-10-18 08:47 Codex原生诊断：独立浏览器登录实际exit0；模型接口明确拒绝ChatGPT登录使用gpt-6.1-sol。账号列表有gpt-5.6-sol及xhigh，待用户选择；不自动换模型，未登记/补录/启动/派新任务。两次失败及脱敏详情保留，产品ec48b17和已验角色保持，详[当前进度](../PROGRESS.md)。
 > 状态：通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容
 
 > 2026-10-18 08:12 Codex迁移准备：用户确认gpt-6.1-sol/xhigh、旧命令不知，原Key来源及无旧bridge已核。新增可选`--codex-task-command`，优先精确任务命令，缺省保留原环境/自定义消息回退；预检仍独立配置。30项bridge及10项本地自检通过，独立CODEX_HOME浏览器登录待确认，无模型/补录/服务动作。候选本地驱动分消息/任务/预检、先只读，未声称历史执行档或MCP真实能力。详[进度](../PROGRESS.md)。

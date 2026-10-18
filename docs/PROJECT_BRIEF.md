@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-18）
 
+2026-10-18 08:47最新：旧Codex独立浏览器登录CLI已exit0，但gpt-6.1-sol/xhigh原生接口明确不支持当前ChatGPT登录；两次探针失败及诊断已留存。账号公开列表有gpt-5.6-sol/xhigh，待用户选择，不自动换模型。尚未登记/补录/启动或创建新任务，已验四角色保持；详[进度](PROGRESS.md)。
+
 2026-10-18 08:12最新：用户指定Codex直接迁移最后旧Codex CLI并确认gpt-6.1-sol/xhigh，旧启动记录不知。原本人Key来源/无旧bridge/未受管事实已核；独立CODEX_HOME已备，设备码被工作区禁用后改标准浏览器登录待CLI确认。新增可选独立任务命令接线，30项bridge/10项本地自检通过，尚无模型、登记/补录/启停或新任务；已验三个Kimi及DeepSeek保持，详[进度](PROGRESS.md)。
 
 2026-10-17 23:52最新：用户确认DeepSeek页面三步均通过，gen4正常stop→gen5ready及新ins_d2b05a620405/16712仍归原manager12536已只读核验；原Key/全部绑定名册/其它服务保持。268原2822与收取保持、旧接单实例正常offline不重跑。DeepSeek迁移正式验收，三个Kimi和DeepSeek均完成，只剩旧Codex CLI，本轮收尾暂停，详[进度](PROGRESS.md)。

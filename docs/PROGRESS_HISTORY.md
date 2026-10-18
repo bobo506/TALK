@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-18 08:47（Asia/Shanghai）— Codex独立浏览器登录成功，原生模型不支持，待用户重新选择
+
+- 用户确认浏览器授权后，实际CLI于UTC00:38:57.727881 exit0/Successfully logged in，独立auth文件存在。旧设备码会话已在UTC00:14:51.339239正常到期；两会话完成，不再续用或重做成功登录，未改工作区策略或桌面MCP。
+- gpt-6.1-sol/xhigh两次固定无工具探针分别exit1/116.234秒与exit1/113.985秒，第二次保留脱敏error/turn.failed，模型接口明确拒绝该ChatGPT登录方式使用gpt-6.1-sol；还记录WebSocket超时/HTTPS回退，不将其全归为网络问题。第一次失败原件保留；本地probe补诊断和error/tool分类，无产品源码变更。
+- 账号实际公开模型列表没有目标模型，gpt-5.6-sol明确列出并支持xhigh。已问用户是否改用该模型或保留原模型暂缓核对；未答前不修改已确认设置，不宣称替代模型实跑通过。新旧认证正文不读/复制/哈希。
+- 实际caller仍agent:codex/项目lead，最新要求留档；CIM无旧codex_bridge。登记脚本只准备，原生失败门禁阻止后续：本人Key目标未物化、无新Codex runner/choice/Role/binding/service/任务。服务端禁止同一成员自委派，后续最小回执拟用已有human operator产品API，不改权限。
+- 本片ec48b17产品30项及本地10项通过证据沿用未变，不重复称新增独立复核。新state/登录及两次失败/公开可用模型/增量源码manifest/只读保护证据保留codex-next/coordination；三个Kimi与DeepSeek服务及原任务均保持，18项其余排序不变。
+- 本轮仅认证、原生诊断与进度收尾，尚未受管迁移；待用户模型决定再继续当前角色，不开下一功能。
+
 ## 2026-10-18 08:12（Asia/Shanghai）— 用户指定Codex直接准备旧Codex CLI迁移，独立浏览器登录待完成
 
 - 用户要求自行操作最后旧Codex CLI，明确选择gpt-6.1-sol/xhigh，旧命令路径不知。最新caller agent:codex/lead及旧页面要求已实读；原USER.md无Codex行，CIM无精确旧bridge，DB无Role/binding/codex runner/service/target在途。当前桌面聊天不作为旧CLI进程接管，未停进程/改MCP或已验角色。

@@ -1,30 +1,29 @@
 # Project Progress
 
-Updated: 2026-10-18 08:12（Asia/Shanghai）。用户授权Codex直接准备旧Codex CLI迁移，并确认gpt-6.1-sol/xhigh，原启动记录不知。已核本人现有Key来源、原bridge不存在/未受管/待办0；30项产品bridge与10项本地准备自检通过。独立CODEX_HOME已备，设备码被工作区禁用，已改标准浏览器登录6586待CLI实际确认；尚无模型调用/登记/补录/服务或新TALK任务。三个Kimi与DeepSeek验收保持。
+Updated: 2026-10-18 08:47（Asia/Shanghai）。旧Codex CLI独立浏览器登录已实际成功；gpt-6.1-sol/xhigh原生探针被模型接口明确拒绝，当前等待用户选择模型。原agent:codex尚未登记/补录/启动，也未创建新TALK任务；三个Kimi及DeepSeek验收保持。
 
 ## 当前身份与范围
 
-- project prj_e8fe7066bbec，MCP实际caller agent:codex/kind agent、业务lead；页面旧development_requirements已读取留档，按用户最新本角色直接实施要求执行，不追改生产要求/历史任务。当前桌面聊天与旧CLI执行实例分开，不停止/改配置或迁走当前聊天。
-- 共享目录只有Codex改码；本轮30+10为自检，不称他人独立复核。仅原Codex受管迁移准备；默认仍派后结束、用户通知取件，不启主动模式，不操作Browser。
+- project prj_e8fe7066bbec，MCP实际caller agent:codex/kind agent、业务lead；页面旧development_requirements已实读，按用户本角色直接实施要求执行。当前桌面聊天/MCP不接管或停用。
+- 共享目录本轮仅Codex准备与诊断，自检不称他人独立复核。产品接线准备已发布ec48b17；默认派后结束、用户通知取件，不启主动等待或Browser验收。
 
-## 当前：旧Codex准备完成，标准浏览器登录待确认
+## 当前：登录通过，所选原生模型不支持
 
-- 原agent:codex/display codex CLI Bridge (agent:codex)/业务lead；USER.md没有Codex命令，用户也不知原记录。实际CIM无精确codex_bridge入口，不停旧PID/接管。名册旧Sept8/1500/idle只是陈旧上报，不当在线或原模型证明；只读SQL无ProjectRole/binding/codex runner/service，target待办0。
-- 原本人TALK Key可信现存源C:/Users/Administrator/.codex/config.toml [mcp_servers.talk.env].TALK_API_KEY，已GET精确验证agent:codex，与2026-10-07身份切换指南来源一致。不从DB读秘密列，不复制/哈希整个源配置，不改当前MCP；宿主本人Key目标D:/claude-test/TALK-private/keys/agent_codex.key尚未物化。
-- 当前npm @openai/codex 0.144.4，本机配置gpt-6.1-sol/xhigh由用户明确选作迁移后设置，不倒推旧历史。原生auth正文未读/复制/哈希；独立native HOME为C:/Users/Administrator/.talk/role-service-host/native/prj_e8fe7066bbec/agent_codex/，CODEX_HOME为其.codex，fresh config仅模型/推理/file登录存储。原执行档不可考，先按产品discussion/read-only默认验证，非历史档已证或扩大权限。
-- 原设备码登录session76734/本地Popen19032仍等待，用户截图明确工作区未开启设备代码身份验证，不能用该码继续；不修改工作区策略，原会话等自然到期。已走官方标准浏览器回调localhost:1455，session6586/Popen168，等用户完成新链接并核CLI exit0/本人auth文件；用户先前“已完成”只对应被禁用设备码，不当实际成功。不要重复登录/续用旧设备码，结束的session不再续读。
-- 登录阶段产品HostManager的TEMP/TMP原指native根，CLI拒建位于临时根下的PATH helper（登录继续）；独立TEMP/TMP改为本人native/tmp后features纯查询无该警告。薄驱动/宿主用此本人子目录，其余HOME族仍本人根；不改当前已运行登录进程或原全局环境。
-- 最小产品接线补正：bridges/codex_bridge.py新增可选--codex-task-command，显式值只覆盖任务通道，聊天/预检分开，缺省旧行为保持。tests/test_codex_bridge.py最终30项通过（含新增4项及真实run_bridge接线）；初次pytest不可用，已改现有unittest，原记录保留。新增参数只由未来新CLI子进程加载，不重启API/现有角色。
-- 本地codex_member_entry.py复用产品HostManager/Popen，执行前只筛本人/项目、drain保句柄；native_driver.py三模式：message仅talk_send MCP、task/preflight无TALK MCP，均显式模型/xhigh/只读，预检临时会话/关shell及multi-agent。细粒度MCP工具auto来自官方配置参考，尚未原生加载验证。薄驱动继承stdin、probe用PIPE（产品spawn_hidden默认DEVNULL不可直接复用），10项自检覆盖此链路、实际parser三命令、隔离/模型拒绝/范围/drain。候选宿主未apply/启动。
-- CLI --help/version/features均本机实际exit0，真实产品parser含模型模板/外层21600组装通过；此预算为既有受管默认，不声称旧CLI预算。安装源码支持--ignore-rules，早期计划文字反向假设已纠正。native_probe.py已备但未运行，不能宣称模型/工具/后端版本能力通过。
-- 已读TERMINAL_MCP：当前桌面talk配置T660秒实读，W300为项目现用；不是新原生宿主的实测等待能力。message预备talk_send T60秒，task/preflight无MCP，不启等待/适配结论。usage-gate实际continue但session/weekly比例null，不当0或推测额度。
-- 本轮证据.tmp/legacy-role-page-control/codex-next/coordination/：baseline HEADb8f1ab5/865跟踪、facts/原进程、MCP名册、CLI帮助/feature/公开源码manifest、entry-plan、30/10测试、两登录start及状态、准备源码manifest、state与官方来源说明。模型与旧记录答复已录；登录是当前唯一外部依赖。
+- 标准浏览器登录session6586/Popen168实际于UTC2026-10-18T00:38:57.727881 exit0，输出Successfully logged in，本人独立auth文件存在。session6586已完成，不能再续读；不需重做成功登录。旧设备码session76734于UTC00:14:51.339239自然超时exit1；其当时auth不存在不推翻后来浏览器成功。两会话均已结束，不续用临时链接/验证码、不修改工作区设备码策略。
+- 独立目录C:/Users/Administrator/.talk/role-service-host/native/prj_e8fe7066bbec/agent_codex/，CODEX_HOME为本人.codex，TEMP/TMP为本人tmp子目录。原全局认证和本人新auth正文均未读/复制/哈希，不改桌面全局配置。
+- 用户原确认模型gpt-6.1-sol/xhigh。首次固定回执探针exit1/116.234秒，无固定回执；第二次诊断exit1/113.985秒，保留脱敏原生error/turn.failed：The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account. 同次还有WebSocket超时并回退HTTPS；不能只当网络故障重复重试。实际tool item为0，error item不算工具调用。原失败及补充诊断都保留，未获得模型能力通过结论。
+- 账号实际models_cache公开列表不含gpt-6.1-sol；包含gpt-5.6-sol且supported_reasoning_levels含xhigh。仅为当前账号可选事实，不自动替换已确认模型，不代表替代模型已实跑。已提问用户选择改用gpt-5.6-sol/xhigh继续，或保留原模型暂缓并核对账号/支持；当前未答，不视为批准。
+- 原成员ID/显示名/业务lead/历史保持。原启动记录用户不知，USER.md无Codex行；最新CIM仍无codex_bridge入口，未停进程或接管PID。本人TALK Key可信源仍全局config.toml的talk.env字段，准备阶段GET已验证agent:codex；宿主Key目标TALK-private/keys/agent_codex.key尚未物化。
+- 当前无Codex ProjectRole/binding/runner/service，target在途0；register_role.py仅已准备，默认dry-run且前置要求原生探针通过，未执行。服务端禁止任务发起者和接收者相同；今后最小回执应由已有human operator按产品API发起/收取，不从本桌面agent:codex向自己委派，不修改权限规则或历史任务。
+- ec48b17产品可选--codex-task-command及30项bridge/10项本地自检保持；本轮产品源码未变。仅本地native_probe.py补充脱敏错误详情、保留首次失败及error分类；原六源manifest保留，增量manifest记录此一变更和未执行登记脚本。
+- 先前discussion/read-only是原执行档未知时采用的现有产品默认验证选择，不当历史档证明。当前仍未验证message原生MCP、真实受管生命周期/接单/页面、固定后端版本或六小时实跑。桌面T660配置/W300旧现用不证明此原生CLI等待能力。
+- 恢复证据.tmp/legacy-role-page-control/codex-next/coordination/：native-browser-login-result、native-login-result、native-probe-first-failed、native-probe（脱敏错误）、native-model-availability、pre-registration-process、login-model-source-manifest及state。未创建269或其它新任务，不能猜编号。
 
 ## 下一步
 
-1. 用户完成新标准浏览器登录后续读session6586，核真实exit0及本人auth文件。再运行native_probe.py（固定TALK_CODEX_NATIVE_PROBE_OK_20261018、shell/multi-agent关闭、实际tool item为0），不复制认证；若登录错误按实际消息诊断，不当已授权。
-2. 原生/候选边界通过后再物化同一本人TALK Key、登记独立codex runner/choice、保原ID/名册/历史legacy-attach，固定同原manager正常启停→最小接单→页面人验。尚未创建269或其它新任务，不猜编号，不提前声称存量迁移全完成。
-3. [18项排期](spec/DEVELOPMENT_ROADMAP.md)其余顺序保持，完整日志/全入口预算/会话复用等仍另片。当前准备若中断先从state恢复，不重复已验角色/268/设备码。
+1. 等用户明确模型选择。若改用可用模型，先同步独立config、驱动/宿主/登记与相关自检，再运行精确固定回执探针；若保留原模型，先核对账号/原生支持，不盲重试或静默换模型。
+2. 原生通过后再物化同一本人TALK Key、精确登记runner/choice、保ID legacy-attach、原manager正常启停→最小接单→人类页面验收。当前不能称五角色全部迁移完成。
+3. 18项排期其余顺序保持，完整日志/全入口预算/会话复用仍另片；已验角色/267/268不重跑。
 
 ## 已验收角色与恢复事实
 
