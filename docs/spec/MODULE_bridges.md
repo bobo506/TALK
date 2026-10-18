@@ -2,7 +2,7 @@
 
 > 所属项目：TALK
 
-> 2026-10-18 10:47原生补验：用户授权npm CLI更新至稳定0.163.0，同一独立登录gpt-6.1-sol/xhigh固定回执实际exit0/精确匹配/tool0（122.094秒），旧模型拒绝已解决。连接重试/HTTPS回退及base_instructions被忽略警告保留，候选三模式须适配后才能生产接入；受管迁移仍暂停，无登记/启停/新任务，详[当前进度](../PROGRESS.md)。
+> 2026-10-18 11:07 Codex切换：本角色显式三命令已适配npm0.163.0、developer_instructions/strict config、原生专用代理上下文，消息用现有TALK_ACTION/无MCP且保只读审批。专用wrapper删除提前配置环境，由共享入口先解析key-file；新增真实入口链/优先级/缺文件测试，186相关与12本地通过。保原ID/Key补录后，原manager16156正常启停至gen5/ins_f9818ce92522/7572 ready；269由human:bobo创建待验，后续须原请求Key收取及页面人验。初次Key None启动失败/消息MCP拒绝均保留，默认命令生成器历史行为不扩改，详[进度](../PROGRESS.md)。
 
 > 2026-10-18 08:47 Codex原生诊断：独立浏览器登录实际exit0；模型接口明确拒绝ChatGPT登录使用gpt-6.1-sol。账号列表有gpt-5.6-sol及xhigh，待用户选择；不自动换模型，未登记/补录/启动/派新任务。两次失败及脱敏详情保留，产品ec48b17和已验角色保持，详[当前进度](../PROGRESS.md)。
 > 状态：通用 CLI bridge 第一版已落地，Codex / Kimi 保持专用入口，pi bridge 保留兼容

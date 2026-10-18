@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-18 11:07（Asia/Shanghai）— Codex新版兼容修正、保身份受管启停通过，269待验
+
+- 用户明确先处理新版问题再恢复Codex切换。本轮原gpt-6.1-sol/xhigh和独立登录保持；开发指令改developer_instructions/strict config、直接npm0.163.0原生exe。发现原代理被HostManager过滤，只以本人专用内存标记在native启动时恢复已有变量，bridge环境/全局代理/provider/凭据不改；独有developer token13.656秒及消息12.187秒无回退/未知字段警告。
+- 初始三通道预检/任务通过，消息MCP被never审批拒绝，无deferred/生产发送，原件保留。消息转产品既有TALK_ACTION及bridge严格校验，真parser/execute+假client验证通过，原生全部无MCP/不宽放审批。未变两通道沿用首次实际成功输出，最后12本地边界通过；这些均为Codex自检。
+- 本人旧Key GET核验后同值物化专属文件，无轮换/新身份/原生认证复制。产品API新增独立runner:codex-local、managed_cli/unverified及choice rmc_b0b68705cd2f，legacy-codex-20261018保原ID/name/名册/历史补录；其余runner/角色/绑定/服务保持。launcher7328/原manager16156，专属codex-next私有目录及native隔离。
+- 首次gen1失败：Codex wrapper在读取key-file前导出None导致退出；35秒验证先返回，原宿主随后就绪超时。根删除提前configure，由既有共享入口统一先解析Key。新增真实入口链文件/env/argv优先级及缺文件fail-closed测试，三个相关模块186项通过。原失败/日志保留，无API重启或其它角色变更。
+- 原manager正常gen2 stop释放失败归属后，修正gen3 ready→gen4正常关闭释放/旧进程退出→只读重查不自启→gen5 ready，实launch6278b283-9a15-4e74-9e01-0f06494d4919/ins_f9818ce92522/7572。OS父链7572→16156→7328、真实21600/Key文件/三个显式命令吻合；无强停/手改状态/PID接管，不外推六小时/后端固定版本或主动等待。
+- 最新caller仍agent:codex/lead和项目要求已读；产品禁止自委派，故既有human:bobo操作Key按用户授权创建实际269/原Codex最小固定回执，UTC03:05:49.140643，Hall group:task-967df63d427b46bc90ca60b5777cbe88。正文保实际要求快照、合法自身号JSON及TALK_CODEX_MANAGED_ACK_20261018，无开发/工具/服务动作。派发后默认等用户通知，不读结果/主动轮询；后续核验通过用human:bobo原请求Key收取，不能用桌面MCP collect。
+- 兼容/登记/启停阶段已完成，接单回传与Codex页面人工三步仍待，不能称五角色全验收。所有准备/原失败/源码manifest/12与186证据/生产事实/任务派发及state保留codex-next/coordination；其它四角色验收、267/268和后续排期保持。
+
 ## 2026-10-18 10:47（Asia/Shanghai）— 用户授权更新npm Codex CLI，原模型固定回执实际通过
 
 - 用户要求“有可能是codex cli没更新…更新下试试”，本轮仅恢复CLI升级及精确原生测试授权，保留gpt-6.1-sol/xhigh和已成功独立登录，未解除受管登记/启停暂停。

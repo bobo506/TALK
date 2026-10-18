@@ -356,7 +356,8 @@ async def run_bridge(args: argparse.Namespace) -> None:
     args.runtime = "codex"
     args.bridge_label = "Codex bridge"
     print(f"[Codex bridge] CLI: {parse_command(args.codex_command)[0]}", file=sys.stderr, flush=True)
-    cli_bridge.configure_talk_tool_environment(args, cli_bridge.member_id_from_name(args.name))
+    # The shared entry resolves --key-file before exporting TALK_API_KEY.
+    # Exporting here would pass None for managed launches that omit --key.
     await cli_bridge.run_bridge(args)
 
 

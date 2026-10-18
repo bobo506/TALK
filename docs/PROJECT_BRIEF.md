@@ -4,7 +4,7 @@
 
 ## 当前实施状态（2026-10-18）
 
-2026-10-18 10:47最新：按用户要求npm Codex CLI0.144.4→稳定0.163.0更新成功；同一独立登录显式gpt-6.1-sol/xhigh固定回执exit0/精确匹配/tool0通过，旧模型拒绝已解决。实际122.094秒含连接回退，新版忽略base_instructions需在正式接入前适配；迁移仍暂停，无登记/启停/新任务，四角色保持，详[进度](PROGRESS.md)。
+2026-10-18 11:07最新：用户恢复Codex新版适配及切换，developer指令/本人native代理上下文及三通道已验；消息走既有TALK_ACTION、不放宽审批。原Key/ID保留登记后，根修Codex key-file导出顺序，186回归/12本地通过，原manager16156正常启停至gen5/ins_f9818ce92522/7572 ready。最小269由human:bobo发起待通知核验/原入口收取，Codex人验待；四角色保持，详[进度](PROGRESS.md)。
 
 2026-10-18 08:47最新：旧Codex独立浏览器登录CLI已exit0，但gpt-6.1-sol/xhigh原生接口明确不支持当前ChatGPT登录；两次探针失败及诊断已留存。账号公开列表有gpt-5.6-sol/xhigh，待用户选择，不自动换模型。尚未登记/补录/启动或创建新任务，已验四角色保持；详[进度](PROGRESS.md)。
 

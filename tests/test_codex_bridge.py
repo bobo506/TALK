@@ -76,6 +76,47 @@ class CodexBridgeTests(unittest.TestCase):
             asyncio.run(codex_bridge.run_bridge(args))
         self.assertEqual(seen, [("message-only", "task-only", "preflight-only")])
 
+    def test_real_shared_entry_resolves_file_and_environment_before_export(self):
+        class ClientBoundaryReached(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            key_file = Path(directory) / "role.key"
+            key_file.write_text("fixture-file-key\n", encoding="utf-8")
+            cases = [
+                (["--key-file", str(key_file)], {}, "fixture-file-key"),
+                ([], {"TALK_ROLE_API_KEY": "fixture-environment-key"}, "fixture-environment-key"),
+                (["--key", "fixture-argv-key", "--key-file", str(key_file)], {}, "fixture-argv-key"),
+            ]
+            for key_args, environment, expected in cases:
+                with self.subTest(source=key_args[:1] or ["environment"]), patch.dict(os.environ, environment, clear=True):
+                    args = codex_bridge.build_parser().parse_args([
+                        "--codex-command", "message-only", "--codex-task-command", "task-only",
+                        "--task-preflight-command", "preflight-only", *key_args,
+                    ])
+
+                    def capture_client(base_url, api_key, **kwargs):
+                        self.assertEqual(api_key, expected)
+                        self.assertEqual(os.environ["TALK_API_KEY"], expected)
+                        self.assertEqual(os.environ["TALK_MEMBER_ID"], "agent:codex")
+                        raise ClientBoundaryReached()
+
+                    with patch("TALK.client.TalkClient", side_effect=capture_client):
+                        with self.assertRaises(ClientBoundaryReached):
+                            asyncio.run(codex_bridge.run_bridge(args))
+
+    def test_missing_key_file_fails_before_client_or_environment_export(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
+            args = codex_bridge.build_parser().parse_args([
+                "--codex-command", "message-only", "--codex-task-command", "task-only",
+                "--task-preflight-command", "preflight-only", "--key-file", str(Path(directory) / "missing.key"),
+            ])
+            with patch("TALK.client.TalkClient") as client:
+                with self.assertRaisesRegex(SystemExit, "bridge key file is not readable"):
+                    asyncio.run(codex_bridge.run_bridge(args))
+            client.assert_not_called()
+            self.assertNotIn("TALK_API_KEY", os.environ)
+
     def test_member_id_from_name_adds_agent_prefix(self):
         self.assertEqual(member_id_from_name("codex"), "agent:codex")
         self.assertEqual(member_id_from_name("agent:codex"), "agent:codex")
