@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-18 14:45（Asia/Shanghai）。用户已反馈页面显示“运行状态待核实”及预期的宿主检查/不能重复启动提示，本片状态与详情提示人工确认闭合；不扩大为其它页面或运行能力验收。代码74ee695已发布，未重启角色或重建其所有权；下一步先解决宿主恢复条件，再推进原排期完整异常日志。
+Updated: 2026-10-18 14:55（Asia/Shanghai）。用户要求继续排查并恢复宿主。本轮只读证实五manager/bridge均不存在、running/queued任务为0；最后心跳与12:05:50 Codex沙箱服务停止事件吻合，精确退出链未证。现有协议没有原Popen消失后的人工归属解除入口；已准备ROLE_SERVICE_ORPHAN_RECOVERY_DESIGN草案，待确认新增人工处置权限后实施。生产状态写入/角色启停/派任务均为0。原状态提示人验及74ee695/2612002保持。
 
 ## 当前身份与授权
 
@@ -22,10 +22,16 @@ Updated: 2026-10-18 14:45（Asia/Shanghai）。用户已反馈页面显示“运
 - 旧manager/bridge均不存在：Codex16156/18204，DeepSeek12536/16712，Kimi17672/10496，旧K28 11920/18124，页面K28 17908/15220。旧记录仅为历史，不从PID/health/磁盘证明重新认领。
 - 原Codex仍npm0.163.0、gpt-6.1-sol/xhigh、独立登录/native HOME、单次21600；本人Key文件`D:/claude-test/TALK-private/keys/agent_codex.key`。原五角色宿主私有根`C:/Users/Administrator/.talk/role-service-host/`下codex-next/deepseek-next/kimi-next/pilot保持，原native登录和角色Key不复制或重做。API仍用`.tmp/legacy-role-page-control/pilot-one/independent-review261/api-launcher.py`及私有api-service控制路径。
 
+## 本轮只读恢复诊断与待确认方案
+
+- Windows系统上次启动为2026-10-16 21:37:18；Application/234565在2026-10-18 12:05:50.1836385记录CodexSandboxService.OpenAI.Codex收到停止请求，五个manager最后心跳均约12:05:49且日志无退出异常。共同退出与该服务停止高度吻合，仅为线索推断，尚无逐进程退出码/完整因果链。
+- 逐角色Windows OpenProcess旧manager/bridge均错误87（不存在），不把访问被拒绝或查询失败当退出；当前无running/queued任务。只读证据和采集脚本保存在`.tmp/role-service-recovery/`，实际应用前须重采。
+- 现有stop要求原管理器活Popen，新manager仅凭文件返回unknown_owner；没有合法自动恢复入口。新增人工确认/审计/CAS解除归属的具体草案已落盘，涉及现有所有权边界变化，按AGENTS须先确认；尚未写产品代码或生产记录。
+
 ## 下一步与限制
 
 1. 用户反馈已确认“运行状态待核实”及完整预期详情提示；本片状态/提示门禁闭合。未另行声称用户复验了全部角色布局、绑定、按钮及真实心跳；既有自动化/接口证据保持。
-2. 之后先核五角色退出原因及安全恢复条件。当前原Popen/owner持有者已消失，不能直接清记录、发新owner或按PID接管；冷启动/异常退出恢复仍未实现或验收。本轮没有重启任何角色，因此尚不能派DeepSeek开发任务。
+2. 待确认[人工恢复草案](spec/ROLE_SERVICE_ORPHAN_RECOVERY_DESIGN.md)：新增human显式确认已停止后的单角色归属解除、独立审计、世代CAS和新心跳/任务/在途动作拒绝，之后按原配置逐角色正常启动。此为现有协议没有的权限与状态边界，尚未实施；不手改DB、重发原owner或按PID接管。DeepSeek执行端离线，获准后本恢复补正由Codex直接实施/自检。
 3. 运行恢复明确后，原下一开发片仍为“完整异常日志持久留存”，DeepSeek首次执行、Codex复核修正；本片为已验功能补正，不重排原2–18项，全入口预算第3、跨任务原生会话复用第4保持。
 4. 五角色恢复后的真实周期心跳、失联/恢复实机补验、六小时实跑、固定后端版本、主动等待T/W、冷启动恢复及255完整新建首次自动ready验收仍待；runner仍unverified/能力空。本轮未读取精确用量占比，不臆测额度。
 
