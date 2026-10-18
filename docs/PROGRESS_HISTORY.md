@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-18 11:25（Asia/Shanghai）— 269真实回传但交付格式无效，270仅补验已派
+
+- 用户通知269完成后，读取完整只读摘要/原任务/实际2823；claimed_by agent:codex、ins_f9818ce92522、Hall/作者/收件人/固定标记/绑定指纹均吻合，attempt1，领取UTC03:06:01.360204、完成03:06:19.507128。不能只用runner succeeded验收。
+- 原JSON仅task_id为数字269，违反string合同；MCP与本地实际均invalid。单改类型的内存分析副本可通过，未冒充原交付，也未改2823或DB；原submitted/result_collected_at null保持，SHA2d055a14c333a9271bd763d12d6b6a8eeba128309104ff873b666fe0ffba2b6e。
+- 只读核原同值Key/GET身份、member/roster/roles/bindings及全部服务与派发前一致；当前gen5/launch6278b283-9a15-4e74-9e01-0f06494d4919/ins_f9818ce92522/PID7572 idle，同manager16156/launcher7328父链及原句柄归属吻合，无服务动作。核验脚本初次误用Issue.path已修field后通过，非产品缺陷。
+- 已结束任务complete接口只接受running，当前无结果补交/编辑入口；本轮不扩接口或改历史。按已有最小回执授权，仅由human:bobo发270“原Codex受管最小回执格式补验”，Hall group:task-fedb473d61bb4211b9e5a7d37b62bfd0，UTC03:23:54.882983。最新项目要求MCP/API相同，保随包快照；显式十字段JSON/自身编号字符串，无工具/文件/服务动作，不扩分工。只记录queued/assigned；默认通知后读，未查270结果或主动等待。
+- 保留smoke269/原MCP/交付/verification、formatfix最新要求/前事实/请求/派发，state清理旧诊断残留为已解决并保存历史。11冻结候选源未变，产品源码无变化，不重复模型/登录/186回归/12本地自检。正式七份文档同步，后续270合法回执/原请求Key收取及原Codex页面三步仍待；其它四角色及18项其余排期保持。
+
 ## 2026-10-18 11:07（Asia/Shanghai）— Codex新版兼容修正、保身份受管启停通过，269待验
 
 - 用户明确先处理新版问题再恢复Codex切换。本轮原gpt-6.1-sol/xhigh和独立登录保持；开发指令改developer_instructions/strict config、直接npm0.163.0原生exe。发现原代理被HostManager过滤，只以本人专用内存标记在native启动时恢复已有变量，bridge环境/全局代理/provider/凭据不改；独有developer token13.656秒及消息12.187秒无回退/未知字段警告。
