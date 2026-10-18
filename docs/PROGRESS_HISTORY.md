@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-18 08:54（Asia/Shanghai）— 用户保留模型并暂停迁移，两版CLI模型支持差异已复现
+
+- 用户明确保留gpt-6.1-sol/xhigh，暂缓迁移并核对账号/模型支持；不将此答复当降模型或恢复迁移授权。原生登录成功保持，不重新登录、调整工作区权限或升级npm。
+- 实际npm CLI0.144.4与桌面原生exe0.163.0-alpha.10.2版本不同。新增本地inspect_native_support.py仅用官方app-server initialize/account/read(refreshToken=false)/model/list，二者同一独立CODEX_HOME、相同诊断clientInfo、type chatgpt/plan team/邮箱内存相同；不保存邮箱/账号ID/token，不读认证正文。没有返回workspace id，不能声称核到具体workspace。
+- 旧CLI5项不列gpt-6.1-sol，新CLI9项列出它且支持xhigh，均分页完成。没有thread/start或turn/start，没有任何新版模型调用或生产服务动作。版本差异已实际复现，模型目录可见与真正调用通过分开；前两次旧CLI失败原件保持。
+- 官方Models明确目标可用于Codex CLI，工作区模型文档要求核客户端/身份/边界。此前根据旧CLI拒绝而概括当前ChatGPT登录不支持，范围过大，现纠正为旧CLI调用链失败；新版目录已表明不能断言该账号整体无模型权限。完整来源及本机事实留support-check-source-notes/native-support-comparison。
+- 候选native_driver/probe仍固定旧npm，未改recipe/config/PATH或登记runner/choice/角色/服务；无新任务。迁移继续暂停，用户恢复后先改用已核新版并做精确gpt-6.1-sol/xhigh固定回执，再继续既有正常启停/接单/页面验收。已验四角色、ec48b17产品/30+10自检及其余排期保持。
+
 ## 2026-10-18 08:47（Asia/Shanghai）— Codex独立浏览器登录成功，原生模型不支持，待用户重新选择
 
 - 用户确认浏览器授权后，实际CLI于UTC00:38:57.727881 exit0/Successfully logged in，独立auth文件存在。旧设备码会话已在UTC00:14:51.339239正常到期；两会话完成，不再续用或重做成功登录，未改工作区策略或桌面MCP。
