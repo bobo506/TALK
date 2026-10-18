@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-18 21:18（Asia/Shanghai）— 日志双线272/273按新分工派发
+
+- 协作规则已以eec9094提交推送。派前再次核caller agent:codex/prj_e8fe7066bbec，DeepSeek/K3最新实例idle且无current_task_id，K3精确alias kimi-code/k3；项目开发要求旧文本与此前一致，任务包明确本次用户2026-10-18约定优先，未改生产永久值或K2.8状态。
+- 272交agent:deepseek首次实现宿主持久异常诊断；主目录仅scripts/role_service_host.py、可新增scripts/role_service_host_diagnostics.py、tests/test_role_service_host_diagnostics.py三路径可写。复用冻结RuntimeDiagnostics API/schema，保claim/report/Popen/owner/预算；验证失败/二次回报/日志与stderr降级/脱敏/跨重启追溯。其它源码、既有测试、公共文档禁止修改；证据仅deepseek-host/。
+- 273交agent:kimi（K3）仅从冻结快照准备日志查看/接单健康反馈/权限边界和查询合同方案、样例及负向验收矩阵；唯一写kimi-k3-design/，不改产品、基线或正式文档，不假称页面/API/健康能力已实现。两线均在当前完整异常日志功能内，未来全根治理/选择性自启动等不提前实施。
+- 两个独立顶层任务使用project_id/target_member_id/title/content最小四参创建；创建者均agent:codex，初始queued/assigned。272 Hall group:task-0cfe29a2fdc04fc0b20eb40bd7c3f20f；273 Hall group:task-648475ec50c74cd58c4c034f03fa47c2。未主动等待或查询接单结果，初始状态不当成交付/验收。
+- 本地.tmp/runtime-logging-parallel-1/coordination保存冻结基线eec90941803a25c87dbec5a81c22633ffe4a5866、878跟踪文件SHA、175个必要源码/测试/合同快照、精确任务包和派发引用；快照不含.git/运行日志/原生认证或私有运行数据。可写白名单与独立证据根控制任务边界，不冒称OS级强制锁或自动合并保证。
+- 执行者交付合法本次字符串task_id JSON后暂停，Codex核实际代码/方案与证据，有问题直接接手；跨线集成前双方暂停，正式协调文档与Git由Codex独占。默认派发后结束，用户通知272/273完成后取件；本轮不操作生产角色/Key/绑定/服务，不跑模型能力探针。派发记录/文档检查后提交常规推送。
+
 ## 2026-10-18 21:15（Asia/Shanghai）— 用户明确后续DeepSeek/Kimi K3协作并允许受控并行
 
 - 用户允许继续后续开发，明确后续新任务给DeepSeek及Kimi K3，不派K2.8；两边首次执行并暂停后，复核与修改均由Codex负责。AGENTS最新协作节、当前角色、路线图和进度已同步；旧历史分工不追改，页面development_requirements仍为旧Kimi/DeepSeek交叉分工，未改生产值。
