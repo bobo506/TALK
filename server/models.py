@@ -1368,11 +1368,15 @@ ROLE_SERVICE_ERROR_ROLE_BINDING_MISSING = "role_binding_missing"
 ROLE_SERVICE_ERROR_ROLE_NOT_FOUND = "role_not_found"
 ROLE_SERVICE_ERROR_ROLE_ARCHIVED = "role_archived"
 ROLE_SERVICE_ERROR_PROJECT_NOT_FOUND = "project_not_found"
+# 运行期只读投影诊断；不改写启动回执、不据此释放进程归属。
+ROLE_SERVICE_ERROR_INSTANCE_UNAVAILABLE = "instance_unavailable"
+ROLE_SERVICE_ERROR_INSTANCE_IDENTITY_MISMATCH = "instance_identity_mismatch"
+ROLE_SERVICE_ERROR_INSTANCE_HEARTBEAT_EXPIRED = "instance_heartbeat_expired"
 
 # 动作截止时间（秒）：claim 与 report 都必须落在
 # ``claimed_at ≤ report_time ≤ launch_expires_at`` 内（合同 §10.2/§10.5）。
 ROLE_SERVICE_LAUNCH_TTL_SECONDS = 120
-# 就绪实例心跳新鲜度 TTL（秒）：超过即不算“新心跳”，不产生就绪（合同 §10.3 条件 3）。
+# 就绪与运行期实例心跳 TTL（秒）：超过不产生就绪，运行期只读投影降为待核实。
 ROLE_SERVICE_INSTANCE_FRESH_SECONDS = 90
 # 批量“全部启动”单次最多处理的角色数（防止一次请求无限扩张）。
 ROLE_SERVICE_START_ALL_MAX_MEMBERS = 200

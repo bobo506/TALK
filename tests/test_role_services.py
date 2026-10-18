@@ -1346,6 +1346,93 @@ class RoleServiceBatchTests(RoleServiceTestCase):
 class RoleServiceProjectionTests(RoleServiceTestCase):
     """公共投影白名单与三个独立事实（合同 §4.3 第 8 条 / §11.2）。"""
 
+    def make_running_service(self):
+        launch, claim = self.start_and_claim()
+        self.bind_instance(launch, claim)
+        self.assertEqual(self.ready_report(launch, claim).status_code, 200)
+        return launch, claim
+
+    def projected_service(self):
+        return next(row for row in self.list_services().json() if row["member_id"] == self.role_a)
+
+    def test_expired_running_heartbeat_is_unknown_without_releasing_or_writing(self):
+        launch, claim = self.make_running_service()
+        self.set_instance_last_seen(claim["expected_instance_id"], 120)
+        before_state = self.state_row().model_dump()
+        before_launch = self.launch_row(launch["launch_id"]).model_dump()
+        row = self.projected_service()
+        self.assertEqual(row["observed"], "unknown")
+        self.assertEqual(row["readiness_service"], "unknown")
+        self.assertEqual(row["error_code"], "instance_heartbeat_expired")
+        self.assertTrue(row["ownership_held"])
+        self.assertFalse(row["can_start"])
+        self.assertTrue(row["can_stop"])
+        role = next(row for row in self.get_roles().json() if row["member_id"] == self.role_a)
+        self.assertEqual(role["service"]["observed"], "unknown")
+        self.assertEqual(self.state_row().model_dump(), before_state)
+        self.assertEqual(self.launch_row(launch["launch_id"]).model_dump(), before_launch)
+        self.assertEqual(self.start().status_code, 409, "失联不得绕过原启动/归属保护")
+
+    def test_current_heartbeat_recovers_without_new_launch_and_busy_is_live(self):
+        launch, claim = self.make_running_service()
+        self.set_instance_last_seen(claim["expected_instance_id"], 120)
+        self.assertEqual(self.projected_service()["observed"], "unknown")
+        self.assertEqual(self.bind_instance(launch, claim, status="busy").status_code, 200)
+        row = self.projected_service()
+        self.assertEqual((row["observed"], row["readiness_service"]), ("running", "ready"))
+        self.assertEqual(row["generation"], launch["generation"])
+        self.assertEqual(row["current_launch"]["launch_id"], launch["launch_id"])
+        self.assertIsNone(row["error_code"])
+
+    def test_heartbeat_freshness_boundary_is_90_seconds(self):
+        _, claim = self.make_running_service()
+        self.set_instance_last_seen(claim["expected_instance_id"], 0)
+        with self.session() as session:
+            seen_at = session.get(AgentInstance, claim["expected_instance_id"]).last_seen_at
+        seen_at = seen_at.replace(tzinfo=timezone.utc)
+        for age, observed in ((0, "running"), (90, "running"), (90.001, "unknown")):
+            with self.subTest(age=age), patch("server.role_services._now", return_value=seen_at + timedelta(seconds=age)):
+                self.assertEqual(self.projected_service()["observed"], observed)
+
+    def test_offline_and_wrong_launch_instances_cannot_prove_running(self):
+        launch, claim = self.make_running_service()
+        for changes in ({"status": "offline"}, {"status": "error"},
+                        {"project_id": OTHER_PROJECT_ID}, {"launch_id": "other-launch"},
+                        {"member_id": "agent:other"}):
+            with self.subTest(changes=changes):
+                with self.session() as session:
+                    instance = session.get(AgentInstance, claim["expected_instance_id"])
+                    original = {field: getattr(instance, field) for field in changes}
+                    for field, value in changes.items():
+                        setattr(instance, field, value)
+                    session.add(instance)
+                    session.commit()
+                row = self.projected_service()
+                self.assertEqual(row["observed"], "unknown")
+                self.assertNotEqual(row["readiness_service"], "ready")
+                self.assertFalse(row["can_start"])
+                with self.session() as session:
+                    instance = session.get(AgentInstance, claim["expected_instance_id"])
+                    for field, value in original.items():
+                        setattr(instance, field, value)
+                    session.add(instance)
+                    session.commit()
+
+    def test_missing_current_instance_cannot_be_replaced_by_another_fresh_instance(self):
+        launch, claim = self.make_running_service()
+        with self.session() as session:
+            session.delete(session.get(AgentInstance, claim["expected_instance_id"]))
+            session.add(AgentInstance(id="decoy", member_id=self.role_a, runtime="dsh",
+                                      status="idle", project_id=PROJECT_ID))
+            session.commit()
+        self.assertEqual(self.projected_service()["observed"], "unknown")
+
+    def test_old_heartbeat_does_not_relabel_an_explicit_stop(self):
+        launch, claim = self.make_running_service()
+        self.set_instance_last_seen(claim["expected_instance_id"], 120)
+        self.assertEqual(self.stop().status_code, 200)
+        self.assertEqual(self.projected_service()["observed"], "stopping")
+
     def test_projection_never_leaks_tokens_or_paths(self):
         launch, claim = self.start_and_claim()
         self.bind_instance(launch, claim)

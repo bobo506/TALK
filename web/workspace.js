@@ -794,8 +794,8 @@ function workspaceRoleBindingSummary(agent) {
 // 数据来源（不新增每角色读请求）：角色行自带的 service 投影叠加最近一次动作响应/轮询结果。
 // own property 判定沿用绑定区纪律：没有 `service` 字段（旧服务未上报）≠ `service: null`（未登记），
 // 后者仍如实渲染禁用控件，不伪装成启动失败。
-// 轮询只在该项目任一角色 observed ∈ {starting, stopping} 时启动，读取
-// GET /api/projects/{id}/role-services，全部收敛为稳定态后不再续期；离开角色页/切项目/切账号
+// 启停中、运行中及运行心跳失联的角色持续读取 GET /api/projects/{id}/role-services；
+// 全部未启动/已关闭后不再续期；离开角色页/切项目/切账号
 // 由 syncWorkspaceLayout（app.js 每次导航都会调用）停止定时器，在途响应按 token 丢弃，不泄漏计时器。
 // 状态文案严格按设计 §11.2 映射；不因 binding_state / 实例自报 idle / can_start 之外的推断放开启动，
 // 只有 control_kind === "managed_cli" 且 can_start 为真时才可能启用启动按钮。
@@ -876,6 +876,11 @@ function roleServiceFailureReason(service) {
   if (code && message) return `${code}：${roleServiceShorten(message)}`;
   return code || (message ? roleServiceShorten(message) : null);
 }
+function roleServiceLivenessUnknown(service) {
+  return service?.observed === "unknown" && [
+    "instance_heartbeat_expired", "instance_unavailable", "instance_identity_mismatch",
+  ].includes(service.error_code);
+}
 // 严格映射（设计 §11.2）：stopped = 人工关闭，不得显示失败；running 只有 readiness_service === "ready"
 // 才是“启动成功”，否则是“启动中…”；未知枚举如实标未知，不伪装。
 function roleServiceStatus(service) {
@@ -887,6 +892,7 @@ function roleServiceStatus(service) {
   if (observed === "not_started") return { text: "未启动", kind: "neutral" };
   if (observed === "starting") return { text: "启动中…", kind: "running" };
   if (observed === "stopping") return { text: "关闭中…", kind: "running" };
+  if (roleServiceLivenessUnknown(service)) return { text: "运行状态待核实", kind: "unknown" };
   if (observed === "running") {
     if (readiness !== "ready") return { text: "启动中…", kind: "running" };
     return { text: nativeLogin === "unverified" ? "启动成功（原生登录未核验）" : "启动成功", kind: "success" };
@@ -927,6 +933,7 @@ function roleServiceControl(role) {
   const canStop = Boolean(service) && service.can_stop === true && !busy && !batchBusy && human
     && observed !== "stopping";
   if (managed && !human) hint = "当前账号是 Agent，只能查看服务状态。";
+  else if (managed && roleServiceLivenessUnknown(service) && !hint) hint = "无法确认执行端仍在运行，请先检查服务宿主；确认停止前不能重复启动。";
   else if (managed && ownershipHeld && !hint) hint = "请先「关闭」并确认已停止，再重新启动。";
   else if (managed && service && service.can_start !== true && service.can_stop !== true && !hint) hint = "当前不可启动。";
   if (view.error) hint = view.error;
@@ -1010,6 +1017,14 @@ function roleServiceBatchConverge(rows) {
     const generation = row.generation;
     const sameAction = track && Number.isInteger(track.generation) && generation === track.generation;
     const observed = typeof row.observed === "string" ? row.observed : "";
+    if (sameAction && roleServiceLivenessUnknown(row)
+      && (settled === "pending" || settled === "liveness_unknown")) {
+      if (settled !== "liveness_unknown") {
+        batch.settled[memberId] = "liveness_unknown";
+        changed = true;
+      }
+      continue;
+    }
     if (settled === "failed_owned") {
       if (row.ownership_held === false && observed === "stopped" && row.can_start === true) {
         batch.settled[memberId] = "failed";
@@ -1021,7 +1036,7 @@ function roleServiceBatchConverge(rows) {
       }
       continue;
     }
-    if (settled !== "pending") continue;
+    if (settled !== "pending" && settled !== "liveness_unknown") continue;
     // 人工关闭或新的动作取代本批次时，不把旧启动一直计为 pending，
     // 也不把后一个世代的成功误计成本批次成功。
     if (track && Number.isInteger(generation) && generation > track.generation) {
@@ -1046,6 +1061,7 @@ function roleServiceBatchConverge(rows) {
       started: settled.filter(v => v === "ready").length,
       failed: (batch.requestFailures || []).length + settled.filter(v => v === "failed" || v === "failed_owned").length,
       pending: settled.filter(v => v === "pending").length,
+      unknown: settled.filter(v => v === "liveness_unknown").length,
       skipped: originalSkipped + settled.filter(v => v === "superseded").length,
     });
   }
@@ -1092,7 +1108,8 @@ function workspaceRoleServiceBatchFeedback() {
     );
     // 口径：写入的是「启动请求」；「已启动」只在真实 ready 后出现。
     box.appendChild(workspaceEl("span", "role-service-batch-status",
-      `启动请求 ${counts.requested ?? 0} · 已启动 ${counts.started ?? 0} · 启动中 ${counts.pending ?? 0} · 跳过 ${counts.skipped ?? 0} · 失败 ${counts.failed ?? 0}`));
+      `启动请求 ${counts.requested ?? 0} · 已启动 ${counts.started ?? 0} · 启动中 ${counts.pending ?? 0} · 跳过 ${counts.skipped ?? 0} · 失败 ${counts.failed ?? 0}`
+      + (counts.unknown ? ` · 待核实 ${counts.unknown}` : "")));
     const failed = roleServiceBatchFailedMembers(batch);
     if (failed.length) {
       const names = failed.map(memberId => {
@@ -1301,7 +1318,8 @@ function roleServiceNeedsPolling() {
     const view = roleServiceView(role);
     if (!view.provided || !view.service) continue;
     const observed = typeof view.service.observed === "string" ? view.service.observed : "";
-    if (observed === "starting" || observed === "stopping") return true;
+    if (observed === "starting" || observed === "stopping" || observed === "running"
+      || roleServiceLivenessUnknown(view.service)) return true;
   }
   return false;
 }
@@ -1344,7 +1362,7 @@ async function pollRoleServices(projectId, accountId) {
   } finally {
     if (token === roleServiceUI.pollToken) {
       roleServiceUI.pollBusy = false;
-      // 重绘会重新评估是否需要续期：全部收敛为稳定态时不再安排下一次，轮询自然停止。
+      // 重绘重新评估续期：运行中/失联继续检查，全部关闭或离页才停表。
       if (roleServicePageActive() && projectId === activeProjectId && accountId === myId) {
         renderWorkspaceList();
         renderTaskDetailsPanel();

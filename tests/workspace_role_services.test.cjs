@@ -99,6 +99,28 @@ test('失败服务关闭并释放归属后可进入批量失败重试', () => {
   assert.equal(h.context.roleServiceBatchFailedMembers(h.roleServiceUI.batch).join(','), 'agent:a');
 });
 
+test('批量结果中的心跳失联单列待核实，不计启动失败或允许重试，恢复后重新收敛', () => {
+  const h = harness({ roster: [{ member_id: 'agent:a', service: serviceRow() }] });
+  h.roleServiceUI.batch = {
+    busy: false, results: [{ member_id: 'agent:a', status: 'requested' }], requestFailures: [],
+    launches: { 'agent:a': { launch_id: 'start-a', generation: 1 } },
+    settled: { 'agent:a': 'pending' }, counts: { requested: 1, pending: 1 },
+  };
+  h.context.roleServiceBatchConverge([{ member_id: 'agent:a', ...serviceRow({
+    generation: 1, observed: 'unknown', readiness_service: 'unknown',
+    error_code: 'instance_heartbeat_expired', ownership_held: true, can_start: false,
+  }) }]);
+  assert.equal(h.roleServiceUI.batch.counts.unknown, 1);
+  assert.equal(h.roleServiceUI.batch.counts.failed, 0);
+  assert.equal(h.context.roleServiceBatchFailedMembers(h.roleServiceUI.batch).length, 0);
+  assert.ok(allTexts(h.context.workspaceRoleServiceBatchFeedback()).join(' ').includes('待核实 1'));
+  h.context.roleServiceBatchConverge([{ member_id: 'agent:a', ...serviceRow({
+    generation: 1, observed: 'running', readiness_service: 'ready',
+  }) }]);
+  assert.equal(h.roleServiceUI.batch.counts.unknown, 0);
+  assert.equal(h.roleServiceUI.batch.counts.started, 1);
+});
+
 test('批量跳过归属未释放的角色仍跟踪后续关闭', () => {
   const h = harness({ roster: [{ member_id: 'agent:a', service: serviceRow({
     generation: 1, observed: 'failed', ownership_held: true, can_start: false, can_stop: true,
@@ -416,7 +438,7 @@ test('HTTP 非 2xx：读取 detail 错误码展示，不显示假成功，且可
 });
 
 // ── 轮询生命周期 ────────────────────────────────────────────────────────────
-test('starting 触发 role-services 轮询，收敛 running+ready 后停止轮询', async () => {
+test('starting 触发轮询，running+ready 仍持续检查，明确 stopped 后停止轮询', async () => {
   const h = harness({
     roster: [{ member_id: 'agent:managed', business_role: 'dev', service: serviceRow({ observed: 'starting', desired: 'running', can_start: false }) }],
   });
@@ -431,10 +453,33 @@ test('starting 触发 role-services 轮询，收敛 running+ready 后停止轮�
     control_kind: 'managed_cli', can_start: false, can_stop: true, generation: 1,
   }]);
   assert.ok(await h.waitFor(() => h.state('agent:managed') === '启动成功'), '收敛态按轮询结果重绘');
+  assert.ok(await h.waitFor(() => h.servicePolls().length >= 2), '运行中仍持续读取实际服务状态');
+  h.reply(1, [{ member_id: 'agent:managed', ...serviceRow({ observed: 'stopped', desired: 'stopped' }) }]);
+  assert.ok(await h.waitFor(() => h.state('agent:managed') === '未启动（已关闭）'));
   const settled = h.servicePolls().length;
   await sleep(40);
-  assert.equal(h.servicePolls().length, settled, '全部收敛为稳定态后停止轮询');
+  assert.equal(h.servicePolls().length, settled, '明确关闭后停止轮询');
   assert.equal(h.roleServiceUI.pollTimer, null);
+});
+
+test('运行中失联显示待核实并继续刷新，心跳恢复后恢复成功且不发送启动请求', async () => {
+  const running = serviceRow({ observed: 'running', desired: 'running', readiness_service: 'ready',
+    native_login: 'verified', can_start: false, can_stop: true, ownership_held: true });
+  const h = harness({ roster: [{ member_id: 'agent:managed', service: running }] });
+  h.setPollDelay(5);
+  await h.enterRoles();
+  assert.ok(await h.waitFor(() => h.servicePolls().length >= 1), '进入已运行角色页也开启持续刷新');
+  h.reply(0, [{ member_id: 'agent:managed', ...running, observed: 'unknown',
+    readiness_service: 'unknown', error_code: 'instance_heartbeat_expired' }]);
+  assert.ok(await h.waitFor(() => h.state('agent:managed') === '运行状态待核实'));
+  assert.equal(h.startBtn('agent:managed').disabled, true, '失联不释放启动门控');
+  assert.equal(h.stopBtn('agent:managed').disabled, false, '保留原关闭入口');
+  assert.ok(h.hint('agent:managed').includes('确认停止前不能重复启动'));
+  assert.ok(!h.state('agent:managed').includes('启动失败'), '失联不改称启动失败或已停止');
+  assert.ok(await h.waitFor(() => h.servicePolls().length >= 2), '失联后继续检查恢复');
+  h.reply(1, [{ member_id: 'agent:managed', ...running }]);
+  assert.ok(await h.waitFor(() => h.state('agent:managed') === '启动成功'));
+  assert.equal(h.startRequests().length, 0, '恢复不自动启动/重建服务');
 });
 
 test('离页/切项目/切账号停止轮询，不泄漏计时器', async () => {

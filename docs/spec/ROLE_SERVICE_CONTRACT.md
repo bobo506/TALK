@@ -48,6 +48,16 @@ R1-3实现服务意图、宿主claim/report、实例就绪、逐角色启动/关
 - spawn即登记句柄，存储异常保留活进程；进程已退出但失败回报尚未确认时保留原证明。只有证明停止并完成相应确认后才回收句柄/记录。当前runner分类变化不撤销原stop，新start仍须满足受管分类。
 - 私有目录/记录复用R1-2 DACL、路径与锁保护；按项目/角色/launch保存，不互相覆盖。operator Key从环境或文件读取，角色Key只传文件路径，token/Key不新增明文argv通道。
 
+## 运行期心跳与只读状态
+
+2026-10-18补正：启动成功回执是历史事实，公共角色列表与服务投影还须核当前运行证据。仅原持久状态为`running`时，读取当前启动的预分配实例，核项目/member/launch/世代与原进程归属关联，且实例为`idle`或`busy`、`last_seen_at`在90秒内，才保持当前`running/ready`。实例缺失或offline/error、归属不匹配、心跳过期分别投影为`unknown/unknown`并附`instance_unavailable`、`instance_identity_mismatch`、`instance_heartbeat_expired`；不将失联直接证明为已停止。
+
+以上只影响本次GET投影，不回写`role_service_state`、启动回执、世代或owner，不产生stop/start动作。原`last_result`仍是上次动作结果；启动/关闭门控保持原持久状态及所有权守卫，不因失联允许重复启动。匹配实例重新上报近期心跳后，投影可恢复为`running/ready`，不新建launch或认领进程。桥接心跳也不替代宿主原Popen证明、原生模型或主动等待验收。
+
+通用CLI及复用它的Codex/Kimi/DSH受管入口每30秒按已有实例PUT协议刷新心跳。刷新与状态变更串行，保留最近状态、当前任务、错误和受管关联；短暂网络错误留待下轮重试，诊断只记录异常类型，取消/正常退出先结束心跳再沿原清理路径上报offline。非受管旧入口保持原上报行为。
+
+页面在角色页可见时持续轮询启停中、运行中及上述失联状态，离页/切项目/切账号停表并丢弃迟到响应；全部关闭/未启动后停止续期。失联显示“运行状态待核实”，不显示为启动失败或已关闭；尚未收敛的批量结果单列“待核实”，不纳入失败重试集合。状态发现通常在最后心跳90秒过期后的下一次2秒轮询，不承诺瞬时发现或在网络不可用时证明进程退出。
+
 ### CLI bridge正常停止处理（真实验收补正）
 
 内置CLI及复用它的Kimi/Codex bridge在显式受管project/launch且有TALK_ROLE_SERVICE_CONTROL_FILE时，监听本launch对应的绝对控制路径；文件名遵循宿主同一sanitize规则。旧手动入口或未配置控制环境不增加监听，非法明确路径拒绝启动；缺失/暂不可读/非精确shutdown内容不当停止。宿主仍是写停止文件、验证原Popen已退出并report的唯一归属持有方，bridge不清owner或采信外部PID。

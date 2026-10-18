@@ -16,11 +16,12 @@
 - 任何 token/Key 明文都不进公共 GET、页面、日志、交付包或异常文本；
 - 本片**不**读取或改写任何生产 Key/配置/账号，也不调用真实模型。
 
-新增的稳定错误码只有四个（其它全部逐字沿用合同 §10.6）：
+R1-3 的动作错误码沿用合同 §10.6，并补充：
 ``control_kind_not_managed``（运行器未声明 ``managed_cli``，启动入口如实拒绝，
 避免建一个没有宿主能领取的 launch）、``member_disabled``、``role_not_in_roster``、
 ``already_stopped``（重复关闭）。停止入口**不**受 ``control_kind`` 限制：
 已受管的进程必须始终可停。
+运行期另有实例不可用、关联不符和心跳过期三项只读诊断，不改动作回执或所有权。
 """
 
 from __future__ import annotations
@@ -45,6 +46,9 @@ from server.models import (
     ROLE_SERVICE_ERROR_CONTROL_KIND_NOT_MANAGED,
     ROLE_SERVICE_ERROR_EXPECTED_INSTANCE_MISMATCH,
     ROLE_SERVICE_ERROR_GENERATION_CONFLICT,
+    ROLE_SERVICE_ERROR_INSTANCE_HEARTBEAT_EXPIRED,
+    ROLE_SERVICE_ERROR_INSTANCE_IDENTITY_MISMATCH,
+    ROLE_SERVICE_ERROR_INSTANCE_UNAVAILABLE,
     ROLE_SERVICE_ERROR_LAUNCH_ACTION_MISMATCH,
     ROLE_SERVICE_ERROR_LAUNCH_EXPIRED,
     ROLE_SERVICE_ERROR_LAUNCH_NOT_FOUND,
@@ -1181,6 +1185,39 @@ def report_role_service_launch(
 # ── 只读投影（页面 / 公共 GET）──────────────────────────────────────────
 
 
+def running_instance_problem(
+    state: RoleServiceState,
+    launch: Optional[RoleServiceLaunch],
+    session: Session,
+    now: datetime,
+) -> Optional[str]:
+    """运行期只认本次启动实例的近期心跳；失联不等于进程已停止。"""
+    if (
+        launch is None
+        or launch.action != ROLE_SERVICE_ACTION_START
+        or launch.project_id != state.project_id
+        or launch.member_id != state.member_id
+        or launch.generation != state.generation
+        or launch.launch_id != state.process_launch_id
+        or launch.expected_instance_id != state.observed_instance_id
+    ):
+        return ROLE_SERVICE_ERROR_INSTANCE_IDENTITY_MISMATCH
+    instance = session.get(AgentInstance, state.observed_instance_id)
+    if instance is None:
+        return ROLE_SERVICE_ERROR_INSTANCE_UNAVAILABLE
+    if (
+        instance.member_id != state.member_id
+        or instance.project_id != state.project_id
+        or instance.launch_id != state.process_launch_id
+    ):
+        return ROLE_SERVICE_ERROR_INSTANCE_IDENTITY_MISMATCH
+    if instance.status not in ("idle", "busy"):
+        return ROLE_SERVICE_ERROR_INSTANCE_UNAVAILABLE
+    if not _instance_is_fresh(instance, now):
+        return ROLE_SERVICE_ERROR_INSTANCE_HEARTBEAT_EXPIRED
+    return None
+
+
 def build_service_projection(
     *,
     project_id: str,
@@ -1208,7 +1245,21 @@ def build_service_projection(
     observed = (
         state.observed_state if state is not None else ROLE_SERVICE_OBSERVED_NOT_STARTED
     )
+    stored_observed = observed
     generation = state.generation if state is not None else 0
+    error_code = state.last_error_code if state is not None else None
+    error_message = state.last_error_message if state is not None else None
+    if observed == ROLE_SERVICE_OBSERVED_RUNNING and state is not None:
+        problem = running_instance_problem(state, launch, session, now)
+        if problem is not None:
+            # 仅降级本次公开投影；原 ready 回执、世代和所有权全部保持。
+            observed = ROLE_SERVICE_OBSERVED_UNKNOWN
+            error_code = problem
+            error_message = {
+                ROLE_SERVICE_ERROR_INSTANCE_HEARTBEAT_EXPIRED: "未收到近期运行心跳，服务运行状态待核实。",
+                ROLE_SERVICE_ERROR_INSTANCE_UNAVAILABLE: "当前执行实例不可用，服务运行状态待核实。",
+                ROLE_SERVICE_ERROR_INSTANCE_IDENTITY_MISMATCH: "当前实例与本次启动信息不匹配，服务运行状态待核实。",
+            }[problem]
 
     if observed == ROLE_SERVICE_OBSERVED_RUNNING and (
         state is not None and state.last_result == ROLE_SERVICE_RESULT_SUCCESS
@@ -1233,7 +1284,7 @@ def build_service_projection(
         and not archived_missing
         and binding_ready
         and effective_control == RUNNER_CONTROL_MANAGED_CLI
-        and observed
+        and stored_observed
         not in (ROLE_SERVICE_OBSERVED_STARTING, ROLE_SERVICE_OBSERVED_RUNNING)
         and not ownership_held(state)
     )
@@ -1241,7 +1292,7 @@ def build_service_projection(
         not archived
         and not archived_missing
         and (
-            observed
+            stored_observed
             in (ROLE_SERVICE_OBSERVED_STARTING, ROLE_SERVICE_OBSERVED_RUNNING)
             or ownership_held(state)
         )
@@ -1266,8 +1317,8 @@ def build_service_projection(
         observed=observed,
         last_action=launch.action if launch is not None else None,
         last_result=state.last_result if state is not None else None,
-        error_code=state.last_error_code if state is not None else None,
-        error_message=state.last_error_message if state is not None else None,
+        error_code=error_code,
+        error_message=error_message,
         control_kind=effective_control,
         manager_kind=(
             state.manager_kind

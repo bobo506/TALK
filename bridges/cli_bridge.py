@@ -77,6 +77,7 @@ DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_TASK_LEASE_SECONDS = 120
 DEFAULT_TASK_HEARTBEAT_INTERVAL = 5.0
+MANAGED_INSTANCE_HEARTBEAT_INTERVAL = 30.0
 TASK_PREFLIGHT_MAX_ATTEMPTS = 3
 DSH_TASK_PREFLIGHT_MAX_ATTEMPTS = 1
 DSH_PREFLIGHT_PATCH_RELATIVE_PATH = Path(".talk") / "dsh" / "preflight-ephemeral.cordis.yml"
@@ -3720,6 +3721,8 @@ async def run_bridge(args: argparse.Namespace) -> None:
     managed_project_id = str(getattr(args, "project_id", None) or "").strip() or None
     managed_started_at = parse_managed_started_at(getattr(args, "process_started_at", None))
     stop_control_file = managed_stop_control_path(managed_project_id, managed_launch_id)
+    status_lock = asyncio.Lock()
+    current_managed_payload: dict[str, Any] = {}
 
     async def report_status(
         status: str,
@@ -3739,9 +3742,13 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 launch_id=managed_launch_id,
                 process_started_at=managed_started_at,
             )
-            await client._request_json(
-                "PUT", f"/api/instances/{instance_id}", json_body=payload
-            )
+            async with status_lock:
+                # 心跳与状态切换串行；忙碌/当前任务/错误不能被旧 idle 快照覆盖。
+                current_managed_payload.clear()
+                current_managed_payload.update(payload)
+                await client._request_json(
+                    "PUT", f"/api/instances/{instance_id}", json_body=payload
+                )
             return
         await client.report_instance_status(
             instance_id,
@@ -3797,9 +3804,28 @@ async def run_bridge(args: argparse.Namespace) -> None:
             )
         )
 
+    async def refresh_managed_instance() -> None:
+        while True:
+            await asyncio.sleep(MANAGED_INSTANCE_HEARTBEAT_INTERVAL)
+            try:
+                async with status_lock:
+                    await client._request_json(
+                        "PUT", f"/api/instances/{instance_id}",
+                        json_body=dict(current_managed_payload),
+                    )
+            except Exception as exc:
+                # 断连不停止 transport；不回显可能含凭据/正文的异常详情。
+                print(f"Managed instance heartbeat failed: {type(exc).__name__}", file=sys.stderr)
+
+    instance_heartbeat = (
+        asyncio.create_task(refresh_managed_instance()) if managed_launch_id else None
+    )
     try:
         await run_until_managed_stop(client, stop_control_file)
     finally:
+        if instance_heartbeat is not None:
+            instance_heartbeat.cancel()
+            await asyncio.gather(instance_heartbeat, return_exceptions=True)
         if task_worker is not None:
             task_worker.cancel()
             try:
