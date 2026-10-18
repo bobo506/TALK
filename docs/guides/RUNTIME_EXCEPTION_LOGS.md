@@ -1,6 +1,6 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
-> 状态：2026-10-18 首片（任务271）经Codex首次交付独立复核、直接修正及最终自检后已收取；相关293项Python回归全部通过，**五角色均已由用户正常重启后实机加载并核验通过**，也没有新增页面、API 或 MCP 查询入口。
+> 状态：271基础/通用bridge已收取且五角色已加载；2026-10-19任务272宿主持久诊断经Codex独立复核、直接修正及141项相关自检后已收取，**长期宿主尚未重启加载272**。仍没有新增页面、API或MCP查询入口。
 > 本文件是维护者入口，不是普通用户页面说明，不能据此声称“完整异常日志整项完成”。
 
 ## 1. 本片实际落了什么
@@ -60,7 +60,7 @@ logs/runtime/
 | 本 run 旧 segment 留存 | 30 天 | `TALK_RUNTIME_LOG_RETENTION_DAYS` 或 `--runtime-log-retention-days` |
 | 关闭本进程写入 | 不关闭 | `TALK_RUNTIME_LOG_DISABLED=1` 或 `--disable-runtime-logs` |
 
-`--runtime-log-*` / `--disable-runtime-logs` 已加入通用 parser，Codex / Kimi 入口继承。宿主 `scripts/role_service_host.py` 尚未显式传这些参数；默认值也会生效，后续宿主/API/页面切片再决定统一配置与展示。
+`--runtime-log-*` / `--disable-runtime-logs` 已加入通用parser，Codex/Kimi入口继承。272宿主也支持同名参数/环境变量及临时根注入；内置配方传递显式策略，自定义`--cli-executable`入口argv保持。相对根在宿主解析时冻结为绝对路径，默认开启。现有长期宿主未重载，不能据此称真实宿主已写入新日志。
 
 ## 3. 轮换、容量与清理
 
@@ -142,7 +142,7 @@ python scripts/runtime_diagnostics.py --ref rtd-031f55a209-000001 --detail --jso
 
 仍未覆盖：
 
-- `scripts/role_service_host.py` 的显式接入：宿主不会主动传日志目录/策略，也不会展示日志状态；默认根目录仍可用。
+- 272宿主接入代码已完成；长期宿主真实重载/加载验证及公开日志状态展示仍待，不能把271的bridge加载等同宿主已部署。
 - API 查询权限、页面查看、页面上的健康/日志呈现。
 - `server/logging_config.py` 与 bridge 诊断的统一；API 日志和 bridge JSONL 是两条链。
 - 角色服务启动前的 Python 导入阶段、宿主管道输出、原生 CLI 自身 stderr、MCP 读取等待预算。
@@ -174,3 +174,11 @@ DeepSeek首次自报281项相关回归，4条stdio pipe用例因受限沙箱WinE
 - `bridges/cli_bridge.py`：bridge / 消息 / 队列 / 任务 / 受管心跳边界接入。
 - `scripts/runtime_diagnostics.py`：维护者本地查询入口。
 - `tests/test_runtime_diagnostics.py`：本片隔离验证。
+
+## 272宿主持久诊断（2026-10-19代码通过，尚未加载实机）
+
+`scripts/role_service_host_diagnostics.py`复用同一基础API/schema，覆盖宿主claim/预检、输出准备/spawn、所有权保存/readiness、stop/control/timeout、report二次失败、poll恢复及配置worker。角色launch事件带真实项目/member/实例/launch，顶层PID为宿主、子进程PID在extra；manager事件member为unknown，不借用角色。预算按实际已知值记录，MCP等待仍未知。
+
+保护值包括本次实际运营/本人Key、report新claim/owner、实际child_env快照中敏感名称的值；不扫描全环境或额外认证。输出文件准备失败原样传播并关闭部分打开流，不改变原业务/归属；已知日志/降级失败不替换原异常。启发式脱敏的原限制保持。
+
+每个manager/launch使用独立run，仍可用现有CLI跨run按ref/member/instance查询。`ready`是本地就绪观察，不代表后续report成功；host_started/host_stopped是serve边界，不足以证明OS进程/worker健康。公开API/schema未扩展，日志ref仍只在本地；全根空间治理与权限页面后续。详[272复核记录](../spec/ROLE_RUNTIME_LOGGING_REVIEW_272.md)。

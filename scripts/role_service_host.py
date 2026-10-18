@@ -70,6 +70,25 @@
   稳定拒绝 ``cli_executable_option_unsupported``，绝不静默忽略。未给新参数时旧调用照旧。
 - 本片只闭合**宿主内置配方通道**：通用 bridge 默认 600 秒、其它旧手动入口、ready/stop/
   HTTP/任务租约/MCP 客户端上限与 TALK 读取等待均**未**改变，也未在运行实例上热改预算。
+
+宿主持久诊断（任务 272）
+------------------------
+- 复用 ``bridges.runtime_diagnostics`` 的稳定 API，不改其写入器/查询器/日志 schema；
+  宿主在 preflight / claim / spawn / readiness / stop / report / poll / 配置 worker
+  边界写真实关键异常和正常生命周期事件。异常保留类型、空消息标志、全部可得
+  traceback 帧与 ``__cause__``/``__context__`` 因果链；原异常与后续 report 二次失败
+  分别落盘，并用 ``related_log_id`` 关联。
+- 具体启动使用真实 project/member/预分配 instance/launch；日志顶层 ``pid`` 是宿主
+  进程 PID，子进程 PID 只放在 ``extra.child_pid``。宿主级事件（poll/worker/服务循环）
+  没有单一角色，``member_id`` 写 ``"unknown"``，不借用其它角色，也不把消息号当任务号。
+- 新增兼容的 ``--runtime-log-dir`` / ``--runtime-log-retention-days`` /
+  ``--runtime-log-max-bytes`` / ``--runtime-log-max-file-bytes`` /
+  ``--disable-runtime-logs`` 及同名 ``TALK_RUNTIME_LOG_*`` 环境变量；默认仍开启，
+  旧构造与旧 CLI 调用不需要新参数。显式根可用于隔离测试；仅内置受管配方会把显式
+  策略传给真实 bridge 已支持的日志参数，``--cli-executable`` 自定义入口 argv 不变。
+- 所有诊断写入都经 :mod:`scripts.role_service_host_diagnostics` 的安全包装；写入、
+  格式化、轮换、stderr 降级再失败都不得替换原异常、丢失原 Popen/owner、伪造成功、
+  吞掉取消或阻断后续动作。公共输出仍只有既有净化摘要/错误码，不新增服务端字段。
 """
 
 from __future__ import annotations
@@ -100,6 +119,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from scripts import role_service_host_diagnostics as host_diag  # noqa: E402 - 复用 271 基础诊断 API
 from scripts.role_provision import (  # noqa: E402 - 复用 R1-2 已验私有创建/路径/锁保护
     ProvisionError,
     _assert_root_chain_has_no_reparse,
@@ -190,6 +210,32 @@ NATIVE_HOME_ENV_VARS: tuple[str, ...] = (
     "XDG_STATE_HOME",
     "TEMP",
     "TMP",
+)
+
+#: 任务 272：只把**名称像秘密**的显式子进程环境值加入已知保护值；不因为一个普通
+#: 配置值（如测试用 host 标识/日志路径）就把它从日志里整体抹掉。
+_SENSITIVE_ENV_NAME_RE = re.compile(
+    r"(?i)(api[_-]?key|apikey|token|secret|password|passwd|credential|authorization|cookie|session)"
+)
+#: 自定义入口 argv 中，敏感参数名后面的值才按原值保护；不把全部 cli 参数当秘密。
+_SENSITIVE_CLI_FLAGS: frozenset[str] = frozenset(
+    {
+        "--key",
+        "--api-key",
+        "--apikey",
+        "--token",
+        "--access-token",
+        "--refresh-token",
+        "--owner-token",
+        "--claim-token",
+        "--session-token",
+        "--password",
+        "--passwd",
+        "--secret",
+        "--client-secret",
+        "--authorization",
+        "--cookie",
+    }
 )
 
 #: 公共输出白名单（严格白名单，而不是黑名单；未列出的键一律不进公共面）。
@@ -1207,6 +1253,11 @@ class HostManager:
         stop_timeout: float = DEFAULT_STOP_TIMEOUT_SECONDS,
         project_root: Optional[Path] = None,
         child_log_dir: Optional[Path] = None,
+        runtime_log_dir: Optional[Path] = None,
+        runtime_log_retention_days: Any = None,
+        runtime_log_max_bytes: Any = None,
+        runtime_log_max_file_bytes: Any = None,
+        runtime_log_disabled: bool = False,
     ):
         # 产品片B：非法配置必须**先于**任何私有凭据读取/API/spawn 被拒绝，且 CLI 与
         # 程序化构造走同一套校验；这里保存的是副本，外部 dict 之后被改动不影响本实例。
@@ -1216,6 +1267,16 @@ class HostManager:
         self.execution_timeout_seconds = normalize_execution_timeout(
             execution_timeout_seconds, cli_executable=cli_executable
         )
+        # 任务 272：日志策略只归一化，不在此处产生日志 I/O；默认开启，旧构造兼容。
+        self.diagnostics_policy = host_diag.HostDiagnosticsPolicy.resolve(
+            root=runtime_log_dir,
+            retention_days=runtime_log_retention_days,
+            max_bytes=runtime_log_max_bytes,
+            max_file_bytes=runtime_log_max_file_bytes,
+            disabled=runtime_log_disabled,
+        )
+        self._launch_diag_writers: dict[str, host_diag.HostDiagnostics] = {}
+        self._host_diag_writers: dict[str, host_diag.HostDiagnostics] = {}
         self.client = client
         self.host = host or socket.gethostname()
         self.store = OwnershipStore(state_dir or DEFAULT_STATE_DIR)
@@ -1439,14 +1500,211 @@ class HostManager:
         env.update(self.child_env_extra)
         return env
 
+    # ── 持久诊断（任务 272）─────────────────────────────────────────
+
+    def _host_sensitive_values(self) -> tuple[str, ...]:
+        """本次宿主内存中已知的敏感值（不读取认证文件/数据库/完整环境）。
+
+        运营 Key、**名称像秘密**的显式子进程环境值，以及旧自定义入口中敏感参数
+        名后面的值在写入前按原值保护；本人 Key 在 preflight 读取后加入对应 launch
+        writer。普通配置值/全部 argv 不当作秘密，避免把正常诊断信息整体抹掉。
+        """
+        values: list[str] = []
+        if self.operator_key:
+            values.append(str(self.operator_key))
+        for name, value in self.child_env_extra.items():
+            if value and _SENSITIVE_ENV_NAME_RE.search(str(name)):
+                values.append(str(value))
+        previous = ""
+        for value in self.cli_args:
+            text = str(value)
+            if previous.lower() in _SENSITIVE_CLI_FLAGS:
+                values.append(text)
+            flag, separator, inline_value = text.partition("=")
+            if separator and inline_value and flag.lower() in _SENSITIVE_CLI_FLAGS:
+                values.append(inline_value)
+            previous = text
+        return tuple(dict.fromkeys(values))
+
+    def _manager_diagnostics(self, project_id: str) -> host_diag.HostDiagnostics:
+        """宿主级事件写入器：无单一角色，member_id 如实写 unknown。"""
+        key = str(project_id or "")
+        existing = self._host_diag_writers.get(key)
+        if existing is not None:
+            return existing
+        diagnostics = host_diag.create_writer(
+            policy=self.diagnostics_policy,
+            member_id="unknown",
+            instance_id=None,
+            project_id=project_id or None,
+            runtime="role-service-host",
+            pid=os.getpid(),
+            known_secrets=self._host_sensitive_values(),
+        )
+        self._host_diag_writers[key] = diagnostics
+        return diagnostics
+
+    def _launch_diagnostics(
+        self,
+        *,
+        project_id: str,
+        member_id: str,
+        launch_id: str,
+        instance_id: Optional[str],
+        runtime: Optional[str] = None,
+        extra_secrets: Sequence[Any] = (),
+    ) -> host_diag.HostDiagnostics:
+        """本次 launch 的写入器（缓存复用；已存在时只补保护值）。"""
+        existing = self._launch_diag_writers.get(str(launch_id))
+        if existing is not None:
+            existing.add_sensitive_values(extra_secrets)
+            return existing
+        diagnostics = host_diag.create_writer(
+            policy=self.diagnostics_policy,
+            member_id=member_id,
+            instance_id=instance_id,
+            project_id=project_id,
+            launch_id=launch_id,
+            runtime=runtime,
+            pid=os.getpid(),
+            known_secrets=(*self._host_sensitive_values(), *extra_secrets),
+        )
+        self._launch_diag_writers[str(launch_id)] = diagnostics
+        return diagnostics
+
+    def _drop_launch_diagnostics(self, launch_id: str) -> None:
+        diagnostics = self._launch_diag_writers.pop(str(launch_id), None)
+        if diagnostics is not None:
+            diagnostics.close()
+
+    def _host_budgets(
+        self,
+        *,
+        facts: Optional[PreflightFacts] = None,
+        poll_interval_seconds: Optional[float] = None,
+        worker: Any = None,
+    ) -> dict[str, Any]:
+        """只记录实际已知预算；MCP 读取等待保持 null + unknown。"""
+
+        def _number(value: Any) -> Optional[float]:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return None
+            return value
+
+        if facts is not None:
+            cli_timeout = facts.execution_timeout_seconds
+            cli_timeout_source = facts.execution_timeout_source
+        else:
+            cli_timeout = self.effective_execution_timeout()
+            cli_timeout_source = "not_applied" if self.cli_executable else (
+                "explicit" if self.execution_timeout_seconds is not None else "builtin_default"
+            )
+        budgets: dict[str, Any] = {
+            "cli_timeout_seconds": cli_timeout,
+            "cli_timeout_source": cli_timeout_source,
+            "http_timeout_seconds": _number(getattr(self.client, "timeout", None)),
+            "ready_timeout_seconds": _number(self.ready_timeout),
+            "stop_timeout_seconds": _number(self.stop_timeout),
+            "host_poll_interval_seconds": _number(poll_interval_seconds),
+            "mcp_wait_seconds": None,
+            "mcp_wait_budget_source": "unknown",
+        }
+        if facts is not None:
+            budgets["command_template_source"] = facts.command_template_source
+        if worker is not None:
+            budgets["provision_worker_io_budget_seconds"] = _number(
+                getattr(worker, "io_budget_seconds", None)
+            )
+            budgets["provision_worker_timeout_seconds"] = _number(
+                getattr(worker, "timeout_seconds", None)
+            )
+        return budgets
+
+    def record_host_exception(
+        self,
+        project_id: Optional[str],
+        exc: BaseException,
+        *,
+        event: str,
+        stage: str,
+        phase: Optional[str] = None,
+        extra: Optional[dict[str, Any]] = None,
+        related_log_id: Optional[str] = None,
+        budgets: Optional[dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """供 CLI/worker 边界复用的安全异常记录入口（永不向业务抛异常）。"""
+        return self._manager_diagnostics(str(project_id or "")).record_exception(
+            exc,
+            event=event,
+            phase=phase,
+            stage=stage,
+            budgets=budgets if budgets is not None else self._host_budgets(),
+            related_log_id=related_log_id,
+            extra=extra,
+        )
+
+    def child_diagnostics_argv(self) -> list[str]:
+        """内置 bridge 的显式日志参数；自定义 ``--cli-executable`` 入口保持旧 argv。"""
+        if self.cli_executable:
+            return []
+        return self.diagnostics_policy.child_diagnostics_arguments()
+
+    def _report_safely(
+        self,
+        diagnostics: Optional[host_diag.HostDiagnostics],
+        *,
+        related_log_id: Optional[str] = None,
+        budgets: Optional[dict[str, Any]] = None,
+        child_pid: Optional[int] = None,
+        **report_kwargs: Any,
+    ) -> dict[str, Any]:
+        """执行原 report；失败时先独立留存二次失败再原样抛出（不改业务语义）。"""
+        if diagnostics is not None:
+            # stop 会领取不同于 start 的新 claim；按本次实际回报参数保护，
+            # 不能沿用启动写入器里缓存的旧 token。
+            diagnostics.add_sensitive_values(
+                (report_kwargs.get("claim_token"), report_kwargs.get("owner_token"))
+            )
+        try:
+            return self._report(**report_kwargs)
+        except Exception as exc:
+            if diagnostics is not None:
+                diagnostics.record_exception(
+                    exc,
+                    event="report_failed",
+                    phase=str(report_kwargs.get("action") or "") or None,
+                    stage="report",
+                    budgets=budgets if budgets is not None else self._host_budgets(),
+                    related_log_id=related_log_id,
+                    extra={
+                        "action": report_kwargs.get("action"),
+                        "outcome": report_kwargs.get("outcome"),
+                        "generation": report_kwargs.get("generation"),
+                        "business_error_code": report_kwargs.get("error_code"),
+                        "report_error_code": getattr(exc, "code", None)
+                        or type(exc).__name__,
+                        "child_pid": child_pid,
+                        "host": self.host,
+                    },
+                )
+            raise
+
     # ── 预检 ────────────────────────────────────────────────────────
 
     def preflight(
-        self, command: dict[str, Any], member_id: str, *, project_id: str, action: str = "start"
+        self,
+        command: dict[str, Any],
+        member_id: str,
+        *,
+        project_id: str,
+        action: str = "start",
+        diagnostics: Optional[host_diag.HostDiagnostics] = None,
     ) -> PreflightFacts:
         """启动前检查：Key 身份、真实入口、精确 binding/choice 指纹、本人三档、当前资格。
 
         只读；不做任何写入（私有原生目录除外），也不执行模型或访问生产资源。
+        ``diagnostics`` 仅用于把本次读取到的本人 Key 加入内存保护值；它本身不写
+        业务状态，任何诊断失败都不影响预检结果。
         """
         key_file = self.role_key_path(member_id)
         if not key_file.is_file():
@@ -1457,6 +1715,9 @@ class HostManager:
             raise HostError("identity_mismatch", "角色 Key 文件不可读") from exc
         if not role_key:
             raise HostError("identity_mismatch", "角色 Key 文件为空")
+        if diagnostics is not None:
+            # 本人在本次动作中真实使用的 Key：在后续任何异常进入日志前先登记保护值。
+            diagnostics.add_sensitive_value(role_key)
         me = self.client.request("GET", "/api/members/me", key=role_key)
         if str(me.get("id") or "") != member_id:
             raise HostError("identity_mismatch", "角色 Key 与目标 member_id 不匹配")
@@ -1525,7 +1786,11 @@ class HostManager:
     # ── start ───────────────────────────────────────────────────────
 
     def execute_start(self, launch: dict[str, Any]) -> dict[str, Any]:
-        """claim → 预检 → spawn → 等就绪 → report（严格四条件由服务端裁决）。"""
+        """claim → 预检 → spawn → 等就绪 → report（严格四条件由服务端裁决）。
+
+        任务 272：每个真实边界都写入本机持久诊断；诊断包装保证日志失败不改变
+        下面的 claim/report/句柄语义。
+        """
         launch_id = str(launch["launch_id"])
         project_id = str(launch["project_id"])
         member_id = str(launch["member_id"])
@@ -1540,23 +1805,82 @@ class HostManager:
                 "error_code": "ownership_unreleased",
             }
 
-        response = self.client.request(
-            "POST",
-            f"/api/role-service-launches/{launch_id}/claim",
-            {
-                "host": self.host,
-                "expected_instance_id": launch["expected_instance_id"],
-            },
-        )
+        try:
+            response = self.client.request(
+                "POST",
+                f"/api/role-service-launches/{launch_id}/claim",
+                {
+                    "host": self.host,
+                    "expected_instance_id": launch["expected_instance_id"],
+                },
+            )
+        except Exception as exc:
+            # claim 失败没有 owner/claim token；仍按已知 member/launch/预分配实例留痕。
+            claim_diag = self._launch_diagnostics(
+                project_id=project_id,
+                member_id=member_id,
+                launch_id=launch_id,
+                instance_id=str(launch.get("expected_instance_id") or "") or None,
+                runtime=None,
+            )
+            claim_diag.record_exception(
+                exc,
+                event="claim_failed",
+                phase="start",
+                stage="claim",
+                budgets=self._host_budgets(),
+                extra={
+                    "action": "start",
+                    "generation": launch.get("generation"),
+                    "error_code": getattr(exc, "code", None) or type(exc).__name__,
+                    "host": self.host,
+                },
+            )
+            self._drop_launch_diagnostics(launch_id)
+            raise
         owner_token = str(response.get("owner_token") or "")
         claim_token = str(response.get("claim_token") or "")
         command = dict(response.get("command") or {})
         instance_id = str(response["expected_instance_id"])
         generation = int(launch["generation"])
+        runtime = str(command.get("runtime") or "").strip() or None
+        diag = self._launch_diagnostics(
+            project_id=project_id,
+            member_id=member_id,
+            launch_id=launch_id,
+            instance_id=instance_id,
+            runtime=runtime,
+            extra_secrets=(owner_token, claim_token),
+        )
+        diag.record_event(
+            "launch_claimed",
+            severity="info",
+            phase="start",
+            stage="claim",
+            budgets=self._host_budgets(),
+            extra={
+                "action": "start",
+                "generation": generation,
+                "expected_instance_id": instance_id,
+                "runtime": runtime,
+                "host": self.host,
+            },
+        )
 
+        preflight_budgets = self._host_budgets()
         try:
             facts = self.preflight(
-                command, member_id, project_id=project_id, action="start"
+                command,
+                member_id,
+                project_id=project_id,
+                action="start",
+                diagnostics=diag,
+            )
+            # 子类可从本人原源动态注入原生凭据；保护真实 child_env 快照，
+            # 不能只检查构造参数 child_env_extra，也不遍历整个宿主环境。
+            diag.add_sensitive_values(
+                value for name, value in facts.child_env.items()
+                if value and _SENSITIVE_ENV_NAME_RE.search(str(name))
             )
             argv = build_child_argv(
                 facts.argv,
@@ -1572,42 +1896,99 @@ class HostManager:
                 process_started_at=_utcnow(),
                 base_url=self.client.base_url,
             )
+            # 只对真实内置 bridge 追加其已支持的日志参数；自定义入口保持旧 argv。
+            argv += self.child_diagnostics_argv()
         except HostError as exc:
-            # 纯预检失败：**没有** spawn，`spawned=False` 让服务端安全释放所有权。
-            self._report(
-                launch_id,
-                generation=generation,
-                action="start",
-                claim_token=claim_token,
-                owner_token=owner_token,
-                outcome="failed",
-                instance_id=None,
-                pid=None,
-                process_started_at=None,
-                error_code=exc.code,
-                spawned=False,
+            failure_ref = diag.record_exception(
+                exc,
+                event="preflight_failed",
+                phase="start",
+                stage="preflight",
+                budgets=preflight_budgets,
+                extra={
+                    "action": "start",
+                    "generation": generation,
+                    "runtime": runtime,
+                    "error_code": exc.code,
+                    "host": self.host,
+                },
             )
+            # 纯预检失败：**没有** spawn，`spawned=False` 让服务端安全释放所有权。
+            try:
+                self._report_safely(
+                    diag,
+                    related_log_id=failure_ref,
+                    budgets=preflight_budgets,
+                    child_pid=None,
+                    launch_id=launch_id,
+                    generation=generation,
+                    action="start",
+                    claim_token=claim_token,
+                    owner_token=owner_token,
+                    outcome="failed",
+                    instance_id=None,
+                    pid=None,
+                    process_started_at=None,
+                    error_code=exc.code,
+                    spawned=False,
+                )
+            finally:
+                self._drop_launch_diagnostics(launch_id)
             return {
                 "launch_id": launch_id,
                 "member_id": member_id,
                 "outcome": "failed",
                 "error_code": exc.code,
             }
+        except Exception as exc:
+            # 原代码不会把未知预检异常转成业务失败：这里只留痕并原样传播。
+            diag.record_exception(
+                exc,
+                event="preflight_failed",
+                phase="start",
+                stage="preflight",
+                budgets=preflight_budgets,
+                extra={
+                    "action": "start",
+                    "generation": generation,
+                    "runtime": runtime,
+                    "host": self.host,
+                },
+            )
+            self._drop_launch_diagnostics(launch_id)
+            raise
 
         # 产品片B：公开启动诊断只带**有界**数值/枚举，且与 `facts.argv` 同属一份快照。
         diagnostics = facts.diagnostics()
+        spawn_budgets = self._host_budgets(facts=facts)
         control_file = self.store.control_path(launch_id)
         child_env = dict(facts.child_env)
         child_env[CONTROL_FILE_ENV] = str(control_file)
         stdout_target: Any = subprocess.DEVNULL
         stderr_target: Any = subprocess.DEVNULL
         opened: list[Any] = []
-        if self.child_log_dir is not None:
-            self.child_log_dir.mkdir(parents=True, exist_ok=True)
-            name = _sanitize_token(launch_id)
-            stdout_target = open(self.child_log_dir / f"{name}.out", "ab")
-            stderr_target = open(self.child_log_dir / f"{name}.err", "ab")
-            opened = [stdout_target, stderr_target]
+        try:
+            if self.child_log_dir is not None:
+                self.child_log_dir.mkdir(parents=True, exist_ok=True)
+                name = _sanitize_token(launch_id)
+                stdout_target = open(self.child_log_dir / f"{name}.out", "ab")
+                opened.append(stdout_target)
+                stderr_target = open(self.child_log_dir / f"{name}.err", "ab")
+                opened.append(stderr_target)
+        except Exception as exc:
+            # 准备输出文件时尚未 spawn。保留原异常/归属语义，不能把这里的
+            # OSError 改记为后面的 cli_missing；第二个文件失败也关闭第一个。
+            diag.record_exception(
+                exc, event="spawn_setup_failed", phase="start", stage="spawn_io",
+                budgets=spawn_budgets,
+                extra={"action": "start", "generation": generation,
+                       "runtime": runtime, "host": self.host},
+            )
+            for stream in opened:
+                with contextlib.suppress(OSError):
+                    stream.close()
+            self._drop_launch_diagnostics(launch_id)
+            raise
         try:
             process = spawn_hidden(
                 argv,
@@ -1617,19 +1998,40 @@ class HostManager:
                 stderr_target=stderr_target,
             )
         except OSError as exc:
-            self._report(
-                launch_id,
-                generation=generation,
-                action="start",
-                claim_token=claim_token,
-                owner_token=owner_token,
-                outcome="failed",
-                instance_id=None,
-                pid=None,
-                process_started_at=None,
-                error_code="cli_missing",
-                spawned=False,
+            failure_ref = diag.record_exception(
+                exc,
+                event="spawn_failed",
+                phase="start",
+                stage="spawn",
+                budgets=spawn_budgets,
+                extra={
+                    "action": "start",
+                    "generation": generation,
+                    "runtime": runtime,
+                    "error_code": "cli_missing",
+                    "host": self.host,
+                },
             )
+            try:
+                self._report_safely(
+                    diag,
+                    related_log_id=failure_ref,
+                    budgets=spawn_budgets,
+                    child_pid=None,
+                    launch_id=launch_id,
+                    generation=generation,
+                    action="start",
+                    claim_token=claim_token,
+                    owner_token=owner_token,
+                    outcome="failed",
+                    instance_id=None,
+                    pid=None,
+                    process_started_at=None,
+                    error_code="cli_missing",
+                    spawned=False,
+                )
+            finally:
+                self._drop_launch_diagnostics(launch_id)
             return {
                 "launch_id": launch_id,
                 "member_id": member_id,
@@ -1637,6 +2039,22 @@ class HostManager:
                 "error_code": "cli_missing",
                 **diagnostics,
             }
+        except Exception as exc:
+            diag.record_exception(
+                exc,
+                event="spawn_failed",
+                phase="start",
+                stage="spawn",
+                budgets=spawn_budgets,
+                extra={
+                    "action": "start",
+                    "generation": generation,
+                    "runtime": runtime,
+                    "host": self.host,
+                },
+            )
+            self._drop_launch_diagnostics(launch_id)
+            raise
         finally:
             for stream in opened:
                 with contextlib.suppress(OSError):
@@ -1673,15 +2091,50 @@ class HostManager:
         self._handles[launch_id] = {
             "process": process, "record": record, "record_persisted": False
         }
+        diag.record_event(
+            "spawned",
+            severity="info",
+            phase="start",
+            stage="spawn",
+            budgets=spawn_budgets,
+            extra={
+                "action": "start",
+                "generation": generation,
+                "child_pid": process.pid,
+                "instance_id": instance_id,
+                "runtime": facts.runtime,
+                "process_started_at": _iso(started_wall),
+                "process_identity_source": source,
+                "host": self.host,
+            },
+        )
         try:
             self.store.save(record)
             self._handles[launch_id]["record_persisted"] = True
         except (HostError, OSError, ProvisionError) as exc:
             error_code = exc.code if isinstance(exc, HostError) else "storage_unavailable"
+            failure_ref = diag.record_exception(
+                exc,
+                event="ownership_save_failed",
+                phase="start",
+                stage="ownership",
+                budgets=spawn_budgets,
+                extra={
+                    "action": "start",
+                    "generation": generation,
+                    "child_pid": process.pid,
+                    "error_code": error_code,
+                    "host": self.host,
+                },
+            )
             stopped = self._abort_spawned_child(process, control_file)
             if stopped:
-                self._report(
-                    launch_id,
+                self._report_safely(
+                    diag,
+                    related_log_id=failure_ref,
+                    budgets=spawn_budgets,
+                    child_pid=process.pid,
+                    launch_id=launch_id,
                     generation=generation,
                     action="start",
                     claim_token=claim_token,
@@ -1697,6 +2150,7 @@ class HostManager:
                 # 后续仍可领取关闭动作并释放服务端归属。
                 self._handles.pop(launch_id, None)
                 self.store.clear(project_id, member_id, launch_id)
+                self._drop_launch_diagnostics(launch_id)
                 return {
                     "launch_id": launch_id,
                     "member_id": member_id,
@@ -1705,8 +2159,12 @@ class HostManager:
                     **diagnostics,
                 }
             # 子进程仍存活：保留句柄与失败报告（服务端据此保留所有权、允许 stop）。
-            self._report(
-                launch_id,
+            self._report_safely(
+                diag,
+                related_log_id=failure_ref,
+                budgets=spawn_budgets,
+                child_pid=process.pid,
+                launch_id=launch_id,
                 generation=generation,
                 action="start",
                 claim_token=claim_token,
@@ -1729,9 +2187,29 @@ class HostManager:
         try:
             self._wait_ready(instance_id, project_id, member_id)
         except HostError as exc:
+            failure_ref = diag.record_exception(
+                exc,
+                event="readiness_failed",
+                phase="start",
+                stage="readiness",
+                budgets=spawn_budgets,
+                extra={
+                    "action": "start",
+                    "generation": generation,
+                    "child_pid": process.pid,
+                    "instance_id": instance_id,
+                    "runtime": facts.runtime,
+                    "error_code": exc.code,
+                    "host": self.host,
+                },
+            )
             # 超时/失败**不**杀子进程：保留句柄与所有权记录，等人类显式 stop。
-            self._report(
-                launch_id,
+            self._report_safely(
+                diag,
+                related_log_id=failure_ref,
+                budgets=spawn_budgets,
+                child_pid=process.pid,
+                launch_id=launch_id,
                 generation=generation,
                 action="start",
                 claim_token=claim_token,
@@ -1750,9 +2228,45 @@ class HostManager:
                 "error_code": exc.code,
                 **diagnostics,
             }
+        except Exception as exc:
+            diag.record_exception(
+                exc,
+                event="readiness_failed",
+                phase="start",
+                stage="readiness",
+                budgets=spawn_budgets,
+                extra={
+                    "action": "start",
+                    "generation": generation,
+                    "child_pid": process.pid,
+                    "instance_id": instance_id,
+                    "runtime": facts.runtime,
+                    "host": self.host,
+                },
+            )
+            raise
 
-        self._report(
-            launch_id,
+        diag.record_event(
+            "ready",
+            severity="info",
+            phase="start",
+            stage="readiness",
+            budgets=spawn_budgets,
+            extra={
+                "action": "start",
+                "generation": generation,
+                "child_pid": process.pid,
+                "instance_id": instance_id,
+                "runtime": facts.runtime,
+                "host": self.host,
+            },
+        )
+        self._report_safely(
+            diag,
+            related_log_id=None,
+            budgets=spawn_budgets,
+            child_pid=process.pid,
+            launch_id=launch_id,
             generation=generation,
             action="start",
             claim_token=claim_token,
@@ -1895,6 +2409,27 @@ class HostManager:
         found = self._live_handles(project_id, member_id)
         if len(found) != 1:
             # 无活句柄/句柄歧义：无法证明归属 → 不认领、不写控制文件、不 kill、不清记录。
+            diag = self._launch_diagnostics(
+                project_id=project_id,
+                member_id=member_id,
+                launch_id=launch_id,
+                instance_id=str(launch.get("expected_instance_id") or "") or None,
+                runtime=None,
+            )
+            diag.record_event(
+                "stop_rejected",
+                severity="warning",
+                phase="stop",
+                stage="stop",
+                budgets=self._host_budgets(),
+                extra={
+                    "action": "stop",
+                    "generation": launch.get("generation"),
+                    "error_code": "unknown_owner",
+                    "host": self.host,
+                },
+            )
+            self._drop_launch_diagnostics(launch_id)
             return {
                 "launch_id": launch_id,
                 "member_id": member_id,
@@ -1903,8 +2438,33 @@ class HostManager:
             }
         original_launch_id, handle = found[0]
         record = handle.get("record") or {}
+        diag = self._launch_diagnostics(
+            project_id=project_id,
+            member_id=member_id,
+            launch_id=launch_id,
+            instance_id=str(record.get("instance_id") or launch.get("expected_instance_id") or "")
+            or None,
+            runtime=str(record.get("runtime") or "") or None,
+            extra_secrets=(record.get("owner_token"),),
+        )
         failure = self._identity_evidence(launch, record, handle)
         if failure is not None:
+            diag.record_event(
+                "stop_rejected",
+                severity="warning",
+                phase="stop",
+                stage="stop",
+                budgets=self._host_budgets(),
+                extra={
+                    "action": "stop",
+                    "generation": launch.get("generation"),
+                    "error_code": failure,
+                    "child_pid": record.get("pid"),
+                    "process_launch_id": original_launch_id,
+                    "host": self.host,
+                },
+            )
+            self._drop_launch_diagnostics(launch_id)
             return {
                 "launch_id": launch_id,
                 "member_id": member_id,
@@ -1914,65 +2474,181 @@ class HostManager:
         process = handle["process"]
         generation = int(launch["generation"])
         started_at = _parse_iso(record.get("process_started_at"))
+        child_pid = int(record["pid"])
+        budgets = self._host_budgets()
 
         if process.poll() is not None:
             # 进程已自行退出：仍按“宿主记录 + 已死”证明停止（claim 拿新 claim_token）。
-            self._report(
-                launch_id,
+            diag.record_event(
+                "stop_process_exited",
+                severity="info",
+                phase="stop",
+                stage="stop",
+                budgets=budgets,
+                extra={
+                    "action": "stop",
+                    "generation": generation,
+                    "child_pid": child_pid,
+                    "child_exit_code": getattr(process, "returncode", None),
+                    "process_launch_id": original_launch_id,
+                    "host": self.host,
+                },
+            )
+            try:
+                claim_token = self._claim_stop(launch_id, record)
+            except Exception as exc:
+                diag.record_exception(
+                    exc,
+                    event="stop_claim_failed",
+                    phase="stop",
+                    stage="claim",
+                    budgets=budgets,
+                    extra={
+                        "action": "stop",
+                        "generation": generation,
+                        "child_pid": child_pid,
+                        "process_launch_id": original_launch_id,
+                        "error_code": getattr(exc, "code", None) or type(exc).__name__,
+                        "host": self.host,
+                    },
+                )
+                self._drop_launch_diagnostics(launch_id)
+                raise
+            self._report_safely(
+                diag,
+                related_log_id=None,
+                budgets=budgets,
+                child_pid=child_pid,
+                launch_id=launch_id,
                 generation=generation,
                 action="stop",
-                claim_token=self._claim_stop(launch_id, record),
+                claim_token=claim_token,
                 owner_token=str(record["owner_token"]),
                 outcome="stopped",
                 instance_id=None,
-                pid=int(record["pid"]),
+                pid=child_pid,
                 process_started_at=started_at,
                 error_code=None,
                 spawned=True,
             )
             self._handles.pop(original_launch_id, None)
             self.store.clear(project_id, member_id, original_launch_id)
+            self._drop_launch_diagnostics(launch_id)
+            self._drop_launch_diagnostics(original_launch_id)
             return {"launch_id": launch_id, "member_id": member_id, "outcome": "stopped"}
 
-        claim_token = self._claim_stop(launch_id, record)
+        try:
+            claim_token = self._claim_stop(launch_id, record)
+        except Exception as exc:
+            diag.record_exception(
+                exc,
+                event="stop_claim_failed",
+                phase="stop",
+                stage="claim",
+                budgets=budgets,
+                extra={
+                    "action": "stop",
+                    "generation": generation,
+                    "child_pid": child_pid,
+                    "process_launch_id": original_launch_id,
+                    "error_code": getattr(exc, "code", None) or type(exc).__name__,
+                    "host": self.host,
+                },
+            )
+            self._drop_launch_diagnostics(launch_id)
+            raise
         control_file = self.store.control_path(original_launch_id)
-        graceful = self._graceful_stop(process, control_file)
+        diag.record_event(
+            "stop_requested",
+            severity="info",
+            phase="stop",
+            stage="stop",
+            budgets=budgets,
+            extra={
+                "action": "stop",
+                "generation": generation,
+                "child_pid": child_pid,
+                "process_launch_id": original_launch_id,
+                "host": self.host,
+            },
+        )
+        graceful, timeout_ref = self._graceful_stop(
+            process,
+            control_file,
+            diagnostics=diag,
+            budgets=budgets,
+            extra={
+                "action": "stop",
+                "generation": generation,
+                "child_pid": child_pid,
+                "process_launch_id": original_launch_id,
+                "host": self.host,
+            },
+        )
         if not graceful:
             # 超时显式失败：不强杀，所有权记录与句柄继续保留。
-            self._report(
-                launch_id,
-                generation=generation,
-                action="stop",
-                claim_token=claim_token,
-                owner_token=str(record["owner_token"]),
-                outcome="failed",
-                instance_id=None,
-                pid=int(record["pid"]),
-                process_started_at=started_at,
-                error_code="stop_timeout",
-                spawned=True,
-            )
+            try:
+                self._report_safely(
+                    diag,
+                    related_log_id=timeout_ref,
+                    budgets=budgets,
+                    child_pid=child_pid,
+                    launch_id=launch_id,
+                    generation=generation,
+                    action="stop",
+                    claim_token=claim_token,
+                    owner_token=str(record["owner_token"]),
+                    outcome="failed",
+                    instance_id=None,
+                    pid=child_pid,
+                    process_started_at=started_at,
+                    error_code="stop_timeout",
+                    spawned=True,
+                )
+            finally:
+                self._drop_launch_diagnostics(launch_id)
             return {
                 "launch_id": launch_id,
                 "member_id": member_id,
                 "outcome": "failed",
                 "error_code": "stop_timeout",
             }
-        self._report(
-            launch_id,
+        diag.record_event(
+            "stopped",
+            severity="info",
+            phase="stop",
+            stage="stop",
+            budgets=budgets,
+            extra={
+                "action": "stop",
+                "generation": generation,
+                "child_pid": child_pid,
+                "child_exit_code": getattr(process, "returncode", None),
+                "process_launch_id": original_launch_id,
+                "host": self.host,
+            },
+        )
+        self._report_safely(
+            diag,
+            related_log_id=None,
+            budgets=budgets,
+            child_pid=child_pid,
+            launch_id=launch_id,
             generation=generation,
             action="stop",
             claim_token=claim_token,
             owner_token=str(record["owner_token"]),
             outcome="stopped",
             instance_id=None,
-            pid=int(record["pid"]),
+            pid=child_pid,
             process_started_at=started_at,
             error_code=None,
             spawned=True,
         )
         self._handles.pop(original_launch_id, None)
         self.store.clear(project_id, member_id, original_launch_id)
+        self._drop_launch_diagnostics(launch_id)
+        self._drop_launch_diagnostics(original_launch_id)
         return {"launch_id": launch_id, "member_id": member_id, "outcome": "stopped"}
 
     def _claim_stop(self, launch_id: str, record: dict[str, Any]) -> str:
@@ -1987,23 +2663,56 @@ class HostManager:
         )
         return str(response.get("claim_token") or "")
 
-    def _graceful_stop(self, process: subprocess.Popen, control_file: Path) -> bool:
-        """请求子进程自行退出；超时返回 ``False``（**不**强杀、不留无主进程）。"""
+    def _graceful_stop(
+        self,
+        process: subprocess.Popen,
+        control_file: Path,
+        *,
+        diagnostics: Optional[host_diag.HostDiagnostics] = None,
+        budgets: Optional[dict[str, Any]] = None,
+        extra: Optional[dict[str, Any]] = None,
+    ) -> tuple[bool, Optional[str]]:
+        """请求子进程自行退出；超时返回 ``(False, 超时日志引用)``（**不**强杀）。
+
+        控制文件发布失败与等待超时是两类真实异常，分别留痕；超时记录用
+        ``related_log_id`` 关联同一次 stop 的控制文件发布失败（若有）。诊断调用
+        都由安全包装负责，不改变原停止/所有权语义。
+        """
         control_file = Path(control_file)
+        related_log_id: Optional[str] = None
         try:
             # 控制文件严格限制在本次私有状态根内，且发布本身带私有 ACL 核验。
             assert_inside_root(self.store.state_dir, control_file.relative_to(self.store.state_dir))
             _publish_private_bytes(control_file, b"shutdown\n")
-        except (ProvisionError, HostError, ValueError, OSError):
-            pass
+        except (ProvisionError, HostError, ValueError, OSError) as exc:
+            if diagnostics is not None:
+                related_log_id = diagnostics.record_exception(
+                    exc,
+                    event="stop_control_file_failed",
+                    phase="stop",
+                    stage="stop",
+                    budgets=budgets,
+                    extra=extra,
+                )
         if os.name != "nt":
             with contextlib.suppress(OSError):
                 process.terminate()
         try:
             process.wait(timeout=self.stop_timeout)
-            return True
-        except subprocess.TimeoutExpired:
-            return False
+            return True, None
+        except subprocess.TimeoutExpired as exc:
+            timeout_ref: Optional[str] = None
+            if diagnostics is not None:
+                timeout_ref = diagnostics.record_exception(
+                    exc,
+                    event="stop_timeout",
+                    phase="stop",
+                    stage="stop",
+                    budgets=budgets,
+                    related_log_id=related_log_id,
+                    extra=extra,
+                )
+            return False, timeout_ref
 
     # ── report ──────────────────────────────────────────────────────
 
@@ -2100,14 +2809,34 @@ class HostManager:
             )
         return actions
 
-    def _start_worker_round(self, provision_worker: Any) -> tuple[Any, dict[str, Any]]:
+    def _start_worker_round(
+        self,
+        provision_worker: Any,
+        *,
+        diagnostics: Optional[host_diag.HostDiagnostics] = None,
+    ) -> tuple[Any, dict[str, Any]]:
         """独立受控线程里跑一轮 worker：同一请求串行、绝不与下一轮重叠（返修 F2）。"""
         box: dict[str, Any] = {"outcomes": None}
 
         def run() -> None:
             try:
                 raw = provision_worker.run_round()
-            except Exception:  # noqa: BLE001 - 配置 IO/超时不得阻塞服务控制循环
+            except Exception as exc:  # noqa: BLE001 - 配置 IO/超时不得阻塞服务控制循环
+                # 原实现只回放一个泛化 outcome；这里在同一捕获点保留真实异常全文，
+                # 但返回值与循环行为保持原样，不影响 poll/stop。
+                if diagnostics is not None:
+                    diagnostics.record_exception(
+                        exc,
+                        event="worker_round_failed",
+                        phase="serve",
+                        stage="provision_worker",
+                        budgets=self._host_budgets(worker=provision_worker),
+                        extra={
+                            "action": "provision-worker",
+                            "host": self.host,
+                            "error_code": getattr(exc, "code", None) or type(exc).__name__,
+                        },
+                    )
                 raw = [{"stage": "worker", "outcome": "failed", "error_code": "http_error"}]
             box["outcomes"] = _coerce_worker_outcomes(raw)
 
@@ -2165,11 +2894,31 @@ class HostManager:
         - **不共享**本管理器的 Popen 句柄/所有权，也不捕获 ``BaseException``；
         - 任何配置 IO 失败或超时都被收敛成 outcome 列表（返修 F1/F5），绝不影响服务控制
           循环；循环结束时按有界窗口收集，仍卡住则显式请求停止并如实记录。
+
+        任务 272：poll 断连/worker 异常/动作异常写入宿主级持久诊断；断连后仍继续
+        原循环，不停止心跳持有、不清 owner、不自动重试任务。
         """
         outcomes: list[dict[str, Any]] = []
         rounds = 0
         worker_thread: Any = None
         worker_box: dict[str, Any] = {}
+        diagnostics = self._manager_diagnostics(project_id)
+        poll_failures = 0
+        diagnostics.record_event(
+            "host_started",
+            severity="info",
+            phase="serve",
+            stage="host",
+            budgets=self._host_budgets(
+                poll_interval_seconds=poll_interval, worker=provision_worker
+            ),
+            extra={
+                "host": self.host,
+                "worker_enabled": provision_worker is not None,
+                "once": bool(once),
+                "max_rounds": max_rounds,
+            },
+        )
         while True:
             rounds += 1
             try:
@@ -2181,7 +2930,57 @@ class HostManager:
                 failure = {"action": "poll", "outcome": "failed", "error_code": error_code}
                 if not outcomes or outcomes[-1] != failure:
                     outcomes.append(failure)
+                poll_failures += 1
+                diagnostics.record_exception(
+                    exc,
+                    event="poll_failed",
+                    phase="serve",
+                    stage="poll",
+                    budgets=self._host_budgets(
+                        poll_interval_seconds=poll_interval, worker=provision_worker
+                    ),
+                    extra={
+                        "action": "poll",
+                        "consecutive_failures": poll_failures,
+                        "host": self.host,
+                    },
+                )
                 actions = []
+            except Exception as exc:
+                # 原代码不会捕获这个异常：记录后原样传播，绝不吞取消或伪造 poll 成功。
+                diagnostics.record_exception(
+                    exc,
+                    event="poll_failed",
+                    phase="serve",
+                    stage="poll",
+                    budgets=self._host_budgets(
+                        poll_interval_seconds=poll_interval, worker=provision_worker
+                    ),
+                    extra={
+                        "action": "poll",
+                        "consecutive_failures": poll_failures + 1,
+                        "host": self.host,
+                    },
+                )
+                raise
+            else:
+                if poll_failures:
+                    diagnostics.record_event(
+                        "poll_recovered",
+                        severity="info",
+                        phase="serve",
+                        stage="poll",
+                        budgets=self._host_budgets(
+                            poll_interval_seconds=poll_interval,
+                            worker=provision_worker,
+                        ),
+                        extra={
+                            "action": "poll",
+                            "consecutive_failures": poll_failures,
+                            "host": self.host,
+                        },
+                    )
+                    poll_failures = 0
             for action in actions:
                 try:
                     if action.get("action") == "stop":
@@ -2197,6 +2996,43 @@ class HostManager:
                             "error_code": exc.code if isinstance(exc, HostError) else "host_unreachable",
                         }
                     )
+                    diagnostics.record_exception(
+                        exc,
+                        event="action_failed",
+                        phase="serve",
+                        stage="action",
+                        budgets=self._host_budgets(
+                            poll_interval_seconds=poll_interval,
+                            worker=provision_worker,
+                        ),
+                        extra={
+                            "action": action.get("action"),
+                            "launch_id": action.get("launch_id"),
+                            "member_id": action.get("member_id"),
+                            "error_code": getattr(exc, "code", None)
+                            or type(exc).__name__,
+                            "host": self.host,
+                        },
+                    )
+                except Exception as exc:
+                    # 原代码会让这个异常终止循环；只记录并原样传播，不改变退出语义。
+                    diagnostics.record_exception(
+                        exc,
+                        event="action_failed",
+                        phase="serve",
+                        stage="action",
+                        budgets=self._host_budgets(
+                            poll_interval_seconds=poll_interval,
+                            worker=provision_worker,
+                        ),
+                        extra={
+                            "action": action.get("action"),
+                            "launch_id": action.get("launch_id"),
+                            "member_id": action.get("member_id"),
+                            "host": self.host,
+                        },
+                    )
+                    raise
             if provision_worker is not None:
                 # 先**非阻塞**收上一轮（grace=0 只在已结束时取回），再决定是否开新一轮。
                 finished = self._collect_worker_round(worker_thread, worker_box, grace=0.0)
@@ -2204,12 +3040,45 @@ class HostManager:
                     outcomes.extend(self._tag_worker_outcomes(finished))
                     worker_thread, worker_box = None, {}
                 if worker_thread is None:
-                    worker_thread, worker_box = self._start_worker_round(provision_worker)
+                    worker_thread, worker_box = self._start_worker_round(
+                        provision_worker, diagnostics=diagnostics
+                    )
             if once or (max_rounds is not None and rounds >= max_rounds):
                 break
             time.sleep(poll_interval)
         if provision_worker is not None and worker_thread is not None:
-            self._finish_worker_round(provision_worker, worker_thread, worker_box, outcomes)
+            self._finish_worker_round(
+                provision_worker,
+                worker_thread,
+                worker_box,
+                outcomes,
+                diagnostics=diagnostics,
+            )
+        diagnostics.record_event(
+            "host_stopped",
+            severity="info",
+            phase="serve",
+            stage="host",
+            budgets=self._host_budgets(
+                poll_interval_seconds=poll_interval, worker=provision_worker
+            ),
+            extra={
+                "host": self.host,
+                "rounds": rounds,
+                "outcomes": len(outcomes),
+                "failed_outcomes": sum(
+                    1
+                    for item in outcomes
+                    if isinstance(item, Mapping)
+                    and item.get("outcome") in ("failed", "reported")
+                ),
+                "stopped_outcomes": sum(
+                    1
+                    for item in outcomes
+                    if isinstance(item, Mapping) and item.get("outcome") == "stopped"
+                ),
+            },
+        )
         return outcomes
 
     def _tag_worker_outcomes(
@@ -2228,6 +3097,8 @@ class HostManager:
         thread: Any,
         box: dict[str, Any],
         outcomes: list[dict[str, Any]],
+        *,
+        diagnostics: Optional[host_diag.HostDiagnostics] = None,
     ) -> None:
         """退出时的有界收尾：先给足预算；仍卡住则请求停止后再等一个窗口。"""
         grace = self._worker_shutdown_grace(provision_worker)
@@ -2235,10 +3106,38 @@ class HostManager:
         if finished is None:
             stop = getattr(provision_worker, "request_stop", None)
             if callable(stop):
-                with contextlib.suppress(Exception):
+                try:
                     stop()
+                except Exception as exc:
+                    if diagnostics is not None:
+                        diagnostics.record_exception(
+                            exc,
+                            event="worker_stop_failed",
+                            phase="serve",
+                            stage="provision_worker",
+                            budgets=self._host_budgets(worker=provision_worker),
+                            extra={
+                                "action": "provision-worker",
+                                "host": self.host,
+                                "error_code": getattr(exc, "code", None)
+                                or type(exc).__name__,
+                            },
+                        )
             finished = self._collect_worker_round(thread, box, grace=grace)
         if finished is None:
+            if diagnostics is not None:
+                diagnostics.record_event(
+                    "worker_round_stopped",
+                    severity="warning",
+                    phase="serve",
+                    stage="provision_worker",
+                    budgets=self._host_budgets(worker=provision_worker),
+                    extra={
+                        "action": "provision-worker",
+                        "host": self.host,
+                        "error_code": "worker_stopped",
+                    },
+                )
             outcomes.append(
                 {
                     "action": "provision-worker",
@@ -2347,6 +3246,36 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ready-timeout", type=float, default=DEFAULT_READY_TIMEOUT_SECONDS)
     parser.add_argument("--stop-timeout", type=float, default=DEFAULT_STOP_TIMEOUT_SECONDS)
     parser.add_argument("--poll-interval", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS)
+    # 任务 272：宿主显式日志策略（与 bridge 同名；默认开启，旧调用无需新参数）。
+    parser.add_argument(
+        "--runtime-log-dir",
+        default=None,
+        help="宿主持久诊断根目录；缺省用 TALK_RUNTIME_LOG_DIR 或 <project>/logs/runtime",
+    )
+    parser.add_argument(
+        "--runtime-log-retention-days",
+        type=float,
+        default=None,
+        help="本 run 轮换 segment 的保留天数；缺省 30 或 TALK_RUNTIME_LOG_RETENTION_DAYS",
+    )
+    parser.add_argument(
+        "--runtime-log-max-bytes",
+        type=int,
+        default=None,
+        help="本 run 事件文件容量目标（字节）；缺省 256 MiB 或 TALK_RUNTIME_LOG_MAX_BYTES",
+    )
+    parser.add_argument(
+        "--runtime-log-max-file-bytes",
+        type=int,
+        default=None,
+        help="单个 segment 轮换阈值（字节）；缺省 8 MiB 或 TALK_RUNTIME_LOG_MAX_FILE_BYTES",
+    )
+    parser.add_argument(
+        "--disable-runtime-logs",
+        dest="runtime_log_disabled",
+        action="store_true",
+        help="只关闭宿主本进程的持久诊断写入（内置 bridge 子进程也显式关闭）",
+    )
     # R1-4b：默认关闭的请求 worker（只接线，不改变服务语义；不 spawn 角色 CLI）。
     parser.add_argument(
         "--provision-worker",
@@ -2445,6 +3374,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             ready_timeout=args.ready_timeout,
             stop_timeout=args.stop_timeout,
             project_root=Path(args.project_root),
+            runtime_log_dir=Path(args.runtime_log_dir) if args.runtime_log_dir else None,
+            runtime_log_retention_days=args.runtime_log_retention_days,
+            runtime_log_max_bytes=args.runtime_log_max_bytes,
+            runtime_log_max_file_bytes=args.runtime_log_max_file_bytes,
+            runtime_log_disabled=args.runtime_log_disabled,
         )
     except HostError as exc:
         print(json.dumps({"schema": SCHEMA, "ok": False, "error_code": exc.code}))
@@ -2493,6 +3427,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         ),
                     )
                 except WorkerError as exc:
+                    with contextlib.suppress(Exception):
+                        manager.record_host_exception(
+                            args.project,
+                            exc,
+                            event="provision_worker_init_failed",
+                            phase="serve",
+                            stage="config_worker",
+                            extra={
+                                "action": "provision-worker",
+                                "worker_apply": bool(args.provision_worker_apply),
+                                "host": manager.host,
+                                "error_code": exc.code,
+                            },
+                        )
                     print(
                         json.dumps(
                             {"schema": SCHEMA, "ok": False, "error_code": exc.code},
@@ -2501,6 +3449,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         )
                     )
                     return EXIT_FAILED
+                except Exception as exc:
+                    # 原代码不会把非 WorkerError 转成稳定输出：留痕后原样传播。
+                    with contextlib.suppress(Exception):
+                        manager.record_host_exception(
+                            args.project,
+                            exc,
+                            event="provision_worker_init_failed",
+                            phase="serve",
+                            stage="config_worker",
+                            extra={
+                                "action": "provision-worker",
+                                "worker_apply": bool(args.provision_worker_apply),
+                                "host": manager.host,
+                            },
+                        )
+                    raise
             result = {
                 "outcomes": manager.serve(
                     args.project,
@@ -2550,6 +3514,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "note": "关闭请求已写入；由常驻管理器 serve 承接执行，本进程不 kill。",
                 }
     except HostError as exc:
+        with contextlib.suppress(Exception):
+            manager.record_host_exception(
+                args.project,
+                exc,
+                event="host_action_failed",
+                phase="cli",
+                stage="cli",
+                extra={
+                    "mode": args.mode,
+                    "member_id": args.member,
+                    "host": manager.host,
+                    "error_code": exc.code,
+                },
+            )
         payload = {"schema": SCHEMA, "ok": False, "error_code": exc.code}
         print(json.dumps(redact(payload), ensure_ascii=False, sort_keys=True))
         return EXIT_FAILED
