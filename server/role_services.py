@@ -483,6 +483,8 @@ def _finalize_readiness_if_ready(
     launch: RoleServiceLaunch, state: RoleServiceState, session: Session, now: datetime
 ) -> bool:
     """四条件齐备时把角色收敛为 ``running``/``success``；否则保持 ``starting``。"""
+    if state.observed_state != ROLE_SERVICE_OBSERVED_STARTING:
+        return False
     if not readiness_conditions_met(launch, state, session, now=now):
         return False
     state.observed_state = ROLE_SERVICE_OBSERVED_RUNNING

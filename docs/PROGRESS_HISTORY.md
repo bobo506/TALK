@@ -1,5 +1,31 @@
 # 开发历史 · TALK
 
+## 2026-10-18 19:02（Asia/Shanghai）— 人工恢复产品入口落地，五角色真实运行恢复待页面复验
+
+- 用户明确“同意”14:55人工恢复方案，授权Codex在全部执行端离线时直接完成本补正、验证后逐角色恢复。桌面协调身份仍agent:codex/prj_e8fe7066bbec/lead，human操作沿原human:bobo Key；未改变生产development_requirements。单方改共享目录，未派TALK任务；全部产品验证为Codex自检，不称外部独立复核。
+- 新增RoleServiceRecovery独立表/DTO、共享候选核验、human-only计划及recover-stopped路由和显式CLI。请求固定明确确认值/原宿主退出理由，携带唯一操作键和expected世代/start/实例/host；不接受模糊解除。计划不回传owner/claim token、Key或原生命令，恢复审计仅记非秘密前后状态、人类操作者和请求指纹。
+- 恢复实际事务先获取SQLite写锁再重读：候选原start/实例/member/project/host精确匹配、心跳超过90秒、目标成员在任意项目无queued/running任务、无未过期pending/claimed启停动作；世代CAS递增、释放旧归属、实例如实offline和独立审计同事务提交，写入故障整体回滚。同操作键同载荷重放只读既有回执，异载荷409，不能清除后来新owner；旧实例PUT拒绝instance_launch_recovered，旧报告只读重放，不伪造原宿主stop。
+- CLI默认plan，apply须保存计划及--confirm-stopped，显式从操作Key文件读取且先核human身份。只读Windows原manager/bridge PID查询只将OpenProcess错误87认定不存在；权限不足/未知/存在均拒绝，核本机原host、项目/member、健康与入口SHA、替代宿主入口/原launch/实例进程；计划变化中止。原生命令只在本地内存用于匹配，不写入证据或提交服务器；apply紧邻POST再核一次。OS检查与DB事务仍不原子，未包装为服务端自动死亡证明。
+- 隔离负向测试首轮发现8.3短路径宿主入口识别缺口，修正Path.resolve规范化后通过，原失败日志保留。其他验证覆盖agent403、错误身份关联/世代/host、心跳新鲜/活动任务/在途动作、权限拒绝、两SQLite连接竞争仅一方成功、心跳竞争、过期旧stop晚到、幂等重放新归属保持、旧报告及实例不能复活、审计/状态写故障回滚，普通启停/Popen守卫/CLI各入口及实例项目隔离回归。
+- 实际重载前核原API启动器SHA、原活Popen和无运行中任务，沿其stop.request正常退出、隐藏同入口重新启动；常规init_db只新增恢复表，未手工改服务/任务DB。随后发现初始120秒TTL内周期心跳可重复覆盖started_at，补_finalize_readiness_if_ready仅starting可进入并添加回归；再正常重载加载最终代码。当前实际launcher7020→API包装15048，owns_original_popen=true/autorestart=false，不按PID收养进程。
+- 相关10模块当前唯一测试共313项Python通过：recovery13、recovery_cli5、role_services65、role_service_host34、managed_instance_liveness5、cli_bridge120、codex_bridge32、kimi_bridge9、instances5、instances_project_dimension25；多次分组回归存在重叠，不重复累计。最终相关117项含ready时间保持；此前280及47分组证据保持。git diff --check通过；本片无前端产品改动，原心跳页面片277 Python/60 Node结果沿用且不并算本片新增测试。未使用Browser或原生模型探针。
+
+| 实际恢复角色 | 旧世代→人工恢复→普通新启动 | 新manager / bridge PID | 新实例 | 新process_launch_id |
+| --- | --- | --- | --- | --- |
+| agent:deepseek | 5→6→7 | 18784 / 14944 | ins_067081e6a036 | bdd664da-537e-4a63-b6a5-33ef076617b2 |
+| agent:kimi-code-k28-preview | 10→11→12 | 9296 / 9332 | ins_e35de45bc9f0 | c761f8c3-3644-42da-8f29-7092f0fc6ab3 |
+| agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c | 7→8→9 | 12320 / 9624 | ins_b52fd666223f | 8cb7cf29-7dde-4a58-a1fa-e8580112ccb4 |
+| agent:kimi | 7→8→9 | 17932 / 16228 | ins_e27eac1f7e2c | 86e37c92-758f-4b69-916a-9565543b955e |
+| agent:codex | 9→10→11 | 3140 / 7616 | ins_c1a05e4834b9 | 58e3f2d6-06a8-4ba3-b24c-00d3cd3b5ba8 |
+
+- 按DeepSeek→旧K28→页面K28→原Kimi K3→原Codex顺序，每位重采原PID消失/无替代进程、API计划、配置及本人Key身份，产生一条human:bobo恢复审计，再从原受控单角色入口创建新manager，由其持有新Popen并走普通start。每位running/ready、实际OS bridge直接父链、新实例idle、30秒真实心跳推进和started_at稳定通过后才进下一位。18:57总核五角色均正常、新实例心跳新鲜、无queued/running任务；旧五实例offline，5条人工恢复审计完整。
+- 原Key文件/ID/名称/绑定/原生HOME和登录未复制、重做或更换。Codex仍npm0.163.0/gpt-6.1-sol/xhigh，DeepSeek仍deepseek-flash/max，两K28仍kimi-code/kimi-for-coding各自原档，原Kimi仍kimi-code/k3/tools；原runner unverified保持。269/2823收取UTC05:19:20.261866及原invalid、270/2824收取UTC03:29:45.015544保持，原正文/SHA和历史失败不改。恢复事务不改旧launch；后续普通start既有过期扫描可置旧launch.state=expired，原outcome/报告指纹/时间保持。
+- 消费者失败如实保留：DeepSeek第一次恢复/start已成功，立即核健康文件时owned_launches晚一轮导致断言失败；随后只读观察同一新实例通过，未重复恢复/start。旧K28初次错误假设统一Key路径、原Kimi中文dry-run按UTF8消费GBK均在生产动作前失败；按原产品配方定位旧K28原Key、外层Python -X utf8修正，另建retry2证据目录，旧失败不覆盖。不是产品原生调用通过或外部独立复核。
+- 证据位于.tmp/role-service-recovery/implementation/：configuration-before.json、各角色plan/recovery-receipt/stopped/new-manager/start-request/ready/heartbeat、prepare-initial-failures.json、final-api正常重载和restored-all.json；原只读diagnosis/sandbox-stop-event保持上级目录。工具输出均筛选必要字段，未输出Key或原生认证。
+- 变更涉及models、新恢复服务/路由/CLI、旧实例更新守卫及首次ready稳定性、两份新测试；同步恢复设计/合同/新使用指南/页面验收节及AGENTS/简报/bridge模块/进度。全部本地执行证据在忽略临时目录保留，不提交凭据、状态库或无关未跟踪产物。
+- 边界：12:05:49五宿主最后心跳与12:05:50沙箱服务停止事件高度吻合，仅线索推断；未证明逐进程终止链或请求者。新manager隐藏窗口和新Popen不等于跨Codex沙箱重启常驻已验，未安装系统服务/计划任务或规避宿主生命周期，未新增无限期自动解除授权。仅恢复监听，不重跑模型或269/270，也不外推六小时/固定后端/T-W/冷启动恢复能力。
+- 本片到人工验收门禁暂停：请用户Ctrl+F5刷新原角色页核五角色均启动成功及详情不再待核实，无需重复停启全部角色。当前页面反馈未到；确认后再按原顺序推进完整异常日志持久留存，DeepSeek首次执行、Codex复核直接修正，原2–18排期保持。正式进度与本记录落盘后提交/常规推送；本轮未读取精确额度百分比，不臆测。
+
 ## 2026-10-18 14:55（Asia/Shanghai）— 五角色异常退出只读诊断与人工恢复草案待确认
 
 - 用户要求继续宿主恢复；实核caller agent:codex/prj_e8fe7066bbec，页面要求仍旧分工，五角色绑定保持。只读Win32进程查询未发现替代host/bridge，旧五manager/bridge逐个OpenProcess错误87确认不存在，权限失败不冒充缺失；项目running/queued任务均0，未派新任务或读完整任务正文进入模型。

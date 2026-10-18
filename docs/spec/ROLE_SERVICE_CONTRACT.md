@@ -58,6 +58,12 @@ R1-3实现服务意图、宿主claim/report、实例就绪、逐角色启动/关
 
 页面在角色页可见时持续轮询启停中、运行中及上述失联状态，离页/切项目/切账号停表并丢弃迟到响应；全部关闭/未启动后停止续期。失联显示“运行状态待核实”，不显示为启动失败或已关闭；尚未收敛的批量结果单列“待核实”，不纳入失败重试集合。状态发现通常在最后心跳90秒过期后的下一次2秒轮询，不承诺瞬时发现或在网络不可用时证明进程退出。
 
+### 原宿主已消失后的人工恢复（2026-10-18已批准实施）
+
+新增human-only`GET .../service/recovery-plan`与`POST .../service/recover-stopped`及显式宿主CLI，详[恢复合同](ROLE_SERVICE_ORPHAN_RECOVERY_DESIGN.md)和[指南](../guides/ROLE_SERVICE_RECOVERY.md)。由人类明确确认原进程已停止，锁内核精确世代/start/实例/host、旧心跳、目标成员无queued/running任务及无未过期在途动作，独立恢复审计与已停止/释放归属同事务CAS；不伪造原宿主stop、不读还原owner、不操作OS进程。相同载荷重放不清新owner；已恢复的旧实例不能重新PUT。普通stop仍须原管理器/活句柄证明。
+
+周期心跳只更新实例事实，首次ready收敛只在starting进行，不能反复更新started_at。五角色已于18:57通过正常新manager/Popen启动及真实周期心跳核验，页面待用户反馈；跨Codex沙箱服务重启的独立驻留能力仍待。
+
 ### CLI bridge正常停止处理（真实验收补正）
 
 内置CLI及复用它的Kimi/Codex bridge在显式受管project/launch且有TALK_ROLE_SERVICE_CONTROL_FILE时，监听本launch对应的绝对控制路径；文件名遵循宿主同一sanitize规则。旧手动入口或未配置控制环境不增加监听，非法明确路径拒绝启动；缺失/暂不可读/非精确shutdown内容不当停止。宿主仍是写停止文件、验证原Popen已退出并report的唯一归属持有方，bridge不清owner或采信外部PID。

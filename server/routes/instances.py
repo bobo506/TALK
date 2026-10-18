@@ -30,6 +30,7 @@ from server.models import (
     ProjectAgent,
     ProjectRole,
     RoleServiceLaunch,
+    RoleServiceRecovery,
 )
 from server.role_services import _as_utc, note_instance_launch_evidence
 
@@ -155,6 +156,15 @@ def upsert_instance_status(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="instance belongs to another member",
         )
+
+    if existing is not None and existing.launch_id and session.exec(
+        select(RoleServiceRecovery.recovery_id).where(
+            RoleServiceRecovery.project_id == existing.project_id,
+            RoleServiceRecovery.member_id == existing.member_id,
+            RoleServiceRecovery.instance_id == instance_id,
+        ).limit(1)
+    ).first() is not None:
+        raise HTTPException(status_code=409, detail="instance_launch_recovered")
 
     provided = body.model_fields_set
 

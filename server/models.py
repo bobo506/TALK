@@ -8,7 +8,7 @@ import re
 import secrets
 import unicodedata
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -1497,6 +1497,27 @@ class RoleServiceLaunch(SQLModel, table=True):
     error_code: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleServiceRecovery(SQLModel, table=True):
+    """人类明确确认原进程已停止的独立审计；不伪造原宿主停止回执。"""
+
+    __tablename__ = "role_service_recoveries"
+
+    project_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True)
+    operation_key: str = Field(primary_key=True)
+    recovery_id: str = Field(default_factory=lambda: str(uuid4()), unique=True)
+    request_fingerprint: str
+    previous_generation: int
+    generation: int
+    process_launch_id: str
+    instance_id: str
+    owner_host: str
+    confirmed_by: str
+    reason: str
+    recovered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    before_state: dict = Field(sa_column=Column(JSON, nullable=False))
 
 
 def new_provision_step(*, attempts: int = 1) -> dict:
@@ -3957,6 +3978,44 @@ class RoleServiceStopOut(BaseModel):
     desired: str = ROLE_SERVICE_DESIRED_STOPPED
     observed: str = ROLE_SERVICE_OBSERVED_STOPPING
     idempotent_stopped: bool = False
+
+
+class RoleServiceRecoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_key: str = PydField(min_length=8, max_length=120, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]+$")
+    expected_generation: int = PydField(strict=True, ge=0)
+    expected_process_launch_id: str = PydField(min_length=1, max_length=200)
+    expected_instance_id: str = PydField(min_length=1, max_length=200)
+    expected_owner_host: str = PydField(min_length=1, max_length=200)
+    confirmation: Literal["old_processes_confirmed_stopped"]
+    reason: Literal["original_host_exited"]
+
+
+class RoleServiceRecoveryPlan(BaseModel):
+    project_id: str
+    member_id: str
+    expected_generation: int
+    expected_process_launch_id: str
+    expected_instance_id: str
+    expected_owner_host: str
+    process_pid: int
+    process_started_at: datetime
+    instance_last_seen_at: datetime
+    checked_at: datetime
+
+
+class RoleServiceRecoveryOut(BaseModel):
+    project_id: str
+    member_id: str
+    operation_key: str
+    recovery_id: str
+    previous_generation: int
+    generation: int
+    confirmed_by: str
+    recovered_at: datetime
+    observed: Literal["stopped"] = "stopped"
+    replayed: bool = False
 
 
 class RoleServiceStartAllRequest(BaseModel):

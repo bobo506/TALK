@@ -25,7 +25,11 @@ from server.models import (
     RoleServiceStartOut,
     RoleServiceStopOut,
     RoleServiceProjectionOut,
+    RoleServiceRecoveryRequest,
+    RoleServiceRecoveryPlan,
+    RoleServiceRecoveryOut,
 )
+from server.role_service_recovery import recovery_plan, recover_stopped
 from server.role_services import (
     claim_role_service_launch,
     list_role_services,
@@ -81,6 +85,22 @@ def stop_project_role_service(
     """
     _require_human(current)
     return stop_role_service(project_id, member_id, current, session)
+
+
+@router.get("/projects/{project_id}/roles/{member_id}/service/recovery-plan",
+            response_model=RoleServiceRecoveryPlan)
+def get_recovery_plan(project_id: str, member_id: str,
+                      current: Member = Depends(get_current_member),
+                      session: Session = Depends(get_session)):
+    return recovery_plan(project_id, member_id, current, session)
+
+
+@router.post("/projects/{project_id}/roles/{member_id}/service/recover-stopped",
+             response_model=RoleServiceRecoveryOut)
+def recover_role_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRequest,
+                         current: Member = Depends(get_current_member),
+                         session: Session = Depends(get_session)):
+    return recover_stopped(project_id, member_id, body, current, session)
 
 
 @router.post(
