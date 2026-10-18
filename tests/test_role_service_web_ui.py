@@ -79,7 +79,7 @@ class RoleServiceWebUiTests(RouteTestCase):
         """列表只展示一个当前状态标签；角色详情不再重复状态标签。"""
         self.assertIn('function workspaceRoleServiceStateLabel(status)', self.script)
         self.assertIn('function workspaceRoleServiceActions(role, className)', self.script)
-        self.assertIn('box.appendChild(workspaceRoleServiceStateLabel(control.status));', self.script)
+        self.assertIn('box.appendChild(workspaceRoleServiceStateLabel(listStatus));', self.script)
         self.assertIn('workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls")', self.script)
         # 详情面板函数体内不得再挂状态标签（只保留标题、说明、操作与提示）。
         panel = self.script.split("function workspaceRoleServicePanel(role) {", 1)[1]

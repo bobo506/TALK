@@ -55,7 +55,8 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   const detailChildren=doc.getElementById('role-details-name-panel').children;
   assert.ok(detailChildren.findIndex(n=>String(n.className).includes('role-maintenance'))>detailChildren.findIndex(n=>String(n.className).includes('role-service-section')),'重置区位于角色开关下方');
   service={...service,observed:'running',readiness_service:'ready'};await controller.refresh();
-  assert.match(h.texts(ctx.blackboardColumns),/启动成功（原生登录未核验）/);
+  assert.match(h.texts(ctx.blackboardColumns),/启动成功/);
+  assert.doesNotMatch(h.texts(ctx.blackboardColumns),/原生登录未核验/);
   service={...service,observed:'stopped',can_start:true,can_stop:false};await controller.refresh();
   assert.match(h.texts(ctx.blackboardColumns),/未启动（已关闭）/);
   assert.equal(requests.some(r=>r.path.includes('/service/')),false);

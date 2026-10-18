@@ -967,8 +967,10 @@ function workspaceRoleServiceControls(role, className = "role-service-controls")
   if (!control.view.provided) return null;
   const box = workspaceEl("div", className);
   if (control.view.memberId) box.dataset.memberId = control.view.memberId;
-  box.appendChild(workspaceRoleServiceStateLabel(control.status));
-  if (control.hint) box.appendChild(workspaceEl("p", "role-service-hint", control.hint));
+  const listStatus = control.status.kind === "success" ? { ...control.status, text: "启动成功" } : control.status;
+  box.appendChild(workspaceRoleServiceStateLabel(listStatus));
+  const listHint = control.hint === "请先「关闭」并确认已停止，再重新启动。" ? "" : control.hint;
+  if (listHint) box.appendChild(workspaceEl("p", "role-service-hint", listHint));
   return box;
 }
 function workspaceRoleServicePanel(role) {

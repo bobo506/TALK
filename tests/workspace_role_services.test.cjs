@@ -327,7 +327,7 @@ test('状态文案：not_started/stopped 不算失败；running 未就绪不出�
       { member_id: 'agent:a', business_role: 'dev', service: serviceRow({ observed: 'not_started' }) },
       { member_id: 'agent:b', business_role: 'dev', service: serviceRow({ observed: 'stopped', last_result: 'stopped' }) },
       { member_id: 'agent:c', business_role: 'dev', service: serviceRow({ observed: 'running', readiness_service: 'pending' }) },
-      { member_id: 'agent:d', business_role: 'dev', service: serviceRow({ observed: 'running', readiness_service: 'ready', native_login: 'unverified' }) },
+      { member_id: 'agent:d', business_role: 'dev', service: serviceRow({ observed: 'running', readiness_service: 'ready', native_login: 'unverified', ownership_held: true, can_start: false, can_stop: true }) },
       { member_id: 'agent:e', business_role: 'dev', service: serviceRow({ observed: 'running', readiness_service: 'ready', native_login: 'verified' }) },
       { member_id: 'agent:f', business_role: 'dev', service: serviceRow({ observed: 'unknown' }) },
       { member_id: 'agent:g', business_role: 'dev', service: serviceRow({ observed: 'failed', last_result: 'failed', error_code: 'readiness_timeout' }) },
@@ -341,7 +341,12 @@ test('状态文案：not_started/stopped 不算失败；running 未就绪不出�
   assert.ok(!h.state('agent:b').includes('失败'), 'stopped 不得显示失败');
   assert.equal(h.state('agent:c'), '启动中…');
   assert.ok(!h.state('agent:c').includes('成功'), 'running 但未就绪不得显示成功');
-  assert.equal(h.state('agent:d'), '启动成功（原生登录未核验）');
+  assert.equal(h.state('agent:d'), '启动成功');
+  assert.ok(!allTexts(h.controlsFor('agent:d')).join(' ').includes('原生登录未核验'));
+  assert.equal(h.hint('agent:d'), '', '已启动角色列表不重复提示关闭后重启');
+  assert.equal(h.startBtn('agent:d').disabled, true);
+  assert.equal(h.stopBtn('agent:d').disabled, false);
+  assert.ok(allTexts(h.el('role-details-name-panel')).includes('请先「关闭」并确认已停止，再重新启动。'));
   assert.equal(h.state('agent:e'), '启动成功');
   assert.equal(h.state('agent:f'), '未知');
   assert.equal(h.state('agent:g'), '启动失败（未就绪）');
@@ -598,7 +603,8 @@ test('全部启动：轮询把后到 ready 计成功、后到 failed 归入失�
   // B 未受管 → 可重试；C 仍受管 → 不能重复启动，必须先关闭。
   assert.equal(h.startBtn('agent:c').disabled, true, '仍持有进程的角色不允许重复启动');
   assert.equal(h.stopBtn('agent:c').disabled, false, '仍持有进程的角色必须先关闭');
-  assert.equal(h.hint('agent:c'), '请先「关闭」并确认已停止，再重新启动。');
+  assert.equal(h.hint('agent:c'), '', '角色列表不显示重复的关闭后重启提示');
+  assert.ok(allTexts(h.el('role-details-name-panel')).includes('请先「关闭」并确认已停止，再重新启动。'), '角色详情保留原操作提示');
   assert.equal(h.state('agent:c'), '启动失败（进程仍受管，请先关闭）');
 });
 

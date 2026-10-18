@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-18 19:37（Asia/Shanghai）— 独立分支准备角色列表文案精简，未干扰271
+
+- 用户要求删除角色列表“（原生登录未核验）”及“请先「关闭」并确认已停止，再重新启动。”，明确不是角色详情，并询问Codex能否直接改、是否影响DeepSeek。该请求构成本片Codex直接实施授权；原AGENTS共享目录单方改码规则保持。
+- 只读核271为running/in_progress、实际DeepSeek恢复实例ins_067081e6a036领取，原目录已有bridges/cli_bridge.py修改；未读其候选或介入复核。创建独立受管Git工作区role-list-copy，基于efe3587建立codex/role-list-copy分支，原D:/claude-test/TALK源码、索引/HEAD和271进程保持，不停任务或重载API/bridge。
+- 仅在workspaceRoleServiceControls列表渲染：成功状态输出简短“启动成功”，特定重复关闭后重启提示不渲染；原roleServiceStatus事实和workspaceRoleServiceActions详情函数不改。其它列表错误/失联提示仍显示；按钮资格、owner保护、原生登录未核验事实和API不改。更新workspace.js静态版本为20261018-role-list-status。
+- 更新现有列表/创建集成断言，覆盖同一运行中ownership_held角色列表无附注/重启提示、详情仍有原操作提示及启停禁用资格；失败仍受管角色的详情提示与保护也保持。26项Node接线测试通过，12项Python页面/静态契约通过，均为Codex自检，不称他人独立复核。
+- 首轮Python一项旧源码字符串断言因control.status改为listStatus失败；修改现有断言后最终12项通过，原失败保存在本分支.tmp/role-list-copy/python-role-ui.log，最终另存-final，未覆盖。未使用Browser；测试为假DOM/隔离TestClient，没有生产HTTP动作或模型调用。
+- 同步本分支进度/历史、Web UI模块、用户手册及验收指南。此分支只完成可审候选，尚未合入当前运行目录，页面刷新不会提前生效；等271交付暂停后按共享目录规则合入，再让用户Ctrl+F5检查仅列表变化。原恢复验收和完整日志排期不改。
+
 ## 2026-10-18 19:11（Asia/Shanghai）— 271完整异常日志首片已派DeepSeek
 
 - 五角色恢复运行状态人验已收尾推送ba46253，按原排期第2项派发独立顶层任务271，仅使用project_id/target_member_id/title/content四个最小字段，未附子任务类型、review_policy或关系参数。creator agent:codex，target agent:deepseek，Hall group:task-34ff3ea145f74e8a9af8bdfe4b790a2d，创建UTC11:11:29.091095；首次返回queued/assigned及bound/deepseek-flash快照，不据此称已执行或模型实跑已验。

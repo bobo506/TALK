@@ -1,6 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-18 19:11（Asia/Shanghai）。用户明确反馈“都显示启动成功”，五角色恢复页面运行状态复验通过并已推送ba46253；原313项自检/真实父链和心跳证据保持。完整异常日志首片271已派DeepSeek（首次返回queued/assigned），当前等待用户通知完成后取件，不主动长等。
+Updated: 2026-10-18 19:37（Asia/Shanghai）。本快照属于独立分支codex/role-list-copy：用户要求仅精简角色列表两处文案，已实现并通过26项Node/12项Python自检；尚未合入D:/claude-test/TALK或当前页面。原目录271仍按用户通知后取件，首次本轮只读确认running/in_progress；为保持共享目录单方写，未打断DeepSeek或修改其源码/HEAD。
+
+## 本分支列表文案补正（待271暂停后合入）
+
+- 用户明确限定角色列表：成功状态显示“启动成功”，隐藏“（原生登录未核验）”；列表隐藏“请先「关闭」并确认已停止，再重新启动。”。仅修改workspaceRoleServiceControls列表渲染，详情提示、原生登录事实、启停守卫和后端保留。workspace.js静态版本更新。
+- 独立工作区C:/Users/Administrator/.codex/worktrees/role-list-copy/TALK，基线efe3587。原共享目录只读查询271运行状态，未停任务/服务、未改原目录源文件或提交。合入前保持该隔离边界，不能让用户现在刷新就认为已部署。
+- 原有用例更新后26项Node和12项Python通过；首轮Python一条旧源码写法断言失败原件保留，修正后通过。证据本分支.tmp/role-list-copy/，均为Codex自检；未使用Browser，视觉人验待合入。
 
 ## 当前身份与授权
 
