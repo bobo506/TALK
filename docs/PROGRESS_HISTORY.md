@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-18 11:30（Asia/Shanghai）— 270合法回执核验并收取，原Codex页面人验待
+
+- 用户通知“好了”，按当前270补验恢复；读取完整MCP交付摘要/原任务与实际msg2824，task_id字符串270、合法talk-delivery-1 complete自报、唯一TALK_CODEX_MANAGED_ACK_20261018、0未完成/阻塞/改文件，本地同一校验亦通过。不把格式或runner状态单独当验收。
+- 独立对照agent:codex/原ins_f9818ce92522、attempt1、human:bobo创建/收件人、group:task-fedb473d61bb4211b9e5a7d37b62bfd0、绑定指纹及实际领取UTC03:24:15.092117/完成03:24:29.693997均吻合。只读核同值原Key/GET本人、名册/角色/绑定/全部服务未变，gen5原launch及Popen仍由manager16156持有，OS父链7572→16156→7328；11冻结候选源保持。
+- 核验通过后，仅以原创建者human:bobo既有操作Key POST /api/tasks/270/collect-result，实际succeeded/completed/msg2824，收取UTC03:29:45.015544。未用桌面agent:codex MCP越过creator限制；原269/msg2823/内容SHA/invalid及submitted/未收取保持，不改历史或DB状态。
+- 已按AGENTS人工验收门禁向用户请求原Codex页面：关闭等未启动→刷新不自启→启动ready；尚待明确结果，未把本次“好了”当页面通过。此前正常启停及186+12证据保持，本次无产品源码/服务/新任务/原生探针或登录动作，不称外部独立复核或六小时/主动等待/固定后端版本已验。
+- 证据smoke270/原MCP、原交付、verification/collection-response/receipt与state保持；正式七份状态文档同步。其它四角色/原267/268及18项后续排期保持，页面确认后只读核真实停启再闭合最后角色，不开新功能。
+
 ## 2026-10-18 11:25（Asia/Shanghai）— 269真实回传但交付格式无效，270仅补验已派
 
 - 用户通知269完成后，读取完整只读摘要/原任务/实际2823；claimed_by agent:codex、ins_f9818ce92522、Hall/作者/收件人/固定标记/绑定指纹均吻合，attempt1，领取UTC03:06:01.360204、完成03:06:19.507128。不能只用runner succeeded验收。
