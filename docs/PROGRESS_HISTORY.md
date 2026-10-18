@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-18 11:58（Asia/Shanghai）— 原Codex页面三步通过，五角色保身份受管迁移正式验收
+
+- 用户明确原「codex CLI Bridge (agent:codex)」关闭等未启动→刷新不自启→启动ready三步均通过。根只读核实际两轮：gen6/aeed5cd8-9cf0-4d98-9c5a-f5f6cd66d7d0于UTC03:54:14.737575 stopped→gen7/51f520cd-f109-499f-ac95-7c510482ea01于03:54:22.875690 ready；gen8/30d3c73a-6491-41d6-b94d-b161eb3e366a于03:54:29.494898 stopped→gen9/2dd35543-c3f8-448b-88dd-bada3624c98e于03:55:11.186103 ready。
+- 旧gen5 ins_f9818ce92522/PID7572及中间gen7 ins_a9985c9b658c/PID10636均正常offline、PID已退出；当前ins_e2b17d48e985/PID18204 idle、父链18204→原manager16156→launcher7328，manager仍UTC03:00:50.810375同一实例且仅持当前launch。无强停、PID收养、宿主重启或协调方服务动作。刷新不自启为用户确认，未伪称Browser独立验证。
+- 原TALK Key同值/GET身份、member/roster/roles/bindings及其它四服务与前快照一致，11冻结源保持；270原msg2824/SHA及human:bobo收取UTC03:29:45.015544不变，269原2823/SHA/invalid/submitted/未收取保持。未重新登录/跑模型或派任务，无产品改码；既有186相关回归/12本地证据沿用，不称他人独立复核。
+- 验收脚本首轮把所有历史动作state都当reported、把宿主claim_member_id当agent本人，断言未过；实读公开记录及role_services.py后按真实语义修正：宿主用human操作Key，旧已ready启动在关闭后过期扫描可标expired且保原ready。再次只读验证通过，另补全三代PID核验。证据smoke270/human-page-acceptance及human-page-all-process-proof保持，非产品故障或服务修复。
+- 原Codex正式验收，至此三个Kimi+DeepSeek+Codex五角色保身份统一受管全部通过接单及页面基础启停，可从角色页控制。当前快照已压缩，正式七份相关文档同步、路线图第1项标已验收且2–18顺序保持；本轮仅收尾，下一片完整异常日志尚未派发。完整日志、全入口预算、原生会话复用、冷启动恢复、六小时/固定后端/主动等待及255完整新建自动ready验收均不据此声称完成。
+
 ## 2026-10-18 11:30（Asia/Shanghai）— 270合法回执核验并收取，原Codex页面人验待
 
 - 用户通知“好了”，按当前270补验恢复；读取完整MCP交付摘要/原任务与实际msg2824，task_id字符串270、合法talk-delivery-1 complete自报、唯一TALK_CODEX_MANAGED_ACK_20261018、0未完成/阻塞/改文件，本地同一校验亦通过。不把格式或runner状态单独当验收。
