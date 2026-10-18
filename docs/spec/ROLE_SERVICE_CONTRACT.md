@@ -62,7 +62,7 @@ R1-3实现服务意图、宿主claim/report、实例就绪、逐角色启动/关
 
 新增human-only`GET .../service/recovery-plan`与`POST .../service/recover-stopped`及显式宿主CLI，详[恢复合同](ROLE_SERVICE_ORPHAN_RECOVERY_DESIGN.md)和[指南](../guides/ROLE_SERVICE_RECOVERY.md)。由人类明确确认原进程已停止，锁内核精确世代/start/实例/host、旧心跳、目标成员无queued/running任务及无未过期在途动作，独立恢复审计与已停止/释放归属同事务CAS；不伪造原宿主stop、不读还原owner、不操作OS进程。相同载荷重放不清新owner；已恢复的旧实例不能重新PUT。普通stop仍须原管理器/活句柄证明。
 
-周期心跳只更新实例事实，首次ready收敛只在starting进行，不能反复更新started_at。五角色已于18:57通过正常新manager/Popen启动及真实周期心跳核验，页面待用户反馈；跨Codex沙箱服务重启的独立驻留能力仍待。
+周期心跳只更新实例事实，首次ready收敛只在starting进行，不能反复更新started_at。五角色已于18:57通过正常新manager/Popen启动及真实周期心跳核验，用户随后确认五角色均显示启动成功，运行状态页面复验通过；跨Codex沙箱服务重启的独立驻留能力仍待。
 
 ### CLI bridge正常停止处理（真实验收补正）
 

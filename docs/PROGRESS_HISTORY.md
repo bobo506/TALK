@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-18 19:09（Asia/Shanghai）— 五角色恢复后的页面运行状态人工复验通过
+
+- 用户明确反馈“都显示启动成功”。结合f881724前既有313项Python自检、五角色新manager/Popen直接父链和真实周期心跳证据，闭合人工恢复后的页面运行状态门禁；不把这句话扩大为全部详情/按钮、重新模型实跑或跨Codex沙箱重启常驻验收。
+- 本轮只读MCP核桌面caller agent:codex、project prj_e8fe7066bbec、业务lead，五角色仍为恢复后的新实例并持续新鲜idle心跳，DeepSeek可用；项目queued/running任务均为空。development_requirements仍为旧Kimi/DeepSeek交叉文本，未改生产永久要求，按AGENTS最新用户分工准备下一片。
+- 同步验收指南、恢复设计/合同、AGENTS、简报、bridge模块、路线图及当前进度；用户手册补运行状态待核实的实际行为与本项目五角色已完成迁移。原269/270报告/收取及全部失败证据保持，未新增服务启停、恢复事务、模型探针或产品代码。
+- 原排期第2项完整异常日志先划定“持久诊断基础与通用CLI bridge接入”首片；宿主接入、公共查询/页面和健康呈现待后续，不假称整项完成。计划由DeepSeek首次执行、Codex独立复核后直接修正；默认派发后结束，用户通知完成再收取。usage-gate返回continue但精确session/weekly百分比均null，仍按单片批次控制。
+
 ## 2026-10-18 19:02（Asia/Shanghai）— 人工恢复产品入口落地，五角色真实运行恢复待页面复验
 
 - 用户明确“同意”14:55人工恢复方案，授权Codex在全部执行端离线时直接完成本补正、验证后逐角色恢复。桌面协调身份仍agent:codex/prj_e8fe7066bbec/lead，human操作沿原human:bobo Key；未改变生产development_requirements。单方改共享目录，未派TALK任务；全部产品验证为Codex自检，不称外部独立复核。

@@ -2,6 +2,8 @@
 
 > 所属项目：TALK
 
+> 2026-10-18 19:09人验：用户确认五角色“都显示启动成功”，人工恢复后的运行状态页面复验闭合；原313项自检、实际新Popen父链/周期心跳及f881724保持。仅确认该反馈，不扩大模型/跨重启常驻能力；按原排期准备完整异常日志基础与通用bridge首片，DeepSeek首次执行、Codex独立复核并直接修正，见[进度](../PROGRESS.md)。
+
 > 2026-10-18 19:02恢复补正：用户明确同意后，Codex直接完成human-only恢复计划/解除、独立审计、显式本地CLI及旧实例防复活；写锁内重核世代/原start/实例/host、过期心跳、跨项目活动任务及有效在途动作，幂等重放不清新owner。313项Python自检通过，18:57五角色原Key/ID/模型绑定保持并正常新启动，实际新Popen父链/周期心跳通过，均running/ready、idle无任务。首次ready收敛限starting，周期心跳保初次started_at。当前页面复验待，跨沙箱重启常驻未验；详[进度](../PROGRESS.md)、[恢复指南](../guides/ROLE_SERVICE_RECOVERY.md)、[恢复设计与结果](ROLE_SERVICE_ORPHAN_RECOVERY_DESIGN.md)。下列旧离线/待恢复记录为当时历史，不代表当前。
 
 > 2026-10-18 14:45状态补正：用户授权修复进程退出后页面仍报启动成功。Codex直接修正并自检：受管CLI公共入口30秒心跳，与状态变化串行且保busy/current_task/error；公开服务投影只认可本次启动匹配实例的90秒内idle/busy心跳，失联只降为unknown，保原回执/世代/owner及启停守卫。角色页持续刷新运行中及失联角色，批量失联单列待核实。277项Python/60项Node相关验证通过，原API正常重载后五角色均unknown且绑定/服务记录保持；角色宿主未恢复，用户已反馈状态及详情提示符合预期，仅该项人验闭合，见[进度](../PROGRESS.md)与[服务合同](ROLE_SERVICE_CONTRACT.md#运行期心跳与只读状态)。
