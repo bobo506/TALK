@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-19 00:16（Asia/Shanghai）。按用户要求依次处理272/273；272原交付独立反例4失败及相对根1失败，Codex直接修正后最终141项相关自检全过，已正常收取。两位执行者均暂停，长期宿主未重启加载；下一步复核273方案。
+Updated: 2026-10-19 00:29（Asia/Shanghai）。272/273已按顺序复核、直接修正并正常收取。272最终141项自检通过、代码b40d59c已推送，宿主尚未重启加载；273正式方案36项静态检查通过、67项未来矩阵未实现。两位执行者暂停，原报告/失败保持，本批收尾不派新任务。
 
 ## 当前身份与分工
 
@@ -11,10 +11,10 @@ Updated: 2026-10-19 00:16（Asia/Shanghai）。按用户要求依次处理272/27
 
 - 原结果2825/作者agent:deepseek/历史领取实例ins_067081e6a036/Hall group:task-34ff3ea145f74e8a9af8bdfe4b790a2d及合法字符串271自报，与本地交付一致。原SHA377f2eca54047bc5c732b68ed7facef8d054a9bc98ed1f51605c27aa2bc9dd8a保持；creator agent:codex于UTC12:00:57.625512收取，succeeded/completed。
 - 首次交付独立6反例5失败/1错误；Codex直接修正脱敏顺序、子进程cmd、异常传播保护值、引号秘密/owner token、stderr降级和枚举预算，另补消息ID/任务预算/旧关联与因果深度标志。修正后9模块293项Python全部通过，含原4条管道用例；是Codex自检，不称外部独立回审。原281自报和失败保持。
-- 完成持久JSONL/引用、CLI bridge关键异常边界、堆栈/原因链、脱敏、本地查询、本run轮换/保留。默认256MiB仅本run事件文件软目标；宿主显式接入、权限API/页面、worker健康呈现、全根旧run/痕迹文件空间治理仍待，整个日志排期未完成。
+- 完成持久JSONL/引用、CLI bridge关键异常边界、堆栈/原因链、脱敏、本地查询、本run轮换/保留。默认256MiB仅本run事件文件软目标；宿主接入代码已由272补齐、实机加载仍待；权限API/页面、worker健康呈现、全根旧run/痕迹文件空间治理仍待，整个日志排期未完成。
 - 正式[复核记录](spec/ROLE_RUNTIME_LOGGING_REVIEW_271.md)、[维护者指南](guides/RUNTIME_EXCEPTION_LOGS.md)；原件/精确SHA及测试证据在.tmp/runtime-exception-logs/independent-review271/。
 
-## 20:48五角色实机加载快照
+## 2026-10-18 20:48五角色bridge加载快照
 
 | 角色 | 世代 | 原manager / 新bridge PID | 新实例 | 队列日志引用 |
 | --- | ---: | --- | --- | --- |
@@ -44,15 +44,20 @@ Updated: 2026-10-19 00:16（Asia/Shanghai）。按用户要求依次处理272/27
 
 - 原2832/作者agent:deepseek/ins_5f81829d3217，合法字符串272报告与本地一致，SHA a0bd0147f6ad5858deb5952b9f5ce0624889c972c269d5de4bc63a685bee0c10保持。Codex独立首批4反例4失败、相对根另1失败，暂停后直接补动态环境凭据、stop新claim、输出准备与部分流关闭、相对根冻结；原三文件精确副本/失败留存。
 - 最终6模块141项全部通过，含原宿主随机回环/固定文本子进程和原日志管道用例；是Codex修正后自检，不称外部回审。受限轮导入/停滞证据保持，最终正常权限隔离回归通过。详[272复核记录](spec/ROLE_RUNTIME_LOGGING_REVIEW_272.md)及.tmp/runtime-logging-parallel-1/independent-review/。
-- 已正常收取272；原schema/owner/Popen/预算、原Key/模型/服务保持。未重启长期宿主或角色，不能称272线上已加载；273仍submitted待复核，公共API/页面/健康及全根治理未实现。
+- 已正常收取272；原schema/owner/Popen/预算、原Key/模型/服务保持。未重启长期宿主或角色，不能称272线上已加载；273方案也已修正收取，公共API/页面/健康及全根治理未实现。
+
+## 273查看/健康权限方案：已修正收取，未实施入口
+
+- 原2839/作者agent:kimi（K3）/ins_23ea501725de，合法字符串273自报与本地一致，SHA cd552f6980376ec53e4e8caf02eb4fc8c9c954f8804c32f57334429d880f2945及原9件不变。独立核17冻结来源/实际代码，发现分页默认过滤/来源失效机制缺口、详情参数矛盾和3项样例路径反例；Codex直接修正。
+- 正式[设计](spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)、[样例](spec/ROLE_RUNTIME_LOG_VIEW_EXAMPLES.json)、[67项未来矩阵](spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)已落盘；修正后36项静态/纯数据检查通过，3反例复测通过，非API产品测试。补领取前预检未知、同机显式来源、manager日志不混角色等边界；API/页面/健康补数均未实现。详[273复核](spec/ROLE_RUNTIME_LOGGING_REVIEW_273.md)。
 
 ## 下一步与限制
 
-1. 272已修正收取并收尾；下一步顺序复核273实际方案/样例/权限来源，有问题由Codex直接改正，不派新返修。冻结基线与原交付保持；不依据历史PID操作。
-2. 原排期第2项内272→agent:deepseek仅可改scripts/role_service_host.py、可新增scripts/role_service_host_diagnostics.py及tests/test_role_service_host_diagnostics.py；273→agent:kimi（kimi-code/k3）只写.tmp/runtime-logging-parallel-1/kimi-k3-design/。冻结基线（878跟踪文件SHA/175个必要文件）、原任务包及派发引用见.tmp/runtime-logging-parallel-1/coordination/与同级baseline/；协调文档由Codex独占，相关执行者暂停后才复核/修正，跨线集成前双方暂停。全入口预算第3、跨任务原生会话复用第4及其后顺序保持。
+1. 本批272/273均completed，执行者暂停、无新派任务；验证和进度已落盘，按本轮提交恢复，不重复收取或开发。实际宿主加载272还未验证，不按旧PID/健康文件接管或直接重启；原271加载与5角色人验历史保持。
+2. 下一片仍在原排期第2项：按273合同拆同机只读provider/投影、API与页面等独立实施片；健康阶段补数及全根空间治理仍需单片明确。基线/原包/精确原件与证据在.tmp/runtime-logging-parallel-1/{coordination,baseline,independent-review}/。后续只派DeepSeek/Kimi K3、Codex复核并直接修正，保持隔离与默认用户通知取件；不提前跳全入口预算/会话复用或选择性自启动。
 3. 跨Codex沙箱重启常驻、六小时、固定后端版本、主动等待T/W、冷启动恢复和255完整新建自动ready仍待。12:05退出与沙箱停止仅吻合线索，无逐进程因果链；无无限期自动解除归属授权。
 4. 本轮未读精确用量占比，前轮usage-gate continue但百分比null，不臆测用量；不主动等待或自动唤回。
 
-恢复时先读AGENTS.md、docs/PROJECT_BRIEF.md和本快照，再按下一片范围读取唯一负责模块；沿用agent:codex/prj_e8fe7066bbec/lead及DeepSeek/Kimi K3首执、Codex复核/直接修正的分工。先确认272收尾，再复核并收取273实际交付；不依赖历史PID操作，不自动重启角色。后续继续派DeepSeek/Kimi K3、不派K2.8；默认派发后结束等待、用户通知后取件。
+恢复时先读AGENTS.md、docs/PROJECT_BRIEF.md和本快照，再按下一片范围读取唯一负责模块；沿用agent:codex/prj_e8fe7066bbec/lead及DeepSeek/Kimi K3首执、Codex复核/直接修正的分工。272/273已收取；先核272宿主加载条件，再按273正式合同划定下一片；不依赖历史PID操作，不自动重启角色。后续继续派DeepSeek/Kimi K3、不派K2.8；默认派发后结束等待、用户通知后取件。
 
 恢复指令：继续项目。

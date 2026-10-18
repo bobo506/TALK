@@ -1,0 +1,315 @@
+{
+  "list_complete": {
+    "schema": "talk-runtime-log-page-1",
+    "scope": {
+      "project_id": "prj_fake_a",
+      "member_id": "agent:fake-a"
+    },
+    "query": {
+      "since": "2026-10-17T20:00:00Z",
+      "until": "2026-10-18T20:00:00Z",
+      "instance_id": null,
+      "launch_id": null,
+      "task_id": null,
+      "event": null,
+      "stage": null,
+      "severity": [
+        "error",
+        "warning"
+      ],
+      "ref": null
+    },
+    "records": [
+      {
+        "log_id": "rtd-031f55a209-000001",
+        "recorded_at": "2026-10-18T19:46:12+00:00",
+        "event": "task_claim_failed",
+        "severity": "error",
+        "stage": "task_claim",
+        "project_id": "prj_fake_a",
+        "member_id": "agent:fake-a",
+        "instance_id": "ins_fake_current92",
+        "launch_id": "launch-fake-a91c",
+        "task_id": 273,
+        "related_log_id": null,
+        "exception": {
+          "type": "TaskClaimError",
+          "message_preview": "open [PATH] failed; api_key=[REDACTED]",
+          "frames_total": 2,
+          "cause_depth": 1
+        },
+        "returncode": null,
+        "timeout": false,
+        "cancel_category": null,
+        "budgets": {
+          "cli_timeout_seconds": 21600,
+          "http_timeout_seconds": 15,
+          "task_lease_seconds": 120,
+          "task_heartbeat_interval_seconds": 5,
+          "managed_heartbeat_interval_seconds": 30,
+          "task_poll_interval_seconds": 3,
+          "mcp_wait_seconds": null
+        },
+        "integrity": {
+          "redacted": true,
+          "truncated": false,
+          "write_complete": true
+        }
+      },
+      {
+        "log_id": "rtd-91aa55bb09-000007",
+        "recorded_at": "2026-10-18T18:10:02+00:00",
+        "event": "managed_heartbeat_failure",
+        "severity": "warning",
+        "stage": "managed_instance_heartbeat",
+        "project_id": "prj_fake_a",
+        "member_id": "agent:fake-a",
+        "instance_id": "ins_fake_old17",
+        "launch_id": "launch-fake-old17",
+        "task_id": null,
+        "related_log_id": null,
+        "exception": {
+          "type": "TimeoutError",
+          "message_preview": "heartbeat attempt timed out",
+          "frames_total": 1,
+          "cause_depth": 0
+        },
+        "returncode": null,
+        "timeout": true,
+        "cancel_category": null,
+        "budgets": {
+          "cli_timeout_seconds": null,
+          "http_timeout_seconds": 15,
+          "task_lease_seconds": null,
+          "task_heartbeat_interval_seconds": null,
+          "managed_heartbeat_interval_seconds": 30,
+          "task_poll_interval_seconds": null,
+          "mcp_wait_seconds": null
+        },
+        "integrity": {
+          "redacted": false,
+          "truncated": false,
+          "write_complete": true
+        }
+      }
+    ],
+    "page": {
+      "limit": 20,
+      "sort": "recorded_at DESC, log_id DESC",
+      "snapshot_until": "2026-10-18T20:00:00Z",
+      "has_more": false,
+      "next_cursor": null
+    },
+    "scan": {
+      "complete": true,
+      "truncated": false,
+      "scanned_files": 4,
+      "scanned_bytes": 8192,
+      "malformed_lines": 0,
+      "unavailable_sources": 0
+    },
+    "warnings": []
+  },
+  "list_limited": {
+    "schema": "talk-runtime-log-page-1",
+    "scope": {
+      "project_id": "prj_fake_a",
+      "member_id": "agent:fake-a"
+    },
+    "query": {
+      "since": "2026-09-18T00:00:00Z",
+      "until": "2026-10-18T20:00:00Z",
+      "instance_id": null,
+      "launch_id": null,
+      "task_id": null,
+      "event": null,
+      "stage": null,
+      "severity": [
+        "error",
+        "warning"
+      ],
+      "ref": null
+    },
+    "records": [],
+    "page": {
+      "limit": 20,
+      "sort": "recorded_at DESC, log_id DESC",
+      "snapshot_until": "2026-10-18T20:00:00Z",
+      "has_more": false,
+      "next_cursor": null
+    },
+    "scan": {
+      "complete": false,
+      "truncated": true,
+      "scanned_files": 5000,
+      "scanned_bytes": 134217728,
+      "malformed_lines": 0,
+      "unavailable_sources": 0
+    },
+    "warnings": [
+      "scan_limited"
+    ]
+  },
+  "detail": {
+    "schema": "talk-runtime-log-detail-1",
+    "scope": {
+      "project_id": "prj_fake_a",
+      "member_id": "agent:fake-a"
+    },
+    "record": {
+      "log_id": "rtd-031f55a209-000001",
+      "recorded_at": "2026-10-18T19:46:12+00:00",
+      "event": "task_claim_failed",
+      "severity": "error",
+      "stage": "task_claim",
+      "project_id": "prj_fake_a",
+      "member_id": "agent:fake-a",
+      "instance_id": "ins_fake_current92",
+      "launch_id": "launch-fake-a91c",
+      "task_id": 273,
+      "related_log_id": null,
+      "exception": {
+        "type": "TaskClaimError",
+        "message": "open [PATH] failed; api_key=[REDACTED]",
+        "str_empty": false,
+        "message_error": false,
+        "frames_total": 2,
+        "frames_omitted": 0,
+        "frames": [
+          {
+            "file_name": "cli_bridge.py",
+            "line": 3214,
+            "function": "handle_queued_task"
+          },
+          {
+            "file_name": "talk_client.py",
+            "line": 88,
+            "function": "claim_task"
+          }
+        ],
+        "cause_chain": [
+          {
+            "relation": "explicit_cause",
+            "type": "OSError",
+            "message": "simulated failure",
+            "frames_total": 1,
+            "frames_omitted": 0,
+            "frames": [
+              {
+                "file_name": "fake_transport.py",
+                "line": 12,
+                "function": "request"
+              }
+            ]
+          }
+        ],
+        "chain_depth": 1,
+        "chain_truncated": false,
+        "chain_cycle": false,
+        "has_explicit_cause": true,
+        "context_present": true,
+        "context_suppressed": false
+      },
+      "returncode": null,
+      "timeout": false,
+      "cancel_category": null,
+      "budgets": {
+        "cli_timeout_seconds": 21600,
+        "http_timeout_seconds": 15,
+        "task_lease_seconds": 120,
+        "task_heartbeat_interval_seconds": 5,
+        "managed_heartbeat_interval_seconds": 30,
+        "task_poll_interval_seconds": 3,
+        "mcp_wait_seconds": null
+      },
+      "integrity": {
+        "redacted": true,
+        "redaction_kinds": [
+          "known_value",
+          "secret_field"
+        ],
+        "truncated": false,
+        "truncated_fields": [],
+        "write_complete": true,
+        "capacity_soft_exceeded": false,
+        "event_size_soft_exceeded": false
+      }
+    },
+    "scan": {
+      "complete": true,
+      "truncated": false,
+      "scanned_files": 4,
+      "scanned_bytes": 8192,
+      "malformed_lines": 0,
+      "unavailable_sources": 0
+    }
+  },
+  "errors": {
+    "agent_forbidden": {
+      "status": 403,
+      "detail": "log_read_forbidden"
+    },
+    "ref_not_found_after_complete_scan": {
+      "status": 404,
+      "detail": "log_not_found",
+      "meaning": "不存在、越 scope 或已不可查；当前不能据此断言已过期"
+    },
+    "ref_scan_incomplete": {
+      "status": 503,
+      "detail": "diagnostics_scan_incomplete",
+      "resolution": "unknown"
+    },
+    "future_retention_expired_only": {
+      "status": 410,
+      "detail": "log_retention_expired",
+      "requires": "authoritative_per_ref_retention_evidence"
+    }
+  },
+  "health_example": {
+    "scope": {
+      "project_id": "prj_fake_a",
+      "member_id": "agent:fake-a"
+    },
+    "rows": [
+      {
+        "kind": "managed_owner",
+        "state": "unknown",
+        "text": "归属未释放；宿主当前状态未知",
+        "evidence": "ownership_held=true；无独立宿主心跳"
+      },
+      {
+        "kind": "instance_heartbeat",
+        "state": "fresh",
+        "text": "近期有实例心跳",
+        "evidence": "同项目/launch/实例的服务端心跳在 90 秒内"
+      },
+      {
+        "kind": "queue_worker",
+        "state": "unknown",
+        "text": "当前接单循环：未知",
+        "evidence": "只有历史 queue_started，无周期 queue heartbeat"
+      },
+      {
+        "kind": "claim_capability",
+        "state": "unverified",
+        "text": "最近领取记录：#273；当前能力未验证",
+        "evidence": "历史 task_claimed；空闲不作为可接单证明"
+      },
+      {
+        "kind": "preclaim_preflight",
+        "state": "unknown",
+        "text": "领取前预检：未知",
+        "evidence": "只有创建/领取时间；缺少实际关联的预检起止记录"
+      }
+    ]
+  },
+  "pagination_invariants": {
+    "canonical_query": "replay_first_response",
+    "cursor_authentication": "independent_server_signature",
+    "source_change_including_append": "stale_cursor",
+    "inventory_before_after": "must_match",
+    "expired_or_restarted": "stale_cursor",
+    "detail_query_params": "none",
+    "exact_ref_default_filters": "none"
+  }
+}

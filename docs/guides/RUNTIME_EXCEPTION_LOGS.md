@@ -182,3 +182,5 @@ DeepSeek首次自报281项相关回归，4条stdio pipe用例因受限沙箱WinE
 保护值包括本次实际运营/本人Key、report新claim/owner、实际child_env快照中敏感名称的值；不扫描全环境或额外认证。输出文件准备失败原样传播并关闭部分打开流，不改变原业务/归属；已知日志/降级失败不替换原异常。启发式脱敏的原限制保持。
 
 每个manager/launch使用独立run，仍可用现有CLI跨run按ref/member/instance查询。`ready`是本地就绪观察，不代表后续report成功；host_started/host_stopped是serve边界，不足以证明OS进程/worker健康。公开API/schema未扩展，日志ref仍只在本地；全根空间治理与权限页面后续。详[272复核记录](../spec/ROLE_RUNTIME_LOGGING_REVIEW_272.md)。
+
+273日志查看/健康反馈[正式方案](../spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)已复核修正收取，含human-only同机显式来源、规范化分页/失效、旧ref与预检证据未知语义。36项静态检查及样例复测不等于API/页面已上线；67项[未来矩阵](../spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)仍not_run，本地CLI继续作为当前定位入口。
