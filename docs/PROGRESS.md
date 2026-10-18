@@ -1,30 +1,29 @@
 # Project Progress
 
-Updated: 2026-10-18 08:54（Asia/Shanghai）。用户明确保留gpt-6.1-sol/xhigh并暂缓Codex迁移，账号/模型支持诊断已完成：同一独立登录在旧npm CLI0.144.4无目标模型，新桌面捆绑CLI0.163.0-alpha.10.2明确列出目标及xhigh。此前账号权限推断已收窄为旧CLI调用链失败；新版实际模型回执仍未验证。迁移保持暂停，已验四角色保持。
+Updated: 2026-10-18 10:47（Asia/Shanghai）。用户要求更新Codex CLI再试：npm官方稳定版已由0.144.4升级到0.163.0，同一独立登录使用gpt-6.1-sol/xhigh实际固定回执通过（exit0、精确匹配、tool0、122.094秒）。旧版本模型拒绝已解决；连接回退耗时及新版忽略base_instructions需在正式接入前处理。受管迁移仍暂停，无Codex登记/服务/新任务，已验四角色保持。
 
 ## 当前身份与范围
 
-- project prj_e8fe7066bbec，实际MCP caller agent:codex/kind agent、业务lead；按用户本角色直接实施/最新暂停要求处理。当前桌面聊天与MCP保持，未接管进程或改生产开发要求。
-- 本轮仅官方来源及两版原生元数据诊断、文档收尾，不恢复迁移、不改产品代码；默认被动取件/不操作Browser保持。自检不称他人独立复核。
+- project prj_e8fe7066bbec，实际MCP caller agent:codex/kind agent、业务lead；本轮按用户“更新下试试”明确授权升级及实际原生验证，保原模型/独立登录。此前受管登记/启停暂停未自动解除，不接管当前桌面聊天或修改MCP。
+- 本轮产品源码未变，只新增本地版本检查探针和证据、维护正式进度。30项bridge/10项准备自检沿用未变，不称本轮新增独立复核；默认被动取件、不操作Browser。
 
-## 当前：旧CLI与新版模型目录差异已复现，迁移暂停
+## 当前：npm CLI更新及目标模型实测通过
 
-- 用户答复明确：保留gpt-6.1-sol，暂缓迁移并核对账号/模型支持。未批准降为gpt-5.6-sol；后续模型仍gpt-6.1-sol/xhigh。此次核对完成后仍保持暂停，待用户恢复再走原生固定回执/受管迁移。
-- 实际版本：迁移准备native_driver.py/native_probe.py固定npm @openai/codex 0.144.4；桌面捆绑原生exe为C:/Users/Administrator/AppData/Local/OpenAI/Codex/bin/e78bad9887fa50cf/codex.exe，--version实际0.163.0-alpha.10.2。没有更新npm、修改PATH或更换候选驱动，不能继续使用旧脚本直接apply。
-- 新增本地inspect_native_support.py，仅分别启动两版本人诊断Popen，官方initialize→account/read(refreshToken=false)→model/list(includeHidden=true)，关闭stdin后退出。两次使用同一独立CODEX_HOME，实际type chatgpt/plan team；邮箱与plan只在内存比较相同，不输出/保存邮箱、账号ID或token。account/read未返回workspace id，不声称已核具体workspace ID。
-- 旧CLI实际模型列表5项无目标；新版9项含gpt-6.1-sol且supportedReasoningEfforts含xhigh，均nextCursor null。新旧CLI、客户端名称、隔离登录保持可比，版本是已复现的关键差异；未伪装桌面clientInfo。未thread/start或turn/start、没有新版模型推理，目录可见不等于实际模型调用通过。
-- 官方[Models](https://learn.chatgpt.com/docs/models)明确gpt-6.1-sol的Codex CLI支持；[workspace model availability](https://learn.chatgpt.com/docs/enterprise/workspace-model-availability)要求分别核客户端、登录和工作区。故前轮旧CLI报错不能扩大成ChatGPT登录一概不支持或该账号没有权限；目前无需据此重做成功登录/调整工作区权限。新版原生实际probe是恢复后的下一验证项。
-- 标准浏览器登录session6586/Popen168于UTC00:38:57.727881实际exit0/Successfully logged in，本人auth存在；旧设备码session76734于UTC00:14:51.339239自然到期。两会话已完成，不再续读或复用临时链接。CODEX_HOME本人.codex/TEMP本人tmp，认证正文均不读/复制/哈希。
-- 前轮旧CLI两次probe exit1/116.234及113.985秒，原错误和脱敏诊断保持：模型拒绝及WebSocket超时/HTTPS回退，actual tool item0。不是本轮新错误，也不因新版目录出现而追改原失败证据。
-- 原agent:codex ID/显示名/历史保持，旧启动记录用户不知、无旧bridge/在途0。本人TALK Key原源全局config.toml talk.env；专属Key未物化，无Codex runner/choice/ProjectRole/binding/service或新任务。服务端禁止自委派，未来最小回执使用既有human operator正常API，不能猜269编号。
-- ec48b17产品可选--codex-task-command和30项bridge/10项本地自检未变；候选三模式/精确模型/正常Popen所有权及21600保持。原执行档未知，discussion/read-only仅现有产品默认初验选择；新CLI旗标/实际message MCP/受管启停接单/页面验收/六小时与主动等待均仍待。
-- 证据.tmp/legacy-role-page-control/codex-next/coordination/：native-support-comparison、support-check-source-notes、support-check-baseline/state，另保留前轮登录/两个失败/manifest。inspect_native_support.py在同目录，尚未接生产入口。
+- 实查npm prefix=C:/Users/Administrator/AppData/Roaming/npm、registry=https://registry.npmjs.org/。npm view @openai/codex@latest实际0.163.0；用户授权后npm install --global @openai/codex@0.163.0 --registry=https://registry.npmjs.org/ --no-audit --no-fund返回0，changed2 packages。未升级npm/Node或桌面程序，不改PATH/全局config/登录配置。
+- 更新后实际--version为codex-cli0.163.0，exec --help exit0并核所需model/sandbox/json/ephemeral/disable等参数；公开package.json/bin/codex.js新SHA留档，旧版本manifest和失败证据保持。原native_driver.py仍固定同一npm JS路径，底层现已更新，不再需要改用桌面alpha路径；其提示词参数仍须适配后方可生产使用。
+- 新增native_probe_updated.py，复用原隔离环境和固定标记，先硬核0.163.0版本，实际--model gpt-6.1-sol、xhigh、read-only、禁shell/multi-agent、ephemeral JSONL。独立结果native-probe-updated-0.163.0.json：UTC02:45:19.648555 exit0、固定TALK_CODEX_NATIVE_PROBE_OK_20261018精确匹配、turn.completed、actual tool item0。预算180秒，实耗122.094秒；旧120秒探针未改或覆写。
+- 本轮成功证明更新后的原生CLI可按显式目标配置调用并回固定文本，旧0.144.4的拒绝已解决，不需要降到5.6或重新登录；不外推固定后端构建版本、开发能力、消息MCP或受管接单通过。
+- 实际错误/警告同样保留：多次WebSocket request timed out后回退HTTPS，故整次较慢；没有阶段计时，不推断模型本身耗时或通用网络根因。新CLI明确忽略session-flags的base_instructions，本次模型回执仍成功，但候选三模式驱动用的旧字段会丢提示词，正式接入前必须修正并验证真实接线。无静默改provider/传输参数或吞警告当完全兼容。
+- 登录仍原本人独立CODEX_HOME .codex、本人tmp，浏览器登录6586实际exit0事实保持；6586/旧设备76734均早已完成，不续读。新旧认证正文均未读/复制/哈希，原TALK Key专属文件未物化。
+- 原agent:codex成员/显示名/历史保持，无旧bridge/在途0，无runner/choice/ProjectRole/binding/service、新任务或受管启停。未来回执不能agent:codex自委派，仍用既有human operator正常权限；不能猜269编号。
+- 两版同登录metadata诊断原件仍在：旧npm0.144.4无目标、新桌面alpha0.163.0-alpha.10.2列目标/xhigh，account/read邮箱/plan内存相同、未返回workspace ID。历史inspect_native_support.py标签固定旧版，仅作原证据，不在升级后无区分重跑覆盖。
+- 证据.tmp/legacy-role-page-control/codex-next/coordination/：cli-update-baseline、npm-update-result/log、updated-install-verification/exec-help、updated-public-source-manifest、native-probe-updated-0.163.0、cli-update-preservation/acceptance及state；前两失败/原六源与增量manifest保留。
 
 ## 下一步
 
-1. 当前迁移暂停，等用户恢复。恢复后先把候选驱动/probe从旧npm改为已核新版原生CLI，核实际flags和边界，再做gpt-6.1-sol/xhigh固定无工具回执；保同一独立登录、不降模型。
-2. 实际原生验证通过后，再按原授权物化同一本人TALK Key、精确登记/保ID legacy-attach、同manager正常启停→最小接单→人类页面验收。当前不能称五角色全部迁移完成。
-3. 18项排期其余顺序保持；完整日志/全入口预算/会话复用仍另片，已验角色和267/268不重跑。
+1. CLI升级和原模型测试已完成，正式迁移仍暂停。用户恢复后先适配新版已忽略的提示词字段，验证消息/任务/预检真实接线，并处理或明确连接回退耗时；原native_driver和register_role.py均尚未因此修改。
+2. 登记脚本前置仍指向旧失败native-probe.json，恢复时必须改指本轮已核通过的独立结果并核最新身份/进程/无在途事实；再按既有授权保ID补录、同manager正常启停、最小接单和人类页面验收，不重做成功登录或降模型。
+3. 18项排期其余顺序保持，完整日志/全入口预算/会话复用另片；已验四角色和267/268不重跑，不能称五角色迁移全部完成。
 
 ## 已验收角色与恢复事实
 

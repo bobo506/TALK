@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-18 10:47（Asia/Shanghai）— 用户授权更新npm Codex CLI，原模型固定回执实际通过
+
+- 用户要求“有可能是codex cli没更新…更新下试试”，本轮仅恢复CLI升级及精确原生测试授权，保留gpt-6.1-sol/xhigh和已成功独立登录，未解除受管登记/启停暂停。
+- 官方npm registry实际latest0.163.0，原prefix下@openai/codex从0.144.4升级0.163.0，安装exit0/changed2 packages；npm/Node/桌面/PATH/config及凭据均未变。实际版本/exec帮助所需参数通过，新公开安装源SHA保存、旧安装manifest不覆盖。
+- native_probe_updated.py版本硬核0.163.0、原独立HOME/固定标记/显式模型xhigh/read-only/禁shell及multi-agent。UTC02:45:19.648555实际exit0、精确固定回执、turn.completed/tool0，耗122.094秒、预算180秒。新结果单独保存，原两次旧CLI失败保持；更新已解决原模型拒绝，不据此外推固定后端版本、bridge或受管能力。
+- 成功同次仍有WebSocket超时重试→HTTPS回退及base_instructions被忽略警告，完整脱敏details保留；未阶段计时，不推断全部为模型耗时。候选native_driver三模式仍使用该旧字段，尚未改码；正式接入前须适配并验证，登记脚本仍指旧失败probe也须更新，不能直接apply。
+- 865跟踪源在写文档前全部保持，四个已验服务公开状态/原任务保持，无Codex Role/runner/binding/service/新任务或专属Key物化。只有本地新版probe与安装/验证/接受证据，非额外独立审查。state已标升级成功、原模型通过、迁移暂停；其余排期不变。
+
 ## 2026-10-18 08:54（Asia/Shanghai）— 用户保留模型并暂停迁移，两版CLI模型支持差异已复现
 
 - 用户明确保留gpt-6.1-sol/xhigh，暂缓迁移并核对账号/模型支持；不将此答复当降模型或恢复迁移授权。原生登录成功保持，不重新登录、调整工作区权限或升级npm。
