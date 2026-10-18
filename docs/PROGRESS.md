@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-18 21:18（Asia/Shanghai）。按用户新分工已派日志两线：272 DeepSeek宿主持久诊断实现、273 Kimi K3只读冻结基线的查看/健康反馈及权限方案；派发返回均queued/assigned，当前不宣称接单或交付。规则基线eec9094；仅DeepSeek写限定产品代码，K3只写独立方案目录，交付暂停后Codex复核并直接修正。
+Updated: 2026-10-18 21:22（Asia/Shanghai）。用户反馈DeepSeek未领取，复查272已于21:20:51由原实例ins_5f81829d3217领取并持续任务租约心跳，running/in_progress/attempt1、无任务错误；273此前已running。派发到272领取190.352秒，预检前置但缺起止证据，未重启/重复派发或改执行者代码。两线继续，交付后暂停，由Codex复核并直接修正。
 
 ## 当前身份与分工
 
@@ -42,7 +42,7 @@ Updated: 2026-10-18 21:18（Asia/Shanghai）。按用户新分工已派日志两
 
 ## 下一步与限制
 
-1. 271已完成；272/273已派，默认本轮结束等待，用户通知后收取。无需再次重启或派模型能力验收任务。角色列表隔离工作区已通过应用归档为可恢复快照，候选7713d2b及主目录.tmp/role-list-copy/测试证据保留。
+1. 271已完成；272/273均已见实际running。272领取延迟诊断见.tmp/runtime-logging-parallel-1/coordination/diagnosis-272.json；缺领取前预检起止记录，后续日志/健康方案须保持该阶段可见性与未知边界。默认仍用户通知交付后收取，无需重启或重复派发。角色列表隔离工作区已通过应用归档为可恢复快照，候选7713d2b及主目录.tmp/role-list-copy/测试证据保留。
 2. 原排期第2项内272→agent:deepseek仅可改scripts/role_service_host.py、可新增scripts/role_service_host_diagnostics.py及tests/test_role_service_host_diagnostics.py；273→agent:kimi（kimi-code/k3）只写.tmp/runtime-logging-parallel-1/kimi-k3-design/。冻结基线（878跟踪文件SHA/175个必要文件）、原任务包及派发引用见.tmp/runtime-logging-parallel-1/coordination/与同级baseline/；协调文档由Codex独占，相关执行者暂停后才复核/修正，跨线集成前双方暂停。全入口预算第3、跨任务原生会话复用第4及其后顺序保持。
 3. 跨Codex沙箱重启常驻、六小时、固定后端版本、主动等待T/W、冷启动恢复和255完整新建自动ready仍待。12:05退出与沙箱停止仅吻合线索，无逐进程因果链；无无限期自动解除归属授权。
 4. 本轮未读精确用量占比，前轮usage-gate continue但百分比null，不臆测用量；不主动等待或自动唤回。
