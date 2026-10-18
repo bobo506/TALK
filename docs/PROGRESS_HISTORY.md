@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-18 20:41（Asia/Shanghai）— DeepSeek用户正常重启后日志首位实机加载通过
+
+- 用户报告“deepseek重启好了”。本轮仅只读核验，没有发服务/模型任务、启停其它角色、重载API或修改凭据/绑定；当前caller agent:codex/项目prj_e8fe7066bbec/业务lead保持。原271/2825收取及原报告SHA保持。
+- 服务gen9 running/ready/ownership_held=true，正常关闭时刻UTC12:37:47.774207、ready UTC12:37:51.547393；新launch dedf3e82-06d2-44b7-b1fe-788b3e3b49c2/ins_4643da0b3d34/bridge18396，当前start reported/ready。原宿主18784/started_at UTC10:49:28.489571保持，health serving且owned_launches只含本次新launch；OS精确PID只读核新18396直接父18784，旧14944不存在，不按文件收养句柄。
+- 新实例idle/current_task_id=null，20:38:21.503837至20:41:21.684853心跳实际推进180.181秒，原deepseek-flash绑定指纹037ccf...保持。其余四角色ID/PID均保持原18:57新实例，未由协调方操作；不根据availability标签替代新鲜心跳。
+- logs/runtime下首次生产DeepSeek manifest及bridge_started/queue_started均匹配真实project/member/instance/launch/PID，记录始于20:37:50/51，完整写入/无截断。维护者CLI按rtd-40162b2fa6-000002可查queue_started与实际预算CLI21600、HTTP10、lease120，MCP等待null。没有故意制造生产异常、重新模型调用或虚构异常日志实跑；异常链/脱敏仍沿271隔离验证。
+- 只读消费者首轮误取公开ProjectRoleServiceOut不存在的pid字段而断言失败；核schema后改从实例、宿主健康和OS三方核PID，原失败原因保留。不是产品/重启失败，没有重复启停掩盖。证据.tmp/runtime-exception-logs/deepseek-real-load/含服务/OS/宿主、两次心跳及引用查询JSON。
+- 正式进度、简报、bridge模块、日志指南/需求/路线图和271复核部署追记同步。当前仅DeepSeek真实加载通过，其余四位待；列表两段文案视觉确认仍待，不能把本次重启反馈扩大为六小时/真实模型能力、跨沙箱常驻或整个日志需求完成。本轮无产品代码变更，不重跑无关回归；文档检查后提交推送收尾。
+
 ## 2026-10-18 20:04（Asia/Shanghai）— 271独立复核后直接修正收取，角色列表文案合入
 
 - 用户进一步确认去角色列表附注合理并通知“271好了”。只读核271 succeeded/submitted、DeepSeek于UTC11:36:41.139420完成并暂停，实际ins_067081e6a036、作者agent:deepseek、原creator agent:codex、Hall及结果2825相符；MCP合法字符串271/complete自报与本地JSON完全一致。原消息SHA377f2eca54047bc5c732b68ed7facef8d054a9bc98ed1f51605c27aa2bc9dd8a、原五文件及原diff/测试失败保持。
