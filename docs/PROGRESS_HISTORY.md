@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-18 08:12（Asia/Shanghai）— 用户指定Codex直接准备旧Codex CLI迁移，独立浏览器登录待完成
+
+- 用户要求自行操作最后旧Codex CLI，明确选择gpt-6.1-sol/xhigh，旧命令路径不知。最新caller agent:codex/lead及旧页面要求已实读；原USER.md无Codex行，CIM无精确旧bridge，DB无Role/binding/codex runner/service/target在途。当前桌面聊天不作为旧CLI进程接管，未停进程/改MCP或已验角色。
+- 本人现有Key源由正式身份切换指南定位至全局config.toml的talk.env.TALK_API_KEY，内存GET验证原agent:codex；未复制/哈希源配置，未物化宿主Key、登记、补录、服务动作或创建任务。模型按用户当前选择固定，不当Sept8旧模型证明；原执行档未知，先用产品discussion/read-only默认做验证。
+- 独立HOME/CODEX_HOME及仅三字段fresh config已准备，无原auth正文读取/复制/哈希。npm CLI0.144.4的help/version/features和真实bridge parser组装实际通过；原TEMP root导致PATH helper警告，后续本人tmp子目录features查询无警告。官方auth/高级配置/配置参考已实际取回并与本地对应，不把文档当当前模型或认证验证。
+- 新增可选--codex-task-command，显式分开任务/消息/预检，缺省兼容旧行为；最终Codex bridge30项（新增4项）通过，初次pytest缺失留痕后用现有unittest。本地窄宿主/三模式native_driver及probe准备，stdin继承/PIPE补正防止spawn_hidden的DEVNULL吞prompt；10项边界自检通过。均是Codex自检，尚无真实原生推理或MCP加载结论，无API重启/其它角色影响。
+- 用户原设备码确认后，CLI未生成凭据；随后截图证实工作区禁用设备码登录。未改工作区策略，原session76734待自然到期；改官方浏览器回调login session6586/localhost1455/Popen168，已给新链接，真实CLI登录成功及原生probe仍待。设备码与OAuth临时链接不写正式Git，独立登录过程不改当前聊天认证。
+- TERMINAL_MCP预算已核：当前桌面T660实读/W300旧现用，新message预备talk_send60秒、任务/预检无MCP，真实等待/取消排队未验。usage-gate UTC23:58:09.580847实际continue但比例null，不臆测额度。基线b8f1ab5/865跟踪，全部准备/测试/失败/登录/模型确认/来源事实及state留codex-next/coordination/。
+- 本片仅准备与产品窄接线补正；登录实际通过后再原模型无工具probe、精确登记/保ID补录、正常启停和接单/人验。三个Kimi与DeepSeek已验保持，268不重跑；只剩Codex尚未迁移，18项其余顺序不变，当前无新任务号。
+
 ## 2026-10-17 23:52（Asia/Shanghai）— DeepSeek页面三步人工验收通过，保身份受管迁移正式闭合
 
 - 用户明确答复原dsh CLI Bridge (agent:deepseek)页面关闭等未启动→刷新不自启→再启动ready“三步均通过”；根只读核实际gen4 stop于UTC15:50:02.107424 outcome stopped、gen5 start于15:50:19.751667 ready，人工门禁释放。没有代用户重复启停或模型调用，不操作Browser。

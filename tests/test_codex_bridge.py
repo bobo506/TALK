@@ -35,6 +35,47 @@ def _base_instructions_value(command: str) -> str:
 
 
 class CodexBridgeTests(unittest.TestCase):
+    def test_explicit_task_command_does_not_replace_message_or_preflight(self):
+        args = codex_bridge.build_parser().parse_args([
+            "--codex-command", "message-cli --model chosen -",
+            "--codex-task-command", "task-cli --model chosen -",
+            "--task-preflight-command", "preflight-cli --model chosen -",
+        ])
+        self.assertEqual(resolve_codex_command(args), "message-cli --model chosen -")
+        self.assertEqual(codex_bridge.resolve_codex_task_command(args), "task-cli --model chosen -")
+        self.assertEqual(codex_bridge.resolve_codex_task_preflight_command(args), "preflight-cli --model chosen -")
+
+    def test_explicit_task_command_wins_over_legacy_environment_override(self):
+        with patch.dict(os.environ, {"TALK_CODEX_COMMAND": "legacy message command"}):
+            args = codex_bridge.build_parser().parse_args([
+                "--codex-task-command", "task-only command",
+            ])
+            self.assertEqual(codex_bridge.resolve_codex_task_command(args), "task-only command")
+            self.assertEqual(resolve_codex_command(args), "legacy message command")
+
+    def test_absent_task_command_keeps_custom_message_fallback(self):
+        with patch.dict(os.environ, {}, clear=True):
+            args = codex_bridge.build_parser().parse_args([
+                "--codex-command", "existing custom command",
+            ])
+            self.assertIsNone(args.codex_task_command)
+            self.assertEqual(codex_bridge.resolve_codex_task_command(args), "existing custom command")
+
+    def test_run_bridge_passes_separate_commands_to_shared_worker(self):
+        args = codex_bridge.build_parser().parse_args([
+            "--codex-command", "message-only", "--codex-task-command", "task-only",
+            "--task-preflight-command", "preflight-only",
+        ])
+        seen = []
+
+        async def capture(resolved):
+            seen.append((resolved.command, resolved.task_command, resolved.task_preflight_command))
+
+        with patch.object(codex_bridge.cli_bridge, "configure_talk_tool_environment"), \
+             patch.object(codex_bridge.cli_bridge, "run_bridge", side_effect=capture):
+            asyncio.run(codex_bridge.run_bridge(args))
+        self.assertEqual(seen, [("message-only", "task-only", "preflight-only")])
+
     def test_member_id_from_name_adds_agent_prefix(self):
         self.assertEqual(member_id_from_name("codex"), "agent:codex")
         self.assertEqual(member_id_from_name("agent:codex"), "agent:codex")

@@ -209,6 +209,9 @@ def resolve_codex_command(args: argparse.Namespace) -> str:
 
 def resolve_codex_task_command(args: argparse.Namespace) -> str:
     """Resolve a task command whose visible output is posted only by the runner."""
+    configured = getattr(args, "codex_task_command", None)
+    if configured:
+        return configured
     if os.environ.get("TALK_CODEX_COMMAND"):
         return args.codex_command
     resolved_default = _build_codex_command(_default_codex_exe(), profile="discussion")
@@ -368,6 +371,11 @@ def build_parser() -> argparse.ArgumentParser:
         command_dest="codex_command",
         command_metavar="CODEX_COMMAND",
         default_bridge_label="Codex bridge",
+    )
+    parser.add_argument(
+        "--codex-task-command",
+        default=None,
+        help="Optional task-only Codex CLI command; keeps task execution separate from the message command",
     )
     parser.add_argument(
         "--codex-execution-profile",
