@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-18 20:04（Asia/Shanghai）— 271独立复核后直接修正收取，角色列表文案合入
+
+- 用户进一步确认去角色列表附注合理并通知“271好了”。只读核271 succeeded/submitted、DeepSeek于UTC11:36:41.139420完成并暂停，实际ins_067081e6a036、作者agent:deepseek、原creator agent:codex、Hall及结果2825相符；MCP合法字符串271/complete自报与本地JSON完全一致。原消息SHA377f2eca54047bc5c732b68ed7facef8d054a9bc98ed1f51605c27aa2bc9dd8a、原五文件及原diff/测试失败保持。
+- 独立实读日志基础1532行、CLI bridge实际差异和维护者查询/测试后，6项针对性反例初次5失败/1错误，首次交付业务复核需修正；不是只凭281项自报验收。按当前用户分工确认暂停后，Codex直接修正，无追加DeepSeek返修/回审任务。
+- 修正完整文本先脱敏再取短CLI摘要、标准子进程异常省略cmd/output、异常链内存保护值和repr/JSON转义、带空格引号秘密及owner/session token、日志及stderr双失败不盖原错误、目录枚举预算。另修消息/任务ID区分、实际租约预算、队列新轮次旧关联清空、因果链深度标志；Windows8.3测试按resolve后路径比较。详ROLE_RUNTIME_LOGGING_REVIEW_271，不称修正后自检为他人独立复核。
+- 最终相关9模块293项Python全部通过，含原4条管道用例，无过滤/跳过；独立反例原失败与中间33项仅短路径断言失败记录均保留。原件首份文本快照有平台换行转换，另以原SHA恢复original-byte-exact并逐个比对通过，首份不覆盖；结果原文及结构化参考保存review目录。
+- 原creator agent:codex已通过正常MCP collect收取271，UTC12:00:57.625512，succeeded/completed/msg2825。原complete正文及开发者281/4阻断记录不改写，不追改269/270或永久开发要求。无新任务、主动长等待、原生模型/登录/生产服务操作。
+- 用户角色列表文案候选7713d2b在271执行时仅写独立工作区，原工作目录HEAD保持efe3587；暂停后将web/workspace.js、index版本及相关现有测试合入。仅列表成功显示“启动成功”、隐藏重复关闭再重启提示；详情、原native_login独立事实、owner/启停守卫保留，其它列表错误提示不隐藏。
+- 合入后26项Node、12项Python UI通过，实际首页新静态版本与workspace.js字节SHA7987150eff95d609e530dedc672184dd046b294878bc03002362629f4110ebb1匹配；原静态断言失败及最终日志从独立工作区保留到主目录.tmp/role-list-copy/。未Browser，列表视觉待用户Ctrl+F5验收；API及五角色未重启，当前长期进程未加载日志新代码。
+- 交付范围明确为日志基础/通用bridge/本地定位；宿主、权限API/页面、worker健康、全根旧run与痕迹文件空间治理和正常部署仍待。256MiB是本run事件文件软目标，不称全系统硬上限；原排期第2项仅首片完成，其它排序不变。本次到页面人验/收尾门禁暂停，不继续开新片。
+- 变更文件：271原5文件、tests/test_runtime_diagnostics_review.py及本片维护/复核/进度文档；列表web两文件、三份既有UI测试、用户手册/验收/Web UI模块同步。提交只含本轮显式文件，旧未跟踪测试产物/私有配置不纳入；证据在.tmp/runtime-exception-logs/independent-review271/和.tmp/role-list-copy/。
+
 ## 2026-10-18 19:11（Asia/Shanghai）— 271完整异常日志首片已派DeepSeek
 
 - 五角色恢复运行状态人验已收尾推送ba46253，按原排期第2项派发独立顶层任务271，仅使用project_id/target_member_id/title/content四个最小字段，未附子任务类型、review_policy或关系参数。creator agent:codex，target agent:deepseek，Hall group:task-34ff3ea145f74e8a9af8bdfe4b790a2d，创建UTC11:11:29.091095；首次返回queued/assigned及bound/deepseek-flash快照，不据此称已执行或模型实跑已验。

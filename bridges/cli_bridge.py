@@ -16,6 +16,7 @@ import shutil
 import socket
 import sys
 import tempfile
+from bridges import runtime_diagnostics as runtime_diag
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -204,6 +205,143 @@ def build_instance_report_payload(
         if process_started_at is not None:
             payload["process_started_at"] = process_started_at.isoformat()
     return payload
+
+
+def _diag_budgets(
+    *,
+    cli_timeout: int | float | None = None,
+    http_timeout: int | float | None = None,
+    lease_seconds: int | float | None = None,
+    heartbeat_interval: int | float | None = None,
+    managed_heartbeat_interval: int | float | None = None,
+    poll_interval: int | float | None = None,
+) -> dict[str, Any]:
+    """Record only budgets the caller actually knows; MCP wait stays unknown."""
+    return {
+        "cli_timeout_seconds": cli_timeout,
+        "http_timeout_seconds": http_timeout,
+        "task_lease_seconds": lease_seconds,
+        "task_heartbeat_interval_seconds": heartbeat_interval,
+        "managed_heartbeat_interval_seconds": managed_heartbeat_interval,
+        "task_poll_interval_seconds": poll_interval,
+        "mcp_wait_seconds": None,
+        "mcp_wait_budget_source": "unknown",
+    }
+
+
+def _diag_http_timeout(client: Any) -> float | None:
+    value = getattr(client, "timeout", None)
+    return value if isinstance(value, (int, float)) else None
+
+
+def _diag_public_text(
+    diagnostics: Any | None,
+    text: Any,
+    *,
+    sensitive_values: Sequence[Any] = (),
+    max_chars: int = 4000,
+) -> str:
+    if isinstance(text, BaseException):
+        sensitive_values = (*sensitive_values, *runtime_diag.exception_sensitive_values(text))
+    if diagnostics is None:
+        return runtime_diag.sanitize_text(text, sensitive_values=sensitive_values, max_chars=max_chars)
+    return diagnostics.sanitize_public_text(
+        text,
+        sensitive_values=sensitive_values,
+        max_chars=max_chars,
+    )
+
+
+def _diag_cli_failure_message(
+    result: CliRunResult, *, diagnostics: Any | None = None,
+    sensitive_values: Sequence[Any] = (),
+) -> str:
+    """A short, sanitized CLI failure summary; never the complete stdout/stderr."""
+    if result.timed_out:
+        return "CLI command timed out"
+    detail = "\n".join(
+        part
+        for part in (
+            clean_cli_output(result.stderr),
+            clean_cli_output(result.stdout),
+        )
+        if part
+    )
+    # Redact the complete text before taking a line/prefix: a multiline prompt
+    # or long opaque value will no longer match once it has been shortened.
+    if diagnostics is not None:
+        detail = diagnostics.sanitize_public_text(detail, sensitive_values=sensitive_values)
+    else:
+        detail = runtime_diag.sanitize_text(detail, sensitive_values=sensitive_values)
+    lines = [line.strip() for line in detail.splitlines() if line.strip()]
+    if not lines:
+        return f"CLI exited with code {result.returncode}"
+    first = lines[0]
+    if len(first) > 500:
+        first = f"{first[:500].rstrip()}…[truncated {len(first) - 500} chars]"
+    return first
+
+
+def _record_cli_failure(
+    diagnostics: Any | None,
+    result: CliRunResult,
+    *,
+    stage: str,
+    task_id: Any,
+    timeout: int,
+    client: Any,
+    sensitive_values: Sequence[Any] = (),
+    message_id: Any = None,
+    budgets: dict[str, Any] | None = None,
+) -> str | None:
+    if diagnostics is None:
+        return None
+    return diagnostics.record_event(
+        "cli_timeout" if result.timed_out else "cli_failed",
+        severity="error",
+        stage=stage,
+        task_id=task_id,
+        message_id=message_id,
+        message=_diag_cli_failure_message(result, diagnostics=diagnostics, sensitive_values=sensitive_values),
+        returncode=result.returncode,
+        timeout=bool(result.timed_out),
+        cancel_category=None,
+        budgets=budgets or _diag_budgets(
+            cli_timeout=timeout,
+            http_timeout=_diag_http_timeout(client),
+        ),
+        sensitive_values=sensitive_values,
+    )
+
+
+def _record_secondary_failure(
+    diagnostics: Any | None,
+    exc: BaseException,
+    *,
+    stage: str,
+    task_id: Any,
+    primary_log_id: str | None,
+    budgets: dict[str, Any] | None = None,
+    sensitive_values: Sequence[Any] = (),
+    message_id: Any = None,
+) -> str | None:
+    if diagnostics is None:
+        return None
+    return diagnostics.record_exception(
+        exc,
+        event="secondary_failure",
+        severity="error",
+        stage=stage,
+        task_id=task_id,
+        message_id=message_id,
+        related_log_id=primary_log_id,
+        budgets=budgets,
+        sensitive_values=sensitive_values,
+    )
+
+
+def _with_log_ref(text: str, log_id: str | None) -> str:
+    return f"{text}; log_ref={log_id}" if log_id else text
 
 
 CHINESE_REQUEST_MARKERS = ("中文", "汉语", "普通话", "简体中文", "用中文")
@@ -2591,6 +2729,8 @@ def format_cli_reply(
     max_chars: int = DEFAULT_MAX_REPLY_CHARS,
     bridge_label: str = "CLI bridge",
     force_one_sentence: bool = False,
+    log_ref: str | None = None,
+    log_write_failed: bool = False,
 ) -> str:
     output = clean_cli_output((result.stdout or "").strip())
 
@@ -2601,12 +2741,20 @@ def format_cli_reply(
     else:
         text = output or f"({bridge_label} finished without output.)"
 
+    if log_write_failed and (result.timed_out or result.returncode != 0):
+        text = f"{bridge_label} 运行失败，本地诊断日志写入失败（已降级）。"
+
     if force_one_sentence and not result.timed_out and result.returncode == 0:
         text = first_sentence(text)
 
     if len(text) > max_chars:
         remaining = len(text) - max_chars
         text = f"{text[:max_chars].rstrip()}\n\n[truncated {remaining} chars]"
+    # Failure summaries may expose a stable local reference; the stack itself
+    # never goes into the chat reply.  Append after truncation so the reference
+    # cannot be cut away.
+    if log_ref:
+        text = f"{text}\n\n{runtime_diag.public_log_reference(log_ref)}"
     return text
 
 
@@ -2914,7 +3062,12 @@ async def _prepare_task_before_claim(
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        raise TaskPreflightError(f"task {task_id} preflight failed: {exc}") from exc
+        wrapped = TaskPreflightError(f"task {task_id} preflight failed: {exc}")
+        # The CLI exception can carry the full prompt (and therefore the task
+        # text).  Keep it in memory for the diagnostics redactor only; the
+        # exception message itself is never written unredacted.
+        setattr(wrapped, "diagnostic_sensitive_values", (prompt,))
+        raise wrapped from exc
     if decision.action == "accept":
         try:
             accepted = await client.accept_task(task_id)
@@ -2969,6 +3122,7 @@ async def handle_queued_task(
     command_runner: Any | None = None,
     lease_seconds: int = DEFAULT_TASK_LEASE_SECONDS,
     heartbeat_interval: float = DEFAULT_TASK_HEARTBEAT_INTERVAL,
+    diagnostics: Any | None = None,
 ) -> bool:
     """Preflight, claim, and execute one task; return False when no action was acquired.
 
@@ -2981,17 +3135,62 @@ async def handle_queued_task(
     _clear_deprecated_decision_tier_env()
     task_id = int(task["id"])
     runner = command_runner or run_cli_command
-    ready_task, replay_context, workflow_advanced = await _prepare_task_before_claim(
-        task,
-        client=client,
-        member_id=member_id,
-        workdir=workdir,
-        preflight_command=preflight_command or command,
-        timeout=timeout,
-        runtime=runtime,
-        prompt_transport=prompt_transport,
-        command_runner=runner,
+    budgets = _diag_budgets(
+        cli_timeout=timeout,
+        http_timeout=_diag_http_timeout(client),
+        lease_seconds=lease_seconds,
+        heartbeat_interval=heartbeat_interval,
     )
+    first_log_id: str | None = None
+    try:
+        ready_task, replay_context, workflow_advanced = await _prepare_task_before_claim(
+            task,
+            client=client,
+            member_id=member_id,
+            workdir=workdir,
+            preflight_command=preflight_command or command,
+            timeout=timeout,
+            runtime=runtime,
+            prompt_transport=prompt_transport,
+            command_runner=runner,
+        )
+    except asyncio.CancelledError:
+        if diagnostics is not None:
+            diagnostics.record_event(
+                "task_cancelled",
+                severity="warning",
+                stage="task_preflight",
+                task_id=task_id,
+                cancel_category="asyncio_cancelled",
+                budgets=budgets,
+            )
+        raise
+    except TaskPreflightError as exc:
+        if diagnostics is not None:
+            first_log_id = diagnostics.record_exception(
+                exc,
+                event="preflight_failed",
+                stage="task_preflight",
+                task_id=task_id,
+                budgets=budgets,
+                sensitive_values=(
+                    *getattr(exc, "diagnostic_sensitive_values", ()),
+                    str(task.get("content") or ""),
+                ),
+            )
+            if first_log_id:
+                setattr(exc, "diagnostic_log_id", first_log_id)
+        raise
+    except Exception as exc:
+        if diagnostics is not None:
+            first_log_id = diagnostics.record_exception(
+                exc,
+                event="preflight_exception",
+                stage="task_preflight",
+                task_id=task_id,
+                budgets=budgets,
+            )
+        raise
     if ready_task is None:
         return workflow_advanced
 
@@ -2999,8 +3198,54 @@ async def handle_queued_task(
         claimed = await client.claim_task(task_id, instance_id=instance_id, lease_seconds=lease_seconds)
     except TalkValidationError as exc:
         if exc.status_code == 409:
+            if diagnostics is not None:
+                diagnostics.record_event(
+                    "task_claim_conflict",
+                    severity="warning",
+                    stage="task_claim",
+                    task_id=task_id,
+                    message=f"claim conflict: HTTP {exc.status_code}",
+                    budgets=budgets,
+                )
             return False
+        if diagnostics is not None:
+            first_log_id = diagnostics.record_exception(
+                exc,
+                event="task_claim_failed",
+                stage="task_claim",
+                task_id=task_id,
+                budgets=budgets,
+            )
         raise
+    except asyncio.CancelledError:
+        if diagnostics is not None:
+            diagnostics.record_event(
+                "task_cancelled",
+                severity="warning",
+                stage="task_claim",
+                task_id=task_id,
+                cancel_category="asyncio_cancelled",
+                budgets=budgets,
+            )
+        raise
+    except Exception as exc:
+        if diagnostics is not None:
+            first_log_id = diagnostics.record_exception(
+                exc,
+                event="task_claim_failed",
+                stage="task_claim",
+                task_id=task_id,
+                budgets=budgets,
+            )
+        raise
+
+    if diagnostics is not None:
+        diagnostics.record_event(
+            "task_claimed",
+            stage="task_claim",
+            task_id=task_id,
+            budgets=budgets,
+        )
 
     claim_token = str(claimed.get("claim_token") or "") or None
     heartbeat_task = _start_task_heartbeat(
@@ -3011,6 +3256,8 @@ async def handle_queued_task(
         heartbeat_interval=heartbeat_interval,
     )
     gate_verdict_payload: dict[str, Any] | None = None
+    prompt = ""
+    task_text = ""
     try:
         try:
             task_text = str(claimed.get("content") or "")
@@ -3033,6 +3280,19 @@ async def handle_queued_task(
                 heartbeat_task,
             )
             result = normalize_runtime_result(result, runtime=runtime)
+            cli_failure_log_id: str | None = None
+            if result.timed_out or result.returncode != 0:
+                cli_failure_log_id = _record_cli_failure(
+                    diagnostics,
+                    result,
+                    stage="task_cli",
+                    task_id=task_id,
+                    timeout=timeout, budgets=budgets,
+                    client=client,
+                    sensitive_values=(task_text, prompt, claim_token),
+                )
+                if cli_failure_log_id is not None and first_log_id is None:
+                    first_log_id = cli_failure_log_id
             if task_kind in {"review", "test"} and not result.timed_out and result.returncode == 0:
                 try:
                     gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
@@ -3053,6 +3313,18 @@ async def handle_queued_task(
                         heartbeat_task,
                     )
                     result = normalize_runtime_result(result, runtime=runtime)
+                    if result.timed_out or result.returncode != 0:
+                        cli_failure_log_id = _record_cli_failure(
+                            diagnostics,
+                            result,
+                            stage="task_cli_gate_repair",
+                            task_id=task_id,
+                            timeout=timeout, budgets=budgets,
+                            client=client,
+                            sensitive_values=(task_text, prompt, repair_prompt, claim_token),
+                        )
+                        if cli_failure_log_id is not None and first_log_id is None:
+                            first_log_id = cli_failure_log_id
                     gate_verdict = parse_task_gate_verdict(result, task_kind=task_kind)
                 gate_verdict_payload = gate_verdict.as_payload()
             reply = format_cli_reply(
@@ -3060,6 +3332,12 @@ async def handle_queued_task(
                 max_chars=max_reply_chars,
                 bridge_label=bridge_label,
                 force_one_sentence=wants_one_sentence(task_text),
+                log_ref=cli_failure_log_id if result.timed_out or result.returncode != 0 else None,
+                log_write_failed=bool(
+                    diagnostics is not None
+                    and (result.timed_out or result.returncode != 0)
+                    and cli_failure_log_id is None
+                ),
             )
             if (
                 task_kind not in {"review", "test"}
@@ -3071,17 +3349,63 @@ async def handle_queued_task(
             completion_status = "failed" if result.timed_out or result.returncode != 0 else "succeeded"
             last_error = None
             if completion_status == "failed":
-                detail = "\n".join(
-                    part for part in (clean_cli_output(result.stderr), clean_cli_output(result.stdout)) if part
+                if diagnostics is not None:
+                    # Public error fields carry only a bounded sanitized
+                    # summary + reference; the local JSONL record is the
+                    # place for the diagnostic envelope.
+                    detail = _diag_cli_failure_message(result, diagnostics=diagnostics, sensitive_values=(task_text, prompt, claim_token))
+                else:
+                    detail = "\n".join(
+                        part for part in (clean_cli_output(result.stderr), clean_cli_output(result.stdout)) if part
+                    )
+                detail = _diag_public_text(
+                    diagnostics,
+                    detail,
+                    sensitive_values=(task_text, prompt, claim_token),
+                    max_chars=800,
                 )
                 last_error = detail or reply
+                if cli_failure_log_id:
+                    last_error = _with_log_ref(str(last_error), cli_failure_log_id)
         except TaskLeaseLostError:
             raise
+        except asyncio.CancelledError:
+            if diagnostics is not None:
+                diagnostics.record_event(
+                    "task_cancelled",
+                    severity="warning",
+                    stage="task_run",
+                    task_id=task_id,
+                    cancel_category="asyncio_cancelled",
+                    budgets=budgets,
+                )
+            raise
         except Exception as exc:
+            if diagnostics is not None:
+                exc_log_id = diagnostics.record_exception(
+                    exc,
+                    event="task_exception",
+                    stage="task_run",
+                    task_id=task_id,
+                    related_log_id=first_log_id,
+                    budgets=budgets,
+                    sensitive_values=(task_text, prompt, claim_token),
+                )
+                if first_log_id is None:
+                    first_log_id = exc_log_id
             reply = f"{bridge_label} 运行失败，错误详情已记录。"
+            if diagnostics is not None and first_log_id is None:
+                reply = f"{bridge_label} 运行失败，本地诊断日志写入失败（已降级）。"
             completion_status = "failed"
-            last_error = f"{bridge_label} failed before completing task {task_id}: {exc}"
-
+            detail = _diag_public_text(
+                diagnostics,
+                exc,
+                sensitive_values=(task_text, prompt, claim_token),
+                max_chars=800,
+            )
+            last_error = f"{bridge_label} failed before completing task {task_id}: {detail}"
+            if first_log_id:
+                last_error = _with_log_ref(last_error, first_log_id)
         await _raise_if_task_lease_lost(heartbeat_task)
         result_message_id: int | None = None
         creator = claimed.get("created_by")
@@ -3093,9 +3417,43 @@ async def handle_queued_task(
                     group_id=claimed.get("hall_group_id"),
                 )
                 result_message_id = int(result_message["id"])
+            except asyncio.CancelledError:
+                if diagnostics is not None:
+                    diagnostics.record_event(
+                        "task_cancelled",
+                        severity="warning",
+                        stage="task_result_send",
+                        task_id=task_id,
+                        cancel_category="asyncio_cancelled",
+                        budgets=budgets,
+                    )
+                raise
             except Exception as exc:
+                secondary_log_id = _record_secondary_failure(
+                    diagnostics,
+                    exc,
+                    stage="task_result_send",
+                    task_id=task_id,
+                    primary_log_id=first_log_id,
+                    budgets=budgets,
+                    sensitive_values=(task_text, prompt, claim_token),
+                )
                 completion_status = "failed"
-                last_error = f"{bridge_label} could not post task result: {exc}"
+                send_error = _diag_public_text(
+                    diagnostics,
+                    exc,
+                    sensitive_values=(task_text, prompt, claim_token),
+                    max_chars=800,
+                )
+                previous = str(last_error) if last_error else ""
+                combined = (
+                    f"{previous}; {bridge_label} could not post task result: {send_error}"
+                    if previous
+                    else f"{bridge_label} could not post task result: {send_error}"
+                )
+                if first_log_id is None:
+                    first_log_id = secondary_log_id
+                last_error = _with_log_ref(combined, first_log_id)
 
         await _raise_if_task_lease_lost(heartbeat_task)
         completion_kwargs: dict[str, Any] = {
@@ -3107,9 +3465,61 @@ async def handle_queued_task(
             completion_kwargs["claim_token"] = claim_token
         if completion_status == "succeeded" and gate_verdict_payload is not None:
             completion_kwargs["gate_verdict"] = gate_verdict_payload
-        await client.complete_task(task_id, **completion_kwargs)
+        try:
+            await client.complete_task(task_id, **completion_kwargs)
+        except asyncio.CancelledError:
+            if diagnostics is not None:
+                diagnostics.record_event(
+                    "task_cancelled",
+                    severity="warning",
+                    stage="task_complete",
+                    task_id=task_id,
+                    cancel_category="asyncio_cancelled",
+                    budgets=budgets,
+                )
+            raise
+        except Exception as exc:
+            secondary_log_id = _record_secondary_failure(
+                diagnostics,
+                exc,
+                stage="task_complete",
+                task_id=task_id,
+                primary_log_id=first_log_id,
+                budgets=budgets,
+                sensitive_values=(task_text, prompt, claim_token),
+            )
+            if first_log_id is None:
+                first_log_id = secondary_log_id
+            raise
+        if diagnostics is not None:
+            diagnostics.record_event(
+                "task_completed",
+                stage="task_complete",
+                severity="info" if completion_status == "succeeded" else "warning",
+                task_id=task_id,
+                message=completion_status,
+                budgets=budgets,
+                extra={
+                    "result_message_id": result_message_id,
+                    "error_log_id": first_log_id,
+                },
+            )
         return True
-    except TaskLeaseLostError:
+    except TaskLeaseLostError as exc:
+        if diagnostics is not None:
+            lease_log_id = diagnostics.record_exception(
+                exc,
+                event="task_lease_lost",
+                stage="task_lease",
+                task_id=task_id,
+                related_log_id=first_log_id,
+                budgets=budgets,
+            )
+            if lease_log_id:
+                print(
+                    f"Task {task_id} lease lost; log_ref={lease_log_id}",
+                    file=sys.stderr,
+                )
         return False
     finally:
         await _stop_task_heartbeat(heartbeat_task)
@@ -3123,21 +3533,59 @@ async def _fail_task_after_preflight_limit(
     attempts: int,
     error: TaskPreflightError,
     lease_seconds: int,
+    diagnostics: Any | None = None,
+    primary_log_id: str | None = None,
 ) -> bool:
     """Persistently fail a poison task after its bounded preflight attempts."""
     from TALK.client.exceptions import TalkValidationError
 
     task_id = int(task["id"])
+    budgets = _diag_budgets(
+        http_timeout=_diag_http_timeout(client),
+        lease_seconds=lease_seconds,
+    )
+    protected_error = _diag_public_text(
+        diagnostics,
+        error,
+        sensitive_values=(
+            *getattr(error, "diagnostic_sensitive_values", ()),
+            str(task.get("content") or ""),
+        ),
+        max_chars=800,
+    )
     last_error = (
         f"task {task_id} preflight failed after {attempts} attempts; "
-        f"automatic retries stopped: {error}"
+        f"automatic retries stopped: {protected_error}"
     )
+    if primary_log_id:
+        last_error = _with_log_ref(last_error, primary_log_id)
     try:
         await client.accept_task(task_id)
     except TalkValidationError as exc:
         if exc.status_code != 409:
+            if diagnostics is not None:
+                diagnostics.record_exception(
+                    exc,
+                    event="secondary_failure",
+                    stage="task_preflight_terminal_accept",
+                    task_id=task_id,
+                    related_log_id=primary_log_id,
+                    budgets=budgets,
+                )
             raise
-        current = await client.get_task(task_id)
+        try:
+            current = await client.get_task(task_id)
+        except Exception as exc2:
+            if diagnostics is not None:
+                diagnostics.record_exception(
+                    exc2,
+                    event="secondary_failure",
+                    stage="task_preflight_terminal_reread",
+                    task_id=task_id,
+                    related_log_id=primary_log_id,
+                    budgets=budgets,
+                )
+            raise
         if str(current.get("workflow_status") or "") != "accepted":
             return False
     try:
@@ -3148,7 +3596,36 @@ async def _fail_task_after_preflight_limit(
         )
     except TalkValidationError as exc:
         if exc.status_code == 409:
+            if diagnostics is not None:
+                diagnostics.record_event(
+                    "task_claim_conflict",
+                    severity="warning",
+                    stage="task_preflight_terminal_claim",
+                    task_id=task_id,
+                    message=f"claim conflict: HTTP {exc.status_code}",
+                    budgets=budgets,
+                )
             return False
+        if diagnostics is not None:
+            diagnostics.record_exception(
+                exc,
+                event="secondary_failure",
+                stage="task_preflight_terminal_claim",
+                task_id=task_id,
+                related_log_id=primary_log_id,
+                budgets=budgets,
+            )
+        raise
+    except Exception as exc:
+        if diagnostics is not None:
+            diagnostics.record_exception(
+                exc,
+                event="secondary_failure",
+                stage="task_preflight_terminal_claim",
+                task_id=task_id,
+                related_log_id=primary_log_id,
+                budgets=budgets,
+            )
         raise
 
     result_message_id: int | None = None
@@ -3165,7 +3642,21 @@ async def _fail_task_after_preflight_limit(
             )
             result_message_id = int(result_message["id"])
         except Exception as exc:
-            last_error = f"{last_error}; could not post preflight failure result: {exc}"
+            secondary_log_id = _record_secondary_failure(
+                diagnostics,
+                exc,
+                stage="task_preflight_terminal_result_send",
+                task_id=task_id,
+                primary_log_id=primary_log_id,
+                budgets=budgets,
+            )
+            send_error = _diag_public_text(diagnostics, exc, max_chars=800)
+            last_error = (
+                f"{last_error}; could not post preflight failure result: {send_error}"
+            )
+            if primary_log_id is None:
+                primary_log_id = secondary_log_id
+            last_error = _with_log_ref(last_error, primary_log_id)
 
     completion_kwargs: dict[str, Any] = {
         "status": "failed",
@@ -3175,7 +3666,28 @@ async def _fail_task_after_preflight_limit(
     claim_token = str(claimed.get("claim_token") or "").strip()
     if claim_token:
         completion_kwargs["claim_token"] = claim_token
-    await client.complete_task(task_id, **completion_kwargs)
+    try:
+        await client.complete_task(task_id, **completion_kwargs)
+    except Exception as exc:
+        _record_secondary_failure(
+            diagnostics,
+            exc,
+            stage="task_preflight_terminal_complete",
+            task_id=task_id,
+            primary_log_id=primary_log_id,
+            budgets=budgets,
+        )
+        raise
+    if diagnostics is not None:
+        diagnostics.record_event(
+            "task_preflight_failed_terminal",
+            severity="warning",
+            stage="task_preflight",
+            task_id=task_id,
+            message=f"preflight stopped after {attempts} attempts",
+            budgets=budgets,
+            extra={"error_log_id": primary_log_id},
+        )
     return True
 
 
@@ -3194,6 +3706,7 @@ async def handle_incoming_message(
     send_ack: bool = False,
     report_status: Any | None = None,
     decision_tier: str | None = None,
+    diagnostics: Any | None = None,
 ) -> None:
     """Handle one incoming group/direct message.
 
@@ -3208,8 +3721,29 @@ async def handle_incoming_message(
 
     task_id = str(message.get("id") or "")
     group_id = message.get("group_id") if isinstance(message.get("group_id"), str) else None
+    budgets = _diag_budgets(
+        cli_timeout=timeout,
+        http_timeout=_diag_http_timeout(client),
+    )
+    task_text = ""
+    prompt = ""
+    cli_failure_log_id: str | None = None
+    report_failure_handled = False
     if report_status is not None:
-        await report_status("busy", current_task_id=task_id)
+        try:
+            await report_status("busy", current_task_id=task_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if diagnostics is not None:
+                diagnostics.record_exception(
+                    exc,
+                    event="message_status_failed",
+                    stage="message_status_busy",
+                    task_id=None, message_id=task_id,
+                    budgets=budgets,
+                )
+            raise
 
     deferred_file: str | None = None
     try:
@@ -3384,6 +3918,16 @@ async def handle_incoming_message(
             prompt_transport=prompt_transport,
         )
         result = normalize_runtime_result(result, runtime=runtime)
+        if result.timed_out or result.returncode != 0:
+            cli_failure_log_id = _record_cli_failure(
+                diagnostics,
+                result,
+                stage="message_cli",
+                task_id=None, message_id=task_id,
+                timeout=timeout,
+                client=client,
+                sensitive_values=(task_text, prompt),
+            )
         # 诊断：function-calling 模式下，工具调用由 LLM 扩展内部处理
         # bridge 只读取 stdout 作为可见回复；TALK_ACTION 文本协议解析继续共存
         if os.environ.get("TALK_DUMP_PROMPT") == "1" and result.returncode == 0:
@@ -3397,6 +3941,12 @@ async def handle_incoming_message(
             max_chars=max_reply_chars,
             bridge_label=bridge_label,
             force_one_sentence=wants_one_sentence(task_text),
+            log_ref=cli_failure_log_id if result.timed_out or result.returncode != 0 else None,
+            log_write_failed=bool(
+                diagnostics is not None
+                and (result.timed_out or result.returncode != 0)
+                and cli_failure_log_id is None
+            ),
         )
         if (runtime.lower() == "pi" or member_id == "agent:pi") and not result.timed_out and result.returncode == 0:
             reply = normalize_pi_reply_language(task_text, reply)
@@ -3515,14 +4065,108 @@ async def handle_incoming_message(
                     reply_to=reply_message_id,
                 )
         if report_status is not None:
-            await report_status(
-                "error" if result.timed_out or result.returncode != 0 else "idle",
-                last_error=(clean_cli_output(result.stderr) or clean_cli_output(result.stdout) or reply)[-4000:]
-                if result.timed_out or result.returncode != 0 else None,
+            failure_error = None
+            if result.timed_out or result.returncode != 0:
+                if diagnostics is not None:
+                    failure_error = _diag_cli_failure_message(result, diagnostics=diagnostics, sensitive_values=(task_text, prompt))
+                else:
+                    failure_error = (
+                        clean_cli_output(result.stderr)
+                        or clean_cli_output(result.stdout)
+                        or reply
+                    )[-4000:]
+                failure_error = _diag_public_text(
+                    diagnostics,
+                    failure_error,
+                    sensitive_values=(task_text, prompt),
+                    max_chars=800,
+                )
+                if cli_failure_log_id:
+                    failure_error = _with_log_ref(str(failure_error), cli_failure_log_id)
+            try:
+                await report_status(
+                    "error" if result.timed_out or result.returncode != 0 else "idle",
+                    last_error=failure_error,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                report_failure_handled = True
+                secondary_log_id = _record_secondary_failure(
+                    diagnostics,
+                    exc,
+                    stage="message_status_report",
+                    task_id=None, message_id=task_id,
+                    primary_log_id=cli_failure_log_id,
+                    budgets=budgets,
+                    sensitive_values=(task_text, prompt),
+                )
+                if diagnostics is not None:
+                    print(
+                        "Message status report failed "
+                        f"({type(exc).__name__}); log_ref={secondary_log_id or 'unavailable'}",
+                        file=sys.stderr,
+                    )
+                raise
+    except asyncio.CancelledError:
+        if diagnostics is not None:
+            diagnostics.record_event(
+                "message_cancelled",
+                severity="warning",
+                stage="message",
+                task_id=None, message_id=task_id,
+                cancel_category="asyncio_cancelled",
+                budgets=budgets,
             )
+        raise
     except Exception as exc:
+        if report_failure_handled:
+            raise
+        primary_log_id: str | None = None
+        if diagnostics is not None:
+            primary_log_id = diagnostics.record_exception(
+                exc,
+                event="message_exception",
+                stage="message",
+                task_id=None, message_id=task_id,
+                related_log_id=cli_failure_log_id,
+                budgets=budgets,
+                sensitive_values=(task_text, prompt),
+            )
         if report_status is not None:
-            await report_status("error", current_task_id=task_id, last_error=str(exc))
+            try:
+                await report_status(
+                    "error",
+                    current_task_id=task_id,
+                    last_error=_with_log_ref(
+                        _diag_public_text(
+                            diagnostics,
+                            exc,
+                            sensitive_values=(task_text, prompt),
+                            max_chars=800,
+                        ),
+                        primary_log_id,
+                    ),
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as report_exc:
+                secondary_log_id = _record_secondary_failure(
+                    diagnostics,
+                    report_exc,
+                    stage="message_status_report",
+                    task_id=None, message_id=task_id,
+                    primary_log_id=primary_log_id,
+                    budgets=budgets,
+                    sensitive_values=(task_text, prompt),
+                )
+                if diagnostics is not None:
+                    print(
+                        "Message status report failed "
+                        f"({type(report_exc).__name__}); "
+                        f"log_ref={secondary_log_id or primary_log_id or 'unavailable'}",
+                        file=sys.stderr,
+                    )
         raise
     finally:
         if deferred_file:
@@ -3542,108 +4186,226 @@ async def run_task_queue_worker(
     args: argparse.Namespace,
     run_lock: asyncio.Lock,
     report_status: Any,
+    diagnostics: Any | None = None,
 ) -> None:
-    preflight_failures: dict[int, tuple[int, TaskPreflightError]] = {}
+    preflight_failures: dict[int, tuple[int, TaskPreflightError, str | None]] = {}
     max_preflight_attempts = resolve_task_preflight_max_attempts(args)
-    while True:
-        try:
-            requeue_expired = getattr(client, "requeue_expired_tasks", None)
-            if requeue_expired is not None:
-                await requeue_expired()
-            tasks = await client.list_tasks(target_member_id=member_id, status="queued")
-            queued = sorted(
-                (
-                    task
-                    for task in tasks
-                    if str(task.get("workflow_status") or "assigned") in _TASK_RUNNER_ACTIONABLE_WORKFLOWS
-                ),
-                key=lambda item: int(item["id"]),
-            )
-            for task in queued:
-                task_id = int(task["id"])
-                async with run_lock:
-                    failure = preflight_failures.get(task_id)
-                    if failure is not None and failure[0] >= max_preflight_attempts:
-                        terminal = await _fail_task_after_preflight_limit(
-                            task,
-                            client=client,
-                            instance_id=instance_id,
-                            attempts=failure[0],
-                            error=failure[1],
-                            lease_seconds=getattr(
-                                args,
-                                "task_lease_seconds",
-                                DEFAULT_TASK_LEASE_SECONDS,
-                            ),
-                        )
-                        if terminal:
-                            preflight_failures.pop(task_id, None)
-                        continue
-                    try:
-                        await handle_queued_task(
-                            task,
-                            client=client,
-                            member_id=member_id,
-                            workdir=workdir,
-                            instance_id=instance_id,
-                            command=getattr(args, "task_command", args.command),
-                            timeout=args.timeout,
-                            max_reply_chars=args.max_reply_chars,
-                            runtime=args.runtime,
-                            bridge_label=args.bridge_label,
-                            prompt_transport=args.prompt_transport,
-                            # Deprecated compat: accepted and ignored by handle_queued_task.
-                            decision_tier=getattr(args, "decision_tier", None),
-                            preflight_command=getattr(
-                                args,
-                                "task_preflight_command",
-                                getattr(args, "task_command", args.command),
-                            ),
-                            lease_seconds=getattr(
-                                args,
-                                "task_lease_seconds",
-                                DEFAULT_TASK_LEASE_SECONDS,
-                            ),
-                            heartbeat_interval=getattr(
-                                args,
-                                "task_heartbeat_interval",
-                                DEFAULT_TASK_HEARTBEAT_INTERVAL,
-                            ),
-                        )
-                    except TaskPreflightError as exc:
-                        attempts = (failure[0] if failure is not None else 0) + 1
-                        preflight_failures[task_id] = (attempts, exc)
-                        if attempts >= max_preflight_attempts:
+    queue_budgets = _diag_budgets(
+        cli_timeout=getattr(args, "timeout", None),
+        http_timeout=_diag_http_timeout(client),
+        lease_seconds=getattr(args, "task_lease_seconds", None),
+        heartbeat_interval=getattr(args, "task_heartbeat_interval", None),
+        poll_interval=getattr(args, "task_poll_interval", None),
+    )
+    current_task_id: int | None = None
+    stop_reason = "unexpected_exit"
+    queue_start_log_id: str | None = None
+    if diagnostics is not None:
+        queue_start_log_id = diagnostics.record_event(
+            "queue_started",
+            stage="queue_worker",
+            message="task queue worker started",
+            budgets=queue_budgets,
+        )
+    try:
+        while True:
+            current_task_id = None
+            try:
+                requeue_expired = getattr(client, "requeue_expired_tasks", None)
+                if requeue_expired is not None:
+                    await requeue_expired()
+                tasks = await client.list_tasks(target_member_id=member_id, status="queued")
+                queued = sorted(
+                    (
+                        task
+                        for task in tasks
+                        if str(task.get("workflow_status") or "assigned") in _TASK_RUNNER_ACTIONABLE_WORKFLOWS
+                    ),
+                    key=lambda item: int(item["id"]),
+                )
+                for task in queued:
+                    task_id = int(task["id"])
+                    current_task_id = task_id
+                    async with run_lock:
+                        failure = preflight_failures.get(task_id)
+                        if failure is not None and failure[0] >= max_preflight_attempts:
                             terminal = await _fail_task_after_preflight_limit(
                                 task,
                                 client=client,
                                 instance_id=instance_id,
-                                attempts=attempts,
-                                error=exc,
+                                attempts=failure[0],
+                                error=failure[1],
                                 lease_seconds=getattr(
                                     args,
                                     "task_lease_seconds",
                                     DEFAULT_TASK_LEASE_SECONDS,
                                 ),
+                                diagnostics=diagnostics,
+                                primary_log_id=failure[2],
                             )
                             if terminal:
                                 preflight_failures.pop(task_id, None)
-                        elif report_status is not None:
-                            await report_status(
-                                "error",
-                                last_error=(
-                                    f"task {task_id} preflight attempt "
-                                    f"{attempts}/{max_preflight_attempts} failed: {exc}"
+                            continue
+                        try:
+                            await handle_queued_task(
+                                task,
+                                client=client,
+                                member_id=member_id,
+                                workdir=workdir,
+                                instance_id=instance_id,
+                                command=getattr(args, "task_command", args.command),
+                                timeout=args.timeout,
+                                max_reply_chars=args.max_reply_chars,
+                                runtime=args.runtime,
+                                bridge_label=args.bridge_label,
+                                prompt_transport=args.prompt_transport,
+                                # Deprecated compat: accepted and ignored by handle_queued_task.
+                                decision_tier=getattr(args, "decision_tier", None),
+                                preflight_command=getattr(
+                                    args,
+                                    "task_preflight_command",
+                                    getattr(args, "task_command", args.command),
                                 ),
+                                lease_seconds=getattr(
+                                    args,
+                                    "task_lease_seconds",
+                                    DEFAULT_TASK_LEASE_SECONDS,
+                                ),
+                                heartbeat_interval=getattr(
+                                    args,
+                                    "task_heartbeat_interval",
+                                    DEFAULT_TASK_HEARTBEAT_INTERVAL,
+                                ),
+                                diagnostics=diagnostics,
                             )
-                    else:
-                        preflight_failures.pop(task_id, None)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            await report_status("error", last_error=f"task queue worker failed: {exc}")
+                        except TaskPreflightError as exc:
+                            attempts = (failure[0] if failure is not None else 0) + 1
+                            error_log_id = getattr(exc, "diagnostic_log_id", None)
+                            if diagnostics is not None and not error_log_id:
+                                error_log_id = diagnostics.record_exception(
+                                    exc,
+                                    event="preflight_failed",
+                                    stage="task_preflight",
+                                    task_id=task_id,
+                                    budgets=queue_budgets,
+                                    sensitive_values=(
+                                        *getattr(exc, "diagnostic_sensitive_values", ()),
+                                        str(task.get("content") or ""),
+                                    ),
+                                )
+                                if error_log_id:
+                                    setattr(exc, "diagnostic_log_id", error_log_id)
+                            preflight_failures[task_id] = (attempts, exc, error_log_id)
+                            if attempts >= max_preflight_attempts:
+                                terminal = await _fail_task_after_preflight_limit(
+                                    task,
+                                    client=client,
+                                    instance_id=instance_id,
+                                    attempts=attempts,
+                                    error=exc,
+                                    lease_seconds=getattr(
+                                        args,
+                                        "task_lease_seconds",
+                                        DEFAULT_TASK_LEASE_SECONDS,
+                                    ),
+                                    diagnostics=diagnostics,
+                                    primary_log_id=error_log_id,
+                                )
+                                if terminal:
+                                    preflight_failures.pop(task_id, None)
+                            elif report_status is not None:
+                                try:
+                                    await report_status(
+                                        "error",
+                                        last_error=_with_log_ref(
+                                            (
+                                                f"task {task_id} preflight attempt "
+                                                f"{attempts}/{max_preflight_attempts} failed: "
+                                                f"{_diag_public_text(diagnostics, exc, max_chars=800)}"
+                                            ),
+                                            error_log_id,
+                                        ),
+                                    )
+                                except asyncio.CancelledError:
+                                    stop_reason = "cancelled"
+                                    raise
+                                except Exception as report_exc:
+                                    if diagnostics is None:
+                                        raise
+                                    secondary_log_id = _record_secondary_failure(
+                                        diagnostics,
+                                        report_exc,
+                                        stage="queue_worker_status_report",
+                                        task_id=task_id,
+                                        primary_log_id=error_log_id,
+                                        budgets=queue_budgets,
+                                    )
+                                    print(
+                                        "Task queue status report failed "
+                                        f"({type(report_exc).__name__}); "
+                                        f"log_ref={secondary_log_id or error_log_id or 'unavailable'}",
+                                        file=sys.stderr,
+                                    )
+                        else:
+                            preflight_failures.pop(task_id, None)
+            except asyncio.CancelledError:
+                stop_reason = "cancelled"
+                raise
+            except Exception as exc:
+                queue_error_log_id: str | None = None
+                if diagnostics is not None:
+                    queue_error_log_id = diagnostics.record_exception(
+                        exc,
+                        event="queue_worker_exception",
+                        stage="queue_worker",
+                        task_id=current_task_id,
+                        budgets=queue_budgets,
+                    )
+                last_error = f"task queue worker failed ({type(exc).__name__})"
+                if queue_error_log_id:
+                    last_error = _with_log_ref(last_error, queue_error_log_id)
+                elif diagnostics is None:
+                    # Legacy behavior for callers that did not opt into local
+                    # diagnostics; type remains visible even for an empty str().
+                    last_error = f"{last_error}: {exc}"
+                try:
+                    if report_status is not None:
+                        await report_status("error", last_error=last_error)
+                except asyncio.CancelledError:
+                    stop_reason = "cancelled"
+                    raise
+                except Exception as report_exc:
+                    if diagnostics is None:
+                        raise
+                    secondary_log_id = _record_secondary_failure(
+                        diagnostics,
+                        report_exc,
+                        stage="queue_worker_status_report",
+                        task_id=current_task_id,
+                        primary_log_id=queue_error_log_id,
+                        budgets=queue_budgets,
+                    )
+                    print(
+                        "Task queue status report failed "
+                        f"({type(report_exc).__name__}); "
+                        f"log_ref={secondary_log_id or queue_error_log_id or 'unavailable'}",
+                        file=sys.stderr,
+                    )
 
-        await asyncio.sleep(args.task_poll_interval)
+            await asyncio.sleep(getattr(args, "task_poll_interval", DEFAULT_TASK_POLL_INTERVAL))
+    finally:
+        if diagnostics is not None:
+            reason = diagnostics.stop_reason or stop_reason
+            diagnostics.record_event(
+                "queue_stopped",
+                stage="queue_worker",
+                message=f"task queue worker stopped: {reason}",
+                budgets=queue_budgets,
+                extra={
+                    "reason": reason,
+                    "start_log_id": queue_start_log_id,
+                },
+            )
 
 
 def managed_stop_control_path(
@@ -3678,10 +4440,10 @@ async def wait_for_managed_stop(control_file: Path, *, poll_interval: float = .2
         await asyncio.sleep(poll_interval)
 
 
-async def run_until_managed_stop(client: Any, control_file: Path | None) -> None:
+async def run_until_managed_stop(client: Any, control_file: Path | None) -> str:
     if control_file is None:
         await client.run()
-        return
+        return "transport_closed"
     transport = asyncio.create_task(client.run())
     stop_waiter = asyncio.create_task(wait_for_managed_stop(control_file))
     try:
@@ -3689,7 +4451,11 @@ async def run_until_managed_stop(client: Any, control_file: Path | None) -> None
             (transport, stop_waiter), return_when=asyncio.FIRST_COMPLETED
         )
         # 保留连接失败；停止请求则取消当前连接/消息，随后走 run_bridge 原清理路径。
-        await (transport if transport in done else stop_waiter)
+        if transport in done:
+            await transport
+            return "transport_closed"
+        await stop_waiter
+        return "managed_stop"
     finally:
         for task in (transport, stop_waiter):
             task.cancel()
@@ -3712,7 +4478,6 @@ async def run_bridge(args: argparse.Namespace) -> None:
     workdir = Path(args.workdir).expanduser().resolve()
     args.task_preflight_command = resolve_task_preflight_command(args)
     client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval)
-    await client.register(member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})")
     instance_id = args.instance_id or f"{member_id}:{uuid4()}"
     host = socket.gethostname()
     # R1-3 受管关联：只有宿主显式传入 ``--launch-id`` 时才附加 project/launch/进程身份，
@@ -3721,6 +4486,65 @@ async def run_bridge(args: argparse.Namespace) -> None:
     managed_project_id = str(getattr(args, "project_id", None) or "").strip() or None
     managed_started_at = parse_managed_started_at(getattr(args, "process_started_at", None))
     stop_control_file = managed_stop_control_path(managed_project_id, managed_launch_id)
+    # The project id is the explicit managed launch binding when present; otherwise
+    # use the identity already exported by configure_talk_tool_environment().  A
+    # missing value stays None instead of being guessed.
+    diagnostics_project_id = managed_project_id or (
+        os.environ.get("TALK_PROJECT_ID") or None
+    )
+    try:
+        diagnostics = runtime_diag.RuntimeDiagnostics.from_bridge_args(
+            args,
+            member_id=member_id,
+            instance_id=instance_id,
+            runtime=args.runtime,
+            project_id=diagnostics_project_id,
+            launch_id=managed_launch_id,
+            known_secrets=(args.key,),
+        )
+    except Exception as exc:
+        # Diagnostics must never prevent the bridge from starting.  Keep the
+        # degradation visible without echoing exception text (which may contain
+        # the in-memory key or another secret).
+        diagnostics = None
+        print(
+            f"[runtime-diagnostics] 本地诊断日志降级：初始化失败 ({type(exc).__name__})",
+            file=sys.stderr,
+        )
+    bridge_budgets = _diag_budgets(
+        cli_timeout=getattr(args, "timeout", None),
+        http_timeout=_diag_http_timeout(client),
+        lease_seconds=getattr(args, "task_lease_seconds", None),
+        heartbeat_interval=getattr(args, "task_heartbeat_interval", None),
+        managed_heartbeat_interval=(
+            MANAGED_INSTANCE_HEARTBEAT_INTERVAL if managed_launch_id else None
+        ),
+        poll_interval=getattr(args, "task_poll_interval", None),
+    )
+    if diagnostics is not None:
+        diagnostics.record_event(
+            "bridge_started",
+            stage="bridge",
+            message="bridge process started",
+            budgets=bridge_budgets,
+            extra={
+                "runtime": args.runtime,
+                "managed": bool(managed_launch_id),
+            },
+        )
+    try:
+        await client.register(member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})")
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        if diagnostics is not None:
+            diagnostics.record_exception(
+                exc,
+                event="bridge_register_failed",
+                stage="register",
+                budgets=bridge_budgets,
+            )
+        raise
     status_lock = asyncio.Lock()
     current_managed_payload: dict[str, Any] = {}
 
@@ -3760,7 +4584,19 @@ async def run_bridge(args: argparse.Namespace) -> None:
             last_error=last_error,
         )
 
-    await report_status("idle")
+    try:
+        await report_status("idle")
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        if diagnostics is not None:
+            diagnostics.record_exception(
+                exc,
+                event="bridge_initial_status_failed",
+                stage="instance_status",
+                budgets=bridge_budgets,
+            )
+        raise
 
     run_lock = asyncio.Lock()
 
@@ -3788,6 +4624,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 send_ack=args.send_ack,
                 report_status=report_status,
                 decision_tier=args.decision_tier,
+                diagnostics=diagnostics,
             )
 
     task_worker: asyncio.Task[None] | None = None
@@ -3801,6 +4638,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 args=args,
                 run_lock=run_lock,
                 report_status=report_status,
+                diagnostics=diagnostics,
             )
         )
 
@@ -3813,16 +4651,53 @@ async def run_bridge(args: argparse.Namespace) -> None:
                         "PUT", f"/api/instances/{instance_id}",
                         json_body=dict(current_managed_payload),
                     )
+            except asyncio.CancelledError:
+                raise
             except Exception as exc:
                 # 断连不停止 transport；不回显可能含凭据/正文的异常详情。
-                print(f"Managed instance heartbeat failed: {type(exc).__name__}", file=sys.stderr)
+                heartbeat_log_id: str | None = None
+                if diagnostics is not None:
+                    heartbeat_log_id = diagnostics.record_exception(
+                        exc,
+                        event="managed_heartbeat_failure",
+                        stage="managed_instance_heartbeat",
+                        severity="warning",
+                        budgets=_diag_budgets(
+                            http_timeout=_diag_http_timeout(client),
+                            managed_heartbeat_interval=MANAGED_INSTANCE_HEARTBEAT_INTERVAL,
+                        ),
+                    )
+                suffix = f"; log_ref={heartbeat_log_id}" if heartbeat_log_id else ""
+                print(
+                    f"Managed instance heartbeat failed ({type(exc).__name__}){suffix}",
+                    file=sys.stderr,
+                )
 
     instance_heartbeat = (
         asyncio.create_task(refresh_managed_instance()) if managed_launch_id else None
     )
+    stop_reason = "transport_closed"
+    stop_error_log_id: str | None = None
     try:
-        await run_until_managed_stop(client, stop_control_file)
+        stop_reason = await run_until_managed_stop(client, stop_control_file)
+    except asyncio.CancelledError:
+        stop_reason = "cancelled"
+        raise
+    except Exception as exc:
+        stop_reason = "transport_error"
+        if diagnostics is not None:
+            stop_error_log_id = diagnostics.record_exception(
+                exc,
+                event="bridge_transport_exception",
+                stage="bridge_transport",
+                budgets=bridge_budgets,
+            )
+        raise
     finally:
+        had_original_error = sys.exc_info()[0] is not None
+        cleanup_error: BaseException | None = None
+        if diagnostics is not None:
+            diagnostics.set_stop_reason(stop_reason)
         if instance_heartbeat is not None:
             instance_heartbeat.cancel()
             await asyncio.gather(instance_heartbeat, return_exceptions=True)
@@ -3832,10 +4707,70 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 await task_worker
             except asyncio.CancelledError:
                 pass
+            except Exception as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+                if diagnostics is not None:
+                    diagnostics.record_exception(
+                        exc,
+                        event="secondary_failure",
+                        stage="task_worker_shutdown",
+                        related_log_id=stop_error_log_id,
+                        budgets=bridge_budgets,
+                    )
         try:
-            await report_status("offline")
+            try:
+                await report_status("offline")
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                cleanup_error = cleanup_error or exc
+                if diagnostics is not None:
+                    offline_log_id = diagnostics.record_exception(
+                        exc,
+                        event="secondary_failure",
+                        stage="offline_status_report",
+                        related_log_id=stop_error_log_id,
+                        budgets=bridge_budgets,
+                    )
+                    print(
+                        "Bridge offline status report failed "
+                        f"({type(exc).__name__}); log_ref={offline_log_id or 'unavailable'}",
+                        file=sys.stderr,
+                    )
         finally:
-            await client.close()
+            try:
+                await client.close()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                if diagnostics is not None:
+                    close_log_id = diagnostics.record_exception(
+                        exc,
+                        event="secondary_failure",
+                        stage="client_close",
+                        related_log_id=stop_error_log_id,
+                        budgets=bridge_budgets,
+                    )
+                    print(
+                        "Bridge client close failed "
+                        f"({type(exc).__name__}); log_ref={close_log_id or 'unavailable'}",
+                        file=sys.stderr,
+                    )
+                if cleanup_error is None:
+                    cleanup_error = exc
+            if diagnostics is not None:
+                diagnostics.record_event(
+                    "bridge_stopped",
+                    stage="bridge",
+                    message=f"bridge stopped: {stop_reason}",
+                    budgets=bridge_budgets,
+                    related_log_id=stop_error_log_id,
+                    extra={"reason": stop_reason},
+                )
+                diagnostics.close()
+        if cleanup_error is not None and not had_original_error:
+            raise cleanup_error
 
 
 def build_parser(
@@ -3880,6 +4815,39 @@ def build_parser(
         default=None,
         help="ISO timestamp of this process start, supplied by the host manager (R1-3 "
         "managed association only).",
+    )
+    parser.add_argument(
+        "--runtime-log-dir",
+        default=None,
+        help="Explicit local runtime diagnostics root. Defaults to TALK_RUNTIME_LOG_DIR "
+        "or <project>/logs/runtime (ignored by Git).",
+    )
+    parser.add_argument(
+        "--runtime-log-retention-days",
+        type=float,
+        default=None,
+        help="Retention in days for rotated diagnostics segments of this run. "
+        "Default: 30 (or TALK_RUNTIME_LOG_RETENTION_DAYS).",
+    )
+    parser.add_argument(
+        "--runtime-log-max-bytes",
+        type=int,
+        default=None,
+        help="Per-run diagnostics capacity in bytes. Default: 268435456 (256 MiB) "
+        "or TALK_RUNTIME_LOG_MAX_BYTES.",
+    )
+    parser.add_argument(
+        "--runtime-log-max-file-bytes",
+        type=int,
+        default=None,
+        help="Rotate a diagnostics segment after this many bytes. Default: 8388608 "
+        "(8 MiB) or TALK_RUNTIME_LOG_MAX_FILE_BYTES.",
+    )
+    parser.add_argument(
+        "--disable-runtime-logs",
+        dest="runtime_log_disabled",
+        action="store_true",
+        help="Disable the local runtime diagnostics writer for this bridge process.",
     )
     parser.add_argument("--runtime", default=default_runtime, help=f"Runtime label reported to TALK. Default: {default_runtime}")
     parser.add_argument("--bridge-label", default=default_bridge_label, help="Human-readable label used in error replies")

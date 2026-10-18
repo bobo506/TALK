@@ -1,45 +1,37 @@
 # Project Progress
 
-Updated: 2026-10-18 19:11（Asia/Shanghai）。用户明确反馈“都显示启动成功”，五角色恢复页面运行状态复验通过并已推送ba46253；原313项自检/真实父链和心跳证据保持。完整异常日志首片271已派DeepSeek（首次返回queued/assigned），当前等待用户通知完成后取件，不主动长等。
+Updated: 2026-10-18 20:04（Asia/Shanghai）。271首次交付经Codex独立复核发现问题，DeepSeek暂停后由Codex直接修正，293项Python相关自检通过，已收取completed。角色列表文案精简也已合入运行目录，26项Node/12项Python与实际静态字节核验通过；待用户Ctrl+F5确认。当前不再派新片。
 
-## 当前身份与授权
+## 当前身份与分工
 
-- project `prj_e8fe7066bbec`；桌面MCP `agent:codex`、业务lead，负责协调、复核、直接修正和收尾。页面development_requirements仍为旧分工，按AGENTS最新明确约定执行，未修改生产永久要求。
-- 本恢复片经用户明确“同意”由Codex在执行端离线时直接实施/验证及逐角色恢复；代码验证均为Codex自检，不称外部独立复核。本轮共享目录单方改码，未派TALK任务或启动原生模型探针。
+- project prj_e8fe7066bbec；桌面MCP agent:codex、业务lead。默认DeepSeek首次执行、自测并暂停；Codex独立复核实际首次交付，发现问题直接修改/验证与Git收尾。页面development_requirements旧交叉分工保持，按AGENTS最新用户约定执行。
+- 本次用户通知“271好了”后取件，并再次确认仅去角色列表两段文案。271暂停前前端候选只在独立工作区，不碰共享目录；暂停后Codex单方合入列表补正并修正日志代码。
 
-## 271完整异常日志首片：已派，待交付
+## 271完整异常日志首片：已修正并收取，未部署到五角色
 
-- 实际任务271，标题“完整异常日志首片：持久诊断基础与通用 bridge 接入”，creator agent:codex，target agent:deepseek，Hall group:task-34ff3ea145f74e8a9af8bdfe4b790a2d；派发时模型快照bound/deepseek-flash，初始queued/assigned，未将其称为已完成或实际模型能力通过。
-- 范围：独立持久诊断基础、通用CLI bridge关键异常/队列/CLI/回报失败关联，脱敏、轮换/留存/容量与跨进程重启追溯、本地受控定位入口及针对性自测。宿主/服务端查询/页面和健康呈现后续，未声称整个日志需求完成。
-- 初始基线ba46253（产品f881724），协调方补编号收尾后写dispatch-ready.json供执行者核最终HEAD；其存在且编号/基线一致前执行者仅只读。产品由DeepSeek单方首次实现，完成暂停；Codex独立复核，有问题直接修正。禁止生产服务/原生模型/Key/绑定/历史动作，不自停或重载。
-- 包/派发回执：.tmp/runtime-exception-logs/coordination/{task.md,dispatch.json,dispatch-ready.json}；预期交付.tmp/runtime-exception-logs/development/delivery.json及完整TALK结果JSON，task_id须字符串271，先validate/summary --expect-task-id 271；默认用户通知后取件。
+- 原结果2825/作者agent:deepseek/实际ins_067081e6a036/Hall group:task-34ff3ea145f74e8a9af8bdfe4b790a2d及合法字符串271自报，和本地交付一致。原SHA 377f2eca54047bc5c732b68ed7facef8d054a9bc98ed1f51605c27aa2bc9dd8a保持；creator agent:codex已于UTC12:00:57.625512收取，succeeded/completed。
+- 原交付含持久JSONL/引用、CLI bridge关键边界、异常堆栈/原因链、脱敏、本地查询、本run轮换/保留。独立6反例首轮5失败/1错误：截短先于脱敏、子进程cmd、保护值跨异常传播、引号秘密/owner token、stderr降级、枚举预算。Codex直接修正，另补普通消息message_id、任务实际预算、队列旧关联清空及链深度标志。
+- 修正后相关9模块293项Python全部通过，包括原先4条沙箱阻断的Windows管道用例；是Codex自检，不称他人独立回审。原自报281及失败不追改。正式[复核记录](spec/ROLE_RUNTIME_LOGGING_REVIEW_271.md)、[维护者指南](guides/RUNTIME_EXCEPTION_LOGS.md)；完整原件、SHA精确字节还原及各轮证据在.tmp/runtime-exception-logs/independent-review271/。
+- 本片只完成基础/通用bridge及受控维护者入口。宿主显式接入、服务端权限查询/页面、worker健康呈现、全根目录旧run与痕迹文件容量治理及正常部署仍待。默认256MiB为本run事件文件软目标，不能声称全系统硬上限或整个日志排期已完成。
+- 当前五个长期角色未重启，仍未加载日志新代码；没有本轮原生模型/登录/Key/绑定或服务动作。API源码未变，无需重载；不把隔离测试当线上日志已生效。
 
-## 已完成恢复片与验证
+## 角色列表文案：已合入，待人工视觉确认
 
-- 已新增human-only `GET .../service/recovery-plan`、`POST .../service/recover-stopped`、独立恢复审计及显式本地CLI。原宿主/bridge不存在且无替代进程、实例心跳过期、目标成员跨项目无活动任务、无有效在途启停，才能由人明确确认后解除遗留归属；SQLite写锁内重读及世代CAS，幂等重放不清新owner，故障整事务回滚，旧实例禁止复活。
-- 每条恢复由human:bobo审计，随后使用原配置和入口正常新启动；不接管旧Popen，不重做登录或复制认证，原Key/ID/名称/模型绑定保持。恢复仅处置旧归属，原ready回执/报告指纹/时间不改；后续普通start的既有过期扫描可把旧launch.state置expired。
-- 首次ready补仅starting可收敛，周期心跳不再覆盖初次started_at。相关10模块共313项Python测试通过（分组重叠不重复累计），含双SQLite连接竞争、心跳竞争、晚到旧stop、审计/状态故障回滚；Windows进程实际采集及五角色真实父链/连续30秒心跳另验。未使用Browser。
-- API按原api-launcher正常停止并隐藏重载，当前实际launcher7020→API包装15048，原Popen持有及autorestart=false已核。正常init_db仅增恢复审计表，角色公开配置与原快照一致。
+- 用户指定只改列表：成功显示“启动成功”，去“（原生登录未核验）”；列表不重复显示“请先「关闭」并确认已停止，再重新启动。”。详情提示、owner/启动守卫、后端native_login事实保留，其它必要错误/失联提示继续显示。
+- 独立候选分支codex/role-list-copy/7713d2b已推送；271暂停后只将前端及相关测试合入原目录，未复制该分支旧进度覆盖本轮记录。实际首页与workspace.js版本20261018-role-list-status一致，HTTP字节SHA7987150eff95d609e530dedc672184dd046b294878bc03002362629f4110ebb1。
+- 26项Node+12项Python相关UI通过，原静态断言首轮失败及最终日志保留于.tmp/role-list-copy/及本轮review目录；未使用Browser。请用户Ctrl+F5检查列表两句已去、详情原提示保持。
 
-## 五角色真实运行快照（18:57）
+## 五角色既有验收与运行位置
 
-| 角色 | 旧世代→人工解除→新启动 | 新manager / bridge PID | 当前实例 |
-| --- | --- | --- | --- |
-| DeepSeek / agent:deepseek | 5→6→7 | 18784 / 14944 | ins_067081e6a036 |
-| 旧K28 / agent:kimi-code-k28-preview | 10→11→12 | 9296 / 9332 | ins_e35de45bc9f0 |
-| 页面K28 / agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c | 7→8→9 | 12320 / 9624 | ins_b52fd666223f |
-| 原Kimi K3 / agent:kimi | 7→8→9 | 17932 / 16228 | ins_e27eac1f7e2c |
-| 原Codex / agent:codex | 9→10→11 | 3140 / 7616 | ins_c1a05e4834b9 |
+- 五角色11:58迁移验收；18:57人工恢复后新manager/Popen直接父链/真实30秒心跳通过，随后用户确认“都显示启动成功”，恢复人验已收尾ba46253；人工恢复产品f881724及313项自检保持。本轮未启停；20:04 MCP复核五个原新实例均idle、current_task_id=null且心跳新鲜，不从旧PID快照推断将来可接管。
+- 18:57历史manager/bridge/实例：DeepSeek18784/14944/ins_067081e6a036；旧K28 9296/9332/ins_e35de45bc9f0；页面K28 12320/9624/ins_b52fd666223f；原Kimi17932/16228/ins_e27eac1f7e2c；Codex3140/7616/ins_c1a05e4834b9。API原启动器7020→包装15048；任何后续服务操作前须重核实时owner/Popen/任务事实。
+- 原Key/ID/名称/模型/绑定/原生HOME保持，Codex npm0.163.0/gpt-6.1-sol/xhigh、DeepSeek deepseek-flash/max、两K28各原档、Kimi k3/tools；runner仍unverified。269原invalid/收取及270合法补验/收取不追改。
 
-- 五角色均running/ready、idle，bridge直接父进程为各自新manager，新manager持有新启动Popen；每位真实last_seen_at推进且started_at保持。runner仍unverified，不把监听恢复当新增模型能力验收。
-- Codex保持npm0.163.0、gpt-6.1-sol/xhigh和独立native HOME；DeepSeek保持deepseek-flash/max，两个K28保持kimi-code/kimi-for-coding各自原档，原Kimi保持kimi-code/k3/tools。桌面MCP身份未迁走。
-- 五次恢复审计、配置前后/真实PID父链/心跳及失败原件在`.tmp/role-service-recovery/implementation/`，总证明`restored-all.json`。原现场诊断及沙箱事件在上一级目录；详[恢复指南](guides/ROLE_SERVICE_RECOVERY.md)、[设计与结果](spec/ROLE_SERVICE_ORPHAN_RECOVERY_DESIGN.md)。
+## 下一步与限制
 
-## 历史保持、已知限制与下一步
-
-1. 五角色11:58迁移人工验收、74ee695/2612002失联提示补正及用户提示确认保持；269/msg2823原invalid报告及已收取、270/msg2824合法补验和收取时间保持，原正文/SHA及失败记录不追改。
-2. 原五宿主最后心跳12:05:49与12:05:50 CodexSandboxService停止事件吻合；尚无逐进程退出链及请求者证明。此次恢复不等于跨Codex沙箱重启常驻已验，未安装系统服务/计划任务或绕开宿主生命周期；没有无限期自动解除归属授权。
-3. 用户明确反馈“都显示启动成功”，五角色恢复后运行状态页面复验闭合；仅记录该反馈，不扩大为全部详情/按钮、模型实跑或跨宿主重启常驻验收。说明见[验收节](guides/ROLE_SERVICE_ACCEPTANCE.md)。原下一项“完整异常日志持久留存”首片271已按上述范围派发；后续由DeepSeek完成暂停、Codex独立复核及直接修正，原2–18顺序保持。
-4. 六小时实跑、固定后端版本、主动等待T/W、冷启动恢复、跨任务原生会话复用及255完整新建首次自动ready仍待，不外推既有结果。usage-gate本轮返回continue，但session/weekly百分比均null，不能据此推断精确用量；按单片批次控制。
+1. 当前列表文案请用户刷新复验，本轮不再开启其它片；日志首片已收取且必要测试完成，正式进度与Git收尾后暂停。
+2. 下一轮仍在原排期第2项完整异常日志内，先明确宿主接入/实际正常部署与查询/空间治理的最小切片，默认DeepSeek首次执行、Codex独立复核及直接修正；全入口预算第3、跨任务原生会话复用第4及其后顺序保持。
+3. 跨Codex沙箱重启常驻、六小时、固定后端版本、主动等待T/W、冷启动恢复和255完整新建自动ready仍待，不扩大本片验证。12:05退出与沙箱停止事件只为吻合线索，无逐进程因果链；无无限期自动解除归属授权。
+4. 本轮未再读取精确用量占比，前轮usage-gate continue但百分比null，不能据此推断具体用量；按单片批次控制，不主动等待或自动唤回。
 
 恢复指令：继续项目。
