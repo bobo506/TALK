@@ -2,6 +2,8 @@
 
 > 所属项目：TALK
 
+> 2026-10-18 20:48全部加载：五角色用户正常重启后，新实例/原manager直接父链、ready/idle、连续心跳及真实bridge_started/queue_started和引用查询均通过，模型绑定保持。DeepSeek旧run停止记录及旧引用跨再次重启仍可查；协调方无服务/模型动作。271基础实机加载闭合，宿主显式配置/公共查询页面/全根空间治理等后续未派，见[进度](../PROGRESS.md)。
+
 > 2026-10-18 20:41真实加载：用户正常重启DeepSeek后，Codex只读核gen9/ins_4643da0b3d34/18396归原manager18784，旧PID退出、idle心跳推进180秒；真实bridge_started/queue_started持久日志和引用查询匹配project/member/launch。原绑定/271收取保持，其余四角色未操作、仍待加载，未跑模型或生产异常。详[进度](../PROGRESS.md)和[维护者指南](../guides/RUNTIME_EXCEPTION_LOGS.md)。
 
 > 2026-10-18 20:04日志首片收取：271原2825合法自报及实际归属核对通过；Codex首次独立复核6反例5失败/1错误，确认DeepSeek暂停后直接修正，最终相关293项Python自检全部通过并收取，原报告/失败保持。持久基础/通用bridge/本地定位已完成，宿主/API页面/全根空间治理和正常部署仍待；当前五个长期角色未加载，不能称整个日志需求或线上已完成。详[复核记录](ROLE_RUNTIME_LOGGING_REVIEW_271.md)、[指南](../guides/RUNTIME_EXCEPTION_LOGS.md)。

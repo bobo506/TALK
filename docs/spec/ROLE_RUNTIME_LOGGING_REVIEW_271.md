@@ -2,6 +2,8 @@
 
 2026-10-18。首次执行DeepSeek，首次交付独立复核及直接修正Codex；遵循AGENTS于2026-10-17明确分工。
 
+当前加载状态：20:48五角色均已正常重启并完成只读实机核验，部署追记见文末；以下首次交付/修正记录按当时事实保留。
+
 ## 原交付与边界
 
 - task271/creator agent:codex/target agent:deepseek，实际ins_067081e6a036领取，Hall group:task-34ff3ea145f74e8a9af8bdfe4b790a2d。结果2825由agent:deepseek提交，合法字符串task_id/complete自报，与本地交付JSON一致；源消息SHA256为377f2eca54047bc5c732b68ed7facef8d054a9bc98ed1f51605c27aa2bc9dd8a。
@@ -37,3 +39,7 @@
 ## 20:41部署追记（不追改20:04验收历史）
 
 用户正常重启DeepSeek后，首位新实例ins_4643da0b3d34/18396/gen9归原manager18784，旧PID退出；真实周期心跳推进180秒，启动和接单循环日志落盘及rtd-40162b2fa6-000002引用查询通过。仅DeepSeek实际加载；其余四角色未操作/待，未制造生产异常或跑模型。证据见.tmp/runtime-exception-logs/deepseek-real-load/。
+
+## 20:48部署追记：五角色加载完成
+
+用户完成重启后，五角色均新一代、running/ready/idle，原manager直接父链及唯一本次launch、90–120秒真实心跳推进、5个启动/队列日志引用查询全部匹配，绑定保持。DeepSeek前一run实际正常停止记录与旧引用跨再次重启仍可查。协调方只读，无启停/模型动作；证据.tmp/runtime-exception-logs/all-roles-real-load/。本片全角色代码加载闭合，不外推宿主配置/查询页面/全根空间治理或所有真实异常路径。

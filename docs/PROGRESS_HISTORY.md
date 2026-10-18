@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-18 20:48（Asia/Shanghai）— 五角色日志代码全部正常重启加载核验通过
+
+- 用户报告“其余4个都重启好了”。实核五角色均新一代（含DeepSeek再次换实例），Codex本轮只读；未发启停/恢复、模型任务、重载API或修改Key/绑定/永久要求。桌面caller agent:codex/prj_e8fe7066bbec/lead保持。
+- Codex gen13/ins_d9e4db935d90/bridge16956→原manager3140，launch ebd8f9e4-170f-4eb9-b0ca-9c920d23b28e；DeepSeek gen11/ins_5f81829d3217/17384→18784，44f3eb60-1b6a-4943-8718-28411827ff8d；Kimi gen11/ins_23ea501725de/17496→17932，b2ee20e4-a746-4d13-ad6a-7350f8b9175e；旧K28 gen14/ins_2a125c8b91f9/12732→9296，007588db-e5f8-4d05-a31a-420590c5dd33；页面K28 gen11/ins_3fee4d491806/16832→12320，73fb586f-cc16-4387-bb80-22327a853966。旧五bridge PID均不在，每个原健康文件serving且owned_launches只有本次新launch；新bridge OS直接父链逐一吻合，不按PID/文件收养句柄。
+- 各真实manifest及bridge_started/queue_started逐一匹配project/member/新实例/launch/PID，5个queue日志引用均由维护者CLI查回且write_complete=true/无截断；CLI配置21600/HTTP10/lease120/MCP等待null。五服务running/ready、实例idle/current_task_id=null，首末MCP心跳分别推进120.095/90.089/90.088/120.149/120.099秒，模型绑定指纹均保持。
+- DeepSeek前一位已加载实例ins_4643da0b3d34旧run实际写入queue_stopped/bridge_stopped，旧rtd-40162b2fa6-000002在再次重启后仍查得；新旧run隔离留存，真实正常停止与跨重启追溯成立。未制造生产异常/重做登录/跑模型，不能把这次加载验收外推所有异常场景、六小时或实际后端版本。
+- 证据.tmp/runtime-exception-logs/all-roles-real-load/含首末实例/绑定、服务/宿主/指定PID、各引用查询及旧DeepSeek追溯；deepseek-real-load前一轮证明保持。271原结果2825/SHA/收取、293项修正后自检及角色列表26Node/12Python保持，列表专门视觉反馈未另收。
+- 同步当前快照、简报、bridge模块、日志指南/需求/路线图、271复核部署追记。五角色本片加载闭合，宿主显式配置/权限查询页面/worker健康/全根空间治理仍待，整个日志排期不标完成；不再重启、不派新片。仅文档变更，检查后提交推送收尾。
+
 ## 2026-10-18 20:41（Asia/Shanghai）— DeepSeek用户正常重启后日志首位实机加载通过
 
 - 用户报告“deepseek重启好了”。本轮仅只读核验，没有发服务/模型任务、启停其它角色、重载API或修改凭据/绑定；当前caller agent:codex/项目prj_e8fe7066bbec/业务lead保持。原271/2825收取及原报告SHA保持。
