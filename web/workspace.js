@@ -3,6 +3,10 @@ const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: nul
 // 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
 const ROLE_TASKS_PAGE_SIZE = 20;
 const roleTasksPageUI = { key: null, page: 1 };
+// 主任务列表分页：每页固定 20 条；页码绑定 账号/项目/模式/离页/搜索/筛选 上下文，
+// 任何变化都重置第一页；同上下文的普通轮询/手动刷新保页码，集合缩小时夹回最后有效页。
+const TASK_LIST_PAGE_SIZE = 20;
+const taskListPageUI = { key: null, page: 1 };
 // R1-3：搜索框保持静态节点；角色页批量操作与结果分别重绘，避免移除搜索及其输入监听。
 function workspaceRootId(task) { return task?.root_task_id || task?.id; }
 function workspaceFinished(task) { return ["completed", "failed", "canceled"].includes(task?.workflow_status); }
@@ -133,7 +137,17 @@ function workspaceTaskDurationEl(task) {
   }
   return el;
 }
+function syncTaskListPaginationContext() {
+  const key = myId && activeProjectId && workspaceUI.mode === "tasks" && blackboardOpen
+    ? JSON.stringify([myId, activeProjectId, workspaceUI.filter, workspaceUI.query]) : null;
+  if (key !== taskListPageUI.key) {
+    taskListPageUI.key = key;
+    taskListPageUI.page = 1;
+  }
+}
 function syncWorkspaceLayout() {
+  // 群聊导航不渲染任务列表；在公共导航入口同步，离页也能立即作废旧页码。
+  syncTaskListPaginationContext();
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
   document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
   document.querySelector(".workbench").classList.toggle("empty-chat-mode", workspaceUI.mode === "chats" && !workspaceHasConversation());
@@ -708,7 +722,15 @@ function renderWorkspaceList() {
       if (workspaceUI.filter === "mine" && !family.some(item => workspaceNeedsMe(item, myId, currentMemberIsHuman()))) return false;
       return `${workspaceTitle(task)} ${workspaceMemberName(task.target_member_id)}`.toLocaleLowerCase().includes(query);
     });
-    for (const task of tasks) blackboardColumns.appendChild(workspaceTaskRow(task));
+    // 主任务列表固定 20 条/页：在原完整可见集合的根任务/family/四筛选/搜索与原顺序之后再切片，
+    // 总数按筛选后的根任务计（子任务卡片不计入），不改任务接口或加载范围。
+    const totalPages = Math.max(1, Math.ceil(tasks.length / TASK_LIST_PAGE_SIZE));
+    if (taskListPageUI.page > totalPages) taskListPageUI.page = totalPages;
+    if (taskListPageUI.page < 1) taskListPageUI.page = 1;
+    const pageStart = (taskListPageUI.page - 1) * TASK_LIST_PAGE_SIZE;
+    for (const task of tasks.slice(pageStart, pageStart + TASK_LIST_PAGE_SIZE)) blackboardColumns.appendChild(workspaceTaskRow(task));
+    // 0 项保原空态、不显示空翻页栏；有结果时底部一行简洁翻页。
+    if (tasks.length) blackboardColumns.appendChild(workspaceTaskListPagination(tasks.length, totalPages));
   }
   if (!blackboardColumns.childElementCount) blackboardColumns.appendChild(workspaceEl("p", "workspace-empty", query ? "没有匹配的结果" : rolesMode ? "这个项目还没有配置角色。" : "当前筛选下没有任务。"));
   // R1-3：重绘后按最新投影决定是否（继续）轮询受管服务状态；无 starting/stopping 时不建立计时器。
@@ -1475,6 +1497,22 @@ function workspaceRoleTasksPagination(total, pageStart, pageCount, totalPages) {
     if (roleTasksPageUI.page < totalPages) { roleTasksPageUI.page += 1; renderWorkspaceRoleDetails(); }
   }, "workspace-text-button role-task-page-next");
   next.disabled = roleTasksPageUI.page >= totalPages;
+  pager.append(prev, info, next);
+  return pager;
+}
+// 主任务列表分页条：上一页/第x/y页（共n项）/下一页，沿用文字按钮与灰色信息样式，首尾禁用。
+// 翻页只重绘左侧列表：不请求任务接口、不改已选任务、不动右侧对话与角色分页状态。
+function workspaceTaskListPagination(total, totalPages) {
+  const pager = workspaceEl("div", "task-list-pagination");
+  const prev = workspaceButton("上一页", () => {
+    if (taskListPageUI.page > 1) { taskListPageUI.page -= 1; renderWorkspaceList(); }
+  }, "workspace-text-button task-list-page-prev");
+  prev.disabled = taskListPageUI.page <= 1;
+  const info = workspaceEl("span", "task-list-page-info", `第 ${taskListPageUI.page} / ${totalPages} 页 · 共 ${total} 项`);
+  const next = workspaceButton("下一页", () => {
+    if (taskListPageUI.page < totalPages) { taskListPageUI.page += 1; renderWorkspaceList(); }
+  }, "workspace-text-button task-list-page-next");
+  next.disabled = taskListPageUI.page >= totalPages;
   pager.append(prev, info, next);
   return pager;
 }

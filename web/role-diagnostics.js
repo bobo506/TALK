@@ -1,5 +1,6 @@
 /* 诊断日志导出：只在人类显式点击后生成一份 JSONL 文件；所有响应文本均按纯文本渲染。
-   页面不展示日志/异常原文；导出按项目+角色跨实例，不按当前 launch 限制旧实例。 */
+   页面不展示日志/异常原文；导出按项目+角色跨实例，不按当前 launch 限制旧实例。
+   状态文案精简：正常 idle/完整成功不堆说明，仅保留简短的生成中/错误/不完整反馈。 */
 var roleDiagnostics = (function roleDiagnosticsModule(global) {
   "use strict";
 
@@ -217,23 +218,14 @@ var roleDiagnostics = (function roleDiagnosticsModule(global) {
     };
     return `talk-diagnostics_${compact(meta.query.since)}_${compact(meta.query.until)}.jsonl`;
   }
-  function summaryText(meta) {
-    const parts = [`范围 ${meta.query.since} ~ ${meta.query.until}`, `共 ${meta.record_count} 条记录`];
-    parts.push(meta.complete
-      ? "扫描与导出完整"
-      : `导出不完整（${meta.reasons.length ? meta.reasons.join("、") : "原因未列出"}）`);
-    return parts.join(" · ");
-  }
+  // 成功文案精简：完整（含完整零条）不堆范围/计数/扫描长句，下载入口可用即可；
+  // 不完整必须保留简短提示，绝不静默显示为完整。
   function applySuccess(meta) {
-    const range = `${meta.query.since} ~ ${meta.query.until}`;
-    const countText = meta.complete && meta.record_count === 0
-      ? "共 0 条记录，所选范围内没有诊断记录"
-      : `共 ${meta.record_count} 条记录`;
     if (meta.complete) {
-      state.status = `已生成诊断文件：${range}，${countText}，扫描与导出完整。可点击“下载日志文件”保存。`;
-      state.statusKind = "success";
+      state.status = "";
+      state.statusKind = "";
     } else {
-      state.status = `已生成诊断文件：${range}，${countText}；导出不完整（${meta.reasons.length ? meta.reasons.join("、") : "原因未列出"}），未将缺失记录当作无异常。`;
+      state.status = "日志文件不完整。";
       state.statusKind = "warning";
     }
   }
@@ -402,28 +394,23 @@ var roleDiagnostics = (function roleDiagnosticsModule(global) {
       const control = byId(id);
       if (control) control.disabled = disabled;
     }
-    setText("role-export-permission", !state.human
-      ? "当前 Agent 账号没有诊断日志导出权限"
-      : state.generating
-        ? "正在生成诊断文件…"
-        : "仅人类账号可生成；生成与下载都不会启停服务、创建任务或调用模型");
+    // 常态不放操作解释；仅在实际无权限（Agent 账号）时保留简短提示。
+    setText("role-export-permission", state.human ? "" : "无导出权限");
   }
   function renderStatus() {
     const status = byId("role-export-status");
     if (status) {
-      status.textContent = state.status
-        || (state.human ? "尚未生成诊断日志；选择角色不会自动扫描。" : "当前 Agent 账号没有诊断日志导出权限。");
+      // 正常 idle/success 不堆状态说明：只有生成中/错误/不完整等必要反馈占用状态行。
+      status.textContent = state.status;
       status.className = `role-export-status${state.statusKind ? ` ${state.statusKind}` : ""}`;
     }
   }
+  // 下载入口在同一工具栏：生成前隐藏，生成成功才出现；无独立结果卡片。
   function renderResult() {
-    const box = byId("role-export-result");
-    const summary = byId("role-export-summary");
     const link = byId("role-export-download");
     const ready = Boolean(state.visible && state.blobUrl && state.meta);
-    if (box) box.classList.toggle("hidden", !ready);
-    if (summary) summary.textContent = ready ? summaryText(state.meta) : "";
     if (link) {
+      link.classList.toggle("hidden", !ready);
       if (ready) {
         link.setAttribute("href", state.blobUrl);
         link.setAttribute("download", state.fileName);
@@ -485,7 +472,7 @@ var roleDiagnostics = (function roleDiagnosticsModule(global) {
       bind(id, "input", () => {
         if (state.generating) return;
         clearResult();
-        state.status = "时间区间已修改，请重新生成诊断文件。";
+        state.status = "";
         state.statusKind = "";
         renderStatus();
       });

@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-19 21:29（Asia/Shanghai）— 278独立复核、直接修正及静态页面合入
+
+- 用户通知278完成，K3新鲜idle/current_task_id=null且报告暂停，按既有Codex独立检查/直接修正规则处理；当前桌面caller agent:codex/lead，生产开发要求旧交叉原文不改。产品5a1c12c、派发64d026e、906跟踪SHA/35冻结及合同保持。
+- 原result2885/agent:kimi/ins_664e5bfefeff正文SHA93046bd2c9b114b60b3ddb2925c7ed5c089f2e07ead65acbb6cd0eb1af976b88；前言+JSON围栏导致MCPunknown原样保留。嵌入JSON与本地delivery逐字段相同，合法实际task278；最终核稳定引用/SHA、独立代码/证据与自检后原creator UTC13:28:04.934383收取succeeded/completed。详[278复核](spec/ROLE_DIAGNOSTICS_LAYOUT_REVIEW_278.md)。
+- 首次交付5产品+3测试：删指定常态文案/（本地）/权限解释/完整成功范围计数与独立结果卡片，24px（窄屏20px）同级标题、14px标签/15px控件和白底单分隔，生成/下载并列；左侧主任务列表原根/family/筛选/搜索/顺序后20项分页，原参与任务/权限/API保持。K3原283全过含helper1项（真实282），基线271含helper1项，原cwd和遮蔽存根失败均存。
+- Codex独立确认群聊真实导航不调用renderWorkspaceList导致页码漏清，移到公共syncWorkspaceLayout同步，app.js无改；改时间仍写常态说明由反例复现清空，partial缩短提示但原因完整留meta。新导航测试首次缺hallFilterInput为夹具错误，保留后补齐、原代码明确2!=1业务失败、修正通过，未冒称原ReferenceError是产品缺陷。
+- 原patch独立check/隔离apply通过，Windows换行规范化使8文件原字节不同，LF内容全部一致；首次失败脚本/证据保留，按经复核候选字节合入并跑正式测试。35冻结件/原交付hash保持。
+- 正式20套workspace284项零失败/跳过（导出24/主分页13，原282+新增2）、另1真实随机回环HTTP UI→API下载联调通过：120跨实例/60异常/10transition、完整成功无长句、下载/改时间/403/401/422均通过。未改后端，不重跑原301 Python；原证据保持。
+- 版本20261019-diagnostics-layout-v2（八引用），UTC13:27:47本机九静态资源字节一致；K3真实导出92条150037字节meta完整，278实际模型预检/accept/claim/CLI/结果发送/complete六组成功配对可查。Agent403/匿名401，前后角色配置/服务投影完全相同；四实例与世代保持，Codex仍正常关闭。只静态更新，无API/宿主重启、无额外任务/模型调用，不扩大为运行器/模型全验收。
+- 原件/反例/自检/集成/实际下载/收取证据.tmp/ui-diagnostics-refinement-v2/independent-review/。当前暂停人验：Ctrl+F5→角色“诊断日志”确认精简样式、生成/下载→左侧“任务”测试20项分页/搜索筛选/群聊往返；既有参与任务保持。无Browser视觉、窄屏/键盘全验结论，不开后续片。用户关于Codex接入DeepSeek的讨论已明确“再说”，本轮不改协作架构/配置。
+
 ## 2026-10-19 20:52（Asia/Shanghai）— 页面验收提出精简/风格统一及主列表分页，278已派K3
 
 - 用户明确三项修改：移除“统一诊断文件·不改变服务状态”和长说明、时间标签“（本地）”、常态权限/不启停解释、完整导出后范围/数量/完整摘要；重做字体字号、按钮短文案及布局，使其与页面一致；主任务列表也默认20项分页。不是上一版全部人工验收通过，276/277原收取/测试/上线事实保持。

@@ -1,93 +1,76 @@
-/* 诊断日志导出：沿用现有浅色面板，不改变角色列表与任务区布局。 */
+/* 诊断日志：沿用右侧详情现有浅色正文风格——与相邻区块相同白色背景、单条分隔线、同级标题字号；
+   不建独立卡片、背景层或新配色。导出仍是显式点击生成、生成后下载才可用。 */
 .role-diagnostics-panel {
-  border-top: 1px solid #dce3ec;
-  border-bottom: 1px solid #dce3ec;
-  padding: 16px 14px;
-  color: #24344d;
-  background: #f8fafc;
+  margin-top: 34px;
+  padding-top: 28px;
+  border-top: 1px solid #ddd;
+  color: #303741;
   min-width: 0;
 }
-.role-diagnostics-heading,
-.role-export-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.role-diagnostics-heading { justify-content: space-between; margin-bottom: 8px; }
-.role-diagnostics-heading h3 { margin: 2px 0 0; font-size: 16px; }
-.role-diagnostics-hint,
-.role-export-permission {
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.55;
-}
-.role-diagnostics-hint { margin: 0 0 12px; }
+.role-diagnostics-heading h3 { margin: 0; font-size: 24px; font-weight: 650; color: #26323d; }
 .role-export-range {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-  margin-bottom: 10px;
+  gap: 14px;
+  margin: 16px 0 14px;
 }
 .role-export-range label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
-  color: #526177;
-  font-size: 12px;
+  color: #626b76;
+  font-size: 14px;
 }
 .role-export-range input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  border: 1px solid #cbd5e1;
-  border-radius: 5px;
+  border: 1px solid #d6d6d2;
+  border-radius: 6px;
   background: #fff;
   color: #1e293b;
-  padding: 6px 7px;
+  padding: 8px 10px;
   font: inherit;
+  font-size: 15px;
 }
-.role-export-actions { margin: 10px 0; }
-.role-export-status {
-  margin: 8px 0;
-  font-size: 12px;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-.role-export-status.error { color: #b42318; }
-.role-export-status.warning { color: #925b0b; }
-.role-export-status.success { color: #167044; }
-.role-export-result {
-  border: 1px solid #dbe3ed;
-  border-radius: 8px;
-  background: #fff;
-  padding: 10px;
-  margin-top: 10px;
-  min-width: 0;
-}
-.role-export-summary {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
+.role-export-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.role-export-actions .room-primary-btn,
+.role-export-actions .room-secondary-btn {
+  width: auto;
+  margin: 0;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 650;
 }
 .role-export-download {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-decoration: none;
+  cursor: pointer;
 }
+.role-export-permission { color: #626b76; font-size: 13px; line-height: 1.6; }
+.role-export-permission:empty { display: none; }
+.role-export-status { margin: 12px 0 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.role-export-status:empty { display: none; margin: 0; }
+.role-export-status.error { color: #9d3434; }
+.role-export-status.warning { color: #8d580d; }
 .role-diagnostics-panel button:focus-visible,
 .role-diagnostics-panel input:focus-visible,
 .role-diagnostics-panel a:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid #2f6fb1;
   outline-offset: 2px;
 }
 .role-diagnostics-panel button:disabled,
-.role-diagnostics-panel input:disabled { opacity: .58; cursor: not-allowed; }
+.role-diagnostics-panel input:disabled { opacity: .55; cursor: not-allowed; }
 
 @media (max-width: 700px) {
-  .role-diagnostics-panel { padding: 14px 10px; }
-  .role-export-range { grid-template-columns: minmax(0, 1fr); }
-  .role-export-actions > button,
-  .role-export-download { flex: 1 1 140px; }
+  .role-diagnostics-heading h3 { font-size: 20px; }
+  .role-export-range { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .role-export-actions { gap: 10px; }
+  .role-export-actions .room-primary-btn,
+  .role-export-actions .room-secondary-btn { font-size: 14px; }
 }

@@ -6,10 +6,10 @@
   <title>TALK</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261019-diagnostics-export-v1">
-  <link rel="stylesheet" href="/workspace.css?v=20261019-diagnostics-export-v1">
-  <link rel="stylesheet" href="/role-creation.css?v=20261019-diagnostics-export-v1">
-  <link rel="stylesheet" href="/role-diagnostics.css?v=20261019-diagnostics-export-v1">
+  <link rel="stylesheet" href="/style.css?v=20261019-diagnostics-layout-v2">
+  <link rel="stylesheet" href="/workspace.css?v=20261019-diagnostics-layout-v2">
+  <link rel="stylesheet" href="/role-creation.css?v=20261019-diagnostics-layout-v2">
+  <link rel="stylesheet" href="/role-diagnostics.css?v=20261019-diagnostics-layout-v2">
 </head>
 <body class="app-shell h-screen flex flex-col">
 
@@ -324,24 +324,20 @@
           <p id="role-description-status" class="role-description-status" role="status"></p>
         </section>
         <!-- 诊断日志导出也是静态 DOM：名称/任务动态容器重绘时，时间输入、焦点与生成结果不被销毁。 -->
-        <section id="role-diagnostics-panel" class="role-diagnostics-panel hidden" aria-label="诊断日志导出">
+        <section id="role-diagnostics-panel" class="role-diagnostics-panel hidden" aria-label="诊断日志">
           <div class="role-diagnostics-heading">
-            <div><div class="sidebar-kicker">统一诊断文件 · 不改变服务状态</div><h3>诊断日志导出</h3></div>
+            <h3>诊断日志</h3>
           </div>
-          <p class="role-diagnostics-hint">按时间范围生成一份 JSONL 诊断文件（含运行节点、普通日志与内嵌异常），生成成功后再点击下载。选择角色不会自动扫描日志；页面不展示日志或异常原文。</p>
           <div class="role-export-range">
-            <label for="role-export-since">开始时间（本地）<input id="role-export-since" type="datetime-local"></label>
-            <label for="role-export-until">结束时间（本地）<input id="role-export-until" type="datetime-local"></label>
+            <label for="role-export-since">开始时间<input id="role-export-since" type="datetime-local"></label>
+            <label for="role-export-until">结束时间<input id="role-export-until" type="datetime-local"></label>
           </div>
           <div class="role-export-actions">
-            <button id="role-export-generate-btn" type="button" class="room-primary-btn">生成诊断日志</button>
-            <span id="role-export-permission" class="role-export-permission">仅人类账号可生成诊断日志</span>
+            <button id="role-export-generate-btn" type="button" class="room-primary-btn">生成</button>
+            <a id="role-export-download" class="role-export-download room-secondary-btn hidden" href="#" role="button">下载</a>
+            <span id="role-export-permission" class="role-export-permission"></span>
           </div>
-          <p id="role-export-status" class="role-export-status" role="status">尚未生成诊断日志；选择角色不会自动扫描。</p>
-          <div id="role-export-result" class="role-export-result hidden">
-            <p id="role-export-summary" class="role-export-summary"></p>
-            <a id="role-export-download" class="role-export-download room-primary-btn" href="#" role="button">下载日志文件</a>
-          </div>
+          <p id="role-export-status" class="role-export-status" role="status"></p>
         </section>
         <section id="role-details-tasks-panel" class="role-details-panel hidden" aria-label="参与的任务"></section>
         <section id="group-members-panel" class="group-members-panel hidden">
@@ -556,9 +552,9 @@
       </form>
     </section>
   </div>
-  <script src="/role-creation.js?v=20261019-diagnostics-export-v1"></script>
-  <script src="/role-diagnostics.js?v=20261019-diagnostics-export-v1"></script>
-  <script src="/workspace.js?v=20261019-diagnostics-export-v1"></script>
-  <script src="/app.js?v=20261019-diagnostics-export-v1"></script>
+  <script src="/role-creation.js?v=20261019-diagnostics-layout-v2"></script>
+  <script src="/role-diagnostics.js?v=20261019-diagnostics-layout-v2"></script>
+  <script src="/workspace.js?v=20261019-diagnostics-layout-v2"></script>
+  <script src="/app.js?v=20261019-diagnostics-layout-v2"></script>
 </body>
 </html>
