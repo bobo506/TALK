@@ -257,3 +257,9 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
   #blackboard-toolbar #workspace-search {flex:1 1 100%;}
   .role-service-batch-feedback {padding:0 20px;}
 }
+
+/* 参与任务分页：固定 20 条/页，翻页只重绘详情、不重新请求任务接口；首尾禁用。 */
+.role-task-pagination {display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:16px;}
+.role-task-page-info {font-size:14px; color:#626b76; overflow-wrap:anywhere;}
+.role-task-pagination .workspace-text-button:disabled {opacity:0.5; cursor:not-allowed; color:#7d858d;}
+@media(max-width:700px){.role-task-pagination {gap:10px;} .role-task-page-info {font-size:13px;}}

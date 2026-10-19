@@ -1,5 +1,8 @@
 /* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
 const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null };
+// 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
+const ROLE_TASKS_PAGE_SIZE = 20;
+const roleTasksPageUI = { key: null, page: 1 };
 // R1-3：搜索框保持静态节点；角色页批量操作与结果分别重绘，避免移除搜索及其输入监听。
 function workspaceRootId(task) { return task?.root_task_id || task?.id; }
 function workspaceFinished(task) { return ["completed", "failed", "canceled"].includes(task?.workflow_status); }
@@ -1381,6 +1384,15 @@ function renderWorkspaceRoleDetails() {
   // ROLE-SETTINGS-1：项目设置与具体角色互斥——选中“项目设置”时角色详情整体隐藏，不残留空白面板。
   const visible = blackboardOpen && workspaceUI.mode === "roles" && !workspaceSettingsSelected();
   const role = workspaceRoles().find(item => item.member_id === workspaceUI.selectedRole) || null;
+  // 分页上下文必须在任何提前 return 前同步：切账号/项目/角色/筛选或离开角色详情（不可见/选择失效）
+  // 一律重置第一页；同上下文的普通轮询保持页码。不凭旧 selectedRole 残留串页。
+  const roleTasksPageKey = visible && role
+    ? JSON.stringify([myId, activeProjectId, role.member_id, workspaceUI.roleFilter])
+    : null;
+  if (roleTasksPageKey !== roleTasksPageUI.key) {
+    roleTasksPageUI.key = roleTasksPageKey;
+    roleTasksPageUI.page = 1;
+  }
   // 运行诊断是独立静态面板：每次导航都同步完整上下文，离页也在 return 前清理；
   // 同角色服务轮询只更新证据，不重建筛选、日志或详情节点。
   if (typeof roleDiagnostics !== "undefined") {
@@ -1428,7 +1440,14 @@ function renderWorkspaceRoleDetails() {
   head.appendChild(tr); table.appendChild(head);
   const body = workspaceEl("tbody");
   const tasks = workspaceRoleTasks(role.member_id).filter(task => workspaceFinished(task) === (workspaceUI.roleFilter === "finished"));
-  for (const task of tasks) {
+  // 固定 20 条/页：在现有完整可见集合与进行中/已结束筛选后的顺序上分页，不改任务接口。
+  // 普通轮询保持页码；记录减少时夹回合法页。
+  const totalPages = Math.max(1, Math.ceil(tasks.length / ROLE_TASKS_PAGE_SIZE));
+  if (roleTasksPageUI.page > totalPages) roleTasksPageUI.page = totalPages;
+  if (roleTasksPageUI.page < 1) roleTasksPageUI.page = 1;
+  const pageStart = (roleTasksPageUI.page - 1) * ROLE_TASKS_PAGE_SIZE;
+  const pageTasks = tasks.slice(pageStart, pageStart + ROLE_TASKS_PAGE_SIZE);
+  for (const task of pageTasks) {
     const row = workspaceEl("tr");
     const name = workspaceEl("td"); name.appendChild(workspaceEl("span", "role-task-name", workspaceTitle(task)));
     const duration = workspaceEl("td"); duration.appendChild(workspaceTaskDurationEl(task));
@@ -1437,8 +1456,27 @@ function renderWorkspaceRoleDetails() {
     row.append(name, duration, status, action); body.appendChild(row);
   }
   table.appendChild(body); section.appendChild(table);
-  if (!tasks.length) section.appendChild(workspaceEl("p", "workspace-empty", "当前没有这类任务。"));
+  if (!tasks.length) {
+    section.appendChild(workspaceEl("p", "workspace-empty", "当前没有这类任务。"));
+  } else {
+    section.appendChild(workspaceRoleTasksPagination(tasks.length, pageStart, pageTasks.length, totalPages));
+  }
   tasksPanel.appendChild(section);
+}
+// 参与任务分页条：上一页/下一页、页数/总数/本页范围；首尾禁用。翻页只重绘详情，不重新请求任务接口。
+function workspaceRoleTasksPagination(total, pageStart, pageCount, totalPages) {
+  const pager = workspaceEl("div", "role-task-pagination");
+  const prev = workspaceButton("上一页", () => {
+    if (roleTasksPageUI.page > 1) { roleTasksPageUI.page -= 1; renderWorkspaceRoleDetails(); }
+  }, "workspace-text-button role-task-page-prev");
+  prev.disabled = roleTasksPageUI.page <= 1;
+  const info = workspaceEl("span", "role-task-page-info", `第 ${roleTasksPageUI.page} / ${totalPages} 页 · 共 ${total} 条 · 本页 ${pageStart + 1}–${pageStart + pageCount} 条`);
+  const next = workspaceButton("下一页", () => {
+    if (roleTasksPageUI.page < totalPages) { roleTasksPageUI.page += 1; renderWorkspaceRoleDetails(); }
+  }, "workspace-text-button role-task-page-next");
+  next.disabled = roleTasksPageUI.page >= totalPages;
+  pager.append(prev, info, next);
+  return pager;
 }
 function workspaceTaskNotice(task, tree) {
   if (task.workflow_status === "completed") return "成果已收取，本任务已完成。无需继续操作。";

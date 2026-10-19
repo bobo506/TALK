@@ -11,13 +11,19 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlmodel import Session
 
 from bridges.runtime_diagnostics import LOG_ID_RE
 from server.auth import get_current_member
 from server.db import get_session
 from server.models import Member, Project, ProjectAgent, ProjectRole
+from server.runtime_diagnostics_export import (
+    build_export,
+    export_filename,
+    parse_export_time,
+    validate_export_window,
+)
 from server.runtime_diagnostics_models import RuntimeLogDetail, RuntimeLogPage
 from server.runtime_diagnostics_query import (
     DEFAULT_PAGE_LIMIT,
@@ -26,6 +32,7 @@ from server.runtime_diagnostics_query import (
     MAX_TASK_ID,
     QuerySpec,
     RuntimeDiagnosticsError,
+    ScanLimits,
 )
 from server.runtime_diagnostics_sources import (
     RuntimeDiagnosticsProvider,
@@ -66,6 +73,7 @@ _REF_CONFLICT_PARAMS = frozenset(
         "severity",
     }
 )
+_EXPORT_PARAMS = frozenset({"since", "until"})
 
 
 def require_log_reader(
@@ -279,6 +287,19 @@ def _parse_list_query(request: Request, provider: RuntimeDiagnosticsProvider) ->
     )
 
 
+def _parse_export_window(request: Request) -> tuple[datetime, datetime]:
+    pairs = _single_pairs(request, _EXPORT_PARAMS)
+    if set(pairs) != {"since", "until"}:
+        raise _invalid_filter()
+    try:
+        since = parse_export_time(pairs["since"])
+        until = parse_export_time(pairs["until"])
+        validate_export_window(since, until)
+    except (TypeError, ValueError, OverflowError):
+        raise _invalid_filter()
+    return since, until
+
+
 def _map_error(exc: RuntimeDiagnosticsError) -> None:
     raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
 
@@ -306,6 +327,57 @@ def list_runtime_logs(
         raise
     except Exception:
         # Never let a raw path, parser message or record body escape in a 500.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="diagnostics_projection_failed",
+        )
+
+
+@router.get(
+    "/{project_id}/roles/{member_id}/runtime-logs/export",
+    responses={
+        200: {"content": {"application/x-ndjson": {"schema": {"type": "string"}}}},
+    },
+)
+def export_runtime_logs(
+    project_id: str,
+    member_id: str,
+    request: Request,
+    current: Member = Depends(require_log_reader),
+    session: Session = Depends(get_session),
+    provider: RuntimeDiagnosticsProvider = Depends(get_runtime_diagnostics_provider),
+):
+    _require_human(current)
+    _require_target(project_id, member_id, session)
+    since, until = _parse_export_window(request)
+    try:
+        source = provider.require_source(project_id, member_id)
+        limits = getattr(provider, "_scan_limits", None)
+        if not isinstance(limits, ScanLimits):
+            limits = ScanLimits()
+        body = build_export(
+            source,
+            project_id=project_id,
+            member_id=member_id,
+            since=since,
+            until=until,
+            generated_at=provider.now(),
+            limits=limits,
+        )
+        filename = export_filename(since, until)
+        return Response(
+            content=body,
+            media_type="application/x-ndjson",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-store",
+            },
+        )
+    except RuntimeDiagnosticsError as exc:
+        _map_error(exc)
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="diagnostics_projection_failed",

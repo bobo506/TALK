@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-19 20:18：276/277首次交付经Codex独立实查，发现问题后直接修正并串行集成、收取；301项Python、270项Node及1项真实隔离HTTP联调通过。统一JSONL下载/逐次阶段节点/参与任务20条分页已本机加载；五宿主正常重载，四个原运行角色恢复ready/idle且心跳推进，Codex原关闭状态保持。配置/绑定/Key/历史保持，暂停等页面人工验收，完整日志整项及后续排期未提前完成。host真实阶段与每次任务模型预检配对采集；新human-only GET `.../runtime-logs/export`单扫描、10000条/16MiB及明确partial，旧两GET兼容。详[276/277复核](ROLE_DIAGNOSTICS_EXPORT_REVIEW_276_277.md)。
+
 > 2026-10-19 10:53：271/272及五宿主/角色启动日志加载已验；274同机human-only查询API经Codex独立复核后直接修正，81项相关自检全部通过、零跳过，已正常收取。原持久schema/CLI/启停守卫保持；新provider/DTO与两GET已落代码，生产来源/加载和275页面未部署，健康补数/跨宿主/全根治理仍待。详[274复核](ROLE_RUNTIME_LOG_VIEW_REVIEW_274.md)；273[合同](ROLE_RUNTIME_LOG_VIEW_DESIGN.md)及原报告/失败保持。
 
 > 所属项目：TALK

@@ -1,52 +1,44 @@
 # Project Progress
 
-Updated: 2026-10-19 19:04（Asia/Shanghai）。用户明确“可以开始了”，解除17:37待开工门禁。已按冻结合同派276给DeepSeek（阶段节点采集/统一JSONL导出API）、277给Kimi K3（隔离下载页面/参与任务20条分页），均creator agent:codex。当前仅派发快照queued/assigned，不称已实现/验收；默认本轮结束，用户通知完成后再独立取件复核与串行集成。
+Updated: 2026-10-19 20:18（Asia/Shanghai）。276/277已完成首次交付独立复核，Codex直接修正/自检、串行集成和收取，本机API/宿主/页面加载通过。**当前暂停等项目管理者验收诊断文件下载与20条任务分页，不开启下一片。**
 
 ## 当前身份与分工
 
-- project prj_e8fe7066bbec；桌面MCP agent:codex、业务lead。DeepSeek与Kimi K3（agent:kimi/kimi-code/k3）首次执行/自测并暂停，Codex独立复核、直接修正/验证、串行集成与Git收尾；后续不派两个K2.8。页面development_requirements旧交叉分工原值保持，按AGENTS/用户最新约定执行。
-- 默认派后结束、用户通知取件，不主动等待或自动唤回。本轮usage-gate guard --provider codex --json返回continue，精确session/weekly比例均null，不臆测用量。
+- 项目prj_e8fe7066bbec；当前桌面MCP agent:codex、业务lead。DeepSeek和Kimi K3（agent:kimi / kimi-code/k3）首次执行并暂停，Codex独立检查、直接修正/自检、集成及正式进度/Git收尾；后续不派两个K2.8。页面development_requirements旧交叉文本原值保持，按用户最新约定执行。
+- 默认派后结束、用户通知后取件；276/277已completed，不再重复收取/派返修。本轮不是主动等待/自动唤回适配。上次usage-gate精确session/weekly比例null，不臆测额度。
 
-## 已确认的改版与本轮派发
+## 本轮交付及验证
 
-- [正式需求](spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md)2026-10-19新节：一份JSONL，文件说明+逐条事件，合并实际运行节点/正常日志/异常详情；成功、失败、中断/未知及重复预检均记录，缺失历史时间不补造。页面仅时间区间/生成/下载和必要提示，撤去现有日志及单独异常查询/展示；人类权限、脱敏和不完整标记保持。
-- 任务分页采用当前完整可见projectTasks+workspaceRoleTasks及原筛选/顺序，仅页面每页20条；现有GET任务接口无条数截断，本片不改任务API/权限。切上下文/筛选回首页、轮询保页/数量减少夹回有效页，保耗时及任务导航。
-- 固定基线e0fdb994cfcc9d033bc6786e214b8bba68af232b，899跟踪SHA/177必要来源，冻结合同SHA4c770c890e39b8e016b13b93d15fce0a9dce86550cd719fb3d9b784abf0cc4ba；.tmp/runtime-diagnostics-export-v1/coordination/含shared-contract、baseline-manifest、task-inputs及实际dispatch，baseline/仅跟踪源码，无忽略DB/日志/凭据/原生状态。
-- 276→agent:deepseek，Hall group:task-deec3f537f07465faef0775414001cb3；主产品唯一写入者，限bridge/runtime诊断、宿主阶段、导出新模块/原路由新增GET及新测试。277→agent:kimi、精确kimi-code/k3，Hall group:task-43effa2d79314a73a44b4b0bd292db6b；仅kimi-k3-ui/内基于冻结源码做JS/CSS/index/workspace候选、分页、交互测试和patch，不读活动后端/改正式web。
-- 导出合同为human-only GET .../runtime-logs/export，仅明确since/until（带时区、半开区间、最多31天），meta+按时序event内嵌详情/严格transition；旧GET保持。单次受控扫描、10000条/16MiB/原扫描预算、部分明确标记；不自动下载/扫描，Blob与迟到请求按账号/项目/角色/离页清理。阶段成功/失败/取消、每次预检及修复尝试实际配对/单调耗时，缺失历史不补。
-- 派前caller agent:codex/kind agent，DS ins_9a144ce6de1c与K3 ins_978820044056均新鲜idle/current_task_id=null、项目queued/running任务空；页面development_requirements仍旧交叉分工，按本次用户最新约定优先且原值不改。只派上述两位，不派K2.8；首次响应为顶层task对象的本地取值纠正未导致重复派发。
-- 两包要求自有假DB/日志/Key/command_runner及随机回环隔离，禁止8000/生产数据/模型/Browser/启停部署；完成各自暂停，Codex独立实查后直接修正，跨线公共入口须双方暂停再串行集成。正式docs/Git由Codex独占；新接口/阶段尚未生产加载，原页面仍首版。
+- 276/result2883/DS、277/result2884/K3，原件/SHA/冻结合同与原失败完整保留，原creator已收取。详[276/277复核](spec/ROLE_DIAGNOSTICS_EXPORT_REVIEW_276_277.md)；完整当次记录见[历史](PROGRESS_HISTORY.md)。原274/275实现与原部署失败记录保留，不追改历史结论。
+- 一份JSONL：首行查询/范围/数量/完整性，后续时序事件，内嵌脱敏异常/帧/因果链及实际phase/严格transition。每次真实启动/任务阶段、每次模型预检及修复均记录实际起止/结果/单调耗时；旧缺失时间不补造，不为日志额外调用模型。
+- human-only GET `.../runtime-logs/export`仅since/until、带时区/最多31天/半开区间，显式五角色根与逐条作用域，保旧GET。单扫描10000条/16MiB与5000文件/128MiB/10秒预算，受限明确partial；读取和净化/序列化均纳入检查，事件不静默截帧。
+- 页面版本20261019-diagnostics-export-v1：角色详情仅时间区间/生成/下载/数量和完整性提示，撤旧日志列表、证据五行和单独异常查询；显式点击才扫描，有界流读取、meta校验，切上下文/改时间/退出回收Blob。参与任务原完整可见集合/关系/筛选/顺序上20条一页，轮询保页、切筛选归首页、缩减夹回，不改任务API/导航/耗时/说明草稿。
+- Codex独立复现并直接修正：最后一次投影超时误标完整、终止预检网络/取消缺终点、矛盾meta、前端先全读再限且多64KiB、改时间保旧下载、partial零条误说空、缺fetch入口忙态不解。旧版本六资源断言在冻结基线即失败，更新本片八资源；旧列表22项退役，下载23/分页10项承接。
+- 修正后301 Python、正式19套270 Node、1真实隔离HTTP UI→API联调全部通过、零跳过；含实际10001条/16MiB/300帧、Windows换链、回环及CLI120项三管道。原交付的环境限制/夹具失败记录保留。未Browser，不称视觉/键盘/窄屏已验收。
 
-## 日志查看首版：已交付，原验证保持
+## 当前本机运行与加载
 
-- 274/result2847/agent:deepseek/ins_7cb44d5a1f80，原SHA3ebc3e891abb9d6c30f6ab13a754c966d9a159e350e695b062c3f11fcdc75009。独立发现死锁、换链、预算/游标IO、净化/参数边界后由Codex直接修正，81项Python零失败/跳过，含真实Windows换链和HTTP。UTC02:53:18.248428收取，代码c073147，详[274复核](spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_274.md)。
-- 275/result2855/agent:kimi/ins_dd80a6b46ade，合法字符串275 complete与本地一致，原SHAe574c42cf0c9c61dddb855ba9fc35011ec4a9d012f56a3b84a9d3c18bf91206d。160冻结来源/8复制件保持，Hall2860暂停；原65项通过，补充3反例全失败。Codex直接补离页DOM清除、退出前清除、返回码/实际预算/关联引用，原19断言保留，新22及五套共95项通过，另1项真实隔离HTTP联调通过。UTC03:27:44.706628原creator收取，succeeded/completed，详[275复核](spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_275.md)。
-- 两方暂停后串行合入新JS/CSS、index/workspace最小钩子及测试，app仅两行退出清理。版本20261019-runtime-log-view-v1；选角色不扫描，显式24h异常/20、筛选/分页/独立ref/详情，human-only。健康证据分列，缺宿主/queue/预检独立证据仍未知。
-- 本机config.toml显式配置本项目五角色绝对日志根，包含旧/新实例，排除manager unknown根；换机器需重新核对。实机五角色human列表/ref/详情200/完整，Agent两端403、无Key401，首页/四资源字节相同；未Browser，不把样例或计数等同273矩阵全验收。
+- 加载前实查四角色运行，Codex受管角色已正常关闭；维持该选择。四角色普通stop释放归属，五空宿主正常drain退出后同入口重载，再普通start四角色。API由原启动器正常重载，现launcher4820/child16632。没有强杀/接管、人工解除归属或新模型任务，配置/绑定/Key/历史与config.toml SHA保持。
+- 旧K28单次start后API ready先于健康句柄写入，脚本暂止；保留原脚本与唯一回执，改只观察已有launch直到健康同步，无重复启动。新五宿主真实启动日志/健康推进通过；四新实例ready/idle、直接父链、周期心跳推进≥30秒。下表仅观测，后续操作必须重核实际归属。
 
-## 本次上线失误与恢复
+| 角色 | 新manager | 新bridge | 实例 | 世代 | 心跳推进秒 |
+| --- | ---: | ---: | --- | ---: | --- |
+| deepseek | 16796 | 16396 | ins_f3684f706645 | 17 | 90.127075 |
+| old-k28 | 9204 | 1480 | ins_ed75dfc33785 | 20 | 120.140629 |
+| page-k28 | 12976 | 10684 | ins_cae7720adfc7 | 17 | 120.121389 |
+| kimi | 17540 | 8876 | ins_664e5bfefeff | 17 | 120.134134 |
+| codex | 5668 | — | 原关闭 | 18 | 保持关闭 |
 
-- 原API launcher7020/15048正常关闭；Codex写配置时CRLF重复转成CRCRLF，首次新API启动失败，原件/失败保留。修为显式LF并以二进制tomllib.load检查磁盘后，同一入口恢复launcher15828/12568，API健康通过。
-- 断连时五原manager/bridge仍活着，但服务投影待核实，35秒心跳观察未回到ready。空队列下由原宿主逐个普通stop→start，旧bridge退出后才新启动；没有强杀、接管、伪写idle或人工解除归属。Key/身份/绑定/模型、非service角色配置保持；旧日志与故障记录仍可查。API暂断后的error收敛记入后续健康/恢复问题，本片未扩改bridge。
-- UTC03:34:44复验五新实例/launch/PID保持，均由原manager直接持有，running/ready/idle且无任务，心跳推进约90秒。下表仅观测，不能按历史PID接管或操作。
+- 五角色真实下载200且meta完整，Agent403/匿名401；九资源与磁盘字节相同，四新运行launch均有六组配对启动节点，队列空。证据`.tmp/runtime-diagnostics-export-v1/independent-review/deploy/`，重点live-first/live-final、hosts/verified-all及各唯一回执。受管Codex关闭不影响当前桌面协调身份。
 
-| 角色 | 世代 | 原manager / 新bridge PID | 当前实例 |
-| --- | ---: | --- | --- |
-| DeepSeek | 15 | 5240 / 19556 | ins_9a144ce6de1c |
-| 旧K28 | 18 | 3540 / 17184 | ins_4d52400c0478 |
-| 页面K28 | 15 | 20148 / 9508 | ins_3a40fa89feb5 |
-| Kimi K3 | 15 | 8944 / 20312 | ins_978820044056 |
-| Codex | 17 | 16136 / 4960 | ins_5a8f9b652a22 |
+## 人工验收与下一步
 
-- 全部原件/3反例/95项/HTTP/收取及部署证据：.tmp/runtime-log-view-v1/independent-review275/，重点deploy/{preflight,normal-restart-complete,live-first,live-final}.json及各角色回执。原失败脚本不重复当恢复脚本执行。
-- 09:46宿主272加载、09:56旧角色日志加载人验及原表保留于PROGRESS_HISTORY/.tmp/runtime-logging-parallel-1/host-load272/，不再是当前实例。
+1. 保持当前已启动的本机服务，在已有页面Ctrl+F5，以原人类账号登录并打开具体角色。
+2. 在“诊断日志导出”选≤31天时间范围，点击生成再下载JSONL；确认页面无旧日志/异常明细，文件首行说明范围与完整性，后续异常内嵌。改时间会使旧下载失效。
+3. 在“参与的任务”验证每页20条、前后页/总数、进行中/已结束筛选；任务详情和说明编辑照常。
 
-## 历史验收、剩余范围与下一步
-
-- 271/272持久日志及宿主接入已修正收取（293/141项自检与加载证据保持），273正式设计/样例已收（36静态检查、67未来矩阵）。五角色迁移/启停历史人验、269原invalid及270补验/收取保持；原模型Codex gpt-6.1-sol/xhigh、DeepSeek deepseek-flash/max、Kimi k3/tools、两K28原档，runner仍unverified，不由声明推断实际后端。
-- 当前仍[排期](spec/DEVELOPMENT_ROADMAP.md)第2项：查看首版已上线；新增宿主/queue心跳、预检事件、跨宿主、全根治理仍待，完整日志整项未完成。跨沙箱重启常驻、六小时、真实模型/主动等待T/W、冷启动和255完整新建自动ready仍未验。
-- 第7项选择性自启动仅需求确认：异常断电后项目加载，未勾选离线，勾选经安全归属核验正常启动；刷新/本轮人工关闭不重启。尚未实施，不扩大自动解除未知归属权限，退出前仍建议逐个正常关闭。
-- 原首版已由用户看到页面，视觉/窄屏/键盘未记全部通过；用户确认统一导出替代当前列表，276/277实施后重新验收。11:35故障恢复/进程表为当时快照；本轮不启停服务或复验原生能力。最新派前MCP：DS/K3新鲜idle，受管Codex实例offline不作本桌面身份或派发能力判断，本桌面caller已核。
-- 当前已取得开工指令并派276/277；**默认派后结束，用户通知完成后再取交付。** 恢复先读AGENTS/PROJECT_BRIEF/本快照及冻结合同，再只读负责模块；274/275已completed不重复派发/收取。此批代码/导出/分页未验收，不先发布或自动重载角色。
+- 等用户确认后再决定第2项完整异常日志的剩余健康补数/跨宿主/全根空间治理；整项尚未完成，不提前跳第3项预算或第7项选择性自启动。
+- 缺失历史节点不补造；强断无法补终点，claim获得上下文前崩溃可能缺持久开始；真实模型预检/取消由隔离测试覆盖，本轮未额外派模型验收。跨沙箱常驻、六小时、真实主动等待、冷启动及255完整新建自动ready仍待。
+- 第7项已确认：断电后项目加载未勾选离线、勾选经安全归属核验正常启动，区分刷新和人工关闭；尚未实施，不扩大未知归属自动释放权限。
 
 恢复指令：继续项目。

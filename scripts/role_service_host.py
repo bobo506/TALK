@@ -120,6 +120,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts import role_service_host_diagnostics as host_diag  # noqa: E402 - 复用 271 基础诊断 API
+from bridges.runtime_diagnostics_timeline import StageTimeline  # noqa: E402 - 276 阶段配对
 from scripts.role_provision import (  # noqa: E402 - 复用 R1-2 已验私有创建/路径/锁保护
     ProvisionError,
     _assert_root_chain_has_no_reparse,
@@ -1665,9 +1666,16 @@ class HostManager:
             diagnostics.add_sensitive_values(
                 (report_kwargs.get("claim_token"), report_kwargs.get("owner_token"))
             )
+        report_action = str(report_kwargs.get("action") or "unknown")
+        report_operation = StageTimeline(diagnostics).start(
+            f"host_{report_action}_report",
+            phase=report_action,
+            budgets=budgets if budgets is not None else self._host_budgets(),
+        )
         try:
-            return self._report(**report_kwargs)
+            result = self._report(**report_kwargs)
         except Exception as exc:
+            report_operation.finish("failed")
             if diagnostics is not None:
                 diagnostics.record_exception(
                     exc,
@@ -1688,6 +1696,8 @@ class HostManager:
                     },
                 )
             raise
+        report_operation.finish("succeeded")
+        return result
 
     # ── 预检 ────────────────────────────────────────────────────────
 
@@ -1805,6 +1815,13 @@ class HostManager:
                 "error_code": "ownership_unreleased",
             }
 
+        claim_budgets = self._host_budgets()
+        claim_timeline = StageTimeline()
+        claim_operation = claim_timeline.begin(
+            "host_start_claim",
+            phase="start",
+            budgets=claim_budgets,
+        )
         try:
             response = self.client.request(
                 "POST",
@@ -1823,12 +1840,13 @@ class HostManager:
                 instance_id=str(launch.get("expected_instance_id") or "") or None,
                 runtime=None,
             )
+            claim_operation.finish("failed", diagnostics=claim_diag)
             claim_diag.record_exception(
                 exc,
                 event="claim_failed",
                 phase="start",
                 stage="claim",
-                budgets=self._host_budgets(),
+                budgets=claim_budgets,
                 extra={
                     "action": "start",
                     "generation": launch.get("generation"),
@@ -1852,12 +1870,13 @@ class HostManager:
             runtime=runtime,
             extra_secrets=(owner_token, claim_token),
         )
+        claim_operation.finish("succeeded", diagnostics=diag)
         diag.record_event(
             "launch_claimed",
             severity="info",
             phase="start",
             stage="claim",
-            budgets=self._host_budgets(),
+            budgets=claim_budgets,
             extra={
                 "action": "start",
                 "generation": generation,
@@ -1868,6 +1887,12 @@ class HostManager:
         )
 
         preflight_budgets = self._host_budgets()
+        preflight_timeline = StageTimeline(diag)
+        preflight_operation = preflight_timeline.start(
+            "host_preflight",
+            phase="start",
+            budgets=preflight_budgets,
+        )
         try:
             facts = self.preflight(
                 command,
@@ -1899,6 +1924,7 @@ class HostManager:
             # 只对真实内置 bridge 追加其已支持的日志参数；自定义入口保持旧 argv。
             argv += self.child_diagnostics_argv()
         except HostError as exc:
+            preflight_operation.finish("failed")
             failure_ref = diag.record_exception(
                 exc,
                 event="preflight_failed",
@@ -1942,6 +1968,7 @@ class HostManager:
             }
         except Exception as exc:
             # 原代码不会把未知预检异常转成业务失败：这里只留痕并原样传播。
+            preflight_operation.finish("failed")
             diag.record_exception(
                 exc,
                 event="preflight_failed",
@@ -1957,6 +1984,7 @@ class HostManager:
             )
             self._drop_launch_diagnostics(launch_id)
             raise
+        preflight_operation.finish("succeeded")
 
         # 产品片B：公开启动诊断只带**有界**数值/枚举，且与 `facts.argv` 同属一份快照。
         diagnostics = facts.diagnostics()
@@ -1967,6 +1995,11 @@ class HostManager:
         stdout_target: Any = subprocess.DEVNULL
         stderr_target: Any = subprocess.DEVNULL
         opened: list[Any] = []
+        spawn_io_operation = StageTimeline(diag).start(
+            "host_spawn_io",
+            phase="start",
+            budgets=spawn_budgets,
+        )
         try:
             if self.child_log_dir is not None:
                 self.child_log_dir.mkdir(parents=True, exist_ok=True)
@@ -1978,6 +2011,7 @@ class HostManager:
         except Exception as exc:
             # 准备输出文件时尚未 spawn。保留原异常/归属语义，不能把这里的
             # OSError 改记为后面的 cli_missing；第二个文件失败也关闭第一个。
+            spawn_io_operation.finish("failed")
             diag.record_exception(
                 exc, event="spawn_setup_failed", phase="start", stage="spawn_io",
                 budgets=spawn_budgets,
@@ -1989,6 +2023,12 @@ class HostManager:
                     stream.close()
             self._drop_launch_diagnostics(launch_id)
             raise
+        spawn_io_operation.finish("succeeded")
+        spawn_operation = StageTimeline(diag).start(
+            "host_spawn",
+            phase="start",
+            budgets=spawn_budgets,
+        )
         try:
             process = spawn_hidden(
                 argv,
@@ -1998,6 +2038,7 @@ class HostManager:
                 stderr_target=stderr_target,
             )
         except OSError as exc:
+            spawn_operation.finish("failed")
             failure_ref = diag.record_exception(
                 exc,
                 event="spawn_failed",
@@ -2040,6 +2081,7 @@ class HostManager:
                 **diagnostics,
             }
         except Exception as exc:
+            spawn_operation.finish("failed")
             diag.record_exception(
                 exc,
                 event="spawn_failed",
@@ -2059,6 +2101,7 @@ class HostManager:
             for stream in opened:
                 with contextlib.suppress(OSError):
                     stream.close()
+        spawn_operation.finish("succeeded")
 
         # spawn 事实：pid 来自真实子进程；创建时刻优先取 OS 事实，取不到才退化为观测时刻。
         os_creation = process_creation_time(process.pid)
@@ -2184,9 +2227,18 @@ class HostManager:
                 **diagnostics,
             }
 
+        readiness_operation = StageTimeline(diag).start(
+            "host_readiness",
+            phase="start",
+            budgets=spawn_budgets,
+        )
         try:
             self._wait_ready(instance_id, project_id, member_id)
         except HostError as exc:
+            readiness_operation.finish(
+                "failed",
+                timeout=exc.code == "readiness_timeout",
+            )
             failure_ref = diag.record_exception(
                 exc,
                 event="readiness_failed",
@@ -2229,6 +2281,7 @@ class HostManager:
                 **diagnostics,
             }
         except Exception as exc:
+            readiness_operation.finish("failed")
             diag.record_exception(
                 exc,
                 event="readiness_failed",
@@ -2245,6 +2298,7 @@ class HostManager:
                 },
             )
             raise
+        readiness_operation.finish("succeeded")
 
         diag.record_event(
             "ready",
@@ -2495,7 +2549,12 @@ class HostManager:
                 },
             )
             try:
-                claim_token = self._claim_stop(launch_id, record)
+                claim_token = self._claim_stop(
+                    launch_id,
+                    record,
+                    diagnostics=diag,
+                    budgets=budgets,
+                )
             except Exception as exc:
                 diag.record_exception(
                     exc,
@@ -2538,7 +2597,12 @@ class HostManager:
             return {"launch_id": launch_id, "member_id": member_id, "outcome": "stopped"}
 
         try:
-            claim_token = self._claim_stop(launch_id, record)
+            claim_token = self._claim_stop(
+                launch_id,
+                record,
+                diagnostics=diag,
+                budgets=budgets,
+            )
         except Exception as exc:
             diag.record_exception(
                 exc,
@@ -2651,16 +2715,33 @@ class HostManager:
         self._drop_launch_diagnostics(original_launch_id)
         return {"launch_id": launch_id, "member_id": member_id, "outcome": "stopped"}
 
-    def _claim_stop(self, launch_id: str, record: dict[str, Any]) -> str:
-        response = self.client.request(
-            "POST",
-            f"/api/role-service-launches/{launch_id}/claim",
-            {
-                "host": str(record["host"]),
-                "expected_instance_id": str(record["instance_id"]),
-                "owner_token": str(record["owner_token"]),
-            },
+    def _claim_stop(
+        self,
+        launch_id: str,
+        record: dict[str, Any],
+        *,
+        diagnostics: Optional[host_diag.HostDiagnostics] = None,
+        budgets: Optional[dict[str, Any]] = None,
+    ) -> str:
+        operation = StageTimeline(diagnostics).start(
+            "host_stop_claim",
+            phase="stop",
+            budgets=budgets,
         )
+        try:
+            response = self.client.request(
+                "POST",
+                f"/api/role-service-launches/{launch_id}/claim",
+                {
+                    "host": str(record["host"]),
+                    "expected_instance_id": str(record["instance_id"]),
+                    "owner_token": str(record["owner_token"]),
+                },
+            )
+        except Exception:
+            operation.finish("failed")
+            raise
+        operation.finish("succeeded")
         return str(response.get("claim_token") or "")
 
     def _graceful_stop(
@@ -2680,11 +2761,17 @@ class HostManager:
         """
         control_file = Path(control_file)
         related_log_id: Optional[str] = None
+        control_operation = StageTimeline(diagnostics).start(
+            "host_stop_control",
+            phase="stop",
+            budgets=budgets,
+        )
         try:
             # 控制文件严格限制在本次私有状态根内，且发布本身带私有 ACL 核验。
             assert_inside_root(self.store.state_dir, control_file.relative_to(self.store.state_dir))
             _publish_private_bytes(control_file, b"shutdown\n")
         except (ProvisionError, HostError, ValueError, OSError) as exc:
+            control_operation.finish("failed")
             if diagnostics is not None:
                 related_log_id = diagnostics.record_exception(
                     exc,
@@ -2694,13 +2781,20 @@ class HostManager:
                     budgets=budgets,
                     extra=extra,
                 )
+        else:
+            control_operation.finish("succeeded")
         if os.name != "nt":
             with contextlib.suppress(OSError):
                 process.terminate()
+        wait_operation = StageTimeline(diagnostics).start(
+            "host_stop_exit_wait",
+            phase="stop",
+            budgets=budgets,
+        )
         try:
             process.wait(timeout=self.stop_timeout)
-            return True, None
         except subprocess.TimeoutExpired as exc:
+            wait_operation.finish("failed", timeout=True)
             timeout_ref: Optional[str] = None
             if diagnostics is not None:
                 timeout_ref = diagnostics.record_exception(
@@ -2713,6 +2807,14 @@ class HostManager:
                     extra=extra,
                 )
             return False, timeout_ref
+        except Exception:
+            wait_operation.finish("failed")
+            raise
+        wait_operation.finish(
+            "succeeded",
+            returncode=getattr(process, "returncode", None),
+        )
+        return True, None
 
     # ── report ──────────────────────────────────────────────────────
 

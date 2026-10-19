@@ -1,5 +1,25 @@
 # 开发历史 · TALK
 
+## 2026-10-19 20:18（Asia/Shanghai）— 276/277独立复核、直接修正、收取与本机正常加载
+
+- 用户通知276/277完成后按暂停规则取件。桌面caller仍agent:codex/lead；DS/K3均新鲜idle/current_task_id=null，页面开发要求旧交叉文本原值保持，实际按用户最新DeepSeek/K3首次执行、Codex独立检查/直接修正。产品基线e0fdb994，派发d64ea1c；原正文/源码/候选/失败与SHA全保存，277本地报告仅一处验证说明文字不同，不改原结果。详[276/277复核](spec/ROLE_DIAGNOSTICS_EXPORT_REVIEW_276_277.md)。
+- 276原result2883、SHA bd3ae7272f27bee3cb32025c1018172250de1908923290f66ff29e4b431d496c；277原result2884、SHA42943c213ef9d3856e13b3847358d26154bff7fc1aabe80f2c20212df2b6b61d。稳定引用复核后原creator于UTC12:08:43.553251/12:08:46.279418收取，两片succeeded/completed。
+- 独立发现：末次投影越时仍complete；终止预检路径网络失败/四处取消只有started；页面接受矛盾完整性、先读整份再限且上限多64KiB、改时间保旧文件、partial零条误说无记录、缺fetch入口忙态不解。先复现，Codex直接修正、自检；初次假writer缺sanitize的夹具错误及修正后业务反例均保留。实际10001条/16MiB整行与300帧边界通过。
+- DS原core165含1跳过及3管道受限、K3原28新测试与旧264/265记录不改。修正后301项Python零失败/跳过（真实联接、回环及CLI120含三管道）、正式19套Node270项零失败/跳过，另1真实随机回环UI→API下载联调：120跨实例/60异常/10transition、作用域/脱敏及403/401/422均通过。冻结基线独立重现旧静态版本断言失败后更新为本片八资源；退役旧275列表22项，换新下载23/分页10项，非伪造DOM过旧测。
+- 正式页面版本20261019-diagnostics-export-v1。human-only GET export只since/until，带时区/31天/半开范围，单扫描meta+时序event、内嵌异常与严格transition，10000条/16MiB/原扫描预算与明确partial。页面只时间/生成/下载，不自动扫描；流式限长/meta校验/Blob上下文清理。任务原完整集合/关系/筛选/顺序上20条分页，不改API/权限/草稿/耗时。
+- 真实加载预检发现Codex原已正常关闭，停止计划由五运行假定改为四运行+Codex保持关闭，预检失败没有变更生产。四角色正常stop释放归属、五宿主清空句柄后，原API启动器正常重载至4820/16632；五宿主逐个正常drain/原进程退出后同入口新启动，再普通恢复四原运行角色。旧K28第一次start后健康文件尚未同步，脚本停止；保留唯一回执后仅观察同launch直至健康跟上，未重复start。无强杀/接管/人工解除归属/额外模型任务。
+- 九静态资源字节相同；五真实导出均完整、各403/401验证通过；四新实例ready/idle、直接父链、同instance/launch/PID周期心跳推进≥30秒，六组真实启动阶段配对。配置/绑定/Key/历史/config.toml SHA保持、任务队列空。以下是本次观测，不按历史PID操作：
+
+| 角色 | 新manager | 新bridge | 实例 | 世代 | 心跳推进秒 |
+| --- | ---: | ---: | --- | ---: | --- |
+| deepseek | 16796 | 16396 | ins_f3684f706645 | 17 | 90.127075 |
+| old-k28 | 9204 | 1480 | ins_ed75dfc33785 | 20 | 120.140629 |
+| page-k28 | 12976 | 10684 | ins_cae7720adfc7 | 17 | 120.121389 |
+| kimi | 17540 | 8876 | ins_664e5bfefeff | 17 | 120.134134 |
+| codex | 5668 | — | 原关闭 | 18 | 保持关闭 |
+
+- 原件/测试/联调/加载证据：.tmp/runtime-diagnostics-export-v1/independent-review/；当前暂停页面人验，不开启下片。人工入口Ctrl+F5→具体角色→诊断日志导出→选范围→生成/下载，并测试20条任务分页。无Browser视觉结论；旧时期未采节点不补造，强断终点/claim崩溃缺开始限制如实记录。完整异常日志剩余健康补数/跨宿主/全根治理，以及六小时/主动等待/选择性自启动均仍待；本轮不扩大自动恢复授权。
+
 ## 2026-10-19 19:04（Asia/Shanghai）— 用户明确开工，统一导出/逐次阶段276与K3页面/分页277已派
 
 - 用户明确“可以开始了”，解除17:37仅登记门禁。恢复AGENTS/简报/快照与相关模块；usage-gate guard返回continue但session/weekly精确比例null。实测caller agent:codex/kind agent，DS/K3新鲜idle/current_task_id=null，queued/running任务空；K3精确kimi-code/k3，DS deepseek-flash，页面开发要求仍旧交叉复核文本，按本次用户/AGENTS优先不改生产值。受管Codex实例offline不影响已核桌面caller，不顺带恢复它或操作服务。
