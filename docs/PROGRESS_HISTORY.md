@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-19 22:13（Asia/Shanghai）— 绑定行格式统一280派发，缺思考强度留空
+
+- 用户在279派发后追加页面小修：角色列表绑定行统一“已绑定 · 运行器名称 · 模型名称 · 思考强度”，注意Kimi三个角色没有强度。Codex核真实公开binding与实际渲染后，说明Codex/DS强度已嵌展示名、Kimi未提供；用户进一步明确“如果是没提供思考强度，获取不到的话，那就空着好了，不用显示未提供”。最新澄清已写合同及任务，覆盖此前提出的占位方案，未实施过该占位。
+- 新合同ROLE_BINDING_SUMMARY_FORMAT_REQUIREMENTS：已有明确展示名强度尾段拆分，缺值省略末项/分隔，不显示未知/未提供/默认；未知后缀保留、原模型fallback/状态/安全保持。K3实际binding模型K3，但共用runner登记名带旧K2.8；只对精确已知kimi-code旧系统标签显示Kimi Code，保当前模型/自定义名称，不写绑定或推断强度。
+- 当前MCP本人agent:codex/lead，项目prj_e8fe7066bbec；K3新鲜idle/current_task_id=null、queued/running为空且精确kimi-code/k3。最新development_requirements仍旧交叉原文，未修改；按用户/AGENTS2026-10-18约定K3首次实现/自测暂停，Codex独立实查并直接修正，不互派复核。
+- 冻结产品9285fd696dfc8f466d729b6b73f9a31740ef2fda、909跟踪SHA/36份前端Node规则副本；只读源无配置/生产数据。K3仅写.tmp/role-binding-summary-v1/kimi-k3/，候选workspace.js/index.html、绑定行测试及两处资源版本断言，统一静态版本20261019-role-binding-summary-v1。279独立后端候选不读不改，两者无共享产品文件，协调方独占正式文档/Git，跨界暂停、双方暂停核范围后串行集成。
+- 以project/target/title/content最小顶层参数创建280/general，UTC14:12:50.305072，creator agent:codex，target agent:kimi，queued/assigned。只派K3不派K2.8；包/冻结合同/manifest/dispatch在.tmp/role-binding-summary-v1/coordination/。不主动等待，用户通知279/280完成后分别取件，不因DS上报idle推断279已交付或自动收取。
+- 本轮没有产品修改/部署/服务启停、Browser或模型调用，不读生产DB/日志/Key；279、278既有范围/人验和原失败保持。正式改动为PROGRESS、PROGRESS_HISTORY、PROJECT_BRIEF、MODULE_webui及新格式需求合同；页面效果待实现/复核/静态加载后交用户验收，不称本轮已修好。
+- verify_dispatch.py机械校验280身份/项目/顶层类型/开发要求快照及最新“缺强度省略”要求、36冻结源及合同SHA通过，非文档跟踪源零改动；git diff --check通过。verification.json保存证据，未重跑无变更产品测试，不把派发校验当业务验收。
+
 ## 2026-10-19 22:03（Asia/Shanghai）— 接单轮询诊断补数279派发
 
 - 新窗按project-framework恢复AGENTS/当前进度及MODULE_bridges，对照排期第2项识别健康补数、跨宿主及全根治理仍待。用户询问用途后获知周期记录用于解释接单查询是否持续、连续失败及再次查询成功；用户明确“好的，那开发吧”，仅授权本最小日志片。
