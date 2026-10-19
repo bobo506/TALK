@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-19 22:03（Asia/Shanghai）— 接单轮询诊断补数279派发
+
+- 新窗按project-framework恢复AGENTS/当前进度及MODULE_bridges，对照排期第2项识别健康补数、跨宿主及全根治理仍待。用户询问用途后获知周期记录用于解释接单查询是否持续、连续失败及再次查询成功；用户明确“好的，那开发吧”，仅授权本最小日志片。
+- 桌面入口MCP反查agent:codex/agent，项目prj_e8fe7066bbec、业务lead；本轮最新DS/K3新鲜idle/current_task_id=null、绑定分别deepseek-flash与kimi-code/k3，DeepSeek queued/running查询为空。页面development_requirements仍旧交叉复核文本，未修改；本片按2026-10-18用户/AGENTS分工，DeepSeek首次实现/自测暂停，Codex独立实查后直接修正问题，修正如实称自检。
+- 新增正式ROLE_QUEUE_POLL_DIAGNOSTICS_DESIGN合同：查询发现阶段定义、真实poll_seq/起止/单调耗时、30秒有界成功快照、连续失败与真实成功恢复、取消/任务异常分离。固定extra.queue_poll13键及导出严格白名单；保旧schema/transition、人类权限/scope、单扫描/限额/partial及页面/服务行为，不增加查询/模型调用或自动恢复。
+- 冻结产品0e4c61d865fcd9e97dc3ef1c5fa86d0f81146203，908跟踪SHA和189份纯源副本；未复制config/DB/日志/凭据/原生状态。执行者只写.tmp/queue-poll-diagnostics-v1/deepseek/，候选仅cli_bridge.py、新queue_poll_diagnostics.py、runtime_diagnostics_export.py及三份新测试；正式文档/Git由Codex独占，跨界暂停。
+- 首次派发误带task_kind=development，API422明确仅child可用，未创建任务；原失败完整保留dispatch-rejected.json。去掉该字段后以project/target/title/content最小参数成功创建唯一279，UTC14:02:19.051911，creator agent:codex、target agent:deepseek、general/queued/assigned；回执dispatch.json及冻结合同/任务包保留。不把首次调用错误说成服务故障或权限审批拒绝。
+- 本轮无产品修改、Browser、真实模型/测试任务、生产配置/日志/DB读取或服务启停/部署；仅核MCP身份/上报和任务可见状态，不证明OS存活、worker健康或跨沙箱常驻。原278人验、79f882d/0e4c61d及既有测试证据保持，不重跑未变更产品测试。
+- verify_dispatch.py机械校验279实际身份/项目/顶层类型/开发要求快照、189冻结源及合同SHA通过，非文档跟踪源零改动；git diff --check通过。verification.json保存本轮校验结果，不把派发/格式校验当成产品验收。
+- 正式改动：docs/PROGRESS.md、PROGRESS_HISTORY.md、PROJECT_BRIEF.md、spec/MODULE_bridges.md、spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md及新spec/ROLE_QUEUE_POLL_DIAGNOSTICS_DESIGN.md。派发包在.tmp/queue-poll-diagnostics-v1/coordination/。默认派后结束，用户通知279完成后先摘要/暂停核对、独立实查/直接修正及最终集成；宿主独立心跳、跨宿主、全根治理及后续预算/选择性自启动不提前推进。
+
 ## 2026-10-19 21:41（Asia/Shanghai）— 用户确认278页面验收通过并要求汇总进度
 
 - 用户原话“验收通过，汇总进度”，明确闭合278诊断区文案精简、与页面一致的样式及左侧主任务列表20项分页本轮页面验收。原参与任务分页/统一文件保护保持；不扩写为键盘、窄屏、全运行器或完整异常日志整项全部通过。
