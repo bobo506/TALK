@@ -1,6 +1,6 @@
 # MODULE: Agent Bridges
 
-> 2026-10-19 09:57：272宿主持久诊断独立复核后由Codex直接修正，6模块141项自检通过并收取；用户先正常关闭角色授权重启五宿主，随后确认页面启动成功。只读核五新实例/宿主直接父链、服务端running/ready、25条host/bridge启动日志及引用通过，心跳均推进约60秒，原配置保持。272启动日志加载验收闭合，真实新宿主接单/模型、公共查询/页面/健康与全根治理不在本轮结论内。详[272复核记录](ROLE_RUNTIME_LOGGING_REVIEW_272.md)。273方案已复核修正收取，见[正式设计](ROLE_RUNTIME_LOG_VIEW_DESIGN.md)；API/页面尚未实现。
+> 2026-10-19 10:53：271/272及五宿主/角色启动日志加载已验；274同机human-only查询API经Codex独立复核后直接修正，81项相关自检全部通过、零跳过，已正常收取。原持久schema/CLI/启停守卫保持；新provider/DTO与两GET已落代码，生产来源/加载和275页面未部署，健康补数/跨宿主/全根治理仍待。详[274复核](ROLE_RUNTIME_LOG_VIEW_REVIEW_274.md)；273[合同](ROLE_RUNTIME_LOG_VIEW_DESIGN.md)及原报告/失败保持。
 
 > 所属项目：TALK
 

@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-19 10:53（Asia/Shanghai）— 274独立复核、直接修正与收取，275未集成
+
+- 用户通知274完成。完整MCP摘要及实际task/Hall/作者核对：task274/result2847/agent:deepseek/ins_7cb44d5a1f80/creator agent:codex，合法字符串274 complete与本地相同，原正文SHA 3ebc3e891abb9d6c30f6ab13a754c966d9a159e350e695b062c3f11fcdc75009。原8文件精确副本、开发报告/原测试和指纹保存在.tmp/runtime-log-view-v1/independent-review274/，基线外跟踪差异仅main和Codex此前进度；未读取275交付或合入UI。
+- 独立原7反例统计7失败/1错误（超长整数有2失败子项），追加游标IO反例1失败；全部假数据/隔离ASGI/有界子进程及真实Windows自有临时junction，不是生产泄漏证据。确认Hall2850明确暂停不改码后，Codex直接修正：provider重入锁、正文读取前实际句柄路径及嵌套reparse校验、有界行/已计入长度读取、不可核验IO503与确认变化409、Unicode POSIX/正斜杠UNC、数字/时区溢出422及坏记录标记；另补200字符preview总长和完整性标记不可静默丢尾。
+- 最终5模块81项全部通过（43+新增11+旧27），0失败/错误/跳过；真实Windows换链与随机回环HTTP通过，原开发断言未改。首次相关回归1项详情错误码变更保回原503合同，另1项本进程代理依赖错误；原失败不删除，最终仅测试进程去代理/正常权限直连随机端口。所有engine/LOG_PATH/临时根在导入main前隔离，不覆盖开发者原日志；不推断原自报skip的唯一原因。本轮修正后为Codex自检，非他人独立回审，81不等同设计67矩阵全通过。
+- 实现human-only同机provider/网络DTO/严格参数、scope/历史对、规范化query/签名游标/来源清单、安全扫描与两GET路由；新增test_runtime_diagnostics_api_review.py，仅main最小注册。原持久writer/schema/CLI、启停/恢复/owner/Key/模型/绑定不变；生产sources缺省空，不配置/扫描真实日志、不重载API或角色、不调用原生模型/浏览器。275候选未集成，不能称线上API或页面已上线，跨宿主/健康补数/全根治理仍待。
+- 原creator agent:codex于UTC2026-10-19T02:53:18.248428正常收取274，succeeded/completed，原结果2847和complete自报不追改。正式ROLE_RUNTIME_LOG_VIEW_REVIEW_274、指南/模块/简报/路线和进度同步，文档/差异/指纹检查后提交常规推送。本轮不返派修正/复核、不派新任务，不主动等275；默认用户通知后取件，再做跨线串行集成和页面验收。
+
 ## 2026-10-19 10:14（Asia/Shanghai）— 用户授权日志查看首版，DeepSeek274与K3 275并行派发
 
 - 用户听取开发顺序及角色详情运行诊断呈现后明确“好的继续，先做一版”。Codex恢复本项目框架与最新AGENTS分工；本轮usage-gate guard返回continue，精确session/weekly比例均null。实测caller agent:codex/项目prj_e8fe7066bbec/lead，派前DeepSeek与K3最新实例idle/current_task_id=null，绑定deepseek-flash与kimi-code/k3；页面development_requirements仍旧交叉分工，未改生产值，任务包明确2026-10-18最新约定优先。

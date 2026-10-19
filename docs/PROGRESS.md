@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-19 10:14（Asia/Shanghai）。用户明确“好的继续，先做一版”，已派274给DeepSeek首次实施同机安全日志查询/人类只读API，275给Kimi K3制作隔离运行诊断页面候选；两条派发快照均queued/assigned。基线4768c20、886跟踪SHA/160冻结来源，主目录仅DeepSeek产品写入、K3只写自有.tmp；完成暂停后Codex独立复核、直接修正和串行集成。本轮仅派发收尾，不主动等待，用户通知后取件；尚未上线API/页面。
+Updated: 2026-10-19 10:53（Asia/Shanghai）。用户通知274完成；原2847/DeepSeek合法交付与本地一致，Codex独立发现并直接修正初始化死锁、嵌套换链越界、读预算、游标IO分类、路径净化与参数边界等缺口，最终81项相关自检0失败/错误/跳过，正常收取274。原件与失败保留，275尚未取件/合入；生产来源和页面未部署，本轮仅收后端，不派新任务或主动等待。
 
 ## 当前身份与分工
 
@@ -50,22 +50,22 @@ Updated: 2026-10-19 10:14（Asia/Shanghai）。用户明确“好的继续，先
 ## 273查看/健康权限方案：已修正收取，未实施入口
 
 - 原2839/作者agent:kimi（K3）/ins_23ea501725de，合法字符串273自报与本地一致，SHA cd552f6980376ec53e4e8caf02eb4fc8c9c954f8804c32f57334429d880f2945及原9件不变。独立核17冻结来源/实际代码，发现分页默认过滤/来源失效机制缺口、详情参数矛盾和3项样例路径反例；Codex直接修正。
-- 正式[设计](spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)、[样例](spec/ROLE_RUNTIME_LOG_VIEW_EXAMPLES.json)、[67项未来矩阵](spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)已落盘；修正后36项静态/纯数据检查通过，3反例复测通过，非API产品测试。补领取前预检未知、同机显式来源、manager日志不混角色等边界；API/页面/健康补数均未实现。详[273复核](spec/ROLE_RUNTIME_LOGGING_REVIEW_273.md)。
+- 正式[设计](spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)、[样例](spec/ROLE_RUNTIME_LOG_VIEW_EXAMPLES.json)、[67项未来矩阵](spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)已落盘；修正后36项静态/纯数据检查通过，3反例复测通过，非API产品测试。补领取前预检未知、同机显式来源、manager日志不混角色等边界；274后端已修正收取，页面/健康补数未实施。详[273复核](spec/ROLE_RUNTIME_LOGGING_REVIEW_273.md)。
 
-## 日志查看首版274/275：已派发，未复核或集成
+## 日志查看首版：274已修正收取，275待取件
 
-- 274→agent:deepseek，Hall group:task-96f3d6d53e1846c6ab31d07c3ec5a0b2：同机安全provider/严格DTO/规范化分页与失效、人类只读两GET路由；主目录白名单仅新query/models/sources、routes/runtime_diagnostics、main最小注册及三个新测试，其余冻结。来源用现有CONFIG的可选runtime_diagnostics.sources精确project/member/绝对root，缺省空且不可用503，不改生产配置。
+- 274/2847/agent:deepseek/ins_7cb44d5a1f80，原合法字符串274报告与本地一致，SHA 3ebc3e891abb9d6c30f6ab13a754c966d9a159e350e695b062c3f11fcdc75009。首次8文件均白名单；新增provider/DTO/同机精确CONFIG来源/human-only两GET及main最小注册，不改生产config/db/旧schema或CLI。Codex独立原7例统计7失败/1错误（含子项），再补游标IO1失败，确认DeepSeek2850保持暂停后直接修正；原件和失败留存。
 - 275→agent:kimi、精确kimi-code/k3，Hall group:task-06eadc5700b646df96cde0bce96fc1a8：仅kimi-k3-ui/内做可运行候选JS/CSS、index/workspace最小钩子、Node样例交互测试和integration.patch；只读冻结基线，不改主web或后端。入口角色详情“运行诊断”，默认按需24h异常，显式详情/独立ref/筛选分页与诚实未知健康，权限按273。
 - 两者created_by=agent:codex，派发时queued/assigned；最新页面开发要求仍旧交叉分工，原样读取、任务包明确用户2026-10-18最新约定优先。派前两实例idle/无任务，caller身份核对通过；不派K2.8。冻结4768c207c8b9e3fe105ba6b0a9800526e9542070，886跟踪SHA/160必要来源；各自临时DB/日志/随机端口隔离，禁止生产数据/凭据/模型/部署。
-- 完整原包与实际回执在.tmp/runtime-log-view-v1/coordination/，双方用实际task_id合法裸talk-delivery-1交付并暂停；Codex仅维护协调进度及Git，不并行改产品源码。本轮无查询API/页面上线或额外人工验收结论。
+- 274最终5模块81项全部通过：原43、新增11聚焦回归、旧日志27；含真实Windows换链和随机回环HTTP。第一次回归详情错误码已保原合同、代理依赖失败保留；仅测试进程清代理并隔离DB/日志后全过。是Codex修正后自检，不称外部回审。原creator于UTC02:53:18.248428收取，succeeded/completed；见[274复核](spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_274.md)及.tmp/runtime-log-view-v1/independent-review274/。
 
 ## 下一步与限制
 
-1. 274/275已按下方范围派发；默认用户通知完成后取结构化交付，先核原件/白名单/实际测试和执行者暂停，再独立复核；问题由Codex直接修正，不返派。跨线集成必须双方暂停，API与index/workspace等公共入口串行。两任务当前领取/完成状态未主动追踪，不把派发回执当开始执行或产品验收。
+1. 274已独立复核后直接修正收取；默认用户通知275完成后取前端原件/候选/测试，独立复核并直接修正。跨线集成仍须双方暂停，index/workspace公共入口串行；本轮无275验收、生产来源配置/服务加载或页面上线，不重复派发/收取274。
 2. 当前仍原排期第2项，首版只覆盖人类账号/同机显式来源/按需日志摘要与详情/现有健康证据；独立宿主/queue心跳与预检补数、跨宿主和全根治理另片。272/273已completed，宿主及角色启动加载已验；原件仍在.tmp/runtime-logging-parallel-1/，本批在.tmp/runtime-log-view-v1/。不提前跳全入口预算/会话复用或选择性自启动。
 3. 跨Codex沙箱重启常驻、六小时、固定后端版本、主动等待T/W、冷启动恢复和255完整新建自动ready仍待。12:05退出与沙箱停止仅吻合线索，无逐进程因果链；无无限期自动解除归属授权。
 4. 本轮usage-gate guard --provider codex --json返回continue，但session/weekly精确比例均null，不臆测用量；本批为同一跨模块里程碑，首次交付复核/集成完成后暂停人工页面验收，不主动等待或自动唤回。
 
-恢复时先读AGENTS.md、docs/PROJECT_BRIEF.md和本快照，再按负责范围只读相应MODULE；沿用agent:codex/prj_e8fe7066bbec/lead及DeepSeek/K3首次执行、Codex独立复核/直接修正分工。274/275已派，取件看.tmp/runtime-log-view-v1/coordination/dispatch.json、task-inputs.json、shared-contract.md及baseline-manifest.json；不重复派发或依赖历史PID启停。默认派发后结束、用户通知后取件。
+恢复时先读AGENTS.md、docs/PROJECT_BRIEF.md和本快照，再按负责范围只读相应MODULE；沿用agent:codex/prj_e8fe7066bbec/lead及DeepSeek/K3首次执行、Codex独立复核/直接修正分工。274已修正收取、275待取件；看274复核及.tmp/runtime-log-view-v1/independent-review274/，原包看coordination/dispatch.json、task-inputs.json、shared-contract.md及baseline-manifest.json；不重复派发或依赖历史PID启停。默认派发后结束、用户通知后取件。
 
 恢复指令：继续项目。
