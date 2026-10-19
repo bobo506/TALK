@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-19 23:02（Asia/Shanghai）— 279获许可正常加载；280独立复核、合入收取，等页面人验
+
+- 用户明确“允许”279正常关启原4运行角色及重载API，Codex保持关闭；另通知280完成。Codex先重核UTC14:54:12无在途任务、配置与原Popen归属，再4角色产品普通stop释放owner、原API启动器正常重载至15792/9808、原manager普通start恢复4角色。没有宿主重启/强停/解除owner或改模型绑定。
+- start-all首命令因循环仍列codex被自动审批拒绝、未执行；缩为四角色白名单后获批运行，Codex一直stopped/gen18。原开发授权不足导致的批量停服拒绝记录保留，由本轮明确许可闭合；不将其改成已执行或绕过审批。
+- 279第二次真实核验UTC14:57:09→14:59:39：DS/K3/两K28新实例均原manager直接父链、ready/idle，心跳推进约150秒，轮询成功seq31→106；4份JSONL完整、12字段/起止配对/30秒正确，Agent403/匿名401，绑定配置保持无在途任务。新实例/世代详279复核；279代码86a4fb5及314项验证、原partial/失败保持，不重复收取。未故意触发生产异常或用此推断真实模型/领取能力。
+- 280原msg2887合法complete，作者K3/旧接单ins_664e5bfefeff及Hall正确，SHA0e7c2392ef0b54e8a2db60f7dd85deb9f77b4e06eb6845961706082daad94af2。官方仅progress_draft.summary追加交付路径，其余9顶层字段/next与本地一致；首轮整体比较暂停后逐字段核清，保两原件不改报告。稳定引用核验后UTC15:01:30.355501由原creator收取completed。
+- Codex独立核五文件实际diff/36冻结源/SHA/patch，未发现需修正项；独立20套workspace288项和当前API五角色真实JS渲染1项全过、零跳过，patch apply --check通过。已有xhigh/max拆分、Kimi缺值不占位，精确旧系统名只短显Kimi Code且保当前模型/自定义名，原状态及textContent/权限/服务/分页/诊断保护保持。
+- 280五文件字节与已测副本一致，八本地资源引用版本20261019-role-binding-summary-v1；九静态资源HTTP字节逐一匹配。280仅静态更新，无额外API/角色/宿主启停，未做Browser视觉/键盘/窄屏，当前暂停等用户Ctrl+F5角色列表验收。
+- 证据：279同根deployment授权/审批/正常回执和deploy/live-first279、live-final279及JSONL；280 .tmp/role-binding-summary-v1/independent-review/的archive/原件/verification/actual-public-bindings/actual-rendered-lines/integrated/live-static/stable-result-reference/collect-receipt。正式改动5个280源测试、PROGRESS/历史/简报、两模块、指南、279合同/复核及280合同/新复核。
+- 本批2片收尾，不开第三片；278原人验保持，完整日志整项仍待宿主独立心跳/跨宿主/全根治理，六小时/主动等待/冷启动/跨沙箱驻留等旧未验边界不扩大。
+
 ## 2026-10-19 22:36（Asia/Shanghai）— 279独立实查、直接修正、集成收取；生产加载待停服许可
 
 - 用户通知279完成；Codex核原msg2886合法partial、作者DeepSeek、instance ins_f3684f706645及本Hall一致，SHA1c9779a72ee03e10b03a4be208a04dc20cd3c51fda7e3486b542a0f00d1bd423与本地合法交付结构相同。原302通过/5环境错误/1跳过及合同13/12歧义不改；UTC14:34:17.193394由原creator收取completed，不等于生产验收。

@@ -386,7 +386,7 @@ test('静态合同：精简导出面板 DOM、冗余文案全部移除且不移�
   assert.ok(description >= 0 && description < diagnostics && diagnostics < tasks);
   assert.ok(indexSource.indexOf('/role-diagnostics.js') < indexSource.indexOf('/workspace.js'));
   const versions = [...indexSource.matchAll(/(?:href|src)="\/[^"?]+\?v=([^"]+)"/g)].map(match => match[1]);
-  assert.ok(versions.length >= 7 && versions.every(version => version === '20261019-diagnostics-layout-v2'));
+  assert.ok(versions.length >= 7 && versions.every(version => version === '20261019-role-binding-summary-v1'));
   assert.ok(!diagnosticsSource.includes('innerHTML'));
   // 用户列出的常态说明全部移除，同文案不移藏到别处（index.html / role-diagnostics.js 双向核查）。
   for (const text of ['统一诊断文件', '不改变服务状态', '按时间范围生成一份 JSONL', '（本地）', '仅人类账号可生成', '生成与下载都不会启停服务', '尚未生成诊断日志', '选择角色不会自动扫描', '扫描与导出完整', '可点击“下载日志文件”', '范围内没有诊断记录', '生成诊断日志']) {

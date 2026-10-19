@@ -1,6 +1,6 @@
 # 279接单轮询诊断补数复核
 
-日期：2026-10-19（Asia/Shanghai）。首次交付由Codex独立实查后发现5项校验缺口，Codex直接修正并自检、集成及收取。**生产尚未加载**：正常批量停4角色被自动审批拒绝，待用户明确本次加载许可。280前端未纳入。
+日期：2026-10-19（Asia/Shanghai）。首次交付由Codex独立实查后发现5项校验缺口，Codex直接修正并自检、集成及收取。用户随后明确允许本次正常停启/重载，279已在原4运行角色加载，真实轮询/下载/原父链及约150秒心跳推进通过，Codex保持关闭。代码复核时280前端未纳入；其后独立按280任务收尾，详该片复核。
 
 ## 交付与独立实查
 
@@ -21,10 +21,18 @@
 - 六正式文件SHA等于已测隔离副本；旧schema/transition、API参数/权限/scope/配置、启停/领取/租约、排序/半开时区/31天、10000条/16MiB及单扫描/文件字节时间预算/partial保持。
 - 证据根`.tmp/queue-poll-diagnostics-v1/independent-review/`：archive.json、原候选/报告/patch、source-result-message.json、original-probes/、corrected/、api-recheck/、node/、final-validation.json、integrated.json、collect-receipt.json、deployment-approval-rejected.json和live-unchanged.json。
 
-## 生产边界
+## 当时生产门禁（随后经明确许可加载闭合）
 
 只读预检核原API4820/16632与五原宿主真实归属/新鲜健康、无在途任务及配置。UTC14:35:18再核4个原角色仍原世代/实例running、Codex原stopped，API/宿主/配置不变。原API没有--reload，源码合入不触发加载。
 
 自动审批拒绝批量普通stop4角色，理由是开发授权未明确包含这次实际停服。命令在创建进程前被拒绝，无stop/marker或其它生产动作；未重试或拆分绕过。代码可审并已集成，待用户明确本次停启许可后重核前置、正常重载API并普通关启原4角色，保原关闭Codex与原宿主/归属，不强停/解除owner/改模型；核真实queue_poll下载和周期心跳后补记加载验收。
 
 不扩大为宿主独立心跳、跨宿主/全根治理、模型/领取能力、主动等待、六小时、冷启动或跨沙箱驻留验收。
+
+## 2026-10-19 23:02加载结果
+
+用户明确“允许”正常关启DeepSeek、K3及两个K2.8并重载API，Codex保持关闭。UTC14:54:12重核无在途任务/原Popen归属及配置后普通stop4角色、由原启动器正常API重载至15792/9808；原manager普通start恢复原4角色，宿主未重启。start-all首入口因仍列codex被审批拦截，未执行；改为四角色白名单后获批，Codex始终gen18 stopped，不扩大启动范围，原拒绝记录保留。
+
+UTC14:57:09→14:59:39，4新实例持续归原manager直接父链且ready/idle，心跳各推进约150秒，查询成功seq31→106；各真实JSONL完整，queue_poll12键/开始成功配对/30秒间隔符合合同，Agent403/匿名401。配置/绑定保持，无强停/清owner/额外任务或故意制造生产异常。异常/失败恢复分支仍以隔离证据验收，不宣称本轮生产故障演练。
+
+新实例：DS ins_a3d16c467fec/gen19/原manager16796；K3 ins_940b81b256c9/gen19/17540；旧K28 ins_37442980db95/gen22/9204；页面K28 ins_17649ed04774/gen19/12976。证据为同根deploy/live-first279.json、live-final279.json、4份真实JSONL、正常停启/API回执及deployment-authorization.json；历史预检/原拒绝不追改。本片真实加载核验闭合，完整日志整项边界保持。

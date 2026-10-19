@@ -791,9 +791,15 @@ function roleBindingStateInfo(agent, row) {
 }
 // 运行器登记名可能附有“· 当前模型 执行”，只去掉与真实模型字段相同的尾段，保留其它自定义名称。
 // 有展示名时不再拼接 runtime；缺展示名仍按已上报 runtime 如实降级。
+// 280：三个 Kimi 角色共用旧登记名“Kimi Code · K2.8 Preview 执行”（及不带“执行”的版本），
+// 该名称是历史系统名、不含当前模型事实。仅对 runtime=kimi-code 且登记名精确匹配这一已知旧系统名时，
+// 列表运行器短名统一为 Kimi Code，模型段仍用当前 binding 模型（K3 保持 K3）；
+// 不泛化截断自定义名称，不改运行器/角色永久名称或绑定数据。
+const ROLE_BINDING_KIMI_CODE_LEGACY_NAMES = new Set(["Kimi Code · K2.8 Preview 执行", "Kimi Code · K2.8 Preview"]);
 function roleBindingRunnerText(row, missing) {
   const name = roleBindingText(row.runner_display_name);
   const runtime = roleBindingText(row.runtime);
+  if (name && runtime === "kimi-code" && ROLE_BINDING_KIMI_CODE_LEGACY_NAMES.has(name.trim())) return "Kimi Code";
   const model = roleBindingModelText(row, null);
   const withoutRole = name?.replace(/\s+执行$/, "");
   const suffix = model && ` · ${model}`;
@@ -804,6 +810,27 @@ function roleBindingRunnerText(row, missing) {
 function roleBindingModelText(row, missing) {
   return roleBindingText(row.model_display_name) || roleBindingText(row.model_alias) || roleBindingText(row.model_id) || missing;
 }
+// 280：公开 binding 没有独立的思考强度字段，只从明确的 model_display_name 最后一个中点段拆
+// 已知强度字面量（匹配忽略大小写，显示保留原值），前段（模型名）须非空；未知后缀原样保留为模型名，
+// 不据别名/成员名/运行实例或 native 配置猜值，alias/id 降级值不做强度拆分。
+// 拆不出强度时返回 null：摘要省略该项与对应分隔符，不显示“未提供/未知/默认”等占位。
+const ROLE_BINDING_THINKING_STRENGTHS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+function roleBindingModelAndStrength(row) {
+  const display = roleBindingText(row.model_display_name);
+  const model = roleBindingModelText(row, null);
+  let strength = null;
+  let modelName = model;
+  if (display) {
+    const cut = display.lastIndexOf("·");
+    const head = cut >= 0 ? display.slice(0, cut).trim() : "";
+    const tail = cut >= 0 ? display.slice(cut + 1).trim() : "";
+    if (head && tail && ROLE_BINDING_THINKING_STRENGTHS.has(tail.toLowerCase())) {
+      modelName = head;
+      strength = tail;
+    }
+  }
+  return { modelName, strength };
+}
 function workspaceRoleBindingSummary(agent) {
   const row = roleBindingRow(agent);
   const state = roleBindingStateInfo(agent, row.row);
@@ -811,7 +838,9 @@ function workspaceRoleBindingSummary(agent) {
   const parts = [state.label];
   if (row.present) {
     parts.push(roleBindingRunnerText(row.row, "运行器未上报"));
-    parts.push(roleBindingModelText(row.row, "模型未上报"));
+    const { modelName, strength } = roleBindingModelAndStrength(row.row);
+    parts.push(modelName || "模型未上报");
+    if (strength) parts.push(strength);
   }
   return `绑定：${parts.join(" · ")}`;
 }
