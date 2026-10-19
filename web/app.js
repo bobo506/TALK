@@ -602,6 +602,8 @@ function showLoginError(msg) {
 
 logoutBtn.addEventListener("click", () => {
   loggingOut = true;
+  // 导航可能延迟；先同步清除日志、详情及在途响应的身份上下文。
+  if (typeof roleDiagnostics !== "undefined") roleDiagnostics.sync({ visible: false });
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;

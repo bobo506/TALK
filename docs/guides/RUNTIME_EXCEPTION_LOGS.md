@@ -187,9 +187,9 @@ DeepSeek首次自报281项相关回归，4条stdio pipe用例因受限沙箱WinE
 
 09:56角色启动补验：五服务running/ready、实例idle且归同一新manager直接持有；各launch_claimed/spawned/ready及bridge_started/queue_started共25条真实记录与身份/launch/PID/child_pid吻合，完整写入并按引用查回，ready/queue引用共10条通过维护者CLI；两次同实例心跳均推进约60秒。旧五个271队列引用和正常停止记录保留。证据`.tmp/runtime-logging-parallel-1/host-load272/role-start/`；本次只读、无新任务/模型调用，不声称已验证新宿主实际接单或六小时能力。
 
-273日志查看/健康反馈[正式方案](../spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)已收取。其36项静态检查/67项[设计矩阵](../spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)为发布时基线；274后端实际验证见[复核记录](../spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_274.md)，页面与健康补数仍未验，本地CLI继续作为当前生产定位入口。
+273日志查看/健康反馈[正式方案](../spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)已收取。其36项静态检查/67项[设计矩阵](../spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)为发布时基线；274后端和275页面已独立复核后直接修正并实机加载，见[274复核](../spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_274.md)、[275复核](../spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_275.md)。页面人工效果及健康补数仍待，本地CLI继续可用。
 
-## 274同机查询API（代码通过，尚未部署生产来源）
+## 274/275同机查询API与页面（已加载，页面待人验）
 
 新增两个human-only只读路径：
 
@@ -198,7 +198,7 @@ DeepSeek首次自报281项相关回归，4条stdio pipe用例因受限沙箱WinE
 
 Agent返回403；人类还需存在项目/历史角色对，记录逐条核当前URL scope。网络详情只有净化后文件名/行号/函数及因果链，不给源码行或本地绝对路径；本地维护者CLI行为保持。
 
-来源仅由管理员通过现有配置加载，缺省为空。下列是**虚构示例，未写入本机配置**：
+来源仅由管理员通过现有配置加载，缺省为空。275已在本机config.toml显式登记当前项目五个角色各自绝对根，包含旧/新实例、排除unknown的manager根；换部署机器须重新核对绝对目录，不能直接沿用本机路径。下列是**虚构示例**：
 
 ```toml
 [[runtime_diagnostics.sources]]
@@ -209,4 +209,6 @@ root = "D:/TALK-logs"
 
 每个project/member对唯一、root必须为本机绝对目录；共享根仍严格筛记录身份。未配/来源不可达返回503，没有默认根回退或HTTP路径参数；需正常加载API后才生效。扫描不完整不当作无异常，规范化分页依据已确认变化409、不可安全读取503；不从未找到推断过期。
 
-274原43项/1跳过自报与失败保持；Codex修正后81项相关自检零跳过，含真实Windows换链和随机回环HTTP。尚无生产查询/页面人验、跨宿主、健康新增事件或全根治理，见[复核记录](../spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_274.md)。
+274原43项/1跳过自报与失败保持；Codex修正后81项相关自检零跳过，含真实Windows换链和随机回环HTTP。275串行集成后95项Node、1项真实隔离HTTP联调及五角色实机权限/旧日志检查通过；API已正常加载。部署时配置换行失误的失败及修复、原宿主普通关启恢复、90秒新实例心跳证据见[275复核](../spec/ROLE_RUNTIME_LOG_VIEW_REVIEW_275.md)。
+
+人类Ctrl+F5→角色→具体角色→运行诊断，点击“查看运行日志”才读取，摘要/独立ref与显式详情分开。默认可见本次真实断连留下的历史错误；不要据旧错误判新实例故障。页面视觉/窄屏/键盘人验、跨宿主、健康新增事件及全根治理仍待；API暂断后接单循环error的恢复收敛也需后续独立处理。

@@ -1380,12 +1380,22 @@ function renderWorkspaceRoleDetails() {
   const tasksPanel = document.getElementById("role-details-tasks-panel");
   // ROLE-SETTINGS-1：项目设置与具体角色互斥——选中“项目设置”时角色详情整体隐藏，不残留空白面板。
   const visible = blackboardOpen && workspaceUI.mode === "roles" && !workspaceSettingsSelected();
+  const role = workspaceRoles().find(item => item.member_id === workspaceUI.selectedRole) || null;
+  // 运行诊断是独立静态面板：每次导航都同步完整上下文，离页也在 return 前清理；
+  // 同角色服务轮询只更新证据，不重建筛选、日志或详情节点。
+  if (typeof roleDiagnostics !== "undefined") {
+    const serviceView = visible && role ? roleServiceView(role) : null;
+    roleDiagnostics.sync({
+      visible: Boolean(visible && role), role, serviceView,
+      serviceStatus: serviceView ? roleServiceStatus(serviceView.service) : null,
+      projectId: activeProjectId, accountId: myId, human: currentMemberIsHuman(),
+    });
+  }
   namePanel.classList.toggle("hidden", !visible);
   tasksPanel.classList.toggle("hidden", !visible);
   if (!visible) return;
   namePanel.replaceChildren();
   tasksPanel.replaceChildren();
-  const role = workspaceRoles().find(item => item.member_id === workspaceUI.selectedRole);
   if (!role) { namePanel.classList.add("hidden"); tasksPanel.classList.add("hidden"); return; } // 防御：失效选择由 workspaceSettingsSelected 回退到项目设置
   namePanel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), workspaceEl("h2", "", workspaceMemberName(role.member_id)), workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
   // ROLE-DESC-F1：原硬编码的短标签行（role-description）与解释行（role-explanation）从动态面板移除；

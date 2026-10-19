@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-19 11:35（Asia/Shanghai）— 275独立复核补正，日志查看首版加载，页面待人验
+
+- 用户通知275完成。原task275/result2855/agent:kimi/ins_dd80a6b46ade、精确kimi-code/k3，合法字符串275 complete与本地一致；原正文SHA e574c42cf0c9c61dddb855ba9fc35011ec4a9d012f56a3b84a9d3c18bf91206d。31件精确副本及失败全保留，160冻结来源/8复制件保持，集成前主web与冻结基线相同，原integration.patch检查通过。K3 Hall2860及DeepSeek暂停后才由Codex串行合入，没有互派返修/复核或新派K2.8。
+- 原65项Node通过；Codex新增3反例全失败：pagehide只清内存未清DOM/筛选身份，退出前依赖导航未立即清，详情未呈现退出码/预算及关联引用。直接统一不可见清理、app两行退出钩子、完整详情补数，关联ref只同scope；测试使用正式docs样例，原19断言保留，新22与相关五套共95项全部通过/零跳过，另1项实际页面脚本→随机回环FastAPI/扫描DTO的隔离HTTP联调通过。修正后为Codex自检，非外部回审，不说273矩阵全部验收。
+- 由原creator agent:codex于UTC03:27:44.706628正常收取275，succeeded/completed；原结果2855和自报不改。新JS/CSS、index/workspace最小上下文钩子及测试合入274后端，app仅退出清理；版本20261019-runtime-log-view-v1。显式人类按需查看、筛选/分页/独立ref/详情及五类诚实证据，缺queue/预检/宿主独立证据仍未知。
+- 本机config.toml明确登记本项目五member各自绝对日志根，包含旧/新实例，排除manager unknown根。上线前核human:bobo、全任务队列空、原API健康/父链及入口SHA、五角色running/ready和已知旧引用；正常stop.request关闭原API7020/15048。Codex配置写入将CRLF经Windows默认写入重复为CRCRLF，内存解析通过但新进程磁盘解析失败；原失败配置/日志保持。修显式LF，实际二进制tomllib.load通过后同原入口恢复15828/12568，API健康。
+- 五原manager/bridge断连期间仍活着，服务投影instance_unavailable，35秒观察未恢复ready；未伪写idle或改bridge。空队列下逐个走原宿主普通stop→start，旧bridge退出后新启动，没有强杀、接管、人工解除归属或重启宿主。当前DeepSeek gen15/5240→19556/ins_9a144ce6de1c；旧K28 gen18/3540→17184/ins_4d52400c0478；页面K28 gen15/20148→9508/ins_3a40fa89feb5；K3 gen15/8944→20312/ins_978820044056；Codex gen17/16136→4960/ins_5a8f9b652a22。本轮正常恢复不是向K2.8派开发任务，不扩大旧一回人工恢复授权。
+- UTC03:34:44只读复验五原manager直接父链、本次实例/launch/PID保持、running/ready/idle且无任务，周期心跳各推进约90秒。Key/绑定/模型及非service角色配置保持；五角色human列表/旧ref/详情200且完整、各Agent列表/详情403、无Key401及首页/四静态字节通过，旧日志及真实故障证据仍可查。未调用新模型或Browser。API断连后的error收敛记入后续健康/恢复范围，本片未扩改生命周期。
+- 正式复核ROLE_RUNTIME_LOG_VIEW_REVIEW_275、简报/模块/指南/用户手册/路线及短快照同步；完整证据.tmp/runtime-log-view-v1/independent-review275/及deploy/。95项、HTTP1与274已有81项分开记录，不因数字合计声称长期/模型/全矩阵验收。里程碑暂停：用户Ctrl+F5→角色→具体角色→运行诊断验收摘要、详情、筛选、旧引用、切换清理及窄屏/键盘；无需再重启服务。健康补数/跨宿主/全根治理、选择性自启动及跨沙箱常驻仍待，不开下一片。
+
 ## 2026-10-19 10:53（Asia/Shanghai）— 274独立复核、直接修正与收取，275未集成
 
 - 用户通知274完成。完整MCP摘要及实际task/Hall/作者核对：task274/result2847/agent:deepseek/ins_7cb44d5a1f80/creator agent:codex，合法字符串274 complete与本地相同，原正文SHA 3ebc3e891abb9d6c30f6ab13a754c966d9a159e350e695b062c3f11fcdc75009。原8文件精确副本、开发报告/原测试和指纹保存在.tmp/runtime-log-view-v1/independent-review274/，基线外跟踪差异仅main和Codex此前进度；未读取275交付或合入UI。

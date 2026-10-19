@@ -1,0 +1,220 @@
+/* 角色运行诊断：沿用现有浅色面板，不改变角色列表与任务区布局。 */
+.role-diagnostics-panel {
+  border-top: 1px solid #dce3ec;
+  border-bottom: 1px solid #dce3ec;
+  padding: 16px 14px;
+  color: #24344d;
+  background: #f8fafc;
+  min-width: 0;
+}
+.role-diagnostics-heading,
+.role-log-detail-head,
+.role-log-record-head,
+.role-log-entry-actions,
+.role-log-query-actions,
+.role-log-ref-row-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.role-diagnostics-heading { justify-content: space-between; margin-bottom: 8px; }
+.role-diagnostics-heading h3 { margin: 2px 0 0; font-size: 16px; }
+.role-diagnostics-hint,
+.role-log-redaction-note,
+.role-log-permission,
+.role-evidence-row small,
+.role-log-integrity,
+.role-log-omitted {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.role-diagnostics-hint,
+.role-log-redaction-note { margin: 0 0 12px; }
+.role-evidence-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.role-evidence-row {
+  background: #fff;
+  border: 1px solid #e1e7ef;
+  border-radius: 7px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.role-evidence-row strong { font-size: 12px; color: #475569; }
+.role-evidence-row p { margin: 3px 0; font-size: 13px; overflow-wrap: anywhere; }
+.role-evidence-row small { display: block; overflow-wrap: anywhere; }
+.role-log-entry-actions { margin: 10px 0; }
+.role-log-filters {
+  border-top: 1px dashed #d7e0ea;
+  padding-top: 10px;
+  min-width: 0;
+}
+.role-log-mode { display: flex; gap: 6px; margin-bottom: 10px; }
+.role-log-mode button[aria-pressed="true"] { color: #1d4ed8; font-weight: 600; }
+.role-log-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.role-log-filter-grid label,
+.role-log-ref-row > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: #526177;
+  font-size: 12px;
+}
+.role-log-filter-grid input,
+.role-log-filter-grid select,
+.role-log-ref-row input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #fff;
+  color: #1e293b;
+  padding: 6px 7px;
+  font: inherit;
+}
+.role-log-severity {
+  border: 0;
+  padding: 0;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.role-log-severity legend { color: #526177; padding: 0 6px 0 0; float: left; }
+.role-log-severity label { display: inline-flex; align-items: center; gap: 4px; }
+.role-log-ref-row { margin: 8px 0 10px; }
+.role-log-ref-row > div { display: flex; gap: 7px; align-items: end; flex-wrap: wrap; }
+.role-log-ref-row > div input { flex: 1 1 180px; }
+.role-log-query-actions { margin: 8px 0; }
+.role-log-status,
+.role-log-scan {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.role-log-status.error,
+.role-log-detail-status.error { color: #b42318; }
+.role-log-status.warning,
+.role-log-scan { color: #925b0b; }
+.role-log-status.success { color: #167044; }
+.role-log-records { display: grid; gap: 10px; margin-top: 10px; }
+.role-log-record {
+  border: 1px solid #dbe3ed;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  min-width: 0;
+}
+.role-log-record-head { align-items: baseline; }
+.role-log-time-text { color: #526177; font-size: 12px; }
+.role-log-severity-badge {
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: #eef2f7;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.role-log-severity-badge.error { color: #a81e16; background: #fff0ee; }
+.role-log-severity-badge.warning { color: #87500a; background: #fff7df; }
+.role-log-severity-badge.info { color: #1d5ea8; background: #edf5ff; }
+.role-log-event-name,
+.role-log-stage,
+.role-log-record-meta span,
+.role-log-ref-text { overflow-wrap: anywhere; word-break: break-word; }
+.role-log-event-name { font-size: 13px; }
+.role-log-stage { color: #64748b; font-size: 12px; }
+.role-log-preview {
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.role-log-record-meta { display: flex; gap: 5px 12px; flex-wrap: wrap; font-size: 12px; color: #526177; }
+.role-log-instance.current { color: #166c46; font-weight: 600; }
+.role-log-instance.historical { color: #6b5d45; }
+.role-log-integrity { margin: 7px 0; }
+.role-log-ref-row-display { align-items: flex-start; }
+.role-log-ref-text {
+  flex: 1 1 180px;
+  color: #334155;
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 4px 6px;
+  user-select: all;
+  white-space: normal;
+}
+.role-log-missing-ref { color: #925b0b; font-size: 12px; }
+.role-log-detail-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: 85vh;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 16px;
+  color: #24344d;
+  background: #fff;
+  box-shadow: 0 18px 55px rgb(15 23 42 / 22%);
+}
+.role-log-detail-dialog::backdrop { background: rgb(15 23 42 / 35%); }
+.role-log-detail-head { justify-content: space-between; align-items: flex-start; }
+.role-log-detail-head h3 { margin: 0 0 5px; font-size: 16px; overflow-wrap: anywhere; }
+.role-log-detail-head code { overflow-wrap: anywhere; user-select: all; }
+.role-log-detail-content { display: grid; gap: 12px; margin-top: 10px; }
+.role-log-detail-section,
+.role-log-cause {
+  border: 1px solid #e0e7ef;
+  border-radius: 7px;
+  padding: 10px;
+  min-width: 0;
+}
+.role-log-detail-section h4,
+.role-log-cause h5 { margin: 0 0 8px; }
+.role-log-detail-section p { overflow-wrap: anywhere; }
+.role-log-detail-message,
+.role-log-frame {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  background: #f6f8fb;
+  border-radius: 5px;
+  padding: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.role-log-frames { padding-left: 22px; }
+.role-log-empty-frame { color: #64748b; }
+.role-diagnostics-panel button:focus-visible,
+.role-diagnostics-panel input:focus-visible,
+.role-diagnostics-panel select:focus-visible,
+.role-diagnostics-panel code:focus-visible,
+.role-log-detail-dialog button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.role-diagnostics-panel button:disabled,
+.role-diagnostics-panel input:disabled,
+.role-diagnostics-panel select:disabled { opacity: .58; cursor: not-allowed; }
+
+@media (max-width: 700px) {
+  .role-diagnostics-panel { padding: 14px 10px; }
+  .role-log-filter-grid { grid-template-columns: minmax(0, 1fr); }
+  .role-log-query-actions > button,
+  .role-log-entry-actions > button { flex: 1 1 140px; }
+  .role-log-detail-dialog { padding: 12px; max-height: 90vh; }
+}

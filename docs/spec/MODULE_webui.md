@@ -1,5 +1,7 @@
 # MODULE: Web UI
 
+> 2026-10-19 11:35：275 Kimi K3首次页面候选经Codex独立检查，3个新增反例失败后直接修正离页/退出清理及详情预算，串行集成274。正式目录95项Node及1项真实隔离HTTP联调通过；本机五角色来源/API已加载，真实列表/旧ref/详情和权限验证通过。版本20261019-runtime-log-view-v1，入口具体角色→运行诊断；选中不自动查日志，human-only，缺健康证据仍未知。页面视觉人验待，部署失误与正常恢复见[275复核](ROLE_RUNTIME_LOG_VIEW_REVIEW_275.md)。下段273为当时方案快照。
+
 > 2026-10-19：273由Kimi K3首次交付日志查看/健康反馈权限方案，Codex独立复核后直接修正规范化分页/来源失效、详情/ref、样例路径及预检未知语义，36项静态自检通过并收取；这是方案，两个API和页面尚未实现，不改现有状态/启停。正式[设计](ROLE_RUNTIME_LOG_VIEW_DESIGN.md)、[复核](ROLE_RUNTIME_LOGGING_REVIEW_273.md)。
 
 > 所属项目：TALK
@@ -16,7 +18,7 @@
 
 ## 负责范围
 
-- 文件：`web/index.html`, `web/app.js`, `web/style.css`, `web/workspace.js`, `web/workspace.css`
+- 文件：`web/index.html`, `web/app.js`, `web/style.css`, `web/workspace.js`, `web/workspace.css`、`web/role-diagnostics.js`、`web/role-diagnostics.css`
 - 由 FastAPI StaticFiles 托管在 `/` 路径下
 
 ## 接口契约
@@ -33,6 +35,7 @@
 - `GET /api/messages` — 拉取历史/轮询新消息
 - `WS /ws?token=` — 实时接收推送
 - `GET /api/events?token=` — SSE 实时事件流兜底
+- `GET /api/projects/{project_id}/roles/{member_id}/runtime-logs` 及 `/{log_ref}/detail` — human-only、显式来源的摘要/独立引用及详情；无自动日志轮询。
 - Tailwind CSS CDN（`https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css`）
 
 ## 关键约束
