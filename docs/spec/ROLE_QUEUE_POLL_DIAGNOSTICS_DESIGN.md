@@ -1,6 +1,6 @@
 # 接单轮询诊断补数：实施合同
 
-确认日期：2026-10-19（Asia/Shanghai）。用户在了解用途后明确“好的，那开发吧”。本片属于完整异常日志的健康补数，尚未实现；不代表完整日志整项完成。
+确认日期：2026-10-19（Asia/Shanghai）。用户在了解用途后明确“好的，那开发吧”。279已独立实查、Codex直接修正并集成收取，290 Python/24 Node通过；生产尚未加载，批量停服被自动审批拒绝，待明确加载许可。不代表完整日志整项完成，详[279复核](ROLE_QUEUE_POLL_DIAGNOSTICS_REVIEW_279.md)。
 
 ## 范围与证据含义
 
@@ -17,7 +17,7 @@
 - 每次真正开始查询时递增进程内 `poll_seq`，同一轮开始/结束相同；新 worker 从1开始，关联现有 project/member/instance/launch/run，不跨实例续算。未开始的轮询不得计数。
 - 连续失败仅在查询发现阶段抛出普通异常时加1，并保留首次失败时间和原始异常引用；每次失败仍有完整脱敏异常证据。下一次查询成功立即记录一次恢复，携带恢复前失败次数及首/末失败时间；之后连续失败归0，无新失败不重复恢复。
 - `asyncio.CancelledError` 单独保留取消/停止事实，不算查询失败或恢复。长时间执行模型/持锁不生成新查询成功；旧记录缺字段保持未知。
-- 采用现有 `talk-runtime-diagnostics-1` 的 `extra.queue_poll`，不更改持久根 schema、已有 transition 或旧事件含义。该对象固定且仅含下列13键：
+- 采用现有 `talk-runtime-diagnostics-1` 的 `extra.queue_poll`，不更改持久根 schema、已有 transition 或旧事件含义。该对象固定且仅含下列12键（原正文13为计数笔误，表格未变；冻结合同和原交付不改）：
 
 | 键 | 类型及意义 |
 | --- | --- |
@@ -40,6 +40,7 @@
 
 - 在统一导出每条 event 增加可空 `queue_poll`，仅从 `extra.queue_poll` 严格投影上述固定类型和键集合；缺失为 null，不透传任意 extra。`phase=queue`。
 - 非法字段、未知键、bool 冒充数字、NaN/Infinity、无时区时间或状态/起止不一致不得原样导出；按既有投影失败机制明确不完整，不把坏记录静默算完整。
+- queue_poll仅允许两个既定事件及queue阶段、interval_seconds固定30；成功last_success_at/失败last_failure_at必须等于同轮finished_at的同一瞬间，不要求墙钟先后顺序，以保留回拨事实。
 - 保持 `talk-diagnostics-export-1`、meta、原字段、排序、半开时区范围/31天、10000条/16MiB、单次扫描和现有文件/字节/时间预算、明确 partial、human-only、作用域及脱敏边界。旧两GET、DTO、配置和页面不改。
 
 ## 实施与验收

@@ -17,6 +17,7 @@ import socket
 import sys
 import tempfile
 from bridges import runtime_diagnostics as runtime_diag
+from bridges.queue_poll_diagnostics import QueuePollCycle, QueuePollRecorder
 from bridges.runtime_diagnostics_timeline import StageTimeline, timed_lock
 from dataclasses import dataclass
 from datetime import datetime
@@ -4417,6 +4418,11 @@ async def run_task_queue_worker(
         heartbeat_interval=getattr(args, "task_heartbeat_interval", None),
         poll_interval=getattr(args, "task_poll_interval", None),
     )
+    poll_recorder = QueuePollRecorder(
+        diagnostics,
+        budgets=queue_budgets,
+    )
+    poll_cycle: QueuePollCycle | None = None
     current_task_id: int | None = None
     stop_reason = "unexpected_exit"
     queue_start_log_id: str | None = None
@@ -4430,7 +4436,9 @@ async def run_task_queue_worker(
     try:
         while True:
             current_task_id = None
+            poll_cycle = None
             try:
+                poll_cycle = poll_recorder.begin()
                 discovery_operation = StageTimeline(diagnostics).begin(
                     "task_discovery",
                     phase="queue",
@@ -4448,6 +4456,11 @@ async def run_task_queue_worker(
                     ),
                     key=lambda item: int(item["id"]),
                 )
+                # The query discovery ends here: before the task lock, preflight
+                # or model execution. Task/model delays never create a new poll
+                # success or advance poll_seq.
+                poll_recorder.succeed(poll_cycle)
+                poll_cycle = None
                 if queued:
                     discovery_operation.finish("succeeded")
                 else:
@@ -4590,9 +4603,13 @@ async def run_task_queue_worker(
                         else:
                             preflight_failures.pop(task_id, None)
             except asyncio.CancelledError:
+                if poll_cycle is not None:
+                    poll_recorder.cancel(poll_cycle)
+                    poll_cycle = None
                 stop_reason = "cancelled"
                 raise
             except Exception as exc:
+                query_failure = poll_cycle is not None
                 queue_error_log_id: str | None = None
                 if diagnostics is not None:
                     queue_error_log_id = diagnostics.record_exception(
@@ -4602,6 +4619,13 @@ async def run_task_queue_worker(
                         task_id=current_task_id,
                         budgets=queue_budgets,
                     )
+                if query_failure:
+                    # Only a real exception in the discovery phase increments the
+                    # consecutive query failure streak. Lock waits, preflight,
+                    # task execution and status reporting are recorded by their
+                    # own events and never pollute this counter.
+                    poll_recorder.fail(poll_cycle, queue_error_log_id)
+                    poll_cycle = None
                 last_error = f"task queue worker failed ({type(exc).__name__})"
                 if queue_error_log_id:
                     last_error = _with_log_ref(last_error, queue_error_log_id)

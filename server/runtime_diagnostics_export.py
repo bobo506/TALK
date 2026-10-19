@@ -8,8 +8,9 @@ half-open time window, projects every selected record through the same strict
 one JSON object per physical line.
 
 Only the controlled source, the 274 scanner and the existing DTO projection are
-used.  Raw ``extra`` (except ``extra.transition``), top-level free ``message``,
-prompt/argv/env, source paths and credentials never enter the output.
+used.  Raw ``extra`` (except ``extra.transition`` and the strictly projected
+``extra.queue_poll``), top-level free ``message``, prompt/argv/env, source paths
+and credentials never enter the output.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from bridges.queue_poll_diagnostics import INTERVAL_SECONDS
+from bridges.runtime_diagnostics import LOG_ID_RE
 from bridges.runtime_diagnostics_timeline import (
     FINAL_STATUSES,
     STARTED,
@@ -79,6 +82,24 @@ _TRANSITION_KEYS = frozenset(
         "attempt",
     }
 )
+_QUEUE_POLL_KEYS = frozenset(
+    {
+        "poll_seq",
+        "state",
+        "started_at",
+        "finished_at",
+        "duration_ms",
+        "last_success_at",
+        "last_failure_at",
+        "failure_streak_started_at",
+        "consecutive_failures",
+        "recovered_failures",
+        "error_log_id",
+        "interval_seconds",
+    }
+)
+_QUEUE_POLL_STATES = frozenset({"started", "succeeded", "failed", "canceled"})
+_QUEUE_POLL_RECOVERED_EVENT = "queue_poll_recovered"
 
 
 def utc_text(value: datetime) -> str:
@@ -206,12 +227,159 @@ def _phase(value: Any) -> str | None:
     return text if text in _EXPORT_PHASES else None
 
 
+def _queue_poll_int(value: Any, *, minimum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ProjectionFailure("queue_poll")
+    if value < minimum:
+        raise ProjectionFailure("queue_poll")
+    return value
+
+
+def _queue_poll_duration(value: Any) -> float | int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProjectionFailure("queue_poll")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ProjectionFailure("queue_poll")
+    if value < 0:
+        raise ProjectionFailure("queue_poll")
+    return value
+
+
+def _queue_poll_interval(value: Any) -> float | int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProjectionFailure("queue_poll")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ProjectionFailure("queue_poll")
+    if value != INTERVAL_SECONDS:
+        raise ProjectionFailure("queue_poll")
+    return value
+
+
+def _queue_poll_time(value: Any, *, optional: bool) -> datetime | None:
+    if value is None:
+        if optional:
+            return None
+        raise ProjectionFailure("queue_poll")
+    parsed = parse_recorded_at(value)
+    if parsed is None:
+        raise ProjectionFailure("queue_poll")
+    return parsed
+
+
+def _queue_poll_log_ref(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not LOG_ID_RE.fullmatch(value):
+        raise ProjectionFailure("queue_poll")
+    return value
+
+
+def _queue_poll(value: Any, *, event_name: Any, phase: Any) -> dict[str, Any] | None:
+    """Strictly project only ``extra.queue_poll``; never any other extra key.
+
+    The persisted object is untrusted.  Unknown keys, bool-as-number, NaN,
+    naive time strings, invalid log references and state/boundary
+    contradictions fail the record's projection instead of being echoed.
+    """
+    if not isinstance(value, dict):
+        return None
+    raw = value.get("queue_poll")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or set(raw) != _QUEUE_POLL_KEYS:
+        raise ProjectionFailure("queue_poll")
+    if not isinstance(event_name, str) or event_name not in {
+        "queue_poll_snapshot", _QUEUE_POLL_RECOVERED_EVENT
+    } or phase != "queue":
+        raise ProjectionFailure("queue_poll")
+
+    poll_seq = _queue_poll_int(raw.get("poll_seq"), minimum=1)
+    state = raw.get("state")
+    if not isinstance(state, str) or state not in _QUEUE_POLL_STATES:
+        raise ProjectionFailure("queue_poll")
+    started = _queue_poll_time(raw.get("started_at"), optional=False)
+    finished_raw = raw.get("finished_at")
+    duration_raw = raw.get("duration_ms")
+    if state == "started":
+        if finished_raw is not None or duration_raw is not None:
+            raise ProjectionFailure("queue_poll")
+        finished = None
+        duration = None
+    else:
+        if finished_raw is None or duration_raw is None:
+            raise ProjectionFailure("queue_poll")
+        finished = _queue_poll_time(finished_raw, optional=False)
+        duration = _queue_poll_duration(duration_raw)
+
+    last_success = _queue_poll_time(raw.get("last_success_at"), optional=True)
+    last_failure = _queue_poll_time(raw.get("last_failure_at"), optional=True)
+    streak_started = _queue_poll_time(
+        raw.get("failure_streak_started_at"), optional=True
+    )
+    consecutive = _queue_poll_int(raw.get("consecutive_failures"), minimum=0)
+    recovered = _queue_poll_int(raw.get("recovered_failures"), minimum=0)
+    error_log_id = _queue_poll_log_ref(raw.get("error_log_id"))
+    interval = _queue_poll_interval(raw.get("interval_seconds"))
+    is_recovered = isinstance(event_name, str) and event_name == _QUEUE_POLL_RECOVERED_EVENT
+    # These are the same observed completion instant, not ordering checks:
+    # wall-clock rollback remains compatible with a monotonic duration.
+    if state == "succeeded" and last_success != finished:
+        raise ProjectionFailure("queue_poll")
+    if state == "failed" and last_failure != finished:
+        raise ProjectionFailure("queue_poll")
+
+    if recovered:
+        if is_recovered is False:
+            raise ProjectionFailure("queue_poll")
+    elif is_recovered:
+        raise ProjectionFailure("queue_poll")
+
+    if is_recovered:
+        # A recovery event carries the just-ended failure segment once.
+        if state != "succeeded" or consecutive != 0:
+            raise ProjectionFailure("queue_poll")
+        if streak_started is None or last_failure is None or last_success is None:
+            raise ProjectionFailure("queue_poll")
+    elif state == "succeeded":
+        if consecutive != 0 or streak_started is not None or last_success is None:
+            raise ProjectionFailure("queue_poll")
+    elif state == "failed":
+        if consecutive < 1 or streak_started is None or last_failure is None:
+            raise ProjectionFailure("queue_poll")
+    else:  # started / canceled
+        if consecutive == 0:
+            if streak_started is not None:
+                raise ProjectionFailure("queue_poll")
+        elif streak_started is None or last_failure is None:
+            raise ProjectionFailure("queue_poll")
+
+    return {
+        "poll_seq": poll_seq,
+        "state": state,
+        "started_at": utc_text(started),
+        "finished_at": utc_text(finished) if finished is not None else None,
+        "duration_ms": duration,
+        "last_success_at": utc_text(last_success) if last_success is not None else None,
+        "last_failure_at": utc_text(last_failure) if last_failure is not None else None,
+        "failure_streak_started_at": (
+            utc_text(streak_started) if streak_started is not None else None
+        ),
+        "consecutive_failures": consecutive,
+        "recovered_failures": recovered,
+        "error_log_id": error_log_id,
+        "interval_seconds": interval,
+    }
+
+
 def _project_event(record: dict[str, Any], scope: tuple[str, str]) -> dict[str, Any]:
     detail = project_detail(record, scope)
     event: dict[str, Any] = {"kind": "event"}
     event.update(detail.model_dump())
     event["phase"] = _phase(record.get("phase"))
     event["transition"] = _transition(record.get("extra"))
+    event["queue_poll"] = _queue_poll(
+        record.get("extra"), event_name=record.get("event"), phase=record.get("phase")
+    )
     return event
 
 
