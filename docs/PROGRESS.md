@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-19 09:57（Asia/Shanghai）。用户确认五角色页面“启动成功”，只读实核五个新实例均running/ready/idle，归本轮新宿主直接持有；25条启动相关日志、10条维护者CLI引用查询及五旧引用查回通过，同实例心跳均推进约60秒，原配置保持。272宿主及角色启动日志加载验收闭合；未新增接单/模型验证。273正式方案36静态检查通过、67未来矩阵未实现；本轮收尾不派新任务。
+Updated: 2026-10-19 10:14（Asia/Shanghai）。用户明确“好的继续，先做一版”，已派274给DeepSeek首次实施同机安全日志查询/人类只读API，275给Kimi K3制作隔离运行诊断页面候选；两条派发快照均queued/assigned。基线4768c20、886跟踪SHA/160冻结来源，主目录仅DeepSeek产品写入、K3只写自有.tmp；完成暂停后Codex独立复核、直接修正和串行集成。本轮仅派发收尾，不主动等待，用户通知后取件；尚未上线API/页面。
 
 ## 当前身份与分工
 
@@ -52,13 +52,20 @@ Updated: 2026-10-19 09:57（Asia/Shanghai）。用户确认五角色页面“启
 - 原2839/作者agent:kimi（K3）/ins_23ea501725de，合法字符串273自报与本地一致，SHA cd552f6980376ec53e4e8caf02eb4fc8c9c954f8804c32f57334429d880f2945及原9件不变。独立核17冻结来源/实际代码，发现分页默认过滤/来源失效机制缺口、详情参数矛盾和3项样例路径反例；Codex直接修正。
 - 正式[设计](spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)、[样例](spec/ROLE_RUNTIME_LOG_VIEW_EXAMPLES.json)、[67项未来矩阵](spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)已落盘；修正后36项静态/纯数据检查通过，3反例复测通过，非API产品测试。补领取前预检未知、同机显式来源、manager日志不混角色等边界；API/页面/健康补数均未实现。详[273复核](spec/ROLE_RUNTIME_LOGGING_REVIEW_273.md)。
 
+## 日志查看首版274/275：已派发，未复核或集成
+
+- 274→agent:deepseek，Hall group:task-96f3d6d53e1846c6ab31d07c3ec5a0b2：同机安全provider/严格DTO/规范化分页与失效、人类只读两GET路由；主目录白名单仅新query/models/sources、routes/runtime_diagnostics、main最小注册及三个新测试，其余冻结。来源用现有CONFIG的可选runtime_diagnostics.sources精确project/member/绝对root，缺省空且不可用503，不改生产配置。
+- 275→agent:kimi、精确kimi-code/k3，Hall group:task-06eadc5700b646df96cde0bce96fc1a8：仅kimi-k3-ui/内做可运行候选JS/CSS、index/workspace最小钩子、Node样例交互测试和integration.patch；只读冻结基线，不改主web或后端。入口角色详情“运行诊断”，默认按需24h异常，显式详情/独立ref/筛选分页与诚实未知健康，权限按273。
+- 两者created_by=agent:codex，派发时queued/assigned；最新页面开发要求仍旧交叉分工，原样读取、任务包明确用户2026-10-18最新约定优先。派前两实例idle/无任务，caller身份核对通过；不派K2.8。冻结4768c207c8b9e3fe105ba6b0a9800526e9542070，886跟踪SHA/160必要来源；各自临时DB/日志/随机端口隔离，禁止生产数据/凭据/模型/部署。
+- 完整原包与实际回执在.tmp/runtime-log-view-v1/coordination/，双方用实际task_id合法裸talk-delivery-1交付并暂停；Codex仅维护协调进度及Git，不并行改产品源码。本轮无查询API/页面上线或额外人工验收结论。
+
 ## 下一步与限制
 
-1. 本批272/273均completed，执行者暂停、无新派任务；用户页面启动确认后五宿主/五角色启动及日志加载实机验收闭合，心跳持续推进。下一实施仍按273合同划定同机只读provider/投影等切片，不重复启停/收取，不把加载验收扩大为模型或接单全链路能力。
-2. 下一片仍在原排期第2项：按273合同拆同机只读provider/投影、API与页面等独立实施片；健康阶段补数及全根空间治理仍需单片明确。基线/原包/精确原件与证据在.tmp/runtime-logging-parallel-1/{coordination,baseline,independent-review}/。后续只派DeepSeek/Kimi K3、Codex复核并直接修正，保持隔离与默认用户通知取件；不提前跳全入口预算/会话复用或选择性自启动。
+1. 274/275已按下方范围派发；默认用户通知完成后取结构化交付，先核原件/白名单/实际测试和执行者暂停，再独立复核；问题由Codex直接修正，不返派。跨线集成必须双方暂停，API与index/workspace等公共入口串行。两任务当前领取/完成状态未主动追踪，不把派发回执当开始执行或产品验收。
+2. 当前仍原排期第2项，首版只覆盖人类账号/同机显式来源/按需日志摘要与详情/现有健康证据；独立宿主/queue心跳与预检补数、跨宿主和全根治理另片。272/273已completed，宿主及角色启动加载已验；原件仍在.tmp/runtime-logging-parallel-1/，本批在.tmp/runtime-log-view-v1/。不提前跳全入口预算/会话复用或选择性自启动。
 3. 跨Codex沙箱重启常驻、六小时、固定后端版本、主动等待T/W、冷启动恢复和255完整新建自动ready仍待。12:05退出与沙箱停止仅吻合线索，无逐进程因果链；无无限期自动解除归属授权。
-4. 本轮未读精确用量占比，前轮usage-gate continue但百分比null，不臆测用量；不主动等待或自动唤回。
+4. 本轮usage-gate guard --provider codex --json返回continue，但session/weekly精确比例均null，不臆测用量；本批为同一跨模块里程碑，首次交付复核/集成完成后暂停人工页面验收，不主动等待或自动唤回。
 
-恢复时先读AGENTS.md、docs/PROJECT_BRIEF.md和本快照，再按下一片范围读取唯一负责模块；沿用agent:codex/prj_e8fe7066bbec/lead及DeepSeek/Kimi K3首执、Codex复核/直接修正的分工。272/273已收取、五宿主已重载；本轮新角色加载已核验，下一步按273正式合同划定实施片；任何启停仍先核实时事实。不依赖历史PID操作，不自动重启角色。后续继续派DeepSeek/Kimi K3、不派K2.8；默认派发后结束等待、用户通知后取件。
+恢复时先读AGENTS.md、docs/PROJECT_BRIEF.md和本快照，再按负责范围只读相应MODULE；沿用agent:codex/prj_e8fe7066bbec/lead及DeepSeek/K3首次执行、Codex独立复核/直接修正分工。274/275已派，取件看.tmp/runtime-log-view-v1/coordination/dispatch.json、task-inputs.json、shared-contract.md及baseline-manifest.json；不重复派发或依赖历史PID启停。默认派发后结束、用户通知后取件。
 
 恢复指令：继续项目。
