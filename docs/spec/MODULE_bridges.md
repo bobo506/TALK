@@ -1,6 +1,6 @@
 # MODULE: Agent Bridges
 
-> 2026-10-19：272宿主持久诊断经Codex首次交付独立复核发现4类缺口后直接修正，最终6模块141项自检通过并收取；原报告/失败保持。长期宿主尚未重启加载，公共权限查询/页面/健康与全根治理继续后续。详[272复核记录](ROLE_RUNTIME_LOGGING_REVIEW_272.md)。273查看/健康权限方案也已由Codex独立复核、直接修正并收取，见[正式设计](ROLE_RUNTIME_LOG_VIEW_DESIGN.md)；API/页面尚未实现。
+> 2026-10-19 09:47：272宿主持久诊断经Codex独立复核后直接修正，最终6模块141项自检通过并收取；本轮用户关闭五角色并明确授权正常重启宿主，五新宿主真实host_started/引用回查和持续状态更新均通过，角色仍stopped、待页面启动后核launch/bridge/心跳。原配置/服务、报告/失败保持。公共权限查询/页面/健康与全根治理继续后续。详[272复核记录](ROLE_RUNTIME_LOGGING_REVIEW_272.md)。273查看/健康权限方案已复核修正收取，见[正式设计](ROLE_RUNTIME_LOG_VIEW_DESIGN.md)；API/页面尚未实现。
 
 > 所属项目：TALK
 

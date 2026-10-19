@@ -33,3 +33,11 @@
 `ready`记录表示本地观察本次预分配实例就绪，后续report仍可能失败；host_started/host_stopped为serve调用边界，不单独证明OS进程或接单循环健康。任务领取前模型预检的起止、公共权限查询/API/页面、健康补数和全根容量治理继续后续。
 
 本次未重启长期宿主或五角色，新宿主代码尚未加载实机；271既有bridge日志加载证据不代替272宿主部署验收。没有新增公开日志ref字段，维护者仍用现有本地查询CLI。完整异常日志整项仍未完成。
+
+## 2026-10-19 09:46宿主加载补验
+
+上段保留原代码收取时边界。用户本次先正常关闭五角色，随后明确允许重启宿主；Codex实核五服务stopped、无owner/current_launch、旧bridge退出、任务空、原宿主空句柄后，逐个以drain信号正常退出，确认原manager/wrapper已退出且无同入口进程，再沿原配置隐藏启动新宿主。没有强杀、Popen接管、恢复API或角色/模型启动。
+
+五个真实host_started记录的项目/runtime/PID、完整性及按ref回查通过；另核新进程、私有状态时间推进和配置/服务完全不变。DeepSeek 5240/rtd-844dfdc6e7-000001，旧K28 3540/rtd-ec3fc68d64-000001，页面K28 20148/rtd-f1aba574ee-000001，K3 8944/rtd-f1fe18c960-000001，Codex 16136/rtd-326554a689-000001。manager的member/instance为unknown，不能视为角色或队列健康证明。
+
+首个操作检查器误预期instance=null，既有schema实际规范化为unknown；原失败单独保留，只修检查器并observe同一新宿主，未重复重启或改产品代码。证据`.tmp/runtime-logging-parallel-1/host-load272/`含preflight/源码SHA、逐个正常退出/spawn/ready及verified-all.json。五角色仍关闭，用户页面启动后的launch/readiness/report、bridge队列/周期心跳和新宿主接单尚未验证；本次只闭合宿主代码加载与manager日志，不扩大完整日志整项验收。

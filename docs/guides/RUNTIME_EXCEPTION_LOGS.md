@@ -1,6 +1,6 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
-> 状态：271基础/通用bridge已收取且五角色已加载；2026-10-19任务272宿主持久诊断经Codex独立复核、直接修正及141项相关自检后已收取，**长期宿主尚未重启加载272**。仍没有新增页面、API或MCP查询入口。
+> 状态：271基础/通用bridge已收取且五角色曾加载；2026-10-19任务272宿主持久诊断经Codex独立复核、直接修正及141项相关自检后已收取。09:46用户正常关闭五角色后授权Codex重启宿主，**五新宿主真实host_started日志/引用及持续状态更新已核验，角色仍关闭待页面启动后核launch链路**。仍没有新增页面、API或MCP查询入口。
 > 本文件是维护者入口，不是普通用户页面说明，不能据此声称“完整异常日志整项完成”。
 
 ## 1. 本片实际落了什么
@@ -60,7 +60,7 @@ logs/runtime/
 | 本 run 旧 segment 留存 | 30 天 | `TALK_RUNTIME_LOG_RETENTION_DAYS` 或 `--runtime-log-retention-days` |
 | 关闭本进程写入 | 不关闭 | `TALK_RUNTIME_LOG_DISABLED=1` 或 `--disable-runtime-logs` |
 
-`--runtime-log-*` / `--disable-runtime-logs` 已加入通用parser，Codex/Kimi入口继承。272宿主也支持同名参数/环境变量及临时根注入；内置配方传递显式策略，自定义`--cli-executable`入口argv保持。相对根在宿主解析时冻结为绝对路径，默认开启。现有长期宿主未重载，不能据此称真实宿主已写入新日志。
+`--runtime-log-*` / `--disable-runtime-logs` 已加入通用parser，Codex/Kimi入口继承。272宿主也支持同名参数/环境变量及临时根注入；内置配方传递显式策略，自定义`--cli-executable`入口argv保持。相对根在宿主解析时冻结为绝对路径，默认开启。五长期宿主已于2026-10-19正常重载并实际写入host_started，角色launch日志待页面启动后核验。
 
 ## 3. 轮换、容量与清理
 
@@ -142,7 +142,7 @@ python scripts/runtime_diagnostics.py --ref rtd-031f55a209-000001 --detail --jso
 
 仍未覆盖：
 
-- 272宿主接入代码已完成；长期宿主真实重载/加载验证及公开日志状态展示仍待，不能把271的bridge加载等同宿主已部署。
+- 272五宿主正常重载及manager日志已核验；新宿主下角色launch/readiness/report、bridge心跳及公开日志状态展示仍待，不能由host_started推断接单健康。
 - API 查询权限、页面查看、页面上的健康/日志呈现。
 - `server/logging_config.py` 与 bridge 诊断的统一；API 日志和 bridge JSONL 是两条链。
 - 角色服务启动前的 Python 导入阶段、宿主管道输出、原生 CLI 自身 stderr、MCP 读取等待预算。
@@ -175,12 +175,14 @@ DeepSeek首次自报281项相关回归，4条stdio pipe用例因受限沙箱WinE
 - `scripts/runtime_diagnostics.py`：维护者本地查询入口。
 - `tests/test_runtime_diagnostics.py`：本片隔离验证。
 
-## 272宿主持久诊断（2026-10-19代码通过，尚未加载实机）
+## 272宿主持久诊断（2026-10-19五宿主日志已实机加载，角色待启动）
 
 `scripts/role_service_host_diagnostics.py`复用同一基础API/schema，覆盖宿主claim/预检、输出准备/spawn、所有权保存/readiness、stop/control/timeout、report二次失败、poll恢复及配置worker。角色launch事件带真实项目/member/实例/launch，顶层PID为宿主、子进程PID在extra；manager事件member为unknown，不借用角色。预算按实际已知值记录，MCP等待仍未知。
 
 保护值包括本次实际运营/本人Key、report新claim/owner、实际child_env快照中敏感名称的值；不扫描全环境或额外认证。输出文件准备失败原样传播并关闭部分打开流，不改变原业务/归属；已知日志/降级失败不替换原异常。启发式脱敏的原限制保持。
 
 每个manager/launch使用独立run，仍可用现有CLI跨run按ref/member/instance查询。`ready`是本地就绪观察，不代表后续report成功；host_started/host_stopped是serve边界，不足以证明OS进程/worker健康。公开API/schema未扩展，日志ref仍只在本地；全根空间治理与权限页面后续。详[272复核记录](../spec/ROLE_RUNTIME_LOGGING_REVIEW_272.md)。
+
+09:46实机核验：用户关闭五角色并明确授权Codex重启后台宿主后，五原宿主逐个正常drain退出、新宿主沿原命令启动；五host_started的项目/runtime/PID、完整写入及引用回查通过，并另查真实进程与私有状态持续更新。manager的member/instance均unknown，不混入角色视图。角色保持stopped、归属已释放，配置/服务快照不变，无强杀/接管/恢复API或模型调用；下一步页面启动角色后核launch/bridge/周期心跳。证据`.tmp/runtime-logging-parallel-1/host-load272/verified-all.json`，本次不证明跨沙箱重启常驻或完整日志整项完成。
 
 273日志查看/健康反馈[正式方案](../spec/ROLE_RUNTIME_LOG_VIEW_DESIGN.md)已复核修正收取，含human-only同机显式来源、规范化分页/失效、旧ref与预检证据未知语义。36项静态检查及样例复测不等于API/页面已上线；67项[未来矩阵](../spec/ROLE_RUNTIME_LOG_VIEW_ACCEPTANCE.md)仍not_run，本地CLI继续作为当前定位入口。

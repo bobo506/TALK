@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-19 09:47（Asia/Shanghai）— 用户授权正常重启五宿主，272宿主日志实机核验通过
+
+- 用户先询问重启方法，随后明确“已全部关闭，可以重启宿主”。Codex实核身份agent:codex/项目prj_e8fe7066bbec/lead；页面development_requirements仍旧交叉复核文本，未改永久要求或新派任务。五服务stopped/can_start、无current_launch/owner，实例offline/无任务、对应旧bridge均退出，queued/running任务均为空；原五宿主身份/入口/创建时间与实时私有健康相符、空句柄且serving。
+- 沿已审原入口逐个写本轮drain信号；原宿主自行报告stopped并连同wrapper退出、核无同入口进程后，才归档/移除本轮标记并隐藏启动原命令。不采用旧健康文件重建Popen、不强杀、不调用recover-stopped，不启动角色，不重载API或调用原生模型。原Key/ID/模型/绑定及全部服务快照保持。
+- 新旧manager和真实持久引用：DeepSeek 18784→5240/rtd-844dfdc6e7-000001；旧K28 9296→3540/rtd-ec3fc68d64-000001；页面K28 12320→20148/rtd-f1aba574ee-000001；K3 17932→8944/rtd-f1fe18c960-000001；Codex 3140→16136/rtd-326554a689-000001。逐个核host_started/project/runtime/PID、write_complete=true/truncated=false并按ref查回；总核验五私有状态时间均推进，原进程不在、配置/服务完全相同、角色仍关闭、任务空。
+- 首个重启后的操作检查器误要求manager instance_id=null，实际既有schema规范化为unknown，检查失败原件在deepseek-first-verification-note.json。只修本轮检查器并observe同一个新manager5240，未重复drain/spawn、未改产品代码/schema；最终五条引用通过。证据.tmp/runtime-logging-parallel-1/host-load272/保存preflight、源码SHA、正常退出、spawn/ready、日志/引用及verified-all.json。
+- 272原141项隔离自检保持，本轮是实机操作核验，不追加模型任务或复跑无关测试。五新宿主已加载272，但host_started与私有状态仅证明本次入口/循环及日志；角色launch/readiness/report、bridge队列/周期心跳和新宿主接单未实测。下一步由用户页面启动需要的角色后只读核验，再继续273合同内只读provider/API/页面；完整日志整项、全根空间治理、跨沙箱重启常驻仍未完成。本轮同步相关文档、检查并常规提交推送后暂停。
+
 ## 2026-10-19 00:29（Asia/Shanghai）— 273方案独立复核后直接修正收取，本批两线收尾
 
 - 272已先正常收取并以b40d59c推送（141项相关自检通过、长期宿主未重启）。随后才实读273方案476行、契约/矩阵/检查脚本及17个冻结来源；核当前公开读权限和页面实际实现。原2839/作者K3/本地交付一致，原SHA cd552f6980376ec53e4e8caf02eb4fc8c9c954f8804c32f57334429d880f2945、原9件/开发32自检及59矩阵保持。
