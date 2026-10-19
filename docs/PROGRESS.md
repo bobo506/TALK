@@ -1,13 +1,22 @@
 # Project Progress
 
-Updated: 2026-10-19 20:18（Asia/Shanghai）。276/277已完成首次交付独立复核，Codex直接修正/自检、串行集成和收取，本机API/宿主/页面加载通过。**当前暂停等项目管理者验收诊断文件下载与20条任务分页，不开启下一片。**
+Updated: 2026-10-19 20:52：用户对276/277页面提出验收修改：删诊断区冗余说明/“（本地）”/权限解释/成功范围计数摘要，统一现有右侧详情字号、控件及白底分隔布局；新增左侧主任务列表20项分页，原参与任务分页保持。已派278给Kimi K3隔离首次执行，完成暂停后Codex独立复核、直接修正/集成；只前端，不改导出API/文件/权限或启停。当前仅派发，未新增上线/人验结论。 默认派后结束，由用户通知278完成后再取件。
 
 ## 当前身份与分工
 
 - 项目prj_e8fe7066bbec；当前桌面MCP agent:codex、业务lead。DeepSeek和Kimi K3（agent:kimi / kimi-code/k3）首次执行并暂停，Codex独立检查、直接修正/自检、集成及正式进度/Git收尾；后续不派两个K2.8。页面development_requirements旧交叉文本原值保持，按用户最新约定执行。
 - 默认派后结束、用户通知后取件；276/277已completed，不再重复收取/派返修。本轮不是主动等待/自动唤回适配。上次usage-gate精确session/weekly比例null，不臆测额度。
 
-## 本轮交付及验证
+## 278：本轮页面验收修改（已派，待交付）
+
+- 用户指定删除的四组文字全部移除，不迁到另一处；常态/完整成功不再展示说明长句，生成中/无权限/失败/partial仅保必要短提示。下载文件内原meta完整性/范围/计数保持。
+- 设计沿用角色说明/参与任务的白底、单分隔、24px标题（窄屏20px）、14px标签、15px输入/按钮；标题“诊断日志”，标签开始/结束时间，“生成”“下载”同一工具栏，去灰底及独立结果卡片，保流式上限/迟到与Blob清理。
+- 左侧任务页原根任务/family、四筛选、搜索和顺序后每页20项；底部上一页/页码总数/下一页，切上下文/搜索筛选归首页，刷新保页、缩减夹回；不清已选任务/对话，不改既有参与任务页码和任务API。
+- 278→agent:kimi、creator agent:codex，Hall group:task-2a9b10653d6d4e849f04840c58bd34c8；初始queued/assigned，绑定快照bound、kimi-code/k3。同组前端文件一项串行，未为并行再派DeepSeek。K3仅写.tmp/ui-diagnostics-refinement-v2/kimi-k3/候选/测试/交付，Codex独占正式docs与后续集成。
+- 基线5a1c12c78467fbeeee20cc35dd0cfda92aedad3c、906跟踪SHA/35份冻结源码；design-contract SHA417db73af02a5d59457bd460632b855eed65faab7108321675c937092e602bea，见.tmp/ui-diagnostics-refinement-v2/coordination/。无生产DB/日志/凭据/服务/Browser动作，只有授权派发模型任务；新资源目标20261019-diagnostics-layout-v2尚未合入。
+- 当前caller agent:codex/lead，K3派前新鲜idle/无在途任务，页面development_requirements旧交叉文本保持，依用户最新分工执行。usage-gate continue但session/weekly比例null。Product Design预检无已存用户上下文，设计直接使用本项目现有源码风格；无视觉截图/Browser验收声明。
+
+## 276/277既有交付及验证（原记录保持）
 
 - 276/result2883/DS、277/result2884/K3，原件/SHA/冻结合同与原失败完整保留，原creator已收取。详[276/277复核](spec/ROLE_DIAGNOSTICS_EXPORT_REVIEW_276_277.md)；完整当次记录见[历史](PROGRESS_HISTORY.md)。原274/275实现与原部署失败记录保留，不追改历史结论。
 - 一份JSONL：首行查询/范围/数量/完整性，后续时序事件，内嵌脱敏异常/帧/因果链及实际phase/严格transition。每次真实启动/任务阶段、每次模型预检及修复均记录实际起止/结果/单调耗时；旧缺失时间不补造，不为日志额外调用模型。
@@ -31,7 +40,9 @@ Updated: 2026-10-19 20:18（Asia/Shanghai）。276/277已完成首次交付独�
 
 - 五角色真实下载200且meta完整，Agent403/匿名401；九资源与磁盘字节相同，四新运行launch均有六组配对启动节点，队列空。证据`.tmp/runtime-diagnostics-export-v1/independent-review/deploy/`，重点live-first/live-final、hosts/verified-all及各唯一回执。受管Codex关闭不影响当前桌面协调身份。
 
-## 人工验收与下一步
+## 下一步与原版验收入口
+
+278交付后先核原件/实际代码/必要回归，由Codex直接修正并串行合入，再刷新验收；本轮不把上版等待门禁当已验收通过。原版入口如下，暂不要求重复验收：
 
 1. 保持当前已启动的本机服务，在已有页面Ctrl+F5，以原人类账号登录并打开具体角色。
 2. 在“诊断日志导出”选≤31天时间范围，点击生成再下载JSONL；确认页面无旧日志/异常明细，文件首行说明范围与完整性，后续异常内嵌。改时间会使旧下载失效。
