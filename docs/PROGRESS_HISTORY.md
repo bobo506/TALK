@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-19 09:57（Asia/Shanghai）— 五角色页面启动确认，272启动日志加载验收闭合
+
+- 用户确认“启动成功”。Codex只读核当前caller agent:codex/项目prj_e8fe7066bbec/lead，五绑定保持原模型；新服务均running/ready/ownership_held/can_stop、实例idle且无任务。五bridge真实直接父进程均为上一轮09:46新manager，实时私有状态只持本次launch；原入口身份及源码SHA、完整非service角色配置与重启前快照一致。
+- 两次完整观测保持相同manager/bridge/instance/launch/generation，五周期心跳分别推进：DeepSeek 60.054525秒；旧K28 60.053891秒；页面K28 60.061466秒；Kimi K3 60.084781秒；Codex 60.041882秒；私有宿主状态时间也推进，队列queued/running均空。新实例与进程：DeepSeek gen13/ins_7cb44d5a1f80/5240→16752；旧K28 gen16/ins_8052a7a2a03f/3540→6404；页面K28 gen13/ins_8069bd2ed1ef/20148→11964；Kimi K3 gen13/ins_dd80a6b46ade/8944→8760；Codex gen15/ins_d13df3c49957/16136→19368。
+- 每角色3条host launch_claimed/spawned/ready与2条bridge_started/queue_started共25条持久记录，身份/launch/PID、host extra.child_pid及write_complete/truncated逐一核对并按ref读回；10个ready/queue引用再通过维护者CLI。另核服务端running/ready，不单凭本地ready判report成功。五新manager原host_started引用保留；五旧271队列引用和各一次正常queue_stopped/bridge_stopped跨重启可查，本次启动记录未见warning/error。
+- 新宿主ready及queue引用：DeepSeek rtd-51b1e581b0-000003 / rtd-444058479f-000002；旧K28 rtd-9cadf66321-000003 / rtd-a36b98f246-000002；页面K28 rtd-7f141b64b8-000003 / rtd-ec9e2b6a88-000002；Kimi K3 rtd-873fa3de45-000003 / rtd-4083d4135a-000002；Codex rtd-e1b963fff5-000003 / rtd-b56839cf4e-000002。完整只读证据.tmp/runtime-logging-parallel-1/host-load272/role-start/{first,final,previous-run-retained}.json和verify_role_load.py；操作脚本两轮均直接通过，无生产修改或新增失败。
+- 记录用户页面启动确认及272宿主/角色启动日志加载通过；本轮未重启、调用恢复/启停API、派新任务、调用原生模型或运行浏览器。141项隔离自检结论保持，不重复全量测试，也不将queue_started/idle/心跳当成新宿主真实接单或模型能力证明。273公共日志查询/API/页面/健康补数及全根治理仍待，下一片按既有DeepSeek/K3首次执行、Codex独立复核并直接修正分工推进；文档/进度检查与提交推送后本轮暂停。
+
 ## 2026-10-19 09:47（Asia/Shanghai）— 用户授权正常重启五宿主，272宿主日志实机核验通过
 
 - 用户先询问重启方法，随后明确“已全部关闭，可以重启宿主”。Codex实核身份agent:codex/项目prj_e8fe7066bbec/lead；页面development_requirements仍旧交叉复核文本，未改永久要求或新派任务。五服务stopped/can_start、无current_launch/owner，实例offline/无任务、对应旧bridge均退出，queued/running任务均为空；原五宿主身份/入口/创建时间与实时私有健康相符、空句柄且serving。

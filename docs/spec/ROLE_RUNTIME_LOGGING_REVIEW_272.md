@@ -41,3 +41,11 @@
 五个真实host_started记录的项目/runtime/PID、完整性及按ref回查通过；另核新进程、私有状态时间推进和配置/服务完全不变。DeepSeek 5240/rtd-844dfdc6e7-000001，旧K28 3540/rtd-ec3fc68d64-000001，页面K28 20148/rtd-f1aba574ee-000001，K3 8944/rtd-f1fe18c960-000001，Codex 16136/rtd-326554a689-000001。manager的member/instance为unknown，不能视为角色或队列健康证明。
 
 首个操作检查器误预期instance=null，既有schema实际规范化为unknown；原失败单独保留，只修检查器并observe同一新宿主，未重复重启或改产品代码。证据`.tmp/runtime-logging-parallel-1/host-load272/`含preflight/源码SHA、逐个正常退出/spawn/ready及verified-all.json。五角色仍关闭，用户页面启动后的launch/readiness/report、bridge队列/周期心跳和新宿主接单尚未验证；本次只闭合宿主代码加载与manager日志，不扩大完整日志整项验收。
+
+## 2026-10-19 09:56角色启动与心跳补验
+
+用户随后确认页面“启动成功”。只读核五新实例分别由09:46同一新manager直接持有，服务端running/ready/ownership_held、实例idle/current_task_id=null，实时宿主状态仅持本次launch。两次观测的实例/launch/进程/世代保持，五周期心跳均推进60.04–60.09秒，宿主状态时间也推进；原角色配置与源码SHA保持，queued/running任务为空。
+
+各角色launch_claimed/spawned/ready及bridge_started/queue_started共25条持久日志的项目/member/实例/launch/PID、host child_pid及完整性核对通过，按引用可查；另用维护者CLI查询10个ready/queue引用。服务端running/ready另查，避免只凭本地ready日志判report成功；五新manager原host_started、五旧271队列引用及正常停止记录保留。本次启动记录未见warning/error。当前实例、引用及完整证据在[进度](../PROGRESS.md)和`.tmp/runtime-logging-parallel-1/host-load272/role-start/{first,final,previous-run-retained}.json`。
+
+本轮用户页面启动确认及272宿主/角色启动日志加载验收闭合；Codex没有启停/恢复服务、派新任务、调用原生模型或改产品代码。141项隔离自检保持，新宿主真实接单、六小时、跨沙箱重启常驻、公开API/页面/健康补数及全根治理不由本次结果推断。
