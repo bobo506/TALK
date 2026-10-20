@@ -1,13 +1,14 @@
 # Project Progress
 
-Updated: 2026-10-20 11:35（Asia/Shanghai）。用户新增“本人管理账号无需加入即可查看所有对话”，明确仅自己的账号；已派Kimi K3 #285修复查看权限，创建queued/assigned。284 SQLite核心原独立包保持、尚未按用户通知取件；产品/配置/生产未改。默认派后结束，用户通知交付后独立实查、直接修正/集成与人验。
+Updated: 2026-10-20 13:53（Asia/Shanghai）。用户返回要求继续暂停的285；已核原身份和空闲执行端，正常resume-tree按slice_budget=0恢复，Kimi同实例已第2次接单running/in_progress。284独立包保持、尚未按用户通知取件；产品/配置未改，页面普通任务恢复参数问题仍待修。默认恢复后结束，用户通知交付后独立实查、直接修正/集成与人验。
 
-## 当前285（用户新增查看权限修复，尚未实施/加载）
+## 当前285（用户新增查看权限修复，隔离执行中、尚未上线）
 
 - 用户页面点“查看对话”被未加入提示拦截，要求能查看所有对话；范围确认明确选择“仅我的管理账号（推荐）”。原operator Key只读反查human:bobo/未输出凭据、与当前项目maintainer一致；这是管理入口事实，未做Browser身份验证。其它human/Agent不获全局查看权，不新建管理员体系或数据库字段。
 - 根因：groups元数据允许human全览，app/workspace入口和messages GET仍按成员拒绝；仅改前端不足。方案用显式conversation_access.observer_member_ids名单（默认空），仅名单内已鉴权human且未禁用可全局查看Group/Task Hall；计划只配置human:bobo，当前生产配置未写。
 - 权限接口只读本人能力；前端不凭ID前缀/旧缓存放权，换账号/登出和旧响应须失效。覆盖入口、历史分页/搜索、成果、Group消息/撤回实时及SSE断线补发；非成员查看为只读，发送/附件/回复/mention/任务/成员守卫保持，不自动加GroupMember。
 - 实际task285“管理账号未入群查看对话权限修复”，UTC2026-10-20T03:34:10.219198，project prj_e8fe7066bbec/creator agent:codex/target agent:kimi（kimi-code/k3），Hall group:task-9c2fef8c38f24b628bf15aa438eed7c4。queued/assigned仅创建快照；完成后由用户通知取件，不主动等待。
+- 用户手动暂停后返回；UTC05:52:26.843842以原agent:codex身份正常POST /api/tasks/285/resume-tree，slice_budget=0/authorization_ttl_seconds=5400。manual_pause/queued/accepted/无claim→active，epoch0→1，非委派/预算0/无委派到期保持；UTC05:52:31.963744原K3实例ins_5a0d307d038c已running/in_progress、attempt2。恢复前Win32_Process核bridge13844/parent9728且无子进程；未启停/解除owner、重建任务或删除原文件。证据.tmp/resume-task285/，原任务范围和隔离目录不变。
 - 干净e4c45a07ee0a9320245658c37e4f9a9a4272400e、89冻结源/指定文档SHA；.tmp/admin-conversation-view-v1/baseline/只读，只有kimi/可写候选/sandbox/合成config与DB/证据。coordination/保存身份事实、原包/manifest/开发要求/回执；只两份正式进度为例外。
 - 产品候选仅新server/conversation_access.py、routes/members.py/messages.py、main.py、web/app.js/workspace.js/index.html；相关新/旧测试白名单固定。不改models/db/auth/host/角色/Key/生产配置或284目录，与284产品白名单无重叠；用户明确新提出的权限修复另片，不顺带开群聊功能。
 - 必须合成SQLite/ASGI真实路由与WS/SSE、Node真实入口接线/只读发送/账号切换等正反验证；无Browser/8000/原生模型/生产读取启停。首次实现自测交付暂停，Codex独立实查并直接修正；配置/正常加载/页面人验在复核后安排，当前仍未修复上线。
@@ -37,11 +38,11 @@ Updated: 2026-10-20 11:35（Asia/Shanghai）。用户新增“本人管理账号
 - 用户明确当前TALK目录不改；main/独立worktree总目录布局仅针对以后新项目。本轮不迁目录、不创建群聊分支，不改变当前功能排期。
 - 原角色/Key/模型/owner/启停、旧local scope/ref/cursor/导出partial与脱敏保持。B2a不把内部payload接口当可接受任意客户端JSON的公开接收口；B2b投影门禁须先闭合才能上线。
 
-## 新发现：临时断网与任务树暂停（咨询，未操作）
+## 临时断网与任务树暂停；285已正常恢复，页面缺陷待修
 
 - 暂停撤销整树claim，运行项回queued/accepted，保Hall/结果/磁盘文件；正常联网时bridge收到claim失效后取消本地命令，恢复会新attempt，不是原生模型上下文冻结续跑。独立根任务需逐棵暂停，断网本身不等于已下达暂停；服务端paused/idle不单独证明原生进程已退出。
-- 实查发现普通非委派根的页面恢复参数不匹配：web/app.js resumeTaskTreeFromBlackboard固定提示/提交slice_budget=1..3，server/routes/tasks.py resume_task_tree对may_delegate=false要求0。284/285原派发回执均false。暂停入口可用，但这类任务不能保证仅靠页面继续恢复；用户回来后可明确要求Codex按正确参数核对现场并恢复。
-- 本轮只回答使用问题/记录缺陷，没有实际暂停、恢复、终止/启停或修改产品；恢复入口修复尚未派发，不自动加到正在执行的285范围。
+- 实查发现普通非委派根的页面恢复参数不匹配：web/app.js resumeTaskTreeFromBlackboard固定提示/提交slice_budget=1..3，server/routes/tasks.py resume_task_tree对may_delegate=false要求0。284/285原派发回执均false。暂停入口可用，当前不要依赖此按钮恢复普通任务；285已按正确参数从正常API恢复。
+- 11:38咨询时未操作；13:52用户返回后仅恢复285，并确认K3已重新接单。284未恢复/取件，角色/服务/owner/配置未动；恢复入口修复尚未派发，不自动加到285范围。恢复是新attempt，保已有文件与记录，不保证原生调用原地续跑。
 
 ## 已验基础与协作
 

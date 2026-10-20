@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-20 13:53（Asia/Shanghai）— 用户返回后正常恢复285，Kimi已第2次接单
+
+- 用户表示285已暂停、询问“授权续一批”按钮。重新核实际任务manual_pause/paused/queued/accepted、attempt1、无claim/实例/lease/result；may_delegate=false。确认页面固定slice_budget=1..3与普通根服务端要求0冲突，告知先别按并按正确参数恢复，不将缺陷扩大进285原开发范围。
+- MCP身份agent:codex/agent、K3同实例ins_5a0d307d038c新鲜idle且无任务；恢复前只读Win32_Process核bridge13844/parent9728、创建时间10:16:44.435601且无子进程。沙箱CIM拒绝后仅提升只读核验成功；无命令行/凭据输出、无强杀或旧PID接管。
+- 使用原agent:codex Key在内存鉴权GET本人/精确285，核creator/target/project/root及非委派/暂停条件后，UTC05:52:26.843842正常POST /api/tasks/285/resume-tree，body slice_budget=0、authorization_ttl_seconds=5400。控制active、epoch0→1、预算0且无委派到期；UTC05:52:31.963744再核K3原实例已running/in_progress/attempt2，未把仅queued称已执行。
+- 原Hall/文件/内容/隔离候选保留；未重建任务、改模型/绑定/owner/Key/config、启停服务或触碰284。证据.tmp/resume-task285/含精确前置条件脚本、before/receipt/verification及claimed-after-resume.json；不提交凭据/原任务全文。
+- 无产品改动/测试或页面验收；只两份正式进度记录本次实际操作。页面恢复参数缺陷仍待独立修复，默认恢复后结束，用户通知285完成后取件实查；284仍按原独立任务包及用户通知约定保持。
+
 ## 2026-10-20 11:38（Asia/Shanghai）— 热点断网暂停咨询；发现普通根任务页面恢复参数问题
 
 - 用户询问离开带走手机热点，能否点“暂停整棵任务树”、回来继续。只读核MODULE_tasks、pause/resume/release、bridge心跳和页面按钮；未请求/执行实际暂停或恢复。
