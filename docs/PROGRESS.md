@@ -1,48 +1,36 @@
 # Project Progress
 
-Updated: 2026-10-20 21:21（Asia/Shanghai）。用户明确取消固定10轮，改用上下文占用达到窗口上限60%换新会话；灵活选择、首轮完整/续轮增量/换窗恢复保持。已同步需求/使用说明草稿和手册未上线提示，TALK尚未采集相关指标或实现续用；287已收取，下一取证/实现片仍待确认。
+Updated: 2026-10-20 21:48（Asia/Shanghai）。用户明确“那确定了，动手开发吧”，288已派DeepSeek首次实现会话选择、60%换窗及首轮完整/续轮增量的离线内核，创建queued/assigned。默认用户通知完成后取件；尚无开发交付/独立验收/集成结论，不开启真实采集/续用或部署。
 
-## 最新需求：首轮完整、续轮增量、换窗恢复
+## 当前开发：288会话机制内核首片
 
-- 派发者按工作关联性决定同角色续用/新建执行对话，系统按上下文占用>=60%换新窗，取消固定10轮及后备轮数。新窗首轮带当前完整任务介绍，续轮只带任务与变化内容；协调输出和bridge不能重复固定包装或全量Hall历史。
-- 占用使用DSH同类projectedTokens/pressureTokens及contextWindow，可含估算，TALK尚未采集；桌面实机值未读取。建议下条指令投递前按原始比例判断，不强停在途任务；缺失/过期/错会话模型保持未知、建议新窗，不填0%。采样/异常/并发和配置入口待实现片明确，60%不称实测最优。
-- [机制需求与使用说明草稿](spec/EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)已落盘；[用户手册](guides/USER_MANUAL.md)说明当前没有该操作入口，真实上线同片补齐选择/上下文占用及未知提示/换窗/恢复步骤和人验。不能把草稿写成已可用。
-- 新方向允许同功能多个独立TALK任务共用执行会话，旧287同任务修复候选不作产品限制；任务账本/权限/隔离与owner守卫保持。记录需求不授权S0或实现派发。
+- 本人MCP实测`agent:codex`/agent、lead、project `prj_e8fe7066bbec`；页面最新开发要求仍旧交叉复核文本，原样存快照，按AGENTS最新约定：DeepSeek首次实现/自测/交付暂停，Codex独立实查/直接修正。Kimi额度暂停所有新派发保持。
+- 用户已确认机制并要求开发，本次拆出[首片合同](spec/EXECUTION_SESSION_CORE_SLICE_1.md)：只实现纯数据统一规划入口和测试，不依赖或改真实DSH配置。真实指标采集/原生会话创建恢复/任务MCPAPI/页面和部署另片确认，不将本次授权扩大为自动连续开片或启停。
+- 288：creator `agent:codex`、target `agent:deepseek`，Hall `group:task-793daa1d8d874e3d966ac5a181a2190c`；独立顶层四参数，创建queued/assigned。派发前DeepSeek原`ins_00acba0f8a9b`/PID12284为idle/无当前任务，queued仅286且paused、running为空。
+- 基线`48526a7851561cd81a42deb3bb82652105df2089`；22份公开源/测试/指定文档共1,149,727字节冻结在`.tmp/execution-session-core-v1/baseline/`。manifest、身份/要求快照、原合同/请求及创建回执在`coordination/`，均执行者只读；唯一可写`deepseek/`，候选仅`candidate/bridges/execution_sessions.py`和`candidate/tests/test_execution_sessions.py`，其它为本片测试/交付产物。
+- 必验：显式新/续用、结构化工作线/角色/工作区/配置/会话代次/基础合同匹配，同工作线不同任务可续；busy/无独占不得同home fresh绕过；原始整数阈值59.9%可续/60%换窗，projected优先/非法未知过期不当0、无轮数兜底；新窗完整/续窗只增量和必要新Hall、任务独立留档可还原、输入不变。
+- 仅标准库离线合成测试，python -B避免冻结区pycache；模块不IO/读环境/启动进程/创建真实会话，正式bridge不导入新模块。不改正式源/测试/文档/Git、配置/Key/绑定/owner或286产物，不读真实会话/profile/生产日志DB，不启停/原生CLI/ACP/额外模型/Browser。
+- 执行者交真实288完整裸JSON及README/代码/测试回执后暂停；Codex优先取只读交付摘要再独立看实际代码/反例，有问题直接修正并自检，不默认追加返修/回审。内核通过不等于真实采集/原生续用/桌面同窗/MCP增量派发或缓存效果通过。
 
-## 当前完成：287只读核查与补正
+## 已确认的整项机制
 
-- 本人MCP实测`agent:codex`/agent、lead、project `prj_e8fe7066bbec`。开始实查时DeepSeek原`ins_00acba0f8a9b`/PID12284上报idle/无当前任务，已暂停；未重派或唤回。页面旧交叉复核要求不改，按AGENTS最新分工由Codex独立实查/直接修正，Kimi额度暂停保持。
-- 287原结果2893为合法complete自报；原11份交付和原始MCP结果保留，不追改。接受的是补正后的只读方案，非当前产品续接或缓存优化验收。详[287复核与补正](spec/EXECUTION_SESSION_CACHE_REVIEW_287.md)和[原切片合同](spec/EXECUTION_SESSION_CACHE_AUDIT.md)。
-- 独立核对42冻结/14安装源码SHA、102引用及源哈希、原合成测量复现、MCP/本地交付一致及真实287校验；9项独立纯函数/静态探针通过。均为静态/合成，不是模型或产品回归。
-- 六组补正：默认源码与实机证据边界；retry累计/缺失cache/total与reasoning口径；续接不保证少输入；task/attempt/execution/launch与目录身份隔离；home锁失败不在同home fresh；历史pycache短暂写入冻结区如实记偏差。严格全程零写入不标通过，现42源一致且无pycache。
-- 补正方案及原证据索引在`.tmp/execution-session-cache-audit-v1/independent-review287/`；`corrected/`是Codex副本，原`deepseek/`未覆写。`collect-receipt.json`确认287 completed，结果仍2893。
+- 派发者按工作关联性选择同角色续用/新建；系统按上下文占用>=60%换窗，已取消固定10轮及任何轮数后备。新窗首轮完整介绍，续窗只任务与变化，协调输出和bridge均不重复固定包装/全量Hall。
+- 允许DSH同类projectedTokens/pressureTokens/contextWindow估算；数值须标来源/采样/会话与模型，不把累计计费或缓存率当占用。建议每次投递前检查，不强停在途任务；未知不按0%，建议新窗；详细采集/异常/并发接线尚未实施。
+- [最新需求与使用说明草稿](spec/EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)已更新开发状态；手册仍标未上线，真实入口落地同片补齐选择/占用/换窗/恢复及人验。本首片无用户操作变化，不提前编造步骤。
 
-## 核查结论与未知
+## 已有结果和边界保持
 
-- 默认bridge/headless每次新进程/新会话，未保存原生session id或接跨任务续用。原生持久化仅证明保存，默认DSH usage字段存在但bridge无结构化采集；实际argv/profile/预检补丁/native home未读，不把默认源码外推为当前实机事实。
-- 实际缓存命中率、费用/收益保持未知；少追加应用层prompt不能证明模型少输入，恢复仍可能带完整有效历史。缓存字段缺失不填0，retry不同attempt累加，total/reasoning不重复求和。
-- 本轮没有产品/生产修改、启停、原生CLI/真实模型/ACP探针、Browser或真实会话/认证/profile/环境值/DB/生产日志读取。用户手册无操作变化，不新增步骤。
+- 287已独立实查、六组方案补正和9项针对性探针通过，结果2893原complete/11产物保留，已收取completed。见[287复核](spec/EXECUTION_SESSION_CACHE_REVIEW_287.md)；源码默认无续用接线、实际argv/profile/home与真实usage/收益未知不因开始本片而改变。
+- 285管理账号只读查看及DeepSeek状态00bdcff/02c7692已加载人验；282/279/280/278原局部验证/人验保持。未重启API/宿主/角色或改绑定。
+- 286仍普通中止：上次及本次派发前核为queued但paused，不恢复/收取/重用；原233份约8.78MB候选原位保留未集成。284接收内核关闭/三表保留，不删库表或启用上传。
+- 日志按本机采集/诊断/导出/留存、跨设备手动转移；日志覆盖/全根留存与全入口21600预算待办保持，不开其它功能。角色/Key/模型/owner/启停权限、终端等待预算和原失败证据不改。
 
-## 下一步（未确认/未派发）
+## 下一步与交接
 
-按上述新需求重新给出具体下一片建议，先说明目的/范围/不变项/验收并获用户确认。S0只读补齐DeepSeek实际argv/transport、预检补丁、native home/有效插件开关仍是候选，未执行/派发；不得把需求澄清或写手册当作新取证/实现授权。
+- 当前仅288已派，不主动等待/唤回/重派；用户通知完成再取件。相关执行者暂停后由Codex独立实查/直接修正，必要验证/进度/Git收尾按同片授权完成；下一片先说明目的/范围/不变项/验收并获确认。
+- 原生指标和会话适配、派发/MCP存档与增量指令分离、实机加载/页面验收仍待，不根据本次开始开发自动部署或迁移。每片先确认及人工里程碑门禁继续有效。
+- 本轮正式仓库仅新增首片合同、更新PROGRESS/PROGRESS_HISTORY/PROJECT_BRIEF/DEVELOPMENT_ROADMAP及总需求；原产品源和既有未跟踪产物不改不清理。交接版本以最终HEAD为准，产品基线48526a7固定。
+- 精确额度占比未读取，不作推断；不把派发/冻结自检当成开发者测试或独立验收。
+- 派发准备自检通过：22冻结SHA及非文档正式源一致、6份UTF-8文档、10个新增本地链接、Git差异/范围与288创建回执，见`.tmp/execution-session-core-v1/coordination/verification.json`。本轮无产品测试/真实模型探针。
 
-usage侧车、同任务修复续接、跨任务实验继续是后续建议，各片另行确认。日志导出覆盖/全根留存和全入口执行预算21600待办保持，不借本片提前宣称完成或批准实施。
-
-## 既有完成与边界保持
-
-- 285管理账号未入群只读查看已加载且人验；仅human:bobo，读200/写403，不自动入群，原162 Python/81 Node证据保持。
-- DeepSeek状态补正00bdcff/170相关自检、02c7692普通加载及页面人验保持；未重启角色/API或更改绑定。282/279/280/278已有局部验证/人验不代表日志整项完成。
-- 286上次核queued/accepted但control_status=paused、无实例/结果、未收取；233份约8.78MB旧候选原位保留未集成，不恢复/重用。284接收内核关闭、三张表保留，不删库表或启用上传。
-- 日志仍按本机采集/诊断/导出留存，跨设备手动转移；HTTP接收/来源/outbox不列当前必做。角色/Key/模型/绑定/owner/启停守卫、终端等待预算不变。
-- 每片先获明确确认；已授权片内复核/直接修正/自检/进度Git收尾不重复询问。默认派发后结束，由用户通知取件；Kimi及其它Kimi角色暂停新派发，直到用户明确恢复。
-
-## 交接
-
-- 产品基线510c9c4、287收尾795edb7、机制文档329a44d；本轮仅更新会话机制需求/手册/PROGRESS/PROGRESS_HISTORY/PROJECT_BRIEF/DEVELOPMENT_ROADMAP，交接版本以最终HEAD为准。原源码与未跟踪产物不改不清理。
-- 287补正时6份UTF-8文档、7个新增本地链接、Git差异/范围及收取回执自检通过，见independent-review287/final-verification.json；此为287历史证据，不当作本轮新检查。不把Codex修正后的自检称为他人独立复核。
-- 已确认287方案及本轮新交办机制要求；S0及所有实现/模型实验未批准、未派发。精确额度占比未读取，不作推断。
-- 上轮机制文档6份UTF-8/7个新增链接自检为历史证据，见`.tmp/execution-session-window-requirements/verification.json`，不当作本轮新检查；本轮不运行产品测试或真实缓存对照。
-- 本轮60%规则更新的6份UTF-8文档、5个新增本地链接、Git差异/范围、固定轮数移除及手册未上线标记自检通过，证据`.tmp/execution-session-window-context60/verification.json`，含3份安装公开源码/说明哈希。
-
-恢复指令：继续项目（恢复60%上下文阈值、已取消十轮及首轮/续轮机制；287已收取，不重复派发，不自动开启S0或实现）。
+恢复指令：继续项目（恢复288当前授权和状态，不重复派发；用户通知完成后取件，不自动开启后续片）。

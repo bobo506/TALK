@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 21:48（Asia/Shanghai）— 用户确认开发，288会话选择/阈值/增量内核已派
+
+- 用户在确认60%换窗、取消固定10轮、首轮完整/续轮增量后明确回复“那确定了，动手开发吧”。Codex据此拆首片实际代码实现，说明范围为不依赖真实生产配置的离线统一内核；真实DSH采集/原生会话接线及部署另片确认，本次不扩大为连续开片/启停授权。
+- MCP确认本人agent:codex/agent、lead、project prj_e8fe7066bbec；页面最新development_requirements仍是旧交叉复核文本，原样留快照，不改页面。DeepSeek原ins_00acba0f8a9b/PID12284上报idle/无任务；派发前queued仅286且paused、running为空。Kimi额度暂停保持，按AGENTS最新分工首次实现/自测/暂停，Codex独立实查/直接修正。
+- 产品基线48526a7851561cd81a42deb3bb82652105df2089，22份公开源/测试/指定文档共1,149,727字节逐字节冻结，manifest、身份/要求快照、原合同/请求和创建回执在.tmp/execution-session-core-v1/coordination/；baseline/coordination只读，执行者唯一deepseek/可写。候选仅bridges/execution_sessions.py、tests/test_execution_sessions.py，不改正式代码或Git。
+- 实际任务288，creator agent:codex、target agent:deepseek、Hall group:task-793daa1d8d874e3d966ac5a181a2190c；最小四参数独立顶层，创建queued/assigned，不据派发声称已开发/验收。未主动等待/读取后续任务状态，默认用户通知完成后取件。
+- 合同要求统一纯数据规划入口：显式选择新/续用，结构化范围/会话代次/基础合同隔离，同工作线不同task可续；busy/无独占不通过同home fresh绕过；projected优先/pressure有条件回退、非法/未知/过期不当0，原始整数60%比较且无轮数后备；新窗完整、续窗仅增量/必要新Hall，不靠正则删除正文，留档可还原，输入不可变。会话generation跨同窗任务稳定，不误用每任务execution id强制新窗。
+- 仅离线合成测试，python -B防冻结区pycache，禁止原生CLI/API/ACP/额外模型、真实会话/profile/认证/日志/DB或owner读取，不启停。交付真实288裸JSON/README/代码/测试回执后暂停，Codex独立实查和直接修正；内核自测不当真实指标、原生续用、桌面同窗、MCP增量派发或缓存效果验收。手册仍正确标未上线，本片无用户操作变化。
+- 本轮派发准备自检22冻结SHA/正式非文档源一致、6份UTF-8文档、10个新增本地链接、Git差异/范围及288创建回执通过，证据coordination/verification.json；不是开发者测试或独立验收。按持续授权常规提交/推送六份协调文档，不纳入候选或其它未跟踪产物。
+
 ## 2026-10-20 21:21（Asia/Shanghai）— 用户改为60%上下文占用换窗，取消十轮
 
 - 用户询问能否读取DSH窗口下方的上下文进度。Codex只读核对本机npm DSH0.1.5-rc.2的token-meter和client-ui-conversation公开源码：UI优先projectedTokens、回退pressureTokens，以contextWindow计算占用；数值包含估算/历史采样，不等于会话累计计费。未读桌面实际会话/运行版本或原生profile，TALK仍无结构化数值采集。
