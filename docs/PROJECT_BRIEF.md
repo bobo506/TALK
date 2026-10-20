@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 16:21：用户明确确认285页面“验收通过”，管理账号未入群查看完整对话/成果及只读行为的人验门禁闭合，8be3921加载及原验证保持。本轮仅记录验收、更新进度/Git；DeepSeek查询恢复后的error状态残留仍单独待处理，不启停角色、不派B2b，Kimi继续暂停新派发。详[285加载/验收记录](spec/CONVERSATION_ACCESS_LOAD_285.md)及[当前进度](PROGRESS.md)。
+
 2026-10-20 15:53：用户同意后已正常加载285，仅human:bobo全局只读查看生效，原未加入Hall读200/发送403，页面人验待确认；配置/SQLite私有备份完成，284三张新日志表各0行、接收仍关闭，旧结构/业务记录/Key/绑定/归属保持。角色未重启，DeepSeek查询已恢复但断连error残留、就绪unknown，单独待处理；Kimi继续暂停新派发，不开B2b。详[285加载记录](spec/CONVERSATION_ACCESS_LOAD_285.md)和[当前进度](PROGRESS.md)。下列为此前阶段记录。
 
 2026-10-20 15:28：285管理账号未入群只读查看已独立实查，9个新反例失败后Codex直接修正，联合162 Python/81 Node通过并集成收取；任务停止入口统一“中止任务”，保派发者复用编号能力。静态HTTP已核，生产权限配置未启用/API未重载；加载会新增284三张空日志表（接收仍关闭），待用户确认该具体加载及后续页面人验。用户明确Kimi额度用尽，AGENTS已记暂停Kimi新派发，后续首次执行先DeepSeek。详[285复核](spec/CONVERSATION_ACCESS_REVIEW_285.md)、[验收说明](guides/CONVERSATION_ACCESS_ACCEPTANCE_285.md)及[当前进度](PROGRESS.md)。

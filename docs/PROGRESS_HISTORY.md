@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-20 16:21（Asia/Shanghai）— 285管理账号只读查看页面验收通过
+
+- 用户对285已加载后的验收问题明确答复“验收通过”：原管理账号human:bobo刷新后，未加入任务的完整对话/成果可读，未加入时发送/附件/回复不可用。本次页面门禁闭合，原代码/加载提交8be3921及此前162 Python/81 Node、实际加载验证保持，不重跑无关测试。
+- 本人MCP仍agent:codex/agent、项目prj_e8fe7066bbec、业务角色lead。本轮仅记录人工答复、同步285复核/加载/验收文档、当前快照/简报及日志计划；不改产品/配置/数据库，不做Browser、不调用模型、不派新任务或启停角色。
+- DeepSeek此前查询已恢复但error/ConnectError残留、公开就绪unknown的已知问题仍待单独处理，不因285人验通过宣称角色状态也验收通过；Kimi额度暂停新派发保持。先收尾本次验收记录，后续先处理状态残留，再回原日志B2b及既定排期。
+- 原deploy285/verification.json等加载证据按当时pending状态原样保留，新增deploy285/human-acceptance.json登记本次明确答复，load-plan/load-execution更新为页面已验收。必要验证为文档差异/UTF-8/新增或修改链接检查及Git范围核对，随后提交/常规推送，不扩大权限或加载范围。
+
 ## 2026-10-20 15:53（Asia/Shanghai）— 用户批准285正常加载，仅本人管理账号只读；三张日志空表落库
 
 - 用户明确选择“同意正常加载（推荐）”，授权配置/SQLite备份、仅human:bobo观察名单、正常API重载与284三张空表；日志接收仍关闭，角色不重启。本人MCP agent:codex/agent、lead及项目身份已核，全局queued/running均为空。

@@ -1,6 +1,6 @@
 # 285 管理账号查看权限正常加载记录
 
-日期：2026-10-20（Asia/Shanghai）。用户明确选择“同意正常加载（推荐）”后，本次加载于15:45完成，15:48接口/数据核验通过。**仅`human:bobo`启用Group/Task Hall全局只读查看，页面人工验收待用户确认。** 日志接收保持关闭，没有派发新任务或调用模型。
+日期：2026-10-20（Asia/Shanghai）。用户明确选择“同意正常加载（推荐）”后，本次加载于15:45完成，15:48接口/数据核验通过。**仅`human:bobo`启用Group/Task Hall全局只读查看；16:21用户明确确认页面“验收通过”，本次未入群查看及只读行为的人验门禁闭合。** 日志接收保持关闭，没有派发新任务或调用模型。
 
 ## 授权、备份和正常重载
 
@@ -35,4 +35,6 @@ API正常重载期间，原DeepSeek bridge12612/实例`ins_39ba69bf6dfe`在15:45
 
 证据根`.tmp/admin-conversation-view-v1/independent-review/deploy285/`：`preflight.json`、`config-applied.json`、`config-git-scope.json`、正常停止/启动/ready回执、`verification.json`、首轮缺头预期失败及第二轮就绪差异、`deepseek-post-reload-poll.json`和受限加载脚本。原285/284交付与失败证据保持，备份内容仅留私有目录。
 
-请按[285页面验收说明](../guides/CONVERSATION_ACCESS_ACCEPTANCE_285.md)用原管理账号刷新验收未入群查看及只读行为。此次实际加载不替代页面验收；验收前不自动开启下一开发切片。
+用户随后对[285页面验收说明](../guides/CONVERSATION_ACCESS_ACCEPTANCE_285.md)对应的验收问题明确答复“验收通过”：原管理账号未加入任务的完整对话/成果可读，未加入时发送/附件/回复不可用。新增`deploy285/human-acceptance.json`保留本次明确答复；加载时`verification.json`的pending标记为当时事实，不追改原证据。
+
+285人验已闭合；DeepSeek错误状态残留仍待单独处理，不能将页面只读功能验收外推为角色状态验收。本次仅文档/进度/Git收尾，不重启角色或自动派发日志B2b。
