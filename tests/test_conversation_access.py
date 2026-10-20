@@ -377,5 +377,3 @@ class ObserverBackfillRevocationTests(RouteTestCase):
                 session.add(member)
                 session.commit()
         self.assert_backfill_stops_after(disable)
-
-
