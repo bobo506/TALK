@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-20 10:01（Asia/Shanghai）— 282独立实查、修正合入收取；169用例/67秒隔离通过，宿主加载待验
+
+- 用户通知282完成。本人MCP身份agent:codex/agent、lead/项目prj_e8fe7066bbec；DeepSeek UTC01:47:51.880027已idle/current_task_id=null。msg2889合法282/partial，作者/接单ins_a3d16c467fec/Hall/creator一致，与本地delivery全文相同，SHA28759b6eed3cc0db19b35510eb95550b5cd964bcebf8c2f820a2245ab48c2e80；稳定引用ok，UTC02:01:25.578048收取completed。原partial/ACL/固定时间窗失败、候选及67.078秒自报保留。
+- 195冻结源/文档SHA及正式产品9c24534无变，003bc2a仅手册/进度。归档原四候选/patch/证据，patch apply --check通过；独立worktree用隔离配置、跟踪web副本，不读生产配置/Key/DB。执行者暂停后Codex实查/修正，无返修/回审或并行改正式产品。
+- 原43项复跑全过；独立6组反例11处子断言失败确认host_started缺run、坏单调时钟terminal无效、首败起点缺失仍发布、固定前256饥饿、路径形身份/PID0及host显示截断改变scope。Codex直接补启动关联、固定对象校验/未知丢弃、原host核scope、有界轮转和严格身份/PID；poll前仅冻结七项身份，不透传owner或让可变record改写归因。
+- 新模块的坏时钟/预算原用例允许无效对象，Codex依合同加强为不发布；原diagnostics测试既有类/方法AST核不变、只追加6项。另在导出测试唯一真实timeline用例给writer/StageTimeline各注入已有固定_Clock，修复墙钟越过固定查询窗口；原业务/权限断言保持。这是Codex第五测试文件维护，不追改执行者白名单/原patch。
+- 修后6组全过；获准隔离环境两项真实私有ACL/原子发布探针通过，宿主/诊断/旧复核/通用日志/导出167项全过、零失败/错误/跳过，不改ACL或用替身冒充。再增真实Windows sys.exit(-1)=4294967295及poll身份冻结两例，新模块/追加诊断51项过；按完整ID去重共169项，不累加重复次数。用例汇总首次未覆盖unittest有docstring时换行，修正解析后核清169，未改测试结果。
+- 独立真实serve67.079秒/68轮、seq=[1,1,61,61]两组，原Popen alive→exited(0)，host_stopped一次/max_rounds及run关联/有效terminal共15检查过。假客户端零网络，不是生产宿主/六小时/跨宿主证明。
+- 五文件按已测SHA合入、AST通过；固定manager_round_snapshot/launch_process_snapshot、16+5/6键对象，只本地采集，无API/DB/认证/来源/页面/received_at或服务控制扩展。复核、合同/指南/模块/简报/路线/剩余计划/进度同步；自己修正如实称自检。
+- 证据.tmp/host-runtime-evidence-impl-v1/independent-review/含archive/原件/source-result、原43/反例失败、corrected-negative、acl-permission-probe、corrected-related167、corrected-final-loop51、real-serve-65s原JSONL/summary、integrated/stable-reference/collect-receipt。没有启停角色、重载现有API/长期宿主、清owner或重建归属；A代码里程碑收尾暂停，先核正常宿主加载条件与明确授权，279一次许可不扩大，不另派B/C或预算/会话。
+- 10:06收尾检查：五正式源SHA与已测副本一致、九份文档本地链接及跟踪差异范围、git diff --check通过，final-verification.json保留。只提交本片五源测试/九文档，不加入临时配置/日志/原交付或旧未跟踪文件。
+
 ## 2026-10-20 09:33（Asia/Shanghai）— 将多轮、多任务协作优势写入用户手册
 
 - 用户明确要求将刚讨论的TALK优势及网站开发示例写入使用说明。确认目标为既有docs/guides/USER_MANUAL.md，新增“TALK的协作优势”，保留“多个任务独立推进、协调者多轮持续安排、整个项目逐步明确、每次委派仍具体”的核心表述；例子先定公共模型/接口/页面规范，再安排用户体系/内容管理，继续讨论报表、待执行角色释放后派发，每条线路独立记录/交付/验收。

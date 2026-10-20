@@ -1,5 +1,7 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
+> 2026-10-20 10:01：282本地宿主循环/原Popen证据已独立实查、修正合入收取，169项相关用例与67秒隔离循环通过；**现有长期宿主尚未重载**，不能声称生产已采集。B接收/跨宿主来源及C全根治理未完成，详[282复核](../spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。
+
 > 2026-10-19 23:02加载更新：用户明确许可后279已在原4运行角色实际加载，真实queue_poll开始/成功与seq推进、完整JSONL下载、原父链和约150秒心跳均通过，Codex保持关闭。旧的“生产尚未加载/待许可”为当时门禁，原审批拒绝及失败证据保留。异常/恢复分支已有隔离验证，本轮没有生产故障演练；完整日志整项仍未全部完成，详[279复核](../spec/ROLE_QUEUE_POLL_DIAGNOSTICS_REVIEW_279.md)。
 
 > 2026-10-19 279代码更新：接单查询新增queue_poll_snapshot/queue_poll_recovered及固定12键extra.queue_poll，统一诊断下载新增可空queue_poll。真实查询起止/序号/单调耗时、30秒有界快照、失败段/恢复证据已集成，290 Python/24 Node通过；旧记录缺值为null。当前生产尚未加载，批量停服被自动审批拒绝，待用户明确本次正常加载许可，不能据源码存在宣称实机采集通过。详[279复核](../spec/ROLE_QUEUE_POLL_DIAGNOSTICS_REVIEW_279.md)。以下旧版说明按各自历史范围保留。
@@ -114,6 +116,19 @@ python scripts/runtime_diagnostics.py --ref rtd-031f55a209-000001 --detail --jso
 - 查询默认限制20条、最多200条；目录枚举和读取均受文件数/时间预算约束，读取还受文件字节预算约束，达到上限明确提示“scan was limited”。只在有界候选集合内按文件新近排序，不能将被限制的查询当成全库无匹配。
 - 非法引用、缺失根目录、非法 limit 返回非零短错误；不会回显路径或文件内容。
 - 日志本身是本地明文文件，访问边界依赖宿主机文件权限；不要把日志目录放到可被普通用户读取的共享位置。
+
+### 282：查看本地宿主循环与原进程观测
+
+代码已合入，现有长期宿主尚未重载；只有管理员完成正常加载后，新记录才会出现。将下面的`<宿主实际日志根>`替换为管理员确认的受控目录，在仓库根运行：
+
+```text
+python scripts/runtime_diagnostics.py --log-dir "<宿主实际日志根>" --event manager_round_snapshot --limit 20 --json --detail
+python scripts/runtime_diagnostics.py --log-dir "<宿主实际日志根>" --event launch_process_snapshot --limit 20 --json --detail
+```
+
+必须带`--detail`才能看到extra里的固定对象，默认JSON摘要不含它。manager_run_id关联本次serve的启动/结束/快照，manager_seq仅随真实轮次推进，正常快照每60秒一组；started只表示开始，不能证明轮次完成。launch_process只表示原Popen的最近观测，alive不代表bridge、接单或模型可用。未观测、超限或无法确认时保持未知；旧记录不回填身份或时间。
+
+manager记录保持member=unknown，不进入角色下载；角色下载也不透传新extra。此处是维护者本地查询，无新API/账号/Key或服务端received_at。刷新页面、只重载API或只重启bridge不能替代宿主加载；先核空闲/原归属及正常退出入口，按[282加载门禁](../spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)安排，不据旧PID接管或解除owner。
 
 ## 6. 脱敏规则与限制
 

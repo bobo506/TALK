@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 10:01：282经Codex独立实查/直接修正，169项相关用例与67秒隔离运行过，五文件合入收取，原partial及6组11处失败保留。新manager_round_snapshot/launch_process_snapshot只本地，固定60秒/真实seq/原Popen/未知/有界轮转，旧控制流/权限保持。长期宿主未重载，B/C未完成，本轮不再派发，详[282复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。
+
 > 2026-10-20 09:07：282本地循环/原Popen运行证据已派DeepSeek，基线9c24534、195冻结副本、四文件逻辑白名单，首次实现/自测后暂停。创建queued/assigned、未集成/部署；不动B接收/认证/DB或页面，Codex独立实查，默认用户通知取件。详[A合同](ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)与[进度](../PROGRESS.md)。
 
 > 2026-10-20 09:03：281方案已独立实查收取；原16项复跑通过，8边界反例7失败/1错误保留。Codex补正A合同（长序号、采样开销、未知/scope、原Popen、取消控制流），没有修改原型/产品或部署；B接收/认证/DB仍提案，received_at不造值。后续仅派A隔离首次实现，详[281复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_281.md)、[A合同](ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)。

@@ -646,8 +646,9 @@ class ExportApiTests(unittest.TestCase):
             project_id=PROJECT,
             launch_id="launch-export-real",
             runtime="dsh",
+            clock=_Clock(),
         )
-        operation = StageTimeline(writer).start(
+        operation = StageTimeline(writer, wall_clock=_Clock()).start(
             "task_model_preflight",
             phase="task_preflight",
             task_id=276,

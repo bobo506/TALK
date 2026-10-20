@@ -4,6 +4,7 @@
 
 ## 已完成与当前门禁
 
+- 282本地A已独立实查、Codex直接修正合入收取，169项相关用例及67秒隔离循环过。现有长期宿主尚未重载；先核原归属/空闲与正常退出入口，明确本次加载授权后实机验收A。B接收/来源/查询和C全根治理仍待，不把本地采集当服务端接收，详[282复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。下列派发与281记录保留当时事实。
 - 持久诊断基础、bridge/宿主关键异常、统一JSONL下载、实际阶段节点与逐次模型预检、接单查询周期/连续失败/恢复证据已经实现并完成各片验证。279在原4运行角色实机加载及真实下载/周期心跳通过；280绑定行格式已独立通过合入收取，用户本轮明确“验收通过，按原计划继续”，页面门禁闭合。
 - 当前代码基线197fe7a。2026-10-20只读MCP核本人agent:codex/lead、项目prj_e8fe7066bbec；DeepSeek/K3分别绑定deepseek-flash/kimi-code/k3且新鲜idle。此为入口/实例上报事实，不替代OS归属或未来派发前复核。
 - 280页面确认已取得。281方案UTC2026-10-20 01:03:17.285773已独立实查并收取；原16探针复跑通过，8独立反例7失败/1错误。Codex只补正[A本地采集合同](ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)，不批准B接收原型；先只做本地记录，received_at保持缺失，真实接收/来源合同留B固定。详[281复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_281.md)。未实施宿主心跳，不启停/部署或读生产日志/凭据。
@@ -14,7 +15,7 @@
 
 目标：能从真实周期记录区分“宿主管理循环近期推进”“原受管子进程最近一次观测”和“bridge/接单循环自己的证据”。沿现有诊断下载供排障，不合成一个笼统的正常状态。
 
-现有HostManager.serve仅记录host_started/host_stopped、poll_failed/poll_recovered和动作/worker异常，缺常态周期运行证据。开始/结束事件和owner未释放不能证明当前宿主存活，实例idle也不能替代宿主或查询循环证据。
+282之前HostManager.serve仅记录host_started/host_stopped、poll_failed/poll_recovered和动作/worker异常，缺常态周期证据；源码缺口已由282补齐，但旧长期进程未加载。开始事件和owner未释放不能证明当前宿主存活，实例idle也不能替代宿主或查询循环证据。
 
 实施前固定以下合同，不先改生产或公共协议：
 

@@ -120,6 +120,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts import role_service_host_diagnostics as host_diag  # noqa: E402 - 复用 271 基础诊断 API
+from scripts import role_service_host_loop_evidence as loop_evidence  # noqa: E402 - 282 本地循环证据
 from bridges.runtime_diagnostics_timeline import StageTimeline  # noqa: E402 - 276 阶段配对
 from scripts.role_provision import (  # noqa: E402 - 复用 R1-2 已验私有创建/路径/锁保护
     ProvisionError,
@@ -1278,6 +1279,9 @@ class HostManager:
         )
         self._launch_diag_writers: dict[str, host_diag.HostDiagnostics] = {}
         self._host_diag_writers: dict[str, host_diag.HostDiagnostics] = {}
+        # 282：本地循环证据只按已创建的 launch writer 身份归因；句柄 record
+        # 若与首次创建 writer 时的 project/member/instance 不一致，不写角色证据。
+        self._launch_diag_identity: dict[str, tuple[str, str, str, str]] = {}
         self.client = client
         self.host = host or socket.gethostname()
         self.store = OwnershipStore(state_dir or DEFAULT_STATE_DIR)
@@ -1556,7 +1560,8 @@ class HostManager:
         extra_secrets: Sequence[Any] = (),
     ) -> host_diag.HostDiagnostics:
         """本次 launch 的写入器（缓存复用；已存在时只补保护值）。"""
-        existing = self._launch_diag_writers.get(str(launch_id))
+        key = str(launch_id)
+        existing = self._launch_diag_writers.get(key)
         if existing is not None:
             existing.add_sensitive_values(extra_secrets)
             return existing
@@ -1570,11 +1575,47 @@ class HostManager:
             pid=os.getpid(),
             known_secrets=(*self._host_sensitive_values(), *extra_secrets),
         )
-        self._launch_diag_writers[str(launch_id)] = diagnostics
+        self._launch_diag_writers[key] = diagnostics
+        self._launch_diag_identity[key] = (
+            str(project_id),
+            str(member_id),
+            key,
+            str(instance_id or ""),
+        )
         return diagnostics
 
+    def _loop_launch_writer(
+        self, record: Mapping[str, Any]
+    ) -> Optional[host_diag.HostDiagnostics]:
+        """282：为已核原 launch 返回**同一身份**的写入器。
+
+        句柄 record 若与首次创建该 launch writer 时的 project/member/instance
+        不一致，返回 ``None``；调用方只丢该条 launch 证据，仍按 scope 聚合。
+        """
+        launch_id = str(record.get("launch_id") or "")
+        if not launch_id:
+            return None
+        expected = (
+            str(record.get("project_id") or ""),
+            str(record.get("member_id") or ""),
+            launch_id,
+            str(record.get("instance_id") or ""),
+        )
+        known = self._launch_diag_identity.get(launch_id)
+        if known is not None and known != expected:
+            return None
+        return self._launch_diagnostics(
+            project_id=expected[0],
+            member_id=expected[1],
+            launch_id=launch_id,
+            instance_id=expected[3] or None,
+            runtime=str(record.get("runtime") or "") or None,
+        )
+
     def _drop_launch_diagnostics(self, launch_id: str) -> None:
-        diagnostics = self._launch_diag_writers.pop(str(launch_id), None)
+        key = str(launch_id)
+        diagnostics = self._launch_diag_writers.pop(key, None)
+        self._launch_diag_identity.pop(key, None)
         if diagnostics is not None:
             diagnostics.close()
 
@@ -3006,75 +3047,80 @@ class HostManager:
         worker_box: dict[str, Any] = {}
         diagnostics = self._manager_diagnostics(project_id)
         poll_failures = 0
-        diagnostics.record_event(
-            "host_started",
-            severity="info",
-            phase="serve",
-            stage="host",
-            budgets=self._host_budgets(
-                poll_interval_seconds=poll_interval, worker=provision_worker
-            ),
-            extra={
-                "host": self.host,
-                "worker_enabled": provision_worker is not None,
-                "once": bool(once),
-                "max_rounds": max_rounds,
-            },
-        )
-        while True:
-            rounds += 1
+        stop_reason = "normal"
+        round_in_flight = False
+        round_actions_seen = 0
+
+        # 282：每次实际 serve 独立 run ID；构造/时钟/观测失败只丢新证据。
+        manager_run_id: Optional[str] = None
+        try:
+            manager_run_id = loop_evidence.new_manager_run_id()
+        except Exception:
+            manager_run_id = None
+        evidence: Any = None
+        try:
+            evidence = loop_evidence.LoopEvidenceRecorder(
+                project_id=project_id,
+                host=self.host,
+                poll_interval=poll_interval,
+                manager_diagnostics=diagnostics,
+                handles=self._handles,
+                launch_writer=self._loop_launch_writer,
+                manager_run_id=manager_run_id,
+            )
+            if getattr(evidence, "manager_run_id", None):
+                manager_run_id = evidence.manager_run_id
+        except Exception:
+            evidence = None
+
+        try:
             try:
-                actions = self.claimable_actions(project_id)
-            except (HostError, OSError, http.client.HTTPException) as exc:
-                # 服务端重载或暂时断连不能使宿主退出并丢失其它角色的活句柄。
-                # 连续同一读错误只保留一次，继续原管理循环等待恢复。
-                error_code = exc.code if isinstance(exc, HostError) else "host_unreachable"
-                failure = {"action": "poll", "outcome": "failed", "error_code": error_code}
-                if not outcomes or outcomes[-1] != failure:
-                    outcomes.append(failure)
-                poll_failures += 1
-                diagnostics.record_exception(
-                    exc,
-                    event="poll_failed",
+                diagnostics.record_event(
+                    "host_started",
+                    severity="info",
                     phase="serve",
-                    stage="poll",
+                    stage="host",
                     budgets=self._host_budgets(
                         poll_interval_seconds=poll_interval, worker=provision_worker
                     ),
                     extra={
-                        "action": "poll",
-                        "consecutive_failures": poll_failures,
                         "host": self.host,
+                        "worker_enabled": provision_worker is not None,
+                        "once": bool(once),
+                        "max_rounds": max_rounds,
+                        "manager_run_id": manager_run_id,
                     },
                 )
-                actions = []
-            except Exception as exc:
-                # 原代码不会捕获这个异常：记录后原样传播，绝不吞取消或伪造 poll 成功。
-                diagnostics.record_exception(
-                    exc,
-                    event="poll_failed",
-                    phase="serve",
-                    stage="poll",
-                    budgets=self._host_budgets(
-                        poll_interval_seconds=poll_interval, worker=provision_worker
-                    ),
-                    extra={
-                        "action": "poll",
-                        "consecutive_failures": poll_failures + 1,
-                        "host": self.host,
-                    },
-                )
-                raise
-            else:
-                if poll_failures:
-                    diagnostics.record_event(
-                        "poll_recovered",
-                        severity="info",
+            except Exception:
+                # 既有诊断包装已保证不抛；这里再兜底，日志失败不影响业务。
+                pass
+            while True:
+                rounds += 1
+                round_in_flight = True
+                round_actions_seen = 0
+                poll_ok = True
+                if evidence is not None:
+                    try:
+                        evidence.begin_round()
+                    except Exception:
+                        pass
+                try:
+                    actions = self.claimable_actions(project_id)
+                except (HostError, OSError, http.client.HTTPException) as exc:
+                    # 服务端重载或暂时断连不能使宿主退出并丢失其它角色的活句柄。
+                    # 连续同一读错误只保留一次，继续原管理循环等待恢复。
+                    error_code = exc.code if isinstance(exc, HostError) else "host_unreachable"
+                    failure = {"action": "poll", "outcome": "failed", "error_code": error_code}
+                    if not outcomes or outcomes[-1] != failure:
+                        outcomes.append(failure)
+                    poll_failures += 1
+                    diagnostics.record_exception(
+                        exc,
+                        event="poll_failed",
                         phase="serve",
                         stage="poll",
                         budgets=self._host_budgets(
-                            poll_interval_seconds=poll_interval,
-                            worker=provision_worker,
+                            poll_interval_seconds=poll_interval, worker=provision_worker
                         ),
                         extra={
                             "action": "poll",
@@ -3082,105 +3128,182 @@ class HostManager:
                             "host": self.host,
                         },
                     )
-                    poll_failures = 0
-            for action in actions:
-                try:
-                    if action.get("action") == "stop":
-                        outcomes.append(self.execute_stop(action))
-                    else:
-                        outcomes.append(self.execute_start(action))
-                except (HostError, OSError, http.client.HTTPException) as exc:
-                    outcomes.append(
-                        {
-                            "launch_id": action.get("launch_id"),
-                            "member_id": action.get("member_id"),
-                            "outcome": "failed",
-                            "error_code": exc.code if isinstance(exc, HostError) else "host_unreachable",
-                        }
-                    )
-                    diagnostics.record_exception(
-                        exc,
-                        event="action_failed",
-                        phase="serve",
-                        stage="action",
-                        budgets=self._host_budgets(
-                            poll_interval_seconds=poll_interval,
-                            worker=provision_worker,
-                        ),
-                        extra={
-                            "action": action.get("action"),
-                            "launch_id": action.get("launch_id"),
-                            "member_id": action.get("member_id"),
-                            "error_code": getattr(exc, "code", None)
-                            or type(exc).__name__,
-                            "host": self.host,
-                        },
-                    )
+                    actions = []
+                    poll_ok = False
                 except Exception as exc:
-                    # 原代码会让这个异常终止循环；只记录并原样传播，不改变退出语义。
+                    # 原代码不会捕获这个异常：记录后原样传播，绝不吞取消或伪造 poll 成功。
                     diagnostics.record_exception(
                         exc,
-                        event="action_failed",
+                        event="poll_failed",
                         phase="serve",
-                        stage="action",
+                        stage="poll",
                         budgets=self._host_budgets(
-                            poll_interval_seconds=poll_interval,
-                            worker=provision_worker,
+                            poll_interval_seconds=poll_interval, worker=provision_worker
                         ),
                         extra={
-                            "action": action.get("action"),
-                            "launch_id": action.get("launch_id"),
-                            "member_id": action.get("member_id"),
+                            "action": "poll",
+                            "consecutive_failures": poll_failures + 1,
                             "host": self.host,
                         },
                     )
                     raise
-            if provision_worker is not None:
-                # 先**非阻塞**收上一轮（grace=0 只在已结束时取回），再决定是否开新一轮。
-                finished = self._collect_worker_round(worker_thread, worker_box, grace=0.0)
-                if finished is not None:
-                    outcomes.extend(self._tag_worker_outcomes(finished))
-                    worker_thread, worker_box = None, {}
-                if worker_thread is None:
-                    worker_thread, worker_box = self._start_worker_round(
-                        provision_worker, diagnostics=diagnostics
-                    )
-            if once or (max_rounds is not None and rounds >= max_rounds):
-                break
-            time.sleep(poll_interval)
-        if provision_worker is not None and worker_thread is not None:
-            self._finish_worker_round(
-                provision_worker,
-                worker_thread,
-                worker_box,
-                outcomes,
-                diagnostics=diagnostics,
-            )
-        diagnostics.record_event(
-            "host_stopped",
-            severity="info",
-            phase="serve",
-            stage="host",
-            budgets=self._host_budgets(
-                poll_interval_seconds=poll_interval, worker=provision_worker
-            ),
-            extra={
-                "host": self.host,
-                "rounds": rounds,
-                "outcomes": len(outcomes),
-                "failed_outcomes": sum(
-                    1
-                    for item in outcomes
-                    if isinstance(item, Mapping)
-                    and item.get("outcome") in ("failed", "reported")
-                ),
-                "stopped_outcomes": sum(
-                    1
-                    for item in outcomes
-                    if isinstance(item, Mapping) and item.get("outcome") == "stopped"
-                ),
-            },
-        )
+                else:
+                    try:
+                        round_actions_seen = len(actions)
+                    except Exception:
+                        round_actions_seen = 0
+                    if poll_failures:
+                        diagnostics.record_event(
+                            "poll_recovered",
+                            severity="info",
+                            phase="serve",
+                            stage="poll",
+                            budgets=self._host_budgets(
+                                poll_interval_seconds=poll_interval,
+                                worker=provision_worker,
+                            ),
+                            extra={
+                                "action": "poll",
+                                "consecutive_failures": poll_failures,
+                                "host": self.host,
+                            },
+                        )
+                        poll_failures = 0
+                for action in actions:
+                    try:
+                        if action.get("action") == "stop":
+                            outcomes.append(self.execute_stop(action))
+                        else:
+                            outcomes.append(self.execute_start(action))
+                    except (HostError, OSError, http.client.HTTPException) as exc:
+                        outcomes.append(
+                            {
+                                "launch_id": action.get("launch_id"),
+                                "member_id": action.get("member_id"),
+                                "outcome": "failed",
+                                "error_code": exc.code if isinstance(exc, HostError) else "host_unreachable",
+                            }
+                        )
+                        diagnostics.record_exception(
+                            exc,
+                            event="action_failed",
+                            phase="serve",
+                            stage="action",
+                            budgets=self._host_budgets(
+                                poll_interval_seconds=poll_interval,
+                                worker=provision_worker,
+                            ),
+                            extra={
+                                "action": action.get("action"),
+                                "launch_id": action.get("launch_id"),
+                                "member_id": action.get("member_id"),
+                                "error_code": getattr(exc, "code", None)
+                                or type(exc).__name__,
+                                "host": self.host,
+                            },
+                        )
+                    except Exception as exc:
+                        # 原代码会让这个异常终止循环；只记录并原样传播，不改变退出语义。
+                        diagnostics.record_exception(
+                            exc,
+                            event="action_failed",
+                            phase="serve",
+                            stage="action",
+                            budgets=self._host_budgets(
+                                poll_interval_seconds=poll_interval,
+                                worker=provision_worker,
+                            ),
+                            extra={
+                                "action": action.get("action"),
+                                "launch_id": action.get("launch_id"),
+                                "member_id": action.get("member_id"),
+                                "host": self.host,
+                            },
+                        )
+                        raise
+                if provision_worker is not None:
+                    # 先**非阻塞**收上一轮（grace=0 只在已结束时取回），再决定是否开新一轮。
+                    finished = self._collect_worker_round(worker_thread, worker_box, grace=0.0)
+                    if finished is not None:
+                        outcomes.extend(self._tag_worker_outcomes(finished))
+                        worker_thread, worker_box = None, {}
+                    if worker_thread is None:
+                        worker_thread, worker_box = self._start_worker_round(
+                            provision_worker, diagnostics=diagnostics
+                        )
+                # 本轮业务动作已经完整走完；此后的取消/异常不得回写上一轮。
+                round_in_flight = False
+                if evidence is not None:
+                    try:
+                        evidence.finish_round(
+                            poll_ok=poll_ok, actions_seen=round_actions_seen
+                        )
+                    except Exception:
+                        pass
+                if once:
+                    stop_reason = "once"
+                    break
+                if max_rounds is not None and rounds >= max_rounds:
+                    stop_reason = "max_rounds"
+                    break
+                time.sleep(poll_interval)
+            if provision_worker is not None and worker_thread is not None:
+                self._finish_worker_round(
+                    provision_worker,
+                    worker_thread,
+                    worker_box,
+                    outcomes,
+                    diagnostics=diagnostics,
+                )
+        except BaseException as exc:
+            try:
+                canceled = loop_evidence.is_cancellation(exc)
+            except Exception:
+                canceled = isinstance(exc, (KeyboardInterrupt, SystemExit))
+            if canceled:
+                stop_reason = "canceled"
+                if evidence is not None and round_in_flight:
+                    try:
+                        evidence.cancel_round(actions_seen=round_actions_seen)
+                    except Exception:
+                        pass
+            else:
+                stop_reason = "exception"
+            raise
+        finally:
+            # host_stopped 恰好尝试一次；写入失败不得替换原异常/取消或业务结果。
+            try:
+                diagnostics.record_event(
+                    "host_stopped",
+                    severity="info",
+                    phase="serve",
+                    stage="host",
+                    budgets=self._host_budgets(
+                        poll_interval_seconds=poll_interval,
+                        worker=provision_worker,
+                    ),
+                    extra={
+                        "host": self.host,
+                        "rounds": rounds,
+                        "outcomes": len(outcomes),
+                        "failed_outcomes": sum(
+                            1
+                            for item in outcomes
+                            if isinstance(item, Mapping)
+                            and item.get("outcome") in ("failed", "reported")
+                        ),
+                        "stopped_outcomes": sum(
+                            1
+                            for item in outcomes
+                            if isinstance(item, Mapping)
+                            and item.get("outcome") == "stopped"
+                        ),
+                        "manager_run_id": manager_run_id,
+                        "stop_reason": stop_reason,
+                    },
+                )
+            except Exception:
+                pass
         return outcomes
 
     def _tag_worker_outcomes(

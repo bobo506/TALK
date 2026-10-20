@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 10:01：282经Codex独立实查发现6组11处边界失败后直接修正，169项相关用例、67秒隔离serve/15检查通过，五文件合入收取原partial；固定本地manager/launch证据，无API/DB/认证/页面/生产操作。现有长期宿主尚未重载，下一步先核正常加载条件/授权，B接收/跨宿主与C全根治理仍待，本轮不开后续片。详[282复核](spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)、[当前进度](PROGRESS.md)。
+
 2026-10-20 09:07：282已按281补正A合同派DeepSeek隔离首次实现本地宿主循环/原Popen证据，创建queued/assigned，195冻结副本及四文件白名单固定；正式产品/生产/API/DB/认证/页面未改。交付暂停后Codex独立实查，默认用户通知取件，不据派发声称已实现；见[进度](PROGRESS.md)。
 
 2026-10-20 09:03：281方案已独立实查并收取，原16探针复跑通过但8独立边界反例暴露问题；Codex仅补正A本地运行证据合同，不采纳B接收原型为实施合同。下一片仅本地采集，无HTTP/DB/认证/生产变更，不声称宿主心跳已实现；详[281复核](spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_281.md)与[A合同](spec/ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)。

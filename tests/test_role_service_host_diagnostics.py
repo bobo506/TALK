@@ -948,5 +948,200 @@ class HostDiagnosticsTestCase(unittest.TestCase):
         self.assertNotEqual(ref_a, ref_b)
 
 
+class HostLoopEvidenceDiagnosticsTests(unittest.TestCase):
+    """任务 282：在既有 272 诊断夹具上追加本地循环证据集成用例。"""
+
+    def setUp(self):
+        self.case = HostDiagnosticsTestCase()
+        self.case.setUp()
+        self.addCleanup(self.case.tearDown)
+
+    def _manager_runs(self, run_id):
+        from scripts import role_service_host_loop_evidence as loop_evidence
+
+        records = self.case.query(event=loop_evidence.MANAGER_EVENT)
+        return [
+            record["extra"]["manager_run"]
+            for record in records
+            if record.get("extra", {})
+            .get("manager_run", {})
+            .get("manager_run_id")
+            == run_id
+        ]
+
+    def _stopped_for(self, run_id):
+        records = self.case.find_all("host_stopped")
+        return [
+            record
+            for record in records
+            if (record.get("extra") or {}).get("manager_run_id") == run_id
+        ]
+
+    def test_serve_once_and_max_rounds_write_one_stopped_each(self):
+        manager = self.case.make_manager()
+        self.assertEqual(manager.serve(PROJECT, poll_interval=0, once=True), [])
+        first = self.case.find_all("host_stopped")
+        self.assertEqual(len(first), 1)
+        self.assertEqual(first[0]["extra"]["stop_reason"], "once")
+        run_id = first[0]["extra"]["manager_run_id"]
+        self.assertRegex(run_id, r"^mgr-[0-9a-f]{32}$")
+        runs = self._manager_runs(run_id)
+        self.assertEqual([item["state"] for item in runs], ["started", "succeeded"])
+        self.assertEqual(runs[0]["process"]["held"], None)
+        self.assertTrue(runs[0]["process"]["truncated"])
+        self.assertFalse(runs[1]["process"]["truncated"])
+
+        second_manager = self.case.make_manager()
+        self.assertEqual(
+            second_manager.serve(PROJECT, poll_interval=0, max_rounds=2), []
+        )
+        stopped = sorted(
+            self.case.find_all("host_stopped"),
+            key=lambda item: item["recorded_at"],
+        )
+        self.assertEqual(len(stopped), 2)
+        self.assertEqual(stopped[-1]["extra"]["stop_reason"], "max_rounds")
+        self.assertEqual(stopped[-1]["extra"]["rounds"], 2)
+
+    def test_cancel_and_unhandled_exception_have_one_stopped_each(self):
+        manager = self.case.make_manager()
+        cancellation = KeyboardInterrupt()
+        with patch.object(
+            manager, "claimable_actions", side_effect=cancellation
+        ):
+            with self.assertRaises(KeyboardInterrupt) as caught:
+                manager.serve(PROJECT, poll_interval=0, once=True)
+        self.assertIs(caught.exception, cancellation)
+        stopped = self.case.find_all("host_stopped")
+        self.assertEqual(len(stopped), 1)
+        self.assertEqual(stopped[0]["extra"]["stop_reason"], "canceled")
+        canceled_run = stopped[0]["extra"]["manager_run_id"]
+        self.assertEqual(
+            [item["state"] for item in self._manager_runs(canceled_run)],
+            ["started", "canceled"],
+        )
+
+        second_manager = self.case.make_manager()
+        failure = RuntimeError("unhandled-action")
+        with patch.object(
+            second_manager, "claimable_actions", side_effect=failure
+        ):
+            with self.assertRaises(RuntimeError) as caught:
+                second_manager.serve(PROJECT, poll_interval=0, once=True)
+        self.assertIs(caught.exception, failure)
+        stopped = sorted(
+            self.case.find_all("host_stopped"),
+            key=lambda item: item["recorded_at"],
+        )
+        self.assertEqual(len(stopped), 2)
+        self.assertEqual(stopped[-1]["extra"]["stop_reason"], "exception")
+        exception_run = stopped[-1]["extra"]["manager_run_id"]
+        self.assertEqual(
+            [item["state"] for item in self._manager_runs(exception_run)],
+            ["started"],
+        )
+
+    def test_disabled_diagnostics_keeps_serve_result_and_writes_nothing(self):
+        manager = self.case.make_manager(disabled=True)
+        self.assertEqual(manager.serve(PROJECT, poll_interval=0, once=True), [])
+        self.assertFalse(Path(self.case.log_root).exists())
+        self.assertEqual(self.case.query(), [])
+
+    def test_cached_launch_identity_mismatch_is_not_written(self):
+        from scripts import role_service_host_loop_evidence as loop_evidence
+
+        manager = self.case.make_manager()
+        manager._launch_diagnostics(
+            project_id=PROJECT,
+            member_id="agent:role-a",
+            launch_id="launch-identity",
+            instance_id="ins_a",
+            runtime="dsh",
+        )
+        process = FakeProcess(pid=5555)
+        record = {
+            "project_id": PROJECT,
+            "host": manager.host,
+            "launch_id": "launch-identity",
+            "member_id": "agent:role-b",
+            "instance_id": "ins_b",
+            "pid": process.pid,
+            "runtime": "dsh",
+        }
+        manager._handles["launch-identity"] = {
+            "process": process,
+            "record": record,
+            "record_persisted": False,
+        }
+        try:
+            self.assertEqual(manager.serve(PROJECT, poll_interval=0, once=True), [])
+            self.assertEqual(
+                self.case.query(event=loop_evidence.LAUNCH_EVENT), []
+            )
+            stopped = self.case.find("host_stopped")
+            run_id = stopped["extra"]["manager_run_id"]
+            runs = self._manager_runs(run_id)
+            self.assertEqual(runs[-1]["process"]["held"], 1)
+            self.assertEqual(runs[-1]["process"]["alive"], 1)
+        finally:
+            manager._handles.pop("launch-identity", None)
+            manager._drop_launch_diagnostics("launch-identity")
+
+    def test_plain_ownership_substitute_keeps_start_ready_business(self):
+        """单列替身：只绕开私有 ACL/os.replace，不证明私有发布通过。"""
+        manager = self.case.make_manager()
+
+        def plain_save(record):
+            path = manager.store.record_path(
+                record["project_id"],
+                record["member_id"],
+                record["launch_id"],
+            )
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            return path
+
+        with patch.object(manager.store, "save", side_effect=plain_save):
+            outcome = self.case.start_ready(manager)
+        self.assertEqual(outcome["outcome"], "ready")
+        self.assertIn(LAUNCH, manager._handles)
+        self.assertTrue(manager._handles[LAUNCH]["record_persisted"])
+
+    def test_manager_events_are_unknown_member_and_summary_hides_extra(self):
+        from scripts import role_service_host_loop_evidence as loop_evidence
+
+        manager = self.case.make_manager()
+        manager.serve(PROJECT, poll_interval=0, once=True)
+        records = self.case.query(event=loop_evidence.MANAGER_EVENT)
+        self.assertTrue(records)
+        self.assertTrue(all(item["member_id"] == "unknown" for item in records))
+        self.assertFalse(
+            [
+                item
+                for item in records
+                if item["member_id"] == MEMBER
+            ]
+        )
+        code, stdout, _stderr = self.case.query_cli(
+            "--event", loop_evidence.MANAGER_EVENT, "--json"
+        )
+        self.assertEqual(code, 0)
+        summary = json.loads(stdout)
+        self.assertTrue(summary["records"])
+        for item in summary["records"]:
+            self.assertNotIn("extra", item)
+        code, stdout, _stderr = self.case.query_cli(
+            "--event", loop_evidence.MANAGER_EVENT, "--json", "--detail"
+        )
+        self.assertEqual(code, 0)
+        detail = json.loads(stdout)
+        for item in detail["records"]:
+            self.assertEqual(len(item["extra"]["manager_run"]), 16)
+            self.assertEqual(len(item["extra"]["manager_run"]["process"]), 5)
+
+
 if __name__ == "__main__":
     unittest.main()
