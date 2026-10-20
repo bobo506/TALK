@@ -8,6 +8,7 @@
 - 当前代码基线197fe7a。2026-10-20只读MCP核本人agent:codex/lead、项目prj_e8fe7066bbec；DeepSeek/K3分别绑定deepseek-flash/kimi-code/k3且新鲜idle。此为入口/实例上报事实，不替代OS归属或未来派发前复核。
 - 280页面确认已取得。281方案UTC2026-10-20 01:03:17.285773已独立实查并收取；原16探针复跑通过，8独立反例7失败/1错误。Codex只补正[A本地采集合同](ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)，不批准B接收原型；先只做本地记录，received_at保持缺失，真实接收/来源合同留B固定。详[281复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_281.md)。未实施宿主心跳，不启停/部署或读生产日志/凭据。
 - 281代码冻结197fe7aaedf2ad0b346c23042e262d5232259740，193份源/指定文档副本及SHA校验，协调方文档覆盖单列；只读.tmp/host-runtime-evidence-v1/baseline/、仅deepseek/可写，coordination/保留任务/manifest/完整派发回执。任务已固定不变项、唯一写白名单、生产/正式源禁止区及候选原型验收；默认派后结束，用户通知完成后Codex独立实查。
+- 282于UTC2026-10-20 01:07:33.547681按补正A合同派DeepSeek隔离首次实现，创建queued/assigned；干净9c24534、195冻结副本，只写.tmp/host-runtime-evidence-impl-v1/deepseek/，candidate四产品/测试路径可变，正式产品/生产禁改。交付暂停再由Codex独立实查，默认用户通知后取件，B/C不并片，不代表新心跳已实现。
 
 ## A. 下一最小切片：宿主独立运行证据
 

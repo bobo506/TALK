@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-20 09:07（Asia/Shanghai）— 282本地宿主循环/原Popen证据首次实现已派发
+
+- 281复核以9c24534提交后，按用户原计划授权派下一片A，不实施B接收或C治理。派前读取最新开发要求，MCP身份agent:codex/agent、lead/项目prj_e8fe7066bbec；DeepSeek UTC01:05:49.378807 fresh idle/current_task_id=null，running/queued均空，绑定deepseek-flash/max保持。旧交叉复核原文随服务端快照，新AGENTS/用户约定优先，未改页面要求。
+- 282于UTC01:07:33.547681由agent:codex派agent:deepseek，general顶层、创建queued/assigned，Hall group:task-056117e6e8094a1498620910beb2fa14。代码/文档冻结干净9c2453426305e6a5a8d2782fa254f11b30a76848，919跟踪SHA/195副本逐一核；正式A合同SHA52ea1b7b447855df6ffcb125c36b01ebcb2f60b27d456a2dd119f9f5c3916a77，任务SHA10323e5525f810cb88e099d4c2daf6fbbae60b32659e19bdfc4bacaed1e5eeb2。
+- 隔离根.tmp/host-runtime-evidence-impl-v1/，执行方仅deepseek/可写，candidate相对基线仅host主文件/新loop_evidence模块/新专测/既有diagnostics追加测试四文件差异。明确不改正式源/文档/Git/生产/API/DB/认证/页面，不调用模型或重启角色；原Popen只读观测、旧控制流/owner/worker/租约及received_at缺失保持。
+- 自测要求含≥21600假时钟轮、固定60秒/未采样无poll、身份/未知/32与256限额及公平选择、取消/异常/worker原控制流、真实自建Popen/Windows退出码、一次≥65秒隔离真实serve、旧相关保护及ACL失败保留；这些是要求，不称已通过。交付后暂停，Codex独立实查/直接修正，默认派后结束等用户通知，不查派后状态/自动唤回，本批不再开其它片。
+- 派发收尾195副本SHA/正式产品字节均未变，实际282回执身份/项目/模型绑定/合同快照、6份文档本地链接及git diff --check通过。coordination/内保任务、baseline-manifest、preflight、dispatch-receipt及verification原件；未把创建状态当执行/测试通过。
+
 ## 2026-10-20 09:03（Asia/Shanghai）— 281方案独立实查收取，A合同补正，B接收原型不采纳
 
 - 用户通知281完成。MCP反查本人agent:codex/agent、项目prj_e8fe7066bbec/lead，结果msg2888作者DeepSeek、接单ins_a3d16c467fec及Hall一致，完整合法281/complete与本地delivery.json相同；SHA8217945f7ad5b3d28b2c215538e50971d9680761aff5658e2caa2b5f5639a8cf，稳定引用复核ok，UTC01:03:17.285773收取completed。只收取方案，不把原型或产品能力判通过。

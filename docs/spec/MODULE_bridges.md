@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 09:07：282本地循环/原Popen运行证据已派DeepSeek，基线9c24534、195冻结副本、四文件逻辑白名单，首次实现/自测后暂停。创建queued/assigned、未集成/部署；不动B接收/认证/DB或页面，Codex独立实查，默认用户通知取件。详[A合同](ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)与[进度](../PROGRESS.md)。
+
 > 2026-10-20 09:03：281方案已独立实查收取；原16项复跑通过，8边界反例7失败/1错误保留。Codex补正A合同（长序号、采样开销、未知/scope、原Popen、取消控制流），没有修改原型/产品或部署；B接收/认证/DB仍提案，received_at不造值。后续仅派A隔离首次实现，详[281复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_281.md)、[A合同](ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)。
 
 > 2026-10-19 23:02：用户明确允许后279已原API正常重载/原宿主关启4角色，真实queue_poll日志/完整下载、原父链及约150秒心跳推进通过；Codex保持关闭，配置绑定不变。旧审批拒绝保留，加载门禁已闭合，不外推模型/六小时/宿主心跳或完整日志整项。详[279复核](ROLE_QUEUE_POLL_DIAGNOSTICS_REVIEW_279.md)，280页面随后独立收尾待人验。

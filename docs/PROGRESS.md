@@ -1,19 +1,22 @@
 # Project Progress
 
-Updated: 2026-10-20 09:03（Asia/Shanghai）。281方案已独立实查并收取；原16单测复跑通过，独立8边界反例暴露7失败/1错误。Codex补正A本地采集合同，原型及B接收不直接采纳；产品/生产未改。280人验保持，顺序仍日志收尾→全入口预算统一→会话复用。
+Updated: 2026-10-20 09:07（Asia/Shanghai）。281方案已独立实查收取，Codex依8反例补正A合同；282已派DeepSeek隔离首次实现本地循环/原Popen证据，创建queued/assigned，不代表已实现。正式产品/生产未改，B接收原型不直接采纳；280人验及日志→预算→会话原序保持。
 
-## 281已复核收取，准备本地A实现
+## 281已复核收取，282本地A实现已派发
 
 - [281复核](spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_281.md)、[A补正合同](spec/ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)。实际193冻结副本/产品基线197fe7a未变；原msg2888完整合法complete、作者DeepSeek/ins_a3d16c467fec/Hall一致，SHA8217945f7ad5b3d28b2c215538e50971d9680761aff5658e2caa2b5f5639a8cf与本地一致。稳定引用ok，UTC01:03:17.285773收取completed，原自报/失败/原型不改。
 - 独立8反例确认序号10000封顶/launch seq0、133次无谓观测、整体失败假空集合、错launch归因、接收同轮两态冲突/嵌套host/跨host幂等冲突。原16项可复跑不抵消缺陷；仅修订正式设计，不能说原型修后全过。
 - A固定真实循环边界/60秒采样、序号≤2^53-1、未知null、不混scope、有界32 poll/256条检查、取消/异常传播及原Popen只读；不增HTTP/DB/认证/配置/页面。B接收方案未批准，received_at保持缺失；C全根治理另片，不提前预算/会话。
 - 证据.tmp/host-runtime-evidence-v1/independent-review/原件/复跑/8反例/CLI/detail/verification/稳定引用/收取齐全。冻结gap/export输出由Codex另加断言，CLI真实隔离fixture验证--json须加--detail才含extra；ACL WinError 5/plain替身限制保留，无生产日志/DB/Key读取或启停。
-- 当前MCP反查本人agent:codex/agent、项目prj_e8fe7066bbec/lead，DeepSeek及K3新鲜idle；原页面旧交叉复核文本保持。usage-gate返回continue但session/weekly比例均null，只据批次/范围刹车，不臆测额度。下一片拟派DeepSeek按A合同隔离首次实现，交付暂停后Codex独立检查。
+- 派前再次MCP反查本人agent:codex/agent、项目prj_e8fe7066bbec/lead，DeepSeek新鲜idle、无running/queued任务，deepseek-flash/max绑定保持；旧页面开发要求随任务原样快照、最新AGENTS/用户分工优先。usage-gate返回continue但比例均null，按批次/范围控制，不臆测额度。
+- 282于UTC01:07:33.547681派DeepSeek，general顶层、创建queued/assigned。基线9c2453426305e6a5a8d2782fa254f11b30a76848，195冻结副本/SHA及4逻辑产品文件白名单固定；只写.tmp/host-runtime-evidence-impl-v1/deepseek/候选/证据，不改正式源/文档/Git/生产。任务SHA10323e5525f810cb88e099d4c2daf6fbbae60b32659e19bdfc4bacaed1e5eeb2，coordination/保任务/manifest/预检/完整回执。
+- 282须验证真实serve及取消/worker边界、≥21600假时钟轮和一次≥65秒真实隔离循环、原Popen/scope/32与256限额/未知/写入失败，ACL失败如实保留；交付暂停后Codex独立实查。默认派后结束，用户通知“282好了”后取件，不查派后状态、不自动等待/唤回。本批不再开其它切片。
+- 282派发收尾195冻结SHA/产品字节未变、实际任务/绑定/合同快照、6份文档本地链接及git diff --check通过，coordination/verification.json保留。尚无282产品测试或实机结论。
 
 ## 当前身份与协作
 
 - 项目prj_e8fe7066bbec，桌面MCP本人agent:codex/agent、业务lead，负责协调/独立实查/直接修正自检/集成与正式进度Git。
-- DeepSeek和Kimi K3首次执行、自测后暂停；279/280及281方案已收尾，下一片仅DeepSeek的本地A实现，当前正式产品未改。不派两个K2.8，不自动等待/唤回或收取未通知任务；页面旧交叉复核文本未改，按用户/AGENTS最新分工。
+- DeepSeek和Kimi K3首次执行、自测后暂停；279/280及281方案已收尾，当前仅DeepSeek的282本地A隔离实现，正式产品未改。不派两个K2.8，不自动等待/唤回或收取未通知任务；页面旧交叉复核文本未改，按用户/AGENTS最新分工。
 - 本轮只推进当前日志功能的281复核及后续A隔离派发，不并开B/C或其它功能。用量来源比例未提供，按批次/范围控制；完整历史见PROGRESS_HISTORY。
 
 ## 279已加载并通过实机核验
