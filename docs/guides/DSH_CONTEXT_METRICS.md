@@ -2,7 +2,7 @@
 
 289已完成首次实现、独立实查、直接补正和离线验证。当前代码未加载到运行角色，真实上下文数值仍未知，不能把本文当作已经可用的用户操作入口。机制见[总体需求](../spec/EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)，验收证据见[289复核](../spec/DSH_CONTEXT_METRICS_REVIEW_289.md)。
 
-当前新片[290](../spec/EXECUTION_SESSION_FALLBACK_SLICE_3.md)已派，仅补占比单纯不可得时的条件十次备用及窗口计数；会为unknown补可审分类贯通，不把所有None都当缺数。下方289 API尚未改动，真实挂载/采集/任务接线也未启用。
+290已完成不可得分类与窗口计数的独立实查、直接补正和离线集成，详[备用调用说明](EXECUTION_SESSION_FALLBACK.md)。unknown仍保持`context_sample=None`，新增`context_unavailability`贯通统一入口；显式非法数据和来源矛盾优先阻止备用。真实挂载/采集/任务接线未启用，collect因API连接失败待补。
 
 ## 模块与调用顺序
 
@@ -61,20 +61,20 @@ adapted = adapt_context_snapshot(
     max_age_seconds=explicit_max_age,
     trusted_host={"verified": True, "source": "受控宿主标签"},
 )
-# 再把adapted["context_sample"]交给plan_execution_session。
-# unknown时该字段为None；既有候选走新窗完整规则，忙通道仍先wait。
+# 同时把context_sample和context_unavailability交给统一规划入口。
+# 备用还需可信完整计数与显式fallback_clock；裸None仍新窗，忙通道先wait。
 ```
 
 `expected_scope`含`project_id/target_member_id/requester_id/continuity_key/workspace_identity/runner_id/native_home_namespace/service_launch_id/provider_id/model_id/model_binding_fingerprint/config_permission_fingerprint`及`native_session_id/session_generation/session_revision`。调用者须由可信当前事实独立组装预期值，不能直接从不可信快照复制后当作核验。
 
 `trusted_host`是调用方显式确认来源，不是跨进程认证；schema/producer标签不能单独证明可信。只支持当前producer版本，未知版本保unknown。`now`和`max_age_seconds`必须显式提供，没有产品默认秒数；无效时间预算抛`ValueError`，无效快照返回unknown及原因。
 
-Python适配核对来源序号均不晚于cut，顺序须满足当前配置→容量→压力→预计值；同序号必须同事件时间。原生字段虽独立更新，仍须能证明属于当前配置；无法证明即unknown。使用量/容量及压力来源必须在预算内，未来或过期不接受。仅projected字段确实missing时才考虑pressure；missing状态若带显式值/来源属于矛盾输入，不得借此隐藏非法优先字段。
+Python适配核对来源序号均不晚于cut，顺序须满足当前配置→容量→压力→预计值；同序号必须同事件时间。原生字段虽独立更新，仍须能证明属于当前配置；无法证明即unknown。使用量/容量及压力来源必须在预算内，未来不接受；过期不能生成可靠指标，仅在其它来源/身份均合法时可分类为单纯不可得，另按可信计数和备用时钟判定。仅projected字段确实missing时才考虑pressure；missing状态若带显式值/来源属于矛盾输入，不得借此隐藏非法优先字段。
 
-合法适配返回known和原始整数样本，不生成UI取整百分比；184项离线验证覆盖59.9%续用、60%新窗、未知/错误身份新窗完整和忙通道等待。基础合同引用/正文回取仍遵守288规则。读取/适配不发送消息、不创建或恢复会话、不取实际锁或修改TALK任务。
+合法适配返回known和原始整数样本，不生成UI取整百分比；当前280项离线验证覆盖59.9%续用、60%新窗、条件备用、错误身份新窗完整和忙通道等待。基础合同引用/正文回取仍遵守288规则。读取/适配不发送消息、不创建或恢复会话、不取实际锁或修改TALK任务。
 
 ## 验证与当前限制
 
-可执行：`node tests/test_dsh_context_capture.mjs`、`python -B -X utf8 tests/test_dsh_context_metrics.py`、`python -B -X utf8 tests/test_execution_sessions.py`；分别34、44、106项通过。Python包含实际执行Node采集测试替身输出并送入适配器及288的跨语言验证；不依赖`.tmp`冻结副本或交付证据文件。原Node逐文件`--test` runner曾被沙箱拒绝spawn，保留原失败回执，直接运行同一node:test文件通过。
+可执行：`node tests/test_dsh_context_capture.mjs`、`python -B -X utf8 tests/test_dsh_context_metrics.py`、`python -B -X utf8 tests/test_execution_sessions.py`；分别34、76、170项通过，共280项、零跳过。Python包含实际执行Node采集测试替身输出并送入适配器及288的跨语言验证；不依赖`.tmp`冻结副本或交付证据文件。原Node逐文件`--test` runner曾被沙箱拒绝spawn，保留原失败回执，直接运行同一node:test文件通过。
 
 真实版本关联、有效插件/native home、采集器挂载/宿主传输和真实数值尚未核验；原生会话续用、MCP增量交办/存档、页面、锁/ACK/幂等及生产加载也未完成。当前headless客户端工具超时未知，不把bridge21600秒当工具预算；没有主动等待/取消排队适配验收。真实入口落地同片更新[用户手册](USER_MANUAL.md)并人工验收。

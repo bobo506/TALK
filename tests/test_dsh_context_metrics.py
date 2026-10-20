@@ -20,9 +20,7 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve()
-PROJECT_ROOT = HERE.parents[1]
-CANDIDATE_ROOT = PROJECT_ROOT
-BASELINE_ROOT = PROJECT_ROOT
+CANDIDATE_ROOT = HERE.parents[1]
 NODE_TEST = HERE.with_name("test_dsh_context_capture.mjs")
 
 SCOPE_FIELDS = (
@@ -78,8 +76,8 @@ ADAPTER = _load_module(
     "dsh_context_metrics_under_test",
 )
 KERNEL = _load_module(
-    BASELINE_ROOT / "bridges" / "execution_sessions.py",
-    "frozen_execution_sessions_288",
+    CANDIDATE_ROOT / "bridges" / "execution_sessions.py",
+    "candidate_execution_sessions_290",
 )
 
 
@@ -651,6 +649,10 @@ def kernel_inputs(
     candidate_revision: Any = None,
     candidate: bool = True,
     channel: dict[str, Any] | None = None,
+    candidate_state: str = "ready",
+    first_turn_confirmed: bool = True,
+    context_unavailability: dict[str, Any] | None = None,
+    window_count_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     base_text = "BASE CONTRACT TEST"
     sha = hashlib.sha256(base_text.encode("utf-8")).hexdigest()
@@ -660,10 +662,10 @@ def kernel_inputs(
         candidate_value = {
             "native_session_id": expected["native_session_id"],
             "scope": copy.deepcopy(scope),
-            "state": "ready",
+            "state": candidate_state,
             "execution_channel_exclusive": True,
             "active_writer": False,
-            "first_turn_confirmed": True,
+            "first_turn_confirmed": first_turn_confirmed,
             "session_revision": (
                 expected["session_revision"]
                 if candidate_revision is None
@@ -693,7 +695,60 @@ def kernel_inputs(
             "active_writer": False,
             "execution_channel_exclusive": True,
         },
+        context_unavailability=context_unavailability,
+        window_count_state=window_count_state,
+        fallback_clock={"now": NOW + timedelta(seconds=MAX_AGE + 1), "max_age_seconds": 120},
     )
+
+
+def kernel_count_state(expected: dict[str, Any], count: int = 1) -> dict[str, Any]:
+    """Build a real candidate count state via initialize/confirm, not a fake dict."""
+
+    scope = kernel_scope(expected)
+    native_session_id = expected["native_session_id"]
+    revision = expected["session_revision"]
+    first = {
+        "delivery_id": "deliv-1",
+        "task_id": "289",
+        "attempt": 0,
+        "execution_id": "exec-289-1",
+        "body_sha256": hashlib.sha256(b"increment-1").hexdigest(),
+        "native_session_id": native_session_id,
+        "session_generation": expected["session_generation"],
+        "session_revision": revision,
+        "outcome": "delivered",
+        "first_turn": True,
+    }
+    initialized = KERNEL.initialize_window_count(
+        scope=scope,
+        native_session_id=native_session_id,
+        first_delivery=first,
+    )
+    if initialized["status"] != "initialized":
+        raise AssertionError(initialized)
+    state = initialized["state"]
+    for index in range(2, count + 1):
+        receipt = {
+            "delivery_id": f"deliv-{index}",
+            "task_id": str(289 + index - 1),
+            "attempt": 0,
+            "execution_id": f"exec-289-{index}",
+            "body_sha256": hashlib.sha256(
+                f"increment-{index}".encode("utf-8")
+            ).hexdigest(),
+            "native_session_id": native_session_id,
+            "session_generation": expected["session_generation"],
+            "session_revision": revision,
+            "outcome": "delivered",
+            "first_turn": False,
+        }
+        merged = KERNEL.confirm_window_delivery(
+            state=state, scope=scope, delivery=receipt
+        )
+        if merged["status"] != "incremented":
+            raise AssertionError(merged)
+        state = merged["state"]
+    return state
 
 
 class KernelIntegrationTests(unittest.TestCase):
@@ -1011,6 +1066,670 @@ class IndependentAdapterTests(unittest.TestCase):
         result = adapt(snapshot, trusted_host={"verified": False, "source": "PRIVATE_AUTH_SENTINEL"})
         self.assertEqual(result["status"], "unknown")
         self.assertNotIn("PRIVATE_AUTH_SENTINEL", json.dumps(result))
+
+
+class ContextUnavailabilityTests(unittest.TestCase):
+    """The adapter must expose a machine-checkable classification, not just None."""
+
+    def test_known_result_has_no_unavailability(self) -> None:
+        adapted = adapt(make_snapshot())
+        self.assertEqual(adapted["status"], "known")
+        self.assertIsNone(adapted["context_unavailability"])
+
+    def test_missing_tokens_is_eligible_and_bound_to_exact_window(self) -> None:
+        snapshot = make_snapshot(
+            projected_metric=metric_missing(),
+            pressure_metric=metric_missing(),
+        )
+        adapted = adapt(snapshot)
+        self.assertEqual(adapted["status"], "unknown")
+        self.assertEqual(adapted["reason_code"], "tokens_missing")
+        self.assertIsNone(adapted["context_sample"])
+        classification = adapted["context_unavailability"]
+        self.assertEqual(classification["schema"], ADAPTER.UNAVAILABILITY_SCHEMA)
+        self.assertEqual(classification["version"], 1)
+        self.assertEqual(classification["reason_code"], "tokens_missing")
+        self.assertEqual(classification["category"], "no_usage_sample")
+        self.assertTrue(classification["fallback_eligible"])
+        expected = expected_from_snapshot(snapshot)
+        self.assertEqual(
+            classification["window"]["native_session_id"],
+            expected["native_session_id"],
+        )
+        self.assertEqual(
+            classification["window"]["session_generation"],
+            expected["session_generation"],
+        )
+        self.assertEqual(
+            classification["window"]["session_revision"],
+            expected["session_revision"],
+        )
+        self.assertEqual(
+            classification["window"]["scope"],
+            {field: expected[field] for field in SCOPE_FIELDS},
+        )
+        self.assertRegex(
+            classification["window"]["scope_fingerprint"], r"^[0-9a-f]{64}$"
+        )
+        evidence = classification["evidence"]
+        self.assertEqual(evidence["trust"], "adapter_verified_snapshot")
+        self.assertTrue(evidence["producer_supported"])
+        self.assertTrue(evidence["identity_verified"])
+        self.assertFalse(evidence["sample_present"])
+        self.assertTrue(
+            all(
+                evidence["checks"].get(key) is True
+                for key in ADAPTER._IDENTITY_CHECK_KEYS
+            )
+        )
+
+    def test_capacity_missing_is_eligible(self) -> None:
+        snapshot = make_snapshot(capacity_metric=metric_missing())
+        adapted = adapt(snapshot)
+        self.assertEqual(adapted["reason_code"], "capacity_missing")
+        classification = adapted["context_unavailability"]
+        self.assertEqual(classification["category"], "capacity_missing")
+        self.assertTrue(classification["fallback_eligible"])
+
+    def test_expired_source_is_eligible(self) -> None:
+        snapshot = make_snapshot()
+        adapted = adapt(snapshot, now=NOW + timedelta(seconds=MAX_AGE + 1))
+        self.assertEqual(adapted["status"], "unknown")
+        self.assertEqual(adapted["reason_code"], "used_sample_expired")
+        classification = adapted["context_unavailability"]
+        self.assertEqual(classification["category"], "source_expired")
+        self.assertTrue(classification["fallback_eligible"])
+        self.assertTrue(classification["evidence"]["identity_verified"])
+
+    def test_invalid_metric_is_blocked(self) -> None:
+        snapshot = make_snapshot(
+            projected_metric=metric_invalid("value_negative"),
+            pressure=59900,
+        )
+        adapted = adapt(snapshot)
+        self.assertEqual(adapted["reason_code"], "projected_invalid")
+        classification = adapted["context_unavailability"]
+        self.assertFalse(classification["fallback_eligible"])
+        self.assertEqual(classification["category"], "invalid_metric")
+        self.assertTrue(classification["evidence"]["identity_verified"])
+
+    def test_identity_producer_and_source_failures_are_blocked(self) -> None:
+        cases: list[tuple[str, dict[str, Any], dict[str, Any], str]] = []
+        snapshot = make_snapshot()
+        snapshot["config"]["model_id"]["value"] = "other-model"
+        cases.append(("wrong_model", snapshot, {}, "model_mismatch"))
+        snapshot = make_snapshot()
+        cases.append(
+            (
+                "wrong_session",
+                snapshot,
+                {"expected": {"native_session_id": "session-other"}},
+                "session_id_mismatch",
+            )
+        )
+        snapshot = make_snapshot()
+        snapshot["producer"]["version"] = "999.0.0"
+        cases.append(("producer", snapshot, {}, "producer_unsupported"))
+        snapshot = make_snapshot()
+        snapshot["metrics"]["projected_tokens"]["source"]["seq"] = 101
+        cases.append(("after_cut", snapshot, {}, "source_after_snapshot_cut"))
+        snapshot = make_snapshot()
+        cases.append(
+            ("future", snapshot, {"now": NOW - timedelta(seconds=10)}, "snapshot_future")
+        )
+        snapshot = make_snapshot(blocking_issues=["private raw event text"])
+        cases.append(("capture_blocking", snapshot, {}, "capture_blocking_issue"))
+        for name, snapshot, kwargs, reason in cases:
+            with self.subTest(name=name):
+                expected = expected_from_snapshot(snapshot)
+                if "expected" in kwargs:
+                    expected.update(kwargs["expected"])
+                    kwargs = {"expected": expected}
+                adapted = adapt(snapshot, **kwargs)
+                self.assertEqual(adapted["status"], "unknown", name)
+                self.assertEqual(adapted["reason_code"], reason, name)
+                classification = adapted["context_unavailability"]
+                self.assertFalse(classification["fallback_eligible"], name)
+
+    def test_blocked_classification_never_echoes_raw_text(self) -> None:
+        sentinel = "PRIVATE_RAW_EVENT_SENTINEL"
+        snapshot = make_snapshot(blocking_issues=[sentinel])
+        result = adapt(snapshot)
+        serialized = json.dumps(result["context_unavailability"], ensure_ascii=False)
+        self.assertNotIn(sentinel, serialized)
+        self.assertEqual(
+            result["context_unavailability"]["category"], "capture_blocked"
+        )
+
+    def test_host_attested_unavailability_requires_trust_and_exact_scope(self) -> None:
+        snapshot = make_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        classification = ADAPTER.build_metrics_unavailability(
+            reason_code="metrics_not_provided",
+            expected_scope=expected,
+            observed_at=NOW,
+            trusted_host=TRUSTED_HOST,
+        )
+        self.assertTrue(classification["fallback_eligible"])
+        self.assertEqual(classification["category"], "metrics_not_provided")
+        self.assertEqual(classification["evidence"]["trust"], "trusted_host_capability")
+        self.assertEqual(
+            classification["window"]["native_session_id"],
+            expected["native_session_id"],
+        )
+        with self.assertRaises(ValueError):
+            ADAPTER.build_metrics_unavailability(
+                reason_code="not_a_real_reason",
+                expected_scope=expected,
+                observed_at=NOW,
+                trusted_host=TRUSTED_HOST,
+            )
+        with self.assertRaises(ValueError):
+            ADAPTER.build_metrics_unavailability(
+                reason_code="metrics_not_provided",
+                expected_scope=expected,
+                observed_at=NOW,
+                trusted_host={"verified": False, "source": "host"},
+            )
+        with self.assertRaises(ValueError):
+            ADAPTER.build_metrics_unavailability(
+                reason_code="metrics_not_provided",
+                expected_scope={"project_id": "partial"},
+                observed_at=NOW,
+                trusted_host=TRUSTED_HOST,
+            )
+        with self.assertRaises(ValueError):
+            ADAPTER.build_metrics_unavailability(
+                reason_code="metrics_not_provided",
+                expected_scope=expected,
+                observed_at="not-a-time",
+                trusted_host=TRUSTED_HOST,
+            )
+
+    def test_runtime_unsupported_is_eligible_without_fake_ratio(self) -> None:
+        expected = expected_from_snapshot(make_snapshot())
+        classification = ADAPTER.build_metrics_unavailability(
+            reason_code="runtime_unsupported",
+            expected_scope=expected,
+            observed_at=NOW,
+            trusted_host=TRUSTED_HOST,
+            producer_supported=False,
+        )
+        self.assertTrue(classification["fallback_eligible"])
+        self.assertEqual(classification["category"], "runtime_unsupported")
+        self.assertFalse(classification["evidence"]["producer_supported"])
+        state = kernel_count_state(expected, count=1)
+        plan = kernel_inputs(
+            expected,
+            None,
+            context_unavailability=classification,
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "reuse_session")
+        self.assertEqual(plan["reason_code"], "reuse_missing_metrics_fallback")
+        self.assertEqual(plan["metrics"]["status"], "unknown")
+        self.assertIsNone(plan["metrics"]["used_tokens"])
+
+    def test_known_output_matches_frozen_contract(self) -> None:
+        # ad46037 冻结结果的规范 JSON 哈希，正式测试不依赖本机 .tmp。
+        candidate = adapt(make_snapshot(projected=599, pressure=599, capacity=1000))
+        payload = {key: candidate[key] for key in ("status", "reason_code", "context_sample")}
+        actual = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+        self.assertEqual(actual, "f2da933a10722584050fdac1da05ab98fdb4dc40dd818c1d3a196584f1e964e5")
+        self.assertIsNone(candidate["context_unavailability"])
+
+
+class FallbackIntegrationTests(unittest.TestCase):
+    """Actual 289 adapter output -> count state -> unified planning entry."""
+
+    def missing_snapshot(self) -> dict[str, Any]:
+        return make_snapshot(
+            projected_metric=metric_missing(),
+            pressure_metric=metric_missing(),
+        )
+
+    def test_actual_missing_tokens_output_allows_fallback(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        self.assertEqual(adapted["status"], "unknown")
+        self.assertIsNone(adapted["context_sample"])
+        classification = adapted["context_unavailability"]
+        state = kernel_count_state(expected, count=1)
+        plan = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=classification,
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "reuse_session")
+        self.assertEqual(plan["reason_code"], "reuse_missing_metrics_fallback")
+        self.assertEqual(plan["briefing_mode"], "incremental")
+        self.assertEqual(plan["window_count"]["status"], "eligible")
+        self.assertEqual(plan["window_count"]["confirmed_count"], 1)
+        self.assertEqual(plan["window_count"]["proposed_ordinal"], 2)
+        self.assertTrue(plan["window_count"]["requires_delivery_confirmation"])
+        self.assertEqual(
+            plan["window_count"]["count_merge"], "after_confirmed_delivery"
+        )
+        self.assertNotIn("BASE CONTRACT TEST", plan["delivery"]["text"])
+
+    def test_actual_capacity_missing_output_allows_tenth(self) -> None:
+        snapshot = make_snapshot(capacity_metric=metric_missing())
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        self.assertEqual(adapted["reason_code"], "capacity_missing")
+        state = kernel_count_state(expected, count=9)
+        plan = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "reuse_session")
+        self.assertEqual(plan["window_count"]["confirmed_count"], 9)
+        self.assertEqual(plan["window_count"]["proposed_ordinal"], 10)
+
+    def test_actual_expired_output_allows_fallback(self) -> None:
+        snapshot = make_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot, now=NOW + timedelta(seconds=MAX_AGE + 1))
+        self.assertEqual(adapted["reason_code"], "used_sample_expired")
+        state = kernel_count_state(expected, count=1)
+        plan = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "reuse_session")
+        self.assertEqual(plan["reason_code"], "reuse_missing_metrics_fallback")
+
+    def test_actual_count_10_goes_to_full_new(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        state = kernel_count_state(expected, count=10)
+        plan = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_fallback_exhausted")
+        self.assertEqual(plan["briefing_mode"], "full")
+        self.assertEqual(plan["window_count"]["status"], "exhausted")
+        self.assertIsNone(plan["window_count"]["proposed_ordinal"])
+        self.assertIn("BASE CONTRACT TEST", plan["delivery"]["text"])
+
+    def test_actual_missing_output_without_count_is_full_new(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        plan = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+        )
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_fallback_count_unverified")
+        self.assertEqual(plan["window_count"]["status"], "missing")
+        self.assertTrue(plan["delivery"]["includes"]["base_contract"])
+
+    def test_actual_invalid_projected_cannot_fallback(self) -> None:
+        snapshot = make_snapshot(
+            projected_metric=metric_invalid("value_negative"),
+            pressure=59900,
+        )
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        self.assertFalse(adapted["context_unavailability"]["fallback_eligible"])
+        state = kernel_count_state(expected, count=1)
+        plan = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["briefing_mode"], "full")
+        self.assertNotEqual(plan["window_count"]["status"], "eligible")
+        self.assertEqual(
+            plan["window_count"]["classification_reason"],
+            "projected_invalid",
+        )
+
+    def test_raw_invalid_sample_beats_eligible_classification(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        classification = adapted["context_unavailability"]
+        self.assertTrue(classification["fallback_eligible"])
+        invalid_sample = {
+            "native_session_id": expected["native_session_id"],
+            "session_generation": expected["session_generation"],
+            "session_revision": expected["session_revision"],
+            "provider_id": expected["provider_id"],
+            "model_id": expected["model_id"],
+            "model_binding_fingerprint": expected["model_binding_fingerprint"],
+            "projected_tokens": -1,
+            "pressure_tokens": 50000,
+            "context_window": 100000,
+            "sampled_at": iso(T4),
+            "now": iso(NOW),
+            "max_age_seconds": MAX_AGE,
+        }
+        state = kernel_count_state(expected, count=1)
+        plan = kernel_inputs(
+            expected,
+            invalid_sample,
+            context_unavailability=classification,
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["metrics"]["reason_code"], "projected_invalid")
+        self.assertNotEqual(plan["window_count"]["status"], "eligible")
+
+    def test_known_metrics_ignore_count_on_both_sides(self) -> None:
+        expected = expected_from_snapshot(make_snapshot())
+        low = adapt(make_snapshot(projected=200, pressure=200, capacity=1000))
+        self.assertEqual(low["status"], "known")
+        state20 = kernel_count_state(expected, count=20)
+        low_plan = kernel_inputs(
+            expected,
+            low["context_sample"],
+            window_count_state=state20,
+        )
+        self.assertEqual(low_plan["action"], "reuse_session")
+        self.assertEqual(low_plan["window_count"]["status"], "verified")
+        self.assertEqual(low_plan["window_count"]["confirmed_count"], 20)
+        self.assertEqual(
+            low_plan["window_count"]["observation_intent"]["observation"][
+                "used_tokens"
+            ],
+            200,
+        )
+        high = adapt(make_snapshot(projected=600, pressure=600, capacity=1000))
+        state1 = kernel_count_state(expected, count=1)
+        high_plan = kernel_inputs(
+            expected,
+            high["context_sample"],
+            window_count_state=state1,
+        )
+        self.assertEqual(high_plan["action"], "new_session")
+        self.assertEqual(high_plan["reason_code"], "new_context_threshold")
+        self.assertEqual(high_plan["window_count"]["confirmed_count"], 1)
+
+    def test_count_1_9_10_actual_output(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        for count, action, status, ordinal in (
+            (1, "reuse_session", "eligible", 2),
+            (9, "reuse_session", "eligible", 10),
+            (10, "new_session", "exhausted", None),
+        ):
+            with self.subTest(count=count):
+                state = kernel_count_state(expected, count=count)
+                plan = kernel_inputs(
+                    expected,
+                    adapted["context_sample"],
+                    context_unavailability=adapted["context_unavailability"],
+                    window_count_state=state,
+                )
+                self.assertEqual(plan["action"], action)
+                self.assertEqual(plan["window_count"]["status"], status)
+                self.assertEqual(
+                    plan["window_count"]["proposed_ordinal"], ordinal
+                )
+
+    def test_planning_is_pure_and_count_is_not_preincremented(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        state = kernel_count_state(expected, count=1)
+        before = copy.deepcopy(state)
+        first = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+        )
+        second = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(state, before)
+        self.assertIsNone(first["window_count"].get("state"))
+        self.assertNotIn("state", first["window_count"])
+
+    def test_host_attested_not_provided_reaches_plan(self) -> None:
+        expected = expected_from_snapshot(make_snapshot())
+        classification = ADAPTER.build_metrics_unavailability(
+            reason_code="metrics_not_provided",
+            expected_scope=expected,
+            observed_at=NOW,
+            trusted_host=TRUSTED_HOST,
+        )
+        state = kernel_count_state(expected, count=1)
+        plan = kernel_inputs(
+            expected,
+            None,
+            context_unavailability=classification,
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "reuse_session")
+        self.assertEqual(
+            plan["window_count"]["classification_reason"],
+            "metrics_not_provided",
+        )
+
+    def test_bare_none_never_auto_fallbacks(self) -> None:
+        expected = expected_from_snapshot(make_snapshot())
+        state = kernel_count_state(expected, count=1)
+        plan = kernel_inputs(
+            expected,
+            None,
+            window_count_state=state,
+        )
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertNotEqual(plan["window_count"]["status"], "eligible")
+
+    def test_unknown_or_tampered_classification_is_rejected(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        state = kernel_count_state(expected, count=1)
+        cases = []
+        unknown = copy.deepcopy(adapted["context_unavailability"])
+        unknown["reason_code"] = "unknown"
+        unknown["category"] = "unknown"
+        cases.append(("unknown_reason", unknown))
+        extra = copy.deepcopy(adapted["context_unavailability"])
+        extra["allow_fallback"] = True
+        cases.append(("allow_flag", extra))
+        no_identity = copy.deepcopy(adapted["context_unavailability"])
+        no_identity["evidence"]["identity_verified"] = False
+        cases.append(("identity_false", no_identity))
+        for name, classification in cases:
+            with self.subTest(name=name):
+                plan = kernel_inputs(
+                    expected,
+                    adapted["context_sample"],
+                    context_unavailability=classification,
+                    window_count_state=state,
+                )
+                self.assertEqual(plan["action"], "new_session", name)
+                self.assertNotEqual(
+                    plan["window_count"]["status"], "eligible", name
+                )
+
+    def test_busy_channel_and_unconfirmed_first_turn_win_over_fallback(self) -> None:
+        snapshot = self.missing_snapshot()
+        expected = expected_from_snapshot(snapshot)
+        adapted = adapt(snapshot)
+        state = kernel_count_state(expected, count=1)
+        busy = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+            channel={
+                "state": "busy",
+                "active_writer": False,
+                "execution_channel_exclusive": True,
+            },
+        )
+        self.assertEqual(busy["action"], "wait")
+        self.assertEqual(busy["reason_code"], "wait_channel_busy")
+        unconfirmed = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=state,
+            first_turn_confirmed=False,
+        )
+        self.assertEqual(unconfirmed["action"], "new_session")
+        self.assertEqual(
+            unconfirmed["reason_code"], "new_first_turn_unconfirmed"
+        )
+
+    def test_high_observation_blocks_missing_metrics(self) -> None:
+        expected = expected_from_snapshot(make_snapshot())
+        state = kernel_count_state(expected, count=1)
+        scope = kernel_scope(expected)
+        observed = KERNEL.record_threshold_observation(
+            now="2026-10-20T15:02:00+00:00",
+            state=state,
+            scope=scope,
+            observation={
+                "native_session_id": expected["native_session_id"],
+                "session_generation": expected["session_generation"],
+                "session_revision": expected["session_revision"],
+                "used_tokens": 600,
+                "capacity_tokens": 1000,
+                "source": "projected",
+                "sampled_at": iso(T4),
+            },
+        )
+        self.assertEqual(observed["status"], "recorded")
+        self.assertEqual(observed["confirmed_count"], 1)
+        self.assertTrue(
+            observed["state"]["last_threshold_observation"]["threshold_met"]
+        )
+        snapshot = make_snapshot(
+            projected_metric=metric_missing(),
+            pressure_metric=metric_missing(),
+        )
+        adapted = adapt(snapshot)
+        plan = kernel_inputs(
+            expected,
+            adapted["context_sample"],
+            context_unavailability=adapted["context_unavailability"],
+            window_count_state=observed["state"],
+        )
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(
+            plan["reason_code"], "new_fallback_threshold_observed"
+        )
+        self.assertEqual(
+            plan["window_count"]["last_threshold_observation_met"], True
+        )
+
+    def test_recovery_keeps_count_then_next_missing_uses_it(self) -> None:
+        expected = expected_from_snapshot(make_snapshot())
+        state = kernel_count_state(expected, count=1)
+        low = adapt(make_snapshot(projected=200, pressure=200, capacity=1000))
+        low_plan = kernel_inputs(
+            expected, low["context_sample"], window_count_state=state
+        )
+        self.assertEqual(low_plan["action"], "reuse_session")
+        intent = low_plan["window_count"]["observation_intent"]
+        self.assertTrue(intent["requires_host_persist"])
+        recorded = KERNEL.record_threshold_observation(
+            now="2026-10-20T15:02:00+00:00",
+            state=state,
+            scope=kernel_scope(expected),
+            observation=intent["observation"],
+        )
+        self.assertEqual(recorded["confirmed_count"], 1)
+        self.assertFalse(
+            recorded["state"]["last_threshold_observation"]["threshold_met"]
+        )
+        missing = adapt(
+            make_snapshot(
+                projected_metric=metric_missing(),
+                pressure_metric=metric_missing(),
+            )
+        )
+        plan = kernel_inputs(
+            expected,
+            missing["context_sample"],
+            context_unavailability=missing["context_unavailability"],
+            window_count_state=recorded["state"],
+        )
+        self.assertEqual(plan["action"], "reuse_session")
+        self.assertEqual(plan["window_count"]["confirmed_count"], 1)
+        self.assertEqual(plan["window_count"]["proposed_ordinal"], 2)
+
+    def test_known_plan_matches_frozen_contract(self) -> None:
+        expected = expected_from_snapshot(make_snapshot())
+        adapted = adapt(make_snapshot(projected=599, pressure=599, capacity=1000))
+        plan = kernel_inputs(expected, adapted["context_sample"])
+        keys = ("action", "reason_code", "briefing_mode", "native_session_ref", "delivery", "archive", "metrics")
+        payload = {key: plan[key] for key in keys}
+        actual = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+        self.assertEqual(actual, "e6d1c687fc90d36e0194925ffdcfb6a996227a2c1944f397f1365a7066dc6920")
+
+
+class FallbackReviewRegressions(unittest.TestCase):
+    def assert_blocked(self, snapshot):
+        result = adapt(snapshot)
+        self.assertEqual(result["status"], "unknown")
+        self.assertFalse(result["context_unavailability"]["fallback_eligible"])
+        expected = expected_from_snapshot(snapshot)
+        plan = kernel_inputs(expected, result["context_sample"],
+                             context_unavailability=result["context_unavailability"],
+                             window_count_state=kernel_count_state(expected))
+        self.assertEqual(plan["action"], "new_session")
+        return result
+
+    def test_capacity_missing_does_not_hide_invalid_or_unknown_metric(self):
+        for field in ("projected_tokens", "pressure_tokens"):
+            for state in ("invalid", "unverified", "unknown"):
+                with self.subTest(field=field, state=state):
+                    snapshot = make_snapshot(capacity_metric=metric_missing())
+                    snapshot["metrics"][field] = dict(state=state, value=None, source=None, reason_code="bad")
+                    self.assert_blocked(snapshot)
+
+    def test_both_tokens_missing_does_not_hide_unknown_projected(self):
+        snapshot = make_snapshot(projected_metric=dict(state="unknown", value=None, source=None), pressure_metric=metric_missing())
+        self.assert_blocked(snapshot)
+
+    def test_missing_capacity_or_tokens_does_not_hide_sources_after_cut(self):
+        for field in ("projected_tokens", "pressure_tokens"):
+            snapshot = make_snapshot(capacity_metric=metric_missing())
+            snapshot["metrics"][field]["source"]["seq"] = 102
+            self.assertEqual(self.assert_blocked(snapshot)["reason_code"], "source_after_snapshot_cut")
+        snapshot = make_snapshot(projected_metric=metric_missing(), pressure_metric=metric_missing())
+        for field in ("provider_id", "model_id"):
+            snapshot["config"][field]["source"]["seq"] = 102
+        self.assertEqual(self.assert_blocked(snapshot)["reason_code"], "source_after_snapshot_cut")
+
+    def test_missing_capacity_does_not_hide_conflicting_event_time(self):
+        snapshot = make_snapshot(capacity_metric=metric_missing())
+        snapshot["metrics"]["projected_tokens"]["source"]["seq"] = snapshot["metrics"]["pressure_tokens"]["source"]["seq"]
+        self.assertEqual(self.assert_blocked(snapshot)["reason_code"], "source_event_time_inconsistent")
+
+    def test_missing_tokens_does_not_hide_backward_source_time(self):
+        snapshot = make_snapshot(projected_metric=metric_missing(), pressure_metric=metric_missing())
+        snapshot["metrics"]["context_window"]["source"]["time"] = iso(BASE)
+        self.assertEqual(self.assert_blocked(snapshot)["reason_code"], "metric_source_order_invalid")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # 会话机制第三片：占比缺失时十次交办兜底
 
-派发记录：2026-10-20 23:59（Asia/Shanghai），实际任务290、creator `agent:codex`、target `agent:deepseek`，Hall `group:task-57de85e8ddd64baeae1006f1cadfbf63`，创建queued/assigned。19份公开项目材料676,842字节已冻结在baseline/；原合同/请求/manifest/名册要求/创建回执在coordination/，均执行者只读。当前无开发交付/独立验收结论，冻结原任务包不随本节更新覆写。
+收尾状态：2026-10-21 07:18（Asia/Shanghai）。290首次交付已经Codex独立实查、直接补正和串行集成，170内核/76适配/34既有Node共280项离线验证通过；原27件和19冻结SHA保持，详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)及[最终API](../guides/EXECUTION_SESSION_FALLBACK.md)。TALK API连接被拒绝，collect未成功，最近可读submitted/结果2896保持，待入口恢复核对补收取。原任务包/请求/失败证据不改，未加载角色或启停；用户要求不派新任务，本轮只保存290。
 
 ## 本轮授权与范围
 

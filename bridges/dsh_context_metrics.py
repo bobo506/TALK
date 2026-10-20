@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Mapping
@@ -31,11 +32,17 @@ __all__ = [
     "ADAPTER_SCHEMA",
     "MAX_SAFE_INTEGER",
     "SNAPSHOT_SCHEMA",
+    "UNAVAILABILITY_SCHEMA",
     "adapt_context_snapshot",
+    "build_metrics_unavailability",
 ]
 
 SNAPSHOT_SCHEMA = "talk-dsh-context-snapshot-1"
 ADAPTER_SCHEMA = "talk-dsh-context-adapter-1"
+# 机器可判的指标不可得分类。它只描述“为什么没有可靠样本”，不伪装成有效
+# 占比；未知/禁止原因一律 fallback_eligible=False。
+UNAVAILABILITY_SCHEMA = "talk-dsh-context-unavailability-1"
+UNAVAILABILITY_VERSION = 1
 CAPTURE_MODULE = "dsh_context_capture"
 CAPTURE_VERSION = "1.0.0"
 PRODUCER_NATIVE_PACKAGE = "@deepseek-ai/dsh"
@@ -75,6 +82,64 @@ _SCOPE_FIELDS = (
 )
 _IDENTIFIER_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 _METRIC_STATES = frozenset(("known", "missing", "invalid", "unverified", "unknown"))
+
+# 有限白名单：只有这些“单纯不可得”原因才可能进入内核备用计数。任何身份/
+# 配置/顺序/非法值/未知 producer 原因都不在此表，分类恒为不可兜底。
+_FALLBACK_REASON_CATEGORIES = {
+    "tokens_missing": "no_usage_sample",
+    "capacity_missing": "capacity_missing",
+    "used_sample_expired": "source_expired",
+    "capacity_sample_expired": "source_expired",
+    "pressure_sample_expired": "source_expired",
+    "metrics_not_provided": "metrics_not_provided",
+    "no_usage_sample": "no_usage_sample",
+    "runtime_unsupported": "runtime_unsupported",
+}
+# 可信宿主在无快照时只能显式声明这三类事实；不能借该 helper 把错误样本
+# 改写成 missing。identity_verified 仍要求精确 scope/native/generation。
+_HOST_ATTESTABLE_REASONS = frozenset(
+    ("metrics_not_provided", "no_usage_sample", "runtime_unsupported")
+)
+_IDENTITY_CHECK_KEYS = (
+    "scope_match",
+    "workspace_verified",
+    "session_id_match",
+    "generation_match",
+    "revision_match",
+    "session_live",
+    "projection_exact",
+    "model_match",
+    "binding_match",
+    "config_source_known",
+)
+_BLOCKED_CATEGORY_BY_REASON = {
+    "trusted_host_unverified": "trust_unverified",
+    "expected_scope_invalid": "scope_unverified",
+    "snapshot_invalid": "schema_or_producer_blocked",
+    "snapshot_schema_unsupported": "schema_or_producer_blocked",
+    "snapshot_version_unsupported": "schema_or_producer_blocked",
+    "producer_unsupported": "schema_or_producer_blocked",
+    "observed_at_invalid": "source_time_blocked",
+    "snapshot_future": "source_time_blocked",
+    "sample_future": "source_time_blocked",
+    "source_after_snapshot_cut": "source_order_blocked",
+    "metric_source_order_invalid": "source_order_blocked",
+    "config_changed_after_pressure_sample": "source_order_blocked",
+    "capacity_changed_after_pressure_sample": "source_order_blocked",
+    "capacity_precedes_current_config": "source_order_blocked",
+    "source_event_time_inconsistent": "source_order_blocked",
+    "projected_invalid": "invalid_metric",
+    "projected_unverified": "unverified_metric",
+    "projected_unknown": "unknown_metric",
+    "pressure_invalid": "invalid_metric",
+    "pressure_unverified": "unverified_metric",
+    "pressure_unknown": "unknown_metric",
+    "pressure_unavailable": "inconsistent_metric",
+    "capacity_invalid": "invalid_metric",
+    "capacity_unverified": "unverified_metric",
+    "capacity_unknown": "unknown_metric",
+    "capture_blocking_issue": "capture_blocked",
+}
 
 
 class _DataError(Exception):
@@ -162,6 +227,127 @@ def _canonical_json(value: Any) -> str:
     )
 
 
+def _binding_fingerprint(
+    scope: Mapping[str, Any],
+    native_session_id: str,
+    session_generation: int,
+    session_revision: str | int,
+) -> str:
+    payload = {
+        "scope": {field: scope[field] for field in _SCOPE_FIELDS},
+        "native_session_id": native_session_id,
+        "session_generation": session_generation,
+        "session_revision": session_revision,
+    }
+    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def _window_binding(expected: Mapping[str, Any]) -> dict[str, Any]:
+    scope = {field: expected[field] for field in _SCOPE_FIELDS}
+    return {
+        "native_session_id": expected["native_session_id"],
+        "session_generation": expected["session_generation"],
+        "session_revision": expected["session_revision"],
+        "scope": scope,
+        "scope_fingerprint": _binding_fingerprint(
+            scope,
+            expected["native_session_id"],
+            expected["session_generation"],
+            expected["session_revision"],
+        ),
+    }
+
+
+def _identity_verified(audit: Mapping[str, Any]) -> bool:
+    checks = audit.get("checks")
+    if not isinstance(checks, Mapping):
+        return False
+    return all(checks.get(key) is True for key in _IDENTITY_CHECK_KEYS)
+
+
+def _blocked_category(reason_code: str) -> str:
+    mapped = _BLOCKED_CATEGORY_BY_REASON.get(reason_code)
+    if mapped is not None:
+        return mapped
+    if reason_code.endswith("_future") or reason_code.endswith("_future_source"):
+        return "source_time_blocked"
+    if reason_code.startswith(("projected_", "pressure_", "capacity_")):
+        return "invalid_or_unverified_metric"
+    if reason_code.startswith(("session_", "generation_", "revision_")):
+        return "session_identity_blocked"
+    if reason_code.startswith(
+        ("config_", "binding_", "permission_", "model_", "provider_")
+    ):
+        return "config_identity_blocked"
+    if reason_code.startswith(("scope_", "workspace_", "host")):
+        return "scope_identity_blocked"
+    if reason_code.startswith(("snapshot_", "producer_")):
+        return "schema_or_producer_blocked"
+    return "blocked_unverified"
+
+
+def _classify_unavailable(
+    reason_code: str,
+    audit: Mapping[str, Any],
+    *,
+    trust: str = "adapter_verified_snapshot",
+) -> dict[str, Any]:
+    """把一次不可得结果映射为有限分类；不采信调用方的 allow 标记。"""
+
+    binding = audit.get("binding")
+    identity_ok = _identity_verified(audit)
+    producer_ok = audit.get("producer_supported") is True
+    category = _FALLBACK_REASON_CATEGORIES.get(reason_code)
+    eligible = bool(
+        category is not None
+        and isinstance(binding, Mapping)
+        and identity_ok
+        and (producer_ok or trust == "trusted_host_capability")
+    )
+    if category is None:
+        category = _blocked_category(reason_code)
+    checks = audit.get("checks")
+    clean_checks = {
+        key: value
+        for key, value in (checks.items() if isinstance(checks, Mapping) else ())
+        if isinstance(key, str) and isinstance(value, bool)
+    }
+    clean_binding = None
+    if isinstance(binding, Mapping):
+        raw_scope = binding.get("scope")
+        if isinstance(raw_scope, Mapping):
+            clean_binding = {
+                "native_session_id": binding.get("native_session_id"),
+                "session_generation": binding.get("session_generation"),
+                "session_revision": binding.get("session_revision"),
+                "scope": {
+                    field: raw_scope.get(field) for field in _SCOPE_FIELDS
+                },
+                "scope_fingerprint": binding.get("scope_fingerprint"),
+            }
+    return {
+        "schema": UNAVAILABILITY_SCHEMA,
+        "version": UNAVAILABILITY_VERSION,
+        "reason_code": reason_code,
+        "category": category,
+        "fallback_eligible": eligible,
+        "window": clean_binding,
+        "evidence": {
+            "trust": trust,
+            "trusted_host_source": (
+                audit.get("trusted_host", {}).get("source")
+                if isinstance(audit.get("trusted_host"), Mapping)
+                else None
+            ),
+            "observed_at": audit.get("snapshot_observed_at"),
+            "producer_supported": producer_ok,
+            "identity_verified": identity_ok,
+            "sample_present": False,
+            "checks": clean_checks,
+        },
+    }
+
+
 def _same_revision(left: Any, right: Any) -> bool:
     return _canonical_json(left) == _canonical_json(right)
 
@@ -212,7 +398,12 @@ def _base_audit(
 
 
 def _result(
-    *, status: str, reason_code: str, context_sample: dict[str, Any] | None, audit: dict[str, Any]
+    *,
+    status: str,
+    reason_code: str,
+    context_sample: dict[str, Any] | None,
+    audit: dict[str, Any],
+    context_unavailability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "schema": ADAPTER_SCHEMA,
@@ -220,6 +411,7 @@ def _result(
         "reason_code": reason_code,
         "reasons": [] if status == "known" else [reason_code],
         "context_sample": context_sample,
+        "context_unavailability": context_unavailability,
         "audit": audit,
     }
 
@@ -230,7 +422,13 @@ def _fail(
     if checks:
         audit["checks"].update(dict(checks))
     audit["unknown_reasons"] = [code]
-    return _result(status="unknown", reason_code=code, context_sample=None, audit=audit)
+    return _result(
+        status="unknown",
+        reason_code=code,
+        context_sample=None,
+        audit=audit,
+        context_unavailability=_classify_unavailable(code, audit),
+    )
 
 
 def _check_trusted_host(trusted_host: Any) -> tuple[bool, str | None]:
@@ -459,6 +657,7 @@ def _check_host(
     _require_identifier(attestation.get("source"), "host.attestation.source")
     audit["checks"]["scope_match"] = True
     audit["checks"]["workspace_verified"] = True
+    audit["binding"] = _window_binding(expected)
 
 
 def _check_session(
@@ -532,6 +731,60 @@ def _age_us(now: datetime, source_time: datetime) -> int:
     return age // timedelta(microseconds=1)
 
 
+def build_metrics_unavailability(
+    *,
+    reason_code: str,
+    expected_scope: Mapping[str, Any],
+    observed_at: datetime | str | int,
+    trusted_host: Mapping[str, Any],
+    producer_supported: bool = False,
+) -> dict[str, Any]:
+    """可信宿主在无当前快照时显式声明“指标不可得”的分类。
+
+    只接受三种有限原因：未提供、尚无用量样本、运行器不提供该能力。调用方
+    必须给出与精确 native session/generation/revision 及作用域绑定的预期值
+    和可信宿主标签；本函数不读取外部状态，也不是跨进程认证。返回对象可直接
+    作为 ``plan_execution_session(context_unavailability=...)`` 的输入。
+    """
+
+    if not isinstance(reason_code, str) or reason_code not in _HOST_ATTESTABLE_REASONS:
+        raise ValueError("reason_code: not_attestable")
+    trusted, trusted_source = _check_trusted_host(trusted_host)
+    if not trusted:
+        raise ValueError("trusted_host: unverified")
+    try:
+        expected = _normalize_expected_scope(expected_scope)
+    except _DataError as exc:
+        raise ValueError(f"expected_scope: {exc.field}") from exc
+    try:
+        observed = _parse_time(observed_at, "observed_at")
+    except _DataError as exc:
+        raise ValueError(f"observed_at: {exc.code}") from exc
+    if not isinstance(producer_supported, bool):
+        raise ValueError("producer_supported: must_be_bool")
+    binding = _window_binding(expected)
+    return {
+        "schema": UNAVAILABILITY_SCHEMA,
+        "version": UNAVAILABILITY_VERSION,
+        "reason_code": reason_code,
+        "category": _FALLBACK_REASON_CATEGORIES[reason_code],
+        "fallback_eligible": True,
+        "window": binding,
+        "evidence": {
+            "trust": "trusted_host_capability",
+            "trusted_host_source": trusted_source,
+            "observed_at": _iso(observed),
+            "producer_supported": producer_supported,
+            "identity_verified": True,
+            "sample_present": False,
+            "checks": {
+                "trusted_host_verified": True,
+                "trusted_scope_confirmed": True,
+            },
+        },
+    }
+
+
 def adapt_context_snapshot(
     snapshot: Mapping[str, Any],
     *,
@@ -587,6 +840,7 @@ def adapt_context_snapshot(
         audit["producer_error"] = exc.code
         audit["error_field"] = exc.field
         return _fail("producer_unsupported", audit)
+    audit["producer_supported"] = True
     try:
         observed_at = _parse_time(snapshot.get("observed_at"), "observed_at")
     except _DataError:
@@ -672,6 +926,44 @@ def adapt_context_snapshot(
         audit["metric_error"] = "capacity"
         audit["error_field"] = exc.field
         return _fail(f"capacity_{exc.code}", audit)
+
+    # 缺字段不能抢先掩盖另一个字段的非法/不可信状态。所有已经存在的来源
+    # 先过 cut、顺序及同事件时间校验，之后才允许分类为单纯 missing。
+    for label, metric in (("projected", projected), ("pressure", pressure),
+                          ("capacity", capacity)):
+        if metric["state"] in ("invalid", "unverified", "unknown"):
+            return _fail(f"{label}_{metric['state']}", audit)
+    sources = [(config_seq, config_time)] + [
+        (metric["source"]["seq"], metric["source"]["_time"])
+        for metric in (projected, pressure, capacity)
+        if metric["state"] == "known"
+    ]
+    if any(seq > cut for seq, _ in sources):
+        return _fail("source_after_snapshot_cut", audit)
+    times_by_seq = {}
+    for seq, time in sources:
+        if seq in times_by_seq and times_by_seq[seq] != time:
+            return _fail("source_event_time_inconsistent", audit)
+        times_by_seq[seq] = time
+    if pressure["state"] == "known":
+        pressure_source = pressure["source"]
+        if config_seq > pressure_source["seq"] or config_time > pressure_source["_time"]:
+            return _fail("config_changed_after_pressure_sample", audit)
+        if capacity["state"] == "known" and (
+            capacity["source"]["seq"] > pressure_source["seq"]
+            or capacity["source"]["_time"] > pressure_source["_time"]
+        ):
+            return _fail("capacity_changed_after_pressure_sample", audit)
+        if projected["state"] == "known" and (
+            projected["source"]["seq"] < pressure_source["seq"]
+            or projected["source"]["_time"] < pressure_source["_time"]
+        ):
+            return _fail("metric_source_order_invalid", audit)
+    if capacity["state"] == "known" and config_seq > capacity["source"]["seq"]:
+        return _fail("capacity_precedes_current_config", audit)
+    ordered = sorted(times_by_seq.items())
+    if any(left[1] > right[1] for left, right in zip(ordered, ordered[1:])):
+        return _fail("metric_source_order_invalid", audit)
 
     if capacity["state"] != "known":
         if capacity["state"] == "missing":

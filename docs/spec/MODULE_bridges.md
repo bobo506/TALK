@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-21 07:18：290条件十次备用/窗口计数已独立实查、直接补正并离线集成，170/76/34共280项过；修复缺数掩盖非法来源、未来证明、旧低值覆盖高观测和计数历史校验。真实采集/原生续用/ACK/存储仍未接通；API连接拒绝使collect待补，不自行启停，用户要求不派新任务。详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)和[备用API](../guides/EXECUTION_SESSION_FALLBACK.md)。
+
 > 2026-10-20 23:59：用户已批准再做一片条件十次兜底，290已派DeepSeek，基线ad46037、19公开材料冻结，创建queued/assigned。仅缺可靠指标且完整计数可信时备用10次，可靠60%规则和scope/通道/非法数据守卫优先；计数从首轮累计，恢复读数不重计。只隔离Python内核/分类及两测试，不改JS采集器/运行角色或启停，无开发/采集验收；用户通知后Codex实查/直接修正，本轮只此片，详[290合同](EXECUTION_SESSION_FALLBACK_SLICE_3.md)。
 
 > 2026-10-20 23:22：289 DSH上下文原生采集接口/Python适配已独立实查、直接补正并集成收取；Node34/Python44/原288的106项共184全过。补来源cut/序号、字段状态和异常/回调边界，四份新源/测试无生产导入，原bridge/host/288不变；实际版本/配置/home/真实数值未知，未加载/启停/模型或会话读取。下一片仅建议只读实机入口/配置及挂载核验，先确认；详[289复核](DSH_CONTEXT_METRICS_REVIEW_289.md)和[采集说明](../guides/DSH_CONTEXT_METRICS.md)。
