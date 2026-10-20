@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-20 16:32（Asia/Shanghai）— 查询恢复error残留直接补正，170项自检通过，待单角色加载
+
+- 用户对先处理DeepSeek错误残留、再回B2b回复“好的”。MCP仍agent:codex/agent、lead、prj_e8fe7066bbec，DeepSeek无current_task_id，项目/全局queued和running为空；原执行者无在途开发，Codex按已交付问题直接补正，不新派任务或Kimi，不冒称他人独立复核。6份原文件/SHA及54101f8基线冻结于.tmp/queue-poll-status-recovery/。
+- 新首5项真实run_bridge/worker隔离反例3失败/1错误/1通过：原查询成功只更新诊断、受管心跳及非受管保error，日志关闭且错误上报失败还会退出worker。cli_bridge以状态锁/本地来源版本恢复本轮询自己的错误，保护busy/执行锁/任务/其它来源错误及后续状态；上报失败保可重试意图，不污染查询失败计数，正常成功无额外请求，取消/非受管无心跳保持。
+- 首次修正漏传诊断辅助task_id参数剩1失败，已修正，原first-fix.log保留。最终14新例覆盖同文案不同来源、后续任务、锁等待、offline/取消、重试和真实诊断计数；联合原心跳/轮询/CLI/正常停止共170项通过、0失败/错误/跳过、3.813秒，为Codex自检。未改服务端/DB/配置/权限/Key/模型/任务协议，无生产故障注入、真实CLI/模型调用。
+- 16:32只读重核原DeepSeek gen21/ins_39ba69bf6dfe/bridge12612、manager11612及创建时间，归属在/can_stop；其他四服务stopped/API保持。loading-plan.json仅计划，旧bridge未加载，新代码不能算实机恢复。方案仅单个DeepSeek普通stop→原Popen退出/释放→start，保Key/模型/manager及其它角色/API，无强杀/清owner/新任务。按AGENTS第130行，代码/验证/进度/Git先收尾，确认实际部署后再加载；B2b不自动开启。
+
 ## 2026-10-20 16:21（Asia/Shanghai）— 285管理账号只读查看页面验收通过
 
 - 用户对285已加载后的验收问题明确答复“验收通过”：原管理账号human:bobo刷新后，未加入任务的完整对话/成果可读，未加入时发送/附件/回复不可用。本次页面门禁闭合，原代码/加载提交8be3921及此前162 Python/81 Node、实际加载验证保持，不重跑无关测试。

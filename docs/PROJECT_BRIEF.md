@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 16:32：用户同意处理DeepSeek查询恢复后的error残留，Codex直接补正通用bridge，仅恢复本轮询自己的错误，保护busy/执行错误/后续状态，状态上报失败可重试；新增14项及原相关用例共170项自检通过。旧DeepSeek尚未加载，已备单角色普通stop/start方案，待部署确认；不动API/宿主/其它角色，285人验保持、B2b未派、Kimi暂停新派发。详[补正与加载方案](spec/QUEUE_POLL_STATUS_RECOVERY_FIX.md)及[进度](PROGRESS.md)。
+
 2026-10-20 16:21：用户明确确认285页面“验收通过”，管理账号未入群查看完整对话/成果及只读行为的人验门禁闭合，8be3921加载及原验证保持。本轮仅记录验收、更新进度/Git；DeepSeek查询恢复后的error状态残留仍单独待处理，不启停角色、不派B2b，Kimi继续暂停新派发。详[285加载/验收记录](spec/CONVERSATION_ACCESS_LOAD_285.md)及[当前进度](PROGRESS.md)。
 
 2026-10-20 15:53：用户同意后已正常加载285，仅human:bobo全局只读查看生效，原未加入Hall读200/发送403，页面人验待确认；配置/SQLite私有备份完成，284三张新日志表各0行、接收仍关闭，旧结构/业务记录/Key/绑定/归属保持。角色未重启，DeepSeek查询已恢复但断连error残留、就绪unknown，单独待处理；Kimi继续暂停新派发，不开B2b。详[285加载记录](spec/CONVERSATION_ACCESS_LOAD_285.md)和[当前进度](PROGRESS.md)。下列为此前阶段记录。

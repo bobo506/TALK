@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 16:32：查询恢复后轮询error残留由Codex直接补正。通用bridge以状态锁/本地来源版本恢复自己的查询错误，保护任务busy/执行错误及后续状态；状态上报失败可重试且不污染诊断，正常成功不加请求。新增14项及原相关用例共170项自检通过，旧DeepSeek尚未加载，待单角色正常stop/start确认。其它角色/API/权限/任务合同保持，详[补正记录](QUEUE_POLL_STATUS_RECOVERY_FIX.md)。
+
 > 2026-10-20 14:48：284 B2a三日志表、来源管理及SQLite接收事务核心已实查/直接修正后集成收取；原37通过、首轮10反例8失败保留，最终51项自检通过，30旧表/480旧AST节点不变。新增内核默认关闭，无host/bridge/HTTP或生产操作，下一片B2b真实writer投影及查询接线待派，详[284复核](ROLE_RUNTIME_LOG_RECEIVE_REVIEW_284.md)。以下是较早快照。
 
 > 2026-10-20 10:55：283 B1方案已实查收取，48原例复跑过、9独立反例失败，原文件inbox不集成；Codex补正三表事务/稳定来源事件/真实writer映射/读取投影及ACK。用户已批准三表/来源登记撤销/接收查询、默认关闭与隔离验证，下一片B2a仅表/事务核心；不改host/bridge或生产，详[283复核](ROLE_RUNTIME_LOG_RECEIVE_REVIEW_283.md)、[B合同](ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)。

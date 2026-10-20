@@ -4408,6 +4408,8 @@ async def run_task_queue_worker(
     run_lock: asyncio.Lock,
     report_status: Any,
     diagnostics: Any | None = None,
+    report_query_error: Any | None = None,
+    recover_query_error: Any | None = None,
 ) -> None:
     preflight_failures: dict[int, tuple[int, TaskPreflightError, str | None]] = {}
     max_preflight_attempts = resolve_task_preflight_max_attempts(args)
@@ -4424,6 +4426,7 @@ async def run_task_queue_worker(
     )
     poll_cycle: QueuePollCycle | None = None
     current_task_id: int | None = None
+    query_status_recovery_pending = False
     stop_reason = "unexpected_exit"
     queue_start_log_id: str | None = None
     if diagnostics is not None:
@@ -4466,6 +4469,28 @@ async def run_task_queue_worker(
                 else:
                     # Idle polling stays out of the persistent timeline.
                     discovery_operation.abandon()
+                if query_status_recovery_pending and recover_query_error is not None:
+                    try:
+                        recovered = await recover_query_error()
+                    except asyncio.CancelledError:
+                        stop_reason = "cancelled"
+                        raise
+                    except Exception as report_exc:
+                        # The query already succeeded. A status PUT failure must
+                        # neither count as a query failure nor kill its retries.
+                        secondary_log_id = _record_secondary_failure(
+                            diagnostics, report_exc,
+                            stage="queue_poll_status_recovery",
+                            task_id=None, primary_log_id=None, budgets=queue_budgets,
+                        )
+                        print(
+                            "Task queue recovery status report failed "
+                            f"({type(report_exc).__name__}); "
+                            f"log_ref={secondary_log_id or 'unavailable'}",
+                            file=sys.stderr,
+                        )
+                    else:
+                        query_status_recovery_pending = not recovered
                 for task in queued:
                     task_id = int(task["id"])
                     current_task_id = task_id
@@ -4634,13 +4659,20 @@ async def run_task_queue_worker(
                     # diagnostics; type remains visible even for an empty str().
                     last_error = f"{last_error}: {exc}"
                 try:
-                    if report_status is not None:
+                    if query_failure and report_query_error is not None:
+                        # Retain this intent even if the error PUT itself fails;
+                        # the reporter may already have updated its heartbeat.
+                        query_status_recovery_pending = True
+                        await report_query_error(last_error)
+                    elif report_status is not None:
                         await report_status("error", last_error=last_error)
                 except asyncio.CancelledError:
                     stop_reason = "cancelled"
                     raise
                 except Exception as report_exc:
-                    if diagnostics is None:
+                    if diagnostics is None and not (
+                        query_failure and report_query_error is not None
+                    ):
                         raise
                     secondary_log_id = _record_secondary_failure(
                         diagnostics,
@@ -4811,7 +4843,41 @@ async def run_bridge(args: argparse.Namespace) -> None:
             )
         raise
     status_lock = asyncio.Lock()
+    run_lock = asyncio.Lock()
     current_managed_payload: dict[str, Any] = {}
+    status_revision = 0
+    query_error_revision: int | None = None
+
+    async def publish_status_locked(
+        status: str,
+        *,
+        current_task_id: str | None = None,
+        last_error: str | None = None,
+        query_owned: bool = False,
+    ) -> None:
+        nonlocal status_revision, query_error_revision
+        payload = build_instance_report_payload(
+            runtime=args.runtime,
+            status=status,
+            host=host,
+            pid=os.getpid(),
+            current_task_id=current_task_id,
+            last_error=last_error,
+            project_id=managed_project_id,
+            launch_id=managed_launch_id,
+            process_started_at=managed_started_at,
+        )
+        status_revision += 1
+        query_error_revision = status_revision if query_owned else None
+        # Keep retry/heartbeat state even when the following request fails.
+        current_managed_payload.clear()
+        current_managed_payload.update(payload)
+        if managed_launch_id:
+            await client._request_json(
+                "PUT", f"/api/instances/{instance_id}", json_body=payload
+            )
+        else:
+            await client.report_instance_status(instance_id, **payload)
 
     async def report_status(
         status: str,
@@ -4819,35 +4885,36 @@ async def run_bridge(args: argparse.Namespace) -> None:
         current_task_id: str | None = None,
         last_error: str | None = None,
     ) -> None:
-        if managed_launch_id:
-            payload = build_instance_report_payload(
-                runtime=args.runtime,
-                status=status,
-                host=host,
-                pid=os.getpid(),
-                current_task_id=current_task_id,
-                last_error=last_error,
-                project_id=managed_project_id,
-                launch_id=managed_launch_id,
-                process_started_at=managed_started_at,
+        async with status_lock:
+            await publish_status_locked(
+                status, current_task_id=current_task_id, last_error=last_error,
             )
-            async with status_lock:
-                # 心跳与状态切换串行；忙碌/当前任务/错误不能被旧 idle 快照覆盖。
-                current_managed_payload.clear()
-                current_managed_payload.update(payload)
-                await client._request_json(
-                    "PUT", f"/api/instances/{instance_id}", json_body=payload
-                )
-            return
-        await client.report_instance_status(
-            instance_id,
-            runtime=args.runtime,
-            status=status,
-            host=host,
-            pid=os.getpid(),
-            current_task_id=current_task_id,
-            last_error=last_error,
-        )
+
+    async def report_query_error(last_error: str) -> None:
+        async with status_lock:
+            owned = query_error_revision is not None and query_error_revision == status_revision
+            if run_lock.locked() or current_managed_payload.get("current_task_id") is not None:
+                return
+            if current_managed_payload.get("status") != "idle" and not owned:
+                return
+            await publish_status_locked("error", last_error=last_error, query_owned=True)
+
+    async def recover_query_error() -> bool:
+        nonlocal query_error_revision
+        async with status_lock:
+            # A normal message/task/offline report invalidates ownership even
+            # if its text happens to equal the previous query error.
+            if query_error_revision is None or query_error_revision != status_revision:
+                return True
+            if run_lock.locked():
+                return False
+            if current_managed_payload.get("current_task_id") is not None or current_managed_payload.get("status") not in ("idle", "error"):
+                return True
+            # Preserve ownership on failure so the next genuine query success
+            # retries this PUT; any intervening status report cancels it.
+            await publish_status_locked("idle", query_owned=True)
+            query_error_revision = None
+            return True
 
     try:
         await report_status("idle")
@@ -4862,8 +4929,6 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 budgets=bridge_budgets,
             )
         raise
-
-    run_lock = asyncio.Lock()
 
     @client.on_message
     async def handle_message(message: dict[str, Any]) -> None:
@@ -4904,6 +4969,8 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 run_lock=run_lock,
                 report_status=report_status,
                 diagnostics=diagnostics,
+                report_query_error=report_query_error,
+                recover_query_error=recover_query_error,
             )
         )
 
