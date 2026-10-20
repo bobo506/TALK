@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-20 17:25（Asia/Shanghai）— 桌面日志方向澄清，286普通中止并保留原产物
+
+- 用户澄清桌面应用目标：日志保存在产生日志的设备，跨设备分析通过导出文件并手动转移即可；当前不继续联网集中上传/接收。 桌面可内置本地服务/数据库，用户无需独立部署集中日志服务；本轮只调整日志路线，不改聊天网络/账号同步架构或现有服务。联网接收B2b/B3不再作为当前日志收尾前置。
+- 读取286当时running/in_progress/active、attempt1、ins_00acba0f8a9b，创建者agent:codex；使用本人原Key调用既有pause-tree后为queued/accepted、control_status=paused、instance_id=null、manual_pause，不能把runner queued误当可继续领取。随后独立只读确认原DeepSeek idle/无当前任务，角色/API未停启。无result_message_id/未收取，不记完成/验收，不发新任务或额外Agent消息。
+- 本片233份约8.78MB隔离产物/原任务包/175冻结及基线5246776保留原位，方向中止时逐文件SHA清单在.tmp/runtime-log-upload-projection-v1/coordination/direction-change/；无候选集成/重用/删除，原中止与收敛回执保持。
+- 284已发布关闭的接收内核、原三张空表保持，不因方向变化自动删表/数据库或改历史提交、原批准和失败。原本地采集/周期/异常关联/统一JSONL导出、285权限和DeepSeek状态人验保持；Kimi暂停新派发。
+- 同步当前需求/简报/模块/原接收及投影片合同标注旧方案、重排本地日志剩余计划与进度；用户手册日志节此前仍为旧275页面，按已落地的诊断日志/生成/下载入口修正文案并补手动转移说明，不新增导入能力或产品代码。依据静态DOM/JS及此前人验校核，不做Browser/模型/额外实机任务；本轮仅文档差异/链接/UTF-8、175冻结/正式源完整性及Git检查。
+- 下一步先只读盘点本机日志导出/来源覆盖与空间留存的实际缺口，固定范围后再安排开发；当前不恢复286，不自动开启旧HTTP/来源接收/outbox或会话复用。
+
 ## 2026-10-20 17:12（Asia/Shanghai）— 日志B2b-1投影首片286已派DeepSeek
 
 - DeepSeek角色状态人验闭合，切片合同/验收记录以5246776固定提交；usage-gate返回continue但精确比例null，不臆测。只读重核MCP agent:codex/agent、DeepSeek idle/无当前任务及目标queued/running为空，读取页面旧development_requirements并注明AGENTS新分工优先，未改页面要求。

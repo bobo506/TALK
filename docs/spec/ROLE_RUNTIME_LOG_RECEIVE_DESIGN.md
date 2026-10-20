@@ -1,5 +1,7 @@
 # 日志来源、接收与查询实施提案（283复核补正）
 
+2026-10-20 17:25方向调整（优先于下方旧方案）：用户澄清桌面应用目标：日志保存在产生日志的设备，跨设备分析通过导出文件并手动转移即可；当前不继续联网集中上传/接收。286由创建者agent:codex调用既有pause-tree普通中止，控制状态paused，当前领取已撤销；原DeepSeek已回idle/无当前任务，服务未停。隔离产物233份约8.78MB保留原位，不收取/验收/集成。原284关闭内核及三张日志表保留，不删库/表、不启用接收；HTTP上传、跨机器来源及outbox移出当前排期。本轮只处理日志方向，桌面内部本地服务/数据库及聊天/账号同步架构保持，未派新任务。 本文为原接收方案历史；原批准/代码/失败证据不追改，不据历史批准自动继续开发。
+
 2026-10-20 17:12：本片已作为独立顶层task286派agent:deepseek，创建queued/assigned。精确基线52467765dfee05ada9ed79bad7d282f2deaf38a8，175公开源/指定文档冻结，原包/manifest/回执在.tmp/runtime-log-upload-projection-v1/coordination/；仅deepseek/隔离候选可写，自测交付暂停后Codex实查/直接修正。生产接收关闭，HTTP/查询后续，不主动等待，用户通知后取件。 [本片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)。
 
 17:03切片细化：DeepSeek状态页面验收已通过，先B2b-1[真实writer上传投影与服务端适配](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)，不改B2a内核/HTTP或启用生产；HTTP、来源接口及读取查询随后串行。首片支持与明确延后类型已固定，不静默忽略launch_process等未适配事件。

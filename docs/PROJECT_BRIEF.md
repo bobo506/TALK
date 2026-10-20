@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 17:25方向调整（优先于下方旧方案）：用户澄清桌面应用目标：日志保存在产生日志的设备，跨设备分析通过导出文件并手动转移即可；当前不继续联网集中上传/接收。286由创建者agent:codex调用既有pause-tree普通中止，控制状态paused，当前领取已撤销；原DeepSeek已回idle/无当前任务，服务未停。隔离产物233份约8.78MB保留原位，不收取/验收/集成。原284关闭内核及三张日志表保留，不删库/表、不启用接收；HTTP上传、跨机器来源及outbox移出当前排期。本轮只处理日志方向，桌面内部本地服务/数据库及聊天/账号同步架构保持，未派新任务。 详[当前需求](spec/ROLE_RUNTIME_LOGGING_AND_MANAGEMENT_REQUIREMENTS.md)、[调整后的日志计划](spec/ROLE_RUNTIME_LOGGING_REMAINING_PLAN.md)与[进度](PROGRESS.md)。
+
 2026-10-20 17:12：日志B2b-1首片286已派DeepSeek，基线5246776/175冻结公开源和指定文档、仅隔离候选白名单；实现真实writer上传对象/服务端严格PreparedBatch适配，HTTP/查询随后串行，生产接收保持关闭。创建queued/assigned，交付暂停后Codex独立实查/直接修正，默认用户通知取件，Kimi暂停派发。详[286合同](spec/ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)及[进度](PROGRESS.md)。
 
 2026-10-20 17:03：用户明确确认DeepSeek“启动成功、绑定保持”的页面验收通过，00bdcff/170项及02c7692实机加载门禁闭合。回原日志B2b，先固定真实writer上传投影和服务端严格适配首片合同，HTTP/查询随后串行，尚未派发/启用生产。Kimi继续暂停新派发，详[切片合同](spec/ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)和[进度](PROGRESS.md)。

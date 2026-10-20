@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 17:25方向调整（优先于下方旧方案）：用户澄清桌面应用目标：日志保存在产生日志的设备，跨设备分析通过导出文件并手动转移即可；当前不继续联网集中上传/接收。286由创建者agent:codex调用既有pause-tree普通中止，控制状态paused，当前领取已撤销；原DeepSeek已回idle/无当前任务，服务未停。隔离产物233份约8.78MB保留原位，不收取/验收/集成。原284关闭内核及三张日志表保留，不删库/表、不启用接收；HTTP上传、跨机器来源及outbox移出当前排期。本轮只处理日志方向，桌面内部本地服务/数据库及聊天/账号同步架构保持，未派新任务。
+
 > 2026-10-20 17:12：本片已作为独立顶层task286派agent:deepseek，创建queued/assigned。精确基线52467765dfee05ada9ed79bad7d282f2deaf38a8，175公开源/指定文档冻结，原包/manifest/回执在.tmp/runtime-log-upload-projection-v1/coordination/；仅deepseek/隔离候选可写，自测交付暂停后Codex实查/直接修正。生产接收关闭，HTTP/查询后续，不主动等待，用户通知后取件。 详[本片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)。
 
 > 2026-10-20 17:03：用户明确确认DeepSeek状态补正页面“验收通过”，00bdcff/170项及02c7692实机加载保持，状态门禁闭合。下一片回B2b-1真实writer上传投影/服务端严格适配，支持边界及明确延后项见[切片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)；尚未派发，生产接收仍关闭、Kimi暂停派发。
