@@ -1,13 +1,14 @@
 # Project Progress
 
-Updated: 2026-10-20 17:03（Asia/Shanghai）。用户明确确认DeepSeek状态页面“验收通过”，修复/加载/人验门禁闭合。回原日志排期，B2b-1真实writer上传投影及严格PreparedBatch适配合同已固定，当前准备冻结和派发，尚未创建任务。生产接收仍关闭，Kimi继续暂停新派发。
+Updated: 2026-10-20 17:12（Asia/Shanghai）。DeepSeek状态页面验收已闭合；按原日志排期已派286“日志上传对象与真实写入器投影适配”给DeepSeek，创建queued/assigned。基线5246776、175份公开源/指定文档已冻结，仅隔离候选白名单可写；交付暂停后Codex实查。生产接收仍关闭，Kimi暂停新派发，默认用户通知后取件。
 
-## 当前工作：B2b-1投影片准备
+## 当前工作：286 B2b-1投影片已派发
 
 - 详[切片合同](spec/ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)、[已批准B合同](spec/ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)。先真实writer→版本化上传对象→服务端严格再次投影→284 PreparedBatch，候选隔离、不改内核/路由/认证/配置/模型/生产。HTTP/来源接口/查询随后串行，B3 outbox后续，不冒称已接收或已跨机器。
 - 首片支持role标准/异常及transition/queue_poll，manager仅manager_round_snapshot；launch_process和其它manager生命周期事件明确拒绝并保本地，待后续补归因，不静默丢弃或伪造manager事实。
-- 首次执行DeepSeek、自测交付后暂停；Codex独立实查/直接修正、集成/正式进度/Git。须先提交合同与人验，再冻结公开源/指定文档、白名单和隔离根派发；本快照时尚未派发。
-- usage-gate guard返回continue；精确用量比例null，未臆测百分比。当前DeepSeek新ins_00acba0f8a9b idle/无任务，实际派发前重核；不启停角色或测试模型。
+- 实际task286/project prj_e8fe7066bbec，creator agent:codex/target agent:deepseek，创建queued/assigned，独立顶层general/无parent；首次执行、自测交付后暂停，Codex独立实查/直接修正、集成/正式进度/Git。Hall group:task-f084b011f9774072a1801162be61e5e3。
+- 精确基线52467765dfee05ada9ed79bad7d282f2deaf38a8，175冻结文件约5.95MB，.tmp/runtime-log-upload-projection-v1/baseline/只读；coordination/存原包/manifest/页面旧要求快照及派发回执。执行者仅deepseek/可写，候选两产品/两测试及合成fixture目录白名单；正式源、内核、writer、配置/DB/Key/服务、正式进度及Git禁止写。
+- usage-gate guard返回continue；精确用量比例null，未臆测百分比。派发前已重核DeepSeek新ins_00acba0f8a9b idle/无任务及目标queued/running为空，随后仅创建286；不启停角色或额外测试模型。
 
 ## 最近完成
 
@@ -25,6 +26,6 @@ Updated: 2026-10-20 17:03（Asia/Shanghai）。用户明确确认DeepSeek状态�
 
 ## 下一步
 
-固定干净基线、冻结副本/白名单后派DeepSeek一个B2b-1投影片，交付暂停后由Codex实查。日志B2b全部收尾再B3持久outbox/真实跨机器和C全根治理；日志整项后统一全入口执行预算21600，再会话复用。
+286已派，默认派后结束、不主动等待，由用户通知完成后读取结构化交付、独立实查；发现问题确认执行者暂停后Codex直接修正。日志B2b全部收尾再B3持久outbox/真实跨机器和C全根治理；日志整项后统一全入口执行预算21600，再会话复用。
 
 恢复指令：继续项目。

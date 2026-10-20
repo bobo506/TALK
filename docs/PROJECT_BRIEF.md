@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 17:12：日志B2b-1首片286已派DeepSeek，基线5246776/175冻结公开源和指定文档、仅隔离候选白名单；实现真实writer上传对象/服务端严格PreparedBatch适配，HTTP/查询随后串行，生产接收保持关闭。创建queued/assigned，交付暂停后Codex独立实查/直接修正，默认用户通知取件，Kimi暂停派发。详[286合同](spec/ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)及[进度](PROGRESS.md)。
+
 2026-10-20 17:03：用户明确确认DeepSeek“启动成功、绑定保持”的页面验收通过，00bdcff/170项及02c7692实机加载门禁闭合。回原日志B2b，先固定真实writer上传投影和服务端严格适配首片合同，HTTP/查询随后串行，尚未派发/启用生产。Kimi继续暂停新派发，详[切片合同](spec/ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)和[进度](PROGRESS.md)。
 
 2026-10-20 16:40：用户明确同意仅加载DeepSeek状态修复，已沿原manager11612普通stop/start为gen23/新ins_00acba0f8a9b/12284，持续ready/idle/无错误，同一实例心跳推进60.059秒。API、全部manager及其它四角色/模型绑定保持，代码00bdcff/170项自检保持；待刷新角色页确认，不派B2b，Kimi继续暂停新派发。详[补正与实际加载](spec/QUEUE_POLL_STATUS_RECOVERY_FIX.md)及[进度](PROGRESS.md)。

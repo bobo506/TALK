@@ -1,5 +1,7 @@
 # B2b-1 真实写入器上传投影与服务端适配
 
+2026-10-20 17:12：本片已作为独立顶层task286派agent:deepseek，创建queued/assigned。精确基线52467765dfee05ada9ed79bad7d282f2deaf38a8，175公开源/指定文档冻结，原包/manifest/回执在.tmp/runtime-log-upload-projection-v1/coordination/；仅deepseek/隔离候选可写，自测交付暂停后Codex实查/直接修正。生产接收关闭，HTTP/查询后续，不主动等待，用户通知后取件。
+
 日期：2026-10-20。范围：已批准B2服务端范围内的首个投影片。先实现真实writer→版本化上传JSON→服务端严格校验/再次投影→B2a的PreparedBatch；后续串行补HTTP、来源接口、读取投影/查询，再B3持久outbox。生产接收仍关闭。
 
 ## 固定边界

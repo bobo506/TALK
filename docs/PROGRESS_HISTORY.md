@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-20 17:12（Asia/Shanghai）— 日志B2b-1投影首片286已派DeepSeek
+
+- DeepSeek角色状态人验闭合，切片合同/验收记录以5246776固定提交；usage-gate返回continue但精确比例null，不臆测。只读重核MCP agent:codex/agent、DeepSeek idle/无当前任务及目标queued/running为空，读取页面旧development_requirements并注明AGENTS新分工优先，未改页面要求。
+- 175份公开Python/测试/指定文档逐字节冻结，基线52467765dfee05ada9ed79bad7d282f2deaf38a8、约5.95MB，manifest及原包/要求快照/回执保存在.tmp/runtime-log-upload-projection-v1/coordination/；baseline只读，DeepSeek仅deepseek/可写，候选两新产品/两测试/合成fixture白名单。生产config/DB/日志/Key/原生会话、正式源/内核/writer、正式进度和Git禁写，避免共享目录并行。
+- 实际任务286，creator agent:codex、target agent:deepseek，project prj_e8fe7066bbec，Hall group:task-f084b011f9774072a1801162be61e5e3，独立顶层默认general/无parent，创建queued/assigned。只传project/target/title/content最小字段，不附子任务关系/质量字段；未手写任务编号。
+- 本片实现真实writer→版本化上传对象→服务端严格再次投影→原PreparedBatch，按逐字段表/最终UTF-8预算/脱敏/严格scope；role标准/异常/transition/queue_poll及manager周期快照，launch_process等明确拒绝并保本地待后续。HTTP/来源公共接口/查询/读取DTO/outbox/生产启用保持后续，不把派发当完成。
+- 执行者使用真实冻结writer生成合成fixture、自测及原51内核回归，裸JSON完整结构化交付后暂停；Codex独立实查/直接修正，默认用户通知完成后取件，不主动等待或自动重派，Kimi仍暂停新派发。本轮仅文档/冻结/派发，无额外模型测试/服务动作。
+
 ## 2026-10-20 17:03（Asia/Shanghai） — DeepSeek状态页面验收通过，回到日志B2b投影首片准备
 
 - 用户对加载后角色列表“启动成功、模型绑定保持”的验收问题明确答复“验收通过”，DeepSeek状态补正的页面门禁闭合。00bdcff修复/170项自检、02c7692加载/同实例60.059秒心跳事实保持，本轮不重跑无关测试或再次启停角色/API。原pending加载证据保留，新增human-acceptance.json。

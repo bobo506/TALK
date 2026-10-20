@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 17:12：本片已作为独立顶层task286派agent:deepseek，创建queued/assigned。精确基线52467765dfee05ada9ed79bad7d282f2deaf38a8，175公开源/指定文档冻结，原包/manifest/回执在.tmp/runtime-log-upload-projection-v1/coordination/；仅deepseek/隔离候选可写，自测交付暂停后Codex实查/直接修正。生产接收关闭，HTTP/查询后续，不主动等待，用户通知后取件。 详[本片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)。
+
 > 2026-10-20 17:03：用户明确确认DeepSeek状态补正页面“验收通过”，00bdcff/170项及02c7692实机加载保持，状态门禁闭合。下一片回B2b-1真实writer上传投影/服务端严格适配，支持边界及明确延后项见[切片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)；尚未派发，生产接收仍关闭、Kimi暂停派发。
 
 > 2026-10-20 16:40：用户明确同意仅DeepSeek加载后，原manager11612普通stop/start为gen23/ins_00acba0f8a9b/12284，ready/idle/无错误且同实例心跳推进60.059秒。API/宿主/其它角色/绑定保持，00bdcff/170项自检保持；角色页确认待，B2b未派。详[补正和实际加载](QUEUE_POLL_STATUS_RECOVERY_FIX.md)，下列16:32待加载是当时事实。

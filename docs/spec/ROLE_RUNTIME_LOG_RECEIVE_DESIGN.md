@@ -1,5 +1,7 @@
 # 日志来源、接收与查询实施提案（283复核补正）
 
+2026-10-20 17:12：本片已作为独立顶层task286派agent:deepseek，创建queued/assigned。精确基线52467765dfee05ada9ed79bad7d282f2deaf38a8，175公开源/指定文档冻结，原包/manifest/回执在.tmp/runtime-log-upload-projection-v1/coordination/；仅deepseek/隔离候选可写，自测交付暂停后Codex实查/直接修正。生产接收关闭，HTTP/查询后续，不主动等待，用户通知后取件。 [本片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)。
+
 17:03切片细化：DeepSeek状态页面验收已通过，先B2b-1[真实writer上传投影与服务端适配](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)，不改B2a内核/HTTP或启用生产；HTTP、来源接口及读取查询随后串行。首片支持与明确延后类型已固定，不静默忽略launch_process等未适配事件。
 
 日期：2026-10-20。状态：**用户已批准SQLite三表、来源登记/撤销、批次接收和只读查询；B2a三表/来源管理/事务内核已独立实查、Codex修正自检51项通过并集成收取，默认关闭。B2b投影/HTTP/只读查询尚未接线，生产未启用。** 详[284复核](ROLE_RUNTIME_LOG_RECEIVE_REVIEW_284.md)。原283设计/原型及48项自测完整保留，不能直接作为实现合同，详[283复核](ROLE_RUNTIME_LOG_RECEIVE_REVIEW_283.md)。A本地采集及282加载/人验保持。
