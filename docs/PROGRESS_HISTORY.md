@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-10-20 14:48（Asia/Shanghai）— 284实查后直接修正集成；256/257历史收尾；任务号复用规则补正
+
+- 用户明确允许沿用原任务号，由派发角色按任务方向决定：停止后继续可复用，原任务不对/换方向不沿用。撤回助手上一轮“一律永久取消、必须新建”建议；页面按一个中止入口简化，保留原任务重新安排能力，移除批次授权和重复风险/整树终止按钮，后端控制/SDK权限合同保持。尚未改页面，不自动恢复人工暂停任务，285同文件串行约束保持。
+- 用户通知284完成，指出旧256/257待核验。MCP本人agent:codex/agent，DS ins_39ba69bf6dfe新鲜idle/无任务；284项目/creator/target/Hall/原作者一致。msg2891合法complete仅自报，raw SHA fb030fd68c1afedc725331f10fdedce513b8cd15d49101ced59b2d64f6833910，本地JSON等值、稳定引用ok；UTC06:48:25.503354已收取succeeded/completed。
+- 82冻结源/指定文档和237原交付归档、逐SHA保持；原37独立复跑全过/9.170秒。真实SQLite schema比较30旧表DDL/列/FK/索引一致，仅新增三表；480旧非import顶层节点/196类函数AST不变，import仅加CheckConstraint。
+- 首轮独立10反例8失败：7种损坏回执仍成功，注入2秒busy timeout约2.203秒才拒绝。Codex在independent-review/worktree直接修正回执绑定已匹配SHA的有序输入/现存事件事实、首次时间/归因/序号，新增默认1秒且不超5秒SQLite事务预算，尊重调用方更短等待、SQL进度/提交前检查及连接设置清理还原。
+- 扩展14首轮13过/1原始sqlite3中断异常，补底层安全错误映射后全过；最终原37+新增14共51项通过/14.189秒。真实提交失败、解析后撤销、SQL中断和迟到提交均回滚；自己的修改称自检，无返修/互派回审。原代码/自报/失败保留，不把37通过说成首次验收通过。
+- 正式集成四产品/测试文件，默认关闭、显式注入SQLite/limits/clock/新鲜Engine绑定Session，无server.db/auth/CONFIG副作用；只收可信PreparedBatch，不接HTTP/外部DTO/真实writer投影/查询/配置启用/host/outbox/C。首次models写入后原始SHA因CRLF/LF不同停止；协调脚本改核UTF-8文本等价及写入SHA继续，正式四文件与已测副本文本相同。API15792/9808无reload标记，未重载/建生产表/改Key或启停服务。
+- 原256/257此前已needs_changes，258已pass_preparation_only且于UTC2026-10-16T23:43:25.199230收取，闭合F1–F4。核v1 22/v2 25原件及review无改、msg2785/2788稳定；UTC06:45:26.757493/06:45:29.893749收取旧结果，保256 complete/257 partial自报及历史失败，不将原两版改成业务通过，不执行旧迁移计划。
+- 同步[284复核](spec/ROLE_RUNTIME_LOG_RECEIVE_REVIEW_284.md)、B合同/剩余计划、MODULE_bridges/简报/两进度。证据.tmp/runtime-log-sqlite-core-v1/independent-review/含原件/原37/两轮反例/最终51/schema/AST/集成/收取；旧收尾证据.tmp/legacy-role-page-control/legacy-close-20261020/。
+- 本轮末只核285任务元数据仍running/in_progress/attempt2/无结果，不把实例idle当交付；未取其交付/改包或页面。284正式models/协调文档差异以后须在285冻结核验单列，不能误当执行者漂移或覆盖三表。本轮Git收尾后暂停，不自动派B2b或第三片；无Browser/模型/真实跨机器及新页面人验。
+
+
 ## 2026-10-20 14:05（Asia/Shanghai）— 确认任务控制名称及入口简化，待285后串行处理
 
 - 用户明确要求“暂停整棵任务树”改名为“中止任务”、移除“授权续一批”（实际“授权继续一批”）按钮，并询问风险检查点/整树终止含义。确认仅前端名称和入口调整，不自动改后端控制语义或删除resume-tree合同，不实际中止任何任务；另两个按钮未获删除要求。

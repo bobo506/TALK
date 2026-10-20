@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
-from sqlalchemy import Column, Index, JSON, text
+from sqlalchemy import CheckConstraint, Column, Index, JSON, text
 from sqlmodel import Field, Session, SQLModel, select
 
 from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
@@ -4759,3 +4759,181 @@ def prove_exclusive_identity(
     elif active_instances or active_tasks or service_in_use:
         refusal = "rotate_identity_in_use"
     return {"refusal": refusal, "references": references}
+
+
+# ── Runtime log receive tables (B2a, contract 283 correction) ───────
+#
+# These three tables are deliberately appended after all existing model
+# definitions.  They add no columns, indexes or relationships to the existing
+# business tables.  The source table stores only the public scope and audit
+# counters; it never stores an API key, owner token, client path or native
+# session.  Batch and event rows are written by
+# ``server.runtime_log_receive_core`` in the same SQLite write transaction as
+# the source counters and authorization recheck.
+#
+# ``received_at`` is kept as timezone-aware ISO-8601 TEXT instead of SQL
+# ``DATETIME``: SQLite drops timezone information from datetime values, while
+# receipt replay must preserve the exact first-commit timestamp (including the
+# server clock's offset and a wall-clock rollback).
+
+
+class RuntimeLogSource(SQLModel, table=True):
+    """Credential-free server-side log source and its usage counters.
+
+    The source scope is immutable.  ``source_id`` is the deterministic hash of
+    ``(project_id, host, subject_kind, subject_id)`` and the unique scope index
+    is a second database-level guard.  Revoking a source only flips ``active``
+    and advances ``revision``; history, counters and ``next_event_seq`` remain
+    so quotas cannot be reset by revoke/reactivate or by creating a new source.
+    """
+
+    __tablename__ = "runtime_log_sources"
+    __table_args__ = (
+        Index(
+            "ux_runtime_log_sources_scope",
+            "project_id",
+            "host",
+            "subject_kind",
+            "subject_id",
+            unique=True,
+        ),
+        Index("ix_runtime_log_sources_active", "active", "revision"),
+        CheckConstraint("active IN (0, 1)", name="ck_runtime_log_sources_active"),
+        CheckConstraint("revision >= 1", name="ck_runtime_log_sources_revision"),
+        CheckConstraint("batch_count >= 0", name="ck_runtime_log_sources_batch_count"),
+        CheckConstraint("event_count >= 0", name="ck_runtime_log_sources_event_count"),
+        CheckConstraint("bytes_used >= 0", name="ck_runtime_log_sources_bytes_used"),
+        CheckConstraint("next_event_seq >= 1", name="ck_runtime_log_sources_next_seq"),
+    )
+
+    source_id: str = Field(primary_key=True)
+    project_id: str = Field(index=True)
+    host: str
+    subject_kind: str
+    subject_id: str
+    active: int = Field(default=1)
+    revision: int = Field(default=1)
+    batch_count: int = Field(default=0)
+    event_count: int = Field(default=0)
+    bytes_used: int = Field(default=0)
+    next_event_seq: int = Field(default=1)
+    created_at: str
+    updated_at: str
+    revoked_at: Optional[str] = None
+
+
+class RuntimeLogBatch(SQLModel, table=True):
+    """One accepted writer batch and its persistent, replayable receipt.
+
+    ``(source_id, writer_run_id, batch_id)`` is the batch key.
+    ``(source_id, writer_run_id, batch_seq)`` is a separate database uniqueness
+    rule: the same sequence may not be reused for a different batch.  Sequence
+    gaps are not interpreted as missing logs.  ``event_uids_json`` is a bounded
+    ordered JSON list of event references; the full safe receipt is stored as
+    canonical JSON as well, so a lost response can be replayed without reading
+    or re-billing any event payload.
+    """
+
+    __tablename__ = "runtime_log_batches"
+    __table_args__ = (
+        Index(
+            "ux_runtime_log_batches_key",
+            "source_id",
+            "writer_run_id",
+            "batch_id",
+            unique=True,
+        ),
+        Index(
+            "ux_runtime_log_batches_seq",
+            "source_id",
+            "writer_run_id",
+            "batch_seq",
+            unique=True,
+        ),
+        CheckConstraint("batch_seq >= 1", name="ck_runtime_log_batches_seq"),
+        CheckConstraint("event_count >= 1", name="ck_runtime_log_batches_event_count"),
+        CheckConstraint("charged_bytes >= 0", name="ck_runtime_log_batches_charged"),
+        CheckConstraint(
+            "length(content_sha256) = 64",
+            name="ck_runtime_log_batches_content_sha",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source_id: str = Field(foreign_key="runtime_log_sources.source_id", index=True)
+    writer_run_id: str
+    batch_id: str
+    batch_seq: int
+    content_sha256: str
+    event_count: int
+    event_uids_json: str
+    receipt_json: str
+    charged_bytes: int
+    received_at: str
+
+
+class RuntimeLogEvent(SQLModel, table=True):
+    """One stable event, deduplicated by the immutable source event key.
+
+    The event identity is ``(source_id, writer_run_id, log_id)`` and
+    ``event_uid`` is their deterministic hash.  Batch id, ordinal, receipt time
+    and payload are deliberately *not* part of the identity, so repartitioning
+    or reordering the same writer events reuses the original row, uid, first
+    received time and source sequence.  ``payload_json`` is the canonical
+    UTF-8 JSON produced by the trusted server-side projection; raw client JSON
+    must never reach this row directly.
+    """
+
+    __tablename__ = "runtime_log_events"
+    __table_args__ = (
+        Index(
+            "ux_runtime_log_events_key",
+            "source_id",
+            "writer_run_id",
+            "log_id",
+            unique=True,
+        ),
+        Index(
+            "ux_runtime_log_events_received_seq",
+            "source_id",
+            "received_seq",
+            unique=True,
+        ),
+        Index("ix_runtime_log_events_manager_run", "manager_run_id"),
+        CheckConstraint("received_seq >= 1", name="ck_runtime_log_events_seq"),
+        CheckConstraint("payload_bytes >= 0", name="ck_runtime_log_events_bytes"),
+        CheckConstraint(
+            "length(content_sha256) = 64",
+            name="ck_runtime_log_events_content_sha",
+        ),
+        CheckConstraint(
+            "attribution_kind IN ('role_instance', 'role_launch', 'manager')",
+            name="ck_runtime_log_events_attribution",
+        ),
+        CheckConstraint(
+            "CASE "
+            "WHEN attribution_kind = 'manager' THEN "
+            "    (manager_run_id IS NOT NULL AND instance_id IS NULL AND launch_id IS NULL) "
+            "WHEN attribution_kind = 'role_instance' THEN "
+            "    (manager_run_id IS NULL AND instance_id IS NOT NULL AND launch_id IS NULL) "
+            "WHEN attribution_kind = 'role_launch' THEN "
+            "    (manager_run_id IS NULL AND instance_id IS NOT NULL AND launch_id IS NOT NULL) "
+            "ELSE 0 END",
+            name="ck_runtime_log_events_attribution_shape",
+        ),
+    )
+
+    event_uid: str = Field(primary_key=True)
+    source_id: str = Field(foreign_key="runtime_log_sources.source_id", index=True)
+    writer_run_id: str
+    log_id: str
+    manager_run_id: Optional[str] = Field(default=None)
+    member_id: str
+    instance_id: Optional[str] = None
+    launch_id: Optional[str] = None
+    attribution_kind: str
+    payload_json: str
+    payload_bytes: int
+    content_sha256: str
+    received_at: str
+    received_seq: int
