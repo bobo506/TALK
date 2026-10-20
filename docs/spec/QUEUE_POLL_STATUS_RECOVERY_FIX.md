@@ -1,6 +1,6 @@
 # 查询恢复后轮询错误状态残留补正
 
-日期：2026-10-20 16:32（Asia/Shanghai）。**代码及针对性验证完成，现有DeepSeek进程尚未加载。** 用户在285人验后对“先处理DeepSeek错误残留，再回日志B2b”回复“好的”。本轮按已交付问题直接修正规则由Codex补正并自检，不新派任务或调用模型，Kimi暂停派发保持。
+日期：2026-10-20（Asia/Shanghai）。**代码00bdcff及170项自检通过；用户明确同意后，16:39仅DeepSeek普通stop/start加载，16:40新实例ready/idle及60.059秒心跳推进通过，待角色页人工确认。** 用户在285人验后对“先处理DeepSeek错误残留，再回日志B2b”回复“好的”，之后选择“同意仅加载DeepSeek修复（推荐）”。本轮按已交付问题直接修正规则由Codex补正并自检，不新派任务或调用模型，Kimi暂停派发保持。
 
 ## 范围和实现
 
@@ -20,8 +20,16 @@
 
 ## 已准备的单角色正常加载
 
-16:32只读核DeepSeek gen21、实例`ins_39ba69bf6dfe`/bridge12612、原manager11612及创建时间，原归属在、can_stop=true；全局无在途任务，其他四角色服务stopped、API原进程保持。本轮尚未启停，新代码未进入旧bridge，error/unknown尚不能记恢复。
+16:32加载前只读核DeepSeek gen21、实例`ins_39ba69bf6dfe`/bridge12612、原manager11612及创建时间，原归属在、can_stop=true；全局无在途任务，其他四角色服务stopped、API原进程保持。此为实施前事实，不能当成当前仍未加载。
 
 实际加载只需原human入口对**单个DeepSeek普通stop→原宿主确认旧Popen正常退出/释放→普通start**，沿原Key/ID/模型/工作目录及manager加载新bridge。实施前重核无任务/原世代/进程/归属/绑定；停止或归属不收敛则停止，不强杀、清owner或接管。不重载API/宿主、不启动Kimi或原已停Codex，不派测试任务/调用模型。加载后核新实例/原父链、running/ready/idle、两次新鲜心跳及其它角色/API/绑定保持，再由用户确认角色页。
 
-按[AGENTS部署门禁](../../AGENTS.md#开发节奏与确认规则)“但遇到产品方向、破坏性接口/数据变更、部署/权限风险、重大用户体验分歧时，必须先确认”，本次实际角色加载另行确认；代码/验证/进度/Git先收尾。日志B2b本轮不派发。
+按[AGENTS部署门禁](../../AGENTS.md#开发节奏与确认规则)完成代码/验证/进度/Git后，用户明确同意仅加载DeepSeek修复，随后执行本次实际角色加载，不需要重复确认同次操作。
+
+## 正常加载结果（16:40）
+
+- `load_fix.py inspect`重核五宿主、原API、原Popen父链、无在途任务及原归属；只执行DeepSeek普通stop，gen22正常stopped/释放，旧bridge12612确已退出，再普通start为gen23。
+- 新实例`ins_00acba0f8a9b`、bridge12284、launch `ba5ad779-0cf6-493f-a4d0-87a97181255f`仍归原manager11612。16:39:30.904687→16:40:30.964092，同一实例/launch的心跳推进60.059405秒，持续idle/current_task_id=null/last_error=null，服务running/ready且原宿主持有新Popen。
+- API launcher5236/uvicorn13952、全部五个manager、其它四角色stopped/世代/归属及角色配置/绑定保持。未重载API或宿主、未强杀/清owner、未启动Kimi或Codex、未改Key/模型/配置/DB协议，没有模型/新任务或生产断网注入。
+- 加载前后`cli_bridge.py`SHA均为已测`fdb73f4080634d357fa5b6af6e559db56941c5c0b4980b31b64efea746877ee5`；本轮只补加载文档，不重复产品测试。生产核正常新实例/心跳；断连后的恢复逻辑由隔离反例证明，不声称已在生产再次断网复现。
+- 证据追加`deploy/`内授权/预检、普通停止/启动回执、`live-first.json/live-final.json`及加载脚本。用户刷新角色页确认DeepSeek“启动成功”前，不自动开启日志B2b。

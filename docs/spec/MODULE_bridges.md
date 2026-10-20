@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 16:40：用户明确同意仅DeepSeek加载后，原manager11612普通stop/start为gen23/ins_00acba0f8a9b/12284，ready/idle/无错误且同实例心跳推进60.059秒。API/宿主/其它角色/绑定保持，00bdcff/170项自检保持；角色页确认待，B2b未派。详[补正和实际加载](QUEUE_POLL_STATUS_RECOVERY_FIX.md)，下列16:32待加载是当时事实。
+
 > 2026-10-20 16:32：查询恢复后轮询error残留由Codex直接补正。通用bridge以状态锁/本地来源版本恢复自己的查询错误，保护任务busy/执行错误及后续状态；状态上报失败可重试且不污染诊断，正常成功不加请求。新增14项及原相关用例共170项自检通过，旧DeepSeek尚未加载，待单角色正常stop/start确认。其它角色/API/权限/任务合同保持，详[补正记录](QUEUE_POLL_STATUS_RECOVERY_FIX.md)。
 
 > 2026-10-20 14:48：284 B2a三日志表、来源管理及SQLite接收事务核心已实查/直接修正后集成收取；原37通过、首轮10反例8失败保留，最终51项自检通过，30旧表/480旧AST节点不变。新增内核默认关闭，无host/bridge/HTTP或生产操作，下一片B2b真实writer投影及查询接线待派，详[284复核](ROLE_RUNTIME_LOG_RECEIVE_REVIEW_284.md)。以下是较早快照。

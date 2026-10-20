@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-20 16:40（Asia/Shanghai）— 用户批准仅DeepSeek正常加载，原宿主新实例ready/idle及两次心跳通过
+
+- 修复00bdcff/170项自检已推送，用户明确选择“同意仅加载DeepSeek修复（推荐）”。授权记录deploy/authorization.json，加载前重核原gen21/ins_39ba69bf6dfe/12612、原manager11612创建时间/持有launch/直接父链、全局queued/running为空；其它四角色stopped/API原进程保持。
+- 仅通过原human入口普通stop：gen22正常stopped/原Popen12612退出/原宿主释放归属，再普通start为gen23，新ins_00acba0f8a9b/bridge12284/launch ba5ad779-0cf6-493f-a4d0-87a97181255f仍归manager11612。未清owner、强杀、接管、重载宿主或API，也未启动Kimi/Codex、派新任务或调用模型。
+- 16:39:30.904687→16:40:30.964092同一新实例/launch心跳推进60.059405秒，持续idle、无当前任务/错误，服务running/ready且原manager持有新Popen。API5236/13952、五manager的PID/创建时间及其它四服务/世代/归属、角色配置/Key/模型绑定保持；cli_bridge已测SHA fdb73f4080634d357fa5b6af6e559db56941c5c0b4980b31b64efea746877ee5保持。
+- 证据.tmp/queue-poll-status-recovery/deploy/含预检/明确授权/正常停启回执/live-first和live-final；生产验证为新代码加载/父链/状态/心跳，不伪称再次生产断网复现。仅补加载文档，原170项及失败证据保持，不重复无关测试；本轮汇总/Git后等刷新角色页确认DeepSeek“启动成功”，不自动派日志B2b，Kimi暂停派发保持。
+
 ## 2026-10-20 16:32（Asia/Shanghai）— 查询恢复error残留直接补正，170项自检通过，待单角色加载
 
 - 用户对先处理DeepSeek错误残留、再回B2b回复“好的”。MCP仍agent:codex/agent、lead、prj_e8fe7066bbec，DeepSeek无current_task_id，项目/全局queued和running为空；原执行者无在途开发，Codex按已交付问题直接补正，不新派任务或Kimi，不冒称他人独立复核。6份原文件/SHA及54101f8基线冻结于.tmp/queue-poll-status-recovery/。

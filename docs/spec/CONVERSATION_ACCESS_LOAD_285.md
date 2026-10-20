@@ -31,6 +31,8 @@ API正常重载期间，原DeepSeek bridge12612/实例`ins_39ba69bf6dfe`在15:45
 
 本次批准范围明确不重启角色，故未借加载重启DeepSeek；此残留问题待后续单独处理，不扩入日志B2b或自动恢复。Kimi额度暂停派发约束继续有效。
 
+后续单独处理（16:40）：上述残留已由Codex补正00bdcff，170项自检通过；另获用户“同意仅加载DeepSeek修复”后，沿原manager普通stop/start为gen23/ins_00acba0f8a9b/12284，ready/idle/无错误且心跳推进60.059秒，待角色页确认。API/其它角色/绑定保持，详[补正与实际加载](QUEUE_POLL_STATUS_RECOVERY_FIX.md)。不追改本节285加载时未启停角色的历史事实。
+
 ## 证据和后续
 
 证据根`.tmp/admin-conversation-view-v1/independent-review/deploy285/`：`preflight.json`、`config-applied.json`、`config-git-scope.json`、正常停止/启动/ready回执、`verification.json`、首轮缺头预期失败及第二轮就绪差异、`deepseek-post-reload-poll.json`和受限加载脚本。原285/284交付与失败证据保持，备份内容仅留私有目录。
