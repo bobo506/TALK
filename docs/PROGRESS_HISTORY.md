@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 09:03（Asia/Shanghai）— 281方案独立实查收取，A合同补正，B接收原型不采纳
+
+- 用户通知281完成。MCP反查本人agent:codex/agent、项目prj_e8fe7066bbec/lead，结果msg2888作者DeepSeek、接单ins_a3d16c467fec及Hall一致，完整合法281/complete与本地delivery.json相同；SHA8217945f7ad5b3d28b2c215538e50971d9680761aff5658e2caa2b5f5639a8cf，稳定引用复核ok，UTC01:03:17.285773收取completed。只收取方案，不把原型或产品能力判通过。
+- DeepSeek UTC00:56:18.673902已idle/current_task_id=null；原193冻结副本和产品197fe7a字节无变，跟踪工作区干净。归档原方案/脚本/日志及SHA，复跑在reproduction副本，原自报/失败/ACL限制不改；无产品开发者并行、无返修或K3复审。
+- 原两套16单测复跑通过、零失败/错误/跳过；冻结gap/export探针由Codex另加事实断言通过（正常三轮仅启停、取消无结束、report二次失败保原Popen/句柄、角色排除unknown与任意extra、行/字节partial）。真实隔离CLI fixture1项核默认JSON省extra，--detail才可见新增对象；原设计示例已纠正。私有ACL WinError 5/plain发布替身保留，不冒称真实私有存储通过。
+- Codex独立8反例7失败/1错误，确认manager序号误用10000上限、launch seq0、130轮observe133次、整体观测失败伪装空集合、错launch/其它项目归因、同轮started/terminal被拒、嵌套host未绑定、跨host batch冲突。B分散锁非事务、全量内存GET与outbox文件不变也不证明正式权限/预算/可靠发送。
+- 新增281复核及A正式补正合同：序号/失败计数≤2^53-1、固定60秒、仅采样terminal观测、32 poll/256元数据检查/公平选择、未知null、严格project/host/launch/原PID归因、Windows退出码原值、旧host参数/worker/取消/异常控制流保持。只补正设计，未修原型或产品，不宣称8反例改后通过；B接收/host新认证/DB/API不采纳为实施合同，received_at不能伪造。下一片仅本地A，B/C另立合同，原排期保持。
+- 证据.tmp/host-runtime-evidence-v1/independent-review/含archive/原件/source-result/16复跑/negative-original/CLI/verification/stable-reference/collect-receipt。无产品、服务、生产DB/日志/凭据、模型或Browser操作。usage-gate返回continue但用量比例null，按批次/范围控制，不报具体额度。进度/简报/模块/路线/剩余计划同步。
+- 收尾校验：193份冻结源/文档SHA未变、产品源字节未变、8份正式文档本地链接与git diff --check通过，证据closeout-verification.json。未重跑无改动产品回归。
+
 ## 2026-10-20 08:40（Asia/Shanghai）— 用户确认原排期及280页面验收，281宿主运行证据方案已派发
 
 - 用户明确“就按照原计划进行吧”，确认不提前同任务续接/跨任务会话复用。原顺序仍日志整项收尾→全入口预算统一→执行会话复用；新增日志剩余计划A宿主独立运行证据、B跨宿主来源/查询、C全根空间治理，避免将279接单循环证据当成完整日志整项闭合。

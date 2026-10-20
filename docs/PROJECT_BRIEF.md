@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 09:03：281方案已独立实查并收取，原16探针复跑通过但8独立边界反例暴露问题；Codex仅补正A本地运行证据合同，不采纳B接收原型为实施合同。下一片仅本地采集，无HTTP/DB/认证/生产变更，不声称宿主心跳已实现；详[281复核](spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_281.md)与[A合同](spec/ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)。
+
 2026-10-20：用户确认按原排期并明确280页面验收通过；279真实日志加载和280代码/页面里程碑保持。281已派DeepSeek做宿主独立运行证据方案与隔离验证（创建queued/assigned），交付暂停后Codex独立实查，再固定实现合同及后续跨宿主/全根治理，预算和会话复用不提前。本轮不改产品或启停服务，不把方案当实现；详[日志剩余计划](spec/ROLE_RUNTIME_LOGGING_REMAINING_PLAN.md)与[进度](PROGRESS.md)。
 
 2026-10-19 23:02：用户明确许可后279已正常重载API、原宿主关启4运行角色，真实轮询/完整下载/约150秒心跳通过，Codex保持关闭；原审批拒绝证据保留。280经Codex独立实查及289项Node通过、五源合入、九资源字节核验并收取；缺思考强度留空的绑定行现等用户Ctrl+F5人验。本批两片收尾，不开第三片，完整日志整项仍待后续治理。详[279复核](spec/ROLE_QUEUE_POLL_DIAGNOSTICS_REVIEW_279.md)、[280复核](spec/ROLE_BINDING_SUMMARY_FORMAT_REVIEW_280.md)与[进度](PROGRESS.md)。
