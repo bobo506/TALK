@@ -2,6 +2,8 @@
 
 日期：2026-10-20。结论：**DeepSeek首次交付经Codex独立实查发现问题；Codex直接修正、自检通过，B2a四文件已集成并收取。默认关闭，尚无HTTP接线或生产启用。** 本片依据[已批准合同](ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)，不代表完整跨宿主日志已经完成。
 
+后续加载更新（15:45）：用户明确同意285正常加载包含本片三张空表；已私有备份并沿原API正常重载，三表各0行、30旧表结构保持，接收仍关闭。详[285加载记录](CONVERSATION_ACCESS_LOAD_285.md)。下列集成时未建生产表为当时事实，不能当成当前表状态。
+
 ## 交付与独立实查
 
 - 实际任务284，项目`prj_e8fe7066bbec`，发起者`agent:codex`、执行者及结果作者`agent:deepseek`，Hall `group:task-425cda60af724510862865e5366f8c37`。结果2891为合法`complete`自报，原文SHA256 `fb030fd68c1afedc725331f10fdedce513b8cd15d49101ced59b2d64f6833910`；本地JSON与消息值相同，稳定引用核验通过。原自报不改写成首次即通过。

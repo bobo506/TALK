@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 15:53（Asia/Shanghai）— 用户批准285正常加载，仅本人管理账号只读；三张日志空表落库
+
+- 用户明确选择“同意正常加载（推荐）”，授权配置/SQLite备份、仅human:bobo观察名单、正常API重载与284三张空表；日志接收仍关闭，角色不重启。本人MCP agent:codex/agent、lead及项目身份已核，全局queued/running均为空。
+- 15:45配置/SQLite一致性备份到仓库外私有目录，quick_check=ok；原配置字节与Git提交一致。配置仅追加conversation_access名单，其他设置等值，新增部分无凭据。原API launcher15792/child9808通过原stop.request正常退出，端口释放；原脚本隐藏启动，新wrapper19504→launcher5236→uvicorn13952父链/创建时间已核，无强杀或自动重启。
+- 原管理Key反查human:bobo/human，本人能力true；agent:codex能力false。原未加入285 Hall历史GET200/1条旧消息，非成员POST403，未新增消息/入群/改任务参与者。缺Header既有422、无效Key401；初次脚本误将缺头预期为401，核auth后只修验证预期，保留失败证据、未改鉴权。
+- SQLite新增runtime_log_sources/runtime_log_batches/runtime_log_events，各0行，共33表；30旧表DDL/索引/外键保持。29非心跳表逐行等值（projects排last_seen_at），含members原Key、消息/任务/群名册/绑定和role_service_state/launch归属；agent_instances身份列保持。接收核心无HTTP/配置接线、仍默认关闭，未登记来源/上传日志。
+- 五个原宿主管理进程和DeepSeek桥接创建时间保持。三个Kimi桥接此前已离线/服务stopped，Codex原stopped，本次不改变。DeepSeek短断连上报ConnectError后公开ready→unknown，第二次验证捕获差异；原15:45:55 poll_seq8332恢复一次失败，15:51:00 poll_seq8482仍成功，但现有成功轮询路径不清error、心跳继续原状态。记录为真实残留问题，不冒称全部角色就绪，也不伪造idle或借加载重启角色。
+- index/app/workspace真实HTTP200且字节一致；无Browser、模型或新任务，本轮产品代码不变，沿用此前162 Python/81 Node结果与实际加载检查。证据.tmp/admin-conversation-view-v1/independent-review/deploy285/含私有备份元信息/预检/配置范围/正常停启/verification及失败差异/当前精确实例轮询恢复，备份内容不入仓库。
+- 新增285实际加载记录，同步页面验收说明、284生产表状态、简报/当前进度/日志计划。先Git收尾并等待用户刷新验收285；DeepSeek错误状态残留单独待处理，Kimi暂停新派发，日志B2b及后续排期不自动开启。
+
 ## 2026-10-20 15:28（Asia/Shanghai）— 285实查修正/任务入口简化收尾；Kimi暂停派发，正常加载待确认
 
 - 用户通知285完成，并明确后面先不派Kimi、额度用尽。MCP本人agent:codex/agent，K3 ins_5a0d307d038c已idle/无任务；不重启/停服或试探额度。AGENTS新增2026-10-20临时优先规则：暂停向所有Kimi角色新派发，后续首次执行先DeepSeek，Codex独立实查/直接修正，不改模型/绑定/Key或历史。

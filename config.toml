@@ -47,3 +47,6 @@ root = "D:/claude-test/TALK/logs/runtime/agent_kimi-5c9a82f4da"
 project_id = "prj_e8fe7066bbec"
 member_id = "agent:codex"
 root = "D:/claude-test/TALK/logs/runtime/agent_codex-c452d2e135"
+
+[conversation_access]
+observer_member_ids = ["human:bobo"]

@@ -1,6 +1,6 @@
 # 285 管理账号只读查看对话复核与集成
 
-日期：2026-10-20。状态：**代码已集成、285已收取；Codex直接修正后的162项Python、81项Node验证通过。生产观察者配置尚未启用，API尚未重载，页面人工验收待加载后进行。** 本片同时收尾用户此前已确认的任务控制入口简化，不修改后端任务控制协议。
+日期：2026-10-20。状态：**代码已集成、285已收取；Codex直接修正后的162项Python、81项Node验证通过。用户批准后已于15:45正常加载，仅human:bobo观察者配置生效；页面人工验收待确认。** 本片同时收尾用户此前已确认的任务控制入口简化，不修改后端任务控制协议。实际加载及DeepSeek断连错误状态残留见[285加载记录](CONVERSATION_ACCESS_LOAD_285.md)。
 
 ## 原交付和独立检查
 
@@ -34,8 +34,8 @@
 
 ## 加载门禁与人工验收
 
-只读实查生产配置尚无conversation_access，三日志表尚不存在；当前API新能力端点404，说明后端未加载。三个静态资源`index.html/app.js/workspace.js`均真实HTTP200且字节与集成文件一致，因此刷新可见按钮更新，但管理账号读权限仍待API正常加载。
+加载前只读实查生产配置无conversation_access，三日志表不存在，API新能力端点404。该历史检查及当时静态HTTP字节证据保持；不是当前加载后的状态。
 
-后续加载的具体变化：备份现配置/数据库，仅增加`observer_member_ids=["human:bobo"]`，正常重载API；既有`init_db/create_all`会同时创建284的三张空日志表，接收仍关闭。按项目数据库/部署确认规则，需用户明确同意此正常加载后执行，不借权限修复无声迁库；不启停四角色或清owner。页面验收见[285验收说明](../guides/CONVERSATION_ACCESS_ACCEPTANCE_285.md)。
+用户随后明确“同意正常加载（推荐）”。配置/SQLite已私有备份，仅增加`observer_member_ids=["human:bobo"]`并正常重载API；既有`init_db/create_all`创建284三张空表，各0行，接收仍关闭。未加入Hall读200/写403及旧结构/数据/Key/绑定/归属保持已核，角色未启停。DeepSeek查询已恢复但error状态残留、公开就绪unknown，未假称角色状态全部正常。详[加载记录](CONVERSATION_ACCESS_LOAD_285.md)；页面验收见[285验收说明](../guides/CONVERSATION_ACCESS_ACCEPTANCE_285.md)。
 
 UTC`2026-10-20T07:23:44.622679`实际收取285为`succeeded/completed`，表示代码交付收尾，不代替生产加载和人工验收。证据`.tmp/admin-conversation-view-v1/independent-review/`含原始消息/稳定引用、冻结/归档、原109/29、新9失败、修正版/联合162和81、集成、生产加载事实及静态HTTP验证。未用Browser、未调用模型或派新任务。
