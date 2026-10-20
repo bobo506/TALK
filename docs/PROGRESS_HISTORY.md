@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 20:01（Asia/Shanghai）— 用户确认优先只读核查会话/缓存，287已派
+
+- 本轮先按“继续项目”只读恢复，核对HEAD510c9c4、已跟踪文件无未提交差异；MCP身份agent:codex/agent、lead、project prj_e8fe7066bbec，286仍queued/accepted/paused、无实例/结果。给出具体只读建议后，用户明确回复“可以，就先做这个”，批准只将该方案片提前；此前17:52暂停决定被本次单片确认局部替代，不代表日志/21600预算完成或授权实施复用。
+- 派发前重新读取页面development_requirements，旧交叉复核文本原样存快照，不改页面；按AGENTS最新约定DeepSeek首次核查/自检/交付暂停，Codex独立实查并直接修正，Kimi额度暂停新派发保持。DeepSeek原ins_00acba0f8a9b/PID12284上报idle/无当前任务，本轮未操作角色/API启停。
+- 固定产品基线510c9c42311e5c4784d8d2227211dc419ee78853，42份公开源码/测试/指定文档逐字节冻结，共1,856,485字节；manifest、原包、身份/开发要求快照、请求正文及创建回执在.tmp/execution-session-cache-audit-v1/coordination/。baseline/与coordination/只读，执行者仅deepseek/产物可写；现有未跟踪和旧测试产物不删除/重用/入Git。
+- 287通过最小四参数project/target/title/content创建，独立顶层，creator agent:codex、target agent:deepseek，Hall group:task-b5057e39171d476f80401f53d7b249e7，创建时queued/assigned；未主动等待或读取其后状态，不把派发写成核查完成。
+- 首片以DeepSeek当前受管入口为主，静态定位新建/保存/续用及上下文重复、usage来源，补Kimi/Codex源码对照。缺真实指标保持未知；提出项目/角色/工作区/模型隔离、单写入者/桌面并发、重置/失败/取消/重启边界及后续正反例验收。只读冻结材料和合同指定已安装公开DSH源码，不执行原生CLI、ACP或额外真实模型探针，不读真实会话/认证/生产日志/数据库。
+- 交付report.md/evidence.json/acceptance.md及本次真实287裸JSON交付包，校验后暂停；用户通知后Codex优先读交付摘要并独立实查，发现问题直接修正并自检，不派Kimi或默认返修。正常方案任务本身沿原DeepSeek模型链执行，不声称零模型消耗。
+- 本轮仅合同/协调文档、冻结及TALK派发；42项冻结SHA与非文档源一致、5份UTF-8文档、6个新增本地链接、Git差异和287创建回执自检通过，证据coordination/verification.json；不重复产品测试、不冒称缓存效果已验。286/旧产物、284关闭内核和三张日志表、角色/Key/模型/绑定/owner保持；手册无用户操作变化，不新增步骤。按持续授权常规提交/推送，下一实施或模型实验仍另片先确认。
+
 ## 2026-10-20 19:50（Asia/Shanghai）— 重新核对连接并汇总窗口交接
 
 - 用户询问是否断连，要求重新检查、汇总进度后自行重开窗口。核对到17:52的决定已写入四份文档但尚未提交；本轮补齐验证与Git收尾，不把汇总要求当作恢复开发授权。无法仅凭之前停顿确定断连原因，当前TALK只读调用正常。
