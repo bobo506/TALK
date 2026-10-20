@@ -1,5 +1,7 @@
 # MODULE: Web UI
 
+> 2026-10-20：用户明确280“验收通过，按原计划继续”，绑定行格式本轮页面人验闭合；原289 Node/九资源字节/收取及197fe7a保持，未另做Codex Browser、键盘/窄屏专项。继续日志原排期，不提前会话复用，详[280复核](ROLE_BINDING_SUMMARY_FORMAT_REVIEW_280.md)。
+
 > 2026-10-19 23:02：280绑定行统一格式经Codex独立实际代码复核通过、289 Node/九静态资源字节通过，五候选合入并收取。已有xhigh/max拆分，Kimi缺强度省略末项/分隔，精确旧系统名短显Kimi Code且保当前模型；状态/安全/其它页面行为保持。版本20261019-role-binding-summary-v1，暂停等用户Ctrl+F5角色列表人验，未做Browser视觉/键盘/窄屏。详[280复核](ROLE_BINDING_SUMMARY_FORMAT_REVIEW_280.md)，279真实加载已另核通过。
 
 > 2026-10-19 22:13：280已派K3隔离首次实现角色列表绑定行统一格式。用户最新明确缺思考强度留空、不显示“未提供”；已有展示名的xhigh/max拆为末项，三个Kimi不猜强度，已知旧登记名只显示Kimi Code且保实际模型。旧状态/自定义名/只读安全及页面其它行为保持，创建queued/assigned而非已实现。279后端隔离，交付暂停后Codex独立检查/直接修正并串行集成，默认用户通知取件。详[格式合同](ROLE_BINDING_SUMMARY_FORMAT_REQUIREMENTS.md)。

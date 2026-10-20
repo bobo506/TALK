@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-20 08:40（Asia/Shanghai）— 用户确认原排期及280页面验收，281宿主运行证据方案已派发
+
+- 用户明确“就按照原计划进行吧”，确认不提前同任务续接/跨任务会话复用。原顺序仍日志整项收尾→全入口预算统一→执行会话复用；新增日志剩余计划A宿主独立运行证据、B跨宿主来源/查询、C全根空间治理，避免将279接单循环证据当成完整日志整项闭合。
+- 只读核当前HostManager.serve：已有host_started/stopped、poll_failed/recovered、动作/worker异常，常态周期及原受管Popen观测/服务端真实接收证据仍须补齐。计划要求manager/launch scope分离、不按owner倒填、服务端接收不可用文件/查询时间冒充、限频/单调时间及旧schema/权限/启停守卫保持；实际公共协议与白名单待正式包固定，不盲增接口或生产写。
+- 入口MCP反查agent:codex/agent、项目prj_e8fe7066bbec/lead，页面仍旧交叉复核原文；DS/K3精确绑定保持且UTC00:31:47新鲜idle/current_task_id=null，不推断OS存活或扩大279一次正常停启授权。Git基线197fe7a、已跟踪产品源无改动。
+- 首先按门禁只整理计划并发起异步确认，用户随后明确“验收通过，按原计划继续”，280页面门禁据此闭合，不由较早的排期确认推断。281于UTC00:40:02.756177由agent:codex派agent:deepseek，创建queued/assigned、general顶层，Hall group:task-e74a8ef325b840f98dd4c0b4ae1d3c08；负责首次方案及隔离验证，交付暂停后Codex独立实查，再固定实现合同。279/280原交付/收取/验证与失败原件、278人验保持。
+- .tmp/host-runtime-evidence-v1/coordination/保留task.md、baseline-manifest.json及完整dispatch-receipt.json；基线197fe7aaedf2ad0b346c23042e262d5232259740、916跟踪文件SHA和193冻结源/指定文档副本逐一核对，协调文档覆盖单列。任务包SHA8c1311166c0fe9bf48d5d7919e84853eb25ab27b772ee008da2220dc456cafed。仅deepseek/可写，只读冻结源码、单一bridges模块；禁止正式源码/进度/Git/生产/模型/Browser，不替新协议或新心跳背书。
+- 派前再核caller身份及DeepSeek新鲜idle、无running/queued任务；首次查询误用pending收到400，改查合法queued得到空，不把失败当无任务。页面旧开发要求随服务端原样快照，任务明确最新用户/AGENTS分工优先，未改生产要求。无主动等待、唤回或自动收取。
+- 正式文档同步原顺序、280人验及日志剩余计划；只做文档/派发校验，不重跑无变更产品测试，没有服务启停/部署、生产DB/日志/凭据读取、模型调用或Browser。下一步用户通知281完成后只读取其合法交付摘要，按具体疑点独立检查方案/原型，再固定实现合同；不提前进入预算/会话功能。
+- 收尾校验：193冻结副本SHA未变、除协调文档外跟踪文件字节未变、281实际回执身份/项目/绑定及原开发要求快照正确、8份文档本地链接与git diff --check通过，verification.json与preflight.json保留。无产品变更，未重跑原产品回归；不查派后状态，不声称281已开始或完成。
+
 ## 2026-10-19 23:02（Asia/Shanghai）— 279获许可正常加载；280独立复核、合入收取，等页面人验
 
 - 用户明确“允许”279正常关启原4运行角色及重载API，Codex保持关闭；另通知280完成。Codex先重核UTC14:54:12无在途任务、配置与原Popen归属，再4角色产品普通stop释放owner、原API启动器正常重载至15792/9808、原manager普通start恢复4角色。没有宿主重启/强停/解除owner或改模型绑定。
