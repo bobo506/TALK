@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 22:45（Asia/Shanghai）— 用户确认DSH指标接入，289采集/适配首片已派
+
+- 用户对288收尾后的“下一片接入DSH真实上下文指标”明确回复“可以，继续吧”。本次授权限原生指标采集接口/到288内核适配及离线验证，不扩为原生会话创建恢复、MCP派发、页面或生产加载/启停。
+- 本人agent:codex/agent、lead，项目prj_e8fe7066bbec；读取最新development_requirements仍旧交叉复核，原样留快照，按AGENTS当前分工首次实现DeepSeek/实查与直接修正Codex。DeepSeek ins_00acba0f8a9b/PID12284 idle无任务，running空、queued仅286且paused；Kimi仍暂停新任务。
+- 只读CIM首个普通沙箱调用拒绝，同一PID白名单读取提权成功：12284父11612、通用cli_bridge/headless/argv、无ACP，外层timeout21600；未直接匹配冻结npm绝对bin.js路径。安装0.1.5-rc.2源码提供contextPressure与snapshot/asOfSeq，不据此冒称当前已加载该版本；native home/有效插件/实际指标未知。无完整argv/环境、真实profile/owner/会话/日志/DB/Key读取，不启停、dump或模型探针。
+- 基线15f77b279993dbf952291f8f8d141756cd07768c，22份项目公开源/指定文档979,318字节和29份原生公开源458,397字节逐SHA冻结于.tmp/dsh-context-metrics-v1/baseline与native-baseline，coordination保manifest/原包/请求/名册要求/脱敏事实/回执。执行者只写deepseek/**，产品仅dsh_context_capture.mjs、dsh_context_metrics.py和两对应测试候选；禁止正式源/文档/Git和冻结/协调区写入。
+- 289实际创建queued/assigned，creator agent:codex、target agent:deepseek、Hall group:task-2fe861b89f60455287e3da370f809adf，最小四参数独立顶层；完整包要求原生接口实际读取、字段来源/可得性/修订/时间、身份隔离、未知不当0及288联测。最终本次裸JSON/自测后暂停，Codex独立实查/直接修正，默认用户通知取件，不主动等待/唤回或另派。
+- 终端预算必查已读，当前headless客户端T及取消/同连接排队未核，不套桌面65秒/W50或把bridge21600当T；本片无主动wait/预算改动或适配通过声称。usage-gate回continue但实际百分比全null，按精确占比不可读记录，不推断剩余用量。
+- 正式仅协调文档更新，288的106项及11,994组检查/15f77b2推送保持，无新产品测试或原生调用。22项目/29原生冻结SHA、正式产品不变、8份UTF-8文档/14新增本地链接及289创建回执/范围自检通过，证据coordination/verification.json；不是执行者测试。真实入口/手册人验及其它接线后续另片确认，286/日志/21600/Kimi边界保持。按持续授权提交推送，不将创建状态写成开发/采集验收。
+
 ## 2026-10-20 22:20（Asia/Shanghai）— 288首次独立实查、直接补正与离线内核集成
 
 - 用户“好了”触发取件；本人agent:codex/agent，DeepSeek idle/无当前任务。最新页面要求仍旧交叉复核，按AGENTS本次分工处理，不派Kimi或返修，不开启新片。

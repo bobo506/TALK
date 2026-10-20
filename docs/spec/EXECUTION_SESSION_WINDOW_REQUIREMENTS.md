@@ -1,6 +1,6 @@
 # 执行会话选择、首轮完整与续轮增量需求
 
-更新：2026-10-20 22:20（Asia/Shanghai）。用户明确采用上下文占用达到60%换窗、取消固定10轮并确认开发。[首片288离线内核](EXECUTION_SESSION_CORE_SLICE_1.md)已由DeepSeek首次实现，经Codex独立实查、补正和自检后集成收取；106项测试及11,994组整数阈值交叉核验通过，详[288复核](EXECUTION_SESSION_CORE_REVIEW_288.md)。当前整项功能尚未接通/上线，不改写原交付或历史验证，不扩大为连续开片或生产部署授权。
+更新：2026-10-20 22:45（Asia/Shanghai）。[首片288离线内核](EXECUTION_SESSION_CORE_SLICE_1.md)已实查/补正/集成收取，106项及11,994组阈值校验保持。用户随后确认“可以，继续吧”，[第二片289的DSH原生指标采集/内核适配](DSH_CONTEXT_METRICS_SLICE_2.md)已派DeepSeek，创建queued/assigned；当前整项功能尚未接通/上线，不改写原交付或历史验证，不扩大为连续开片或生产部署授权。
 
 ## 已确认的机制
 
@@ -51,4 +51,4 @@
 
 ## 当前边界与下一步
 
-当前默认bridge/headless未接通本机制，真实argv/profile/native home与usage缺口仍见[287复核](EXECUTION_SESSION_CACHE_REVIEW_287.md)。首片288纯数据决策与提示内核已入库：所有投递均要求独立的当前通道确认，续轮可只传基础引用且留档不重复正文，新窗必须有匹配的完整正文。公开入口见[内核调用说明](../guides/EXECUTION_SESSION_KERNEL.md)。S0实机取证、DSH指标/会话适配、任务/MCP/API/页面接线和生产加载需在后续具体切片先明确并确认；本次不依赖/读取真实生产配置，不开启下一片。
+当前默认bridge/headless未接通本机制。288内核已入库：所有投递均要求独立的当前通道确认，续轮可只传基础引用且留档不重复正文，新窗必须有匹配的完整正文，详[调用说明](../guides/EXECUTION_SESSION_KERNEL.md)。289已获本片确认，负责可挂载的DSH原生projection采集器、规范化到288及离线链路；只读核实当前headless/argv入口，实际安装版本关联/native home/插件/真实占用仍未知，不能据冻结源码自称采集成功。原生会话续用、任务/MCP/API/页面接线和生产加载仍另片确认，不在289扩大实施。

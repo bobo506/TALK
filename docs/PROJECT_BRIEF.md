@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 22:45最新：用户确认继续DSH真实上下文指标接入，289已派DeepSeek首次实现原生projection采集器/Python适配及离线链路，基线15f77b2，22份项目材料和29份原生源冻结，创建queued/assigned。实际进程核为headless/argv、非ACP、外层21600，但不能关联冻结npm版本，home/插件/真实占用未知；只隔离产出、不读真实会话/配置/凭据，不加载/启停或模型探针。288已收尾保持，交付暂停后Codex独立实查/直接修正，默认用户通知取件；续用/MCP/生产加载仍后续。详[289合同](spec/DSH_CONTEXT_METRICS_SLICE_2.md)和[进度](PROGRESS.md)。下方为此前记录。
+
 2026-10-20 22:20最新：288离线会话内核已由DeepSeek首次实现，经Codex独立实查、直接补正和自检后集成收取completed。新增统一规划模块/106项测试，11,994组整数阈值交叉核验通过；补当前通道显式独占、基础合同引用/留档、UTF-8校验与回执核对。真实DSH指标/原生会话/任务MCP接线尚未接通，生产无新模块导入，不启停或模型探针；下一片指标适配仅建议待确认。详[288复核](spec/EXECUTION_SESSION_CORE_REVIEW_288.md)、[调用说明](guides/EXECUTION_SESSION_KERNEL.md)及[进度](PROGRESS.md)。下方为此前记录。
 
 2026-10-20 21:48最新：用户明确“那确定了，动手开发吧”，288已派DeepSeek首次实现会话选择/60%换窗/首轮完整与续轮增量的离线内核，基线48526a7、22份公开材料冻结，创建queued/assigned。仅隔离候选一产品模块/一测试，不改运行中bridge/API/MCP/配置或启停，真实DSH采集和续用接线另片确认；交付暂停后Codex独立实查/直接修正，默认用户通知取件。Kimi暂停、286/日志/21600待办保持，不能据派发称整项已上线；详[首片合同](spec/EXECUTION_SESSION_CORE_SLICE_1.md)和[进度](PROGRESS.md)。
