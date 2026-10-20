@@ -29,6 +29,8 @@
 
 ## B. 跨宿主日志来源与查询
 
+2026-10-20 10:59：283补正/用户授权以30e5eb8收尾推送后已派DeepSeek #284“SQLite日志接收三表与事务核心”，创建queued/assigned。B2a仅追加三表/来源与接收事务内核及两测试，82冻结源、四候选白名单，.tmp/runtime-log-sqlite-core-v1/coordination/保存原包/manifest/回执；默认关闭/隔离SQLite，不接HTTP/raw writer映射/公开查询或改生产。自测交付暂停、用户通知后Codex独立实查/直接修正，再串行B2b。下文283派发/复核为阶段记录。
+
 2026-10-20 10:55：283方案已独立实查收取，原48过但9独立反例均失败；文件inbox原型不集成，实施以[补正合同](ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)为准。用户已明确批准SQLite三日志表、来源登记撤销、接收与只读查询，默认关闭并隔离验证；先B2a表/事务核心，再B2b上传投影与查询HTTP串行，生产启用/真实跨机器另验。详[283复核](ROLE_RUNTIME_LOG_RECEIVE_REVIEW_283.md)。下方派发为当时快照。
 
 2026-10-20 10:27：282加载/用户人验及Git收尾后已派DeepSeek #283“日志来源、接收与查询合同及隔离边界验证”，创建queued/assigned。B1仅方案/合同与必要隔离反例，干净1e43502、79冻结源/指定文档；原任务/manifest/回执见.tmp/runtime-log-source-query-design-v1/coordination/。执行者只写deepseek/、自测交付暂停，Codex独立实查/直接修正；真实接收/新认证/DB/公共API/来源配置/生产部署尚未批准或实施，默认用户通知完成后取件。原281 B原型不能自动成为实现合同。

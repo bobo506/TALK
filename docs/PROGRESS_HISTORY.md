@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 10:59（Asia/Shanghai）— 283收尾后派284 SQLite三表/日志接收事务核心
+
+- 用户明确批准SQLite三张日志专用表、来源登记/撤销、接收和只读查询，默认关闭、先隔离验证；283复核/补正合同已收取并提交推送30e5eb8，先收尾后派下一片。原48过/9反例失败、162原件和原自报保持，不将设计修正称原型已通过。
+- 派前再次读项目最新development_requirements/caller：本人agent:codex/agent；DS ins_39ba69bf6dfe/12612/deepseek-flash/max新鲜idle无任务。页面旧交叉分工原文保留，AGENTS/本次最新执行自测后Codex独立实查、直接修正优先，无Kimi回审/返修。
+- 实际#284“SQLite日志接收三表与事务核心”，UTC2026-10-20T02:59:03.023710，project prj_e8fe7066bbec、creator agent:codex、target agent:deepseek、Hall group:task-425cda60af724510862865e5366f8c37，创建queued/assigned。最小顶层参数，不附子任务字段，不以创建状态冒充当前运行/交付。
+- 干净30e5eb8047b24b659ea24815d37e586a0f84f4c7、82源/指定文档双份SHA核；冻结.tmp/runtime-log-sqlite-core-v1/baseline/，仅deepseek/写自己的候选/sandbox/合成配置DB与证据，coordination/保存完整包/manifest/身份要求/回执，三份正式协调文档例外。无生产Key/config/DB/日志复制。
+- 只四产品候选：models.py追加三日志表及必要imports/约束、新runtime_log_receive_core.py、新核心及并发两测试。固定来源登记撤销/CAS、真实既有Member/角色/实例/launch事务重核、事件身份独立批次、重分批/回执/原接收时间、三表一次提交/回滚、序号及服务端UTF-8/来源与全局预算；默认关闭，显式engine/clock/limits，禁隐式server.db/config。
+- 必须独立SQLite/WAL、多store/连接并发、真实模型身份/撤销序列、提交失败/响应丢失/重启、UTF-8/容量等实测；内部可信投影payload不冒充raw JSONL/外部安全读取。HTTP/routes/DTO/query/auth/db/config/host/bridge/web/生产/旧GET/Key/owner/目录均禁改，B2b/B3/C不并片。
+- 执行者完整裸JSON用自身284校验、原日志和失败保留、候选patch只在副本验证，交付暂停；Codex独立实查并直接修正。默认派后结束，用户通知完成后取件，不等待/自动唤回或扩大权限。
+
 ## 2026-10-20 10:55（Asia/Shanghai）— 283独立实查收取；原48过/9反例失败，SQLite三表补正范围获用户确认
 
 - 用户通知283完成，并明确目录讨论只针对以后新项目、当前TALK不改；本轮不迁目录/开群聊分支。MCP本人agent:codex/agent、lead，DS UTC02:42:40.844391已idle/无当前任务，按交付暂停后独立实查，不返修/互派复核。

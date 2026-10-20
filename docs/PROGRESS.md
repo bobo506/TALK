@@ -1,6 +1,14 @@
 # Project Progress
 
-Updated: 2026-10-20 10:55（Asia/Shanghai）。283方案经Codex独立实查并收取；原48项复跑过，9个独立反例全部失败，原型不集成。Codex补正SQLite三表提案，用户明确批准三表/来源登记撤销/接收与只读查询、默认关闭和隔离验证。先收尾283再派B2a三表/事务核心，后续HTTP/查询串行；日志→全入口预算→会话复用原序保持。
+Updated: 2026-10-20 10:59（Asia/Shanghai）。283已独立实查、补正收取，30e5eb8已推送；用户已确认SQLite三表/来源登记撤销/接收查询、默认关闭和隔离验证。已派DeepSeek #284首次实现B2a三表/事务核心，创建queued/assigned；产品/生产尚未改，HTTP/查询后续串行。默认派后结束，用户通知完成取件；日志→预算→会话原序保持。
+
+## 当前284（首次实现，尚未集成）
+
+- “SQLite日志接收三表与事务核心”，创建UTC2026-10-20T02:59:03.023710，project prj_e8fe7066bbec/creator agent:codex/target agent:deepseek，Hall group:task-425cda60af724510862865e5366f8c37。queued/assigned仅派发快照；取件时核实际状态，不推断已完成。
+- 干净30e5eb8047b24b659ea24815d37e586a0f84f4c7、82冻结源/指定文档SHA一致；.tmp/runtime-log-sqlite-core-v1/baseline/只读，只有deepseek/可写。coordination/保存manifest、完整任务、派前身份/要求及回执；三份协调文档为例外。
+- 候选仅server/models.py追加RuntimeLogSource/Batch/Event三表及必要约束、新server/runtime_log_receive_core.py及两新核心/并发测试。默认关闭、显式engine/clock/limits，无server.db/global CONFIG导入；来源登记撤销/CAS、事务内真实成员及双向实例launch、批次/事件独立去重、重放/首次时间、容量/序号/回执同事务提交。
+- 要求真实SQLite/WAL多store/多连接并发、冲突/禁用/轮换/撤销序列、异常/提交失败全回滚、响应丢失后重放/重启、UTF-8及全局配额证据。内部payload只接受后续服务端可信投影，不等于已实现raw writer映射/外部读安全；HTTP/查询/配置/宿主/outbox/生产禁改。
+- 执行者首次实现/自测、完整裸talk-delivery-1按实际284校验后暂停；Codex独立实查、直接修正与集成，不返修/互派回审。默认用户通知后取件，不主动等待/自动派后续。
 
 ## 283复核与已确认方向
 
@@ -14,7 +22,7 @@ Updated: 2026-10-20 10:55（Asia/Shanghai）。283方案经Codex独立实查并�
 
 ## 下一步与不变项
 
-- 本片先完成进度/Git，再派DeepSeek隔离首次实现B2a三表/接收事务/来源登记撤销内核及自测；仅models追加日志表、新核心/新测试，HTTP/新配置/来源生产启用暂不接线。交付暂停后Codex独立实查、直接修正和集成。
+- 283收尾30e5eb8已推送，284已派DeepSeek隔离首次实现B2a三表/接收事务/来源登记撤销内核及自测；仅models追加日志表、新核心/新测试，HTTP/新配置/来源生产启用暂不接线。交付暂停后Codex独立实查、直接修正和集成。
 - received完整writer投影、human-only查询/导出和host持久outbox/真实跨机器仍待；281/283原型均不等产品。C先只读盘点/dry-run，不默认跨run删除。日志整项完成后统一全入口预算21600且保显式覆盖，再会话复用。
 - 用户明确当前TALK目录不改；main/独立worktree总目录布局仅针对以后新项目。本轮不迁目录、不创建群聊分支，不改变当前功能排期。
 - 原角色/Key/模型/owner/启停、旧local scope/ref/cursor/导出partial与脱敏保持。B2a不把内部payload接口当可接受任意客户端JSON的公开接收口；B2b投影门禁须先闭合才能上线。
