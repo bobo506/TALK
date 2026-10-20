@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-20 23:59（Asia/Shanghai）— 用户批准缺数十次备用，290单片已派
+
+- 用户先核对“同功能先筛选、再看占比”，确认可靠<60%续用、>=60%新窗；随后询问取不到是否10轮兜底。Codex建议仅单纯不可得且同功能/会话/配置及完整计数可信时10次备用，身份/配置不符或数据矛盾不续；从窗口首轮累计、恢复不重计、内部工具不计。用户明确继续开发并估计只够再一片，本次据此确认290，不执行此前实机核验建议。
+- 本人MCP agent:codex/agent、lead，project prj_e8fe7066bbec；读取页面最新要求仍旧交叉复核，以AGENTS分工DeepSeek首次实现/自测/暂停，Codex实查/直接修正，不改页面。DeepSeek ins_00acba0f8a9b/PID12284 idle/无任务，running空、queued仅286且paused，Kimi仍暂停新任务。usage-gate continue但实际百分比全null，不推断额度；本轮只此片、派后结束，无主动等/唤回。
+- 产品基线ad46037d26286f45e3302bb208a75a3c7ff544e2，19份公开材料676,842字节逐SHA冻结于.tmp/execution-session-fallback-v1/baseline，coordination保原包/请求/manifest/名册要求/创建回执。唯一deepseek可写，候选仅两既有Python模块execution_sessions/dsh_context_metrics和两Python测试；DSH JS采集器与正式文件/Git/生产均禁止写。
+- 实际290 creator agent:codex、target agent:deepseek、Hall group:task-57de85e8ddd64baeae1006f1cadfbf63，最小四参数独立顶层，23:59创建queued/assigned，原请求经换行归一核对完整保留。本片实现条件分类贯通与窗口计数/确认归并纯函数，不用None/allow标记绕过错身份/非法数据/通道或>=60%，可靠低占比不受10次硬限。
+- 计数覆盖完整首轮和后续正式指令，仅真实确认进入窗口才计，规划/工具/预检/未发送不计、ACK幂等且冲突不重计，后取消不倒扣；读数恢复、再缺数及换task不重置，无可靠历史不造计数。纯状态不实际发送/持久存储或生成ACK成功事实；实际采集加载/原生续用/MCP/页面/权限/锁另片，禁止读取真实会话/配置/环境/凭据/日志DB，不启停/模型/Browser/主动wait。
+- 新建290合同并同步总需求/手册/两调用指南/进度/简报/模块/排期，新决策局部替代此前无十轮后备，旧任务原包/失败不改。19冻结SHA/正式产品不变、10份UTF-8文档/15新增本地链接及创建回执自检通过，证据coordination/verification.json；当前产品仍ad46037、原184验证保持，本轮无产品测试或原生调用。交付暂停后Codex独立实查/直接修正，下一片先确认，286/日志/21600/Kimi边界保持；准备检查/文档Git收尾不冒称开发或上线验收。
+
 ## 2026-10-20 23:22（Asia/Shanghai）— 289首次独立实查、直接补正与采集/适配代码集成
 
 - 用户通知289好了，MCP核本人agent:codex/agent，DeepSeek ins_00acba0f8a9b/PID12284 idle/无当前任务后接手；页面旧交叉复核要求如实读取，按AGENTS分工，不改页面、不返修或派Kimi。

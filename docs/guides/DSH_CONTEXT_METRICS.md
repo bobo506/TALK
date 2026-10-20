@@ -2,6 +2,8 @@
 
 289已完成首次实现、独立实查、直接补正和离线验证。当前代码未加载到运行角色，真实上下文数值仍未知，不能把本文当作已经可用的用户操作入口。机制见[总体需求](../spec/EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)，验收证据见[289复核](../spec/DSH_CONTEXT_METRICS_REVIEW_289.md)。
 
+当前新片[290](../spec/EXECUTION_SESSION_FALLBACK_SLICE_3.md)已派，仅补占比单纯不可得时的条件十次备用及窗口计数；会为unknown补可审分类贯通，不把所有None都当缺数。下方289 API尚未改动，真实挂载/采集/任务接线也未启用。
+
 ## 模块与调用顺序
 
 | 模块 | 入口 | 职责 |

@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 23:59：用户已批准再做一片条件十次兜底，290已派DeepSeek，基线ad46037、19公开材料冻结，创建queued/assigned。仅缺可靠指标且完整计数可信时备用10次，可靠60%规则和scope/通道/非法数据守卫优先；计数从首轮累计，恢复读数不重计。只隔离Python内核/分类及两测试，不改JS采集器/运行角色或启停，无开发/采集验收；用户通知后Codex实查/直接修正，本轮只此片，详[290合同](EXECUTION_SESSION_FALLBACK_SLICE_3.md)。
+
 > 2026-10-20 23:22：289 DSH上下文原生采集接口/Python适配已独立实查、直接补正并集成收取；Node34/Python44/原288的106项共184全过。补来源cut/序号、字段状态和异常/回调边界，四份新源/测试无生产导入，原bridge/host/288不变；实际版本/配置/home/真实数值未知，未加载/启停/模型或会话读取。下一片仅建议只读实机入口/配置及挂载核验，先确认；详[289复核](DSH_CONTEXT_METRICS_REVIEW_289.md)和[采集说明](../guides/DSH_CONTEXT_METRICS.md)。
 
 > 2026-10-20 22:45：用户已确认DSH上下文指标接入，289已派DeepSeek隔离实现原生contextPressure采集接口、Python规范化到288及离线联测，基线15f77b2、22项目/29原生源冻结。当前queued/assigned，无开发交付/采样验收，不加载运行中bridge/角色，不改288或启用原生续用/MCP。实际入口headless/argv、外层21600，安装版本关联/home/插件/真实指标未知；交付暂停后Codex独立实查/直接修正，默认用户通知取件，详[289合同](DSH_CONTEXT_METRICS_SLICE_2.md)。
