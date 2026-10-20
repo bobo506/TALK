@@ -6,7 +6,7 @@
 - 项目`prj_e8fe7066bbec`；协调/派发/首次交付独立实查为`agent:codex`，首次核查与必要自检为`agent:deepseek`，完成后暂停。Kimi继续暂停新派发。
 - 本次已读取页面`development_requirements`，仍为旧Kimi/DeepSeek交叉复核文本；实际按`AGENTS.md`最新用户约定执行，不修改或冒称已更新页面要求。
 - 产品源码基线`510c9c42311e5c4784d8d2227211dc419ee78853`。冻结目录`.tmp/execution-session-cache-audit-v1/baseline/`只读；逐文件SHA-256、原始任务包、名册/要求快照和创建回执由协调方保存于`coordination/`。
-- 已创建任务287，creator `agent:codex`、target `agent:deepseek`，Hall `group:task-b5057e39171d476f80401f53d7b249e7`；创建时`queued/assigned`，独立顶层、最小四参数派发。原始任务包及创建回执保留；尚无交付或验收结论。
+- 任务287，creator `agent:codex`、target `agent:deepseek`，Hall `group:task-b5057e39171d476f80401f53d7b249e7`；创建时`queued/assigned`，独立顶层、最小四参数派发。2026-10-20原结果2893经Codex首次独立实查、六组方案补正与自检后已收取为`succeeded/completed`；原包/自报/偏差保留，不代表真实缓存或会话复用实现验收。详[287复核与补正](EXECUTION_SESSION_CACHE_REVIEW_287.md)。
 
 ## 目的与范围
 

@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 20:27（Asia/Shanghai）— 287首次独立实查、直接补正方案并收取
+
+- 用户通知“287好了”后，先读完整必要交付摘要：结果2893合法complete自报、task_id匹配，runner succeeded/submitted；本人仍agent:codex/agent，DeepSeek原ins_00acba0f8a9b/PID12284上报idle、无当前任务，确认暂停后开始实查，不重派或唤回。
+- 独立核对42冻结源码/14已安装DSH源码哈希及102引用范围/锚点/源哈希；纯函数合成提示测量可复现，MCP正文SHA与本地delivery JSON一致、真实287校验通过。11份原交付均原位保留，MCP原complete不追改。
+- 发现并直接补正六组：默认源码/实机事实外推；retry累计与缺失cache/total/reasoning口径；“续接明确减少输入”的收益误判；task attempt/execution/launch与路径归一化；home锁失败同home fresh及外部锁合作边界；首次pycache短暂写入冻结区的只读偏差。严格全程零写入不标通过，现42源一致且无pycache；补正方案保留原件另存independent-review287/corrected/。
+- 9项独立纯函数/静态探针全部通过，取自已检查源码：同结算去重/修订、retry/失败attempt累计、cache缺失投影为0、reasoning不重复求和、非法total缺失、cache优先字段与历史请求装配。没有运行DSH入口或真实会话/模型/网络，不冒称产品回归。首次独立发现与Codex修正后自检区分，没有其它角色回审。
+- 接受补正后的方案并于20:27:10收取287为succeeded/completed、仍结果2893；原始响应、原11产物SHA、完整性与探针结果、修正索引及收取回执保存于.tmp/execution-session-cache-audit-v1/independent-review287/。正式[287复核](spec/EXECUTION_SESSION_CACHE_REVIEW_287.md)随Git保存结论，原报告不追改。
+- 仅文档/隔离证据收尾，未改产品/配置/模型/绑定/Key/owner或启停服务，不读取真实会话/profile/环境值/生产DB日志；286/旧产物和Kimi额度暂停保持。手册无用户操作变化。静态默认链无跨任务续用，真实缓存/费用/改善仍未知；后续S0脱敏实际接线证据为新取证范围，须先用户确认，未派发，不借复核自动开启。
+- 补正后收尾自检6份UTF-8文档、7个新增本地链接、Git差异/范围和287收取回执通过，原11产物及42冻结源保持，证据independent-review287/final-verification.json；按持续授权常规提交/推送六份文档，不纳入其它未跟踪文件。
+
 ## 2026-10-20 20:01（Asia/Shanghai）— 用户确认优先只读核查会话/缓存，287已派
 
 - 本轮先按“继续项目”只读恢复，核对HEAD510c9c4、已跟踪文件无未提交差异；MCP身份agent:codex/agent、lead、project prj_e8fe7066bbec，286仍queued/accepted/paused、无实例/结果。给出具体只读建议后，用户明确回复“可以，就先做这个”，批准只将该方案片提前；此前17:52暂停决定被本次单片确认局部替代，不代表日志/21600预算完成或授权实施复用。
