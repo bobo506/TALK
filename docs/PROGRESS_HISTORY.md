@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-20 10:27（Asia/Shanghai）— 282验收收尾后派283日志来源/接收/查询方案
+
+- 用户明确“验收通过，继续原计划”，282加载与页面状态门禁闭合，十份加载/进度文档已提交1e43502并常规推送。正式产品仍6f3f9c5，无额外启停/API重载或模型探针；先完成当前片Git再开B方案。
+- 派前重新读取项目development_requirements/caller：本人agent:codex/agent，DeepSeek新ins_39ba69bf6dfe、deepseek-flash/max新鲜idle/无当前任务。旧Kimi/DeepSeek交叉要求原文保存，本次AGENTS最新分工优先：DeepSeek首次方案/自测暂停，Codex独立实查、直接修正和收尾，不派Kimi复核或返修。
+- 实际#283“日志来源、接收与查询合同及隔离边界验证”，UTC2026-10-20T02:25:58.965925，project prj_e8fe7066bbec/creator agent:codex/target agent:deepseek/Hall group:task-5ba13f2d6bf94892b4103dadb95b85ef，创建queued/assigned；最小顶层参数，无子任务/父任务/授权扩张字段。不用派发快照冒充运行或完成。
+- 干净1e4350238e1435e4abb71b72e8663173e8a4240d，79实际源/指定文档双份SHA核对；冻结.tmp/runtime-log-source-query-design-v1/baseline/，仅deepseek/可写、coordination/独占，三份正式协调文档例外列manifest。无生产配置/Key/DB/日志复制。只读MODULE_bridges及必要实际源码，不读其它MODULE。
+- 范围B1设计/合同/缺口与最小必要合成隔离反例：现有受控来源/认证与新接收必要性、manager/角色scope、同seq多事件、全层host归属、幂等/冲突/原子事务/真实received_at、稳定ref/cursor、撤销/缺源/扫描限额/partial/敏感字段/outbox声明边界；给一个最小B2实施切片。281 B原型未批准，不把提案当公共DB/认证/HTTP实施授权或实机跨宿主通过。
+- 禁正式产品/生产读取与网络/模型/启停/owner/删除/回收，C不并片；交付完整裸talk-delivery-1/实际283并本地validate，先暂停再由用户通知取件。task.md/manifest/agents-before-dispatch/dispatch-receipt完整保留，默认派后结束，无主动等待/自动唤回/后续实施。
+
 ## 2026-10-20 10:21（Asia/Shanghai）— 282五宿主正常加载，四角色恢复及77.568秒实机复验通过
 
 - 用户在282推送/下一步核正常重载的说明后明确“好的，那继续”。Codex按本次授权直接核验和操作，不借279一次许可；MCP本人agent:codex/agent、lead、prj_e8fe7066bbec，queued/running为空、四bridge idle。五原manager精确入口/创建时间、原句柄/launch与OS父链一致，五原配方dry-run通过；配置/实现/配方SHA固定。
