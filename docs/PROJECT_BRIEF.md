@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 17:03：用户明确确认DeepSeek“启动成功、绑定保持”的页面验收通过，00bdcff/170项及02c7692实机加载门禁闭合。回原日志B2b，先固定真实writer上传投影和服务端严格适配首片合同，HTTP/查询随后串行，尚未派发/启用生产。Kimi继续暂停新派发，详[切片合同](spec/ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)和[进度](PROGRESS.md)。
+
 2026-10-20 16:40：用户明确同意仅加载DeepSeek状态修复，已沿原manager11612普通stop/start为gen23/新ins_00acba0f8a9b/12284，持续ready/idle/无错误，同一实例心跳推进60.059秒。API、全部manager及其它四角色/模型绑定保持，代码00bdcff/170项自检保持；待刷新角色页确认，不派B2b，Kimi继续暂停新派发。详[补正与实际加载](spec/QUEUE_POLL_STATUS_RECOVERY_FIX.md)及[进度](PROGRESS.md)。
 
 2026-10-20 16:32：用户同意处理DeepSeek查询恢复后的error残留，Codex直接补正通用bridge，仅恢复本轮询自己的错误，保护busy/执行错误/后续状态，状态上报失败可重试；新增14项及原相关用例共170项自检通过。旧DeepSeek尚未加载，已备单角色普通stop/start方案，待部署确认；不动API/宿主/其它角色，285人验保持、B2b未派、Kimi暂停新派发。详[补正与加载方案](spec/QUEUE_POLL_STATUS_RECOVERY_FIX.md)及[进度](PROGRESS.md)。

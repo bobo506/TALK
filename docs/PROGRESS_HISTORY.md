@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-20 17:03（Asia/Shanghai） — DeepSeek状态页面验收通过，回到日志B2b投影首片准备
+
+- 用户对加载后角色列表“启动成功、模型绑定保持”的验收问题明确答复“验收通过”，DeepSeek状态补正的页面门禁闭合。00bdcff修复/170项自检、02c7692加载/同实例60.059秒心跳事实保持，本轮不重跑无关测试或再次启停角色/API。原pending加载证据保留，新增human-acceptance.json。
+- 本人MCP仍agent:codex/agent、lead、prj_e8fe7066bbec；DeepSeek新ins_00acba0f8a9b idle/无任务。读取的页面development_requirements仍为旧交叉分工，按AGENTS最新约定：DeepSeek首次执行、自测交付暂停，Codex独立实查/直接修正；Kimi额度暂停新派发保持，不冒称页面要求已更新。
+- 回原日志排期，先固定B2b-1真实writer→版本化上传对象→服务端严格再次投影→PreparedBatch合同，支持role标准/异常/transition/queue_poll及manager周期快照，launch_process和其它manager事件明确拒绝并保本地待后续映射，不静默丢弃。下一片再串行HTTP/读取查询接线，本轮生产接收关闭，无outbox/模型/部署。详ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md。
+- usage-gate guard返回continue，但精确使用比例为null，不臆测百分比。本轮先提交人验与切片合同，再冻结公开源码/指定文档、建立隔离白名单任务；此记录时尚未派发，不把准备记为执行完成。
+
 ## 2026-10-20 16:40（Asia/Shanghai）— 用户批准仅DeepSeek正常加载，原宿主新实例ready/idle及两次心跳通过
 
 - 修复00bdcff/170项自检已推送，用户明确选择“同意仅加载DeepSeek修复（推荐）”。授权记录deploy/authorization.json，加载前重核原gen21/ins_39ba69bf6dfe/12612、原manager11612创建时间/持有launch/直接父链、全局queued/running为空；其它四角色stopped/API原进程保持。

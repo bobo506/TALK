@@ -1,6 +1,6 @@
 # 查询恢复后轮询错误状态残留补正
 
-日期：2026-10-20（Asia/Shanghai）。**代码00bdcff及170项自检通过；用户明确同意后，16:39仅DeepSeek普通stop/start加载，16:40新实例ready/idle及60.059秒心跳推进通过，待角色页人工确认。** 用户在285人验后对“先处理DeepSeek错误残留，再回日志B2b”回复“好的”，之后选择“同意仅加载DeepSeek修复（推荐）”。本轮按已交付问题直接修正规则由Codex补正并自检，不新派任务或调用模型，Kimi暂停派发保持。
+日期：2026-10-20（Asia/Shanghai）。**代码00bdcff及170项自检通过；用户明确同意后，16:39仅DeepSeek普通stop/start加载，16:40新实例ready/idle及60.059秒心跳推进通过，用户已明确确认角色页验收通过（17:03）。** 用户在285人验后对“先处理DeepSeek错误残留，再回日志B2b”回复“好的”，之后选择“同意仅加载DeepSeek修复（推荐）”。本轮按已交付问题直接修正规则由Codex补正并自检，不新派任务或调用模型，Kimi暂停派发保持。
 
 ## 范围和实现
 
@@ -32,4 +32,4 @@
 - 新实例`ins_00acba0f8a9b`、bridge12284、launch `ba5ad779-0cf6-493f-a4d0-87a97181255f`仍归原manager11612。16:39:30.904687→16:40:30.964092，同一实例/launch的心跳推进60.059405秒，持续idle/current_task_id=null/last_error=null，服务running/ready且原宿主持有新Popen。
 - API launcher5236/uvicorn13952、全部五个manager、其它四角色stopped/世代/归属及角色配置/绑定保持。未重载API或宿主、未强杀/清owner、未启动Kimi或Codex、未改Key/模型/配置/DB协议，没有模型/新任务或生产断网注入。
 - 加载前后`cli_bridge.py`SHA均为已测`fdb73f4080634d357fa5b6af6e559db56941c5c0b4980b31b64efea746877ee5`；本轮只补加载文档，不重复产品测试。生产核正常新实例/心跳；断连后的恢复逻辑由隔离反例证明，不声称已在生产再次断网复现。
-- 证据追加`deploy/`内授权/预检、普通停止/启动回执、`live-first.json/live-final.json`及加载脚本。用户刷新角色页确认DeepSeek“启动成功”前，不自动开启日志B2b。
+- 证据追加`deploy/`内授权/预检、普通停止/启动回执、`live-first.json/live-final.json`及加载脚本。用户已明确确认DeepSeek“启动成功、模型绑定保持”的页面验收通过，门禁闭合；后续按B2b明确切片推进，不自动等待执行者。

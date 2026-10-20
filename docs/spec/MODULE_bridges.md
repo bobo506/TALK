@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 17:03：用户明确确认DeepSeek状态补正页面“验收通过”，00bdcff/170项及02c7692实机加载保持，状态门禁闭合。下一片回B2b-1真实writer上传投影/服务端严格适配，支持边界及明确延后项见[切片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)；尚未派发，生产接收仍关闭、Kimi暂停派发。
+
 > 2026-10-20 16:40：用户明确同意仅DeepSeek加载后，原manager11612普通stop/start为gen23/ins_00acba0f8a9b/12284，ready/idle/无错误且同实例心跳推进60.059秒。API/宿主/其它角色/绑定保持，00bdcff/170项自检保持；角色页确认待，B2b未派。详[补正和实际加载](QUEUE_POLL_STATUS_RECOVERY_FIX.md)，下列16:32待加载是当时事实。
 
 > 2026-10-20 16:32：查询恢复后轮询error残留由Codex直接补正。通用bridge以状态锁/本地来源版本恢复自己的查询错误，保护任务busy/执行错误及后续状态；状态上报失败可重试且不污染诊断，正常成功不加请求。新增14项及原相关用例共170项自检通过，旧DeepSeek尚未加载，待单角色正常stop/start确认。其它角色/API/权限/任务合同保持，详[补正记录](QUEUE_POLL_STATUS_RECOVERY_FIX.md)。
