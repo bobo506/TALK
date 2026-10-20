@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 23:22：289 DSH上下文原生采集接口/Python适配已独立实查、直接补正并集成收取；Node34/Python44/原288的106项共184全过。补来源cut/序号、字段状态和异常/回调边界，四份新源/测试无生产导入，原bridge/host/288不变；实际版本/配置/home/真实数值未知，未加载/启停/模型或会话读取。下一片仅建议只读实机入口/配置及挂载核验，先确认；详[289复核](DSH_CONTEXT_METRICS_REVIEW_289.md)和[采集说明](../guides/DSH_CONTEXT_METRICS.md)。
+
 > 2026-10-20 22:45：用户已确认DSH上下文指标接入，289已派DeepSeek隔离实现原生contextPressure采集接口、Python规范化到288及离线联测，基线15f77b2、22项目/29原生源冻结。当前queued/assigned，无开发交付/采样验收，不加载运行中bridge/角色，不改288或启用原生续用/MCP。实际入口headless/argv、外层21600，安装版本关联/home/插件/真实指标未知；交付暂停后Codex独立实查/直接修正，默认用户通知取件，详[289合同](DSH_CONTEXT_METRICS_SLICE_2.md)。
 
 > 2026-10-20 22:20：288离线执行会话内核已实查/补正/集成收取，统一显式规划入口支持60%整数阈值、首轮完整/续轮增量、基础合同引用留档及当前通道守卫。106项自检/11,994组阈值交叉核验通过；运行中bridge/host/API/MCP不导入新模块，真实指标/原生续用/锁ACK/部署尚未接通，下一片待确认。详[288复核](EXECUTION_SESSION_CORE_REVIEW_288.md)和[内核调用说明](../guides/EXECUTION_SESSION_KERNEL.md)。

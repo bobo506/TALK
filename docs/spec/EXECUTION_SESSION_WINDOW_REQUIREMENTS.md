@@ -1,6 +1,6 @@
 # 执行会话选择、首轮完整与续轮增量需求
 
-更新：2026-10-20 22:45（Asia/Shanghai）。[首片288离线内核](EXECUTION_SESSION_CORE_SLICE_1.md)已实查/补正/集成收取，106项及11,994组阈值校验保持。用户随后确认“可以，继续吧”，[第二片289的DSH原生指标采集/内核适配](DSH_CONTEXT_METRICS_SLICE_2.md)已派DeepSeek，创建queued/assigned；当前整项功能尚未接通/上线，不改写原交付或历史验证，不扩大为连续开片或生产部署授权。
+更新：2026-10-20 23:22（Asia/Shanghai）。[288离线内核](EXECUTION_SESSION_CORE_SLICE_1.md)及[289的DSH原生指标采集/内核适配](DSH_CONTEXT_METRICS_SLICE_2.md)均已首次独立实查、直接补正和集成收取。289相关Node34/Python44及原内核106项共184项通过，详[289复核](DSH_CONTEXT_METRICS_REVIEW_289.md)。当前采集器未加载、真实数值未知，整项未接通/上线，不改写原交付或扩大为连续开片/生产部署授权。
 
 ## 已确认的机制
 
@@ -51,4 +51,4 @@
 
 ## 当前边界与下一步
 
-当前默认bridge/headless未接通本机制。288内核已入库：所有投递均要求独立的当前通道确认，续轮可只传基础引用且留档不重复正文，新窗必须有匹配的完整正文，详[调用说明](../guides/EXECUTION_SESSION_KERNEL.md)。289已获本片确认，负责可挂载的DSH原生projection采集器、规范化到288及离线链路；只读核实当前headless/argv入口，实际安装版本关联/native home/插件/真实占用仍未知，不能据冻结源码自称采集成功。原生会话续用、任务/MCP/API/页面接线和生产加载仍另片确认，不在289扩大实施。
+当前默认bridge/headless未接通本机制。288内核及289可挂载的原生projection采集器/Python适配已入库，源/cut/配置顺序、字段非法/缺失及完整/增量链路通过离线测试；详[内核说明](../guides/EXECUTION_SESSION_KERNEL.md)和[采集说明](../guides/DSH_CONTEXT_METRICS.md)。实际入口虽已核headless/argv，版本关联/native home/有效插件和真实占用仍未知，不能据冻结源码自称线上采集成功。下一片建议先只读核验这些事实与挂载位置并形成隔离联调/加载方案；尚未确认/派发。原生会话续用、任务/MCP/API/页面及生产加载仍另片确认。

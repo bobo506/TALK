@@ -1,5 +1,7 @@
 # 会话机制第二片：DSH上下文指标采集与内核适配
 
+当前状态：2026-10-20 23:22（Asia/Shanghai），289首次候选经Codex独立实查、直接补正和自检后集成，已收取completed，结果2895原自报保持。正式Node34/Python44/既有288的106项全过，共184项；采集器未加载、真实占用仍未知。详[289复核](DSH_CONTEXT_METRICS_REVIEW_289.md)和[调用说明](../guides/DSH_CONTEXT_METRICS.md)。下方创建状态仅保派发时历史，原冻结任务包不覆写。
+
 派发状态：2026-10-20 22:45（Asia/Shanghai），实际任务289，创建`queued/assigned`，creator `agent:codex`、target `agent:deepseek`，Hall `group:task-2fe861b89f60455287e3da370f809adf`。22份项目公开材料979,318字节、29份原生公开源码458,397字节已冻结，逐SHA清单及原合同/请求/脱敏入口事实/创建回执在`coordination/`。当前无开发交付或独立验收结论；下方原合同保持，冻结任务包不随本节更新覆写。
 
 ## 授权、目的与不变项

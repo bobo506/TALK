@@ -77,4 +77,4 @@ full_requirements = reconstruct_full_requirements(
 
 运行`python -B -X utf8 tests/test_execution_sessions.py`：106项标准库离线测试通过。独立整数阈值交叉核验11,994组通过。
 
-尚未接通真实DSH指标采集、原生会话创建/恢复、锁/投递幂等/ACK、MCP增量派发/存档、页面或生产加载；也未验证原生桌面同窗和费用/缓存改善。用户已确认的[第二片289](../spec/DSH_CONTEXT_METRICS_SLICE_2.md)负责原生projection采集接口及规范化适配，已派发、尚无验收结论，当前内核和运行中角色不改。其余接线仍须另片确认；实际使用入口落地时，同片更新[用户手册](USER_MANUAL.md)并完成人工验收。
+尚未接通运行中的DSH指标、原生会话创建/恢复、锁/投递幂等/ACK、MCP增量派发/存档、页面或生产加载；也未验证原生桌面同窗和费用/缓存改善。[第二片289](../spec/DSH_CONTEXT_METRICS_SLICE_2.md)的采集接口及Python适配已实查/补正/集成，Node34/Python44和本内核106项共184项离线验证通过，详[采集调用说明](DSH_CONTEXT_METRICS.md)；本内核及运行中角色保持。实际版本/配置和真实采样仍未知，其余接线需另片确认；实际入口落地时同片更新[用户手册](USER_MANUAL.md)并人工验收。
