@@ -37,6 +37,12 @@ Updated: 2026-10-20 11:35（Asia/Shanghai）。用户新增“本人管理账号
 - 用户明确当前TALK目录不改；main/独立worktree总目录布局仅针对以后新项目。本轮不迁目录、不创建群聊分支，不改变当前功能排期。
 - 原角色/Key/模型/owner/启停、旧local scope/ref/cursor/导出partial与脱敏保持。B2a不把内部payload接口当可接受任意客户端JSON的公开接收口；B2b投影门禁须先闭合才能上线。
 
+## 新发现：临时断网与任务树暂停（咨询，未操作）
+
+- 暂停撤销整树claim，运行项回queued/accepted，保Hall/结果/磁盘文件；正常联网时bridge收到claim失效后取消本地命令，恢复会新attempt，不是原生模型上下文冻结续跑。独立根任务需逐棵暂停，断网本身不等于已下达暂停；服务端paused/idle不单独证明原生进程已退出。
+- 实查发现普通非委派根的页面恢复参数不匹配：web/app.js resumeTaskTreeFromBlackboard固定提示/提交slice_budget=1..3，server/routes/tasks.py resume_task_tree对may_delegate=false要求0。284/285原派发回执均false。暂停入口可用，但这类任务不能保证仅靠页面继续恢复；用户回来后可明确要求Codex按正确参数核对现场并恢复。
+- 本轮只回答使用问题/记录缺陷，没有实际暂停、恢复、终止/启停或修改产品；恢复入口修复尚未派发，不自动加到正在执行的285范围。
+
 ## 已验基础与协作
 
 - 282实现6f3f9c5，169项相关自检/67秒隔离过；五宿主正常加载、四角色ready/idle、77.568秒周期/原进程及60–90秒心跳、用户页面验收均过，加载记录1e43502已推送。API原进程和绑定保持，Codex桥接关闭；详[加载记录](spec/ROLE_HOST_RUNTIME_EVIDENCE_LOAD_282.md)。过去PID只作证据，未来先重核。
