@@ -1,12 +1,14 @@
 # 会话机制首片：选择、60%阈值与首轮/续轮内核
 
+当前状态：2026-10-20 22:20，288首次候选经Codex独立实查、直接补正后已集成并收取completed。正式106项离线测试及11,994组整数阈值交叉核验通过；不是DSH真实采集/原生续用或上线验收。详[288复核](EXECUTION_SESSION_CORE_REVIEW_288.md)与[调用说明](../guides/EXECUTION_SESSION_KERNEL.md)。下方为本次原合同及交付边界，原任务包保持不改。
+
 ## 授权、基线与交付方式
 
 - 2026-10-20用户在确认[最新机制](EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)后明确回复“那确定了，动手开发吧”。本次据此开始开发，拆出本首片；本轮不把该授权扩大为生产部署、角色启停或其它功能开片。
 - 首片目的：先将会话选择、上下文60%换窗和首轮完整/续轮增量落实为可直接复用、可离线验收的产品代码。真实DSH指标采集、原生会话创建/恢复、任务/MCP/API接线、存储/锁及页面另片确认；当前实机argv/profile/home未知不在本片强行闭合。
 - 项目`prj_e8fe7066bbec`，协调/首次交付独立实查与直接修正`agent:codex`，首次实现与自测`agent:deepseek`，交付即暂停。Kimi继续暂停新派发；页面旧交叉复核开发要求已读取，按AGENTS最新约定优先，不改页面。
 - 产品/任务基线`48526a7851561cd81a42deb3bb82652105df2089`。22份公开源码/测试/指定文档共1,149,727字节逐字节冻结在`.tmp/execution-session-core-v1/baseline/`，逐文件SHA与名册/原包/回执由Codex保存在`coordination/`。
-- 实际任务288，creator `agent:codex`、target `agent:deepseek`，Hall `group:task-793daa1d8d874e3d966ac5a181a2190c`；创建时`queued/assigned`，最小四参数独立顶层派发。此为派发记录，尚无独立复核/集成结论；原任务合同保留在coordination/，不随本节状态更新覆写。
+- 实际任务288，creator `agent:codex`、target `agent:deepseek`，Hall `group:task-793daa1d8d874e3d966ac5a181a2190c`；创建时`queued/assigned`，最小四参数独立顶层派发。现结果2894原complete保留，已实查/补正/集成收取；原任务合同保留在coordination/，不随状态更新覆写。
 - 执行者唯一可写`.tmp/execution-session-core-v1/deepseek/**`。候选产品白名单仅`candidate/bridges/execution_sessions.py`；候选测试仅`candidate/tests/test_execution_sessions.py`；交付说明/JSON/合成证据在同一deepseek/内。
 - 禁止改正式源/测试/文档/Git、baseline/和coordination/、数据库、配置、Key、绑定、owner和任何旧任务产物；不读真实会话/profile/凭据/生产日志/私有owner，不启停或执行原生CLI/ACP/额外模型探针，不做Browser，不派其它Agent或子任务。
 

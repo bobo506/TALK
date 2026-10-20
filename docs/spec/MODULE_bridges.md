@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 22:20：288离线执行会话内核已实查/补正/集成收取，统一显式规划入口支持60%整数阈值、首轮完整/续轮增量、基础合同引用留档及当前通道守卫。106项自检/11,994组阈值交叉核验通过；运行中bridge/host/API/MCP不导入新模块，真实指标/原生续用/锁ACK/部署尚未接通，下一片待确认。详[288复核](EXECUTION_SESSION_CORE_REVIEW_288.md)和[内核调用说明](../guides/EXECUTION_SESSION_KERNEL.md)。
+
 > 2026-10-20 17:25方向调整（优先于下方旧方案）：用户澄清桌面应用目标：日志保存在产生日志的设备，跨设备分析通过导出文件并手动转移即可；当前不继续联网集中上传/接收。286由创建者agent:codex调用既有pause-tree普通中止，控制状态paused，当前领取已撤销；原DeepSeek已回idle/无当前任务，服务未停。隔离产物233份约8.78MB保留原位，不收取/验收/集成。原284关闭内核及三张日志表保留，不删库/表、不启用接收；HTTP上传、跨机器来源及outbox移出当前排期。本轮只处理日志方向，桌面内部本地服务/数据库及聊天/账号同步架构保持，未派新任务。
 
 > 2026-10-20 17:12：本片已作为独立顶层task286派agent:deepseek，创建queued/assigned。精确基线52467765dfee05ada9ed79bad7d282f2deaf38a8，175公开源/指定文档冻结，原包/manifest/回执在.tmp/runtime-log-upload-projection-v1/coordination/；仅deepseek/隔离候选可写，自测交付暂停后Codex实查/直接修正。生产接收关闭，HTTP/查询后续，不主动等待，用户通知后取件。 详[本片合同](ROLE_RUNTIME_LOG_UPLOAD_PROJECTION_B2B1.md)。
