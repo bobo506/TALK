@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-20 10:55：283 B1方案已实查收取，48原例复跑过、9独立反例失败，原文件inbox不集成；Codex补正三表事务/稳定来源事件/真实writer映射/读取投影及ACK。用户已批准三表/来源登记撤销/接收查询、默认关闭与隔离验证，下一片B2a仅表/事务核心；不改host/bridge或生产，详[283复核](ROLE_RUNTIME_LOG_RECEIVE_REVIEW_283.md)、[B合同](ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)。
+
 > 2026-10-20 10:01：282经Codex独立实查/直接修正，169项相关用例与67秒隔离运行过，五文件合入收取，原partial及6组11处失败保留。新manager_round_snapshot/launch_process_snapshot只本地，固定60秒/真实seq/原Popen/未知/有界轮转，旧控制流/权限保持。后续经本次用户确认已正常重载五宿主、普通恢复四角色，77.568秒实机周期/原进程及心跳复验通过，Codex桥接保持关闭；页面状态已获用户明确验收通过，B/C未完成，详[加载记录](ROLE_HOST_RUNTIME_EVIDENCE_LOAD_282.md)与[282复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。
 
 > 2026-10-20 09:07：282本地循环/原Popen运行证据已派DeepSeek，基线9c24534、195冻结副本、四文件逻辑白名单，首次实现/自测后暂停。创建queued/assigned、未集成/部署；不动B接收/认证/DB或页面，Codex独立实查，默认用户通知取件。详[A合同](ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)与[进度](../PROGRESS.md)。

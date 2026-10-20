@@ -67,6 +67,8 @@ A不填received_at，不把recorded_at、mtime、本地查询或generated_at冒�
 
 服务端真实接收时间仅在真实受认证接收并校验、实际存储成功时产生，重放返回原时间；来源/存储、重放、撤销、稳定ref和旧记录兼容必须另片固定。B/C和日志整项均未完成。
 
+283 B1已独立实查收取；原文件inbox/无表方案不集成，Codex补正[B接收合同](ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)，用户已明确批准SQLite三日志表/来源登记撤销/接收查询，默认关闭隔离验证。A合同不变，B2a先表/事务核心，后续HTTP/查询串行，未实施/部署。
+
 ## A实现白名单与验收
 
 候选产品白名单仅scripts/role_service_host.py、scripts/role_service_host_loop_evidence.py（新）、tests/test_role_service_host_loop_evidence.py（新）、tests/test_role_service_host_diagnostics.py（只追加）。正式文档/Git由Codex维护。无server/通用写入器/页面/生产变化；首次实现仍DeepSeek隔离、自测后暂停，Codex独立实查/直接修正。

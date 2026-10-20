@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 10:55（Asia/Shanghai）— 283独立实查收取；原48过/9反例失败，SQLite三表补正范围获用户确认
+
+- 用户通知283完成，并明确目录讨论只针对以后新项目、当前TALK不改；本轮不迁目录/开群聊分支。MCP本人agent:codex/agent、lead，DS UTC02:42:40.844391已idle/无当前任务，按交付暂停后独立实查，不返修/互派复核。
+- task283/project prj_e8fe7066bbec/creator agent:codex/target及作者agent:deepseek/Hall group:task-5ba13f2d6bf94892b4103dadb95b85ef/ins_39ba69bf6dfe一致。msg2890合法complete只方案自报，SHA eafec2b0b993b2f8b50ef6cf4b485f8ddc65f26865b1e2600cd499f4fa950bc2；本地JSON等值但文本排版/尾换行不同，稳定引用ok，UTC02:53:51.162402收取completed。原报告/结论不改。
+- 79冻结源与非例外正式SHA保持、755dd60仅三份协调文档；原162文件归档，复跑只在独立副本。原48项重跑全过、零失败错误跳过、0.844秒，server.db未导入，无生产配置/Key/DB/日志/原生会话、网络/模型/启停。
+- Codex真实冻结writer隔离输出核实际字段、unknown实例与writer/manager独立run，补9反例。首次6fail/3error含页预算探针自身缺exception字段；保留日志，修正探针自身并把预期成功的格式拒绝转明确断言后9fail/0error。暴露上传映射、两run混同、重分批重复、双向launch缺核、写前撤销、对象私锁突破配额、UTF-8超页、损坏raw透传、错误ACK丢pending；未改原型，不冒称修后全过。
+- 原文件inbox缺认证库/计数/去重/回执原子提交、首次空宿主登记、完整既有日志投影等合同。Codex补正ROLE_RUNTIME_LOG_RECEIVE_DESIGN及复核报告：复用现有主体，推荐现有SQLite追加Source/Batch/Event三日志专用表、单受限事务重核/去重/配额/事件与回执、事件身份不含批次、显式映射/读侧投影、严格ACK。
+- 针对新增DB/协议范围按AGENTS提出可审确认问题，用户明确“按此范围开发（推荐）”：三表、来源登记撤销、批次接收/只读查询，默认关闭先隔离库验证。实施授权已取得，不再次请求同一范围；先B2a三表/事务核心，再B2b映射/查询HTTP串行，不写生产库/配置或启停。
+- 正式变更仅设计/复核/必要协调文档；283产品/B/跨机器/持久outbox/C整项未完成。证据.tmp/runtime-log-source-query-design-v1/independent-review/含archive/原件/source-result、48复跑、两轮negative、stable-reference/collect-receipt/implementation-approval。先完成本片Git再派B2a，默认派后结束。
+
 ## 2026-10-20 10:27（Asia/Shanghai）— 282验收收尾后派283日志来源/接收/查询方案
 
 - 用户明确“验收通过，继续原计划”，282加载与页面状态门禁闭合，十份加载/进度文档已提交1e43502并常规推送。正式产品仍6f3f9c5，无额外启停/API重载或模型探针；先完成当前片Git再开B方案。

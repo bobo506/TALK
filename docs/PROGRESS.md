@@ -1,35 +1,29 @@
 # Project Progress
 
-Updated: 2026-10-20 10:27（Asia/Shanghai）。282五宿主加载/四角色恢复及实机复验、用户人验已闭合，1e43502已推送。按用户“验收通过，继续原计划”派DeepSeek #283做B1来源/接收/查询方案与隔离边界验证，创建queued/assigned；未实施B/API/DB/认证。默认派后结束，用户通知完成后收取复核；日志→全入口预算→会话复用原序保持。
+Updated: 2026-10-20 10:55（Asia/Shanghai）。283方案经Codex独立实查并收取；原48项复跑过，9个独立反例全部失败，原型不集成。Codex补正SQLite三表提案，用户明确批准三表/来源登记撤销/接收与只读查询、默认关闭和隔离验证。先收尾283再派B2a三表/事务核心，后续HTTP/查询串行；日志→全入口预算→会话复用原序保持。
 
-## 当前任务283（方案，未实施）
+## 283复核与已确认方向
 
-- “日志来源、接收与查询合同及隔离边界验证”，创建UTC2026-10-20T02:25:58.965925，target agent:deepseek、created_by agent:codex、项目prj_e8fe7066bbec，Hall group:task-5ba13f2d6bf94892b4103dadb95b85ef；queued/assigned仅派发快照，不推断当前状态或完成。
-- 干净1e4350238e1435e4abb71b72e8663173e8a4240d、79冻结源/指定文档及SHA，.tmp/runtime-log-source-query-design-v1/baseline/只读，只有deepseek/可写，coordination/保存原任务/manifest/身份开发要求及完整派发回执；仅三份协调文档为基线例外。
-- 产物限定design/contract/gap报告及必要合成隔离正反探针，先比较现有来源/认证与新接收的必要性，提出单一最小B2切片/白名单。固定全层scope、稳定事件ID/同轮多状态、幂等/并发原子/received_at、旧ref/cursor/partial/限额/撤销/不可用，281 B原型不批准为实施合同。
-- 不改正式产品/HTTP/DB/认证/页面/来源/AGENTS/Git；不读生产配置/Key/DB/日志、不网络/模型/启停或清owner、不并C回收。执行者首次方案自测交付暂停，完整裸talk-delivery-1用实际283校验；Codex独立实查，问题直接修正，不互派返修/回审。默认不主动等待或自动推进。
+- [283复核](spec/ROLE_RUNTIME_LOG_RECEIVE_REVIEW_283.md)、[补正实施合同](spec/ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)。task283/creator agent:codex/target及作者agent:deepseek/project prj_e8fe7066bbec/Hall/ins_39ba69bf6dfe一致；原msg2890合法complete仅方案自报，原文SHA eafec2b0b993b2f8b50ef6cf4b485f8ddc65f26865b1e2600cd499f4fa950bc2，稳定引用ok；本地JSON值相同、排版/尾换行有差异。UTC02:53:51.162402已收取completed。
+- DeepSeek取件时UTC02:42:40.844391已idle/无当前任务；79冻结SHA和非例外正式源保持，755dd60仅三份协调文档。162原件归档，复跑/反例只在independent-review/worktree，原候选/报告/失败不改，无返修/互派复核。
+- 原48测试独立重跑48过/零失败错误跳过/0.844秒/server.db未导入；真实冻结writer隔离输出确认writer_run与manager_run独立、unknown实例及实际字段。
+- 9反例全部失败：真实上传映射缺失、两run混同、换批重复、实例launch双向缺核、提交前撤销失效、两个store并发突破配额、中文UTF-8超页、损坏存储raw透传、无效outbox ACK删pending。首次探针页预算fixture缺五键而未到目标，保留首次6fail/3error；修正探针自身后9fail/0error，不冒称原型已修。
+- Codex只补正设计：事件身份不含batch/ordinal、显式真实writer投影、三表事务统一权限重核/来源计数/事件/回执、二次投影与UTF-8预算、来源登记/撤销及首次空宿主、严格ACK。自己的补正称自检，产品/HTTP/DB/认证/配置/页面/宿主均未改。
+- 用户已明确选择“按此范围开发（推荐）”，覆盖新增3张日志表、来源登记撤销、批次接收和只读查询；默认关闭、先隔离库验证，不需要为同一范围重复确认。先B2a表/事务/内核，再B2b投影与查询HTTP接线；生产启用/迁库/重载另验。
+- 证据.tmp/runtime-log-source-query-design-v1/independent-review/：archive/source-result-message/original-delivery/worktree、original-48、两轮negative日志/JSON、stable-reference/collect-receipt/implementation-approval。无生产配置/Key/DB/日志/原生会话读取，零网络/模型/启停。
 
-## 本次282加载结果
+## 下一步与不变项
 
-- [正常加载/实机证据](spec/ROLE_HOST_RUNTIME_EVIDENCE_LOAD_282.md)、[实现复核](spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)、[A合同](spec/ROLE_HOST_RUNTIME_EVIDENCE_DESIGN.md)、[维护者指南](guides/RUNTIME_EXCEPTION_LOGS.md)。用户在“核正常重载方式，再实机验收”后明确“好的，那继续”，本次授权已完成，不扩大为无限启停/清owner授权。
-- 前置任务queued/running均空、四bridge idle；逐个核原manager创建/精确入口、原句柄/launch、bridge父链和五份启动配方dry-run。普通stop四角色、正常释放归属/句柄，再逐个既有drain退出；确认原进程全部消失后，沿原命令隐藏启动五新manager，未强杀/PID接管/恢复API/人工清owner。
-- 五新host_started合法独立run及日志引用回查、空载/健康推进通过后，普通start恢复四原角色，最终running/ready/idle。Codex仅重载空宿主、bridge仍stopped/gen18；API原launcher15792/child9808保持，配置/绑定、入口/配方/实现SHA不变，无原生模型调用或生产故障演练。
-- 两轮UTC02:17:35.784922→02:18:53.352975，相隔77.568秒。同run成功seq：DS171→284、旧K28 171→227、页面K28 170→227、K3 114→170、Codex114→171；真实60秒采样及固定对象校验通过。四launch的project/member/instance/launch/run、alive/null退出值与spawned子PID/OS父链精确匹配；process四宿主1/1/0/0/false、Codex0/0/0/0/false，manager仍member=unknown。
-- 四角色心跳分别推进90.096/90.059/60.066/90.111秒，实例/launch/代次/父链保持。临时核验顶层pid误比较子PID及一次采样边界前提前复验均保留说明，随后按原合同补关联/足够间隔通过，未改产品/原日志，不冒称首次全过。
-- 证据.tmp/host-runtime-evidence-impl-v1/independent-review/deploy282/：preflight/manifest、普通停启回执、hosts排空/正常退出/spawn/ready/引用及verified-all、live-first/live-final/live-records；脚本为上级load282.py。产品无变化，不重复上一轮169相关用例；本轮只维护加载记录和必要现行文档。
+- 本片先完成进度/Git，再派DeepSeek隔离首次实现B2a三表/接收事务/来源登记撤销内核及自测；仅models追加日志表、新核心/新测试，HTTP/新配置/来源生产启用暂不接线。交付暂停后Codex独立实查、直接修正和集成。
+- received完整writer投影、human-only查询/导出和host持久outbox/真实跨机器仍待；281/283原型均不等产品。C先只读盘点/dry-run，不默认跨run删除。日志整项完成后统一全入口预算21600且保显式覆盖，再会话复用。
+- 用户明确当前TALK目录不改；main/独立worktree总目录布局仅针对以后新项目。本轮不迁目录、不创建群聊分支，不改变当前功能排期。
+- 原角色/Key/模型/owner/启停、旧local scope/ref/cursor/导出partial与脱敏保持。B2a不把内部payload接口当可接受任意客户端JSON的公开接收口；B2b投影门禁须先闭合才能上线。
 
-## 下一步与人工确认结果
+## 已验基础与协作
 
-- 已请求用户刷新现有角色页：四执行角色应启动成功、模型绑定保持，Codex停止。无新账号/启动动作；用户随后明确“验收通过，继续原计划”，本片页面门禁闭合。无Browser操作。
-- 当前283只做B受控来源、project/member/instance/launch/manager scope、真实接收时间和查询预算/权限方案；待交付独立复核后固定B2实施合同，未直接批准公共接口/认证/DB变更。C先只读盘点/dry-run，跨run删除无默认授权。
-- A仅当前同机本地采集；角色下载不透传新extra/manager，received_at缺失。未验新宿主接单/模型、六小时、跨宿主、生产异常、跨沙箱驻留/冷启动，不从alive推断。日志整项仍未闭合；[路线](spec/DEVELOPMENT_ROADMAP.md)后续全入口默认21600且保显式覆盖，再执行会话复用。
-
-## 当前身份、协作与最近交付
-
-- 项目prj_e8fe7066bbec，MCP本人agent:codex/agent、lead；Codex协调/首次交付独立实查、直接修正自检/集成及正式进度Git。DeepSeek和Kimi K3首次执行/自测后暂停，不派K2.8；页面旧交叉复核文本保持，AGENTS/用户最新约定优先。
-- 默认派后结束、用户通知取件；282已收取且加载人验通过，283已派方案，未自动等待或唤回。多轮逐步明确项目的优势已写[手册](guides/USER_MANUAL.md#talk-的协作优势)，不扩大并发/权限或排期。
-- 282原msg2889合法partial、SHA28759b6eed3cc0db19b35510eb95550b5cd964bcebf8c2f820a2245ab48c2e80，UTC02:01:25.578048收取。原交付/6组11处失败、Codex修正及169去重用例/67秒隔离证据保留，详历史/复核；原195冻结/候选不改。
-- 279轮询证据86a4fb5、正常加载/真实下载/约150秒心跳保持；280绑定行197fe7a已用户明确验收，278人验保持。281方案已收取、A补正合同为准。无精确上下文/用量比例可读时不臆测百分比。
-- 当前PID仅为本次证据，未来先重核：DS manager11612/bridge12612/ins_39ba69bf6dfe/gen21；旧K28 20396/17100/ins_1719a2292f59/gen24；页面K28 19228/2800/ins_6fb574360b75/gen21；K3 9728/13844/ins_5a0d307d038c/gen21；Codex空manager11768/gen18。不能据这些数字接管进程。
+- 282实现6f3f9c5，169项相关自检/67秒隔离过；五宿主正常加载、四角色ready/idle、77.568秒周期/原进程及60–90秒心跳、用户页面验收均过，加载记录1e43502已推送。API原进程和绑定保持，Codex桥接关闭；详[加载记录](spec/ROLE_HOST_RUNTIME_EVIDENCE_LOAD_282.md)。过去PID只作证据，未来先重核。
+- 279真实轮询/完整下载/约150秒心跳保持；280绑定行197fe7a已用户人验，278人验保持。新宿主模型/六小时/跨宿主/生产异常/跨沙箱驻留/冷启动不从alive推断。
+- 本人MCP agent:codex/agent、lead，项目prj_e8fe7066bbec；DeepSeek/Kimi K3首次执行自测暂停，Codex首次独立实查、问题直接修正自检、集成与进度Git。页面旧交叉要求保持，AGENTS/用户最新约定优先，不派K2.8新任务。
+- 默认派后结束、用户通知取件，不自动等待/唤回；不做Browser验证。精确用量比例未提供，不臆测百分比。
 
 恢复指令：继续项目。
