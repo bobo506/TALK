@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-20 10:21（Asia/Shanghai）— 282五宿主正常加载，四角色恢复及77.568秒实机复验通过
+
+- 用户在282推送/下一步核正常重载的说明后明确“好的，那继续”。Codex按本次授权直接核验和操作，不借279一次许可；MCP本人agent:codex/agent、lead、prj_e8fe7066bbec，queued/running为空、四bridge idle。五原manager精确入口/创建时间、原句柄/launch与OS父链一致，五原配方dry-run通过；配置/实现/配方SHA固定。
+- 普通stop原四角色，原宿主收尾原Popen/释放归属；五角色stopped、无launch/归属/句柄、旧bridge退出后，逐个既有drain正常退出。确认原入口进程全部消失才沿原命令隐藏启动一次，五新host_started合法run/引用回查及空载健康推进通过；没有强杀、PID接管、恢复API或人工清owner。
+- 普通start恢复原四角色，最终running/ready/idle/无任务。DS manager16796→11612/bridge12612/ins_39ba69bf6dfe/gen21；旧K28 9204→20396/17100/ins_1719a2292f59/gen24；页面K28 12976→19228/2800/ins_6fb574360b75/gen21；K3 17540→9728/13844/ins_5a0d307d038c/gen21；Codex5668→11768，bridge始终stopped/gen18。API launcher15792/child9808保持；Key/模型/绑定/历史不改。
+- 实机两轮UTC02:17:35.784922→02:18:53.352975，77.568秒；同run成功seq分别171→284/171→227/170→227/114→170/114→171，固定60秒采样及16+5对象校验过。四launch精确project/member/instance/launch/run，alive/exit_code=null；同launch spawned子PID=API实例PID、OS父进程=manager。最终四宿主process1/1/0/0/false、空Codex0/0/0/0/false，manager保持unknown，扫描无截断/坏行。
+- 四角色心跳分别推进90.096/90.059/60.066/90.111秒，同轮实例/launch/代次/父链保持。首次临时脚本误将顶层宿主pid与子PID比较，按既有272/282合同更正并补spawn关联；又一次在个别60秒点前提前复验，随后足够间隔通过。失败说明/原日志保留，未改产品或把首次失败抹去。
+- 证据.tmp/host-runtime-evidence-impl-v1/independent-review/deploy282/含preflight/manifest、四普通停启、hosts正常排空/旧进程退出/新启动/ready/引用与verified-all、live-first/live-final/live-records及脚本更正/提前复验说明。实现6f3f9c5保持，无原生模型调用/故障注入，不重复无变更169项回归；新加载文档及现行进度/指南/合同/模块/简报/路线同步。
+- 已异步请用户刷新角色页确认四启动成功/原绑定及Codex停止；用户随后明确“验收通过，继续原计划”，页面门禁闭合。本片含实际启停/部署，先完成进度/Git收尾；用户已确认继续，随后仅派B方案，不直接实施B/C；下一片先固定B来源/接收/scope/查询合同，再C全根盘点，日志整项完成后预算统一和会话复用。新宿主实际接单/模型、六小时、跨宿主/异常/跨沙箱驻留/冷启动未验。
+
 ## 2026-10-20 10:01（Asia/Shanghai）— 282独立实查、修正合入收取；169用例/67秒隔离通过，宿主加载待验
 
 - 用户通知282完成。本人MCP身份agent:codex/agent、lead/项目prj_e8fe7066bbec；DeepSeek UTC01:47:51.880027已idle/current_task_id=null。msg2889合法282/partial，作者/接单ins_a3d16c467fec/Hall/creator一致，与本地delivery全文相同，SHA28759b6eed3cc0db19b35510eb95550b5cd964bcebf8c2f820a2245ab48c2e80；稳定引用ok，UTC02:01:25.578048收取completed。原partial/ACL/固定时间窗失败、候选及67.078秒自报保留。

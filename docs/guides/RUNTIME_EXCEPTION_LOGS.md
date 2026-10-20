@@ -1,6 +1,6 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
-> 2026-10-20 10:01：282本地宿主循环/原Popen证据已独立实查、修正合入收取，169项相关用例与67秒隔离循环通过；**现有长期宿主尚未重载**，不能声称生产已采集。B接收/跨宿主来源及C全根治理未完成，详[282复核](../spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。
+> 2026-10-20 10:19加载更新：282实现6f3f9c5已沿既有排空入口正常重载五宿主、普通恢复四个原运行角色；77.568秒间隔的真实seq/60秒采样、精确launch原进程观测和60–90秒心跳推进均通过，Codex桥接保持关闭、API及绑定保持。页面状态已获用户明确验收通过；B接收/跨宿主来源及C全根治理未完成，详[加载记录](../spec/ROLE_HOST_RUNTIME_EVIDENCE_LOAD_282.md)及[282复核](../spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。
 
 > 2026-10-19 23:02加载更新：用户明确许可后279已在原4运行角色实际加载，真实queue_poll开始/成功与seq推进、完整JSONL下载、原父链和约150秒心跳均通过，Codex保持关闭。旧的“生产尚未加载/待许可”为当时门禁，原审批拒绝及失败证据保留。异常/恢复分支已有隔离验证，本轮没有生产故障演练；完整日志整项仍未全部完成，详[279复核](../spec/ROLE_QUEUE_POLL_DIAGNOSTICS_REVIEW_279.md)。
 
@@ -119,7 +119,7 @@ python scripts/runtime_diagnostics.py --ref rtd-031f55a209-000001 --detail --jso
 
 ### 282：查看本地宿主循环与原进程观测
 
-代码已合入，现有长期宿主尚未重载；只有管理员完成正常加载后，新记录才会出现。将下面的`<宿主实际日志根>`替换为管理员确认的受控目录，在仓库根运行：
+当前五长期宿主已正常加载，实机新记录及周期推进已核验；本机日志根为`logs/runtime`。其它部署仍需管理员先正常加载。将下面的`<宿主实际日志根>`替换为管理员确认的受控目录，在仓库根运行：
 
 ```text
 python scripts/runtime_diagnostics.py --log-dir "<宿主实际日志根>" --event manager_round_snapshot --limit 20 --json --detail

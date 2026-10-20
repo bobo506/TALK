@@ -2,7 +2,7 @@
 
 日期：2026-10-20。281是方案/隔离验证任务，原交付msg2888与complete自报保留，不等于产品已实现。Codex独立实查及反例后固定本合同；后续实现以本文件为准，不直接照搬原型。完整日志仍按A本地采集→B来源/接收/查询→C全根治理推进，再预算统一、会话复用。
 
-282实现已独立实查、Codex直接修正并串行合入收取，169项相关用例及67秒隔离循环通过；现有长期宿主尚未重载，不代表生产采集已验。事件名固定manager_round_snapshot与launch_process_snapshot；坏时钟或首败时刻无法满足对象约束时丢弃该条，不发布无效terminal。详[282复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。
+282实现已独立实查、Codex直接修正并串行合入收取，169项相关用例及67秒隔离循环通过；随后经用户确认继续，五宿主已正常重载，四原运行角色恢复ready/idle，77.568秒间隔实机复验通过；页面状态已获用户明确验收通过，详[加载记录](ROLE_HOST_RUNTIME_EVIDENCE_LOAD_282.md)。事件名固定manager_round_snapshot与launch_process_snapshot；坏时钟或首败时刻无法满足对象约束时丢弃该条，不发布无效terminal。详[282复核](ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。
 
 ## 范围与已知缺口
 
