@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-20 11:35（Asia/Shanghai）— 用户新增管理账号未入群全局查看需求，派285 Kimi K3修复
+
+- 用户在页面点查看对话遇“未加入无法查看”，认为自己的管理账号应查看所有对话；Codex确认权限范围，用户明确“仅我的管理账号（推荐）”。只为本人管理账号补全Group/Task Hall全局只读查看，不扩大所有human，不自动入群/改Task Hall名册或发言/任务权限。
+- 实际源码定位：groups list/get对human允许全览，但messages GET、canEnterGroup/openTaskHall/showWorkspaceResult仍按GroupMember；WS/SSE实时与backfill也只发成员。源MODULE_groups为本片唯一模块文档；前端查看/发送共用workspaceHasConversation，必须拆出只读资格，不能简单放行human导致写权限意外扩大。
+- 经本次用户明确范围，既有operator凭据只读GET本人/项目：human:bobo/kind human/display bobo，项目maintainer同ID。Key未输出/复制/修改，未查询浏览器；API/config/DB/服务未写。管理事实保存在.tmp/admin-conversation-view-v1/coordination/management-identity.json。
+- 采用显式conversation_access.observer_member_ids名单（默认空）+未禁用human鉴权；部署建议仅human:bobo，无API管理名单/新admin表。本人能力接口及前端权威加载/换账号失效，历史/分页搜索/成果/实时撤回/SSE补发统一策略；legacy/direct、POST/WS发送/回复/mention/成员及任务权限保原，不改当前目录/群聊功能。
+- 干净e4c45a07ee0a9320245658c37e4f9a9a4272400e，89冻结源/指定文档SHA核，只有kimi/候选与sandbox写、baseline/coordination冻结，正式两进度例外。七产品路径+相关测试白名单固定，禁止models/db/auth/ws_hub/groups/284范围写，无生产Key/config/DB/日志复制，无Browser或8000/模型/启停。
+- 派前读取最新development_requirements/caller：agent:codex/agent，Kimi agent:kimi精确kimi-code/k3、新鲜idle/无当前任务；页面旧交叉分工原文保存，AGENTS最新首次实现/自测暂停、Codex独立实查/直接修正优先。usage-gate返回continue但使用比例null，不臆测具体百分比。
+- 实际#285“管理账号未入群查看对话权限修复”，UTC2026-10-20T03:34:10.219198，project prj_e8fe7066bbec/creator agent:codex/target agent:kimi/Hall group:task-9c2fef8c38f24b628bf15aa438eed7c4，创建queued/assigned。最小顶层参数，不加父/子任务字段；当前权限尚未上线。
+- 要求合成SQLite/真实ASGI路由+WS/SSE隔离及Node实际入口/账号生命周期/只读守卫，现有权限断言不删弱；完整裸talk-delivery-1用实际285校验、失败证据保留，交付暂停。默认派后结束，用户通知后实查/集成/配置正常加载/人验。284原独立包和日志排期保持，未自动取件/串改或宽放并发。
+
 ## 2026-10-20 10:59（Asia/Shanghai）— 283收尾后派284 SQLite三表/日志接收事务核心
 
 - 用户明确批准SQLite三张日志专用表、来源登记/撤销、接收和只读查询，默认关闭、先隔离验证；283复核/补正合同已收取并提交推送30e5eb8，先收尾后派下一片。原48过/9反例失败、162原件和原自报保持，不将设计修正称原型已通过。
