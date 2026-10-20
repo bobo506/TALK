@@ -5,6 +5,8 @@
 
 ## 目标
 
+2026-10-20更新：285已实现显式人工观察者的Group/Task Hall全局只读查看，代码已复核/修正集成，正常加载和页面人验待确认。名单默认空，仅当前合法未禁用human生效，不改变成员/发送权限；详[285复核](CONVERSATION_ACCESS_REVIEW_285.md)。
+
 为 TALK 增加正式的讨论房间模型。Group 是一个讨论房间，Hall 是 Group 内共享的消息时间线。该模块为后续多 Agent 讨论、左侧频道导航、SSE 流式输出和任务状态可视化提供房间作用域。
 
 ## 负责范围
@@ -97,7 +99,7 @@
 `GET /api/messages?group_id=<id>`：
 
 - 读取指定 Group 的 Hall 时间线。
-- 调用者必须是该 Group 成员。
+- 调用者必须是该Group成员，或明确配置且未禁用的人工观察者；观察者只读，不因此加入Group。
 - 返回该 Group 内所有消息，包括未 mention 当前成员的消息。
 
 不传 `group_id`：
@@ -108,8 +110,8 @@
 ## WebSocket 推送
 
 - Legacy/global 消息继续按旧规则推送：广播给所有在线成员，direct 推送给发送者和接收者。
-- Group 消息推送给该 Group 的成员。
-- 非 Group 成员不会通过 WebSocket 收到 Group 消息。
+- Group消息推送给该Group成员及当前合法的人工观察者，发送/mention用的成员集合不扩大。
+- 未获观察者授权的非Group成员不会通过WebSocket收到Group消息。
 
 ## 当前边界
 
@@ -120,7 +122,7 @@
 - 当前没有 Group 删除 API；删除语义需先确认历史 Hall 消息如何保留或归档。
 - 当前没有成员管理权限细分；human 可管理 Group 成员，Agent 不可管理。
 - `DISCUSSION-PROTOCOL-1` 已新增 Discussion Session / Turn 表，用于记录多 Agent 讨论顺序、立场和轮次；具体协议见 `docs/spec/MODULE_discussions.md`。
-- 当前没有 SSE stream；Group 只为后续 stream 提供作用域。
+- SSE已提供实时消息/撤回和断线补发；观察者的后续补发页重新核对当前配置和成员状态，legacy/direct可见性保持。
 
 ## 后续计划
 
@@ -159,7 +161,7 @@ TALK 的差异化选择：
 - [x] Group 消息只允许 Group 成员发送。
 - [x] Group 内 mention 目标必须是同组成员。
 - [x] Group Hall 对所有 Group 成员可见，即使消息 `to_ids` 只 mention 其中一人。
-- [x] 非 Group 成员不能读取 Group Hall。
+- [x] 未获观察者授权的非Group成员不能读取Group Hall；观察者不自动加入或获得发言权。
 - [x] 不传 `group_id` 的旧消息历史不包含 Group 消息。
 - [x] 旧消息测试、Group 测试和全量后端回归通过。
 - [x] Web UI 可在全局消息流和 Group Hall 之间切换。

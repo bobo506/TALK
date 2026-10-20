@@ -1550,7 +1550,8 @@ function workspaceTaskNotice(task, tree) {
   if (task.workflow_status === "failed") return "任务执行失败，请查看已有结果和失败原因。";
   if (task.workflow_status === "canceled") return "任务已取消，不会继续执行。";
   if (tree?.root.control_status === "awaiting_human" && tree.root.checkpoint_reason === "milestone") return "检查已完成，等待项目负责人进行人工验收。";
-  if (["paused", "awaiting_human"].includes(tree?.root.control_status)) return `任务已暂停：${checkpointReasonLabel(tree.root.checkpoint_reason)}。`;
+  if (tree?.root.control_status === "paused") return `任务已中止：${checkpointReasonLabel(tree.root.checkpoint_reason)}。`;
+  if (tree?.root.control_status === "awaiting_human") return `任务等待人工处理：${checkpointReasonLabel(tree.root.checkpoint_reason)}。`;
   if (task.workflow_status === "submitted") return task.created_by === myId ? "成果已提交，等待你查看并收取。" : "成果已提交，等待请求者收取。";
   if (task.workflow_status === "clarification_requested") return task.created_by === myId ? "需要你补充任务要求，请在完整对话中答复。" : "等待请求者补充任务要求。";
   if (task.workflow_status === "needs_decision") return "需要项目负责人作出决定，任务尚未继续。";

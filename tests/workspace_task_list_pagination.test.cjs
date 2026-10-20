@@ -234,6 +234,9 @@ test('复核导航：经真实群聊按钮离页再返回任务，页码必须�
     blackboardView: h.el('blackboard-view'), roomStrip: h.el('room-strip'),
     hallHeader: h.el('hall-header'), messagesEl: h.el('messages'),
     composerFooter: h.el('composer-footer'), renderBlackboard: () => h.context.renderWorkspaceList(),
+    msgInput: h.el('msg-input'), sendBtn: h.el('send-btn'), attachBtn: h.el('attach-btn'),
+    mentionDropdown: h.el('mention-dropdown'), sending: false,
+    clearComposerStatus: () => {}, updateComposerPlaceholder: () => {},
   });
   const start = appSource.indexOf('function renderWorkspaceMode()');
   const end = appSource.indexOf('function taskStatusMeta(', start);

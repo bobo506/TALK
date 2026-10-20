@@ -18,6 +18,7 @@ from sqlmodel import select
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from server.auth import resolve_member_by_key
+from server.conversation_access import is_conversation_observer
 from server.db import (
     FILE_RETENTION_DAYS,
     HOST,
@@ -142,15 +143,20 @@ def _group_visible_to_member_expr(member_id: str):
     )
 
 
-def _sse_backfill_stmt(member_id: str, since_id: int):
+def _sse_backfill_stmt(member_id: str, since_id: int, *, include_all_groups: bool = False):
     global_visible = and_(
         Message.group_id.is_(None),
         messages._visible_to_member_expr(member_id),
     )
-    group_visible = and_(
-        Message.group_id.is_not(None),
-        _group_visible_to_member_expr(member_id),
-    )
+    if include_all_groups:
+        # 已配置且合法的人工观察者：断线补发覆盖全部 Group Hall 消息，
+        # 与 messages 路由的只读旁观判定保持同一权威策略；legacy 可见性不变。
+        group_visible = Message.group_id.is_not(None)
+    else:
+        group_visible = and_(
+            Message.group_id.is_not(None),
+            _group_visible_to_member_expr(member_id),
+        )
     return (
         select(Message)
         .where(Message.id > since_id)
@@ -160,10 +166,17 @@ def _sse_backfill_stmt(member_id: str, since_id: int):
     )
 
 
-def _sse_backfill_events(member_id: str, since_id: int, session: Session):
+def _sse_backfill_events(member_id: str, since_id: int, session: Session, *, include_all_groups: bool = False):
     cursor = since_id
     while True:
-        batch = session.exec(_sse_backfill_stmt(member_id, cursor)).all()
+        # A connection-time grant is only a ceiling.  Each subsequent page
+        # rechecks current configuration and fresh member state so a long
+        # backfill cannot retain observer rights after revocation/disable.
+        current = session.get(Member, member_id, populate_existing=True)
+        if current is None or current.disabled_at is not None:
+            return
+        observer = include_all_groups and is_conversation_observer(current)
+        batch = session.exec(_sse_backfill_stmt(member_id, cursor, include_all_groups=observer)).all()
         if not batch:
             return
 
@@ -318,6 +331,8 @@ async def sse_events(
     if member is None:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+    # 观察者身份在连接建立时按当前配置与成员状态判定；禁用 / 配置失效不扩权。
+    include_all_groups = is_conversation_observer(member)
     since_id, backfill_requested = _resolve_sse_last_event_id(last_event_id, last_event_id_header)
 
     async def event_generator():
@@ -331,7 +346,9 @@ async def sse_events(
 
             if backfill_requested:
                 with Session(engine) as session:
-                    for event_id, event_text in _sse_backfill_events(member.id, since_id, session):
+                    for event_id, event_text in _sse_backfill_events(
+                        member.id, since_id, session, include_all_groups=include_all_groups
+                    ):
                         replayed_event_ids.add(event_id)
                         yield event_text
 

@@ -78,6 +78,11 @@ let taskCreateOpen = false;
 let taskCreateSaving = false;
 let taskActionSaving = false;
 let taskCreateParentRoot = null;
+// 当前账号的对话只读旁观能力：仅由 /api/members/me/permissions 已认证接口驱动，
+// 不读本地存储 / ID 前缀 / 旧响应；登录、登出、换账号都会先清零再重新加载。
+let canViewAllConversations = false;
+let myPermissionsRequest = 0;
+let loginRequest = 0;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const loginOverlay = document.getElementById("login-overlay");
@@ -442,29 +447,49 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
   clearLoginError();
   const nextKey = (providedKey ?? loginKey.value).trim();
   if (!nextKey) return false;
+  const request = ++loginRequest;
+  loggingOut = false;
   apiKey = nextKey;
+  // 换账号 / 重新登录先清零旁观能力，再由已认证接口重新加载，不继承旧响应。
+  resetMyPermissions();
+  const current = () => request === loginRequest && apiKey === nextKey && !loggingOut;
+  const failLogin = () => {
+    resetMyPermissions();
+    apiKey = "";
+    myId = "";
+  };
 
   try {
     const meRes = await apiFetch("/api/members/me");
+    if (!current()) return false;
     if (!meRes.ok) {
-      apiKey = "";
+      failLogin();
       clearStoredApiKeys();
       showLoginError("登录密钥无效或认证失败。");
       return false;
     }
     const me = await meRes.json();
+    if (!current()) return false;
     myId = me.id;
+    await loadMyPermissions();
+    if (!current()) return false;
 
     const membersRes = await apiFetch("/api/members");
+    if (!current()) return false;
     if (!membersRes.ok) {
-      apiKey = "";
+      failLogin();
       showLoginError("成员列表加载失败。");
       return false;
     }
-    members = await membersRes.json();
+    const nextMembers = await membersRes.json();
+    if (!current()) return false;
+    members = nextMembers;
     await loadRuntimeConfig();
+    if (!current()) return false;
     await loadProjects();
+    if (!current()) return false;
     await loadGroups();
+    if (!current()) return false;
 
     loginOverlay.classList.add("hidden");
     userBadge.textContent = myId;
@@ -475,7 +500,8 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
     startChat();
     return true;
   } catch (err) {
-    apiKey = "";
+    if (!current()) return false;
+    failLogin();
     showLoginError("连接失败：" + err.message);
     return false;
   }
@@ -550,40 +576,7 @@ async function bootstrapAuthFlow() {
 }
 
 async function doLogin() {
-  loginError.textContent = "";
-  loginError.classList.add("hidden");
-  apiKey = loginKey.value.trim();
-  if (!apiKey) return;
-
-  try {
-    const meRes = await apiFetch("/api/members/me");
-    if (!meRes.ok) {
-      showLoginError("API Key 无效或认证失败");
-      return;
-    }
-    const me = await meRes.json();
-    myId = me.id;
-
-    const membersRes = await apiFetch("/api/members");
-    if (!membersRes.ok) {
-      showLoginError("成员列表加载失败");
-      return;
-    }
-    members = await membersRes.json();
-    await loadRuntimeConfig();
-    await loadProjects();
-    await loadGroups();
-
-    loginOverlay.classList.add("hidden");
-    userBadge.textContent = myId;
-    localStorage.setItem("talk_api_key", apiKey);
-    hasPresenceSnapshot = false;
-    onlineMemberIds = new Set();
-    renderPresenceStrip();
-    startChat();
-  } catch (err) {
-    showLoginError("连接失败：" + err.message);
-  }
+  return doLoginV2();
 }
 
 (function autoLogin() {
@@ -602,6 +595,10 @@ function showLoginError(msg) {
 
 logoutBtn.addEventListener("click", () => {
   loggingOut = true;
+  loginRequest += 1;
+  resetMyPermissions();
+  apiKey = "";
+  myId = "";
   // 导航可能延迟；先同步清除日志、详情及在途响应的身份上下文。
   if (typeof roleDiagnostics !== "undefined") roleDiagnostics.sync({ visible: false });
   if (pollTimer) {
@@ -951,6 +948,25 @@ function renderWorkspaceMode() {
   if (!chats) renderBlackboard();
   else renderRoomStrip();
   renderGroupMembersPanel();
+  syncComposerReadOnly();
+}
+
+// 只读旁观（未加入但有查看权限）的 Hall：输入、发送、附件与回复入口全部关闭，
+// 仅展示简洁提示；已有成员的发言路径不受影响。
+function syncComposerReadOnly() {
+  const readOnly = workspaceHasConversation() && activeGroupReadOnly();
+  msgInput.disabled = readOnly;
+  attachBtn.disabled = readOnly || sending;
+  sendBtn.disabled = readOnly || sending;
+  mentionDropdown.classList.add("hidden");
+  if (readOnly) {
+    if (pendingFile) clearPendingFile();
+    if (activeReplyTo) clearReplyTarget();
+    showComposerStatus("当前为只读查看。", "info", { source: "readonly", timeoutMs: 0 });
+  } else {
+    clearComposerStatus("readonly");
+  }
+  updateComposerPlaceholder();
 }
 
 function taskStatusMeta(task) {
@@ -1048,7 +1064,7 @@ function checkpointReasonLabel(reason) {
     usage_limit: "用量门禁",
     review_exhausted: "返工轮次耗尽",
     needs_decision: "澄清需要人工决策",
-    manual_pause: "人工暂停",
+    manual_pause: "人工中止",
   }[reason] || reason || "无";
 }
 
@@ -1146,26 +1162,13 @@ function renderTaskDetailsPanel() {
       );
     }
     if (root.control_status === "active") {
-      taskDetailsActions.appendChild(
-        taskActionButton("暂停整棵任务树", "task-action-secondary", () => runTaskTreeAction(root, "pause-tree"))
-      );
-      taskDetailsActions.appendChild(
-        taskActionButton("在风险边界暂停", "task-action-secondary", () => runTaskTreeAction(root, "checkpoint", { reason: "risk_boundary" }))
-      );
-    }
-    if (["paused", "awaiting_human"].includes(root.control_status) && root.checkpoint_reason !== "milestone") {
-      taskDetailsActions.appendChild(
-        taskActionButton("授权继续一批", "task-action-primary", () => resumeTaskTreeFromBlackboard(root))
-      );
+      const stopButton = taskActionButton("中止任务", "task-action-secondary", () => runTaskTreeAction(root, "pause-tree"));
+      stopButton.title = "中止当前任务及未完成子任务的执行，保留记录；后续由派发角色决定重新执行或另建任务。";
+      taskDetailsActions.appendChild(stopButton);
     }
     if (root.control_status === "awaiting_human" && root.checkpoint_reason === "milestone" && tree.test_gate?.satisfied) {
       taskDetailsActions.appendChild(
         taskActionButton("人工验收通过", "task-action-primary", () => runTaskTreeAction(root, "accept-milestone"))
-      );
-    }
-    if (root.control_status !== "canceled") {
-      taskDetailsActions.appendChild(
-        taskActionButton("终止整棵任务树", "task-action-danger", () => runTaskTreeAction(root, "cancel-tree", null, { confirmCancel: true }))
       );
     }
   }
@@ -1210,12 +1213,11 @@ async function runTaskAction(task, action, { confirmCancel = false } = {}) {
   }
 }
 
-async function runTaskTreeAction(root, action, body = null, { confirmCancel = false } = {}) {
+async function runTaskTreeAction(root, action, body = null) {
   if (!workspaceTreeMatches(getContextTask(), selectedTaskTree) || Number(root.id) !== Number(selectedTaskTree.root.id)) {
     showTaskDetailsError("任务已切换，请在当前任务中重新选择操作。"); return;
   }
   if (taskActionSaving) return;
-  if (confirmCancel && !window.confirm("这会终止整棵任务树，未完成任务不能恢复。确定继续吗？")) return;
   const contextKey = taskContextKey();
   const projectId = activeProjectId;
   const memberId = myId;
@@ -1242,20 +1244,6 @@ async function runTaskTreeAction(root, action, body = null, { confirmCancel = fa
     taskActionSaving = false;
     renderTaskDetailsPanel();
   }
-}
-
-function resumeTaskTreeFromBlackboard(root) {
-  const raw = window.prompt("下一批允许启动多少个开发切片？请输入 1–3。", "1");
-  if (raw === null) return;
-  const sliceBudget = Number(raw);
-  if (!Number.isInteger(sliceBudget) || sliceBudget < 1 || sliceBudget > 3) {
-    showTaskDetailsError("切片额度必须是 1–3 的整数。");
-    return;
-  }
-  runTaskTreeAction(root, "resume-tree", {
-    slice_budget: sliceBudget,
-    authorization_ttl_seconds: 5400,
-  });
 }
 
 async function submitLatestClarificationAnswer(task) {
@@ -1575,7 +1563,19 @@ function getGroupMemberIds(group) {
 
 function canEnterGroup(groupId) {
   const group = groups.find((item) => item.id === groupId);
-  return Boolean(group && getGroupMemberIds(group).has(myId));
+  if (!group) return false;
+  if (getGroupMemberIds(group).has(myId)) return true;
+  // 已授权的管理账号可以只读进入任意 Group / Task Hall。
+  return canViewAllConversations;
+}
+
+// 只读旁观：能进入但不是成员。只读不发成员写入，发送 / 附件 / 回复入口单独守卫。
+function isGroupReadOnlyForMe(group) {
+  return Boolean(group && !getGroupMemberIds(group).has(myId));
+}
+
+function activeGroupReadOnly() {
+  return Boolean(activeGroupId && isGroupReadOnlyForMe(getActiveGroup()));
 }
 
 function setActiveGroup(groupId) {
@@ -1657,14 +1657,18 @@ function renderRoomStrip() {
     for (const group of visibleGroups) {
       const button = document.createElement("button");
       const isActive = !blackboardOpen && group.id === activeGroupId;
-      const canEnter = getGroupMemberIds(group).has(myId);
+      const isMember = getGroupMemberIds(group).has(myId);
+      const canEnter = isMember || canViewAllConversations;
       button.type = "button";
       button.className = `room-chip group-chat-row ${isActive ? "active" : ""}`;
       button.setAttribute("aria-pressed", String(isActive));
-      button.append(workspaceEl("strong", "", group.name), workspaceEl("span", "", `${getGroupMemberIds(group).size} 位成员${canEnter ? "" : " · 尚未加入"}`));
-      button.title = canEnter
+      const memberNote = isMember ? "" : canViewAllConversations ? " · 未加入（只读）" : " · 尚未加入";
+      button.append(workspaceEl("strong", "", group.name), workspaceEl("span", "", `${getGroupMemberIds(group).size} 位成员${memberNote}`));
+      button.title = isMember
         ? `${group.name} (${group.id})`
-        : `${group.name} (${group.id}) · 你还不是成员`;
+        : canViewAllConversations
+          ? `${group.name} (${group.id}) · 未加入，可只读查看`
+          : `${group.name} (${group.id}) · 你还不是成员`;
       button.disabled = !canEnter;
       button.addEventListener("click", () => setActiveGroup(group.id));
       groupRoomList.appendChild(button);
@@ -2668,6 +2672,10 @@ msgInput.addEventListener("keydown", (e) => {
 
 async function sendMessage() {
   if (sending || !workspaceHasConversation()) return;
+  if (activeGroupReadOnly()) {
+    showComposerStatus("当前为只读查看，不能发送消息。", "info", { source: "send", timeoutMs: 3500 });
+    return;
+  }
 
   const rawText = msgInput.value.trim();
   if (!rawText && !pendingFile) return;
@@ -2705,44 +2713,50 @@ async function sendMessage() {
     showComposerStatus(err.message, "error", { source: "send", timeoutMs: 0 });
   } finally {
     sending = false;
-    sendBtn.disabled = false;
+    syncComposerReadOnly();
   }
 }
 
 async function sendFileMessage(caption = null) {
   if (!workspaceHasConversation()) return;
+  if (activeGroupReadOnly()) {
+    showComposerStatus("当前为只读查看，不能发送文件。", "info", { source: "send", timeoutMs: 3500 });
+    return;
+  }
   if (!pendingFile) return;
+  const current = captureTimelineContext();
+  const file = pendingFile;
+  const body = applyActiveGroupToPayload({
+    type: "file", content: file.name, caption,
+    reply_to: activeReplyTo ? activeReplyTo.id : null,
+  });
 
   sending = true;
   sendBtn.disabled = true;
   attachBtn.disabled = true;
   try {
     const uploaded = await uploadPendingFile();
+    if (!current() || activeGroupReadOnly()) return;
     const res = await apiFetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(applyActiveGroupToPayload({
-        type: "file",
-        content: pendingFile.name,
-        file_id: uploaded.file_id,
-        caption,
-        reply_to: activeReplyTo ? activeReplyTo.id : null,
-      })),
+      body: JSON.stringify({ ...body, file_id: uploaded.file_id }),
     });
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `文件消息发送失败: ${res.status}`));
     }
-    clearPendingFile();
+    if (!current()) return;
+    if (pendingFile === file) clearPendingFile();
     clearReplyTarget();
     resetComposerInput();
     clearComposerStatus("send");
   } catch (err) {
+    if (!current()) return;
     console.error(err);
     showComposerStatus(err.message, "error", { source: "send", timeoutMs: 0 });
   } finally {
     sending = false;
-    sendBtn.disabled = false;
-    attachBtn.disabled = false;
+    syncComposerReadOnly();
   }
 }
 
@@ -2816,8 +2830,8 @@ function createMessageElement(m) {
 }
 
 function renderMessageActions(message) {
-  const canReply = !message.revoked;
-  const canRevoke = canRevokeMessage(message);
+  const canReply = !message.revoked && !activeGroupReadOnly();
+  const canRevoke = !activeGroupReadOnly() && canRevokeMessage(message);
   if (!canReply && !canRevoke) {
     clearRevokeButtonTimer(message.id);
     return null;
@@ -3208,6 +3222,7 @@ function clearAllRevokeButtonTimers() {
 }
 
 async function revokeMessage(messageId, buttonEl) {
+  if (activeGroupReadOnly()) return;
   if (buttonEl) {
     buttonEl.disabled = true;
     buttonEl.textContent = "撤回中...";
@@ -3620,6 +3635,10 @@ window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => e.preventDefault());
 
 function setPendingFile(file) {
+  if (activeGroupReadOnly()) {
+    showComposerStatus("当前为只读查看，不能发送文件。", "info", { source: "send", timeoutMs: 3500 });
+    return;
+  }
   if (appConfig.max_upload_bytes && file.size > appConfig.max_upload_bytes) {
     showComposerStatus(
       `文件过大：${formatBytes(file.size)}，当前上限 ${formatBytes(appConfig.max_upload_bytes)}`,
@@ -3663,6 +3682,10 @@ function formatFileMeta(message) {
 }
 
 function updateComposerPlaceholder() {
+  if (activeGroupReadOnly()) {
+    msgInput.placeholder = "当前为只读查看，不能发送消息";
+    return;
+  }
   if (activeGroupId) {
     msgInput.placeholder = pendingFile
       ? "输入文件附言… Hall 内 @ 只用于提醒成员"
@@ -3673,6 +3696,7 @@ function updateComposerPlaceholder() {
 }
 
 function activateReplyTarget(message) {
+  if (activeGroupReadOnly()) return;
   activeReplyTo = {
     id: message.id,
     from_id: message.from,
@@ -3749,6 +3773,36 @@ function jumpToMessage(messageId) {
 
 function getRevokeWindowSec() {
   return Number(appConfig.revoke_window_sec || DEFAULT_REVOKE_WINDOW_SEC);
+}
+
+function resetMyPermissions() {
+  myPermissionsRequest += 1;
+  canViewAllConversations = false;
+}
+
+async function loadMyPermissions() {
+  // 仅信任已认证接口的本人响应；旧服务 404 / 错误 / 缺字段 / 成员不匹配都不授权。
+  const requestKey = apiKey;
+  const requestMember = myId;
+  const request = ++myPermissionsRequest;
+  const current = () => request === myPermissionsRequest && requestKey === apiKey && requestMember === myId && !loggingOut;
+  canViewAllConversations = false;
+  if (!requestKey || !requestMember || !current()) return;
+  try {
+    const res = await apiFetch("/api/members/me/permissions");
+    if (!current()) return;
+    if (!res.ok) return;
+    const payload = await res.json();
+    if (!current()) return;
+    canViewAllConversations = Boolean(
+      payload && payload.member_id === myId && payload.can_view_all_conversations === true
+    );
+  } catch (err) {
+    if (current()) {
+      console.warn("Failed to load member permissions", err);
+      canViewAllConversations = false;
+    }
+  }
 }
 
 async function loadRuntimeConfig() {

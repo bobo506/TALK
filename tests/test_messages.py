@@ -4,8 +4,10 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
+import server.db as db
 from server.models import MessageCreate
 from server.routes.messages import get_messages, send_message
+from server.ws_hub import hub
 from tests.test_support import RouteTestCase
 
 
@@ -871,3 +873,116 @@ class MessagesRouteTests(RouteTestCase):
 
         self.assertEqual(reply.status_code, 400)
         self.assertEqual(reply.json()["detail"], "cannot_reply_to_different_group")
+
+
+class ObserverGroupDeliveryTests(RouteTestCase):
+    """285：Group 消息 / 撤回的实时投递合并合法观察者；legacy/direct 不扩大。"""
+
+    def setUp(self):
+        super().setUp()
+        self.human = self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        self.agent_ai1 = self.add_member("agent:AI1", api_key="ai1-key", display_name="AI1")
+        self.agent_ai2 = self.add_member("agent:AI2", api_key="ai2-key", display_name="AI2")
+
+    def set_observer_config(self, section):
+        old_config = db.CONFIG
+        new_config = dict(old_config)
+        if section is None:
+            new_config.pop("conversation_access", None)
+        else:
+            new_config["conversation_access"] = section
+        db.CONFIG = new_config
+        self.addCleanup(setattr, db, "CONFIG", old_config)
+
+    def sse_queue(self, member_id):
+        queue = asyncio.Queue()
+        hub._event_queues.setdefault(member_id, []).append(queue)
+        return queue
+
+    def make_group(self, group_id="group:lab", member_ids=()):
+        with self.make_client() as client:
+            response = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "ai1-key"},
+                json={"id": group_id, "name": "Local Lab", "member_ids": list(member_ids)},
+            )
+        assert response.status_code == 201, response.text
+
+    def test_group_message_live_delivery_reaches_observer_queue(self):
+        self.set_observer_config({"observer_member_ids": ["human:bobo"]})
+        self.make_group(member_ids=[])
+        bobo_queue = self.sse_queue("human:bobo")
+        ai2_queue = self.sse_queue("agent:AI2")
+
+        with self.make_client() as client:
+            created = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "ai1-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "hello hall"},
+            )
+        self.assertEqual(created.status_code, 201)
+
+        self.assertFalse(bobo_queue.empty())
+        event_text = bobo_queue.get_nowait()
+        self.assertIn("event: message", event_text)
+        self.assertIn(f'"id": {created.json()["id"]}', event_text)
+        self.assertIn("hello hall", event_text)
+        # 非成员且非观察者的 Agent 不收到 Group 实时消息。
+        self.assertTrue(ai2_queue.empty())
+
+    def test_group_revoke_live_delivery_reaches_observer_queue(self):
+        self.set_observer_config({"observer_member_ids": ["human:bobo"]})
+        self.make_group(member_ids=[])
+        bobo_queue = self.sse_queue("human:bobo")
+        ai2_queue = self.sse_queue("agent:AI2")
+
+        with self.make_client() as client:
+            created = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "ai1-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "revoke me"},
+            )
+            revoked = client.post(
+                f"/api/messages/{created.json()['id']}/revoke",
+                headers={"X-API-Key": "ai1-key"},
+            )
+        self.assertEqual(revoked.status_code, 200)
+
+        events = []
+        while not bobo_queue.empty():
+            events.append(bobo_queue.get_nowait())
+        revoke_events = [text for text in events if "event: revoke" in text]
+        self.assertEqual(len(revoke_events), 1)
+        self.assertIn(f'"id": {created.json()["id"]}', revoke_events[0])
+        while not ai2_queue.empty():
+            self.assertNotIn("event: revoke", ai2_queue.get_nowait())
+
+    def test_legacy_direct_message_not_pushed_to_observer(self):
+        self.set_observer_config({"observer_member_ids": ["human:bobo"]})
+        bobo_queue = self.sse_queue("human:bobo")
+        ai2_queue = self.sse_queue("agent:AI2")
+
+        with self.make_client() as client:
+            created = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "ai1-key"},
+                json={"type": "text", "content": "@agent:AI2 secret direct"},
+            )
+        self.assertEqual(created.status_code, 201)
+
+        self.assertFalse(ai2_queue.empty())
+        self.assertTrue(bobo_queue.empty())
+
+    def test_default_config_group_message_not_pushed_to_non_member(self):
+        self.set_observer_config(None)
+        self.make_group(member_ids=[])
+        bobo_queue = self.sse_queue("human:bobo")
+
+        with self.make_client() as client:
+            created = client.post(
+                "/api/messages",
+                headers={"X-API-Key": "ai1-key"},
+                json={"type": "text", "group_id": "group:lab", "content": "hello hall"},
+            )
+        self.assertEqual(created.status_code, 201)
+        self.assertTrue(bobo_queue.empty())

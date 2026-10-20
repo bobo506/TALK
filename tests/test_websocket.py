@@ -1,3 +1,4 @@
+import server.db as db
 import server.main as main
 from starlette.websockets import WebSocketDisconnect
 
@@ -276,3 +277,160 @@ class WebSocketTests(RouteTestCase):
                     self.assert_presence(agent_ws, ["agent:AI1", "human:bobo"])
                     self.assert_presence(agent_ws, ["agent:AI1", "human:bobo"])
                     self.assert_presence(human_ws, ["agent:AI1", "human:bobo"])
+
+
+class ObserverWebSocketTests(RouteTestCase):
+    """285：观察者经真实 WS 端点收到 Group 实时消息 / 撤回；只读不能写；默认关闭不扩权。"""
+
+    def setUp(self):
+        super().setUp()
+        self.human = self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        self.agent_ai1 = self.add_member("agent:AI1", api_key="ai1-key", display_name="AI1")
+        self.agent_ai2 = self.add_member("agent:AI2", api_key="ai2-key", display_name="AI2")
+
+    def set_observer_config(self, section):
+        old_config = db.CONFIG
+        new_config = dict(old_config)
+        if section is None:
+            new_config.pop("conversation_access", None)
+        else:
+            new_config["conversation_access"] = section
+        db.CONFIG = new_config
+        self.addCleanup(setattr, db, "CONFIG", old_config)
+
+    def receive_event(self, websocket, expected_type: str) -> dict:
+        for _ in range(20):
+            event = websocket.receive_json()
+            if event["type"] == expected_type:
+                return event
+            if event["type"] == "ping":
+                websocket.send_json({"type": "pong"})
+                continue
+            # presence 由连接/断开广播驱动，数量随拓扑变化；等待目标事件时跳过。
+            if event["type"] == "presence":
+                continue
+            self.fail(f"expected {expected_type!r}, got {event['type']!r}")
+        self.fail(f"timed out waiting for {expected_type!r}")
+
+    def assert_presence(self, websocket) -> None:
+        event = websocket.receive_json()
+        self.assertEqual(event["type"], "presence")
+        self.assertIn("online_ids", event["payload"])
+
+    def make_group(self, group_id="group:lab", member_ids=()):
+        with self.make_client() as client:
+            response = client.post(
+                "/api/groups",
+                headers={"X-API-Key": "ai1-key"},
+                json={"id": group_id, "name": "Local Lab", "member_ids": list(member_ids)},
+            )
+        assert response.status_code == 201, response.text
+
+    def test_observer_receives_group_message_and_revoke_over_ws(self):
+        self.set_observer_config({"observer_member_ids": ["human:bobo"]})
+        self.make_group(member_ids=[])
+
+        with self.make_client() as client:
+            with client.websocket_connect("/ws?token=bobo-key") as bobo_ws:
+                self.assert_presence(bobo_ws)
+                with client.websocket_connect("/ws?token=ai2-key") as ai2_ws:
+                    self.assert_presence(ai2_ws)
+
+                    created = client.post(
+                        "/api/messages",
+                        headers={"X-API-Key": "ai1-key"},
+                        json={"type": "text", "group_id": "group:lab", "content": "observer live"},
+                    )
+                    self.assertEqual(created.status_code, 201)
+                    message_id = created.json()["id"]
+
+                    bobo_event = self.receive_event(bobo_ws, "message")
+                    self.assertEqual(bobo_event["payload"]["id"], message_id)
+                    self.assertEqual(bobo_event["payload"]["group_id"], "group:lab")
+
+                    # 边界：ai2 非成员非观察者，先发一条它可见的私信；
+                    # 若群消息越权推送给 ai2，它会先于这条私信到达。
+                    direct = client.post(
+                        "/api/messages",
+                        headers={"X-API-Key": "ai1-key"},
+                        json={"type": "text", "content": "@agent:AI2 barrier"},
+                    )
+                    self.assertEqual(direct.status_code, 201)
+                    ai2_event = self.receive_event(ai2_ws, "message")
+                    self.assertEqual(ai2_event["payload"]["id"], direct.json()["id"])
+                    self.assertIsNone(ai2_event["payload"]["group_id"])
+
+                    revoked = client.post(
+                        f"/api/messages/{message_id}/revoke",
+                        headers={"X-API-Key": "ai1-key"},
+                    )
+                    self.assertEqual(revoked.status_code, 200)
+                    revoke_event = self.receive_event(bobo_ws, "revoke")
+                    self.assertEqual(revoke_event["payload"]["id"], message_id)
+
+    def test_observer_cannot_send_to_group_over_ws(self):
+        self.set_observer_config({"observer_member_ids": ["human:bobo"]})
+        self.make_group(member_ids=[])
+
+        with self.make_client() as client:
+            with client.websocket_connect("/ws?token=bobo-key") as bobo_ws:
+                self.assert_presence(bobo_ws)
+                bobo_ws.send_json(
+                    {
+                        "type": "send",
+                        "payload": {"type": "text", "group_id": "group:lab", "content": "write attempt"},
+                    }
+                )
+                ack = self.receive_event(bobo_ws, "send_ack")
+                self.assertFalse(ack["ok"])
+                self.assertIn("not in group", ack["error"])
+
+    def test_default_config_group_message_not_pushed_over_ws(self):
+        self.set_observer_config(None)
+        self.make_group(member_ids=[])
+
+        with self.make_client() as client:
+            with client.websocket_connect("/ws?token=bobo-key") as bobo_ws:
+                self.assert_presence(bobo_ws)
+                created = client.post(
+                    "/api/messages",
+                    headers={"X-API-Key": "ai1-key"},
+                    json={"type": "text", "group_id": "group:lab", "content": "no push default"},
+                )
+                self.assertEqual(created.status_code, 201)
+
+                # 边界：广播对 bobo 可见；若群消息越权推送，它会先于广播到达。
+                barrier = client.post(
+                    "/api/messages",
+                    headers={"X-API-Key": "ai1-key"},
+                    json={"type": "text", "content": "broadcast barrier"},
+                )
+                self.assertEqual(barrier.status_code, 201)
+                event = self.receive_event(bobo_ws, "message")
+                self.assertEqual(event["payload"]["id"], barrier.json()["id"])
+                self.assertIsNone(event["payload"]["group_id"])
+
+    def test_observer_does_not_receive_legacy_direct_over_ws(self):
+        self.set_observer_config({"observer_member_ids": ["human:bobo"]})
+        self.make_group(member_ids=[])
+
+        with self.make_client() as client:
+            with client.websocket_connect("/ws?token=bobo-key") as bobo_ws:
+                self.assert_presence(bobo_ws)
+                direct = client.post(
+                    "/api/messages",
+                    headers={"X-API-Key": "ai1-key"},
+                    json={"type": "text", "content": "@agent:AI2 private"},
+                )
+                self.assertEqual(direct.status_code, 201)
+
+                group_message = client.post(
+                    "/api/messages",
+                    headers={"X-API-Key": "ai1-key"},
+                    json={"type": "text", "group_id": "group:lab", "content": "group barrier"},
+                )
+                self.assertEqual(group_message.status_code, 201)
+                # 私信不应推给观察者；下一条到达 bobo 的 message 必须是群消息。
+                event = self.receive_event(bobo_ws, "message")
+                self.assertEqual(event["payload"]["id"], group_message.json()["id"])
+                self.assertEqual(event["payload"]["group_id"], "group:lab")

@@ -1,5 +1,5 @@
 /* I-2 固定主控入口退役：真实接线验证。
-   静态部分断言 index.html 不再含主控面板 DOM、八处静态资源版本一致、web 源码无退役符号；
+   静态部分断言 index.html 不再含主控面板 DOM、静态资源缓存版本正确、web 源码无退役符号；
    运行时部分用 vm 加载整份真实 web/workspace.js（含顶部真实事件绑定）与从 web/app.js
    按函数边界真实抽取的 renderWorkspaceMode/renderGroupMembersPanel/renderTaskDetailsPanel/
    refreshProjectWorkspace 等，经真实“角色”按钮 click、真实 radio change 与“保存” click 驱动：
@@ -166,6 +166,8 @@ function harness() {
     taskTreeRequest: 0,
     groupMembersOpen: false,
     taskActionSaving: false,
+    sending: false,
+    clearComposerStatus: () => {},
     groupMemberSaving: false,
     agentProfileSaving: false,
     onlineMemberIds: new Set(),
@@ -212,6 +214,9 @@ function harness() {
       deleteGroupBtn: 'delete-group-btn',
       hallFilterInput: 'hall-filter-input',
       msgInput: 'msg-input',
+      attachBtn: 'attach-btn',
+      sendBtn: 'send-btn',
+      mentionDropdown: 'mention-dropdown',
       userBadge: 'user-badge',
       taskCreateAgent: 'task-create-agent',
       refreshProjectBtn: 'refresh-project-btn',
@@ -229,7 +234,7 @@ function harness() {
   return { context, ui, modeui: context.__modeui, el, requests, tick, hidden, assignmentCalls };
 }
 
-test('静态退役：index.html 无主控面板 DOM、八处版本一致；web 源码无退役符号', () => {
+test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源码无退役符号', () => {
   for (const id of RETIRED_DOM_IDS) {
     assert.ok(!indexHtml.includes(`id="${id}"`), `index.html 不得残留 #${id}`);
     assert.ok(!workspaceSource.includes(id), `workspace.js 不得引用 #${id}`);
@@ -241,7 +246,10 @@ test('静态退役：index.html 无主控面板 DOM、八处版本一致；web �
   }
   assert.ok(!workspaceSource.includes('/controller-assignment'), 'workspace.js 不再读写指定端点');
   assert.ok(!appSource.includes('/controller-assignment'), 'app.js 不再读写指定端点');
-  assert.equal(indexHtml.split(STATIC_VERSION).length - 1, 8, '八处静态资源版本一致');
+  assert.equal(indexHtml.split(STATIC_VERSION).length - 1, 6, '未改动的六处资源保留原缓存版本');
+  for (const asset of ['app.js', 'workspace.js']) {
+    assert.ok(indexHtml.includes(`/${asset}?v=20261020-conversation-controls-v2`), `${asset} 的修改必须更新缓存版本`);
+  }
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 

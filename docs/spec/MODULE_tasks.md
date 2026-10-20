@@ -262,7 +262,7 @@
 - 根任务创建入口可开启委派、选择 1–3 个开发切片额度并标记里程碑 Test；Human 可从根详情创建开发、Review、Test 与返工子任务，并选择 Review 策略、冻结任务关系和触发质量任务；根执行 Agent 继续通过 API / SDK 执行同一合同。
 - 委派弹窗使用有背景、边框和阴影的实体卡片，并按两阶段上下文切换标题、说明、Agent 标签与提交按钮：根入口显示“根任务负责人”，根详情入口显示“子任务执行 Agent”；两种模式的表单标题和下拉框可访问名称与当前上下文一致。
 - 任务卡和详情面板展示请求者、执行者、运行状态、attempt 与活动租约；治理卡同时展示根控制状态、授权 epoch、剩余切片、Review 门禁和里程碑 Test 门禁。
-- 页面按当前成员权限提供进入 Hall、澄清答复提交、人工决策释放、接受、收取结果、安全取消、暂停整树、风险检查点、有限批次恢复、里程碑验收和整树终止动作。
+- 页面按当前成员权限提供进入Hall、澄清答复提交、人工决策释放、接受、收取结果、安全取消、中止任务和里程碑验收。2026-10-20页面停止入口统一为“中止任务”（仍调用pause-tree、影响根及未完成子任务）；风险检查点/批次恢复/整树终止不再单列按钮，后端控制/预算/权限合同保持，由派发角色决定复用原任务号或另建。
 - Task Hall 继续复用既有消息时间线和文件 / 回复能力；项目任务每 5 秒刷新一次，runner 回写结果后可从 Hall 与黑板两处看到，并由请求者收取为完成态。
 - Review / Test 的结构化结论仍由对应 runner / SDK 随 `complete` 提交；Human 页面负责查看门禁摘要、控制推进和执行人工验收，不从自然语言消息猜测质量结论。
 
@@ -393,7 +393,7 @@ TH-6c / TH-6d 已补齐类型化切片计数与自动检查点：`development / 
 ```text
 active -> pause_requested -> paused
 active/paused -> awaiting_human
-paused/awaiting_human -> active        # 仅人类重新授权
+paused/awaiting_human -> active        # 仅原任务发起者或Human重新授权
 active/paused/awaiting_human -> cancel_requested -> canceled
 ```
 

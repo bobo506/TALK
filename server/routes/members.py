@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
+from server.conversation_access import is_conversation_observer
 from server.db import get_session
 from server.models import Member, MemberCreate, MemberDisableUpdate, MemberOut
 
@@ -104,6 +105,20 @@ def list_members(
 def get_me(current: Member = Depends(get_current_member)):
     """Return the member resolved from the current API key."""
     return current
+
+
+@router.get("/me/permissions")
+def get_my_permissions(current: Member = Depends(get_current_member)):
+    """Return the current member's own conversation-view permissions.
+
+    只回当前登录者本人（沿用现有鉴权 / 禁用语义），只暴露
+    ``can_view_all_conversations`` 一个布尔能力；不返回配置名单或其他权限。
+    旧客户端遇到 404 / 缺字段时不得授予额外权限（前端按 fail closed 处理）。
+    """
+    return {
+        "member_id": current.id,
+        "can_view_all_conversations": is_conversation_observer(current),
+    }
 
 
 @router.patch("/{member_id}", response_model=MemberOut)

@@ -14,6 +14,7 @@ from sqlalchemy import and_, exists, func, literal, or_
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
+from server.conversation_access import can_read_group_conversation, merge_observer_targets
 from server.db import REVOKE_WINDOW_SEC, get_session
 from server.models import (
     DiscussionSession,
@@ -377,7 +378,12 @@ async def create_message(
         reply_to=_build_reply_summary(reply_target) if reply_target is not None else None,
     )
 
-    await hub.broadcast(out, targets=group_member_ids)
+    # 实时投递目标：Group 消息在严格成员之外合并当前合法的人工观察者（只读旁观），
+    # legacy / direct 消息目标保持原语义不扩大；发送资格仍由 _resolve_group_scope 把关。
+    delivery_targets = group_member_ids
+    if body.group_id is not None and delivery_targets is not None:
+        delivery_targets = merge_observer_targets(delivery_targets, session)
+    await hub.broadcast(out, targets=delivery_targets)
     return out
 
 
@@ -415,7 +421,12 @@ async def revoke_message(
     session.commit()
     session.refresh(msg)
 
-    targets = _group_member_ids(msg.group_id, session) if msg.group_id is not None else None
+    # 撤回事件同样只针对 Group 消息合并合法观察者；legacy / direct 目标不扩大。
+    targets = (
+        merge_observer_targets(_group_member_ids(msg.group_id, session), session)
+        if msg.group_id is not None
+        else None
+    )
     await hub.broadcast_revoke(msg, targets=targets)
     return MessageRevokeOut(
         id=msg.id,
@@ -473,7 +484,8 @@ def get_messages(
     if group_id is not None:
         if session.get(Group, group_id) is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="group_id not found")
-        if not _is_group_member(group_id, _current.id, session):
+        # 成员可读；已配置且合法的人工观察者可只读读取全历史 / 分页 / 搜索。
+        if not can_read_group_conversation(group_id, _current, session):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="current member is not in group")
         stmt = select(Message).where(Message.group_id == group_id)
     else:

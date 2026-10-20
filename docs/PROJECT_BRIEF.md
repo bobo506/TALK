@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-20）
 
+2026-10-20 15:28：285管理账号未入群只读查看已独立实查，9个新反例失败后Codex直接修正，联合162 Python/81 Node通过并集成收取；任务停止入口统一“中止任务”，保派发者复用编号能力。静态HTTP已核，生产权限配置未启用/API未重载；加载会新增284三张空日志表（接收仍关闭），待用户确认该具体加载及后续页面人验。用户明确Kimi额度用尽，AGENTS已记暂停Kimi新派发，后续首次执行先DeepSeek。详[285复核](spec/CONVERSATION_ACCESS_REVIEW_285.md)、[验收说明](guides/CONVERSATION_ACCESS_ACCEPTANCE_285.md)及[当前进度](PROGRESS.md)。
+
 2026-10-20 14:48：284 SQLite三日志表/来源管理/接收事务核心已独立实查，回执绑定和事务超时问题由Codex直接修正，最终51项通过并集成收取；旧30表/480模型AST节点不变，默认关闭，未接HTTP/生产启用。256/257历史needs_changes保持，已确认258替代后收取旧结果。285仍执行；任务中止后是否沿用原编号由派发角色按需求决定，页面简化待285交付后串行处理。详[284复核](spec/ROLE_RUNTIME_LOG_RECEIVE_REVIEW_284.md)与[当前进度](PROGRESS.md)。以下为阶段快照。
 
 2026-10-20 10:55：283方案已独立实查收取，原48过、9独立反例失败，原文件inbox不集成。Codex补正SQLite三表事务/来源/稳定事件标识/投影与ACK合同，用户已确认三表、来源登记撤销、接收和只读查询，默认关闭先隔离库验证。先收尾后派B2a表/事务核心，HTTP/查询接线串行；未改产品或生产，当前目录不迁。详[283复核](spec/ROLE_RUNTIME_LOG_RECEIVE_REVIEW_283.md)与[补正合同](spec/ROLE_RUNTIME_LOG_RECEIVE_DESIGN.md)。
