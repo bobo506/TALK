@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import and_, update
 from sqlmodel import Session, select
 
 from server.models import (
@@ -47,8 +47,18 @@ def candidate(project_id: str, member_id: str, session: Session, now: datetime):
         fail("recovery_identity_mismatch")
     if (now - _as_utc(instance.last_seen_at)).total_seconds() <= ROLE_SERVICE_INSTANCE_FRESH_SECONDS:
         fail("recovery_recent_heartbeat")
+    # 只排除“明确已暂停、领取已完全撤销”的根任务。未知/子任务/暂停过渡态、
+    # running或任何残余领取/租约仍阻断；不取消/恢复任务，也不放宽恢复鉴权。
+    unclaimed_paused_root = and_(
+        AgentTask.status == "queued", AgentTask.control_status == "paused",
+        AgentTask.parent_task_id.is_(None), AgentTask.root_task_id == AgentTask.id,
+        AgentTask.claimed_by.is_(None), AgentTask.instance_id.is_(None),
+        AgentTask.claim_token.is_(None), AgentTask.lease_expires_at.is_(None),
+    )
     if instance.current_task_id is not None or session.exec(select(AgentTask.id).where(
-        AgentTask.target_member_id == member_id, AgentTask.status.in_(("queued", "running"))
+        AgentTask.target_member_id == member_id, AgentTask.status.in_(("queued", "running")),
+        # SQL的NULL不能误排除缺控制状态/根身份的旧任务。
+        unclaimed_paused_root.is_not(True),
     ).limit(1)).first() is not None:
         fail("recovery_tasks_active")
     if session.exec(select(RoleServiceLaunch.launch_id).where(

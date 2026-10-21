@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-21 19:46（Asia/Shanghai）— DeepSeek关闭超时与paused根任务守卫补正，单次已关闭恢复
+
+- 用户报告点击关闭后一直“关闭中”，只读诊断旧manager11612/bridge12284已不存在，stop动作19:20:19 gen24 pending无claim，19:22:19截止后GET仍stopping。旧过期收敛仅在控制动作执行；286 queued/control_status=paused、无领取实例token/租约，但人工恢复仍按queued阻挡。用户明确确认修复范围，Codex直接实施/自检，不派新任务或给离线DeepSeek/Kimi返工。
+- 补GET只读超时投影unknown/stop_timeout，不写库/自动释放；仅排除paused、queued、自身根/无parent/领取全空任务，SQL IS NOT TRUE防NULL遗漏，其余queued/running/子任务/残余领取仍挡；human/CAS/新心跳/本机旧进程不存在等保护保持。页面显示关闭超时待核实、继续刷新、保持启动守卫，更新workspace资源版本。
+- 新7项Python前5失败、新Node前失败；首次90项自检1失败/3错误来自TestClient旧库迁移修复/补默认值，已保留并按真实事务修正夹具；页面另有旧缓存版本断言此前就失效，保原证据并按本次资源精确更新。最终90生命周期/恢复/CLI+12页面合同+26 Node共128项全过，零跳过。无Browser，自改称自检。
+- 本机human:bobo准备/反复核原API、配置绑定、5角色/286哈希与原start/实例/host/代次。19:41原API启动器正常stop/start，launcher22360/child22332/healthz正常，生产已投影DeepSeekunknown/stop_timeout但归属保持，HTML/JS字节核验通过。没有强杀或直接写生产库。
+- 原恢复CLI plan及apply --confirm-stopped按用户本次单角色授权，19:42:24审计eea3c70a-0bc6-4284-b755-7cbcca3fac73，gen24→25、confirmed_by human:bobo、非重放。最终DeepSeekstopped/ownership=false/can_start=true；旧实例offline、心跳时间保持，旧stop回执不伪造。286全文哈希/暂停、其它四角色记录/所有记录角色进程及配置绑定保持，running0，无启动角色/新任务。证据.tmp/deepseek-stop-diagnostic-20261021/fix/verification.json，原失败/8份冻结保持。
+- 同步[补正及人验](spec/ROLE_SERVICE_STOP_TIMEOUT_FIX_20261021.md)、人工恢复指南/合同、用户手册/简报/模块/排期/进度；页面等待用户Ctrl+F5确认“未启动（已关闭）”。DeepSeekmanager仍未启动，后续启动须另获确认；290已收取/会话离线边界、286/日志/21600/Kimi约束保持，本轮只这一片，完成Git后暂停。
+
 ## 2026-10-21 19:15（Asia/Shanghai）— 用户允许恢复原API，290补收completed
 
 - API此前持续WinError10061；用户明确“允许”恢复原入口并补收290。只读核旧launcher5236/child13952均已不存在、8000端口空闲、无stop.request/运行中任务；290仍succeeded/submitted/结果2896、原creator/target，五角色记录PID均不存在。未把残留health running当真实存活。

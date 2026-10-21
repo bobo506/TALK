@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-21 19:46：用户确认后直接修复过期stop无限关闭中和paused根任务误阻挡；102 Python/26 Node共128项通过。原API正常重载，DeepSeek19:42:24 gen24→25人工确认已关闭、归属释放、未启动；286及其它角色/配置绑定不变，无新派发。当前页面待Ctrl+F5验收；详[本片记录](ROLE_SERVICE_STOP_TIMEOUT_FIX_20261021.md)。
+
 > 2026-10-21 19:15：用户允许后仅恢复原API，healthz正常，290已于19:13:09补收completed，原2896/SHA保持。配置和五角色归属/进程事实不变，五角色记录进程原已退出且本轮未恢复；无新任务派发。57cb119/280项与会话机制未加载边界保持，详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)。
 
 > 2026-10-21 07:18：290条件十次备用/窗口计数已独立实查、直接补正并离线集成，170/76/34共280项过；修复缺数掩盖非法来源、未来证明、旧低值覆盖高观测和计数历史校验。真实采集/原生续用/ACK/存储仍未接通；API连接拒绝使collect待补，不自行启停，用户要求不派新任务。详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)和[备用API](../guides/EXECUTION_SESSION_FALLBACK.md)。

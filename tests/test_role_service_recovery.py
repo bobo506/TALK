@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 from server.models import AgentInstance, AgentInstanceUpdate, AgentTask, Member, RoleServiceLaunch, RoleServiceRecovery, RoleServiceRecoveryRequest
-from server.role_service_recovery import recover_stopped
+from server.role_service_recovery import recover_stopped, recovery_plan
 from tests.test_role_services import RoleServiceTestCase, PROJECT_ID, OTHER_PROJECT_ID, HOST
 from tests.test_project_roles import encode
 
@@ -103,6 +103,65 @@ class RoleServiceRecoveryTests(RoleServiceTestCase):
                 session.add(task); session.commit()
                 self.assertEqual(self.recover().json()["detail"], "recovery_tasks_active")
                 session.delete(task); session.commit()
+        self.assertEqual(self.audits(), [])
+
+    def add_paused_root(self, **changes):
+        with self.session() as session:
+            task = AgentTask(target_member_id=self.role_a, created_by="human:bobo", content="paused fixture",
+                             project_id=PROJECT_ID, status="queued", control_status="paused")
+            session.add(task); session.flush()
+            task.root_task_id = task.id
+            for key, value in changes.items():
+                setattr(task, key, value)
+            session.add(task); session.commit(); session.refresh(task)
+            return task
+
+    def test_unclaimed_paused_root_does_not_block_or_change_on_recovery(self):
+        task = self.add_paused_root()
+        self.assertEqual(self.plan().status_code, 200)
+        # TestClient启动会补齐旧任务迁移默认值；对照实际恢复前的规范状态。
+        with self.session() as session:
+            before = session.get(AgentTask, task.id).model_dump()
+        result = self.recover()
+        self.assertEqual(result.status_code, 200, result.text)
+        with self.session() as session:
+            self.assertEqual(session.get(AgentTask, task.id).model_dump(), before)
+
+    def test_paused_with_running_or_claim_evidence_still_blocks(self):
+        for changes in ({"status": "running"}, {"claimed_by": self.role_a},
+                        {"instance_id": self.claimed["expected_instance_id"]},
+                        {"claim_token": "fixture-claim"},
+                        {"lease_expires_at": datetime.now(timezone.utc)-timedelta(seconds=60)}):
+            with self.subTest(changes=changes):
+                task = self.add_paused_root(**changes)
+                self.assertEqual(self.recover().json()["detail"], "recovery_tasks_active")
+                with self.session() as session:
+                    session.delete(session.get(AgentTask, task.id)); session.commit()
+        self.assertEqual(self.audits(), [])
+
+    def test_missing_or_inconsistent_pause_evidence_still_blocks(self):
+        for changes in ({"control_status": None}, {"control_status": "pause_requested"},
+                        {"control_status": "active"}, {"root_task_id": None},
+                        {"root_task_id": 987654}, {"parent_task_id": 987654}):
+            with self.subTest(changes=changes):
+                task = self.add_paused_root(**changes)
+                # 直接验证损坏输入，避免TestClient启动先修复NULL根身份，
+                # 遮掉SQL三值逻辑反例；此处仍使用真实SQLite事务。
+                with self.session() as session:
+                    with self.assertRaises(HTTPException) as error:
+                        recovery_plan(PROJECT_ID, self.role_a, session.get(Member, "human:bobo"), session)
+                    self.assertEqual(error.exception.detail, "recovery_tasks_active")
+                with self.session() as session:
+                    session.delete(session.get(AgentTask, task.id)); session.commit()
+
+    def test_pause_resumed_after_plan_blocks_apply(self):
+        task = self.add_paused_root()
+        self.assertEqual(self.plan().status_code, 200)
+        with self.session() as session:
+            current = session.get(AgentTask, task.id)
+            current.control_status = "active"
+            session.add(current); session.commit()
+        self.assertEqual(self.recover().json()["detail"], "recovery_tasks_active")
         self.assertEqual(self.audits(), [])
 
     def test_unexpired_pending_or_claimed_action_blocks(self):

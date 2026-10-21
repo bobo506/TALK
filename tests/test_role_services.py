@@ -1433,6 +1433,51 @@ class RoleServiceProjectionTests(RoleServiceTestCase):
         self.assertEqual(self.stop().status_code, 200)
         self.assertEqual(self.projected_service()["observed"], "stopping")
 
+    def test_expired_unclaimed_stop_is_unknown_without_writing_or_releasing(self):
+        self.make_running_service()
+        stop = self.stop().json()
+        self.set_launch_expired(stop["launch_id"])
+        before_state = self.state_row().model_dump()
+        before_launch = self.launch_row(stop["launch_id"]).model_dump()
+        row = self.projected_service()
+        self.assertEqual(row["observed"], "unknown")
+        self.assertEqual(row["readiness_service"], "unknown")
+        self.assertEqual(row["error_code"], "stop_timeout")
+        self.assertTrue(row["ownership_held"])
+        self.assertFalse(row["can_start"])
+        role = next(x for x in self.get_roles().json() if x["member_id"] == self.role_a)
+        self.assertEqual(role["service"]["observed"], "unknown")
+        self.assertEqual(self.state_row().model_dump(), before_state)
+        self.assertEqual(self.launch_row(stop["launch_id"]).model_dump(), before_launch)
+
+    def test_expired_claimed_stop_is_unknown_and_keeps_ownership(self):
+        launch, claim = self.make_running_service()
+        stop = self.stop().json()
+        result = self.claim(stop["launch_id"], {"host": HOST,
+            "expected_instance_id": claim["expected_instance_id"],
+            "owner_token": claim["owner_token"]}, key=self.role_a_key)
+        self.assertEqual(result.status_code, 200)
+        self.set_launch_expired(stop["launch_id"])
+        before = self.state_row().model_dump()
+        row = self.projected_service()
+        self.assertEqual((row["observed"], row["error_code"]), ("unknown", "stop_timeout"))
+        self.assertEqual(self.state_row().model_dump(), before)
+        self.assertEqual(self.state_row().process_launch_id, launch["launch_id"])
+
+    def test_stop_timeout_projection_boundary_and_generation_guard(self):
+        self.make_running_service()
+        stop = self.stop().json()
+        deadline = self.launch_row(stop["launch_id"]).launch_expires_at.replace(tzinfo=timezone.utc)
+        for delta, expected in ((-1, "stopping"), (0, "stopping"), (.000001, "unknown")):
+            with self.subTest(delta=delta), patch("server.role_services._now", return_value=deadline+timedelta(seconds=delta)):
+                self.assertEqual(self.projected_service()["observed"], expected)
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            state.generation += 1
+            session.add(state); session.commit()
+        with patch("server.role_services._now", return_value=deadline+timedelta(seconds=1)):
+            self.assertEqual(self.projected_service()["observed"], "stopping", "旧代次超时不能污染新代次")
+
     def test_projection_never_leaks_tokens_or_paths(self):
         launch, claim = self.start_and_claim()
         self.bind_instance(launch, claim)

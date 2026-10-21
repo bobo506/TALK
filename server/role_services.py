@@ -1251,6 +1251,23 @@ def build_service_projection(
     generation = state.generation if state is not None else 0
     error_code = state.last_error_code if state is not None else None
     error_message = state.last_error_message if state is not None else None
+    if (
+        observed == ROLE_SERVICE_OBSERVED_STOPPING
+        and state is not None
+        and launch is not None
+        and launch.project_id == project_id
+        and launch.member_id == member_id
+        and launch.generation == state.generation
+        and launch.action == ROLE_SERVICE_ACTION_STOP
+        and launch.state in (ROLE_SERVICE_LAUNCH_PENDING, ROLE_SERVICE_LAUNCH_CLAIMED)
+        and _as_utc(launch.launch_expires_at) is not None
+        and _as_utc(launch.launch_expires_at) < now
+    ):
+        # GET只投影超时事实，不依赖仍存活的manager触发过期扫描，也不把未获
+        # 停止证明的旧进程伪装成stopped；归属、原动作和数据库记录保持。
+        observed = ROLE_SERVICE_OBSERVED_UNKNOWN
+        error_code = ROLE_SERVICE_ERROR_STOP_TIMEOUT
+        error_message = "关闭请求已超时，尚未确认原进程停止，请核实后进行人工恢复。"
     if observed == ROLE_SERVICE_OBSERVED_RUNNING and state is not None:
         problem = running_instance_problem(state, launch, session, now)
         if problem is not None:

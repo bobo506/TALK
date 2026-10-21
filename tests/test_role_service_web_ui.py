@@ -13,7 +13,7 @@ from pathlib import Path
 from tests.test_support import RouteTestCase
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261016-role-auto-start"
+STATIC_VERSION = "20261021-stop-timeout"
 
 #: 设计 §5.3 的六个入口里，页面只允许调用 human 意图写与只读投影这四个。
 PAGE_API_PATHS = (
@@ -32,12 +32,12 @@ class RoleServiceWebUiTests(RouteTestCase):
         self.styles = (PROJECT_ROOT / "web" / "workspace.css").read_text(encoding="utf-8")
 
     def test_static_assets_are_versioned_for_r1_3(self):
-        self.assertIn(STATIC_VERSION, self.html)
+        self.assertIn(f'src="/workspace.js?v={STATIC_VERSION}"', self.html)
         self.assertNotIn("20261011-role-lifecycle-r1-2", self.html)
         with self.make_client() as client:
             response = client.get("/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(STATIC_VERSION, response.text)
+        self.assertIn(f'src="/workspace.js?v={STATIC_VERSION}"', response.text)
 
     def test_role_page_wires_start_stop_and_start_all(self):
         for path in PAGE_API_PATHS:

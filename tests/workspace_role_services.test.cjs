@@ -487,6 +487,27 @@ test('运行中失联显示待核实并继续刷新，心跳恢复后恢复成�
   assert.equal(h.startRequests().length, 0, '恢复不自动启动/重建服务');
 });
 
+test('关闭超时显示待核实并保留启动守卫，人工恢复后显示已关闭', async () => {
+  const stopping = serviceRow({ observed: 'stopping', desired: 'stopped',
+    can_start: false, can_stop: true, ownership_held: true, last_action: 'stop' });
+  const h = harness({ roster: [{ member_id: 'agent:managed', service: stopping }] });
+  h.setPollDelay(5);
+  await h.enterRoles();
+  assert.equal(h.state('agent:managed'), '关闭中…');
+  assert.ok(await h.waitFor(() => h.servicePolls().length >= 1));
+  h.reply(0, [{ member_id: 'agent:managed', ...stopping, observed: 'unknown',
+    readiness_service: 'unknown', error_code: 'stop_timeout',
+    error_message: '关闭请求已超时，尚未确认原进程停止，请核实后进行人工恢复。' }]);
+  assert.ok(await h.waitFor(() => h.state('agent:managed') === '关闭超时（状态待核实）'));
+  assert.equal(h.startBtn('agent:managed').disabled, true);
+  assert.ok(h.hint('agent:managed').includes('人工恢复'));
+  assert.ok(await h.waitFor(() => h.servicePolls().length >= 2));
+  h.reply(1, [{ member_id: 'agent:managed', ...serviceRow({ observed: 'stopped',
+    desired: 'stopped', last_action: 'stop', last_result: 'stopped' }) }]);
+  assert.ok(await h.waitFor(() => h.state('agent:managed') === '未启动（已关闭）'));
+  assert.equal(h.startRequests().length, 0);
+});
+
 test('离页/切项目/切账号停止轮询，不泄漏计时器', async () => {
   const h = harness({
     roster: [{ member_id: 'agent:managed', business_role: 'dev', service: serviceRow({ observed: 'starting', desired: 'running', can_start: false }) }],

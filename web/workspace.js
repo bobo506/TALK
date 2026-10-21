@@ -935,6 +935,9 @@ function roleServiceLivenessUnknown(service) {
     "instance_heartbeat_expired", "instance_unavailable", "instance_identity_mismatch",
   ].includes(service.error_code);
 }
+function roleServiceStopTimeout(service) {
+  return service?.observed === "unknown" && service.error_code === "stop_timeout";
+}
 // 严格映射（设计 §11.2）：stopped = 人工关闭，不得显示失败；running 只有 readiness_service === "ready"
 // 才是“启动成功”，否则是“启动中…”；未知枚举如实标未知，不伪装。
 function roleServiceStatus(service) {
@@ -946,6 +949,7 @@ function roleServiceStatus(service) {
   if (observed === "not_started") return { text: "未启动", kind: "neutral" };
   if (observed === "starting") return { text: "启动中…", kind: "running" };
   if (observed === "stopping") return { text: "关闭中…", kind: "running" };
+  if (roleServiceStopTimeout(service)) return { text: "关闭超时（状态待核实）", kind: "unknown" };
   if (roleServiceLivenessUnknown(service)) return { text: "运行状态待核实", kind: "unknown" };
   if (observed === "running") {
     if (readiness !== "ready") return { text: "启动中…", kind: "running" };
@@ -987,6 +991,7 @@ function roleServiceControl(role) {
   const canStop = Boolean(service) && service.can_stop === true && !busy && !batchBusy && human
     && observed !== "stopping";
   if (managed && !human) hint = "当前账号是 Agent，只能查看服务状态。";
+  else if (managed && roleServiceStopTimeout(service) && !hint) hint = "关闭请求已超时，请检查原宿主及进程；确认已停止后进行人工恢复，不能重复启动。";
   else if (managed && roleServiceLivenessUnknown(service) && !hint) hint = "无法确认执行端仍在运行，请先检查服务宿主；确认停止前不能重复启动。";
   else if (managed && ownershipHeld && !hint) hint = "请先「关闭」并确认已停止，再重新启动。";
   else if (managed && service && service.can_start !== true && service.can_stop !== true && !hint) hint = "当前不可启动。";
@@ -1375,7 +1380,7 @@ function roleServiceNeedsPolling() {
     if (!view.provided || !view.service) continue;
     const observed = typeof view.service.observed === "string" ? view.service.observed : "";
     if (observed === "starting" || observed === "stopping" || observed === "running"
-      || roleServiceLivenessUnknown(view.service)) return true;
+      || roleServiceLivenessUnknown(view.service) || roleServiceStopTimeout(view.service)) return true;
   }
   return false;
 }
