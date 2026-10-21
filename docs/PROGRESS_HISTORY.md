@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-21 22:32（Asia/Shanghai）— 291独立实查、方案补正并收取completed
+
+- 用户通知291好了后核MCP实际agent:codex/agent、DeepSeek idle/无current_task；按最新AGENTS独立实查/直接修正，不派返修/互审/Kimi或新片。原9件134,871字节先冻结，30项目/57原生冻结SHA保持。
+- 原结果2897为合法complete自报，两页稳定SHA05e73b742932d6138f683510f0406d9b8ea81416e8997fb1d1cb103e5240a40d与本地JSON语义一致。原static_probe改独立输出路径复跑通过：30/57 SHA、93锚点、4反向核对、55安装树磁盘文件一致；不把静态核验称为模型/挂载集成测试。
+- 独立实查发现并补正六组方案缺口：continuity随task/attempt变化、无字段分隔的指纹及绑定来源、合法过期误阻断、capacity_missing被误列宿主能力声明、插件激活失败与不影响任务承诺冲突、C盘示例及映射/监听/路径/信任边界。原稿与自报不改，正式[补正方案](spec/DSH_CONTEXT_WIRING_DESIGN.md)/[291复核](spec/EXECUTION_SESSION_LIVE_ENTRY_REVIEW_291.md)作为后续依据，自改称自检。
+- 既有纯API的12项原因分类/指纹定点核验、30引用SHA/行范围及loader失败边界通过；未执行原生应用/模型或合成挂载链，不改产品或生产配置，不重跑无关280项。再次核原manager18856/bridge22812、实例ins_ffc603d6fc88、gen28 running/ready/idle、running任务0，配置/绑定/286全文/其它四角色不变。
+- 22:30:41正常collect，291 workflow completed、结果2897保持，UTC回执2026-10-21T14:30:41.377787，证据.tmp/execution-session-live-entry-s0/independent-review291。默认headless当前一次性且无resume接线，采集器未加载、真实占用/续用/任务入口及ACK存储未实现，不能把方案验收当功能上线。
+- 同步合同/指南/需求/简报/模块/排期与进度，用户手册无入口标记仍正确。本片收尾后依用户排序优先处理宿主统一启动链路，具体范围/验收仍先明确确认，不提前派发；286/日志/21600/Kimi约束保持。
+
 ## 2026-10-21 21:53（Asia/Shanghai）— 会话机制第四片291获确认并派DeepSeek
 
 - 用户要求恢复DeepSeek后尽快继续会话复用功能，宿主随TALK统一启动问题放在本片后；随后对具体范围明确回复“确认，派给DeepSeek”。本片只读实机入口/版本、配置插件证据和采集器挂载核验，交付可实施接线方案，非生产加载或新一轮290开发。

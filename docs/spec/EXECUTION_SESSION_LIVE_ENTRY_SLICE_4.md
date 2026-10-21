@@ -1,5 +1,7 @@
 # 会话机制第四片：DSH实机入口与采集器挂载核验（291）
 
+收尾状态：2026-10-21 22:32（Asia/Shanghai），291已独立实查、Codex直接补正六组方案缺口并收取completed，结果2897及原文SHA保持。原9件/87冻结保留，静态复跑/12项定点与30引用核对通过。正式后续依据为[补正方案](DSH_CONTEXT_WIRING_DESIGN.md)及[291复核](EXECUTION_SESSION_LIVE_ENTRY_REVIEW_291.md)。无产品或真实加载变更；宿主统一启动问题按用户排序下一优先。以下为派发时合同，不追改原任务。
+
 2026-10-21 21:53（Asia/Shanghai）。用户明确回复“确认，派给DeepSeek”，291已创建，发起者agent:codex、执行者agent:deepseek，项目`prj_e8fe7066bbec`，独立Task Hall `group:task-50fe771b347747e6a8be8677e455511b`。创建回执为queued/assigned；本轮不主动等待或据此宣称执行完成。
 
 ## 本片目的与已确认顺序

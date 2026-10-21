@@ -1,5 +1,7 @@
 # DSH上下文采集与内核适配调用说明
 
+2026-10-21 22:32更新：291入口/挂载核验已独立实查、补正并收取completed；后续实施依据改为[接线方案](../spec/DSH_CONTEXT_WIRING_DESIGN.md)及[复核记录](../spec/EXECUTION_SESSION_LIVE_ENTRY_REVIEW_291.md)。DeepSeek宿主已恢复，采集器仍未加载；默认headless当前没有跨任务resume接线。下方API/既有离线验证保持，不能把方案当真实采集或续用上线。
+
 289已完成首次实现、独立实查、直接补正和离线验证。当前代码未加载到运行角色，真实上下文数值仍未知，不能把本文当作已经可用的用户操作入口。机制见[总体需求](../spec/EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)，验收证据见[289复核](../spec/DSH_CONTEXT_METRICS_REVIEW_289.md)。
 
 290已完成不可得分类与窗口计数的独立实查、直接补正和离线集成，详[备用调用说明](EXECUTION_SESSION_FALLBACK.md)。unknown仍保持`context_sample=None`，新增`context_unavailability`贯通统一入口；显式非法数据和来源矛盾优先阻止备用。真实挂载/采集/任务接线未启用，API经用户允许恢复后，290已于2026-10-21 19:13补收completed；角色服务未恢复，采集器仍未加载。
