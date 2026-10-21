@@ -1,5 +1,7 @@
 # DSH上下文采集与内核适配调用说明
 
+2026-10-21 23:01更新：用户要求完整可用后才完成，292已授权并派发真实纵向接线，原生续接、采集、API/MCP及ACK状态一起实施，详[292合同](../spec/EXECUTION_SESSION_USABLE_SLICE_5.md)。当前整项仍未完成，采集器未加载；本指南现有离线API/守卫继续适用，不能据此声称已可实际续用。宿主统一启动修复延至本功能整体可用/验收后。
+
 2026-10-21 22:32更新：291入口/挂载核验已独立实查、补正并收取completed；后续实施依据改为[接线方案](../spec/DSH_CONTEXT_WIRING_DESIGN.md)及[复核记录](../spec/EXECUTION_SESSION_LIVE_ENTRY_REVIEW_291.md)。DeepSeek宿主已恢复，采集器仍未加载；默认headless当前没有跨任务resume接线。下方API/既有离线验证保持，不能把方案当真实采集或续用上线。
 
 289已完成首次实现、独立实查、直接补正和离线验证。当前代码未加载到运行角色，真实上下文数值仍未知，不能把本文当作已经可用的用户操作入口。机制见[总体需求](../spec/EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)，验收证据见[289复核](../spec/DSH_CONTEXT_METRICS_REVIEW_289.md)。

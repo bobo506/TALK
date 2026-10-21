@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-21 23:01（Asia/Shanghai）— 用户明确整体可用标准，292完整纵向接线已派
+
+- 用户澄清同窗口、60%阈值换窗、条件十轮兜底必须完整实现并真正使用才算完成，未完成继续本功能。Codex明确288–291仅离线/方案阶段；本次授权292完整接线，宿主统一启动问题延至本功能整体可用/验收后，旧291后切换顺序被替代。
+- 实际MCP agent:codex/agent、lead，当前页面旧交叉复核要求读取保留，以最新AGENTS DeepSeek首次执行/暂停、Codex独立实查/直接补正为准，不给Kimi派新任务。21d308b基线，80项目/57公开原生文件3,741,458字节冻结，执行者只写隔离deepseek/**。
+- 旧恢复verify准备失败来自Kimi generation22→24外部变化，未做任何回滚/启停；记录差异后改用当前基线。配置/绑定/286全文哈希保持；DeepSeek派前同原manager18856/bridge22812/实例ins_ffc603d6fc88/gen28 running/idle、心跳正常。
+- 22:56:32实际292 creator agent:codex/target agent:deepseek，独立Hall group:task-221d84cd748544a89716bb183c51eb0d，queued/assigned，最小四参数原包完整保留及项目要求快照存在。根.tmp/execution-session-usable-v1，禁止改正式源/生产配置或加载，首次候选交付后暂停。
+- [292合同](spec/EXECUTION_SESSION_USABLE_SLICE_5.md)要求API/MCP/SDK和基础合同持久引用、原生create/resume与每任务工具上下文、投递前真实指标及既有规划、真实ACK/状态/锁/CAS、全链路隔离与原生fake模型验证；不允许只交helper或后续接线计划。必要真实模型及生产加载在Codex实查后闭合，整项验收前持续标记未完成。
+- 同步AGENTS完成判据、总需求/使用说明/方案/排期/进度；仅协调文档，无产品改码/模型/服务操作，不重跑无关280项。默认派后结束、用户通知取件；286/Kimi/日志/21600等边界保持，不能把任务候选complete等同功能上线。
+
 ## 2026-10-21 22:32（Asia/Shanghai）— 291独立实查、方案补正并收取completed
 
 - 用户通知291好了后核MCP实际agent:codex/agent、DeepSeek idle/无current_task；按最新AGENTS独立实查/直接修正，不派返修/互审/Kimi或新片。原9件134,871字节先冻结，30项目/57原生冻结SHA保持。
