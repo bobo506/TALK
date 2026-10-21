@@ -1,6 +1,6 @@
 # 会话机制第三片：占比缺失时十次交办兜底
 
-收尾状态：2026-10-21 07:18（Asia/Shanghai）。290首次交付已经Codex独立实查、直接补正和串行集成，170内核/76适配/34既有Node共280项离线验证通过；原27件和19冻结SHA保持，详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)及[最终API](../guides/EXECUTION_SESSION_FALLBACK.md)。TALK API连接被拒绝，collect未成功，最近可读submitted/结果2896保持，待入口恢复核对补收取。原任务包/请求/失败证据不改，未加载角色或启停；用户要求不派新任务，本轮只保存290。
+收尾状态：2026-10-21 19:15（Asia/Shanghai）。290首次交付已经Codex独立实查、直接补正并串行集成，170内核/76适配/34既有Node共280项离线验证通过，产品57cb119已推送。此前collect失败回执保留；用户明确允许后，仅原API于19:12恢复，19:13:09正常收取completed，结果2896及SHA未变。配置和五角色归属/进程事实保持，未恢复角色或加载机制，也未派新任务。详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)及[最终API](../guides/EXECUTION_SESSION_FALLBACK.md)。
 
 ## 本轮授权与范围
 

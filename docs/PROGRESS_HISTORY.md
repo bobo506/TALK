@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-21 19:15（Asia/Shanghai）— 用户允许恢复原API，290补收completed
+
+- API此前持续WinError10061；用户明确“允许”恢复原入口并补收290。只读核旧launcher5236/child13952均已不存在、8000端口空闲、无stop.request/运行中任务；290仍succeeded/submitted/结果2896、原creator/target，五角色记录PID均不存在。未把残留health running当真实存活。
+- 原启动器SHA77e92903624f621616c40512ad3e44defb5e6cf8a8272f39c37a2c506ac01cc6核验后，使用原.venv/127.0.0.1:8000入口隐藏启动，launcher7764/child10096，healthz正常、原Popen及创建时间可核、automatic_restart=false。配置SHA和五角色归属/代次/launch/PID及创建事实保持，没有角色启停/归属解除/认证复制或新任务派发。
+- MCP核本人agent:codex/agent，页面旧交叉复核要求保持；按AGENTS本次分工。290原结果2896及SHA6c4b8963cea32eb64fdb73ed1a82abf1bb8828dd529f1cf920e5c4991f28f6b2一致，19:13:09正常collect为completed。跨工具调用后API仍存活，配置/五角色不变、running任务0，原失败回执保留，恢复/收取证据在.tmp/execution-session-fallback-v1/independent-review290/api-recovery-20261021。
+- 产品57cb119与280项通过保持，本轮无产品变更，不重跑无关测试。补正当前进度/复核/指南/合同/简报/排期，历史失败不追改；会话机制未加载，真实采集/原生续用/任务MCP接线/ACK存储仍未完成。用户要求不派新任务持续有效；本次仅API恢复与补收，不扩为角色恢复或下一片授权。
+
 ## 2026-10-21 07:18（Asia/Shanghai）— 290独立实查、直接补正与离线集成，collect待恢复
 
 - 用户通知完成后核本人agent:codex/lead、DeepSeek idle/current_task为空；按最新AGENTS接手，页面旧要求原样保留，未给Kimi或其它角色派发。用户随后说明中断并要求不要派新任务，本轮继续原授权290收尾，不开新片。

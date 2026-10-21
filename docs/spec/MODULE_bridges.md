@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-21 19:15：用户允许后仅恢复原API，healthz正常，290已于19:13:09补收completed，原2896/SHA保持。配置和五角色归属/进程事实不变，五角色记录进程原已退出且本轮未恢复；无新任务派发。57cb119/280项与会话机制未加载边界保持，详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)。
+
 > 2026-10-21 07:18：290条件十次备用/窗口计数已独立实查、直接补正并离线集成，170/76/34共280项过；修复缺数掩盖非法来源、未来证明、旧低值覆盖高观测和计数历史校验。真实采集/原生续用/ACK/存储仍未接通；API连接拒绝使collect待补，不自行启停，用户要求不派新任务。详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)和[备用API](../guides/EXECUTION_SESSION_FALLBACK.md)。
 
 > 2026-10-20 23:59：用户已批准再做一片条件十次兜底，290已派DeepSeek，基线ad46037、19公开材料冻结，创建queued/assigned。仅缺可靠指标且完整计数可信时备用10次，可靠60%规则和scope/通道/非法数据守卫优先；计数从首轮累计，恢复读数不重计。只隔离Python内核/分类及两测试，不改JS采集器/运行角色或启停，无开发/采集验收；用户通知后Codex实查/直接修正，本轮只此片，详[290合同](EXECUTION_SESSION_FALLBACK_SLICE_3.md)。

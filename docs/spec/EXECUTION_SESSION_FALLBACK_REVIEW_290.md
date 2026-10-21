@@ -1,6 +1,6 @@
 # 290条件十次备用：首次独立实查与直接补正
 
-2026-10-21（Asia/Shanghai）。用户通知执行完成后，Codex接收290的首次交付，独立检查实际源码、复现问题并直接修正。修正后280项离线测试通过，代码与调用说明已整合。收取时TALK API连接被拒绝，collect未成功；不能将任务账本写成completed，待入口恢复后核对并补收取。没有新派发、启停服务或生产加载。
+2026-10-21（Asia/Shanghai）。290已完成首次独立实查、直接补正和离线集成，280项通过，产品提交57cb119已推送。此前API拒绝连接使collect失败，原回执保持；用户随后明确允许仅恢复原API并补收。19:12原启动器恢复、healthz正常，19:13:09已收取为completed，结果2896及原文SHA不变。没有派新任务、启动角色或加载会话机制，恢复证据见本节末尾。
 
 ## 身份、原件与范围
 
@@ -44,4 +44,13 @@ Codex补全部字段/来源优先检查、原始样本备用前校验、显式`f
 
 当前仍无真实ACK/锁/CAS/持久化。调用者必须原子保存可靠观测和真实送达历史；遗漏高占比持久化可能错误延长备用，不能凭纯函数声称历史可信。字符串revision仅支持精确相同，真实接线需可核的顺序事实。
 
-采集器未加载，实际版本/home/插件/上下文读数未知；原生续用、协调端增量生成及任务/MCP/API/页面尚未接通。没有读真实配置/profile/会话/凭据/日志/DB，没有CLI/ACP/模型/Browser调用或主动等待。TALK API拒绝连接原因未核定，不自行恢复服务；collect尚待补做。用户已要求不要派新任务，本轮只保存290当前成果，后续切片继续先确认。
+采集器未加载，实际版本/home/插件/上下文读数未知；原生续用、协调端增量生成及任务/MCP/API/页面尚未接通。没有读真实配置/profile/会话/凭据/日志/DB，没有CLI/ACP/模型/Browser调用或主动等待。此前API退出原因未核定；用户随后明确允许仅恢复API并补收290。恢复未扩大为角色启停或新片派发，后续切片继续先确认。
+
+## API恢复与补收（2026-10-21 19:12–19:14）
+
+- 用户明确“允许”恢复原TALK API入口并补收290；只恢复API，角色服务保持原状，不派发新任务。
+- 恢复前原health仍写running，但launcher5236/child13952均不存在，8000端口空闲，无stop.request；数据库只读核290为submitted/结果2896、running任务0。五角色记录中的PID均已不存在，不将旧实例idle或health标签当在线事实。
+- 核原启动器SHA为77e92903624f621616c40512ad3e44defb5e6cf8a8272f39c37a2c506ac01cc6，按原`.venv`/127.0.0.1:8000/无reload入口隐藏启动；新launcher7764、child10096，原Popen与创建时间可核、automatic_restart=false，healthz正常。没有复制认证、改配置或启动角色。
+- MCP核本人agent:codex/agent；页面旧要求保持，按AGENTS本次分工。task290 creator/target与原结果2896匹配，原文SHA6c4b8963cea32eb64fdb73ed1a82abf1bb8828dd529f1cf920e5c4991f28f6b2未变；19:13:09正常collect，workflow completed，原自报不追改。
+- 跨工具调用后再次核API进程/healthz正常，配置SHA、五角色generation/launch/owner/PID及进程创建事实均与恢复前相同，五个记录进程仍不存在，running任务0。原失败回执保留，新增证据在`independent-review290/api-recovery-20261021/`的preflight/start/api-restored/collection/final-check。
+- 本轮仅运行恢复、账本收取和文档状态收尾，产品代码未改，不重复执行此前280项测试。会话机制仍是离线实现，真实指标采集/原生续用/任务接线/ACK存储尚未启用；本次不增加自动恢复角色或连续开片授权。

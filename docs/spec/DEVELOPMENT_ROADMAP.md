@@ -1,5 +1,10 @@
 # TALK 后续开发安排：多终端主控与桌面工作区
 
+## 2026-10-21 19:15：API已恢复，290补收完成
+
+- 用户明确允许仅恢复原API并补收290；19:12原启动器恢复、healthz正常，19:13:09 workflow completed、结果2896及SHA保持，详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)。
+- 配置及五角色generation/launch/owner/PID和进程创建事实保持；五角色记录进程原已不存在，本轮不恢复、不新派发。产品57cb119/280项离线验证保持，会话机制仍未加载，真实接线仍另片先确认。
+
 ## 2026-10-21 07:18：290离线补正完成，收取待API恢复
 
 - 280项通过、原27件/19冻结SHA保持；缺数分类/可信窗口计数及10次备用已整合，可靠60%规则和范围/通道守卫优先。详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)和[最终API](../guides/EXECUTION_SESSION_FALLBACK.md)。
