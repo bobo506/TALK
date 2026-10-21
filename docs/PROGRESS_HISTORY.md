@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-21 21:53（Asia/Shanghai）— 会话机制第四片291获确认并派DeepSeek
+
+- 用户要求恢复DeepSeek后尽快继续会话复用功能，宿主随TALK统一启动问题放在本片后；随后对具体范围明确回复“确认，派给DeepSeek”。本片只读实机入口/版本、配置插件证据和采集器挂载核验，交付可实施接线方案，非生产加载或新一轮290开发。
+- MCP实际agent:codex/agent、lead，页面旧交叉复核要求原样读取保存，按最新AGENTS DeepSeek首次执行/自测/暂停，Codex独立实查/直接修正；Kimi暂停。21:48核manager18856/bridge22812和原实例/launch、running/ready/idle，配置/绑定/286全文/其它四角色保持；派前MCP最新仍idle。
+- Git67b1a58，30项目/57原生公开文件1,835,498字节逐SHA冻结；本机仅投影指定profile/patch和package的白名单插件声明等，无完整配置/环境/凭据/正文。空plugin_declarations不代表没有插件；原生HOME是声明证据，磁盘0.1.5-rc.2不冒充实际执行字节或有效挂载树。
+- 21:51:42创建真实291，creator agent:codex/target agent:deepseek，Hall group:task-50fe771b347747e6a8be8677e455511b、独立顶层四参数，queued/assigned；原请求完整保留，创建工具自动附项目要求快照。根.tmp/execution-session-live-entry-s0，baseline/coordination只读、执行者仅deepseek/**，额外公开安装文本须验证真实路径/留SHA，不读原生HOME或真实配置。
+- [291合同](spec/EXECUTION_SESSION_LIVE_ENTRY_SLICE_4.md)要求精确挂载生命周期/事件来源/cut、实际schema接线、最小实施与回滚、隔离验收及T/W/执行者预算分开。禁止配置/服务启停/额外CLI模型/主动wait/其它Agent；286暂停、其它角色和既有280项/会话离线边界保持。
+- 同步进度/简报/模块/排期与需求状态；本轮仅派发及文档，无产品代码变更。usage-gate continue但百分比全null，不臆测额度；默认派后结束，用户通知291好了再取件。291完成收尾后按新顺序处理宿主统一启动链路，不提前混片或无限连续派发。
+
 ## 2026-10-21 21:10（Asia/Shanghai）— 原DeepSeek宿主恢复、普通启动及真实心跳通过
 
 - 用户明确回复“允许恢复宿主并启动DeepSeek”。本次只恢复原DeepSeek宿主管理器、经普通入口启动一次，配置/模型/Key/HOME、286暂停及其它角色保持，不派新任务。此前关闭页面已获用户确认通过；用户start gen26未领取、随后gen27已关闭的诊断与失败证据保留。

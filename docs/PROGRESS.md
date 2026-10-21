@@ -1,26 +1,26 @@
 # Project Progress
 
-Updated: 2026-10-21 21:10（Asia/Shanghai）。用户确认关闭状态页面通过后，另行明确“允许恢复宿主并启动DeepSeek”。原DeepSeek宿主管理器已恢复，经普通入口仅启动一次，当前running/ready、idle；同一实例真实心跳推进60.055873秒。配置/绑定、286暂停和其它四角色保持，无新任务派发。启动页面结果待用户确认。
+Updated: 2026-10-21 21:53（Asia/Shanghai）。用户明确“确认，派给DeepSeek”，会话机制第四片291已派发：只读核实DSH入口/版本、配置与插件证据及采集器挂载位置，交付最小接线方案后暂停。宿主随TALK统一启动问题按用户要求在291完成收尾后优先处理，不混入本片。
 
-## 当前切片与实机状态
+## 当前切片
 
-- 本人agent:codex/agent、lead、project `prj_e8fe7066bbec`。本次为明确授权的单角色操作恢复，Codex直接执行与核验；Kimi继续暂停新派发，不派新任务。
-- 原关闭超时补正`36107c6`已推送：过期stop只读投影unknown/stop_timeout，页面明确关闭超时并持续刷新；人工恢复仅排除明确paused且领取全空的queued根任务，human/CAS/心跳/本机进程守卫保持。90生命周期/恢复/CLI+12页面合同+26 Node共128项自检通过，零跳过；用户已确认页面“是关闭状态”。详[补正记录](spec/ROLE_SERVICE_STOP_TIMEOUT_FIX_20261021.md)。
-- 用户后续start gen26从未claimed/reported，随后gen27已关闭、无归属；原因核为原manager11612已不存在，API恢复不会自动恢复角色宿主。获单独启动授权后，按已核SHA原入口及原choice恢复wrapper3284/manager18856；原API launcher22360/child22332保持。
-- 普通start仅一次：generation28、launch `6ca1765d-7fd0-4cfa-b3f6-a5179b32c8fa`、实例`ins_ffc603d6fc88`、bridge22812。OS父链22812→18856，公开running/ready、ownership=true、无错误，实例idle/current_task_id为空。
-- 21:06:41核同一实例心跳13:05:39.129391→13:06:39.185264 UTC，真实推进60.055873秒；manager health同步更新。配置/全部绑定/286完整行哈希、其它四角色记录保持，running任务0，无角色Key/HOME/模型修改或额外模型探针。
-- 详[宿主恢复记录](spec/DEEPSEEK_HOST_RESTORE_20261021.md)，新证据`.tmp/deepseek-start-diagnostic-20261021/restore/verification.json`；此前关闭恢复及失败证据保留，不覆写。本次无产品代码变化，不重跑无关测试。
+- 本人实际MCP agent:codex/agent、lead，project `prj_e8fe7066bbec`。291 creator agent:codex、target agent:deepseek、独立Hall `group:task-50fe771b347747e6a8be8677e455511b`，21:51:42创建queued/assigned；不主动追踪后续状态，等用户通知取件。
+- 基线`67b1a58a6b38e0fa1a4e5e0020f7e01e05ead9c1`，30项目/57公开安装材料1,835,498字节逐SHA冻结，根`.tmp/execution-session-live-entry-s0/`。执行者只写deepseek/**，baseline/coordination只读，Codex独占正式协调文档；无产品并行写入。
+- 入口/配置白名单投影关联当前实例和launch，不含完整配置/环境/Key/会话正文。当前磁盘DSH0.1.5-rc.2不等于运行进程已加载版本；home为已核宿主声明，未读取进程环境；空插件投影不表示没有插件，实际树/采集值未知。
+- 目的/白名单/禁止区/验收和交付见[291合同](spec/EXECUTION_SESSION_LIVE_ENTRY_SLICE_4.md)。不加载采集器、不改配置、不启停、不调用额外模型/CLI/ACP，不处理宿主统一启动。页面旧交叉复核要求快照保留，按最新AGENTS由DeepSeek首次执行/暂停，Codex独立实查和直接修正；Kimi暂停新派发。
 
-## 验收与下一步
+## 当前实机与既有成果
 
-- 请用户刷新角色页确认DeepSeek显示“启动成功”；同一实例持续心跳已核，无需重复启动。关闭状态页面验收已通过。
-- [用户手册](guides/USER_MANUAL.md)和[人工恢复指南](guides/ROLE_SERVICE_RECOVERY.md)同步API与角色宿主的区别。正式提交/推送以最终HEAD为准，临时证据不提交、不清理。
-- 保持不派新任务，不恢复286，不启停其它角色。每个新切片仍先说明范围与验收并获确认；本次不扩为自动恢复、开机自启或无限期解除归属授权。注销/重启/Codex沙箱服务停止后的持续驻留未验证。
+- DeepSeek已恢复原宿主并普通启动一次，manager18856/bridge22812、gen28、实例`ins_ffc603d6fc88`、launch `6ca1765d-7fd0-4cfa-b3f6-a5179b32c8fa`；此前同一实例周期心跳推进60.055873秒，21:48派前复核running/ready、idle，最新心跳正常。详[恢复记录](spec/DEEPSEEK_HOST_RESTORE_20261021.md)，证据原样保留；本轮不重复启动。
+- 原关闭超时补正36107c6的128项自检通过，用户已确认页面“是关闭状态”；恢复文档67b1a58已推送。API launcher22360/child22332保持。宿主原退出具体原因尚未核定，API恢复不会自动恢复角色宿主；统一启动/检测/恢复链路后置，不能称已闭环。
+- 290已收取completed/结果2896，产品57cb119、收取99ec909已推送；170内核/76适配/34 Node共280项既有离线验证保持。本轮无产品代码变化，不重复无关测试。
+- 会话规则保持：同功能/scope先验，可靠<60%续、≥60%下一次换；仅单纯缺数且完整可信计数才10次备用。真实采集加载、原生续用、协调增量生成、任务/MCP/API接线及ACK存储仍未完成，291只核接线方案。
+- 286仍queued/control_status=paused、无领取/租约，233份候选不恢复/取消/收取/集成；配置/绑定和其它四角色保持。284关闭内核/三表、日志手动跨设备转移/全根留存及全入口21600待办不变。
 
-## 既有项目状态保持
+## 取件与后续顺序
 
-- 290已收取completed/结果2896；会话机制产品57cb119、收取99ec909已推送，原280离线测试保持。规则为同功能/scope先验、可靠<60%续/≥60%下一次换，仅单纯缺数且完整可信计数才10次备用；当前没有真实采集加载、原生续用、协调增量生成、任务/MCP/API接线或ACK存储。
-- 286仍queued但control_status=paused，无领取/租约；233份候选不恢复/取消/收取/集成，284关闭内核及三表保持。Kimi额度暂停、日志手动跨设备转移/全根留存及全入口21600待办不变。
-- 精确额度百分比不可读，不臆测剩余；headless工具客户端T/取消排队未核，bridge21600和旧桌面65秒不能当当前工具预算证据。本轮无CLI模型/ACP/Browser/主动任务等待或原生认证/会话读取。
+- 默认派后结束，用户通知“291好了”再优先取交付摘要、独立检查实际证据；有问题由Codex直接修正与自检，不派返修或互审，随后必要文档/Git收尾。
+- 291收尾后按用户最新顺序处理宿主统一启动问题，实施片前明确具体范围与验收；不借本次授权扩大为自动启动所有角色、无限期解除归属或恢复286。注销/重启/Codex沙箱服务停止后的持续驻留仍未验证。
+- usage-gate decision=continue，但session/weekly实际百分比均null，不臆测额度。headless工具客户端T/取消排队未核；bridge21600和旧桌面65秒不能当当前工具预算证据。本轮不主动等待/唤回或制造实机长等待。
 
-恢复指令：继续项目（先核DeepSeek启动页面反馈；当前已恢复宿主并普通启动成功，不重复解除归属/启动或派新片）。
+恢复指令：继续项目（291已派，只取件/核状态，不重复派发；先完成291复核收尾，再按已确认顺序处理宿主启动链路问题）。
