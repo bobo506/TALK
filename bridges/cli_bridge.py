@@ -22,7 +22,7 @@ from bridges.runtime_diagnostics_timeline import StageTimeline, timed_lock
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Awaitable, Sequence
+from typing import Any, Awaitable, Mapping, Sequence
 from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -540,6 +540,33 @@ def _is_dsh_launcher_command(command_args: Sequence[str]) -> bool:
     if not command_args:
         return False
     return Path(command_args[0]).name.lower() in {"dsh", "dsh.cmd", "dsh.exe"}
+
+
+def _dsh_package_root_from_command(command: str | Sequence[str]) -> str | None:
+    """292：从已配置的 dsh 入口解析公开安装包根，供原生 runner 校验。
+
+    只读取同一命令路径旁的 ``package.json``；不扫描 HOME、不读取配置。
+    解析失败返回 ``None``，由调用方明确报 ``native_package_unresolved``。
+    """
+
+    args = parse_command(command) if isinstance(command, str) else [str(part) for part in command]
+    try:
+        resolved = resolve_command_executable(args)
+    except (OSError, ValueError):
+        return None
+    for item in resolved:
+        candidate = Path(item)
+        if candidate.name == "bin.js" and candidate.parent.name == "lib":
+            root = candidate.parent.parent
+            try:
+                manifest = json.loads(
+                    (root / "package.json").read_text(encoding="utf-8")
+                )
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                return None
+            if manifest.get("name") == "@deepseek-ai/dsh":
+                return str(root.resolve())
+    return None
 
 
 def resolve_task_preflight_command(args: argparse.Namespace) -> str | list[str]:
@@ -2912,15 +2939,17 @@ async def _run_while_task_lease_active(
     if heartbeat_task is None:
         return await operation
     operation_task = asyncio.create_task(operation)
-    done, _ = await asyncio.wait({operation_task, heartbeat_task}, return_when=asyncio.FIRST_COMPLETED)
-    if heartbeat_task in done:
-        operation_task.cancel()
-        try:
-            await operation_task
-        except asyncio.CancelledError:
-            pass
-        await heartbeat_task
-    return await operation_task
+    try:
+        done, _ = await asyncio.wait({operation_task, heartbeat_task}, return_when=asyncio.FIRST_COMPLETED)
+        if heartbeat_task in done:
+            operation_task.cancel()
+            await asyncio.gather(operation_task, return_exceptions=True)
+            await heartbeat_task
+        return await operation_task
+    finally:
+        if not operation_task.done():
+            operation_task.cancel()
+        await asyncio.gather(operation_task, return_exceptions=True)
 
 
 async def _stop_task_heartbeat(heartbeat_task: asyncio.Task[None] | None) -> None:
@@ -2979,6 +3008,7 @@ async def _prepare_task_before_claim(
     diagnostics: Any | None = None,
     preflight_attempt: int = 1,
     budgets: dict[str, Any] | None = None,
+    preflight_base_context: str | None = None,
 ) -> tuple[dict[str, Any] | None, str, bool]:
     """Run Task Hall preflight and return (ready_task, replay_context, workflow_advanced).
 
@@ -3029,8 +3059,17 @@ async def _prepare_task_before_claim(
                 return None, replay_context, True
             return None, replay_context, False
 
+    # 预检仍走原只读、非持久化命令，不进入正式会话或累计交办次数。
+    # 仅预检副本补基础合同；正式续轮的增量正文与任务账本不被改写。
+    preflight_task = task
+    if preflight_base_context is not None:
+        preflight_task = {**task, "content": (
+            "[[已核冻结基础合同，仅供本次只读预检]]\n"
+            + preflight_base_context + "\n\n[[本次增量]]\n"
+            + str(task.get("content") or "")
+        )}
     prompt = build_cli_task_preflight_prompt(
-        task,
+        preflight_task,
         member_id=member_id,
         workdir=workdir,
         runtime=runtime,
@@ -3184,6 +3223,143 @@ async def _prepare_task_before_claim(
         return None, replay_context, False
 
 
+async def _handle_execution_session_claimed(
+    claimed: dict[str, Any],
+    *,
+    client: Any,
+    member_id: str,
+    workdir: Path,
+    command: str | Sequence[str],
+    timeout: int,
+    max_reply_chars: int,
+    bridge_label: str,
+    claim_token: str | None,
+    heartbeat_task: asyncio.Task[None] | None,
+    execution_context: Mapping[str, Any],
+    diagnostics: Any | None,
+    replay_context: str,
+) -> bool:
+    """292：claim 后的执行会话分支；结果发送/完成仍走原任务账本。"""
+
+    from bridges.dsh_execution_channel import (
+        ExecutionSessionRunError,
+        run_execution_session_task,
+    )
+
+    task_id = int(claimed["id"])
+    creator = claimed.get("created_by")
+    if isinstance(command, str):
+        command_args: str | Sequence[str] = parse_command(command)
+    else:
+        command_args = list(command)
+    state: dict[str, Any] | None = None
+    completion_status = "failed"
+    last_error: str | None = None
+    try:
+        try:
+            outcome = await _run_while_task_lease_active(run_execution_session_task(
+                task=claimed,
+                client=client,
+                member_id=member_id,
+                workdir=workdir,
+                command=command_args,
+                timeout=timeout,
+                launch_id=execution_context.get("launch_id"),
+                project_id=execution_context.get("project_id"),
+                binding_snapshot=claimed.get("target_binding_snapshot"),
+                hall_history=replay_context,
+                diagnostics=diagnostics,
+                store_override=execution_context.get("store_override"),
+                native_package_root=execution_context.get("native_package_root"),
+                runner=execution_context.get("runner"),
+            ), heartbeat_task)
+        except TaskLeaseLostError:
+            raise
+        except asyncio.CancelledError:
+            raise
+        except ExecutionSessionRunError as exc:
+            reason = exc.reason_code
+            completion_status = "failed"
+            reply = (
+                f"{bridge_label} 执行会话未完成（{reason}）。"
+                "本次没有自动重跑模型；TALK 任务记录与已有窗口状态已保留。"
+            )
+            last_error = f"execution session failed: {reason}"
+            state = {
+                "schema": "talk-execution-session-state-1",
+                "version": 1,
+                "status": "failed",
+                "decision": "unconfirmed",
+                "reason_code": reason,
+                "limitations": "未取得可核任务回执；计数与窗口以持久账本为准，未自动重跑模型。",
+            }
+        except Exception:
+            completion_status = "failed"
+            reply = (
+                f"{bridge_label} 执行会话运行失败，错误详情已记录。"
+                "本次没有自动重跑模型。"
+            )
+            last_error = "execution session failed before confirmed delivery"
+            state = {
+                "schema": "talk-execution-session-state-1",
+                "version": 1,
+                "status": "failed",
+                "decision": "unconfirmed",
+                "reason_code": "runner_failed",
+                "limitations": "未取得可核任务回执；计数与窗口以持久账本为准，未自动重跑模型。",
+            }
+        else:
+            reply = str(outcome.reply or "").strip()
+            completion_status = outcome.completion_status
+            last_error = outcome.last_error
+            state = outcome.state
+        reply = reply or f"{bridge_label} 执行会话已完成，但没有可展示文本。"
+        if len(reply) > max_reply_chars:
+            reply = reply[: max(0, max_reply_chars - 20)].rstrip() + "\n…（结果已截断）"
+
+        await _raise_if_task_lease_lost(heartbeat_task)
+        result_message_id: int | None = None
+        if creator:
+            result_message = await client.send_text(
+                reply,
+                to=[str(creator)],
+                group_id=claimed.get("hall_group_id"),
+            )
+            result_message_id = int(result_message["id"])
+        await _raise_if_task_lease_lost(heartbeat_task)
+        completion_kwargs: dict[str, Any] = {
+            "status": completion_status,
+            "result_message_id": result_message_id,
+            "last_error": last_error,
+            "execution_session_state": state,
+        }
+        if claim_token is not None:
+            completion_kwargs["claim_token"] = claim_token
+        await client.complete_task(task_id, **completion_kwargs)
+        if diagnostics is not None:
+            try:
+                diagnostics.record_event(
+                    "execution_session_completed",
+                    stage="execution_session",
+                    task_id=task_id,
+                    message=completion_status,
+                    extra={
+                        "native_session_id": (state or {}).get("native_session_id"),
+                        "reused": (state or {}).get("reused"),
+                        "confirmed_count": (state or {}).get("confirmed_count"),
+                    },
+                )
+            except Exception:
+                pass
+        return True
+    except TaskLeaseLostError:
+        return False
+    except asyncio.CancelledError:
+        raise
+    finally:
+        await _stop_task_heartbeat(heartbeat_task)
+
+
 async def handle_queued_task(
     task: dict[str, Any],
     *,
@@ -3204,6 +3380,7 @@ async def handle_queued_task(
     heartbeat_interval: float = DEFAULT_TASK_HEARTBEAT_INTERVAL,
     diagnostics: Any | None = None,
     preflight_attempt: int = 1,
+    execution_context: Mapping[str, Any] | None = None,
 ) -> bool:
     """Preflight, claim, and execute one task; return False when no action was acquired.
 
@@ -3215,6 +3392,11 @@ async def handle_queued_task(
 
     _clear_deprecated_decision_tier_env()
     task_id = int(task["id"])
+    execution_task = bool(
+        execution_context is not None
+        and str(runtime).lower() == "dsh"
+        and isinstance(task.get("execution_session"), dict)
+    )
     runner = command_runner or run_cli_command
     budgets = _diag_budgets(
         cli_timeout=timeout,
@@ -3224,6 +3406,15 @@ async def handle_queued_task(
     )
     first_log_id: str | None = None
     try:
+        preflight_base_context = None
+        if execution_task:
+            from bridges.dsh_execution_channel import _load_base_contract
+            try:
+                preflight_base_context = (await _load_base_contract(
+                    client, task, task["execution_session"]
+                ))["text"]
+            except Exception as exc:
+                raise TaskPreflightError("execution session base preflight unavailable") from exc
         ready_task, replay_context, workflow_advanced = await _prepare_task_before_claim(
             task,
             client=client,
@@ -3237,6 +3428,7 @@ async def handle_queued_task(
             diagnostics=diagnostics,
             preflight_attempt=preflight_attempt,
             budgets=budgets,
+            preflight_base_context=preflight_base_context,
         )
     except asyncio.CancelledError:
         if diagnostics is not None:
@@ -3349,6 +3541,26 @@ async def handle_queued_task(
         lease_seconds=lease_seconds,
         heartbeat_interval=heartbeat_interval,
     )
+    if (
+        execution_task
+        and execution_context is not None
+        and isinstance(claimed.get("execution_session"), dict)
+    ):
+        return await _handle_execution_session_claimed(
+            claimed,
+            client=client,
+            member_id=member_id,
+            workdir=workdir,
+            command=execution_context.get("command", command),
+            timeout=timeout,
+            max_reply_chars=max_reply_chars,
+            bridge_label=bridge_label,
+            claim_token=claim_token,
+            heartbeat_task=heartbeat_task,
+            execution_context=execution_context,
+            diagnostics=diagnostics,
+            replay_context=replay_context,
+        )
     gate_verdict_payload: dict[str, Any] | None = None
     prompt = ""
     task_text = ""
@@ -4556,6 +4768,14 @@ async def run_task_queue_worker(
                                 ),
                                 diagnostics=diagnostics,
                                 preflight_attempt=preflight_attempt,
+                                execution_context={
+                                    "project_id": getattr(args, "project_id", None),
+                                    "launch_id": getattr(args, "launch_id", None),
+                                    "store_override": None,
+                                    "native_package_root": _dsh_package_root_from_command(
+                                        getattr(args, "task_command", args.command)
+                                    ),
+                                },
                             )
                         except TaskPreflightError as exc:
                             attempts = (failure[0] if failure is not None else 0) + 1

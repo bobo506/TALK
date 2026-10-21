@@ -4706,6 +4706,125 @@ class BuildGroupMemberContextTests(unittest.TestCase):
         self.assertEqual(client.turns, [(9, 82, "greeting", "agent:pi", "demand", 1)])
 
 
+class ExecutionSessionBridgeWiringTests(unittest.TestCase):
+    """292：claim 后执行会话分支仍走原 TALK 结果/完成账本。"""
+
+    def test_execution_session_branch_sends_and_completes_with_state(self):
+        from bridges.dsh_execution_channel import ExecutionOutcome
+
+        class FakeClient:
+            def __init__(self):
+                self.sent = []
+                self.completed = None
+
+            async def send_text(self, body, *, to, group_id=None):
+                self.sent.append((body, to, group_id))
+                return {"id": 42}
+
+            async def complete_task(self, task_id, **kwargs):
+                self.completed = (task_id, kwargs)
+                return {"id": task_id}
+
+            async def heartbeat_task(self, *args, **kwargs):
+                return {}
+
+            async def claim_task(self, task_id, *, instance_id=None, lease_seconds=120):
+                return claimed
+
+        task = {
+            "id": 7,
+            "attempt": 0,
+            "target_member_id": "agent:deepseek",
+            "created_by": "agent:codex",
+            "project_id": "prj_test",
+            "task_kind": "general",
+            "content": "执行会话任务",
+            "hall_group_id": "group:task-7",
+            "execution_session": {"schema": "talk-execution-session-request-1"},
+            "target_binding_snapshot": {"state": "bound", "runtime": "dsh"},
+        }
+        claimed = {**task, "claim_token": "token-1"}
+        client = FakeClient()
+
+        async def fake_prepare(*args, **kwargs):
+            return claimed, "", False
+
+        async def fake_run(**kwargs):
+            return ExecutionOutcome(
+                reply="执行会话回复",
+                completion_status="succeeded",
+                state={
+                    "schema": "talk-execution-session-state-1",
+                    "version": 1,
+                    "status": "completed",
+                    "decision": "reuse_session",
+                },
+                delivered=True,
+            )
+
+        original_prepare = cli_bridge._prepare_task_before_claim
+        cli_bridge._prepare_task_before_claim = fake_prepare
+        try:
+            with unittest.mock.patch(
+                "bridges.dsh_execution_channel.run_execution_session_task",
+                new=fake_run,
+            ), unittest.mock.patch(
+                "bridges.dsh_execution_channel._load_base_contract",
+                new=unittest.mock.AsyncMock(return_value={"text":"wiring test base"}),
+            ), unittest.mock.patch.object(
+                cli_bridge, "_start_task_heartbeat", return_value=None
+            ):
+                result = asyncio.run(
+                    cli_bridge.handle_queued_task(
+                        task,
+                        client=client,
+                        member_id="agent:deepseek",
+                        workdir=Path("."),
+                        instance_id="inst-1",
+                        command=["dsh", "--profile", "headless"],
+                        timeout=60,
+                        max_reply_chars=1000,
+                        runtime="dsh",
+                        bridge_label="DSH",
+                        prompt_transport="stdin",
+                        execution_context={"project_id": "prj_test"},
+                    )
+                )
+        finally:
+            cli_bridge._prepare_task_before_claim = original_prepare
+
+        self.assertTrue(result)
+        self.assertEqual(client.sent[0][0], "执行会话回复")
+        self.assertEqual(client.sent[0][1], ["agent:codex"])
+        self.assertEqual(client.sent[0][2], "group:task-7")
+        self.assertEqual(client.completed[0], 7)
+        self.assertEqual(client.completed[1]["status"], "succeeded")
+        self.assertEqual(
+            client.completed[1]["execution_session_state"]["decision"],
+            "reuse_session",
+        )
+        self.assertEqual(client.completed[1]["claim_token"], "token-1")
+
+
+class DshPackageRootResolutionTests(unittest.TestCase):
+    def test_package_root_is_read_from_resolved_public_install(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "dsh"
+            (root / "lib").mkdir(parents=True)
+            (root / "lib" / "bin.js").write_text("", encoding="utf-8")
+            (root / "package.json").write_text(
+                json.dumps({"name": "@deepseek-ai/dsh", "version": "0.1.5-rc.2"}),
+                encoding="utf-8",
+            )
+            resolved = cli_bridge._dsh_package_root_from_command(
+                ["node", str(root / "lib" / "bin.js"), "--profile", "headless"]
+            )
+            self.assertEqual(Path(resolved).resolve(), root.resolve())
+        self.assertIsNone(cli_bridge._dsh_package_root_from_command(["python", "-V"]))
+
+
 class ManagedLaunchAssociationTests(unittest.TestCase):
     """R1-3：受管启动关联参数与凭据文件（旧 ``--key`` 入口保持兼容）。"""
 

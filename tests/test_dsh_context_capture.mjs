@@ -62,6 +62,7 @@ function createWorld({
   config = { provider: "deepseek-official", model: "deepseek-flash" },
   initialView,
   request = {},
+  beforeTrack,
 } = {}) {
   const sessionListeners = new Set();
   const disposedListeners = new Set();
@@ -160,6 +161,7 @@ function createWorld({
   });
   const resolvedRequest = { nativeSessionId: id, ...request };
   if (initialView !== undefined) projection.setView(session, initialView);
+  if (typeof beforeTrack === "function") beforeTrack(session, projection);
   const handle = capture.track(makeRequest(resolvedRequest));
   return {
     id,
@@ -937,4 +939,53 @@ test("projection envelope getters are contained in both read and track", () => {
 test("identifiers reject unpaired surrogates before transport", () => {
   const world = createWorld();
   assert.throws(() => world.capture.track(makeRequest({ nativeSessionId: "\ud800" })), CaptureError);
+});
+
+test("explicit resumeRestore sources real events of the verified managed session", () => {
+  const view = {
+    projectedTokens: 599016,
+    pressureTokens: 599000,
+    contextWindow: 1000000,
+  };
+  const beforeTrack = (session, projection) => {
+    session.append(
+      "request/context",
+      { provider: "deepseek-official", model: "deepseek-flash", contextWindow: 1000000 },
+      T1,
+      "append"
+    );
+    session.append("user/message", { content: [{ type: "text", text: "delta" }] }, T2, "append");
+    session.append(
+      "assistant/message",
+      { message: { role: "assistant", content: [] }, usage: { inputTokens: 599000, outputTokens: 2 } },
+      T3
+    );
+    session.append("turn/end", { reason: { kind: "completed" } }, T4);
+    projection.setView(session, view);
+  };
+  const restored = createWorld({
+    initialView: view,
+    request: { resumeRestore: true },
+    beforeTrack,
+  });
+  const snapshot = restored.read();
+  assert.equal(snapshot.capture.status, "available");
+  assert.equal(snapshot.metrics.pressure_tokens.state, "known");
+  assert.equal(snapshot.metrics.pressure_tokens.value, 599000);
+  assert.equal(snapshot.metrics.projected_tokens.state, "known");
+  assert.equal(snapshot.metrics.projected_tokens.value, 599016);
+  assert.equal(snapshot.metrics.context_window.value, 1000000);
+  assert.equal(snapshot.config.provider_id.state, "known");
+  assert.equal(snapshot.config.provider_id.value, "deepseek-official");
+  assert.equal(snapshot.metrics.pressure_tokens.source.time, iso(T3));
+  assert.ok(snapshot.capture.limitations.includes("source_times_restored_from_managed_durable_events"));
+  assert.ok(!snapshot.capture.limitations.includes("source_times_tracked_only_after_mount"));
+  assert.equal(snapshot.metrics.context_window.source.time, iso(T1));
+  restored.capture.dispose();
+
+  const strict = createWorld({ initialView: view, beforeTrack });
+  const strictSnapshot = strict.read();
+  assert.notEqual(strictSnapshot.metrics.pressure_tokens.state, "known");
+  assert.notEqual(strictSnapshot.metrics.context_window.state, "known");
+  strict.capture.dispose();
 });

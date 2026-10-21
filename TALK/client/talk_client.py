@@ -371,6 +371,7 @@ class TalkClient:
         authorization_ttl_seconds: int | None = None,
         milestone_test_required: bool = False,
         max_clarification_rounds: int = 1,
+        execution_session: JsonDict | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "target_member_id": target_member_id,
@@ -393,6 +394,8 @@ class TalkClient:
             "milestone_test_required": milestone_test_required,
             "max_clarification_rounds": max_clarification_rounds,
         }
+        if execution_session is not None:
+            payload["execution_session"] = execution_session
         return await self._request_json("POST", "/api/tasks", json_body=payload)
 
     async def list_tasks(
@@ -542,6 +545,7 @@ class TalkClient:
         last_error: str | None = None,
         claim_token: str | None = None,
         gate_verdict: JsonDict | None = None,
+        execution_session_state: JsonDict | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "status": status,
@@ -550,7 +554,16 @@ class TalkClient:
             "claim_token": claim_token,
             "gate_verdict": gate_verdict,
         }
+        if execution_session_state is not None:
+            payload["execution_session_state"] = execution_session_state
         return await self._request_json("POST", f"/api/tasks/{task_id}/complete", json_body=payload)
+
+    async def get_execution_session_base(self, task_id: int) -> JsonDict:
+        """292：读取本执行会话任务/基础任务的冻结基础合同（参与者权限）。"""
+
+        return await self._request_json(
+            "GET", f"/api/tasks/{task_id}/execution-session-base"
+        )
 
     async def create_task_schedule(
         self,

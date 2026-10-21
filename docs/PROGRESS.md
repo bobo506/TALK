@@ -1,27 +1,26 @@
 # Project Progress
 
-Updated: 2026-10-21 23:01（Asia/Shanghai）。用户明确“完整实现同窗口、阈值换窗、十轮兜底且真正可用才算完成，没完成继续本功能”。已据此派292完整纵向实现；不是又一片方案，整项功能当前仍未完成。宿主统一启动问题延至本功能整体可用/验收之后，旧“291后先修宿主”排序被局部替代。
+Updated: 2026-10-22 01:06（Asia/Shanghai）。292会话机制已工程接通并实际使用验证，现暂停等待项目管理者人工里程碑验收；不派宿主统一启动或其它新片。
 
-## 当前执行
+## 已完成及证据
 
-- 292 creator agent:codex、target agent:deepseek，project `prj_e8fe7066bbec`，Hall `group:task-221d84cd748544a89716bb183c51eb0d`，22:56:32创建queued/assigned。实际身份MCP agent:codex/agent、lead；页面旧交叉复核要求保留，以最新AGENTS本次分工为准，Kimi暂停。
-- 本片要求API/MCP/SDK选择与持久基础合同、增量交办、原生create/resume及独立每任务MCP上下文、投递前真实采集、60%/条件10次规划、真实ACK/状态/锁/CAS和隔离全链路；具体[292合同](spec/EXECUTION_SESSION_USABLE_SLICE_5.md)。不能只交离线helper或“下一片再接线”。
-- 基线21d308b，80项目/57原生文件3,741,458字节逐SHA冻结，根`.tmp/execution-session-usable-v1/`，执行者唯一可写deepseek/**；baseline/coordination只读，Codex只写正式协调文档，不并行改产品。
-- 执行者先做隔离真实入口/fake模型验证，生产加载及少量真实模型连续任务由Codex独立实查后闭合；执行者交付必须暂停，Codex直接修正/自检与集成。整项可用验收必须看native ID、阈值/计数换窗、首轮/增量及实际入口证据。
+- 当前agent:codex/agent、项目prj_e8fe7066bbec/lead；DeepSeek首次执行并暂停，Codex独立实查后直接补正、自检和集成。292已01:03:04收取completed，结果2898/SHA ef617e7fb6f02ac692fbd803c3d9176b9e0c80d74e1ca35d095cfb46eed3f19b保持。
+- 同功能稳定continuity_key→可靠<60%续用/≥60%下次新窗→仅单纯缺数及可信历史时10次/第11次新窗；首轮完整、续轮增量、换新自动恢复。API/SDK/MCP、真实DSH create/resume/query/采集、原生送达ACK、持久计数/锁/CAS/尝试幂等及每任务审计已接通，非离线helper。
+- 安装版DSH+fake模型14次投递验证59.9/60%和缺数1..10/11；4个独立任务SDK/MCP全链路通过。真实293→294同native ID且计数1→2，第二轮仅增量仍回想验证码；295 force_new不同ID、计数1、完整基础恢复，三条均收取。
+- 独立/修正后完整相关回归533 Python中532通过，唯一角色清单长度1523<1500失败已原基线复现；35采集Node过。最后定向164 Python/5 runner Node全过，不改无关长度断言。实查与自检区别、原失败和版本分别留痕，详[292复核](spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)。
+- 19份产品/测试文件集成，4nullable列正常新增且历史不回填。原292条历史在迁移时旧列逐行哈希不变，收尾仅292正常collect更新；286全文/暂停及其它角色、原配置/绑定保持。唯一必要项目元数据初始化为project_root_path从null登记D:\claude-test\TALK（本地项目ID已核，profile仍human-only）。
 
-## 当前实机与保持项
+## 当前运行与使用
 
-- DeepSeek派前同manager18856/bridge22812、实例`ins_ffc603d6fc88`、gen28/launch `6ca1765d-7fd0-4cfa-b3f6-a5179b32c8fa`，running/idle，心跳正常，无current_task。本轮未重启角色/API/宿主，不改原deepseek-flash/max、Key/HOME/绑定。
-- 准备时旧恢复断言因Kimi generation22→24已外部变化失败，差异证据保留；本轮未操作Kimi，固定当前值，不回滚。配置/绑定/286整行哈希保持，running任务0为派前事实。未把历史恢复基线当不可变生产状态。
-- 291已completed/结果2897，复核21d308b已推送；原9件/87冻结保持，正式补正工作线/指纹/分类/失败边界等六组问题。它是方案阶段成果，不代表会话功能完成；其scope限制不阻止用户本次已授权的292完整接线。
-- 288/289/290离线产品57cb119、280项验证保持，当前运行链路尚未启用真实续用/指标/ACK；本轮派发仅改协调文档，不重跑无关回归，不提前加载候选。
-- 286仍queued/control_status=paused、无领取/租约，233份候选不恢复/取消/收取/集成；Kimi暂停新派发，日志手动跨设备转移/全根留存与全入口21600待办保持。
+- 原manager18856保持，DeepSeek普通stop/start后generation30、launch205e7f05-1b0c-4e96-becf-8cbb154f75a6、实例ins_7a91214893c6，running/ready、无在途任务；原模型deepseek-flash/max、Key/HOME/绑定不变，无owner人工恢复。
+- API经原launcher正常重载：包装PID6320、真实launcher2624、API子10876。就绪脚本曾错比包装PID，核实父子关系/创建时间及schema通过，没有重复重启；宿主联动问题未修。
+- [使用说明](guides/EXECUTION_SESSION_USAGE.md)含首轮/续轮/force_new、SDK/REST/MCP和状态核验。当前Codex旧MCP目录尚无execution_session参数，需重连；SDK/API已实机使用，fresh MCP schema/dispatch隔离已验。不改桌面MCP配置。
+- 先支持bound/runtime=dsh及原生0.1.5-rc.2普通顶层general任务，旧任务行为保持。GUI同窗显示、手动续写与缓存费用收益未验；60%与10/11实机边界用fake模型，不声称真实高占用压力试验。
 
-## 取件与完成标准
+## 下一步与保持项
 
-- 默认派后结束，用户通知“292好了”再读交付摘要并独立检查实际代码/链路；有问题Codex直接补正与验证，不派互审/返修。本功能缺口继续补齐，不把candidate complete/离线通过当整体已完成。
-- 真正可用的同功能跨任务原生会话、可靠≥60%实际换窗、缺数条件十次/第11次新窗、首轮完整/续轮增量/换窗恢复、任务权限与ACK及使用说明均须闭合。以受控隔离边界试验配少量真实会话/任务证明，不为撞阈值浪费模型用量。
-- 已确认整体功能范围内必要实查/修正/自检继续；新功能或新的部署/权限/破坏性处置仍在具体结果可审后处理。宿主统一启动修复继续后置，不能因292阶段交付就提前切换。
-- 精确额度百分比仍不可读，usage-gate continue但百分比null；headless客户端T/取消排队未核，不用21600或旧桌面65秒替代。本轮不主动wait/唤回或额外模型。
+- 人工查看293/294/295结果并按说明验收连续交办；确认里程碑后，再明确确认下一片宿主统一启动的目的/范围/验收，才实施或派发。不因本片收取自动开新片。
+- 286仍queued/control_status=paused，不恢复/取消/收取/集成；233候选保持。Kimi额度暂停，不派Kimi。日志手动跨设备/全根留存、全入口21600等待办保持。
+- 证据根.tmp/execution-session-usable-v1/independent-review292/；原始交付在original，修正前失败、最终164/5、自测/原生/隔离API/生产回执、集成清单和collect均已落盘。精确额度占比不可读，不臆测；headless客户端T未核，未启用主动长等待/自动唤回。
 
-恢复指令：继续项目（292已派，整项未完成；先取件/实查/补齐真正可用链路，不重复派292，不恢复286或改做宿主统一启动）。
+恢复指令：继续项目（先核本里程碑人工验收；不重复派292或293–295，不恢复286，不自动开宿主新片）。

@@ -724,29 +724,36 @@ def delegate_task(
     parent_task_id: int | None = None,
     authorization_epoch: int | None = None,
     max_clarification_rounds: int = 1,
+    execution_session: JsonDict | None = None,
 ) -> JsonDict:
     effective_project_id = _project_id(project_id, required=True)
     # 派发前读取该项目的当前开发要求：只作用于本次新建任务的存储正文，
     # 不追溯修改已创建任务，也不改变任何权限或预算字段。
     requirements = project_development_requirements(effective_project_id)
-    stored_content = snapshot_task_content(content, requirements)
-    return _api_request(
-        "POST",
-        "/api/tasks",
-        json_body={
-            "target_member_id": target_member_id,
-            "content": stored_content,
-            "title": title,
-            "project_id": effective_project_id,
-            "task_kind": task_kind,
-            "review_policy": review_policy,
-            "related_task_ids": list(related_task_ids or []),
-            "trigger_task_id": trigger_task_id,
-            "parent_task_id": parent_task_id,
-            "authorization_epoch": authorization_epoch,
-            "max_clarification_rounds": max_clarification_rounds,
-        },
-    )
+    if execution_session is not None:
+        # 292：执行会话语义下固定要求只进入基础合同一次，续轮 content 只放本次
+        # 增量；不能用“字符串替换”从正文删除要求，也不能让桥接层在续轮重新拼回。
+        # REST 服务端统一冻结要求/审计与基础合同，SDK/MCP 使用同一规则。
+        # 不通过区块标题子串猜测正文是否已含当前要求。
+        stored_content = content
+    else:
+        stored_content = snapshot_task_content(content, requirements)
+    payload: JsonDict = {
+        "target_member_id": target_member_id,
+        "content": stored_content,
+        "title": title,
+        "project_id": effective_project_id,
+        "task_kind": task_kind,
+        "review_policy": review_policy,
+        "related_task_ids": list(related_task_ids or []),
+        "trigger_task_id": trigger_task_id,
+        "parent_task_id": parent_task_id,
+        "authorization_epoch": authorization_epoch,
+        "max_clarification_rounds": max_clarification_rounds,
+    }
+    if execution_session is not None:
+        payload["execution_session"] = execution_session
+    return _api_request("POST", "/api/tasks", json_body=payload)
 
 
 def list_tasks(
@@ -1950,6 +1957,42 @@ TOOL_SCHEMAS: list[JsonDict] = [
                     "maximum": 2,
                     "default": 1,
                 },
+                "execution_session": {
+                    "type": "object",
+                    "description": (
+                        "可选执行会话复用元数据。首轮基础任务必须显式给 "
+                        "base_context（完整固定介绍）；同工作线后续任务用 "
+                        "base_task_id 引用首个任务，不再重复基础介绍。"
+                        "缺省时本工具保持旧的一次性任务行为。"
+                    ),
+                    "properties": {
+                        "schema": {"const": "talk-execution-session-request-1"},
+                        "version": {"const": 1},
+                        "continuity_key": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 128,
+                        },
+                        "force_new": {"type": "boolean", "default": False},
+                        "base_task_id": {"type": "integer", "minimum": 1},
+                        "base_context": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 60000,
+                        },
+                        "base_context_version": {"type": "string"},
+                        "baseline_change": {"type": "string", "maxLength": 4000},
+                        "authorization_change": {
+                            "type": "string",
+                            "maxLength": 4000,
+                        },
+                        "acceptance_difference": {
+                            "type": "string",
+                            "maxLength": 4000,
+                        },
+                    },
+                    "required": ["schema", "version", "continuity_key"],
+                },
             },
             "required": ["target_member_id", "content"],
         },
@@ -2223,6 +2266,7 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             max_clarification_rounds=int(
                 arguments.get("max_clarification_rounds", 1)
             ),
+            execution_session=arguments.get("execution_session"),
         )
     if name == "talk_get_task":
         return get_task(int(arguments["task_id"]))

@@ -2379,6 +2379,16 @@ class AgentTask(SQLModel, table=True):
         default=None, sa_column=Column(JSON)
     )
     target_binding_state: Optional[str] = Field(default=None, index=True)
+    # 292：任务级执行会话复用元数据。NULL = 该任务走旧的一次性独立会话，
+    # 行为与历史任务完全一致；基础任务另存冻结正文，续接任务只存引用/哈希。
+    execution_session: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    execution_session_base_text: Optional[str] = None
+    # 每任务冻结当前要求供审计；不在公开任务响应或续轮提示中反复输出。
+    execution_session_audit: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    # bridge 完成后回传的最小窗口状态（不含正文/凭据），供任务响应核验。
+    execution_session_state: Optional[dict] = Field(
+        default=None, sa_column=Column(JSON)
+    )
 
 
 class AgentTaskClarificationRound(SQLModel, table=True):
@@ -2958,6 +2968,9 @@ class AgentTaskCreate(BaseModel):
         ge=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
         le=TASK_MAX_CLARIFICATION_ROUNDS_LIMIT,
     )
+    # 292：可选执行会话元数据；缺失/None 时任务创建与执行完全保持旧行为。
+    # 详细严格校验在 server/execution_session_tasks.py（路由层）完成。
+    execution_session: Optional[dict] = None
 
     @model_validator(mode="after")
     def validate_task_create(self) -> "AgentTaskCreate":
@@ -3111,6 +3124,7 @@ class AgentTaskComplete(BaseModel):
     last_error: Optional[str] = None
     claim_token: Optional[str] = None
     gate_verdict: Optional[AgentTaskGateVerdict] = None
+    execution_session_state: Optional[dict] = None
 
     @model_validator(mode="after")
     def validate_task_complete(self) -> "AgentTaskComplete":
@@ -3217,10 +3231,28 @@ class AgentTaskOut(BaseModel):
     # 不接收客户端写入，也不得推断成 unconfigured 或某个模型值（合同 §7.4/§10）。
     target_binding_snapshot: Optional[dict]
     target_binding_state: Optional[str]
+    execution_session: Optional[dict] = None
+    execution_session_state: Optional[dict] = None
 
 
 class AgentTaskClaimOut(AgentTaskOut):
     claim_token: str
+
+
+class ExecutionSessionBaseOut(BaseModel):
+    """基础合同只读响应：只对同一基础任务/续接任务的参与者返回。"""
+
+    task_id: int
+    continuity_key: str
+    project_id: str
+    requester_id: str
+    target_member_id: str
+    base_contract_version: str
+    base_contract_sha256: str
+    base_context: str
+    binding_fingerprint: str
+    workspace_root: str
+    workspace_identity: str
 
 
 class AgentTaskRelationOut(BaseModel):

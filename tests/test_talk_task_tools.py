@@ -620,6 +620,162 @@ class TalkTaskToolTests(RouteTestCase):
             self.assertIn(field, source)
 
 
+class TalkExecutionSessionToolTests(RouteTestCase):
+    """292：MCP 工具 schema/派发与基础合同引用。"""
+
+    def setUp(self):
+        super().setUp()
+        self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        self.add_member("agent:worker", api_key="worker-key", display_name="Worker")
+        with self.make_client() as client:
+            created = client.post(
+                "/api/projects",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_tools", "display_name": "Tool Project"},
+            )
+            synced = client.post(
+                "/api/projects/prj_tools/sync",
+                headers={"X-API-Key": "bobo-key"},
+                json={
+                    "agents": [
+                        {
+                            "member_id": "agent:worker",
+                            "business_role": "developer",
+                            "decision_tier": "execution",
+                            "capability_summary": ["代码实现"],
+                        }
+                    ]
+                },
+            )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(synced.status_code, 200)
+
+    @staticmethod
+    def _environment(base_url: str, api_key: str, member_id: str) -> dict[str, str]:
+        return {
+            "TALK_BASE_URL": base_url,
+            "TALK_API_KEY": api_key,
+            "TALK_MEMBER_ID": member_id,
+            "TALK_PROJECT_ID": "prj_tools",
+        }
+
+    def test_delegate_execution_session_uses_base_reference_and_no_repeat(self):
+        from server.models import (
+            Project,
+            ProjectRoleBinding,
+            RunnerRegistry,
+        )
+
+        root = self._tmpdir / "execution-workspace"
+        root.mkdir()
+        now = datetime.now(timezone.utc)
+        with self.session() as session:
+            project = session.get(Project, "prj_tools")
+            project.project_root_path = str(root)
+            project.development_requirements = "固定要求：只在基础合同出现一次。"
+            session.add(project)
+            session.add(
+                RunnerRegistry(
+                    runner_id="runner:tool-dsh",
+                    runtime="dsh",
+                    display_name="Tool DSH",
+                    adapter_status="adapted",
+                    capabilities=[],
+                    control_kind="managed_cli",
+                    created_by="human:bobo",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            session.add(
+                ProjectRoleBinding(
+                    project_id="prj_tools",
+                    member_id="agent:worker",
+                    runner_id="runner:tool-dsh",
+                    model_source="builtin",
+                    provider_id="deepseek-official",
+                    connection_ref="isolated",
+                    model_id="deepseek-flash",
+                    model_alias="deepseek-flash",
+                    model_display_name="DeepSeek Flash",
+                    updated_by="human:bobo",
+                    updated_at=now,
+                )
+            )
+            session.commit()
+
+        schema = next(tool for tool in TOOL_SCHEMAS if tool["name"] == "talk_delegate_task")
+        self.assertIn("execution_session", schema["inputSchema"]["properties"])
+        self.assertIn(
+            "base_context",
+            schema["inputSchema"]["properties"]["execution_session"]["properties"],
+        )
+
+        base_context = "这是完整固定介绍：背景、规则、权限边界。"
+        with LiveTalkServer(main.app) as base_url:
+            env = self._environment(base_url, "bobo-key", "human:bobo")
+            with patch.dict(os.environ, env, clear=False):
+                created = dispatch_tool(
+                    "talk_delegate_task",
+                    {
+                        "project_id": "prj_tools",
+                        "target_member_id": "agent:worker",
+                        "title": "首轮",
+                        "content": "首轮增量",
+                        "execution_session": {
+                            "schema": "talk-execution-session-request-1",
+                            "version": 1,
+                            "continuity_key": "tools/feature/one",
+                            "base_context": base_context,
+                        },
+                    },
+                )
+                self.assertEqual(created["execution_session"]["base_task_id"], None)
+                self.assertNotIn(
+                    "固定要求：只在基础合同出现一次。",
+                    created["content"],
+                )
+                base = dispatch_tool(
+                    "talk_get_task", {"task_id": created["id"]}
+                )
+                base_message = base["task"]
+                self.assertEqual(base_message["id"], created["id"])
+                with httpx.Client(trust_env=False) as http:
+                    base_response = http.get(
+                        f"{base_url}/api/tasks/{created['id']}/execution-session-base",
+                        headers={"X-API-Key": "worker-key"},
+                    )
+                self.assertEqual(base_response.status_code, 200, base_response.text)
+                self.assertIn(
+                    "固定要求：只在基础合同出现一次。",
+                    base_response.json()["base_context"],
+                )
+
+                continuation = dispatch_tool(
+                    "talk_delegate_task",
+                    {
+                        "project_id": "prj_tools",
+                        "target_member_id": "agent:worker",
+                        "title": "续轮",
+                        "content": "续轮增量",
+                        "execution_session": {
+                            "schema": "talk-execution-session-request-1",
+                            "version": 1,
+                            "continuity_key": "tools/feature/one",
+                            "base_task_id": created["id"],
+                        },
+                    },
+                )
+        self.assertEqual(
+            continuation["execution_session"]["base_task_id"], created["id"]
+        )
+        self.assertEqual(
+            continuation["execution_session"]["base_contract_sha256"],
+            created["execution_session"]["base_contract_sha256"],
+        )
+        self.assertNotIn("固定要求：只在基础合同出现一次。", continuation["content"])
+
+
 class TalkWaitTaskTests(RouteTestCase):
     """600 秒有界等待：提前返回、有界输出、程序级计数与错误语义。"""
 

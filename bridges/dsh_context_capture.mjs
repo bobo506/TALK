@@ -296,6 +296,28 @@ function configFromRequestContext(session) {
   }
 }
 
+/**
+ * Minimal read of a durable Assistant settlement's usage for source restore.
+ * The token-meter accepts `assistant/message.data.usage` and the last usage
+ * chunk in `assistant/attempt.data.stream`; keep the same two spellings and
+ * reject unknown shapes instead of guessing.
+ */
+function usageFromRestoredEvent(event) {
+  if (!isPlainObject(event) || !isPlainObject(event.data)) return null;
+  if (event.type === "assistant/message" && isPlainObject(event.data.usage)) {
+    return event.data.usage;
+  }
+  if (event.type !== "assistant/attempt") return null;
+  const stream = event.data.stream;
+  if (!Array.isArray(stream)) return null;
+  for (let index = stream.length - 1; index >= 0; index--) {
+    const chunk = stream[index];
+    if (!isPlainObject(chunk)) continue;
+    if (chunk.type === "usage" && isPlainObject(chunk.usage)) return chunk.usage;
+  }
+  return null;
+}
+
 function deepFreeze(value) {
   if (value === null || typeof value !== "object") return value;
   for (const key of Object.keys(value)) deepFreeze(value[key]);
@@ -467,6 +489,12 @@ function normalizeTrackRequest(raw) {
     fail("generation_invalid", "sessionGeneration");
   }
   normalized.sessionGeneration = raw.sessionGeneration;
+  // 显式恢复模式：仅对本功能已验证的受管 resume 会话开启。旧默认（缺省 false）
+  // 仍保持“挂载前已有值不可当来源”的严格行为。
+  if (raw.resumeRestore !== undefined && typeof raw.resumeRestore !== "boolean") {
+    fail("request_invalid", "resumeRestore");
+  }
+  normalized.resumeRestore = raw.resumeRestore === true;
   const attestation = raw.hostAttestation;
   if (!isPlainObject(attestation) || attestation.verified !== true) {
     normalized.hostAttestation = null;
@@ -667,6 +695,9 @@ class ContextCapture {
     };
     this.tracked.set(session, handle);
     this.trackedById.set(normalized.nativeSessionId, handle);
+    if (normalized.resumeRestore && projectionSnapshot.asOfSeq >= 0) {
+      this._restoreSources(handle, session, projectionSnapshot.asOfSeq);
+    }
     this._ensureListeners();
     return handle;
   }
@@ -683,6 +714,133 @@ class ContextCapture {
       dispose: () => {},
     };
     return handle;
+  }
+
+  /**
+   * Explicit resume restore: re-derive config/capacity/usage *sources* from the
+   * durable events of the same verified managed session. Only invoked when the
+   * track request sets `resumeRestore: true` (our execution-session resume);
+   * the default track path never reads history and keeps its old strictness.
+   *
+   * It never rewrites a value or uses the observation time: each restored slot
+   * uses the real committed event seq/time, and only when the current registry
+   * view still equals the value reconstructed from that event.
+   */
+  _restoreSources(handle, session, cut) {
+    try {
+      const floor = Math.max(0, cut - 2000);
+      let config = null;
+      let capacity = null;
+      let pressure = null;
+      let projected = null;
+      for (let seq = cut; seq >= floor; seq--) {
+        let event;
+        try {
+          event = session.eventAt(seq);
+        } catch {
+          break;
+        }
+        if (!isPlainObject(event) || event.seq !== seq) continue;
+        const time = isClockMs(event.time) ? event.time : null;
+        if (time === null) continue;
+        const data = isPlainObject(event.data) ? event.data : null;
+        if (event.type === "request/context" && data !== null) {
+          if (
+            config === null &&
+            isIdentifier(data.provider) &&
+            isIdentifier(data.model)
+          ) {
+            config = {
+              provider: data.provider,
+              model: data.model,
+              seq,
+              time,
+              known: true,
+            };
+          }
+          if (
+            capacity === null &&
+            isSafeInteger(data.contextWindow, 1)
+          ) {
+            capacity = { seq, time, value: data.contextWindow };
+          }
+        }
+        const usage = usageFromRestoredEvent(event);
+        if (usage !== null) {
+          const pressureValue =
+            usage.inputTokens +
+            (usage.cacheReadTokens ?? 0) +
+            (usage.cacheWriteTokens ?? 0);
+          if (isSafeInteger(pressureValue)) {
+            if (pressure === null) {
+              pressure = { seq, time, value: pressureValue };
+            }
+            if (projected === null) projected = { seq, time };
+          }
+        }
+        if (projected === null && event.surfaceOp !== undefined) {
+          projected = { seq, time };
+        }
+        if (config !== null && capacity !== null && pressure !== null && projected !== null) {
+          break;
+        }
+      }
+
+      if (config !== null) handle.configSource = config;
+      const view = handle.lastView;
+      if (isPlainObject(view)) {
+        const capacityField = readField(view, "contextWindow", "capacity");
+        if (
+          capacity !== null &&
+          capacityField.present &&
+          capacityField.valid &&
+          capacityField.value === capacity.value
+        ) {
+          handle.fieldSources.contextWindow = {
+            present: true,
+            valid: true,
+            value: capacity.value,
+            seq: capacity.seq,
+            time: capacity.time,
+            known: true,
+          };
+        }
+        const pressureField = readField(view, "pressureTokens", "tokens");
+        if (
+          pressure !== null &&
+          pressureField.present &&
+          pressureField.valid &&
+          pressureField.value === pressure.value
+        ) {
+          handle.fieldSources.pressureTokens = {
+            present: true,
+            valid: true,
+            value: pressure.value,
+            seq: pressure.seq,
+            time: pressure.time,
+            known: true,
+          };
+        }
+        const projectedField = readField(view, "projectedTokens", "tokens");
+        if (
+          projected !== null &&
+          projectedField.present &&
+          projectedField.valid
+        ) {
+          handle.fieldSources.projectedTokens = {
+            present: true,
+            valid: true,
+            value: projectedField.value,
+            seq: projected.seq,
+            time: projected.time,
+            known: true,
+          };
+        }
+      }
+      handle.restoredSources = true;
+    } catch {
+      handle.anomalies.add("restore_source_failed");
+    }
   }
 
   _onProjectionChanged(session, key, value, seq) {
@@ -1129,7 +1287,7 @@ class ContextCapture {
             this.listenersReady &&
             !this.listenerIssues.some((issue) => issue.startsWith("session_disposed")),
         },
-        limitations: [...STATIC_LIMITATIONS],
+        limitations: STATIC_LIMITATIONS.map(value => handle.request.resumeRestore && value === "source_times_tracked_only_after_mount" ? "source_times_restored_from_managed_durable_events" : value),
       },
     };
     return deepFreeze(snapshot);

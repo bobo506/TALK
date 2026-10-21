@@ -1,8 +1,8 @@
 # 执行会话离线内核调用说明
 
-任务288已经实现并经独立实查、补正和自检后入库。本模块只生成计划，当前bridge/API/MCP没有导入它；此文面向后续接线开发者，不能作为已上线的操作入口。用户机制见[需求](../spec/EXECUTION_SESSION_WINDOW_REQUIREMENTS.md)，复核与证据见[288记录](../spec/EXECUTION_SESSION_CORE_REVIEW_288.md)。
+> 2026-10-22当前：本模块已由292受控DSH runner/query/ACK链路实际调用；293→294真实同窗和295新窗恢复已验，60%/缺数10/11边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工验收；实际操作见[会话复用使用说明](EXECUTION_SESSION_USAGE.md)，完整证据见[292实查](../spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)。下方旧离线状态保留其日期语义。
 
-最新开发状态：[290条件备用](EXECUTION_SESSION_FALLBACK.md)已独立实查、直接补正和集成，最终内核170项/适配76项/Node34项共280项通过。新增不可得分类、显式备用时钟和窗口计数纯状态；下方原有基础API规则保持，备用及确认归并详新指南。真实发送/ACK/存储和生产入口未接通，API经用户允许恢复后，290已于2026-10-21 19:13补收completed；角色服务未恢复，机制仍未加载。
+本模块是纯规划内核，只生成计划；当前由292通道调用，原生投递、锁/状态与ACK由调用方负责。本文保留内核开发API，实际用户入口见[使用说明](EXECUTION_SESSION_USAGE.md)。288/290阶段仅离线的历史结论见[288记录](../spec/EXECUTION_SESSION_CORE_REVIEW_288.md)和[备用复核](../spec/EXECUTION_SESSION_FALLBACK_REVIEW_290.md)，不再代表当前接线状态。
 
 ## 入口与事实来源
 

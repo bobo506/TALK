@@ -1,6 +1,8 @@
 # 缺上下文读数时的窗口计数与备用规则
 
-290的离线实现已完成首次独立实查、直接补正和自检，见[复核记录](../spec/EXECUTION_SESSION_FALLBACK_REVIEW_290.md)。本说明面向后续接线开发者。当前没有真实投递、ACK、存储或原生续用入口；运行角色尚未加载本机制。
+> 2026-10-22当前：本模块已由292受控DSH runner/query/ACK链路实际调用；293→294真实同窗和295新窗恢复已验，60%/缺数10/11边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工验收；实际操作见[会话复用使用说明](EXECUTION_SESSION_USAGE.md)，完整证据见[292实查](../spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)。下方旧离线状态保留其日期语义。
+
+290的离线实现已完成首次独立实查、直接补正和自检，见[复核记录](../spec/EXECUTION_SESSION_FALLBACK_REVIEW_290.md)。本说明面向内核调用者；当前292已将这些API接入真实投递、ACK及持久状态，实际入口见上方使用说明。
 
 ## 判定顺序
 

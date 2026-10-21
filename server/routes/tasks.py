@@ -37,6 +37,7 @@ from server.models import (
     AgentTaskTreeCheckpoint,
     AgentTaskTreeOut,
     AgentTaskTreeResume,
+    ExecutionSessionBaseOut,
     Group,
     GroupMember,
     Member,
@@ -65,6 +66,12 @@ from server.models import (
     resolve_target_binding_snapshot,
 )
 from server.routes.messages import _build_reply_lookup
+from server.execution_session_tasks import (
+    ExecutionSessionValidationError,
+    normalize_execution_session_metadata,
+    normalize_execution_session_state,
+    sha256_utf8,
+)
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -1470,6 +1477,10 @@ def _create_task_with_hall(
     max_clarification_rounds: int,
     now: datetime,
     session: Session,
+    execution_session: dict | None = None,
+    execution_session_base_text: str | None = None,
+    execution_session_request: dict | None = None,
+    execution_session_audit: dict | None = None,
 ) -> AgentTask:
     # ROLE-BINDING-B1b（合同 §7.3/§7.5）：本函数是新任务绑定快照的**唯一**构造/写入点，
     # 位于构造 Group/GroupMember/AgentTask **之前**，因此普通任务、子任务与 schedule
@@ -1500,6 +1511,31 @@ def _create_task_with_hall(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="project_id not found",
         ) from exc
+    # 292：执行会话校验复用同一次绑定事实，不在 create_task 再发起第二条
+    # resolve 读取（保持“唯一构造/写入点”约束）。校验失败时不建 Group/Hall。
+    if execution_session_request is not None and execution_session is None:
+        try:
+            (
+                execution_session,
+                execution_session_base_text,
+                execution_session_audit,
+            ) = normalize_execution_session_metadata(
+                execution_session_request,
+                project_id=project_id,
+                requester_id=created_by,
+                target_member_id=target_member_id,
+                binding_snapshot=binding_snapshot,
+                task_kind=task_kind,
+                parent_task_id=parent_task_id,
+                session=session,
+            )
+        except ExecutionSessionValidationError as exc:
+            if session.in_transaction():
+                session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
     hall_group_id = f"group:task-{uuid4().hex}"
     session.add(
         Group(
@@ -1555,6 +1591,9 @@ def _create_task_with_hall(
         workflow_status="assigned",
         target_binding_snapshot=binding_snapshot,
         target_binding_state=binding_snapshot["state"],
+        execution_session=execution_session,
+        execution_session_base_text=execution_session_base_text,
+        execution_session_audit=execution_session_audit,
         created_at=now,
         updated_at=now,
     )
@@ -1713,6 +1752,8 @@ def create_task(
     # （子任务继承根任务项目），不从客户端绕过。
     _ensure_target_role_not_archived(project_id, body.target_member_id, session)
 
+    # 292：执行会话元数据在 _create_task_with_hall 内复用同一次绑定事实校验，
+    # 保持快照唯一构造/写入点，也保证校验失败时不创建 Group/Hall。
     task = _create_task_with_hall(
         target_member_id=body.target_member_id,
         created_by=current.id,
@@ -1740,6 +1781,7 @@ def create_task(
         max_clarification_rounds=body.max_clarification_rounds,
         now=now,
         session=session,
+        execution_session_request=body.execution_session,
     )
     if task.id is None:
         session.rollback()
@@ -1983,6 +2025,104 @@ def get_task(
     task = _get_task(task_id, session)
     _ensure_task_visible(task, current)
     return task
+
+
+@router.get(
+    "/{task_id}/execution-session-base",
+    response_model=ExecutionSessionBaseOut,
+)
+def get_execution_session_base(
+    task_id: int,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """292：按基础任务引用取回冻结基础合同（仅本任务双方可见）。
+
+    - 只接受本执行会话任务/基础任务的发起者或目标成员；
+    - 重新核验基础任务与本任务的项目/发起者/目标/工作线/工作区/绑定；
+    - 正文来自基础任务冻结列，不由调用参数提供；哈希每次重算。
+    """
+
+    task = _get_task(task_id, session)
+    _ensure_task_visible(task, current)
+    if current.id not in {task.created_by, task.target_member_id}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="execution session base is limited to the task participants",
+        )
+    metadata = task.execution_session if isinstance(task.execution_session, dict) else None
+    if metadata is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="task has no execution session metadata",
+        )
+    base_task_id = metadata.get("base_task_id")
+    if base_task_id is None:
+        base = task
+    else:
+        if isinstance(base_task_id, bool) or not isinstance(base_task_id, int):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="execution session base reference is invalid",
+            )
+        base = _get_task(base_task_id, session)
+        _ensure_task_visible(base, current)
+    base_metadata = (
+        base.execution_session if isinstance(base.execution_session, dict) else None
+    )
+    if base_metadata is None or base.execution_session_base_text is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="execution session base contract is unavailable",
+        )
+    expected = {
+        "continuity_key": metadata.get("continuity_key"),
+        "project_id": metadata.get("project_id"),
+        "requester_id": metadata.get("requester_id"),
+        "target_member_id": metadata.get("target_member_id"),
+        "base_contract_version": metadata.get("base_contract_version"),
+        "base_contract_sha256": metadata.get("base_contract_sha256"),
+        "binding_fingerprint": metadata.get("binding_fingerprint"),
+        "workspace_root": metadata.get("workspace_root"),
+        "workspace_identity": metadata.get("workspace_identity"),
+    }
+    for key, value in expected.items():
+        actual = base_metadata.get(key)
+        if key in {"base_contract_version", "base_contract_sha256"}:
+            actual = base_metadata.get(key)
+        if actual != value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"execution session base {key} mismatch",
+            )
+    if base_metadata.get("base_task_id") is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="execution session base must be the first immutable task",
+        )
+    if base.created_by != task.created_by or base.target_member_id != task.target_member_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="execution session base participants mismatch",
+        )
+    if sha256_utf8(base.execution_session_base_text) != expected["base_contract_sha256"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="execution session base contract hash mismatch",
+        )
+    return ExecutionSessionBaseOut(
+        task_id=int(base.id),
+        continuity_key=str(expected["continuity_key"]),
+        project_id=str(expected["project_id"]),
+        requester_id=str(expected["requester_id"]),
+        target_member_id=str(expected["target_member_id"]),
+        base_contract_version=str(expected["base_contract_version"]),
+        base_contract_sha256=str(expected["base_contract_sha256"]),
+        base_context=base.execution_session_base_text,
+        binding_fingerprint=str(expected["binding_fingerprint"]),
+        workspace_root=str(expected["workspace_root"]),
+        workspace_identity=str(expected["workspace_identity"]),
+    )
 
 
 @router.get("/{task_id}/relations", response_model=list[AgentTaskRelationOut])
@@ -3105,6 +3245,30 @@ def complete_task(
     _ensure_result_message_owner(body.result_message_id, current, task, session)
     instance = _ensure_instance_owner(task.instance_id, current, session)
 
+    # 292：只有持有效 claim 的目标 agent 能回传最小窗口状态；普通旧任务不接收
+    # 该字段，避免把无关任务写入伪执行会话状态。
+    execution_session_state_value = None
+    if body.execution_session_state is not None:
+        if not isinstance(task.execution_session, dict):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="execution_session_state is only valid for execution-session tasks",
+            )
+        try:
+            execution_session_state_value = normalize_execution_session_state(
+                body.execution_session_state
+            )
+            for key, expected in {'task_id':task.id,'attempt':task.attempt,
+                    'base_contract_sha256':task.execution_session.get('base_contract_sha256'),
+                    'base_contract_version':task.execution_session.get('base_contract_version')}.items():
+                if key in execution_session_state_value and execution_session_state_value[key] != expected:
+                    raise ExecutionSessionValidationError(f'execution_session_state.{key} 与当前任务不一致')
+        except ExecutionSessionValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+
     workflow_status = {
         "succeeded": "submitted",
         "failed": "failed",
@@ -3137,6 +3301,11 @@ def complete_task(
             result_message_id=body.result_message_id,
             gate_verdict=gate_verdict,
             last_error=body.last_error,
+            execution_session_state=(
+                execution_session_state_value
+                if execution_session_state_value is not None
+                else task.execution_session_state
+            ),
             finished_at=now,
             updated_at=now,
         )

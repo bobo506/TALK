@@ -248,6 +248,7 @@ class TalkClientSync:
         authorization_ttl_seconds: int | None = None,
         milestone_test_required: bool = False,
         max_clarification_rounds: int = 1,
+        execution_session: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.create_task(
@@ -270,6 +271,7 @@ class TalkClientSync:
                 authorization_ttl_seconds=authorization_ttl_seconds,
                 milestone_test_required=milestone_test_required,
                 max_clarification_rounds=max_clarification_rounds,
+                execution_session=execution_session,
             )
         )
 
@@ -410,6 +412,7 @@ class TalkClientSync:
         last_error: str | None = None,
         claim_token: str | None = None,
         gate_verdict: dict[str, Any] | None = None,
+        execution_session_state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return self._submit(
             self._client.complete_task(
@@ -419,8 +422,12 @@ class TalkClientSync:
                 last_error=last_error,
                 claim_token=claim_token,
                 gate_verdict=gate_verdict,
+                execution_session_state=execution_session_state,
             )
         )
+
+    def get_execution_session_base(self, task_id: int) -> dict[str, Any]:
+        return self._submit(self._client.get_execution_session_base(task_id))
 
     def create_task_schedule(
         self,

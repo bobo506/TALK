@@ -1,5 +1,7 @@
 # 会话机制第五片：完整可用纵向接线（292）
 
+> 2026-10-22 01:06当前：292已独立实查/直接补正、正常加载并通过293→294真实同窗及295新窗恢复；60%/10次边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工里程碑验收；旧MCP连接需重连，SDK/API已可用。详[292实查](EXECUTION_SESSION_USABLE_REVIEW_292.md)与[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。以下旧阶段状态保留其日期语义。
+
 2026-10-21 23:01（Asia/Shanghai）。用户明确要求同窗口、阈值换窗和十轮兜底均真正可用才算完成，未完成继续本功能。292已派DeepSeek首次实现，creator agent:codex、target agent:deepseek、project `prj_e8fe7066bbec`，Hall `group:task-221d84cd748544a89716bb183c51eb0d`，22:56:32创建queued/assigned。原始任务及创建回执在`.tmp/execution-session-usable-v1/coordination/`。
 
 ## 整体完成标准

@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-22 01:06（Asia/Shanghai）— 292完整会话链路实查、补正、实际加载与收取
+
+- 用户通知好了后，核292 succeeded/submitted、DeepSeek idle/无current_task；原19份候选及证据冻结，80项目/57原生冻结和安装57源SHA一致。原结果2898 complete自报/SHA ef617e7fb6f02ac692fbd803c3d9176b9e0c80d74e1ca35d095cfb46eed3f19b保持。Codex首次独立实查发现缺口，按已确认范围直接修正、自检，不派返修/Kimi/新片。
+- 补正预检被跳过、任务/通道租约及父取消、query仍用旧快照、运行权限/插件/推理指纹、重复任务再次调模型、未知送达旧窗仍active、回执冲突及非原子提交、状态类型/摘要/任务关联、错误路径/清理边界和原生版本保护；再补REST/SDK/MCP统一基础要求与每任务私有审计，要求变更拒绝旧引用。修改19源/测试，四个可空列不回填历史。详[292实查](spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)。
+- 原候选独立522 Python/35+3 Node，修正后完整组533 Python中532过、35+4 Node过；唯一长度断言1523<1500为既有基线失败保留。最后定向164 Python/5 runner Node全过；新增模型重复、未知投递、冲突ACK、fresh query、计数恢复/低值>10、原子回滚及路径等反例闭合。自修后测试不称外部独立复核。
+- 安装版DSH+fake模型14次真实投递验证59.9%续同ID/60%后新ID、缺数1..10同ID/第11新ID且完整首轮；4任务SDK/MCP→REST→claim→bridge→DSH→ACK/结果读回通过。第一次隔离API因夹具端口18090失配失败，保留原证据，v2修正后通过。
+- 空闲核原manager18856/bridge22812、无running任务后普通stop DeepSeek；集成19文件，原API launcher正常重载四nullable列，292条旧任务旧列逐行哈希不变。就绪脚本因venv包装PID6320与实际launcher2624不一致误报，核父子关系、子10876创建时间/schema通过，没有二次重启。原manager18856普通start到gen30、launch205e7f05-1b0c-4e96-becf-8cbb154f75a6/实例ins_7a91214893c6，running/ready，不清owner。
+- 首次真实创建因project_root_path=null获422，未建任务/调模型；只按已授权当前工作区登记D:\claude-test\TALK，核本地项目ID及其它项目字段不变，profile仍human-only。真实293→294同原生session-729a2e89-716d-4bd7-831f-005a36865ea3，计数1→2、续轮增量仍回想基础验证码；295 force_new为session-8ac3ad08-679a-4211-8ecc-389e382a7539，计数1且完整恢复，同样回想成功。三条succeeded/completed均收取；实际低占用，不冒称真实60%压力实验。
+- 292于01:03:04正式收取completed；最终核其它历史/286暂停、配置绑定及其它角色保持，三个真实ACK已计数、尝试confirmed、sidecar无助手正文、通道释放、无running任务。原模型/Key/HOME不变；原证据在.tmp/execution-session-usable-v1/independent-review292，不读旧原生历史。
+- [使用说明](guides/EXECUTION_SESSION_USAGE.md)、用户手册、模块/需求/排期及进度同步。当前DSH已工程接通可用，人工里程碑仍待；现有Codex旧MCP须重连加载参数，SDK/API已实机可用，GUI可见/手工续写与费用收益未验；headless T未知，不开主动长等待。宿主统一启动问题继续后置，验收及下一片明确确认前不派新片，Kimi/286/日志/21600约束保持。
+
 ## 2026-10-21 23:01（Asia/Shanghai）— 用户明确整体可用标准，292完整纵向接线已派
 
 - 用户澄清同窗口、60%阈值换窗、条件十轮兜底必须完整实现并真正使用才算完成，未完成继续本功能。Codex明确288–291仅离线/方案阶段；本次授权292完整接线，宿主统一启动问题延至本功能整体可用/验收后，旧291后切换顺序被替代。

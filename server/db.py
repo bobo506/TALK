@@ -173,6 +173,21 @@ def init_db() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE agent_tasks ADD COLUMN target_binding_state TEXT"
             )
+        # 292：只 ADD 可空列/JSON，不回填旧行；旧任务字段保持 NULL 即旧行为。
+        if "execution_session" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN execution_session JSON"
+            )
+        if "execution_session_base_text" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN execution_session_base_text TEXT"
+            )
+        if "execution_session_state" not in task_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE agent_tasks ADD COLUMN execution_session_state JSON"
+            )
+        if "execution_session_audit" not in task_columns:
+            conn.exec_driver_sql("ALTER TABLE agent_tasks ADD COLUMN execution_session_audit JSON")
         conn.exec_driver_sql(
             """
             UPDATE agent_tasks
