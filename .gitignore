@@ -61,6 +61,12 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# 执行会话的本地账本与原生投递临时文件（失败证据也只在本机保留）
+/.talk/execution-session-store.sqlite3
+/.talk/execution-session-store.sqlite3-wal
+/.talk/execution-session-store.sqlite3-shm
+/.talk/spawns/
+
 # Flask stuff:
 instance/
 .webassets-cache
