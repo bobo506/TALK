@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-21 21:10（Asia/Shanghai）— 原DeepSeek宿主恢复、普通启动及真实心跳通过
+
+- 用户明确回复“允许恢复宿主并启动DeepSeek”。本次只恢复原DeepSeek宿主管理器、经普通入口启动一次，配置/模型/Key/HOME、286暂停及其它角色保持，不派新任务。此前关闭页面已获用户确认通过；用户start gen26未领取、随后gen27已关闭的诊断与失败证据保留。
+- 原入口SHA11c3cf955831d19fbd8005c4ba2f2549d5dcb62fd490c473a492ca89aaeb483e/choice rmc_3a5435e0e283核验后隐藏恢复wrapper3284/manager18856；先核宿主就绪且无旧进程接管，再普通start一次。新gen28/launch6ca1765d-7fd0-4cfa-b3f6-a5179b32c8fa/实例ins_ffc603d6fc88/bridge22812，OS父链22812→18856。
+- 21:06:41公开running/ready、ownership=true、无错误，实例idle/无current_task；同一实例心跳13:05:39.129391→13:06:39.185264 UTC推进60.055873秒，manager health同步推进。配置/全部绑定/286整行哈希及其它四角色记录不变，running任务0，无新任务/模型探针/API重启或产品代码变化。
+- 同步[操作记录](spec/DEEPSEEK_HOST_RESTORE_20261021.md)、手册/恢复指南/简报/模块和当前进度；证据.tmp/deepseek-start-diagnostic-20261021/restore/verification.json，原关闭恢复证据不覆写。本次仅文档QA与Git收尾，不重复运行128项已通过自检；启动页面待用户刷新确认。
+- API与角色宿主分别运行，启动API不代表原宿主自动恢复。本次不扩为开机自启/注销重启驻留验证、其它角色恢复或下一片；290离线边界、286/日志/21600/Kimi约束保持，收尾后不派新任务。
+
+## 2026-10-21 20:58（Asia/Shanghai）— 关闭状态人验通过；重新启动未被宿主领取
+
+- 用户反馈“是关闭状态”，关闭超时补正/单次恢复的页面验收通过。用户随后尝试重新启动未成功，Codex只读核本人agent:codex/agent、原绑定保持。
+- 19:47:59 start gen26从未claimed/reported，当前已经expired；20:56核当前gen27 stopped、无归属/PID、can_start=true。原DeepSeek manager11612不存在、无匹配宿主/残留drain，health仍为旧时间；286仍queued/paused/无实例。不是已进入原生模型阶段后的失败，不擅自覆盖最新关闭意图。
+- 已单独询问用户是否允许仅恢复原DeepSeek宿主管理器并普通启动一次，保持配置/286/其它角色，无新任务派发；许可未到前只读，不重置归属、不修改产品或启停。诊断证据.tmp/deepseek-start-diagnostic-20261021/diagnostic.json，本记录不把请求许可写成已授权。
+
 ## 2026-10-21 19:46（Asia/Shanghai）— DeepSeek关闭超时与paused根任务守卫补正，单次已关闭恢复
 
 - 用户报告点击关闭后一直“关闭中”，只读诊断旧manager11612/bridge12284已不存在，stop动作19:20:19 gen24 pending无claim，19:22:19截止后GET仍stopping。旧过期收敛仅在控制动作执行；286 queued/control_status=paused、无领取实例token/租约，但人工恢复仍按queued阻挡。用户明确确认修复范围，Codex直接实施/自检，不派新任务或给离线DeepSeek/Kimi返工。

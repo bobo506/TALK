@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-21 21:10：用户另行允许恢复原DeepSeek宿主并普通启动一次，manager18856/bridge22812、gen28 running/ready/idle，同一实例周期心跳推进60.055873秒。配置/绑定、286暂停及其它角色保持，无新派发/产品改码。关闭状态页面已通过，启动页面待确认；API恢复不等于角色宿主恢复，详[操作记录](DEEPSEEK_HOST_RESTORE_20261021.md)。以下为此前快照。
+
 > 2026-10-21 19:46：用户确认后直接修复过期stop无限关闭中和paused根任务误阻挡；102 Python/26 Node共128项通过。原API正常重载，DeepSeek19:42:24 gen24→25人工确认已关闭、归属释放、未启动；286及其它角色/配置绑定不变，无新派发。当前页面待Ctrl+F5验收；详[本片记录](ROLE_SERVICE_STOP_TIMEOUT_FIX_20261021.md)。
 
 > 2026-10-21 19:15：用户允许后仅恢复原API，healthz正常，290已于19:13:09补收completed，原2896/SHA保持。配置和五角色归属/进程事实不变，五角色记录进程原已退出且本轮未恢复；无新任务派发。57cb119/280项与会话机制未加载边界保持，详[290复核](EXECUTION_SESSION_FALLBACK_REVIEW_290.md)。

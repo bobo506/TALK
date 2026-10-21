@@ -25,6 +25,8 @@ python -X utf8 scripts/role_service_recovery.py apply --operator-key-file OPERAT
 
 缺确认不执行；旧计划任何关键事实变化即拒绝。输出恢复审计ID、原/新世代、确认者与时间。此动作只标记人类确认已停止，不spawn或杀进程。恢复后的默认结果是“未启动（已关闭）”；是否随后启动须依本次授权，不能自动启动。另获启动授权时，再按该角色既有宿主入口及页面/普通start启动：新管理器只持有本次新Popen，生成新launch/预分配实例，不续接旧归属。
 
+TALK API与各角色宿主管理器分别运行；仅恢复API不会自动恢复原宿主。另获启动授权后，先确认对应原宿主可处理请求；恢复宿主本身不代替普通start。已有start尚在处理时观察同一动作，不重复提交。2026-10-21 DeepSeek原宿主恢复、普通启动及周期心跳证据见[实际记录](../spec/DEEPSEEK_HOST_RESTORE_20261021.md)。
+
 ## 服务端入口与审计
 
 - `GET /api/projects/{project_id}/roles/{member_id}/service/recovery-plan`：human-only，只读可恢复候选及所需预期字段，不含token/argv/绝对路径。
