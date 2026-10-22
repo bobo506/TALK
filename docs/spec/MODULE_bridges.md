@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-22 23:10：用户新建workbuddy-k3原创建意图经正式worker处理为provisioned，窄宿主普通启动到gen2/ready/idle。MCP312→313同原生会话1→2、314新窗恢复1均通过并收取；3confirmed尝试/通道0，311条旧任务及六旧角色/绑定/配置/286保持。新角色和manager17772保留运行，原WorkBuddy接入验证仍停止；未改产品代码。原页面请求无人消费及gen1过期是部署缺口，配置worker常驻/宿主统一启动仍待另片确认，不把手动处理称自动链路完成。详[WorkBuddy适配](EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)和当前进度。
+
 > 2026-10-22 20:20：WorkBuddy按用户批准的内置CodeBuddy Code独立CLI形态补齐，新增native/channel/bridge/窄host及普通任务接线。403项Python、安装版16次正式投递边界、309→310真实同窗1→2和311新窗恢复均通过并收取；原生/proof/账本SHA一致，通道0。原身份Key和模型源复用、HOME独立，仅新增本项目WorkBuddy登记和精确绑定；308条历史、原五角色/配置绑定权限及286保持。API正常重载，验后WorkBuddy普通停止gen2/无owner、manager正常drain退出，运行器adapted。四类运行器的授权形态现已接通，人工验收待确认，不代表WorkBuddy桌面窗口控制或主动MCP等待；下一片仍须确认。详[WorkBuddy适配](EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)和[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。
 
 > 2026-10-22 18:02：用户明确允许Kimi短文本生产闭环，禁止开发派发。303—308六条已派发/领取/交付/收取：K3与旧K2.8均同窗1→2、新窗恢复计数1；原生模型/双SHA及持久计数核实。原入口正常启停后两个角色恢复停止无owner，临时宿主正常drain退出；302条旧任务、配置/绑定/Key/权限、286及其它角色保持。常规开发暂停、下一片另行确认，详[Kimi适配](EXECUTION_SESSION_KIMI_ADAPTATION.md)。

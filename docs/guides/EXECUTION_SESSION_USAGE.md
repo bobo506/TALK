@@ -119,11 +119,13 @@ K2.8和K3共用一套`kimi-code`适配，选择精确角色和已有模型别名
 
 ### WorkBuddy内置引擎独立CLI
 
+2026-10-22 23:10补验：用户新建的“workbuddy-k3”已完成正式配置并保留运行/空闲，成员`agent:prj-e8fe7066bbec.workbuddy-k3-61b7e314`，有自己的独立Key及HOME。MCP312→313同原生会话/计数1→2，314新窗完整恢复/计数1，三条已收取。发起者可按本节参数选择这个新成员；当前不必重复启动它的宿主。原创建意图曾因没有配置worker停在等待，既有启动请求随后超时；本轮手动消费原意图并普通启动成功，配置worker常驻/随TALK统一启动仍待单独处理。
+
 本机WorkBuddy5.8.3自带CodeBuddy Code2.161.0，作为独立`workbuddy`运行器接入；以原WorkBuddy.exe和包内CLI启动，不控制或续接原WorkBuddy桌面任务窗口。角色`agent:workbuddy`沿原身份Key/模型源`custom-local:kimi-k3`，会话HOME独立，不复制桌面模型Key或历史。REST/SDK/MCP参数同上，目标换为该成员即可。
 
 309→310同原生ID`21ca2f60-7439-47da-82b8-a5a4c3d72fa7`、计数1→2，第二条只发增量仍正确答“青禾42 / 鹿鸣57”；311新ID`600b5ced-5e22-4db8-838e-62561b15733b`恢复基础“鹿鸣57”、计数1。三条已收取。真实占用取最近原生assistant `usage.totalTokens`，容量按精确模型`maxInputTokens`并核result `contextWindow`；本次容量1000000。正式用户ID/请求ID/正文SHA须同时匹配stdout、原生JSONL和最小proof；工具/预检不计数。
 
-角色现为stopped/gen2/无owner，临时宿主已退出。需要使用时，先在项目根目录由已授权管理员手动启动窄宿主，然后从普通角色页启动“WorkBuddy接入验证”：
+原`agent:workbuddy`“WorkBuddy接入验证”现为stopped/gen2/无owner，首次验收临时宿主已退出；新“workbuddy-k3”运行状态见本节首段。需要使用原接入验证角色时，先在项目根目录由已授权管理员手动启动其窄宿主，然后从普通角色页启动“WorkBuddy接入验证”：
 
 ```powershell
 .venv\Scripts\python.exe -B -X utf8 scripts/workbuddy_role_host.py serve `

@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-22 23:10（Asia/Shanghai）— 用户新建workbuddy-k3处理并验证312—314，保留新角色运行
+
+- 用户告知刚创建WorkBuddy角色似乎失败，要求检查并考虑用它验证会话复用。当前Codex只读核明原意图role-d625d012175555c1768b8fc27a028ea0，名称workbuddy-k3、runner:workbuddy-embedded-cli、choice rmc_150e9866f272均正确；status=requested/member=null/未领取，无失败回执，原项目配置入口enabled，但没有worker消费。仅正式RoleProvisionWorker.process该原意图一次，独立身份/Key/档案及精确绑定预检通过，status=provisioned，生成agent:prj-e8fe7066bbec.workbuddy-k3-61b7e314；不复制旧角色Key，不处理其它请求。
+- 页面已有gen1/start在没有宿主期间自然过期，claimed_at=null、无owner；保留readiness_timeout/expired原记录。窄manager17772就绪后按can_start普通start到gen2/ins_4501cac619eb，bridge19324，running/ready；没有所有权恢复、强杀、重复启动宿主或重建身份。临时辅助脚本首次误读公开请求payload及初始状态假设在写入前停止，按真实保存意图/既有启动事实修正，没有产品代码变更。
+- 当前agent:codex经真实MCP派发/领取链创建并收取312、313、314。312→313同原生session48d38738-4bf9-430f-830c-cce299e309e9、计数1→2；增量未重发暗号或基础，仍答“白鹭28 / 云杉64”。314 force_new为2880f855-925f-48df-b406-07dd33a9ba09，完整恢复“云杉64”、计数1。三条general短文本均succeeded/completed/已收取，消息2939/2940/2944；无开发/工具/文件操作。真实用量32101/32576/32128，容量1000000；60%/条件10→11继续沿用此前受控证据，不消耗真实长上下文。
+- 原生JSONL/proof/投递账本的用户ID/请求ID/正文SHA逐条一致，3正式输入/3confirmed尝试/通道0，新旧WorkBuddy HOME隔离。311条原任务逐行SHA、六旧角色/服务/绑定、配置、286、模型源文件SHA及mtime保持；33份当前产物/18915份独立HOME文件凭据原值匹配0，本次原生writer进程0。证据.tmp/workbuddy-new-role-validation/含inspection、正式worker、原gen1超时、普通gen2/start、MCP任务/收取、原生和最终保护回执。只做既有产品的实际配置/验证，不重跑无改动403项单测。
+- 按用户验证/使用新角色的意图，新workbuddy-k3保留running/ready/idle及其窄宿主17772，旧WorkBuddy接入验证和三个Kimi仍停止，原DSH/Codex保持。页面创建自动消费及随TALK统一启动尚未形成常驻链路，本轮手动处理不冒称补齐统一宿主。人工里程碑、Kimi开发暂停、286和下一片先确认保持；同步当前进度、适配/使用说明及相关入口文档，常规Git收尾。
+
 ## 2026-10-22 22:36（Asia/Shanghai）— 中断恢复核对，生产成果保持，补文档Git收尾
 
 - 用户告知刚中断并要求检查。产品9ac1dbf已在远端，8份收尾文档尚未提交；没有丢失产品改动或重开模型任务。本地只读数据库确认309—311均succeeded/completed/已收取，308条原任务逐行SHA、原五角色服务行、配置和286保持；WorkBuddy仍gen2/stopped/无owner/pid为空。MCP当前agent:codex，WorkBuddy bound/offline；对human创建任务的当前agent读取权限不扩大，改以已授权项目本地只读事实核验。

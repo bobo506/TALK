@@ -39,6 +39,8 @@
 
 ## 会话复用的整体完成判据（2026-10-21，用户最新明确要求）
 
+- 2026-10-22 23:10最新实际角色补验：用户要求检查新建workbuddy-k3并用其验证本功能。原页面意图requested/无人领取、runner/choice正确，Codex仅通过正式worker处理这条原请求，provisioned并生成独立agent:prj-e8fe7066bbec.workbuddy-k3-61b7e314/Key/档案；既有页面gen1未领取即超时原记录保留，窄manager17772后普通start到gen2/ins_4501cac619eb/bridge19324。MCP312→313真实同窗1→2、314新窗基础恢复1均通过并收取，原生双ID/SHA、持久计数与通道0通过；311条旧任务、原六角色/绑定/配置Key权限/模型源及286保持。新workbuddy-k3保留running/ready/idle供用户使用，原WorkBuddy接入验证及三个Kimi仍停止，DSH/Codex保持。配置worker未常驻、宿主统一启动仍未另行实施，本次手动配置/启动不冒称修复该部署缺口；人工里程碑及下一片先确认保持。详[WorkBuddy适配](docs/spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)与当前进度。
+
 - 2026-10-22 20:20最新：用户批准WorkBuddy内置引擎作为独立CLI，当前Codex直接实现/自检已完成第四类运行器。WorkBuddy5.8.3内置CodeBuddy Code2.161.0，403项相关Python、安装版fake模型16次正式投递（含60%与受控10→11）、309→310真实同窗/计数1→2及311新窗基础恢复均通过，三条已收取。原身份Key复用，仅新增本项目WorkBuddy名册/imported角色/独立运行器和精确绑定，原五角色/绑定、308条历史、原配置/Key/权限与286保持；sync正常更新名册时间戳。API正常重载child21996，临时窄宿主普通启停后WorkBuddy最终gen2/stopped/无owner，manager正常drain退出，运行器adapted。当前覆盖DSH/Codex/Kimi Code/WorkBuddy独立CLI的已核验组合，不代表WorkBuddy桌面窗口控制、主动MCP等待或另一K2.8成员独立HOME通过。人工里程碑待确认，Kimi常规开发仍暂停，下一片/宿主统一启动仍须明确确认。详[WorkBuddy适配](docs/spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)、[使用说明](docs/guides/EXECUTION_SESSION_USAGE.md)和当前进度；下列较早状态保留日期语义。
 
 - 2026-10-22当前WorkBuddy片已获确认：用户回复“可以，继续”，随后根据桌面入口实查明确选择“允许以内置引擎作为独立运行器接入”。本片由当前Codex直接开发/自检，基于WorkBuddy5.8.3内置CodeBuddy Code2.161.0作为独立CLI运行器，实现同窗、真实占用60%、条件10/11、基础恢复及任务闭环；不能冒称控制WorkBuddy桌面窗口。既有角色/模型/Key/绑定/权限和286保持；Kimi不派开发任务，下一无关切片仍另行确认。
