@@ -24,6 +24,26 @@ BASE_SHA = hashlib.sha256(BASE_TEXT.encode("utf-8")).hexdigest()
 
 
 class ExecutionSessionTaskApiTests(RouteTestCase):
+    def test_codex_binding_can_create_and_reference_base_but_kimi_stays_unsupported(self):
+        with self.session() as session:
+            runner=session.get(RunnerRegistry,'runner:api-dsh')
+            runner.runtime='codex'
+            binding=session.get(ProjectRoleBinding,(PROJECT,TARGET))
+            binding.provider_id='openai'; binding.model_id='gpt-6.1-sol'; binding.model_alias='gpt-6.1-sol'
+            session.add(runner);session.add(binding);session.commit()
+        first=self._create(execution_session=self._base_request())
+        self.assertEqual(first.status_code,201,first.text)
+        self.assertEqual(first.json()['execution_session']['runtime'],'codex')
+        follow=self._base_request(); follow.pop('base_context'); follow['base_task_id']=first.json()['id']
+        second=self._create(execution_session=follow)
+        self.assertEqual(second.status_code,201,second.text)
+        self.assertEqual(second.json()['execution_session']['base_contract_sha256'],first.json()['execution_session']['base_contract_sha256'])
+        with self.session() as session:
+            runner=session.get(RunnerRegistry,'runner:api-dsh');runner.runtime='kimi-code'
+            session.add(runner);session.commit()
+        unsupported=self._create(execution_session=self._base_request())
+        self.assertEqual(unsupported.status_code,422,unsupported.text)
+
     def test_requirements_snapshot_is_private_and_changed_requirements_require_new_base(self):
         from server.models import AgentTask
         with self.session() as session:

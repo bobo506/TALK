@@ -57,6 +57,9 @@ TASK_PREFLIGHT_SYSTEM_PROMPT = (
     "本会话只能判断任务信息是否足以开始执行,不得修改文件、运行任务或产出最终交付。"
     "runner 给出的标题和任务原文已经是完整权威输入,Task Hall 没有补充消息本身不算信息缺失;"
     "不得要求请求者重复标题、任务原文或上下文,只能询问执行必需且当前确实没有给出的具体事实。"
+    "当runner明确提供执行会话续轮预检边界时,正式执行阶段会在独立核验会话和阈值后恢复可用历史;"
+    "不要仅因隔离预检未复制旧对话而要求重传上一轮内容。预检就绪只允许进入正式规划,不证明会话已经恢复;"
+    "与旧对话无关的新增必要事实缺失仍应正常澄清。"
     "信息充分时只输出 TALK_TASK_PREFLIGHT JSON;信息不足时把同一轮必须回答的问题集中到一个 question 字段。"
     "不要调用任何 TALK 工具;runner 会原子推进任务状态并把问题写入对应 Task Hall。"
 )
@@ -3063,8 +3066,20 @@ async def _prepare_task_before_claim(
     # 仅预检副本补基础合同；正式续轮的增量正文与任务账本不被改写。
     preflight_task = task
     if preflight_base_context is not None:
+        continuation_note = ""
+        execution_meta = task.get("execution_session") or {}
+        if (runtime == "codex" and execution_meta.get("runtime") == "codex"
+                and type(execution_meta.get("base_task_id")) is int
+                and execution_meta["base_task_id"] > 0 and not execution_meta.get("force_new")):
+            continuation_note = (
+                "[[执行会话续轮预检边界]]\n"
+                "本轮通过已核基础合同引用声明同功能续接；正式执行器随后独立核验原生窗口、权限、历史和占比，"
+                "满足条件才恢复该窗口。此隔离预检不复制旧原生记录，也不计交办轮次。"
+                "仅因任务引用上一轮对话而本预检未携带旧记录，不要求用户重传；预检就绪只表示可进入正式规划，"
+                "不能承诺一定续用、越过阈值或补造事实。其它新增必要参数缺失仍正常澄清。\n\n"
+            )
         preflight_task = {**task, "content": (
-            "[[已核冻结基础合同，仅供本次只读预检]]\n"
+            continuation_note + "[[已核冻结基础合同，仅供本次只读预检]]\n"
             + preflight_base_context + "\n\n[[本次增量]]\n"
             + str(task.get("content") or "")
         )}
@@ -3245,6 +3260,8 @@ async def _handle_execution_session_claimed(
         ExecutionSessionRunError,
         run_execution_session_task,
     )
+    if (claimed.get("execution_session") or {}).get("runtime") == "codex":
+        from bridges.codex_execution_channel import run_execution_session_task
 
     task_id = int(claimed["id"])
     creator = claimed.get("created_by")
@@ -3394,7 +3411,7 @@ async def handle_queued_task(
     task_id = int(task["id"])
     execution_task = bool(
         execution_context is not None
-        and str(runtime).lower() == "dsh"
+        and str(runtime).lower() in {"dsh", "codex"}
         and isinstance(task.get("execution_session"), dict)
     )
     runner = command_runner or run_cli_command

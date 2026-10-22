@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-22 16:20（Asia/Shanghai）— Codex原生会话适配由Codex直接完成、自检及真实加载
+
+- 用户明确下一角色为Codex，并要求本会话自行开发，不派DeepSeek。本片代码/修正/测试均Codex自检，不称外部独立复核。基线28a69d9，8原源冻结；新增Codex原生stdio与通道，API扩bound/codex、bridge按runtime分派，复用已有内核/sidecar/合同/计数。TALK页面保持。
+- 原生0.163.0沿原gpt-6.1-sol/xhigh、独立HOME/read-only/never；最近请求用量/原生容量用于60%，缺数可信计数10/11及首轮/增量/新窗完整恢复保持。补延迟落盘、正式UserMessage、Windows扩展路径、resume同设置回执白名单、重复/未知/配置/来源异常和取消后计数。
+- 原TALK测试299在领取前错误索要上一轮暗号，未正式投递；正常取消保留原问题和失败。修经合同引用续轮的隔离预检边界，仍可对新增必要事实正常澄清；最后205项Python全部通过，覆盖DSH回归。60%/10/11为受控原生格式+假模型边界，真实模型低占用，不冒称压力验证。
+- 当前桌面agent:codex向同名角色自派被400正常拒绝，未建任务；真实验收由已授权human:bobo普通SDK/API创建和收取。300→301同原生01a162a3-eee4-7f63-b8d7-54ee978f0e71/计数1→2，第二轮只增量仍回复“海星84 / 银杏73”；302 force_new新ID01a162a6-bdc5-7a30-978e-82fd55d2e9a6/计数1，恢复“银杏73”，三条均收取。298原首轮收取保留。
+- 原API沿正常launcher重载，launcher20664/子20500，297条旧任务哈希不变。Codex原stopped/无owner，从已退出原manager恢复到19564、普通start19，预检补正后普通stop/start21；实例ins_e98e909598ec/bridge8816，running/ready/idle，不解除owner。配置/绑定、其它角色/286原文及暂停、6原入口/DSH内核源SHA保持；无在途任务或Codex通道。
+- 已同步[Codex验收](spec/EXECUTION_SESSION_CODEX_ADAPTATION.md)、[使用说明](guides/EXECUTION_SESSION_USAGE.md)及当前入口。证据.tmp/execution-session-codex-v1/含原失败、205输出、合法请求/收取及最终原生SHA/ACK核对。DSH/Codex已接通，Kimi未适配且暂停，整体全角色目标仍有剩余；下一片/宿主统一启动不自动开启。
+
 ## 2026-10-22 10:45（Asia/Shanghai）— 用户取消页面补齐，以角色原生会话连续为核实口径
 
 - 用户明确“talk上的页面就不要改了，只要确认我们发送给角色的任务会出现在它的同一窗口就行”。TALK任务厅保持原状，撤下此前页面会话核验入口建议，不作为新开发片或既定功能待补项。

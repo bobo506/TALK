@@ -4710,6 +4710,11 @@ class ExecutionSessionBridgeWiringTests(unittest.TestCase):
     """292：claim 后执行会话分支仍走原 TALK 结果/完成账本。"""
 
     def test_execution_session_branch_sends_and_completes_with_state(self):
+        for runtime in ("dsh", "codex"):
+            with self.subTest(runtime=runtime):
+                self._check_execution_session_branch(runtime)
+
+    def _check_execution_session_branch(self, runtime):
         from bridges.dsh_execution_channel import ExecutionOutcome
 
         class FakeClient:
@@ -4740,8 +4745,8 @@ class ExecutionSessionBridgeWiringTests(unittest.TestCase):
             "task_kind": "general",
             "content": "执行会话任务",
             "hall_group_id": "group:task-7",
-            "execution_session": {"schema": "talk-execution-session-request-1"},
-            "target_binding_snapshot": {"state": "bound", "runtime": "dsh"},
+            "execution_session": {"schema": "talk-execution-session-request-1", "runtime": runtime},
+            "target_binding_snapshot": {"state": "bound", "runtime": runtime},
         }
         claimed = {**task, "claim_token": "token-1"}
         client = FakeClient()
@@ -4766,7 +4771,7 @@ class ExecutionSessionBridgeWiringTests(unittest.TestCase):
         cli_bridge._prepare_task_before_claim = fake_prepare
         try:
             with unittest.mock.patch(
-                "bridges.dsh_execution_channel.run_execution_session_task",
+                f"bridges.{runtime}_execution_channel.run_execution_session_task",
                 new=fake_run,
             ), unittest.mock.patch(
                 "bridges.dsh_execution_channel._load_base_contract",
@@ -4784,7 +4789,7 @@ class ExecutionSessionBridgeWiringTests(unittest.TestCase):
                         command=["dsh", "--profile", "headless"],
                         timeout=60,
                         max_reply_chars=1000,
-                        runtime="dsh",
+                        runtime=runtime,
                         bridge_label="DSH",
                         prompt_transport="stdin",
                         execution_context={"project_id": "prj_test"},

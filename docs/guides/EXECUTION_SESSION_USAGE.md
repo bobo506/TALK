@@ -1,6 +1,6 @@
 # 连续任务的原生会话复用
 
-2026-10-22：已接通当前 DeepSeek/DSH 链路，292已完成代码实查、修正和必要实机验证，用户已明确TALK页面不改，只需确认同功能任务进入角色同一原生会话；296/297原生文件已满足该核实口径。生产293→294已复用同一原生会话；295主动换窗并恢复基础介绍。60%与缺数10/11边界使用安装版DSH配假模型响应验证，未为撞阈值消耗真实模型长上下文。
+2026-10-22：当前已接通DeepSeek/DSH及Codex两种运行器，Codex由本会话直接开发并通过205项自检、正常加载及300→301真实同窗/302换窗恢复验证。Kimi尚未适配且额度暂停，不能把当前状态称为所有角色已完成。用户明确TALK页面保持，以角色原生会话为核实标准。DSH与Codex的60%/缺数10/11边界均有受控验证，真实模型验证使用低占用场景。
 
 ## 选择规则
 
@@ -23,7 +23,7 @@
 
 ## 实际入口
 
-支持绑定为`bound`、`runtime=dsh`的普通顶层`general`任务，当前核验原生版本为`0.1.5-rc.2`。项目须登记绝对`project_root_path`，并与bridge实际工作目录一致。其它runtime以及子任务、review/test/rework保持原路径；不支持的执行会话选择会明确拒绝。
+支持绑定为`bound`、`runtime=dsh`或`runtime=codex`的普通顶层`general`任务。当前实机核验分别为DSH `0.1.5-rc.2`和Codex `0.163.0`，适用各自已核验的本地命令/模型/权限组合。项目须登记绝对`project_root_path`，并与bridge实际工作目录一致。其它runtime以及子任务、review/test/rework保持原路径；不支持的执行会话选择会明确拒绝。
 
 REST `POST /api/tasks`、异步`TalkClient.create_task`、同步`TalkClientSync.create_task`和MCP `talk_delegate_task`均支持可选`execution_session`。不传该字段时保持旧行为。MCP的既有长连接须重连并刷新工具目录，确认schema出现此参数；本次用户重连后MCP296→297已实际验证同窗、增量回想及计数1→2，SDK/API亦已验证可用。无需修改现有桌面MCP配置。
 
@@ -96,6 +96,18 @@ async with TalkClient(base_url="http://127.0.0.1:8000", api_key=api_key) as clie
 本机运行已加载：原manager18856保持，DeepSeek普通stop/start到generation30；原API正常重载，4个可空列只新增、不回填旧任务。本项目根路径从空登记为`D:\claude-test\TALK`，角色模型/Key/HOME/绑定和286暂停保持。293/294同ID且计数1→2，295新ID且计数1，三条均成功收取；两次均能在增量中回想基础验证码。
 
 用户重连MCP后的补验：296首条要求记住“青竹47”，回复“已记住”；297仅引用base_task_id=296并询问暗号，没有重发暗号或基础介绍，回复“青竹47”。两条原生ID均为`session-357a3c78-7ddc-47a0-bcb9-745a57cda64c`，计数1→2，第二条`reused=true/context_status=known`，两条均已正常收取。最终指标21447/1000000，属于低占用；该证据证明底层原生会话续用，桌面GUI显示仍由用户观察。
+
+### Codex 入口与验收
+
+Codex当前核验版本`0.163.0`，使用原受管命令、gpt-6.1-sol/xhigh、独立CODEX_HOME及read-only/never权限；以私有app-server stdio创建/明确ID续接，不连接桌面daemon或新增端口。版本、未知命令参数、HOME/模型/权限不符会拒绝，不自动降模型或改登录。其它Codex命令/权限组合需另核，不能沿用本次实际组合的验收结论。
+
+同功能选择和参数沿用上方示例，目标换为`agent:codex`；请求者必须是另一个合法member。当前桌面MCP身份也为agent:codex，直接向同名目标派发会按既有规则400拒绝。本片真实验收由已授权human:bobo通过普通SDK/API创建并收取，未改变桌面身份或借用DeepSeek身份。MCP参数/双runtime分派已有隔离验证，不能把该桌面自派路径写成已通过。
+
+Codex读原生最近请求`last_token_usage.total_tokens / model_context_window`，保留来源时间，不使用累计计费量。预检采用独立非持久化过程；只对经合同引用声明的续轮解释历史上下文边界，不跳过正常澄清，也不保证原生窗口一定能续用。正式原生UserMessage及指令SHA确认后才计数；原生延迟落盘、正常resume设置回执、自动AGENTS/环境介绍和工具调用均不计轮次。
+
+实机300→301的原生ID为`01a162a3-eee4-7f63-b8d7-54ee978f0e71`，计数1→2，第二轮未重发暗号仍回复“海星84 / 银杏73”；302 force_new为`01a162a6-bdc5-7a30-978e-82fd55d2e9a6`，计数1并恢复“银杏73”。三条均完成收取，真实容量475000。原298首轮保留；299发现预检缺口后由原请求者取消，未正式投递，不追改失败。详[Codex实现与验收](../spec/EXECUTION_SESSION_CODEX_ADAPTATION.md)。
+
+原Codex宿主已正常恢复、单角色重载到generation21，原模型/Key/绑定/权限保持；API正常重载且297条既有任务哈希保持。原DSH运行状态保持。MCP上限T未重测，不启用主动长等待；原任务执行预算、有限RPC和清理边界详验收记录。
 
 ### 页面任务厅与原生会话
 
