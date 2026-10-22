@@ -97,4 +97,12 @@ async with TalkClient(base_url="http://127.0.0.1:8000", api_key=api_key) as clie
 
 用户重连MCP后的补验：296首条要求记住“青竹47”，回复“已记住”；297仅引用base_task_id=296并询问暗号，没有重发暗号或基础介绍，回复“青竹47”。两条原生ID均为`session-357a3c78-7ddc-47a0-bcb9-745a57cda64c`，计数1→2，第二条`reused=true/context_status=known`，两条均已正常收取。最终指标21447/1000000，属于低占用；该证据证明底层原生会话续用，桌面GUI显示仍由用户观察。
 
+### 页面任务厅与原生会话
+
+目前TALK按任务分别创建Task Hall，296和297仍显示为两个任务窗口；页面未显示原生会话ID、复用/换窗状态、关联任务或同会话连续记录，因此仅靠当前页面无法核验是否续用。
+
+受管DeepSeek以headless运行，使用独立`DSH_HOME`：本机为`C:\Users\Administrator\.talk\role-service-host\native\prj_e8fe7066bbec\agent_deepseek\.dsh`。原生会话在其`sessions/<工作区目录>/<native_session_id>/session.v3.jsonl.zstd`中；默认`~/.dsh`目录未发现本次会话。若用户现有DSH界面使用默认目录，它不会自动显示受管目录里的会话，也不会因headless任务自动弹窗。
+
+2026-10-22只读补核：同一原生文件含41条记录，原生记录9/28为第一条业务正文/最终回复，36/38为第二条业务正文/最终回复。可读摘录在`.tmp/execution-session-usable-v1/independent-review292/visibility-296-297/native-conversation-excerpt.txt`，仅提取本测试正文和最终回复，不是完整对话导出。当前缺少用户可直接核验的页面入口，本项人工验收继续待确认；页面补齐范围仍须明确，不将建议当作已批准。
+
 人工验收：在任务列表查看293、294、295及296、297的结果；按上面的参数使用同一功能连续交办，核对任务响应的native ID/计数和首轮/续轮变化。完成后确认本里程碑；下一片宿主统一启动问题仍需单独确认。

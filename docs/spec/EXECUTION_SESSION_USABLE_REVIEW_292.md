@@ -52,6 +52,14 @@ API就绪检查曾把venv包装PID6320误当实际launcherPID，报一次未就�
 
 请求、创建/状态/收取的有界回执、核验与SHA清单保存在`.tmp/execution-session-usable-v1/independent-review292/mcp-reconnect-296-297/`。第一次证据落盘命令超过Windows长度限制，未启动或产生文件；缩减为必要任务字段后成功，未重发任何模型任务。
 
+## 用户反馈界面无法核验后的只读补核（2026-10-22 10:41）
+
+用户指出TALK中296/297仍是两个窗口，现有DSH界面也找不到会话。检查实际代码：TALK每任务独立Task Hall保持，web未引用execution_session_state/native_session_id，当前没有页面会话核验入口；受管DeepSeek以headless运行，独立DSH_HOME与默认目录分开。未检查用户当前DSH窗口配置，不武断认定它使用哪个目录。
+
+在受管角色`.dsh/sessions/--D-claude-test-TALK--/session-357a3c78-7ddc-47a0-bcb9-745a57cda64c/session.v3.jsonl.zstd`找到61255字节原生文件，SHA256为`9e246a868a07da1e1afaf8d27507922c039d1e1165ca59b9945186a9451996fb`；默认用户`.dsh/sessions`无该ID。逐个解码17个Zstd帧得到41条记录，同一header ID及工作区匹配。记录9/28为第一条业务正文/“已记住”，36/38为第二条业务正文/“青竹47”；第二条正文未重发暗号。Node默认解码只返回首帧header，已识别并完整遍历，未误报原生正文缺失。
+
+四条可读摘录、原生路径/SHA、有界验证和只读重现脚本在`.tmp/execution-session-usable-v1/independent-review292/visibility-296-297/`。没有修改原生文件、配置、凭据、运行服务或产品代码，也未新派任务。结论为底层持久会话已续用，但“同窗口成功”不能替代界面验收；当前页面缺口如实保留，补齐范围待确认，整体人工里程碑未通过。
+
 ## 状态与剩余门禁
 
 当前DSH链路已工程接通并能实际使用，[实际入口与说明](../guides/EXECUTION_SESSION_USAGE.md)已给出。用户重连后当前Codex MCP已加载新参数，296→297已真实验证同窗/记忆及计数1→2；SDK/API亦可直接使用，不改当前桌面MCP配置。其它runtime不冒称支持，桌面GUI显示/手动续写和缓存/费用收益未验；headless实际工具上限T未核，不启用主动长等待。
