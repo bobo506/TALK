@@ -60,8 +60,77 @@ function chatMemberName(member) {
   return name && !/CLI Bridge|agent:/i.test(name) ? name : ({codex:"Codex",deepseek:"DeepSeek",kimi:"Kimi"}[short] || short);
 }
 function workspaceMemberName(id) {
+  const projectName = projectAgents.find(role => role.member_id === id)?.role_name;
+  if (typeof projectName === "string" && projectName.trim()) return projectName;
   const roleName = typeof roleRequestApp !== "undefined" && roleRequestApp?.roleName(id);
   return roleName || chatMemberName(members.find(item => item.id === id) || {id});
+}
+
+const roleNameUI = { context: null, seq: 0, saving: false };
+function roleNameContextCurrent(context) {
+  return context && context.projectId === activeProjectId && context.accountId === myId
+    && currentMemberIsHuman() && workspaceUI.mode === "roles" && blackboardOpen;
+}
+function closeRoleNameEditor(restoreFocus = true) {
+  const context = roleNameUI.context;
+  roleNameUI.context = null; roleNameUI.seq++; roleNameUI.saving = false;
+  document.getElementById("role-name-modal")?.classList.add("hidden");
+  if (restoreFocus && roleNameContextCurrent(context)) document.getElementById("role-name-edit")?.focus();
+}
+function syncRoleNameEditor() {
+  if (roleNameUI.context && !roleNameContextCurrent(roleNameUI.context)) closeRoleNameEditor(false);
+}
+function openRoleNameEditor(role) {
+  if (!currentMemberIsHuman() || role.archived === true) return;
+  const input = document.getElementById("role-name-input");
+  if (!input) return;
+  roleNameUI.context = {projectId: activeProjectId, accountId: myId, memberId: role.member_id};
+  roleNameUI.seq++; roleNameUI.saving = false;
+  input.value = workspaceMemberName(role.member_id); input.disabled = false;
+  document.getElementById("role-name-status").textContent = "";
+  document.getElementById("role-name-save").disabled = false;
+  document.getElementById("role-name-cancel").disabled = false;
+  document.getElementById("role-name-modal").classList.remove("hidden");
+  input.focus(); input.select?.();
+}
+async function saveRoleName(event) {
+  event?.preventDefault();
+  const context = roleNameUI.context;
+  if (!roleNameContextCurrent(context) || roleNameUI.saving) return;
+  const input = document.getElementById("role-name-input");
+  const name = input.value.trim();
+  const status = document.getElementById("role-name-status");
+  if (!name || Array.from(name).length > 64) { status.textContent = "角色名称须为1–64个字符。"; input.focus(); return; }
+  const seq = ++roleNameUI.seq; roleNameUI.saving = true;
+  for (const id of ["role-name-input", "role-name-save", "role-name-cancel"]) document.getElementById(id).disabled = true;
+  status.textContent = "正在保存…";
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(context.projectId)}/roles/${encodeURIComponent(context.memberId)}`, {
+      method: "PATCH", body: JSON.stringify({role_name: name}),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!roleNameContextCurrent(context) || roleNameUI.seq !== seq) return;
+    if (!res.ok) {
+      const code = typeof body.detail === "string" ? body.detail : "";
+      throw new Error(({role_name_conflict: "这个角色名称已被使用，请换一个名称。", role_name_invalid: "角色名称须为1–64个字符。", role_archived: "该角色已归档，请刷新角色列表。"})[code] || "名称保存失败，请重试。");
+    }
+    if (body.member_id !== context.memberId || typeof body.role_name !== "string") throw new Error("名称回执不完整，请刷新核对。");
+    // Ignore roster reads issued before this confirmed rename.
+    if (typeof projectAgentRequest !== "undefined") projectAgentRequest++;
+    const role = projectAgents.find(row => row.member_id === context.memberId);
+    if (role) role.role_name = body.role_name;
+    if (typeof roleRequestApp !== "undefined") roleRequestApp?.setRoleName?.(context.memberId, body.role_name);
+    closeRoleNameEditor(false);
+    renderWorkspaceList(); renderTaskDetailsPanel();
+    document.getElementById("role-name-edit")?.focus();
+  } catch (err) {
+    if (roleNameContextCurrent(context) && roleNameUI.seq === seq) status.textContent = err.message || "名称保存失败，请重试。";
+  } finally {
+    if (roleNameContextCurrent(context) && roleNameUI.seq === seq) {
+      roleNameUI.saving = false;
+      for (const id of ["role-name-input", "role-name-save", "role-name-cancel"]) document.getElementById(id).disabled = false;
+    }
+  }
 }
 function workspaceChatCandidates(items, roles, projectId, selfId) {
   const roleIds = new Set(roles.map(role => role.member_id));
@@ -904,6 +973,7 @@ function ensureRoleServiceContext() {
 }
 // app.js 每次导航/刷新都会经 renderWorkspaceMode → syncWorkspaceLayout；离页即停表。
 function syncRoleServicePollingContext() {
+  syncRoleNameEditor();
   if (!roleServicePageActive()) { stopRoleServicePolling(); return; }
   ensureRoleServiceContext();
 }
@@ -1465,7 +1535,15 @@ function renderWorkspaceRoleDetails() {
   namePanel.replaceChildren();
   tasksPanel.replaceChildren();
   if (!role) { namePanel.classList.add("hidden"); tasksPanel.classList.add("hidden"); return; } // 防御：失效选择由 workspaceSettingsSelected 回退到项目设置
-  namePanel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), workspaceEl("h2", "", workspaceMemberName(role.member_id)), workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
+  const nameHeading = workspaceEl("div", "role-name-heading");
+  nameHeading.appendChild(workspaceEl("h2", "", workspaceMemberName(role.member_id)));
+  if (currentMemberIsHuman() && role.archived !== true) {
+    const edit = workspaceButton("", () => openRoleNameEditor(role), "icon-action subtle role-name-edit");
+    edit.id = "role-name-edit"; edit.title = "修改角色名称"; edit.setAttribute("aria-label", "修改角色名称");
+    edit.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7"/><path d="m16 3 5 5M10 14l-1 4 4-1 9-9a2.1 2.1 0 0 0-5-5z"/></svg>';
+    nameHeading.appendChild(edit);
+  }
+  namePanel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), nameHeading, workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
   // ROLE-DESC-F1：原硬编码的短标签行（role-description）与解释行（role-explanation）从动态面板移除；
   // 说明统一由居中静态编辑区 #role-description-panel 呈现（自定义 ?? 默认），映射仅作默认值生成器。
   // ROLE-SETTINGS-1：移除角色详情的“交办任务”快捷入口；ROLE-DESC-F2 已移除顶部“新建任务”入口，
@@ -1940,6 +2018,20 @@ if (typeof document !== "undefined") {
     }
   }
   const roleDescriptionInput = document.getElementById("role-description-input");
+  const roleNameForm = document.getElementById("role-name-form");
+  if (roleNameForm) {
+    roleNameForm.addEventListener("submit", saveRoleName);
+    document.getElementById("role-name-cancel").addEventListener("click", () => closeRoleNameEditor());
+    document.getElementById("role-name-modal").addEventListener("keydown", event => {
+      if (event.key === "Escape" && !roleNameUI.saving) { event.preventDefault(); closeRoleNameEditor(); }
+      if (event.key === "Tab") {
+        const nodes = ["role-name-input", "role-name-cancel", "role-name-save"].map(id => document.getElementById(id)).filter(node => !node.disabled);
+        const first = nodes[0], last = nodes[nodes.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    });
+  }
   if (roleDescriptionInput) {
     roleDescriptionInput.addEventListener("input", recordRoleDescriptionDraft);
     document.getElementById("role-description-save").addEventListener("click", saveRoleDescription);

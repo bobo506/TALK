@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import socket
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import Mock, patch
 
@@ -30,7 +31,7 @@ class RoleServiceRecoveryCliTests(unittest.TestCase):
                                     inventory=kwargs.get("inventory", lambda: []))
 
     def test_unknown_access_or_existing_process_never_means_absent(self):
-        for state in ("unknown", "present", "exited"):
+        for state in ("unknown", "present"):
             with self.subTest(state=state), self.assertRaises(HostError):
                 self.proof(probe=lambda _: state)
         kernel = Mock()
@@ -41,6 +42,19 @@ class RoleServiceRecoveryCliTests(unittest.TestCase):
         with patch.object(recovery.ctypes, "WinDLL", return_value=kernel), \
                 patch.object(recovery.ctypes, "get_last_error", return_value=87):
             self.assertEqual(recovery.probe_pid(1234), "absent")
+
+    def test_windows_confirmed_exited_object_is_stopped_but_not_absent(self):
+        proof=self.proof(probe=lambda _: "exited")
+        self.assertTrue(proof["both_stopped"])
+        self.assertFalse(proof["both_absent"])
+        for live_pid in (1234,4321):
+            with self.subTest(live_pid=live_pid),self.assertRaises(HostError):
+                self.proof(probe=lambda pid: "present" if pid==live_pid else "exited")
+
+    @unittest.skipUnless(recovery.os.name=="nt","Windows command-line grammar")
+    def test_windows_inventory_handles_json_and_escaped_quotes(self):
+        args=['C:/Program Files/Python/python.exe','-c','print("a")',"value's",'{"message":"quoted \\\"text\\\""}']
+        self.assertEqual(recovery.process_argv(subprocess.list2cmdline(args)),args)
 
     def test_replacement_host_bridge_or_unknown_inventory_blocks(self):
         for command in (f'python.exe "{self.entry}" --apply',

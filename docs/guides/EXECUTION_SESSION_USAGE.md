@@ -1,5 +1,7 @@
 # 连续任务的原生会话复用
 
+2026-10-23：本机统一启动入口已接入API、配置worker与七成员宿主；DSH/Codex/新WorkBuddy继续运行，三个Kimi与旧WorkBuddy原生角色保持停止。页面以项目创建名称展示并可用铅笔修改，新角色现为`WorkBuddy-k3`；旧验证身份另存。受管消息游标和网络瞬断恢复已补齐，原会话复用合同不变。使用[统一启动指南](TALK_RUNTIME.md)，直接uvicorn仍只启动API；详情见[本片实查](../spec/ROLE_HOST_NAME_HEALTH_FIX_20261023.md)。页面人工验收仍待确认。下段2026-10-22为此前阶段记录。
+
 2026-10-22 20:20：DeepSeek/DSH、Codex、Kimi Code及用户批准形态的WorkBuddy内置独立CLI实际任务链均已接通。Kimi K2.8/K3共用适配，303—308均已收取；WorkBuddy309→310同原生ID/计数1→2，311新ID恢复基础/计数1，三条生产派发/领取/交付/收取通过。WorkBuddy403项联合自检及安装版16次正式投递边界通过。验后WorkBuddy及三个Kimi角色停止、无owner，临时宿主已退出；Kimi常规开发暂停。另一K2.8成员未单独实机；TALK页面保持。真实模型为低占用，60%/缺数10/11边界按受控证据说明，人工里程碑待确认。WorkBuddy结论限于独立CLI，不等同控制原桌面窗口。
 
 ## 选择规则

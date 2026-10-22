@@ -16,6 +16,7 @@ import shutil
 import socket
 import sys
 import tempfile
+import httpx
 from bridges import runtime_diagnostics as runtime_diag
 from bridges.queue_poll_diagnostics import QueuePollCycle, QueuePollRecorder
 from bridges.runtime_diagnostics_timeline import StageTimeline, timed_lock
@@ -4661,6 +4662,7 @@ async def run_task_queue_worker(
     poll_cycle: QueuePollCycle | None = None
     current_task_id: int | None = None
     query_status_recovery_pending = False
+    query_transport_failure_streak = 0
     stop_reason = "unexpected_exit"
     queue_start_log_id: str | None = None
     if diagnostics is not None:
@@ -4698,6 +4700,7 @@ async def run_task_queue_worker(
                 # success or advance poll_seq.
                 poll_recorder.succeed(poll_cycle)
                 poll_cycle = None
+                query_transport_failure_streak = 0
                 if queued:
                     discovery_operation.finish("succeeded")
                 else:
@@ -4902,10 +4905,17 @@ async def run_task_queue_worker(
                     last_error = f"{last_error}: {exc}"
                 try:
                     if query_failure and report_query_error is not None:
-                        # Retain this intent even if the error PUT itself fails;
-                        # the reporter may already have updated its heartbeat.
-                        query_status_recovery_pending = True
-                        await report_query_error(last_error)
+                        transient = isinstance(exc, (httpx.TransportError, ConnectionError, TimeoutError))
+                        query_transport_failure_streak = query_transport_failure_streak + 1 if transient else 0
+                        # A short API reload must not replace a live managed idle
+                        # heartbeat with error. Every failure is still diagnosed;
+                        # the third consecutive transport failure publishes error.
+                        # Auth/programming/task errors and unmanaged clients retain
+                        # immediate reporting; genuine stale heartbeat stays unknown.
+                        grace = bool(getattr(args, "launch_id", None)) and transient and query_transport_failure_streak <= 2
+                        if not grace:
+                            query_status_recovery_pending = True
+                            await report_query_error(last_error)
                     elif report_status is not None:
                         await report_status("error", last_error=last_error)
                 except asyncio.CancelledError:
@@ -5016,7 +5026,8 @@ async def run_bridge(args: argparse.Namespace) -> None:
     configure_talk_tool_environment(args, member_id)
     workdir = Path(args.workdir).expanduser().resolve()
     args.task_preflight_command = resolve_task_preflight_command(args)
-    client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval)
+    client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval,
+                        start_from_latest=bool(getattr(args, "launch_id", None)))
     instance_id = args.instance_id or f"{member_id}:{uuid4()}"
     host = socket.gethostname()
     # R1-3 受管关联：只有宿主显式传入 ``--launch-id`` 时才附加 project/launch/进程身份，

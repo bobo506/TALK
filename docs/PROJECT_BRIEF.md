@@ -2,7 +2,9 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
-## 当前实施状态（2026-10-22）
+## 当前实施状态（2026-10-23）
+
+2026-10-23最新：用户明确本片全部由Codex自行开发，角色名/铅笔改名与宿主统一启动、DeepSeek状态修复已直接实现/自检并实际加载。新增项目名册role_name权威，项目内PATCH改名，WorkBuddy-k3与旧验证身份分开保留；API/配置worker/七角色宿主统一入口已就绪，三运行角色普通启停及重载/周期心跳通过，四原生停止角色保持。受管查询网络瞬断宽限及SDK启动消息游标防旧私信回放已补齐，原90秒真实性/归属守卫保持。368项相关Python、67项Node及隔离/生产进程证据通过，314条旧任务/286/原模型Key绑定保护；全部自检，页面人工验收待确认。初始DSH退出根因仍未确证，修复边界和旧私信回放三条回复保留见[本片记录](spec/ROLE_HOST_NAME_HEALTH_FIX_20261023.md)、[统一启动](guides/TALK_RUNTIME.md)及[当前进度](PROGRESS.md)。下方为此前阶段记录。
 
 2026-10-22 23:10最新：用户新建workbuddy-k3的原意图因无配置worker消费停在requested；Codex经正式worker仅处理该意图，独立身份/Key/档案和绑定预检通过，provisioned。既有页面gen1/start未领取即过期，保留原失败后普通start到gen2；新角色running/ready/idle，窄manager17772保留运行。新角色真实MCP312→313同窗/计数1→2、314新窗恢复/计数1均已收取，原生双ID/SHA及计数核对通过；311条旧任务、六旧角色/绑定、配置/模型源与286保持，无产品源码修改。部署上的配置worker常驻及宿主统一启动仍待另片确认，本次手动接入不冒称全自动链路完成。详[当前进度](PROGRESS.md)、[新角色实机证据](spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)与[使用说明](guides/EXECUTION_SESSION_USAGE.md)。下方为此前阶段记录。
 

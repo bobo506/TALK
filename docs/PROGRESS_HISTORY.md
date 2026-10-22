@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-23 00:31（Asia/Shanghai）— 项目名称/铅笔改名、统一宿主与重连稳定性自检交付
+
+- 用户要求与下一个角色启动器修复合片，并明确所有开发由当前Codex完成。项目名册新增role_name权威、工作台显示/搜索及同风格方框铅笔弹窗，使用既有human-only项目PATCH；冲突保草稿/取消/键盘与迟到响应防覆盖。新角色保存WorkBuddy-k3，原全局名称和旧验证身份保持；不是将两个身份合并。
+- 新产品统一入口run.ps1/talk_runtime/talk_api实现API、配置worker、五个已核静态成员配方及两个WorkBuddy独立宿主一起就绪，Windows隐藏独立常驻、OS锁、原Popen、虚拟环境解释器父链、独立worker线程、有界宿主退避、正常stop/drain和API重载通过。部署仍依赖原本机窄入口，不冒称任意运行器新角色均自动适配或开机自启。
+- 原DSH确实退出，exit0、最后ReadTimeout/心跳22:05:40、manager22:06:08，早于新WorkBuddy角色验证；根因未确证。恢复CLI补Windows exited/原生argv边界，仅旧DSH gen30一次human计划/CAS恢复到31，其后普通启动。Codex/WB均由原宿主普通关闭/drain再迁入统一入口，未接管PID或自动解除其它归属。
+- 生产重载实查复现网络短断立刻写实例error，修正受管队列前两次连续传输异常仅诊断重试，第三次/其它异常照常报错，真实90秒失联和原归属保护保持。另在最终检查发现SDK首次HTTP回退从0回放旧私信，Codex产生2953—2955三条回复，保留原历史；普通stop清理超过20秒，桥已退出后由原manager普通stop重试收取，未强杀/人工解除。受管SDK启动最新游标、WS间隙补取及去重补齐，默认SDK历史语义/任务队列不变。补正后最终97次采样/1次短断/0次非运行，三实例空闲无再回放。
+- 368项Python、67项Node自检通过，隔离真实进程常驻/重载/正常退出及正式统一启停/重载通过。最终入口23816/API Popen11220；DSH gen38/5680/ins_bd06a61dbca2，Codex gen30/7900/ins_35c3b5b9bb33，新WB gen10/17768/ins_6aaee847cfc4，182秒真实心跳推进，七宿主serving、worker正常。四原生停止角色保持，314条原任务SHA/286/配置名册绑定/Keymtime/原模型与认证源保护，五静态文件字节一致；无新任务/开发派发。证据.tmp/role-host-name-health-fix/，包括中间失败与最终回执。
+- 全部为当前Codex实施/自检，未调用Browser/computer-use，用户页面人工验收待。技术与验收范围见[本片实查](spec/ROLE_HOST_NAME_HEALTH_FIX_20261023.md)、[统一启动](guides/TALK_RUNTIME.md)。同步AGENTS/简报/webui模块/恢复及会话使用指南和进度；常规Git收尾后暂停，不开下一片，不恢复Kimi开发或286。
+
 ## 2026-10-22 23:10（Asia/Shanghai）— 用户新建workbuddy-k3处理并验证312—314，保留新角色运行
 
 - 用户告知刚创建WorkBuddy角色似乎失败，要求检查并考虑用它验证会话复用。当前Codex只读核明原意图role-d625d012175555c1768b8fc27a028ea0，名称workbuddy-k3、runner:workbuddy-embedded-cli、choice rmc_150e9866f272均正确；status=requested/member=null/未领取，无失败回执，原项目配置入口enabled，但没有worker消费。仅正式RoleProvisionWorker.process该原意图一次，独立身份/Key/档案及精确绑定预检通过，status=provisioned，生成agent:prj-e8fe7066bbec.workbuddy-k3-61b7e314；不复制旧角色Key，不处理其它请求。

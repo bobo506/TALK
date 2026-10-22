@@ -1,5 +1,7 @@
 # MODULE: Web UI
 
+> 2026-10-23：当前Codex按用户明确要求自行开发/自检项目角色名称及方框铅笔改名，名册新增role_name权威，列表/详情/搜索优先项目名，既有human-only PATCH项目内保存、不改全局Member名称。静态弹窗保草稿、冲突/取消/键盘操作、切账号/项目及迟到名册保护，复用现有图标按钮与弹窗样式。版本20261023-role-name-v1，67项相关Node及实际API/五静态文件通过；新角色WorkBuddy-k3与旧验证角色保留，Browser视觉和真实点击待用户Ctrl+F5人验。本片同时完成统一宿主/网络短断及消息游标修复，见[本片记录](ROLE_HOST_NAME_HEALTH_FIX_20261023.md)。
+
 > 2026-10-20：用户明确280“验收通过，按原计划继续”，绑定行格式本轮页面人验闭合；原289 Node/九资源字节/收取及197fe7a保持，未另做Codex Browser、键盘/窄屏专项。继续日志原排期，不提前会话复用，详[280复核](ROLE_BINDING_SUMMARY_FORMAT_REVIEW_280.md)。
 
 > 2026-10-19 23:02：280绑定行统一格式经Codex独立实际代码复核通过、289 Node/九静态资源字节通过，五候选合入并收取。已有xhigh/max拆分，Kimi缺强度省略末项/分隔，精确旧系统名短显Kimi Code且保当前模型；状态/安全/其它页面行为保持。版本20261019-role-binding-summary-v1，暂停等用户Ctrl+F5角色列表人验，未做Browser视觉/键盘/窄屏。详[280复核](ROLE_BINDING_SUMMARY_FORMAT_REVIEW_280.md)，279真实加载已另核通过。

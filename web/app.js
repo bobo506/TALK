@@ -66,6 +66,7 @@ let agentProfileSaving = false;
 let projects = [];
 let activeProjectId = null;
 let projectAgents = [];
+let projectAgentRequest = 0;
 let projectTasks = [];
 let blackboardOpen = false;
 let timelineRevision = 0;
@@ -746,6 +747,7 @@ async function loadProjects() {
 }
 
 async function loadProjectAgents() {
+  const request = ++projectAgentRequest;
   if (!activeProjectId) {
     projectAgents = [];
     return;
@@ -757,7 +759,7 @@ async function loadProjectAgents() {
     throw new Error(await readErrorDetail(res, `项目 Agent 加载失败: ${res.status}`));
   }
   const loaded = await res.json();
-  if (projectId === activeProjectId && memberId === myId) projectAgents = loaded;
+  if (request === projectAgentRequest && projectId === activeProjectId && memberId === myId) projectAgents = loaded;
 }
 
 async function loadProjectTasks({ silent = false } = {}) {

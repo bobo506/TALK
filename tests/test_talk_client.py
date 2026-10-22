@@ -65,6 +65,20 @@ class TalkClientTests(RouteTestCase):
             )
         self.assertEqual(response.status_code, 201)
 
+    def test_managed_tail_skips_old_dm_and_keeps_new_messages_after_reconnect(self):
+        async def scenario(base_url):
+            async with TalkClient(base_url,'bobo-key') as human, TalkClient(base_url,'demo-key',start_from_latest=True) as agent:
+                await human.send_text('old fixture DM',to=['agent:demo'])
+                received=[];agent.on_message(lambda m:received.append(m))
+                await agent._initialize_message_cursor()
+                tail=agent._last_message_id
+                await agent._poll_once();self.assertEqual(received,[])
+                new=await human.send_text('new fixture DM',to=['agent:demo'])
+                await agent._poll_once();await agent._poll_once()
+                self.assertEqual([m['id'] for m in received],[new['id']])
+                self.assertGreater(agent._last_message_id,tail)
+        with LiveTalkServer(main.app) as base_url:asyncio.run(scenario(base_url))
+
     def test_me_and_members(self):
         async def scenario(base_url: str) -> None:
             async with TalkClient(base_url, "demo-key") as client:

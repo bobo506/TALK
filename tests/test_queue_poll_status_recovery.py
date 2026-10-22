@@ -5,6 +5,7 @@ import io
 import os
 import tempfile
 import unittest
+import httpx
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,7 +15,7 @@ from bridges import runtime_diagnostics as runtime_diag
 
 class QueuePollStatusRecoveryTests(unittest.IsolatedAsyncioTestCase):
     async def scenario(self, *, managed=True, query_failure=True, fail_error=False,
-                       fail_recovery=False, heartbeat_interval=60, worker=None, log_root=None):
+                       fail_recovery=False, heartbeat_interval=60, worker=None, log_root=None, query_exception=None, query_failures=1):
         reports, attempts, clients = [], [], []
         finished = asyncio.Event()
         error_seen = False
@@ -58,9 +59,9 @@ class QueuePollStatusRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
             async def list_tasks(self, **kwargs):
                 self.calls += 1
-                if query_failure and self.calls == 1:
-                    raise ConnectionError('private query failure fixture')
-                if self.calls >= 4:
+                if query_failure and self.calls <= query_failures:
+                    raise query_exception or ValueError('private query failure fixture')
+                if self.calls >= query_failures+3:
                     finished.set()
                 return []
 
@@ -116,6 +117,20 @@ class QueuePollStatusRecoveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_unmanaged_real_query_recovery_keeps_event_only_reporting(self):
         reports, _ = await self.scenario(managed=False)
         self.assertEqual([row['status'] for row in reports], ['idle', 'error', 'idle', 'offline'])
+
+    async def test_deepseek_observed_read_timeout_recovers_without_exiting_worker(self):
+        reports,_=await self.scenario(query_exception=httpx.ReadTimeout('fixture read timeout'))
+        self.assertEqual([row['status'] for row in reports],['idle','offline'])
+
+    async def test_three_consecutive_transport_failures_report_then_clear_error(self):
+        reports,_=await self.scenario(query_exception=httpx.ReadTimeout('fixture read timeout'),query_failures=3)
+        self.assertEqual([row['status'] for row in reports],['idle','error','idle','offline'])
+        self.assertIn('ReadTimeout',reports[1]['last_error'])
+        self.assertIsNone(reports[2]['last_error'])
+
+    async def test_unmanaged_transport_failure_keeps_immediate_error(self):
+        reports,_=await self.scenario(managed=False,query_exception=ConnectionError('fixture offline'))
+        self.assertEqual([row['status'] for row in reports],['idle','error','idle','offline'])
 
     async def test_query_error_report_failure_does_not_kill_recovery_without_logs(self):
         reports, attempts = await self.scenario(fail_error=True)

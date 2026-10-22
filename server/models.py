@@ -4358,6 +4358,8 @@ class RoleBindingResponse(BaseModel):
 
 class ProjectAgentOut(BaseModel):
     member_id: str
+    # 项目内角色名为展示权威；与全局 Member.display_name 独立。
+    role_name: Optional[str] = None
     identity_path: Optional[str]
     soul_path: Optional[str]
     user_path: Optional[str]
@@ -4389,6 +4391,7 @@ class ProjectAgentOut(BaseModel):
         agent: ProjectAgent,
         *,
         display_name: Optional[str] = None,
+        role_name: Optional[str] = None,
         availability: str = "offline",
         instances: Optional[list[AgentInstanceOut]] = None,
         role_description: Optional[str] = None,
@@ -4398,6 +4401,7 @@ class ProjectAgentOut(BaseModel):
     ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
+            role_name=role_name,
             identity_path=agent.identity_path,
             soul_path=agent.soul_path,
             user_path=agent.user_path,

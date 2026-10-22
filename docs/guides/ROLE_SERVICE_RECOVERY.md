@@ -5,7 +5,7 @@
 ## 权限与前提
 
 - 只有既有human操作Key可读取恢复计划或确认处置，agent调用403；Key从已有仓库外文件读取，不能放进命令行或交付。
-- 在原物理宿主运行；CLI核本机hostname与原owner_host、项目/成员和manager-health精确对应。检查旧manager/bridge均不存在，未知/权限拒绝/PID仍存在均停止；检查替代宿主、同实例或原launch进程，不能靠旧PID或文件认领进程。
+- 在原物理宿主运行；CLI核本机hostname与原owner_host、项目/成员和manager-health精确对应。检查旧manager/bridge均不存在，或Windows已确认exited（进程对象仍可能保留）；unknown/权限拒绝/present均停止。使用Windows原生参数规则检查替代宿主、同实例或原launch进程，不能靠旧PID或文件认领进程。
 - 服务端在真实写锁内核原start/实例/host/世代、90秒内无心跳、目标成员没有任何项目的实际活跃queued/running任务、没有未到截止的pending/claimed启停动作。仅明确paused且queued、自身根/无parent、claimed_by/instance/claim_token/lease全为空的任务不阻挡恢复，任务本身保持暂停；running、暂停过渡、身份未知/子任务或残余领取仍拒绝。人类明确确认原进程已经停止，才记录独立审计并释放归属。
 - OS检查和HTTP事务无法组成一个跨进程原子事务。CLI多次紧邻复核并检测计划/健康文件/入口源码变化，遇新事实中止；这不等于服务端自行证明OS进程退出。
 

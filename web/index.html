@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/style.css?v=20261019-role-binding-summary-v1">
-  <link rel="stylesheet" href="/workspace.css?v=20261019-role-binding-summary-v1">
+  <link rel="stylesheet" href="/workspace.css?v=20261023-role-name-v1">
   <link rel="stylesheet" href="/role-creation.css?v=20261019-role-binding-summary-v1">
   <link rel="stylesheet" href="/role-diagnostics.css?v=20261019-role-binding-summary-v1">
 </head>
@@ -552,9 +552,19 @@
       </form>
     </section>
   </div>
-  <script src="/role-creation.js?v=20261019-role-binding-summary-v1"></script>
+  <div id="role-name-modal" class="role-create-backdrop hidden">
+    <section class="role-create-dialog role-name-dialog" role="dialog" aria-modal="true" aria-labelledby="role-name-title">
+      <div class="role-create-heading"><h2 id="role-name-title">修改角色名称</h2></div>
+      <form id="role-name-form">
+        <label class="role-request-field role-name-field" for="role-name-input"><span>角色名称</span><input id="role-name-input" class="profile-input" type="text" autocomplete="off" required aria-describedby="role-name-status"></label>
+        <p id="role-name-status" class="role-request-status" role="status" aria-live="polite"></p>
+        <div class="role-create-footer role-name-footer"><button id="role-name-cancel" type="button" class="role-service-button">取消</button><button id="role-name-save" type="submit" class="role-service-button role-create-primary">保存</button></div>
+      </form>
+    </section>
+  </div>
+  <script src="/role-creation.js?v=20261023-role-name-v1"></script>
   <script src="/role-diagnostics.js?v=20261019-role-binding-summary-v1"></script>
-  <script src="/workspace.js?v=20261021-stop-timeout"></script>
-  <script src="/app.js?v=20261020-conversation-controls-v2"></script>
+  <script src="/workspace.js?v=20261023-role-name-v1"></script>
+  <script src="/app.js?v=20261023-role-name-v1"></script>
 </body>
 </html>

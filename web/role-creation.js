@@ -524,6 +524,7 @@ function createRoleRequestUI(deps) {
   }
   attach();
   return { state, sync, refresh, open, close, chooseRunner, registerModel, submit, mutate, recover, setHost, rolePanel, newButton,
+    setRoleName: (id, name) => { const role = state.roles.find(r => r.member_id === id); if (role) role.role_name = name; },
     roleName: id => state.roles.find(r => r.member_id === id)?.role_name || "" };
 }
 

@@ -16,7 +16,7 @@ const tree = id => ({root:root(id), tasks:[root(id)]});
 function harness(...names) {
   const pending = [];
   const context = vm.createContext({
-    ...helpers, activeProjectId:'p1', myId:'human:qa', taskTreeRequest:0,
+    ...helpers, activeProjectId:'p1', myId:'human:qa', taskTreeRequest:0, projectAgentRequest:0,
     selectedTaskTree:null, taskTreeError:'', currentTask:root(15),
     getContextTask(){return context.currentTask;},
     apiFetch: url => new Promise((resolve,reject) => pending.push({url,resolve,reject})),
@@ -87,6 +87,15 @@ test('角色索引响应不能写入另一个项目',async()=>{
   const {context:c,reply}=harness('loadProjectAgents');
   c.projectAgents=[]; const request=c.loadProjectAgents(); c.activeProjectId='p2';
   reply(0,[{member_id:'agent:old'}]); await request; assert.equal(c.projectAgents.length,0);
+});
+
+test('改名完成后的版本递增阻止较早名册响应覆盖名称',async()=>{
+  const {context:c,reply}=harness('loadProjectAgents');
+  c.projectAgents=[{member_id:'agent:new',role_name:'旧名称'}];
+  const pending=c.loadProjectAgents();c.projectAgentRequest++;
+  c.projectAgents[0].role_name='新名称';
+  reply(0,[{member_id:'agent:new',role_name:'旧名称'}]);await pending;
+  assert.equal(c.projectAgents[0].role_name,'新名称');
 });
 
 test('群聊只列本项目和历史无项目房间，排除任务专属房间',()=>{

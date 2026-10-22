@@ -67,6 +67,26 @@ def normalized(value):
     return str(value).strip('"').replace("\\", "/").casefold()
 
 
+def process_argv(command):
+    """Use the OS command-line grammar: shlex cannot parse Windows JSON arguments."""
+    if os.name != "nt":
+        return shlex.split(command, posix=False)
+    shell=ctypes.WinDLL("shell32",use_last_error=True)
+    shell.CommandLineToArgvW.argtypes=[wintypes.LPCWSTR,ctypes.POINTER(ctypes.c_int)]
+    shell.CommandLineToArgvW.restype=ctypes.POINTER(wintypes.LPWSTR)
+    kernel=ctypes.WinDLL("kernel32",use_last_error=True)
+    kernel.LocalFree.argtypes=[wintypes.HLOCAL]
+    kernel.LocalFree.restype=wintypes.HLOCAL
+    count=ctypes.c_int()
+    argv=shell.CommandLineToArgvW(command,ctypes.byref(count))
+    if not argv:
+        raise ValueError("process_commandline_unreadable")
+    try:
+        return [argv[i] for i in range(count.value)]
+    finally:
+        kernel.LocalFree(ctypes.cast(argv,wintypes.HLOCAL))
+
+
 def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None):
     probe = probe or probe_pid
     inventory = inventory or process_inventory
@@ -80,7 +100,10 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
     if seen is None or (datetime.now(timezone.utc) - seen).total_seconds() <= 90:
         raise HostError("recovery_manager_recent")
     manager_pid, bridge_pid = health.get("pid"), plan["process_pid"]
-    if probe(manager_pid) != "absent" or probe(bridge_pid) != "absent":
+    manager_state, bridge_state = probe(manager_pid), probe(bridge_pid)
+    # Windows may retain an exited process object while another handle is open.
+    # GetExitCodeProcess has confirmed it is stopped; unknown/live still fail closed.
+    if manager_state not in ("absent", "exited") or bridge_state not in ("absent", "exited"):
         raise HostError("recovery_process_not_absent")
     entry = normalized(host_entry.resolve(strict=True))
     for row in inventory():
@@ -88,7 +111,7 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
         if not isinstance(command, str) or not command.strip():
             raise HostError("recovery_process_inventory_unknown")
         try:
-            argv = [normalized(value) for value in shlex.split(command, posix=False)]
+            argv = [normalized(value) for value in process_argv(command)]
         except ValueError as exc:
             raise HostError("recovery_process_inventory_unknown") from exc
         scripts = [value for value in argv[1:] if value.endswith(".py")]
@@ -106,7 +129,8 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
                 or normalized(plan["expected_instance_id"]) in argv
                 or normalized(plan["expected_process_launch_id"]) in argv):
             raise HostError("recovery_replacement_process_present")
-    return {"manager_pid": manager_pid, "bridge_pid": bridge_pid, "both_absent": True,
+    return {"manager_pid": manager_pid, "bridge_pid": bridge_pid,
+            "both_absent": manager_state == bridge_state == "absent", "both_stopped": True,
             "manager_health_sha256": hashlib.sha256(health_bytes).hexdigest(),
             "host_entry_sha256": hashlib.sha256(host_entry.read_bytes()).hexdigest()}
 

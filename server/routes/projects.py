@@ -342,6 +342,15 @@ def _project_agent_outs(
         else []
     )
     members_by_id = {member.id: member for member in members}
+    names_by_member = {
+        role.member_id: role.role_name
+        for role in session.exec(
+            select(ProjectRole).where(
+                ProjectRole.project_id == project_id,
+                ProjectRole.member_id.in_(member_ids),
+            )
+        ).all()
+    }
     instances_by_member: dict[str, list[AgentInstance]] = {}
     for instance in instances:
         instances_by_member.setdefault(instance.member_id, []).append(instance)
@@ -372,6 +381,7 @@ def _project_agent_outs(
     return [
         ProjectAgentOut.from_orm_agent(
             agent,
+            role_name=names_by_member.get(agent.member_id),
             display_name=(
                 members_by_id[agent.member_id].display_name
                 if agent.member_id in members_by_id

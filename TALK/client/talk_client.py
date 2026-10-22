@@ -44,6 +44,7 @@ class TalkClient:
         reconnect_max_delay: float = 8.0,
         dedupe_size: int = 512,
         timeout: float = 10.0,
+        start_from_latest: bool = False,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.ws_url = self._derive_ws_url(self.base_url, api_key)
@@ -53,6 +54,8 @@ class TalkClient:
         self.reconnect_max_delay = reconnect_max_delay
         self.dedupe_size = dedupe_size
         self.timeout = timeout
+        self.start_from_latest = start_from_latest
+        self._message_cursor_initialized = False
 
         self._http: httpx.AsyncClient | None = None
         self._ws = None
@@ -640,6 +643,8 @@ class TalkClient:
             await self._ensure_member()
             while not self._closing:
                 try:
+                    if self.start_from_latest and not self._message_cursor_initialized:
+                        await self._initialize_message_cursor()
                     await self._run_websocket_session()
                     reconnect_delay = self.reconnect_initial_delay
                 except asyncio.CancelledError:
@@ -676,6 +681,10 @@ class TalkClient:
 
             async with websockets.connect(self.ws_url, **ws_kwargs) as ws:
                 self._ws = ws
+                if self.start_from_latest:
+                    # Catch messages arriving after the initial tail read and
+                    # before WS subscription; buffered WS duplicates are deduped.
+                    await self._poll_once()
                 async for raw in ws:
                     await self._handle_ws_event(raw)
         finally:
@@ -705,7 +714,15 @@ class TalkClient:
         self._ws = None
         return min(reconnect_delay * 2, self.reconnect_max_delay)
 
+    async def _initialize_message_cursor(self) -> None:
+        messages = await self.fetch_history(limit=1)
+        latest = max((int(message["id"]) for message in messages), default=0)
+        self._last_message_id = max(self._last_message_id, latest)
+        self._message_cursor_initialized = True
+
     async def _poll_once(self) -> None:
+        if self.start_from_latest and not self._message_cursor_initialized:
+            await self._initialize_message_cursor()
         messages = await self.fetch_history(since=self._last_message_id, limit=100)
         for payload in messages:
             await self._handle_message_payload(payload)
