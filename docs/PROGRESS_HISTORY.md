@@ -2,6 +2,8 @@
 
 ## 2026-10-23 00:31（Asia/Shanghai）— 项目名称/铅笔改名、统一宿主与重连稳定性自检交付
 
+- 主体版本`1b8e10d`。最后暂存区检查指出新增名称接口测试EOF多一空行，收尾提交清理此空白并记录版本，不改变已验证行为；差异检查重新通过后常规推送当前分支。
+
 - 用户要求与下一个角色启动器修复合片，并明确所有开发由当前Codex完成。项目名册新增role_name权威、工作台显示/搜索及同风格方框铅笔弹窗，使用既有human-only项目PATCH；冲突保草稿/取消/键盘与迟到响应防覆盖。新角色保存WorkBuddy-k3，原全局名称和旧验证身份保持；不是将两个身份合并。
 - 新产品统一入口run.ps1/talk_runtime/talk_api实现API、配置worker、五个已核静态成员配方及两个WorkBuddy独立宿主一起就绪，Windows隐藏独立常驻、OS锁、原Popen、虚拟环境解释器父链、独立worker线程、有界宿主退避、正常stop/drain和API重载通过。部署仍依赖原本机窄入口，不冒称任意运行器新角色均自动适配或开机自启。
 - 原DSH确实退出，exit0、最后ReadTimeout/心跳22:05:40、manager22:06:08，早于新WorkBuddy角色验证；根因未确证。恢复CLI补Windows exited/原生argv边界，仅旧DSH gen30一次human计划/CAS恢复到31，其后普通启动。Codex/WB均由原宿主普通关闭/drain再迁入统一入口，未接管PID或自动解除其它归属。

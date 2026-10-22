@@ -36,4 +36,3 @@ class ProjectRoleNameTests(RoleApiTestCase):
             for project, name in [('prj_alpha','WorkBuddy-k3'),('prj_beta','另一项目的名称')]:
                 rows=client.get(f'/api/projects/{project}/agents',headers={'X-API-Key':'bobo-key'}).json()
                 self.assertEqual(rows[0]['role_name'],name)
-
