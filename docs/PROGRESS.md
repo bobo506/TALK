@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-22 22:36（Asia/Shanghai，中断恢复核对）。WorkBuddy内置引擎独立CLI片代码、自检、309—311真实生产闭环和文档已完成；人工里程碑待确认，不自动开启宿主自启或其它片。
+Updated: 2026-10-22 22:39（Asia/Shanghai，中断恢复核对完成）。WorkBuddy内置引擎独立CLI片代码、自检、309—311真实生产闭环和文档已完成；人工里程碑待确认，不自动开启宿主自启或其它片。
 
 ## 当前交付与身份
 
@@ -22,11 +22,11 @@ Updated: 2026-10-22 22:36（Asia/Shanghai，中断恢复核对）。WorkBuddy内
 - DSH293—297、Codex300—302及Kimi303—308的既有原生/收取证据保持；K2.8/K3共用kimi-code实现，无需两套适配。另一K2.8成员未单独实机，Kimi常规开发仍暂停。当前覆盖四类运行器的授权接入形态，人工里程碑待用户确认。
 - 新WorkBuddy角色已停止，使用时先手动运行窄宿主再从普通入口启动，命令见[使用说明](guides/EXECUTION_SESSION_USAGE.md)。宿主统一启动、286、日志手动跨设备/全根留存和其它原排期保持；下一片须另行说明范围/验收并获确认，不自动派发/启停。
 - WorkBuddy未配置MCP，不启用主动长等待；21600任务预算与MCP客户端T/W分开。GUI显示/手动续写/费用收益不在验证结论内。
-- 一次诊断误输出原models数组，两项Key进入本次工具日志，已告知用户，未擅自轮换。已改固定字段白名单，生产验后205份本片产物精确扫描无凭据正文；不可复述原对象或声称工具日志已撤回。最终综合检查完成原值比对/原生writer退出检查后，在旧历史绝对路径链接断言处失败；修正仅检新增链接后的整体验证未执行，因自动审批工作区额度不足。恢复时未重读外部凭据，仅本地核验8份文档UTF-8及13个新增相对链接通过，不冒称整体验证生成成功回执。
+- 一次诊断误输出原models数组，两项Key进入本次工具日志，已告知用户，未擅自轮换，不可复述原对象或声称日志已撤回。已改固定字段白名单；22:39审批恢复后最终综合复查通过：18份正式文件、209份本片产物及5444份独立原生HOME文件的原值凭据匹配均为0，本次原生writer进程0，变更文档编码与新增链接通过。先前旧历史绝对链接断言及额度审批中断如实记历史，不再作为当前阻塞。证据`production/final-artifact-check.json`。
 - 精确额度百分比未读取，不臆测。新本地身份档及既有未跟踪产物保留，不混入提交。
 
 ## 恢复
 
-22:36已只读核实309—311仍succeeded/completed且已收取、308条旧任务逐行SHA保持、原五服务行/配置/286保持，WorkBuddy仍gen2/stopped/无owner/pid为空。MCP当前身份仍agent:codex，本项目WorkBuddy bound/offline；当前身份非任务发起者，生产任务事实按本地只读数据库核验。剩余Git收尾仅8份文档，无产品改动、不重放原生产脚本。证据`production/resume-check.json`。
+22:36已只读核实309—311仍succeeded/completed且已收取、308条旧任务逐行SHA保持、原五服务行/配置/286保持，WorkBuddy仍gen2/stopped/无owner/pid为空。MCP当前身份仍agent:codex，本项目WorkBuddy bound/offline；当前身份非任务发起者，生产任务事实按本地只读数据库核验。8份收尾文档已提交`e4cf02f`；审批恢复后最终综合检查通过，无产品改动、不重放原生产脚本。证据`production/resume-check.json`及`production/final-artifact-check.json`。
 
 [WorkBuddy实现与验收](spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)、[使用说明](guides/EXECUTION_SESSION_USAGE.md)、[完整历史](PROGRESS_HISTORY.md)。恢复指令：`继续项目`；先读本快照，不重放单次生产脚本，不恢复286或Kimi开发派发。当前片收尾后等用户验收/下一片明确确认。

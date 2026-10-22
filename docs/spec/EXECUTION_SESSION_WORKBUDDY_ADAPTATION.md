@@ -50,6 +50,6 @@
 
 TALK页面不改，首轮/增量/换窗参数见[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。本角色当前停止，手动启用时先启动已验证的窄宿主，再使用普通角色启动入口；不由页面绕过宿主所有权，也不自动恢复旧归属。本片四类运行器接线范围已覆盖DSH、Codex、Kimi Code及用户批准形态的WorkBuddy内置独立CLI，人工里程碑仍待用户确认；不外推其它版本/模型、另一K2.8成员独立HOME、桌面GUI控制或主动MCP长等待。宿主统一启动仍是另片，须先获确认。
 
-一次诊断误将原models数组完整输出，导致两项Key进入本次工具日志，已告知用户。随后改固定字段白名单；最初50份、生产验后205份本片产物精确扫描均未含凭据正文，未擅自换Key。不可复述该输出、复制含密钥原配置或提交凭据。此为实际诊断失误，不冒称日志已被撤回。
+一次诊断误将原models数组完整输出，导致两项Key进入本次工具日志，已告知用户。随后改固定字段白名单；最初50份、生产验后205份本片产物精确扫描均未含凭据正文，未擅自换Key。中断恢复后22:39最终综合复查通过：18份正式文件、209份本片产物、5444份独立原生HOME文件原值匹配0，本次原生writer进程0，新增链接/编码通过，回执`production/final-artifact-check.json`。先前历史绝对路径断言及工作区额度审批失败留存，审批恢复后正规重跑成功。不可复述原输出、复制含密钥原配置或提交凭据；此为实际诊断失误，不冒称工具日志已被撤回。
 
 接口参考：[官方headless](https://www.codebuddy.ai/docs/cli/headless)、[CLI参考](https://www.codebuddy.ai/docs/cli/cli-reference)；具体兼容性以本机安装版源码/实际CLI证据为准。桌面方案核查参考[WorkBuddy任务对话](https://www.workbuddy.cn/docs/workbuddy/Conversation)和[Open API](https://open.workbuddy.cn/docs/openapi)，不把云任务或本地助理单消息接口当作桌面窗口控制能力。
