@@ -64,6 +64,6 @@ API就绪检查曾把venv包装PID6320误当实际launcherPID，报一次未就�
 
 当前DSH链路已工程接通并能实际使用，[实际入口与说明](../guides/EXECUTION_SESSION_USAGE.md)已给出。用户重连后当前Codex MCP已加载新参数，296→297已真实验证同窗/记忆及计数1→2；SDK/API亦可直接使用，不改当前桌面MCP配置。其它runtime不冒称支持，桌面GUI显示/手动续写和缓存/费用收益未验；headless实际工具上限T未核，不启用主动长等待。
 
-完整功能当前等待项目管理者人工里程碑验收；在此之前不派宿主统一启动或其它新片。286/Kimi额度暂停、日志/21600等待办保持。本轮没有修宿主自启动或自动解除任何owner。
+用户于2026-10-22 10:45明确TALK页面不改，只需核实发送给角色的同功能任务进入同一原生会话；296/297同一原生文件两轮已证实，满足此次确认条件。撤下页面核验补齐建议，保留原始反馈及核查记录，不因此新增界面开发。宿主统一启动或其它新片仍须单独明确确认后才派发。286/Kimi额度暂停、日志/21600等待办保持。本轮没有修宿主自启动或自动解除任何owner。
 
 完整证据索引：`.tmp/execution-session-usable-v1/independent-review292/`的`preparation.json`、`checks/`、`final-targeted.txt`、`final-runner.txt`、`native-replay/`、`api-replay-v2/`、`integrated-manifest.json`、`production/`及`collection-receipt.json`。原始失败证据不覆盖，生产新任务引用与交付结果保留。
