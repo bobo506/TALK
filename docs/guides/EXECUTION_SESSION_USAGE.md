@@ -1,6 +1,6 @@
 # 连续任务的原生会话复用
 
-2026-10-22：当前生产已接通DeepSeek/DSH及Codex，Codex通过205项自检、正常加载及300→301真实同窗/302换窗恢复验证。Kimi Code的K2.8/K3共用适配已由本会话直接实现，338项相关自检及真实CLI+本地假模型21轮通过，但额度暂停保持，尚未生产加载或真实账号验收，不能称所有角色已完成。TALK页面保持，以角色原生会话为核实标准。DSH/Codex真实模型验证使用低占用场景；各运行器60%/缺数10/11边界按受控证据说明。
+2026-10-22：DeepSeek/DSH及Codex的真实任务链已验；Kimi Code的K2.8/K3共用适配由本会话直接实现，338项相关自检、真实CLI+本地假模型21轮及原账号各三轮原生同窗/新窗恢复均通过，原API已正常加载。用户允许Kimi验收额度，但明确不给Kimi派发任务；本次零TALK任务，三个Kimi角色仍停止，生产派发/领取/收取链未实测，不称该部分已验。TALK页面保持；各运行器真实模型验证为低占用，60%/缺数10/11边界按受控证据说明。
 
 ## 选择规则
 
@@ -23,7 +23,7 @@
 
 ## 实际入口
 
-源码支持绑定为`bound`且`runtime=dsh/codex/kimi-code`的普通顶层`general`任务；生产当前已加载DSH `0.1.5-rc.2`和Codex `0.163.0`，Kimi `2.0.2`待加载及真实账号验收。适用各自已核验的本地命令/模型/权限组合。项目须登记绝对`project_root_path`，并与bridge实际工作目录一致。其它runtime以及子任务、review/test/rework保持原路径；不支持的执行会话选择会明确拒绝。
+源码及已加载API支持绑定为`bound`且`runtime=dsh/codex/kimi-code`的普通顶层`general`任务。实机版本为DSH `0.1.5-rc.2`、Codex `0.163.0`、Kimi `2.0.2`；Kimi角色目前停止，已验证原账号直接原生调用，未做生产任务链。适用各自已核验的本地命令/模型/权限组合。项目须登记绝对`project_root_path`，并与bridge实际工作目录一致。其它runtime以及子任务、review/test/rework保持原路径；不支持的执行会话选择会明确拒绝。
 
 REST `POST /api/tasks`、异步`TalkClient.create_task`、同步`TalkClientSync.create_task`和MCP `talk_delegate_task`均支持可选`execution_session`。不传该字段时保持旧行为。MCP的既有长连接须重连并刷新工具目录，确认schema出现此参数；本次用户重连后MCP296→297已实际验证同窗、增量回想及计数1→2，SDK/API亦已验证可用。无需修改现有桌面MCP配置。
 
@@ -109,11 +109,11 @@ Codex读原生最近请求`last_token_usage.total_tokens / model_context_window`
 
 原Codex宿主已正常恢复、单角色重载到generation21，原模型/Key/绑定/权限保持；API正常重载且297条既有任务哈希保持。原DSH运行状态保持。MCP上限T未重测，不启用主动长等待；原任务执行预算、有限RPC和清理边界详验收记录。
 
-### Kimi Code 共用适配（开发完成，生产待验）
+### Kimi Code 共用适配与原生验收
 
 K2.8和K3共用一套`kimi-code`适配，选择精确角色和已有模型别名即可；各角色、模型、工作线、HOME和计数仍隔离，不需要维护两套实现。当前仅核验CLI `2.0.2`；首次沿原Agent文件创建，续轮以明确`--session`恢复原生权限配置，配置或工具边界不符时拒绝。
 
-实现已接入同一REST/SDK/MCP参数、基础合同、60%与条件十轮规则。实际账号的Kimi额度仍暂停，本轮只用真实CLI与本地假模型验证K3/review及K2.8/tools五轮各一组、受控隐藏指标下第10/11轮；未向Kimi派生产任务、未重载API或启停角色。待用户明确本片最小实机额度/加载安排后，才沿原入口验收，不据此恢复常规派发。
+实现已接入同一REST/SDK/MCP参数、基础合同、60%与条件十轮规则。用户随后允许原生验收额度，但禁止向Kimi派发任务：原K3及旧K2.8均保原tools档，各三轮完成同原生ID/计数1→2、增量回想及force_new完整恢复；六次真实模型请求通过，容量均1048576，原API正常重载。TALK任务302条逐行不变，三个Kimi角色保持停止，常规派发未恢复；该生产任务链及另一个K2.8成员未单独实机，不冒称通过。此前K3/review为隔离兼容性验证，不是生产原权限。
 
 正式送达须原生用户prompt与上下文消息双SHA相符；预检、自动介绍、工具及重复回执不计。指标使用原生上下文计数与精确模型配置的容量，`llm.request.maxTokens`为输出预算，不作窗口容量。Windows原生argv长度受系统限制，超限会明确失败，不截断基础介绍。详[Kimi实现、自检及待验范围](../spec/EXECUTION_SESSION_KIMI_ADAPTATION.md)。
 

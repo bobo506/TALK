@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-22 17:37（Asia/Shanghai）— 用户允许原生验收但禁止派Kimi任务，K3/K2.8六轮通过及API正常加载
+
+- 用户明确“允许，只要不给kimi派发任务，目前的额度支持验收”。Codex按此直接完成原生账号验收，不创建/派发/领取/收取任何TALK任务，不启动接单bridge或恢复常规派发；沿本片自行实施职责，全部称自检，产品代码6f1a293保持。
+- 原human入口只读核验两个目标stopped/无owner/can_start，原API健康及Popen创建时间通过。先前普通沙箱Key读取PermissionError保持；本次用户授权后经审批只用同一原Key内存认证，不输出/复制凭据、不重做登录或改Key/绑定。原生产K3与旧K2.8均tools档，未将上片隔离K3/review测试误当原权限；说明已补正。
+- 通过产品Kimi通道与隔离sidecar/内存用例，沿原独立HOME/登录及精确alias直接三轮各一组。K3首/续ID session_20efd6a4-9a46-4f9b-843e-95fd7d36b08c，计数1→2，第3新ID session_5aeefb96-e6b3-4aaa-982e-fd6a9c35eeba、计数1；旧K2.8分别session_5d72aa7a-c3a3-4602-9035-c80362406be6和session_4418b8b3-a7ae-4d92-9c06-814ee14ccff1，同样1→2/1。内存用例不是生产任务，也没有冒称收取。
+- 两模型续轮directive未重发暗号/基础标记，仍正确回复“松涛38 / 白鹭76”；force_new恢复完整基础后回复“白鹭76”。原生6次llm.request精确alias/model，六条正式prompt SHA匹配，六尝试confirmed、通道0、六原生进程已退出，没有工具调用。K3用量6962/7430/6887，K2.8为7025/7506/7167，容量均1048576；低占用真实模型，不替代60%/10次受控边界证据。
+- 原API通过已核launcher/stop.request正常关闭重开，新launcher18580/child10600，健康及创建时间核验通过；没有强杀、启停任何角色或解除owner。302条既有生产任务逐行SHA、原配置/绑定、五角色服务记录、286全文及暂停均保持。三个Kimi仍stopped/无owner，原DSH/Codex代次/实例保持，TALK任务新增0。
+- 证据.tmp/execution-session-kimi-v1/account-validation/：readiness、逐轮JSON/原生stdout/stderr、sidecar、native-request-model-audit、api-reloaded及final-verification。代码未改，338项自检/最后Kimi29项定点复验与21轮本地假模型证据保持；未重复已完成的真实模型探针。
+- 同步8份文档：AGENTS、PROGRESS/HISTORY、PROJECT_BRIEF、MODULE_bridges、Kimi说明、使用说明、用户手册；差异/UTF-8/新增链接及产品源码SHA核对后常规提交/推送。原历史与失败证据、未跟踪产物保持。
+- 本片开发/自检/原生账号验收及API加载已完成；按用户约束未实测生产任务派发/领取/收取链，不称该链或人工验收通过，另一个K2.8角色未单独实机。Kimi派发仍暂停，页面/286/日志/21600与宿主统一启动排期保持；下一片仍另行确认，不自动继续。
+
 ## 2026-10-22 17:17（Asia/Shanghai）— Kimi K2.8/K3共用适配由Codex直接开发，自检完成，生产待验
 
 - 用户明确“继续开发kimi的，开发工作仍旧由你自己执行”，并询问2.8/K3是否共用。当前agent:codex、prj_e8fe7066bbec/lead核实三个Kimi同kimi-code运行器，一套适配按模型/角色隔离；不派DeepSeek/Kimi。本片均Codex自检，不称独立复核；基线56060b8，证据.tmp/execution-session-kimi-v1。

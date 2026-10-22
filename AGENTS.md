@@ -39,7 +39,7 @@
 
 ## 会话复用的整体完成判据（2026-10-21，用户最新明确要求）
 
-- 2026-10-22 Kimi后续授权：用户明确继续开发Kimi适配，仍由当前Codex自行实施，不派DeepSeek/Kimi；K2.8与K3共用一套kimi-code适配，各角色/模型/会话/计数隔离。当前338项自检及真实CLI+本地假模型21轮通过，代码接通API/MCP/普通领取入口，但未生产加载或真实账号验收。Kimi额度暂停未明确解除；不自动创建生产验收任务/恢复常规派发，不宣称全角色完成。详[Kimi适配](docs/spec/EXECUTION_SESSION_KIMI_ADAPTATION.md)及当前进度。
+- 2026-10-22 17:34 Kimi最新边界：用户明确适配仍由当前Codex自行开发，K2.8/K3共用kimi-code实现、角色/模型/会话/计数隔离；随后允许验收额度，但明确“只要不给kimi派发任务”。338项自检/真实CLI+假模型21轮保持；原K3与旧K2.8各三轮真实账号原生验收已通过，同窗/计数1→2及新窗基础恢复均核。没有创建/派发任何TALK任务，302条历史任务、五角色记录、模型/Key/绑定/权限及286保持；原API正常重载18580→10600，三个Kimi仍停止、常规派发暂停。原生6轮在隔离sidecar/内存用例中验证，不称生产任务派发/领取/收取链实测通过；另一K2.8角色未单独实机。详[Kimi适配](docs/spec/EXECUTION_SESSION_KIMI_ADAPTATION.md)及当前进度。下一片/宿主统一启动仍另行确认。
 
 - 2026-10-22当前实施边界：整体目标适用所有角色；292已接通DSH，当前Codex由本会话按用户明确指示自行实现、自检和实机加载，205项通过、300→301真实同窗/计数1→2、302新窗恢复已验并收取。当前DSH/Codex可用，Kimi尚未适配且额度暂停，不能宣称全角色完成。用户明确TALK页面不改，以角色原生会话为准。Codex同名自派400规则保持，实机由合法human请求/收取；原模型/Key/绑定/权限及286保护项保持。下一片及宿主统一启动仍须另行明确确认，不自动派发。详[Codex适配](docs/spec/EXECUTION_SESSION_CODEX_ADAPTATION.md)、[292实查](docs/spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)和[使用说明](docs/guides/EXECUTION_SESSION_USAGE.md)。
 

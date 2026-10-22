@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-22 17:34：用户仅允许原生账号验收、禁止给Kimi派发任务。原K3/旧K2.8各三轮原生同窗/计数1→2/新窗恢复通过；原API正常重载18580→10600，零TALK任务、302条历史及五角色/配置/286保持，Kimi三角色仍停止。原生产两角色均tools档，本次保原权限。普通TALK派发/领取/收取链未实测，另一K2.8未单独实机；详[Kimi适配](EXECUTION_SESSION_KIMI_ADAPTATION.md)。
+
 > 2026-10-22 17:15：Kimi Code共用适配由当前Codex直接实现/自检，K2.8/K3按角色和模型隔离；API/MCP/普通领取入口已接线，338项自检及真实CLI+本地假模型21轮通过。Kimi额度暂停，未生产加载/真实账号验收，不能称全角色完成。TALK页面和原配置/权限/286保持；详[Kimi适配](EXECUTION_SESSION_KIMI_ADAPTATION.md)。
 
 > 2026-10-22 16:20当前：用户指定Codex适配由本会话直接开发，205项自检、300→301真实同窗/计数1→2及302新窗恢复已通过并收取，原Codex宿主正常恢复、API正常加载。DSH/Codex已接通；Kimi未适配且暂停，TALK页面不改，同名自派守卫保持。详[Codex适配](EXECUTION_SESSION_CODEX_ADAPTATION.md)与[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。下方为此前阶段记录。
