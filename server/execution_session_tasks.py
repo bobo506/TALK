@@ -306,9 +306,9 @@ def normalize_execution_session_metadata(
         raise ExecutionSessionValidationError(
             "目标角色当前没有可核的 bound 绑定，不能启用执行会话复用"
         )
-    if binding_snapshot.get("runtime") not in {"dsh", "codex"}:
+    if binding_snapshot.get("runtime") not in {"dsh", "codex", "kimi-code"}:
         raise ExecutionSessionValidationError(
-            "execution_session 当前只支持 runtime=dsh/codex；其它运行器保持旧行为"
+            "execution_session 当前只支持 runtime=dsh/codex/kimi-code；其它运行器保持旧行为"
         )
     if not binding_snapshot.get("provider_id") or not binding_snapshot.get("model_id"):
         raise ExecutionSessionValidationError(

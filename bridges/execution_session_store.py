@@ -366,15 +366,44 @@ class ExecutionSessionStore:
         return dict(row) if row is not None else None
 
     def reserve_attempt(self, *, task_id: int, attempt: int, execution_id: str,
-                        body_sha256: str, window_id: str, native_session_id: str,
+                        body_sha256: str, window_id: str, native_session_id: str | None,
                         channel_key: str, owner_token: str) -> None:
         self.assert_channel(scope_key=channel_key, owner_token=owner_token)
         with self._transaction() as conn:
             try:
                 conn.execute('INSERT INTO attempts VALUES(?,?,?,?,?,?,?,\'started\',?)',
-                    (str(task_id),attempt,execution_id,body_sha256,window_id,native_session_id,channel_key,_iso(_utc_now())))
+                    (str(task_id),attempt,execution_id,body_sha256,window_id,native_session_id or '',channel_key,_iso(_utc_now())))
             except sqlite3.IntegrityError as exc:
                 raise StoreConflict('task_attempt_already_started') from exc
+
+    def bind_pending_native_session(self, *, task_id: int, attempt: int, window_id: str,
+                                    execution_id: str, native_session_id: str,
+                                    channel_key: str, owner_token: str) -> None:
+        """CLI 首轮结束后绑定真正原生 ID；只允许本人 pending 尝试的一次 CAS。"""
+        if not native_session_id:
+            raise StoreConflict('native_session_id_required')
+        self.assert_channel(scope_key=channel_key, owner_token=owner_token)
+        with self._transaction() as conn:
+            lease = conn.execute('SELECT owner_token,lease_expires_at FROM channels WHERE scope_key=?',
+                (channel_key,)).fetchone()
+            expiry = _parse_iso(lease['lease_expires_at']) if lease is not None else None
+            if lease is None or lease['owner_token'] != owner_token or expiry is None or expiry <= _utc_now():
+                raise StoreConflict('channel_owner_mismatch')
+            window = conn.execute('SELECT status,native_session_id,scope_json FROM windows WHERE window_id=?',
+                (window_id,)).fetchone()
+            if window is None or window['status'] != _PENDING_FIRST or window['native_session_id'] is not None:
+                raise StoreConflict('pending_window_conflict')
+            scope = json.loads(window['scope_json'])
+            expected_channel = '|'.join(str(scope.get(k) or '') for k in
+                ('project_id','target_member_id','native_home_namespace','runner_id'))
+            if channel_key != expected_channel:
+                raise StoreConflict('pending_channel_conflict')
+            result = conn.execute('''UPDATE attempts SET native_session_id=?
+                WHERE task_id=? AND attempt=? AND window_id=? AND execution_id=?
+                AND channel_key=? AND state='started' AND native_session_id='' ''',
+                (native_session_id,str(task_id),attempt,window_id,execution_id,channel_key))
+            if result.rowcount != 1:
+                raise StoreConflict('pending_attempt_conflict')
 
     def commit_confirmed_delivery(self, *, window_id: str, expected_row_revision: int,
                                  native_session_id: str, count_state: Mapping[str, Any],

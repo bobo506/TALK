@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-22）
 
+2026-10-22 17:15当前：用户明确Kimi适配仍由当前Codex直接开发。K2.8/K3共用kimi-code实现、按角色/模型隔离；API/MCP及领取入口已接线，338项自检、真实CLI2.0.2+本地假模型21轮（含同窗/60%/受控缺数10→11/新窗恢复）通过。Kimi额度暂停保持，未生产加载/真实账号验收，DSH/Codex仍为当前已加载可用范围；TALK页面、302条既有任务、配置/绑定、五角色记录及286保持。详[Kimi适配](spec/EXECUTION_SESSION_KIMI_ADAPTATION.md)与[当前进度](PROGRESS.md)。下方为此前阶段记录。
+
 2026-10-22 16:20最新：用户明确同窗机制应覆盖所有角色，并指定Codex适配由本会话直接开发。当前DSH与Codex已工程接通并实机验证：205项自检，300→301同原生会话/计数1→2、302新窗基础恢复均完成收取。Codex原宿主正常恢复和单角色重载，未解除归属；297条既有任务、配置/绑定及其它角色保持。TALK页面按用户要求不改；Kimi尚未适配且额度暂停，不能称全角色完成。当前桌面同名自派400守卫保持，真实测试由合法human入口创建/收取。详[Codex适配](spec/EXECUTION_SESSION_CODEX_ADAPTATION.md)、[使用说明](guides/EXECUTION_SESSION_USAGE.md)及[当前进度](PROGRESS.md)。下方为此前阶段记录。
 
 2026-10-22 10:19最新：292首次交付已独立实查，Codex直接补正并集成19份源码/测试；原生阈值/缺数边界和SDK/MCP全链路隔离验证通过，293→294真实同窗/增量回想、295新窗完整恢复均成功收取。当前DeepSeek/DSH链路已工程接通可用，等待人工里程碑验收；用户重连后MCP296→297真实同窗/增量回想、计数1→2均已收取，SDK/API亦已可用。其它runtime/GUI可见性/费用收益不冒称通过；宿主统一启动修复仍在验收及下一片确认后。详[292实查与验收](spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)、[使用说明](guides/EXECUTION_SESSION_USAGE.md)和[进度](PROGRESS.md)。 下方为此前记录。

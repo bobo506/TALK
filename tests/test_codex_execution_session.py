@@ -338,7 +338,7 @@ class ContinuationPreflightTests(unittest.IsolatedAsyncioTestCase):
             async def fetch_history(self,**kwargs):return []
             async def send_text(self,*args,**kwargs):return {'id':2}
             async def request_task_clarification(self,task_id,**kwargs):self.requests.append(task_id);return {'id':task_id}
-        for runtime,base_id,forced,expected in [('codex',1,False,True),('codex',1,True,False),('codex',None,False,False),('dsh',1,False,False)]:
+        for runtime,base_id,forced,expected in [('codex',1,False,True),('codex',1,True,False),('codex',None,False,False),('kimi-code',1,False,True),('kimi-code',1,True,False),('dsh',1,False,False)]:
             with self.subTest(runtime=runtime,base_id=base_id,force_new=forced):
                 client=Client();prompts=[]
                 async def run(command,prompt,**kwargs):

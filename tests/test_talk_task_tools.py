@@ -660,6 +660,15 @@ class TalkExecutionSessionToolTests(RouteTestCase):
         }
 
     def test_delegate_execution_session_uses_base_reference_and_no_repeat(self):
+        self._check_execution_session_delegate('dsh','deepseek-official','deepseek-flash','deepseek-flash')
+
+    def test_kimi_k3_execution_session_via_mcp(self):
+        self._check_execution_session_delegate('kimi-code','managed:kimi-code','k3','kimi-code/k3')
+
+    def test_kimi_k28_execution_session_via_mcp(self):
+        self._check_execution_session_delegate('kimi-code','managed:kimi-code','kimi-for-coding','kimi-code/kimi-for-coding')
+
+    def _check_execution_session_delegate(self, runtime, provider, model_id, model_alias):
         from server.models import (
             Project,
             ProjectRoleBinding,
@@ -677,7 +686,7 @@ class TalkExecutionSessionToolTests(RouteTestCase):
             session.add(
                 RunnerRegistry(
                     runner_id="runner:tool-dsh",
-                    runtime="dsh",
+                    runtime=runtime,
                     display_name="Tool DSH",
                     adapter_status="adapted",
                     capabilities=[],
@@ -693,10 +702,10 @@ class TalkExecutionSessionToolTests(RouteTestCase):
                     member_id="agent:worker",
                     runner_id="runner:tool-dsh",
                     model_source="builtin",
-                    provider_id="deepseek-official",
+                    provider_id=provider,
                     connection_ref="isolated",
-                    model_id="deepseek-flash",
-                    model_alias="deepseek-flash",
+                    model_id=model_id,
+                    model_alias=model_alias,
                     model_display_name="DeepSeek Flash",
                     updated_by="human:bobo",
                     updated_at=now,
@@ -731,6 +740,7 @@ class TalkExecutionSessionToolTests(RouteTestCase):
                     },
                 )
                 self.assertEqual(created["execution_session"]["base_task_id"], None)
+                self.assertEqual(created["execution_session"]["runtime"], runtime)
                 self.assertNotIn(
                     "固定要求：只在基础合同出现一次。",
                     created["content"],

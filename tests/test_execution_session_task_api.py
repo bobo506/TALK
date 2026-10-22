@@ -24,7 +24,7 @@ BASE_SHA = hashlib.sha256(BASE_TEXT.encode("utf-8")).hexdigest()
 
 
 class ExecutionSessionTaskApiTests(RouteTestCase):
-    def test_codex_binding_can_create_and_reference_base_but_kimi_stays_unsupported(self):
+    def test_codex_and_kimi_bindings_can_create_and_reference_base(self):
         with self.session() as session:
             runner=session.get(RunnerRegistry,'runner:api-dsh')
             runner.runtime='codex'
@@ -41,8 +41,13 @@ class ExecutionSessionTaskApiTests(RouteTestCase):
         with self.session() as session:
             runner=session.get(RunnerRegistry,'runner:api-dsh');runner.runtime='kimi-code'
             session.add(runner);session.commit()
-        unsupported=self._create(execution_session=self._base_request())
-        self.assertEqual(unsupported.status_code,422,unsupported.text)
+        kimi=self._create(execution_session=self._base_request())
+        self.assertEqual(kimi.status_code,201,kimi.text)
+        self.assertEqual(kimi.json()['execution_session']['runtime'],'kimi-code')
+        follow['base_task_id']=kimi.json()['id']
+        continued=self._create(execution_session=follow)
+        self.assertEqual(continued.status_code,201,continued.text)
+        self.assertEqual(continued.json()['execution_session']['base_contract_sha256'],kimi.json()['execution_session']['base_contract_sha256'])
 
     def test_requirements_snapshot_is_private_and_changed_requirements_require_new_base(self):
         from server.models import AgentTask

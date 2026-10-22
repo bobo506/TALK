@@ -3062,13 +3062,14 @@ async def _prepare_task_before_claim(
                 return None, replay_context, True
             return None, replay_context, False
 
-    # 预检仍走原只读、非持久化命令，不进入正式会话或累计交办次数。
+    # 预检仍走原只读独立命令，不进入正式会话或累计交办次数。
+    # Kimi prompt 预检可以保留独立原生记录；不冒称该运行器无持久化。
     # 仅预检副本补基础合同；正式续轮的增量正文与任务账本不被改写。
     preflight_task = task
     if preflight_base_context is not None:
         continuation_note = ""
         execution_meta = task.get("execution_session") or {}
-        if (runtime == "codex" and execution_meta.get("runtime") == "codex"
+        if (runtime in {"codex", "kimi-code"} and execution_meta.get("runtime") == runtime
                 and type(execution_meta.get("base_task_id")) is int
                 and execution_meta["base_task_id"] > 0 and not execution_meta.get("force_new")):
             continuation_note = (
@@ -3262,6 +3263,8 @@ async def _handle_execution_session_claimed(
     )
     if (claimed.get("execution_session") or {}).get("runtime") == "codex":
         from bridges.codex_execution_channel import run_execution_session_task
+    elif (claimed.get("execution_session") or {}).get("runtime") == "kimi-code":
+        from bridges.kimi_execution_channel import run_execution_session_task
 
     task_id = int(claimed["id"])
     creator = claimed.get("created_by")
@@ -3411,7 +3414,7 @@ async def handle_queued_task(
     task_id = int(task["id"])
     execution_task = bool(
         execution_context is not None
-        and str(runtime).lower() in {"dsh", "codex"}
+        and str(runtime).lower() in {"dsh", "codex", "kimi-code"}
         and isinstance(task.get("execution_session"), dict)
     )
     runner = command_runner or run_cli_command

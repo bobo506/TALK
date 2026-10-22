@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-22 17:17（Asia/Shanghai）— Kimi K2.8/K3共用适配由Codex直接开发，自检完成，生产待验
+
+- 用户明确“继续开发kimi的，开发工作仍旧由你自己执行”，并询问2.8/K3是否共用。当前agent:codex、prj_e8fe7066bbec/lead核实三个Kimi同kimi-code运行器，一套适配按模型/角色隔离；不派DeepSeek/Kimi。本片均Codex自检，不称独立复核；基线56060b8，证据.tmp/execution-session-kimi-v1。
+- 新增kimi_execution_native/channel，API允许bound/kimi-code普通general任务，SDK/MCP沿用参数，bridge领取前基础合同、续轮预检及正式分支接通。共享原规划/计数/store/合同，覆盖首轮完整/续轮增量/新窗恢复、可靠60%及单纯缺数可信计数10/11。原生2.0.2禁止agent-file/session同用，首轮原Agent创建、续轮恢复并核profile/model/tools/subagents。
+- 原生turn.prompt与context.append_message双ID/SHA才ACK；自动介绍/工具/预检不计，未知/重复不重跑，送达后失败仍计数并停用旧窗。CLI首轮才生成ID，先以既有sidecar空串预留未知ID、一次CAS绑定、原事务ACK/计数，无schema迁移。指标取token_counting与精确模型配置容量，排除输出maxTokens；非法/未来/配置冲突不兜底、恢复读数不清零。新回执不含助手正文/凭据。
+- Python338项全部通过（tests-final-2.txt），最后严格未来时间校验后Kimi29项定点复验通过，不叠加计数；含DSH/Codex、API、真实隔离MCP各模型及普通领取入口。首轮NOT NULL预留、假模型命令识别、缺容量模型原生拒绝等原失败均保留；修正为既有schema空串未知ID和受控隐藏指标，不冒充自然缺数。
+- 真实安装版CLI2.0.2配独立HOME/sidecar及回环假模型，最终21轮/21次本地请求通过：K3/review与K2.8/tools各5轮真实同窗/计数1→2、增量回想星河42、force_new恢复杉木53、6000/10000后下轮换ID；受控隐藏指标1..10同ID、第11新ID/计数1及恢复基础。原生wire/results/requests在native-integration/b27d4189。无真实账号/付费调用，不称真实高占用或安装版自然缺数。
+- 保护前后302条生产任务SHA、原配置/绑定、五角色服务记录、286全文/暂停保持；无生产任务/API重载/角色启停。三个Kimi DB记录stopped/无process_launch，不代替进程健康。原human操作Key读取遭当前沙箱PermissionError，未调用human服务API/换凭据；无自动审批升级请求或拒绝。原Kimi bridge、DSH/Codex适配/内核保持。
+- 已读TERMINAL_MCP要求，Kimi实际T未知/未重测，660000仅模板；不主动长等待/唤回，任务21600与清理各10秒分开。页面不改，286/日志/宿主统一启动排期保持。同步AGENTS、简报、bridge模块、说明/用户手册及进度；Git差异检查通过，按本片常规提交/推送。
+- 开发及隔离自检完成，生产加载/真实账号验收未完成；Kimi额度暂停未明确解除，不能称全角色完成。只待本片最小实机安排确认：原API/宿主普通加载，K3及一个K2.8各三轮首轮/续轮/force_new，合法创建/收取，必要普通启停恢复原状态；不自动解除owner、恢复常规派发或286。下一功能仍另行确认。
+
 ## 2026-10-22 16:30（Asia/Shanghai）— Codex适配Git收尾与用户要求汇总进度
 
 - 用户要求“汇总下进度”；当前仍为agent:codex、TALK项目prj_e8fe7066bbec/lead，负责本片直接开发后的自检、集成及进度/Git收尾，不派DeepSeek或Kimi。
