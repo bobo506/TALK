@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-22 16:30（Asia/Shanghai）— Codex适配Git收尾与用户要求汇总进度
+
+- 用户要求“汇总下进度”；当前仍为agent:codex、TALK项目prj_e8fe7066bbec/lead，负责本片直接开发后的自检、集成及进度/Git收尾，不派DeepSeek或Kimi。
+- 功能提交fe64bc7a30f78b3f2586240deef73d59589d7056已常规推送origin/codex/terminal-return-codex，15份代码/测试/说明文件落库。本地HEAD与远程跟踪一致、提交后已跟踪工作区干净；7份代码/测试SHA仍与final-qa.json中的205项自检版本相同，Git收尾回执保存在.tmp/execution-session-codex-v1/git-closeout.json。
+- 当前成果为DSH与Codex原生会话复用可用：同功能先验、可靠60%判断、仅单纯缺数且计数可信时十次兜底，以及首轮完整/续轮增量/新窗恢复。Codex300→301真实同窗记忆及计数1→2、302新窗恢复已验；60%和10/11为受控边界验证，不改称真实高占用压力验证。详细实施及原失败保留在下方16:20记录和[Codex验收](spec/EXECUTION_SESSION_CODEX_ADAPTATION.md)。
+- 本次仅更新PROGRESS及本历史，核对UTF-8、文档差异和Git；不重跑已通过的代码测试/模型探针，不派任务、不启停服务，保留既有未跟踪产物。运行PID/状态沿上片实测快照记录，本次未重新核实，不把历史快照当作实时健康证明。
+- 全角色目标剩Kimi，额度暂停仍有效；当前桌面同名Codex自派限制保持，实机由合法human入口完成，TALK页面不改，286继续暂停。等待本片人工确认，下一角色范围/额度及宿主统一启动均需另行明确确认；此次汇总不代替验收或批准新片。
+- 当前恢复入口[PROGRESS.md](PROGRESS.md)，下次可说“继续项目”；先读快照及[使用说明](guides/EXECUTION_SESSION_USAGE.md)，只读核当前状态，不重放300–302或已用单次生产脚本。
+
 ## 2026-10-22 16:20（Asia/Shanghai）— Codex原生会话适配由Codex直接完成、自检及真实加载
 
 - 用户明确下一角色为Codex，并要求本会话自行开发，不派DeepSeek。本片代码/修正/测试均Codex自检，不称外部独立复核。基线28a69d9，8原源冻结；新增Codex原生stdio与通道，API扩bound/codex、bridge按runtime分派，复用已有内核/sidecar/合同/计数。TALK页面保持。
