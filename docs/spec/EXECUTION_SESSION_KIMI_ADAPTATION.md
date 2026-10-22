@@ -48,9 +48,28 @@
 
 证据`.tmp/execution-session-kimi-v1/account-validation/`：readiness、逐轮JSON/原生stdout与stderr、独立sidecar、模型请求审计、api-reloaded及final-verification。生产原权限两角色均tools，未沿用隔离review测试来变更权限。此前Key读取失败保留，未更换凭据或重新登录。
 
+## 生产短文本派发、领取、交付与收取（2026-10-22 18:02）
+
+用户进一步明确“可以做TALK生产任务派发、领取、收取闭环……只要不是给kimi安排开发任务就可以”。本轮以原human:bobo入口创建/收取六条general短文本，Kimi只回复标记，没有安排开发、工具或文件操作；Codex继续负责实查与自检，不称独立复核。每次创建前读取最新项目开发要求，保留其旧分工快照，本次用户授权只适用短文本验收。
+
+| 模型 | 首轮/同窗续轮 | 新窗恢复 | 结果消息 |
+|---|---|---|---|
+| K3 / agent:kimi | 303→304：`session_e9184946-9730-44b3-b3da-5b2b558bf8e2`，计数1→2 | 305：`session_61157b63-30e2-412c-aaaa-1d1a2be2cfdf`，计数1 | 2909/2910/2911 |
+| K2.8 / agent:kimi-code-k28-preview | 306→307：`session_25479f95-9055-4729-81d7-774b679be0a4`，计数1→2 | 308：`session_95e380ac-c5c2-4881-97d1-7a4e07c46d09`，计数1 | 2912/2913/2914 |
+
+六条均由精确角色/新实例真实领取并交付，human收取后为succeeded/completed、有result_collected_at。首轮回复“已记住”；续轮增量未重发暗号或基础标记，正确回复“海棠42 / 鹿鸣57”；force_new恢复基础后回复“鹿鸣57”。双prompt/context的ID及SHA逐条匹配，原生llm.request模型与alias精确对应，正式请求共六次、无工具调用；只读sidecar六尝试confirmed、通道0。必要模型预检另有原生调用，不计入正式送达次数。
+
+首轮/force_new决策的context_status=unavailable来自无候选或主动新窗，完成后的last_snapshot均available；续轮决策context_status=known。K3用量7107/7652/7133，K2.8为7252/7803/7259，容量均1048576。本轮没有填充真实大上下文，60%及缺数10/11仍以上述受控边界验证为据。
+
+起始两个原宿主均不存在、角色停止无owner且没有待执行旧任务。临时沿原窄入口恢复：K3 manager10708/gen25/ins_ec8cf7085581，旧K2.8 manager5524/gen26/ins_754ac10862f9。三条各收取后普通stop，最终K3 gen26、旧K2.8 gen27均stopped/无owner；待宿主异步发布空handles后正常drain退出，仅删除本轮写入的drain标记，第三Kimi始终停止。API10600未重载，DSH/Codex代次/实例/归属保持；302条原任务逐行SHA、原配置/绑定、Key文件mtime、权限与286全文/暂停均不变。
+
+证据`.tmp/execution-session-kimi-v1/production-validation/`含readiness、逐任务request/requirements/created/status/result/collected/accepted、启停/宿主回执、native-audit及final-verification；脚本不自动重复创建任务。验收辅助脚本曾误把首轮context_status要求为reliable，303已成功但尚未收取时断言停止，核对原生读数后仅收取原303，未重建或重跑模型。停止后宿主健康回报短暂仍含旧handle，改为等原异步清理完成后正常drain，未改产品。K3第三条首次权限审批超时被拒，按系统允许仅重试一次后成功；超时没有风险判定，未绕过权限。原失败证据保留。
+
+本轮没有产品源码变化，原338项和最后Kimi29项定点自检保持，不重复无关测试或真实模型探针。人工里程碑待用户确认；本次短验收不恢复Kimi常规开发派发，也不自动开启下一片。
+
 ## 当前边界与预算
 
-**K2.8/K3共用适配的开发、自检、原生真实账号验收及API加载完成。** 三个Kimi角色均保持停止，常规派发仍暂停；不把本次原生用例称为生产TALK任务链实测或人工验收通过。另一K2.8成员的独立HOME/登录尚未按本片单独实机；共用代码和隔离规则已有覆盖。后续实际启动应沿原普通入口，派发仍遵守用户最新约束；下一片及宿主统一启动另行确认。
+**K2.8/K3共用适配的开发、自检、原生真实账号验收及生产TALK任务闭环已完成。** 三个Kimi角色均保持停止，常规开发派发仍暂停；人工里程碑待用户确认。另一K2.8成员的独立HOME/登录尚未按本片单独实机，共用代码和隔离规则已有覆盖。后续启动沿原普通入口，派发遵守最新授权；下一片及宿主统一启动另行确认。
 
 执行预算沿原入口，单次任务默认21600秒；取消/超时仅清理本次Popen及其子树，Windows taskkill及Popen退出各有10秒等待，清理可额外消耗20秒，不与模型执行预算混称。原MCP主动等待客户端上限T未重测；不启用主动长等待，W未配置。Kimi模板`toolTimeoutMs=660000`只作模板事实，不作为实际宿主能力。已读[终端预算要求](../guides/TERMINAL_MCP.md)，本片不新增模型侧TALK MCP，不宣称主动等待适配完成。
 
