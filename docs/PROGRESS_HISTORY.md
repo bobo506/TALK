@@ -1,5 +1,21 @@
 # 开发历史 · TALK
 
+## 2026-10-22 22:36（Asia/Shanghai）— 中断恢复核对，生产成果保持，补文档Git收尾
+
+- 用户告知刚中断并要求检查。产品9ac1dbf已在远端，8份收尾文档尚未提交；没有丢失产品改动或重开模型任务。本地只读数据库确认309—311均succeeded/completed/已收取，308条原任务逐行SHA、原五角色服务行、配置和286保持；WorkBuddy仍gen2/stopped/无owner/pid为空。MCP当前agent:codex，WorkBuddy bound/offline；对human创建任务的当前agent读取权限不扩大，改以已授权项目本地只读事实核验。
+- 中断前最终综合脚本完成凭据原值扫描和原生writer退出检查，随后因历史中另一电脑的绝对路径链接断言失败；修正只查新增链接后的重跑未执行，自动审批报告工作区额度不足、审批无法完成，并非判定动作不安全。原205份产物零凭据匹配证据保持，不把整套脚本称为成功或伪造其成功回执。
+- 本轮不重读仓库外凭据、不启停/派发/收取或重放单次生产操作；本地8份文档编码和13个新增相对链接已通过，git diff --check通过。恢复证据`.tmp/execution-session-workbuddy-v1/production/resume-check.json`，继续仅当前已批准片的文档/Git收尾，下一片及人工里程碑约束保持。
+
+## 2026-10-22 20:20（Asia/Shanghai）— WorkBuddy独立CLI生产309—311通过，四类运行器当前授权形态接通
+
+- 用户明确选择“允许以内置引擎作为独立运行器接入”；当前Codex直接开发/自检及必要生产操作，不派DeepSeek/Kimi开发，不称独立复核。产品`9ac1dbf`已推送，沿用403项相关Python和安装版16次正式投递/17次fake模型请求证据，本阶段没有产品修正或额外全量回归。
+- 原human:bobo与agent:workbuddy Key核验后，只追加WorkBuddy身份档、项目名册/imported角色、新runner:workbuddy-embedded-cli和选择rmc_150e9866f272/精确绑定；保全局名“WorkBuddy接入验证”、原Key、custom-local:kimi-k3来源。原五名册业务字段保持，完整sync正常更新时间戳。首次legacy-attach422保留已登记事实，只补未完成绑定成功；新角色not_started且can_start=true，临时脚本先前只接受stopped的假设补正，没有修改产品或重建身份/角色/任务。
+- 原API正常停止并用同一启动器加载新代码，child10600→21996/launcher22340。新窄manager4708普通start得到gen1/ins_be5cf2fc8b12；三条general短文本由human:bobo派发/收取，不安排开发/工具/文件操作。309→310同原生session21ca2f60-7439-47da-82b8-a5a4c3d72fa7、计数1→2；310只发增量仍答“青禾42 / 鹿鸣57”。311 force_new为600b5ced-5e22-4db8-838e-62561b15733b，恢复“鹿鸣57”、计数1。三条succeeded/completed，结果消息2936—2938已收取。
+- 原生/proof/投递正文SHA、用户/请求ID和精确模型/alias逐条一致，正式用户3、助手3、无工具；三个尝试confirmed，通道0。指令字节2523/1192/2512，续轮没有重发暗号或基础。原生最近用量31606/32039/31603，容量1000000，属低占用；60%/缺数10→11仍依据受控边界验证，不为碰阈值使用真实长上下文。
+- 验后普通stop至gen2，WorkBuddy stopped/无owner/可启动，manager空handles后正常drain退出。运行器经最终保护核对后标adapted。308条旧任务逐行SHA、286全文/暂停、原五服务行/绑定、原配置、原角色Key文件mtime、WorkBuddy原models/settings/mcp SHA和mtime保持；恰好新增309—311。原DSH/Codex继续运行，三个Kimi保持停止，原WorkBuddy桌面未启停。无所有权恢复、强杀、模型降级或Key/登录/权限修改。
+- 一次较早诊断曾输出models数组，两项Key进入本次工具日志，已告知用户，不复述、不冒称撤回，也未擅自轮换；固定白名单诊断及生产验后205份本片产物精确扫描无凭据正文。原失败和阶段证据保留，完整回执在`.tmp/execution-session-workbuddy-v1/production/`。
+- 同步AGENTS/简报/bridge模块、适配记录、使用说明、用户手册和当前进度；新增窄宿主手动启动命令、当前停止状态与独立CLI边界。四类运行器DSH/Codex/Kimi Code/WorkBuddy内置独立CLI的已核验组合工程链路覆盖，人工里程碑待用户确认；不等同桌面窗口控制，不外推主动MCP等待或另一K2.8成员独立HOME。Kimi常规开发暂停，286与原排期保持，宿主统一启动须下一片明确确认。
+
 ## 2026-10-22 20:05（Asia/Shanghai）— WorkBuddy独立CLI已获授权，代码/403自检与原生16轮通过，生产待验
 
 - 用户批准补WorkBuddy，再明确选择将自带官方引擎作为独立CLI运行器；本会话Codex自行开发/自检，不派执行者、不称独立复核。桌面5.8.3/内置CodeBuddy Code2.161.0实查，桌面内部RPC/预填链接及Open API不足以直接证明原窗口控制；只查看/展开桌面，没有发消息或改设置。截图捕获失败后可访问文本成功，随后按用户新选择转独立CLI。

@@ -39,6 +39,8 @@
 
 ## 会话复用的整体完成判据（2026-10-21，用户最新明确要求）
 
+- 2026-10-22 20:20最新：用户批准WorkBuddy内置引擎作为独立CLI，当前Codex直接实现/自检已完成第四类运行器。WorkBuddy5.8.3内置CodeBuddy Code2.161.0，403项相关Python、安装版fake模型16次正式投递（含60%与受控10→11）、309→310真实同窗/计数1→2及311新窗基础恢复均通过，三条已收取。原身份Key复用，仅新增本项目WorkBuddy名册/imported角色/独立运行器和精确绑定，原五角色/绑定、308条历史、原配置/Key/权限与286保持；sync正常更新名册时间戳。API正常重载child21996，临时窄宿主普通启停后WorkBuddy最终gen2/stopped/无owner，manager正常drain退出，运行器adapted。当前覆盖DSH/Codex/Kimi Code/WorkBuddy独立CLI的已核验组合，不代表WorkBuddy桌面窗口控制、主动MCP等待或另一K2.8成员独立HOME通过。人工里程碑待确认，Kimi常规开发仍暂停，下一片/宿主统一启动仍须明确确认。详[WorkBuddy适配](docs/spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)、[使用说明](docs/guides/EXECUTION_SESSION_USAGE.md)和当前进度；下列较早状态保留日期语义。
+
 - 2026-10-22当前WorkBuddy片已获确认：用户回复“可以，继续”，随后根据桌面入口实查明确选择“允许以内置引擎作为独立运行器接入”。本片由当前Codex直接开发/自检，基于WorkBuddy5.8.3内置CodeBuddy Code2.161.0作为独立CLI运行器，实现同窗、真实占用60%、条件10/11、基础恢复及任务闭环；不能冒称控制WorkBuddy桌面窗口。既有角色/模型/Key/绑定/权限和286保持；Kimi不派开发任务，下一无关切片仍另行确认。
 
 - 2026-10-22 18:52整体范围补正：用户明确按运行器适配，仍少WorkBuddy。当前完成的是DSH、Codex、Kimi Code三种，K2.8/K3共用Kimi Code适配，不能据此宣称覆盖所有运行器。WorkBuddy既往仅桌面MCP单任务人工流程通过，会话复用、真实指标/60%换窗、条件10/11及新窗基础恢复尚未适配；桌面能力不能用内置CodeBuddy CLI/ACP替代证明。当前仅只读核对和更新范围，未批准新切片、未派发/启停/改产品；下一片先说明具体范围/验收并获确认，Kimi开发暂停及286保护保持。

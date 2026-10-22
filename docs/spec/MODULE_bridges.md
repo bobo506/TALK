@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-22 20:20：WorkBuddy按用户批准的内置CodeBuddy Code独立CLI形态补齐，新增native/channel/bridge/窄host及普通任务接线。403项Python、安装版16次正式投递边界、309→310真实同窗1→2和311新窗恢复均通过并收取；原生/proof/账本SHA一致，通道0。原身份Key和模型源复用、HOME独立，仅新增本项目WorkBuddy登记和精确绑定；308条历史、原五角色/配置绑定权限及286保持。API正常重载，验后WorkBuddy普通停止gen2/无owner、manager正常drain退出，运行器adapted。四类运行器的授权形态现已接通，人工验收待确认，不代表WorkBuddy桌面窗口控制或主动MCP等待；下一片仍须确认。详[WorkBuddy适配](EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)和[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。
+
 > 2026-10-22 18:02：用户明确允许Kimi短文本生产闭环，禁止开发派发。303—308六条已派发/领取/交付/收取：K3与旧K2.8均同窗1→2、新窗恢复计数1；原生模型/双SHA及持久计数核实。原入口正常启停后两个角色恢复停止无owner，临时宿主正常drain退出；302条旧任务、配置/绑定/Key/权限、286及其它角色保持。常规开发暂停、下一片另行确认，详[Kimi适配](EXECUTION_SESSION_KIMI_ADAPTATION.md)。
 
 > 2026-10-22 17:34：用户仅允许原生账号验收、禁止给Kimi派发任务。原K3/旧K2.8各三轮原生同窗/计数1→2/新窗恢复通过；原API正常重载18580→10600，零TALK任务、302条历史及五角色/配置/286保持，Kimi三角色仍停止。原生产两角色均tools档，本次保原权限。普通TALK派发/领取/收取链未实测，另一K2.8未单独实机；详[Kimi适配](EXECUTION_SESSION_KIMI_ADAPTATION.md)。

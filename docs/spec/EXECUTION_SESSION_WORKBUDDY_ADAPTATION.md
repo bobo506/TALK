@@ -1,6 +1,6 @@
 # WorkBuddy内置引擎独立CLI会话适配
 
-2026-10-22 20:05，生产验证进行中。用户先批准补齐WorkBuddy，再明确选择“允许以内置引擎作为独立运行器接入”。本片由当前Codex直接实现、调试和自检，不称独立复核。当前代码基线`bbfd7fe`。
+2026-10-22 20:20，代码、自检与生产短任务闭环完成，待人工里程碑确认。用户先批准补齐WorkBuddy，再明确选择“允许以内置引擎作为独立运行器接入”。本片由当前Codex直接实现、调试和自检，不称独立复核。产品提交`9ac1dbf`，原开发基线`bbfd7fe`。
 
 ## 范围与入口
 
@@ -30,10 +30,26 @@
 - 原生证据`.tmp/execution-session-workbuddy-v1/native-integration/b77bf085/`含逐轮结果、请求与原生格式审计。native组同窗`8c3190cd-b4dc-4a75-bca8-26f1f823ca46`；缺数组第1..10为`bda2cb66-02e3-4410-944a-025e4c0cca3f`，第11为`6434c3c8-fd63-44dc-abd3-4edb39069b20`。
 - 最初部分辅助测试误用方法名/SQLite连接未显式关闭已修；MCP旧1500字符总长度断言在移除新配方后仍复现1523。改为实例摘要严格300字符和总响应2000字符，并保留单实例/字段/无历史日志校验，未改MCP产品输出；原失败日志保留。
 
-## 生产验证当前状态
+## 生产闭环与最终状态
 
-原human:bobo和原agent:workbuddy Key身份核验通过；初始项目未登记该成员，独立CLI运行器未登记。308条旧任务、五角色状态/归属、原配置/绑定、286全文/暂停及WorkBuddy原models/settings/mcp已固定保护基线。只读阶段无新TALK任务、未启停既有角色；后续按本片授权补原身份项目登记和独立CLI配置，普通启停及三条短文本闭环完成后再更新本节，不能提前称生产通过。
+复用原`agent:workbuddy`身份和Key，保留其全局名称“WorkBuddy接入验证”。原项目没有该成员，现只新增本成员身份档、项目名册、imported角色、独立CLI运行器`runner:workbuddy-embedded-cli`及模型选择`rmc_150e9866f272`/精确绑定；不生成新Key。名册按原五成员完整快照追加，原五成员业务字段保持，同步产生的时间戳正常更新。首次补录422后保留已成功登记的事实，只补未完成绑定；新角色正常`not_started`状态修正了临时验收脚本的`stopped`假设，没有修改产品或重建角色。
 
-一次诊断误将原models数组完整输出，导致两项Key进入本次工具日志，已告知用户。随后改固定字段白名单、扫描本片50份产物未含凭据正文；未擅自换Key。不可复述该输出、复制含密钥原配置或提交凭据。此为实际诊断失误，不冒称日志已被撤回。
+原API使用原启动器正常加载：child10600→21996，launcher22340；没有停止原角色或解除所有权。新窄宿主manager4708按普通start得到generation1、instance `ins_be5cf2fc8b12`。原human:bobo创建并收取以下三条`general`短文本任务，WorkBuddy不开发、不执行工具或文件操作：
+
+| 任务 | 原生session | 计数 | 答复 | 真实占用/容量 |
+| --- | --- | --- | --- | --- |
+| 309 | `21ca2f60-7439-47da-82b8-a5a4c3d72fa7` | 1 | 已记住 | 31606/1000000 |
+| 310 | 同309 | 2 | 青禾42 / 鹿鸣57 | 32039/1000000 |
+| 311 | `600b5ced-5e22-4db8-838e-62561b15733b` | 1 | 鹿鸣57 | 31603/1000000 |
+
+三条均`succeeded/completed`并已收取，结果消息2936—2938。310正式输入没有重发暗号或基础标记，指令2523→1192字节；311的`force_new`恢复基础、指令2512字节。原生磁盘/proof/sidecar投递正文SHA及用户ID/请求ID逐条一致；正式输入3、助手记录3、无工具，三个尝试均confirmed/计数成功，通道0。独立原生HOME为`C:\Users\Administrator\.talk\role-service-host\native\prj_e8fe7066bbec\agent_workbuddy\.codebuddy`；必要预检使用独立进程，不计入这三个正式输入。真实模型均低占用，60%/缺数10→11仍依据上节受控验证，不冒称真实长上下文压力测试。
+
+验后普通stop至generation2，角色`stopped`、无owner、可再次启动，manager空handles后正常drain退出；运行器仅在最终核对通过后标为`adapted`。308条原任务逐行SHA、286全文/暂停、原五服务行/绑定、原配置、角色Key文件mtime、WorkBuddy原models/settings/mcp文件SHA及mtime保持；只有309—311三条新增任务。没有所有权恢复、强杀、模型降级、原Key/登录/权限变更，原WorkBuddy桌面进程未启停。完整回执见`.tmp/execution-session-workbuddy-v1/production/`，含`native-audit.json`、`final-verification.json`和普通启停/drain证据。
+
+## 使用与边界
+
+TALK页面不改，首轮/增量/换窗参数见[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。本角色当前停止，手动启用时先启动已验证的窄宿主，再使用普通角色启动入口；不由页面绕过宿主所有权，也不自动恢复旧归属。本片四类运行器接线范围已覆盖DSH、Codex、Kimi Code及用户批准形态的WorkBuddy内置独立CLI，人工里程碑仍待用户确认；不外推其它版本/模型、另一K2.8成员独立HOME、桌面GUI控制或主动MCP长等待。宿主统一启动仍是另片，须先获确认。
+
+一次诊断误将原models数组完整输出，导致两项Key进入本次工具日志，已告知用户。随后改固定字段白名单；最初50份、生产验后205份本片产物精确扫描均未含凭据正文，未擅自换Key。不可复述该输出、复制含密钥原配置或提交凭据。此为实际诊断失误，不冒称日志已被撤回。
 
 接口参考：[官方headless](https://www.codebuddy.ai/docs/cli/headless)、[CLI参考](https://www.codebuddy.ai/docs/cli/cli-reference)；具体兼容性以本机安装版源码/实际CLI证据为准。桌面方案核查参考[WorkBuddy任务对话](https://www.workbuddy.cn/docs/workbuddy/Conversation)和[Open API](https://open.workbuddy.cn/docs/openapi)，不把云任务或本地助理单消息接口当作桌面窗口控制能力。
