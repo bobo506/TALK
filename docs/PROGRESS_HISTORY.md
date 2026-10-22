@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-23 00:49（Asia/Shanghai）— 改名JSON请求头漏传修复，后台再次退出事实补记
+
+- 用户反馈“名称保存失败”。当前Codex直接修正已授权同片问题，不派开发。实际日志为human:bobo对Codex角色00:41:05—07四次PATCH422。saveRoleName漏Content-Type，apiFetch只注入鉴权头，fetch将字符串按普通文本提交；旧mock测试未覆盖此层。新增真实UI保存函数→实际apiFetch→隔离HTTP回归先失败，再补显式application/json及401/403/404/422具体提示、失败保草稿，版本20261023-role-name-json-v2。29项Python、68项Node通过；没有改后端权限、全局API helper或角色业务合同。
+- 生产实查时8000不可达。原runtime23816健康最后00:41:31为api_exited，原API/三manager/三bridge均absent，根因未明；上片182秒/重载通过不等于跨会话驻留通过。沿原清单仅恢复入口/API及安全发现，实际runtime9720/API Popen13468、worker正常；三个旧owner仍被保护，原DSH/Codex/新WB均unknown/recovery_required，未解除/重启。三个Kimi和旧WB原生停止保持。后台驻留和三角色人工恢复仍需按下一片明确范围确认，不能把这次API恢复写成全部角色已恢复。
+- 实际API提供的新页面代码经合法human同名保存核验：旧格式422、新保存函数200、名称保持。隔离链路实改名并验证名册持久/全局名不改；生产不替用户选择新名称。314条原任务/286、模型源、Keymtime/绑定保持；一次普通同名PATCH仅更新Codex项目角色updated_at。证据.tmp/role-name-save-fix/含修前失败、修后测试、live-verification与final-state，未运行Browser/原生模型或新TALK任务。
+- 同步当前进度、简报/webui及上片实查/AGENTS的最新事实，常规Git收尾并等用户重试改名；原后台故障保持明确未解决，不追改旧通过证据。
+
 ## 2026-10-23 00:31（Asia/Shanghai）— 项目名称/铅笔改名、统一宿主与重连稳定性自检交付
 
 - 主体版本`1b8e10d`。最后暂存区检查指出新增名称接口测试EOF多一空行，收尾提交清理此空白并记录版本，不改变已验证行为；差异检查重新通过后常规推送当前分支。

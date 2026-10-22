@@ -30,6 +30,7 @@ test('改名使用精确项目/成员PATCH，成功只更新项目角色，保�
   x.h.el('role-name-input').value='  新名称  ';await x.submit();
   assert.equal(x.requests.length,1);assert.equal(x.requests[0].path,'/api/projects/p/roles/agent%3Anew');
   assert.equal(x.requests[0].method,'PATCH');assert.deepEqual(JSON.parse(x.requests[0].body),{role_name:'新名称'});
+  assert.equal(x.requests[0].headers['Content-Type'],'application/json');
   assert.equal(x.ctx.projectAgents[0].role_name,'新名称');assert.equal(x.ctx.projectAgents[1].role_name,'WorkBuddy接入验证');
   assert.equal(x.ctx.members[0].display_name,'被运行器覆盖的名称');
   assert.equal(x.h.el('role-name-modal').classList.contains('hidden'),true);
@@ -39,6 +40,16 @@ test('冲突保留草稿并允许重试，不把失败的名称写入列表',asy
   x.open();x.h.el('role-name-input').value='重复名';await x.submit();
   assert.match(x.h.el('role-name-status').textContent,/已被使用/);assert.equal(x.h.el('role-name-input').value,'重复名');
   assert.equal(x.h.el('role-name-save').disabled,false);assert.equal(x.ctx.projectAgents[0].role_name,'WorkBuddy-k3');
+});
+
+test('格式验证失败和权限失效显示具体提示并保留草稿',async()=>{
+  for(const [status,detail,message] of [[422,[{type:'model_attributes_type',loc:['body']}],/提交格式/],[401,'invalid_api_key',/登录已失效/],[403,'human_only',/没有修改角色名称的权限/]]) {
+    const x=harness();x.respond(async()=>({ok:false,status,json:async()=>({detail})}));
+    x.open();x.h.el('role-name-input').value='待保存的新名称';await x.submit();
+    assert.match(x.h.el('role-name-status').textContent,message);
+    assert.equal(x.h.el('role-name-input').value,'待保存的新名称');
+    assert.equal(x.h.el('role-name-save').disabled,false);
+  }
 });
 test('空白和65个Unicode字符都在发送前阻止',async()=>{
   const x=harness();x.open();for(const value of ['   ','😀'.repeat(65)]){x.h.el('role-name-input').value=value;await x.submit();}

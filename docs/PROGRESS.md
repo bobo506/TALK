@@ -1,28 +1,24 @@
 # Project Progress
 
-Updated: 2026-10-23 00:31（Asia/Shanghai）。用户批准的角色名称/铅笔改名、统一启动及DeepSeek状态片已由当前Codex自行开发、自检并实际加载；368项Python、67项Node和生产重载/182秒心跳通过，待页面人工验收。下一新片不自动开启。
+Updated: 2026-10-23 00:49（Asia/Shanghai）。改名保存失败已修复：漏JSON请求头导致422，补齐后实际页面保存函数→apiFetch→HTTP验证200。29项Python、68项Node通过。另确认上片后台及原运行角色再次退出；只恢复API，三角色旧归属保留、当前unknown，跨会话驻留尚未解决。
 
-## 当前交付与身份
+## 当前职责与范围
 
-- 当前职责 `agent:codex / prj_e8fe7066bbec / lead`。本片用户明确全部由当前Codex实施，未派DeepSeek/Kimi或子代理开发，全部验证称自检。Kimi常规开发暂停、286暂停、每个新切片先确认继续有效。
-- 新角色项目名称已保存为 `WorkBuddy-k3`，成员 `agent:prj-e8fe7066bbec.workbuddy-k3-61b7e314`；原创建值/全局名称为 `workbuddy-k3`。旧 `agent:workbuddy / WorkBuddy接入验证` 为另一身份，保留且停止，不合并/删除。名册role_name为项目显示权威，详情标题旁有同风格方框铅笔，可修改/取消/提示重名，跨刷新持久，迟到名册不覆盖。
-- 新 `run.ps1` / `scripts.talk_runtime` / `scripts.talk_api` 把API、配置worker与七成员宿主一起启动，原生角色仍按页面普通启动/关闭。Windows隐藏独立常驻、OS单例锁、原Popen持有、虚拟环境真实父链、正常全局停止/API重载和启动失败有界退避均已核；不安装开机计划，不接管PID，不自动解除owner。
+- 当前Codex `agent:codex / prj_e8fe7066bbec / lead`，继续用户已授权片内发现问题后的自行修正/自检；不派DeepSeek/Kimi或子代理开发，不称独立复核。下一新片仍先确认，Kimi常规开发暂停与286保护保持。
+- 本次只改角色名称提交的JSON请求头和具体失败提示，前端版本 `20261023-role-name-json-v2`；保原项目名权威、图标弹窗样式、全局名称/Key/模型/绑定。用户实际失败是Codex角色PATCH于00:41:05—07返回422，并非重名或权限问题。
+- 原测试仅mock apiFetch、绕过真实请求封装，漏测Content-Type。新增真实保存函数→实际apiFetch→Node fetch→隔离HTTP回归先复现失败，再验证改名成功且全局名不改。新增格式/权限提示测试，失败保草稿可重试。29项相关Python、68项Node通过，语法/差异检查通过。
+- 已从实际API获取页面代码，用合法human凭据对Codex进行同名保存：缺请求头422、修正后200，原名称保持；没有替用户决定新名称。静态资源与当前源码一致、首页新版本已提供，无需重载API/原生角色来加载这个前端修正。证据 `.tmp/role-name-save-fix/`。
 
-## 生产最终状态与证据
+## 后台真实现状（优先于上片00:31运行状态）
 
-- 入口实际Python PID23816，API子进程Popen11220；七宿主serving，worker正常轮询。私有清单 `D:/claude-test/TALK-private/talk-runtime.json` 只含命令/凭据路径，原生HOME/Key/登录/模型沿用。
-- DeepSeek gen38 / ins_bd06a61dbca2 / bridge5680；Codex gen30 / ins_35c3b5b9bb33 / bridge7900；新WorkBuddy gen10 / ins_6aaee847cfc4 / bridge17768。三者running/ready/idle，最终API重载保原manager/bridge PID、实例与服务归属，182秒观察心跳推进。三个Kimi原生角色及旧WorkBuddy保持停止/no owner，其宿主仅待页面请求。
-- 原DSH manager18856/bridge11704均已exited且exit0，最后实例ReadTimeout为10月22日22:05:40，manager健康22:06:08；最初退出原因未确证，不能宣称ReadTimeout杀死进程。仅旧DSH gen30/原launch/原实例按一次human CAS计划恢复到31，再普通启动。Windows恢复脚本允许OS确认exited，present/unknown仍拒绝；原Popen丢失不自动接管。
-- 受管队列前两次连续传输异常保留诊断并重试，第三次或非传输/任务异常正常报错，成功恢复；原90秒心跳真实性守卫保持。补正前实查能复现短暂错误投影，补正后首轮102次/最终97次重载采样各1次传输短断、0次非运行状态。
-- 最终检查另发现SDK首次HTTP回退游标0回放八月私信；Codex因此生成回复2953—2955，保留原记录。立即普通stop，原生清理超过20秒，退出后原manager普通stop重试正常收取原Popen；没有强杀/人工解除Codex归属。现受管bridge启用启动最新游标、WS连接间隙增量补取和去重，失败不回0，重连不跳过新消息；普通SDK默认语义保持。最终重载后均空闲、无继续回放，无新增TALK任务。
-- 368项相关Python、67项Node通过；SDK真实HTTP/WS间隙与回退、受管状态、日志、宿主、worker、名称隔离及UI竞态均覆盖。隔离API独立常驻/重载/正常停止通过。五份正式静态文件HTTP字节一致。证据 `.tmp/role-host-name-health-fix/`，最终 `production-final-verification.json`、`api-reload-observed-states.json`，失败与补正过程均保留。
-- 原314条任务逐行SHA/286全文暂停、名册/绑定/配置、原Key文件mtime、WorkBuddy模型/settings/MCP源及Codex原认证源SHA/mtime保持。只改新角色项目名及三运行角色普通启停/DSH一次恢复的服务事实。原四运行器会话证据293—314保持，K2.8/K3共用适配，不代表WorkBuddy桌面窗口或主动MCP等待通过。
-- 提交前31份正式改动、71份本片产物和三条旧回放回复原值凭据匹配0；游标修正后没有继续增加回放回复。UTF-8/新文档链接/PowerShell语法/差异空白检查通过，证据final-artifact-check.json。
+- 核验时8000端口不可达；旧runtime健康最后00:41:31为api_exited，23816/11220、三个原manager1004/20236/21444及bridge5680/7900/17768均OS确认absent。退出原因仍未确证。上片182秒/重载采样是当时通过，不能作为跨会话持续驻留通过的证据。
+- 为验证改名，沿同一清单正常恢复入口：实际runtime9720、API子进程Popen13468，worker正常。DSH/Codex/新WorkBuddy旧owner仍在，入口按守卫报告recovery_required；三原生角色均unknown，**没有自动解除归属或重启**。另外三个Kimi及旧WorkBuddy原生角色仍stopped/no owner，其四宿主仅待命。
+- 原314条任务逐行SHA、286暂停、配置/Keymtime/原模型及认证源、绑定保持。新WorkBuddy项目名仍WorkBuddy-k3，旧WorkBuddy接入验证身份保留；本次同名保存仅Codex项目角色普通updated_at更新，名称未改。
+- 后台跨会话驻留及三角色逐个恢复仍待处理，不能宣称已稳定常驻或自动解除旧owner。下一片先说明进程所属Job/退出链诊断、独立后台启动方案及精确人工恢复范围并获确认；不安装开机任务/服务，不扩大此前DSH单次CAS授权。
 
-## 使用与人工验收
+## 已有工程证据与人验
 
-启动/状态/正常重载/退出用 [统一启动指南](guides/TALK_RUNTIME.md)。当前服务已运行，无需再次启动；`run.ps1 -Config D:/claude-test/TALK-private/talk-runtime.json -Action status` 可只读查看。直接uvicorn仍只启动API；本机静态配方依赖原 `.tmp/legacy-role-page-control`，不要删除。WorkBuddy新成员可自动发现，其它运行器新成员仍须精确宿主配方。
-
-请用户人类账号Ctrl+F5→角色：核对WorkBuddy-k3与旧验证身份、标题铅笔改名/取消/重名/刷新、DeepSeek及另两角色状态。未使用Browser/computer-use，不将DOM/API通过称视觉/人工验收。最初DSH外部退出根因及跨电脑/关机恢复未外推；正常关闭后重新启动仍按普通入口与归属守卫。
-
-本片主体代码提交 `1b8e10d`；收尾清理新增测试文件尾部空行，无行为变更，常规推送后暂停等人验。原异常日志其它排期及任何新片继续先确认，不恢复286或Kimi开发。详 [本片实查](spec/ROLE_HOST_NAME_HEALTH_FIX_20261023.md)、[历史](PROGRESS_HISTORY.md)。恢复指令：`继续项目`，先读此快照，不重放单次生产脚本。
+- 四类运行器DSH/Codex/Kimi Code/WorkBuddy独立CLI的会话复用、60%及条件10/11、基础恢复/原生SHA与任务293—314证据保持；K2.8/K3共用适配。不是桌面窗口控制或主动MCP等待验收。
+- 上片主体1b8e10d、收尾b81808c已推送，368项Python/67项Node及隔离/生产进程证据为当时事实；误触发旧私信回复2953—2955保留，游标防回放修正保持。详[上片记录](spec/ROLE_HOST_NAME_HEALTH_FIX_20261023.md)、[统一启动](guides/TALK_RUNTIME.md)。
+- 用户人类账号Ctrl+F5后重试铅笔改名；本次没有使用Browser/computer-use，不把真实函数/HTTP验证称视觉/真实点击人验通过。后台三角色待核实属于已确认的后台退出事实，与本次422请求头错误分开。
+- 本轮必要验证、进度/Git收尾后暂停。当前服务API可用，勿重放旧单次脚本、强杀/接管或自行解除归属；恢复指令 `继续项目`。历史见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。

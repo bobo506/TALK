@@ -1,5 +1,11 @@
 # 角色名称、统一启动与重连状态修复
 
+## 00:49最新补正（优先于下方00:31阶段结论）
+
+用户实点改名返回422：前端漏JSON Content-Type，旧模拟测试绕过实际apiFetch未发现。已补请求头和明确状态提示，增加真实保存函数→apiFetch→隔离HTTP回归先复现再通过；29项Python/68项Node与生产实际页面函数同名PATCH200通过，版本20261023-role-name-json-v2。
+
+本次实查同时确认原runtime23816/API11220、三manager/bridge均absent，原健康最后00:41:31为api_exited，根因未明。下方182秒/采样为当时事实，不证明跨会话驻留。已只恢复API/runtime9720，三旧归属仍保护且unknown/recovery_required，未自动恢复角色或解除owner；后台驻留及三角色恢复仍待明确切片确认。当前事实以[进度](../PROGRESS.md)为准，较早证据不追改。
+
 用户明确要求与下一项角色宿主启动修复一起处理：按创建名称展示、增加同风格铅笔改名按钮、修复 DeepSeek 自发变待核实；全部由当前 Codex 实施与自检，不派 DeepSeek/Kimi 开发，不称独立复核。
 
 ## 实际问题与实现

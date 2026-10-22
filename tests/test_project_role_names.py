@@ -1,10 +1,26 @@
 """Project names survive member re-registration and stay isolated across projects."""
 from sqlmodel import select
+from pathlib import Path
+import subprocess
+import server.main as main
 from server.models import Member, ProjectRole
 from tests.test_project_roles import RoleApiTestCase
+from tests.test_talk_client import LiveTalkServer
 
 
 class ProjectRoleNameTests(RoleApiTestCase):
+    def test_actual_ui_save_through_api_fetch_and_http(self):
+        self.register_project()
+        choice=self.seed_runner_and_choice()
+        made=self.create_role('prj_alpha',role_name='WorkBuddy-k3',choice_id=choice,
+                              operation_key='name-actual-ui-http').json()
+        member=made['member_id']
+        root=Path(__file__).resolve().parents[1]
+        with LiveTalkServer(main.app) as base:
+            result=subprocess.run(['node',str(root/'tests/role_name_http_probe.cjs'),base,member],cwd=root,
+                                  capture_output=True,text=True,encoding='utf-8',timeout=20)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def test_creation_and_rename_are_authoritative_in_actual_roster_response(self):
         self.register_project()
         choice = self.seed_runner_and_choice()

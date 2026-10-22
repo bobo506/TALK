@@ -106,13 +106,15 @@ async function saveRoleName(event) {
   status.textContent = "正在保存…";
   try {
     const res = await apiFetch(`/api/projects/${encodeURIComponent(context.projectId)}/roles/${encodeURIComponent(context.memberId)}`, {
-      method: "PATCH", body: JSON.stringify({role_name: name}),
+      method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({role_name: name}),
     });
     const body = await res.json().catch(() => ({}));
     if (!roleNameContextCurrent(context) || roleNameUI.seq !== seq) return;
     if (!res.ok) {
       const code = typeof body.detail === "string" ? body.detail : "";
-      throw new Error(({role_name_conflict: "这个角色名称已被使用，请换一个名称。", role_name_invalid: "角色名称须为1–64个字符。", role_archived: "该角色已归档，请刷新角色列表。"})[code] || "名称保存失败，请重试。");
+      const message = ({role_name_conflict: "这个角色名称已被使用，请换一个名称。", role_name_invalid: "角色名称须为1–64个字符。", role_archived: "该角色已归档，请刷新角色列表。"})[code];
+      const statusMessage = ({401: "登录已失效，请重新登录后重试。", 403: "当前账号没有修改角色名称的权限。", 404: "角色不存在或已移除，请刷新角色列表。", 422: "名称提交格式不正确，请刷新页面后重试。"})[res.status];
+      throw new Error(message || statusMessage || `名称保存失败（HTTP ${res.status}），请稍后重试。`);
     }
     if (body.member_id !== context.memberId || typeof body.role_name !== "string") throw new Error("名称回执不完整，请刷新核对。");
     // Ignore roster reads issued before this confirmed rename.
