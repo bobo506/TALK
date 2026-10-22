@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-22 20:05（Asia/Shanghai）— WorkBuddy独立CLI已获授权，代码/403自检与原生16轮通过，生产待验
+
+- 用户批准补WorkBuddy，再明确选择将自带官方引擎作为独立CLI运行器；本会话Codex自行开发/自检，不派执行者、不称独立复核。桌面5.8.3/内置CodeBuddy Code2.161.0实查，桌面内部RPC/预填链接及Open API不足以直接证明原窗口控制；只查看/展开桌面，没有发消息或改设置。截图捕获失败后可访问文本成功，随后按用户新选择转独立CLI。
+- 新workbuddy_native/channel/bridge和单成员host，API/MCP/任务入口/宿主配方接通；只引用原模型源，独立HOME/默认权限，双ID/请求ID/SHA计数，指标取原生usage.totalTokens/精确input容量并核modelUsage；异常、配置/模型/工作线/权限漂移不误走兜底。保普通归属/启停，21600与清理10+10秒分记；未启用WorkBuddy主动MCP等待。
+- 联合403项Python全过；安装版16次正式输入、17次本机fake模型请求通过，同窗1→2、增量回想、force_new恢复、60%下一轮换窗及受控缺数10→11。证据native-integration/b77bf085、tests-final；辅助测试错误与旧总长度断言1523/1500失败均保留，MCP摘要约束改为实例300/总响应2000并保字段/无历史校验，产品输出未改。
+- 原WorkBuddy全局身份Key仍有效，当前项目无该角色/独立运行器；只读准备固定308条旧任务、五角色/原模型Key绑定权限、286暂停与原桌面配置。尚无真实模型/新TALK任务/生产登记启停，后续在当前授权内做普通加载和三条短文本闭环；本次产品提交不等于整项已完成。
+- 诊断曾误把models数组完整输出，两项Key进入本次工具日志，已告知用户；未复述、未复制原Key或擅自轮换。固定白名单替代该输出，50份产物扫描无凭据正文。具体失误和未完成项见[WorkBuddy适配](spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)。不把CLI结果写成桌面窗口控制，Kimi开发暂停/286与下一片确认保持。
+
 ## 2026-10-22 18:52（Asia/Shanghai）— 按运行器补正整体范围，WorkBuddy仍待适配
 
 - 用户明确按运行器为单位开发，仍少WorkBuddy。Codex只读核对：API的execution_session允许集和bridge正式入口仅dsh/codex/kimi-code；K2.8/K3共用同一Kimi Code实现。此前三种运行器的交付与303—308验收不变，整项尚未覆盖WorkBuddy。

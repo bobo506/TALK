@@ -1,9 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-22 18:52（Asia/Shanghai）。用户明确本功能按运行器适配，仍少WorkBuddy。DSH、Codex、Kimi Code三种已完成当前链路；K2.8/K3共用Kimi Code实现，整项不能称全运行器完成。WorkBuddy待确认下一片，当前仅只读核对和记录，不派发或启停。
+Updated: 2026-10-22 20:05（Asia/Shanghai，实施中）。用户已确认WorkBuddy自带官方引擎作为独立CLI运行器接入，由当前Codex直接开发/自检。代码已接线，403项联合自检及安装版16轮本地假模型通过，生产短文本闭环待验；不等同桌面窗口控制，不转宿主自启。
 
 ## 当前交付
 
+- WorkBuddy片：新native/channel/bridge及单角色host，API/MCP/普通领取与宿主配方已接线；模型源只读引用、会话HOME独立、stdout与原生双ID/SHA证明，真实usage/input容量、同窗/60%/条件十次/基础恢复均按原内核。403项联合Python通过；安装版16次正式投递/17次fake模型请求通过（含60%与受控10→11）。当前未使用真实模型或新增TALK任务；原human/WorkBuddy Key已验证、308条历史/五角色/原配置/286基线固定，准备只补WorkBuddy项目登记/独立运行器后普通加载与三条短验收。详[本片实现和边界](spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)。
+- 桌面调查已核预填深链仅prepareInput，官方本地助理Open API未提供指定会话/创建新窗参数，未把包内CLI当桌面证明。computer-use只查看/展开桌面，截图失败后可访问文本读取成功，未发消息/改设置。用户随后选择独立CLI方案，桌面自动控制不在本片新交付内。
+- 一次诊断误把models数组完整输出，导致两项原Key进入本次工具日志，已如实告知用户；未复述或擅自换Key。改用固定字段白名单，50份本片产物精确扫描无凭据正文，证据private-metadata-safe.json。后续不得输出原models/settings/mcp对象或完整异常。
 - 身份agent:codex/agent、项目prj_e8fe7066bbec/lead。用户指定本会话直接实施/验收，不派DeepSeek/Kimi开发；全部称自检。产品提交6f1a293已推送，本轮产品源码不变，新增生产验收和8份文档收尾。
 - K2.8/K3共用kimi-code适配，按角色/模型/请求者/工作线/HOME/配置权限/服务代次/基础合同隔离。API/MCP/SDK、领取前预检、正式原生分派及持久计数已接线；首轮完整/续轮增量/新窗恢复、可靠60%/条件十次用原内核。
 - Kimi2.0.2正式prompt/context双ID/SHA证明送达，首轮预留未知原生ID、一次CAS绑定，失败/取消/重复不重跑。指标取token_counting和精确模型容量，输出maxTokens不作容量，非法/未来/配置冲突不兜底；首轮计1、工具/预检不计、恢复读数不清零。
@@ -25,6 +28,6 @@ Updated: 2026-10-22 18:52（Asia/Shanghai）。用户明确本功能按运行器
 
 ## 下一步
 
-- 建议下一片由当前Codex直接补WorkBuddy：先核桌面原生入口/会话与真实指标，再接同窗/60%/条件10次及基础恢复、任务链/计数与隔离；不能用内置CodeBuddy CLI/ACP冒充桌面能力。验收含真实同窗、新窗恢复、受控60%/10→11和派发/领取/收取，MCP实际T/W/余量/取消排队分别核验。此为待确认范围，未批准实施或派发。
+- 继续当前已授权WorkBuddy内置引擎独立CLI片：实现真实会话/指标/用户ACK适配、同窗/60%/条件10→11、基础恢复、API/MCP/普通任务分支及必要宿主配方，完成针对性自检/安装版假模型边界与真实账号短闭环后收尾；模型/Key/绑定/权限及286保护保持，不向Kimi派开发任务。不能把CLI结果写成桌面窗口控制通过。
 - 整项完成前不提前转宿主统一启动；下一片仍按AGENTS先确认，不自动派发、启停或解除归属，286保持暂停。
 - 完整记录见[PROGRESS_HISTORY.md](PROGRESS_HISTORY.md)。恢复指令：继续项目（先读本快照，Kimi常规开发仍暂停，不恢复286、不重放单次生产脚本）。

@@ -24,6 +24,27 @@ BASE_SHA = hashlib.sha256(BASE_TEXT.encode("utf-8")).hexdigest()
 
 
 class ExecutionSessionTaskApiTests(RouteTestCase):
+    def test_workbuddy_binding_can_create_and_reference_base(self):
+        with self.session() as session:
+            runner = session.get(RunnerRegistry, 'runner:api-dsh')
+            runner.runtime = 'workbuddy'
+            binding = session.get(ProjectRoleBinding, (PROJECT, TARGET))
+            binding.provider_id = 'managed:workbuddy'
+            binding.model_id = 'native-test'
+            binding.model_alias = 'custom-local:native-test'
+            session.add(runner)
+            session.add(binding)
+            session.commit()
+        first = self._create(execution_session=self._base_request())
+        self.assertEqual(first.status_code, 201, first.text)
+        self.assertEqual(first.json()['execution_session']['runtime'], 'workbuddy')
+        follow = self._base_request()
+        follow.pop('base_context')
+        follow['base_task_id'] = first.json()['id']
+        continued = self._create(execution_session=follow)
+        self.assertEqual(continued.status_code, 201, continued.text)
+        self.assertEqual(continued.json()['execution_session']['base_contract_sha256'], first.json()['execution_session']['base_contract_sha256'])
+
     def test_codex_and_kimi_bindings_can_create_and_reference_base(self):
         with self.session() as session:
             runner=session.get(RunnerRegistry,'runner:api-dsh')

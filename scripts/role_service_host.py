@@ -734,6 +734,11 @@ class RuntimeRecipe:
 #: runtime → 真实仓库入口配方。``alias_flag`` 只有真实 parser 确实接受模型参数时才非空；
 #: 需要把 alias 放进**本地登记命令**的运行器用 ``command_flag``（``{model}`` 占位）。
 RUNTIME_RECIPES: dict[str, RuntimeRecipe] = {
+    "workbuddy": RuntimeRecipe(
+        "bridges.workbuddy_bridge",
+        ("{python}", "-m", "bridges.workbuddy_bridge"),
+        alias_flag="--workbuddy-model",
+    ),
     "kimi-code": RuntimeRecipe(
         "bridges.kimi_bridge",
         ("{python}", "-m", "bridges.kimi_bridge"),

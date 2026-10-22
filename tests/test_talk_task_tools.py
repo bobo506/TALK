@@ -210,7 +210,9 @@ class TalkTaskToolTests(RouteTestCase):
         self.assertEqual(instance["pid"], 4321)
         self.assertEqual(set(instance), INSTANCE_SUMMARY_KEYS)
         self.assertIn("availability_note", result)
-        self.assertLess(len(payload), 1500)
+        # 身份/模式合同说明已增长；严格限制实例摘要，同时约束整个有界响应。
+        self.assertLess(len(json.dumps(agent["instances"], ensure_ascii=False)), 300)
+        self.assertLess(len(payload), 2000)
         self.assertNotIn(LEAKED_LOG_MARKER, payload)
         self.assertNotIn("last_error", payload)
         self.assertNotIn("worker-old-", payload)
@@ -667,6 +669,9 @@ class TalkExecutionSessionToolTests(RouteTestCase):
 
     def test_kimi_k28_execution_session_via_mcp(self):
         self._check_execution_session_delegate('kimi-code','managed:kimi-code','kimi-for-coding','kimi-code/kimi-for-coding')
+
+    def test_workbuddy_embedded_cli_execution_session_via_mcp(self):
+        self._check_execution_session_delegate('workbuddy','managed:workbuddy','kimi-k3','custom-local:kimi-k3')
 
     def _check_execution_session_delegate(self, runtime, provider, model_id, model_alias):
         from server.models import (

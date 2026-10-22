@@ -3069,7 +3069,7 @@ async def _prepare_task_before_claim(
     if preflight_base_context is not None:
         continuation_note = ""
         execution_meta = task.get("execution_session") or {}
-        if (runtime in {"codex", "kimi-code"} and execution_meta.get("runtime") == runtime
+        if (runtime in {"codex", "kimi-code", "workbuddy"} and execution_meta.get("runtime") == runtime
                 and type(execution_meta.get("base_task_id")) is int
                 and execution_meta["base_task_id"] > 0 and not execution_meta.get("force_new")):
             continuation_note = (
@@ -3265,6 +3265,8 @@ async def _handle_execution_session_claimed(
         from bridges.codex_execution_channel import run_execution_session_task
     elif (claimed.get("execution_session") or {}).get("runtime") == "kimi-code":
         from bridges.kimi_execution_channel import run_execution_session_task
+    elif (claimed.get("execution_session") or {}).get("runtime") == "workbuddy":
+        from bridges.workbuddy_execution_channel import run_execution_session_task
 
     task_id = int(claimed["id"])
     creator = claimed.get("created_by")
@@ -3414,7 +3416,7 @@ async def handle_queued_task(
     task_id = int(task["id"])
     execution_task = bool(
         execution_context is not None
-        and str(runtime).lower() in {"dsh", "codex", "kimi-code"}
+        and str(runtime).lower() in {"dsh", "codex", "kimi-code", "workbuddy"}
         and isinstance(task.get("execution_session"), dict)
     )
     runner = command_runner or run_cli_command
