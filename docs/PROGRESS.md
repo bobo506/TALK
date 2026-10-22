@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-22 01:06（Asia/Shanghai）。292会话机制已工程接通并实际使用验证，现暂停等待项目管理者人工里程碑验收；不派宿主统一启动或其它新片。
+Updated: 2026-10-22 10:19（Asia/Shanghai）。292会话机制已工程接通并实际使用验证，现暂停等待项目管理者人工里程碑验收；不派宿主统一启动或其它新片。
 
 ## 已完成及证据
 
@@ -14,13 +14,13 @@ Updated: 2026-10-22 01:06（Asia/Shanghai）。292会话机制已工程接通并
 
 - 原manager18856保持，DeepSeek普通stop/start后generation30、launch205e7f05-1b0c-4e96-becf-8cbb154f75a6、实例ins_7a91214893c6，running/ready、无在途任务；原模型deepseek-flash/max、Key/HOME/绑定不变，无owner人工恢复。
 - API经原launcher正常重载：包装PID6320、真实launcher2624、API子10876。就绪脚本曾错比包装PID，核实父子关系/创建时间及schema通过，没有重复重启；宿主联动问题未修。
-- [使用说明](guides/EXECUTION_SESSION_USAGE.md)含首轮/续轮/force_new、SDK/REST/MCP和状态核验。当前Codex旧MCP目录尚无execution_session参数，需重连；SDK/API已实机使用，fresh MCP schema/dispatch隔离已验。不改桌面MCP配置。
+- [使用说明](guides/EXECUTION_SESSION_USAGE.md)含首轮/续轮/force_new、SDK/REST/MCP和状态核验。用户已重连，当前MCP新参数加载；296→297真实同ID、计数1→2，第二条未重发暗号/基础介绍仍回复“青竹47”，两条已收取。SDK/API亦已实机使用。不改桌面MCP配置。
 - 先支持bound/runtime=dsh及原生0.1.5-rc.2普通顶层general任务，旧任务行为保持。GUI同窗显示、手动续写与缓存费用收益未验；60%与10/11实机边界用fake模型，不声称真实高占用压力试验。
 
 ## 下一步与保持项
 
-- 人工查看293/294/295结果并按说明验收连续交办；确认里程碑后，再明确确认下一片宿主统一启动的目的/范围/验收，才实施或派发。不因本片收取自动开新片。
+- 人工查看293/294/295及296/297结果并按说明验收连续交办；确认里程碑后，再明确确认下一片宿主统一启动的目的/范围/验收，才实施或派发。不因本片收取自动开新片。
 - 286仍queued/control_status=paused，不恢复/取消/收取/集成；233候选保持。Kimi额度暂停，不派Kimi。日志手动跨设备/全根留存、全入口21600等待办保持。
 - 证据根.tmp/execution-session-usable-v1/independent-review292/；原始交付在original，修正前失败、最终164/5、自测/原生/隔离API/生产回执、集成清单和collect均已落盘。精确额度占比不可读，不臆测；headless客户端T未核，未启用主动长等待/自动唤回。
 
-恢复指令：继续项目（先核本里程碑人工验收；不重复派292或293–295，不恢复286，不自动开宿主新片）。
+恢复指令：继续项目（先核本里程碑人工验收；不重复派292或293–297，不恢复286，不自动开宿主新片）。

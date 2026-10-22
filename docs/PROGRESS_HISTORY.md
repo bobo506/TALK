@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-22 10:19（Asia/Shanghai）— 用户重连MCP，296→297两轮真实同窗补验通过
+
+- 用户明确要求第一条收到回复后再发第二条。本次属于292已授权功能验收，不开新开发切片；两次派发前均读取项目要求/实际身份，沿当前AGENTS最新职责执行，未启停服务或改变角色绑定/配置。
+- 当前MCP schema已包含execution_session。296首轮记住“青竹47”并回复“已记住”，收取后才派297；第二条只问暗号，携带相同continuity_key及base_task_id=296，无base_context且未重发暗号，回复“青竹47”。
+- 两条原生ID同为session-357a3c78-7ddc-47a0-bcb9-745a57cda64c，送达计数1→2，297 reused=true/context_status=known；结果2902/2903均正常收取completed。最终21447/1000000为低占用，不替代原60%/10次受控边界或GUI人工观察。
+- 证据在.tmp/execution-session-usable-v1/independent-review292/mcp-reconnect-296-297/；首次落盘命令超过Windows长度上限未启动，缩减保存字段后成功，未重复派发。同步当前MCP可用状态及说明，旧历史不追改。人工里程碑仍待，宿主统一启动新片未派，Kimi/286及其它保持项继续。
+
 ## 2026-10-22 01:06（Asia/Shanghai）— 292完整会话链路实查、补正、实际加载与收取
 
 - Git收尾另补`.gitignore`精确排除默认执行账本及WAL/SHM、原生spawns目录；运行状态和失败投递正文不进入后续Git提交。19份产品/测试之外只增加此项本地运行产物保护，不改产品行为。

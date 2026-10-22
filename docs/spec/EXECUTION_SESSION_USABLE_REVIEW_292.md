@@ -41,9 +41,20 @@ API就绪检查曾把venv包装PID6320误当实际launcherPID，报一次未就�
 
 三条均succeeded/completed并收取；三个真实ACK均已计数，sidecar无助手正文、通道已释放，无在途任务。真实容量均1000000，293结束projected17063、294结束17501、295结束17232；不把这些低占用结果当真实60%压力试验。60%/缺数10/11来自受控原生边界验证，未以烧token方式触发真实上限。
 
+## 用户重连MCP后的两轮补验（2026-10-22 10:19）
+
+按用户“先发一条，收到回复后再发第二条”要求，使用当前桌面刷新的`talk_delegate_task`实际派发，两次均先核当前项目要求和agent:codex身份，DeepSeek绑定仍bound、原实例idle；未启停服务、修改产品代码或另开开发切片。
+
+- 296：新工作线首轮提供固定基础合同，任务正文要求记住“青竹47”，回复“已记住”，计数1；正常收取后才派下一条。
+- 297：相同continuity_key，仅用base_task_id=296引用首轮，正文只询问刚才暗号；未重发暗号或base_context，实际回复“青竹47”，计数2，reused=true，context_status=known。
+- 两条原生ID均为`session-357a3c78-7ddc-47a0-bcb9-745a57cda64c`，结果2902/2903，均succeeded/completed并收取。正式投递字节2573→1092；这是投递内容长度，不能当作实际计费节省。第二条结束projected21447、容量1000000，未做新的高占用试验。
+- 当前MCP新参数已加载且实际复用通过；独立TALK任务厅保持，复用的是底层DSH原生会话。未观察桌面GUI，不替用户作整体人工里程碑确认。
+
+请求、创建/状态/收取的有界回执、核验与SHA清单保存在`.tmp/execution-session-usable-v1/independent-review292/mcp-reconnect-296-297/`。第一次证据落盘命令超过Windows长度限制，未启动或产生文件；缩减为必要任务字段后成功，未重发任何模型任务。
+
 ## 状态与剩余门禁
 
-当前DSH链路已工程接通并能实际使用，[实际入口与说明](../guides/EXECUTION_SESSION_USAGE.md)已给出。现有Codex旧MCP连接尚无新参数，需重连刷新目录；SDK/API已可直接使用，fresh MCP schema/dispatch已隔离验证，不改当前桌面MCP配置。其它runtime不冒称支持，桌面GUI显示/手动续写和缓存/费用收益未验；headless实际工具上限T未核，不启用主动长等待。
+当前DSH链路已工程接通并能实际使用，[实际入口与说明](../guides/EXECUTION_SESSION_USAGE.md)已给出。用户重连后当前Codex MCP已加载新参数，296→297已真实验证同窗/记忆及计数1→2；SDK/API亦可直接使用，不改当前桌面MCP配置。其它runtime不冒称支持，桌面GUI显示/手动续写和缓存/费用收益未验；headless实际工具上限T未核，不启用主动长等待。
 
 完整功能当前等待项目管理者人工里程碑验收；在此之前不派宿主统一启动或其它新片。286/Kimi额度暂停、日志/21600等待办保持。本轮没有修宿主自启动或自动解除任何owner。
 

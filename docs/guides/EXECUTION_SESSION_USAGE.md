@@ -25,7 +25,7 @@
 
 支持绑定为`bound`、`runtime=dsh`的普通顶层`general`任务，当前核验原生版本为`0.1.5-rc.2`。项目须登记绝对`project_root_path`，并与bridge实际工作目录一致。其它runtime以及子任务、review/test/rework保持原路径；不支持的执行会话选择会明确拒绝。
 
-REST `POST /api/tasks`、异步`TalkClient.create_task`、同步`TalkClientSync.create_task`和MCP `talk_delegate_task`均支持可选`execution_session`。不传该字段时保持旧行为。MCP的既有长连接须重连并刷新工具目录，确认schema出现此参数；当前Codex旧连接未热加载，SDK/API已实际验证可用。无需修改现有桌面MCP配置。
+REST `POST /api/tasks`、异步`TalkClient.create_task`、同步`TalkClientSync.create_task`和MCP `talk_delegate_task`均支持可选`execution_session`。不传该字段时保持旧行为。MCP的既有长连接须重连并刷新工具目录，确认schema出现此参数；本次用户重连后MCP296→297已实际验证同窗、增量回想及计数1→2，SDK/API亦已验证可用。无需修改现有桌面MCP配置。
 
 首轮MCP/REST请求示例（将示例值换为实际项目和工作线）：
 
@@ -95,4 +95,6 @@ async with TalkClient(base_url="http://127.0.0.1:8000", api_key=api_key) as clie
 
 本机运行已加载：原manager18856保持，DeepSeek普通stop/start到generation30；原API正常重载，4个可空列只新增、不回填旧任务。本项目根路径从空登记为`D:\claude-test\TALK`，角色模型/Key/HOME/绑定和286暂停保持。293/294同ID且计数1→2，295新ID且计数1，三条均成功收取；两次均能在增量中回想基础验证码。
 
-人工验收：在任务列表查看293、294、295的结果；按上面的参数使用同一功能连续交办，核对任务响应的native ID/计数和首轮/续轮变化。完成后确认本里程碑；下一片宿主统一启动问题仍需单独确认。
+用户重连MCP后的补验：296首条要求记住“青竹47”，回复“已记住”；297仅引用base_task_id=296并询问暗号，没有重发暗号或基础介绍，回复“青竹47”。两条原生ID均为`session-357a3c78-7ddc-47a0-bcb9-745a57cda64c`，计数1→2，第二条`reused=true/context_status=known`，两条均已正常收取。最终指标21447/1000000，属于低占用；该证据证明底层原生会话续用，桌面GUI显示仍由用户观察。
+
+人工验收：在任务列表查看293、294、295及296、297的结果；按上面的参数使用同一功能连续交办，核对任务响应的native ID/计数和首轮/续轮变化。完成后确认本里程碑；下一片宿主统一启动问题仍需单独确认。

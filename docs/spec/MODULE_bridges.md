@@ -1,6 +1,6 @@
 # MODULE: Agent Bridges
 
-> 2026-10-22 01:06当前：292已独立实查/直接补正、正常加载并通过293→294真实同窗及295新窗恢复；60%/10次边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工里程碑验收；旧MCP连接需重连，SDK/API已可用。详[292实查](EXECUTION_SESSION_USABLE_REVIEW_292.md)与[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。以下旧阶段状态保留其日期语义。
+> 2026-10-22 10:19当前：292已独立实查/直接补正、正常加载并通过293→294真实同窗及295新窗恢复；60%/10次边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工里程碑验收；重连后MCP296→297真实同窗/记忆及计数1→2已验，SDK/API亦已可用。详[292实查](EXECUTION_SESSION_USABLE_REVIEW_292.md)与[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。以下旧阶段状态保留其日期语义。
 
 > 2026-10-21 23:01：用户已明确本功能须真实同窗/60%换窗/条件10次及完整增量全部可用，292已派完整纵向代码实现与隔离验证，不再以helper/方案代替接线。原生create/resume、每任务MCP上下文、基础合同引用、实时指标和真实ACK状态均在包内；整体仍未完成，宿主自启延至本功能验收后。详[合同](EXECUTION_SESSION_USABLE_SLICE_5.md)，以下为此前阶段快照。
 

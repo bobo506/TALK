@@ -1,6 +1,6 @@
 # DSH上下文采集挂载与接线方案（291复核补正版）
 
-> 2026-10-22 01:06当前：292已独立实查/直接补正、正常加载并通过293→294真实同窗及295新窗恢复；60%/10次边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工里程碑验收；旧MCP连接需重连，SDK/API已可用。详[292实查](EXECUTION_SESSION_USABLE_REVIEW_292.md)与[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。以下旧阶段状态保留其日期语义。
+> 2026-10-22 10:19当前：292已独立实查/直接补正、正常加载并通过293→294真实同窗及295新窗恢复；60%/10次边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工里程碑验收；重连后MCP296→297真实同窗/记忆及计数1→2已验，SDK/API亦已可用。详[292实查](EXECUTION_SESSION_USABLE_REVIEW_292.md)与[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。以下旧阶段状态保留其日期语义。
 
 2026-10-21。本文由Codex在291首次交付独立实查后补正，作为后续实施依据；原始9份交付保留于`.tmp/execution-session-live-entry-s0/deepseek/`。这是方案，未加载插件、改运行配置或启用原生会话续用。
 
