@@ -58,7 +58,7 @@ interval_seconds = 86400
 
 Codex修正后在317同一review/tmp环境变量根重跑132项通过（含27项自动清理/SQLite/后台测试），证据`coordination/fix-regression-2.log`；317原始5个反例的协调方副本亦全部通过，见`coordination/recheck-317-findings.log`。旧测试在删除临时目录前显式关闭writer/manager日志句柄，junction创建不再使用PIPE；未削弱产品ACL/私有记录发布核验。
 
-318 DeepSeek定向独立复验为complete/pass，132相关回归、27新增测试、原5反例、37个旧失败项及27个复核侧反例全部通过；本环境真实HostStore私有发布也通过。23产品/合同、10证据共33份冻结匹配，317原报告/失败证据保持，318结果2959与本地交付一致。Codex取件核验见`coordination/318-acceptance.json`，独立报告/日志在`review-fix1/`。318已收取；317收取被自动审批以“此前暂不收取、本次仅确认318”为由拒绝，仍submitted，不能写成已收取。
+318 DeepSeek定向独立复验为complete/pass，132相关回归、27新增测试、原5反例、37个旧失败项及27个复核侧反例全部通过；本环境真实HostStore私有发布也通过。23产品/合同、10证据共33份冻结匹配，317原报告/失败证据保持，318结果2959与本地交付一致。Codex取件核验见`coordination/318-acceptance.json`，独立报告/日志在`review-fix1/`。318已收取；317原收取曾被自动审批拒绝，用户随后明确授权后于UTC12:00:49正常收取completed，原partial/2958不改。
 
 Codex另外用真实随机端口API、正式lifespan、隔离SQLite/来源做加载补验：启动时后台自动删除一个40天旧且任务闭环的分段，HTTP详情410，未认证401、agent403，近期/活跃分段保留，持久next_check约一天，API退出时worker停止。仅本轮fixture，无生产副作用，见`coordination/api-smoke.log`及`api-smoke/result.json`；这项是加载自检，不冒称DeepSeek独立生产验证。
 

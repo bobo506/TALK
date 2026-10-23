@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-23 20:06：用户批准正式启用，正常drain及配置应用完成，待API重启
+
+用户明确回复“确认启用并正常重载”及“授权收取317，保留原结论”。API身份复核agent:codex，317于UTC12:00:49收取completed，msg2958仍partial，原失败/拒绝证据保留。部署通过原human:bobo客户端检查：无running任务、配置worker空闲、唯一运行DSH真实idle/无current_task/90秒内心跳，其余六角色stopped；原角色/运行状态快照留coordination/deployment-before.json，不复制Key。
+
+经原scripts.talk_runtime正常stop请求，由原runtime持有的Popen/普通角色停止流程drain；七角色均stopped/无owner/can_start，原runtime在UTC12:04:53记stopped、进程随后absent，所有旧manager由原控制器正常退出，无强杀或归属CAS。用户终端external API未接管/停止。旧runtime健康hosts字典仍保留serving旧投影，不能据此说manager仍在；最终状态/原Popen退出及角色无owner用于本次证明。
+
+UTC12:05:20按批准差异且原config SHA b839cdea…一致后原子替换：db_path同文件绝对路径，五条source root统一D:/claude-test/TALK/logs/runtime且project/member不变，新增enabled/30天/1073741824/86400。内存全配置比较确保其它字段不改，新SHA3654bdc3c9a9c14d2435a9e6ada099de25e883e76c9e602a0e4cada73bf7012d。实际配置构造只读预检enabled/1根/5范围/策略正确，未连接DB/建线程/执行sweep，生产根policy未写。
+
+已请求用户在原启动API终端Ctrl+C正常退出后重跑原命令，回复“已重新启动”。旧API仍用旧CONFIG，当前只配置落盘，不称已启用运行。后续核新版API/宿主和真实后台policy/due/保护结果，仅普通start恢复原running的DSH，其余六角色保持停止，再必要独立复验与部署验收；无需重复问本片授权。全部helper/evidence在.tmp/local-log-auto-retention-v1/coordination，Key仅经现有客户端内部使用、未输出正文；模型/Key/绑定/286/历史保持。
+
 ## 2026-10-23 19:44：318独立复验通过并收取，正式启用方案待确认
 
 Git收尾：19:46代码/测试/文档18文件提交`0f67794f010692c48355b2316642f1f61fe5b07d`（1442新增/23删除），提交后跟踪文件干净；生产config.toml和全部临时/私有文件未暂存。本轮进度补记随当前codex/terminal-return-codex分支一起推送。

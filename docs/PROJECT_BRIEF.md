@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-23）
 
+2026-10-23 20:06最新：用户已明确批准正式启用/正常重载及317收取；317已completed，原partial保持。旧统一宿主/七manager正常drain退出、角色无owner，原仅DSH running；批准配置已应用并只读构造预检1根5范围通过。待用户原终端重启external API，随后核后台实际生效并仅普通start恢复DSH，其余六个保持stopped；当前不称worker已运行。本片授权不重复询问，详[部署记录](spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)。
+
 2026-10-23 19:44最新：318独立定向复验通过并收取，132回归/27新增/5原反例/27复核侧反例全通过，F1—F5/P1关闭；Codex已核冻结与远端交付，并补正式API lifespan/隔离真实410及后台启停自检通过。生产尚未启用，五来源root需统一原总根、同DB绝对路径和正常宿主/角色加载，external API需用户原终端重启；[可审部署方案](spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)待用户确认。317收取被自动审批拒绝、仍submitted，原partial保留，详[进度](PROGRESS.md)。
 
 2026-10-23 17:26最新：317后台自动清理独立复核partial，Codex已修正删除窗口/祖先依赖/缺DB绑定/空任务及测试句柄缺口，132相关回归与原5反例自检通过；33份新冻结后派318定向独立复验，产品修改暂停。317原结论保留，生产仍未启用；同窗315→317计数3、末占用60.171%达阈值，318交原守卫换窗恢复基础。详[当前进度](PROGRESS.md)与[合同](spec/LOCAL_LOG_AUTO_RETENTION_DESIGN_20261023.md)。

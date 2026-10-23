@@ -18,7 +18,7 @@ keep_last = 7
 upload_max_mb = 100
 file_retention_days = 30
 storage_dir = "./storage"
-db_path = "./talk.db"
+db_path = "D:/claude-test/TALK/talk.db"
 
 # 本机 dogfood 的显式日志来源：仅此项目/角色，换部署机器须重新核对绝对根。
 # manager 的 unknown/unknown 日志不混入角色来源；网络响应不会返回这些路径。
@@ -26,27 +26,33 @@ db_path = "./talk.db"
 [[runtime_diagnostics.sources]]
 project_id = "prj_e8fe7066bbec"
 member_id = "agent:deepseek"
-root = "D:/claude-test/TALK/logs/runtime/agent_deepseek-6e4441511c"
+root = "D:/claude-test/TALK/logs/runtime"
 
 [[runtime_diagnostics.sources]]
 project_id = "prj_e8fe7066bbec"
 member_id = "agent:kimi-code-k28-preview"
-root = "D:/claude-test/TALK/logs/runtime/agent_kimi-code-k28-preview-deb3c1095f"
+root = "D:/claude-test/TALK/logs/runtime"
 
 [[runtime_diagnostics.sources]]
 project_id = "prj_e8fe7066bbec"
 member_id = "agent:prj-e8fe7066bbec.kimi-k2-8-7c1c334c"
-root = "D:/claude-test/TALK/logs/runtime/agent_prj-e8fe7066bbec.kimi-k2-8-7c1c334c-a91155e8a3"
+root = "D:/claude-test/TALK/logs/runtime"
 
 [[runtime_diagnostics.sources]]
 project_id = "prj_e8fe7066bbec"
 member_id = "agent:kimi"
-root = "D:/claude-test/TALK/logs/runtime/agent_kimi-5c9a82f4da"
+root = "D:/claude-test/TALK/logs/runtime"
 
 [[runtime_diagnostics.sources]]
 project_id = "prj_e8fe7066bbec"
 member_id = "agent:codex"
-root = "D:/claude-test/TALK/logs/runtime/agent_codex-c452d2e135"
+root = "D:/claude-test/TALK/logs/runtime"
 
 [conversation_access]
 observer_member_ids = ["human:bobo"]
+
+[runtime_log_retention]
+enabled = true
+retention_days = 30
+max_total_bytes = 1073741824
+interval_seconds = 86400

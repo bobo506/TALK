@@ -1,6 +1,6 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
-> 2026-10-23自动清理片：318独立复验通过并收取，132回归/27新增/5原反例/27复核侧反例通过；正式lifespan/隔离HTTP410加载自检通过。生产仍未启用，[部署方案](../spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)待确认。规则见[合同](../spec/LOCAL_LOG_AUTO_RETENTION_DESIGN_20261023.md)：同DB绝对路径、来源root需为writer总根，project/member严格限定；启用后日常无需页面操作。未知/缺证/空任务旧run保持，新版writer服从根policy。不要删除策略/lease/closed/retention痕迹来触发清理或恢复旧策略。
+> 2026-10-23自动清理片：318独立复验通过并收取，132回归/27新增/5原反例/27复核侧反例通过；正式lifespan/隔离HTTP410加载自检通过。用户已批准正式启用，生产配置已应用、旧宿主正常drain，待原终端重启API核实际生效，见[部署记录](../spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)。规则见[合同](../spec/LOCAL_LOG_AUTO_RETENTION_DESIGN_20261023.md)：同DB绝对路径、来源root需为writer总根，project/member严格限定；启用后日常无需页面操作。未知/缺证/空任务旧run保持，新版writer服从根policy。不要删除策略/lease/closed/retention痕迹来触发清理或恢复旧策略。
 
 > 2026-10-23本机盘点片：新增维护者只读入口`python scripts/runtime_log_inventory.py --log-dir <显式日志根>`，只统计元数据并输出旧分段核查预览，不能删除日志，也不证明run已关闭。315独立复核发现旧时间/空根缺陷后已修正，316定向独立复验通过，两任务均收取。默认30天/单根1GiB只是报告提案，未改writer或生产设置，现有writer每run自动清理策略继续保持，完整日志收尾未完成。使用限制及覆盖缺口见[本片报告](../spec/LOCAL_LOG_INVENTORY_AND_RETENTION_20261023.md)。工具无需重启服务；空白根会拒绝，旧时间可格式化，超出日期范围返回partial。2026-10-20用户已停止推进下方旧B联网接收路线，286继续暂停，跨设备分析通过导出文件手动转移。
 
