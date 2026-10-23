@@ -605,6 +605,10 @@ class RuntimeDiagnostics:
         self._current_index = 0
         self._current_path: Path | None = None
         self._current_size = 0
+        self._closure_tasks: set[int] = set()
+        self._closure_ranges: dict[str, list[int]] = {}
+        self._closure_complete = True
+        self._run_lease = None
         self._writes_since_cleanup = 0
         self.stop_reason: str | None = None
 
@@ -624,6 +628,14 @@ class RuntimeDiagnostics:
         self.rotation_path = self.namespace / "rotation.jsonl"
         self.retention_path = self.namespace / "retention.jsonl"
         self._ensure_namespace()
+        if self._namespace_ready:
+            try:
+                from bridges.runtime_log_retention import NativeFile, pinned
+                with pinned(self.namespace):
+                    self._run_lease = NativeFile(self.namespace / "run.lease", write=True, create=True)
+            except Exception:
+                # Logging stays usable; without a lifetime lease this run is never auto-expirable.
+                self._closure_complete = False
 
     @property
     def enabled(self) -> bool:
@@ -967,6 +979,21 @@ class RuntimeDiagnostics:
                 data = _json_bytes(record)
                 if not self._append_locked(self._current_path, data):
                     return None
+                task = record.get("task_id")
+                if task is not None:
+                    if isinstance(task, str) and task.isascii() and task.isdigit():
+                        task = int(task)
+                    if (type(task) is int and 0 < task <= 2**53-1
+                            and (task in self._closure_tasks or len(self._closure_tasks) < 1024)):
+                        self._closure_tasks.add(task)
+                    else:
+                        self._closure_complete = False
+                name = self._current_path.name
+                if name in self._closure_ranges or len(self._closure_ranges) < 4096:
+                    bounds = self._closure_ranges.setdefault(name, [self._seq, self._seq])
+                    bounds[1] = self._seq
+                else:
+                    self._closure_complete = False
                 self._current_size += len(data)
                 self._writes_since_cleanup += 1
                 if self._writes_since_cleanup >= 100:
@@ -974,6 +1001,7 @@ class RuntimeDiagnostics:
                     self._cleanup_expired_locked("retention")
                 return log_id
             except Exception as exc:
+                self._closure_complete = False
                 self._degrade("event_write_failed", exc)
                 return None
 
@@ -1087,6 +1115,10 @@ class RuntimeDiagnostics:
         self._cleanup_expired_locked("rotation")
 
     def _enforce_capacity_locked(self, *, incoming: int, record: dict[str, Any]) -> None:
+        if self._defer_to_global_retention():
+            if sum(self._safe_size(p) for p in self._event_files_locked()) + incoming > self.policy.max_bytes:
+                record.setdefault("integrity", {})["capacity_soft_exceeded"] = True
+            return
         files = self._event_files_locked()
         total = sum(self._safe_size(path) for path in files) + incoming
         if total <= self.policy.max_bytes:
@@ -1109,6 +1141,8 @@ class RuntimeDiagnostics:
             integrity["truncated_fields"] = sorted(fields)
 
     def _cleanup_expired_locked(self, reason: str) -> None:
+        if self._defer_to_global_retention():
+            return
         now_ns = _aware(self._now()).timestamp() * 1_000_000_000
         cutoff_ns = now_ns - int(self.policy.retention_days * 86400 * 1_000_000_000)
         for path in self._event_files_locked():
@@ -1121,6 +1155,21 @@ class RuntimeDiagnostics:
             if modified_ns >= cutoff_ns:
                 continue
             self._delete_segment_locked(path, f"retention:{reason}")
+
+    def _defer_to_global_retention(self) -> bool:
+        marker = self.root / ".retention-policy.json"
+        if not marker.exists() and not marker.is_symlink():
+            return False
+        try:
+            from bridges.runtime_log_retention import pinned, read_json
+            with pinned(self.root):
+                value = read_json(marker, limit=64*1024)
+            if value.get("schema") != "talk-log-retention-policy-1":
+                return True
+            return value.get("enabled") is not False and [self.project_id, self.member_id] in value.get("scopes", [])
+        except Exception:
+            # Unavailable policy never falls back to deleting active/recent segments.
+            return True
 
     def _delete_segment_locked(self, path: Path, reason: str) -> bool:
         if path == self._current_path or path.name in {"manifest.json", "rotation.jsonl", "retention.jsonl"}:
@@ -1206,7 +1255,37 @@ class RuntimeDiagnostics:
             return removed
 
     def close(self) -> None:
-        self._closed = True
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            if self._run_lease is None:
+                return
+            try:
+                from bridges.runtime_log_retention import NativeFile, identity, pinned, write_json
+                with pinned(self.namespace):
+                    segments = []
+                    for path in self._event_files_locked():
+                        with NativeFile(path) as handle:
+                            bounds = self._closure_ranges.get(path.name)
+                            if bounds is None:
+                                self._closure_complete = False
+                                continue
+                            segments.append({"name": path.name, "identity": identity(os.fstat(handle.fd)),
+                                             "first": bounds[0], "last": bounds[1]})
+                    if len(segments) > 4096:
+                        self._closure_complete = False
+                    value = {"schema": "talk-log-closed-1", "run_id": self.run_id,
+                             "project_id": self.project_id, "member_id": self.member_id,
+                             "instance_id": self.instance_id, "closed_at": _timestamp(_aware(self._now())),
+                             "prefix": self._log_prefix, "task_ids": sorted(self._closure_tasks),
+                             "complete": self._closure_complete, "segments": segments}
+                    write_json(self.namespace / "closed.json", value)
+            except Exception as exc:
+                self._degrade("close_receipt_failed", exc)
+            finally:
+                self._run_lease.close()
+                self._run_lease = None
 
     @property
     def run_log_id_prefix(self) -> str:

@@ -1,5 +1,7 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
+> 2026-10-23自动清理片：318独立复验通过并收取，132回归/27新增/5原反例/27复核侧反例通过；正式lifespan/隔离HTTP410加载自检通过。生产仍未启用，[部署方案](../spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)待确认。规则见[合同](../spec/LOCAL_LOG_AUTO_RETENTION_DESIGN_20261023.md)：同DB绝对路径、来源root需为writer总根，project/member严格限定；启用后日常无需页面操作。未知/缺证/空任务旧run保持，新版writer服从根policy。不要删除策略/lease/closed/retention痕迹来触发清理或恢复旧策略。
+
 > 2026-10-23本机盘点片：新增维护者只读入口`python scripts/runtime_log_inventory.py --log-dir <显式日志根>`，只统计元数据并输出旧分段核查预览，不能删除日志，也不证明run已关闭。315独立复核发现旧时间/空根缺陷后已修正，316定向独立复验通过，两任务均收取。默认30天/单根1GiB只是报告提案，未改writer或生产设置，现有writer每run自动清理策略继续保持，完整日志收尾未完成。使用限制及覆盖缺口见[本片报告](../spec/LOCAL_LOG_INVENTORY_AND_RETENTION_20261023.md)。工具无需重启服务；空白根会拒绝，旧时间可格式化，超出日期范围返回partial。2026-10-20用户已停止推进下方旧B联网接收路线，286继续暂停，跨设备分析通过导出文件手动转移。
 
 > 2026-10-20 10:19加载更新：282实现6f3f9c5已沿既有排空入口正常重载五宿主、普通恢复四个原运行角色；77.568秒间隔的真实seq/60秒采样、精确launch原进程观测和60–90秒心跳推进均通过，Codex桥接保持关闭、API及绑定保持。页面状态已获用户明确验收通过；B接收/跨宿主来源及C全根治理未完成，详[加载记录](../spec/ROLE_HOST_RUNTIME_EVIDENCE_LOAD_282.md)及[282复核](../spec/ROLE_HOST_RUNTIME_EVIDENCE_REVIEW_282.md)。

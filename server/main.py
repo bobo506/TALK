@@ -258,8 +258,20 @@ async def lifespan(app: FastAPI):
         )
     else:
         logger.info("Expired file cleanup disabled", extra={"event": "startup_cleanup_disabled"})
+    from server.db import CONFIG
+    from server.runtime_log_retention import RetentionService
+    retention_service = None
+    try:
+        retention_service = RetentionService(engine, CONFIG)
+        retention_service.start()
+    except Exception as exc:
+        logger.error("Log retention unavailable: %s", type(exc).__name__)
     logger.info("TALK server ready", extra={"event": "startup_ready", "host": HOST, "port": PORT})
-    yield
+    try:
+        yield
+    finally:
+        if retention_service is not None:
+            await asyncio.to_thread(retention_service.stop)
 
 
 app = FastAPI(title="TALK", version="0.1.0", lifespan=lifespan)

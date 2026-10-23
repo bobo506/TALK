@@ -149,8 +149,12 @@ class HostDiagnosticsTestCase(unittest.TestCase):
         self.role_key_file.write_text(ROLE_KEY + "\n", encoding="utf-8")
         self.client = ScriptedClient()
         self.client.command["project_root"] = str(self.root)
+        self._managers = []
 
     def tearDown(self):
+        for manager in self._managers:
+            for writer in (*manager._host_diag_writers.values(), *manager._launch_diag_writers.values()):
+                writer.close()
         self._tmp.cleanup()
 
     # ── 脚手架 ──────────────────────────────────────────────────────
@@ -169,7 +173,9 @@ class HostDiagnosticsTestCase(unittest.TestCase):
             child_env={"TALK_NATIVE_SECRET": NATIVE_SECRET},
         )
         options.update(overrides)
-        return HostManager(self.client, **options)
+        manager = HostManager(self.client, **options)
+        self._managers.append(manager)
+        return manager
 
     def facts(self, *, runtime: str = "dsh", timeout: int | None = 21600) -> PreflightFacts:
         return PreflightFacts(
@@ -266,6 +272,7 @@ class HostDiagnosticsTestCase(unittest.TestCase):
                 role_key_file=self.role_key_file,
                 project_root=self.root,
             )
+            self._managers.append(manager)
             self.assertFalse(manager.diagnostics_policy.disabled)
             self.assertEqual(manager.child_diagnostics_argv(), [])
 
@@ -286,6 +293,7 @@ class HostDiagnosticsTestCase(unittest.TestCase):
                 role_key_file=self.role_key_file,
                 project_root=self.root,
             )
+            self._managers.append(manager)
             with patch.object(manager, "preflight", return_value=self.facts()), patch(
                 "scripts.role_service_host.spawn_hidden", return_value=FakeProcess()
             ), patch.object(manager, "_wait_ready", return_value=True):

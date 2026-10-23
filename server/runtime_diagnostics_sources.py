@@ -423,6 +423,12 @@ class RuntimeDiagnosticsProvider:
             if not outcome.complete:
                 raise scan_incomplete_error()
             if not collector.ref_matches:
+                from bridges.runtime_log_retention import expired_reference
+                expired = expired_reference(source.root, project_id, member_id, query.ref)
+                if expired is True:
+                    raise RuntimeDiagnosticsError("log_expired", 410)
+                if expired is None:
+                    raise scan_incomplete_error()
                 raise _log_not_found()
             if len(collector.ref_matches) > 1:
                 raise _log_ref_conflict()
@@ -512,6 +518,12 @@ class RuntimeDiagnosticsProvider:
         if not outcome.complete:
             raise scan_incomplete_error()
         if not collector.ref_matches:
+            from bridges.runtime_log_retention import expired_reference
+            expired = expired_reference(source.root, project_id, member_id, log_ref)
+            if expired is True:
+                raise RuntimeDiagnosticsError("log_expired", 410)
+            if expired is None:
+                raise scan_incomplete_error()
             raise _log_not_found()
         if len(collector.ref_matches) > 1:
             raise _log_ref_conflict()

@@ -17,6 +17,7 @@ class RuntimeDiagnosticsReviewTests(unittest.TestCase):
         self.diag = rd.RuntimeDiagnostics(member_id="agent:test", instance_id="ins_test", root=self.root)
 
     def tearDown(self):
+        self.diag.close()
         self.temp.cleanup()
 
     def raw(self):

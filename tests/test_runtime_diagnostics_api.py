@@ -692,7 +692,7 @@ class RuntimeLogApiTests(unittest.TestCase):
             port = server.servers[0].sockets[0].getsockname()[1]
             self.assertNotEqual(port, 8000)
             base = f"http://127.0.0.1:{port}"
-            with httpx.Client(timeout=5) as client:
+            with httpx.Client(timeout=5, trust_env=False) as client:
                 health = client.get(base + "/healthz")
                 if health.status_code == 503 and not health.text:
                     # This sandbox intercepts loopback TCP with an empty 503

@@ -45,8 +45,11 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def setUp(self):
         self._tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self._tempdir.name)
+        self._writers = []
 
     def tearDown(self):
+        for writer in self._writers:
+            writer.close()
         self._tempdir.cleanup()
 
     def make_diagnostics(self, **kwargs):
@@ -54,7 +57,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "policy",
             runtime_diag.DiagnosticsPolicy.create(root=self.root),
         )
-        return runtime_diag.RuntimeDiagnostics(
+        writer = runtime_diag.RuntimeDiagnostics(
             member_id=kwargs.pop("member_id", "agent:deepseek"),
             instance_id=kwargs.pop("instance_id", "agent:deepseek:test"),
             policy=policy,
@@ -64,6 +67,8 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             known_secrets=kwargs.pop("known_secrets", ()),
             **kwargs,
         )
+        self._writers.append(writer)
+        return writer
 
     def records(self, **kwargs):
         kwargs.setdefault("limit", 200)
@@ -456,6 +461,7 @@ class RuntimeDiagnosticsCliTests(unittest.TestCase):
         )
 
     def tearDown(self):
+        self.diagnostics.close()
         self._tempdir.cleanup()
 
     def test_default_output_is_summary_only_and_detail_includes_frames(self):
@@ -505,6 +511,7 @@ class BridgeDiagnosticsTests(unittest.TestCase):
         )
 
     def tearDown(self):
+        self.diagnostics.close()
         self._tempdir.cleanup()
 
     def records(self, **kwargs):
@@ -1080,7 +1087,7 @@ class ManagedHeartbeatDiagnosticsTests(unittest.TestCase):
         control_file.write_text("", encoding="utf-8")
 
         class FakeTalkClient:
-            def __init__(self, base_url, api_key, poll_interval=2.0):
+            def __init__(self, base_url, api_key, poll_interval=2.0, *, start_from_latest=False):
                 self.timeout = 10.0
                 self.put_calls = 0
                 self.closed = False
@@ -1170,8 +1177,11 @@ class FailureContainmentTests(unittest.TestCase):
     def setUp(self):
         self._tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self._tempdir.name)
+        self._writers = []
 
     def tearDown(self):
+        for writer in self._writers:
+            writer.close()
         self._tempdir.cleanup()
 
     def test_queued_task_still_completes_when_log_writer_fails(self):
@@ -1180,6 +1190,7 @@ class FailureContainmentTests(unittest.TestCase):
             instance_id="agent:deepseek:writer-failure",
             root=self.root,
         )
+        self._writers.append(diagnostics)
 
         class TaskClient:
             timeout = 10.0
@@ -1242,6 +1253,7 @@ class FailureContainmentTests(unittest.TestCase):
             instance_id="agent:deepseek:public-degradation",
             root=self.root,
         )
+        self._writers.append(diagnostics)
 
         class TaskClient:
             timeout = 10.0
