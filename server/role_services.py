@@ -1247,10 +1247,25 @@ def build_service_projection(
     observed = (
         state.observed_state if state is not None else ROLE_SERVICE_OBSERVED_NOT_STARTED
     )
-    stored_observed = observed
     generation = state.generation if state is not None else 0
     error_code = state.last_error_code if state is not None else None
     error_message = state.last_error_message if state is not None else None
+    projected_result = state.last_result if state is not None else None
+    if (
+        observed == ROLE_SERVICE_OBSERVED_STARTING
+        and state is not None and launch is not None
+        and launch.project_id == project_id and launch.member_id == member_id
+        and launch.generation == state.generation
+        and launch.action == ROLE_SERVICE_ACTION_START
+        and launch.state in (ROLE_SERVICE_LAUNCH_PENDING, ROLE_SERVICE_LAUNCH_CLAIMED, ROLE_SERVICE_LAUNCH_REPORTED)
+        and _as_utc(launch.launch_expires_at) is not None
+        and _as_utc(launch.launch_expires_at) < now
+    ):
+        # 即使宿主没有启动，GET也必须收敛启动超时；不改写回执或释放旧归属。
+        observed = ROLE_SERVICE_OBSERVED_FAILED
+        projected_result = ROLE_SERVICE_RESULT_FAILED
+        error_code = ROLE_SERVICE_ERROR_READINESS_TIMEOUT
+        error_message = "启动请求已超时，执行端未就绪，请重试或检查本机宿主。"
     if (
         observed == ROLE_SERVICE_OBSERVED_STOPPING
         and state is not None
@@ -1303,7 +1318,7 @@ def build_service_projection(
         and not archived_missing
         and binding_ready
         and effective_control == RUNNER_CONTROL_MANAGED_CLI
-        and stored_observed
+        and observed
         not in (ROLE_SERVICE_OBSERVED_STARTING, ROLE_SERVICE_OBSERVED_RUNNING)
         and not ownership_held(state)
     )
@@ -1311,7 +1326,7 @@ def build_service_projection(
         not archived
         and not archived_missing
         and (
-            stored_observed
+            observed
             in (ROLE_SERVICE_OBSERVED_STARTING, ROLE_SERVICE_OBSERVED_RUNNING)
             or ownership_held(state)
         )
@@ -1335,7 +1350,7 @@ def build_service_projection(
         desired=desired,
         observed=observed,
         last_action=launch.action if launch is not None else None,
-        last_result=state.last_result if state is not None else None,
+        last_result=projected_result,
         error_code=error_code,
         error_message=error_message,
         control_kind=effective_control,

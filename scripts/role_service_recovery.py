@@ -7,6 +7,7 @@ import ctypes
 from ctypes import wintypes
 from datetime import datetime, timezone
 import hashlib
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -42,6 +43,42 @@ def probe_pid(pid: int) -> str:
         return "present" if code.value == 259 else "exited"
     finally:
         kernel.CloseHandle(handle)
+
+
+@lru_cache(maxsize=1)
+def system_boot_time():
+    """本机内核启动时间；进程不能跨重启存活，失败时不给出恢复证明。"""
+    if os.name != "nt":
+        return None
+    try:
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+            "(Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime.ToUniversalTime().ToString('o')"],
+            capture_output=True, encoding="utf-8", check=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
+        value = _parse_iso(result.stdout.strip())
+        return value.timestamp() if value else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def recorded_process_state(pid, seen_at, *, probe=None, boot_time=None, created_at=None):
+    """区分原进程与重启/PID复用后的其它进程；绝不接管或结束复用PID。"""
+    real_probe = probe is None
+    state = (probe or probe_pid)(pid)
+    if state in ("absent", "exited"):
+        return state
+    seen = _parse_iso(seen_at)
+    if seen is None:
+        return state
+    boot = system_boot_time() if boot_time is None and real_probe else boot_time
+    if boot is not None and seen.timestamp() < boot - 2:
+        return "previous_boot"
+    if state == "present":
+        if created_at is None and real_probe:
+            from scripts.role_service_host import process_creation_time
+            created_at = process_creation_time(pid)
+        if created_at is not None and created_at > seen.timestamp() + 1:
+            return "pid_reused"
+    return state
 
 
 def process_inventory():
@@ -88,7 +125,6 @@ def process_argv(command):
 
 
 def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None):
-    probe = probe or probe_pid
     inventory = inventory or process_inventory
     if plan["expected_owner_host"].casefold() != socket.gethostname().casefold():
         raise HostError("recovery_wrong_local_host")
@@ -100,10 +136,12 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
     if seen is None or (datetime.now(timezone.utc) - seen).total_seconds() <= 90:
         raise HostError("recovery_manager_recent")
     manager_pid, bridge_pid = health.get("pid"), plan["process_pid"]
-    manager_state, bridge_state = probe(manager_pid), probe(bridge_pid)
+    manager_state = recorded_process_state(manager_pid, health.get("seen_at"), probe=probe)
+    bridge_state = recorded_process_state(bridge_pid, plan.get("instance_last_seen_at"), probe=probe)
     # Windows may retain an exited process object while another handle is open.
     # GetExitCodeProcess has confirmed it is stopped; unknown/live still fail closed.
-    if manager_state not in ("absent", "exited") or bridge_state not in ("absent", "exited"):
+    stopped_states = ("absent", "exited", "previous_boot", "pid_reused")
+    if manager_state not in stopped_states or bridge_state not in stopped_states:
         raise HostError("recovery_process_not_absent")
     entry = normalized(host_entry.resolve(strict=True))
     for row in inventory():
@@ -131,6 +169,7 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
             raise HostError("recovery_replacement_process_present")
     return {"manager_pid": manager_pid, "bridge_pid": bridge_pid,
             "both_absent": manager_state == bridge_state == "absent", "both_stopped": True,
+            "manager_original_state":manager_state, "bridge_original_state":bridge_state,
             "manager_health_sha256": hashlib.sha256(health_bytes).hexdigest(),
             "host_entry_sha256": hashlib.sha256(host_entry.read_bytes()).hexdigest()}
 

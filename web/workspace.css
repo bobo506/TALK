@@ -269,9 +269,10 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .task-list-page-info {font-size:14px; color:#626b76; overflow-wrap:anywhere;}
 .task-list-pagination .workspace-text-button:disabled {opacity:0.5; cursor:not-allowed; color:#7d858d;}
 @media(max-width:700px){.task-list-pagination {gap:10px; padding:12px 20px 16px;} .task-list-page-info {font-size:13px;}}
-.role-name-heading { display:flex; align-items:center; gap:12px; min-width:0; }
+.role-name-heading { display:flex; align-items:center; gap:8px; min-width:0; }
 .role-name-heading h2 { min-width:0; overflow-wrap:anywhere; margin:0; }
-.role-name-edit { flex:0 0 34px; cursor:pointer; }
+.role-name-edit { flex:0 0 17px; width:17px; height:17px; min-width:17px; padding:0; border-radius:4px; cursor:pointer; }
+.role-name-edit svg { width:12px; height:12px; }
 .role-name-edit:hover { color:var(--blue); background:var(--blue-soft, #edf4fa); }
 .role-name-edit:focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
 .role-name-dialog { width:min(430px,100%); }

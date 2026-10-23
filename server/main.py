@@ -237,6 +237,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     logger.info("Initializing database")
     init_db()
+    from server.local_runtime import ensure_local_runtime
+    try:
+        runtime_state = ensure_local_runtime(engine)
+        logger.info("Local runtime: %s", runtime_state, extra={"event": "local_runtime_start"})
+    except Exception as exc:
+        # 仅记录类型，避免本机清单路径/凭据/命令进入公开日志。
+        logger.error("Local runtime unavailable: %s", type(exc).__name__, extra={"event": "local_runtime_start_failed"})
     with Session(engine) as session:
         cleanup_stats = files.purge_expired_files(session, FILE_RETENTION_DAYS)
     if FILE_RETENTION_DAYS > 0:

@@ -3,7 +3,7 @@
 - 全部实现在 :mod:`server.role_services`；本模块只做路由、权限边界与响应模型；
 - 意图写（start/stop/start-all）**仅 human**；claim/report 只允许目标角色的 agent
   或合法 human 宿主，agent **不能**修改 ``desired_state``；
-- 服务端**不** spawn/kill 任何进程；
+- 角色原生进程由本机runtime/宿主执行；服务端不按PID接管/kill角色进程；
 - 公共 GET 与所有响应都不返回 ``owner_token``/``claim_token``、argv 或绝对路径。
 """
 
@@ -30,6 +30,7 @@ from server.models import (
     RoleServiceRecoveryOut,
 )
 from server.role_service_recovery import recovery_plan, recover_stopped
+from server.local_runtime import require_local_runtime, recover_local_human_stop
 from server.role_services import (
     claim_role_service_launch,
     list_role_services,
@@ -63,9 +64,10 @@ def start_project_role_service(
     """请求启动（**仅 human**）：CAS 递增世代并建 ``action='start'`` 的 pending launch。
 
     服务端预分配全新 ``expected_instance_id`` 与 ``launch_expires_at``；
-    **不返回任何 token**，也不 spawn 任何进程。
+    **不返回任何 token**，不直接spawn角色；已绑定本机入口时确保后台宿主可用。
     """
     _require_human(current)
+    require_local_runtime(session.get_bind())
     return start_role_service(project_id, member_id, current, session)
 
 
@@ -84,6 +86,8 @@ def stop_project_role_service(
     无受管进程且可证明已停 → 幂等 ``stopped``；所有权未知 → ``409 unknown_owner``。
     """
     _require_human(current)
+    recover_local_human_stop(project_id, member_id, current, session)
+    require_local_runtime(session.get_bind())
     return stop_role_service(project_id, member_id, current, session)
 
 
@@ -119,6 +123,7 @@ def start_all_project_role_services(
     部分失败不整体回滚。
     """
     _require_human(current)
+    require_local_runtime(session.get_bind())
     return start_all_role_services(project_id, body.member_ids, current, session)
 
 

@@ -1355,6 +1355,38 @@ class RoleServiceProjectionTests(RoleServiceTestCase):
     def projected_service(self):
         return next(row for row in self.list_services().json() if row["member_id"] == self.role_a)
 
+    def test_unclaimed_start_timeout_is_visible_without_manager_or_database_write(self):
+        launch = self.start().json()
+        self.set_launch_expired(launch["launch_id"])
+        before_state, before_launch = self.state_row().model_dump(), self.launch_row(launch["launch_id"]).model_dump()
+        row = self.projected_service()
+        self.assertEqual((row["observed"], row["error_code"], row["last_result"]), ("failed", "readiness_timeout", "failed"))
+        self.assertTrue(row["can_start"])
+        self.assertFalse(row["can_stop"])
+        self.assertEqual(before_state, self.state_row().model_dump())
+        self.assertEqual(before_launch, self.launch_row(launch["launch_id"]).model_dump())
+
+    def test_claimed_start_timeout_keeps_owner_and_cannot_restart(self):
+        launch, claim = self.start_and_claim()
+        self.set_launch_expired(launch["launch_id"])
+        row = self.projected_service()
+        self.assertEqual(row["observed"], "failed")
+        self.assertTrue(row["ownership_held"])
+        self.assertFalse(row["can_start"])
+        self.assertTrue(row["can_stop"])
+
+    def test_start_timeout_projection_respects_deadline_and_generation(self):
+        launch = self.start().json()
+        deadline = self.launch_row(launch["launch_id"]).launch_expires_at.replace(tzinfo=timezone.utc)
+        for delta, expected in ((0, "starting"), (.000001, "failed")):
+            with patch("server.role_services._now", return_value=deadline+timedelta(seconds=delta)):
+                self.assertEqual(self.projected_service()["observed"], expected)
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a)); state.generation += 1
+            session.add(state); session.commit()
+        with patch("server.role_services._now", return_value=deadline+timedelta(seconds=1)):
+            self.assertEqual(self.projected_service()["observed"], "starting")
+
     def test_expired_running_heartbeat_is_unknown_without_releasing_or_writing(self):
         launch, claim = self.make_running_service()
         self.set_instance_last_seen(claim["expected_instance_id"], 120)

@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 from scripts import role_service_host as rsh
 from scripts.role_provision import key_file_path
 from scripts.role_provision_worker import RoleProvisionWorker
-from scripts.role_service_recovery import probe_pid
+from scripts.role_service_recovery import recorded_process_state
 
 
 class RuntimeErrorCode(RuntimeError):
@@ -130,7 +130,7 @@ def launcher_lock(private):
 
 
 class TalkRuntime:
-    def __init__(self, config, *, client=None, spawn=None, clock=time.monotonic, sleeper=time.sleep):
+    def __init__(self, config, *, client=None, spawn=None, clock=time.monotonic, sleeper=time.sleep, attach_api=False):
         self.config = config
         self.project = config["project_id"]
         self.project_root = Path(config["project_root"])
@@ -139,6 +139,7 @@ class TalkRuntime:
         self.spawn_override = spawn
         self.clock, self.sleep = clock, sleeper
         self.api = None
+        self.attach_api = attach_api
         self.api_control_file = None
         self.hosts = {}
         self.statuses = {}
@@ -170,6 +171,7 @@ class TalkRuntime:
             "seen_at":utcnow(), "state":state, "stopping":self.stopping,
             "child_pid":self.api.pid if self.api else None,
             "owns_original_popen":self.api is not None, "automatic_restart":False,
+            "api_mode":"external" if self.attach_api else "owned",
             "hosts":self.statuses, "worker_in_flight":bool(self.worker_thread and self.worker_thread.is_alive()),
             "worker_error":self.worker_error}
         value["worker_completed_at"]=self.worker_completed_at
@@ -198,7 +200,7 @@ class TalkRuntime:
     def wait_api(self, seconds=30):
         deadline = self.clock() + seconds
         while self.clock() < deadline:
-            if self.api.poll() is not None:
+            if self.api is not None and self.api.poll() is not None:
                 raise RuntimeErrorCode("runtime_api_exited")
             try:
                 me = self.request("GET", "/api/members/me")
@@ -298,8 +300,8 @@ class TalkRuntime:
                     self.statuses[member] = {"state":"health_unreadable"}
                     continue
             if existing:
-                process_state=probe_pid(existing.get("pid"))
-                if process_state not in ("absent","exited"):
+                process_state=recorded_process_state(existing.get("pid"), existing.get("seen_at"))
+                if process_state not in ("absent","exited","previous_boot","pid_reused"):
                     self.statuses[member] = {"state":"external_manager" if process_state=="present" else "external_manager_unverified","pid":existing.get("pid")}
                     continue
             if service.get("ownership_held"):
@@ -397,7 +399,9 @@ class TalkRuntime:
         self.operator = Path(self.config["operator_key_file"]).read_text(encoding="utf-8").strip()
         self.client = self.client or rsh.TalkHostClient(self.config["base_url"],self.operator,timeout=5)
         try:
-            self.start_api()
+            if not self.attach_api:
+                self.start_api()
+            self.health("waiting_api")
             self.wait_api()
             if self.config.get("provision_worker", True):
                 self.worker = RoleProvisionWorker(project_id=self.project,host_label=self.config.get("host") or socket.gethostname(),
@@ -419,7 +423,7 @@ class TalkRuntime:
                     reload_file.unlink()
                 except (RuntimeErrorCode,rsh.HostError,OSError) as exc:
                     self.worker_error=getattr(exc,"code",None) or type(exc).__name__
-            if self.api.poll() is not None:
+            if self.api is not None and self.api.poll() is not None:
                 # Keep every original host Popen alive. A user reload can restore API;
                 # this is deliberately not unbounded role/API auto-restart.
                 self.health("api_exited")
@@ -435,7 +439,7 @@ class TalkRuntime:
         self.health("stopping")
         while True:
             try:
-                if self.api.poll() is not None:
+                if self.api is not None and self.api.poll() is not None:
                     self.reload_api()
                 self.stop()
                 break
@@ -452,37 +456,42 @@ def main(argv=None):
     parser.add_argument("--config",required=True)
     parser.add_argument("--apply",action="store_true")
     parser.add_argument("--detach",action="store_true")
+    parser.add_argument("--attach-api",action="store_true",help="只运行本机宿主/worker，观察已由其它入口启动的API，不接管或关闭API")
     args=parser.parse_args(argv)
     config=load_config(args.config)
     private=Path(config["state_dir"])/"runtime"
     if args.action=="status":
         value=json.loads((private/"health.json").read_text(encoding="utf-8"))
-        value["process_present"]=probe_pid(value["pid"])=="present"
+        value["process_state"]=recorded_process_state(value["pid"],value.get("seen_at"))
+        value["process_present"]=value["process_state"]=="present"
         print(json.dumps(value,ensure_ascii=False));return 0
     if not args.apply:
         print(json.dumps({"mode":"dry_run","action":args.action,"project_id":config["project_id"],"configured_hosts":len(config.get("hosts",[])),"workbuddy_dynamic":bool(config.get("workbuddy"))}));return 0
     rsh.ensure_private_dir(private)
     if args.action in ("stop","reload-api"):
         health=json.loads((private/"health.json").read_text(encoding="utf-8"))
-        if probe_pid(health["pid"])!="present":raise RuntimeErrorCode("runtime_not_running")
+        if recorded_process_state(health["pid"],health.get("seen_at"))!="present":raise RuntimeErrorCode("runtime_not_running")
+        if args.action=="reload-api" and health.get("api_mode")=="external":raise RuntimeErrorCode("runtime_api_not_owned")
         (private/("stop.request" if args.action=="stop" else "reload-api.request")).write_text(utcnow(),encoding="utf-8")
         return 0
     health_file=private/"health.json"
-    if health_file.is_file():
-        prior=json.loads(health_file.read_text(encoding="utf-8"))
-        if probe_pid(prior["pid"])=="present":raise RuntimeErrorCode("runtime_already_running")
+    # PID可能在电脑重启后复用；单实例由下方OS锁证明，旧健康PID不能阻止恢复。
     stop_file=private/"stop.request"
     if stop_file.exists():
         if not health_file.exists() or json.loads(health_file.read_text(encoding="utf-8")).get("state")!="stopped":raise RuntimeErrorCode("runtime_stop_marker_requires_review")
         stop_file.unlink()
     if args.detach:
         command=[sys.executable,"-B","-X","utf8","-m","scripts.talk_runtime","serve","--config",str(Path(args.config).resolve()),"--apply"]
+        if args.attach_api:command.append("--attach-api")
         flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_BREAKAWAY_FROM_JOB if os.name=="nt" else 0
         with (private/"launcher.out").open("ab") as out,(private/"launcher.err").open("ab") as err:
             child=subprocess.Popen(command,cwd=config["project_root"],stdin=subprocess.DEVNULL,stdout=out,stderr=err,
                 **({"creationflags":flags,"startupinfo":rsh._hidden_startupinfo()} if os.name=="nt" else {"start_new_session":True}))
         print(json.dumps({"started_launcher_pid":child.pid,"note":"Check status for actual readiness."}));return 0
-    runtime=TalkRuntime(config)
+    if not args.attach_api:
+        from server.local_runtime import bind_local_runtime
+        bind_local_runtime(args.config, config)
+    runtime=TalkRuntime(config,attach_api=args.attach_api)
     def stopping(*_):runtime.stopping=True
     signal.signal(signal.SIGINT,stopping)
     if hasattr(signal,"SIGBREAK"):signal.signal(signal.SIGBREAK,stopping)

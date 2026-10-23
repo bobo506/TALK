@@ -771,3 +771,31 @@ test('未归档才有控制；归档角色不渲染服务控制', async () => {
   assert.ok(h.controlsFor('agent:live'));
   assert.equal(h.controlsFor('agent:archived'), undefined, '归档角色不显示服务控制');
 });
+
+test('已停止回执覆盖旧服务默认stopping，并保留一次资格刷新', () => {
+  const h = harness();
+  const merged = h.context.roleServiceMergeAction(serviceRow({ observed: 'unknown', ownership_held: true }),
+    { action: 'stop', observed: 'stopping', idempotent_stopped: true });
+  assert.equal(merged.observed, 'stopped');
+  assert.equal(merged.ownership_held, false);
+  assert.equal(merged.can_stop, false);
+});
+
+test('幂等关闭后仍获取服务资格，重新启用启动按钮；旧回执不永久卡关闭中', async () => {
+  const member = 'agent:managed';
+  const h = harness({ roster: [{ member_id: member, service: serviceRow({
+    observed: 'unknown', ownership_held: true, can_start: false, can_stop: true }) }] });
+  h.setPollDelay(60000); await h.enterRoles();
+  h.stopBtn(member).fire('click'); await h.flush();
+  h.reply(0, { member_id: member, action: 'stop', observed: 'stopping', desired: 'stopped', idempotent_stopped: true });
+  await h.flush();
+  assert.equal(h.state(member), '未启动（已关闭）');
+  assert.equal(h.context.roleServiceNeedsPolling(), true);
+  const polling = h.context.pollRoleServices(h.roleServiceUI.projectId, h.roleServiceUI.memberId);
+  await h.flush();
+  h.reply(1, [{ member_id: member, ...serviceRow({ observed: 'stopped', can_start: true, can_stop: false, ownership_held: false }) }]);
+  await polling; await h.flush();
+  assert.equal(h.startBtn(member).disabled, false);
+  assert.equal(h.context.roleServiceNeedsPolling(), false);
+  assert.equal(h.stopRequests().length, 1);
+});

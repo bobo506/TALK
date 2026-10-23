@@ -940,6 +940,7 @@ const roleServiceUI = {
   pollTimer: null,
   pollBusy: false,
   pollToken: 0,
+  actionRefresh: 0,
   pollError: "",
   pollDelayMs: 2000,
 };
@@ -971,6 +972,7 @@ function ensureRoleServiceContext() {
   roleServiceUI.busy = new Set();
   roleServiceUI.errors = new Map();
   roleServiceUI.batch = null;
+  roleServiceUI.actionRefresh = 0;
   roleServiceUI.pollError = "";
 }
 // app.js 每次导航/刷新都会经 renderWorkspaceMode → syncWorkspaceLayout；离页即停表。
@@ -1265,10 +1267,20 @@ function workspaceRoleServiceBatchFeedback() {
   return box.childElementCount ? box : null;
 }
 async function roleServiceErrorDetail(res, fallback) {
+  const messages = {
+    local_runtime_unavailable: "本机角色服务暂不可用，请检查启动终端后重试。",
+    recovery_process_not_absent: "尚未确认原执行端已停止，请检查本机服务后重试关闭。",
+    recovery_process_inventory_unknown: "暂时无法核实本机进程，请检查权限后重试关闭。",
+    recovery_tasks_active: "该角色仍有未结束的任务，请先处理任务再关闭。",
+    local_recovery_unverified: "暂时无法核实原执行端，请检查本机服务后重试关闭。",
+  };
   try {
-    if (typeof readErrorDetail === "function") return await readErrorDetail(res, fallback);
+    if (typeof readErrorDetail === "function") {
+      const detail = await readErrorDetail(res, fallback);
+      return messages[detail] || detail;
+    }
     const body = await res.json();
-    if (body && typeof body.detail === "string" && body.detail) return body.detail;
+    if (body && typeof body.detail === "string" && body.detail) return messages[body.detail] || body.detail;
   } catch (_) { /* 响应体不可读时退回兜底文案 */ }
   return fallback;
 }
@@ -1279,8 +1291,12 @@ function roleServiceMergeAction(base, data) {
   if (typeof data.desired === "string") merged.desired = data.desired;
   if (typeof data.observed === "string") merged.observed = data.observed;
   if (Number.isInteger(data.generation)) merged.generation = data.generation;
-  if (data.idempotent_stopped === true && !("observed" in data)) merged.observed = "stopped";
-  if (data.action === "start" || data.action === "stop") {
+  if (data.idempotent_stopped === true) {
+    // 兼容旧服务响应中默认的observed=stopping；已确认停止的回执优先。
+    Object.assign(merged, { observed: "stopped", ownership_held: false, can_stop: false,
+      last_result: "stopped", error_code: null, error_message: null, current_launch: null });
+  }
+  if ((data.action === "start" || data.action === "stop") && data.idempotent_stopped !== true) {
     merged.current_launch = {
       launch_id: data.launch_id ?? null,
       action: data.action,
@@ -1348,6 +1364,7 @@ async function stopRoleService(memberId) {
     } else {
       const data = await res.json().catch(() => null);
       roleServiceUI.overlay.set(memberId, roleServiceMergeAction(roleServiceBaseFor(memberId), data));
+      if (data?.idempotent_stopped === true) roleServiceUI.actionRefresh = (roleServiceUI.actionRefresh || 0) + 1;
     }
   } catch (err) {
     if (projectId === activeProjectId && accountId === myId) roleServiceUI.errors.set(memberId, (err && err.message) || "关闭请求失败，请重试。");
@@ -1445,6 +1462,7 @@ async function startAllRoleServices(memberIds) {
 }
 function roleServiceNeedsPolling() {
   if (!roleServicePageActive()) return false;
+  if (roleServiceUI.actionRefresh) return true;
   const batch = roleServiceUI.batch;
   if (batch && Object.values(batch.settled || {}).some(value => value === "pending")) return true;
   for (const role of workspaceRoles()) {
@@ -1470,6 +1488,7 @@ async function pollRoleServices(projectId, accountId) {
   if (!roleServicePageActive() || projectId !== activeProjectId || accountId !== myId) return;
   if (roleServiceUI.pollBusy || typeof apiFetch !== "function") return;
   const token = ++roleServiceUI.pollToken;
+  const actionRefresh = roleServiceUI.actionRefresh || 0;
   roleServiceUI.pollBusy = true;
   try {
     const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/role-services`);
@@ -1480,6 +1499,7 @@ async function pollRoleServices(projectId, accountId) {
       const list = await res.json().catch(() => null);
       if (token !== roleServiceUI.pollToken || projectId !== activeProjectId || accountId !== myId) return;
       roleServiceUI.pollError = "";
+      if (actionRefresh === roleServiceUI.actionRefresh) roleServiceUI.actionRefresh = 0;
       const rows = Array.isArray(list) ? list : [];
       for (const item of rows) {
         const memberId = item && typeof item.member_id === "string" ? item.member_id : "";

@@ -66,6 +66,7 @@ db.sqlite3-journal
 /.talk/execution-session-store.sqlite3-wal
 /.talk/execution-session-store.sqlite3-shm
 /.talk/spawns/
+/.talk/runtime.local.json
 
 # Flask stuff:
 instance/

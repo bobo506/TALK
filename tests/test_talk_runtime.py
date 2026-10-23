@@ -65,6 +65,15 @@ class RuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(runtime.RuntimeErrorCode,"already_running"):
                 with runtime.launcher_lock(self.private):pass
         with runtime.launcher_lock(self.private):pass
+    def test_old_runtime_pid_reuse_is_not_live_status_or_stop_authority(self):
+        self.write_config()
+        (self.private/"health.json").write_text('{"pid":123,"seen_at":"2026-10-01T00:00:00Z"}',encoding="utf-8")
+        with patch.object(runtime,"recorded_process_state",return_value="previous_boot"), patch("builtins.print") as output:
+            runtime.main(["status","--config",str(self.path)])
+            self.assertFalse(json.loads(output.call_args.args[0])["process_present"])
+            with self.assertRaisesRegex(runtime.RuntimeErrorCode,"runtime_not_running"):
+                runtime.main(["stop","--config",str(self.path),"--apply"])
+        self.assertFalse((self.private/"stop.request").exists())
     def test_redirector_ancestry_never_accepts_unrelated_pid_or_cycle(self):
         self.assertTrue(runtime.is_owned_descendant(1,3,{3:2,2:1}))
         self.assertTrue(runtime.is_owned_descendant(1,1,{}))
@@ -85,13 +94,22 @@ class RuntimeTests(unittest.TestCase):
     def test_external_manager_or_unknown_owner_is_never_adopted(self):
         s=self.spec();self.config["hosts"]=[s]
         Path(s["health_file"]).write_text('{"pid":123}',encoding="utf-8")
-        with patch.object(runtime,"probe_pid",return_value="present"):
+        with patch.object(runtime,"recorded_process_state",return_value="present"):
             self.runtime.reconcile_hosts([self.role(ownership_held=True)])
         self.assertEqual(self.runtime.statuses["agent:one"]["state"],"external_manager")
-        with patch.object(runtime,"probe_pid",return_value="exited"):
+        with patch.object(runtime,"recorded_process_state",return_value="exited"):
             self.runtime.reconcile_hosts([self.role(ownership_held=True)])
         self.assertEqual(self.runtime.statuses["agent:one"]["state"],"recovery_required")
         self.assertFalse(self.spawned);self.assertFalse(self.runtime.hosts)
+    def test_reused_manager_pid_does_not_block_but_old_owner_still_requires_human_stop(self):
+        spec=self.spec();self.config["hosts"]=[spec]
+        Path(spec["health_file"]).write_text('{"pid":123}',encoding="utf-8")
+        with patch.object(runtime,"recorded_process_state",return_value="previous_boot"):
+            self.runtime.reconcile_hosts([self.role(ownership_held=True)])
+            self.assertEqual(self.runtime.statuses["agent:one"]["state"],"recovery_required")
+            self.assertFalse(self.spawned)
+            self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+            self.assertEqual(len(self.spawned),1)
     def test_manager_failures_back_off_and_stop_after_three_until_generation_changes(self):
         self.config["hosts"]=[self.spec()];role=self.role(generation=3,ownership_held=False)
         for count in range(3):
@@ -141,6 +159,15 @@ class RuntimeTests(unittest.TestCase):
         self.assertIsNone(owned["process"].poll())
         self.assertEqual(self.spawned[-1][0],"api")
         self.assertFalse((self.private/"owned.stop").exists())
+    def test_attached_api_readiness_and_shutdown_do_not_spawn_or_stop_external_api(self):
+        attached = runtime.TalkRuntime(self.config, client=self.client, spawn=self.runtime.spawn_override, attach_api=True)
+        attached.wait_api()
+        attached.stop()
+        self.assertIsNone(attached.api)
+        self.assertEqual(self.spawned, [])
+        value = json.loads((self.private/"health.json").read_text(encoding="utf-8"))
+        self.assertFalse(value["owns_original_popen"])
+        self.assertEqual(value["api_mode"], "external")
     def test_shutdown_uses_ordinary_stop_then_drain_then_api(self):
         s=self.spec()
         self.config["hosts"]=[s];self.runtime.reconcile_hosts([self.role()]);self.client.rows=[self.role(can_stop=True,ownership_held=True)]

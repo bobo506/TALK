@@ -12,6 +12,15 @@ from scripts.role_service_host import HostError
 
 
 class RoleServiceRecoveryCliTests(unittest.TestCase):
+    def test_pid_reuse_and_previous_boot_do_not_mean_the_old_process_is_alive(self):
+        seen="2026-10-23T00:00:00Z"
+        epoch=datetime(2026,10,23,tzinfo=timezone.utc).timestamp()
+        self.assertEqual(recovery.recorded_process_state(1,seen,probe=lambda p:"present",boot_time=epoch+100),"previous_boot")
+        self.assertEqual(recovery.recorded_process_state(1,seen,probe=lambda p:"present",created_at=epoch+100),"pid_reused")
+        for status in ("present","unknown"):
+            self.assertEqual(recovery.recorded_process_state(1,seen,probe=lambda p:status),status)
+            self.assertEqual(recovery.recorded_process_state(1,seen,probe=lambda p:status,boot_time=epoch-100),status)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
