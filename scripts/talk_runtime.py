@@ -483,7 +483,7 @@ def main(argv=None):
     if args.detach:
         command=[sys.executable,"-B","-X","utf8","-m","scripts.talk_runtime","serve","--config",str(Path(args.config).resolve()),"--apply"]
         if args.attach_api:command.append("--attach-api")
-        flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_BREAKAWAY_FROM_JOB if os.name=="nt" else 0
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW | subprocess.CREATE_BREAKAWAY_FROM_JOB if os.name=="nt" else 0
         with (private/"launcher.out").open("ab") as out,(private/"launcher.err").open("ab") as err:
             child=subprocess.Popen(command,cwd=config["project_root"],stdin=subprocess.DEVNULL,stdout=out,stderr=err,
                 **({"creationflags":flags,"startupinfo":rsh._hidden_startupinfo()} if os.name=="nt" else {"start_new_session":True}))

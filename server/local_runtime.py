@@ -64,7 +64,8 @@ def ensure_local_runtime(engine):
     command = [sys.executable, "-B", "-X", "utf8", "-m", "scripts.talk_runtime",
                "serve", "--config", str(path), "--apply", "--attach-api"]
     # 启动于真实API进程，不依赖当前聊天的工具进程；不接管已有API或角色PID。
-    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS if os.name == "nt" else 0
+    # DETACHED_PROCESS会令venv包装器的解释器另开可见控制台；NO_WINDOW让整条子链继承无控制台。
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     with (private/"launcher.out").open("ab") as out, (private/"launcher.err").open("ab") as err:
         subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                          **({"creationflags": flags, "startupinfo": _hidden_startupinfo()} if os.name == "nt" else {"start_new_session": True}))

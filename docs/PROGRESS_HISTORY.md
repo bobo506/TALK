@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-23 10:44：上片人工验收通过，修正启动TALK额外弹出Python窗口
+
+用户明确“验收通过”，并确认重启电脑后可以正常启动角色服务；记录 `ed5842a` 的按钮/启停及电脑重启后启动人工验收通过，不扩大为另一次跨聊天驻留实验。用户附图反馈启动TALK时额外弹出 `.venv/Scripts/python.exe` 黑色窗口，本轮Codex直接修正该显示问题，不派发、不操作生产角色或旧owner。
+
+隔离venv探针复现：`DETACHED_PROCESS + CREATE_NEW_PROCESS_GROUP + SW_HIDE` 的实际解释器console=true/visible=true；替换为 `CREATE_NO_WINDOW + CREATE_NEW_PROCESS_GROUP` 后console=false/visible=false，模块导入成功且正常退出。无控制台父进程下，原有两种子进程策略均继承无控制台。因此仅修改API拉起runtime与显式detach两个入口，保留独立分组及显式detach原BREAKAWAY；不改角色spawn_hidden创建策略或任何模型/Key/归属规则。
+
+真实隔离API自动拉起runtime及显式detach均通过控制台检查、运行、API正常重启/单实例保持、runtime正常停止且不结束外部API；相关24项Python通过，语法/差异检查通过。旧实现新增控制台断言先失败，失败证据保留。失败用例清理等待顺序已补正；仅清理过该失败用例创建的空宿主临时进程，未碰生产进程。证据 `.tmp/no-console-fix/`。
+
+修改在后台管理器完整退出后、再次启动TALK时生效；当前已运行的生产API/runtime不热替换，不为去窗口停止已验角色，当前窗口未宣称已关闭。原启动终端照常保留日志。用户手册及统一启动指南同步，下一无关新片先确认。
+
 ## 2026-10-23 09:58：角色按钮缩小、重启后的启停链路修复与七角色实测
 
 用户验收反馈改名按钮过大、重启电脑后所有角色启停卡住，明确优先修复。当前Codex直接实施和自检，未派DeepSeek/Kimi/子代理。按钮34×34改17×17（面积1/4），图标12px；前端版本 `20261023-role-control-v4`。API通过本机精确数据库/清单绑定恢复独立宿主及worker；启动超时GET收敛、human关闭内逐项本地核验/CAS恢复遗留归属、重启/PID复用识别、旧幂等关闭回执兼容及启动资格刷新均已补齐。

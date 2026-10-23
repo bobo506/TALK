@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-23 10:44最新：用户明确上片验收通过，电脑重启后角色可正常启动。新增反馈启动TALK额外Python窗口，Codex仅修正API→runtime与显式detach入口的窗口创建标志；隔离console=false/visible=false、正常重启/退出及24项Python通过。原角色创建策略/Key/模型/归属不改，未启停生产服务；后台管理器完整退出后再次启动生效，当前窗口未宣称已关闭。窗口人验待复验，详当前进度及[本片记录](docs/spec/ROLE_START_REBOOT_FIX_20261023.md)。
+
 - 2026-10-23 09:58最新：用户验收反馈按钮过大/重启后启停卡住，本轮Codex直接修正。17×17按钮、API绑定恢复宿主/worker、启动超时投影、human关闭逐项证明/CAS恢复、重启/PID复用及旧关闭回执兼容通过；七角色实际启停、三角色周期心跳、最后31项Python/37项Node通过。旧K2.8只纠正原Key文件引用；314任务/286/模型绑定/名称/原Key保持。最终七宿主serving、原生角色全stopped可启动；runtime12856附加用户终端API，跨聊天/再开机仍待人验，不外推驻留最终通过。详[本片记录](docs/spec/ROLE_START_REBOOT_FIX_20261023.md)和当前进度。下一无关新片先确认。
 
 - 2026-10-23 00:49最新补正：用户反馈改名失败，Codex自行修正遗漏JSON请求头的422；29项Python、68项Node及实际页面函数/HTTP200通过，页面版本role-name-json-v2。另确认上片runtime/API/三个原manager/bridge于00:41前后再次退出，跨会话驻留未通过；本轮只正常恢复API/runtime9720，三角色旧owner仍保护、unknown/recovery_required，没有自动解除或重启。此前182秒证据仅为当时事实。下一片驻留修复/三角色恢复先明确范围并获确认，不扩大旧DSH一次CAS授权；见当前进度。

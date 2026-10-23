@@ -46,3 +46,13 @@
 当前API仍由用户原终端管理，后台管理器独立运行；不自动重启外部API，不安装开机任务/服务。完整API独立驻留可按统一入口正常切换。真实再重启电脑/结束聊天后的复查未发生，不能将本轮采样冒称最终驻留通过。原生模型/桌面控制能力不在本轮扩展范围。
 
 请Ctrl+F5刷新，用人类账号检查按钮大小、逐角色启动/关闭，以及关闭后重新启动。若有遗留归属，可再次明确点击关闭，由本机证明/CAS处理；核验失败会保留归属并提示。未获下一无关切片授权。
+
+## 2026-10-23 10:44 后续人工验收与额外Python窗口修正
+
+用户明确上一轮验收通过，实际重启电脑后角色服务能正常启动。此为电脑重启后人工验收事实，不重写此前未验状态的时间语义。
+
+新增截图反馈为启动TALK多出 `.venv/Scripts/python.exe` 黑色窗口。隔离原策略得到console=true/visible=true，新策略得到console=false/visible=false且模块导入/退出正常；无控制台父进程的原子进程策略也能继承无控制台。仅将 `server/local_runtime.py` API自启动入口及 `scripts/talk_runtime.py` 显式detach入口的DETACHED_PROCESS替换为CREATE_NO_WINDOW，保留其余创建标志。没有把历史原生角色路径的DLL限制外推为本入口限制；原生角色spawn_hidden行为保持。Windows的NO_WINDOW与DETACHED不能叠加，参见[Microsoft创建标志说明](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags)。
+
+新增回归通过隔离辅助进程只附加到本次用例自己创建的runtime检查控制台，权限不足/进程不存在不能当作无控制台。旧版本先复现失败；修正后24项Python通过，覆盖自动拉起和显式detach的真实运行/无控制台/正常API重启及单实例/正常停止。证据 `probe-results.json`、`nested-results.json`、`before.log`、`after.log` 均在 `.tmp/no-console-fix/`。失败用例退出顺序已修正，已删除配置导致不能正常drain的唯一空宿主临时进程经精确路径/PID核对后清理，生产进程未触碰。
+
+用户手册、启动指南、进度同步。该修正后台管理器完整退出后、再次启动TALK生效；未热替换当前生产进程，未为窗口调整停角色/解除owner，未改生产Key、模型、绑定或历史任务。当前窗口未宣称已关闭，视觉效果待用户正常重启后复验。

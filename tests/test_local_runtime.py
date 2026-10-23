@@ -45,6 +45,13 @@ class BootstrapTests(unittest.TestCase):
 
 class ActualBootstrapTests(unittest.TestCase):
     def test_actual_api_bootstrap_and_normal_restart_keep_one_independent_runtime(self):
+        self.exercise_bootstrap()
+
+    @unittest.skipUnless(os.name=="nt","Windows detached entry")
+    def test_explicit_detached_entry_has_no_console_and_preserves_restart(self):
+        self.exercise_bootstrap(detached=True)
+
+    def exercise_bootstrap(self,detached=False):
         from scripts.role_service_recovery import probe_pid
         with tempfile.TemporaryDirectory(prefix="talk-local-runtime-") as folder:
             root=Path(folder); state=root/"state"; state.mkdir()
@@ -56,6 +63,7 @@ class ActualBootstrapTests(unittest.TestCase):
                 "operator_key_file":str(key),"base_url":f"http://127.0.0.1:{port}","provision_worker":False,
                 "api_argv":[sys.executable,"-m","scripts.talk_api","--control-file","{control_file}"],"hosts":[]}),encoding="utf-8")
             env=dict(os.environ,TALK_RUNTIME_FIXTURE_CONFIG=str(config)); children=[]
+            if detached:env.pop("TALK_RUNTIME_FIXTURE_CONFIG",None)
             health=state/"runtime/health.json"
             def wait_for(predicate):
                 deadline=time.monotonic()+18
@@ -76,10 +84,21 @@ class ActualBootstrapTests(unittest.TestCase):
                 children.append((child,marker));return child,marker
             try:
                 first,marker=start_api(1)
+                if detached:
+                    def listening():
+                        with socket.socket() as sock:return sock.connect_ex(("127.0.0.1",port))==0
+                    wait_for(listening)
+                    subprocess.run([sys.executable,"-B","-m","scripts.talk_runtime","serve","--config",str(config),
+                        "--apply","--attach-api","--detach"],cwd=local.ROOT,env=env,check=True,
+                        stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
                 wait_for(lambda:facts().get("state")=="running")
                 original=facts()["pid"]
                 self.assertEqual(facts()["api_mode"],"external")
                 self.assertFalse(facts()["owns_original_popen"])
+                if os.name=="nt":
+                    probe=subprocess.run([sys.executable,"-B",str(local.ROOT/"tests/windows_console_probe.py"),str(original)],
+                        capture_output=True,text=True,check=True,timeout=8,creationflags=subprocess.CREATE_NO_WINDOW)
+                    self.assertEqual(json.loads(probe.stdout),{"console":False,"visible":False})
                 marker.write_text("normal API restart",encoding="utf-8");self.assertEqual(first.wait(timeout=8),0)
                 if os.name=="nt":self.assertEqual(probe_pid(original),"present")
                 second,_=start_api(2)
@@ -96,6 +115,7 @@ class ActualBootstrapTests(unittest.TestCase):
             finally:
                 if health.exists():
                     (state/"runtime/stop.request").write_text("test cleanup",encoding="utf-8")
+                    wait_for(lambda:facts().get("state")=="stopped")
                 for child,marker in children:
                     if child.poll() is None:
                         marker.write_text("test cleanup",encoding="utf-8");child.wait(timeout=10)

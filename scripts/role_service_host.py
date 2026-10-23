@@ -1139,9 +1139,10 @@ def build_child_argv(
 def _hidden_startupinfo() -> Any:
     """Windows 隐藏窗口的 ``STARTUPINFO``（``SW_HIDE``）。
 
-    刻意**不**用 ``CREATE_NO_WINDOW``：在本项目的受限宿主环境里该标志会让子进程
-    以 ``0xC0000142``（DLL 初始化失败）立即退出（已用隔离探针实测），而
-    ``STARTF_USESHOWWINDOW + SW_HIDE`` 同样不显示任何窗口且能正常启动。
+    原生角色路径沿用已核验的创建策略：历史受限宿主使用 ``CREATE_NO_WINDOW``
+    曾遇到 ``0xC0000142``，因此此处仅设置 ``SW_HIDE``，不改变该路径的创建标志。
+    该初始显示值不能证明venv再派生的解释器没有控制台；TALK后台入口已单独验证
+    ``CREATE_NO_WINDOW``，在对应入口使用，不把历史限制外推为全局结论。
     """
     if os.name != "nt":  # pragma: no cover - 平台相关
         return None

@@ -1,26 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-23 09:58（Asia/Shanghai）。本轮按用户验收反馈，优先修复重启电脑后角色启停卡住，并缩小改名按钮。当前代码/正式文档已完成，Git收尾随本轮提交；页面操作待用户复验。
+Updated: 2026-10-23 10:44（Asia/Shanghai）。用户明确上一轮验收通过，电脑重启后能正常启动角色服务。新增反馈“启动TALK额外弹出Python黑色窗口”已由Codex直接修正、自检，后台管理器完整退出后再次启动生效；窗口视觉待用户复验。
 
 ## 当前职责与范围
 
-- 当前Codex `agent:codex / prj_e8fe7066bbec / lead` 直接实施、自检与收尾，未派DeepSeek/Kimi或子代理，不称独立复核。下一无关切片先确认；Kimi常规开发暂停、286暂停保持。
-- 按钮34×34→17×17，面积约原1/4；图标12px，与名称居中对齐。前端版本 `20261023-role-control-v4`，当前实际HTTP资源与源码SHA一致，真实视觉/点击交用户验收。
+- 当前Codex `agent:codex / prj_e8fe7066bbec / lead` 直接修正和收尾，未派DeepSeek/Kimi/子代理，不称独立复核。Kimi开发暂停、286保护及下一无关切片先确认保持。
+- 上片 `ed5842a` 的按钮缩小、角色启停和电脑重启后启动已获用户人验通过。跨聊天持续驻留没有额外实测，不据此扩展证明。
 
-## 已完成与证据
+## 本片完成与验证
 
-- 已绑定本机清单/精确数据库后，从原终端启动API会恢复独立宿主与配置worker；原生角色仍按human启动/关闭，不批量启动模型。绑定文件 `.talk/runtime.local.json` Git忽略，不含Key；隔离数据库不能启动生产宿主。
-- 启动超时GET不再永久starting；无owner可重试，已有owner保持。human明确点击关闭时，针对本机原宿主/实例/进程做双次证明及原恢复CAS审计；活进程/未知/活动任务/替代进程仍拒绝，后台/GET/Agent不解除归属。旧幂等关闭回执兼容与关闭后资格刷新已补。
-- 本次三个遗留owner（Codex/DSH/新WorkBuddy）已逐项恢复。OS确认DSH旧PID被系统进程复用，使用本次开机/创建时间区分原进程，未接管或结束复用PID。旧K2.8原清单引用不存在的Key文件，正式反查原本人Key后只修正该宿主role-key-file路径；不复制/重签Key，不改模型/绑定。
-- 相关115项Python回归通过；最后31项宿主/真实隔离API重启/本地恢复/PID专项和37项Node通过，语法/差异检查通过。七角色全部实际启动ready、实例心跳与普通关闭通过；三个代表角色35秒周期心跳推进。详[本片记录](spec/ROLE_START_REBOOT_FIX_20261023.md)，证据 `.tmp/role-start-reboot-fix/`。
+- 根因已隔离复现：Windows分离启动的venv包装器会另建可见解释器控制台，SW_HIDE不能保证整个子链无窗口。两个后台入口改用CREATE_NO_WINDOW，去掉互斥的DETACHED_PROCESS；分组/显式detach的BREAKAWAY、原日志文件及生命周期保持。
+- 仅改API→runtime入口和显式detach入口，原角色spawn_hidden创建策略不改。真实隔离自动启动/显式detach均为console=false/visible=false，模块加载、正常运行、API重启/单实例和正常停止通过；24项Python通过，语法/差异检查通过。证据 `.tmp/no-console-fix/`。
+- 原代码新增控制台断言先复现失败；探针与失败证据保留，失败隔离用例的进程已限定清理。本轮未读生产Key、改绑定/模型/配置/历史任务，未启停生产角色或解除owner。
 
-## 最近现场与保护项
+## 当前部署边界
 
-- 本轮最终核验：runtime12856为external API附加模式，七宿主serving；七原生角色均stopped/no owner/can_start=true，供页面逐一启动。宿主包装器4196与API包装器14684不在Job；解释器venv Job单字段不作外层归属证明。
-- 314条原任务逐行SHA、286暂停、项目名称“小C/小D/小K”等、全部原模型/绑定与config.toml保持；消息最大ID2955保持，无旧私信回放。旧K2.8本人Key mtime保持；私有运行清单仅该Key文件路径纠正。
-- 外部API仍由用户原终端管理；正常重启保留宿主，不能用reload-api接管外部API。需API也独立运行时按[统一启动](guides/TALK_RUNTIME.md)正常切换，不安装开机任务/服务。未实际再重启电脑或结束聊天后复查，不能将本轮采样称跨会话/开机驻留最终验收通过。
+- 新显示方式在后台管理器完整退出后、再次启动TALK时生效；没有热替换当前生产API/runtime，也没有宣称当前已打开的窗口已关闭。原终端启动API仍由原终端显示日志，后台管理器不额外开Python窗口。
+- 用户已重启电脑，旧09:58的runtime12856等PID仅为历史，不能拿作当前运行事实；本轮未重新探测生产进程/角色。当前角色状态以用户实际页面为准。
+- 上片314任务/286/角色名称/模型/Key保护证据及七角色实测保持历史语义。详细范围见[修复记录](spec/ROLE_START_REBOOT_FIX_20261023.md)和[启动指南](guides/TALK_RUNTIME.md)。
 
-## 下一步与人验
+## 下一步
 
-- 请用户Ctrl+F5刷新，检查缩小后的改名按钮及七角色启动/关闭，确认已关闭后再次启动可用；原名称已保留。API已由用户正常重启加载核心修复，当前无需再重启角色或重做登录。
-- 本轮基线 `adbeb5d`，本轮交付以Git提交为准。人验未通过时在本授权范围继续直接修正；无关新片先明确范围并确认。历史见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。
+- 用户下一次正常启动TALK时复验不再弹出额外Python窗口；原终端日志入口保持。当前授权范围内若仍有问题由Codex直接修正，下一无关新片先确认。
+- 本轮基线 `ed5842a`，产品/文档随本片Git提交与常规推送收尾。历史见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。
