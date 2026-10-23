@@ -754,8 +754,8 @@ def kernel_count_state(expected: dict[str, Any], count: int = 1) -> dict[str, An
 class KernelIntegrationTests(unittest.TestCase):
     def test_59_9_reuses_and_60_starts_new(self) -> None:
         for used, action, mode in (
-            (599, "reuse_session", "incremental"),
-            (600, "new_session", "full"),
+            (699, "reuse_session", "incremental"),
+            (700, "new_session", "full"),
         ):
             with self.subTest(used=used):
                 snapshot = make_snapshot(
@@ -1450,7 +1450,7 @@ class FallbackIntegrationTests(unittest.TestCase):
             ],
             200,
         )
-        high = adapt(make_snapshot(projected=600, pressure=600, capacity=1000))
+        high = adapt(make_snapshot(projected=700, pressure=700, capacity=1000))
         state1 = kernel_count_state(expected, count=1)
         high_plan = kernel_inputs(
             expected,
@@ -1611,7 +1611,7 @@ class FallbackIntegrationTests(unittest.TestCase):
                 "native_session_id": expected["native_session_id"],
                 "session_generation": expected["session_generation"],
                 "session_revision": expected["session_revision"],
-                "used_tokens": 600,
+                "used_tokens": 700,
                 "capacity_tokens": 1000,
                 "source": "projected",
                 "sampled_at": iso(T4),

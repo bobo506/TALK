@@ -86,7 +86,7 @@ class WorkBuddyExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.env = patch.dict(os.environ, env, clear=True)
         self.env.start()
         self.native = FakeNative(resolve_launch(self.argv, self.root, self.binding), self.root)
-        self.native.used = 59900
+        self.native.used = 69900
         self.native.fail_before = self.native.fail_after = self.native.cancel = self.native.missing = False
         self.native.age_ms = 0
         self.native.directives = []
@@ -130,7 +130,7 @@ class WorkBuddyExecutionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_exact_threshold_changes_next_window(self):
         first = await self.run_task(1)
-        self.native.used = 60000
+        self.native.used = 70000
         second, third = await self.run_task(2), await self.run_task(3)
         self.assertEqual(first.state["native_session_id"], second.state["native_session_id"])
         self.assertNotEqual(second.state["native_session_id"], third.state["native_session_id"])

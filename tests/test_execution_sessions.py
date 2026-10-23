@@ -106,7 +106,7 @@ def make_task(**overrides):
         "task_id": "288",
         "attempt": 0,
         "execution_id": "exec-288-a",
-        "goal": "实现会话选择、60% 阈值与增量交办离线内核。",
+        "goal": "实现会话选择、70% 阈值与增量交办离线内核。",
         "authorization": "仅写 deepseek/ 候选目录；不部署、不接生产。",
         "body": TASK_BODY,
     }
@@ -514,24 +514,24 @@ class NewWindowTests(KernelTestCase):
 
 class ThresholdTests(KernelTestCase):
     def test_below_threshold_reuses_incrementally(self):
-        result = self.usage_plan(599, 1000)
+        result = self.usage_plan(699, 1000)
         self.assert_consistent(result)
         self.assert_incremental(result)
         self.assertEqual(result["action"], "reuse_session")
         self.assertEqual(result["metrics"]["source"], "projected")
-        self.assertEqual(result["metrics"]["used_tokens"], 599)
+        self.assertEqual(result["metrics"]["used_tokens"], 699)
         self.assertEqual(result["metrics"]["capacity_tokens"], 1000)
         self.assertFalse(result["metrics"]["threshold_met"])
         self.assertEqual(
-            result["metrics"]["exact_comparison"]["used_times_5"], "2995"
+            result["metrics"]["exact_comparison"]["used_times_10"], "6990"
         )
         self.assertEqual(
-            result["metrics"]["exact_comparison"]["capacity_times_3"],
-            "3000",
+            result["metrics"]["exact_comparison"]["capacity_times_7"],
+            "7000",
         )
 
-    def test_exact_60_percent_starts_new_window(self):
-        result = self.usage_plan(600, 1000)
+    def test_exact_70_percent_starts_new_window(self):
+        result = self.usage_plan(700, 1000)
         self.assert_consistent(result)
         self.assert_full(result)
         self.assertEqual(result["reason_code"], "new_context_threshold")
@@ -539,20 +539,20 @@ class ThresholdTests(KernelTestCase):
         self.assertEqual(result["metrics"]["source"], "projected")
 
     def test_above_threshold_starts_new_window(self):
-        result = self.usage_plan(601, 1000)
+        result = self.usage_plan(701, 1000)
         self.assert_consistent(result)
         self.assert_full(result)
         self.assertEqual(result["reason_code"], "new_context_threshold")
         self.assertTrue(result["metrics"]["threshold_met"])
 
-    def test_ui_rounding_59_6_percent_does_not_trigger(self):
-        result = self.usage_plan(5960, 10000)
+    def test_ui_rounding_69_6_percent_does_not_trigger(self):
+        result = self.usage_plan(6960, 10000)
         self.assert_consistent(result)
         self.assert_incremental(result)
         self.assertFalse(result["metrics"]["threshold_met"])
 
-    def test_ui_rounding_59_9_percent_does_not_trigger(self):
-        result = self.usage_plan(599, 1000)
+    def test_ui_rounding_69_9_percent_does_not_trigger(self):
+        result = self.usage_plan(699, 1000)
         self.assert_consistent(result)
         self.assert_incremental(result)
         self.assertFalse(result["metrics"]["threshold_met"])
@@ -573,7 +573,7 @@ class ThresholdTests(KernelTestCase):
 
     def test_big_integers_compare_exactly(self):
         capacity = 9_000_000_000_000_000
-        exact = 5_400_000_000_000_000
+        exact = 6_300_000_000_000_000
         below = exact - 1
         above = exact + 1
         with self.subTest("below"):
@@ -1944,7 +1944,7 @@ class IndependentRegressions(unittest.TestCase):
     def test_new_requires_full_body(self):
         args = self.kwargs()
         args["base_contract"].pop("text")
-        args["context_sample"]["projected_tokens"] = 600
+        args["context_sample"]["projected_tokens"] = 700
         result = plan_execution_session(**args, execution_channel={"state": "ready", "active_writer": False, "execution_channel_exclusive": True})
         self.assertEqual(result["action"], "reject")
         self.assertEqual(result["reason_code"], "reject_base_text_required")
@@ -2366,7 +2366,7 @@ class WindowCountStateTests(KernelTestCase):
             "native_session_id": self.candidate["native_session_id"],
             "session_generation": self.scope["session_generation"],
             "session_revision": self.candidate["session_revision"],
-            "used_tokens": 600,
+            "used_tokens": 700,
             "capacity_tokens": 1000,
             "source": "projected",
             "sampled_at": "2026-10-20T13:00:00+00:00",
@@ -2632,7 +2632,7 @@ class FallbackPlanningTests(KernelTestCase):
                 "native_session_id": candidate["native_session_id"],
                 "session_generation": scope["session_generation"],
                 "session_revision": candidate["session_revision"],
-                "used_tokens": 600,
+                "used_tokens": 700,
                 "capacity_tokens": 1000,
                 "source": "projected",
                 "sampled_at": "2026-10-20T13:00:00+00:00",
@@ -2683,7 +2683,7 @@ class FallbackPlanningTests(KernelTestCase):
     def test_known_high_metrics_ignore_eligible_classification(self):
         scope = make_scope()
         candidate = make_candidate(scope)
-        sample = make_sample(scope, candidate, projected_tokens=600)
+        sample = make_sample(scope, candidate, projected_tokens=700)
         state = make_count_state(scope, candidate, 1)
         result = call_plan(
             scope=scope,
@@ -2707,7 +2707,7 @@ class FallbackPlanningTests(KernelTestCase):
                 "native_session_id": candidate["native_session_id"],
                 "session_generation": scope["session_generation"],
                 "session_revision": candidate["session_revision"],
-                "used_tokens": 600,
+                "used_tokens": 700,
                 "capacity_tokens": 1000,
                 "source": "projected",
                 "sampled_at": "2026-10-20T12:59:00+00:00",
@@ -2892,7 +2892,7 @@ class FallbackPlanningTests(KernelTestCase):
     def test_known_high_metrics_ignore_count_one(self):
         scope = make_scope()
         candidate = make_candidate(scope)
-        sample = make_sample(scope, candidate, projected_tokens=600)
+        sample = make_sample(scope, candidate, projected_tokens=700)
         state = make_count_state(scope, candidate, 1)
         result = call_plan(
             scope=scope,
@@ -3183,7 +3183,7 @@ class FallbackReviewRegressions(unittest.TestCase):
     def observation(self, **changes):
         value = dict(native_session_id=self.candidate["native_session_id"],
                      session_generation=self.scope["session_generation"],
-                     session_revision=100, used_tokens=600, capacity_tokens=1000,
+                     session_revision=100, used_tokens=700, capacity_tokens=1000,
                      source="projected", sampled_at="2026-10-20T13:01:00+00:00")
         value.update(changes)
         return value
@@ -3208,7 +3208,7 @@ class FallbackReviewRegressions(unittest.TestCase):
         self.assertEqual(self.plan(fallback_clock=self.clock)["action"], "new_session")
 
     def test_known_metric_does_not_need_fallback_clock(self):
-        for used, action in ((599, "reuse_session"), (600, "new_session")):
+        for used, action in ((699, "reuse_session"), (700, "new_session")):
             result = call_plan(scope=self.scope, candidate=self.candidate,
                                context_sample=make_sample(self.scope, self.candidate, projected_tokens=used),
                                window_count_state=make_count_state(self.scope, self.candidate, 12),

@@ -1,4 +1,4 @@
-"""执行会话选择、上下文 60% 阈值、缺指标 10 次备用与首轮/续轮投递计划离线内核。
+"""执行会话选择、上下文 70% 阈值、缺指标 10 次备用与首轮/续轮投递计划离线内核。
 
 本模块只使用调用方显式传入的数据：不访问环境变量、文件、数据库或网络，不
 spawn 进程，不在导入时产生副作用，也不创建/恢复真实原生会话。统一入口
@@ -11,8 +11,8 @@ spawn 进程，不在导入时产生副作用，也不创建/恢复真实原生�
 - ``wait``：候选忙、存在活动 writer 或无法证明执行通道独占，暂不投递。
 - ``reject``：输入不合法，未生成投递计划。
 
-阈值只使用原始整数精确比较：``used * 5 >= capacity * 3``（即 ``>= 60%``）。
-可靠指标优先：``<60%`` 续窗、``>=60%`` 下一次新窗，即使已交办超过 10 次也
+阈值只使用原始整数精确比较：``used * 10 >= capacity * 7``（即 ``>= 70%``）。
+可靠指标优先：``<70%`` 续窗、``>=70%`` 下一次新窗，即使已交办超过 10 次也
 不因轮数换窗。仅当可靠指标明确不可得、分类在有限白名单内且该精确窗口有
 可信完整计数时，才允许从新窗首轮起累计的最多 10 次交办；第 10 次可投递，
 第 11 次新窗。计数在这里只是纯状态，不等于真实送达；``window_count`` 的
@@ -57,9 +57,9 @@ FALLBACK_LIMIT = 10
 # JSON / JavaScript 安全整数上界（2**53 - 1）。token 数、容量和代次均不得超出。
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
-# 60% = 3/5；用 used * 5 >= capacity * 3 做原始整数比较。
-THRESHOLD_NUMERATOR = 3
-THRESHOLD_DENOMINATOR = 5
+# 70% = 7/10；用 used * 10 >= capacity * 7 做原始整数比较。
+THRESHOLD_NUMERATOR = 7
+THRESHOLD_DENOMINATOR = 10
 
 _SELECTIONS = frozenset(("auto", "new", "reuse"))
 _CANDIDATE_STATES = frozenset(("ready", "busy", "tainted", "closed"))
@@ -122,7 +122,7 @@ _REASON_TEXT = {
     "new_no_candidate": "未提供可续用候选，生成新窗完整首轮计划。",
     "new_explicit": "派发者显式选择新窗，生成新窗完整首轮计划。",
     "new_context_threshold": (
-        "上下文原始占用已达到 60% 阈值，下一次投递转新窗并恢复完整基础介绍。"
+        "上下文原始占用已达到 70% 阈值，下一次投递转新窗并恢复完整基础介绍。"
     ),
     "new_context_unknown": (
         "候选上下文指标不可用，不能把未知占比当作可续用，生成新窗完整首轮计划。"
@@ -136,7 +136,7 @@ _REASON_TEXT = {
         "生成新窗完整首轮计划。"
     ),
     "new_fallback_threshold_observed": (
-        "该窗口最后一次可靠占比已达到 60% 阈值，缺数时仍必须换窗，"
+        "该窗口最后一次可靠占比已达到 70% 阈值，缺数时仍必须换窗，"
         "不能再用不足 10 次拖延。"
     ),
     "new_fallback_exhausted": (
@@ -171,7 +171,7 @@ _REASON_TEXT = {
         "候选首轮基础合同未确认送达，不能按已知上下文省略基础信息，"
         "生成新窗完整首轮计划。"
     ),
-    "reuse_session": "候选作用域匹配且上下文低于 60%，生成增量续窗计划。",
+    "reuse_session": "候选作用域匹配且上下文低于 70%，生成增量续窗计划。",
     "wait_candidate_busy": (
         "候选执行会话忙，暂不投递；不在同一 home 另起新窗绕过。"
     ),
@@ -1176,7 +1176,10 @@ def _normalize_observation_state(value: Any) -> dict[str, Any]:
         raw["used_tokens"] * THRESHOLD_DENOMINATOR
         >= raw["capacity_tokens"] * THRESHOLD_NUMERATOR
     )
-    if raw["threshold_met"] != threshold_met:
+    # 旧状态按 60% 保存布尔投影；核对其原规则后，按原始 token 数重新投影为
+    # 当前 70% 规则。仅兼容这两个已知规则，不修改原始观测、计数或历史交付。
+    legacy_threshold_met = raw["used_tokens"] * 5 >= raw["capacity_tokens"] * 3
+    if raw["threshold_met"] not in (threshold_met, legacy_threshold_met):
         _fail(
             "state.last_threshold_observation.threshold_met",
             "与原始整数占用不一致",
@@ -2016,8 +2019,8 @@ def _metrics_known(
         "threshold_met": threshold_met,
         "exact_comparison": {
             "operator": ">=",
-            "used_times_5": str(used * THRESHOLD_DENOMINATOR),
-            "capacity_times_3": str(capacity * THRESHOLD_NUMERATOR),
+            "used_times_10": str(used * THRESHOLD_DENOMINATOR),
+            "capacity_times_7": str(capacity * THRESHOLD_NUMERATOR),
         },
         "sample": {
             "native_session_id": native_session_id,
@@ -2525,7 +2528,7 @@ def plan_execution_session(
     window_count_state: Mapping[str, Any] | None = None,
     fallback_clock: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """统一规划入口：校验显式输入、选择会话、判断 60% 阈值并生成正文/留档。
+    """统一规划入口：校验显式输入、选择会话、判断 70% 阈值并生成正文/留档。
 
     参数（全部由调用方显式传入，本函数不读取外部状态）：
 

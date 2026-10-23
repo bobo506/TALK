@@ -9,7 +9,7 @@
 - 只保存最小事实：native session id/generation/窗口计数/已核快照/送达回执/
   决策摘要；不保存 TALK Key、claim token、完整配置或会话正文；
 - ``count_state`` 仍由 ``bridges.execution_sessions`` 纯内核生成与归并；本模块
-  只做持久化和原子比较，不复制另一套 60%/10 次规则。
+  只做持久化和原子比较，不复制另一套 70%/10 次规则。
 """
 
 from __future__ import annotations

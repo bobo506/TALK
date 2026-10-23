@@ -26,7 +26,7 @@ class FakeNative:
             "controlled", "fixed system", (), "f" * 64, "e" * 64)
         self.fingerprint = self.spec.fingerprint
         self.last_session_id = None
-        self.used = 59900
+        self.used = 69900
         self.missing = self.fail_before = self.fail_after = self.cancel = self.foreign = False
         self.age = 0
         self.directives = []
@@ -136,7 +136,7 @@ class KimiExecutionTests(unittest.IsolatedAsyncioTestCase):
         first = await self.run_task(1)
         below = await self.run_task(2)
         self.assertTrue(below.state["reused"])
-        self.native.used = 60000
+        self.native.used = 70000
         third = await self.run_task(3)
         fourth = await self.run_task(4)
         self.assertEqual(third.state["native_session_id"], first.state["native_session_id"])
@@ -258,7 +258,7 @@ class KimiExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_output_budget_never_used_as_context_capacity(self):
         first = await self.run_task(1)
         self.assertEqual(first.state["last_snapshot"]["context_window"], 100000)
-        self.assertEqual(first.state["last_snapshot"]["used_tokens"], 59900)
+        self.assertEqual(first.state["last_snapshot"]["used_tokens"], 69900)
 
     async def test_missing_capacity_fallback_and_corrupt_time_new_window(self):
         self.native.spec.capacity = None

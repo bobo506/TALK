@@ -48,7 +48,7 @@ def _iso(dt: datetime) -> str:
 @dataclass
 class FakeNative:
     mode: str = "known"
-    used: int = 599_000
+    used: int = 699_000
     capacity: int = 1_000_000
     malformed: bool = False
     timeout_before: bool = False
@@ -416,11 +416,11 @@ class FirstAndReuseTests(RuntimeBase):
 
 
 class ThresholdTests(RuntimeBase):
-    async def test_599_reuses_and_60_rotates_next(self) -> None:
-        self.native.used = 599_000
-        first = await self.run_task(1, content="59.9")
-        self.native.used = 600_000
-        second = await self.run_task(2, content="60")
+    async def test_699_reuses_and_70_rotates_next(self) -> None:
+        self.native.used = 699_000
+        first = await self.run_task(1, content="69.9")
+        self.native.used = 700_000
+        second = await self.run_task(2, content="70")
         self.assertTrue(second.state["reused"])
         self.assertEqual(second.state["native_session_id"], first.state["native_session_id"])
         self.assertEqual(second.state["context_status"], "known")

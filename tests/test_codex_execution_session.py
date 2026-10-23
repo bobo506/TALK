@@ -29,7 +29,7 @@ class FakeNative:
         self.root = root
         self.fingerprint = "f" * 64
         self.paths = {}
-        self.used, self.capacity = 59900, 100000
+        self.used, self.capacity = 69900, 100000
         self.missing = False
         self.fail_before = self.fail_after = self.cancel = self.foreign = self.rerouted = False
         self.directives = []
@@ -137,15 +137,15 @@ class CodexExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second.state["confirmed_count"], 2)
         self.assertIn(self.base_text, self.native.directives[0][1])
         self.assertNotIn(self.base_text, self.native.directives[1][1])
-        self.assertEqual(second.state["last_snapshot"]["used_tokens"], 59900)
+        self.assertEqual(second.state["last_snapshot"]["used_tokens"], 69900)
         third = await self.run_task(3, force=True)
         self.assertNotEqual(first.state["native_session_id"], third.state["native_session_id"])
         self.assertEqual(third.state["confirmed_count"], 1)
         self.assertIn(self.base_text, self.native.directives[-1][1])
 
-    async def test_599_then_60_rotates_next_task_not_during_turn(self):
+    async def test_699_then_70_rotates_next_task_not_during_turn(self):
         first = await self.run_task(1)
-        self.native.used = 60000
+        self.native.used = 70000
         second = await self.run_task(2)
         self.assertEqual(first.state["native_session_id"], second.state["native_session_id"])
         third = await self.run_task(3)
@@ -257,7 +257,7 @@ class CodexExecutionTests(unittest.IsolatedAsyncioTestCase):
         sid=result.state['native_session_id']
         self.native.append(sid,'event_msg',{'type':'token_count','info':None})
         snapshot,_=self.native.snapshot(sid)
-        self.assertEqual(snapshot['used_tokens'],59900)
+        self.assertEqual(snapshot['used_tokens'],69900)
         self.assertFalse(snapshot['metrics_missing'])
 
     async def test_wrong_native_model_or_path_is_rejected(self):
