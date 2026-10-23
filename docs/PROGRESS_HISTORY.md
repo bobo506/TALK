@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-23 08:53（Asia/Shanghai）— 汇总进度并保留后台驻留未完成边界
+
+- 用户要求“汇总进度”。当前Codex按project-framework只维护进度/历史与Git，不开发、派发、启停、恢复角色或解除归属。核本地/远端均d062ada、已跟踪工作区干净，复读修正后的29项Python/68项Node日志、真实页面保存HTTP200与final-state保护证据，没有重复产品回归或读取私有凭据。
+- 工程成果：四类运行器当前授权CLI形态的会话复用接线保持；项目名称显示/铅笔改名已落地，d062ada修正漏JSON请求头的422并补实际UI→apiFetch→HTTP回归。页面人验仍待确认，WorkBuddy独立CLI不代表桌面窗口控制。
+- 卡点：后台/原角色00:41前后再次退出，00:49仅恢复API/runtime9720，三旧owner保留、unknown/recovery_required；另外四原生角色停止。最初退出原因和跨会话驻留未闭合，本轮未新探测API/进程，不把00:49的PID/状态写成08:53仍在线，也不将上片182秒观察外推为稳定常驻。314条旧任务/286、原模型Key绑定的保护结论沿用最近证据。
+- 下一步仅建议：恢复时先只读核实当前API/manager/bridge及归属，再给驻留修复和三角色精确恢复范围/不变项/验收，获用户明确确认后实施；Kimi常规开发/286继续暂停，不新增开机任务或扩展旧DSH单次CAS授权。本轮只改docs/PROGRESS.md和docs/PROGRESS_HISTORY.md，完成UTF-8/链接/差异检查后常规提交推送。恢复口令“继续项目”。
+
 ## 2026-10-23 00:49（Asia/Shanghai）— 改名JSON请求头漏传修复，后台再次退出事实补记
 
 - 用户反馈“名称保存失败”。当前Codex直接修正已授权同片问题，不派开发。实际日志为human:bobo对Codex角色00:41:05—07四次PATCH422。saveRoleName漏Content-Type，apiFetch只注入鉴权头，fetch将字符串按普通文本提交；旧mock测试未覆盖此层。新增真实UI保存函数→实际apiFetch→隔离HTTP回归先失败，再补显式application/json及401/403/404/422具体提示、失败保草稿，版本20261023-role-name-json-v2。29项Python、68项Node通过；没有改后端权限、全局API helper或角色业务合同。
