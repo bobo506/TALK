@@ -1,5 +1,15 @@
 # 后台自动日志清理：正式启用记录
 
+## 2026-10-23 20:53独立部署复核通过
+
+319 DeepSeek独立复核为complete/pass，结果2960已于UTC12:52:34正式收取；未发现产品修正项。39份冻结/实际来源匹配，config/policy/state/新run/lease、API健康及新旧进程时序、仅DSH恢复/其它六最新实例offline、日周期与helper无sweep/伪造均通过。取件协调方再核远端与本地JSON及39份材料，证据coordination/319-acceptance.json；原独立报告/限制在review-deployment保持不改。
+
+复核者未获Git旧对象导致旧config全字段独立diff受限；Codex补读取4d3d781旧对象自检，旧SHA与批准基线一致、解析差异仅批准字段、当前SHA3654bdc3…一致，未输出/保存旧配置。该补证只称协调方自检，不改写独立报告。原stopped快照健康数组5/7，独立复核另用旧WorkBuddy PID缺席补齐；旧解释器PID12344被新host复用，不作为旧进程不存在证据。
+
+319实际原生回执new_no_candidate/reused=false，新session-48dfb7c1-20dd-42c7-a0b4-30599b5066a9/count1、基础合同SHA同315、末占用30.8189%；未续318，未强拼候选，原因只记录无候选、不推测根因。任务级claimed_by/instance/delivery均确认，复核实时实例仍idle/null而非预告working/319，不能写成已观察到working。
+
+本片已正式启用并完成代码/首次部署独立复核：每日检查、启动补检，五已登记范围的30天保留/1GiB软预算，正常使用无需前台操作。首次生产0删除是保护缺证旧run；30天长期效果/未来容量/生产到期删除与410、其它成员/OS、私有输出仍未实跑。摘要HTTP200为partial，与后台容量complete分开。完整日志整项及真实主被动功能未在本片完成；下一切片另行明确确认。
+
 ## 2026-10-23 20:26加载核验（待独立部署复核）
 
 用户已回复“已重新启动”。生产API健康ok、DB/storage ok；新统一runtime14584和七个新宿主serving。后台由API首次启动自行执行：UTC12:20:23.836218，完整盘点532,532,295逻辑字节（约508MiB），454个legacy_or_unclosed run全部保护，deleted_files/bytes均0，errors空，capacity_scan complete、未超1GiB；持久next_check=1792844423.836218，即次日UTC12:20:23。核验脚本没有调用sweep或手工写policy/state。
@@ -24,7 +34,7 @@
 
 额外真实API加载自检通过：正式lifespan启动后台worker，真实隔离SQLite任务闭环，自动删除40天旧事件，详情HTTP410，未认证401/agent403，近期/活跃保留，持久daily due，API关闭worker正常停止。测试端口59899，非生产8000；记录在`.tmp/local-log-auto-retention-v1/coordination/api-smoke/`。这不替代生产验证。
 
-## 只读核对的部署事实
+## 原部署前只读核对（20:00前）
 
 - 当前storage.db_path为`./talk.db`，解析到现有`D:/claude-test/TALK/talk.db`；本片enabled门禁要求绝对路径。
 - 当前只有五个已登记来源范围，分别为DeepSeek、Codex和三个Kimi成员，project均为`prj_e8fe7066bbec`。其root指向各成员子目录，而writer的根是`D:/claude-test/TALK/logs/runtime`。
@@ -32,7 +42,7 @@
 - 当前统一宿主running，API为external（由用户原终端运行）。无法通过受管reload-api重载外部API，不按PID强杀/接管它。
 - 当前无runtime_log_retention配置，生产仍未启用；未写root policy、未删除生产日志、未启停角色/宿主/API。
 
-## 准备好的配置差异
+## 已批准并应用的配置差异（原方案）
 
 `.tmp/local-log-auto-retention-v1/coordination/deployment-config.patch`只包含以下差异，内存中已解析验证与原配置相比恰为这些字段；没有保存完整私有配置副本：
 
@@ -48,7 +58,7 @@ max_total_bytes = 1073741824
 interval_seconds = 86400
 ```
 
-原配置SHA256为`b839cdea0ddfe0dd97e91af7ced2825da4557c7af8c2ed307095568d8d7bdc3f`，仅用作未来防止覆盖期间变更的CAS基线；实际应用前须重新核对。这里只准备差异，尚未应用。
+原配置SHA256为`b839cdea0ddfe0dd97e91af7ced2825da4557c7af8c2ed307095568d8d7bdc3f`，曾用作应用前CAS基线并已核对通过；UTC12:05:20已应用，当前SHA3654bdc3…，不再是待应用状态。
 
 ## 确认后按正常流程加载
 

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-23 20:53：319独立部署复核通过并收取，本片正式收尾
+
+用户通知319完成，Codex读取完整结构化交付及独立报告/关键证据：complete/pass、result2960、unfinished/blocked0，无产品修正项。39份/339596字节源和冻结全匹配；实际config DB/五scope/总根/30天/1GiB/86400、生产policy/state首次complete/454保护/删除0/约508MiB/daily due、run manifest/活跃lease、真实API健康/新旧进程时序/只DSH恢复和其余最新实例offline均独立核验。helper无sweep/无手工policy-state写，部分摘要未被说成全量。319于UTC12:52:34.979206收取completed，msg2960及原独立报告保持。
+
+Codex取件重核39份实际与冻结、TALK结果与本地JSON一致，coordination/319-acceptance.json通过；未改产品或重复132/27回归。复核R2受Git沙箱限制未拿到旧config，Codex追加只读Git4d3d781旧对象自检：SHA b839cdea…一致，完整解析差异仅批准DB绝对路径/五root/retention，当前SHA3654bdc3…一致，未输出/保存旧配置；这是自检补证，原独立报告限制不改。
+
+319任务回执claimed_by=agent:deepseek、instance=ins_057877d1df52、delivery_outcome=delivered/turn completed；但原生窗口决策new_no_candidate、reused=false/first_turn=true/count1，新session-48dfb7c1-20dd-42c7-a0b4-30599b5066a9。完整基础SHA仍d357bd93918cb63738664064369952d8b56f75f3345d838bdb58ebf429bf717a，directive14050字节；末projected308189/1000000=30.8189%。实际没有续318，不将无候选归因为60%或凭空确认重载丢状态根因；用户条件允许续窗要求及原守卫保持，本片不扩为会话复用新修复。独立复核实时实例idle/null而非预告working/319，只如实记录任务级回执和实例观测不一致，不伪造已观察到working。
+
+保留限制：454保护数是生产state输出，复核未遍历事件树重算；stopped健康数组只列五个配置host，另两WorkBuddy旧PID由独立进程证据补齐，旧kimi-code解释器12344被新host复用不能据PID缺席判断。摘要HTTP200仍partial/unavailable1；30天长期/未来容量/生产到期删除及410、其它成员/OS、manager unknown与私有输出未验证，不称完整日志整项完成。
+
+本片后台每日/启动补检已实际启用，无需前台逐次操作；DSH保持gen54 running/ready/idle，另六角色stopped。代码0f67794/批准配置9ad18ca/加载记录f108a7a已推送，本轮只验收/进度文档收尾。Kimi开发暂停、286/模型/Key/绑定及旧partial保护保持；下一无关新片仍须先说明范围/验收并确认，不自动派下一任务或建监控。
+
 ## 2026-10-23 20:30：生产后台首次执行/保护与DSH恢复已核，派319独立部署复核
 
 用户回复已重新启动API后，Codex只读核API health/DB/storage ok，新统一runtime14584与七manager均serving。根policy由正式API后台写入，五scope精确匹配批准配置；state.last UTC12:20:23.836218，status/capacity_scan complete、errors空、deleted_files/bytes0、454个legacy_or_unclosed run保护、observed532532295字节（约508MiB）、未超1GiB，next_check1792844423.836218为次日UTC12:20:23。helper未调用sweep或写根policy/state，不用缺证旧run制造删除回执。
