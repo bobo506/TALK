@@ -1,4 +1,14 @@
-# 后台自动日志清理：正式启用记录（API待重启）
+# 后台自动日志清理：正式启用记录
+
+## 2026-10-23 20:26加载核验（待独立部署复核）
+
+用户已回复“已重新启动”。生产API健康ok、DB/storage ok；新统一runtime14584和七个新宿主serving。后台由API首次启动自行执行：UTC12:20:23.836218，完整盘点532,532,295逻辑字节（约508MiB），454个legacy_or_unclosed run全部保护，deleted_files/bytes均0，errors空，capacity_scan complete、未超1GiB；持久next_check=1792844423.836218，即次日UTC12:20:23。核验脚本没有调用sweep或手工写policy/state。
+
+通过原human普通start只恢复原先running的DeepSeek：gen54、ins_057877d1df52、bridge PID8652，running/ready/idle；实际last_seen由UTC12:22:09推进到12:26:10，其余六角色保持原stopped/无owner。新bridge对应manifest身份/PID匹配，run.lease以WinError32拒绝第二可写句柄，closed不存在，证明新活跃写入器已加载；未停止它来制造关闭凭据。
+
+真实人类日志摘要HTTP200、scope严格为本项目DeepSeek、返回2条摘要，scan.complete=false/truncated=true、scanned_bytes=133480910；它是部分查询，不能当全量日志查询通过。原host客户端5秒预算不足，辅助核验改用既有10秒扫描预算+5秒余量的15秒HTTP预算，实际约8.078秒；只改临时核验helper，未改产品超时/扫描限制。后台容量盘点complete与这项摘要查询partial是两个不同结果。
+
+配置SHA仍3654bdc3…不变，根policy的五对project/member与批准配置精确一致。证据在coordination/deployment-{loaded,restored,heartbeat,producer}.json、deployment-producer-check.log；旧停服/配置应用证据保持。代码318独立通过，生产实际加载/保护/恢复证据交DeepSeek另做部署复核；不把自检或0删除说成30天长期容量验证，也不扩大五成员范围到WorkBuddy/manager。
 
 ## 2026-10-23 20:06执行状态
 
@@ -6,7 +16,7 @@
 
 批准的配置已于UTC12:05:20应用，除下列已审字段外保持完全相同，新SHA为`3654bdc3c9a9c14d2435a9e6ada099de25e883e76c9e602a0e4cada73bf7012d`。只读构造预检1根/5范围/策略正确，未建线程/连接DB/sweep。现等待用户原终端重启external API，随后检查后台实际生效并仅普通start恢复DSH；其余六个仍停。配置落盘不等于已加载，生产policy/删除尚未执行。
 
-以下为原审查方案及确认依据，保留时点语义；无需再问本片部署授权。
+以下为原审查方案及确认依据，保留时点语义；无需再问本片部署授权。20:06的API待重启状态已由上述20:26加载事实更新。
 
 ## 已完成的代码验收
 

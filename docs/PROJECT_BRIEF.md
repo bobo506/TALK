@@ -4,6 +4,8 @@
 
 ## 当前实施状态（2026-10-23）
 
+2026-10-23 20:30最新：用户重启API后后台首次完整检查已实际执行，454旧缺证run保护/删除0、约508MiB/未超1GiB、次日日周期已持久；新API/七宿主正常，只普通start恢复DSH running/ready/idle及持续心跳，另外六角色仍停止。39份部署证据冻结，319已交DeepSeek独立部署复核（优先续318窗，回执待核）；产品暂停、未开新片。摘要接口HTTP200但扫描partial已明记，不外推全量查询或30天长期容量效果，详[部署记录](spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)。
+
 2026-10-23 20:06最新：用户已明确批准正式启用/正常重载及317收取；317已completed，原partial保持。旧统一宿主/七manager正常drain退出、角色无owner，原仅DSH running；批准配置已应用并只读构造预检1根5范围通过。待用户原终端重启external API，随后核后台实际生效并仅普通start恢复DSH，其余六个保持stopped；当前不称worker已运行。本片授权不重复询问，详[部署记录](spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)。
 
 2026-10-23 19:44最新：318独立定向复验通过并收取，132回归/27新增/5原反例/27复核侧反例全通过，F1—F5/P1关闭；Codex已核冻结与远端交付，并补正式API lifespan/隔离真实410及后台启停自检通过。生产尚未启用，五来源root需统一原总根、同DB绝对路径和正常宿主/角色加载，external API需用户原终端重启；[可审部署方案](spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)待用户确认。317收取被自动审批拒绝、仍submitted，原partial保留，详[进度](PROGRESS.md)。

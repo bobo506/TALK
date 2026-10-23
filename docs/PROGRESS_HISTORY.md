@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-23 20:30：生产后台首次执行/保护与DSH恢复已核，派319独立部署复核
+
+用户回复已重新启动API后，Codex只读核API health/DB/storage ok，新统一runtime14584与七manager均serving。根policy由正式API后台写入，五scope精确匹配批准配置；state.last UTC12:20:23.836218，status/capacity_scan complete、errors空、deleted_files/bytes0、454个legacy_or_unclosed run保护、observed532532295字节（约508MiB）、未超1GiB，next_check1792844423.836218为次日UTC12:20:23。helper未调用sweep或写根policy/state，不用缺证旧run制造删除回执。
+
+按原集合只human普通start恢复DSH gen54/ins_057877d1df52/PID8652，running/ready/idle，心跳12:22:09→12:26:10；其余六个stopped/无owner。新bridge manifest项目/成员/实例/PID匹配，run.lease第二可写句柄被errno32拒绝、closed不存在。辅助核验最初误假设同instance仅一个run，实际宿主/bridge各自写入；随后按manifest.pid定位真实bridge，不改生产文件。日志摘要真实HTTP200/scope正确/2条，扫描partial/truncated/133480910字节/unavailable_sources1，约8.078秒。原控制客户端5秒不足，临时核验预算调整为既有10秒扫描+5秒余量15秒；未改产品超时或扫描逻辑，不把partial当全量查询通过。
+
+39份/339596字节冻结（12公开源/24证据/3精确生产控制元数据），manifest在coordination/deployment-manifest.json、快照deployment-baseline；源为HEAD9ad18ca及两个合同加载事实增补，Python产品未改。319已queued/assigned交DeepSeek独立核正式配置/实际首次执行/保护/原角色恢复及限制；沿315同continuity/base、优先续318末31.7806%原生窗，具体回执待验。新增权限只准精确生产policy/state、新run manifest/lease元数据与公开配置三字段只读，不准事件正文/私有Key/清单/原生会话或任何生产变更；主写review-deployment。产品暂停，默认用户通知319后取件，不自动等/唤回或开下片。
+
+代码0f67794/进度4d3d781及批准配置/drain记录9ad18ca已推送，本轮仅补正式加载文档。旧/未知/空任务run不补closed或mtime；30天长期效果、未来实际删除和生产410仍未实跑。318隔离代码独立通过和本次生产事实分别记录，319独立部署结论待验；模型/Key/绑定/286/旧报告保持。
+
 ## 2026-10-23 20:06：用户批准正式启用，正常drain及配置应用完成，待API重启
 
 用户明确回复“确认启用并正常重载”及“授权收取317，保留原结论”。API身份复核agent:codex，317于UTC12:00:49收取completed，msg2958仍partial，原失败/拒绝证据保留。部署通过原human:bobo客户端检查：无running任务、配置worker空闲、唯一运行DSH真实idle/无current_task/90秒内心跳，其余六角色stopped；原角色/运行状态快照留coordination/deployment-before.json，不复制Key。

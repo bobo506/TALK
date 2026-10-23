@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-23 20:30最新：用户已重启API，新runtime14584/七manager serving，后台首次UTC12:20:23完整盘点532532295字节、454旧缺证run保护/删除0/未超1GiB、daily due已持久。仅普通start恢复原DSH gen54/ins_057877d1df52/bridge8652，running/ready/idle且连续心跳；其余六角色stopped/无owner。新bridge lease活跃/无closed，摘要HTTP200但扫描partial已明记，不充全量通过。39份部署材料冻结，319已派DeepSeek独立部署复核，沿base315/continuity请求续318窗，实际复用待回执；产品修改暂停，默认用户通知319后取件。代码/配置已推送至9ad18ca，本轮仅正式加载文档增补；模型/Key/绑定/286与旧报告保持，不造生产删除/410，不提前开新片。详当前进度及部署记录。
+
 - 2026-10-23 20:06最新：用户明确“确认启用并正常重载”及“授权收取317，保留原结论”。317已completed/2958仍partial。无running任务、worker空闲且DSH idle/新鲜后，经原统一入口普通stop，原runtime/七manager正常drain退出，角色均stopped/无owner/can_start，不强杀/不CAS。原仅DSH running，其余六个stopped。生产config已CAS原子应用：同DB绝对路径、原五scope统一总根、30天/1GiB/日周期enabled，构造预检1根5范围通过。现待用户原终端Ctrl+C重跑API一次，已发“已重新启动”问题；旧API尚未加载worker，不能称生效。收到回复后核后台policy/due/保护摘要和新宿主，只普通start恢复DSH，再必要独立复验/Git收尾；本片部署已获授权不再重复确认，模型/Key/绑定/286及下一无关新片先确认保持。详当前进度及部署记录。
 
 - 2026-10-23 19:44最新：318 DeepSeek定向独立复验complete/pass并已收取2959，F1—F5/P1关闭；独立132回归/27新测试/5原反例/27复核侧反例/37旧失败项通过，33冻结/远端本地交付核验一致。实际new_context_threshold新窗/count1/基础SHA同315，末占用31.7806%。Codex补正式API lifespan/隔离真实HTTP410及后台启停自检通过，未改产品；仅澄清合同新增事件措辞。生产配置/服务未启用，现有五source需统一原总根、同DB绝对路径；external API原终端需重启，正常宿主/角色加载方案已准备待用户确认，详当前进度/部署方案。317收取被自动审批以旧“暂不收取”及本次只确认318拒绝，仍submitted，原partial/失败保持，未绕行；需明确授权才处理。Git代码收尾按当前进度。
