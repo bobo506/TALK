@@ -346,6 +346,21 @@ test('复核：不完整的零条文件不能宣称范围内没有记录', async
   assert.doesNotMatch(h.statusText(), /范围内没有诊断记录/);
 });
 
+test('后台合并导出保留缺口提示，后台事件只进入文件', async () => {
+  for (const reason of ['backend_coverage_unverified', 'backend_missing_components', 'backend_unavailable']) {
+    const h = harness(); h.generate(); const request = h.lastRequest();
+    const event = { ...eventRecord(), kind: 'backend_event', component: 'api',
+      context: { route: '/api/projects/{project_id}/roles/{member_id}' } };
+    h.respondExport(request, exportBody(metaFor(request, { complete: false, reasons: [reason],
+      backend: { available: reason !== 'backend_unavailable', history_complete: false } }, 1), [event]));
+    await h.flush();
+    assert.equal(h.statusText(), '日志文件不完整。');
+    assert.equal(h.downloadVisible(), true);
+    assert.ok(h.urlStub.created[0].blob.text.includes('backend_event'));
+    assert.doesNotMatch(allTexts(h.el('role-diagnostics-panel')).join(' '), /backend_event|project_id/);
+  }
+});
+
 test('复核：请求入口不可用也解除生成状态', async () => {
   const h = harness(); h.context.apiFetch = null; h.generate(); await h.flush();
   assert.equal(h.el('role-export-generate-btn').disabled, false);
@@ -385,8 +400,9 @@ test('静态合同：精简导出面板 DOM、冗余文案全部移除且不移�
   const tasks = indexSource.indexOf('id="role-details-tasks-panel"');
   assert.ok(description >= 0 && description < diagnostics && diagnostics < tasks);
   assert.ok(indexSource.indexOf('/role-diagnostics.js') < indexSource.indexOf('/workspace.js'));
-  const versions = [...indexSource.matchAll(/(?:href|src)="\/[^"?]+\?v=([^"]+)"/g)].map(match => match[1]);
-  assert.ok(versions.length >= 7 && versions.every(version => version === '20261019-role-binding-summary-v1'));
+  const versions = [...indexSource.matchAll(/(?:href|src)="\/([^"?]+)\?v=([^"]+)"/g)];
+  assert.ok(versions.length >= 7 && versions.every(match => /^[A-Za-z0-9.-]+$/.test(match[2])));
+  assert.equal(versions.find(match => match[1] === 'role-diagnostics.js')[2], '20261023-backend-export-v1');
   assert.ok(!diagnosticsSource.includes('innerHTML'));
   // 用户列出的常态说明全部移除，同文案不移藏到别处（index.html / role-diagnostics.js 双向核查）。
   for (const text of ['统一诊断文件', '不改变服务状态', '按时间范围生成一份 JSONL', '（本地）', '仅人类账号可生成', '生成与下载都不会启停服务', '尚未生成诊断日志', '选择角色不会自动扫描', '扫描与导出完整', '可点击“下载日志文件”', '范围内没有诊断记录', '生成诊断日志']) {
@@ -745,6 +761,7 @@ test('退出登录在导航前回收 Blob 并拒绝在途旧响应（复用 app.
   assert.ok(match, '使用实际退出回调');
   let reloaded = false;
   Object.assign(h.context, {
+    loginRequest: 0, loggingOut: false, resetMyPermissions() {},
     pollTimer: null, taskPollTimer: null, taskDurationTimer: null, reconnectTimer: null, ws: null,
     closeEventStream() {}, clearStoredApiKeys() {},
     location: { reload() {

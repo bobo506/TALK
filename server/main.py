@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -39,6 +40,12 @@ from server.ws_hub import hub
 configure_logging()
 logger = logging.getLogger("talk")
 START_TIME = time.monotonic()
+
+
+def _backend_failure(app, subsystem, exc, *, stage="serve"):
+    recorder = getattr(app.state, "backend_recorder", None)
+    if recorder is not None:
+        recorder.lifecycle("api_background_exception", stage=stage, exc=exc, context={"subsystem": subsystem})
 
 WS_CLOSE_INVALID_API_KEY = 4001
 WS_CLOSE_IDLE_TIMEOUT = 4002
@@ -205,9 +212,28 @@ def _sse_event_id(event_text: str) -> int | None:
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start = time.perf_counter()
+        request_id = uuid.uuid4().hex  # never trust a supplied correlation header
+        def backend(event, *, status=None, exc=None):
+            recorder = getattr(request.app.state, "backend_recorder", None)
+            if recorder is None:
+                return
+            if getattr(request.state, "auth_database_file", None) != recorder.database_file:
+                return
+            route = request.scope.get("route")
+            project_id = request.path_params.get("project_id")
+            # Only matched project routes can attribute request context. Global
+            # and unauthenticated calls are not guessed into a local project.
+            if not project_id or not getattr(request.state, "member_id", None) or route is None:
+                return
+            context = {"stage": "request", "request_id": request_id, "method": request.method,
+                "route": route.path, "status": status,
+                "duration_ms": int((time.perf_counter()-start)*1000),
+                "member_id": getattr(request.state, "backend_member_id", None)}
+            recorder.emit(project_id, event, context=context, exc=exc)
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception as exc:
+            backend("api_exception", status=500, exc=exc)
             logger.exception(
                 "http exception",
                 extra={
@@ -218,6 +244,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 },
             )
             raise
+
+        if response.status_code >= 400 or request.method not in ("GET", "HEAD", "OPTIONS") or time.perf_counter()-start >= 5:
+            backend("api_request", status=response.status_code)
 
         logger.info(
             "http request",
@@ -230,11 +259,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 "member_id": getattr(request.state, "member_id", None),
             },
         )
+        response.headers["X-TALK-Request-ID"] = request_id
         return response
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def _server_lifespan(app: FastAPI):
     logger.info("Initializing database")
     init_db()
     from server.local_runtime import ensure_local_runtime
@@ -244,6 +274,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         # 仅记录类型，避免本机清单路径/凭据/命令进入公开日志。
         logger.error("Local runtime unavailable: %s", type(exc).__name__, extra={"event": "local_runtime_start_failed"})
+        _backend_failure(app, "local_runtime", exc, stage="startup")
     with Session(engine) as session:
         cleanup_stats = files.purge_expired_files(session, FILE_RETENTION_DAYS)
     if FILE_RETENTION_DAYS > 0:
@@ -266,12 +297,50 @@ async def lifespan(app: FastAPI):
         retention_service.start()
     except Exception as exc:
         logger.error("Log retention unavailable: %s", type(exc).__name__)
+        _backend_failure(app, "log_retention", exc, stage="startup")
     logger.info("TALK server ready", extra={"event": "startup_ready", "host": HOST, "port": PORT})
     try:
         yield
     finally:
         if retention_service is not None:
             await asyncio.to_thread(retention_service.stop)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from server.backend_diagnostics import BackendRecorder
+    from server.db import CONFIG
+    recorder = BackendRecorder(CONFIG, engine)
+    app.state.backend_recorder = recorder
+    recorder.lifecycle("backend_starting", stage="startup")
+
+    async def heartbeat():
+        while True:
+            await asyncio.sleep(30)
+            await asyncio.to_thread(recorder.lifecycle, "backend_heartbeat", stage="serve")
+
+    heartbeat_task = None
+    try:
+        async with _server_lifespan(app):
+            recorder.lifecycle("backend_ready", stage="startup")
+            heartbeat_task = asyncio.create_task(heartbeat())
+            try:
+                yield
+            finally:
+                recorder.lifecycle("backend_stopping", stage="shutdown")
+        recorder.lifecycle("backend_stopped", stage="shutdown")
+    except BaseException as exc:
+        recorder.lifecycle("backend_failed", stage="shutdown" if heartbeat_task else "startup", exc=exc)
+        raise
+    finally:
+        if heartbeat_task is not None:
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+        recorder.close()
+        app.state.backend_recorder = None
 
 
 app = FastAPI(title="TALK", version="0.1.0", lifespan=lifespan)
@@ -301,15 +370,17 @@ def healthz():
 
     try:
         db_status = _check_db_health()
-    except Exception:
+    except Exception as exc:
         logger.exception("healthz db check failed", extra={"event": "healthz_db_error"})
+        _backend_failure(app, "database", exc)
         db_status = "error"
         http_status = 503
 
     try:
         storage_status = _check_storage_health()
-    except Exception:
+    except Exception as exc:
         logger.exception("healthz storage check failed", extra={"event": "healthz_storage_error"})
+        _backend_failure(app, "storage", exc)
         storage_status = "error"
         http_status = 503
 

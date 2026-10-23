@@ -9,6 +9,7 @@ project/service/task endpoint changes behavior or permission.
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
@@ -350,20 +351,27 @@ def export_runtime_logs(
     _require_human(current)
     _require_target(project_id, member_id, session)
     since, until = _parse_export_window(request)
+    started = time.monotonic()
     try:
-        source = provider.require_source(project_id, member_id)
+        from server.backend_diagnostics import merge_role_export, unavailable_role_export, project_members, project_routes
+        from server.db import CONFIG
+        from bridges.backend_diagnostics import settings
+        backend_settings = settings(CONFIG, database_file=session.get_bind().url.database)
         limits = getattr(provider, "_scan_limits", None)
         if not isinstance(limits, ScanLimits):
             limits = ScanLimits()
-        body = build_export(
-            source,
-            project_id=project_id,
-            member_id=member_id,
-            since=since,
-            until=until,
-            generated_at=provider.now(),
-            limits=limits,
-        )
+        try:
+            source = provider.require_source(project_id, member_id)
+            body = build_export(source, project_id=project_id, member_id=member_id,
+                since=since, until=until, generated_at=provider.now(), limits=limits)
+        except RuntimeDiagnosticsError as exc:
+            if exc.code != "diagnostics_unavailable" or backend_settings is None or project_id not in backend_settings["projects"]:
+                raise
+            body = unavailable_role_export(project_id, member_id, since=since, until=until)
+        if backend_settings is not None or (isinstance(CONFIG.get("backend_diagnostics"), dict) and CONFIG["backend_diagnostics"].get("enabled") is True):
+            body = merge_role_export(body, backend_settings, project_id, member_id,
+                since=since, until=until, remaining_seconds=limits.max_seconds-(time.monotonic()-started), limits=limits,
+                allowed_members=project_members(session, project_id), allowed_routes=project_routes(request.app))
         filename = export_filename(since, until)
         return Response(
             content=body,
@@ -382,6 +390,32 @@ def export_runtime_logs(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="diagnostics_projection_failed",
         )
+
+
+@router.get("/{project_id}/backend-logs/export")
+def export_backend_logs(project_id: str, request: Request,
+                        current: Member = Depends(require_log_reader),
+                        session: Session = Depends(get_session)):
+    _require_human(current)
+    if session.get(Project, project_id) is None:
+        raise HTTPException(404, "project_not_found")
+    since, until = _parse_export_window(request)
+    try:
+        from server.backend_diagnostics import build_backend_export, project_members, project_routes
+        from server.db import CONFIG
+        from bridges.backend_diagnostics import settings
+        # Binding uses the *request's database*, not a module-global engine that
+        # dependency overrides or another local project might not be using.
+        value = settings(CONFIG, database_file=session.get_bind().url.database)
+        body = build_backend_export(value, project_id, since=since, until=until,
+            allowed_members=project_members(session, project_id), allowed_routes=project_routes(request.app))
+        return Response(body, media_type="application/x-ndjson", headers={
+            "Content-Disposition": f'attachment; filename="{export_filename(since, until)}"',
+            "Cache-Control": "no-store"})
+    except RuntimeDiagnosticsError as exc:
+        _map_error(exc)
+    except Exception:
+        raise HTTPException(503, "backend_diagnostics_unavailable")
 
 
 @router.get(

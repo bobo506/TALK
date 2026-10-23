@@ -12,6 +12,7 @@ var roleDiagnostics = (function roleDiagnosticsModule(global) {
   const KNOWN_REASONS = new Set([
     "scan_incomplete", "source_changed", "malformed_records", "unavailable_records",
     "projection_failed", "record_limit", "byte_limit", "time_limit", "duplicate_log_id",
+    "backend_coverage_unverified", "backend_missing_components", "backend_unavailable",
   ]);
   const SAFE_FILENAME_RE = /^talk-diagnostics_\d{8}T\d{6}Z_\d{8}T\d{6}Z\.jsonl$/;
   const state = {

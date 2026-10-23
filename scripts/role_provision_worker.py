@@ -421,6 +421,7 @@ class RoleProvisionWorker:
         environ: Any = None,
         clock: Any = None,
         repo_root: Any = REPO_ROOT,
+        diagnostics: Any = None,
     ):
         if not str(project_id or "").strip():
             raise WorkerError("http_error", "缺少 project_id")
@@ -458,12 +459,38 @@ class RoleProvisionWorker:
         self._deadline: Optional[float] = None
         #: 轮次内已开过预算：``process`` 在同一个 ``run_round`` 里不再重开（返修 F2）。
         self._in_round = False
+        self._backend_diagnostics = diagnostics
+        self._backend_initialized = diagnostics is not None
+        self._backend_heartbeat = 0.0
+
+    def _backend(self, event, *, context=None, exc=None):
+        if not self.enabled or not self.apply:
+            return
+        try:
+            if not self._backend_initialized:
+                self._backend_initialized = True
+                from bridges.backend_diagnostics import runtime_journals
+                self._backend_diagnostics = runtime_journals(self.project_root, self.project_id,
+                    known_secrets=(self.operator_key,), components=("provision_worker",)).get("provision_worker")
+                if self._backend_diagnostics:
+                    self._backend_diagnostics.emit("backend_starting", context={"stage": "startup"})
+                    self._backend_diagnostics.emit("backend_ready", context={"stage": "startup"})
+            if self._backend_diagnostics:
+                self._backend_diagnostics.emit(event, context=context, exc=exc)
+        except Exception:
+            pass
+
+    def close_diagnostics(self):
+        self._backend("backend_stopped", context={"stage": "shutdown"})
+        if self._backend_diagnostics:
+            self._backend_diagnostics.close()
 
     # ── 生命周期控制 ─────────────────────────────────────────────────
 
     def request_stop(self) -> None:
         """请求停止：只在阶段边界生效，不触碰任何外部进程/句柄。"""
         self._stopping = True
+        self._backend("backend_stopping", context={"stage": "shutdown"})
 
     def cancel_stage(self) -> None:
         """取消当前阶段：下一次阶段检查点抛 ``WorkerStopped``。"""
@@ -842,6 +869,13 @@ class RoleProvisionWorker:
     # ── 单请求处理 ───────────────────────────────────────────────────
 
     def process(self, request_key: str) -> dict[str, Any]:
+        if not self._backend_initialized:
+            self._backend("backend_heartbeat", context={"stage": "serve"})
+        result = self._process(request_key)
+        self._backend("worker_result", context=result)
+        return result
+
+    def _process(self, request_key: str) -> dict[str, Any]:
         """处理单个请求：claim → 创建/恢复 → 私有 Key/元数据 → 三步 → report。
 
         返修 F1：``process`` 是**可执行入口**，因此必须与 ``serve``/``run_round`` 同语义——
@@ -1174,6 +1208,7 @@ class RoleProvisionWorker:
             result["stage"] = "report"
             return self._finish_provisioned(request_key, lease_token, result)
         except LeaseInvalidated as exc:
+            self._backend("worker_exception", context=result, exc=exc)
             # 返修 F4：资格已在本地副作用前失效 → 不继续本地、不 ACK、不 report，
             # 也绝不用新版本给旧工作补证；真实已创建成员按原样保留。
             result["stage"] = "invalidated"
@@ -1190,16 +1225,19 @@ class RoleProvisionWorker:
         except WorkerError as exc:
             result["outcome"] = "failed"
             result["error_code"] = exc.code
+            self._backend("worker_exception", context=result, exc=exc)
             if lease_token:
                 return self._finish_failed(request_key, lease_token, result, exc.code)
             return redact(result)
         except ProvisionError as exc:
             result["outcome"] = "failed"
             result["error_code"] = exc.code
+            self._backend("worker_exception", context=result, exc=exc)
             if lease_token:
                 return self._finish_failed(request_key, lease_token, result, exc.code)
             return redact(result)
-        except Exception:  # noqa: BLE001 - 绝不回显可能含凭据的异常正文
+        except Exception as exc:  # noqa: BLE001 - 仅记录结构，不记录异常正文
+            self._backend("worker_exception", context=result, exc=exc)
             result["outcome"] = "failed"
             result["error_code"] = "http_error"
             if lease_token:
@@ -1340,6 +1378,18 @@ class RoleProvisionWorker:
         )
 
     def run_round(self) -> list[dict[str, Any]]:
+        if not self._backend_initialized:
+            self._backend("backend_heartbeat", context={"stage": "serve"})
+        results = self._run_round()
+        for result in results:
+            if isinstance(result, dict) and not result.get("request_key"):
+                self._backend("worker_result", context=result)
+        if time.monotonic() - self._backend_heartbeat >= 30:
+            self._backend("backend_heartbeat", context={"stage": "serve"})
+            self._backend_heartbeat = time.monotonic()
+        return results
+
+    def _run_round(self) -> list[dict[str, Any]]:
         """一个轮次：发现 → 单请求处理。**始终**返回 ``list[dict]``，异常一律收敛。
 
         返修 F1/F5：``run_round`` 也是可执行入口，必须与 ``serve`` 同语义——
@@ -1386,12 +1436,14 @@ class RoleProvisionWorker:
                     )
                 ]
             except WorkerError as exc:
+                self._backend("worker_exception", context={"stage": "discover", "error_code": exc.code}, exc=exc)
                 return [
                     redact(
                         {"stage": "discover", "outcome": "failed", "error_code": exc.code}
                     )
                 ]
-            except Exception:  # noqa: BLE001 - 配置 IO/超时绝不阻塞宿主控制循环
+            except Exception as exc:  # noqa: BLE001 - 配置 IO/超时绝不阻塞宿主控制循环
+                self._backend("worker_exception", context={"stage": "discover"}, exc=exc)
                 return [
                     redact(
                         {
@@ -1537,7 +1589,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except WorkerError as exc:
         print(json.dumps({"schema": SCHEMA, "ok": False, "error_code": exc.code}))
         return EXIT_FAILED
-    document = worker.serve(once=args.once, max_rounds=args.max_rounds)
+    try:
+        document = worker.serve(once=args.once, max_rounds=args.max_rounds)
+    finally:
+        worker.close_diagnostics()
     payload = {"schema": SCHEMA, "ok": True, **document}
     print(json.dumps(redact(payload), ensure_ascii=False, sort_keys=True))
     # 返修 F5：轮次结果统一为 ``list[dict]``；业务 failed 必须以非零退出码反映，

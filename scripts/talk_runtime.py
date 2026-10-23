@@ -25,7 +25,9 @@ from scripts.role_service_recovery import recorded_process_state
 
 
 class RuntimeErrorCode(RuntimeError):
-    pass
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
 
 
 def utcnow():
@@ -130,7 +132,7 @@ def launcher_lock(private):
 
 
 class TalkRuntime:
-    def __init__(self, config, *, client=None, spawn=None, clock=time.monotonic, sleeper=time.sleep, attach_api=False):
+    def __init__(self, config, *, client=None, spawn=None, clock=time.monotonic, sleeper=time.sleep, attach_api=False, diagnostics=None):
         self.config = config
         self.project = config["project_id"]
         self.project_root = Path(config["project_root"])
@@ -151,6 +153,14 @@ class TalkRuntime:
         self.started_at = utcnow()
         self.operator = None
         self.failures = {}
+        self.diagnostics = diagnostics or {}
+        self._backend_state = None
+        self._backend_seen = 0.0
+
+    def event(self, event, *, context=None, exc=None, component="runtime"):
+        journal = self.diagnostics.get(component)
+        if journal:
+            journal.emit(event, context=context, exc=exc)
 
     def request(self, method, path, body=None):
         return self.client.request(method, path, body)
@@ -167,6 +177,10 @@ class TalkRuntime:
                 startupinfo=rsh._hidden_startupinfo(), **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}))
 
     def health(self, state="running"):
+        if self._backend_state != state or time.monotonic()-self._backend_seen >= 30:
+            event = "backend_stopped" if state == "stopped" else "backend_heartbeat"
+            self.event(event, context={"stage": "serve", "state": state})
+            self._backend_state, self._backend_seen = state, time.monotonic()
         value = {"schema":"talk-runtime-health-1", "pid":os.getpid(), "started_at":self.started_at,
             "seen_at":utcnow(), "state":state, "stopping":self.stopping,
             "child_pid":self.api.pid if self.api else None,
@@ -222,6 +236,7 @@ class TalkRuntime:
             except Exception as exc:
                 # Only type/code goes into health; no HTTP body/Key/exception text.
                 self.worker_error = getattr(exc, "code", None) or type(exc).__name__
+                self.event("worker_exception", component="provision_worker", context={"stage": "serve", "error_code": self.worker_error}, exc=exc)
         self.worker_thread = threading.Thread(target=run, name="talk-provision", daemon=True)
         self.worker_thread.start()
 
@@ -281,6 +296,7 @@ class TalkRuntime:
                     if state=="serving":self.statuses[member]["interpreter_pid"]=facts["pid"]
                     continue
                 # An exited manager never grants adoption of its previous native children.
+                self.event("host_exited", context={"member_id": member, "returncode": owned["process"].poll(), "outcome": "failed"})
                 self.hosts.pop(member)
                 prior = self.failures.get(member,{"count":0})
                 self.failures[member] = {"count":prior["count"]+1,"generation":(role.get("service") or {}).get("generation"),"retry_at":self.clock()+min(30,2**(prior["count"]+1))}
@@ -312,13 +328,15 @@ class TalkRuntime:
                 continue
             try:
                 process = self.spawn("host-"+rsh._sanitize_token(member), spec["argv"])
-            except OSError:
+            except OSError as exc:
+                self.event("host_start_failed", context={"member_id": member, "stage": "startup"}, exc=exc)
                 count=self.failures.get(member,{"count":0})["count"]+1
                 self.failures[member]={"count":count,"generation":service.get("generation"),"retry_at":self.clock()+min(30,2**count)}
                 self.statuses[member]={"state":"manager_failed","attempts":count}
                 continue
             self.hosts[member] = {"process":process,"spec":spec}
             self.statuses[member] = {"state":"starting","pid":process.pid}
+            self.event("host_started", context={"member_id": member, "child_pid": process.pid, "stage": "startup"})
 
     def reload_api(self):
         if self.api is None:
@@ -342,6 +360,7 @@ class TalkRuntime:
 
     def stop(self):
         self.stopping = True
+        self.event("backend_stopping", context={"stage": "shutdown"})
         if self.worker:
             self.worker.request_stop()
         if self.worker_thread and self.worker_thread.is_alive():
@@ -394,9 +413,26 @@ class TalkRuntime:
         self.health("stopped")
 
     def serve(self):
+        if not self.diagnostics:
+            from bridges.backend_diagnostics import runtime_journals
+            self.diagnostics = runtime_journals(self.project_root, self.project)
+        self.event("backend_starting", context={"stage": "startup"})
+        try:
+            self._serve()
+        except BaseException as exc:
+            self.event("backend_failed", context={"stage": "shutdown" if self.stopping else "startup",
+                "error_code": getattr(exc, "code", None)}, exc=exc)
+            raise
+        finally:
+            for journal in self.diagnostics.values():
+                journal.close()
+
+    def _serve(self):
         rsh.ensure_private_dir(self.private)
         rsh.ensure_private_dir(Path(self.config["state_dir"])/"api-service")
         self.operator = Path(self.config["operator_key_file"]).read_text(encoding="utf-8").strip()
+        for journal in self.diagnostics.values():
+            journal.secrets = (*journal.secrets, self.operator)
         self.client = self.client or rsh.TalkHostClient(self.config["base_url"],self.operator,timeout=5)
         try:
             if not self.attach_api:
@@ -404,11 +440,15 @@ class TalkRuntime:
             self.health("waiting_api")
             self.wait_api()
             if self.config.get("provision_worker", True):
+                self.event("backend_starting", component="provision_worker", context={"stage": "startup"})
                 self.worker = RoleProvisionWorker(project_id=self.project,host_label=self.config.get("host") or socket.gethostname(),
                     project_root=self.project_root,key_root=Path(self.config["key_root"]),operator_key=self.operator,
                     base_url=self.config["base_url"],enabled=True,apply=True,timeout_seconds=5,io_budget_seconds=120,
-                    cli_executable=self.config.get("provision_cli_executable"))
-        except Exception:
+                    cli_executable=self.config.get("provision_cli_executable"), diagnostics=self.diagnostics.get("provision_worker"))
+                self.event("backend_ready", component="provision_worker", context={"stage": "startup"})
+            self.event("backend_ready", context={"stage": "startup"})
+        except Exception as exc:
+            self.event("backend_failed", context={"stage": "startup", "error_code": getattr(exc, "code", None)}, exc=exc)
             # Startup has not created a manager yet; close only our API child.
             self._stop_api()
             self.health("startup_failed")
@@ -423,6 +463,7 @@ class TalkRuntime:
                     reload_file.unlink()
                 except (RuntimeErrorCode,rsh.HostError,OSError) as exc:
                     self.worker_error=getattr(exc,"code",None) or type(exc).__name__
+                    self.event("runtime_exception", context={"stage": "serve", "error_code": self.worker_error}, exc=exc)
             if self.api is not None and self.api.poll() is not None:
                 # Keep every original host Popen alive. A user reload can restore API;
                 # this is deliberately not unbounded role/API auto-restart.
@@ -434,6 +475,7 @@ class TalkRuntime:
                 self.reconcile_hosts(self.roles())
             except (rsh.HostError, OSError, ValueError) as exc:
                 self.worker_error = getattr(exc, "code", None) or type(exc).__name__
+                self.event("runtime_exception", context={"stage": "serve", "error_code": self.worker_error}, exc=exc)
             self.health()
             self.sleep(2)
         self.health("stopping")
@@ -446,8 +488,10 @@ class TalkRuntime:
             except (RuntimeErrorCode,rsh.HostError,OSError,ValueError) as exc:
                 # A failed shutdown must never abandon the original owners.
                 self.worker_error=getattr(exc,"code",None) or type(exc).__name__
+                self.event("runtime_exception", context={"stage": "shutdown", "error_code": self.worker_error}, exc=exc)
                 self.health("stop_blocked")
                 self.sleep(2)
+        self.event("backend_stopped", component="provision_worker", context={"stage": "shutdown"})
 
 
 def main(argv=None):

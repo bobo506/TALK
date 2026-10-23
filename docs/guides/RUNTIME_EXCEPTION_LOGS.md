@@ -1,5 +1,23 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
+> 2026-10-23 321收尾：F1/F2/OBS1及错误分类主路径独立复验通过，另发现的`cli_command_unresolved`漏登记由Codex补正，修前反例失败/修后29项定向自检通过；最后修正未追加独立回审。320/321均已收取，原partial与失败证据保留。代码完成收尾，生产仍未启用；待按[具体部署方案](../spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)确认后正常加载。以下22:26为修正前阶段记录。
+
+> 2026-10-23 22:26：后台/API导出320独立复核发现路径角色/持久路由校验和已知错误码缺陷，Codex已按报告修正，87项针对性自检及新真实隔离HTTP通过，待定向独立复验，生产仍未启用。无效路径值不作为角色身份，新流导出须核真实角色/应用模板；已正确开启联合导出时来源全缺为200 partial，未开启/未绑定保持旧来源缺失503。原320 partial/失败证据、旧五范围自动清理不改写。
+
+> 2026-10-23后台/API统一导出候选已实现、自检通过，尚未独立复核/生产启用，详[本片合同](../spec/BACKEND_DIAGNOSTICS_EXPORT_20261023.md)。启用后仍从角色详情选择时间“生成/下载”，同一JSONL新增`backend_event`（API/统一后台/配置worker），后台共享事件明确标注，不伪造角色；也提供human-only项目后台接口`/api/projects/{project_id}/backend-logs/export?since=...&until=...`。旧输出/崩溃空档及未归属全局请求不能补全，文件会保守标为部分结果；只保留异常类型/调用栈，不含消息、请求正文/头、原生会话。新后台根未注册清理，不扩大下方已启用五范围策略。
+
+候选部署配置（本机实际启用须通过独立复核及具体部署确认）：
+
+```toml
+[backend_diagnostics]
+enabled = true
+root = "D:/claude-test/TALK/logs/backend"
+database_file = "D:/claude-test/TALK/talk.db"
+projects = ["prj_e8fe7066bbec"]
+```
+
+该节缺失/关闭不采集新后台流；错库/空根/UNC/非法项目清单拒用。角色/worker/Key和原清理配置不用改变。配置生效需API与原统一后台正常重载；只改配置不会让旧进程自动加载，不能为了日志强杀服务或绕过owner保护。
+
 > 2026-10-23自动清理片已正式启用：318代码与319首次部署独立复核通过并收取，首次后台完整检查保护454旧缺证run/删除0/约508MiB、次日due保存，DSH恢复、其它六角色仍停止，详[部署记录](../spec/LOCAL_LOG_AUTO_RETENTION_DEPLOYMENT_20261023.md)。规则见[合同](../spec/LOCAL_LOG_AUTO_RETENTION_DESIGN_20261023.md)：同DB绝对路径、writer总根/五个精确project/member范围，每日检查/启动补检，30天保留及1GiB软预算，日常无需页面操作。未知/缺证/空任务旧run保持；摘要partial不视为全量，30天长期/生产未来删除尚未实跑。不要删除policy/lease/closed/retention痕迹来触发清理或恢复旧策略。
 
 > 2026-10-23本机盘点片：新增维护者只读入口`python scripts/runtime_log_inventory.py --log-dir <显式日志根>`，只统计元数据并输出旧分段核查预览，不能删除日志，也不证明run已关闭。315独立复核发现旧时间/空根缺陷后已修正，316定向独立复验通过，两任务均收取。默认30天/单根1GiB只是报告提案，未改writer或生产设置，现有writer每run自动清理策略继续保持，完整日志收尾未完成。使用限制及覆盖缺口见[本片报告](../spec/LOCAL_LOG_INVENTORY_AND_RETENTION_20261023.md)。工具无需重启服务；空白根会拒绝，旧时间可格式化，超出日期范围返回partial。2026-10-20用户已停止推进下方旧B联网接收路线，286继续暂停，跨设备分析通过导出文件手动转移。

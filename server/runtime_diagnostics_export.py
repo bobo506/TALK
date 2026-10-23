@@ -436,6 +436,7 @@ def _collector(
     since: datetime,
     until: datetime,
     max_records: int,
+    record_filter: Any = None,
 ) -> tuple[dict[str, int], list[_MaxRecord], Any]:
     counter = {"matches": 0, "sequence": 0}
     heap: list[_MaxRecord] = []
@@ -450,6 +451,8 @@ def _collector(
         if key is None:
             return
         if key[0] < since or key[0] >= until:
+            return
+        if record_filter is not None and not record_filter(record):
             return
         counter["matches"] += 1
         counter["sequence"] += 1
@@ -482,6 +485,8 @@ def build_export(
     limits: ScanLimits | None = None,
     max_records: int = MAX_EXPORT_RECORDS,
     max_bytes: int = MAX_EXPORT_BYTES,
+    event_projector: Any = None,
+    record_filter: Any = None,
 ) -> bytes:
     """Build one bounded NDJSON export from exactly one logical source scan."""
     limits = limits or ScanLimits()
@@ -501,6 +506,7 @@ def build_export(
         since=since,
         until=until,
         max_records=max_records,
+        record_filter=record_filter,
     )
     outcome = scan_source(source, limits=limits, visitor=visit)
     scan_elapsed = time.monotonic() - started
@@ -546,7 +552,7 @@ def build_export(
             timed_out = True
             break
         try:
-            event = _project_event(item.record, (project_id, member_id))
+            event = (event_projector or _project_event)(item.record, (project_id, member_id))
             line = _json_line(event)
         except Exception:
             projection_failures += 1

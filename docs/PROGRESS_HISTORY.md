@@ -1,5 +1,47 @@
 # 开发历史 · TALK
 
+## 2026-10-23：321独立复验收尾，末项漏登记由Codex修正
+
+用户通知321好了。Codex核远端2962与本地交付JSON一致，55份源/快照及旧42快照零漂移；当前HEAD5394f2a来自单独获批70%片，不在321冻结文件内。DeepSeek已submitted/idle/无当前任务，实际身份仍agent:codex/prj_e8fe7066bbec/lead，页面旧开发要求按用户当前分工覆盖。
+
+321结论partial：F1/F2/OBS1与F3主路径通过，独立28项新/定向及15项鉴权/成员/健康通过，network-fix1仅独立解析而非新进程实跑。残留P3是变量条件分支HostError的cli_command_unresolved未登记，原仅扫直接字面量的测试漏报。Codex补登记，扩展有限局部变量/IfExp/BoolOp来源检查，新增实际dsh/cli/codex缺模板分支。修前反例两条分类缺失、修后29项定向自检通过；末项未追加独立回审。一次最初单用例调用类名错误另存fix2-before.log，与真实产品反例fix2-before-product.log区分。无变化的35/24/25等不机械重跑，70%免验约定仅覆盖上片。
+
+320/321分别于UTC14:59:50/14:59:53收取completed，结果2961/2962原partial与失败证据保留。321按当时60%版本new_context_threshold新窗session-9dd192d4-1d3b-41bd-aa99-934648d7a106/count1、基础SHA同315，末379106/1000000=37.9106%，不套用后来70%规则。原review-fix1双CR差异保留，新干净差异另存review-fix2.diff；最终代码/关键证据另冻结manifest-final。
+
+生产config SHA3654bdc3…bf7012d保持，未启用新采集、未启停或改配置。已准备[具体部署方案](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)：只追加显式根/同DB/项目一节，原入口正常drain、用户原终端正常重启API一次、恢复部署前运行集合；既有五范围清理、模型/Key/绑定、286保持。新后台根只分段不自动删，历史partial/覆盖缺口不外推，正式部署待本次明确确认。
+
+## 2026-10-23：用户要求直接将同窗阈值60%改为70%
+
+用户在询问改动量后明确“我觉得不用验证和复核，你直接改吧”，授权本次Codex直接修改及免验。统一内核改7/10，原始整数精确比较，旧60%布尔投影先核对旧/新已知规则后按原始token数归一为70%；保留观测身份/来源/修订/计数等约束，不批量追改历史。提示、三份当前指南、六份既有测试的阈值数据同步，未新增或运行测试、未模型调用/联调/独立复核，不宣称通过。
+
+未改生产配置、读取原生会话或启停服务；运行中的角色待下次正常重启加载。缺数10/11备用、原清理/角色绑定与286保持。321后台/API导出复验及55份冻结不改、不取件；既派任务按实际加载版本/回执解释，原60%历史证据保留。本次免验仅覆盖阈值调整，不取消其它片的复核/确认约定，详[调整记录](spec/EXECUTION_SESSION_THRESHOLD_70_20261023.md)。
+
+12份阈值文件独立提交并推送`5394f2a`；321候选代码未纳入该提交，混有待复验事项的正式进度文档留工作区随原片收尾。
+
+## 2026-10-23 22:35：321定向独立复验已派发
+
+按已授权同功能修正/复核流程，321创建queued/active/assigned，目标DeepSeek/原绑定保持，产品55份冻结/暂停。派发前再次核caller=agent:codex，原DSH同ins_057877d1df52/idle，页面旧要求按本次明确分工覆盖。沿base315/同continuity，320末63.5214%达阈值，服从原守卫换窗恢复基础；派发execution_session_state=null，实际原生决策待后续回执，不预称已换或复用。任务仅F1/F2/F3正反例及OBS1/必要关联回归，只写review-fix1，不做生产读写/启停或产品修改；319例外不沿用。320原partial/2961及原失败保持，默认用户通知321后取件，生产新采集未启用，正式部署/Git最终收尾尚未完成。
+
+## 2026-10-23 22:30：320首次复核partial，Codex直接修正三项缺口
+
+用户通知320完成，Codex核完整交付partial/2961（9完成/5未完成/0阻塞、13验证），本地/远端JSON一致、42份/971595字节实际及冻结零漂移后接手；DeepSeek已submitted并idle/无当前任务，共享目录无并行产品写入。首次独立18/24/25及冻结run-4解析通过，真实进程级独立重验受沙箱限制未完成，此限制保留。Codex在自有repro-320根重现F1无效角色路径404 token入新流、F2持久/private路由导出、F3两已知runtime码被摘要；320报告、原失败及原freeze/network证据不改写。
+
+F1改为请求认证Session核当前项目Role/历史Roster后设置可信角色，middleware不读路径原值；F2导出用真实角色集合+代码模板集合严格投影，非法member进入projection_failed而非悄然略过/转共享；F3新增有限runtime/host码表和RuntimeErrorCode.code，实际启动失败保留已知分类，未知前缀仍摘要。OBS1只澄清兼容：联合导出已启用且精确绑定时全缺200 partial，未开启旧来源缺失仍503。28（原18+10反例）/35导出鉴权等/24runtime宿主共87针对性自检通过，Node未改、沿320独立25证据；新真实隔离network-fix1-run-1三组件21条/合并22、无效路径human404/agent403不入新流、真实角色正例、两个Popen正常0退出/三组件stopped，11源SHA与生产config SHA前后相同。
+
+55份/1031561字节修正版冻结baseline-fix1/manifest-fix1，差异review-fix1.diff，产品暂停待DeepSeek定向复验；不将自检说成独立复验。320实际reuse_session续319同ID/count2，末可靠635214/1000000=63.5214%，下轮服从60%守卫换窗恢复完整基础，不强制原窗。新采集未生产启用/未重载，原清理/模型Key绑定/286保持，默认用户通知取件；下一无关切片仍先确认。
+
+## 2026-10-23 21:41：320独立复核已派发
+
+复核320已由agent:codex向agent:deepseek创建queued/active/assigned，目标模型/绑定保持；审查包与派发记录在`.tmp/backend-diagnostics-export-v1/coordination/review-task.md`和`dispatch.json`。continuity_key沿local-log-inventory-review-20261023/base315，请求优先续319，但派发响应execution_session_state=null，不能预称原生续窗。319特殊生产元数据读取授权不沿用，本次只读公开产品/42份冻结/隔离假数据、只写review根；不启停/部署/读Key或生产日志。Codex产品暂停，正式进度可更新，默认用户通知320完成后再收取、独立核交付与必要直接修正；尚未Git最终收尾或启用生产。
+
+## 2026-10-23 21:39：后台/API统一脱敏导出实现与自检，冻结待独立复核
+
+用户对下一片目的/范围/不变项/验收明确答“按此开工”，仍Codex直接开发、DeepSeek独立复核、条件允许原窗。当前身份通过MCP再次核agent:codex/prj_e8fe7066bbec，DSH原ins_057877d1df52/idle/绑定不变；页面旧开发要求不覆盖明确分工。Codex实现独立后台来源、三组件启停/异常结构/worker结果、API精确认证DB与项目路由归属、human-only项目接口及角色统一下载，原来源缺失/后台缺失不造完整，时间/总字节/记录/余量限制沿用；原清理五范围、286及模型Key绑定不改。
+
+18新增+74启停worker宿主+24原导出+38认证成员健康清理共154不同Python、25Node通过。原Node旧统一资源版本/退出回调变量夹具修正，初始失败保留。真实隔离network-run-4的API/独立附加runtime/worker、受控异常、三组件18条/合并19条、401/403/敏感值不入文件/同项目和正常原Popen退出0/三组件stopped通过；十份产品SHA前后相同，生产config SHA3654bdc3…bf7012d保持。run1测试路由被静态挂载遮挡而失败，夹具注册顺序修正后2/3/4通过，不倒写原失败。
+
+3d7a01b基线、42份/971595字节已冻结，产品暂停，待DeepSeek独立实查和自己反例；优先续319窗/原守卫，实际以回执为准，默认用户通知取件。不把自检说成独立复核，不启用生产或停启服务。保留旧私有输出/未知归属/原生会话/异常消息及新根清理缺口，整体history_complete=false/coverage_unverified；正式加载须具体部署方案确认，完整日志整项及真实主被动未完成。
+
 ## 2026-10-23 20:53：319独立部署复核通过并收取，本片正式收尾
 
 用户通知319完成，Codex读取完整结构化交付及独立报告/关键证据：complete/pass、result2960、unfinished/blocked0，无产品修正项。39份/339596字节源和冻结全匹配；实际config DB/五scope/总根/30天/1GiB/86400、生产policy/state首次complete/454保护/删除0/约508MiB/daily due、run manifest/活跃lease、真实API健康/新旧进程时序/只DSH恢复和其余最新实例offline均独立核验。helper无sweep/无手工policy-state写，部分摘要未被说成全量。319于UTC12:52:34.979206收取completed，msg2960及原独立报告保持。
