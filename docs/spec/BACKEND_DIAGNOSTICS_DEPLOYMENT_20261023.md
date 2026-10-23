@@ -1,4 +1,18 @@
-# 后台/API统一脱敏日志：待确认部署方案
+# 后台/API统一脱敏日志：部署记录与原方案
+
+## 2026-10-23 23:13：已获确认并应用配置，等待原终端重启API
+
+用户明确回复“确认启用并正常重载”，本次部署已获授权，不再重复请求相同许可。代码8149be9已提交推送。部署前经原human身份核实无running任务、worker空闲、七个宿主serving，仅DeepSeek gen56/ins_a2b239105b97/PID10676为running/ready/idle且心跳新鲜，其余六角色stopped/无owner。
+
+原统一runtime14584经普通stop/drain于UTC15:12:08完成stopped，原runtime及七宿主的包装器/解释器共14个原进程绑定均确认为absent，七角色全stopped/无owner/can_start。未强杀、未CAS或解除遗留归属。固定清单五宿主之外的两个WorkBuddy动态宿主也逐个核对，不以五份健康文件代替七宿主证明。
+
+UTC15:13:08仅原子追加下方backend_diagnostics配置，旧SHA3654bdc3…bf7012d→新SHA`db98e42dd482627724825c28106697288862d7b7e6bdbb1d756fa2ec87a8543c`。解析前后差异仅该节；同DB、原runtime_diagnostics来源及runtime_log_retention完全保持。原字节副本在既有私有state目录以私有ACL保留，SHA核验一致；不复制到公开证据。产品设置只读构造校验通过，没有手动制造生产事件。
+
+当前外部API尚待用户在原终端Ctrl+C后重跑原命令，已发送“已重新启动”操作问题。配置落盘不等于已加载，不声称三组件实际采集或本片生产验收通过。收到用户回复后，检查API、原统一后台/七宿主及worker实际加载、日志组件/归属/预算/权限和心跳，只普通start恢复DeepSeek，其余六保持停止。本次正常重载已获授权；未请求提前开启下一片。
+
+证据：`.tmp/backend-diagnostics-export-v1/deployment/authorization.json`、`deployment-before.json`、`deployment-stop-precheck.json`、`deployment-stop-request.json`、`deployment-stopped.json`、`deployment-all-host-processes.json`、`deployment-config-applied.json`。helper只向原入口提出普通动作并记录核验，不写policy、日志事件或伪造关闭凭据。
+
+以下为部署前原可审方案，保留其当时状态和批准配置。
 
 ## 可审结果
 

@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-23 23:13：后台/API新日志正式部署获批，配置应用后等待用户重启API
+
+用户明确答复“确认启用并正常重载”，本次配置/普通停启及恢复原运行集合已获授权。原API/human身份核无running任务、配置worker空闲，七宿主serving，仅DeepSeek gen56/ins_a2b239105b97/PID10676运行、idle/无任务且心跳新鲜；其余六全stopped/无owner。原runtime14584接受普通stop，UTC15:12:08正常drain退出；七宿主（含两个WorkBuddy动态宿主）14个包装器/解释器绑定均absent，七角色全stopped/无owner/can_start。未强杀、未解除owner/CAS、未接管external API。
+
+UTC15:13:08仅原子追加审定backend_diagnostics节：同DB绝对路径、logs/backend本地根、项目清单；旧SHA3654bdc3…bf7012d→db98e42dd482627724825c28106697288862d7b7e6bdbb1d756fa2ec87a8543c。原完整字节在既有私有state/deployment目录以私有ACL备份、SHA核实；解析差异仅该节、原来源和五范围清理保持，设置只读构造预检通过，不手造生产事件/policy。代码8149be9已推送。
+
+已请用户在启动API的原终端Ctrl+C正常退出并重跑原命令，等待“已重新启动”回复。当前配置落盘尚不等于实际采集生效；收到回复后核新API/统一后台/七宿主/worker与日志归属/权限/心跳，仅普通start恢复DSH，其余六停止。本次部署已获明确确认，后续必要加载/验证不重复询问；原partial报告/历史决策/模型Key绑定、286及70%片例外保持。证据在.tmp/backend-diagnostics-export-v1/deployment/，详[部署记录](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)。
+
 ## 2026-10-23：321独立复验收尾，末项漏登记由Codex修正
 
 用户通知321好了。Codex核远端2962与本地交付JSON一致，55份源/快照及旧42快照零漂移；当前HEAD5394f2a来自单独获批70%片，不在321冻结文件内。DeepSeek已submitted/idle/无当前任务，实际身份仍agent:codex/prj_e8fe7066bbec/lead，页面旧开发要求按用户当前分工覆盖。

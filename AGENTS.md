@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-23 23:13部署中：用户明确“确认启用并正常重载”。无running/worker空闲且仅DSH gen56 idle后，原runtime14584普通drain退出；七宿主含两个动态WorkBuddy共14个进程绑定absent，七角色stopped/无owner。仅追加backend_diagnostics节，新config SHA db98e42d…a8543c，原同DB/来源/清理保持。现等待用户原终端Ctrl+C重跑API，已发“已重新启动”；配置落盘不等于采集生效。收到回复后核实际三组件/宿主/权限/日志，仅普通start恢复DSH，其余六停止；本次正常加载已批准不重复询问，不CAS/强杀。详[部署记录](docs/spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)。
+
 - 2026-10-23 321收尾：独立复验partial/2962，F1/F2/OBS1及F3主路径通过，残留P3 `cli_command_unresolved`由Codex补登记/扩展有限分支检查及真实失败用例，29项针对性自检通过；末项未追加独立回审。320/321均收取completed，原partial/失败保持；321实际按旧60%规则新窗/count1，末37.9106%，不倒写为70%决策。生产配置SHA3654bdc3…保持，未启用/重载；[具体部署方案](docs/spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)已准备待明确确认，下一无关新片仍先确认。
 
 - 2026-10-23阈值调整：用户明确要求Codex直接把同窗阈值60%改70%，本次免测试/独立复核；统一内核、旧布尔观测兼容、说明及原有边界数据已修改，未运行验证、未部署/重载。角色下次正常重启后加载；321后台/API导出复验及55份冻结不动，默认仍用户通知后取件。本次免验例外不延伸到其它切片，详[调整记录](docs/spec/EXECUTION_SESSION_THRESHOLD_70_20261023.md)。

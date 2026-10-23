@@ -1,6 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-23（Asia/Shanghai，321收尾）。321主要复验通过，残留P3漏登记由Codex补齐，29项定向自检通过；320/321已收取，原partial/失败保留。后台/API导出代码完成收尾、生产未启用/重载，具体部署方案待确认。70%阈值已独立提交5394f2a，其免验例外仅限该次调整；原五范围自动清理保持。
+Updated: 2026-10-23 23:13（Asia/Shanghai，正式部署进行中）。用户明确确认启用并正常重载；原宿主/角色已普通退出，backend_diagnostics配置已应用，新SHA db98e42d…a8543c。现等待用户在原终端重启TALK API，尚未声称实际采集通过；之后只恢复原DeepSeek，其余六角色保持停止。代码8149be9已推送，原清理/绑定/历史保持。
+
+## 当前恢复点：等待用户原终端重启API
+
+- [部署记录与已批准方案](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)：原human核无running任务、worker空闲，仅DSH gen56/ins_a2b239105b97/PID10676运行。runtime14584普通drain于UTC15:12:08停止；七宿主含两个动态WorkBuddy的14个包装器/解释器绑定均absent，七角色全stopped/无owner/can_start，无强杀/CAS。
+- UTC15:13:08原子追加backend_diagnostics节，显式项目、本地根logs/backend及同DB绝对路径；新config SHA db98e42dd482627724825c28106697288862d7b7e6bdbb1d756fa2ec87a8543c。解析差异仅该节；原来源和五范围清理保持，旧字节备份在私有目录，设置只读预检通过。
+- 已请用户原终端Ctrl+C后重跑API，等待“已重新启动”回复。外部API仍由原终端控制，未接管/重启第二个API；新采集尚未实测加载。本次部署已获确认，后续加载/核验/仅恢复DSH无需重复确认；其余六角色维持停止，具体证据在.tmp/backend-diagnostics-export-v1/deployment/。
 
 ## 本次：统一换窗阈值70%
 
@@ -17,7 +23,7 @@ Updated: 2026-10-23（Asia/Shanghai，321收尾）。321主要复验通过，残
 - 新28（原18+10反例）、原导出/认证等35、runtime/本机宿主24共87针对性自检通过；新network-fix1-run-1三组件21/合并22、无效路径404/403不入流、真实角色正例、原Popen正常0退出，11源SHA前后相同、生产config不变。Node未改，320独立25通过保持，不无关重跑全量。
 - 321原partial/2962：独立确认F1/F2/OBS1及F3主路径、28新/定向+15鉴权等通过；末项`cli_command_unresolved`漏登记由Codex补正，扩展变量/条件赋值检查和真实dsh/cli/codex失败路径，修前反例失败、修后29项自检通过。末项未追加独立回审，旧失败/55份及原42快照不改；本地/远端交付一致，接手前55份当前源/快照零漂移。新差异与最终材料在coordination/review-fix2.diff及manifest-final.json。
 - 320/321均已收取completed，原msg2961/2962仍partial；321实际new_context_threshold新窗session-9dd192d4-1d3b-41bd-aa99-934648d7a106/count1，基础SHA同315，末37.9106%。按其当时加载的60%版本解释，不套用后来70%规则；未新派复核任务。
-- 保留缺口：不导入私有.out/.err、原生会话/异常自由文本、未知项目全局请求；不能证明历史完整，整体固定partial/coverage_unverified，不造旧记录。新增后台根只分段、不加入既有清理范围。原config SHA3654bdc3…保持；代码收尾共32份/502689字节最终冻结，未生产加载。[具体启用方案](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)已准备，只追加一节/原入口正常drain/用户原终端重启API一次/恢复部署前运行集合，待明确确认。
+- 保留缺口：不导入私有.out/.err、原生会话/异常自由文本、未知项目全局请求；不能证明历史完整，整体固定partial/coverage_unverified，不造旧记录。新增后台根只分段、不加入既有清理范围。代码8149be9已提交推送、32份/502689字节最终代码证据冻结；用户已批准[具体启用方案](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)，配置已应用但原API尚待正常重启，加载验收未完成。
 
 ## 当前身份与边界
 

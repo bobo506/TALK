@@ -56,3 +56,9 @@ enabled = true
 retention_days = 30
 max_total_bytes = 1073741824
 interval_seconds = 86400
+
+[backend_diagnostics]
+enabled = true
+root = "D:/claude-test/TALK/logs/backend"
+database_file = "D:/claude-test/TALK/talk.db"
+projects = ["prj_e8fe7066bbec"]
