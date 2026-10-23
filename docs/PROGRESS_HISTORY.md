@@ -2,6 +2,8 @@
 
 ## 2026-10-23 19:44：318独立复验通过并收取，正式启用方案待确认
 
+Git收尾：19:46代码/测试/文档18文件提交`0f67794f010692c48355b2316642f1f61fe5b07d`（1442新增/23删除），提交后跟踪文件干净；生产config.toml和全部临时/私有文件未暂存。本轮进度补记随当前codex/terminal-return-codex分支一起推送。
+
 用户通知318完成，Codex核最新caller为agent:codex，DeepSeek已idle/结束，读取完整结构化摘要/本地报告和必要证据。318 complete/pass、结果2959：132相关回归、27新增、5原始反例、27复核侧反例、37个旧失败项全通过，F1—F5/P1关闭。取件再核33份SHA/字节、317原报告/反例未改、TALK结果与本地JSON一致，验收记录coordination/318-acceptance.json。未重新运行已独立通过的全量测试；取件后产品源码保持冻结，只澄清合同“未登记事件/普通附加文件”的原有边界。
 
 318真实窗口回执decision=new_context_threshold、session-e067e0e8-da90-4d91-9051-c9a986011b43、reused=false/first_turn=true/count1，基础SHA仍d357bd93918cb63738664064369952d8b56f75f3345d838bdb58ebf429bf717a，末projected317806/1000000=31.7806%。证明317达到60%后按原规则换窗恢复基础，不能称318仍复用原窗。
