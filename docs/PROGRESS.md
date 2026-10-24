@@ -1,13 +1,16 @@
 # Project Progress
 
-Updated: 2026-10-24 13:23（Asia/Shanghai，本片实际加载自检通过）。用户已重启API，新API11520/runtime4888/七宿主serving；后台启动自动检查complete/无错误/删除0/保护4旧run/907191字节，next_check本地10月25日13:21:30。仅恢复DSH gen60/ins_fd018306ec1c、同实例心跳推进60.078633秒，其余六停止。配置428c928e…保持，待首次独立部署证据复核，不称整项日志完成。
+Updated: 2026-10-24 13:27（Asia/Shanghai，324首次部署证据独立复核已派发）。实际加载自检通过、配置428c928e…保持；45份/634741字节已冻结，派前source/snapshot零漂移，324交DeepSeek queued/assigned、写根review-deployment/。产品/冻结材料暂停，默认用户通知完成后取件；新清理已启用，未提前称独立部署通过。
 
-## 当前状态：实际启用自检通过，待冻结部署证据复核
+- 324只核本次实际正常启停/单字段配置/正式自动检查与due/三组件真实活跃lease/仅DSH恢复及保护边界，45份/634741字节冻结baseline-deployment-v1，manifest-deployment.json为权威，产品与测试仍匹配323。只读普通源/冻结安全摘要，允许PID/创建时间元数据；不读生产配置正文/DB/Key/私有state/原生会话/日志，不生产sweep/启停或改码。
+- Git基线da4e4fb（已推送实际加载记录），沿base315/同日志工作线优先相容原窗，正常重载换代后服从守卫；派发execution_session_state=null，实际决策待回执，不预称复用。默认用户通知“324好了”后取件，不主动等待/唤回；新片仍先确认。
+
+## 当前状态：实际启用自检通过，324已派发
 
 - [实际加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)：用户完成原API重启，新API11520健康ok、runtime4888/七宿主serving、worker无错误。只普通start恢复原DSH gen60/ins_fd018306ec1c/PID11164、running/ready/idle，真实同实例心跳推进60.078633秒，其余六停止/无owner/can_start。
 - 正式后台首次检查UTC05:21:30.240394 complete/errors空、删除0/保护4（3缺新闭合证明、1legacy/unclosed）、907191字节、容量盘点complete/未超预算；next_check=1792905690.240394/本地10月25日13:21:30。原五角色policy、同DB/绑定/要求/286 paused保持，helper未触发sweep或造state。
 - 三组件新manifest/PID/项目/member均正确，真实只读打开run.lease受Windows共享冲突32保护，closed不存在；新关闭标记待未来正常close。首次检查早于runtime新run建立，4只是该时点快照，不外推覆盖以后全部run；286生产删除分支本次未触发，旧缺证/未关闭先保护。长期30天和未来生产到期删除未实跑。
-- 702d47a代码、f4e733e收尾及f030c6d获批配置等待点已推送。现准备只读部署证据冻结并交DeepSeek首次独立复核，依原用户授权优先base315工作线相容会话；重载改变代际仍服从守卫，不force旧窗，不主动等待/自动唤回。
+- 702d47a代码、f4e733e收尾、f030c6d获批配置及da4e4fb实际加载记录均已推送。45份部署证据冻结并派324首次独立复核如上；其余边界及真实状态不因派发改写。
 
 ## 本次配置应用过程（用户随后已重启，实际结果见上方）
 
