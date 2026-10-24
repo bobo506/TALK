@@ -85,7 +85,7 @@ COMMAND_OVERRIDE_ALLOWED = False
 CONTROLLED_KIMI_COMMAND = "kimi --output-format stream-json -p"
 CONTROLLED_COMMAND_SOURCE = "explicit_fixed_contract"
 ENV_COMMAND_VAR = "TALK_KIMI_COMMAND"
-EXECUTION_TIMEOUT_SECONDS = 21600
+EXECUTION_TIMEOUT_SECONDS = 86400
 
 # --- 只读在线身份核验（launch 门禁；不是注册写入） --------------------------
 HTTP_TIMEOUT_SECONDS = 15.0
@@ -419,7 +419,7 @@ def budget_contract(*, timeout: int = EXECUTION_TIMEOUT_SECONDS) -> dict:
         },
         "bridge_execution_timeout_seconds": {
             "value": timeout,
-            "source": "本入口单次 CLI 执行预算；默认 21600 秒（6 小时），可通过 --timeout 指定正整数秒",
+            "source": "本入口单次 CLI 执行预算；默认 86400 秒（24 小时），可通过 --timeout 指定正整数秒",
         },
         "identity_preflight_http_timeout_seconds": {
             "value": HTTP_TIMEOUT_SECONDS,

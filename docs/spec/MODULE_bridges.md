@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-24 17:53：326默认执行时限24小时已完成实现、Codex独立核验/集成并收取。通用/专用继承入口、受管配方及K2.8模板默认86400秒，无页面配置，现有显式参数兼容；候选149项及集成同149项过。生产尚未正常重载，受管入口须先重载后台管理器再启动角色，不能以只重启旧manager下的角色保证生效；其它等待/HTTP/ready/stop等预算保持。详[核验记录](EXECUTION_TIMEOUT_24H_20261024_REVIEW.md)。下方旧600/21600及六小时内容保留各自日期的历史语义。
+
 > 2026-10-22 23:10：用户新建workbuddy-k3原创建意图经正式worker处理为provisioned，窄宿主普通启动到gen2/ready/idle。MCP312→313同原生会话1→2、314新窗恢复1均通过并收取；3confirmed尝试/通道0，311条旧任务及六旧角色/绑定/配置/286保持。新角色和manager17772保留运行，原WorkBuddy接入验证仍停止；未改产品代码。原页面请求无人消费及gen1过期是部署缺口，配置worker常驻/宿主统一启动仍待另片确认，不把手动处理称自动链路完成。详[WorkBuddy适配](EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)和当前进度。
 
 > 2026-10-22 20:20：WorkBuddy按用户批准的内置CodeBuddy Code独立CLI形态补齐，新增native/channel/bridge/窄host及普通任务接线。403项Python、安装版16次正式投递边界、309→310真实同窗1→2和311新窗恢复均通过并收取；原生/proof/账本SHA一致，通道0。原身份Key和模型源复用、HOME独立，仅新增本项目WorkBuddy登记和精确绑定；308条历史、原五角色/配置绑定权限及286保持。API正常重载，验后WorkBuddy普通停止gen2/无owner、manager正常drain退出，运行器adapted。四类运行器的授权形态现已接通，人工验收待确认，不代表WorkBuddy桌面窗口控制或主动MCP等待；下一片仍须确认。详[WorkBuddy适配](EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)和[使用说明](../guides/EXECUTION_SESSION_USAGE.md)。

@@ -147,7 +147,7 @@ class ContractTests(K28ExecutorTestCase):
         self.assertFalse(budget["client_tool_timeout_ms"]["verified_on_host"])
         self.assertFalse(budget["explicit_wait_seconds"]["enabled"])
         self.assertIsNone(budget["explicit_wait_seconds"]["value"])
-        self.assertEqual(budget["bridge_execution_timeout_seconds"]["value"], 21600)
+        self.assertEqual(budget["bridge_execution_timeout_seconds"]["value"], 86400)
         self.assertEqual(budget["identity_preflight_http_timeout_seconds"]["value"], 15.0)
         self.assertFalse(budget["initiator_wait_in_this_slice"])
 
@@ -166,7 +166,7 @@ class ContractTests(K28ExecutorTestCase):
         self.assertEqual(argv[argv.index("--name") + 1], k28.MEMBER_ID)
         self.assertEqual(argv[argv.index("--kimi-model") + 1], k28.MODEL_ALIAS)
         self.assertEqual(argv[argv.index("--kimi-task-profile") + 1], "tools")
-        self.assertEqual(argv[argv.index("--timeout") + 1], "21600")
+        self.assertEqual(argv[argv.index("--timeout") + 1], "86400")
 
 
 class NativeConfigCheckTests(K28ExecutorTestCase):
@@ -927,7 +927,7 @@ class LaunchConsistencyTests(K28ExecutorTestCase):
         }
 
     def test_default_and_longer_budgets_reach_both_gate_and_bridge(self):
-        for requested, expected in ((None, 21600), (43200, 43200)):
+        for requested, expected in ((None, 86400), (43200, 43200)):
             with self.subTest(requested=requested):
                 overrides = {} if requested is None else {"timeout": requested}
                 bridge = AsyncMock()

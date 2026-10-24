@@ -353,7 +353,7 @@ class WorkBuddyBridgeTests(unittest.IsolatedAsyncioTestCase):
         from scripts.role_service_host import build_runtime_argv, verify_runtime_entry
         argv = build_runtime_argv("workbuddy", model_alias="custom-local:unit")
         self.assertIn("--workbuddy-model", argv)
-        self.assertEqual(argv[argv.index("--timeout") + 1], "21600")
+        self.assertEqual(argv[argv.index("--timeout") + 1], "86400")
         self.assertTrue(verify_runtime_entry("workbuddy", argv))
 
 

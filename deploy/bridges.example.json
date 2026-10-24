@@ -11,7 +11,7 @@
       "decision_tier": "decision",
       "workdir": ".",
       "prompt_transport": "stdin",
-      "timeout": 600,
+      "timeout": 86400,
       "poll_interval": 2.0,
       "send_ack": true,
       "respond_to_broadcast": false
@@ -26,7 +26,7 @@
       "decision_tier": "execution",
       "workdir": ".",
       "prompt_transport": "argv",
-      "timeout": 600,
+      "timeout": 86400,
       "poll_interval": 2.0,
       "send_ack": false,
       "respond_to_broadcast": false

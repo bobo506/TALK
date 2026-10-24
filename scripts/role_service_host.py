@@ -56,7 +56,7 @@
   旧全局参数保持单字符串语义，不被解析成新语法。模板是**本机显式登记事实**，不等于真实
   能力验收，也不点亮 ``runtime-verified``。
 - 新增 ``--cli-execution-timeout-seconds N``：内置受管配方有效默认
-  :data:`DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS`（21600 秒），显式十进制正整数可覆盖；
+  :data:`DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS`（86400 秒），显式十进制正整数可覆盖；
   拒绝 ``bool``/零/负值/小数/``NaN``/``Inf``/非数字字符串/超范围值。CLI 未显式给出时保留
   ``None``，用于区分“内置默认”与“显式自定义入口兼容”，程序化构造走同一套校验。
   内置路径的**外层 argv 恰好一个** ``--timeout N``，真实 parser 的 ``timeout`` 与该有效值
@@ -66,10 +66,10 @@
   **不**新增服务端 claim/report 协议字段，不输出模板正文、完整 argv、Key 或私有路径。
 - 显式 ``--cli-executable`` 仍是既有自定义协议入口：保留旧 ``cli_args``/``alias_flag``
   接线，**不**自动附加 bridge 专用 ``--timeout``，其预算事实是 ``None`` +
-  ``not_applied``（不宣称被六小时管控）；同时显式给新 per-runtime 模板或新预算参数时
+  ``not_applied``（不宣称被 24 小时预算管控）；同时显式给新 per-runtime 模板或新预算参数时
   稳定拒绝 ``cli_executable_option_unsupported``，绝不静默忽略。未给新参数时旧调用照旧。
-- 本片只闭合**宿主内置配方通道**：通用 bridge 默认 600 秒、其它旧手动入口、ready/stop/
-  HTTP/任务租约/MCP 客户端上限与 TALK 读取等待均**未**改变，也未在运行实例上热改预算。
+- 本片（260，产品片B）只闭合**宿主内置配方通道**：当时通用 bridge 自身默认、其它旧手动入口、
+  ready/stop/HTTP/任务租约/MCP 客户端上限与 TALK 读取等待均**未**改变，也未在运行实例上热改预算。
 
 宿主持久诊断（任务 272）
 ------------------------
@@ -142,12 +142,12 @@ DEFAULT_HTTP_TIMEOUT_SECONDS = 15.0
 DEFAULT_READY_TIMEOUT_SECONDS = 60.0
 DEFAULT_STOP_TIMEOUT_SECONDS = 20.0
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
-#: 产品片B：**内置受管配方**的有效执行预算默认值（六小时）。
-#: 它只作用于宿主内置配方外层 argv 的 ``--timeout``；不改变 ``bridges.cli_bridge``
-#: 自身的 600 秒默认，也不改变 ready/stop/HTTP/任务租约/MCP 上限与 TALK 读取等待。
-DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS = 21600
+#: 产品片B：**内置受管配方**的有效执行预算默认值（24 小时）。
+#: 它只作用于宿主内置配方外层 argv 的 ``--timeout``；不改变 ready/stop/HTTP/任务租约/
+#: MCP 上限与 TALK 读取等待。
+DEFAULT_CLI_EXECUTION_TIMEOUT_SECONDS = 86400
 #: 显式执行预算的可表达范围上界（有符号 64 位）。超过即稳定拒绝，绝不静默截断或取模；
-#: 刻意**不**设 3600/21600 这类固定上限。
+#: 刻意**不**设 3600 这类固定上限。
 MAX_CLI_EXECUTION_TIMEOUT_SECONDS = 2**63 - 1
 
 #: R1-4b 返修 F2：worker 轮次在宿主退出时的**有界**收集窗口。
@@ -863,7 +863,7 @@ def normalize_execution_timeout(
 
     显式值**只接受十进制正整数**（1..:data:`MAX_CLI_EXECUTION_TIMEOUT_SECONDS`）；
     ``bool``/零/负值/小数/``NaN``/``Inf``/非数字字符串/超范围值一律稳定拒绝，且不设
-    3600 或 21600 这类固定上限。显式自定义入口（``--cli-executable``）不支持该参数，
+    3600 这类固定上限。显式自定义入口（``--cli-executable``）不支持该参数，
     一旦显式给出即稳定拒绝，绝不静默忽略。
     """
     if value is None:
@@ -962,7 +962,7 @@ def verify_runtime_entry(runtime: str, argv: Sequence[str]) -> str:
     """用**真实仓库入口**的 parser 解析核验 argv；返回入口指纹（模块路径 + sha256）。
 
     产品片B：除了解析成功，还核验外层 argv **恰好一个** ``--timeout``，且真实 parser
-    解析出的 ``timeout`` 是正整数——证明“六小时预算”确实进了真实入口，而不是只写在
+    解析出的 ``timeout`` 是正整数——证明“24 小时预算”确实进了真实入口，而不是只写在
     宿主自己的诊断里。
     """
     key = str(runtime or "").strip()
@@ -3457,7 +3457,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--cli-execution-timeout-seconds",
         default=None,
         help=(
-            "内置受管配方的执行预算秒数（十进制正整数；缺省 21600，可显式覆盖如 60/43200）；"
+            "内置受管配方的执行预算秒数（十进制正整数；缺省 86400，可显式覆盖如 60/43200）；"
             "显式 --cli-executable 自定义入口不支持该参数"
         ),
     )

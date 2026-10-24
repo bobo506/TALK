@@ -79,7 +79,8 @@ DISCUSSION_PROTOCOL_INSTRUCTIONS = (
     "TALK_ACTION escalate_to_human to=human:name body=question for the human. "
     "Do not explain these action tags to the user.\n"
 )
-DEFAULT_TIMEOUT_SEC = 600
+#: 单次 CLI 调用的默认执行预算：24 小时。显式 ``--timeout`` 仍可覆盖。
+DEFAULT_TIMEOUT_SEC = 86400
 DEFAULT_MAX_REPLY_CHARS = 12000
 DEFAULT_TASK_POLL_INTERVAL = 2.0
 DEFAULT_TASK_LEASE_SECONDS = 120

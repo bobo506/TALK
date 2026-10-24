@@ -25,7 +25,7 @@
     "env_command_ignored": true,
     "decision_tier_argv": "execution",
     "base_url_default": "http://127.0.0.1:8000",
-    "execution_timeout_seconds": 21600,
+    "execution_timeout_seconds": 86400,
     "instance_id": "agent:kimi-code-k28-preview:<uuid4>",
     "_命令说明": "入口 argv 显式写入 controlled_command，必须等于 bridges/kimi_bridge.py 的 DEFAULT_KIMI_COMMAND；command_override_allowed=false，任何非该值的 --kimi-command 都被拒绝，TALK_KIMI_COMMAND 环境继承同样不生效。只有走该受控分支时三档才会生成带 --model 与 --agent-file 的 Agent 文件。",
     "_分级与地址说明": "argv 同时显式写入 --decision-tier execution 与同一个 --base-url：远端名册核验的是 execution，固定执行合同不允许既有 cli_bridge 回读本地 .talk/groups.yaml 改成 decision；只读身份预检与实际 bridge argv 使用同一个服务地址，禁止“验 19091、跑 8000”。"
@@ -64,8 +64,8 @@
       "reason": "宿主单次工具上限 T 未核验；未核验 T 时不启用主动长等待"
     },
     "bridge_execution_timeout_seconds": {
-      "value": 21600,
-      "source": "本入口单次 CLI 执行预算；默认 21600 秒（6 小时），可通过 --timeout 指定正整数秒"
+      "value": 86400,
+      "source": "本入口单次 CLI 执行预算；默认 86400 秒（24 小时），可通过 --timeout 指定正整数秒"
     },
     "identity_preflight_http_timeout_seconds": {
       "value": 15.0,

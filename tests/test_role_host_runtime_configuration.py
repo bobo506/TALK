@@ -6,7 +6,7 @@
 - ``--runtime-command-template``：同一 manager 上 codex+dsh 不串用、per-runtime 优先于旧
   全局回退、旧全局单字符串兼容、无模板保持原错误路径、重复同值去重、异值
   ``runtime_template_conflict``、未知/不适用 runtime、空白、缺 ``{model}``、Windows 空格路径；
-- ``--cli-execution-timeout-seconds``：内置全部配方默认 21600、显式 60/43200、非法值
+- ``--cli-execution-timeout-seconds``：内置全部配方默认 86400、显式 60/43200、非法值
   （``bool``/0/负/小数/``NaN``/``Inf``/字符串/超范围）稳定拒绝，CLI 未显式给出时保留
   ``None``；
 - 预检冻结的 argv/预算**直达**最终 ``spawn_hidden``：外层恰好一个 ``--timeout``，公开诊断
@@ -448,7 +448,7 @@ class ExecutionTimeoutTests(HostConfigTestCase):
     def test_leading_zeroes_do_not_change_a_representable_decimal_budget(self):
         self.assertEqual(normalize_execution_timeout("0" * 5000 + "60"), 60)
 
-    def test_default_is_six_hours_on_every_builtin_recipe(self):
+    def test_default_is_24_hours_on_every_builtin_recipe(self):
         manager = self.make_manager(runtime_command_templates=dict(COMMAND_TEMPLATES))
         self.assertIsNone(manager.execution_timeout_seconds)
         self.assertEqual(
@@ -464,7 +464,7 @@ class ExecutionTimeoutTests(HostConfigTestCase):
                 )
                 self.assertEqual(timeout_source, "builtin_default")
                 # 真实 parser 必须看到同一个数值（不是只写在宿主诊断里）。
-                self.assertEqual(real_parser_timeout(runtime, argv), 21600)
+                self.assertEqual(real_parser_timeout(runtime, argv), 86400)
 
     def test_explicit_60_and_43200_override_every_builtin_recipe(self):
         for requested in (60, 43200):
@@ -569,7 +569,7 @@ class PreflightToSpawnConsistencyTests(HostConfigTestCase):
                         runtime_command_templates=dict(COMMAND_TEMPLATES),
                         execution_timeout_seconds=requested,
                     )
-                    effective = 21600 if requested is None else requested
+                    effective = 86400 if requested is None else requested
 
                     def verify_then_change_config(*args):
                         fingerprint = real_verify(*args)
@@ -600,7 +600,7 @@ class PreflightToSpawnConsistencyTests(HostConfigTestCase):
 
         with patch.object(role_service_host, "build_runtime_argv", side_effect=build_then_change_config):
             argv, _template_source, timeout_source = manager.build_entry_argv("dsh", MODEL_ALIAS)
-        self.assertEqual(single_outer_timeout(argv), 21600)
+        self.assertEqual(single_outer_timeout(argv), 86400)
         self.assertEqual(timeout_source, "builtin_default")
 
     def make_client(self, **overrides) -> ScriptedHostClient:
@@ -628,8 +628,8 @@ class PreflightToSpawnConsistencyTests(HostConfigTestCase):
         facts = manager.preflight(
             client.command, MEMBER_ID, project_id=PROJECT_ID, action="start"
         )
-        self.assertEqual(single_outer_timeout(facts.argv), 21600)
-        self.assertEqual(facts.execution_timeout_seconds, 21600)
+        self.assertEqual(single_outer_timeout(facts.argv), 86400)
+        self.assertEqual(facts.execution_timeout_seconds, 86400)
         self.assertEqual(facts.execution_timeout_source, "builtin_default")
         self.assertEqual(facts.command_template_source, "runtime_template")
         self.assertTrue(template_present(facts.argv, DSH_TEMPLATE, MODEL_ALIAS))
@@ -639,7 +639,7 @@ class PreflightToSpawnConsistencyTests(HostConfigTestCase):
         argv = captured["argv"]
         # 最终 spawn 的 base 前缀逐项等于预检冻结的 argv。
         self.assertEqual(argv[: len(facts.argv)], list(facts.argv))
-        self.assertEqual(single_outer_timeout(argv), 21600)
+        self.assertEqual(single_outer_timeout(argv), 86400)
         self.assertEqual(
             single_outer_timeout(argv), outcome["execution_timeout_seconds"]
         )
@@ -690,13 +690,13 @@ class PreflightToSpawnConsistencyTests(HostConfigTestCase):
         with patch.object(manager, "preflight", side_effect=mutating_preflight):
             outcome, captured = self.run_start(manager, client, self.launch())
         self.assertEqual(outcome["outcome"], "ready", outcome)
-        self.assertEqual(single_outer_timeout(captured["argv"]), 21600)
+        self.assertEqual(single_outer_timeout(captured["argv"]), 86400)
         self.assertTrue(template_present(captured["argv"], DSH_TEMPLATE, MODEL_ALIAS))
         self.assertFalse(
             any("HIJACKED" in str(part) for part in captured["argv"]),
             captured["argv"],
         )
-        self.assertEqual(outcome["execution_timeout_seconds"], 21600)
+        self.assertEqual(outcome["execution_timeout_seconds"], 86400)
         self.assertEqual(outcome["command_template_source"], "runtime_template")
 
     def test_custom_executable_spawn_has_no_bridge_timeout_and_no_budget_claim(self):
@@ -965,7 +965,7 @@ class NegativeControlTests(HostConfigTestCase):
         # 新代码路径：同样的断言全部通过（不是恒真，也不是恒假）。
         manager = self.make_manager(runtime_command_templates={"dsh": DSH_TEMPLATE})
         argv = manager.base_argv("dsh", MODEL_ALIAS)
-        self.assertEqual(single_outer_timeout(argv), 21600)
+        self.assertEqual(single_outer_timeout(argv), 86400)
         self.assertFalse(template_present(argv, CODEX_TEMPLATE, MODEL_ALIAS))
         self.assertTrue(template_present(argv, DSH_TEMPLATE, MODEL_ALIAS))
 
@@ -1055,7 +1055,7 @@ class ExistingGuardRegressionTests(HostConfigTestCase):
     def test_real_recipe_table_and_alias_flags_unchanged(self):
         self.assertEqual(
             sorted(RUNTIME_RECIPES),
-            ["cli", "codex", "dsh", "kimi-code"],
+            ["cli", "codex", "dsh", "kimi-code", "workbuddy"],
         )
         self.assertEqual(RUNTIME_RECIPES["kimi-code"].alias_flag, "--kimi-model")
         self.assertEqual(RUNTIME_RECIPES["kimi-code"].command_flag, None)
@@ -1064,12 +1064,12 @@ class ExistingGuardRegressionTests(HostConfigTestCase):
         self.assertEqual(resolve_alias_flag("dsh"), "--model")
         self.assertEqual(resolve_alias_flag("custom", "--my-model"), "--my-model")
 
-    def test_build_runtime_argv_defaults_to_six_hours_without_new_parameters(self):
-        # 旧调用点（只给 command_template）自动获得内置 21600 预算，且仍被真实 parser 接受。
+    def test_build_runtime_argv_defaults_to_24_hours_without_new_parameters(self):
+        # 旧调用点（只给 command_template）自动获得内置 86400 预算，且仍被真实 parser 接受。
         argv = build_runtime_argv(
             "dsh", model_alias=MODEL_ALIAS, command_template=DSH_TEMPLATE
         )
-        self.assertEqual(single_outer_timeout(argv), 21600)
+        self.assertEqual(single_outer_timeout(argv), 86400)
         self.assertTrue(verify_runtime_entry("dsh", argv).startswith("bridges.cli_bridge@"))
         with self.assertRaises(HostError) as ctx:
             build_runtime_argv("unknown-runtime", model_alias=MODEL_ALIAS)

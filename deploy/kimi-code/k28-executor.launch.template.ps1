@@ -23,9 +23,9 @@
 # 官方 native managed 登录凭据由官方 CLI 自行读取，本入口不读取、不复制。
 
 param(
-    # 单次 CLI 执行预算（秒）；例如 -TimeoutSeconds 43200 为 12 小时。
+    # 单次 CLI 执行预算（秒）；缺省 24 小时，例如 -TimeoutSeconds 43200 为 12 小时。
     [ValidateRange(1, 2147483647)]
-    [int]$TimeoutSeconds = 21600
+    [int]$TimeoutSeconds = 86400
 )
 
 $ErrorActionPreference = 'Stop'
