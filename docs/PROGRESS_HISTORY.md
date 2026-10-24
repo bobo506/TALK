@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-24 14:25：325补正独立复验通过并收取，本片正式收尾
+
+用户通知325完成；本人agent:codex/prj_e8fe7066bbec、DSH同ins_fd018306ec1c idle/无当前任务。325原交付complete/2966，无P1/P2或必须修正项，独立23检查零失败。Codex取件重核新33源/快照760220字节、原45快照634741字节及目录exactness、2helper+2guide预期漂移与本地远端完整JSON一致后收取completed；原324 partial/2965与报告/失败证据保留。本轮未改产品/配置/服务或重跑无变化全量，见coordination/325-acceptance.json/325-collection.json。
+
+独立确认public_roles真实ProjectRoleListItem/28旧null反例/required缺失、service缺失、bound缺runner-model与重复拒绝、未知Key/argv过滤；两次当前完整7角色/service、原before service逐字段提取、322磁盘与323保留工具值/当前完整binding 7×14字段及runner/model映射均过。9个旧展示/choice字段确未记录，不能恢复、不声称前后相同；事后保存工具响应不冒充当时磁盘冻结。当前要求/286只在断言与summary、更新verify未重跑旧null基线、无独立TALK/API重读均作为P3/证据限制保持，不为低风险观察追加修复循环。
+
+325实际reuse_session续324/session-adc88ac8-3adb-44b5-904f-35eefccdcd86，count2/known，末485807/1000000=48.5807%，基础SHA同315；不追改324 new_no_candidate/count1。实现323通过/代码702d47a、用户批准的单字段配置f030c6d、正常加载da4e4fb均已推送；实际首检0删除/4保护=3旧缺证+1新API未关闭、907191字节、下次本地10月25日13:21:30，原DSH已普通恢复且60.078633秒心跳/其它六停止的当时证据保持。
+
+本片完成实现、正常启用与必要独立复核收尾，日常自动检查，无需前台清理或再次重启；原五范围/角色模型Key绑定/286保护保持。生产30天长期与未来到期删除、286删除分支尚未实跑，1GiB软预算、323六P3/独立104+1 ACL及历史partial继续保留。不宣称完整日志整项/真实主被动完成，不自动开下一片。当前PROGRESS精简为恢复所需快照，旧细节已在本历史/专题记录及Git 2e28ed5保存。
+
 ## 2026-10-24 14:05：325角色字段证据补正定向独立复验已派发
 
 3d35442补正文档已推送后，33份/760220字节冻结baseline-deployment-fix1/，manifest-deployment-fix1.json为权威；原45快照逐项SHA/字节不变，旧当前源只有2helper+2guide明确补正漂移，5产品/5测试未变。325 queued/assigned、agent:deepseek、唯一写review-deployment-fix1/；只核真实公开角色schema采集/完整service落盘、原before service恢复、322磁盘与323前保留工具值/当前binding逐字段一致，以及不能恢复的旧展示/choice历史边界；不重跑无变化全量或改产品，不把自检提前当独立通过。

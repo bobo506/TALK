@@ -1,5 +1,15 @@
 # 新后台日志自动清理：正式启用方案
 
+## 本片收尾：325定向复验通过并收取（2026-10-24 14:25）
+
+325 complete/result2966已收取completed，无P1/P2或必须修正项。独立23项检查零失败：33份/760220字节新源与快照、原45份/634741字节快照、预期2helper+2guide漂移、5产品/5测试保持、真实公开schema与反例、当前7完整投影/service、原before service提取、7角色14字段binding与runner/model映射、原324 partial及历史缺口均通过。协调方取件再核全部新源/新旧快照及目录exactness、本地远端完整JSON一致，未再改产品或无关重跑；见coordination/325-acceptance.json及325-collection.json。
+
+本片实现323通过、正常启用与部署机制324已确认，F-R1证据补正由325独立通过；代码702d47a、配置f030c6d及实际加载记录da4e4fb已推送。新backend_enabled=true与原五范围清理保持，日常自动检查，无需人工清理或再次重启。本轮仅收取与文档/Git收尾，不新增配置/权限/启停或下一个切片。
+
+325实际reuse_session续324/session-adc88ac8-3adb-44b5-904f-35eefccdcd86、confirmed_count=2，known指标决策、基础SHA同315，末485807/1000000=48.5807%，不追写324为同窗。
+
+限制继续保留：324原partial/2965不覆盖；9个旧展示/choice字段未记录且不可恢复，两次当前读取不冒充部署前后。325未独立访问生产角色/绑定API，其比对依据冻结公开JSON；当前要求/286只在采集断言与summary、更新verify未对旧null基线重跑均为P3，不追加修复循环。生产30天长期/未来真正到期删除、286删除分支尚未实跑，旧缺证/活跃和未闭环任务继续保护，1GiB仍是软预算；323六P3与独立104+1 ACL限制保持。不将本片写成完整日志整项或真实主被动完成。
+
 ## 324独立复核partial与角色证据补正（2026-10-24 14:01）
 
 324原2965已收取completed，结论partial/needs_changes保留。45份/634741字节取件源/快照一致、本地远端完整JSON一致；DeepSeek已idle/无当前任务。独立确认普通drain/单字段配置/17新PID和17旧PID/首检policy-state与86400日周期/真实三活跃lease冲突32及旧关闭lease对照/原DSH心跳均通过，但F-R1（P2）指出coordinator采错字段导致7角色display_name/business_role/decision_tier/binding均null，恢复结果又漏存desired/readiness_service/can_start/can_stop，不能只凭pass布尔当全字段证据。
