@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-24 19:27：328定向独立复验已派，原327 partial保持
+
+302b637已推送，64份/2581366字节源/新冻结、原50快照及35份原报告材料逐项一致。328创建UTC11:27:02.454607、queued/assigned；任务正文只复验327四项P2与关联补检，唯一写review-fix1/，无生产/产品/文档/Git写入或真实模型/浏览器许可。沿base327/role-delete-independent-review-20261024请求相容续窗，基础SHA0cc024eb…5db49不变；创建execution_session_state=null，实际领取决定待验，不提前称同窗或通过。Codex产品暂停，默认用户通知后取件，不自动等待/唤回。
+
+派前实核DSH同ins_723f2b7d12a6/PID7916 idle/无任务，七角色公开绑定逐项相等，286仍queued/accepted/paused。首次派发携根general不适用的related_task_ids未创建成功，328只读404后去掉该字段重试，只有一次成功创建；不发送普通Hall消息以免占锁。原327/2971 partial与独立环境失败保持，暂未收取；正常加载和页面人验未做。详coordination/328-dispatch.json、fix1-integrity.json及本片合同。
+
 ## 2026-10-24 19:22：327独立partial接手修正，最终333项自检通过，待定向复验
 
 用户通知“327好了”后核对正式succeeded/submitted、结果2971作者agent:deepseek/Hall/任务匹配，读取完整1708字符自由文本及本地报告。MCP业务unknown保持；独立自报partial及4项P2与本地delivery/checks一致，未把runner成功当通过。原50份/2074815字节源/快照取件零漂移，35份/230325字节报告/反例/日志另快照在coordination/327-original-review，原材料不改，327暂未收取。实际new_no_candidate新窗/count1/session-13d42eaa-9929-4cde-9380-999435d9de22，末421001/1000000=42.1001%，不是续326。

@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-24 19:23（Asia/Shanghai）。327独立partial已接手；Codex修正4项P2及补检后265Python+68Node通过，64份/2581366字节新冻结，待DeepSeek同片定向复验。原327未收取；生产未加载或删除现有角色。
+Updated: 2026-10-24 19:27（Asia/Shanghai）。327独立partial已接手修正；302b637已推送，265Python+68Node自检通过，64份/2581366字节新冻结。DeepSeek定向复验328已派queued/assigned，产品暂停；原327未收取，生产未加载或删除现有角色。
 
 ## 当前切片
 
@@ -20,5 +20,5 @@ Updated: 2026-10-24 19:23（Asia/Shanghai）。327独立partial已接手；Codex
 ## 身份、协作与下一步
 
 - Codex实核agent:codex/prj_e8fe7066bbec/lead，用户本片指定Codex开发、DeepSeek核验；必要修正/自检/定向复验已授权，无新片或生产部署许可。
-- 待派定向复验，优先请求相容327同原生窗、服从原守卫，实际决策以领取回执为准。默认派后结束，用户通知后取件，不自动等待/唤回；产品冻结暂停。
+- 328创建UTC11:27:02，queued/assigned，唯一写review-fix1/；沿base327请求相容同原生窗，创建state=null，实际决策以领取回执为准。默认派后结束、用户通知后取件，不自动等待/唤回；产品冻结暂停。回执见coordination/328-dispatch.json。
 - 复验通过后收取/必要加载方案及Git收尾；下一无关功能仍先确认。完整历史见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。
