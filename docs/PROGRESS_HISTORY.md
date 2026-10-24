@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-24 23:55：用户授权验证后继续一片，正常后台退出，待原API终端重启
+
+在本轮具体加载确认问题之后，用户明确“验证好无误后你可以继续开下一个切片，你开发deepseek复核，我要离开下，回来再验收”。据此继续当前方案的最小正常加载与已指定两角色删除验证；仅在当前真实验证全部通过后允许一个下一选择性项目自启动切片的开发/自测/DeepSeek独立复核，人工验收延后。该授权覆盖本轮必要动作与条件下一片，不扩为未验证先开片、连续多片、自动等待或读取生产配置/Key摘要；不重复请求同一范围确认。
+
+新增deployment/lifecycle.py只允许inspect/request-stop/drained，human凭据仅正常API认证，原启动清单只由既有runtime正常status/stop消费，不另行查看/哈希。首个默认沙箱预检PermissionError没有形成结果；同一最小命令按已授权访问正常执行，非自动审批拒绝，未绕行私有检查。UTC15:51:24预检runtime3852/external、worker空闲无错、无running任务，仅DSH gen64原实例running/ready/idle。WorkBuddy原manager已清理，实际现存宿主六个；七个公开角色仍为原目标状态。
+
+UTC15:51:56.323382原统一入口只提交一次普通stop。首个stopping观察保留；UTC15:52:54.929592最终核runtime3852 absent、六宿主12个原PID/创建时间绑定全部absent，七角色stopped/无owner，DSH gen65。完整非service公开角色投影/要求与before一致，286 queued/accepted/paused；未强杀/CAS/配置改写、未实际delete/retry/sweep。
+
+正常status的api_mode=external/owns_original_popen=false，代码与CLI都明确runtime_api_not_owned，不能由此接管外部终端或另启第二API。已向用户发操作提示：原终端Ctrl+C并重跑原命令。用户尚未回报重启动作，API/清理器未加载修复，DSH暂保持正常关闭；未把旧API可用当加载完成，也未提前开发下一片。恢复时先核新runtime/六宿主与旧墓碑，依次两目标正式delete/retry跟进complete、只恢复原DSH并核心跳/其它保护；全部验证通过才开已授权下一片，不再重复批准问题。
+
+证据在role-delete-user-fix1/deployment/authorization.json、before.json、stop-precheck.json、stop-request.json、drain-observation-*.json、drained.json；原50/64/79快照及327/328/329交付均保持。本轮只更新恢复文档/Git，未派DeepSeek任务。
+
 ## 2026-10-24 23:47：329独立核验收取完成，准备正常加载
 
 用户通知329完成。正式2973为agent:deepseek在正确Hall提交的talk-delivery-1裸JSON，任务号匹配、业务complete、与本地delivery逐字段等值。协调方检查普通代码/独立探针/原始日志/冻结和Git差异后验收，无必须修正项；UTC15:42:57.123595收取workflow completed，runner仍succeeded，不能仅据后者推断功能完成。

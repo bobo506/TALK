@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 23:55用户续行授权及实际停机：用户明确“验证好无误后…继续开下一个切片，你开发deepseek复核，我要离开下，回来再验收”。按已给正常加载方案继续当前验证，并仅在当前真实验证全部通过后允许一个下一片（已讨论的选择性项目自启动）开发/自测/DeepSeek独立复核，人工验收延后；同一范围不重复询问，不能未验证就先开片。原runtime3852及六现存宿主已普通stop/drain，12原PID全部absent、七角色stopped/无owner、DSH gen65；公开非service投影/绑定/要求/286保持。现在external API仍由用户原终端运行，正常reload-api明确不拥有；已发原终端Ctrl+C重跑提示，待实际动作后核新版/依次两目标delete-retry/恢复原DSH与心跳。未生产真实删除重试/读配置Key摘要/DB私有日志，不强杀CAS，不开第二API。当前卡点是原终端重启动作，不是缺少新片授权；[当前加载记录](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)有可恢复证据。
+
 - 2026-10-24 23:47收尾：329定向独立complete/2973已验收并收取completed，无必须修正项。API核心8/本机5/整页8/Node82通过，另1严格步骤形状P3探针失败、Python283的5F/7E环境限制如实保留；不追加无关返修。79新与50/64原快照零错配，15份/190160字节原交付已保留，产品/测试仍4ef58bc。实际new_no_candidate新窗/count1，末snapshot38.1537%，未续328；原327/328保持。公开七binding与派前相同、DeepSeek原实例idle、286 queued/accepted/paused。本轮未生产启停/加载/delete/retry/私有读取；[具体正常加载与两目标验证方案](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)已准备待本次确认，原许可不自动延伸。当前只文档/Git收尾，选择性自启动未批准，下一无关片仍先确认。
 
 - 2026-10-24 22:59派发：删除人工验收返修329已交DeepSeek queued/assigned，4ef58bc已推送；79份/2964423字节新源/冻结及原50/64快照零错配。唯一写role-delete-user-fix1/review/，产品/正式测试/冻结暂停，默认用户通知后取件。沿base327请求相容续窗，创建state=null、实际决定待回执，不预称复用或独立通过。283Python+82Node仅Codex自检；未重载/重试真实删除，WorkBuddy用户原墓碑与其它五binding/286保持。派发后只登记协调文档，下一无关片仍先确认。详[返修合同](docs/spec/ROLE_DELETE_USER_FIX_20261024.md)。
