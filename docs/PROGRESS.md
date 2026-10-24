@@ -1,6 +1,15 @@
 # Project Progress
 
-Updated: 2026-10-24 14:38（Asia/Shanghai，用户明确跳过日志额外核查并调整推进优先级）。当前推进到325，后台日志自动清理已收尾并启用；恢复时HEAD=origin=e2c4b59、tracked工作区干净。本轮只记录决策，无产品开发/派发/启停，下一切片尚未确认。
+Updated: 2026-10-24 14:47（Asia/Shanghai）。用户已确认本片简化为代码固定默认24小时，无页面配置；326已派DeepSeek queued/assigned，尚未交付。前片日志自动清理已完成并保持启用，额外日志核查已跳过；6c2d7a1决策记录已推送。本轮不改生产配置或启停服务。
+
+## 当前切片：326默认执行时限24小时
+
+- [本片合同](spec/EXECUTION_TIMEOUT_24H_20261024.md)：TALK自带CLI入口及受管配方/自带模板默认统一86400秒（24小时）；不增加页面配置、存储或新API，现有CLI显式参数仅保留兼容。此前待确认的默认6小时建议由本次明确授权取代。
+- DeepSeek首次实现/必要自测，交付暂停后Codex独立核验、必要直接修正及集成；唯一写根.tmp/execution-timeout24h-v1/deepseek/，正式产品与54份冻结源暂停修改。基线6c2d7a1，54份/1963080字节baseline-v1与源派前零漂移，manifest及实际任务请求/回执在coordination/。
+- 326为独立顶层general任务、queued/assigned，目标agent:deepseek；新工作线execution-timeout24h-20261024/基础版本1，不强续日志base315。execution_session_state=null，原生实际会话决策待交付回执，不提前声称新窗或复用通过。
+- 覆盖通用CLI/DSH、Codex、Kimi Code、WorkBuddy及pi兼容包装器；用真实parser/最终argv/模板一致性和隔离短预算假CLI验收。MCP客户端T/显式W/余量、HTTP、ready/stop、租约、21600上下文证明、70%及缺数10/11保持。
+- 已运行进程仍沿原启动参数；未加载24小时新值，不热改或中断任务、不操作角色/owner/286、不读生产配置正文/Key/DB/私有state/原生会话日志，不做真实模型调用。本片不等于主动MCP适配；正常加载另按可审代码及既有部署约定。
+- 默认派后结束，用户通知326完成后取件；不主动等待或追加下一功能。
 
 ## 已完成的前序能力
 
@@ -8,7 +17,7 @@ Updated: 2026-10-24 14:38（Asia/Shanghai，用户明确跳过日志额外核查
 - [会话复用](guides/EXECUTION_SESSION_USAGE.md)已接通DSH、Codex、Kimi Code与WorkBuddy内置CLI：同功能续原生会话、新窗基础恢复、真实指标与条件10/11备用。共用阈值已按用户要求[改70%](spec/EXECUTION_SESSION_THRESHOLD_70_20261023.md)，该调整本身按当次要求免测试/复核；历史验证边界保留，不当作桌面窗口控制。
 - 角色异常日志与新增API/runtime/配置worker后台日志已接入按时间脱敏导出及既有权限；原五角色和本片后台根自动清理已加载。旧历史/未知来源/私有输出仍不能称全量完整，详下方限制。
 
-## 当前结果
+## 前片日志结果（325已收尾）
 
 - [后台日志自动清理覆盖](spec/BACKEND_LOG_AUTO_RETENTION_20261024.md)已实现、获准启用并实际加载；[部署与独立收尾](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)为本片权威记录。仅增加runtime_log_retention.backend_enabled=true，30天/1GiB软预算/每日检查及启动补检，日常无需页面操作。
 - 实现323 complete/2964、部署324原partial/2965、F-R1补正325 complete/2966均已收取；324原结论/失败证据保留。325独立23检查零失败，无必须修正项。
@@ -36,8 +45,8 @@ Updated: 2026-10-24 14:38（Asia/Shanghai，用户明确跳过日志额外核查
 
 ## 身份、协作与下一步
 
-- 当前Codex为agent:codex / prj_e8fe7066bbec / lead，本轮负责决策记录及文档/Git收尾；前片Codex开发、DeepSeek独立复核的事实保持，后续新片分工按当次授权。页面旧development_requirements未更新，用户明确分工优先；Kimi开发仍暂停。
+- 当前Codex为agent:codex / prj_e8fe7066bbec / lead，本轮负责326范围/派发及交付后的独立核验、必要修正和收尾；DeepSeek首次实现/自测。前片Codex开发、DeepSeek独立复核的历史保持。页面旧development_requirements未更新，最新AGENTS及本次授权优先；Kimi开发仍暂停。
 - 默认派后结束，由用户通知完成再取件，不主动等待/自动唤回；相容时优先DeepSeek原窗但服从原守卫。单写者、历史不追改、Key/模型/绑定/权限及286保护保持。
 - 用户明确跳过“日志剩余覆盖与导出扫描缺口”的额外核查；功能已经实现且没有影响使用的缺陷时，优先推进下一新功能。可选扩展/优化和非阻断观察不作为前置门禁，必要验证、复核及收尾仍保留；上述日志边界继续如实记录，不追加日志切片。
-- 下一片尚未确认。按原排期，下一项未完成工作为全入口统一执行预算：默认21600秒（6小时），保留显式覆盖；之后为删除角色等功能。此为待确认建议，尚未实施/派发；不据本次优先级约定自动开工。删除/归档/退出、自启动及真实主被动等继续按确认排期。
+- 当前只推进已确认326，下一无关片尚未确认。原排期之后为删除角色等功能；删除/归档/退出、自启动及真实主被动等仍先明确范围/验收并确认，不自动开工。
 - 既往详细记录见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)与专题文档；精简前完整进度快照保留在Git 2e28ed5。
