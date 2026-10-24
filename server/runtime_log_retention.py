@@ -10,14 +10,14 @@ from pathlib import Path
 from sqlalchemy import or_, select
 
 from bridges import runtime_log_retention as retention
-from server.models import AgentTask, AgentTaskRelation
+from server.models import AgentTask, AgentTaskRelation, Project
 from server.runtime_diagnostics_sources import RuntimeDiagnosticsProvider
 
 logger = logging.getLogger("talk")
 
 
 @contextlib.contextmanager
-def task_guard(engine, project, member, task_ids):
+def task_guard(engine, project, member, task_ids, *, project_wide=False):
     """Short non-blocking SQLite write reservation; no task data is changed.
 
     The reservation prevents a task being resumed/reassigned between the
@@ -31,10 +31,21 @@ def task_guard(engine, project, member, task_ids):
             # Walk both directions, including ancestors of the logged tasks.
             # A missing/foreign/unfinished connected task or bounded-out graph
             # protects the run. Cycles terminate via visited IDs.
+            deadline = time.monotonic() + .1
             safe = bool(task_ids) and len(task_ids) <= retention.MAX_TASKS and all(
                 type(i) is int and i > 0 for i in task_ids)
+            if project_wide:
+                from bridges.backend_diagnostics import MEMBER
+                # Backend runs are shared project diagnostics, never a fake role.
+                # An empty receipt is accepted only with an existing project and
+                # a complete, bounded project-task query under this reservation.
+                safe = member == MEMBER and task_ids == [] and conn.execute(
+                    select(Project.project_id).where(Project.project_id == project)).scalar_one_or_none() is not None
+                task_ids = list(conn.execute(select(AgentTask.id).where(
+                    AgentTask.project_id == project).limit(retention.MAX_TASKS+1)).scalars()) if safe else []
+                safe = safe and len(task_ids) <= retention.MAX_TASKS and all(
+                    type(task_id) is int and 0 < task_id <= 2**53-1 for task_id in task_ids)
             pending, visited = set(task_ids), set()
-            deadline = time.monotonic() + .1
             while safe and pending:
                 if len(visited | pending) > retention.MAX_TASKS or time.monotonic() >= deadline:
                     safe = False
@@ -51,7 +62,7 @@ def task_guard(engine, project, member, task_ids):
                 for task_id in ids:
                     row = found.get(task_id)
                     if (row is None or row["project_id"] != project
-                            or (task_id in task_ids and row["target_member_id"] != member)
+                            or (not project_wide and task_id in task_ids and row["target_member_id"] != member)
                             or row["status"] not in {"succeeded", "failed", "canceled"}
                             or row["workflow_status"] not in {"completed", "canceled"}
                             or row["control_status"] != "active"):
@@ -85,7 +96,7 @@ def task_guard(engine, project, member, task_ids):
                 pending.update(ref for row in relations for ref in row if ref is not None)
                 visited.update(ids)
                 pending.difference_update(visited)
-            yield safe
+            yield safe and (not project_wide or time.monotonic() < deadline)
         finally:
             conn.rollback()
             conn.exec_driver_sql(f"PRAGMA busy_timeout={int(previous)}")
@@ -97,10 +108,13 @@ class RetentionService:
         self.stop_event = threading.Event()
         self.thread = None
         self.groups = {}
+        self.backend_sources = []
+        self.backend_config_error = None
         section = config.get("runtime_log_retention", {})
         if (not isinstance(section, dict)
-                or set(section) - {"enabled", "retention_days", "max_total_bytes", "interval_seconds"}
-                or type(section.get("enabled", False)) is not bool):
+                or set(section) - {"enabled", "retention_days", "max_total_bytes", "interval_seconds", "backend_enabled"}
+                or type(section.get("enabled", False)) is not bool
+                or type(section.get("backend_enabled", False)) is not bool):
             raise ValueError("retention_config_invalid")
         self.enabled = isinstance(section, dict) and section.get("enabled") is True
         self.policy = {}
@@ -139,6 +153,14 @@ class RetentionService:
                 or type(size) is not int or not 1 <= size <= 2**63-1
                 or type(interval) is not int or not 60 <= interval <= 604800):
             raise ValueError("retention_policy_invalid")
+        if section.get("backend_enabled", False):
+            from bridges.backend_diagnostics import project_root, settings
+            backend = settings(config, database_file=actual_db)
+            if backend is None:
+                self.backend_config_error = "backend_binding_unavailable"
+            else:
+                self.backend_sources = [(project_root(backend["root"], project), project)
+                    for project in backend["projects"]]
 
     def tick(self):
         result = []
@@ -148,6 +170,27 @@ class RetentionService:
             result.append(retention.sweep(root, scopes,
                 lambda p, m, ids: task_guard(self.engine, p, m, ids),
                 now=self.clock(), stop=self.stop_event, **self.policy))
+        from bridges.backend_diagnostics import MEMBER
+        from bridges.backend_log_retention import backend_receipt_valid
+        if self.backend_config_error:
+            result.append({"source_kind": "backend", "status": "protected", "deleted_files": 0,
+                "reason": self.backend_config_error})
+        for root, project in self.backend_sources:
+            if self.stop_event.is_set():
+                break
+            try:
+                with retention.pinned(root), retention.NativeFile(root, directory=True) as handle:
+                    canonical = handle.path
+                if any(canonical == role_root or canonical.is_relative_to(role_root)
+                        or role_root.is_relative_to(canonical) for role_root in self.groups):
+                    raise ValueError("backend_role_root_overlap")
+                report = retention.sweep(canonical, {(project, MEMBER)},
+                    lambda p, m, ids: task_guard(self.engine, p, m, ids, project_wide=True),
+                    now=self.clock(), stop=self.stop_event, receipt_validator=backend_receipt_valid, **self.policy)
+                result.append({**report, "source_kind": "backend", "project_id": project})
+            except (OSError, ValueError, TypeError):
+                result.append({"source_kind": "backend", "project_id": project, "status": "protected",
+                    "deleted_files": 0, "reason": "backend_root_unavailable_or_overlapping"})
         return result
 
     def start(self):

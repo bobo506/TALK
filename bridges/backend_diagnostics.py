@@ -17,6 +17,7 @@ from bridges.runtime_diagnostics import DiagnosticsPolicy, RuntimeDiagnostics, s
 from bridges.backend_error_codes import HOST_ERROR_CODES, RUNTIME_ERROR_CODES
 
 MEMBER = "backend:project"  # storage namespace, never a registered TALK member
+RETENTION_SCOPE = "talk-backend-project-retention-1"
 COMPONENTS = frozenset({"api", "runtime", "provision_worker"})
 EVENTS = frozenset({
     "backend_starting", "backend_ready", "backend_stopping", "backend_stopped",
@@ -166,8 +167,11 @@ def exception_structure(exc: BaseException, *, secrets=()) -> dict:
 
 
 class _BackendWriter(RuntimeDiagnostics):
+    def _closed_receipt_extra(self):
+        return {"retention_scope": RETENTION_SCOPE, "backend_component": self.runtime}
+
     def _cleanup_expired_locked(self, reason):
-        pass  # a new source must not silently expand the existing cleanup policy
+        pass  # only the explicitly enabled backend retention worker may expire runs
 
     def _enforce_capacity_locked(self, *, incoming, record):
         if sum(self._safe_size(p) for p in self._event_files_locked()) + incoming > self.policy.max_bytes:

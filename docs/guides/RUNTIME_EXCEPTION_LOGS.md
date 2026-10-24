@@ -1,5 +1,7 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
+> 2026-10-24后台清理候选：323独立复核complete/已收取，无必须修正项，独立新22项及真实隔离API通过；组合104通过/1项ACL临时文件清理限制，Codex自检105通过。backend_enabled缺省false、专用关闭证明及共享项目任务保护已实现，生产开关仍未添加，SHA db98e42d…a8543c保持。仅增backend_enabled=true的[具体启用方案](../spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)已预检，待明确确认后正常重载；日常无需前台操作。项目存在paused/未闭环任务（包括286）或旧run缺新关闭证明仍保留，不承诺启用后立刻删除。详[本片合同](../spec/BACKEND_LOG_AUTO_RETENTION_20261024.md)。
+
 > 2026-10-24：322首次部署证据独立复核complete/pass并已收取，无产品修正项；真实加载/三组件导出及保护边界证据通过，原权限/ACL/P3限制保留。新后台根仍只分段，不自动删除；下一片已由用户确认改回Codex开发清理覆盖、DeepSeek复核，尚未实现或启用。详[322收尾记录](../spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)。
 
 > 2026-10-23 23:24：原API已由用户正常重启，后台/API/worker三组件实际采集及human下载、401/403通过；仅恢复原DSH并核实连续心跳。角色合并文件因旧来源扫描仍明确partial，后台历史也固定不完整。新后台根只分段、不自动清理；目前待独立部署证据复核及页面人工体验。下方23:13为当时等待点，详[实际加载记录](../spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)。

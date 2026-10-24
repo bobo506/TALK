@@ -1254,6 +1254,10 @@ class RuntimeDiagnostics:
                 self._degrade("cleanup_failed", exc)
             return removed
 
+    def _closed_receipt_extra(self) -> dict[str, Any]:
+        """Code-owned source proof; extensions cannot override closure facts."""
+        return {}
+
     def close(self) -> None:
         with self._lock:
             if self._closed:
@@ -1280,6 +1284,10 @@ class RuntimeDiagnostics:
                              "instance_id": self.instance_id, "closed_at": _timestamp(_aware(self._now())),
                              "prefix": self._log_prefix, "task_ids": sorted(self._closure_tasks),
                              "complete": self._closure_complete, "segments": segments}
+                    extra = self._closed_receipt_extra()
+                    if not isinstance(extra, dict) or set(extra) & set(value):
+                        raise ValueError("retention_receipt_extension_invalid")
+                    value.update(extra)
                     write_json(self.namespace / "closed.json", value)
             except Exception as exc:
                 self._degrade("close_receipt_failed", exc)

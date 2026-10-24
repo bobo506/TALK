@@ -1,6 +1,20 @@
 # Project Progress
 
-Updated: 2026-10-24（Asia/Shanghai，322通过并收取）。322首次部署证据复核complete/2963，44源/快照及远端本地交付一致，无产品修正项，已收取completed；证据权限/ACL/P3限制保留。用户明确下一片改回Codex开发“新增后台日志自动清理覆盖”、DeepSeek独立复核，取代临时DeepSeek开发安排。先收尾322，再在已说明范围内实现；新清理尚未实现/启用。
+Updated: 2026-10-24 13:14（Asia/Shanghai，323独立复核通过并收取）。新后台清理无必须修正项，30份/852486字节取件零漂移、本地/远端交付一致；独立22项与隔离API通过，组合104通过/1项ACL清理限制，自检105通过。具体启用方案和单字段候选已准备，生产开关仍缺省关闭、config SHA db98e42d…保持，待明确启用确认。
+
+## 本片：后台日志自动清理覆盖（323已通过，待正式启用确认）
+
+- 323 complete/2964已收取completed，DeepSeek已idle/无当前任务。取件核30份源/快照852486字节与exactness、本地/远端完整JSON一致，未产品返修或重复全量测试；原报告/早期失败/六项P3保留。
+- 独立新22/22及taskless/paused286/submitted/不存在与空项目反例通过，真实隔离API端口60498通过；组合105项为104通过+1私有ACL临时文件cleanup PermissionError，测试体通过，不能写独立105全过。Codex冻结自检105全过保持。
+- P3保留：保护结果可观测性、旧根不可读导致整体不可用、ACL清理、smoke常量证据标签、workflow收取代理、NULL项目旧任务覆盖边界。复核只解析冻结生产invariant/进程元数据，未读取生产配置正文/DB/Key/私有state/原生会话/日志或生产重跑；取件预检另由Codex只读计算当前config SHA，未改配置/启停。
+- 323实际续322/session-939f1561-b543-43c1-ab10-c7fff4c951fc/count2，decision=reuse_missing_metrics_fallback，末52.6519%；决策时缺数，不能倒写成可靠占比决策，基础SHA同315。
+- [可审部署方案](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)：仅增加runtime_log_retention.backend_enabled=true，原SHA db98e42d…a8543c，候选428c928e…e09825，其它解析字段/五来源/同DB不变、根存在不重叠。待确认后正常drain全部七宿主、用户重启原终端API、普通恢复原运行集合（最后仅DSH）；无强杀/CAS。286与旧缺证run仍保护，不承诺实际生产删除。当前未启用/重载/生产sweep。
+
+- [合同](spec/BACKEND_LOG_AUTO_RETENTION_20261024.md)：仅新增API/runtime/worker根，默认backend_enabled=false，旧五范围保持；新关闭证明/项目哈希子根/有限组件及空task_ids专用验证，不注册假角色。一般角色仍不允许空任务引用删除。
+- 同SQLite写保留事务确认项目及全部任务图闭环；任何paused（包括286）/未收取/未知/跨项目/非法引用或1024任务/约100ms预算受限均保护。空项目仅有真实项目+完整查询空集才可清理。旧backend run缺新关闭证明不回填；新源与旧角色根重叠/错库/无效配置保护。
+- 最终105项（22新+27原清理+29后台导出/隐私+27writer）全过；真实隔离API端口51817，正式lifespan自动删除旧backend与原角色，近期/活跃/legacy保留，401/403/200/原角色410、server/worker退出、新API关闭标记均过。首轮Project.id误用已修正，first-tests.log保留；属于Codex自检。
+- 30份/852486字节冻结于.tmp/backend-log-auto-retention-v1/baseline-v1/，manifest.json/candidate.diff为权威；首次freeze助手引用inventory文件路径错误而留下baseline/不完整副本，保留且不用于验收。派前及取件source/snapshot零漂移；323只写review/，产品未改。当前生产新开关缺省关闭，config SHA db98e42d…a8543c未改，未生产启停/DB/Key/日志写入；正式新删除部署仍需可审结果后确认。原320/321 partial、322限制、286和所有绑定保持。
+- 复核沿base315/同日志工作线优先相容原窗，不force旧窗；实际续322/计数2如上。默认派后结束、用户通知完成后取件，不主动等待/自动唤回；必要测试只在review自有fake根，生产配置正文/DB/Key/私有state/原生会话/日志未由复核者读取。
 
 ## 当前恢复点：322部署复核通过，下一片Codex开发已授权
 

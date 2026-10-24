@@ -1,5 +1,31 @@
 # 开发历史 · TALK
 
+## 2026-10-24 13:14：323独立复核通过并收取，正式启用方案待确认
+
+用户通知323完成；Codex核实际身份agent:codex/prj_e8fe7066bbec，DeepSeek同ins_211a91c1827a已idle/无当前任务。完整交付complete/result2964；30份source/snapshot的852486字节与目录exactness零漂移、本地远端JSON一致后收取completed，见coordination/323-acceptance.json/323-collection.json。无必须修正项，取件不改产品或无关重跑。
+
+DeepSeek独立22新/补充taskless、paused286、submitted、空与不存在项目反例均过；真实隔离API端口60498重跑通过。组合105为104通过/1私有ACL临时文件cleanup PermissionError，测试体通过；Codex冻结105自检及51817 API保持，不伪称独立105全过。六项P3：保护结果可观测性、旧根不可读整体不可用、ACL cleanup、smoke常量标签、workflow收取代理、NULL项目旧任务边界均保留；复核者未读取生产配置正文/DB/Key/私有state/原生会话/日志或生产HTTP重跑。
+
+323实际续322/session-939f1561-b543-43c1-ab10-c7fff4c951fc/count2、decision=reuse_missing_metrics_fallback，决策时context_missing；末526519/1000000=52.6519%，基础SHA同315，不倒写为可靠占比决策或追加70%独立复核。原320/321 partial、286和绑定不追改。
+
+Codex只读预检当前配置原SHA db98e42d…a8543c未变，候选仅增runtime_log_retention.backend_enabled=true，SHA428c928e…e09825，其它解析字段相同、五来源/同DB与根不重叠通过。具体部署方案已准备，未写生产配置/启停/调用sweep。待明确启用确认后正常drain七宿主、请用户重启原终端API、只恢复部署前原运行集合；日常自动检查不需前台动作。286 paused及旧后台缺新关闭证明会保护，不承诺生产立刻删除，详[部署方案](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
+
+## 2026-10-24 11:15：323新后台日志清理首次独立复核已派发
+
+用户最新要求仍由Codex开发已落实：5产品/1新测试及合同完成、105联合自检与真实隔离API自动删除/保护/原角色410通过。30份/852486字节冻结baseline-v1，source/snapshot派前零漂移；首次冻结助手错引用inventory源文件而留下baseline不完整副本，保留不当验收根。323 queued/assigned，目标agent:deepseek，写根仅review/，原页面旧分工按本次用户安排覆盖。
+
+任务要求独立核实际差异、新22真实删除/保护/锁及必要反例与原五范围兼容；只读普通源/冻结证据，禁止生产配置正文/DB/Key/provider/私有state/原生会话/日志正文及生产清理/启停，自己的fixture必须隔离，不共用协调或旧测试夹具。沿base315/同日志工作线优先相容会话，不force旧窗；派发execution_session_state=null，实际原生决策待回执。产品/冻结源暂停，代码未提交；生产config SHA db98e42d…保持、新开关未启用。默认用户通知323后取件，不主动等待/唤回；复核后的具体正式删除部署仍另行确认。
+
+## 2026-10-24：Codex完成新增后台日志自动清理候选及自检
+
+322收取及9b21a51文档推送后，按用户最新明确安排Codex直接开发，DeepSeek独立复核。新增后台专用适配器，通用writer关闭扩展不得覆盖原事实；_BackendWriter发布有限组件/retention_scope声明，旧角色校验仍要求非空任务，只有显式后台验证接受空task_ids。RetentionService新增backend_enabled缺省false，显式DB/项目/哈希子根，各项目三组件共享子根/软预算，与旧根重叠或无效绑定保护。
+
+后台共享项目日志通过同SQLite BEGIN IMMEDIATE查项目存在及全部任务图闭环，任一paused/未完成/未收取/跨项目/缺失/非法引用或超过1024任务/约100ms预算即保护；真实空项目可确认空集。旧run缺新标记不回填，286保持paused会保护共享项目旧后台日志，不承诺生产有删除。精确句柄/lease/关闭分段/intent审计沿原核心，非普通lease存在性授权删除。
+
+首轮74项中Project.id误写被检出（4失败/5错误），已更正project_id并保留原first-tests.log；最终105项联合回归全过。真实隔离API随机端口51817，正式lifespan触发backend和原角色旧分段自动删除、近期/活跃/legacy保留，401/403/后台200与角色410、server/worker退出和新API关闭标记均过。仅独立fake DB/root/Key/端口，无前台清理动作，不作为独立复核或生产删除证明。
+
+生产config SHA db98e42d…a8543c保持，新开关未添加/未启用，未重载/改生产DB/Key/日志/模型绑定或286。产品待冻结交DeepSeek独立复核后暂停，正式新删除启用另行具体方案确认，详[本片合同](spec/BACKEND_LOG_AUTO_RETENTION_20261024.md)。
+
 ## 2026-10-24：322部署证据复核通过并收取，下一片改回Codex开发
 
 用户通知322完成，明确下一片仍由Codex开发，取代2026-10-23临时DeepSeek开发安排；范围仍为已说明的新增API/runtime/worker后台日志自动清理覆盖，Codex直接开发/自测、DeepSeek独立复核，未扩大到其它根或新部署。322原complete/2963已收取completed，取件核44源/快照895337字节零漂移、本地/远端JSON一致，无产品修正项；原独立报告及11限制保持。

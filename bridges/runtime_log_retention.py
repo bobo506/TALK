@@ -213,7 +213,7 @@ def read_journal(path):
     return [json.loads(line) for line in data.splitlines() if line]
 
 
-def receipt_valid(value, run, scopes):
+def receipt_valid(value, run, scopes, *, allow_taskless=False):
     from bridges.runtime_diagnostics import _safe_token
     if (not isinstance(value, dict) or value.get("schema") != "talk-log-closed-1"
             or value.get("complete") is not True):
@@ -228,7 +228,7 @@ def receipt_valid(value, run, scopes):
         return False
     tasks = value.get("task_ids")
     segments = value.get("segments")
-    if (not isinstance(tasks, list) or not tasks or len(tasks) > MAX_TASKS
+    if (not isinstance(tasks, list) or (not tasks and not allow_taskless) or len(tasks) > MAX_TASKS
             or any(type(i) is not int or not 0 < i <= 2**53-1 for i in tasks)
             or not isinstance(segments, list) or len(segments) > MAX_SEGMENTS
             or not isinstance(value.get("prefix"), str)
@@ -304,7 +304,7 @@ def check_segments(run, value, known_intents, cutoff, deadline):
 
 def sweep(root, scopes, task_guard, *, now=None, retention_days=30,
           max_total_bytes=1024**3, max_seconds=10, max_deletions=100,
-          interval_seconds=86400, stop=None):
+          interval_seconds=86400, stop=None, receipt_validator=None):
     """One automatic sweep. task_guard holds the task-state transaction."""
     now = now or utcnow()
     current = epoch(now)
@@ -316,7 +316,8 @@ def sweep(root, scopes, task_guard, *, now=None, retention_days=30,
             or type(interval_seconds) is not int or not 60 <= interval_seconds <= 604800
             or type(max_deletions) is not int or not 1 <= max_deletions <= 1000
             or type(max_seconds) not in (int, float) or not math.isfinite(max_seconds)
-            or not 0 < max_seconds <= 60):
+            or not 0 < max_seconds <= 60
+            or (receipt_validator is not None and not callable(receipt_validator))):
         raise ValueError("retention_policy_invalid")
     cutoff = current - retention_days * 86400
     root = Path(os.path.abspath(root))
@@ -364,7 +365,7 @@ def sweep(root, scopes, task_guard, *, now=None, retention_days=30,
                           NativeFile(run / "closed.json") as closed_handle):
                         # Keep closure evidence read-pinned through the whole batch.
                         value = json.loads(closed_handle.read(MAX_RECEIPT))
-                        if not receipt_valid(value, run, scopes):
+                        if not (receipt_validator or receipt_valid)(value, run, scopes):
                             protect("scope_or_incomplete_evidence")
                             continue
                         closed = datetime.fromisoformat(value["closed_at"])
