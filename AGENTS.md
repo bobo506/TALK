@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 13:20最新：用户已明确“确认启用并正常重载”。human实核无running/worker空闲、仅DSH gen58 idle后，原runtime4856普通drain退出，七宿主14个原PID/创建时间绑定均absent、七角色stopped/无owner。仅加backend_enabled=true，配置新SHA428c928e…e09825；其余解析字段/五source/同DB/绑定/要求/286 paused保持、旧字节私有备份完成，无强杀/CAS/手动sweep。现在待用户原终端Ctrl+C重跑API；回复后核正式清理policy/state/due、新宿主并普通恢复原DSH，其余六停止。不重复同一已批准部署确认，不把落盘称加载通过。详[加载记录](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)，下一无关片仍先确认。
+
 - 2026-10-24 13:14最新：323首次独立复核complete/2964已收取，30份/852486字节取件源/快照与本地远端交付一致，DeepSeek idle/无当前任务，无产品修正项。独立22新及真实隔离API通过；组合104通过/1私有ACL cleanup限制，不称独立105全过，Codex自检105通过保持，六项P3原报告保留。实际续322原窗/count2、missing-metrics备用、末52.6519%。[具体启用方案](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)已准备，只读预检仅增backend_enabled=true、候选SHA428c928e…e09825，原SHA db98e42d…保持，尚未启用/重载/生产sweep。新部署仍须用户明确确认；286 paused和旧缺证run保留，不许造删除证明或扩大归属许可。下一无关片仍先确认。
 
 - 2026-10-24 11:15派发：新后台日志清理独立复核323已交DeepSeek，queued/assigned；基线9b21a51、30份/852486字节在baseline-v1，派前source/snapshot零漂移，产品暂停。写根仅review/，新22实际删除/保护需独立验证；不读生产配置正文/DB/Key/私有state/原生会话/日志，不操作生产。沿base315优先相容原窗，实际原生决策待回执不预称；默认用户通知323后取件。生产新开关未启用，原清理/绑定/286保持，尚未提交新片代码。

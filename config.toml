@@ -52,6 +52,7 @@ root = "D:/claude-test/TALK/logs/runtime"
 observer_member_ids = ["human:bobo"]
 
 [runtime_log_retention]
+backend_enabled = true
 enabled = true
 retention_days = 30
 max_total_bytes = 1073741824

@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-24 13:20：后台清理正式启用获批，配置已应用等待原API重启
+
+用户对已准备方案明确回复“确认启用并正常重载”，本次部署已授权。Codex核实际agent:codex/prj_e8fe7066bbec；human:bobo核无running、worker空闲、只有DSH gen58/ins_211a91c1827a/PID860 idle、其余六停止，286仍queued/accepted/paused。原runtime4856正常stop/drain，角色先释放owner，七宿主14个包装器/解释器原PID/创建时间绑定随后全部absent，最终runtime stopped/absent，无强杀/CAS。
+
+UTC05:19:40原配置字节经私有备份后，仅新增runtime_log_retention.backend_enabled=true；SHA从db98e42d…a8543c变为428c928edb7044e8cc7741c09a3f18a908bd8eed3365d66b109bd0f182e09825，符合预审候选，完整解析其它字段相同，同DB/五source/角色绑定/开发要求及286一致。部署不调用生产sweep，不造closed/policy/state/mtime，配置落盘尚不等于加载生效。沙箱首次读私有runtime配置PermissionError后按明确授权提升执行，无自动审批拒绝。
+
+实际证据和当前恢复点见[加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。等待用户在原API终端Ctrl+C并重跑原命令；回复后核新API/runtime/七宿主/worker、正式后台清理policy/state/下次due与保护结果，只普通恢复原DSH并验真实心跳，其余六保持停止，不重复同一部署许可。323已独立通过/收取、702d47a代码和f4e733e收尾文档已推送，原P3/ACL/历史partial及286保护保持。
+
 ## 2026-10-24 13:14：323独立复核通过并收取，正式启用方案待确认
 
 用户通知323完成；Codex核实际身份agent:codex/prj_e8fe7066bbec，DeepSeek同ins_211a91c1827a已idle/无当前任务。完整交付complete/result2964；30份source/snapshot的852486字节与目录exactness零漂移、本地远端JSON一致后收取completed，见coordination/323-acceptance.json/323-collection.json。无必须修正项，取件不改产品或无关重跑。

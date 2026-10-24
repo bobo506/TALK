@@ -1,10 +1,20 @@
 # 新后台日志自动清理：正式启用方案
 
+## 当前恢复点：配置已应用，待用户原终端重启API
+
+2026-10-24 13:19：用户明确回复“确认启用并正常重载”。human:bobo实核无running任务/worker空闲，只有DSH gen58/ins_211a91c1827a/PID860运行且idle，其余六停止。原runtime4856沿普通stop/drain退出；七宿主的14个包装器/解释器进程绑定均absent，七角色均stopped/无owner，无强杀或归属CAS。
+
+UTC05:19:40仅增加runtime_log_retention.backend_enabled=true，原SHA db98e42d…a8543c变为候选428c928edb7044e8cc7741c09a3f18a908bd8eed3365d66b109bd0f182e09825；完整解析其余字段相同，同DB/五原source/角色绑定/开发要求/286 paused保持。原字节已备份原仓库外私有部署目录，未输出Key/配置正文，未调用生产sweep或造closed/mtime。
+
+证据在.tmp/backend-log-auto-retention-v1/deployment/的authorization.json、deployment-before.json、deployment-stop-precheck.json、deployment-drain-proof.json、deployment-invariants-before/stopped.json、deployment-config-applied.json。原脚本沙箱读取私有runtime配置被PermissionError拒绝后，按用户明确部署授权经提升执行；未发生自动审批拒绝或绕过授权。配置已落盘不等于运行采集/清理已加载。
+
+下一步仅请用户在启动TALK API的原终端Ctrl+C正常退出并重跑原命令。回复后沿coordination/verify_retention_deployment.py只读核新API/runtime/七宿主、正式后台policy/state与due/保护结果，再通过deploy_retention.py restore普通恢复原DSH，核连续心跳；其余六保持停止。286和旧缺证run继续保护，不额外请求同一部署许可。
+
 ## 当前状态与可审差异
 
-2026-10-24：本片Codex实现及自检完成，DeepSeek323独立复核complete，无必须修正项，原结果2964已收取。独立新22项和真实隔离API通过；组合105项独立104通过/1个ACL临时文件清理限制，Codex自检105通过。六项P3及历史证据保留，详[实现与复核合同](BACKEND_LOG_AUTO_RETENTION_20261024.md)。本方案尚未获正式启用确认，未改生产配置或服务。
+2026-10-24准备时：本片Codex实现及自检完成，DeepSeek323独立复核complete，无必须修正项，原结果2964已收取。独立新22项和真实隔离API通过；组合105项独立104通过/1个ACL临时文件清理限制，Codex自检105通过。六项P3及历史证据保留，详[实现与复核合同](BACKEND_LOG_AUTO_RETENTION_20261024.md)。当时尚未获正式启用确认；后续获确认及实际操作见上方恢复点。
 
-代码、测试及本方案已随702d47a推送现有分支，生产配置不在该提交；当前等待明确启用确认。
+代码、测试及本方案已随702d47a推送现有分支，生产配置不在该提交；本次仅追加已批准单字段配置与加载等待记录。
 
 只在现有config.toml的runtime_log_retention节增加一行：
 

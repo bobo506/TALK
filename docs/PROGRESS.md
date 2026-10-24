@@ -1,8 +1,14 @@
 # Project Progress
 
-Updated: 2026-10-24 13:14（Asia/Shanghai，323独立复核通过并收取）。新后台清理无必须修正项，30份/852486字节取件零漂移、本地/远端交付一致；独立22项与隔离API通过，组合104通过/1项ACL清理限制，自检105通过。具体启用方案和单字段候选已准备，生产开关仍缺省关闭、config SHA db98e42d…保持，待明确启用确认。
+Updated: 2026-10-24 13:20（Asia/Shanghai，用户已批准本片启用及正常重载）。原runtime4856/七宿主正常退出、14个原进程绑定absent、七角色无owner；仅增加backend_enabled=true，配置SHA428c928e…e09825，其余字段及286保持。现待用户在原终端正常重启TALK API，尚未核实际清理加载；回复后只普通恢复原DSH，其余六保持停止。
 
-## 本片：后台日志自动清理覆盖（323已通过，待正式启用确认）
+## 当前加载恢复点：等待用户重启原API
+
+- 用户已明确“确认启用并正常重载”，不再重复请求本次部署许可。human:bobo实核无running任务、worker空闲，仅DSH gen58/ins_211a91c1827a/PID860 idle；原runtime4856普通drain后stopped/absent、七宿主包装器/解释器14绑定absent，七角色stopped/无owner，无强杀/CAS。
+- UTC05:19:40原配置备份至仓库外私有目录，单字段backend_enabled=true应用成功，新SHA428c928edb7044e8cc7741c09a3f18a908bd8eed3365d66b109bd0f182e09825；其余解析字段、同DB/五source、绑定/开发要求/286 paused一致。未手动sweep或造closed/state/mtime。配置落盘不等于生产加载完成。
+- [实际加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)及.tmp/backend-log-auto-retention-v1/deployment/保存快照/14进程退出/配置与不变项证据。收到“已重新启动”后核API/新runtime/七宿主、正式后台policy/state/下次due与实际保护，再普通恢复原DSH、核真实心跳；其余六保持停止。旧缺证run与286继续保护，不保证立即删除。
+
+## 本片：后台日志自动清理覆盖（323已通过，以下为启用前记录）
 
 - 本片13份代码/测试/正式文档已提交推送702d47a；生产配置未纳入该提交、新开关仍未启用。以下为323通过后的恢复点，下一步仅等待本片部署确认，不开启其它切片。
 - 323 complete/2964已收取completed，DeepSeek已idle/无当前任务。取件核30份源/快照852486字节与exactness、本地/远端完整JSON一致，未产品返修或重复全量测试；原报告/早期失败/六项P3保留。

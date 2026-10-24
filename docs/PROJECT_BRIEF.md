@@ -6,6 +6,8 @@
 
 ## 当前实施状态（2026-10-23）
 
+2026-10-24 13:20：用户已批准新后台清理启用和正常重载；原runtime4856及七宿主14个原进程正常退出、七角色无owner，仅增加backend_enabled=true，新配置SHA428c928e…e09825，其它字段/五source/同DB/绑定/286保持。待用户原终端重启TALK API，回复后核正式清理状态并仅普通恢复原DSH；当前尚未称加载通过。详[加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
+
 2026-10-24 13:14：新后台日志清理323独立复核complete/2964已收取，30份/852486字节取件零漂移与本地远端一致，无必须修正项。独立22新及隔离API通过，组合104通过/1项ACL cleanup限制，Codex自检105通过，原P3/权限边界保留。实际续322/count2，末52.6519%。仅增backend_enabled=true的[具体启用方案](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)已预检；生产原SHA db98e42d…保持、未启用/重载，待明确确认，286/旧缺证run仍保护，详[当前进度](PROGRESS.md)。
 
 2026-10-24新增后台清理候选：按用户最新安排Codex开发/自测、DeepSeek独立复核。backend_enabled缺省false、新后台关闭声明/哈希子根/项目任务保护已实现，105项隔离回归及真实API自动清理/保护/原角色410通过；生产配置未变/未启用/未重载。旧backend缺声明、项目有paused/未闭环任务（含286）或预算不足均保护，保原五范围，不凭322的lease存在性删除。详[本片合同](spec/BACKEND_LOG_AUTO_RETENTION_20261024.md)与当前进度。
