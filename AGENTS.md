@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 19:22接手327：正式2971自由文本partial（MCP业务unknown），50源/快照零漂移、35份/230325字节原审查材料已保留；DSH实际new_no_candidate新窗/count1、末42.1001%。Codex复现并修正P2-1残留owned_launches、P2-2文件目标目录误删、P2-3墓碑身份全局任务/schedule绕过与项目在册守卫、P2-4独占离册降格preserved；另修旧名册墓碑created_by和重试steps。最终265Python+68Node通过，原失败/partial不改，327暂未收取；修正版待新冻结交DeepSeek定向复验后产品暂停。共享Key及其它项目明确在册任务保持，无删除历史全局角色兼容。未生产读取正文/启停/删除，286 paused和七角色绑定保持。详[本片合同](docs/spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)与当前进度。
+
 - 2026-10-24 18:35派发：删除角色独立核验327已交DeepSeek，创建queued/assigned；c61a4c4已推送，50份/2074815字节baseline-v1与manifest-v1逐项零漂移。唯一写.tmp/role-delete-v1/review/，禁止生产配置正文/Key/DB/私有state/原生会话日志、启停/删除/sweep/CAS与产品/Git写入；仅普通源和合成隔离验证。产品/冻结暂停，默认用户通知后取件，不自动等待；新工作线role-delete-independent-review-20261024，实际原生决策state=null待领取，不预称同窗或通过。286 queued/accepted/paused、七角色绑定/模型与生产保持，尚未部署/页面人验。
 
 - 2026-10-24 18:30删除角色片：用户已明确“可以，继续，你来开发，deepseek核验”，本片由Codex直接开发/自测、DeepSeek独立核验，取代默认首次派发分工。删除入口、事务守卫/墓碑、专属资源清理/租约/失败重试已实现；29新增Python及147关联回归（新增deletion公开字段断言更新后复跑）、68Node通过，真实隔离HTTP/Windows文件/原Popen普通drain通过。冻结后产品暂停待DeepSeek独立核验，不把自检称独立通过；未读生产配置正文/Key/DB/私有state/原生日志，未生产启停/删除，7角色绑定与286 paused保持。详[本片合同](docs/spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)与当前进度；下一无关片仍先确认。

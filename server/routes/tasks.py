@@ -46,6 +46,7 @@ from server.models import (
     Project,
     ProjectAgent,
     ProjectRole,
+    RoleDeletion,
     ProjectRolePolicy,
     TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
     TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT,
@@ -113,21 +114,32 @@ def _ensure_target_agent(member_id: str, session: Session) -> Member:
     return member
 
 
+def _ensure_deleted_identity_task_scope(project_id, member_id, session):
+    if not session.exec(select(RoleDeletion).where(RoleDeletion.member_id == member_id)).first():
+        return
+    if project_id is None:
+        raise HTTPException(409, "task_project_scope_required")
+    # Naming an unrelated project is not permission to revive a deleted role.
+    # A legacy roster in another project is valid even without a ProjectRole row.
+    if session.get(ProjectAgent, (project_id, member_id)) is None:
+        raise HTTPException(409, "task_role_not_in_project")
+
+
 def _ensure_target_role_not_archived(
     project_id: str | None, member_id: str, session: Session
 ) -> None:
-    """归档角色禁入派发（合同 §9.3，R5）：只在任务带 ``project_id`` 时生效。
-
-    不带项目的历史/全局任务保持旧边界（不新增项目级检查）；R1-1 无归档入口，
-    本守卫由直接构造归档数据的测试覆盖。
+    """Deleted shared identities need an explicit active project; other legacy
+    members retain their global behavior. Call inside the task write transaction.
     """
     if project_id is None:
+        _ensure_deleted_identity_task_scope(project_id, member_id, session)
         return
     role = session.get(ProjectRole, (project_id, member_id))
     if role is not None and role.archived_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="task_role_archived"
         )
+    _ensure_deleted_identity_task_scope(project_id, member_id, session)
 
 
 def _ensure_project_exists(project_id: str | None, session: Session) -> None:
@@ -1495,6 +1507,8 @@ def _create_task_with_hall(
     # 若此前已有 DML（``_reserve_authorized_descendant``），helper 复用该实际事务，
     # 不重复 BEGIN、不中途 commit/rollback 拆开任务/Hall/关系/快照。
     begin_immediate_write(session)
+    _ensure_target_role_not_archived(project_id, created_by, session)
+    _ensure_target_role_not_archived(project_id, target_member_id, session)
     ensure_identity_exclusive_reference_allowed(created_by, project_id, session)
     ensure_identity_exclusive_reference_allowed(
         target_member_id, project_id, session
@@ -1861,7 +1875,10 @@ def create_task_schedule(
     session: Session = Depends(get_session),
 ):
     """Create a one-off or interval task schedule."""
+    begin_immediate_write(session)
     _ensure_target_agent(body.target_member_id, session)
+    _ensure_target_role_not_archived(None, body.target_member_id, session)
+    _ensure_target_role_not_archived(None, current.id, session)
     _ensure_distinct_participants(current.id, body.target_member_id)
     now = datetime.now(timezone.utc)
     run_at = body.run_at or now
@@ -1919,6 +1936,7 @@ def run_due_task_schedules(
     This endpoint is intentionally explicit: TALK records schedules, but this
     first slice does not start an internal background scheduler.
     """
+    begin_immediate_write(session)
     now = datetime.now(timezone.utc)
     stmt = select(AgentTaskSchedule).where(
         AgentTaskSchedule.status == "active",
@@ -1974,8 +1992,12 @@ def update_task_schedule(
     session: Session = Depends(get_session),
 ):
     """Pause, resume, or cancel a task schedule."""
+    begin_immediate_write(session)
     schedule = _get_schedule(schedule_id, current, session)
     _require_schedule_manager(schedule, current)
+    if body.status == "active":
+        _ensure_target_role_not_archived(None, schedule.target_member_id, session)
+        _ensure_target_role_not_archived(None, schedule.created_by, session)
     if schedule.status == "completed" and body.status != "canceled":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="completed schedules cannot be resumed or paused")
     if schedule.status == "canceled" and body.status != "canceled":
@@ -2761,6 +2783,7 @@ def claim_task(
 ):
     """Claim a queued task for the target Agent."""
     _require_agent(current)
+    begin_immediate_write(session)
     task = _get_task(task_id, session)
     if task.target_member_id != current.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task belongs to another agent")
@@ -2771,6 +2794,7 @@ def claim_task(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="role_archived"
             )
+    _ensure_deleted_identity_task_scope(task.project_id, current.id, session)
 
     instance = _ensure_instance_owner(body.instance_id, current, session)
     now = datetime.now(timezone.utc)

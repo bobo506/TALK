@@ -153,6 +153,7 @@ class RoleDeletionTests(RoleApiTestCase):
         self.assertEqual(self.call("/deletion/claim",{"revision":first["revision"]}).status_code,409)
         self.assertEqual(self.report(first,outcome="failed",error="cleanup_busy").json()["status"],"failed")
         retry=self.delete().json();self.assertEqual(retry["status"],"pending")
+        self.assertEqual(retry["steps"],{})
         second=self.claim(retry["revision"])
         self.assertEqual(self.report(first).status_code,409)
         bad=dict(second,lease_token="wrong");self.assertEqual(self.report(bad).status_code,409)
@@ -222,6 +223,130 @@ class RoleDeletionTests(RoleApiTestCase):
             self.assertEqual(result.json()["status"],"complete",result.text)
             self.assertEqual(client.get("/api/projects/prj_alpha/agents",headers={"X-API-Key":"bobo-key"}).json(),[])
         self.assertFalse(profile.exists());self.assertFalse(key.exists());self.assertEqual(other.read_text(encoding="utf-8"),"other role secret")
+
+
+    def _shared_role(self):
+        with self.session() as session:
+            role=session.get(m.ProjectRole,("prj_alpha",self.member))
+            role.origin="imported";role.identity_exclusive=0;session.add(role);session.commit()
+
+    def test_off_roster_managed_identity_refuses_without_silent_credential_preservation(self):
+        self.assertEqual(self.sync_roster("prj_alpha",[]).status_code,200)
+        result=self.delete();self.assertEqual(result.status_code,409,result.text)
+        self.assertEqual(result.json()["detail"],"role_delete_identity_proof_required")
+        with self.session() as session:
+            self.assertIsNone(session.get(RoleDeletion,("prj_alpha",self.member)))
+            self.assertIsNone(session.get(m.ProjectRole,("prj_alpha",self.member)).archived_at)
+            self.assertIsNotNone(session.get(m.ProjectRoleBinding,("prj_alpha",self.member)))
+        self.assertEqual(self.sync_roster("prj_alpha",[{"member_id":self.member}]).status_code,200)
+        self.assertTrue(self.delete().json()["identity_disabled"])
+        with self.make_client() as client:
+            self.assertEqual(client.get("/api/members/me",headers={"X-API-Key":self.role["api_key"]}).status_code,401)
+
+    def test_deleted_shared_identity_requires_scope_for_global_task_and_schedule(self):
+        self._shared_role();self.assertEqual(self.delete().status_code,200)
+        with self.make_client() as client:
+            for path,body,key in [("/api/tasks",{"target_member_id":self.member,"content":"ambiguous"},"bobo-key"),
+                    ("/api/tasks/schedules",{"target_member_id":self.member,"content":"ambiguous"},"bobo-key"),
+                    ("/api/tasks",{"target_member_id":"agent:worker","content":"ambiguous"},self.role["api_key"])]:
+                response=client.post(path,headers={"X-API-Key":key},json=body)
+                self.assertEqual(response.status_code,409,response.text)
+                self.assertEqual(response.json()["detail"],"task_project_scope_required")
+
+    def test_deleted_shared_identity_cannot_claim_legacy_projectless_task(self):
+        self._shared_role();self.delete()
+        with self.session() as session:
+            task=m.AgentTask(target_member_id=self.member,created_by="human:bobo",content="old bypass",control_status="active")
+            session.add(task);session.commit();task_id=task.id
+        with self.make_client() as client:
+            response=client.post(f"/api/tasks/{task_id}/claim",headers={"X-API-Key":self.role["api_key"]},json={"lease_seconds":60})
+            self.assertEqual(response.status_code,409,response.text)
+            self.assertEqual(response.json()["detail"],"task_project_scope_required")
+        with self.session() as session:
+            self.assertEqual(session.get(m.AgentTask,task_id).status,"queued")
+
+    def test_shared_other_project_stays_usable_with_explicit_scope(self):
+        self._shared_role();self.register_project("prj_beta")
+        with self.session() as session:
+            session.add(m.ProjectAgent(project_id="prj_beta",member_id=self.member))
+            session.add(m.ProjectRole(project_id="prj_beta",member_id=self.member,role_name="other-project",origin="imported",created_by="human:bobo"));session.commit()
+        self.delete()
+        response=self.create_task("prj_beta",self.member)
+        self.assertEqual(response.status_code,201,response.text)
+        with self.make_client() as client:
+            claim=client.post(f"/api/tasks/{response.json()['id']}/claim",headers={"X-API-Key":self.role["api_key"]},json={"lease_seconds":60})
+            self.assertEqual(claim.status_code,200,claim.text)
+        blocked=self.create_task("prj_alpha",self.member)
+        self.assertIn(blocked.status_code,[400,409])
+
+    def test_unclosed_global_task_blocks_project_deletion(self):
+        self._shared_role();task=self.create_task(None,self.member)
+        self.assertEqual(task.status_code,201,task.text)
+        response=self.delete()
+        self.assertEqual(response.status_code,409,response.text)
+        self.assertEqual(response.json()["detail"],"role_has_active_tasks")
+
+    def test_deleted_global_schedule_cannot_resume_or_materialize(self):
+        self._shared_role();self.delete()
+        with self.session() as session:
+            schedule=m.AgentTaskSchedule(target_member_id=self.member,created_by="human:bobo",content="old bypass",
+                schedule_type="once",status="paused",next_run_at=datetime.now(timezone.utc))
+            session.add(schedule);session.commit();sid=schedule.id
+        with self.make_client() as client:
+            resumed=client.patch(f"/api/tasks/schedules/{sid}",headers={"X-API-Key":"bobo-key"},json={"status":"active"})
+            self.assertEqual(resumed.status_code,409,resumed.text)
+        with self.session() as session:
+            schedule=session.get(m.AgentTaskSchedule,sid);schedule.status="active";session.add(schedule);session.commit()
+        with self.make_client() as client:
+            result=client.post("/api/tasks/schedules/run-due",headers={"X-API-Key":"bobo-key"},json={})
+            self.assertEqual(result.status_code,409,result.text)
+        with self.session() as session:
+            self.assertIsNone(session.exec(select(m.AgentTask).where(m.AgentTask.schedule_id==sid)).first())
+
+    def test_schedule_create_and_delete_serialize(self):
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+        self._shared_role();gate=threading.Barrier(2)
+        def scheduling():
+            gate.wait()
+            with self.make_client() as client:
+                return client.post("/api/tasks/schedules",headers={"X-API-Key":"bobo-key"},json={"target_member_id":self.member,"content":"race"})
+        def deleting():
+            gate.wait();return self.delete()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            a,b=pool.submit(scheduling),pool.submit(deleting)
+            scheduled,removed=a.result(timeout=20),b.result(timeout=20)
+        self.assertIn((scheduled.status_code,removed.status_code),[(201,409),(409,200)],(scheduled.text,removed.text))
+
+    def test_legacy_roster_only_role_gets_valid_tombstone_and_preserves_shared_key(self):
+        with self.session() as session:
+            session.add(m.ProjectAgent(project_id="prj_alpha",member_id="agent:worker"));session.commit()
+        with self.make_client() as client:
+            response=client.post("/api/projects/prj_alpha/roles/agent%3Aworker/delete",
+                headers={"X-API-Key":"bobo-key"},json={"confirm_member_id":"agent:worker"})
+            self.assertEqual(response.status_code,200,response.text)
+            self.assertFalse(response.json()["identity_disabled"])
+            self.assertEqual(client.get("/api/members/me",headers={"X-API-Key":"worker-key"}).status_code,200)
+        with self.session() as session:
+            self.assertEqual(session.get(m.ProjectRole,("prj_alpha","agent:worker")).created_by,"human:bobo")
+
+    def test_deleted_identity_cannot_invent_project_scope_but_other_legacy_roster_works(self):
+        self._shared_role();self.register_project("prj_beta");self.delete()
+        response=self.create_task("prj_beta",self.member)
+        self.assertEqual(response.status_code,409,response.text)
+        self.assertEqual(response.json()["detail"],"task_role_not_in_project")
+        with self.session() as session:
+            task=m.AgentTask(project_id="prj_beta",target_member_id=self.member,created_by="human:bobo",content="old bypass",control_status="active")
+            session.add(task);session.commit();task_id=task.id
+        with self.make_client() as client:
+            claim=client.post(f"/api/tasks/{task_id}/claim",headers={"X-API-Key":self.role["api_key"]},json={"lease_seconds":60})
+            self.assertEqual(claim.status_code,409,claim.text)
+        with self.session() as session:
+            session.add(m.ProjectAgent(project_id="prj_beta",member_id=self.member));session.commit()
+        self.assertEqual(self.create_task("prj_beta",self.member).status_code,201)
+        with self.make_client() as client:
+            claim=client.post(f"/api/tasks/{task_id}/claim",headers={"X-API-Key":self.role["api_key"]},json={"lease_seconds":60})
+            self.assertEqual(claim.status_code,200,claim.text)
 
 
 class DeletionBindingTests(RoleApiTestCase):

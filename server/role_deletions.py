@@ -88,7 +88,7 @@ def _idle(session, project, member):
         raise HTTPException(409, "role_instance_active")
     # Uncollected submissions, pauses and creator obligations must be resolved too.
     tasks = session.exec(select(m.AgentTask).where(
-        m.AgentTask.project_id == project,
+        or_(m.AgentTask.project_id == project, m.AgentTask.project_id.is_(None)),
         or_(m.AgentTask.target_member_id == member, m.AgentTask.created_by == member))).all()
     if any(t.workflow_status not in ("completed", "canceled")
            or t.status in ("queued", "running") or t.control_status == "paused" for t in tasks):
@@ -134,6 +134,7 @@ def request_delete(project, member, confirm, current, session):
             if existing.status == "failed":
                 existing.status = "pending"
                 existing.error_code = None
+                existing.steps = {}
                 existing.revision += 1
                 existing.updated_at = datetime.now(timezone.utc)
                 session.add(existing)
@@ -147,8 +148,10 @@ def request_delete(project, member, confirm, current, session):
         _idle(session, project, member)
         _unambiguous_resources(session, project, member)
         proof = m.prove_exclusive_identity(project, member, session)
-        exclusive = bool(role and role.origin == "managed" and role.identity_exclusive
-                         and proof["refusal"] is None)
+        managed_exclusive = bool(role and role.origin == "managed" and role.identity_exclusive)
+        if managed_exclusive and proof["refusal"] is not None:
+            raise HTTPException(409, "role_delete_identity_proof_required")
+        exclusive = managed_exclusive
         now = datetime.now(timezone.utc)
         row = RoleDeletion(project_id=project, member_id=member, created_by=current.id,
                            revoke_identity=exclusive,
@@ -156,7 +159,7 @@ def request_delete(project, member, confirm, current, session):
                            if exclusive else None)
         if role is None:
             role = m.ProjectRole(project_id=project, member_id=member,
-                                 role_name=identity.display_name, origin="imported")
+                                 role_name=identity.display_name, origin="imported", created_by=current.id)
         role.archived_at = now
         role.updated_at = now
         session.add(role)

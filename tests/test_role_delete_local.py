@@ -176,3 +176,65 @@ class LocalDeletionTests(unittest.TestCase):
         self.assertEqual(result["outcome"],"failed");self.assertEqual(result["steps"]["startup_config"],"failed")
         self.assertEqual(self.path.read_bytes(),original)
         self.assertEqual(self.run_cleanup()["outcome"],"complete")
+
+    def _manager_fixture(self, owned=False, launches=None, health_present=True):
+        directory=self.state/"manager";directory.mkdir()
+        health=directory/"health.json";marker=directory/"drain.request"
+        if health_present:
+            health.write_text(json.dumps({"pid":2147483000,"seen_at":"2026-10-24T00:00:00Z",
+                "owned_launches":launches if launches is not None else []}),encoding="utf-8")
+        spec={"member_id":self.member,"health_file":str(health),"drain_file":str(marker),"argv":[sys.executable]}
+        self.runtime.config["hosts"]=[spec]
+        self.config=self.runtime.config;self.write_config()
+        if owned:
+            class Exited:
+                def poll(self):return 0
+                def wait(self,timeout=None):return 0
+            self.runtime.hosts[self.member]={"process":Exited(),"spec":spec}
+        return health,marker
+
+    def test_exited_owned_manager_with_unresolved_launches_is_protected(self):
+        health,_=self._manager_fixture(owned=True,launches=["unresolved"])
+        result=self.run_cleanup()
+        self.assertEqual(result["error_code"],"manager_not_stopped",result)
+        self.assertTrue(health.exists());self.assertTrue(self.profile.exists());self.assertTrue(self.key.exists())
+
+    def test_absent_external_manager_with_unresolved_launches_is_protected(self):
+        health,_=self._manager_fixture(launches=["unresolved"])
+        with patch("scripts.role_service_recovery.recorded_process_state",return_value="absent"):
+            result=self.run_cleanup()
+        self.assertEqual(result["error_code"],"manager_not_stopped",result)
+        self.assertTrue(health.exists());self.assertTrue(self.profile.exists());self.assertTrue(self.key.exists())
+
+    def test_owned_manager_missing_health_cannot_erase_evidence(self):
+        self._manager_fixture(owned=True,health_present=False)
+        result=self.run_cleanup()
+        self.assertEqual(result["error_code"],"manager_not_stopped",result)
+        self.assertTrue(self.profile.exists());self.assertTrue(self.record.exists())
+
+    def test_health_launches_are_rechecked_after_ordinary_drain(self):
+        health,_=self._manager_fixture()
+        class Process:
+            def poll(self):return None
+            def wait(self,timeout=None):
+                health.write_text(json.dumps({"owned_launches":["late-unresolved"]}),encoding="utf-8")
+                return 0
+        self.runtime.hosts[self.member]={"process":Process(),"spec":self.runtime.config["hosts"][0]}
+        result=self.run_cleanup()
+        self.assertEqual(result["error_code"],"manager_not_stopped",result)
+        self.assertTrue(health.exists());self.assertTrue(self.profile.exists())
+
+    def _directory_at_file(self,target):
+        target.unlink();target.mkdir();sentinel=target/"unrelated.txt";sentinel.write_text("keep",encoding="utf-8")
+        result=self.run_cleanup()
+        self.assertEqual(result["error_code"],"unsafe_resource",result)
+        self.assertEqual(sentinel.read_text(encoding="utf-8"),"keep")
+
+    def test_directory_at_key_is_never_recursively_deleted(self):
+        self._directory_at_file(self.key)
+
+    def test_directory_at_credential_metadata_is_never_recursively_deleted(self):
+        self._directory_at_file(self.metadata)
+
+    def test_directory_at_control_file_is_never_recursively_deleted(self):
+        self._directory_at_file(self.control)

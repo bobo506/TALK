@@ -39,7 +39,7 @@ class Files:
         with pinned(path.parent), NativeFile(path) as handle:
             return handle.read(limit)
 
-    def remove(self, path, *, digest=None, verify=None, skip=frozenset()):
+    def remove(self, path, *, tree=False, digest=None, verify=None, skip=frozenset()):
         self.budget()
         # lexists catches dangling symlinks too. Missing resources are idempotent.
         if not os.path.lexists(path):
@@ -49,11 +49,13 @@ class Files:
             if _link(info) or (not stat.S_ISDIR(info.st_mode) and info.st_nlink != 1):
                 raise CleanupError("unsafe_resource")
             if stat.S_ISDIR(info.st_mode):
+                if not tree:
+                    raise CleanupError("unsafe_resource")
                 with NativeFile(path, directory=True):
                     for child in path.iterdir():
                         self.budget()
                         if child.name not in skip:
-                            self.remove(child)
+                            self.remove(child, tree=True)
                 if skip and any(path.iterdir()):
                     return  # Permanent empty OS lock guards contain no role configuration.
                 with NativeFile(path, directory=True, delete=True) as handle:
@@ -102,16 +104,39 @@ def _key_paths(config, member):
 def _drain(runtime, member, files):
     owned = runtime.hosts.get(member)
     specs = [s for s in runtime.config.get("hosts", []) if s["member_id"] == member]
+    if owned:
+        specs.append(owned["spec"])
     own_paths = {str(Path(s[k]).absolute()).casefold() for s in specs for k in ("health_file", "drain_file")}
     for other in runtime.config.get("hosts", []):
         if other["member_id"] != member and any(str(Path(other[k]).absolute()).casefold() in own_paths for k in ("health_file", "drain_file")):
             raise CleanupError("unsafe_resource")
+    from scripts.role_service_recovery import recorded_process_state
+    wb = Path(runtime.config["state_dir"])/"workbuddy-native"/host._sanitize_token(runtime.project)/host._sanitize_token(member)
+    health_paths = {Path(s["health_file"]) for s in specs} | {wb/"manager-health.json"}
+    owned_health = Path(owned["spec"]["health_file"]) if owned else None
+
+    def verify_health():
+        for path in health_paths:
+            if not os.path.lexists(path):
+                if path == owned_health:
+                    raise CleanupError("manager_not_stopped")
+                continue
+            try:
+                facts = json.loads(files.read(path))
+                if not isinstance(facts,dict) or facts.get("owned_launches") != []:
+                    raise CleanupError("manager_not_stopped")
+            except (OSError,ValueError):
+                raise CleanupError("manager_not_stopped") from None
+            # Exited or absent managers do not prove their native children exited.
+            # Every health receipt must first have an explicitly empty launch list.
+            if path != owned_health and recorded_process_state(facts.get("pid"),facts.get("seen_at")) not in (
+                    "absent", "exited", "previous_boot", "pid_reused"):
+                raise CleanupError("manager_not_stopped")
+
+    verify_health()
     if owned:
         spec = owned["spec"]
         if owned["process"].poll() is None:
-            facts = json.loads(files.read(Path(spec["health_file"])))
-            if facts.get("owned_launches") != []:
-                raise CleanupError("manager_not_stopped")
             # The runtime retains the original Popen. A marker only requests normal exit.
             marker = Path(spec["drain_file"])
             if marker.exists() and not owned.get("delete_drain_written"):
@@ -124,20 +149,10 @@ def _drain(runtime, member, files):
                 owned["process"].wait(timeout=25)
             except Exception:
                 raise CleanupError("manager_not_stopped") from None
-        specs.append(spec)
-    else:
-        # A missing Popen is never permission to adopt/kill an external manager.
-        from scripts.role_service_recovery import recorded_process_state
-        wb = Path(runtime.config["state_dir"])/"workbuddy-native"/host._sanitize_token(runtime.project)/host._sanitize_token(member)
-        health_paths = [Path(s["health_file"]) for s in specs] + [wb/"manager-health.json"]
-        for path in health_paths:
-            if os.path.lexists(path):
-                facts = json.loads(files.read(path))
-                if recorded_process_state(facts.get("pid"), facts.get("seen_at")) not in (
-                        "absent", "exited", "previous_boot", "pid_reused"):
-                    raise CleanupError("manager_not_stopped")
+        verify_health()
     for spec in specs:
-        for key in ("health_file", "drain_file"):
+        # Retain health evidence if removing a locked drain marker fails, for retry.
+        for key in ("drain_file", "health_file"):
             path = Path(spec[key])
             root = Path(runtime.config["state_dir"])
             provision.assert_inside_root(root, path.relative_to(root))
@@ -228,7 +243,7 @@ def cleanup(runtime, member, receipt):
         handles = provision.acquire_provision_locks(root, keys, member)
         step = "profiles"
         directory = provision.profile_lock_path_for(root, member).parent
-        files.remove(directory, skip={".provision.lock", ".provision.lock.guard"})
+        files.remove(directory, tree=True, skip={".provision.lock", ".provision.lock.guard"})
         steps[step] = "complete"
         step = "credentials"
         if receipt["identity_disabled"]:
@@ -246,7 +261,7 @@ def cleanup(runtime, member, receipt):
             files.remove(provision.assert_inside_root(state, Path("control")/(launch+".ctl")))
         for category in ("roles", "native", "workbuddy-native"):
             path = provision.assert_inside_root(state, Path(category)/project_token/member_token)
-            files.remove(path)
+            files.remove(path, tree=True)
         steps[step] = "complete"
         step = "startup_config"
         _config(runtime, member, files)

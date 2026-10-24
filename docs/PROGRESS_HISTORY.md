@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-24 19:22：327独立partial接手修正，最终333项自检通过，待定向复验
+
+用户通知“327好了”后核对正式succeeded/submitted、结果2971作者agent:deepseek/Hall/任务匹配，读取完整1708字符自由文本及本地报告。MCP业务unknown保持；独立自报partial及4项P2与本地delivery/checks一致，未把runner成功当通过。原50份/2074815字节源/快照取件零漂移，35份/230325字节报告/反例/日志另快照在coordination/327-original-review，原材料不改，327暂未收取。实际new_no_candidate新窗/count1/session-13d42eaa-9929-4cde-9380-999435d9de22，末421001/1000000=42.1001%，不是续326。
+
+独立176组合165通过/4失败/7错误（DSH私有ACL replace、CreatePipe、DLL初始化沙箱限制），另删除API15通过、Node进程内68通过、ACL替代本地13通过/1跳过。全部原失败/P3/限制保留，不合称独立244全过。Codex先用新断言复现，43项组合13失败/1夹具遗漏created_by错误，夹具补正及产品修正后44项通过；后补无关项目范围反例，最终265Python零失败/零跳过、68Node通过，含原生临时子进程普通drain、Windows真实文件与junction/硬链接等。证据见coordination/fix1-before.log、fix1-final.log及fix1-node.log，不倒写初次结果。
+
+P2-1所有宿主health均校验空owned_launches，已退出/外部不存在也不能忽略子归属；原owner缺health拒绝，drain后复查并保留失败重试health。P2-2文件目标默认file-only，只有专属目录显式tree，Key/metadata/control目录伪装不得递归删除。P2-3真实删除墓碑身份须明确且仍在册的项目，global task/schedule新增/领取/恢复/物化守卫与写入同事务，旧全局未闭环任务保护；其它项目旧名册共享身份保持，不能伪填无关项目，不改变无删除历史的全局角色。P2-4managed独占证明失败409，不降格preserved成功；核对恢复名册后按原证明吊销。另补旧名册墓碑human创建者及重试清steps（OBS-2）；成功JSON格式可归一化、其它字段语义保持，发布失败原字节保持（OBS-1澄清）。详本片合同。
+
+本轮由Codex直接修正，DeepSeek已交付idle，产品待新冻结交同工作线定向复验后暂停。未读生产配置正文/Key/DB/私有state/原生日志会话，未生产启停/删除/CAS；公开身份仍agent:codex/prj_e8fe7066bbec/lead，七角色绑定和286保护保持。正常加载/页面人验仍未实施，下一无关片仍先确认，不扩大本片许可。
+
 ## 2026-10-24 18:35：删除角色327已派DeepSeek独立核验，产品与冻结暂停
 
 实现c61a4c4已推送，50份/2074815字节源与baseline-v1派前逐项匹配。327创建于UTC10:35:34.621225，queued/assigned，目标agent:deepseek；新工作线role-delete-independent-review-20261024、基础SHA0cc024eb…5db49，创建execution_session_state=null，实际原生决定待领取，不能预称同窗或核验通过。派前最新身份及要求重读，DSH同ins_723f2b7d12a6/PID7916 idle/无任务；286仍queued/accepted/paused。

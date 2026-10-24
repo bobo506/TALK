@@ -1119,6 +1119,7 @@ function roleDeleteMessage(code) {
     role_has_active_tasks: "该角色还有未闭环任务，请先处理并收取结果。",
     role_has_active_schedules: "该角色还有定时任务，请先结束相关定时任务。",
     role_provision_active: "角色正在配置，请等配置结束后再删除。",
+    role_delete_identity_proof_required: "独占身份归属未确认，请先核对角色名册及共享引用后再删除。",
     manager_not_stopped: "本机宿主尚未退出，请确认后台正常运行后重试。",
     local_runtime_required: "请先正常重载 TALK 后台，再重试清理。",
     runtime_config_changed: "本机配置已变化，请正常重载 TALK 后台后重试。",
