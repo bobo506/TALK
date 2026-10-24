@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-24 22:59：删除人工验收返修329已派DeepSeek独立复核
+
+实现4ef58bc4f7250a06f4d8b4af620a13bbcf4f6b88已常规推送。新role-delete-user-fix1/baseline-v1与manifest.json冻结79份/2964423字节，派前源/快照零漂移；原50份2074815字节/64份2581366字节快照均零错配。独立写根仅review/，代码/正式测试/新旧冻结暂停；不授予生产配置/Key/DB/私有state/日志访问或生产操作，实际286 paused保持。
+
+UTC14:58:41.585475创建329，target=agent:deepseek，queued/assigned，Task Hall group:task-6e37ba408c5d4603a226c86d90ecc3ee。沿continuity=role-delete-independent-review-20261024、base327/role-delete-review-v1、基础SHA0cc024eb…引用原合同并明确本次差异；创建execution_session_state=null，实际原生选择仍待运行回执，不提前称续窗。默认用户通知完成后取件，不主动等待或发普通Hall进展消息；无生产重载/两目标retry/delete，派发后只登记协调文档。
+
 ## 2026-10-24 22:56：删除人工验收两项缺陷与立即列表移除
 
 用户删除旧agent:kimi-code-k28-preview提示仍有在线/未确认实例；删除agent:workbuddy先清理中后失败，要求接受删除即列表消失。公开API只读表明K2.8服务stopped无owner、14条历史实例投影offline；逐条公开PID/创建时间OS核对13 absent/1 previous_boot。WorkBuddy墓碑已由用户原删除建立、绑定清空，revision2的private_state为failed/cleanup_budget，两条原进程absent。未读生产DB/配置或私有内容；原状态误拦依据普通代码/隔离反例确认。

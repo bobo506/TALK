@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 22:59派发：删除人工验收返修329已交DeepSeek queued/assigned，4ef58bc已推送；79份/2964423字节新源/冻结及原50/64快照零错配。唯一写role-delete-user-fix1/review/，产品/正式测试/冻结暂停，默认用户通知后取件。沿base327请求相容续窗，创建state=null、实际决定待回执，不预称复用或独立通过。283Python+82Node仅Codex自检；未重载/重试真实删除，WorkBuddy用户原墓碑与其它五binding/286保持。派发后只登记协调文档，下一无关片仍先确认。详[返修合同](docs/spec/ROLE_DELETE_USER_FIX_20261024.md)。
+
 - 2026-10-24 22:56人工验收返修：用户删除旧K2.8 Preview被历史实例误拦、WorkBuddy接入验证因cleanup_budget失败，明确要求删除接受即列表消失。Codex直接修正/365项自检通过，待冻结交DeepSeek独立复核，非选择性自启动新片。仅放行同机过期无任务且OS证明退出的原实例，轮换严格证明不变；有进展预算耗尽自动分批，逻辑移除与资源清理分别显示。原327/328报告及50/64快照保持；未再次生产delete/retry/启停/加载、不读配置/Key/DB/私有state。其它五binding与286 paused保持；WorkBuddy用户已清绑定保留事实。后端仍旧版，复核后正常加载另行确认；默认派后用户通知取件。详[返修合同](docs/spec/ROLE_DELETE_USER_FIX_20261024.md)与当前进度。
 
 - 2026-10-24 22:18最新：用户已确认正常重载并补充最小访问许可，仅原运行器读取talk-runtime.json与原human凭据正常认证；自动审批拒绝的配置/角色Key摘要检查不再继续，原helper禁用。原runtime4888及七宿主14个PID经普通drain全部absent，用户原终端API重启后新runtime3852/七宿主serving/worker无错、删除路由及7个deletion=null投影正常。仅恢复原DeepSeek gen64/ins_eb493b140f6e/PID1804 running/ready/idle，其余六停止无owner；中断后同实例心跳推进6938.368393秒，七角色完整binding/公开投影/要求/286 paused保持，页面v2资产HTTP200且匹配。先前TALK自动审批额度失败，本次原工具重试恢复；未绕过。默认24小时代码随新后台加载，未实测长跑；未删除现有角色、未改配置/sweep/CAS，页面人验待完成。327/328代码独立核验保持，本轮是协调方加载自检，不再派核验或下一功能；当前只文档/Git收尾，下一无关片仍先确认。详[加载记录](docs/spec/ROLE_DELETE_DEPLOYMENT_20261024.md)。
