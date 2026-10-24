@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-24 22:18：326默认24小时代码已随本机API/runtime/七宿主正常重载加载。仅普通恢复原DeepSeek gen64/ins_eb493b140f6e，running/ready/idle，同实例真实心跳前后推进6938.368393秒，其余六停止/无owner；七角色公开binding与286保持。不改显式CLI参数，不宣称24小时真实长跑或所有原生运行器新执行均已实测；代码核验/环境限制保持，详[本轮加载记录](ROLE_DELETE_DEPLOYMENT_20261024.md)。
+
 > 2026-10-24 17:53：326默认执行时限24小时已完成实现、Codex独立核验/集成并收取。通用/专用继承入口、受管配方及K2.8模板默认86400秒，无页面配置，现有显式参数兼容；候选149项及集成同149项过。生产尚未正常重载，受管入口须先重载后台管理器再启动角色，不能以只重启旧manager下的角色保证生效；其它等待/HTTP/ready/stop等预算保持。详[核验记录](EXECUTION_TIMEOUT_24H_20261024_REVIEW.md)。下方旧600/21600及六小时内容保留各自日期的历史语义。
 
 > 2026-10-22 23:10：用户新建workbuddy-k3原创建意图经正式worker处理为provisioned，窄宿主普通启动到gen2/ready/idle。MCP312→313同原生会话1→2、314新窗恢复1均通过并收取；3confirmed尝试/通道0，311条旧任务及六旧角色/绑定/配置/286保持。新角色和manager17772保留运行，原WorkBuddy接入验证仍停止；未改产品代码。原页面请求无人消费及gen1过期是部署缺口，配置worker常驻/宿主统一启动仍待另片确认，不把手动处理称自动链路完成。详[WorkBuddy适配](EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)和当前进度。

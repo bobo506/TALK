@@ -1,23 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-24 20:00（Asia/Shanghai）。328定向独立复验通过，无必须修正项；327/328均已收取。删除代码302b637已推送，加载方案已准备，尚未生产重载或删除现有角色。
+Updated: 2026-10-24 22:18（Asia/Shanghai）。删除功能已正常加载，协调方加载/恢复及中断后复查通过；默认24小时代码随新后台加载。327/328代码独立核验均已收取，原partial/沙箱限制保持；页面待人工验收，未删除现有角色。
 
-## 当前切片
+## 本轮实际加载
 
-- 删除入口/确认、事务守卫、墓碑防恢复、专属清理/租约/重试已实现。327的四项P2及旧名册墓碑/重试steps经Codex修正、328独立闭合；历史任务/结果/消息与共享其它项目身份保持，重新添加是新ID。
-- Codex最终265Python+68Node自检通过。独立增补API11、本机21及Node68通过；规定45项为37通过/4失败/4错误，完整265项为253通过/5失败/7错误，ACL/进程沙箱限制保留，不称独立333全过。
-- 64份/2581366字节源/新快照、旧50快照及原35审查材料取件零错配；328普通证据21份/487816字节另保留。收取后仅合同/手册等协调文档更新，产品/测试与冻结保持。
-- 328/2972自报complete并逐项验收；原327 partial/2971及失败记录不改，工具自由文本业务unknown保持。两任务已completed，收取UTC11:59:28与11:59:37。
-- 328实际续327同一原生session、count2/known、末62.3015%；未强制换窗。DeepSeek idle/无当前任务。
+- 用户明确确认重载，随后明确授权最小访问：仅原运行器读取talk-runtime.json作正常status/stop，原human凭据只供API认证；不继续被拒的生产配置/角色Key摘要检查，不输出正文。
+- 原runtime4888经普通stop/drain退出，七宿主14个原PID绑定最终均absent；七角色停止/无owner。用户已在原终端正常重启外部API，不强杀、不CAS、不改配置。
+- 新runtime3852/七宿主serving、worker无错，API healthz ok。删除公开路由及7个deletion=null/archived=false投影正常，未提交任何delete/claim/report。
+- 仅普通恢复原DeepSeek gen64/ins_eb493b140f6e/PID1804，running/ready/idle；其它六保持停止/无owner。
+- 用户报告工具中断后复查，仍是同runtime/七宿主/DeepSeek实例；心跳前后推进6938.368393秒，API uptime7020秒。TALK工具曾因自动审批额度不足未执行，本次原工具重试成功，未绕过检查或重复启停。
+- 七角色全部公开binding与重载前逐字段相等；角色/runner/model/choice/说明/项目要求保持，286仍queued/accepted/paused。首页/JS/CSS均HTTP200且与已核验资产一致，页面role-delete-v2。
+- 默认86400秒代码已随新管理器加载；未改显式CLI覆盖、未派模型验收或实测24小时长跑。
 
-## 保护与限制
+## 独立代码核验与保护
 
-- Codex公开实核agent:codex/prj_e8fe7066bbec/lead；七角色完整binding与派前一致，286仍queued/accepted/paused。
-- 未读生产配置正文/Key/DB/私有state/原生会话日志，未生产启停/删除/CAS。Kimi不派开发，下一无关片仍先明确范围并确认。
-- 原ACL marker发布、junction/子进程沙箱限制和旧直接构造墓碑P3保留；本片未生产部署，不为非阻断观察另开返修。浏览器视觉人验未完成。
-- 326默认24小时已核验/集成/收取，生产manager仍待正常重载；日志自动清理已部署并独立收尾，额外覆盖扫描按用户要求跳过。
+- 删除入口/守卫/墓碑/专属清理/租约/重试已实现。327四项P2及关联补检由Codex修正、328独立闭合，无必须修正项。两任务completed，327原partial/2971及失败不改，328/2972通过。
+- Codex265Python+68Node自检通过；独立API增补11、本机21、Node68通过。独立45/265组合仍受ACL/子进程沙箱限制，不称独立333全过。旧直接构造墓碑等P3、junction/私有ACL限制保留。
+- 64份新冻结及原50快照/35原报告保持；生产加载后仅协调文档更新，产品/测试不再修改。Kimi不派开发，286及七角色身份绑定保持。
+- 本轮为协调方加载自检，不冒称新增独立部署核验；未读生产DB或原生会话日志、未手动sweep，未保存配置/Key摘要一致证明。
 
-## 下一步
+## 人工验收与下一步
 
-- [正常加载方案](spec/ROLE_DELETE_DEPLOYMENT_20261024.md)已准备：普通drain原后台、用户原终端重启API、新runtime/worker/七宿主就绪后仅恢复原运行角色；不删任何现有角色。加载已核验删除功能并同时采用此前默认24小时代码。
-- AGENTS规定新的部署先确认，本轮328完成通知尚不包含生产重载许可；当前停在确认加载。代码核验见[本片合同](spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)，完整历史见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。
+- 刷新页面查看角色详情的“删除角色”及可取消的确认弹窗；尚未浏览器视觉人验或生产角色删除端到端验收。真实删除仍由用户明确目标并确认。
+- 当前只收尾，不派下一任务。下一无关功能先说明范围/验收并确认。[加载记录](spec/ROLE_DELETE_DEPLOYMENT_20261024.md)、[代码验收](spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)及[完整历史](PROGRESS_HISTORY.md)。

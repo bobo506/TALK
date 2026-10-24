@@ -18,7 +18,7 @@
 - 精确删除 `.talk/agents/<member>` 档案、已证明独占的 Key/credential metadata、`state_dir/{roles,native,workbuddy-native}/<project>/<member>` 及角色控制文件、精确启动 host/key_files 映射。活跃/未知私有原生进程记录也拒绝；不按 PID 接管或结束进程。Windows 逐层句柄固定目录，拒绝 reparse/hardlink/UNC、路径别名和跨角色重复资源。专属原生 HOME 可删除，共享原生登录和模型目录不作为目标。
 - 永久 OS `.guard` 文件仅有互斥标记字节，不含可恢复配置或凭据，按既有 provision 锁协议保留以防 ABA；历史诊断日志仍由原留存策略管理。旧创建/补录/轮换与请求保留公开审计事实，墓碑禁止旧创建重放、recover、sync/绑定/说明/身份档写入恢复旧角色。
 - 新建角色沿原创建接口生成新 ID；清理未完成也不会把旧配置恢复为可用。共享/imported 身份不吊销其它项目的全局 Key，本项目接入和档案仍清理。
-- 当前未生产加载、未删除任何生产角色。上线需正常重载 API 与统一后台，不能只刷新页面；旧后端缺 deletion 字段时页面隐藏删除入口。
+- 2026-10-24本机已正常重载API与统一后台，删除路由与deletion投影已加载；未删除任何生产角色，浏览器人验待完成。其它部署不能只刷新页面；旧后端缺deletion字段时页面隐藏删除入口。详[加载记录](ROLE_DELETE_DEPLOYMENT_20261024.md)。
 
 ## 328 独立复验与收取（2026-10-24 20:00）
 
@@ -39,7 +39,7 @@ P2-1/P2-2关键拒绝反例使用原ACL；两处明确替代仅用于成功配�
 
 非阻断P3保留：旧代码/直接构造的failed或pending墓碑若revoke_identity=false，existing-row重试不会重证；本片未生产部署，也未授权迁移此类旧行，不为此新增返修。真实私有ACL marker、junction、浏览器/生产加载边界保留。复核者未实查生产保护；Codex本次另以公开接口核实286仍queued/accepted/paused、七角色完整binding与派前一致、DeepSeek idle/无任务。
 
-当前代码核验闭合，未生产加载或删除任何现有角色。[正常加载方案](ROLE_DELETE_DEPLOYMENT_20261024.md)已准备，须先确认；原始证据见review-fix1/、coordination/328-received.json、328-collected.json及328-original-review/manifest.json。
+代码核验闭合后，用户已明确批准正常重载及最小运行器访问。22:18本机加载/恢复及中断后复查通过：runtime3852/七宿主正常，DeepSeek gen64/新实例ready/idle，同实例心跳推进6938.368393秒，七角色公开绑定和286保护保持；未删除现有角色，页面人验待完成。详[加载记录](ROLE_DELETE_DEPLOYMENT_20261024.md)。代码原始证据见review-fix1/、coordination/328-received.json、328-collected.json及328-original-review/manifest.json，原独立限制保持。
 
 ## Codex 首轮自检（历史记录）
 

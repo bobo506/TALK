@@ -1,5 +1,21 @@
 # 开发历史 · TALK
 
+## 2026-10-24 22:18：新版加载与中断后复查通过
+
+用户在原终端完成正常API重启后，UTC12:21:12核新runtime3852（UTC12:20:41启动）及七宿主serving、worker空闲/无错，API healthz为ok/db ok/storage ok。新公开OpenAPI含删除路由，七个角色均有deletion=null且archived=false；公开角色查询成功也证实新表/投影可用，不直接读取生产数据库。加载核验时七角色均停止/无owner。
+
+仅通过原human入口普通start恢复重载前唯一运行的DeepSeek，gen63→64、ins_eb493b140f6e/PID1804，running/ready/idle；其余六保持stopped/无owner/can_start。UTC12:22:11保存首次恢复快照。用户随后报告“刚刚断了。继续看下”，UTC14:17:39复查原runtime3852、相同七宿主与同一DeepSeek实例仍正常，API uptime7020秒；同实例last_seen_at从12:21:56.173760推进至14:17:34.542153，差6938.368393秒。此为两次真实端点观察，不声称期间逐秒监控或24小时长跑通过，未再启停。
+
+UTC14:18重新调用TALK列表核七角色全部公开binding字段与重载前一致，身份仍agent:codex/prj_e8fe7066bbec/lead；公开角色/runner/model/choice/说明/项目要求也与原快照一致。286始终queued/accepted/paused。此前TALK工具报Automatic approval review failed: workspace out of credits，是自动审批未完成、动作未执行，不是服务不安全判定；本次同一原工具重试成功，未绕过检查。初次页面资源检查也未形成证据，本次重试才实际完成。
+
+首页、workspace.js、workspace.css三个公开GET均HTTP200且字节SHA与当前已核验工作区一致；首页脚本为20261024-role-delete-v2。没有使用浏览器自动化或提交删除确认，页面视觉/取消确认弹窗仍待用户验收，生产角色删除端到端未做。
+
+此前326默认86400秒代码随本次新runtime/宿主管理器加载；不为验时限另派模型任务，不声称所有运行器真实24小时长跑或旧显式覆盖均已实测。没有生产配置改写、删除请求/claim/report、手动sweep、强杀或CAS。按收窄后的最小授权，既有运行器读取原启动清单仅供原生status/stop；没有继续被拒的配置/Key摘要检查，也未直接检查私有日志policy/state。未保存/输出凭据正文；不把未完成的摘要检查写成字节一致证明。
+
+本轮协调方加载自检通过，不冒称新增独立部署复核。327/328代码独立结果及原环境/P3限制保持，不另派任务。下一无关功能仍先说明范围/验收并确认。当前可刷新页面体验删除入口，真实删除前仍由用户指定目标并确认。
+
+最终证据：minimal-loaded.json、minimal-restored.json、minimal-heartbeat.json、public-binding-preservation.json、public-assets.json；前序授权/普通退出证据和自动审批限制原样保留。
+
 ## 2026-10-24 20:00：328定向独立通过，327/328均收取，待确认正常加载
 
 用户通知“328好了”，正式328 succeeded/submitted、结果2972的作者agent:deepseek/Hall/任务号与完整正文和本地report/checks/delivery核对一致，工具自由文本业务unknown保持。64份/2581366字节源/新快照、原50份/2074815字节快照与原35份/230325字节审查材料重新比对零错配；328普通证据21份/487816字节另存coordination/328-original-review，不读取隔离凭据或私有state。
