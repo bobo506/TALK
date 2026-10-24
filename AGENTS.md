@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 18:35派发：删除角色独立核验327已交DeepSeek，创建queued/assigned；c61a4c4已推送，50份/2074815字节baseline-v1与manifest-v1逐项零漂移。唯一写.tmp/role-delete-v1/review/，禁止生产配置正文/Key/DB/私有state/原生会话日志、启停/删除/sweep/CAS与产品/Git写入；仅普通源和合成隔离验证。产品/冻结暂停，默认用户通知后取件，不自动等待；新工作线role-delete-independent-review-20261024，实际原生决策state=null待领取，不预称同窗或通过。286 queued/accepted/paused、七角色绑定/模型与生产保持，尚未部署/页面人验。
+
 - 2026-10-24 18:30删除角色片：用户已明确“可以，继续，你来开发，deepseek核验”，本片由Codex直接开发/自测、DeepSeek独立核验，取代默认首次派发分工。删除入口、事务守卫/墓碑、专属资源清理/租约/失败重试已实现；29新增Python及147关联回归（新增deletion公开字段断言更新后复跑）、68Node通过，真实隔离HTTP/Windows文件/原Popen普通drain通过。冻结后产品暂停待DeepSeek独立核验，不把自检称独立通过；未读生产配置正文/Key/DB/私有state/原生日志，未生产启停/删除，7角色绑定与286 paused保持。详[本片合同](docs/spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)与当前进度；下一无关片仍先确认。
 
 - 2026-10-24 17:53最新：326/2970已独立核验、集成并收取completed。固定默认24小时/86400秒且无页面配置；候选146测试+真实隔离CLI正常/超时/取消3项通过，集成同149通过。原54快照及59候选冻结保持，13份产品/测试/指南集成，3指南仅补正受管入口须重载后台管理器再启动角色；生产未重载/启停，现有进程仍旧值。2970自由文本业务unknown保留，不以本地complete自报替代独立实查；326实际new_no_candidate/count1、末9.5389%。2968消息通道占锁问题记录但本片未改路由；当前只文档/Git收尾，不开下一片。详[326核验](docs/spec/EXECUTION_TIMEOUT_24H_20261024_REVIEW.md)与精简进度。

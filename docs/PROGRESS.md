@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-24 18:30（Asia/Shanghai）。删除角色切片已获确认，由Codex开发、自检，冻结待DeepSeek独立核验；未生产加载或删除现有角色。
+Updated: 2026-10-24 18:35（Asia/Shanghai）。删除角色切片已由Codex开发、自检；c61a4c4已推送，DeepSeek独立核验327已派queued/assigned。产品/冻结暂停，默认用户通知后取件；未生产加载或删除现有角色。
 
 ## 本片实现与验证
 
@@ -8,6 +8,7 @@ Updated: 2026-10-24 18:30（Asia/Shanghai）。删除角色切片已获确认，
 - 本机统一后台只普通drain原Popen，按精确DB/项目根/配置摘要清理专属档案、凭据、私有状态及启动映射。共享全局Key、登录/模型和历史任务/结果/消息保留；重新添加使用新身份。
 - 29新增Python及147关联回归通过，68Node通过；含真实隔离HTTP闭环、Windows文件删除/占用/链接/共享保护、普通退出子进程、并发/租约/崩溃与防恢复。初次169关联组合中唯一新增公开字段白名单断言已补正复跑，不倒写初次全绿；C盘短路径夹具限制和原失败日志保留。
 - 证据与冻结见.tmp/role-delete-v1/及[本片合同](spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)。自检不能代替DeepSeek独立核验；当前冻结后暂停产品修改，默认派后结束、用户通知完成后取件。
+- 327创建UTC10:35:34，50份/2074815字节源与baseline-v1逐项匹配，唯一写review/。新工作线role-delete-independent-review-20261024，实际原生决策state=null待领取，不预称同窗/独立通过；派前DSH同实例idle。派发回执见327-dispatch.json。
 
 ## 保留边界
 

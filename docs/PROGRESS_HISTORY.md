@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-24 18:35：删除角色327已派DeepSeek独立核验，产品与冻结暂停
+
+实现c61a4c4已推送，50份/2074815字节源与baseline-v1派前逐项匹配。327创建于UTC10:35:34.621225，queued/assigned，目标agent:deepseek；新工作线role-delete-independent-review-20261024、基础SHA0cc024eb…5db49，创建execution_session_state=null，实际原生决定待领取，不能预称同窗或核验通过。派前最新身份及要求重读，DSH同ins_723f2b7d12a6/PID7916 idle/无任务；286仍queued/accepted/paused。
+
+独立核验写根只review/，范围含真实隔离HTTP/Windows清理和必要反例，禁止生产正文/Key/DB/私有state/原生会话日志、生产启停/删除/sweep/CAS、产品/冻结/协调文档及Git写入。隔离wrapper显式替换生产配置与runtime pointer，支持全部临时写入review；本机精确DB绑定及真实HTTP清理smoke另通过。Codex产品暂停，仅记录派发/Git收尾，默认用户通知后取件，不主动等待或发送普通Hall消息。本片未生产加载，七角色/绑定及286保持；详327-dispatch.json、manifest-v1.json及本片合同。
+
 ## 2026-10-24 18:30：删除角色已由Codex开发、自检，冻结待DeepSeek独立核验
 
 用户批准此前已说明的删除范围，并明确由Codex开发、DeepSeek核验；本次覆盖页面确认、事务守卫/墓碑、角色配置清除、独占Key吊销、持久清理状态/租约、Windows专属文件清理、失败重试及新建新身份。历史任务/结果/消息保留，共享身份全局Key/原生登录/模型保持。详情见[本片合同](spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)。
