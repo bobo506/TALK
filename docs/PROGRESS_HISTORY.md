@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-24 17:36：326已正式领取，进一步核实澄清回答占用普通消息执行通道
+
+用户再次报告326仍未接单。Codex实核任务仍queued/clarification_answered、attempt0；DeepSeek同ins_723f2b7d12a6/PID7916 busy/current_task_id=2968，同时候选实现及检查文件持续更新。读取普通源确认：run_bridge对定向Task Hall回答仍按普通消息调用handle_incoming_message，并与run_task_queue_worker共用run_lock；消息号2968因此占用执行路径，队列需等该轮结束。这不是326已有claim，上一轮仅回答澄清并不足以证明恢复领取。
+
+本轮不打断正在写候选的开发，不伪造claim、不切换身份、不重派/强制accept/启停服务。普通消息完成并回复2969后，正式326已由agent:deepseek/ins_723f2b7d12a6在UTC09:36:24.588032（本地17:36:24）领取，running/in_progress、attempt1；UTC09:36:44.706950同领取心跳推进，result_message_id仍null、execution_session_state仍null。独立状态等待命中in_progress，并由get_task确认上述字段，证据coordination/326-confirmed-claim.json。
+
+2969自报与本地delivery/report是普通消息轮的候选产物，不能当正式326交付或据此收取；原54份/1963080字节源/快照再核零漂移，正式产品/生产配置/服务未动。原TALK实例元数据及候选文件时序已足够定位；沙箱读取进程CIM元数据被拒后未提升读取，也未读取生产日志/Key/DB或原生会话。当前停止领取恢复观察，按原约定由用户通知326完成后再核正式交付、暂停状态与候选，自检限制如实保留。普通消息路由问题已记录，本轮未改该产品逻辑，不把本次自然释放锁称代码修复。
+
 ## 2026-10-24 17:12：326待接单实为澄清，补充遗漏的WorkBuddy测试权限并正式回答
 
 用户报告DeepSeek没有接326、重启角色也无效。Codex只读核326和当前实例：326 queued/clarification_requested、attempt0，无claim；DeepSeek于14:50消息2967已明确询问冻结WorkBuddy测试默认21600断言不在候选测试可改白名单的问题。用户重启后新ins_723f2b7d12a6/PID7916 idle，本次未据此误判角色/宿主故障，未读生产日志/配置正文或启停服务。

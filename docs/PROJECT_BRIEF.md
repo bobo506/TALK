@@ -6,6 +6,8 @@
 
 ## 当前实施状态（2026-10-23）
 
+2026-10-24 17:36：326已正式running/in_progress，agent:deepseek/ins_723f2b7d12a6、attempt1、17:36:24真实claim及同领取心跳确认。此前回答2968被普通消息执行并占同一run_lock，结束回复2969后队列才领取；2969不当正式326交付。源/快照54份仍零漂移，未启停/改产品或生产配置，默认用户通知正式完成后取件，详[当前进度](PROGRESS.md)和[接单记录](spec/EXECUTION_TIMEOUT_24H_326_CLARIFICATION.md)。
+
 2026-10-24 17:12：326未接单实为14:50预检等待澄清，任务包漏列一个已冻结WorkBuddy测试的可改权限；Codex已核实并仅增该候选默认断言同步权限，正式回答2968后queued/clarification_answered，尚未称running。原54源/快照零漂移、产品配置服务不变、不新派任务，详[澄清补正](spec/EXECUTION_TIMEOUT_24H_326_CLARIFICATION.md)与[当前进度](PROGRESS.md)。
 
 2026-10-24 14:47：用户跳过额外日志核查、要求已实现且无使用缺陷时优先新功能；本片已明确简化为各CLI入口代码固定默认24小时（86400秒），无页面配置。326交DeepSeek首次实现/自测、Codex独立核验，54份冻结，当前queued/assigned；尚未产品交付/集成/加载，不启停或热改生产，其它等待/网络/启停预算及286保持，详[本片合同](spec/EXECUTION_TIMEOUT_24H_20261024.md)与[当前进度](PROGRESS.md)。
