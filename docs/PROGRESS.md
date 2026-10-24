@@ -1,12 +1,13 @@
 # Project Progress
 
-Updated: 2026-10-24 14:47（Asia/Shanghai）。用户已确认本片简化为代码固定默认24小时，无页面配置；326已派DeepSeek queued/assigned，尚未交付。前片日志自动清理已完成并保持启用，额外日志核查已跳过；6c2d7a1决策记录已推送。本轮不改生产配置或启停服务。
+Updated: 2026-10-24 17:14（Asia/Shanghai）。用户报告326未接单、重启角色无效；实核是14:50预检等待澄清，Codex已补列必要候选测试并正式回答2968，当前queued/clarification_answered。DeepSeek最新busy/current_task_id=2968是在处理回答消息，不能称已领取326。24小时本片未交付/生产加载；本轮不改产品/生产配置或启停服务。
 
 ## 当前切片：326默认执行时限24小时
 
 - [本片合同](spec/EXECUTION_TIMEOUT_24H_20261024.md)：TALK自带CLI入口及受管配方/自带模板默认统一86400秒（24小时）；不增加页面配置、存储或新API，现有CLI显式参数仅保留兼容。此前待确认的默认6小时建议由本次明确授权取代。
 - DeepSeek首次实现/必要自测，交付暂停后Codex独立核验、必要直接修正及集成；唯一写根.tmp/execution-timeout24h-v1/deepseek/，正式产品与54份冻结源暂停修改。基线6c2d7a1，54份/1963080字节baseline-v1与源派前零漂移，manifest及实际任务请求/回执在coordination/。
 - 326为独立顶层general任务、queued/assigned，目标agent:deepseek；新工作线execution-timeout24h-20261024/基础版本1，不强续日志base315。execution_session_state=null，原生实际会话决策待交付回执，不提前声称新窗或复用通过。
+- [接单澄清补正](spec/EXECUTION_TIMEOUT_24H_326_CLARIFICATION.md)：14:50问题2967指出原白名单漏列WorkBuddy测试默认21600断言；已核实并仅增候选tests/test_workbuddy_execution_session.py的必要默认断言同步权限，原54冻结源/快照仍零漂移。17:12正式回答2968后变为queued/clarification_answered，待正常再预检/领取，不重建任务。用户重启后的新DSH ins_723f2b7d12a6/PID7916 idle；无需因本澄清再次重启。
 - 覆盖通用CLI/DSH、Codex、Kimi Code、WorkBuddy及pi兼容包装器；用真实parser/最终argv/模板一致性和隔离短预算假CLI验收。MCP客户端T/显式W/余量、HTTP、ready/stop、租约、21600上下文证明、70%及缺数10/11保持。
 - 已运行进程仍沿原启动参数；未加载24小时新值，不热改或中断任务、不操作角色/owner/286、不读生产配置正文/Key/DB/私有state/原生会话日志，不做真实模型调用。本片不等于主动MCP适配；正常加载另按可审代码及既有部署约定。
 - 默认派后结束，用户通知326完成后取件；不主动等待或追加下一功能。

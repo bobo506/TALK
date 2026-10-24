@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-24 17:12：326待接单实为澄清，补充遗漏的WorkBuddy测试权限并正式回答
+
+用户报告DeepSeek没有接326、重启角色也无效。Codex只读核326和当前实例：326 queued/clarification_requested、attempt0，无claim；DeepSeek于14:50消息2967已明确询问冻结WorkBuddy测试默认21600断言不在候选测试可改白名单的问题。用户重启后新ins_723f2b7d12a6/PID7916 idle，本次未据此误判角色/宿主故障，未读生产日志/配置正文或启停服务。
+
+Codex核实test_workbuddy_execution_session.py:356及原54份/1963080字节源/快照零漂移，承认任务包漏项；在原24小时授权内只补这一候选测试默认断言86400权限，通过原发起者talk_reply_task/submit_clarification_answer正式回答2968。工具回执326变为queued/clarification_answered、control_status active，尚不能据此声称已领取。原任务、14:50问题、基础合同及冻结54源不改，不新派任务；原产品/生产禁区、其它预算、286和交付暂停保持。
+
+详[澄清补正](spec/EXECUTION_TIMEOUT_24H_326_CLARIFICATION.md)及coordination/326-clarification-*；默认仍在完成后由用户通知取件，本轮仅核解除阻塞与必要领取状态，不持续等待任务交付或追加新功能。
+
+17:14补核：一次显式50秒领取观察正常到期，326仍queued/clarification_answered；DeepSeek同新实例busy/current_task_id=2968，为处理回答消息，不冒称已claim326。4份补正文档UTF-8和git diff --check通过，未运行无变化产品回归。
+
 ## 2026-10-24 14:47：用户简化为固定默认24小时，326已派DeepSeek首次实现
 
 用户进一步明确“不用，对这个切片功能，我们简化到当前默认写死为24个小时吧”。本片不开发页面配置、存储或API，统一TALK自带CLI默认86400秒及启动/合同/部署示例模板，现有显式CLI参数保留兼容。任务继续按一次CLI调用计时，不混入MCP工具/等待/HTTP/ready/stop/租约或21600上下文证明有效期；原6小时待确认建议已由本次24小时授权取代。
