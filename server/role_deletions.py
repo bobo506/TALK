@@ -93,6 +93,22 @@ def _historical_local_instance_exited(instance, now):
         return False
 
 
+def _task_blocks_deletion(task, now):
+    if task.status in ("queued", "running") or task.control_status == "paused":
+        return True
+    if task.workflow_status in ("completed", "canceled"):
+        return False
+    # Failed runs cannot use collect-result (which only accepts submitted).
+    # Recognize a proven terminal failure without rewriting its audit history.
+    from server.role_services import _as_utc
+    finished = _as_utc(task.finished_at)
+    return not (task.status == task.workflow_status == "failed"
+                and finished is not None and finished <= now
+                and task.claim_token is None and task.lease_expires_at is None
+                and task.control_status in (None, "active", "canceled")
+                and task.reserved_slice_count in (None, 0))
+
+
 def _idle(session, project, member):
     service = session.get(m.RoleServiceState, (project, member))
     if service and (service.desired_state != "stopped"
@@ -112,12 +128,11 @@ def _idle(session, project, member):
     now = datetime.now(timezone.utc)
     if any(not _historical_local_instance_exited(instance, now) for instance in instances):
         raise HTTPException(409, "role_instance_active")
-    # Uncollected submissions, pauses and creator obligations must be resolved too.
+    # Uncollected submissions, pauses and unfinished creator obligations still block.
     tasks = session.exec(select(m.AgentTask).where(
         or_(m.AgentTask.project_id == project, m.AgentTask.project_id.is_(None)),
         or_(m.AgentTask.target_member_id == member, m.AgentTask.created_by == member))).all()
-    if any(t.workflow_status not in ("completed", "canceled")
-           or t.status in ("queued", "running") or t.control_status == "paused" for t in tasks):
+    if any(_task_blocks_deletion(task, now) for task in tasks):
         raise HTTPException(409, "role_has_active_tasks")
     if session.exec(select(m.AgentTaskSchedule).where(
             or_(m.AgentTaskSchedule.target_member_id == member,

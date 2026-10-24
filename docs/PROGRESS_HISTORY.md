@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-25 00:42：用户重启后WorkBuddy真实清理完成，旧K2.8失败历史误拦必要补正
+
+用户回报原终端正常重启API。UTC16:27:42实际核新runtime11200/external、六宿主serving/worker空闲无错、API健康；与原before完整非service公开角色投影/要求保持，286 queued/accepted/paused。历史实例误拦解除，旧K2.8正式delete却被role_has_active_tasks拒绝，无墓碑或绑定修改。只读公开19条相关任务元数据定位唯一250：2026-10-16已failed/failed/finished、无lease、原2767未收取；collect-result只接受submitted，形成失败历史不能解除的死结。
+
+原历史“不收取/追改250”保持，未对生产250 collect/cancel/resume或改库，两次公开task/result逐字段完全相同。Codex按用户当前删除缺陷授权修正分类，只有runner/workflow均failed、结束时间明确且不在未来、无claim/lease/保留预算且control稳定时可保留失败历史继续删除；queued/running/paused/submitted/缺证/混合活动义务及原服务/实例/定时/配置/独占守卫保持。不改任务/消息/绑定快照，无新表/配置/权限。产品仅server/role_deletions.py、测试仅test_role_deletion.py。
+
+先完成另一已指定目标：UTC16:30:05正式重试agent:workbuddy原failed墓碑，r3 pending、实见r4/5 cleaning与private_state pending，UTC16:32:32.772268 r6 complete；credentials preserved/identity_disabled=false，其它步骤complete，角色接口实际移除。由正常runtime跨轮清理，不看私有目录、不手工删除、不造claim/report。仅普通恢复原DSH gen66/ins_203aa34895b9/PID8092 ready/idle，同实例真实心跳90.105977秒；其余五现存角色停止。两目标之外五角色公开配置/绑定/要求与before相同，286 paused保持；K2.8仍原绑定/无deletion。
+
+新4项真实隔离API测试修前2失败/2过；首个143组合141过/2失败是合成旧任务的NULL默认字段在API启动迁移后与迁移前快照不同，改为正常初始化后的删除基线，不改迁移产品代码。原before/selfcheck失败日志保留；补正后4项定向过，最终同四模块143/143全过、102.836秒、零错/跳过，重叠不相加。未改页面/本机清理，不重跑Node/原283。新守卫尚未生产加载，自检不替独立复核。
+
+准备新冻结交DeepSeek定向复核后产品暂停；新role-delete-failed-history-v1材料与旧50/64/79快照、327/328/329报告分开，原250失败证据保留。用户允许当前验证无误后继续一片、自行开发/DeepSeek复核及回来人验的授权保持，但当前K2.8未闭合，不提前实施选择性自启动，不扩大私有访问或生产部署范围。
+
 ## 2026-10-24 23:55：用户授权验证后继续一片，正常后台退出，待原API终端重启
 
 在本轮具体加载确认问题之后，用户明确“验证好无误后你可以继续开下一个切片，你开发deepseek复核，我要离开下，回来再验收”。据此继续当前方案的最小正常加载与已指定两角色删除验证；仅在当前真实验证全部通过后允许一个下一选择性项目自启动切片的开发/自测/DeepSeek独立复核，人工验收延后。该授权覆盖本轮必要动作与条件下一片，不扩为未验证先开片、连续多片、自动等待或读取生产配置/Key摘要；不重复请求同一范围确认。

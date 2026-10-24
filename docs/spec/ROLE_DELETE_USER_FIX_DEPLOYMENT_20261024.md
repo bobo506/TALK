@@ -1,6 +1,18 @@
 # 删除人工验收返修的正常加载与两目标验证（2026-10-24）
 
-状态：用户已要求继续验证，验证无误后允许再开一个切片，由Codex开发、DeepSeek复核，人工验收留待返回后。本轮原runtime3852及六个现存宿主已普通退出，12个原宿主PID绑定均absent，七角色stopped/无owner；待用户原终端重启external API，再核新版并完成两个目标删除。329 complete/2973已收取，产品4ef58bc保持；当前未再次提交真实delete/retry，未实施下一片。
+状态：用户已正常重启原API，新runtime11200/六宿主与worker健康。WorkBuddy正式重试已complete并从角色接口移除；DeepSeek已恢复gen66/ins_203aa34895b9/ready/idle、同实例心跳推进90.105977秒。旧K2.8仍被历史250 failed/failed误当活动任务阻挡；Codex补正143自检通过，待DeepSeek定向复核及后续API正常加载。250原任务/结果保持，当前没有开启下一自启动片。
+
+## 2026-10-25 00:39：WorkBuddy真实删除通过，旧K2.8发现失败历史兼容缺陷
+
+用户已回报原终端正常重启API。UTC16:27:42核runtime11200（新PID）/六宿主serving/worker无错、API健康，完整非service公开投影/要求与before保持，旧WorkBuddy failed墓碑不创建宿主；角色均停止无owner。
+
+正式旧K2.8删除通过原实例门后，被role_has_active_tasks拒绝，未创建墓碑/清绑定。只读公开任务元数据发现唯一250，2026-10-16已failed/failed/finished、lease空；collect-result只接受submitted，所以不能靠普通收取消除误拦。历史“不收取/追改250”保持，没有生产collect/cancel/resume或改库。两次公开250任务/结果逐字段一致。
+
+因此先完成无关的另一目标：UTC16:30:05对agent:workbuddy的原failed墓碑正式重试，r3 pending，r4/5 cleaning及private_state pending被实际观测，UTC16:32:32.772268终态r6 complete，credentials preserved、identity_disabled=false，全部其它清理步骤complete。此为正常runtime多轮实际清理与正式回执，不是隔离用例或手工补证；角色接口已经不再返回WorkBuddy。
+
+仅普通start恢复原DeepSeek，gen66/ins_203aa34895b9/PID8092 running/ready/idle，heartbeat前后90.105977秒，六宿主仍serving/worker无错；其它五个现存角色停止。两目标之外五角色完整公开配置/绑定/要求与before一致，286 queued/accepted/paused，K2.8仍原绑定/无deletion。
+
+Codex现仅补正已终止失败历史分类，保留250原failed状态/结果，143项隔离相关自检通过，待冻结交DeepSeek独立复核；详[必要补正合同](ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)。新守卫尚未加载，329原代码/报告及旧快照不改。用户条件下一片仍已授权，但当前两个目标验证未全部完成，不提前开片。
 
 ## 2026-10-24 23:55：已正常退出，待原终端重启API
 

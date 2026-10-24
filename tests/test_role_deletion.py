@@ -123,6 +123,69 @@ class RoleDeletionTests(RoleApiTestCase):
             session.add(m.AgentInstance(id="ins_fixture",member_id=self.member,runtime="dsh",status="idle"));session.commit()
         self.assertEqual(self.delete().json()["detail"],"role_instance_active")
 
+    def test_finished_failed_history_is_not_collectable_and_does_not_block_delete(self):
+        message=self.add_message(from_id=self.member,to_ids='["human:bobo"]',message_type="text",content="original bridge failure")
+        with self.session() as session:
+            task=m.AgentTask(project_id="prj_alpha",target_member_id=self.member,created_by="human:bobo",content="failed history",
+                status="failed",workflow_status="failed",control_status="active",finished_at=datetime.now(timezone.utc)-timedelta(days=8),
+                result_message_id=message.id,last_error="original failure",reserved_slice_count=0)
+            session.add(task);session.commit();task_id=task.id
+        with self.make_client() as client:
+            self.assertEqual(client.post(f"/api/tasks/{task_id}/collect-result",headers={"X-API-Key":"bobo-key"}).status_code,409)
+        # The normal test API lifespan fills legacy task-tree NULL defaults.
+        # Take the deletion baseline after that unrelated startup migration.
+        with self.session() as session:
+            original=session.get(m.AgentTask,task_id).model_dump(mode="json")
+            result_before=session.get(m.Message,message.id).model_dump(mode="json")
+        result=self.delete();self.assertEqual(result.status_code,200,result.text)
+        receipt=self.claim();self.assertEqual(self.report(receipt).status_code,200)
+        with self.session() as session:
+            self.assertEqual(session.get(m.AgentTask,task_id).model_dump(mode="json"),original)
+            self.assertEqual(session.get(m.Message,message.id).model_dump(mode="json"),result_before)
+
+    def test_finished_failed_creator_global_history_is_preserved(self):
+        with self.session() as session:
+            task=m.AgentTask(project_id=None,target_member_id="agent:worker",created_by=self.member,content="legacy failed creator",
+                status="failed",workflow_status="failed",finished_at=datetime.now(timezone.utc)-timedelta(hours=1))
+            session.add(task);session.commit();task_id=task.id
+        with self.make_client() as client:
+            self.assertEqual(client.get("/healthz").status_code,200)
+        with self.session() as session:
+            original=session.get(m.AgentTask,task_id).model_dump(mode="json")
+        result=self.delete();self.assertEqual(result.status_code,200,result.text)
+        with self.session() as session:
+            self.assertEqual(session.get(m.AgentTask,task_id).model_dump(mode="json"),original)
+
+    def test_failed_task_without_terminal_proof_still_blocks_deletion(self):
+        now=datetime.now(timezone.utc)
+        cases=[{"finished_at":None},{"finished_at":now+timedelta(minutes=1)},
+            {"lease_expires_at":now+timedelta(minutes=1)},{"lease_expires_at":now-timedelta(minutes=1)},
+            {"claim_token":"still-owned"},{"reserved_slice_count":1},
+            *[{"control_status":control} for control in ("paused","pause_requested","awaiting_human","cancel_requested","unknown")],
+            {"status":"running"},{"status":"queued"},{"status":"succeeded"},
+            {"workflow_status":"submitted"},{"workflow_status":"in_progress"},{"workflow_status":"accepted"}]
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                values=dict(project_id="prj_alpha",target_member_id=self.member,created_by="human:bobo",content="guard failed",
+                    status="failed",workflow_status="failed",control_status="active",finished_at=now-timedelta(hours=1))
+                values.update(overrides)
+                with self.session() as session:
+                    task=m.AgentTask(**values);session.add(task);session.commit();task_id=task.id
+                rejected=self.delete();self.assertEqual(rejected.status_code,409,rejected.text)
+                self.assertEqual(rejected.json()["detail"],"role_has_active_tasks")
+                with self.session() as session:
+                    self.assertIsNone(session.get(RoleDeletion,("prj_alpha",self.member)))
+                    session.delete(session.get(m.AgentTask,task_id));session.commit()
+
+    def test_terminal_failed_history_does_not_hide_another_active_task(self):
+        with self.session() as session:
+            session.add(m.AgentTask(project_id="prj_alpha",target_member_id=self.member,created_by="human:bobo",content="old failed",
+                status="failed",workflow_status="failed",finished_at=datetime.now(timezone.utc)-timedelta(days=1)))
+            session.add(m.AgentTask(project_id=None,target_member_id=self.member,created_by="human:bobo",content="still queued"))
+            session.commit()
+        result=self.delete();self.assertEqual(result.status_code,409,result.text)
+        self.assertEqual(result.json()["detail"],"role_has_active_tasks")
+
     def test_pending_launch_provision_request_and_schedule_are_protected(self):
         rows=[m.RoleServiceLaunch(launch_id="launch-delete-fixture",project_id="prj_alpha",member_id=self.member,
                 action="start",generation=1,expected_instance_id="ins_fixture",launch_expires_at=datetime.now(timezone.utc)+timedelta(minutes=1)),

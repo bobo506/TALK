@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-25 00:42：用户API重启后329修复已加载runtime11200/六宿主，WorkBuddy正式r6 complete/角色接口移除，DSH gen66恢复且心跳推进90.105977秒。旧K2.8剩余阻挡是250已终止failed历史不可collect；Codex只读分类补正143自检过，待DeepSeek独立复核/正常加载，不改250原任务结果。五保护角色/286保持；下一片虽已条件授权，当前未闭合不提前实施。详[补正合同](spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)和[进度](PROGRESS.md)。
+
 2026-10-24 23:55：用户授权当前验证无误后继续一个下一切片，Codex开发/DeepSeek复核、人工验收等用户返回；下一片为此前讨论的选择性项目自启动，当前验证未完不提前实施。原runtime3852及六现存宿主已正常退出，12原PID全absent、七角色停止无owner、DSH gen65，公开非service角色投影/绑定/要求/286保持。现在待用户原终端重启external API，随后核新版/完成两目标删除/恢复DSH/心跳，再推进条件下一片，无需重复同范围确认。尚未delete/retry或开新片。详[加载记录](spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)和[当前进度](PROGRESS.md)。
 
 2026-10-24 23:47：329删除返修独立complete/2973已核验收取，无必须修正项；历史实例门/自动分批/整页列表即时移除闭合。API核心8/本机5/整页8/Node82过，另1P3探针失败、完整Python5F/7E环境限制保持，不称全独立通过。79新与50/64原快照零错配，产品4ef58bc未再改；实际新窗/count1/末38.1537%，七binding与286保护保持。正常重载与真实目标delete/retry尚未执行，[具体方案](spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)待确认；详[进度](PROGRESS.md)。

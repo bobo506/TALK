@@ -1,27 +1,26 @@
 # Project Progress
 
-Updated: 2026-10-24 23:56（Asia/Shanghai）。当前正常加载已获继续验证安排授权，原后台/六宿主已正常退出；待用户原终端重启external API。两个目标尚未重试删除。用户已授权当前全部验证通过后继续一个下一片，Codex开发/DeepSeek复核，人工验收等返回，不再重复该片确认。
+Updated: 2026-10-25 00:42（Asia/Shanghai）。329修复已加载，WorkBuddy正式清理complete并从角色接口移除；DeepSeek已恢复。旧K2.8发现额外的“已终止failed历史”误拦，Codex补正143自检通过，待冻结交DeepSeek定向复核；新守卫未加载，下一自启动片尚未开工。
 
-## 当前现场
+## 当前运行与真实删除
 
-- 实际身份agent:codex / prj_e8fe7066bbec / lead。329 complete/2973已核验收取completed，无必须修正项，产品4ef58bc保持，尚未加载新API/清理器。
-- UTC15:51:24预检runtime3852/external、worker空闲无错、无running任务，仅DeepSeek gen64/ins_eb493b140f6e运行ready/idle；实际六宿主（原WorkBuddy manager已由用户原删除清理）。
-- UTC15:51:56只从原统一入口普通stop一次。UTC15:52:54最终原runtime3852和六宿主12个原PID/创建时间绑定全部absent；七角色stopped/无owner，DeepSeek gen65。非service公开角色完整投影/绑定/开发要求与before一致，286 queued/accepted/paused。
-- 外部API仍由用户原终端运行；normal status为api_mode=external/owns_original_popen=false，reload-api明确runtime_api_not_owned。已发原终端Ctrl+C重跑原命令的操作提示，未收到重启完成回复；不接管、强杀或另起第二API。
-- 精确目标 `agent:kimi-code-k28-preview` 仍deletion=null；`agent:workbuddy` 仍用户原failed/revision2/cleanup_budget。另两个managed K2.8/workbuddy-k3保留。本轮未真实delete/retry、未恢复DSH或派下一任务。
-- 原human凭据只正常认证，原启动清单仅既有运行器status/stop正常消费；未额外读生产配置/角色Key正文或摘要、DB/私有state/原生会话日志。不CAS、不手工claim/report/sweep。
+- agent:codex / prj_e8fe7066bbec / lead。用户已原终端正常重启API；新runtime11200/六宿主serving、worker无错，原非service公开角色投影/要求保持。
+- agent:workbuddy正式重试r3，观测r4/5 cleaning，UTC16:32:32.772268（本地00:32）r6 complete；credentials preserved/identity_disabled=false，其它清理步骤complete。角色接口已移除它，未查看私有目录或手工删除文件。
+- 原DeepSeek普通start恢复gen66/ins_203aa34895b9/PID8092，running/ready/idle，同实例心跳推进90.105977秒；其它五个现存角色停止无owner。
+- 两目标之外五角色完整公开配置/绑定/要求与before一致；286仍queued/accepted/paused。另两个managed K2.8/workbuddy-k3保留。
 
-## 验证和证据
+## K2.8 当前必要补正
 
-- 329独立核心API8/本机5/整页8/Node82通过；另1严格步骤形状P3失败，完整Python283为271过/5F/7E环境限制，原失败保留。Codex原283+82自检全过，不称全部独立通过、不为P3再开返修。
-- 新79/原50/64快照、327/328/329原报告保持；329原交付15份/190160字节另存coordination/329-original-review。产品/正式测试无新改动。
-- 当前证据在.tmp/role-delete-user-fix1/deployment/：authorization、before、stop-precheck、stop-request、drain-observation-*、drained及lifecycle.py。首个默认沙箱预检PermissionError未完成，后原最小命令在授权下正常执行，没有自动审批拒绝或私有读取绕行。
+- 精确目标agent:kimi-code-k28-preview已解除历史实例误拦，但正式delete因role_has_active_tasks拒绝，未建墓碑/清绑定。
+- 唯一阻挡为250：2026-10-16已failed/failed、有finished_at/无lease，原result2767未收取。collect-result只接受submitted；旧“不收取/追改250”保持，未生产collect/cancel/resume或改DB。前后公开250任务/原结果逐字段相同。
+- 仅server/role_deletions.py + tests/test_role_deletion.py补正：只有failed/failed、明确已结束、无claim/lease、无保留预算且非暂停/待人工控制的历史不再误拦。不更改任务/结果/绑定快照；queued/running/paused/submitted/缺证/混合活动任务及其它原守卫保持。
+- 最终四模块143/143通过，4新增包含在内不相加；修前2反例失败、首个组合2夹具迁移基线失败原日志保持，修正后定向4及最终143全过。未改前端/本机清理，不重复Node或原283全组。
+- 新守卫尚未加载；143只是Codex自检，不代称独立通过。原327/328/329结果、50/64/79快照、250历史及286保护保持。
 
-## 恢复后顺序（已经授权）
+## 下一步和授权
 
-1. 用户回报原终端API正常重启后，核新API/runtime/worker、六宿主就绪，原WorkBuddy墓碑保持且不新建宿主；只刷页面不足以加载API。
-2. 对两个精确目标依次正式delete/retry，GET正式状态跟进自动多轮到complete或明确failed；不伪造回执或绕过live/unknown/归属/占用守卫。
-3. 普通start只恢复原DeepSeek，验证ready/idle和真实心跳推进；其它四个保留角色停止，五角色公开配置/绑定/286保护一致。
-4. 当前真实验证全部通过后，直接开展此前讨论的一个选择性项目自启动切片，由Codex开发/自测、DeepSeek独立复核，人工验收等用户返回。用户最新条件授权已记入AGENTS，不重复确认、不扩成连续多片，也不在当前验证未完时提前实施。
+冻结新片role-delete-failed-history-v1后交DeepSeek定向复核，Codex暂停产品修改。通过后正常加载API、正式删除旧K2.8并核250不变；当前许可持续覆盖必要验证/修复，不重复询问同范围，外部API仍需原终端正常重启。
 
-详[当前加载记录/恢复方案](spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)、[329收尾](spec/ROLE_DELETE_USER_FIX_20261024.md)及[历史](PROGRESS_HISTORY.md)。
+用户已经授权：当前真实验证全部通过后，继续一个此前讨论的选择性项目自启动切片，Codex开发、DeepSeek独立复核，人工验收等用户返回。当前K2.8未闭合，不提前开新功能；不扩大连续多片或生产私有访问权限。
+
+详[失败历史补正合同](spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)、[实际加载记录](spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)及[历史](PROGRESS_HISTORY.md)。

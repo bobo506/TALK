@@ -1,5 +1,7 @@
 # 删除角色人工验收缺陷修正（2026-10-24）
 
+2026-10-25 00:39：329修复已随用户原API重启加载，WorkBuddy实际正式清理r6 complete并从角色接口消失；DSH gen66恢复且同实例心跳推进90.105977秒。旧K2.8已解除历史实例误拦，但被旧250 failed/failed历史守卫阻断；其原结果不可普通收取，Codex必要补正143自检通过，待DeepSeek定向复核，尚未加载该补正。不改250历史/329结论，不提前新片；详[本次必要补正](ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)与[实际加载记录](ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)。
+
 2026-10-24 23:56加载阶段：用户已要求继续当前验证，通过后再开一个下一切片（Codex开发、DeepSeek复核，人工验收等返回）。原runtime3852/六现存宿主已正常退出，12原PID全absent、七角色停止无owner，保护投影保持；现在待原终端external API重启，尚未再次delete/retry或实施下一片。恢复后无需重复同范围确认，详[当前加载记录](ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)。
 
 2026-10-24 23:43：329定向独立复核complete/2973已核验并收取completed，无必须修正项。产品不追加修改；正常加载及两个真实角色删除仍待按[具体方案](ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)确认，尚未执行。原始阶段叙述按时间保留。
