@@ -1,5 +1,17 @@
 # 新后台日志自动清理：正式启用方案
 
+## 324独立复核partial与角色证据补正（2026-10-24 14:01）
+
+324原2965已收取completed，结论partial/needs_changes保留。45份/634741字节取件源/快照一致、本地远端完整JSON一致；DeepSeek已idle/无当前任务。独立确认普通drain/单字段配置/17新PID和17旧PID/首检policy-state与86400日周期/真实三活跃lease冲突32及旧关闭lease对照/原DSH心跳均通过，但F-R1（P2）指出coordinator采错字段导致7角色display_name/business_role/decision_tier/binding均null，恢复结果又漏存desired/readiness_service/can_start/can_stop，不能只凭pass布尔当全字段证据。
+
+Codex未修改产品、配置或服务，仅修正coordination/deploy_retention.py按真实ProjectRoleListItem保存runner/model等公开静态字段；新增role_projection_evidence.py按公开Pydantic schema筛除未知凭据/argv、缺required字段或bound却缺runner/model即拒绝；verify_retention_deployment.py以后同时保存完整公开service。原45份快照及324报告不改，补采只写coordination/role-evidence-fix1/，不重跑旧脚本覆盖历史证据。
+
+UTC06:00:17前后通过原human入口两次只读角色API采集7个完整公开投影，真实28个旧空字段反例复现、缺runner拒绝/未知Key与argv不入证据反例均过。DSH仍gen60/ins_fd018306ec1c、desired/observed=running/readiness=ready、can_start=false/can_stop=true/owner=true；其余六desired/observed=stopped、can_start=true/can_stop=false/无owner。原before.json完整service可直接提取desired/readiness/can_start等历史值，不是事后回填。七角色所有公开binding字段与既有322磁盘binding-preservation.json的before/after、323取件前TALK工具响应、当前TALK公开bindings均逐字段相等，runner/model投影与binding映射也逐字段核对通过；要求和286保持。
+
+必须保留的历史边界：323前TALK响应是从本聊天保留值事后落盘，不能冒充当时磁盘冻结，已有更早322磁盘记录提供独立一致性佐证。部署前完整ProjectRoleListItem确实未保存，role_name/origin/identity/archived/identity_exclusive/role_description和model.choice_id/choice_source/choice_binding_mismatch的当时值无法恢复；本片不再宣称这些展示/choice字段“前后完全相同”，仅报告当前完整值与可恢复的binding/service事实。两次当前读取也不冒充部署前后读取。
+
+原“4旧run”简写现纠正为3个旧缺证closed+1个新API未关闭run，0删除/4保护结果本身正确。324实际new_no_candidate新窗session-adc88ac8-3adb-44b5-904f-35eefccdcd86/count1、基础SHA同315、末29.9676%，不能称续323；相容优先原窗仍服从守卫。补正属于协调方自检，待DeepSeek定向复验，不提前写独立通过或开启新片；历史P3/ACL/286与长期边界保持。
+
 ## 实际加载核验通过（2026-10-24 13:23）
 
 用户已回复“已重新启动”。新API11520健康ok，新runtime4888及全部七宿主serving，worker无错误；只普通start恢复原DSH至gen60/ins_fd018306ec1c/PID11164、running/ready/idle，同一实例真实心跳推进60.078633秒，其余六角色停止/无owner/can_start。模型/绑定/开发要求/286 paused与部署前不变。

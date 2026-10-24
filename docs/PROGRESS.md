@@ -1,11 +1,18 @@
 # Project Progress
 
-Updated: 2026-10-24 13:27（Asia/Shanghai，324首次部署证据独立复核已派发）。实际加载自检通过、配置428c928e…保持；45份/634741字节已冻结，派前source/snapshot零漂移，324交DeepSeek queued/assigned、写根review-deployment/。产品/冻结材料暂停，默认用户通知完成后取件；新清理已启用，未提前称独立部署通过。
+Updated: 2026-10-24 14:01（Asia/Shanghai，324原partial已收取，F-R1证据补正自检完成）。部署机制/清理状态/lease通过，角色字段采错/漏存为唯一P2；Codex只改采证helper并只读补采，七角色完整当前公开投影、原service历史值与binding一致性已核，无法恢复的旧展示/choice字段明确缺失。产品/配置/服务未改；待冻结补正材料交DeepSeek定向复验。
+
+## 当前恢复点：324角色证据补正待定向复验
+
+- 324 partial/2965已收取，原报告保留；取件45源/快照634741字节零漂移、本地远端一致后才修改采证helper。独立确认drain/单字段配置/新旧进程/正式policy-state与日周期/0删除4保护/lease32及负对照/DSH真实心跳通过；F-R1仅证据缺口，未发现产品回归。
+- 真实schema采集取代4个不存在字段的get(null)，保存完整runner/model和service；只读两次当前7角色API并提取原before里的service，DSH running/ready/idle、can_start=false/can_stop=true，其余六stopped/can_start=true/can_stop=false。28旧空值反例、缺runner拒绝和未知Key/argv过滤自检通过。
+- 七角色binding全字段与旧322磁盘before/after、323前TALK保留响应及当前公开绑定逐字段相等，当前runner/model也逐字段匹配；要求/286保持。旧TALK响应事后落盘须披露；部署前role_name/origin/identity/archived/identity_exclusive/role_description及model.choice三字段不可恢复，不再宣称这些旧值不变，不把两次当前读取说成部署前后。
+- 原45快照/324报告保留，新补证在coordination/role-evidence-fix1/；没有产品/配置/服务改动或全量重跑。待DeepSeek定向复验；324实际新窗/count1/末29.9676%，未续323。保护4正确口径为3旧缺证+1新API未关闭，不是4个旧run。
 
 - 324只核本次实际正常启停/单字段配置/正式自动检查与due/三组件真实活跃lease/仅DSH恢复及保护边界，45份/634741字节冻结baseline-deployment-v1，manifest-deployment.json为权威，产品与测试仍匹配323。只读普通源/冻结安全摘要，允许PID/创建时间元数据；不读生产配置正文/DB/Key/私有state/原生会话/日志，不生产sweep/启停或改码。
 - Git基线da4e4fb（已推送实际加载记录），沿base315/同日志工作线优先相容原窗，正常重载换代后服从守卫；派发execution_session_state=null，实际决策待回执，不预称复用。默认用户通知“324好了”后取件，不主动等待/唤回；新片仍先确认。
 
-## 当前状态：实际启用自检通过，324已派发
+## 实际加载状态（324已复核机制通过，完整结论见上方）
 
 - [实际加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)：用户完成原API重启，新API11520健康ok、runtime4888/七宿主serving、worker无错误。只普通start恢复原DSH gen60/ins_fd018306ec1c/PID11164、running/ready/idle，真实同实例心跳推进60.078633秒，其余六停止/无owner/can_start。
 - 正式后台首次检查UTC05:21:30.240394 complete/errors空、删除0/保护4（3缺新闭合证明、1legacy/unclosed）、907191字节、容量盘点complete/未超预算；next_check=1792905690.240394/本地10月25日13:21:30。原五角色policy、同DB/绑定/要求/286 paused保持，helper未触发sweep或造state。

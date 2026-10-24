@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-24 14:01：324原partial收取，Codex补正角色公开字段证据
+
+用户通知复核完成。本人agent:codex/prj_e8fe7066bbec、DeepSeek已idle/无当前任务；取件45份634741字节源/快照零漂移、本地远端JSON一致，原2965 partial/needs_changes已收取completed，不改原失败/报告。独立确认普通drain七宿主14进程/新旧17进程、单字段配置、正式policy-state/86400/0删除4保护907191、三活跃lease32及旧关闭lease负对照、DSH心跳通过；F-R1 P2仅角色公开字段全null/恢复service精简，无法只凭status=pass验全字段。
+
+Codex只改协调helper：真实ProjectRoleListItem保存公开runner/model，验证缺required/bound缺runner-model即拒绝、剔除额外Key/argv；以后结果保存完整service。UTC06:00:17前后两次只读当前完整7角色，28旧空值反例、缺runner拒绝/未知凭据字段过滤均过。原before里的完整service可恢复历史desired/readiness/can_start等；DSH当前running/ready/idle、can_start=false/can_stop=true，另六stopped/can_start=true/can_stop=false。七角色公开binding全字段与既有322磁盘before/after、323前TALK响应及当前值逐字段相等，runner/model映射/要求/286一致。
+
+明确保留历史证据限制：旧TALK响应从本聊天保留值事后保存，非当时磁盘冻结；322旧磁盘记录作独立佐证。部署前完整ProjectRoleListItem没有记录，旧角色名/描述等六展示身份字段及choice三字段不可恢复，不能用当前值补成旧值或宣称前后未变。原45快照不变，helper当前差异为有意补正，补证仅新目录；不改产品/配置/服务或无关全量测试。324实际new_no_candidate新窗/count1/session-adc88ac8-3adb-44b5-904f-35eefccdcd86、末29.9676%，未续323，基础SHA同315；4保护正确为3旧缺证+1新API未关闭。待冻结补正材料交DeepSeek定向复验，详[本片记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
+
 ## 2026-10-24 13:27：324首次生产加载证据独立复核已派发
 
 按用户既有“后续验收条件允许交DeepSeek同一窗口”授权，在本片实际加载自检及da4e4fb推送后，冻结45份/634741字节于baseline-deployment-v1/，manifest-deployment.json权威，派前source/snapshot SHA/字节和目录exactness一致，5产品/5测试仍匹配323已通过基线。324 queued/assigned，agent:deepseek，唯一写review-deployment/；不新增下一功能、不扩大生产访问，产品/冻结保持暂停。

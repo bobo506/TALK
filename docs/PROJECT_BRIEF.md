@@ -6,6 +6,8 @@
 
 ## 当前实施状态（2026-10-23）
 
+2026-10-24 14:01：324首次部署复核partial/2965已收取，机制/自动检查/lease通过，唯一F-R1为角色字段采证错误/漏存。Codex只读补采完整当前公开角色及修采证helper，绑定/原service可核一致，旧展示/choice历史值不可恢复并保留缺口，产品/配置/服务不变。待DeepSeek定向复验，不提前称完整部署独立通过；详[补正记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
+
 2026-10-24 13:27：324首次部署证据独立复核已派DeepSeek queued/assigned，45份/634741字节源/快照零漂移冻结，产品/冻结材料暂停，写根仅review-deployment/；不授予生产配置正文/DB/Key/私有state/原生会话/日志访问，不操作生产。实际加载自检通过、da4e4fb已推送，新后台清理已启用，待独立部署复核；沿base315相容窗口服从守卫、实际回执待324，默认用户通知后取件。详[当前进度](PROGRESS.md)。
 
 2026-10-24 13:23实际加载：用户重启API后，新API11520/runtime4888/七宿主serving，worker无错；正式后台自动检查complete/删除0/保护4/907191字节、下次本地10月25日13:21:30。仅普通恢复DSH gen60/ins_fd018306ec1c、同实例心跳推进60.078633秒，其余六停止；新三组件活跃lease由Windows共享冲突32证明、closed不存在，同DB/五policy/绑定/要求/286保持。协调方加载自检通过，待DeepSeek首次部署证据独立复核，详[加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
