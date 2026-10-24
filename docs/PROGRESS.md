@@ -1,8 +1,11 @@
 # Project Progress
 
-Updated: 2026-10-24 14:01（Asia/Shanghai，324原partial已收取，F-R1证据补正自检完成）。部署机制/清理状态/lease通过，角色字段采错/漏存为唯一P2；Codex只改采证helper并只读补采，七角色完整当前公开投影、原service历史值与binding一致性已核，无法恢复的旧展示/choice字段明确缺失。产品/配置/服务未改；待冻结补正材料交DeepSeek定向复验。
+Updated: 2026-10-24 14:05（Asia/Shanghai，325定向独立复验已派发）。324原partial/2965已收取且保留；F-R1证据补正自检通过，33份/760220字节冻结baseline-deployment-fix1/，原45快照不变。325交DeepSeek queued/assigned，唯一写review-deployment-fix1/，产品/冻结暂停，默认用户通知后取件。新清理保持启用，本轮未改产品/配置/服务或重启。
 
-## 当前恢复点：324角色证据补正待定向复验
+- 325基线3d35442已推送，manifest-deployment-fix1.json为权威；只复验F-R1真实角色字段/服务值、历史绑定逐字段比较和不可恢复边界，不重跑部署/全量/70%片。原45的当前源仅2helper+2guide预期漂移，新33当前源/快照一致。
+- 已请求沿base315工作线相容优先324原窗、同DSH gen60/ins_fd018306ec1c，派发execution_session_state=null，实际决策待回执，不force或预称同窗。派前本人agent:codex/prj_e8fe7066bbec、DSH idle/无当前任务，页面旧要求按用户当前分工覆盖；不读生产Key/配置正文/DB/私有state/原生会话/日志，不启停/sweep。默认用户通知“325好了”后取件。
+
+## 当前恢复点：325已派发，324角色证据补正待独立结论
 
 - 324 partial/2965已收取，原报告保留；取件45源/快照634741字节零漂移、本地远端一致后才修改采证helper。独立确认drain/单字段配置/新旧进程/正式policy-state与日周期/0删除4保护/lease32及负对照/DSH真实心跳通过；F-R1仅证据缺口，未发现产品回归。
 - 真实schema采集取代4个不存在字段的get(null)，保存完整runner/model和service；只读两次当前7角色API并提取原before里的service，DSH running/ready/idle、can_start=false/can_stop=true，其余六stopped/can_start=true/can_stop=false。28旧空值反例、缺runner拒绝和未知Key/argv过滤自检通过。

@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-24 14:05：325角色字段证据补正定向独立复验已派发
+
+3d35442补正文档已推送后，33份/760220字节冻结baseline-deployment-fix1/，manifest-deployment-fix1.json为权威；原45快照逐项SHA/字节不变，旧当前源只有2helper+2guide明确补正漂移，5产品/5测试未变。325 queued/assigned、agent:deepseek、唯一写review-deployment-fix1/；只核真实公开角色schema采集/完整service落盘、原before service恢复、322磁盘与323前保留工具值/当前binding逐字段一致，以及不能恢复的旧展示/choice历史边界；不重跑无变化全量或改产品，不把自检提前当独立通过。
+
+派前TALK核本人agent:codex/prj_e8fe7066bbec、DSH同gen60/ins_fd018306ec1c idle/无当前任务，页面旧分工按用户当前明确要求覆盖。沿base315/local-log-inventory-review-20261023、相容优先324原窗，不force；派发state=null，实际回执待325。产品/冻结材料暂停，默认用户通知完成后取件，无主动等待/自动唤回。324原partial/2965已收取保持，本轮不改生产配置/服务/角色/286，已启用自动清理保持。
+
 ## 2026-10-24 14:01：324原partial收取，Codex补正角色公开字段证据
 
 用户通知复核完成。本人agent:codex/prj_e8fe7066bbec、DeepSeek已idle/无当前任务；取件45份634741字节源/快照零漂移、本地远端JSON一致，原2965 partial/needs_changes已收取completed，不改原失败/报告。独立确认普通drain七宿主14进程/新旧17进程、单字段配置、正式policy-state/86400/0删除4保护907191、三活跃lease32及旧关闭lease负对照、DSH心跳通过；F-R1 P2仅角色公开字段全null/恢复service精简，无法只凭status=pass验全字段。

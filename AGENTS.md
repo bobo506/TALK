@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 14:05派发：325定向独立复验F-R1已交DeepSeek queued/assigned，33份/760220字节baseline-deployment-fix1/及manifest-deployment-fix1.json；原45快照不变，当前源只有2helper+2guide预期补正，5产品/5测试未变。唯一写review-deployment-fix1/，禁止生产Key/配置正文/DB/私有state/原生会话/日志及启停/sweep；只核真实公开字段/原service提取/完整binding逐字段比较与诚实保留的旧展示-choice缺口。基线3d35442已推送，产品/冻结暂停，默认用户通知完成后取件。相容优先324同窗仍服从守卫，派发state=null、实际待回执；324原partial/2965已收取保持，不提前称独立修复通过。
+
 - 2026-10-24 14:01最新：324原partial/2965已收取，45源/快照634741字节及本地远端一致后接手；唯一P2 F-R1为采证字段错误/漏存，部署机制、正式清理/lease/进程/心跳已独立通过。Codex只修协调helper并只读补采完整公开角色runner/model/service，7绑定与旧322磁盘/323前工具保留值/当前值一致，历史service可从原before提取；旧展示/choice字段未记录、无法恢复，明确不声称前后不变。原报告/45快照不改、产品配置服务未变，待冻结交DeepSeek定向复验，不追加产品返修。324实际new_no_candidate新窗/count1、末29.9676%，未续323；3旧缺证+1新API未关闭=4保护，旧简写纠正。详[补正记录](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
 
 - 2026-10-24 13:27派发：324首次部署证据独立复核已交DeepSeek queued/assigned；45份/634741字节baseline-deployment-v1及manifest-deployment.json，派前源/快照零漂移，5产品/5测试仍匹配323，基线da4e4fb已推送。唯一写review-deployment/；不读生产配置正文/DB/Key/私有state/原生会话/日志，只核冻结安全证据/普通代码和可选PID创建时间元数据，不生产启停/sweep/改码。原用户“后续验收条件允许同窗”继续沿base315工作线，换代仍服从守卫，实际回执待324不预称复用。产品/冻结暂停，默认用户通知完成后取件。新自动清理已正式加载、仅DSH恢复及实际检查自检通过；不提前称独立部署通过或完整日志完成。
