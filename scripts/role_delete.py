@@ -17,6 +17,7 @@ from scripts import role_provision as provision
 from scripts import role_service_host as host
 
 STEPS = ("manager", "profiles", "credentials", "private_state", "startup_config")
+MAX_OPERATIONS = 4096
 
 
 class CleanupError(Exception):
@@ -27,11 +28,11 @@ class CleanupError(Exception):
 
 class Files:
     def __init__(self, deadline):
-        self.deadline, self.count = deadline, 0
+        self.deadline, self.count, self.deleted = deadline, 0, 0
 
     def budget(self):
         self.count += 1
-        if self.count > 4096 or time.monotonic() >= self.deadline:
+        if self.count > MAX_OPERATIONS or time.monotonic() >= self.deadline:
             raise CleanupError("cleanup_budget")
 
     def read(self, path, limit=1024*1024):
@@ -40,10 +41,10 @@ class Files:
             return handle.read(limit)
 
     def remove(self, path, *, tree=False, digest=None, verify=None, skip=frozenset()):
-        self.budget()
         # lexists catches dangling symlinks too. Missing resources are idempotent.
         if not os.path.lexists(path):
             return
+        self.budget()
         with pinned(path.parent):
             info = path.lstat()
             if _link(info) or (not stat.S_ISDIR(info.st_mode) and info.st_nlink != 1):
@@ -60,6 +61,7 @@ class Files:
                     return  # Permanent empty OS lock guards contain no role configuration.
                 with NativeFile(path, directory=True, delete=True) as handle:
                     handle.expire(identity(os.fstat(handle.fd)))
+                self.deleted += 1
             elif stat.S_ISREG(info.st_mode):
                 with NativeFile(path, delete=True) as handle:
                     if digest is not None and hashlib.sha256(handle.read(16384).strip()).hexdigest() != digest:
@@ -67,6 +69,7 @@ class Files:
                     if verify is not None and not verify(handle.read(1024*1024)):
                         raise CleanupError("unsafe_resource")
                     handle.expire(identity(os.fstat(handle.fd)))
+                self.deleted += 1
             else:
                 raise CleanupError("unsafe_resource")
 
@@ -215,9 +218,9 @@ def _config(runtime, member, files):
                     # The private temporary file is verified before the only replacement.
                     # Never delete the shared runtime config on a post-publication failure.
                     os.replace(temporary, path)
+                    runtime.config = updated
                 finally:
                     files.remove(temporary)
-            runtime.config = updated
     finally:
         provision.release_lock(lock, held)
 
@@ -268,8 +271,13 @@ def cleanup(runtime, member, receipt):
         steps[step] = "complete"
         return {"outcome":"complete", "steps":steps, "error_code":None}
     except Exception as exc:
-        steps[step] = "failed"
         code = exc.code if isinstance(exc, CleanupError) else "cleanup_busy" if isinstance(exc, provision.ProvisionError) and "lock" in exc.code else "cleanup_failed"
+        if code == "cleanup_budget" and files.deleted > 0 and step != "manager":
+            # Tangible progress yields the lease; the next runtime tick resumes
+            # the same tombstone. Never turn a lock/ownership error into a retry loop.
+            steps[step] = "pending"
+            return {"outcome":"pending", "steps":steps, "error_code":None}
+        steps[step] = "failed"
         return {"outcome":"failed", "steps":steps, "error_code":code}
     finally:
         provision.release_provision_locks(handles)

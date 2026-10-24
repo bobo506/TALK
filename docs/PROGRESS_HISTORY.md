@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-24 22:56：删除人工验收两项缺陷与立即列表移除
+
+用户删除旧agent:kimi-code-k28-preview提示仍有在线/未确认实例；删除agent:workbuddy先清理中后失败，要求接受删除即列表消失。公开API只读表明K2.8服务stopped无owner、14条历史实例投影offline；逐条公开PID/创建时间OS核对13 absent/1 previous_boot。WorkBuddy墓碑已由用户原删除建立、绑定清空，revision2的private_state为failed/cleanup_budget，两条原进程absent。未读生产DB/配置或私有内容；原状态误拦依据普通代码/隔离反例确认。
+
+Codex同片返修：同机过期且无任务、有效PID并OS证明原进程已退出的历史实例不再误拦；删除独占证明显式使用同规则，原Key轮换默认严格不变。有实际删除进展的单轮预算耗尽报告pending/释放租约，由原runtime下轮继续；无进展或真实错误仍失败。页面接受删除即排除角色，单独资源区跟踪/重试、设置状态也继续轮询；资源未清完不假称物理完成。用户最新要求更新旧显示合同，角色/历史/共享账号保护保留。
+
+最终Python283与Node82共365通过，包含真实Windows大目录、真实隔离TestClient→TalkRuntime自动多轮、整页JS行消失与后续完成。修前4项3失败/1错误、55项首轮53过/2失败，以及整页DOM夹具首次81/82均保留，最终通过另记；定向87与完整283重叠不相加。修复过程未启停/重载生产或再次delete/retry；v3静态文件可能随刷新读取，后台仍旧版，独立复核后正常加载另行确认。原327/328报告及快照保持，公开完整binding与诊断开始零漂移，WorkBuddy用户原清绑定不倒写，286始终queued/accepted/paused。待新冻结交DeepSeek后产品暂停，默认用户通知后取件。选择性自启动未确认、不实施。
+
 ## 2026-10-24 22:18：新版加载与中断后复查通过
 
 用户在原终端完成正常API重启后，UTC12:21:12核新runtime3852（UTC12:20:41启动）及七宿主serving、worker空闲/无错，API healthz为ok/db ok/storage ok。新公开OpenAPI含删除路由，七个角色均有deletion=null且archived=false；公开角色查询成功也证实新表/投影可用，不直接读取生产数据库。加载核验时七角色均停止/无owner。

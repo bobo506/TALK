@@ -1,6 +1,7 @@
 """Isolated HTTP deletion, fencing, history, leases and shared-identity protection."""
 from datetime import datetime, timedelta, timezone
 import json
+import socket
 from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import quote
@@ -347,6 +348,119 @@ class RoleDeletionTests(RoleApiTestCase):
         with self.make_client() as client:
             claim=client.post(f"/api/tasks/{task_id}/claim",headers={"X-API-Key":self.role["api_key"]},json={"lease_seconds":60})
             self.assertEqual(claim.status_code,200,claim.text)
+
+
+    def historical_instance(self, **overrides):
+        values = dict(id="ins_old_delete", member_id=self.member, project_id="prj_alpha", runtime="dsh",
+            status="idle", host=socket.gethostname(), pid=2147483000,
+            process_started_at=datetime.now(timezone.utc)-timedelta(days=2),
+            last_seen_at=datetime.now(timezone.utc)-timedelta(days=1))
+        values.update(overrides)
+        with self.session() as session:
+            session.add(m.AgentInstance(**values));session.commit()
+
+    def test_historical_local_exited_instance_does_not_block_delete(self):
+        self.historical_instance()
+        with patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"):
+            with self.session() as session:
+                self.assertEqual(m.prove_exclusive_identity("prj_alpha",self.member,session)["refusal"],"rotate_identity_in_use")
+            result=self.delete()
+        self.assertEqual(result.status_code,200,result.text)
+
+    def test_historical_reused_pid_does_not_block_delete(self):
+        self.historical_instance()
+        with patch("scripts.role_service_recovery.recorded_process_state", return_value="pid_reused"):
+            result=self.delete()
+        self.assertEqual(result.status_code,200,result.text)
+
+    def test_historical_local_online_status_also_requires_and_accepts_exit_proof(self):
+        self.historical_instance(status="online")
+        with patch("scripts.role_service_recovery.recorded_process_state",return_value="previous_boot"):
+            result=self.delete()
+        self.assertEqual(result.status_code,200,result.text)
+
+    def test_real_absent_local_process_metadata_allows_historical_instance(self):
+        self.historical_instance()
+        result=self.delete()
+        self.assertEqual(result.status_code,200,result.text)
+
+    def test_old_heartbeat_is_not_proof_that_a_local_process_exited(self):
+        self.historical_instance()
+        for state in ("present","unknown"):
+            with patch("scripts.role_service_recovery.recorded_process_state",return_value=state):
+                self.assertEqual(self.delete().json()["detail"],"role_instance_active")
+
+    def test_remote_missing_pid_or_unknown_status_remains_protected(self):
+        for extra in ({"host":"another-machine"},{"host":None},{"pid":None},{"status":"unconfirmed"},{"current_task_id":"old-task"}):
+            self.historical_instance(**extra)
+            with patch("scripts.role_service_recovery.recorded_process_state",return_value="absent"):
+                self.assertEqual(self.delete().json()["detail"],"role_instance_active")
+            with self.session() as session:
+                session.delete(session.get(m.AgentInstance,"ins_old_delete"));session.commit()
+
+    def test_fresh_or_future_heartbeat_remains_protected_even_if_pid_absent(self):
+        for delta in (timedelta(seconds=-1),timedelta(minutes=1)):
+            self.historical_instance(last_seen_at=datetime.now(timezone.utc)+delta)
+            with patch("scripts.role_service_recovery.recorded_process_state",return_value="absent"):
+                self.assertEqual(self.delete().json()["detail"],"role_instance_active")
+            with self.session() as session:
+                session.delete(session.get(m.AgentInstance,"ins_old_delete"));session.commit()
+
+    def test_cleanup_batch_yields_and_reclaims_without_another_delete_click(self):
+        self.delete();first=self.claim()
+        steps={"manager":"complete","profiles":"complete","credentials":"complete","private_state":"pending","startup_config":"pending"}
+        yielded=self.report(first,outcome="pending",steps=steps)
+        self.assertEqual(yielded.status_code,200,yielded.text)
+        self.assertEqual(yielded.json()["status"],"pending")
+        self.assertIsNone(yielded.json()["error_code"])
+        second=self.claim(yielded.json()["revision"])
+        self.assertEqual(self.report(first).status_code,409)
+        self.assertEqual(self.report(second).json()["status"],"complete")
+
+    def test_pending_receipt_cannot_mask_failed_or_unstarted_work(self):
+        self.delete();receipt=self.claim()
+        cases=[{s:"pending" for s in STEPS},{s:"complete" for s in STEPS},
+            {**{s:"pending" for s in STEPS},"manager":"complete","profiles":"failed"}]
+        for steps in cases:
+            self.assertEqual(self.report(receipt,outcome="pending",steps=steps).status_code,422)
+        self.assertEqual(self.report(receipt).status_code,200)
+
+
+    def test_real_http_runtime_resumes_large_cleanup_until_role_disappears(self):
+        import hashlib
+        from scripts.talk_runtime import TalkRuntime
+        from scripts.role_provision import key_file_path,profile_target_paths
+        from scripts.role_service_host import _sanitize_token
+        project=self._tmpdir/"project";project.mkdir()
+        keys=self._tmpdir/"keys";keys.mkdir();state=self._tmpdir/"private-state";state.mkdir()
+        config={"project_id":"prj_alpha","project_root":str(project),"key_root":str(keys),"state_dir":str(state),"hosts":[]}
+        config_path=self._tmpdir/"runtime.json";config_path.write_text(json.dumps(config),encoding="utf-8")
+        profile=profile_target_paths(project,self.member)["identity"];profile.parent.mkdir(parents=True);profile.write_text("synthetic identity",encoding="utf-8")
+        key=key_file_path(keys,self.member);key.write_text(self.role["api_key"],encoding="utf-8")
+        other=keys/"other.key";other.write_text("synthetic other identity",encoding="utf-8")
+        cache=state/"workbuddy-native/prj_alpha"/_sanitize_token(self.member)/"home/cache/a/b/c";cache.mkdir(parents=True)
+        for i in range(160):(cache/f"entry-{i}").write_text("synthetic cache",encoding="utf-8")
+        with self.session() as session:
+            p=session.get(m.Project,"prj_alpha");p.project_root_path=str(project);session.add(p);session.commit()
+        self.assertEqual(self.delete().status_code,200)
+        with self.make_client() as client:
+            class Client:
+                def request(_,method,path,body=None):
+                    response=client.request(method,path,json=body,headers={"X-API-Key":"bobo-key"})
+                    response.raise_for_status();return response.json()
+            runtime=TalkRuntime(config,client=Client(),config_path=config_path)
+            digest=hashlib.sha256(json.dumps(config,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
+            seen=[]
+            with patch("server.role_deletions._cleanup_binding_digest",return_value=digest),patch("scripts.role_delete.MAX_OPERATIONS",100):
+                for _ in range(30):
+                    runtime.reconcile_deletions(runtime.roles())
+                    result=client.get(self.base+"/deletion",headers={"X-API-Key":"bobo-key"}).json();seen.append(result["status"])
+                    if result["status"]=="complete":break
+                    self.assertEqual(result["status"],"pending",result)
+                    self.assertIsNone(result["error_code"])
+            self.assertEqual(seen[-1],"complete",seen);self.assertIn("pending",seen)
+            self.assertEqual(client.get("/api/projects/prj_alpha/roles",headers={"X-API-Key":"bobo-key"}).json(),[])
+        self.assertFalse(cache.exists());self.assertFalse(profile.exists());self.assertFalse(key.exists());self.assertTrue(other.exists())
 
 
 class DeletionBindingTests(RoleApiTestCase):

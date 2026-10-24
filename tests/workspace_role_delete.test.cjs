@@ -10,7 +10,7 @@ function harness(){
     Object.defineProperty(n,'childElementCount',{get:()=>n.children.length});return n;};
   const ctx=vm.createContext({document:dom.document,myId:'human:qa',activeProjectId:'prj_a',projectAgentRequest:0,
     projectAgents:[{member_id:'agent:a',role_name:'角色 A',deletion:null,service:{observed:'stopped',ownership_held:false}},{member_id:'agent:b'}],
-    projectTasks:[{id:286,status:'queued',control_status:'paused'}],currentMemberIsHuman:()=>true,
+    projectTasks:[{id:286,status:'queued',control_status:'paused'}],members:[],currentMemberIsHuman:()=>true,
     workspaceMemberName:()=> '角色 A',roleServiceView:role=>({service:role.service,provided:Boolean(role.service)}),
     workspaceEl:element,workspaceButton:(text,fn,cls)=>{const n=element('button',cls,text);n.addEventListener('click',fn);return n;},
     renderWorkspaceList(){},renderTaskDetailsPanel(){},renderWorkspaceRoleDetails(){},
@@ -18,6 +18,7 @@ function harness(){
     apiFetch:async(url,opts)=>{calls.push({url,opts});return reply ? reply() : {ok:true,json:async()=>({member_id:'agent:a',status:'pending',revision:1})};},
   });
   vm.runInContext(deletion,ctx);
+  vm.runInContext(source.match(/function workspaceRoles\(\) {[^\n]+}/)[0],ctx);
   return {ctx,calls,timers,dom,cancel(){confirmed=false;},respond(fn){reply=fn;},button(){return ctx.roleDeleteButton(ctx.projectAgents[0]);},
     role(){return ctx.projectAgents[0];},state(){return vm.runInContext('roleDeleteUI',ctx);}};
 }
@@ -57,7 +58,7 @@ test('同一角色在途重复点击只发一次',async()=>{
   const pending=x.ctx.deleteWorkspaceRole('agent:a');await Promise.resolve();await x.ctx.deleteWorkspaceRole('agent:a');
   assert.equal(x.calls.length,1);finish({ok:true,json:async()=>({member_id:'agent:a',status:'pending'})});await pending;
 });
-test('轮询完成才从角色列表移除，历史不变，离页停止轮询',async()=>{
+test('轮询完成后清除本地清理记录，历史不变，离页停止轮询',async()=>{
   const x=harness();x.role().deletion={status:'cleaning'};x.ctx.roleDeleteSync(x.role());
   assert.equal(x.timers.size,1);const tick=[...x.timers.values()][0];x.timers.clear();
   x.respond(()=>({ok:true,json:async()=>({member_id:'agent:a',status:'complete'})}));await tick();
@@ -68,6 +69,31 @@ test('详情按钮实际接在启动关闭控件旁，失败面板仍有重试',
   assert.match(source,/controls\?\.children\[0\] \|\| section/);
   assert.match(source,/const deletePanel = workspaceRoleDeletePanel\(role\)/);
 });
+test('删除被接受立即从正常角色集合消失，资源清理记录仍可查看',async()=>{
+  const x=harness();await x.button().fire('click');
+  assert.deepEqual(Array.from(x.ctx.workspaceRoles(),r=>r.member_id),['agent:b']);
+  assert.equal(x.ctx.projectAgents.length,2);
+  const panel=x.ctx.workspaceRoleCleanupPanel();
+  assert.match(x.dom.texts(panel),/已删除角色的资源清理/);
+  assert.match(x.dom.texts(panel),/分批清理/);
+  assert.equal(x.ctx.projectTasks[0].control_status,'paused');
+});
+
+test('清理失败不把角色放回正常列表，独立记录仍可重试',()=>{
+  const x=harness();x.role().archived=true;x.role().deletion={status:'failed',steps:{private_state:'failed'},error_code:'cleanup_busy'};
+  assert.deepEqual(Array.from(x.ctx.workspaceRoles(),r=>r.member_id),['agent:b']);
+  const panel=x.ctx.workspaceRoleCleanupPanel();
+  assert.match(x.dom.texts(panel),/资源清理未完成/);
+  assert.match(x.dom.texts(panel),/重试清理/);
+  x.ctx.currentMemberIsHuman=()=>false;assert.equal(x.ctx.workspaceRoleCleanupPanel(),null);
+});
+
+test('没有选中角色时仍在角色页跟进清理，离页停止跟进',()=>{
+  assert.match(source,/roleDeleteSync\(blackboardOpen && workspaceUI.mode === "roles" && currentMemberIsHuman\(\)/);
+  assert.match(source,/projectAgents.find\(item => \["pending", "cleaning"\].includes\(item.deletion\?\.status\)\)/);
+  assert.match(source,/const cleanupFeedback = workspaceRoleCleanupPanel\(\)/);
+});
+
 test('旧状态不能覆盖较新的重试，旧服务不显示删除按钮',()=>{
   const x=harness();x.role().deletion={status:'pending',revision:3};
   x.ctx.roleDeleteApply({account:'human:qa',project:'prj_a',member:'agent:a'},{member_id:'agent:a',status:'failed',revision:2});

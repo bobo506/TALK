@@ -71,6 +71,7 @@ const ROSTER = [
 
 function harness({ human = true, projectId = 'A', roster = ROSTER } = {}) {
   const pending = [];
+  const timers = new Map(); let timerId = 0;
   const elements = new Map();
   const getEl = id => {
     if (!elements.has(id)) { const node = fakeEl('div'); node.id = id; elements.set(id, node); }
@@ -88,6 +89,7 @@ function harness({ human = true, projectId = 'A', roster = ROSTER } = {}) {
   const calls = { selectTask: [] };
   const context = vm.createContext({
     document: documentStub,
+    setTimeout: fn => { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id),
     blackboardOpen: true,
     activeProjectId: projectId,
     activeGroupId: null,
@@ -174,12 +176,31 @@ function harness({ human = true, projectId = 'A', roster = ROSTER } = {}) {
   const rows = () => el('blackboard-columns').children.flatMap(node => String(node.className).includes('role-entry') ? node.children : [node]);
   const settingsRow = () => rows()[0];
   const roleRow = memberId => rows().find(row => !row.className.includes('role-settings-row') && row.dataset.memberId === memberId);
-  return { context, ui, pending, reply, replyProjectReads, flush, hidden, el, enterRoles, rows, settingsRow, roleRow, calls };
+  return { context, ui, pending, timers, reply, replyProjectReads, flush, hidden, el, enterRoles, rows, settingsRow, roleRow, calls };
 }
 
 const CONTROLLER_READ = {
   controller_member_id: null, controller_assignment_version: 0, controller_assignment_status: 'unassigned',
 };
+
+test('真实整页删除接受后角色行消失、返回设置且继续跟进后台清理', async () => {
+  const h=harness({roster:[{member_id:'agent:kimi',role_name:'准备删除',deletion:null,
+    service:{desired:'stopped',observed:'stopped',ownership_held:false,can_start:true,can_stop:false}}]});
+  await h.enterRoles();h.roleRow('agent:kimi').fire('click');await h.flush();
+  const request=h.context.deleteWorkspaceRole('agent:kimi');await h.flush();
+  const index=h.pending.findIndex(p=>p.url.endsWith('/delete'));
+  assert.ok(index>=0);h.reply(index,{member_id:'agent:kimi',status:'pending',revision:1});await request;
+  assert.equal(h.roleRow('agent:kimi'),undefined);
+  assert.equal(h.context.workspaceSettingsSelected(),true);
+  assert.match(allTexts(h.el('role-service-batch-feedback')).join('\n'),/已删除角色的资源清理/);
+  assert.ok(h.timers.size>0,'没有选中角色也继续轮询清理');
+  const tick=[...h.timers.values()][0];h.timers.clear();const polling=tick();await h.flush();
+  const pollIndex=h.pending.findIndex(p=>p.url.endsWith('/deletion'));
+  assert.ok(pollIndex>=0);h.reply(pollIndex,{member_id:'agent:kimi',status:'complete',revision:3});await polling;
+  assert.equal(h.roleRow('agent:kimi'),undefined);
+  assert.doesNotMatch(allTexts(h.el('role-service-batch-feedback')).join('\n'),/已删除角色的资源清理/);
+  assert.equal(h.timers.size,0);
+});
 
 test('固定首项：首次进入角色页默认“项目设置”，不计入角色、不是 Agent、不发起角色相关请求', async () => {
   const h = harness();

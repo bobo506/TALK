@@ -4726,6 +4726,8 @@ def prove_exclusive_identity(
     project_id: str,
     member_id: str,
     session: Session,
+    *,
+    for_role_deletion: bool = False,
 ) -> dict:
     """独占引用证明（合同 §7.5，``rotate-key`` 与后续全局禁用共用）。
 
@@ -4788,6 +4790,13 @@ def prove_exclusive_identity(
             )
         ).all()
     )
+    if for_role_deletion:
+        # Deletion rechecks stale local process evidence; key rotation retains
+        # its original strict instance policy by default.
+        from server.role_deletions import _historical_local_instance_exited
+        now = datetime.now(timezone.utc)
+        active_instances = [row for row in active_instances
+                            if not _historical_local_instance_exited(row, now)]
     active_tasks = list(
         session.exec(
             select(AgentTask)

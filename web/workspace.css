@@ -282,3 +282,6 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-name-dialog { width:min(430px,100%); }
 .role-name-field { margin-top:22px; }
 .role-name-footer { gap:10px; }
+.role-cleanup-feedback { display:grid; gap:6px; padding:10px 20px; }
+.role-cleanup-feedback h3 { margin:0; font-size:14px; }
+.role-cleanup-feedback .role-delete-section { margin:0 0 8px; }

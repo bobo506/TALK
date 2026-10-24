@@ -238,3 +238,31 @@ class LocalDeletionTests(unittest.TestCase):
 
     def test_directory_at_control_file_is_never_recursively_deleted(self):
         self._directory_at_file(self.control)
+
+    def test_large_private_home_cleanup_automatically_continues_in_bounded_batches(self):
+        home=self.state/"workbuddy-native"/self.project_id/host._sanitize_token(self.member)/"home/cache/a/b/c"
+        home.mkdir(parents=True)
+        for index in range(160):
+            (home/f"cached-{index}.txt").write_text("synthetic cache",encoding="utf-8")
+        outcomes=[]
+        # Small per-round budget exercises the same cap without a slow multi-thousand-file fixture.
+        with patch.object(d,"MAX_OPERATIONS",100,create=True):
+            for _ in range(30):
+                result=self.run_cleanup();outcomes.append(result["outcome"])
+                if result["outcome"]=="complete":break
+                self.assertEqual(result["outcome"],"pending",result)
+                self.assertIsNone(result["error_code"])
+        self.assertEqual(outcomes[-1],"complete",outcomes)
+        self.assertIn("pending",outcomes)
+        self.assertFalse(home.exists());self.assertTrue(self.other.exists())
+
+    def test_budget_without_progress_is_an_honest_failure(self):
+        with patch.object(d.Files,"budget",side_effect=d.CleanupError("cleanup_budget")):
+            result=self.run_cleanup()
+        self.assertEqual(result["outcome"],"failed")
+        self.assertEqual(result["error_code"],"cleanup_budget")
+        self.assertTrue(self.profile.exists())
+
+    def test_absent_resource_remains_idempotent_after_budget_exhaustion(self):
+        files=d.Files(0)
+        files.remove(self.root/"already-removed")

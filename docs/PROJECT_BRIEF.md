@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-24 22:56：用户实测删除缺陷已由Codex修正并自检283Python+82Node通过，待DeepSeek定向独立复核。旧K2.8历史实例只有同机过期且OS证实原进程退出才放行；WorkBuddy预算有进展自动分批；接受删除即列表消失、资源区持续跟进。原327/328保持，后端未重载/两目标未再次delete或retry，286及其它五binding保持。选择性自启动未确认。详[本次返修](spec/ROLE_DELETE_USER_FIX_20261024.md)和[进度](PROGRESS.md)。
+
 2026-10-24 22:18：删除功能已按用户确认正常加载，默认24小时代码随新后台加载。runtime3852/七宿主/worker正常，仅恢复原DeepSeek gen64/新实例ready/idle，同实例心跳前后推进约116分钟；七角色完整binding及286保护保持。页面v2资产匹配，未删除现有角色，浏览器操作待人验。原工具自动审批额度中断已原工具重试恢复，无重复启停。详[加载记录](spec/ROLE_DELETE_DEPLOYMENT_20261024.md)和[进度](PROGRESS.md)。
 
 2026-10-24 20:00：删除角色328定向独立通过、无必须修正项，327/328均已收取；原327 partial与环境失败保持。独立增补API11/本机21/Node68通过，完整Python组合受ACL/进程沙箱限制，不称独立全过。七角色完整binding与286保护已公开核对保持，生产未加载/删除。具体[正常加载方案](spec/ROLE_DELETE_DEPLOYMENT_20261024.md)已准备待确认；详[进度](PROGRESS.md)及[验收](spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)。

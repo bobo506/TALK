@@ -154,7 +154,7 @@ function workspaceRoleDescription(role) {
     tester: "负责验证成果是否符合要求，并提交测试结论。",
   })[workspaceRoleKey(role)];
 }
-function workspaceRoles() { return projectAgents.filter(agent => agent.deletion?.status !== "complete" && (agent.deletion || !members.find(member => member.id === agent.member_id)?.disabled_at)); }
+function workspaceRoles() { return projectAgents.filter(agent => !agent.deletion && !members.find(member => member.id === agent.member_id)?.disabled_at); }
 // ROLE-SETTINGS-1：角色列表固定首项“项目设置”是独立导航项，不是伪造 Agent——
 // 不计入角色数量、不进入名册成员候选，其选中状态也不会作为 member_id 传给任何任务或 API。
 // 选择状态：roleSelection === "role" 且 selectedRole 命中当前名册时查看具体角色；
@@ -782,6 +782,8 @@ function renderWorkspaceList() {
     }
     const batchFeedback = workspaceRoleServiceBatchFeedback();
     if (batchFeedback) batchFeedbackContainer.appendChild(batchFeedback);
+    const cleanupFeedback = workspaceRoleCleanupPanel();
+    if (cleanupFeedback) batchFeedbackContainer.appendChild(cleanupFeedback);
   } else {
     for (const [value, label] of [["all", "全部"], ["running", "进行中"], ["mine", "待我处理"], ["finished", "已结束"]]) {
       const button = workspaceButton(label, () => { workspaceUI.filter = value; renderWorkspaceList(); });
@@ -1126,7 +1128,7 @@ function roleDeleteMessage(code) {
     credential_mismatch: "专属凭据归属核验未通过，请核对后重试。",
     unsafe_resource: "资源归属或路径无法确认，请核对后重试。",
     cleanup_busy: "资源正被占用，请稍后重试。",
-    cleanup_budget: "本轮清理尚未完成，请重试继续清理。"})[code] || "删除尚未完成，请稍后重试。";
+    cleanup_budget: "清理达到单轮上限且未能继续，请重试；角色不会重新出现。"})[code] || "资源清理尚未完成，请稍后重试。";
 }
 function roleDeleteApply(context, value) {
   if (!roleDeleteCurrent(context) || value?.member_id !== context.member) return;
@@ -1200,7 +1202,7 @@ function roleDeleteSync(role) {
     } finally {
       if (roleDeleteUI.context === key && roleDeleteUI.generation === generation) {
         roleDeleteUI.timer = null;
-        if (roleDeleteCurrent(context)) renderWorkspaceRoleDetails();
+        if (roleDeleteCurrent(context)) { renderWorkspaceList(); renderWorkspaceRoleDetails(); }
       }
     }
   }, 2000);
@@ -1213,7 +1215,7 @@ function workspaceRoleDeletePanel(role) {
   }
   if (role.deletion) {
     const failed = role.deletion.status === "failed";
-    section.appendChild(workspaceEl("p", "", failed ? "删除未完成" : "正在清理角色专属资源…"));
+    section.appendChild(workspaceEl("p", "", failed ? "角色已移除，资源清理未完成" : "角色已移除，后台正在分批清理专属资源…"));
     if (failed) section.appendChild(workspaceEl("p", "", roleDeleteMessage(role.deletion.error_code)));
     const labels = {manager:"本机宿主",profiles:"身份档",credentials:"专属凭据",private_state:"专属状态",startup_config:"启动配置"};
     for (const [step, state] of Object.entries(role.deletion.steps || {})) {
@@ -1224,6 +1226,20 @@ function workspaceRoleDeletePanel(role) {
   const error = roleDeleteUI.errors.get(roleDeleteKey(role.member_id));
   if (error) section.appendChild(workspaceEl("p", "role-delete-error", error));
   return section.childElementCount ? section : null;
+}
+function workspaceRoleCleanupPanel() {
+  if (!currentMemberIsHuman()) return null;
+  const rows = projectAgents.filter(role => role.deletion && role.deletion.status !== "complete");
+  if (!rows.length) return null;
+  const section = workspaceEl("section", "role-cleanup-feedback");
+  section.setAttribute("aria-live", "polite");
+  section.appendChild(workspaceEl("h3", "", "已删除角色的资源清理"));
+  for (const role of rows) {
+    section.appendChild(workspaceEl("strong", "", workspaceMemberName(role.member_id)));
+    const panel = workspaceRoleDeletePanel(role);
+    if (panel) section.appendChild(panel);
+  }
+  return section;
 }
 function workspaceRoleServicePanel(role) {
   const control = roleServiceControl(role);
@@ -1674,7 +1690,8 @@ function renderWorkspaceRoleDetails() {
   }
   namePanel.classList.toggle("hidden", !visible);
   tasksPanel.classList.toggle("hidden", !visible);
-  roleDeleteSync(visible ? role : null);
+  roleDeleteSync(blackboardOpen && workspaceUI.mode === "roles" && currentMemberIsHuman()
+    ? projectAgents.find(item => ["pending", "cleaning"].includes(item.deletion?.status)) || null : null);
   if (!visible) return;
   namePanel.replaceChildren();
   tasksPanel.replaceChildren();

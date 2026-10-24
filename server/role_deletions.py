@@ -9,6 +9,7 @@ import hashlib
 import secrets
 import re
 import json
+import socket
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -69,6 +70,29 @@ def _cleanup_binding_digest(session, project):
         return None
 
 
+def _historical_local_instance_exited(instance, now):
+    """A stale heartbeat alone is insufficient; prove this local process is gone.
+
+    Instance GETs project stale records as offline without rewriting their stored
+    status. Keep remote, fresh, busy-task and unverifiable identities protected.
+    """
+    from server.role_services import _as_utc
+    seen = _as_utc(instance.last_seen_at)
+    if (instance.status not in ("starting", "online", "idle", "busy", "stopping", "error") or seen is None
+            or (now-seen).total_seconds() <= m.ROLE_SERVICE_INSTANCE_FRESH_SECONDS
+            or instance.current_task_id is not None
+            or not isinstance(instance.host, str)
+            or instance.host.casefold() != socket.gethostname().casefold()
+            or type(instance.pid) is not int or instance.pid <= 0):
+        return False
+    from scripts.role_service_recovery import recorded_process_state
+    try:
+        return recorded_process_state(instance.pid, instance.process_started_at or seen) in (
+            "absent", "exited", "previous_boot", "pid_reused")
+    except (OSError, ValueError, TypeError):
+        return False
+
+
 def _idle(session, project, member):
     service = session.get(m.RoleServiceState, (project, member))
     if service and (service.desired_state != "stopped"
@@ -81,10 +105,12 @@ def _idle(session, project, member):
             m.RoleServiceLaunch.member_id == member,
             m.RoleServiceLaunch.state.in_(["pending", "claimed"]))).first():
         raise HTTPException(409, "role_service_running")
-    if session.exec(select(m.AgentInstance).where(
+    instances = session.exec(select(m.AgentInstance).where(
             m.AgentInstance.member_id == member,
             or_(m.AgentInstance.project_id == project, m.AgentInstance.project_id.is_(None)),
-            m.AgentInstance.status.notin_(["offline", "stopped"]))).first():
+            m.AgentInstance.status.notin_(["offline", "stopped"]))).all()
+    now = datetime.now(timezone.utc)
+    if any(not _historical_local_instance_exited(instance, now) for instance in instances):
         raise HTTPException(409, "role_instance_active")
     # Uncollected submissions, pauses and creator obligations must be resolved too.
     tasks = session.exec(select(m.AgentTask).where(
@@ -147,7 +173,7 @@ def request_delete(project, member, confirm, current, session):
             raise HTTPException(404, "role_not_found")
         _idle(session, project, member)
         _unambiguous_resources(session, project, member)
-        proof = m.prove_exclusive_identity(project, member, session)
+        proof = m.prove_exclusive_identity(project, member, session, for_role_deletion=True)
         managed_exclusive = bool(role and role.origin == "managed" and role.identity_exclusive)
         if managed_exclusive and proof["refusal"] is not None:
             raise HTTPException(409, "role_delete_identity_proof_required")
@@ -225,7 +251,7 @@ def claim(project, member, revision, current, session):
 
 def report(project, member, token, revision, outcome, steps, error, current, session):
     _human(current)
-    if outcome not in ("complete", "failed") or set(steps) != set(STEPS) or any(
+    if outcome not in ("complete", "failed", "pending") or set(steps) != set(STEPS) or any(
             v not in ("complete", "preserved", "failed", "pending") for v in steps.values()):
         raise HTTPException(422, "role_deletion_report_invalid")
     if outcome == "complete" and any(v not in ("complete", "preserved") for v in steps.values()):
@@ -234,6 +260,9 @@ def report(project, member, token, revision, outcome, steps, error, current, ses
         raise HTTPException(422, "role_deletion_report_invalid")
     if outcome == "failed" and "failed" not in steps.values():
         raise HTTPException(422, "role_deletion_report_incomplete")
+    if outcome == "pending" and (error is not None or steps["manager"] != "complete"
+            or "failed" in steps.values() or "pending" not in steps.values()):
+        raise HTTPException(422, "role_deletion_report_invalid")
     begin_immediate_write(session)
     try:
         row = _row(session, project, member)
@@ -250,6 +279,7 @@ def report(project, member, token, revision, outcome, steps, error, current, ses
         row.status, row.steps, row.error_code = outcome, steps, error
         row.updated_at = datetime.now(timezone.utc)
         row.lease_hash = None
+        row.lease_expires_at = None
         if outcome == "complete":
             roster = session.get(m.ProjectAgent, (project, member))
             if roster:
