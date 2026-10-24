@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-24 23:47：329独立核验收取完成，准备正常加载
+
+用户通知329完成。正式2973为agent:deepseek在正确Hall提交的talk-delivery-1裸JSON，任务号匹配、业务complete、与本地delivery逐字段等值。协调方检查普通代码/独立探针/原始日志/冻结和Git差异后验收，无必须修正项；UTC15:42:57.123595收取workflow completed，runner仍succeeded，不能仅据后者推断功能完成。
+
+独立核心API8过/另1严格pending形状P3失败，本机5与整页8通过，规定Node82通过；规定283Python为271过/5F/7E，ACL原子发布/CreatePipe/子进程启动及teardown限制保持。配置发布两项独立探针用普通临时文件/Python复制受控替代，不能代称真实私有ACL发布通过；定向58包含在283不相加。真实240文件/80操作预算7轮pending后complete，物理文件逐轮减少；整页行/计数消失、设置回退、多墓碑/失败重试与上下文隔离通过。协调方原365自检通过保持，本轮不重复产品测试。
+
+取件79份/2964423字节新快照零错配，源77与2份预期协调文档漂移；原50份2074815字节/64份2581366字节快照零错配，manifest列出的327/328原报告保持。329的15份190160字节交付文件显式复制到coordination/329-original-review/，零错配，不扫描isolated合成scratch。产品/正式测试与4ef58bc无差异，后续只更新收尾文档；冻结/原失败不可追改。
+
+三项P3为pending步骤/identity形状未严格前缀校验、provision锁失败步骤标签仍manager、后端保留pending墓碑供独立清理区。受信runtime正常路径、失败保护和用户可见列表目标已闭合，按用户优先新功能的约定不因此追加无关返修。329实际new_no_candidate新窗/count1/session-6f404675-b02c-411d-90e6-836fb2e2897d，初始context_status unavailable/no_candidate，末公开snapshot381537/1000000=38.1537%；未续328、不读取私有会话补数。
+
+协调方公开接口另核七个完整binding/binding_state与派前相同（WorkBuddy原用户删除已null），DeepSeek gen64原实例idle/无任务，286 queued/accepted/paused。独立复核者没有实时核这些生产字段，只有未触碰证据，分开记录。本轮未重载/启停或再次提交两目标delete/retry，未读生产配置/角色Key/DB/私有state/原生会话日志。已准备ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024具体方案，正常重载需本次明确确认，只恢复DeepSeek并完成用户已指定两角色删除；选择性自启动未批准、不实施。原327partial/2971、328complete/2972及旧部署阶段事实保持。
+
 ## 2026-10-24 22:59：删除人工验收返修329已派DeepSeek独立复核
 
 实现4ef58bc4f7250a06f4d8b4af620a13bbcf4f6b88已常规推送。新role-delete-user-fix1/baseline-v1与manifest.json冻结79份/2964423字节，派前源/快照零漂移；原50份2074815字节/64份2581366字节快照均零错配。独立写根仅review/，代码/正式测试/新旧冻结暂停；不授予生产配置/Key/DB/私有state/日志访问或生产操作，实际286 paused保持。

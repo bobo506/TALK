@@ -1,5 +1,29 @@
 # 删除角色人工验收缺陷修正（2026-10-24）
 
+2026-10-24 23:43：329定向独立复核complete/2973已核验并收取completed，无必须修正项。产品不追加修改；正常加载及两个真实角色删除仍待按[具体方案](ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)确认，尚未执行。原始阶段叙述按时间保留。
+
+## 329 独立结果与协调方收尾
+
+正式裸JSON通过talk-delivery-1校验，task_id=329、作者agent:deepseek、Task Hall与2973一致，且与本地delivery.json逐字段等值；不是从runner succeeded推断通过。UTC15:42:57.123595已正式收取completed。
+
+取件重算79份/2964423字节新快照零错配，源77匹配/AGENTS与PROJECT_BRIEF两份预期协调文档漂移；原50份/2074815字节、64份/2581366字节快照零错配。产品/正式测试与4ef58bc没有差异，329的15份/190160字节报告、脚本与日志另存coordination/329-original-review/，保留原API严格步骤探针失败及Python环境失败，不扫描isolated合成scratch。
+
+| 独立检查 | 实际结果与边界 |
+| --- | --- |
+| 历史实例/managed复证/轮换严格/pending租约核心 | API8项通过；另1项严格步骤顺序/身份形状探针失败，列为P3并保留原失败 |
+| 实际大树、无进展/占用失败、配置内存/幂等 | 5/5通过；240文件在80操作预算下7轮pending、最后complete。配置发布两项用普通临时文件/Python复制替代，未独立证明真实私有ACL原子发布 |
+| 独立整页JS | 8/8通过；行和计数消失、设置回退、多墓碑/失败重试、非human及项目/账户/revision隔离 |
+| 规定Node六文件 | 82/82通过，进程内真实JS/合成DOM，未真人浏览器验收 |
+| 规定完整Python九模块 | 283项中271通过/5失败/7错误；ACL、CreatePipe、子进程启动/teardown限制，不能称独立283全过。定向58已包含，不重复累计 |
+
+三项非阻断观察按用户优先完成功能的约定留档，不因此开启新返修：pending报告尚无严格步骤前缀/identity形状校验，但仅受信human/runtime可持有效租约报告，complete仍独立校验；provision锁失败可能将manager步骤标失败而非profiles，但cleanup_busy/文件保留/不自动循环正确；后端保留pending墓碑供清理区使用，用户可见常用角色列表已经排除，不能把“列表消失”解释成立即删库。原327/328的P3与限制保持。
+
+329实际new_no_candidate新窗/count1/session-6f404675-b02c-411d-90e6-836fb2e2897d，没有续328。初始context_status=unavailable/no_candidate；末snapshot可用381537/1000000=38.1537%。这些来自任务公开execution_session_state，不读取私有会话补数，也不倒写原报告的“无占用声明”。
+
+协调方另以公开接口核七个角色完整binding/binding_state与派前逐字段相同（含WorkBuddy已因用户原删除而为null），286仍queued/accepted/paused，DeepSeek原实例idle/无任务。独立复核者仅证明未触碰生产，没有独立实时查询这些保护；两类证据分开记录。本轮未启停/加载或再次delete/retry，原生Key/生产配置/DB/私有日志未读取。
+
+证据：review/report.md、checks.json、原始logs；coordination/329-received.json、329-formal-delivery.json、329-pickup-verification.json、329-collected-raw.json、protection-after-review.json和329-original-review/manifest.json。下一步仅按具体加载方案确认，选择性自启动未批准、不实施。
+
 用户实测旧 K2.8 Preview 提示“仍有在线或状态未确认的实例”，WorkBuddy接入验证提示“清理中”后“清理失败”，要求确认删除后即从角色列表消失。本轮是已授权删除切片的使用缺陷修正，由 Codex 开发、自测，DeepSeek 独立复核。选择性自启动尚未获确认，继续留待后续。
 
 ## 实际对象与只读诊断

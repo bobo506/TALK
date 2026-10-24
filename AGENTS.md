@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 23:47收尾：329定向独立complete/2973已验收并收取completed，无必须修正项。API核心8/本机5/整页8/Node82通过，另1严格步骤形状P3探针失败、Python283的5F/7E环境限制如实保留；不追加无关返修。79新与50/64原快照零错配，15份/190160字节原交付已保留，产品/测试仍4ef58bc。实际new_no_candidate新窗/count1，末snapshot38.1537%，未续328；原327/328保持。公开七binding与派前相同、DeepSeek原实例idle、286 queued/accepted/paused。本轮未生产启停/加载/delete/retry/私有读取；[具体正常加载与两目标验证方案](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)已准备待本次确认，原许可不自动延伸。当前只文档/Git收尾，选择性自启动未批准，下一无关片仍先确认。
+
 - 2026-10-24 22:59派发：删除人工验收返修329已交DeepSeek queued/assigned，4ef58bc已推送；79份/2964423字节新源/冻结及原50/64快照零错配。唯一写role-delete-user-fix1/review/，产品/正式测试/冻结暂停，默认用户通知后取件。沿base327请求相容续窗，创建state=null、实际决定待回执，不预称复用或独立通过。283Python+82Node仅Codex自检；未重载/重试真实删除，WorkBuddy用户原墓碑与其它五binding/286保持。派发后只登记协调文档，下一无关片仍先确认。详[返修合同](docs/spec/ROLE_DELETE_USER_FIX_20261024.md)。
 
 - 2026-10-24 22:56人工验收返修：用户删除旧K2.8 Preview被历史实例误拦、WorkBuddy接入验证因cleanup_budget失败，明确要求删除接受即列表消失。Codex直接修正/365项自检通过，待冻结交DeepSeek独立复核，非选择性自启动新片。仅放行同机过期无任务且OS证明退出的原实例，轮换严格证明不变；有进展预算耗尽自动分批，逻辑移除与资源清理分别显示。原327/328报告及50/64快照保持；未再次生产delete/retry/启停/加载、不读配置/Key/DB/私有state。其它五binding与286 paused保持；WorkBuddy用户已清绑定保留事实。后端仍旧版，复核后正常加载另行确认；默认派后用户通知取件。详[返修合同](docs/spec/ROLE_DELETE_USER_FIX_20261024.md)与当前进度。
