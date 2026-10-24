@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-24 20:00：328定向独立通过，327/328均收取，待确认正常加载
+
+用户通知“328好了”，正式328 succeeded/submitted、结果2972的作者agent:deepseek/Hall/任务号与完整正文和本地report/checks/delivery核对一致，工具自由文本业务unknown保持。64份/2581366字节源/新快照、原50份/2074815字节快照与原35份/230325字节审查材料重新比对零错配；328普通证据21份/487816字节另存coordination/328-original-review，不读取隔离凭据或私有state。
+
+P2-1所有health的owned_launches与drain后复查、P2-2文件目标目录伪装拒绝、P2-3墓碑身份任务/schedule全局绕过与明确在册项目守卫、P2-4独占证明失败不降格，均独立通过；旧名册human创建者、重试清steps及OBS-1字段/失败原字节已补验，无必须修正项。独立API增补11/11、本机21/21、Node68/68通过；规定45项37通过/4失败/4错误、完整265项253通过/5失败/7错误，日志核对仍为ACL发布、CreatePipe、子进程/teardown环境限制，不合称独立333全过。关键拒绝反例使用原ACL，两处成功发布/marker替代明列；原junction和真实私有ACL限制保持。
+
+328实际reuse_session续327原session-13d42eaa-9929-4cde-9380-999435d9de22，confirmed_count2/known，末623015/1000000=62.3015%，未强制同窗或倒写决策。328收取UTC11:59:28.441075、327收取UTC11:59:37.359508，均completed；327原partial/2971及原报告/失败/P3不改。旧直接构造failed/pending墓碑的重试不重证P3保留，本片未生产部署，不为此另开返修。
+
+Codex实核agent:codex/prj_e8fe7066bbec/lead，七角色公开binding全部字段与328派前一致，286 queued/accepted/paused，DeepSeek同ins_723f2b7d12a6/PID7916 idle/无当前任务。复核者未实时查生产的边界与协调方本次公共查询分开记载。未读生产配置正文/Key/DB/真实身份档/runtime pointer/私有state/原生日志会话，未启停/删除/CAS、未派下一任务。
+
+本轮仅验收/手册/进度与Git收尾，产品/测试仍匹配fix1；收取后合同/手册的预期文档漂移另列，不修改冻结。具体正常加载方案已准备于ROLE_DELETE_DEPLOYMENT_20261024.md：不改配置、不删七角色、普通停后台并由用户原终端重启API，核新宿主/worker后仅恢复原运行集合；同时加载此前326默认24小时代码。生产重载仍须按AGENTS明确确认，浏览器人验尚未实施，下一无关片仍先确认。
+
 ## 2026-10-24 19:27：328定向独立复验已派，原327 partial保持
 
 302b637已推送，64份/2581366字节源/新冻结、原50快照及35份原报告材料逐项一致。328创建UTC11:27:02.454607、queued/assigned；任务正文只复验327四项P2与关联补检，唯一写review-fix1/，无生产/产品/文档/Git写入或真实模型/浏览器许可。沿base327/role-delete-independent-review-20261024请求相容续窗，基础SHA0cc024eb…5db49不变；创建execution_session_state=null，实际领取决定待验，不提前称同窗或通过。Codex产品暂停，默认用户通知后取件，不自动等待/唤回。

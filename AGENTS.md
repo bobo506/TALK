@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-24 20:00最新：328定向复验complete/2972已验收并收取，327也收取completed，原partial/2971及失败/P3保持。四项P2与旧名册墓碑/重试steps独立闭合，无必须修正项；独立API11/本机21/Node68通过，规定45及265仍有ACL/子进程环境限制，不称独立333全过。64源/新快照、原50快照与35原审查材料零错配，328证据21份/487816字节另存。实际续327原窗/count2/known、末62.3015%。七角色完整公开binding与派前一致，286 queued/accepted/paused、DeepSeek idle；本轮未生产启停/删除/读正文。代码302b637已推送，具体[加载方案](docs/spec/ROLE_DELETE_DEPLOYMENT_20261024.md)待用户确认：普通重载API/runtime/宿主，仅恢复原运行角色，同时加载此前24小时默认；不删现有角色、不改配置。当前只文档/Git收尾，下一无关片先确认。
+
 - 2026-10-24 19:27派发：327定向复验328已交DeepSeek queued/assigned；修正302b637已推送，64份/2581366字节源/新冻结与原50快照、35原审查材料均匹配。唯一写review-fix1/，产品/新旧冻结及原报告暂停；默认用户通知后取件、不自动等待。沿base327/原continuity请求相容同窗，创建state=null，实际决定待领取。原327 partial/2971未收取，不能预称独立修复通过；265Python+68Node只是Codex自检。七角色公开绑定及286 queued/accepted/paused已再次核对，未生产启停/加载/删除或读取正文。详当前进度及本片合同，下一无关片仍先确认。
 
 - 2026-10-24 19:22接手327：正式2971自由文本partial（MCP业务unknown），50源/快照零漂移、35份/230325字节原审查材料已保留；DSH实际new_no_candidate新窗/count1、末42.1001%。Codex复现并修正P2-1残留owned_launches、P2-2文件目标目录误删、P2-3墓碑身份全局任务/schedule绕过与项目在册守卫、P2-4独占离册降格preserved；另修旧名册墓碑created_by和重试steps。最终265Python+68Node通过，原失败/partial不改，327暂未收取；修正版待新冻结交DeepSeek定向复验后产品暂停。共享Key及其它项目明确在册任务保持，无删除历史全局角色兼容。未生产读取正文/启停/删除，286 paused和七角色绑定保持。详[本片合同](docs/spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)与当前进度。
