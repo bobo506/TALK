@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-24 14:30：按用户要求汇总当前进度
+
+核当前PROGRESS/AGENTS及Git：推进到325，a0b7cae已推送且HEAD=origin，tracked工作区干净。TALK实际身份agent:codex/prj_e8fe7066bbec/lead，DSH同ins_fd018306ec1c/PID11164最新idle/无当前任务。此次只整理进度，不开启切片、不派任务、不改产品配置或启停服务。
+
+当前快照补齐前序能力索引：角色改名/统一宿主/重启后启停已验收；DSH/Codex/Kimi Code/WorkBuddy内置CLI原生会话复用及条件10/11已接通，70%调整按当次免验要求；角色与API/runtime/worker脱敏日志导出、原五范围与新增后台自动清理已加载。323实现与325补正独立通过并收取，324原partial/历史九字段不可恢复/ACL/P3/30天长期与生产实际到期删除限制保留，不声称完整日志整项或真实主被动完成。
+
+下一片尚未确认，真实主被动、全入口21600、删除归档/退出、自启动等仍待按范围与验收确认后排期。当前仍由Codex按当次明确授权开发和收尾、DeepSeek独立复核，相容时优先复用原窗，默认用户通知后取件；Kimi开发暂停及286保护保持。
+
 ## 2026-10-24 14:25：325补正独立复验通过并收取，本片正式收尾
 
 用户通知325完成；本人agent:codex/prj_e8fe7066bbec、DSH同ins_fd018306ec1c idle/无当前任务。325原交付complete/2966，无P1/P2或必须修正项，独立23检查零失败。Codex取件重核新33源/快照760220字节、原45快照634741字节及目录exactness、2helper+2guide预期漂移与本地远端完整JSON一致后收取completed；原324 partial/2965与报告/失败证据保留。本轮未改产品/配置/服务或重跑无变化全量，见coordination/325-acceptance.json/325-collection.json。

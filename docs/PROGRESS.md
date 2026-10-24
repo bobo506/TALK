@@ -1,6 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-24 14:25（Asia/Shanghai）。325定向独立复验通过并收取，本片完成收尾；下一切片尚未确认。
+Updated: 2026-10-24 14:30（Asia/Shanghai，用户要求汇总进度）。当前推进到325，后台日志清理片已收尾并启用；代码与收尾记录截至a0b7cae已推送、汇总前tracked工作区干净。当前仅汇总，无新开发/派发/启停，下一切片尚未确认。
+
+## 已完成的前序能力
+
+- [角色启停与重启恢复](spec/ROLE_START_REBOOT_FIX_20261023.md)、项目/角色改名及统一宿主已修正，用户已确认重启电脑后角色可正常启动；不扩大为未验证运行器/权限或无限归属恢复授权。
+- [会话复用](guides/EXECUTION_SESSION_USAGE.md)已接通DSH、Codex、Kimi Code与WorkBuddy内置CLI：同功能续原生会话、新窗基础恢复、真实指标与条件10/11备用。共用阈值已按用户要求[改70%](spec/EXECUTION_SESSION_THRESHOLD_70_20261023.md)，该调整本身按当次要求免测试/复核；历史验证边界保留，不当作桌面窗口控制。
+- 角色异常日志与新增API/runtime/配置worker后台日志已接入按时间脱敏导出及既有权限；原五角色和本片后台根自动清理已加载。旧历史/未知来源/私有输出仍不能称全量完整，详下方限制。
 
 ## 当前结果
 
@@ -9,7 +15,7 @@ Updated: 2026-10-24 14:25（Asia/Shanghai）。325定向独立复验通过并收
 - 取件重核33份/760220字节新源和快照、原45份/634741字节快照与目录exactness、预期2helper+2guide差异、本地远端交付一致；产品与测试仍同323。证据在.tmp/backend-log-auto-retention-v1/coordination/325-acceptance.json及review-deployment-fix1/。
 - F-R1采证helper已按真实公开schema保存完整runner/model/service；7角色binding的14字段与历史/当前记录逐值相等，原before service可恢复；当前完整投影已保存。旧9个展示/choice字段不可恢复，不声称这些旧值前后相同；两次当前读取不冒充部署前后。
 - 325实际续324的session-adc88ac8-3adb-44b5-904f-35eefccdcd86/count2，known指标、末48.5807%，基础SHA同315；324仍是new_no_candidate/count1，不追改历史。
-- 代码702d47a、获批配置f030c6d、实际加载da4e4fb、补正3d35442与325派发2e28ed5均已推送。本轮只做收取及文档/Git收尾，未再改产品/配置/启停服务。
+- 代码702d47a、获批配置f030c6d、实际加载da4e4fb、补正3d35442、325派发2e28ed5及收尾a0b7cae均已推送。汇总前HEAD与origin一致；本轮只整理进度，未再改产品/配置/启停服务。
 
 ## 已批准的实际运行状态
 
