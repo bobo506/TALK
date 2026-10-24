@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-25 00:42（Asia/Shanghai）。329修复已加载，WorkBuddy正式清理complete并从角色接口移除；DeepSeek已恢复。旧K2.8发现额外的“已终止failed历史”误拦，Codex补正143自检通过，待冻结交DeepSeek定向复核；新守卫未加载，下一自启动片尚未开工。
+Updated: 2026-10-25 00:46（Asia/Shanghai）。WorkBuddy正式清理complete并已移除、DeepSeek已恢复。旧K2.8的已终止failed历史误拦补正330已交DeepSeek定向独立复核，派发queued/assigned；Codex产品修改暂停。新守卫未加载，K2.8尚未删除，下一自启动片尚未开工。
 
 ## 当前运行与真实删除
 
@@ -19,7 +19,9 @@ Updated: 2026-10-25 00:42（Asia/Shanghai）。329修复已加载，WorkBuddy正
 
 ## 下一步和授权
 
-冻结新片role-delete-failed-history-v1后交DeepSeek定向复核，Codex暂停产品修改。通过后正常加载API、正式删除旧K2.8并核250不变；当前许可持续覆盖必要验证/修复，不重复询问同范围，外部API仍需原终端正常重启。
+补正eb6cf6c已推送；45份/2054979字节新冻结源/快照零漂移，原50/64/79快照和329原15份报告归档零错配。330于UTC16:45:50派DeepSeek queued/assigned，唯一写role-delete-failed-history-v1/review/，Codex产品/正式测试/冻结暂停；默认用户通知完成后取件。沿base327请求相容续329窗，创建state=null，实际决定待回执，不预称复用或独立通过。
+
+通过后正常加载API、正式删除旧K2.8并核250不变；当前许可持续覆盖必要验证/修复，不重复询问同范围，外部API仍需原终端正常重启。330属于当前必要修正，不是下一新功能。
 
 用户已经授权：当前真实验证全部通过后，继续一个此前讨论的选择性项目自启动切片，Codex开发、DeepSeek独立复核，人工验收等用户返回。当前K2.8未闭合，不提前开新功能；不扩大连续多片或生产私有访问权限。
 

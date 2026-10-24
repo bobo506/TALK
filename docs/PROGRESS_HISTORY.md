@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-25 00:46：失败历史删除守卫必要补正330已派DeepSeek
+
+实现eb6cf6c24daddca62ac9b584b4d69206d0d32ea9已推送；仅server/role_deletions.py与tests/test_role_deletion.py两份产品/测试修改，其余为实际加载/补正合同/恢复文档。143项相关自检全过后，role-delete-failed-history-v1/manifest.json及baseline-v1冻结45份/2054979字节，派前源/快照零漂移；原50/64/79快照与329原15份190160字节报告归档逐项零错配。生产observations只汇总既有公开响应，不传私有路径正文或生产helper。
+
+UTC16:45:50.049609创建330、目标agent:deepseek、queued/assigned，唯一写本片review/合成夹具，产品/正式测试/新旧冻结暂停。正式包包含最新页面开发要求快照并明确本次用户分工优先；普通源只读，禁止生产配置/Key/DB/私有state/原生会话日志与所有生产变更（本任务正常领取/心跳/交付除外）。250不收取/追改、286不操作；原始失败日志与329结论保持。
+
+execution_session沿role-delete-independent-review-20261024/base327/role-delete-review-v1引用原合同，明确失败历史只读分类验收差异，请求相容续329，仍服从70%及可信/作用域守卫。创建state=null，真实原生决定待回执，不预称同窗。默认派后结束、用户通知后取件，不主动等待或互派。
+
+当前WorkBuddy已正式complete/移除，DSH gen66正常恢复；旧K2.8仍原绑定/无墓碑，新的failed历史守卫仅工作区/隔离通过，未加载API。用户允许当前验证无误后进入一个新片的授权继续保留，但本次330仍为当前必要修正，选择性自启动尚未实施。当前只协调文档/Git收尾，不并行产品写入。
+
 ## 2026-10-25 00:42：用户重启后WorkBuddy真实清理完成，旧K2.8失败历史误拦必要补正
 
 用户回报原终端正常重启API。UTC16:27:42实际核新runtime11200/external、六宿主serving/worker空闲无错、API健康；与原before完整非service公开角色投影/要求保持，286 queued/accepted/paused。历史实例误拦解除，旧K2.8正式delete却被role_has_active_tasks拒绝，无墓碑或绑定修改。只读公开19条相关任务元数据定位唯一250：2026-10-16已failed/failed/finished、无lease、原2767未收取；collect-result只接受submitted，形成失败历史不能解除的死结。

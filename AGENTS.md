@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 00:46派发：旧K2.8失败历史必要补正330已交DeepSeek queued/assigned，eb6cf6c已推送；45份/2054979字节新源/冻结零漂移，原50/64/79和329原15报告归档零错配。仅1产品1测试修改，143自检通过；唯一写role-delete-failed-history-v1/review/，产品/测试/冻结暂停，默认用户通知后取件。沿base327请求相容续329窗，创建state=null、实际决定待回执。WorkBuddy真实complete/移除、DSH gen66已恢复；K2.8仍原绑定/无墓碑，250/286未变，新守卫未加载。330是当前缺陷必要返修，不是下一自启动片；用户条件续片授权保持，当前未闭合不提前实施。详当前进度与[补正合同](docs/spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)。
+
 - 2026-10-25 00:42加载及必要补正：用户已原终端正常重启API，新runtime11200/六宿主serving/worker无错。WorkBuddy原失败墓碑正式重试r3→r6 complete（UTC16:32:32），共享凭据保留、角色接口已移除；仅恢复DSH gen66/ins_203aa34895b9/PID8092 ready/idle、同实例心跳90.105977秒，其它五现存角色停止。五保护角色完整公开配置/绑定/要求及286 paused保持。旧K2.8通过实例门后被250 failed/failed历史误拦，正常collect只认submitted；不收取/追改250，前后公开任务/结果相同。Codex仅1产品1测试补正明确终止失败历史分类，143自检过，待冻结交DeepSeek定向复核，尚未加载该守卫。50/64/79及旧报告保持；当前K2.8未闭合，不提前开下一片。用户条件续一片授权保持，无须重复确认；详[必要补正](docs/spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)和当前进度。
 
 - 2026-10-24 23:55用户续行授权及实际停机：用户明确“验证好无误后…继续开下一个切片，你开发deepseek复核，我要离开下，回来再验收”。按已给正常加载方案继续当前验证，并仅在当前真实验证全部通过后允许一个下一片（已讨论的选择性项目自启动）开发/自测/DeepSeek独立复核，人工验收延后；同一范围不重复询问，不能未验证就先开片。原runtime3852及六现存宿主已普通stop/drain，12原PID全部absent、七角色stopped/无owner、DSH gen65；公开非service投影/绑定/要求/286保持。现在external API仍由用户原终端运行，正常reload-api明确不拥有；已发原终端Ctrl+C重跑提示，待实际动作后核新版/依次两目标delete-retry/恢复原DSH与心跳。未生产真实删除重试/读配置Key摘要/DB私有日志，不强杀CAS，不开第二API。当前卡点是原终端重启动作，不是缺少新片授权；[当前加载记录](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)有可恢复证据。
