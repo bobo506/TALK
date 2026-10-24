@@ -132,8 +132,9 @@ def launcher_lock(private):
 
 
 class TalkRuntime:
-    def __init__(self, config, *, client=None, spawn=None, clock=time.monotonic, sleeper=time.sleep, attach_api=False, diagnostics=None):
+    def __init__(self, config, *, client=None, spawn=None, clock=time.monotonic, sleeper=time.sleep, attach_api=False, diagnostics=None, config_path=None):
         self.config = config
+        self.config_path = Path(config_path) if config_path else None
         self.project = config["project_id"]
         self.project_root = Path(config["project_root"])
         self.private = Path(config["state_dir"]) / "runtime"
@@ -338,6 +339,33 @@ class TalkRuntime:
             self.statuses[member] = {"state":"starting","pid":process.pid}
             self.event("host_started", context={"member_id": member, "child_pid": process.pid, "stage": "startup"})
 
+    def reconcile_deletions(self, roles):
+        from scripts.role_delete import cleanup
+        from urllib.parse import quote
+        for role in roles:
+            deletion = role.get("deletion") or {}
+            if deletion.get("status") not in ("pending", "cleaning"):
+                continue
+            expiry = rsh._parse_iso(deletion.get("lease_expires_at"))
+            if deletion.get("status") == "cleaning" and expiry and expiry > datetime.now(timezone.utc):
+                continue
+            member = role["member_id"]
+            base = f"/api/projects/{quote(self.project,safe='')}/roles/{quote(member,safe='')}/deletion"
+            receipt = self.request("POST", base+"/claim", {"revision":deletion["revision"]})
+            project = self.request("GET", f"/api/projects/{quote(self.project,safe='')}")
+            registered = project.get("project_root_path")
+            import hashlib
+            digest = hashlib.sha256(json.dumps(self.config,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
+            if not registered or Path(registered).resolve() != self.project_root.resolve() or receipt.get("cleanup_config_digest") != digest:
+                from scripts.role_delete import STEPS
+                result = {"outcome":"failed", "steps":{step:"failed" if step=="manager" else "pending" for step in STEPS},
+                          "error_code":"local_runtime_required" if not receipt.get("cleanup_config_digest") else "runtime_config_changed"}
+            else:
+                result = cleanup(self, member, receipt)
+            self.request("POST", base+"/report", {"lease_token":receipt["lease_token"],
+                "revision":receipt["revision"], **result})
+            break  # One bounded cleanup per tick; roles/API/worker remain responsive.
+
     def reload_api(self):
         if self.api is None:
             raise RuntimeErrorCode("runtime_api_not_owned")
@@ -472,7 +500,9 @@ class TalkRuntime:
                 continue
             try:
                 self.worker_tick()
-                self.reconcile_hosts(self.roles())
+                roles = self.roles()
+                self.reconcile_deletions(roles)
+                self.reconcile_hosts(roles)
             except (rsh.HostError, OSError, ValueError) as exc:
                 self.worker_error = getattr(exc, "code", None) or type(exc).__name__
                 self.event("runtime_exception", context={"stage": "serve", "error_code": self.worker_error}, exc=exc)
@@ -535,7 +565,7 @@ def main(argv=None):
     if not args.attach_api:
         from server.local_runtime import bind_local_runtime
         bind_local_runtime(args.config, config)
-    runtime=TalkRuntime(config,attach_api=args.attach_api)
+    runtime=TalkRuntime(config,attach_api=args.attach_api,config_path=Path(args.config).resolve())
     def stopping(*_):runtime.stopping=True
     signal.signal(signal.SIGINT,stopping)
     if hasattr(signal,"SIGBREAK"):signal.signal(signal.SIGBREAK,stopping)

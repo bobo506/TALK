@@ -972,6 +972,24 @@ class SchemaMigration(SQLModel, table=True):
     applied_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class RoleDeletion(SQLModel, table=True):
+    """Minimal tombstone cleanup state; no plaintext credentials or local paths."""
+    __tablename__ = "role_deletions"
+    project_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True)
+    status: str = "pending"
+    revision: int = 1
+    revoke_identity: bool = False
+    credential_digest: Optional[str] = None
+    lease_hash: Optional[str] = None
+    lease_expires_at: Optional[datetime] = None
+    steps: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    error_code: Optional[str] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class RoleProvisionJob(SQLModel, table=True):
     """跨宿主配置作业（角色生命周期 R1-2，PROVISION_CONTRACT §1）。
 
@@ -4132,6 +4150,7 @@ class ProjectRoleListItem(BaseModel):
     role_description: Optional[str] = None
     binding_state: Optional[str] = None
     service: Optional[ProjectRoleServiceOut] = None
+    deletion: Optional[dict] = None
 
 
 class RoleCredentialRotateOut(BaseModel):
@@ -4358,6 +4377,8 @@ class RoleBindingResponse(BaseModel):
 
 class ProjectAgentOut(BaseModel):
     member_id: str
+    archived: bool = False
+    deletion: Optional[dict] = None
     # 项目内角色名为展示权威；与全局 Member.display_name 独立。
     role_name: Optional[str] = None
     identity_path: Optional[str]
@@ -4398,9 +4419,13 @@ class ProjectAgentOut(BaseModel):
         binding: Optional[RoleBindingOut] = None,
         binding_state: Optional[str] = None,
         service: Optional[ProjectRoleServiceOut] = None,
+        archived: bool = False,
+        deletion: Optional[dict] = None,
     ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
+            archived=archived,
+            deletion=deletion,
             role_name=role_name,
             identity_path=agent.identity_path,
             soul_path=agent.soul_path,
@@ -4648,6 +4673,10 @@ def ensure_identity_exclusive_reference_allowed(
     只有新独占身份被限制在创建项目内，跨项目或全局（``project_id is None``）引用一律
     ``409 identity_exclusive_reference_refused``。调用方必须与新增写入处于同一写事务。
     """
+    if reference_project_id is not None:
+        role = session.get(ProjectRole, (reference_project_id, member_id))
+        if role is not None and role.archived_at is not None:
+            raise HTTPException(status_code=409, detail="role_archived")
     owner = exclusive_identity_owner_project(member_id, session)
     if owner is None:
         return

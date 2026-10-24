@@ -21,6 +21,7 @@ from sqlmodel import Session, select
 
 from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.auth import get_current_member
+from server.role_deletions import RoleDeletion, public as deletion_public
 from server.db import begin_immediate_write, get_session
 from server.models import (
     CHOICE_SOURCE_CREATION_OPERATION,
@@ -342,8 +343,8 @@ def _project_agent_outs(
         else []
     )
     members_by_id = {member.id: member for member in members}
-    names_by_member = {
-        role.member_id: role.role_name
+    role_rows = {
+        role.member_id: role
         for role in session.exec(
             select(ProjectRole).where(
                 ProjectRole.project_id == project_id,
@@ -351,6 +352,9 @@ def _project_agent_outs(
             )
         ).all()
     }
+    names_by_member = {member: role.role_name for member, role in role_rows.items()}
+    deletion_rows = {row.member_id: row for row in session.exec(select(RoleDeletion).where(
+        RoleDeletion.project_id == project_id, RoleDeletion.member_id.in_(member_ids))).all()}
     instances_by_member: dict[str, list[AgentInstance]] = {}
     for instance in instances:
         instances_by_member.setdefault(instance.member_id, []).append(instance)
@@ -381,6 +385,8 @@ def _project_agent_outs(
     return [
         ProjectAgentOut.from_orm_agent(
             agent,
+            archived=bool(role_rows.get(agent.member_id) and role_rows[agent.member_id].archived_at),
+            deletion=deletion_public(deletion_rows[agent.member_id]) if agent.member_id in deletion_rows else None,
             role_name=names_by_member.get(agent.member_id),
             display_name=(
                 members_by_id[agent.member_id].display_name
@@ -527,6 +533,8 @@ def update_agent_profile(
     project = _get_project(project_id, session)
     root = _require_project_root(project)
 
+    begin_immediate_write(session)
+    ensure_identity_exclusive_reference_allowed(member_id, project_id, session)
     try:
         for kind in ("identity", "soul", "user"):
             if kind in body.model_fields_set:
@@ -799,8 +807,11 @@ def sync_project(
     existing = session.exec(
         select(ProjectAgent).where(ProjectAgent.project_id == project_id)
     ).all()
+    pending_deletions = {row.member_id for row in session.exec(select(RoleDeletion).where(
+        RoleDeletion.project_id == project_id, RoleDeletion.status != "complete")).all()}
     for row in existing:
-        session.delete(row)
+        if row.member_id not in pending_deletions:
+            session.delete(row)
 
     now = datetime.now(timezone.utc)
     for entry in body.agents:
@@ -1149,6 +1160,8 @@ def _role_projection(
             session, project_id=project_id, member_ids=member_ids
         )
     }
+    deletion_rows = {row.member_id: row for row in session.exec(select(RoleDeletion).where(
+        RoleDeletion.project_id == project_id, RoleDeletion.member_id.in_(member_ids))).all()}
 
     projected: dict[str, ProjectRoleListItem] = {}
     now = datetime.now(timezone.utc)
@@ -1204,6 +1217,7 @@ def _role_projection(
 
         projected[member_id] = ProjectRoleListItem(
             member_id=member_id,
+            deletion=deletion_public(deletion_rows[member_id]) if member_id in deletion_rows else None,
             role_name=role_name,
             origin=origin,
             identity=identity,
@@ -1245,7 +1259,9 @@ def _role_list_member_ids(project_id: str, session: Session) -> list[str]:
             select(ProjectAgent).where(ProjectAgent.project_id == project_id)
         ).all()
     }
-    return sorted(role_ids | roster_ids)
+    deleted = {row.member_id for row in session.exec(select(RoleDeletion).where(
+        RoleDeletion.project_id == project_id, RoleDeletion.status == "complete")).all()}
+    return sorted((role_ids | roster_ids) - deleted)
 
 
 @router.get("/{project_id}/roles", response_model=list[ProjectRoleListItem])
@@ -1357,6 +1373,9 @@ def create_project_role(
                     detail="operation_key_conflict",
                 )
             replay_member_id = committed.member_id
+            deleted_role = session.get(ProjectRole, (project_id, replay_member_id))
+            if deleted_role and deleted_role.archived_at is not None:
+                raise HTTPException(409, "role_archived")
             # 未写任何事实：直接释放写锁，再按原身份的当前只读投影返回（不发 Key）。
             session.rollback()
             item = _role_projection(project_id, [replay_member_id], session)[

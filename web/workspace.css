@@ -235,6 +235,10 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-service-button {background:#fff; border:1px solid #cfd6dd; border-radius:6px; color:#2b5f92; font-size:14px; line-height:1.4; padding:6px 14px; cursor:pointer;}
 .role-service-button:hover:not(:disabled) {border-color:#9db6cc; background:#f2f8fd;}
 .role-service-button:disabled {opacity:0.5; cursor:not-allowed; color:#7d858d;}
+.role-delete-button {color:#a6423e; border-color:#e7b0ad;}
+.role-delete-button:hover:not(:disabled) {color:#90312d; border-color:#d49590; background:#fff5f4;}
+.role-delete-section {font-size:14px; line-height:1.7; margin:12px 0 24px; overflow-wrap:anywhere;}
+.role-delete-error {color:#a6423e;}
 .role-service-hint {font-size:13px; color:#82651f; line-height:1.7; margin:8px 0 0; overflow-wrap:anywhere;}
 .role-service-section {color:#303741; margin:0 0 26px;}
 .role-service-head {display:flex; align-items:baseline; flex-wrap:wrap; gap:12px; margin-bottom:10px;}

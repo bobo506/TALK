@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-24 18:30：删除角色已由Codex开发、自检，冻结待DeepSeek独立核验
+
+用户批准此前已说明的删除范围，并明确由Codex开发、DeepSeek核验；本次覆盖页面确认、事务守卫/墓碑、角色配置清除、独占Key吊销、持久清理状态/租约、Windows专属文件清理、失败重试及新建新身份。历史任务/结果/消息保留，共享身份全局Key/原生登录/模型保持。详情见[本片合同](spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)。
+
+29新增Python与147关联回归、68Node通过：真实隔离HTTP从删除请求到运行时回执完整闭环；真实Windows文件、普通drain原子进程、占用失败/重试、hardlink/junction、并发任务与租约、崩溃续处理、防恢复、精确DB/项目根/配置摘要及旧页面降级均已自检。关联回归初次169项中168通过、唯一新deletion公开字段严格白名单断言需更新，更新后单项及全部新增项复跑通过；不把初次报成全绿。临时C盘短路径在当前沙箱无法通过既有NativeFile检查，文件夹具改在仓库隔离目录后通过，未削弱产品守卫。初始失败及后续结果保留在.tmp/role-delete-v1/。
+
+实际身份仍agent:codex/prj_e8fe7066bbec/lead；派前DeepSeek ins_723f2b7d12a6/PID7916 idle/无任务，最新公开绑定未变。286仍queued/accepted/paused。未读生产配置正文/Key/DB/私有state/原生日志或会话，未启停/删除生产角色。当前冻结产品并准备独立复核任务包，默认派后结束、用户通知后取件；自检不是独立通过，生产正常加载与页面人验尚未进行。下一无关片仍先确认。
+
 ## 2026-10-24 17:53：326独立核验149项通过、集成并收取，默认24小时代码完成
 
 用户通知“好了”后，Codex按326完成取件；TALK实核agent:codex/prj_e8fe7066bbec/lead，DeepSeek同ins_723f2b7d12a6已idle/无当前任务。正式326 succeeded/submitted、结果2970；完整830字符自由文本补读且作者/Task Hall/任务号正确。工具业务结论unknown和原文本保持，本地delivery.json complete不替代独立实查，未要求为格式另开返修片。

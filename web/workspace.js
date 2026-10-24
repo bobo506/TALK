@@ -135,7 +135,7 @@ async function saveRoleName(event) {
   }
 }
 function workspaceChatCandidates(items, roles, projectId, selfId) {
-  const roleIds = new Set(roles.map(role => role.member_id));
+  const roleIds = new Set(roles.filter(role => !role.archived).map(role => role.member_id));
   return items.filter(member => member.id !== selfId && !member.disabled_at
     && (member.kind !== "agent" || !projectId || roleIds.has(member.id)));
 }
@@ -154,7 +154,7 @@ function workspaceRoleDescription(role) {
     tester: "负责验证成果是否符合要求，并提交测试结论。",
   })[workspaceRoleKey(role)];
 }
-function workspaceRoles() { return projectAgents.filter(agent => !members.find(member => member.id === agent.member_id)?.disabled_at); }
+function workspaceRoles() { return projectAgents.filter(agent => agent.deletion?.status !== "complete" && (agent.deletion || !members.find(member => member.id === agent.member_id)?.disabled_at)); }
 // ROLE-SETTINGS-1：角色列表固定首项“项目设置”是独立导航项，不是伪造 Agent——
 // 不计入角色数量、不进入名册成员候选，其选中状态也不会作为 member_id 传给任何任务或 API。
 // 选择状态：roleSelection === "role" 且 selectedRole 命中当前名册时查看具体角色；
@@ -529,7 +529,8 @@ function renderRoleDescriptionPanel() {
   if (!panel) return;
   // 与角色详情同一可见条件：角色模式 + 选中具体在册角色（非项目设置）；其余导航一律隐藏。
   const visible = blackboardOpen && workspaceUI.mode === "roles" && !workspaceSettingsSelected()
-    && Boolean(activeProjectId) && Boolean(myId);
+    && Boolean(activeProjectId) && Boolean(myId)
+    && !projectAgents.find(role => role.member_id === workspaceUI.selectedRole)?.archived;
   panel.classList.toggle("hidden", !visible);
   if (!visible) return;
   const projectId = activeProjectId, accountId = myId, memberId = workspaceUI.selectedRole;
@@ -764,6 +765,7 @@ function renderWorkspaceList() {
       if (workSummary) row.appendChild(workspaceEl("small", "", workSummary));
       row.appendChild(workspaceEl("small", "role-binding-summary", workspaceRoleBindingSummary(role)));
       entry.appendChild(row);
+      if (role.deletion) row.appendChild(workspaceEl("small", "role-delete-summary", role.deletion.status === "failed" ? "删除未完成" : "正在删除…"));
       // R1-3：受管服务控制作为角色行的同级块（行本身是 <button>，不能再嵌套按钮）；未归档才显示。
       if (role.archived !== true) {
         const serviceControls = workspaceRoleServiceControls(role);
@@ -1106,6 +1108,122 @@ function workspaceRoleServiceControls(role, className = "role-service-controls")
   if (listHint) box.appendChild(workspaceEl("p", "role-service-hint", listHint));
   return box;
 }
+const roleDeleteUI = {busy: new Set(), errors: new Map(), timer: null, context: null, generation: 0};
+function roleDeleteKey(memberId) { return JSON.stringify([myId, activeProjectId, memberId]); }
+function roleDeleteCurrent(context) {
+  return context && context.account === myId && context.project === activeProjectId;
+}
+function roleDeleteMessage(code) {
+  return ({role_service_running: "请先关闭角色，确认已停止后再删除。",
+    role_instance_active: "仍有在线或状态未确认的角色实例，请先关闭。",
+    role_has_active_tasks: "该角色还有未闭环任务，请先处理并收取结果。",
+    role_has_active_schedules: "该角色还有定时任务，请先结束相关定时任务。",
+    role_provision_active: "角色正在配置，请等配置结束后再删除。",
+    manager_not_stopped: "本机宿主尚未退出，请确认后台正常运行后重试。",
+    local_runtime_required: "请先正常重载 TALK 后台，再重试清理。",
+    runtime_config_changed: "本机配置已变化，请正常重载 TALK 后台后重试。",
+    credential_mismatch: "专属凭据归属核验未通过，请核对后重试。",
+    unsafe_resource: "资源归属或路径无法确认，请核对后重试。",
+    cleanup_busy: "资源正被占用，请稍后重试。",
+    cleanup_budget: "本轮清理尚未完成，请重试继续清理。"})[code] || "删除尚未完成，请稍后重试。";
+}
+function roleDeleteApply(context, value) {
+  if (!roleDeleteCurrent(context) || value?.member_id !== context.member) return;
+  if (typeof projectAgentRequest !== "undefined") projectAgentRequest++;
+  const role = projectAgents.find(row => row.member_id === context.member);
+  if (role?.deletion && Number.isInteger(role.deletion.revision) && Number.isInteger(value.revision)
+      && value.revision < role.deletion.revision) return;
+  if (value.status === "complete") {
+    projectAgents = projectAgents.filter(row => row.member_id !== context.member);
+  } else if (role) {
+    role.archived = true; role.deletion = value;
+    role.binding = null; role.role_description = null;
+  }
+  renderWorkspaceList(); renderTaskDetailsPanel();
+}
+async function deleteWorkspaceRole(memberId) {
+  if (!currentMemberIsHuman() || !activeProjectId) return;
+  const role = projectAgents.find(row => row.member_id === memberId);
+  const key = roleDeleteKey(memberId);
+  if (!role || roleDeleteUI.busy.has(key)) return;
+  if (!role.deletion && !window.confirm(`删除角色「${workspaceMemberName(memberId)}」？\n将清除本项目角色配置和专属接入资源，保留历史任务、结果与消息。重新添加会创建新身份。`)) return;
+  const context = {account:myId, project:activeProjectId, member:memberId};
+  roleDeleteUI.busy.add(key); roleDeleteUI.errors.delete(key);
+  renderWorkspaceRoleDetails();
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(context.project)}/roles/${encodeURIComponent(memberId)}/delete`, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({confirm_member_id:memberId}),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(roleDeleteMessage(body.detail));
+    if (body.member_id !== memberId || !["pending","cleaning","failed","complete"].includes(body.status)) throw new Error("删除回执不完整，请刷新核对。");
+    roleDeleteApply(context, body);
+  } catch (err) {
+    if (roleDeleteCurrent(context)) roleDeleteUI.errors.set(key, err.message || "删除失败，请重试。");
+  } finally {
+    roleDeleteUI.busy.delete(key);
+    if (roleDeleteCurrent(context)) renderWorkspaceRoleDetails();
+  }
+}
+function roleDeleteButton(role) {
+  if (!currentMemberIsHuman() || !("deletion" in role)) return null;
+  const key = roleDeleteKey(role.member_id), service = roleServiceView(role).service;
+  const pending = ["pending","cleaning"].includes(role.deletion?.status);
+  const button = workspaceButton(role.deletion ? "重试清理" : "删除角色", () => deleteWorkspaceRole(role.member_id), "role-service-button role-delete-button");
+  button.disabled = pending || roleDeleteUI.busy.has(key) || (!role.deletion && Boolean(service && (
+    service.ownership_held || ["running","starting","stopping","unknown"].includes(service.observed))));
+  if (button.disabled && !pending) button.title = "请先关闭角色并确认已停止。";
+  return button;
+}
+function roleDeleteSync(role) {
+  const context = role ? {account:myId, project:activeProjectId, member:role.member_id} : null;
+  const key = context ? JSON.stringify(context) : null;
+  if (roleDeleteUI.context !== key) {
+    if (roleDeleteUI.timer) clearTimeout(roleDeleteUI.timer);
+    roleDeleteUI.timer = null; roleDeleteUI.context = key;
+    roleDeleteUI.generation++;
+  }
+  if (!role?.deletion || !["pending","cleaning"].includes(role.deletion.status) || roleDeleteUI.timer) return;
+  const generation = roleDeleteUI.generation;
+  roleDeleteUI.timer = setTimeout(async () => {
+    try {
+      const res = await apiFetch(`/api/projects/${encodeURIComponent(context.project)}/roles/${encodeURIComponent(context.member)}/deletion`);
+      if (!res.ok) throw new Error("清理状态暂时无法读取，正在重试…");
+      const body = await res.json();
+      if (roleDeleteCurrent(context) && roleDeleteUI.context === key && roleDeleteUI.generation === generation) {
+        roleDeleteUI.errors.delete(roleDeleteKey(context.member));
+        roleDeleteApply(context, body);
+      }
+    } catch (err) {
+      if (roleDeleteCurrent(context) && roleDeleteUI.context === key && roleDeleteUI.generation === generation) roleDeleteUI.errors.set(roleDeleteKey(context.member), err.message);
+    } finally {
+      if (roleDeleteUI.context === key && roleDeleteUI.generation === generation) {
+        roleDeleteUI.timer = null;
+        if (roleDeleteCurrent(context)) renderWorkspaceRoleDetails();
+      }
+    }
+  }, 2000);
+}
+function workspaceRoleDeletePanel(role) {
+  const section = workspaceEl("section", "role-delete-section");
+  section.setAttribute("aria-live", "polite");
+  if (!role.deletion && (role.archived || !roleServiceView(role).provided)) {
+    const button = roleDeleteButton(role); if (button) section.appendChild(button);
+  }
+  if (role.deletion) {
+    const failed = role.deletion.status === "failed";
+    section.appendChild(workspaceEl("p", "", failed ? "删除未完成" : "正在清理角色专属资源…"));
+    if (failed) section.appendChild(workspaceEl("p", "", roleDeleteMessage(role.deletion.error_code)));
+    const labels = {manager:"本机宿主",profiles:"身份档",credentials:"专属凭据",private_state:"专属状态",startup_config:"启动配置"};
+    for (const [step, state] of Object.entries(role.deletion.steps || {})) {
+      if (state === "failed" || state === "pending") section.appendChild(workspaceEl("p", "", `${labels[step] || "资源"}：${state === "failed" ? "清理失败" : "待清理"}`));
+    }
+    if (failed) { const button = roleDeleteButton(role); if (button) section.appendChild(button); }
+  }
+  const error = roleDeleteUI.errors.get(roleDeleteKey(role.member_id));
+  if (error) section.appendChild(workspaceEl("p", "role-delete-error", error));
+  return section.childElementCount ? section : null;
+}
 function workspaceRoleServicePanel(role) {
   const control = roleServiceControl(role);
   if (!control.view.provided) return null;
@@ -1116,6 +1234,8 @@ function workspaceRoleServicePanel(role) {
   section.appendChild(head);
   const controls = workspaceRoleServiceActions(role, "role-service-controls role-service-detail-controls");
   if (controls) section.appendChild(controls);
+  const deleteButton = roleDeleteButton(role);
+  if (deleteButton) (controls?.children[0] || section).appendChild(deleteButton);
   return section;
 }
 function roleServiceRoleName(memberId) {
@@ -1553,6 +1673,7 @@ function renderWorkspaceRoleDetails() {
   }
   namePanel.classList.toggle("hidden", !visible);
   tasksPanel.classList.toggle("hidden", !visible);
+  roleDeleteSync(visible ? role : null);
   if (!visible) return;
   namePanel.replaceChildren();
   tasksPanel.replaceChildren();
@@ -1578,7 +1699,9 @@ function renderWorkspaceRoleDetails() {
     const servicePanel = workspaceRoleServicePanel(role);
     if (servicePanel) namePanel.appendChild(servicePanel);
   }
-  if (typeof roleRequestApp !== "undefined") {
+  const deletePanel = workspaceRoleDeletePanel(role);
+  if (deletePanel) namePanel.appendChild(deletePanel);
+  if (typeof roleRequestApp !== "undefined" && !role.deletion) {
     const actions = roleRequestApp?.rolePanel(role); if (actions) namePanel.appendChild(actions);
   }
   const section = workspaceEl("section", "role-task-section");
