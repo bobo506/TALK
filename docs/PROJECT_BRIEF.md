@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-25 07:55：330独立complete/2974已验收收取，143关联回归与5项真实隔离API探针通过，无必须修正项；原交付9份81785字节及新旧冻结保持，过程写根偏差/报告纠正见补正合同。原runtime11200及六宿主已正常退出，12原PID全absent、DSH gen67/stopped，待用户原终端重启external API。新守卫尚未加载；重启后正式删旧K2.8、保250 failed/原结果、仅恢复DSH并核保护，全部闭合后继续已授权一个自启动片。WorkBuddy complete、286 paused保持。详[进度](PROGRESS.md)。
+
 2026-10-25 00:46：旧K2.8终止失败历史误拦补正330已派DeepSeek独立复核（派发queued/assigned），eb6cf6c推送、45份/2054979字节源/冻结零漂移，旧50/64/79与329原报告保持。产品暂停、默认用户通知取件；原窗复用待实际回执。WorkBuddy真实complete且DSH恢复保持，250失败历史/286保护不变；K2.8尚未删、新守卫未加载，下一功能未开。详[进度](PROGRESS.md)。
 
 2026-10-25 00:42：用户API重启后329修复已加载runtime11200/六宿主，WorkBuddy正式r6 complete/角色接口移除，DSH gen66恢复且心跳推进90.105977秒。旧K2.8剩余阻挡是250已终止failed历史不可collect；Codex只读分类补正143自检过，待DeepSeek独立复核/正常加载，不改250原任务结果。五保护角色/286保持；下一片虽已条件授权，当前未闭合不提前实施。详[补正合同](spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)和[进度](PROGRESS.md)。

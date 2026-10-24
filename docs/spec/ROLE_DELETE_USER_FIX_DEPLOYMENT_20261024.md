@@ -1,6 +1,20 @@
 # 删除人工验收返修的正常加载与两目标验证（2026-10-24）
 
-状态：用户已正常重启原API，新runtime11200/六宿主与worker健康。WorkBuddy正式重试已complete并从角色接口移除；DeepSeek已恢复gen66/ins_203aa34895b9/ready/idle、同实例心跳推进90.105977秒。旧K2.8仍被历史250 failed/failed误当活动任务阻挡；Codex补正143自检通过，待DeepSeek定向复核及后续API正常加载。250原任务/结果保持，当前没有开启下一自启动片。
+状态：330独立复核complete/2974已验收收取，无必须修正项；143关联回归与5项新增隔离API探针通过。已按同一正常加载授权停止runtime11200及六宿主，12原PID全部absent，六角色停止无owner、DeepSeek gen67。现在待用户原终端重启external API；330守卫尚未加载，旧K2.8未删除。WorkBuddy原r6 complete保持，250/286保护及条件下一片授权保持。
+
+## 2026-10-25 07:55：330收取完成，原后台已正常退出
+
+正式2974与本地交付等值，独立143/143及5项真实隔离API探针通过，无必须修正项；UTC23:50:35.761278收取330为completed。9份/81785字节原交付归档、45新冻结及50/64/79旧冻结均已核验，产品仍eb6cf6c。调试wrapper写根偏差和报告第4.3节失败原因混写另见[330收尾说明](ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)，原报告不追改。
+
+UTC23:51:31预检：API健康/runtime11200/external，六宿主serving，worker空闲无错，无running任务；仅DeepSeek gen66为新鲜idle，其它五角色stopped/无owner。六角色完整非service投影/项目要求与上次heartbeat相同；旧K2.8无墓碑/原绑定，WorkBuddy r6 complete/identity_disabled=false；250 failed/failed/result2767未收取，286 queued/accepted/paused。
+
+UTC23:53:08.208785仅从原统一入口提交一次普通stop。中间stopping和进程陆续退出的观察原样保留；UTC23:55:20.074444核runtime11200 absent、六宿主12个原PID/创建时间绑定全absent，六角色stopped/无owner、DeepSeek gen67，公开非service投影/要求/286仍相同。未强杀/CAS、改配置或手动清理。
+
+API为external/owns_original_popen=false，原终端正常重启仍须用户实际执行，已发Ctrl+C后重跑提示。这不是重复申请已授权正常加载许可，也不借helper接管终端或另启API。当前守卫未加载、不提交K2.8删除、不提前开启自启动片。
+
+本次独立证据与部署helper另存 `.tmp/role-delete-failed-history-v1/coordination/`、`deployment/`，不覆盖前轮证据。用户重启后运行本片after_reload.py的loaded：核API启动时间晚于本轮before、新runtime/六宿主/worker健康、六角色完整公开投影及250原任务/2767结果逐字段保持。再正式delete唯一旧K2.8目标，跟踪complete并核剩五角色/五宿主、WorkBuddy原complete不变；仅普通start恢复DeepSeek，核ready/idle及同实例真实心跳，其它四角色停止。每步均核五保护角色完整公开绑定/要求、250和286。完成后才实施已授权一个选择性项目自启动片，不再重复同范围确认。
+
+停止后另以公开GET逐字段核250任务及原2767结果、WorkBuddy complete不变，history-after-drain.json为pass。新协调helper首次把HTTP任务响应误当TALK工具的envelope而KeyError，未生产写入；已按实际HTTP纯task与公开Hall消息接口修正并通过。此为协调helper响应适配，不改产品或独立143/5结论。
 
 ## 2026-10-25 00:39：WorkBuddy真实删除通过，旧K2.8发现失败历史兼容缺陷
 

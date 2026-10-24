@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-25 07:55：330独立复核收取，原后台正常退出待API重启
+
+用户通知330完成。正式2974/正确Hall/author agent:deepseek的talk-delivery-1业务complete，与本地delivery逐字段一致；协调方核报告/源码/探针/日志及冻结后验收，无必须修正项，UTC23:50:35.761278收取为completed。独立四模块143/143过、115.197秒、零失败/错误/跳过，另5真实隔离API探针过（内部22拒绝/5混合/6旧守卫等不累计）。产品与正式测试eb6cf6c保持，不重复原整组自检。
+
+45份2054979字节快照、原50/64/79快照及329原15份归档零错配，源仅AGENTS/PROJECT_BRIEF为派发后预期协调漂移。显式9份81785字节原交付保存至coordination/330-original-review/且逐项一致，不扫描合成scratch/私有目录。330实际new_no_candidate新窗/count1/session-b0cb3ab9-4176-4693-8f99-d41cd1746f4b，初始unavailable/no_candidate、末公开snapshot260273/1000000=26.0273%，未续329，不查私有会话猜原因。
+
+原复核报告声明一次非冻结调试wrapper未重定向mkdtemp，38合成DB写出唯一review根外.tmp-tests并声明清除，正式143/5证据已用正确冻结wrapper重跑。不能以通过掩盖过程偏差或声称全程唯一写根合规；未据此扩大权限/追加产品修改。另report第4.3节混写失败原因：before.log的2失败是真实旧守卫409，selfcheck.log的2失败才是迁移夹具基线；本轮协调说明纠正，原报告/失败日志不改。
+
+按当前正常加载既有授权继续，UTC23:51:31预检runtime11200/external/六宿主serving/worker空闲无错/无running任务，仅DSH gen66新鲜idle；六角色完整非service投影/要求、WorkBuddy r6 complete、250 failed/failed/result2767未收取、286 paused均保持。UTC23:53:08.208785原统一入口仅一次普通stop，UTC23:55:20.074444最终原runtime absent、六宿主12原PID全absent、六角色stopped/无owner、DSH gen67；中间观察均保留，不强杀/CAS、不改配置/DB或手工清理。
+
+external API仍需用户在原终端Ctrl+C重跑，已发实际操作提示，不重复申请同范围许可或接管终端/另启API。新部署证据在role-delete-failed-history-v1/deployment/，helper只复用既有统一运行器和正常human认证，公开核250完整任务及原2767结果，不看生产配置正文/角色Key/私有目录。当前新守卫未加载、K2.8无墓碑；用户回复后核新API/runtime/六宿主，正式删除旧K2.8跟踪complete、剩五角色/五宿主，保WorkBuddy和250不变，恢复DSH并核心跳/其它保护。当前全部闭合后继续已授权一个选择性项目自启动片，人工验收等用户返回；不提前实施，不新增自动等待/唤回或无限续片授权。
+
 ## 2026-10-25 00:46：失败历史删除守卫必要补正330已派DeepSeek
 
 实现eb6cf6c24daddca62ac9b584b4d69206d0d32ea9已推送；仅server/role_deletions.py与tests/test_role_deletion.py两份产品/测试修改，其余为实际加载/补正合同/恢复文档。143项相关自检全过后，role-delete-failed-history-v1/manifest.json及baseline-v1冻结45份/2054979字节，派前源/快照零漂移；原50/64/79快照与329原15份190160字节报告归档逐项零错配。生产observations只汇总既有公开响应，不传私有路径正文或生产helper。
