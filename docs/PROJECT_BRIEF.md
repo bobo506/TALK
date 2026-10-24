@@ -6,6 +6,8 @@
 
 ## 当前实施状态（2026-10-23）
 
+2026-10-24 13:23实际加载：用户重启API后，新API11520/runtime4888/七宿主serving，worker无错；正式后台自动检查complete/删除0/保护4/907191字节、下次本地10月25日13:21:30。仅普通恢复DSH gen60/ins_fd018306ec1c、同实例心跳推进60.078633秒，其余六停止；新三组件活跃lease由Windows共享冲突32证明、closed不存在，同DB/五policy/绑定/要求/286保持。协调方加载自检通过，待DeepSeek首次部署证据独立复核，详[加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
+
 2026-10-24 13:20：用户已批准新后台清理启用和正常重载；原runtime4856及七宿主14个原进程正常退出、七角色无owner，仅增加backend_enabled=true，新配置SHA428c928e…e09825，其它字段/五source/同DB/绑定/286保持。待用户原终端重启TALK API，回复后核正式清理状态并仅普通恢复原DSH；当前尚未称加载通过。详[加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
 
 2026-10-24 13:14：新后台日志清理323独立复核complete/2964已收取，30份/852486字节取件零漂移与本地远端一致，无必须修正项。独立22新及隔离API通过，组合104通过/1项ACL cleanup限制，Codex自检105通过，原P3/权限边界保留。实际续322/count2，末52.6519%。仅增backend_enabled=true的[具体启用方案](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)已预检；生产原SHA db98e42d…保持、未启用/重载，待明确确认，286/旧缺证run仍保护，详[当前进度](PROGRESS.md)。

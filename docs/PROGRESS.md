@@ -1,8 +1,15 @@
 # Project Progress
 
-Updated: 2026-10-24 13:20（Asia/Shanghai，用户已批准本片启用及正常重载）。原runtime4856/七宿主正常退出、14个原进程绑定absent、七角色无owner；仅增加backend_enabled=true，配置SHA428c928e…e09825，其余字段及286保持。现待用户在原终端正常重启TALK API，尚未核实际清理加载；回复后只普通恢复原DSH，其余六保持停止。
+Updated: 2026-10-24 13:23（Asia/Shanghai，本片实际加载自检通过）。用户已重启API，新API11520/runtime4888/七宿主serving；后台启动自动检查complete/无错误/删除0/保护4旧run/907191字节，next_check本地10月25日13:21:30。仅恢复DSH gen60/ins_fd018306ec1c、同实例心跳推进60.078633秒，其余六停止。配置428c928e…保持，待首次独立部署证据复核，不称整项日志完成。
 
-## 当前加载恢复点：等待用户重启原API
+## 当前状态：实际启用自检通过，待冻结部署证据复核
+
+- [实际加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)：用户完成原API重启，新API11520健康ok、runtime4888/七宿主serving、worker无错误。只普通start恢复原DSH gen60/ins_fd018306ec1c/PID11164、running/ready/idle，真实同实例心跳推进60.078633秒，其余六停止/无owner/can_start。
+- 正式后台首次检查UTC05:21:30.240394 complete/errors空、删除0/保护4（3缺新闭合证明、1legacy/unclosed）、907191字节、容量盘点complete/未超预算；next_check=1792905690.240394/本地10月25日13:21:30。原五角色policy、同DB/绑定/要求/286 paused保持，helper未触发sweep或造state。
+- 三组件新manifest/PID/项目/member均正确，真实只读打开run.lease受Windows共享冲突32保护，closed不存在；新关闭标记待未来正常close。首次检查早于runtime新run建立，4只是该时点快照，不外推覆盖以后全部run；286生产删除分支本次未触发，旧缺证/未关闭先保护。长期30天和未来生产到期删除未实跑。
+- 702d47a代码、f4e733e收尾及f030c6d获批配置等待点已推送。现准备只读部署证据冻结并交DeepSeek首次独立复核，依原用户授权优先base315工作线相容会话；重载改变代际仍服从守卫，不force旧窗，不主动等待/自动唤回。
+
+## 本次配置应用过程（用户随后已重启，实际结果见上方）
 
 - 用户已明确“确认启用并正常重载”，不再重复请求本次部署许可。human:bobo实核无running任务、worker空闲，仅DSH gen58/ins_211a91c1827a/PID860 idle；原runtime4856普通drain后stopped/absent、七宿主包装器/解释器14绑定absent，七角色stopped/无owner，无强杀/CAS。
 - UTC05:19:40原配置备份至仓库外私有目录，单字段backend_enabled=true应用成功，新SHA428c928edb7044e8cc7741c09a3f18a908bd8eed3365d66b109bd0f182e09825；其余解析字段、同DB/五source、绑定/开发要求/286 paused一致。未手动sweep或造closed/state/mtime。配置落盘不等于生产加载完成。

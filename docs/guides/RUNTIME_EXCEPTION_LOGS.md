@@ -1,5 +1,7 @@
 # TALK 桥接运行时异常日志（维护者指南）
 
+> 2026-10-24 13:23实际加载：新API/runtime/七宿主及自动检查已核验，后台首次complete/无错误/删除0/保护4旧run/907191字节，下次本地10月25日13:21:30；只恢复DSH并验60.078633秒心跳，其余六停止。新三组件活跃lease由Windows冲突32证明，closed不存在，五旧范围/绑定/286保持。日常自动检查，无需前台清理。当前为协调方加载自检通过，待DeepSeek首次部署证据独立复核，旧缺证与未闭环任务仍保护、长期和未来生产到期删除尚待；详[加载记录](../spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
+
 > 2026-10-24 13:20：用户已确认本片清理启用并正常重载，原runtime/七宿主已正常退出，backend_enabled=true已应用、新SHA428c928e…e09825。当前待原终端正常重启TALK API，再核实际后台检查并恢复原DSH；配置落盘尚不代表加载通过，286和旧缺证run继续保护。详[加载记录](../spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。以下为批准前及历史阶段状态。
 
 > 2026-10-24后台清理候选：323独立复核complete/已收取，无必须修正项，独立新22项及真实隔离API通过；组合104通过/1项ACL临时文件清理限制，Codex自检105通过。backend_enabled缺省false、专用关闭证明及共享项目任务保护已实现，生产开关仍未添加，SHA db98e42d…a8543c保持。仅增backend_enabled=true的[具体启用方案](../spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)已预检，待明确确认后正常重载；日常无需前台操作。项目存在paused/未闭环任务（包括286）或旧run缺新关闭证明仍保留，不承诺启用后立刻删除。详[本片合同](../spec/BACKEND_LOG_AUTO_RETENTION_20261024.md)。

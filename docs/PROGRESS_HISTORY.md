@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-24 13:23：新后台自动清理实际加载自检通过
+
+用户已回复原终端API重启完成。新API11520健康ok、runtime4888/七宿主serving、worker无错；普通start只恢复部署前DSH，gen60/ins_fd018306ec1c/PID11164 running/ready/idle，同实例真实心跳推进60.078633秒，其余六停止/无owner/can_start。配置SHA428c928e…e09825，同DB/五旧policy/角色绑定/开发要求/286 paused保持，无强杀/CAS。
+
+正式API后台首次检查UTC05:21:30.240394，complete/errors空、删除0/保护4旧run（scope_or_incomplete_evidence3、legacy_or_unclosed1），观察907191字节、capacity_scan complete/over_budget false，持久next_check=1792905690.240394，即本地10月25日13:21:30。policy精确本项目/backend:project，核验脚本未调用sweep或写policy/state。三组件新manifest/项目/member/instance/PID/启动时间正确，原生进程present、lease存在且只读打开均遭Windows共享冲突32，证明活跃writer持有；closed不存在，不造新关闭证明。首次检查在runtime/worker新run建立前，4保护是当时快照；生产286删除分支未触发，不把隔离反例冒称该分支生产通过。
+
+702d47a实现及323独立复核、f030c6d获批配置已推送；协调方本轮实际加载核验通过，待按用户既有要求冻结证据交DeepSeek首次独立部署复核。重载换代后优先base315相容会话但服从守卫，不force旧窗/自动等待；Kimi不派开发。30天长期运行/未来真正生产到期删除尚未实跑，历史partial/六项P3/ACL限制与286保持，详[加载记录](spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
+
 ## 2026-10-24 13:20：后台清理正式启用获批，配置已应用等待原API重启
 
 用户对已准备方案明确回复“确认启用并正常重载”，本次部署已授权。Codex核实际agent:codex/prj_e8fe7066bbec；human:bobo核无running、worker空闲、只有DSH gen58/ins_211a91c1827a/PID860 idle、其余六停止，286仍queued/accepted/paused。原runtime4856正常stop/drain，角色先释放owner，七宿主14个包装器/解释器原PID/创建时间绑定随后全部absent，最终runtime stopped/absent，无强杀/CAS。

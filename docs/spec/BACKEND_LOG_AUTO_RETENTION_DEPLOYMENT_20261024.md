@@ -1,5 +1,15 @@
 # 新后台日志自动清理：正式启用方案
 
+## 实际加载核验通过（2026-10-24 13:23）
+
+用户已回复“已重新启动”。新API11520健康ok，新runtime4888及全部七宿主serving，worker无错误；只普通start恢复原DSH至gen60/ins_fd018306ec1c/PID11164、running/ready/idle，同一实例真实心跳推进60.078633秒，其余六角色停止/无owner/can_start。模型/绑定/开发要求/286 paused与部署前不变。
+
+正式API后台于UTC05:21:30.240394自动执行首次检查：status=complete、errors空，deleted_files=0、protected_runs=4（scope_or_incomplete_evidence=3、legacy_or_unclosed=1）；观察907191字节、capacity_scan=complete、over_budget=false。实际持久next_check=1792905690.240394，即2026-10-25 UTC05:21:30/本地13:21:30。policy精确为本项目/backend:project，原五角色policy完全保持；核验脚本未调用sweep或写这些文件。
+
+新api/runtime/provision_worker三个manifest项目/member/组件/PID/启动时间匹配，进程均present，lease文件存在且只读句柄打开均遇Windows共享冲突32，证明活跃写租约持有；closed均不存在，符合尚未正常退出。新关闭声明只能在今后正常close生成，未为了验收再重启或伪造证明。首次检查早于runtime新run建立，因此protected_runs=4是当时扫描快照，不谎称覆盖随后全部6个run。
+
+证据新增deployment-loaded/restored/heartbeat.json及deployment-backend-runs.json，配置仍428c928e…e09825。协调方生产加载自检通过，下一步按既有用户授权交DeepSeek只读独立复核这些证据；不扩大为新功能或生产故障演练。零删除是旧缺证/未关闭保护，286仍paused的项目任务保护继续有效，但本次未走到该删除分支，不能伪称生产286保护分支已触发。长期30天运行/未来实际到期删除尚待，不把本片称完整日志整项完成。
+
 ## 当前恢复点：配置已应用，待用户原终端重启API
 
 2026-10-24 13:19：用户明确回复“确认启用并正常重载”。human:bobo实核无running任务/worker空闲，只有DSH gen58/ins_211a91c1827a/PID860运行且idle，其余六停止。原runtime4856沿普通stop/drain退出；七宿主的14个包装器/解释器进程绑定均absent，七角色均stopped/无owner，无强杀或归属CAS。
