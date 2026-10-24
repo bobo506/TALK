@@ -1,5 +1,31 @@
 # 开发历史 · TALK
 
+## 2026-10-24：322部署证据复核通过并收取，下一片改回Codex开发
+
+用户通知322完成，明确下一片仍由Codex开发，取代2026-10-23临时DeepSeek开发安排；范围仍为已说明的新增API/runtime/worker后台日志自动清理覆盖，Codex直接开发/自测、DeepSeek独立复核，未扩大到其它根或新部署。322原complete/2963已收取completed，取件核44源/快照895337字节零漂移、本地/远端JSON一致，无产品修正项；原独立报告及11限制保持。
+
+独立47硬检查通过、只读进程元数据核17新PID present/15旧PID absent；29测试中28通过、另一项测试体通过但私有ACL清理受限，不改写为29独立通过。停启/单节配置/新三组件run/仅DSH恢复/60.067982秒心跳/真实下载55与69含51后台/401403/partial/绑定/286证据通过；复核者未直接重跑生产下载或读取生产config正文/Key/DB/私有state/日志正文。P3观察如compare/replace非OS级CAS、布尔证据表达、固定5与完整7宿主视图、55/51差异摘要、lease仅存在性均保留，不借本次通过作为删除关闭证明。
+
+322实际new_no_candidate新窗session-939f1561-b543-43c1-ab10-c7fff4c951fc/count1，基础SHA同315，末31.9794%，不伪称续321。当前角色最新公开实例仍DSH同ins_211a91c1827a/idle/无当前任务；本人agent:codex/lead，页面旧要求按用户新分工覆盖。本次先正式文档/Git收尾，再实施已确认新片；新根清理尚未实现/启用，不改原五范围/模型Key绑定/286或旧320/321 partial。
+
+## 2026-10-23：下一片后台日志清理覆盖改由DeepSeek首次开发
+
+用户因Codex额度明确要求“换下，接下来这片由deepseek开发”，本次授权下一片已说明的新增API/统一后台/worker日志根自动清理覆盖交DeepSeek首次实现及必要自测；完成暂停后Codex独立复核，发现问题由Codex直接修正，不能将后续自身修正称独立复核。沿用30天、活跃/未关闭/缺证不删，保原五范围清理及模型/Key/绑定/286，不扩其它新功能或Kimi开发。322仍按默认用户通知后取件，先收尾再固定基线/白名单/隔离根/验收与正式派发，当前未新派、不并行写共享代码。该调整仅覆盖接下来这一片。
+
+## 2026-10-23 23:29：322首次部署证据独立复核已派发
+
+同一已批准日志功能的实际加载核验完成，44份/895337字节代码/安全元数据已冻结，派前source/snapshot SHA及字节零漂移、11产品与manifest-final一致。322已交agent:deepseek，queued/assigned，写根仅review-deployment；只读审查正常停启/单节配置/仅恢复DSH/三组件55条及合并69条/401/403/已知Key不在导出/partial边界、绑定及286保护与helper无伪造。此前已读取实际caller/当前旧页面要求，按用户当前Codex直接开发/DeepSeek复核安排；派前DSH gen58同ins_211a91c1827a/idle/无当前任务、心跳新鲜。
+
+不授权生产配置正文、DB、Key/provider环境、私有state、原生会话或生产日志正文访问；319旧特别许可不沿用，生产取证/部署脚本只静态审核不执行。沿base315/同日志工作线优先复用，正常重载后服务代际已变，服从真实守卫且不force旧窗；派发execution_session_state=null，实际回执待322，不预称复用或换窗。产品/44冻结暂停，默认派后结束用户通知取件，无自动唤回或持续等待；Git基线3f4be45不在复核中改变，当前部署结果/派发进度文档留工作区，随322收尾提交。真实主被动及完整日志整项不据本片外推完成。
+
+## 2026-10-23 23:24：后台/API新采集实际加载，仅恢复DSH并完成协调方核验
+
+用户回复已重新启动，原终端API healthz ok/db/storage ok，新runtime4856/七宿主serving、worker空闲无错误，后台根三个run/lease存在且无closed。仅普通start恢复原DeepSeek gen58/ins_211a91c1827a/PID860，running/ready/idle、同一实例last_seen真实推进60.067982秒；其余六角色保持stopped/无owner。未CAS/强杀或接管external API。绑定全字段/项目要求与部署前一致，286仍paused。
+
+真实human项目后台导出200，55条/48,281字节，三组件及项目/共享角色归属通过；未认证401、原DeepSeek Agent403，human/DSH Key不在导出。角色合并200，69条（51后台）、63,521字节、约4.859秒；backend scan完整三组件齐全，角色旧来源133,481,203字节/536文件后仍scan_incomplete/source_changed/unavailable_records及truncated，history_complete固定false。旧来源partial不掩盖，也不将HTTP200说成完整日志整项通过。
+
+核验助手最初按argv/default key_root定位凭据，因原窄入口显式覆写而安全停止，未下载/改变凭据；改为仅解析原入口KEY=Path字面量并确认本人agent:deepseek后，401/403/下载核验成功。不读取provider凭据/原生会话/私有原始输出，不emit生产事件或触发清理。新config SHA db98e42d…a8543c保持，代码8149be9和配置3f4be45均已推送；后续只读审核冻结代码与安全元数据，不扩大319旧许可。详[部署记录](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)，独立证据复核及人工体验待完成，下一无关切片仍先确认。
+
 ## 2026-10-23 23:13：后台/API新日志正式部署获批，配置应用后等待用户重启API
 
 用户明确答复“确认启用并正常重载”，本次配置/普通停启及恢复原运行集合已获授权。原API/human身份核无running任务、配置worker空闲，七宿主serving，仅DeepSeek gen56/ins_a2b239105b97/PID10676运行、idle/无任务且心跳新鲜；其余六全stopped/无owner。原runtime14584接受普通stop，UTC15:12:08正常drain退出；七宿主（含两个WorkBuddy动态宿主）14个包装器/解释器绑定均absent，七角色全stopped/无owner/can_start。未强杀、未解除owner/CAS、未接管external API。

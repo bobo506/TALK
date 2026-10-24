@@ -1,12 +1,17 @@
 # Project Progress
 
-Updated: 2026-10-23 23:13（Asia/Shanghai，正式部署进行中）。用户明确确认启用并正常重载；原宿主/角色已普通退出，backend_diagnostics配置已应用，新SHA db98e42d…a8543c。现等待用户在原终端重启TALK API，尚未声称实际采集通过；之后只恢复原DeepSeek，其余六角色保持停止。代码8149be9已推送，原清理/绑定/历史保持。
+Updated: 2026-10-24（Asia/Shanghai，322通过并收取）。322首次部署证据复核complete/2963，44源/快照及远端本地交付一致，无产品修正项，已收取completed；证据权限/ACL/P3限制保留。用户明确下一片改回Codex开发“新增后台日志自动清理覆盖”、DeepSeek独立复核，取代临时DeepSeek开发安排。先收尾322，再在已说明范围内实现；新清理尚未实现/启用。
 
-## 当前恢复点：等待用户原终端重启API
+## 当前恢复点：322部署复核通过，下一片Codex开发已授权
+
+- 用户2026-10-24明确下一片改回Codex直接开发/自测，DeepSeek独立复核，替代上次额度不足时的临时分工。范围为新增API/runtime/worker后台日志根30天自动清理及活跃/未关闭/缺证保护，保原五范围；此为此前明确下一片的授权，不再重复询问同一开发范围。新部署/实际删除启用仍需具体可审方案后确认。
 
 - [部署记录与已批准方案](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)：原human核无running任务、worker空闲，仅DSH gen56/ins_a2b239105b97/PID10676运行。runtime14584普通drain于UTC15:12:08停止；七宿主含两个动态WorkBuddy的14个包装器/解释器绑定均absent，七角色全stopped/无owner/can_start，无强杀/CAS。
 - UTC15:13:08原子追加backend_diagnostics节，显式项目、本地根logs/backend及同DB绝对路径；新config SHA db98e42dd482627724825c28106697288862d7b7e6bdbb1d756fa2ec87a8543c。解析差异仅该节；原来源和五范围清理保持，旧字节备份在私有目录，设置只读预检通过。
-- 已请用户原终端Ctrl+C后重跑API，等待“已重新启动”回复。外部API仍由原终端控制，未接管/重启第二个API；新采集尚未实测加载。本次部署已获确认，后续加载/核验/仅恢复DSH无需重复确认；其余六角色维持停止，具体证据在.tmp/backend-diagnostics-export-v1/deployment/。
+- 用户已回复重启，原终端API健康ok、runtime4856和七宿主serving、worker无错误。仅普通start恢复DSH gen58/ins_211a91c1827a/PID860，idle/无任务，真实同实例心跳推进60.067982秒；其余六停止/无owner。三个新run manifest均有lease/无closed，凭据/绑定/要求/286保持。
+- 后台HTTP200：55条/48,281字节/三组件齐全；未认证401/Agent403、项目归属/已知Key不在文件通过。角色合并HTTP200：69条含51后台、63,521字节、约4.859秒；backend扫描完整，旧角色来源133,481,203字节/536文件后仍partial/truncated（scan_incomplete/source_changed/unavailable_records），历史覆盖固定不完整。不能把下载200当作完整日志验收。
+- 322 complete/pass、2963已收取；协调方取件复核44份/895337字节源/快照和本地/远端JSON一致，未修改产品或重复全量测试。独立47项硬检查通过，29测试中28项通过，另一项测试体通过但ACL清理受限；不是29项独立全过。冻结生产摘要解析/实时进程元数据不等同于再次生产下载，配置/Key/DB/私有state/日志正文未由复核者读取。P3的配置compare/replace非OS原子CAS、布尔证据可读性、55/51条角色过滤摘要无法逐条还原、lease仅存在性等观察保留，不作为新清理删除证明。
+- 322实际new_no_candidate新窗session-939f1561-b543-43c1-ab10-c7fff4c951fc/count1、基础SHA同315，末319794/1000000=31.9794%，不追写为复用321。代码8149be9及配置3f4be45已推送；本片部署复核/状态文档现完成收尾，外部API仍归原终端。新清理片尚未启用。
 
 ## 本次：统一换窗阈值70%
 
@@ -23,7 +28,7 @@ Updated: 2026-10-23 23:13（Asia/Shanghai，正式部署进行中）。用户明
 - 新28（原18+10反例）、原导出/认证等35、runtime/本机宿主24共87针对性自检通过；新network-fix1-run-1三组件21/合并22、无效路径404/403不入流、真实角色正例、原Popen正常0退出，11源SHA前后相同、生产config不变。Node未改，320独立25通过保持，不无关重跑全量。
 - 321原partial/2962：独立确认F1/F2/OBS1及F3主路径、28新/定向+15鉴权等通过；末项`cli_command_unresolved`漏登记由Codex补正，扩展变量/条件赋值检查和真实dsh/cli/codex失败路径，修前反例失败、修后29项自检通过。末项未追加独立回审，旧失败/55份及原42快照不改；本地/远端交付一致，接手前55份当前源/快照零漂移。新差异与最终材料在coordination/review-fix2.diff及manifest-final.json。
 - 320/321均已收取completed，原msg2961/2962仍partial；321实际new_context_threshold新窗session-9dd192d4-1d3b-41bd-aa99-934648d7a106/count1，基础SHA同315，末37.9106%。按其当时加载的60%版本解释，不套用后来70%规则；未新派复核任务。
-- 保留缺口：不导入私有.out/.err、原生会话/异常自由文本、未知项目全局请求；不能证明历史完整，整体固定partial/coverage_unverified，不造旧记录。新增后台根只分段、不加入既有清理范围。代码8149be9已提交推送、32份/502689字节最终代码证据冻结；用户已批准[具体启用方案](spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)，配置已应用但原API尚待正常重启，加载验收未完成。
+- 保留缺口：不导入私有.out/.err、原生会话/异常自由文本、未知项目全局请求；不能证明历史完整，整体固定partial/coverage_unverified，不造旧记录。新增后台根只分段、不加入既有清理范围。代码8149be9已提交推送、32份/502689字节最终代码证据冻结；本轮已获批准并实际加载，协调方核验完成，独立部署证据复核/人工体验尚待完成。
 
 ## 当前身份与边界
 

@@ -1,5 +1,25 @@
 # 后台/API统一脱敏日志：部署记录与原方案
 
+## 2026-10-24：322独立部署证据复核通过并收取
+
+322 complete/pass，无产品修正项，结果2963已收取completed。取件核44份/895337字节源/快照零漂移、本地/远端交付JSON一致；原独立报告及限制保留于review-deployment，协调方验收在coordination/322-acceptance.json。独立47项硬检查通过；29测试中28通过、另1项测试体通过但私有ACL临时文件清理受限，不能写成29独立全过。独立实时进程元数据证明复核时新17 PID present/旧15 absent，不外推永久驻留。
+
+报告中的配置/私有备份SHA未独立重算、生产下载仅冻结摘要解析、原生/DB/Key/私有state/日志正文未读取等权限限制保持。配置compare/replace非OS原子CAS、布尔字段证据表达、停前serving视图/固定5与另证7宿主、55/51条摘要无法逐条还原、lease仅存在性等P3观察不影响本次加载，但不作为未来自动删除的输入证明。未修改产品或重复无变化全量测试。
+
+322实际new_no_candidate/count1、session-939f1561-b543-43c1-ab10-c7fff4c951fc，末31.9794%；不倒写为复用321。用户已将下一片新增后台根自动清理开发改回Codex/DeepSeek复核；此为新片，原部署通过不代表新根已受30天清理，也不代表完整日志整项或真实主被动完成。
+
+## 2026-10-23 23:24：实际加载及协调方核验完成，待独立部署复核
+
+用户已回复“已重新启动”。原终端API的healthz为ok/db ok/storage ok，新统一runtime4856/七宿主serving，worker空闲且无错误；新根生成三个run manifest，run.lease存在且无closed。只普通start恢复原DeepSeek至gen58/ins_211a91c1827a/PID860，running/ready/idle、同实例last_seen推进60.067982秒；其余六角色仍stopped/无owner。七成员及绑定全字段与部署前一致，项目开发要求未改，286仍paused。
+
+真实human项目后台导出HTTP200，48,281字节/55条，三组件api/runtime/provision_worker齐全，项目与共享/角色归属检查通过；401/403分别符合未认证/Agent身份，导出不含核验使用的human/原DeepSeek Key。原角色合并下载HTTP200，63,521字节/69条，含51条后台事件，耗时约4.859秒；backend.scan complete、三组件齐全，但角色旧来源扫描133,481,203字节/536文件，保持scan_incomplete/source_changed/unavailable_records和truncated。后台历史仍固定backend_coverage_unverified/history_complete=false，不能据真实HTTP200称整个文件完整。
+
+新配置SHA仍db98e42d…a8543c，未更改清理、模型、原Key或绑定。核验helper最初假定宿主argv直接携带Key文件/默认key_root，因原窄宿主显式覆写而停止；随后只解析原入口字面量KEY路径，核本人agent身份后成功验证403，没有修改/重建凭据或读取provider凭据。该中间错误是核验助手定位问题，不是产品下载失败。helper只读现有新日志/健康状态，未手动emit事件、注入故障或触发清理。
+
+代码8149be9、配置/批准记录3f4be45均已提交推送。当前为协调方实际加载核验，尚未独立部署复核/人工体验验收，不代表完整日志整项或主被动功能完成；只将代码/安全元数据证据交DeepSeek只读审核，不扩大到生产Key/私有日志/数据库或原生会话访问。旧32份最终代码证据保持，新增部署材料单独冻结。
+
+证据：deployment-loaded/restored/heartbeat.json、deployment-heartbeat-proof.json、deployment-exports.json、binding-preservation.json及task286-protection.json。以下23:13为当时等待点。
+
 ## 2026-10-23 23:13：已获确认并应用配置，等待原终端重启API
 
 用户明确回复“确认启用并正常重载”，本次部署已获授权，不再重复请求相同许可。代码8149be9已提交推送。部署前经原human身份核实无running任务、worker空闲、七个宿主serving，仅DeepSeek gen56/ins_a2b239105b97/PID10676为running/ready/idle且心跳新鲜，其余六角色stopped/无owner。
