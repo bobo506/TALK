@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-25 12:51：原332正式恢复，兼容遗漏加入同次集中首审
+
+用户看到角色启动后明确“接下来发布任务…还有兼容遗漏”，据此续原332，不新建重复首审。Task Hall正常补充消息2976，指向coordination/RESUME_332_COMPATIBILITY_20261025.md及具名公开恢复证据，原生产读取/启停/产品写入禁令不变。要求利用已存review结果，只补未完成与旧API缺startup/8轮门控超过120秒TTL反例，不能为兼容弱化新版API下的冷恢复/未知归属/任务保护。一次列全部必须修正项/非阻断观察，partial/failed也正常交付后暂停，由Codex集中修正、必要一次定向复验，DeepSeek不开发。
+
+原human仅正常认证调用POST /api/tasks/332/resume-tree，非委派slice_budget0，HTTP200、epoch0→1、active，原正文/冻结/基线不变。12:50:43有界快照仍queued/accepted/attempt1、未claim；12:51:09实例ins_9318d6d0efce/PID16492 busy/current_task_id=2976是消息通道活动，未冒称332实际领取或会话复用。63/3613416字节快照零错配，源漂移仅既有四协调文档。新补充、Hall原响应和resume操作前后证据存coordination/，未修改产品/正式测试/冻结/生产配置/其它任务。默认收尾后结束，待用户通知完成再取件，无自动等待/唤回。
+
 ## 2026-10-25 12:42：用户暂停332后启动超时，正式入口恢复DeepSeek并定位兼容遗漏
 
 332由用户12:33正常暂停为queued/accepted/paused，领取/lease清空；原DSH gen70归属经其正常关闭后已释放。用户入口启动新runtime11280（12:33:28），旧API仍运行且OpenAPI无startup路由，新后台8轮HostError等待阻挡宿主。gen73 launch12:33:30发出、12:35:30到期，始终未claim，12:36:40后投影failed/readiness_timeout/无归属；五宿主最终serving。因此本次启动失败是已确证的新旧组件兼容/等待预算遗漏，不归因模型或Key；与09:56原进程退出原因未确认分开。
