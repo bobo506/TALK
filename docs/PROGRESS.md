@@ -1,24 +1,20 @@
 # Project Progress
 
-Updated: 2026-10-25 13:53（Asia/Shanghai）。333已实际领取running/in_progress/attempt1，领取后75.398234秒仍有任务心跳且无error，已越过原channel_busy失败点；正式复验结果待交付。ca2d30b/新116冻结及旧63/33保持，产品/正式测试暂停，默认用户通知完成后取件。
+Updated: 2026-10-25 14:23（Asia/Shanghai）。333正式partial/2979已收取completed；原MF-2/MF-3与四失败断言独立通过，新增MF-1R已最小修正、26自检通过。待Git/新冻结后仅定向复验本反例及旧API/newAPIpending对照，不重做整片。生产未加载新修正。
 
 ## 当前事实
 
-- 333于13:51:43.954651由ins_aa6223b0735e领取，13:52:59.352885任务心跳推进75.398234秒；13:53:04实例同ID/PID10360心跳保持。execution_session_state仍null，不能据此预称原生新窗/同窗、计数或复验通过。实例idle/current_task_id为空不覆盖任务端running事实。证据fix1/final-task333-raw.json、final-agents-raw.json、started-check.json。
-
-- 333-项目自启动三项集中修正定向复验已创建，Task Hall group:task-b74e9c011f924ff690ad894d7afc2982，直接正式派发而未另发可执行消息。base_task_id332/原continuity_key，写根仅fix1/review，旧review/新旧冻结只读。创建state=null、最近快照尚未领取，实际原生决策/计数待回执，不冒称复用旧tainted窗。116新源/快照零漂移、旧63及33归档保持；原332 failed/2978核对不变。
-
-- 身份agent:codex / prj_e8fe7066bbec / lead已实核。332 attempt2于12:59领取，13:00因channel_busy失败；原记录/结果不改不收取。DeepSeek先通过补充消息2977交REVIEW/checks，真实独立结论failed/3必须修正/4失败断言；33份99053字节原产物归档coordination/332-original-review/。
-- Codex已修MF-1旧API能力探测/unsupported及时开放宿主，MF-2缺boot或进程开始时间不判ready，MF-3入队/旧start收敛/提交前再核并回滚。223项关联Python与10项兼容/原探针过，重合5项，并集228；34定向组也重合，不相加。UI未改、原58Node保留不重跑。旧63份3613416字节快照/原报告保持，新修正未加载生产。
-- 用户本轮明确仅授权一次本项目DSH侧账本元数据读取，已RO/query_only执行：owner15992 absent、held，lease UTC01:59:25过期，332/attempt1自UTC01:41仍started；不读token/原生ID/正文/Key/日志，不改账本。原因是未确认旧native writer结束，不能再只归因补充消息重叠或盲目重派。
-- 一次性恢复脚本10项合成检查过后，用户另明确确认旧native已结束并授权写入，UTC05:45:40已锁内匹配原scope/PID/lease/updated_at/唯一attempt1，记interrupted、旧window tainted并同事务审计。通道行不删不改、主TALK任务/结果不改。原生退出依据是用户确认，不伪称仅父PID absent足够；该定向许可已用，不延伸为一般清锁。
-- 用户已正常关闭当前DSH gen75无owner；原runtime11280/五宿主仍serving。恢复通道后仅正式start一次，gen76/ins_aa6223b0735e/UTC05:45:47 ready，未重启API/后台或加载ca2d30b。下一步用新冻结定向复验，不再另发可执行补充消息。
-- DSH最近公开实例gen74/ins_9318d6d0efce/PID16492 idle且心跳新鲜，另四停止。当前runtime11280是用户12:33重启时加载的初版，API仍旧，新修正未加载；250/2767/286与五binding保护保持。原09:56进程退出原因仍未知，本次兼容超时不代替解释。
+- 身份agent:codex / prj_e8fe7066bbec / lead已实核。333正式succeeded/submitted、业务partial、review failed，1个新必须修正/4类反例。正式消息与本地delivery相同，29份210648字节报告/探针/日志已归档fix2/coordination/333-original-review；UTC06:19:59.605967正常收取completed，原partial/失败不改。实际new_no_candidate/count1，末32.6345%，未复用旧tainted窗。
+- MF-1R：startup路径存在但为Reference-with-POST、断链Reference、null或get-only时，不应unsupported。Codex仅1产品1测试改为path key确缺才unsupported并补4回归。16正式runtime/兼容+10原333 MF-1探针全过，零失败/错误/跳过；原探针断言未改，未追加plain-publish替代。这26项是自检，未称独立通过。
+- 原MF-2/MF-3及四失败断言已由333独立通过，不重复整片。333原39正式测试受DACL限制2F/28E、替代plain publish后39过及非阻断观察如实保留。原223关联/228并集/58Node为旧阶段证据，UI未改不为数字重跑。
+- 原63份3613416字节、fix1的116份3872285字节及332原33份99053字节均保持；fix2新快照单独生成，原报告/冻结不改。332仍failed/2978 channel_busy，不收取/倒写；原独立产物来自Hall2977。
+- DSH旧通道已按用户分开的明确授权完成一次元数据只读、一次审计恢复（332attempt1 interrupted/旧窗tainted/通道行保留）。native结束依据是用户明确确认；两次许可已用完，不可重复或传给复核者。333已正常正式完成，未再channel_busy。
+- 最近公开DSH ins_aa6223b0735e/PID10360 idle/无当前任务，前次正常start gen76；另四原停止。API仍旧、runtime11280仍用户12:33加载的初版，ca2d30b及本MF-1R修正均未加载。250原failed/2767、286 queued/accepted/paused及五角色绑定保护保持。
 
 ## 下一步
 
-1. 333已派，完成本轮派发文档/Git收尾即结束；用户通知完成再核原始交付、取件与必要修正。保留332失败历史，不伪造收取、原生决策或同窗回执。
-2. 只读和一次定向恢复许可均已按明确范围执行，不授复核者生产DB/native访问或通道操作。新复核写根仅fix1/review，产品/正式测试和新旧冻结随后暂停，默认用户通知完成后取件。
-3. 仍由Codex开发/修正、DeepSeek独立核验；正式加载新功能须独立复验及具体部署确认，不自动勾选角色或改模型/Key/绑定/286。下一无关切片先确认。
+1. 提交/推送最小修正与文档、建新冻结，交DeepSeek一次MF-1R定向复验。只核此次新反例和旧API/newAPIpending对照，不重做整片；唯一写fix2/review，产品/正式测试/新旧冻结暂停。
+2. 默认派发后结束，用户通知完成再核正式结果并收取；不主动等待/唤回，不另发可执行Hall消息。
+3. 独立通过后给出具体正常加载方案并确认，不自动勾选角色、改模型/Key/绑定/250/286或声称真实断电/模型/浏览器通过。下一无关切片先确认。
 
-详[集中修正](spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)、[原合同](spec/PROJECT_ROLE_AUTO_START_20261025.md)和[历史](PROGRESS_HISTORY.md)。331两角色删除已真实complete，旧证据/报告保持。
+详[本次必要补正](spec/PROJECT_ROLE_AUTO_START_FIX2_20261025.md)、[上一集中修正](spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)、[原合同](spec/PROJECT_ROLE_AUTO_START_20261025.md)和[历史](PROGRESS_HISTORY.md)。331两角色删除已真实complete，旧证据保持。

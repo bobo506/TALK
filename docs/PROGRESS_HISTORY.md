@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 14:23：333收取，修正新增MF-1R反例
+
+用户通知后核实333正式succeeded/submitted/2979、delivery.conclusion=partial，REVIEW/checks verdict=failed，1个新必须修正/4类反例失败。原MF-2/MF-3、四失败断言及MF-1主路径均独立通过。正式消息与本地delivery逐字段相同，29份210648字节报告/探针/日志归档fix2/coordination/333-original-review，UTC06:19:59.605967正常收取completed，原partial/失败保留。333实际new_no_candidate/count1，末326345/1000000=32.6345%，未复用旧tainted窗。332仍failed/2978不收取；原116份3872285字节、旧63份3613416字节及332原33份99053字节均零错配，取件前源仅四协调文档漂移。
+
+新增MF-1R是startup路径存在但值为Reference-with-POST、断链Reference、null或get-only也unsupported并提前开放宿主。实际FastAPI是内联POST，无生产触发证据，但违反未知结构保持门控合同。Codex仅1产品1测试改为key确缺才unsupported、补4回归；16正式runtime/兼容+10原333 MF-1探针共26不同用例通过，原反例断言未改、未追加plain-publish替代。不重跑整片/58Node或已过MF-2/MF-3。新发现阻断需要一次极小定向独立复验，只核本反例和旧API/newAPIpending对照，不另开非阻断任务。
+
+生产API/runtime11280未重载，未改配置/Key/绑定/250/2767/286，未扩前次一次元数据和定向恢复许可。待Git/新冻结交DeepSeek后默认用户通知再取件；独立通过后仍须具体正常加载确认，不自动开下一无关片。详[fix2](spec/PROJECT_ROLE_AUTO_START_FIX2_20261025.md)。
+
 ## 2026-10-25 13:53：333正式领取与持续任务心跳已核
 
 有界复查确认333由DeepSeek ins_aa6223b0735e于13:51:43.954651领取，running/in_progress/attempt1；13:52:59.352885任务心跳距领取75.398234秒，last_error/result均空，越过此前领取后约30秒channel_busy失败点。实例13:53:04仍同ID/PID10360真实心跳；实例idle/current_task_id空与任务running并列记录，不用前者冒称任务未接。execution_session_state=null，尚无原生最终决策/计数/复验结论，未预称同窗或通过。fix1/final-task333-raw.json、final-agents-raw.json、started-check.json保留；原332failed/2978不改。当前仅收尾文档/Git，产品/正式测试/新旧冻结暂停，默认等待用户通知333后取件，不主动等待或扩新片。

@@ -280,11 +280,14 @@ class TalkRuntime:
                             and isinstance(schema.get("paths"),dict)):
                         paths=schema["paths"]
                         roles=paths.get("/api/projects/{project_id}/roles")
-                        target=paths.get("/api/projects/{project_id}/role-services/startup")
+                        startup_path="/api/projects/{project_id}/role-services/startup"
+                        target=paths.get(startup_path)
                         if isinstance(target,dict) and isinstance(target.get("post"),dict):
                             self.startup_support="supported"
                         elif (isinstance(roles,dict) and isinstance(roles.get("get"),dict)
-                              and (target is None or isinstance(target,dict) and "post" not in target)):
+                              and startup_path not in paths):
+                            # A present Reference or unknown path item is not
+                            # proof of absence; retain POST/retry and host gating.
                             self.startup_support="unsupported"
                 if self.startup_support=="unsupported":
                     self.startup_state="unsupported"

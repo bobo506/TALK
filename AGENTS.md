@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 14:23取件及必要补正：333正式2979业务partial/review failed已收取completed；原MF-2/MF-3及四失败断言独立通过，新增MF-1R为present Reference/null/get-only误判unsupported。29份210648字节原产物已归档，旧63/116及332原33保持；333实际new_no_candidate/count1、末32.6345%，未复用旧tainted窗。Codex仅1产品1测试改为path key确缺才unsupported并补4回归，16正式+10原MF-1探针共26通过；待新冻结后只定向复验本反例及旧API/newAPIpending对照，不重做整片。332failed/2978及前次一次生产例外边界保持；未加载/启停/改选择，250/286和五binding保护不变。详[fix2](docs/spec/PROJECT_ROLE_AUTO_START_FIX2_20261025.md)。
+
 - 2026-10-25 13:53实际领取：333已由DSH ins_aa6223b0735e于13:51:43.954651正式领取，running/in_progress/attempt1，13:52:59.352885任务心跳距领取75.398234秒、无error/result；已越过原30秒channel_busy失败点，但execution_session_state仍null，不预称原生决策/同窗/独立通过。实例13:53:04心跳/PID10360保持；实例显示idle不替代任务真实running事实。最新公开回执和started-check存fix1，116新快照及原63/33保持，产品/正式测试暂停、默认用户通知333后取件，不继续主动等待。
 
 - 2026-10-25 13:50派发：三项集中修正定向复验333已交DeepSeek queued/assigned，沿base332/原continuity_key，仅本轮新write root=fix1/review；原旧窗tainted不强复用，实际原生决策/计数待回执。代码ca2d30b/冻结HEAD f0da4ff已推送，116份3872285字节新源/快照零漂移，旧63及原33归档不变；产品/正式测试/新旧冻结暂停。直接派正式任务，不再额外发可执行Hall补充；332原failed/2978及2977独立failed不改。用户一次元数据/一次定向恢复均已限域用完，不授复核者实际DB/native/生产权限。默认用户通知333完成后取件，不主动等待/唤回，不提前生产加载修正或称独立通过。

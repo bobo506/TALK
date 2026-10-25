@@ -88,3 +88,25 @@ class StartupCompatibilityTests(unittest.TestCase):
         rt,seen,_=self.run_runtime(api)
         self.assertEqual(rt.startup_state,'complete');self.assertIsNone(rt.startup_support)
         self.assertEqual(seen['posts'],1)
+
+    def assert_present_path_keeps_gate(self, target, **extra):
+        document=schema(False);document['paths'][PATH]=target;document.update(extra)
+        api=API(document,error=RuntimeError('HTTP404'))
+        rt,seen,health=self.run_runtime(api)
+        self.assertIsNone(rt.startup_support);self.assertEqual(rt.startup_state,'failed')
+        self.assertEqual(seen['posts'],8);self.assertGreaterEqual(seen['at'],120)
+        self.assertEqual(health['startup_state'],'failed')
+
+    def test_reference_with_post_cannot_prove_startup_path_absent(self):
+        self.assert_present_path_keeps_gate({'$ref':'#/components/pathItems/Startup'},
+            components={'pathItems':{'Startup':{'post':{'responses':{'200':{}}}}}})
+
+    def test_broken_reference_cannot_prove_startup_path_absent(self):
+        self.assert_present_path_keeps_gate({'$ref':'#/components/pathItems/Missing'},
+            components={'pathItems':{}})
+
+    def test_explicit_null_cannot_prove_startup_path_absent(self):
+        self.assert_present_path_keeps_gate(None)
+
+    def test_get_only_item_cannot_prove_startup_path_absent(self):
+        self.assert_present_path_keeps_gate({'get':{}})
