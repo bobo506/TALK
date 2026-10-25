@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-25 08:08：330正式加载放行删除，旧K2.8资源守卫失败待元数据授权
+
+用户回复已在原终端正常重启API。UTC00:04:06核新runtime17580/external、API uptime12秒/健康、初始六宿主serving/worker空闲无错，所有角色停止无owner，完整公开非service投影/要求与before保持；250原失败任务/2767结果及WorkBuddy r6 complete/286 paused均相同。UTC00:04:15.883386正式delete旧agent:kimi-code-k28-preview被接受r1 pending，证明330守卫实际生效，不收取/重写250。
+
+UTC00:04:20.452278正式r2 failed/unsafe_resource，manager/profiles complete、credentials preserved、private_state failed、startup_config pending、identity_disabled=false；当前五宿主serving。未自动retry/手工清理/CAS/强杀，不把公共错误码猜成具体链接或实现缺陷；受信runtime已移除三份旧目标项目档案，Git记录对应删除而不读内容。旧角色保持归档/清绑定，不能恢复旧配置。
+
+仅普通start恢复原DSH gen68/ins_e463b3ea6ebf/PID7476 running/ready/idle，同实例心跳60.088815秒；其它四保留角色停止无owner，五保护角色完整公开投影/绑定/项目要求、250原任务/结果、286不变。HTTP首页和workspace.js版本v3及源码字节一致，原workspaceRoles函数配本次公开角色数据执行，五可用角色/两目标均排除；非真人浏览器验收，旧K2.8资源清理仍未complete。
+
+原“协调方不额外检查私有目录”边界保持，尚未读取实际私有资源元数据或文件内容。role-delete-resource-metadata-v1/inspect_metadata.py准备一次精确目标lstat检查，只由原load_config定位state_dir、输出文件类型/链接数/重解析分类计数，不读取内容/Key/原生会话日志正文、不跟链接或生产变更；合成硬链接目录自检通过，实际--inspect-authorized未执行。已向用户请求这次最小边界例外，等待答复；本轮不提前开条件下一片。实际API证据存本片deployment、静态筛选证明存public-projection.json，原330报告/143与5探针/新旧快照不改。
+
 ## 2026-10-25 07:55：330独立复核收取，原后台正常退出待API重启
 
 用户通知330完成。正式2974/正确Hall/author agent:deepseek的talk-delivery-1业务complete，与本地delivery逐字段一致；协调方核报告/源码/探针/日志及冻结后验收，无必须修正项，UTC23:50:35.761278收取为completed。独立四模块143/143过、115.197秒、零失败/错误/跳过，另5真实隔离API探针过（内部22拒绝/5混合/6旧守卫等不累计）。产品与正式测试eb6cf6c保持，不重复原整组自检。

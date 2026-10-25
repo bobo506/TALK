@@ -1,6 +1,20 @@
 # 删除人工验收返修的正常加载与两目标验证（2026-10-24）
 
-状态：330独立复核complete/2974已验收收取，无必须修正项；143关联回归与5项新增隔离API探针通过。已按同一正常加载授权停止runtime11200及六宿主，12原PID全部absent，六角色停止无owner、DeepSeek gen67。现在待用户原终端重启external API；330守卫尚未加载，旧K2.8未删除。WorkBuddy原r6 complete保持，250/286保护及条件下一片授权保持。
+状态：用户已重启API，330已实际加载runtime17580。旧K2.8正式删除r1被接受，但r2在private_state报unsafe_resource，尚未完整清理；WorkBuddy原r6 complete保持。页面实际筛选已排除两个目标，只显示五角色。DeepSeek恢复gen68/ready/idle且心跳推进60.088815秒；250原任务/结果、五保护角色及286保持。等待一次最小只读资源元数据核查授权，不提前开下一片。
+
+## 2026-10-25 08:08：330加载/列表移除通过，专属资源守卫另行排查
+
+用户明确已在原终端正常重启API。UTC00:04:06核新runtime17580/external、新API uptime12秒、六宿主serving/worker空闲无错，六角色均停止无owner、完整非service投影/要求与before相同。250公开原任务与2767结果逐字段相同、WorkBuddy原r6 complete不变、286 paused，已核API启动时间晚于本轮before。
+
+UTC00:04:15.883386按原human正式delete唯一agent:kimi-code-k28-preview，接受r1 pending/identity_disabled=false。证明330终止失败历史分类实际生效，不必收取或重写250。UTC00:04:20.452278后台r2 failed/unsafe_resource：manager/profiles complete、credentials preserved、private_state failed、startup_config pending。原目标宿主退出后当前五宿主serving，墓碑使旧角色保持归档/绑定清空；没有循环retry/手动文件删除/造claim或report。三份已由受信runtime清除的项目档案在Git记录相应删除，未读取其内容。
+
+按预定失败处理，仅普通start恢复原DeepSeek，gen68/ins_e463b3ea6ebf/PID7476 running/ready/idle，同实例心跳由00:04:46.603644推进到00:05:46.692459、60.088815秒。其它四保留角色stopped/无owner，五保护角色完整非service投影/绑定/项目要求、250原任务/2767结果与286逐字段保持。WorkBuddy仍complete，共享凭据均未吊销。
+
+实际HTTP首页引用20261024-role-delete-v3，workspace.js响应字节与当前普通源码相同；使用本次公开角色响应执行原workspaceRoles函数，五可用角色且两删除目标不在其中。此为实际资产/筛选证据，真人浏览器仍待用户验收；资源失败单独在清理区显示，不能把逻辑移除写成专属资源已清完。
+
+公开unsafe_resource不含路径或具体元数据原因，普通代码说明它可能是链接/多链接、文件类型或归属检查拒绝，当前不能确定。按既有“协调方不额外检查私有目录”边界，未直接查看实际目录或放宽守卫。已准备一次最小只读脚本，仅原load_config定位state_dir、目标专属目录lstat类型/链接数/重解析标记，结果只固定分类计数，无文件内容或原生会话/日志正文、无跟链接/删除；合成目录自检通过，尚未执行生产模式，已向用户请求这次边界例外。等待答复期间只收尾已有证据，不实施条件下一片。
+
+新证据在role-delete-failed-history-v1/deployment/及role-delete-resource-metadata-v1/public-projection.json；原330独立报告/143与5探针、新旧冻结及250失败历史不追改。此次实际失败不倒写为330复核发现，也不在原因未明时宣称新产品修正成立。
 
 ## 2026-10-25 07:55：330收取完成，原后台已正常退出
 

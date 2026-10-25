@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 08:08实际加载：用户重启API后runtime17580/初始六宿主健康，330守卫正式放行旧K2.8删除r1、250原failed/2767结果全字段不改；后续r2 private_state失败unsafe_resource，manager/profiles complete、credentials preserved/identity_disabled=false、startup_config pending，当前五宿主serving。页面实际v3资产及原函数配公开响应核五角色、排除两目标，资源未清完不冒称complete。仅恢复DSH gen68/ins_e463b3ea6ebf/PID7476 ready/idle，心跳60.088815秒，其它四停止；五保护角色完整公开投影/要求/286保持。未直接检查私有目录或绕守卫，最小metadata脚本合成自检过，实际未执行，已请求一次只读元数据边界例外；待答复，不提前开已条件授权下一片。原330报告/快照保持，详[加载记录](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)和[进度](docs/PROGRESS.md)。
+
 - 2026-10-25 07:55收尾/正常加载：330 complete/2974已核验收取completed，独立143关联回归+5真实隔离API探针通过，无必须修正项；9份81785字节原交付归档、新45与旧50/64/79快照零错配，产品eb6cf6c未再改。原报告保留调试wrapper跨唯一写根38合成DB偏差及协调方失败原因纠正，不声称全程唯一写根合规。实际new_no_candidate新窗/count1、末26.0273%，未续329。已普通stop/drain原runtime11200及六宿主，12原PID全absent、六角色stopped/无owner、DSH gen67，公开投影/绑定/要求/286保持。待用户原终端重启external API；随后核新版本、正式删旧K2.8且250原failed/2767结果不改，仅恢复DSH及心跳。WorkBuddy原r6 complete保持；当前未加载330守卫、K2.8未删，不提前开已条件授权下一片，也不重复同范围确认。详[当前进度](docs/PROGRESS.md)与[加载记录](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)。
 
 - 2026-10-25 00:46派发：旧K2.8失败历史必要补正330已交DeepSeek queued/assigned，eb6cf6c已推送；45份/2054979字节新源/冻结零漂移，原50/64/79和329原15报告归档零错配。仅1产品1测试修改，143自检通过；唯一写role-delete-failed-history-v1/review/，产品/测试/冻结暂停，默认用户通知后取件。沿base327请求相容续329窗，创建state=null、实际决定待回执。WorkBuddy真实complete/移除、DSH gen66已恢复；K2.8仍原绑定/无墓碑，250/286未变，新守卫未加载。330是当前缺陷必要返修，不是下一自启动片；用户条件续片授权保持，当前未闭合不提前实施。详当前进度与[补正合同](docs/spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)。
