@@ -24,6 +24,7 @@ from scripts import role_service_host as rsh
 from scripts.role_provision import key_file_path
 from scripts.role_provision_worker import RoleProvisionWorker
 from scripts.role_service_recovery import recorded_process_state
+from bridges.backend_error_codes import HOST_ERROR_CODES, RUNTIME_ERROR_CODES
 
 
 class RuntimeErrorCode(RuntimeError):
@@ -39,6 +40,9 @@ def utcnow():
 SHUTDOWN_PHASES = {"idle", "waiting_startup", "waiting_worker", "stopping_roles",
                    "draining_hosts", "stopping_api", "complete"}
 EXITED_PROCESS_STATES = {"absent", "exited", "previous_boot", "pid_reused"}
+SHUTDOWN_ERROR_CODES = RUNTIME_ERROR_CODES | HOST_ERROR_CODES | frozenset({
+    "runtime_startup_stop_timeout", "OSError", "HostError", "ValueError",
+})
 
 
 def _runtime_identity(health):
@@ -66,7 +70,7 @@ def wait_for_stop(private, expected, seconds, *, clock=time.monotonic, sleeper=t
 
     def result(status, code=None):
         return {"action": "stop", "stop_status": status, "error_code": code,
-                "pid": identity[1], "activation_id": identity[3],
+                "pid": identity[1],
                 "shutdown": {"phase": phase, "error_code": detail}}
 
     while True:
@@ -82,7 +86,7 @@ def wait_for_stop(private, expected, seconds, *, clock=time.monotonic, sleeper=t
         raw_phase = shutdown.get("phase")
         phase = raw_phase if isinstance(raw_phase, str) and raw_phase in SHUTDOWN_PHASES else "unknown"
         detail = shutdown.get("error_code")
-        detail = detail if isinstance(detail, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,79}", detail) else None
+        detail = detail if isinstance(detail, str) and detail in SHUTDOWN_ERROR_CODES else None
         state = recorded_process_state(current["pid"], current.get("seen_at"))
         if current.get("state") == "stopped" and state in EXITED_PROCESS_STATES:
             return result("stopped")

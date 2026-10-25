@@ -1,24 +1,25 @@
 # Project Progress
 
-Updated: 2026-10-25 20:56（Asia/Shanghai）。用户授权一个下一片：Codex开发、DeepSeek独立核实。按原排期第8项，当前“正常后台退出进度与有限等待”已实现并交DeepSeek336首审；不扩大为整项异常恢复或生产加载。
+Updated: 2026-10-25 21:30（Asia/Shanghai）。336正式交付partial已收取，两个必须修正项已集中补正；当前待新冻结后一次定向复验，尚未独立闭合或生产加载。
 
 ## 已完成
 
-- 日志自动清理、默认执行24小时、两个指定旧角色真实删除保持。选择性项目自启动334/335已独立通过；原runtime11280/12PID正常退出后，新runtime13252一轮complete，小D自动gen78/ready/idle、同实例心跳90.130226秒，其余四停止；上片运行验证闭合。
-- 本片仅scripts/talk_runtime.py产品变更：退出阶段/pending成员/错误/完成时刻，已退出宿主stopped投影；新增显式stop --apply --wait --wait-seconds N，默认300秒、最大900秒。旧不带wait的停止语义保持。
-- 等待只跟踪原project/pid/started_at/activation；stopped健康加原进程退出才成功，阻挡/超时/异常退出/新代/未知均不冒报完成。原所属Popen/任务归属、外部API及失败事实保持。
-- 最终47项严格合成配置隔离回归全过，0失败/错误/跳过，包含真实合成CLI正常/超时/随后完成及外部API保留。原40项首轮2E、随后两项/46项/3项均分别留档，不相加冒称更多独立用例。
+- 日志自动清理、默认执行24小时、指定旧角色删除及选择性自启动上片真实验证保持。当前生产运行/用户小Dtrue/rev1不改；本片未生产启停/加载，完整保护对比最后为上片20:05，不冒称重新完整核验。
+- 退出进度/有限等待基线760fe12已推送，336独立核代码/旧语义/双证据/代际/原句柄和失败保留总体成立；正式2982为partial，发现activation任意原值回显及token形错误码回显。336已正常收取completed，原业务partial不改。
+- 336原19份264144字节交付已核对正式消息与本地delivery并归档。原236新/197及63/116/162旧冻结、332至335原归档保持；336实际new_no_candidate新窗/count1、末29.3375%。
+- Codex仅1产品1测试补正：回执省略activation原值，内部身份精确比对不变；nested错误用既有有限错误码白名单及固定类型标签。指南澄清初始错误与等待结果形状、blocked可重试，不扩status原始健康输出面。
 
-## 当前边界
+## 验证与限制
 
-- 当前身份agent:codex / prj_e8fe7066bbec / lead。仅本片开发/隔离验证；没有生产启停/加载/偏好写入或任务修改，现有小D用户true/rev1保持保护，250failed/2767及286paused不动。最后完整公开保护对比仍是上片20:05，本轮不冒称再次完整核验。
-- 新使用说明[退出指南](guides/RUNTIME_SHUTDOWN.md)、[本片合同](spec/PROJECT_RUNTIME_SHUTDOWN_20261025.md)；证据.tmp/runtime-shutdown-v1/。早期直接unittest入口存在server默认配置导入链，不算严格配置隔离；最终47项已走既有run_isolated防护，不读真实默认配置。
-- 纯授权补记cde4620不单独推送；用户明确有代码更新则推送，本轮代码及配套文档普通推送既有公开bobo506/TALK当前分支。旧推送审批拒绝保持为历史。
+- 原2个注入方法在补正前6个失败子断言保留。补正后新增4方法，总51正式严格合成配置回归0F/0E/0S；补startup stop timeout/已知错误回显。
+- 336原run_formal.py逐字节副本正常权限下代跑旧47与新51均过；原probe_wait_edges.py逐字节副本25条记录验证两泄漏false、running超时一次请求/不重发/不释放、代际不接管。以上是Codex协调核验，不能冒称DeepSeek本人已在正常权限复跑。
+- DeepSeek原正式47沙箱7F/22E、CREATE_NO_WINDOW/ACL/breakaway限制保留；其原逻辑探针使用明文发布替身不当正式安全文件验证。无生产配置/Key/DB/私有state/native/log读取或生产启停，不改250/286/绑定/项目要求/自启动选择。
+- 证据.tmp/runtime-shutdown-fix1/，详[本轮补正](spec/PROJECT_RUNTIME_SHUTDOWN_FIX1_20261025.md)；原报告与原失败不覆盖。
 
 ## 下一步
 
-1. 代码760fe12已推送；DeepSeek首审336创建queued/assigned，原生执行会话state=null，不预称已领取/同窗。236份8982718字节新冻结零漂移，旧冻结/332至335原交付保持；唯一写.tmp/runtime-shutdown-v1/review，产品/正式测试/新旧冻结暂停。自检不能替代独立通过，尚未部署本片。
-2. 默认用户通知336完成再取件；必要集中修正/定向复验，不为非阻断观察增加轮次，不主动等待/唤回。
-3. 本片闭合后再明确下一范围；真实断电/OS重启、完整在途任务中断恢复、桌面外壳和实际模型上报不由本片证明。
+1. Git/新冻结后交DeepSeek一次只针对MF-1/MF-2及停止/身份兼容的定向复验；不重复已知受限的全量环境尝试。代码/正式测试随后冻结暂停，尚未部署。
+2. 默认用户通知复验完成后取件，不主动等待/唤回，不发额外可执行Hall消息；非阻断观察不追加轮次。
+3. 当前仅闭合本片修正；下一无关功能先确认，完整异常恢复/实际模型/主被动真实链路不在本片。
 
-详[历史](PROGRESS_HISTORY.md)及[上一片真实自启动证据](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)。
+详[历史](PROGRESS_HISTORY.md)、[退出指南](guides/RUNTIME_SHUTDOWN.md)。

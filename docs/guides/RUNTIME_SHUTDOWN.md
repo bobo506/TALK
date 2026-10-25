@@ -10,6 +10,10 @@ python -B scripts/talk_runtime.py stop --config <原配置清单绝对路径> --
 
 退出码0且JSON中`stop_status=stopped`，表示本代健康状态已确认stopped、原后台进程已确证退出。仅看到停止请求成功、角色停止或健康文件stopped，仍不能独立证明原后台进程已经结束。
 
+回执省略健康文件中的activation_id原值；后台代际核验仍在内部精确比对，不因省略输出而改变。nested shutdown.error_code只允许代码中固定的运行器/宿主错误类别，其它内容返回null，避免把路径、Key形状值或任意坏健康字段混入回执。
+
+下面的stop_status表适用于已经进入等待的结果。参数不合法会退出2；初始健康缺失/损坏、身份非法、项目不符或原进程无法核实时，可能先退出1并返回`ok=false + error_code`，不会产生stop_status成功回执。blocked表示本次等待提前结束；原后台可能继续正常重试，用户可查看status或再次等待。
+
 其它等待结果退出码为1：
 
 | stop_status | 含义与处理 |

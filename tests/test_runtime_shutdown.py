@@ -98,6 +98,20 @@ class ShutdownProgressTests(unittest.TestCase):
         self.assertEqual(self.health()['shutdown']['phase'], 'waiting_worker')
         self.assertFalse(any(c[0] == 'POST' for c in self.client.calls))
 
+    def test_startup_writer_timeout_keeps_worker_and_roles_untouched(self):
+        owner = self
+        class Thread:
+            def is_alive(self): return True
+            def join(self, timeout): owner.advance(timeout)
+        self.runtime.startup_thread = Thread()
+        worker = self.runtime.worker = unittest.mock.Mock()
+        with self.assertRaisesRegex(runtime.RuntimeErrorCode, 'runtime_startup_stop_timeout'):
+            self.runtime.stop()
+        self.assertEqual(self.now, 70)
+        self.assertEqual(self.health()['shutdown']['phase'], 'waiting_startup')
+        worker.request_stop.assert_not_called()
+        self.assertFalse(any(c[0] == 'POST' for c in self.client.calls))
+
     def test_api_timeout_keeps_original_process_and_never_reports_complete(self):
         self.runtime.api = fixtures.Process(77)
         self.runtime.api_control_file = self.private / 'api.stop'
@@ -206,6 +220,43 @@ class StopWaitTests(unittest.TestCase):
             result = self.wait()
         self.assertNotIn('private', json.dumps(result))
         self.assertEqual(result['shutdown']['phase'], 'unknown')
+
+    def test_receipt_omits_activation_content_but_keeps_opaque_identity_matching(self):
+        for activation in ('C:/private/native/session/key-material', 'sk_live_activation_token_123456',
+                           '7f422e7778704cd9a05bcbca58f08b5a'):
+            with self.subTest(activation=activation):
+                self.expected = {**self.expected, 'activation_id': activation}
+                self.value = {**self.expected, 'state': 'stopped'}; self.write()
+                with patch.object(runtime, 'recorded_process_state', return_value='absent'):
+                    result = self.wait()
+                self.assertEqual(result['stop_status'], 'stopped')
+                self.assertNotIn('activation_id', result)
+                self.assertNotIn(activation, json.dumps(result))
+                self.value['activation_id'] = 'replacement-generation'; self.write()
+                with patch.object(runtime, 'recorded_process_state') as probe:
+                    self.assertEqual(self.wait()['stop_status'], 'generation_changed')
+                    probe.assert_not_called()
+
+    def test_receipt_rejects_token_shaped_errors_without_prefix_trust(self):
+        for token in ('sk_live_abcdef123456', 'runtime_host_stop_timeout_secret', 'host_secret_123'):
+            with self.subTest(token=token):
+                self.value.update(state='stop_blocked', shutdown={'phase': 'draining_hosts', 'error_code': token})
+                self.write()
+                with patch.object(runtime, 'recorded_process_state', return_value='present'):
+                    result = self.wait()
+                self.assertEqual(result['stop_status'], 'blocked')
+                self.assertIsNone(result['shutdown']['error_code'])
+                self.assertNotIn(token, json.dumps(result))
+
+    def test_receipt_preserves_only_known_fixed_error_categories(self):
+        for code in ('runtime_host_stop_timeout', 'runtime_startup_stop_timeout', 'host_unreachable', 'OSError', 'HostError'):
+            with self.subTest(code=code):
+                self.value.update(state='stop_blocked', shutdown={'phase': 'waiting_worker', 'error_code': code})
+                self.write()
+                with patch.object(runtime, 'recorded_process_state', return_value='present'):
+                    result = self.wait()
+                self.assertEqual(result['stop_status'], 'blocked')
+                self.assertEqual(result['shutdown']['error_code'], code)
 
     def test_invalid_budgets_never_read_health(self):
         with patch.object(Path, 'read_text') as read:
