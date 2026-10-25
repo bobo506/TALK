@@ -26,6 +26,71 @@ class CleanupError(Exception):
         super().__init__(code)
 
 
+def _remove_native_junction(path, expected):
+    """Delete only the checked junction entry; never open its target or reparse data.
+
+    Caller pins the ordinary native-home ancestors. OPEN_REPARSE_POINT plus a
+    no-write/no-delete-share handle prevents a path swap after verification.
+    Other tags, non-junction replacements and changed identities fail closed.
+    """
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes as w
+
+    tag=0xA0000003  # IO_REPARSE_TAG_MOUNT_POINT: directory junction
+    if (not _link(expected) or not stat.S_ISDIR(expected.st_mode)
+            or getattr(expected,"st_reparse_tag",None)!=tag or expected.st_nlink!=1):
+        raise CleanupError("unsafe_resource")
+    k=ctypes.WinDLL("kernel32",use_last_error=True)
+    k.GetLongPathNameW.argtypes=[w.LPCWSTR,w.LPWSTR,w.DWORD]
+    k.GetLongPathNameW.restype=w.DWORD
+    path=Path(os.path.abspath(path))
+    # Normalize only the ordinary, pinned parent: even exists() on the junction
+    # would follow it to obtain target metadata. Dangling links use the same path.
+    buffer=ctypes.create_unicode_buffer(32768)
+    length=k.GetLongPathNameW(str(path.parent),buffer,len(buffer))
+    if not length or length>=len(buffer):
+        raise CleanupError("unsafe_resource")
+    canonical=Path(buffer.value)/path.name
+    k.CreateFileW.argtypes=[w.LPCWSTR,w.DWORD,w.DWORD,w.LPVOID,w.DWORD,w.DWORD,w.HANDLE]
+    k.CreateFileW.restype=w.HANDLE
+    k.CloseHandle.argtypes=[w.HANDLE];k.CloseHandle.restype=w.BOOL
+    handle=k.CreateFileW(str(canonical),0x10000|0x80,1,None,3,0x00200000|0x02000000,None)
+    if handle==ctypes.c_void_p(-1).value:
+        raise OSError(ctypes.get_last_error(),"junction_open_unavailable")
+    fd=None
+    try:
+        class Attributes(ctypes.Structure):
+            _fields_=[("attributes",w.DWORD),("tag",w.DWORD)]
+        k.GetFileInformationByHandleEx.argtypes=[w.HANDLE,ctypes.c_int,w.LPVOID,w.DWORD]
+        k.GetFileInformationByHandleEx.restype=w.BOOL
+        attributes=Attributes()
+        if (not k.GetFileInformationByHandleEx(handle,9,ctypes.byref(attributes),ctypes.sizeof(attributes))
+                or attributes.tag!=tag or not attributes.attributes&0x400 or not attributes.attributes&0x10):
+            raise CleanupError("unsafe_resource")
+        k.GetFinalPathNameByHandleW.argtypes=[w.HANDLE,w.LPWSTR,w.DWORD,w.DWORD]
+        k.GetFinalPathNameByHandleW.restype=w.DWORD
+        length=k.GetFinalPathNameByHandleW(handle,buffer,len(buffer),0)
+        actual=buffer.value
+        if actual.startswith("\\\\?\\"):actual=actual[4:]
+        if not length or length>=len(buffer) or os.path.normcase(actual)!=os.path.normcase(str(canonical)):
+            raise CleanupError("unsafe_resource")
+        fd=msvcrt.open_osfhandle(handle,os.O_BINARY|os.O_RDONLY)
+        handle=None
+        if identity(os.fstat(fd))!=identity(expected):
+            raise CleanupError("unsafe_resource")
+        class Disposition(ctypes.Structure):
+            _fields_=[("delete",ctypes.c_ubyte)]
+        k.SetFileInformationByHandle.argtypes=[w.HANDLE,ctypes.c_int,w.LPVOID,w.DWORD]
+        k.SetFileInformationByHandle.restype=w.BOOL
+        disposition=Disposition(1)
+        if not k.SetFileInformationByHandle(msvcrt.get_osfhandle(fd),4,ctypes.byref(disposition),ctypes.sizeof(disposition)):
+            raise OSError(ctypes.get_last_error(),"junction_delete_unavailable")
+    finally:
+        if fd is not None:os.close(fd)
+        if handle is not None:k.CloseHandle(handle)
+
+
 class Files:
     def __init__(self, deadline):
         self.deadline, self.count, self.deleted = deadline, 0, 0
@@ -40,14 +105,23 @@ class Files:
         with pinned(path.parent), NativeFile(path) as handle:
             return handle.read(limit)
 
-    def remove(self, path, *, tree=False, digest=None, verify=None, skip=frozenset()):
+    def remove(self, path, *, tree=False, digest=None, verify=None, skip=frozenset(), native_root=None):
         # lexists catches dangling symlinks too. Missing resources are idempotent.
         if not os.path.lexists(path):
             return
         self.budget()
         with pinned(path.parent):
             info = path.lstat()
-            if _link(info) or (not stat.S_ISDIR(info.st_mode) and info.st_nlink != 1):
+            if _link(info):
+                # Only descendants of the canonical, ordinary native-home root
+                # may unlink a junction. Profiles/credentials/control stay strict.
+                if (native_root is None or not tree or path==native_root
+                        or not path.is_relative_to(native_root)):
+                    raise CleanupError("unsafe_resource")
+                _remove_native_junction(path,info)
+                self.deleted += 1
+                return
+            if not stat.S_ISDIR(info.st_mode) and info.st_nlink != 1:
                 raise CleanupError("unsafe_resource")
             if stat.S_ISDIR(info.st_mode):
                 if not tree:
@@ -56,7 +130,7 @@ class Files:
                     for child in path.iterdir():
                         self.budget()
                         if child.name not in skip:
-                            self.remove(child, tree=True)
+                            self.remove(child, tree=True, native_root=native_root)
                 if skip and any(path.iterdir()):
                     return  # Permanent empty OS lock guards contain no role configuration.
                 with NativeFile(path, directory=True, delete=True) as handle:
@@ -264,7 +338,7 @@ def cleanup(runtime, member, receipt):
             files.remove(provision.assert_inside_root(state, Path("control")/(launch+".ctl")))
         for category in ("roles", "native", "workbuddy-native"):
             path = provision.assert_inside_root(state, Path(category)/project_token/member_token)
-            files.remove(path, tree=True)
+            files.remove(path, tree=True, native_root=path if category=="native" else None)
         steps[step] = "complete"
         step = "startup_config"
         _config(runtime, member, files)

@@ -266,3 +266,146 @@ class LocalDeletionTests(unittest.TestCase):
     def test_absent_resource_remains_idempotent_after_budget_exhaustion(self):
         files=d.Files(0)
         files.remove(self.root/"already-removed")
+
+    def _native_junction(self, *, dangling=False, root_link=False):
+        home=self.state/"native"/self.project_id/host._sanitize_token(self.member)
+        target=self.root/"outside-native-target"
+        target.mkdir();sentinel=target/"shared-data.txt"
+        sentinel.write_bytes(b"keep shared native data\x00\xff")
+        link=home if root_link else home/"cache"/"linked-directory"
+        link.parent.mkdir(parents=True,exist_ok=True)
+        # Only this explicitly resolved synthetic junction is created or removed.
+        self._junction(link,target)
+        if dangling:sentinel.unlink();target.rmdir()
+        return home,link,target,sentinel
+
+    def _junction(self,link,target):
+        self.assertTrue(link.absolute().is_relative_to(self.root.absolute()))
+        self.assertTrue(target.absolute().is_relative_to(self.root.absolute()))
+        result=subprocess.run(["cmd","/c","mklink","/J",str(link),str(target)],
+            capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW)
+        self.assertEqual(result.returncode,0,result.stderr)
+        def remove_link():
+            if os.path.lexists(link):os.rmdir(link)
+        self.addCleanup(remove_link)
+
+    def test_native_junction_entry_removed_shared_target_unchanged(self):
+        home,link,target,sentinel=self._native_junction()
+        nested=target/"nested";nested.mkdir();(nested/"keep.txt").write_text("keep",encoding="utf-8")
+        before={str(p.relative_to(target)):p.read_bytes() for p in target.rglob('*') if p.is_file()}
+        original_stat=Path.stat
+        def no_target_stat(path,*args,**kwargs):
+            if path==link and kwargs.get('follow_symlinks',True):
+                raise AssertionError('junction target must not be statted')
+            if path==target or path.is_relative_to(target):
+                raise AssertionError('shared target must not be opened')
+            return original_stat(path,*args,**kwargs)
+        with patch.object(Path,'stat',no_target_stat):
+            result=self.run_cleanup()
+        self.assertEqual(result["outcome"],"complete",result)
+        self.assertFalse(os.path.lexists(link));self.assertFalse(home.exists())
+        self.assertEqual({str(p.relative_to(target)):p.read_bytes() for p in target.rglob('*') if p.is_file()},before)
+        self.assertTrue(self.other.exists())
+
+    def test_dangling_native_junction_is_removed_without_opening_target(self):
+        home,link,target,_=self._native_junction(dangling=True)
+        self.assertTrue(os.path.lexists(link));self.assertFalse(link.exists())
+        result=self.run_cleanup()
+        self.assertEqual(result["outcome"],"complete",result)
+        self.assertFalse(os.path.lexists(link));self.assertFalse(home.exists());self.assertFalse(target.exists())
+
+    def test_native_home_root_junction_remains_rejected(self):
+        _,link,_,sentinel=self._native_junction(root_link=True)
+        result=self.run_cleanup()
+        self.assertEqual(result["outcome"],"failed",result)
+        self.assertTrue(os.path.lexists(link));self.assertEqual(sentinel.read_bytes(),b"keep shared native data\x00\xff")
+
+    def test_native_hardlink_remains_rejected(self):
+        home=self.state/"native"/self.project_id/host._sanitize_token(self.member)
+        home.mkdir(parents=True)
+        target=self.root/"shared-native-file";target.write_text("keep",encoding="utf-8")
+        os.link(target,home/"hardlink")
+        result=self.run_cleanup()
+        self.assertEqual(result["outcome"],"failed",result)
+        self.assertEqual(result["error_code"],"unsafe_resource")
+        self.assertEqual(target.read_text(encoding="utf-8"),"keep")
+
+    def test_locked_native_junction_is_preserved_then_retry_succeeds(self):
+        import ctypes
+        from ctypes import wintypes as w
+        home,link,_,sentinel=self._native_junction()
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.CreateFileW.argtypes=[w.LPCWSTR,w.DWORD,w.DWORD,w.LPVOID,w.DWORD,w.DWORD,w.HANDLE]
+        kernel.CreateFileW.restype=w.HANDLE
+        kernel.CloseHandle.argtypes=[w.HANDLE];kernel.CloseHandle.restype=w.BOOL
+        # Metadata-only handles do not enforce data/delete sharing restrictions.
+        handle=kernel.CreateFileW(str(link),0x80000000,1,None,3,0x00200000|0x02000000,None)
+        self.assertNotEqual(handle,ctypes.c_void_p(-1).value)
+        try:result=self.run_cleanup()
+        finally:kernel.CloseHandle(handle)
+        self.assertEqual(result['outcome'],'failed',result)
+        self.assertEqual(result['steps']['private_state'],'failed')
+        self.assertTrue(os.path.lexists(link));self.assertEqual(sentinel.read_bytes(),b'keep shared native data\x00\xff')
+        self.assertEqual(self.run_cleanup()['outcome'],'complete')
+        self.assertFalse(home.exists());self.assertTrue(sentinel.exists())
+
+    def test_native_junction_replaced_before_open_is_not_deleted(self):
+        home,link,_,sentinel=self._native_junction()
+        other=self.root/'second-target';other.mkdir();(other/'keep.txt').write_text('second',encoding='utf-8')
+        relocated=link.with_name('original-junction')
+        original=d._remove_native_junction
+        def swap(path,expected):
+            self.assertEqual(path,link)
+            path.rename(relocated)
+            self.addCleanup(lambda:os.rmdir(relocated) if os.path.lexists(relocated) else None)
+            self._junction(path,other)
+            return original(path,expected)
+        with patch.object(d,'_remove_native_junction',side_effect=swap):
+            result=self.run_cleanup()
+        self.assertEqual(result['outcome'],'failed',result)
+        self.assertEqual(result['error_code'],'unsafe_resource')
+        self.assertTrue(os.path.lexists(link));self.assertTrue(os.path.lexists(relocated))
+        self.assertEqual(sentinel.read_bytes(),b'keep shared native data\x00\xff')
+        self.assertEqual((other/'keep.txt').read_text(encoding='utf-8'),'second')
+        self.assertEqual(self.run_cleanup()['outcome'],'complete')
+        self.assertFalse(home.exists());self.assertTrue(sentinel.exists());self.assertTrue((other/'keep.txt').exists())
+
+    def test_native_cycle_junction_is_unlinked_without_recursion(self):
+        home,link,target,sentinel=self._native_junction()
+        cycle=home/'cache'/'cycle'
+        self._junction(cycle,home)
+        result=self.run_cleanup()
+        self.assertEqual(result['outcome'],'complete',result)
+        self.assertFalse(home.exists());self.assertTrue(target.exists());self.assertTrue(sentinel.exists())
+
+    def test_native_junction_batches_finish_without_target_mutation(self):
+        home,link,target,sentinel=self._native_junction()
+        for index in range(35):(home/f'cache-{index}').write_text('synthetic',encoding='utf-8')
+        outcomes=[]
+        with patch.object(d,'MAX_OPERATIONS',60):
+            for _ in range(15):
+                result=self.run_cleanup();outcomes.append(result['outcome'])
+                if result['outcome']=='complete':break
+                self.assertEqual(result['outcome'],'pending',result)
+        self.assertIn('pending',outcomes);self.assertEqual(outcomes[-1],'complete',outcomes)
+        self.assertFalse(home.exists());self.assertTrue(target.exists());self.assertEqual(sentinel.read_bytes(),b'keep shared native data\x00\xff')
+
+    def test_native_symbolic_links_remain_rejected(self):
+        home=self.state/'native'/self.project_id/host._sanitize_token(self.member)
+        home.mkdir(parents=True)
+        target=self.root/'symbolic-target';target.mkdir();sentinel=target/'keep.txt'
+        sentinel.write_text('keep symbolic target',encoding='utf-8')
+        for directory in (False,True):
+            with self.subTest(directory=directory):
+                link=home/'symbolic-link'
+                try:os.symlink(target if directory else sentinel,link,target_is_directory=directory)
+                except OSError as exc:
+                    if getattr(exc,'winerror',None)==1314:self.skipTest('symbolic-link privilege unavailable')
+                    raise
+                try:
+                    result=self.run_cleanup()
+                    self.assertEqual(result['outcome'],'failed',result)
+                    self.assertEqual(result['error_code'],'unsafe_resource')
+                    self.assertTrue(os.path.lexists(link))
+                    self.assertEqual(sentinel.read_text(encoding='utf-8'),'keep symbolic target')
+                finally:link.unlink()

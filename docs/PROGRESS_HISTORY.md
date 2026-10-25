@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-25 08:31：一次授权元数据确认目录联接，Codex最小补正121隔离通过
+
+用户明确授权一次最小只读核查，执行inspect_metadata.py --inspect-authorized，仅原load_config定位state_dir。1309条元数据为native目录360/普通文件949，唯一目录reparse/tag0xA0000003；无资源内容/Key/会话日志正文读取、私有路径/目标输出、链接跟随或生产修改。本次例外执行完，不延伸继续扫描、手工删联接或目标；原330加载/列表筛选、DSH恢复、250/286及共享身份保护保持。
+
+仅scripts/role_delete.py与tests/test_role_delete_local.py变更：规范native普通成员根的后代目录联接，以固定父目录/不跟随打开的独占HANDLE核tag/属性/路径/原对象身份后只删入口；不对链接exists/resolve、不遍历目标。native根、profiles/roles/control/凭据/workbuddy-native、符号链接/硬链接/其它tag仍拒绝，不改通用NativeFile/日志/API/页面。9新含断开/循环/预算分批、外部目标树全字节保留、替换竞态、真实读HANDLE锁及拒绝保护。
+
+修前4中2失败/2保护通过，原before.log保持。首个shell因日志根缺失未执行测试，单独记为协调运行问题。初改4通过；首轮本机32中1失败是锁夹具只开metadata-only HANDLE，不参与数据/删除共享约束，修为GENERIC_READ真实读HANDLE，未据此放宽产品。随后沙箱33零失败但两个符号链接子场景缺权限skip；所有原日志保持。最终正常沙箱外四模块121/121、64.868秒零失败/错误/跳过，含33本机/18runtime/38删除/32轮换，9新和定向重叠不累计；测试始终原合成wrapper/本片isolated，无生产夹具，未重复Node/原全283或330的143。
+
+待冻结交DeepSeek定向独立复核，Codex随后暂停改码，默认用户通知后取件；新清理器尚未加载，生产墓碑仍r2 failed，未停启或retry。本次只改runtime，正常CLI原serve --attach-api --detach可在普通stop/drain后恢复后台而保外部API，既有隔离测试/普通代码已核，不要求用户为本次再重启API；实际加载还须后续健康/归属/清理回执验证，不提前称生产能力通过。全部闭合后才开已授权下一片，详ROLE_DELETE_NATIVE_JUNCTION_20261025。
+
 ## 2026-10-25 08:08：330正式加载放行删除，旧K2.8资源守卫失败待元数据授权
 
 用户回复已在原终端正常重启API。UTC00:04:06核新runtime17580/external、API uptime12秒/健康、初始六宿主serving/worker空闲无错，所有角色停止无owner，完整公开非service投影/要求与before保持；250原失败任务/2767结果及WorkBuddy r6 complete/286 paused均相同。UTC00:04:15.883386正式delete旧agent:kimi-code-k28-preview被接受r1 pending，证明330守卫实际生效，不收取/重写250。
