@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 14:36：334通过收取，本片代码闭合并准备正常加载方案
+
+用户通知334好了后，核实正式succeeded/submitted/2980、conclusion=complete，无unfinished/blocked/必须修正，正式消息与本地delivery逐字段一致。DeepSeek独立10原MF-1探针+7新增判断全过，原333四反例断言未改；MF-2/MF-3沿333通过，不重复全审。真实ACL/断电/原生模型/浏览器等限制保留；不把Codex26自检与本次17相加冒称不同用例。334实际reuse_session续333/count2，末37.6821%，未复用332 tainted旧窗。15份36242字节原报告/探针/日志按manifest归档fix2/pickup334/334-original-review；UTC06:33:30.383042正常收取completed。333原partial/2979、332failed/2978不改不追收。
+
+162份4240533字节新冻结、旧63/116、332原33及333原29零错配；产品/正式测试/web仍058e153，无新修改。公开五完整binding/项目要求及250/286整份任务响应与派前相同。只读正常认证与原CLI status确认runtime11280/fivehosts serving、worker_in_flight=false/worker_error=null，API healthz ok/uptime23480秒且新startup路由仍缺，五startup字段null；不把null当实测false。仅DSH gen76/ins_aa6223b0735e/PID10360运行/idle，其它四停止。初次默认沙箱CLI退出1详细原因未留，不推测；随后预检误用/health 404，按源码更正/healthz通过，失败记录在pickup334；未做任何生产修改。
+
+[正常加载方案](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)已具体落盘：确认后刷新公开预检，原后台普通stop/drain并核原PID退出；外部API由用户原终端重启，然后原attach-api/detach入口重启后台，核新路由/默认false/本代complete，最后仅恢复原DSH并核同实例60秒心跳，五binding/要求/250/286保持。未勾选、未生产启停/加载、未读额外配置/DB/native或复用一次例外。当前只文档/Git收尾，部署确认尚待用户；不再派非阻断复核，不自动开下一无关片。
+
 ## 2026-10-25 14:25：最小修正推送并交334单项定向复验
 
 058e153c44338eebd5f5968b79b01aefaa729a47已推送。manifest-fix2/baseline-fix2为162份4240533字节，派前源/快照零漂移；旧63/116、332原33及333原29归档零错配。派前公开五角色完整binding/项目要求与333派前相同；250仍failed/failed/2767且未收取，286queued/accepted/paused，DSH ins_aa6223b0735e/PID10360 idle/无任务/新鲜心跳。未实际读取生产配置/DB/native或进行生命周期操作。

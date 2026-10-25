@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 14:36复核闭合：334 complete/2980已核验收取completed，无必须修正；10原MF-1探针+7补充独立判断全过，原四新增反例不改断言通过，MF-2/MF-3沿333通过不重审。162新/旧63/116及332原33/333原29零错配，334原15份36242字节已归档；实际续333窗/count2、末37.6821%。产品仍058e153、无新改动；五完整binding/项目要求及250/286整份公开任务相同。只读实测API仍旧无startup路由，runtime11280/五宿主serving/worker空闲，仅DSH gen76运行，其它四停止；新功能未加载。具体[正常加载方案](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)已准备待确认：原后台普通stop/drain、用户原终端重启API、attach-api重启后台、默认false不代勾选、仅恢复DSH/核心跳。前次一次例外已用完，不重复用；本轮不启停/部署/开下一无关片，不为非阻断项再派复核。
+
 - 2026-10-25 14:25派发：MF-1R单项定向复验334已交DeepSeek queued/assigned，代码058e153已推送；162份4240533字节新源/快照零漂移，旧63/116及332原33、333原29报告零错配。唯一写fix2/review，产品/正式测试/新旧冻结暂停；base332/原continuity优先相容333窗但服从守卫，创建state=null不预称同窗。仅核原四新增反例和旧API/newAPIpending对照，不重做整片。333partial/2979已正常收取、332failed/2978不改；派前五完整binding/要求相同、250failed/2767未收取、286paused、DSH原实例idle。无生产加载/启停/额外私有读取，不重复用一次元数据/恢复许可。默认用户通知334完成再取件，不主动等待/唤回，不开下一无关片。
 
 - 2026-10-25 14:23取件及必要补正：333正式2979业务partial/review failed已收取completed；原MF-2/MF-3及四失败断言独立通过，新增MF-1R为present Reference/null/get-only误判unsupported。29份210648字节原产物已归档，旧63/116及332原33保持；333实际new_no_candidate/count1、末32.6345%，未复用旧tainted窗。Codex仅1产品1测试改为path key确缺才unsupported并补4回归，16正式+10原MF-1探针共26通过；待新冻结后只定向复验本反例及旧API/newAPIpending对照，不重做整片。332failed/2978及前次一次生产例外边界保持；未加载/启停/改选择，250/286和五binding保护不变。详[fix2](docs/spec/PROJECT_ROLE_AUTO_START_FIX2_20261025.md)。
