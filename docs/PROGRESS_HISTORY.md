@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 12:42：用户暂停332后启动超时，正式入口恢复DeepSeek并定位兼容遗漏
+
+332由用户12:33正常暂停为queued/accepted/paused，领取/lease清空；原DSH gen70归属经其正常关闭后已释放。用户入口启动新runtime11280（12:33:28），旧API仍运行且OpenAPI无startup路由，新后台8轮HostError等待阻挡宿主。gen73 launch12:33:30发出、12:35:30到期，始终未claim，12:36:40后投影failed/readiness_timeout/无归属；五宿主最终serving。因此本次启动失败是已确证的新旧组件兼容/等待预算遗漏，不归因模型或Key；与09:56原进程退出原因未确认分开。
+
+Codex只经原human正常start接口重试一次（无手工CAS/解owner），UTC04:41:37返回gen74/launch670d9544-0c37-41f9-af76-b1712abc339d/ins_9318d6d0efce，04:41:39 ready，04:42:39同实例idle/无任务/PID16492真实心跳，距ready59.980973秒。另四角色stopped/无owner，五完整公开binding/要求、250全部公开字段及2767结果、286全部公开字段与原保存值一致。332保持paused，未resume/新派/收取/代report；产品/正式测试/63冻结保持。兼容遗漏纳入当前片集中修正，正式review探针仍未成最终报告；不以角色恢复称新自启动全部加载通过。证据.tmp/project-role-autostart-v1/coordination/restore-20261025/。
+
+本轮首次复用只读诊断helper覆盖了stall-20261025-1216/public-api.json，原12:19摘要/stdout和raw task/agents仍保留，但不声称原完整文件保持；helper已改唯一时间名。恢复helper最初项目instances路径404，未当实例证据；后续使用有界TALK当前实例心跳，并修正为公开/api/instances过滤路径。均未读生产配置正文/DB/角色Key/私有日志或重启API，runtime status仅原统一入口读取已许可清单/健康投影。无新增产品返修或测试/Git源码变更。
+
 ## 2026-10-25 12:19：332超时只读实查，确认执行端退出/任务状态未收敛
 
 用户认为DeepSeek复核两小时异常，Codex核公开任务/成员、四个原PID元数据、OS启动时间、具名合成review日志及公开恢复计划。33209:41:24领取，最后心跳09:56:37.925551、lease09:58:37过期，至12:19仍running/in_progress且无result；runtime12980、DSH宿主5116/5604、bridge15992均已不存在，机器上次boot为10月23日10:02，APIhealth ok/uptime15317秒。只能确认执行端退出与任务未收敛，退出原因未证，不归因模型慢/系统重启。DSH gen70 unknown/instance_heartbeat_expired/ownership_held，can_start=false；只读恢复计划409 recovery_tasks_active。

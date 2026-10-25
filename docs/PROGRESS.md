@@ -1,8 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-25 12:19（Asia/Shanghai）。用户反馈332超过两小时；只读实查确认09:56已失联，原runtime/DeepSeek宿主/bridge均退出，API仍健康，332却残留running。不是持续复核两小时，正式交付仍空。当前仅诊断/记录，未恢复、CAS或部署，产品/正式测试/冻结保持。
+Updated: 2026-10-25 12:42（Asia/Shanghai，最新取证）。用户已暂停332并重启角色，首次gen73因旧API与新runtime启动等待不兼容而超时；宿主就绪后Codex通过正式start一次恢复DSH gen74/ready/idle，约60秒后同实例心跳已证。332仍暂停，产品/正式测试/冻结未改。
 
 ## 当前自启动切片
+
+- 用户12:33已将332正常暂停为queued/accepted/paused、领取/lease清空，旧DSH归属经用户正常关闭后已释放。用户操作启动runtime11280（本片新版runtime已被其启动入口加载，API仍旧版），8次startup请求失败后五宿主serving；OpenAPI确证缺本片startup路由。初次DSH gen73 launch未领取即12:35:30过期，readiness_timeout，无归属；不是模型/Key失败。新自启动未成功执行，不把这次部分加载称完整部署验收。
+- Codex仅正式start重试一次，UTC04:41:37 gen74/ins_9318d6d0efce，04:41:39 ready，04:42:39同实例idle/无任务/PID16492心跳，距ready59.980973秒。另四角色stopped/无owner，五完整binding/要求、250全部公开字段与2767结果、286全部公开字段保持。332未恢复/替换/收取，合成review不改。原09:56进程退出原因仍未查明。
+- 本次已确认兼容遗漏：runtime在旧API前等待8轮阻挡宿主，超过角色120秒launch TTL，列入当前切片集中修正项；产品及63冻结保持，不在332未交付时单独改冻结源码。恢复证据coordination/restore-20261025/restoration-check.json。协调只读helper的固定名public-api.json被本轮检查覆盖，12:19摘要/工具输出与原task/agents仍保留；已改后续唯一文件名，不声称早期完整响应文件未变。
 
 - 332于09:41:24领取，最后心跳09:56:37、lease09:58:37过期；至12:19无result_message。原runtime12980、DSH宿主5116/5604及bridge15992均已由OS元数据确认不存在，系统上次启动10月23日10:02；API健康/uptime15317秒。退出原因尚未确定，不归因模型慢或电脑重启。
 - DSH gen70现unknown/instance_heartbeat_expired/ownership_held、can_start=false；只读恢复计划409 recovery_tasks_active。review日志停09:56:40，REVIEW.md/checks.json未生成，已有两个合成探针共三条失败断言，仅作未完证据不当正式独立结论。保留原332，未补收/代report/新派或改review。证据coordination/stall-20261025-1216/。
@@ -24,7 +28,7 @@ Updated: 2026-10-25 12:19（Asia/Shanghai）。用户反馈332超过两小时；
 
 ## 下一步和有效授权
 
-1. 等待已不能推进332；下一步应经正式控制处理中断任务/旧归属，再恢复原DeepSeek续审，保留已有证据。用户本轮仅要求检查，尚未执行恢复；不得借恢复加载尚未独立通过的自启动代码或扩大旧CAS许可。完整独立交付后再集中修正必要问题。
+1. DSH已恢复，332仍按用户选择暂停，保留原任务/材料，不自动越过暂停。恢复原332后收齐正式复核，将已有探针与本次兼容遗漏集中修正并必要一次定向复验；本轮没有新派重复任务。正式加载新自启动仍须独立核验及具体部署确认。
 2. 本片仍由Codex开发、自检，集中核对/集中修复后统一送DeepSeek首审，必要才一次集中复验；非阻断观察只记录。默认派后结束、用户通知后取件，不新增自动等待/唤回或无限续片授权。新功能生产启用仍按可审结果和既有具体授权边界，不自动勾选现存角色或改模型/Key/绑定/286。
 3. 用户已延后人工验收到返回后，不用以等待页面验收重新拦住已条件授权的这一片。其它无关片仍先说明范围并确认。
 

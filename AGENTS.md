@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 12:42恢复：用户已暂停332、正常重启角色，原gen70归属已由用户正常关闭释放。新runtime11280自动加载本片代码而API仍旧、OpenAPI缺startup接口，8轮等待阻挡宿主使gen73未领取即120秒超时；五宿主随后serving。Codex仅正式start重试一次恢复DSH gen74/ins_9318d6d0efce/PID16492 ready/idle，距ready59.980973秒仍有同实例心跳；另四stopped/无owner，五完整binding/要求、250/2767及286全公开字段保持。332保持queued/accepted/paused，不自行恢复/替换/代report；产品/正式测试/63冻结不改。兼容遗漏列当前片集中修正项，不把部分runtime加载称新功能完整部署验收；原09:56退出原因仍未知。恢复证据coordination/restore-20261025/；只读helper固定public-api文件被后续检查覆盖已如实记录/改唯一名，旧摘要/rawtask/agents保留。下一步继续原332正式核验，已有探针与兼容项集中修正，避免新建重复任务。
+
 - 2026-10-25 12:19失联实查：用户因332超两小时要求检查。332仍running/in_progress，但最后心跳09:56:37、lease09:58:37过期、无正式结果；原runtime12980/DSH宿主5116与5604/bridge15992均OS元数据证实不存在，系统上次boot10月23日，API仍健康/uptime15317秒。不是持续复核两小时，退出原因未确认。DSH gen70 unknown/ownership_held/can_start=false，原恢复计划409 recovery_tasks_active；review停09:56:40且无REVIEW/checks，三条合成失败断言只属未完证据。原332/冻结/产品/报告保持，未代claim/report/收取、未生产启停/CAS/加载、未读生产配置/私有日志；human仅正常GET认证。诊断在本片coordination/stall-20261025-1216/。下一步需正式处理失联任务/旧归属并恢复续审，本次“检查”未执行恢复，也不据此批准加载未独立通过的自启动代码。
 
 - 2026-10-25 09:41派发：选择性项目自启动首次独立复核332已交DeepSeek queued/assigned，基线5831fd0已推送；63份/3613416字节源/新快照零漂移，产品/正式测试/冻结暂停，唯一写本片review/。本工作线新基础合同/continuity_key=project-role-startup-review-20261025，创建state=null，实际新窗/计数待回执，不冒称复用331。两次HTTP422分别为一般任务不接受review_policy、版本名超32字符，均未创建任务；去非必要字段并用版本1后仅332成功，原错误保留。默认用户通知332完成后取件，不主动等待/唤回、不部署或改生产选择；250/286、原五角色与331保持。
