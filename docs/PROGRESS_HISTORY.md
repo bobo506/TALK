@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 18:52：API与实际页面控件已生效，用户已保存小D自启动选择
+
+用户报告用原启动命令启动后，仅读原CLI status/公开API/已知PID元数据实核：UTC10:50:58 API uptime76秒，/agents startup与/roles逐值相同，335补正已加载；公开小D enabled=true/revision1/updated_at UTC10:50:31、其余四false/revision0/last_activation均null。现有Chrome TALK页面human bobo/小D详情实际存在“随项目自动启动”checkbox且checked，提示下次加载生效；截图ui-fix1/user-restart-20261025-1850/visible.jpg。Agent只观察，没有勾选/PUT/启停，不把用户保存说成自动修改。控件缺失和保存回读已经真实闭合，不再为此要求刷新或重启API。
+
+原runtime11280仍UTC04:33:28启动、startup_state=failed/HostError旧状态；此前12PID均present且创建时刻与18:34前完全相同，五宿主serving、DSH gen76/原ins_aa6223b0735e运行/idle，另四停止。用户只说原命令启动，客观事实是API换代而后台未换代，不推断用户执行过何种stop/serve。新runtime本代执行/下次真正自动启动尚未验证，不冒称整个加载完成。后续后台正常重启要保留用户最新小Dtrue，先观察自动入队/ready，不重复手动start；其余四false/停止，不按旧全false方案覆盖。
+
+五完整binding、角色公开配置（除服务/自启动状态）、250/286完整公开任务与原before逐字段一致，无running任务；原19份335、197冻结及旧材料保持。仅文档记录，无产品/正式测试改动，无生产配置正文/DB/私有state/native/log或侧账本访问；原自动审批拒绝stop事实继续保留，未尝试绕过，不新派复核/无关片。
+
 ## 2026-10-25 18:37：335收取，加载前预检通过，正常停机被自动审批拒绝
 
 335正式succeeded/submitted/2981、conclusion complete且无unfinished/blocked，与本地delivery逐字段相同，UTC10:33:06.725371正常收取completed。19份42557字节原报告/探针/日志逐项归档ui-fix1/pickup335/335-original-review；197份4465676字节、旧63/116/162及原332/333/334均零错配，产品仍d3c9c96无新改动。独立真实API→Node原2项因CreatePipe限制出现1E，文件重定向下同2项通过、/sync探针及缺startup负向对照通过；保持原限制，不称未修改全过。实际续333/334窗count3、末44.7013%。五完整binding/开发要求和250/286整份公开任务与派前相同；原332failed/2978、333partial/2979、334complete/2980不改。

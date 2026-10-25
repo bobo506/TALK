@@ -1,5 +1,9 @@
 # 项目角色选择性自启动：复核闭合与正常加载方案
 
+**2026-10-25 18:52最新实测：** 用户报告“用原来的启动命令启动了”。UTC10:50:58 API uptime76秒，/agents已返回与/roles一致的startup，335控件补正已实际加载。现有Chrome human bobo/小D详情实看“随项目自动启动”可见且已勾选；公开API显示小Denabled=true/revision1/updated_at=UTC10:50:31，另四false/revision0。该选择由用户保存，本Agent未勾选或PUT；必须保留，不能再按旧方案一律写回false。截图user-restart-20261025-1850/visible.jpg。
+
+旧runtime11280仍UTC04:33:28启动，原12PID及创建时刻均相同、五宿主serving，原DSH gen76/ins_aa6223b0735e运行/idle；只有API更换，没有后台换代，旧startup_state=failed保持。五绑定/角色公开配置/250与286完整任务相同，无running任务；控件“显示并保存”问题已真实闭合，下一代自动启动仍待后台正常重启实测。若继续后台重载，应以用户最新选择为准，小Dtrue应由新runtime本代一次执行；先观察自动启动结果，已ready就不重复手动start。其余四保持false/停止。原stop被审批拒绝的事实保留，Agent未绕过或执行停机；用户尚未报告后台stop/serve完成，不作已执行推断，不要求再次重启已更新的API。
+
 **2026-10-25 18:37最新：** 控件人工验收返修335 complete/2981已收取，无必须修正；d3c9c96补齐真实页面/agents DTO，197冻结及旧63/116/162、原332至334保持，335原19份42557字节归档。原始未修改独立2测试中1项受CreatePipe沙箱限制1E；文件重定向下同2项、独立/sync探针和缺字段负向对照通过，原失败不改。当前外部API仍缺本次/agents补正，14:42的重载只加载了初版；因此本次需在正常停后台后由用户原终端重启API一次，不能仅凭startup路由存在跳过本补正加载。
 
 加载前只读预检通过：runtime11280/五宿主/当前DSH桥共12PID均present且有真实创建时刻；无running任务、worker空闲，五自启动选项全false，仅DSH gen76运行/idle，其它四停止。五完整binding/要求及250/286公开响应与派前相同。预检两次脚本断言/字段错误未产生生产写入，改按公开observed_instance_id后通过，原事实存deployment-20261025-1834/。
