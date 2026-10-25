@@ -20,6 +20,8 @@
 
 检查使用RO/query_only、仅指定列/项目通道，不调用会写schema的Store构造器，不读取token、原生会话ID/正文、Key/日志。脚本合成验证通过，结果在.tmp/project-role-autostart-fix1/channel-metadata-readonly.json。该一次许可已用，不沿用为修改账本或额外读取。
 
-已准备一次性协调恢复脚本`.tmp/project-role-autostart-fix1/recover_332_attempt.py`，10项合成检查通过（未确认/活进程/unknown/作用域或代际变化/额外started/事务故障均拒绝或回滚，成功和幂等通过）。尚未获写入许可、尚未对生产执行。拟仅在human明确确认旧原生模型进程已结束后，锁内核对原scope hash/PID/lease/updated_at及唯一332/attempt1，再把该attempt记interrupted、关联旧window记tainted，并同事务写专用审计；通道行不删不改，主TALK任务/结果不改，旧窗口不复用。仅父bridge PID不存在不足以替代human对旧native writer的确认，不能默默放宽保护。确认不足则保持阻挡。
+一次性协调恢复脚本`.tmp/project-role-autostart-fix1/recover_332_attempt.py`先通过10项合成检查（未确认/活进程/unknown/作用域或代际变化/额外started/事务故障均拒绝或回滚，成功和幂等通过）。用户随后明确“已确认旧原生进程结束，授权定向恢复”；这与前次只读许可分开。UTC05:45:40已锁内核对原scope hash/PID/lease/updated_at及唯一332/attempt1，将该attempt记interrupted、关联旧window记tainted，同事务写operator_channel_recovery_audit。operation_id=operator-recover-332-attempt1-20261025；通道行不删不改，主TALK任务/结果不改，旧窗口不复用。原生writer已结束依据是用户明确确认，不伪称仅父PID不存在就构成完整OS子进程证明。
 
-本轮只读与拟恢复许可分开，后者已向用户提出明确确认请求。未再次派发一个已知会被旧通道挡住的复验；待安全恢复后，发一次覆盖MF-1至3的定向复验，不再通过额外可执行消息安排重复整片首审。原332失败、2977独立failed、原日志和沙箱限制永久保留。
+恢复前预检还确认用户已正常关闭当前DSH gen75/stopped/无owner，原后台11280及五宿主仍serving，因此未重启后台/加载新修正。恢复后仅正常start一次，UTC05:45:45返回gen76/ins_aa6223b0735e，05:45:47 ready；332原failed/2978保持。操作回执与正式start记录在fix1目录。只读许可未扩大为任意DB读取或一般清锁；本次定向恢复许可亦不延伸到其它任务/窗口。
+
+待新冻结后只发一次MF-1至3定向复验，不再通过额外可执行消息安排重复首审。原332失败、2977独立failed、原日志和沙箱限制永久保留；不收取失败任务或补造执行回执。

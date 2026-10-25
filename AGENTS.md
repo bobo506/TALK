@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 13:46通道恢复：用户另明确“已确认旧原生进程结束，授权定向恢复”；依据该人工确认及锁内原scope/PID15992/lease/updated_at/唯一332attempt1核对，UTC05:45:40一次记interrupted、旧window tainted并同事务审计，operation_id=operator-recover-332-attempt1-20261025。通道行不删不改、332 failed/2978及全部历史不改，不用父PID absent伪装完整原生进程证明。预检DSH已被用户正常关闭gen75无owner，原runtime11280/五宿主serving保持；仅普通start恢复DSH gen76/ins_aa6223b0735e、05:45:47 ready，未重启后台/API或加载新修正。ca2d30b三项修正已推送，223关联+原反例通过，待新冻结后一次定向复验；生产DB/native许可均限已执行的一次操作，不授DeepSeek或其它任务。详[fix1](docs/spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)。
+
 - 2026-10-25 13:42集中修正：332正式failed/2978 channel_busy保留；同Hall DeepSeek报告2977已独立交付failed/3必须修正/4失败断言，33份99053字节原材料已归档。Codex接手修MF-1旧API能力探测/unsupported及时放行宿主、MF-2正向boot证据、MF-3提交前复核/回滚，223关联及10兼容/原探针过（重合5，并集228），34定向也重合；UI未改原58Node保留。旧63冻结不变，新修正未生产加载。用户仅批准一次侧账本元数据只读，已执行owner15992 absent/lease过期/332attempt1仍started，说明旧native writer未闭环，不再只归因消息重叠；不读token/原生ID/正文/Key/日志、不改账本。定向恢复脚本10合成检查过，须human确认旧原生模型进程结束且另授权写入才能操作，当前请求待答复；仅父PID absent不足，未盲目删锁或重复派。待安全恢复再一次MF-1至3定向复验，Codex开发/DeepSeek核验及250/286保护保持。详[fix1](docs/spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)和精简进度。
 
 - 2026-10-25 12:51续332：用户明确要求角色恢复后发布任务并含兼容遗漏。已在原Hall发送补充2976，须先读coordination/RESUME_332_COMPATIBILITY_20261025.md；原63冻结/5831fd0产品不变，DeepSeek仍只复核、写根review/，只新增具名公开恢复证据只读，不授生产权限。human正式resume-tree HTTP200，原332 epoch0→1/active、非委派slice_budget0、正文不变，未新建重复任务。12:50:43任务queued/accepted尚未claim，12:51:09 DSH实例busy/current_task_id=2976是消息通道补充活动，不能称332已接或推测原生同窗。利用旧材料只补兼容/未完成缺口，一次提交全部必须修正项及非阻断观察，partial亦可正式提交；随后Codex集中修正/必要一次定向复验。产品/正式测试/冻结暂停，250/286保护，默认用户通知完成后取件，不主动等待/唤回。

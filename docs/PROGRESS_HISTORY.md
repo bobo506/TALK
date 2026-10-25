@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-25 13:46：用户确认后一次审计恢复旧通道，正常恢复DSH供定向复验
+
+用户在此前一次只读元数据之外，另明确“已确认旧原生进程结束，授权定向恢复”。协调脚本10合成检查先过；原生writer结束以该用户确认作人工处置依据，不以父PID absent代替完整子进程证明。锁内核对固定scope hash a81fef9e…、owner15992/held、原lease与updated_at、唯一332/attempt1仍started，UTC05:45:40.450893一次将其记interrupted、旧window tainted（保留既有taint_reason）、同事务新增operator_channel_recovery_audit记录；operation_id=operator-recover-332-attempt1-20261025。未读取token/原生会话ID/正文/Key/日志；通道行不删不改、主TALK任务332/结果2978及其它任务不改。
+
+第一次恢复预检因实例offline而先停止执行，未触碰账本；随后公开服务实核用户已正常关闭DSH gen75/stopped/无owner，并核原runtime11280和五宿主仍serving，才进行上述单次恢复。之后仅正式start一次，UTC05:45:45 gen76/ins_aa6223b0735e，05:45:47 ready。API/后台均未重启，运行的仍是用户先前加载的初版，新ca2d30b三项修正未加载；模型Key绑定/250/286保护保持。回执在fix1/channel-recovered-result.json和normal-start-after-channel.json。下一步新冻结、一次MF-1至3定向复验，原332失败/独立failed/旧快照保留，不再额外发可执行消息重复整片。
+
 ## 2026-10-25 13:42：332失败取件、三项集中修正与一次通道元数据核查
 
 332于12:59:48 attempt2领取、13:00:18正式failed/2978，execution_session_state reason channel_busy/unconfirmed，计数/原生回执不自补。DeepSeek此前已通过补充消息2977在同Hall交独立failed报告，含3必须修正/4失败断言；消息产物不倒写成正式任务成功，不收取失败332。源仍5831fd0、原63快照及17产品/测试一致后接手，33份99053字节REVIEW/checks/日志/探针逐项归档，原报告里“332仍暂停”等过时观察保留为当时作者表述，不追改。

@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-25 13:46：ca2d30b三项修正已推送；用户明确确认旧原生进程结束并授权一次定向恢复，旧332attempt1已记interrupted/旧窗tainted并同事务审计，通道行和332原失败不改。仅正常恢复DSH gen76/ready，原runtime11280/五宿主及API未重启，新修正未加载。准备新冻结后一次MF-1至3定向复验，生产权限不授复核者。详[fix1](spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)。
+
 2026-10-25 13:42：332正式失败为channel_busy，但DeepSeek已在Hall2977交3项必须修正报告；Codex集中修正完成，223关联+原反例通过（不同Python并集228），待一次定向复验。只读元数据证实旧owner已退出、lease过期但332attempt1仍started；写入恢复需human确认旧原生进程结束及单独授权，未删锁/改账本。原63冻结/33报告归档保持，新修正未加载，250/286保护保持。详[fix1](spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)与[进度](PROGRESS.md)。
 
 2026-10-25 12:51：用户明确续任务及兼容遗漏；原332已正式恢复active/epoch1，Hall补充2976与coordination/RESUME_332_COMPATIBILITY_20261025.md要求纳入集中首审，不新派重复任务。最新332仍queued未claim，DSH正在消息通道处理2976，不称332已接；仍只复核/写review，产品/正式测试/63冻结不变。完成后用户通知，Codex集中修正全部阻断及兼容项，再必要一次复验。详[进度](PROGRESS.md)。
