@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 15:00：控件真实取数遗漏已冻结并交335定向复核
+
+d3c9c96128bba4861e548c5e92237afe687ecb92已推送。197份4465676字节manifest-ui-fix1/baseline-ui-fix1派前源/快照零漂移，旧63/116/162和原332的33/333的29/334的15交付逐项零错配；派前五完整binding/项目要求、250/286整份公开任务与334取件时一致。93旧关联+修夹具后2新通过、9Node是Codex自检，原失败和编码限制保留。
+
+335创建queued/assigned，Hall group:task-8a0f4b116dea41b0b83e0e292f534f15，仅复核真实/agents DTO到实际页面loader/控件及/sync共享输出，不重做已过runtime/MF-1R/2/3。唯一写ui-fix1/review，产品/正式测试/新旧冻结与原review暂停；沿base332/原continuity优先相容续334，服从原守卫，创建state=null，不预称实际同窗/计数或独立通过。只正式派任务、不另发可执行Hall消息，默认用户通知335完成后取件，不主动等待/唤回。
+
+本轮未生产API重载/后台启停/勾选或读私有配置/DB/native，原用户页仍看不到控件，不能拿合成链路通过冒称生产可见；独立通过后统一正常加载并原页面实际检查，原runtime11280仍待原方案正常重载。不复用一次例外、不改五绑定/250/286、不自动开下一无关片。
+
 ## 2026-10-25 14:58：角色自启动控件人工验收遗漏已定位修正
 
 用户表示列表/角色详情均找不到，强制刷新后仍无。本次通过现有Chrome TALK页面实核human bobo/小D详情缺控件，DOM引用workspace.js?v=20261025-role-startup-v1；截图ui-fix1/before.png，未点击启停/删除/勾选。app.js实际loadProjectAgents请求/agents，原服务端只在/roles DTO填startup，ProjectAgentOut/组装函数遗漏字段；UTC06:55:28公开正常GET证明五/agents均无startup，/roles均false/revision0，五binding bound/managed_cli。前次Codex仅按源码给入口而未实核链路，现明确纠正，不归因刷新或用户位置。
