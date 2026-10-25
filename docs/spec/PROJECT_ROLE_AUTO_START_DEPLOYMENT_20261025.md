@@ -1,5 +1,11 @@
 # 项目角色选择性自启动：复核闭合与正常加载方案
 
+**2026-10-25 20:08正常后台换代验证通过：** 用户已明确同意按本方案正常停启一次，API无需重启、用户选择保持。UTC12:03:51原runtime11280及12原PID全absent，五角色stopped/无owner后，经原serve --apply --attach-api --detach启动runtime13252（UTC12:04:08.877058）。新activation=`2516e24aa2994cfa9d1ae4bd7016c9f1`、startup_state=complete/attempts1、无startup/worker错误、五宿主serving。API uptime由4323持续增至4574秒。
+
+小D用户true/revision1/UTC10:50:31保持，自动审计enqueued，launch_id=`bf09cbbd-7b32-4960-83e2-05679ca878b4`与新gen78/`ins_9c7bcef519c6`/PID7748匹配，ready/idle；另外四false/revision0/not_selected/stopped/无owner。UTC12:05:53同实例/同代/同activation心跳由12:04:15.315327推进至12:05:45.445553，真实90.130226秒。没有手动start、PUT偏好或重放activation，本次正常后台自启动运行验证已闭合。
+
+五完整binding、角色公开配置、项目开发要求、用户选择及250/286完整公开任务与停机前相同；197/旧63/116/162和332至335原归档哈希无错配。证据`.tmp/project-role-autostart-ui-fix1/reload-20261025-1916/`的before、stop-request、stop-pending、stopped、start-request、ready、heartbeat、RESULT、freeze-verification.json；目录准备名不代表实际操作时刻。本轮无产品/正式测试改动、不追加复核或下一片，不外推真实断电/OS启动、24小时长跑及全部原生模型能力。下方为历次原始状态/方案记录，其中全false或手动恢复DSH步骤已由18:52用户选择和本次真实自动启动事实更新，不能再据旧段落回写或重复启动。
+
 **2026-10-25 18:52最新实测：** 用户报告“用原来的启动命令启动了”。UTC10:50:58 API uptime76秒，/agents已返回与/roles一致的startup，335控件补正已实际加载。现有Chrome human bobo/小D详情实看“随项目自动启动”可见且已勾选；公开API显示小Denabled=true/revision1/updated_at=UTC10:50:31，另四false/revision0。该选择由用户保存，本Agent未勾选或PUT；必须保留，不能再按旧方案一律写回false。截图user-restart-20261025-1850/visible.jpg。
 
 旧runtime11280仍UTC04:33:28启动，原12PID及创建时刻均相同、五宿主serving，原DSH gen76/ins_aa6223b0735e运行/idle；只有API更换，没有后台换代，旧startup_state=failed保持。五绑定/角色公开配置/250与286完整任务相同，无running任务；控件“显示并保存”问题已真实闭合，下一代自动启动仍待后台正常重启实测。若继续后台重载，应以用户最新选择为准，小Dtrue应由新runtime本代一次执行；先观察自动启动结果，已ready就不重复手动start。其余四保持false/停止。原stop被审批拒绝的事实保留，Agent未绕过或执行停机；用户尚未报告后台stop/serve完成，不作已执行推断，不要求再次重启已更新的API。

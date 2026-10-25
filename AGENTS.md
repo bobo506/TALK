@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 20:08正常加载闭合：用户明确同意既定后台停启一次，原11280/12PID普通stop/drain全部absent后，原attach-api/detach入口启动runtime13252；API未重启。新activation一轮complete、五宿主serving，小D按用户true/rev1自动到gen78/ins_9c7bcef519c6/ready/idle，同实例真实心跳90.130226秒；另四false/not_selected/stopped。无手动start/PUT或重放，五binding/角色配置/要求/250/286完整公开响应保持。197及旧冻结/332至335归档零错配，产品/正式测试未改、不追加复核。本片正常后台换代运行验收闭合，真实断电/长跑/原生模型能力不外推；仅文档/Git收尾，下一无关片先确认。详[当前进度](docs/PROGRESS.md)。
+
 - 2026-10-25 19:09用户要求汇总进度：仅只读刷新/落盘汇总，无新开发/测试/派发/启停。UTC11:08:50确认原runtime11280仍旧、DSH gen76/原实例ready运行，小D自启动true/rev1、另四false，last_activation全null；实际页面控件此前18:52已验。335已收取，API补正生效，唯一剩余本片运行验收是后台正常换代后观察小D真实自动启动，不重复API重启/手动start或覆盖用户选择。保护和原拒绝边界保持；详[当前进度](docs/PROGRESS.md)，下一无关片先确认。
 
 - 2026-10-25 18:52用户启动后实核：API已加载335 /agents补正、uptime76秒，原Chrome小D详情“随项目自动启动”实际可见/已选中，API小Dtrue/revision1/UTC10:50:31保存，另四false；本Agent无PUT/勾选，保留用户选择，不能再一律false。截图ui-fix1/user-restart-20261025-1850/visible.jpg，控件缺失与保存已实际闭合。旧runtime11280/原12PID同创建时刻仍present，五宿主serving，DSH gen76原实例idle，尚未后台换代/验证自动执行；不推断用户已完成stop/serve，不重复要求API重启。五binding/角色公开配置/250/286保持，无running任务。后续后台正常重启时应观察小D按true自动启动，ready不重复手动start；旧停机审批拒绝仍保留，不擅自重试或读私有资料，不追加复核/下一片。

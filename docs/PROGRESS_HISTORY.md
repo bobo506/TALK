@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-25 20:08：用户明确授权正常后台换代，小D真实自动启动通过
+
+用户在“是否授权按既定方案正常停启后台一次、API无需重启且不改选择”的明确问题后回复“好的”。本轮按该具体授权执行，原18:37自动审批拒绝记录保留，不将其改写成已获批。实际协调身份agent:codex / prj_e8fe7066bbec / lead；既有human:bobo凭据仅正常认证公开API，原CLI消费既有talk-runtime.json；无额外生产配置正文、角色Key、DB/侧账本、私有state/HOME/native/session/log读取，不强杀/CAS/清锁。
+
+UTC12:01:40预检原runtime11280、12已知PID存活及创建时刻、五宿主serving、worker空闲/无错、无running任务；仅小D原gen76/ins_aa6223b0735e idle/ready。小Dtrue/revision1、其余四false/revision0保持，保存五完整binding/角色配置/项目要求及250/286完整公开响应。普通stop经原CLI接受后，先观察小Dgen77/stopped释放归属，再顺序等待宿主drain；UTC12:03:51原12PID全部absent、后台stopped、五角色stopped/无owner及保护项一致，才继续启动。中间两份stop-pending如实保留，没有重发stop。
+
+原serve --apply --attach-api --detach启动新runtime13252（UTC12:04:08.877058），原API持续健康，uptime由4323增至4574秒；没有另起或重启API。activation `2516e24aa2994cfa9d1ae4bd7016c9f1` 本代仅1轮complete，startup_error/worker_error均null、五宿主serving。UTC12:04:12小Dlast_activation=enqueued/launch_id=`bf09cbbd-7b32-4960-83e2-05679ca878b4`，实际gen78/`ins_9c7bcef519c6`/bridge7748匹配同一launch，ready/idle；其余四not_selected、stopped/无owner且原代数不变。全过程没有手动start或写自启动选择；用户18:50:31的true/revision1原样保留。
+
+UTC12:05:53同实例、同PID、同代和同activation实核，last_seen_at由12:04:15.315327推进至12:05:45.445553，真实心跳90.130226秒；无running任务，五binding、角色公开配置、要求、用户偏好和250/286完整公开任务逐字段一致。250failed/2767未收取、286queued/accepted/paused保持。API/agents与roles的startup投影一致；没有再人工启动已ready的小D。
+
+197份4465676字节新冻结、旧63/116/162及332原33/333原29/334原15/335原19份42557字节归档重新逐项哈希校验零错配；源与冻结的差异仅AGENTS、PROGRESS、PROGRESS_HISTORY、PROJECT_BRIEF四份协调文档。产品仍d3c9c96，原334/335复核通过与失败/沙箱限制保持；本轮只有加载运行验证和文档/Git收尾，不改产品/正式测试、不派任务。本片真实正常后台自启动验证已闭合，不外推真实断电/OS重启、24小时长跑或原生模型能力。用户可复看页面状态；下一无关功能仍先确认。
+
+原始公开证据及操作记录保留在`.tmp/project-role-autostart-ui-fix1/reload-20261025-1916/`，包括before、stop-request、两份stop-pending、stopped、start-request、ready、heartbeat、freeze-verification及RESULT.json。目录名沿准备名称，实际时间以上述UTC字段为准。此前19:13恢复曾在默认沙箱读取原human凭据时PermissionError，之后原操作申请提升后只读成功；该失败不涉及生产写入，本次停启未被审批拒绝。
+
 ## 2026-10-25 19:09：用户请求汇总进度并刷新只读现状
 
 本轮只汇总/记录。UTC11:08:50原CLI status及公开角色GET确认runtime11280仍UTC04:33:28启动、present/running、worker空闲/无错；旧代startup_state=failed保持，不作为新代码失败证据。DSH gen76/ins_aa6223b0735e running/ready，小D自启动true/revision1/UTC10:50:31由用户保存，另四false/rev0；last_activation全部null，尚无后台新代执行证据。18:52真实Chrome控件可见/checked证据继续有效；本轮未再次操作浏览器/生产设置或假称新代通过。只读记录ui-fix1/summary-status-20261025-1908.json。
