@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 19:09：用户请求汇总进度并刷新只读现状
+
+本轮只汇总/记录。UTC11:08:50原CLI status及公开角色GET确认runtime11280仍UTC04:33:28启动、present/running、worker空闲/无错；旧代startup_state=failed保持，不作为新代码失败证据。DSH gen76/ins_aa6223b0735e running/ready，小D自启动true/revision1/UTC10:50:31由用户保存，另四false/rev0；last_activation全部null，尚无后台新代执行证据。18:52真实Chrome控件可见/checked证据继续有效；本轮未再次操作浏览器/生产设置或假称新代通过。只读记录ui-fix1/summary-status-20261025-1908.json。
+
+已完成状态：日志自动清理已部署、执行默认24小时无页面配置、旧K2.8与WorkBuddy删除真实闭合；当前选择性自启动实现/独立复核与API/页面补正闭合。335 complete/2981已收取、原19份及197/63/116/162和旧报告保持，生产当前选择须保留。唯一剩余本片运行验收是后台正常换代后核小D真正自动启动/ready/实际心跳及其它四不启动；不再要求重启已更新API，不为非阻断观察派任务。
+
+用户本轮是汇总请求，不扩为新开发/测试/派发/生产启停或读取私有资料；原stop审批拒绝、不强杀/CAS/清锁/重写任务的边界保持。五binding/250/2767与286最后完整核对不变（18:50证据），本轮未再次读取完整任务或绑定，不将未重测冒称19:09重新逐字段确认。进度文件精简更新，Git/推送后结束，下一无关片先确认。
+
 ## 2026-10-25 18:52：API与实际页面控件已生效，用户已保存小D自启动选择
 
 用户报告用原启动命令启动后，仅读原CLI status/公开API/已知PID元数据实核：UTC10:50:58 API uptime76秒，/agents startup与/roles逐值相同，335补正已加载；公开小D enabled=true/revision1/updated_at UTC10:50:31、其余四false/revision0/last_activation均null。现有Chrome TALK页面human bobo/小D详情实际存在“随项目自动启动”checkbox且checked，提示下次加载生效；截图ui-fix1/user-restart-20261025-1850/visible.jpg。Agent只观察，没有勾选/PUT/启停，不把用户保存说成自动修改。控件缺失和保存回读已经真实闭合，不再为此要求刷新或重启API。

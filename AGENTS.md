@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 19:09用户要求汇总进度：仅只读刷新/落盘汇总，无新开发/测试/派发/启停。UTC11:08:50确认原runtime11280仍旧、DSH gen76/原实例ready运行，小D自启动true/rev1、另四false，last_activation全null；实际页面控件此前18:52已验。335已收取，API补正生效，唯一剩余本片运行验收是后台正常换代后观察小D真实自动启动，不重复API重启/手动start或覆盖用户选择。保护和原拒绝边界保持；详[当前进度](docs/PROGRESS.md)，下一无关片先确认。
+
 - 2026-10-25 18:52用户启动后实核：API已加载335 /agents补正、uptime76秒，原Chrome小D详情“随项目自动启动”实际可见/已选中，API小Dtrue/revision1/UTC10:50:31保存，另四false；本Agent无PUT/勾选，保留用户选择，不能再一律false。截图ui-fix1/user-restart-20261025-1850/visible.jpg，控件缺失与保存已实际闭合。旧runtime11280/原12PID同创建时刻仍present，五宿主serving，DSH gen76原实例idle，尚未后台换代/验证自动执行；不推断用户已完成stop/serve，不重复要求API重启。五binding/角色公开配置/250/286保持，无running任务。后续后台正常重启时应观察小D按true自动启动，ready不重复手动start；旧停机审批拒绝仍保留，不擅自重试或读私有资料，不追加复核/下一片。
 
 - 2026-10-25 18:37取件及审批边界：335 complete/2981已验收收取completed，无必须修正；19份42557字节原交付归档，197新/旧63/116/162及332原33/333原29/334原15保持。真实API→页面2项在文件重定向下、独立/sync和缺字段负对照通过；原CreatePipe环境1E保持。实际续333/334窗count3、末44.7013%。公开五binding/要求及250/286整份任务未变，正常加载预检确认无running任务/worker空闲、12原PID含当前DSH桥present有创建时刻、五选择false。旧后台11280及五宿主普通stop/drain被自动审批在执行前拒绝：记录只有API重载，缺明确后台停机确认；未停机、不绕过。待用户明确授权一次按[方案](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)停旧后台/五宿主，再用户原终端重启API并恢复后台/原DSH。新/agents补正未加载、实际控件尚未显示；不追加复核，不改生产配置/绑定/任务、不复用一次私有例外，不开下一片。
