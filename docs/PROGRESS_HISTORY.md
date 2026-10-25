@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-25 14:25：最小修正推送并交334单项定向复验
+
+058e153c44338eebd5f5968b79b01aefaa729a47已推送。manifest-fix2/baseline-fix2为162份4240533字节，派前源/快照零漂移；旧63/116、332原33及333原29归档零错配。派前公开五角色完整binding/项目要求与333派前相同；250仍failed/failed/2767且未收取，286queued/accepted/paused，DSH ins_aa6223b0735e/PID10360 idle/无任务/新鲜心跳。未实际读取生产配置/DB/native或进行生命周期操作。
+
+334-项目自启动MF-1R单项定向复验创建queued/assigned，Hall group:task-3e9e1c8181e64958aa957c49c116313d，只直接正式派任务，无额外可执行Hall消息。沿base332/原continuity_key请求相容续333，仍服从原守卫，创建state=null，实际是否同窗/计数待回执。仅核333四新增反例及可信旧API/新APIpending对照，不重做已过MF-2/MF-3/整片；唯一写fix2/review，其它报告/产品/正式测试/新旧冻结暂停。默认用户通知334完成再取件，不主动等待/唤回；前次一次例外已用完，不授复核者生产读取/恢复许可。未部署/自动勾选，下一无关片仍先确认。
+
 ## 2026-10-25 14:23：333收取，修正新增MF-1R反例
 
 用户通知后核实333正式succeeded/submitted/2979、delivery.conclusion=partial，REVIEW/checks verdict=failed，1个新必须修正/4类反例失败。原MF-2/MF-3、四失败断言及MF-1主路径均独立通过。正式消息与本地delivery逐字段相同，29份210648字节报告/探针/日志归档fix2/coordination/333-original-review，UTC06:19:59.605967正常收取completed，原partial/失败保留。333实际new_no_candidate/count1，末326345/1000000=32.6345%，未复用旧tainted窗。332仍failed/2978不收取；原116份3872285字节、旧63份3613416字节及332原33份99053字节均零错配，取件前源仅四协调文档漂移。
