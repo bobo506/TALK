@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 13:53实际领取：333已由DSH ins_aa6223b0735e于13:51:43.954651正式领取，running/in_progress/attempt1，13:52:59.352885任务心跳距领取75.398234秒、无error/result；已越过原30秒channel_busy失败点，但execution_session_state仍null，不预称原生决策/同窗/独立通过。实例13:53:04心跳/PID10360保持；实例显示idle不替代任务真实running事实。最新公开回执和started-check存fix1，116新快照及原63/33保持，产品/正式测试暂停、默认用户通知333后取件，不继续主动等待。
+
 - 2026-10-25 13:50派发：三项集中修正定向复验333已交DeepSeek queued/assigned，沿base332/原continuity_key，仅本轮新write root=fix1/review；原旧窗tainted不强复用，实际原生决策/计数待回执。代码ca2d30b/冻结HEAD f0da4ff已推送，116份3872285字节新源/快照零漂移，旧63及原33归档不变；产品/正式测试/新旧冻结暂停。直接派正式任务，不再额外发可执行Hall补充；332原failed/2978及2977独立failed不改。用户一次元数据/一次定向恢复均已限域用完，不授复核者实际DB/native/生产权限。默认用户通知333完成后取件，不主动等待/唤回，不提前生产加载修正或称独立通过。
 
 - 2026-10-25 13:46通道恢复：用户另明确“已确认旧原生进程结束，授权定向恢复”；依据该人工确认及锁内原scope/PID15992/lease/updated_at/唯一332attempt1核对，UTC05:45:40一次记interrupted、旧window tainted并同事务审计，operation_id=operator-recover-332-attempt1-20261025。通道行不删不改、332 failed/2978及全部历史不改，不用父PID absent伪装完整原生进程证明。预检DSH已被用户正常关闭gen75无owner，原runtime11280/五宿主serving保持；仅普通start恢复DSH gen76/ins_aa6223b0735e、05:45:47 ready，未重启后台/API或加载新修正。ca2d30b三项修正已推送，223关联+原反例通过，待新冻结后一次定向复验；生产DB/native许可均限已执行的一次操作，不授DeepSeek或其它任务。详[fix1](docs/spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)。

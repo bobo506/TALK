@@ -1,8 +1,10 @@
 # Project Progress
 
-Updated: 2026-10-25 13:50（Asia/Shanghai）。ca2d30b三项集中修正已推送，223关联及原探针通过；通道定向审计恢复和DSH gen76/ready已完成。新116份3872285字节冻结零漂移后，333已交DeepSeek一次定向复验（queued/assigned），产品/正式测试暂停，默认用户通知完成后取件。
+Updated: 2026-10-25 13:53（Asia/Shanghai）。333已实际领取running/in_progress/attempt1，领取后75.398234秒仍有任务心跳且无error，已越过原channel_busy失败点；正式复验结果待交付。ca2d30b/新116冻结及旧63/33保持，产品/正式测试暂停，默认用户通知完成后取件。
 
 ## 当前事实
+
+- 333于13:51:43.954651由ins_aa6223b0735e领取，13:52:59.352885任务心跳推进75.398234秒；13:53:04实例同ID/PID10360心跳保持。execution_session_state仍null，不能据此预称原生新窗/同窗、计数或复验通过。实例idle/current_task_id为空不覆盖任务端running事实。证据fix1/final-task333-raw.json、final-agents-raw.json、started-check.json。
 
 - 333-项目自启动三项集中修正定向复验已创建，Task Hall group:task-b74e9c011f924ff690ad894d7afc2982，直接正式派发而未另发可执行消息。base_task_id332/原continuity_key，写根仅fix1/review，旧review/新旧冻结只读。创建state=null、最近快照尚未领取，实际原生决策/计数待回执，不冒称复用旧tainted窗。116新源/快照零漂移、旧63及33归档保持；原332 failed/2978核对不变。
 
