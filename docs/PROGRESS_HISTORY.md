@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-25 08:35：目录联接必要补正331已派DeepSeek独立复核
+
+实现a97ef466c83cf709f0bc03d52aa081b8dca0fdcc已推送，55份/2112541字节manifest/baseline-v1派前源/快照零漂移；原50/64/79/45快照及329/330原交付归档逐项零错配。当前只有1产品1测试差异，其余为必要修正/实际证据文档，冻结后不再改产品或正式测试。最新页面项目要求已读取并保存快照，本次用户明确Codex开发/DeepSeek复核优先。
+
+首次一般任务额外related_task_ids触发Pydantic HTTP422拒绝，未创建任务；这是接口参数错误，不是自动审批拒绝。去掉非必要字段、其它范围/权限不变，UTC00:34:30.573142正常创建331/agent:deepseek、queued/assigned，Hall group:task-0aa537c7746344eba4be40ccaed67da5。两次原始工具回执及dispatch.json均保留，不把失败写成已派发。
+
+execution_session沿base327/role-delete-review-v1/原continuity，基础SHA0cc024eb…保持，请求相容续330；创建state=null，具体原生决定待领取，不强制同窗或读取私有会话。唯一写本片review/，必须先设置TALK_ISOLATED_TEST_ROOT并用冻结wrapper，禁止330旧临时wrapper越根偏差重演；产品/正式测试/文档/Git/新旧冻结/原报告只读。一次生产metadata授权不授给复核者，不生产访问/启停/删除或互派；正常本任务心跳/交付除外。
+
+派前只读再核runtime17580/五宿主serving/worker无错，旧K2.8 r2 failed、共享凭据preserved，五保护角色公开投影/要求、250原任务/结果、WorkBuddy complete和286 paused保持；未再次metadata扫描、生产重载或retry。121自检和9新增仍非独立结论，默认用户通知331完成后取件，不自动等或唤回。当前只协调文档/Git收尾，条件下一片未开工。
+
 ## 2026-10-25 08:31：一次授权元数据确认目录联接，Codex最小补正121隔离通过
 
 用户明确授权一次最小只读核查，执行inspect_metadata.py --inspect-authorized，仅原load_config定位state_dir。1309条元数据为native目录360/普通文件949，唯一目录reparse/tag0xA0000003；无资源内容/Key/会话日志正文读取、私有路径/目标输出、链接跟随或生产修改。本次例外执行完，不延伸继续扫描、手工删联接或目标；原330加载/列表筛选、DSH恢复、250/286及共享身份保护保持。

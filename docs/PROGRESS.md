@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-25 08:31（Asia/Shanghai）。一次已授权元数据核查确认旧K2.8的native专属目录内一处目录联接。Codex最小补正仅清该联接入口，121项隔离回归零失败/跳过；待冻结交DeepSeek定向复核。生产仍r2 failed/unsafe_resource，未加载/重试；下一自启动片未开工。
+Updated: 2026-10-25 08:35（Asia/Shanghai）。目录联接入口必要补正已交DeepSeek331独立复核，创建queued/assigned；55份/2112541字节已冻结，Codex产品/正式测试暂停。121自检通过不是独立结论；生产仍r2 failed/unsafe_resource，未加载/重试，下一自启动片未开工。
 
 ## 当前运行与真实删除
 
@@ -26,9 +26,11 @@ Updated: 2026-10-25 08:31（Asia/Shanghai）。一次已授权元数据核查确
 
 当前仅scripts/role_delete.py + tests/test_role_delete_local.py新增规范native成员根后代的目录联接入口HANDLE删除；不遍历目标，固定父目录并核打开属性/tag/路径/身份。根、profiles/roles/control/凭据/workbuddy-native链接、硬链接/符号链接/其它tag仍拒绝，通用NativeFile/日志/API/页面不改。
 
-9新测试包含在最终四模块121/121内，64.868秒，零失败/错误/跳过。修前4中2失败、初次本机锁夹具1失败及沙箱符号链接2skip原日志保持，正常沙箱外完整121通过，不把重叠组累计；详新合同。产品待冻结交DeepSeek，尚无新独立通过结论。
+9新测试包含在最终四模块121/121内，64.868秒，零失败/错误/跳过。修前4中2失败、初次本机锁夹具1失败及沙箱符号链接2skip原日志保持，正常沙箱外完整121通过，不把重叠组累计；详新合同。实现a97ef46已推送，55份/2112541字节派前源/快照零漂移，旧50/64/79/45及329/330归档保持。
 
-新材料role-delete-native-junction-v1，旧330/327/328/329报告及冻结保持。只改runtime清理器，复核后先按原入口普通stop/drain，再serve --attach-api --detach恢复runtime，API无需为此补正重启；当前未生产停启/重试，不接管external API或另开第二API。随后正式retry旧K2.8到complete并核250/286/五保护角色、恢复DeepSeek及心跳。默认派后用户通知取件。
+UTC00:34:30.573142创建331/agent:deepseek，唯一写本片review/，产品/正式测试/新旧冻结暂停，默认用户通知331完成后取件。沿base327请求相容续330，创建state=null、实际原生决定待回执。首次普通任务带非必要related_task_ids被HTTP422拒绝且未创建，去掉该字段后正常创建331；不混称审批拒绝，原错误保持。
+
+只改runtime清理器，复核后先按原入口普通stop/drain，再serve --attach-api --detach恢复runtime，API无需为此补正重启；当前未生产停启/重试，不接管external API或另开第二API。随后正式retry旧K2.8到complete并核250/286/五保护角色、恢复DeepSeek及心跳。派发前只读再核runtime17580/五宿主/worker无错、旧r2不变、五保护角色/250/286保持；一次metadata授权未重复使用。
 
 用户已经授权：当前真实验证全部通过后，继续一个此前讨论的选择性项目自启动切片，Codex开发、DeepSeek独立复核，人工验收等用户返回。当前K2.8未闭合，不提前开新功能；不扩大连续多片或生产私有访问权限。
 
