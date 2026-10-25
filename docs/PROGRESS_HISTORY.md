@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-25 12:19：332超时只读实查，确认执行端退出/任务状态未收敛
+
+用户认为DeepSeek复核两小时异常，Codex核公开任务/成员、四个原PID元数据、OS启动时间、具名合成review日志及公开恢复计划。33209:41:24领取，最后心跳09:56:37.925551、lease09:58:37过期，至12:19仍running/in_progress且无result；runtime12980、DSH宿主5116/5604、bridge15992均已不存在，机器上次boot为10月23日10:02，APIhealth ok/uptime15317秒。只能确认执行端退出与任务未收敛，退出原因未证，不归因模型慢/系统重启。DSH gen70 unknown/instance_heartbeat_expired/ownership_held，can_start=false；只读恢复计划409 recovery_tasks_active。
+
+review最后日志09:56:40，正式REVIEW.md/checks.json未生成；ready-gap两个及late-writer一个合成失败断言已存在，但不代替正式独立交付，也未运行/修改这些探针。63冻结零错配、源漂移仍仅既有四文档；未代claim/report/收取/新派、未启停/CAS/部署、未读生产配置/角色Key/私有state/HOME/日志，原human凭据仅正常GET认证。公开响应与诊断保存.tmp/project-role-autostart-v1/coordination/stall-20261025-1216/。本轮“检查”已完成，恢复需要另走正式任务/旧归属流程，不能以此加载未独立通过的自启动代码；250/286与旧报告不改。
+
 ## 2026-10-25 09:41：选择性项目自启动统一首审332已派，产品暂停
 
 实现5831fd072281333a26eaf103ce989fd07601a0e1已推送，63份3613416字节新快照与源零漂移后交DeepSeek，创建332 queued/assigned、Hall group:task-e69b29d3bc70406fad066b3973d3f512。新工作线project-role-startup-review-20261025/基础版本1/SHA0e5d006c…，创建execution_session_state=null，实际新窗/复用/计数待回执，未冒称续331。两次HTTP422分别一般任务不接受review_policy、基础版本名超32字符，均未创建；去字段/版本1后仅332成功，原请求/错误保留。唯一写本片review/，产品/正式测试/冻结暂停；默认用户通知完成后取件，未生产部署/修改选择，不主动等待或派下片。
