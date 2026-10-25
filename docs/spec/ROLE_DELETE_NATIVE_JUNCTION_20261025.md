@@ -36,3 +36,15 @@ Windows的OPEN_REPARSE_POINT语义及按同一HANDLE设置删除依据[Microsoft
 本次新清理器未加载、未重试生产墓碑；一次元数据授权不扩为手动删除联接或目标。独立通过后沿本次既有正常加载/指定目标验证范围，先确认无running任务/worker空闲且仅原DeepSeek idle，再普通stop/drain及核原进程退出，通过原统一serve --attach-api --detach入口只恢复runtime，不重启或接管external API；API产品未改。该正常入口先按普通代码和隔离模式验证，不另起第二API。再正式retry旧K2.8并跟踪complete，保250原任务/结果、共享凭据和五保护角色，只恢复原DeepSeek并核心跳。若原入口或归属证据不足，保留现场，不强杀/CAS或绕私有保护。
 
 只有新runtime加载不代表本目标complete，只有逻辑列表移除也不替代专属资源清理。全部验证通过才开已授权下一片；默认派DeepSeek后结束，用户通知后取件。
+
+## 2026-10-25 09:09：331收取及本机实际清理完成
+
+正式2975作者agent:deepseek/正确Hall，完整talk-delivery-1与本地delivery等值，结构校验通过；must_fix为空，UTC01:01:42.379539收取331为completed。19份211819字节原交付显式归档并逐项一致，不扫描review/scratch。55新与50/64/79/45旧快照、329/330原归档保持，产品/测试仍a97ef46，未追加产品返修或重复整组测试。
+
+独立真实Windows无PIPE探针12场景11通过/1符号链接权限skip，证明入口不跟随HANDLE删除/外部树保持/竞态/真实锁/其它资源和未知tag拒绝/预算续轮；38删除API+32轮换及6定向通过。原样121在DSH沙箱为5F/14E/2S，CreatePipe/私有ACL/子进程与符号链接限制原样保留，不称独立121全过；Codex正常环境121/121证据保持。根/占用失败错误码为cleanup_failed的非阻断观察留档，不为此追加任务。331实际new_no_candidate新窗/count1/session-eb344c0c-2d66-46ab-b5b7-9ddeac1aba81，末公开snapshot350890/1000000=35.089%，未续330。
+
+按既有授权预检无running任务/worker空闲、仅DSH新鲜idle后普通stop/drain，原runtime17580及五宿主10原PID全部absent；原统一serve --attach-api --detach启动新runtime12980/五宿主serving。API健康/uptime连续、启动估计保持，未接管external API或要求用户重启，未改产品配置/手工清理/追加metadata扫描。
+
+正式human retry唯一旧K2.8，r3 pending→实见r4 cleaning→UTC01:05:53.596415 r4 complete，manager/profiles/private_state/startup_config complete、credentials preserved/identity_disabled=false；WorkBuddy原r6 complete全字段保持，普通角色接口仅五保留角色。没有读取实际联接目标或计算内容前后摘要，目标保护以已复核不跟随机制与隔离真实反例为证，不补造生产内容一致证明。
+
+仅正常恢复原DeepSeek gen70/ins_81ee44313cdb/PID15992，running/ready/idle，同实例心跳推进120.283935秒；其它四角色stopped/无owner，五保护角色完整公开投影/绑定/项目要求、250原failed/2767结果、286 paused逐字段保持。实际证据在本片deployment/，真人浏览器人验仍待用户返回；按用户已条件授权，Git收尾后直接推进一个选择性项目自启动片，不为非阻断事项或同一正常加载重复确认。

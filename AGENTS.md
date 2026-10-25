@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 09:09删除验证闭合：331 complete/2975已核验收取completed，无必须修正项；真实联接11场景通过/1符号链接权限skip，原121沙箱5F/14E/2S与Codex121全过分别保留。55新/50/64/79/45旧快照和329/330归档保持，331原19份211819字节另存；实际新窗/count1、末35.089%。原runtime17580及五宿主10PID正常退出，原attach-api入口启动runtime12980/五宿主serving，API uptime连续、无需用户重启。旧K2.8正式retry r3→r4 complete（UTC01:05:53），WorkBuddy r6 complete保持，两目标普通角色接口移除；共享凭据保留。仅恢复DSH gen70/ins_81ee44313cdb/PID15992 ready/idle，真实心跳120.283935秒，另四停止；五角色完整公开投影/要求/250原失败结果/286保持，未追加metadata/私有内容读取或手动清理。当前只完成文档/Git收尾，随后直接开已授权一个选择性自启动片，Codex开发/DeepSeek统一首审，人工验收等用户返回；不重复同范围确认，不为非阻断项再派任务。
+
 - 2026-10-25 08:35派发：目录联接入口必要补正331已交DeepSeek queued/assigned，实现a97ef46推送；55份/2112541字节源/冻结零漂移，旧50/64/79/45和329/330归档零错配。唯一写role-delete-native-junction-v1/review/，产品/正式测试/新旧冻结暂停，默认用户通知331完成后取件。base327请求相容续330，创建state=null、实际决定待回执；首次一般任务related_task_ids被HTTP422拒绝无创建，去掉非必要字段后成功，原错误保留。121只是Codex自检，生产r2 failed/新清理未加载/未retry；派前公开五保护角色/250/286/runtime17580/五宿主无错保持。metadata仅已授权一次、不重复；下一片未开工，不提前生产或宣称独立通过。
 
 - 2026-10-25 08:31必要补正：用户明确授权一次最小元数据核查，实际1309条、native内一个目录联接/tag0xA0000003；未读资源内容/Key/会话日志、未跟链接或改生产，例外不扩为后续私有扫描。Codex仅scripts/role_delete.py+test_role_delete_local.py补正规范native成员根后代的目录联接入口HANDLE删除，目标不遍历；其它链接位置/硬链接/符号链接/未知tag及旧守卫保持。121隔离相关回归零失败/错误/跳过（9新包含其中），待冻结交DeepSeek定向复核后暂停；原330/旧冻结/250/286保持。新代码未加载、生产未重试，DSH gen68仍原恢复状态。仅runtime变更，后续拟原普通stop/drain后serve --attach-api --detach，无需用户重启API；当前不提前执行。条件下一片仍等当前闭合，不重复同范围确认。详[目录联接补正](docs/spec/ROLE_DELETE_NATIVE_JUNCTION_20261025.md)与进度。

@@ -1,6 +1,18 @@
 # 删除人工验收返修的正常加载与两目标验证（2026-10-24）
 
-状态：一次最小元数据核查已获用户明确授权并执行，确认旧K2.8的native内一个目录联接。Codex入口清理补正121项隔离回归零失败/跳过，待冻结交DeepSeek独立复核，未加载/重试；当前r2 failed/unsafe_resource、WorkBuddy r6 complete保持。页面筛选排除两目标，DSH gen68已恢复且心跳60.088815秒；250原任务/结果、五保护角色和286保持，不提前开下一片。
+状态：331独立复核complete/2975已收取，无必须修正项；新runtime12980加载且原API未重启，旧K2.8正式retry r4 complete，WorkBuddy r6 complete保持，普通角色接口只剩五角色。仅恢复DeepSeek gen70/ready/idle并核心跳120.283935秒，250原任务/结果、五保护角色及286保持。当前删除后台验证闭合，人工页面验收等用户返回；Git收尾后直接继续已授权一个选择性项目自启动片。
+
+## 2026-10-25 09:09：两目标正式complete，恢复验证闭合
+
+331正式交付与本地等值、19份211819字节原证据归档通过，UTC01:01:42.379539收取completed。真实联接核心11场景及70项API/轮换、6定向独立通过，原121沙箱5F/14E/2S和1符号链接探针skip保留，无必须修正项，不追加返修或整组重复；详[331验收](ROLE_DELETE_NATIVE_JUNCTION_20261025.md)。
+
+UTC01:04:03原runtime17580/五宿主健康、worker空闲无running任务、仅DSH fresh idle，五角色完整公开投影/要求、250原任务/2767结果、WorkBuddy complete/286保持。UTC01:04:18.528986原入口一次普通stop；UTC01:04:56.438688核原runtime及五宿主10原PID全absent、角色停止无owner。UTC01:05:10原serve --attach-api --detach正常拉起，新runtime12980/五宿主serving/worker无错；API uptime连续、无接管或第二API，用户没有再重启API。
+
+UTC01:05:30.587954正式retry旧agent:kimi-code-k28-preview，r3 pending→实见r4 cleaning→UTC01:05:53.596415 r4 complete；所有专属资源/启动配置步骤complete，credentials preserved/identity_disabled=false。WorkBuddy原r6 complete全字段相同，普通角色接口只返回五保留角色。协调方未手工删除联接/读取目标、未重复一次metadata例外或造claim/report。
+
+仅普通start恢复DeepSeek gen70/ins_81ee44313cdb/PID15992，ready/idle，同实例心跳01:06:23.505496→01:08:23.789431、120.283935秒；其它四角色停止无owner。五保留角色完整公开非service投影/绑定/项目要求、250原失败任务/结果、286 queued/accepted/paused保持。证据在role-delete-native-junction-v1/deployment/的before/stop/drained/launch/loaded/intent/cleanup/complete/restore/heartbeat，不覆盖前轮现场。
+
+当前后台真实验证完成，页面原v3筛选/HTTP证据保持，真人浏览器验收等用户返回。按既有明确授权，当前Git收尾后直接开发一个选择性项目自启动片，Codex实施/DeepSeek集中独立首审；不重复同范围确认、不再为非阻断观察拆任务，生产新功能启用仍不混入本次删除许可。
 
 ## 2026-10-25 08:31：一次元数据定位及最小补正待复核
 

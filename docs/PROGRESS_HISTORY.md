@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 09:09：331收取及两角色实际清理完成，恢复后继续条件授权下一片
+
+正式2975/正确作者Hall的talk-delivery-1与本地等值，结构校验通过、must_fix为空，UTC01:01:42.379539收取331为completed。19份211819字节原交付按显式清单归档并逐项一致；55新/50/64/79/45旧快照、329/330原归档保持，产品仍a97ef46。独立真实联接12场景11过/1符号链接权限skip，38删除+32轮换及6定向过；原样121沙箱5F/14E/2S保留，不称独立121全过，Codex原正常环境121全过保持。不为非阻断错误码观察重开返修/重跑全组。实际new_no_candidate新窗/count1/session-eb344c0c-2d66-46ab-b5b7-9ddeac1aba81，末350890/1000000=35.089%，未续330。
+
+按同范围既有授权预检空闲/原DSH新鲜后一次普通stop，UTC01:04:56核原runtime17580及五宿主10原PID全absent；原serve --attach-api --detach正常启动新runtime12980/五宿主serving/worker无错。API uptime连续，未接管external API、未开第二API或要求用户重启；无强杀/CAS/生产配置正文或私有内容读取、无再次metadata扫描。正式retry旧K2.8 r3 pending→实见r4 cleaning→UTC01:05:53.596415 r4 complete，专属步骤complete、credentials preserved/identity_disabled=false；WorkBuddy r6 complete全字段保持，普通角色接口仅五保留角色，不造实际目标内容摘要或手动清理证明。
+
+仅恢复DeepSeek gen70/ins_81ee44313cdb/PID15992 running/ready/idle，同实例真实心跳120.283935秒；其它四角色停止无owner，五角色完整公开非service投影/绑定/要求、250原failed/2767结果、286 paused逐字段相同。新证据在role-delete-native-junction-v1/deployment/，不覆盖旧阶段。当前后台真实验证闭合，页面v3已核筛选/资产证据保持，真人浏览器人验按用户要求等返回；当前文档/Git收尾后直接开已条件授权一个选择性项目自启动片，Codex开发/DeepSeek集中首审，不再重复同范围确认、不为非阻断拆任务，也不扩大新功能生产启用许可。
+
 ## 2026-10-25 08:59：用户确认集中修复和核验，减少碎片任务
 
 用户针对327—331迭代过多询问流程后，明确认可改进建议。后续同一功能先集中核对可见阻挡项/历史兼容场景、集中实现和自测后统一首审；必须修正项由Codex收齐后集中修复/定向验证，目标一次首审加必要的一次集中复验，只有真实新增阻断或证据不足才追加并说明。非阻断观察记录后推进已授权下一功能，同范围已有授权正常核查/加载/取件/收尾不重复确认。
