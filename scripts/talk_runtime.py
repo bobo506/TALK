@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import math
 import os
 import re
 import signal
@@ -33,6 +34,66 @@ class RuntimeErrorCode(RuntimeError):
 
 def utcnow():
     return datetime.now(timezone.utc).isoformat()
+
+
+SHUTDOWN_PHASES = {"idle", "waiting_startup", "waiting_worker", "stopping_roles",
+                   "draining_hosts", "stopping_api", "complete"}
+EXITED_PROCESS_STATES = {"absent", "exited", "previous_boot", "pid_reused"}
+
+
+def _runtime_identity(health):
+    if not isinstance(health, dict):
+        raise RuntimeErrorCode("runtime_stop_health_invalid")
+    pid = health.get("pid")
+    started = health.get("started_at")
+    if (type(pid) is not int or pid <= 0 or not isinstance(started, str)
+            or rsh._parse_iso(started) is None or not isinstance(health.get("project_id"), str)
+            or not health["project_id"]):
+        raise RuntimeErrorCode("runtime_stop_health_invalid")
+    activation = health.get("activation_id")
+    if activation is not None and (not isinstance(activation, str) or not activation):
+        raise RuntimeErrorCode("runtime_stop_health_invalid")
+    return health["project_id"], pid, started, activation
+
+
+def wait_for_stop(private, expected, seconds, *, clock=time.monotonic, sleeper=time.sleep):
+    """Observe one original runtime; a timeout never changes process ownership."""
+    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or not 0 < seconds <= 900:
+        raise RuntimeErrorCode("runtime_stop_wait_budget_invalid")
+    identity = _runtime_identity(expected)
+    deadline = clock() + seconds
+    phase, detail = "unknown", None
+
+    def result(status, code=None):
+        return {"action": "stop", "stop_status": status, "error_code": code,
+                "pid": identity[1], "activation_id": identity[3],
+                "shutdown": {"phase": phase, "error_code": detail}}
+
+    while True:
+        try:
+            current = json.loads((Path(private) / "health.json").read_text(encoding="utf-8"))
+            current_identity = _runtime_identity(current)
+        except (OSError, ValueError, RuntimeErrorCode):
+            return result("unverified", "runtime_stop_health_unverified")
+        if current_identity != identity:
+            return result("generation_changed", "runtime_stop_generation_changed")
+        shutdown = current.get("shutdown")
+        shutdown = shutdown if isinstance(shutdown, dict) else {}
+        raw_phase = shutdown.get("phase")
+        phase = raw_phase if isinstance(raw_phase, str) and raw_phase in SHUTDOWN_PHASES else "unknown"
+        detail = shutdown.get("error_code")
+        detail = detail if isinstance(detail, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,79}", detail) else None
+        state = recorded_process_state(current["pid"], current.get("seen_at"))
+        if current.get("state") == "stopped" and state in EXITED_PROCESS_STATES:
+            return result("stopped")
+        if state in EXITED_PROCESS_STATES:
+            return result("incomplete", "runtime_stop_incomplete")
+        if current.get("state") == "stop_blocked":
+            return result("blocked", "runtime_stop_blocked")
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return result("timeout", "runtime_stop_wait_timeout")
+        sleeper(min(.2, remaining))
 
 
 def process_parents():
@@ -167,6 +228,12 @@ class TalkRuntime:
         self.diagnostics = diagnostics or {}
         self._backend_state = None
         self._backend_seen = 0.0
+        self.shutdown_phase = "idle"
+        self.shutdown_pending = []
+        self.shutdown_started_at = None
+        self.shutdown_completed_at = None
+        self.shutdown_error = None
+        self._shutdown_seen = 0.0
 
     def event(self, event, *, context=None, exc=None, component="runtime"):
         journal = self.diagnostics.get(component)
@@ -203,6 +270,9 @@ class TalkRuntime:
             "hosts":self.statuses, "worker_in_flight":bool((self.worker_thread and self.worker_thread.is_alive())
                 or (self.startup_thread and self.startup_thread.is_alive())),
             "worker_error":self.worker_error}
+        value["shutdown"] = {"phase": self.shutdown_phase, "pending_members": self.shutdown_pending,
+            "started_at": self.shutdown_started_at, "completed_at": self.shutdown_completed_at,
+            "error_code": self.shutdown_error}
         value["worker_completed_at"]=self.worker_completed_at
         try:
             rsh._publish_private_bytes(self.private / "health.json", json.dumps(value).encode())
@@ -458,20 +528,36 @@ class TalkRuntime:
             if self.api_control_file.read_text(encoding="utf-8")=="talk-runtime-stop\n":
                 self.api_control_file.unlink()
 
+    def _shutdown_progress(self, phase, pending=()):
+        pending = list(pending)
+        changed = phase != self.shutdown_phase or pending != self.shutdown_pending
+        self.shutdown_phase, self.shutdown_pending = phase, pending
+        if changed or self.clock() - self._shutdown_seen >= 2:
+            self.health("stopping")
+            self._shutdown_seen = self.clock()
+
+    def _shutdown_join(self, thread, seconds, error):
+        deadline = self.clock() + seconds
+        while thread and thread.is_alive():
+            remaining = deadline - self.clock()
+            if remaining <= 0:
+                raise RuntimeErrorCode(error)
+            thread.join(timeout=min(2, remaining))
+            self._shutdown_progress(self.shutdown_phase, self.shutdown_pending)
+
     def stop(self):
         self.stopping = True
-        self.health("stopping")  # Invalidates the startup writer before awaiting its request.
+        self.shutdown_started_at = self.shutdown_started_at or utcnow()
+        previous_shutdown_error = self.shutdown_error
+        self.shutdown_error = None
+        self._shutdown_progress("waiting_startup")  # Invalidates startup before awaiting its writer.
         self.event("backend_stopping", context={"stage": "shutdown"})
-        if self.startup_thread and self.startup_thread.is_alive():
-            self.startup_thread.join(timeout=70)
-            if self.startup_thread.is_alive():
-                raise RuntimeErrorCode("runtime_startup_stop_timeout")
+        self._shutdown_join(self.startup_thread, 70, "runtime_startup_stop_timeout")
+        self._shutdown_progress("waiting_worker")
         if self.worker:
             self.worker.request_stop()
-        if self.worker_thread and self.worker_thread.is_alive():
-            self.worker_thread.join(timeout=130)
-            if self.worker_thread.is_alive():
-                raise RuntimeErrorCode("runtime_worker_stop_timeout")
+        self._shutdown_join(self.worker_thread, 130, "runtime_worker_stop_timeout")
+        self._shutdown_progress("stopping_roles", self.hosts)
         for member, owned in self.hosts.items():
             if owned["process"].poll() is None:
                 # Human-authenticated ordinary stop; the original manager verifies its Popen.
@@ -483,22 +569,27 @@ class TalkRuntime:
         while self.clock() < deadline:
             roles = {r["member_id"]:r for r in self.roles()}
             waiting = [member for member in self.hosts if roles.get(member, {}).get("service", {}).get("ownership_held")]
+            self._shutdown_progress("stopping_roles", waiting)
             if not waiting:
                 break
             self.sleep(.5)
         else:
             raise RuntimeErrorCode("runtime_role_stop_timeout")
-        for owned in self.hosts.values():
+        pending = [m for m, h in self.hosts.items() if h["process"].poll() is None]
+        self._shutdown_progress("draining_hosts", pending)
+        for member, owned in self.hosts.items():
             if owned["process"].poll() is not None:
                 marker=Path(owned["spec"]["drain_file"])
                 if owned.get("drain_marker_written") and marker.is_file() and marker.read_text(encoding="utf-8")=="talk-runtime-stop\n":
                     marker.unlink()
+                self.statuses.setdefault(member, {})["state"] = "stopped"
                 continue
             health = json.loads(Path(owned["spec"]["health_file"]).read_text(encoding="utf-8"))
             if health.get("owned_launches"):
                 deadline = self.clock() + 10
                 while health.get("owned_launches") and self.clock() < deadline:
                     self.sleep(.25)
+                    self._shutdown_progress("draining_hosts", pending)
                     health = json.loads(Path(owned["spec"]["health_file"]).read_text(encoding="utf-8"))
                 if health.get("owned_launches"):
                     raise RuntimeErrorCode("runtime_manager_not_drained")
@@ -508,13 +599,27 @@ class TalkRuntime:
             if not owned.get("drain_marker_written"):
                 marker.write_text("talk-runtime-stop\n",encoding="utf-8")
                 owned["drain_marker_written"]=True
-            try:
-                owned["process"].wait(timeout=25)
-            except subprocess.TimeoutExpired as exc:
-                raise RuntimeErrorCode("runtime_host_stop_timeout") from exc
+            deadline = self.clock() + 25
+            while owned["process"].poll() is None:
+                remaining = deadline - self.clock()
+                if remaining <= 0:
+                    raise RuntimeErrorCode("runtime_host_stop_timeout")
+                try:
+                    owned["process"].wait(timeout=min(2, remaining))
+                except subprocess.TimeoutExpired:
+                    self._shutdown_progress("draining_hosts", pending)
+            self.statuses.setdefault(member, {})["state"] = "stopped"
+            pending.remove(member)
+            self._shutdown_progress("draining_hosts", pending)
             if marker.read_text(encoding="utf-8") == "talk-runtime-stop\n":
                 marker.unlink()
+        self._shutdown_progress("stopping_api")
         self._stop_api()
+        self.shutdown_phase = "complete"
+        self.shutdown_pending = []
+        self.shutdown_completed_at = utcnow()
+        if previous_shutdown_error is not None and self.worker_error == previous_shutdown_error:
+            self.worker_error = None
         self.health("stopped")
 
     def serve(self):
@@ -605,6 +710,7 @@ class TalkRuntime:
             except (RuntimeErrorCode,rsh.HostError,OSError,ValueError) as exc:
                 # A failed shutdown must never abandon the original owners.
                 self.worker_error=getattr(exc,"code",None) or type(exc).__name__
+                self.shutdown_error = self.worker_error
                 self.event("runtime_exception", context={"stage": "shutdown", "error_code": self.worker_error}, exc=exc)
                 self.health("stop_blocked")
                 self.sleep(2)
@@ -618,7 +724,13 @@ def main(argv=None):
     parser.add_argument("--apply",action="store_true")
     parser.add_argument("--detach",action="store_true")
     parser.add_argument("--attach-api",action="store_true",help="只运行本机宿主/worker，观察已由其它入口启动的API，不接管或关闭API")
+    parser.add_argument("--wait", action="store_true", help="stop请求后等待本代后台实际退出；不强制终止")
+    parser.add_argument("--wait-seconds", type=float, default=None, help="stop --wait的等待秒数，默认300，范围(0,900]")
     args=parser.parse_args(argv)
+    if (args.wait or args.wait_seconds is not None) and args.action != "stop":
+        parser.error("--wait/--wait-seconds only support stop")
+    if args.wait_seconds is not None and (not args.wait or not math.isfinite(args.wait_seconds) or not 0 < args.wait_seconds <= 900):
+        parser.error("--wait-seconds requires --wait and a finite value in (0,900]")
     config=load_config(args.config)
     private=Path(config["state_dir"])/"runtime"
     if args.action=="status":
@@ -630,10 +742,25 @@ def main(argv=None):
         print(json.dumps({"mode":"dry_run","action":args.action,"project_id":config["project_id"],"configured_hosts":len(config.get("hosts",[])),"workbuddy_dynamic":bool(config.get("workbuddy"))}));return 0
     rsh.ensure_private_dir(private)
     if args.action in ("stop","reload-api"):
-        health=json.loads((private/"health.json").read_text(encoding="utf-8"))
-        if recorded_process_state(health["pid"],health.get("seen_at"))!="present":raise RuntimeErrorCode("runtime_not_running")
+        try:
+            health=json.loads((private/"health.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            if args.wait:
+                raise RuntimeErrorCode("runtime_stop_health_unverified") from None
+            raise
+        if args.wait:
+            if _runtime_identity(health)[0] != config["project_id"]:
+                raise RuntimeErrorCode("runtime_stop_project_mismatch")
+        process_state = recorded_process_state(health["pid"],health.get("seen_at"))
+        if process_state != "present" and not (args.wait and process_state in EXITED_PROCESS_STATES):
+            raise RuntimeErrorCode("runtime_not_running")
         if args.action=="reload-api" and health.get("api_mode")=="external":raise RuntimeErrorCode("runtime_api_not_owned")
-        (private/("stop.request" if args.action=="stop" else "reload-api.request")).write_text(utcnow(),encoding="utf-8")
+        if process_state == "present" and (not args.wait or health.get("state") not in ("stopping", "stop_blocked", "stopped")):
+            (private/("stop.request" if args.action=="stop" else "reload-api.request")).write_text(utcnow(),encoding="utf-8")
+        if args.wait:
+            result = wait_for_stop(private, health, args.wait_seconds if args.wait_seconds is not None else 300)
+            print(json.dumps(result, ensure_ascii=False))
+            return 0 if result["stop_status"] == "stopped" else 1
         return 0
     health_file=private/"health.json"
     # PID可能在电脑重启后复用；单实例由下方OS锁证明，旧健康PID不能阻止恢复。
