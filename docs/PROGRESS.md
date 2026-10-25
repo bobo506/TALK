@@ -1,9 +1,10 @@
 # Project Progress
 
-Updated: 2026-10-25 14:36（Asia/Shanghai）。334 complete/2980已核验收取completed，无必须修正。项目角色选择性自启动代码复核已闭合，产品仍058e153，尚未正式加载；具体正常加载方案已落盘，待明确确认。当前只文档/Git收尾，不再派非阻断复核或开下一无关片。
+Updated: 2026-10-25 14:42（Asia/Shanghai）。用户已重载API，只读确认新startup路由存在、五角色自启动设置均enabled=false/revision0/未执行；原runtime11280尚未重启，完整加载仍待正常后台重载。334 complete/2980已收取，产品仍058e153，无新修改；不重复要求用户重启已经更新的API，不追加复核或下一无关片。
 
 ## 当前事实
 
+- 用户询问默认关闭语义，本次仅只读核对：UTC06:41:37 API uptime127秒，新startup路由存在，五角色startup均enabled=false/revision0/updated_at=null/last_activation=null。原runtime11280仍UTC04:33:28启动，五宿主serving，旧startup_state=failed；仅DSH gen76/原ins_aa6223b0735e继续运行，其它四停止。自启动选择默认false不意味着重载API会停止已运行角色；已运行服务保持原状态。本轮未执行后台启停或自动勾选。
 - 身份agent:codex / prj_e8fe7066bbec / lead已实核。334正式complete，UTC06:33:30.383042收取completed；15份36242字节原交付按manifest归档fix2/pickup334/334-original-review，正式消息与本地delivery一致。实际续333原窗/count2，末37.6821%，未复用332旧tainted窗。
 - DeepSeek本次独立10原MF-1探针+7新增判断全过，333四类失败反例不改断言通过；MF-2/MF-3沿333独立通过，不重做全审。原26自检、223/228/58Node与DACL/替代限制保持，不能相加冒称不同用例；真实ACL/断电/模型/浏览器未验。
 - 162份4240533字节新冻结、旧63份3613416字节/116份3872285字节及332原33份99053字节/333原29份210648字节均零错配；产品/正式测试/web在058e153后无改动。333partial/2979、原review failed与332failed/2978永久保留，不追改或收取失败332。
@@ -13,7 +14,7 @@ Updated: 2026-10-25 14:36（Asia/Shanghai）。334 complete/2980已核验收取c
 
 ## 下一步
 
-1. [具体正常加载方案](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)已准备待确认：刷新公开预检，原后台普通stop/drain并核PID退出；用户原终端重启外部API，再原attach-api/detach入口重启后台。
+1. [具体正常加载方案](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)的API重载已由用户提前完成；后续刷新公开预检后按方案续后台普通stop/drain、核PID退出并原attach-api/detach启动。不重复要求API重启，除非之后证据表明API未运行新版本。
 2. 加载核新路由/默认false/本代complete/五宿主后，仅恢复原DeepSeek并核同实例60秒真实心跳，其它四停止；不代勾选、不改配置/模型/Key/绑定/250/286。不强杀/CAS/清锁，不接管外部API或开第二API。
 3. 本轮不再追加非阻断复核。实际选择保存、下一代自动启动/真实断电及浏览器人验后续明确安排；下一无关切片仍先确认。
 

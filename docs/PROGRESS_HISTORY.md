@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-25 14:42：用户API重载已生效，解释默认关闭并核对剩余后台步骤
+
+用户说已重新加载并问是否启动TALK后角色默认关闭。本次仅只读原运行器status及原human正常GET公开API：UTC06:41:37 API uptime127秒、新startup路由存在，五角色startup均enabled=false/revision0/updated_at=null/last_activation=null。原runtime11280仍UTC04:33:28启动、五宿主serving、旧8轮failed状态；仅DSH gen76/ins_aa6223b0735e运行，其它四停止。首次默认不随后台自动启动，勾选影响下代，页面/API重载不停止原已运行角色。原人工控制和默认false不冲突。
+
+API重载步骤已由用户完成，完整加载仍差原后台普通stop/drain及原attach-api/detach启动；后续正常加载不重复要求API重启，除非新证据表明版本回退。未在本次语义询问中执行生产后台启停/自动勾选/额外DB或私有访问，未改产品/正式测试/冻结/绑定/250/286。证据fix2/reload-check-20261025-1441/public-preflight.json；334原复核闭合保持。
+
 ## 2026-10-25 14:36：334通过收取，本片代码闭合并准备正常加载方案
 
 用户通知334好了后，核实正式succeeded/submitted/2980、conclusion=complete，无unfinished/blocked/必须修正，正式消息与本地delivery逐字段一致。DeepSeek独立10原MF-1探针+7新增判断全过，原333四反例断言未改；MF-2/MF-3沿333通过，不重复全审。真实ACL/断电/原生模型/浏览器等限制保留；不把Codex26自检与本次17相加冒称不同用例。334实际reuse_session续333/count2，末37.6821%，未复用332 tainted旧窗。15份36242字节原报告/探针/日志按manifest归档fix2/pickup334/334-original-review；UTC06:33:30.383042正常收取completed。333原partial/2979、332failed/2978不改不追收。

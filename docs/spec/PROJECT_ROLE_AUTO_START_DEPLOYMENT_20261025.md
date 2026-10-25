@@ -22,6 +22,8 @@ runtime11280（UTC04:33:28启动）running/present，api_mode=external，不拥�
 
 ## 确认后按顺序执行
 
+**14:42实际进展补充：** 用户已提前重载API。UTC06:41:37公开实测新startup路由存在/uptime127秒，五startup均enabled=false/revision0/last_activation=null；原runtime11280/五宿主尚未重启、DSH原运行状态保持。本次仅只读，未后台启停或勾选。后续刷新预检后可续后台普通stop/drain及第4步，API新版本持续健康则第3步不重复执行。完整加载尚未完成。
+
 1. **刷新只读预检。** 原human公开接口确认没有新领取/运行任务、worker空闲，保存五角色完整公开投影/binding/项目要求、250/2767及286；原CLI刷新runtime/五宿主PID和代际。若用户期间有手动启动/选择变化，以新事实为准，不用旧快照覆盖。
 2. **正常停后台。** 用原统一入口`python -B scripts/talk_runtime.py stop --config D:/claude-test/TALK-private/talk-runtime.json --apply`；等待普通stop/drain退出、原runtime和五宿主/解释器PID消失、角色停止且无owner。不给强杀/CAS/清锁许可；未闭合则保存公开错误并停止后续加载，不冒称停止成功。
 3. **用户重启原API终端。** API由用户外部终端持有，平台不能接管reload；后台退出后提示用户在原终端Ctrl+C，重跑原API启动命令。不得关闭其它终端、强杀API或启动第二API。API正常启动流程自动创建新增自启动设置/执行审计表，不手动修改或检查DB、生产配置或旧数据。
