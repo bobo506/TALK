@@ -124,7 +124,7 @@ def process_argv(command):
         kernel.LocalFree(ctypes.cast(argv,wintypes.HLOCAL))
 
 
-def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None):
+def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None, _preboot_at=None):
     inventory = inventory or process_inventory
     if plan["expected_owner_host"].casefold() != socket.gethostname().casefold():
         raise HostError("recovery_wrong_local_host")
@@ -133,7 +133,9 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
     if health.get("project_id") != plan["project_id"] or health.get("member_id") != plan["member_id"]:
         raise HostError("recovery_manager_identity_mismatch")
     seen = _parse_iso(health.get("seen_at"))
-    if seen is None or (datetime.now(timezone.utc) - seen).total_seconds() <= 90:
+    if _preboot_at is not None and (seen is None or seen >= _preboot_at):
+        raise HostError("recovery_not_previous_boot")
+    if seen is None or (_preboot_at is None and (datetime.now(timezone.utc) - seen).total_seconds() <= 90):
         raise HostError("recovery_manager_recent")
     manager_pid, bridge_pid = health.get("pid"), plan["process_pid"]
     manager_state = recorded_process_state(manager_pid, health.get("seen_at"), probe=probe)

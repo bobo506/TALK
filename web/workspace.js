@@ -1660,7 +1660,72 @@ async function pollRoleServices(projectId, accountId) {
     }
   }
 }
+const roleStartupUI = { context: null, busy: new Map(), saved: new Map(), errors: new Map() };
+function roleStartupContext() {
+  const key = JSON.stringify([activeProjectId, myId]);
+  if (roleStartupUI.context !== key) {
+    roleStartupUI.context = key;
+    roleStartupUI.busy = new Map(); roleStartupUI.saved = new Map(); roleStartupUI.errors = new Map();
+  }
+  return key;
+}
+function roleStartupValue(role) {
+  const saved = roleStartupUI.saved.get(role.member_id);
+  if (saved && saved.revision > role.startup.revision) return { ...role.startup, ...saved };
+  return role.startup;
+}
+async function saveRoleStartup(memberId, enabled) {
+  const context = roleStartupContext(), project = activeProjectId, account = myId;
+  const role = projectAgents.find(item => item.member_id === memberId);
+  if (!currentMemberIsHuman() || !role?.startup || role.archived || role.deletion
+      || roleServiceView(role).service?.control_kind !== "managed_cli" || role.binding_state !== "bound"
+      || roleStartupUI.busy.has(memberId)) return;
+  const token = {};
+  roleStartupUI.busy.set(memberId, token); roleStartupUI.errors.delete(memberId);
+  renderWorkspaceRoleDetails();
+  const current = () => context === roleStartupUI.context && project === activeProjectId && account === myId
+    && roleStartupUI.busy.get(memberId) === token;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(project)}/roles/${encodeURIComponent(memberId)}/startup`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: Boolean(enabled) }),
+    });
+    const data = await res.json();
+    if (!current()) return;
+    if (!res.ok || typeof data.enabled !== "boolean" || !Number.isInteger(data.revision)) {
+      roleStartupUI.errors.set(memberId, "保存失败，请重试。");
+    } else {
+      const present = projectAgents.find(item => item.member_id === memberId);
+      if (present?.startup && !present.archived && !present.deletion && present.startup.revision <= data.revision) {
+        roleStartupUI.saved.set(memberId, { enabled: data.enabled, revision: data.revision, updated_at: data.updated_at });
+        present.startup = { ...present.startup, ...data };
+      }
+    }
+  } catch (_) {
+    if (current()) roleStartupUI.errors.set(memberId, "保存失败，请检查连接后重试。");
+  } finally {
+    if (current()) { roleStartupUI.busy.delete(memberId); renderWorkspaceRoleDetails(); }
+  }
+}
+function workspaceRoleStartupPanel(role) {
+  roleStartupContext();
+  if (!currentMemberIsHuman() || !role.startup || role.archived || role.deletion
+      || roleServiceView(role).service?.control_kind !== "managed_cli" || role.binding_state !== "bound") return null;
+  const value = roleStartupValue(role), panel = workspaceEl("div", "role-startup-panel");
+  const label = workspaceEl("label", "role-startup-choice"), input = workspaceEl("input");
+  input.type = "checkbox"; input.checked = value.enabled === true;
+  input.disabled = roleStartupUI.busy.has(role.member_id);
+  input.addEventListener("change", () => saveRoleStartup(role.member_id, input.checked));
+  label.append(input, workspaceEl("span", "", "随项目自动启动")); panel.appendChild(label);
+  panel.appendChild(workspaceEl("p", "role-service-hint", "下次加载项目时生效；本次手动关闭后不会再次拉起。"));
+  const error = roleStartupUI.errors.get(role.member_id);
+  if (error) panel.appendChild(workspaceEl("p", "role-service-hint error", error));
+  else if (["failed", "skipped"].includes(value.last_activation?.status)) {
+    panel.appendChild(workspaceEl("p", "role-service-hint", "上次自动启动未完成，请查看服务状态后手动启动。"));
+  }
+  return panel;
+}
 function renderWorkspaceRoleDetails() {
+  roleStartupContext();
   // ROLE-DESC-F1 修正（#137/N4）：角色详情拆为名称区与参与任务区两个动态容器，
   // 静态说明编辑区（index.html 居中独立）位于两者之间；replaceChildren 只触碰这两个容器，
   // 绝不经过说明区——编辑区节点、内容与焦点在轮询重绘时天然保持。
@@ -1717,6 +1782,8 @@ function renderWorkspaceRoleDetails() {
     const servicePanel = workspaceRoleServicePanel(role);
     if (servicePanel) namePanel.appendChild(servicePanel);
   }
+  const startupPanel = workspaceRoleStartupPanel(role);
+  if (startupPanel) namePanel.appendChild(startupPanel);
   const deletePanel = workspaceRoleDeletePanel(role);
   if (deletePanel) namePanel.appendChild(deletePanel);
   if (typeof roleRequestApp !== "undefined" && !role.deletion) {

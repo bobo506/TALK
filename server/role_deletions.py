@@ -212,7 +212,7 @@ def request_delete(project, member, confirm, current, session):
             roster.capability_summary = []
             roster.business_role = roster.decision_tier = None
             session.add(roster)
-        for model in (m.ProjectRoleBinding, m.ProjectRoleDescription, m.ProjectRolePolicy):
+        for model in (m.ProjectRoleBinding, m.ProjectRoleDescription, m.ProjectRolePolicy, m.ProjectRoleStartup):
             item = session.get(model, (project, member))
             if item:
                 session.delete(item)

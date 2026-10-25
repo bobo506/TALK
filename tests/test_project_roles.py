@@ -609,6 +609,7 @@ class ProjectRoleApiTests(RoleApiTestCase):
                 "binding_state",
                 "service",
                 "deletion",
+                "startup",
             },
         )
         self.assertEqual(

@@ -275,6 +275,9 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 @media(max-width:700px){.task-list-pagination {gap:10px; padding:12px 20px 16px;} .task-list-page-info {font-size:13px;}}
 .role-name-heading { display:flex; align-items:center; gap:8px; min-width:0; }
 .role-name-heading h2 { min-width:0; overflow-wrap:anywhere; margin:0; }
+.role-startup-panel { margin:12px 0; }
+.role-startup-choice { display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+.role-startup-choice input { width:16px; height:16px; margin:0; accent-color:var(--accent, #6071cb); }
 .role-name-edit { flex:0 0 17px; width:17px; height:17px; min-width:17px; padding:0; border-radius:4px; cursor:pointer; }
 .role-name-edit svg { width:12px; height:12px; }
 .role-name-edit:hover { color:var(--blue); background:var(--blue-soft, #edf4fa); }

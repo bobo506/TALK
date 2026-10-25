@@ -30,7 +30,7 @@ def fail(code: str):
     raise HTTPException(409, code)
 
 
-def candidate(project_id: str, member_id: str, session: Session, now: datetime):
+def candidate(project_id: str, member_id: str, session: Session, now: datetime, *, _preboot_at=None):
     load_role_service_context(project_id, member_id, session)
     state = session.get(RoleServiceState, (project_id, member_id))
     if state is None or not state.process_launch_id:
@@ -45,7 +45,19 @@ def candidate(project_id: str, member_id: str, session: Session, now: datetime):
             or not state.owner_host or not state.pid or state.pid <= 0
             or state.process_started_at is None or instance.last_seen_at is None):
         fail("recovery_identity_mismatch")
-    if (now - _as_utc(instance.last_seen_at)).total_seconds() <= ROLE_SERVICE_INSTANCE_FRESH_SECONDS:
+    preboot = bool(_preboot_at is not None and all(_as_utc(value) < _preboot_at
+        for value in (instance.last_seen_at, state.process_started_at, launch.created_at)))
+    if _preboot_at is not None and not preboot:
+        fail("recovery_not_previous_boot")
+    if _preboot_at is not None:
+        if not instance.host or instance.host.casefold()!=state.owner_host.casefold():
+            fail("recovery_identity_mismatch")
+        if session.exec(select(AgentTask.id).where(
+            AgentTask.target_member_id==member_id,
+            (AgentTask.claim_token.is_not(None) | AgentTask.lease_expires_at.is_not(None)),
+        ).limit(1)).first() is not None:
+            fail("recovery_tasks_active")
+    if not preboot and (now - _as_utc(instance.last_seen_at)).total_seconds() <= ROLE_SERVICE_INSTANCE_FRESH_SECONDS:
         fail("recovery_recent_heartbeat")
     # 只排除“明确已暂停、领取已完全撤销”的根任务。未知/子任务/暂停过渡态、
     # running或任何残余领取/租约仍阻断；不取消/恢复任务，也不放宽恢复鉴权。
@@ -61,10 +73,11 @@ def candidate(project_id: str, member_id: str, session: Session, now: datetime):
         unclaimed_paused_root.is_not(True),
     ).limit(1)).first() is not None:
         fail("recovery_tasks_active")
-    if session.exec(select(RoleServiceLaunch.launch_id).where(
+    actions = session.exec(select(RoleServiceLaunch).where(
         RoleServiceLaunch.project_id == project_id, RoleServiceLaunch.member_id == member_id,
         RoleServiceLaunch.state.in_(("pending", "claimed")), RoleServiceLaunch.launch_expires_at >= now,
-    ).limit(1)).first() is not None:
+    )).all()
+    if any(not (preboot and _as_utc(action.created_at) < _preboot_at) for action in actions):
         fail("recovery_action_active")
     return state, instance
 
@@ -92,7 +105,7 @@ def receipt(audit: RoleServiceRecovery, *, replayed=False):
 
 
 def recover_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRequest,
-                    operator: Member, session: Session):
+                    operator: Member, session: Session, *, _preboot_at=None, _on_recovered=None):
     require_human(operator)
     _write_begin(session)
     try:
@@ -109,7 +122,7 @@ def recover_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRe
             session.rollback()
             return result
         now = _now()
-        state, instance = candidate(project_id, member_id, session, now)
+        state, instance = candidate(project_id, member_id, session, now, _preboot_at=_preboot_at)
         if (state.generation != body.expected_generation
                 or state.process_launch_id != body.expected_process_launch_id
                 or state.observed_instance_id != body.expected_instance_id
@@ -144,6 +157,15 @@ def recover_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRe
         # last_seen_at 保留原执行端心跳时间，不把人工处置伪装成在线上报。
         session.add(instance)
         session.add(audit)
+        if _preboot_at is not None:
+            for action in session.exec(select(RoleServiceLaunch).where(
+                RoleServiceLaunch.project_id==project_id, RoleServiceLaunch.member_id==member_id,
+                RoleServiceLaunch.state.in_(("pending","claimed")))).all():
+                if _as_utc(action.created_at) < _preboot_at:
+                    action.state="expired";action.error_code="previous_boot";action.updated_at=now
+                    session.add(action)
+        if _on_recovered is not None:
+            _on_recovered(audit,session)
         session.flush()
         result = receipt(audit)
         session.commit()

@@ -55,14 +55,18 @@ class ActualBootstrapTests(unittest.TestCase):
         from scripts.role_service_recovery import probe_pid
         with tempfile.TemporaryDirectory(prefix="talk-local-runtime-") as folder:
             root=Path(folder); state=root/"state"; state.mkdir()
+            project_root=root/"project";project_root.mkdir()
+            # Child processes do not inherit the parent test's Python patches.
+            # Runtime diagnostics must only ever open this synthetic config.
+            (project_root/"config.toml").write_text('[storage]\ndb_path="fixture.db"\n',encoding="utf-8")
             key=root/"human.key";key.write_text("fixture-only",encoding="utf-8")
             with socket.socket() as sock:sock.bind(("127.0.0.1",0));port=sock.getsockname()[1]
             config=root/"runtime.json"
             config.write_text(json.dumps({"schema":"talk-runtime-config-1","version":1,"project_id":"prj_fixture",
-                "project_root":str(local.ROOT),"state_dir":str(state),"key_root":str(root/"keys"),
+                "project_root":str(project_root),"state_dir":str(state),"key_root":str(root/"keys"),
                 "operator_key_file":str(key),"base_url":f"http://127.0.0.1:{port}","provision_worker":False,
                 "api_argv":[sys.executable,"-m","scripts.talk_api","--control-file","{control_file}"],"hosts":[]}),encoding="utf-8")
-            env=dict(os.environ,TALK_RUNTIME_FIXTURE_CONFIG=str(config)); children=[]
+            env=dict(os.environ,TALK_RUNTIME_FIXTURE_CONFIG=str(config),PYTHONPATH=str(local.ROOT)); children=[]
             if detached:env.pop("TALK_RUNTIME_FIXTURE_CONFIG",None)
             health=state/"runtime/health.json"
             def wait_for(predicate):
@@ -91,7 +95,7 @@ class ActualBootstrapTests(unittest.TestCase):
                     subprocess.run([sys.executable,"-B","-m","scripts.talk_runtime","serve","--config",str(config),
                         "--apply","--attach-api","--detach"],cwd=local.ROOT,env=env,check=True,
                         stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
-                wait_for(lambda:facts().get("state")=="running")
+                wait_for(lambda:facts().get("state")=="running" and facts().get("startup_state")=="complete")
                 original=facts()["pid"]
                 self.assertEqual(facts()["api_mode"],"external")
                 self.assertFalse(facts()["owns_original_popen"])

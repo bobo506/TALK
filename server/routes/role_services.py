@@ -28,6 +28,8 @@ from server.models import (
     RoleServiceRecoveryRequest,
     RoleServiceRecoveryPlan,
     RoleServiceRecoveryOut,
+    RoleStartupPreferenceRequest,
+    ProjectStartupRequest,
 )
 from server.role_service_recovery import recovery_plan, recover_stopped
 from server.local_runtime import require_local_runtime, recover_local_human_stop
@@ -41,6 +43,20 @@ from server.role_services import (
 )
 
 router = APIRouter(prefix="/api", tags=["role-services"])
+
+
+@router.put("/projects/{project_id}/roles/{member_id}/startup")
+def save_role_startup(project_id: str, member_id: str, body: RoleStartupPreferenceRequest,
+                      current: Member = Depends(get_current_member), session: Session = Depends(get_session)):
+    from server.role_startup import set_preference
+    return set_preference(project_id,member_id,body.enabled,current,session)
+
+
+@router.post("/projects/{project_id}/role-services/startup")
+def activate_project_startup(project_id: str, body: ProjectStartupRequest,
+                             current: Member = Depends(get_current_member), session: Session = Depends(get_session)):
+    from server.role_startup import activate
+    return activate(project_id,body.activation_id,current,session)
 
 
 def _require_human(current: Member) -> None:

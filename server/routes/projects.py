@@ -22,6 +22,7 @@ from sqlmodel import Session, select
 from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.auth import get_current_member
 from server.role_deletions import RoleDeletion, public as deletion_public
+from server.role_startup import projection as startup_projection
 from server.db import begin_immediate_write, get_session
 from server.models import (
     CHOICE_SOURCE_CREATION_OPERATION,
@@ -1218,6 +1219,7 @@ def _role_projection(
         projected[member_id] = ProjectRoleListItem(
             member_id=member_id,
             deletion=deletion_public(deletion_rows[member_id]) if member_id in deletion_rows else None,
+            startup=startup_projection(project_id,member_id,session),
             role_name=role_name,
             origin=origin,
             identity=identity,

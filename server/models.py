@@ -12,7 +12,7 @@ from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field as PydField, model_validator
+from pydantic import BaseModel, ConfigDict, Field as PydField, StrictBool, model_validator
 from sqlalchemy import CheckConstraint, Column, Index, JSON, text
 from sqlmodel import Field, Session, SQLModel, select
 
@@ -970,6 +970,58 @@ class SchemaMigration(SQLModel, table=True):
 
     key: str = Field(primary_key=True)
     applied_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectRoleStartup(SQLModel, table=True):
+    """Explicit next-project-load preference; never inferred from last running state."""
+    __tablename__ = "project_role_startup"
+    project_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True)
+    enabled: bool = False
+    revision: int = 1
+    updated_by: str
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectStartupCycle(SQLModel, table=True):
+    """Seals one runtime generation's roster, including an empty project."""
+    __tablename__ = "project_startup_cycles"
+    project_id: str = Field(primary_key=True)
+    activation_id: str = Field(primary_key=True)
+    runtime_pid: int
+    runtime_started_at: datetime
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleStartupActivation(SQLModel, table=True):
+    """One attempt per role/runtime; audit is separate from service readiness."""
+    __tablename__ = "role_startup_activations"
+    __table_args__ = (Index("ix_role_startup_latest", "project_id", "member_id", "created_at"),)
+    project_id: str = Field(primary_key=True)
+    activation_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True)
+    enabled: bool
+    preference_revision: int
+    expected_generation: int
+    status: str = "pending"
+    lease_hash: Optional[str] = None
+    lease_expires_at: Optional[datetime] = None
+    launch_id: Optional[str] = None
+    recovery_id: Optional[str] = None
+    error_code: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoleStartupPreferenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: StrictBool
+
+
+class ProjectStartupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    activation_id: str = PydField(pattern=r"^[a-f0-9]{32}$")
 
 
 class RoleDeletion(SQLModel, table=True):
@@ -4151,6 +4203,7 @@ class ProjectRoleListItem(BaseModel):
     binding_state: Optional[str] = None
     service: Optional[ProjectRoleServiceOut] = None
     deletion: Optional[dict] = None
+    startup: Optional[dict] = None
 
 
 class RoleCredentialRotateOut(BaseModel):
