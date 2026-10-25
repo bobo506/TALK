@@ -1,5 +1,9 @@
 # 退出闭环正常加载方案（337复验已通过）
 
+**2026-10-25 23:17实际完成：** 用户明确“是”授权本方案一次正常后台重载。原stop --wait返回0/stopped，回执省略activation原值；UTC15:12:55原13252及11去重PID全absent、五角色stopped/无owner后启动新runtime4956（UTC15:13:22.151066）。新shutdown=idle且其余初始字段为空，startup一轮complete、worker无错、五宿主serving；小D按用户true/rev1自动gen80/ins_3d1a0388545c/PID7868 ready/idle，真实同实例心跳60.090351秒，另四停止。APIuptime15705→15909连续，五binding/配置/要求/偏好及250/286完整公开响应相同。
+
+本片正常加载已完成，无需再次重启API或后台。停止对象为旧版，phase unknown属于兼容；没有为验证新版阶段再停第二次，真实生产故障注入/断电/完整异常恢复不外推。275/236/旧冻结及332至337原材料保持，产品仍b9e2de0；证据`.tmp/runtime-shutdown-fix1/deployment-20261025/`中的before/stop-result/stopped/start-request/ready/heartbeat/RESULT/freeze-and-archives.json。本次许可已执行，后续新停启仍按明确任务边界处理。下方保留原始可审方案与当时未执行状态，不代表当前仍待执行。
+
 2026-10-25。本方案已准备，尚未执行生产停启。337正式2983 complete、无必须修正项，原17份154086字节交付已核验归档并收取；产品仍b9e2de0，没有后续产品/正式测试修改。上片选择性自启动的一次正常停启许可已执行，本片生产加载不由该旧许可自动延伸。
 
 ## 当前只读事实

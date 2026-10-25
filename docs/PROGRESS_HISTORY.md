@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-10-25 23:17：退出闭环一次正常加载完成，小D自动恢复并核真实心跳
+
+用户在337闭合后“是否按具体方案正常重载后台一次、API不动”的问题回复“是”。按本次明确授权执行，身份agent:codex / prj_e8fe7066bbec / lead；UTC15:11:23预检runtime13252/五宿主/当前DSH桥共11个去重PID均present且有创建时刻，无running任务、worker空闲无错、小Dgen78/原实例idle/ready，其它四停止。小D用户true/rev1与另四false保持；五完整binding/配置/要求/偏好和250/286全公开响应保存。
+
+原stop --apply --wait --wait-seconds300仅执行一次，返回0、stop_status=stopped、error_code=null且不输出activation，旧后台没有shutdown，nested phase=unknown如实保留为兼容。UTC15:12:55原11PID全部absent、旧后台stopped、五角色stopped/无owner，保护项相同后，才通过原serve --apply --attach-api --detach启动新runtime4956（UTC15:13:22.151066）。没有强杀/CAS/清锁/删除状态来伪造退出；没有第二停止循环。
+
+新runtime实际running/present，shutdown.phase=idle、pending=[]、started_at/completed_at/error_code均null，证明本片退出进度加载；startup_state=complete/attempts1、startup/worker无错、五宿主serving。小D按用户已保存true/rev1由本代自动入队，launch与新gen80/ins_3d1a0388545c/PID7868一致，ready/idle；其它四false/rev0/not_selected/stopped无owner。没有手动start、PUT偏好或重放activation。UTC15:14:47同实例/同PID/同代/同activation真实心跳由15:13:27.105622推进至15:14:27.195973，60.090351秒，未产生running任务。
+
+API持续健康、uptime15705→15909秒，没有停止/重启/接管外部API或另启第二API；五完整binding、角色公开配置、项目要求、用户偏好及250/286整份公开任务与本轮before逐字段相同。250failed/2767未收取、286queued/accepted/paused保持。仅原CLI消费既有清单、原human正常认证GET和已授权正常生命周期操作；无额外生产配置正文/Key/DB/私有state/HOME/native/session/log读取，不追加恢复或删除操作。
+
+275新/236原、旧63/116/162/197及332至336原材料和337原17份154086字节重新哈希校验无错配；四个产品/测试/指南/补正合同路径仍与275冻结一致，产品保持b9e2de0。337独立13等待/25原探针/55固定码及协调51证据口径不变，336原partial和环境失败保留。本次完成正常加载/旧代停止等待及新代恢复验证，不冒称新后台各失败阶段的生产注入、真实断电/OS重启、整项在途任务恢复或全部原生能力通过。全部操作与原始公开证据保存runtime-shutdown-fix1/deployment-20261025/。
+
+当前只维护六份协调/加载文档并本地提交，无产品/正式测试改动，按用户纯文档不单独推送；本次一次停启许可已执行，不继续第二循环、派复核或自动开启下一无关片。
+
 ## 2026-10-25 23:07：337独立complete已收取，正常加载方案准备但未执行
 
 337正式succeeded/submitted/2983为合法complete，无unfinished/blocked/must_fix；结果作者/Hall/基线/任务号与本地delivery一致，原17份154086字节逐项SHA归档pickup337/337-original-review。本人13项StopWaitTests日志SHA及结构化13/0F/0E/0S、25原探针逐字节副本、三方对比无状态/其它运行差异、六状态回执形状/55固定码保留与未知值拒绝/只读断言均已核，MF-1/MF-2关闭。UTC15:04:40.581208正常收取completed，336原partial/2982/19份及原正式47沙箱7F/22E保持，不追改。
