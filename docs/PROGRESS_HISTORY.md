@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-25 23:07：337独立complete已收取，正常加载方案准备但未执行
+
+337正式succeeded/submitted/2983为合法complete，无unfinished/blocked/must_fix；结果作者/Hall/基线/任务号与本地delivery一致，原17份154086字节逐项SHA归档pickup337/337-original-review。本人13项StopWaitTests日志SHA及结构化13/0F/0E/0S、25原探针逐字节副本、三方对比无状态/其它运行差异、六状态回执形状/55固定码保留与未知值拒绝/只读断言均已核，MF-1/MF-2关闭。UTC15:04:40.581208正常收取completed，336原partial/2982/19份及原正式47沙箱7F/22E保持，不追改。
+
+337实际reuse_session续336原窗/count2，末396713/1000000=39.6713%；不列native原文ID。原275/236及旧63/116/162/197与332至336副本哈希保持，产品仍b9e2de0无修改。协调方旧47/新51正常权限代跑经337独立核字节/命令/合成根/日志/结果；其本人运行范围为13+25+定向，不冒称本人全量51，ACL/隐藏进程限制和startup timeout仅核材料的边界保留。不再为非阻断观察派复核或返修。
+
+UTC15:04:44正常human公开GET及原CLI status只读预检：runtime13252仍UTC12:04:08旧进程running/present、startup complete、external API、worker空闲无错、五宿主serving，没有本片shutdown字段。小Dgen78/ins_9c7bcef519c6 running/ready，另四stopped/无owner，无running任务；小D用户true/revision1/UTC10:50:31和另四false/rev0保持。与上片自动启动最终heartbeat快照逐字段比较，五完整binding、角色公开配置、项目要求、偏好和250/286完整公开任务相同；250failed/2767未收取、286paused保持。API uptime15307秒，API无本片变更，无需再次重启。
+
+当前只完成核验/归档/收取/只读现状及可审加载方案；没有生产启停/加载/偏好写入、额外配置正文/Key/DB/私有state/native/session/log读取。先前自启动片一次后台重载许可已执行，不扩为本片新停启。加载方案已写docs/spec/PROJECT_RUNTIME_SHUTDOWN_DEPLOYMENT_20261025.md：本次另确认后刷新预检、原stop --wait确认旧进程确实退出、API不动、原attach-api/detach启动一次新后台，保用户选择观察小D自动ready和≥60秒真实心跳，完整核保护项。旧后台缺阶段时phase unknown属于兼容，不冒称新版阶段生产验证；不为可选覆盖停第二次或强造失败。本轮仅本地文档/Git收尾，按用户纯文档不必单独推送，下一无关片先确认。
+
 ## 2026-10-25 21:34：336两项回执补正已推送并交337一次定向复验
 
 b9e2de0a1ecd23e6f52dfd68dc6ed7266b8b2253已按用户当前功能有代码更新可推送的授权普通推送到既有公开分支。275份9350812字节新源/快照零漂移；原236份8982718字节、336原19份264144字节及旧63/116/162/197和332至335原材料逐项哈希保持。新正式51项与旧47正常权限代跑、原25探针记录口径如上一节；不将协调代跑冒称DeepSeek本人全权限通过，不改336原partial/沙箱7F22E。
