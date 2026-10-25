@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-26 00:10：忙任务停机保护开发、自检完成，待冻结首审
+
+用户在下一片范围问题中明确选择“先做忙任务停机保护，显示阻挡任务”，延续Codex开发/DeepSeek独立核实；实际身份agent:codex / prj_e8fe7066bbec / lead已核。上片337/正常加载保持，一次一片，不实现完整中断恢复。
+
+角色stop在原BEGIN IMMEDIATE中检查同目标/当前实例与未知实例的running或残余claim/lease、当前归属实例busy/current_task_id。409仅输出固定code、最多20正整数任务引用、总数与busy，拒绝不改世代/动作/任务/租约/实例。未领取无租约queued、已撤销领取paused根、无领取终态及明确其它实例不阻挡。stop与claim同写锁，stop接受后拒绝新claim；过期重排commit后补重取锁与最新状态，旧续租/完成及无受管关联全局行为保持。页面实际共享函数显示编号/占用且不合并停止状态；宿主转有限结构、后台沿原重试保留Popen/API，stop --wait给blocked引用，不自动取消/强杀。旧55固定码报告不改，本片新增role_service_busy。
+
+新增19项首轮5F、补夹具后1F均保留，原因是启动迁移/客户端启动锁/专属身份全局创建限制；修为显式迁移合成旧行、两客户端先启动、合成历史全局行，原断言与保护保持。最终正常ACL权限严格隔离221Python零F/E/S，包含19新、真实WAL两序竞争、过期重排间隙另一连接stop、拒绝前后四类整行相同及旧生命周期/合成子进程。31页面含3新全过，真实HTTP409→实际app函数→完整workspace详情/按钮；扩大全部350Node为333过/17失败，改动前7c61f8b副本五模块复现相同17失败位置，不扩片改其它页面，不称全前端通过。
+
+UTC16:06公开核对DSH gen80原ins_3d1a0388545c/PID7868 idle、五完整binding/要求与开工相同、无running任务，250failed/2767未收取及286queued/accepted/paused原公开响应保存。runtime4956与用户true/rev1保持，本轮无生产启停/加载、偏好PUT或生产DB/private/HOME/native/log读取，原一次停启许可不延伸。准备普通代码推送/新工作线冻结首审，证据.tmp/role-busy-stop-v1/，详[合同](spec/ROLE_BUSY_STOP_GUARD_20261025.md)。
+
 ## 2026-10-25 23:17：退出闭环一次正常加载完成，小D自动恢复并核真实心跳
 
 用户在337闭合后“是否按具体方案正常重载后台一次、API不动”的问题回复“是”。按本次明确授权执行，身份agent:codex / prj_e8fe7066bbec / lead；UTC15:11:23预检runtime13252/五宿主/当前DSH桥共11个去重PID均present且有创建时刻，无running任务、worker空闲无错、小Dgen78/原实例idle/ready，其它四停止。小D用户true/rev1与另四false保持；五完整binding/配置/要求/偏好和250/286全公开响应保存。

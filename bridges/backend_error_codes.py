@@ -13,6 +13,7 @@ RUNTIME_ERROR_CODES = frozenset({
 })
 
 HOST_ERROR_CODES = frozenset({
+    "role_service_busy",
     "binding_fingerprint_mismatch", "choice_unverified", "cli_command_unresolved", "cli_executable_option_unsupported",
     "cli_incompatible", "cli_missing", "execution_timeout_invalid", "host_unreachable",
     "identity_mismatch", "member_required", "model_alias_unresolved", "operator_key_missing",

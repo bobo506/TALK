@@ -142,6 +142,7 @@
 - 只有任务目标 Agent 可以领取该任务。
 - claim 使用条件更新保证并发领取只有一个请求成功；同一实例重复 claim 当前任务保持幂等。
 - 可传 `instance_id`，且该实例必须属于当前 Agent。
+- 忙任务停机保护：新领取与受管角色关闭在同一实际写锁下检查；任务项目或所指定实例的项目角色已接受关闭且仍持有进程归属时，返回409/`role_service_stopping`，不领取。过期重排提交后须重取锁及最新状态；已运行任务的幂等领取、续租/完成与无受管关联的旧全局任务保持原协议。参见[本片合同](ROLE_BUSY_STOP_GUARD_20261025.md)。
 - 可传 `lease_seconds`（默认 120 秒，范围 5–3600 秒）；成功领取生成私有 `claim_token`、递增 `attempt` 并返回 `lease_expires_at`。
 - `clarification_requested / clarification_answered / needs_decision` 均不能直接领取；B 必须完成澄清协议并显式接受。旧客户端从 `assigned` 直接领取仍兼容。
 - 领取后执行状态变为 `running`、协作状态变为 `in_progress`；关联实例会变为 `busy`，并写入 `current_task_id`。

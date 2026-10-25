@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-26 00:10：用户选择下一片忙任务停机保护，Codex开发/DeepSeek独立核实。409显示有限阻挡任务引用，领取/关闭同写锁、关闭接受后不再领取，页面与后台等待反馈已接通；221Python/31相关Node自检通过，扩大前端17旧失败在改动前HEAD复现。待冻结首审，生产runtime4956/DSH gen80与保护项保持，未加载/启停，不外推完整任务中断恢复；详[合同](spec/ROLE_BUSY_STOP_GUARD_20261025.md)及[进度](PROGRESS.md)。
+
 2026-10-25 23:17：用户明确授权后退出闭环已正常加载，stop --wait实际确认旧13252/11原PID退出，新runtime4956/shutdown idle/五宿主serving；API未重启。小D按原true/rev1自动gen80/ready/idle，同实例心跳60.090351秒，另四停止，完整保护项保持；详[进度](PROGRESS.md)。本轮无产品改动，不再追加停启/复核。
 
 2026-10-25 23:07：337 complete/2983已核验收取，无必须修正，13等待/25原探针/55固定码独立通过；17份原交付归档，冻结保持。退出闭环首片代码复核闭合，但runtime13252仍旧无shutdown，尚未生产加载；API不需重启，[正常加载方案](spec/PROJECT_RUNTIME_SHUTDOWN_DEPLOYMENT_20261025.md)待本次后台重载许可。小Dtrue/rev1、五绑定/要求/250/286保持，详[进度](PROGRESS.md)。

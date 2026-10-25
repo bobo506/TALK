@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-26 00:10忙任务停机保护片：用户明确选择“先做忙任务停机保护，显示阻挡任务”，Codex开发/DeepSeek独立核实。原写事务内409有限任务引用、stop/claim串行守卫（过期重排提交后重取锁）、实例占用保守拒绝、页面中文及后台blocked回执已接通，不自动取消/伪报原生退出。221关联Python含19新、31页面含3新通过；扩大350Node为333过/17旧失败，改动前HEAD副本复现同17位置，原夹具失败保留。待提交/冻结首审，不称独立通过或生产加载。runtime4956/DSH gen80原实例idle、五绑定/要求及250failed/2767未收取、286paused保持；无本轮生产启停/PUT/私有读取。原停启许可已用，完整消息/preflight/原生子链与任务恢复不在本片。详[合同](docs/spec/ROLE_BUSY_STOP_GUARD_20261025.md)与[进度](docs/PROGRESS.md)。
+
 - 2026-10-25 23:17正常加载闭合：用户明确“是”授权本片一次后台重载；stop --wait返回0/stopped且无activation原值，旧13252/11去重原PID全absent、五角色stopped无owner后，原attach-api/detach启动runtime4956/UTC15:13:22，shutdown idle空初始字段、startup一轮complete/五宿主serving。小D保用户true/rev1自动gen80/ins_3d1a0388545c/ready/idle，同实例真实心跳60.090351秒；另四false/not_selected/停止。APIuptime15705→15909连续，五binding/角色配置/要求/偏好/250/286完整公开任务保持。无手动start/PUT/额外停启或私有读取，275/236/旧冻结及332至337归档保持。337独立闭合和本片加载完成，旧后台phase unknown不冒称新版失败阶段生产验证；当前仅本地文档/Git收尾不单独推送，下一无关片先确认。详[进度](docs/PROGRESS.md)。
 
 - 2026-10-25 23:07337闭合：正式complete/2983已核验收取completed，无新增必须修正；本人13等待测试+25原探针+六状态/55固定码独立通过，协调方51证据已核但不冒称其本人全量运行。17份154086字节原交付归档，275/原236/旧冻结及332至336材料保持；实际续336/count2/末39.6713%。UTC15:04:44只读实核runtime13252仍旧无shutdown、五宿主serving、小Dgen78/原实例ready，其它四停止；偏好true/rev1及五binding/角色配置/要求/250/286整份公开任务均同上片。API持续健康无需重启；本片尚未加载。[具体加载方案](docs/spec/PROJECT_RUNTIME_SHUTDOWN_DEPLOYMENT_20261025.md)已准备待本次后台重载许可，旧一次许可不自动延伸。本轮无停启/改偏好/额外私有读取，不追加复核/下一片；仅本地文档/Git收尾，纯文档不单独推送。

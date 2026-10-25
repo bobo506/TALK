@@ -47,6 +47,7 @@ from server.models import (
     ProjectAgent,
     ProjectRole,
     RoleDeletion,
+    RoleServiceState,
     ProjectRolePolicy,
     TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS,
     TASK_AUTHORIZED_SLICE_BUDGET_DEFAULT,
@@ -105,6 +106,16 @@ def _get_schedule(schedule_id: int, current: Member, session: Session) -> AgentT
     if current.kind != "human" and schedule.target_member_id != current.id and schedule.created_by != current.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="schedule not found")
     return schedule
+
+
+def _ensure_role_not_stopping_for_claim(task, instance, member_id, session):
+    # A managed process can serve global tasks too; its instance project remains
+    # relevant even when task.project_id is absent or names another project.
+    projects = {task.project_id, instance.project_id if instance is not None else None} - {None}
+    for project_id in projects:
+        service = session.get(RoleServiceState, (project_id, member_id))
+        if service is not None and service.process_launch_id is not None and service.desired_state == "stopped":
+            raise HTTPException(status_code=409, detail="role_service_stopping")
 
 
 def _ensure_target_agent(member_id: str, session: Session) -> Member:
@@ -2801,6 +2812,7 @@ def claim_task(
     if task.status == "running" and _lease_expired(task, now):
         _try_requeue_expired_task(task, now, session)
         session.commit()
+        begin_immediate_write(session)
         session.expire_all()
         task = _get_task(task_id, session)
         instance = _ensure_instance_owner(body.instance_id, current, session)
@@ -2856,6 +2868,8 @@ def claim_task(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"task workflow is {task.workflow_status}, not ready to start",
         )
+
+    _ensure_role_not_stopping_for_claim(task, instance, current.id, session)
 
     claim_token = uuid4().hex
     claim_conditions = [

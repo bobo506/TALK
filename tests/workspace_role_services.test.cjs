@@ -8,6 +8,11 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const wsSource = fs.readFileSync(require.resolve('../web/workspace.js'), 'utf8');
+// Exercise the actual shared formatter used by the HTML page, including structured 409s.
+const appSource = fs.readFileSync(require.resolve('../web/app.js'), 'utf8');
+const errorFormatter = appSource.slice(appSource.indexOf('async function readErrorDetail('),
+  appSource.indexOf('// ── @ Autocomplete', appSource.indexOf('async function readErrorDetail(')));
+assert.ok(errorFormatter.includes('async function readErrorDetail('));
 
 function fakeEl(tag) {
   const classes = new Set();
@@ -186,10 +191,6 @@ function harness({ human = true, roster = [] } = {}) {
       requests.push({ url, opts });
       return new Promise((resolve, reject) => pending.push({ url, opts, resolve, reject }));
     },
-    readErrorDetail: async (res, fallback) => {
-      try { const body = await res.json(); if (typeof body?.detail === 'string' && body.detail) return body.detail; } catch (_) {}
-      return fallback;
-    },
     taskStatusMeta: () => ({ label: '执行中', className: 'running' }),
     formatTaskTime: () => '10-11 10:00',
     selectWorkspaceTask: () => {},
@@ -218,6 +219,7 @@ function harness({ human = true, roster = [] } = {}) {
     userBadge: getEl('user-badge'),
   });
   context.renderTaskDetailsPanel = () => { context.renderWorkspaceRoleDetails(); };
+  vm.runInContext(errorFormatter, context);
   vm.runInContext(wsSource, context);
   vm.runInContext('this.__roleServiceUI = roleServiceUI; this.__workspaceUI = workspaceUI;', context);
   const roleServiceUI = context.__roleServiceUI;
@@ -283,6 +285,50 @@ function harness({ human = true, roster = [] } = {}) {
 }
 
 // ── 门控：只有 managed_cli 才可能启用启动 ───────────────────────────────────
+test('忙任务真实 API 409 → 实际共享错误函数 → 详情控件：保持运行且可重试', async () => {
+  const body = process.env.TALK_BUSY_STOP_RESPONSE
+    ? JSON.parse(fs.readFileSync(process.env.TALK_BUSY_STOP_RESPONSE, 'utf8'))
+    : { detail: { code: 'role_service_busy', task_ids: [42], task_count: 1, instance_busy: true } };
+  const running = serviceRow({ observed: 'running', desired: 'running', readiness_service: 'ready',
+    can_stop: true, ownership_held: true, can_start: false });
+  const h = harness({ roster: [{ member_id: 'agent:managed', service: running }] });
+  h.setPollDelay(60000);
+  await h.enterRoles();
+  h.stopBtn('agent:managed').fire('click'); await h.flush();
+  const index = h.requests.findIndex(r => /\/service\/stop$/.test(r.url));
+  assert.ok(index >= 0);
+  h.reply(index, body, { ok: false, status: 409 }); await h.flush();
+  for (const id of body.detail.task_ids) assert.ok(h.hint('agent:managed').includes(`#${id}`));
+  assert.ok(h.hint('agent:managed').includes('暂不能关闭'));
+  assert.equal(h.state('agent:managed'), '启动成功');
+  assert.equal(h.roleServiceUI.overlay.has('agent:managed'), false);
+  assert.equal(h.stopBtn('agent:managed').disabled, false);
+  assert.equal(h.stopRequests().length, 1);
+  assert.equal(h.requests.some(r => /cancel|complete/.test(r.url)), false);
+});
+
+test('忙任务格式化有界且不回显任意字段，只有实例占用时不伪造任务编号', async () => {
+  const h = harness();
+  const format = detail => h.context.readErrorDetail({ json: async () => ({ detail }) }, 'fallback');
+  const message = await format({ code: 'role_service_busy', task_ids: [true, -1, 0, 'PRIVATE', 2 ** 53, 42, 42,
+    ...Array.from({ length: 40 }, (_, i) => i + 1)], task_count: 50, token: 'PRIVATE-TOKEN' });
+  assert.ok(message.includes('#42、#1'));
+  assert.ok(message.includes('等50项'));
+  assert.equal((message.match(/#/g) || []).length, 20);
+  assert.ok(!message.includes('PRIVATE'));
+  const busy = await format({ code: 'role_service_busy', task_ids: [], task_count: 0, instance_busy: true, current_task_id: 777 });
+  assert.ok(busy.includes('执行占用'));
+  assert.ok(!busy.includes('#'));
+  assert.equal(await format({ code: 'PRIVATE', task_ids: [42] }), 'fallback');
+});
+
+test('共享错误函数原字符串、验证数组和不可读响应保持', async () => {
+  const h = harness();
+  assert.equal(await h.context.readErrorDetail({ json: async () => ({ detail: 'already_stopped' }) }, 'fallback'), 'already_stopped');
+  assert.equal(await h.context.readErrorDetail({ json: async () => ({ detail: [{ msg: 'invalid' }] }) }, 'fallback'), 'invalid');
+  assert.equal(await h.context.readErrorDetail({ json: async () => { throw Error(); } }, 'fallback'), 'fallback');
+});
+
 test('门控：managed_cli + can_start 可启动；unknown/external_session/service=null 禁用并有如实提示', async () => {
   const h = harness({
     roster: [

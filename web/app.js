@@ -3896,6 +3896,14 @@ async function readErrorDetail(res, fallback) {
     if (typeof body?.detail === "string" && body.detail) {
       return body.detail;
     }
+    if (body?.detail?.code === "role_service_busy") {
+      const detail = body.detail;
+      const ids = Array.isArray(detail.task_ids)
+        ? [...new Set(detail.task_ids.filter(id => Number.isSafeInteger(id) && id > 0))].slice(0, 20) : [];
+      const count = Number.isSafeInteger(detail.task_count) && detail.task_count >= ids.length ? detail.task_count : ids.length;
+      const tasks = ids.length ? `任务 ${ids.map(id => `#${id}`).join("、")}${count > ids.length ? ` 等${count}项` : ""}仍在执行，` : "该角色仍有执行占用，";
+      return `${tasks}暂不能关闭。请等待执行结束后重试。`;
+    }
     if (Array.isArray(body?.detail) && body.detail.length > 0) {
       return body.detail.map((item) => item.msg || JSON.stringify(item)).join("; ");
     }

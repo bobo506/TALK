@@ -1079,7 +1079,13 @@ class TalkHostClient:
         if status >= 400:
             detail = ""
             if isinstance(payload, dict):
-                detail = str(payload.get("detail") or "")
+                raw_detail = payload.get("detail")
+                from bridges.stop_blockers import BUSY_STOP_CODE, safe_stop_blockers
+                if status == 409 and isinstance(raw_detail, dict) and raw_detail.get("code") == BUSY_STOP_CODE:
+                    error = HostError(BUSY_STOP_CODE, "角色仍有执行占用，暂不能关闭")
+                    error.stop_blockers = safe_stop_blockers(raw_detail)
+                    raise error
+                detail = str(raw_detail or "")
             raise HostError(detail or f"http_{status}", f"HTTP {status}")
         return payload if isinstance(payload, dict) else {"data": payload}
 

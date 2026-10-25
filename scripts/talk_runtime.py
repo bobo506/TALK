@@ -25,6 +25,7 @@ from scripts.role_provision import key_file_path
 from scripts.role_provision_worker import RoleProvisionWorker
 from scripts.role_service_recovery import recorded_process_state
 from bridges.backend_error_codes import HOST_ERROR_CODES, RUNTIME_ERROR_CODES
+from bridges.stop_blockers import BUSY_STOP_CODE, safe_stop_blockers
 
 
 class RuntimeErrorCode(RuntimeError):
@@ -66,12 +67,15 @@ def wait_for_stop(private, expected, seconds, *, clock=time.monotonic, sleeper=t
         raise RuntimeErrorCode("runtime_stop_wait_budget_invalid")
     identity = _runtime_identity(expected)
     deadline = clock() + seconds
-    phase, detail = "unknown", None
+    phase, detail, blockers = "unknown", None, None
 
     def result(status, code=None):
-        return {"action": "stop", "stop_status": status, "error_code": code,
+        value = {"action": "stop", "stop_status": status, "error_code": code,
                 "pid": identity[1],
                 "shutdown": {"phase": phase, "error_code": detail}}
+        if detail == BUSY_STOP_CODE and blockers is not None:
+            value["shutdown"]["blocking_tasks"] = blockers
+        return value
 
     while True:
         try:
@@ -87,6 +91,7 @@ def wait_for_stop(private, expected, seconds, *, clock=time.monotonic, sleeper=t
         phase = raw_phase if isinstance(raw_phase, str) and raw_phase in SHUTDOWN_PHASES else "unknown"
         detail = shutdown.get("error_code")
         detail = detail if isinstance(detail, str) and detail in SHUTDOWN_ERROR_CODES else None
+        blockers = safe_stop_blockers(shutdown.get("blocking_tasks")) if detail == BUSY_STOP_CODE else None
         state = recorded_process_state(current["pid"], current.get("seen_at"))
         if current.get("state") == "stopped" and state in EXITED_PROCESS_STATES:
             return result("stopped")
@@ -237,6 +242,7 @@ class TalkRuntime:
         self.shutdown_started_at = None
         self.shutdown_completed_at = None
         self.shutdown_error = None
+        self.shutdown_blockers = None
         self._shutdown_seen = 0.0
 
     def event(self, event, *, context=None, exc=None, component="runtime"):
@@ -277,6 +283,9 @@ class TalkRuntime:
         value["shutdown"] = {"phase": self.shutdown_phase, "pending_members": self.shutdown_pending,
             "started_at": self.shutdown_started_at, "completed_at": self.shutdown_completed_at,
             "error_code": self.shutdown_error}
+        blockers = safe_stop_blockers(self.shutdown_blockers)
+        if self.shutdown_error == BUSY_STOP_CODE and blockers is not None:
+            value["shutdown"]["blocking_tasks"] = blockers
         value["worker_completed_at"]=self.worker_completed_at
         try:
             rsh._publish_private_bytes(self.private / "health.json", json.dumps(value).encode())
@@ -554,6 +563,7 @@ class TalkRuntime:
         self.shutdown_started_at = self.shutdown_started_at or utcnow()
         previous_shutdown_error = self.shutdown_error
         self.shutdown_error = None
+        self.shutdown_blockers = None
         self._shutdown_progress("waiting_startup")  # Invalidates startup before awaiting its writer.
         self.event("backend_stopping", context={"stage": "shutdown"})
         self._shutdown_join(self.startup_thread, 70, "runtime_startup_stop_timeout")
@@ -568,7 +578,12 @@ class TalkRuntime:
                 roles = {r["member_id"]:r for r in self.roles()}
                 service = roles.get(member, {}).get("service") or {}
                 if service.get("can_stop"):
-                    self.request("POST", f"/api/projects/{self.project}/roles/{member}/service/stop")
+                    try:
+                        self.request("POST", f"/api/projects/{self.project}/roles/{member}/service/stop")
+                    except rsh.HostError as exc:
+                        if exc.code == BUSY_STOP_CODE:
+                            self.shutdown_blockers = safe_stop_blockers(getattr(exc, "stop_blockers", None))
+                        raise
         deadline = self.clock() + 90
         while self.clock() < deadline:
             roles = {r["member_id"]:r for r in self.roles()}

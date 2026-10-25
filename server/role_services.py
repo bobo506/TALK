@@ -33,10 +33,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import update
+from sqlalchemy import func, or_, update
 from sqlmodel import Session, select
 
 from server.db import begin_immediate_write
+from bridges.stop_blockers import BUSY_STOP_CODE, STOP_BLOCKER_LIMIT, safe_stop_blockers
 from server.models import (
     ROLE_AUTO_START_ACTOR,
     ROLE_SERVICE_ACTION_START,
@@ -102,6 +103,7 @@ from server.models import (
     RUNNER_CONTROL_MANAGED_CLI,
     RUNNER_CONTROL_UNKNOWN,
     AgentInstance,
+    AgentTask,
     Member,
     Project,
     ProjectAgent,
@@ -654,6 +656,31 @@ def _idempotent_stopped(
     )
 
 
+def _stop_blockers(state, start_launch, session):
+    """Read finite execution references while the stop writer lock is held.
+
+    A stale lease is still evidence of an unfinished executor. Never clear it
+    or infer process exit here; another known instance is outside this stop.
+    """
+    instance_id = state.observed_instance_id or start_launch.expected_instance_id
+    conditions = [
+        AgentTask.target_member_id == state.member_id,
+        or_(AgentTask.status == "running", AgentTask.claim_token.is_not(None),
+            AgentTask.lease_expires_at.is_not(None)),
+        or_(AgentTask.instance_id == instance_id, AgentTask.instance_id.is_(None),
+            AgentTask.instance_id == ""),
+    ]
+    count = session.exec(select(func.count()).select_from(AgentTask).where(*conditions)).one()
+    ids = list(session.exec(select(AgentTask.id).where(*conditions)
+                           .order_by(AgentTask.id).limit(STOP_BLOCKER_LIMIT)).all())
+    instance = session.get(AgentInstance, instance_id) if instance_id else None
+    busy = bool(instance and instance.member_id == state.member_id and instance.project_id == state.project_id
+                and instance.launch_id == state.process_launch_id and
+                (instance.status == "busy" or str(instance.current_task_id or "").strip()))
+    return safe_stop_blockers({"code": BUSY_STOP_CODE, "task_ids": ids,
+                               "task_count": count, "instance_busy": busy})
+
+
 def stop_role_service(
     project_id: str, member_id: str, operator: Member, session: Session
 ) -> RoleServiceStopOut:
@@ -708,6 +735,10 @@ def stop_role_service(
         or start_launch.member_id != member_id
     ):
         raise _fail(status.HTTP_409_CONFLICT, ROLE_SERVICE_ERROR_UNKNOWN_OWNER)
+
+    blockers = _stop_blockers(state, start_launch, session)
+    if blockers:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blockers)
 
     old_generation = state.generation or 0
     new_generation = old_generation + 1
