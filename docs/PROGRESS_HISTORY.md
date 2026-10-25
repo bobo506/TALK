@@ -2,6 +2,8 @@
 
 ## 2026-10-25 20:08：用户明确授权正常后台换代，小D真实自动启动通过
 
+2026-10-25 20:10收尾补记：本地`5214d9b`已提交五份进度/加载文档，git push到origin/codex/terminal-return-codex被自动审批在执行前拒绝，理由为具体GitHub目的地可信授权不足及内部内容外传风险。只读GitHub get_repo确认bobo506/TALK为公开仓库、当前连接有push权限；不将连接权限等同发布授权。已另明确询问用户是否允许将本次内部任务编号/运行状态文档推送到该公开分支，未重试、未改用其它通道。功能正常停启和真实自动启动验证均保持通过；本轮后续仅记录此收尾待确认项。
+
 用户在“是否授权按既定方案正常停启后台一次、API无需重启且不改选择”的明确问题后回复“好的”。本轮按该具体授权执行，原18:37自动审批拒绝记录保留，不将其改写成已获批。实际协调身份agent:codex / prj_e8fe7066bbec / lead；既有human:bobo凭据仅正常认证公开API，原CLI消费既有talk-runtime.json；无额外生产配置正文、角色Key、DB/侧账本、私有state/HOME/native/session/log读取，不强杀/CAS/清锁。
 
 UTC12:01:40预检原runtime11280、12已知PID存活及创建时刻、五宿主serving、worker空闲/无错、无running任务；仅小D原gen76/ins_aa6223b0735e idle/ready。小Dtrue/revision1、其余四false/revision0保持，保存五完整binding/角色配置/项目要求及250/286完整公开响应。普通stop经原CLI接受后，先观察小Dgen77/stopped释放归属，再顺序等待宿主drain；UTC12:03:51原12PID全部absent、后台stopped、五角色stopped/无owner及保护项一致，才继续启动。中间两份stop-pending如实保留，没有重发stop。
