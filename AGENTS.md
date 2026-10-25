@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 13:42集中修正：332正式failed/2978 channel_busy保留；同Hall DeepSeek报告2977已独立交付failed/3必须修正/4失败断言，33份99053字节原材料已归档。Codex接手修MF-1旧API能力探测/unsupported及时放行宿主、MF-2正向boot证据、MF-3提交前复核/回滚，223关联及10兼容/原探针过（重合5，并集228），34定向也重合；UI未改原58Node保留。旧63冻结不变，新修正未生产加载。用户仅批准一次侧账本元数据只读，已执行owner15992 absent/lease过期/332attempt1仍started，说明旧native writer未闭环，不再只归因消息重叠；不读token/原生ID/正文/Key/日志、不改账本。定向恢复脚本10合成检查过，须human确认旧原生模型进程结束且另授权写入才能操作，当前请求待答复；仅父PID absent不足，未盲目删锁或重复派。待安全恢复再一次MF-1至3定向复验，Codex开发/DeepSeek核验及250/286保护保持。详[fix1](docs/spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)和精简进度。
+
 - 2026-10-25 12:51续332：用户明确要求角色恢复后发布任务并含兼容遗漏。已在原Hall发送补充2976，须先读coordination/RESUME_332_COMPATIBILITY_20261025.md；原63冻结/5831fd0产品不变，DeepSeek仍只复核、写根review/，只新增具名公开恢复证据只读，不授生产权限。human正式resume-tree HTTP200，原332 epoch0→1/active、非委派slice_budget0、正文不变，未新建重复任务。12:50:43任务queued/accepted尚未claim，12:51:09 DSH实例busy/current_task_id=2976是消息通道补充活动，不能称332已接或推测原生同窗。利用旧材料只补兼容/未完成缺口，一次提交全部必须修正项及非阻断观察，partial亦可正式提交；随后Codex集中修正/必要一次定向复验。产品/正式测试/冻结暂停，250/286保护，默认用户通知完成后取件，不主动等待/唤回。
 
 - 2026-10-25 12:42恢复：用户已暂停332、正常重启角色，原gen70归属已由用户正常关闭释放。新runtime11280自动加载本片代码而API仍旧、OpenAPI缺startup接口，8轮等待阻挡宿主使gen73未领取即120秒超时；五宿主随后serving。Codex仅正式start重试一次恢复DSH gen74/ins_9318d6d0efce/PID16492 ready/idle，距ready59.980973秒仍有同实例心跳；另四stopped/无owner，五完整binding/要求、250/2767及286全公开字段保持。332保持queued/accepted/paused，不自行恢复/替换/代report；产品/正式测试/63冻结不改。兼容遗漏列当前片集中修正项，不把部分runtime加载称新功能完整部署验收；原09:56退出原因仍未知。恢复证据coordination/restore-20261025/；只读helper固定public-api文件被后续检查覆盖已如实记录/改唯一名，旧摘要/rawtask/agents保留。下一步继续原332正式核验，已有探针与兼容项集中修正，避免新建重复任务。

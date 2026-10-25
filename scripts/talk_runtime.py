@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -152,6 +153,8 @@ class TalkRuntime:
         self.worker_completed_at = None
         self.activation_id = uuid.uuid4().hex
         self.startup_client = client
+        self.startup_probe_client = client
+        self.startup_support = None
         self.startup_thread = None
         self.startup_state = "pending"
         self.startup_attempts = 0
@@ -254,18 +257,40 @@ class TalkRuntime:
 
     def startup_tick(self):
         """One bounded HTTP round off the health loop; never replay a completed boot."""
-        if (self.stopping or self.startup_state in ("complete","failed")
+        if (self.stopping or self.startup_state in ("complete","failed","unsupported")
                 or (self.startup_thread and self.startup_thread.is_alive()) or self.clock()<self.startup_next):
             return
         if self.startup_attempts>=8:
             self.startup_state="failed"
             self.startup_error=self.startup_error or "startup_round_limit"
             return
-        self.startup_attempts+=1
         self.startup_state="processing"
         def run():
             delay=5
             try:
+                if self.startup_support is None:
+                    try:
+                        schema=self.startup_probe_client.request("GET","/openapi.json")
+                    except Exception:
+                        schema=None
+                    # An ordinary 404 is not capability proof. Require a
+                    # recognizable document plus the existing roles API.
+                    if (isinstance(schema,dict) and isinstance(schema.get("openapi"),str)
+                            and re.fullmatch(r"3\.\d+\.\d+",schema["openapi"])
+                            and isinstance(schema.get("paths"),dict)):
+                        paths=schema["paths"]
+                        roles=paths.get("/api/projects/{project_id}/roles")
+                        target=paths.get("/api/projects/{project_id}/role-services/startup")
+                        if isinstance(target,dict) and isinstance(target.get("post"),dict):
+                            self.startup_support="supported"
+                        elif (isinstance(roles,dict) and isinstance(roles.get("get"),dict)
+                              and (target is None or isinstance(target,dict) and "post" not in target)):
+                            self.startup_support="unsupported"
+                if self.startup_support=="unsupported":
+                    self.startup_state="unsupported"
+                    self.startup_error="startup_api_unsupported"
+                    return
+                self.startup_attempts+=1
                 result=self.startup_client.request("POST",f"/api/projects/{self.project}/role-services/startup",
                     {"activation_id":self.activation_id})
                 if (isinstance(result,dict) and result.get("activation_id")==self.activation_id
@@ -512,6 +537,7 @@ class TalkRuntime:
             journal.secrets = (*journal.secrets, self.operator)
         self.client = self.client or rsh.TalkHostClient(self.config["base_url"],self.operator,timeout=5)
         self.startup_client = self.startup_client or rsh.TalkHostClient(self.config["base_url"],self.operator,timeout=65)
+        self.startup_probe_client = self.startup_probe_client or rsh.TalkHostClient(self.config["base_url"],self.operator,timeout=3)
         try:
             if not self.attach_api:
                 self.start_api()
@@ -554,7 +580,7 @@ class TalkRuntime:
                 # Keep the old manager evidence intact until cold-boot recovery
                 # has finished. Provisioning can also create replacement hosts.
                 self.health()
-                if self.startup_state not in ("complete","failed") or (self.startup_thread and self.startup_thread.is_alive()):
+                if self.startup_state not in ("complete","failed","unsupported") or (self.startup_thread and self.startup_thread.is_alive()):
                     self.sleep(2)
                     continue
                 self.worker_tick()

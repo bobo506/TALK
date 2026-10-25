@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-25 13:42：332失败取件、三项集中修正与一次通道元数据核查
+
+332于12:59:48 attempt2领取、13:00:18正式failed/2978，execution_session_state reason channel_busy/unconfirmed，计数/原生回执不自补。DeepSeek此前已通过补充消息2977在同Hall交独立failed报告，含3必须修正/4失败断言；消息产物不倒写成正式任务成功，不收取失败332。源仍5831fd0、原63快照及17产品/测试一致后接手，33份99053字节REVIEW/checks/日志/探针逐项归档，原报告里“332仍暂停”等过时观察保留为当时作者表述，不追改。
+
+Codex集中实现MF-1公开OpenAPI短探测：只在可信旧API确缺startup POST时unsupported及时开放宿主、不发8次404、不伪complete；新APIpending/404/403/409/未知schema继续保护。MF-2就绪必须有当前boot正向时间；MF-3入队前后/旧start收敛前runtime和lease复核，失效同事务回滚。223关联Python通过，10兼容/原探针过（5官方兼容重合，5原探针另计），不同用例并集228；34定向也包含其中。UI未改，原58Node不为数字重跑。新修正未生产加载，不称独立修复通过。
+
+用户明确授权一次最小元数据只读，RO/query_only脚本先通过合成验证，只读取指定侧账本本项目DSH通道列并核PID，不用会初始化schema的Store构造器。实查owner_pid15992/stateheld、lease UTC01:59:25过期、updated01:56:25，owner absent；332/attempt1创建01:41:24仍started。故channel_busy不能仅归因消息重叠，也不能只靠租约超时认定native writer已结束。未读token/原生会话ID/正文/Key/日志，未修改账本；该一次许可已用。
+
+一次定向恢复协调脚本已准备并10项合成检查通过，当前未获写入授权/未生产apply：只有human明确确认旧native模型进程结束，且锁内核对原scope/PID/lease/代际与唯一attempt1后，才将其记interrupted、旧window tainted、同事务加审计；通道行保留、主TALK任务/结果不改、旧窗口不复用。确认不足不执行，已向用户提出分离的写入确认。先完成Git/冻结，安全恢复后一次定向复验，未盲目重复派已知会失败任务；250/286与模型Key绑定保护保持。详[fix1](spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)。
+
 ## 2026-10-25 12:51：原332正式恢复，兼容遗漏加入同次集中首审
 
 用户看到角色启动后明确“接下来发布任务…还有兼容遗漏”，据此续原332，不新建重复首审。Task Hall正常补充消息2976，指向coordination/RESUME_332_COMPATIBILITY_20261025.md及具名公开恢复证据，原生产读取/启停/产品写入禁令不变。要求利用已存review结果，只补未完成与旧API缺startup/8轮门控超过120秒TTL反例，不能为兼容弱化新版API下的冷恢复/未知归属/任务保护。一次列全部必须修正项/非阻断观察，partial/failed也正常交付后暂停，由Codex集中修正、必要一次定向复验，DeepSeek不开发。

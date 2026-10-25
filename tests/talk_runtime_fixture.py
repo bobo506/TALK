@@ -23,7 +23,7 @@ def me():return {'id':'human:runtime-fixture','kind':'human'}
 @app.get('/api/projects/{project}/roles')
 def roles(project):return []
 
-@app.post('/api/projects/{project}/role-services/startup')
-def startup(project,body:dict):
+@app.post('/api/projects/{project_id}/role-services/startup')
+def startup(project_id,body:dict):
     # Empty synthetic project; no server DB, production binding, or real roles.
     return {'activation_id':body['activation_id'],'complete':True,'results':[],'retry_after_seconds':5}

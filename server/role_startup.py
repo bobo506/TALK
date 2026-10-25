@@ -144,9 +144,16 @@ def _finish(row,status,error=None,launch=None):
 def _ready(state,current,cutoff):
     # A quick OS reboot can leave a <90s DB heartbeat. That old process cannot
     # be ready in this boot; require the full cold-recovery identity proof.
-    preboot=bool(state and state.process_started_at and cutoff is not None
-                 and _as_utc(state.process_started_at)<cutoff)
-    return bool(not preboot and current and current.observed=='running' and current.readiness_service=='ready')
+    current_boot=bool(state and state.process_started_at and cutoff is not None
+                      and _as_utc(state.process_started_at)>=cutoff)
+    return bool(current_boot and current and current.observed=='running' and current.readiness_service=='ready')
+
+def _complete(key,digest,status,session,*,launch=None):
+    # Keep the final health/lease check beside commit. Flushed launch/state
+    # changes roll back if the runtime stopped while checks were executing.
+    verified_runtime(key[0],key[1],session)
+    row=_locked_entry(key,digest,session)
+    _finish(row,status,launch=launch);session.add(row);session.commit()
 
 def _cold_recover(key,digest,operator,session,config,cutoff):
     """Only proven preboot ownership; current-boot failures remain manual."""
@@ -213,7 +220,7 @@ def _apply(key,digest,operator,session):
     current=project_role_service(key[0],key[2],session)
     already=_ready(state,current,cutoff)
     if already:
-        _finish(row,'already_running');session.add(row);session.commit();return
+        _complete(key,digest,'already_running',session);return
     if ownership_held(state):fail('startup_recovery_required')
     launch=session.get(m.RoleServiceLaunch,state.current_launch_id) if state and state.current_launch_id else None
     old_unclaimed=bool(cutoff is not None and launch and launch.action=='start'
@@ -225,17 +232,21 @@ def _apply(key,digest,operator,session):
         # A never-claimed preboot start has no child; invalidate it and persist
         # the activation's new baseline in the same ordinary stop transaction.
         row.expected_generation=int(state.generation)+1;session.add(row)
+        verified_runtime(key[0],key[1],session)
+        _locked_entry(key,digest,session)
         _idempotent_stopped(key[0],key[2],ctx.role.role_name,state,session,_now(),operator)
         _write_begin(session);row=_locked_entry(key,digest,session);state=_generation(row,session)
         verified_runtime(key[0],key[1],session)
         ctx=load_role_service_context(key[0],key[2],session)
     if state and state.observed_state in ('unknown','stopping'):fail('startup_recovery_required')
     if not row.enabled:
-        _finish(row,'not_selected');session.add(row);session.commit();return
+        _complete(key,digest,'not_selected',session);return
     _require_managed_cli(ctx)
+    verified_runtime(key[0],key[1],session)
+    _locked_entry(key,digest,session)
     launch=_enqueue_start_launch(ctx,key[0],key[2],session=session,now=_now(),
                                  actor_id='system:project-startup',expected_generation=row.expected_generation)
-    _finish(row,'enqueued',launch=launch.launch_id);session.add(row);session.commit()
+    _complete(key,digest,'enqueued',session,launch=launch.launch_id)
 
 def activate(project,activation,operator,session):
     human(operator);deadline=time.monotonic()+ROUND_SECONDS

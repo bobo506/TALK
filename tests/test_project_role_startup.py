@@ -313,3 +313,55 @@ class ProjectStartupTests(RoleServiceTestCase):
         with self.make_client() as client:
             response=client.get(f'/api/projects/{PROJECT_ID}/roles/{encode(self.role_a)}/service/recovery-plan',headers={'X-API-Key':'bobo-key'})
         self.assertEqual(response.json()['detail'],'recovery_recent_heartbeat')
+
+    def test_ready_requires_process_start_time_and_known_boot(self):
+        _,claim,_=self.cold(True)
+        with self.session() as session:
+            state=session.get(m.RoleServiceState,(PROJECT_ID,self.role_a));state.process_started_at=None
+            session.add(state);session.commit()
+        self.assertEqual(self.result()['error_code'],'recovery_identity_mismatch')
+        self.assertTrue(self.state_row().process_launch_id)
+        self.assertEqual(len(self.launch_rows()),1)
+        self.cutoff=None
+        self.assertEqual(self.result(activation='d'*32)['error_code'],'startup_boot_unverified')
+        self.assertTrue(self.state_row().process_launch_id)
+
+    def test_runtime_invalidation_after_expiry_scan_prevents_enqueue(self):
+        self.preference(True);valid={'value':True};original=startup.expire_due_launches
+        def verify(*args):
+            if not valid['value']:raise HTTPException(409,'startup_runtime_unverified')
+            return self.config,self.health,self.cutoff
+        def expire(*args,**kwargs):
+            result=original(*args,**kwargs);valid['value']=False;return result
+        with patch.object(startup,'verified_runtime',side_effect=verify),patch.object(startup,'expire_due_launches',side_effect=expire):
+            result=self.result()
+        self.assertEqual((result['status'],result['error_code']),('failed','startup_runtime_unverified'))
+        self.assertEqual(self.launch_rows(),[]);self.assertIsNone(self.state_row())
+
+    def test_runtime_invalidation_after_enqueue_rolls_back_launch_and_generation(self):
+        self.preference(True);valid={'value':True};original=startup._enqueue_start_launch
+        def verify(*args):
+            if not valid['value']:raise HTTPException(409,'startup_runtime_unverified')
+            return self.config,self.health,self.cutoff
+        def enqueue(*args,**kwargs):
+            result=original(*args,**kwargs);valid['value']=False;return result
+        with patch.object(startup,'verified_runtime',side_effect=verify),patch.object(startup,'_enqueue_start_launch',side_effect=enqueue):
+            result=self.result()
+        self.assertEqual((result['status'],result['error_code']),('failed','startup_runtime_unverified'))
+        self.assertEqual(self.launch_rows(),[]);self.assertIsNone(self.state_row())
+
+    def test_runtime_invalidation_also_rolls_back_preboot_stop(self):
+        launch=self.start().json()
+        with self.session() as session:
+            row=session.get(m.RoleServiceLaunch,launch['launch_id']);row.created_at=self.cutoff-timedelta(seconds=3)
+            session.add(row);session.commit()
+        original=startup.expire_due_launches;valid={'value':True};before=self.state_row().model_dump()
+        def verify(*args):
+            if not valid['value']:raise HTTPException(409,'startup_runtime_unverified')
+            return self.config,self.health,self.cutoff
+        def expire(*args,**kwargs):
+            result=original(*args,**kwargs);valid['value']=False;return result
+        with patch.object(startup,'verified_runtime',side_effect=verify),patch.object(startup,'expire_due_launches',side_effect=expire):
+            self.assertEqual(self.result()['error_code'],'startup_runtime_unverified')
+        self.assertEqual(self.state_row().model_dump(),before)
+        self.assertEqual(self.launch_row(launch['launch_id']).state,'pending')

@@ -19,6 +19,9 @@ class StartupRuntimeTests(unittest.TestCase):
         self.client=Mock();self.now=0
         self.runtime=runtime.TalkRuntime({'project_id':'p','project_root':str(self.root),'state_dir':str(self.root)},
             client=self.client,attach_api=True,clock=lambda:self.now)
+        self.runtime.startup_probe_client=Mock()
+        self.runtime.startup_probe_client.request.return_value={'openapi':'3.1.0','paths':{
+            '/api/projects/{project_id}/role-services/startup':{'post':{}}}}
 
     def test_startup_io_keeps_health_responsive_and_does_not_overlap_or_replay(self):
         started=threading.Event();done=threading.Event()
@@ -110,7 +113,8 @@ class StartupRuntimeTests(unittest.TestCase):
              patch.object(recovery,'system_boot_time',return_value=now.timestamp()-1):
             path.write_text(json.dumps(health));self.assertEqual(role_startup.verified_runtime('p','a'*32,session)[1]['pid'],os.getpid())
             for change in ({'activation_id':'b'*32},{'project_id':'other'},{'seen_at':(now-timedelta(seconds=40)).isoformat()},
-                           {'stopping':True},{'state':'stopped'},{'startup_state':'failed'},{'pid':True}):
+                           {'stopping':True},{'state':'stopped'},{'startup_state':'failed'},
+                           {'startup_state':'unsupported'},{'pid':True}):
                 path.write_text(json.dumps({**health,**change}))
                 with self.assertRaises(HTTPException):role_startup.verified_runtime('p','a'*32,session)
             path.write_text(json.dumps(health));probe.return_value='unknown'
