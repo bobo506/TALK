@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 18:37取件及审批边界：335 complete/2981已验收收取completed，无必须修正；19份42557字节原交付归档，197新/旧63/116/162及332原33/333原29/334原15保持。真实API→页面2项在文件重定向下、独立/sync和缺字段负对照通过；原CreatePipe环境1E保持。实际续333/334窗count3、末44.7013%。公开五binding/要求及250/286整份任务未变，正常加载预检确认无running任务/worker空闲、12原PID含当前DSH桥present有创建时刻、五选择false。旧后台11280及五宿主普通stop/drain被自动审批在执行前拒绝：记录只有API重载，缺明确后台停机确认；未停机、不绕过。待用户明确授权一次按[方案](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)停旧后台/五宿主，再用户原终端重启API并恢复后台/原DSH。新/agents补正未加载、实际控件尚未显示；不追加复核，不改生产配置/绑定/任务、不复用一次私有例外，不开下一片。
+
 - 2026-10-25 15:00派发：角色自启动控件缺失335已交DeepSeek queued/assigned，d3c9c96已推送；197份4465676字节新源/快照零漂移，旧63/116/162及332原33/333原29/334原15零错配。仅复核真实/agents DTO到页面控件和/sync共享输出，不重审runtime；唯一写ui-fix1/review，产品/正式测试/新旧冻结暂停。沿base332/原continuity优先相容续334但服从守卫，创建state=null不预称同窗；不另发可执行Hall消息，默认用户通知335完成后取件、不主动等待/唤回。五完整binding/要求与250/286整份公开任务派前一致。生产补正未加载、用户页面尚缺控件，原runtime11280未重载；不代勾选/启停/读额外私有资料，下一无关片不自动开。
 
 - 2026-10-25 14:58人工验收返修：用户两次刷新仍无自启动控件，实际Chrome human/小D详情确认缺失、加载新版JS；只读公开GET证实五/agents无startup而/roles全false。根因app.js从/agents取数，但原仅/roles DTO填startup；前次只据代码指导位置不足。Codex仅models.py+routes/projects.py共5行补ProjectAgentOut字段/透传与共用投影，新增真实隔离GET→实际页面loader/控件链路2项。95关联中93旧通过，新2夹具编码/过期快照1F/1E修后只复跑2全过，并集95；原失败保留，9Node全过。待新冻结交DeepSeek只核本接口/页面遗漏，产品随后暂停；334/058e153及旧报告/冻结保持，不重审runtime。生产API尚无补正、后台11280也未重载；未勾选/启停/额外私有读取，五binding/250/286保护保持，复核后统一正常加载并实看页面。详[本次合同](docs/spec/PROJECT_ROLE_AUTO_START_UI_FIX_20261025.md)。

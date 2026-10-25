@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 18:37：335收取，加载前预检通过，正常停机被自动审批拒绝
+
+335正式succeeded/submitted/2981、conclusion complete且无unfinished/blocked，与本地delivery逐字段相同，UTC10:33:06.725371正常收取completed。19份42557字节原报告/探针/日志逐项归档ui-fix1/pickup335/335-original-review；197份4465676字节、旧63/116/162及原332/333/334均零错配，产品仍d3c9c96无新改动。独立真实API→Node原2项因CreatePipe限制出现1E，文件重定向下同2项通过、/sync探针及缺startup负向对照通过；保持原限制，不称未修改全过。实际续333/334窗count3、末44.7013%。五完整binding/开发要求和250/286整份公开任务与派前相同；原332failed/2978、333partial/2979、334complete/2980不改。
+
+按已定正常加载流程准备仅读预检：原CLI status消费原清单、human只正常GET公开角色/任务/健康，已知PID只核存活/创建时间。首轮PID选择宽泛断言未过、单个失败PID未留；次轮误用expected_instance_id KeyError，按已核实observed_instance_id修后预检通过。12当前PID（runtime11280+五宿主10+DSH桥10360）均present/有创建时刻，无running任务、worker空闲、仅DSH gen76运行/idle、其它四停止、五选择false；before.json保留。无配置正文/DB/角色Key/日志或旧native扫描，前两次失败未产生生产写入。
+
+随后普通stop/drain命令被自动审批在CreateProcess前拒绝，**未实际执行**。原因为后台及五宿主停机会中断服务，现有证据明确的是API重载/方案准备，缺少用户对后台停机的明确确认。未改用其它方法绕过，原后台/API/角色继续运行。已记录stop-approval-rejected.json；待用户明确授权一次正常停旧后台/五宿主、用户原终端重启含/agents补正的新API、再恢复后台与原DSH（选择全false、其余四停止，保护配置/绑定/250/286）。335收尾/具体方案/Git先完成后再问，不追加独立任务或下一无关片；本次私有例外不扩大。
+
 ## 2026-10-25 15:00：控件真实取数遗漏已冻结并交335定向复核
 
 d3c9c96128bba4861e548c5e92237afe687ecb92已推送。197份4465676字节manifest-ui-fix1/baseline-ui-fix1派前源/快照零漂移，旧63/116/162和原332的33/333的29/334的15交付逐项零错配；派前五完整binding/项目要求、250/286整份公开任务与334取件时一致。93旧关联+修夹具后2新通过、9Node是Codex自检，原失败和编码限制保留。

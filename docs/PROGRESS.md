@@ -1,21 +1,21 @@
 # Project Progress
 
-Updated: 2026-10-25 15:00（Asia/Shanghai）。335已交DeepSeek定向复核真实/agents字段遗漏；d3c9c96已推送，197份4465676字节新冻结零漂移，旧63/116/162及原332至334材料保持。产品/正式测试暂停，默认用户通知335后取件；补正尚未加载，用户页面仍缺控件。
+Updated: 2026-10-25 18:37（Asia/Shanghai）。335 complete/2981已收取，无必须修正；加载前只读预检通过，但普通停旧后台/五宿主被自动审批在执行前拒绝，缺少用户明确后台停机确认。未实际停机或绕过，补正尚未加载；待明确授权后按具体方案统一加载并实看控件。
 
 ## 当前事实
 
-- 335 queued/assigned，Hall group:task-8a0f4b116dea41b0b83e0e292f534f15，仅核真实/agents DTO→页面loader/控件与/sync共享输出；唯一写ui-fix1/review。base332/原continuity请求相容续334但服从守卫，创建state=null，实际决策/计数待回执，不预称同窗。五完整binding/要求及250/286整份公开任务派前一致。
-- 实际Chrome human bobo/小D详情无控件，页面确加载新版workspace.js；截图ui-fix1/before.png。公开GET五/agents均无startup而/roles均false/revision0，绑定全bound/managed_cli。刷新无助的根因是实际页面接口DTO遗漏，不是控件位置；前次指导未先核实这条链路，已纠正。
-- 仅server/models.py+server/routes/projects.py共5行补ProjectAgentOut startup字段/参数/透传及既有公开投影；GET /agents和POST /sync共享组装。前端显示守卫、权限、选择写入/启停、数据库表和生产配置不变。
-- 新增真实隔离API响应→实际app.js loadProjectAgents→workspaceRoleStartupPanel链路，默认/保存true/回读/保存false及审计/项目隔离/只读均通过。改前新2测试2F；95关联首次93旧通过，新2夹具编码/过期快照1F/1E，修夹具后2项复跑全过，不同Python并集95；不是单轮95全过。9原Node测试过，不为归档重跑。日志在.tmp/project-role-autostart-ui-fix1/。
-- 334 complete/2980已收取，原MF-1R/2/3独立闭合仍保持；本返修不重做runtime首审。旧63/116/162及332原33/333原29/334原15报告均保留；332failed/2978、333partial/2979不追改。
-- 用户已重载含startup的新API，但尚无本次/agents补正；原runtime11280/五宿主仍旧，DSH gen76/原实例idle，另四停止。五选择默认false，250failed/2767未收取、286queued/accepted/paused保护保持。
-- 本次实际浏览器只读观察及原human公开GET；没有勾选/启停/删除/恢复或读生产配置正文/角色Key/DB/侧账本/private state/HOME/native/log。原一次元数据/定向恢复例外已用完，不复用或授复核者。
+- 身份agent:codex / prj_e8fe7066bbec / lead已实核。335正式complete，UTC10:33:06.725371收取completed；19份42557字节原交付归档ui-fix1/pickup335/335-original-review，正式消息与本地delivery一致。实际续333/334窗/count3，末44.7013%。
+- 真实/agents DTO→实际loader/控件链路在独立文件重定向下2项通过，独立/sync探针及缺字段负对照通过；未修改运行2项原有CreatePipe环境1E保留。197新/旧63/116/162及332原33/333原29/334原15零错配，产品d3c9c96未再改；不重审runtime或新增非阻断任务。
+- 控件缺失根因为页面从/agents取数而原只给/roles填startup；2产品5行已补。当前生产外部API尚无本次/agents补正，因此此前重载初版API不等于已加载此补正；用户页面尚待一次正常加载实看，不称已显示。
+- 公开五完整binding/项目开发要求及250/286整份公开任务与派前相同；250failed/failed/原2767未收取，286queued/accepted/paused，332failed/2978、333partial/2979、334complete/2980保持。
+- 原CLI/公开接口加载预检通过：runtime11280+五宿主10PID+当前DSH桥10360共12PID present且有创建时刻；无running任务、worker空闲、仅DSH gen76/原实例idle，其它四停止；五startup均false/revision0。原记录deployment-20261025-1834/before.json。
+- 普通stop/drain命令被自动审批在CreateProcess前拒绝，理由是会中断生产后台/五宿主，而现有记录只有API重载/方案准备，缺用户明确后台停机确认；没有执行或尝试绕过。旧后台/API/角色继续运行。
+- 本次只正常认证公开GET和既有CLI status、已知PID元数据；未勾选/启停/删除/恢复、未读配置正文/角色Key/DB/侧账本/private state/HOME/native/log。原一次元数据/定向恢复许可已用完，不复用。预检初两次脚本断言/字段错误未生产写入，记录保留。
 
 ## 下一步
 
-1. 335已派，当前仅派发文档/Git收尾；产品/正式测试/新旧冻结暂停。默认用户通知完成再取件，不主动等待/唤回，不另发可执行Hall消息。
-2. 独立通过后统一正常加载补正、实看用户页面控件；当前不让用户反复刷新/重启，不称生产已可见或完整加载完成。
-3. 仍按[原加载方案](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)补齐后台正常重载，默认false且仅恢复原DSH；不自动勾选，不改模型/Key/绑定/250/286，不强杀/CAS/清锁。下一无关片先确认。
+1. 请用户明确授权按[具体加载方案](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)正常停旧后台及五宿主（短暂中断），用户原终端重启API，再原attach-api/detach启动后台、仅恢复原DSH并核60秒真实心跳。
+2. 授权前不再发停机命令；不接管外部API或开第二API，不强杀/CAS/清锁，不代勾选/改配置/模型/Key/绑定/250/286。授权后同范围不重复询问。
+3. 加载后原页面实际检查“随项目自动启动”可见且默认未勾选，保存/真实下代启动或断电人验另按用户安排。本片不再追加复核，下一无关切片先确认。
 
-详[本次验收返修](spec/PROJECT_ROLE_AUTO_START_UI_FIX_20261025.md)、[加载记录](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)和[历史](PROGRESS_HISTORY.md)。
+详[加载方案与审批记录](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)、[控件返修](spec/PROJECT_ROLE_AUTO_START_UI_FIX_20261025.md)和[历史](PROGRESS_HISTORY.md)。
