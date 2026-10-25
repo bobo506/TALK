@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 20:25推送授权闭合：用户明确答复“授权本次推送到公开仓库 bobo506/TALK”，随后原git push普通执行成功，5214d9b与df0da3e已到origin/codex/terminal-return-codex。此前自动审批拒绝及公开仓库事实保留；仅授权本次当前片进度记录，不外推其它公开发布/新功能。当前仅同步本授权结果/Git收尾，服务与产品未操作，下一无关片先确认。详[当前进度](docs/PROGRESS.md)。
+
 - 2026-10-25 20:10Git收尾边界：本地5214d9b已记录正常后台自启动通过；推送GitHub被自动审批执行前拒绝，具体目的地授权不足。只读GitHub确认bobo506/TALK为public，已请用户明确是否允许本次进度/内部运行记录向该公开分支推送；答复前不重试或绕过，服务保持当前验证状态。详[当前进度](docs/PROGRESS.md)。
 
 - 2026-10-25 20:08正常加载闭合：用户明确同意既定后台停启一次，原11280/12PID普通stop/drain全部absent后，原attach-api/detach入口启动runtime13252；API未重启。新activation一轮complete、五宿主serving，小D按用户true/rev1自动到gen78/ins_9c7bcef519c6/ready/idle，同实例真实心跳90.130226秒；另四false/not_selected/stopped。无手动start/PUT或重放，五binding/角色配置/要求/250/286完整公开响应保持。197及旧冻结/332至335归档零错配，产品/正式测试未改、不追加复核。本片正常后台换代运行验收闭合，真实断电/长跑/原生模型能力不外推；仅文档/Git收尾，下一无关片先确认。详[当前进度](docs/PROGRESS.md)。
