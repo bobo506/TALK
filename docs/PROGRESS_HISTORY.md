@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-25 13:50：集中修正116份冻结并交333一次定向复验
+
+ca2d30b产品/测试修正、f0da4ff冻结HEAD均已推送。116份3872285字节baseline-fix1/manifest-fix1创建后源/快照零漂移，原63份3613416字节及原332报告33份99053字节零错配。直接正式派发333 queued/assigned，Hall group:task-b74e9c011f924ff690ad894d7afc2982，未再发送可执行补充消息。base_task_id332/continuity_key=project-role-startup-review-20261025，baseline/权限/验收差异明确；旧窗tainted不强复用，创建state=null，实际原生决策/计数待回执，未称已领取或同窗。
+
+唯一写fix1/review/，原review/新旧冻结/产品/正式测试暂停，禁止实际生产DB/配置/Key/state/HOME/native/log读取/启停/恢复；冻结安全摘要不传递协调方一次例外。任务只复验三项与原4失败断言及必要反例，部分失败也正常提交，不重复整片旧组。332原failed/2978及Hall2977独立failed再次公开核对不变，新修正未生产加载。默认用户通知333后取件，当前仅派发文档/Git收尾，不主动等待或新片。
+
 ## 2026-10-25 13:46：用户确认后一次审计恢复旧通道，正常恢复DSH供定向复验
 
 用户在此前一次只读元数据之外，另明确“已确认旧原生进程结束，授权定向恢复”。协调脚本10合成检查先过；原生writer结束以该用户确认作人工处置依据，不以父PID absent代替完整子进程证明。锁内核对固定scope hash a81fef9e…、owner15992/held、原lease与updated_at、唯一332/attempt1仍started，UTC05:45:40.450893一次将其记interrupted、旧window tainted（保留既有taint_reason）、同事务新增operator_channel_recovery_audit记录；operation_id=operator-recover-332-attempt1-20261025。未读取token/原生会话ID/正文/Key/日志；通道行不删不改、主TALK任务332/结果2978及其它任务不改。
