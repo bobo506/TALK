@@ -4432,6 +4432,8 @@ class ProjectAgentOut(BaseModel):
     member_id: str
     archived: bool = False
     deletion: Optional[dict] = None
+    # The role page reads this roster DTO, including its saved startup choice.
+    startup: Optional[dict] = None
     # 项目内角色名为展示权威；与全局 Member.display_name 独立。
     role_name: Optional[str] = None
     identity_path: Optional[str]
@@ -4474,11 +4476,13 @@ class ProjectAgentOut(BaseModel):
         service: Optional[ProjectRoleServiceOut] = None,
         archived: bool = False,
         deletion: Optional[dict] = None,
+        startup: Optional[dict] = None,
     ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
             archived=archived,
             deletion=deletion,
+            startup=startup,
             role_name=role_name,
             identity_path=agent.identity_path,
             soul_path=agent.soul_path,

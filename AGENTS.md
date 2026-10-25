@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-25 14:58人工验收返修：用户两次刷新仍无自启动控件，实际Chrome human/小D详情确认缺失、加载新版JS；只读公开GET证实五/agents无startup而/roles全false。根因app.js从/agents取数，但原仅/roles DTO填startup；前次只据代码指导位置不足。Codex仅models.py+routes/projects.py共5行补ProjectAgentOut字段/透传与共用投影，新增真实隔离GET→实际页面loader/控件链路2项。95关联中93旧通过，新2夹具编码/过期快照1F/1E修后只复跑2全过，并集95；原失败保留，9Node全过。待新冻结交DeepSeek只核本接口/页面遗漏，产品随后暂停；334/058e153及旧报告/冻结保持，不重审runtime。生产API尚无补正、后台11280也未重载；未勾选/启停/额外私有读取，五binding/250/286保护保持，复核后统一正常加载并实看页面。详[本次合同](docs/spec/PROJECT_ROLE_AUTO_START_UI_FIX_20261025.md)。
+
 - 2026-10-25 14:42用户重载后只读核对：新API startup路由已存在、uptime127秒，五startup均enabled=false/revision0/last_activation=null；原runtime11280仍12:33初版/五宿主serving，DSH gen76原实例继续运行、其它四停止。用户本次问默认关闭语义，答为初次默认不随后台自动启动，勾选后影响下代；重载API不停止已运行角色。本次未后台启停或勾选。完整加载还差正常后台重载，不重复要求用户重启已更新API；334/058e153/冻结及250/286、五binding保护保持。详[加载记录](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)。
 
 - 2026-10-25 14:36复核闭合：334 complete/2980已核验收取completed，无必须修正；10原MF-1探针+7补充独立判断全过，原四新增反例不改断言通过，MF-2/MF-3沿333通过不重审。162新/旧63/116及332原33/333原29零错配，334原15份36242字节已归档；实际续333窗/count2、末37.6821%。产品仍058e153、无新改动；五完整binding/项目要求及250/286整份公开任务相同。只读实测API仍旧无startup路由，runtime11280/五宿主serving/worker空闲，仅DSH gen76运行，其它四停止；新功能未加载。具体[正常加载方案](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)已准备待确认：原后台普通stop/drain、用户原终端重启API、attach-api重启后台、默认false不代勾选、仅恢复DSH/核心跳。前次一次例外已用完，不重复用；本轮不启停/部署/开下一无关片，不为非阻断项再派复核。

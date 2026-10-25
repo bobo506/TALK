@@ -388,6 +388,7 @@ def _project_agent_outs(
             agent,
             archived=bool(role_rows.get(agent.member_id) and role_rows[agent.member_id].archived_at),
             deletion=deletion_public(deletion_rows[agent.member_id]) if agent.member_id in deletion_rows else None,
+            startup=startup_projection(project_id, agent.member_id, session),
             role_name=names_by_member.get(agent.member_id),
             display_name=(
                 members_by_id[agent.member_id].display_name

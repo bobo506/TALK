@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-25 14:58：角色自启动控件人工验收遗漏已定位修正
+
+用户表示列表/角色详情均找不到，强制刷新后仍无。本次通过现有Chrome TALK页面实核human bobo/小D详情缺控件，DOM引用workspace.js?v=20261025-role-startup-v1；截图ui-fix1/before.png，未点击启停/删除/勾选。app.js实际loadProjectAgents请求/agents，原服务端只在/roles DTO填startup，ProjectAgentOut/组装函数遗漏字段；UTC06:55:28公开正常GET证明五/agents均无startup，/roles均false/revision0，五binding bound/managed_cli。前次Codex仅按源码给入口而未实核链路，现明确纠正，不归因刷新或用户位置。
+
+Codex只改server/models.py和server/routes/projects.py共5行，加startup可选DTO/参数/透传及既有startup_projection，/agents与/sync共用原组装，不改前端守卫/权限/启停/数据表。新2测试以真实隔离API JSON输入实际app loader和控件，覆盖默认→保存true→列表回读→保存false、审计/roles一致、跨项目隔离与读取不产生执行；改产品前2F/0E原日志保持。95关联首次93旧通过，新2因UTF8/GBK和SQLModel提交后过期快照问题1F/1E；修测试夹具后只复跑2全过，不同Python并集95，不称单轮95全过。runner混合编码解析异常和原日志均保留，产品在首次关联跑后未改。9项Node原控件测试通过，未为归档重跑。
+
+现准备Git/新冻结交DeepSeek只复核本遗漏，不重做334/runtime/MF-2/MF-3。旧63/116/162及332/333/334报告保持；生产尚未加载补正，原后台11280尚待正常重载。用户原页面最终可见性要在复核/一次正常加载后实看，不能拿本次合成通过冒称生产已可见；未生产勾选/启停或读配置/DB/native，一次元数据/恢复例外不复用。五绑定、250/2767和286保持，下一无关片不自动开。
+
 ## 2026-10-25 14:42：用户API重载已生效，解释默认关闭并核对剩余后台步骤
 
 用户说已重新加载并问是否启动TALK后角色默认关闭。本次仅只读原运行器status及原human正常GET公开API：UTC06:41:37 API uptime127秒、新startup路由存在，五角色startup均enabled=false/revision0/updated_at=null/last_activation=null。原runtime11280仍UTC04:33:28启动、五宿主serving、旧8轮failed状态；仅DSH gen76/ins_aa6223b0735e运行，其它四停止。首次默认不随后台自动启动，勾选影响下代，页面/API重载不停止原已运行角色。原人工控制和默认false不冲突。

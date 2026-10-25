@@ -1,21 +1,20 @@
 # Project Progress
 
-Updated: 2026-10-25 14:42（Asia/Shanghai）。用户已重载API，只读确认新startup路由存在、五角色自启动设置均enabled=false/revision0/未执行；原runtime11280尚未重启，完整加载仍待正常后台重载。334 complete/2980已收取，产品仍058e153，无新修改；不重复要求用户重启已经更新的API，不追加复核或下一无关片。
+Updated: 2026-10-25 14:58（Asia/Shanghai）。人工验收发现自启动控件仍缺：实际页面从/agents取数，原只给/roles填startup。Codex已2产品5行补正；93关联+新2复跑通过（不同Python并集95）、9Node通过，原失败保留。待新冻结交DeepSeek一次定向复核，随后暂停产品；尚未生产加载。
 
 ## 当前事实
 
-- 用户询问默认关闭语义，本次仅只读核对：UTC06:41:37 API uptime127秒，新startup路由存在，五角色startup均enabled=false/revision0/updated_at=null/last_activation=null。原runtime11280仍UTC04:33:28启动，五宿主serving，旧startup_state=failed；仅DSH gen76/原ins_aa6223b0735e继续运行，其它四停止。自启动选择默认false不意味着重载API会停止已运行角色；已运行服务保持原状态。本轮未执行后台启停或自动勾选。
-- 身份agent:codex / prj_e8fe7066bbec / lead已实核。334正式complete，UTC06:33:30.383042收取completed；15份36242字节原交付按manifest归档fix2/pickup334/334-original-review，正式消息与本地delivery一致。实际续333原窗/count2，末37.6821%，未复用332旧tainted窗。
-- DeepSeek本次独立10原MF-1探针+7新增判断全过，333四类失败反例不改断言通过；MF-2/MF-3沿333独立通过，不重做全审。原26自检、223/228/58Node与DACL/替代限制保持，不能相加冒称不同用例；真实ACL/断电/模型/浏览器未验。
-- 162份4240533字节新冻结、旧63份3613416字节/116份3872285字节及332原33份99053字节/333原29份210648字节均零错配；产品/正式测试/web在058e153后无改动。333partial/2979、原review failed与332failed/2978永久保留，不追改或收取失败332。
-- 公开五完整binding/项目开发要求及250/286整份公开任务响应与派前相同：250failed/failed、2767未收取；286queued/accepted/paused。334后DSH ins_aa6223b0735e/PID10360 idle/无当前任务。
-- UTC06:35只读原CLI/公开API实测runtime11280 running/present、api_mode external、五宿主serving、worker_in_flight=false/worker_error=null；仅DSH gen76运行、其它四停止。API healthz ok/uptime23480秒，新startup路由仍缺、五startup字段null。当前是旧API/初版runtime，原8轮failed状态不代表新修正失败；不把null当实测false，不把代码完成当加载成功。
-- 本轮只用既有原运行器status/原human正常认证。一次元数据读取与一次定向恢复许可已经用完，不重复、不传给复核者；没有生产配置/DB/native额外读取、清锁/CAS/启停或选择写入。预检CLI初次退出1（详细原因未留），随后脚本/health 404已更正/healthz通过，原失败记录保留。
+- 实际Chrome human bobo/小D详情无控件，页面确加载新版workspace.js；截图ui-fix1/before.png。公开GET五/agents均无startup而/roles均false/revision0，绑定全bound/managed_cli。刷新无助的根因是实际页面接口DTO遗漏，不是控件位置；前次指导未先核实这条链路，已纠正。
+- 仅server/models.py+server/routes/projects.py共5行补ProjectAgentOut startup字段/参数/透传及既有公开投影；GET /agents和POST /sync共享组装。前端显示守卫、权限、选择写入/启停、数据库表和生产配置不变。
+- 新增真实隔离API响应→实际app.js loadProjectAgents→workspaceRoleStartupPanel链路，默认/保存true/回读/保存false及审计/项目隔离/只读均通过。改前新2测试2F；95关联首次93旧通过，新2夹具编码/过期快照1F/1E，修夹具后2项复跑全过，不同Python并集95；不是单轮95全过。9原Node测试过，不为归档重跑。日志在.tmp/project-role-autostart-ui-fix1/。
+- 334 complete/2980已收取，原MF-1R/2/3独立闭合仍保持；本返修不重做runtime首审。旧63/116/162及332原33/333原29/334原15报告均保留；332failed/2978、333partial/2979不追改。
+- 用户已重载含startup的新API，但尚无本次/agents补正；原runtime11280/五宿主仍旧，DSH gen76/原实例idle，另四停止。五选择默认false，250failed/2767未收取、286queued/accepted/paused保护保持。
+- 本次实际浏览器只读观察及原human公开GET；没有勾选/启停/删除/恢复或读生产配置正文/角色Key/DB/侧账本/private state/HOME/native/log。原一次元数据/定向恢复例外已用完，不复用或授复核者。
 
 ## 下一步
 
-1. [具体正常加载方案](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)的API重载已由用户提前完成；后续刷新公开预检后按方案续后台普通stop/drain、核PID退出并原attach-api/detach启动。不重复要求API重启，除非之后证据表明API未运行新版本。
-2. 加载核新路由/默认false/本代complete/五宿主后，仅恢复原DeepSeek并核同实例60秒真实心跳，其它四停止；不代勾选、不改配置/模型/Key/绑定/250/286。不强杀/CAS/清锁，不接管外部API或开第二API。
-3. 本轮不再追加非阻断复核。实际选择保存、下一代自动启动/真实断电及浏览器人验后续明确安排；下一无关切片仍先确认。
+1. 完成修正Git/新冻结后交DeepSeek一次定向复核，仅核真实/agents/sync接口兼容及页面默认/保存回读可见，不重做334/runtime或非阻断观察；唯一写ui-fix1/review，产品/正式测试/新旧冻结暂停。
+2. 默认派后用户通知完成再取件，不主动等待/唤回，不另发可执行Hall消息。独立通过后统一正常加载补正、实看用户页面控件；当前不让用户反复刷新/重启。
+3. 仍按[原加载方案](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)补齐后台正常重载，默认false且仅恢复原DSH；不自动勾选，不改模型/Key/绑定/250/286，不强杀/CAS/清锁。下一无关片先确认。
 
-详[加载方案与闭合记录](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)、[本次必要补正](spec/PROJECT_ROLE_AUTO_START_FIX2_20261025.md)、[原合同](spec/PROJECT_ROLE_AUTO_START_20261025.md)和[历史](PROGRESS_HISTORY.md)。331两角色删除已真实complete，旧证据保持。
+详[本次验收返修](spec/PROJECT_ROLE_AUTO_START_UI_FIX_20261025.md)、[加载记录](spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)和[历史](PROGRESS_HISTORY.md)。
