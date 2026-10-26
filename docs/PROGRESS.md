@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-26（Asia/Shanghai）。340已取回但未独立通过；本片集中返修完成，准备新的MF-1/2/3定向复验。尚未生产集成/加载。
+Updated: 2026-10-26 19:37（Asia/Shanghai）。340未通过的三项集中返修已提交DeepSeek定向复验341（创建queued/assigned）。代码ffa4be5已推送；尚未独立通过或生产集成/加载。
 
 ## 当前切片
 
@@ -13,7 +13,7 @@ Updated: 2026-10-26（Asia/Shanghai）。340已取回但未独立通过；本片
 ## 协作、加载与保护
 
 - 当前C:/Users/Administrator/.codex/worktrees/kimi-role-host-fix/TALK，原D盘339源码/295冻结与332至338旧归档清单已重核零错配。339仍submitted/2985未取报告/收取，不能据runner状态称独立通过；后续仍需其取件/必要返修/当前宿主加载与I-4验收。
-- 正式新包D:/claude-test/TALK/.tmp/kimi-role-host-fix1/；准备新baseline及三项集中定向复验，只允许复核者写review，派发后产品/正式测试/新旧冻结暂停。默认passive/version6，不主动等待/唤回/额外可执行Hall。
+- 正式新包D:/claude-test/TALK/.tmp/kimi-role-host-fix1/；正式新baseline289份10251260字节、274产品/测试/页面文件与已测候选字节一致，正式根定向76Python/41Node过、前后集合/hash干净、自建Job进程归零。341沿base340及原continuity请求相容续用，创建state=null，不预称已领取/同窗。只允许复核者写review，产品/正式测试/新旧冻结已暂停。默认passive/version6，不主动等待/唤回/额外可执行Hall。
 - 六角色binding/要求/模式与取件相同。原runtime18784/五宿主、大K原身份/模型/无owner的失败gen1、自启动选择、250 failed/2767未收取及286 paused不操作。未启停/改绑/复制原生凭据/读私有会话日志或调用真实模型。
 - 独立通过后再形成具体正常加载方案：启用Kimi配方和大K逐成员tools配置，统一后台正常重载并沿原角色普通start重试，外部API仍归原终端；不强杀/CAS/清锁，不另开第二个API。实际页面/原生登录/版本不由本次DOM与合成host证据冒称通过。
 - 用户明确免单独K3.1模型验证，后续首个真实开发任务交新角色；本轮复核只是必要流程修正。
