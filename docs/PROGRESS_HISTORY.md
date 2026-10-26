@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-26 10:21：338实际正常加载与部署自检完成，小D自动恢复
+
+用户明确“执行实际加载与验收”，按本次新授权保存原CLI/public API预检，无running任务、worker空闲、原4956/五宿主/DSH桥11去重PID均present且有创建时刻。APIuptime55188秒，仍早于338实现提交；小Dtrue/rev1与其余四false/rev0、五完整binding/角色配置/项目要求、250failed/2767未收取和286queued/accepted/paused完整公开响应保存。仅原入口消费既有启动清单、原human凭据正常认证，无额外配置/Key摘要/DB/private/native/log读取。
+
+UTC02:09:55.469828仅一次普通stop --apply --wait --wait-seconds300。首次CLI退出1、stop_status=blocked、phase=draining_hosts/error=runtime_host_stop_timeout，原记录保留。UTC02:11:23观察仅WorkBuddy宿主13064及runtime4956仍present，其余已退出；不猜测原因、不读取私有日志、不强杀/清锁/再次stop。原后台沿既有重试于02:11:38.117003完成shutdown complete、pending空/error与worker_error清空；02:14:47及02:16:01原11PID全absent、五角色stopped/无owner与保护项相同，独立stopped.json确证后才继续。原blocked不改成0/stopped，不以首个命令失败否认后来实际完成。
+
+用户在原API终端Ctrl+C后重跑原命令并回复“API已重启”。02:17:57只读核新APIuptime26秒，API已自动带runtime18784（02:17:38.088854）与五宿主，startup complete/worker无错/shutdown idle；因此没有重复serve，也无手动角色start或PUT选择。小D按原true/rev1自动gen82/ins_b65106fc9fdb/PID18580 ready/idle，launch与新activation一致；其余四false/rev0/not_selected/stopped/无owner。02:19:09记录ready，02:20:20同实例/同PID真实心跳推进90.075601秒，APIuptime168秒，无running任务。
+
+全部五binding/角色配置/项目要求/用户偏好及250/286整份公开响应与before相同，agents startup与roles一致。八处关键源码SHA与338冻结一致且保存早于新API启动，重启后实际HTTP index/app.js/workspace.js逐字节匹配已复核版本（缓存20261025-role-busy-stop-v1）。275新/旧shutdown236/275、自启动63/116/162/197及332至338原归档零错配；此轮仅新增加载文档与维护协调/指南，无产品/正式测试改动。
+
+部署自检完成；忙时拒绝/编号/停止后claim守卫以338本人17核心Python/31Node及已核正常权限19/221证据区分记录，本轮未修改生产任务/租约/实例来造忙态，不冒称生产忙任务注入或真人页面验收。实际页面人验待用户刷新；用户已收敛的运行器内部子进程责任边界保持，不重新加入原生树证明/强制取消/断电恢复。证据在role-busy-stop-v1/deployment-20261026/：before、stop-intent/result、stop-observation、stopped、api-check、start-request、ready、heartbeat、static-check、RESULT与freeze-and-archives。当前完成本地文档/Git收尾，纯文档不单独推送，不为可选覆盖再停第二次或追加复核/下一片。
+
 ## 2026-10-26 09:53：按用户意见收敛退出边界，撤回原生进程链确认片
 
 用户对09:04建议的三条提出不同看法，明确只要有正在执行任务就不允许退出，子进程在对应运行器内部，不需TALK增加复杂管理。按最新用户指示确定产品责任边界：TALK保执行中/运行器上报占用时阻挡退出，空闲后沿既有正常生命周期关闭TALK自身服务及运行器入口；运行器内部子进程由其自身负责。撤回“所属原生进程链的可靠退出与确认”建议，不再列为下一片、338完成门槛或继续开发门槛。此前普通消息/预处理重复建议仍撤回。

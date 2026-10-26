@@ -1,34 +1,26 @@
 # Project Progress
 
-Updated: 2026-10-26 09:53（Asia/Shanghai）。用户明确收敛退出责任边界，撤回“原生进程链退出确认”建议，不再作为新增开发片。338开发/复核已完成，代码3203044尚未生产加载。
+Updated: 2026-10-26 10:21（Asia/Shanghai）。338忙任务退出保护已实际正常加载，部署自检完成；页面人工验收待用户刷新确认。
 
-## 最新责任边界
+## 已完成
 
-- TALK有任务执行或运行器上报忙时阻挡退出；空闲时沿既有正常生命周期关闭自身服务与运行器入口。
-- 运行器内部子进程由对应运行器负责；TALK不新增原生进程树管理/终止/退出证明，不作为338完成或下一新功能门槛。
-- 338现有任务/残余领取/实例占用保护及旧归属守卫保持，已有适配器关闭实现不追改。本轮仅文档记录，无新开发、测试、派发或生产加载。
+- 代码3203044已推送，338/2984独立核验收取completed，无必须修正；原自由文本MCP业务unknown及环境限制保留。
+- 用户本次明确授权实际加载；原runtime4956一次普通stop首次blocked/host_stop_timeout，原后台正常重试最终shutdown complete/error空、11原PID全absent、五角色stopped/无owner。未强杀/CAS/清锁或重复stop，原失败回执保持。
+- 用户原终端重启API后，API自动带新runtime18784/UTC02:17:38，五宿主serving、startup complete/worker无错、shutdown idle。未重复serve/手动start/PUT偏好。
+- 小D保用户true/rev1自动gen82/ins_b65106fc9fdb/PID18580 ready/idle，同实例真实心跳推进90.075601秒；其它四false/rev0/not_selected/stopped/无owner。
+- 新APIuptime168秒；八处关键源码SHA匹配338冻结且保存早于新API启动，重启后HTTP页面/app.js/workspace.js逐字节匹配，缓存20261025-role-busy-stop-v1。
 
-## 本片完成开发
+## 保护与验收口径
 
-- 角色关闭在原写事务内检查正式running/残余claim或lease及当前实例占用；忙时409/role_service_busy，仅显示最多20任务编号、总数与占用标记。拒绝不改任务/实例/动作/归属，不伪报已取消。
-- 领取与关闭共享真实写锁：领取先完成则关闭被阻挡；关闭先接受则新领取拒绝。过期重排commit后重取锁并读取最新stop状态；旧续租/完成和无受管关联全局行为保持。
-- 实际页面中文、宿主桥接和后台blocked等待回执接通；无任务行只报占用，无正文/标题/token/原生ID/私有路径。后台保留句柄/API，沿原退出重试。
-- 221关联Python全过（19新、零F/E/S）；31相关Node全过（3新、真实API409→实际app函数→整份workspace渲染）。扩大350Node为333过/17失败，改动前7c61f8b副本复现同17位置，旧夹具/缓存断言不扩片改正；首轮新夹具5F、补后1F保留。
-
-## 实际状态与保护
-
-- 上片337 complete/2983及b9e2de0正常加载保持；runtime4956/五宿主serving，DSH gen80/ins_3d1a0388545c/PID7868原实例idle。小D用户true/rev1、其余四false保持。本片未加载，未生产停启/API重启或偏好PUT。
-- UTC16:06公开核对五完整binding/要求与开工相同、无running任务；250failed/2767未收取及286queued/accepted/paused整份公开响应保存，旧冻结/交付保护。
-- 338/2984自由文本complete/无必须修正已逐项核验并正式收取；MCP业务unknown原样保留。DeepSeek本人17核心Python与31相关Node通过，两项健康发布受ACL限制（原4E/EPERM保留），正常权限19/221日志SHA已核，区别于其本人全量运行。5非阻断观察不扩片。
-- 本轮未读取生产配置正文/Key/DB/private/HOME/native/session/log，不强杀/CAS/清锁、加载/启停或偏好PUT。上片一次重载许可已执行，不延伸为本片许可。
-- 代码3203044已推送公开bobo506/TALK当前分支，新275份9946204字节baseline-v1/manifest.json零漂移；旧shutdown236/275、自启动63/116/162/197及332至337原交付零错配。338新工作线/完整base_context，创建state=null不预称领取/原生同窗。派前公开保护项相同，DSH原实例idle。
-- 338原28份140104字节普通交付已归档pickup338/338-original-review，未复制合成DB/私有ACL临时内容；实际new_no_candidate/count1、末投影31.9295%。当前五binding/要求和250/286整份公开响应与派前相同，DSH原实例idle，无running任务。
+- 五完整binding/角色配置/项目要求/自启动选择及250/286整份公开响应与加载前相同；250failed/2767未收取、286queued/accepted/paused保持，无running任务。
+- 275新与旧冻结、332至338原归档零错配。产品/正式测试未改，无生产配置正文/Key摘要/DB/private/HOME/native/session/log读取；原入口与human凭据仅正常用途消费。
+- 忙时禁止关闭/有限编号/关闭接受后claim拒绝，已有338独立17核心Python/31Node及正常权限19/221证据。本轮未造生产忙态，不把静态HTTP核验称真人页面验收；原19合并4E/Node EPERM及350中17旧失败保留。
+- 用户明确：TALK执行中/运行器忙则挡退出，空闲正常关闭自身服务与运行器入口；运行器内部子进程由运行器负责。原生进程树新增切片已撤回，不作为后续门槛；不外推强制取消或真实断电恢复。
 
 ## 下一步
 
-1. 338剩实际加载与人验，需正常更新API与后台，当前未执行；无需为非阻断观察再派复核。
-2. 已撤回与338重叠的“普通消息/任务预处理停机保护”建议；338已覆盖同归属实例busy/current_task_id，不能按消息类型宣称未保护。
-3. 原“所属原生进程链退出确认”建议已按用户意见撤回，不再进入后续排期。后续新功能按原路线图明确最小范围，不重复338，不重开已撤回的复杂化切片。
-4. 分工仍Codex开发/DeepSeek复核；338加载人验尚未安排，本轮不自动部署。纯协调文档不单独推送。
+1. 用户刷新页面，确认小D仍显示启动成功、其它四保持停止。当前API与后台已完成更新，不需要再次重启。
+2. 不为可选覆盖再停第二次或追加DeepSeek复核；本次正常停启许可已执行。当前仅本地文档/Git收尾，纯文档不单独推送。
+3. 页面人验后，再按原排期明确下一个新功能最小范围，不重复338或重开已撤回的子进程树切片。
 
-详[合同](spec/ROLE_BUSY_STOP_GUARD_20261025.md)、[退出指南](guides/RUNTIME_SHUTDOWN.md)及[历史](PROGRESS_HISTORY.md)。证据.tmp/role-busy-stop-v1/。
+详[实际加载记录](spec/ROLE_BUSY_STOP_DEPLOYMENT_20261026.md)、[本片合同](spec/ROLE_BUSY_STOP_GUARD_20261025.md)、[退出指南](guides/RUNTIME_SHUTDOWN.md)及[历史](PROGRESS_HISTORY.md)。证据.tmp/role-busy-stop-v1/deployment-20261026/。
