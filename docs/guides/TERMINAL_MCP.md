@@ -71,8 +71,8 @@
 ### 正常到期、错误和续等
 
 1. 未完成任务等到预算到期，应正常返回 `return_reason=timeout`；任务轮询命中则提前返回 `matched`。网络/API错误显式报错，客户端超时或取消单独记录，不能把这些错误当成任务已完成或普通等待到期。
-2. 单次到期后工具不会自动续等。只有明确授权的主动模式消费者，核验最新身份/模式/任务发起者归属与剩余总预算后，才可再次调用；任务完成、错误、模式变化或总预算耗尽时停止，不无限重试/轮询。总预算目前是提示词约定，尚无代码强制。
-3. 同步stdio等待占用当前MCP连接；客户端超时/取消目前不会立即结束程序侧等待。适配须验证正常返回后可继续查询，以及取消/失败后是否排队、何时恢复，不能假定客户端报错就已释放程序。socket请求超时也不提供任意慢响应的端到端硬截止。
+2. 原`talk_wait_tasks`仍只执行单次等待。2026-10-26新增的`talk_follow_tasks`以单调时钟强制连接内有限总预算，并在续等/取件/写入前复核本人归属、模式版本和任务控制；不自动取消执行任务。旧消费者的总预算约定不据此变成代码强制。接入方式见[主动跟进指南](INITIATOR_FOLLOWUP.md)，代码与当前宿主实际加载分别验收。
+3. 新版3.0 stdio MCP将等待放入有界独立通道，检测取消通知/EOF，允许同连接查询/ping，重复等待立即拒绝。旧运行进程及其它未接通入口仍须独立验证同步阻塞边界。适配须验证正常到期、命中、取消后可继续查询和有无排队；socket请求超时也不提供任意慢响应的端到端硬截止。
 4. 本项目默认仍被动收取：派发后结束，用户通知完成再读取。上述预算规则是有限主动等待的接入要求，不自动开启主动模式或改终端运行配置。
 
 ### 适配交付与验收证据
@@ -175,7 +175,7 @@ python scripts/kimi_talk_precheck.py probe --config D:/claude-test/TALK/.kimi-co
 ## 首轮验收
 
 1. 用 `--check` 确认身份和默认项目正确。
-2. 在 MCP 客户端中检查能看到九个工具：`talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result`、`talk_get_delivery`。
+2. 新版MCP应有十个任务工具：`talk_list_agents`、`talk_delegate_task`、`talk_get_task`、`talk_list_tasks`、`talk_wait_tasks`、`talk_reply_task`、`talk_cancel_task`、`talk_collect_result`、`talk_get_delivery`、`talk_follow_tasks`。目录只证明加载；主动接入另按[指南](INITIATOR_FOLLOWUP.md)核预算及完整链路。
 3. 调用 `talk_list_agents` 确认目标角色并读取顶层 `development_requirements` 最新项目要求；经用户授权后委派一个范围明确的任务。REQ-1新实现会在 `talk_delegate_task` 创建任务时将非空要求追加到正文作为快照，旧任务不会随项目要求变化。
 4. 目标 bridge 在线时执行任务；终端通过查询或有界等待读取进展，需要补充信息时在同一任务中回复并提交澄清答复。
 5. 任务进入 `submitted` 后先检查成果，再调用 `talk_collect_result`；预期变为 `completed`，并可在现有任务页面看到结果。
@@ -183,7 +183,7 @@ python scripts/kimi_talk_precheck.py probe --config D:/claude-test/TALK/.kimi-co
 ## 当前范围与验证
 
 - 这是 TH-7 的第一片接入包装，没有修改任务协议、页面、数据库或 bridge 的执行方式。
-- 入口暴露九个工具：八个 Task Hall 工具加只读交付摘要 `talk_get_delivery`（完整结果按 `result_message_id` 分页补读）；旧 `talk_send` 依赖 bridge 在当前轮结束后处理延迟记录，因此普通终端不展示也不接受它。原 `talk_send_mcp.py` bridge 入口继续保留原有九工具行为。
+- 2026-10-26新版终端入口增加`talk_follow_tasks`共十个工具；bridge入口另含延迟`talk_send`共十一个。普通终端不展示或接受依赖bridge回收的延迟发送。下方早期九工具验证仍为当时版本记录，不倒改原证据；新增消费者见[指南](INITIATOR_FOLLOWUP.md)。
 - 没有自动安装到任何桌面客户端、编辑用户级 MCP 配置、启动角色服务或开放远程 MCP 服务；具体客户端安装与真实模型验收属于下一片。
 - L1-1 只新增 Kimi 独立会话的模板、生成/预检脚本与启动器，并核对既有入口的工具目录；没有修改 `bridges/` 下任何工具合同，没有激活任何工作区级 `mcp.json`（避免影响现有与新开的 bridge 会话）。
 - 自动化已在隔离服务和数据库中验证：中文与空格目录启动、配置优先级、只读检查、错误诊断、stdio 工具目录、委派→提交→查询→收取。执行方通过测试 API 模拟，没有调用真实模型或修改现有验收数据。

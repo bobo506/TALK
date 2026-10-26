@@ -326,6 +326,7 @@ class TalkTaskToolTests(RouteTestCase):
                 "talk_cancel_task",
                 "talk_collect_result",
                 "talk_get_delivery",
+                "talk_follow_tasks",
             },
         )
         delegate_schema = next(
@@ -903,7 +904,7 @@ class TalkWaitTaskTests(RouteTestCase):
         self.assertIn("omitted_task_ids", schema["description"])
         self.assertIn(str(talk_task_tools.WAIT_MAX_TASK_REFERENCES), schema["description"])
         self.assertIn("不保证宿主外层零回合", schema["description"])
-        self.assertIn("不保证带走 MCP 子进程", schema["description"])
+        self.assertIn("notifications/cancelled", schema["description"])
         self.assertIn("不改变任务状态", schema["description"])
         self.assertIn("程序内部不调用模型", schema["description"])
         # 成果提交 / 完成 / 失败 / 需澄清都必须在默认提前返回集合里。

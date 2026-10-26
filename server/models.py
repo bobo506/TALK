@@ -12,7 +12,7 @@ from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field as PydField, StrictBool, model_validator
+from pydantic import BaseModel, ConfigDict, Field as PydField, StrictBool, field_validator, model_validator
 from sqlalchemy import CheckConstraint, Column, Index, JSON, text
 from sqlmodel import Field, Session, SQLModel, select
 
@@ -3186,6 +3186,25 @@ class AgentTaskGateVerdict(BaseModel):
         if not self.summary:
             raise ValueError("gate verdict summary is required")
         return self
+
+
+class AgentTaskFollowupCreate(AgentTaskCreate):
+    expected_mode_version: int = PydField(strict=True, ge=0)
+    followup_task_ids: list[int] = PydField(default_factory=list, max_length=20)
+
+    @field_validator("followup_task_ids", mode="before")
+    @classmethod
+    def strict_followup_ids(cls, value):
+        if not isinstance(value, list) or any(type(i) is not int or not 0 < i <= 2**53-1 for i in value):
+            raise ValueError("followup_task_ids must contain only positive safe integers")
+        return value
+
+
+class AgentTaskFollowupCollect(BaseModel):
+    """Atomic active-creator collection guard; legacy manual collection unchanged."""
+    expected_result_message_id: int = PydField(strict=True, gt=0)
+    expected_content_sha256: str = PydField(pattern=r"^[0-9a-f]{64}$")
+    expected_mode_version: int = PydField(strict=True, ge=0)
 
 
 class AgentTaskComplete(BaseModel):

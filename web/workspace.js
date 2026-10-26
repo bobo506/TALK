@@ -1873,9 +1873,8 @@ function workspaceTaskNotice(task, tree) {
 // ── C2-B 项目调度模式（角色页“项目设置”，仅保存设置意向） ─────────────────
 // 读取 GET /api/projects/{id} 的 controller_mode / controller_mode_version；加载中禁用控件
 // 并提示读取中。写入只走专用 PATCH /api/projects/{id}/controller-mode，expected_version
-// 原样回传上次读取的版本（不自己 +1、不走普通项目 PATCH）。保存的永远只是“意向”：
-// 本版本没有任何主动调度生效入口（effective 恒为 null），界面把“已保存设置”与
-// “实际执行”分两行如实显示，绝不把 null 伪装成启用状态。
+// 原样回传上次读取的版本（不自己 +1、不走普通项目 PATCH）。设置与实际连接状态分开：
+// 发起者跟进在各自连接内生效，页面不将项目设置伪装成所有会话均已生效。
 // I-2（发起者模式）：模式只约束任务发起侧，与任何指定/成员状态无关——面板不再读取、
 // 不依赖任何指定字段，保存“主动”统一显示固定意向提示，无任何指定前置要求。
 // 状态绑定 项目/账号/请求序号，保存收尾用独立 saveToken 所有权（内部 409 重读会递增
@@ -1942,10 +1941,9 @@ function syncControllerModePanel() {
   } else {
     savedLine.textContent = `已保存设置：无法识别的模式（服务返回：${String(controllerModeUI.saved)}），可选择下方模式重新保存`;
   }
-  // 状态行二：实际执行。本版本没有主动调度的生效入口，支持读取时恒为这句话；
-  // 不支持或读取失败时如实标注无法确认，绝不写成启用状态。
+  // 实际跟进状态只由相应发起会话回执证明，项目 GET 不承诺全局生效。
   effectiveLine.textContent = ready
-    ? "实际执行：尚无生效的主动调度（本版本不支持自动生效）"
+    ? "实际执行：以任务发起会话的跟进回执为准"
     : `实际执行：${controllerModeUI.loaded ? "当前服务不支持调度模式读取，无法确认" : "读取失败，无法确认"}`;
   // 显示选择 = 用户未保存选择 ?? 已保存值（未知模式不预选任何项）。重绘只按状态回写
   // checked，用户选择存放在 selection 中，轮询/重绘不会吞掉未保存选择。
@@ -2114,8 +2112,8 @@ async function saveControllerMode() {
         } else {
           controllerModeUI.selection = null;
           if (submitted === "active") {
-            // I-2：保存“主动”只记录项目意向，无任何指定前置；固定提示，不查询任何指定状态。
-            controllerModeUI.notice = "已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。";
+            // 不恢复固定指定；实际状态由各发起连接确认，保存不会唤回已结束会话。
+            controllerModeUI.notice = "已保存“主动”。支持主动跟进的发起会话会在本次授权范围内继续处理；已结束的会话仍需人工唤回。";
           } else {
             controllerModeUI.notice = "已保存“被动”。派发任务后本轮结束，由你通知完成后再读取与收取。";
           }

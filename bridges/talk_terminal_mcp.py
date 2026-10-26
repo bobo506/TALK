@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import yaml
 
 from bridges import talk_send_mcp
+from bridges.initiator_followup import Budget
 from bridges.talk_delivery import (
     DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
     DELIVERY_DETAIL_MAX_PAGE_CHARS,
@@ -55,6 +56,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="可选：把每次 talk_wait_tasks 的程序级计数（轮询轮次/HTTP 数/耗时/返回原因）追加写入该 JSONL 文件",
     )
     parser.add_argument("--check", action="store_true", help="只读检查身份、项目及可用角色，然后退出")
+    for name in ('client-timeout-seconds','wait-seconds','total-seconds','return-margin-seconds'):
+        parser.add_argument('--followup-'+name, type=float, help='主动跟进的明确客户端/等待/总预算/余量（秒）；客户端值须按当前宿主核验')
     return parser
 
 
@@ -92,6 +95,11 @@ def configure(args: argparse.Namespace) -> tuple[str, str]:
     os.environ.update(TALK_BASE_URL=server, TALK_PROJECT_ID=project_id, TALK_API_KEY=api_key)
     # 独立终端以 API Key 的真实身份为准，避免继承另一个 bridge 的成员提示。
     os.environ.pop("TALK_MEMBER_ID", None)
+    for field, key in [('client_timeout_seconds','CLIENT_TIMEOUT_SECONDS'),('wait_seconds','WAIT_SECONDS'),
+                       ('total_seconds','TOTAL_SECONDS'),('return_margin_seconds','RETURN_MARGIN_SECONDS')]:
+        value=getattr(args,'followup_'+field,None)
+        if value is not None:os.environ['TALK_FOLLOWUP_'+key]=str(value)
+    Budget.environment()  # Validate before any task can be created.
     stats_file = getattr(args, "wait_stats_file", None)
     if stats_file is not None:
         resolved = Path(stats_file).expanduser().resolve()
@@ -151,6 +159,7 @@ def delivery_defaults() -> dict:
 def check_connection(server: str, project_id: str) -> dict:
     me = _api_request("GET", "/api/members/me")
     discovered = list_agents(project_id=project_id)
+    budget = Budget.environment()
     return {
         "ok": True,
         "server": server,
@@ -159,6 +168,7 @@ def check_connection(server: str, project_id: str) -> dict:
         "display_name": me.get("display_name"),
         "wait_defaults": wait_defaults(),
         "delivery_defaults": delivery_defaults(),
+        "initiator_followup_budget": budget.public() if budget else None,
         "agents": [
             {key: agent.get(key) for key in ("member_id", "display_name", "availability")}
             for agent in discovered["agents"]
@@ -176,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.check:
             print(json.dumps(check_connection(server, project_id), ensure_ascii=False))
         else:
-            # 普通终端仅开放九个只读/写入明确的 HTTP 任务工具，不暴露依赖 bridge 回收的延迟发送。
+            # 普通终端开放十个任务工具，不暴露依赖 bridge 回收的延迟发送。
             talk_send_mcp.main(include_deferred_send=False)
     except (TalkToolError, OSError, ValueError) as exc:
         message = str(exc)

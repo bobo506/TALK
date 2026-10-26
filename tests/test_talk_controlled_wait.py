@@ -85,6 +85,7 @@ TOOL_NAMES = (
     "talk_cancel_task",
     "talk_collect_result",
     "talk_get_delivery",
+    "talk_follow_tasks",
 )
 MEMBERS_ME_AGENT = {"id": "agent:worker", "kind": "agent", "display_name": "Worker"}
 
@@ -1451,7 +1452,7 @@ class ToolSurfaceTests(unittest.TestCase):
     """schema / 描述 / --check 说明与九工具集合。"""
 
     def test_tool_schema_surface_is_unchanged_and_documents_controlled_wait(self):
-        self.assertEqual(len(TOOL_SCHEMAS), 9)
+        self.assertEqual(len(TOOL_SCHEMAS), 10)
         self.assertEqual(tuple(tool["name"] for tool in TOOL_SCHEMAS), TOOL_NAMES)
         schema = next(tool for tool in TOOL_SCHEMAS if tool["name"] == "talk_wait_tasks")
         properties = schema["inputSchema"]["properties"]
@@ -1486,7 +1487,7 @@ class ToolSurfaceTests(unittest.TestCase):
             "660",
             "omitted_task_ids",
             "不保证宿主外层零回合",
-            "不保证带走 MCP 子进程",
+            "notifications/cancelled",
             "不改变任务状态",
             "程序内部不调用模型",
             "verified_task_count",
@@ -1511,7 +1512,7 @@ class ToolSurfaceTests(unittest.TestCase):
         self.assertIn("已弃用", list_description)
         self.assertIn("任务发起者派发新任务前应先读取", list_description)
         self.assertNotIn("主控派发新任务前", list_description)
-        self.assertIn("没有发起者会话绑定", list_description)
+        self.assertIn("当前连接的局部状态", list_description)
 
         note = talk_task_tools.WAIT_COUNTING_NOTE
         self.assertIn("http_requests", note)

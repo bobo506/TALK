@@ -157,9 +157,9 @@ class TerminalConfigTests(unittest.TestCase):
             defaults["max_task_references_per_call"],
             talk_task_tools.WAIT_MAX_TASK_REFERENCES,
         )
-        # 取消边界必须如实说明：同步等待不会被客户端取消立即终止，也不保证子进程随之退出。
-        self.assertIn("不会立即终止程序侧等待", defaults["cancellation_note"])
-        self.assertIn("不保证带走 MCP 子进程", defaults["cancellation_note"])
+        # 新stdio检测取消/EOF；在途HTTP受socket边界限制，其它入口须独立核验。
+        self.assertIn("notifications/cancelled", defaults["cancellation_note"])
+        self.assertIn("socket边界", defaults["cancellation_note"])
         self.assertIn("不改变任务状态", defaults["cancellation_note"])
 
     def test_wait_stats_file_sets_env_and_rejects_missing_directory(self):

@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -24,9 +25,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from bridges.talk_task_tools import TOOL_SCHEMAS, TalkToolError, dispatch_tool
+from bridges.mcp_wait_dispatch import WaitLane
 
 SERVER_NAME = "talk_tools_mcp"
-SERVER_VERSION = "2.0.0"
+SERVER_VERSION = "3.0.0"
+_OUTPUT_LOCK = threading.RLock()
 
 
 # ---------------------------------------------------------------------------
@@ -36,8 +39,9 @@ SERVER_VERSION = "2.0.0"
 
 def _write_json(data: dict[str, Any]) -> None:
     """写一行 JSON 到 stdout。"""
-    sys.stdout.write(json.dumps(data, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
+    with _OUTPUT_LOCK:
+        sys.stdout.write(json.dumps(data, ensure_ascii=False) + "\n")
+        sys.stdout.flush()
 
 
 def _write_response(id_: Any, result: Any) -> None:
@@ -123,6 +127,7 @@ _TOOL_SCHEMA = {
 
 
 def main(*, include_deferred_send: bool = True) -> None:
+    lane = WaitLane(dispatch_tool, _write_response, _write_error)
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -130,6 +135,9 @@ def main(*, include_deferred_send: bool = True) -> None:
         try:
             request = json.loads(line)
         except json.JSONDecodeError:
+            continue
+
+        if not isinstance(request, dict):
             continue
 
         method = request.get("method", "")
@@ -146,11 +154,22 @@ def main(*, include_deferred_send: bool = True) -> None:
             elif method == "notifications/initialized":
                 # MCP 初始化完成通知，无需响应
                 pass
+            elif method == "ping":
+                _write_response(req_id, {})
+            elif method == "notifications/cancelled":
+                if isinstance(params, dict):
+                    lane.cancel(params.get("requestId"))
             elif method == "tools/list":
                 _write_response(req_id, {"tools": ([_TOOL_SCHEMA] if include_deferred_send else []) + TOOL_SCHEMAS})
             elif method == "tools/call":
                 tool_name = params.get("name", "")
                 tool_args: dict[str, Any] = params.get("arguments", {})
+                if not isinstance(tool_args, dict):
+                    _write_error(req_id, -32602, "arguments must be an object")
+                    continue
+                if WaitLane.handles(tool_name, tool_args):
+                    lane.submit(req_id, tool_name, tool_args)
+                    continue
                 if tool_name == "talk_send" and include_deferred_send:
                     target = str(tool_args.get("target", "")).strip()
                     body = str(tool_args.get("body", "")).strip()
@@ -203,6 +222,7 @@ def main(*, include_deferred_send: bool = True) -> None:
                     }, ensure_ascii=False) + "\n")
             except Exception:
                 pass
+    lane.close()
 
 
 if __name__ == "__main__":

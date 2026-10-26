@@ -1255,7 +1255,7 @@ class DeliveryCompatibilityTests(unittest.TestCase):
             "talk_get_delivery",
         ):
             self.assertIn(name, names)
-        self.assertEqual(names[-1], "talk_get_delivery")
+        self.assertEqual(names[-2:], ["talk_get_delivery", "talk_follow_tasks"])
         self.assertEqual(len(names), len(set(names)))
         collect = next(tool for tool in TOOL_SCHEMAS if tool["name"] == "talk_collect_result")
         self.assertEqual(collect["inputSchema"]["required"], ["task_id"])

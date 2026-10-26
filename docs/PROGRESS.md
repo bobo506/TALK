@@ -1,27 +1,26 @@
 # Project Progress
 
-Updated: 2026-10-26 10:36（Asia/Shanghai）。338本轮页面启动基础人验已通过。用户澄清现有选模/运行器对齐已满足当前场景，撤回独立双模型报告/差异展示提案；未开始新片。
+Updated: 2026-10-26 15:28（Asia/Shanghai）。用户明确完成已有发起者主被动功能，Codex开发/DeepSeek独立核实；本片开发及隔离自检完成，待冻结首审。生产未加载，不能提前宣布真实主动链路I-4完成。
 
-## 已完成
+## 本片实现
 
-- 代码3203044已推送，338/2984独立核验收取completed，无必须修正；原自由文本MCP业务unknown及环境限制保留。
-- 用户本次明确授权实际加载；原runtime4956一次普通stop首次blocked/host_stop_timeout，原后台正常重试最终shutdown complete/error空、11原PID全absent、五角色stopped/无owner。未强杀/CAS/清锁或重复stop，原失败回执保持。
-- 用户原终端重启API后，API自动带新runtime18784/UTC02:17:38，五宿主serving、startup complete/worker无错、shutdown idle。未重复serve/手动start/PUT偏好。
-- 小D保用户true/rev1自动gen82/ins_b65106fc9fdb/PID18580 ready/idle，同实例真实心跳推进90.075601秒；其它四false/rev0/not_selected/stopped/无owner。
-- 新APIuptime168秒；八处关键源码SHA匹配338冻结且保存早于新API启动，重启后HTTP页面/app.js/workspace.js逐字节匹配，缓存20261025-role-busy-stop-v1。
-- 用户已确认实际页面“启动成功”，本轮基础人验通过；不扩大为生产忙态注入或其它异常/原生能力验收。
+- 复用已完成的模式设置、created_by权限、等待与交付工具，新增连接内有限主动跟进：本人显式任务→等待→完整摘要/必要原文→依约核验/独立复核/返修→声明与证据后收取。
+- talk_follow_tasks为第十个stdio任务工具；已配置明确预算时active派发自动登记，后续复核/返修加入同一单调deadline。已读取未收取的原任务不会阻塞复核交付；被动保持派后结束、用户通知取件。
+- 新创建/收取专用路由在实际BEGIN IMMEDIATE内重核模式版本、归属/根控制；收取另核结果ID/正文SHA/作者/Hall/撤回。旧服务缺路由拒绝，不回退忽略条件的旧写入；无DB迁移，原人工权限与接口保持。
+- 新stdio独立等待通道检测取消/EOF，正常查询/ping不排队、重复等待拒绝。切回被动/身份/范围/控制改变或总预算耗尽只停止跟进，不取消/重派后台任务。5xx/传输未知写入结果须先读状态，不自动重放。
+- 局部effective只回报当前连接/显式批次，不恢复固定主控、角色分级或全局授权；报告正文不执行成指令，已收取不等于语义/人工验收通过。页面仅同步说明及workspace缓存，保存/CAS/切页机制保持。
 
-## 保护与验收口径
+## 验证与限制
 
-- 五完整binding/角色配置/项目要求/自启动选择及250/286整份公开响应与加载前相同；250failed/2767未收取、286queued/accepted/paused保持，无running任务。
-- 275新与旧冻结、332至338原归档零错配。产品/正式测试未改，无生产配置正文/Key摘要/DB/private/HOME/native/session/log读取；原入口与human凭据仅正常用途消费。
-- 忙时禁止关闭/有限编号/关闭接受后claim拒绝，已有338独立17核心Python/31Node及正常权限19/221证据。本轮未造生产忙态，不把静态HTTP核验称真人页面验收；原19合并4E/Node EPERM及350中17旧失败保留。
-- 用户明确：TALK执行中/运行器忙则挡退出，空闲正常关闭自身服务与运行器入口；运行器内部子进程由运行器负责。原生进程树新增切片已撤回，不作为后续门槛；不外推强制取消或真实断电恢复。
+- 237关联Python全过（含31新增），35页面模式Node全过。新增31项在最后的并发初始化锁补正后复跑全过；同一测试不叠加计数。
+- 真实互动JSON-RPC隔离客户端明确T10/W4/余量5，正常到期4.016秒、命中交付→核验声明→原子收取、取消/EOF、同连接查询0.094秒、重复等待、模式切换均通过并落实际耗时。真实SQLite WAL两个写入者证明模式写入先行后，自动创建/收取读取最新事实并拒绝。
+- 当前Codex宿主和其它终端的实际T/W、重连及完整主动验收尚待代码独立通过后进行；隔离客户端不是它们的替代证据。旧Pi直接工具不外推新能力。生产仍passive/version6，当前MCP旧目录不能当新工具已加载。
+- 原首轮16的1F/1E、stdio初5E夹具遗漏、旧160的5F及235的2F说明/目录断言保留。页面缓存旧断言在HEAD副本同样失败；按本轮实际资源版本补正后35过，未移除交互断言。
 
-## 下一步
+## 保护与下一步
 
-1. 338已完成本轮人验收尾，无需再次重启/追加复核，本次停启许可已执行。
-2. 用户当前场景为添加角色选模→运行器适配/执行对齐，保现有单模型展示与校验。10:27独立模型报告/双字段/差异展示提案已撤回，不作为新切片或继续开发门槛；不把数据来源不同当新产品需求，也不冒称额外统一证据功能已实现。
-3. 后续核真正尚未满足的需求，不重复338、已撤回的子进程树片或现有模型对齐。当前未开工/派发/启停，分工仍Codex开发/DeepSeek复核；纯文档不单独推送。
+- 实际身份agent:codex / prj_e8fe7066bbec / lead；本次分工优先于长期默认分工。250failed/2767未收取、286queued/accepted/paused及五完整binding/项目要求保持；不操作自启动选择。原runtime18784与DeepSeek gen82保持，不在开发阶段启停/重载/改模式。
+- 不读生产config正文/Key/DB/private/HOME/native/session/log。所有测试严格合成配置/假凭据/动态本地端口和本测试所属子进程；旧冻结与332—338原交付保持。338页面启动基础人验已闭合，子进程树管理与双模型展示提案已撤回，不重开。
+- 接下来固定源与证据，普通提交/推送当前分支，交DeepSeek集中首审，产品/正式测试/冻结暂停，唯一写本片review。仍按当前被动约定由用户通知完成后取件，不为测试本功能擅自切生产主动；独立通过后继续当前宿主实际接入与人验，不另开无关片。
 
-详[实际加载记录](spec/ROLE_BUSY_STOP_DEPLOYMENT_20261026.md)、[本片合同](spec/ROLE_BUSY_STOP_GUARD_20261025.md)、[退出指南](guides/RUNTIME_SHUTDOWN.md)及[历史](PROGRESS_HISTORY.md)。证据.tmp/role-busy-stop-v1/deployment-20261026/。
+详[本片合同](spec/INITIATOR_FOLLOWUP_COMPLETE_20261026.md)、[使用指南](guides/INITIATOR_FOLLOWUP.md)、[模块](spec/MODULE_bridges.md)及[历史](PROGRESS_HISTORY.md)。证据.tmp/initiator-followup-v1/。

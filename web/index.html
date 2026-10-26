@@ -267,9 +267,9 @@
               <h3>调度模式</h3>
             </div>
           </div>
-          <p class="controller-mode-hint">这里保存的是项目的调度模式意向：只记录设置，不唤醒任何会话、不自动运行任务。模式只约束任务发起侧：被动为派发后结束、由你通知后继续；主动为任务发起者在已获授权的任务流程内等待交付、读取结果、安排独立复核并收尾。</p>
+          <p class="controller-mode-hint">模式只约束任务发起侧：被动为派发后结束、由你通知后继续；主动为已接入跟进的发起会话在本次授权范围内等待交付、核验结果、安排复核并收尾。切回被动后停止后续跟进，执行中的任务继续运行。</p>
           <p id="controller-mode-saved" class="controller-mode-saved">已保存设置：读取中…</p>
-          <p id="controller-mode-effective" class="controller-mode-effective">实际执行：尚无生效的主动调度（本版本不支持自动生效）</p>
+          <p id="controller-mode-effective" class="controller-mode-effective">实际执行：以任务发起会话的跟进回执为准</p>
           <fieldset id="controller-mode-options" class="controller-mode-options">
             <legend class="sr-only">选择要保存的调度模式</legend>
             <label class="controller-mode-option" for="controller-mode-passive">
@@ -283,7 +283,7 @@
               <input id="controller-mode-active" type="radio" name="controller-mode" value="active">
               <span class="controller-mode-option-body">
                 <strong>主动</strong>
-                <span>任务发起者在等待期间继续读取交付、交独立复核并收尾。保存“主动”只是设置意向，不等于已生效：没有任何会话因此被唤醒或自动运行；已结束的对话仍需人工唤回。</span>
+                <span>任务发起者在本次授权内持续跟进交付、核验、复核与收尾；已结束的对话仍需人工唤回。</span>
               </span>
             </label>
           </fieldset>
@@ -564,7 +564,7 @@
   </div>
   <script src="/role-creation.js?v=20261023-role-name-v1"></script>
   <script src="/role-diagnostics.js?v=20261023-backend-export-v1"></script>
-  <script src="/workspace.js?v=20261025-role-startup-v1"></script>
+  <script src="/workspace.js?v=20261026-initiator-followup-v1"></script>
   <script src="/app.js?v=20261025-role-busy-stop-v1"></script>
 </body>
 </html>

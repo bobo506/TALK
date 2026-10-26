@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, update
@@ -23,6 +24,8 @@ from server.models import (
     AgentTaskClarificationRound,
     AgentTaskClarificationRoundOut,
     AgentTaskComplete,
+    AgentTaskFollowupCollect,
+    AgentTaskFollowupCreate,
     AgentTaskCreate,
     AgentTaskHeartbeat,
     AgentTaskOut,
@@ -1834,6 +1837,32 @@ def create_task(
     return task
 
 
+@router.post("/followup", response_model=AgentTaskOut, status_code=status.HTTP_201_CREATED)
+def create_followup_task(
+    body: AgentTaskFollowupCreate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Atomic mode/ownership guard for an active creator's next dispatch.
+
+    Ordinary dispatch and its permissions stay unchanged. Old servers lack this
+    distinct route and cannot silently ignore an active continuation's guard.
+    """
+    _require_agent(current)
+    begin_immediate_write(session)
+    session.expire_all()
+    project = session.get(Project, body.project_id) if body.project_id else None
+    if project is None or project.controller_mode != 'active' or project.controller_mode_version != body.expected_mode_version:
+        raise HTTPException(409, 'followup_mode_changed')
+    for task_id in dict.fromkeys(body.followup_task_ids):
+        task = _get_task(task_id, session)
+        if task.created_by != current.id or task.project_id != body.project_id:
+            raise HTTPException(403, 'followup_creator_scope_required')
+        if _get_root_task(task, session).control_status != 'active':
+            raise HTTPException(409, 'followup_task_control_changed')
+    return create_task(body, current, session)
+
+
 @router.get("", response_model=list[AgentTaskOut])
 def list_tasks(
     target_member_id: str | None = Query(None),
@@ -2751,6 +2780,45 @@ def collect_task_result(
     now = datetime.now(timezone.utc)
     task.result_collected_at = now
     return _update_workflow_status(task, "completed", now, session)
+
+
+@router.post("/{task_id}/collect-followup-result", response_model=AgentTaskOut)
+def collect_followup_result(
+    task_id: int,
+    body: AgentTaskFollowupCollect,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """Recheck mode/control/result inside the same real writer as collection.
+
+    This distinct route fails closed on old servers; no ignored optional body
+    can accidentally turn an active collection into legacy manual collection.
+    """
+    _require_agent(current)
+    begin_immediate_write(session)
+    session.expire_all()
+    task = _get_task(task_id, session)
+    if task.created_by != current.id:
+        raise HTTPException(403, 'followup_creator_required')
+    project = session.get(Project, task.project_id) if task.project_id else None
+    if project is None or project.controller_mode != 'active' or project.controller_mode_version != body.expected_mode_version:
+        raise HTTPException(409, 'followup_mode_changed')
+    if _get_root_task(task, session).control_status != 'active':
+        raise HTTPException(409, 'followup_task_control_changed')
+    if task.result_message_id != body.expected_result_message_id:
+        raise HTTPException(409, 'followup_result_changed')
+    message = session.get(Message, task.result_message_id)
+    if (message is None or message.revoked_at is not None or message.from_id != task.target_member_id
+            or message.group_id not in (task.hall_group_id, None)
+            or hashlib.sha256((message.content or '').encode('utf-8')).hexdigest() != body.expected_content_sha256):
+        raise HTTPException(409, 'followup_result_changed')
+    if task.workflow_status == 'completed':
+        return task
+    if task.workflow_status != 'submitted':
+        raise HTTPException(409, 'followup_result_not_submitted')
+    now = datetime.now(timezone.utc)
+    task.result_collected_at = now
+    return _update_workflow_status(task, 'completed', now, session)
 
 
 @router.post("/{task_id}/cancel", response_model=AgentTaskOut)

@@ -104,7 +104,7 @@ function harness({ human = true, projectId = 'A' } = {}) {
   return { context, pending, reply, fail, el, ui, enter, document, setSettingsSelected };
 }
 
-const EFFECTIVE_LINE = '实际执行：尚无生效的主动调度（本版本不支持自动生效）';
+const EFFECTIVE_LINE = '实际执行：以任务发起会话的跟进回执为准';
 
 test('无项目或未登录时面板隐藏且不发起请求', () => {
   const { context, pending, el } = harness();
@@ -152,8 +152,8 @@ test('human 加载被动默认：状态两行如实显示，保存需显式选�
   assert.equal(el('controller-mode-saved').textContent, '已保存设置：主动');
   assert.equal(el('controller-mode-active').checked, true);
   // I-2：保存主动为固定意向提示，不再查询任何指定状态
-  assert.equal(ui.notice, '已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。');
-  assert.match(el('controller-mode-effective').textContent, /尚无生效的主动调度/, '保存主动不伪装成已生效');
+  assert.equal(ui.notice, '已保存“主动”。支持主动跟进的发起会话会在本次授权范围内继续处理；已结束的会话仍需人工唤回。');
+  assert.match(el('controller-mode-effective').textContent, /以任务发起会话的跟进回执为准/, '保存主动不伪装成已生效');
 });
 
 test('保存主动/被动提示固定：不查询、不依赖任何指定状态（响应携带已弃用字段也无关）', async () => {
@@ -167,7 +167,7 @@ test('保存主动/被动提示固定：不查询、不依赖任何指定状态�
     controller_member_id: 'agent:kimi', controller_assignment_status: 'assigned',
   });
   await save;
-  assert.equal(ui.notice, '已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。');
+  assert.equal(ui.notice, '已保存“主动”。支持主动跟进的发起会话会在本次授权范围内继续处理；已结束的会话仍需人工唤回。');
   assert.ok(!/已生效|已启用/.test(ui.notice));
   // 指定失效（成员被禁用）：提示逐字节相同——模式保存不再有指定前置
   const h2 = harness();
@@ -179,7 +179,7 @@ test('保存主动/被动提示固定：不查询、不依赖任何指定状态�
     controller_member_id: 'agent:kimi', controller_assignment_status: 'member_disabled',
   });
   await save2;
-  assert.equal(h2.ui.notice, '已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。');
+  assert.equal(h2.ui.notice, '已保存“主动”。支持主动跟进的发起会话会在本次授权范围内继续处理；已结束的会话仍需人工唤回。');
 });
 
 test('已保存主动无任何指定可用性提示；指定字段变化不影响模式状态与面板', async () => {

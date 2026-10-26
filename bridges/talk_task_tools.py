@@ -13,6 +13,7 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from bridges import talk_delivery
+from bridges import mcp_wait_context
 from bridges.talk_delivery import (
     DELIVERY_DETAIL_DEFAULT_PAGE_CHARS,
     DELIVERY_DETAIL_MAX_PAGE_CHARS,
@@ -72,9 +73,9 @@ WAIT_COUNTING_NOTE = (
 )
 # 取消/断线边界（工具描述与 --check 共用，避免被读成"取消会立即终止服务端等待"）。
 WAIT_CANCELLATION_NOTE = (
-    "talk_wait_tasks 是同步阻塞轮询：程序内部不调用模型，但本工具无法保证宿主外层零回合；"
-    "客户端取消（notifications/cancelled）不会立即终止程序侧等待，等待仍会跑到命中或超时截止；"
-    "Windows 下客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。"
+    "工具内部同步轮询、不调用模型，不保证宿主外层零回合。新版stdio MCP把等待放入有界独立通道，"
+    "处理notifications/cancelled和EOF，只结束读等待、不改变任务状态、不取消执行者任务；在途HTTP受socket边界限制。"
+    "直接函数或其它未接入该stdio通道的客户端不具备这一取消检测源，须分别核验。"
 )
 # ---------------------------------------------------------------------------
 # C2-A1 受控等待（opt-in）常量
@@ -152,12 +153,13 @@ PROJECT_REQUIREMENTS_SNAPSHOT_NOTE = (
     "不自动授予权限，不替代或覆盖宿主系统指令，也不追溯修改已创建任务。"
 )
 # C1a 模式只读状态：requested_mode 是项目保存的“模式意向”，
-# effective_mode 是“本会话实际生效”的证据，本片没有任何会话绑定/生效确认，恒为 null。
+# 无当前连接跟进证据时，effective_mode 保持 null；连接消费者仅补充自己的局部状态。
 CONTROLLER_MODE_NOTE = (
     "controller_mode 只是项目保存的模式意向（requested_mode）与版本，"
-    "本版本没有发起者会话绑定或生效确认：effective_mode 恒为 null（effective_status=not_bound）。"
-    "保存 active 不等于已生效、不等于已唤回发起者会话，也不产生等待/调度/派发或任何授权；"
-    "默认协作仍是派发后结束、由用户通知后再取件。"
+    "无当前连接跟进证据时effective_mode=null（effective_status=not_bound）；"
+    "已配置明确预算的主动消费者只回报当前连接/显式任务的实际状态。"
+    "保存 active 不等于已生效、不等于已唤回发起者会话，不增加任何授权；"
+    "被动协作仍是派发后结束、由用户通知后再取件。"
 )
 CONTROLLER_MODE_UNSUPPORTED_NOTE = (
     "当前后端未返回模式字段（旧后端）：模式意向状态为 unsupported，"
@@ -261,6 +263,7 @@ def _api_request(
     stats: JsonDict | None = None,
     timeout: float = WAIT_REQUEST_TIMEOUT_SECONDS,
 ) -> Any:
+    timeout = mcp_wait_context.http_timeout(timeout)
     base_url, api_key = _config()
     query = urlencode({key: value for key, value in (params or {}).items() if value is not None})
     url = f"{base_url}{path}" + (f"?{query}" if query else "")
@@ -276,6 +279,7 @@ def _api_request(
     try:
         with urlopen(request, timeout=timeout) as response:
             payload = response.read()
+        mcp_wait_context.check_cancelled()
     except HTTPError as exc:
         try:
             payload = exc.read()
@@ -289,14 +293,17 @@ def _api_request(
             pass
         raise TalkApiHttpError(f"TALK API HTTP {exc.code}: {detail}", status=exc.code) from exc
     except TimeoutError as exc:
+        mcp_wait_context.check_cancelled()
         # 连接阶段或 getresponse/read 阶段的裸超时：归一为工具错误，不让裸异常逃出工具层。
         raise TalkToolError(_request_timeout_message(timeout)) from exc
     except URLError as exc:
+        mcp_wait_context.check_cancelled()
         reason = getattr(exc, "reason", None)
         if isinstance(reason, TimeoutError):
             raise TalkToolError(_request_timeout_message(timeout)) from exc
         raise TalkToolError(f"无法连接 TALK API: {reason}") from exc
     except OSError as exc:
+        mcp_wait_context.check_cancelled()
         # 未被 URLError 包装的网络 OSError：同样归一，但如实按网络错误报告，不统称“超时”。
         if isinstance(exc, TimeoutError):
             raise TalkToolError(_request_timeout_message(timeout)) from exc
@@ -725,6 +732,7 @@ def delegate_task(
     authorization_epoch: int | None = None,
     max_clarification_rounds: int = 1,
     execution_session: JsonDict | None = None,
+    followup_plan: Any = None,
 ) -> JsonDict:
     effective_project_id = _project_id(project_id, required=True)
     # 派发前读取该项目的当前开发要求：只作用于本次新建任务的存储正文，
@@ -753,7 +761,13 @@ def delegate_task(
     }
     if execution_session is not None:
         payload["execution_session"] = execution_session
-    return _api_request("POST", "/api/tasks", json_body=payload)
+    path = "/api/tasks"
+    if followup_plan is not None:
+        _, _, version, _, flow = followup_plan
+        payload["expected_mode_version"] = version
+        payload["followup_task_ids"] = list(flow.ids) if flow else []
+        path = "/api/tasks/followup"
+    return _api_request("POST", path, json_body=payload)
 
 
 def list_tasks(
@@ -1359,7 +1373,7 @@ def _wait_tasks_legacy(
         if _monotonic() - started_monotonic >= effective_timeout:
             return finish(timed_out=True, reason="timeout", polled=tasks, matched=[])
         sleep_seconds = min(poll_interval, max(0.0, deadline - _monotonic()))
-        _sleep(sleep_seconds)
+        mcp_wait_context.wait_sleep(sleep_seconds, _sleep)
         poll_interval = min(poll_interval * 2, WAIT_MAX_POLL_INTERVAL_SECONDS)
 
 
@@ -1803,7 +1817,7 @@ def _wait_tasks_controlled(
                 exit_detail="deadline 耗尽，未再发出请求",
             )
         sleep_seconds = min(poll_interval, max(0.0, remaining()))
-        _sleep(sleep_seconds)
+        mcp_wait_context.wait_sleep(sleep_seconds, _sleep)
         poll_interval = min(poll_interval * 2, WAIT_MAX_POLL_INTERVAL_SECONDS)
 
 
@@ -1839,8 +1853,8 @@ def wait_tasks(
       tasks_truncated / tasks_omitted_count / omitted_task_ids 标记，matched_task_ids 完整。
     - TALK API 错误（含 4xx/5xx/网络错误/单次请求超时）直接抛出错误，绝不复用超时返回结构；
       受控路径连接受阻或响应读取阶段超时同样按 api_error 报错，不伪装成正常 timeout。
-    - 同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），Windows 下
-      客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态、不取消在途任务、不收取。
+    - 新stdio入口通过独立等待通道读取取消/EOF；其它直接调用须自备取消源。
+      在途HTTP仍受socket边界限制；全程只读，不改变任务状态、不取消在途任务、不收取。
     - query_stats 给出本次调用的程序级实测计数（轮询轮次、HTTP 请求数、耗时、返回原因）；
       受控路径把身份 GET、项目 GET、G8 逐任务核验 GET、每 30 秒重读 GET 与任务轮询 GET
       （含失败尝试）全部计入。
@@ -1874,9 +1888,9 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "再按该要求派发。"
             "顶层还返回只读的 controller_mode（与开发要求复用同一次项目读取）："
             "requested_mode / requested_version 是项目保存的模式意向与版本，"
-            "effective_mode 恒为 null、effective_status=not_bound，表示本版本没有发起者会话绑定或"
-            "生效确认。保存 active 不等于已生效、不等于已唤回任何会话，也不授权自动等待、调度、"
-            "派发或推进；默认协作仍是派发后结束、由用户通知后再取件，不得据此字段声称已唤回会话。"
+            "无局部跟进证据时effective_mode=null、effective_status=not_bound；已接入的消费者"
+            "仅回报当前连接的局部状态。保存 active 不等于已生效、不等于已唤回任何会话，"
+            "不增加任务权限；被动协作仍是派发后结束、由用户通知后再取件。"
             "非项目路径 controller_mode 为 null；旧后端缺模式字段时为 supported=false / "
             "effective_status=unsupported，不能当成 passive 或已支持。"
             "顶层还返回只读的 controller_assignment（同样复用这一次项目读取）："
@@ -2036,8 +2050,8 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "omitted_task_ids 标记，matched_task_ids 始终是完整命中集合。"
             "query_stats 只含本工具内部实测计数（轮询轮次、HTTP 请求数、耗时、返回原因）。"
             "TALK API 错误会直接返回错误，不会被当成超时。"
-            "本工具同步阻塞：客户端取消不会立即终止程序侧等待（仍会跑到命中或超时截止），"
-            "Windows 下客户端进程退出不保证带走 MCP 子进程；等待全程只读，不改变任务状态。"
+            "新版stdio MCP等待不独占连接，支持notifications/cancelled/EOF结束读等待；"
+            "在途HTTP受socket边界限制，直接调用或其它入口须分别核验；不改变任务状态、不取消执行者任务。"
             "客户端单工具超时必须大于最长等待，建议 >= 660 秒（本工具读不到宿主客户端预算，"
             "唯一强制上限是 600 秒 clamp）。"
             "受控等待是显式 opt-in 参数 controlled_wait（默认 false，缺省/ false 时与旧行为逐字段一致，"
@@ -2234,11 +2248,23 @@ TOOL_SCHEMAS: list[JsonDict] = [
 ]
 
 
+from bridges.initiator_followup import SCHEMA as _FOLLOWUP_SCHEMA
+TOOL_SCHEMAS.append(_FOLLOWUP_SCHEMA)
+next(s for s in TOOL_SCHEMAS if s['name']=='talk_delegate_task')['description'] += (
+    ' 当前MCP配置了明确跟进预算且项目为active时，返回initiator_followup；'
+    '在本次授权范围内立即调用talk_follow_tasks(action=next,followup_id=...)保持有限跟进，'
+    '取交付后实际核验再收取；stop/人工门禁/预算耗尽时停止，不自动开无关开发。'
+)
+
+
 def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
+    from bridges.initiator_followup import manager
+    if name == "talk_follow_tasks":
+        return manager().call(arguments)
     if name == "talk_list_agents":
-        return list_agents(project_id=arguments.get("project_id"))
+        return manager().decorate(list_agents(project_id=arguments.get("project_id")))
     if name == "talk_delegate_task":
-        return delegate_task(
+        return manager().delegate(arguments, lambda followup_plan: delegate_task(
             project_id=arguments.get("project_id"),
             target_member_id=str(arguments.get("target_member_id") or "").strip(),
             title=str(arguments.get("title") or "").strip() or None,
@@ -2267,7 +2293,8 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
                 arguments.get("max_clarification_rounds", 1)
             ),
             execution_session=arguments.get("execution_session"),
-        )
+            followup_plan=followup_plan,
+        ))
     if name == "talk_get_task":
         return get_task(int(arguments["task_id"]))
     if name == "talk_list_tasks":
@@ -2287,6 +2314,7 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             controlled_wait=arguments.get("controlled_wait"),
         )
     if name == "talk_reply_task":
+        manager().guard_legacy_write(int(arguments["task_id"]))
         return reply_task(
             task_id=int(arguments["task_id"]),
             body=str(arguments.get("body") or "").strip(),
@@ -2299,6 +2327,7 @@ def dispatch_tool(name: str, arguments: JsonDict) -> JsonDict:
             reason=str(arguments.get("reason") or "").strip() or None,
         )
     if name == "talk_collect_result":
+        manager().guard_legacy_write(int(arguments["task_id"]), collection=True)
         return collect_result(task_id=int(arguments["task_id"]))
     if name == "talk_get_delivery":
         return get_delivery(

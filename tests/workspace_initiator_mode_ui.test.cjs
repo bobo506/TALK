@@ -246,10 +246,11 @@ test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源
   }
   assert.ok(!workspaceSource.includes('/controller-assignment'), 'workspace.js 不再读写指定端点');
   assert.ok(!appSource.includes('/controller-assignment'), 'app.js 不再读写指定端点');
-  assert.equal(indexHtml.split(STATIC_VERSION).length - 1, 6, '未改动的六处资源保留原缓存版本');
-  for (const asset of ['app.js', 'workspace.js']) {
-    assert.ok(indexHtml.includes(`/${asset}?v=20261020-conversation-controls-v2`), `${asset} 的修改必须更新缓存版本`);
+  for (const asset of ['style.css', 'role-creation.css', 'role-diagnostics.css']) {
+    assert.ok(indexHtml.includes(`/${asset}?v=${STATIC_VERSION}`), `${asset} 保留原缓存版本`);
   }
+  assert.ok(indexHtml.includes('/app.js?v=20261025-role-busy-stop-v1'), '未修改的 app.js 保留原缓存版本');
+  assert.ok(indexHtml.includes('/workspace.js?v=20261026-initiator-followup-v1'), '本次 workspace.js 更新缓存版本');
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 
@@ -262,7 +263,7 @@ test('真实“角色”按钮进入项目设置：模式面板读取/渲染保�
   assert.equal(h.hidden('controller-mode-panel'), false, '模式面板在项目设置可见');
   assert.equal(h.hidden('requirements-panel'), false, '开发要求面板保留');
   assert.equal(h.el('controller-mode-saved').textContent, '已保存设置：被动');
-  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：尚无生效的主动调度（本版本不支持自动生效）');
+  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：以任务发起会话的跟进回执为准');
   assert.ok(h.requests.some(r => /\/api\/projects\/A$/.test(r.url)), '模式/开发要求项目读取存在');
   assert.equal(h.assignmentCalls().length, 0, '全链路不得请求 /controller-assignment');
   // 已删函数在真实运行上下文中不存在；保留的模式函数可用
@@ -333,7 +334,7 @@ test('保存“主动”走真实绑定：PATCH controller-mode 成功核实后�
   assert.equal(h.modeui.saved, 'active');
   assert.equal(h.el('controller-mode-saved').textContent, '已保存设置：主动');
   // I-2：固定意向提示，无任何指定前置
-  assert.equal(h.modeui.notice, '已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。');
-  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：尚无生效的主动调度（本版本不支持自动生效）');
+  assert.equal(h.modeui.notice, '已保存“主动”。支持主动跟进的发起会话会在本次授权范围内继续处理；已结束的会话仍需人工唤回。');
+  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：以任务发起会话的跟进回执为准');
   assert.equal(h.assignmentCalls().length, 0, '保存模式不触碰 /controller-assignment');
 });

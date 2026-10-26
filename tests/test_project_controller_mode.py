@@ -53,6 +53,7 @@ PROJECT_TOOL_NAMES = (
     "talk_cancel_task",
     "talk_collect_result",
     "talk_get_delivery",
+    "talk_follow_tasks",
 )
 
 
@@ -839,7 +840,7 @@ class ControllerModeToolTests(RouteTestCase):
         self.assertIsNone(weird["requested_version"])
 
     def test_tool_surface_unchanged_and_description_documents_intent_only(self):
-        self.assertEqual(len(TOOL_SCHEMAS), 9)
+        self.assertEqual(len(TOOL_SCHEMAS), 10)
         self.assertEqual(
             tuple(tool["name"] for tool in TOOL_SCHEMAS), PROJECT_TOOL_NAMES
         )
