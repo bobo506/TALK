@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-26 16:00 K3.1配置：用户确认已在Kimi Code用过K3.1，明确只改配置、不要另派模型验证，页面角色由用户自行添加，下一项开发任务交新角色。按该授权仅在C:/Users/Administrator/.kimi-code/config.toml追加公开模型表kimi-code/k3.1-pro，model=k3.1-pro/provider沿managed:kimi-code、1M及原思考能力；原默认kimi-code/k3、旧条目和凭据不改，不复制/哈希私有正文。原human正常API认证POST模型目录HTTP201，choice_id=rmc_04e11ae89092/display K3.1 Pro/source native_config。仅配置接入、不声称TALK实任务已验；未运行模型/CLI测试、未创建角色/派验证/改绑/启停或更新CLI。当前用户仅授权本次模型配置所需访问，不扩为其它native/HOME/session/log或Key读取。新角色创建后下一开发任务优先交它，免单独K3.1验证任务；339原独立复核及其后当前片加载/人验流程保持，产品/正式测试/冻结暂停，不另开并行开发片。证据.tmp/kimi-k31-config-20261026/，仅公开选择字段/目录回执，无私有配置副本。
+
 - 2026-10-26 15:39派发：发起者主被动功能339已交DeepSeek queued/assigned，代码de5a91a已普通推送；295份10454599字节新源/冻结零漂移，旧275/236/275/63/116/162/197及332至338原交付零错配。237关联Python（含31新增）、35Node通过，最后31复跑通过；真实隔离客户端T10/W4/余量5的到期/取消/EOF/查询证据已存，不冒充当前Codex/其它宿主适配。新工作线initiator-followup-review-20261026/基础1，创建execution_session_state=null，不预称原生同窗/独立通过。唯一写本片review，产品/正式测试/新旧冻结暂停；生产passive/version6、原runtime18784/DSH gen82及五binding/要求保持，250/286整份公开任务派后相同。默认用户通知339完成后取件，不主动等待/唤回，不另发可执行Hall消息；未生产加载/启停/改模式/偏好或私有读取，独立通过后继续当前宿主接入及人工验收，不开下一无关片。
 
 - 2026-10-26 15:14：用户明确完成已有发起者主被动功能，Codex开发、DeepSeek独立核实。复用模式/created_by/受控等待，接通连接内有限主动跟进、交付核验声明后收取、复核/返修同预算接入；新增原子模式/归属/结果守卫及取消/EOF独立等待通道，页面说明同步。仅严格合成项目自测，生产passive/version6、runtime18784及五角色/250/286不改；新代码尚未独立通过/实际加载，不提前称I-4完成。详[本片合同](docs/spec/INITIATOR_FOLLOWUP_COMPLETE_20261026.md)。

@@ -1,6 +1,11 @@
 # Project Progress
 
-Updated: 2026-10-26 15:39（Asia/Shanghai）。用户明确完成已有发起者主被动功能，Codex开发/DeepSeek独立核实；代码de5a91a已推送，339已交DeepSeek独立首审（创建queued/assigned）。生产未加载，不能提前宣布真实主动链路I-4完成。
+Updated: 2026-10-26 16:00（Asia/Shanghai）。K3.1 Pro已按用户授权完成配置登记，用户自行页面添加角色，下一开发任务交新角色且不另派模型验证；339仍待用户通知后取件，代码de5a91a/冻结保持，尚未生产加载主动跟进。
+
+## K3.1 Pro配置
+
+- 已追加原生公开模型表kimi-code/k3.1-pro并POST登记TALK目录，HTTP201/choice rmc_04e11ae89092，显示K3.1 Pro。默认K3、旧模型和已有角色未修改；无CLI升级/启停或模型测试，不声称TALK实任务已经通过。
+- 用户刷新页面，在现有Kimi Code运行器下选择K3.1 Pro自行添加角色；建好后下一项开发任务交该角色，按用户要求不先派单独验证任务。本次限配置所需公开字段与原human正常API认证，不扩大私有读取。
 
 ## 本片实现
 
