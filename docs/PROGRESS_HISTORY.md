@@ -1,5 +1,9 @@
 # 开发历史 · TALK
 
+## 2026-10-26 17:05：340新建Kimi宿主定向独立复核已派发
+
+2026-10-26 17:05派发：新建Kimi角色宿主/创建反馈定向复核340已交DeepSeek queued/assigned，代码e3654e3已推送独立codex/kimi-role-host-fix分支。C隔离worktree产品/正式测试暂停；D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/manifest-v2.json及baseline-v2固定294份10338896字节零漂移，被测根为baseline-v2，唯一写D同目录review。190Python/40Node过，冻结副本11项过；首v1漏cli/TALK依赖的2E及286原副本/manifest/打包材料保留。新continuity_key=kimi-new-role-host-review-20261026/基础1，创建state=null，不预称同窗/独立通过。原D盘339源/295冻结与旧归档保持，339仍submitted/2985未取件；六角色绑定/模式/用户选择及250/286不操作。生产未加载、runtime18784及原五宿主保持，大K仍原身份/原gen1未领取超时，不重建。用户不另派K3.1模型验证及后续首开发任务交新角色的授权保持，本次340是必要流程代码复核。默认用户通知340后取件，不主动等待/唤回/另发可执行Hall，审后具体正常加载/启用Kimi配方/普通start重试，外部API不接管、不强杀/CAS清锁。
+
 ## 2026-10-26 16:53：大K创建流程缺陷，隔离修正自检完成
 
 2026-10-26 16:53用户创建K3.1角色“大K”反馈等待宿主无操作。实际请求UTC08:05:40已provisioned，原gen1自动start无人claim后readiness_timeout；原runtime18784只有五宿主，动态接入仅覆盖WorkBuddy。Codex在独立worktree C:/Users/Administrator/.codex/worktrees/kimi-role-host-fix/TALK修正通用Kimi单角色宿主/显式kimi配方及页面等待刷新、配置后实际服务反馈；190关联Python/40Node通过（9/3新包含其中）。原D:/claude-test/TALK的339产品/正式测试/295冻结保持，当前仅只读任务状态确认339succeeded/submitted/2985，未读报告/收取、不称独立通过。新修正未集成或生产加载，六现有角色/绑定/选择/250/286不操作，不重复创建大K，不复制原生凭据/读取私有会话日志，不调用真实模型或另派模型验证。先冻结本修正供DeepSeek集中核实，唯一review写根拟D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/review；审后再正常加载后台并沿现有角色普通start，不强杀/CAS/清锁。后续首个开发任务交用户新角色的授权保持。
