@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-10-26 23:22：手动Kimi MCP以大K身份配置、只读连接通过
+
+2026-10-26 23:22手动Kimi MCP已配置：用户明确选择“大K”，已在C:/Users/Administrator/.kimi-code/mcp.json添加talk，仅引用大K现有仓库外Key文件，不复制密钥正文、不改原生模型配置。工具上限toolTimeoutMs=660000/启动30000毫秒，显式client=660/wait=300/total=1800/return_margin=15秒，固定D盘工作区和原项目。首配置附加--project被现有launcher的参数缩写识别为--project-root，导致工作区误指项目ID而退出；只改配置为TALK_PROJECT_ID环境变量传项目，不改产品，原失败与脱敏诊断保留。修后按实际写入条目的command/args/cwd/env启动，initialize/tools-list/无参数list_agents只读链路通过、tools_mcp3.0.0/10工具含followup及delivery、服务端身份确认为大K/原项目，EOF正常exit0。当前仍passive/version6/effective not_bound；未调用模型/派任务/改模式或生产启停。真实Kimi已打开会话尚未重载，须新会话检查/mcp；本次连接检查不冒充原生客户端等待/取消/排队或主被动整链人工验收。用户此前仅表示将验收，尚未确认通过；里程碑仍待人验，后续首开发交大K。证据D:/claude-test/TALK/.tmp/kimi-code-mcp-setup-20261026/。本轮汇总同步四文档，仅本地Git记录、不单独推送。
+
+## 2026-10-26 22:54：里程碑待人验，手动Kimi MCP身份待选
+
+2026-10-26 22:54进度汇总及手动MCP准备：已复核代码已随d994293集成并推送，主被动跟进及Kimi新角色宿主已完成开发、独立复核与正常加载；用户表示准备验收，尚未明确验收通过。最新MCP只读实核caller=agent:codex/项目prj_e8fe7066bbec，六binding均bound/指纹保持、无running任务，小D原ins_8b6f2d624400及大K原ins_6ea3a5aecdd7仍idle且心跳推进；模式仍passive/version6/effective not_bound。22:35公开运行快照runtime19744/六宿主serving/startup complete/shutdown idle/worker无错，保护250failed/2767未收取、286paused及原用户自启动选择保持。用户追加要求为手动Kimi Code配置TALK MCP；官方用户级mcp.json及项目覆盖位置已核对，两处原均不存在，待用户选择该手动入口使用大K或小K身份后再引用对应仓库外Key写入，不复制密钥正文或读取无关原生配置/会话/日志。拟配置工具660秒、单轮300秒、总跟进1800秒、返回余量15秒；目前只是方案，尚未写入或宣称当前Kimi会话适配通过。本轮无产品/测试改动、任务派发/收取、生产启停、模式/绑定/偏好写入；只读连接检查不调用模型。本里程碑待新会话加载MCP及主被动实际流程/页面人验，后续首正式开发交大K，不自动开无关片。纯汇总仅本地Git记录，不单独推送。
+
 ## 2026-10-26 21:58：原API正常重启，后台/大K启动加载自检完成
 
 2026-10-26 21:58实际加载：用户明确授权本次正常加载并启动大K，且确认原API已重启。旧runtime18784首stop --wait为blocked/runtime_host_stop_timeout，原后台自身普通重试于UTC13:39:52完成、错误清空，停前12个原入口全absent、全角色无owner后才集成15固定SHA文件；原失败回执保留，无第二次stop/强杀/CAS/清锁。仅原私有清单追加kimi.enabled=true及大K逐成员tools，其它字段内存比较相同、不复制凭据。新API路由均在、自动runtime19744/UTC13:48:44/六宿主serving、startup complete/shutdown idle/worker无错；未另起API或手动起第二后台。小D原true/rev1自动gen84/ins_8b6f2d624400/PID12392 ready/idle，大K仅一次普通start到gen2/ins_6ea3a5aecdd7/PID13912 ready/idle；同实例心跳分别推进330.686/330.504秒，其余四false/rev0仍停止，大K自启动false/rev0保持。六角色绑定/配置/用户偏好及250failed/2767未收取/286paused选定公开状态与加载前相同，模式passive6，真实HTTP role-creation.js与源SHA一致。原gen1未领取超时事实、新旧冻结和339至343归档保留；未另派K3.1验证、不称实际模型/当前宿主T-W/I-4/真人验收通过。当前正常加载自检完成，页面人验待用户刷新，后续首正式开发按约定交新角色，不自动开无关片。
