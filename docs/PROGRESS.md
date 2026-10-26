@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-26 10:21（Asia/Shanghai）。338忙任务退出保护已实际正常加载，部署自检完成；页面人工验收待用户刷新确认。
+Updated: 2026-10-26 10:27（Asia/Shanghai）。用户确认“启动成功”，338本轮页面启动基础人工验收通过。按用户要求仅告知下一片建议，未开工。
 
 ## 已完成
 
@@ -9,6 +9,7 @@ Updated: 2026-10-26 10:21（Asia/Shanghai）。338忙任务退出保护已实际
 - 用户原终端重启API后，API自动带新runtime18784/UTC02:17:38，五宿主serving、startup complete/worker无错、shutdown idle。未重复serve/手动start/PUT偏好。
 - 小D保用户true/rev1自动gen82/ins_b65106fc9fdb/PID18580 ready/idle，同实例真实心跳推进90.075601秒；其它四false/rev0/not_selected/stopped/无owner。
 - 新APIuptime168秒；八处关键源码SHA匹配338冻结且保存早于新API启动，重启后HTTP页面/app.js/workspace.js逐字节匹配，缓存20261025-role-busy-stop-v1。
+- 用户已确认实际页面“启动成功”，本轮基础人验通过；不扩大为生产忙态注入或其它异常/原生能力验收。
 
 ## 保护与验收口径
 
@@ -19,8 +20,8 @@ Updated: 2026-10-26 10:21（Asia/Shanghai）。338忙任务退出保护已实际
 
 ## 下一步
 
-1. 用户刷新页面，确认小D仍显示启动成功、其它四保持停止。当前API与后台已完成更新，不需要再次重启。
-2. 不为可选覆盖再停第二次或追加DeepSeek复核；本次正常停启许可已执行。当前仅本地文档/Git收尾，纯文档不单独推送。
-3. 页面人验后，再按原排期明确下一个新功能最小范围，不重复338或重开已撤回的子进程树切片。
+1. 338已完成本轮人验收尾，无需再次重启/追加复核，本次停启许可已执行。
+2. 下一开发片建议原排期第9项“运行器实际模型报告与展示”：现有绑定页主要显示配置，承接已有内部校验，统一展示明确报告值；区分配置与运行器报告，无证据未知，差异只提示，不新增自动切换/拦截且保原校验。只证明运行器报告，不推断提供商内部隐藏后端。
+3. 用户本次只要求告知内容，当前未开工/派发/启停。分工仍Codex开发/DeepSeek复核，具体片执行待用户决定；不重复338或重开已撤回的子进程树切片。纯文档不单独推送。
 
 详[实际加载记录](spec/ROLE_BUSY_STOP_DEPLOYMENT_20261026.md)、[本片合同](spec/ROLE_BUSY_STOP_GUARD_20261025.md)、[退出指南](guides/RUNTIME_SHUTDOWN.md)及[历史](PROGRESS_HISTORY.md)。证据.tmp/role-busy-stop-v1/deployment-20261026/。

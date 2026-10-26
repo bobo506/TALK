@@ -1,5 +1,7 @@
 # 338忙任务退出保护：正常加载与验收
 
+**2026-10-26 10:27用户人工确认：** 用户回复“启动成功”，本轮实际页面启动状态基础验收通过；原部署自检/90.075601秒心跳/保护项保持，未追加生产忙态注入、停启或新开发。338本轮收尾闭合，后续仅按用户要求明确下一新功能。
+
 **2026-10-26 10:21部署自检完成，页面人工验收待用户刷新确认。** 用户已在原API终端重启，新API自动带起runtime18784（UTC02:17:38.088854），未另行serve/手动start角色。五宿主serving、shutdown idle、startup complete/worker无错；小D按原true/rev1自动gen82/ins_b65106fc9fdb/PID18580 ready/idle，同实例心跳推进90.075601秒；其余四false/rev0/stopped/无owner。新APIuptime168秒，源码指纹及重启后HTTP页面/app.js/workspace.js与已复核3203044一致。五完整binding/角色配置/项目要求/偏好及250/286整份公开响应相同，无running任务。
 
 本次原runtime4956普通stop于UTC02:09:55开始，首次CLI退出1/blocked、draining_hosts/runtime_host_stop_timeout，记录未覆盖。只读观察原后台自身重试，UTC02:11:38.117003最终shutdown complete/pending空/error与worker_error清空；UTC02:14:47及02:16:01原11PID全部absent、五角色stopped/无owner，才请求用户重启原API。没有第二次stop、强杀/CAS/清锁或读取私有日志来“修复”超时。原blocked回执不改写为0/stopped，最终同代完成及OS证据独立保存stopped.json。
