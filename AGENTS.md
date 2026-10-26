@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-26 08:39取件：338正式2984自由文本complete/无必须修正已核验、正常收取completed；MCP业务unknown原样保留，不以runner succeeded替代验收。DeepSeek本人11+6Python与31Node通过、两项健康发布受ACL限制（2测试/4E）、node --test EPERM原失败保留，19/221正常权限日志SHA已核而非其本人全跑。5项非阻断观察不扩片；旧恢复前置路径可仍给通用提示，无归属/异常实例等边界保持。28份140104字节普通原交付逐项归档，未复制合成DB/私有ACL临时内容；275新/旧冻结与332至337归档零错配。实际new_no_candidate/count1，末投影31.9295%；五完整binding/要求及250/286整份公开响应相同，DSH gen80原实例idle、无running任务。代码仍3203044未生产加载，无新产品/测试修改/启停/偏好PUT/私有读取；当前仅本地进度/Git收尾，下一无关片及实际加载另按明确范围处理。详[进度](docs/PROGRESS.md)。
+
 - 2026-10-26 00:17派发：忙任务停机保护338已交DeepSeek queued/assigned，3203044已推送；本片新275份9946204字节baseline-v1源/快照零漂移，旧shutdown236/275、自启动63/116/162/197与332至337原交付零错配。新工作线role-busy-stop-review-20261026/版本1完整base_context，创建state=null不预称领取/原生同窗。唯一写role-busy-stop-v1/review/，产品/正式测试/新旧冻结暂停，默认用户通知338完成后取件，不主动等待/唤回或另发可执行Hall补充。派前五完整binding/要求及250/286整份公开响应相同，无running任务，DSH gen80原实例idle。221/31为Codex自检，17旧Node失败在原HEAD复现；本片未生产加载/启停/改选择，无私有读取，下一无关片不自动开。详[进度](docs/PROGRESS.md)。
 
 - 2026-10-26 00:10忙任务停机保护片：用户明确选择“先做忙任务停机保护，显示阻挡任务”，Codex开发/DeepSeek独立核实。原写事务内409有限任务引用、stop/claim串行守卫（过期重排提交后重取锁）、实例占用保守拒绝、页面中文及后台blocked回执已接通，不自动取消/伪报原生退出。221关联Python含19新、31页面含3新通过；扩大350Node为333过/17旧失败，改动前HEAD副本复现同17位置，原夹具失败保留。待提交/冻结首审，不称独立通过或生产加载。runtime4956/DSH gen80原实例idle、五绑定/要求及250failed/2767未收取、286paused保持；无本轮生产启停/PUT/私有读取。原停启许可已用，完整消息/preflight/原生子链与任务恢复不在本片。详[合同](docs/spec/ROLE_BUSY_STOP_GUARD_20261025.md)与[进度](docs/PROGRESS.md)。

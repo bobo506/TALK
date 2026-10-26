@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-26 08:39：338独立复核核验收取，忙任务停机保护待实际加载
+
+用户通知“338好了”，并询问本片主要内容。按既定授权取正式2984，作者agent:deepseek、请求者agent:codex、任务/项目/Hall/实现3203044全部对应；原报告自由文本业务complete/无必须修正，MCP仍unknown(unstructured_text)，不追改为结构化可信complete、不以runner succeeded代替本次实查。实际caller身份/lead职责正常核实，正式收取UTC00:38:08.198195后workflow completed。
+
+已核独立11项BusyStop、6项消毒/等待和31项实际页面日志/命令/退出码/逐项SHA；真实隔离409与冻结副本逐字节相同。本人19项合并首跑17通过/4E，另两项BusyRuntime健康发布因私有ACL os.replace WinError5受限（含cleanup错误），node --test原EPERM保留、同一测试文件直接node执行31过。正常权限19/221保存日志、350Node333过/17旧失败与7c61f8b基线36项17同位置失败均按SHA实核，区分独立实跑与已核证据，不冒称DeepSeek全量通过，也不为原环境限制追加复核。
+
+报告5项非阻断观察已逐条核读：旧本机恢复前置路径/心跳过期等仍可给recovery_tasks_active通用提示而不带编号；无process_launch_id时先走既有幂等/未知路径；instance占用须launch身份一致；畸形busy页面形状只显示通用占用；全量221/350未由复核者本人重跑。本片合同针对持有进程的正式执行/残余领取与当前实例占用，保留这些边界，不扩片变更旧恢复协议。领取/停止事务串行与过期重排再加锁、页面反馈/有限回执核心已通过，无新增必须修正。
+
+pickup338/verify_archive.py逐项复算checks.json、write-scope声明的普通交付、实跑/保存日志摘要与SHA、冻结前后JSON/写入范围；28份140104字节普通原报告/脚本/JSON/日志/409已逐字节归档338-original-review，合成DB与私有ACL临时内容未读/未复制，原生产者写范围清单保留。本片275份9946204字节与旧shutdown236/275、自启动63/116/162/197及332至337原归档零错配，源只四份派发协调文档有预期差异；产品/正式测试仍3203044。实际原生new_no_candidate/count1，末projected_tokens319295/1000000=31.9295%，不称续337。
+
+当前五完整binding/开发要求与派前相同，250/286整份公开响应逐字段相同，250failed/2767未收取、286queued/accepted/paused保持；DSH原ins_3d1a0388545c/PID7868 idle，无running任务。本轮无生产加载/启停/偏好PUT、生产配置正文/Key/DB/private/HOME/native/session/log读取、强杀/CAS/清锁或新任务派发。当前完成独立复核闭合及本地四份进度/Git收尾，纯文档不单独推送；实际部署尚需API与后台都正常加载，不扩大上片一次许可，不自动开下一片。完整消息/preflight协同退出、原生子链退出证明、running取消与断电/在途恢复仍待后续专片。
+
 ## 2026-10-26 00:17：忙任务停机保护338正式派发，产品冻结
 
 3203044e84700efac5eb089ffde5a654ba18f140已普通推送到既有公开bobo506/TALK/codex/terminal-return-codex；19文件577增/25删，仅本片代码/测试/文档及随行进度，无生产配置/私有目录。新275份9946204字节源/快照逐项SHA零漂移，原shutdown236/275、自启动63/116/162/197与332至337原交付均零错配，manifest及baseline-v1保存role-busy-stop-v1。
