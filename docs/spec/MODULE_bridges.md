@@ -1,6 +1,8 @@
 # MODULE: Agent Bridges
 
-> 2026-10-26 16:53新建Kimi宿主缺陷补正：用户已建大K配置完成但无人领取自动start。独立worktree增加精确单角色Kimi宿主、统一runtime显式配方及页面后续反馈；190Python/40Node自检通过，未生产加载。原D盘339冻结保持；详[合同](KIMI_NEW_ROLE_HOST_FIX_20261026.md)和[进度](../PROGRESS.md)。
+> 2026-10-26 340返修：独立报告必须修正，190/40是协调方正常权限自检；本人沙箱Python190有28F/17E，Node40及71服务过，不能称独立全过。已复现并修正健康发布阻挡stop/drain，旧v2清单匹配但有100个额外文件保留；新包隔离日志/TEMP、只清理自身测试Job并精确检查快照集合。详[返修合同](KIMI_NEW_ROLE_HOST_FIX1_20261026.md)。尚未生产加载。
+
+> 2026-10-26 16:53新建Kimi宿主缺陷补正：用户已建大K配置完成但无人领取自动start。独立worktree增加精确单角色Kimi宿主、统一runtime显式配方及页面后续反馈；Codex正常权限的190Python/40Node合成自检通过，未生产加载。原D盘339冻结保持；详[合同](KIMI_NEW_ROLE_HOST_FIX_20261026.md)和[进度](../PROGRESS.md)。
 
 > 2026-10-26发起者主被动完成片：已实现连接内有限消费者`initiator_followup.py`及第十个任务工具`talk_follow_tasks`，active派发接入、交付/复核/返修同总预算、声明核验后原子收取；新stdio等待独立通道支持取消/EOF与同连接查询，旧入口不外推。服务端新增专用创建/收取守卫路由，无DB迁移或权限扩张。当前是开发/隔离验证代码，未据此宣布生产I-4通过；分工Codex开发/DeepSeek独立核实。正式接口与边界见[本片合同](INITIATOR_FOLLOWUP_COMPLETE_20261026.md)、[使用指南](../guides/INITIATOR_FOLLOWUP.md)和[进度](../PROGRESS.md)。下方旧意向/取消/总预算说明按日期区分，原受控wait的G1–G8合同保持。
 

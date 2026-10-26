@@ -357,3 +357,13 @@ test('配置完成后只依据真实ready服务显示已启动',async()=>{
   await h.ui.refresh();assert.match(h.texts(h.el('role-create-result')),/角色配置已完成，服务已启动/);
   assert.equal(h.timers.size,0);
 });
+
+
+test('宿主关闭时提示先开启配置，不承诺自动处理且刷新不重发请求',async()=>{
+  const h=harness();await h.ready();h.backend.host.enabled=false;
+  await h.fill();await h.ui.submit();await h.ui.refresh();
+  const text=h.texts(h.el('role-create-result'));
+  assert.match(text,/请先开启宿主配置/);assert.doesNotMatch(text,/宿主会自动处理/);
+  assert.match(text,/可以关闭.*请勿重复创建/);
+  assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+});

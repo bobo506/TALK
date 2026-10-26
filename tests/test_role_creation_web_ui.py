@@ -35,7 +35,7 @@ class RoleCreationWebUiTests(RouteTestCase):
             required=['/role-creation.js','/workspace.js','/app.js']
             self.assertTrue(all(path in scripts for path in required))
             self.assertEqual([scripts.index(path) for path in required],sorted(scripts.index(path) for path in required))
-            self.assertIn('/role-creation.js?v=20261026-kimi-role-host-fix-v1',parser.assets)
+            self.assertIn('/role-creation.js?v=20261026-kimi-role-host-fix1',parser.assets)
             for asset in ['/role-creation.js','/role-creation.css']:
                 self.assertEqual(client.get(asset).status_code,200)
 

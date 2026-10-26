@@ -1,5 +1,7 @@
 # 新建Kimi角色宿主接入与创建反馈补正
 
+> 340未独立通过：原下文190/40为协调方正常权限自检。本人受限环境Python190有28F/17E，71服务/40Node过；发现健康写阻挡stop/drain及旧v2目录100个额外文件。原记录保留，集中返修与新证据见[返修合同](KIMI_NEW_ROLE_HOST_FIX1_20261026.md)。
+
 用户在页面创建K3.1 Pro角色“大K”后反馈只有“等待宿主”且无法操作。本次是该创建流程缺陷修复，由Codex处理必要接线；不另派模型验证，不更换用户已建角色，不擅自派无关开发。
 
 实际请求role-dfd08e33de03c6212ffc722f2bf9e53c于UTC08:05:37.602741提交，08:05:40.131680已provisioned。member=agent:prj-e8fe7066bbec.k-4bf013b9，choice=rmc_04e11ae89092。自动start gen1/ee3a6c9c-938a-4c61-9f81-6bbd2637de0d从未被claim，08:07:40到期、readiness_timeout/无owner。后台18784健康且worker无错，但只有原五宿主；reconcile_hosts仅为未列成员生成WorkBuddy配方，新建Kimi无接入。原静态Kimi宿主精确锁定旧成员，不能替换其身份去处理新成员。

@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-26：340取件，三项必须修正集中处理
+
+2026-10-26 340取件及集中返修：2986正式报告必须修正/补证，已核验收讫completed而非独立通过；19份249616字节普通原交付逐项归档。原Python190的28F/17E及40Node/71服务独立过保持，MCP业务unknown不冒充验收。已复现健康发布阻挡stop/drain的1F/2E并修正，保活句柄、固定一次诊断、空闲退出及最终health失败不阻止退出；宿主关闭文案同步补正。新wrapper固定合成配置/日志/TEMP、门控Windows Job只清理自建测试进程、精确集合/hash检查，不开放breakaway。候选受限定向76Python/41Node过；协调普通权限完整193为192过/1E（旧detach请求breakaway被本测试Job拒绝）、41Node过，完整结论partial不强求全过。原v1的286清单匹配无extras；旧v2的294清单匹配但有100extras原地保留，不再称目录干净。正式新冻结及MF-1/2/3定向复验准备中，尚未独立通过/生产加载。原D339源/295冻结及旧归档零错配；六binding/要求/passive6同取件，runtime18784/原五宿主、大K原身份/gen1过期及250/286不操作。339未取报告/收取，用户免K3.1验证及首开发交新角色保持；不强杀/CAS/清锁或接管外部API。
+
+详[返修合同](spec/KIMI_NEW_ROLE_HOST_FIX1_20261026.md)。
+
 ## 2026-10-26 17:05：340新建Kimi宿主定向独立复核已派发
 
 2026-10-26 17:05派发：新建Kimi角色宿主/创建反馈定向复核340已交DeepSeek queued/assigned，代码e3654e3已推送独立codex/kimi-role-host-fix分支。C隔离worktree产品/正式测试暂停；D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/manifest-v2.json及baseline-v2固定294份10338896字节零漂移，被测根为baseline-v2，唯一写D同目录review。190Python/40Node过，冻结副本11项过；首v1漏cli/TALK依赖的2E及286原副本/manifest/打包材料保留。新continuity_key=kimi-new-role-host-review-20261026/基础1，创建state=null，不预称同窗/独立通过。原D盘339源/295冻结与旧归档保持，339仍submitted/2985未取件；六角色绑定/模式/用户选择及250/286不操作。生产未加载、runtime18784及原五宿主保持，大K仍原身份/原gen1未领取超时，不重建。用户不另派K3.1模型验证及后续首开发任务交新角色的授权保持，本次340是必要流程代码复核。默认用户通知340后取件，不主动等待/唤回/另发可执行Hall，审后具体正常加载/启用Kimi配方/普通start重试，外部API不接管、不强杀/CAS清锁。

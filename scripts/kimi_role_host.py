@@ -68,6 +68,7 @@ class KimiRoleHost(rsh.HostManager):
         self.task_profile = task_profile
         self.private = Path(private)
         self.drain_requested = False
+        self._health_degraded = False
         super().__init__(*args, **kwargs)
 
     def publish_health(self, state='serving'):
@@ -79,13 +80,27 @@ class KimiRoleHost(rsh.HostManager):
         rsh._publish_private_bytes(self.private / 'manager-health.json',
             (json.dumps(value) + '\n').encode('utf-8'))
 
+    def publish_health_best_effort(self, state='serving'):
+        try:
+            self.publish_health(state)
+        except (rsh.HostError, OSError, ValueError):
+            if not self._health_degraded:
+                # Fixed, bounded diagnostic; filesystem errors may contain secrets.
+                try:
+                    print('kimi_host_health_unavailable', file=sys.stderr)
+                except (OSError, ValueError):
+                    pass
+            self._health_degraded = True
+        else:
+            self._health_degraded = False
+
     def claimable_actions(self, project_id):
         if project_id != self.project:
             return []
         self.drain_requested = self.drain_requested or (self.private / 'drain.request').is_file()
-        self.publish_health()
         if self.drain_requested and not self._handles:
             raise Drained()
+        self.publish_health_best_effort()
         return [action for action in super().claimable_actions(project_id)
             if action.get('project_id') == self.project and action.get('member_id') == self.member
             and (not self.drain_requested or action.get('action') == 'stop')]
@@ -152,7 +167,7 @@ def main(argv=None):
                 manager.serve(args.project, poll_interval=rsh.DEFAULT_POLL_INTERVAL_SECONDS,
                     once=False, max_rounds=None, provision_worker=None)
             except Drained:
-                manager.publish_health('stopped')
+                manager.publish_health_best_effort('stopped')
                 return 0
             except (rsh.HostError, OSError, ValueError):
                 # Keep the original Popen owners on transient host/health errors.
@@ -164,7 +179,7 @@ def main(argv=None):
             except KeyboardInterrupt:
                 manager.drain_requested = True
                 if not manager._handles:
-                    manager.publish_health('stopped')
+                    manager.publish_health_best_effort('stopped')
                     return 0
                 try:
                     manager.request_stop(args.project, args.member)

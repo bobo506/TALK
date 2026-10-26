@@ -2,6 +2,7 @@
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import io
 import os
 from pathlib import Path
 import subprocess
@@ -133,6 +134,41 @@ class NewKimiRoleHostTests(unittest.TestCase):
             self.assertEqual(len(manager._handles), 1)
             manager._handles.clear()
             with self.assertRaises(host.Drained): manager.claimable_actions('p')
+
+    def test_health_failure_does_not_block_owned_stop_or_drop_handles(self):
+        manager = self.manager()
+        manager._handles['owned'] = object()
+        manager.drain_requested = True
+        actions = [dict(project_id='p', member_id='agent:new', action='stop'),
+            dict(project_id='p', member_id='agent:other', action='stop'),
+            dict(project_id='p', member_id='agent:new', action='start')]
+        with patch.object(manager, 'publish_health', side_effect=host.rsh.HostError('storage_unavailable', 'synthetic health failure')):
+            with patch.object(host.rsh.HostManager, 'claimable_actions', return_value=actions):
+                with patch('sys.stderr', new=io.StringIO()) as diagnostics:
+                    self.assertEqual(manager.claimable_actions('p'), [actions[0]])
+                    self.assertEqual(manager.claimable_actions('p'), [actions[0]])
+                    self.assertEqual(diagnostics.getvalue(), 'kimi_host_health_unavailable\n')
+        self.assertEqual(len(manager._handles), 1)
+
+    def test_health_failure_cannot_prevent_empty_drain(self):
+        manager = self.manager()
+        manager.drain_requested = True
+        with patch.object(manager, 'publish_health', side_effect=OSError('synthetic health failure')):
+            with patch('sys.stderr', new=io.StringIO()):
+                with self.assertRaises(host.Drained):
+                    manager.claimable_actions('p')
+        self.assertFalse(manager._handles)
+
+    def test_final_health_failure_does_not_turn_clean_drain_into_failure(self):
+        self.key(); self.client.rows = [self.role]
+        argv = host.host_spec(self.config, self.role)['argv']
+        argv = argv[argv.index('scripts.kimi_role_host') + 1:]
+        with patch.object(host.rsh, 'load_operator_key', return_value='synthetic-human-key'), \
+             patch.object(host.rsh, 'TalkHostClient', return_value=self.client), \
+             patch.object(host.KimiRoleHost, 'serve', side_effect=host.Drained), \
+             patch.object(host.KimiRoleHost, 'publish_health', side_effect=OSError('synthetic health failure')), \
+             patch('sys.stderr', new=io.StringIO()):
+            self.assertEqual(host.main(argv), 0)
 
     def test_native_homes_remain_separate_and_are_not_copied_from_another_role(self):
         a, b = self.manager(), self.manager('agent:other')

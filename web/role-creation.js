@@ -172,7 +172,9 @@ function createRoleRequestUI(deps) {
     if (row.status === "failed") box.append(node("p", "role-request-error", lookup(codes, row.last_error_code, "宿主未完成配置，请检查环境后继续。")));
     const actions = node("div", "role-request-actions");
     if (["requested", "leased", "created"].includes(row.status)) {
-      box.append(node("p", "role-request-status", "请求已保存，宿主会自动处理。可以关闭此窗口，稍后查看配置进度；请勿重复创建。"));
+      box.append(node("p", "role-request-status", state.host?.enabled === false
+        ? "请求已保存，请先开启宿主配置后继续处理。可以关闭此窗口；请勿重复创建。"
+        : "请求已保存，宿主会自动处理。可以关闭此窗口，稍后查看配置进度；请勿重复创建。"));
       actions.append(button("刷新进度", () => refresh()));
     }
     if (human() && safeInt(row.revision)) {
