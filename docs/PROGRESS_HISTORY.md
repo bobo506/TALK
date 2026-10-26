@@ -1,5 +1,9 @@
 # 开发历史 · TALK
 
+## 2026-10-26 20:02：341产品修正独立通过，M2-1包缺陷单项复验342
+
+2026-10-26 20:02取件及派发：341/2987完整报告partial已核验收讫completed，MF-1健康降级/停止缺陷与76无子进程Python、41直跑Node独立通过；快照/权限口径通过，剩M2-1为wrapper未捕获CreatePipe的PermissionError/OSError。原29份137974字节普通交付归档，未复制合成DB/私有ACL状态；341实际reuse_session/count2/末投影52.8827%，不输出原生会话标识。仅新复核包fix2补OSError/固定白名单错误、两套件not_run_or_incomplete和整体exit1；4个合成故障注入断言过、未起子进程/产品套件，不更换IPC或开放breakaway。产品/正式测试/页面274文件与341全相同，仍ffa4be5，未再改产品；新固定290份10258874字节、原289及旧v1/v2/原失败保留。M2-1单项复验342已交DeepSeek queued/assigned，沿base340/原continuity服从守卫，创建state=null不预称同窗；唯一写D:/claude-test/TALK/.tmp/kimi-role-host-fix2/review，产品/正式测试/新旧冻结暂停。六binding/要求/passive6与341取件相同，339未取报告/收取，250/2767/286不操作；原runtime18784/五宿主、大K原身份/模型/gen1失败保持，未加载/启停/改配置或读私有资料。默认用户通知342后取件，不主动等待/唤回或另发可执行Hall；单项通过后再具体正常加载，不把受限未运行当成功，不重审产品整片或另派K3.1验证，后续首开发交新角色保持。
+
 ## 2026-10-26 19:37：340返修定向复验341已派发
 
 2026-10-26 19:37派发：340三项集中返修已交DeepSeek定向复验341，queued/assigned；代码ffa4be5已推送独立codex/kimi-role-host-fix分支。正式baseline固定289份10251260字节，274产品/正式测试/页面文件与已测候选字节相同；新正式根受限定向76Python/41Node通过，前后精确集合/hash干净且自建测试Job归零。普通权限完整193为192过/1E（旧detach请求breakaway被测试Job拒绝）及41Node过，完整仍partial；340原190的28F/17E、原报告和旧294目录100extras保留，不冒称独立全过。只写D:/claude-test/TALK/.tmp/kimi-role-host-fix1/review，产品/正式测试/新旧冻结暂停；沿base340/原continuity优先相容续用但服从守卫，创建state=null不预称已领取或同窗。首两次API参数预校验422未建任务，最终沿340兼容general根及明确复核正文正式派发，未要质量子任务权限。派后六binding/要求/passive6同取件；250failed/2767未收取、286paused保持。原D339源/295冻结和旧归档零错配，339未取报告/收取；未生产加载/启停/改配置或私有读取，原runtime18784/五宿主、大K原身份/gen1到期保持。默认用户通知341完成后取件，不主动等待/唤回或另发可执行Hall，审后再具体正常加载，不重建大K/强杀/CAS清锁/接管外部API；免K3.1模型验证及后续首开发交新角色保持。
