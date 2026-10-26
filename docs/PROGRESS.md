@@ -1,31 +1,21 @@
 # Project Progress
 
-Updated: 2026-10-26 16:00（Asia/Shanghai）。K3.1 Pro已按用户授权完成配置登记，用户自行页面添加角色，下一开发任务交新角色且不另派模型验证；339仍待用户通知后取件，代码de5a91a/冻结保持，尚未生产加载主动跟进。
+Updated: 2026-10-26 16:53（Asia/Shanghai）。当前优先修复新建Kimi角色的宿主接入与页面后续操作，代码在独立worktree自检完成，待冻结独立核实；未集成到原D盘、未生产加载。
 
-## K3.1 Pro配置
+## 当前缺陷与修正
 
-- 已追加原生公开模型表kimi-code/k3.1-pro并POST登记TALK目录，HTTP201/choice rmc_04e11ae89092，显示K3.1 Pro。默认K3、旧模型和已有角色未修改；无CLI升级/启停或模型测试，不声称TALK实任务已经通过。
-- 用户刷新页面，在现有Kimi Code运行器下选择K3.1 Pro自行添加角色；建好后下一项开发任务交该角色，按用户要求不先派单独验证任务。本次限配置所需公开字段与原human正常API认证，不扩大私有读取。
+- 用户已建“大K”/agent:prj-e8fe7066bbec.k-4bf013b9，choice rmc_04e11ae89092。原创建请求role-dfd08e33de03c6212ffc722f2bf9e53c于16:05:40已provisioned，自动start gen1从未claim、16:07:40到期，无owner；角色应保留。
+- 原runtime18784/worker健康、五宿主serving，但未列成员仅WorkBuddy动态接入，Kimi缺新宿主；旧Kimi静态配方精确锁定旧成员，不能替换身份复用。
+- 新scripts/kimi_role_host.py复用HostManager所有权/claim/start/stop/drain和隔离HOME，精确project/member/choice/alias。runtime新增显式kimi.enabled与逐成员task_profiles（默认review，tools须明确），原静态配方优先，不迁移旧角色。
+- 页面等待时增加刷新/可关闭说明，配置完成后继续读取真实启动状态，显示ready或启动未完成及查看角色入口；不重建请求/角色，不由前端重复发start。
+- 190关联Python、40Node全过，含9/3新。真实合成HTTP宿主进程正常启动/drain，真实公开DTO纯规划命中大K。首轮26的1F、189的21F/2E和旧D盘静态断言失败均保留；合成根移到被测worktree外后不改产品安全守卫而全过。无真实模型调用。
 
-## 本片实现
+## 协作、加载与保护
 
-- 复用已完成的模式设置、created_by权限、等待与交付工具，新增连接内有限主动跟进：本人显式任务→等待→完整摘要/必要原文→依约核验/独立复核/返修→声明与证据后收取。
-- talk_follow_tasks为第十个stdio任务工具；已配置明确预算时active派发自动登记，后续复核/返修加入同一单调deadline。已读取未收取的原任务不会阻塞复核交付；被动保持派后结束、用户通知取件。
-- 新创建/收取专用路由在实际BEGIN IMMEDIATE内重核模式版本、归属/根控制；收取另核结果ID/正文SHA/作者/Hall/撤回。旧服务缺路由拒绝，不回退忽略条件的旧写入；无DB迁移，原人工权限与接口保持。
-- 新stdio独立等待通道检测取消/EOF，正常查询/ping不排队、重复等待拒绝。切回被动/身份/范围/控制改变或总预算耗尽只停止跟进，不取消/重派后台任务。5xx/传输未知写入结果须先读状态，不自动重放。
-- 局部effective只回报当前连接/显式批次，不恢复固定主控、角色分级或全局授权；报告正文不执行成指令，已收取不等于语义/人工验收通过。页面仅同步说明及workspace缓存，保存/CAS/切页机制保持。
+- 当前工作目录C:/Users/Administrator/.codex/worktrees/kimi-role-host-fix/TALK。原D:/claude-test/TALK的339产品/正式测试/295冻结及旧归档零错配；339仅只读状态succeeded/submitted/2985，未读报告/收取，不能据此说独立通过。
+- 本修正先固定源/证据，DeepSeek集中核实，只写D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/review，产品/正式测试/冻结随后暂停。原D盘主分支不在共享复核期间改产品。
+- 生产runtime/API尚未重载或改清单。拟审后集成修正、显式启用Kimi配方，正常重启统一后台，外部API保持原终端归属；保用户既有六角色、绑定/自启动选择、250 failed/2767未收取、286 paused，不强杀/CAS/清锁，不重复创建大K。原过期start保留，沿普通start重试。
+- 未读额外native/HOME/session/log或复制凭据。用户已明确不额外派K3.1模型验证，后续首个开发任务交新角色；本轮仅代码流程回归。独立原生环境/登录/CLI版本与实际模型不由宿主接入假称已验。浏览器只读入口因kernel assets路径问题未运行，实际页面人验留待加载。
+- 339发起者主被动功能仍待正式取件、必要返修及当前宿主加载/I-4验收；不把其任务状态当自动验收，不丢失原目标。
 
-## 验证与限制
-
-- 237关联Python全过（含31新增），35页面模式Node全过。新增31项在最后的并发初始化锁补正后复跑全过；同一测试不叠加计数。
-- 真实互动JSON-RPC隔离客户端明确T10/W4/余量5，正常到期4.016秒、命中交付→核验声明→原子收取、取消/EOF、同连接查询0.094秒、重复等待、模式切换均通过并落实际耗时。真实SQLite WAL两个写入者证明模式写入先行后，自动创建/收取读取最新事实并拒绝。
-- 当前Codex宿主和其它终端的实际T/W、重连及完整主动验收尚待代码独立通过后进行；隔离客户端不是它们的替代证据。旧Pi直接工具不外推新能力。生产仍passive/version6，当前MCP旧目录不能当新工具已加载。
-- 原首轮16的1F/1E、stdio初5E夹具遗漏、旧160的5F及235的2F说明/目录断言保留。页面缓存旧断言在HEAD副本同样失败；按本轮实际资源版本补正后35过，未移除交互断言。
-
-## 保护与下一步
-
-- 实际身份agent:codex / prj_e8fe7066bbec / lead；本次分工优先于长期默认分工。250failed/2767未收取、286queued/accepted/paused整份公开任务派后相同，五完整binding/项目要求派前一致；不操作自启动选择。原runtime18784与DeepSeek gen82保持，不在开发阶段启停/重载/改模式。
-- 不读生产config正文/Key/DB/private/HOME/native/session/log。所有测试严格合成配置/假凭据/动态本地端口和本测试所属子进程；旧冻结与332—338原交付保持。338页面启动基础人验已闭合，子进程树管理与双模型展示提案已撤回，不重开。
-- 新295份10454599字节冻结零漂移；旧275/236/275/63/116/162/197及332—338原交付零错配。339已正式交DeepSeek，创建execution_session_state=null，实际原生决策待回执，不预称复用/独立通过。产品/正式测试/新旧冻结暂停，唯一写本片review。仍按当前被动约定由用户通知完成后取件，不为测试本功能擅自切生产主动；独立通过后继续当前宿主实际接入与人验，不另开无关片。
-
-详[本片合同](spec/INITIATOR_FOLLOWUP_COMPLETE_20261026.md)、[使用指南](guides/INITIATOR_FOLLOWUP.md)、[模块](spec/MODULE_bridges.md)及[历史](PROGRESS_HISTORY.md)。证据.tmp/initiator-followup-v1/。
+详[本片合同](spec/KIMI_NEW_ROLE_HOST_FIX_20261026.md)、[统一启动指南](guides/TALK_RUNTIME.md)与[历史](PROGRESS_HISTORY.md)。修正证据在本worktree.tmp/kimi-role-host-fix-v1/，原生产诊断在D:/claude-test/TALK/.tmp/kimi-k31-config-20261026/。

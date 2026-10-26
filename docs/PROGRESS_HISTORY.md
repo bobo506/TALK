@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-26 16:53：大K创建流程缺陷，隔离修正自检完成
+
+2026-10-26 16:53用户创建K3.1角色“大K”反馈等待宿主无操作。实际请求UTC08:05:40已provisioned，原gen1自动start无人claim后readiness_timeout；原runtime18784只有五宿主，动态接入仅覆盖WorkBuddy。Codex在独立worktree C:/Users/Administrator/.codex/worktrees/kimi-role-host-fix/TALK修正通用Kimi单角色宿主/显式kimi配方及页面等待刷新、配置后实际服务反馈；190关联Python/40Node通过（9/3新包含其中）。原D:/claude-test/TALK的339产品/正式测试/295冻结保持，当前仅只读任务状态确认339succeeded/submitted/2985，未读报告/收取、不称独立通过。新修正未集成或生产加载，六现有角色/绑定/选择/250/286不操作，不重复创建大K，不复制原生凭据/读取私有会话日志，不调用真实模型或另派模型验证。先冻结本修正供DeepSeek集中核实，唯一review写根拟D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/review；审后再正常加载后台并沿现有角色普通start，不强杀/CAS/清锁。后续首个开发任务交用户新角色的授权保持。
+
+原26项首轮真实HTTP1F已修客户端列表包装；真实公开DTO回放纠正control_kind位置并补1测试。189关联初21F/2E如实保留（20F/2E合成Key根在被测源码内触发原守卫，另1旧资源断言在未改D源码基线同样失败），后190全过，不弱化安全守卫。新宿主与原HostManager复用持有Popen、正常stop/drain和独立HOME；任务权限默认review，tools须逐成员显式配方。实际模型/独立原生环境不由本片自检冒充已验。
+
 ## 2026-10-26 16:00：K3.1 Pro配置登记，后续开发交新角色
 
 2026-10-26 16:00 K3.1配置：用户确认已在Kimi Code用过K3.1，明确只改配置、不要另派模型验证，页面角色由用户自行添加，下一项开发任务交新角色。按该授权仅在C:/Users/Administrator/.kimi-code/config.toml追加公开模型表kimi-code/k3.1-pro，model=k3.1-pro/provider沿managed:kimi-code、1M及原思考能力；原默认kimi-code/k3、旧条目和凭据不改，不复制/哈希私有正文。原human正常API认证POST模型目录HTTP201，choice_id=rmc_04e11ae89092/display K3.1 Pro/source native_config。仅配置接入、不声称TALK实任务已验；未运行模型/CLI测试、未创建角色/派验证/改绑/启停或更新CLI。当前用户仅授权本次模型配置所需访问，不扩为其它native/HOME/session/log或Key读取。新角色创建后下一开发任务优先交它，免单独K3.1验证任务；339原独立复核及其后当前片加载/人验流程保持，产品/正式测试/冻结暂停，不另开并行开发片。证据.tmp/kimi-k31-config-20261026/，仅公开选择字段/目录回执，无私有配置副本。

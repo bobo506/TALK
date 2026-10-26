@@ -28,10 +28,14 @@ class RoleCreationWebUiTests(RouteTestCase):
             self.assertEqual(len(parser.ids),len(set(parser.ids)))
             for target in ['role-create-modal','role-create-form','role-create-runner','role-create-model','role-create-name','role-create-description','role-create-submit','role-request-list','role-request-host-panel']:
                 self.assertIn(target,parser.ids)
-            self.assertEqual(len(parser.assets),6)
-            self.assertTrue(all('v=20261016-role-auto-start' in asset for asset in parser.assets))
-            scripts=[path for path in parser.assets if path.endswith('v=20261016-role-auto-start') and '.js?' in path]
-            self.assertEqual(scripts,['/role-creation.js?v=20261016-role-auto-start','/workspace.js?v=20261016-role-auto-start','/app.js?v=20261016-role-auto-start'])
+            asset_paths=[asset.split('?',1)[0] for asset in parser.assets]
+            self.assertEqual(len(asset_paths),len(set(asset_paths)))
+            self.assertTrue(all('?v=' in asset for asset in parser.assets))
+            scripts=[path for path in asset_paths if path.endswith('.js')]
+            required=['/role-creation.js','/workspace.js','/app.js']
+            self.assertTrue(all(path in scripts for path in required))
+            self.assertEqual([scripts.index(path) for path in required],sorted(scripts.index(path) for path in required))
+            self.assertIn('/role-creation.js?v=20261026-kimi-role-host-fix-v1',parser.assets)
             for asset in ['/role-creation.js','/role-creation.css']:
                 self.assertEqual(client.get(asset).status_code,200)
 

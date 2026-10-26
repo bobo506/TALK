@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-26 16:53新建Kimi宿主缺陷补正：用户已建大K配置完成但无人领取自动start。独立worktree增加精确单角色Kimi宿主、统一runtime显式配方及页面后续反馈；190Python/40Node自检通过，未生产加载。原D盘339冻结保持；详[合同](KIMI_NEW_ROLE_HOST_FIX_20261026.md)和[进度](../PROGRESS.md)。
+
 > 2026-10-26发起者主被动完成片：已实现连接内有限消费者`initiator_followup.py`及第十个任务工具`talk_follow_tasks`，active派发接入、交付/复核/返修同总预算、声明核验后原子收取；新stdio等待独立通道支持取消/EOF与同连接查询，旧入口不外推。服务端新增专用创建/收取守卫路由，无DB迁移或权限扩张。当前是开发/隔离验证代码，未据此宣布生产I-4通过；分工Codex开发/DeepSeek独立核实。正式接口与边界见[本片合同](INITIATOR_FOLLOWUP_COMPLETE_20261026.md)、[使用指南](../guides/INITIATOR_FOLLOWUP.md)和[进度](../PROGRESS.md)。下方旧意向/取消/总预算说明按日期区分，原受控wait的G1–G8合同保持。
 
 > 2026-10-24 22:18：326默认24小时代码已随本机API/runtime/七宿主正常重载加载。仅普通恢复原DeepSeek gen64/ins_eb493b140f6e，running/ready/idle，同实例真实心跳前后推进6938.368393秒，其余六停止/无owner；七角色公开binding与286保持。不改显式CLI参数，不宣称24小时真实长跑或所有原生运行器新执行均已实测；代码核验/环境限制保持，详[本轮加载记录](ROLE_DELETE_DEPLOYMENT_20261024.md)。
