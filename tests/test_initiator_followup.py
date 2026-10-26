@@ -346,3 +346,103 @@ class InitiatorFlowTests(RouteTestCase):
         # Human-triggered legacy receipt keeps its original permission and semantics.
         result=self.client.post(f"/api/tasks/{task['id']}/collect-result",headers={'X-API-Key':'lead-key'})
         self.assertEqual(result.status_code,200,result.text)
+
+
+    def test_explicit_start_without_environment_enrolls_review_and_rework_in_same_budget(self):
+        with patch.dict(os.environ,{k:'' for k in ENV if k.startswith('TALK_FOLLOWUP_')}):
+            now=[100.0];self.manager.clock=lambda:now[0]
+            task=self.create();self.assertNotIn('initiator_followup',task)
+            started=self.manager.call({'action':'start','project_id':PROJECT,'task_ids':[task['id']],'budget':BUDGET})
+            flow=self.manager.get(started['followup_id']);deadline=flow.deadline
+            self.complete(task);self.manager.call({'action':'next','followup_id':flow.id})
+            now[0]=104;self.calls.clear()
+            review=self.create('agent:other');rework=self.create('agent:worker')
+            self.assertEqual(review['initiator_followup']['followup_id'],flow.id)
+            self.assertEqual(rework['initiator_followup']['followup_id'],flow.id)
+            self.assertEqual(flow.ids,[task['id'],review['id'],rework['id']])
+            self.assertEqual(flow.deadline,deadline);self.assertEqual(flow.budget,follow.Budget.parse(BUDGET))
+            posts=[c for c in self.calls if c[0]=='POST']
+            self.assertEqual([p[1] for p in posts],['/api/tasks/followup']*2)
+            self.assertEqual(posts[0][2]['followup_task_ids'],[task['id']])
+            self.assertEqual(posts[1][2]['followup_task_ids'],[task['id'],review['id']])
+            self.assertTrue(all(p[2]['expected_mode_version']==flow.version for p in posts))
+
+    def test_explicit_start_without_environment_expired_flow_rejects_new_post(self):
+        with patch.dict(os.environ,{k:'' for k in ENV if k.startswith('TALK_FOLLOWUP_')}):
+            now=[100.0];self.manager.clock=lambda:now[0];task=self.create()
+            started=self.manager.call({'action':'start','project_id':PROJECT,'task_ids':[task['id']],'budget':BUDGET})
+            flow=self.manager.get(started['followup_id']);now[0]=flow.deadline+1;self.calls.clear()
+            with self.assertRaises(follow.FollowupError):self.create('agent:other')
+            self.assertEqual(flow.reason,'total_budget_exhausted')
+            self.assertFalse(any(c[0]=='POST' for c in self.calls))
+
+    def test_explicit_start_without_environment_changed_identity_rejects_post(self):
+        with patch.dict(os.environ,{k:'' for k in ENV if k.startswith('TALK_FOLLOWUP_')}):
+            task=self.create();started=self.manager.call({'action':'start','project_id':PROJECT,'task_ids':[task['id']],'budget':BUDGET})
+            flow=self.manager.get(started['followup_id']);original=self.api;self.calls.clear()
+            def api(method,path,**kwargs):
+                if path=='/api/members/me':return {'id':'agent:other','kind':'agent'}
+                return original(method,path,**kwargs)
+            with patch.object(tools,'_api_request',side_effect=api):
+                with self.assertRaisesRegex(follow.FollowupError,'identity_changed'):self.create('agent:other')
+            self.assertEqual(flow.reason,'identity_changed')
+            self.assertFalse(any(c[0]=='POST' for c in self.calls))
+
+    def test_explicit_start_without_environment_mode_flip_rejects_post(self):
+        with patch.dict(os.environ,{k:'' for k in ENV if k.startswith('TALK_FOLLOWUP_')}):
+            task=self.create();started=self.manager.call({'action':'start','project_id':PROJECT,'task_ids':[task['id']],'budget':BUDGET})
+            flow=self.manager.get(started['followup_id']);self.mode('passive');self.calls.clear()
+            with self.assertRaisesRegex(follow.FollowupError,'mode_changed'):self.create('agent:other')
+            self.assertEqual(flow.reason,'mode_changed')
+            self.assertFalse(any(c[0]=='POST' for c in self.calls))
+
+    def test_stop_before_collection_dispatch_keeps_result_uncollected(self):
+        task=self.create();self.complete(task);delivery=self.next(task)
+        flow=self.manager.get(delivery['followup_id']);original=self.manager.reference
+        def stop_after_reference(value):
+            result=original(value);self.manager.stop(flow,'creator_stopped');return result
+        self.calls.clear()
+        with patch.object(self.manager,'reference',side_effect=stop_after_reference):
+            result=self.manager.call(self.collect_args(delivery))
+        self.assertEqual(result['state'],'stopped');self.assertEqual(result['stop_reason'],'creator_stopped')
+        self.assertFalse(any(c[0]=='POST' for c in self.calls))
+        self.assertEqual(self.current(task['id'])['workflow_status'],'submitted')
+
+    def collect_with_concurrent_stop(self,fail_after_commit=False):
+        task=self.create();self.complete(task);delivery=self.next(task)
+        flow=self.manager.get(delivery['followup_id']);entered=threading.Event();release=threading.Event();original=self.api
+        def api(method,path,**kwargs):
+            if method=='POST' and path.endswith('/collect-followup-result'):
+                entered.set()
+                if not release.wait(3):raise AssertionError('test release was not signaled')
+                value=original(method,path,**kwargs)
+                if fail_after_commit:raise tools.TalkApiHttpError('synthetic response failed after commit',status=500)
+                return value
+            return original(method,path,**kwargs)
+        self.calls.clear()
+        with patch.object(tools,'_api_request',side_effect=api):
+            with ThreadPoolExecutor(1) as pool:
+                future=pool.submit(self.manager.call,self.collect_args(delivery))
+                try:
+                    self.assertTrue(entered.wait(3))
+                    stopped=self.manager.call({'action':'stop','followup_id':flow.id})
+                    self.assertEqual(stopped['stop_reason'],'creator_stopped')
+                    self.assertFalse(future.done())
+                finally:release.set()
+                if fail_after_commit:
+                    with self.assertRaisesRegex(follow.FollowupError,'outcome_unconfirmed'):future.result(timeout=5)
+                else:
+                    result=future.result(timeout=5)
+                    self.assertEqual(result['state'],'stopped');self.assertEqual(result['next_action'],'notify_user')
+                    self.assertEqual(result['collection']['task']['workflow_status'],'completed')
+                    self.assertIn(task['id'],flow.collected)
+        self.assertEqual(flow.state,'stopped');self.assertEqual(flow.reason,'creator_stopped')
+        self.assertEqual(self.current(task['id'])['workflow_status'],'completed')
+        self.assertEqual(len([c for c in self.calls if c[0]=='POST']),1)
+        self.assertEqual(self.manager.call({'action':'next','followup_id':flow.id})['state'],'stopped')
+
+    def test_stop_during_collection_keeps_terminal_state_and_actual_receipt(self):
+        self.collect_with_concurrent_stop()
+
+    def test_stop_during_failed_collection_keeps_original_stop_reason(self):
+        self.collect_with_concurrent_stop(fail_after_commit=True)

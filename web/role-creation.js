@@ -122,6 +122,13 @@ function createRoleRequestUI(deps) {
   function autoStartFeedback(row) {
     // pending意图不能把配置失败/取消伪装成启动中；旧请求和恢复保持原反馈。
     if (row.kind !== "create" || row.auto_start !== true || row.status !== "provisioned") return null;
+    const service = state.roles.find(role => role.member_id === row.member_id)?.service;
+    if (service?.observed === "running" && service.readiness_service === "ready") return {
+      text: "角色配置已完成，服务已启动。", attention: false,
+    };
+    if (service?.observed === "failed") return {
+      text: "角色配置已完成，但服务启动未完成。请查看角色，在角色详情中重试启动。", attention: true,
+    };
     if (row.auto_start_status === "enqueued") return {
       text: "自动启动请求已提交，实际运行状态请查看角色开关。", attention: false,
     };
@@ -164,6 +171,12 @@ function createRoleRequestUI(deps) {
     }
     if (row.status === "failed") box.append(node("p", "role-request-error", lookup(codes, row.last_error_code, "宿主未完成配置，请检查环境后继续。")));
     const actions = node("div", "role-request-actions");
+    if (["requested", "leased", "created"].includes(row.status)) {
+      box.append(node("p", "role-request-status", state.host?.enabled === false
+        ? "请求已保存，请先开启宿主配置后继续处理。可以关闭此窗口；请勿重复创建。"
+        : "请求已保存，宿主会自动处理。可以关闭此窗口，稍后查看配置进度；请勿重复创建。"));
+      actions.append(button("刷新进度", () => refresh()));
+    }
     if (human() && safeInt(row.revision)) {
       if (!row.member_id && ["requested", "leased", "failed"].includes(row.status)) actions.append(button("取消创建", () => mutate(row, "cancel")));
       if ((row.status === "failed" && row.last_error_code !== "manual_recovery_required") || (row.retry_exhausted === true && row.lease_held !== true)) {
@@ -244,7 +257,9 @@ function createRoleRequestUI(deps) {
   function schedule() {
     if (state.timer !== null) deps.clearTimeout(state.timer);
     state.timer = null;
-    if (state.active && state.supported && state.rows.some(r => ["requested", "leased", "created"].includes(r.status))) {
+    if (state.active && state.supported && state.rows.some(r => ["requested", "leased", "created"].includes(r.status)
+      || (r.status === "provisioned" && r.auto_start === true && r.auto_start_status === "enqueued"
+        && state.roles.find(role => role.member_id === r.member_id)?.service?.observed === "starting"))) {
       state.timer = deps.setTimeout(() => { state.timer = null; refresh(); }, 3000);
     }
   }
@@ -282,7 +297,10 @@ function createRoleRequestUI(deps) {
       if (!host || typeof host.enabled !== "boolean" || !requests || !Array.isArray(roles)) throw new Error("服务返回的配置事实不完整，请刷新后重试。");
       state.host = { enabled: host.enabled, host_label: host.host_label, config_version: host.config_version };
       state.rows = requests.rows; state.limited = requests.limited;
-      state.roles = roles.map(r => ({ member_id: r.member_id, role_name: r.role_name, archived: r.archived }));
+      state.roles = roles.map(r => ({ member_id: r.member_id, role_name: r.role_name, archived: r.archived,
+        service: r.service && typeof r.service === "object" ? {
+          observed: r.service.observed, readiness_service: r.service.readiness_service,
+        } : null }));
       state.supported = true; state.error = "";
       if (state.modalRow) state.modalRow = state.rows.find(r => r.request_key === state.modalRow.request_key) || state.modalRow;
       // 新成员由宿主创建后，重读既有名册；不制造临时member或伪造角色行。

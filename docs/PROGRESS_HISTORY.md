@@ -1,5 +1,45 @@
 # 开发历史 · TALK
 
+## 2026-10-26 21:58：原API正常重启，后台/大K启动加载自检完成
+
+2026-10-26 21:58实际加载：用户明确授权本次正常加载并启动大K，且确认原API已重启。旧runtime18784首stop --wait为blocked/runtime_host_stop_timeout，原后台自身普通重试于UTC13:39:52完成、错误清空，停前12个原入口全absent、全角色无owner后才集成15固定SHA文件；原失败回执保留，无第二次stop/强杀/CAS/清锁。仅原私有清单追加kimi.enabled=true及大K逐成员tools，其它字段内存比较相同、不复制凭据。新API路由均在、自动runtime19744/UTC13:48:44/六宿主serving、startup complete/shutdown idle/worker无错；未另起API或手动起第二后台。小D原true/rev1自动gen84/ins_8b6f2d624400/PID12392 ready/idle，大K仅一次普通start到gen2/ins_6ea3a5aecdd7/PID13912 ready/idle；同实例心跳分别推进330.686/330.504秒，其余四false/rev0仍停止，大K自启动false/rev0保持。六角色绑定/配置/用户偏好及250failed/2767未收取/286paused选定公开状态与加载前相同，模式passive6，真实HTTP role-creation.js与源SHA一致。原gen1未领取超时事实、新旧冻结和339至343归档保留；未另派K3.1验证、不称实际模型/当前宿主T-W/I-4/真人验收通过。当前正常加载自检完成，页面人验待用户刷新，后续首正式开发按约定交新角色，不自动开无关片。
+
+## 2026-10-26 21:26：343代码复验闭合，正常加载方案待许可
+
+2026-10-26 21:26取件：343/2989完整报告已核验收讫completed，MF-1/MF-2独立定向通过、无新增必须修正；本人243/0F/0E，6stdio仍CreatePipe受限not_run（6E），协调244含6过不冒充本人。正式new_force_new/count1/末24.4864%，原13份70248字节普通材料归档；原339 partial及过程偏差保持。15文件合并加载补丁apply-check过但未应用，274路径计划内容相同（164处仅LF/CRLF、原raw比较失败保留），只拟复制15个固定SHA公开文件。21:21只读预检runtime18784/五宿主serving、无running任务，API未加载followup新路由，外部API需用户原终端正常重启；大K原bound/choice/gen1未领取到期/无owner/can_start保持。具体加载方案已备，拟先普通stop --wait再集成/启用kimi及大K tools，用户重启API后核自动后台/小D恢复并普通start大K；此前用户授权只取件先不重启，现待本次明确正常停启许可。生产源码/配置/服务未改，无私有native/session/log读取，六binding/passive6/要求/自启动及250/2767/286保持；免K3.1验证、后续首开发交新角色保持。
+
+## 2026-10-26 20:55：339返修定向复验343派发
+
+2026-10-26 20:55派发：339两项集中返修定向复验343已交DeepSeek queued/assigned，0a63b3b已推送独立codex/kimi-role-host-fix分支。新baseline291份10336494字节源/快照零漂移，35冻结入口过；244关联含6真实stdio协调全过、自建Job归零，原2正确性探针不改字节过。原339/2985 partial已按用户明确授权核验收讫，原11份111542字节/过程偏差/6pipe未独立执行保持；实际new_no_candidate/count1/末30.3245%，不采用报告自猜的原生同窗。343沿base339/原continuity并force_new请求新窗，创建state=null不预称已落实；唯一写D:/claude-test/TALK/.tmp/initiator-followup-fix1/review，产品/正式测试/新旧冻结暂停，默认用户通知343后取件，不主动等待/唤回或另发可执行Hall。342已闭合，原31份36501字节归档，原Kimi286/294/289/290及旧339295/旧归档保持；原D生产源/配置/服务未集成加载。派后六binding/要求/passive6同342取件，250/2767/286及原runtime18784/五宿主/外部API、大K原身份/choice/gen1失败不操作。审后刷新合并加载计划，再取得本次具体正常停启许可；本次用户明确先不重启。免K3.1验证及后续首正式开发交新角色保持。
+
+## 2026-10-26：342闭合，明确授权取339后集中修正
+
+2026-10-26 342取件与339集中返修：342/2988 M2-1完整核验通过并收讫，原31份36501字节普通材料归档，实际reuse/count3/末57.8171%；Kimi代码复核已闭合，生产未加载。后台重载涉及339代码，首次读取被自动审批按旧边界拒绝，未绕过；用户明确授权“读取339，核验后收取”后才核验5506字符及完整报告、收讫339/2985。339原partial/2必须修正/过程偏差保持，11份111542字节普通原交付归档。C隔离源仅1产品1正式测试补显式start无环境预算的同flow/原预算/原子守卫接入及stop/collect终态/首因保持；7新原5F/1E，修后32、244关联含6真实stdio协调过，自建Job归零，原2正确性断言不改字节过。原报告直接导入配置/日志/pyc偏差保留，拟新复验force_new及统一合成守卫，不重审非阻断项/不把6pipe受限当已验。原D源/配置/runtime18784/五宿主/外部API与六binding/passive6/要求/用户选择/250/2767/286未改；11文件加载补丁仅apply-check，待339复验后刷新合并方案，本次未重启。用户免K3.1验证及首开发交新角色保持。
+
+## 2026-10-26 20:02：341产品修正独立通过，M2-1包缺陷单项复验342
+
+2026-10-26 20:02取件及派发：341/2987完整报告partial已核验收讫completed，MF-1健康降级/停止缺陷与76无子进程Python、41直跑Node独立通过；快照/权限口径通过，剩M2-1为wrapper未捕获CreatePipe的PermissionError/OSError。原29份137974字节普通交付归档，未复制合成DB/私有ACL状态；341实际reuse_session/count2/末投影52.8827%，不输出原生会话标识。仅新复核包fix2补OSError/固定白名单错误、两套件not_run_or_incomplete和整体exit1；4个合成故障注入断言过、未起子进程/产品套件，不更换IPC或开放breakaway。产品/正式测试/页面274文件与341全相同，仍ffa4be5，未再改产品；新固定290份10258874字节、原289及旧v1/v2/原失败保留。M2-1单项复验342已交DeepSeek queued/assigned，沿base340/原continuity服从守卫，创建state=null不预称同窗；唯一写D:/claude-test/TALK/.tmp/kimi-role-host-fix2/review，产品/正式测试/新旧冻结暂停。六binding/要求/passive6与341取件相同，339未取报告/收取，250/2767/286不操作；原runtime18784/五宿主、大K原身份/模型/gen1失败保持，未加载/启停/改配置或读私有资料。默认用户通知342后取件，不主动等待/唤回或另发可执行Hall；单项通过后再具体正常加载，不把受限未运行当成功，不重审产品整片或另派K3.1验证，后续首开发交新角色保持。
+
+## 2026-10-26 19:37：340返修定向复验341已派发
+
+2026-10-26 19:37派发：340三项集中返修已交DeepSeek定向复验341，queued/assigned；代码ffa4be5已推送独立codex/kimi-role-host-fix分支。正式baseline固定289份10251260字节，274产品/正式测试/页面文件与已测候选字节相同；新正式根受限定向76Python/41Node通过，前后精确集合/hash干净且自建测试Job归零。普通权限完整193为192过/1E（旧detach请求breakaway被测试Job拒绝）及41Node过，完整仍partial；340原190的28F/17E、原报告和旧294目录100extras保留，不冒称独立全过。只写D:/claude-test/TALK/.tmp/kimi-role-host-fix1/review，产品/正式测试/新旧冻结暂停；沿base340/原continuity优先相容续用但服从守卫，创建state=null不预称已领取或同窗。首两次API参数预校验422未建任务，最终沿340兼容general根及明确复核正文正式派发，未要质量子任务权限。派后六binding/要求/passive6同取件；250failed/2767未收取、286paused保持。原D339源/295冻结和旧归档零错配，339未取报告/收取；未生产加载/启停/改配置或私有读取，原runtime18784/五宿主、大K原身份/gen1到期保持。默认用户通知341完成后取件，不主动等待/唤回或另发可执行Hall，审后再具体正常加载，不重建大K/强杀/CAS清锁/接管外部API；免K3.1模型验证及后续首开发交新角色保持。
+
+## 2026-10-26：340取件，三项必须修正集中处理
+
+2026-10-26 340取件及集中返修：2986正式报告必须修正/补证，已核验收讫completed而非独立通过；19份249616字节普通原交付逐项归档。原Python190的28F/17E及40Node/71服务独立过保持，MCP业务unknown不冒充验收。已复现健康发布阻挡stop/drain的1F/2E并修正，保活句柄、固定一次诊断、空闲退出及最终health失败不阻止退出；宿主关闭文案同步补正。新wrapper固定合成配置/日志/TEMP、门控Windows Job只清理自建测试进程、精确集合/hash检查，不开放breakaway。候选受限定向76Python/41Node过；协调普通权限完整193为192过/1E（旧detach请求breakaway被本测试Job拒绝）、41Node过，完整结论partial不强求全过。原v1的286清单匹配无extras；旧v2的294清单匹配但有100extras原地保留，不再称目录干净。正式新冻结及MF-1/2/3定向复验准备中，尚未独立通过/生产加载。原D339源/295冻结及旧归档零错配；六binding/要求/passive6同取件，runtime18784/原五宿主、大K原身份/gen1过期及250/286不操作。339未取报告/收取，用户免K3.1验证及首开发交新角色保持；不强杀/CAS/清锁或接管外部API。
+
+详[返修合同](spec/KIMI_NEW_ROLE_HOST_FIX1_20261026.md)。
+
+## 2026-10-26 17:05：340新建Kimi宿主定向独立复核已派发
+
+2026-10-26 17:05派发：新建Kimi角色宿主/创建反馈定向复核340已交DeepSeek queued/assigned，代码e3654e3已推送独立codex/kimi-role-host-fix分支。C隔离worktree产品/正式测试暂停；D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/manifest-v2.json及baseline-v2固定294份10338896字节零漂移，被测根为baseline-v2，唯一写D同目录review。190Python/40Node过，冻结副本11项过；首v1漏cli/TALK依赖的2E及286原副本/manifest/打包材料保留。新continuity_key=kimi-new-role-host-review-20261026/基础1，创建state=null，不预称同窗/独立通过。原D盘339源/295冻结与旧归档保持，339仍submitted/2985未取件；六角色绑定/模式/用户选择及250/286不操作。生产未加载、runtime18784及原五宿主保持，大K仍原身份/原gen1未领取超时，不重建。用户不另派K3.1模型验证及后续首开发任务交新角色的授权保持，本次340是必要流程代码复核。默认用户通知340后取件，不主动等待/唤回/另发可执行Hall，审后具体正常加载/启用Kimi配方/普通start重试，外部API不接管、不强杀/CAS清锁。
+
+## 2026-10-26 16:53：大K创建流程缺陷，隔离修正自检完成
+
+2026-10-26 16:53用户创建K3.1角色“大K”反馈等待宿主无操作。实际请求UTC08:05:40已provisioned，原gen1自动start无人claim后readiness_timeout；原runtime18784只有五宿主，动态接入仅覆盖WorkBuddy。Codex在独立worktree C:/Users/Administrator/.codex/worktrees/kimi-role-host-fix/TALK修正通用Kimi单角色宿主/显式kimi配方及页面等待刷新、配置后实际服务反馈；190关联Python/40Node通过（9/3新包含其中）。原D:/claude-test/TALK的339产品/正式测试/295冻结保持，当前仅只读任务状态确认339succeeded/submitted/2985，未读报告/收取、不称独立通过。新修正未集成或生产加载，六现有角色/绑定/选择/250/286不操作，不重复创建大K，不复制原生凭据/读取私有会话日志，不调用真实模型或另派模型验证。先冻结本修正供DeepSeek集中核实，唯一review写根拟D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/review；审后再正常加载后台并沿现有角色普通start，不强杀/CAS/清锁。后续首个开发任务交用户新角色的授权保持。
+
+原26项首轮真实HTTP1F已修客户端列表包装；真实公开DTO回放纠正control_kind位置并补1测试。189关联初21F/2E如实保留（20F/2E合成Key根在被测源码内触发原守卫，另1旧资源断言在未改D源码基线同样失败），后190全过，不弱化安全守卫。新宿主与原HostManager复用持有Popen、正常stop/drain和独立HOME；任务权限默认review，tools须逐成员显式配方。实际模型/独立原生环境不由本片自检冒充已验。
+
 ## 2026-10-26 16:00：K3.1 Pro配置登记，后续开发交新角色
 
 2026-10-26 16:00 K3.1配置：用户确认已在Kimi Code用过K3.1，明确只改配置、不要另派模型验证，页面角色由用户自行添加，下一项开发任务交新角色。按该授权仅在C:/Users/Administrator/.kimi-code/config.toml追加公开模型表kimi-code/k3.1-pro，model=k3.1-pro/provider沿managed:kimi-code、1M及原思考能力；原默认kimi-code/k3、旧条目和凭据不改，不复制/哈希私有正文。原human正常API认证POST模型目录HTTP201，choice_id=rmc_04e11ae89092/display K3.1 Pro/source native_config。仅配置接入、不声称TALK实任务已验；未运行模型/CLI测试、未创建角色/派验证/改绑/启停或更新CLI。当前用户仅授权本次模型配置所需访问，不扩为其它native/HOME/session/log或Key读取。新角色创建后下一开发任务优先交它，免单独K3.1验证任务；339原独立复核及其后当前片加载/人验流程保持，产品/正式测试/冻结暂停，不另开并行开发片。证据.tmp/kimi-k31-config-20261026/，仅公开选择字段/目录回执，无私有配置副本。

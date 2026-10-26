@@ -112,7 +112,8 @@ class Followups:
 
     def stop(self, flow, reason):
         with self.lock:
-            flow.state, flow.reason = 'stopped', reason
+            if flow.state!='stopped':
+                flow.state, flow.reason = 'stopped', reason
 
     def alive(self, flow):
         check_cancelled()
@@ -274,20 +275,33 @@ class Followups:
             raise FollowupError('collection_outcome_unconfirmed: read the task; do not blindly retry') from None
         if value.get('task',{}).get('workflow_status')!='completed':
             self.stop(flow,'collection_outcome_unconfirmed');raise Stopped()
-        flow.collected.add(task_id);flow.state='watching'
-        return self.view(flow,collection=value,verification_declaration={'summary':note,'evidence_refs':evidence},
-            next_action='call_talk_follow_tasks_next',collection_is_acceptance=False)
+        with self.lock:
+            flow.collected.add(task_id)
+            # An already-dispatched write may finish after stop. Report its receipt,
+            # but never resume the flow or replace the original stop reason.
+            if flow.state!='stopped':flow.state='watching'
+            return self.view(flow,collection=value,verification_declaration={'summary':note,'evidence_refs':evidence},
+                next_action='notify_user' if flow.state=='stopped' else 'call_talk_follow_tasks_next',
+                collection_is_acceptance=False)
 
     def delegate(self, arguments, create):
         """Bound preparation + the one POST + enrollment by this client's budget."""
         budget=Budget.environment()
+        explicit_flow=None
         if budget is None:
-            return create(None)
+            project=arguments.get('project_id') or os.environ.get('TALK_PROJECT_ID')
+            with self.lock:
+                explicit_flow=next((f for f in self.flows.values()
+                    if f.project==project and f.state!='stopped'),None)
+            if explicit_flow is None:return create(None)
+            budget=explicit_flow.budget
         token=CURRENT_WAIT.set(WaitContext())
         CURRENT_WAIT.get().limit(budget.client-budget.margin)
         plan=None
         try:
-            plan=self.prepare_delegate(arguments)
+            plan=self.prepare_delegate(arguments,budget=budget,explicit_flow=explicit_flow)
+            if plan is not None:
+                CURRENT_WAIT.get().limit(plan[3].client-plan[3].margin)
             if plan is not None and plan[4] is not None:
                 CURRENT_WAIT.get().limit(max(0,plan[4].deadline-self.clock()))
             created=create(plan)
@@ -360,13 +374,21 @@ class Followups:
         finally:
             with self.lock: flow.busy=False
 
-    def prepare_delegate(self, arguments):
-        budget=Budget.environment()
-        if budget is None: return None
+    def prepare_delegate(self, arguments, *, budget=None, explicit_flow=None):
+        budget=budget or Budget.environment()
+        if budget is None:return None
         project=arguments.get('project_id') or os.environ.get('TALK_PROJECT_ID')
         owner,mode,version=self.identity_mode(project)
+        if explicit_flow is not None and owner!=explicit_flow.owner:
+            self.stop(explicit_flow,'identity_changed')
+            raise FollowupError('identity_changed: explicit followup stopped; no task was dispatched')
         with self.lock:
-            flow=next((f for f in self.flows.values() if f.project==project and f.owner==owner and f.state!='stopped'),None)
+            if explicit_flow is not None:
+                if self.flows.get(explicit_flow.id) is not explicit_flow or explicit_flow.state=='stopped':
+                    raise FollowupError('active_followup_stopped; no task was dispatched')
+                flow=explicit_flow
+            else:
+                flow=next((f for f in self.flows.values() if f.project==project and f.owner==owner and f.state!='stopped'),None)
         if mode!='active':
             if flow:
                 self.stop(flow,'mode_changed')
@@ -376,7 +398,7 @@ class Followups:
             try: self.checked_tasks(flow)
             except Stopped: raise FollowupError('active_followup_stopped; do not auto-dispatch another task') from None
             if len(flow.ids)>=20: raise FollowupError('followup_task_limit_reached')
-        return project,owner,version,budget,flow
+        return project,owner,version,flow.budget if flow else budget,flow
 
     def guard_legacy_write(self, task_id, *, collection=False):
         with self.lock:
@@ -399,8 +421,8 @@ class Followups:
                 if flow:self.stop(flow,'mode_changed')
                 result['initiator_followup']={'state':'stopped','stop_reason':'mode_changed_after_dispatch','next_action':'end_turn'}
             elif flow:
-                self.alive(flow)
                 with self.lock:
+                    self.alive(flow)
                     if task['id'] not in flow.ids:flow.ids.append(task['id'])
                     flow.state='watching'
                 result['initiator_followup']=self.view(flow)

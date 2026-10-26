@@ -328,3 +328,42 @@ test('旧服务未确认auto意图时诚实提示，不仅凭提交载荷承诺�
   assert.match(h.el('role-create-notice').textContent,/未确认自动启动意图/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
+
+
+test('新建等待时可刷新进度，并提示可关闭且不要重复创建',async()=>{
+  const h=harness();await h.ready();await h.fill();await h.ui.submit();
+  const text=h.texts(h.el('role-create-result'));
+  assert.match(text,/请求已保存.*可以关闭.*请勿重复创建/);
+  const refresh=h.el('role-create-result').querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='刷新进度');
+  assert.ok(refresh);const before=h.requests.length;await refresh.fire('click');
+  assert.ok(h.requests.length>before);assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+});
+
+test('配置完成后继续跟进实际启动，失败展示查看角色并停止轮询',async()=>{
+  const h=harness();await completedAuto(h);
+  h.backend.roles=[{member_id:'agent:auto',service:{observed:'starting',readiness_service:'pending'}}];
+  await h.ui.refresh();assert.equal(h.timers.size,1);
+  h.backend.roles[0].service={observed:'failed',readiness_service:'failed'};
+  await h.ui.refresh();assert.equal(h.timers.size,0);
+  assert.match(h.texts(h.el('role-create-result')),/角色配置已完成，但服务启动未完成/);
+  const view=h.el('role-create-result').querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='查看角色');
+  assert.ok(view);await view.fire('click');assert.equal(h.ctx.selected,'agent:auto');
+  assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+});
+
+test('配置完成后只依据真实ready服务显示已启动',async()=>{
+  const h=harness();await completedAuto(h);
+  h.backend.roles=[{member_id:'agent:auto',service:{observed:'running',readiness_service:'ready'}}];
+  await h.ui.refresh();assert.match(h.texts(h.el('role-create-result')),/角色配置已完成，服务已启动/);
+  assert.equal(h.timers.size,0);
+});
+
+
+test('宿主关闭时提示先开启配置，不承诺自动处理且刷新不重发请求',async()=>{
+  const h=harness();await h.ready();h.backend.host.enabled=false;
+  await h.fill();await h.ui.submit();await h.ui.refresh();
+  const text=h.texts(h.el('role-create-result'));
+  assert.match(text,/请先开启宿主配置/);assert.doesNotMatch(text,/宿主会自动处理/);
+  assert.match(text,/可以关闭.*请勿重复创建/);
+  assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+});
