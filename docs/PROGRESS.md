@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-26 15:28（Asia/Shanghai）。用户明确完成已有发起者主被动功能，Codex开发/DeepSeek独立核实；本片开发及隔离自检完成，待冻结首审。生产未加载，不能提前宣布真实主动链路I-4完成。
+Updated: 2026-10-26 15:39（Asia/Shanghai）。用户明确完成已有发起者主被动功能，Codex开发/DeepSeek独立核实；代码de5a91a已推送，339已交DeepSeek独立首审（创建queued/assigned）。生产未加载，不能提前宣布真实主动链路I-4完成。
 
 ## 本片实现
 
@@ -19,8 +19,8 @@ Updated: 2026-10-26 15:28（Asia/Shanghai）。用户明确完成已有发起者
 
 ## 保护与下一步
 
-- 实际身份agent:codex / prj_e8fe7066bbec / lead；本次分工优先于长期默认分工。250failed/2767未收取、286queued/accepted/paused及五完整binding/项目要求保持；不操作自启动选择。原runtime18784与DeepSeek gen82保持，不在开发阶段启停/重载/改模式。
+- 实际身份agent:codex / prj_e8fe7066bbec / lead；本次分工优先于长期默认分工。250failed/2767未收取、286queued/accepted/paused整份公开任务派后相同，五完整binding/项目要求派前一致；不操作自启动选择。原runtime18784与DeepSeek gen82保持，不在开发阶段启停/重载/改模式。
 - 不读生产config正文/Key/DB/private/HOME/native/session/log。所有测试严格合成配置/假凭据/动态本地端口和本测试所属子进程；旧冻结与332—338原交付保持。338页面启动基础人验已闭合，子进程树管理与双模型展示提案已撤回，不重开。
-- 接下来固定源与证据，普通提交/推送当前分支，交DeepSeek集中首审，产品/正式测试/冻结暂停，唯一写本片review。仍按当前被动约定由用户通知完成后取件，不为测试本功能擅自切生产主动；独立通过后继续当前宿主实际接入与人验，不另开无关片。
+- 新295份10454599字节冻结零漂移；旧275/236/275/63/116/162/197及332—338原交付零错配。339已正式交DeepSeek，创建execution_session_state=null，实际原生决策待回执，不预称复用/独立通过。产品/正式测试/新旧冻结暂停，唯一写本片review。仍按当前被动约定由用户通知完成后取件，不为测试本功能擅自切生产主动；独立通过后继续当前宿主实际接入与人验，不另开无关片。
 
 详[本片合同](spec/INITIATOR_FOLLOWUP_COMPLETE_20261026.md)、[使用指南](guides/INITIATOR_FOLLOWUP.md)、[模块](spec/MODULE_bridges.md)及[历史](PROGRESS_HISTORY.md)。证据.tmp/initiator-followup-v1/。
