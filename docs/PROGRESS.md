@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-27 11:18（Asia/Shanghai）。用户重启API后健康，但未拉起后台；脱敏事件显示启动锁打开PermissionError，API进程完整性为低（RID 4096），须在正常完整性Windows终端重启，再验证后台和小D。
+Updated: 2026-10-27 11:23（Asia/Shanghai）。再次核验API仍低完整性；已定位项目.venv的python.exe继承低完整性标签，并仅调整四旧宿主为同版本系统Python。需用户以系统Python及原虚拟环境依赖重启API，再核后台和小D。
 
 ## 当前状态
 
@@ -13,9 +13,11 @@ Updated: 2026-10-27 11:18（Asia/Shanghai）。用户重启API后健康，但未
 
 - 用户重启API已确认，healthz正常；但新API PID22288启动事件显示在launcher.lock打开时PermissionError，后台仍停/小D离线。API进程低完整性RID4096、诊断进程高完整性RID12288；锁ACL未修改，诊断进程只读取得并释放锁成功。低完整性解释API不能写较高完整性对象，但此前四宿主异常的具体原因仍未最终证明。
 
+- 第二次用户重启后API PID20124仍低完整性RID4096，后台未恢复。已核`D:/claude-test/TALK/.venv/Scripts/python.exe`继承Low标签；同一次探针系统Python RID12288、项目venv Python RID4096，四旧宿主argv首项正是该venv Python。经恢复授权，在后台停止、持正常启动锁时原子替换原清单，仅将四项宿主argv首项改为同版本系统Python；其他JSON值经语义比对不变，不修改ACL、角色绑定、Key或自启动选择。已验证系统Python能从原venv site-packages导入uvicorn/fastapi/sqlmodel。
+
 ## 下一步与约束
 
 - 用户登记后续需求：检查TALK适配的运行器是否有新版本，发现后仅提示用户，不自动下载、安装或更新；具体范围和排期开发前确定，见[路线图](spec/DEVELOPMENT_ROADMAP.md)。当前不开发该功能。
-- 用户需停止目前低完整性API，在Windows开始菜单打开正常终端，D:/claude-test/TALK中用原`.venv` Python启动uvicorn；用户通知后核API完整性、自动后台、六宿主及小D原选择，不另启第二后台；如仍失败保留现场。恢复后才由用户删除旧大K并创建登录验收。
+- 用户需停止目前低完整性API，在Windows开始菜单的正常PowerShell中进入项目目录，将PYTHONPATH设为原`.venv/Lib/site-packages`，以系统Python 3.12启动同一uvicorn；用户通知后核API完整性、自动后台、六宿主及小D原选择，不另启第二后台。如仍失败保留现场；恢复后才由用户删除旧大K并创建登录验收。
 - 新角色的工作区开发按用户原授权继续；不自动重派344，不自行启停或清理归属。真实服务加载、模型调用、主动跟进和页面人验均尚无本片通过记录。
 - 历史见[历史](PROGRESS_HISTORY.md)。

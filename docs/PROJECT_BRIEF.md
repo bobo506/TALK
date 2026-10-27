@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-27 11:23：用户再启API仍低完整性；实证项目.venv/python.exe继承Low标签、系统Python高完整性，四旧宿主均用venv exe。依恢复授权在后台停止和启动锁内仅将四宿主argv[0]改为同版本系统Python，其他清单JSON值相同，不改ACL/角色/Key；系统Python可导入venv依赖。待用户在正常Windows终端以系统Python和venv PYTHONPATH重启API后核后台六宿主/小D，暂不删除大K。详[进度](PROGRESS.md)。
+
 2026-10-27 11:18：用户重启API后健康，但后台未自动拉起；脱敏事件确认API启动打开launcher.lock时PermissionError，API PID22288 Windows完整性低RID4096、诊断进程高RID12288。锁ACL未修改且可由诊断进程取得释放；旧runtime940 absent，小D离线。需用户从Windows开始菜单正常终端用原.venv启动API，随后核完整性/后台/六宿主；前一四宿主错误具体差异尚未证明，暂不删除大K。详[进度](PROGRESS.md)。
 
 2026-10-27 11:08：用户授权后定向脱敏检查，四旧宿主启动后私有健康文件CreateFileW错误5；同目录探针成功、权限未放宽，差异原因未明。19376正常停后重启940仍四宿主失败，940现已正常停且absent，原API仍用户终端管理；需用户原终端重启API由既有链恢复，再核六宿主/小D，不提前删除大K。详[进度](PROGRESS.md)。

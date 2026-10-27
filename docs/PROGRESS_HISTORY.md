@@ -1,5 +1,10 @@
 # 开发历史 · TALK
 
+## 2026-10-27 11:23（Asia/Shanghai）— 低完整性可执行文件与四宿主启动路径修正
+
+- 用户再次启动API，PID20124仍低完整性RID4096，后台未自动启动。只读Windows安全标记确认项目根的Low标签由`.venv/Scripts/python.exe`继承；同一探针系统Python进程RID12288而venv Python RID4096。原清单四旧宿主首个argv均为该venv Python，与旧宿主权限错误证据相吻合；不改根目录或可执行文件ACL。
+- 用户此前授权恢复；在后台停止且持原launcher OS锁时，原子替换原私有清单，精确只把四个既有宿主argv首项改为`C:/Users/Administrator/AppData/Local/Programs/Python/Python312/python.exe`，其他JSON值验证完全相同。系统Python 3.12从原venv site-packages导入uvicorn/fastapi/sqlmodel已通过。未输出/复制密钥正文，未修改角色选择/绑定/自启动。仍需正常完整性用户终端用系统Python加原venv PYTHONPATH重启API；未实际验证六宿主或小D恢复，不提前删除大K。
+
 ## 2026-10-27 11:18（Asia/Shanghai）— API重启未带起后台的原因
 
 - 用户确认重启，healthz正常，旧runtime940仍stopped/absent，小D离线。经授权后台脱敏事件确认新API启动于03:16:07 UTC，`ensure_local_runtime`打开`launcher.lock`时PermissionError，故未拉起后台；不以旧health里的manager_failed当新后台状态。
