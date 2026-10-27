@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-27 21:44：用户最新明确后续分工为大K开发、DeepSeek独立复核、Codex拆包/分配/核验；覆盖后续功能及必要返修，Codex不再直接代写后续产品改动。按可独立验证的完整流程拆包，不整模块委派、不按单字段碎拆；每次只派一个依赖闭环，交付冻结后复核、必要返修集中处理，再开下一包。348「DSH新角色：共享连接准备与受管启停（开发）」已派大K并于21:41:26领取，最后running/in_progress；484项隔离基线manifest SHA256 `2f550a65a06fe3735b0f0bd84e02246340063356fc388951dc898b877f572519`无漂移，仅写本包candidate/delivery，约45分钟开发进度检查点。WorkBuddy随后，删除/版本等不混入；DeepSeek复核待本包交付冻结后派。force_new只是请求、原生状态null；自动跟进已按原通知后取件偏好creator_stopped，未取消开发或改模式，不主动等待。详[进度](docs/PROGRESS.md)及[任务包](docs/spec/DSH_NEW_ROLE_TASK_PACKAGE_20261027.md)。API开发要求快照仍旧分工，本次人类明确指令优先，不改生产角色字段/配置/偏好。
+
 - 2026-10-27 21:32：用户确认Codex新角色使用官方模型目录返回的默认思考强度；已在`.tmp/role-creation-codex-default-20261027/`新副本落实，每次准备取官方defaultReasoningEffort并校验/落盘，不继承名称或原准备值xhigh；缺失/不支持明确失败，页面提示同规则。4项变化、484项冻结manifest SHA256 `6e543560e74043ce533efbb1dfc4b8c4d73635d7176d5479444de22e90415844`，最终333 Python/118 Node全过，父484/核心479/原347及首次复核材料无漂移。Codex块开发/自检完成，后续DSH/WorkBuddy等新角色准备按已授权范围逐块接入，不重复询问相同开工；仍未集成/生产启停/真实登录模型/改偏好/收取347或公开推送。详[进度](docs/PROGRESS.md)及[Codex记录](docs/spec/ROLE_CREATION_CODEX_20261027.md)。
 
 - 2026-10-27 21:05：用户“继续”后Codex在`.tmp/role-creation-codex-20261027/`实现新Codex角色独立设备授权/验证码、所选模型元数据检查、动态宿主与准备门禁；484项冻结manifest SHA256 `1cc1efbf108293d5c25b256504e272eaf9872c43de8474b4a4d84f896697312e`，冻结复跑331 Python/117 Node通过，父479及原347/首次复核无漂移。当前公开模型标注xhigh却无独立规范字段，已询问保留所选强度并明确登记xhigh或使用官方默认；答复前不改依赖部分/不集成，候选现用官方默认缺省不等于最终规则。本块仍待确认，其他运行器继续按已授权范围逐块接入；未生产启停/真实登录模型/改绑定偏好/收取347或公开推送。详[进度](docs/PROGRESS.md)及[Codex候选](docs/spec/ROLE_CREATION_CODEX_20261027.md)。
