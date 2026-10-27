@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-27 11:26（Asia/Shanghai）。用户以系统Python和原虚拟环境依赖重启后，后台及六宿主已恢复，小D按原选择自动上线并有连续心跳。Kimi角色登录修复已加载，待用户自行删除旧大K并重建验收。
+Updated: 2026-10-27 11:35（Asia/Shanghai）。用户重建大K并反馈等待宿主；只读核实新角色创建已完成且新宿主serving，待用户独立设备登录与实际启动验收。
 
 ## 当前状态
 
@@ -17,11 +17,13 @@ Updated: 2026-10-27 11:26（Asia/Shanghai）。用户以系统Python和原虚拟
 
 - 用户按系统Python加venv依赖重启后，runtime23268 running、startup complete、worker无错、六宿主serving；小D原true/rev1自动gen88、ins_35a60b11066b ready/idle、同实例心跳推进60.099秒，其他五角色false/rev0及停止，旧大K停止/无owner。六绑定bound；API健康、HTTP页面与源码字节一致，无running任务；250/2767未收取、286 paused、344/2990未收取保持。active7且本Codex连接not_bound。未真实Kimi设备登录/模型或人工验收。
 
+- 用户新建大K `agent:prj-e8fe7066bbec.k-d4bf0429`，创建请求provisioned/作业succeeded，模型k3.1-pro绑定bound、新宿主serving；角色服务not_started、gen0/无owner、未验证native登录。用户看到等待宿主，服务端已完成，可能页面数据未刷新但未做浏览器复现。页面刷新后应显示配置完成及独立登录说明，用户需在正常PowerShell用系统Python运行setup并完成设备授权，未实际运行登录。新成员默认review，开发tools权限需配置及正常重载后再执行开发；小D原实例idle、后台23268运行，无running任务。
+
 ## 下一步与约束
 
 - 用户反馈新增角色时Kimi Code运行器名称仍包含K2.8等模型名称，不正确；后续核查并修正，见[路线图](spec/DEVELOPMENT_ROADMAP.md)，本次仅登记。
 - 用户反馈删除大K后资源清理失败且重试无效；后续核查新角色是否复用身份档、专属凭据、状态及启动配置，确认专属且不复用后删除时直接清理，并修复清理重试，见[路线图](spec/DEVELOPMENT_ROADMAP.md)。这是用户反馈，尚未独立检查或实施清理。
 - 用户登记后续需求：检查TALK适配的运行器是否有新版本，发现后仅提示用户，不自动下载、安装或更新；具体范围和排期开发前确定，见[路线图](spec/DEVELOPMENT_ROADMAP.md)。当前不开发该功能。
-- 用户反馈已删除旧大K，后续在页面创建新角色并按页面提示在TALK宿主进行独立设备登录；因venv Python低完整性，登录命令须在正常PowerShell用系统Python并设置原venv PYTHONPATH，页面给出的角色ID照用。待用户新建后按新member配置既有开发工具权限，再通过正常开发任务验证；不单独派模型验证。
+- 用户已重建大K，下一步在TALK宿主进行独立设备登录；因venv Python低完整性，登录命令须在正常PowerShell用系统Python并设置原venv PYTHONPATH，页面给出的角色ID照用。待用户新建后按新member配置既有开发工具权限，再通过正常开发任务验证；不单独派模型验证。
 - 新角色的工作区开发按用户原授权继续；不自动重派344，不自行启停或清理归属。真实服务加载、模型调用、主动跟进和页面人验均尚无本片通过记录。
 - 历史见[历史](PROGRESS_HISTORY.md)。

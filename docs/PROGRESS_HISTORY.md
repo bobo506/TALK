@@ -1,5 +1,10 @@
 # 开发历史 · TALK
 
+## 2026-10-27 11:35（Asia/Shanghai）— 新大K创建状态核验
+
+- 用户新建大K并反馈页面等待宿主；只读公开API核新member `agent:prj-e8fe7066bbec.k-d4bf0429` 创建请求provisioned、作业succeeded、所选k3.1-pro binding bound，新Kimi宿主serving。角色服务not_started/gen0/无owner，native登录未验证，不把宿主serving或预检当真实登录/模型通过。页面所见可能未刷新，未自行浏览器复现。
+- 用户需在正常PowerShell、系统Python及原venv PYTHONPATH下运行该角色setup并完成官方设备登录；新角色默认review，按用户原开发授权后续须配置该member的tools并正常加载，不能在登录前声称可开发。小D原实例idle、后台23268运行、无running任务。未改配置、实际登录/启停、派任务或读取密钥。
+
 ## 2026-10-27 — 登记 Kimi Code 运行器名称问题
 
 - 用户反馈新增角色时，Kimi Code 运行器名称仍包含K2.8等模型信息，名称不正确；已加入路线图，后续核查来源并修正运行器与模型的显示名称。本轮仅登记，未排查、开发或修改配置。

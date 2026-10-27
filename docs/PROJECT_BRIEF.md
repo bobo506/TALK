@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-27 11:35：用户重建大K后反馈等待宿主；新member agent:prj-e8fe7066bbec.k-d4bf0429只读核实创建provisioned/作业succeeded、k3.1-pro绑定bound、宿主serving，角色not_started/gen0/无owner，native登录未验证。可能页面未刷新，未浏览器复现；待用户正常PowerShell系统Python+venv PYTHONPATH执行独立设备登录，随后为新member配置tools并正常加载后按原授权开展开发，不另派模型测试。详[进度](PROGRESS.md)。
+
 2026-10-27 11:26：用户系统Python重启后runtime23268运行、六宿主serving，小D原true/rev1自动gen88/ins_35a60b11066b ready/idle、同实例心跳推进60.099秒，其他角色原false/stopped、旧大K无owner；六绑定bound，页面HTTP字节匹配，250/286/344保持。修复已加载，用户可自行删除旧大K并新建，独立登录须正常PowerShell系统Python+venv PYTHONPATH；新成员开发工具需配置，真实登录/模型/人验待验，active7本连接not_bound。详[进度](PROGRESS.md)。
 
 2026-10-27 11:23：用户再启API仍低完整性；实证项目.venv/python.exe继承Low标签、系统Python高完整性，四旧宿主均用venv exe。依恢复授权在后台停止和启动锁内仅将四宿主argv[0]改为同版本系统Python，其他清单JSON值相同，不改ACL/角色/Key；系统Python可导入venv依赖。待用户在正常Windows终端以系统Python和venv PYTHONPATH重启API后核后台六宿主/小D，暂不删除大K。详[进度](PROGRESS.md)。
