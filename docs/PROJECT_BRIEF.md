@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-27 10:22：345报告四项必须修正已核验收取但不通过；Codex隔离集中修正33 Python/75 Node合成自检，474份清洁快照SHA256清单5a7f5cbbb14a5fea5ebcf8e48e76b5ae4cba004676186690a071369e80b45c7b，346交DeepSeek定向复验queued/assigned，源和新旧快照暂停。移除新增角色可写权限配置，沿用既有宿主配置默认review；新角色开发工具需按新成员配置。未生产加载/真实登录，用户待修复加载后自行重建。页面active7而Codex连接not_bound，无跟进句柄、等待预算未核；344失败与250/286保持。详[进度](PROGRESS.md)。
+
 2026-10-27 09:49：用户要求先修复新建Kimi角色独立登录/模型配置，修复后自行删除大K并新建验收。Codex隔离候选27 Python/74 Node自检，345交DeepSeek独立复核，09:50已领取running/in_progress；1072项清单SHA256 239d609f392b4cf147c43db51b3dad7f2d96a2235acf2e06fff6a919d4c759b5。候选及产品暂停，未生产加载/真实登录；当前active7但连接not_bound、无自动跟进句柄，实际等待预算未核。344原失败保留，详[进度](PROGRESS.md)。
 
 2026-10-27 09:22：依用户仅检查授权核实，手动Kimi配置含k3.1-pro/managed:kimi-code；大K受管隔离KIMI_CODE_HOME存在但config.toml不存在，宿主显式使用该隔离HOME，解释344模型预检失败。未读Key/日志、未改配置或重派；登录/凭据与原生断言原因未知，修复需另获授权。详[进度](PROGRESS.md)。
