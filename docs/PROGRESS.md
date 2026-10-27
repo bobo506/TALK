@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-27 11:23（Asia/Shanghai）。再次核验API仍低完整性；已定位项目.venv的python.exe继承低完整性标签，并仅调整四旧宿主为同版本系统Python。需用户以系统Python及原虚拟环境依赖重启API，再核后台和小D。
+Updated: 2026-10-27 11:26（Asia/Shanghai）。用户以系统Python和原虚拟环境依赖重启后，后台及六宿主已恢复，小D按原选择自动上线并有连续心跳。Kimi角色登录修复已加载，待用户自行删除旧大K并重建验收。
 
 ## 当前状态
 
@@ -15,9 +15,11 @@ Updated: 2026-10-27 11:23（Asia/Shanghai）。再次核验API仍低完整性；
 
 - 第二次用户重启后API PID20124仍低完整性RID4096，后台未恢复。已核`D:/claude-test/TALK/.venv/Scripts/python.exe`继承Low标签；同一次探针系统Python RID12288、项目venv Python RID4096，四旧宿主argv首项正是该venv Python。经恢复授权，在后台停止、持正常启动锁时原子替换原清单，仅将四项宿主argv首项改为同版本系统Python；其他JSON值经语义比对不变，不修改ACL、角色绑定、Key或自启动选择。已验证系统Python能从原venv site-packages导入uvicorn/fastapi/sqlmodel。
 
+- 用户按系统Python加venv依赖重启后，runtime23268 running、startup complete、worker无错、六宿主serving；小D原true/rev1自动gen88、ins_35a60b11066b ready/idle、同实例心跳推进60.099秒，其他五角色false/rev0及停止，旧大K停止/无owner。六绑定bound；API健康、HTTP页面与源码字节一致，无running任务；250/2767未收取、286 paused、344/2990未收取保持。active7且本Codex连接not_bound。未真实Kimi设备登录/模型或人工验收。
+
 ## 下一步与约束
 
 - 用户登记后续需求：检查TALK适配的运行器是否有新版本，发现后仅提示用户，不自动下载、安装或更新；具体范围和排期开发前确定，见[路线图](spec/DEVELOPMENT_ROADMAP.md)。当前不开发该功能。
-- 用户需停止目前低完整性API，在Windows开始菜单的正常PowerShell中进入项目目录，将PYTHONPATH设为原`.venv/Lib/site-packages`，以系统Python 3.12启动同一uvicorn；用户通知后核API完整性、自动后台、六宿主及小D原选择，不另启第二后台。如仍失败保留现场；恢复后才由用户删除旧大K并创建登录验收。
+- 用户现可自行删除旧大K并在页面创建新角色，按页面提示在TALK宿主进行独立设备登录；因venv Python低完整性，登录命令须在正常PowerShell用系统Python并设置原venv PYTHONPATH，页面给出的角色ID照用。待用户新建后按新member配置既有开发工具权限，再通过正常开发任务验证；不单独派模型验证。
 - 新角色的工作区开发按用户原授权继续；不自动重派344，不自行启停或清理归属。真实服务加载、模型调用、主动跟进和页面人验均尚无本片通过记录。
 - 历史见[历史](PROGRESS_HISTORY.md)。

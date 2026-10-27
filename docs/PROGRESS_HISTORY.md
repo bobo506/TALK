@@ -1,5 +1,10 @@
 # 开发历史 · TALK
 
+## 2026-10-27 11:26（Asia/Shanghai）— 用户重启后六宿主及小D恢复
+
+- 用户在正常终端以系统Python及原venv PYTHONPATH重启API；runtime23268 running、startup complete、shutdown idle、worker无错，六宿主serving。小D原自启动true/rev1自动gen88、ins_35a60b11066b/PID24484 ready/idle，同实例心跳03:24:38.509→03:25:38.607，推进60.099秒。其他五角色原false/rev0及stopped，大K无owner。
+- API/db/storage健康、HTTP role-creation.js与index.html字节匹配已审源码，六绑定bound且无running任务；250 failed/2767未收取、286 paused、344 failed/2990未收取保持。用户现可自行删除旧大K并新建；首次角色独立设备登录及模型执行/页面验收仍待实际操作。由于venv Python低完整性，登录命令需在正常PowerShell使用系统Python与原venv PYTHONPATH；新成员默认review，开发权限待按新成员配置。active7、当前连接not_bound不外推主动等待通过。
+
 ## 2026-10-27 11:23（Asia/Shanghai）— 低完整性可执行文件与四宿主启动路径修正
 
 - 用户再次启动API，PID20124仍低完整性RID4096，后台未自动启动。只读Windows安全标记确认项目根的Low标签由`.venv/Scripts/python.exe`继承；同一探针系统Python进程RID12288而venv Python RID4096。原清单四旧宿主首个argv均为该venv Python，与旧宿主权限错误证据相吻合；不改根目录或可执行文件ACL。
