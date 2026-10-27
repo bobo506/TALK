@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-27 11:18（Asia/Shanghai）— API重启未带起后台的原因
+
+- 用户确认重启，healthz正常，旧runtime940仍stopped/absent，小D离线。经授权后台脱敏事件确认新API启动于03:16:07 UTC，`ensure_local_runtime`打开`launcher.lock`时PermissionError，故未拉起后台；不以旧health里的manager_failed当新后台状态。
+- 只读核查API PID22288的Windows进程完整性RID4096（低），诊断进程RID12288（高）；两者均显示elevated，完整性独立于管理员状态。锁ACL含用户/管理员/SYSTEM，诊断进程可正常取得并释放锁；未修改ACL、清锁或读取凭据。低完整性API无法写较高完整性的启动锁，解释本次自动启动失败；之前四宿主CreateFileW拒绝仍未证明具体差异。
+- 用户需停止低完整性API，从Windows开始菜单打开正常完整性的终端，在原项目目录以原`.venv` Python、`-m uvicorn server.main:app --host 127.0.0.1 --port 8000`运行；完成后核进程完整性与六宿主/小D，不能提前删除大K。
+
 ## 2026-10-27 11:08（Asia/Shanghai）— 授权核查宿主启动失败与恢复尝试
 
 - 用户明确授权仅查本次脱敏启动错误并恢复。human授权后台事件显示四旧宿主三次都成功启动子进程后exit1，非Popen创建失败；各宿主错误尾部只提取固定异常/调用位置，均在健康状态私有临时文件CreateFileW错误5并映射key_permissions_failed，不输出原生输出或凭据。
