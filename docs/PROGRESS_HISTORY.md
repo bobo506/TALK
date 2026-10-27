@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-27 15:05（Asia/Shanghai）— 大K开发角色创建完整流程派发
+
+- 用户明确将之前确认的新建角色至正常启停完整流程派大K开发、Codex复核；本次具体分工优先既有默认交叉复核。347创建queued/assigned后只读确认原大K实例领取running/in_progress，不等同真实任务完成或模型能力通过，不额外派模型测试。
+- 474项清洁源快照base de90147445408996df996ff233ff4aec5549bdfa，manifest SHA256 581d8c7535419b52c75ec34dba290580feca0a02cefcc6157ff02f86c4018073；唯一开发/交付`.tmp/role-creation-complete-20261027/candidate/`及delivery，baseline/manifest/正式产品暂停。任务覆盖保存关闭/自动刷新、自动配置及必要官方授权引导、独立环境/所选模型/宿主与启停、状态和失败恢复；Kimi是必须打通运行器，其他实际能力必须如实报告，创建界面Kimi名称修正纳入。删除资源清理及运行器更新提示不混本片。
+- 六角色绑定保持，小D和大K派前idle，无running任务；active7但本Codex连接not_bound、派发无跟进句柄/客户端预算未核，默认用户通知347后取件。未改生产配置/服务、未真实登录/模型验收，344/2990原失败未收取，不自动重派；本地文档记录，不绕过此前公开推送自动审批拒绝。
+
 ## 2026-10-27 14:56（Asia/Shanghai）— 新大K启动及开发权限加载
 
 - 用户明确表示新大K启动成功；只读核gen1运行/ready、ins_8785cc656329 idle。当前member默认review，按用户先前“大K开发、Codex复核”明确分工，仅把该member宿主task_profiles设为tools，其余清单值逐项相同。
