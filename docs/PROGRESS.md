@@ -1,8 +1,10 @@
 # Project Progress
 
-Updated: 2026-10-27 11:35（Asia/Shanghai）。用户重建大K并反馈等待宿主；只读核实新角色创建已完成且新宿主serving，待用户独立设备登录与实际启动验收。
+Updated: 2026-10-27 14:56（Asia/Shanghai）。用户确认新大K启动成功；已加载其开发权限并恢复原运行状态，实际开发任务与完整创建流程仍待后续验证。
 
 ## 当前状态
+
+- 用户确认新大K启动成功。核服务最初gen1/ready/idle；按用户既定开发分工，将新member的宿主task_profiles设为tools，其他配置值保持，正常stop原runtime23268并确认原进程退出，重启runtime23792六宿主serving，小D依原true/rev1自动ready；大K因原自启动false在重载后停止，已按用户原运行状态正常启动gen3，实例ins_b3f454d21921 ready/idle，实际宿主命令权限为tools，心跳推进30秒。未改角色启动偏好，未派任务或调用模型；native_login公开状态仍unverified，不能以ready声称实际模型任务已验。
 
 - DeepSeek独立复核345的完整报告结论不通过，提出四项必须修正：provider与当前绑定核对、同名模型公开参数冲突、异常结构受控失败、角色可写权限配置边界。正式结果2991已核验收讫completed；MCP业务结论unknown，收取不等于通过。本人22/27 Python通过，5项受ACL限制未运行；42项Node进程内通过，原node子进程EPERM保留。报告位于`.tmp/kimi-role-onboarding-20261027/review/REPORT.md`。
 - Codex在`.tmp/kimi-role-onboarding-fix1-20261027/candidate/`集中修正四项，最终33 Python及75 Node合成测试通过；一次中间测试因预期错误文案改变失败，调整后通过。新快照474份、排除了先前基线包含的合成测试数据库等，manifest SHA256 `5a7f5cbbb14a5fea5ebcf8e48e76b5ae4cba004676186690a071369e80b45c7b`，相对清理后旧候选只改五文件。原345候选、清单、报告及失败保留。
@@ -17,8 +19,6 @@ Updated: 2026-10-27 11:35（Asia/Shanghai）。用户重建大K并反馈等待�
 
 - 用户按系统Python加venv依赖重启后，runtime23268 running、startup complete、worker无错、六宿主serving；小D原true/rev1自动gen88、ins_35a60b11066b ready/idle、同实例心跳推进60.099秒，其他五角色false/rev0及停止，旧大K停止/无owner。六绑定bound；API健康、HTTP页面与源码字节一致，无running任务；250/2767未收取、286 paused、344/2990未收取保持。active7且本Codex连接not_bound。未真实Kimi设备登录/模型或人工验收。
 
-- 用户新建大K `agent:prj-e8fe7066bbec.k-d4bf0429`，创建请求provisioned/作业succeeded，模型k3.1-pro绑定bound、新宿主serving；角色服务not_started、gen0/无owner、未验证native登录。用户看到等待宿主，服务端已完成，可能页面数据未刷新但未做浏览器复现。页面刷新后应显示配置完成及独立登录说明，用户需在正常PowerShell用系统Python运行setup并完成设备授权，未实际运行登录。新成员默认review，开发tools权限需配置及正常重载后再执行开发；小D原实例idle、后台23268运行，无running任务。
-
 ## 下一步与约束
 
 - 用户明确后续目标：实现从新建角色到可正常启动、关闭的完整闭环；角色保存后完成各环节配置与加载，包含必要授权、所选模型、宿主和启停，状态须如实显示，见[路线图](spec/DEVELOPMENT_ROADMAP.md)。本次登记范围，未开发或验收。
@@ -26,6 +26,6 @@ Updated: 2026-10-27 11:35（Asia/Shanghai）。用户重建大K并反馈等待�
 - 用户反馈新增角色时Kimi Code运行器名称仍包含K2.8等模型名称，不正确；后续核查并修正，见[路线图](spec/DEVELOPMENT_ROADMAP.md)，本次仅登记。
 - 用户反馈删除大K后资源清理失败且重试无效；后续核查新角色是否复用身份档、专属凭据、状态及启动配置，确认专属且不复用后删除时直接清理，并修复清理重试，见[路线图](spec/DEVELOPMENT_ROADMAP.md)。这是用户反馈，尚未独立检查或实施清理。
 - 用户登记后续需求：检查TALK适配的运行器是否有新版本，发现后仅提示用户，不自动下载、安装或更新；具体范围和排期开发前确定，见[路线图](spec/DEVELOPMENT_ROADMAP.md)。当前不开发该功能。
-- 用户已重建大K，下一步在TALK宿主进行独立设备登录；因venv Python低完整性，登录命令须在正常PowerShell用系统Python并设置原venv PYTHONPATH，页面给出的角色ID照用。待用户新建后按新member配置既有开发工具权限，再通过正常开发任务验证；不单独派模型验证。
+- 新大K已由用户确认启动，开发tools权限已配置加载；后续通过正常开发任务验证，不单独派模型验证。项目venv Python仍为低完整性，继续沿系统Python及原venv依赖启动方式。
 - 新角色的工作区开发按用户原授权继续；不自动重派344，不自行启停或清理归属。真实服务加载、模型调用、主动跟进和页面人验均尚无本片通过记录。
 - 历史见[历史](PROGRESS_HISTORY.md)。

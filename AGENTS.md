@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-27 14:56：用户确认新大K启动成功；按既定开发分工仅为新member配置tools，正常停原runtime23268并启动23792，六宿主serving、小D按原偏好自动gen90 ready；大K原自启动false，已恢复至gen3/ins_b3f454d21921 ready/idle，实际宿主确认tools、心跳推进。未改启动偏好、派任务或调用模型；native_login公开unverified，不能把服务ready当任务通过。344不自动重派，完整新建启停闭环仍待开发。详[进度](docs/PROGRESS.md)。
+
 - 2026-10-27 11:35：用户重建大K后反馈等待宿主；新member agent:prj-e8fe7066bbec.k-d4bf0429只读核实创建provisioned/作业succeeded、k3.1-pro绑定bound、宿主serving，角色not_started/gen0/无owner，native登录未验证。可能页面未刷新，未浏览器复现；待用户正常PowerShell系统Python+venv PYTHONPATH执行独立设备登录，随后为新member配置tools并正常加载后按原授权开展开发，不另派模型测试。详[进度](docs/PROGRESS.md)。
 
 - 2026-10-27 11:26：用户系统Python重启后runtime23268运行、六宿主serving，小D原true/rev1自动gen88/ins_35a60b11066b ready/idle、同实例心跳推进60.099秒，其他角色原false/stopped、旧大K无owner；六绑定bound，页面HTTP字节匹配，250/286/344保持。修复已加载，用户可自行删除旧大K并新建，独立登录须正常PowerShell系统Python+venv PYTHONPATH；新成员开发工具需配置，真实登录/模型/人验待验，active7本连接not_bound。详[进度](docs/PROGRESS.md)。
