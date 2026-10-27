@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-27 15:42重开交接：用户要求汇总全部待办并重开窗口；路线图顶部14项及可选/暂缓归并，当前347只读状态running/in_progress但大K实例idle、原因未查/无交付，按用户明确要求停止主动等待，等用户通知后Codex复核，不推断成功或失败。后续70%规则源码已有，统一失效时长/计时起点待定；公共仓库推送此前被自动审批拒绝，未推送不绕过。详[进度](docs/PROGRESS.md)。
+
 - 2026-10-27 15:05：用户明确347新建角色至正常启停完整流程由大K开发、Codex复核，原大K实例已领取running/in_progress；474项隔离基线base de90147445408996df996ff233ff4aec5549bdfa、manifest SHA256 581d8c7535419b52c75ec34dba290580feca0a02cefcc6157ff02f86c4018073，唯一写candidate/delivery、baseline和产品暂停。覆盖保存关闭/刷新、Kimi自动配置与必要授权、真实状态及启停，其他运行器如实报告，包含创建页运行器名称；删除清理/版本提醒后续。active7但连接not_bound且派发无跟进句柄，默认用户通知后取件。详[进度](docs/PROGRESS.md)。
 
 - 2026-10-27 14:56：用户确认新大K启动成功；按既定开发分工仅为新member配置tools，正常停原runtime23268并启动23792，六宿主serving、小D按原偏好自动gen90 ready；大K原自启动false，已恢复至gen3/ins_b3f454d21921 ready/idle，实际宿主确认tools、心跳推进。未改启动偏好、派任务或调用模型；native_login公开unverified，不能把服务ready当任务通过。344不自动重派，完整新建启停闭环仍待开发。详[进度](docs/PROGRESS.md)。
