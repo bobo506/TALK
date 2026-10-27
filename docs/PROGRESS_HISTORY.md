@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-27 09:19（Asia/Shanghai）— 工作区开发派发及大K预检失败
+
+- 用户确认手动Kimi Code已加载TALK MCP，要求大K通过正常开发任务验证；批准工作区登记与加载，由大K开发、Codex复核。页面由用户设置为active/version7，实时当前连接effective not_bound，派发未返回主动跟进，实际工具等待上限/预算未核实。
+- 创建344，身份agent:codex、目标大K，queued/assigned后原实例领取；模型预检自动失败三次，failed/2990未收取。公开错误为受管Kimi环境未配置`kimi-code/k3.1-pro`，并包含原生进程断言；未据此推断凭据状态。未读取私有配置、Key或日志，未改绑定/服务、未重派或收取。
+- 代码605d6c7固定1070份隔离候选、排除config.toml，manifest SHA256 f20cc67b76f3651ad9fc6ca2e8bfc05db82f052a4c5aa1bb300ea2a79f353495。开发未开始，正式产品源码未修改。需按用户私有环境访问边界取得对大K受管配置的必要授权后，最小核实/修复，沿原范围恢复任务；MCP加载确认不代表主动链路或受管模型运行验收通过。
+
 ## 2026-10-26 23:22：手动Kimi MCP以大K身份配置、只读连接通过
 
 2026-10-26 23:22手动Kimi MCP已配置：用户明确选择“大K”，已在C:/Users/Administrator/.kimi-code/mcp.json添加talk，仅引用大K现有仓库外Key文件，不复制密钥正文、不改原生模型配置。工具上限toolTimeoutMs=660000/启动30000毫秒，显式client=660/wait=300/total=1800/return_margin=15秒，固定D盘工作区和原项目。首配置附加--project被现有launcher的参数缩写识别为--project-root，导致工作区误指项目ID而退出；只改配置为TALK_PROJECT_ID环境变量传项目，不改产品，原失败与脱敏诊断保留。修后按实际写入条目的command/args/cwd/env启动，initialize/tools-list/无参数list_agents只读链路通过、tools_mcp3.0.0/10工具含followup及delivery、服务端身份确认为大K/原项目，EOF正常exit0。当前仍passive/version6/effective not_bound；未调用模型/派任务/改模式或生产启停。真实Kimi已打开会话尚未重载，须新会话检查/mcp；本次连接检查不冒充原生客户端等待/取消/排队或主被动整链人工验收。用户此前仅表示将验收，尚未确认通过；里程碑仍待人验，后续首开发交大K。证据D:/claude-test/TALK/.tmp/kimi-code-mcp-setup-20261026/。本轮汇总同步四文档，仅本地Git记录、不单独推送。

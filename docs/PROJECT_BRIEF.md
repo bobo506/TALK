@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-27 09:19：用户确认手动Kimi Code已加载TALK MCP，批准工作区登记与加载由大K开发、Codex复核；大K在正常任务中验证。页面active/version7，但当前Codex连接effective not_bound、344未自动登记主动跟进且实际等待预算未核。344被大K领取后模型预检3次失败：受管隔离环境未配置`kimi-code/k3.1-pro`；failed/2990未收取，开发未开始。未读私有配置/Key/日志或重派；先取得必要的指定配置访问授权再核实修复，详[进度](PROGRESS.md)。
+
 2026-10-26 23:22手动Kimi MCP已配置：用户明确选择“大K”，已在C:/Users/Administrator/.kimi-code/mcp.json添加talk，仅引用大K现有仓库外Key文件，不复制密钥正文、不改原生模型配置。工具上限toolTimeoutMs=660000/启动30000毫秒，显式client=660/wait=300/total=1800/return_margin=15秒，固定D盘工作区和原项目。首配置附加--project被现有launcher的参数缩写识别为--project-root，导致工作区误指项目ID而退出；只改配置为TALK_PROJECT_ID环境变量传项目，不改产品，原失败与脱敏诊断保留。修后按实际写入条目的command/args/cwd/env启动，initialize/tools-list/无参数list_agents只读链路通过、tools_mcp3.0.0/10工具含followup及delivery、服务端身份确认为大K/原项目，EOF正常exit0。当前仍passive/version6/effective not_bound；未调用模型/派任务/改模式或生产启停。真实Kimi已打开会话尚未重载，须新会话检查/mcp；本次连接检查不冒充原生客户端等待/取消/排队或主被动整链人工验收。用户此前仅表示将验收，尚未确认通过；里程碑仍待人验，后续首开发交大K。证据D:/claude-test/TALK/.tmp/kimi-code-mcp-setup-20261026/。本轮汇总同步四文档，仅本地Git记录、不单独推送。
 
 2026-10-26 22:54进度汇总及手动MCP准备：已复核代码已随d994293集成并推送，主被动跟进及Kimi新角色宿主已完成开发、独立复核与正常加载；用户表示准备验收，尚未明确验收通过。最新MCP只读实核caller=agent:codex/项目prj_e8fe7066bbec，六binding均bound/指纹保持、无running任务，小D原ins_8b6f2d624400及大K原ins_6ea3a5aecdd7仍idle且心跳推进；模式仍passive/version6/effective not_bound。22:35公开运行快照runtime19744/六宿主serving/startup complete/shutdown idle/worker无错，保护250failed/2767未收取、286paused及原用户自启动选择保持。用户追加要求为手动Kimi Code配置TALK MCP；官方用户级mcp.json及项目覆盖位置已核对，两处原均不存在，待用户选择该手动入口使用大K或小K身份后再引用对应仓库外Key写入，不复制密钥正文或读取无关原生配置/会话/日志。拟配置工具660秒、单轮300秒、总跟进1800秒、返回余量15秒；目前只是方案，尚未写入或宣称当前Kimi会话适配通过。本轮无产品/测试改动、任务派发/收取、生产启停、模式/绑定/偏好写入；只读连接检查不调用模型。本里程碑待新会话加载MCP及主被动实际流程/页面人验，后续首正式开发交大K，不自动开无关片。纯汇总仅本地Git记录，不单独推送。
