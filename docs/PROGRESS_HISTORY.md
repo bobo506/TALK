@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-27 09:49（Asia/Shanghai）— Kimi新角色独立登录修复派审
+
+- 用户明确先修复新建Kimi角色的运行环境问题，修复后自己删除大K并重新创建验证；Codex在隔离候选实现，未操作真实角色、真实登录或生产服务。
+- 页面新建Kimi不自动启动，并在角色配置进度/详情给出受限的本机登录命令；工具按项目/角色及当前绑定定位隔离HOME，通过用户操作官方设备授权，不复制原有登录；必要时仅复制所选模型白名单公开字段，核对provider/alias/model，保护原配置、使用锁和私有原子发布。用户在终端明确选择是否启用该角色开发工具；已有宿主明确配置优先。Kimi宿主启动前校验模型配置、锁和当前选择，缺失或冲突失败，不冒充模型实测。
+- 最终27 Python、74 Node及语法检查通过；其中账号/登录均为合成，不冒充真人/模型/浏览器验证。候选1072文件manifest SHA256 239d609f392b4cf147c43db51b3dad7f2d96a2235acf2e06fff6a919d4c759b5，基础6cdbb80，排除config.toml。中间测试1F因测试桩复用可变argv，调整后通过；原失败保留于会话。
+- 345交DeepSeek独立复核，派时queued/assigned、09:50只读确认已领取running/in_progress；唯一写`.tmp/kimi-role-onboarding-20261027/review/`，候选与正式产品暂停修改。页面active/version7，但当前连接effective not_bound、派发无跟进句柄且实际客户端等待预算未核；不能声称主动跟进已生效。344/2990 failed未收取，250/286和原角色保护不操作。正常加载与用户重建验收尚未执行。
+
 ## 2026-10-27 09:22（Asia/Shanghai）— 大K受管模型配置原因只读核验
 
 - 用户授权检查并要求说明原因，本次无修复授权。仅核对指定模型公开字段与目标路径元数据：手动用户config.toml含`kimi-code/k3.1-pro`（model `k3.1-pro`、provider `managed:kimi-code`）；大K受管角色HOME及其`.kimi-code`目录存在，但其中config.toml不存在。

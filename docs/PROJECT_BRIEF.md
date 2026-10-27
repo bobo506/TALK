@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-27 09:49：用户要求先修复新建Kimi角色独立登录/模型配置，修复后自行删除大K并新建验收。Codex隔离候选27 Python/74 Node自检，345交DeepSeek独立复核，09:50已领取running/in_progress；1072项清单SHA256 239d609f392b4cf147c43db51b3dad7f2d96a2235acf2e06fff6a919d4c759b5。候选及产品暂停，未生产加载/真实登录；当前active7但连接not_bound、无自动跟进句柄，实际等待预算未核。344原失败保留，详[进度](PROGRESS.md)。
+
 2026-10-27 09:22：依用户仅检查授权核实，手动Kimi配置含k3.1-pro/managed:kimi-code；大K受管隔离KIMI_CODE_HOME存在但config.toml不存在，宿主显式使用该隔离HOME，解释344模型预检失败。未读Key/日志、未改配置或重派；登录/凭据与原生断言原因未知，修复需另获授权。详[进度](PROGRESS.md)。
 
 2026-10-27 09:19：用户确认手动Kimi Code已加载TALK MCP，批准工作区登记与加载由大K开发、Codex复核；大K在正常任务中验证。页面active/version7，但当前Codex连接effective not_bound、344未自动登记主动跟进且实际等待预算未核。344被大K领取后模型预检3次失败：受管隔离环境未配置`kimi-code/k3.1-pro`；failed/2990未收取，开发未开始。未读私有配置/Key/日志或重派；先取得必要的指定配置访问授权再核实修复，详[进度](PROGRESS.md)。
