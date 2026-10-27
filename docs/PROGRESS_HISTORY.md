@@ -1,5 +1,10 @@
 # 开发历史 · TALK
 
+## 2026-10-27 09:22（Asia/Shanghai）— 大K受管模型配置原因只读核验
+
+- 用户授权检查并要求说明原因，本次无修复授权。仅核对指定模型公开字段与目标路径元数据：手动用户config.toml含`kimi-code/k3.1-pro`（model `k3.1-pro`、provider `managed:kimi-code`）；大K受管角色HOME及其`.kimi-code`目录存在，但其中config.toml不存在。
+- `scripts/kimi_role_host.py`按角色将KIMI_CODE_HOME指向隔离目录，因此此前仅追加到手动用户配置的模型不会自动出现在受管角色配置中；这与344预检报告吻合。原生断言及登录/凭据状态未作根因推断。未读Key、日志或其他会话资料，未修改配置、启停服务、重派或收取344；当前连接主动跟进状态不变。
+
 ## 2026-10-27 09:19（Asia/Shanghai）— 工作区开发派发及大K预检失败
 
 - 用户确认手动Kimi Code已加载TALK MCP，要求大K通过正常开发任务验证；批准工作区登记与加载，由大K开发、Codex复核。页面由用户设置为active/version7，实时当前连接effective not_bound，派发未返回主动跟进，实际工具等待上限/预算未核实。

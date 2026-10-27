@@ -2,6 +2,8 @@
 
 > 本文件是所有参与开发的 agent 的**必读公共上下文**。
 
+2026-10-27 09:22：依用户仅检查授权核实，手动Kimi配置含k3.1-pro/managed:kimi-code；大K受管隔离KIMI_CODE_HOME存在但config.toml不存在，宿主显式使用该隔离HOME，解释344模型预检失败。未读Key/日志、未改配置或重派；登录/凭据与原生断言原因未知，修复需另获授权。详[进度](PROGRESS.md)。
+
 2026-10-27 09:19：用户确认手动Kimi Code已加载TALK MCP，批准工作区登记与加载由大K开发、Codex复核；大K在正常任务中验证。页面active/version7，但当前Codex连接effective not_bound、344未自动登记主动跟进且实际等待预算未核。344被大K领取后模型预检3次失败：受管隔离环境未配置`kimi-code/k3.1-pro`；failed/2990未收取，开发未开始。未读私有配置/Key/日志或重派；先取得必要的指定配置访问授权再核实修复，详[进度](PROGRESS.md)。
 
 2026-10-26 23:22手动Kimi MCP已配置：用户明确选择“大K”，已在C:/Users/Administrator/.kimi-code/mcp.json添加talk，仅引用大K现有仓库外Key文件，不复制密钥正文、不改原生模型配置。工具上限toolTimeoutMs=660000/启动30000毫秒，显式client=660/wait=300/total=1800/return_margin=15秒，固定D盘工作区和原项目。首配置附加--project被现有launcher的参数缩写识别为--project-root，导致工作区误指项目ID而退出；只改配置为TALK_PROJECT_ID环境变量传项目，不改产品，原失败与脱敏诊断保留。修后按实际写入条目的command/args/cwd/env启动，initialize/tools-list/无参数list_agents只读链路通过、tools_mcp3.0.0/10工具含followup及delivery、服务端身份确认为大K/原项目，EOF正常exit0。当前仍passive/version6/effective not_bound；未调用模型/派任务/改模式或生产启停。真实Kimi已打开会话尚未重载，须新会话检查/mcp；本次连接检查不冒充原生客户端等待/取消/排队或主被动整链人工验收。用户此前仅表示将验收，尚未确认通过；里程碑仍待人验，后续首开发交大K。证据D:/claude-test/TALK/.tmp/kimi-code-mcp-setup-20261026/。本轮汇总同步四文档，仅本地Git记录、不单独推送。
