@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import sys
 import time
+import tomllib
 
 from scripts import role_service_host as rsh
 
@@ -105,13 +106,77 @@ class KimiRoleHost(rsh.HostManager):
             if action.get('project_id') == self.project and action.get('member_id') == self.member
             and (not self.drain_requested or action.get('action') == 'stop')]
 
+    def _current_binding(self, project_id, member_id, alias):
+        response = self.client.request('GET', '/api/projects/' + rsh.urllib.parse.quote(project_id, safe='') + '/agents')
+        rows = response.get('data') if isinstance(response, dict) else response
+        if not isinstance(rows, list):
+            raise rsh.HostError('binding_fingerprint_mismatch', '无法核实角色模型绑定')
+        matches = [item for item in rows if isinstance(item, dict) and item.get('member_id') == member_id]
+        if len(matches) != 1 or matches[0].get('binding_state') != 'bound':
+            raise rsh.HostError('binding_fingerprint_mismatch', '角色模型绑定不可用')
+        binding = matches[0].get('binding')
+        if (not isinstance(binding, dict) or binding.get('model_alias') != alias
+                or binding.get('runtime') != 'kimi-code'
+                or not isinstance(binding.get('provider_id'), str) or not binding['provider_id']
+                or not isinstance(binding.get('model_id'), str) or not binding['model_id']):
+            raise rsh.HostError('binding_fingerprint_mismatch', '角色模型绑定不完整或已改变')
+        return binding
+
     def build_entry_argv(self, runtime, model_alias):
         if runtime != 'kimi-code':
             raise rsh.HostError('kimi_runtime_only', '本宿主只服务当前Kimi角色')
+        home = self.store.native_home_dir(self.project, self.member)
+        if rsh.lock_path_for(home / 'kimi-role-setup').exists():
+            raise rsh.HostError('kimi_setup_in_progress', '请等待角色原生登录完成')
+        binding = self._current_binding(self.project, self.member, model_alias)
+        try:
+            config = rsh.assert_inside_root(home, Path('.kimi-code') / 'config.toml')
+            if rsh._is_reparse_point(config) or not config.is_file() or config.stat().st_size > 2 * 1024 * 1024:
+                raise ValueError('invalid Kimi configuration')
+            with config.open('rb') as stream:
+                native = tomllib.load(stream)
+            model = native.get('models', {}).get(model_alias)
+            if not isinstance(model, dict) or not isinstance(model.get('provider'), str):
+                raise ValueError('selected Kimi model unavailable')
+            native_model = model.get('model') or model.get('name')
+            if not isinstance(native_model, str) or not native_model:
+                raise ValueError('selected Kimi model unavailable')
+            if native_model != binding['model_id'] or model['provider'] != binding['provider_id']:
+                raise ValueError('selected Kimi model or provider mismatch')
+            if model['provider'] not in native.get('providers', {}):
+                raise ValueError('Kimi provider unavailable')
+        except (OSError, ValueError, TypeError, AttributeError):
+            raise rsh.HostError('kimi_role_setup_required', '请先在本机完成该角色的Kimi登录和模型配置') from None
         argv, template, timeout = super().build_entry_argv(runtime, model_alias)
         argv += ['--display-name', self.display_name, '--workdir', str(self.project_root.resolve()),
             '--kimi-task-profile', self.task_profile]
         return argv, template, timeout
+
+    def preflight(self, command, member_id, *, project_id, action='start', diagnostics=None):
+        facts = super().preflight(command, member_id, project_id=project_id, action=action, diagnostics=diagnostics)
+        roles = self.client.request('GET', '/api/projects/' + rsh.urllib.parse.quote(project_id, safe='') + '/roles')
+        roles = roles if isinstance(roles, list) else roles.get('data') if isinstance(roles, dict) else None
+        role = next((item for item in roles or [] if isinstance(item, dict) and item.get('member_id') == member_id), None)
+        selected = (role or {}).get('model') or {}
+        alias = command.get('model_alias')
+        if (not role or not isinstance(selected, dict) or role.get('archived') or role.get('binding_state') != 'bound'
+                or selected.get('model_alias') != alias or not isinstance(selected.get('model_id'), str)
+                or not selected['model_id']):
+            raise rsh.HostError('binding_fingerprint_mismatch', '角色模型选择已改变，请重新启动')
+        binding = self._current_binding(project_id, member_id, alias)
+        if binding['model_id'] != selected['model_id']:
+            raise rsh.HostError('binding_fingerprint_mismatch', '角色模型绑定已改变，请重新启动')
+        try:
+            home = self.store.native_home_dir(project_id, member_id)
+            config = rsh.assert_inside_root(home, Path('.kimi-code') / 'config.toml')
+            with config.open('rb') as stream:
+                model = tomllib.load(stream).get('models', {}).get(alias)
+            if (not isinstance(model, dict) or (model.get('model') or model.get('name')) != selected['model_id']
+                    or model.get('provider') != binding['provider_id']):
+                raise ValueError('selected model mismatch')
+        except (OSError, ValueError, TypeError, AttributeError):
+            raise rsh.HostError('kimi_role_setup_required', '角色本机模型与所选模型不一致，请重新配置') from None
+        return facts
 
     def child_environment(self, project_id, member_id):
         if (project_id, member_id) != (self.project, self.member):

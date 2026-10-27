@@ -36,7 +36,7 @@ class NewKimiRoleHostTests(unittest.TestCase):
         self.role = {'project_id': 'p', 'member_id': 'agent:new', 'role_name': 'new Kimi',
             'archived': False, 'binding_state': 'bound',
             'runner': {'runtime': 'kimi-code', 'status': 'unverified'},
-            'model': {'choice_id': 'rmc_new', 'model_alias': 'kimi-code/k3.1-pro'},
+            'model': {'choice_id': 'rmc_new', 'model_alias': 'kimi-code/k3.1-pro', 'model_id': 'k3.1-pro'},
             'service': {'generation': 1, 'ownership_held': False, 'control_kind': 'managed_cli'}}
         self.client = Client()
         self.client.identity = {'id': 'agent:new', 'kind': 'agent', 'display_name': 'new Kimi'}

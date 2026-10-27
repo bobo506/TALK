@@ -144,6 +144,16 @@ function createRoleRequestUI(deps) {
     }, row.auto_start_status, "自动启动结果尚未确认，请刷新核对。" );
     return { text: lookup(reasons, row.auto_start_error_code, fallback), attention: true };
   }
+  function kimiSetup(role) {
+    if (!human() || role?.archived || role?.runner?.runtime !== "kimi-code") return null;
+    const project = context().projectId, member = role.member_id;
+    const safe = value => typeof value === "string" && /^[A-Za-z0-9:._-]{1,128}$/.test(value);
+    const box = node("div", "role-reset-control");
+    box.append(node("p", "role-reset-hint", "Kimi角色使用独立登录。首次使用或需要重新登录时，请先关闭该角色，在运行TALK的电脑中打开项目终端并运行以下命令；完成官方Kimi授权后返回这里启动角色。开发工具权限由宿主配置管理："));
+    if (safe(project) && safe(member)) box.append(node("code", "", `python -m scripts.kimi_role_setup --project ${project} --member ${member}`));
+    else box.append(node("p", "role-reset-hint", "角色标识无法安全生成配置命令，请联系管理员。"));
+    return box;
+  }
   function canRecover(row) {
     return human() && safeInt(row.revision) && Boolean(row.member_id)
       && (row.status === "provisioned" || (row.status === "failed" && row.last_error_code === "manual_recovery_required"))
@@ -161,6 +171,8 @@ function createRoleRequestUI(deps) {
     box.append(node("strong", "", row.role_name || "角色配置"), node("p", "role-request-status", label(row)));
     const autoStart = autoStartFeedback(row);
     if (autoStart) box.append(node("p", "role-request-status", autoStart.text));
+    const setup = kimiSetup(state.roles.find(role => role.member_id === row.member_id));
+    if (setup && row.status === "provisioned") box.append(setup);
     if (row.provision_job) {
       const steps = node("ul", "role-request-steps");
       for (const [step, title] of [["profile", "身份档案"], ["key_file", "本机接入配置"], ["preflight", "配置检查"]]) {
@@ -298,6 +310,7 @@ function createRoleRequestUI(deps) {
       state.host = { enabled: host.enabled, host_label: host.host_label, config_version: host.config_version };
       state.rows = requests.rows; state.limited = requests.limited;
       state.roles = roles.map(r => ({ member_id: r.member_id, role_name: r.role_name, archived: r.archived,
+        runner: { runtime: r.runner?.runtime },
         service: r.service && typeof r.service === "object" ? {
           observed: r.service.observed, readiness_service: r.service.readiness_service,
         } : null }));
@@ -427,9 +440,10 @@ function createRoleRequestUI(deps) {
         || !state.choices.some(c => c.choice_id === choice && c.runner_id === runner)) { state.notice = "请选择运行器和模型，并填写 1–64 字的名称、最多 2000 字的介绍。"; render(); return; }
       let key; try { key = deps.newKey(); } catch (_) { state.notice = "无法生成请求标识，请重新加载页面后再试。"; render(); return; }
       const selectedModel = state.choices.find(c => c.choice_id === choice);
+      const isKimi = state.runners.find(r => r.runner_id === runner)?.runtime === "kimi-code";
       state.attempt = { key, labels: { runner: state.runners.find(r => r.runner_id === runner)?.display_name || "已选运行器",
         model: selectedModel.model_display_name || selectedModel.model_alias || selectedModel.model_id || "已选模型" },
-        payload: { request_key: key, kind: "create", confirm: true, auto_start: true,
+        payload: { request_key: key, kind: "create", confirm: true, auto_start: !isKimi,
         role_name: name, role_description: description, runner_id: runner, choice_id: choice } }; keepAttempt();
     }
     const attempt = state.attempt; state.busy = true; state.notice = ""; render();
@@ -440,7 +454,7 @@ function createRoleRequestUI(deps) {
       upsert(row); state.modalRow = publicRow(row); state.attempt = null; keepAttempt();
       state.notice = row.auto_start === true ? "请求已保存，配置完成后将尝试自动启动服务。"
         : attempt.payload.auto_start === true ? "请求已保存，当前服务未确认自动启动意图；配置完成后请核对角色开关。"
-        : "原请求已保存，宿主会继续配置；本次未请求自动启动。";
+        : "原请求已保存，宿主会继续配置；请查看角色详情并手动启动。";
       await refresh();
     } catch (err) {
       if (!current(epoch)) return;
@@ -505,6 +519,8 @@ function createRoleRequestUI(deps) {
     const row = state.rows.find(r => r.member_id === role.member_id);
     if (!row) return null;
     const panel = node("section", "role-maintenance");
+    const setup = kimiSetup(state.roles.find(item => item.member_id === role.member_id));
+    if (setup && row.status === "provisioned") panel.append(setup);
     if (row.status !== "provisioned") {
       panel.append(node("p", row.status === "failed" ? "role-request-error" : "role-request-status", label(row)));
       if (row.status === "failed") panel.append(node("p", "role-request-error", lookup(codes, row.last_error_code, "本机配置未完成，请检查环境后继续。")));

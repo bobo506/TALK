@@ -49,6 +49,38 @@ test('选择真实目录并提交单一人类意图，未知凭据字段不进�
   assert.equal(h.el('role-create-submit').disabled,true);
   assert.doesNotMatch(JSON.stringify(h.ui.state),/SECRET|TOKEN/);assert.doesNotMatch([...h.storage.values()].join(''),/SECRET|TOKEN/);
 });
+
+test('新建Kimi角色先等待独立登录，不自动启动未配置的运行器',async()=>{
+  const h=harness({handler:c=>{
+    if(c.path==='/api/runners')return response([{runner_id:'r',runtime:'kimi-code',display_name:'Kimi',adapter_status:'adapted',control_kind:'managed_cli'}]);
+    if(c.path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'K3.1'}]);
+  }});
+  await h.ready();await h.fill();await h.ui.submit();
+  assert.equal(h.requests.find(r=>r.method==='POST').body.auto_start,false);
+  assert.match(h.el('role-create-notice').textContent,/手动启动/);
+});
+
+test('已创建Kimi角色展示受限本机登录指引，禁止拼接不安全标识',async()=>{
+  const h=harness();
+  h.backend.roles=[{member_id:'agent:new',role_name:'K',runner:{runtime:'kimi-code'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-0000000000000000000000000001',kind:'create',status:'provisioned',revision:3,credential_version:1,member_id:'agent:new'}];
+  await h.ready();
+  let panel=h.ui.rolePanel({member_id:'agent:new'});
+  assert.match(h.texts(panel),/python -m scripts\.kimi_role_setup --project p --member agent:new/);
+  h.ctx.projectId='p;danger';
+  panel=h.ui.rolePanel({member_id:'agent:new'});
+  assert.doesNotMatch(h.texts(panel),/python -m/);
+  assert.match(h.texts(panel),/无法安全生成/);
+});
+
+test('已归档Kimi角色不展示登录配置命令',async()=>{
+  const h=harness();
+  h.backend.roles=[{member_id:'agent:new',role_name:'K',archived:true,runner:{runtime:'kimi-code'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-0000000000000000000000000001',kind:'create',status:'provisioned',revision:3,credential_version:1,member_id:'agent:new'}];
+  await h.ready();
+  const panel=h.ui.rolePanel({member_id:'agent:new'});
+  assert.doesNotMatch(h.texts(panel),/kimi_role_setup/);
+});
 test('保存处理中重复点击不会创建第二个请求',async()=>{
   const d=deferred();const h=harness({handler:c=>c.method==='POST'?d.promise:undefined});await h.ready();await h.fill();
   const pending=h.ui.submit();await h.ui.submit();assert.equal(h.requests.filter(r=>r.method==='POST').length,1);

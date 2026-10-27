@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-27 11:02（Asia/Shanghai）— 346收取与加载后宿主恢复异常
+
+- 346/2992完整报告核验并收讫completed：DeepSeek条件通过、无新增必须修正；本人30/33 Python，3项ACL not_run，75 Node进程内通过、标准runner EPERM。Codex在相同474项快照补跑3项全过，区别于本人证据；原报告和MCP业务unknown保留。快照事后474/474、零extras，报告SHA a9e3892b7be9458cd23bc0c3b32cf443d11bb1c39bacebf546965239d61e708a。
+- 七文件前后SHA核验后集成，页面HTTP字节与源码一致；计划和补丁在`.tmp/kimi-role-onboarding-fix1-20261027/`，patch SHA d1346f7d94ae0c8e0b9c960d346b23bf69589c98ba8eb9e0252d6be0bf82e4ef，apply-check通过。未真实设备登录/模型/人工验收。
+- 用户授权修复后执行正常加载：原runtime19744 stop --wait 90秒timeout/draining_hosts，随后后台自行complete、原进程及已查宿主入口absent，未强杀或重复stop。原attach-api/detach重启runtime19376；running/startup complete/worker无错，但小D、Codex、原Kimi、Kimi k2.8四宿主manager_failed各三次，大K与WorkBuddy宿主serving，小D原实例offline。原因未知，输出文件写入打开权限均通过，不代表Popen成功；未读取日志正文。页面虽加载，服务恢复不完整，当前禁止将修复称验收通过或请用户删除大K。
+- 后续需经用户许可仅检查本次后台脱敏启动错误结构来定位并恢复，不读原生会话/Key/完整日志；原生API由用户终端管理，不强杀/清锁/另启后台。active7连接not_bound；344/2990、250/286及原角色保护。
+
 ## 2026-10-27 — 登记运行器版本更新提示
 
 - 用户要求后续检查TALK适配运行器是否有新版本，并在可更新时提示；仅提示，不自动更新。已加入路线图，具体范围和排期后续确定。本次无开发或任务派发，346复核及Kimi角色修复顺序保持。

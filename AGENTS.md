@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-27 11:02：346/2992条件通过、核验收取；本人30 Python/75 Node，3项ACL未跑由Codex在同一快照补跑通过，不冒称本人。七文件已集成/HTTP页面匹配；正常停机90秒超时后原runtime19744自行complete且absent，新runtime19376启动后四宿主manager_failed各3次（小D离线），仅大K和WorkBuddy宿主serving。原因未知，未读取日志正文；暂停用户删除大K，先获许可仅检查本次脱敏后台启动错误结构并恢复，不强杀/重复启动。详[进度](docs/PROGRESS.md)。
+
 - 2026-10-27 10:22：345报告四项必须修正已核验收取但不通过；Codex隔离集中修正33 Python/75 Node合成自检，474份清洁快照SHA256清单5a7f5cbbb14a5fea5ebcf8e48e76b5ae4cba004676186690a071369e80b45c7b，346交DeepSeek定向复验queued/assigned，源和新旧快照暂停。移除新增角色可写权限配置，沿用既有宿主配置默认review；新角色开发工具需按新成员配置。未生产加载/真实登录，用户待修复加载后自行重建。页面active7而Codex连接not_bound，无跟进句柄、等待预算未核；344失败与250/286保持。详[进度](docs/PROGRESS.md)。
 
 - 2026-10-27 09:49：用户要求先修复新建Kimi角色独立登录及模型配置，修复后本人删除大K并新建验收。Codex隔离候选27 Python/74 Node自检，345已派DeepSeek独立复核，09:50已领取running/in_progress；1072项清单SHA256 239d609f392b4cf147c43db51b3dad7f2d96a2235acf2e06fff6a919d4c759b5，候选/产品暂停，未生产加载/真实登录。页面active7但当前连接effective not_bound、无自动跟进句柄，实际客户端预算未核；345完成后核验并完成必要修正、正常加载，再请用户重建验收。344原failed/2990未收取，见docs/PROGRESS.md。
