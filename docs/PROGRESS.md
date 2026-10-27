@@ -4,9 +4,12 @@ Updated: 2026-10-27 15:05（Asia/Shanghai）。用户明确派大K开发新建�
 
 ## 当前状态
 
+- 用户指出页面active但Codex未主动：只读核实际Codex TALK配置工具超时660秒，但未配置TALK_FOLLOWUP预算；实测当前连接35秒正常等待及期间并发查询成功。已在项目级`.codex/config.toml`仅新增非秘密预算（client35/wait20/total1800/margin10），`codex mcp get`确认合并保留原身份、命令与660配置；新连接实际加载/完整取消边界尚未验证。
+- 当前连接曾以显式预算对347建立主动跟进，`list_agents`实测effective active/waiting，多轮20秒正常到期；用户随后明确“先暂停，不用继续等待，任务好了我告诉你”，已stop该跟进creator_stopped，不取消347，不再等或轮询，由用户通知后核验。主动页面意向仍为active，停止本连接等待不改项目设置；不将受控stop冒充底层MCP取消验证。
+
 - 347「完善新建角色到正常启停的完整流程」按用户明确分工交新大K开发、Codex独立复核；派时queued/assigned，随后只读核到running/in_progress、原ins_b3f454d21921领取。首正式开发任务，不另派模型测试；不因领取就认定模型任务成功。
 - 347隔离根`.tmp/role-creation-complete-20261027/`，474项baseline/candidate源字节一致，base `de90147445408996df996ff233ff4aec5549bdfa`、manifest SHA256 `581d8c7535419b52c75ec34dba290580feca0a02cefcc6157ff02f86c4018073`，排除config/Key/DB及临时产物。大K仅修改candidate和delivery，baseline及正式产品暂停；要求保存关闭/刷新、自动配置与必要授权引导、模型及宿主、正常启停和可靠状态，优先打通Kimi并核实其他运行器，不能虚称支持；运行器名称修正含本片，删除清理及版本提醒仍后续。
-- 派发未返回主动跟进句柄，当前连接仍not_bound、等待预算未核；按用户通知后取件并由Codex核验，不用轮询冒充主动跟进。未生产加载或改生产服务/配置，344/2990仍失败未收取。
+- 347派发时无主动跟进句柄；后已补建当前连接的主动跟进并经用户要求停止，改由用户通知后取件并由Codex核验。未改生产服务/角色配置，344/2990仍失败未收取。
 
 - 用户确认新大K启动成功。核服务最初gen1/ready/idle；按用户既定开发分工，将新member的宿主task_profiles设为tools，其他配置值保持，正常stop原runtime23268并确认原进程退出，重启runtime23792六宿主serving，小D依原true/rev1自动ready；大K因原自启动false在重载后停止，已按用户原运行状态正常启动gen3，实例ins_b3f454d21921 ready/idle，实际宿主命令权限为tools，心跳推进30秒。未改角色启动偏好，未派任务或调用模型；native_login公开状态仍unverified，不能以ready声称实际模型任务已验。
 

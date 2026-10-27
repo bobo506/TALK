@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-27 — Codex主动跟进核查、启用与用户暂停
+
+- 用户指出页面已主动而Codex仍未绑定。核实际Codex TALK配置tool_timeout_sec=660但MCP环境无TALK_FOLLOWUP预算；当前连接进程对应旧启动，受控只读等待35秒正常到期、期间并发查询约2.6秒返回。按保守client35/wait20/total1800/margin10显式为347建立跟进，list_agents实际effective active/waiting，数轮20秒超时正常返回。
+- 在受信项目`.codex/config.toml`只写四个非秘密跟进预算，未复制或修改现有密钥；`codex mcp get talk`验证配置合并后保留身份/命令/参数/660超时。当前连接是显式start，新配置仅对后续加载连接生效，未验证新进程实际运行或底层MCP取消；实测连接可同时查询不冒称全部取消/排队验证。
+- 用户明确要求暂停等待、任务完成后由其通知；立即调用stop返回creator_stopped，未取消347，不再调用next或轮询，不改变页面active。暂停后续任务仍需用户通知；原受控stop与协议取消分开记录。本轮无产品/生产服务/角色修改。
+
 ## 2026-10-27 15:05（Asia/Shanghai）— 大K开发角色创建完整流程派发
 
 - 用户明确将之前确认的新建角色至正常启停完整流程派大K开发、Codex复核；本次具体分工优先既有默认交叉复核。347创建queued/assigned后只读确认原大K实例领取running/in_progress，不等同真实任务完成或模型能力通过，不额外派模型测试。
