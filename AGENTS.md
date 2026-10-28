@@ -1,492 +1,161 @@
 # TALK — AI 智能体聊天中转平台
 
-家庭局域网内的轻量级 Agent ↔ Agent ↔ 人类 实时聊天与文件交换平台。
+家庭局域网内的轻量级 Agent ↔ Agent ↔ 人类实时聊天、任务协作与文件交换平台。
+
+本文件是每次会话自动加载的规则入口，只保存当前授权、长期协作约束和文档索引。任务流水账、历史分工、测试数量、进程信息及验收证据不在这里重复维护。
 
 ## 开发者指引
 
-1. **先读** `docs/PROJECT_BRIEF.md` — 了解项目全貌、技术栈、数据模型
-2. **再读你负责的模块文档** — 根据你的任务，在 PROJECT_BRIEF 的模块索引中找到对应的 `spec/MODULE_xxx.md`，只读那一份
-3. **不要读其它模块的文档** — 节省 token，保持专注
-4. **不确定时** — 查看 PROJECT_BRIEF 的模块索引表，或询问项目管理者
-5. **适配任一终端或桌面 MCP 时** — 必读 `docs/guides/TERMINAL_MCP.md` 的“终端适配必查：工具超时与等待预算”，核验实际客户端超时、显式单次等待预算、返回余量、取消/排队边界并提供验证证据；不能只确认工具可发现就宣称主动等待适配通过。
-
-## Agent 角色与协作约束
-
-`AGENTS.md` 是本项目 Agent 角色与协作边界的权威来源。项目管理者于2026-10-10更正并确认：取消角色固定的“决策/执行”分级，保留任务发起者的主动/被动模式。协调责任由具体任务发起者确定；开发、独立复核和收尾职责由项目开发要求、本次明确授权及任务包确定，同一角色可在不同任务承担不同职责。
-
-**实施边界**：2026-10-11 R1-1/R1-2代码已独立复核并发布（`96d63ce`），用户随后确认三项页面基础验收通过。旧`decision_tier`列/接口/参数兼容保留，已停用服务端权限判定、bridge分级注入、扫描/启动分级校验及页面固定分级；原人工身份档/生产配置/历史任务不追改。当前每任务分工、独立权限与发起者主动/被动保持。2026-10-12 R1-3受管服务生命周期及页面反馈补正已独立复核并发布（服务`35886b3`、页面最终`34e9df4`），用户明确本轮页面基础“验收通过”。下一片R1-4完整创建/配置页面、外部桌面引导、删除/归档与退出清理；真实配置/登录/模型/原生服务仍待验，不能直接删除旧生产配置或声称实际运行器能力通过。
-
-每次会话先核对实际身份（`member_id / 项目 / 业务角色`）和本次任务授权；有bridge注入时读取其身份事实，无注入时读取下方当前会话职责。保留独立复核、一次一片、共享目录暂停后审查、人工验收与进度/Git收尾约束，取消分级不扩大权限或任务范围。
-
-## 当前 Agent 角色
-
-- 2026-10-28验收/交接完成：用户仅授权348验收和进度汇总，随后重新指定决策及其它角色。**348本次验收不通过**：独立401 Python/120 Node通过，但新增3项凭据/准备边界有2项失败（TALK身份变量可被误作提供商Key目标、命令模板可带明文Key进入argv）。489项复核源清单SHA256 `99ee2abed274e4c53e3b3c49a1d2fb1ecee9ec8fbca4b82c20ec3fad6e76cece`，原基线/候选/交付及前序冻结无漂移；2994仍submitted未收取。**本轮未派发任何任务、未修改产品/原候选、未集成或生产启停。**DeepSeek复核、返修、WorkBuddy及后续开发均不自动派发；不恢复主动等待，不代指定接任者。用户重新指定/授权前停在本交接点，覆盖此前自动接续安排；接口仍回显agent:codex/lead不构成继续决策授权。详[交接总览](docs/HANDOFF_20261028.md)、[348验收](docs/spec/DSH_NEW_ROLE_REVIEW_348_20261028.md)、[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 21:44：用户最新明确后续分工为大K开发、DeepSeek独立复核、Codex拆包/分配/核验；覆盖后续功能及必要返修，Codex不再直接代写后续产品改动。按可独立验证的完整流程拆包，不整模块委派、不按单字段碎拆；每次只派一个依赖闭环，交付冻结后复核、必要返修集中处理，再开下一包。348「DSH新角色：共享连接准备与受管启停（开发）」已派大K并于21:41:26领取，最后running/in_progress；484项隔离基线manifest SHA256 `2f550a65a06fe3735b0f0bd84e02246340063356fc388951dc898b877f572519`无漂移，仅写本包candidate/delivery，约45分钟开发进度检查点。WorkBuddy随后，删除/版本等不混入；DeepSeek复核待本包交付冻结后派。force_new只是请求、原生状态null；自动跟进已按原通知后取件偏好creator_stopped，未取消开发或改模式，不主动等待。详[进度](docs/PROGRESS.md)及[任务包](docs/spec/DSH_NEW_ROLE_TASK_PACKAGE_20261027.md)。API开发要求快照仍旧分工，本次人类明确指令优先，不改生产角色字段/配置/偏好。
-
-- 2026-10-27 21:32：用户确认Codex新角色使用官方模型目录返回的默认思考强度；已在`.tmp/role-creation-codex-default-20261027/`新副本落实，每次准备取官方defaultReasoningEffort并校验/落盘，不继承名称或原准备值xhigh；缺失/不支持明确失败，页面提示同规则。4项变化、484项冻结manifest SHA256 `6e543560e74043ce533efbb1dfc4b8c4d73635d7176d5479444de22e90415844`，最终333 Python/118 Node全过，父484/核心479/原347及首次复核材料无漂移。Codex块开发/自检完成，后续DSH/WorkBuddy等新角色准备按已授权范围逐块接入，不重复询问相同开工；仍未集成/生产启停/真实登录模型/改偏好/收取347或公开推送。详[进度](docs/PROGRESS.md)及[Codex记录](docs/spec/ROLE_CREATION_CODEX_20261027.md)。
-
-- 2026-10-27 21:05：用户“继续”后Codex在`.tmp/role-creation-codex-20261027/`实现新Codex角色独立设备授权/验证码、所选模型元数据检查、动态宿主与准备门禁；484项冻结manifest SHA256 `1cc1efbf108293d5c25b256504e272eaf9872c43de8474b4a4d84f896697312e`，冻结复跑331 Python/117 Node通过，父479及原347/首次复核无漂移。当前公开模型标注xhigh却无独立规范字段，已询问保留所选强度并明确登记xhigh或使用官方默认；答复前不改依赖部分/不集成，候选现用官方默认缺省不等于最终规则。本块仍待确认，其他运行器继续按已授权范围逐块接入；未生产启停/真实登录模型/改绑定偏好/收取347或公开推送。详[进度](docs/PROGRESS.md)及[Codex候选](docs/spec/ROLE_CREATION_CODEX_20261027.md)。
-
-- 2026-10-27 20:30：347独立复核不通过后，用户确认先停止旧授权进程再启动新流程；统一准备覆盖所有已适配运行器的新角色，旧角色不强制重登；API Key模型连接复用已有连接，仅服务端引用，角色身份和目录隔离。Codex首块核心返修在`.tmp/role-creation-fix1-20261027/`自检298 Python/112 Node，479项冻结manifest SHA256 `3f572a5a8705e1b62b748505bb3908fca81317b788f7edabc5d61f06f8b7f5e2`；原交付/冻结不改，未集成/生产加载/真实登录或模型验证，347/2993未收取。其他运行器逐块接入已授权，不重复询问同范围开工许可，不能复制旧角色秘密或冒称全链完成。详[进度](docs/PROGRESS.md)及[首块返修](docs/spec/ROLE_CREATION_FIX1_20261027.md)。
-
-- 2026-10-27 15:42重开交接：用户要求汇总全部待办并重开窗口；路线图顶部14项及可选/暂缓归并，当前347只读状态running/in_progress但大K实例idle、原因未查/无交付，按用户明确要求停止主动等待，等用户通知后Codex复核，不推断成功或失败。后续70%规则源码已有，统一失效时长/计时起点待定；公共仓库推送此前被自动审批拒绝，未推送不绕过。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 15:05：用户明确347新建角色至正常启停完整流程由大K开发、Codex复核，原大K实例已领取running/in_progress；474项隔离基线base de90147445408996df996ff233ff4aec5549bdfa、manifest SHA256 581d8c7535419b52c75ec34dba290580feca0a02cefcc6157ff02f86c4018073，唯一写candidate/delivery、baseline和产品暂停。覆盖保存关闭/刷新、Kimi自动配置与必要授权、真实状态及启停，其他运行器如实报告，包含创建页运行器名称；删除清理/版本提醒后续。active7但连接not_bound且派发无跟进句柄，默认用户通知后取件。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 14:56：用户确认新大K启动成功；按既定开发分工仅为新member配置tools，正常停原runtime23268并启动23792，六宿主serving、小D按原偏好自动gen90 ready；大K原自启动false，已恢复至gen3/ins_b3f454d21921 ready/idle，实际宿主确认tools、心跳推进。未改启动偏好、派任务或调用模型；native_login公开unverified，不能把服务ready当任务通过。344不自动重派，完整新建启停闭环仍待开发。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 11:35：用户重建大K后反馈等待宿主；新member agent:prj-e8fe7066bbec.k-d4bf0429只读核实创建provisioned/作业succeeded、k3.1-pro绑定bound、宿主serving，角色not_started/gen0/无owner，native登录未验证。可能页面未刷新，未浏览器复现；待用户正常PowerShell系统Python+venv PYTHONPATH执行独立设备登录，随后为新member配置tools并正常加载后按原授权开展开发，不另派模型测试。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 11:26：用户系统Python重启后runtime23268运行、六宿主serving，小D原true/rev1自动gen88/ins_35a60b11066b ready/idle、同实例心跳推进60.099秒，其他角色原false/stopped、旧大K无owner；六绑定bound，页面HTTP字节匹配，250/286/344保持。修复已加载，用户可自行删除旧大K并新建，独立登录须正常PowerShell系统Python+venv PYTHONPATH；新成员开发工具需配置，真实登录/模型/人验待验，active7本连接not_bound。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 11:23：用户再启API仍低完整性；实证项目.venv/python.exe继承Low标签、系统Python高完整性，四旧宿主均用venv exe。依恢复授权在后台停止和启动锁内仅将四宿主argv[0]改为同版本系统Python，其他清单JSON值相同，不改ACL/角色/Key；系统Python可导入venv依赖。待用户在正常Windows终端以系统Python和venv PYTHONPATH重启API后核后台六宿主/小D，暂不删除大K。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 11:18：用户重启API后健康，但后台未自动拉起；脱敏事件确认API启动打开launcher.lock时PermissionError，API PID22288 Windows完整性低RID4096、诊断进程高RID12288。锁ACL未修改且可由诊断进程取得释放；旧runtime940 absent，小D离线。需用户从Windows开始菜单正常终端用原.venv启动API，随后核完整性/后台/六宿主；前一四宿主错误具体差异尚未证明，暂不删除大K。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 11:08：用户授权后定向脱敏检查，四旧宿主启动后私有健康文件CreateFileW错误5；同目录探针成功、权限未放宽，差异原因未明。19376正常停后重启940仍四宿主失败，940现已正常停且absent，原API仍用户终端管理；需用户原终端重启API由既有链恢复，再核六宿主/小D，不提前删除大K。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 11:02：346/2992条件通过、核验收取；本人30 Python/75 Node，3项ACL未跑由Codex在同一快照补跑通过，不冒称本人。七文件已集成/HTTP页面匹配；正常停机90秒超时后原runtime19744自行complete且absent，新runtime19376启动后四宿主manager_failed各3次（小D离线），仅大K和WorkBuddy宿主serving。原因未知，未读取日志正文；暂停用户删除大K，先获许可仅检查本次脱敏后台启动错误结构并恢复，不强杀/重复启动。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 10:22：345报告四项必须修正已核验收取但不通过；Codex隔离集中修正33 Python/75 Node合成自检，474份清洁快照SHA256清单5a7f5cbbb14a5fea5ebcf8e48e76b5ae4cba004676186690a071369e80b45c7b，346交DeepSeek定向复验queued/assigned，源和新旧快照暂停。移除新增角色可写权限配置，沿用既有宿主配置默认review；新角色开发工具需按新成员配置。未生产加载/真实登录，用户待修复加载后自行重建。页面active7而Codex连接not_bound，无跟进句柄、等待预算未核；344失败与250/286保持。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-27 09:49：用户要求先修复新建Kimi角色独立登录及模型配置，修复后本人删除大K并新建验收。Codex隔离候选27 Python/74 Node自检，345已派DeepSeek独立复核，09:50已领取running/in_progress；1072项清单SHA256 239d609f392b4cf147c43db51b3dad7f2d96a2235acf2e06fff6a919d4c759b5，候选/产品暂停，未生产加载/真实登录。页面active7但当前连接effective not_bound、无自动跟进句柄，实际客户端预算未核；345完成后核验并完成必要修正、正常加载，再请用户重建验收。344原failed/2990未收取，见docs/PROGRESS.md。
-
-- 2026-10-27 09:22：用户授权只读检查并要求告知原因；已仅检查指定模型配置和路径元数据：手动Kimi配置含k3.1-pro/managed:kimi-code，大K受管隔离KIMI_CODE_HOME目录存在但config.toml不存在。宿主代码显式选择隔离HOME，故不会读取此前写入手动用户目录的模型表，与344预检失败吻合。登录/凭据状态和原生断言原因未知；未读Key或日志、未改配置/启停/重派。检查授权不等于修复授权；详docs/PROGRESS.md。
-
-- 2026-10-27 09:19：用户确认手动Kimi Code已加载TALK MCP，并批准工作区登记与加载由大K开发、Codex复核；大K通过正常开发任务验证，不另派模型测试。页面已设active/version7，但当前连接effective not_bound、344未自动登记主动跟进，工具等待上限/预算未核。344被大K原实例领取后模型预检3次失败，公开错误为受管环境未配置`kimi-code/k3.1-pro`，failed/2990未收取、开发未开始；受管角色HOME与手动用户HOME不同。未读私有配置/Key/日志或重派；先取得必要的指定配置访问授权，核实修复后再按本片分工恢复。冻结基线与记录见docs/PROGRESS.md。
-
-- 2026-10-26 23:22手动Kimi MCP已配置：用户明确选择“大K”，已在C:/Users/Administrator/.kimi-code/mcp.json添加talk，仅引用大K现有仓库外Key文件，不复制密钥正文、不改原生模型配置。工具上限toolTimeoutMs=660000/启动30000毫秒，显式client=660/wait=300/total=1800/return_margin=15秒，固定D盘工作区和原项目。首配置附加--project被现有launcher的参数缩写识别为--project-root，导致工作区误指项目ID而退出；只改配置为TALK_PROJECT_ID环境变量传项目，不改产品，原失败与脱敏诊断保留。修后按实际写入条目的command/args/cwd/env启动，initialize/tools-list/无参数list_agents只读链路通过、tools_mcp3.0.0/10工具含followup及delivery、服务端身份确认为大K/原项目，EOF正常exit0。当前仍passive/version6/effective not_bound；未调用模型/派任务/改模式或生产启停。真实Kimi已打开会话尚未重载，须新会话检查/mcp；本次连接检查不冒充原生客户端等待/取消/排队或主被动整链人工验收。用户此前仅表示将验收，尚未确认通过；里程碑仍待人验，后续首开发交大K。证据D:/claude-test/TALK/.tmp/kimi-code-mcp-setup-20261026/。本轮汇总同步四文档，仅本地Git记录、不单独推送。
-
-- 2026-10-26 22:54进度汇总及手动MCP准备：已复核代码已随d994293集成并推送，主被动跟进及Kimi新角色宿主已完成开发、独立复核与正常加载；用户表示准备验收，尚未明确验收通过。最新MCP只读实核caller=agent:codex/项目prj_e8fe7066bbec，六binding均bound/指纹保持、无running任务，小D原ins_8b6f2d624400及大K原ins_6ea3a5aecdd7仍idle且心跳推进；模式仍passive/version6/effective not_bound。22:35公开运行快照runtime19744/六宿主serving/startup complete/shutdown idle/worker无错，保护250failed/2767未收取、286paused及原用户自启动选择保持。用户追加要求为手动Kimi Code配置TALK MCP；官方用户级mcp.json及项目覆盖位置已核对，两处原均不存在，待用户选择该手动入口使用大K或小K身份后再引用对应仓库外Key写入，不复制密钥正文或读取无关原生配置/会话/日志。拟配置工具660秒、单轮300秒、总跟进1800秒、返回余量15秒；目前只是方案，尚未写入或宣称当前Kimi会话适配通过。本轮无产品/测试改动、任务派发/收取、生产启停、模式/绑定/偏好写入；只读连接检查不调用模型。本里程碑待新会话加载MCP及主被动实际流程/页面人验，后续首正式开发交大K，不自动开无关片。纯汇总仅本地Git记录，不单独推送。
-
-- 2026-10-26 21:58实际加载：用户明确授权本次正常加载并启动大K，且确认原API已重启。旧runtime18784首stop --wait为blocked/runtime_host_stop_timeout，原后台自身普通重试于UTC13:39:52完成、错误清空，停前12个原入口全absent、全角色无owner后才集成15固定SHA文件；原失败回执保留，无第二次stop/强杀/CAS/清锁。仅原私有清单追加kimi.enabled=true及大K逐成员tools，其它字段内存比较相同、不复制凭据。新API路由均在、自动runtime19744/UTC13:48:44/六宿主serving、startup complete/shutdown idle/worker无错；未另起API或手动起第二后台。小D原true/rev1自动gen84/ins_8b6f2d624400/PID12392 ready/idle，大K仅一次普通start到gen2/ins_6ea3a5aecdd7/PID13912 ready/idle；同实例心跳分别推进330.686/330.504秒，其余四false/rev0仍停止，大K自启动false/rev0保持。六角色绑定/配置/用户偏好及250failed/2767未收取/286paused选定公开状态与加载前相同，模式passive6，真实HTTP role-creation.js与源SHA一致。原gen1未领取超时事实、新旧冻结和339至343归档保留；未另派K3.1验证、不称实际模型/当前宿主T-W/I-4/真人验收通过。当前正常加载自检完成，页面人验待用户刷新，后续首正式开发按约定交新角色，不自动开无关片。
-
-- 2026-10-26 21:26取件：343/2989完整报告已核验收讫completed，MF-1/MF-2独立定向通过、无新增必须修正；本人243/0F/0E，6stdio仍CreatePipe受限not_run（6E），协调244含6过不冒充本人。正式new_force_new/count1/末24.4864%，原13份70248字节普通材料归档；原339 partial及过程偏差保持。15文件合并加载补丁apply-check过但未应用，274路径计划内容相同（164处仅LF/CRLF、原raw比较失败保留），只拟复制15个固定SHA公开文件。21:21只读预检runtime18784/五宿主serving、无running任务，API未加载followup新路由，外部API需用户原终端正常重启；大K原bound/choice/gen1未领取到期/无owner/can_start保持。具体加载方案已备，拟先普通stop --wait再集成/启用kimi及大K tools，用户重启API后核自动后台/小D恢复并普通start大K；此前用户授权只取件先不重启，现待本次明确正常停启许可。生产源码/配置/服务未改，无私有native/session/log读取，六binding/passive6/要求/自启动及250/2767/286保持；免K3.1验证、后续首开发交新角色保持。
-
-- 2026-10-26 20:55派发：339两项集中返修定向复验343已交DeepSeek queued/assigned，0a63b3b已推送独立codex/kimi-role-host-fix分支。新baseline291份10336494字节源/快照零漂移，35冻结入口过；244关联含6真实stdio协调全过、自建Job归零，原2正确性探针不改字节过。原339/2985 partial已按用户明确授权核验收讫，原11份111542字节/过程偏差/6pipe未独立执行保持；实际new_no_candidate/count1/末30.3245%，不采用报告自猜的原生同窗。343沿base339/原continuity并force_new请求新窗，创建state=null不预称已落实；唯一写D:/claude-test/TALK/.tmp/initiator-followup-fix1/review，产品/正式测试/新旧冻结暂停，默认用户通知343后取件，不主动等待/唤回或另发可执行Hall。342已闭合，原31份36501字节归档，原Kimi286/294/289/290及旧339295/旧归档保持；原D生产源/配置/服务未集成加载。派后六binding/要求/passive6同342取件，250/2767/286及原runtime18784/五宿主/外部API、大K原身份/choice/gen1失败不操作。审后刷新合并加载计划，再取得本次具体正常停启许可；本次用户明确先不重启。免K3.1验证及后续首正式开发交新角色保持。
-
-- 2026-10-26 342取件与339集中返修：342/2988 M2-1完整核验通过并收讫，原31份36501字节普通材料归档，实际reuse/count3/末57.8171%；Kimi代码复核已闭合，生产未加载。后台重载涉及339代码，首次读取被自动审批按旧边界拒绝，未绕过；用户明确授权“读取339，核验后收取”后才核验5506字符及完整报告、收讫339/2985。339原partial/2必须修正/过程偏差保持，11份111542字节普通原交付归档。C隔离源仅1产品1正式测试补显式start无环境预算的同flow/原预算/原子守卫接入及stop/collect终态/首因保持；7新原5F/1E，修后32、244关联含6真实stdio协调过，自建Job归零，原2正确性断言不改字节过。原报告直接导入配置/日志/pyc偏差保留，拟新复验force_new及统一合成守卫，不重审非阻断项/不把6pipe受限当已验。原D源/配置/runtime18784/五宿主/外部API与六binding/passive6/要求/用户选择/250/2767/286未改；11文件加载补丁仅apply-check，待339复验后刷新合并方案，本次未重启。用户免K3.1验证及首开发交新角色保持。
-
-- 2026-10-26 20:02取件及派发：341/2987完整报告partial已核验收讫completed，MF-1健康降级/停止缺陷与76无子进程Python、41直跑Node独立通过；快照/权限口径通过，剩M2-1为wrapper未捕获CreatePipe的PermissionError/OSError。原29份137974字节普通交付归档，未复制合成DB/私有ACL状态；341实际reuse_session/count2/末投影52.8827%，不输出原生会话标识。仅新复核包fix2补OSError/固定白名单错误、两套件not_run_or_incomplete和整体exit1；4个合成故障注入断言过、未起子进程/产品套件，不更换IPC或开放breakaway。产品/正式测试/页面274文件与341全相同，仍ffa4be5，未再改产品；新固定290份10258874字节、原289及旧v1/v2/原失败保留。M2-1单项复验342已交DeepSeek queued/assigned，沿base340/原continuity服从守卫，创建state=null不预称同窗；唯一写D:/claude-test/TALK/.tmp/kimi-role-host-fix2/review，产品/正式测试/新旧冻结暂停。六binding/要求/passive6与341取件相同，339未取报告/收取，250/2767/286不操作；原runtime18784/五宿主、大K原身份/模型/gen1失败保持，未加载/启停/改配置或读私有资料。默认用户通知342后取件，不主动等待/唤回或另发可执行Hall；单项通过后再具体正常加载，不把受限未运行当成功，不重审产品整片或另派K3.1验证，后续首开发交新角色保持。
-
-- 2026-10-26 19:37派发：340三项集中返修已交DeepSeek定向复验341，queued/assigned；代码ffa4be5已推送独立codex/kimi-role-host-fix分支。正式baseline固定289份10251260字节，274产品/正式测试/页面文件与已测候选字节相同；新正式根受限定向76Python/41Node通过，前后精确集合/hash干净且自建测试Job归零。普通权限完整193为192过/1E（旧detach请求breakaway被测试Job拒绝）及41Node过，完整仍partial；340原190的28F/17E、原报告和旧294目录100extras保留，不冒称独立全过。只写D:/claude-test/TALK/.tmp/kimi-role-host-fix1/review，产品/正式测试/新旧冻结暂停；沿base340/原continuity优先相容续用但服从守卫，创建state=null不预称已领取或同窗。首两次API参数预校验422未建任务，最终沿340兼容general根及明确复核正文正式派发，未要质量子任务权限。派后六binding/要求/passive6同取件；250failed/2767未收取、286paused保持。原D339源/295冻结和旧归档零错配，339未取报告/收取；未生产加载/启停/改配置或私有读取，原runtime18784/五宿主、大K原身份/gen1到期保持。默认用户通知341完成后取件，不主动等待/唤回或另发可执行Hall，审后再具体正常加载，不重建大K/强杀/CAS清锁/接管外部API；免K3.1模型验证及后续首开发交新角色保持。
-
-- 2026-10-26 340取件及集中返修：2986正式报告必须修正/补证，已核验收讫completed而非独立通过；19份249616字节普通原交付逐项归档。原Python190的28F/17E及40Node/71服务独立过保持，MCP业务unknown不冒充验收。已复现健康发布阻挡stop/drain的1F/2E并修正，保活句柄、固定一次诊断、空闲退出及最终health失败不阻止退出；宿主关闭文案同步补正。新wrapper固定合成配置/日志/TEMP、门控Windows Job只清理自建测试进程、精确集合/hash检查，不开放breakaway。候选受限定向76Python/41Node过；协调普通权限完整193为192过/1E（旧detach请求breakaway被本测试Job拒绝）、41Node过，完整结论partial不强求全过。原v1的286清单匹配无extras；旧v2的294清单匹配但有100extras原地保留，不再称目录干净。正式新冻结及MF-1/2/3定向复验准备中，尚未独立通过/生产加载。原D339源/295冻结及旧归档零错配；六binding/要求/passive6同取件，runtime18784/原五宿主、大K原身份/gen1过期及250/286不操作。339未取报告/收取，用户免K3.1验证及首开发交新角色保持；不强杀/CAS/清锁或接管外部API。
-
-- 2026-10-26 17:05派发：新建Kimi角色宿主/创建反馈定向复核340已交DeepSeek queued/assigned，代码e3654e3已推送独立codex/kimi-role-host-fix分支。C隔离worktree产品/正式测试暂停；D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/manifest-v2.json及baseline-v2固定294份10338896字节零漂移，被测根为baseline-v2，唯一写D同目录review。190Python/40Node过，冻结副本11项过；首v1漏cli/TALK依赖的2E及286原副本/manifest/打包材料保留。新continuity_key=kimi-new-role-host-review-20261026/基础1，创建state=null，不预称同窗/独立通过。原D盘339源/295冻结与旧归档保持，339仍submitted/2985未取件；六角色绑定/模式/用户选择及250/286不操作。生产未加载、runtime18784及原五宿主保持，大K仍原身份/原gen1未领取超时，不重建。用户不另派K3.1模型验证及后续首开发任务交新角色的授权保持，本次340是必要流程代码复核。默认用户通知340后取件，不主动等待/唤回/另发可执行Hall，审后具体正常加载/启用Kimi配方/普通start重试，外部API不接管、不强杀/CAS清锁。
-
-- 2026-10-26 16:53用户创建K3.1角色“大K”反馈等待宿主无操作。实际请求UTC08:05:40已provisioned，原gen1自动start无人claim后readiness_timeout；原runtime18784只有五宿主，动态接入仅覆盖WorkBuddy。Codex在独立worktree C:/Users/Administrator/.codex/worktrees/kimi-role-host-fix/TALK修正通用Kimi单角色宿主/显式kimi配方及页面等待刷新、配置后实际服务反馈；190关联Python/40Node通过（9/3新包含其中）。原D:/claude-test/TALK的339产品/正式测试/295冻结保持，当前仅只读任务状态确认339succeeded/submitted/2985，未读报告/收取、不称独立通过。新修正未集成或生产加载，六现有角色/绑定/选择/250/286不操作，不重复创建大K，不复制原生凭据/读取私有会话日志，不调用真实模型或另派模型验证。先冻结本修正供DeepSeek集中核实，唯一review写根拟D:/claude-test/TALK/.tmp/kimi-role-host-fix-v1/review；审后再正常加载后台并沿现有角色普通start，不强杀/CAS/清锁。后续首个开发任务交用户新角色的授权保持。
-
-- 2026-10-26 16:00 K3.1配置：用户确认已在Kimi Code用过K3.1，明确只改配置、不要另派模型验证，页面角色由用户自行添加，下一项开发任务交新角色。按该授权仅在C:/Users/Administrator/.kimi-code/config.toml追加公开模型表kimi-code/k3.1-pro，model=k3.1-pro/provider沿managed:kimi-code、1M及原思考能力；原默认kimi-code/k3、旧条目和凭据不改，不复制/哈希私有正文。原human正常API认证POST模型目录HTTP201，choice_id=rmc_04e11ae89092/display K3.1 Pro/source native_config。仅配置接入、不声称TALK实任务已验；未运行模型/CLI测试、未创建角色/派验证/改绑/启停或更新CLI。当前用户仅授权本次模型配置所需访问，不扩为其它native/HOME/session/log或Key读取。新角色创建后下一开发任务优先交它，免单独K3.1验证任务；339原独立复核及其后当前片加载/人验流程保持，产品/正式测试/冻结暂停，不另开并行开发片。证据.tmp/kimi-k31-config-20261026/，仅公开选择字段/目录回执，无私有配置副本。
-
-- 2026-10-26 15:39派发：发起者主被动功能339已交DeepSeek queued/assigned，代码de5a91a已普通推送；295份10454599字节新源/冻结零漂移，旧275/236/275/63/116/162/197及332至338原交付零错配。237关联Python（含31新增）、35Node通过，最后31复跑通过；真实隔离客户端T10/W4/余量5的到期/取消/EOF/查询证据已存，不冒充当前Codex/其它宿主适配。新工作线initiator-followup-review-20261026/基础1，创建execution_session_state=null，不预称原生同窗/独立通过。唯一写本片review，产品/正式测试/新旧冻结暂停；生产passive/version6、原runtime18784/DSH gen82及五binding/要求保持，250/286整份公开任务派后相同。默认用户通知339完成后取件，不主动等待/唤回，不另发可执行Hall消息；未生产加载/启停/改模式/偏好或私有读取，独立通过后继续当前宿主接入及人工验收，不开下一无关片。
-
-- 2026-10-26 15:14：用户明确完成已有发起者主被动功能，Codex开发、DeepSeek独立核实。复用模式/created_by/受控等待，接通连接内有限主动跟进、交付核验声明后收取、复核/返修同预算接入；新增原子模式/归属/结果守卫及取消/EOF独立等待通道，页面说明同步。仅严格合成项目自测，生产passive/version6、runtime18784及五角色/250/286不改；新代码尚未独立通过/实际加载，不提前称I-4完成。详[本片合同](docs/spec/INITIATOR_FOLLOWUP_COMPLETE_20261026.md)。
-
-- 2026-10-26 10:36模型范围澄清：用户指出添加角色所选模型就是让对应运行器实际使用的模型，适配时已有运行器/模型对齐，当前没有并列“配置/报告模型”的使用场景。撤回10:27“运行器实际模型报告与展示”建议，不再作为当前独立切片或继续开发门槛，保单模型展示、选模/适配与既有执行校验，不改API/UI/生产模型或添加新拦截。页面字段技术上取自binding配置这一事实保持，不能把数据来源差异当作新产品需求；也不把撤回需求冒称独立B2证据上报已经实现。本轮仅澄清并维护进度/排期，无新开发/测试/派发/启停或私有读取，338人验闭合保持。后续按尚未满足的真实需求核对，不重复模型/退出已覆盖内容。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-26 10:27人验及下一片建议：用户明确“启动成功”，338实际页面启动状态基础人验通过，开发/独立复核/正常加载与本轮人验收尾闭合；不扩大为生产忙态注入或其它原生能力验收。用户要求“继续告诉我下一个切片做什么”，仅只读核对原路线第9项与源码并给范围建议，未授权开工/未开发测试派发或启停。建议下一片“运行器实际模型报告与展示”：当前页面绑定只展示配置，部分原生适配器已有内部校验，不重复开发；接通运行器明确报告→TALK只读展示，分清配置/本次报告模型，缺证据未知、差异提示，不用alias/默认值/模型自述冒充实际，不新增自动切换/拦截策略，原校验保持。证据只证明运行器报告，不证明提供商内部隐藏后端。原生子进程树片仍取消、250/286及生产选择保持，分工仍Codex开发/DeepSeek复核。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-26 10:21实际加载：用户明确“执行实际加载与验收”，并确认原API终端已重启。本次旧runtime4956普通stop首次1/blocked host_stop_timeout保留，原后台自身重试于UTC02:11:38 complete/error与worker_error清空，原11PID最终全absent、五角色stopped/无owner后才重启API；未第二次stop/强杀/CAS/清锁。新API自动带runtime18784/UTC02:17:38、五宿主serving、startup complete/shutdown idle/worker无错；小D原true/rev1自动gen82/ins_b65106fc9fdb/PID18580 ready/idle，同实例心跳90.075601秒，其余四false/rev0/停止。五binding/配置/要求/偏好及250/286整份公开响应相同，无running任务；源码指纹/重启后HTTP资产匹配3203044，275及旧冻结/332至338归档保持。部署自检完成，页面人验待用户刷新；忙拒绝采用338既有独立/隔离证据，未注入生产忙态、未外推取消/原生树或断电恢复。无新开发/测试/派发或私有读取，不重复已执行本次停启许可，当前只文档/Git收尾不单独推送。详[加载记录](docs/spec/ROLE_BUSY_STOP_DEPLOYMENT_20261026.md)。
-
-- 2026-10-26 09:53用户收敛退出责任边界：用户明确认为当前有执行中任务就不允许退出，运行器内部子进程由运行器负责，不需要TALK新增复杂进程链管理。撤回09:04“所属原生进程链退出确认”建议并取消后续排期，不作为338完成或继续开发门槛。TALK保338现有忙任务/残余领取/实例占用守卫，空闲时沿既有正常生命周期关闭自身服务与运行器入口；不新增原生进程树扫描/终止/证明，不改现有适配器或删除旧关闭逻辑。338开发/复核已完成，剩正常加载与人验；本轮仅更新边界/进度/路线图，无产品/测试/派发/生产启停或私有读取，纯文档本地记录不单独推送。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-26 09:04范围纠正：用户指出原建议“普通消息/任务预处理停机保护”与338忙时禁止关闭重叠，已撤回原选项1。338已保护running/残余领取和当前归属实例busy/current_task_id，普通消息只要已上报占用同样受保护，不能再按任务种类宣称整项未实现。本轮仅按用户“重新确认下一片内容”只读核对路线图第8项与源码，下一开发片建议为“所属原生进程链的退出确认”：补通用执行器只kill直接子进程及各适配器缺统一完整退出证据的空档，保本次所有权/有界等待/未确认阻挡；不重做338、不新增强制取消入口、不操作生产。只是范围建议，未开发/测试/派发/加载；338仍待正常加载与人验，分工保持Codex开发/DeepSeek复核。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-26 08:39取件：338正式2984自由文本complete/无必须修正已核验、正常收取completed；MCP业务unknown原样保留，不以runner succeeded替代验收。DeepSeek本人11+6Python与31Node通过、两项健康发布受ACL限制（2测试/4E）、node --test EPERM原失败保留，19/221正常权限日志SHA已核而非其本人全跑。5项非阻断观察不扩片；旧恢复前置路径可仍给通用提示，无归属/异常实例等边界保持。28份140104字节普通原交付逐项归档，未复制合成DB/私有ACL临时内容；275新/旧冻结与332至337归档零错配。实际new_no_candidate/count1，末投影31.9295%；五完整binding/要求及250/286整份公开响应相同，DSH gen80原实例idle、无running任务。代码仍3203044未生产加载，无新产品/测试修改/启停/偏好PUT/私有读取；当前仅本地进度/Git收尾，下一无关片及实际加载另按明确范围处理。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-26 00:17派发：忙任务停机保护338已交DeepSeek queued/assigned，3203044已推送；本片新275份9946204字节baseline-v1源/快照零漂移，旧shutdown236/275、自启动63/116/162/197与332至337原交付零错配。新工作线role-busy-stop-review-20261026/版本1完整base_context，创建state=null不预称领取/原生同窗。唯一写role-busy-stop-v1/review/，产品/正式测试/新旧冻结暂停，默认用户通知338完成后取件，不主动等待/唤回或另发可执行Hall补充。派前五完整binding/要求及250/286整份公开响应相同，无running任务，DSH gen80原实例idle。221/31为Codex自检，17旧Node失败在原HEAD复现；本片未生产加载/启停/改选择，无私有读取，下一无关片不自动开。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-26 00:10忙任务停机保护片：用户明确选择“先做忙任务停机保护，显示阻挡任务”，Codex开发/DeepSeek独立核实。原写事务内409有限任务引用、stop/claim串行守卫（过期重排提交后重取锁）、实例占用保守拒绝、页面中文及后台blocked回执已接通，不自动取消/伪报原生退出。221关联Python含19新、31页面含3新通过；扩大350Node为333过/17旧失败，改动前HEAD副本复现同17位置，原夹具失败保留。待提交/冻结首审，不称独立通过或生产加载。runtime4956/DSH gen80原实例idle、五绑定/要求及250failed/2767未收取、286paused保持；无本轮生产启停/PUT/私有读取。原停启许可已用，完整消息/preflight/原生子链与任务恢复不在本片。详[合同](docs/spec/ROLE_BUSY_STOP_GUARD_20261025.md)与[进度](docs/PROGRESS.md)。
-
-- 2026-10-25 23:17正常加载闭合：用户明确“是”授权本片一次后台重载；stop --wait返回0/stopped且无activation原值，旧13252/11去重原PID全absent、五角色stopped无owner后，原attach-api/detach启动runtime4956/UTC15:13:22，shutdown idle空初始字段、startup一轮complete/五宿主serving。小D保用户true/rev1自动gen80/ins_3d1a0388545c/ready/idle，同实例真实心跳60.090351秒；另四false/not_selected/停止。APIuptime15705→15909连续，五binding/角色配置/要求/偏好/250/286完整公开任务保持。无手动start/PUT/额外停启或私有读取，275/236/旧冻结及332至337归档保持。337独立闭合和本片加载完成，旧后台phase unknown不冒称新版失败阶段生产验证；当前仅本地文档/Git收尾不单独推送，下一无关片先确认。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-25 23:07337闭合：正式complete/2983已核验收取completed，无新增必须修正；本人13等待测试+25原探针+六状态/55固定码独立通过，协调方51证据已核但不冒称其本人全量运行。17份154086字节原交付归档，275/原236/旧冻结及332至336材料保持；实际续336/count2/末39.6713%。UTC15:04:44只读实核runtime13252仍旧无shutdown、五宿主serving、小Dgen78/原实例ready，其它四停止；偏好true/rev1及五binding/角色配置/要求/250/286整份公开任务均同上片。API持续健康无需重启；本片尚未加载。[具体加载方案](docs/spec/PROJECT_RUNTIME_SHUTDOWN_DEPLOYMENT_20261025.md)已准备待本次后台重载许可，旧一次许可不自动延伸。本轮无停启/改偏好/额外私有读取，不追加复核/下一片；仅本地文档/Git收尾，纯文档不单独推送。
-
-- 2026-10-25 21:34派发：336两项回执补正定向复验337已交DeepSeek queued/assigned，b9e2de0已推送；275份9350812字节新源/冻结零漂移，原236/336原19及旧冻结/332至335保持。唯一写runtime-shutdown-fix1/review，产品/正式测试/新旧冻结及336旧报告暂停。沿base336/原continuity请求相容续窗但服从守卫，创建state=null不预称已领取/同窗。只核MF-1/MF-2与必要兼容、13项StopWaitTests和代跑证据，不重复已知受限全量尝试。派前五binding/要求同336取件、DSH原实例idle无running任务；无生产加载/启停/改偏好/250/286。默认用户通知337完成后取件，不主动等待/唤回或另发可执行Hall补充；当前仅本地协调文档收尾，不为纯文档单独推送，下一无关片先确认。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-25 21:30接手336集中修正：正式2982业务partial已核对/收取completed，19份264144字节原材料归档保持。两项必须修正为wait回执activation任意回显及token形error；Codex仅1产品1测试补正，内部代际比对不变，回执省略activation、错误改固定白名单；原2方法6失败保留，补正后51正式全过，原独立探针25条不改字节代跑通过。原47在正常权限代跑亦过，但均标协调方核验，不冒称DeepSeek沙箱已通过；原7F/22E保留。336实际新窗/count1/末29.3375%。旧236/197/63/116/162及332至335保持，未生产加载/启停/改偏好或250/286；待新冻结一次MF-1/MF-2定向复验，不重做非阻断整片，当前只该片修正/收尾。详[补正](docs/spec/PROJECT_RUNTIME_SHUTDOWN_FIX1_20261025.md)。
-
-- 2026-10-25 20:56派发：后台退出闭环/有限等待首审336已交DeepSeek queued/assigned，代码760fe12已按用户“有代码改动就推送”推送。236份8982718字节源/快照零漂移，旧63/116/162/197及332至335原交付哈希保持；唯一写runtime-shutdown-v1/review，产品/正式测试/新旧冻结暂停。新基础工作线project-runtime-shutdown-review-20261025，创建state=null，不冒称原生同窗/领取/独立通过。47项严格隔离自检、早期失败/入口限制保留。派前caller=agent:codex、五binding/要求同开片、DSH原ins_9c7bcef519c6 idle，无running任务；未生产启停/加载/改偏好/250/286。默认用户通知336完成后取件、不主动等待/唤回，不发额外可执行Hall消息；当前仅本地协调文档收尾，不为纯文档再推送，下一无关片先确认。详[进度](docs/PROGRESS.md)。
-
-- 2026-10-25 20:50新片自检：用户明确授权一个下一片由Codex开发、DeepSeek核实，按原排期8先补正常后台退出进度/有限等待。1产品scripts/talk_runtime.py及新测试/指南已实现；47项最终严格合成配置隔离验证全过，早期普通入口2E/默认配置导入边界保留。不带wait旧行为/原句柄守卫保持，不强杀/CAS/清锁；未生产启停/加载/改偏好或250/286。准备Git/新冻结统一交DeepSeek首审后暂停，不续332无关原窗、不主动等待；独立通过前不称已部署。用户明确代码更新可推送，纯cde4620不单独推送。详[本片合同](docs/spec/PROJECT_RUNTIME_SHUTDOWN_20261025.md)和[进度](docs/PROGRESS.md)。
-
-- 2026-10-25 20:25推送授权闭合：用户明确答复“授权本次推送到公开仓库 bobo506/TALK”，随后原git push普通执行成功，5214d9b与df0da3e已到origin/codex/terminal-return-codex。此前自动审批拒绝及公开仓库事实保留；仅授权本次当前片进度记录，不外推其它公开发布/新功能。当前仅同步本授权结果/Git收尾，服务与产品未操作，下一无关片先确认。详[当前进度](docs/PROGRESS.md)。
-
-- 2026-10-25 20:10Git收尾边界：本地5214d9b已记录正常后台自启动通过；推送GitHub被自动审批执行前拒绝，具体目的地授权不足。只读GitHub确认bobo506/TALK为public，已请用户明确是否允许本次进度/内部运行记录向该公开分支推送；答复前不重试或绕过，服务保持当前验证状态。详[当前进度](docs/PROGRESS.md)。
-
-- 2026-10-25 20:08正常加载闭合：用户明确同意既定后台停启一次，原11280/12PID普通stop/drain全部absent后，原attach-api/detach入口启动runtime13252；API未重启。新activation一轮complete、五宿主serving，小D按用户true/rev1自动到gen78/ins_9c7bcef519c6/ready/idle，同实例真实心跳90.130226秒；另四false/not_selected/stopped。无手动start/PUT或重放，五binding/角色配置/要求/250/286完整公开响应保持。197及旧冻结/332至335归档零错配，产品/正式测试未改、不追加复核。本片正常后台换代运行验收闭合，真实断电/长跑/原生模型能力不外推；仅文档/Git收尾，下一无关片先确认。详[当前进度](docs/PROGRESS.md)。
-
-- 2026-10-25 19:09用户要求汇总进度：仅只读刷新/落盘汇总，无新开发/测试/派发/启停。UTC11:08:50确认原runtime11280仍旧、DSH gen76/原实例ready运行，小D自启动true/rev1、另四false，last_activation全null；实际页面控件此前18:52已验。335已收取，API补正生效，唯一剩余本片运行验收是后台正常换代后观察小D真实自动启动，不重复API重启/手动start或覆盖用户选择。保护和原拒绝边界保持；详[当前进度](docs/PROGRESS.md)，下一无关片先确认。
-
-- 2026-10-25 18:52用户启动后实核：API已加载335 /agents补正、uptime76秒，原Chrome小D详情“随项目自动启动”实际可见/已选中，API小Dtrue/revision1/UTC10:50:31保存，另四false；本Agent无PUT/勾选，保留用户选择，不能再一律false。截图ui-fix1/user-restart-20261025-1850/visible.jpg，控件缺失与保存已实际闭合。旧runtime11280/原12PID同创建时刻仍present，五宿主serving，DSH gen76原实例idle，尚未后台换代/验证自动执行；不推断用户已完成stop/serve，不重复要求API重启。五binding/角色公开配置/250/286保持，无running任务。后续后台正常重启时应观察小D按true自动启动，ready不重复手动start；旧停机审批拒绝仍保留，不擅自重试或读私有资料，不追加复核/下一片。
-
-- 2026-10-25 18:37取件及审批边界：335 complete/2981已验收收取completed，无必须修正；19份42557字节原交付归档，197新/旧63/116/162及332原33/333原29/334原15保持。真实API→页面2项在文件重定向下、独立/sync和缺字段负对照通过；原CreatePipe环境1E保持。实际续333/334窗count3、末44.7013%。公开五binding/要求及250/286整份任务未变，正常加载预检确认无running任务/worker空闲、12原PID含当前DSH桥present有创建时刻、五选择false。旧后台11280及五宿主普通stop/drain被自动审批在执行前拒绝：记录只有API重载，缺明确后台停机确认；未停机、不绕过。待用户明确授权一次按[方案](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)停旧后台/五宿主，再用户原终端重启API并恢复后台/原DSH。新/agents补正未加载、实际控件尚未显示；不追加复核，不改生产配置/绑定/任务、不复用一次私有例外，不开下一片。
-
-- 2026-10-25 15:00派发：角色自启动控件缺失335已交DeepSeek queued/assigned，d3c9c96已推送；197份4465676字节新源/快照零漂移，旧63/116/162及332原33/333原29/334原15零错配。仅复核真实/agents DTO到页面控件和/sync共享输出，不重审runtime；唯一写ui-fix1/review，产品/正式测试/新旧冻结暂停。沿base332/原continuity优先相容续334但服从守卫，创建state=null不预称同窗；不另发可执行Hall消息，默认用户通知335完成后取件、不主动等待/唤回。五完整binding/要求与250/286整份公开任务派前一致。生产补正未加载、用户页面尚缺控件，原runtime11280未重载；不代勾选/启停/读额外私有资料，下一无关片不自动开。
-
-- 2026-10-25 14:58人工验收返修：用户两次刷新仍无自启动控件，实际Chrome human/小D详情确认缺失、加载新版JS；只读公开GET证实五/agents无startup而/roles全false。根因app.js从/agents取数，但原仅/roles DTO填startup；前次只据代码指导位置不足。Codex仅models.py+routes/projects.py共5行补ProjectAgentOut字段/透传与共用投影，新增真实隔离GET→实际页面loader/控件链路2项。95关联中93旧通过，新2夹具编码/过期快照1F/1E修后只复跑2全过，并集95；原失败保留，9Node全过。待新冻结交DeepSeek只核本接口/页面遗漏，产品随后暂停；334/058e153及旧报告/冻结保持，不重审runtime。生产API尚无补正、后台11280也未重载；未勾选/启停/额外私有读取，五binding/250/286保护保持，复核后统一正常加载并实看页面。详[本次合同](docs/spec/PROJECT_ROLE_AUTO_START_UI_FIX_20261025.md)。
-
-- 2026-10-25 14:42用户重载后只读核对：新API startup路由已存在、uptime127秒，五startup均enabled=false/revision0/last_activation=null；原runtime11280仍12:33初版/五宿主serving，DSH gen76原实例继续运行、其它四停止。用户本次问默认关闭语义，答为初次默认不随后台自动启动，勾选后影响下代；重载API不停止已运行角色。本次未后台启停或勾选。完整加载还差正常后台重载，不重复要求用户重启已更新API；334/058e153/冻结及250/286、五binding保护保持。详[加载记录](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)。
-
-- 2026-10-25 14:36复核闭合：334 complete/2980已核验收取completed，无必须修正；10原MF-1探针+7补充独立判断全过，原四新增反例不改断言通过，MF-2/MF-3沿333通过不重审。162新/旧63/116及332原33/333原29零错配，334原15份36242字节已归档；实际续333窗/count2、末37.6821%。产品仍058e153、无新改动；五完整binding/项目要求及250/286整份公开任务相同。只读实测API仍旧无startup路由，runtime11280/五宿主serving/worker空闲，仅DSH gen76运行，其它四停止；新功能未加载。具体[正常加载方案](docs/spec/PROJECT_ROLE_AUTO_START_DEPLOYMENT_20261025.md)已准备待确认：原后台普通stop/drain、用户原终端重启API、attach-api重启后台、默认false不代勾选、仅恢复DSH/核心跳。前次一次例外已用完，不重复用；本轮不启停/部署/开下一无关片，不为非阻断项再派复核。
-
-- 2026-10-25 14:25派发：MF-1R单项定向复验334已交DeepSeek queued/assigned，代码058e153已推送；162份4240533字节新源/快照零漂移，旧63/116及332原33、333原29报告零错配。唯一写fix2/review，产品/正式测试/新旧冻结暂停；base332/原continuity优先相容333窗但服从守卫，创建state=null不预称同窗。仅核原四新增反例和旧API/newAPIpending对照，不重做整片。333partial/2979已正常收取、332failed/2978不改；派前五完整binding/要求相同、250failed/2767未收取、286paused、DSH原实例idle。无生产加载/启停/额外私有读取，不重复用一次元数据/恢复许可。默认用户通知334完成再取件，不主动等待/唤回，不开下一无关片。
-
-- 2026-10-25 14:23取件及必要补正：333正式2979业务partial/review failed已收取completed；原MF-2/MF-3及四失败断言独立通过，新增MF-1R为present Reference/null/get-only误判unsupported。29份210648字节原产物已归档，旧63/116及332原33保持；333实际new_no_candidate/count1、末32.6345%，未复用旧tainted窗。Codex仅1产品1测试改为path key确缺才unsupported并补4回归，16正式+10原MF-1探针共26通过；待新冻结后只定向复验本反例及旧API/newAPIpending对照，不重做整片。332failed/2978及前次一次生产例外边界保持；未加载/启停/改选择，250/286和五binding保护不变。详[fix2](docs/spec/PROJECT_ROLE_AUTO_START_FIX2_20261025.md)。
-
-- 2026-10-25 13:53实际领取：333已由DSH ins_aa6223b0735e于13:51:43.954651正式领取，running/in_progress/attempt1，13:52:59.352885任务心跳距领取75.398234秒、无error/result；已越过原30秒channel_busy失败点，但execution_session_state仍null，不预称原生决策/同窗/独立通过。实例13:53:04心跳/PID10360保持；实例显示idle不替代任务真实running事实。最新公开回执和started-check存fix1，116新快照及原63/33保持，产品/正式测试暂停、默认用户通知333后取件，不继续主动等待。
-
-- 2026-10-25 13:50派发：三项集中修正定向复验333已交DeepSeek queued/assigned，沿base332/原continuity_key，仅本轮新write root=fix1/review；原旧窗tainted不强复用，实际原生决策/计数待回执。代码ca2d30b/冻结HEAD f0da4ff已推送，116份3872285字节新源/快照零漂移，旧63及原33归档不变；产品/正式测试/新旧冻结暂停。直接派正式任务，不再额外发可执行Hall补充；332原failed/2978及2977独立failed不改。用户一次元数据/一次定向恢复均已限域用完，不授复核者实际DB/native/生产权限。默认用户通知333完成后取件，不主动等待/唤回，不提前生产加载修正或称独立通过。
-
-- 2026-10-25 13:46通道恢复：用户另明确“已确认旧原生进程结束，授权定向恢复”；依据该人工确认及锁内原scope/PID15992/lease/updated_at/唯一332attempt1核对，UTC05:45:40一次记interrupted、旧window tainted并同事务审计，operation_id=operator-recover-332-attempt1-20261025。通道行不删不改、332 failed/2978及全部历史不改，不用父PID absent伪装完整原生进程证明。预检DSH已被用户正常关闭gen75无owner，原runtime11280/五宿主serving保持；仅普通start恢复DSH gen76/ins_aa6223b0735e、05:45:47 ready，未重启后台/API或加载新修正。ca2d30b三项修正已推送，223关联+原反例通过，待新冻结后一次定向复验；生产DB/native许可均限已执行的一次操作，不授DeepSeek或其它任务。详[fix1](docs/spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)。
-
-- 2026-10-25 13:42集中修正：332正式failed/2978 channel_busy保留；同Hall DeepSeek报告2977已独立交付failed/3必须修正/4失败断言，33份99053字节原材料已归档。Codex接手修MF-1旧API能力探测/unsupported及时放行宿主、MF-2正向boot证据、MF-3提交前复核/回滚，223关联及10兼容/原探针过（重合5，并集228），34定向也重合；UI未改原58Node保留。旧63冻结不变，新修正未生产加载。用户仅批准一次侧账本元数据只读，已执行owner15992 absent/lease过期/332attempt1仍started，说明旧native writer未闭环，不再只归因消息重叠；不读token/原生ID/正文/Key/日志、不改账本。定向恢复脚本10合成检查过，须human确认旧原生模型进程结束且另授权写入才能操作，当前请求待答复；仅父PID absent不足，未盲目删锁或重复派。待安全恢复再一次MF-1至3定向复验，Codex开发/DeepSeek核验及250/286保护保持。详[fix1](docs/spec/PROJECT_ROLE_AUTO_START_FIX1_20261025.md)和精简进度。
-
-- 2026-10-25 12:51续332：用户明确要求角色恢复后发布任务并含兼容遗漏。已在原Hall发送补充2976，须先读coordination/RESUME_332_COMPATIBILITY_20261025.md；原63冻结/5831fd0产品不变，DeepSeek仍只复核、写根review/，只新增具名公开恢复证据只读，不授生产权限。human正式resume-tree HTTP200，原332 epoch0→1/active、非委派slice_budget0、正文不变，未新建重复任务。12:50:43任务queued/accepted尚未claim，12:51:09 DSH实例busy/current_task_id=2976是消息通道补充活动，不能称332已接或推测原生同窗。利用旧材料只补兼容/未完成缺口，一次提交全部必须修正项及非阻断观察，partial亦可正式提交；随后Codex集中修正/必要一次定向复验。产品/正式测试/冻结暂停，250/286保护，默认用户通知完成后取件，不主动等待/唤回。
-
-- 2026-10-25 12:42恢复：用户已暂停332、正常重启角色，原gen70归属已由用户正常关闭释放。新runtime11280自动加载本片代码而API仍旧、OpenAPI缺startup接口，8轮等待阻挡宿主使gen73未领取即120秒超时；五宿主随后serving。Codex仅正式start重试一次恢复DSH gen74/ins_9318d6d0efce/PID16492 ready/idle，距ready59.980973秒仍有同实例心跳；另四stopped/无owner，五完整binding/要求、250/2767及286全公开字段保持。332保持queued/accepted/paused，不自行恢复/替换/代report；产品/正式测试/63冻结不改。兼容遗漏列当前片集中修正项，不把部分runtime加载称新功能完整部署验收；原09:56退出原因仍未知。恢复证据coordination/restore-20261025/；只读helper固定public-api文件被后续检查覆盖已如实记录/改唯一名，旧摘要/rawtask/agents保留。下一步继续原332正式核验，已有探针与兼容项集中修正，避免新建重复任务。
-
-- 2026-10-25 12:19失联实查：用户因332超两小时要求检查。332仍running/in_progress，但最后心跳09:56:37、lease09:58:37过期、无正式结果；原runtime12980/DSH宿主5116与5604/bridge15992均OS元数据证实不存在，系统上次boot10月23日，API仍健康/uptime15317秒。不是持续复核两小时，退出原因未确认。DSH gen70 unknown/ownership_held/can_start=false，原恢复计划409 recovery_tasks_active；review停09:56:40且无REVIEW/checks，三条合成失败断言只属未完证据。原332/冻结/产品/报告保持，未代claim/report/收取、未生产启停/CAS/加载、未读生产配置/私有日志；human仅正常GET认证。诊断在本片coordination/stall-20261025-1216/。下一步需正式处理失联任务/旧归属并恢复续审，本次“检查”未执行恢复，也不据此批准加载未独立通过的自启动代码。
-
-- 2026-10-25 09:41派发：选择性项目自启动首次独立复核332已交DeepSeek queued/assigned，基线5831fd0已推送；63份/3613416字节源/新快照零漂移，产品/正式测试/冻结暂停，唯一写本片review/。本工作线新基础合同/continuity_key=project-role-startup-review-20261025，创建state=null，实际新窗/计数待回执，不冒称复用331。两次HTTP422分别为一般任务不接受review_policy、版本名超32字符，均未创建任务；去非必要字段并用版本1后仅332成功，原错误保留。默认用户通知332完成后取件，不主动等待/唤回、不部署或改生产选择；250/286、原五角色与331保持。
-
-- 2026-10-25 09:38新片自检完成：331实际删除闭合/1ed992d推送后，按用户已授权一个下一片，由Codex实现选择性项目自启动：默认false设置、runtime新代一次执行、手动操作优先、严格preboot旧归属收敛、lease/重试/停止守卫和页面控件。213关联+47最终guard有重合并集214Python、58Node通过，新30/9；真实合成后台启停两项包含在关联组。首轮210中2F/1E及旧子进程patch边界如实留档，已改合成项目/TOML正式复跑通过，不补读生产。250/2767、286及要求保持，五角色runner/model/绑定状态对比一致，当前完整binding已存但不倒补旧缺字段；原a97两源与旧冻结/交付保持。待Git/冻结统一交DeepSeek首审后暂停，未部署/启用生产选择，不把自检称独立通过；详[本片合同](docs/spec/PROJECT_ROLE_AUTO_START_20261025.md)和进度。
-
-- 2026-10-25 09:09删除验证闭合：331 complete/2975已核验收取completed，无必须修正项；真实联接11场景通过/1符号链接权限skip，原121沙箱5F/14E/2S与Codex121全过分别保留。55新/50/64/79/45旧快照和329/330归档保持，331原19份211819字节另存；实际新窗/count1、末35.089%。原runtime17580及五宿主10PID正常退出，原attach-api入口启动runtime12980/五宿主serving，API uptime连续、无需用户重启。旧K2.8正式retry r3→r4 complete（UTC01:05:53），WorkBuddy r6 complete保持，两目标普通角色接口移除；共享凭据保留。仅恢复DSH gen70/ins_81ee44313cdb/PID15992 ready/idle，真实心跳120.283935秒，另四停止；五角色完整公开投影/要求/250原失败结果/286保持，未追加metadata/私有内容读取或手动清理。当前只完成文档/Git收尾，随后直接开已授权一个选择性自启动片，Codex开发/DeepSeek统一首审，人工验收等用户返回；不重复同范围确认，不为非阻断项再派任务。
-
-- 2026-10-25 08:35派发：目录联接入口必要补正331已交DeepSeek queued/assigned，实现a97ef46推送；55份/2112541字节源/冻结零漂移，旧50/64/79/45和329/330归档零错配。唯一写role-delete-native-junction-v1/review/，产品/正式测试/新旧冻结暂停，默认用户通知331完成后取件。base327请求相容续330，创建state=null、实际决定待回执；首次一般任务related_task_ids被HTTP422拒绝无创建，去掉非必要字段后成功，原错误保留。121只是Codex自检，生产r2 failed/新清理未加载/未retry；派前公开五保护角色/250/286/runtime17580/五宿主无错保持。metadata仅已授权一次、不重复；下一片未开工，不提前生产或宣称独立通过。
-
-- 2026-10-25 08:31必要补正：用户明确授权一次最小元数据核查，实际1309条、native内一个目录联接/tag0xA0000003；未读资源内容/Key/会话日志、未跟链接或改生产，例外不扩为后续私有扫描。Codex仅scripts/role_delete.py+test_role_delete_local.py补正规范native成员根后代的目录联接入口HANDLE删除，目标不遍历；其它链接位置/硬链接/符号链接/未知tag及旧守卫保持。121隔离相关回归零失败/错误/跳过（9新包含其中），待冻结交DeepSeek定向复核后暂停；原330/旧冻结/250/286保持。新代码未加载、生产未重试，DSH gen68仍原恢复状态。仅runtime变更，后续拟原普通stop/drain后serve --attach-api --detach，无需用户重启API；当前不提前执行。条件下一片仍等当前闭合，不重复同范围确认。详[目录联接补正](docs/spec/ROLE_DELETE_NATIVE_JUNCTION_20261025.md)与进度。
-
-- 2026-10-25 08:08实际加载：用户重启API后runtime17580/初始六宿主健康，330守卫正式放行旧K2.8删除r1、250原failed/2767结果全字段不改；后续r2 private_state失败unsafe_resource，manager/profiles complete、credentials preserved/identity_disabled=false、startup_config pending，当前五宿主serving。页面实际v3资产及原函数配公开响应核五角色、排除两目标，资源未清完不冒称complete。仅恢复DSH gen68/ins_e463b3ea6ebf/PID7476 ready/idle，心跳60.088815秒，其它四停止；五保护角色完整公开投影/要求/286保持。未直接检查私有目录或绕守卫，最小metadata脚本合成自检过，实际未执行，已请求一次只读元数据边界例外；待答复，不提前开已条件授权下一片。原330报告/快照保持，详[加载记录](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)和[进度](docs/PROGRESS.md)。
-
-- 2026-10-25 07:55收尾/正常加载：330 complete/2974已核验收取completed，独立143关联回归+5真实隔离API探针通过，无必须修正项；9份81785字节原交付归档、新45与旧50/64/79快照零错配，产品eb6cf6c未再改。原报告保留调试wrapper跨唯一写根38合成DB偏差及协调方失败原因纠正，不声称全程唯一写根合规。实际new_no_candidate新窗/count1、末26.0273%，未续329。已普通stop/drain原runtime11200及六宿主，12原PID全absent、六角色stopped/无owner、DSH gen67，公开投影/绑定/要求/286保持。待用户原终端重启external API；随后核新版本、正式删旧K2.8且250原failed/2767结果不改，仅恢复DSH及心跳。WorkBuddy原r6 complete保持；当前未加载330守卫、K2.8未删，不提前开已条件授权下一片，也不重复同范围确认。详[当前进度](docs/PROGRESS.md)与[加载记录](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)。
-
-- 2026-10-25 00:46派发：旧K2.8失败历史必要补正330已交DeepSeek queued/assigned，eb6cf6c已推送；45份/2054979字节新源/冻结零漂移，原50/64/79和329原15报告归档零错配。仅1产品1测试修改，143自检通过；唯一写role-delete-failed-history-v1/review/，产品/测试/冻结暂停，默认用户通知后取件。沿base327请求相容续329窗，创建state=null、实际决定待回执。WorkBuddy真实complete/移除、DSH gen66已恢复；K2.8仍原绑定/无墓碑，250/286未变，新守卫未加载。330是当前缺陷必要返修，不是下一自启动片；用户条件续片授权保持，当前未闭合不提前实施。详当前进度与[补正合同](docs/spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)。
-
-- 2026-10-25 00:42加载及必要补正：用户已原终端正常重启API，新runtime11200/六宿主serving/worker无错。WorkBuddy原失败墓碑正式重试r3→r6 complete（UTC16:32:32），共享凭据保留、角色接口已移除；仅恢复DSH gen66/ins_203aa34895b9/PID8092 ready/idle、同实例心跳90.105977秒，其它五现存角色停止。五保护角色完整公开配置/绑定/要求及286 paused保持。旧K2.8通过实例门后被250 failed/failed历史误拦，正常collect只认submitted；不收取/追改250，前后公开任务/结果相同。Codex仅1产品1测试补正明确终止失败历史分类，143自检过，待冻结交DeepSeek定向复核，尚未加载该守卫。50/64/79及旧报告保持；当前K2.8未闭合，不提前开下一片。用户条件续一片授权保持，无须重复确认；详[必要补正](docs/spec/ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)和当前进度。
-
-- 2026-10-24 23:55用户续行授权及实际停机：用户明确“验证好无误后…继续开下一个切片，你开发deepseek复核，我要离开下，回来再验收”。按已给正常加载方案继续当前验证，并仅在当前真实验证全部通过后允许一个下一片（已讨论的选择性项目自启动）开发/自测/DeepSeek独立复核，人工验收延后；同一范围不重复询问，不能未验证就先开片。原runtime3852及六现存宿主已普通stop/drain，12原PID全部absent、七角色stopped/无owner、DSH gen65；公开非service投影/绑定/要求/286保持。现在external API仍由用户原终端运行，正常reload-api明确不拥有；已发原终端Ctrl+C重跑提示，待实际动作后核新版/依次两目标delete-retry/恢复原DSH与心跳。未生产真实删除重试/读配置Key摘要/DB私有日志，不强杀CAS，不开第二API。当前卡点是原终端重启动作，不是缺少新片授权；[当前加载记录](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)有可恢复证据。
-
-- 2026-10-24 23:47收尾：329定向独立complete/2973已验收并收取completed，无必须修正项。API核心8/本机5/整页8/Node82通过，另1严格步骤形状P3探针失败、Python283的5F/7E环境限制如实保留；不追加无关返修。79新与50/64原快照零错配，15份/190160字节原交付已保留，产品/测试仍4ef58bc。实际new_no_candidate新窗/count1，末snapshot38.1537%，未续328；原327/328保持。公开七binding与派前相同、DeepSeek原实例idle、286 queued/accepted/paused。本轮未生产启停/加载/delete/retry/私有读取；[具体正常加载与两目标验证方案](docs/spec/ROLE_DELETE_USER_FIX_DEPLOYMENT_20261024.md)已准备待本次确认，原许可不自动延伸。当前只文档/Git收尾，选择性自启动未批准，下一无关片仍先确认。
-
-- 2026-10-24 22:59派发：删除人工验收返修329已交DeepSeek queued/assigned，4ef58bc已推送；79份/2964423字节新源/冻结及原50/64快照零错配。唯一写role-delete-user-fix1/review/，产品/正式测试/冻结暂停，默认用户通知后取件。沿base327请求相容续窗，创建state=null、实际决定待回执，不预称复用或独立通过。283Python+82Node仅Codex自检；未重载/重试真实删除，WorkBuddy用户原墓碑与其它五binding/286保持。派发后只登记协调文档，下一无关片仍先确认。详[返修合同](docs/spec/ROLE_DELETE_USER_FIX_20261024.md)。
-
-- 2026-10-24 22:56人工验收返修：用户删除旧K2.8 Preview被历史实例误拦、WorkBuddy接入验证因cleanup_budget失败，明确要求删除接受即列表消失。Codex直接修正/365项自检通过，待冻结交DeepSeek独立复核，非选择性自启动新片。仅放行同机过期无任务且OS证明退出的原实例，轮换严格证明不变；有进展预算耗尽自动分批，逻辑移除与资源清理分别显示。原327/328报告及50/64快照保持；未再次生产delete/retry/启停/加载、不读配置/Key/DB/私有state。其它五binding与286 paused保持；WorkBuddy用户已清绑定保留事实。后端仍旧版，复核后正常加载另行确认；默认派后用户通知取件。详[返修合同](docs/spec/ROLE_DELETE_USER_FIX_20261024.md)与当前进度。
-
-- 2026-10-24 22:18最新：用户已确认正常重载并补充最小访问许可，仅原运行器读取talk-runtime.json与原human凭据正常认证；自动审批拒绝的配置/角色Key摘要检查不再继续，原helper禁用。原runtime4888及七宿主14个PID经普通drain全部absent，用户原终端API重启后新runtime3852/七宿主serving/worker无错、删除路由及7个deletion=null投影正常。仅恢复原DeepSeek gen64/ins_eb493b140f6e/PID1804 running/ready/idle，其余六停止无owner；中断后同实例心跳推进6938.368393秒，七角色完整binding/公开投影/要求/286 paused保持，页面v2资产HTTP200且匹配。先前TALK自动审批额度失败，本次原工具重试恢复；未绕过。默认24小时代码随新后台加载，未实测长跑；未删除现有角色、未改配置/sweep/CAS，页面人验待完成。327/328代码独立核验保持，本轮是协调方加载自检，不再派核验或下一功能；当前只文档/Git收尾，下一无关片仍先确认。详[加载记录](docs/spec/ROLE_DELETE_DEPLOYMENT_20261024.md)。
-
-- 2026-10-24 20:00最新：328定向复验complete/2972已验收并收取，327也收取completed，原partial/2971及失败/P3保持。四项P2与旧名册墓碑/重试steps独立闭合，无必须修正项；独立API11/本机21/Node68通过，规定45及265仍有ACL/子进程环境限制，不称独立333全过。64源/新快照、原50快照与35原审查材料零错配，328证据21份/487816字节另存。实际续327原窗/count2/known、末62.3015%。七角色完整公开binding与派前一致，286 queued/accepted/paused、DeepSeek idle；本轮未生产启停/删除/读正文。代码302b637已推送，具体[加载方案](docs/spec/ROLE_DELETE_DEPLOYMENT_20261024.md)待用户确认：普通重载API/runtime/宿主，仅恢复原运行角色，同时加载此前24小时默认；不删现有角色、不改配置。当前只文档/Git收尾，下一无关片先确认。
-
-- 2026-10-24 19:27派发：327定向复验328已交DeepSeek queued/assigned；修正302b637已推送，64份/2581366字节源/新冻结与原50快照、35原审查材料均匹配。唯一写review-fix1/，产品/新旧冻结及原报告暂停；默认用户通知后取件、不自动等待。沿base327/原continuity请求相容同窗，创建state=null，实际决定待领取。原327 partial/2971未收取，不能预称独立修复通过；265Python+68Node只是Codex自检。七角色公开绑定及286 queued/accepted/paused已再次核对，未生产启停/加载/删除或读取正文。详当前进度及本片合同，下一无关片仍先确认。
-
-- 2026-10-24 19:22接手327：正式2971自由文本partial（MCP业务unknown），50源/快照零漂移、35份/230325字节原审查材料已保留；DSH实际new_no_candidate新窗/count1、末42.1001%。Codex复现并修正P2-1残留owned_launches、P2-2文件目标目录误删、P2-3墓碑身份全局任务/schedule绕过与项目在册守卫、P2-4独占离册降格preserved；另修旧名册墓碑created_by和重试steps。最终265Python+68Node通过，原失败/partial不改，327暂未收取；修正版待新冻结交DeepSeek定向复验后产品暂停。共享Key及其它项目明确在册任务保持，无删除历史全局角色兼容。未生产读取正文/启停/删除，286 paused和七角色绑定保持。详[本片合同](docs/spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)与当前进度。
-
-- 2026-10-24 18:35派发：删除角色独立核验327已交DeepSeek，创建queued/assigned；c61a4c4已推送，50份/2074815字节baseline-v1与manifest-v1逐项零漂移。唯一写.tmp/role-delete-v1/review/，禁止生产配置正文/Key/DB/私有state/原生会话日志、启停/删除/sweep/CAS与产品/Git写入；仅普通源和合成隔离验证。产品/冻结暂停，默认用户通知后取件，不自动等待；新工作线role-delete-independent-review-20261024，实际原生决策state=null待领取，不预称同窗或通过。286 queued/accepted/paused、七角色绑定/模型与生产保持，尚未部署/页面人验。
-
-- 2026-10-24 18:30删除角色片：用户已明确“可以，继续，你来开发，deepseek核验”，本片由Codex直接开发/自测、DeepSeek独立核验，取代默认首次派发分工。删除入口、事务守卫/墓碑、专属资源清理/租约/失败重试已实现；29新增Python及147关联回归（新增deletion公开字段断言更新后复跑）、68Node通过，真实隔离HTTP/Windows文件/原Popen普通drain通过。冻结后产品暂停待DeepSeek独立核验，不把自检称独立通过；未读生产配置正文/Key/DB/私有state/原生日志，未生产启停/删除，7角色绑定与286 paused保持。详[本片合同](docs/spec/ROLE_DELETE_IMPLEMENTATION_20261024.md)与当前进度；下一无关片仍先确认。
-
-- 2026-10-24 17:53最新：326/2970已独立核验、集成并收取completed。固定默认24小时/86400秒且无页面配置；候选146测试+真实隔离CLI正常/超时/取消3项通过，集成同149通过。原54快照及59候选冻结保持，13份产品/测试/指南集成，3指南仅补正受管入口须重载后台管理器再启动角色；生产未重载/启停，现有进程仍旧值。2970自由文本业务unknown保留，不以本地complete自报替代独立实查；326实际new_no_candidate/count1、末9.5389%。2968消息通道占锁问题记录但本片未改路由；当前只文档/Git收尾，不开下一片。详[326核验](docs/spec/EXECUTION_TIMEOUT_24H_20261024_REVIEW.md)与精简进度。
-
-- 2026-10-24 14:25最新：325 complete/2966已收取，独立23检查零失败，F-R1可证binding/service/完整当前投影闭合，无必须修正项；33份/760220字节新源/快照与原45份/634741快照、预期漂移、远端本地交付一致后收取。实际续324原窗/count2/known、末48.5807%；324原partial/2965及9个旧展示-choice字段不可恢复、P3/ACL/长期边界保持。后台清理已批准并实际加载，代码702d47a/配置f030c6d/加载da4e4fb已推送，日常无需人工操作或再次重启。当前仅文档/Git收尾，未改产品配置/启停或新派任务；下一无关切片仍先说明范围/验收并确认。详[独立收尾记录](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)和精简当前进度，旧阶段记录见历史。
-
-- 2026-10-24 14:05派发：325定向独立复验F-R1已交DeepSeek queued/assigned，33份/760220字节baseline-deployment-fix1/及manifest-deployment-fix1.json；原45快照不变，当前源只有2helper+2guide预期补正，5产品/5测试未变。唯一写review-deployment-fix1/，禁止生产Key/配置正文/DB/私有state/原生会话/日志及启停/sweep；只核真实公开字段/原service提取/完整binding逐字段比较与诚实保留的旧展示-choice缺口。基线3d35442已推送，产品/冻结暂停，默认用户通知完成后取件。相容优先324同窗仍服从守卫，派发state=null、实际待回执；324原partial/2965已收取保持，不提前称独立修复通过。
-
-- 2026-10-24 14:01最新：324原partial/2965已收取，45源/快照634741字节及本地远端一致后接手；唯一P2 F-R1为采证字段错误/漏存，部署机制、正式清理/lease/进程/心跳已独立通过。Codex只修协调helper并只读补采完整公开角色runner/model/service，7绑定与旧322磁盘/323前工具保留值/当前值一致，历史service可从原before提取；旧展示/choice字段未记录、无法恢复，明确不声称前后不变。原报告/45快照不改、产品配置服务未变，待冻结交DeepSeek定向复验，不追加产品返修。324实际new_no_candidate新窗/count1、末29.9676%，未续323；3旧缺证+1新API未关闭=4保护，旧简写纠正。详[补正记录](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
-
-- 2026-10-24 13:27派发：324首次部署证据独立复核已交DeepSeek queued/assigned；45份/634741字节baseline-deployment-v1及manifest-deployment.json，派前源/快照零漂移，5产品/5测试仍匹配323，基线da4e4fb已推送。唯一写review-deployment/；不读生产配置正文/DB/Key/私有state/原生会话/日志，只核冻结安全证据/普通代码和可选PID创建时间元数据，不生产启停/sweep/改码。原用户“后续验收条件允许同窗”继续沿base315工作线，换代仍服从守卫，实际回执待324不预称复用。产品/冻结暂停，默认用户通知完成后取件。新自动清理已正式加载、仅DSH恢复及实际检查自检通过；不提前称独立部署通过或完整日志完成。
-
-- 2026-10-24 13:23最新：用户已正常重启原API，新API11520/runtime4888/七宿主serving/worker无错，后台启动自动检查complete/0删除/4旧缺证或未关闭保护、907191字节/容量complete/next_check本地10月25日13:21:30。只普通恢复原DSH gen60/ins_fd018306ec1c/PID11164，running/ready/idle、同实例真实心跳推进60.078633秒，其余六停止/无owner。三组件新manifest及Windows冲突32证实活跃lease，closed不存在；不造关闭证据。配置428c928e…及同DB/五policy/绑定/要求/286 paused保持；协调方加载自检通过，待冻结交DeepSeek首次独立部署证据复核，不预称独立通过。原“等待重启”为下方历史阶段，详[加载记录](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)。
-
-- 2026-10-24 13:20最新：用户已明确“确认启用并正常重载”。human实核无running/worker空闲、仅DSH gen58 idle后，原runtime4856普通drain退出，七宿主14个原PID/创建时间绑定均absent、七角色stopped/无owner。仅加backend_enabled=true，配置新SHA428c928e…e09825；其余解析字段/五source/同DB/绑定/要求/286 paused保持、旧字节私有备份完成，无强杀/CAS/手动sweep。现在待用户原终端Ctrl+C重跑API；回复后核正式清理policy/state/due、新宿主并普通恢复原DSH，其余六停止。不重复同一已批准部署确认，不把落盘称加载通过。详[加载记录](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)，下一无关片仍先确认。
-
-- 2026-10-24 13:14最新：323首次独立复核complete/2964已收取，30份/852486字节取件源/快照与本地远端交付一致，DeepSeek idle/无当前任务，无产品修正项。独立22新及真实隔离API通过；组合104通过/1私有ACL cleanup限制，不称独立105全过，Codex自检105通过保持，六项P3原报告保留。实际续322原窗/count2、missing-metrics备用、末52.6519%。[具体启用方案](docs/spec/BACKEND_LOG_AUTO_RETENTION_DEPLOYMENT_20261024.md)已准备，只读预检仅增backend_enabled=true、候选SHA428c928e…e09825，原SHA db98e42d…保持，尚未启用/重载/生产sweep。新部署仍须用户明确确认；286 paused和旧缺证run保留，不许造删除证明或扩大归属许可。下一无关片仍先确认。
-
-- 2026-10-24 11:15派发：新后台日志清理独立复核323已交DeepSeek，queued/assigned；基线9b21a51、30份/852486字节在baseline-v1，派前source/snapshot零漂移，产品暂停。写根仅review/，新22实际删除/保护需独立验证；不读生产配置正文/DB/Key/私有state/原生会话/日志，不操作生产。沿base315优先相容原窗，实际原生决策待回执不预称；默认用户通知323后取件。生产新开关未启用，原清理/绑定/286保持，尚未提交新片代码。
-
-- 2026-10-24新后台清理片：按用户最新安排由Codex直接开发/自测。5份产品接入独立backend_enabled（缺省false）、新backend关闭声明和project-wide任务保护；105项隔离回归/真实隔离API自动删除及保护/原角色410通过，待DeepSeek独立复核。原五范围/生产config SHA db98e42d…a8543c保持，未重载/启用新删除。项目存在任何paused/未闭环任务（含286）、超过任务预算或旧backend run缺新证明均保护，不能用322的lease存在性当删除凭据。详[本片合同](docs/spec/BACKEND_LOG_AUTO_RETENTION_20261024.md)。
-
-- 2026-10-24最新：用户通知322完成，并明确“下一片还是继续由你开发”，取代上条临时DeepSeek开发安排。322部署证据复核complete/2963、44源/快照零漂移、本地/远端交付一致，已收取completed，无产品修正项；P3/权限与沙箱限制保留。下一片已按此前说明的范围获确认：Codex直接开发/自测“新增API/runtime/worker后台日志自动清理覆盖”，DeepSeek独立复核；仅新增根、30天/活跃/未关闭/缺证保护，保原五范围、模型Key绑定及286，不派Kimi、不扩大部署许可。先完成322文档/Git收尾再动新产品；具体启用仍待可审代码后确认，默认派复核后结束。
-
-- 2026-10-23下一片分工调整：用户因Codex额度要求“接下来这片由deepseek开发”，明确将已说明的“新后台日志自动清理覆盖”首次开发/必要自测交DeepSeek；完成暂停后Codex独立复核，发现问题再由Codex直接修正。范围仅新增API/runtime/worker后台日志根，沿用30天及活跃/未关闭/缺证保护、保原五范围策略与身份绑定；不扩为其它功能或Kimi开发。322部署证据复核仍默认用户通知后取件，先完成其收尾，再准备正式冻结任务包派发下一片，不并行改共享代码。
-
-- 2026-10-23 23:29派发：首次部署证据复核322已交DeepSeek，queued/assigned；44份/895337字节源/快照零漂移，写根仅review-deployment，产品/冻结材料暂停。只核本片实际停启/配置/三组件导出/保护及证据边界，不授权生产配置正文/DB/Key/私有state/原生会话/日志正文访问，319旧许可不沿用。优先沿base315工作线，因正常重载服务换代仍服从原守卫，原生实际决策待回执；默认用户通知322后取件，不主动等待。实际新采集与DSH恢复自检已过，不提前称独立部署通过。
-
-- 2026-10-23 23:24实际加载：用户已重启API，新runtime4856/七宿主serving及三组件新run就绪；仅普通start恢复DSH gen58/ins_211a91c1827a/PID860，running/ready/idle、同实例真实心跳推进60.067982秒，其余六停止/无owner。human后台55条三组件/合并69条含51后台、401/403/已知Key不在导出通过；角色旧来源仍明确partial，不当作完整。配置SHA db98e42d…a8543c、绑定全字段/要求/286保持；8149be9及配置3f4be45已推送。本轮协调方加载核验通过，待DeepSeek只读部署证据复核，不让其读生产Key/原生会话/私有日志或改产品；不自动等待。详[部署记录](docs/spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)。
-
-- 2026-10-23 23:13部署中：用户明确“确认启用并正常重载”。无running/worker空闲且仅DSH gen56 idle后，原runtime14584普通drain退出；七宿主含两个动态WorkBuddy共14个进程绑定absent，七角色stopped/无owner。仅追加backend_diagnostics节，新config SHA db98e42d…a8543c，原同DB/来源/清理保持。现等待用户原终端Ctrl+C重跑API，已发“已重新启动”；配置落盘不等于采集生效。收到回复后核实际三组件/宿主/权限/日志，仅普通start恢复DSH，其余六停止；本次正常加载已批准不重复询问，不CAS/强杀。详[部署记录](docs/spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)。
-
-- 2026-10-23 321收尾：独立复验partial/2962，F1/F2/OBS1及F3主路径通过，残留P3 `cli_command_unresolved`由Codex补登记/扩展有限分支检查及真实失败用例，29项针对性自检通过；末项未追加独立回审。320/321均收取completed，原partial/失败保持；321实际按旧60%规则新窗/count1，末37.9106%，不倒写为70%决策。生产配置SHA3654bdc3…保持，未启用/重载；[具体部署方案](docs/spec/BACKEND_DIAGNOSTICS_DEPLOYMENT_20261023.md)已准备待明确确认，下一无关新片仍先确认。
-
-- 2026-10-23阈值调整：用户明确要求Codex直接把同窗阈值60%改70%，本次免测试/独立复核；统一内核、旧布尔观测兼容、说明及原有边界数据已修改，未运行验证、未部署/重载。角色下次正常重启后加载；321后台/API导出复验及55份冻结不动，默认仍用户通知后取件。本次免验例外不延伸到其它切片，详[调整记录](docs/spec/EXECUTION_SESSION_THRESHOLD_70_20261023.md)。
-
-- 2026-10-23 22:35派发：321已交DeepSeek定向独立复验320的F1/F2/F3及OBS1，创建queued/assigned；55份修正版冻结/产品暂停。320原partial/2961及失败保持；原窗63.5214%已到阈值，本次服从换窗恢复基础，实际原生决策待回执，不提前宣称。生产未启用新采集/未重载，默认用户通知321后取件。
-
-- 2026-10-23 22:30最新：320独立复核partial/2961，F1无效路径身份、F2持久路由/角色校验、F3已知runtime码丢失已由Codex重现并直接修正。28新/定向+35导出鉴权+24宿主共87针对性自检和新真实隔离HTTP通过；55份/1031561字节修正版冻结，产品暂停待定向复验。320原结论/失败证据不改；生产配置及新采集未启用，未重载角色。320实际续319/count2，末63.5214%到阈值，下轮按原守卫换窗/恢复基础；不强制同窗，默认用户通知取件。
-
-- 2026-10-23 21:41派发：后台/API统一脱敏导出独立复核320已交DeepSeek，创建queued/assigned；已请求base315/同日志工作线优先续319，原生实际决策待领取回执，不提前称同窗。42份冻结保持，Codex产品暂停、默认用户通知320后取件；尚未启用新生产采集/重载，原清理/绑定/286保持。
-
-- 2026-10-23 21:39最新：用户明确批准后台/API统一脱敏导出，由Codex直接开发、DeepSeek独立复核。18新隔离/154不同Python及25Node自检、真实隔离API+runtime+worker/合并下载/正常退出通过；42份代码和证据冻结，产品写入暂停待独立复核。生产配置SHA保持3654bdc3…bf7012d，新采集未启用/未正常重载，不能称本片生产可用；旧五范围自动清理保持。复核优先续319窗、服从原守卫，默认用户通知取件，详[本片合同](docs/spec/BACKEND_DIAGNOSTICS_EXPORT_20261023.md)和当前进度。
-
-- 2026-10-23 20:53最新：319独立部署复核complete/pass并已收取2960，39份源/冻结及生产policy/state/run/lease、API健康/进程时序/仅DSH恢复/日周期保护、helper无伪造均通过，无产品修正项；318代码复验及317亦已收取，317原partial保持。本片后台清理已正式启用，首次454缺证旧run保护/删除0/约508MiB未超预算，DSH gen54 running/ready/idle，其余六角色stopped；五成员范围/未知旧run/partial摘要与30天长期未实跑限制保持。319实际new_no_candidate新窗/count1/session-48dfb7c1-20dd-42c7-a0b4-30599b5066a9、基础SHA同315、末占用30.8189%，未复用318，不能倒写同窗或推测根因。本轮仅验收文档/Git收尾，未改产品配置；模型/Key/绑定/286保护保持。下一无关新片先说明范围/验收并确认，完整日志整项及真实主被动仍未完成，详当前进度。
-
-- 2026-10-23 20:30最新：用户已重启API，新runtime14584/七manager serving，后台首次UTC12:20:23完整盘点532532295字节、454旧缺证run保护/删除0/未超1GiB、daily due已持久。仅普通start恢复原DSH gen54/ins_057877d1df52/bridge8652，running/ready/idle且连续心跳；其余六角色stopped/无owner。新bridge lease活跃/无closed，摘要HTTP200但扫描partial已明记，不充全量通过。39份部署材料冻结，319已派DeepSeek独立部署复核，沿base315/continuity请求续318窗，实际复用待回执；产品修改暂停，默认用户通知319后取件。代码/配置已推送至9ad18ca，本轮仅正式加载文档增补；模型/Key/绑定/286与旧报告保持，不造生产删除/410，不提前开新片。详当前进度及部署记录。
-
-- 2026-10-23 20:06最新：用户明确“确认启用并正常重载”及“授权收取317，保留原结论”。317已completed/2958仍partial。无running任务、worker空闲且DSH idle/新鲜后，经原统一入口普通stop，原runtime/七manager正常drain退出，角色均stopped/无owner/can_start，不强杀/不CAS。原仅DSH running，其余六个stopped。生产config已CAS原子应用：同DB绝对路径、原五scope统一总根、30天/1GiB/日周期enabled，构造预检1根5范围通过。现待用户原终端Ctrl+C重跑API一次，已发“已重新启动”问题；旧API尚未加载worker，不能称生效。收到回复后核后台policy/due/保护摘要和新宿主，只普通start恢复DSH，再必要独立复验/Git收尾；本片部署已获授权不再重复确认，模型/Key/绑定/286及下一无关新片先确认保持。详当前进度及部署记录。
-
-- 2026-10-23 19:44最新：318 DeepSeek定向独立复验complete/pass并已收取2959，F1—F5/P1关闭；独立132回归/27新测试/5原反例/27复核侧反例/37旧失败项通过，33冻结/远端本地交付核验一致。实际new_context_threshold新窗/count1/基础SHA同315，末占用31.7806%。Codex补正式API lifespan/隔离真实HTTP410及后台启停自检通过，未改产品；仅澄清合同新增事件措辞。生产配置/服务未启用，现有五source需统一原总根、同DB绝对路径；external API原终端需重启，正常宿主/角色加载方案已准备待用户确认，详当前进度/部署方案。317收取被自动审批以旧“暂不收取”及本次只确认318拒绝，仍submitted，原partial/失败保持，未绕行；需明确授权才处理。Git代码收尾按当前进度。
-
-- 2026-10-23 17:26最新：317独立复核partial/2958，F1—F5/P1经Codex接手修正；删除前后重查/关闭证据固定、双向任务图、强制绝对DB绑定、空任务保护及旧fixture释放lease补正。132相关回归/原5反例及NULL未知control补验自检通过；33份新材料已冻结，318已派DeepSeek定向复验，产品再次暂停。317实际续用315/316同窗、计数3，末占用60.171%达阈值，318按原守卫换窗恢复基础，实际回执待验。原317 partial/失败证据未改未收取，生产仍未启用，默认用户通知318后取件；详当前进度与本片合同。
-
-- 2026-10-23后台自动清理片：29份公开材料/证据共888,338字节已冻结，317已派DeepSeek独立复核，创建queued/assigned；沿base_task_id315/原continuity_key请求同窗，具体新白名单/验收以本轮任务包为准，实际复用待运行回执。Codex产品修改已暂停，默认用户通知317完成后取件；复核/修正复验及生产正常加载前不称最终通过，不启用生产清理。详当前进度。
-
-- 2026-10-23 16:44当前：用户明确批准后台自动清理开工，Codex直接实现关闭凭据/lease、白名单/DB精确绑定/任务依赖、Windows句柄删除/审计、API后台每日/启动补检与410过期引用；127项自检/相关回归通过。新版根策略协调旧writer，软容量不提前删近期日志，未知旧run保持。产品待冻结交DeepSeek独立复核，Codex随后暂停改码；生产配置/服务尚未加载或启用，不能称已自动清理生产。日常无需前台逐次确认，部署仍需正常加载证据；Kimi/286保护及下一新片先确认保持，详[本片合同](docs/spec/LOCAL_LOG_AUTO_RETENTION_DESIGN_20261023.md)。
-
-- 2026-10-23 15:54最新：本机日志盘点首片经DeepSeek315独立复核发现F1/F2、Codex直接修正后，316定向独立复验通过；19项自检/原2反例/15关联/6边界均通过，28冻结/23实际匹配。315/316已收取completed，原315 partial/2956及失败证据保持。两任务实际同一原生session，confirmed_count 1→2。只读工具/覆盖及30天/单根1GiB提案交付，不启用清理、不改生产配置/角色/Key/owner，不冒称完整日志整项完成。Codex开发/DeepSeek独立复核及条件允许续窗按用户要求执行，下一新片仍先确认；Kimi暂停、286保护保持。详本片报告和进度。
-
-- 2026-10-23本片315取件后：DeepSeek315独立复核发现F1旧mtime崩溃/F2空根隐式cwd，Codex已独立复现并直接修正，19项自检+原两反例通过；F3旧writer自动清理及16MiB含meta说明已补。316已用base_task_id=315/同continuity_key请求同窗定向复验，28份新冻结，产品修改再次暂停；实际同窗以运行回执为准。315原partial/2956/失败证据保留未收取，316完成后再核验/收取/Git收尾，不把自检称独立通过。详本片记录和当前进度。
-
-- 2026-10-23 15:27用户补充：后续已授权的验收/定向复验，在条件允许时优先发给DeepSeek同一原生执行会话，不为每次验收默认新开窗口。当前复核线基础任务315、continuity_key=`local-log-inventory-review-20261023`；相容续轮用base_task_id=315引用基础合同，仅补任务差异，保独立任务/交付/验收记录。同项目/角色/运行器/模型/权限/工作范围及原生会话可信等复用守卫保持；可靠占用达到60%、单纯缺数且可信计数达到10/11边界、会话失效或作用域不符时按既有规则换窗，不强行拼接无关任务。本约定不增加新片实施/自动等待或唤回授权，315仍待复核。
-
-- 2026-10-23 15:18本片：用户批准“本机日志覆盖与留存盘点”，明确Codex开发、DeepSeek独立复核，不能用自检替代复核；本片发现问题由Codex修正，再提交定向复验。只读盘点工具/覆盖及留存方案14项自检通过，25份材料已冻结，315已派DeepSeek独立复核，Codex产品修改暂停；未自动清理/改配置/启停/解除owner，不扩大为日志整项完成。默认用户通知后取件，Kimi开发暂停、286保护及下一无关片先确认保持。详[本片](docs/spec/LOCAL_LOG_INVENTORY_AND_RETENTION_20261023.md)。
-
-- 2026-10-23 10:44最新：用户明确上片验收通过，电脑重启后角色可正常启动。新增反馈启动TALK额外Python窗口，Codex仅修正API→runtime与显式detach入口的窗口创建标志；隔离console=false/visible=false、正常重启/退出及24项Python通过。原角色创建策略/Key/模型/归属不改，未启停生产服务；后台管理器完整退出后再次启动生效，当前窗口未宣称已关闭。窗口人验待复验，详当前进度及[本片记录](docs/spec/ROLE_START_REBOOT_FIX_20261023.md)。
-
-- 2026-10-23 09:58最新：用户验收反馈按钮过大/重启后启停卡住，本轮Codex直接修正。17×17按钮、API绑定恢复宿主/worker、启动超时投影、human关闭逐项证明/CAS恢复、重启/PID复用及旧关闭回执兼容通过；七角色实际启停、三角色周期心跳、最后31项Python/37项Node通过。旧K2.8只纠正原Key文件引用；314任务/286/模型绑定/名称/原Key保持。最终七宿主serving、原生角色全stopped可启动；runtime12856附加用户终端API，跨聊天/再开机仍待人验，不外推驻留最终通过。详[本片记录](docs/spec/ROLE_START_REBOOT_FIX_20261023.md)和当前进度。下一无关新片先确认。
-
-- 2026-10-23 00:49最新补正：用户反馈改名失败，Codex自行修正遗漏JSON请求头的422；29项Python、68项Node及实际页面函数/HTTP200通过，页面版本role-name-json-v2。另确认上片runtime/API/三个原manager/bridge于00:41前后再次退出，跨会话驻留未通过；本轮只正常恢复API/runtime9720，三角色旧owner仍保护、unknown/recovery_required，没有自动解除或重启。此前182秒证据仅为当时事实。下一片驻留修复/三角色恢复先明确范围并获确认，不扩大旧DSH一次CAS授权；见当前进度。
-
-- 2026-10-23本片用户明确当前Codex自行开发界面/角色启动器/DeepSeek稳定性修复，不派DeepSeek/Kimi开发；本片已直接实现与自检，新增项目名称权威及铅笔改名、统一API/配置worker/七成员宿主入口，受管网络瞬断及消息启动游标补正。真实常驻、正常统一停启/API重载、持续心跳与保护项已验，页面视觉/操作待人验。旧DSH退出原因未确证，只对旧gen30进行一次human CAS恢复；Codex旧私信回放的三条回复2953—2955保留，原314任务/286/模型Key绑定保持。最新服务及恢复入口见当前进度和[本片记录](docs/spec/ROLE_HOST_NAME_HEALTH_FIX_20261023.md)。后续新切片仍先明确确认，不据此扩大自动解除归属、恢复Kimi开发或桌面控制权限。
-
-- 当前Codex会话职责：需求/范围协调、任务拆分与派发、首次交付独立复核、发现问题后的直接修正与验证、集成及正式进度/Git收尾；DeepSeek和Kimi K3承担首次执行、自测与交付后暂停。以2026-10-18下述最新协作方式为准。
-- 既有分工沿革：2026-10-10取消固定决策/执行分级；2026-10-12曾约定前端Codex实施/DeepSeek复核、后端DeepSeek实施/Codex复核；2026-10-16由DeepSeek替代旧agent:kimi-code-k28-preview。2026-10-17最新约定替代旧的当前分工，不追改254等历史执行者/结果或生产配置。
-- 通过TALK bridge运行的其它member按实际身份和任务包承担职责，不因模型名称、业务角色标签或兼容 `decision_tier` 自动继承本次Codex职责。
-- 如项目管理者人工修改本节，后续Agent按最新明确职责执行。
-
-## 临时额度约束（2026-10-20，优先于下方常规派发安排）
-
-- 用户于2026-10-20明确Kimi额度用完，常规开发派发暂停，285由Codex独立实查/直接修正/收尾。2026-10-22本片明确例外：额度支持验收，允许生产短文本派发、领取、收取闭环，不给Kimi安排开发任务；本次303—308已全部收取，不据此恢复常规开发或无限期验收派发。
-- 需要首次执行的新切片先按已确认分工交`agent:deepseek`，仍一次一片、必要自测后暂停，由Codex独立实查和直接修正。此项只调整派发，不停服、不删除角色、不改模型/绑定/Key或历史结果，不增加自动等待/唤回。
-
-## 功能完成后的推进优先级（2026-10-24，用户最新约定）
-
-- 用户明确：功能已经实现、没有影响使用的缺陷时，优先继续开发下一个新功能。可选的覆盖扩展、额外盘点、性能优化或非阻断观察不再默认作为进入下一功能的前置条件；必要验证、独立复核、人工验收及进度/Git收尾仍按既有要求执行。
-- 本次明确跳过“日志剩余覆盖与导出扫描缺口”的额外只读核查。已约定范围的日志自动清理已完成、启用并独立复核；未登记来源、历史完整性和30天长期观测等边界如实保留，不因此追加日志切片，也不把未知能力写成完成。
-- 本约定调整推进优先级，不自动批准某个新切片；下一片仍先说明目的、范围、不变项和验收标准，获得确认后实施或派发。
-
-## 集中修复与核验节奏（2026-10-25，用户最新确认）
-
-- 同一已授权功能，先集中核对可见阻挡项、旧状态与兼容场景；集中实现和自测后统一冻结送独立复核，不为每个错误默认拆新切片或单独送审。
-- 复核发现的必须修正项收齐后由Codex集中修复、针对性验证；目标是一次首审，加必要的一次集中定向复验。只有真实新增阻断或证据不足才追加轮次，并简述新增证据及必要性，不把目标轮数当作跳过缺陷的硬上限。
-- 非阻断观察、可选覆盖和完善事项如实记录，不默认追加返修或阻止进入已授权的下一功能；影响使用或安全/数据正确性的真实缺陷仍须处理。
-- 同一范围已有授权的正常核查、加载、取件和收尾连续完成，不重复请求确认；新增权限、范围扩大、未授权破坏性处置或确需用户执行的外部操作仍须明确说明，先提供具体可审结果。
-- 独立复核、单一产品写入方/冻结后暂停、原失败证据、人工验收和Git收尾保持。默认派后结束、用户通知后取件不变，不新增自动等待/唤回或无限续片授权；下一无关功能的确认规则及此前已明确的单片条件授权保持。
-- 当前331按原包继续，不取消或重写327—331历史；收到交付后集中处理必须修正项，再按已有授权完成正常加载和真实验证，不为非阻断项继续拆任务。本条优先于旧记录中默认逐项返修/反复送审的安排。
-
-## 每个新切片先确认（2026-10-20，用户最新约定，优先适用）
-
-- 用户在澄清桌面日志目标并中止286后明确要求：下一步每个切片都先与用户确认。Codex先说明目的、范围、不变项和验收标准，得到该片的明确确认后，才开始新的切片实施或向执行角色派发；方案/核查任务也不能先派后报。
-- “按原计划继续”、上片交付完成或人工验收通过，不自动授权开启下一片或扩大当前片。可直接只读核对现有排期、整理待确认建议及记录本次决策；拟调整优先顺序时一并说明，不能把建议写成已批准。
-- 已获确认切片内的必要自测、首次交付独立实查、发现问题后的直接修正、自检及进度/Git收尾仍按既有职责完成，不为同一已授权范围重复询问。改变产品方向、扩大范围或涉及新的部署/权限/破坏性处置时，仍提交具体可审结果后确认。
-- 本节替代下方“可自主连续开发多个切片”“自主判断是否继续下一片”等冲突规定；执行者一次一片、共享目录暂停后审查、默认派后结束及人工验收约束保持。
-
-## 会话复用的整体完成判据（2026-10-21，用户最新明确要求）
-
-- 2026-10-22 23:10最新实际角色补验：用户要求检查新建workbuddy-k3并用其验证本功能。原页面意图requested/无人领取、runner/choice正确，Codex仅通过正式worker处理这条原请求，provisioned并生成独立agent:prj-e8fe7066bbec.workbuddy-k3-61b7e314/Key/档案；既有页面gen1未领取即超时原记录保留，窄manager17772后普通start到gen2/ins_4501cac619eb/bridge19324。MCP312→313真实同窗1→2、314新窗基础恢复1均通过并收取，原生双ID/SHA、持久计数与通道0通过；311条旧任务、原六角色/绑定/配置Key权限/模型源及286保持。新workbuddy-k3保留running/ready/idle供用户使用，原WorkBuddy接入验证及三个Kimi仍停止，DSH/Codex保持。配置worker未常驻、宿主统一启动仍未另行实施，本次手动配置/启动不冒称修复该部署缺口；人工里程碑及下一片先确认保持。详[WorkBuddy适配](docs/spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)与当前进度。
-
-- 2026-10-22 20:20最新：用户批准WorkBuddy内置引擎作为独立CLI，当前Codex直接实现/自检已完成第四类运行器。WorkBuddy5.8.3内置CodeBuddy Code2.161.0，403项相关Python、安装版fake模型16次正式投递（含60%与受控10→11）、309→310真实同窗/计数1→2及311新窗基础恢复均通过，三条已收取。原身份Key复用，仅新增本项目WorkBuddy名册/imported角色/独立运行器和精确绑定，原五角色/绑定、308条历史、原配置/Key/权限与286保持；sync正常更新名册时间戳。API正常重载child21996，临时窄宿主普通启停后WorkBuddy最终gen2/stopped/无owner，manager正常drain退出，运行器adapted。当前覆盖DSH/Codex/Kimi Code/WorkBuddy独立CLI的已核验组合，不代表WorkBuddy桌面窗口控制、主动MCP等待或另一K2.8成员独立HOME通过。人工里程碑待确认，Kimi常规开发仍暂停，下一片/宿主统一启动仍须明确确认。详[WorkBuddy适配](docs/spec/EXECUTION_SESSION_WORKBUDDY_ADAPTATION.md)、[使用说明](docs/guides/EXECUTION_SESSION_USAGE.md)和当前进度；下列较早状态保留日期语义。
-
-- 2026-10-22当前WorkBuddy片已获确认：用户回复“可以，继续”，随后根据桌面入口实查明确选择“允许以内置引擎作为独立运行器接入”。本片由当前Codex直接开发/自检，基于WorkBuddy5.8.3内置CodeBuddy Code2.161.0作为独立CLI运行器，实现同窗、真实占用60%、条件10/11、基础恢复及任务闭环；不能冒称控制WorkBuddy桌面窗口。既有角色/模型/Key/绑定/权限和286保持；Kimi不派开发任务，下一无关切片仍另行确认。
-
-- 2026-10-22 18:52整体范围补正：用户明确按运行器适配，仍少WorkBuddy。当前完成的是DSH、Codex、Kimi Code三种，K2.8/K3共用Kimi Code适配，不能据此宣称覆盖所有运行器。WorkBuddy既往仅桌面MCP单任务人工流程通过，会话复用、真实指标/60%换窗、条件10/11及新窗基础恢复尚未适配；桌面能力不能用内置CodeBuddy CLI/ACP替代证明。当前仅只读核对和更新范围，未批准新切片、未派发/启停/改产品；下一片先说明具体范围/验收并获确认，Kimi开发暂停及286保护保持。
-
-- 2026-10-22 18:02 Kimi最新边界：用户进一步明确允许TALK生产派发、领取、收取短闭环，仅禁止给Kimi安排开发任务。本会话Codex继续自行开发/验收；K2.8/K3共用适配，338项自检/真实CLI+假模型21轮及此前原账号六轮保持。生产general短文本303→304（K3）、306→307（旧K2.8）均真实同窗/计数1→2，305/308新窗完整恢复、计数1；六条均succeeded/completed并已收取，原生双SHA/精确模型/持久计数核验通过。原入口临时恢复宿主并普通start/stop，K3最终gen26、旧K2.8 gen27，均stopped/无owner，临时宿主正常drain退出，第三Kimi保持停止。302条原任务逐行SHA、配置/绑定/Key/权限、286及其它角色保持。常规开发派发暂停仍在；不扩大为持续验收或下一片。另一K2.8成员未单独实机；60%/10次为受控边界证据。详[Kimi适配](docs/spec/EXECUTION_SESSION_KIMI_ADAPTATION.md)与当前进度；下一片/宿主统一启动仍另行确认。
-
-- 2026-10-22 Codex阶段记录（后续Kimi状态见上一条）：整体目标适用所有角色；292已接通DSH，当前Codex由本会话按用户明确指示自行实现、自检和实机加载，205项通过、300→301真实同窗/计数1→2、302新窗恢复已验并收取。当时DSH/Codex可用、Kimi尚未适配；随后Kimi已完成本片共用适配与生产验证。用户明确TALK页面不改，以角色原生会话为准。Codex同名自派400规则保持，实机由合法human请求/收取；原模型/Key/绑定/权限及286保护项保持。详[Codex适配](docs/spec/EXECUTION_SESSION_CODEX_ADAPTATION.md)、[292实查](docs/spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)和[使用说明](docs/guides/EXECUTION_SESSION_USAGE.md)。
-
-
-- 用户明确：“我们需要完整实现该功能包括同窗口，达到阈值换窗口和10轮兜底这些功能并能够真正使用才算完成。没完成就继续开发这项功能。”288–291仅为离线代码/核查阶段成果，不得宣称整项功能已经可用。
-- 当前已明确授权292完整纵向接线首次实现：任务API/MCP、基础合同留存及续轮增量、原生会话创建/续接、真实上下文采集、60%换窗、条件十次备用、送达计数/状态与隔离验证。执行者仍一次一片、交付后暂停，Codex独立实查并直接补正，随后必要实机验证/使用说明及人工验收；遗漏项继续在本功能内补齐，不用“后续再接线”替代完成。
-- 同功能先验、可靠占比优先、仅单纯缺数且完整可信计数才十次备用保持；第一轮计数、读数恢复不清零、工具调用不计、新窗恢复完整介绍。以真实原生session及任务链路证据验收，离线测试或方案通过不代表整项完成。
-- 优先级局部更新：先使本项功能完整可用，宿主随TALK统一启动问题延至本功能整体完成/验收后，替代此前“291收尾后先修宿主”的顺序。Kimi暂停、286暂停、配置/绑定/权限保护与历史不追改继续；不扩大为其它功能或自动解除归属授权。
-- 此项明确本次292和整体验收边界，不取消其它新切片先说明范围/验收并确认、共享目录暂停后审查、默认派后结束及必要部署/权限确认要求。
-
-## 当前Codex适配片的明确分工（2026-10-22）
-
-- 用户确认下一角色为Codex，并明确“这部分由你自己来进行开发，不用交给deepseek”。本片由当前Codex直接实施、调试、自检、实际接线与收尾，不派DeepSeek/Kimi，不把自检称独立复核；其它新片仍按当次授权。
-- 范围为Codex原生会话同功能续用、真实上下文读取/60%换窗、单纯缺数且可信计数时10/11备用、基础合同首轮/增量/新窗恢复、API/MCP及持久计数。TALK页面不改，原gpt-6.1-sol/xhigh、Key/绑定/权限和286/Kimi暂停保持。原Codex已正常stopped、无owner、can_start=true；实机沿原宿主及普通入口，不自动解除归属或修宿主统一启动。
-- 本片现已直接实现/自检并正常加载：205项相关Python通过，300→301真实同窗/计数1→2及302新窗恢复通过并收取。原API正常重载，Codex原manager恢复且普通重载至generation21，未解除owner。当前桌面agent:codex自派400守卫保持，实机由已授权human:bobo创建/收取；DSH/Codex当前可用，Kimi未适配且暂停。详[Codex适配](docs/spec/EXECUTION_SESSION_CODEX_ADAPTATION.md)与当前进度。
-
-## 当前协作方式（2026-10-18，分工安排；新切片确认以上节为准）
-
-- 后续新任务由Codex派给DeepSeek（agent:deepseek）和Kimi K3（agent:kimi，当前精确绑定kimi-code/k3）；不再给两个K2.8角色派新任务。不因本约定停服、删除角色或更换模型/绑定，历史执行者和结果不追改。
-- 两位执行者分别承担明确切片的首次实现/方案、必要自测和结构化交付，完成后暂停。两者的首次交付均由Codex独立实查；发现问题后确认相关执行者暂停，由Codex直接修正、验证和最终集成，不默认互派复核或追加执行者返修。Codex自己的修改仍如实称自检。
-- 可以同时推进最多两条已经拆清的线路，优先同一当前功能内无依赖的切片；每位执行者一次一片。派发前固定基线、接口/不变项、可写文件白名单、禁止区、隔离验证根与验收/交付规则。有前置依赖或需要修改同一文件/数据库/协议/公共入口时先串行，不为并行提前开启无关后续功能。
-- 优先隔离工作区；使用同一目录时只有一个产品代码写入者，另一方只读冻结基线并写自己独立的方案/测试产物目录。两边不得并行修改相同文件，不共享临时数据库、日志、原生会话或测试端口。跨界需要先暂停说明，由Codex裁定，不自行扩大白名单。
-- Codex在相关执行者交付并暂停后复核/修正；跨线路集成前两方均暂停，核对范围及实际差异，再串行合入、验证和提交。协调文档由Codex独占，执行者不改正式进度、AGENTS、共享合同或Git状态；原始交付和失败证据保留。人工里程碑验收、所有权/部署权限和必要验证约束继续有效。
-- 当前先试行完整异常日志内的“DeepSeek宿主持久诊断实现 + K3日志查看/健康反馈及权限边界方案”；方案只读冻结源码、不改页面/API或假称已实现。后续满足隔离条件时可并行两个实现任务，否则串行。
-- 项目页面development_requirements若仍是旧Kimi/DeepSeek交叉分工，应如实读取并在任务包说明本次用户新约定优先；不冒称页面已更新。此为当前项目协作安排，不固化为TALK所有用户的永久产品流程。
-- 默认仍派发后结束，由用户通知完成再取件；并行授权不自动增加主动等待、自动唤回、自动重启或解除旧归属权限。本节替代下方相冲突的旧分工和全局串行措辞，未冲突的验证、单片暂停及进度/Git约束保持。
-
-## 协作方式沿革（2026-10-17；冲突部分已由2026-10-18约定替代）
-
-- Codex划定任务范围并派给DeepSeek；DeepSeek只负责该片首次执行、必要自测和交付，完成后暂停。
-- Codex独立检查首次交付的实际代码与证据；发现问题后确认DeepSeek已暂停，由Codex直接修改、调试和验证，不再默认派DeepSeek返修，也不以追加回审任务延续往返。
-- Codex对自己修正的部分完成针对性测试与最终验收，准确区分首次交付的独立复核和修正后的自检，不把自检称为他人独立复核。一次一方改共享目录，原始交付与失败证据保留，必要验证、人工里程碑验收及进度/Git收尾继续执行。
-- 258已经派发，按原任务范围完成并暂停；之后由Codex复核，有问题直接接手，不再派下一轮同片返修。默认仍是派后结束等待、用户通知完成后取件；本次调整不增加主动等待或自动唤回机制。
-- 本约定替代下文历史的前后端固定分工、发现问题交回开发者、Codex修正后必须再次交其它执行者复核等要求；如页面development_requirements仍为旧文本，按本次用户明确分工执行，读取并如实记录旧值，不冒称页面已更新。
-- 2026-10-17用户进一步明确：DeepSeek自身迁入受管服务由Codex直接核实、准备和实际操作；本角色迁移按该明确分工执行，其它切片仍按当次任务要求。先核原身份/模型/凭据来源和入口状态，使用已验证的产品宿主与必要隔离验证；正常切换、人工验收、进度/Git收尾约束保持，不追改旧任务或生产开发要求。
-- 2026-10-18用户询问并要求Codex自行操作剩余旧Codex CLI迁移，本角色也由Codex直接准备/实施；已明确迁移后模型gpt-6.1-sol/xhigh，旧启动记录用户不知。当前桌面聊天不作为旧CLI进程接管；先核本人Key/身份、独立登录和原生调用，再受管补录/正常启停与接单/人工验收，不复制原认证、不改现有桌面MCP或已验角色。
-- 2026-10-18用户随后选择保留gpt-6.1-sol/xhigh，暂缓该角色迁移并核对账号/模型支持。本轮仅诊断：同一独立登录下旧npm CLI0.144.4无目标、新桌面原生CLI0.163.0-alpha.10.2列目标及xhigh，尚无新版模型实跑。迁移保持暂停，待用户恢复后先更新候选原生CLI并验证；不降模型、重做登录、登记或启停服务。
-- 2026-10-18用户随后明确要求更新Codex CLI再试，本次授权覆盖npm CLI升级及原模型验证：已从0.144.4更新稳定0.163.0，原独立登录gpt-6.1-sol/xhigh固定回执通过。受管登记/启停暂停仍保持；新版提示词参数被忽略及连接回退须在正式接入前闭合，不把原生回执当受管迁移验收。
-- 2026-10-18用户进一步要求先修新版问题、再重新开始Codex切换；新版兼容/原Key及ID登记、同宿主启停和270合法回执已核验收取，用户确认Codex页面三步通过，五角色迁移于11:58正式验收。后续用户明确要求收取269并汇总后重开窗口，已按新要求收取269，原invalid报告/历史失败不改。13:20核原角色宿主及bridge旧PID均不存在，仅恢复原API入口，未重启角色/重建所有权。新窗先核运行恢复条件，再按排期推进完整异常日志；桌面仍agent:codex协调，不改永久要求或宽放权限。
-- 2026-10-18新窗用户确认先修复“实际进程退出但角色页仍显示启动成功”。DeepSeek执行端已离线，Codex按既有发现问题后直接修正授权完成本片；受管bridge补30秒心跳，公开状态按本次实例90秒新鲜度降为待核实，保原启动回执/归属/启停守卫，页面运行中及失联继续刷新。相关自检通过，原API正常重载后五角色接口已为unknown，用户已反馈状态及详情提示符合预期；未重启角色或重建所有权。下一步先解决宿主安全恢复条件，再按原排期推进完整异常日志；本片不改变永久分工。
-- 2026-10-18用户随后明确“同意”新增人工恢复入口、验证后恢复五角色。Codex直接完成human-only计划/恢复API、独立审计及显式CLI，313项相关Python自检通过；原API正常加载后，经human确认/精确CAS逐个解除遗留归属并普通start，18:57五角色均新manager/Popen、running/ready/idle且真实30秒心跳通过，原Key/ID/模型/绑定/历史保持。用户随后确认“都显示启动成功”，恢复后的运行状态页面复验通过；跨Codex沙箱服务停止后的持续驻留仍未验；本次五条处置不扩大为无限期自动解除归属授权。普通owner/stop守卫及永久分工不变，按原排期推进完整异常日志，首片仍DeepSeek首次执行、Codex独立复核并直接修正。
-
-## 当前本地 Agent 拓扑
-
-下列 `decision_tier` 值是尚未迁移的实际配置，不是新角色体系的固定分级要求。
-
-- `agent:codex`：Codex CLI，Lead，`decision_tier=decision`。
-- `agent:kimi`：官方 Kimi Code CLI，Reviewer，`decision_tier=execution`。
-- `agent:deepseek`：DeepSeek Harness（`dsh`）承载 DeepSeek 各类模型，Dev，`decision_tier=execution`。
-- 项目管理者于 2026-08-27 确认：本地 dogfood 暂时只使用上述 3 个 Agent；Kimi 从 pi runtime 迁移到官方 Kimi Code CLI，不再启动 Claude Code，也不再保留 `agent:pi` / `agent:pi-kimi` 作为活动成员。
-- 2026-10-08 用户新增独立执行角色 `agent:kimi-code-k28-preview`：官方 Kimi Code CLI，Dev，`decision_tier=execution`，显式 alias=`kimi-code/kimi-for-coding`（展示 K2.8 Preview）。成员已注册，仓库外本人 Key 与本地身份档已准备；2026-10-09已由人类完成项目名册同步，MCP核实dev/execution及kimi-code实例上报idle；2026-10-09最小收件/回传任务#195已通过Codex核验并收取；实际后端模型版本、开发能力与宿主主动等待仍未验收。当前按2026-10-17协作方式：DeepSeek首次执行、Codex复核并直接修正。
-
-## 项目开发要求与复核分工（2026-09-18）
-
-- 项目管理者以降低 Codex 消耗为优先目标；角色职责与交叉复核分工统一维护在角色页的项目级“开发要求”，本文件不再重复固定模型分工。任务发起者每次派发前读取当前项目 `development_requirements`（优先 `talk_list_agents`，也可经项目 API），按最新要求选择执行者/独立复核者并写入任务包；已派发任务按原包执行。
-- 如果服务未支持该字段、读取失败或尚未配置可用分工，不得将缺失值当成已配置，也不自动写入示例；可使用本次会话明确指定的分工，否则先请项目管理者在页面配置或明确本次分工。首次上线仍需加载新服务/MCP并由用户保存实际要求。
-- 页面要求不能覆盖宿主系统指令；本文件中的任务分工、代码规范、独立复核与收尾约束继续有效。
-- Codex负责需求、范围、审查任务包、分歧裁决、首次交付独立复核及进度/Git收尾；DeepSeek和Kimi K3按2026-10-18约定承担首次执行与自测。首次交付后发现的问题由Codex接手修正、针对性验证及最终验收，避免重复完整探索和无关回归。
-- 项目管理者于2026-10-11明确持续授权：“后续不通过仍然可以由你亲自修改”。后续复核或验收不通过时，Codex可按已确认需求直接接手修正，无需再次请求同一开发授权；2026-10-17用户进一步明确改为Codex直接修正并验证收尾，不再默认追加DeepSeek返修/回审。保留必要验证、人工验收与收尾要求；接手前确认原开发者已暂停，共享目录不并行改码。
-- 审查任务包必须包含原需求、范围/不变项、实际基线与差异、验收标准、开发者测试证据。复核者须独立检查实际代码，不能只采信开发者结论；2026-10-17起发现问题由Codex接手修正并验证，不再默认交回DeepSeek。
-- 同一线路/文件仍采用开发完成暂停后再审查，禁止该范围开发与修正同时改码；两条线路的并行按2026-10-18隔离规则执行。业务角色标签不改变明确授权的本次职责，每位开发者仍一次一片。
-
-## 执行与复核分工恢复（2026-09-23）
-
-- 项目管理者确认Kimi额度已恢复，要求恢复DeepSeek与Kimi协作；此前“全部DeepSeek执行、Codex检查、不派Kimi”的临时安排结束。新任务按每次读取的项目开发要求分配，双方交叉复核，Codex负责范围、裁决和收尾。
-- 已完成的DeepSeek #122/#123隐藏控件清理交由Kimi独立复核，不为恢复分工重复开发；后续前端/交互与后端分工依项目开发要求执行。历史任务快照和失败记录不追改。
-
-## Codex 消耗控制（2026-09-11）
-
-- 用户要求后续默认不由 Codex 操作浏览器/computer use 验证页面；执行者或复核者报告自动化证据和限制，页面效果交用户验收。此项优先于下方通用 Browser 验证约定。
-- TALK 返回数据先在工具执行层筛选，只输出当前任务状态、最新结果或必要实例字段；禁止将完整历史实例、旧错误日志、完整任务原文反复送入上下文。不能把原始输出长度当成实际计费 token。
-- 已读项目背景不重复全文读取；当前按2026-10-18分工由Codex独立复核DeepSeek/Kimi K3首次交付、直接修正问题和收尾，避免重复全量探索及无关测试。等待期间不反复读diff、截图或建立无关预览。
-- 等待期间只在新成果、失败、需决策或实际阶段变化时更新，避免重复“仍在等待”等无变化播报；外层工具续等本身不构成业务进展。遵守宿主更高优先级要求，不宣称项目规则能关闭宿主续行或实现零模型消耗。
-- 续等轮的最小行为约定：仅当原工具明确仍在运行，且没有新用户输入、错误或需处理事件时，直接按原运行标识续等；不另查任务状态、不读文件/diff/历史、不重述背景或重新展开方案分析，不发起重复的内部等待请求。若更高优先级指令要求更新，仅提供最短必要说明。工具完成、超时结束、报错或收到用户新输入时，退出该路径并处理实际情况；内部请求已结束不得把旧运行标识继续当作运行中使用。这是项目提示词约定，不保证零内部推理或消除每次模型续行成本。
-- 当前默认协作采用“派发后结束发起者等待，由用户通知完成再收取”；只有用户明确要求持续发起者等待时才采用上述续等路径。不为验证该约定额外创建等待任务。
-
-- 用户于2026-09-13指定 TALK 长等待的项目默认目标为600秒：在当前宿主工具能力和更高优先级指令允许时，外层 `functions.exec` 显式使用 `yield_time_ms=600000`，必要的 `functions.wait` 同样使用600000。若当前宿主指令要求更短阻塞，则按其要求调用，不以项目规则覆盖，并如实说明600秒目标未实际生效。避免主动设1000或依赖更短默认值；内部等待仍按任务需求使用现有预算，不为凑外层时长拆成短请求。结果可提前返回；连续600秒阻塞能力与用量节省尚未验证。
-- 2026-10-06终端适配预算决策更新：实际等待调用按各终端客户端预算分别配置，DeepSeek桌面 `toolCallTimeoutMs=65000` 下显式 `timeout_seconds=50`，Codex保持用户当前使用的300秒等待；其它终端先核验实际上限再定值。此规则取代跨终端统一申请600秒等待的目标，通用工具默认/最大600秒兼容合同仍保留；客户端超时与外层工具交还控制权的预算分别核验，不能靠项目配置覆盖宿主限制。默认仍派发后结束、用户通知后取件，有限续等只在明确授权的主动模式内按总预算组织。
-
-## 本地交付与收尾流程（2026-09-12 试行）
-
-- 按 `docs/guides/TASK_WORKFLOW.md` 派发一个明确切片；独立顶层任务使用已验证的最小参数，不附加子任务专用字段。
-- 执行者按使用指南生成结构化交付包，包含本次实际任务号、完成/未完成/阻塞项、差异、验证、限制和进度草稿。使用 MCP 交付摘要时将完整 JSON 作为 TALK 结果消息；可同时保留 `.tmp/<切片>/` 副本。旧的短结论加文件路径模式仍可本地读取，但 MCP 不会按消息路径读取文件，业务结论会为 unknown。正式进度仍由 Codex 维护。
-- 任务发起者（协调方）优先执行 `python scripts/talk_workflow.py summary <交付包> --expect-task-id <当前任务号>`，通过工具执行层只输出摘要；校验失败先纠正交付，不回灌完整任务原文或 Hall 历史。仅在有具体疑点时按字段/路径补读。
-- MCP 目录已加载 `talk_get_delivery` 时优先用其只读摘要，未加载时沿用本地入口。合法结构化交付默认完整保留必要内容，不机械截断：任务与结论、完成/未完成/阻塞、验证证据、限制和下一步；只写重点，同一正文避免重复。MCP 的完整性按同次响应各字段合看，不能只读 summary_text。摘要仍是审查索引：旧文本预览、显式限长有省略或存在疑点时，按 `read_more` 补读，携带结果消息 ID 与 `expect_sha256`，遇 stale_reference 从头获取。输入保护仍有效，不能只凭自报摘要验收。
-- 校验通过只代表格式、自报一致性与任务号匹配，不代表业务验收通过；仍按默认分工独立复核，确认后再收取。开发与复核期间禁止并行改码。
-- 必要验证与进度文档完成后统一提交/推送；权限阻碍明确记录部分完成及剩余动作。本流程尚未接入 bridge 自动强制执行，仍依赖调用者使用本地入口，不承诺固定调用轮数或额度节省。
-
-## 历史决策分级（迁移前字典，2026-10-10已取消固定分级方向）
-
-以下定义保留用于理解旧配置/任务；不再据此分配新任务的永久身份。当前协作按上方任务分工约定和下方开发节奏执行。
-
-### 决策 Agent
-
-默认不进行具体的切片开发，仅提供决策和方案以及负责更新进度文档。当项目管理者提出要求后可进行具体开发，详细规则见下方"开发节奏与确认规则"。
-
-### 执行 Agent
-
-负责开发，每次只开发一个已确认切片，完成后必须暂停等待确认，不负责更新进度文档。详细规则见下方"开发节奏与确认规则"。
-
-### 默认分级
-
-普通 Codex 项目会话按"当前 Agent 角色"处理。除此之外，bridge 未在配置中明确声明 `decision_tier=decision`、且本文件也未明确记录角色的 agent，一律按**执行 Agent** 处理。
-
-## Agent 业务角色
-
-业务角色（lead / ui / dev / tester / reviewer 等）**不在本文件枚举**，由 `groups.metadata.roles` 在群创建时定义；bridge 在处理每条消息前反查 `roles[<self_member_id>]` 在 prompt 中注入给模型。平台不在 schema 层固化业务角色枚举。
-
-业务角色用于说明人工定义的工作定位，不决定协调责任、永久分级或任务权限。旧配置中的 `decision_tier` 待兼容迁移；任务发起者的主动/被动模式保留，只约束该任务的发起侧。
-
-## 开发节奏与确认规则
-
-- 项目管理者于2026-10-09确认：集中完成一个已确认功能的开发、必要验证、验收与进度/Git收尾，再开展下一功能，不在功能间反复切换。当前先完成角色/模型绑定已批准范围及验收；主被动真实链路待本功能收尾后再排。各切片暂停、独立复核与人工验收门禁仍有效。
-- 本次协调方：默认不进行具体的切片开发；每个新切片按2026-10-20约定先明确目的、范围和验收标准，得到用户确认后才实施或派发。方向明确、原排期或上片验收通过均不替代该片确认；已批准范围内必要验证、实查、修正及收尾继续执行。
-- 本次协调方每片完成后汇总、提交并等待下一片确认，不再按旧批次额度自动连续开启多个切片。产品方向、破坏性接口/数据变更、部署/权限风险或重大用户体验分歧仍需单独明确。
-- 本次协调方连续工作约 60-90 分钟后，不应开启新切片；应先完成当前切片的必要验证、汇总进度、提交/推送，并输出下一步建议。
-- 若后续任务需要重新读取另一个模块文档，或 Agent 明显开始依赖“回忆前文”才能继续判断，应在完成当前切片收尾后暂停，不再开启新切片。
-- 本次开发者：每次只开发一个已确认切片；切片完成后必须暂停，并提交给本次协调方或项目管理者确认后，才能进入下一个切片。
-- “不确定项”包括：需求理解不明确、实现路径有多种可选方案、Agent 认为存在更优替代方案、可能影响现有行为或接口的改动。
-- 对未获授权的本次开发者：除 `docs/PROGRESS.md` 和必要的本切片局部文档外，其它项目文档默认不得擅自修改；如需改动，必须先得到项目管理者或本次协调方明确许可。
-- 对已授权的本次协调方：可以直接维护与当前工作相关的项目文档、模块文档、进度记录与必要决策说明，但应保持改动聚焦、可追溯，不顺手扩写无关内容。
-- 一旦项目管理者明确确认某项需求/实现决策，并允许同步文档，Agent 应在相关代码落地后及时更新对应文档，使文档与当前实现保持一致。
-
-## 切片收尾、提交与 GitHub
-
-- 项目管理者于2026-09-18明确持续授权：本项目可向 `bobo506/TALK`（`https://github.com/bobo506/TALK.git`）提交后的分支执行常规推送，后续无需重复请求用户许可；仍遵守切片验证、独立复核与收尾要求。该授权不扩大为强制推送、删除远程分支或改写远程历史的授权。
-
-- 无论是本次协调方还是本次开发者，每完成一个可能影响功能的开发切片，都必须执行“汇总进度”。
-- 每个切片收尾应包含：必要验证、进度更新、变更文件记录、待确认问题、下一步计划。
-- 本次协调方完成切片后，应为已完成切片提交一个可回溯版本；下一切片先给出具体建议并获用户确认，不自主开启。
-- 本次开发者完成切片后，应提交给本次协调方判断是否 git commit、GitHub push 或创建 PR。
-- GitHub 的人类可读描述必须使用中文，包括 PR 标题、PR 描述、变更摘要、测试说明和验收说明；commit message 也优先使用中文。
-
-## 进度文档与上下文交接
-
-- `docs/PROGRESS.md` 是当前进度快照文档，只保留当前状态、当前角色、卡点、下一步、最近恢复所需信息，必须保持长度可控。
-- `docs/PROGRESS_HISTORY.md` 是历史进度文档，用于保存已完成切片的完整记录。
-- 每次“汇总进度”时，应将已完成切片记录写入 `docs/PROGRESS_HISTORY.md`，并同步更新 `docs/PROGRESS.md` 的当前快照。
-- 当上下文达到 80%-90% 或明显接近承载上限时，Agent 必须先执行“汇总进度”，确认进度文件已写入；如本轮有代码/文档改动，还要完成验证与提交。
-- 如果运行环境提供 5 小时额度或 token 用量占比，且当前占比达到或超过 90%，Agent 不应继续开启新切片；必须先完成当前切片的必要验证、汇总进度、提交/推送已完成改动，并输出恢复指令 `继续项目`。
-- 如果运行环境未向 Agent 暴露 token/额度占比，Agent 不得臆测具体百分比；应继续按“上下文达到 80%-90% 或明显接近承载上限”规则执行，并在进度中如实说明无法读取精确用量。
-- 完成汇总、落盘、提交后，如果环境支持自动清除上下文或开启新窗口，则自动执行；如果不支持，则输出明确恢复指令：`继续项目`。
-- 核心约束：先汇总、先落盘、先提交，再清上下文；不能反过来。
-
-## Browser 验证约定
-
-- 前端或浏览器交互相关改动完成后，应优先使用 Codex Browser / in-app browser 做真实页面验证。
-- 若 Browser 插件连接失败，应先做最小诊断：确认 `node_repl` 是否可执行、`browser-client.mjs` 是否可 import、`setupAtlasRuntime(...)` 是否能完成。
-- 若 `node_repl` 可执行且 `browser-client.mjs` 可 import，但 `setupAtlasRuntime(...)` 阻塞或超时，应视为 Codex 浏览器运行时/后端连接异常，而不是项目代码问题；本轮应记录该限制，改用静态检查、后端测试、必要的临时隔离服务验证，并提示项目管理者可通过重启 Codex Desktop、重新打开 in-app browser 或检查 Browser/Chrome 后端可用性后再补测。
-- Browser 验证失败不得伪造成已通过；进度文件必须写清楚失败阶段、已替代的验证方式和残余风险。
+1. 先读 `docs/PROJECT_BRIEF.md` 了解项目定位、技术栈、数据模型和模块索引。
+2. 根据本次任务只读对应的一份 `docs/spec/MODULE_*.md`，不无关扩展阅读。
+3. 先核对实际 `member_id / 项目 / 业务角色`、当前进度和本次授权；bridge 注入或工具返回的身份事实优先于角色标签和旧记录。
+4. 已派发任务按原任务包执行；新任务以用户最新明确指令、当前项目开发要求和本次任务包为准。
+5. 不确定时先查模块索引、当前进度或询问项目管理者，不靠回忆补全事实。
+
+### 文档入口
+
+| 内容 | 权威入口 |
+|---|---|
+| 当前状态、卡点、下一步 | [PROGRESS.md](docs/PROGRESS.md) |
+| 已完成切片的详细历史 | [PROGRESS_HISTORY.md](docs/PROGRESS_HISTORY.md) |
+| 当前交接总览 | [HANDOFF_20261028.md](docs/HANDOFF_20261028.md) |
+| 后续待开发与可选项 | [DEVELOPMENT_ROADMAP.md](docs/spec/DEVELOPMENT_ROADMAP.md) |
+| 用户操作与协作亮点 | [USER_MANUAL.md](docs/guides/USER_MANUAL.md) |
+| 任务派发与结构化交付 | [TASK_WORKFLOW.md](docs/guides/TASK_WORKFLOW.md) |
+| 终端 MCP 与等待预算 | [TERMINAL_MCP.md](docs/guides/TERMINAL_MCP.md) |
+| 会话复用使用方式 | [EXECUTION_SESSION_USAGE.md](docs/guides/EXECUTION_SESSION_USAGE.md) |
+| 348 原任务包 | [DSH_NEW_ROLE_TASK_PACKAGE_20261027.md](docs/spec/DSH_NEW_ROLE_TASK_PACKAGE_20261027.md) |
+| 348 验收报告 | [DSH_NEW_ROLE_REVIEW_348_20261028.md](docs/spec/DSH_NEW_ROLE_REVIEW_348_20261028.md) |
+
+这些文档按需读取，不把其正文复制到本文件。修改某文档所记录的长期规则时，应同步更新该文档；修改用户可见行为时，同时检查模块文档和用户手册。
+
+## 当前身份、现场与授权
+
+- 用户已指定当前大K会话接替原 Codex 的辅助决策、需求澄清、任务拆分与分配职责。当前身份为 `agent:prj-e8fe7066bbec.k-d4bf0429`，项目为 `prj_e8fe7066bbec`。该职责不自动扩大为直接开发、生产操作或旧任务收取权限。
+- 348 已由大K开发并由 Codex 完成本次验收和交接。常规回归 401 项 Python、120 项 Node 通过，但新增 3 项边界验证有 2 项失败，因此本次验收不通过、候选不集成。
+- 两项必须修正为：`target_api_key_env=TALK_API_KEY` 等保留身份变量可能引发提供商凭据与 TALK 身份混用；命令模板可将明文 Key 带入最终 `argv`。详见 348 验收报告。
+- 348 结果 2994 仍为 `succeeded/submitted`、未收取；其 `created_by=agent:codex`，只能由原请求者通过正常接口收尾。不得复制 Codex Key、私改任务归属或绕过权限。
+- 348 返修、DeepSeek 独立复核、WorkBuddy 及其它后续开发均不因交接自动派发。当前明确授权仅为结构化精简本文件及必要本地 Git 收尾；完成后等待用户确认下一片。
+- 项目页面保存的开发要求或历史主控字段可能仍是旧值。用户本次明确分工优先，但不得冒称已同步页面配置，也不得利用历史字段取得额外权限。
+
+## Agent 角色与任务分工
+
+- 取消固定“决策/执行”身份分级。旧 `decision_tier` 字段只作兼容事实，不用于新任务权限、调度或角色判断。
+- 协调责任由具体任务的 `created_by` 和本次明确授权确定；开发、独立复核、返修和收尾职责由用户最新指令、项目开发要求及任务包确定。同一角色可在不同任务承担不同职责。
+- 业务角色如 `lead / dev / reviewer` 只说明工作定位，不代表永久权限。模型名称、runner 名称和旧实例状态也不能证明本次授权。
+- 每次派发前读取当前项目 `development_requirements`，优先使用 `talk_list_agents`。若页面要求与用户本次明确指令不同，应在任务包如实记录快照和本次优先依据，不擅自改写页面值。
+- 如果身份、开发要求或授权读取失败，不得把缺失值猜成已配置；可沿用本次会话明确分工，否则先请项目管理者确认。
+- 新角色不会自动继承旧任务的收取、停止、恢复或所有权操作权限。历史任务按原创建者和原任务包处理。
+
+## 每个新切片先确认
+
+- 每个新切片开始前，先向用户说明**目的、范围、不变项和验收标准**，获得明确确认后才实施或派发。方案、核查和返修切片同样适用。
+- “按原计划继续”、路线图已有记录、上片交付或验收通过，都不自动授权下一片。已确认切片内的必要自测、独立核验、集中返修、正常取件和收尾不重复询问同一授权。
+- 按可独立验证的完整流程拆包：不把整个模块笼统委派，也不按单字段、单接口机械碎拆。每次只推进一个依赖闭环；有共享文件、数据库、协议或公共入口依赖时必须串行。
+- 确需并行时，必须已有明确授权，且工作区、文件、数据库、日志、原生会话和测试端口完全隔离；任一共享写入冲突都先串行。
+- 已实现且没有影响使用的缺陷时，可优先建议下一真实功能。可选覆盖、性能优化和非阻断观察不默认成为前置工作，但也不构成自动开工授权。
+- 连续工作约 60–90 分钟、需要重新读取另一模块才能判断、或明显依赖回忆前文时，不开启新片，先验证、汇总和提交。
+
+### 任务包必须明确
+
+- 原需求、目标、范围和不变项。
+- 实际分支、commit、基线清单及预期差异。
+- 可写文件白名单、禁止区、唯一写入方和隔离验证根。
+- 验收标准、必须运行的真实命令及环境要求。
+- 结构化交付路径、证据格式、已知限制和暂停点。
+- 执行者、独立复核者、返修责任及协调者。
+- 必要的进度检查点；检查点不是自动扩范围或降低验收质量的理由。
+
+独立顶层任务按 `docs/guides/TASK_WORKFLOW.md` 使用已验证的最小参数。业务性质写在标题和正文，不猜测或伪造服务端质量子任务权限。
+
+## 隔离、冻结与独立复核
+
+- 同一范围只能有一个产品写入方。开发完成并冻结后才能独立复核；复核期间不得并行修改相同候选。
+- 优先使用隔离工作区或明确候选目录。共享目录时，另一方只能读取冻结基线并写自己的独立交付/复核目录。
+- 不共享临时数据库、日志、原生会话、HOME、凭据或测试端口。不得递归整体复制含生成物的候选目录，应按源清单和明确差异取件。
+- 开发者必须完成必要自测并如实报告失败、错误、跳过和未运行项。`runner succeeded`、自由文本“完成”或服务 ready 都不等于业务验收通过。
+- 独立复核者必须检查实际代码、差异和证据，不能只采信开发者结论，也不能把协调方代跑结果冒称本人独立执行。
+- 原始交付、失败证据、旧快照和冻结清单必须保留。不得为了全绿删除断言、改写旧结果或覆盖失败日志。
+- 自检不能称为他人独立复核。更换决策角色不会自动改变原任务的独立复核关系。
+
+### 集中返修与复验
+
+- 同一已授权功能先集中核对可见阻挡项、兼容场景和旧状态，集中实现、自测后统一冻结送审，不为每个小错误反复拆新片。
+- 必须修正项收齐后按本次分工集中返修，目标是一次首审和必要的一次集中定向复验。只有真实新增阻断或证据不足才追加轮次，并说明新增证据及必要性。
+- 非阻断观察和可选完善如实记录，不默认追加返修或阻挡下一已授权功能；安全、数据正确性和实际使用缺陷仍必须处理。
+- 返修应另建候选并保留原冻结，不直接改原交付或生产源码。复验至少覆盖原失败反例、正常路径和相关回归。
+
+## 生产、权限与秘密保护
+
+- 未经本次明确授权，不执行生产启停、部署、删除、强制终止、CAS、清锁、所有权解除、角色重建或配置迁移。
+- 需要重试授权或启动替代流程时，必须先正常停止并确认旧流程退出；停止结果未知、归属不明或任务仍忙时保持阻挡，不猜测清理。
+- 保留现有忙任务、残余领取、实例占用和所有权守卫。运行器内部子进程生命周期由运行器负责，不擅自恢复原生子进程树管理方案。
+- 不读取真实 Key、私有配置正文、生产 DB、私有 native HOME、会话或日志，除非用户明确授予本次所需的最小范围。只读核查授权不自动等于修复授权。
+- 秘密不得写入仓库、角色公开配置、页面、Task Hall、交付、诊断或命令行。API Key 模型连接仅按明确合同在服务端引用，并经受管执行器必要的内存环境使用。
+- 不复制其他角色原生认证，不根据名称猜秘密路径，不自动扫描用户目录或全环境寻找 Key。
+- 旧角色不强制重新登录或追溯重配；角色身份、HOME、cwd、任务和原生会话隔离保持。
+- 自动审批或权限拒绝后不得绕过、换通道重试或伪造成功；应保留拒绝事实并说明所需授权。
+
+## 发起者主被动与等待
+
+- 主被动模式只约束任务发起侧，不赋予执行者或复核者额外权限。保存 `active` 只是模式意向，不等于当前连接已经生效、已唤回或已获得授权。
+- **默认被动**：派发后结束，由用户通知交付后再取件。只有用户明确授权主动跟进时，才在指定任务、连接和总预算内等待、核验和收尾。
+- 不自动恢复等待、唤回会话、创建定时任务或持续轮询。工具内部轮询不等于零模型消耗，也不能据此宣称节省额度。
+- 适配任一终端或桌面 MCP 前，必须阅读 `docs/guides/TERMINAL_MCP.md` 的“终端适配必查：工具超时与等待预算”。
+- 必须核验实际客户端工具超时、显式单次等待预算、总预算、返回余量、取消、EOF 和排队边界。不能只确认工具可发现就宣称主动等待适配通过。
+- 各终端预算分别确定，不把通用默认 600 秒、其他终端参数或 bridge 执行时限直接套用到当前客户端。
+- 收取、停止和恢复接口仍按原任务创建者及现有权限执行，不因当前是协调角色而越权。
+
+## 交付与业务验收
+
+- 执行者按 `talk-delivery-1` 提交结构化结果，包含本次真实任务号、`complete/partial/blocked`、完成/未完成/阻塞、变更文件、基线、验证、限制和进度草稿。
+- 结果消息应包含完整合法 JSON；可同时保留 `.tmp/<切片>/` 副本。自由文本旧报告的业务结论保持 `unknown`，不得猜测为完成。
+- 优先使用 `talk_get_delivery` 只读摘要，或运行：
+
+```bash
+python scripts/talk_workflow.py summary <交付包> --expect-task-id <当前任务号>
+```
+
+- 摘要必须结合同次响应的各字段阅读；有截断、疑点或旧自由文本时按稳定引用补读。`stale_reference` 必须从头读取，不拼接两份结果。
+- 格式校验只证明结构、自报一致性和任务号匹配，不代表业务正确或独立验收通过，也不会自动 collect/accept。
+- 验收必须运行项目标准构建和测试命令，并实际检查用户原始场景。只导入、只编译、只静态检查或只跑合成测试不能代替真实端到端验证。
+- 无法执行的真实登录、模型调用、生产加载、浏览器操作或长期运行必须明确标为未验证，不得从相关证据外推通过。
+- 独立复核通过后再按权限正常收取。原失败结论可以保留并收取为已处理，不等于验收通过；两者必须区分。
+
+## 进度、文档与上下文交接
+
+- `docs/PROGRESS.md` 只保留当前快照、角色、卡点、下一步和恢复所需信息，长度保持可控。
+- `docs/PROGRESS_HISTORY.md` 保存已完成切片的完整记录。每次汇总先写历史，再更新当前快照。
+- `docs/spec/DEVELOPMENT_ROADMAP.md` 保存后续待开发和可选项，不把旧排期当作开工授权。
+- `docs/guides/USER_MANUAL.md` 只描述当前真实可见、可操作的用户行为。未来能力先留在需求/合同，不得提前写成已上线。
+- 每个可能影响功能、权限、状态含义、失败提示或恢复方式的切片，都要检查模块文档、用户手册和进度影响；长期规则变化时同步本文件。
+- 文档和 GitHub 人类可读描述使用中文，commit message 优先中文。代码标识、API、命令和协议名可保留原文。
+- 当上下文达到 80%–90% 或明显接近上限时，先完成当前片必要验证、汇总、落盘和提交，再清上下文或输出 `继续项目`。
+- 如果环境没有提供准确 token/额度占比，不得臆测百分比，按可观察的上下文、工作时长和模块切换信号节制。
+
+## Git 收尾
+
+- 每个已完成切片都应有可回溯的本地提交，只暂存本次明确文件。现存未跟踪文件、他人改动、原始交付和生成证据必须保留，不得顺手清理。
+- 提交前审阅最终 diff、运行必要验证并检查空白错误。测试未通过、实现不完整或关键场景未验证时不得冒称完成。
+- 常规推送按用户最新授权执行，不强制推送、不删除远程分支、不改写远程历史。
+- 含内部运行、诊断或私有材料向公开仓库推送前，必须核对内容和目的地授权。此前拒绝不自动解除，不绕过。
+- 本轮 `AGENTS.md` 精简只做本地提交，不自动推送。
 
 ## 人工验收门禁
 
-- 当完成一个可独立查看或使用的里程碑版本时，Agent 必须暂停继续开发，汇总进度，完成验证、提交、GitHub push/PR，并用中文提供验收说明。
-- 里程碑示例：登录模块完整可操作；一个 Agent 可成功接入并完成消息接收/反馈；Group Hall 可完整创建、进入、发消息；多 Agent 协作流程可跑通一轮。
-- 人工验收说明应包含：启动方式、验证入口、可测试账号或 API Key 获取方式、核心验收步骤、已知限制。
-- 等待项目管理者人工验收后，再继续下一阶段开发。
+- 完成可独立查看或使用的里程碑时，暂停继续扩展，先完成必要验证、独立复核、进度和 Git 收尾。
+- 验收说明必须包含启动方式、入口、必要账号或 Key 获取方式、核心步骤、预期结果和已知限制。
+- 前端或浏览器交互改动优先做真实页面验证。工具不可用或环境受限时，记录失败阶段、替代证据和残余风险，不能伪造浏览器通过。
+- 等待项目管理者明确验收后再进入下一阶段；服务 ready、测试通过或开发者自报均不代替人工门禁。
 
-## 编码约定
+## 终端、编码与项目约定
 
-- 所有文件写入操作必须显式指定 `encoding='utf-8'`
-- Windows 环境下 Python 默认编码可能是 GBK；如果省略编码参数，中文内容可能被写成乱码
-- Python 写文件示例：`open(path, "w", encoding="utf-8")`
-
-## 文档语言约定
-
-- 项目文档中的描述性内容尽量使用中文，包括需求说明、设计说明、进度记录、验收说明、变更摘要和面向人阅读的解释文字。
-- 代码标识、API 路径、命令、配置键、库名、协议名、错误码、commit hash 等技术字面量可以保留英文或原始写法，并使用反引号标注。
-- 如引用外部英文资料或第三方专有名词，优先保留原文名词，并在必要时补充中文解释。
-
-## 项目结构注意事项
-
-- SDK 代码位于 `TALK/client/`；项目根目录下存在一个同名 `TALK` 子目录，这不是 bug
-- 这是 `SDK-1` 落地后的当前结构，默认运行前提是 `cwd = 项目根`
-- Python import 路径固定写成 `from TALK.client import TalkClient`
-- 不要写成 `from client import X`，也不要假设 `client/` 是项目根级包
-
-## 技术栈速查
-
-- 后端：Python 3.11 + FastAPI + uvicorn + SQLModel
-- 数据库：SQLite（WAL 模式）
-- 前端：Vanilla JS + Tailwind CSS (CDN)
-- 鉴权：X-API-Key header
-- 配置：config.toml（由 tomllib 读取）
+- 所有文件写入显式使用 UTF-8；Python 示例：`open(path, "w", encoding="utf-8")`。
+- 遵循周边代码的命名、结构和技术 idioms，不擅自引入新依赖或框架。新增测试只放入已有测试体系。
+- 代码修改后检查注释和 docstring，避免继续描述旧行为。
+- SDK 位于 `TALK/client/`，固定导入 `from TALK.client import TalkClient`，不要写成 `from client import X`。
+- 后端：Python 3.11+、FastAPI、uvicorn、SQLModel；数据库为 SQLite WAL；前端为 Vanilla JS + Tailwind CSS CDN；鉴权为 `X-API-Key`。
+- 配置由 `config.toml` 和 `tomllib` 读取。运行数据、日志、上传文件和备份不属于产品源码。
 
 ## 启动方式
 
@@ -495,4 +164,4 @@ pip install -r requirements.txt
 python -m uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-API 文档：http://127.0.0.1:8000/docs
+API 文档：`http://127.0.0.1:8000/docs`
