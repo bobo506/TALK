@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-10-28（Asia/Shanghai）— 强制结果消息只包含完整 development.json
+
+- 用户明确要求以后执行者直接把`development.json`完整内容原样作为结果消息，不在前后添加“已完成”“交付路径”等说明。已写入AGENTS与`docs/guides/TASK_WORKFLOW.md`。
+- 新规范要求结果正文只能包含完整JSON；允许整体套一层`json`围栏，但围栏外不得有任何文字，也不得再拼第二个围栏或前后缀。这样`talk_get_delivery`才能识别可信结构化自报，避免业务结论unknown。
+- 旧自由文本结果不追改、不迁移，历史结论保持。此次仅更新规范和进度记录，不影响349/350原结果或实现。
+
 ## 2026-10-28（Asia/Shanghai）— 350复验通过，349/350集成并正常收取
 
 - 350仅修改`server/role_provision_requests.py`和对应测试，为延迟回调增加pending状态门；349原失败反例修正后2/2通过，正常pending/四种非pending/重复回调3/3通过，fix1 baseline 485项及声明SHA/patch一致。349首次不通过及350返修材料均保留，两任务已由大K正常收取completed。

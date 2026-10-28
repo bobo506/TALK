@@ -190,7 +190,8 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
  "limitations":["..."],"progress_draft":{"summary":"...","next":"..."}}
 ```
 
-- 正文整体可以套一层 ```` ```json ```` 围栏，摘要会剥掉围栏再校验；围栏之外不要混入解释文字。
+- **正文必须且只能是完整的 `development.json` 内容**，不得在前后添加“已完成”“交付路径”、说明、总结或其他自由文本。结果正文应直接粘贴交付包全文，不要另行拼接报告。
+- 正文整体可以套一层 ```` ```json ```` 围栏，摘要会剥掉围栏再校验；围栏之外不要混入解释文字。除此之外不得再添加第二个围栏或任何前后缀。
 - `task_id` 必须是**这份报告自身所属任务**的真实 TALK 任务号（不是被复核的开发任务号、不是
   `review-42` 这类自造标签）：工具会拿它与任务记录的实际 `id` 比对，错号即判 `invalid`/不可信。
   关联的开发/复核任务号写在 `baseline.diff_note` 等说明文字里。
