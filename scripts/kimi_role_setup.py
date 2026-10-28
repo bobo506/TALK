@@ -259,6 +259,129 @@ def setup(project: str, member: str, *, root: Path = ROOT, run=subprocess.run) -
             release_lock(lock_path, lock)
 
 
+class NativeLoginAttempt:
+    """一次页面授权持有的本机事实；对象不进入 API、日志或数据库。"""
+    def __init__(self, *, project, member, root, config, database, binding, source, executable, home,
+                 kimi_home, was_present, lock_path, lock, process, process_generation=None):
+        self.project = project
+        self.member = member
+        self.root = root
+        self.config = config
+        self.database = database
+        self.binding = binding
+        self.source = source
+        self.executable = executable
+        self.home = home
+        self.kimi_home = kimi_home
+        self.was_present = was_present
+        self.lock_path = lock_path
+        self.lock = lock
+        self.process = process
+        self.process_generation = process_generation
+        self.released = False
+
+
+def begin_native_login(project: str, member: str, *, root: Path = ROOT, popen=subprocess.Popen) -> NativeLoginAttempt:
+    """在角色专属 HOME 启动官方登录；只返回内存句柄，不读取或复制凭据。"""
+    config, database = _local_facts(root, project, member)
+    executable = shutil.which("kimi")
+    if not executable:
+        raise SetupError("本机找不到 Kimi Code CLI。")
+    db = _open_db(database)
+    lock = None
+    lock_path = None
+    transition = None
+    transition_path = None
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        binding = _role(db, project, member)
+        original_home = os.environ.get("KIMI_CODE_HOME")
+        source = (Path(original_home).expanduser() if original_home else Path.home() / ".kimi-code") / "config.toml"
+        state_dir = Path(config["state_dir"])
+        relative = Path("native") / host._sanitize_token(project) / host._sanitize_token(member)
+        home = host.ensure_private_dir(host.assert_inside_root(state_dir, relative))
+        kimi_home = host.ensure_private_dir(host.assert_inside_root(home, Path(".kimi-code")))
+        transition_path = lock_path_for(home / 'native-setup-transition')
+        transition = acquire_lock(transition_path)
+        from scripts import native_setup_process
+        native_setup_process.stop_previous(home, project, member)
+        lock_path = lock_path_for(home / "kimi-role-setup")
+        lock = acquire_lock(lock_path)
+        was_present = _existing_alias(kimi_home / "config.toml", binding[0])
+        db.rollback()
+        env = {name: value for name in host.CHILD_ENV_ALLOWLIST if (value := os.environ.get(name))}
+        env.update({name: str(home) for name in host.NATIVE_HOME_ENV_VARS})
+        env["KIMI_CODE_HOME"] = str(kimi_home)
+        options = {}
+        if os.name == "nt":
+            options.update({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW,
+                            "startupinfo": host._hidden_startupinfo()})
+        else:
+            options["start_new_session"] = True
+        base_flags=options.pop('creationflags',0)
+        process, process_generation = native_setup_process.spawn_recorded(home, project, member, lock,
+            lambda extra_flags: popen([executable, "login"], cwd=str(root), env=env, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                errors="replace", bufsize=1, **({'creationflags':base_flags|extra_flags} if os.name=='nt' else {}), **options))
+        return NativeLoginAttempt(project=project, member=member, root=root, config=config,
+            database=database, binding=binding, source=source, executable=executable,
+            home=home, kimi_home=kimi_home, was_present=was_present,
+            lock_path=lock_path, lock=lock, process=process, process_generation=process_generation)
+    except Exception:
+        if lock is not None:
+            release_lock(lock_path, lock)
+        raise
+    finally:
+        if transition is not None:
+            release_lock(transition_path, transition)
+        if db.in_transaction:
+            db.rollback()
+        db.close()
+
+
+def finish_native_login(attempt: NativeLoginAttempt) -> str:
+    """官方进程成功退出后，复核绑定并只准备所选模型的公开字段。"""
+    db = _open_db(attempt.database)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        binding = _role(db, attempt.project, attempt.member)
+        if binding != attempt.binding:
+            raise SetupError("角色模型在登录期间发生变化，未写入模型；请重试。")
+        outcome = _append_model(attempt.kimi_home / "config.toml", binding,
+            lambda: _source_if_present(attempt.source, binding), allow_login_generated=not attempt.was_present)
+        db.rollback()
+        return outcome
+    finally:
+        if db.in_transaction:
+            db.rollback()
+        db.close()
+        release_native_login(attempt)
+
+
+def release_native_login(attempt: NativeLoginAttempt) -> None:
+    if not attempt.released:
+        if attempt.process_generation is not None:
+            from scripts.native_setup_process import finish_record
+            finish_record(attempt.home, attempt.project, attempt.member, attempt.process_generation, attempt.process)
+        release_lock(attempt.lock_path, attempt.lock)
+        attempt.released = True
+
+
+def cancel_native_login(attempt: NativeLoginAttempt) -> None:
+    """只取消本次官方登录的专属进程组，不触碰角色服务或其它进程。"""
+    try:
+        if attempt.process.poll() is None:
+            attempt.process.terminate()
+            try:
+                attempt.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                attempt.process.kill()
+                attempt.process.wait(timeout=5)
+    finally:
+        if attempt.process.poll() is not None:
+            release_native_login(attempt)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", required=True)

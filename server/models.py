@@ -1042,6 +1042,46 @@ class RoleDeletion(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class RoleNativeSetup(SQLModel, table=True):
+    """角色原生授权/模型准备的公开状态；不保存凭据、进程参数或私有路径。"""
+    __tablename__ = "role_native_setups"
+    project_id: str = Field(primary_key=True)
+    member_id: str = Field(primary_key=True)
+    choice_id: str
+    status: str = "required"
+    revision: int = 1
+    attempt_id: Optional[str] = None
+    authorization_url: Optional[str] = None
+    authorization_code: Optional[str] = None
+    error_code: Optional[str] = None
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: Optional[datetime] = None
+
+
+class RoleNativeSetupOut(BaseModel):
+    project_id: str
+    member_id: str
+    choice_id: str
+    status: str
+    revision: int
+    authorization_url: Optional[str] = None
+    authorization_code: Optional[str] = None
+    error_code: Optional[str] = None
+    requires_user_action: bool = False
+    can_start: bool = False
+    can_cancel: bool = False
+    updated_at: datetime
+    completed_at: Optional[datetime] = None
+
+
+class RoleNativeSetupStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: StrictBool
+    expected_revision: int = PydField(ge=0)
+
+
 class RoleProvisionJob(SQLModel, table=True):
     """跨宿主配置作业（角色生命周期 R1-2，PROVISION_CONTRACT §1）。
 
@@ -3965,6 +4005,7 @@ class ProjectRoleServiceOut(BaseModel):
     current_launch: Optional[ProjectRoleServiceLaunchOut] = None
     observed_instance_id: Optional[str] = None
     native_login: str = ROLE_SERVICE_NATIVE_LOGIN_UNVERIFIED
+    native_setup_status: Optional[str] = None
     model_alias: str = ROLE_SERVICE_MODEL_ALIAS_UNCONFIGURED
     readiness_service: str = ROLE_SERVICE_READINESS_PENDING
     can_start: bool = False

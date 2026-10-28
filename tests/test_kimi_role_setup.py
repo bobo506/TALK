@@ -117,6 +117,51 @@ display_name = "K3.1 Pro"
         self.run_setup(login_with_model)
         self.assertTrue((self.state/'native/prj_1/agent_one/.kimi-code/config.toml').is_file())
 
+    def test_page_login_begin_finish_isolates_environment_and_public_model(self):
+        from scripts import native_setup_process
+        process = type('Process', (), {})()
+        def popen(argv, **kwargs):
+            self.assertEqual(argv, ['fake-kimi', 'login'])
+            env = kwargs['env']
+            self.assertNotEqual(env['KIMI_CODE_HOME'], str(self.manual))
+            self.assertNotIn('KIMI_MODEL_API_KEY', env)
+            target = Path(env['KIMI_CODE_HOME']) / 'config.toml'
+            target.write_text('[providers."managed:kimi-code"]\ntoken="DESTINATION_SECRET"\n', encoding='utf-8')
+            return process
+        with patch.dict(os.environ, {'KIMI_CODE_HOME':str(self.manual), 'KIMI_MODEL_API_KEY':'BAD'}), \
+             patch.object(setup.shutil, 'which', return_value='fake-kimi'), \
+             patch.object(setup.host, 'ensure_private_dir', side_effect=self.private_dir), \
+             patch.object(setup, 'acquire_lock', return_value={'token':'synthetic'}), \
+             patch.object(setup, 'release_lock', return_value=True) as released, \
+             patch.object(native_setup_process, 'spawn_recorded', side_effect=lambda *args: (args[-1](0), 'fake-generation')), \
+             patch.object(native_setup_process, 'finish_record'):
+            attempt = setup.begin_native_login('prj_1', 'agent:one', root=self.root, popen=popen)
+            self.assertEqual(setup.finish_native_login(attempt), 'added')
+        target = self.state / 'native/prj_1/agent_one/.kimi-code/config.toml'
+        text = target.read_text(encoding='utf-8')
+        self.assertIn('DESTINATION_SECRET', text)
+        self.assertNotIn('DO_NOT_COPY_SOURCE', text)
+        self.assertIn('k3.1-pro', text)
+        self.assertEqual(released.call_count, 2)  # 短准备互斥及长授权锁各正常释放一次。
+
+    def test_page_login_accepts_model_generated_by_official_login(self):
+        from scripts import native_setup_process
+        (self.manual / 'config.toml').unlink()
+        process = type('Process', (), {})()
+        def popen(argv, **kwargs):
+            target = Path(kwargs['env']['KIMI_CODE_HOME']) / 'config.toml'
+            target.write_text('[providers."managed:kimi-code"]\n[models."kimi-code/k3.1-pro"]\nprovider="managed:kimi-code"\nmodel="k3.1-pro"\n', encoding='utf-8')
+            return process
+        with patch.dict(os.environ, {'KIMI_CODE_HOME':str(self.manual)}), \
+             patch.object(setup.shutil, 'which', return_value='fake-kimi'), \
+             patch.object(setup.host, 'ensure_private_dir', side_effect=self.private_dir), \
+             patch.object(setup, 'acquire_lock', return_value={'token':'synthetic'}), \
+             patch.object(setup, 'release_lock', return_value=True), \
+             patch.object(native_setup_process, 'spawn_recorded', side_effect=lambda *args: (args[-1](0), 'fake-generation')), \
+             patch.object(native_setup_process, 'finish_record'):
+            attempt = setup.begin_native_login('prj_1', 'agent:one', root=self.root, popen=popen)
+            self.assertEqual(setup.finish_native_login(attempt), 'existing')
+
     def test_failed_login_does_not_prepare_model(self):
         def fail(*args, **kwargs): return type('Result', (), {'returncode': 1})()
         with self.assertRaisesRegex(setup.SetupError, '登录未完成'):

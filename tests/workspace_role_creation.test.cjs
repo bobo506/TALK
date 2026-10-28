@@ -17,11 +17,11 @@ function limitedHistory(call,backend) {
 const oldHistory=()=>Array.from({length:205},(_,i)=>({request_key:`role-old-history-${String(i).padStart(8,'0')}`,status:'provisioned',revision:3,member_id:`old:${i}`,created_at:'2025-01-01T00:00:00Z'}));
 function harness({storage=new Map(),human=true,handler}={}) {
   const dom=documentFixture(),ctx={projectId:'p',accountId:'human:a',active:true,settings:true,human};
-  const requests=[],timers=new Map();let count=0,confirms=0;
+  const requests=[],timers=new Map(),alerts=[];let count=0,confirms=0;
   const backend={host:{enabled:true,host_label:'local',config_version:0},rows:[],roles:[]};
   const deps={document:dom.document,context:()=>ctx,storage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
     setTimeout:fn=>{const id=++count;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id),
-    newKey:()=>`role-000000000000000000000000000${++count}`,confirm:()=>{confirms++;return true;},
+    newKey:()=>`role-000000000000000000000000000${++count}`,confirm:()=>{confirms++;return true;},alert:text=>alerts.push(text),
     refreshRoster:async()=>{},renderDetails:()=>{},selectRole:id=>{ctx.selected=id;},
     api:async(path,options)=>{
       const call={path,method:options.method||'GET',body:options.body?JSON.parse(options.body):null};requests.push(call);
@@ -38,7 +38,7 @@ function harness({storage=new Map(),human=true,handler}={}) {
   const ui=createRoleRequestUI(deps);
   async function ready() {ui.sync();await tick();}
   async function fill(name='审查助手') {await ui.open();dom.el('role-create-runner').value='r';await ui.chooseRunner();dom.el('role-create-model').value='c';dom.el('role-create-name').value=name;dom.el('role-create-description').value='负责审查';}
-  return {...dom,ui,ctx,requests,timers,backend,storage,deps,ready,fill,confirms:()=>confirms};
+  return {...dom,ui,ctx,requests,timers,alerts,backend,storage,deps,ready,fill,confirms:()=>confirms};
 }
 test('选择真实目录并提交单一人类意图，未知凭据字段不进入状态或存储',async()=>{
   const h=harness();await h.ready();await h.fill();await h.ui.submit();
@@ -46,7 +46,9 @@ test('选择真实目录并提交单一人类意图，未知凭据字段不进�
   assert.equal(posts[0].path,'/api/projects/p/role-requests');
   assert.deepEqual(Object.keys(posts[0].body).sort(),['auto_start','choice_id','confirm','kind','request_key','role_description','role_name','runner_id'].sort());
   assert.equal(posts[0].body.role_name,'审查助手');assert.equal(posts[0].body.choice_id,'c');
-  assert.equal(h.el('role-create-submit').disabled,true);
+  assert.equal(h.el('role-create-submit').disabled,false);
+  assert.equal(h.ui.state.modal,false);assert.ok(h.el('role-create-modal').classList.contains('hidden'));
+  assert.equal(h.requests.find(r=>r.method==='POST').body.auto_start,false);
   assert.doesNotMatch(JSON.stringify(h.ui.state),/SECRET|TOKEN/);assert.doesNotMatch([...h.storage.values()].join(''),/SECRET|TOKEN/);
 });
 
@@ -55,22 +57,137 @@ test('新建Kimi角色先等待独立登录，不自动启动未配置的运行�
     if(c.path==='/api/runners')return response([{runner_id:'r',runtime:'kimi-code',display_name:'Kimi',adapter_status:'adapted',control_kind:'managed_cli'}]);
     if(c.path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'K3.1'}]);
   }});
-  await h.ready();await h.fill();await h.ui.submit();
+  await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
   assert.equal(h.requests.find(r=>r.method==='POST').body.auto_start,false);
-  assert.match(h.el('role-create-notice').textContent,/手动启动/);
+  assert.match(h.el('role-create-notice').textContent,/保存不会自动启动/);
+  assert.equal(h.ui.state.modal,false);
 });
 
-test('已创建Kimi角色展示受限本机登录指引，禁止拼接不安全标识',async()=>{
-  const h=harness();
-  h.backend.roles=[{member_id:'agent:new',role_name:'K',runner:{runtime:'kimi-code'},service:{observed:'stopped'}}];
+test('已创建Kimi角色展示页面授权与真实状态，不提供Python命令',async()=>{
+  const h=harness({handler:c=>{
+    if(c.path.endsWith('/native-setup'))return response({member_id:'agent:new',choice_id:'c',status:'awaiting_authorization',revision:2,authorization_url:'https://kimi.example/auth',can_cancel:true,updated_at:'2026-10-27T00:00:00Z'});
+  }});
+  h.backend.roles=[{member_id:'agent:new',role_name:'K',runner:{runtime:'kimi-code'},model:{model_display_name:'K3.1'},service:{observed:'stopped'}}];
   h.backend.rows=[{request_key:'role-0000000000000000000000000001',kind:'create',status:'provisioned',revision:3,credential_version:1,member_id:'agent:new'}];
   await h.ready();
-  let panel=h.ui.rolePanel({member_id:'agent:new'});
-  assert.match(h.texts(panel),/python -m scripts\.kimi_role_setup --project p --member agent:new/);
-  h.ctx.projectId='p;danger';
-  panel=h.ui.rolePanel({member_id:'agent:new'});
-  assert.doesNotMatch(h.texts(panel),/python -m/);
-  assert.match(h.texts(panel),/无法安全生成/);
+  const panel=h.ui.rolePanel({member_id:'agent:new'}),text=h.texts(panel);
+  assert.match(text,/官方授权/);assert.match(text,/K3.1/);assert.match(text,/取消本次授权/);
+  assert.doesNotMatch(text,/python -m|K2\.8/);
+  const link=panel.querySelectorAll().find(n=>n.tagName==='A');assert.equal(link.href,'https://kimi.example/auth');assert.equal(link.rel,'noopener noreferrer');
+});
+
+test('新Codex角色显示官方链接和验证码，旧角色和非人类不被引导重新授权',async()=>{
+  for(const status of ['awaiting_authorization','not_required'])for(const human of [true,false]) {
+    const h=harness({human,handler:c=>{
+      if(c.path.endsWith('/native-setup'))return response({member_id:'agent:new',choice_id:'c',status,revision:2,
+        authorization_url:'https://auth.openai.com/codex/device',authorization_code:'ABCD-EFGHI',can_cancel:true});
+    }});
+    h.backend.roles=[{member_id:'agent:new',role_name:'C',runner:{runtime:'codex'},model:{model_id:'exact-model',model_display_name:'exact-model · xhigh'},service:{observed:'stopped'}}];
+    h.backend.rows=[{request_key:'role-0000000000000000000000000001',kind:'create',status:'provisioned',revision:3,credential_version:1,member_id:'agent:new'}];
+    await h.ready();
+    const panel=h.ui.rolePanel({member_id:'agent:new'}),text=panel?h.texts(panel):'';
+    if(human&&status==='awaiting_authorization') {
+      assert.match(text,/Codex 官方授权/);assert.match(text,/ABCD-EFGHI/);assert.match(text,/exact-model/);
+      assert.match(text,/官方模型目录返回的默认值/);assert.doesNotMatch(text,/xhigh/);
+      assert.equal(panel.querySelectorAll().find(n=>n.tagName==='A').href,'https://auth.openai.com/codex/device');
+    } else {assert.doesNotMatch(text,/ABCD-EFGHI|开始官方授权|Codex 官方授权/);}
+  }
+});
+
+test('创建Codex角色时说明官方默认强度，不从选项名称继承xhigh',async()=>{
+  const h=harness({handler:c=>{
+    if(c.path==='/api/runners')return response([{runner_id:'r',runtime:'codex',display_name:'Codex',adapter_status:'adapted',control_kind:'managed_cli'}]);
+    if(c.path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'selected · xhigh'}]);
+  }});
+  await h.ready();await h.fill();
+  assert.match(h.texts(h.el('role-create-model-setup')),/官方模型目录返回的默认思考强度/);
+  assert.equal(h.el('role-create-model-setup').classList.contains('hidden'),false);
+});
+
+test('Codex角色允许保存自动启动意图，后台准备反馈不再是手动刷新前置',async()=>{
+  const h=harness({handler:c=>{
+    if(c.path==='/api/runners')return response([{runner_id:'r',runtime:'codex',display_name:'Codex',adapter_status:'adapted',control_kind:'managed_cli'}]);
+    if(c.path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'GPT-6.1 Terra'}]);
+  }});
+  await h.ready();await h.fill();
+  const auto=h.el('role-create-auto-start');
+  assert.equal(auto.disabled,false);auto.checked=true;await h.ui.submit();
+  assert.equal(h.requests.find(r=>r.method==='POST').body.auto_start,true);
+  assert.match(h.el('role-create-notice').textContent,/后台会自动完成添加、官方授权准备和反馈/);
+});
+
+test('Codex自动启动在官方准备未完成时显示等待而非成功',async()=>{
+  const h=harness();
+  h.backend.roles=[{member_id:'agent:new',role_name:'Terra',runner:{runtime:'codex'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-terra-00000001',kind:'create',status:'provisioned',revision:4,credential_version:1,
+    member_id:'agent:new',auto_start:true,auto_start_status:'pending',auto_start_error_code:'native_authorization_required'}];
+  await h.ready();
+  const text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));
+  assert.match(text,/等待完成运行器官方授权与模型准备后自动启动/);
+  assert.doesNotMatch(text,/服务已启动/);
+});
+
+test('自动启动pending遇到准备失败时不再显示等待成功',async()=>{
+  const h=harness({handler:c=>{
+    if(c.path.endsWith('/native-setup'))return response({member_id:'agent:new',choice_id:'c',status:'failed',revision:3,
+      error_code:'native_cli_version_unsupported',can_start:true});
+  }});
+  h.backend.roles=[{member_id:'agent:new',role_name:'Terra',runner:{runtime:'codex'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-terra-00000003',kind:'create',status:'provisioned',revision:4,credential_version:1,
+    member_id:'agent:new',auto_start:true,auto_start_status:'pending',auto_start_error_code:'native_authorization_required'}];
+  await h.ready();
+  const text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));
+  assert.match(text,/自动启动未执行/);assert.match(text,/当前 Codex CLI 版本未适配/);
+  assert.doesNotMatch(text,/等待完成运行器官方授权/);
+});
+
+test('未勾选自动启动的Codex后台准备仍持续轮询到ready或失败',async()=>{
+  let status='required';
+  const h=harness({handler:c=>{
+    if(c.path==='/api/runners')return response([{runner_id:'r',runtime:'codex',display_name:'Codex',adapter_status:'adapted',control_kind:'managed_cli'}]);
+    if(c.path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'GPT-6.1 Terra'}]);
+    if(c.path.endsWith('/native-setup'))return response({member_id:'agent:new',choice_id:'c',status,revision:status==='required'?1:2,can_start:status==='failed'});
+  }});
+  await h.ready();await h.fill();await h.ui.submit();
+  const key=h.requests.find(r=>r.method==='POST').body.request_key;
+  h.backend.rows=[{request_key:key,kind:'create',status:'provisioned',revision:4,credential_version:1,member_id:'agent:new',auto_start:false}];
+  h.backend.roles=[{member_id:'agent:new',role_name:'Terra',runner:{runtime:'codex'},service:{observed:'stopped'}}];
+  await h.ui.refresh();
+  assert.ok(h.timers.size>0,'required 状态仍应轮询后台准备');
+  status='ready';await h.ui.refresh();
+  assert.equal(h.timers.size,0,'ready 后停止轮询');
+});
+
+test('后台准备失败弹窗一次且保留角色详情可读错误',async()=>{
+  let status='starting';
+  const h=harness({handler:c=>{
+    if(c.path.endsWith('/native-setup'))return response({member_id:'agent:new',choice_id:'c',status,revision:status==='failed'?3:2,
+      error_code:status==='failed'?'native_cli_version_unsupported':null,can_start:status==='failed',updated_at:'2026-10-27T00:00:00Z'});
+  }});
+  h.backend.roles=[{member_id:'agent:new',role_name:'Terra',runner:{runtime:'codex'},model:{model_id:'gpt-6.1-terra'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-terra-00000002',kind:'create',status:'provisioned',revision:4,credential_version:1,member_id:'agent:new'}];
+  await h.ready();
+  assert.equal(h.alerts.length,0);
+  status='failed';await h.ui.refresh();
+  assert.equal(h.alerts.length,1);assert.match(h.alerts[0],/当前 Codex CLI 版本未适配/);
+  await h.ui.refresh();assert.equal(h.alerts.length,1);
+  assert.match(h.texts(h.ui.rolePanel({member_id:'agent:new'})),/当前 Codex CLI 版本未适配/);
+});
+
+test('页面授权开始/取消只提交当前revision，失败保留重试且不启动角色',async()=>{
+  let setup={member_id:'agent:new',choice_id:'c',status:'required',revision:1,can_start:true,requires_user_action:true,updated_at:'2026-10-27T00:00:00Z'};
+  const h=harness({handler:c=>{
+    if(c.path.endsWith('/native-setup'))return response(setup);
+    if(c.method==='POST'&&c.path.endsWith('/native-setup/start')) {assert.deepEqual(c.body,{confirm:true,expected_revision:1});setup={...setup,status:'awaiting_authorization',revision:2,authorization_url:'https://kimi.example/auth',can_start:false,can_cancel:true};return response(setup);}
+    if(c.method==='POST'&&c.path.endsWith('/native-setup/cancel')) {assert.deepEqual(c.body,{confirm:true,expected_revision:2});setup={...setup,status:'failed',revision:3,error_code:'native_authorization_canceled',authorization_url:null,can_start:true,can_cancel:false};return response(setup);}
+  }});
+  h.backend.roles=[{member_id:'agent:new',role_name:'K',runner:{runtime:'kimi-code'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-native-00000000',kind:'create',status:'provisioned',revision:3,credential_version:1,member_id:'agent:new'}];
+  await h.ready();
+  let panel=h.ui.rolePanel({member_id:'agent:new'});await panel.querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='开始官方授权').fire('click');
+  panel=h.ui.rolePanel({member_id:'agent:new'});await panel.querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='取消本次授权').fire('click');
+  const text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));assert.match(text,/已取消本次官方授权/);assert.match(text,/重试官方授权/);
+  assert.equal(h.requests.filter(r=>r.method==='POST').length,2);assert.equal(h.requests.some(r=>r.path.includes('/service/')),false);
 });
 
 test('已归档Kimi角色不展示登录配置命令',async()=>{
@@ -271,10 +388,10 @@ test('详情移除进度大块后，处理中与失败仍有简短反馈及原�
 });
 
 
-test('新建请求固定自动首次启动，配置尚未完成时不显示已启动或发启动POST',async()=>{
-  const h=harness();await h.ready();await h.fill();await h.ui.submit();
+test('新建请求仅在用户勾选时自动首次启动，配置未完成不冒充已启动',async()=>{
+  const h=harness();await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
   const post=h.requests.find(r=>r.method==='POST');assert.equal(post.body.auto_start,true);
-  assert.match(h.el('role-create-notice').textContent,/配置完成后将尝试自动启动/);
+  assert.match(h.el('role-create-notice').textContent,/按你的选择尝试自动启动/);
   assert.doesNotMatch(h.texts(h.el('role-create-result')),/启动成功|请求已提交|启动中/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
   assert.equal(h.requests.some(r=>r.path.includes('/service/')),false);
@@ -292,26 +409,24 @@ test('旧缓存缺省、false、null和新true均沿原键原载荷重试，不�
 
 test('自动启动新请求丢响应重建页面后仍保留true及同一请求',async()=>{
   const storage=new Map();const h=harness({storage,handler:c=>{if(c.method==='POST')throw Error('lost');}});
-  await h.ready();await h.fill();await h.ui.submit();
+  await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
   const payload=h.requests.find(r=>r.method==='POST').body;assert.equal(payload.auto_start,true);
   const reopened=harness({storage});await reopened.ready();await reopened.ui.open();await reopened.ui.submit();
   assert.deepEqual(reopened.requests.find(r=>r.method==='POST').body,payload);
 });
 
 async function completedAuto(h,extra={}) {
-  await h.ready();await h.fill();await h.ui.submit();
+  await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
   Object.assign(h.backend.rows[0],{status:'provisioned',member_id:'agent:auto',revision:4,credential_version:1,
     auto_start_status:'enqueued',auto_start_launch_id:'launch-public',auto_start_error_code:null,...extra});
   await h.ui.refresh();
 }
 
-test('入队只显示已提交，详情沿角色开关展示实际状态且无重复配置卡',async()=>{
+test('入队只在角色详情显示已提交，沿角色开关展示实际状态且无重复配置卡',async()=>{
   const h=harness();await completedAuto(h);
-  assert.match(h.texts(h.el('role-create-result')),/配置已完成/);
-  assert.match(h.texts(h.el('role-create-result')),/自动启动请求已提交/);
-  assert.doesNotMatch(h.texts(h.el('role-create-result')),/启动成功|已就绪|启动中/);
   const detail=h.texts(h.ui.rolePanel({member_id:'agent:auto'}));
-  assert.match(detail,/绑定重置/);assert.doesNotMatch(detail,/配置已完成|请求已提交|身份档案|启动成功/);
+  assert.match(detail,/自动启动请求已提交/);assert.match(detail,/绑定重置/);
+  assert.doesNotMatch(detail,/启动成功|已就绪|启动中|配置已完成|身份档案/);
   assert.equal(h.ui.state.rows[0].auto_start_launch_id,'launch-public');
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
@@ -324,7 +439,6 @@ test('人工意图、未受管和入队失败分别有简短反馈，刷新只�
     ['failed','auto_start_enqueue_failed',/自动启动请求提交失败/],
   ]) {
     const h=harness();await completedAuto(h,{auto_start_status:status,auto_start_error_code:code,auto_start_launch_id:null});
-    assert.match(h.texts(h.el('role-create-result')),/配置已完成/);
     assert.match(h.texts(h.ui.rolePanel({member_id:'agent:auto'})),message);
     assert.doesNotMatch(h.texts(h.ui.rolePanel({member_id:'agent:auto'})),/配置已完成|身份档案|查看角色|启动成功/);
     await h.ui.refresh();assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
@@ -345,9 +459,9 @@ test('配置失败取消不把pending意图当启动中，旧请求及恢复不�
 });
 
 test('未知自动启动状态或错误码不冒充就绪、不展示后端任意错误正文',async()=>{
-  for(const status of ['pending','__proto__',null]) {
+  for(const status of ['__proto__',null]) {
     const h=harness();await completedAuto(h,{auto_start_status:status,auto_start_error_code:'<img src=x onerror=alert(1)>'});
-    const text=h.texts(h.el('role-create-result'));
+    const text=h.texts(h.ui.rolePanel({member_id:'agent:auto'}));
     assert.match(text,/结果尚未确认/);assert.doesNotMatch(text,/启动成功|已就绪|<img|alert\(1\)/);
   }
 });
@@ -356,37 +470,36 @@ test('旧服务未确认auto意图时诚实提示，不仅凭提交载荷承诺�
   const h=harness({handler:(c,b)=>{
     if(c.method==='POST') {const row={...c.body,status:'requested',revision:1};delete row.auto_start;b.rows=[row];return response(row);}
   }});
-  await h.ready();await h.fill();await h.ui.submit();
+  await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
   assert.match(h.el('role-create-notice').textContent,/未确认自动启动意图/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
 
 
-test('新建等待时可刷新进度，并提示可关闭且不要重复创建',async()=>{
+test('保存后关闭创建页，等待项在列表刷新且不重复创建',async()=>{
   const h=harness();await h.ready();await h.fill();await h.ui.submit();
-  const text=h.texts(h.el('role-create-result'));
+  assert.equal(h.ui.state.modal,false);assert.equal(h.texts(h.el('role-create-result')),'');
+  const text=h.texts(h.el('role-request-list'));
   assert.match(text,/请求已保存.*可以关闭.*请勿重复创建/);
-  const refresh=h.el('role-create-result').querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='刷新进度');
+  const refresh=h.el('role-request-list').querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='刷新进度');
   assert.ok(refresh);const before=h.requests.length;await refresh.fire('click');
   assert.ok(h.requests.length>before);assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
 
-test('配置完成后继续跟进实际启动，失败展示查看角色并停止轮询',async()=>{
+test('配置完成后继续跟进实际启动，失败在详情显示并停止轮询',async()=>{
   const h=harness();await completedAuto(h);
   h.backend.roles=[{member_id:'agent:auto',service:{observed:'starting',readiness_service:'pending'}}];
   await h.ui.refresh();assert.equal(h.timers.size,1);
   h.backend.roles[0].service={observed:'failed',readiness_service:'failed'};
   await h.ui.refresh();assert.equal(h.timers.size,0);
-  assert.match(h.texts(h.el('role-create-result')),/角色配置已完成，但服务启动未完成/);
-  const view=h.el('role-create-result').querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='查看角色');
-  assert.ok(view);await view.fire('click');assert.equal(h.ctx.selected,'agent:auto');
+  assert.match(h.texts(h.ui.rolePanel({member_id:'agent:auto'})),/角色配置已完成，但服务启动未完成/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
 
 test('配置完成后只依据真实ready服务显示已启动',async()=>{
   const h=harness();await completedAuto(h);
   h.backend.roles=[{member_id:'agent:auto',service:{observed:'running',readiness_service:'ready'}}];
-  await h.ui.refresh();assert.match(h.texts(h.el('role-create-result')),/角色配置已完成，服务已启动/);
+  await h.ui.refresh();assert.match(h.texts(h.ui.rolePanel({member_id:'agent:auto'})),/角色配置已完成，服务已启动/);
   assert.equal(h.timers.size,0);
 });
 
@@ -394,7 +507,7 @@ test('配置完成后只依据真实ready服务显示已启动',async()=>{
 test('宿主关闭时提示先开启配置，不承诺自动处理且刷新不重发请求',async()=>{
   const h=harness();await h.ready();h.backend.host.enabled=false;
   await h.fill();await h.ui.submit();await h.ui.refresh();
-  const text=h.texts(h.el('role-create-result'));
+  const text=h.texts(h.el('role-request-list'));
   assert.match(text,/请先开启宿主配置/);assert.doesNotMatch(text,/宿主会自动处理/);
   assert.match(text,/可以关闭.*请勿重复创建/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
