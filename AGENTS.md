@@ -20,6 +20,8 @@
 
 ## 当前 Agent 角色
 
+- 2026-10-28验收/交接完成：用户仅授权348验收和进度汇总，随后重新指定决策及其它角色。**348本次验收不通过**：独立401 Python/120 Node通过，但新增3项凭据/准备边界有2项失败（TALK身份变量可被误作提供商Key目标、命令模板可带明文Key进入argv）。489项复核源清单SHA256 `99ee2abed274e4c53e3b3c49a1d2fb1ecee9ec8fbca4b82c20ec3fad6e76cece`，原基线/候选/交付及前序冻结无漂移；2994仍submitted未收取。**本轮未派发任何任务、未修改产品/原候选、未集成或生产启停。**DeepSeek复核、返修、WorkBuddy及后续开发均不自动派发；不恢复主动等待，不代指定接任者。用户重新指定/授权前停在本交接点，覆盖此前自动接续安排；接口仍回显agent:codex/lead不构成继续决策授权。详[交接总览](docs/HANDOFF_20261028.md)、[348验收](docs/spec/DSH_NEW_ROLE_REVIEW_348_20261028.md)、[进度](docs/PROGRESS.md)。
+
 - 2026-10-27 21:44：用户最新明确后续分工为大K开发、DeepSeek独立复核、Codex拆包/分配/核验；覆盖后续功能及必要返修，Codex不再直接代写后续产品改动。按可独立验证的完整流程拆包，不整模块委派、不按单字段碎拆；每次只派一个依赖闭环，交付冻结后复核、必要返修集中处理，再开下一包。348「DSH新角色：共享连接准备与受管启停（开发）」已派大K并于21:41:26领取，最后running/in_progress；484项隔离基线manifest SHA256 `2f550a65a06fe3735b0f0bd84e02246340063356fc388951dc898b877f572519`无漂移，仅写本包candidate/delivery，约45分钟开发进度检查点。WorkBuddy随后，删除/版本等不混入；DeepSeek复核待本包交付冻结后派。force_new只是请求、原生状态null；自动跟进已按原通知后取件偏好creator_stopped，未取消开发或改模式，不主动等待。详[进度](docs/PROGRESS.md)及[任务包](docs/spec/DSH_NEW_ROLE_TASK_PACKAGE_20261027.md)。API开发要求快照仍旧分工，本次人类明确指令优先，不改生产角色字段/配置/偏好。
 
 - 2026-10-27 21:32：用户确认Codex新角色使用官方模型目录返回的默认思考强度；已在`.tmp/role-creation-codex-default-20261027/`新副本落实，每次准备取官方defaultReasoningEffort并校验/落盘，不继承名称或原准备值xhigh；缺失/不支持明确失败，页面提示同规则。4项变化、484项冻结manifest SHA256 `6e543560e74043ce533efbb1dfc4b8c4d73635d7176d5479444de22e90415844`，最终333 Python/118 Node全过，父484/核心479/原347及首次复核材料无漂移。Codex块开发/自检完成，后续DSH/WorkBuddy等新角色准备按已授权范围逐块接入，不重复询问相同开工；仍未集成/生产启停/真实登录模型/改偏好/收取347或公开推送。详[进度](docs/PROGRESS.md)及[Codex记录](docs/spec/ROLE_CREATION_CODEX_20261027.md)。
