@@ -5,6 +5,7 @@
 - 350仅修改`server/role_provision_requests.py`和对应测试，为延迟回调增加pending状态门；349原失败反例修正后2/2通过，正常pending/四种非pending/重复回调3/3通过，fix1 baseline 485项及声明SHA/patch一致。349首次不通过及350返修材料均保留，两任务已由大K正常收取completed。
 - 生产根对照发现其比候选基线更旧，直接复制10个差异文件会在前端因`index.html`等依赖缺失失败，遂按实际差异补齐18个依赖，共集成28个实现/测试/页面文件，SHA与fix1 candidate一致；未整目录覆盖，未改生产配置/数据库/Key或其他角色。
 - 集成后Node创建/集成/服务/绑定/目录111项全部通过；状态门定向测试通过。Python相关回归仍有9项Windows `ADMINI~1`短路径差异，baseline同现，作为既有环境限制单列，不冒充产品通过。
+- 本地集成提交`8fa0f6e`；按“完整切片只推送一次”规则，另从远端基线发布公开提交`4c5cb33`并创建[PR #7](https://github.com/bobo506/TALK/pull/7)，仅含本切片34个实现/测试/文档文件，不带其他内部提交或PROGRESS。公开版111项Node及Python语法检查通过，PR基线为`codex/terminal-return-codex`，尚未合并。
 - 真实API重启、生产角色创建/启停、官方登录/模型和浏览器人验未执行。详[350复验与集成](spec/TERRA_ROLE_REVIEW_350_20261028.md)。后续新切片按用户约定转为Terra开发、DeepSeek复核，大K只做决策和分配，不自动开工。
 
 ## 2026-10-28（Asia/Shanghai）— 349独立复核不通过并派350集中返修

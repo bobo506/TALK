@@ -6,7 +6,7 @@ Updated: 2026-10-28（Asia/Shanghai）。当前由大K承担辅助决策与任�
 
 - **AGENTS.md已结构化精简**：经独立审阅补回三项规则及用户再次手动精简，当前161行、6,334字符；本地提交含`0c1ff4e`、`0a2a289`、`7f1919a`。公开PR [#6](https://github.com/bobo506/TALK/pull/6)为先前版本，仅含三份文档和公开提交`5665d68`，未带入其余31个内部提交，尚未合并或更新。
 - **Codex模型目录新增GPT-6.1 Terra**：官方`model/list`实测`model=gpt-6.1-terra`、显示名`GPT-6.1 Terra`、默认强度`low`且非隐藏。经human正常API登记`choice_id=rmc_54101bd4da53`，复用`builtin/openai/native-codex-chatgpt-login`；目录由1条变2条，原`gpt-6.1-sol`保留。新建角色页刷新后可选；本次只登记目录，未发起模型推理、角色启停或CLI 0.164.0适配开发。
-- **349/350代码复核与集成已完成**：349首次不通过的状态门已由350修复，延迟回调只恢复pending，`not_eligible/failed/enqueued/None`不再复活；两任务均已正常收取completed。生产根比候选基线更旧，除原10个差异文件外另补18个依赖，共集成28个实现/测试/页面文件，SHA与fix1 candidate一致。集成后111项Node通过，原失败反例及定向测试通过；Windows短路径差异仍为baseline同现的环境限制。真实API加载、角色创建/启停、官方登录/模型和浏览器人验未执行。详[350复验与集成](spec/TERRA_ROLE_REVIEW_350_20261028.md)。
+- **349/350代码复核与集成已完成**：349首次不通过的状态门已由350修复，延迟回调只恢复pending，`not_eligible/failed/enqueued/None`不再复活；两任务均已正常收取completed。共集成28个实现/测试/页面文件，SHA与fix1 candidate一致。集成后111项Node通过，原失败反例及定向测试通过；Windows短路径差异仍为baseline同现的环境限制。本地集成提交`8fa0f6e`；已按切片一次推送公开提交`4c5cb33`并创建[PR #7](https://github.com/bobo506/TALK/pull/7)，仅含本切片34个代码/文档文件，不带其他内部提交。真实API加载、角色创建/启停、官方登录/模型和浏览器人验未执行。详[350复验与集成](spec/TERRA_ROLE_REVIEW_350_20261028.md)。
 - **Git节奏与任务颗粒度规则已明确**：完整功能切片完成开发、必要验证、独立复核和收尾后可推送GitHub一次；切片内部多次分布作业、检查点和集中返修只做本地保存，执行者仅交付未复核不算完成。任务颗粒度以执行者一次能独立理解、完成并验证为准，不一股脑转交大需求，也不机械碎拆。
 - **348保持原验收结论**：结果2994仍为`succeeded/submitted`、未收取，原创建者`agent:codex`才能正常收尾。常规401 Python/120 Node通过但两个凭据边界失败，候选不集成；返修和DeepSeek复核须按用户后续明确范围执行。详[348验收报告](spec/DSH_NEW_ROLE_REVIEW_348_20261028.md)。
 
