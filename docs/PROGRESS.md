@@ -1,38 +1,41 @@
 # Project Progress
 
-Updated: 2026-10-28（Asia/Shanghai）。当前由大K承担辅助决策与任务分配。AGENTS结构化精简已完成并发布PR #6；Codex新角色目录已登记GPT-6.1 Terra。348原验收不通过及未收取状态不变。
+Updated: 2026-10-28（Asia/Shanghai）。当前由大K承担辅助决策与任务分配。Terra首片代码已集成并发布PR #7；新runtime已正常换代，G-terra准备失败为`native_cli_missing`，待配置实际Codex可执行文件后复验。
 
-## 本轮结论
+## 当前身份与协作规则
 
-- **AGENTS.md已结构化精简**：经独立审阅补回三项规则及用户再次手动精简，当前161行、6,334字符；本地提交含`0c1ff4e`、`0a2a289`、`7f1919a`。公开PR [#6](https://github.com/bobo506/TALK/pull/6)为先前版本，仅含三份文档和公开提交`5665d68`，未带入其余31个内部提交，尚未合并或更新。
-- **Codex模型目录新增GPT-6.1 Terra**：官方`model/list`实测`model=gpt-6.1-terra`、显示名`GPT-6.1 Terra`、默认强度`low`且非隐藏。经human正常API登记`choice_id=rmc_54101bd4da53`，复用`builtin/openai/native-codex-chatgpt-login`；目录由1条变2条，原`gpt-6.1-sol`保留。新建角色页刷新后可选；本次只登记目录，未发起模型推理、角色启停或CLI 0.164.0适配开发。
-- **349/350代码复核与集成已完成**：349首次不通过的状态门已由350修复，延迟回调只恢复pending，`not_eligible/failed/enqueued/None`不再复活；两任务均已正常收取completed。共集成28个实现/测试/页面文件，SHA与fix1 candidate一致。集成后111项Node通过，原失败反例及定向测试通过；Windows短路径差异仍为baseline同现的环境限制。本地集成提交`8fa0f6e`；已按切片一次推送公开提交`4c5cb33`并创建[PR #7](https://github.com/bobo506/TALK/pull/7)，仅含本切片34个代码/文档文件，不带其他内部提交。真实API加载、角色创建/启停、官方登录/模型和浏览器人验未执行。详[350复验与集成](spec/TERRA_ROLE_REVIEW_350_20261028.md)。
-- **Git节奏、任务颗粒度与交付格式已明确**：完整功能切片完成开发、必要验证、独立复核和收尾后可推送GitHub一次；切片内部多次分布作业、检查点和集中返修只做本地保存，执行者仅交付未复核不算完成。任务颗粒度以执行者一次能独立理解、完成并验证为准。结果消息正文必须且只能是完整`development.json`，不得添加“已完成”“交付路径”等前后说明；旧自由文本结果不追改。
-- **348保持原验收结论**：结果2994仍为`succeeded/submitted`、未收取，原创建者`agent:codex`才能正常收尾。常规401 Python/120 Node通过但两个凭据边界失败，候选不集成；返修和DeepSeek复核须按用户后续明确范围执行。详[348验收报告](spec/DSH_NEW_ROLE_REVIEW_348_20261028.md)。
+- 当前大K `agent:prj-e8fe7066bbec.k-d4bf0429`负责决策、拆包、分配和复核，明确保留，不得删除。旧成员`k-4bf013b9`的残留资源另行按归属清理。
+- 349/350由DeepSeek开发、大K复核并正常收取completed。首个完整切片完成后，后续新任务按用户约定转为Terra开发、DeepSeek复核，大K只做决策和分配，不自动开工。
+- `AGENTS.md`已结构化精简并持续人工调整，当前强调：新片先确认、合理颗粒度、单一写入方、独立复核、集中返修、生产权限保护、默认被动。
+- Git规则：完整功能切片验收收尾后可推送一次，切片内部多次分布作业和返修只做本地保存。结果消息正文必须且只能是完整`development.json`，不得添加“已完成”“交付路径”等前后说明；旧自由文本结果不追改。
 
-## 当前项目主线
+## 已完成实现与发布
 
-- 347原大K交付2993未收取，首次独立不通过结论保持；整体“所有已适配运行器的新角色准备→所选模型→正常启停”尚未完成，未生产加载/人验。
-- 核心返修第一块：`.tmp/role-creation-fix1-20261027/frozen-v1/`，479项，298 Python/112 Node，manifest `3f572a5a8705e1b62b748505bb3908fca81317b788f7edabc5d61f06f8b7f5e2`。
-- Codex新角色定稿：`.tmp/role-creation-codex-default-20261027/frozen-v1/`，484项，333 Python/118 Node，manifest `6e543560e74043ce533efbb1dfc4b8c4d73635d7176d5479444de22e90415844`。采用用户确认的官方默认思考强度；各轮测试有重叠，不累计冒充更多独立用例。
-- 348继承上述484项，基线manifest `2f550a65a06fe3735b0f0bd84e02246340063356fc388951dc898b877f572519`；本包两个凭据边界待修正。WorkBuddy等其余新角色准备未开工，先前排期不构成用户本次停止后的继续授权。
+- **GPT-6.1 Terra目录**：官方`model/list`实测`model=gpt-6.1-terra`、显示`GPT-6.1 Terra`、默认强度`low`且非隐藏。human正常API登记`choice_id=rmc_54101bd4da53`，复用`builtin/openai/native-codex-chatgpt-login`，原Sol保留。
+- **349/350 Terra首片**：349首次不通过的延迟启动状态门已由350修复；ready只恢复pending，`not_eligible/failed/enqueued/None`不再复活。共集成28个实现/测试/页面文件，SHA与fix1 candidate一致。集成后111项Node及原失败反例、正常pending和重复回调测试通过；Windows `ADMINI~1`短路径差异为baseline同现的环境限制，不冒充产品通过。
+- **发布**：本地集成`8fa0f6e`，公开`4c5cb33`，[PR #7](https://github.com/bobo506/TALK/pull/7)仅含本切片34个代码/文档文件，不带其他内部提交，尚未合并。发布工作区`.tmp/terra-role-publication-20261028`保留。发布记录`7c129ca`，交付格式规范`e095f81`。
+- **AGENTS公开PR #6**为早期版本，尚未合并或更新；当前分支后续规则以本地文件为准。
+- 详[350复验与集成](spec/TERRA_ROLE_REVIEW_350_20261028.md)、[349首次复核](spec/TERRA_ROLE_REVIEW_349_20261028.md)。
 
-## 已确认边界与现场限制
+## 当前运行现场
 
-- 新角色覆盖所有已适配运行器，按需配置/登录/模型检查；旧角色不强制重登；已有API Key模型连接只做服务端引用，角色身份/HOME/cwd隔离。
-- 授权重试先停止并确认旧授权退出；Codex新角色每次准备取官方模型目录默认强度，缺失/不支持明确失败，不继承xhigh名称或旧准备值。
-- 忙时禁止关闭保留，不新增运行器内部进程树管理；模型双字段展示需求已撤回。70%规则已有，统一失效时间/起点待确认。任务窗口要求按真实对话聚合、只读并展示可信缓存指标。
-- **当前大K `agent:prj-e8fe7066bbec.k-d4bf0429`承担决策和分配，明确保留，不得删除**。旧成员`k-4bf013b9`的残留资源与当前角色无关，只按专属归属清理；347/2993、348/2994正常收取用于历史闭环，不作为删除任何“大K”的条件。项目模式意向active7，主动跟进不自动恢复，仍按默认被动、用户通知后取件。
-- 旧记录保护250/2767 failed未收取、286 paused、344/2990 failed未收取，未操作或重派。新角色不会自动继承`created_by=agent:codex`旧任务的收取权限，须由用户安排正常身份收尾，不复制Key或私改归属。
-- 先前venv exe低完整性问题用系统Python3.12及venv PYTHONPATH恢复；不放宽ACL、不接管用户API终端。本轮不重新验证生产状态。
-- AGENTS公开PR采用独立分支只发布三份文档，未公开当前分支其余31个内部提交；旧`codex/kimi-role-host-fix`分支/工作区归档仍登记，未删除或归档。
+- 旧runtime `18116`已正常停止，`shutdown=complete`。用户随后用系统Python和venv依赖重启API，新runtime为 **PID `25440`**，2026-10-28 12:00:54启动，startup complete、worker无错、六宿主serving；大K角色自身仍显示`recovery_required`，不要据此解除归属或清理。
+- 新建`G-terra agent:prj-e8fe7066bbec.g-terra-cf9bbd88`选择Terra，绑定bound，但`role_native_setups.status=failed`、`error_code=native_cli_missing`，revision 5；没有服务状态、launch或实例。说明当前缺少可执行的Codex CLI配置，不能把绑定或宿主serving当成角色ready。
+- 旧`GPT agent:prj-e8fe7066bbec.gpt-79445c1f`仍offline、无实例、无`role_native_setups`准备记录；它创建于新准备链之前，不要连续点击启动或擅自删除，后续按旧角色兼容/重建流程处理。
+- 用户曾遇任务列表全空，日志为`/api/tasks` 500 `sqlite3.OperationalError: unable to open database file`；任务数据未丢，MCP可返回347—350。完整换代后是否已恢复需重新验证，不能只看healthz或刷新页面。
+- 当前API使用系统Python+`PYTHONPATH=D:/claude-test/TALK;D:/claude-test/TALK/.venv/Lib/site-packages`，避免venv exe低完整性。生产配置、原生HOME、Key和既有角色未擅自修改。
 
-## 待办与接续
+## 旧任务与未解决项
 
-全部16项主待办及可选/暂缓见[交接总览](HANDOFF_20261028.md)与[路线图](spec/DEVELOPMENT_ROADMAP.md)：角色闭环/删除清理、角色列表与创建交互、会话换窗/只读任务窗口/缓存、版本提示、主动跟进/定时唤醒、工作区登记/隔离、群聊会议、异常恢复、外部桌面与Windows外壳/目录选择、正式端到端验收及旧分支归档。
+- **347/2993**：首次独立不通过结论保持，WorkBuddy等运行器和整体联调仍未完成；**348/2994**：两个凭据边界未修，分别为TALK身份变量误作提供商Key目标、明文Key进入argv。二者`created_by=agent:codex`，只能由Codex正常收取，349/350不能替代其验收。
+- 角色页面其余6项：强度展示、文本框选复制、删除清理闭环、下拉框宽度、移除自动启动未完成提示、移除绑定重置区并统一详情。其他16项路线及可选/暂缓见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
+- 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
-1. 首片优先处理Terra新角色创建/启动失败，由DeepSeek开发、大K复核；先明确完整任务包、候选隔离和真实验收，不直接操作现有GPT角色或生产配置。
-2. 首片完成后，后续开发转为Terra、DeepSeek复核，大K只负责决策和分配；角色页面其余6项按完整流程拆包。
-3. 348两个凭据边界及整体角色创建闭环按后续明确范围处理；其他运行器、整体联调和人验不自动开工。
+## 下一步恢复顺序
 
-历史细节见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。
+1. 配置并核对本机实际Codex CLI可执行文件（当前PATH为`codex-cli 0.164.0`），不要改绑定或复制其他角色认证。随后重试G-terra准备，必要时完成官方设备授权，验证官方low、正常start-ready-stop/drain。
+2. 重新检查`/api/tasks`与任务列表是否恢复；若仍500，继续定位数据库访问问题，不通过刷新掩盖。
+3. 新角色实际链路通过后，后续切片才按Terra开发、DeepSeek复核安排；其余页面项按完整可验流程拆包。
+4. 348安全边界优先于347整体收尾，最终仍由Codex收取原2994/2993，不复制Codex Key、不私改任务归属。
+
+重开窗口后恢复指令：`继续项目`。历史细节见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。

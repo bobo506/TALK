@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-28（Asia/Shanghai）— 重开窗口前进度汇总：Terra已集成发布，新runtime换代，G-terra待CLI配置
+
+- **协作与规则**：当前大K负责决策、拆包、分配和复核；首片后新任务约定转为Terra开发、DeepSeek复核。AGENTS已精简，Git按完整切片收尾后推送一次，结果消息必须只含完整`development.json`，旧自由文本不追改。PR #6为早期AGENTS版本，未合并。
+- **实现与发布**：Terra目录已登记`rmc_54101bd4da53`，官方默认low。349首次状态门缺陷由350修复，两任务均正常收取completed；28个文件集成，111项Node及反例/定向测试通过，Windows短路径差异为baseline同现环境限制。本地`8fa0f6e`、公开`4c5cb33`，[PR #7](https://github.com/bobo506/TALK/pull/7)仅含34个代码/文档文件，未合并；发布工作区保留。
+- **runtime重载**：旧runtime `18116`停止complete后，用户用系统Python+venv依赖重启API，新runtime为PID `25440`，12:00:54启动，startup complete、worker无错、六宿主serving；大K自身角色仍recovery_required，不解除归属。API和任务数据未丢。
+- **当前真实失败**：新建`G-terra agent:prj-e8fe7066bbec.g-terra-cf9bbd88`绑定bound，但`role_native_setups.status=failed`、`error_code=native_cli_missing`、revision 5，无launch/实例。下一步需配置实际Codex CLI可执行文件后重试准备/官方授权/启停，不能由绑定或serving推断ready。旧GPT仍offline且无准备记录，不连续点击或擅自删除。
+- **其他未决**：任务列表曾因`/api/tasks` 500 `unable to open database file`全空，完整换代后需重新验证。347/2993和348/2994仍未通过且只能由Codex收取；348两个凭据边界优先，349/350不替代。角色页面其余6项和其他16项路线不自动开工。
+- 本次只更新进度与历史并做本地提交，未推送。恢复时先读`docs/PROGRESS.md`和[350复验与集成](spec/TERRA_ROLE_REVIEW_350_20261028.md)，使用系统Python+`PYTHONPATH=D:/claude-test/TALK;D:/claude-test/TALK/.venv/Lib/site-packages`，可说“继续项目”。
+
 ## 2026-10-28（Asia/Shanghai）— 强制结果消息只包含完整 development.json
 
 - 用户明确要求以后执行者直接把`development.json`完整内容原样作为结果消息，不在前后添加“已完成”“交付路径”等说明。已写入AGENTS与`docs/guides/TASK_WORKFLOW.md`。
