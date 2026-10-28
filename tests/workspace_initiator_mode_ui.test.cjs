@@ -250,7 +250,7 @@ test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源
     assert.ok(indexHtml.includes(`/${asset}?v=${STATIC_VERSION}`), `${asset} 保留原缓存版本`);
   }
   assert.ok(indexHtml.includes('/app.js?v=20261025-role-busy-stop-v1'), '未修改的 app.js 保留原缓存版本');
-  assert.ok(indexHtml.includes('/workspace.js?v=20261026-initiator-followup-v1'), '本次 workspace.js 更新缓存版本');
+  assert.ok(indexHtml.includes('/workspace.js?v=20261027-role-creation-complete-v1'), '本次 workspace.js 更新缓存版本');
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 

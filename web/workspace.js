@@ -1072,6 +1072,7 @@ function roleServiceControl(role) {
   else if (managed && roleServiceStopTimeout(service) && !hint) hint = "关闭请求已超时，请检查原宿主及进程；确认已停止后进行人工恢复，不能重复启动。";
   else if (managed && roleServiceLivenessUnknown(service) && !hint) hint = "无法确认执行端仍在运行，请先检查服务宿主；确认停止前不能重复启动。";
   else if (managed && ownershipHeld && !hint) hint = "请先「关闭」并确认已停止，再重新启动。";
+  else if (managed && service?.native_setup_status && service.native_setup_status !== "ready" && !hint) hint = "请先完成下方运行器官方授权与所选模型准备，再启动角色。";
   else if (managed && service && service.can_start !== true && service.can_stop !== true && !hint) hint = "当前不可启动。";
   if (view.error) hint = view.error;
   return { view, status, busy, batchBusy, human, kind, observed, managed, ownershipHeld, canStart, canStop, hint };

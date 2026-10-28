@@ -537,7 +537,7 @@
   <div id="role-create-modal" class="role-create-backdrop hidden">
     <section class="role-create-dialog" role="dialog" aria-modal="true" aria-labelledby="role-create-title">
       <div class="role-create-heading"><h2 id="role-create-title">创建角色</h2><button id="role-create-close" type="button" class="workspace-text-button" aria-label="关闭创建角色">关闭</button></div>
-      <p class="role-request-hint">选择运行器和模型，保存后由宿主配置独立身份，并在配置完成后尝试自动启动服务。可在角色详情查看实际状态、手动关闭或重新启动。</p>
+      <p class="role-request-hint">选择运行器和模型，保存后关闭本页并自动刷新角色列表，由宿主在后台配置独立身份。保存不会自动启动；可在角色详情查看准备进度、官方授权和实际启停状态。</p>
       <form id="role-create-form">
         <div class="role-create-grid">
           <label class="role-request-field"><span>运行器</span><select id="role-create-runner" class="group-member-select" required></select></label>
@@ -545,6 +545,7 @@
           <label class="role-request-field wide"><span>角色名称</span><input id="role-create-name" class="profile-input" type="text" required placeholder="例如：代码审查助手"></label>
           <label class="role-request-field wide"><span>角色介绍 <small>可选，最多 2000 字</small></span><textarea id="role-create-description" class="profile-textarea" rows="4" placeholder="这个角色负责什么工作"></textarea></label>
         </div>
+        <label class="role-request-hint" for="role-create-auto-start"><input id="role-create-auto-start" type="checkbox"> 配置完成后自动启动一次（默认不选；Kimi Code 需先完成官方授权，不自动启动）</label>
         <div id="role-create-model-setup" class="role-request-card hidden"></div>
         <p id="role-create-notice" class="role-request-status" role="status"></p>
         <div id="role-create-result" aria-live="polite"></div>
@@ -562,9 +563,9 @@
       </form>
     </section>
   </div>
-  <script src="/role-creation.js?v=20261026-kimi-role-host-fix1"></script>
+  <script src="/role-creation.js?v=20261027-role-creation-complete-v1"></script>
   <script src="/role-diagnostics.js?v=20261023-backend-export-v1"></script>
-  <script src="/workspace.js?v=20261026-initiator-followup-v1"></script>
+  <script src="/workspace.js?v=20261027-role-creation-complete-v1"></script>
   <script src="/app.js?v=20261025-role-busy-stop-v1"></script>
 </body>
 </html>

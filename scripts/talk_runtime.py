@@ -180,6 +180,15 @@ def load_config(path):
                 or any(not isinstance(member, str) or not member or profile not in ("review", "tools")
                     for member, profile in kimi_recipe.get("task_profiles", {}).items())):
             raise RuntimeErrorCode("runtime_host_config_invalid")
+    codex_recipe = config.get("codex")
+    if codex_recipe is not None:
+        if (not isinstance(codex_recipe, dict) or type(codex_recipe.get("enabled")) is not bool
+                or not isinstance(codex_recipe.get("executable"), str)
+                or not Path(codex_recipe["executable"]).is_absolute()
+                or not isinstance(codex_recipe.get("task_profiles", {}), dict)
+                or any(not isinstance(member, str) or not member or profile not in ("review", "tools")
+                    for member, profile in codex_recipe.get("task_profiles", {}).items())):
+            raise RuntimeErrorCode("runtime_host_config_invalid")
     recipe=config.get("workbuddy")
     if recipe is not None and (not isinstance(recipe,dict) or any(not isinstance(recipe.get(k),str) or not Path(recipe[k]).is_absolute() for k in ("executable","models_home")) or not isinstance(recipe.get("key_files",{}),dict)):
         raise RuntimeErrorCode("runtime_workbuddy_config_invalid")
@@ -441,6 +450,22 @@ class TalkRuntime:
             return None
         return spec
 
+    def codex_spec(self, role):
+        from scripts.codex_role_host import host_spec
+        spec = host_spec(self.config, role)
+        if spec is None:
+            return None
+        member = spec["member_id"]
+        key = key_file_path(Path(self.config["key_root"]), member)
+        if not key.is_file():
+            self.statuses[member] = {"state": "key_not_configured"}
+            return None
+        identity = self.client.request("GET", "/api/members/me", key=key.read_text(encoding="utf-8").strip())
+        if identity.get("id") != member or identity.get("kind") != "agent":
+            self.statuses[member] = {"state": "identity_mismatch"}
+            return None
+        return spec
+
     def reconcile_hosts(self, roles):
         parents=process_parents()
         by_id = {r["member_id"]:r for r in roles}
@@ -448,7 +473,7 @@ class TalkRuntime:
         for role in roles:
             if role["member_id"] not in specs:
                 try:
-                    spec = self.workbuddy_spec(role) or self.kimi_spec(role)
+                    spec = self.workbuddy_spec(role) or self.kimi_spec(role) or self.codex_spec(role)
                 except (rsh.HostError,OSError,ValueError):
                     self.statuses[role["member_id"]]={"state":"identity_check_failed"}
                     continue

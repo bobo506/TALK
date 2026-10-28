@@ -3,7 +3,9 @@ function createRoleRequestUI(deps) {
   const state = { epoch: 0, key: "", active: false, loading: false, seq: 0, timer: null,
     host: null, rows: [], roles: [], supported: null, error: "", busy: false,
     modal: false, runners: [], choices: [], catalogSeq: 0, attempt: null, notice: "",
-    recentKeys: [], limited: false, storageUnavailable: false, modelSeeds: [] };
+    recentKeys: [], limited: false, storageUnavailable: false, modelSeeds: [],
+    failureAlerts: new Set(),
+    nativeSetups: new Map(), nativeBusy: new Set(), nativeErrors: new Map(), nativeReadSeq: new Map() };
   const el = id => deps.document.getElementById(id);
   const context = () => deps.context();
   const human = () => context().human === true;
@@ -129,6 +131,22 @@ function createRoleRequestUI(deps) {
     if (service?.observed === "failed") return {
       text: "角色配置已完成，但服务启动未完成。请查看角色，在角色详情中重试启动。", attention: true,
     };
+    if (row.auto_start_status === "pending") {
+      const setup = state.nativeSetups.get(row.member_id);
+      if (setup?.status === "failed") return {
+        text: `官方授权或模型准备未完成，自动启动未执行。${nativeErrorsText[setup.error_code] || "请在角色详情重试准备。"}`,
+        attention: true,
+      };
+      if (setup?.status === "ready") return {
+        text: "后台准备已完成，正在等待启动入队；也可在角色详情手动启动并核对真实状态。",
+        attention: true,
+      };
+      return {
+        text: row.auto_start_error_code === "native_authorization_required"
+          ? "等待完成运行器官方授权与模型准备后自动启动。"
+          : "等待后台准备完成后自动启动。", attention: false,
+      };
+    }
     if (row.auto_start_status === "enqueued") return {
       text: "自动启动请求已提交，实际运行状态请查看角色开关。", attention: false,
     };
@@ -137,12 +155,121 @@ function createRoleRequestUI(deps) {
       auto_start_config_disabled: "本次未执行自动启动：宿主配置已关闭。",
       auto_start_manual_intent_present: "已保留手动启停操作，本次不再自动启动。",
       auto_start_enqueue_failed: "本次自动启动请求提交失败，请在角色开关核对后手动启动。",
+      native_authorization_required: "请先完成运行器官方授权与所选模型准备，再手动启动角色。",
     };
     const fallback = lookup({
       not_eligible: "本次未执行自动启动：启动条件未满足。当前状态请查看角色开关。",
       failed: "本次自动启动未完成，请在角色开关核对当前状态。",
     }, row.auto_start_status, "自动启动结果尚未确认，请刷新核对。" );
     return { text: lookup(reasons, row.auto_start_error_code, fallback), attention: true };
+  }
+  const nativeErrorsText = {
+    native_previous_process_unverified: "无法确认上次授权进程，尚未启动新授权，请检查原授权是否已结束。",
+    native_previous_process_identity_changed: "上次授权进程的身份已变化，未停止其他进程，也未启动新授权。",
+    native_previous_process_stop_unconfirmed: "尚未确认上次授权进程已退出，本次不会启动新授权，请稍后重试。",
+    native_process_identity_unverified: "未能记录本次授权进程的身份，授权未继续，请重试。",
+    native_process_scope_unavailable: "本次授权进程无法隔离管理，准备未继续，请检查运行环境后重试。",
+    native_cli_missing: "运行 TALK 的电脑未找到已配置的运行器 CLI，请核对本机安装与运行器配置后重试。",
+    native_role_busy: "角色仍在运行或配置被占用，请先正常关闭后重试。",
+    native_model_configuration_required: "官方授权已返回，但所选模型尚未准备完成；请核对模型后重试。",
+    native_model_selection_changed: "所选模型已变化，请重新完成官方授权与模型准备。",
+    native_authorization_failed: "官方授权未完成，请重试；TALK 不会把进程退出当作授权成功。",
+    native_authorization_canceled: "已取消本次官方授权，角色未启动。",
+    native_setup_interrupted: "授权会话已中断，请重试；不会沿用未确认的授权结果。",
+    native_cli_version_unsupported: "当前 Codex CLI 版本未适配，请核对本机运行器配置。",
+    native_model_catalog_unavailable: "无法确认官方模型目录，请稍后重试。",
+    native_selected_model_unavailable: "当前账号的官方模型目录未找到所选模型，请核对账号和模型选择。",
+    native_setup_failed: "本机授权或模型准备失败，请检查环境后重试。",
+  };
+  function notifyFailure(key, roleName, detail) {
+    if (!key || state.failureAlerts.has(key)) return;
+    state.failureAlerts.add(key);
+    const text = `角色「${roleName || "新角色"}」未完成：${detail}`;
+    try { deps.alert?.(text); } catch (_) { /* 弹窗被浏览器拦截时保留列表内状态。 */ }
+  }
+  function nativePublic(row) {
+    if (!row || typeof row !== "object") return null;
+    return { member_id: row.member_id, choice_id: row.choice_id, status: row.status,
+      revision: row.revision, authorization_code: typeof row.authorization_code === "string" ? row.authorization_code : null, authorization_url: typeof row.authorization_url === "string" ? row.authorization_url : null,
+      error_code: typeof row.error_code === "string" ? row.error_code : null,
+      requires_user_action: row.requires_user_action === true, can_start: row.can_start === true,
+      can_cancel: row.can_cancel === true, updated_at: row.updated_at, completed_at: row.completed_at || null };
+  }
+  async function loadNativeSetup(role, epoch = state.epoch, paint = true) {
+    const member = role?.member_id;
+    if (!member || !human() || state.nativeBusy.has(member)) return;
+    const seq = (state.nativeReadSeq.get(member) || 0) + 1;
+    state.nativeReadSeq.set(member, seq);
+    const fresh = () => current(epoch) && state.nativeReadSeq.get(member) === seq;
+    try {
+      const row = await api(`${base()}/roles/${encodeURIComponent(member)}/native-setup`);
+      if (!fresh() || row.member_id !== member) return;
+      const before = state.nativeSetups.get(member);
+      const clean = nativePublic(row);
+      if (clean) {
+        state.nativeSetups.set(member, clean);
+        const recent = state.rows.some(item => item.member_id === member && state.recentKeys.includes(item.request_key));
+        if (clean.status === "failed" && (!before || before.status !== "failed") && (before || recent)) {
+          const detail = nativeErrorsText[clean.error_code] || "官方授权或模型准备未完成，请查看角色详情后重试。";
+          notifyFailure(`native:${member}:${clean.revision}`, role?.role_name, detail);
+        }
+      }
+      state.nativeErrors.delete(member);
+    } catch (err) {
+      if (fresh()) state.nativeErrors.set(member, err.status ? err.message : "授权状态暂时无法读取，请稍后刷新。");
+    } finally {
+      if (paint && fresh()) { render(); deps.renderDetails(); schedule(); }
+    }
+  }
+  async function mutateNativeSetup(role, action) {
+    const member = role?.member_id, row = state.nativeSetups.get(member);
+    if (!member || !row || state.nativeBusy.has(member) || !human()) return;
+    state.nativeReadSeq.set(member, (state.nativeReadSeq.get(member) || 0) + 1);
+    const epoch = state.epoch; state.nativeBusy.add(member); state.nativeErrors.delete(member); render();
+    try {
+      const result = await api(`${base()}/roles/${encodeURIComponent(member)}/native-setup/${action}`,
+        { confirm: true, expected_revision: row.revision });
+      if (!current(epoch) || result.member_id !== member) return;
+      const clean = nativePublic(result); if (!clean) throw new Error("授权状态不完整。");
+      state.nativeSetups.set(member, clean);
+      await refresh();
+    } catch (err) {
+      if (current(epoch)) state.nativeErrors.set(member, err.status ? err.message : "授权结果尚未确认，请刷新后重试。");
+    } finally {
+      if (current(epoch)) { state.nativeBusy.delete(member); render(); schedule(); }
+    }
+  }
+  function nativeSetup(role) {
+    if (!human() || role?.archived || !["kimi-code", "codex"].includes(role?.runner?.runtime)) return null;
+    const runnerName = role.runner.runtime === "codex" ? "Codex" : "Kimi Code";
+    const member = role.member_id, setup = state.nativeSetups.get(member);
+    if (setup?.status === "not_required") return null;
+    const box = node("div", "role-reset-control role-native-setup");
+    box.append(node("strong", "", `${runnerName} 官方授权与模型准备`));
+    const labels = { required: "需官方授权", starting: "正在启动官方授权…",
+      awaiting_authorization: "等待你在官方页面完成授权", finalizing: "正在角色独立环境准备所选模型…",
+      ready: "官方授权与所选模型配置已完成", failed: "官方授权或模型准备未完成" };
+    box.append(node("p", "role-request-status", labels[setup?.status] || "正在读取授权状态…"));
+    const model = (runnerName === "Codex" ? role.model?.model_id : null)
+      || role.model?.model_display_name || role.model?.model_alias || role.model?.model_id;
+    if (model) box.append(node("p", "role-reset-hint", `所选模型：${model}`));
+    if (runnerName === "Codex") box.append(node("p", "role-reset-hint", "思考强度使用准备时官方模型目录返回的默认值。"));
+    if (setup?.authorization_url && setup.status === "awaiting_authorization") {
+      const link = node("a", "role-service-button", `打开 ${runnerName} 官方授权页面`);
+      link.href = setup.authorization_url; link.target = "_blank"; link.rel = "noopener noreferrer";
+      box.append(link);
+      if (setup.authorization_code) box.append(node("p", "role-device-code", `在官方页面输入一次性验证码：${setup.authorization_code}`));
+    }
+    if (state.nativeErrors.has(member)) box.append(node("p", "role-request-error", state.nativeErrors.get(member)));
+    if (setup?.error_code) box.append(node("p", "role-request-error", nativeErrorsText[setup.error_code] || "准备未完成，请刷新后重试。"));
+    const actions = node("div", "role-request-actions");
+    if (setup?.can_start) actions.append(button(setup.status === "failed" ? "重试官方授权" : "开始官方授权", () => mutateNativeSetup(role, "start")));
+    if (setup?.can_cancel) actions.append(button("取消本次授权", () => mutateNativeSetup(role, "cancel")));
+    actions.append(button("刷新授权状态", () => loadNativeSetup(role)));
+    for (const child of actions.children) child.disabled = state.nativeBusy.has(member);
+    box.append(actions);
+    box.append(node("p", "role-reset-hint", `通过 ${runnerName} 官方流程授权。角色使用独立目录；保存后会在后台自动开始准备，完成后可在角色详情启动或关闭。${runnerName === "Codex" ? "设备码登录需先在 ChatGPT 安全设置或工作区权限中启用。" : ""}`));
+    return box;
   }
   function canRecover(row) {
     return human() && safeInt(row.revision) && Boolean(row.member_id)
@@ -161,6 +288,8 @@ function createRoleRequestUI(deps) {
     box.append(node("strong", "", row.role_name || "角色配置"), node("p", "role-request-status", label(row)));
     const autoStart = autoStartFeedback(row);
     if (autoStart) box.append(node("p", "role-request-status", autoStart.text));
+    const setup = nativeSetup(state.roles.find(role => role.member_id === row.member_id));
+    if (setup && row.status === "provisioned") box.append(setup);
     if (row.provision_job) {
       const steps = node("ul", "role-request-steps");
       for (const [step, title] of [["profile", "身份档案"], ["key_file", "本机接入配置"], ["preflight", "配置检查"]]) {
@@ -204,6 +333,10 @@ function createRoleRequestUI(deps) {
     for (const id of ["role-create-runner", "role-create-model", "role-create-name", "role-create-description"]) {
       el(id).disabled = state.busy || pinned || Boolean(state.modalRow) || !human() || (id === "role-create-model" && !state.choices.length);
     }
+    const selectedRunner = state.runners.find(r => r.runner_id === el("role-create-runner").value);
+    const auto = el("role-create-auto-start");
+    if (auto) { auto.disabled = state.busy || pinned || Boolean(state.modalRow) || !human() || selectedRunner?.runtime === "kimi-code";
+      if (selectedRunner?.runtime === "kimi-code") auto.checked = false; }
     el("role-create-submit").disabled = state.busy || Boolean(state.modalRow) || !human() || state.supported !== true
       || (!pinned && (!el("role-create-runner").value || !el("role-create-model").value || !el("role-create-name").value.trim()));
     el("role-create-submit").textContent = state.busy ? "保存中…" : pinned ? "核对并重试保存" : "保存并配置";
@@ -232,6 +365,12 @@ function createRoleRequestUI(deps) {
   function renderModelSetup() {
     const panel = el("role-create-model-setup"); if (!panel) return;
     panel.replaceChildren();
+    const runner = state.runners.find(row => row.runner_id === el("role-create-runner").value);
+    if (state.modal && !state.attempt && !state.modalRow && runner?.runtime === "codex") {
+      panel.classList.remove("hidden");
+      panel.append(node("p", "role-request-hint", "新角色使用官方模型目录返回的默认思考强度，不沿用模型名称中的强度标注。"));
+      return;
+    }
     const visible = state.modal && !state.choices.length && state.modelSeeds.length > 0 && !state.attempt && !state.modalRow;
     panel.classList.toggle("hidden", !visible); if (!visible) return;
     panel.append(node("p", "role-request-hint", "这个运行器尚无可选模型，可以登记本项目已保存的模型配置。登记不代表原生登录或服务启动已经通过。"));
@@ -257,9 +396,21 @@ function createRoleRequestUI(deps) {
   function schedule() {
     if (state.timer !== null) deps.clearTimeout(state.timer);
     state.timer = null;
-    if (state.active && state.supported && state.rows.some(r => ["requested", "leased", "created"].includes(r.status)
-      || (r.status === "provisioned" && r.auto_start === true && r.auto_start_status === "enqueued"
-        && state.roles.find(role => role.member_id === r.member_id)?.service?.observed === "starting"))) {
+    if (state.active && state.supported && (state.rows.some(r => {
+      if (["requested", "leased", "created"].includes(r.status)) return true;
+      if (r.status !== "provisioned" || r.auto_start !== true) return false;
+      if (r.auto_start_status === "pending") return true;
+      if (r.auto_start_status !== "enqueued") return false;
+      // 已投递后持续跟踪到真实 running/失败，用户无需手动刷新。
+      const service = state.roles.find(role => role.member_id === r.member_id)?.service;
+      return service?.observed !== "running" && service?.observed !== "failed";
+    })
+      || [...state.nativeSetups.entries()].some(([member, row]) => {
+        if (!["required", "starting", "awaiting_authorization", "finalizing"].includes(row.status)) return false;
+        if (state.roles.find(role => role.member_id === member)?.runner.runtime !== "codex") return false;
+        return state.rows.some(item => item.member_id === member
+          && (state.recentKeys.includes(item.request_key) || ["requested", "leased", "created"].includes(item.status)));
+      }))) {
       state.timer = deps.setTimeout(() => { state.timer = null; refresh(); }, 3000);
     }
   }
@@ -291,6 +442,7 @@ function createRoleRequestUI(deps) {
   async function refresh() {
     if (!state.active) return;
     const epoch = state.epoch, seq = ++state.seq, prefix = base(); state.loading = true;
+    const previousRows = new Map(state.rows.map(row => [row.request_key, row]));
     try {
       const [host, requests, roles] = await Promise.all([api(`${prefix}/role-provision-host`), readRows(prefix, epoch, seq), api(`${prefix}/roles`)]);
       if (!current(epoch) || seq !== state.seq) return;
@@ -298,13 +450,31 @@ function createRoleRequestUI(deps) {
       state.host = { enabled: host.enabled, host_label: host.host_label, config_version: host.config_version };
       state.rows = requests.rows; state.limited = requests.limited;
       state.roles = roles.map(r => ({ member_id: r.member_id, role_name: r.role_name, archived: r.archived,
+        runner: { runtime: r.runner?.runtime },
+        model: r.model && typeof r.model === "object" ? {
+          model_display_name: r.model.model_display_name, model_alias: r.model.model_alias, model_id: r.model.model_id,
+        } : null,
         service: r.service && typeof r.service === "object" ? {
           observed: r.service.observed, readiness_service: r.service.readiness_service,
         } : null }));
+      for (const row of state.rows) {
+        const before = previousRows.get(row.request_key);
+        const recent = state.recentKeys.includes(row.request_key);
+        if (row.status === "failed" && (!before || before.status !== "failed") && (before || recent)) {
+          notifyFailure(`request:${row.request_key}:${row.revision}`, row.role_name,
+            lookup(codes, row.last_error_code, "后台配置未完成，请检查环境后继续。"));
+        }
+        if (row.status === "provisioned" && row.auto_start === true && row.auto_start_status === "failed"
+            && (!before || before.auto_start_status !== "failed")) {
+          notifyFailure(`auto:${row.request_key}:${row.revision}`, row.role_name,
+            "角色已配置，但自动启动未完成；请在角色详情核对后重试启动。");
+        }
+      }
       state.supported = true; state.error = "";
       if (state.modalRow) state.modalRow = state.rows.find(r => r.request_key === state.modalRow.request_key) || state.modalRow;
       // 新成员由宿主创建后，重读既有名册；不制造临时member或伪造角色行。
       await deps.refreshRoster(); if (!current(epoch) || seq !== state.seq) return;
+      await Promise.all(state.roles.filter(role => ["kimi-code", "codex"].includes(role.runner.runtime)).map(role => loadNativeSetup(role, epoch, false)));
     } catch (err) {
       if (!current(epoch) || seq !== state.seq) return;
       state.error = err.status ? err.message : "配置进度暂时无法读取，请刷新重试。";
@@ -320,7 +490,8 @@ function createRoleRequestUI(deps) {
     state.timer = null; ++state.epoch; ++state.seq; state.active = Boolean(c.active); state.key = key;
     Object.assign(state, { host: null, rows: [], roles: [], supported: null, error: "", busy: false, loading: false,
       attempt: null, modalRow: null, hostDirty: false, notice: "", runners: [], choices: [], recoveryAttempts: new Map(),
-      recentKeys: [], limited: false, storageUnavailable: false, modelSeeds: [] });
+      recentKeys: [], limited: false, storageUnavailable: false, modelSeeds: [], failureAlerts: new Set(),
+      nativeSetups: new Map(), nativeBusy: new Set(), nativeErrors: new Map(), nativeReadSeq: new Map() });
     close(false); render();
     if (state.active) { restoreAttempt(); restoreRecentKeys(); refresh(); }
   }
@@ -342,6 +513,7 @@ function createRoleRequestUI(deps) {
     if (state.attempt) {
       el("role-create-name").value = state.attempt.payload.role_name;
       el("role-create-description").value = state.attempt.payload.role_description || "";
+      if (el("role-create-auto-start")) el("role-create-auto-start").checked = state.attempt.payload.auto_start === true;
       fillSelect("role-create-runner", [{ runner_id: state.attempt.payload.runner_id, display_name: state.attempt.labels?.runner || "上次选择的运行器" }], "选择运行器", "runner_id");
       fillSelect("role-create-model", [{ choice_id: state.attempt.payload.choice_id, display_name: state.attempt.labels?.model || "上次选择的模型" }], "选择模型", "choice_id");
       el("role-create-runner").value = state.attempt.payload.runner_id;
@@ -349,6 +521,7 @@ function createRoleRequestUI(deps) {
       state.notice = "上次保存尚未确认，将用同一请求核对和重试。"; render(); return;
     }
     el("role-create-name").value = ""; el("role-create-description").value = "";
+    if (el("role-create-auto-start")) el("role-create-auto-start").checked = false;
     state.choices = []; fillSelect("role-create-runner", [], "读取运行器…", "runner_id");
     fillSelect("role-create-model", [], "先选择运行器", "choice_id"); render();
     try {
@@ -427,9 +600,13 @@ function createRoleRequestUI(deps) {
         || !state.choices.some(c => c.choice_id === choice && c.runner_id === runner)) { state.notice = "请选择运行器和模型，并填写 1–64 字的名称、最多 2000 字的介绍。"; render(); return; }
       let key; try { key = deps.newKey(); } catch (_) { state.notice = "无法生成请求标识，请重新加载页面后再试。"; render(); return; }
       const selectedModel = state.choices.find(c => c.choice_id === choice);
+      // Kimi 仍须先完成页面内官方授权；Codex 允许保存自动启动意图，服务端会等
+      // 后台设备授权/模型准备 ready 后再投递首次启动。
+      const needsManualPreparation = state.runners.find(r => r.runner_id === runner)?.runtime === "kimi-code";
       state.attempt = { key, labels: { runner: state.runners.find(r => r.runner_id === runner)?.display_name || "已选运行器",
         model: selectedModel.model_display_name || selectedModel.model_alias || selectedModel.model_id || "已选模型" },
-        payload: { request_key: key, kind: "create", confirm: true, auto_start: true,
+        payload: { request_key: key, kind: "create", confirm: true,
+        auto_start: !needsManualPreparation && el("role-create-auto-start")?.checked === true,
         role_name: name, role_description: description, runner_id: runner, choice_id: choice } }; keepAttempt();
     }
     const attempt = state.attempt; state.busy = true; state.notice = ""; render();
@@ -437,10 +614,12 @@ function createRoleRequestUI(deps) {
       const row = await api(`${prefix}/role-requests`, attempt.payload);
       if (!current(epoch)) return;
       if (row.request_key !== attempt.key) throw new Error("保存结果尚未确认。");
-      upsert(row); state.modalRow = publicRow(row); state.attempt = null; keepAttempt();
-      state.notice = row.auto_start === true ? "请求已保存，配置完成后将尝试自动启动服务。"
+      upsert(row); state.modalRow = null; state.attempt = null; keepAttempt();
+      // 保存受理即关闭创建页并回到真实角色列表；后台进度在列表/详情持续刷新。
+      close(false);
+      state.notice = row.auto_start === true ? "请求已保存，后台会自动完成添加、官方授权准备和反馈；准备完成后将按你的选择尝试自动启动。"
         : attempt.payload.auto_start === true ? "请求已保存，当前服务未确认自动启动意图；配置完成后请核对角色开关。"
-        : "原请求已保存，宿主会继续配置；本次未请求自动启动。";
+        : "请求已保存，后台会自动完成添加与准备；保存不会自动启动角色。";
       await refresh();
     } catch (err) {
       if (!current(epoch)) return;
@@ -505,6 +684,8 @@ function createRoleRequestUI(deps) {
     const row = state.rows.find(r => r.member_id === role.member_id);
     if (!row) return null;
     const panel = node("section", "role-maintenance");
+    const setup = nativeSetup(state.roles.find(item => item.member_id === role.member_id));
+    if (setup && row.status === "provisioned") panel.append(setup);
     if (row.status !== "provisioned") {
       panel.append(node("p", row.status === "failed" ? "role-request-error" : "role-request-status", label(row)));
       if (row.status === "failed") panel.append(node("p", "role-request-error", lookup(codes, row.last_error_code, "本机配置未完成，请检查环境后继续。")));
@@ -513,7 +694,7 @@ function createRoleRequestUI(deps) {
       }
     }
     const autoStart = autoStartFeedback(row);
-    if (autoStart?.attention) panel.append(node("p", "role-request-status", autoStart.text));
+    if (autoStart) panel.append(node("p", "role-request-status", autoStart.text));
     if (canRecover(row)) panel.append(resetControl(row));
     return panel.children.length ? panel : null;
   }
@@ -553,7 +734,7 @@ const roleRequestApp = typeof document === "undefined" ? null : createRoleReques
   get storage() { try { return sessionStorage; } catch (_) { return null; } },
   newKey: () => { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
     return `role-${Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("")}`; },
-  confirm: text => window.confirm(text), setTimeout, clearTimeout,
+  confirm: text => window.confirm(text), alert: text => window.alert(text), setTimeout, clearTimeout,
   refreshRoster: async () => { await loadProjectAgents(); },
   renderDetails: () => { renderWorkspaceList(); renderTaskDetailsPanel(); },
   selectRole: id => { workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = id; renderWorkspaceList(); renderTaskDetailsPanel(); },

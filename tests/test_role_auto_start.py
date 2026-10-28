@@ -48,12 +48,13 @@ from server.models import (
     ROLE_SERVICE_ERROR_UNKNOWN_OWNER,
     ProjectRole,
     ProjectRoleBinding,
+    RoleNativeSetup,
     RoleProvisionRequestRow,
     RoleServiceLaunch,
     RoleServiceState,
     RunnerRegistry,
 )
-from server.role_provision_requests import _set_auto_start
+from server.role_provision_requests import _set_auto_start, enqueue_pending_auto_start
 from server.role_services import (
     enqueue_auto_start_launch,
     expire_due_launches,
@@ -309,6 +310,79 @@ class AutoStartHappyPathTests(AutoStartApiTestCase):
         self.assertEqual(conflicted.status_code, 409)
         self.assertEqual(conflicted.json()["detail"], "role_request_stale_report")
         self.assertEqual(len(self.launch_rows(member_id)), 1)
+
+    def test_native_setup_ready_resumes_pending_auto_start_once(self):
+        with self.session() as session:
+            runner = session.get(RunnerRegistry, RUNNER_ID)
+            runner.runtime = "codex"
+            session.add(runner)
+            session.commit()
+        from unittest.mock import patch
+        with patch("server.kimi_native_setup.schedule_auto_native_setup") as scheduled:
+            created, _token, reported = self.happy_path()
+        member_id = created["member_id"]
+        self.assertEqual(reported.status_code, 200, reported.text)
+        body = reported.json()
+        self.assertTrue(body["auto_start"])
+        self.assertEqual(body["auto_start_status"], "pending")
+        self.assertIsNone(body["auto_start_launch_id"])
+        self.assertEqual(body["auto_start_error_code"], "native_authorization_required")
+        self.assertEqual(self.launch_rows(member_id), [])
+        scheduled.assert_called_once_with("prj_alpha", member_id)
+
+        with self.session() as session:
+            setup = session.get(RoleNativeSetup, ("prj_alpha", member_id))
+            self.assertEqual(setup.status, "required")
+            setup.status = "ready"
+            session.add(setup)
+            session.commit()
+
+        enqueue_pending_auto_start("prj_alpha", member_id)
+        current = self.get_request(REQUEST_KEY).json()
+        self.assertEqual(current["auto_start_status"], "enqueued")
+        self.assertTrue(current["auto_start_launch_id"])
+        launches = self.launch_rows(member_id)
+        self.assertEqual(len(launches), 1)
+        self.assertEqual(launches[0].launch_id, current["auto_start_launch_id"])
+
+        # 重复回调/刷新不得投递第二次。
+        enqueue_pending_auto_start("prj_alpha", member_id)
+        self.assertEqual(len(self.launch_rows(member_id)), 1)
+
+    def test_ready_callback_only_revives_pending_not_terminal_states(self):
+        with self.session() as session:
+            runner = session.get(RunnerRegistry, RUNNER_ID)
+            runner.runtime = "codex"
+            session.add(runner)
+            session.commit()
+        from unittest.mock import patch
+        with patch("server.kimi_native_setup.schedule_auto_native_setup"):
+            created, _token, reported = self.happy_path()
+        member_id = created["member_id"]
+        self.assertEqual(reported.json()["auto_start_status"], "pending")
+        for status, code in (
+            ("not_eligible", "auto_start_config_disabled"),
+            ("failed", "auto_start_enqueue_failed"),
+            ("enqueued", None),
+            (None, None),
+        ):
+            with self.subTest(status=status):
+                with self.session() as session:
+                    request = session.get(RoleProvisionRequestRow, REQUEST_KEY)
+                    request.auto_start_status = status
+                    request.auto_start_error_code = code
+                    request.auto_start_launch_id = None
+                    session.add(request)
+                    setup = session.get(RoleNativeSetup, ("prj_alpha", member_id))
+                    setup.status = "ready"
+                    session.add(setup)
+                    session.commit()
+                enqueue_pending_auto_start("prj_alpha", member_id)
+                self.assertEqual(self.launch_rows(member_id), [],
+                    f"{status!r} must not be revived by a later ready callback")
+                current = self.get_request(REQUEST_KEY).json()
+                self.assertEqual(current["auto_start_status"], status)
+                self.assertIsNone(current["auto_start_launch_id"])
 
     def test_worker_retry_claim_after_terminal_is_status_conflict(self):
         created, token, reported = self.happy_path()
