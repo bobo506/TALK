@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-28（Asia/Shanghai）— 349独立复核不通过并派350集中返修
+
+- 349合法结构化交付格式通过，但自由文本MCP结论unknown，runner succeeded不代表验收通过。baseline 484无漂移，candidate 485、9改1增、声明SHA/patch匹配；原candidate/交付保持，未集成、未收取2995。
+- 在正确candidate根复跑Node 111项全部通过。Python相关284项有9项Windows `ADMINI~1`短路径差异，baseline同一用例也失败，属于既有环境差异，不是349新增回归，不改断言。
+- 独立反例证明`enqueue_pending_auto_start`未限制只能恢复pending，`not_eligible/auto_start_config_disabled`在ready回调后仍新增1个launch。另一探针确认迟到失败回写不覆盖ready。最终349不通过，详[复核报告](spec/TERRA_ROLE_REVIEW_349_20261028.md)。
+- 已派350单项返修，初始`queued/assigned`。从349 candidate 485另建`.tmp/terra-role-fix1-20261028/`，manifest SHA256 `9408e7d8869663d8445780a0760092a8e6590a29284c2390ad59b3fbc140247d`；只修pending状态门及回归，其他Terra/0.164/页面逻辑、348和生产不动。自动跟进已`creator_stopped`，未取消任务或主动等待。
+
 ## 2026-10-28（Asia/Shanghai）— 明确功能切片推送节奏与任务颗粒度
 
 - 用户明确：一个功能切片开发完成后可推送GitHub一次；切片开发过程中的多次分布作业只做本地Git保存。已写入AGENTS：完整切片须完成开发、必要验证、独立复核和收尾后才可推送一次，检查点、分布作业和集中返修不反复推送；执行者仅交付但尚未复核不算完成。

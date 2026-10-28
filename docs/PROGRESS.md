@@ -6,7 +6,7 @@ Updated: 2026-10-28（Asia/Shanghai）。当前由大K承担辅助决策与任�
 
 - **AGENTS.md已结构化精简**：经独立审阅补回三项规则及用户再次手动精简，当前161行、6,334字符；本地提交含`0c1ff4e`、`0a2a289`、`7f1919a`。公开PR [#6](https://github.com/bobo506/TALK/pull/6)为先前版本，仅含三份文档和公开提交`5665d68`，未带入其余31个内部提交，尚未合并或更新。
 - **Codex模型目录新增GPT-6.1 Terra**：官方`model/list`实测`model=gpt-6.1-terra`、显示名`GPT-6.1 Terra`、默认强度`low`且非隐藏。经human正常API登记`choice_id=rmc_54101bd4da53`，复用`builtin/openai/native-codex-chatgpt-login`；目录由1条变2条，原`gpt-6.1-sol`保留。新建角色页刷新后可选；本次只登记目录，未发起模型推理、角色启停或CLI 0.164.0适配开发。
-- **349 Terra首片已派DeepSeek**：目标为修复GPT `agent:prj-e8fe7066bbec.gpt-79445c1f`创建后仅绑定、offline且无实例的问题，覆盖后台创建、0.164.0协议兼容、官方low、真实列表/失败反馈及受管启停。初始`queued/assigned`，尚无交付；大K后续独立复核。隔离基线484项manifest SHA256 `0ba997ebe35fd9cfc05ca670178a0335b47a75be217306b08e309c58d0ab3f76`，仅写新candidate/delivery，不操作现有GPT或生产。自动跟进已`creator_stopped`，详[任务包](spec/TERRA_NEW_ROLE_TASK_PACKAGE_20261028.md)。首片完成后才转为Terra开发、DeepSeek复核。
+- **349本次复核不通过，350集中返修已派**：349交付485文件、9改1增及patch/冻结匹配；正确candidate根111项Node通过。Python284项有9项Windows短路径差异，baseline同现，非新增回归。独立反例证实`enqueue_pending_auto_start`会让`not_eligible`在ready后重新产生launch，违反合同，故不通过、不集成、结果2995未收取。350已派DeepSeek只修pending状态门和回归，初始`queued/assigned`，新基线485项manifest SHA256 `9408e7d8869663d8445780a0760092a8e6590a29284c2390ad59b3fbc140247d`，自动跟进已停止。详[独立复核](spec/TERRA_ROLE_REVIEW_349_20261028.md)及[返修包](spec/TERRA_ROLE_FIX1_20261028.md)。
 - **Git节奏与任务颗粒度规则已明确**：完整功能切片完成开发、必要验证、独立复核和收尾后可推送GitHub一次；切片内部多次分布作业、检查点和集中返修只做本地保存，执行者仅交付未复核不算完成。任务颗粒度以执行者一次能独立理解、完成并验证为准，不一股脑转交大需求，也不机械碎拆。
 - **348保持原验收结论**：结果2994仍为`succeeded/submitted`、未收取，原创建者`agent:codex`才能正常收尾。常规401 Python/120 Node通过但两个凭据边界失败，候选不集成；返修和DeepSeek复核须按用户后续明确范围执行。详[348验收报告](spec/DSH_NEW_ROLE_REVIEW_348_20261028.md)。
 
