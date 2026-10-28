@@ -276,12 +276,23 @@ function createRoleRequestUI(deps) {
       && (row.status === "provisioned" || (row.status === "failed" && row.last_error_code === "manual_recovery_required"))
       && safeInt(row.credential_version) && row.credential_version > 0;
   }
+  function resetButton(row) {
+    const btn = button("绑定重置", () => recover(row));
+    btn.disabled = state.busy;
+    return btn;
+  }
   function resetControl(row) {
     const box = node("div", "role-reset-control");
-    box.append(button("绑定重置", () => recover(row)),
+    box.append(resetButton(row),
       node("p", "role-reset-hint", "接入异常时修复本机配置，必要时更新接入凭据。"));
-    box.children[0].disabled = state.busy;
     return box;
+  }
+  // 2026-10-28：按用户要求把“绑定重置”移到角色详情服务行的第 4 个按钮位（删除角色之后），
+  // 详情里不再重复渲染维护面板中的旧位置；仅保留按钮本身，不再带说明段落。
+  function resetButtonFor(memberId) {
+    if (!state.active) return null;
+    const row = state.rows.find(r => r.member_id === memberId);
+    return row && canRecover(row) ? resetButton(row) : null;
   }
   function progress(row, { showRoleLink = true } = {}) {
     const box = node("section", "role-request-card");
@@ -495,11 +506,40 @@ function createRoleRequestUI(deps) {
     close(false); render();
     if (state.active) { restoreAttempt(); restoreRecentKeys(); refresh(); }
   }
+  // 2026-10-28：Kimi Code 的历史登记名带模型与“执行”后缀（如“Kimi Code · K2.8 Preview 执行”）。
+  // 角色列表已有同一套规范化（workspace.js 的 ROLE_BINDING_KIMI_CODE_LEGACY_NAMES），创建弹窗此前
+  // 直接显示原始登记名；这里补齐为“Kimi Code”。只影响展示，不改登记数据或绑定。
+  const KIMI_CODE_LEGACY_RUNNER_NAMES = new Set(["Kimi Code · K2.8 Preview 执行", "Kimi Code · K2.8 Preview"]);
+  // 与 workspace.js 的 runnerNameWithoutCli 保持同一口径：运行器展示名去掉“CLI”字样。
+  function stripRunnerCli(name) {
+    const text = String(name || "").trim();
+    if (!text) return text;
+    return text.replace(/\s*内置\s*CLI\b/gi, " ").replace(/\bCLI\b/gi, " ").replace(/\s{2,}/g, " ").trim();
+  }
+  function runnerLabel(row) {
+    const name = String(row?.display_name || "").trim();
+    if (name && row?.runtime === "kimi-code" && KIMI_CODE_LEGACY_RUNNER_NAMES.has(name)) return "Kimi Code";
+    return stripRunnerCli(name);
+  }
+  // 2026-10-28：创建角色时模型下拉只显示模型名；“· xhigh”这类强度后缀只用于列表展示，
+  // 不在选择阶段出现（强度来源改为准备阶段落库的官方值）。
+  const MODEL_STRENGTH_LITERALS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+  function modelLabel(row) {
+    const display = String(row?.model_display_name || "").trim();
+    if (display) {
+      const cut = display.lastIndexOf("·");
+      const head = cut >= 0 ? display.slice(0, cut).trim() : "";
+      const tail = cut >= 0 ? display.slice(cut + 1).trim() : "";
+      if (head && tail && MODEL_STRENGTH_LITERALS.has(tail.toLowerCase())) return head;
+      return display;
+    }
+    return String(row?.model_alias || row?.model_id || row?.choice_id || "");
+  }
   function fillSelect(id, values, title, key) {
     const select = el(id); select.replaceChildren();
     const empty = node("option", "", title); empty.value = ""; select.append(empty);
     for (const row of values) {
-      const option = node("option", "", row.display_name || row.model_display_name || row.model_alias || row.model_id || row[key]);
+      const option = node("option", "", row.display_name ? runnerLabel(row) : modelLabel(row));
       option.value = row[key]; select.append(option);
     }
     select.value = "";
@@ -604,8 +644,8 @@ function createRoleRequestUI(deps) {
       // Kimi 仍须先完成页面内官方授权；Codex 允许保存自动启动意图，服务端会等
       // 后台设备授权/模型准备 ready 后再投递首次启动。
       const needsManualPreparation = state.runners.find(r => r.runner_id === runner)?.runtime === "kimi-code";
-      state.attempt = { key, labels: { runner: state.runners.find(r => r.runner_id === runner)?.display_name || "已选运行器",
-        model: selectedModel.model_display_name || selectedModel.model_alias || selectedModel.model_id || "已选模型" },
+      state.attempt = { key, labels: { runner: runnerLabel(state.runners.find(r => r.runner_id === runner)) || "已选运行器",
+        model: modelLabel(selectedModel) || "已选模型" },
         payload: { request_key: key, kind: "create", confirm: true,
         auto_start: !needsManualPreparation && el("role-create-auto-start")?.checked === true,
         role_name: name, role_description: description, runner_id: runner, choice_id: choice } }; keepAttempt();
@@ -696,8 +736,9 @@ function createRoleRequestUI(deps) {
     }
     const autoStart = autoStartFeedback(row);
     if (autoStart) panel.append(node("p", "role-request-status", autoStart.text));
-    if (canRecover(row)) panel.append(resetControl(row));
-    return panel.children.length ? panel : null;
+    // 2026-10-28：“绑定重置”已移到角色详情服务行，这里不再渲染；面板即使为空也返回，
+    // 由 CSS `.role-maintenance:empty` 隐藏，避免调用方拿到 null 后改变既有渲染语义。
+    return panel;
   }
   function attach() {
     el("role-create-form")?.addEventListener("submit", submit);
@@ -724,6 +765,7 @@ function createRoleRequestUI(deps) {
   }
   attach();
   return { state, sync, refresh, open, close, chooseRunner, registerModel, submit, mutate, recover, setHost, rolePanel, newButton,
+    resetButton: resetButtonFor,
     setRoleName: (id, name) => { const role = state.roles.find(r => r.member_id === id); if (role) role.role_name = name; },
     roleName: id => state.roles.find(r => r.member_id === id)?.role_name || "" };
 }

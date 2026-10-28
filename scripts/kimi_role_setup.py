@@ -349,6 +349,15 @@ def finish_native_login(attempt: NativeLoginAttempt) -> str:
             raise SetupError("角色模型在登录期间发生变化，未写入模型；请重试。")
         outcome = _append_model(attempt.kimi_home / "config.toml", binding,
             lambda: _source_if_present(attempt.source, binding), allow_login_generated=not attempt.was_present)
+        # 2026-10-28：模型条目里的官方默认强度挂到 attempt 上，供服务端落库展示；
+        # 读取失败不影响准备结果，只是不显示强度。
+        try:
+            with (attempt.kimi_home / "config.toml").open("rb") as stream:
+                entry = (tomllib.load(stream).get("models") or {}).get(binding[0])
+            if isinstance(entry, dict) and isinstance(entry.get("default_effort"), str):
+                attempt.default_effort = entry["default_effort"]
+        except Exception:
+            pass
         db.rollback()
         return outcome
     finally:

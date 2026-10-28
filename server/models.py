@@ -781,6 +781,9 @@ class ProjectRoleBinding(SQLModel, table=True):
     model_id: Optional[str] = None
     model_alias: Optional[str] = None
     model_display_name: Optional[str] = None
+    # 2026-10-28：准备流程从官方模型目录取回的默认思考强度（公开展示用，可空）。
+    # 不参与六维内容指纹，也不参与绑定有效性判定；旧行/未准备行保持 NULL。
+    default_effort: Optional[str] = None
     updated_by: str
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -2203,6 +2206,7 @@ def build_role_binding_out(facts: Optional[dict]) -> Optional["RoleBindingOut"]:
         model_id=facts.get("model_id"),
         model_alias=facts.get("model_alias"),
         model_display_name=facts.get("model_display_name"),
+        default_effort=facts.get("default_effort"),
         binding_state=resolve_role_binding_state(facts),
         binding_fingerprint=binding_fingerprint(facts),
         updated_by=facts.get("updated_by"),
@@ -2247,6 +2251,7 @@ SELECT
     b.model_id                                       AS model_id,
     b.model_alias                                    AS model_alias,
     b.model_display_name                             AS model_display_name,
+    b.default_effort                                 AS default_effort,
     b.updated_by                                     AS updated_by,
     b.updated_at                                     AS updated_at
 FROM requested AS req
@@ -2258,7 +2263,7 @@ LEFT JOIN runner_registry       AS r  ON r.runner_id   = b.runner_id;"""
 
 BINDING_FACTS_SQL = _BINDING_FACTS_SQL_ANCHOR + _BINDING_FACTS_SQL_BODY
 
-# 27 个唯一列别名（顺序与 SQL 一致）；无项目分支用它构造全 null 事实。
+# 28 个唯一列别名（顺序与 SQL 一致）；无项目分支用它构造全 null 事实。
 BINDING_FACTS_COLUMNS = (
     "requested_project_id",
     "requested_member_id",
@@ -2285,6 +2290,7 @@ BINDING_FACTS_COLUMNS = (
     "model_id",
     "model_alias",
     "model_display_name",
+    "default_effort",
     "updated_by",
     "updated_at",
 )
@@ -4468,6 +4474,7 @@ class RoleBindingOut(BaseModel):
     model_id: Optional[str] = None
     model_alias: Optional[str] = None
     model_display_name: Optional[str] = None
+    default_effort: Optional[str] = None
     binding_state: Optional[str] = None
     binding_fingerprint: Optional[str] = None
     updated_by: Optional[str] = None

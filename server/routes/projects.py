@@ -760,6 +760,9 @@ def put_agent_role_binding(
         "model_id": binding.model_id,
         "model_alias": binding.model_alias,
         "model_display_name": binding.model_display_name,
+        # 2026-10-28：绑定（重）写时清空旧的官方强度，等新选择真正准备完成后由
+        # 原生准备流程写回，避免把上一个模型的强度留在新绑定上。
+        "default_effort": None,
         "updated_by": current.id,
         "updated_at": now,
     }

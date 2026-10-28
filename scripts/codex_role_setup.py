@@ -204,6 +204,8 @@ def finish_native_login(attempt):
             raise SetupError('native_model_configuration_required')
         write_config(attempt.native_home / 'config.toml', dict(prior, model_reasoning_effort=effort))
         db.rollback()
+        # 2026-10-28：把官方 model/list 返回的默认强度挂到 attempt 上，供服务端落库展示。
+        attempt.default_effort = effort
         return 'configured'
     finally:
         db.rollback()

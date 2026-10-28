@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-28 晚（Asia/Shanghai）。大K仍负责决策与分配。本日两个闭环：349/350 Terra首片已集成发布[PR #7](https://github.com/bobo506/TALK/pull/7)（未合并）；角色页面三项精简+创建弹窗两轮修正已由用户页面验收通过、本地提交未推送。G-terra 与 348 均卡在官方登录授权。
+Updated: 2026-10-29 凌晨（Asia/Shanghai）。大K仍负责决策与分配。昨晚角色页三项已验收；随后完成“官方思考强度落库+存量回填”（Codex/Kimi/DSH 已有值）与“绑定重置移到服务行第4位”，DSH/WorkBuddy 只做了读取与回填、新建时写入不可行；旧角色兼容恢复（B1）因架构约束暂停待定。
 
 ## 当前身份与协作规则
 
@@ -13,6 +13,8 @@ Updated: 2026-10-28 晚（Asia/Shanghai）。大K仍负责决策与分配。本�
 ## 已完成实现与发布
 
 - **角色页面三项精简（2026-10-28 晚，用户已验收）**：移除“上次自动启动未完成”提示；创建弹窗运行器/模型各占整行；角色列表文字可框选复制（拖选不导航、选区期间暂缓重绘）。同片返修两轮：下拉文字竖直裁切（定高38px挤16px内容区）、创建弹窗内部滚动条（`max-height`缺0.8界面缩放补偿）。改动5个产品文件+6个测试文件+4份文档，本地提交，未推送。报告与截图见`.tmp/role-list-select-20261028/`。
+- **官方思考强度（2026-10-29 凌晨，用户已确认强度显示生效）**：`project_role_bindings` 新增可空 `default_effort`（仅展示，不参与六维指纹与有效性），准备完成时由 Codex 官方`model/list` / Kimi 模型条目写回；绑定行第四段只读该字段，取不到整项省略；创建弹窗模型下拉只显示模型名。存量已回填：codex`xhigh`、kimi`high`、G-terra`low`、大K`high`、Kimi k2.8`max`、DSH`max`；旧GPT与WorkBuddy为空（前者配置无强度，后者绑定模型`kimi-k3`不在当前`models.json`）。
+- **角色详情按钮行（2026-10-29 凌晨）**：`绑定重置`移到角色开关操作行第4位（启动/关闭、删除角色之后），去掉按钮下方说明段落；G-terra 截图确认四个按钮齐全。旧角色（小G/小D/小K）仍无该按钮，见下方未解决项。
 - **GPT-6.1 Terra目录**：官方`model/list`实测`model=gpt-6.1-terra`、显示`GPT-6.1 Terra`、默认强度`low`且非隐藏。human正常API登记`choice_id=rmc_54101bd4da53`，复用`builtin/openai/native-codex-chatgpt-login`，原Sol保留。
 - **349/350 Terra首片**：349首次不通过的延迟启动状态门已由350修复；ready只恢复pending，`not_eligible/failed/enqueued/None`不再复活。共集成28个实现/测试/页面文件，SHA与fix1 candidate一致。集成后111项Node及原失败反例、正常pending和重复回调测试通过；Windows `ADMINI~1`短路径差异为baseline同现的环境限制，不冒充产品通过。
 - **发布**：本地集成`8fa0f6e`，公开`4c5cb33`，PR #7仅含本切片34个代码/文档文件，不带其他内部提交，尚未合并。发布工作区`.tmp/terra-role-publication-20261028`保留。发布记录`7c129ca`，交付格式规范`e095f81`。
@@ -30,14 +32,17 @@ Updated: 2026-10-28 晚（Asia/Shanghai）。大K仍负责决策与分配。本�
 ## 旧任务与未解决项
 
 - **347/2993**：首次独立不通过结论保持，WorkBuddy等运行器和整体联调仍未完成；**348/2994**：用户口述（本会话未独立核实）Codex已修一轮——受管Codex配方固定npm包内0.164.0、补齐运行配置缺失的codex段，`native_cli_missing`已解决，现卡在官方登录授权。两项`created_by=agent:codex`，只能由Codex正常身份收取。
-- **角色页面余项3个**：强度展示的可信来源（3b）、删除后资源清理提示闭环（3d）、移除“绑定重置”区并统一详情（3g）。3c/3e/3f已随本片完成并验收。
+- **旧角色兼容恢复（B1）阻塞待定**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`均为`origin=imported`、`identity_exclusive=0`、无`RoleCreationOperation`，服务端`_normalize_recover_intent`三道门全拒，所以页面没有“绑定重置”。三条已提交的`role_legacy_attach_operations`（choice_id 分别为`rmc_b0b68705cd2f`/`rmc_3a5435e0e283`/`rmc_80be012402f1`）可作为放行锚点；但`role_creation_operations`的合同明确禁止补录复用，且恢复的下游（worker执行与完成回写校验）强依赖`origin_operation_key → RoleCreationOperation + RoleProvisionJob`，需要为“legacy 来源”新增合法分支。属架构决定，未在夜间实施。
+- **DSH/WorkBuddy 强度接入只完成读取+回填**：WorkBuddy 的`models.json`有`reasoning.defaultEffort`（本机`max`），DSH 角色 patch 有`reasoningEffort: max`；但两类运行器没有模型配置写入器，无法“新建角色时写”，只能脚本回填。是否在角色启动时顺带刷新，待用户定。
+- **角色页面余项**：3b已随官方强度落库完成主要部分（余 DSH/WorkBuddy 的写入时机）；3d删除清理闭环、3g（已改为“保留按钮+移位置”并完成）状态见路线图。
 - 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
 ## 下一步恢复顺序
 
-1. Codex侧完成Terra的官方设备授权/登录，随后真实创建角色并验证官方low与start-ready-stop/drain；这属环境与授权步骤，不由绑定或serving推断。
-2. 348/347由Codex正常身份收取收尾；两项凭据边界按用户口述已修，需独立核验后才能记通过。
-3. 角色页面余下3项（3b/3d/3g）按完整可验流程拆包，需用户明确确认后开工，不因本片验收自动授权。
-4. 其余路线图条目见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
+1. **先定 B1 方案**：① 给恢复链路增加“legacy 来源”分支（worker/完成校验按 legacy attach 取 choice 快照，不写`role_creation_operations`）；② 或旧角色恢复只做配置修复、不轮换凭据。定了才动服务端。
+2. Codex侧完成Terra的官方设备授权/登录，随后真实创建角色并验证官方low与start-ready-stop/drain；这属环境与授权步骤，不由绑定或serving推断。
+3. 348/347由Codex正常身份收取收尾；两项凭据边界按用户口述已修，需独立核验后才能记通过。
+4. DSH/WorkBuddy 的写入时机（启动刷新 or 仅脚本）与3d删除清理闭环按完整可验流程拆包，需用户确认后开工。
+5. 其余路线图条目见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
 
 重开窗口后恢复指令：`继续项目`。历史细节见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。

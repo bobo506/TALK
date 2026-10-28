@@ -355,6 +355,7 @@ SELECT
     b.model_id                                       AS model_id,
     b.model_alias                                    AS model_alias,
     b.model_display_name                             AS model_display_name,
+    b.default_effort                                 AS default_effort,
     b.updated_by                                     AS updated_by,
     b.updated_at                                     AS updated_at
 FROM requested AS req
@@ -369,7 +370,7 @@ SQL 硬约束（与本 SQL 一起实现）：
 
 - **单条语句**：整段只有一个 `;`（结尾），不含子查询后再补查询；调用方一次 `session.execute(text(BINDING_FACTS_SQL), {...})`。
 - **恰好 1 行**：五个 `LEFT JOIN` 的右表主键都是 `(project_id, member_id)` 或 `runner_id` 单键，因此结果恒为 1 行（`mappings().one()`），与是否存在绑定行无关。
-- **列别名唯一**：上列 27 个别名互不重复（`runner_id` 与 `registry_runner_id`、`member_id` 与 `roster_member_id` 等分别命名），避免 `Mappings` 覆盖。
+- **列别名唯一**：上列 28 个别名互不重复（`runner_id` 与 `registry_runner_id`、`member_id` 与 `roster_member_id` 等分别命名），避免 `Mappings` 覆盖。2026-10-28 增加 `default_effort`（准备阶段从官方模型目录落库的默认思考强度，仅展示、可空、不参与六维指纹与有效性判定）；原 27 列与 SQL 指纹为历史值。
 - **参数只有两个**：`:project_id`、`:member_id`（都来自请求，不来自 ORM 缓存）。
 - **`project_exists = 0`** → 事实助手只返回不存在事实，**不产生任何 `binding_state`**。项目名册/绑定接口映射为 **404**；任务创建保留 `_ensure_project_exists` 的 **400**（`server/routes/tasks.py:104-106`），任务快照助手再次遇到此事实也按 **400**，不由共用读取助手统一抛 HTTP 错误。
 - **无项目分支（`project_id is None`）**：不执行 SQL，直接 `state="no_project"`、字段全 `null`（语句数 **0**）。

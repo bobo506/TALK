@@ -308,6 +308,8 @@ class NativeSetupManager:
                 return
             _attempt_adapter(attempt).finish_native_login(attempt)
             if self._current(key, token):
+                # 2026-10-28：把官方目录返回的默认强度落库，供角色列表展示；取不到保持 NULL。
+                _record_default_effort(project_id, member_id, getattr(attempt, "default_effort", None))
                 self._update(project_id, member_id, status="ready", token=token)
         except Exception as exc:
             if self._current(key, token):
@@ -376,6 +378,29 @@ def _role_runtime(project_id: str, member_id: str, session: Session):
     binding = session.get(ProjectRoleBinding, (project_id, member_id))
     runner = session.get(RunnerRegistry, binding.runner_id) if binding and binding.runner_id else None
     return runner.runtime if runner is not None else None
+
+
+_DEFAULT_EFFORT_VALUES = {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+
+
+def _record_default_effort(project_id: str, member_id: str, effort) -> None:
+    """把准备阶段从官方模型目录取回的默认思考强度写回绑定行（只用于展示）。
+
+    - 只接受已知强度字面量；取不到或不认识时保持 NULL，列表不显示强度，不猜、不回退展示名；
+    - 不参与六维指纹、绑定有效性与启停判定；绑定行不存在（已删除）时静默跳过。
+    """
+    from server.models import ProjectRoleBinding
+
+    value = effort.strip().lower() if isinstance(effort, str) else ""
+    if value not in _DEFAULT_EFFORT_VALUES:
+        value = None
+    with Session(db.engine) as session:
+        binding = session.get(ProjectRoleBinding, (project_id, member_id))
+        if binding is None or binding.default_effort == value:
+            return
+        binding.default_effort = value
+        session.add(binding)
+        session.commit()
 
 
 def _mark_auto_setup_failed(project_id: str, member_id: str, code: str) -> None:

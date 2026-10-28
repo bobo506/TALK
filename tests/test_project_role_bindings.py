@@ -10,7 +10,7 @@
 - A14/A15/A16 不影响其它维度、sync 全量替换、项目删除清理；
 - A17 双连接 upsert 收敛（last-write-wins，无主键 409）；
 - A18 载荷计数冒烟（不越界改 bridge/B3）；
-- A19/A20/A21 事实助手：无绑定四例 1 行、离册有/无绑定、项目不存在、27 列、
+- A19/A20/A21 事实助手：无绑定四例 1 行、离册有/无绑定、项目不存在、28 列、
   单语句性质（带项目 1 条 / 无项目 0 条）、批量等价与查询数固定。
 
 全部用例使用进程内 TestClient 与隔离临时库；不启动生产服务、不调用模型、不读 Key、
@@ -65,7 +65,7 @@ from server.models import (
 )
 from tests.test_support import RouteTestCase
 
-EXPECTED_SQL_SHA = "a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e"
+EXPECTED_SQL_SHA = "2008b7326af9eafb763cffd05dc75e8cff75c9ec833a8b46f1b946d8fd18c294"
 
 RUNNER_ID = "runner:dsh-cli"
 RUNNER_RUNTIME = "dsh"
@@ -1171,9 +1171,9 @@ class RoleBindingFactsTests(BindingApiTestCase):
         self.assertEqual(digest, EXPECTED_SQL_SHA)
         self.assertEqual(BINDING_FACTS_SQL.count(";"), 1)
         self.assertTrue(BINDING_FACTS_SQL.rstrip().endswith(";"))
-        self.assertEqual(len(BINDING_FACTS_COLUMNS), 27)
-        self.assertEqual(len(set(BINDING_FACTS_COLUMNS)), 27)
-        # 27 个别名都要真的出现在 SQL 里。
+        self.assertEqual(len(BINDING_FACTS_COLUMNS), 28)
+        self.assertEqual(len(set(BINDING_FACTS_COLUMNS)), 28)
+        # 28 个别名都要真的出现在 SQL 里。
         for column in BINDING_FACTS_COLUMNS:
             self.assertIn(column, BINDING_FACTS_SQL)
 
@@ -1204,7 +1204,7 @@ class RoleBindingFactsTests(BindingApiTestCase):
             with self.subTest(name=name):
                 facts = self.facts("prj_facts", member_id)
                 # `.one()` 已经强制“恰好 1 行”，这里再核验列集合与关键事实。
-                self.assertEqual(len(facts), 27)
+                self.assertEqual(len(facts), 28)
                 self.assertEqual(set(facts), set(BINDING_FACTS_COLUMNS))
                 self.assertEqual(facts["project_exists"], 1)
                 self.assertEqual(facts["binding_exists"], 0)
@@ -1236,7 +1236,7 @@ class RoleBindingFactsTests(BindingApiTestCase):
         # 项目不存在：只返回不存在事实，不造任何绑定状态。
         absent = self.facts("prj_missing", "agent:worker")
         self.assertEqual(absent["project_exists"], 0)
-        self.assertEqual(len(absent), 27)
+        self.assertEqual(len(absent), 28)
         self.assertIsNone(resolve_role_binding_state(absent))
 
     def test_bound_row_exposes_all_columns_and_fingerprint(self):
@@ -1259,6 +1259,24 @@ class RoleBindingFactsTests(BindingApiTestCase):
         self.assertEqual(
             binding_fingerprint(facts), fingerprint_of()
         )
+
+    def test_default_effort_is_display_only(self):
+        """2026-10-28：准备阶段落库的官方默认强度只用于展示，不参与指纹与有效性。"""
+        self.register_runner()
+        self.seed_binding_row("prj_facts", "agent:worker")
+        base = binding_fingerprint(self.facts("prj_facts", "agent:worker"))
+        self.assertIsNone(self.facts("prj_facts", "agent:worker")["default_effort"])
+        with self.session() as session:
+            row = session.get(ProjectRoleBinding, ("prj_facts", "agent:worker"))
+            row.default_effort = "low"
+            session.add(row)
+            session.commit()
+        facts = self.facts("prj_facts", "agent:worker")
+        self.assertEqual(facts["default_effort"], "low")
+        self.assertEqual(binding_fingerprint(facts), base)
+        self.assertEqual(resolve_role_binding_state(facts), ROLE_BINDING_BOUND)
+        response = self.get_binding("prj_facts", "agent:worker").json()
+        self.assertEqual(response["binding"]["default_effort"], "low")
 
     # ── partial / runner_missing / runner_retired 的精确边界 ─────────
 

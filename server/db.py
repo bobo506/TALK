@@ -394,6 +394,18 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS ix_project_role_bindings_runner_id "
             "ON project_role_bindings (runner_id)"
         )
+        # 2026-10-28：绑定行增加准备阶段从官方模型目录取回的默认思考强度（仅展示，可空）。
+        # 旧行保持 NULL，列表不显示强度；不参与六维指纹与有效性判定。
+        binding_columns = {
+            row[1]
+            for row in conn.exec_driver_sql(
+                "PRAGMA table_info(project_role_bindings)"
+            ).fetchall()
+        }
+        if "default_effort" not in binding_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE project_role_bindings ADD COLUMN default_effort TEXT"
+            )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_member_id ON group_members (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_business_role ON group_members (business_role)")

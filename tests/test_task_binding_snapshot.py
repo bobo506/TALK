@@ -461,7 +461,7 @@ class TargetBindingSnapshotResolverTests(SnapshotSeedMixin, RouteTestCase):
         )
         self.assertEqual(
             hashlib.sha256(BINDING_FACTS_SQL.encode("utf-8")).hexdigest(),
-            "a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e",
+            "2008b7326af9eafb763cffd05dc75e8cff75c9ec833a8b46f1b946d8fd18c294",
         )
         self.assert_snapshot_shape(snapshot, ROLE_BINDING_UNCONFIGURED)
         self.assert_all_binding_fields_null(snapshot)

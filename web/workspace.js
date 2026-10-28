@@ -894,8 +894,15 @@ function roleBindingStateInfo(agent, row) {
 // 列表运行器短名统一为 Kimi Code，模型段仍用当前 binding 模型（K3 保持 K3）；
 // 不泛化截断自定义名称，不改运行器/角色永久名称或绑定数据。
 const ROLE_BINDING_KIMI_CODE_LEGACY_NAMES = new Set(["Kimi Code · K2.8 Preview 执行", "Kimi Code · K2.8 Preview"]);
+// 2026-10-28：运行器展示名统一去掉“CLI”字样（登记名如 "Codex CLI"、"WorkBuddy 内置CLI"），
+// 只改展示，不改登记数据；去掉后为空时仍按缺展示名降级到 runtime。
+function runnerNameWithoutCli(name) {
+  const text = String(name || "").trim();
+  if (!text) return text;
+  return text.replace(/\s*内置\s*CLI\b/gi, " ").replace(/\bCLI\b/gi, " ").replace(/\s{2,}/g, " ").trim();
+}
 function roleBindingRunnerText(row, missing) {
-  const name = roleBindingText(row.runner_display_name);
+  const name = runnerNameWithoutCli(roleBindingText(row.runner_display_name));
   const runtime = roleBindingText(row.runtime);
   if (name && runtime === "kimi-code" && ROLE_BINDING_KIMI_CODE_LEGACY_NAMES.has(name.trim())) return "Kimi Code";
   const model = roleBindingModelText(row, null);
@@ -908,24 +915,20 @@ function roleBindingRunnerText(row, missing) {
 function roleBindingModelText(row, missing) {
   return roleBindingText(row.model_display_name) || roleBindingText(row.model_alias) || roleBindingText(row.model_id) || missing;
 }
-// 280：公开 binding 没有独立的思考强度字段，只从明确的 model_display_name 最后一个中点段拆
-// 已知强度字面量（匹配忽略大小写，显示保留原值），前段（模型名）须非空；未知后缀原样保留为模型名，
-// 不据别名/成员名/运行实例或 native 配置猜值，alias/id 降级值不做强度拆分。
-// 拆不出强度时返回 null：摘要省略该项与对应分隔符，不显示“未提供/未知/默认”等占位。
+// 2026-10-28：思考强度只认准备阶段从官方模型目录落库的 binding.default_effort；
+// 展示名里的“· xhigh”这类后缀只从模型名中剥掉，不再当作强度来源（旧行不会凭空多出强度）。
+// 没有官方值时整项省略、不显示“未知”，也不据别名/成员名/运行实例猜值。
 const ROLE_BINDING_THINKING_STRENGTHS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
 function roleBindingModelAndStrength(row) {
   const display = roleBindingText(row.model_display_name);
   const model = roleBindingModelText(row, null);
-  let strength = null;
+  const strength = roleBindingText(row.default_effort) || null;
   let modelName = model;
   if (display) {
     const cut = display.lastIndexOf("·");
     const head = cut >= 0 ? display.slice(0, cut).trim() : "";
     const tail = cut >= 0 ? display.slice(cut + 1).trim() : "";
-    if (head && tail && ROLE_BINDING_THINKING_STRENGTHS.has(tail.toLowerCase())) {
-      modelName = head;
-      strength = tail;
-    }
+    if (head && tail && ROLE_BINDING_THINKING_STRENGTHS.has(tail.toLowerCase())) modelName = head;
   }
   return { modelName, strength };
 }
@@ -938,6 +941,7 @@ function workspaceRoleBindingSummary(agent) {
     parts.push(roleBindingRunnerText(row.row, "运行器未上报"));
     const { modelName, strength } = roleBindingModelAndStrength(row.row);
     parts.push(modelName || "模型未上报");
+    // 2026-10-28：强度只显示官方落库值；没有就整项省略（存量角色不显示）。
     if (strength) parts.push(strength);
   }
   return `绑定：${parts.join(" · ")}`;
@@ -1277,6 +1281,12 @@ function workspaceRoleServicePanel(role) {
   if (controls) section.appendChild(controls);
   const deleteButton = roleDeleteButton(role);
   if (deleteButton) (controls?.children[0] || section).appendChild(deleteButton);
+  // 2026-10-28：按用户要求“绑定重置”排在删除角色之后，作为服务行第 4 个按钮；
+  // 按钮与恢复逻辑仍由 role-creation.js 提供，这里只负责位置。
+  if (typeof roleRequestApp !== "undefined") {
+    const resetButton = roleRequestApp?.resetButton?.(role.member_id);
+    if (resetButton) (controls?.children[0] || section).appendChild(resetButton);
+  }
   return section;
 }
 function roleServiceRoleName(memberId) {

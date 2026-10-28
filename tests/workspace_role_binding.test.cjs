@@ -216,7 +216,7 @@ test('列表模型字段降级和运行器缺展示名保持，不猜型号',asy
 });
 
 // 280：按当前API公开binding构造五个实际角色的最终绑定行；每行前缀仍是“绑定：已绑定”。
-test('五个实际角色绑定行统一为 已绑定 · 运行器 · 模型 · 思考强度，缺强度省略最后项',async()=>{
+test('五个实际角色绑定行统一为 已绑定 · 运行器 · 模型 · 官方强度，缺强度省略最后项',async()=>{
   const legacy='Kimi Code · K2.8 Preview 执行';
   const roster=[
     {member_id:'agent:codex',business_role:'lead',binding:boundRow({runner_id:'codex-cli',runtime:'codex',runner_display_name:'Codex CLI',provider_id:'managed:codex-cli',model_id:'gpt-6.1-sol',model_alias:'codex/gpt-6.1-sol',model_display_name:'gpt-6.1-sol · xhigh'}),binding_state:'bound'},
@@ -226,20 +226,22 @@ test('五个实际角色绑定行统一为 已绑定 · 运行器 · 模型 · �
     {member_id:'agent:kimi-k28-b',business_role:'dev',binding:boundRow({runner_display_name:'Kimi Code · K2.8 Preview'}),binding_state:'bound'},
   ];
   const h=harness({roster});await h.enterRoles();assert.equal(h.roleRows().length,5);
-  assert.equal(h.bindingSummary('agent:codex'),'绑定：已绑定 · Codex CLI · gpt-6.1-sol · xhigh');
-  assert.equal(h.bindingSummary('agent:deepseek'),'绑定：已绑定 · DeepSeek Harness CLI · DeepSeek Flash · max');
+  assert.equal(h.bindingSummary('agent:codex'),'绑定：已绑定 · Codex · gpt-6.1-sol');
+  assert.equal(h.bindingSummary('agent:deepseek'),'绑定：已绑定 · DeepSeek Harness · DeepSeek Flash');
   assert.equal(h.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · K3');
   assert.equal(h.bindingSummary('agent:kimi-k28-a'),'绑定：已绑定 · Kimi Code · K2.8 Preview');
   assert.equal(h.bindingSummary('agent:kimi-k28-b'),'绑定：已绑定 · Kimi Code · K2.8 Preview');
 });
 
-// 280：拆不出思考强度时省略该项与对应分隔符，不显示“未提供/未知/默认”等占位，不猜Kimi强度。
-test('缺思考强度时无占位无尾分隔，强度字面量忽略大小写且显示保留原值',async()=>{
+// 2026-10-28：强度只认准备阶段落库的 default_effort，展示名后缀不再当强度；缺值整项省略。
+test('缺官方强度时省略末项，官方值存在时显示在末项',async()=>{
   const noStrength=harness({roster:[{member_id:'agent:kimi',binding:boundRow({model_display_name:'K3'}),binding_state:'bound'}]});await noStrength.enterRoles();
   const plain=noStrength.bindingSummary('agent:kimi');assert.equal(plain,'绑定：已绑定 · Kimi Code · K3');
   assert.doesNotMatch(plain,/未提供|未知|默认|none/i);assert.ok(!plain.trimEnd().endsWith('·'));
+  const official=harness({roster:[{member_id:'agent:codex',binding:boundRow({runner_display_name:'Codex CLI',runtime:'codex',model_display_name:'gpt-6.1-sol · xhigh',default_effort:'low'}),binding_state:'bound'}]});await official.enterRoles();
+  assert.equal(official.bindingSummary('agent:codex'),'绑定：已绑定 · Codex · gpt-6.1-sol · low');
   const upper=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:'Custom Runner',model_display_name:'DeepSeek Flash · MAX'}),binding_state:'bound'}]});await upper.enterRoles();
-  assert.equal(upper.bindingSummary('agent:kimi'),'绑定：已绑定 · Custom Runner · DeepSeek Flash · MAX');
+  assert.equal(upper.bindingSummary('agent:kimi'),'绑定：已绑定 · Custom Runner · DeepSeek Flash');
   const bare=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:'Custom Runner',model_display_name:'xhigh'}),binding_state:'bound'}]});await bare.enterRoles();
   assert.equal(bare.bindingSummary('agent:kimi'),'绑定：已绑定 · Custom Runner · xhigh');
   const emptyHead=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:'Custom Runner',model_display_name:' · high'}),binding_state:'bound'}]});await emptyHead.enterRoles();
@@ -249,9 +251,9 @@ test('缺思考强度时无占位无尾分隔，强度字面量忽略大小写�
 // 280：只从明确 model_display_name 拆强度；未知后缀保留为模型名，alias/id 降级值与 capability 标签不当强度。
 test('未知后缀保留为模型名，alias降级不拆强度、thinking能力标签不算强度',async()=>{
   const unknown=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:'Codex CLI',model_display_name:'gpt-6.1-sol · turbo'}),binding_state:'bound'}]});await unknown.enterRoles();
-  assert.equal(unknown.bindingSummary('agent:kimi'),'绑定：已绑定 · Codex CLI · gpt-6.1-sol · turbo');
+  assert.equal(unknown.bindingSummary('agent:kimi'),'绑定：已绑定 · Codex · gpt-6.1-sol · turbo');
   const aliasOnly=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:'DeepSeek Harness CLI',model_display_name:'',model_alias:'vendor/flash · max'}),binding_state:'bound'}]});await aliasOnly.enterRoles();
-  assert.equal(aliasOnly.bindingSummary('agent:kimi'),'绑定：已绑定 · DeepSeek Harness CLI · vendor/flash · max');
+  assert.equal(aliasOnly.bindingSummary('agent:kimi'),'绑定：已绑定 · DeepSeek Harness · vendor/flash · max');
   const capability=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:'Custom Runner',model_display_name:'K3',thinking:true,always_thinking:true}),binding_state:'bound'}]});await capability.enterRoles();
   const text=capability.bindingSummary('agent:kimi');assert.equal(text,'绑定：已绑定 · Custom Runner · K3');assert.doesNotMatch(text,/thinking/i);
 });
@@ -262,6 +264,20 @@ test('Kimi旧系统名映射不泛化：自定义名与其它runtime保持原样
   assert.equal(custom.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · K2.8 Preview 执行加强版 · K3');
   const otherRuntime=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runtime:'codex',runner_display_name:'Kimi Code · K2.8 Preview 执行',model_id:'k3',model_alias:'kimi-code/k3',model_display_name:'K3'}),binding_state:'bound'}]});await otherRuntime.enterRoles();
   assert.equal(otherRuntime.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · K2.8 Preview 执行 · K3');
+});
+
+// 2026-10-28：运行器展示名统一去掉“CLI”字样；WorkBuddy 的“内置CLI”一并去掉，只改展示。
+test('运行器展示名去掉CLI字样，WorkBuddy内置CLI显示为WorkBuddy',async()=>{
+  for(const [raw,expected] of [
+    ['Codex CLI','Codex'],
+    ['DeepSeek Harness CLI','DeepSeek Harness'],
+    ['WorkBuddy 内置CLI','WorkBuddy'],
+    ['Custom Runner','Custom Runner'],
+  ]){
+    const h=harness({roster:[{member_id:'agent:kimi',binding:boundRow({runner_display_name:raw,model_display_name:'K3'}),binding_state:'bound'}]});
+    await h.enterRoles();
+    assert.equal(h.bindingSummary('agent:kimi'),`绑定：已绑定 · ${expected} · K3`);
+  }
 });
 
 test('列表和详情使用公开文本，未知附加字段和属性元数据不展示',async()=>{

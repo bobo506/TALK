@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-29（Asia/Shanghai）— 官方思考强度落库与展示、绑定重置移位、存量回填；B1 兼容恢复待定
+
+- **授权与现场**：用户夜间明确按“B1 → DSH/WorkBuddy → 回填 → 全量回归 → 提交”推进，遇不确定暂停等确认。改动前 HEAD `16dbc44`，工作树干净；本机 API 仍以旧代码运行（PID `9660`），数据库已由回填脚本补列。
+- **官方强度落库（A2）**：`project_role_bindings` 增可空 `default_effort`（展示专用，不参与六维指纹与有效性），`db.py` 幂等迁移；Codex 的 `model/list` 默认强度与 Kimi 模型条目的 `default_effort` 在准备完成时经 `_record_default_effort` 写回；绑定投影（28 列，SQL 指纹 `2008b73…`）与 `RoleBindingOut` 带出该字段；绑定重写时清空旧值。列表只读该字段，取不到整项省略；创建弹窗模型下拉只显示模型名。
+- **存量回填**：一次性脚本按角色已准备的配置读取官方值并写库，dry-run 后执行——Codex `xhigh`、Kimi `high`、G-terra `low`、大K `high`、Kimi k2.8 `max`、DSH `max`；旧 GPT 配置无强度、WorkBuddy 绑定模型 `kimi-k3` 不在当前 `models.json`，均保持空。
+- **按钮位置（3g 改版）**：`绑定重置`保留并移到角色开关操作行第 4 位（启动/关闭、删除角色之后），移除按钮下说明段落；维护面板不再重复渲染并加 `.role-maintenance:empty` 隐藏。G-terra 页面截图确认四按钮齐全。
+- **B1 阻塞**：小G/小D/小K 是 `origin=imported`、`identity_exclusive=0`、无创建操作的旧角色，服务端恢复的三道门全拒。三条已提交的 `role_legacy_attach_operations` 可作放行锚点，但 `role_creation_operations` 的合同禁止补录复用，且 worker 执行/完成校验强依赖 `origin_operation_key → RoleCreationOperation + RoleProvisionJob`；需新增“legacy 来源”分支，属架构决定，暂停待用户确认。
+- **DSH/WorkBuddy 调研与回填**：WorkBuddy `models.json` 有 `reasoning.defaultEffort`（本机 `max`），DSH 角色 patch 有 `reasoningEffort: max`；两类运行器无模型配置写入器，无法“新建时写”，只能脚本读取回填，写入时机待定。
+- **验证**：Node 全量 24 套件 351 用例 / 335 通过 / 16 既有失败；`test_project_role_bindings` 41、`test_task_binding_snapshot` 27、`test_role_creation_web_ui` 3 均通过（合计 71）；`git diff --check` 干净。未验证：真实重启后的页面（用户已确认强度显示生效）、B1（未实施）。
+- **证据**：`.tmp/role-effort-backfill-20261028/`（回填与探查脚本）、`.tmp/role-list-select-20261028/REPORT.md`。本地提交，未推送。
+
 ## 2026-10-28（Asia/Shanghai）— 角色页面三项精简、列表框选复制与创建弹窗修正（用户验收通过）
 
 - **授权与现场**：用户明确指定DeepSeek单独开发本片，免去独立复核、由用户本人页面验收。改动前HEAD `51f7b7f`，工作树无已跟踪修改。本机DSH默认`workspace-write`沙箱下所有命令启动即失败（`0xC0000142`），重启应用无效；用户切到`danger-full-access`后命令通道恢复，本次所有测试与浏览器验证均在恢复后执行。
