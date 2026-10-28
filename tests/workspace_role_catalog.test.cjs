@@ -28,7 +28,9 @@ function harness(handler) {
 }
 test('创建目录接受已登记未核验/可发现/外部运行器，排除下架与未知状态',async()=>{
   const h=harness();h.data.runners.push({runner_id:'visible',adapter_status:'discoverable',control_kind:'external_session'},{runner_id:'retired',adapter_status:'retired',control_kind:'managed_cli'},{runner_id:'bad',adapter_status:'__proto__'});await h.ready();
-  assert.deepEqual(h.ui.state.runners.map(r=>r.runner_id),['kimi','visible']);assert.equal(h.posts().length,0);assert.match(h.el('role-create-notice').textContent,/尚未确认/);
+  assert.deepEqual(h.ui.state.runners.map(r=>r.runner_id),['kimi','visible']);assert.equal(h.posts().length,0);
+  // 2026-10-28：按用户要求删除“运行器接入或启停能力尚未确认…”提示，未核验运行器不再追加说明。
+  assert.doesNotMatch(h.el('role-create-notice').textContent,/尚未确认/);
 });
 test('空模型目录以真实项目绑定提供登记入口，不自动写入或伪造模型',async()=>{
   const h=harness();await h.ready();assert.match(h.texts(h.el('role-create-model-setup')),/K2.8 Preview/);assert.equal(h.ui.state.choices.length,0);assert.equal(h.posts().length,0);

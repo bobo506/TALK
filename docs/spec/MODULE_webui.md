@@ -490,6 +490,8 @@
 
 - 基线98beb9c后端已验收；用户明确继续下一片，Codex前端实施、DeepSeek只读独立复核，正式项目development_requirements不改。仅11源：role-creation.js/index.html、两创建Node测试与7个缓存断言消费者，六资源20261016-role-auto-start；workspace.js/app.js及全部后端/宿主不改。255已收取，11源随本轮发布。
 - 新create固定auto_start=true，无额外勾选；未确认保存使用原键原载荷，恢复缓存保留true/false/null/缺省，不追补旧请求或recover。只读公开auto布尔/状态/launch锚点/稳定码，未知凭据字段不进入DOM或存储。
-- 创建弹窗区分配置成功与启动请求已提交；详情沿既有角色开关呈现实际服务状态，只对自动启动未执行/失败/未知给短反馈，不恢复配置成功大卡或重复服务标签。人工意图保留，配置失败/取消即使pending也不写成启动中，刷新不发第二个start。
+- 创建弹窗区分配置成功与启动请求已提交；详情沿既有角色开关呈现实际服务状态。2026-10-28 按用户要求移除“上次自动启动未完成，请查看服务状态后手动启动。”提示行，自动启动未执行/失败/未知一律以服务状态区实际状态为准，不恢复配置成功大卡或重复服务标签。人工意图保留，配置失败/取消即使pending也不写成启动中，刷新不发第二个start。
+- 2026-10-28角色页面三项（用户已验收）：运行器/模型字段在各占整行（复用`.wide`），下拉不再继承`.group-member-select`的38px定高（`.role-create-dialog .role-request-field select{height:auto}`），避免16px内容区裁掉15px文字；`.role-create-dialog`的`max-height`改用`calc(100vh / var(--interface-scale,1) - 48px)`，与`.modal-card`同一缩放补偿口径，常规窗口不再出现内部滚动条。创建弹窗移除Codex默认强度说明与“运行器接入或启停能力尚未确认”提示，能力事实只由服务状态区呈现。
+- 2026-10-28角色列表框选复制：`.role-row`声明`user-select:text`；`workspaceRoleListSelection()`判断选区是否落在`.role-entry`内，角色行与“项目设置”行据此在拖选结束时放弃导航；存在列表选区时`renderWorkspaceList()`置`workspaceUI.listRenderDeferred`并暂缓重建，`selectionchange`折叠后补绘一次，服务轮询因此不会清掉正在进行的框选。范围仅角色列表，任务列表未改。
 - 255由DeepSeek独立实读11源，95/95 Node、26/26 Python、14项自建VM探针及8项Node变异检出通过，0正向失败/错误/跳过；根核实际驱动、日志、11候选/842保护SHA及本地/远端交付字段一致。MCP原msg2782因说明+围栏为unknown保持，根只去围栏整理JSON校验task255，Hall裁决msg2783后收取，不冒称原结果已结构化。根另以临时DB/storage补验首页六资源字节通过；原独立静态探针未显式隔离DB的范围遗漏保留，原日志清理数0不能证明DB完全未写。Python侧首轮7失败仅复核者自报，末轮5失败原件保留，不叠加为新正向测试。证据final255/，源码未再改。
 - 没有Browser/视觉键盘或真实原生CLI/模型/生产宿主验证，unknown/unverified不变。代码已通过并本轮发布，按[页面人工验收](../guides/ROLE_AUTO_START_PAGE_ACCEPTANCE.md)确认后再开下一功能，本轮不同时开展日志/旧角色迁移/预算/删除或私有目录路径改造。

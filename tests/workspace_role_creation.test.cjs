@@ -94,14 +94,15 @@ test('新Codex角色显示官方链接和验证码，旧角色和非人类不被
   }
 });
 
-test('创建Codex角色时说明官方默认强度，不从选项名称继承xhigh',async()=>{
+test('创建Codex角色时不再显示默认强度说明，也不从选项名称继承xhigh',async()=>{
   const h=harness({handler:c=>{
     if(c.path==='/api/runners')return response([{runner_id:'r',runtime:'codex',display_name:'Codex',adapter_status:'adapted',control_kind:'managed_cli'}]);
     if(c.path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'selected · xhigh'}]);
   }});
   await h.ready();await h.fill();
-  assert.match(h.texts(h.el('role-create-model-setup')),/官方模型目录返回的默认思考强度/);
-  assert.equal(h.el('role-create-model-setup').classList.contains('hidden'),false);
+  // 2026-10-28：按用户要求删除“新角色使用官方模型目录返回的默认思考强度…”说明行，面板对 Codex 保持隐藏。
+  assert.doesNotMatch(h.texts(h.el('role-create-model-setup')),/默认思考强度/);
+  assert.equal(h.el('role-create-model-setup').classList.contains('hidden'),true);
 });
 
 test('Codex角色允许保存自动启动意图，后台准备反馈不再是手动刷新前置',async()=>{

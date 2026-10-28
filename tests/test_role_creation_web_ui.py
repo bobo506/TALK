@@ -35,8 +35,8 @@ class RoleCreationWebUiTests(RouteTestCase):
             required=['/role-creation.js','/workspace.js','/app.js']
             self.assertTrue(all(path in scripts for path in required))
             self.assertEqual([scripts.index(path) for path in required],sorted(scripts.index(path) for path in required))
-            self.assertIn('/role-creation.js?v=20261027-role-creation-complete-v1',parser.assets)
-            self.assertIn('/workspace.js?v=20261027-role-creation-complete-v1',parser.assets)
+            self.assertIn('/role-creation.js?v=20261028-role-create-dialog-v1',parser.assets)
+            self.assertIn('/workspace.js?v=20261028-role-list-select-v1',parser.assets)
             self.assertIn('role-create-auto-start',parser.ids)
             for asset in ['/role-creation.js','/role-creation.css']:
                 self.assertEqual(client.get(asset).status_code,200)
@@ -48,3 +48,10 @@ class RoleCreationWebUiTests(RouteTestCase):
         for field in ['role-create-runner','role-create-model','role-create-name']:
             self.assertRegex(html,rf'id="{field}"[^>]*required')
         self.assertNotIn('onclick=',html)
+
+    def test_creation_dialog_select_height_follows_content(self):
+        # 2026-10-28：.group-member-select 的 38px 定高减去 10px 上下内边距和边框后只剩 16px 内容区，
+        # 15px 字的行盒放不下，默认提示「选择运行器」上下笔画会被裁掉；下拉必须随内容高度。
+        css=(ROOT/'web/role-creation.css').read_text(encoding='utf-8')
+        self.assertRegex(css,r'\.role-create-dialog \.role-request-field select \{height:auto;\}')
+        self.assertRegex(css,r'\.role-request-field input,\.role-request-field select,\.role-request-field textarea \{[^}]*padding:10px 12px;')

@@ -1,6 +1,8 @@
 .role-create-backdrop {position:fixed; inset:0; z-index:100; background:rgba(24,34,45,.35); display:flex; align-items:center; justify-content:center; padding:24px;}
 .role-create-backdrop.hidden,.role-request-list.hidden,.role-request-host-panel.hidden {display:none!important;}
-.role-create-dialog {width:min(620px,100%); max-height:calc(100vh - 48px); overflow:auto; background:#fff; border:1px solid #d4dce2; border-radius:14px; padding:26px; box-shadow:0 20px 70px rgba(28,39,53,.2); color:#303741;}
+/* 2026-10-28：桌面 0.8 界面缩放下 100vh 仍是物理视口（见 workspace.css 的 --interface-scale 注释），
+   未补偿时弹窗只拿到 80% 的可用高度，下拉加高后即出现内部滚动条；这里与 .modal-card 采用同一补偿口径。 */
+.role-create-dialog {width:min(620px,100%); max-height:calc(100vh / var(--interface-scale,1) - 48px); overflow:auto; background:#fff; border:1px solid #d4dce2; border-radius:14px; padding:26px; box-shadow:0 20px 70px rgba(28,39,53,.2); color:#303741;}
 .role-create-heading {display:flex; align-items:center; justify-content:space-between; gap:18px;}
 .role-create-heading h2 {font-size:25px; font-weight:650; margin:0;}
 .role-create-grid {display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px;}
@@ -8,6 +10,10 @@
 .role-request-field {display:flex; flex-direction:column; gap:8px; min-width:0; font-size:14px;}
 .role-request-field small {color:#7a838c; font-weight:400; margin-left:8px;}
 .role-request-field input,.role-request-field select,.role-request-field textarea {width:100%; min-width:0; box-sizing:border-box; padding:10px 12px; border:1px solid #cfd6dd; border-radius:6px; font-size:15px; background:#fff; color:#303741;}
+/* 2026-10-28：下拉还吃到了 style.css 的 .group-member-select{height:38px}。38px 减上下各 10px 内边距与边框后
+   内容区只剩 16px，装不下 15px 文字的行盒，默认提示「选择运行器」上下的笔画会被裁掉。改为随内容高度，
+   与同一表单的输入框保持一致；宽度/内边距/字号/圆角不变。 */
+.role-create-dialog .role-request-field select {height:auto;}
 .role-request-field :focus {outline:2px solid #a7c5dd; outline-offset:2px;}
 .role-request-field :disabled {background:#f4f5f5; color:#737f8b;}
 .role-create-primary {background:#2b6595; color:white; border-color:#2b6595; min-height:44px;}

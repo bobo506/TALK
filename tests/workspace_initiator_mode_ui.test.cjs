@@ -246,11 +246,12 @@ test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源
   }
   assert.ok(!workspaceSource.includes('/controller-assignment'), 'workspace.js 不再读写指定端点');
   assert.ok(!appSource.includes('/controller-assignment'), 'app.js 不再读写指定端点');
-  for (const asset of ['style.css', 'role-creation.css', 'role-diagnostics.css']) {
+  for (const asset of ['style.css', 'role-diagnostics.css']) {
     assert.ok(indexHtml.includes(`/${asset}?v=${STATIC_VERSION}`), `${asset} 保留原缓存版本`);
   }
+  assert.ok(indexHtml.includes('/role-creation.css?v=20261028-role-create-dialog-v1'), '本次 role-creation.css 更新缓存版本');
   assert.ok(indexHtml.includes('/app.js?v=20261025-role-busy-stop-v1'), '未修改的 app.js 保留原缓存版本');
-  assert.ok(indexHtml.includes('/workspace.js?v=20261027-role-creation-complete-v1'), '本次 workspace.js 更新缓存版本');
+  assert.ok(indexHtml.includes('/workspace.js?v=20261028-role-list-select-v1'), '本次 workspace.js 更新缓存版本');
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 

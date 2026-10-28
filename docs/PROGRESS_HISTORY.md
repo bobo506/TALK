@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-10-28（Asia/Shanghai）— 角色页面三项精简、列表框选复制与创建弹窗修正（用户验收通过）
+
+- **授权与现场**：用户明确指定DeepSeek单独开发本片，免去独立复核、由用户本人页面验收。改动前HEAD `51f7b7f`，工作树无已跟踪修改。本机DSH默认`workspace-write`沙箱下所有命令启动即失败（`0xC0000142`），重启应用无效；用户切到`danger-full-access`后命令通道恢复，本次所有测试与浏览器验证均在恢复后执行。
+- **3f 移除提示**：删除角色详情“上次自动启动未完成，请查看服务状态后手动启动。”分支，保留本页保存失败错误提示；`USER_MANUAL`、`MODULE_webui`、`ROLE_AUTO_START_PAGE_ACCEPTANCE`同步，原断言改为“不再出现”。
+- **3e 放宽下拉**：创建弹窗运行器/模型字段复用已有`.wide`各占整行。实测（headless Chrome + 真实CSS，含0.8界面缩放）文字空间175→408，`Codex CLI Bridge (agent:codex)`由截断变为完整；未改弹窗宽度、字号、间距、配色。
+- **3c 框选复制**：`.role-row`加`user-select:text`；新增`workspaceRoleListSelection()`，角色行/项目设置行拖选不导航；有选区时`renderWorkspaceList()`暂缓重绘，`selectionchange`折叠后补绘。真实浏览器实测：拖选取到文字、click 1次导航0次、清空选区后单击正常导航1次。
+- **R1 竖直裁切返修**：用户反馈下拉默认文字不完整。根因是`.group-member-select{height:38px;padding:0 12px}`与`.role-request-field select{padding:10px 12px;font-size:15px;box-sizing:border-box}`叠加后内容区仅16px，15px行盒被裁。新增`.role-create-dialog .role-request-field select{height:auto}`，内容区16→23，下拉与同表单输入框对齐。
+- **R2 删文字+去滚动条**：按用户要求删除Codex“默认思考强度”说明与未核验运行器“接入或启停能力尚未确认”提示，相应断言改为不出现；`.role-create-dialog`的`max-height`由未补偿的`calc(100vh - 48px)`改为`calc(100vh / var(--interface-scale,1) - 48px)`，与`.modal-card`同口径。1366×768由溢出60px变为无内部滚动条，1280×720/1600×900同样无。
+- **验证**：定向Node 124/124、86/86通过；`test_role_creation_web_ui` 3/3；全量24个workspace套件348用例/332通过/16失败，用`git stash`还原源码复跑基线（22失败，含新增测试在旧源码下的必然失败）后逐条确认16项均为既有vm缺全局失败，无新增；`node --check`、`git diff --check`通过。
+- **未验证/限制**：真实登录态整页效果由用户人验完成（已确认通过）；未做其它浏览器、键盘操作与极小窗口验证；真实服务轮询下的长时间选区保持未长跑；删除“能力尚未确认”提示后，该信息只能从角色详情/服务状态区获得。
+- **证据**：`.tmp/role-list-select-20261028/REPORT.md`及三张截图；可复用探针`.tmp/ui-select-probe-20261028/`（CDP选择/布局测量）。本地提交，未推送。
+
 ## 2026-10-28（Asia/Shanghai）— 重开窗口前进度汇总：Terra已集成发布，新runtime换代，G-terra待CLI配置
 
 - **协作与规则**：当前大K负责决策、拆包、分配和复核；首片后新任务约定转为Terra开发、DeepSeek复核。AGENTS已精简，Git按完整切片收尾后推送一次，结果消息必须只含完整`development.json`，旧自由文本不追改。PR #6为早期AGENTS版本，未合并。

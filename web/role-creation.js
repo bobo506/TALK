@@ -366,9 +366,9 @@ function createRoleRequestUI(deps) {
     const panel = el("role-create-model-setup"); if (!panel) return;
     panel.replaceChildren();
     const runner = state.runners.find(row => row.runner_id === el("role-create-runner").value);
+    // 2026-10-28：按用户要求移除 Codex 的默认强度说明行；本面板仍保持“对 Codex 不出模型种子列表”。
     if (state.modal && !state.attempt && !state.modalRow && runner?.runtime === "codex") {
-      panel.classList.remove("hidden");
-      panel.append(node("p", "role-request-hint", "新角色使用官方模型目录返回的默认思考强度，不沿用模型名称中的强度标注。"));
+      panel.classList.add("hidden");
       return;
     }
     const visible = state.modal && !state.choices.length && state.modelSeeds.length > 0 && !state.attempt && !state.modalRow;
@@ -545,7 +545,8 @@ function createRoleRequestUI(deps) {
         .map(c => ({ choice_id: c.choice_id, runner_id: c.runner_id, model_display_name: c.model_display_name, model_alias: c.model_alias, model_id: c.model_id })) : [];
       fillSelect("role-create-model", state.choices, state.choices.length ? "选择模型" : "暂无可选模型", "choice_id");
       const fact = state.runners.find(r => r.runner_id === runner);
-      if (fact && (fact.adapter_status !== "adapted" || fact.control_kind !== "managed_cli")) state.notice = "运行器接入或启停能力尚未确认；配置可以继续，自动启动须通过实际能力检查。";
+      // 2026-10-28：按用户要求移除未核验运行器的“接入或启停能力尚未确认”提示；
+      // 能力事实仍由运行器/服务状态区展示，这里不再追加说明。
       if (!state.choices.length) {
         if (fact?.runtime === "kimi-code") {
           const agents = await api(`${base()}/agents`);

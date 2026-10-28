@@ -1,5 +1,5 @@
 /* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
-const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null };
+const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null, listRenderDeferred: false };
 // 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
 const ROLE_TASKS_PAGE_SIZE = 20;
 const roleTasksPageUI = { key: null, page: 1 };
@@ -711,7 +711,22 @@ function resetRoleDescription() {
   }
   saveRoleDescription();
 }
+// 角色列表文字可框选复制（2026-10-28）：选区落在角色条目内时，行点击不当作导航，
+// 避免拖选复制误跳详情；同时让 renderWorkspaceList 暂缓重绘，避免服务轮询把选区清掉。
+function workspaceRoleListSelection() {
+  if (typeof window === "undefined" || typeof window.getSelection !== "function") return null;
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed) return null;
+  const anchor = selection.anchorNode;
+  if (!anchor) return null;
+  const element = anchor.nodeType === 1 ? anchor : anchor.parentElement;
+  if (!element || typeof element.closest !== "function") return null;
+  return element.closest(".role-entry") ? selection : null;
+}
 function renderWorkspaceList() {
+  // 有选区时暂缓重建：轮询/事件重绘会替换列表节点，把用户正在框选的文字清掉。
+  // 选区消失后由 selectionchange 补一次重绘，状态不会长期滞后。
+  if (workspaceRoleListSelection()) { workspaceUI.listRenderDeferred = true; return; }
   const rolesMode = workspaceUI.mode === "roles";
   // 开发要求编辑区的可见性统一由 renderTaskDetailsPanel() 同步（app.js），覆盖群聊等不经本函数的导航路径。
   syncWorkspaceLayout();
@@ -739,7 +754,11 @@ function renderWorkspaceList() {
       if (workspaceUI.roleSelection === "role") workspaceUI.roleSelection = "settings";
     }
     // 固定首项“项目设置”：独立导航项，不参与角色搜索过滤，名册为空时也可达。
-    const settingsRow = workspaceButton("", () => { workspaceUI.roleSelection = "settings"; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row role-settings-row");
+    const settingsRow = workspaceButton("", () => {
+      // 拖选复制文字时不触发导航，与角色行一致。
+      if (workspaceRoleListSelection()) return;
+      workspaceUI.roleSelection = "settings"; renderWorkspaceList(); renderTaskDetailsPanel();
+    }, "role-row role-settings-row");
     settingsRow.classList.toggle("selected", workspaceSettingsSelected());
     settingsRow.setAttribute("aria-pressed", String(workspaceSettingsSelected()));
     settingsRow.append(workspaceEl("strong", "", "项目设置"), workspaceEl("span", "", "开发要求 · 调度模式 · 宿主配置"), workspaceEl("small", "", "项目级 · 不属于任何角色"));
@@ -753,7 +772,11 @@ function renderWorkspaceList() {
       // R1-3 布局修正：角色行与其服务控制包进同一个 .role-entry，条目自己只有一条底边线，
       // 状态标签留在行内正常流中，不再用负外边距压到行边框上；两个子块各自负责左右留白。
       const entry = workspaceEl("div", "role-entry");
-      const row = workspaceButton("", () => { workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = role.member_id; renderWorkspaceList(); renderTaskDetailsPanel(); }, "role-row");
+      const row = workspaceButton("", () => {
+        // 拖选复制文字时不触发导航，避免选中模型名后误跳角色详情。
+        if (workspaceRoleListSelection()) return;
+        workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = role.member_id; renderWorkspaceList(); renderTaskDetailsPanel();
+      }, "role-row");
       row.dataset.memberId = role.member_id;
       row.classList.toggle("selected", !workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole);
       row.setAttribute("aria-pressed", String(!workspaceSettingsSelected() && role.member_id === workspaceUI.selectedRole));
@@ -1719,10 +1742,9 @@ function workspaceRoleStartupPanel(role) {
   label.append(input, workspaceEl("span", "", "随项目自动启动")); panel.appendChild(label);
   panel.appendChild(workspaceEl("p", "role-service-hint", "下次加载项目时生效；本次手动关闭后不会再次拉起。"));
   const error = roleStartupUI.errors.get(role.member_id);
+  // 2026-10-28：按用户要求移除“上次自动启动未完成，请查看服务状态后手动启动。”一行；
+  // 上次激活失败的真实状态仍由角色服务状态区展示，这里只保留本页保存失败的错误提示。
   if (error) panel.appendChild(workspaceEl("p", "role-service-hint error", error));
-  else if (["failed", "skipped"].includes(value.last_activation?.status)) {
-    panel.appendChild(workspaceEl("p", "role-service-hint", "上次自动启动未完成，请查看服务状态后手动启动。"));
-  }
   return panel;
 }
 function renderWorkspaceRoleDetails() {
@@ -2228,6 +2250,13 @@ if (typeof document !== "undefined") {
     renderWorkspaceMode();
   });
   document.getElementById("workspace-search").addEventListener("input", event => { workspaceUI.query = event.target.value; renderWorkspaceList(); });
+  // 角色列表框选复制的补绘：选区结束后立刻恢复之前被推迟的重绘。
+  // 用可选调用兼容只实现部分 DOM 的测试环境（真实浏览器始终有该方法）。
+  document.addEventListener?.("selectionchange", () => {
+    if (!workspaceUI.listRenderDeferred || workspaceRoleListSelection()) return;
+    workspaceUI.listRenderDeferred = false;
+    renderWorkspaceList();
+  });
   const requirementsInput = document.getElementById("requirements-input");
   if (requirementsInput) {
     requirementsInput.addEventListener("input", recordRequirementsDraft);

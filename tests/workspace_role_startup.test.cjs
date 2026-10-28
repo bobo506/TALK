@@ -61,12 +61,16 @@ test('agent/归档/缺绑定/不受管/旧后端均隐藏且不能发送',async(
     assert.equal(x.panel(),null);await x.save(true);assert.equal(x.requests.length,0);
   }
 });
-test('失败执行只显示操作提示，保存不把入队说成已就绪',()=>{
+test('失败执行不再显示自动启动提示，保存不把入队说成已就绪',()=>{
   const x=fixture();x.role.startup.last_activation={status:'failed',error_code:'private-path'};
-  assert.match(x.h.texts(x.panel()),/查看服务状态后手动启动/);assert.doesNotMatch(x.h.texts(x.panel()),/private-path|启动成功/);
+  const text=x.h.texts(x.panel());
+  // 2026-10-28：按用户要求移除“上次自动启动未完成，请查看服务状态后手动启动。”，不再展示该行。
+  assert.doesNotMatch(text,/查看服务状态后手动启动/);
+  assert.doesNotMatch(text,/private-path|启动成功/);
+  assert.match(text,/随项目自动启动/);
 });
 test('页面详情接入控件，资源版本更新，UI没有启动执行API调用',()=>{
   assert.match(source,/const startupPanel = workspaceRoleStartupPanel\(role\)/);
-  assert.match(fs.readFileSync(require.resolve('../web/index.html'),'utf8'),/20261025-role-startup-v1/);
+  assert.match(fs.readFileSync(require.resolve('../web/index.html'),'utf8'),/20261028-role-list-select-v1/);
   assert.doesNotMatch(part,/role-services\/startup|\/service\/start|\/service\/stop/);
 });

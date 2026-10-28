@@ -40,7 +40,8 @@
    行/控制块只做内部排版，避免负外边距、重复横线与状态标签压线。 */
 .role-entry {display:flex; flex-direction:column; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; padding:24px 25px 20px;}
 .role-entry .role-row {border:0; background:transparent; padding:0; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left;}
-.role-row {border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; background:transparent; padding:24px 28px; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left;}
+/* 2026-10-28：角色行文字可框选复制（<button> 默认不可选）；拖选不触发导航由 workspace.js 守卫。 */
+.role-row {border:0; border-bottom:1px solid #dfdfda; border-left:3px solid transparent; background:transparent; padding:24px 28px; display:flex; flex-direction:column; gap:7px; width:100%; text-align:left; user-select:text; -webkit-user-select:text;}
 /* N2 修正：列表摘要明确省略号截断（最多 2 行），长无空格字符串不撑破布局；搜索仍用有效说明全文。 */
 .role-row strong {font-size:22px;} .role-row span {font-size:15px; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere;} .role-row small {font-size:14px; color:#626b76;}
 .workspace-empty {padding:20px 28px; color:#626b76; font-size:15px;}
