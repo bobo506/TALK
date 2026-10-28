@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-28（Asia/Shanghai）— Codex新角色目录登记GPT-6.1 Terra
+
+- 用户要求新建角色时Codex运行器可选择GPT-6.1 Terra。只读核实页面选项来自`GET /api/runners/{runner_id}/model-choices`，并非前端硬编码；原目录仅有`gpt-6.1-sol`。
+- 本机CLI为`codex-cli 0.164.0`。仅通过官方app-server `model/list`读取元数据，未创建thread/turn或发起推理，确认`model=gpt-6.1-terra`、显示`GPT-6.1 Terra`、默认强度`low`、`hidden=false`，支持low/medium/high/xhigh/max/ultra。诊断时项目级CODEX_HOME导致`invalid transport`，改为仅在诊断进程显式使用当前用户原生目录后完成查询，未修改任何原生配置。
+- 经用户授权，仅本次使用既有human正常认证执行一次目录POST及只读核验，未打印、复制或保存凭据正文。新增`choice_id=rmc_54101bd4da53`，`model_id/model_alias=gpt-6.1-terra`，复用`builtin/openai/native-codex-chatgpt-login`，显示名`GPT-6.1 Terra`，`source_kind=declared`、capabilities空。目录由1条变2条，原Sol选择保留；新建角色页面刷新后可选。
+- 本次仅模型目录登记，不修改产品代码、数据库结构、既有绑定、其他角色或服务，不直接写数据库，不调用模型或启停角色。CLI 0.164.0与既有候选适配器0.163.0的版本适配不在本片，登记成功不代表新角色准备、模型调用或启动已经验收。
+
 ## 2026-10-28（Asia/Shanghai）— 348验收不通过，完成汇总并等待用户重新指定角色
 
 - 用户通知348完成，明确本轮只验收、然后汇总进度纳入验收结果，禁止派发任务；后续由用户重新指定决策及其它角色接替。Codex身份只读确认为agent:codex/原项目/lead，项目active7而本连接effective not_bound；没有将身份事实或旧分工当成继续授权，没有恢复等待或代指定接任者。
