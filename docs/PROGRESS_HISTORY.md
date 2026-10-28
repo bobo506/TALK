@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-10-28（Asia/Shanghai）— 派发349 Terra新角色创建与正常启动首片
+
+- 用户确认开始第一项开发，并允许将手动精简后的AGENTS随下次提交；该文件已单独本地提交`7f1919a`，未推送，未混入任务包或产品变更。
+- 从Codex默认强度同源484项建立`.tmp/terra-role-flow-20261028/baseline`与candidate，逐文件验证源和目标均一致；manifest SHA256 `0ba997ebe35fd9cfc05ca670178a0335b47a75be217306b08e309c58d0ab3f76`。不包含348改动，不从生产根重做后半包。
+- 349已派`agent:deepseek`，初始`queued/assigned`，创建者大K。范围为保存后后台创建、0.164.0协议兼容、独立HOME/官方low、成功自动进列表/失败弹窗及受管启停；其余6项页面需求、DSH/348、WorkBuddy、删除、真实登录/模型/生产操作均不在包内。DeepSeek仅写candidate/delivery，完成冻结后由大K独立复核。
+- 创建请求新工作线force_new，execution_session_state=null，不预称原生新窗已落实。自动跟进已停止为`creator_stopped`，未取消任务、主动等待或唤回。现无交付，不据queued推断开发开始或完成。
+
 ## 2026-10-28（Asia/Shanghai）— 调整角色页面优先级并明确Terra首片及后续分工
 
 - 用户要求将“角色列表与创建交互统一修正”移至路线图第3项，并将其中GPT-6.1 Terra新角色创建/启动失败列为最优先问题。当前GPT `agent:prj-e8fe7066bbec.gpt-79445c1f`仅绑定且offline、无实例。
