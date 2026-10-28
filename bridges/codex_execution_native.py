@@ -1,4 +1,4 @@
-"""Codex 0.163.0 原生会话接口；不读取认证文件，不自动批准工具请求。
+"""Codex 0.163.0/0.164.0 原生会话接口；不读取认证文件，不自动批准工具请求。
 
 复用已配置任务命令的模型、开发者指令、沙箱、禁用功能及网络环境。
 app-server 只走本次私有 stdio；不连接桌面 daemon、不开放监听端口。
@@ -20,7 +20,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-SUPPORTED_VERSION = "0.163.0"
+CURRENT_VERSION = "0.164.0"
+LEGACY_VERSIONS = ("0.163.0",)
+SUPPORTED_VERSIONS = (CURRENT_VERSION, *LEGACY_VERSIONS)
+# 兼容旧调用方按单值比较；新代码必须按集合判定，不能把 0.164 当 0.163 放行。
+SUPPORTED_VERSION = CURRENT_VERSION
 MAX_ROLLOUT_BYTES = 128 * 1024 * 1024
 MAX_LINE_BYTES = 16 * 1024 * 1024
 SESSION_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -84,6 +88,7 @@ class LaunchSpec:
     sandbox: str
     approval: str
     fingerprint: str
+    version: str = CURRENT_VERSION
 
 
 def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, Any]) -> LaunchSpec:
@@ -130,7 +135,13 @@ def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, 
     version = subprocess.run([str(executable), "--version"], capture_output=True,
                              encoding="utf-8", timeout=15, check=True,
                              **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
-    if version.stdout.strip() != "codex-cli " + SUPPORTED_VERSION:
+    cli_version = version.stdout.strip()
+    if not cli_version.startswith("codex-cli "):
+        raise CodexNativeError("codex_version_unsupported")
+    cli_version = cli_version[len("codex-cli "):]
+    # 0.164 的 app-server 对本适配器使用的 thread/start、thread/read、
+    # thread/resume、turn/start 与 model/list 为增量兼容；0.163 旧角色仍可启动。
+    if cli_version not in SUPPORTED_VERSIONS:
         raise CodexNativeError("codex_version_unsupported")
     prefix = argv[1:at]
     approved_prefix: list[str] = []
@@ -204,13 +215,14 @@ def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, 
     sources["channel"] = hashlib.sha256(Path(__file__).with_name("codex_execution_channel.py").read_bytes()).hexdigest()
     stable_binding = {k: binding[k] for k in ("runtime", "runner_id", "provider_id", "model_id", "binding_fingerprint")}
     fingerprint = digest({"argv": args, "sources": sources, "home": str(home).casefold(),
-                          "binding": stable_binding, "version": SUPPORTED_VERSION})
+                          "binding": stable_binding, "version": cli_version})
     return LaunchSpec(args, env, home, str(binding["model_id"]), str(binding["provider_id"]),
-                      effort, sandbox, approval, fingerprint)
+                      effort, sandbox, approval, fingerprint, cli_version)
 
 
 def read_rollout(path: Path, *, home: Path, session_id: str, workdir: Path,
-                 model: str, provider: str) -> tuple[dict, list[tuple[int, str]]]:
+                 model: str, provider: str,
+                 version: str | None = None) -> tuple[dict, list[tuple[int, str]]]:
     """逐行读取指定会话，保留原生来源时间；不把累计计费用量当上下文。"""
     if not SESSION_RE.fullmatch(session_id) or not _inside(path, home / "sessions"):
         raise CodexNativeError("codex_rollout_path_invalid")
@@ -231,7 +243,9 @@ def read_rollout(path: Path, *, home: Path, session_id: str, workdir: Path,
     if not rows or rows[0].get("type") != "session_meta":
         raise CodexNativeError("codex_rollout_header_missing")
     meta = rows[0].get("payload", {})
-    if (meta.get("id") != session_id or meta.get("cli_version") != SUPPORTED_VERSION
+    meta_version = meta.get("cli_version")
+    if (meta.get("id") != session_id or meta_version not in SUPPORTED_VERSIONS
+            or (version is not None and meta_version != version)
             or Path(meta.get("cwd", "")).resolve() != workdir.resolve()
             or meta.get("model_provider") != provider):
         raise CodexNativeError("codex_rollout_identity_mismatch")
@@ -398,8 +412,10 @@ class CodexNative:
         sid = thread.get("id")
         if not isinstance(sid, str) or not SESSION_RE.fullmatch(sid) or (session_id is not None and sid != session_id):
             raise CodexNativeError("codex_thread_id_mismatch")
+        thread_version = thread.get("cliVersion")
         if (Path(thread.get("cwd", "")).resolve() != self.workdir.resolve()
-                or thread.get("modelProvider") != self.spec.provider or thread.get("ephemeral") is not False):
+                or thread.get("modelProvider") != self.spec.provider or thread.get("ephemeral") is not False
+                or (thread_version is not None and thread_version not in SUPPORTED_VERSIONS)):
             raise CodexNativeError("codex_thread_identity_mismatch")
         if attached and (result.get("model") != self.spec.model or result.get("reasoningEffort") != self.spec.effort
                          or result.get("approvalPolicy") != self.spec.approval
@@ -443,6 +459,8 @@ class CodexNative:
                      "session_revision": 0, "native_sha256": hashlib.sha256(b"").hexdigest(),
                      "observed_at": now_iso(), "used_tokens": None, "context_window": None,
                      "source_time": None, "metrics_missing": True}, [])
+        # 旧角色可能在 0.163 创建后由 0.164 CLI 续接；rollout 头只要求是受支持
+        # 的协议版本，不能把当前可执行文件版本强加给历史文件。
         return read_rollout(self._paths[session_id], home=self.home, session_id=session_id,
                             workdir=self.workdir, model=self.spec.model, provider=self.spec.provider)
 

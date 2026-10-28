@@ -28,6 +28,8 @@ from server.models import (
     RoleServiceRecoveryRequest,
     RoleServiceRecoveryPlan,
     RoleServiceRecoveryOut,
+    RoleNativeSetupOut,
+    RoleNativeSetupStartRequest,
     RoleStartupPreferenceRequest,
     ProjectStartupRequest,
 )
@@ -65,6 +67,41 @@ def _require_human(current: Member) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="only human members can control role services",
         )
+
+
+@router.get("/projects/{project_id}/roles/{member_id}/native-setup",
+            response_model=RoleNativeSetupOut)
+def get_native_setup(project_id: str, member_id: str,
+                     current: Member = Depends(get_current_member),
+                     session: Session = Depends(get_session)):
+    _require_human(current)
+    from server.kimi_native_setup import manager
+    return manager.get(project_id, member_id, session)
+
+
+@router.post("/projects/{project_id}/roles/{member_id}/native-setup/start",
+             response_model=RoleNativeSetupOut)
+def start_native_setup(project_id: str, member_id: str, body: RoleNativeSetupStartRequest,
+                       current: Member = Depends(get_current_member),
+                       session: Session = Depends(get_session)):
+    _require_human(current)
+    if body.confirm is not True:
+        raise HTTPException(422, "native_setup_confirmation_required")
+    require_local_runtime(session.get_bind())
+    from server.kimi_native_setup import manager
+    return manager.start(project_id, member_id, body.expected_revision, current.id, session)
+
+
+@router.post("/projects/{project_id}/roles/{member_id}/native-setup/cancel",
+             response_model=RoleNativeSetupOut)
+def cancel_native_setup(project_id: str, member_id: str, body: RoleNativeSetupStartRequest,
+                        current: Member = Depends(get_current_member),
+                        session: Session = Depends(get_session)):
+    _require_human(current)
+    if body.confirm is not True:
+        raise HTTPException(422, "native_setup_confirmation_required")
+    from server.kimi_native_setup import manager
+    return manager.cancel(project_id, member_id, body.expected_revision, session)
 
 
 @router.post(

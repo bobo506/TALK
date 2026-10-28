@@ -295,6 +295,8 @@ def _enqueue_start_launch(
     事实传入；CAS 沿用 ``synchronize_session=False`` 的 Core update，调用方在
     保存点回滚后如需读取 state 必须重新 ``session.get()``。
     """
+    from server.kimi_native_setup import require_native_setup_for_start
+    require_native_setup_for_start(project_id, member_id, session)
     old_generation = int(expected_generation)
     new_generation = old_generation + 1
     launch = RoleServiceLaunch(
@@ -563,6 +565,8 @@ def start_role_service(
     _write_begin(session)
     ctx = load_role_service_context(project_id, member_id, session)
     _require_managed_cli(ctx)
+    from server.kimi_native_setup import require_native_setup_for_start
+    require_native_setup_for_start(project_id, member_id, session)
     now = _now()
     expire_due_launches(session, now=now, project_id=project_id, member_id=member_id)
     state = _get_state(project_id, member_id, session)
@@ -1435,7 +1439,7 @@ def project_role_service(
         and member.kind == "agent"
         and member.disabled_at is None
     )
-    return build_service_projection(
+    service = build_service_projection(
         project_id=project_id,
         member_id=member_id,
         role_name=role.role_name if role is not None else None,
@@ -1447,6 +1451,17 @@ def project_role_service(
         binding_ready=binding_ready,
         now=now,
     )
+    if runner is not None and runner.runtime in ("kimi-code", "codex"):
+        from server.kimi_native_setup import native_login_fact
+        present, ready = native_login_fact(project_id, member_id, session)
+        service.native_login = "configured" if ready else "unverified"
+        if present:
+            from server.models import RoleNativeSetup
+            setup = session.get(RoleNativeSetup, (project_id, member_id))
+            service.native_setup_status = setup.status if setup is not None else None
+        if present and not ready:
+            service.can_start = False
+    return service
 
 
 def list_role_services(

@@ -20,7 +20,7 @@ function documentFixture() {
   }
   document.createElement=element;
   document.getElementById=id=>elements.get(id)||[...elements.values()].flatMap(n=>n.querySelectorAll()).find(n=>n.id===id)||null;
-  const ids=['role-request-list','role-request-host-panel','role-request-host-status','role-request-host-name','role-request-host-enable','role-request-host-disable','role-create-form','role-create-modal','role-create-runner','role-create-model','role-create-name','role-create-description','role-create-submit','role-create-close','role-create-notice','role-create-result'];
+  const ids=['role-request-list','role-request-host-panel','role-request-host-status','role-request-host-name','role-request-host-enable','role-request-host-disable','role-create-form','role-create-modal','role-create-runner','role-create-model','role-create-name','role-create-description','role-create-auto-start','role-create-submit','role-create-close','role-create-notice','role-create-result'];
   ids.push('role-create-model-setup');
   for(const id of ids) {const n=element(id.includes('submit')||id.includes('close')?'button':'div'); n.id=id;elements.set(id,n);}
   const el=id=>elements.get(id);

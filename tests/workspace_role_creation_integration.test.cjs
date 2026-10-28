@@ -36,12 +36,12 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   await new Promise(resolve=>setImmediate(resolve));
   const controller=vm.runInContext('roleRequestApp',ctx);
   const toolbar=doc.getElementById('role-service-batch-actions');assert.match(h.texts(toolbar),/创建角色/);
-  await controller.open();h.el('role-create-runner').value='r';await controller.chooseRunner();h.el('role-create-model').value='c';h.el('role-create-name').value='新助手';await controller.submit();
+  await controller.open();h.el('role-create-runner').value='r';await controller.chooseRunner();h.el('role-create-model').value='c';h.el('role-create-name').value='新助手';h.el('role-create-auto-start').checked=true;await controller.submit();
   assert.equal(requests.find(r=>r.method==='POST').body.auto_start,true);
   assert.equal(ctx.projectAgents[0].member_id,'agent:new');assert.match(h.texts(ctx.blackboardColumns),/新助手/);
-  const viewRole=h.el('role-create-result').querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='查看角色');
-  assert.ok(viewRole,'创建结果应提供查看角色入口');await viewRole.fire('click');
   assert.equal(controller.state.modal,false);assert.ok(h.el('role-create-modal').classList.contains('hidden'));
+  assert.equal(h.texts(h.el('role-create-result')),'');
+  vm.runInContext('workspaceUI.roleSelection="role";workspaceUI.selectedRole="agent:new";renderTaskDetailsPanel();',ctx);
   assert.equal(vm.runInContext('workspaceUI.selectedRole',ctx),'agent:new');
   assert.equal(vm.runInContext('workspaceUI.roleSelection',ctx),'role');
   assert.equal(doc.getElementById('role-details-name-panel').classList.contains('hidden'),false);
@@ -51,7 +51,8 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   Object.assign(rows[0],{status:'provisioned',revision:4,lease_held:false,auto_start_status:'enqueued',auto_start_launch_id:'launch-auto'});await controller.refresh();
   assert.match(h.texts(ctx.blackboardColumns),/启动中/);assert.doesNotMatch(h.texts(ctx.blackboardColumns),/启动成功/);
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/绑定重置/);
-  assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/配置进度|配置已完成|身份档案|查看角色|运行器与模型绑定/);
+  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/自动启动请求已提交/);
+  assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/配置进度|配置已完成|身份档案|运行器与模型绑定/);
   const detailChildren=doc.getElementById('role-details-name-panel').children;
   assert.ok(detailChildren.findIndex(n=>String(n.className).includes('role-maintenance'))>detailChildren.findIndex(n=>String(n.className).includes('role-service-section')),'重置区位于角色开关下方');
   service={...service,observed:'running',readiness_service:'ready'};await controller.refresh();

@@ -23,6 +23,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import update
 from sqlmodel import Session, select
 
+from server import db
 from server.db import begin_immediate_write
 from server.models import (
     Member,
@@ -1520,6 +1521,14 @@ def _auto_start_after_provision(
         )
         return
 
+    from server.kimi_native_setup import native_login_fact
+    native_present, native_ready = native_login_fact(row.project_id, row.member_id, session)
+    if native_present and not native_ready:
+        # 保留启动意图，等后台准备 ready 后再由同一函数投递；这不是拒绝。
+        _set_auto_start(session, row.request_key, status=ROLE_AUTO_START_STATUS_PENDING,
+            code="native_authorization_required", now=now)
+        return
+
     savepoint = session.begin_nested()
     try:
         launch_id, code = enqueue_auto_start_launch(
@@ -1565,6 +1574,39 @@ def _auto_start_after_provision(
             code=code,
             now=now,
         )
+
+
+def enqueue_pending_auto_start(project_id: str, member_id: str) -> None:
+    """准备 ready 后恢复被 pending 的自动启动意图（新角色首次启动）。
+
+    复用 ``_auto_start_after_provision`` 的全部判定与保存点语义；这里只负责在
+    native 准备完成后取得写锁、重读请求事实并提交一次。**只有仍为 pending 的
+    请求**才可能被延迟恢复；not_eligible/failed/enqueued 等终态或拒绝状态即使
+    native 后来 ready，也不得重新启动。没有意图/已投递/已人工操作时零副作用。
+    """
+    with Session(db.engine) as session:
+        write_begin(session)
+        try:
+            row = session.exec(
+                select(RoleProvisionRequestRow)
+                .where(RoleProvisionRequestRow.project_id == project_id)
+                .where(RoleProvisionRequestRow.member_id == member_id)
+                .where(RoleProvisionRequestRow.kind == ROLE_REQUEST_KIND_CREATE)
+                .where(RoleProvisionRequestRow.status == ROLE_REQUEST_STATUS_PROVISIONED)
+                .order_by(RoleProvisionRequestRow.created_at.desc())
+            ).first()
+            if (row is None
+                    or row.auto_start_status != ROLE_AUTO_START_STATUS_PENDING
+                    or not int(row.auto_start_intent or 0)
+                    or row.auto_start_launch_id):
+                _rollback(session)
+                return
+            _auto_start_after_provision(row, session=session,
+                config=load_host_config(project_id, session), now=_now())
+            session.commit()
+        except Exception:
+            _rollback(session)
+            raise
 
 
 def _is_exact_report_replay(
@@ -1676,6 +1718,7 @@ def report_request(
             if row.member_id
             else None
         )
+        native_setup_added = False
         if outcome == ROLE_REQUEST_STATUS_PROVISIONED:
             require_completion_facts(row, session)
             row.status = ROLE_REQUEST_STATUS_PROVISIONED
@@ -1699,8 +1742,19 @@ def report_request(
         # 做自动启动入队——入队失败只回滚自己，不会把未 flush 的外层改动卷进去。
         session.flush()
         if outcome == ROLE_REQUEST_STATUS_PROVISIONED and row.kind == ROLE_REQUEST_KIND_CREATE:
+            from server.kimi_native_setup import ensure_native_setup_required
+            native_setup_added = ensure_native_setup_required(project_id, row.member_id, session)
+            session.flush()
             _auto_start_after_provision(row, session=session, config=config, now=now)
         session.commit()
+        if native_setup_added:
+            # 提交后才启动后台准备，避免线程读到未提交的 required 行。后台调度
+            # 失败不能把已提交的配置成功回滚成 500；用户仍可手动重试准备。
+            try:
+                from server.kimi_native_setup import schedule_auto_native_setup
+                schedule_auto_native_setup(project_id, row.member_id)
+            except Exception:
+                pass
         session.refresh(row)
         projection = request_projection(
             row, session=session, now=now, config=load_host_config(project_id, session)
