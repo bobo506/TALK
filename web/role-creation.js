@@ -289,10 +289,17 @@ function createRoleRequestUI(deps) {
   }
   // 2026-10-28：按用户要求把“绑定重置”移到角色详情服务行的第 4 个按钮位（删除角色之后），
   // 详情里不再重复渲染维护面板中的旧位置；仅保留按钮本身，不再带说明段落。
-  function resetButtonFor(memberId) {
-    if (!state.active) return null;
+  // 2026-10-29 B1-a：旧角色（imported + 已提交补录记录）没有创建请求行，用角色自身的
+  // recoverable / credential_version 生成同样的恢复请求；服务端按补录锚点校验。
+  function resetButtonFor(memberId, role) {
+    if (!state.active || !human()) return null;
     const row = state.rows.find(r => r.member_id === memberId);
-    return row && canRecover(row) ? resetButton(row) : null;
+    if (row && canRecover(row)) return resetButton(row);
+    if (role && role.recoverable === true && Number.isInteger(role.credential_version)
+        && role.credential_version > 0) {
+      return resetButton({ member_id: memberId, credential_version: role.credential_version });
+    }
+    return null;
   }
   function progress(row, { showRoleLink = true } = {}) {
     const box = node("section", "role-request-card");

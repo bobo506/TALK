@@ -4525,6 +4525,11 @@ class ProjectAgentOut(BaseModel):
     service: Optional[ProjectRoleServiceOut] = None
     display_name: Optional[str]
     availability: str
+    # 2026-10-29：角色恢复资格（只读事实）。credential_version 只用于恢复请求的 CAS，
+    # 不是秘密；recoverable 由服务端按与恢复入口相同的门禁计算（managed+创建操作，
+    # 或 imported+已提交补录锚点），页面据此决定是否显示“绑定重置”。
+    credential_version: Optional[int] = None
+    recoverable: bool = False
     instances: list[AgentInstanceOut]
     updated_at: datetime
 
@@ -4544,6 +4549,8 @@ class ProjectAgentOut(BaseModel):
         archived: bool = False,
         deletion: Optional[dict] = None,
         startup: Optional[dict] = None,
+        credential_version: Optional[int] = None,
+        recoverable: bool = False,
     ) -> "ProjectAgentOut":
         return cls(
             member_id=agent.member_id,
@@ -4564,6 +4571,8 @@ class ProjectAgentOut(BaseModel):
             service=service,
             display_name=display_name,
             availability=availability,
+            credential_version=credential_version,
+            recoverable=recoverable,
             instances=instances or [],
             updated_at=agent.updated_at,
         )

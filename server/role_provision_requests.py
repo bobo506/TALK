@@ -32,6 +32,7 @@ from server.models import (
     ProjectRole,
     RoleCreationOperation,
     RoleCredentialRotation,
+    RoleLegacyAttachOperation,
     RoleProvisionHostConfig,
     RoleProvisionJob,
     RoleProvisionRequestRow,
@@ -532,6 +533,52 @@ def _pure_recover_intent(project_id: str, body: RoleRequestCreate) -> dict:
     }
 
 
+def legacy_attach_anchor(
+    session: Session, project_id: str, member_id: str
+) -> Optional[RoleLegacyAttachOperation]:
+    """已提交的存量补录锚点（无则 None）。只读，绝不写 ``role_creation_operations``。"""
+    row = session.exec(
+        select(RoleLegacyAttachOperation)
+        .where(RoleLegacyAttachOperation.project_id == project_id)
+        .where(RoleLegacyAttachOperation.member_id == member_id)
+    ).first()
+    return row if row is not None and row.committed_at is not None else None
+
+
+def legacy_choice_snapshot(
+    session: Session, attach: RoleLegacyAttachOperation
+) -> Optional[dict]:
+    """按补录记录的 ``choice_id`` 现读模型目录，合成与创建操作同形的只读快照。
+
+    只含公开六维事实与展示名，不含密钥/凭据；choice 与 runner 不匹配时返回 ``None``，
+    调用方按“补录来源不可用”拒绝恢复，不做任何猜测。
+    """
+    choice = session.get(RunnerModelChoice, attach.choice_id)
+    runner = session.get(RunnerRegistry, attach.runner_id)
+    if choice is None or runner is None or choice.runner_id != attach.runner_id:
+        return None
+    facts = {
+        "runner_id": choice.runner_id,
+        "runtime": runner.runtime,
+        "model_source": choice.model_source,
+        "provider_id": choice.provider_id,
+        "connection_ref": choice.connection_ref,
+        "model_id": choice.model_id,
+    }
+    return {
+        "choice_id": choice.choice_id,
+        "runner_id": choice.runner_id,
+        "runtime": runner.runtime,
+        "model_source": choice.model_source,
+        "provider_id": choice.provider_id,
+        "connection_ref": choice.connection_ref,
+        "model_id": choice.model_id,
+        "model_alias": choice.model_alias or "",
+        "model_display_name": choice.model_display_name,
+        "binding_fingerprint": binding_fingerprint(facts),
+    }
+
+
 def _normalize_recover_intent(
     project_id: str, body: RoleRequestCreate, session: Session
 ) -> dict:
@@ -546,11 +593,26 @@ def _normalize_recover_intent(
     role = session.get(ProjectRole, (project_id, member_id))
     if role is None or role.archived_at is not None:
         raise _fail(_NOT_FOUND, "role_not_found")
-    if role.origin != PROJECT_ROLE_ORIGIN_MANAGED:
-        # imported/legacy 身份不得借恢复扩大边界（与配置入口同一稳定错误码）。
-        raise _fail(_CONFLICT, "provision_imported_identity_unsupported")
-    if not role.identity_exclusive:
-        raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_ROLE_CONFLICT)
+    # 2026-10-29 B1-a：managed 角色走创建操作；imported/legacy 角色只要有**已提交的补录记录**
+    # 也可恢复。补录记录是来源审计锚点，绝不写入或复用 role_creation_operations。
+    operation = None
+    attach = None
+    if role.origin == PROJECT_ROLE_ORIGIN_MANAGED:
+        if not role.identity_exclusive:
+            raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_ROLE_CONFLICT)
+        operation = session.exec(
+            select(RoleCreationOperation)
+            .where(RoleCreationOperation.project_id == project_id)
+            .where(RoleCreationOperation.member_id == member_id)
+        ).first()
+        if operation is None:
+            # imported/legacy（有名册行但没有创建操作）不得借恢复扩大边界。
+            raise _fail(_CONFLICT, "provision_imported_identity_unsupported")
+    else:
+        attach = legacy_attach_anchor(session, project_id, member_id)
+        if attach is None:
+            # 无补录记录的旧身份同样不得借恢复扩大边界。
+            raise _fail(_CONFLICT, "provision_imported_identity_unsupported")
     member = session.get(Member, member_id)
     if member is None or member.kind != "agent":
         raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_ROLE_CONFLICT)
@@ -558,19 +620,19 @@ def _normalize_recover_intent(
         raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_ROLE_CONFLICT)
     if session.get(ProjectAgent, (project_id, member_id)) is None:
         raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_ROLE_CONFLICT)
-    operation = session.exec(
-        select(RoleCreationOperation)
-        .where(RoleCreationOperation.project_id == project_id)
-        .where(RoleCreationOperation.member_id == member_id)
-    ).first()
-    if operation is None:
-        # imported/legacy（有名册行但没有创建操作）不得借恢复扩大边界。
-        raise _fail(_CONFLICT, "provision_imported_identity_unsupported")
     if int(role.credential_version or 1) != version:
         raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH)
 
     normalized["role_name"] = role.role_name
-    normalized["origin_operation_key"] = operation.operation_key
+    if operation is not None:
+        normalized["origin_operation_key"] = operation.operation_key
+        return normalized
+    snapshot = legacy_choice_snapshot(session, attach)
+    if snapshot is None:
+        # 补录记录指向的选择/运行器已不可读：拒绝恢复，不按 model_id 反查猜测。
+        raise _fail(_CONFLICT, "provision_imported_identity_unsupported")
+    normalized["origin_operation_key"] = attach.operation_key
+    normalized["choice_snapshot"] = snapshot
     return normalized
 
 
@@ -1364,14 +1426,22 @@ def require_completion_facts(
     if not row.origin_operation_key:
         raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_COMPLETION_INCOMPLETE)
     operation = session.get(RoleCreationOperation, row.origin_operation_key)
-    if (
-        operation is None
-        or operation.project_id != row.project_id
-        or operation.member_id != row.member_id
-    ):
-        raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_COMPLETION_INCOMPLETE)
-    if row.kind == ROLE_REQUEST_KIND_CREATE:
-        if operation.request_fingerprint != row.request_fingerprint:
+    if operation is not None:
+        if (
+            operation.project_id != row.project_id
+            or operation.member_id != row.member_id
+        ):
+            raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_COMPLETION_INCOMPLETE)
+        if row.kind == ROLE_REQUEST_KIND_CREATE:
+            if operation.request_fingerprint != row.request_fingerprint:
+                raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_COMPLETION_INCOMPLETE)
+    else:
+        # 2026-10-29 B1-a：存量补录来源的恢复没有创建操作，只接受与原键一致的已提交补录锚点；
+        # create 仍必须有创建操作（不因补录记录放行新身份创建）。
+        if row.kind != ROLE_REQUEST_KIND_RECOVER:
+            raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_COMPLETION_INCOMPLETE)
+        attach = legacy_attach_anchor(session, row.project_id, row.member_id)
+        if attach is None or attach.operation_key != row.origin_operation_key:
             raise _fail(_CONFLICT, ROLE_REQUEST_ERROR_COMPLETION_INCOMPLETE)
     job = session.get(RoleProvisionJob, row.origin_operation_key)
     if job is None:

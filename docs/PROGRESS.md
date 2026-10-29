@@ -1,6 +1,6 @@
 # Project Progress
 
-Updated: 2026-10-29 凌晨（Asia/Shanghai）。大K仍负责决策与分配。昨晚角色页三项已验收；随后完成“官方思考强度落库+存量回填”（Codex/Kimi/DSH 已有值）与“绑定重置移到服务行第4位”，DSH/WorkBuddy 只做了读取与回填、新建时写入不可行；旧角色兼容恢复（B1）因架构约束暂停待定。
+Updated: 2026-10-29 下午（Asia/Shanghai）。大K仍负责决策与分配。已完成：角色页三项、官方思考强度落库与回填、绑定重置移位、**B1-a 旧角色恢复链**（合成用例通过，真实点击待验）。DSH/WorkBuddy 的强度只做到读取+脚本回填。
 
 ## 当前身份与协作规则
 
@@ -32,14 +32,14 @@ Updated: 2026-10-29 凌晨（Asia/Shanghai）。大K仍负责决策与分配。�
 ## 旧任务与未解决项
 
 - **347/2993**：首次独立不通过结论保持，WorkBuddy等运行器和整体联调仍未完成；**348/2994**：用户口述（本会话未独立核实）Codex已修一轮——受管Codex配方固定npm包内0.164.0、补齐运行配置缺失的codex段，`native_cli_missing`已解决，现卡在官方登录授权。两项`created_by=agent:codex`，只能由Codex正常身份收取。
-- **旧角色兼容恢复（B1）阻塞待定**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`均为`origin=imported`、`identity_exclusive=0`、无`RoleCreationOperation`，服务端`_normalize_recover_intent`三道门全拒，所以页面没有“绑定重置”。三条已提交的`role_legacy_attach_operations`（choice_id 分别为`rmc_b0b68705cd2f`/`rmc_3a5435e0e283`/`rmc_80be012402f1`）可作为放行锚点；但`role_creation_operations`的合同明确禁止补录复用，且恢复的下游（worker执行与完成回写校验）强依赖`origin_operation_key → RoleCreationOperation + RoleProvisionJob`，需要为“legacy 来源”新增合法分支。属架构决定，未在夜间实施。
+- **旧角色兼容恢复（B1-a，2026-10-29 已实现，待真实点击验证）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作，此前无“绑定重置”。现按用户选定 B1-a 增加**恢复专用** legacy 分支：以已提交的`role_legacy_attach_operations`为锚点（choice_id 分别`rmc_b0b68705cd2f`/`rmc_3a5435e0e283`/`rmc_80be012402f1`），`choice_snapshot`按 choice_id 现读合成，**不写也不复用**`role_creation_operations`；`_require_provision_identity`与`require_completion_facts`都加了仅限 recover+匹配补录键的分支；`/agents`投影新增`credential_version`与`recoverable`。合成用例 5 项通过；真实旧角色尚未点过，需重启 API 后验证。
 - **DSH/WorkBuddy 强度接入只完成读取+回填**：WorkBuddy 的`models.json`有`reasoning.defaultEffort`（本机`max`），DSH 角色 patch 有`reasoningEffort: max`；但两类运行器没有模型配置写入器，无法“新建角色时写”，只能脚本回填。是否在角色启动时顺带刷新，待用户定。
 - **角色页面余项**：3b已随官方强度落库完成主要部分（余 DSH/WorkBuddy 的写入时机）；3d删除清理闭环、3g（已改为“保留按钮+移位置”并完成）状态见路线图。
 - 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
 ## 下一步恢复顺序
 
-1. **先定 B1 方案**：① 给恢复链路增加“legacy 来源”分支（worker/完成校验按 legacy attach 取 choice 快照，不写`role_creation_operations`）；② 或旧角色恢复只做配置修复、不轮换凭据。定了才动服务端。
+1. **验证 B1-a**：重启 API 后在小G/小D/小K详情点“绑定重置”，观察恢复请求、作业执行与完成回写是否全绿；若 worker 三步或完成校验报错，按稳定错误码定位。
 2. Codex侧完成Terra的官方设备授权/登录，随后真实创建角色并验证官方low与start-ready-stop/drain；这属环境与授权步骤，不由绑定或serving推断。
 3. 348/347由Codex正常身份收取收尾；两项凭据边界按用户口述已修，需独立核验后才能记通过。
 4. DSH/WorkBuddy 的写入时机（启动刷新 or 仅脚本）与3d删除清理闭环按完整可验流程拆包，需用户确认后开工。

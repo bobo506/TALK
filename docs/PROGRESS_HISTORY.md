@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-29（Asia/Shanghai）— B1-a：存量补录角色接入恢复链
+
+- **授权**：用户在 B1-a/B1-b 中选择 B1-a（完整方案），并要求 WorkBuddy 旧角色不动（后续删除重建 k3.1-pro）。
+- **服务端**：`_normalize_recover_intent` 增加 imported 分支——仅当该成员存在**已提交** `role_legacy_attach_operations` 锚点时放行，`origin_operation_key` 取补录键，`choice_snapshot` 按补录 `choice_id` 现读 `runner_model_choices`+`runner_registry` 合成（choice/runner 失配即拒绝，不按 model_id 反查）；仍然不写、不复用 `role_creation_operations`。`_require_provision_identity` 与 `require_completion_facts` 各加一条仅限 recover + 键匹配的分支，create 与其它入口保持原拒绝。
+- **投影**：`GET /api/projects/{p}/agents` 新增 `credential_version` 与 `recoverable`（服务端按同一套门禁计算），供页面决定是否显示“绑定重置”。
+- **前端**：`resetButtonFor(memberId, role)` 在无请求行时回落到角色自身的 `recoverable/credential_version`，生成同样的 recover 请求；`workspace.js` 调用时把角色对象一起传入。
+- **验证**：`tests/test_role_legacy_recover.py` 5 项（补录后放行并合成快照、未补录仍 409、代际不符 409、恢复可开配置作业且作业键为补录键、agents 投影字段）；`workspace_role_creation` 新增旧角色按钮与 recover 载荷用例；Node 全量 352 用例/336 通过/16 既有失败；Python 相关 105 项通过。
+- **限制**：真实旧角色（小G/小D/小K）尚未点击验证，需重启 API 后实测；worker 三步执行与完成回写只在合成用例覆盖到“建作业”，未跑真实 CLI。
+
 ## 2026-10-29（Asia/Shanghai）— 官方思考强度落库与展示、绑定重置移位、存量回填；B1 兼容恢复待定
 
 - **授权与现场**：用户夜间明确按“B1 → DSH/WorkBuddy → 回填 → 全量回归 → 提交”推进，遇不确定暂停等确认。改动前 HEAD `16dbc44`，工作树干净；本机 API 仍以旧代码运行（PID `9660`），数据库已由回填脚本补列。

@@ -1284,7 +1284,7 @@ function workspaceRoleServicePanel(role) {
   // 2026-10-28：按用户要求“绑定重置”排在删除角色之后，作为服务行第 4 个按钮；
   // 按钮与恢复逻辑仍由 role-creation.js 提供，这里只负责位置。
   if (typeof roleRequestApp !== "undefined") {
-    const resetButton = roleRequestApp?.resetButton?.(role.member_id);
+    const resetButton = roleRequestApp?.resetButton?.(role.member_id, role);
     if (resetButton) (controls?.children[0] || section).appendChild(resetButton);
   }
   return section;

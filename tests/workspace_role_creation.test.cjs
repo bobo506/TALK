@@ -366,6 +366,24 @@ test('完成配置的详情不再重复成功状态或三步，绑定重置移�
   assert.equal(h.requests.filter(r=>r.method==='POST').length,0);assert.equal(h.timers.size,0);
 });
 
+test('旧角色按角色自身 recoverable/credential_version 提供重置入口',async()=>{
+  const h=harness();await h.ready();
+  const role={member_id:'agent:legacy',recoverable:true,credential_version:1};
+  const button=h.ui.resetButton('agent:legacy',role);
+  assert.ok(button);assert.equal(button.textContent,'绑定重置');
+  h.deps.confirm=()=>true;
+  await button.fire('click');
+  const posts=h.requests.filter(r=>r.method==='POST');
+  assert.equal(posts.length,1);
+  assert.equal(posts[0].body.kind,'recover');
+  assert.equal(posts[0].body.member_id,'agent:legacy');
+  assert.equal(posts[0].body.expected_credential_version,1);
+  // 无可恢复标记或无凭据代际时不显示；缺 role 参数时保持旧行为（只认请求行）。
+  assert.equal(h.ui.resetButton('agent:legacy',{...role,recoverable:false}),null);
+  assert.equal(h.ui.resetButton('agent:legacy',{...role,credential_version:0}),null);
+  assert.equal(h.ui.resetButton('agent:legacy'),null);
+});
+
 test('角色详情不提供自指入口，agent与缺代际旧记录没有可用重置操作',async()=>{
   for(const human of [true,false]) {
     const h=harness({human});h.backend.rows=[{request_key:'role-completed-00000000',member_id:'agent:ready',role_name:'Kimi k2.8',status:'provisioned',revision:4,credential_version:1}];

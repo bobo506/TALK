@@ -53,3 +53,14 @@ Codex定义范围、复核并直接修正问题、验证及正式文档/Git收�
 - 最终162项：补录54、角色投影26、旧库迁移15、宿主34、创建幂等12、创建请求守卫21；0失败/错误/跳过。另2项显式journal_mode=wal的双入口并发探针分别锁定补录先成功和新建先成功，均只有一个操作提交、另一端409。8源compile与diff检查通过。
 - 开发者685项为结构化自报，原本地目录没有完整测试原始日志；本轮不以该数字作独立验收或重复累计。原交付/代码字节/开发SHA证据与根失败、最终日志及收取回执位于.tmp/legacy-role-page-control/product-attach/independent-review259/。
 - 验证入口：项目根执行 `python -m unittest tests.test_role_legacy_attach tests.test_project_roles tests.test_role_policy_migration tests.test_role_service_host tests.test_role_creation_idempotency tests.test_role_creation_request_guard`（临时库/假Key）。生产服务尚未由本片主动部署/重启，真实补录仍需后续宿主配方/凭据就绪和逐角色计划；不据本片宣称5角色已受管或可页面启停。
+
+## 2026-10-29 恢复扩展（B1-a，用户选定）
+
+- **问题**：已补录的 imported 角色（`origin=imported`、`identity_exclusive=0`、无创建操作）在页面没有“绑定重置”——恢复入口 `_normalize_recover_intent` 的三道门全部拒绝。
+- **方案**：为**恢复**新增 legacy 来源分支，锚点是**已提交的** `role_legacy_attach_operations`；仍然**不写入、不复用** `role_creation_operations`（本条继续有效：补录不等于创建新身份）。
+  - 恢复请求：`origin_operation_key` = 补录 operation_key；`choice_snapshot` 按补录记录的 `choice_id` 现读 `runner_model_choices` + `runner_registry` 合成；choice/runner 失配即拒绝，不按 model_id 反查。
+  - 配置作业入口 `_require_provision_identity`：仅当“该成员无创建操作 + 传入键等于已提交补录锚点 + 存在指向该键的 recover 请求”时放行；create 与其它入口保持原拒绝。
+  - 完成回写 `require_completion_facts`：无创建操作时只接受 recover 且操作键与补录锚点一致；create 仍必须有创建操作与指纹匹配。
+  - `GET /api/projects/{p}/agents` 投影新增 `credential_version` 与 `recoverable`（服务端按同一套门禁计算），页面据此显示“绑定重置”。
+- **验证**：`tests/test_role_legacy_recover.py` 5 项（放行、未补录仍拒绝、代际不符拒绝、恢复可开配置作业、投影字段）；`tests/workspace_role_creation.test.cjs` 新增旧角色按钮与 recover 载荷用例；相关回归见进度记录。
+- **限制**：真实旧角色（小G/小D/小K）的页面恢复仍**未执行**——需重启 API 后由用户点击验证；worker 全链路的三步执行与完成回写只在合成用例中覆盖到建作业，未跑真实 CLI。

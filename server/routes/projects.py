@@ -85,6 +85,7 @@ from server.models import (
     RoleCredentialRotation,
     RoleDescriptionUpdate,
     RoleLegacyAttachOperation,
+    RoleProvisionRequestRow,
     RoleProvisionAckRequest,
     RoleProvisionJob,
     RoleProvisionJobOut,
@@ -354,6 +355,34 @@ def _project_agent_outs(
         ).all()
     }
     names_by_member = {member: role.role_name for member, role in role_rows.items()}
+    # 2026-10-29：恢复资格来源集合——managed 看创建操作，imported 看已提交补录锚点。
+    creation_op_members = (
+        {
+            row.member_id
+            for row in session.exec(
+                select(RoleCreationOperation).where(
+                    RoleCreationOperation.project_id == project_id,
+                    RoleCreationOperation.member_id.in_(member_ids),
+                )
+            ).all()
+        }
+        if member_ids
+        else set()
+    )
+    attach_op_members = (
+        {
+            row.member_id
+            for row in session.exec(
+                select(RoleLegacyAttachOperation).where(
+                    RoleLegacyAttachOperation.project_id == project_id,
+                    RoleLegacyAttachOperation.member_id.in_(member_ids),
+                    RoleLegacyAttachOperation.committed_at.is_not(None),
+                )
+            ).all()
+        }
+        if member_ids
+        else set()
+    )
     deletion_rows = {row.member_id: row for row in session.exec(select(RoleDeletion).where(
         RoleDeletion.project_id == project_id, RoleDeletion.member_id.in_(member_ids))).all()}
     instances_by_member: dict[str, list[AgentInstance]] = {}
@@ -390,6 +419,20 @@ def _project_agent_outs(
             deletion=deletion_public(deletion_rows[agent.member_id]) if agent.member_id in deletion_rows else None,
             startup=startup_projection(project_id, agent.member_id, session),
             role_name=names_by_member.get(agent.member_id),
+            credential_version=(
+                role_rows[agent.member_id].credential_version
+                if agent.member_id in role_rows
+                else None
+            ),
+            recoverable=bool(
+                agent.member_id in role_rows
+                and role_rows[agent.member_id].archived_at is None
+                and int(role_rows[agent.member_id].credential_version or 0) >= 1
+                and (
+                    agent.member_id in creation_op_members
+                    or agent.member_id in attach_op_members
+                )
+            ),
             display_name=(
                 members_by_id[agent.member_id].display_name
                 if agent.member_id in members_by_id
@@ -2333,28 +2376,47 @@ def _require_provision_identity(
         .where(RoleCreationOperation.member_id == member_id)
     ).first()
     if identity_operation is None:
-        has_role = session.get(ProjectRole, (project_id, member_id)) is not None
-        has_roster = session.get(ProjectAgent, (project_id, member_id)) is not None
-        if has_role or has_roster:
+        # 2026-10-29 B1-a：存量补录来源的恢复。只在该成员存在**已提交补录锚点**且本次
+        # operation_key 正是它、并且确有一条指向它的 recover 请求时放行；仍不写、不复用
+        # role_creation_operations。create/其它入口继续按原合同拒绝。
+        attach = session.get(RoleLegacyAttachOperation, operation_key)
+        legacy_recover = (
+            attach is not None
+            and attach.committed_at is not None
+            and attach.project_id == project_id
+            and attach.member_id == member_id
+            and session.exec(
+                select(RoleProvisionRequestRow)
+                .where(RoleProvisionRequestRow.project_id == project_id)
+                .where(RoleProvisionRequestRow.member_id == member_id)
+                .where(RoleProvisionRequestRow.kind == ROLE_REQUEST_KIND_RECOVER)
+                .where(RoleProvisionRequestRow.origin_operation_key == operation_key)
+            ).first()
+            is not None
+        )
+        if not legacy_recover:
+            has_role = session.get(ProjectRole, (project_id, member_id)) is not None
+            has_roster = session.get(ProjectAgent, (project_id, member_id)) is not None
+            if has_role or has_roster:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="provision_imported_identity_unsupported",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="provision_operation_not_found",
+            )
+    else:
+        anchor = session.get(RoleCreationOperation, operation_key)
+        if (
+            anchor is None
+            or anchor.project_id != project_id
+            or anchor.member_id != member_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="provision_imported_identity_unsupported",
+                detail="provision_operation_mismatch",
             )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="provision_operation_not_found",
-        )
-
-    anchor = session.get(RoleCreationOperation, operation_key)
-    if (
-        anchor is None
-        or anchor.project_id != project_id
-        or anchor.member_id != member_id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="provision_operation_mismatch",
-        )
 
     role = session.get(ProjectRole, (project_id, member_id))
     if role is None:
