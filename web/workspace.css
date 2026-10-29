@@ -239,7 +239,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-delete-button {color:#a6423e; border-color:#e7b0ad;}
 .role-delete-button:hover:not(:disabled) {color:#90312d; border-color:#d49590; background:#fff5f4;}
 .role-delete-section {font-size:14px; line-height:1.7; margin:12px 0 24px; overflow-wrap:anywhere;}
-.role-delete-error {color:#a6423e;}
+.role-delete-reason, .role-delete-error {color:#a6423e;}
 .role-service-hint {font-size:13px; color:#82651f; line-height:1.7; margin:8px 0 0; overflow-wrap:anywhere;}
 .role-service-section {color:#303741; margin:0 0 26px;}
 .role-service-head {display:flex; align-items:baseline; flex-wrap:wrap; gap:12px; margin-bottom:10px;}
@@ -286,6 +286,3 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-name-dialog { width:min(430px,100%); }
 .role-name-field { margin-top:22px; }
 .role-name-footer { gap:10px; }
-.role-cleanup-feedback { display:grid; gap:6px; padding:10px 20px; }
-.role-cleanup-feedback h3 { margin:0; font-size:14px; }
-.role-cleanup-feedback .role-delete-section { margin:0 0 8px; }

@@ -183,7 +183,7 @@ const CONTROLLER_READ = {
   controller_member_id: null, controller_assignment_version: 0, controller_assignment_status: 'unassigned',
 };
 
-test('真实整页删除接受后角色行消失、返回设置且继续跟进后台清理', async () => {
+test('真实整页删除接受后角色行消失、返回设置且继续静默跟进后台清理', async () => {
   const h=harness({roster:[{member_id:'agent:kimi',role_name:'准备删除',deletion:null,
     service:{desired:'stopped',observed:'stopped',ownership_held:false,can_start:true,can_stop:false}}]});
   await h.enterRoles();h.roleRow('agent:kimi').fire('click');await h.flush();
@@ -192,14 +192,36 @@ test('真实整页删除接受后角色行消失、返回设置且继续跟进�
   assert.ok(index>=0);h.reply(index,{member_id:'agent:kimi',status:'pending',revision:1});await request;
   assert.equal(h.roleRow('agent:kimi'),undefined);
   assert.equal(h.context.workspaceSettingsSelected(),true);
-  assert.match(allTexts(h.el('role-service-batch-feedback')).join('\n'),/已删除角色的资源清理/);
+  // 2026-10-29 3d：删除被接受后不再有独立清理面板，列表与反馈区都不留痕迹。
+  assert.doesNotMatch(allTexts(h.el('role-service-batch-feedback')).join('\n'),/资源清理/);
   assert.ok(h.timers.size>0,'没有选中角色也继续轮询清理');
   const tick=[...h.timers.values()][0];h.timers.clear();const polling=tick();await h.flush();
   const pollIndex=h.pending.findIndex(p=>p.url.endsWith('/deletion'));
   assert.ok(pollIndex>=0);h.reply(pollIndex,{member_id:'agent:kimi',status:'complete',revision:3});await polling;
   assert.equal(h.roleRow('agent:kimi'),undefined);
-  assert.doesNotMatch(allTexts(h.el('role-service-batch-feedback')).join('\n'),/已删除角色的资源清理/);
   assert.equal(h.timers.size,0);
+});
+
+test('真实整页清理失败后角色回到列表，详情原因在删除按钮下方', async () => {
+  const h=harness({roster:[{member_id:'agent:kimi',role_name:'准备删除',deletion:null,
+    service:{desired:'stopped',observed:'stopped',ownership_held:false,can_start:true,can_stop:false}}]});
+  await h.enterRoles();h.roleRow('agent:kimi').fire('click');await h.flush();
+  const request=h.context.deleteWorkspaceRole('agent:kimi');await h.flush();
+  const index=h.pending.findIndex(p=>p.url.endsWith('/delete'));
+  assert.ok(index>=0);h.reply(index,{member_id:'agent:kimi',status:'pending',revision:1});await request;
+  assert.equal(h.roleRow('agent:kimi'),undefined);
+  const tick=[...h.timers.values()][0];h.timers.clear();const polling=tick();await h.flush();
+  const pollIndex=h.pending.findIndex(p=>p.url.endsWith('/deletion'));
+  assert.ok(pollIndex>=0);
+  h.reply(pollIndex,{member_id:'agent:kimi',status:'failed',revision:2,error_code:'cleanup_busy',steps:{manager:'complete'}});
+  await polling;
+  assert.ok(h.roleRow('agent:kimi'),'清理失败后角色回到列表');
+  assert.match(allTexts(h.roleRow('agent:kimi')).join('\n'),/删除未完成/);
+  h.roleRow('agent:kimi').fire('click');await h.flush();
+  const detail=allTexts(h.el('role-details-name-panel')).join('\n');
+  assert.match(detail,/删除角色/);
+  assert.match(detail,/资源清理未完成/);
+  assert.match(detail,/资源正被占用/);
 });
 
 test('固定首项：首次进入角色页默认“项目设置”，不计入角色、不是 Agent、不发起角色相关请求', async () => {

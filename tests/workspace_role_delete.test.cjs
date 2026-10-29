@@ -18,7 +18,7 @@ function harness(){
     apiFetch:async(url,opts)=>{calls.push({url,opts});return reply ? reply() : {ok:true,json:async()=>({member_id:'agent:a',status:'pending',revision:1})};},
   });
   vm.runInContext(deletion,ctx);
-  vm.runInContext(source.match(/function workspaceRoles\(\) {[^\n]+}/)[0],ctx);
+  vm.runInContext(source.match(/function workspaceRoles\(\) \{[\s\S]*?\n\}/)[0],ctx);
   return {ctx,calls,timers,dom,cancel(){confirmed=false;},respond(fn){reply=fn;},button(){return ctx.roleDeleteButton(ctx.projectAgents[0]);},
     role(){return ctx.projectAgents[0];},state(){return vm.runInContext('roleDeleteUI',ctx);}};
 }
@@ -40,10 +40,10 @@ test('未闭环任务的拒绝说明可读，不改变原角色',async()=>{
   await x.button().fire('click');assert.equal(x.role().archived,undefined);
   assert.match(x.dom.texts(x.ctx.workspaceRoleDeletePanel(x.role())),/未闭环任务/);
 });
-test('失败清理列出未完成项，重试不要求重新确认删除',async()=>{
+test('清理失败给出原因，再点删除不要求重新确认',async()=>{
   const x=harness();x.role().archived=true;x.role().deletion={status:'failed',error_code:'cleanup_busy',steps:{credentials:'failed',startup_config:'pending'}};
-  assert.match(x.dom.texts(x.ctx.workspaceRoleDeletePanel(x.role())),/专属凭据：清理失败/);
-  assert.match(x.dom.texts(x.ctx.workspaceRoleDeletePanel(x.role())),/启动配置：待清理/);
+  assert.match(x.dom.texts(x.ctx.workspaceRoleDeletePanel(x.role())),/资源清理未完成/);
+  assert.match(x.dom.texts(x.ctx.workspaceRoleDeletePanel(x.role())),/资源正被占用/);
   x.cancel();await x.button().fire('click');assert.equal(x.calls.length,1);assert.equal(x.role().deletion.status,'pending');
 });
 test('迟到的项目或账号回执不能移除新上下文的角色',async()=>{
@@ -65,33 +65,38 @@ test('轮询完成后清除本地清理记录，历史不变，离页停止轮�
   assert.equal(x.ctx.projectAgents.length,1);assert.equal(x.ctx.projectAgents[0].member_id,'agent:b');assert.equal(x.ctx.projectTasks[0].id,286);
   x.ctx.roleDeleteSync(null);assert.equal(x.timers.size,0);
 });
-test('详情按钮实际接在启动关闭控件旁，失败面板仍有重试',()=>{
+test('详情删除按钮接在启动关闭控件旁，失败原因显示在按钮下方',()=>{
   assert.match(source,/controls\?\.children\[0\] \|\| section/);
   assert.match(source,/const deletePanel = workspaceRoleDeletePanel\(role\)/);
+  const x=harness();x.role().archived=true;x.role().deletion={status:'failed',error_code:'cleanup_busy'};
+  const panel=x.ctx.workspaceRoleDeletePanel(x.role());
+  const nodes=Array.from(panel.children);
+  const index=nodes.findIndex(node=>node.className==='role-service-button role-delete-button');
+  const reason=index>=0?nodes.slice(index+1).find(node=>node.className==='role-delete-reason'):null;
+  assert.ok(index>=0,'删除按钮仍在');
+  assert.ok(reason,'原因说明在按钮之后');
+  assert.match(reason.textContent,/资源清理未完成/);
 });
-test('删除被接受立即从正常角色集合消失，资源清理记录仍可查看',async()=>{
+test('删除被接受立即从正常角色集合消失，不再有独立清理面板',async()=>{
   const x=harness();await x.button().fire('click');
   assert.deepEqual(Array.from(x.ctx.workspaceRoles(),r=>r.member_id),['agent:b']);
   assert.equal(x.ctx.projectAgents.length,2);
-  const panel=x.ctx.workspaceRoleCleanupPanel();
-  assert.match(x.dom.texts(panel),/已删除角色的资源清理/);
-  assert.match(x.dom.texts(panel),/分批清理/);
+  assert.equal(x.ctx.workspaceRoleCleanupPanel,undefined);
   assert.equal(x.ctx.projectTasks[0].control_status,'paused');
 });
 
-test('清理失败不把角色放回正常列表，独立记录仍可重试',()=>{
+test('清理失败角色回到正常列表，原因只在详情删除按钮下方',()=>{
   const x=harness();x.role().archived=true;x.role().deletion={status:'failed',steps:{private_state:'failed'},error_code:'cleanup_busy'};
-  assert.deepEqual(Array.from(x.ctx.workspaceRoles(),r=>r.member_id),['agent:b']);
-  const panel=x.ctx.workspaceRoleCleanupPanel();
-  assert.match(x.dom.texts(panel),/资源清理未完成/);
-  assert.match(x.dom.texts(panel),/重试清理/);
-  x.ctx.currentMemberIsHuman=()=>false;assert.equal(x.ctx.workspaceRoleCleanupPanel(),null);
+  assert.deepEqual(Array.from(x.ctx.workspaceRoles(),r=>r.member_id),['agent:a','agent:b']);
+  assert.match(x.dom.texts(x.ctx.workspaceRoleDeletePanel(x.role())),/资源清理未完成/);
+  assert.match(x.dom.texts(x.ctx.workspaceRoleDeletePanel(x.role())),/资源正被占用/);
+  x.ctx.currentMemberIsHuman=()=>false;assert.equal(x.ctx.workspaceRoleDeletePanel(x.role()),null);
 });
 
 test('没有选中角色时仍在角色页跟进清理，离页停止跟进',()=>{
   assert.match(source,/roleDeleteSync\(blackboardOpen && workspaceUI.mode === "roles" && currentMemberIsHuman\(\)/);
   assert.match(source,/projectAgents.find\(item => \["pending", "cleaning"\].includes\(item.deletion\?\.status\)\)/);
-  assert.match(source,/const cleanupFeedback = workspaceRoleCleanupPanel\(\)/);
+  assert.doesNotMatch(source,/workspaceRoleCleanupPanel/);
 });
 
 test('旧状态不能覆盖较新的重试，旧服务不显示删除按钮',()=>{

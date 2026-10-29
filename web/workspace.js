@@ -154,7 +154,14 @@ function workspaceRoleDescription(role) {
     tester: "负责验证成果是否符合要求，并提交测试结论。",
   })[workspaceRoleKey(role)];
 }
-function workspaceRoles() { return projectAgents.filter(agent => !agent.deletion && !members.find(member => member.id === agent.member_id)?.disabled_at); }
+function workspaceRoles() {
+  // 2026-10-29 3d：删除被接受后（pending/cleaning）角色立即退出正常列表；
+  // 清理失败（failed）时回到列表，并在详情删除按钮下方说明原因。
+  return projectAgents.filter(agent => {
+    if (agent.deletion) return agent.deletion.status === "failed";
+    return !members.find(member => member.id === agent.member_id)?.disabled_at;
+  });
+}
 // ROLE-SETTINGS-1：角色列表固定首项“项目设置”是独立导航项，不是伪造 Agent——
 // 不计入角色数量、不进入名册成员候选，其选中状态也不会作为 member_id 传给任何任务或 API。
 // 选择状态：roleSelection === "role" 且 selectedRole 命中当前名册时查看具体角色；
@@ -805,8 +812,6 @@ function renderWorkspaceList() {
     }
     const batchFeedback = workspaceRoleServiceBatchFeedback();
     if (batchFeedback) batchFeedbackContainer.appendChild(batchFeedback);
-    const cleanupFeedback = workspaceRoleCleanupPanel();
-    if (cleanupFeedback) batchFeedbackContainer.appendChild(cleanupFeedback);
   } else {
     for (const [value, label] of [["all", "全部"], ["running", "进行中"], ["mine", "待我处理"], ["finished", "已结束"]]) {
       const button = workspaceButton(label, () => { workspaceUI.filter = value; renderWorkspaceList(); });
@@ -1151,12 +1156,12 @@ function roleDeleteMessage(code) {
     role_provision_active: "角色正在配置，请等配置结束后再删除。",
     role_delete_identity_proof_required: "独占身份归属未确认，请先核对角色名册及共享引用后再删除。",
     manager_not_stopped: "本机宿主尚未退出，请确认后台正常运行后重试。",
-    local_runtime_required: "请先正常重载 TALK 后台，再重试清理。",
-    runtime_config_changed: "本机配置已变化，请正常重载 TALK 后台后重试。",
+    local_runtime_required: "请先正常重载 TALK 后台，再点“删除角色”重试。",
+    runtime_config_changed: "本机配置已变化，请正常重载 TALK 后台后，再点“删除角色”重试。",
     credential_mismatch: "专属凭据归属核验未通过，请核对后重试。",
     unsafe_resource: "资源归属或路径无法确认，请核对后重试。",
     cleanup_busy: "资源正被占用，请稍后重试。",
-    cleanup_budget: "清理达到单轮上限且未能继续，请重试；角色不会重新出现。"})[code] || "资源清理尚未完成，请稍后重试。";
+    cleanup_budget: "清理达到单轮上限且未能继续，请稍后再点“删除角色”重试。"})[code] || "资源清理尚未完成，请稍后重试。";
 }
 function roleDeleteApply(context, value) {
   if (!roleDeleteCurrent(context) || value?.member_id !== context.member) return;
@@ -1200,7 +1205,7 @@ function roleDeleteButton(role) {
   if (!currentMemberIsHuman() || !("deletion" in role)) return null;
   const key = roleDeleteKey(role.member_id), service = roleServiceView(role).service;
   const pending = ["pending","cleaning"].includes(role.deletion?.status);
-  const button = workspaceButton(role.deletion ? "重试清理" : "删除角色", () => deleteWorkspaceRole(role.member_id), "role-service-button role-delete-button");
+  const button = workspaceButton("删除角色", () => deleteWorkspaceRole(role.member_id), "role-service-button role-delete-button");
   button.disabled = pending || roleDeleteUI.busy.has(key) || (!role.deletion && Boolean(service && (
     service.ownership_held || ["running","starting","stopping","unknown"].includes(service.observed))));
   if (button.disabled && !pending) button.title = "请先关闭角色并确认已停止。";
@@ -1236,38 +1241,22 @@ function roleDeleteSync(role) {
   }, 2000);
 }
 function workspaceRoleDeletePanel(role) {
+  // 2026-10-29 3d：删除结果只在本角色详情里说明。
+  // 删除被接受时角色立即离开列表；清理失败则回到列表（行内标“删除未完成”），
+  // 原因固定显示在删除按钮下方；不再另设“重试清理”按钮或独立清理面板。
+  if (!currentMemberIsHuman()) return null;
+  const error = roleDeleteUI.errors.get(roleDeleteKey(role.member_id));
+  // 未归档且有受管服务的角色，删除按钮由服务面板承载；这里只补失败原因。
+  const standalone = Boolean(role.deletion) || role.archived || !roleServiceView(role).provided;
+  if (!standalone && !error) return null;
   const section = workspaceEl("section", "role-delete-section");
   section.setAttribute("aria-live", "polite");
-  if (!role.deletion && (role.archived || !roleServiceView(role).provided)) {
-    const button = roleDeleteButton(role); if (button) section.appendChild(button);
+  if (standalone) { const button = roleDeleteButton(role); if (button) section.appendChild(button); }
+  if (role.deletion?.status === "failed") {
+    section.appendChild(workspaceEl("p", "role-delete-reason", `资源清理未完成：${roleDeleteMessage(role.deletion.error_code)}`));
   }
-  if (role.deletion) {
-    const failed = role.deletion.status === "failed";
-    section.appendChild(workspaceEl("p", "", failed ? "角色已移除，资源清理未完成" : "角色已移除，后台正在分批清理专属资源…"));
-    if (failed) section.appendChild(workspaceEl("p", "", roleDeleteMessage(role.deletion.error_code)));
-    const labels = {manager:"本机宿主",profiles:"身份档",credentials:"专属凭据",private_state:"专属状态",startup_config:"启动配置"};
-    for (const [step, state] of Object.entries(role.deletion.steps || {})) {
-      if (state === "failed" || state === "pending") section.appendChild(workspaceEl("p", "", `${labels[step] || "资源"}：${state === "failed" ? "清理失败" : "待清理"}`));
-    }
-    if (failed) { const button = roleDeleteButton(role); if (button) section.appendChild(button); }
-  }
-  const error = roleDeleteUI.errors.get(roleDeleteKey(role.member_id));
   if (error) section.appendChild(workspaceEl("p", "role-delete-error", error));
   return section.childElementCount ? section : null;
-}
-function workspaceRoleCleanupPanel() {
-  if (!currentMemberIsHuman()) return null;
-  const rows = projectAgents.filter(role => role.deletion && role.deletion.status !== "complete");
-  if (!rows.length) return null;
-  const section = workspaceEl("section", "role-cleanup-feedback");
-  section.setAttribute("aria-live", "polite");
-  section.appendChild(workspaceEl("h3", "", "已删除角色的资源清理"));
-  for (const role of rows) {
-    section.appendChild(workspaceEl("strong", "", workspaceMemberName(role.member_id)));
-    const panel = workspaceRoleDeletePanel(role);
-    if (panel) section.appendChild(panel);
-  }
-  return section;
 }
 function workspaceRoleServicePanel(role) {
   const control = roleServiceControl(role);
