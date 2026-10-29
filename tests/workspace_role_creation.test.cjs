@@ -327,6 +327,19 @@ test('同一角色以最新配置请求展示，历史失败不盖住新恢复�
   await h.ready();const text=h.texts(h.ui.rolePanel({member_id:'m'}));assert.ok(h.ui.resetButton('m'));assert.doesNotMatch(text,/绑定重置|配置未完成/);
 });
 
+test('同一成员已有更晚成功请求时，刷新不再弹旧失败提示',async()=>{
+  const oldKey='role-oldfail-00000000',newKey='role-newsucceed-000000';
+  const storage=new Map([['talk-role-intent:["p","human:a"]:saved',JSON.stringify([oldKey])]]);
+  const h=harness({storage});
+  h.backend.rows=[
+    {request_key:oldKey,member_id:'agent:kimi',role_name:'小K',status:'failed',last_error_code:'identity_mismatch',revision:3,created_at:'2026-10-29T12:09:11Z'},
+    {request_key:newKey,member_id:'agent:kimi',role_name:'小K',status:'provisioned',revision:3,created_at:'2026-10-29T12:45:43Z'},
+  ];
+  await h.ready();
+  assert.equal(h.alerts.length,0,'被取代的失败请求不应再弹未完成');
+  assert.deepEqual(JSON.parse(storage.get('talk-role-intent:["p","human:a"]:saved')),[],'本地跟踪里也移除旧失败键');
+});
+
 test('截断外按原键读取的迟到结果不能污染新项目',async()=>{
   const d=deferred();const key='role-tracked-00000000',storage=new Map([['talk-role-intent:["p","human:a"]:saved',JSON.stringify([key])]]);
   const h=harness({storage,handler:(c,b)=>c.path.endsWith('/role-requests/'+key)?d.promise:limitedHistory(c,b)});h.backend.rows=oldHistory();h.ui.sync();await tick();

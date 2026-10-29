@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const {documentFixture}=require('./role_creation_dom.cjs');
@@ -71,6 +71,6 @@ test('失败执行不再显示自动启动提示，保存不把入队说成已�
 });
 test('页面详情接入控件，资源版本更新，UI没有启动执行API调用',()=>{
   assert.match(source,/const startupPanel = workspaceRoleStartupPanel\(role\)/);
-  assert.match(fs.readFileSync(require.resolve('../web/index.html'),'utf8'),/20261028-role-list-select-v1/);
+  assert.match(fs.readFileSync(require.resolve('../web/index.html'),'utf8'),/20261029-role-delete-inline-v1/);
   assert.doesNotMatch(part,/role-services\/startup|\/service\/start|\/service\/stop/);
 });

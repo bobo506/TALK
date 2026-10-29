@@ -1,4 +1,4 @@
-/* I-2 固定主控入口退役：真实接线验证。
+﻿/* I-2 固定主控入口退役：真实接线验证。
    静态部分断言 index.html 不再含主控面板 DOM、静态资源缓存版本正确、web 源码无退役符号；
    运行时部分用 vm 加载整份真实 web/workspace.js（含顶部真实事件绑定）与从 web/app.js
    按函数边界真实抽取的 renderWorkspaceMode/renderGroupMembersPanel/renderTaskDetailsPanel/
@@ -251,7 +251,7 @@ test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源
   }
   assert.ok(indexHtml.includes('/role-creation.css?v=20261028-role-create-dialog-v1'), '本次 role-creation.css 更新缓存版本');
   assert.ok(indexHtml.includes('/app.js?v=20261025-role-busy-stop-v1'), '未修改的 app.js 保留原缓存版本');
-  assert.ok(indexHtml.includes('/workspace.js?v=20261028-role-binding-strength-v1'), '本次 workspace.js 更新缓存版本');
+  assert.ok(indexHtml.includes('/workspace.js?v=20261029-role-delete-inline-v1'), '本次 workspace.js 更新缓存版本');
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 

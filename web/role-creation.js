@@ -467,6 +467,22 @@ function createRoleRequestUI(deps) {
       if (!host || typeof host.enabled !== "boolean" || !requests || !Array.isArray(roles)) throw new Error("服务返回的配置事实不完整，请刷新后重试。");
       state.host = { enabled: host.enabled, host_label: host.host_label, config_version: host.config_version };
       state.rows = requests.rows; state.limited = requests.limited;
+      // 2026-10-29：同一成员已有更晚的成功请求时，更早的失败请求视为已被取代——既不弹
+      // “未完成”，也从本页已保存请求里移除，避免刷新后反复提示旧失败。
+      const provisionedAt = new Map();
+      for (const row of requests.rows) {
+        if (row.status !== "provisioned" || !row.member_id) continue;
+        const at = String(row.created_at || "");
+        if (!provisionedAt.has(row.member_id) || at > provisionedAt.get(row.member_id)) provisionedAt.set(row.member_id, at);
+      }
+      const superseded = new Set(requests.rows
+        .filter(row => row.status === "failed" && provisionedAt.has(row.member_id)
+          && String(row.created_at || "") < provisionedAt.get(row.member_id))
+        .map(row => row.request_key));
+      if (superseded.size && state.recentKeys.some(key => superseded.has(key))) {
+        state.recentKeys = state.recentKeys.filter(key => !superseded.has(key));
+        try { if (deps.storage) deps.storage.setItem(`${storageKey()}:saved`, JSON.stringify(state.recentKeys)); } catch (_) { /* 存储禁用时只影响下次刷新。 */ }
+      }
       state.roles = roles.map(r => ({ member_id: r.member_id, role_name: r.role_name, archived: r.archived,
         runner: { runtime: r.runner?.runtime },
         model: r.model && typeof r.model === "object" ? {
@@ -478,7 +494,7 @@ function createRoleRequestUI(deps) {
       for (const row of state.rows) {
         const before = previousRows.get(row.request_key);
         const recent = state.recentKeys.includes(row.request_key);
-        if (row.status === "failed" && (!before || before.status !== "failed") && (before || recent)) {
+        if (row.status === "failed" && !superseded.has(row.request_key) && (!before || before.status !== "failed") && (before || recent)) {
           notifyFailure(`request:${row.request_key}:${row.revision}`, row.role_name,
             lookup(codes, row.last_error_code, "后台配置未完成，请检查环境后继续。"));
         }
