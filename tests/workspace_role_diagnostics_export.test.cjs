@@ -419,8 +419,9 @@ test('静态合同：精简导出面板 DOM、冗余文案全部移除且不移�
   assert.ok(actions.indexOf('id="role-export-generate-btn"') < actions.indexOf('id="role-export-download"'), '生成与下载并列同一工具栏');
   assert.match(actions, /id="role-export-generate-btn"[^>]*class="room-primary-btn"/);
   assert.match(actions, /id="role-export-download"[^>]*class="[^"]*room-secondary-btn[^"]*\bhidden\b/);
-  // 样式合同：白底单分隔、标题 24px（窄屏 20px）、标签 14px、输入/按钮 15px、按钮约 38–40px 高。
-  assert.match(cssSource, /\.role-diagnostics-panel\s*\{[^}]*border-top:\s*1px solid #ddd/s);
+  // 样式合同：单一分隔、标题 24px（窄屏 20px）、标签 14px、输入/按钮 15px、按钮约 38–40px 高；
+  // 2026-10-29 起分隔线改用语义变量 var(--line)，夜间模式随主题切换。
+  assert.match(cssSource, /\.role-diagnostics-panel\s*\{[^}]*border-top:\s*1px solid var\(--line\)/s);
   assert.ok(!cssSource.includes('#f8fafc'), '去掉原浅灰背景');
   assert.ok(!cssSource.includes('border-bottom'), '去掉上下双边框');
   assert.match(cssSource, /\.role-diagnostics-heading h3\s*\{[^}]*font-size:\s*24px/s);
