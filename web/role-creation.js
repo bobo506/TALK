@@ -784,7 +784,10 @@ const roleRequestApp = typeof document === "undefined" ? null : createRoleReques
   get storage() { try { return sessionStorage; } catch (_) { return null; } },
   newKey: () => { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
     return `role-${Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("")}`; },
-  confirm: text => window.confirm(text), alert: text => window.alert(text), setTimeout, clearTimeout,
+  confirm: text => window.confirm(text), alert: text => window.alert(text),
+  // 浏览器定时器要求 Window 接收者；不能经 deps.setTimeout 改成普通对象调用。
+  setTimeout: (callback, delay) => window.setTimeout(callback, delay),
+  clearTimeout: timer => window.clearTimeout(timer),
   refreshRoster: async () => { await loadProjectAgents(); },
   renderDetails: () => { renderWorkspaceList(); renderTaskDetailsPanel(); },
   selectRole: id => { workspaceUI.roleSelection = "role"; workspaceUI.selectedRole = id; renderWorkspaceList(); renderTaskDetailsPanel(); },

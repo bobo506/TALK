@@ -3,6 +3,9 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {createRoleRequestUI}=require('../web/role-creation.js');
 const {documentFixture}=require('./role_creation_dom.cjs');
+const vm=require('node:vm');
+const fs=require('node:fs');
+const path=require('node:path');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const response=(data,status=200)=>({ok:status>=200&&status<300,status,json:async()=>data});
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
@@ -15,6 +18,32 @@ function limitedHistory(call,backend) {
   if(call.path.includes('/role-requests/'))return response(backend.rows.find(r=>call.path.endsWith('/'+r.request_key))||{},backend.rows.some(r=>call.path.endsWith('/'+r.request_key))?200:404);
 }
 const oldHistory=()=>Array.from({length:205},(_,i)=>({request_key:`role-old-history-${String(i).padStart(8,'0')}`,status:'provisioned',revision:3,member_id:`old:${i}`,created_at:'2025-01-01T00:00:00Z'}));
+test('真实页面入口保留浏览器定时器接收者，恢复请求自动收敛并在退出时取消刷新',async()=>{
+  const h=harness(),timers=new Map();let serial=0;
+  const browserWindow={confirm:()=>true,alert:()=>{},
+    setTimeout:function(fn){assert.equal(this,browserWindow,'setTimeout 必须由 window 调用');const id=++serial;timers.set(id,fn);return id;},
+    clearTimeout:function(id){assert.equal(this,browserWindow,'clearTimeout 必须由 window 调用');timers.delete(id);}};
+  const context=vm.createContext({document:h.document,window:browserWindow,
+    setTimeout:browserWindow.setTimeout,clearTimeout:browserWindow.clearTimeout,
+    activeProjectId:'p',myId:'human:a',blackboardOpen:true,workspaceUI:{mode:'roles'},
+    currentMemberIsHuman:()=>true,workspaceSettingsSelected:()=>true,
+    apiFetch:h.deps.api,loadProjectAgents:async()=>{},renderWorkspaceList:()=>{},renderTaskDetailsPanel:()=>{},
+    sessionStorage:h.deps.storage,crypto:require('node:crypto').webcrypto});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/role-creation.js'),'utf8')+'\nthis.testUI=roleRequestApp;',context);
+  const ui=context.testUI;ui.sync();await tick();
+  for(const finalStatus of ['provisioned','failed']){
+    await ui.recover({member_id:'agent:kimi',credential_version:2});
+    assert.equal(ui.state.error,'');assert.equal(ui.state.rows[0].status,'requested');
+    assert.equal(timers.size,1);
+    const row=h.backend.rows[0];row.status=finalStatus;row.revision=3;
+    if(finalStatus==='failed')row.last_error_code='preflight_failed';
+    const [id,callback]=timers.entries().next().value;timers.delete(id);callback();await tick();
+    assert.equal(ui.state.rows[0].status,finalStatus);assert.equal(timers.size,0);
+    assert.equal(ui.state.error,'');
+  }
+  await ui.recover({member_id:'agent:kimi',credential_version:2});
+  assert.equal(timers.size,1);context.blackboardOpen=false;ui.sync();assert.equal(timers.size,0);
+});
 function harness({storage=new Map(),human=true,handler}={}) {
   const dom=documentFixture(),ctx={projectId:'p',accountId:'human:a',active:true,settings:true,human};
   const requests=[],timers=new Map(),alerts=[];let count=0,confirms=0;

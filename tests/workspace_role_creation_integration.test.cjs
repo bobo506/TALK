@@ -12,7 +12,7 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   doc.addEventListener=()=>{};
   const requests=[],storage=new Map();let rows=[],service=null;
   const ctx=vm.createContext({document:doc,console,crypto:webcrypto,Uint8Array,Map,Set,URLSearchParams,
-    window:{confirm:()=>true,matchMedia:()=>({matches:false})},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
+    window:{confirm:()=>true,matchMedia:()=>({matches:false}),setTimeout:()=>1,clearTimeout:()=>{}},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
     setTimeout:()=>1,clearTimeout:()=>{},activeProjectId:'p',myId:'human:a',blackboardOpen:true,
     members:[{id:'human:a',kind:'human'}],projectAgents:[],projectTasks:[],groups:[],userBadge:doc.getElementById('badge'),
     currentMemberIsHuman:()=>true,getActiveGroup:()=>null,canEnterGroup:()=>false,

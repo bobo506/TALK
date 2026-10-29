@@ -1,5 +1,8 @@
 # Project Progress
 
+
+> 2026-10-29 本轮更新：小K宿主凭据路径已被后续操作统一，既有恢复于20:30成功；下方19:25停止/路径分歧为历史快照。本轮修正页面定时器 Illegal invocation 导致等待不更新，104项测试通过；新请求真实页面验收待恢复浏览器确认框。见 [修复记录](spec/BINDING_RESET_TIMER_FIX_20261029.md)。
+> 2026-10-29 晚补充（DeepSeek）：B1 后端**已闭环**——补上作业侧预期绑定指纹的补录回落（B1-d，`3a8091b`）后，20:30/20:44/20:45 三次恢复全部 `provisioned`，作业 `legacy-kimi-k3-20261017` 推进为 `succeeded`（`profile/key_file=skipped`、`preflight=succeeded`、revision 6），`credential_version` 保持 2，无多余轮换；用户确认小K 可正常启动与关闭。页面定时器修复与本文档其余改动由 GPT 完成、DeepSeek 代为提交。第 3 项仅剩 **3d 删除后资源清理提示闭环**。
 Updated: 2026-10-29 19:25（Asia/Shanghai）。本轮由 WorkBuddy 交付 B1 恢复链的 B1-b/B1-c 两个修正并补测（`39bf7e7`、`4fcfc45`），**整链仍未通过一次真实端到端验证**；服务当前停止，小K 因宿主与 worker 的 Key 目录不一致处于 `manager_failed`。用户已要求转交其他角色接续，完整交接见[HANDOFF_20261029.md](HANDOFF_20261029.md)。
 
 ## 本轮未验收与阻塞（接手先读）

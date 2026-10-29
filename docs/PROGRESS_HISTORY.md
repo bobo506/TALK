@@ -9838,3 +9838,8 @@ Updated: 2026-10-04 (Asia/Shanghai)
 收取前只读核187/msg2689、188/msg2690引用未变、各自自身号一致，最新caller=agent:codex/kind=agent/note=null、项目passive v6/effective not_bound。已按189→188→187实际收取succeeded/completed，UTC12:29:14.041920 / 12:29:16.464359 / 12:29:18.988891，原消息/报告不追改；不把原自报抹成首次即正确。正式PROJECT_BRIEF/MODULE_bridges同步代码入口与局部指南，不改通用bridge/server/API/schema/AGENTS/现有角色。
 
 通过范围为独立执行入口代码、无密钥合同/启动模板/局部指南和零模型风险验证。现有真实名册仍codex/deepseek/kimi，新agent:kimi-code-k28-preview未注册/入册、未生成应用本人Key/启停bridge或安排生产任务；真实身份GET、模型后端版本/质量/耗时/额度与生产claim→交付闭环未验。rolling alias不承诺永久K2.8，CLI2.0.2仅rollout记录，宿主T未知、660000ms仅模板，主动T/W/取消/排队/I-4另验。下一步正式身份/名册/配置应用和最小接单，仍按用户临时DeepSeek开发/Codex复核、Kimi额度不足不派Kimi。完成本轮提交推送后暂停，不继续开新切片；185/186已发布与I-3文档闭合保持。
+
+
+## 2026-10-29 绑定重置页面刷新中断（验收进行中）
+
+实际后台小K恢复已成功，页面因 Window 定时器接收者错误抛 Illegal invocation，停在等待宿主。本人修正定时器包装与缓存版本，104项相关测试通过，旧失败证据保留；真实新请求确认框遇浏览器控制超时，待恢复窗口完成验收。详 [修复记录](spec/BINDING_RESET_TIMER_FIX_20261029.md)。未操作 Key、后台启停或 Git。

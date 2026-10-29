@@ -35,7 +35,7 @@ class RoleCreationWebUiTests(RouteTestCase):
             required=['/role-creation.js','/workspace.js','/app.js']
             self.assertTrue(all(path in scripts for path in required))
             self.assertEqual([scripts.index(path) for path in required],sorted(scripts.index(path) for path in required))
-            self.assertIn('/role-creation.js?v=20261028-role-binding-strength-v1',parser.assets)
+            self.assertIn('/role-creation.js?v=20261029-role-recover-timer-v1',parser.assets)
             self.assertIn('/workspace.js?v=20261028-role-binding-strength-v1',parser.assets)
             self.assertIn('role-create-auto-start',parser.ids)
             for asset in ['/role-creation.js','/role-creation.css']:
