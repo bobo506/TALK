@@ -9,6 +9,7 @@
 """
 from server.models import (
     ROLE_REQUEST_KIND_CREATE,
+    ProjectAgent,
     ProjectRole,
     RoleCreationOperation,
     RoleLegacyAttachOperation,
@@ -280,3 +281,96 @@ class LegacyRecoverTests(LegacyAttachTestCase):
         self.assertEqual(
             job.json()["detail"], "provision_imported_identity_unsupported"
         )
+
+    # ── 凭据轮换（B1-b）：补录来源可在恢复意图下轮换一次 ──────────────────
+
+    def claim_recover(self, request_key=RECOVER_KEY):
+        """创建并领取恢复请求，返回 ``(request_key, lease_token)``。"""
+        self.assertEqual(self.attach().status_code, 201)
+        # 补录夹具默认把 agent:legacy 也挂在 prj_beta 名册；换 Key 要求该身份
+        # 仅在本项目被引用，这里先移除跨项目名册行（服务端会如实拒绝，不会自动清理）。
+        with self.session() as session:
+            other = session.get(ProjectAgent, ("prj_beta", "agent:legacy"))
+            if other is not None:
+                session.delete(other)
+                session.commit()
+        response = self.recover(request_key=request_key)
+        self.assertIn(response.status_code, (200, 201), response.text)
+        with self.make_client() as client:
+            host = client.post(
+                "/api/projects/prj_alpha/role-provision-host/enable",
+                headers={"X-API-Key": "bobo-key"},
+                json={"host_label": HOST_LABEL, "expected_version": 0},
+            )
+        self.assertEqual(host.status_code, 200, host.text)
+        with self.make_client() as client:
+            detail = client.get(
+                f"/api/projects/prj_alpha/role-requests/{request_key}",
+                headers={"X-API-Key": "bobo-key"},
+            ).json()
+            claimed = client.post(
+                f"/api/projects/prj_alpha/role-requests/{request_key}/claim",
+                headers={"X-API-Key": "bobo-key"},
+                json={"host": HOST_LABEL, "expected_revision": detail["revision"]},
+            )
+        self.assertEqual(claimed.status_code, 200, claimed.text)
+        return request_key, claimed.json()["lease_token"]
+
+    def rotate(self, *, member_id="agent:legacy", body=None):
+        with self.make_client() as client:
+            return client.post(
+                f"/api/projects/prj_alpha/roles/{member_id}/rotate-key",
+                headers={"X-API-Key": "bobo-key"},
+                json=body,
+            )
+
+    def test_legacy_rotate_with_recover_request_returns_new_key_once(self):
+        request_key, lease_token = self.claim_recover()
+        body = {
+            "request_key": request_key,
+            "lease_token": lease_token,
+            "expected_credential_version": 1,
+        }
+        first = self.rotate(body=body)
+        self.assertEqual(first.status_code, 201, first.text)
+        self.assertTrue(first.json()["api_key"])
+        self.assertEqual(first.json()["credential_version"], 2)
+        # 重放同一意图：只读回放，绝不再返 Key。
+        replay = self.rotate(body=body)
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertTrue(replay.json()["reused"])
+        self.assertNotIn("api_key", replay.json())
+        with self.session() as session:
+            role = session.get(ProjectRole, ("prj_alpha", "agent:legacy"))
+            self.assertEqual(role.credential_version, 2)
+            # 轮换不得伪造创建操作，也不得改身份来源。
+            self.assertIsNone(session.get(RoleCreationOperation, OP_KEY))
+            self.assertEqual(role.origin, "imported")
+
+    def test_legacy_rotate_without_request_key_is_refused(self):
+        """补录来源不接受无来源的手工轮换，必须由恢复请求驱动。"""
+        self.assertEqual(self.attach().status_code, 201)
+        response = self.rotate(body=None)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"], "provision_lease_required")
+
+    def test_imported_role_without_attach_cannot_rotate(self):
+        with self.session() as session:
+            session.add(
+                ProjectRole(
+                    project_id="prj_alpha",
+                    member_id="agent:second",
+                    role_name="Second One",
+                    origin="imported",
+                    identity_exclusive=0,
+                    credential_version=1,
+                    created_by="human:bobo",
+                )
+            )
+            session.commit()
+        response = self.rotate(
+            member_id="agent:second",
+            body={"request_key": "op-recover-0301", "lease_token": "synthetic-lease"},
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"], "rotate_not_managed_identity")

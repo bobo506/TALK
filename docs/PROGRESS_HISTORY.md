@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-10-29 17:20（Asia/Shanghai）— B1-b：补录来源角色可在恢复意图下轮换一次凭据
+
+- 用户选定 C 方案（能修配置就修、Key 真失效才换一次），并明确不实现“恢复后自动重启”。本片由 WorkBuddy 实现，单写入方，产品改动集中在 `server/routes/projects.py` 与 `server/models.py`。
+- 前半段为实机复核：用户点击小K“绑定重置”后页面无报错，但生产库中请求为 `failed`、`last_error_code=http_error`、`role_provision_jobs` 零行。日志链路为 16:32:58 建请求 201 → 16:33:00 claim 200 → `rotate-key` **409** → report failed。根因是 worker 在“本机无可用 Key”时调用 `rotate-key`，而该端点只允许 managed 独占身份。同时核实 `C:/Users/Administrator/.talk/keys` 下没有 `agent_kimi.key`（仅空锁守卫），该角色能启动是因为宿主常驻持有内存 Key，凭据从未落盘。
+- B1-b 改动一：`rotate-key` 增加仅恢复用途的 legacy 分支。imported 且存在**已提交**补录锚点时改用锚点 `operation_key` 取证；无锚点仍 `rotate_not_managed_identity`；legacy 分支强制要求 `request_key` + `lease_token`，无来源手工轮换一律 `provision_lease_required`；仍不写、不复用 `role_creation_operations`，不改 `origin`/`identity_exclusive`。
+- B1-b 改动二：`prove_exclusive_identity` 新增 `ignore_exited_instances`（默认 False）。legacy 恢复轮换传 True，复用删除路径既有的 `_historical_local_instance_exited` 判定，让已证明退出的历史实例（本机 + 心跳过期 + 无在途任务 + `recorded_process_state` 为 absent/exited/previous_boot/pid_reused）不再阻断；远端、新鲜、持任务、无法核验的实例仍拒绝。managed 路径行为不变。
+- 现场事实：小G/小D/小K 均只在 `prj_e8fe7066bbec` 名册，无跨项目引用；小K 有 9 条 8–9 月的 `idle` 残留实例，原会以 `rotate_identity_in_use` 阻断换 Key。服务端不做自动清理，跨项目引用仍硬拒绝。
+- 测试：`tests/test_role_legacy_recover.py` 由 5 项增至 15 项（换 Key 成功且重放不返 Key、无 `request_key` 拒绝、无锚点仍拒、三步成功与完成回写、三类失配拒绝、投影字段）。修改 `tests/test_role_rotation_exclusivity.py` 的 mock 签名以透传新增关键字参数，断言未改。
+- 未验证：真实点击小K、真实 worker 三步与真实 CLI 行为。换 Key 后旧凭据立即失效，正在运行的实例必须关闭再启动才读到新 Key（bridge 仅在启动时解析 `--key-file`）。
+- 证据：`.tmp/b1a-review/REVIEW.md` 与 `.tmp/b1a-review/probe_completion.py`。
+
 ## 2026-10-29 15:33（Asia/Shanghai）— G-terra 启动修复与实际启停验收
 
 - 本片用户授权Codex本人处理、不派任务，并明确批准G-terra宿主正常排空、重新加载及启停。Git/GitHub交DeepSeek，本轮未执行或派发。

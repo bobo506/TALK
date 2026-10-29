@@ -4861,6 +4861,7 @@ def prove_exclusive_identity(
     session: Session,
     *,
     for_role_deletion: bool = False,
+    ignore_exited_instances: bool = False,
 ) -> dict:
     """独占引用证明（合同 §7.5，``rotate-key`` 与后续全局禁用共用）。
 
@@ -4923,9 +4924,11 @@ def prove_exclusive_identity(
             )
         ).all()
     )
-    if for_role_deletion:
+    if for_role_deletion or ignore_exited_instances:
         # Deletion rechecks stale local process evidence; key rotation retains
-        # its original strict instance policy by default.
+        # its original strict instance policy by default. 补录来源（B1-b）的恢复
+        # 轮换显式复用同一判定：已证明退出的历史实例不再阻断换 Key，仍保护
+        # 远端、新鲜、持有任务或无法核验的实例。
         from server.role_deletions import _historical_local_instance_exited
         now = datetime.now(timezone.utc)
         active_instances = [row for row in active_instances

@@ -1,6 +1,12 @@
 # Project Progress
 
-Updated: 2026-10-29 15:33（Asia/Shanghai）。本片用户授权Codex本人修复G-terra启动、不派任务。官方授权/模型准备完成，cli_incompatible已修，真实启动→关闭→再启动通过，最终idle。46项关联测试通过；真实模型任务未验证。其余角色页/强度/B1-a进度保持。详[本片记录](spec/G_TERRA_START_FIX_20261029.md)。
+Updated: 2026-10-29 17:20（Asia/Shanghai）。本片由WorkBuddy按用户选定C方案实现B1-b：补录来源角色可在恢复意图下轮换一次凭据（rotate-key legacy分支），并让已证明退出的历史实例不再阻断换Key。合成用例15项通过；真实点击小K待用户执行（换Key后需重启该角色）。G-terra修复已由用户验证并提交`dfd0af1`；B1-a经实机复核发现真实点击失败（详见[设计文档](spec/ROLE_LEGACY_ATTACH_DESIGN.md)）。
+
+## B1-b 现场事实（2026-10-29 下午）
+
+- 小K`agent:kimi`16:33的真实恢复请求为`failed`：claim后调`rotate-key`被409拒绝，`role_provision_jobs`零行。原B1-a只打通建请求/建作业/完成回写，换凭据动作无分支。
+- 根因链：`C:/Users/Administrator/.talk/keys`下无`agent_kimi.key`（仅空锁守卫）→ worker判absent → 调rotate → 仅managed独占身份可换。该角色能启动是因为宿主常驻持有内存Key，凭据从未落盘。
+- 三个旧角色均只在`prj_e8fe7066bbec`名册，无跨项目引用；小K有9条8-9月的`idle`残留实例（进程早已退出），原先会以`rotate_identity_in_use`阻断换Key。
 
 ## 当前身份与协作规则
 
@@ -34,14 +40,14 @@ Updated: 2026-10-29 15:33（Asia/Shanghai）。本片用户授权Codex本人修�
 ## 旧任务与未解决项
 
 - **347/2993**整体仍未完成；**348/2994**两个DSH凭据拒绝边界仍缺修复/复验证据。之前Codex仅补CLI运行配置，本轮仅修Codex启动前缀，均不是348安全修复。原创建者agent:codex，尚未收取；正常收取与业务验收通过须区分。
-- **旧角色兼容恢复（B1-a，2026-10-29 已实现，待真实点击验证）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作，此前无“绑定重置”。现按用户选定 B1-a 增加**恢复专用** legacy 分支：以已提交的`role_legacy_attach_operations`为锚点（choice_id 分别`rmc_b0b68705cd2f`/`rmc_3a5435e0e283`/`rmc_80be012402f1`），`choice_snapshot`按 choice_id 现读合成，**不写也不复用**`role_creation_operations`；`_require_provision_identity`与`require_completion_facts`都加了仅限 recover+匹配补录键的分支；`/agents`投影新增`credential_version`与`recoverable`。合成用例 5 项通过；真实旧角色尚未点过，需重启 API 后验证。
+- **旧角色兼容恢复（B1-a 已实现；B1-b 补齐换凭据，2026-10-29）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作。B1-a 以已提交`role_legacy_attach_operations`为锚点（`rmc_b0b68705cd2f`/`rmc_3a5435e0e283`/`rmc_80be012402f1`），`choice_snapshot`现读合成，`_require_provision_identity`与`require_completion_facts`加 recover 分支，`/agents`投影出`credential_version`/`recoverable`，**不写也不复用**创建操作。B1-a 实机点击失败（rotate-key 拒绝 imported），B1-b 因此补：rotate-key 的 legacy 分支（必须带`request_key`+`lease_token`，锚点+代际+仅本项目引用四道门），并让已证明退出的历史实例不阻断（`ignore_exited_instances`，managed 路径不变）。合成用例 15 项通过；真实点击待用户在小K 执行，需**先停止角色**，换 Key 后重新启动才生效。
 - **DSH/WorkBuddy 强度接入只完成读取+回填**：WorkBuddy 的`models.json`有`reasoning.defaultEffort`（本机`max`），DSH 角色 patch 有`reasoningEffort: max`；但两类运行器没有模型配置写入器，无法“新建角色时写”，只能脚本回填。是否在角色启动时顺带刷新，待用户定。
 - **角色页面余项**：3b已随官方强度落库完成主要部分（余 DSH/WorkBuddy 的写入时机）；3d删除清理闭环、3g（已改为“保留按钮+移位置”并完成）状态见路线图。
 - 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
 ## 下一步恢复顺序
 
-1. **验证 B1-a**：重启 API 后在小G/小D/小K详情点“绑定重置”，观察恢复请求、作业执行与完成回写是否全绿；若 worker 三步或完成校验报错，按稳定错误码定位。
+1. **验证 B1-b**：先在小K页面停止该角色，再点“绑定重置”，确认请求`succeeded`、作业三步（profile/key_file/preflight，前者可能 skipped）与完成回写全绿；随后启动并确认新 Key 生效。若失败按稳定错误码定位（`rotate_legacy_roster_reference_refused`=跨项目名册引用，`rotate_identity_in_use`=仍有在用实例/任务）。
 2. G-terra授权及实际启停已通过，后续真实模型任务/任务链按明确授权验证，本轮用户要求不派任务。
 3. 348凭据边界修复/复验与347剩余范围仍待完成，再由Codex正常身份处理历史收尾。
 4. DSH/WorkBuddy 的写入时机（启动刷新 or 仅脚本）与3d删除清理闭环按完整可验流程拆包，需用户确认后开工。

@@ -129,6 +129,7 @@ from server.models import (
 )
 from server.role_provision_requests import (
     apply_create_intent_created,
+    legacy_attach_anchor,
     request_has_source_for_member,
     require_create_intent_for_creation,
     resolve_request_source,
@@ -2075,11 +2076,17 @@ def rotate_project_role_key(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="role_archived"
             )
+        # 2026-10-29 B1-b：补录来源（imported）角色可在“已提交补录锚点 + 对应 recover
+        # 请求 + 代际一致”下轮换一次凭据，用于把从未落盘的旧身份凭据重新安装到本机。
+        # 仍不修改 origin / identity_exclusive，也不写、不复用 role_creation_operations。
+        legacy_attach = None
         if role.origin != PROJECT_ROLE_ORIGIN_MANAGED:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="rotate_not_managed_identity",
-            )
+            legacy_attach = legacy_attach_anchor(session, project_id, target_member_id)
+            if legacy_attach is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="rotate_not_managed_identity",
+                )
         member = session.get(Member, target_member_id)
         if member is None or member.kind != "agent":
             raise HTTPException(
@@ -2091,13 +2098,19 @@ def rotate_project_role_key(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="rotate_member_disabled",
             )
-        if not role.identity_exclusive:
+        if not role.identity_exclusive and legacy_attach is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="rotate_shared_identity_refused",
             )
 
         if request_key is None:
+            if legacy_attach is not None:
+                # 补录来源的轮换必须由本次恢复请求驱动，不接受无来源的手工旁路。
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ROLE_REQUEST_ERROR_SOURCE_REQUIRED,
+                )
             if lease_token is not None:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -2109,19 +2122,23 @@ def rotate_project_role_key(
                     detail=ROLE_REQUEST_ERROR_SOURCE_REQUIRED,
                 )
         else:
-            operation = session.exec(
-                select(RoleCreationOperation)
-                .where(RoleCreationOperation.project_id == project_id)
-                .where(RoleCreationOperation.member_id == target_member_id)
-            ).first()
-            if operation is None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="role_request_operation_mismatch",
-                )
+            if legacy_attach is not None:
+                source_operation_key = legacy_attach.operation_key
+            else:
+                operation = session.exec(
+                    select(RoleCreationOperation)
+                    .where(RoleCreationOperation.project_id == project_id)
+                    .where(RoleCreationOperation.member_id == target_member_id)
+                ).first()
+                if operation is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="role_request_operation_mismatch",
+                    )
+                source_operation_key = operation.operation_key
             source_row = resolve_request_source(
                 project_id,
-                operation_key=operation.operation_key,
+                operation_key=source_operation_key,
                 member_id=target_member_id,
                 request_key=request_key,
                 lease_token=lease_token,
@@ -2167,7 +2184,12 @@ def rotate_project_role_key(
                     detail=ROLE_REQUEST_ERROR_CREDENTIAL_MISMATCH,
                 )
 
-        proof = prove_exclusive_identity(project_id, target_member_id, session)
+        proof = prove_exclusive_identity(
+            project_id,
+            target_member_id,
+            session,
+            ignore_exited_instances=legacy_attach is not None,
+        )
         if proof["refusal"] is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail=proof["refusal"]

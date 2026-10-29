@@ -64,3 +64,58 @@ Codex定义范围、复核并直接修正问题、验证及正式文档/Git收�
   - `GET /api/projects/{p}/agents` 投影新增 `credential_version` 与 `recoverable`（服务端按同一套门禁计算），页面据此显示“绑定重置”。
 - **验证**：`tests/test_role_legacy_recover.py` 5 项（放行、未补录仍拒绝、代际不符拒绝、恢复可开配置作业、投影字段）；`tests/workspace_role_creation.test.cjs` 新增旧角色按钮与 recover 载荷用例；相关回归见进度记录。
 - **限制**：真实旧角色（小G/小D/小K）的页面恢复仍**未执行**——需重启 API 后由用户点击验证；worker 全链路的三步执行与完成回写只在合成用例中覆盖到建作业，未跑真实 CLI。
+
+## 2026-10-29 凭据轮换扩展（B1-b，用户选定 C 方案）
+
+### 问题（实机复核发现）
+
+B1-a 交付后用户在小K（`agent:kimi`）点击“绑定重置”，页面无报错，但请求实际失败。
+只读核对生产库与日志的链路：
+
+| 时刻 | 事实 |
+|---|---|
+| 16:32:58 | 创建 recover 请求 201，`choice_snapshot` 按补录 `choice_id` 合成成功 |
+| 16:33:00 | claim 200 |
+| 16:33:00 | `POST /roles/agent:kimi/rotate-key` **409** |
+| 16:33:00 | report failed，`role_provision_jobs` 零行 |
+
+根因：worker 的恢复流程先核本机 Key，无可用 Key 时调用一次 `rotate-key` 换凭据；
+而 `rotate-key` 只允许 `origin=managed` 且 `identity_exclusive=1` 的角色，imported
+补录来源必然被拒。B1-a 只打通了“建请求 / 建作业 / 完成回写 / 投影按钮”，中间的
+换凭据动作没有分支，真实点击因此必然失败。
+
+同时确认：`C:/Users/Administrator/.talk/keys` 下没有 `agent_kimi.key`，只有空的
+锁守卫；该角色能启动是因为宿主进程常驻并持有内存中的 Key，凭据从未落盘。这也是
+“换一次并写入本机”具有实际价值的原因。
+
+### 方案
+
+1. `POST /roles/{member_id}/rotate-key` 增加**仅恢复用途**的 legacy 分支：
+   - 角色为 imported 且存在**已提交**补录锚点时，改用锚点 `operation_key` 取证；
+     无锚点仍返回 `rotate_not_managed_identity`。
+   - `identity_exclusive=0` 在 legacy 分支下不再直接拒绝，改由
+     `prove_exclusive_identity` 的实际引用证明把关。
+   - legacy 分支**必须**携带 `request_key`（同时必须给 `lease_token`），无来源的手工
+     轮换一律 `provision_lease_required`，不保留旁路。
+   - 仍不写、不复用 `role_creation_operations`，不改 `origin` / `identity_exclusive`。
+2. `prove_exclusive_identity` 新增 `ignore_exited_instances`（默认 False，managed 路径
+   行为不变）。legacy 恢复轮换传 True：已证明退出的历史实例（本机 + 心跳过期 + 无
+   在途任务 + `recorded_process_state` 判定 absent/exited/previous_boot/pid_reused）
+   不再阻断换 Key；远端、新鲜、持有任务或无法核验的实例仍然拒绝。
+3. 跨项目引用仍硬拒绝：`other_roster → rotate_legacy_roster_reference_refused`，
+   `other_roles/bindings/descriptions → rotate_shared_identity_refused`。补录来源必须
+   只在本项目被引用，服务端不做自动清理。
+
+### 验证
+
+- `tests/test_role_legacy_recover.py` 增至 15 项：新增换 Key 成功且重放不返 Key、
+  无 `request_key` 拒绝、无补录锚点仍 `rotate_not_managed_identity`。
+- 关联回归：`test_role_credential_recovery`、`test_role_rotation_exclusivity`、
+  `test_role_legacy_attach`、`test_role_deletion`、`test_project_roles`。
+- 真实点击待用户执行；本轮不自动重启角色服务，也不改用户的自启动选择。
+
+### 限制
+
+- 换 Key 后旧凭据立即失效；正在运行的实例必须关闭再启动才会读到新 Key（bridge 只在
+  启动时把 `--key-file` 解析进内存）。本轮不实现“恢复后自动重启”。
+- 轮换仍受“同一意图最多一次”约束；重放返回 `reused=true` 且不返 Key。

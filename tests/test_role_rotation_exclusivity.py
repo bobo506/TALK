@@ -919,12 +919,13 @@ class ReferenceGuardWriteTransactionTests(ExclusiveIdentityGuardTests):
         state: dict = {}
         reference_was_blocked = False
 
-        def gated(project_id, member_id, session):
+        def gated(project_id, member_id, session, **kwargs):
             driver = session.connection().connection.driver_connection
             state["sqlite_in_transaction"] = bool(driver.in_transaction)
+            state["proof_kwargs"] = dict(kwargs)
             entered.set()
             release.wait(timeout=15)
-            return original_proof(project_id, member_id, session)
+            return original_proof(project_id, member_id, session, **kwargs)
 
         def rotate():
             return self.rotate_key("prj_alpha", self.member_id)
