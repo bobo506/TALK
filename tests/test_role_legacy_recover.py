@@ -121,6 +121,16 @@ class LegacyRecoverTests(LegacyAttachTestCase):
             )
         self.assertEqual(job.status_code, 201, job.text)
         self.assertEqual(job.json()["operation_key"], OP_KEY)
+        # 2026-10-29 B1-d：补录来源作业的预期绑定指纹回落到恢复请求快照，而不是 None。
+        with self.session() as session:
+            snapshot = session.get(
+                RoleProvisionRequestRow, "op-recover-0001"
+            ).choice_snapshot
+        self.assertIsInstance(job.json().get("expected_binding_fingerprint"), str)
+        self.assertEqual(
+            job.json()["expected_binding_fingerprint"],
+            snapshot["binding_fingerprint"],
+        )
 
     def test_agents_projection_exposes_recoverable_and_credential_version(self):
         self.assertEqual(self.attach().status_code, 201)

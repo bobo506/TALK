@@ -2550,7 +2550,22 @@ def _provision_expected_binding_fingerprint(
     """
     operation = session.get(RoleCreationOperation, job.operation_key)
     if operation is None:
-        return None
+        # 2026-10-29 B1-d：补录来源的恢复作业没有创建操作。回落该成员最近一次 recover
+        # 请求行里由服务端按补录锚点现读合成的快照指纹（B1-a 写入），仍然不按 model_id
+        # 反查；没有快照就如实返回 None，由消费方 fail closed。
+        row = session.exec(
+            select(RoleProvisionRequestRow)
+            .where(RoleProvisionRequestRow.project_id == job.project_id)
+            .where(RoleProvisionRequestRow.member_id == job.member_id)
+            .where(RoleProvisionRequestRow.kind == ROLE_REQUEST_KIND_RECOVER)
+            .where(RoleProvisionRequestRow.origin_operation_key == job.operation_key)
+            .order_by(RoleProvisionRequestRow.created_at.desc())
+        ).first()
+        if row is None:
+            return None
+        snapshot = row.choice_snapshot or {}
+        value = snapshot.get("binding_fingerprint")
+        return value if isinstance(value, str) else None
     choice = session.get(RunnerModelChoice, operation.choice_id)
     if choice is None:
         return None

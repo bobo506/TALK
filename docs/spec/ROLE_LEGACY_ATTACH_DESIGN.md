@@ -144,3 +144,32 @@ B1-b 上线后用户重启 API 再点小K，`rotate-key` 已成功（201，Key �
 
 注意：`_run_preflight_step` 运行在宿主 worker 进程内，本片改的是
 `scripts/role_provision.py`，**必须重启整个后台（runtime/宿主）**才生效，只重启 API 不够。
+
+### B1-d：作业侧预期绑定指纹的补录回落（2026-10-29 晚）
+
+B1-c 之后再次点击，后台仍在 `stage=steps` 失败 `identity_mismatch`，且**没有调用
+`rotate-key`、作业未被更新**。只读定位：
+
+- 错误码 `identity_mismatch` 在 `scripts/role_provision.py` 只出现在 preflight；
+- preflight 的“预期绑定指纹”来自作业输出 `expected_binding_fingerprint`；
+- 该值由 `server/routes/projects.py::_provision_expected_binding_fingerprint(job)` 计算，
+  无创建操作时**直接返回 None** —— B1-c 只修了**请求侧** `expected_binding_fingerprint()`，
+  **作业侧漏了**，于是 preflight 拿 `None` 去比对必然失败。
+
+修正：`_provision_expected_binding_fingerprint` 在无创建操作时，回落该成员**最近一次
+recover 请求**（`origin_operation_key` 与作业键一致）的 `choice_snapshot.binding_fingerprint`；
+仍不按 `model_id` 反查，没有快照就如实 `None` 由消费方 fail closed。
+
+验证：
+
+- 单元：`tests/test_role_legacy_recover.py` 16 项通过，新增“作业输出的预期指纹是字符串
+  且等于请求快照”的断言；
+- 实机（2026-10-29 20:30 / 20:44 / 20:45）：三次恢复请求全部 `provisioned`，
+  作业 `legacy-kimi-k3-20261017` 由 `partial` 推进为 **succeeded**
+  （`profile/key_file=skipped`、`preflight=succeeded`、revision 6），
+  `credential_version` 保持 2，未发生多余轮换；用户确认小K 可正常启动与关闭。
+- 本片只需重启 API（`reload-api`）即生效，宿主无需重启。
+
+页面侧遗留：“等待宿主”不自动消失，原因是 `role-creation.js` 把 `window.setTimeout`
+摘下后经 `deps.setTimeout` 作为普通对象方法调用，浏览器抛 `Illegal invocation`
+中断后续刷新；由另一处前端修正处理，与本后端修复分开提交。
