@@ -70,6 +70,25 @@ Updated: 2026-10-29 19:25（Asia/Shanghai）。本轮由 WorkBuddy 交付 B1 恢
 - **角色页面余项**：3d 删除清理闭环已完成（`da001a8`）并实机验收；外观模式（白天/夜间）已完成并推送（`bc3bba7`）。
 - 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
+## 明日开工（2026-10-30，用户关机前留）
+
+启动命令（正常 PowerShell，`PYTHONPATH` 那行必须带）：
+
+```powershell
+cd D:\claude-test\TALK
+$env:PYTHONPATH = "D:/claude-test/TALK;D:/claude-test/TALK/.venv/Lib/site-packages"
+python -B -X utf8 -m scripts.talk_runtime serve --config "D:/claude-test/TALK-private/talk-runtime.json" --apply --detach
+```
+
+状态检查：`python -B -X utf8 -m scripts.talk_runtime status --config "D:/claude-test/TALK-private/talk-runtime.json"`；页面 `http://127.0.0.1:8000`。
+
+已知残留风险：若关机时宿主未正常退出，明天可能出现某宿主 `drain_marker_present`（小D 的
+`~/.talk/role-service-host/deepseek-next/prj_e8fe7066bbec/agent_deepseek/drain.request`），
+删掉该标记即可；若 `serve` 提示 `*_requires_review`，先确认没有旧 runtime 进程再清
+`runtime\*.request`。`reload-api` 的兜底修复已在 `3fc5320`，但要下次整套重启才生效。
+
+明日建议顺序：先 347/348 收尾（只读复核缺口再动手，涉及 DSH 凭据拒绝边界），再做运行器新版本提示（需先定"已适配版本"来源）。
+
 ## 下一步恢复顺序
 
 1. **347/2993 与 348/2994 的历史收尾**：整体仍未完成；348 两个 DSH 凭据拒绝边界仍缺修复/复验证据。原创建者为 `agent:codex`，收取需按其身份与权限执行；用户可决定是否重新派发。
