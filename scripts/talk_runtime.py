@@ -237,6 +237,7 @@ class TalkRuntime:
         self.worker_thread = None
         self.worker_error = None
         self.worker_completed_at = None
+        self.effort_refreshed = False
         self.activation_id = uuid.uuid4().hex
         self.startup_client = client
         self.startup_probe_client = client
@@ -542,6 +543,44 @@ class TalkRuntime:
             self.statuses[member] = {"state":"starting","pid":process.pid}
             self.event("host_started", context={"member_id": member, "child_pid": process.pid, "stage": "startup"})
 
+    def _dsh_reasoning_effort(self, member):
+        """读取 DSH 角色 patch 里的 reasoningEffort；没有就返回 None（不猜）。"""
+        import re
+        from pathlib import Path
+        root = Path(self.config["state_dir"]) / "native" / self.project / rsh._sanitize_token(member)
+        if not root.is_dir():
+            return None
+        for path in sorted(root.glob("model-*.patch.yml")):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            match = re.search(r"^\s*reasoningEffort:\s*([A-Za-z]+)\s*$", text, re.MULTILINE)
+            if match:
+                return match.group(1).strip().lower()
+        return None
+
+    def refresh_dsh_efforts(self, roles):
+        """启动时一次性把 DSH 角色的 patch 强度回填到绑定（尽力而为，失败只记事件）。"""
+        from urllib.parse import quote
+        for role in roles:
+            if (role.get("runner") or {}).get("runtime") != "dsh":
+                continue
+            member = role.get("member_id")
+            if not member:
+                continue
+            effort = self._dsh_reasoning_effort(member)
+            if not effort:
+                continue
+            try:
+                self.request(
+                    "POST",
+                    f"/api/projects/{quote(self.project, safe='')}/roles/{quote(member, safe='')}/binding/default-effort",
+                    {"default_effort": effort},
+                )
+            except Exception as exc:  # noqa: BLE001 - 刷新失败不影响宿主/服务
+                self.event("dsh_effort_refresh_failed", context={"member_id": member}, exc=exc)
+
     def reconcile_deletions(self, roles):
         from scripts.role_delete import cleanup
         from urllib.parse import quote
@@ -572,10 +611,33 @@ class TalkRuntime:
     def reload_api(self):
         if self.api is None:
             raise RuntimeErrorCode("runtime_api_not_owned")
-        self._stop_api()
+        try:
+            self._stop_api()
+        except RuntimeErrorCode as exc:
+            if getattr(exc, "code", None) != "runtime_api_stop_timeout":
+                raise
+            # 2026-10-30 实测：宿主长期保持 WebSocket，uvicorn 的优雅关闭会一直等连接，
+            # 旧 API 不退出就永远起不了新的（reload 标记反复重试）。reload 是受控重启，
+            # 超时后按进程结束旧子进程，API 无本地状态，客户端重连即可。
+            self._force_stop_api()
         self.start_api()
         self.wait_api()
         # Existing hosts/Popen owners deliberately remain untouched.
+
+    def _force_stop_api(self):
+        if self.api is None or self.api.poll() is not None:
+            return
+        try:
+            self.api.terminate()
+            self.api.wait(timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            try:
+                self.api.kill()
+                self.api.wait(timeout=10)
+            except (OSError, subprocess.TimeoutExpired):
+                raise RuntimeErrorCode("runtime_api_stop_timeout") from None
+        if self.api_control_file is not None and self.api_control_file.exists():
+            self.api_control_file.unlink()
 
     def _stop_api(self):
         if self.api and self.api.poll() is None:
@@ -762,6 +824,9 @@ class TalkRuntime:
                 roles = self.roles()
                 self.reconcile_deletions(roles)
                 self.reconcile_hosts(roles)
+                if not self.effort_refreshed:
+                    self.effort_refreshed = True
+                    self.refresh_dsh_efforts(roles)
             except (rsh.HostError, OSError, ValueError) as exc:
                 self.worker_error = getattr(exc, "code", None) or type(exc).__name__
                 self.event("runtime_exception", context={"stage": "serve", "error_code": self.worker_error}, exc=exc)

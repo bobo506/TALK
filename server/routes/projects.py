@@ -25,6 +25,7 @@ from server.role_deletions import RoleDeletion, public as deletion_public
 from server.role_startup import projection as startup_projection
 from server.db import begin_immediate_write, get_session
 from server.models import (
+    DEFAULT_EFFORT_VALUES,
     CHOICE_SOURCE_CREATION_OPERATION,
     CHOICE_SOURCE_CREATION_OPERATION_MISMATCH,
     CHOICE_SOURCE_LEGACY_ATTACH,
@@ -82,6 +83,7 @@ from server.models import (
     RoleBindingUpdate,
     RoleCreationOperation,
     RoleCredentialRotateOut,
+    RoleDefaultEffortUpdate,
     RoleCredentialRotation,
     RoleDescriptionUpdate,
     RoleLegacyAttachOperation,
@@ -826,6 +828,46 @@ def put_agent_role_binding(
         )
     )
     session.commit()
+    return _binding_response(project_id, target_member_id, session)
+
+
+@router.post(
+    "/{project_id}/roles/{member_id:path}/binding/default-effort",
+    response_model=RoleBindingResponse,
+)
+def set_agent_role_binding_effort(
+    project_id: str,
+    member_id: str,
+    body: RoleDefaultEffortUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """只更新已有绑定的默认思考强度（**仅 human**；本机运行器启动时回填用）。
+
+    - 不创建、不解除、不改 runner/model 六维，也不参与绑定有效性判定；
+    - 值只接受已知强度字面量，其它一律 422；绑定不存在 → 404；
+    - 与 Kimi 官方目录写入共用 ``DEFAULT_EFFORT_VALUES``，避免两处校验分叉。
+    """
+    _require_human(current)
+    _get_project(project_id, session)
+    target_member_id = member_id.strip()
+    binding = session.get(ProjectRoleBinding, (project_id, target_member_id))
+    if binding is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="role_binding_not_found"
+        )
+    value = body.default_effort.strip().lower()
+    if value not in DEFAULT_EFFORT_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="default_effort_invalid",
+        )
+    if binding.default_effort != value:
+        binding.default_effort = value
+        binding.updated_by = current.id
+        binding.updated_at = datetime.now(timezone.utc)
+        session.add(binding)
+        session.commit()
     return _binding_response(project_id, target_member_id, session)
 
 

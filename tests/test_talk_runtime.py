@@ -51,6 +51,61 @@ class RuntimeTests(unittest.TestCase):
     def spec(self,member="agent:one"):
         d=self.state/member.replace(":","_");d.mkdir(exist_ok=True)
         return {"member_id":member,"argv":[sys.executable,"fixture.py"],"health_file":str(d/"health.json"),"drain_file":str(d/"drain.request")}
+    def test_dsh_effort_refresh_reads_patch_and_posts_once(self):
+        native = self.state / "native" / "prj_fixture" / "agent_dsh"
+        native.mkdir(parents=True)
+        (native / "model-deepseek-flash.patch.yml").write_text(
+            "model:\n  reasoningEffort: MAX\n", encoding="utf-8"
+        )
+        self.runtime.refresh_dsh_efforts([
+            {"member_id": "agent:dsh", "runner": {"runtime": "dsh"}},
+            {"member_id": "agent:codex", "runner": {"runtime": "codex"}},
+            {"member_id": "agent:other", "runner": {"runtime": "dsh"}},
+        ])
+        posts = [
+            call
+            for call in self.client.calls
+            if call[0] == "POST" and "binding/default-effort" in call[1]
+        ]
+        self.assertEqual(
+            posts,
+            [
+                (
+                    "POST",
+                    "/api/projects/prj_fixture/roles/agent%3Adsh/binding/default-effort",
+                    {"default_effort": "max"},
+                )
+            ],
+        )
+
+    def test_dsh_effort_refresh_skips_roles_without_patch(self):
+        self.runtime.refresh_dsh_efforts([
+            {"member_id": "agent:nopatch", "runner": {"runtime": "dsh"}},
+        ])
+        self.assertEqual(
+            [
+                call
+                for call in self.client.calls
+                if "binding/default-effort" in call[1]
+            ],
+            [],
+        )
+
+    def test_dsh_effort_refresh_failure_does_not_raise(self):
+        native = self.state / "native" / "prj_fixture" / "agent_dsh"
+        native.mkdir(parents=True)
+        (native / "model-x.patch.yml").write_text("reasoningEffort: high\n", encoding="utf-8")
+        original = self.runtime.request
+        def boom(*args, **kwargs):
+            raise RuntimeError("offline")
+        self.runtime.request = boom
+        try:
+            self.runtime.refresh_dsh_efforts([
+                {"member_id": "agent:dsh", "runner": {"runtime": "dsh"}},
+            ])
+        finally:
+            self.runtime.request = original
+
     def role(self,member="agent:one",**service):return {"member_id":member,"service":service}
     def test_config_rejects_remote_inline_key_and_path_escape(self):
         self.write_config();self.assertEqual(runtime.load_config(self.path)["project_id"],"prj_fixture")
@@ -159,6 +214,26 @@ class RuntimeTests(unittest.TestCase):
         self.assertIsNone(owned["process"].poll())
         self.assertEqual(self.spawned[-1][0],"api")
         self.assertFalse((self.private/"owned.stop").exists())
+    def test_api_reload_falls_back_to_force_stop_when_graceful_times_out(self):
+        self.runtime.api = Process(77)
+        self.runtime.api_control_file = self.private / "owned.stop"
+        self.runtime.api_control_file.write_text("talk-runtime-stop\n", encoding="utf-8")
+        calls = {"count": 0}
+        def wait(timeout=None):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise subprocess.TimeoutExpired("fixture-api", timeout)
+            self.runtime.api.returncode = 1
+            return 0
+        self.runtime.api.wait = wait
+        terminated = []
+        self.runtime.api.terminate = lambda: terminated.append("terminate")
+        with patch.object(self.runtime, "wait_api"):
+            self.runtime.reload_api()
+        self.assertEqual(terminated, ["terminate"])
+        self.assertEqual(self.spawned[-1][0], "api")
+        self.assertFalse((self.private / "owned.stop").exists())
+
     def test_attached_api_readiness_and_shutdown_do_not_spawn_or_stop_external_api(self):
         attached = runtime.TalkRuntime(self.config, client=self.client, spawn=self.runtime.spawn_override, attach_api=True)
         attached.wait_api()

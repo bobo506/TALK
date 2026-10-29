@@ -185,6 +185,16 @@ class BindingApiTestCase(RouteTestCase):
                 f"/api/projects/{project_id}/agents", headers={"X-API-Key": key}
             )
 
+    def set_effort(
+        self, project_id: str, member_id: str, effort, *, key: str = "bobo-key"
+    ):
+        with self.make_client() as client:
+            return client.post(
+                f"/api/projects/{project_id}/roles/{encode(member_id)}/binding/default-effort",
+                headers={"X-API-Key": key},
+                json={"default_effort": effort},
+            )
+
     def delete_project(self, project_id: str, *, key: str = "bobo-key"):
         with self.make_client() as client:
             return client.delete(
@@ -430,6 +440,39 @@ class RoleBindingApiTests(BindingApiTestCase):
         single = self.get_binding("prj_b1a", "agent:worker").json()
         self.assertEqual(single["binding"], body["binding"])
         self.assertEqual(single["binding_state"], ROLE_BINDING_BOUND)
+
+    def test_default_effort_endpoint_only_updates_existing_binding(self):
+        self.register_project("prj_effort")
+        self.sync(
+            "prj_effort",
+            [{"member_id": "agent:worker"}, {"member_id": "agent:other"}],
+        )
+        self.register_runner()
+        created = self.put_binding("prj_effort", "agent:worker", self.binding_payload())
+        self.assertEqual(created.status_code, 200)
+
+        updated = self.set_effort("prj_effort", "agent:worker", "  XHIGH ")
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["binding"]["default_effort"], "xhigh")
+        self.assertEqual(updated.json()["binding_state"], ROLE_BINDING_BOUND)
+
+        # 只改强度，不动六维与指纹
+        before = updated.json()["binding"]
+        again = self.set_effort("prj_effort", "agent:worker", "max")
+        self.assertEqual(again.status_code, 200)
+        after = again.json()["binding"]
+        self.assertEqual(after["default_effort"], "max")
+        for field in ("runner_id", "model_id", "model_alias", "binding_fingerprint"):
+            self.assertEqual(after[field], before[field])
+
+        invalid = self.set_effort("prj_effort", "agent:worker", "turbo")
+        self.assertEqual(invalid.status_code, 422)
+        missing = self.set_effort("prj_effort", "agent:other", "high")
+        self.assertEqual(missing.status_code, 404)
+        forbidden = self.set_effort(
+            "prj_effort", "agent:worker", "high", key="worker-key"
+        )
+        self.assertEqual(forbidden.status_code, 403)
 
     def test_custom_api_source_and_alias_are_stored_verbatim(self):
         self.register_project("prj_custom")

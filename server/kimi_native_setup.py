@@ -16,6 +16,7 @@ from sqlmodel import Session, select
 
 from server import db
 from server.models import (
+    DEFAULT_EFFORT_VALUES,
     ProjectRole,
     RoleCreationOperation,
     RoleNativeSetup,
@@ -380,7 +381,7 @@ def _role_runtime(project_id: str, member_id: str, session: Session):
     return runner.runtime if runner is not None else None
 
 
-_DEFAULT_EFFORT_VALUES = {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+_DEFAULT_EFFORT_VALUES = DEFAULT_EFFORT_VALUES
 
 
 def _record_default_effort(project_id: str, member_id: str, effort) -> None:

@@ -4456,6 +4456,23 @@ class RoleBindingUpdate(BaseModel):
     binding: Optional[RoleBindingInput]
 
 
+class RoleDefaultEffortUpdate(BaseModel):
+    """``POST /api/projects/{project_id}/roles/{member_id}/binding/default-effort`` 请求体。
+
+    只更新已有绑定的思考强度事实：不接受 runner/model 维度，也不创建或解除绑定。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_effort: str
+
+
+# 与 kimi_native_setup 的写入校验共用同一集合，避免两处各写一份。
+DEFAULT_EFFORT_VALUES = frozenset(
+    {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+)
+
+
 class RoleBindingOut(BaseModel):
     """绑定读取输出（合同 §4.3）。
 
