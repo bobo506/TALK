@@ -1,5 +1,7 @@
 # MODULE: Agent Bridges
 
+> 2026-10-29：G-terra启动cli_incompatible已修。CodexRoleHost生成bridge argv遵循公共python -m入口合同，不再插入与预检冲突的解释器选项；46项关联测试及真实启动/关闭/再启动通过，未派模型任务，未外推完整任务验收。详[G-terra修复](G_TERRA_START_FIX_20261029.md)。
+
 > 2026-10-28 Terra首片349/350已复核并集成：Codex新角色保存后自动进入官方设备授权/模型准备；准备未完成保留pending，ready后只恢复pending并恰好一次自动启动，非pending不被复活。支持Codex CLI 0.164/0.163及官方默认强度，Terra按目录low落盘。共集成28个实现/测试/页面文件，正确根Node 111项通过；Windows ADMINI~1短路径差异为baseline同现的环境限制。真实登录/模型/生产加载/浏览器人验未执行，详[349复核](TERRA_ROLE_REVIEW_349_20261028.md)及[350复验与集成](TERRA_ROLE_REVIEW_350_20261028.md)。
 
 > 2026-10-26 339首审集中返修：用户明确授权取件后确认两项必须修正，显式start接入复核/返修同预算与stop/collect终态竞争已在C隔离源修正；244关联Python含6真实stdio协调自检过，原两正确性探针不改字节过。原339过程偏差保留，新复验请求全新会话和统一隔离入口；342 Kimi包M2-1已闭合，生产未加载。详[返修合同](INITIATOR_FOLLOWUP_FIX1_20261026.md)。

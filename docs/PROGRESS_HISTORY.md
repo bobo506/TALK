@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-10-29 15:33（Asia/Shanghai）— G-terra 启动修复与实际启停验收
+
+- 本片用户授权Codex本人处理、不派任务，并明确批准G-terra宿主正常排空、重新加载及启停。Git/GitHub交DeepSeek，本轮未执行或派发。
+- 页面确认授权/模型准备已完成、Terra/low，启动失败cli_incompatible。宿主生成的python -B -X utf8 -m不符合公共python -m预检合同；隔离修正前缀，新增review/tools、默认/显式预算、真实parser与诊断解析回归。
+- 46项关联unittest通过。首次9项Windows短路径失败原样保留，设置独立TEMP后原断言全部通过。256份快照保留，集成前核对2份源无漂移、集成后与候选一致且无行尾空白。
+- 仅G-terra宿主16440正常drain退出后由runtime重建1784；runtime13920和其余宿主PID不变。实际浏览器启动成功/18308 idle → 正常关闭/offline且进程退出 → 再启动成功/11340 idle，最终实例ins_e28faeceedf8保持运行，自启动选择false。
+- 未派模型任务、未做他人独立复核或全仓库测试；真实模型任务和完整任务链仍未验证。未读登录凭据/原生会话/无关日志，未强杀、清锁或解除归属。用户手册原启停步骤仍适用。
+- 348两个DSH凭据边界仍缺修复/复验证据；本会话补CLI配置与本片Codex启动修复都不能替代348安全验收。
+- 证据与命令见[本片记录](spec/G_TERRA_START_FIX_20261029.md)及.tmp/g-terra-start-fix-20261029/。产品/测试两文件和本片文档未提交，待DeepSeek后续Git收尾。
+
 ## 2026-10-29（Asia/Shanghai）— B1-a：存量补录角色接入恢复链
 
 - **授权**：用户在 B1-a/B1-b 中选择 B1-a（完整方案），并要求 WorkBuddy 旧角色不动（后续删除重建 k3.1-pro）。

@@ -119,6 +119,29 @@ class NewCodexRoleHostTests(unittest.TestCase):
             task_profile='review', codex_executable=str(self.root / 'codex.exe'), private=host.manager_directory(self.config['state_dir'], 'p', member),
             state_dir=Path(self.config['state_dir']), project_root=self.root / 'project')
 
+    def test_generated_bridge_argv_passes_real_host_preflight_parser(self):
+        from scripts import codex_role_setup as setup
+        from bridges import codex_bridge
+        for profile, timeout in [('review', None), ('tools', 123)]:
+            with self.subTest(profile=profile, timeout=timeout):
+                manager = self.manager()
+                manager.task_profile = profile
+                manager.execution_timeout_seconds = timeout
+                config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
+                with patch.object(manager, '_configuration', return_value=config), \
+                     patch.object(manager, 'child_environment', return_value={}), \
+                     patch.object(setup, 'require_version'), \
+                     patch('cli.profiles.load_profile', return_value={}), \
+                     patch('cli.profiles.compose_system_prompt', return_value='synthetic instructions'):
+                    argv, _, _ = manager.build_entry_argv('codex', 'gpt-6.1-terra')
+                fingerprint = host.rsh.verify_runtime_entry('codex', argv)
+                self.assertTrue(fingerprint.startswith('bridges.codex_bridge@'))
+                self.assertGreater(host.rsh.parse_unit_count(argv, 'codex'), 0)
+                parsed = codex_bridge.build_parser().parse_args(argv[3:])
+                self.assertEqual(parsed.timeout, timeout or 86400)
+                self.assertEqual(parsed.codex_execution_profile,
+                                 'tools' if profile == 'tools' else 'discussion')
+
     def test_claim_scope_and_drain_keep_only_own_stop_and_owned_handles(self):
         manager = self.manager()
         manager._handles['owned'] = object()

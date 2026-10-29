@@ -1,8 +1,10 @@
 # Project Progress
 
-Updated: 2026-10-29 下午（Asia/Shanghai）。大K仍负责决策与分配。已完成：角色页三项、官方思考强度落库与回填、绑定重置移位、**B1-a 旧角色恢复链**（合成用例通过，真实点击待验）。DSH/WorkBuddy 的强度只做到读取+脚本回填。
+Updated: 2026-10-29 15:33（Asia/Shanghai）。本片用户授权Codex本人修复G-terra启动、不派任务。官方授权/模型准备完成，cli_incompatible已修，真实启动→关闭→再启动通过，最终idle。46项关联测试通过；真实模型任务未验证。其余角色页/强度/B1-a进度保持。详[本片记录](spec/G_TERRA_START_FIX_20261029.md)。
 
 ## 当前身份与协作规则
+
+- 本会话实核身份agent:codex；本片按用户最新明确授权本人修复，不冒认上轮大K身份。Git/GitHub操作全部交DeepSeek；本轮未执行Git或派发，本片改动待后续提交。
 
 - 当前大K `agent:prj-e8fe7066bbec.k-d4bf0429`负责决策、拆包、分配和复核，明确保留，不得删除。旧成员`k-4bf013b9`的残留资源另行按归属清理。
 - 349/350由DeepSeek开发、大K复核并正常收取completed。首个完整切片完成后，后续新任务按用户约定转为Terra开发、DeepSeek复核，大K只做决策和分配，不自动开工。
@@ -25,13 +27,13 @@ Updated: 2026-10-29 下午（Asia/Shanghai）。大K仍负责决策与分配。�
 
 - 本日晚实测：`/healthz` 200（db/storage ok），8000端口监听PID `9660`，`uptime_sec≈3992`（约19:54重启），与12:00记录的PID `25440`已不同；`/api/tasks`未带Key返回422（路由正常，不再是500），未用真实凭据验证列表内容。
 - 大K角色自身仍显示`recovery_required`，不要据此解除归属或清理。
-- 新建`G-terra agent:prj-e8fe7066bbec.g-terra-cf9bbd88`绑定bound，但`role_native_setups.status=failed`、`error_code=native_cli_missing`，revision 5；没有服务状态、launch或实例。不能把绑定或宿主serving当成角色ready。
+- G-terra官方授权及模型准备完成，Terra/low。最终实例`ins_e28faeceedf8`/PID11340 idle；宿主16440正常换代1784，runtime13920与其他宿主PID不变。此前native_cli_missing失败已过时，本轮实际启停通过。
 - 旧`GPT agent:prj-e8fe7066bbec.gpt-79445c1f`仍offline、无实例、无`role_native_setups`准备记录；不要连续点击启动或擅自删除。
 - 当前API用系统Python+`PYTHONPATH=D:/claude-test/TALK;D:/claude-test/TALK/.venv/Lib/site-packages`，避免venv exe低完整性。生产配置、原生HOME、Key和既有角色未擅自修改。
 
 ## 旧任务与未解决项
 
-- **347/2993**：首次独立不通过结论保持，WorkBuddy等运行器和整体联调仍未完成；**348/2994**：用户口述（本会话未独立核实）Codex已修一轮——受管Codex配方固定npm包内0.164.0、补齐运行配置缺失的codex段，`native_cli_missing`已解决，现卡在官方登录授权。两项`created_by=agent:codex`，只能由Codex正常身份收取。
+- **347/2993**整体仍未完成；**348/2994**两个DSH凭据拒绝边界仍缺修复/复验证据。之前Codex仅补CLI运行配置，本轮仅修Codex启动前缀，均不是348安全修复。原创建者agent:codex，尚未收取；正常收取与业务验收通过须区分。
 - **旧角色兼容恢复（B1-a，2026-10-29 已实现，待真实点击验证）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作，此前无“绑定重置”。现按用户选定 B1-a 增加**恢复专用** legacy 分支：以已提交的`role_legacy_attach_operations`为锚点（choice_id 分别`rmc_b0b68705cd2f`/`rmc_3a5435e0e283`/`rmc_80be012402f1`），`choice_snapshot`按 choice_id 现读合成，**不写也不复用**`role_creation_operations`；`_require_provision_identity`与`require_completion_facts`都加了仅限 recover+匹配补录键的分支；`/agents`投影新增`credential_version`与`recoverable`。合成用例 5 项通过；真实旧角色尚未点过，需重启 API 后验证。
 - **DSH/WorkBuddy 强度接入只完成读取+回填**：WorkBuddy 的`models.json`有`reasoning.defaultEffort`（本机`max`），DSH 角色 patch 有`reasoningEffort: max`；但两类运行器没有模型配置写入器，无法“新建角色时写”，只能脚本回填。是否在角色启动时顺带刷新，待用户定。
 - **角色页面余项**：3b已随官方强度落库完成主要部分（余 DSH/WorkBuddy 的写入时机）；3d删除清理闭环、3g（已改为“保留按钮+移位置”并完成）状态见路线图。
@@ -40,8 +42,8 @@ Updated: 2026-10-29 下午（Asia/Shanghai）。大K仍负责决策与分配。�
 ## 下一步恢复顺序
 
 1. **验证 B1-a**：重启 API 后在小G/小D/小K详情点“绑定重置”，观察恢复请求、作业执行与完成回写是否全绿；若 worker 三步或完成校验报错，按稳定错误码定位。
-2. Codex侧完成Terra的官方设备授权/登录，随后真实创建角色并验证官方low与start-ready-stop/drain；这属环境与授权步骤，不由绑定或serving推断。
-3. 348/347由Codex正常身份收取收尾；两项凭据边界按用户口述已修，需独立核验后才能记通过。
+2. G-terra授权及实际启停已通过，后续真实模型任务/任务链按明确授权验证，本轮用户要求不派任务。
+3. 348凭据边界修复/复验与347剩余范围仍待完成，再由Codex正常身份处理历史收尾。
 4. DSH/WorkBuddy 的写入时机（启动刷新 or 仅脚本）与3d删除清理闭环按完整可验流程拆包，需用户确认后开工。
 5. 其余路线图条目见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
 

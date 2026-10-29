@@ -163,7 +163,8 @@ class CodexRoleHost(rsh.HostManager):
         task = command(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT,
             'workspace-write' if self.task_profile == 'tools' else 'read-only')
         precheck = command(cli_bridge.TASK_PREFLIGHT_SYSTEM_PROMPT, 'read-only')
-        argv = [sys.executable, '-B', '-X', 'utf8', '-m', 'bridges.codex_bridge',
+        # HostManager validates and parses the shared python -m entry contract.
+        argv = [sys.executable, '-m', 'bridges.codex_bridge',
             '--codex-command', message, '--codex-task-command', task,
             '--task-preflight-command', precheck, '--codex-execution-profile',
             'tools' if self.task_profile == 'tools' else 'discussion',
