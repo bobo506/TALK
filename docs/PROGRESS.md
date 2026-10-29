@@ -64,17 +64,16 @@ Updated: 2026-10-29 19:25（Asia/Shanghai）。本轮由 WorkBuddy 交付 B1 恢
 ## 旧任务与未解决项
 
 - **347/2993**整体仍未完成；**348/2994**两个DSH凭据拒绝边界仍缺修复/复验证据。之前Codex仅补CLI运行配置，本轮仅修Codex启动前缀，均不是348安全修复。原创建者agent:codex，尚未收取；正常收取与业务验收通过须区分。
-- **旧角色兼容恢复（B1-a 已实现；B1-b 补齐换凭据，2026-10-29）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作。B1-a 以已提交`role_legacy_attach_operations`为锚点（`rmc_b0b68705cd2f`/`rmc_3a5435e0e283`/`rmc_80be012402f1`），`choice_snapshot`现读合成，`_require_provision_identity`与`require_completion_facts`加 recover 分支，`/agents`投影出`credential_version`/`recoverable`，**不写也不复用**创建操作。B1-a 实机点击失败（rotate-key 拒绝 imported），B1-b 因此补：rotate-key 的 legacy 分支（必须带`request_key`+`lease_token`，锚点+代际+仅本项目引用四道门），并让已证明退出的历史实例不阻断（`ignore_exited_instances`，managed 路径不变）。合成用例 15 项通过；真实点击待用户在小K 执行，需**先停止角色**，换 Key 后重新启动才生效。
-- **DSH/WorkBuddy 强度接入只完成读取+回填**：WorkBuddy 的`models.json`有`reasoning.defaultEffort`（本机`max`），DSH 角色 patch 有`reasoningEffort: max`；但两类运行器没有模型配置写入器，无法“新建角色时写”，只能脚本回填。是否在角色启动时顺带刷新，待用户定。
-- **角色页面余项**：3b已随官方强度落库完成主要部分（余 DSH/WorkBuddy 的写入时机）；3d删除清理闭环、3g（已改为“保留按钮+移位置”并完成）状态见路线图。
+- **旧角色兼容恢复（B1-a/b/c/d 已完成并实机闭环，2026-10-29 晚）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作。B1-a 以已提交`role_legacy_attach_operations`为锚点，`choice_snapshot`现读合成；B1-b 补 rotate-key legacy 分支；B1-c 放行 preflight 的补录来源；B1-d 让作业侧预期绑定指纹回落请求快照。20:30/20:44/20:45 三次恢复全部`provisioned`，作业推进为`succeeded`，`credential_version`保持 2，用户确认小K 启停正常。
+- **DSH/WorkBuddy 强度接入只完成读取+回填**：WorkBuddy 的`models.json`有`reasoning.defaultEffort`（本机`max`），DSH 角色 patch 有`reasoningEffort: max`；两类运行器没有模型配置写入器，无法“新建角色时写”，只能脚本回填。是否在角色启动时顺带刷新，待用户定。旧 WorkBuddy 角色已删除，用户计划重建后再看。
+- **角色页面余项**：3d 删除清理闭环已完成（`da001a8`）并实机验收；外观模式（白天/夜间）已完成并推送（`bc3bba7`）。
 - 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
 ## 下一步恢复顺序
 
-1. **验证 B1-b**：先在小K页面停止该角色，再点“绑定重置”，确认请求`succeeded`、作业三步（profile/key_file/preflight，前者可能 skipped）与完成回写全绿；随后启动并确认新 Key 生效。若失败按稳定错误码定位（`rotate_legacy_roster_reference_refused`=跨项目名册引用，`rotate_identity_in_use`=仍有在用实例/任务）。
-2. G-terra授权及实际启停已通过，后续真实模型任务/任务链按明确授权验证，本轮用户要求不派任务。
-3. 348凭据边界修复/复验与347剩余范围仍待完成，再由Codex正常身份处理历史收尾。
-4. DSH/WorkBuddy 的写入时机（启动刷新 or 仅脚本）与3d删除清理闭环按完整可验流程拆包，需用户确认后开工。
-5. 其余路线图条目见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
+1. **347/2993 与 348/2994 的历史收尾**：整体仍未完成；348 两个 DSH 凭据拒绝边界仍缺修复/复验证据。原创建者为 `agent:codex`，收取需按其身份与权限执行；用户可决定是否重新派发。
+2. **DSH/WorkBuddy 强度写入时机**：待用户在“启动时刷新”与“仅脚本回填”之间决定；WorkBuddy 旧角色已删除，重建后再看。
+3. **缓存清理**：用户已明确优先级不高，暂缓；盘点结论见下（可安全清理约 40MB，大头是各 CLI 状态目录，不能按缓存删）。
+4. 路线图其余条目（会话窗口换新、任务列表按真实对话窗口、运行器新版本提示、主被动跟进、定时任务项目化、工作区登记）见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
 
 重开窗口后恢复指令：`继续项目`。历史细节见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。
