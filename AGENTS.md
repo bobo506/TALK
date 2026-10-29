@@ -18,7 +18,8 @@
 |---|---|
 | 当前状态、卡点、下一步 | [PROGRESS.md](docs/PROGRESS.md) |
 | 已完成切片的详细历史 | [PROGRESS_HISTORY.md](docs/PROGRESS_HISTORY.md) |
-| 当前交接总览 | [HANDOFF_20261028.md](docs/HANDOFF_20261028.md) |
+| 当前交接总览 | [HANDOFF_20261029.md](docs/HANDOFF_20261029.md) |
+| 上一轮交接（2026-10-28） | [HANDOFF_20261028.md](docs/HANDOFF_20261028.md) |
 | 后续待开发与可选项 | [DEVELOPMENT_ROADMAP.md](docs/spec/DEVELOPMENT_ROADMAP.md) |
 | 用户操作与协作亮点 | [USER_MANUAL.md](docs/guides/USER_MANUAL.md) |
 | 任务派发与结构化交付 | [TASK_WORKFLOW.md](docs/guides/TASK_WORKFLOW.md) |

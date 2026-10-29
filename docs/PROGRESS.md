@@ -1,6 +1,17 @@
 # Project Progress
 
-Updated: 2026-10-29 17:20（Asia/Shanghai）。本片由WorkBuddy按用户选定C方案实现B1-b：补录来源角色可在恢复意图下轮换一次凭据（rotate-key legacy分支），并让已证明退出的历史实例不再阻断换Key。合成用例15项通过；真实点击小K待用户执行（换Key后需重启该角色）。G-terra修复已由用户验证并提交`dfd0af1`；B1-a经实机复核发现真实点击失败（详见[设计文档](spec/ROLE_LEGACY_ATTACH_DESIGN.md)）。
+Updated: 2026-10-29 19:25（Asia/Shanghai）。本轮由 WorkBuddy 交付 B1 恢复链的 B1-b/B1-c 两个修正并补测（`39bf7e7`、`4fcfc45`），**整链仍未通过一次真实端到端验证**；服务当前停止，小K 因宿主与 worker 的 Key 目录不一致处于 `manager_failed`。用户已要求转交其他角色接续，完整交接见[HANDOFF_20261029.md](HANDOFF_20261029.md)。
+
+## 本轮未验收与阻塞（接手先读）
+
+- **B1 全链未通过**：请求创建、claim、`rotate-key`（Key 真落盘）、建作业、profile/key_file 已实证；
+  `preflight` 与完成回写未走通。B1-c 修了 preflight 两处，**但尚未在任何进程上加载验证**。
+- **小K 起不来**：宿主 argv 指向 `TALK-private\keys\agent_kimi.key`（32字节、10-17、已失效），
+  worker 写的是 `.talk\keys\agent_kimi.key`（44字节、10-29、有效）；宿主报 `Invalid API key` 8 次。
+  属 B1-b 的副作用，Key 路径统一方案（A 同步文件 / B 统一配置 / C 反向设 key_root）待定。
+- **服务停止**：`runtime state=stopped`、8000 无监听、宿主全部 stopped，需在正常 PowerShell 启动。
+- **`/api/tasks?project_id=...` 出现一次 500**，未定位。
+- 本地领先远程约 59 个提交，未推送。
 
 ## B1-c 现场事实（2026-10-29 18:36 实测后）
 

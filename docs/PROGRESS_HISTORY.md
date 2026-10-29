@@ -1,5 +1,24 @@
 # 开发历史 · TALK
 
+## 2026-10-29 19:25（Asia/Shanghai）— B1-c 修 preflight，并暴露 Key 路径不一致
+
+- 用户重启 API 后再点小K，`rotate-key` 已成功（17:36:07，201），`agent_kimi.key`（44字节）与
+  `credential.json` 落盘、`credential_version=2`、Key 与 DB 一致且对应 `agent:kimi`；作业已建，
+  `profile`/`key_file` 为 skipped，`preflight` 失败 `identity_mismatch`。
+- 定位两处遗留仍只认创建操作：`expected_binding_fingerprint()` 对无创建操作请求返回 None；
+  `_run_preflight_step` 的来源白名单只有 `creation_operation`（补录角色投影为 `legacy_attach`）。
+- B1-c 修正：指纹回落请求行 `choice_snapshot`；来源白名单扩为两者之一；逐对比对、六维校验、
+  身份档可读性校验全部保留。测试 `test_role_legacy_recover` 增至 16 项，连同
+  `test_role_provision_requests`、`test_role_provision_jobs` 共 80 项通过，提交 `4fcfc45`。
+- 重启过程发现两个新事实：
+  1. 宿主 argv 写死 `--role-key-file D:\claude-test\TALK-private\keys\agent_kimi.key`（32字节、
+     10-17、按值查库无成员=已失效），与 worker 写入的 `.talk\keys`（44字节、有效）不是同一目录。
+     B1-b 换 Key 只更新后者，宿主拿旧 Key 报 `Invalid API key` 8 次，小K 进入 `manager_failed`。
+  2. 在本 agent 环境内无法常驻启动服务：`--detach` 的 `CreateProcess` 报 WinError 5，
+     `Start-Process` 拉起的进程在命令结束后被回收；本轮一度导致 API 与 runtime 全部停止。
+- 未做：Key 路径统一（A/B/C 三方案待定）、`preflight` 及之后链路的真实验证、`/api/tasks` 500 定位。
+  服务截止记录时仍为 stopped，需用户在正常 PowerShell 启动。
+
 ## 2026-10-29 17:20（Asia/Shanghai）— B1-b：补录来源角色可在恢复意图下轮换一次凭据
 
 - 用户选定 C 方案（能修配置就修、Key 真失效才换一次），并明确不实现“恢复后自动重启”。本片由 WorkBuddy 实现，单写入方，产品改动集中在 `server/routes/projects.py` 与 `server/models.py`。
