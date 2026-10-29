@@ -17,7 +17,10 @@ from server.models import (
     RunnerModelChoice,
     RunnerRegistry,
 )
-from server.role_provision_requests import require_completion_facts
+from server.role_provision_requests import (
+    expected_binding_fingerprint,
+    require_completion_facts,
+)
 from tests.test_role_legacy_attach import OP_KEY, RUNNER_ID, LegacyAttachTestCase
 
 #: 复核补齐用例使用的恢复请求键与宿主标签（与原有 0001 号用例互不干扰）。
@@ -374,3 +377,16 @@ class LegacyRecoverTests(LegacyAttachTestCase):
         )
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["detail"], "rotate_not_managed_identity")
+
+    # ── 绑定指纹回落（B1-c）：补录来源没有创建操作时用请求快照 ─────────
+
+    def test_expected_binding_fingerprint_falls_back_to_request_snapshot(self):
+        request_key, _ = self.claim_recover()
+        with self.session() as session:
+            row = session.get(RoleProvisionRequestRow, request_key)
+            fingerprint = expected_binding_fingerprint(row, session)
+            snapshot_fingerprint = row.choice_snapshot["binding_fingerprint"]
+        # 必须给出 64 位指纹（否则 preflight 会当作"无法取得预期指纹"失败）。
+        self.assertIsInstance(fingerprint, str)
+        self.assertEqual(len(fingerprint), 64)
+        self.assertEqual(fingerprint, snapshot_fingerprint)

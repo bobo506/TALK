@@ -1842,7 +1842,10 @@ def _run_preflight_step(
         )
     # choice_source=creation_operation 由服务端按“当前绑定六维事实 == 创建操作所选 choice”
     # 现算，是绑定来源/指纹一致的权威证据；legacy/mismatch 一律不通过。
-    if choice_source != "creation_operation" or not (
+    # 2026-10-29 B1-c：补录来源（legacy_attach）的绑定同样可信——它由服务端按已提交
+    # 补录锚点现读合成，绝不按 model_id 反查。来源白名单因此从“仅创建操作”扩展为
+    # “创建操作或补录锚点”；下面的逐对指纹比较与绑定投影校验保持不变，仍是硬门槛。
+    if choice_source not in ("creation_operation", "legacy_attach") or not (
         isinstance(choice_id, str) and choice_id.strip()
     ) or choice_mismatch:
         return _step(

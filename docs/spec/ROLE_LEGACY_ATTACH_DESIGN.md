@@ -119,3 +119,28 @@ B1-a 交付后用户在小K（`agent:kimi`）点击“绑定重置”，页面�
 - 换 Key 后旧凭据立即失效；正在运行的实例必须关闭再启动才会读到新 Key（bridge 只在
   启动时把 `--key-file` 解析进内存）。本轮不实现“恢复后自动重启”。
 - 轮换仍受“同一意图最多一次”约束；重放返回 `reused=true` 且不返 Key。
+
+## 2026-10-29 preflight 放行补录来源（B1-c）
+
+B1-b 上线后用户重启 API 再点小K，`rotate-key` 已成功（201，Key 与凭据元数据已落盘，
+`credential_version=2`），但配置作业在 `preflight` 一步失败 `identity_mismatch`。
+只读核对日志与代码，确认两处仍是“只认创建操作”的遗留：
+
+1. `expected_binding_fingerprint()` 遇到无创建操作的请求直接返回 `None`，worker 因此
+   认为“无法取得预期绑定指纹”，preflight 无法完成逐对比较。
+2. `_run_preflight_step` 的绑定来源白名单只有 `creation_operation`；补录角色的投影
+   来源是 `legacy_attach`（B1-a 已如实标注），必然被拒。
+
+修正：
+
+- `expected_binding_fingerprint()`：无创建操作时回落用请求行自身的
+  `choice_snapshot.binding_fingerprint`（B1-a 由服务端按补录锚点现读合成后写入），
+  仍不按 `model_id` 反查；managed 路径优先取创建操作，行为不变。
+- `_run_preflight_step`：来源白名单扩为 `creation_operation` 或 `legacy_attach`；
+  后续的逐对指纹比较、绑定投影六维校验、身份档可读性校验全部保留，仍是硬门槛。
+
+验证：`tests/test_role_legacy_recover.py` 增至 16 项（新增指纹回落用例）；
+`test_role_provision_requests`、`test_role_provision_jobs` 合计 80 项通过。
+
+注意：`_run_preflight_step` 运行在宿主 worker 进程内，本片改的是
+`scripts/role_provision.py`，**必须重启整个后台（runtime/宿主）**才生效，只重启 API 不够。

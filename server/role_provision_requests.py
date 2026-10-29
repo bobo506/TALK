@@ -920,11 +920,18 @@ def is_claimable(
 def expected_binding_fingerprint(
     row: RoleProvisionRequestRow, session: Session
 ) -> Optional[str]:
-    """预期绑定指纹：已有成员用原创建操作的六维；未创建直接用意图快照。"""
+    """预期绑定指纹：已有成员用原创建操作的六维；未创建直接用意图快照。
+
+    2026-10-29 B1-c：补录来源的恢复没有创建操作，回落用**请求行自身**的
+    ``choice_snapshot.binding_fingerprint``（B1-a 按补录锚点现读合成、服务端写入），
+    仍然拒绝凭空猜测；managed 路径优先取创建操作，行为不变。
+    """
+    snapshot = row.choice_snapshot or {}
+    snapshot_value = snapshot.get("binding_fingerprint")
     if row.origin_operation_key:
         operation = session.get(RoleCreationOperation, row.origin_operation_key)
         if operation is None:
-            return None
+            return snapshot_value if isinstance(snapshot_value, str) else None
         choice = session.get(RunnerModelChoice, operation.choice_id)
         if choice is None:
             return None
@@ -939,9 +946,7 @@ def expected_binding_fingerprint(
                 "model_id": choice.model_id,
             }
         )
-    snapshot = row.choice_snapshot or {}
-    value = snapshot.get("binding_fingerprint")
-    return value if isinstance(value, str) else None
+    return snapshot_value if isinstance(snapshot_value, str) else None
 
 
 def request_projection(

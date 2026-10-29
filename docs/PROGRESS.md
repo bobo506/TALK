@@ -2,6 +2,13 @@
 
 Updated: 2026-10-29 17:20（Asia/Shanghai）。本片由WorkBuddy按用户选定C方案实现B1-b：补录来源角色可在恢复意图下轮换一次凭据（rotate-key legacy分支），并让已证明退出的历史实例不再阻断换Key。合成用例15项通过；真实点击小K待用户执行（换Key后需重启该角色）。G-terra修复已由用户验证并提交`dfd0af1`；B1-a经实机复核发现真实点击失败（详见[设计文档](spec/ROLE_LEGACY_ATTACH_DESIGN.md)）。
 
+## B1-c 现场事实（2026-10-29 18:36 实测后）
+
+- B1-b 生效：小K 恢复在 17:36:07 成功调用 `rotate-key` **201**，`agent_kimi.key` 与 `credential.json` 已落盘，`credential_version=2`（与 DB `api_key` 一致、身份为 `agent:kimi`）。
+- 但配置作业 `preflight` 失败 `identity_mismatch`：`expected_binding_fingerprint` 对无创建操作的请求返回 None；`preflight` 的绑定来源白名单只认 `creation_operation`（补录角色投影为 `legacy_attach`）。
+- B1-c 已修两处（指纹回落请求快照、来源白名单加 `legacy_attach`），`test_role_legacy_recover`/`test_role_provision_requests`/`test_role_provision_jobs` 共 80 项通过。
+- **生效前提：必须重启整个后台（runtime/宿主）**，因为 preflight 在 worker 进程内；只重启 API 不够。
+
 ## B1-b 现场事实（2026-10-29 下午）
 
 - 小K`agent:kimi`16:33的真实恢复请求为`failed`：claim后调`rotate-key`被409拒绝，`role_provision_jobs`零行。原B1-a只打通建请求/建作业/完成回写，换凭据动作无分支。
