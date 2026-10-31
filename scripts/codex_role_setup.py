@@ -18,6 +18,8 @@ from scripts.role_provision import acquire_lock, release_lock, lock_path_for
 
 ROOT = Path(__file__).resolve().parents[1]
 EFFORTS = {'minimal', 'low', 'medium', 'high', 'xhigh'}
+# 351-C：官方目录支持清单的规范顺序（与 Codex 适配器接受顺序一致），落库前统一排序。
+EFFORT_ORDER = ('minimal', 'low', 'medium', 'high', 'xhigh')
 IDENTIFIER = re.compile(r'[A-Za-z0-9_.:/-]{1,128}\Z')
 BASE_CONFIG = {'cli_auth_credentials_store': 'file', 'forced_login_method': 'chatgpt',
                'model_provider': 'openai'}
@@ -180,6 +182,10 @@ async def _model_effort(attempt):
                 supported = {r.get('reasoningEffort') for r in entry.get('supportedReasoningEfforts', []) if isinstance(r, dict)}
                 if effort not in EFFORTS or effort not in supported:
                     raise SetupError('native_model_configuration_required')
+                # 351-C：把官方目录的支持清单挂到 attempt 上，供服务端落库为可选项来源
+                # （catalog）。只在官方目录确实给出清单时设置，未给出保持 None（不猜）。
+                if supported:
+                    attempt.supported_efforts = [item for item in EFFORT_ORDER if item in supported]
                 return effort
             cursor = result.get('nextCursor')
             if cursor is None:

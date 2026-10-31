@@ -10,6 +10,8 @@ import shlex
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
+from urllib.parse import quote
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -159,6 +161,64 @@ def materialize_kimi_commands(
     return message_command, task_command, preflight_command
 
 
+def _effort_diagnostic(event: str) -> None:
+    """固定、有界的一行诊断；不回显配置内容或绑定细节。"""
+    try:
+        print("[Kimi bridge] " + event, file=sys.stderr, flush=True)
+    except (OSError, ValueError):
+        pass
+
+
+async def _binding_for(client: Any, project: str, member_id: str):
+    """读公开绑定（351-A 起含有效强度与能力来源）；失败返回 None，不阻断任务。"""
+    try:
+        rows = await client._request_json(
+            "GET", "/api/projects/" + quote(project, safe="") + "/agents"
+        )
+    except Exception:
+        _effort_diagnostic("kimi_effort_lookup_failed")
+        return None
+    if isinstance(rows, dict):
+        rows = rows.get("data")
+    if not isinstance(rows, list):
+        return None
+    matches = [row for row in rows if isinstance(row, dict) and row.get("member_id") == member_id]
+    return matches[0].get("binding") if len(matches) == 1 else None
+
+
+def make_effort_hook(client: Any, args: argparse.Namespace):
+    """351-D：每个任务执行前把生效强度写进角色自己的 config.toml。
+
+    只在能安全确定目标值时写入（用户覆盖 > 模型默认，且必须通过公开清单校验）；
+    读取失败/能力未知时保留原配置并留一行诊断，绝不猜档位。
+    """
+    from bridges.kimi_effort import apply_role_config_effort, resolve_target_effort
+
+    async def apply_effort(task: Any) -> None:
+        del task
+        project = str(
+            getattr(args, "project_id", None) or os.environ.get("TALK_PROJECT_ID") or ""
+        ).strip()
+        alias = getattr(args, "kimi_model", None)
+        home = os.environ.get("KIMI_CODE_HOME")
+        if not project or not isinstance(alias, str) or not alias.strip() or not home:
+            return
+        binding = await _binding_for(
+            client, project, cli_bridge.member_id_from_name(args.name)
+        )
+        target = resolve_target_effort(binding)
+        if target is None:
+            if isinstance(binding, dict) and binding.get("effort_override"):
+                _effort_diagnostic("kimi_effort_capability_unknown")
+            return
+        try:
+            apply_role_config_effort(Path(home) / "config.toml", alias, target)
+        except Exception:
+            _effort_diagnostic("kimi_effort_apply_failed")
+
+    return apply_effort
+
+
 async def run_bridge(args: argparse.Namespace) -> None:
     with tempfile.TemporaryDirectory(prefix="talk-kimi-bridge-") as temp_dir:
         message_command, task_command, preflight_command = materialize_kimi_commands(
@@ -169,6 +229,8 @@ async def run_bridge(args: argparse.Namespace) -> None:
         args.command = message_command
         args.task_command = task_command
         args.task_preflight_command = preflight_command
+        # 351-D：注册逐任务钩子；cli_bridge 在拿到 client 后构造它。
+        args.before_task_factory = make_effort_hook
         await cli_bridge.run_bridge(args)
 
 

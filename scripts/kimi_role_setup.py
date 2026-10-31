@@ -29,6 +29,19 @@ class SetupError(Exception):
     pass
 
 
+# 351-C：官方模型条目的支持清单规范顺序（落库与页面选项一致）。
+EFFORT_ORDER = ("minimal", "low", "medium", "high", "xhigh", "max", "ultra")
+
+
+def canonical_support_efforts(values):
+    """把模型条目的 ``support_efforts`` 规范成已知字面量列表（去重、固定顺序）。
+
+    只接受字符串且属于已知强度；其它一律丢弃，不猜、不补通用枚举。
+    """
+    known = {value.strip().lower() for value in values if isinstance(value, str)}
+    return [item for item in EFFORT_ORDER if item in known]
+
+
 def _read_json(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
@@ -351,11 +364,19 @@ def finish_native_login(attempt: NativeLoginAttempt) -> str:
             lambda: _source_if_present(attempt.source, binding), allow_login_generated=not attempt.was_present)
         # 2026-10-28：模型条目里的官方默认强度挂到 attempt 上，供服务端落库展示；
         # 读取失败不影响准备结果，只是不显示强度。
+        # 351-C：把同一份条目的 support_efforts 也挂上，供服务端落库为 catalog 来源的
+        # 可选项清单；缺失/非法时保持 None（不猜档位）。
         try:
             with (attempt.kimi_home / "config.toml").open("rb") as stream:
                 entry = (tomllib.load(stream).get("models") or {}).get(binding[0])
-            if isinstance(entry, dict) and isinstance(entry.get("default_effort"), str):
-                attempt.default_effort = entry["default_effort"]
+            if isinstance(entry, dict):
+                if isinstance(entry.get("default_effort"), str):
+                    attempt.default_effort = entry["default_effort"]
+                supported = entry.get("support_efforts")
+                if isinstance(supported, list):
+                    canon = canonical_support_efforts(supported)
+                    if canon:
+                        attempt.supported_efforts = canon
         except Exception:
             pass
         db.rollback()

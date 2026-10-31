@@ -310,7 +310,13 @@ class NativeSetupManager:
             _attempt_adapter(attempt).finish_native_login(attempt)
             if self._current(key, token):
                 # 2026-10-28：把官方目录返回的默认强度落库，供角色列表展示；取不到保持 NULL。
-                _record_default_effort(project_id, member_id, getattr(attempt, "default_effort", None))
+                # 351-C：同一份目录的支持清单一并落库，作为 catalog 来源的可选项。
+                _record_default_effort(
+                    project_id,
+                    member_id,
+                    getattr(attempt, "default_effort", None),
+                    getattr(attempt, "supported_efforts", None),
+                )
                 self._update(project_id, member_id, status="ready", token=token)
         except Exception as exc:
             if self._current(key, token):
@@ -384,22 +390,29 @@ def _role_runtime(project_id: str, member_id: str, session: Session):
 _DEFAULT_EFFORT_VALUES = DEFAULT_EFFORT_VALUES
 
 
-def _record_default_effort(project_id: str, member_id: str, effort) -> None:
-    """把准备阶段从官方模型目录取回的默认思考强度写回绑定行（只用于展示）。
+def _record_default_effort(project_id: str, member_id: str, effort, supported=None) -> None:
+    """把准备阶段从官方模型目录取回的思考强度事实写回绑定行。
 
-    - 只接受已知强度字面量；取不到或不认识时保持 NULL，列表不显示强度，不猜、不回退展示名；
+    - ``effort``：模型默认强度（展示与“跟随模型默认”用）；
+    - ``supported``：同一份目录给出的支持清单（351-C 起落库为 ``catalog`` 来源的可选项），
+      缺失/非法时写 NULL，页面回落到运行器适配事实或禁用，不猜档位；
+    - 只接受已知强度字面量；取不到或不认识时保持 NULL，不猜、不回退展示名；
     - 不参与六维指纹、绑定有效性与启停判定；绑定行不存在（已删除）时静默跳过。
     """
-    from server.models import ProjectRoleBinding
+    from server.models import ProjectRoleBinding, serialize_supported_efforts
 
     value = effort.strip().lower() if isinstance(effort, str) else ""
     if value not in _DEFAULT_EFFORT_VALUES:
         value = None
+    capabilities = serialize_supported_efforts(supported)
     with Session(db.engine) as session:
         binding = session.get(ProjectRoleBinding, (project_id, member_id))
-        if binding is None or binding.default_effort == value:
+        if binding is None:
+            return
+        if binding.default_effort == value and binding.supported_efforts == capabilities:
             return
         binding.default_effort = value
+        binding.supported_efforts = capabilities
         session.add(binding)
         session.commit()
 

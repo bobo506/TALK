@@ -151,6 +151,17 @@ class CodexSetupTests(unittest.TestCase):
         self.assertEqual(self.metadata(attempt,[{'data':[],'nextCursor':'next'},
             {'data':[{'model':'selected-exact-model','defaultReasoningEffort':'medium',
                 'supportedReasoningEfforts':[{'reasoningEffort':'medium'},{'reasoningEffort':'xhigh'}]}], 'nextCursor':None}]),'medium')
+        # 351-C：官方目录的支持清单按适配器顺序挂到 attempt，供服务端落库为 catalog 来源。
+        self.assertEqual(attempt.supported_efforts, ['medium', 'xhigh'])
+
+    def test_catalog_support_list_is_canonical_and_unknown_values_are_dropped(self):
+        attempt=self.begin()
+        effort=self.metadata(attempt,[{'data':[{'model':'selected-exact-model',
+            'defaultReasoningEffort':'high','supportedReasoningEfforts':[
+                {'reasoningEffort':'high'},{'reasoningEffort':'turbo'},
+                {'reasoningEffort':'minimal'},{'reasoningEffort':'high'}]}], 'nextCursor':None}])
+        self.assertEqual(effort,'high')
+        self.assertEqual(attempt.supported_efforts,['minimal','high'])
 
     def test_missing_official_default_does_not_fall_back_to_local_xhigh(self):
         attempt=self.begin()

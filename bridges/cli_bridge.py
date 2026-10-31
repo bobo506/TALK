@@ -4634,6 +4634,19 @@ async def handle_incoming_message(
             os.environ.pop("TALK_DEFERRED_FILE", None)
 
 
+async def run_before_task(args: argparse.Namespace, task: Mapping[str, Any]) -> None:
+    """351-D：执行任务前的可选钩子（同步或异步）。
+
+    钩子只接收 ``task``；未注册时是空操作，既有运行器行为完全不变。
+    """
+    hook = getattr(args, "before_task", None)
+    if hook is None:
+        return
+    result = hook(task)
+    if hasattr(result, "__await__"):
+        await result
+
+
 async def run_task_queue_worker(
     *,
     client: Any,
@@ -4762,6 +4775,9 @@ async def run_task_queue_worker(
                         preflight_attempt = (
                             failure[0] if failure is not None else 0
                         ) + 1
+                        # 351-D：运行器可选钩子（如 Kimi 把生效强度写进角色配置），
+                        # 在执行本任务前调用；未注册时是空操作。
+                        await run_before_task(args, task)
                         try:
                             await handle_queued_task(
                                 task,
@@ -5029,6 +5045,11 @@ async def run_bridge(args: argparse.Namespace) -> None:
     args.task_preflight_command = resolve_task_preflight_command(args)
     client = TalkClient(args.base_url, args.key, poll_interval=args.poll_interval,
                         start_from_latest=bool(getattr(args, "launch_id", None)))
+    # 351-D：运行器可注册“每个任务执行前”的钩子（Kimi 用它把生效强度写进角色配置）。
+    # 工厂在拿到 client 之后调用，钩子只拿 task；没有注册时行为完全不变。
+    _hook_factory = getattr(args, "before_task_factory", None)
+    if _hook_factory is not None:
+        args.before_task = _hook_factory(client, args)
     instance_id = args.instance_id or f"{member_id}:{uuid4()}"
     host = socket.gethostname()
     # R1-3 受管关联：只有宿主显式传入 ``--launch-id`` 时才附加 project/launch/进程身份，
