@@ -22,7 +22,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from bridges import cli_bridge
+from bridges.codex_effort import EffortUnavailable, apply_effort, resolve_binding_effort
 from cli.profiles import compose_system_prompt, load_profile
+from urllib.parse import quote
 
 _MCP_SERVER_PATH = str(PROJECT_ROOT / "bridges" / "talk_send_mcp.py").replace("\\", "/")
 CODEX_SYSTEM_INSTRUCTIONS = cli_bridge.FUNCTION_CALLING_SYSTEM_PROMPT
@@ -277,6 +279,48 @@ async def run_codex_command(
     return await cli_bridge.run_cli_command(command, prompt, cwd=cwd, timeout=timeout)
 
 
+def _effort_diagnostic(event: str) -> None:
+    """固定、有界的一行诊断；不回显绑定内容或命令。"""
+    try:
+        print("[Codex bridge] " + event, file=sys.stderr, flush=True)
+    except (OSError, ValueError):
+        pass
+
+
+async def resolve_task_effort(client: Any, task: dict[str, Any], member_id: str) -> str | None:
+    """按公开绑定事实取**本次执行**应使用的思考强度（351-B）。
+
+    - 只读 ``GET /api/projects/{id}/roles`` 的公开 ``binding``，不读私有配置；
+    - 旧服务没有 351-A 字段时返回 ``None``，继续用启动时烘焙的值（行为不变）；
+    - 查询失败/能力未知时记一行诊断并返回 ``None``，不阻断任务，也不编造档位。
+    """
+    project = task.get("project_id")
+    if not isinstance(project, str) or not project:
+        return None
+    try:
+        rows = await client._request_json("GET", "/api/projects/" + quote(project, safe="") + "/roles")
+    except Exception:
+        _effort_diagnostic("codex_effort_lookup_failed")
+        return None
+    if isinstance(rows, dict):
+        rows = rows.get("data")
+    if not isinstance(rows, list):
+        return None
+    matches = [row for row in rows if isinstance(row, dict) and row.get("member_id") == member_id]
+    if len(matches) != 1:
+        return None
+    binding = matches[0].get("binding")
+    if not isinstance(binding, dict) or "effective_effort" not in binding:
+        # 旧服务/未提供新字段：保持既有行为。
+        return None
+    try:
+        effort, _source = resolve_binding_effort(binding, None)
+    except EffortUnavailable as exc:
+        _effort_diagnostic(exc.reason)
+        return None
+    return effort
+
+
 async def handle_queued_task(
     task: dict[str, Any],
     *,
@@ -301,6 +345,13 @@ async def handle_queued_task(
         prompt_transport: str = "stdin",
     ) -> CodexRunResult:
         del prompt_transport
+        # 351-B：每次执行前按公开绑定重取强度并写回命令，使角色详情页的修改作用于
+        # **下一次执行**，无需重启角色服务；命令形态不认识时原样执行并留诊断。
+        effort = await resolve_task_effort(client, task, member_id)
+        if effort is not None:
+            command, mode = apply_effort(command, effort)
+            if mode == "unchanged":
+                _effort_diagnostic("codex_effort_command_unrecognized")
         return await run_codex_command(command, prompt, cwd=cwd, timeout=timeout)
 
     return await cli_bridge.handle_queued_task(

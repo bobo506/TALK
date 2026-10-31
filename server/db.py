@@ -406,6 +406,16 @@ def init_db() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE project_role_bindings ADD COLUMN default_effort TEXT"
             )
+        # 2026-10-31（351-A）：用户覆盖的思考强度与可校验支持清单。旧行保持 NULL：
+        # 前者 = 跟随模型默认，后者 = 能力未知（页面如实禁用，不猜选项）。
+        if "effort_override" not in binding_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE project_role_bindings ADD COLUMN effort_override TEXT"
+            )
+        if "supported_efforts" not in binding_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE project_role_bindings ADD COLUMN supported_efforts TEXT"
+            )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_member_id ON group_members (member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_role ON group_members (role)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_group_members_business_role ON group_members (business_role)")

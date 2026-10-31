@@ -784,6 +784,13 @@ class ProjectRoleBinding(SQLModel, table=True):
     # 2026-10-28：准备流程从官方模型目录取回的默认思考强度（公开展示用，可空）。
     # 不参与六维内容指纹，也不参与绑定有效性判定；旧行/未准备行保持 NULL。
     default_effort: Optional[str] = None
+    # 2026-10-31（351-A）：角色详情页由有权限的真人显式覆盖的思考强度。
+    # NULL = 跟随模型默认（不改写 default_effort）；与 default_effort 分离：宿主/准备流程的
+    # 默认值回填**不得**覆盖本列，否则用户选择会被静默丢弃。同样不参与六维指纹与有效性判定。
+    effort_override: Optional[str] = None
+    # 2026-10-31（351-A）：可校验的支持强度清单（JSON 数组文本，canonical 顺序）。
+    # 只允许两类来源：官方模型目录（准备阶段）或运行器适配事实；NULL = 能力未知，不猜。
+    supported_efforts: Optional[str] = None
     updated_by: str
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -2195,6 +2202,9 @@ def build_role_binding_out(facts: Optional[dict]) -> Optional["RoleBindingOut"]:
     if not facts or not facts.get("binding_exists"):
         return None
     runtime, runner_display_name, runner_status = _derived_runner_fields(facts)
+    # 2026-10-31（351-A）：思考强度三元事实（用户覆盖 / 模型默认 / 可选清单与来源）由同一
+    # 纯函数派生，列表与详情、写入响应共用一套口径，不在前端重复实现能力规则。
+    effort = resolve_role_effort(facts)
     return RoleBindingOut(
         runner_id=facts.get("runner_id"),
         runtime=runtime,
@@ -2207,6 +2217,10 @@ def build_role_binding_out(facts: Optional[dict]) -> Optional["RoleBindingOut"]:
         model_alias=facts.get("model_alias"),
         model_display_name=facts.get("model_display_name"),
         default_effort=facts.get("default_effort"),
+        effort_override=effort["effort_override"],
+        effective_effort=effort["effective_effort"],
+        effort_options=effort["effort_options"],
+        effort_source=effort["effort_source"],
         binding_state=resolve_role_binding_state(facts),
         binding_fingerprint=binding_fingerprint(facts),
         updated_by=facts.get("updated_by"),
@@ -2223,7 +2237,9 @@ _BINDING_FACTS_SQL_ANCHOR = (
 )
 
 # 以下 SQL 原文与合同 §7.3 / 计划 §2.3 的 fenced SQL 逐字符一致
-# （sha256 = a812ee474b4710f5eac29f773fb02f39dec70201c3fdd0abc66709f7b17f0f1e，2484 字符）。
+# （2026-10-31 351-A 增加 effort_override / supported_efforts 两列后，
+#  sha256 = 659d905ba49745d257d9a4a8ab0339721022222fa15494939b530e6739f5019c，2598 字符；
+#  原 28 列 2484 字符的 sha256 a812ee47… 是加列前历史值，不再对应当前 SQL）。
 _BINDING_FACTS_SQL_BODY = """
 SELECT
     req.project_id                                   AS requested_project_id,
@@ -2252,6 +2268,8 @@ SELECT
     b.model_alias                                    AS model_alias,
     b.model_display_name                             AS model_display_name,
     b.default_effort                                 AS default_effort,
+    b.effort_override                                AS effort_override,
+    b.supported_efforts                              AS supported_efforts,
     b.updated_by                                     AS updated_by,
     b.updated_at                                     AS updated_at
 FROM requested AS req
@@ -2263,7 +2281,8 @@ LEFT JOIN runner_registry       AS r  ON r.runner_id   = b.runner_id;"""
 
 BINDING_FACTS_SQL = _BINDING_FACTS_SQL_ANCHOR + _BINDING_FACTS_SQL_BODY
 
-# 28 个唯一列别名（顺序与 SQL 一致）；无项目分支用它构造全 null 事实。
+# 30 个唯一列别名（顺序与 SQL 一致）；无项目分支用它构造全 null 事实。
+# 2026-10-31（351-A）：原 28 列 + effort_override / supported_efforts。
 BINDING_FACTS_COLUMNS = (
     "requested_project_id",
     "requested_member_id",
@@ -2291,6 +2310,8 @@ BINDING_FACTS_COLUMNS = (
     "model_alias",
     "model_display_name",
     "default_effort",
+    "effort_override",
+    "supported_efforts",
     "updated_by",
     "updated_at",
 )
@@ -4473,6 +4494,118 @@ DEFAULT_EFFORT_VALUES = frozenset(
 )
 
 
+class RoleEffortOverrideUpdate(BaseModel):
+    """``PUT /api/projects/{project_id}/roles/{member_id}/binding/effort`` 请求体。
+
+    ``effort`` 是**必填键**（无默认值 = required but nullable）：显式 ``null`` 或空串 =
+    清除用户覆盖、恢复跟随模型默认；其余只接受已知强度字面量，未知字段 → 422。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    effort: Optional[str]
+
+
+# 2026-10-31（351-A）：canonical 顺序；存储与选项都按此排序，避免不同来源顺序不一致。
+DEFAULT_EFFORT_ORDER = (
+    "none",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra",
+)
+
+# 运行器适配器**实际接受并会传给 CLI** 的强度集合（已有适配事实）。仅在绑定没有官方目录
+# 清单可用时作为“运行器级”候选来源，界面须如实标注来源，不能当成所有模型都支持。
+# codex 项与 bridges/codex_execution_native.py 的 CodexNative 校验集合一致；
+# 351-B 让执行侧成为唯一来源后，本表退化为兜底事实。
+RUNNER_ADAPTER_EFFORT_VALUES = {
+    "codex": frozenset({"minimal", "low", "medium", "high", "xhigh"}),
+}
+
+EFFORT_SOURCE_CATALOG = "catalog"
+EFFORT_SOURCE_ADAPTER = "adapter"
+
+
+def canonical_effort_values(values) -> list[str]:
+    """把任意来源的强度清单规范成 canonical 顺序的已知字面量列表（去重、忽略未知）。"""
+    if not isinstance(values, (list, tuple, set, frozenset)):
+        return []
+    normalized = set()
+    for value in values:
+        if isinstance(value, str):
+            item = value.strip().lower()
+            if item in DEFAULT_EFFORT_VALUES:
+                normalized.add(item)
+    return [item for item in DEFAULT_EFFORT_ORDER if item in normalized]
+
+
+def parse_supported_efforts(raw) -> Optional[list[str]]:
+    """解析库里 ``supported_efforts`` JSON 文本。
+
+    ``None`` = 能力未知（字段缺失/空/非法 JSON/非数组一律未知，不猜）；
+    ``[]`` = 已确认清单为空（页面如实禁用，不用默认值兜底）。
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, list):
+        return None
+    return canonical_effort_values(data)
+
+
+def serialize_supported_efforts(values) -> Optional[str]:
+    """把清单写成 canonical JSON 文本；空清单/``None`` → ``None``（不写 ``[]`` 冒充已确认）。"""
+    canonical = canonical_effort_values(values)
+    if not canonical:
+        return None
+    return json.dumps(canonical, ensure_ascii=False)
+
+
+def resolve_role_effort(facts: Optional[dict]) -> dict:
+    """派生一个绑定的思考强度三元事实：用户覆盖 / 模型默认 / 可选清单与来源。
+
+    - ``effort_override``：用户显式设置值，``None`` 表示跟随模型默认；
+    - ``default_effort``：准备阶段官方目录写回的模型默认事实（系统回填，不覆盖覆盖值）；
+    - ``effective_effort``：``override ?? default``，只表达“下一次执行将采用的选择”，
+      **不是执行证据**（实际是否按此执行由执行链路证据回答，见 351-B）；
+    - ``effort_options`` / ``effort_source``：可选项只来自官方目录（``catalog``）或运行器
+      适配事实（``adapter``）；两者都没有时如实为空列表 + ``None``，不拿通用枚举凑数。
+    """
+    facts = facts or {}
+    override_raw = facts.get("effort_override")
+    override = override_raw.strip().lower() if isinstance(override_raw, str) else ""
+    override = override if override in DEFAULT_EFFORT_VALUES else None
+    default_raw = facts.get("default_effort")
+    default = default_raw.strip().lower() if isinstance(default_raw, str) else ""
+    default = default if default in DEFAULT_EFFORT_VALUES else None
+    supported = parse_supported_efforts(facts.get("supported_efforts"))
+    if supported is not None:
+        options, source = supported, EFFORT_SOURCE_CATALOG
+    else:
+        runtime = facts.get("runtime")
+        adapter = (
+            RUNNER_ADAPTER_EFFORT_VALUES.get(runtime)
+            if isinstance(runtime, str)
+            else None
+        )
+        options = canonical_effort_values(adapter) if adapter else []
+        source = EFFORT_SOURCE_ADAPTER if adapter else None
+    return {
+        "default_effort": default,
+        "effort_override": override,
+        "effective_effort": override or default,
+        "effort_options": options,
+        "effort_source": source,
+    }
+
+
 class RoleBindingOut(BaseModel):
     """绑定读取输出（合同 §4.3）。
 
@@ -4492,6 +4625,13 @@ class RoleBindingOut(BaseModel):
     model_alias: Optional[str] = None
     model_display_name: Optional[str] = None
     default_effort: Optional[str] = None
+    # 2026-10-31（351-A）：用户覆盖值（NULL = 跟随模型默认）与“下一次执行将采用”的生效值。
+    # effective_effort 只表示配置选择，**不是**执行证据。
+    effort_override: Optional[str] = None
+    effective_effort: Optional[str] = None
+    # 可选项只来自官方目录（catalog）或运行器适配事实（adapter）；都没有时为空 + None。
+    effort_options: list[str] = []
+    effort_source: Optional[str] = None
     binding_state: Optional[str] = None
     binding_fingerprint: Optional[str] = None
     updated_by: Optional[str] = None

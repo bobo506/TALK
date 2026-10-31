@@ -924,10 +924,24 @@ function roleBindingModelText(row, missing) {
 // 展示名里的“· xhigh”这类后缀只从模型名中剥掉，不再当作强度来源（旧行不会凭空多出强度）。
 // 没有官方值时整项省略、不显示“未知”，也不据别名/成员名/运行实例猜值。
 const ROLE_BINDING_THINKING_STRENGTHS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+// 2026-10-31（351-A）：思考强度三元事实（用户覆盖 / 模型默认 / 生效值）。
+// 服务端在 binding 上下发 effective_effort、effort_options 与 effort_source；旧服务只给
+// default_effort 时仍按默认值展示，且不猜可选项（options 为空 == 能力未知）。
+// list 与详情共用这一份派生，避免两处各算一套“当前强度”。
+function roleBindingEffortFacts(row) {
+  const override = roleBindingText(row.effort_override);
+  const fallback = roleBindingText(row.default_effort);
+  const effective = roleBindingText(row.effective_effort) || override || fallback;
+  const options = Array.isArray(row.effort_options)
+    ? row.effort_options.filter(value => typeof value === "string" && ROLE_BINDING_THINKING_STRENGTHS.has(value.toLowerCase()))
+    : [];
+  return { override, fallback, effective, options, source: roleBindingText(row.effort_source) };
+}
 function roleBindingModelAndStrength(row) {
   const display = roleBindingText(row.model_display_name);
   const model = roleBindingModelText(row, null);
-  const strength = roleBindingText(row.default_effort) || null;
+  const effort = roleBindingEffortFacts(row);
+  const strength = roleBindingText(effort.effective);
   let modelName = model;
   if (display) {
     const cut = display.lastIndexOf("·");
@@ -935,7 +949,8 @@ function roleBindingModelAndStrength(row) {
     const tail = cut >= 0 ? display.slice(cut + 1).trim() : "";
     if (head && tail && ROLE_BINDING_THINKING_STRENGTHS.has(tail.toLowerCase())) modelName = head;
   }
-  return { modelName, strength };
+  // 用户覆盖时标注来源，让列表也能区分“用户设置”与“模型默认”；未覆盖时保持旧格式。
+  return { modelName, strength: strength && effort.override ? `${strength}（用户设置）` : strength };
 }
 function workspaceRoleBindingSummary(agent) {
   const row = roleBindingRow(agent);
@@ -1746,8 +1761,116 @@ function workspaceRoleStartupPanel(role) {
   if (error) panel.appendChild(workspaceEl("p", "role-service-hint error", error));
   return panel;
 }
+// ── 2026-10-31（351-A）角色详情页思考强度设置 ─────────────────────────────
+// 只写用户覆盖值（effort_override），与准备阶段回填的模型默认值（default_effort）分离；
+// 可选项与来源全部来自服务端 binding（catalog/adapter），页面不自行推断能力。
+// 保存走 PUT /api/projects/{id}/roles/{member}/binding/effort；成功后只更新本次角色行的
+// binding，再由列表/详情共同重绘，不发额外读请求。
+const roleEffortUI = { context: null, busy: new Map(), errors: new Map() };
+function roleEffortContext() {
+  const key = JSON.stringify([activeProjectId, myId]);
+  if (roleEffortUI.context !== key) {
+    roleEffortUI.context = key;
+    roleEffortUI.busy = new Map();
+    roleEffortUI.errors = new Map();
+  }
+  return key;
+}
+function roleEffortErrorMessage(status) {
+  return ({
+    401: "登录已失效，请重新登录后重试。",
+    403: "当前账号没有修改思考强度的权限。",
+    404: "角色绑定不存在或已被移除，请刷新后重试。",
+    409: "暂时无法校验该模型支持哪些强度，请先完成官方模型准备后再试。",
+    422: "该强度不在当前模型/运行器支持的范围内。",
+  })[status] || "保存失败，请重试。";
+}
+async function saveRoleEffort(memberId, value) {
+  const context = roleEffortContext(), project = activeProjectId, account = myId;
+  const role = projectAgents.find(item => item.member_id === memberId);
+  if (!currentMemberIsHuman() || !role || role.archived || role.deletion || roleEffortUI.busy.has(memberId)) return;
+  const token = {};
+  roleEffortUI.busy.set(memberId, token);
+  roleEffortUI.errors.delete(memberId);
+  renderWorkspaceRoleDetails();
+  const current = () => context === roleEffortUI.context && project === activeProjectId
+    && account === myId && roleEffortUI.busy.get(memberId) === token;
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(project)}/roles/${encodeURIComponent(memberId)}/binding/effort`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      // 空值显式提交 null：清除覆盖、恢复跟随模型默认；不省略字段（字段必填、可为 null）。
+      body: JSON.stringify({ effort: value ? String(value) : null }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!current()) return;
+    if (!res.ok || !data || typeof data !== "object" || !data.binding) {
+      roleEffortUI.errors.set(memberId, roleEffortErrorMessage(res.status));
+    } else {
+      const present = projectAgents.find(item => item.member_id === memberId);
+      if (present) { present.binding = data.binding; present.binding_state = data.binding_state; }
+    }
+  } catch (_) {
+    if (current()) roleEffortUI.errors.set(memberId, "保存失败，请检查连接后重试。");
+  } finally {
+    if (current()) {
+      roleEffortUI.busy.delete(memberId);
+      renderWorkspaceList();
+      renderWorkspaceRoleDetails();
+    }
+  }
+}
+function workspaceRoleEffortControl(role) {
+  roleEffortContext();
+  const binding = roleBindingRow(role);
+  // 没有绑定行就没有可设置的执行配置；旧服务未提供 binding 时同样不渲染。
+  if (!binding.supported || !binding.present) return null;
+  const effort = roleBindingEffortFacts(binding.row);
+  const selectable = effort.options.length > 0;
+  const editable = selectable && currentMemberIsHuman() && role.archived !== true
+    && !role.deletion && role.binding_state === "bound";
+  const box = workspaceEl("div", "role-effort-control");
+  const choice = workspaceEl("label", "role-effort-choice");
+  const select = workspaceEl("select", "role-effort-select");
+  select.id = `role-effort-select-${String(role.member_id).replace(/[^A-Za-z0-9_-]/g, "-")}`;
+  select.setAttribute("aria-label", "思考强度");
+  // 生效值不在当前支持清单内（准备后目录变动）时，仍如实显示当前设置，避免下拉“漂移”成别的值。
+  if (effort.override && !effort.options.includes(effort.override)) {
+    const option = workspaceEl("option", "", `${effort.override}（当前设置，支持清单未包含）`);
+    option.value = effort.override;
+    select.appendChild(option);
+  }
+  const follow = workspaceEl("option", "", effort.fallback ? `跟随模型默认（${effort.fallback}）` : "跟随模型默认（未记录）");
+  follow.value = "";
+  select.appendChild(follow);
+  for (const value of effort.options) {
+    const option = workspaceEl("option", "", value);
+    option.value = value;
+    select.appendChild(option);
+  }
+  select.value = effort.override || "";
+  select.disabled = !editable || roleEffortUI.busy.has(role.member_id);
+  if (editable) select.title = "修改该角色下一次执行使用的思考强度";
+  select.addEventListener("change", () => saveRoleEffort(role.member_id, select.value));
+  choice.append(workspaceEl("span", "role-effort-label", "思考强度"), select);
+  box.appendChild(choice);
+  // 三种事实分别如实呈现：用户覆盖、模型默认、生效值（生效值不是执行证据，执行证据见后续切片）。
+  const hints = [];
+  hints.push(effort.override ? `用户设置：${effort.override}` : "跟随模型默认");
+  hints.push(effort.fallback ? `模型默认：${effort.fallback}` : "模型默认：未记录");
+  if (!selectable) hints.push("该运行器/模型未提供可校验的支持清单，暂不能修改。");
+  else if (effort.source === "adapter") hints.push("可选值来自运行器支持的强度，未按官方模型目录逐项校验。");
+  else if (effort.source === "catalog") hints.push("可选值来自官方模型目录。");
+  if (selectable && role.binding_state !== "bound") hints.push("绑定当前无效，修复绑定后才能修改。");
+  box.appendChild(workspaceEl("span", "role-effort-hint", hints.join(" · ")));
+  const error = roleEffortUI.errors.get(role.member_id);
+  if (error) box.appendChild(workspaceEl("span", "role-effort-error", error));
+  return box;
+}
 function renderWorkspaceRoleDetails() {
   roleStartupContext();
+  // 2026-10-31（351-A）：思考强度的保存中/错误状态同样按 账号+项目 隔离，切换上下文即丢弃。
+  roleEffortContext();
   // ROLE-DESC-F1 修正（#137/N4）：角色详情拆为名称区与参与任务区两个动态容器，
   // 静态说明编辑区（index.html 居中独立）位于两者之间；replaceChildren 只触碰这两个容器，
   // 绝不经过说明区——编辑区节点、内容与焦点在轮询重绘时天然保持。
@@ -1785,6 +1908,10 @@ function renderWorkspaceRoleDetails() {
   if (!role) { namePanel.classList.add("hidden"); tasksPanel.classList.add("hidden"); return; } // 防御：失效选择由 workspaceSettingsSelected 回退到项目设置
   const nameHeading = workspaceEl("div", "role-name-heading");
   nameHeading.appendChild(workspaceEl("h2", "", workspaceMemberName(role.member_id)));
+  // 2026-10-31（351-A）：思考强度控件放在大号角色名称右侧、名称编辑按钮之前；
+  // 没有绑定行时返回 null，保持旧角色详情结构不变。
+  const effortControl = workspaceRoleEffortControl(role);
+  if (effortControl) nameHeading.appendChild(effortControl);
   if (currentMemberIsHuman() && role.archived !== true) {
     const edit = workspaceButton("", () => openRoleNameEditor(role), "icon-action subtle role-name-edit");
     edit.id = "role-name-edit"; edit.title = "修改角色名称"; edit.setAttribute("aria-label", "修改角色名称");

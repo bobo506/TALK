@@ -84,6 +84,7 @@ from server.models import (
     RoleCreationOperation,
     RoleCredentialRotateOut,
     RoleDefaultEffortUpdate,
+    RoleEffortOverrideUpdate,
     RoleCredentialRotation,
     RoleDescriptionUpdate,
     RoleLegacyAttachOperation,
@@ -126,6 +127,7 @@ from server.models import (
     read_role_binding_facts,
     read_role_binding_facts_batch,
     resolve_role_binding_state,
+    resolve_role_effort,
     role_binding_dimension_facts,
     serialize_provision_job,
 )
@@ -808,7 +810,11 @@ def put_agent_role_binding(
         "model_display_name": binding.model_display_name,
         # 2026-10-28：绑定（重）写时清空旧的官方强度，等新选择真正准备完成后由
         # 原生准备流程写回，避免把上一个模型的强度留在新绑定上。
+        # 2026-10-31（351-A）：换模型后旧的用户覆盖与旧模型的能力清单同样作废——
+        # 沿用到新模型就是拿旧模型的事实冒充新模型的可用性。
         "default_effort": None,
+        "effort_override": None,
+        "supported_efforts": None,
         "updated_by": current.id,
         "updated_at": now,
     }
@@ -864,6 +870,88 @@ def set_agent_role_binding_effort(
         )
     if binding.default_effort != value:
         binding.default_effort = value
+        binding.updated_by = current.id
+        binding.updated_at = datetime.now(timezone.utc)
+        session.add(binding)
+        session.commit()
+    return _binding_response(project_id, target_member_id, session)
+
+
+@router.put(
+    "/{project_id}/roles/{member_id:path}/binding/effort",
+    response_model=RoleBindingResponse,
+)
+def set_agent_role_binding_effort_override(
+    project_id: str,
+    member_id: str,
+    body: RoleEffortOverrideUpdate,
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """设置/清除角色绑定的**用户覆盖**思考强度（**仅 human**；角色详情页使用）。
+
+    与 ``default-effort`` 的分工（2026-10-31，351-A）：
+
+    - ``default-effort`` 是准备阶段官方目录写回的**模型默认事实**，宿主启动时会回填；
+    - 本接口写 ``effort_override``，只由有权限的真人设置，**不会被默认值回填覆盖**；
+    - ``null`` / 空串 = 清除覆盖、恢复跟随模型默认（不需要能力清单，随时可做）；
+    - 非空值必须同时满足：已知强度字面量（否则 422 ``effort_value_invalid``）、
+      能力来源已知（否则 409 ``effort_capability_unknown``，不猜可用值）、
+      在可选项内（否则 422 ``effort_not_supported``）；
+    - 不创建/解除绑定、不改六维与指纹、不参与有效性判定，也不改 ``default_effort``。
+    - 并发语义与既有 ``default-effort`` 一致：单列最后写入生效（``updated_by`` /
+      ``updated_at`` 如实记录），不引入新 CAS。
+    """
+    _require_human(current)
+    _get_project(project_id, session)
+    target_member_id = member_id.strip()
+    binding = session.get(ProjectRoleBinding, (project_id, target_member_id))
+    if binding is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="role_binding_not_found"
+        )
+    runner = (
+        session.get(RunnerRegistry, binding.runner_id)
+        if isinstance(binding.runner_id, str) and binding.runner_id
+        else None
+    )
+    # 能力来源只认“官方目录清单”或“运行器适配事实”，两者都由同一纯函数裁决，
+    # 页面不自行拼接选项，避免前后端各算一套。
+    resolved = resolve_role_effort(
+        {
+            "runtime": runner.runtime if runner is not None else None,
+            "default_effort": binding.default_effort,
+            "effort_override": binding.effort_override,
+            "supported_efforts": binding.supported_efforts,
+        }
+    )
+    raw = body.effort
+    value = raw.strip().lower() if isinstance(raw, str) else ""
+    if not value:
+        if binding.effort_override is not None:
+            binding.effort_override = None
+            binding.updated_by = current.id
+            binding.updated_at = datetime.now(timezone.utc)
+            session.add(binding)
+            session.commit()
+        return _binding_response(project_id, target_member_id, session)
+    if value not in DEFAULT_EFFORT_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="effort_value_invalid",
+        )
+    if resolved["effort_source"] is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="effort_capability_unknown",
+        )
+    if value not in resolved["effort_options"]:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="effort_not_supported",
+        )
+    if binding.effort_override != value:
+        binding.effort_override = value
         binding.updated_by = current.id
         binding.updated_at = datetime.now(timezone.utc)
         session.add(binding)

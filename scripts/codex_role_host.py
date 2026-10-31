@@ -125,7 +125,13 @@ class CodexRoleHost(rsh.HostManager):
         return binding
 
     def _configuration(self, alias):
+        """返回 ``(config, effort)``：native 配置 + 本次执行应使用的强度。
+
+        351-B：强度按公开绑定事实解析（用户覆盖 > 模型默认 > native 配置值），
+        与 351-A 的写入/展示口径一致；无法安全确定时明确失败，不静默降级。
+        """
         from scripts.codex_role_setup import read_config, EFFORTS
+        from bridges.codex_effort import EffortUnavailable, resolve_binding_effort
         home = self.store.native_home_dir(self.project, self.member)
         if rsh.lock_path_for(home / 'codex-role-setup').exists():
             raise rsh.HostError('codex_setup_in_progress', '请等待角色官方授权完成')
@@ -138,7 +144,14 @@ class CodexRoleHost(rsh.HostManager):
                 raise ValueError()
         except (OSError, ValueError, RuntimeError):
             raise rsh.HostError('codex_role_setup_required', '请先完成该角色的官方授权和模型准备') from None
-        return config
+        try:
+            effort, source = resolve_binding_effort(binding, config['model_reasoning_effort'])
+        except EffortUnavailable as exc:
+            reason = exc.reason
+            if reason == 'codex_effort_capability_unknown':
+                raise rsh.HostError(reason, '无法校验该角色支持的思考强度，请先完成官方模型准备后再试') from None
+            raise rsh.HostError(reason, '当前思考强度不被该 Codex 适配器支持，请在角色详情改回受支持的档位') from None
+        return config, effort
 
     def build_entry_argv(self, runtime, model_alias):
         if runtime != 'codex':
@@ -147,7 +160,7 @@ class CodexRoleHost(rsh.HostManager):
         from bridges import cli_bridge
         from cli.profiles import compose_system_prompt, load_profile
         from scripts.codex_role_setup import require_version, SetupError
-        config = self._configuration(model_alias)
+        config, effort = self._configuration(model_alias)
         try:
             require_version(self.codex_executable, self.project_root, self.child_environment(self.project, self.member))
         except SetupError:
@@ -157,7 +170,7 @@ class CodexRoleHost(rsh.HostManager):
             return shlex.join([self.codex_executable, '-a', 'never', '--strict-config', 'exec',
                 '--model', config['model'], '--sandbox', sandbox, '--color', 'never',
                 '--skip-git-repo-check', '--ignore-rules',
-                '-c', 'model_reasoning_effort=' + json.dumps(config['model_reasoning_effort']),
+                '-c', 'model_reasoning_effort=' + json.dumps(effort),
                 '-c', 'base_instructions=' + json.dumps(compose_system_prompt(prompt, profile)), '-'])
         message = command(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT, 'read-only')
         task = command(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT,
