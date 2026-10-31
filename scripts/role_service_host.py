@@ -383,6 +383,39 @@ def _sanitize_token(value: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Windows API 绑定：进程内只初始化一次（背景见 docs/spec/MEMORY_LEAK_DIAGNOSIS_20261031.md）
+#
+# 早先每次调用都重新 ``WinDLL`` / 重设原型 / 现场定义结构体类，这些类型对象会被
+# ctypes 引用住、GC 不回收；宿主每轮健康写入都走这些路径，内存按调用次数线性增长。
+# 这里只共享 DLL 句柄、函数原型与 Structure 类；句柄/缓冲区仍由各次调用独立创建。
+# ---------------------------------------------------------------------------
+_WINDOWS = os.name == "nt"
+if _WINDOWS:  # pragma: no cover - 平台分支
+    import ctypes as _ctypes
+    from ctypes import wintypes as _wt
+
+    _kernel32 = _ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class _FileTime(_ctypes.Structure):
+        _fields_ = [("low", _wt.DWORD), ("high", _wt.DWORD)]
+
+    _kernel32.OpenProcess.argtypes = [_wt.DWORD, _wt.BOOL, _wt.DWORD]
+    _kernel32.OpenProcess.restype = _wt.HANDLE
+    _kernel32.GetProcessTimes.argtypes = [
+        _wt.HANDLE,
+        _ctypes.c_void_p,
+        _ctypes.c_void_p,
+        _ctypes.c_void_p,
+        _ctypes.c_void_p,
+    ]
+    _kernel32.GetProcessTimes.restype = _wt.BOOL
+    _kernel32.CloseHandle.argtypes = [_wt.HANDLE]
+    _kernel32.CloseHandle.restype = _wt.BOOL
+    _kernel32.CreateDirectoryW.argtypes = [_wt.LPCWSTR, _ctypes.c_void_p]
+    _kernel32.CreateDirectoryW.restype = _wt.BOOL
+
+
 def process_creation_time(pid: int) -> Optional[float]:
     """进程真实创建时刻（epoch 秒）；无法取得时返回 ``None``。
 
@@ -392,26 +425,7 @@ def process_creation_time(pid: int) -> Optional[float]:
     """
     if os.name == "nt":  # pragma: no cover - 平台相关，测试在 Windows 上实测
         try:
-            import ctypes
-            from ctypes import wintypes
-
-            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-            kernel32.OpenProcess.restype = wintypes.HANDLE
-            kernel32.GetProcessTimes.argtypes = [
-                wintypes.HANDLE,
-                ctypes.c_void_p,
-                ctypes.c_void_p,
-                ctypes.c_void_p,
-                ctypes.c_void_p,
-            ]
-            kernel32.GetProcessTimes.restype = wintypes.BOOL
-            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-
-            class _FileTime(ctypes.Structure):
-                _fields_ = [("low", wintypes.DWORD), ("high", wintypes.DWORD)]
-
-            handle = kernel32.OpenProcess(0x1000, False, int(pid))
+            handle = _kernel32.OpenProcess(0x1000, False, int(pid))
             if not handle:
                 return None
             try:
@@ -419,18 +433,18 @@ def process_creation_time(pid: int) -> Optional[float]:
                 exit_time = _FileTime()
                 kernel = _FileTime()
                 user = _FileTime()
-                if not kernel32.GetProcessTimes(
+                if not _kernel32.GetProcessTimes(
                     handle,
-                    ctypes.byref(creation),
-                    ctypes.byref(exit_time),
-                    ctypes.byref(kernel),
-                    ctypes.byref(user),
+                    _ctypes.byref(creation),
+                    _ctypes.byref(exit_time),
+                    _ctypes.byref(kernel),
+                    _ctypes.byref(user),
                 ):
                     return None
                 ticks = (creation.high << 32) | creation.low
                 return ticks / 10_000_000.0 - 11_644_473_600.0
             finally:
-                kernel32.CloseHandle(handle)
+                _kernel32.CloseHandle(handle)
         except Exception:  # pragma: no cover - 受限环境按“无 OS 证据”处理
             return None
     try:  # pragma: no cover - POSIX
@@ -457,18 +471,15 @@ def _windows_create_dir_with_private_acl(path: Path) -> None:
     逐记录的私有 ACL 文件里（复用 R1-2 已验流程）。该函数保留以便人类在受支持的宿主
     上显式开启目录级私有 ACL 时复用，当前实现不调用它。
     """
-    import ctypes
-    from ctypes import wintypes
-
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.CreateDirectoryW.argtypes = [wintypes.LPCWSTR, ctypes.c_void_p]
-    kernel32.CreateDirectoryW.restype = wintypes.BOOL
-    attributes, keepalive = _windows_build_private_security_attributes()
+    if not _WINDOWS:  # pragma: no cover - 平台分支
+        raise HostError("state_dir_insecure", "仅 Windows 支持私有目录 ACL")
+    security = _windows_build_private_security_attributes()
     try:
-        ok = kernel32.CreateDirectoryW(str(path), ctypes.byref(attributes))
-        error = ctypes.get_last_error()
+        ok = _kernel32.CreateDirectoryW(str(path), _ctypes.byref(security.attributes))
+        error = _ctypes.get_last_error()
     finally:
-        del keepalive
+        # 本次调用独占的 SID/描述符在成功后立即归还，不跨调用保留。
+        security.close()
     if not ok and error != 183:  # ERROR_ALREADY_EXISTS：已存在，交给调用方核验
         raise HostError("state_dir_insecure", "无法创建私有状态目录")
 

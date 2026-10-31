@@ -105,33 +105,61 @@ def wait_for_stop(private, expected, seconds, *, clock=time.monotonic, sleeper=t
         sleeper(min(.2, remaining))
 
 
+# Windows 进程快照绑定：进程内只初始化一次（背景见
+# docs/spec/MEMORY_LEAK_DIAGNOSIS_20261031.md）。早先在每次调用里现场定义
+# Structure 类并重新 WinDLL，类型对象被 ctypes 引用住、GC 不回收，按调用次数增长。
+if os.name == "nt":  # pragma: no cover - 平台分支
+    import ctypes as _ctypes
+    from ctypes import wintypes as _wt
+
+    _kernel32 = _ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class _ProcessEntry(_ctypes.Structure):
+        _fields_ = [
+            ("dwSize", _wt.DWORD),
+            ("cntUsage", _wt.DWORD),
+            ("pid", _wt.DWORD),
+            ("heap", _ctypes.c_size_t),
+            ("module", _wt.DWORD),
+            ("threads", _wt.DWORD),
+            ("parent", _wt.DWORD),
+            ("priority", _wt.LONG),
+            ("flags", _wt.DWORD),
+            ("exe", _wt.WCHAR * 260),
+        ]
+
+    _kernel32.CreateToolhelp32Snapshot.argtypes = [_wt.DWORD, _wt.DWORD]
+    _kernel32.CreateToolhelp32Snapshot.restype = _wt.HANDLE
+    _kernel32.Process32FirstW.argtypes = [
+        _wt.HANDLE,
+        _ctypes.POINTER(_ProcessEntry),
+    ]
+    _kernel32.Process32FirstW.restype = _wt.BOOL
+    _kernel32.Process32NextW.argtypes = [
+        _wt.HANDLE,
+        _ctypes.POINTER(_ProcessEntry),
+    ]
+    _kernel32.Process32NextW.restype = _wt.BOOL
+    _kernel32.CloseHandle.argtypes = [_wt.HANDLE]
+    _kernel32.CloseHandle.restype = _wt.BOOL
+
+
 def process_parents():
     """Read only PID ancestry (never command lines or credentials)."""
     if os.name!="nt":
         return {}
-    import ctypes
-    from ctypes import wintypes as w
-    class Entry(ctypes.Structure):
-        _fields_=[("dwSize",w.DWORD),("cntUsage",w.DWORD),("pid",w.DWORD),
-            ("heap",ctypes.c_size_t),("module",w.DWORD),("threads",w.DWORD),
-            ("parent",w.DWORD),("priority",w.LONG),("flags",w.DWORD),("exe",w.WCHAR*260)]
-    k=ctypes.WinDLL("kernel32",use_last_error=True)
-    k.CreateToolhelp32Snapshot.argtypes=[w.DWORD,w.DWORD];k.CreateToolhelp32Snapshot.restype=w.HANDLE
-    k.Process32FirstW.argtypes=[w.HANDLE,ctypes.POINTER(Entry)];k.Process32FirstW.restype=w.BOOL
-    k.Process32NextW.argtypes=[w.HANDLE,ctypes.POINTER(Entry)];k.Process32NextW.restype=w.BOOL
-    k.CloseHandle.argtypes=[w.HANDLE];k.CloseHandle.restype=w.BOOL
-    handle=k.CreateToolhelp32Snapshot(2,0)
-    if handle==ctypes.c_void_p(-1).value:
+    handle=_kernel32.CreateToolhelp32Snapshot(2,0)
+    if handle==_ctypes.c_void_p(-1).value:
         return {}
     try:
-        row=Entry();row.dwSize=ctypes.sizeof(row);parents={}
-        more=k.Process32FirstW(handle,ctypes.byref(row))
+        row=_ProcessEntry();row.dwSize=_ctypes.sizeof(row);parents={}
+        more=_kernel32.Process32FirstW(handle,_ctypes.byref(row))
         while more:
             parents[row.pid]=row.parent
-            more=k.Process32NextW(handle,ctypes.byref(row))
+            more=_kernel32.Process32NextW(handle,_ctypes.byref(row))
         return parents
     finally:
-        k.CloseHandle(handle)
+        _kernel32.CloseHandle(handle)
 
 
 def is_owned_descendant(original_pid, reported_pid, parents):

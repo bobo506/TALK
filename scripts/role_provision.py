@@ -43,6 +43,7 @@ import secrets
 import stat
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -718,28 +719,225 @@ def _read_lock_record(lock_path: Path) -> Optional[Mapping[str, Any]]:
     return record if isinstance(record, Mapping) else None
 
 
+# ---------------------------------------------------------------------------
+# Windows API 绑定：整个进程只初始化一次
+#
+# 背景见 docs/spec/MEMORY_LEAK_DIAGNOSIS_20261031.md：早先每次调用都重新
+# ``ctypes.WinDLL(...)`` + 重设 argtypes + 现场定义 Structure 类。这些类型与原型
+# 对象会被 ctypes 引用住、GC 不回收；健康文件每秒写若干次时，内存按调用次数线性
+# 增长（实测每次发布约 55 KB）。这里把「不可变定义」与「每次调用的数据」分开：
+#
+#   - 本段（模块加载时执行一次）：DLL 句柄、函数原型、Structure 类；
+#   - 各函数内部：句柄、缓冲区、指针、SECURITY_ATTRIBUTES 实例仍然每次独立创建，
+#     并在 finally 中释放，包括 ConvertStringSidToSidW / ConvertSidToStringSidW
+#     返回、必须由 LocalFree 回收的 SID/字符串内存。
+# ---------------------------------------------------------------------------
+_WINDOWS = os.name == "nt"
+if _WINDOWS:  # pragma: no cover - 平台分支，Windows 上由真实调用覆盖
+    from ctypes import wintypes as _wt
+
+    _kernel32 = None
+    _advapi32 = None
+
+    class _SidAndAttributes(ctypes.Structure):
+        _fields_ = [("Sid", ctypes.c_void_p), ("Attributes", _wt.DWORD)]
+
+    class _TokenUser(ctypes.Structure):
+        _fields_ = [("User", _SidAndAttributes)]
+
+    class _SecurityAttributes(ctypes.Structure):
+        _fields_ = [
+            ("nLength", _wt.DWORD),
+            ("lpSecurityDescriptor", ctypes.c_void_p),
+            ("bInheritHandle", _wt.BOOL),
+        ]
+
+    class _AclSizeInformation(ctypes.Structure):
+        _fields_ = [
+            ("AceCount", _wt.DWORD),
+            ("AclBytesInUse", _wt.DWORD),
+            ("AclBytesFree", _wt.DWORD),
+        ]
+
+    class _AceHeader(ctypes.Structure):
+        _fields_ = [
+            ("AceType", ctypes.c_ubyte),
+            ("AceFlags", ctypes.c_ubyte),
+            ("AceSize", ctypes.c_ushort),
+        ]
+
+    class _WindowsPrivateSecurity:
+        """一次调用独占的私有 DACL 载体；``close()`` 释放本调用借的系统内存。
+
+        只保存「本次调用」的数据（ACL/描述符缓冲区、SID 指针），不缓存到模块级；
+        ``close()`` 幂等，异常路径与成功路径都由调用方在 finally 里调用。
+        """
+
+        __slots__ = ("attributes", "_keepalive", "_sids", "_closed")
+
+        def __init__(self, attributes, keepalive, sids):
+            self.attributes = attributes
+            self._keepalive = keepalive
+            self._sids = tuple(sids)
+            self._closed = False
+
+        def close(self) -> None:
+            if self._closed:
+                return
+            self._closed = True
+            for sid in self._sids:
+                if sid:
+                    _kernel32.LocalFree(sid)
+            self._sids = ()
+            self._keepalive = ()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            self.close()
+            return False
+
+    _win_lock = threading.Lock()
+
+    def _win():
+        """惰性建立 Windows DLL 绑定；进程内只建一次，之后复用。
+
+        刻意不在 import 时建：保持 ``ctypes.WinDLL`` 在首次使用前仍可被替换
+        （G4 中断用例在真实 CreateFile 与 WriteFile 之间注入屏障）。双检锁保证
+        多线程首次调用只建一份，``_kernel32`` 最后赋值，先看到它即视为已就绪。
+        """
+        global _kernel32, _advapi32
+        if _kernel32 is not None:
+            return _kernel32, _advapi32
+        with _win_lock:
+            if _kernel32 is not None:
+                return _kernel32, _advapi32
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [_wt.DWORD, _wt.BOOL, _wt.DWORD]
+            kernel32.OpenProcess.restype = _wt.HANDLE
+            kernel32.GetExitCodeProcess.argtypes = [
+                _wt.HANDLE,
+                ctypes.POINTER(_wt.DWORD),
+            ]
+            kernel32.GetExitCodeProcess.restype = _wt.BOOL
+            kernel32.CloseHandle.argtypes = [_wt.HANDLE]
+            kernel32.CloseHandle.restype = _wt.BOOL
+            kernel32.GetCurrentProcess.restype = _wt.HANDLE
+            kernel32.LocalFree.argtypes = [ctypes.c_void_p]
+            kernel32.LocalFree.restype = ctypes.c_void_p
+            kernel32.CreateFileW.argtypes = [
+                _wt.LPCWSTR,
+                _wt.DWORD,
+                _wt.DWORD,
+                ctypes.c_void_p,
+                _wt.DWORD,
+                _wt.DWORD,
+                _wt.HANDLE,
+            ]
+            kernel32.CreateFileW.restype = _wt.HANDLE
+            kernel32.WriteFile.argtypes = [
+                _wt.HANDLE,
+                ctypes.c_void_p,
+                _wt.DWORD,
+                ctypes.POINTER(_wt.DWORD),
+                ctypes.c_void_p,
+            ]
+            kernel32.WriteFile.restype = _wt.BOOL
+            kernel32.FlushFileBuffers.argtypes = [_wt.HANDLE]
+            kernel32.FlushFileBuffers.restype = _wt.BOOL
+
+            advapi32.OpenProcessToken.argtypes = [
+                _wt.HANDLE,
+                _wt.DWORD,
+                ctypes.POINTER(_wt.HANDLE),
+            ]
+            advapi32.OpenProcessToken.restype = _wt.BOOL
+            advapi32.GetTokenInformation.argtypes = [
+                _wt.HANDLE,
+                ctypes.c_int,
+                ctypes.c_void_p,
+                _wt.DWORD,
+                ctypes.POINTER(_wt.DWORD),
+            ]
+            advapi32.GetTokenInformation.restype = _wt.BOOL
+            advapi32.ConvertSidToStringSidW.argtypes = [
+                ctypes.c_void_p,
+                ctypes.POINTER(ctypes.c_wchar_p),
+            ]
+            advapi32.ConvertSidToStringSidW.restype = _wt.BOOL
+            advapi32.ConvertStringSidToSidW.argtypes = [
+                _wt.LPCWSTR,
+                ctypes.POINTER(ctypes.c_void_p),
+            ]
+            advapi32.ConvertStringSidToSidW.restype = _wt.BOOL
+            advapi32.InitializeAcl.argtypes = [
+                ctypes.c_void_p,
+                _wt.DWORD,
+                _wt.DWORD,
+            ]
+            advapi32.InitializeAcl.restype = _wt.BOOL
+            advapi32.AddAccessAllowedAceEx.argtypes = [
+                ctypes.c_void_p,
+                _wt.DWORD,
+                _wt.DWORD,
+                _wt.DWORD,
+                ctypes.c_void_p,
+            ]
+            advapi32.AddAccessAllowedAceEx.restype = _wt.BOOL
+            advapi32.InitializeSecurityDescriptor.argtypes = [
+                ctypes.c_void_p,
+                _wt.DWORD,
+            ]
+            advapi32.InitializeSecurityDescriptor.restype = _wt.BOOL
+            advapi32.SetSecurityDescriptorDacl.argtypes = [
+                ctypes.c_void_p,
+                _wt.BOOL,
+                ctypes.c_void_p,
+                _wt.BOOL,
+            ]
+            advapi32.SetSecurityDescriptorDacl.restype = _wt.BOOL
+            advapi32.GetNamedSecurityInfoW.argtypes = [
+                _wt.LPWSTR,
+                ctypes.c_int,
+                _wt.DWORD,
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(ctypes.c_void_p),
+            ]
+            advapi32.GetNamedSecurityInfoW.restype = _wt.DWORD
+            advapi32.GetAclInformation.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_void_p,
+                _wt.DWORD,
+                ctypes.c_int,
+            ]
+            advapi32.GetAclInformation.restype = _wt.BOOL
+            advapi32.GetAce.argtypes = [
+                ctypes.c_void_p,
+                _wt.DWORD,
+                ctypes.POINTER(ctypes.c_void_p),
+            ]
+            advapi32.GetAce.restype = _wt.BOOL
+            _advapi32 = advapi32
+            _kernel32 = kernel32
+        return _kernel32, _advapi32
+
+
 def _windows_pid_alive(pid: int) -> Optional[bool]:
     """Windows 三态存活判定；只用 OpenProcess/GetExitCodeProcess，不发信号。"""
-    try:
-        from ctypes import wintypes
-    except Exception:  # pragma: no cover - 非 Windows 走不到
+    if not _WINDOWS:  # pragma: no cover - 非 Windows 走不到
         return None
+    _win()
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     STILL_ACTIVE = 259
     ERROR_ACCESS_DENIED = 5
     ERROR_INVALID_PARAMETER = 87
     try:
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-        kernel32.OpenProcess.restype = wintypes.HANDLE
-        kernel32.GetExitCodeProcess.argtypes = [
-            wintypes.HANDLE,
-            ctypes.POINTER(wintypes.DWORD),
-        ]
-        kernel32.GetExitCodeProcess.restype = wintypes.BOOL
-        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-        kernel32.CloseHandle.restype = wintypes.BOOL
-        handle = kernel32.OpenProcess(
+        handle = _kernel32.OpenProcess(
             PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid)
         )
     except (OSError, AttributeError, ValueError):  # pragma: no cover - 平台能力缺失
@@ -752,12 +950,12 @@ def _windows_pid_alive(pid: int) -> Optional[bool]:
             return False
         return None
     try:
-        code = wintypes.DWORD()
-        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+        code = _wt.DWORD()
+        if not _kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
             return None
         return code.value == STILL_ACTIVE
     finally:
-        kernel32.CloseHandle(handle)
+        _kernel32.CloseHandle(handle)
 
 
 def _process_is_alive(pid: Any) -> Optional[bool]:
@@ -1090,59 +1288,36 @@ class _WindowsAclError(RuntimeError):
 
 def _windows_current_user_sid() -> str:
     """当前进程令牌的用户 SID（字符串形式）。"""
-    from ctypes import wintypes
-
-    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    advapi32.OpenProcessToken.argtypes = [
-        wintypes.HANDLE,
-        wintypes.DWORD,
-        ctypes.POINTER(wintypes.HANDLE),
-    ]
-    advapi32.OpenProcessToken.restype = wintypes.BOOL
-    advapi32.GetTokenInformation.argtypes = [
-        wintypes.HANDLE,
-        ctypes.c_int,
-        ctypes.c_void_p,
-        wintypes.DWORD,
-        ctypes.POINTER(wintypes.DWORD),
-    ]
-    advapi32.GetTokenInformation.restype = wintypes.BOOL
-    advapi32.ConvertSidToStringSidW.argtypes = [
-        ctypes.c_void_p,
-        ctypes.POINTER(ctypes.c_wchar_p),
-    ]
-    advapi32.ConvertSidToStringSidW.restype = wintypes.BOOL
-    kernel32.LocalFree.argtypes = [ctypes.c_void_p]
-
-    class _SidAndAttributes(ctypes.Structure):
-        _fields_ = [("Sid", ctypes.c_void_p), ("Attributes", wintypes.DWORD)]
-
-    class _TokenUser(ctypes.Structure):
-        _fields_ = [("User", _SidAndAttributes)]
-
-    token = wintypes.HANDLE()
-    if not advapi32.OpenProcessToken(
-        kernel32.GetCurrentProcess(), 0x0008, ctypes.byref(token)
+    if not _WINDOWS:  # pragma: no cover - 平台分支
+        raise _WindowsAclError("windows_only")
+    _win()
+    token = _wt.HANDLE()
+    if not _advapi32.OpenProcessToken(
+        _kernel32.GetCurrentProcess(), 0x0008, ctypes.byref(token)
     ):
         raise _WindowsAclError("OpenProcessToken failed")
+    text = ctypes.c_wchar_p()
     try:
-        size = wintypes.DWORD(0)
-        advapi32.GetTokenInformation(token, 1, None, 0, ctypes.byref(size))
+        size = _wt.DWORD(0)
+        _advapi32.GetTokenInformation(token, 1, None, 0, ctypes.byref(size))
         if not size.value:
             raise _WindowsAclError("GetTokenInformation size failed")
         buffer = ctypes.create_string_buffer(size.value)
-        if not advapi32.GetTokenInformation(
+        if not _advapi32.GetTokenInformation(
             token, 1, buffer, size.value, ctypes.byref(size)
         ):
             raise _WindowsAclError("GetTokenInformation failed")
         user = ctypes.cast(buffer, ctypes.POINTER(_TokenUser)).contents
-        text = ctypes.c_wchar_p()
-        if not advapi32.ConvertSidToStringSidW(user.User.Sid, ctypes.byref(text)):
+        if not _advapi32.ConvertSidToStringSidW(
+            user.User.Sid, ctypes.byref(text)
+        ):
             raise _WindowsAclError("ConvertSidToStringSidW failed")
         return str(text.value)
     finally:
-        kernel32.CloseHandle(token)
+        # ConvertSidToStringSidW 返回的是 LocalAlloc 内存：成功/失败/异常都必须还。
+        if text:
+            _kernel32.LocalFree(ctypes.cast(text, ctypes.c_void_p))
+        _kernel32.CloseHandle(token)
 
 
 def _windows_acl_sids() -> list[str]:
@@ -1152,68 +1327,48 @@ def _windows_acl_sids() -> list[str]:
     )
 
 
-def _windows_build_private_security_attributes():
-    """构造带私有 DACL 的 ``SECURITY_ATTRIBUTES``（含全部 keepalive 引用）。"""
-    from ctypes import wintypes
+def _windows_build_private_security_attributes() -> "_WindowsPrivateSecurity":
+    """构造带私有 DACL 的 ``SECURITY_ATTRIBUTES``（**本调用独占**，用完 ``close()``）。
 
-    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
-    advapi32.InitializeAcl.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD]
-    advapi32.InitializeAcl.restype = wintypes.BOOL
-    advapi32.AddAccessAllowedAceEx.argtypes = [
-        ctypes.c_void_p,
-        wintypes.DWORD,
-        wintypes.DWORD,
-        wintypes.DWORD,
-        ctypes.c_void_p,
-    ]
-    advapi32.AddAccessAllowedAceEx.restype = wintypes.BOOL
-    advapi32.ConvertStringSidToSidW.argtypes = [
-        wintypes.LPCWSTR,
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    advapi32.ConvertStringSidToSidW.restype = wintypes.BOOL
-    advapi32.InitializeSecurityDescriptor.argtypes = [ctypes.c_void_p, wintypes.DWORD]
-    advapi32.InitializeSecurityDescriptor.restype = wintypes.BOOL
-    advapi32.SetSecurityDescriptorDacl.argtypes = [
-        ctypes.c_void_p,
-        wintypes.BOOL,
-        ctypes.c_void_p,
-        wintypes.BOOL,
-    ]
-    advapi32.SetSecurityDescriptorDacl.restype = wintypes.BOOL
-
-    class _SecurityAttributes(ctypes.Structure):
-        _fields_ = [
-            ("nLength", wintypes.DWORD),
-            ("lpSecurityDescriptor", ctypes.c_void_p),
-            ("bInheritHandle", wintypes.BOOL),
-        ]
-
+    每次调用独立创建 ACL/描述符缓冲区与 SID 指针；``ConvertStringSidToSidW`` 返回的
+    SID 必须由 ``LocalFree`` 回收，由返回对象的 ``close()`` 负责（幂等）。进程内共享的
+    只有 DLL 句柄、函数原型与 Structure 类，不共享任何每次调用的数据。
+    """
+    if not _WINDOWS:  # pragma: no cover - 平台分支
+        raise _WindowsAclError("windows_only")
+    _win()
     acl = ctypes.create_string_buffer(4096)
-    if not advapi32.InitializeAcl(acl, 4096, 2):
+    if not _advapi32.InitializeAcl(acl, 4096, 2):
         raise _WindowsAclError("InitializeAcl failed")
     sid_pointers: list[Any] = []
-    for sid_text in _windows_acl_sids():
-        psid = ctypes.c_void_p()
-        if not advapi32.ConvertStringSidToSidW(sid_text, ctypes.byref(psid)):
-            raise _WindowsAclError("ConvertStringSidToSidW failed")
-        sid_pointers.append(psid)
-        if not advapi32.AddAccessAllowedAceEx(
-            acl, 2, 0, _WINDOWS_FILE_ALL_ACCESS, psid
-        ):
-            raise _WindowsAclError("AddAccessAllowedAceEx failed")
-    descriptor = ctypes.create_string_buffer(64)
-    if not advapi32.InitializeSecurityDescriptor(descriptor, 1):
-        raise _WindowsAclError("InitializeSecurityDescriptor failed")
-    if not advapi32.SetSecurityDescriptorDacl(descriptor, True, acl, False):
-        raise _WindowsAclError("SetSecurityDescriptorDacl failed")
+    try:
+        for sid_text in _windows_acl_sids():
+            psid = ctypes.c_void_p()
+            if not _advapi32.ConvertStringSidToSidW(sid_text, ctypes.byref(psid)):
+                raise _WindowsAclError("ConvertStringSidToSidW failed")
+            sid_pointers.append(psid)
+            if not _advapi32.AddAccessAllowedAceEx(
+                acl, 2, 0, _WINDOWS_FILE_ALL_ACCESS, psid
+            ):
+                raise _WindowsAclError("AddAccessAllowedAceEx failed")
+        descriptor = ctypes.create_string_buffer(64)
+        if not _advapi32.InitializeSecurityDescriptor(descriptor, 1):
+            raise _WindowsAclError("InitializeSecurityDescriptor failed")
+        if not _advapi32.SetSecurityDescriptorDacl(descriptor, True, acl, False):
+            raise _WindowsAclError("SetSecurityDescriptorDacl failed")
+    except BaseException:
+        # 中途失败同样要还：这些 SID 是本次调用刚分配的，不能留给 GC。
+        for psid in sid_pointers:
+            if psid:
+                _kernel32.LocalFree(psid)
+        raise
     attributes = _SecurityAttributes(
         nLength=ctypes.sizeof(_SecurityAttributes),
         lpSecurityDescriptor=ctypes.cast(descriptor, ctypes.c_void_p),
         bInheritHandle=False,
     )
-    # 返回 SECURITY_ATTRIBUTES 时必须同时保留 buffer/SID 指针，避免被 GC 回收。
-    return attributes, (acl, descriptor, sid_pointers)
+    # 返回对象同时持有缓冲区/SID 引用，避免 CreateFileW 前被 GC 回收。
+    return _WindowsPrivateSecurity(attributes, (acl, descriptor), sid_pointers)
 
 
 def _windows_create_file_with_private_acl(path: Path, payload: bytes) -> None:
@@ -1223,123 +1378,59 @@ def _windows_create_file_with_private_acl(path: Path, payload: bytes) -> None:
     「核验通过则跳过」路径）。``WriteFile`` 短写或 ``FlushFileBuffers`` 失败都抛错，
     并尽力删掉**本次刚创建**的半截文件；写入后由调用方回读校验。
     """
-    from ctypes import wintypes
-
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.CreateFileW.argtypes = [
-        wintypes.LPCWSTR,
-        wintypes.DWORD,
-        wintypes.DWORD,
-        ctypes.c_void_p,
-        wintypes.DWORD,
-        wintypes.DWORD,
-        wintypes.HANDLE,
-    ]
-    kernel32.CreateFileW.restype = wintypes.HANDLE
-    kernel32.WriteFile.argtypes = [
-        wintypes.HANDLE,
-        ctypes.c_void_p,
-        wintypes.DWORD,
-        ctypes.POINTER(wintypes.DWORD),
-        ctypes.c_void_p,
-    ]
-    kernel32.WriteFile.restype = wintypes.BOOL
-    kernel32.FlushFileBuffers.argtypes = [wintypes.HANDLE]
-    kernel32.FlushFileBuffers.restype = wintypes.BOOL
-    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-    kernel32.CloseHandle.restype = wintypes.BOOL
-
-    attributes, keepalive = _windows_build_private_security_attributes()
-    invalid = ctypes.c_void_p(-1).value
-    handle = kernel32.CreateFileW(
-        str(path),
-        0x40000000,  # GENERIC_WRITE
-        0,  # 独占
-        ctypes.byref(attributes),
-        1,  # CREATE_NEW：不覆盖既有文件
-        0x80,  # FILE_ATTRIBUTE_NORMAL
-        None,
-    )
-    if not handle or handle == invalid:
-        raise _WindowsAclError(f"CreateFileW failed err={ctypes.get_last_error()}")
-    failed = True
+    if not _WINDOWS:  # pragma: no cover - 平台分支
+        raise _WindowsAclError("windows_only")
+    _win()
+    security = _windows_build_private_security_attributes()
     try:
-        written = wintypes.DWORD(0)
-        buffer = ctypes.create_string_buffer(payload, len(payload))
-        if not kernel32.WriteFile(
-            handle, buffer, len(payload), ctypes.byref(written), None
-        ):
-            raise _WindowsAclError("WriteFile failed")
-        if written.value != len(payload):
-            raise _WindowsAclError("WriteFile short write")
-        if not kernel32.FlushFileBuffers(handle):
-            raise _WindowsAclError("FlushFileBuffers failed")
-        failed = False
+        invalid = ctypes.c_void_p(-1).value
+        handle = _kernel32.CreateFileW(
+            str(path),
+            0x40000000,  # GENERIC_WRITE
+            0,  # 独占
+            ctypes.byref(security.attributes),
+            1,  # CREATE_NEW：不覆盖既有文件
+            0x80,  # FILE_ATTRIBUTE_NORMAL
+            None,
+        )
+        if not handle or handle == invalid:
+            raise _WindowsAclError(
+                f"CreateFileW failed err={ctypes.get_last_error()}"
+            )
+        failed = True
+        try:
+            written = _wt.DWORD(0)
+            buffer = ctypes.create_string_buffer(payload, len(payload))
+            if not _kernel32.WriteFile(
+                handle, buffer, len(payload), ctypes.byref(written), None
+            ):
+                raise _WindowsAclError("WriteFile failed")
+            if written.value != len(payload):
+                raise _WindowsAclError("WriteFile short write")
+            if not _kernel32.FlushFileBuffers(handle):
+                raise _WindowsAclError("FlushFileBuffers failed")
+            failed = False
+        finally:
+            _kernel32.CloseHandle(handle)
+            if failed:
+                # 只清理本次 CREATE_NEW 成功创建的文件；失败时尽力删除，不掩盖原异常。
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
     finally:
-        kernel32.CloseHandle(handle)
-        del keepalive
-        if failed:
-            # 只清理本次 CREATE_NEW 成功创建的文件；失败时尽力删除，不掩盖原异常。
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+        # 成功/失败/异常三条路径都释放本次调用借的 SID 与描述符引用。
+        security.close()
 
 
 def _windows_verify_private_acl(path: Path) -> tuple[bool, str]:
     """回读实际 DACL：只允许私有主体、无继承 ACE、无 DENY；否则失败。"""
-    from ctypes import wintypes
-
-    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    advapi32.GetNamedSecurityInfoW.argtypes = [
-        wintypes.LPWSTR,
-        ctypes.c_int,
-        wintypes.DWORD,
-        ctypes.POINTER(ctypes.c_void_p),
-        ctypes.POINTER(ctypes.c_void_p),
-        ctypes.POINTER(ctypes.c_void_p),
-        ctypes.POINTER(ctypes.c_void_p),
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    advapi32.GetNamedSecurityInfoW.restype = wintypes.DWORD
-    advapi32.GetAclInformation.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        wintypes.DWORD,
-        ctypes.c_int,
-    ]
-    advapi32.GetAclInformation.restype = wintypes.BOOL
-    advapi32.GetAce.argtypes = [
-        ctypes.c_void_p,
-        wintypes.DWORD,
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    advapi32.GetAce.restype = wintypes.BOOL
-    advapi32.ConvertSidToStringSidW.argtypes = [
-        ctypes.c_void_p,
-        ctypes.POINTER(ctypes.c_wchar_p),
-    ]
-    advapi32.ConvertSidToStringSidW.restype = wintypes.BOOL
-    kernel32.LocalFree.argtypes = [ctypes.c_void_p]
-
-    class _AclSizeInformation(ctypes.Structure):
-        _fields_ = [
-            ("AceCount", wintypes.DWORD),
-            ("AclBytesInUse", wintypes.DWORD),
-            ("AclBytesFree", wintypes.DWORD),
-        ]
-
-    class _AceHeader(ctypes.Structure):
-        _fields_ = [
-            ("AceType", ctypes.c_ubyte),
-            ("AceFlags", ctypes.c_ubyte),
-            ("AceSize", ctypes.c_ushort),
-        ]
-
+    if not _WINDOWS:  # pragma: no cover - 平台分支
+        return False, "windows_only"
+    _win()
     dacl = ctypes.c_void_p()
     descriptor = ctypes.c_void_p()
-    status = advapi32.GetNamedSecurityInfoW(
+    status = _advapi32.GetNamedSecurityInfoW(
         str(path),
         1,  # SE_FILE_OBJECT
         0x00000004,  # DACL_SECURITY_INFORMATION
@@ -1353,7 +1444,7 @@ def _windows_verify_private_acl(path: Path) -> tuple[bool, str]:
         return False, f"read_dacl_failed status={status}"
     try:
         info = _AclSizeInformation()
-        if not advapi32.GetAclInformation(
+        if not _advapi32.GetAclInformation(
             dacl, ctypes.byref(info), ctypes.sizeof(info), 2
         ):
             return False, "acl_info_failed"
@@ -1363,15 +1454,20 @@ def _windows_verify_private_acl(path: Path) -> tuple[bool, str]:
         seen: list[str] = []
         for index in range(info.AceCount):
             ace = ctypes.c_void_p()
-            if not advapi32.GetAce(dacl, index, ctypes.byref(ace)):
+            if not _advapi32.GetAce(dacl, index, ctypes.byref(ace)):
                 return False, "get_ace_failed"
             header = ctypes.cast(ace, ctypes.POINTER(_AceHeader)).contents
             sid_text = ctypes.c_wchar_p()
-            if not advapi32.ConvertSidToStringSidW(
-                ctypes.c_void_p(ace.value + 8), ctypes.byref(sid_text)
-            ):
-                return False, "sid_decode_failed"
-            sid = str(sid_text.value)
+            try:
+                if not _advapi32.ConvertSidToStringSidW(
+                    ctypes.c_void_p(ace.value + 8), ctypes.byref(sid_text)
+                ):
+                    return False, "sid_decode_failed"
+                sid = str(sid_text.value)
+            finally:
+                # 每次迭代都还：ConvertSidToStringSidW 分配的是 LocalAlloc 内存。
+                if sid_text:
+                    _kernel32.LocalFree(ctypes.cast(sid_text, ctypes.c_void_p))
             seen.append(sid)
             if header.AceFlags & 0x10:  # INHERITED_ACE
                 return False, f"inherited_ace:{sid}"
@@ -1383,7 +1479,8 @@ def _windows_verify_private_acl(path: Path) -> tuple[bool, str]:
             return False, "current_user_missing"
         return True, "acl=" + ",".join(seen)
     finally:
-        kernel32.LocalFree(descriptor)
+        if descriptor:
+            _kernel32.LocalFree(descriptor)
 
 
 def _enforce_private_permissions(path: Path) -> str:
