@@ -751,8 +751,9 @@ RUNTIME_RECIPES: dict[str, RuntimeRecipe] = {
         command_required=True,
     ),
     "dsh": RuntimeRecipe(
-        "bridges.cli_bridge",
-        ("{python}", "-m", "bridges.cli_bridge"),
+        # 351-E：DSH 从通用入口改为同构包装层，用于逐任务写入思考强度；命令契约不变。
+        "bridges.dsh_bridge",
+        ("{python}", "-m", "bridges.dsh_bridge"),
         command_flag="--command",
         command_required=True,
     ),

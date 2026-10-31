@@ -629,8 +629,9 @@ class RoleBindingApiTests(BindingApiTestCase):
             "prj_override_err",
             [{"member_id": "agent:worker"}, {"member_id": "agent:other"}],
         )
-        # dsh 没有适配器强度事实，也没有目录清单 → 能力未知，不得猜可用值。
-        self.register_runner(runtime="dsh")
+        # workbuddy 没有适配器强度事实，也没有落库清单 → 能力未知，不得猜可用值。
+        # （351-E 起 dsh 已有适配事实 off/low/high/max，不能再当"未知能力"样本。）
+        self.register_runner(runtime="workbuddy")
         self.put_binding("prj_override_err", "agent:worker", self.binding_payload())
         unknown = self.put_effort_override("prj_override_err", "agent:worker", "high")
         self.assertEqual(unknown.status_code, 409)

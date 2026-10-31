@@ -4489,8 +4489,9 @@ class RoleDefaultEffortUpdate(BaseModel):
 
 
 # 与 kimi_native_setup 的写入校验共用同一集合，避免两处各写一份。
+# 351-E：加入 ``off``（DSH 界面的“关闭思考”档位），仅当运行器/模型清单把它列为可选项时才会出现。
 DEFAULT_EFFORT_VALUES = frozenset(
-    {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+    {"off", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
 )
 
 
@@ -4507,7 +4508,9 @@ class RoleEffortOverrideUpdate(BaseModel):
 
 
 # 2026-10-31（351-A）：canonical 顺序；存储与选项都按此排序，避免不同来源顺序不一致。
+# 351-E：``off``（关闭思考）排在最前，作为最弱档位。
 DEFAULT_EFFORT_ORDER = (
+    "off",
     "none",
     "minimal",
     "low",
@@ -4524,6 +4527,9 @@ DEFAULT_EFFORT_ORDER = (
 # 351-B 让执行侧成为唯一来源后，本表退化为兜底事实。
 RUNNER_ADAPTER_EFFORT_VALUES = {
     "codex": frozenset({"minimal", "low", "medium", "high", "xhigh"}),
+    # 351-E：DSH 的实际档位由用户在界面观察到 off/low/high/max；四档全部开放（用户确认），
+    # 默认值仍由角色 patch/绑定决定。
+    "dsh": frozenset({"off", "low", "high", "max"}),
 }
 
 EFFORT_SOURCE_CATALOG = "catalog"

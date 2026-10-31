@@ -1,4 +1,4 @@
-"""产品片B（TALK 任务 260）：受管宿主运行器模板与执行预算的首次实现自测。
+﻿"""产品片B（TALK 任务 260）：受管宿主运行器模板与执行预算的首次实现自测。
 
 覆盖 ``docs/spec/ROLE_HOST_RUNTIME_CONFIGURATION_DESIGN.md`` 的全部验收面，且**不**访问
 真实模型、真实 CLI、生产 API/SQLite 或真实凭据：
@@ -1070,7 +1070,7 @@ class ExistingGuardRegressionTests(HostConfigTestCase):
             "dsh", model_alias=MODEL_ALIAS, command_template=DSH_TEMPLATE
         )
         self.assertEqual(single_outer_timeout(argv), 86400)
-        self.assertTrue(verify_runtime_entry("dsh", argv).startswith("bridges.cli_bridge@"))
+        self.assertTrue(verify_runtime_entry("dsh", argv).startswith("bridges.dsh_bridge@"))
         with self.assertRaises(HostError) as ctx:
             build_runtime_argv("unknown-runtime", model_alias=MODEL_ALIAS)
         self.assertEqual(ctx.exception.code, "cli_missing")

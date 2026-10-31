@@ -1,4 +1,4 @@
-"""角色生命周期 R1-3：宿主受管执行闭环的真实端到端测试（含首轮返修 F1–F6）。
+﻿"""角色生命周期 R1-3：宿主受管执行闭环的真实端到端测试（含首轮返修 F1–F6）。
 
 在**隔离临时库 + 显式随机回环端口**上用真实 HTTP 跑完整链路：
 
@@ -1063,7 +1063,7 @@ class RoleServiceHostArgumentTests(unittest.TestCase):
             "dsh", model_alias="deepseek-flash", command_template="dsh --model {model} --print"
         )
         self.assertIn("dsh --model deepseek-flash --print", dsh)
-        self.assertTrue(verify_runtime_entry("dsh", dsh).startswith("bridges.cli_bridge@"))
+        self.assertTrue(verify_runtime_entry("dsh", dsh).startswith("bridges.dsh_bridge@"))
         self.assertGreater(parse_unit_count(dsh, "dsh"), 10)
         codex = build_runtime_argv(
             "codex", model_alias="gpt-5", command_template="codex exec --model {model} -"

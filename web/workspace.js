@@ -1,4 +1,4 @@
-/* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
+﻿/* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
 const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null, listRenderDeferred: false };
 // 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
 const ROLE_TASKS_PAGE_SIZE = 20;
@@ -923,7 +923,7 @@ function roleBindingModelText(row, missing) {
 // 2026-10-28：思考强度只认准备阶段从官方模型目录落库的 binding.default_effort；
 // 展示名里的“· xhigh”这类后缀只从模型名中剥掉，不再当作强度来源（旧行不会凭空多出强度）。
 // 没有官方值时整项省略、不显示“未知”，也不据别名/成员名/运行实例猜值。
-const ROLE_BINDING_THINKING_STRENGTHS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+const ROLE_BINDING_THINKING_STRENGTHS = new Set(["off", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
 // 2026-10-31（351-A）：思考强度三元事实（用户覆盖 / 模型默认 / 生效值）。
 // 服务端在 binding 上下发 effective_effort、effort_options 与 effort_source；旧服务只给
 // default_effort 时仍按默认值展示，且不猜可选项（options 为空 == 能力未知）。
