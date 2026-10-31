@@ -329,3 +329,98 @@ test('agent只读角色摘要，历史分级或实例信息不改变展示和权
   const text=[...allTexts(h.el('blackboard-columns')),...allTexts(h.el('role-details-name-panel'))].join('\n');assert.doesNotMatch(text,/not-a-binding-model|决策 Agent|decision_tier/);
   assert.match(h.bindingSummary('agent:kimi'),/K2.8 Preview/);assert.equal(h.requests.some(r=>r.opts?.method&&r.opts.method!=='GET'),false);
 });
+
+// ── 2026-10-31（351-A）角色详情页思考强度设置 ─────────────────────────
+// 夹具模拟服务端 binding：默认 low、运行器适配来源、未覆盖；选项与来源全部来自服务端，
+// 页面不自行推断能力。
+function effortRow(overrides={}){
+  return boundRow({default_effort:'low',effort_override:null,effective_effort:'low',
+    effort_options:['minimal','low','medium','high','xhigh'],effort_source:'adapter',...overrides});
+}
+function effortHarness(row,{human=true}={}){
+  return harness({human,roster:[{...DEFAULT_ROSTER[0],binding:row},DEFAULT_ROSTER[1]]});
+}
+const effortSelect=panel=>findAll(panel,n=>String(n.className).includes('role-effort-select'))[0]||null;
+const optionValues=select=>select.children.map(child=>child.value);
+const optionTexts=select=>select.children.map(child=>child.textContent);
+
+test('思考强度控件在角色名称右侧：跟随默认+真实支持项，未覆盖时显示跟随',async()=>{
+  const h=effortHarness(effortRow());await h.enterRoles();await h.selectRole('agent:kimi');
+  const panel=h.el('role-details-name-panel');
+  const heading=findAll(panel,n=>String(n.className).includes('role-name-heading'))[0];
+  assert.ok(heading);assert.equal(heading.children[0].tagName,'h2');
+  assert.match(String(heading.children[1].className),/role-effort-control/);
+  const select=effortSelect(panel);assert.ok(select);
+  assert.deepEqual(optionValues(select),['','minimal','low','medium','high','xhigh']);
+  assert.match(optionTexts(select)[0],/跟随模型默认（low）/);
+  assert.equal(select.value,'');assert.equal(select.disabled,false);
+  const text=allTexts(heading.children[1]).join('\n');
+  assert.match(text,/模型默认：low/);assert.match(text,/可选值来自运行器支持的强度/);
+});
+
+test('用户覆盖值作为当前选择，并在列表与详情标注来源',async()=>{
+  const h=effortHarness(effortRow({effort_override:'high',effective_effort:'high'}));
+  await h.enterRoles();await h.selectRole('agent:kimi');
+  const panel=h.el('role-details-name-panel');
+  assert.equal(effortSelect(panel).value,'high');
+  assert.match(allTexts(panel).join('\n'),/用户设置：high/);
+  assert.equal(h.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · K2.8 Preview · high（用户设置）');
+});
+
+test('改变选择写入用户覆盖接口，成功后只更新本角色绑定、不发额外读取',async()=>{
+  const h=effortHarness(effortRow());await h.enterRoles();await h.selectRole('agent:kimi');
+  const before=h.requests.length;const select=effortSelect(h.el('role-details-name-panel'));
+  select.value='xhigh';select.fire('change');
+  assert.equal(h.requests.length,before+1);
+  const request=h.pending[h.pending.length-1];
+  assert.equal(request.opts.method,'PUT');
+  assert.match(request.url,/\/api\/projects\/A\/roles\/agent%3Akimi\/binding\/effort$/);
+  assert.deepEqual(JSON.parse(request.opts.body),{effort:'xhigh'});
+  request.resolve({ok:true,status:200,json:async()=>({binding:effortRow({effort_override:'xhigh',effective_effort:'xhigh'}),binding_state:'bound'})});
+  await h.flush();
+  assert.equal(effortSelect(h.el('role-details-name-panel')).value,'xhigh');
+  assert.equal(h.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · K2.8 Preview · xhigh（用户设置）');
+  assert.equal(h.requests.slice(before).filter(r=>r.opts?.method==='GET').length,0);
+});
+
+test('恢复跟随模型默认提交 null，不把默认值当作用户覆盖写入',async()=>{
+  const h=effortHarness(effortRow({effort_override:'high',effective_effort:'high'}));
+  await h.enterRoles();await h.selectRole('agent:kimi');
+  const select=effortSelect(h.el('role-details-name-panel'));select.value='';select.fire('change');
+  const request=h.pending[h.pending.length-1];
+  assert.deepEqual(JSON.parse(request.opts.body),{effort:null});
+  request.resolve({ok:true,status:200,json:async()=>({binding:effortRow(),binding_state:'bound'})});
+  await h.flush();
+  assert.equal(effortSelect(h.el('role-details-name-panel')).value,'');
+});
+
+test('能力未知时如实禁用并解释，不猜任何选项',async()=>{
+  const h=effortHarness(effortRow({effort_options:[],effort_source:null}));
+  await h.enterRoles();await h.selectRole('agent:kimi');
+  const panel=h.el('role-details-name-panel');const select=effortSelect(panel);
+  assert.deepEqual(optionValues(select),['']);assert.equal(select.disabled,true);
+  assert.match(allTexts(panel).join('\n'),/未提供可校验的支持清单/);
+});
+
+test('保存失败显示错误提示且不保留伪成功值',async()=>{
+  const h=effortHarness(effortRow());await h.enterRoles();await h.selectRole('agent:kimi');
+  const select=effortSelect(h.el('role-details-name-panel'));
+  select.value='medium';select.fire('change');
+  h.pending[h.pending.length-1].resolve({ok:false,status:422,json:async()=>({detail:'effort_not_supported'})});
+  await h.flush();
+  const panel=h.el('role-details-name-panel');const text=allTexts(panel).join('\n');
+  assert.match(text,/不在当前模型\/运行器支持的范围内/);assert.doesNotMatch(text,/effort_not_supported/);
+  assert.equal(effortSelect(panel).value,'');
+});
+
+test('agent会话与归档角色只读：控件禁用且不发写请求',async()=>{
+  const agent=effortHarness(effortRow(),{human:false});await agent.enterRoles();await agent.selectRole('agent:kimi');
+  const agentSelect=effortSelect(agent.el('role-details-name-panel'));
+  assert.ok(agentSelect);assert.equal(agentSelect.disabled,true);
+  agentSelect.fire('change');assert.equal(agent.requests.some(r=>r.opts?.method==='PUT'),false);
+  const archived=effortHarness(effortRow());
+  archived.context.projectAgents[0].archived=true;
+  await archived.enterRoles();await archived.selectRole('agent:kimi');
+  const archivedSelect=effortSelect(archived.el('role-details-name-panel'));
+  assert.ok(archivedSelect);assert.equal(archivedSelect.disabled,true);
+});

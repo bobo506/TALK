@@ -459,9 +459,11 @@ class TargetBindingSnapshotResolverTests(SnapshotSeedMixin, RouteTestCase):
             statements[0].strip(),
             BINDING_FACTS_SQL.replace(":project_id", "?").replace(":member_id", "?").strip(),
         )
+        # 2026-10-31（351-A）：绑定事实 SQL 增 effort_override / supported_efforts 两列后，
+        # 指纹同步更新；任务快照仍复用同一段 SQL 与同一助手，不复制第二份。
         self.assertEqual(
             hashlib.sha256(BINDING_FACTS_SQL.encode("utf-8")).hexdigest(),
-            "2008b7326af9eafb763cffd05dc75e8cff75c9ec833a8b46f1b946d8fd18c294",
+            "36c5c552e8b521cf1b74daad17d3d609079a5cf2124bcfdd3b27417ff9b9cf0d",
         )
         self.assert_snapshot_shape(snapshot, ROLE_BINDING_UNCONFIGURED)
         self.assert_all_binding_fields_null(snapshot)

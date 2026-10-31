@@ -10,7 +10,7 @@
 - A14/A15/A16 不影响其它维度、sync 全量替换、项目删除清理；
 - A17 双连接 upsert 收敛（last-write-wins，无主键 409）；
 - A18 载荷计数冒烟（不越界改 bridge/B3）；
-- A19/A20/A21 事实助手：无绑定四例 1 行、离册有/无绑定、项目不存在、28 列、
+- A19/A20/A21 事实助手：无绑定四例 1 行、离册有/无绑定、项目不存在、30 列、
   单语句性质（带项目 1 条 / 无项目 0 条）、批量等价与查询数固定。
 
 全部用例使用进程内 TestClient 与隔离临时库；不启动生产服务、不调用模型、不读 Key、
@@ -65,7 +65,7 @@ from server.models import (
 )
 from tests.test_support import RouteTestCase
 
-EXPECTED_SQL_SHA = "2008b7326af9eafb763cffd05dc75e8cff75c9ec833a8b46f1b946d8fd18c294"
+EXPECTED_SQL_SHA = "36c5c552e8b521cf1b74daad17d3d609079a5cf2124bcfdd3b27417ff9b9cf0d"
 
 RUNNER_ID = "runner:dsh-cli"
 RUNNER_RUNTIME = "dsh"
@@ -193,6 +193,17 @@ class BindingApiTestCase(RouteTestCase):
                 f"/api/projects/{project_id}/roles/{encode(member_id)}/binding/default-effort",
                 headers={"X-API-Key": key},
                 json={"default_effort": effort},
+            )
+
+    def put_effort_override(
+        self, project_id: str, member_id: str, effort, *, key: str = "bobo-key"
+    ):
+        """351-A：用户覆盖强度写接口（``effort=null`` 表示恢复跟随模型默认）。"""
+        with self.make_client() as client:
+            return client.put(
+                f"/api/projects/{project_id}/roles/{encode(member_id)}/binding/effort",
+                headers={"X-API-Key": key},
+                json={"effort": effort},
             )
 
     def delete_project(self, project_id: str, *, key: str = "bobo-key"):
@@ -388,6 +399,88 @@ class RoleBindingMigrationTests(unittest.TestCase):
             self.assertEqual(len(session.exec(select(Project)).all()), 1)
 
 
+class RoleBindingEffortMigrationTests(unittest.TestCase):
+    """351-A：只增列。旧库已有 ``project_role_bindings`` 时补两列，旧行保持 NULL、不猜值。"""
+
+    def setUp(self):
+        super().setUp()
+        tmp_root = Path(__file__).resolve().parent.parent / ".tmp-tests"
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        self._tmpdir = Path(
+            tempfile.mkdtemp(prefix="talk-effort-migrate-", dir=tmp_root)
+        )
+        self.db_path = self._tmpdir / "legacy-effort.db"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE project_role_bindings (
+                    project_id TEXT,
+                    member_id TEXT,
+                    runner_id TEXT,
+                    model_source TEXT,
+                    provider_id TEXT,
+                    connection_ref TEXT,
+                    model_id TEXT,
+                    model_alias TEXT,
+                    model_display_name TEXT,
+                    default_effort TEXT,
+                    updated_by TEXT NOT NULL,
+                    updated_at TIMESTAMP,
+                    PRIMARY KEY (project_id, member_id)
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO project_role_bindings (project_id, member_id, runner_id, "
+                "model_source, provider_id, connection_ref, model_id, default_effort, "
+                "updated_by) VALUES ('prj_old', 'agent:old', 'runner:old', 'builtin', "
+                "'openai', 'native-old', 'gpt-6.1-sol', 'xhigh', 'human:bobo')"
+            )
+        self.engine = create_engine(
+            f"sqlite:///{self.db_path}",
+            echo=False,
+            connect_args={"check_same_thread": False},
+        )
+        self._old_engine = db.engine
+        self._old_main_engine = main.engine
+        db.engine = self.engine
+        main.engine = self.engine
+        self.addCleanup(self._restore_engines)
+
+    def _restore_engines(self):
+        db.engine = self._old_engine
+        main.engine = self._old_main_engine
+        self.engine.dispose()
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _columns(self):
+        with sqlite3.connect(self.db_path) as conn:
+            return {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(project_role_bindings)")
+            }
+
+    def test_effort_columns_are_added_once_and_old_rows_stay_null(self):
+        self.assertNotIn("effort_override", self._columns())
+        self.assertNotIn("supported_efforts", self._columns())
+        db.init_db()
+        columns = self._columns()
+        self.assertIn("default_effort", columns)
+        self.assertIn("effort_override", columns)
+        self.assertIn("supported_efforts", columns)
+        with Session(self.engine) as session:
+            row = session.get(ProjectRoleBinding, ("prj_old", "agent:old"))
+            self.assertEqual(row.default_effort, "xhigh")
+            self.assertIsNone(row.effort_override)
+            self.assertIsNone(row.supported_efforts)
+        # 幂等：重复初始化不重建表、不清掉旧值。
+        db.init_db()
+        with Session(self.engine) as session:
+            row = session.get(ProjectRoleBinding, ("prj_old", "agent:old"))
+            self.assertEqual(row.default_effort, "xhigh")
+            self.assertIsNone(row.effort_override)
+
+
 # ════════════════════════════════════════════════════════════════════
 # A5–A18：绑定 API
 # ════════════════════════════════════════════════════════════════════
@@ -473,6 +566,138 @@ class RoleBindingApiTests(BindingApiTestCase):
             "prj_effort", "agent:worker", "high", key="worker-key"
         )
         self.assertEqual(forbidden.status_code, 403)
+
+    # ── 351-A：用户覆盖强度与模型默认分离、能力校验、换模型清空 ─────────
+    def test_effort_override_separates_user_value_from_model_default(self):
+        """用户覆盖值独立于模型默认；宿主回填默认值不得覆盖用户选择。"""
+        self.register_project("prj_override")
+        self.sync("prj_override", [{"member_id": "agent:worker"}])
+        # codex 无官方目录清单时按运行器适配事实给选项（不能拿通用枚举凑数）。
+        self.register_runner(runtime="codex")
+        self.assertEqual(
+            self.put_binding("prj_override", "agent:worker", self.binding_payload()).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.set_effort("prj_override", "agent:worker", "low").status_code, 200
+        )
+        before = self.get_binding("prj_override", "agent:worker").json()["binding"]
+        self.assertEqual(before["default_effort"], "low")
+        self.assertIsNone(before["effort_override"])
+        self.assertEqual(before["effective_effort"], "low")
+        self.assertEqual(
+            before["effort_options"],
+            ["minimal", "low", "medium", "high", "xhigh"],
+        )
+        self.assertEqual(before["effort_source"], "adapter")
+
+        saved = self.put_effort_override("prj_override", "agent:worker", "  HIGH ")
+        self.assertEqual(saved.status_code, 200)
+        body = saved.json()["binding"]
+        self.assertEqual(body["effort_override"], "high")
+        self.assertEqual(body["default_effort"], "low")
+        self.assertEqual(body["effective_effort"], "high")
+        self.assertEqual(saved.json()["binding_state"], ROLE_BINDING_BOUND)
+        for field in ("runner_id", "model_id", "model_alias", "binding_fingerprint"):
+            self.assertEqual(body[field], before[field])
+
+        # 准备流程/宿主回填模型默认，不得清掉用户覆盖。
+        self.assertEqual(
+            self.set_effort("prj_override", "agent:worker", "xhigh").status_code, 200
+        )
+        after = self.get_binding("prj_override", "agent:worker").json()["binding"]
+        self.assertEqual(after["effort_override"], "high")
+        self.assertEqual(after["default_effort"], "xhigh")
+        self.assertEqual(after["effective_effort"], "high")
+
+        # 刷新后仍保留（同一绑定读取路径）。
+        again = self.get_binding("prj_override", "agent:worker").json()["binding"]
+        self.assertEqual(again["effort_override"], "high")
+
+        # null / 空串 = 清除覆盖，恢复跟随模型默认。
+        cleared = self.put_effort_override("prj_override", "agent:worker", None)
+        self.assertEqual(cleared.status_code, 200)
+        self.assertIsNone(cleared.json()["binding"]["effort_override"])
+        self.assertEqual(cleared.json()["binding"]["effective_effort"], "xhigh")
+        blank = self.put_effort_override("prj_override", "agent:worker", "   ")
+        self.assertEqual(blank.status_code, 200)
+        self.assertIsNone(blank.json()["binding"]["effort_override"])
+
+    def test_effort_override_validates_permission_capability_and_values(self):
+        self.register_project("prj_override_err")
+        self.sync(
+            "prj_override_err",
+            [{"member_id": "agent:worker"}, {"member_id": "agent:other"}],
+        )
+        # dsh 没有适配器强度事实，也没有目录清单 → 能力未知，不得猜可用值。
+        self.register_runner(runtime="dsh")
+        self.put_binding("prj_override_err", "agent:worker", self.binding_payload())
+        unknown = self.put_effort_override("prj_override_err", "agent:worker", "high")
+        self.assertEqual(unknown.status_code, 409)
+        self.assertEqual(unknown.json()["detail"], "effort_capability_unknown")
+        # 恢复跟随默认不需要能力清单。
+        self.assertEqual(
+            self.put_effort_override("prj_override_err", "agent:worker", None).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.put_effort_override("prj_override_err", "agent:other", "high").status_code,
+            404,
+        )
+        forbidden = self.put_effort_override(
+            "prj_override_err", "agent:worker", "high", key="worker-key"
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+        # 官方目录清单存在时以目录为准（不回落运行器兜底集）。
+        self.register_runner(runner_id="runner:codex", runtime="codex")
+        self.put_binding(
+            "prj_override_err",
+            "agent:other",
+            self.binding_payload(runner_id="runner:codex"),
+        )
+        with self.session() as session:
+            row = session.get(ProjectRoleBinding, ("prj_override_err", "agent:other"))
+            row.supported_efforts = json.dumps(["high", "xhigh"])
+            session.add(row)
+            session.commit()
+        catalog = self.get_binding("prj_override_err", "agent:other").json()["binding"]
+        self.assertEqual(catalog["effort_source"], "catalog")
+        self.assertEqual(catalog["effort_options"], ["high", "xhigh"])
+        not_supported = self.put_effort_override(
+            "prj_override_err", "agent:other", "low"
+        )
+        self.assertEqual(not_supported.status_code, 422)
+        self.assertEqual(not_supported.json()["detail"], "effort_not_supported")
+        self.assertEqual(
+            self.put_effort_override("prj_override_err", "agent:other", "xhigh").status_code,
+            200,
+        )
+        invalid = self.put_effort_override("prj_override_err", "agent:other", "turbo")
+        self.assertEqual(invalid.status_code, 422)
+        self.assertEqual(invalid.json()["detail"], "effort_value_invalid")
+
+    def test_effort_override_is_cleared_when_binding_is_rewritten(self):
+        self.register_project("prj_override_reset")
+        self.sync("prj_override_reset", [{"member_id": "agent:worker"}])
+        self.register_runner(runtime="codex")
+        self.put_binding("prj_override_reset", "agent:worker", self.binding_payload())
+        self.assertEqual(
+            self.put_effort_override("prj_override_reset", "agent:worker", "high").status_code,
+            200,
+        )
+        rewritten = self.put_binding(
+            "prj_override_reset",
+            "agent:worker",
+            self.binding_payload(model_id="gpt-6.1-terra"),
+        )
+        self.assertEqual(rewritten.status_code, 200)
+        binding = rewritten.json()["binding"]
+        self.assertEqual(binding["model_id"], "gpt-6.1-terra")
+        # 换模型后旧的用户覆盖与旧模型能力清单都作废。
+        self.assertIsNone(binding["effort_override"])
+        self.assertIsNone(binding["default_effort"])
+        self.assertIsNone(binding["effective_effort"])
 
     def test_custom_api_source_and_alias_are_stored_verbatim(self):
         self.register_project("prj_custom")
@@ -1214,9 +1439,9 @@ class RoleBindingFactsTests(BindingApiTestCase):
         self.assertEqual(digest, EXPECTED_SQL_SHA)
         self.assertEqual(BINDING_FACTS_SQL.count(";"), 1)
         self.assertTrue(BINDING_FACTS_SQL.rstrip().endswith(";"))
-        self.assertEqual(len(BINDING_FACTS_COLUMNS), 28)
-        self.assertEqual(len(set(BINDING_FACTS_COLUMNS)), 28)
-        # 28 个别名都要真的出现在 SQL 里。
+        self.assertEqual(len(BINDING_FACTS_COLUMNS), 30)
+        self.assertEqual(len(set(BINDING_FACTS_COLUMNS)), 30)
+        # 30 个别名都要真的出现在 SQL 里。
         for column in BINDING_FACTS_COLUMNS:
             self.assertIn(column, BINDING_FACTS_SQL)
 
@@ -1247,7 +1472,7 @@ class RoleBindingFactsTests(BindingApiTestCase):
             with self.subTest(name=name):
                 facts = self.facts("prj_facts", member_id)
                 # `.one()` 已经强制“恰好 1 行”，这里再核验列集合与关键事实。
-                self.assertEqual(len(facts), 28)
+                self.assertEqual(len(facts), 30)
                 self.assertEqual(set(facts), set(BINDING_FACTS_COLUMNS))
                 self.assertEqual(facts["project_exists"], 1)
                 self.assertEqual(facts["binding_exists"], 0)
@@ -1279,7 +1504,7 @@ class RoleBindingFactsTests(BindingApiTestCase):
         # 项目不存在：只返回不存在事实，不造任何绑定状态。
         absent = self.facts("prj_missing", "agent:worker")
         self.assertEqual(absent["project_exists"], 0)
-        self.assertEqual(len(absent), 28)
+        self.assertEqual(len(absent), 30)
         self.assertIsNone(resolve_role_binding_state(absent))
 
     def test_bound_row_exposes_all_columns_and_fingerprint(self):

@@ -200,7 +200,7 @@ class CodexCommandTests(unittest.TestCase):
                 task_profile='review',private=root/'manager',codex_executable=str(root/'codex.exe'),
                 state_dir=root/'state',project_root=root)
             config={'model':'exact-selected-model','model_reasoning_effort':'xhigh'}
-            with patch.object(manager,'_configuration',return_value=config), \
+            with patch.object(manager,'_configuration',return_value=(config,'xhigh')), \
                  patch.object(setup,'require_version'),patch('cli.profiles.load_profile',return_value={}), \
                  patch('cli.profiles.compose_system_prompt',side_effect=lambda prompt,profile:prompt):
                 argv,_,_=manager.build_entry_argv('codex','public-alias')
@@ -234,7 +234,7 @@ class CodexCommandTests(unittest.TestCase):
                 task_profile='review',private=root/'manager',codex_executable=str(root/'codex.exe'),
                 state_dir=root/'state',project_root=root)
             config={'model':'gpt-6.1-terra','model_reasoning_effort':'low'}
-            with patch.object(manager,'_configuration',return_value=config), \
+            with patch.object(manager,'_configuration',return_value=(config,'low')), \
                  patch.object(setup,'require_version'),patch('cli.profiles.load_profile',return_value={}), \
                  patch('cli.profiles.compose_system_prompt',side_effect=lambda prompt,profile:prompt):
                 argv,_,_=manager.build_entry_argv('codex','gpt-6.1-terra')

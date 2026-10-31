@@ -128,7 +128,7 @@ class NewCodexRoleHostTests(unittest.TestCase):
                 manager.task_profile = profile
                 manager.execution_timeout_seconds = timeout
                 config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
-                with patch.object(manager, '_configuration', return_value=config), \
+                with patch.object(manager, '_configuration', return_value=(config, 'low')), \
                      patch.object(manager, 'child_environment', return_value={}), \
                      patch.object(setup, 'require_version'), \
                      patch('cli.profiles.load_profile', return_value={}), \
@@ -141,6 +141,58 @@ class NewCodexRoleHostTests(unittest.TestCase):
                 self.assertEqual(parsed.timeout, timeout or 86400)
                 self.assertEqual(parsed.codex_execution_profile,
                                  'tools' if profile == 'tools' else 'discussion')
+
+    # ── 351-B：思考强度按公开绑定解析并写入执行命令 ───────────────────
+    def test_configuration_resolves_effort_from_public_binding(self):
+        from scripts import codex_role_setup as setup
+        manager = self.manager()
+        binding = {'runtime': 'codex', 'model_alias': 'gpt-6.1-terra', 'model_id': 'gpt-6.1-terra',
+                   'provider_id': 'openai', 'binding_state': 'bound',
+                   'default_effort': 'low', 'effective_effort': 'high', 'effort_override': 'high',
+                   'effort_options': ['low', 'medium', 'high', 'xhigh'], 'effort_source': 'catalog'}
+        config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
+        with patch.object(manager, '_current_binding', return_value=binding), \
+             patch.object(setup, 'read_config', return_value=config):
+            resolved, effort = manager._configuration('gpt-6.1-terra')
+        self.assertEqual(resolved, config)
+        self.assertEqual(effort, 'high')
+
+    def test_configuration_rejects_unsupported_override_instead_of_downgrading(self):
+        from scripts import codex_role_setup as setup
+        manager = self.manager()
+        binding = {'runtime': 'codex', 'model_alias': 'gpt-6.1-terra', 'model_id': 'gpt-6.1-terra',
+                   'provider_id': 'openai', 'effective_effort': 'ultra'}
+        config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
+        with patch.object(manager, '_current_binding', return_value=binding), \
+             patch.object(setup, 'read_config', return_value=config):
+            with self.assertRaises(host.rsh.HostError) as caught:
+                manager._configuration('gpt-6.1-terra')
+        self.assertEqual(caught.exception.code, 'codex_effort_unsupported')
+
+    def test_old_service_binding_keeps_native_config_value(self):
+        from scripts import codex_role_setup as setup
+        manager = self.manager()
+        binding = {'runtime': 'codex', 'model_alias': 'gpt-6.1-terra', 'model_id': 'gpt-6.1-terra',
+                   'provider_id': 'openai'}
+        config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
+        with patch.object(manager, '_current_binding', return_value=binding), \
+             patch.object(setup, 'read_config', return_value=config):
+            _, effort = manager._configuration('gpt-6.1-terra')
+        self.assertEqual(effort, 'low')
+
+    def test_entry_argv_carries_resolved_effort_not_stale_config_value(self):
+        from scripts import codex_role_setup as setup
+        manager = self.manager()
+        config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
+        with patch.object(manager, '_configuration', return_value=(config, 'xhigh')), \
+             patch.object(manager, 'child_environment', return_value={}), \
+             patch.object(setup, 'require_version'), \
+             patch('cli.profiles.load_profile', return_value={}), \
+             patch('cli.profiles.compose_system_prompt', return_value='synthetic instructions'):
+            argv, _, _ = manager.build_entry_argv('codex', 'gpt-6.1-terra')
+        parsed = argv[argv.index('--codex-task-command') + 1]
+        self.assertIn('model_reasoning_effort="xhigh"', parsed)
+        self.assertNotIn('model_reasoning_effort="low"', parsed)
 
     def test_claim_scope_and_drain_keep_only_own_stop_and_owned_handles(self):
         manager = self.manager()
