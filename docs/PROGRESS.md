@@ -7,9 +7,12 @@
 > 2026-10-29 21:55（DeepSeek）：WorkBuddy 删除**已完成**（五步全 complete、roster 与 service 行删除、native 目录移除，21:48），3d 实机验收通过。大K 按用户授权执行 `recover-stopped`（generation 3→4，服务重置 stopped、旧宿主归属解除、实例置离线），宿主恢复 serving，启动/关闭/绑定重置可用。另修：同一成员已有更晚成功请求时，更早的失败请求不再弹“未完成”并清出本地跟踪（小K 刷新反复提示的根因，版本 `20261029-role-stale-request-v1`）；同时补正 3d 改版后的资源版本断言（3d 提交时全量跑在版本号更新前，遗留两处未覆盖）。
 > 2026-10-29 22:45（DeepSeek）：外观模式完成。顶部左侧项目下拉框右边新增“自动/白天/夜间”三段控件：自动按 08:00–18:00 白天、其余夜间，跨边界与回到页面时自动重算；手动选择记在本机。四个样式文件 256 处颜色字面量收敛为语义变量，夜间整体换色（背景/面板/文字/边框/按钮/强调），首屏内联脚本避免闪白。版本 `20261029-theme-day-night-v1`；Node 全量 360 项 / 344 通过（16 项既有失败与基线一致），theme_mode 5 项通过；夜间实机四视图亮背景残留检测为 0。
 > 2026-10-30 00:30（DeepSeek）：DSH 强度启动回填与 reload 卡死修复。新增仅 human 的 `POST /roles/{m}/binding/default-effort`（只改强度、不建不解绑定，未知值 422/无绑定 404）；强度枚举收敛到 `DEFAULT_EFFORT_VALUES` 共用；runtime 启动时读取 DSH 角色 `native/<member>/model-*.patch.yml` 的 `reasoningEffort` 回填一次。另修 `reload-api`：宿主长期保持 WebSocket 会让 uvicorn 优雅关闭一直等，导致旧 API 不退、reload 标记无限重试；现超时后终止旧子进程再启动。今晚因此发生一次 API 中断，靠重启 runtime 恢复；教训记入本文件。
-Updated: 2026-10-29 19:25（Asia/Shanghai）。本轮由 WorkBuddy 交付 B1 恢复链的 B1-b/B1-c 两个修正并补测（`39bf7e7`、`4fcfc45`），**整链仍未通过一次真实端到端验证**；服务当前停止，小K 因宿主与 worker 的 Key 目录不一致处于 `manager_failed`。用户已要求转交其他角色接续，完整交接见[HANDOFF_20261029.md](HANDOFF_20261029.md)。
+> 2026-11-01 00:10（大K，进度汇总）：当前 `/healthz` 200（db/storage ok）。动态恢复修复 `48be9d4` 已上线，六套170项全过，大K/小D运行、其余角色启停验证后恢复关闭。351-A–F已形成 `6efe0ff`/`b1c3323`/`bc148ff`/`583ebc6` 四个实现与补测提交，各片提交记录均有授权加载与测试证据，任务351仍为 `succeeded/submitted`，待复核确认与收取；352提交 `4de489c`，任务已完成，Node 391项中375通过、16项既有失败不变，静态页面3项通过。当前分支领先远程6个本地提交，均未推送。本会话负责上线核验与进度收尾，不冒称351已复核。
+> 2026-10-31 15:25（大K）：364/365动态角色恢复修复已完成独立补验并上线。六套170项全过；四产品文件与365冻结哈希一致，正常停启后七宿主serving。大K冷恢复为已关闭后重新启动至gen9/`ins_770346c0363b`，ready且同实例心跳推进；小D恢复运行，其余五角色逐一启停验证后保持关闭。未改DB/配置/绑定/Key/自启动偏好，286保持，未派任务或调用模型。既有内存泄漏未修，本次重启仅为临时缓解。
+> 2026-10-31 13:45（DeepSeek，**只读诊断，未修复未提交**）：定位到 2026-10-31 凌晨整机卡死的 TALK 侧根因——`talk_runtime` + 6 个角色宿主共用的「私有权限文件发布」路径存在稳定泄漏，实测合计约 **27 MB/分钟 ≈ 1.6 GB/小时**（runtime 8.9、每个宿主 3.1），09:07 启动到 13:39 已占约 7.6 GB 私有提交，8 GB 机器又到临界（空闲物理 165 MB）。`talk_api` 本身平稳（113–125 MB），事故中是受害者。修复方案与验收标准见 [内存泄漏诊断](spec/MEMORY_LEAK_DIAGNOSIS_20261031.md)，**等用户确认后再开工**；短期建议先重启一次后台兜底。
+Updated: 2026-11-01 00:10（Asia/Shanghai）。当前状态以顶部最新记录和“当前运行现场”为准；下方 B1 各节仅保留 2026-10-29 的历史排查背景，实际闭环见“旧任务与未解决项”。
 
-## 本轮未验收与阻塞（接手先读）
+## B1 历史未验收快照（已闭环，仅作背景）
 
 - **B1 全链未通过**：请求创建、claim、`rotate-key`（Key 真落盘）、建作业、profile/key_file 已实证；
   `preflight` 与完成回写未走通。B1-c 修了 preflight 两处，**但尚未在任何进程上加载验证**。
@@ -56,9 +59,10 @@ Updated: 2026-10-29 19:25（Asia/Shanghai）。本轮由 WorkBuddy 交付 B1 恢
 
 ## 当前运行现场
 
-- 本日晚实测：`/healthz` 200（db/storage ok），8000端口监听PID `9660`，`uptime_sec≈3992`（约19:54重启），与12:00记录的PID `25440`已不同；`/api/tasks`未带Key返回422（路由正常，不再是500），未用真实凭据验证列表内容。
-- 大K角色自身仍显示`recovery_required`，不要据此解除归属或清理。
-- G-terra官方授权及模型准备完成，Terra/low。最终实例`ins_e28faeceedf8`/PID11340 idle；宿主16440正常换代1784，runtime13920与其他宿主PID不变。此前native_cli_missing失败已过时，本轮实际启停通过。
+- **2026-10-31 内存泄漏未修（P0 待确认）**：15:14 后台已正常重启（非崩溃），重启后 17 分钟基线约 **740 MB**（runtime 197 + 7 个宿主 ×72 + API 115）；重启前 13:39 曾达 **7.6 GB**、整机空闲物理仅 165 MB。按 1.6–1.8 GB/小时斜率，约 4–5 小时再次到临界。诊断、A/B 证据以及「为什么定时清缓存/清工作集无效」的实测见 [MEMORY_LEAK_DIAGNOSIS_20261031](spec/MEMORY_LEAK_DIAGNOSIS_20261031.md)。
+- 2026-10-31 15:25实测：`/healthz` 200（db/storage ok），runtime `3928`、API `15212`，startup complete、worker无错、七宿主serving。
+- 大K已完成冷恢复并启动至generation 9/`ins_770346c0363b`，running/ready/idle，同实例心跳持续推进；旧实例已离线，不再处于`recovery_required`。
+- G-terra已实际启动到ready并正常关闭，最终恢复原关闭状态。任务366的预检`base_instructions`不兼容属于另一执行配置问题，不影响本次角色启停结论，也未在本片修改。
 - 旧`GPT agent:prj-e8fe7066bbec.gpt-79445c1f`仍offline、无实例、无`role_native_setups`准备记录；不要连续点击启动或擅自删除。
 - 当前API用系统Python+`PYTHONPATH=D:/claude-test/TALK;D:/claude-test/TALK/.venv/Lib/site-packages`，避免venv exe低完整性。生产配置、原生HOME、Key和既有角色未擅自修改。
 
@@ -66,7 +70,7 @@ Updated: 2026-10-29 19:25（Asia/Shanghai）。本轮由 WorkBuddy 交付 B1 恢
 
 - **347/2993**整体仍未完成；**348/2994**两个DSH凭据拒绝边界仍缺修复/复验证据。之前Codex仅补CLI运行配置，本轮仅修Codex启动前缀，均不是348安全修复。原创建者agent:codex，尚未收取；正常收取与业务验收通过须区分。
 - **旧角色兼容恢复（B1-a/b/c/d 已完成并实机闭环，2026-10-29 晚）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作。B1-a 以已提交`role_legacy_attach_operations`为锚点，`choice_snapshot`现读合成；B1-b 补 rotate-key legacy 分支；B1-c 放行 preflight 的补录来源；B1-d 让作业侧预期绑定指纹回落请求快照。20:30/20:44/20:45 三次恢复全部`provisioned`，作业推进为`succeeded`，`credential_version`保持 2，用户确认小K 启停正常。
-- **DSH/WorkBuddy 强度接入只完成读取+回填**：WorkBuddy 的`models.json`有`reasoning.defaultEffort`（本机`max`），DSH 角色 patch 有`reasoningEffort: max`；两类运行器没有模型配置写入器，无法“新建角色时写”，只能脚本回填。是否在角色启动时顺带刷新，待用户定。旧 WorkBuddy 角色已删除，用户计划重建后再看。
+- **351思考强度（实现已提交，任务待复核收取）**：A–F已覆盖用户覆盖值、Codex/Kimi/DSH/WorkBuddy逐任务生效与官方能力清单；DSH逐任务原子改写角色patch，WorkBuddy逐任务传`--effort`，不再只是读取+回填。四个本地提交及测试/授权加载记录见顶部；任务351仍`submitted`，不得提前写成已复核。
 - **角色页面余项**：3d 删除清理闭环已完成（`da001a8`）并实机验收；外观模式（白天/夜间）已完成并推送（`bc3bba7`）。
 - 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
@@ -91,8 +95,9 @@ python -B -X utf8 -m scripts.talk_runtime serve --config "D:/claude-test/TALK-pr
 
 ## 下一步恢复顺序
 
+0. **P0 内存泄漏修复（用户 2026-10-31 明确“先不急着修，写进进度文档”后缓办）**：方案、代码位置、A/B 证据与验收标准见 [MEMORY_LEAK_DIAGNOSIS_20261031](spec/MEMORY_LEAK_DIAGNOSIS_20261031.md)。开工前先与用户确认范围；如需临时缓解，可正常重启一次 TALK 后台（非修复）。后续 P1 轮询降频、P2 内存观测、P3 并发/内存规格另开切片。
 1. **347/2993 与 348/2994 的历史收尾**：整体仍未完成；348 两个 DSH 凭据拒绝边界仍缺修复/复验证据。原创建者为 `agent:codex`，收取需按其身份与权限执行；用户可决定是否重新派发。
-2. **DSH/WorkBuddy 强度写入时机**：待用户在“启动时刷新”与“仅脚本回填”之间决定；WorkBuddy 旧角色已删除，重建后再看。
+2. **351思考强度收尾**：复核四个本地提交的实际实现与测试/加载证据，确认后按原任务权限收取；本次汇总会话不冒称独立复核，不自动开工。
 3. **缓存清理**：用户已明确优先级不高，暂缓；盘点结论见下（可安全清理约 40MB，大头是各 CLI 状态目录，不能按缓存删）。
 4. 路线图其余条目（会话窗口换新、任务列表按真实对话窗口、运行器新版本提示、主被动跟进、定时任务项目化、工作区登记）见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
 
