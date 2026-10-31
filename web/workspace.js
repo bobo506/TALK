@@ -1,4 +1,4 @@
-﻿/* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
+/* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
 const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null, listRenderDeferred: false };
 // 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
 const ROLE_TASKS_PAGE_SIZE = 20;
@@ -937,6 +937,13 @@ function roleBindingEffortFacts(row) {
     : [];
   return { override, fallback, effective, options, source: roleBindingText(row.effort_source) };
 }
+// 2026-10-31（352）：自定义 API 来源的模型在展示名后追加「 API」，官方内置同名模型不加；
+// 已带后缀的不重复追加。只影响展示，不改 model_id / 绑定数据。
+function modelSourceLabel(name, modelSource) {
+  const text = typeof name === "string" ? name.trim() : "";
+  if (!text || modelSource !== "custom_api") return name;
+  return /\sAPI$/i.test(text) ? name : `${text} API`;
+}
 function roleBindingModelAndStrength(row) {
   const display = roleBindingText(row.model_display_name);
   const model = roleBindingModelText(row, null);
@@ -949,6 +956,7 @@ function roleBindingModelAndStrength(row) {
     const tail = cut >= 0 ? display.slice(cut + 1).trim() : "";
     if (head && tail && ROLE_BINDING_THINKING_STRENGTHS.has(tail.toLowerCase())) modelName = head;
   }
+  modelName = modelSourceLabel(modelName, row.model_source);
   // 用户覆盖时标注来源，让列表也能区分“用户设置”与“模型默认”；未覆盖时保持旧格式。
   return { modelName, strength: strength && effort.override ? `${strength}（用户设置）` : strength };
 }
@@ -1834,35 +1842,26 @@ function workspaceRoleEffortControl(role) {
   const select = workspaceEl("select", "role-effort-select");
   select.id = `role-effort-select-${String(role.member_id).replace(/[^A-Za-z0-9_-]/g, "-")}`;
   select.setAttribute("aria-label", "思考强度");
-  // 生效值不在当前支持清单内（准备后目录变动）时，仍如实显示当前设置，避免下拉“漂移”成别的值。
+  // 2026-10-31（用户要求）：不再提供“跟随模型默认”选项，也不显示强度说明行；
+  // 下拉直接列出该模型的可选档位，当前生效值作为默认选中项。
   if (effort.override && !effort.options.includes(effort.override)) {
-    const option = workspaceEl("option", "", `${effort.override}（当前设置，支持清单未包含）`);
+    const option = workspaceEl("option", "", effort.override);
     option.value = effort.override;
     select.appendChild(option);
   }
-  const follow = workspaceEl("option", "", effort.fallback ? `跟随模型默认（${effort.fallback}）` : "跟随模型默认（未记录）");
-  follow.value = "";
-  select.appendChild(follow);
   for (const value of effort.options) {
     const option = workspaceEl("option", "", value);
     option.value = value;
     select.appendChild(option);
   }
-  select.value = effort.override || "";
+  const current = effort.options.includes(effort.override) ? effort.override
+    : effort.options.includes(effort.effective) ? effort.effective : (effort.options[0] || "");
+  select.value = current;
   select.disabled = !editable || roleEffortUI.busy.has(role.member_id);
   if (editable) select.title = "修改该角色下一次执行使用的思考强度";
   select.addEventListener("change", () => saveRoleEffort(role.member_id, select.value));
   choice.append(workspaceEl("span", "role-effort-label", "思考强度"), select);
   box.appendChild(choice);
-  // 三种事实分别如实呈现：用户覆盖、模型默认、生效值（生效值不是执行证据，执行证据见后续切片）。
-  const hints = [];
-  hints.push(effort.override ? `用户设置：${effort.override}` : "跟随模型默认");
-  hints.push(effort.fallback ? `模型默认：${effort.fallback}` : "模型默认：未记录");
-  if (!selectable) hints.push("该运行器/模型未提供可校验的支持清单，暂不能修改。");
-  else if (effort.source === "adapter") hints.push("可选值来自运行器支持的强度，未按官方模型目录逐项校验。");
-  else if (effort.source === "catalog") hints.push("可选值来自官方模型目录。");
-  if (selectable && role.binding_state !== "bound") hints.push("绑定当前无效，修复绑定后才能修改。");
-  box.appendChild(workspaceEl("span", "role-effort-hint", hints.join(" · ")));
   const error = roleEffortUI.errors.get(role.member_id);
   if (error) box.appendChild(workspaceEl("span", "role-effort-error", error));
   return box;
@@ -1903,21 +1902,24 @@ function renderWorkspaceRoleDetails() {
   roleDeleteSync(blackboardOpen && workspaceUI.mode === "roles" && currentMemberIsHuman()
     ? projectAgents.find(item => ["pending", "cleaning"].includes(item.deletion?.status)) || null : null);
   if (!visible) return;
+  // 2026-10-31（用户反馈）：下拉展开时不能因轮询重绘被强制关闭；聚焦期间跳过本次重建。
+  const focused = document.activeElement;
+  if (role && focused && focused.id === `role-effort-select-${String(role.member_id).replace(/[^A-Za-z0-9_-]/g, "-")}`) return;
   namePanel.replaceChildren();
   tasksPanel.replaceChildren();
   if (!role) { namePanel.classList.add("hidden"); tasksPanel.classList.add("hidden"); return; } // 防御：失效选择由 workspaceSettingsSelected 回退到项目设置
   const nameHeading = workspaceEl("div", "role-name-heading");
   nameHeading.appendChild(workspaceEl("h2", "", workspaceMemberName(role.member_id)));
   // 2026-10-31（351-A）：思考强度控件放在大号角色名称右侧、名称编辑按钮之前；
-  // 没有绑定行时返回 null，保持旧角色详情结构不变。
+  // 2026-10-31（用户要求）：名称编辑按钮在前，思考强度下拉在后（换位），用右侧留白避免拥挤。
   const effortControl = workspaceRoleEffortControl(role);
-  if (effortControl) nameHeading.appendChild(effortControl);
   if (currentMemberIsHuman() && role.archived !== true) {
     const edit = workspaceButton("", () => openRoleNameEditor(role), "icon-action subtle role-name-edit");
     edit.id = "role-name-edit"; edit.title = "修改角色名称"; edit.setAttribute("aria-label", "修改角色名称");
     edit.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7"/><path d="m16 3 5 5M10 14l-1 4 4-1 9-9a2.1 2.1 0 0 0-5-5z"/></svg>';
     nameHeading.appendChild(edit);
   }
+  if (effortControl) nameHeading.appendChild(effortControl);
   namePanel.append(workspaceEl("p", "workspace-breadcrumb", `角色 / ${workspaceMemberName(role.member_id)}`), nameHeading, workspaceEl("p", "role-current", workspaceWorkSummary(role.member_id)));
   // ROLE-DESC-F1：原硬编码的短标签行（role-description）与解释行（role-explanation）从动态面板移除；
   // 说明统一由居中静态编辑区 #role-description-panel 呈现（自定义 ?? 默认），映射仅作默认值生成器。

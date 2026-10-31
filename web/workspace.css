@@ -1,4 +1,4 @@
-/* 已确认的任务 / 角色双栏工作台。旧聊天入口继续保留。 */
+﻿/* 已确认的任务 / 角色双栏工作台。旧聊天入口继续保留。 */
 .app-header {min-width:0!important; height:70px; min-height:70px; display:flex; gap:32px; padding:0 28px; border-bottom:1px solid var(--line);}
 .window-brand {padding:0; flex-shrink:0;} .header-actions {margin-left:auto; padding:0; gap:18px;}
 .app-header .project-select {width:180px; margin:0; font-size:16px;}
@@ -14,7 +14,7 @@
 .workspace-tabs>button[aria-pressed="true"] {color:var(--blue-strong); border-bottom-color:var(--blue-strong);}
 .workspace-tabs .workspace-refresh {margin-left:auto; font-size:13px; font-weight:400; color:var(--muted-strong);}
 .blackboard-view {display:block; padding:0; overflow:visible; height:auto; background:transparent;}
-.blackboard-header {padding:0 28px 16px; border:0; min-height:0; display:block;}
+.blackboard-header {padding:0 28px 16px; border:0; min-height:0; display:block; background:transparent;}
 .blackboard-header p {margin:0; color:var(--muted-strong); font-size:15px;}
 /* R1-3 页面验收反馈：顶栏操作区让搜索占满剩余宽度，批量入口靠右对齐；
    任务页保持原整行搜索宽度不变。 */
@@ -229,7 +229,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-service-detail-controls {padding:0;}
 .role-service-row {display:flex; align-items:center; flex-wrap:wrap; gap:10px;}
 .role-service-state {font-size:14px; line-height:1.5; padding:3px 10px; border-radius:11px; border:1px solid var(--line-strong); background:var(--card-soft); color:var(--muted-strong); overflow-wrap:anywhere;}
-.role-service-state.success {border-color:var(--line-strong); background:var(--card-soft); color:var(--text);}
+.role-service-state.success {border-color:var(--line-strong); background:var(--card-soft); color:var(--green);}
 .role-service-state.danger {border-color:var(--line-strong); background:var(--red-soft); color:var(--red);}
 .role-service-state.running {border-color:var(--line); background:var(--blue-soft); color:var(--blue);}
 .role-service-state.unknown {border-color:var(--line-strong); background:var(--card-soft); color:var(--amber);}
@@ -274,10 +274,10 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .task-list-page-info {font-size:14px; color:var(--muted-strong); overflow-wrap:anywhere;}
 .task-list-pagination .workspace-text-button:disabled {opacity:0.5; cursor:not-allowed; color:var(--muted);}
 @media(max-width:700px){.task-list-pagination {gap:10px; padding:12px 20px 16px;} .task-list-page-info {font-size:13px;}}
-.role-name-heading { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:wrap; row-gap:6px; }
+.role-name-heading { display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap; row-gap:8px; }
 .role-name-heading h2 { min-width:0; overflow-wrap:anywhere; margin:0; }
 /* 2026-10-31（351-A）：角色名称右侧的思考强度控件；紧凑、带清晰标签，窄屏换行不压标题。 */
-.role-effort-control { display:flex; flex-direction:column; gap:2px; min-width:0; max-width:100%; flex:0 1 auto; }
+.role-effort-control { display:flex; flex-direction:column; gap:2px; min-width:0; max-width:100%; flex:0 1 auto; margin-left:auto; }
 .role-effort-choice { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted-strong); min-width:0; }
 .role-effort-label { font-weight:600; white-space:nowrap; }
 .role-effort-select { max-width:170px; height:28px; padding:0 6px; font-size:12px; border:1px solid var(--line); border-radius:6px; background:var(--card, #fff); color:var(--text); cursor:pointer; }

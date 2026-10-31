@@ -393,7 +393,7 @@ function createRoleRequestUI(deps) {
     panel.classList.toggle("hidden", !visible); if (!visible) return;
     panel.append(node("p", "role-request-hint", "这个运行器尚无可选模型，可以登记本项目已保存的模型配置。登记不代表原生登录或服务启动已经通过。"));
     for (const seed of state.modelSeeds) {
-      const name = seed.payload.model_display_name || seed.payload.model_alias || seed.payload.model_id;
+      const name = modelSourceLabel(seed.payload.model_display_name || seed.payload.model_alias || seed.payload.model_id, seed.payload.model_source);
       const action = button(`登记项目已有模型：${name}`, () => registerModel(seed), "role-service-button");
       action.disabled = state.busy || !human() || state.supported !== true; panel.append(action);
     }
@@ -547,6 +547,11 @@ function createRoleRequestUI(deps) {
   // 2026-10-28：创建角色时模型下拉只显示模型名；“· xhigh”这类强度后缀只用于列表展示，
   // 不在选择阶段出现（强度来源改为准备阶段落库的官方值）。
   const MODEL_STRENGTH_LITERALS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+  function modelSourceLabel(name, modelSource) {
+    const text = String(name || "").trim();
+    if (!text || modelSource !== "custom_api") return name;
+    return /\sAPI$/i.test(text) ? name : text + " API";
+  }
   function modelLabel(row) {
     const display = String(row?.model_display_name || "").trim();
     if (display) {
@@ -562,7 +567,8 @@ function createRoleRequestUI(deps) {
     const select = el(id); select.replaceChildren();
     const empty = node("option", "", title); empty.value = ""; select.append(empty);
     for (const row of values) {
-      const option = node("option", "", row.display_name ? runnerLabel(row) : modelLabel(row));
+      const label = row.display_name ? runnerLabel(row) : modelSourceLabel(modelLabel(row), row.model_source);
+      const option = node("option", "", label);
       option.value = row[key]; select.append(option);
     }
     select.value = "";
@@ -605,7 +611,7 @@ function createRoleRequestUI(deps) {
       const choices = await api(`/api/runners/${encodeURIComponent(runner)}/model-choices`);
       if (!current(epoch) || !state.modal || seq !== state.catalogSeq || el("role-create-runner").value !== runner) return;
       state.choices = Array.isArray(choices) ? choices.filter(c => c.runner_id === runner && !c.retired_at)
-        .map(c => ({ choice_id: c.choice_id, runner_id: c.runner_id, model_display_name: c.model_display_name, model_alias: c.model_alias, model_id: c.model_id })) : [];
+        .map(c => ({ choice_id: c.choice_id, runner_id: c.runner_id, model_display_name: c.model_display_name, model_alias: c.model_alias, model_id: c.model_id, model_source: c.model_source })) : [];
       fillSelect("role-create-model", state.choices, state.choices.length ? "选择模型" : "暂无可选模型", "choice_id");
       const fact = state.runners.find(r => r.runner_id === runner);
       // 2026-10-28：按用户要求移除未核验运行器的“接入或启停能力尚未确认”提示；
@@ -638,7 +644,7 @@ function createRoleRequestUI(deps) {
       if (!valid()) return;
       if (result.runner_id !== runnerId || !result.choice_id || result.retired_at
         || JSON.stringify([result.model_source, result.provider_id, result.connection_ref, result.model_id, result.model_alias || ""]) !== seed.fingerprint) throw new Error("登记结果尚未确认，请重新选择运行器核对模型目录。");
-      state.choices = [{ choice_id: result.choice_id, runner_id: runnerId, model_display_name: result.model_display_name, model_alias: result.model_alias, model_id: result.model_id }];
+      state.choices = [{ choice_id: result.choice_id, runner_id: runnerId, model_display_name: result.model_display_name, model_alias: result.model_alias, model_id: result.model_id, model_source: result.model_source }];
       state.modelSeeds = []; fillSelect("role-create-model", state.choices, "选择模型", "choice_id");
       el("role-create-model").value = result.choice_id; state.notice = "模型目录已准备，可以填写角色名称并保存配置。登记不代表服务已启动。";
     } catch (err) { if (valid()) {
@@ -668,7 +674,7 @@ function createRoleRequestUI(deps) {
       // 后台设备授权/模型准备 ready 后再投递首次启动。
       const needsManualPreparation = state.runners.find(r => r.runner_id === runner)?.runtime === "kimi-code";
       state.attempt = { key, labels: { runner: runnerLabel(state.runners.find(r => r.runner_id === runner)) || "已选运行器",
-        model: modelLabel(selectedModel) || "已选模型" },
+        model: modelSourceLabel(modelLabel(selectedModel), selectedModel && selectedModel.model_source) || "已选模型" },
         payload: { request_key: key, kind: "create", confirm: true,
         auto_start: !needsManualPreparation && el("role-create-auto-start")?.checked === true,
         role_name: name, role_description: description, runner_id: runner, choice_id: choice } }; keepAttempt();
