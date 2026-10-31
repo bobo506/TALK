@@ -10,7 +10,7 @@ import hashlib
 from functools import lru_cache
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import shlex
 import socket
 import subprocess
@@ -124,6 +124,154 @@ def process_argv(command):
         kernel.LocalFree(ctypes.cast(argv,wintypes.HLOCAL))
 
 
+_HOST_MODULES = frozenset({
+    "scripts.kimi_role_host",
+    "scripts.codex_role_host",
+    "scripts.workbuddy_role_host",
+    "scripts.role_service_host",
+})
+_HOST_SCRIPTS = frozenset(module.rsplit(".", 1)[1] + ".py" for module in _HOST_MODULES)
+_PROJECT_FLAGS = ("--project", "--project-id")
+
+
+def _identity_values(argv, flags):
+    """Return exact option values and whether a flag was malformed.
+
+    argparse rejects prefix abbreviation, so only ``--flag value`` and
+    ``--flag=value`` are accepted here.  Missing/empty values stay ambiguous
+    instead of being interpreted as a different role.
+    """
+    values, malformed = [], False
+    index = 1
+    while index < len(argv):
+        token = argv[index]
+        for flag in flags:
+            if token == flag:
+                if (index + 1 < len(argv) and argv[index + 1]
+                        and not argv[index + 1].startswith("-")):
+                    values.append(argv[index + 1])
+                    index += 1
+                else:
+                    malformed = True
+                break
+            if token.startswith(flag + "="):
+                value = token[len(flag) + 1:]
+                if value and not value.startswith("-"):
+                    values.append(value)
+                else:
+                    malformed = True
+                break
+        index += 1
+    return values, malformed
+
+
+def _member_list(argv):
+    values, malformed = _identity_values(argv, ("--members",))
+    members = set()
+    for value in values:
+        for part in value.split(","):
+            part = part.strip().strip('"')
+            if part:
+                members.add(part)
+            else:
+                malformed = True
+    return members, malformed
+
+
+def _identity_status(argv, plan):
+    """Classify a host command as this role, another role, or ambiguous.
+
+    Both project and member are needed for a positive match.  A clear mismatch
+    on either dimension means the process belongs elsewhere and must not block
+    this role forever.  Missing/conflicting identity is unknown, not a release.
+    """
+    projects, project_bad = _identity_values(argv, _PROJECT_FLAGS)
+    members, member_bad = _identity_values(argv, ("--member",))
+    listed, listed_bad = _member_list(argv)
+    projects = {str(value).strip().strip('"') for value in projects}
+    members = {str(value).strip().strip('"') for value in members}
+    if project_bad or member_bad or listed_bad or len(projects) > 1 or len(members) > 1:
+        return "unknown"
+    if members and listed and members != listed:
+        return "unknown"
+    member_set = members or listed
+    project = next(iter(projects)) if projects else None
+    target_project, target_member = plan["project_id"], plan["member_id"]
+    if project is not None and project != target_project:
+        return "other"
+    if member_set and target_member not in member_set:
+        return "other"
+    if project == target_project and target_member in member_set:
+        return "same"
+    return "unknown"
+
+
+def _command_entry(argv):
+    """Return the ``-m`` module or the first real .py script entry."""
+    for index, value in enumerate(argv[:-1]):
+        if value == "-m":
+            return "module", argv[index + 1]
+    for value in argv[1:]:
+        if not value.startswith("-") and value.endswith(".py"):
+            return "script", value
+    return None, None
+
+
+def _module_candidate(module, entry):
+    """Classify ``-m`` as a shared host module, the fixed entry itself, or other."""
+    name = str(module).strip().strip('"').casefold()
+    if not name:
+        return None
+    if name in _HOST_MODULES:
+        return "shared"
+    # A fixed hosts entry may itself use ``python -m package.host``.
+    path = name.replace(".", "/") + ".py"
+    if entry.endswith("/" + path):
+        return "entry"
+    if "/" not in path and PurePosixPath(path).name == PurePosixPath(entry).name:
+        return "entry"
+    return None
+
+
+def _script_candidate(script, entry):
+    """Classify a .py entry as a shared host script, the fixed entry, or other."""
+    value = normalized(script)
+    if not value:
+        return None
+    name = PurePosixPath(value).name
+    if name in _HOST_SCRIPTS:
+        return "shared"
+    windows_absolute = PureWindowsPath(value).is_absolute()
+    if windows_absolute or value.startswith("/"):
+        if value == entry:
+            return "entry"
+        try:
+            # Windows 8.3短路径与完整路径必须识别为同一入口。
+            resolved = normalized(Path(value).resolve(strict=True))
+        except OSError:
+            return None
+        return "entry" if resolved == entry else None
+    relative = value[2:] if value.startswith("./") else value
+    if "/" in relative:
+        if entry.endswith("/" + relative.lstrip("/")):
+            return "entry"
+        # No cwd is available for a relative .. path; retain the old
+        # conservative basename boundary instead of releasing it.
+        if ".." in PurePosixPath(relative).parts and name == PurePosixPath(entry).name:
+            return "entry"
+        return None
+    return "entry" if name == PurePosixPath(entry).name else None
+
+
+def _host_candidate(argv, entry):
+    kind, value = _command_entry(argv)
+    if kind == "module":
+        return _module_candidate(value, entry)
+    if kind == "script":
+        return _script_candidate(value, entry)
+    return None
+
+
 def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None, _preboot_at=None):
     inventory = inventory or process_inventory
     if plan["expected_owner_host"].casefold() != socket.gethostname().casefold():
@@ -146,29 +294,40 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
     if manager_state not in stopped_states or bridge_state not in stopped_states:
         raise HostError("recovery_process_not_absent")
     entry = normalized(host_entry.resolve(strict=True))
+    expected_instance = normalized(plan["expected_instance_id"])
+    expected_launch = normalized(plan["expected_process_launch_id"])
     for row in inventory():
+        if not isinstance(row, dict):
+            raise HostError("recovery_process_inventory_unknown")
         command = row.get("CommandLine")
         if not isinstance(command, str) or not command.strip():
             raise HostError("recovery_process_inventory_unknown")
         try:
-            argv = [normalized(value) for value in process_argv(command)]
+            argv = process_argv(command)
         except ValueError as exc:
             raise HostError("recovery_process_inventory_unknown") from exc
-        scripts = [value for value in argv[1:] if value.endswith(".py")]
-        active_entry = scripts[0] if scripts else ""
-        if active_entry and Path(active_entry).is_absolute():
-            try:
-                # Windows 8.3短路径与完整路径必须识别为同一入口。
-                active_entry = normalized(Path(active_entry).resolve(strict=True))
-            except OSError as exc:
-                raise HostError("recovery_process_inventory_unknown") from exc
-        if (active_entry == entry or active_entry.endswith("/scripts/role_service_host.py")
-                or (active_entry and not Path(active_entry).is_absolute()
-                    and Path(active_entry).name == host_entry.name.casefold())
-                or "scripts.role_service_host" in argv
-                or normalized(plan["expected_instance_id"]) in argv
-                or normalized(plan["expected_process_launch_id"]) in argv):
+        if not argv or any(not isinstance(value, str) for value in argv):
+            raise HostError("recovery_process_inventory_unknown")
+        normalized_argv = [normalized(value) for value in argv]
+        # 旧实例/launch标识仍是明确证据；不伪造真实命令没有的 --instance 参数。
+        if expected_instance in normalized_argv or expected_launch in normalized_argv:
             raise HostError("recovery_replacement_process_present")
+        candidate = _host_candidate(argv, entry)
+        if candidate is None:
+            continue
+        if candidate == "entry":
+            # The configured fixed entry (or ``-m package.host``) is specific
+            # to this member; its exact launch is blocking regardless of any
+            # generic --project/--member argument convention.
+            raise HostError("recovery_replacement_process_present")
+        identity = _identity_status(argv, plan)
+        if identity == "other":
+            # Another role/project host must not become a machine-wide blocker.
+            continue
+        if identity == "same":
+            raise HostError("recovery_replacement_process_present")
+        # A known host entry with unreadable/incomplete identity is unknown.
+        raise HostError("recovery_process_inventory_unknown")
     return {"manager_pid": manager_pid, "bridge_pid": bridge_pid,
             "both_absent": manager_state == bridge_state == "absent", "both_stopped": True,
             "manager_original_state":manager_state, "bridge_original_state":bridge_state,

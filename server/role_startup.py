@@ -158,22 +158,24 @@ def _complete(key,digest,status,session,*,launch=None):
 def _cold_recover(key,digest,operator,session,config,cutoff):
     """Only proven preboot ownership; current-boot failures remain manual."""
     from server.role_service_recovery import candidate,recover_stopped
+    from server.role_host_resolution import RecoveryHostError,resolve_recovery_host
+    from server.role_services import load_role_service_context
     from scripts.role_service_recovery import local_proof
-    from scripts.role_service_host import _sanitize_token,HostError
+    from scripts.role_service_host import HostError
     row=session.get(m.RoleStartupActivation,key);state=_generation(row,session)
     if not ownership_held(state):return
     if cutoff is None:fail('startup_boot_unverified')
     old,instance=candidate(key[0],key[2],session,_now(),_preboot_at=cutoff)
     if old.owner_host.casefold()!=socket.gethostname().casefold():fail('recovery_wrong_local_host')
-    spec=next((s for s in config.get('hosts',[]) if s['member_id']==key[2]),None)
-    if spec:
-        health=Path(spec['health_file'])
-        entry=next((Path(a) for a in spec['argv'][1:] if a.endswith('.py')),None)
-    elif config.get('workbuddy'):
-        health=Path(config['state_dir'])/'workbuddy-native'/_sanitize_token(key[0])/_sanitize_token(key[2])/'manager-health.json'
-        entry=Path(__file__).resolve().parents[1]/'scripts/workbuddy_role_host.py'
-    else:fail('startup_host_unconfigured')
-    if entry is None:fail('local_recovery_entry_unverified')
+    ctx=load_role_service_context(key[0],key[2],session)
+    try:
+        target=resolve_recovery_host(config=config,project_id=key[0],member_id=key[2],
+            original_runtime=instance.runtime,
+            current_runtime=(ctx.runner.runtime if ctx.runner is not None else None),
+            control_kind=ctx.control_kind)
+    except RecoveryHostError as exc:
+        fail(exc.code)
+    health,entry=target.health_file,target.host_entry
     plan={'project_id':key[0],'member_id':key[2],'expected_generation':old.generation,
           'expected_process_launch_id':old.process_launch_id,'expected_instance_id':old.observed_instance_id,
           'expected_owner_host':old.owner_host,'process_pid':old.pid,

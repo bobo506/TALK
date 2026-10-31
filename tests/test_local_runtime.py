@@ -1,4 +1,5 @@
 """本机自动宿主与human关闭恢复：隔离数据库，不启动生产模型。"""
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -13,8 +14,10 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from sqlmodel import create_engine
 from server import local_runtime as local
+from server.role_host_resolution import (RecoveryHostError, entry_from_argv,
+    resolve_recovery_host)
 from scripts.role_service_host import HostError
-from tests.test_role_services import RoleServiceTestCase, PROJECT_ID
+from tests.test_role_services import RoleServiceTestCase, PROJECT_ID, RUNNER_ID
 
 
 class BootstrapTests(unittest.TestCase):
@@ -41,6 +44,107 @@ class BootstrapTests(unittest.TestCase):
                 self.assertEqual(local.ensure_local_runtime(None), "requested")
                 self.assertIn("--attach-api", spawn.call_args.args[0])
                 self.assertNotIn("--key", spawn.call_args.args[0])
+
+
+class RecoveryHostResolutionTests(unittest.TestCase):
+    """Pure resolver: fixed hosts first, dynamic source identical to startup."""
+
+    def test_fixed_host_both_entry_contracts_and_priority(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); member = "agent:one"; project = "prj_1"
+            health = root / "fixed-health.json"; health.write_text("{}", encoding="utf-8")
+            config = {"project_id": project, "project_root": str(root),
+                      "state_dir": str(root / "state"), "hosts": [
+                          {"member_id": member, "health_file": str(health),
+                           "argv": [sys.executable, "-m", "scripts.kimi_role_host"]}],
+                      "kimi": {"enabled": True}, "workbuddy": {"executable": "unused"}}
+            host = resolve_recovery_host(config=config, project_id=project, member_id=member,
+                original_runtime="kimi-code", current_runtime="kimi-code",
+                control_kind="managed_cli")
+            self.assertEqual(host.source, "fixed")
+            self.assertEqual(host.health_file, health)
+            self.assertEqual(host.host_entry.name, "kimi_role_host.py")
+            script = root / "custom-host.py"; script.write_text("# fixture", encoding="utf-8")
+            config["hosts"] = [{"member_id": member, "health_file": str(health),
+                                "argv": [sys.executable, str(script)]}]
+            host = resolve_recovery_host(config=config, project_id=project, member_id=member,
+                original_runtime="workbuddy", current_runtime="workbuddy",
+                control_kind="managed_cli")
+            self.assertEqual((host.source, host.host_entry), ("fixed", script))
+
+    def test_dynamic_health_paths_match_startup_manager_directories(self):
+        from scripts import codex_role_host, kimi_role_host
+        from scripts.role_service_host import _sanitize_token
+        with tempfile.TemporaryDirectory() as folder:
+            project, member = "prj_1", "agent:one"
+            config = {"project_id": project, "state_dir": folder, "hosts": [],
+                      "kimi": {"enabled": True}, "codex": {"enabled": True},
+                      "workbuddy": {"executable": "unused"}}
+            kimi = resolve_recovery_host(config=config, project_id=project, member_id=member,
+                original_runtime="kimi-code", current_runtime="kimi-code",
+                control_kind="managed_cli")
+            self.assertEqual(kimi.health_file,
+                Path(kimi_role_host.manager_directory(folder, project, member)) / "manager-health.json")
+            codex = resolve_recovery_host(config=config, project_id=project, member_id=member,
+                original_runtime="codex", current_runtime="codex", control_kind="managed_cli")
+            self.assertEqual(codex.health_file,
+                Path(codex_role_host.manager_directory(folder, project, member)) / "manager-health.json")
+            workbuddy = resolve_recovery_host(config=config, project_id=project, member_id=member,
+                original_runtime="workbuddy", current_runtime="workbuddy",
+                control_kind="managed_cli")
+            self.assertEqual(workbuddy.health_file,
+                Path(folder) / "workbuddy-native" / _sanitize_token(project)
+                / _sanitize_token(member) / "manager-health.json")
+            self.assertEqual(workbuddy.host_entry.name, "workbuddy_role_host.py")
+
+    def test_unknown_incomplete_or_changed_binding_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = {"project_id": "prj_1", "state_dir": folder, "hosts": [],
+                    "workbuddy": {"executable": "unused"}}
+            cases = [
+                ({"project_id": "prj_1", "state_dir": folder, "hosts": [],
+                  "workbuddy": {"executable": "unused"}},
+                 "mystery", "mystery", "managed_cli", "local_recovery_runner_unsupported"),
+                (base, None, "kimi-code", "managed_cli", "local_recovery_runner_unverified"),
+                (base, "kimi-code", "workbuddy", "managed_cli", "local_recovery_binding_changed"),
+                (base, "kimi-code", "kimi-code", "unknown", "local_recovery_binding_changed"),
+                (base, "kimi-code", "kimi-code", "managed_cli", "local_recovery_host_unconfigured"),
+                ({**base, "workbuddy": {}}, "workbuddy", "workbuddy", "managed_cli",
+                 "local_recovery_host_unconfigured"),
+            ]
+            for config, original, current, control, code in cases:
+                with self.subTest(code=code):
+                    with self.assertRaisesRegex(RecoveryHostError, code):
+                        resolve_recovery_host(config=config, project_id="prj_1",
+                            member_id="agent:one", original_runtime=original,
+                            current_runtime=current, control_kind=control)
+
+    def test_bad_fixed_entry_identity_duplicate_and_no_entry_are_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); member = "agent:one"; health = str(root / "h.json")
+            base = {"project_id": "prj_1", "project_root": str(root),
+                    "state_dir": str(root / "state"), "hosts": []}
+            cases = [
+                ([{"member_id": member, "health_file": health,
+                   "argv": [sys.executable, "-m", "not_scripts.host"]}],
+                 "local_recovery_entry_unverified"),
+                ([{"member_id": member, "health_file": health, "argv": [sys.executable]}],
+                 "local_recovery_entry_unverified"),
+                ([{"member_id": member, "health_file": health, "argv": [sys.executable, "h.py"],
+                   "project_id": "other"}], "local_recovery_identity_mismatch"),
+                ([{"member_id": member, "health_file": "" , "argv": [sys.executable, "h.py"]}],
+                 "local_recovery_host_unconfigured"),
+                ([{"member_id": member, "health_file": health, "argv": [sys.executable, "h.py"]},
+                  {"member_id": member, "health_file": health, "argv": [sys.executable, "h.py"]}],
+                 "local_recovery_host_ambiguous"),
+            ]
+            for hosts, code in cases:
+                with self.subTest(code=code):
+                    with self.assertRaisesRegex(RecoveryHostError, code):
+                        resolve_recovery_host(config={**base, "hosts": hosts},
+                            project_id="prj_1", member_id=member,
+                            original_runtime=None, current_runtime=None, control_kind=None)
+            self.assertIsNone(entry_from_argv([sys.executable, "-m", "not_scripts.host"], root))
 
 
 class ActualBootstrapTests(unittest.TestCase):
@@ -143,6 +247,7 @@ class LocalStopTests(RoleServiceTestCase):
         from sqlmodel import select
         self.body_project = PROJECT_ID
         with self.session() as session, patch.object(local,"configured_runtime",return_value=self.bound()), \
+             patch.object(local,"ensure_local_runtime",return_value="disabled"), \
              patch("scripts.role_service_recovery.local_proof",return_value={"both_stopped":True}) as proof:
             operator = session.get(Member,"human:bobo")
             self.assertTrue(local.recover_local_human_stop(PROJECT_ID,self.role_a,operator,session))
@@ -157,7 +262,220 @@ class LocalStopTests(RoleServiceTestCase):
         self.body_project = PROJECT_ID
         for side_effect in (HostError("recovery_process_not_absent"), [{"sha":"a"},{"sha":"b"}]):
             with self.session() as session, patch.object(local,"configured_runtime",return_value=self.bound()), \
+                 patch.object(local,"ensure_local_runtime",return_value="disabled"), \
                  patch("scripts.role_service_recovery.local_proof",side_effect=side_effect):
                 operator = session.get(Member,"human:bobo")
                 with self.assertRaises(HTTPException):local.recover_local_human_stop(PROJECT_ID,self.role_a,operator,session)
                 self.assertIsNotNone(session.get(RoleServiceState,(PROJECT_ID,self.role_a)).process_launch_id)
+
+
+class DynamicLocalStopTests(RoleServiceTestCase):
+    """Human stop must resolve the dynamic host used by the original instance."""
+
+    def setUp(self):
+        super().setUp()
+        self.host_name = socket.gethostname()
+        launch, claimed = self.start_and_claim(host=self.host_name)
+        self.bind_instance(launch, claimed, host=self.host_name)
+        self.assertEqual(self.ready_report(launch, claimed, host=self.host_name).status_code, 200)
+        self.launch, self.claimed = launch, claimed
+        self.set_instance_last_seen(claimed["expected_instance_id"], 120)
+        self.temp = tempfile.TemporaryDirectory(prefix="talk-dynamic-stop-")
+        self.addCleanup(self.temp.cleanup)
+        self.state_dir = Path(self.temp.name)
+
+    def prepare(self, runtime):
+        from server.models import AgentInstance, ProjectRoleBinding, RunnerRegistry
+        from scripts.role_service_host import _sanitize_token
+        with self.session() as session:
+            runner = session.get(RunnerRegistry, RUNNER_ID)
+            runner.runtime = runtime
+            binding = session.get(ProjectRoleBinding, (PROJECT_ID, self.role_a))
+            binding.runner_id = RUNNER_ID
+            instance = session.get(AgentInstance, self.claimed["expected_instance_id"])
+            instance.runtime = runtime
+            session.add_all([runner, binding, instance])
+            session.commit()
+        # Deliberately keep a workbuddy recipe present even for Kimi/Codex:
+        # its mere existence must never select workbuddy-native/{project}/{member}.
+        config = {"schema": "talk-runtime-config-1", "project_id": PROJECT_ID,
+                  "state_dir": str(self.state_dir), "hosts": [],
+                  "workbuddy": {"executable": "unused", "models_home": "unused"}}
+        if runtime == "kimi-code":
+            config["kimi"] = {"enabled": True}
+            directory = "kimi-dynamic"
+        elif runtime == "codex":
+            config["codex"] = {"enabled": True, "executable": "unused"}
+            directory = "codex-dynamic"
+        else:
+            directory = "workbuddy-native"
+        health = (self.state_dir / directory / _sanitize_token(PROJECT_ID)
+                  / _sanitize_token(self.role_a) / "manager-health.json")
+        health.parent.mkdir(parents=True)
+        seen = datetime.now(timezone.utc) - timedelta(seconds=120)
+        health.write_text(json.dumps({"schema": "talk-dynamic-manager-health-1",
+            "project_id": PROJECT_ID, "member_id": self.role_a, "pid": 99999999,
+            "seen_at": seen.isoformat(), "state": "stopped"}), encoding="utf-8")
+        return config, health
+
+    def stop_through_api(self, runtime):
+        from server.models import RoleServiceRecovery, RoleServiceState
+        from sqlmodel import select
+        config, _ = self.prepare(runtime)
+        # Isolate the unrelated TestClient lifespan runtime spawn; the recovery
+        # route still reads configured_runtime and the real local proof.
+        with patch.object(local, "configured_runtime", return_value=(Path("unused.json"), config)), \
+             patch.object(local, "ensure_local_runtime", return_value="disabled"), \
+             patch("server.routes.role_services.require_local_runtime", return_value="requested"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"), \
+             patch("scripts.role_service_recovery.process_inventory", return_value=[]):
+            response = self.stop()
+        self.assertEqual(response.status_code, 200, response.text)
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertIsNone(state.process_launch_id)
+            self.assertEqual(len(session.exec(select(RoleServiceRecovery)).all()), 1)
+
+    def test_dynamic_kimi_human_stop_uses_kimi_health_not_workbuddy(self):
+        self.stop_through_api("kimi-code")
+
+    def test_dynamic_codex_human_stop_uses_codex_health_not_workbuddy(self):
+        self.stop_through_api("codex")
+
+    def test_dynamic_workbuddy_human_stop_uses_workbuddy_health(self):
+        self.stop_through_api("workbuddy")
+
+    def test_live_dynamic_manager_is_not_released_by_human_stop(self):
+        from server.models import RoleServiceRecovery, RoleServiceState
+        from sqlmodel import select
+        config, _ = self.prepare("kimi-code")
+        # Isolate the unrelated TestClient lifespan runtime spawn; the recovery
+        # route still reads configured_runtime and the real local proof.
+        with patch.object(local, "configured_runtime", return_value=(Path("unused.json"), config)), \
+             patch.object(local, "ensure_local_runtime", return_value="disabled"), \
+             patch("server.routes.role_services.require_local_runtime", return_value="requested"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="present"), \
+             patch("scripts.role_service_recovery.process_inventory", return_value=[]):
+            response = self.stop()
+        self.assertEqual(response.status_code, 200, response.text)
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertIsNotNone(state.process_launch_id)
+            self.assertEqual(session.exec(select(RoleServiceRecovery)).all(), [])
+
+    def test_recent_dynamic_heartbeat_keeps_ownership(self):
+        from server.models import RoleServiceRecovery, RoleServiceState
+        from sqlmodel import select
+        config, _ = self.prepare("kimi-code")
+        self.set_instance_last_seen(self.claimed["expected_instance_id"], 0)
+        # Isolate the unrelated TestClient lifespan runtime spawn; the recovery
+        # route still reads configured_runtime and the real local proof.
+        with patch.object(local, "configured_runtime", return_value=(Path("unused.json"), config)), \
+             patch.object(local, "ensure_local_runtime", return_value="disabled"), \
+             patch("server.routes.role_services.require_local_runtime", return_value="requested"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"), \
+             patch("scripts.role_service_recovery.process_inventory", return_value=[]):
+            response = self.stop()
+        self.assertEqual(response.status_code, 200, response.text)
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertIsNotNone(state.process_launch_id)
+            self.assertEqual(session.exec(select(RoleServiceRecovery)).all(), [])
+
+    def test_missing_dynamic_health_is_not_released(self):
+        from server.models import RoleServiceRecovery, RoleServiceState
+        from sqlmodel import select
+        config, health = self.prepare("kimi-code")
+        health.unlink()
+        # Isolate the unrelated TestClient lifespan runtime spawn; the recovery
+        # route still reads configured_runtime and the real local proof.
+        with patch.object(local, "configured_runtime", return_value=(Path("unused.json"), config)), \
+             patch.object(local, "ensure_local_runtime", return_value="disabled"), \
+             patch("server.routes.role_services.require_local_runtime", return_value="requested"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"), \
+             patch("scripts.role_service_recovery.process_inventory", return_value=[]):
+            response = self.stop()
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()["detail"], "local_recovery_unverified")
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertIsNotNone(state.process_launch_id)
+            self.assertEqual(session.exec(select(RoleServiceRecovery)).all(), [])
+
+    def test_wrong_dynamic_health_identity_is_not_released(self):
+        from server.models import RoleServiceRecovery, RoleServiceState
+        from sqlmodel import select
+        config, health = self.prepare("kimi-code")
+        record = json.loads(health.read_text(encoding="utf-8"))
+        record["member_id"] = "agent:other"
+        health.write_text(json.dumps(record), encoding="utf-8")
+        # Isolate the unrelated TestClient lifespan runtime spawn; the recovery
+        # route still reads configured_runtime and the real local proof.
+        with patch.object(local, "configured_runtime", return_value=(Path("unused.json"), config)), \
+             patch.object(local, "ensure_local_runtime", return_value="disabled"), \
+             patch("server.routes.role_services.require_local_runtime", return_value="requested"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"), \
+             patch("scripts.role_service_recovery.process_inventory", return_value=[]):
+            response = self.stop()
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()["detail"], "recovery_manager_identity_mismatch")
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertIsNotNone(state.process_launch_id)
+            self.assertEqual(session.exec(select(RoleServiceRecovery)).all(), [])
+
+    def test_real_dynamic_module_replacement_is_not_released(self):
+        """Codex's reported gap: real -m hosts carry no fabricated --instance."""
+        from server.models import RoleServiceRecovery, RoleServiceState
+        from sqlmodel import select
+        for runtime, module, serve in (("kimi-code", "kimi_role_host", False),
+                                       ("codex", "codex_role_host", False),
+                                       ("workbuddy", "workbuddy_role_host", True)):
+            with self.subTest(runtime=runtime):
+                config, _ = self.prepare(runtime)
+                parts = ["python", "-B", "-X", "utf8", "-m", f"scripts.{module}"]
+                if serve:
+                    parts.append("serve")
+                parts += ["--project", PROJECT_ID, "--member", self.role_a,
+                          "--project-root", r"C:\fixture\project",
+                          "--state-dir", r"C:\fixture\state",
+                          "--base-url", "http://127.0.0.1:9"]
+                command = subprocess.list2cmdline(parts)
+                with patch.object(local, "configured_runtime",
+                                  return_value=(Path("unused.json"), config)), \
+                     patch.object(local, "ensure_local_runtime", return_value="disabled"), \
+                     patch("server.routes.role_services.require_local_runtime",
+                           return_value="requested"), \
+                     patch("scripts.role_service_recovery.recorded_process_state",
+                           return_value="absent"), \
+                     patch("scripts.role_service_recovery.process_inventory",
+                           return_value=[{"CommandLine": command}]):
+                    response = self.stop()
+                self.assertEqual(response.status_code, 409, response.text)
+                self.assertEqual(response.json()["detail"],
+                                 "recovery_replacement_process_present")
+                with self.session() as session:
+                    state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+                    self.assertIsNotNone(state.process_launch_id)
+                    self.assertEqual(session.exec(select(RoleServiceRecovery)).all(), [])
+
+    def test_replacement_dynamic_process_is_not_released(self):
+        from server.models import RoleServiceRecovery, RoleServiceState
+        from sqlmodel import select
+        config, _ = self.prepare("kimi-code")
+        inventory = [{"CommandLine": "python -m scripts.kimi_role_host --instance "
+                      + self.claimed["expected_instance_id"]}]
+        # Isolate the unrelated TestClient lifespan runtime spawn; the recovery
+        # route still reads configured_runtime and the real local proof.
+        with patch.object(local, "configured_runtime", return_value=(Path("unused.json"), config)), \
+             patch.object(local, "ensure_local_runtime", return_value="disabled"), \
+             patch("server.routes.role_services.require_local_runtime", return_value="requested"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"), \
+             patch("scripts.role_service_recovery.process_inventory", return_value=inventory):
+            response = self.stop()
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()["detail"], "recovery_replacement_process_present")
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertIsNotNone(state.process_launch_id)
+            self.assertEqual(session.exec(select(RoleServiceRecovery)).all(), [])

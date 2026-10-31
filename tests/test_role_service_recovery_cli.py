@@ -76,6 +76,96 @@ class RoleServiceRecoveryCliTests(unittest.TestCase):
         self.assertTrue(self.proof(inventory=lambda: [{"CommandLine":
             f'python.exe scripts/role_service_recovery.py apply --host-entry "{self.entry}"'}])["both_absent"])
 
+    @staticmethod
+    def host_command(module, *, project="p", member="agent:x", serve=False, extra=()):
+        parts = ["python", "-B", "-X", "utf8", "-m", module]
+        if serve:
+            parts.append("serve")
+        parts += ["--project", project, "--member", member, *extra]
+        return subprocess.list2cmdline(parts)
+
+    def assert_replacement(self, command):
+        with self.subTest(command=command), self.assertRaises(HostError) as raised:
+            self.proof(inventory=lambda: [{"CommandLine": command}])
+        self.assertEqual(raised.exception.code, "recovery_replacement_process_present")
+
+    def assert_not_blocking(self, command):
+        with self.subTest(command=command):
+            self.assertTrue(self.proof(inventory=lambda: [{"CommandLine": command}])["both_absent"])
+
+    def test_real_dynamic_module_launch_contract_blocks_replacement(self):
+        # Real Kimi/Codex commands have no --instance; WorkBuddy really uses serve.
+        for module, serve in (("scripts.kimi_role_host", False),
+                              ("scripts.codex_role_host", False),
+                              ("scripts.workbuddy_role_host", True)):
+            self.assert_replacement(self.host_command(
+                module, serve=serve,
+                extra=("--project-root", r"C:\fixture\project",
+                       "--state-dir", r"C:\fixture\state")))
+
+    def test_quoted_windows_script_and_module_contracts_block(self):
+        with tempfile.TemporaryDirectory(prefix="talk-host path ") as folder:
+            entry = Path(folder) / "fixture host.py"
+            entry.write_text("# fixture\n", encoding="utf-8")
+            self.entry = entry
+            self.assert_replacement(subprocess.list2cmdline(
+                ["python", "-B", "-X", "utf8", str(entry), "--project", "p", "--member", "agent:x"]))
+            self.assert_replacement(
+                r'python -B -X utf8 "C:\Program Files\TALK\scripts\kimi_role_host.py" '
+                r'--project p --member agent:x')
+            self.assert_replacement(
+                r'python -B -X utf8 scripts/codex_role_host.py --project=p --member=agent:x')
+            self.assert_replacement(subprocess.list2cmdline(
+                ["python", "-B", "-X", "utf8", f"..\\fixtures\\{entry.name}", "--apply"]))
+            self.assert_replacement(subprocess.list2cmdline(
+                ["python", "-B", "-X", "utf8",
+                 r"C:\Program Files\TALK\scripts\workbuddy_role_host.py", "serve",
+                 "--project", "p", "--member", "agent:x"]))
+
+    def test_other_role_project_and_unrelated_module_do_not_block(self):
+        for command in (
+                self.host_command("scripts.kimi_role_host", project="other-project"),
+                self.host_command("scripts.codex_role_host", member="agent:other"),
+                self.host_command("scripts.workbuddy_role_host", serve=True,
+                                  project="other-project", member="agent:other"),
+                "python -m scripts.role_service_recovery apply --project p --member agent:x",
+                "python -m bridges.cli_bridge --project p --member agent:x",
+                "python -m pytest -q",
+                subprocess.list2cmdline(["python", r"C:\deleted\unrelated.py", "--flag"]),
+        ):
+            self.assert_not_blocking(command)
+
+    def test_unknown_or_incomplete_host_identity_is_refused(self):
+        for command in (
+                "python -m scripts.kimi_role_host",
+                "python -m scripts.kimi_role_host --project p",
+                "python -m scripts.kimi_role_host --member agent:x",
+                "python -m scripts.kimi_role_host --project p --member",
+                "python -m scripts.role_service_host serve",
+                "python -m scripts.role_service_host --project p --project-id other --member agent:x",
+                "python -m scripts.kimi_role_host --project p --member agent:other --member agent:x",
+                r'python -B -X utf8 "C:\fixture\kimi_role_host.py" --apply',
+        ):
+            with self.subTest(command=command), self.assertRaises(HostError) as raised:
+                self.proof(inventory=lambda: [{"CommandLine": command}])
+            self.assertEqual(raised.exception.code, "recovery_process_inventory_unknown")
+
+    def test_members_list_equals_forms_and_fixed_entry_boundaries(self):
+        for command in (
+                "python -m scripts.role_service_host serve --project=p "
+                "--members=agent:other,agent:x",
+                "python -m scripts.kimi_role_host --project p --member=agent:x",
+                subprocess.list2cmdline(["python.exe", str(self.entry), "--project", "p",
+                                         "--member", "agent:x"]),
+                # A configured fixed entry is pinned to this member; its exact
+                # script match stays blocking even if generic args look foreign.
+                subprocess.list2cmdline(["python.exe", str(self.entry), "--project", "other",
+                                         "--member", "agent:other"]),
+        ):
+            self.assert_replacement(command)
+        self.assert_not_blocking(
+            "python -m scripts.role_service_host serve --project=p --members=agent:other")
+
     def test_wrong_identity_or_recent_manager_health_blocks(self):
         health = json.loads(self.health.read_text(encoding="utf-8"))
         for changes in ({"member_id": "other"}, {"seen_at": datetime.now(timezone.utc).isoformat()}):

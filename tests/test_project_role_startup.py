@@ -3,6 +3,7 @@ from datetime import datetime,timedelta,timezone
 import json
 from pathlib import Path
 import socket
+import subprocess
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -13,7 +14,7 @@ from sqlalchemy import text
 from sqlmodel import select
 from server import models as m,role_startup as startup
 from scripts import role_service_recovery as local
-from tests.test_role_services import RoleServiceTestCase,PROJECT_ID,OTHER_PROJECT_ID,HOST
+from tests.test_role_services import RoleServiceTestCase,PROJECT_ID,OTHER_PROJECT_ID,HOST,RUNNER_ID
 from tests.test_project_roles import encode
 
 ACTIVATION='a'*32
@@ -235,6 +236,38 @@ class ProjectStartupTests(RoleServiceTestCase):
         self.config={'hosts':[{'member_id':self.role_a,'health_file':str(health),'argv':['python',str(entry)]}]}
         return launch,claim,health
 
+    def cold_dynamic(self,runtime,*,seen_seconds=20):
+        """Reproduce a preboot owner whose runner is a dynamic Kimi/Codex/WorkBuddy host."""
+        from scripts.role_service_host import _sanitize_token
+        self.preference(True)
+        launch,claim=self.start_and_claim(host=socket.gethostname())
+        self.bind_instance(launch,claim,host=socket.gethostname())
+        self.assertEqual(self.ready_report(launch,claim,host=socket.gethostname()).status_code,200)
+        old=startup._now()-timedelta(seconds=seen_seconds)
+        with self.session() as session:
+            row=session.get(m.RoleServiceLaunch,launch['launch_id']);row.created_at=old;session.add(row)
+            state=session.get(m.RoleServiceState,(PROJECT_ID,self.role_a));state.process_started_at=old;session.add(state)
+            instance=session.get(m.AgentInstance,claim['expected_instance_id'])
+            instance.last_seen_at=old;instance.runtime=runtime;session.add(instance)
+            runner=session.get(m.RunnerRegistry,RUNNER_ID);runner.runtime=runtime;session.add(runner);session.commit()
+        directory={'kimi-code':'kimi-dynamic','codex':'codex-dynamic','workbuddy':'workbuddy-native'}[runtime]
+        root=Path(self.coldtemp.name)/('dynamic-'+directory);root.mkdir(parents=True,exist_ok=True)
+        health=(root/directory/_sanitize_token(PROJECT_ID)/_sanitize_token(self.role_a)
+                /'manager-health.json')
+        health.parent.mkdir(parents=True,exist_ok=True)
+        health.write_text(json.dumps({'schema':'talk-dynamic-manager-health-1',
+            'project_id':PROJECT_ID,'member_id':self.role_a,'pid':321,
+            'seen_at':old.isoformat()}),encoding='utf8')
+        # Keep workbuddy present for Kimi/Codex: config existence alone is not identity.
+        self.config={'project_id':PROJECT_ID,'state_dir':str(root),'hosts':[],
+                     'workbuddy':{'executable':'unused','models_home':'unused'}}
+        if runtime=='kimi-code':
+            self.config['kimi']={'enabled':True}
+        elif runtime=='codex':
+            self.config['codex']={'enabled':True,'executable':'unused'}
+        self.launch,self.claim,self.dynamic_health=launch,claim,health
+        return launch,claim,health
+
     def cold_probes(self):
         # Only synthetic PID inventory and synthetic boot epoch; exercise real local_proof.
         from contextlib import ExitStack
@@ -242,6 +275,58 @@ class ProjectStartupTests(RoleServiceTestCase):
         stack.enter_context(patch.object(local,'recorded_process_state',return_value='previous_boot'))
         stack.enter_context(patch.object(local,'process_inventory',return_value=[]))
         return stack
+
+    def real_dynamic_command(self, module, serve=False, member=None):
+        parts = ['python', '-B', '-X', 'utf8', '-m', f'scripts.{module}']
+        if serve:
+            parts.append('serve')
+        parts += ['--project', PROJECT_ID, '--member', member or self.role_a,
+                  '--project-root', r'C:\fixture\project',
+                  '--state-dir', r'C:\fixture\state',
+                  '--base-url', 'http://127.0.0.1:9']
+        return subprocess.list2cmdline(parts)
+
+    def assert_real_cold_replacement_refused(self, runtime, module, serve=False):
+        launch, claim, _ = self.cold_dynamic(runtime)
+        command = self.real_dynamic_command(module, serve)
+        with self.cold_probes() as stack:
+            stack.enter_context(patch.object(local, 'process_inventory',
+                return_value=[{'CommandLine': command}]))
+            result = self.result()
+        self.assertEqual(result['status'], 'failed', result)
+        self.assertEqual(result['error_code'], 'recovery_replacement_process_present')
+        self.assertTrue(self.state_row().process_launch_id)
+        self.assertEqual(len(self.launch_rows()), 1)
+        self.assertEqual(self.launch_rows()[0].launch_id, launch['launch_id'])
+
+    def test_real_dynamic_kimi_module_replacement_is_refused(self):
+        self.assert_real_cold_replacement_refused('kimi-code', 'kimi_role_host')
+
+    def test_real_dynamic_codex_module_replacement_is_refused(self):
+        self.assert_real_cold_replacement_refused('codex', 'codex_role_host')
+
+    def test_real_dynamic_workbuddy_module_replacement_is_refused(self):
+        self.assert_real_cold_replacement_refused('workbuddy', 'workbuddy_role_host', serve=True)
+
+    def test_real_dynamic_host_for_other_member_does_not_block(self):
+        self.cold_dynamic('kimi-code')
+        command = self.real_dynamic_command('kimi_role_host', member='agent:other')
+        with self.cold_probes() as stack:
+            stack.enter_context(patch.object(local, 'process_inventory',
+                return_value=[{'CommandLine': command}]))
+            result = self.result()
+        self.assertEqual(result['status'], 'enqueued', result)
+        self.assertNotEqual(self.state_row().current_launch_id, self.launch['launch_id'])
+
+    def test_real_dynamic_host_with_incomplete_identity_is_unknown(self):
+        self.cold_dynamic('kimi-code')
+        with self.cold_probes() as stack:
+            stack.enter_context(patch.object(local, 'process_inventory',
+                return_value=[{'CommandLine': 'python -m scripts.kimi_role_host'}]))
+            result = self.result()
+        self.assertEqual(result['status'], 'failed', result)
+        self.assertEqual(result['error_code'], 'recovery_process_inventory_unknown')
+        self.assertTrue(self.state_row().process_launch_id)
 
     def test_fast_reboot_selected_recovers_and_enqueues_fresh_instance_atomically(self):
         launch,claim,_=self.cold(True)
@@ -255,6 +340,110 @@ class ProjectStartupTests(RoleServiceTestCase):
             row=session.get(m.RoleStartupActivation,(PROJECT_ID,ACTIVATION,self.role_a))
             self.assertIsNotNone(row.recovery_id)
             self.assertEqual(session.get(m.AgentInstance,claim['expected_instance_id']).status,'offline')
+
+    def test_dynamic_kimi_preboot_recovers_and_enqueues(self):
+        launch,claim,_=self.cold_dynamic('kimi-code')
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['status'],'enqueued',result)
+        state=self.state_row();self.assertEqual(state.generation,launch['generation']+2)
+        self.assertNotEqual(state.current_launch_id,launch['launch_id'])
+
+    def test_dynamic_codex_preboot_recovers_and_enqueues(self):
+        launch,claim,_=self.cold_dynamic('codex')
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['status'],'enqueued',result)
+        state=self.state_row();self.assertEqual(state.generation,launch['generation']+2)
+        self.assertNotEqual(state.current_launch_id,launch['launch_id'])
+
+    def test_dynamic_workbuddy_preboot_recovers_and_enqueues(self):
+        launch,claim,_=self.cold_dynamic('workbuddy')
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['status'],'enqueued',result)
+        state=self.state_row();self.assertEqual(state.generation,launch['generation']+2)
+        self.assertNotEqual(state.current_launch_id,launch['launch_id'])
+
+    def test_dynamic_unknown_runner_never_falls_back_to_workbuddy(self):
+        self.cold_dynamic('kimi-code')
+        with self.session() as session:
+            instance=session.get(m.AgentInstance,self.claim['expected_instance_id'])
+            instance.runtime='mystery';session.add(instance)
+            runner=session.get(m.RunnerRegistry,RUNNER_ID);runner.runtime='mystery';session.add(runner)
+            session.commit()
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['error_code'],'local_recovery_runner_unsupported')
+        self.assertTrue(self.state_row().process_launch_id)
+        self.assertEqual(len(self.launch_rows()),1)
+
+    def test_dynamic_binding_change_cannot_use_new_runner_for_old_owner(self):
+        self.cold_dynamic('kimi-code')
+        with self.session() as session:
+            runner=session.get(m.RunnerRegistry,RUNNER_ID);runner.runtime='workbuddy';session.add(runner)
+            session.commit()
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['error_code'],'local_recovery_binding_changed')
+        self.assertTrue(self.state_row().process_launch_id)
+
+    def test_dynamic_missing_health_is_unverified(self):
+        self.cold_dynamic('kimi-code')
+        self.dynamic_health.unlink()
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['error_code'],'local_recovery_unverified')
+        self.assertTrue(self.state_row().process_launch_id)
+
+    def test_dynamic_wrong_health_identity_is_refused(self):
+        self.cold_dynamic('kimi-code')
+        record=json.loads(self.dynamic_health.read_text(encoding='utf8'))
+        record['member_id']='agent:other'
+        self.dynamic_health.write_text(json.dumps(record),encoding='utf8')
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['error_code'],'recovery_manager_identity_mismatch')
+        self.assertTrue(self.state_row().process_launch_id)
+
+    def test_dynamic_live_manager_is_refused(self):
+        from contextlib import ExitStack
+        self.cold_dynamic('kimi-code')
+        with ExitStack() as stack:
+            stack.enter_context(self.cold_probes())
+            stack.enter_context(patch.object(local,'recorded_process_state',return_value='present'))
+            result=self.result()
+        self.assertEqual(result['error_code'],'recovery_process_not_absent')
+        self.assertTrue(self.state_row().process_launch_id)
+
+    def test_dynamic_recent_health_is_not_previous_boot(self):
+        self.cold_dynamic('kimi-code')
+        record=json.loads(self.dynamic_health.read_text(encoding='utf8'))
+        record['seen_at']=startup._now().isoformat()
+        self.dynamic_health.write_text(json.dumps(record),encoding='utf8')
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['error_code'],'recovery_not_previous_boot')
+        self.assertTrue(self.state_row().process_launch_id)
+
+    def test_dynamic_replacement_process_is_refused(self):
+        launch,claim,_=self.cold_dynamic('kimi-code')
+        with self.cold_probes() as stack:
+            stack.enter_context(patch.object(local,'process_inventory',return_value=[
+                {'CommandLine':'python -m scripts.kimi_role_host --instance '
+                 + claim['expected_instance_id']}]))
+            result=self.result()
+        self.assertEqual(result['error_code'],'recovery_replacement_process_present')
+        self.assertTrue(self.state_row().process_launch_id)
+
+    def test_fixed_host_priority_does_not_depend_on_dynamic_recipe(self):
+        launch,claim,dynamic_health=self.cold_dynamic('kimi-code')
+        dynamic_health.unlink()
+        root=Path(self.coldtemp.name)/'fixed-priority';root.mkdir(parents=True,exist_ok=True)
+        health=root/'manager.json';entry=root/'host.py'
+        entry.write_text('# isolated fixed fixture',encoding='utf8')
+        old=startup._now()-timedelta(seconds=20)
+        health.write_text(json.dumps({'project_id':PROJECT_ID,'member_id':self.role_a,
+            'pid':321,'seen_at':old.isoformat()}),encoding='utf8')
+        self.config={'project_id':PROJECT_ID,'state_dir':str(Path(self.coldtemp.name)),
+                     'hosts':[{'member_id':self.role_a,'health_file':str(health),
+                               'argv':['python',str(entry)]}],
+                     'kimi':{'enabled':True},'workbuddy':{'executable':'unused','models_home':'unused'}}
+        with self.cold_probes():result=self.result()
+        self.assertEqual(result['status'],'enqueued',result)
+        self.assertNotEqual(self.state_row().current_launch_id,launch['launch_id'])
 
     def test_fast_reboot_unselected_is_stopped_and_paused_root_is_unchanged(self):
         self.cold(False)

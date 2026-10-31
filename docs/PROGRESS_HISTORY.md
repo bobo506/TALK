@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-10-31 — 动态角色关闭/冷恢复修复上线（任务364–367及接续验收）
+
+- 364定位动态 Kimi/Codex 被误按 WorkBuddy 路径恢复的问题，新增统一纯解析器；独立复核发现真实 `-m scripts.<host>` 替代宿主漏判。365集中修正真实模块/脚本、引号、Windows/短路径和项目/角色匹配边界，保留忙任务、近期心跳、活进程、PID复用、双次proof/CAS等守卫。
+- 366未形成代码复核结论：G-terra在任务预检因 `base_instructions` 配置不兼容失败；367只做加载前准备，因当时沙箱与低内存限制停止，生产变更为0。当前大K会话重新独立审查365实际差异、六个真实反例和冻结哈希，不冒称366/367已通过。
+- 独立验证第一轮170项中169项通过，唯一失败为 `ADMINI~1`/`Administrator` 临时路径字符串差异；原始日志保留。同一断言和代码在长路径TEMP环境第二轮 **170/170全部通过**，含ActualBootstrap真实API/runtime重启与六组真实宿主反例。
+- 正常停止旧runtime 9580并确认进程退出、8000关闭后，仅加载四个产品文件 `server/role_host_resolution.py`、`server/local_runtime.py`、`server/role_startup.py`、`scripts/role_service_recovery.py`，SHA256与365冻结一致；三项回归测试同步且哈希一致。未改数据库、运行配置、绑定、Key或自启动偏好。
+- 新runtime 3928/API 15212健康，七宿主serving。大K先从旧unknown/ownership恢复为generation 8已关闭、旧实例离线，再按原运行状态启动到generation 9/`ins_770346c0363b`、running/ready/idle；同实例心跳07:15:34推进至07:19:05。小D按原自启动偏好恢复ready。
+- 小G、G-terra、小K、Kimi k2.8、w-d逐一完成真实启动ready、正常关闭和实例离线，最终恢复原关闭状态；未派开发任务、未调用真实模型。历史286保持queued/accepted/未领取。既有内存泄漏不在本片修复范围，本次正常重启只作临时缓解。
+
 ## 2026-10-29 19:25（Asia/Shanghai）— B1-c 修 preflight，并暴露 Key 路径不一致
 
 - 用户重启 API 后再点小K，`rotate-key` 已成功（17:36:07，201），`agent_kimi.key`（44字节）与

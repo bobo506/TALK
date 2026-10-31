@@ -90,9 +90,11 @@ def recover_local_human_stop(project_id, member_id, operator, session):
     if bound is None or bound[1]["project_id"] != project_id:
         return False
     from server.role_service_recovery import recovery_plan, recover_stopped
-    from server.models import RoleServiceRecoveryRequest
+    from server.models import AgentInstance, RoleServiceRecoveryRequest
+    from server.role_host_resolution import RecoveryHostError, resolve_recovery_host
+    from server.role_services import load_role_service_context
     from scripts.role_service_recovery import local_proof
-    from scripts.role_service_host import HostError, _sanitize_token
+    from scripts.role_service_host import HostError
     try:
         plan = recovery_plan(project_id, member_id, operator, session).model_dump(mode="json")
     except HTTPException as exc:
@@ -100,17 +102,17 @@ def recover_local_human_stop(project_id, member_id, operator, session):
             return False
         raise
     config = bound[1]
-    spec = next((s for s in config.get("hosts", []) if s["member_id"] == member_id), None)
-    if spec:
-        health = Path(spec["health_file"])
-        entry = next((Path(a) for a in spec["argv"][1:] if a.endswith(".py")), None)
-    elif config.get("workbuddy"):
-        health = Path(config["state_dir"]) / "workbuddy-native" / _sanitize_token(project_id) / _sanitize_token(member_id) / "manager-health.json"
-        entry = ROOT / "scripts/workbuddy_role_host.py"
-    else:
-        return False
-    if entry is None:
-        raise HTTPException(409, "local_recovery_entry_unverified")
+    ctx = load_role_service_context(project_id, member_id, session)
+    instance = session.get(AgentInstance, plan["expected_instance_id"])
+    try:
+        target = resolve_recovery_host(
+            config=config, project_id=project_id, member_id=member_id,
+            original_runtime=(instance.runtime if instance is not None else None),
+            current_runtime=(ctx.runner.runtime if ctx.runner is not None else None),
+            control_kind=ctx.control_kind)
+    except RecoveryHostError as exc:
+        raise HTTPException(409, exc.code) from exc
+    health, entry = target.health_file, target.host_entry
     try:
         from scripts.role_service_recovery import recorded_process_state
         manager = json.loads(health.read_text(encoding="utf-8"))

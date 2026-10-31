@@ -1,6 +1,7 @@
 # MODULE: Agent Bridges
 
 
+> 2026-10-31 任务364/365修复已上线：动态 Kimi/Codex/WorkBuddy 的 human 关闭恢复与 preboot 冷恢复统一使用 `server/role_host_resolution.py`，固定 `hosts` 优先，健康文件与真实 `-m scripts.<host>`/`.py` 入口按原实例运行器和当前 managed_cli 绑定解析。真实模块替代宿主、缺失/冲突身份继续拒绝，其他角色/项目不误阻挡；原有忙任务、心跳、PID 复用、双次 proof/CAS 守卫保持。独立复跑六套170项全过；大K冷恢复、启动与持续心跳及七角色实际启停通过，未派任务或调用模型。详[进度](../PROGRESS.md)。
 > 2026-10-29：绑定重置进度刷新修正 Window 定时器接收者，避免后台完成但页面停留等待。后台恢复协议不变，104项相关测试通过，真实新请求验收进行中。见 [修复记录](BINDING_RESET_TIMER_FIX_20261029.md)。
 > 2026-10-29：G-terra启动cli_incompatible已修。CodexRoleHost生成bridge argv遵循公共python -m入口合同，不再插入与预检冲突的解释器选项；46项关联测试及真实启动/关闭/再启动通过，未派模型任务，未外推完整任务验收。详[G-terra修复](G_TERRA_START_FIX_20261029.md)。
 
