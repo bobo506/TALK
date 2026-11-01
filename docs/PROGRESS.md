@@ -16,6 +16,7 @@
 > 2026-11-01 20:53（DeepSeek，**Terra 宿主已重启**）：Terra 原宿主 11184（00:56 启动）按 drain 标记正常退出，runtime 拉起新宿主 17088（20:53:16）并 serving；服务保持 stopped、generation 11、未持有进程。Terra 配置无需修改，新宿主已加载结构化校验；API 4764 仍未重载，新建 Codex 角色需下次自然重载，Terra 自身启动校验在宿主侧已生效。
 > 2026-11-01 22:24（DeepSeek，**Codex base_instructions 兼容已修复**）：386/387 的 `unknown configuration field base_instructions` 是正式宿主/桥接生成旧参数，与 `config.toml` 校验无关。`codex_role_host`/`codex_bridge` 三条命令统一改 `developer_instructions`；`codex_execution_native` 的 `-c` 白名单移除 `base_instructions`，旧命令在 TALK 层拒绝。组合回归 83 项 OK。Terra 正常关闭→宿主 18292→启动 generation 16/`ins_71c494b3c6c4` ready；任务 388 预检+执行通过（`TALK_PARAM_OK`），普通消息 3118/3119 返回 `PM_PARAM_OK`/`PM_PATH_OK`；实例 idle、心跳正常。详见 `.tmp/codex-param-fix-20261101/REPORT.md`。
 > 2026-11-01 22:27（DeepSeek，**API 已重载**）：旧 API 4764 正常替换为 18248，`/healthz` 200、startup complete、worker 无错；7 个宿主保持 serving，Terra 宿主 18292 未动，服务 generation 16/`ins_71c494b3c6c4` running/ready、实例 idle（心跳 22:27:42）。API 重载只替换 API，不关闭角色宿主；页面刷新后即可线上验收。
+> 2026-11-02 00:05（DeepSeek）：**351-G 已完成并加载**。真实接单走 `cli_bridge.run_task_queue_worker`，此前 `codex_bridge.handle_queued_task` 的强度逻辑从未被调用；现注册 `before_task` 钩子，每任务（预检+执行）从 `/agents` 读绑定并从启动模板重写命令（`-c model_reasoning_effort=` / `--effort`）。实测：小G、Terra 启动值 high/xhigh，改 low 后**不重启**即生效（rollout 与命令行双证据），任务 390/391 成功并收取。回归 171 项 + 新增 9 项通过。
 Updated: 2026-11-01 22:30（Asia/Shanghai）。当前状态以顶部最新记录和“当前运行现场”为准；下方 B1 各节仅保留 2026-10-29 的历史排查背景，实际闭环见“旧任务与未解决项”。
 
 ## B1 历史未验收快照（已闭环，仅作背景）
@@ -77,7 +78,7 @@ Updated: 2026-11-01 22:30（Asia/Shanghai）。当前状态以顶部最新记录
 
 - **347/2993**整体仍未完成；**348/2994**两个DSH凭据拒绝边界仍缺修复/复验证据。之前Codex仅补CLI运行配置，本轮仅修Codex启动前缀，均不是348安全修复。原创建者agent:codex，尚未收取；正常收取与业务验收通过须区分。
 - **旧角色兼容恢复（B1-a/b/c/d 已完成并实机闭环，2026-10-29 晚）**：小G`agent:codex`、小D`agent:deepseek`、小K`agent:kimi`为`origin=imported`、无创建操作。B1-a 以已提交`role_legacy_attach_operations`为锚点，`choice_snapshot`现读合成；B1-b 补 rotate-key legacy 分支；B1-c 放行 preflight 的补录来源；B1-d 让作业侧预期绑定指纹回落请求快照。20:30/20:44/20:45 三次恢复全部`provisioned`，作业推进为`succeeded`，`credential_version`保持 2，用户确认小K 启停正常。
-- **351思考强度（实现已提交，任务待复核收取）**：A–F已覆盖用户覆盖值、Codex/Kimi/DSH/WorkBuddy逐任务生效与官方能力清单；DSH逐任务原子改写角色patch，WorkBuddy逐任务传`--effort`，不再只是读取+回填。四个本地提交及测试/授权加载记录见顶部；任务351仍`submitted`，不得提前写成已复核。
+- **351思考强度（已完成并加载，351-G 已补逐任务修复）**：A–F 覆盖用户覆盖值、官方能力清单与四种运行器落点；351-G 修复 Codex 真实接单路径（cli_bridge 钩子 + 模板化重写），小G 与 Terra 不重启即可逐任务生效。五个运行器的最小实测均已通过（DSH patch、Kimi config.toml、WorkBuddy --effort、Codex rollout/命令行）。用户确认 Codex 复核已完成；任务 351 待按原权限收取，未推送。
 - **角色页面余项**：3d 删除清理闭环已完成（`da001a8`）并实机验收；外观模式（白天/夜间）已完成并推送（`bc3bba7`）。
 - 旧记录250/2767 failed未收取、286 paused、344/2990 failed未收取，保持不操作。历史主控/页面开发要求可能仍是旧值，不冒称已同步。
 
@@ -104,7 +105,7 @@ python -B -X utf8 -m scripts.talk_runtime serve --config "D:/claude-test/TALK-pr
 
 0. **P0 内存泄漏修复：已验收通过（2026-11-01）**。`27985e9` 修复 + `229a735` 观察：6 小时逐进程 <0.2 MB/分钟、合计 0.086 且分段递减；独立复核 369（kimi）approved，370（小G）环境修复后重派为 371，发现 R1 已由 `12c992f` 返修、377 定向复验通过（两反例 3/3/0、346 项、G4、ACL 语义与 close 幂等）；369/370/371/377 均已收取（370 置 completed 但保留 blocked 事实）。剩余：推送（分支领先 15 个提交，含他人 351/352）与部署 `12c992f`（异常路径修复，可等自然重启）。P1 轮询降频、P2 内存观测、P3 并发/内存规格另开切片。
 1. **347/2993 与 348/2994 的历史收尾**：整体仍未完成；348 两个 DSH 凭据拒绝边界仍缺修复/复验证据。原创建者为 `agent:codex`，收取需按其身份与权限执行；用户可决定是否重新派发。
-2. **351思考强度收尾**：复核四个本地提交的实际实现与测试/加载证据，确认后按原任务权限收取；本次汇总会话不冒称独立复核，不自动开工。
+2. **推送与收取**：分支领先 17 个本地提交（含 351/352 与他人的修复），Codex 复核已完成、五个运行器实测通过；待用户确认推送并按权限收取 351。进度文档已收口到本条目。
 3. **缓存清理**：用户已明确优先级不高，暂缓；盘点结论见下（可安全清理约 40MB，大头是各 CLI 状态目录，不能按缓存删）。
 4. 路线图其余条目（会话窗口换新、任务列表按真实对话窗口、运行器新版本提示、主被动跟进、定时任务项目化、工作区登记）见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
 5. **正式 Codex 宿主 tools 分支**：`scripts/codex_role_host.py` 的 `tools → workspace-write` 尚未加 `windows.sandbox`/`--add-dir`，新 Codex 角色复用前需补产品切片（含 `bridges/codex_execution_native.py` 的 `-c`/`--add-dir` 白名单与测试）；小G 仍走遗留入口。

@@ -152,6 +152,7 @@ python scripts/talk_workflow.py summary <交付包> --expect-task-id <当前任�
 - SDK 位于 `TALK/client/`，固定导入 `from TALK.client import TalkClient`，不要写成 `from client import X`。
 - 后端：Python 3.11+、FastAPI、uvicorn、SQLModel；数据库为 SQLite WAL；前端为 Vanilla JS + Tailwind CSS CDN；鉴权为 `X-API-Key`。
 - 配置由 `config.toml` 和 `tomllib` 读取。运行数据、日志、上传文件和备份不属于产品源码。
+- 新接或升级非交互运行器必须按[非交互开发权限验收](docs/guides/TERMINAL_MCP.md#非交互开发权限验收2026-10-30)逐项核验受管授权、真实读写/命令正例与拒绝反例、来源优先级及重启/会话边界；ready或工具可发现不算开发验收。
 
 ## 启动方式
 

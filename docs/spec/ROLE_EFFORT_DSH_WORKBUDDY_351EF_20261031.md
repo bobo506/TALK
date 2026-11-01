@@ -28,9 +28,9 @@ WorkBuddy 的 `--effort` 是从其 CLI bundle 与 `models.json` 契约核实到�
 - `test_role_host_runtime_configuration` 与 DSH 入口无关的断言更新为 `bridges.dsh_bridge@`；
   该套件在本机候选内因“测试根必须在工作区外”的环境守卫整体失败，**基线同样失败**，非本片回归。
 
-未验证：未用真实 DSH/WorkBuddy 任务核对 CLI 是否按新值执行；未加载生产。
+已验证（2026-10-31 晚，加载后实测）：DSH patch 由 off 改为 low、Kimi config.toml 由 high 改为 low、WorkBuddy 前置 --effort max 而正式任务 --effort high。生产已于 2026-10-31 23:05 加载。
 
 ## 4. 遗留
 
-- 两个运行器的存量角色还要做一次能力补齐（WorkBuddy 读 models.json；DSH 落 max）。
+- 两个运行器的存量角色能力补齐已完成（WorkBuddy 读 models.json；DSH 由适配事实提供四档）。
 - 真实执行证据与页面验收在加载后由用户操作验证。
