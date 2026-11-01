@@ -178,7 +178,9 @@ def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, 
                 disabled.append(value)
             elif flag in {"-c", "--config"}:
                 key, sep, raw = value.partition("=")
-                if not sep or key not in {"model_reasoning_effort", "developer_instructions", "base_instructions"}:
+                # 0.163/0.164 的 config schema 只接受 developer_instructions；
+                # base_instructions 不是合法的 -c 覆盖，必须在 TALK 层拒绝。
+                if not sep or key not in {"model_reasoning_effort", "developer_instructions"}:
                     raise CodexNativeError("codex_config_option_unsupported")
                 try:
                     settings[key] = json.loads(raw)

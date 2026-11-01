@@ -321,10 +321,12 @@ Codex `exec` 默认对 MCP tool call 走 approval 闸门,在非交互(`-` stdin)
 codex exec --skip-git-repo-check --ignore-rules
            --sandbox <read-only|workspace-write> --color never
            --dangerously-bypass-approvals-and-sandbox
-           -c base_instructions=...
+           -c developer_instructions=...
            -c mcp_servers.talk_send.command=...
            -c mcp_servers.talk_send.args=...
 ```
+
+Codex 0.163/0.164 的 config schema 只接受 `developer_instructions`；`base_instructions` 不是合法的 `-c` 覆盖（2026-11-01 修正）。
 
 风险面控制依赖两个事实:
 - MCP catalog 只暴露 `talk_send` 一个工具(bridge 配置,LLM 无法绕开)

@@ -245,6 +245,7 @@ Agent 提交结果后，任务会进入“结果待收取”。
 - 执行任务的 TEMP 放在仓库外（`%TEMP%\talk-codex-task`），并通过 Codex 的 `--add-dir` 授权为可写目录。不要把它改回仓库内，否则 346 项会因 `key_root_inside_repo` 失败。
 - 项目根的 `.codex/config.toml` 必须符合当前 Codex 版本；旧格式会报 `invalid transport` 并阻断启动。本项目已将旧的 181 字节文件改名为 `.codex/config.toml.stale-20261027`。
 - 角色启动前会按字段校验原生 `config.toml`：Codex 自动写回的项目信任（`[projects.<项目根>]`）与已确认的沙箱/审批设置允许；空白、注释、字段顺序不影响。`model`、文件型凭据存储或信任路径被改动时仍拒绝启动。
+- Codex 0.163/0.164 的系统提示通过 `-c developer_instructions=...` 传入；不要再使用 `base_instructions`，否则任务预检会在模型调用前报配置解析错误。
 - 当前小G 走遗留入口；新建 Codex 角色使用的正式入口尚未加同一套沙箱开关，需管理员另开切片适配。
 
 ## 12. 当前版本边界

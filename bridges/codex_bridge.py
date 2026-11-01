@@ -34,7 +34,7 @@ def _codex_config_arg(key: str, value: Any) -> str:
     return shlex.quote(f"{key}={json.dumps(value, ensure_ascii=False)}")
 
 
-_CODEX_SYSTEM_CONFIG_ARG = _codex_config_arg("base_instructions", CODEX_SYSTEM_INSTRUCTIONS)
+_CODEX_SYSTEM_CONFIG_ARG = _codex_config_arg("developer_instructions", CODEX_SYSTEM_INSTRUCTIONS)
 _CODEX_MCP_COMMAND_CONFIG_ARG = _codex_config_arg("mcp_servers.talk_send.command", "python")
 _CODEX_MCP_ARGS_CONFIG_ARG = _codex_config_arg("mcp_servers.talk_send.args", [_MCP_SERVER_PATH])
 # Windows 下 MCP server 子进程必须强制 UTF-8，否则 stdin/stdout 走系统 codepage(cp936)，
@@ -128,7 +128,7 @@ def _build_codex_command(
 ) -> str:
     """Build the codex exec command for a given system instructions + profile.
 
-    The system layer for codex is the ``base_instructions`` config value
+    The system layer for codex is the ``developer_instructions`` config value
     (PROJECT_INTEGRATION §5.4); Phase 2 profile injection works by passing an
     enhanced ``system_instructions`` here. ``_codex_config_arg`` already wraps
     values with ``shlex.quote`` over a JSON encoding, so arbitrary profile
@@ -138,7 +138,7 @@ def _build_codex_command(
     return (
         f"{codex_exe} exec --skip-git-repo-check --ignore-rules --sandbox {sandbox} --color never "
         f"{_CODEX_APPROVAL_BYPASS_FLAG} "
-        f"-c {_codex_config_arg('base_instructions', system_instructions)} "
+        f"-c {_codex_config_arg('developer_instructions', system_instructions)} "
         f"-c {_CODEX_MCP_COMMAND_CONFIG_ARG} "
         f"-c {_CODEX_MCP_ARGS_CONFIG_ARG} "
         f"-c {_CODEX_MCP_ENV_UTF8_CONFIG_ARG} "
@@ -158,7 +158,7 @@ def _build_codex_task_command(
     return (
         f"{codex_exe} exec --skip-git-repo-check --ignore-rules --sandbox {sandbox} --color never "
         f"{_CODEX_APPROVAL_BYPASS_FLAG} "
-        f"-c {_codex_config_arg('base_instructions', system_instructions)} "
+        f"-c {_codex_config_arg('developer_instructions', system_instructions)} "
         f"-"
     )
 
@@ -187,7 +187,7 @@ def resolve_codex_command(args: argparse.Namespace) -> str:
     - ``TALK_CODEX_COMMAND`` env or a custom ``--codex-command`` is respected
       as-is; whoever overrides owns the system instructions.
     - With ``--project`` set and a non-empty ``.talk/`` profile for this member,
-      the IDENTITY/SOUL/USER profile is composed into ``base_instructions``
+      the IDENTITY/SOUL/USER profile is composed into ``developer_instructions``
       (approach B, system layer).
     - Without ``--project`` (or with an empty profile) the result is
       byte-identical to today — strictly opt-in, zero regression.

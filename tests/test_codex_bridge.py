@@ -26,12 +26,12 @@ from cli.profiles import SYSTEM_PROMPT_PROFILE_HEADER, agent_profile_dir
 from TALK.client.exceptions import TalkValidationError
 
 
-def _base_instructions_value(command: str) -> str:
+def _developer_instructions_value(command: str) -> str:
     args = shlex.split(command, posix=True)
     for index, arg in enumerate(args):
-        if arg == "-c" and index + 1 < len(args) and args[index + 1].startswith("base_instructions="):
+        if arg == "-c" and index + 1 < len(args) and args[index + 1].startswith("developer_instructions="):
             return args[index + 1]
-    raise AssertionError("base_instructions config arg not found")
+    raise AssertionError("developer_instructions config arg not found")
 
 
 class CodexBridgeTests(unittest.TestCase):
@@ -184,7 +184,8 @@ class CodexBridgeTests(unittest.TestCase):
             for index, arg in enumerate(command_args)
             if arg == "-c" and index + 1 < len(command_args)
         ]
-        self.assertTrue(any(value.startswith("base_instructions=") for value in config_values))
+        self.assertTrue(any(value.startswith("developer_instructions=") for value in config_values))
+        self.assertFalse(any(value.startswith("base_instructions=") for value in config_values))
         self.assertTrue(any("不存在下一轮" in value for value in config_values))
         self.assertTrue(any(value == 'mcp_servers.talk_send.command="python"' for value in config_values))
         self.assertTrue(any(value.startswith("mcp_servers.talk_send.args=[") for value in config_values))
@@ -233,7 +234,18 @@ class CodexBridgeTests(unittest.TestCase):
 
         self.assertIn("--sandbox read-only", command)
         self.assertNotIn("mcp_servers.talk_send", command)
-        self.assertIn("优先严格遵循请求者给出的任务正文", _base_instructions_value(command))
+        self.assertIn("优先严格遵循请求者给出的任务正文", _developer_instructions_value(command))
+        self.assertNotIn("base_instructions", command)
+
+    def test_all_default_commands_use_developer_instructions_only(self):
+        for command in (
+            default_codex_command(),
+            codex_bridge.default_codex_task_command(),
+            codex_bridge.default_codex_task_preflight_command(),
+        ):
+            with self.subTest(command=command[:80]):
+                self.assertIn("developer_instructions=", command)
+                self.assertNotIn("base_instructions", command)
 
     def test_tools_profile_task_command_keeps_workspace_write_without_talk_mcp(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
@@ -263,7 +275,7 @@ class CodexBridgeTests(unittest.TestCase):
         self.assertIn("--sandbox read-only", command)
         self.assertNotIn("--sandbox workspace-write", command)
         self.assertNotIn("mcp_servers.talk_send", command)
-        self.assertIn("领取前预检", _base_instructions_value(command))
+        self.assertIn("领取前预检", _developer_instructions_value(command))
 
     def test_resolve_codex_command_without_project_is_default(self):
         old_value = os.environ.pop("TALK_CODEX_COMMAND", None)
@@ -286,7 +298,7 @@ class CodexBridgeTests(unittest.TestCase):
                 os.environ["TALK_CODEX_COMMAND"] = old_value
         self.assertIn("--sandbox workspace-write", resolved)
 
-    def test_resolve_codex_command_injects_profile_into_base_instructions(self):
+    def test_resolve_codex_command_injects_profile_into_developer_instructions(self):
         tmp = Path(tempfile.mkdtemp(prefix="talk-codex-project-"))
         self.addCleanup(lambda: shutil.rmtree(tmp, ignore_errors=True))
         agent_dir = agent_profile_dir(tmp, "agent:codex")
@@ -304,13 +316,13 @@ class CodexBridgeTests(unittest.TestCase):
             if old_value is not None:
                 os.environ["TALK_CODEX_COMMAND"] = old_value
 
-        base_instructions = _base_instructions_value(resolved)
-        # base system instructions preserved …
-        self.assertIn("不存在下一轮", base_instructions)
+        developer_instructions = _developer_instructions_value(resolved)
+        # developer instructions preserved …
+        self.assertIn("不存在下一轮", developer_instructions)
         # … plus the framed profile background
-        self.assertIn(SYSTEM_PROMPT_PROFILE_HEADER, base_instructions)
-        self.assertIn("不写汇报体", base_instructions)
-        self.assertIn("决策型代码 Agent", base_instructions)
+        self.assertIn(SYSTEM_PROMPT_PROFILE_HEADER, developer_instructions)
+        self.assertIn("不写汇报体", developer_instructions)
+        self.assertIn("决策型代码 Agent", developer_instructions)
 
     def test_resolve_codex_command_project_without_profile_is_byte_identical(self):
         tmp = Path(tempfile.mkdtemp(prefix="talk-codex-noprofile-"))

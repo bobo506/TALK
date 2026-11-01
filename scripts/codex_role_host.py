@@ -172,7 +172,7 @@ class CodexRoleHost(rsh.HostManager):
                 '--model', config['model'], '--sandbox', sandbox, '--color', 'never',
                 '--skip-git-repo-check', '--ignore-rules',
                 '-c', 'model_reasoning_effort=' + json.dumps(effort),
-                '-c', 'base_instructions=' + json.dumps(compose_system_prompt(prompt, profile)), '-'])
+                '-c', 'developer_instructions=' + json.dumps(compose_system_prompt(prompt, profile)), '-'])
         message = command(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT, 'read-only')
         task = command(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT,
             'workspace-write' if self.task_profile == 'tools' else 'read-only')

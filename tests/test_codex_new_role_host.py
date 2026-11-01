@@ -141,6 +141,10 @@ class NewCodexRoleHostTests(unittest.TestCase):
                 self.assertEqual(parsed.timeout, timeout or 86400)
                 self.assertEqual(parsed.codex_execution_profile,
                                  'tools' if profile == 'tools' else 'discussion')
+                for command in (parsed.codex_command, parsed.codex_task_command,
+                                parsed.task_preflight_command):
+                    self.assertIn("developer_instructions=", command)
+                    self.assertNotIn("base_instructions", command)
 
     # ── 351-B：思考强度按公开绑定解析并写入执行命令 ───────────────────
     def test_configuration_resolves_effort_from_public_binding(self):

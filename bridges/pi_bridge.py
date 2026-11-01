@@ -50,7 +50,7 @@ def _single_line(text: str) -> str:
     ``--system-prompt`` 参数在 cmd.exe 这层截断/破坏，pi 收到残缺提示后**不产出任何可见
     回复**（→ bridge 兜底成"我是 pi，已切换为中文回复…"那句）。把提示压成一行即可绕过该
     shim，同时完整保留内容。2026-06-19 实测 pi 0.79.8：含 \\n 的提示 pi 吐空，单行化后正常
-    出话。codex 不受影响（它走 JSON 编码的 ``-c base_instructions``，换行被转义）。
+    出话。codex 不受影响（它走 JSON 编码的 ``-c developer_instructions``，换行被转义）。
     """
     return " ".join(text.split())
 

@@ -220,6 +220,8 @@ class CodexCommandTests(unittest.TestCase):
             self.assertEqual(command[command.index('--sandbox')+1],'read-only')
             self.assertEqual(command[1:4],['-a','never','--strict-config'])
             self.assertFalse(any('bypass' in a for a in command))
+            self.assertTrue(any(item.startswith('developer_instructions=') for item in command))
+            self.assertFalse(any(item.startswith('base_instructions=') for item in command))
             env=manager.child_environment('p','agent:new')
             self.assertEqual(Path(env['CODEX_HOME']),manager.store.native_home_dir('p','agent:new')/'.codex')
             # Validate the produced command against the existing strict native adapter,
@@ -232,6 +234,9 @@ class CodexCommandTests(unittest.TestCase):
                 model_id='exact-selected-model',binding_fingerprint='synthetic-fingerprint')
             with patch.dict(os.environ,env),patch.object(native.subprocess,'run',return_value=SimpleNamespace(stdout='codex-cli 0.163.0')):
                 launch=native.resolve_launch(command,root,binding)
+                legacy=[('base_instructions='+item.split('=',1)[1]) if item.startswith('developer_instructions=') else item for item in command]
+                with self.assertRaisesRegex(native.CodexNativeError,'codex_config_option_unsupported'):
+                    native.resolve_launch(legacy,root,binding)
             self.assertEqual((launch.model,launch.effort,launch.sandbox),('exact-selected-model','xhigh','read-only'))
 
     def test_native_adapter_negotiates_0_164_and_rejects_unlisted_versions(self):
