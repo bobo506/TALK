@@ -164,6 +164,12 @@ API 107 MB + 7 个宿主约 23 MB ≈ **326 MB**；随后每 5 分钟采样一�
 回归 350 项中仅 `test_slow_real_worker_does_not_block_control_loop_stop` 失败，经 `git stash` 还原基线复测
 3 次同样 2 次失败，属既有 flaky（时序），不计入本次回归。
 
+**R1 定向复验（377）**：两个注入反例重放均为 `allocations=3 / frees=3 / leaked=0`；新增 4 项、346 项
+（275.005s，2 个符号链接跳过）、G4、`close()` 幂等、6 类旧异常与 4 类发布错误码对照、真实 ACL 原子发布
+均通过；303 份候选源码哈希一致。377 自报 `blocked` 仅因**交付枚举冲突**：`talk-delivery-1` 只接受
+`complete/partial/blocked`，本轮派发要求填 `approved` 属派发方笔误，技术结论为通过。
+后续派发统一使用 `complete/partial/blocked`，不再使用 `approved/changes_requested`。
+
 验收口径（按复核意见细化）：
 1. **快速验收**：预热 200 次后，连续多批（3×1000 次）发布 `≤ 1 KB/次`；本次实测 0.000 KB/次。
 2. **进程级指标**：逐进程采样（`talk_runtime`、每个宿主、`talk_api` 分别记），同时给出合计值；
