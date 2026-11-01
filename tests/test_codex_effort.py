@@ -147,7 +147,7 @@ class ResolveTaskEffortTests(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([{"member_id": "agent:x", "binding": self.binding()}])
         effort = await resolve_task_effort(client, {"project_id": "prj_1"}, "agent:x")
         self.assertEqual(effort, "high")
-        self.assertEqual(client.calls, [("GET", "/api/projects/prj_1/roles")])
+        self.assertEqual(client.calls, [("GET", "/api/projects/prj_1/agents")])
 
     async def test_old_service_without_effective_field_keeps_baked_value(self):
         from bridges.codex_bridge import resolve_task_effort

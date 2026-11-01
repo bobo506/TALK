@@ -298,7 +298,7 @@ async def resolve_task_effort(client: Any, task: dict[str, Any], member_id: str)
     if not isinstance(project, str) or not project:
         return None
     try:
-        rows = await client._request_json("GET", "/api/projects/" + quote(project, safe="") + "/roles")
+        rows = await client._request_json("GET", "/api/projects/" + quote(project, safe="") + "/agents")
     except Exception:
         _effort_diagnostic("codex_effort_lookup_failed")
         return None
