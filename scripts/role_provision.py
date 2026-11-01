@@ -1341,6 +1341,7 @@ def _windows_build_private_security_attributes() -> "_WindowsPrivateSecurity":
     if not _advapi32.InitializeAcl(acl, 4096, 2):
         raise _WindowsAclError("InitializeAcl failed")
     sid_pointers: list[Any] = []
+    handed_off = False
     try:
         for sid_text in _windows_acl_sids():
             psid = ctypes.c_void_p()
@@ -1356,19 +1357,22 @@ def _windows_build_private_security_attributes() -> "_WindowsPrivateSecurity":
             raise _WindowsAclError("InitializeSecurityDescriptor failed")
         if not _advapi32.SetSecurityDescriptorDacl(descriptor, True, acl, False):
             raise _WindowsAclError("SetSecurityDescriptorDacl failed")
-    except BaseException:
-        # 中途失败同样要还：这些 SID 是本次调用刚分配的，不能留给 GC。
-        for psid in sid_pointers:
-            if psid:
-                _kernel32.LocalFree(psid)
-        raise
-    attributes = _SecurityAttributes(
-        nLength=ctypes.sizeof(_SecurityAttributes),
-        lpSecurityDescriptor=ctypes.cast(descriptor, ctypes.c_void_p),
-        bInheritHandle=False,
-    )
-    # 返回对象同时持有缓冲区/SID 引用，避免 CreateFileW 前被 GC 回收。
-    return _WindowsPrivateSecurity(attributes, (acl, descriptor), sid_pointers)
+        attributes = _SecurityAttributes(
+            nLength=ctypes.sizeof(_SecurityAttributes),
+            lpSecurityDescriptor=ctypes.cast(descriptor, ctypes.c_void_p),
+            bInheritHandle=False,
+        )
+        # 返回对象同时持有缓冲区/SID 引用，避免 CreateFileW 前被 GC 回收。
+        security = _WindowsPrivateSecurity(attributes, (acl, descriptor), sid_pointers)
+        handed_off = True
+        return security
+    finally:
+        # 所有权交接成功前（含 _SecurityAttributes / _WindowsPrivateSecurity 构造本身
+        # 抛 MemoryError）都必须由本函数归还 SID；交接成功后由返回对象负责，避免双重释放。
+        if not handed_off:
+            for psid in sid_pointers:
+                if psid:
+                    _kernel32.LocalFree(psid)
 
 
 def _windows_create_file_with_private_acl(path: Path, payload: bytes) -> None:

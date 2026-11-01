@@ -156,6 +156,14 @@ API 107 MB + 7 个宿主约 23 MB ≈ **326 MB**；随后每 5 分钟采样一�
 
 **结论：P0 验收通过**（逐进程均 <0.2 MB/分钟，合计曲线趋平）。85 分钟中间检查点数据（runtime 0.009、合计 0.140）保留在上文历史记录中，结论以后者为准。
 
+**371 复核 R1（已返修，待定向复验）**：复核指出 `_SecurityAttributes` 构造与 `_WindowsPrivateSecurity`
+所有权交接原先位于异常清理区之外，这两步抛 `MemoryError` 时本次分配的 3 个 SID 无人释放、调用方也拿不到
+`security` 对象（复核用注入复现：`native_sid_allocations=3, frees=0`）。返修把 `try` 延伸到所有权交接之后，
+用 `handed_off` 标志区分：交接前任何异常在 `finally` 归还 SID，交接成功后由返回对象 `close()` 负责，避免双重释放。
+新增 `tests/test_role_provision_p0_leak.py` 覆盖两个注入反例、成功路径与 `close()` 幂等。
+回归 350 项中仅 `test_slow_real_worker_does_not_block_control_loop_stop` 失败，经 `git stash` 还原基线复测
+3 次同样 2 次失败，属既有 flaky（时序），不计入本次回归。
+
 验收口径（按复核意见细化）：
 1. **快速验收**：预热 200 次后，连续多批（3×1000 次）发布 `≤ 1 KB/次`；本次实测 0.000 KB/次。
 2. **进程级指标**：逐进程采样（`talk_runtime`、每个宿主、`talk_api` 分别记），同时给出合计值；
