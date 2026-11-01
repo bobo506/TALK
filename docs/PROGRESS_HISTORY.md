@@ -3,13 +3,17 @@
 ## 2026-11-01 — P0 内存泄漏修复收尾与 Codex 复核执行能力（小G）
 
 - P0 内存泄漏修复 `27985e9`（+观察文档 `229a735`）：DLL/函数原型/Structure 进程内只建一次，SID/字符串 `LocalFree` 覆盖成功、中途失败、提前返回；单次发布 55.5 KB → 0.000 KB。上线后 6 小时 72 点采样合计 **0.086 MB/分钟**且分段递减。
-- 作者侧 346 项全绿；独立复核 369（kimi）三项实测（基准、346、30 分钟斜率）通过并 approved；370（小G 代码与边界）因 Codex 环境 blocked，按用户决定保留原失败记录、暂不收取。
+- 作者侧 346 项全绿；独立复核 369（kimi）三项实测（基准、346、30 分钟斜率）通过并 approved；370（小G 代码与边界）因 Codex 环境 blocked，按用户决定保留原失败记录、暂不收取（后按用户要求于 19:28 收取并置 completed，见本节末尾补记）。
 - 小G 原问题：Codex 0.164 在 Windows 默认 `Windows sandbox selection: disabled`，`-a never` + read-only 时 `exec_policy` 把所有命令判 Forbidden，任务 370 在 CreateProcess 前报 `blocked by policy`。
 - 最终修复：任务模式改为 cwd=项目根、`--sandbox workspace-write`、`-c windows.sandbox="elevated"`、`--add-dir %TEMP%\talk-codex-task`（TEMP 在仓库外）；message/preflight 仍 read-only。整仓可写，复核者能自己跑测试。
 - 实测：沙箱内 33 项 12.861s OK；完整 346 项 **296.940s OK（skipped=2）**；仓库根写文件成功；`git rev-parse HEAD` 正常。
 - 尝试过并放弃：常驻 worktree + 任务前重置。干净 worktree/TEMP 在仓库内会触发 `key_root_inside_repo`，346 出现 23 failures + 2 errors；worktree 已 purge。`scripts/talk_review_pretest.py`（`4da5578`）作为可选兜底保留，不参与当前流程。
 - 本地配置：`.codex/config.toml`（181 字节，2026-10-27）对 0.164 报 `invalid transport`，阻断 elevated；已改名 `.codex/config.toml.stale-20261027`。要恢复 `TALK_FOLLOWUP_*` 需按 0.164 MCP schema 重写。
 - 边界：整仓可写意味着复核者“能”改源码；任务正文仍要求不改产品源码、证据写 `.tmp/<任务号>/`，收取前用 `git status` 核对。小G 仍走遗留入口；正式 `codex_role_host.py` 的 `tools` 分支尚未加同一开关，需另开产品切片。
+- **当晚补记（371/377 与 R1）**：370 环境修复后 18:09 重派 371；codex 在 300 份冻结源码候选上跑 346 项 254.885s OK（2 个符号链接跳过）、G4 与基准 `+0.132/0/0 KB` 通过，结论 `changes_requested`，唯一阻断 **R1**——`_SecurityAttributes` 构造与 `_WindowsPrivateSecurity` 所有权交接在异常清理区之外，注入 `MemoryError` 时 3 个 SID 只分配不释放（`allocations=3 / frees=0 / leaked=3`）。
+- R1 返修 `12c992f`：`try` 延伸到所有权交接之后，`handed_off` 标志区分——交接前任何异常在 `finally` 归还 SID，交接成功后由返回对象 `close()` 负责，避免双重释放；新增 `tests/test_role_provision_p0_leak.py`（两个注入反例、成功交接 + `close()` 幂等、ACL 中途失败原路径，4 项）。350 项回归仅既有 flaky `test_slow_real_worker_does_not_block_control_loop_stop` 失败，基线 3 次 2 败已证。
+- 定向复验 377：两个反例均 `3/3/0`、新增 4 项、346 项 275.005s OK、G4、`close()` 幂等、6 类旧异常与 4 类发布错误码对照、4 例真实 ACL 原子发布、303 份候选 SHA 全过；自报 `blocked` 仅因交付枚举冲突（`talk-delivery-1` 只接受 `complete/partial/blocked`，派发误写 `approved`），**技术结论通过**。
+- 收取与状态：369/371/377 按已处理收取；370 于 19:28 按用户要求收取并置 `completed`，保留其 blocked 事实（不代表复核通过，真正独立复核实为 371+377）。文档提交 `a9c2801`、`bf27957`、`44e62d4`；分支领先远程 15 个提交未推送；生产仍运行 `27985e9`，R1 属异常路径，未强制部署。
 
 ## 2026-10-31 — 动态角色关闭/冷恢复修复上线（任务364–367及接续验收）
 
