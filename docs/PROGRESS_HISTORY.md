@@ -17,6 +17,7 @@
 
 - **小G 启动校验修正（19:52）**：根因是 Codex 0.164 在沙箱修复后把 `[projects.'d:\claude-test\talk'] trust_level="trusted"` 写回 native `config.toml`；遗留入口仍用整份文本与 `native_login.CONFIG` 比较，误报 `codex_native_config_changed`。新增 `bridges/codex_native_config.py`：TOML 结构化字段校验，忽略空白/注释/顺序；强制 `model`、`cli_auth_credentials_store=file`；`projects` 只允许项目根且只允许 `trust_level`；拒绝未知字段与 `disabled`/`danger-full-access` 等放宽值。遗留入口与 `scripts/codex_role_setup.read_config` 共用，`write_config` 同步修正嵌套表写法。
 - **实机与证据（19:48–19:50）**：drain 标记正常下线旧宿主 11172，runtime 自动拉起 17568；start 成功 generation 51/`ins_49e91fecc579`/ready。任务 384 两条只读命令均退出 0，`python -c` 输出 `XIAOG_TASK_OK`；交付 JSON 因自定义 `status`/`commands` 字段被 `talk-delivery-1` 判 invalid，只作执行证据。定向 48 项 OK；`test_codex_role_setup` 10 项既有 `ADMINI~1` 路径失败未变。未重启 API，正式宿主改动下个自然重载生效；未重新验收完整 workspace-write 开发能力。
+- **Terra 宿主重启（20:53）**：存量另一个 Codex 角色 G-terra 原宿主 11184（00:56 启动）按 drain 标记正常退出，runtime 拉起新宿主 17088（20:53:16）并 serving；服务保持 stopped、generation 11、ownership false。Terra 配置无需修改，新 `read_config` 对原配置和“原配置 + 项目信任”均验证通过；API 4764 仍未重载，只影响新建 Codex 角色的准备流程。
 
 ## 2026-10-31 — 动态角色关闭/冷恢复修复上线（任务364–367及接续验收）
 
