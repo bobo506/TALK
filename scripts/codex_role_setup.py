@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 import re
 import subprocess
-import tomllib
 from types import SimpleNamespace
 
+from bridges import codex_native_config as native_config
 from bridges.codex_execution_native import CodexNative, LaunchSpec, SUPPORTED_VERSIONS
 from scripts import role_service_host as host
 from scripts import native_setup_process
@@ -85,23 +85,55 @@ def require_version(exe, root, env):
         raise SetupError('native_cli_version_unsupported') from None
 
 
-def read_config(path):
+def read_config(path, *, root=None):
+    """读取 native 配置；排版差异忽略，模型/隔离/信任约束仍逐字段校验。
+
+    Codex 会把项目信任写回 ``config.toml``；这里允许项目根上的 ``trust_level``，
+    但拒绝其他信任路径与任何未知字段（结构化校验见 bridges/codex_native_config）。
+    """
+    path = Path(path)
     if not path.exists():
         return None
     if host._is_reparse_point(path) or not path.is_file() or path.stat().st_size > 65536:
         raise SetupError('native_model_configuration_required')
-    with path.open('rb') as stream:
-        value = tomllib.load(stream)
-    if (set(value) - set(BASE_CONFIG) - {'model', 'model_reasoning_effort'}
-            or any(value.get(k) != v for k, v in BASE_CONFIG.items())):
-        raise SetupError('native_model_configuration_required')
-    return value
+    try:
+        return native_config.read_config(path, root=root, required=BASE_CONFIG)
+    except native_config.NativeConfigChanged:
+        raise SetupError('native_model_configuration_required') from None
+
+
+def _toml_scalar(value):
+    """只序列化 config.toml 允许的标量；不猜未知类型。"""
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    raise ValueError('unsupported native config value')
 
 
 def write_config(path, value):
     # Private, atomic publication; only the explicit public configuration is written.
-    text = ''.join(k + ' = ' + json.dumps(v) + '\n' for k, v in value.items())
-    host._publish_private_bytes(path, text.encode('utf-8'))
+    # Codex 会把 [projects.<root>] / [windows] 这类表写回配置，但 json.dumps 只适合
+    # 标量；嵌套 dict 必须按 TOML 表语法逐层写，否则会把合法配置改坏。
+    lines = []
+    tables = []
+    for key, item in value.items():
+        if isinstance(item, dict):
+            tables.append((key, item))
+        else:
+            lines.append(key + ' = ' + _toml_scalar(item) + '\n')
+    for key, item in tables:
+        for subkey, subvalue in item.items():
+            if isinstance(subvalue, dict):
+                lines.append('\n' + '[' + key + '.' + json.dumps(str(subkey), ensure_ascii=False) + ']\n')
+                for nested_key, nested_value in subvalue.items():
+                    lines.append(nested_key + ' = ' + _toml_scalar(nested_value) + '\n')
+            else:
+                lines.append('\n' + '[' + key + ']\n')
+                lines.append(subkey + ' = ' + _toml_scalar(subvalue) + '\n')
+    host._publish_private_bytes(path, ''.join(lines).encode('utf-8'))
 
 
 def begin_native_login(project, member, *, root=ROOT, popen=subprocess.Popen):
@@ -121,7 +153,7 @@ def begin_native_login(project, member, *, root=ROOT, popen=subprocess.Popen):
         native_setup_process.stop_previous(home, project, member)
         lock_path = lock_path_for(home / 'codex-role-setup')
         lock = acquire_lock(lock_path)
-        prior = read_config(native / 'config.toml')
+        prior = read_config(native / 'config.toml', root=root)
         if prior is not None and prior.get('model') != binding[1]:
             raise SetupError('native_model_selection_changed')
         env = environment(home)
@@ -205,7 +237,7 @@ def finish_native_login(attempt):
         db.execute('BEGIN IMMEDIATE')
         if _role(db, attempt.project, attempt.member) != attempt.binding:
             raise SetupError('native_model_selection_changed')
-        prior = read_config(attempt.native_home / 'config.toml')
+        prior = read_config(attempt.native_home / 'config.toml', root=attempt.root)
         if prior is None or prior.get('model') != attempt.binding[1]:
             raise SetupError('native_model_configuration_required')
         write_config(attempt.native_home / 'config.toml', dict(prior, model_reasoning_effort=effort))

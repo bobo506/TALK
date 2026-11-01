@@ -137,7 +137,8 @@ class CodexRoleHost(rsh.HostManager):
             raise rsh.HostError('codex_setup_in_progress', '请等待角色官方授权完成')
         binding = self._current_binding(self.project, self.member, alias)
         try:
-            config = read_config(rsh.assert_inside_root(home, Path('.codex') / 'config.toml'))
+            config = read_config(rsh.assert_inside_root(home, Path('.codex') / 'config.toml'),
+                                 root=self.project_root)
             if (config is None or config.get('model') != binding['model_id']
                     or binding['provider_id'] != 'openai'
                     or config.get('model_reasoning_effort') not in EFFORTS):

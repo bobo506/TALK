@@ -263,3 +263,41 @@ class CodexCommandTests(unittest.TestCase):
                     return_value=SimpleNamespace(stdout='codex-cli 0.165.0')):
                 with self.assertRaisesRegex(native.CodexNativeError,'version_unsupported'):
                     native.resolve_launch(command,root,binding)
+
+
+class CodexNativeConfigReadTests(unittest.TestCase):
+    """配置读取的结构化边界：项目信任可放行，越界信任仍拒绝。"""
+
+    def setUp(self):
+        import tempfile
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.path = self.root / 'config.toml'
+
+    def write(self, trust_path=None):
+        value = trust_path if trust_path is not None else self.root
+        self.path.write_text(
+            ''.join(f'{key} = {json.dumps(item)}\n' for key, item in setup.BASE_CONFIG.items())
+            + 'model = "selected-exact-model"\n'
+            + f'\n[projects.{json.dumps(str(value))}]\ntrust_level = "trusted"\n',
+            encoding='utf-8')
+        return self.path
+
+    def test_project_trust_on_project_root_is_accepted(self):
+        value = setup.read_config(self.write(), root=self.root)
+        self.assertEqual(value['model'], 'selected-exact-model')
+        self.assertEqual(list(value['projects'].values())[0]['trust_level'], 'trusted')
+
+    def test_project_trust_outside_project_root_is_rejected(self):
+        outside = self.root.parent / 'unrelated-project'
+        with self.assertRaisesRegex(setup.SetupError, 'native_model_configuration_required'):
+            setup.read_config(self.write(outside), root=self.root)
+
+    def test_write_config_round_trips_project_trust_and_windows_table(self):
+        path = self.write()
+        value = dict(setup.read_config(path, root=self.root),
+                     windows={'sandbox': 'elevated'})
+        setup.write_config(path, value)
+        self.assertEqual(setup.read_config(path, root=self.root), value)
+        self.assertIn('[projects.', path.read_text('utf-8'))

@@ -15,6 +15,9 @@
 - 定向复验 377：两个反例均 `3/3/0`、新增 4 项、346 项 275.005s OK、G4、`close()` 幂等、6 类旧异常与 4 类发布错误码对照、4 例真实 ACL 原子发布、303 份候选 SHA 全过；自报 `blocked` 仅因交付枚举冲突（`talk-delivery-1` 只接受 `complete/partial/blocked`，派发误写 `approved`），**技术结论通过**。
 - 收取与状态：369/371/377 按已处理收取；370 于 19:28 按用户要求收取并置 `completed`，保留其 blocked 事实（不代表复核通过，真正独立复核实为 371+377）。文档提交 `a9c2801`、`bf27957`、`44e62d4`；分支领先远程 15 个提交未推送；生产仍运行 `27985e9`，R1 属异常路径，未强制部署。
 
+- **小G 启动校验修正（19:52）**：根因是 Codex 0.164 在沙箱修复后把 `[projects.'d:\claude-test\talk'] trust_level="trusted"` 写回 native `config.toml`；遗留入口仍用整份文本与 `native_login.CONFIG` 比较，误报 `codex_native_config_changed`。新增 `bridges/codex_native_config.py`：TOML 结构化字段校验，忽略空白/注释/顺序；强制 `model`、`cli_auth_credentials_store=file`；`projects` 只允许项目根且只允许 `trust_level`；拒绝未知字段与 `disabled`/`danger-full-access` 等放宽值。遗留入口与 `scripts/codex_role_setup.read_config` 共用，`write_config` 同步修正嵌套表写法。
+- **实机与证据（19:48–19:50）**：drain 标记正常下线旧宿主 11172，runtime 自动拉起 17568；start 成功 generation 51/`ins_49e91fecc579`/ready。任务 384 两条只读命令均退出 0，`python -c` 输出 `XIAOG_TASK_OK`；交付 JSON 因自定义 `status`/`commands` 字段被 `talk-delivery-1` 判 invalid，只作执行证据。定向 48 项 OK；`test_codex_role_setup` 10 项既有 `ADMINI~1` 路径失败未变。未重启 API，正式宿主改动下个自然重载生效；未重新验收完整 workspace-write 开发能力。
+
 ## 2026-10-31 — 动态角色关闭/冷恢复修复上线（任务364–367及接续验收）
 
 - 364定位动态 Kimi/Codex 被误按 WorkBuddy 路径恢复的问题，新增统一纯解析器；独立复核发现真实 `-m scripts.<host>` 替代宿主漏判。365集中修正真实模块/脚本、引号、Windows/短路径和项目/角色匹配边界，保留忙任务、近期心跳、活进程、PID复用、双次proof/CAS等守卫。

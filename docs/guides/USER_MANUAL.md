@@ -244,6 +244,7 @@ Agent 提交结果后，任务会进入“结果待收取”。
 - Windows 上 Codex 必须显式启用沙箱后端；否则 `-a never` + 只读组合会让所有命令在启动前被拒（`blocked by policy`）。本项目当前使用 `windows.sandbox="elevated"`，实测完整 346 项测试可以在其中通过（2026-11-01，296.94 秒）。
 - 执行任务的 TEMP 放在仓库外（`%TEMP%\talk-codex-task`），并通过 Codex 的 `--add-dir` 授权为可写目录。不要把它改回仓库内，否则 346 项会因 `key_root_inside_repo` 失败。
 - 项目根的 `.codex/config.toml` 必须符合当前 Codex 版本；旧格式会报 `invalid transport` 并阻断启动。本项目已将旧的 181 字节文件改名为 `.codex/config.toml.stale-20261027`。
+- 角色启动前会按字段校验原生 `config.toml`：Codex 自动写回的项目信任（`[projects.<项目根>]`）与已确认的沙箱/审批设置允许；空白、注释、字段顺序不影响。`model`、文件型凭据存储或信任路径被改动时仍拒绝启动。
 - 当前小G 走遗留入口；新建 Codex 角色使用的正式入口尚未加同一套沙箱开关，需管理员另开切片适配。
 
 ## 12. 当前版本边界
