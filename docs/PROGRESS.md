@@ -17,7 +17,8 @@
 > 2026-11-01 22:24（DeepSeek，**Codex base_instructions 兼容已修复**）：386/387 的 `unknown configuration field base_instructions` 是正式宿主/桥接生成旧参数，与 `config.toml` 校验无关。`codex_role_host`/`codex_bridge` 三条命令统一改 `developer_instructions`；`codex_execution_native` 的 `-c` 白名单移除 `base_instructions`，旧命令在 TALK 层拒绝。组合回归 83 项 OK。Terra 正常关闭→宿主 18292→启动 generation 16/`ins_71c494b3c6c4` ready；任务 388 预检+执行通过（`TALK_PARAM_OK`），普通消息 3118/3119 返回 `PM_PARAM_OK`/`PM_PATH_OK`；实例 idle、心跳正常。详见 `.tmp/codex-param-fix-20261101/REPORT.md`。
 > 2026-11-01 22:27（DeepSeek，**API 已重载**）：旧 API 4764 正常替换为 18248，`/healthz` 200、startup complete、worker 无错；7 个宿主保持 serving，Terra 宿主 18292 未动，服务 generation 16/`ins_71c494b3c6c4` running/ready、实例 idle（心跳 22:27:42）。API 重载只替换 API，不关闭角色宿主；页面刷新后即可线上验收。
 > 2026-11-02 00:05（DeepSeek）：**351-G 已完成并加载**。真实接单走 `cli_bridge.run_task_queue_worker`，此前 `codex_bridge.handle_queued_task` 的强度逻辑从未被调用；现注册 `before_task` 钩子，每任务（预检+执行）从 `/agents` 读绑定并从启动模板重写命令（`-c model_reasoning_effort=` / `--effort`）。实测：小G、Terra 启动值 high/xhigh，改 low 后**不重启**即生效（rollout 与命令行双证据），任务 390/391 成功并收取。回归 171 项 + 新增 9 项通过。
-Updated: 2026-11-01 22:30（Asia/Shanghai）。当前状态以顶部最新记录和“当前运行现场”为准；下方 B1 各节仅保留 2026-10-29 的历史排查背景，实际闭环见“旧任务与未解决项”。
+> 2026-11-02 00:40（DeepSeek）：**小d 启动门槛已修**。`deepseek_native_patch_changed` 的根因是遗留 DSH 宿主按整份 patch 逐字节比对（基线 `reasoningEffort: max`），而逐任务钩子于 11-01 18:48 按绑定把同一行写成 `low`，此后每次启动都在预检阶段失败（`spawned=0`，未起进程/实例）；页面改回 max 只写 `effort_override`，不回写 patch，故重试仍失败。按用户选择先把 patch 回写 `max` 解锁启动，随后新增 [bridges/dsh_patch.py](../bridges/dsh_patch.py) 做结构化校验（provider/model 必须等于确认值，强度只认 off/low/high/max，注释/顺序/行尾不再阻断），遗留入口改为调用它，错误码保留 `deepseek_native_patch_changed`。新增 11 项测试 + 既有强度回归 23 项 OK；宿主同款系统 Python 实测当前 patch 通过、模拟 `low` 通过、模拟改 model 拒绝。**宿主已重启（15656 → 18084，runtime 状态 serving，00:38:01）**，新门槛已加载；patch 保持 `max`，七个宿主均 serving。
+Updated: 2026-11-02 00:40（Asia/Shanghai）。当前状态以顶部最新记录和“当前运行现场”为准；下方 B1 各节仅保留 2026-10-29 的历史排查背景，实际闭环见“旧任务与未解决项”。
 
 ## B1 历史未验收快照（已闭环，仅作背景）
 

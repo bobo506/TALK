@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-02 — 小d（agent:deepseek）启动门槛：整份字节比对改结构化校验
+
+- **现象**：小d 每次启动都报 `启动失败（deepseek_native_patch_changed：service reported failure）`；DB `role_service_state` 记录 `spawned=0`、无 pid/实例，说明进程根本没起。
+- **根因**：遗留宿主 `.tmp/legacy-role-page-control/deepseek-next/deepseek_member_entry.py` 的 `build_entry_argv` 要求角色私有 patch 与确认基线**逐字节相等**（基线含 `reasoningEffort: max`）。11-01 18:48 任务 375（351 强度实测）领取时，产品的逐任务钩子（`bridges/dsh_bridge.py` → `bridges/dsh_effort.py`）按当时绑定生效值把同一行写成 `low`（`model-deepseek-flash.patch.yml` 217 字节，仅此一处差异）。此后 23:03、00:08 的启动全部在预检被拒。23:09 页面把强度改成 max 只写 `binding.effort_override`，不回写 patch，故重试仍失败；且 patch 只能由“跑起来的 bridge”在任务前改写，形成死锁。
+- **止血（按用户选择）**：把 patch 的 `reasoningEffort` 回写 `max`，与旧基线逐字节一致（sha256 `e860622b…42eba0`，217 字节），原 `low` 版本备份到 `%TEMP%\dsh-diag\`；未起停任何进程。
+- **修复**：新增 `bridges/dsh_patch.py`（零新依赖的简单 YAML 解析 + 结构化校验）：`agent-default-model.config.provider/model` 必须等于确认值，缺段/重复段/标量 `config`/不可识别结构 fail-closed；`llm-deepseek.config.reasoningEffort` 只要求存在且属于 `off/low/high/max`，具体值仍由绑定逐任务写入；注释、行尾、引号、行内注释与字段顺序不再造成启动失败。遗留入口改用 `patch_problem(text)`，错误码保留 `deepseek_native_patch_changed`，不可读文件也归到该码。
+- **验证**：新增 `tests/test_dsh_patch_preflight.py` 11 项（确认基线、四档、书写差异、provider/model 漂移、缺/重复段、结构反例、行内注释、CRLF、引号、字段顺序、额外段）；与 `tests.test_dsh_workbuddy_effort` 合并 **23 项 OK（exit 0）**；用宿主同款系统 Python 对遗留入口 `py_compile` + 真实导入：当前 patch 返回 `None`，模拟 `low` 放行，模拟 `model: deepseek-pro` 拒绝；入口源码已无 `PATCH_TEXT` 整份比对。
+- **加载与边界**：校验在宿主进程启动时加载。用户确认后已重启小d宿主：旧 15656 终止，runtime 于 00:38:01 拉起 18084 并 `serving`，新门槛生效；其余六个宿主未动、均 serving，patch 保持 `max`。遗留入口位于 `.tmp/`（gitignored），改动只保留在本机运行目录，逻辑已版本化到 `bridges/dsh_patch.py`；本片作者自测通过，未做独立复核、未推送。
+
+
 ## 2026-11-01 — P0 内存泄漏修复收尾与 Codex 复核执行能力（小G）
 
 - P0 内存泄漏修复 `27985e9`（+观察文档 `229a735`）：DLL/函数原型/Structure 进程内只建一次，SID/字符串 `LocalFree` 覆盖成功、中途失败、提前返回；单次发布 55.5 KB → 0.000 KB。上线后 6 小时 72 点采样合计 **0.086 MB/分钟**且分段递减。
