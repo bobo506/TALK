@@ -287,13 +287,8 @@ def _effort_diagnostic(event: str) -> None:
         pass
 
 
-async def resolve_task_effort(client: Any, task: dict[str, Any], member_id: str) -> str | None:
-    """按公开绑定事实取**本次执行**应使用的思考强度（351-B）。
-
-    - 只读 ``GET /api/projects/{id}/roles`` 的公开 ``binding``，不读私有配置；
-    - 旧服务没有 351-A 字段时返回 ``None``，继续用启动时烘焙的值（行为不变）；
-    - 查询失败/能力未知时记一行诊断并返回 ``None``，不阻断任务，也不编造档位。
-    """
+async def fetch_task_binding(client: Any, task: dict[str, Any], member_id: str) -> dict[str, Any] | None:
+    """只读 ``GET /api/projects/{id}/agents`` 的公开 ``binding``，不读私有配置。"""
     project = task.get("project_id")
     if not isinstance(project, str) or not project:
         return None
@@ -313,12 +308,77 @@ async def resolve_task_effort(client: Any, task: dict[str, Any], member_id: str)
     if not isinstance(binding, dict) or "effective_effort" not in binding:
         # 旧服务/未提供新字段：保持既有行为。
         return None
+    return binding
+
+
+def _has_effort_override(binding: dict[str, Any]) -> bool:
+    override = binding.get("effort_override")
+    return isinstance(override, str) and bool(override.strip())
+
+
+async def resolve_task_effort(client: Any, task: dict[str, Any], member_id: str) -> str | None:
+    """按公开绑定事实取**本次执行**应使用的思考强度（兼容辅助）。"""
+    binding = await fetch_task_binding(client, task, member_id)
+    if binding is None:
+        return None
     try:
         effort, _source = resolve_binding_effort(binding, None)
     except EffortUnavailable as exc:
         _effort_diagnostic(exc.reason)
         return None
     return effort
+
+
+def _rewrite_effort_commands(args: argparse.Namespace, effort: str) -> None:
+    """从启动模板生成本次命令（不就地累积改写）；两种命令形态都要能识别。"""
+    task_template = getattr(args, "task_command_template", None)
+    preflight_template = getattr(args, "task_preflight_command_template", None)
+    if task_template is None or preflight_template is None:
+        raise cli_bridge.TaskPreflightError("codex_effort_template_missing")
+    command, mode = apply_effort(task_template, effort)
+    preflight, preflight_mode = apply_effort(preflight_template, effort)
+    if mode == "unchanged" or preflight_mode == "unchanged":
+        raise cli_bridge.TaskPreflightError("codex_effort_command_unrecognized")
+    args.task_command = command
+    args.task_preflight_command = preflight
+
+
+def make_effort_hook(client: Any, args: argparse.Namespace):
+    """351-G：每个任务（预检+正式执行）前，从模板重写本次强度。
+
+    真实接单走 ``cli_bridge.run_task_queue_worker``，不会调用 ``handle_queued_task``
+    的兼容包装；因此强度刷新挂在通用队列的 ``before_task`` 钩子上，旧小G 入口与 Terra
+    动态宿主都覆盖。
+    """
+
+    member_id = cli_bridge.member_id_from_name(getattr(args, "name", "codex"))
+
+    async def refresh(task: dict[str, Any]) -> None:
+        # 先回到启动模板，避免上一次任务改写后的命令残留。
+        task_template = getattr(args, "task_command_template", None)
+        preflight_template = getattr(args, "task_preflight_command_template", None)
+        if task_template is not None:
+            args.task_command = task_template
+        if preflight_template is not None:
+            args.task_preflight_command = preflight_template
+        binding = await fetch_task_binding(client, task, member_id)
+        if binding is None:
+            return
+        try:
+            effort, _source = resolve_binding_effort(binding, None)
+        except EffortUnavailable as exc:
+            if _has_effort_override(binding):
+                raise cli_bridge.TaskPreflightError(f"codex_effort_unavailable: {exc.reason}")
+            _effort_diagnostic(exc.reason)
+            return
+        try:
+            _rewrite_effort_commands(args, effort)
+        except cli_bridge.TaskPreflightError:
+            if _has_effort_override(binding):
+                raise
+            _effort_diagnostic("codex_effort_command_unrecognized")
+
+    return refresh
 
 
 async def handle_queued_task(
@@ -403,6 +463,10 @@ async def run_bridge(args: argparse.Namespace) -> None:
     args.task_preflight_command = resolve_codex_task_preflight_command(args)
     args.task_command = resolve_codex_task_command(args)
     args.codex_command = resolve_codex_command(args)
+    # 351-G：保存启动模板；每个任务前由钩子从模板重写强度（预检与正式执行同步）。
+    args.task_command_template = args.task_command
+    args.task_preflight_command_template = args.task_preflight_command
+    args.before_task_factory = make_effort_hook
     args.command = args.codex_command
     args.runtime = "codex"
     args.bridge_label = "Codex bridge"

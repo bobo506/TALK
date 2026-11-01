@@ -4775,10 +4775,11 @@ async def run_task_queue_worker(
                         preflight_attempt = (
                             failure[0] if failure is not None else 0
                         ) + 1
-                        # 351-D：运行器可选钩子（如 Kimi 把生效强度写进角色配置），
-                        # 在执行本任务前调用；未注册时是空操作。
-                        await run_before_task(args, task)
                         try:
+                            # 351-D/351-G：运行器可选钩子（Kimi 写角色配置、Codex 改写本次命令），
+                            # 在本次尝试内执行；钩子抛 TaskPreflightError 时按预检失败处理，
+                            # 不会静默沿用旧值继续执行。
+                            await run_before_task(args, task)
                             await handle_queued_task(
                                 task,
                                 client=client,
