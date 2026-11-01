@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-01 — P0 内存泄漏修复收尾与 Codex 复核执行能力（小G）
+
+- P0 内存泄漏修复 `27985e9`（+观察文档 `229a735`）：DLL/函数原型/Structure 进程内只建一次，SID/字符串 `LocalFree` 覆盖成功、中途失败、提前返回；单次发布 55.5 KB → 0.000 KB。上线后 6 小时 72 点采样合计 **0.086 MB/分钟**且分段递减。
+- 作者侧 346 项全绿；独立复核 369（kimi）三项实测（基准、346、30 分钟斜率）通过并 approved；370（小G 代码与边界）因 Codex 环境 blocked，按用户决定保留原失败记录、暂不收取。
+- 小G 原问题：Codex 0.164 在 Windows 默认 `Windows sandbox selection: disabled`，`-a never` + read-only 时 `exec_policy` 把所有命令判 Forbidden，任务 370 在 CreateProcess 前报 `blocked by policy`。
+- 最终修复：任务模式改为 cwd=项目根、`--sandbox workspace-write`、`-c windows.sandbox="elevated"`、`--add-dir %TEMP%\talk-codex-task`（TEMP 在仓库外）；message/preflight 仍 read-only。整仓可写，复核者能自己跑测试。
+- 实测：沙箱内 33 项 12.861s OK；完整 346 项 **296.940s OK（skipped=2）**；仓库根写文件成功；`git rev-parse HEAD` 正常。
+- 尝试过并放弃：常驻 worktree + 任务前重置。干净 worktree/TEMP 在仓库内会触发 `key_root_inside_repo`，346 出现 23 failures + 2 errors；worktree 已 purge。`scripts/talk_review_pretest.py`（`4da5578`）作为可选兜底保留，不参与当前流程。
+- 本地配置：`.codex/config.toml`（181 字节，2026-10-27）对 0.164 报 `invalid transport`，阻断 elevated；已改名 `.codex/config.toml.stale-20261027`。要恢复 `TALK_FOLLOWUP_*` 需按 0.164 MCP schema 重写。
+- 边界：整仓可写意味着复核者“能”改源码；任务正文仍要求不改产品源码、证据写 `.tmp/<任务号>/`，收取前用 `git status` 核对。小G 仍走遗留入口；正式 `codex_role_host.py` 的 `tools` 分支尚未加同一开关，需另开产品切片。
+
 ## 2026-10-31 — 动态角色关闭/冷恢复修复上线（任务364–367及接续验收）
 
 - 364定位动态 Kimi/Codex 被误按 WorkBuddy 路径恢复的问题，新增统一纯解析器；独立复核发现真实 `-m scripts.<host>` 替代宿主漏判。365集中修正真实模块/脚本、引号、Windows/短路径和项目/角色匹配边界，保留忙任务、近期心跳、活进程、PID复用、双次proof/CAS等守卫。

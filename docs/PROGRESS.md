@@ -11,7 +11,8 @@
 > 2026-10-31 15:25（大K）：364/365动态角色恢复修复已完成独立补验并上线。六套170项全过；四产品文件与365冻结哈希一致，正常停启后七宿主serving。大K冷恢复为已关闭后重新启动至gen9/`ins_770346c0363b`，ready且同实例心跳推进；小D恢复运行，其余五角色逐一启停验证后保持关闭。未改DB/配置/绑定/Key/自启动偏好，286保持，未派任务或调用模型。既有内存泄漏未修，本次重启仅为临时缓解。
 > 2026-11-01 00:40（DeepSeek，**P0 已修复，待 4–6 小时观察**）：按 Codex 复核意见完成内存泄漏修复（`scripts/role_provision.py` / `role_service_host.py` / `talk_runtime.py`）：DLL、函数原型、Structure 类改为进程内只建一次（role_provision 用惰性单例，保留 `ctypes.WinDLL` 可替换性），SID/字符串 `LocalFree` 覆盖成功、中途失败与提前返回三条路径。实测 `_publish_private_bytes` **55.5 KB/次 → 0.000 KB/次**（预热 200 次后连续 3×1000 次），`process_parents` 7.5 KB/次 → 0.00 KB/次；346 项相关测试全绿，另 137 项关联测试中 2 项失败，经 `git stash` 还原基线复现为既有环境问题。**尚未重启生产**，4–6 小时进程级观察待做。详见 [诊断文档](spec/MEMORY_LEAK_DIAGNOSIS_20261031.md)。
 > 2026-10-31 13:45（DeepSeek，**诊断，已由 2026-11-01 修复**）：定位到一个可复现、量级足以造成严重内存压力的 TALK 泄漏（不在网页/API）——`talk_runtime` + 6 个角色宿主共用的「私有权限文件发布」路径，实测合计约 **27 MB/分钟 ≈ 1.6 GB/小时**（runtime 8.9、每个宿主 3.1），09:07 启动到 13:39 已占约 7.6 GB 私有提交，8 GB 机器又到临界（空闲物理 165 MB）。`talk_api` 本身平稳（113–125 MB），事故中是受害者。是否为 03:00 那次整机耗尽的首发原因无法证明，口径见文档 §6.0；当时建议先重启兜底。
-Updated: 2026-11-01 00:10（Asia/Shanghai）。当前状态以顶部最新记录和“当前运行现场”为准；下方 B1 各节仅保留 2026-10-29 的历史排查背景，实际闭环见“旧任务与未解决项”。
+> 2026-11-01 18:00（DeepSeek，**Codex 复核执行能力已补正**）：小G 原 `blocked by policy` 的根因是 Codex 0.164 在 Windows 默认关闭沙箱后端。任务模式已改为 cwd=项目根 + `workspace-write` + `windows.sandbox="elevated"` + 仓库外 TEMP 的 `--add-dir`，可写整仓并自己跑测试。实测完整 346 项 `Ran 346 tests in 296.940s / OK`（skipped=2），33 项 12.861s OK，仓库根写文件成功。常驻 worktree 方案已放弃（干净 worktree/TEMP 在仓库内会触发 `key_root_inside_repo`，346 出现 23 failures + 2 errors，worktree 已 purge）。旧 `.codex/config.toml` 对 0.164 报 `invalid transport`，已改名 `.codex/config.toml.stale-20261027`。370 保持原失败记录未收取，待用户重发；内存修复 369 已 approved。详见本地记录 `.tmp/diag-codex-20261101/REPO_WRITABLE_20261101.md`。
+Updated: 2026-11-01 18:00（Asia/Shanghai）。当前状态以顶部最新记录和“当前运行现场”为准；下方 B1 各节仅保留 2026-10-29 的历史排查背景，实际闭环见“旧任务与未解决项”。
 
 ## B1 历史未验收快照（已闭环，仅作背景）
 
@@ -60,7 +61,8 @@ Updated: 2026-11-01 00:10（Asia/Shanghai）。当前状态以顶部最新记录
 
 ## 当前运行现场
 
-- **2026-11-01 内存泄漏 P0 已修复、上线并验收通过**：00:56 正常停启（提交 `27985e9`），基线 329 MB。6 小时 72 次采样（00:56–06:52，进程未重启）：runtime 61.2 → 66.9 MB（**0.016 MB/分钟**，修复前 8.9）、7 宿主合计 158.2 → 175.2（0.048）、API 109.9 → 117.9（0.023）、合计 329.3 → 360.0（**0.086 MB/分钟**）；分段斜率 0.150 → 0.068 → 0.039 逐步下降，符合预热后趋平。夜间 0 条 ERROR、0 次 `MemoryError`/`can't start new thread`，空闲物理 646 → 965 MB。修复前同样 355 分钟预计增长约 11 GB，实测 +30.7 MB。诊断、A/B 与「为什么定时清缓存无效」见 [MEMORY_LEAK_DIAGNOSIS_20261031](spec/MEMORY_LEAK_DIAGNOSIS_20261031.md)。
+- **2026-11-01 内存泄漏 P0 已修复、上线并验收通过**：00:56 正常停启（提交 `27985e9`），基线 329 MB。6 小时 72 次采样（00:56–06:52，进程未重启）：runtime 61.2 → 66.9 MB（**0.016 MB/分钟**，修复前 8.9）、7 宿主合计 158.2 → 175.2（0.048）、API 109.9 → 117.9（0.023）、合计 329.3 → 360.0（**0.086 MB/分钟**）；分段斜率 0.150 → 0.068 → 0.039 逐步下降，符合预热后趋平。夜间 0 条 ERROR、0 次 `MemoryError`/`can't start new thread`，空闲物理 646 → 965 MB。修复前同样 355 分钟预计增长约 11 GB，实测 +30.7 MB。独立复核：**369（K2.8p）已 approved**；**370（agent:codex 代码与边界）因 Codex 环境 blocked，保持原失败记录未收取、待用户重发**。诊断、A/B 与「为什么定时清缓存无效」见 [MEMORY_LEAK_DIAGNOSIS_20261031](spec/MEMORY_LEAK_DIAGNOSIS_20261031.md)。
+- **2026-11-01 Codex 复核执行能力已补正**：小G 任务模式改为 cwd=项目根 + `workspace-write` + `windows.sandbox="elevated"` + 仓库外 TEMP（`--add-dir`），可写整仓；实测 346 项 296.940s OK、33 项 12.861s OK、仓库根写文件成功。常驻 worktree 方案已放弃；旧 `.codex/config.toml` 已改名 `.codex/config.toml.stale-20261027`。`agent:codex` 宿主 11172/2916 保持 serving，驱动按任务重新 spawn，无需重启。正式 `codex_role_host.py` 的 tools 分支尚未加同一开关（另开切片）。
 - 2026-10-31 15:25实测：`/healthz` 200（db/storage ok），runtime `3928`、API `15212`，startup complete、worker无错、七宿主serving。
 - 大K已完成冷恢复并启动至generation 9/`ins_770346c0363b`，running/ready/idle，同实例心跳持续推进；旧实例已离线，不再处于`recovery_required`。
 - G-terra已实际启动到ready并正常关闭，最终恢复原关闭状态。任务366的预检`base_instructions`不兼容属于另一执行配置问题，不影响本次角色启停结论，也未在本片修改。
@@ -96,10 +98,11 @@ python -B -X utf8 -m scripts.talk_runtime serve --config "D:/claude-test/TALK-pr
 
 ## 下一步恢复顺序
 
-0. **P0 内存泄漏修复：已上线并通过 6 小时观察（2026-11-01 06:52，`27985e9`）**。逐进程均 <0.2 MB/分钟、合计 0.086 MB/分钟且分段递减。剩余收尾：独立复核（建议 Codex 或大K 按 §6 验收口径复跑）→ 整片提交/推送。P1 轮询降频、P2 内存观测、P3 并发/内存规格另开切片。
+0. **P0 内存泄漏修复：已上线并通过 6 小时观察（2026-11-01 06:52，`27985e9`）**。逐进程均 <0.2 MB/分钟、合计 0.086 MB/分钟且分段递减。独立复核：369（kimi）approved；370（小G 代码与边界）因 Codex 环境 blocked，按用户决定保留原失败记录、待重发。Codex 复核执行能力已于 2026-11-01 补正（任务模式 cwd=项目根 + workspace-write + elevated + 仓库外 TEMP，完整 346 项 296.940s OK），重发 370 可直接要求小G 自己跑 346。整片提交/推送待 370 收尾。P1 轮询降频、P2 内存观测、P3 并发/内存规格另开切片。
 1. **347/2993 与 348/2994 的历史收尾**：整体仍未完成；348 两个 DSH 凭据拒绝边界仍缺修复/复验证据。原创建者为 `agent:codex`，收取需按其身份与权限执行；用户可决定是否重新派发。
 2. **351思考强度收尾**：复核四个本地提交的实际实现与测试/加载证据，确认后按原任务权限收取；本次汇总会话不冒称独立复核，不自动开工。
 3. **缓存清理**：用户已明确优先级不高，暂缓；盘点结论见下（可安全清理约 40MB，大头是各 CLI 状态目录，不能按缓存删）。
 4. 路线图其余条目（会话窗口换新、任务列表按真实对话窗口、运行器新版本提示、主被动跟进、定时任务项目化、工作区登记）见[路线图](spec/DEVELOPMENT_ROADMAP.md)，不自动开工。
+5. **正式 Codex 宿主 tools 分支**：`scripts/codex_role_host.py` 的 `tools → workspace-write` 尚未加 `windows.sandbox`/`--add-dir`，新 Codex 角色复用前需补产品切片（含 `bridges/codex_execution_native.py` 的 `-c`/`--add-dir` 白名单与测试）；小G 仍走遗留入口。
 
 重开窗口后恢复指令：`继续项目`。历史细节见[PROGRESS_HISTORY](PROGRESS_HISTORY.md)。
