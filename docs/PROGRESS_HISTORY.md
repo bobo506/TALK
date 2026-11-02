@@ -8,7 +8,9 @@
 - **测试**：新增两宿主 health 单测与真实 HTTP 启停字段断言；`test_role_delete_local` 增加“缺字段仍拒绝”回归，`_manager_fixture` 支持省略字段。`unittest tests.test_codex_new_role_host tests.test_kimi_new_role_host tests.test_role_delete_local` **65 项 OK**；`tests.test_role_deletion` **38 项 OK**。
 - **GPT 现场**：API 重试（revision 5 pending → 6 complete），五步全 complete；Key、credential metadata、roster、service 行移除，档案仅余永久 `.provision.lock.guard`；遗留 `codex-dynamic` health 存档到 `.tmp/role-delete-gpt-20261102/manager-health.json` 后删除目录。
 - **宿主加载**：Terra 服务先正常 stop（gen21，bridge 退出），与 k-d4 一起写 drain 标记；旧宿主 11284/3232 正常退出，标记删除后 runtime 拉起 14148/10044。新 health 分别为 `["0e38a4a7-c07d-486b-b35d-4ec5a174045c"]`（Terra 新 launch）与 `[]`（k-d4）。Terra 服务恢复到 running（gen22/`ins_68b8e8da00e0`），k-d4 保持 stopped，其余宿主未动。
-- **边界/残留**：动态宿主目录 `codex-dynamic/`、`kimi-dynamic/` 仍不在 `role_delete` 的 private_state 清理清单，已删的 k-4bf013b9 仍有残留目录，留作后续观察；本片未独立复核、未推送。
+- **小K 通用删除现场（20:52）**：小K（`agent:kimi`，imported）页面删除 `complete`，revision 2，manager/profiles/private_state/startup_config complete、credentials preserved。Key/metadata 按共享身份保留，native home 移除，宿主 12448 退出，`talk-runtime.json` 的宿主条目移除；档案仅余永久 `.provision.lock.guard`。遗留 `kimi-next/.../agent_kimi` 只有两个 0 字节日志，已连同空 `kimi-next` 命名空间清理。此路径验证通用删除流程，但不覆盖动态宿主字段。
+- **动态 Codex 一次性角色闭环（20:48）**：新建 managed Codex 角色“删除验证”（`agent:prj-e8fe7066bbec.role-9fad0c64`，gpt-6.1-sol），宿主 18248 自动 serving，health 为 `{"state":"serving","owned_launches":[]}`——修复字段在真实动态宿主上生效。官方授权未完成，按页面“取消本次授权”后 native setup 为 `failed/native_authorization_canceled`、device login 进程退出。随后页面删除至 `complete`（revision 2，五步全 complete，manager 不再报 `manager_not_stopped`）；独占 Key/metadata/native 移除、宿主退出、空 `codex-dynamic` 目录清理。其余 6 宿主保持 serving，Terra running、k-d4 stopped，`/healthz` 200。
+- **边界/残留**：动态宿主目录 `codex-dynamic/`、`kimi-dynamic/` 仍不在 `role_delete` 的 private_state 清理清单；本次 k-4bf013b9 遗留 health 与一次性角色的空目录均已手工清理，后续删除仍会留下空目录。删除后的 native setup 审计行（failed/canceled）按审计保留。本片未独立复核；用户已确认删除验证通过并推送 `codex/terminal-return-codex`。小K 的 4 个已跟踪档案删除按要求不纳入提交。
 
 ## 2026-11-02 — Kimi 角色：配置门槛结构化 + 启动时强度对齐
 
