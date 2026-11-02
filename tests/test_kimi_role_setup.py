@@ -329,7 +329,7 @@ display_name = "K3.1 Pro"
         manager=object.__new__(kimi_role_host.KimiRoleHost)
         home=self.base/'host-home'; home.mkdir(); (home/'.kimi-code').mkdir()
         config=home/'.kimi-code/config.toml'
-        config.write_text('[models."kimi-code/k3.1-pro"]\nprovider="managed:kimi-code"\nmodel="k3.1-pro"\n',encoding='utf-8')
+        config.write_text('[providers."managed:kimi-code"]\n[models."kimi-code/k3.1-pro"]\nprovider="managed:kimi-code"\nmodel="k3.1-pro"\n',encoding='utf-8')
         manager.store=type('Store',(),{'native_home_dir':lambda self,*args: home})()
         role={'member_id':'agent:one','archived':False,'binding_state':'bound','model':{'model_alias':'kimi-code/k3.1-pro','model_id':'k3.1-pro'}}
         binding={'runtime':'kimi-code','model_alias':'kimi-code/k3.1-pro','model_id':'k3.1-pro','provider_id':'managed:kimi-code'}
@@ -341,7 +341,7 @@ display_name = "K3.1 Pro"
             binding['model_id']='other'
             with self.assertRaisesRegex(kimi_role_host.rsh.HostError,'模型不一致'):
                 manager.preflight(command,'agent:one',project_id='prj_1')
-            config.write_text('[models."kimi-code/k3.1-pro"]\nprovider="managed:kimi-code"\nmodel="other"\n',encoding='utf-8')
+            config.write_text('[providers."managed:kimi-code"]\n[models."kimi-code/k3.1-pro"]\nprovider="managed:kimi-code"\nmodel="other"\n',encoding='utf-8')
             self.assertEqual(manager.preflight(command,'agent:one',project_id='prj_1'),'base-facts')
 
     def test_real_http_client_wraps_agent_list_and_detects_provider_mismatch(self):

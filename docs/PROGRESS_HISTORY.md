@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-02 — Kimi 角色：配置门槛结构化 + 启动时强度对齐
+
+- **背景**：小d 事故后核查 Kimi。强度写在角色 `config.toml`（同一份宿主校验文件），产品宿主只比 provider/model，安全；但两个遗留入口（小K、Kimi k2.8）启动时完全不读配置，模型漂移要拖到任务期才报错；强度只在任务前写，消息/首轮沿用旧值（实测 `k-d4bf0429` 页面 high、配置 low）。
+- **改动**：新增 `bridges/kimi_native_config.py`（`read_config_text` 2 MB 上限 + `config_problem`：只校验 `models.<alias>.provider/model` 与 providers 声明，`default_effort` 不参与，坏 TOML fail-closed）；`scripts/kimi_role_host.py` 的 `build_entry_argv`/`preflight` 改为共用（错误码仍 `kimi_role_setup_required`，原因附在提示里）；两个遗留入口新增 `_native_config_problem`（从 `/agents` 取绑定后结构化核对）；`cli_bridge.run_startup_hook` 新增可选启动钩子（失败只留 `startup_hook_failed: <类型>`，不阻断），`kimi_bridge.align_effort_at_startup` 启动时按绑定对齐一次强度。
+- **不变项**：门槛只认 provider/model/provider 声明；强度值、注释、行尾、顺序都不参与，改强度永不挡启动；对齐与逐任务钩子共用同一判定与写入函数；未注册启动钩子的运行器行为不变；不读凭据正文。
+- **验证**：Kimi 套件 **173 项 OK**（含新 `tests/test_kimi_native_config.py` 8 项、`tests/test_kimi_effort.py` 新增 7 项）；`tests.test_cli_bridge` 122 项、`tests.test_role_host_runtime_configuration` 40 项 OK；三份真实 `config.toml` 在纯校验/产品宿主/两个遗留入口四条路径均返回 `None`，改 `default_effort` 仍通过、改 provider/model 被拒；`tests.test_kimi_talk_entry` 2 项 `tool_count 10≠9` 经 `git stash` 基线复现，属既有失败。
+- **环境口径**：PID 相关的真实进程测试须用系统 Python 跑；`.venv\Scripts\python.exe` 是启动器，Popen PID ≠ 子进程 PID，会产生假失败。
+- **生效与边界**：宿主侧校验随宿主重启加载；启动对齐在下次角色启动生效。本机已于 19:43 重启三个宿主（小K 9648→12448、K2.8 14952→7732、k-d4bf0429 19392→3232），均 `serving`，服务保持 `stopped`、无在管进程。**实机整链（19:50，k2.8）**：override 改 `low` → 启动 gen 29/`ins_026db48e7926` ready（约 2s）→ 未跑任务 `config.toml` 即变 `low`（启动对齐）→ 消息 3130 收到 3131 `K28_STARTUP_OK` → 改回 `high` → stop/start gen 31 配置回到 `high` → stop gen 32；最终 stopped/override high/config high，无失败诊断与遗留 kimi 进程。遗留入口在 `.tmp/`（gitignored），逻辑已版本化到 `bridges`。作者自测，未独立复核、未推送。
+
 ## 2026-11-02 — 小d（agent:deepseek）启动门槛：整份字节比对改结构化校验
 
 - **现象**：小d 每次启动都报 `启动失败（deepseek_native_patch_changed：service reported failure）`；DB `role_service_state` 记录 `spawned=0`、无 pid/实例，说明进程根本没起。

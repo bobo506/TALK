@@ -12,8 +12,8 @@ import os
 from pathlib import Path
 import sys
 import time
-import tomllib
 
+from bridges.kimi_native_config import KimiConfigError, config_problem, read_config_text
 from scripts import role_service_host as rsh
 
 
@@ -122,6 +122,13 @@ class KimiRoleHost(rsh.HostManager):
             raise rsh.HostError('binding_fingerprint_mismatch', '角色模型绑定不完整或已改变')
         return binding
 
+    def _config_problem(self, home, alias, model_id, provider_id):
+        """结构化核对角色 config.toml；``default_effort`` 不参与（由 TALK 按绑定写入）。"""
+        config = rsh.assert_inside_root(home, Path('.kimi-code') / 'config.toml')
+        if rsh._is_reparse_point(config) or not config.is_file():
+            raise KimiConfigError('配置文件不可用')
+        return config_problem(read_config_text(config), alias, model_id, provider_id)
+
     def build_entry_argv(self, runtime, model_alias):
         if runtime != 'kimi-code':
             raise rsh.HostError('kimi_runtime_only', '本宿主只服务当前Kimi角色')
@@ -130,23 +137,14 @@ class KimiRoleHost(rsh.HostManager):
             raise rsh.HostError('kimi_setup_in_progress', '请等待角色原生登录完成')
         binding = self._current_binding(self.project, self.member, model_alias)
         try:
-            config = rsh.assert_inside_root(home, Path('.kimi-code') / 'config.toml')
-            if rsh._is_reparse_point(config) or not config.is_file() or config.stat().st_size > 2 * 1024 * 1024:
-                raise ValueError('invalid Kimi configuration')
-            with config.open('rb') as stream:
-                native = tomllib.load(stream)
-            model = native.get('models', {}).get(model_alias)
-            if not isinstance(model, dict) or not isinstance(model.get('provider'), str):
-                raise ValueError('selected Kimi model unavailable')
-            native_model = model.get('model') or model.get('name')
-            if not isinstance(native_model, str) or not native_model:
-                raise ValueError('selected Kimi model unavailable')
-            if native_model != binding['model_id'] or model['provider'] != binding['provider_id']:
-                raise ValueError('selected Kimi model or provider mismatch')
-            if model['provider'] not in native.get('providers', {}):
-                raise ValueError('Kimi provider unavailable')
-        except (OSError, ValueError, TypeError, AttributeError):
-            raise rsh.HostError('kimi_role_setup_required', '请先在本机完成该角色的Kimi登录和模型配置') from None
+            problem = self._config_problem(home, model_alias, binding['model_id'], binding['provider_id'])
+        except (OSError, ValueError) as exc:
+            problem = str(exc) or '配置文件不可读'
+        if problem:
+            raise rsh.HostError(
+                'kimi_role_setup_required',
+                '请先在本机完成该角色的Kimi登录和模型配置（%s）' % problem,
+            ) from None
         argv, template, timeout = super().build_entry_argv(runtime, model_alias)
         argv += ['--display-name', self.display_name, '--workdir', str(self.project_root.resolve()),
             '--kimi-task-profile', self.task_profile]
@@ -168,14 +166,14 @@ class KimiRoleHost(rsh.HostManager):
             raise rsh.HostError('binding_fingerprint_mismatch', '角色模型绑定已改变，请重新启动')
         try:
             home = self.store.native_home_dir(project_id, member_id)
-            config = rsh.assert_inside_root(home, Path('.kimi-code') / 'config.toml')
-            with config.open('rb') as stream:
-                model = tomllib.load(stream).get('models', {}).get(alias)
-            if (not isinstance(model, dict) or (model.get('model') or model.get('name')) != selected['model_id']
-                    or model.get('provider') != binding['provider_id']):
-                raise ValueError('selected model mismatch')
-        except (OSError, ValueError, TypeError, AttributeError):
-            raise rsh.HostError('kimi_role_setup_required', '角色本机模型与所选模型不一致，请重新配置') from None
+            problem = self._config_problem(home, alias, selected['model_id'], binding['provider_id'])
+        except (OSError, ValueError) as exc:
+            problem = str(exc) or '配置文件不可读'
+        if problem:
+            raise rsh.HostError(
+                'kimi_role_setup_required',
+                '角色本机模型与所选模型不一致，请重新配置（%s）' % problem,
+            ) from None
         return facts
 
     def child_environment(self, project_id, member_id):

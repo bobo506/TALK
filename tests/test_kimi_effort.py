@@ -195,5 +195,93 @@ class BeforeTaskWiringTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen, [7, 8])
 
 
+class StartupAlignmentTests(unittest.IsolatedAsyncioTestCase):
+    """启动期对齐：首个任务/消息之前也使用页面上的生效强度（2026-11-02）。"""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="talk-kimi-startup-")
+        self.addCleanup(self.temp.cleanup)
+        self.home = Path(self.temp.name)
+        (self.home / "config.toml").write_text(CONFIG, encoding="utf-8")
+        self.args = argparse.Namespace(
+            name="kimi", project_id="prj_1", kimi_model="kimi-code/k3.1-pro"
+        )
+
+    def config_text(self):
+        return (self.home / "config.toml").read_text(encoding="utf-8")
+
+    async def test_alignment_writes_effective_effort(self):
+        from bridges.kimi_bridge import align_effort_at_startup
+
+        binding = {
+            "effective_effort": "max",
+            "effort_override": "max",
+            "effort_options": ["medium", "max"],
+            "effort_source": "catalog",
+        }
+        with patch.dict(os.environ, {"KIMI_CODE_HOME": str(self.home)}):
+            await align_effort_at_startup(FakeClient(binding), self.args)
+        self.assertIn('default_effort = "max"', self.config_text())
+
+    async def test_alignment_is_a_noop_without_known_target(self):
+        from bridges.kimi_bridge import align_effort_at_startup
+
+        with patch.dict(os.environ, {"KIMI_CODE_HOME": str(self.home)}):
+            await align_effort_at_startup(FakeClient({}), self.args)
+        self.assertIn('default_effort = "high"', self.config_text())
+
+    async def test_alignment_failure_does_not_block_startup(self):
+        from bridges.kimi_bridge import align_effort_at_startup
+
+        class Broken:
+            async def _request_json(self, *args, **kwargs):
+                raise RuntimeError("api down")
+
+        with patch.dict(os.environ, {"KIMI_CODE_HOME": str(self.home)}):
+            await align_effort_at_startup(Broken(), self.args)  # 不抛
+        self.assertIn('default_effort = "high"', self.config_text())
+
+
+class StartupWiringTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unregistered_startup_hook_is_a_noop(self):
+        from bridges.cli_bridge import run_startup_hook
+
+        await run_startup_hook(argparse.Namespace(), object())
+
+    async def test_startup_hook_receives_client_and_args(self):
+        from bridges.cli_bridge import run_startup_hook
+
+        seen = []
+
+        async def factory(client, args):
+            seen.append((client, args))
+
+        args, client = argparse.Namespace(startup_factory=factory), object()
+        await run_startup_hook(args, client)
+        self.assertEqual(seen, [(client, args)])
+
+    async def test_startup_hook_failure_is_swallowed(self):
+        from bridges.cli_bridge import run_startup_hook
+
+        async def factory(client, args):
+            raise RuntimeError("boom")
+
+        await run_startup_hook(argparse.Namespace(startup_factory=factory), object())  # 不抛
+
+    async def test_kimi_run_bridge_registers_startup_alignment(self):
+        from unittest.mock import AsyncMock
+
+        from bridges import cli_bridge, kimi_bridge
+
+        args, run = argparse.Namespace(), AsyncMock()
+        with patch.object(
+            kimi_bridge, "materialize_kimi_commands", return_value=(["m"], ["t"], ["p"])
+        ), patch.object(cli_bridge, "run_bridge", run):
+            await kimi_bridge.run_bridge(args)
+        self.assertIs(args.startup_factory, kimi_bridge.align_effort_at_startup)
+        self.assertIs(args.before_task_factory, kimi_bridge.make_effort_hook)
+        run.assert_awaited_once_with(args)
+
+
 if __name__ == "__main__":
     unittest.main()

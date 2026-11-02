@@ -219,6 +219,18 @@ def make_effort_hook(client: Any, args: argparse.Namespace):
     return apply_effort
 
 
+async def align_effort_at_startup(client: Any, args: argparse.Namespace) -> None:
+    """启动时按绑定对齐一次强度：首个任务之前（含普通消息）也使用页面生效值。
+
+    与逐任务钩子共用同一套判定（用户覆盖 > 模型默认，且必须通过公开清单）。
+    对齐失败只留固定诊断，绝不阻断服务启动。
+    """
+    try:
+        await make_effort_hook(client, args)({})
+    except Exception as exc:  # noqa: BLE001 - 诊断只留类型名，不回显配置内容
+        _effort_diagnostic("kimi_effort_startup_failed:%s" % type(exc).__name__)
+
+
 async def run_bridge(args: argparse.Namespace) -> None:
     with tempfile.TemporaryDirectory(prefix="talk-kimi-bridge-") as temp_dir:
         message_command, task_command, preflight_command = materialize_kimi_commands(
@@ -231,6 +243,8 @@ async def run_bridge(args: argparse.Namespace) -> None:
         args.task_preflight_command = preflight_command
         # 351-D：注册逐任务钩子；cli_bridge 在拿到 client 后构造它。
         args.before_task_factory = make_effort_hook
+        # 启动期对齐一次，避免“页面已是新强度、native 还停在旧值”直到下一个任务。
+        args.startup_factory = align_effort_at_startup
         await cli_bridge.run_bridge(args)
 
 

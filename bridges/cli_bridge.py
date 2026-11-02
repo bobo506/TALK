@@ -4647,6 +4647,30 @@ async def run_before_task(args: argparse.Namespace, task: Mapping[str, Any]) -> 
         await result
 
 
+async def run_startup_hook(args: argparse.Namespace, client: Any) -> None:
+    """运行器可选的启动期对齐钩子（``startup_factory(client, args)``）。
+
+    在服务进入接单循环之前执行一次，用于把已确认状态（如生效强度）同步到本机；
+    未注册时是空操作。对齐失败只留固定诊断，绝不阻断服务启动。
+    """
+    factory = getattr(args, "startup_factory", None)
+    if factory is None:
+        return
+    try:
+        result = factory(client, args)
+        if hasattr(result, "__await__"):
+            await result
+    except Exception as exc:  # noqa: BLE001 - 只输出类型名，避免回显细节
+        try:
+            print(
+                "[cli_bridge] startup_hook_failed: %s" % type(exc).__name__,
+                file=sys.stderr,
+                flush=True,
+            )
+        except (OSError, ValueError):
+            pass
+
+
 async def run_task_queue_worker(
     *,
     client: Any,
@@ -5051,6 +5075,9 @@ async def run_bridge(args: argparse.Namespace) -> None:
     _hook_factory = getattr(args, "before_task_factory", None)
     if _hook_factory is not None:
         args.before_task = _hook_factory(client, args)
+    # 启动期对齐（可选）：运行器可在首个任务/消息前把已确认状态同步到本机，
+    # 必须尽力而为——失败只留固定诊断，绝不阻断服务启动。
+    await run_startup_hook(args, client)
     instance_id = args.instance_id or f"{member_id}:{uuid4()}"
     host = socket.gethostname()
     # R1-3 受管关联：只有宿主显式传入 ``--launch-id`` 时才附加 project/launch/进程身份，
