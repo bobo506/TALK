@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-02 — Codex 角色默认整仓可写（tools）与 Terra 实测
+
+- **背景**：2026-11-01 的整仓可写修复只落在小G遗留入口 `.tmp/legacy-role-page-control/codex-next/native_driver.py`；正式 `scripts/codex_role_host.py` 缺 `windows.sandbox`/`--add-dir`，Terra 默认 review。任务 392 的只读命令全部 `blocked by policy`，确认是不同入口。
+- **实现**：`host_spec` 默认 tools，`--task-profile` CLI 默认 tools；`command()` 对 tools 使用 `workspace-write` + `-c windows.sandbox="elevated"` + `--add-dir`（仓库外临时根），review 用 `unelevated`；`bridges/codex_execution_native.py` 允许并校验 `windows.sandbox` 的 elevated/unelevated。`codex.task_profiles` 仍可显式写 review，当前无例外。
+- **验证**：4 个套件 63 项 OK（`test_codex_new_role_host`/`test_codex_role_setup`/`test_codex_execution_session`/`test_terra_role_flow`；长 TEMP 规避既有 ADMINI~1 失败）。runtime 22:26 重启后 Terra 宿主 17224 为 tools；任务 394 单命令 `TERRA_TOOLS_RETRY_OK` exit 0；任务 395 写入 `.tmp/terra-tools-write-20261102/ok.txt`、读回三行、exit 0，SHA256 `8ED7691A...`；393/394/395 均已收取。
+- **边界**：首次 tools 任务会触发 Windows 沙箱初始化；393 首任务在初始化期间被模型 90s 工具等待判 blocked，394/395 重试通过；未做预热/超时优化。review 仍可显式配置。小G 遗留入口本来就是 tools，未改。
+- **收尾**：4 个代码/测试文件与 3 份文档已提交为 `0c6c044`，未推送；351 任务已 completed/collected（结果 blocked，第一轮）；12c992f 已加载；远端 HEAD `8650aa0`（本次提交前）。
+
 ## 2026-11-02 — 动态 Codex/Kimi 角色删除：health 补 owned_launches
 
 - **现象**：GPT 删除行停在 `failed/manager_not_stopped`，页面提示“本机宿主尚未退出”，但角色无任务、服务已 stopped。

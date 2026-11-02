@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 import time
 
 from scripts import role_service_host as rsh
@@ -23,6 +24,24 @@ class Drained(Exception):
 def manager_directory(state_dir, project, member):
     return rsh.assert_inside_root(Path(state_dir), Path('codex-dynamic') /
         rsh._sanitize_token(project) / rsh._sanitize_token(member))
+
+
+def task_temp_directory(project_root):
+    """Writable temp root for tools tasks; never inside the repository.
+
+    Codex 0.164 on Windows keeps its sandbox backend disabled unless
+    ``windows.sandbox`` is selected explicitly.  The tools profile uses the
+    elevated backend and needs an extra writable root for temporary test files;
+    keep that root outside the project so the existing ``key_root_inside_repo``
+    guard is not loosened.
+    """
+    root = Path(project_root).resolve()
+    candidate = Path(tempfile.gettempdir()).resolve()
+    if candidate == root or candidate.is_relative_to(root):
+        candidate = (Path(os.environ.get('USERPROFILE', 'C:/Users/Administrator')) /
+                     'AppData' / 'Local' / 'Temp' / 'talk-codex-task').resolve()
+    candidate.mkdir(parents=True, exist_ok=True)
+    return candidate
 
 
 def host_spec(config, role):
@@ -44,8 +63,12 @@ def host_spec(config, role):
         return None
     if not isinstance(recipe.get('executable'), str) or not Path(recipe['executable']).is_absolute():
         raise ValueError('codex_executable_required')
-    profiles = recipe.get('task_profiles', {})
-    profile = profiles.get(member, 'review')
+    profiles = recipe.get('task_profiles') or {}
+    if not isinstance(profiles, dict):
+        profiles = {}
+    # 2026-11-02：所有 Codex 角色默认整仓可执行（tools）；需要只读的角色
+    # 必须在 codex.task_profiles 里显式写 review，不能靠遗漏配置降级。
+    profile = profiles.get(member, 'tools')
     if profile not in ('review', 'tools'):
         raise ValueError('codex_task_profile_invalid')
     from scripts.role_provision import key_file_path
@@ -168,11 +191,16 @@ class CodexRoleHost(rsh.HostManager):
             raise rsh.HostError('codex_version_unsupported', '当前 Codex CLI 版本未适配') from None
         profile = load_profile(self.project, self.member)
         def command(prompt, sandbox):
-            return shlex.join([self.codex_executable, '-a', 'never', '--strict-config', 'exec',
+            writable = sandbox == 'workspace-write'
+            parts = [self.codex_executable, '-a', 'never', '--strict-config', 'exec',
                 '--model', config['model'], '--sandbox', sandbox, '--color', 'never',
                 '--skip-git-repo-check', '--ignore-rules',
+                '-c', 'windows.sandbox="' + ('elevated' if writable else 'unelevated') + '"',
                 '-c', 'model_reasoning_effort=' + json.dumps(effort),
-                '-c', 'developer_instructions=' + json.dumps(compose_system_prompt(prompt, profile)), '-'])
+                '-c', 'developer_instructions=' + json.dumps(compose_system_prompt(prompt, profile))]
+            if writable:
+                parts += ['--add-dir', str(task_temp_directory(self.project_root))]
+            return shlex.join([*parts, '-'])
         message = command(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT, 'read-only')
         task = command(cli_bridge.TASK_RUNNER_SYSTEM_PROMPT,
             'workspace-write' if self.task_profile == 'tools' else 'read-only')
@@ -207,7 +235,7 @@ def main(argv=None):
     for name in ('project', 'member', 'project-root', 'state-dir', 'base-url',
                  'operator-key-file', 'role-key-file', 'expected-choice-id', 'expected-model-alias', 'codex-executable'):
         parser.add_argument('--' + name, required=True)
-    parser.add_argument('--task-profile', choices=('review', 'tools'), default='review')
+    parser.add_argument('--task-profile', choices=('review', 'tools'), default='tools')
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args(argv)
     private = manager_directory(args.state_dir, args.project, args.member)

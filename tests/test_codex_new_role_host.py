@@ -64,7 +64,7 @@ class NewCodexRoleHostTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--member') + 1], 'agent:new')
         self.assertEqual(argv[argv.index('--expected-choice-id') + 1], 'rmc_new')
         self.assertEqual(argv[argv.index('--expected-model-alias') + 1], 'model-selected')
-        self.assertEqual(argv[argv.index('--task-profile') + 1], 'review')
+        self.assertEqual(argv[argv.index('--task-profile') + 1], 'tools')
         self.assertFalse(any(call[0] == 'POST' for call in self.client.calls))
 
     def test_public_roles_dto_shape_keeps_control_kind_in_service_not_runner(self):
@@ -102,13 +102,15 @@ class NewCodexRoleHostTests(unittest.TestCase):
         self.assertEqual(self.spawned[0][1], [sys.executable, 'old.py'])
         self.assertFalse(self.client.calls)
 
-    def test_task_profile_requires_explicit_per_member_tools_setting(self):
-        self.config['codex']['task_profiles'] = {'agent:new': 'tools'}
+    def test_task_profile_defaults_to_tools_and_supports_explicit_review(self):
         spec = host.host_spec(self.config, self.role)
         argv = spec['argv']; self.assertEqual(argv[argv.index('--task-profile') + 1], 'tools')
+        self.config['codex']['task_profiles'] = {'agent:new': 'review'}
+        spec = host.host_spec(self.config, self.role)
+        argv = spec['argv']; self.assertEqual(argv[argv.index('--task-profile') + 1], 'review')
         other = deepcopy(self.role); other['member_id'] = 'agent:other'
         argv = host.host_spec(self.config, other)['argv']
-        self.assertEqual(argv[argv.index('--task-profile') + 1], 'review')
+        self.assertEqual(argv[argv.index('--task-profile') + 1], 'tools')
         self.config['codex']['task_profiles']['agent:new'] = 'unrestricted'
         config = self.root / 'runtime.json'; config.write_text(json.dumps(self.config), encoding='utf-8')
         with self.assertRaisesRegex(runtime.RuntimeErrorCode, 'runtime_host_config_invalid'):
@@ -145,6 +147,13 @@ class NewCodexRoleHostTests(unittest.TestCase):
                                 parsed.task_preflight_command):
                     self.assertIn("developer_instructions=", command)
                     self.assertNotIn("base_instructions", command)
+                self.assertIn('windows.sandbox="unelevated"', parsed.codex_command)
+                self.assertIn('windows.sandbox="unelevated"', parsed.task_preflight_command)
+                expected_sandbox = 'elevated' if profile == 'tools' else 'unelevated'
+                self.assertIn('windows.sandbox="' + expected_sandbox + '"', parsed.codex_task_command)
+                self.assertEqual('--add-dir' in parsed.codex_task_command, profile == 'tools')
+                self.assertNotIn('--add-dir', parsed.codex_command)
+                self.assertNotIn('--add-dir', parsed.task_preflight_command)
 
     # ── 351-B：思考强度按公开绑定解析并写入执行命令 ───────────────────
     def test_configuration_resolves_effort_from_public_binding(self):

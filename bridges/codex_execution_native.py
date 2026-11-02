@@ -180,12 +180,17 @@ def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, 
                 key, sep, raw = value.partition("=")
                 # 0.163/0.164 的 config schema 只接受 developer_instructions；
                 # base_instructions 不是合法的 -c 覆盖，必须在 TALK 层拒绝。
-                if not sep or key not in {"model_reasoning_effort", "developer_instructions"}:
+                # Windows 沙箱档位是每个角色启动命令的一部分：只允许两个受限值，
+                # 不把 danger-full-access 之类的放宽值带进原生通道。
+                if not sep or key not in {"model_reasoning_effort", "developer_instructions", "windows.sandbox"}:
                     raise CodexNativeError("codex_config_option_unsupported")
                 try:
-                    settings[key] = json.loads(raw)
+                    parsed = json.loads(raw)
                 except json.JSONDecodeError as exc:
                     raise CodexNativeError("codex_config_option_invalid") from exc
+                if key == "windows.sandbox" and parsed not in {"elevated", "unelevated"}:
+                    raise CodexNativeError("codex_config_option_unsupported")
+                settings[key] = parsed
             i += 2
         elif flag in {"--skip-git-repo-check", "--ignore-rules"}:
             # These exec-only flags do not grant model capabilities.

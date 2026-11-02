@@ -220,6 +220,8 @@ class CodexCommandTests(unittest.TestCase):
             self.assertEqual(command[command.index('--sandbox')+1],'read-only')
             self.assertEqual(command[1:4],['-a','never','--strict-config'])
             self.assertFalse(any('bypass' in a for a in command))
+            self.assertIn('windows.sandbox="unelevated"', command)
+            self.assertFalse('--add-dir' in command)
             self.assertTrue(any(item.startswith('developer_instructions=') for item in command))
             self.assertFalse(any(item.startswith('base_instructions=') for item in command))
             env=manager.child_environment('p','agent:new')
