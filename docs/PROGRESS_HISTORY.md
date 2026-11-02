@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-02 — 删除角色后的动态宿主目录清理
+
+- **问题**：`scripts/role_delete.py` 的 `private_state` 只清 `roles`/`native`/`workbuddy-native`，未清 `codex-dynamic`/`kimi-dynamic` 的 per-member 管理目录；删除角色后会留下空目录/health 残留。
+- **实现**：两个动态类别加入 per-member 清理；成员目录删除后，仅当对应 `project`/`category` 目录为空时 `rmdir`，有其它角色或项目时保留；清理空父目录失败不阻断删除。
+- **验证**：新增 `test_dynamic_host_directories_removed_only_for_deleted_member`，`tests.test_role_delete_local` + `tests.test_role_deletion` **73 项 OK**。
+- **收尾**：提交 `ccf4521`，未推送。
+
 ## 2026-11-02 — Codex 角色默认整仓可写（tools）与 Terra 实测
 
 - **背景**：2026-11-01 的整仓可写修复只落在小G遗留入口 `.tmp/legacy-role-page-control/codex-next/native_driver.py`；正式 `scripts/codex_role_host.py` 缺 `windows.sandbox`/`--add-dir`，Terra 默认 review。任务 392 的只读命令全部 `blocked by policy`，确认是不同入口。

@@ -46,6 +46,18 @@ class LocalDeletionTests(unittest.TestCase):
     def run_cleanup(self):
         return d.cleanup(self.runtime,self.member,self.receipt)
 
+    def test_dynamic_host_directories_removed_only_for_deleted_member(self):
+        codex=self.state/"codex-dynamic"/self.project_id/host._sanitize_token(self.member)
+        codex.mkdir(parents=True);(codex/"manager-health.json").write_text("{}",encoding="utf-8")
+        kimi=self.state/"kimi-dynamic"/self.project_id/host._sanitize_token(self.member)
+        kimi.mkdir(parents=True);(kimi/"drain.request").write_text("",encoding="utf-8")
+        other=self.state/"codex-dynamic"/self.project_id/"agent_other"
+        other.mkdir(parents=True);(other/"manager-health.json").write_text("{}",encoding="utf-8")
+        result=self.run_cleanup();self.assertEqual(result["outcome"],"complete",result)
+        for path in (codex,kimi):self.assertFalse(path.exists(),path)
+        self.assertTrue(other.exists())
+        self.assertTrue((other/"manager-health.json").exists())
+
     def test_actual_files_config_and_private_state_removed_other_role_preserved(self):
         self.config["workbuddy"]={"key_files":{self.member:str(self.key),"agent:other":"other.key"},"models_home":"shared-models"}
         self.write_config();self.runtime.config=copy.deepcopy(self.config)

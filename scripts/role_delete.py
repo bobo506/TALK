@@ -336,9 +336,21 @@ def cleanup(runtime, member, receipt):
         project_token, member_token = host._sanitize_token(runtime.project), host._sanitize_token(member)
         for launch in controls:
             files.remove(provision.assert_inside_root(state, Path("control")/(launch+".ctl")))
-        for category in ("roles", "native", "workbuddy-native"):
+        for category in ("roles", "native", "workbuddy-native", "codex-dynamic", "kimi-dynamic"):
             path = provision.assert_inside_root(state, Path(category)/project_token/member_token)
             files.remove(path, tree=True, native_root=path if category=="native" else None)
+        # Dynamic Codex/Kimi manager directories are per member; after the member
+        # directory is gone, only remove empty project/category parents. A shared
+        # parent with another role or project is never removed.
+        for category in ("codex-dynamic", "kimi-dynamic"):
+            project_dir = provision.assert_inside_root(state, Path(category)/project_token)
+            category_dir = provision.assert_inside_root(state, Path(category))
+            for candidate in (project_dir, category_dir):
+                try:
+                    if candidate.is_dir() and not any(candidate.iterdir()):
+                        candidate.rmdir()
+                except OSError:
+                    pass
         steps[step] = "complete"
         step = "startup_config"
         _config(runtime, member, files)
