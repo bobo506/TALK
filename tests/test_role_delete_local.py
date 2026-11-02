@@ -177,12 +177,14 @@ class LocalDeletionTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(),original)
         self.assertEqual(self.run_cleanup()["outcome"],"complete")
 
-    def _manager_fixture(self, owned=False, launches=None, health_present=True):
+    def _manager_fixture(self, owned=False, launches=None, health_present=True, launch_field=True):
         directory=self.state/"manager";directory.mkdir()
         health=directory/"health.json";marker=directory/"drain.request"
         if health_present:
-            health.write_text(json.dumps({"pid":2147483000,"seen_at":"2026-10-24T00:00:00Z",
-                "owned_launches":launches if launches is not None else []}),encoding="utf-8")
+            facts={"pid":2147483000,"seen_at":"2026-10-24T00:00:00Z"}
+            if launch_field:
+                facts["owned_launches"]=launches if launches is not None else []
+            health.write_text(json.dumps(facts),encoding="utf-8")
         spec={"member_id":self.member,"health_file":str(health),"drain_file":str(marker),"argv":[sys.executable]}
         self.runtime.config["hosts"]=[spec]
         self.config=self.runtime.config;self.write_config()
@@ -203,6 +205,12 @@ class LocalDeletionTests(unittest.TestCase):
         health,_=self._manager_fixture(launches=["unresolved"])
         with patch("scripts.role_service_recovery.recorded_process_state",return_value="absent"):
             result=self.run_cleanup()
+        self.assertEqual(result["error_code"],"manager_not_stopped",result)
+        self.assertTrue(health.exists());self.assertTrue(self.profile.exists());self.assertTrue(self.key.exists())
+
+    def test_health_without_launch_evidence_is_not_treated_as_empty(self):
+        health,_=self._manager_fixture(launch_field=False)
+        result=self.run_cleanup()
         self.assertEqual(result["error_code"],"manager_not_stopped",result)
         self.assertTrue(health.exists());self.assertTrue(self.profile.exists());self.assertTrue(self.key.exists())
 

@@ -1,5 +1,7 @@
 # 删除角色切片（2026-10-24）
 
+2026-11-02 20:25：动态 Codex/Kimi 宿主 health 缺 `owned_launches`，`role_delete` 因此把无任务的停止角色误判为 `manager_not_stopped`（GPT 10-30 失败行）。两宿主现与 WorkBuddy 同口径发布 `list(self._handles)`；`role_delete` 的严格 `== []` 判据不放宽，并新增“缺字段仍拒绝”回归；宿主单测、真实 HTTP 启停断言与删除定向共 65 项 OK，API 删除回归 38 项 OK。GPT 已重试至 `complete`（五步全 complete，Key/metadata/roster/service 移除，档案仅余永久 `.provision.lock.guard`）；Terra/k-d4 已 drain 重载，新 health 分别含当前 launch 与 `[]`，Terra 服务恢复到 running。动态宿主目录 `codex-dynamic/`、`kimi-dynamic/` 仍不在本流程的清理范围，已删角色的残留目录留作后续观察。
+
 2026-10-25 08:31：旧K2.8实际删除接受后，native目录联接被原统一拒绝拦住；用户一次只读元数据授权已执行，未看内容或目标。Codex新增仅规范native普通根后代的目录联接入口HANDLE删除，目标不遍历，其它链接/根/硬链接保护保持；121自检通过待DeepSeek定向复核，新清理器未加载/未生产重试。此为下方原“所有链接拒绝”的有限兼容补正，不放宽通用NativeFile/日志/其它资源边界；详[新合同](ROLE_DELETE_NATIVE_JUNCTION_20261025.md)。
 
 2026-10-25 00:39：329版本已实际加载并完成WorkBuddy删除，旧K2.8剩余阻挡是已failed/finished但不可collect的250历史。Codex已做只读分类补正/143自检，待定向独立复核，原250/327/328/329均不追改。当前不将新片授权当作跳过真实删除验证；[补正合同](ROLE_DELETE_FAILED_TASK_HISTORY_20261025.md)记录严格终止证据和保持原任务的边界。

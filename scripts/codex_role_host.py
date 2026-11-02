@@ -79,7 +79,7 @@ class CodexRoleHost(rsh.HostManager):
         value = {'schema': 'talk-codex-manager-health-1', 'pid': os.getpid(),
             'project_id': self.project, 'member_id': self.member,
             'seen_at': datetime.now(timezone.utc).isoformat(), 'state': state,
-            'draining': self.drain_requested}
+            'draining': self.drain_requested, 'owned_launches': list(self._handles)}
         rsh._publish_private_bytes(self.private / 'manager-health.json',
             (json.dumps(value) + '\n').encode('utf-8'))
 

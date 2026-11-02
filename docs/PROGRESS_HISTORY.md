@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-02 — 动态 Codex/Kimi 角色删除：health 补 owned_launches
+
+- **现象**：GPT 删除行停在 `failed/manager_not_stopped`，页面提示“本机宿主尚未退出”，但角色无任务、服务已 stopped。
+- **根因**：`scripts/role_delete.py` 的 `_drain` 要求每个宿主 health 明确 `owned_launches == []`；Codex/Kimi 动态宿主的 `publish_health` 没有该字段，`None != []` 即判未停。WorkBuddy 与遗留宿主已有该字段；Terra/k-d4 也缺。GPT 旧宿主 health 的 pid 10524 已不存在，当前 runtime 又未持有它，故旧记录不再被扫描，失败现场一直留在 DB。
+- **改动**：`scripts/codex_role_host.py`、`scripts/kimi_role_host.py` 的 health 增加 `owned_launches: list(self._handles)`（无在管 launch 为 `[]`，与 WorkBuddy 同口径）；严格判据、任务/服务语义、动态目录清理范围均未改。
+- **测试**：新增两宿主 health 单测与真实 HTTP 启停字段断言；`test_role_delete_local` 增加“缺字段仍拒绝”回归，`_manager_fixture` 支持省略字段。`unittest tests.test_codex_new_role_host tests.test_kimi_new_role_host tests.test_role_delete_local` **65 项 OK**；`tests.test_role_deletion` **38 项 OK**。
+- **GPT 现场**：API 重试（revision 5 pending → 6 complete），五步全 complete；Key、credential metadata、roster、service 行移除，档案仅余永久 `.provision.lock.guard`；遗留 `codex-dynamic` health 存档到 `.tmp/role-delete-gpt-20261102/manager-health.json` 后删除目录。
+- **宿主加载**：Terra 服务先正常 stop（gen21，bridge 退出），与 k-d4 一起写 drain 标记；旧宿主 11284/3232 正常退出，标记删除后 runtime 拉起 14148/10044。新 health 分别为 `["0e38a4a7-c07d-486b-b35d-4ec5a174045c"]`（Terra 新 launch）与 `[]`（k-d4）。Terra 服务恢复到 running（gen22/`ins_68b8e8da00e0`），k-d4 保持 stopped，其余宿主未动。
+- **边界/残留**：动态宿主目录 `codex-dynamic/`、`kimi-dynamic/` 仍不在 `role_delete` 的 private_state 清理清单，已删的 k-4bf013b9 仍有残留目录，留作后续观察；本片未独立复核、未推送。
+
 ## 2026-11-02 — Kimi 角色：配置门槛结构化 + 启动时强度对齐
 
 - **背景**：小d 事故后核查 Kimi。强度写在角色 `config.toml`（同一份宿主校验文件），产品宿主只比 provider/model，安全；但两个遗留入口（小K、Kimi k2.8）启动时完全不读配置，模型漂移要拖到任务期才报错；强度只在任务前写，消息/首轮沿用旧值（实测 `k-d4bf0429` 页面 high、配置 low）。

@@ -214,6 +214,15 @@ class NewCodexRoleHostTests(unittest.TestCase):
             manager._handles.clear()
             with self.assertRaises(host.Drained): manager.claimable_actions('p')
 
+    def test_health_publishes_owned_launch_list_for_bounded_deletion(self):
+        manager = self.manager()
+        manager.publish_health()
+        health = manager.private / 'manager-health.json'
+        self.assertEqual(json.loads(health.read_text(encoding='utf-8'))['owned_launches'], [])
+        manager._handles['launch-owned'] = {'process': object()}
+        manager.publish_health()
+        self.assertEqual(json.loads(health.read_text(encoding='utf-8'))['owned_launches'], ['launch-owned'])
+
     def test_health_failure_does_not_block_owned_stop_or_drop_handles(self):
         manager = self.manager()
         manager._handles['owned'] = object()
@@ -285,8 +294,11 @@ class NewCodexRoleHostTests(unittest.TestCase):
                 self.assertIsNone(process.poll(), (self.root / 'out.log').read_text(encoding='utf-8'))
                 health = json.loads(Path(spec['health_file']).read_text(encoding='utf-8'))
                 self.assertEqual((health['project_id'], health['member_id'], health['pid'], health['state']), ('p', 'agent:new', process.pid, 'serving'))
+                self.assertEqual(health['owned_launches'], [])
                 Path(spec['drain_file']).write_text('drain', encoding='utf-8')
                 self.assertEqual(process.wait(timeout=7), 0)
-                self.assertEqual(json.loads(Path(spec['health_file']).read_text(encoding='utf-8'))['state'], 'stopped')
+                stopped = json.loads(Path(spec['health_file']).read_text(encoding='utf-8'))
+                self.assertEqual(stopped['state'], 'stopped')
+                self.assertEqual(stopped['owned_launches'], [])
             finally:
                 if process.poll() is None: process.kill(); process.wait(timeout=5)
