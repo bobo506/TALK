@@ -1,5 +1,9 @@
 # Project Progress
 
+> 2026-11-03 22:32（DeepSeek，**会话窗口换新 90% 已完成并验证**）：换窗阈值由 70% 改为 90%（原始整数 `used*10 >= capacity*9`，89.9% 续、90% 及以上下一次投递前新窗）；取消缺数 10/11 次备用——取不到可靠占比一律 `new_context_unknown` 新窗；不判断失效时间。旧 60%/70% 观测与旧计数状态保留只读兼容，`exact_comparison` 改为 `capacity_times_9`。Terra 按 413–416 开发（413 因候选目录缺失 blocked、414/415 partial、416 complete，均已按已处理收取），DeepSeek 独立复核实际 diff、独立探针（89.9 续 / 90、90.1 换 / 缺数新窗 / 旧观测可读）与整组测试：Python 323 项 OK（六套会话测试 + 任务 API），Node 采集 35 项通过。k2.8 启动加载新内核（generation 33 ready）后已正常停止回 generation 34。真实 90% 高占用与生产 API 重载未验证。提交 `8992e7f`。
+
+> 2026-11-03 21:30（DeepSeek，用户决策、尚未开工）：近期顺序调整为 ①**会话窗口换新**——换窗阈值改为上下文占比 **90%**，**不判断失效时间、只看占比**；②**任务列表按真实对话窗口展示**（大工程）；跨项目角色创建/工作区隔离**整体后移**至基础功能完成后，其它待办等这两项完成后再议。本轮只记录决策、同步路线图并给出拆片建议，未改代码、未启停、未派发。
+
 > 2026-11-03 15:20（DeepSeek，**DSH 多角色验收通过并推送**）：DSH 动态宿主/创建流程已完成本机验收。新建 managed 角色大D（`agent:prj-e8fe7066bbec.d-fec6cc7c`）和二D（`agent:prj-e8fe7066bbec.d-d2a55cb3`）均成功启动为 serving，smoke 任务 411/412 通过（只读 `git rev-parse --short HEAD` 退出码 0）；随后两个测试角色已删除，`dsh-dynamic` per-member 目录和独立 native 目录清理，小D 保持 serving/idle。跨项目角色创建与工作区隔离（所有运行器）已写入 [DEVELOPMENT_ROADMAP.md](spec/DEVELOPMENT_ROADMAP.md)。本地实现提交 `d2efa4a`/`4d60cb8`/`67bb011`/`1e60f40`，验收/路线记录 `4355874`；DSH 23 项测试通过。没有推送前状态保留在历史；本次按用户验收通过提交并推送 `codex/terminal-return-codex`。
 >
 > 2026-11-03 15:25（DeepSeek，当前角色：后端/开发与复核）：`AGENTS.md` 已补“派发颗粒度与执行输入”并精简上下文/额度三条为一条，提交 `3ddc7dc`（纯文档，未单独推送；远端仍为 `7b4dd78`）。下一片是跨项目/工作区落地：每项目独立角色配置、各运行器原生准备（DSH model patch、Codex/Kimi/WorkBuddy 登录/配置）、工作区切换与关闭清理；首个 Codex tools 任务的沙箱预热/超时仍后置。

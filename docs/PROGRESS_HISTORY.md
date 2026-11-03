@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-03 22:32 — 会话窗口换新：阈值 90%、取消缺数备用
+
+- **用户决策**：跨项目/工作区整体后移；先做会话窗口换新——上下文占比达到窗口 **90%** 即在下一次投递前换新窗，**不判断失效时间、只看占比**；随后做任务列表按真实对话窗口展示。缺数备用按用户选择**取消**：取不到可靠占比一律换新窗。
+- **实现**：`bridges/execution_sessions.py` 阈值 `THRESHOLD_NUMERATOR=9`（`used*10 >= capacity*9`），`plan_execution_session` 在 `metrics.status != known` 时统一返回 `new_context_unknown` 新窗、`window_count=not_required/fallback_disabled`；`context_unavailability`、`window_count_state`、`fallback_clock` 仅保留签名兼容、不参与判定；旧 60%/70% `threshold_met` 布尔按原始 token 重投影为 90%、不追改历史；`exact_comparison` 改 `capacity_times_9`。备用专用私有函数保留并标注“2026-11-03 起不可达，清理另片”，`FALLBACK_LIMIT`/`UNAVAILABILITY_SCHEMA` 等导出常量保留。`bridges/execution_session_store.py` 只改 docstring。
+- **测试**：删除 `FallbackPlanningTests`/`FallbackReviewRegressions` 两类（40 项）与 3 项旧 70%/60% 边界用例；保留 9 项非备用契约到 `RetainedGuardTests`/`RetainedObservationTests`，新增 `NoFallbackTests` 4 项与 89.6/89.9/90/90.1、超容量、大整数、旧观测可读用例；`tests/test_dsh_context_capture.mjs` 的跨语言边界从 `new_60` 改 `new_90`。
+- **验证**：主工作树 Python 六套 + `test_execution_session_task_api` 共 **323 项 OK**；Node 采集 **35 项通过**；独立探针（不读测试夹具）实测 89.9% `reuse_session`、90%/90.1% `new_context_threshold`、缺数 `new_context_unknown`、`capacity_times_9`、旧 60/70 观测可读。`git diff --check` 无空白错误。
+- **加载验证**：`kimi-k2-8` 角色服务启动到 generation 33 / `ins_827ffb917ebf`、`readiness_service=ready`，随后正常停止回 generation 34（此前为 stopped）；证明新内核可在角色宿主内导入运行。真实 90% 高占用、生产 API 重载未验证。
+- **过程**：413 因候选 worktree 未预建被 Terra 报 blocked（任务包缺创建命令）；414/415 partial（测试逐条改写推进过慢、415 交付含非法 `schema` 字段被判 invalid）；416 改为“整类删除旧备用测试 + 补新用例”后一次通过。三任务均按已处理收取。DeepSeek 独立复核实际 diff、测试与探针，未只采信自报。
+- **文档**：`EXECUTION_SESSION_USAGE.md`、`EXECUTION_SESSION_KERNEL.md`、`EXECUTION_SESSION_FALLBACK.md`、`USER_MANUAL.md` 同步 90%/无备用；旧 60%/70% 仅作历史说明，明确真实 90% 未实测。
+- **提交**：`8992e7f`（13 文件，+293/−1109）。
+
 ## 2026-11-03 — DSH 多角色验收、跨项目路线与 AGENTS 派发规则
 
 - **完成**：DSH 动态宿主/创建流程落地并完成本机验收。396 连接、397 恢复/删除映射、400 原生准备、406 bridge 任务前 binding、407 host、408 runtime `dsh_spec`/config/reconcile 全部接入；host 支持默认 tools、health `owned_launches`、native 用户环境、冻结 binding fingerprint、`dsh_role_setup` 启动准备与 model patch 路径。
