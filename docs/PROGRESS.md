@@ -1,6 +1,6 @@
 # Project Progress
 
-> 2026-11-04 00:35（DeepSeek，**长等待改为“程序轮询 + 完成通知”**）：新增 `scripts/talk_wait_task.py`（只读 `GET /api/tasks/{id}`、Key 只从文件/环境读、进入终态即退出）与 `tests/test_talk_wait_task.py`（19 项通过）。`AGENTS.md`「发起者主被动与等待」与 `docs/guides/TERMINAL_MCP.md` 已加入规则、命令模板、退出码和预算，明确只在 DSH 验证、Codex/Kimi/WorkBuddy 未适配不外推。真实验收：任务 418 由后台 job 等待 240 秒后**自动唤醒本会话**（无轮询回合），任务 417 同机制等待 231 秒；`toolCallTimeoutMs` 保持 65000，只用于普通 MCP 调用。未验证：会话关闭后通知丢失、其它终端。
+> 2026-11-04 00:35（DeepSeek，**长等待改为“程序轮询 + 完成通知”**）：新增 `scripts/talk_wait_task.py`（只读 `GET /api/tasks/{id}`、Key 只从文件/环境读、进入终态即退出）与 `tests/test_talk_wait_task.py`（19 项通过）。`AGENTS.md`「发起者主被动与等待」与 `docs/guides/TERMINAL_MCP.md` 已加入规则、命令模板、退出码和预算，明确只在 DSH 验证、Codex/Kimi/WorkBuddy 未适配不外推。**默认策略同步改为**：派发后若终端具备后台通知或类似机制则自动等待，没有类似机制则保持被动、由操作人告知结果；人工验收里程碑与“不用跟”除外。真实验收：任务 418 由后台 job 等待 240 秒后**自动唤醒本会话**（无轮询回合），任务 417 同机制等待 231 秒；`toolCallTimeoutMs` 保持 65000，只用于普通 MCP 调用。未验证：会话关闭后通知丢失、其它终端。
 
 > 2026-11-03 22:32（DeepSeek，**会话窗口换新 90% 已完成并验证**）：换窗阈值由 70% 改为 90%（原始整数 `used*10 >= capacity*9`，89.9% 续、90% 及以上下一次投递前新窗）；取消缺数 10/11 次备用——取不到可靠占比一律 `new_context_unknown` 新窗；不判断失效时间。旧 60%/70% 观测与旧计数状态保留只读兼容，`exact_comparison` 改为 `capacity_times_9`。Terra 按 413–416 开发（413 因候选目录缺失 blocked、414/415 partial、416 complete，均已按已处理收取），DeepSeek 独立复核实际 diff、独立探针（89.9 续 / 90、90.1 换 / 缺数新窗 / 旧观测可读）与整组测试：Python 323 项 OK（六套会话测试 + 任务 API），Node 采集 35 项通过。k2.8 启动加载新内核（generation 33 ready）后已正常停止回 generation 34。真实 90% 高占用与生产 API 重载未验证。提交 `8992e7f`。
 

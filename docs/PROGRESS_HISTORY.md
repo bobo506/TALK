@@ -4,7 +4,7 @@
 
 - **背景**：DSH 客户端 `toolCallTimeoutMs=65000` 会把 `talk_wait_tasks` 的长等待在 65 秒掐断；此前等 Terra 约 50 分钟用了十余个模型回合，每轮重复读入上下文。用户确认：以后任务等待统一走“程序轮询 + 通知”，先在 DSH 落地，其它终端以后再说。
 - **工具**：新增 `scripts/talk_wait_task.py`：`--task-id/--key-file/--interval/--timeout/--json`，只读 `GET /api/tasks/{id}`，终态退出；Key 只从 `--key-file` 或 `TALK_API_KEY`/`TALK_WAIT_KEY_FILE` 读，不进命令行、不打印；输出 `TALK_TASK_DONE`/`TALK_TASK_TIMEOUT`/`TALK_TASK_ERROR`，退出码 0/1/2/64。新增 `tests/test_talk_wait_task.py` 共 **19 项通过**（假时钟、假 fetch、Key 优先级、404 致命/500 重试、main 输出）。
-- **规则与指南**：`AGENTS.md`「发起者主被动与等待」增加 4 条：长等待优先程序轮询 + 完成通知、只在 DSH 验证不外推、会话关闭回退被动、等待期间不靠 goal 续轮；`docs/guides/TERMINAL_MCP.md` 增加同节，含命令模板、输出/退出码、预算（间隔 10–30 秒、`--timeout` ≤1 小时）和回退边界。
+- **规则与指南**：`AGENTS.md`「发起者主被动与等待」增加 4 条：长等待优先程序轮询 + 完成通知、只在 DSH 验证不外推、会话关闭回退被动、等待期间不靠 goal 续轮；`docs/guides/TERMINAL_MCP.md` 增加同节，含命令模板、输出/退出码、预算（间隔 10–30 秒、`--timeout` ≤1 小时）和回退边界。**默认策略**（用户确认）：派发后若终端具备后台通知或类似机制则自动等待；没有类似机制则保持被动，由操作人告知结果。例外：操作人明确说“不用跟”、人工验收里程碑。
 - **真实验收**：
   - 任务 417：后台 job 轮询 231 秒一次等到 `succeeded/submitted`，模型只在开始与取件各一次；
   - 哑任务：`job_output(wait=true, timeout_ms=600000)` 一次阻塞满 420 秒，证明单次等待可覆盖 7 分钟以上；
