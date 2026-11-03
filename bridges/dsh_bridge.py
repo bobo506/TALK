@@ -83,8 +83,47 @@ def make_effort_hook(client: Any, args: argparse.Namespace):
     return apply_effort
 
 
+_BINDING_FIELDS = (
+    "runner_id", "runtime", "model_source", "provider_id", "connection_ref",
+    "model_id", "model_alias", "binding_fingerprint",
+)
+
+
+def make_before_task_hook(client: Any, args: argparse.Namespace):
+    """Validate the task binding before applying the existing effort hook."""
+    effort_hook = make_effort_hook(client, args)
+
+    async def before_task(task: Any) -> None:
+        snapshot = task.get("target_binding_snapshot") if isinstance(task, dict) else None
+        project = str(
+            getattr(args, "project_id", None) or os.environ.get("TALK_PROJECT_ID") or ""
+        ).strip()
+        if (not isinstance(snapshot, dict) or not project
+                or snapshot.get("schema_version") != "role-binding-snapshot-1"
+                or snapshot.get("state") != "bound"):
+            raise cli_bridge.TaskPreflightError("dsh_task_binding_invalid")
+        try:
+            binding = await _binding_for(client, project, cli_bridge.member_id_from_name(args.name))
+        except Exception:
+            raise cli_bridge.TaskPreflightError("dsh_task_binding_invalid") from None
+        if (not isinstance(binding, dict) or binding.get("binding_state") != "bound"
+                or any(not isinstance(snapshot.get(field), str)
+                       or not snapshot[field].strip()
+                       or snapshot[field] != binding.get(field)
+                       for field in _BINDING_FIELDS)):
+            raise cli_bridge.TaskPreflightError("dsh_task_binding_invalid")
+        expected = os.environ.get("TALK_DSH_EXPECTED_BINDING_FINGERPRINT")
+        if isinstance(expected, str) and expected and (
+                snapshot.get("binding_fingerprint") != expected
+                or binding.get("binding_fingerprint") != expected):
+            raise cli_bridge.TaskPreflightError("dsh_task_binding_invalid")
+        await effort_hook(task)
+
+    return before_task
+
+
 async def run_bridge(args: argparse.Namespace) -> None:
-    args.before_task_factory = make_effort_hook
+    args.before_task_factory = make_before_task_hook
     await cli_bridge.run_bridge(args)
 
 

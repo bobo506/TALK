@@ -220,6 +220,12 @@ def load_config(path):
     recipe=config.get("workbuddy")
     if recipe is not None and (not isinstance(recipe,dict) or any(not isinstance(recipe.get(k),str) or not Path(recipe[k]).is_absolute() for k in ("executable","models_home")) or not isinstance(recipe.get("key_files",{}),dict)):
         raise RuntimeErrorCode("runtime_workbuddy_config_invalid")
+    if config.get("dsh") is not None:
+        from scripts.dsh_connections import ConnectionSetupError, validate_dsh_config
+        try:
+            validate_dsh_config(config)
+        except ConnectionSetupError as exc:
+            raise RuntimeErrorCode(exc.code) from None
     return config
 
 
@@ -495,6 +501,22 @@ class TalkRuntime:
             return None
         return spec
 
+    def dsh_spec(self, role):
+        from scripts.dsh_role_host import host_spec
+        spec = host_spec(self.config, role)
+        if spec is None:
+            return None
+        member = spec["member_id"]
+        key = key_file_path(Path(self.config["key_root"]), member)
+        if not key.is_file():
+            self.statuses[member] = {"state": "key_not_configured"}
+            return None
+        identity = self.client.request("GET", "/api/members/me", key=key.read_text(encoding="utf-8").strip())
+        if identity.get("id") != member or identity.get("kind") != "agent":
+            self.statuses[member] = {"state": "identity_mismatch"}
+            return None
+        return spec
+
     def reconcile_hosts(self, roles):
         parents=process_parents()
         by_id = {r["member_id"]:r for r in roles}
@@ -502,7 +524,7 @@ class TalkRuntime:
         for role in roles:
             if role["member_id"] not in specs:
                 try:
-                    spec = self.workbuddy_spec(role) or self.kimi_spec(role) or self.codex_spec(role)
+                    spec = self.workbuddy_spec(role) or self.kimi_spec(role) or self.codex_spec(role) or self.dsh_spec(role)
                 except (rsh.HostError,OSError,ValueError):
                     self.statuses[role["member_id"]]={"state":"identity_check_failed"}
                     continue

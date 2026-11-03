@@ -49,6 +49,18 @@ class BootstrapTests(unittest.TestCase):
 class RecoveryHostResolutionTests(unittest.TestCase):
     """Pure resolver: fixed hosts first, dynamic source identical to startup."""
 
+    def test_dsh_resolution_and_disabled_refusal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            config = {"state_dir": folder, "hosts": [], "dsh": {"enabled": True}}
+            kw = dict(config=config, project_id="prj_1", member_id="agent:one",
+                      original_runtime="dsh", current_runtime="dsh", control_kind="managed_cli")
+            resolved = resolve_recovery_host(**kw)
+            self.assertEqual(resolved.host_entry.name, "dsh_role_host.py")
+            self.assertEqual(resolved.health_file.parts[-3:], ("prj_1", "agent_one", "manager-health.json"))
+            config["dsh"]["enabled"] = False
+            with self.assertRaisesRegex(RecoveryHostError, "local_recovery_host_unconfigured"):
+                resolve_recovery_host(**kw)
+
     def test_fixed_host_both_entry_contracts_and_priority(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); member = "agent:one"; project = "prj_1"

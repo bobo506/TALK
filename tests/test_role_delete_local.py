@@ -51,10 +51,15 @@ class LocalDeletionTests(unittest.TestCase):
         codex.mkdir(parents=True);(codex/"manager-health.json").write_text("{}",encoding="utf-8")
         kimi=self.state/"kimi-dynamic"/self.project_id/host._sanitize_token(self.member)
         kimi.mkdir(parents=True);(kimi/"drain.request").write_text("",encoding="utf-8")
+        dsh=self.state/"dsh-dynamic"/self.project_id/host._sanitize_token(self.member)
+        dsh.mkdir(parents=True);(dsh/"manager-health.json").write_text("{}",encoding="utf-8")
+        dsh_other=self.state/"dsh-dynamic"/self.project_id/"agent_other"
+        dsh_other.mkdir(parents=True)
         other=self.state/"codex-dynamic"/self.project_id/"agent_other"
         other.mkdir(parents=True);(other/"manager-health.json").write_text("{}",encoding="utf-8")
         result=self.run_cleanup();self.assertEqual(result["outcome"],"complete",result)
-        for path in (codex,kimi):self.assertFalse(path.exists(),path)
+        for path in (codex,kimi,dsh):self.assertFalse(path.exists(),path)
+        self.assertTrue(dsh_other.exists())
         self.assertTrue(other.exists())
         self.assertTrue((other/"manager-health.json").exists())
 
