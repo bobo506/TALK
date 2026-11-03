@@ -38,7 +38,7 @@ def _check_argv(parts, secret=None):
             _fail('dsh_command_invalid')
 
 
-def _template_parts(template):
+def _template_parts(template, require_model_id=True):
     if not isinstance(template, str) or not template:
         _fail('dsh_command_invalid')
     try:
@@ -46,7 +46,9 @@ def _template_parts(template):
         if any(spec or conversion for _, field, spec, conversion in parsed if field is not None):
             _fail('dsh_command_invalid')
         fields = [field for _, field, _, _ in parsed if field is not None]
-        if set(fields) != {'model', 'model_id'}:
+        if not fields or not set(fields) <= {'model', 'model_id', 'native_home'}:
+            _fail('dsh_command_invalid')
+        if require_model_id and 'model_id' not in fields:
             _fail('dsh_command_invalid')
         parts = shlex.split(template, posix=True)
     except ValueError:
@@ -73,26 +75,57 @@ def resolve_connection(config, binding):
         if not isinstance(expected, str) or not SAFE_TOKEN.fullmatch(expected) or entry.get(field) != expected:
             _fail('dsh_connection_mismatch')
     target = entry.get('target_api_key_env')
-    if (entry.get('auth_type') != 'api_key'
-            or not ENV_NAME.fullmatch(str(entry.get('api_key_env') or ''))
-            or not TARGET_ENV_NAME.fullmatch(str(target or ''))
-            or target.startswith('TALK_')):
+    auth_type = entry.get('auth_type')
+    if auth_type == 'api_key':
+        if (not ENV_NAME.fullmatch(str(entry.get('api_key_env') or ''))
+                or not TARGET_ENV_NAME.fullmatch(str(target or ''))
+                or target.startswith('TALK_')):
+            _fail('dsh_connection_mismatch')
+    elif auth_type == 'native':
+        if ('api_key_env' in entry
+                or not TARGET_ENV_NAME.fullmatch(str(target or ''))
+                or target.startswith('TALK_')):
+            _fail('dsh_connection_mismatch')
+    else:
         _fail('dsh_connection_mismatch')
     for field in ('command_template', 'tools_command_template'):
         if field in entry:
-            _template_parts(entry[field])
+            _template_parts(entry[field], require_model_id=auth_type != 'native')
     return dict(entry)
 
 
-def connection_command(entry, binding, profile):
+def connection_command(entry, binding, profile, native_home=None):
     if profile not in PROFILES:
         _fail('dsh_task_profile_invalid')
     template = entry.get('command_template' if profile == 'review' else 'tools_command_template')
-    _template_parts(template)
-    return template.replace('{model_id}', binding['model_id'])
+    _template_parts(template, require_model_id=entry.get('auth_type') != 'native')
+    command = template.replace('{model_id}', binding['model_id']).replace('{model}', binding['model_alias'])
+    if native_home is not None:
+        command = command.replace('{native_home}', str(native_home))
+    if '{native_home}' in command:
+        _fail('dsh_command_invalid')
+    return command
+
+
+def _native_secret(name, environ=None):
+    source = os.environ if environ is None else environ
+    value = source.get(name)
+    if (not isinstance(value, str) or not value.strip()) and os.name == 'nt':
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment') as key:
+                value, _ = winreg.QueryValueEx(key, name)
+        except (OSError, ValueError):
+            value = None
+    if not isinstance(value, str) or not value.strip():
+        _fail('dsh_connection_secret_missing')
+    return value
 
 
 def connection_environment(entry, environ=None):
+    if entry.get('auth_type') == 'native':
+        name = entry['target_api_key_env']
+        return {name: _native_secret(name, environ)}
     source = os.environ if environ is None else environ
     value = source.get(entry['api_key_env'])
     if not isinstance(value, str) or not value.strip():
@@ -100,8 +133,8 @@ def connection_environment(entry, environ=None):
     return {entry['target_api_key_env']: value}
 
 
-def validate_command(entry, binding, profile='tools', *, which=shutil.which, secret=None):
-    command = connection_command(entry, binding, profile).replace('{model}', binding['model_alias'])
+def validate_command(entry, binding, profile='tools', *, which=shutil.which, secret=None, native_home=None):
+    command = connection_command(entry, binding, profile, native_home=native_home)
     try:
         parts = shlex.split(command, posix=True)
     except ValueError:

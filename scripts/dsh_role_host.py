@@ -144,11 +144,12 @@ class DshRoleHost(rsh.HostManager):
         try:
             entry = resolve_connection(self.runtime_config, binding)
             secret_env = connection_environment(entry, os.environ)
-            secret = secret_env[entry["target_api_key_env"]]
+            secret = next(iter(secret_env.values()))
             self._active_secret = secret
             self._active_binding_fingerprint = binding["binding_fingerprint"]
-            validate_command(entry, binding, self.task_profile, which=shutil.which, secret=secret)
-            template = connection_command(entry, binding, self.task_profile)
+            validate_command(entry, binding, self.task_profile, which=shutil.which, secret=secret,
+                native_home=str(home))
+            template = connection_command(entry, binding, self.task_profile, native_home=str(home))
         except ConnectionSetupError as exc:
             raise rsh.HostError(exc.code, "DSH 连接或模型映射不可用") from None
         self._active_connection = entry

@@ -50,6 +50,25 @@ class DshConnectionsTest(unittest.TestCase):
         with self.assertRaises(dsh.ConnectionSetupError):
             dsh.validate_command(self.entry, self.binding, 'tools', which=lambda _: True)
 
+    def test_native_connection_uses_user_environment(self):
+        entry = dict(self.entry)
+        entry.pop('api_key_env')
+        entry['auth_type'] = 'native'
+        entry['target_api_key_env'] = 'DSH_TEST_NATIVE_API_KEY'
+        entry['command_template'] = 'dsh.cmd --profile headless --patch {native_home}/model-{model}.patch.yml'
+        entry['tools_command_template'] = entry['command_template']
+        self.config['dsh']['connections']['conn'] = entry
+        resolved = dsh.resolve_connection(self.config, self.binding)
+        self.assertEqual(dsh.connection_environment(entry, {'DSH_TEST_NATIVE_API_KEY': 'synthetic'}),
+                         {'DSH_TEST_NATIVE_API_KEY': 'synthetic'})
+        self.assertIn('D:/state/model-alias.patch.yml',
+                      dsh.connection_command(resolved, self.binding, 'tools', native_home='D:/state'))
+        with self.assertRaises(dsh.ConnectionSetupError):
+            dsh.connection_environment(entry, {})
+        entry['api_key_env'] = 'TALK_DSH_CONNECTION_X_API_KEY'
+        with self.assertRaises(dsh.ConnectionSetupError):
+            dsh.resolve_connection(self.config, self.binding)
+
     def test_template_and_config_are_fail_closed(self):
         for template in ('dsh --model {model}', 'dsh {model!r} {model_id}',
                          'dsh {model} {model_id} {secret}'):

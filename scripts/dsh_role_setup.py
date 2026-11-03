@@ -1,4 +1,4 @@
-﻿"""Prepare an isolated DSH home after validating its local role binding."""
+"""Prepare an isolated DSH home after validating its local role binding."""
 from pathlib import Path
 import re
 import shutil
@@ -56,14 +56,16 @@ def setup(project, member, *, root=ROOT, which=shutil.which, environ=None):
             raise SetupError('dsh_task_profile_invalid')
         profile = profiles.get(member, 'tools')
         secret_env = connections.connection_environment(entry, environ)
-        secret = secret_env[entry['target_api_key_env']]
-        # Both templates must be safe and resolvable, including the default tools profile.
-        for name in connections.PROFILES:
-            connections.validate_command(entry, binding, name, which=which, secret=secret)
-        del secret, secret_env
+        secret = next(iter(secret_env.values()))
         state = Path(config['state_dir'])
         relative = Path('native') / host._sanitize_token(project) / host._sanitize_token(member) / '.dsh'
         native = host.assert_inside_root(state, relative)
+        native_home = native.parent
+        # Both templates must be safe and resolvable, including the default tools profile.
+        for name in connections.PROFILES:
+            connections.validate_command(entry, binding, name, which=which, secret=secret,
+                native_home=str(native_home))
+        del secret, secret_env
         host.ensure_private_dir(native)
         return {'profile': profile, 'native_dir': str(native)}
     except connections.ConnectionSetupError as exc:

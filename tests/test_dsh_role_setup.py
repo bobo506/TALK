@@ -49,6 +49,28 @@ class DshRoleSetupTest(unittest.TestCase):
         self.assertEqual(caught.exception.code, code)
         self.assertFalse(self.state.exists())
 
+    def test_native_setup_uses_user_environment(self):
+        entry = dict(self.entry)
+        entry.pop('api_key_env')
+        entry['auth_type'] = 'native'
+        entry['target_api_key_env'] = 'DSH_TEST_NATIVE_API_KEY'
+        entry['command_template'] = 'dsh.cmd --profile headless --patch {native_home}/model-{model}.patch.yml'
+        entry['tools_command_template'] = entry['command_template']
+        self.config['dsh']['connections']['conn'] = entry
+        result = self.run_setup(env={'DSH_TEST_NATIVE_API_KEY': 'synthetic'})
+        self.assertEqual(result['profile'], 'tools')
+        self.assertTrue((self.state / 'native' / 'project' / 'agent_test' / '.dsh').is_dir())
+
+    def test_native_setup_missing_user_environment(self):
+        entry = dict(self.entry)
+        entry.pop('api_key_env')
+        entry['auth_type'] = 'native'
+        entry['target_api_key_env'] = 'DSH_TEST_NATIVE_API_KEY'
+        entry['command_template'] = 'dsh.cmd --profile headless --patch {native_home}/model-{model}.patch.yml'
+        entry['tools_command_template'] = entry['command_template']
+        self.config['dsh']['connections']['conn'] = entry
+        self.assert_failure('dsh_connection_secret_missing', env={})
+
     def test_success_and_explicit_profiles(self):
         result = self.run_setup()
         self.assertEqual(result['profile'], 'tools')
