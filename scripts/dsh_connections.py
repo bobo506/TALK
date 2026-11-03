@@ -99,7 +99,7 @@ def connection_command(entry, binding, profile, native_home=None):
         _fail('dsh_task_profile_invalid')
     template = entry.get('command_template' if profile == 'review' else 'tools_command_template')
     _template_parts(template, require_model_id=entry.get('auth_type') != 'native')
-    command = template.replace('{model_id}', binding['model_id']).replace('{model}', binding['model_alias'])
+    command = template.replace('{model_id}', binding['model_id'])
     if native_home is not None:
         command = command.replace('{native_home}', str(native_home))
     if '{native_home}' in command:
@@ -134,7 +134,7 @@ def connection_environment(entry, environ=None):
 
 
 def validate_command(entry, binding, profile='tools', *, which=shutil.which, secret=None, native_home=None):
-    command = connection_command(entry, binding, profile, native_home=native_home)
+    command = connection_command(entry, binding, profile, native_home=native_home).replace('{model}', binding['model_alias'])
     try:
         parts = shlex.split(command, posix=True)
     except ValueError:

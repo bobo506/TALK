@@ -61,8 +61,11 @@ class DshConnectionsTest(unittest.TestCase):
         resolved = dsh.resolve_connection(self.config, self.binding)
         self.assertEqual(dsh.connection_environment(entry, {'DSH_TEST_NATIVE_API_KEY': 'synthetic'}),
                          {'DSH_TEST_NATIVE_API_KEY': 'synthetic'})
-        self.assertIn('D:/state/model-alias.patch.yml',
+        self.assertIn('D:/state/model-{model}.patch.yml',
                       dsh.connection_command(resolved, self.binding, 'tools', native_home='D:/state'))
+        self.assertIn('D:/state/model-alias.patch.yml',
+                      dsh.validate_command(resolved, self.binding, 'tools', which=lambda _: True,
+                          secret='synthetic', native_home='D:/state'))
         with self.assertRaises(dsh.ConnectionSetupError):
             dsh.connection_environment(entry, {})
         entry['api_key_env'] = 'TALK_DSH_CONNECTION_X_API_KEY'
