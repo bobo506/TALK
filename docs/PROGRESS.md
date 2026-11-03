@@ -1,6 +1,8 @@
 # Project Progress
 
 > 2026-11-03 15:20（DeepSeek，**DSH 多角色验收通过并推送**）：DSH 动态宿主/创建流程已完成本机验收。新建 managed 角色大D（`agent:prj-e8fe7066bbec.d-fec6cc7c`）和二D（`agent:prj-e8fe7066bbec.d-d2a55cb3`）均成功启动为 serving，smoke 任务 411/412 通过（只读 `git rev-parse --short HEAD` 退出码 0）；随后两个测试角色已删除，`dsh-dynamic` per-member 目录和独立 native 目录清理，小D 保持 serving/idle。跨项目角色创建与工作区隔离（所有运行器）已写入 [DEVELOPMENT_ROADMAP.md](spec/DEVELOPMENT_ROADMAP.md)。本地实现提交 `d2efa4a`/`4d60cb8`/`67bb011`/`1e60f40`，验收/路线记录 `4355874`；DSH 23 项测试通过。没有推送前状态保留在历史；本次按用户验收通过提交并推送 `codex/terminal-return-codex`。
+>
+> 2026-11-03 15:25（DeepSeek，当前角色：后端/开发与复核）：`AGENTS.md` 已补“派发颗粒度与执行输入”并精简上下文/额度三条为一条，提交 `3ddc7dc`（纯文档，未单独推送；远端仍为 `7b4dd78`）。下一片是跨项目/工作区落地：每项目独立角色配置、各运行器原生准备（DSH model patch、Codex/Kimi/WorkBuddy 登录/配置）、工作区切换与关闭清理；首个 Codex tools 任务的沙箱预热/超时仍后置。
 
 > 2026-10-29 本轮更新：小K宿主凭据路径已被后续操作统一，既有恢复于20:30成功；下方19:25停止/路径分歧为历史快照。本轮修正页面定时器 Illegal invocation 导致等待不更新，104项测试通过；新请求真实页面验收待恢复浏览器确认框。见 [修复记录](spec/BINDING_RESET_TIMER_FIX_20261029.md)。
 > 2026-10-29 晚补充（DeepSeek）：B1 后端**已闭环**——补上作业侧预期绑定指纹的补录回落（B1-d，`3a8091b`）后，20:30/20:44/20:45 三次恢复全部 `provisioned`，作业 `legacy-kimi-k3-20261017` 推进为 `succeeded`（`profile/key_file=skipped`、`preflight=succeeded`、revision 6），`credential_version` 保持 2，无多余轮换；用户确认小K 可正常启动与关闭。页面定时器修复与本文档其余改动由 GPT 完成、DeepSeek 代为提交。第 3 项仅剩 **3d 删除后资源清理提示闭环**。

@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-03 — DSH 多角色验收、跨项目路线与 AGENTS 派发规则
+
+- **完成**：DSH 动态宿主/创建流程落地并完成本机验收。396 连接、397 恢复/删除映射、400 原生准备、406 bridge 任务前 binding、407 host、408 runtime `dsh_spec`/config/reconcile 全部接入；host 支持默认 tools、health `owned_launches`、native 用户环境、冻结 binding fingerprint、`dsh_role_setup` 启动准备与 model patch 路径。
+- **真实验收**：创建 managed 大D（`agent:prj-e8fe7066bbec.d-fec6cc7c`）和二D（`agent:prj-e8fe7066bbec.d-d2a55cb3`）；两者 serving，smoke 411/412 均 succeeded（只读 `git rev-parse --short HEAD` 退出码 0，输出分别为 `1e60f40`、`4355874`）。随后按用户确认删除两个测试角色：角色归档、服务/实例移除、`dsh-dynamic` per-member 与独立 native 目录清理；小D 保持 serving/idle。
+- **验证**：DSH 23 项 OK；`tests.test_local_runtime` 等 75 项中 74 过，1 个 detached `serve` error 在未改 runtime 的 main 对照同样复现，按既有环境问题保留。真实 host 启动/任务/删除已实际执行，未声称跨项目。
+- **跨项目方向**：`DEVELOPMENT_ROADMAP.md` 增加“跨项目角色创建与工作区隔离（所有运行器）”：每工作区独立角色名册/绑定/服务/实例/任务/native HOME/会话/Key；同一 runner/模型/登录可复用但身份/目录/服务/任务不共享；创建时准备运行器专属配置（DSH connections/model patch、Codex/Kimi/WorkBuddy 登录/配置），switching/close 只处理本应用自有服务；历史 imported 身份保留。
+- **AGENTS**：新增“派发颗粒度与执行输入（2026-11-03）”：一片为可完整验收能力（通常 2–4 个紧密文件），任务正文为唯一输入，禁止执行者自行找 TASKx/PROJECT_BRIEF/无关模块，控制读取/截断，blocked 仅外部硬阻塞，不用 blocked 代替未完成；同时把上下文/额度三条合并为一条。当前 agent 记录为 DeepSeek（后端/开发与复核）。
+- **提交/推送**：`d2efa4a` 接入、`4d60cb8` native、`67bb011` alias、`1e60f40` patch 路径、`4355874` 路线、`7b4dd78` 验收记录；已推送 `8650aa0..7b4dd78` 到 `codex/terminal-return-codex`。AGENTS 纯文档 `3ddc7dc` 为本地提交，未单独推送。未提交私有配置/Key/交付证据。
+- **后续**：跨项目落地（每项目 DSH/Codex/Kimi/WorkBuddy 配置与角色原生准备、自动 model patch、页面/工作区生命周期）；首个 Codex tools 任务的沙箱预热/超时仍后置。当前小D serving，API/runtime 正常；无生产秘密进入仓库。
+
 ## 2026-11-02 — 删除角色后的动态宿主目录清理
 
 - **问题**：`scripts/role_delete.py` 的 `private_state` 只清 `roles`/`native`/`workbuddy-native`，未清 `codex-dynamic`/`kimi-dynamic` 的 per-member 管理目录；删除角色后会留下空目录/health 残留。
