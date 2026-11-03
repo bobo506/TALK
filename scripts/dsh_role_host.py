@@ -138,6 +138,7 @@ class DshRoleHost(rsh.HostManager):
         if runtime != "dsh":
             raise rsh.HostError("dsh_runtime_only", "宿主仅服务当前 DSH 角色")
         home = self.store.native_home_dir(self.project, self.member)
+        native_home = home.as_posix()
         if rsh.lock_path_for(home / "dsh-role-setup").exists():
             raise rsh.HostError("dsh_setup_in_progress", "请等待角色连接配置检查完成")
         binding = self._current_binding(self.project, self.member, model_alias)
@@ -148,8 +149,8 @@ class DshRoleHost(rsh.HostManager):
             self._active_secret = secret
             self._active_binding_fingerprint = binding["binding_fingerprint"]
             validate_command(entry, binding, self.task_profile, which=shutil.which, secret=secret,
-                native_home=str(home))
-            template = connection_command(entry, binding, self.task_profile, native_home=str(home))
+                native_home=native_home)
+            template = connection_command(entry, binding, self.task_profile, native_home=native_home)
         except ConnectionSetupError as exc:
             raise rsh.HostError(exc.code, "DSH 连接或模型映射不可用") from None
         self._active_connection = entry

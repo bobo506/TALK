@@ -60,7 +60,7 @@ def setup(project, member, *, root=ROOT, which=shutil.which, environ=None):
         state = Path(config['state_dir'])
         relative = Path('native') / host._sanitize_token(project) / host._sanitize_token(member) / '.dsh'
         native = host.assert_inside_root(state, relative)
-        native_home = native.parent
+        native_home = native.parent.as_posix()
         # Both templates must be safe and resolvable, including the default tools profile.
         for name in connections.PROFILES:
             connections.validate_command(entry, binding, name, which=which, secret=secret,
