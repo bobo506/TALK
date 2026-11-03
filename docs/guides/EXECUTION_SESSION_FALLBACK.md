@@ -1,96 +1,33 @@
-# 缺上下文读数时的窗口计数与备用规则
+# 缺上下文读数与窗口计数规则（备用已取消）
 
-> 2026-10-22当前：本模块已由292受控DSH runner/query/ACK链路实际调用；293→294真实同窗和295新窗恢复已验，60%/缺数10/11边界由安装版DSH+fake模型验证。当前DSH工程可用，待人工验收；实际操作见[会话复用使用说明](EXECUTION_SESSION_USAGE.md)，完整证据见[292实查](../spec/EXECUTION_SESSION_USABLE_REVIEW_292.md)。下方旧离线状态保留其日期语义。
+> 2026-11-03：按用户决定，缺数备用取消。可靠占比低于90%续窗，达到90%下一次投递前新窗；取不到可靠占比一律新窗（`new_context_unknown`）。旧60%/70%观测和10次备用只作历史兼容说明，不再生效。本文保留计数/分类接口的调用边界；实际用户入口见[会话复用使用说明](EXECUTION_SESSION_USAGE.md)。
 
-290的离线实现已完成首次独立实查、直接补正和自检，见[复核记录](../spec/EXECUTION_SESSION_FALLBACK_REVIEW_290.md)。本说明面向内核调用者；当前292已将这些API接入真实投递、ACK及持久状态，实际入口见上方使用说明。
-
-## 判定顺序
+## 当前判定顺序
 
 1. 先检查同功能工作线、完整scope、首轮已确认及当前通道。不同功能/配置新窗；busy、有writer或无法独占时先wait。
-2. 当前可靠占比低于70%续窗，即使超过10次；达到70%下一次新窗，即使只有1次。比较原始整数`used * 10 >= capacity * 7`。此阈值于2026-10-23按用户要求直接修改，未测试或独立复核，角色下次正常重启后加载。
-3. 仅指标单纯不可得、分类与精确窗口关联、完整计数可信且最后可靠观测未达到70%时，使用10次备用。旧60%观测以原始token数重投影为新规则；已确认9次允许第10次；已确认10次则下一次新窗。
+2. 当前可靠占比低于90%续窗，即使已交办超过10次；达到或超过90%在下一次投递前新窗，即使只有1次。比较原始整数`used * 10 >= capacity * 9`，不使用UI取整值。
+3. 指标未知（缺失、非法、过期、未来、错会话/模型/修订等）一律新窗，原因码`new_context_unknown`；不因`context_unavailability`、`window_count_state`或`fallback_clock`改变决定，也没有“最多10次”的备用上限。
+4. 不按时间失效判断，只看本轮显式传入的可靠占比。新窗投递完整基础合同加本次增量，续窗只给增量和必要新Hall。
 
-新窗完整基础合同加本次增量，续窗仅增量和必要新Hall；任务、授权和交付分别留档。备用不改变通道、权限、范围或基础合同守卫。
+## 兼容参数与历史状态
 
-## 分类来源和时间
+`plan_execution_session`仍接受`context_unavailability`、`window_count_state`和`fallback_clock`，仅为兼容既有调用方；三者不参与换窗判定。缺数导致的新窗计划`window_count`为`status=not_required`、`reason_code=fallback_disabled`，字段保持齐全。
 
-`adapt_context_snapshot(...)`的known输出保持原`context_sample`；unknown仍为`None`，另有`context_unavailability`，schema为`talk-dsh-context-unavailability-1`、version为1。不能仅凭None或`fallback_eligible=True`续窗。
+- 旧60%或70%规则保存的`threshold_met`布尔仍可读取，按原始token数重算为90%，不追改原始观测、计数或历史交付。
+- `FALLBACK_LIMIT`、`UNAVAILABILITY_SCHEMA`及导出的分类常量保留；原备用判定相关私有函数自2026-11-03起不可达，仅作历史兼容，清理另片。
+- `initialize_window_count`、`confirm_window_delivery`、`record_threshold_observation`仍可用于记录真实送达和可靠观测；计数不再影响换窗，规划也不会预增计数。
+- 适配器仍可产出`talk-dsh-context-unavailability-1`用于诊断和留档，但内核不再用它决定续窗或换窗；不能据此宣称缺数可以续用。
 
-| 来源 | 可能备用的原因 |
-| --- | --- |
-| 已核快照适配器 | `tokens_missing`、`capacity_missing`、`used_sample_expired`、`capacity_sample_expired`、`pressure_sample_expired` |
-| 可信宿主的显式能力声明 | `metrics_not_provided`、`no_usage_sample`、`runtime_unsupported` |
+## 分类与计数来源
 
-所有原因仍须精确核对native ID、generation、revision、工作线和配置身份。非法/不可信/矛盾字段、错误producer/schema、未来时间、来源超cut或顺序矛盾不得改称缺数。适配器先检查所有已存在的来源；缺容量也不能掩盖非法projected或错误来源。统一规划还会检查原始样本，过期不能掩盖显式非法数值。
+`adapt_context_snapshot(...)`的known输出保持原`context_sample`；unknown仍为`None`，另有`context_unavailability`。分类只在有限原因、精确native ID/generation/revision和工作线配置身份匹配时可信，但即使可信也不改变当前换窗决定。
 
-没有快照时可使用`build_metrics_unavailability(reason_code=..., expected_scope=..., observed_at=..., trusted_host=..., producer_supported=...)`。该helper只允许表内三种宿主原因。`trusted_host`是调用层明确核验的事实，不提供跨进程认证，也不能用它将错误快照重新包装成missing。
+没有快照时可调用`build_metrics_unavailability(...)`生成诊断分类。`trusted_host`只代表调用层明确核验的事实，不提供跨进程认证。非法、不可信或矛盾字段不得改称缺数。
 
-备用规划必须传入独立的`fallback_clock={"now": explicit_now, "max_age_seconds": explicit_budget}`，没有默认预算。证明来自未来、已经过期、缺时钟或时钟无效均新窗；年龄恰等于预算有效。当前可靠指标按样本自身时间校验，不依赖备用时钟。
+计数schema为`execution-session-window-count-1`、version为1，绑定native ID、generation及完整规范scope指纹。ACK必填`delivery_id/task_id/attempt/execution_id/body_sha256/native_session_id/session_generation/session_revision/outcome`；`delivered`、`canceled_after_delivery`、`timed_out_after_delivery`计入，送达后取消/超时不倒扣。相同回执幂等，冲突不可覆盖。
 
-## 纯状态接口
+## 验证与未验证
 
-```python
-from bridges.execution_sessions import (
-    initialize_window_count, confirm_window_delivery,
-    record_threshold_observation, plan_execution_session,
-)
-
-# first_ack来自未来宿主的真实首轮送达确认，不能用计划伪造。
-created = initialize_window_count(
-    scope=verified_scope,
-    native_session_id=verified_native_id,
-    first_delivery=first_ack,
-    previous_state=None,
-)
-state = created["state"]  # 成功首轮计1；须检查status后再接收state。
-
-plan = plan_execution_session(
-    scope=verified_scope,
-    base_contract=base_contract,
-    task=current_task,
-    candidate=verified_candidate,
-    execution_channel=verified_channel,
-    context_sample=adapted["context_sample"],
-    context_unavailability=adapted["context_unavailability"],
-    window_count_state=state,
-    fallback_clock={"now": explicit_now, "max_age_seconds": explicit_budget},
-    new_messages=necessary_new_messages,
-)
-
-# 可靠观测与送达是两件事；没有投递也须保留高占比事实。
-intent = plan["window_count"].get("observation_intent")
-if intent:
-    observed = record_threshold_observation(
-        state=state, scope=verified_scope,
-        observation=intent["observation"], now=explicit_now,
-    )
-    # 未来宿主须检查结果、原子持久化，再允许任何后续规划。
-
-# 仅真正进入同一原生窗口后归并；本函数不会发送指令。
-confirmed = confirm_window_delivery(
-    state=current_persisted_state,
-    scope=verified_scope,
-    delivery=actual_delivery_ack,
-)
-```
-
-每个结果须检查`status`、`reason_code`和`errors`；不是所有返回值都包含可替换的state。规划不会修改输入或预增次数，`proposed_ordinal`仅表示允许尝试第几次。
-
-计数schema为`execution-session-window-count-1`、version为1，绑定native ID、generation及完整规范scope指纹，包括基础合同版本/哈希、launch、runtime/home、模型绑定和权限。计数与完整连续的`deliveries`对应，首条必须为首轮；任务号变化、读数恢复和再次缺数不清零。缺状态、零计数但首轮已确认、历史不完整、重复身份、倒序revision或错scope不能备用。
-
-ACK必填`delivery_id/task_id/attempt/execution_id/body_sha256/native_session_id/session_generation/session_revision/outcome`，首轮另传`first_turn=True`。后续默认false。正文SHA对应实际进入窗口的UTF-8正文。
-
-- `delivered`、`canceled_after_delivery`、`timed_out_after_delivery`计入；送达后取消/超时不倒扣。
-- `failed/rejected/preflight/dry_run/planned/repeated_planning/tool_call/internal_step/canceled_before_delivery/timed_out_before_delivery`不计入。
-- 同delivery或同task/attempt/execution的相同正文回执幂等；身份相同而正文/窗口不同报conflict，不能覆盖。重试不得伪造新execution当作同一确认。
-- 数字revision不得回退，历史本身也不得倒序。不透明字符串revision只有完全相同才继续，无法证明先后时拒绝备用。
-
-`record_threshold_observation(..., now=...)`不增加交办数，按原始整数计算阈值；拒绝未来观测、时间倒退及同revision/同来源时刻的冲突值。较新的可靠低占比可以替换旧高占比；裸未知不能将已知高占比清为false。规划中所有观测意图仍属于旧窗口，即使计划动作是新窗。
-
-## 后续宿主必须完成的部分
-
-纯函数无法证明调用者提交的是最新、完整的历史。未来宿主必须从新窗出生起保存每个真实ACK，在同一独占/CAS边界内归并计数和可靠观测，并在下一次规划前提交成功。遗漏首次高占比观测的持久化可能错误延长备用，不能笼统声称“不持久化只会更保守”；写入失败或历史覆盖未知时应撤销备用资格，不再提供该状态，走新窗或等待。
-
-当前没有实现上述锁、CAS、存储、真实发送/ACK或旧窗口迁移；不允许凭记忆补造完整计数。采集加载、原生创建/续用、协调端增量生成、任务/MCP/API/页面仍待后续切片确认。10次不保证执行过程中上下文低于70%，也不承诺费用或缓存收益。
-
-正式测试不依赖本机`.tmp`：内核170项、适配76项、既有Node采集34项共280项全部通过、零跳过。真实用户入口上线时仍须更新[用户手册](USER_MANUAL.md)并进行人工验收。
+- 六套共313项离线测试覆盖89.9%/90%/90.1%、超容量、大整数、旧60%/70%观测可读、缺数一律新窗及原通道/首轮/留档守卫。
+- 真实90%高占用、生产加载和长期运行未验证；不得用离线测试外推真实比例通过。
+- 若将来恢复任何备用或时间失效规则，须另立任务、更新规格并独立复核，不能沿用本页的历史行为。

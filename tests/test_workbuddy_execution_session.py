@@ -130,32 +130,37 @@ class WorkBuddyExecutionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_exact_threshold_changes_next_window(self):
         first = await self.run_task(1)
-        self.native.used = 70000
+        self.native.used = 90000
         second, third = await self.run_task(2), await self.run_task(3)
         self.assertEqual(first.state["native_session_id"], second.state["native_session_id"])
         self.assertNotEqual(second.state["native_session_id"], third.state["native_session_id"])
 
-    async def test_missing_only_ten_then_eleven(self):
+    async def test_missing_metrics_always_start_new_window(self):
         self.native.missing = True
-        first = await self.run_task(1)
-        for i in range(2, 11):
+        previous = await self.run_task(1)
+        for i in range(2, 12):
             r = await self.run_task(i)
-            self.assertEqual(r.state["native_session_id"], first.state["native_session_id"])
-        self.assertEqual(r.state["confirmed_count"], 10)
-        last = await self.run_task(11)
-        self.assertNotEqual(first.state["native_session_id"], last.state["native_session_id"])
-        self.assertEqual(last.state["confirmed_count"], 1)
+            self.assertFalse(r.state["reused"])
+            self.assertNotEqual(r.state["native_session_id"], previous.state["native_session_id"])
+            self.assertEqual(r.state["confirmed_count"], 1)
+            previous = r
 
     async def test_reliable_low_occupancy_can_exceed_ten(self):
         for i in range(1, 13): r = await self.run_task(i)
         self.assertEqual(r.state["confirmed_count"], 12)
 
-    async def test_measurement_recovery_keeps_count(self):
+    async def test_measurement_recovery_reuses_known_window(self):
         self.native.missing = True
         await self.run_task(1)
         await self.run_task(2)
         self.native.missing = False
-        self.assertEqual((await self.run_task(3)).state["confirmed_count"], 3)
+        third = await self.run_task(3)
+        self.assertFalse(third.state["reused"])
+        self.assertEqual(third.state["decision"], "new_context_unknown")
+        fourth = await self.run_task(4)
+        self.assertTrue(fourth.state["reused"])
+        self.assertEqual(fourth.state["native_session_id"], third.state["native_session_id"])
+        self.assertEqual(fourth.state["confirmed_count"], 2)
 
     async def test_invalid_metrics_cannot_use_fallback(self):
         await self.run_task(1)

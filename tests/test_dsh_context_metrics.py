@@ -752,10 +752,12 @@ def kernel_count_state(expected: dict[str, Any], count: int = 1) -> dict[str, An
 
 
 class KernelIntegrationTests(unittest.TestCase):
-    def test_59_9_reuses_and_60_starts_new(self) -> None:
+    def test_below_90_reuses_and_90_starts_new(self) -> None:
         for used, action, mode in (
-            (699, "reuse_session", "incremental"),
-            (700, "new_session", "full"),
+            (700, "reuse_session", "incremental"),
+            (800, "reuse_session", "incremental"),
+            (899, "reuse_session", "incremental"),
+            (900, "new_session", "full"),
         ):
             with self.subTest(used=used):
                 snapshot = make_snapshot(
@@ -973,7 +975,7 @@ class CrossLanguageTests(unittest.TestCase):
             if name in {"reuse_59_9", "zero", "pressure_fallback"}:
                 self.assertEqual(adapted["status"], "known", name)
                 self.assertEqual(plan["action"], "reuse_session", name)
-            elif name in {"new_60"}:
+            elif name in {"new_90"}:
                 self.assertEqual(adapted["status"], "known", name)
                 self.assertEqual(plan["action"], "new_session", name)
             elif name == "invalid_projected":
@@ -987,7 +989,7 @@ class CrossLanguageTests(unittest.TestCase):
                 self.fail(f"unexpected cross-language case {name}")
         self.assertEqual(
             seen,
-            {"reuse_59_9", "new_60", "zero", "pressure_fallback", "invalid_projected", "expired"},
+            {"reuse_59_9", "new_90", "zero", "pressure_fallback", "invalid_projected", "expired"},
         )
 
 
@@ -1265,8 +1267,10 @@ class ContextUnavailabilityTests(unittest.TestCase):
             context_unavailability=classification,
             window_count_state=state,
         )
-        self.assertEqual(plan["action"], "reuse_session")
-        self.assertEqual(plan["reason_code"], "reuse_missing_metrics_fallback")
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertEqual(plan["window_count"]["status"], "not_required")
+        self.assertEqual(plan["window_count"]["reason_code"], "fallback_disabled")
         self.assertEqual(plan["metrics"]["status"], "unknown")
         self.assertIsNone(plan["metrics"]["used_tokens"])
 
@@ -1288,7 +1292,7 @@ class FallbackIntegrationTests(unittest.TestCase):
             pressure_metric=metric_missing(),
         )
 
-    def test_actual_missing_tokens_output_allows_fallback(self) -> None:
+    def test_actual_missing_tokens_output_starts_new(self) -> None:
         snapshot = self.missing_snapshot()
         expected = expected_from_snapshot(snapshot)
         adapted = adapt(snapshot)
@@ -1302,19 +1306,16 @@ class FallbackIntegrationTests(unittest.TestCase):
             context_unavailability=classification,
             window_count_state=state,
         )
-        self.assertEqual(plan["action"], "reuse_session")
-        self.assertEqual(plan["reason_code"], "reuse_missing_metrics_fallback")
-        self.assertEqual(plan["briefing_mode"], "incremental")
-        self.assertEqual(plan["window_count"]["status"], "eligible")
-        self.assertEqual(plan["window_count"]["confirmed_count"], 1)
-        self.assertEqual(plan["window_count"]["proposed_ordinal"], 2)
-        self.assertTrue(plan["window_count"]["requires_delivery_confirmation"])
-        self.assertEqual(
-            plan["window_count"]["count_merge"], "after_confirmed_delivery"
-        )
-        self.assertNotIn("BASE CONTRACT TEST", plan["delivery"]["text"])
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertEqual(plan["briefing_mode"], "full")
+        self.assertEqual(plan["window_count"]["status"], "not_required")
+        self.assertEqual(plan["window_count"]["reason_code"], "fallback_disabled")
+        self.assertIsNone(plan["window_count"]["confirmed_count"])
+        self.assertIsNone(plan["window_count"]["proposed_ordinal"])
+        self.assertIn("BASE CONTRACT TEST", plan["delivery"]["text"])
 
-    def test_actual_capacity_missing_output_allows_tenth(self) -> None:
+    def test_actual_capacity_missing_starts_new(self) -> None:
         snapshot = make_snapshot(capacity_metric=metric_missing())
         expected = expected_from_snapshot(snapshot)
         adapted = adapt(snapshot)
@@ -1326,11 +1327,12 @@ class FallbackIntegrationTests(unittest.TestCase):
             context_unavailability=adapted["context_unavailability"],
             window_count_state=state,
         )
-        self.assertEqual(plan["action"], "reuse_session")
-        self.assertEqual(plan["window_count"]["confirmed_count"], 9)
-        self.assertEqual(plan["window_count"]["proposed_ordinal"], 10)
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertEqual(plan["window_count"]["status"], "not_required")
+        self.assertEqual(plan["window_count"]["reason_code"], "fallback_disabled")
 
-    def test_actual_expired_output_allows_fallback(self) -> None:
+    def test_actual_expired_output_starts_new(self) -> None:
         snapshot = make_snapshot()
         expected = expected_from_snapshot(snapshot)
         adapted = adapt(snapshot, now=NOW + timedelta(seconds=MAX_AGE + 1))
@@ -1342,8 +1344,8 @@ class FallbackIntegrationTests(unittest.TestCase):
             context_unavailability=adapted["context_unavailability"],
             window_count_state=state,
         )
-        self.assertEqual(plan["action"], "reuse_session")
-        self.assertEqual(plan["reason_code"], "reuse_missing_metrics_fallback")
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
 
     def test_actual_count_10_goes_to_full_new(self) -> None:
         snapshot = self.missing_snapshot()
@@ -1357,9 +1359,10 @@ class FallbackIntegrationTests(unittest.TestCase):
             window_count_state=state,
         )
         self.assertEqual(plan["action"], "new_session")
-        self.assertEqual(plan["reason_code"], "new_fallback_exhausted")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
         self.assertEqual(plan["briefing_mode"], "full")
-        self.assertEqual(plan["window_count"]["status"], "exhausted")
+        self.assertEqual(plan["window_count"]["status"], "not_required")
+        self.assertEqual(plan["window_count"]["reason_code"], "fallback_disabled")
         self.assertIsNone(plan["window_count"]["proposed_ordinal"])
         self.assertIn("BASE CONTRACT TEST", plan["delivery"]["text"])
 
@@ -1373,8 +1376,9 @@ class FallbackIntegrationTests(unittest.TestCase):
             context_unavailability=adapted["context_unavailability"],
         )
         self.assertEqual(plan["action"], "new_session")
-        self.assertEqual(plan["reason_code"], "new_fallback_count_unverified")
-        self.assertEqual(plan["window_count"]["status"], "missing")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertEqual(plan["window_count"]["status"], "not_required")
+        self.assertEqual(plan["window_count"]["reason_code"], "fallback_disabled")
         self.assertTrue(plan["delivery"]["includes"]["base_contract"])
 
     def test_actual_invalid_projected_cannot_fallback(self) -> None:
@@ -1393,12 +1397,11 @@ class FallbackIntegrationTests(unittest.TestCase):
             window_count_state=state,
         )
         self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
         self.assertEqual(plan["briefing_mode"], "full")
-        self.assertNotEqual(plan["window_count"]["status"], "eligible")
-        self.assertEqual(
-            plan["window_count"]["classification_reason"],
-            "projected_invalid",
-        )
+        self.assertEqual(plan["metrics"]["reason_code"], "context_missing")
+        self.assertEqual(plan["window_count"]["status"], "not_required")
+        self.assertEqual(plan["window_count"]["reason_code"], "fallback_disabled")
 
     def test_raw_invalid_sample_beats_eligible_classification(self) -> None:
         snapshot = self.missing_snapshot()
@@ -1450,7 +1453,7 @@ class FallbackIntegrationTests(unittest.TestCase):
             ],
             200,
         )
-        high = adapt(make_snapshot(projected=700, pressure=700, capacity=1000))
+        high = adapt(make_snapshot(projected=900, pressure=900, capacity=1000))
         state1 = kernel_count_state(expected, count=1)
         high_plan = kernel_inputs(
             expected,
@@ -1465,11 +1468,7 @@ class FallbackIntegrationTests(unittest.TestCase):
         snapshot = self.missing_snapshot()
         expected = expected_from_snapshot(snapshot)
         adapted = adapt(snapshot)
-        for count, action, status, ordinal in (
-            (1, "reuse_session", "eligible", 2),
-            (9, "reuse_session", "eligible", 10),
-            (10, "new_session", "exhausted", None),
-        ):
+        for count in (1, 9, 10):
             with self.subTest(count=count):
                 state = kernel_count_state(expected, count=count)
                 plan = kernel_inputs(
@@ -1478,11 +1477,10 @@ class FallbackIntegrationTests(unittest.TestCase):
                     context_unavailability=adapted["context_unavailability"],
                     window_count_state=state,
                 )
-                self.assertEqual(plan["action"], action)
-                self.assertEqual(plan["window_count"]["status"], status)
-                self.assertEqual(
-                    plan["window_count"]["proposed_ordinal"], ordinal
-                )
+                self.assertEqual(plan["action"], "new_session")
+                self.assertEqual(plan["reason_code"], "new_context_unknown")
+                self.assertEqual(plan["window_count"]["status"], "not_required")
+                self.assertIsNone(plan["window_count"]["proposed_ordinal"])
 
     def test_planning_is_pure_and_count_is_not_preincremented(self) -> None:
         snapshot = self.missing_snapshot()
@@ -1507,7 +1505,7 @@ class FallbackIntegrationTests(unittest.TestCase):
         self.assertIsNone(first["window_count"].get("state"))
         self.assertNotIn("state", first["window_count"])
 
-    def test_host_attested_not_provided_reaches_plan(self) -> None:
+    def test_host_attested_not_provided_starts_new(self) -> None:
         expected = expected_from_snapshot(make_snapshot())
         classification = ADAPTER.build_metrics_unavailability(
             reason_code="metrics_not_provided",
@@ -1522,11 +1520,10 @@ class FallbackIntegrationTests(unittest.TestCase):
             context_unavailability=classification,
             window_count_state=state,
         )
-        self.assertEqual(plan["action"], "reuse_session")
-        self.assertEqual(
-            plan["window_count"]["classification_reason"],
-            "metrics_not_provided",
-        )
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertIsNone(plan["window_count"]["classification_reason"])
+        self.assertEqual(plan["window_count"]["status"], "not_required")
 
     def test_bare_none_never_auto_fallbacks(self) -> None:
         expected = expected_from_snapshot(make_snapshot())
@@ -1611,7 +1608,7 @@ class FallbackIntegrationTests(unittest.TestCase):
                 "native_session_id": expected["native_session_id"],
                 "session_generation": expected["session_generation"],
                 "session_revision": expected["session_revision"],
-                "used_tokens": 700,
+                "used_tokens": 900,
                 "capacity_tokens": 1000,
                 "source": "projected",
                 "sampled_at": iso(T4),
@@ -1634,14 +1631,12 @@ class FallbackIntegrationTests(unittest.TestCase):
             window_count_state=observed["state"],
         )
         self.assertEqual(plan["action"], "new_session")
-        self.assertEqual(
-            plan["reason_code"], "new_fallback_threshold_observed"
-        )
-        self.assertEqual(
-            plan["window_count"]["last_threshold_observation_met"], True
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertIsNone(
+            plan["window_count"]["last_threshold_observation_met"]
         )
 
-    def test_recovery_keeps_count_then_next_missing_uses_it(self) -> None:
+    def test_recovery_keeps_count_then_missing_starts_new(self) -> None:
         expected = expected_from_snapshot(make_snapshot())
         state = kernel_count_state(expected, count=1)
         low = adapt(make_snapshot(projected=200, pressure=200, capacity=1000))
@@ -1673,9 +1668,10 @@ class FallbackIntegrationTests(unittest.TestCase):
             context_unavailability=missing["context_unavailability"],
             window_count_state=recorded["state"],
         )
-        self.assertEqual(plan["action"], "reuse_session")
-        self.assertEqual(plan["window_count"]["confirmed_count"], 1)
-        self.assertEqual(plan["window_count"]["proposed_ordinal"], 2)
+        self.assertEqual(plan["action"], "new_session")
+        self.assertEqual(plan["reason_code"], "new_context_unknown")
+        self.assertEqual(plan["window_count"]["status"], "not_required")
+        self.assertEqual(plan["window_count"]["reason_code"], "fallback_disabled")
 
     def test_known_plan_matches_frozen_contract(self) -> None:
         expected = expected_from_snapshot(make_snapshot())
@@ -1684,7 +1680,7 @@ class FallbackIntegrationTests(unittest.TestCase):
         keys = ("action", "reason_code", "briefing_mode", "native_session_ref", "delivery", "archive", "metrics")
         payload = {key: plan[key] for key in keys}
         actual = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
-        self.assertEqual(actual, "e6d1c687fc90d36e0194925ffdcfb6a996227a2c1944f397f1365a7066dc6920")
+        self.assertEqual(actual, "d0b2cb1915ab0c33242e4367b763264ab27ba03491cb016d882c473740d88359")
 
 
 class FallbackReviewRegressions(unittest.TestCase):

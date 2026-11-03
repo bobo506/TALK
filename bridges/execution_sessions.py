@@ -1,23 +1,8 @@
-"""执行会话选择、上下文 70% 阈值、缺指标 10 次备用与首轮/续轮投递计划离线内核。
+"""执行会话规划纯内核：以精确整数比较判断 90% 阈值。
 
-本模块只使用调用方显式传入的数据：不访问环境变量、文件、数据库或网络，不
-spawn 进程，不在导入时产生副作用，也不创建/恢复真实原生会话。统一入口
-:func:`plan_execution_session` 返回一个可 JSON 序列化的计划，**不发送消息**、
-不写 TALK 任务状态、不产生原生 session 成功事实，也不预增计数。
-
-动作：
-- ``reuse_session``：续用指定候选，投递增量正文。
-- ``new_session``：生成新窗计划，投递完整基础合同 + 本次增量。
-- ``wait``：候选忙、存在活动 writer 或无法证明执行通道独占，暂不投递。
-- ``reject``：输入不合法，未生成投递计划。
-
-阈值只使用原始整数精确比较：``used * 10 >= capacity * 7``（即 ``>= 70%``）。
-可靠指标优先：``<70%`` 续窗、``>=70%`` 下一次新窗，即使已交办超过 10 次也
-不因轮数换窗。仅当可靠指标明确不可得、分类在有限白名单内且该精确窗口有
-可信完整计数时，才允许从新窗首轮起累计的最多 10 次交办；第 10 次可投递，
-第 11 次新窗。计数在这里只是纯状态，不等于真实送达；``window_count`` 的
-``proposed_ordinal`` 必须等宿主真实确认送达后再通过
-:func:`confirm_window_delivery` 归并。
+占比低于 90% 续窗，达到或超过 90% 在下一次投递前新建窗口；指标不可得一律新窗，
+不判断失效时间。备用机制自 2026-11-03 起取消，旧 60%/70% 观测及旧计数状态
+仅用于历史兼容读取。本模块不访问环境、文件、数据库或网络。
 """
 
 from __future__ import annotations
@@ -50,15 +35,14 @@ COUNT_STATE_SCHEMA = "execution-session-window-count-1"
 COUNT_STATE_VERSION = 1
 UNAVAILABILITY_SCHEMA = "talk-dsh-context-unavailability-1"
 UNAVAILABILITY_VERSION = 1
-# 备用规则：已确认 9 次时允许第 10 次；确认第 10 次后下一次新窗。这不是
-# 有效指标下的硬上限。
+# 历史常量，仅为旧计数状态兼容保留；缺数备用已取消。
 FALLBACK_LIMIT = 10
 
 # JSON / JavaScript 安全整数上界（2**53 - 1）。token 数、容量和代次均不得超出。
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
-# 70% = 7/10；用 used * 10 >= capacity * 7 做原始整数比较。
-THRESHOLD_NUMERATOR = 7
+# 90% = 9/10；用 used * 10 >= capacity * 9 做原始整数比较。
+THRESHOLD_NUMERATOR = 9
 THRESHOLD_DENOMINATOR = 10
 
 _SELECTIONS = frozenset(("auto", "new", "reuse"))
@@ -122,7 +106,7 @@ _REASON_TEXT = {
     "new_no_candidate": "未提供可续用候选，生成新窗完整首轮计划。",
     "new_explicit": "派发者显式选择新窗，生成新窗完整首轮计划。",
     "new_context_threshold": (
-        "上下文原始占用已达到 70% 阈值，下一次投递转新窗并恢复完整基础介绍。"
+        "上下文原始占用已达到 90% 阈值，下一次投递转新窗并恢复完整基础介绍。"
     ),
     "new_context_unknown": (
         "候选上下文指标不可用，不能把未知占比当作可续用，生成新窗完整首轮计划。"
@@ -136,7 +120,7 @@ _REASON_TEXT = {
         "生成新窗完整首轮计划。"
     ),
     "new_fallback_threshold_observed": (
-        "该窗口最后一次可靠占比已达到 70% 阈值，缺数时仍必须换窗，"
+        "该窗口最后一次可靠占比已达到 90% 阈值，缺数时仍必须换窗，"
         "不能再用不足 10 次拖延。"
     ),
     "new_fallback_exhausted": (
@@ -171,7 +155,7 @@ _REASON_TEXT = {
         "候选首轮基础合同未确认送达，不能按已知上下文省略基础信息，"
         "生成新窗完整首轮计划。"
     ),
-    "reuse_session": "候选作用域匹配且上下文低于 70%，生成增量续窗计划。",
+    "reuse_session": "候选作用域匹配且上下文低于 90%，生成增量续窗计划。",
     "wait_candidate_busy": (
         "候选执行会话忙，暂不投递；不在同一 home 另起新窗绕过。"
     ),
@@ -671,6 +655,7 @@ def _binding_fingerprint(
     return _fingerprint(payload)
 
 
+# 2026-11-03 起不可达，仅保留历史兼容与常量导入，清理另片。
 def _normalize_unavailability(value: Any) -> dict[str, Any]:
     """校验 DSH 适配器/可信宿主给出的不可得分类与绑定证据。"""
 
@@ -848,6 +833,7 @@ def _unavailability_binding_error(
     return None
 
 
+# 2026-11-03 起不可达，仅保留历史兼容与常量导入，清理另片。
 def _raw_fallback_blocker(sample: Any) -> str | None:
     """备用前遍历显式数值，不能由更早发现的 missing/expired 掩盖错误。"""
     if not isinstance(sample, Mapping):
@@ -862,6 +848,7 @@ def _raw_fallback_blocker(sample: Any) -> str | None:
     return None
 
 
+# 2026-11-03 起不可达，仅保留历史兼容与常量导入，清理另片。
 def _evaluate_context_unavailability(
     value: Any,
     scope: Mapping[str, Any],
@@ -1176,10 +1163,11 @@ def _normalize_observation_state(value: Any) -> dict[str, Any]:
         raw["used_tokens"] * THRESHOLD_DENOMINATOR
         >= raw["capacity_tokens"] * THRESHOLD_NUMERATOR
     )
-    # 旧状态按 60% 保存布尔投影；核对其原规则后，按原始 token 数重新投影为
-    # 当前 70% 规则。仅兼容这两个已知规则，不修改原始观测、计数或历史交付。
+    # 旧状态按 60% 或 70% 保存布尔投影；按原始 token 数重新投影为
+    # 当前 90% 规则。兼容上述历史规则，不修改原始观测、计数或历史交付。
     legacy_threshold_met = raw["used_tokens"] * 5 >= raw["capacity_tokens"] * 3
-    if raw["threshold_met"] not in (threshold_met, legacy_threshold_met):
+    legacy_70_threshold_met = raw["used_tokens"] * 10 >= raw["capacity_tokens"] * 7
+    if raw["threshold_met"] not in (threshold_met, legacy_threshold_met, legacy_70_threshold_met):
         _fail(
             "state.last_threshold_observation.threshold_met",
             "与原始整数占用不一致",
@@ -1442,6 +1430,7 @@ def _new_window_count_view(reason_code: str = "first_turn_pending") -> dict[str,
     return view
 
 
+# 2026-11-03 起不可达，仅保留历史兼容与常量导入，清理另片。
 def _attach_classification(
     view: dict[str, Any], classification: Mapping[str, Any] | None
 ) -> dict[str, Any]:
@@ -1511,6 +1500,7 @@ def _known_metrics_count_view(
     return view
 
 
+# 2026-11-03 起不可达，仅保留历史兼容与常量导入，清理另片。
 def _missing_metrics_count_view(
     count_state_value: Any,
     scope: Mapping[str, Any],
@@ -2020,7 +2010,7 @@ def _metrics_known(
         "exact_comparison": {
             "operator": ">=",
             "used_times_10": str(used * THRESHOLD_DENOMINATOR),
-            "capacity_times_7": str(capacity * THRESHOLD_NUMERATOR),
+            "capacity_times_9": str(capacity * THRESHOLD_NUMERATOR),
         },
         "sample": {
             "native_session_id": native_session_id,
@@ -2528,7 +2518,7 @@ def plan_execution_session(
     window_count_state: Mapping[str, Any] | None = None,
     fallback_clock: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """统一规划入口：校验显式输入、选择会话、判断 70% 阈值并生成正文/留档。
+    """统一规划入口：校验显式输入、选择会话、判断 90% 阈值并生成正文/留档。
 
     参数（全部由调用方显式传入，本函数不读取外部状态）：
 
@@ -2579,21 +2569,9 @@ def plan_execution_session(
     ``new_messages``
         只包含调用方明确传入的本次必要新 Hall 消息（字符串数组）；不读取历史。
 
-    ``context_unavailability``
-        可选，DSH 适配器/可信宿主给出的不可得分类（schema
-        ``talk-dsh-context-unavailability-1``）。只有有限白名单原因、且
-        精确 native session/generation/revision 与当前 scope 均匹配时才可能
-        进入备用；裸 ``None``、未知 reason 或仅传可兜底布尔值都不会获准。
-
-    ``window_count_state``
-        可选，与精确 native session/generation/规范 JSON scope 指纹绑定的纯
-        计数状态。必须证明首轮确认、从 1 连续累计、去重身份完整；可靠指标
-        存在时不参与换窗决定，只在指标明确不可得时作为 10 次备用依据。
-        本入口不修改状态、不预增计数。
-
-    ``fallback_clock``
-        备用路径必须显式提供 ``now`` 和 ``max_age_seconds``，校验不可得证明
-        的时间。缺时钟、过期或未来证明不兜底；known 指标仍按其独立样本判定。
+    2026-11-03 起缺数备用已取消：``context_unavailability``、
+    ``window_count_state`` 和 ``fallback_clock`` 仅为兼容旧调用方保留，
+    不参与换窗判定。
 
     返回计划是普通 dict / JSON 可序列化对象。``wait``/``reject`` 不带可执行
     正文；``new_session`` 不伪造 native session id，``reuse_session`` 才带候选
@@ -2611,9 +2589,7 @@ def plan_execution_session(
         sample_value = copy.deepcopy(context_sample)
         messages_value = copy.deepcopy(new_messages)
         channel_value = copy.deepcopy(execution_channel)
-        unavailability_value = copy.deepcopy(context_unavailability)
         count_state_value = copy.deepcopy(window_count_state)
-        fallback_clock_value = copy.deepcopy(fallback_clock)
     except Exception:
         return _reject_plan(
             selection=None,
@@ -2834,97 +2810,11 @@ def plan_execution_session(
             window_count=count_view,
         )
 
-    # 原校验可能先报告过期或缺容量；备用必须继续检查其它显式非法字段。
-    raw_error = (
-        _raw_fallback_blocker(sample_value) if unavailability_value is not None else None
-    )
-    fallback = (
-        {"status": "ineligible", "reason_code": raw_error, "classification": None, "errors": [raw_error]}
-        if raw_error else _evaluate_context_unavailability(
-            unavailability_value, scope_norm, candidate_info, metrics, fallback_clock_value
-        )
-    )
-    if fallback["status"] == "eligible":
-        plan_reason, count_view = _missing_metrics_count_view(
-            count_state_value, scope_norm, candidate_info
-        )
-        if plan_reason == "reuse_missing_metrics_fallback":
-            observation = count_state_value.get("last_threshold_observation")
-            if (observation is not None and _parse_time(
-                observation["sampled_at"], "observation.sampled_at"
-            ) > _parse_time(fallback_clock_value["now"], "fallback_clock.now")):
-                plan_reason = "new_fallback_count_unverified"
-                count_view["status"] = "unverified"
-                count_view["reason_code"] = "observation_future"
-                count_view["proposed_ordinal"] = None
-                count_view["requires_delivery_confirmation"] = False
-                count_view["count_merge"] = None
-        _attach_classification(count_view, fallback.get("classification"))
-        if plan_reason == "reuse_missing_metrics_fallback":
-            return _reuse_plan(
-                scope=scope_norm,
-                base=base_norm,
-                task=task_norm,
-                messages=messages_norm,
-                candidate_info=candidate_info,
-                selection=selection_norm,
-                metrics=metrics,
-                reason_code=plan_reason,
-                window_count=count_view,
-            )
-        return _new_plan(
-            reason_code=plan_reason,
-            scope=scope_norm,
-            base=base_norm,
-            task=task_norm,
-            messages=messages_norm,
-            candidate_info=candidate_info,
-            selection=selection_norm,
-            metrics=metrics,
-            window_count=count_view,
-        )
-
-    if fallback["status"] == "absent":
-        count_view = _default_count_view(
-            "not_required", "classification_absent"
-        )
-    else:
-        classification = fallback.get("classification")
-        if classification is not None:
-            count_view = _count_state_view(
-                "not_eligible",
-                fallback["reason_code"],
-                classification=classification,
-            )
-            _attach_classification(count_view, classification)
-        else:
-            count_view = _default_count_view(
-                "unverified", fallback["reason_code"]
-            )
-            count_view["classification_reason"] = fallback.get(
-                "classification_reason"
-            )
-            count_view["classification_category"] = fallback.get(
-                "classification_category"
-            )
-            error_items = fallback.get("errors")
-            if isinstance(error_items, list) and error_items:
-                count_view["classification_error"] = str(error_items[0])
-        count_view["observation_intent"] = None
     return _new_plan(
-        reason_code=(
-            "new_context_unknown"
-            if fallback["status"] == "absent"
-            else "new_fallback_classification_unverified"
-        ),
-        scope=scope_norm,
-        base=base_norm,
-        task=task_norm,
-        messages=messages_norm,
-        candidate_info=candidate_info,
-        selection=selection_norm,
-        metrics=metrics,
-        window_count=count_view,
+        reason_code="new_context_unknown", scope=scope_norm, base=base_norm,
+        task=task_norm, messages=messages_norm, candidate_info=candidate_info,
+        selection=selection_norm, metrics=metrics,
+        window_count=_default_count_view("not_required", "fallback_disabled"),
     )
 
 

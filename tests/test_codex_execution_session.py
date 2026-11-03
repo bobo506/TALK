@@ -143,36 +143,43 @@ class CodexExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(third.state["confirmed_count"], 1)
         self.assertIn(self.base_text, self.native.directives[-1][1])
 
-    async def test_699_then_70_rotates_next_task_not_during_turn(self):
+    async def test_899_then_90_rotates_next_task_not_during_turn(self):
         first = await self.run_task(1)
-        self.native.used = 70000
+        self.native.used = 90000
         second = await self.run_task(2)
         self.assertEqual(first.state["native_session_id"], second.state["native_session_id"])
         third = await self.run_task(3)
         self.assertFalse(third.state["reused"])
         self.assertEqual(third.state["decision"], "new_context_threshold")
 
-    async def test_missing_data_reuses_ten_rotates_eleventh(self):
+    async def test_missing_data_always_starts_new_window(self):
         self.native.missing = True
         results = [await self.run_task(i) for i in range(1, 12)]
-        self.assertTrue(all(x.state["native_session_id"] == results[0].state["native_session_id"] for x in results[:10]))
-        self.assertEqual([x.state["confirmed_count"] for x in results[:10]], list(range(1, 11)))
-        self.assertNotEqual(results[-1].state["native_session_id"], results[0].state["native_session_id"])
-        self.assertEqual(results[-1].state["decision"], "new_fallback_exhausted")
+        self.assertEqual(results[0].state["decision"], "new_no_candidate")
+        for previous, current in zip(results, results[1:]):
+            self.assertFalse(current.state["reused"])
+            self.assertEqual(current.state["decision"], "new_context_unknown")
+            self.assertNotEqual(current.state["native_session_id"], previous.state["native_session_id"])
+            self.assertEqual(current.state["confirmed_count"], 1)
 
     async def test_reliable_low_can_exceed_ten(self):
         results = [await self.run_task(i) for i in range(1, 13)]
         self.assertTrue(all(x.state["native_session_id"] == results[0].state["native_session_id"] for x in results))
         self.assertEqual(results[-1].state["confirmed_count"], 12)
 
-    async def test_missing_then_recovery_does_not_clear_count(self):
+    async def test_missing_then_known_rotates_until_known_snapshot(self):
         self.native.missing = True
-        await self.run_task(1)
+        first = await self.run_task(1)
         self.native.missing = False
         second = await self.run_task(2)
         third = await self.run_task(3)
-        self.assertEqual(second.state["confirmed_count"], 2)
-        self.assertEqual(third.state["confirmed_count"], 3)
+        self.assertFalse(second.state["reused"])
+        self.assertEqual(second.state["decision"], "new_context_unknown")
+        self.assertEqual(second.state["context_status"], "unavailable")
+        self.assertNotEqual(second.state["native_session_id"], first.state["native_session_id"])
+        self.assertTrue(third.state["reused"])
+        self.assertEqual(third.state["native_session_id"], second.state["native_session_id"])
+        self.assertEqual(third.state["confirmed_count"], 2)
         self.assertEqual(third.state["context_status"], "known")
 
     async def test_duplicate_attempt_never_calls_model_twice(self):
@@ -221,12 +228,14 @@ class CodexExecutionTests(unittest.IsolatedAsyncioTestCase):
         second = await self.run_task(2, launch="launch:other")
         self.assertNotEqual(first.state["native_session_id"], second.state["native_session_id"])
 
-    async def test_expired_sample_uses_trusted_count_without_faking_source_time(self):
+    async def test_expired_sample_starts_new_without_faking_source_time(self):
         self.native.age = 21601
         first = await self.run_task(1)
         second = await self.run_task(2)
-        self.assertEqual(first.state["native_session_id"], second.state["native_session_id"])
-        self.assertEqual(second.state["confirmed_count"], 2)
+        self.assertFalse(second.state["reused"])
+        self.assertEqual(second.state["decision"], "new_context_unknown")
+        self.assertNotEqual(first.state["native_session_id"], second.state["native_session_id"])
+        self.assertEqual(second.state["confirmed_count"], 1)
         self.assertEqual(second.state["context_status"], "unavailable")
         age=datetime.now(timezone.utc)-datetime.fromisoformat(second.state["last_snapshot"]["pressure_tokens_source_time"])
         self.assertGreater(age.total_seconds(),21600)

@@ -136,7 +136,7 @@ class KimiExecutionTests(unittest.IsolatedAsyncioTestCase):
         first = await self.run_task(1)
         below = await self.run_task(2)
         self.assertTrue(below.state["reused"])
-        self.native.used = 70000
+        self.native.used = 90000
         third = await self.run_task(3)
         fourth = await self.run_task(4)
         self.assertEqual(third.state["native_session_id"], first.state["native_session_id"])
@@ -148,32 +148,38 @@ class KimiExecutionTests(unittest.IsolatedAsyncioTestCase):
             result = await self.run_task(i)
         self.assertEqual(result.state["confirmed_count"], 12)
 
-    async def test_missing_only_ten_then_eleventh_new(self):
+    async def test_missing_metrics_always_start_new_window(self):
         self.native.missing = True
-        first = await self.run_task(1)
-        for i in range(2, 11):
+        previous = await self.run_task(1)
+        for i in range(2, 12):
             result = await self.run_task(i)
-            self.assertEqual(first.state["native_session_id"], result.state["native_session_id"])
-            self.assertEqual(result.state["confirmed_count"], i)
-        new = await self.run_task(11)
-        self.assertNotEqual(new.state["native_session_id"], first.state["native_session_id"])
-        self.assertEqual(new.state["confirmed_count"], 1)
+            self.assertFalse(result.state["reused"])
+            self.assertNotEqual(result.state["native_session_id"], previous.state["native_session_id"])
+            self.assertEqual(result.state["confirmed_count"], 1)
+            previous = result
 
-    async def test_recovered_measurement_does_not_reset_count(self):
+    async def test_recovered_measurement_reuses_known_window(self):
         self.native.missing = True
         await self.run_task(1)
         await self.run_task(2)
         self.native.missing = False
-        result = await self.run_task(3)
-        self.assertEqual(result.state["confirmed_count"], 3)
-        self.assertFalse(result.state["last_snapshot"]["used_tokens"] is None)
+        third = await self.run_task(3)
+        self.assertFalse(third.state["reused"])
+        self.assertEqual(third.state["decision"], "new_context_unknown")
+        fourth = await self.run_task(4)
+        self.assertTrue(fourth.state["reused"])
+        self.assertEqual(fourth.state["native_session_id"], third.state["native_session_id"])
+        self.assertEqual(fourth.state["confirmed_count"], 2)
+        self.assertFalse(fourth.state["last_snapshot"]["used_tokens"] is None)
 
-    async def test_aged_metric_uses_trusted_count(self):
+    async def test_aged_metric_starts_new_window(self):
         self.native.age = 22000
-        await self.run_task(1)
+        first = await self.run_task(1)
         result = await self.run_task(2)
-        self.assertTrue(result.state["reused"])
-        self.assertEqual(result.state["confirmed_count"], 2)
+        self.assertFalse(result.state["reused"])
+        self.assertEqual(result.state["decision"], "new_context_unknown")
+        self.assertNotEqual(first.state["native_session_id"], result.state["native_session_id"])
+        self.assertEqual(result.state["confirmed_count"], 1)
 
     async def test_invalid_metric_must_not_use_ten_fallback(self):
         self.native.used = -1
@@ -260,13 +266,15 @@ class KimiExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first.state["last_snapshot"]["context_window"], 100000)
         self.assertEqual(first.state["last_snapshot"]["used_tokens"], 69900)
 
-    async def test_missing_capacity_fallback_and_corrupt_time_new_window(self):
+    async def test_missing_capacity_and_corrupt_time_start_new_window(self):
         self.native.spec.capacity = None
         first = await self.run_task(1)
-        result = await self.run_task(2)
-        self.assertTrue(result.state["reused"])
-        self.native.append(result.state["native_session_id"], "token_counting.turn_recorded", agentId="main", tokens=True)
+        second = await self.run_task(2)
+        self.assertFalse(second.state["reused"])
+        self.assertEqual(second.state["decision"], "new_context_unknown")
+        self.native.append(second.state["native_session_id"], "token_counting.turn_recorded", agentId="main", tokens=True)
         third = await self.run_task(3)
+        self.assertFalse(third.state["reused"])
         self.assertNotEqual(first.state["native_session_id"], third.state["native_session_id"])
 
     async def test_native_failure_return_still_taints_counted_window(self):

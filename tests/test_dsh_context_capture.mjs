@@ -777,12 +777,12 @@ function crossLanguageCases() {
     now: iso(NOW + 1000),
     expected: { action: "reuse_session", used: 59900, capacity: 100000 },
   });
-  const exact = installKnownWorld({ projected: 60000, pressure: 60000 });
+  const exact = installKnownWorld({ projected: 90000, pressure: 90000 });
   cases.push({
-    name: "new_60",
+    name: "new_90",
     snapshot: exact.read(NOW),
     now: iso(NOW + 1000),
-    expected: { action: "new_session", used: 60000, capacity: 100000 },
+    expected: { action: "new_session", used: 90000, capacity: 100000 },
   });
   const zero = installKnownWorld({ projected: 0, pressure: 0, capacity: 1000 });
   cases.push({

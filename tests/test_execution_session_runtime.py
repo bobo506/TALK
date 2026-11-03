@@ -416,11 +416,11 @@ class FirstAndReuseTests(RuntimeBase):
 
 
 class ThresholdTests(RuntimeBase):
-    async def test_699_reuses_and_70_rotates_next(self) -> None:
-        self.native.used = 699_000
-        first = await self.run_task(1, content="69.9")
-        self.native.used = 700_000
-        second = await self.run_task(2, content="70")
+    async def test_899_reuses_and_90_rotates_next(self) -> None:
+        self.native.used = 899_000
+        first = await self.run_task(1, content="89.9")
+        self.native.used = 900_000
+        second = await self.run_task(2, content="90")
         self.assertTrue(second.state["reused"])
         self.assertEqual(second.state["native_session_id"], first.state["native_session_id"])
         self.assertEqual(second.state["context_status"], "known")
@@ -434,23 +434,19 @@ class ThresholdTests(RuntimeBase):
         )
 
 
-class FallbackTests(RuntimeBase):
-    async def test_missing_metrics_counts_10_then_rotates_11(self) -> None:
+class MissingMetricsTests(RuntimeBase):
+    async def test_missing_metrics_always_rotates(self) -> None:
         self.native.mode = "missing"
         rows = []
         for index in range(1, 12):
             outcome = await self.run_task(index, content=f"missing {index}")
             rows.append(outcome.state)
         self.assertTrue(all(row["context_status"] == "unavailable" for row in rows))
-        for index in range(1, 10):
-            self.assertTrue(rows[index]["reused"], rows[index])
-            self.assertEqual(rows[index]["confirmed_count"], index + 1)
-        self.assertTrue(rows[9]["reused"])
-        self.assertEqual(rows[9]["confirmed_count"], 10)
-        self.assertFalse(rows[10]["reused"])
-        self.assertEqual(rows[10]["confirmed_count"], 1)
-        self.assertNotEqual(rows[10]["native_session_id"], rows[0]["native_session_id"])
-        self.assertEqual(rows[10]["decision"], "new_fallback_exhausted")
+        for index in range(1, 11):
+            self.assertFalse(rows[index]["reused"], rows[index])
+            self.assertEqual(rows[index]["confirmed_count"], 1)
+            self.assertNotEqual(rows[index]["native_session_id"], rows[index - 1]["native_session_id"])
+            self.assertEqual(rows[index]["decision"], "new_context_unknown")
 
 
 class FailureAndLockTests(RuntimeBase):
@@ -666,13 +662,15 @@ class AdditionalRuntimeRegressionTests(RuntimeBase):
         self.assertEqual(len({x['native_session_id'] for x in rows}),1)
         self.assertEqual(rows[-1]['confirmed_count'],12)
 
-    async def test_metrics_recovery_does_not_reset_count(self):
+    async def test_missing_metrics_rotate_until_known_snapshot(self):
         rows=[]
-        for n in range(1,12):
+        for n in range(1,8):
             self.native.mode='known' if n in {6,7} else 'missing'
             rows.append((await self.run_task(n,content=f'change {n}')).state)
-        self.assertEqual([x['confirmed_count'] for x in rows[:10]],list(range(1,11)))
-        self.assertNotEqual(rows[0]['native_session_id'],rows[10]['native_session_id'])
+        self.assertEqual([x['confirmed_count'] for x in rows], [1]*6 + [2])
+        self.assertFalse(any(x['reused'] for x in rows[:6]))
+        self.assertTrue(rows[6]['reused'])
+        self.assertEqual(rows[6]['native_session_id'], rows[5]['native_session_id'])
 
     async def test_atomic_commit_rolls_back_receipt_when_window_update_fails(self):
         original=ExecutionSessionStore.commit_confirmed_delivery
