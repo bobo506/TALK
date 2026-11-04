@@ -10,7 +10,10 @@
   - `AGENTS.md`：「发起者主被动与等待」改为“派发前读模式、派发后按模式执行”，删除“默认总是等待”。
   - 文档：USER_MANUAL 调度模式与限制段、TERMINAL_MCP 程序轮询触发条件、MODULE_webui、CONTROLLER_MODE_DESIGN（I-4 取消注记）、INITIATOR_MODE_UI_ACCEPTANCE。
 - **验证**：Python **153 项 OK**（`test_project_controller_mode` 33，含新增 `initiator_wait` 单元与真实派发两态；`test_project_development_requirements` 21；`test_talk_task_tools` 21；`test_initiator_followup` 32；`test_initiator_followup_stdio` 6；`test_talk_controlled_wait` 37；`test_role_creation_web_ui` 3）；Node `workspace_controller_mode_ui` + `workspace_initiator_mode_ui` **35 项通过**。`git diff --check` 无空白错误。
-- **已知未验证/限制**：新桥接代码要 MCP 重连/重启后才在真实会话生效；真实“主动→自动起 job→通知唤醒”“被动→不起 job”两态尚未实机跑（需用户在页面切一次模式）；`talk_delegate_task` 的 `initiator_wait` 只是建议与命令模板，TALK 无法强制 agent 回合；`test_controller_web_ui` 仍有 2 项基线既有失败（STATIC_VERSION 常量过期，与本片无关，未改）；未做独立复核、未推送。
+- **实机验收（2026-11-04 19:25，两态都跑过）**：
+  - 主动态（v9）：18:54:35 派发 419 → 18:56:38 Terra 领取（预检约 2 分钟）→ 18:59:14 完成；后台 job 输出 `TALK_TASK_DONE task=419 status=succeeded workflow=submitted result=3195 elapsed=270s`（退出码 0），等待期间零模型轮询、由完成通知唤醒后取件。419 的结果消息仅 78 字符且被截断（invalid JSON），按已处理收取，不作为业务结论。
+  - 被动态（v10）：19:17:07 派发 420，**未启动等待 job**，结束本轮；19:19:10 领取 → 19:21:40 完成，交付 3196 为完整 `talk-delivery-1`（complete、task_id 420 一致、verification pass、changed_files 空），19:22:33 收取。419 的截断未复现，暂按偶发观察，不据此改产品。
+- **已知未验证/限制**：新桥接代码要 MCP 重连/重启后才在真实会话生效（本会话仍读旧 `controller_mode` note，`initiator_wait` 回显未实测）；页面新文案需刷新浏览器；`talk_delegate_task` 的 `initiator_wait` 只是建议与命令模板，TALK 无法强制 agent 回合；`test_controller_web_ui` 仍有 2 项基线既有失败（STATIC_VERSION 常量过期，与本片无关，未改）；未做独立复核、未推送。
 
 ## 2026-11-04 17:25 — 用户取消“主被动跟进完整接入与验证”
 
