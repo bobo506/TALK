@@ -965,20 +965,51 @@ function composerReadOnly() {
   return activeGroupReadOnly() || taskHallComposerReadOnly();
 }
 
+let taskHallBriefKey = null;
+let taskHallBriefExpanded = false;
+
 function renderTaskHallBrief() {
   const old = document.getElementById("task-hall-brief");
   if (old) old.remove();
-  if (!workspaceHasConversation() || getActiveGroup()?.type !== "task") return;
-  const task = getContextTask();
-  if (!task) return;
+  const task = workspaceHasConversation() && getActiveGroup()?.type === "task" ? getContextTask() : null;
+  if (!task) {
+    taskHallBriefKey = null;
+    taskHallBriefExpanded = false;
+    return;
+  }
+  const key = `${activeGroupId}:${task.id}`;
+  if (taskHallBriefKey !== key) {
+    taskHallBriefKey = key;
+    taskHallBriefExpanded = false;
+  }
   const brief = document.createElement("section");
   brief.id = "task-hall-brief";
-  brief.style.cssText = "max-height:40vh;overflow:auto;background:var(--card, #fff);padding:12px;border:1px solid var(--line, #ccc);white-space:pre-wrap;overflow-wrap:anywhere";
+  brief.style.cssText = "background:var(--card, #fff);padding:8px 12px;border:1px solid var(--line, #ccc)";
+  const header = document.createElement("div");
+  header.style.cssText = "display:flex;align-items:center;gap:8px;min-width:0";
   const heading = document.createElement("strong");
   heading.textContent = "任务交办内容";
+  const title = document.createElement("span");
+  title.style.cssText = "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+  title.textContent = task.title || `任务 #${task.id}`;
+  const status = document.createElement("span");
+  status.textContent = taskStatusMeta(task).label;
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.textContent = taskHallBriefExpanded ? "收起" : "展开";
+  toggle.setAttribute("aria-expanded", String(taskHallBriefExpanded));
+  toggle.onclick = () => {
+    taskHallBriefExpanded = !taskHallBriefExpanded;
+    details.hidden = !taskHallBriefExpanded;
+    toggle.textContent = taskHallBriefExpanded ? "收起" : "展开";
+    toggle.setAttribute("aria-expanded", String(taskHallBriefExpanded));
+  };
   const details = document.createElement("div");
-  details.textContent = `标题：${task.title || `任务 #${task.id}`}\n正文：${task.content || ""}\n状态：${taskStatusMeta(task).label}\n发起者：${workspaceMemberName(task.created_by)}\n执行者：${workspaceMemberName(task.target_member_id)}\n创建时间：${formatTaskTime(task.created_at)}`;
-  brief.append(heading, details);
+  details.style.cssText = "max-height:60vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere";
+  details.hidden = !taskHallBriefExpanded;
+  details.textContent = `正文：${task.content || ""}\n发起者：${workspaceMemberName(task.created_by)}\n执行者：${workspaceMemberName(task.target_member_id)}\n创建时间：${formatTaskTime(task.created_at)}`;
+  header.append(heading, title, status, toggle);
+  brief.append(header, details);
   messagesEl.prepend(brief);
 }
 

@@ -12,7 +12,7 @@ function harness() {
   const elements = new Map();
   function element(tag) {
     const classes = new Set();
-    const node = { tag, children: [], style: {}, dataset: {}, disabled: false, querySelectorAll: () => [],
+    const node = { tag, children: [], style: {}, dataset: {}, disabled: false, setAttribute(name, value) { this[name] = value; }, querySelectorAll: () => [],
       classList: { add: x => classes.add(x), remove: x => classes.delete(x), toggle: (x, on) => on ? classes.add(x) : classes.delete(x), contains: x => classes.has(x) },
       append(...items) { for (const item of items) this.appendChild(item); },
       appendChild(item) { if (item.fragment) { for (const child of [...item.children]) this.appendChild(child); return item; } item.parent = this; this.children.push(item); return item; },
@@ -47,15 +47,28 @@ function harness() {
 test('任务交办内容置顶、保留原文且不计入消息；历史向前加载仍置顶', () => {
   const { ctx, el } = harness();
   ctx.renderTaskHallBrief();
-  const brief = el('messages').children[0];
+  let brief = el('messages').children[0];
   assert.equal(brief.id, 'task-hall-brief');
-  assert.doesNotMatch(brief.style.cssText, /position\s*:\s*sticky/i);
-  assert.match(brief.style.cssText, /max-height\s*:\s*40vh/i);
-  assert.match(brief.style.cssText, /overflow\s*:\s*auto/i);
-  assert.equal(brief.children[0].textContent, '任务交办内容');
-  assert.match(brief.children[1].textContent, /<标题>/);
-  assert.match(brief.children[1].textContent, /第一行\n第二行/);
-  assert.match(brief.children[1].textContent, /发起者：人\n执行者：执行者\n创建时间：2026-11-04/);
+  assert.doesNotMatch(brief.style.cssText, /position\s*:\s*(sticky|fixed|absolute)/i);
+  const header = brief.children[0], details = brief.children[1], toggle = header.children[3];
+  assert.equal(header.children[0].textContent, '任务交办内容');
+  assert.equal(header.children[1].textContent, '<标题>');
+  assert.equal(toggle.textContent, '展开');
+  assert.equal(details.hidden, true);
+  toggle.onclick();
+  assert.equal(details.hidden, false);
+  assert.equal(toggle.textContent, '收起');
+  assert.match(details.textContent, /第一行\n第二行/);
+  assert.match(details.textContent, /发起者：人\n执行者：执行者\n创建时间：2026-11-04/);
+  assert.match(details.style.cssText, /max-height\s*:\s*60vh/i);
+  assert.match(details.style.cssText, /overflow\s*:\s*auto/i);
+  assert.doesNotMatch(details.style.cssText, /position\s*:\s*(sticky|fixed|absolute)/i);
+  ctx.renderTaskHallBrief();
+  brief = el('messages').children[0];
+  assert.equal(brief.children[1].hidden, false);
+  assert.equal(brief.children[0].children[3].textContent, '收起');
+  brief.children[0].children[3].onclick();
+  assert.equal(brief.children[1].hidden, true);
   assert.equal(ctx.messageRecords.size, 0);
   ctx.appendMessages([{ id: 2 }]); ctx.prependMessages([{ id: 1 }]);
   assert.deepEqual(el('messages').children.map(n => n.id), ['task-hall-brief', 'msg-1', 'msg-2']);
@@ -70,4 +83,16 @@ test('任务状态与旁观权限共同控制输入；普通群聊保持可用',
   ctx.projectTasks[0].workflow_status = 'submitted'; ctx.syncComposerReadOnly(); assert.equal(el('send').disabled, true);
   ctx.renderTaskHallBrief(); ctx.activeGroupId = 'g'; ctx.workspaceUI.mode = 'chats'; ctx.renderTaskHallBrief(); ctx.syncComposerReadOnly();
   assert.equal(el('input').disabled, false); assert.equal(el('send').disabled, false); assert.equal(el('messages').children.length, 0);
+});
+
+test('reset on leaving or switching task', () => {
+  const { ctx, el } = harness();
+  ctx.renderTaskHallBrief();
+  el('messages').children[0].children[0].children[3].onclick();
+  ctx.activeGroupId = 'g'; ctx.renderTaskHallBrief();
+  ctx.activeGroupId = 't'; ctx.renderTaskHallBrief();
+  assert.equal(el('messages').children[0].children[1].hidden, true);
+  el('messages').children[0].children[0].children[3].onclick();
+  ctx.projectTasks[0].id = 2; ctx.renderTaskHallBrief();
+  assert.equal(el('messages').children[0].children[1].hidden, true);
 });
