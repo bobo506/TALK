@@ -2021,13 +2021,13 @@ function workspaceTaskNotice(task, tree) {
   if (task.workflow_status === "needs_decision") return "需要项目负责人作出决定，任务尚未继续。";
   return task.workflow_status === "in_progress" ? "负责人正在推进任务，下面可查看分工进展。" : "任务已交办，等待负责人接手。";
 }
-// ── C2-B 项目调度模式（角色页“项目设置”，仅保存设置意向） ─────────────────
+// ── C2-B 项目调度模式（角色页“项目设置”，控制发起者派发后是否后台轮询） ─────
 // 读取 GET /api/projects/{id} 的 controller_mode / controller_mode_version；加载中禁用控件
 // 并提示读取中。写入只走专用 PATCH /api/projects/{id}/controller-mode，expected_version
-// 原样回传上次读取的版本（不自己 +1、不走普通项目 PATCH）。设置与实际连接状态分开：
-// 发起者跟进在各自连接内生效，页面不将项目设置伪装成所有会话均已生效。
-// I-2（发起者模式）：模式只约束任务发起侧，与任何指定/成员状态无关——面板不再读取、
-// 不依赖任何指定字段，保存“主动”统一显示固定意向提示，无任何指定前置要求。
+// 原样回传上次读取的版本（不自己 +1、不走普通项目 PATCH）。
+// 2026-11-04 用户决定：模式接程序轮询——主动=发起者派发后后台轮询、就绪时通知取件；
+// 被动=派发后结束、由操作人通知。能否自动通知取决于发起终端，页面只说明契约，
+// 不把项目设置伪装成所有会话都已生效。
 // 状态绑定 项目/账号/请求序号，保存收尾用独立 saveToken 所有权（内部 409 重读会递增
 // 请求序号，不用序号当所有权）；迟到成功/错误不回填其它上下文；用户未保存的选择存于
 // selection，重绘不得吞掉。不新增后台轮询。
@@ -2092,9 +2092,9 @@ function syncControllerModePanel() {
   } else {
     savedLine.textContent = `已保存设置：无法识别的模式（服务返回：${String(controllerModeUI.saved)}），可选择下方模式重新保存`;
   }
-  // 实际跟进状态只由相应发起会话回执证明，项目 GET 不承诺全局生效。
+  // 模式决定发起者派发后是否后台轮询；能否自动通知仍取决于发起终端，项目 GET 无法证明。
   effectiveLine.textContent = ready
-    ? "实际执行：以任务发起会话的跟进回执为准"
+    ? "实际执行：主动由发起终端后台轮询并在就绪时通知；不支持通知时按被动处理"
     : `实际执行：${controllerModeUI.loaded ? "当前服务不支持调度模式读取，无法确认" : "读取失败，无法确认"}`;
   // 显示选择 = 用户未保存选择 ?? 已保存值（未知模式不预选任何项）。重绘只按状态回写
   // checked，用户选择存放在 selection 中，轮询/重绘不会吞掉未保存选择。
@@ -2264,7 +2264,7 @@ async function saveControllerMode() {
           controllerModeUI.selection = null;
           if (submitted === "active") {
             // 不恢复固定指定；实际状态由各发起连接确认，保存不会唤回已结束会话。
-            controllerModeUI.notice = "已保存“主动”。支持主动跟进的发起会话会在本次授权范围内继续处理；已结束的会话仍需人工唤回。";
+            controllerModeUI.notice = "已保存“主动”。发起者派发后会后台轮询结果并在就绪时通知；终端不支持通知时按被动处理。";
           } else {
             controllerModeUI.notice = "已保存“被动”。派发任务后本轮结束，由你通知完成后再读取与收取。";
           }

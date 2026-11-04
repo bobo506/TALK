@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-04 18:00 — 调度模式接通程序轮询（主动=等待，被动=不等待）
+
+- **需求**：用户要求把项目“调度模式”开关接到 11-04 落地的程序轮询——打开主动就派发后后台等待，关闭就不等待；开关背后的旧主动链路代码可保留或以后清理。
+- **语义**：`active`=派发成功后发起者启动 `scripts/talk_wait_task.py` 后台 job（零模型轮询、终态通知唤醒后取件）；`passive`=派发后结束、由操作人通知；`active` 但终端无后台完成通知（Codex/Kimi/WorkBuddy）→ 回落被动并说明；操作人当场明确要求等待可覆盖；模式读不到按被动处理、不猜成主动。
+- **实现**：
+  - `bridges/talk_task_tools.py`：新增 `project_snapshot()`（派发路径一次项目 GET 同时取开发要求与模式，`project_development_requirements` 改为其包装）；新增纯函数 `initiator_wait_plan()`；`delegate_task` 成功响应附 `initiator_wait`（含命令模板与 `requires_completion_notification`）；`CONTROLLER_MODE_NOTE`、`talk_list_agents`/`talk_delegate_task` 工具描述同步新语义。
+  - `web/index.html` + `web/workspace.js`：副标“控制发起者派发后是否等待”、hint、两态说明、“实际执行”行、保存“主动”后的提示改为程序轮询语义；workspace.js 缓存版本 `20261104-initiator-wait-v1`（同步 Python/Node 版本断言）。
+  - `AGENTS.md`：「发起者主被动与等待」改为“派发前读模式、派发后按模式执行”，删除“默认总是等待”。
+  - 文档：USER_MANUAL 调度模式与限制段、TERMINAL_MCP 程序轮询触发条件、MODULE_webui、CONTROLLER_MODE_DESIGN（I-4 取消注记）、INITIATOR_MODE_UI_ACCEPTANCE。
+- **验证**：Python **153 项 OK**（`test_project_controller_mode` 33，含新增 `initiator_wait` 单元与真实派发两态；`test_project_development_requirements` 21；`test_talk_task_tools` 21；`test_initiator_followup` 32；`test_initiator_followup_stdio` 6；`test_talk_controlled_wait` 37；`test_role_creation_web_ui` 3）；Node `workspace_controller_mode_ui` + `workspace_initiator_mode_ui` **35 项通过**。`git diff --check` 无空白错误。
+- **已知未验证/限制**：新桥接代码要 MCP 重连/重启后才在真实会话生效；真实“主动→自动起 job→通知唤醒”“被动→不起 job”两态尚未实机跑（需用户在页面切一次模式）；`talk_delegate_task` 的 `initiator_wait` 只是建议与命令模板，TALK 无法强制 agent 回合；`test_controller_web_ui` 仍有 2 项基线既有失败（STATIC_VERSION 常量过期，与本片无关，未改）；未做独立复核、未推送。
+
 ## 2026-11-04 17:25 — 用户取消“主被动跟进完整接入与验证”
 
 - **决策**：路线图第 7 项“主被动跟进完整接入与验证”（逐宿主验证主动等待的预算/T/W/取消/并发、交付核验与收取链）**取消**。理由：2026-11-04 已落地的“程序轮询 + 完成通知”覆盖了等待交付的实际需求——后台 job 只读轮询任务状态、零模型调用，终态通知后再取件，不再需要发起会话内的主动等待链路。

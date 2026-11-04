@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -282,27 +282,27 @@
         <section id="controller-mode-panel" class="controller-mode-panel hidden" aria-label="调度模式">
           <div class="controller-mode-heading">
             <div>
-              <div class="sidebar-kicker">项目级 · 仅保存设置意向</div>
+              <div class="sidebar-kicker">项目级 · 控制发起者派发后是否等待</div>
               <h3>调度模式</h3>
             </div>
           </div>
-          <p class="controller-mode-hint">模式只约束任务发起侧：被动为派发后结束、由你通知后继续；主动为已接入跟进的发起会话在本次授权范围内等待交付、核验结果、安排复核并收尾。切回被动后停止后续跟进，执行中的任务继续运行。</p>
+          <p class="controller-mode-hint">模式只约束任务发起侧：被动=派发后结束本轮，由你通知后再取件；主动=派发后由发起者后台轮询任务状态，结果就绪时通知取件（需要终端支持后台完成通知，不支持时按被动处理）。切换模式不影响执行中的任务，也不会唤醒已结束的对话。</p>
           <p id="controller-mode-saved" class="controller-mode-saved">已保存设置：读取中…</p>
-          <p id="controller-mode-effective" class="controller-mode-effective">实际执行：以任务发起会话的跟进回执为准</p>
+          <p id="controller-mode-effective" class="controller-mode-effective">实际执行：主动需发起终端支持后台完成通知；不支持时按被动处理</p>
           <fieldset id="controller-mode-options" class="controller-mode-options">
             <legend class="sr-only">选择要保存的调度模式</legend>
             <label class="controller-mode-option" for="controller-mode-passive">
               <input id="controller-mode-passive" type="radio" name="controller-mode" value="passive">
               <span class="controller-mode-option-body">
                 <strong>被动（默认）</strong>
-                <span>派发任务后本轮结束，由你通知完成后再读取与收取。当前所有项目默认此模式。</span>
+                <span>派发任务后本轮结束，不启动等待；由你通知完成后再读取与收取。当前所有项目默认此模式。</span>
               </span>
             </label>
             <label class="controller-mode-option" for="controller-mode-active">
               <input id="controller-mode-active" type="radio" name="controller-mode" value="active">
               <span class="controller-mode-option-body">
                 <strong>主动</strong>
-                <span>任务发起者在本次授权内持续跟进交付、核验、复核与收尾；已结束的对话仍需人工唤回。</span>
+                <span>派发后由发起者后台轮询任务状态，结果就绪时通知取件；终端不支持后台完成通知时回落被动。</span>
               </span>
             </label>
           </fieldset>
@@ -585,7 +585,7 @@
   <script src="/theme.js?v=20261029-theme-day-night-v1"></script>
 <script src="/role-creation.js?v=20261031-model-api-v1"></script>
   <script src="/role-diagnostics.js?v=20261023-backend-export-v1"></script>
-  <script src="/workspace.js?v=20261031-role-effort-v2"></script>
+  <script src="/workspace.js?v=20261104-initiator-wait-v1"></script>
   <script src="/app.js?v=20261025-role-busy-stop-v1"></script>
 </body>
 </html>

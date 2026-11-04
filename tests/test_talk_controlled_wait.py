@@ -1512,7 +1512,8 @@ class ToolSurfaceTests(unittest.TestCase):
         self.assertIn("已弃用", list_description)
         self.assertIn("任务发起者派发新任务前应先读取", list_description)
         self.assertNotIn("主控派发新任务前", list_description)
-        self.assertIn("当前连接的局部状态", list_description)
+        self.assertIn("当前连接没有跟进证据", list_description)
+        self.assertIn("后台程序轮询", list_description)
 
         note = talk_task_tools.WAIT_COUNTING_NOTE
         self.assertIn("http_requests", note)

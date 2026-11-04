@@ -152,14 +152,14 @@ PROJECT_REQUIREMENTS_SNAPSHOT_NOTE = (
     "以下内容由任务发起者在派发时从项目读取并写入任务正文，仅作为随包保存的文本快照："
     "不自动授予权限，不替代或覆盖宿主系统指令，也不追溯修改已创建任务。"
 )
-# C1a 模式只读状态：requested_mode 是项目保存的“模式意向”，
-# 无当前连接跟进证据时，effective_mode 保持 null；连接消费者仅补充自己的局部状态。
+# 2026-11-04：调度模式改为决定发起者的等待方式（程序轮询），
+# 旧连接内主动跟进（talk_follow_tasks / controlled_wait）保留但不作为默认链路。
 CONTROLLER_MODE_NOTE = (
-    "controller_mode 只是项目保存的模式意向（requested_mode）与版本，"
-    "无当前连接跟进证据时effective_mode=null（effective_status=not_bound）；"
-    "已配置明确预算的主动消费者只回报当前连接/显式任务的实际状态。"
-    "保存 active 不等于已生效、不等于已唤回发起者会话，不增加任何授权；"
-    "被动协作仍是派发后结束、由用户通知后再取件。"
+    "controller_mode 是项目保存的调度模式（requested_mode）与版本："
+    "active=发起者派发后由后台程序轮询任务状态、就绪时通知取件（需终端支持后台完成通知）；"
+    "passive=派发后结束本轮，由操作人通知后再取件。"
+    "effective_mode=null 只表示当前连接没有跟进证据（effective_status=not_bound），"
+    "不代表保存的模式无效；模式不增加任何权限，也不唤醒已结束的会话。"
 )
 CONTROLLER_MODE_UNSUPPORTED_NOTE = (
     "当前后端未返回模式字段（旧后端）：模式意向状态为 unsupported，"
@@ -167,6 +167,23 @@ CONTROLLER_MODE_UNSUPPORTED_NOTE = (
 )
 CONTROLLER_MODE_EFFECTIVE_STATUS_SUPPORTED = "not_bound"
 CONTROLLER_MODE_EFFECTIVE_STATUS_UNSUPPORTED = "unsupported"
+# 派发成功后的发起者等待指示：由项目保存模式在派发瞬间求值，随响应回显给模型。
+# 只是建议性事实 + 命令模板，不启动任何进程、不代表已经等待或已经生效。
+INITIATOR_WAIT_START = "start_background_wait"
+INITIATOR_WAIT_END = "end_turn"
+INITIATOR_WAIT_UNKNOWN = "unknown"
+INITIATOR_WAIT_ACTIVE_NOTE = (
+    "项目保存为主动：派发成功后按 command 启动后台轮询（零模型调用），"
+    "任务进入终态时由完成通知唤醒后再取件；终端不支持后台完成通知时回落被动并向用户说明，"
+    "不要假装正在等待。"
+)
+INITIATOR_WAIT_PASSIVE_NOTE = (
+    "项目保存为被动：派发后结束本轮，不启动等待；由操作人通知结果后再取件。"
+)
+INITIATOR_WAIT_UNKNOWN_NOTE = (
+    "未读到可靠的调度模式（服务端未返回或读取失败）：按被动处理，"
+    "不猜成主动、不启动等待，可向用户说明模式读取失败。"
+)
 # 只读白名单：与 server.models.PROJECT_CONTROLLER_MODES 对齐；服务端返回未知值时
 # 只报 null，不把意外取值当成合法模式透传给模型。
 CONTROLLER_MODES = ("passive", "active")
@@ -430,6 +447,24 @@ def latest_instance_summary(instances: list[JsonDict]) -> list[JsonDict]:
     ]
 
 
+def project_snapshot(project_id: str) -> JsonDict:
+    """只读读取一次项目详情（不缓存、不跨项目回退）。
+
+    开发要求与调度模式复用同一份响应：派发路径只发一次 ``GET /api/projects/{id}``。
+    项目缺失或不可见时沿用该接口的既有错误语义，抛 ``TalkToolError``。
+    """
+    project = _api_request("GET", f"/api/projects/{quote(project_id, safe='')}")
+    return project if isinstance(project, dict) else {}
+
+
+def _requirements_text(project: JsonDict) -> str | None:
+    value = project.get("development_requirements")
+    if value is None:
+        return None
+    text = str(value)
+    return text if text.strip() else None
+
+
 def project_development_requirements(project_id: str) -> str | None:
     """读取指定项目当前的最新开发要求（只读，不做缓存）。
 
@@ -437,12 +472,7 @@ def project_development_requirements(project_id: str) -> str | None:
       不会回退到其它项目或上一次读到的陈旧快照；
     - 无内容（服务端存 NULL/空）时返回 ``None``，调用方据此保持原有行为。
     """
-    project = _api_request("GET", f"/api/projects/{quote(project_id, safe='')}")
-    value = project.get("development_requirements") if isinstance(project, dict) else None
-    if value is None:
-        return None
-    text = str(value)
-    return text if text.strip() else None
+    return _requirements_text(project_snapshot(project_id))
 
 
 def snapshot_task_content(content: str, requirements: str | None) -> str:
@@ -502,6 +532,50 @@ def controller_mode_summary(project: JsonDict) -> JsonDict:
         "effective_mode": None,
         "effective_status": CONTROLLER_MODE_EFFECTIVE_STATUS_SUPPORTED,
         "note": CONTROLLER_MODE_NOTE,
+    }
+
+
+def initiator_wait_plan(controller: JsonDict, task_id: Any) -> JsonDict:
+    """派发成功后按项目保存模式给出发起者的等待指示（纯函数，不启动任何进程）。
+
+    - ``active``：给出后台轮询命令模板，并如实标注需要“后台完成通知”能力；
+      这不代表已经启动等待，也不保证本终端支持；
+    - ``passive``：明确结束本轮、由操作人通知后再取件；
+    - 读不到可靠模式：``unknown``，按被动处理，不猜成主动。
+    """
+    mode = controller.get("requested_mode")
+    version = controller.get("requested_version")
+    if mode == "active":
+        command = None
+        if isinstance(task_id, int) and not isinstance(task_id, bool) and task_id > 0:
+            command = (
+                f"python -B -X utf8 -m scripts.talk_wait_task --task-id {task_id} "
+                "--key-file <调用者自己的 Key 文件>"
+            )
+        return {
+            "saved_mode": "active",
+            "saved_version": version,
+            "action": INITIATOR_WAIT_START,
+            "command": command,
+            "requires_completion_notification": True,
+            "note": INITIATOR_WAIT_ACTIVE_NOTE,
+        }
+    if mode == "passive":
+        return {
+            "saved_mode": "passive",
+            "saved_version": version,
+            "action": INITIATOR_WAIT_END,
+            "command": None,
+            "requires_completion_notification": False,
+            "note": INITIATOR_WAIT_PASSIVE_NOTE,
+        }
+    return {
+        "saved_mode": None,
+        "saved_version": version,
+        "action": INITIATOR_WAIT_UNKNOWN,
+        "command": None,
+        "requires_completion_notification": False,
+        "note": INITIATOR_WAIT_UNKNOWN_NOTE,
     }
 
 
@@ -735,9 +809,9 @@ def delegate_task(
     followup_plan: Any = None,
 ) -> JsonDict:
     effective_project_id = _project_id(project_id, required=True)
-    # 派发前读取该项目的当前开发要求：只作用于本次新建任务的存储正文，
-    # 不追溯修改已创建任务，也不改变任何权限或预算字段。
-    requirements = project_development_requirements(effective_project_id)
+    # 派发前读取该项目的当前开发要求与调度模式：同一次 GET 复用，不新增请求。
+    project = project_snapshot(effective_project_id)
+    requirements = _requirements_text(project)
     if execution_session is not None:
         # 292：执行会话语义下固定要求只进入基础合同一次，续轮 content 只放本次
         # 增量；不能用“字符串替换”从正文删除要求，也不能让桥接层在续轮重新拼回。
@@ -767,7 +841,14 @@ def delegate_task(
         payload["expected_mode_version"] = version
         payload["followup_task_ids"] = list(flow.ids) if flow else []
         path = "/api/tasks/followup"
-    return _api_request("POST", path, json_body=payload)
+    result = _api_request("POST", path, json_body=payload)
+    if isinstance(result, dict):
+        # 开关只在派发瞬间求值一次：响应回显当前保存模式对应的等待动作，
+        # 不启动进程、不改变任务、不授予任何权限。
+        result["initiator_wait"] = initiator_wait_plan(
+            controller_mode_summary(project), result.get("id")
+        )
+    return result
 
 
 def list_tasks(
@@ -1887,10 +1968,11 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "不重复写进每个 Agent；无内容时为 null）：任务发起者派发新任务前应先读取它与角色清单，"
             "再按该要求派发。"
             "顶层还返回只读的 controller_mode（与开发要求复用同一次项目读取）："
-            "requested_mode / requested_version 是项目保存的模式意向与版本，"
-            "无局部跟进证据时effective_mode=null、effective_status=not_bound；已接入的消费者"
-            "仅回报当前连接的局部状态。保存 active 不等于已生效、不等于已唤回任何会话，"
-            "不增加任务权限；被动协作仍是派发后结束、由用户通知后再取件。"
+            "requested_mode / requested_version 是项目保存的调度模式与版本："
+            "active=发起者派发后由后台程序轮询任务状态、就绪时通知取件（需终端支持后台完成通知，"
+            "不支持时回落被动）；passive=派发后结束本轮，由操作人通知后再取件。"
+            "effective_mode=null / effective_status=not_bound 只表示当前连接没有跟进证据，"
+            "不代表模式未保存或已生效；模式不增加任何权限，也不唤醒已结束的会话。"
             "非项目路径 controller_mode 为 null；旧后端缺模式字段时为 supported=false / "
             "effective_status=unsupported，不能当成 passive 或已支持。"
             "顶层还返回只读的 controller_assignment（同样复用这一次项目读取）："
@@ -1941,6 +2023,10 @@ TOOL_SCHEMAS: list[JsonDict] = [
             "并保留调用者原始 content；要求为空时正文与旧行为一致。"
             "该快照只是随任务包保存的文本：不解析、不执行、不自动授予权限、不覆盖宿主系统指令，"
             "已创建任务不因项目要求后续修改而追溯变更。"
+            "派发成功的响应附加只读的 initiator_wait：按派发瞬间的项目调度模式给出 "
+            "saved_mode / action（start_background_wait 或 end_turn）/ command / "
+            "requires_completion_notification。它只是建议与命令模板，不启动进程、不改变任务、"
+            "不授予任何权限；action=unknown 时按被动处理。"
         ),
         "inputSchema": {
             "type": "object",

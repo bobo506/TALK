@@ -141,18 +141,18 @@ class ControllerModeWebUiTests(RouteTestCase):
             self.assertIn(f'id="{element_id}"', html)
         self.assertIn('aria-label="调度模式"', html)
         self.assertIn("<h3>调度模式</h3>", html)
-        # 副标与两态说明：仅保存设置意向；被动默认；主动不唤醒/不自动运行/人工唤回。
-        self.assertIn("项目级 · 仅保存设置意向", html)
+        # 2026-11-04：调度模式接程序轮询——副标与两态说明改为“控制发起者是否等待”。
+        self.assertIn("项目级 · 控制发起者派发后是否等待", html)
         self.assertIn("被动（默认）", html)
-        self.assertIn("派发任务后本轮结束，由你通知完成后再读取与收取", html)
-        # I-2 发起者语义：模式只约束任务发起侧；主动说明与 hint 均不含任何指定前置。
-        self.assertIn("模式只约束任务发起侧：被动为派发后结束、由你通知后继续；主动为任务发起者在已获授权的任务流程内等待交付、读取结果、安排独立复核并收尾。", html)
-        self.assertIn("任务发起者在等待期间继续读取交付、交独立复核并收尾", html)
-        self.assertIn("没有任何会话因此被唤醒或自动运行；已结束的对话仍需人工唤回", html)
+        self.assertIn("派发任务后本轮结束，不启动等待；由你通知完成后再读取与收取", html)
+        # 只约束任务发起侧，不出现任何指定/主控前置描述。
+        self.assertIn("模式只约束任务发起侧：被动=派发后结束本轮，由你通知后再取件；主动=派发后由发起者后台轮询任务状态，结果就绪时通知取件（需要终端支持后台完成通知，不支持时按被动处理）。", html)
+        self.assertIn("派发后由发起者后台轮询任务状态，结果就绪时通知取件；终端不支持后台完成通知时回落被动。", html)
+        self.assertIn("切换模式不影响执行中的任务，也不会唤醒已结束的对话", html)
         self.assertNotIn("主控会话", html)
-        # 状态分两行：已保存设置 / 实际执行；effective=null 绝不显示成主动已启用。
+        # 状态分两行：已保存设置 / 实际执行；不把“主动”显示成已生效。
         self.assertIn("已保存设置：读取中…", html)
-        self.assertIn("实际执行：尚无生效的主动调度（本版本不支持自动生效）", html)
+        self.assertIn("实际执行：主动需发起终端支持后台完成通知；不支持时按被动处理", html)
         self.assertNotIn("主动已启用", html)
         # 语义化表单：radio 同名分组 + fieldset/legend，键盘可用。
         self.assertIn('type="radio" name="controller-mode" value="passive"', html)
@@ -210,12 +210,12 @@ class ControllerModeWebUiTests(RouteTestCase):
         self.assertIn("controllerModeUI.saveToken = saveToken;", block)
         self.assertIn("controllerModeUI.saveToken === saveToken", block)
         self.assertIn("contextAlive() && ownsSave()", block)
-        # 状态分两行；effective=null 绝不写成启用。
+        # 状态分两行；主动不等于已经生效。
         self.assertIn("已保存设置：", block)
-        self.assertIn("实际执行：尚无生效的主动调度（本版本不支持自动生效）", block)
+        self.assertIn("实际执行：主动由发起终端后台轮询并在就绪时通知；不支持通知时按被动处理", block)
         self.assertNotIn("已启用", block)
-        # I-2：保存“主动”为固定意向提示，无任何指定前置；不再出现指定可用性分支。
-        self.assertIn("已保存“主动”。这只是设置意向：不会唤醒会话或自动运行，已结束的桌面对话仍需人工唤回。", block)
+        # 2026-11-04：保存“主动”提示改为程序轮询语义，仍无任何指定前置。
+        self.assertIn("已保存“主动”。发起者派发后会后台轮询结果并在就绪时通知；终端不支持通知时按被动处理。", block)
         self.assertNotIn("不会因此产生任何主动调度", block)
         self.assertNotIn("尚未指定项目主控", block)
         self.assertNotIn("主控", block)

@@ -1,4 +1,4 @@
-﻿/* I-2 固定主控入口退役：真实接线验证。
+/* I-2 固定主控入口退役：真实接线验证。
    静态部分断言 index.html 不再含主控面板 DOM、静态资源缓存版本正确、web 源码无退役符号；
    运行时部分用 vm 加载整份真实 web/workspace.js（含顶部真实事件绑定）与从 web/app.js
    按函数边界真实抽取的 renderWorkspaceMode/renderGroupMembersPanel/renderTaskDetailsPanel/
@@ -251,7 +251,7 @@ test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源
   }
   assert.ok(indexHtml.includes('/role-creation.css?v=20261029-theme-day-night-v1'), '本次 role-creation.css 更新缓存版本');
   assert.ok(indexHtml.includes('/app.js?v=20261025-role-busy-stop-v1'), '未修改的 app.js 保留原缓存版本');
-  assert.ok(indexHtml.includes('/workspace.js?v=20261031-role-effort-v2'), '本次 workspace.js 更新缓存版本');
+  assert.ok(indexHtml.includes('/workspace.js?v=20261104-initiator-wait-v1'), '本次 workspace.js 更新缓存版本');
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 
@@ -264,7 +264,7 @@ test('真实“角色”按钮进入项目设置：模式面板读取/渲染保�
   assert.equal(h.hidden('controller-mode-panel'), false, '模式面板在项目设置可见');
   assert.equal(h.hidden('requirements-panel'), false, '开发要求面板保留');
   assert.equal(h.el('controller-mode-saved').textContent, '已保存设置：被动');
-  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：以任务发起会话的跟进回执为准');
+  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：主动由发起终端后台轮询并在就绪时通知；不支持通知时按被动处理');
   assert.ok(h.requests.some(r => /\/api\/projects\/A$/.test(r.url)), '模式/开发要求项目读取存在');
   assert.equal(h.assignmentCalls().length, 0, '全链路不得请求 /controller-assignment');
   // 已删函数在真实运行上下文中不存在；保留的模式函数可用
@@ -335,7 +335,7 @@ test('保存“主动”走真实绑定：PATCH controller-mode 成功核实后�
   assert.equal(h.modeui.saved, 'active');
   assert.equal(h.el('controller-mode-saved').textContent, '已保存设置：主动');
   // I-2：固定意向提示，无任何指定前置
-  assert.equal(h.modeui.notice, '已保存“主动”。支持主动跟进的发起会话会在本次授权范围内继续处理；已结束的会话仍需人工唤回。');
-  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：以任务发起会话的跟进回执为准');
+  assert.equal(h.modeui.notice, '已保存“主动”。发起者派发后会后台轮询结果并在就绪时通知；终端不支持通知时按被动处理。');
+  assert.equal(h.el('controller-mode-effective').textContent, '实际执行：主动由发起终端后台轮询并在就绪时通知；不支持通知时按被动处理');
   assert.equal(h.assignmentCalls().length, 0, '保存模式不触碰 /controller-assignment');
 });

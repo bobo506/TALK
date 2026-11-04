@@ -38,6 +38,7 @@ from bridges.talk_task_tools import (
     TalkToolError,
     controller_mode_summary,
     dispatch_tool,
+    initiator_wait_plan,
 )
 from server.models import AgentInstance, AgentTask, Member, Project
 from tests.test_support import RouteTestCase
@@ -724,11 +725,51 @@ class ControllerModeToolTests(RouteTestCase):
         self.assertIsNone(controller["effective_mode"])
         self.assertEqual(controller["effective_status"], CONTROLLER_MODE_EFFECTIVE_STATUS_SUPPORTED)
         self.assertEqual(controller["effective_status"], "not_bound")
-        self.assertIn("意向", controller["note"])
+        self.assertIn("后台程序轮询", controller["note"])
+        self.assertIn("不代表保存的模式无效", controller["note"])
         # 角色条目仍是原样，不重复写模式字段。
         for agent in result["agents"]:
             self.assertNotIn("controller_mode", agent)
             self.assertNotIn("effective_mode", agent)
+
+    def test_delegate_response_reports_initiator_wait(self):
+        """派发瞬间按项目保存模式回显 initiator_wait（active=后台轮询 / passive=结束本轮）。"""
+        self.set_mode("prj_tools", "active", 0)
+        with LiveTalkServer(main.app) as base_url:
+            env = self._environment(base_url, "bobo-key", "human:bobo")
+            with patch.dict(os.environ, env, clear=False):
+                active = dispatch_tool(
+                    "talk_delegate_task",
+                    {
+                        "project_id": "prj_tools",
+                        "target_member_id": "agent:worker",
+                        "content": "主动派发",
+                    },
+                )
+                # prj_other 保持默认 passive：同一桥接进程按各自项目模式分别求值。
+                passive = dispatch_tool(
+                    "talk_delegate_task",
+                    {
+                        "project_id": "prj_other",
+                        "target_member_id": "agent:worker",
+                        "content": "被动派发",
+                    },
+                )
+
+        wait = active["initiator_wait"]
+        self.assertEqual(wait["saved_mode"], "active")
+        self.assertEqual(wait["saved_version"], 1)
+        self.assertEqual(wait["action"], "start_background_wait")
+        self.assertTrue(wait["requires_completion_notification"])
+        self.assertIn(f"--task-id {active['id']}", wait["command"])
+        self.assertIn("--key-file", wait["command"])
+        self.assertIn("后台轮询", wait["note"])
+        end = passive["initiator_wait"]
+        self.assertEqual(end["saved_mode"], "passive")
+        self.assertEqual(end["action"], "end_turn")
+        self.assertIsNone(end["command"])
+        self.assertFalse(end["requires_completion_notification"])
+        self.assertIn("结束本轮", end["note"])
 
     def test_mode_matches_the_project_get_and_reuses_one_request(self):
         self.set_mode("prj_tools", "active", 0)
@@ -839,7 +880,43 @@ class ControllerModeToolTests(RouteTestCase):
         self.assertIsNone(weird["requested_mode"])
         self.assertIsNone(weird["requested_version"])
 
-    def test_tool_surface_unchanged_and_description_documents_intent_only(self):
+    def test_initiator_wait_plan_follows_saved_mode(self):
+        active = initiator_wait_plan(
+            controller_mode_summary(
+                {"project_id": "p", "controller_mode": "active", "controller_mode_version": 2}
+            ),
+            41,
+        )
+        self.assertEqual(active["action"], "start_background_wait")
+        self.assertIn("--task-id 41", active["command"])
+        self.assertTrue(active["requires_completion_notification"])
+
+        passive = initiator_wait_plan(
+            controller_mode_summary(
+                {"project_id": "p", "controller_mode": "passive", "controller_mode_version": 5}
+            ),
+            42,
+        )
+        self.assertEqual(passive["action"], "end_turn")
+        self.assertIsNone(passive["command"])
+
+        # 读不到可靠模式（旧后端 / 未知取值）：按被动处理，不猜成主动。
+        unknown = initiator_wait_plan(controller_mode_summary({"project_id": "p"}), 43)
+        self.assertEqual(unknown["action"], "unknown")
+        self.assertIsNone(unknown["saved_mode"])
+        self.assertIsNone(unknown["command"])
+
+        # 任务号不可用时不拼命令，但仍如实要求走后台轮询规则。
+        no_id = initiator_wait_plan(
+            controller_mode_summary(
+                {"project_id": "p", "controller_mode": "active", "controller_mode_version": 1}
+            ),
+            None,
+        )
+        self.assertEqual(no_id["action"], "start_background_wait")
+        self.assertIsNone(no_id["command"])
+
+    def test_tool_surface_unchanged_and_description_documents_wait_semantics(self):
         self.assertEqual(len(TOOL_SCHEMAS), 10)
         self.assertEqual(
             tuple(tool["name"] for tool in TOOL_SCHEMAS), PROJECT_TOOL_NAMES
@@ -850,8 +927,13 @@ class ControllerModeToolTests(RouteTestCase):
         self.assertIn("effective_mode", description)
         self.assertIn("not_bound", description)
         self.assertIn("unsupported", description)
-        self.assertIn("不等于已生效", description)
-        self.assertIn("用户通知", description)
+        # 2026-11-04：模式决定发起者是否后台轮询，不再是纯意向。
+        self.assertIn("后台程序轮询", description)
+        self.assertIn("不支持时回落被动", description)
+        self.assertIn("不唤醒已结束的会话", description)
+        delegate_description = tool_description("talk_delegate_task")
+        self.assertIn("initiator_wait", delegate_description)
+        self.assertIn("start_background_wait", delegate_description)
 
     def test_mode_is_read_only_for_agents_and_not_a_new_tool(self):
         """agent 身份读取模式不做任何写入；工具也是原样 9 个只读入口。"""
