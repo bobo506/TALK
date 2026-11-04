@@ -973,7 +973,7 @@ function renderTaskHallBrief() {
   if (!task) return;
   const brief = document.createElement("section");
   brief.id = "task-hall-brief";
-  brief.style.cssText = "position:sticky;top:0;z-index:1;background:var(--card, #fff);padding:12px;border:1px solid var(--line, #ccc);white-space:pre-wrap;overflow-wrap:anywhere";
+  brief.style.cssText = "max-height:40vh;overflow:auto;background:var(--card, #fff);padding:12px;border:1px solid var(--line, #ccc);white-space:pre-wrap;overflow-wrap:anywhere";
   const heading = document.createElement("strong");
   heading.textContent = "任务交办内容";
   const details = document.createElement("div");

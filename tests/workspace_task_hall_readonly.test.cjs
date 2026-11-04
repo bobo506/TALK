@@ -49,6 +49,9 @@ test('任务交办内容置顶、保留原文且不计入消息；历史向前�
   ctx.renderTaskHallBrief();
   const brief = el('messages').children[0];
   assert.equal(brief.id, 'task-hall-brief');
+  assert.doesNotMatch(brief.style.cssText, /position\s*:\s*sticky/i);
+  assert.match(brief.style.cssText, /max-height\s*:\s*40vh/i);
+  assert.match(brief.style.cssText, /overflow\s*:\s*auto/i);
   assert.equal(brief.children[0].textContent, '任务交办内容');
   assert.match(brief.children[1].textContent, /<标题>/);
   assert.match(brief.children[1].textContent, /第一行\n第二行/);
