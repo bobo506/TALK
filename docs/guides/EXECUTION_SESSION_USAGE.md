@@ -148,7 +148,7 @@ K2.8和K3共用一套`kimi-code`适配，选择精确角色和已有模型别名
 
 ### 页面任务厅与原生会话
 
-目前TALK按任务分别创建Task Hall，296和297仍显示为两个任务窗口；页面未显示原生会话ID、复用/换窗状态、关联任务或同会话连续记录，因此仅靠当前页面无法核验是否续用。
+目前TALK按任务分别创建Task Hall，296和297仍显示为两个任务窗口；页面未显示原生会话ID、复用/换窗状态、关联任务或同会话连续记录，因此仅靠当前页面无法核验是否续用。**2026-11-04 用户决定不做“按真实对话窗口聚合展示”，任务窗口继续按任务维度保持原样；上述页面展示差异不再视为待补项。**
 
 受管DeepSeek以headless运行，使用独立`DSH_HOME`：本机为`C:\Users\Administrator\.talk\role-service-host\native\prj_e8fe7066bbec\agent_deepseek\.dsh`。原生会话在其`sessions/<工作区目录>/<native_session_id>/session.v3.jsonl.zstd`中；默认`~/.dsh`目录未发现本次会话。若用户现有DSH界面使用默认目录，它不会自动显示受管目录里的会话，也不会因headless任务自动弹窗。
 
