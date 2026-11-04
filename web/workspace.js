@@ -1,5 +1,47 @@
 /* 面向日常使用者的任务 / 角色工作台；复用现有 API 和权限。 */
 const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: null, roleSelection: "settings", roleFilter: "finished", result: null, resultRequest: 0, renderedTask: null, listRenderDeferred: false };
+// 随现有渲染节奏刷新，十分钟内复用结果。
+const runnerVersionsUI = { items: null, lastFetch: 0, pending: false, member: null };
+function runnerVersionText(item) {
+  const name = `${item.display_name || item.runtime} (${item.runtime})`;
+  if (item.status === "match") return `${name}：${item.detected_version}，已适配 ${item.adapted_version}`;
+  if (item.status === "newer" || item.status === "older") {
+    const relation = item.status === "newer" ? "有新版本" : "旧于适配";
+    return `${name}：检测到 ${item.detected_version}（${relation}），TALK 已适配 ${item.adapted_version}；仅提示，不会自动更新`;
+  }
+  return `${name}：${item.detected_version || "未知"}，关系未知${item.detail ? `（${item.detail}）` : ""}`;
+}
+function syncRunnerVersions() {
+  const box = document.getElementById("runner-versions");
+  if (!box || !box.isConnected || !box.parentElement) return;
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && Boolean(myId);
+  box.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  if (runnerVersionsUI.member !== myId) {
+    runnerVersionsUI.member = myId; runnerVersionsUI.items = null; runnerVersionsUI.lastFetch = 0;
+  }
+  box.replaceChildren();
+  const title = document.createElement("strong"); title.textContent = "运行器版本："; box.appendChild(title);
+  if (!runnerVersionsUI.items || !runnerVersionsUI.items.length) {
+    const placeholder = document.createElement("span"); placeholder.textContent = "未知"; box.appendChild(placeholder);
+  } else {
+    for (const item of runnerVersionsUI.items) {
+      const row = document.createElement("div"); row.textContent = runnerVersionText(item);
+      if (item.status === "newer" || item.status === "older") {
+        row.style.color = "#b45309"; row.style.fontWeight = "bold";
+      }
+      box.appendChild(row);
+    }
+  }
+  if (runnerVersionsUI.pending || Date.now() - runnerVersionsUI.lastFetch < 600000) return;
+  runnerVersionsUI.pending = true; runnerVersionsUI.lastFetch = Date.now();
+  const member = myId;
+  Promise.resolve().then(() => apiFetch("/api/runners/versions"))
+    .then(res => { if (!res.ok) throw new Error("版本加载失败"); return res.json(); })
+    .then(items => { if (runnerVersionsUI.member === member && Array.isArray(items)) runnerVersionsUI.items = items; })
+    .catch(() => { if (runnerVersionsUI.member === member) runnerVersionsUI.items = null; })
+    .finally(() => { runnerVersionsUI.pending = false; syncRunnerVersions(); });
+}
 // 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
 const ROLE_TASKS_PAGE_SIZE = 20;
 const roleTasksPageUI = { key: null, page: 1 };
@@ -226,6 +268,7 @@ function syncTaskListPaginationContext() {
 function syncWorkspaceLayout() {
   // 群聊导航不渲染任务列表；在公共导航入口同步，离页也能立即作废旧页码。
   syncTaskListPaginationContext();
+  if (typeof syncRunnerVersions === "function") syncRunnerVersions();
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
   document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
   document.querySelector(".workbench").classList.toggle("empty-chat-mode", workspaceUI.mode === "chats" && !workspaceHasConversation());

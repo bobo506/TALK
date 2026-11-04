@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-04 23:55 — 运行器版本检测与只读升级提示（425）
+
+- **需求**：检查 TALK 已适配运行器是否有新版本，发现时提示用户；仅提示，不自动下载/安装/更新。
+- **实现**：`server/runner_versions.py` 定义适配基线（codex 0.164.0 来自 `SUPPORTED_VERSIONS`；kimi-code 2.0.2、dsh 0.2.1-rc.5 为本机验证基线；workbuddy 无可靠 CLI 探针）；探测 `codex.cmd`/`kimi`/`dsh.cmd` 的 `--version`（3 秒超时、10 分钟缓存、异常归一 unknown）；语义化版本比较（多段数字 + `-rc.`，非法输入不猜）。`GET /api/runners/versions` 按 `runner_registry` 去重返回只读结果（任意已认证成员可读）。角色页项目条下渲染只读摘要，一致时简短、不一致时提示，未知显示原因。
+- **复核（独立执行）**：路由声明顺序 `/versions` 在 `/{runner_id}` 类路由之前、无遮蔽；真实探针三路 codex/kimi/dsh 均 `match`、workbuddy `unknown`；`tests.test_runner_versions` 5 项 + 新 Node 4 项 + `test_project_controller_mode` 33 项通过；全量 Node 393 项 16 失败与基线 `e7cf985` 逐名一致。
+- **集成修正**：候选白名单未包含 `tests/workspace_initiator_mode_ui.test.cjs`，其 workspace.js 缓存版断言因版本号变化新增 1 个失败；集成时将该断言更新为 `20261104-runner-versions-v1`，全量恢复为 16 个基线失败。
+- **已知限制**：WorkBuddy 为桌面 GUI、无可靠 CLI 探针，显示未知；提示行使用内联固定橙色（深色主题观感一般）；未做真实浏览器验证（需刷新页面确认）；不安装/升级任何运行器。
+- **提交**：随后与 2 个排查记录提交一并推送。
+
 ## 2026-11-04 22:05 — 等待工具识别待澄清并通知发起者（424）
 
 - **背景**：主动模式的等待 job 只在终态退出，执行者提出澄清（`clarification_requested`/`needs_decision`）时 job 不退出，发起者收不到通知，只能等操作人转述或超时。

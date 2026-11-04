@@ -6,7 +6,7 @@
   adapter_status / adapter_note / capabilities；``runner_id`` / ``runtime`` 不可改；
 - 本片**无 DELETE**：停用走 ``adapter_status=retired``，历史绑定与历史快照保持。
 
-本模块只读写登记事实：不启动进程、不读取或校验任何凭据正文、不探测任何连接、
+本模块维护登记事实，版本接口运行本机版本探针，不读取或校验任何凭据正文、
 不把 ``capabilities`` 用于权限/路由/执行判定，也不改动项目名册或任务权限。
 """
 
@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from server.runner_versions import get_version
 from server.auth import get_current_member
 from server.db import get_session
 from server.models import (
@@ -63,6 +64,23 @@ def list_runners(
         select(RunnerRegistry).order_by(RunnerRegistry.runner_id)
     ).all()
     return [RunnerOut.from_orm_runner(runner) for runner in runners]
+
+
+@router.get("/versions")
+def list_runner_versions(
+    current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """按已登记 runtime 去重，返回只读版本探测结果。"""
+    runners = session.exec(select(RunnerRegistry).order_by(RunnerRegistry.runner_id)).all()
+    seen = set()
+    result = []
+    for runner in runners:
+        if runner.runtime in seen:
+            continue
+        seen.add(runner.runtime)
+        result.append({"runtime": runner.runtime, "display_name": runner.display_name, **get_version(runner.runtime)})
+    return result
 
 
 @router.post("", response_model=RunnerOut, status_code=status.HTTP_201_CREATED)
