@@ -134,6 +134,8 @@ $text = $existing.TrimEnd() + "`n`n" + $block.TrimEnd() + "`n"
 
 ### 3.5 重载
 
+> **2026-11-04 实测（当前本机形态）**：本机在用的 TALK MCP 是 App 级进程——`scripts/dsh_talk_mcp_launch.py`（`--server http://127.0.0.1:8000 --project <id>`），由 DSH 宿主在 **App 启动后数秒拉起、跨对话共享**；实测 PID 自 2026-11-02 09:56 起在多次“重开窗口”后仍未变化。因此**改 `bridges/` 代码后，HMR 和重开对话都不生效，必须完全退出并重开 DSH**（任务管理器确认 `DeepSeek Harness.exe` 全部退出）；重开后新 MCP 进程启动时间应与 App 启动时间相差几秒。该形态下它也不出现在「设置 → 插件」清单里。核对方法：调用 `talk_list_agents` 看 `controller_mode.note` 是否为新文案，或用 `tools/list` 检查 `talk_delegate_task` 描述是否含 `initiator_wait`。
+
 1. 保存后等 **2 秒以上**（HMR 的写入稳定窗口），配置会重新组合并挂载 `mcp-talk`。
 2. 如果想确认它有没有被组合进去：桌面「设置 → 插件」的只读清单里应能看到 `mcp-talk` 行（该清单是当前 Loader 条目的只读投影）。
 3. 没生效时的兜底：**退出并重新打开桌面 App**（HMR 不可用时改动只在重启后生效）。patch 文件语法错误会让 profile 启动失败并报错；此时用第 3.2 节的备份还原。
