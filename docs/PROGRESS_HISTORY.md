@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-04 22:05 — 等待工具识别待澄清并通知发起者（424）
+
+- **背景**：主动模式的等待 job 只在终态退出，执行者提出澄清（`clarification_requested`/`needs_decision`）时 job 不退出，发起者收不到通知，只能等操作人转述或超时。
+- **实现**：`scripts/talk_wait_task.py` 新增 `attention_reason()` 与退出条件；`TALK_TASK_ATTENTION task=… status=… workflow=… reason=<clarification|decision> elapsed=…s`，退出码 3；`--json` 增加 `outcome`/`reason`；终态优先判定。`docs/guides/TERMINAL_MCP.md` 补退出码与处理步骤；`AGENTS.md` 补规则（attention 不是完成 → 读 Hall 问题 → 用 `talk_reply_task` 的 `submit_clarification_answer` 同任务答复 → 重起等待 job；不新建任务）。
+- **退出码裁定**：Terra 交付 `partial`，指出任务包把“用法/Key=64 保持不变”写成要求，但基线 argparse 用法错误实际返回 2。复核裁定保留她的改动：**用法错误 2→64**（与脚本原有文档“64=用法”一致、且 `else 64` 分支本就存在），Key/运行错误仍为 2，attention 为 3；该变化在 `TERMINAL_MCP.md` 明确记录，属有意变更。
+- **验证**：`tests.test_talk_wait_task` **23 项通过**（新增 4 项：attention 单行输出与退出码 3、needs_decision、终态优先级、timeout/error JSON）；真实终态任务 424 实跑输出 `TALK_TASK_DONE task=424 status=succeeded workflow=submitted result=3200 elapsed=0s`、exit 0。
+- **未验证**：真实澄清任务触发 attention（现有证据为单测合成状态）；真实后台通知唤醒与 Hall 答复链路；未做真实模型/服务编排验证。
+- **提交**：`scripts/talk_wait_task.py`、`tests/test_talk_wait_task.py`、`AGENTS.md`、`docs/guides/TERMINAL_MCP.md` 随后提交并推送。
+
 ## 2026-11-04 21:25 — 任务窗口只读展示交办内容（用户验收通过）
 
 - **需求**：用户 10-27 登记、11-04 确认的保留项——任务窗口展示发给角色的任务信息与后续结果，窗口只读、去掉输入区；澄清问答需保留（用户选择：默认只读，仅“待澄清/需人工决策”时开放输入）。

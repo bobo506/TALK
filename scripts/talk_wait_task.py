@@ -2,8 +2,8 @@
 """等待 TALK 任务进入终态的程序轮询小工具（不调用模型）。
 
 用途：在支持“后台任务完成通知”的终端（当前为 DSH）里由后台 job 运行。
-任务进入终态后本进程退出并触发终端通知，发起者醒来后再用 ``talk_get_delivery``
-取件、核验。等待期间不产生任何模型调用。
+任务进入终态或需要人工动作时本进程退出并触发终端通知；仅终态可进入取件、核验。
+等待期间不产生任何模型调用。
 
 边界：
 - 只读 ``GET /api/tasks/{id}``，不领取、不完成、不取消、不写任务；
@@ -12,7 +12,7 @@
 - 默认每 15 秒查一次、总时长上限 30 分钟；到点或出错都输出单行可读结果。
 
 退出码：0=任务已进入终态（任务本身成功与否看输出）；1=等待超时；
-2=等待错误（Key/任务不可读等）；64=用法或密钥配置错误。
+2=等待错误（Key/任务不可读等）；3=需要人工动作；64=用法错误。
 """
 
 from __future__ import annotations
@@ -63,6 +63,13 @@ def is_terminal(task: dict) -> bool:
     )
 
 
+def attention_reason(task: dict) -> str | None:
+    """返回需要发起者处理的原因；此状态不是交付终态。"""
+    return {"clarification_requested": "clarification", "needs_decision": "decision"}.get(
+        task.get("workflow_status")
+    )
+
+
 def wait_for_task(
     task_id: int,
     fetch,
@@ -72,7 +79,7 @@ def wait_for_task(
     clock=time.monotonic,
     sleep=time.sleep,
 ) -> tuple[dict, float]:
-    """轮询直到终态；返回 ``(task, elapsed_seconds)``，超时抛 ``WaitTimeout``。
+    """轮询直到终态或需要人工动作；返回 ``(task, elapsed_seconds)``，超时抛 ``WaitTimeout``。
 
     ``fetch`` 接受 task_id 并返回任务字典；可预期的致命错误抛 ``WaitError``，
     其它 ``OSError`` 视为瞬时网络错误继续重试直到总时长上限。
@@ -92,6 +99,8 @@ def wait_for_task(
         if isinstance(task, dict):
             last = task
             if is_terminal(task):
+                return task, clock() - started
+            if attention_reason(task):
                 return task, clock() - started
         elapsed = clock() - started
         if elapsed >= timeout:
@@ -193,7 +202,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:  # argparse 用法错误
-        return int(exc.code) if isinstance(exc.code, int) else 64
+        return 0 if exc.code == 0 else 64
     try:
         key, _source = resolve_key(args.key_file)
         task, elapsed = wait_for_task(
@@ -207,13 +216,14 @@ def main(argv: list[str] | None = None) -> int:
     except WaitTimeout as exc:
         if args.json:
             print(json.dumps({"event": "timeout", "task_id": exc.task_id,
-                              "elapsed_seconds": int(exc.elapsed)}, ensure_ascii=False))
+                              "elapsed_seconds": int(exc.elapsed), "outcome": "timeout", "reason": None}, ensure_ascii=False))
         else:
             print(f"TALK_TASK_TIMEOUT task={exc.task_id} elapsed={int(exc.elapsed)}s")
         return 1
     except WaitError as exc:
         if args.json:
-            print(json.dumps({"event": "error", "code": exc.code, "message": str(exc)},
+            print(json.dumps({"event": "error", "code": exc.code, "message": str(exc),
+                              "outcome": "error", "reason": None},
                              ensure_ascii=False))
         else:
             print(f"TALK_TASK_ERROR code={exc.code} message={exc}")
@@ -223,9 +233,18 @@ def main(argv: list[str] | None = None) -> int:
         return 130
 
     payload = _summary(task, elapsed)
-    payload["event"] = "done"
+    reason = None if is_terminal(task) else attention_reason(task)
+    payload["event"] = "attention" if reason else "done"
+    payload["outcome"] = payload["event"]
+    payload["reason"] = reason
     if args.json:
         print(json.dumps(payload, ensure_ascii=False))
+    elif reason:
+        print(
+            f"TALK_TASK_ATTENTION task={payload['task_id']} status={payload['status']} "
+            f"workflow={payload['workflow_status']} reason={reason} "
+            f"elapsed={payload['elapsed_seconds']}s"
+        )
     else:
         print(
             "TALK_TASK_DONE task={0} status={1} workflow={2} result={3} elapsed={4}s".format(
@@ -236,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
                 payload["elapsed_seconds"],
             )
         )
-    return 0
+    return 3 if reason else 0
 
 
 if __name__ == "__main__":

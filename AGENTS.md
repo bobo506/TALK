@@ -100,6 +100,8 @@
 
 ## 发起者主被动与等待
 
+- 等待 job 以 attention（退出码 3）结束不是任务完成；发起者应读取任务及 Hall 中的问题，能回答时使用 `talk_reply_task` 的 `submit_clarification_answer` 在同一任务答复，答完重新启动等待 job；不能回答时转给操作人。
+
 - 主被动模式只约束任务发起侧，不赋予执行者或复核者额外权限，也不唤醒已结束的会话。**2026-11-04 起，模式接通程序轮询**：`active`=发起者派发后由后台程序轮询任务状态、就绪时通知取件；`passive`=派发后结束本轮、由操作人通知后再取件。主动模式的旧连接内跟进（`talk_follow_tasks`/受控等待）已取消接入与验证，存量代码保留但不作为待办，也不得据此宣称主动调度已生效。
 - **派发前读模式，派发后按模式执行**：模式取 `talk_list_agents` 的 `controller_mode.requested_mode`，或本次 `talk_delegate_task` 响应里的 `initiator_wait`（派发瞬间求值）。`active` 且终端具备后台任务完成通知时，用后台 job 运行 `python -m scripts.talk_wait_task --task-id <id> --key-file <仓库外 Key>`（按需 `--interval 15 --timeout 1800`），按 10–30 秒间隔只读任务状态，进入终态即退出并触发通知；等待期间不产生模型调用，通知到达后再取件、核验和收尾。一次 job 只等一个任务，必须设总时长上限，失败/超时照实输出。
 - **`passive` 或读不到模式**：派发后结束本轮，不启动等待；模式读取失败按被动处理并如实说明，不猜成主动。

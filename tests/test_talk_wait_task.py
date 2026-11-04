@@ -237,5 +237,54 @@ class MainTests(unittest.TestCase):
         self.assertIn("task_unavailable", text)
 
 
+class AttentionTests(unittest.TestCase):
+    def test_second_poll_and_main_output(self):
+        clock = FakeClock()
+        responses = iter([task(), task(workflow="clarification_requested")])
+        real_wait = waiter.wait_for_task
+        def fake_wait(task_id, fetch, **kwargs):
+            return real_wait(task_id, fetch, interval=5, timeout=60,
+                             clock=clock, sleep=clock.sleep)
+        output = io.StringIO()
+        with mock.patch.object(waiter, "resolve_key", return_value=("key", "test")), \
+             mock.patch.object(waiter, "fetch_task", side_effect=lambda *a, **k: next(responses)) as fetch, \
+             mock.patch.object(waiter, "wait_for_task", side_effect=fake_wait), redirect_stdout(output):
+            code = waiter.main(["--task-id", "417"])
+        self.assertEqual(code, 3)
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual(output.getvalue(), "TALK_TASK_ATTENTION task=417 status=running workflow=clarification_requested reason=clarification elapsed=5s\n")
+
+    def test_json_outcomes_and_terminal_priority(self):
+        cases = [(task(workflow="clarification_requested"), 3, "attention", "clarification"),
+                 (task(workflow="needs_decision"), 3, "attention", "decision"),
+                 (task(status="succeeded", workflow="needs_decision"), 0, "done", None)]
+        for response, expected, outcome, reason in cases:
+            with self.subTest(outcome=outcome, reason=reason):
+                out = io.StringIO()
+                with mock.patch.object(waiter, "resolve_key", return_value=("key", "test")), \
+                     mock.patch.object(waiter, "fetch_task", return_value=response), redirect_stdout(out):
+                    code = waiter.main(["--task-id", "417", "--json"])
+                payload = json.loads(out.getvalue())
+                self.assertEqual((code, payload["outcome"], payload["reason"]), (expected, outcome, reason))
+                self.assertEqual(payload["event"], outcome)
+
+    def test_timeout_and_error_json(self):
+        for exc, code, outcome in [(waiter.WaitTimeout(task_id=417, elapsed=5, last=None), 1, "timeout"),
+                                    (waiter.WaitError("error"), 2, "error")]:
+            out = io.StringIO()
+            with mock.patch.object(waiter, "resolve_key", return_value=("key", "test")), \
+                 mock.patch.object(waiter, "wait_for_task", side_effect=exc), redirect_stdout(out):
+                self.assertEqual(waiter.main(["--task-id", "417", "--json"]), code)
+            payload = json.loads(out.getvalue())
+            self.assertEqual((payload["outcome"], payload["reason"]), (outcome, None))
+
+    def test_usage_and_key_errors(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            self.assertEqual(waiter.main([]), 64)
+        with mock.patch.object(waiter, "resolve_key", side_effect=waiter.WaitError("missing", code="key_missing")), \
+             redirect_stdout(io.StringIO()):
+            self.assertEqual(waiter.main(["--task-id", "417"]), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -90,7 +90,8 @@ python -B -X utf8 -m scripts.talk_wait_task --task-id <id> --key-file "$env:USER
 ```
 
 - 工具只读 `GET /api/tasks/{id}`，不领取、不完成、不取消任务；Key 只从 `--key-file` 或环境变量 `TALK_API_KEY`/`TALK_WAIT_KEY_FILE` 读取，不进命令行、不打印。
-- 输出单行 `TALK_TASK_DONE task=… status=… workflow=… result=… elapsed=…s`；超时输出 `TALK_TASK_TIMEOUT`，错误输出 `TALK_TASK_ERROR`。退出码：0=已到终态、1=超时、2=等待错误、64=用法/Key 错误。
+- 输出单行 `TALK_TASK_DONE task=… status=… workflow=… result=… elapsed=…s`；超时输出 `TALK_TASK_TIMEOUT`，错误输出 `TALK_TASK_ERROR`。退出码：0=已到终态、1=超时、2=等待错误（含 Key 配置错误）、3=需要人工动作、64=用法错误。
+- 待澄清或需人工决策时输出单行 `TALK_TASK_ATTENTION task=… status=… workflow=… reason=<clarification|decision> elapsed=…s`；退出码 3 不表示交付完成。发起者读取任务和 Hall 问题，能回答时通过 `talk_reply_task` 的 `submit_clarification_answer` 在同一任务答复，答完重新启动等待 job；不能回答时转给操作人。不要新建任务，也不要当成交付。`--json` 的 `outcome` 为 `done`、`attention`、`timeout` 或 `error`，`reason` 仅在 attention 时为 `clarification` 或 `decision`，其余为 null。
 - 用法：后台 job 启动它后**结束回合**；job 完成会触发终端通知，发起者再醒来取件。等待期间不调用模型，成本只落在通知后的取件回合。
 - 2026-11-04 DSH POC：任务 417 等待 231 秒一次等到终态；另测 420 秒单次阻塞等待未被截断；90 秒哑任务结束后自动唤醒空闲会话（无轮询回合）。
 - 预算：DSH 客户端 `toolCallTimeoutMs` 保持 65000，只用于普通 MCP 调用存活检测；本机制不使用该超时。单次 job 建议 `--timeout` 不超过 1 小时，轮询间隔 10–30 秒。
