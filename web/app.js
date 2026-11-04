@@ -804,6 +804,8 @@ async function loadProjectTasks({ silent = false } = {}) {
     renderRoomStrip();
     renderBlackboard();
     renderGroupMembersPanel();
+    renderTaskHallBrief();
+    syncComposerReadOnly();
   } catch (err) {
     if (!silent) {
       showComposerStatus(err.message, "error", { source: "tasks", timeoutMs: 3500 });
@@ -950,16 +952,42 @@ function renderWorkspaceMode() {
   if (!chats) renderBlackboard();
   else renderRoomStrip();
   renderGroupMembersPanel();
+  renderTaskHallBrief();
   syncComposerReadOnly();
 }
 
-// 只读旁观（未加入但有查看权限）的 Hall：输入、发送、附件与回复入口全部关闭，
-// 仅展示简洁提示；已有成员的发言路径不受影响。
+function taskHallComposerReadOnly() {
+  if (getActiveGroup()?.type !== "task") return false;
+  return !["clarification_requested", "needs_decision"].includes(getContextTask()?.workflow_status);
+}
+
+function composerReadOnly() {
+  return activeGroupReadOnly() || taskHallComposerReadOnly();
+}
+
+function renderTaskHallBrief() {
+  const old = document.getElementById("task-hall-brief");
+  if (old) old.remove();
+  if (!workspaceHasConversation() || getActiveGroup()?.type !== "task") return;
+  const task = getContextTask();
+  if (!task) return;
+  const brief = document.createElement("section");
+  brief.id = "task-hall-brief";
+  brief.style.cssText = "position:sticky;top:0;z-index:1;background:var(--card, #fff);padding:12px;border:1px solid var(--line, #ccc);white-space:pre-wrap;overflow-wrap:anywhere";
+  const heading = document.createElement("strong");
+  heading.textContent = "任务交办内容";
+  const details = document.createElement("div");
+  details.textContent = `标题：${task.title || `任务 #${task.id}`}\n正文：${task.content || ""}\n状态：${taskStatusMeta(task).label}\n发起者：${workspaceMemberName(task.created_by)}\n执行者：${workspaceMemberName(task.target_member_id)}\n创建时间：${formatTaskTime(task.created_at)}`;
+  brief.append(heading, details);
+  messagesEl.prepend(brief);
+}
+
 function syncComposerReadOnly() {
-  const readOnly = workspaceHasConversation() && activeGroupReadOnly();
+  const readOnly = workspaceHasConversation() && composerReadOnly();
   msgInput.disabled = readOnly;
   attachBtn.disabled = readOnly || sending;
   sendBtn.disabled = readOnly || sending;
+  messagesEl.querySelectorAll(".message-reply-action").forEach((button) => { button.disabled = readOnly; });
   mentionDropdown.classList.add("hidden");
   if (readOnly) {
     if (pendingFile) clearPendingFile();
@@ -1207,6 +1235,8 @@ async function runTaskAction(task, action, { confirmCancel = false } = {}) {
     await loadSelectedTaskTree({ silent: true });
     renderProjectStrip();
     renderBlackboard();
+    renderTaskHallBrief();
+    syncComposerReadOnly();
   } catch (err) {
     if (contextKey === taskContextKey()) showTaskDetailsError(err.message);
   } finally {
@@ -2421,6 +2451,7 @@ function resetTimelineState({ clearSearch = true } = {}) {
   clearAllRevokeButtonTimers();
   clearReplyTarget();
   messagesEl.innerHTML = "";
+  renderTaskHallBrief();
   updateMessagesEmptyState();
   updateComposerPlaceholder();
   renderHistoryToolbar();
@@ -2674,7 +2705,7 @@ msgInput.addEventListener("keydown", (e) => {
 
 async function sendMessage() {
   if (sending || !workspaceHasConversation()) return;
-  if (activeGroupReadOnly()) {
+  if (composerReadOnly()) {
     showComposerStatus("当前为只读查看，不能发送消息。", "info", { source: "send", timeoutMs: 3500 });
     return;
   }
@@ -2721,7 +2752,7 @@ async function sendMessage() {
 
 async function sendFileMessage(caption = null) {
   if (!workspaceHasConversation()) return;
-  if (activeGroupReadOnly()) {
+  if (composerReadOnly()) {
     showComposerStatus("当前为只读查看，不能发送文件。", "info", { source: "send", timeoutMs: 3500 });
     return;
   }
@@ -2738,7 +2769,7 @@ async function sendFileMessage(caption = null) {
   attachBtn.disabled = true;
   try {
     const uploaded = await uploadPendingFile();
-    if (!current() || activeGroupReadOnly()) return;
+    if (!current() || composerReadOnly()) return;
     const res = await apiFetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2844,7 +2875,8 @@ function renderMessageActions(message) {
 
   if (canReply) {
     const replyBtn = document.createElement("button");
-    replyBtn.className = "message-action-btn";
+    replyBtn.className = "message-action-btn message-reply-action";
+    replyBtn.disabled = composerReadOnly();
     replyBtn.type = "button";
     replyBtn.textContent = "回复";
     replyBtn.addEventListener("click", () => activateReplyTarget(message));
@@ -2947,7 +2979,9 @@ function upsertMessages(messages, position = "append") {
 
   if (insertedCount > 0) {
     if (position === "prepend") {
-      messagesEl.prepend(fragment);
+      const brief = document.getElementById("task-hall-brief");
+      if (brief) brief.after(fragment);
+      else messagesEl.prepend(fragment);
     } else {
       messagesEl.appendChild(fragment);
     }
@@ -3068,6 +3102,7 @@ async function reloadHistoryView() {
   messageRecords = new Map();
   clearAllRevokeButtonTimers();
   messagesEl.innerHTML = "";
+  renderTaskHallBrief();
   updateMessagesEmptyState();
   renderHistoryToolbar();
   await loadHistory();
@@ -3076,7 +3111,7 @@ async function reloadHistoryView() {
 function updateMessagesEmptyState() {
   const hasMessages = renderedMessageIds.size > 0;
   const activeGroup = getActiveGroup();
-  messagesEl.classList.toggle("is-empty", !hasMessages);
+  messagesEl.classList.toggle("is-empty", !hasMessages && !document.getElementById("task-hall-brief"));
   messagesEl.dataset.emptyText = appliedHistoryQuery
     ? emptySearchText
     : activeGroup
@@ -3637,7 +3672,7 @@ window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => e.preventDefault());
 
 function setPendingFile(file) {
-  if (activeGroupReadOnly()) {
+  if (composerReadOnly()) {
     showComposerStatus("当前为只读查看，不能发送文件。", "info", { source: "send", timeoutMs: 3500 });
     return;
   }
@@ -3684,7 +3719,7 @@ function formatFileMeta(message) {
 }
 
 function updateComposerPlaceholder() {
-  if (activeGroupReadOnly()) {
+  if (composerReadOnly()) {
     msgInput.placeholder = "当前为只读查看，不能发送消息";
     return;
   }
@@ -3698,7 +3733,7 @@ function updateComposerPlaceholder() {
 }
 
 function activateReplyTarget(message) {
-  if (activeGroupReadOnly()) return;
+  if (composerReadOnly()) return;
   activeReplyTo = {
     id: message.id,
     from_id: message.from,
