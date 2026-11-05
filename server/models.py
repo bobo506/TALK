@@ -4574,7 +4574,7 @@ def serialize_supported_efforts(values) -> Optional[str]:
     return json.dumps(canonical, ensure_ascii=False)
 
 
-def resolve_role_effort(facts: Optional[dict]) -> dict:
+def resolve_role_effort(facts: Optional[dict], runtime_options=None) -> dict:
     """派生一个绑定的思考强度三元事实：用户覆盖 / 模型默认 / 可选清单与来源。
 
     - ``effort_override``：用户显式设置值，``None`` 表示跟随模型默认；
@@ -4594,6 +4594,8 @@ def resolve_role_effort(facts: Optional[dict]) -> dict:
     supported = parse_supported_efforts(facts.get("supported_efforts"))
     if supported is not None:
         options, source = supported, EFFORT_SOURCE_CATALOG
+    elif runtime_options is not None:
+        options, source = canonical_effort_values(runtime_options), EFFORT_SOURCE_ADAPTER
     else:
         runtime = facts.get("runtime")
         adapter = (

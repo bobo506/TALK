@@ -436,3 +436,15 @@ test('352：custom_api 模型展示名追加 API，builtin 同名模型不追加
   await already.enterRoles();
   assert.equal(already.bindingSummary('agent:kimi'),'绑定：已绑定 · Kimi Code · DeepSeek-V4.1-Flash API · max');
 });
+
+
+test('无生效强度时可跟随模型默认，空值保存为 null',async()=>{
+  const h=effortHarness(effortRow({default_effort:null,effort_override:null,effective_effort:null,effort_options:['low','high','max']}));
+  await h.enterRoles();await h.selectRole('agent:kimi');
+  const select=effortSelect(h.el('role-details-name-panel'));
+  assert.deepEqual(optionValues(select),['','low','high','max']);
+  assert.equal(optionTexts(select)[0],'跟随模型默认');
+  assert.equal(select.value,'');
+  select.fire('change');
+  assert.deepEqual(JSON.parse(h.pending[h.pending.length-1].opts.body),{effort:null});
+});

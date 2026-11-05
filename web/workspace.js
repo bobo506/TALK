@@ -1885,8 +1885,11 @@ function workspaceRoleEffortControl(role) {
   const select = workspaceEl("select", "role-effort-select");
   select.id = `role-effort-select-${String(role.member_id).replace(/[^A-Za-z0-9_-]/g, "-")}`;
   select.setAttribute("aria-label", "思考强度");
-  // 2026-10-31（用户要求）：不再提供“跟随模型默认”选项，也不显示强度说明行；
-  // 下拉直接列出该模型的可选档位，当前生效值作为默认选中项。
+  if (selectable && !effort.effective) {
+    const option = workspaceEl("option", "", "跟随模型默认");
+    option.value = "";
+    select.appendChild(option);
+  }
   if (effort.override && !effort.options.includes(effort.override)) {
     const option = workspaceEl("option", "", effort.override);
     option.value = effort.override;
@@ -1898,7 +1901,7 @@ function workspaceRoleEffortControl(role) {
     select.appendChild(option);
   }
   const current = effort.options.includes(effort.override) ? effort.override
-    : effort.options.includes(effort.effective) ? effort.effective : (effort.options[0] || "");
+    : effort.options.includes(effort.effective) ? effort.effective : (!effort.effective ? "" : (effort.options[0] || ""));
   select.value = current;
   select.disabled = !editable || roleEffortUI.busy.has(role.member_id);
   if (editable) select.title = "修改该角色下一次执行使用的思考强度";

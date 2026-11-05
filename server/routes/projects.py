@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from cli.profiles import load_profile, resolve_profile_path, write_profile_file
+from server.workbuddy_effort import runtime_options_for_facts
 from server.auth import get_current_member
 from server.role_deletions import RoleDeletion, public as deletion_public
 from server.role_startup import projection as startup_projection
@@ -454,7 +455,7 @@ def _project_agent_outs(
                 for instance in instances_by_member.get(agent.member_id, [])
             ],
             role_description=descriptions_by_member.get(agent.member_id),
-            binding=build_role_binding_out(
+            binding=_binding_with_runtime_effort(
                 binding_facts_by_member.get(agent.member_id)
             ),
             binding_state=resolve_role_binding_state(
@@ -692,6 +693,16 @@ def update_agent_role_description(
     )
 
 
+def _binding_with_runtime_effort(facts):
+    binding = build_role_binding_out(facts)
+    if binding is not None and binding.effort_source != "catalog":
+        options, source = runtime_options_for_facts(facts)
+        if options is not None:
+            binding.effort_options = options
+            binding.effort_source = source
+    return binding
+
+
 def _binding_response(
     project_id: str, member_id: str, session: Session
 ) -> RoleBindingResponse:
@@ -705,7 +716,7 @@ def _binding_response(
     return RoleBindingResponse(
         project_id=project_id,
         member_id=member_id,
-        binding=build_role_binding_out(facts),
+        binding=_binding_with_runtime_effort(facts),
         binding_state=resolve_role_binding_state(facts),
     )
 
@@ -917,14 +928,6 @@ def set_agent_role_binding_effort_override(
     )
     # 能力来源只认“官方目录清单”或“运行器适配事实”，两者都由同一纯函数裁决，
     # 页面不自行拼接选项，避免前后端各算一套。
-    resolved = resolve_role_effort(
-        {
-            "runtime": runner.runtime if runner is not None else None,
-            "default_effort": binding.default_effort,
-            "effort_override": binding.effort_override,
-            "supported_efforts": binding.supported_efforts,
-        }
-    )
     raw = body.effort
     value = raw.strip().lower() if isinstance(raw, str) else ""
     if not value:
@@ -940,6 +943,17 @@ def set_agent_role_binding_effort_override(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="effort_value_invalid",
         )
+    effort_facts = {
+        "model_alias": binding.model_alias,
+        "runtime": runner.runtime if runner is not None else None,
+        "default_effort": binding.default_effort,
+        "effort_override": binding.effort_override,
+        "supported_efforts": binding.supported_efforts,
+    }
+    resolved = resolve_role_effort(effort_facts)
+    if resolved["effort_source"] is None:
+        runtime_options, _ = runtime_options_for_facts(effort_facts)
+        resolved = resolve_role_effort(effort_facts, runtime_options)
     if resolved["effort_source"] is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1348,7 +1362,7 @@ def _role_projection(
         role = roles.get(member_id)
         member = members.get(member_id)
         facts = facts_by_member.get(member_id) or {}
-        binding_out = build_role_binding_out(facts)
+        binding_out = _binding_with_runtime_effort(facts)
         if role is not None:
             role_name = role.role_name
             origin = role.origin

@@ -207,3 +207,36 @@ def list_models(endpoint=None, include_custom=False):
         return [{k: m[k] for k in ('modelId','name','description','_meta') if k in m} for m in models if isinstance(m,dict) and isinstance(m.get('modelId'),str) and (include_custom or not m['modelId'].startswith('custom-local:'))]
     finally:
         client.disconnect()
+
+
+def probe_effort_options(model_id, *, timeout=60, endpoint=None):
+    """Probe model capabilities without prompting; failures raise AcpError.
+
+    Only the second new session is configured. Unknown or unavailable options
+    return an empty list, and the model-default value is excluded.
+    """
+    if not isinstance(model_id, str) or not model_id.strip():
+        raise AcpError('workbuddy_acp_invalid_model')
+    client = _Client(endpoint, timeout)
+    try:
+        client.connect(); client.initialize()
+        first = client.new(Path.cwd()).get('sessionId')
+        second = client.new(Path.cwd()).get('sessionId')
+        if not isinstance(first, str) or not first or not isinstance(second, str) or not second or first == second:
+            raise AcpError('workbuddy_acp_session_bind_failed')
+        result = client.rpc('session/set_config_option', {'sessionId': second, 'configId': 'model', 'value': model_id}, 'workbuddy_acp_model_not_applied')[0]
+        configs = result.get('configOptions') or []
+        if not any(isinstance(x, dict) and x.get('id') == 'model' and x.get('currentValue') == model_id for x in configs):
+            raise AcpError('workbuddy_acp_model_not_applied')
+        values = set()
+        for config in configs:
+            if isinstance(config, dict) and config.get('id') == 'thought_level':
+                for option in config.get('options') or []:
+                    if isinstance(option, dict) and isinstance(option.get('value'), str):
+                        values.add(option['value'])
+        return [v for v in ('off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra') if v in values]
+    finally:
+        try:
+            client.disconnect()
+        except AcpError:
+            pass

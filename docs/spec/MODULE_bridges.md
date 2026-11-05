@@ -130,6 +130,8 @@
 
 ## WorkBuddy 内置模型 ACP 通道（2026-11-05）
 
+强度选项按模型通过 ACP 运行时探测，排除表示模型默认的 enabled；探测失败时能力未知，不推测通用档位。仅作用于下一次任务执行。
+
 TALK 的 WorkBuddy 角色新增 `workbuddy-acp:<modelId>` 选择：不再通过 `models.json` 的
 `custom-local:*` 走自备 API Key，而是连接桌面 WorkBuddy 已登录的内嵌 CLI 本地 ACP 运行时，
 使用账号自带的内置模型（如 `deepseek-v4.1-flash`），按桌面额度计费。

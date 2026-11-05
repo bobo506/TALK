@@ -69,6 +69,8 @@ Codex新角色支持CLI 0.164.0和0.163.0。Terra等模型使用准备时官方�
 
 ### WorkBuddy 内置模型（免自备 Key）
 
+角色详情的思考强度按所选内置模型提供；无覆盖时选择“跟随模型默认”，修改作用于下一次任务执行。桌面不可用时选项可能暂不可用。
+
 WorkBuddy 角色可以选择 WorkBuddy 账号自带的内置模型（例如 DeepSeek-V4.1-Flash），不再需要
 在 `models.json` 里配置自定义 API Key。该通道使用桌面 WorkBuddy 当前登录的账号与额度；
 本机需保持 WorkBuddy 桌面端运行并已登录。
