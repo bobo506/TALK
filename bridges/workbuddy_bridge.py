@@ -27,6 +27,11 @@ def build_command(executable: Path, model: str, *, tools: str, effort: str | Non
     return command
 
 
+
+def build_acp_command(model_id: str, mode: str, workdir: str) -> list[str]:
+    return [sys.executable, "-m", "scripts.workbuddy_acp_prompt", "--model", model_id,
+            "--mode", mode, "--project-root", str(workdir), "--timeout", "600"]
+
 def read_model_reasoning(models_home: Path, model_alias: str) -> dict | None:
     """只读模型条目里的公开能力字段（不返回原始配置或凭据）。"""
     try:
@@ -75,6 +80,18 @@ async def _binding_for(client: Any, project: str, member_id: str):
 
 def set_command_effort(command: Any, effort: str) -> tuple[Any, str]:
     """把强度写入命令：已有 ``--effort`` 就替换，没有则插到 ``--model <alias>`` 之后。"""
+    if isinstance(command, list) and "scripts.workbuddy_acp_prompt" in command:
+        if effort not in {"low", "high", "max", "enabled"}:
+            _diagnostic("workbuddy_acp_effort_unknown")
+            return command, "unchanged"
+        result = list(command)
+        if "--effort" in result:
+            index = result.index("--effort")
+            if index + 1 >= len(result):
+                return command, "unchanged"
+            result[index + 1] = effort
+            return result, "replaced"
+        return result + ["--effort", effort], "inserted"
     from bridges.codex_effort import apply_effort
 
     rewritten, mode = apply_effort(command, effort)
@@ -99,7 +116,12 @@ def make_effort_hook(client: Any, args: argparse.Namespace):
         if not project:
             return
         binding = await _binding_for(client, project, cli_bridge.member_id_from_name(args.name))
-        target = resolve_target_effort(binding)
+        command = getattr(args, "task_command", None) or getattr(args, "command", None)
+        if isinstance(command, list) and "scripts.workbuddy_acp_prompt" in command:
+            target = binding.get("effective_effort") if isinstance(binding, dict) else None
+            target = target.strip().lower() if isinstance(target, str) else None
+        else:
+            target = resolve_target_effort(binding)
         if target is None:
             if isinstance(binding, dict) and binding.get("effort_override"):
                 _diagnostic("workbuddy_effort_capability_unknown")
@@ -131,6 +153,19 @@ def prepare_environment(args: argparse.Namespace) -> None:
 
 
 async def run_bridge(args: argparse.Namespace) -> None:
+    if args.workbuddy_model and args.workbuddy_model.startswith("workbuddy-acp:"):
+        model_id = args.workbuddy_model[len("workbuddy-acp:"):]
+        if not model_id:
+            raise ValueError("workbuddy_explicit_model_required")
+        workdir = str(Path(args.workdir or os.getcwd()).resolve())
+        args.command = build_acp_command(model_id, "chat", workdir)
+        args.task_command = build_acp_command(model_id, "task", workdir)
+        args.task_preflight_command = build_acp_command(model_id, "plan", workdir)
+        args.runtime = "workbuddy"
+        args.prompt_transport = "stdin"
+        args.before_task_factory = make_effort_hook
+        await cli_bridge.run_bridge(args)
+        return
     prepare_environment(args)
     executable = Path(args.workbuddy_executable).resolve()
     if not executable.is_file():

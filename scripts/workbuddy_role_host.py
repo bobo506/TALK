@@ -47,7 +47,7 @@ class WorkBuddyRoleHost(rsh.HostManager):
             and (not draining or row.get("action")=="stop")]
 
     def build_entry_argv(self, runtime, model_alias):
-        if runtime != "workbuddy" or not str(model_alias).startswith("custom-local:"):
+        if runtime != "workbuddy" or not isinstance(model_alias, str) or not any(model_alias.startswith(prefix) and len(model_alias) > len(prefix) for prefix in ("custom-local:", "workbuddy-acp:")):
             raise rsh.HostError("workbuddy_binding_unsupported")
         argv,template,budget=super().build_entry_argv(runtime,model_alias)
         argv += ["--workbuddy-executable",str(self.executable),"--workbuddy-models-home",str(self.models_home),
@@ -78,7 +78,7 @@ def main(argv=None):
             or args.alias_flag or args.child_env or args.provision_worker or args.provision_worker_apply):
         raise rsh.HostError("workbuddy_entry_override_rejected")
     exe=Path(args.workbuddy_executable).resolve();models=Path(args.workbuddy_models_home).resolve()
-    if not exe.is_file() or exe.name.lower()!="workbuddy.exe" or not (models/"models.json").is_file():
+    if not exe.is_file() or exe.name.lower()!="workbuddy.exe":
         raise rsh.HostError("workbuddy_source_missing")
     plan={"schema":"talk-workbuddy-host-plan-1","mode":"apply" if args.apply else "dry_run",
         "project_id":args.project,"member_id":args.member,"executable":str(exe),"models_home":str(models),

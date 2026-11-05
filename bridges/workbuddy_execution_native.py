@@ -110,6 +110,8 @@ def _inventory(argv, home, models_home, model):
 
 
 def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, Any]) -> LaunchSpec:
+    if str(binding.get("model_alias", "")).startswith("workbuddy-acp:"):
+        raise WorkBuddyNativeError("workbuddy_builtin_execution_session_unsupported")
     argv = list(map(str, command))
     if len(argv) < 4 or Path(argv[0]).name.lower() != "workbuddy.exe" or Path(argv[1]).name != "codebuddy":
         raise WorkBuddyNativeError("workbuddy_command_unsupported")

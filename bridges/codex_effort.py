@@ -94,9 +94,10 @@ def apply_effort(command: Any, effort: str) -> tuple[Any, str]:
     字符串命令与 bridge 使用同一套 POSIX 解析/重组（``shlex``），保持与既有
     ``cli_bridge.parse_command`` 一致；列表命令按 token 边界替换。
     """
-    if _normalize(effort) is None:
-        raise EffortUnavailable("codex_effort_unsupported")
     tokens = _split(command)
+    is_acp = tokens is not None and "scripts.workbuddy_acp_prompt" in tokens
+    if _normalize(effort) is None and not (is_acp and effort in {"max", "enabled"}):
+        raise EffortUnavailable("codex_effort_unsupported")
     if tokens is None:
         return command, "unchanged"
     mode = "unchanged"
