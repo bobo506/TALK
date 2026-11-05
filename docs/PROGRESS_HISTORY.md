@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 01:10 — 454 工作区隔离设计完成
+
+- 交付 `.tmp/workspace-isolation-20261106/DESIGN.md`（13.6KB）：现状 20 项能力、与目标差距 6 条、建议切片 4 个、待用户决定 8 项、兼容安全与未覆盖项。
+- 关键事实：`projects.project_root_path` 已存在但允许为空、无规范化/重复/可访问性/移动重关联；任务 `project_id` 可为空、列表仅传参过滤；human 群列表不按项目过滤、无项目历史群共享；日程无 project 字段且物化 `project_id=None`；`File` 无 `project_id`、blob 共享；Key 路径未按 project 分层；实例 `project_id` 可空；启动无选择工作区入口；本机 runtime 根受限于 TALK 代码根。
+- 建议切片：①工作区登记与旧项目兼容；②项目数据与任务边界；③角色/运行时按工作区建立；④加载/切换/人工验收。均为建议，未获开工授权。
+- 待决问题 8 项：project 复用、启动选几个、切换是否停旧服务、跨工作区共享历史身份/群/文件/日程、默认项目迁移、目录重关联、运行器登录复用、目录选择入口。
+- 455 fix3 已进入 Codex 预检；B 待其交付与 k2.8 复验。
+
 ## 2026-11-06 01:05 — 453 复核 changes_requested；455 fix3 派发
 
 - **453（k2.8）**：fix2 主目标通过——`has_valid_delivery` 与 `cli_bridge.normalize_task_delivery` 候选扫描逐字一致；内嵌合法 JSON 不触发 repair；首轮纯 JSON、多 JSON、无效 JSON、错 task_id 边界一致；152 项 OK/39.6s；文档口径准确；7 文件范围未越界。
