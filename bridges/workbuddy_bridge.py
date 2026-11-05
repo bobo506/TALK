@@ -161,6 +161,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
         args.command = build_acp_command(model_id, "chat", workdir)
         args.task_command = build_acp_command(model_id, "task", workdir)
         args.task_preflight_command = build_acp_command(model_id, "plan", workdir)
+        args.delivery_contract = True
         args.runtime = "workbuddy"
         args.prompt_transport = "stdin"
         args.before_task_factory = make_effort_hook

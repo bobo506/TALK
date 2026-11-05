@@ -2629,6 +2629,7 @@ def build_cli_task_prompt(
     runtime: str = "cli",
     decision_tier: str | None = None,
     hall_history: str = "",
+    delivery_contract: bool = False,
 ) -> str:
     """Build the queued-task prompt.
 
@@ -2658,13 +2659,29 @@ def build_cli_task_prompt(
             "`failed` 或 `blocked` 的 findings 不得为空；不要从自然语言暗示结论。"
         )
 
+    delivery_instructions = ""
+    if delivery_contract and task_kind not in {"review", "test"}:
+        delivery_instructions = (
+            "\n\n最终输出必须且只能是完整 JSON，不得有解释、Markdown 围栏、TALK_ACTION 或其他文字。"
+            "遵守 talk-delivery-1 校验合同："
+            f' task_id="{task.get("id")}"（字符串）；conclusion 为 complete、partial 或 blocked；'
+            '包含 completed、unfinished、blocked、changed_files、limitations 数组（空数组照写）；'
+            'baseline 为 {"ref":"...","diff_note":"..."}；verification 为非空数组，'
+            '每项为 {"check":"...","result":"pass|fail|not_run","evidence":"..."}，'
+            'check 不超过120字符，evidence 不超过300字符；progress_draft 为'
+            ' {"summary":"...","next":"..."}。所有文本为非空单行短句。'
+            '不得添加 schema 等额外字段。complete 不得有未完成、阻塞或失败验证；'
+            'partial 必须列出已完成和未完成或阻塞；blocked 必须列出阻塞。'
+            'blocked 仅用于真实外部阻塞；工具或命令失败应如实说明并使用 partial 或 blocked。'
+        )
+
     if _uses_compact_prompt(runtime, member_id):
         creator = task.get("created_by") or "unknown"
         task_text = f"{title}\n{content}" if title else content
         # 任务路径同样注入身份(紧凑写法,理由同 build_cli_prompt)。
         return (
             f"你是 {member_id}。{creator} 对你说:"
-            f"{task_text}{history_block}{gate_contract}"
+            f"{task_text}{history_block}{gate_contract}{delivery_instructions}"
         )
 
     task_id = task.get("id") or "unknown"
@@ -2683,8 +2700,50 @@ def build_cli_task_prompt(
         "Task:\n"
         f"{content}\n"
         f"{history_block}\n"
-        f"{gate_contract}\n"
+        f"{gate_contract}{delivery_instructions}\n"
     )
+
+
+def normalize_task_delivery(result: CliRunResult, *, task_id: int, sensitive_values: Sequence[Any] = ()) -> str:
+    """Return a validated delivery or a conservative, schema-valid fallback."""
+    from bridges.talk_delivery import parse_delivery_report, redact_secrets
+
+    raw = result.stdout or ""
+    if not result.timed_out and result.returncode == 0:
+        candidates: list[tuple[int, str]] = [(0, raw.strip())]
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"\{", raw):
+            try:
+                obj, end = decoder.raw_decode(raw, match.start())
+            except (ValueError, RecursionError):
+                continue
+            if isinstance(obj, dict):
+                candidate = raw[match.start():end]
+                # Embedded objects must be delivery objects, not unrelated JSON.
+                if 'talk-delivery-1' in candidate or '"conclusion"' in candidate:
+                    candidates.append((match.start(), candidate))
+        for _, candidate in sorted(candidates, key=lambda item: item[0], reverse=True):
+            parsed = parse_delivery_report(candidate, expect_task_id=task_id)
+            if parsed.kind == "valid":
+                return json.dumps(parsed.report, ensure_ascii=False)
+
+    failed = result.timed_out or result.returncode != 0
+    reason = ("模型运行超时" if result.timed_out else f"模型运行失败，退出码 {result.returncode}") if failed else "模型返回内容未满足结构化交付格式"
+    # Existing schema limits evidence to 300 characters, stricter than the raw 1000 budget.
+    safe = _diag_public_text(None, raw, sensitive_values=sensitive_values, max_chars=1000)
+    safe, _ = redact_secrets(safe)
+    safe = " ".join(line for line in safe.splitlines() if not CONTROL_PROTOCOL_RESIDUE_RE.search(line))
+    safe = re.sub(r"[\x00-\x1f\x7f]", " ", safe).strip()[:300] or "无可展示的模型输出"
+    report = {
+        "task_id": str(task_id), "conclusion": "blocked" if failed else "partial",
+        "completed": [] if failed else ["模型返回内容但未按结构化交付"],
+        "unfinished": ["结构化交付格式未满足"], "blocked": [reason] if failed else [],
+        "changed_files": [], "baseline": {"ref": "未知", "diff_note": "模型未提供可校验的基线"},
+        "verification": [{"check": "结构化交付和模型执行", "result": "fail", "evidence": safe}],
+        "limitations": ["模型工作内容及验证结果未核实"],
+        "progress_draft": {"summary": reason, "next": "检查模型输出并补充可验证的结构化交付"},
+    }
+    return json.dumps(report, ensure_ascii=False)
 
 
 def parse_task_gate_verdict(result: CliRunResult, *, task_kind: str) -> TaskGateVerdict:
@@ -3405,6 +3464,7 @@ async def handle_queued_task(
     diagnostics: Any | None = None,
     preflight_attempt: int = 1,
     execution_context: Mapping[str, Any] | None = None,
+    delivery_contract: bool = False,
 ) -> bool:
     """Preflight, claim, and execute one task; return False when no action was acquired.
 
@@ -3598,6 +3658,7 @@ async def handle_queued_task(
                 workdir=workdir,
                 runtime=runtime,
                 hall_history=replay_context,
+                delivery_contract=delivery_contract,
             )
             cli_operation = StageTimeline(diagnostics).start(
                 "task_cli",
@@ -3727,8 +3788,11 @@ async def handle_queued_task(
                     and cli_failure_log_id is None
                 ),
             )
+            if delivery_contract and task_kind not in {"review", "test"}:
+                reply = normalize_task_delivery(result, task_id=task_id, sensitive_values=(claim_token,))
             if (
-                task_kind not in {"review", "test"}
+                not delivery_contract
+                and task_kind not in {"review", "test"}
                 and (runtime.lower() == "pi" or member_id == "agent:pi")
                 and not result.timed_out
                 and result.returncode == 0
@@ -4835,6 +4899,7 @@ async def run_task_queue_worker(
                                 ),
                                 diagnostics=diagnostics,
                                 preflight_attempt=preflight_attempt,
+                                delivery_contract=getattr(args, "delivery_contract", False),
                                 execution_context={
                                     "project_id": getattr(args, "project_id", None),
                                     "launch_id": getattr(args, "launch_id", None),

@@ -130,6 +130,8 @@
 
 ## WorkBuddy 内置模型 ACP 通道（2026-11-05）
 
+ACP 的 general 任务要求 `talk-delivery-1` 结构化交付；格式无效时降级为 partial，运行超时或失败时为 blocked，不冒充 complete。review/test 仍使用 gate verdict。现有校验合同要求 task_id 为字符串，且不接受 schema 字段。
+
 强度选项按模型通过 ACP 运行时探测，排除表示模型默认的 enabled；探测失败时能力未知，不推测通用档位。仅作用于下一次任务执行。
 
 TALK 的 WorkBuddy 角色新增 `workbuddy-acp:<modelId>` 选择：不再通过 `models.json` 的
