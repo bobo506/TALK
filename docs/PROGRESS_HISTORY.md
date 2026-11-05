@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-05 20:45 — WorkBuddy 任务结构化交付（443，K2.8 复核 PASS，待角色重启验证）
+
+- **需求**：WorkBuddy 内置模型（ACP）的 general 任务结果此前是 Markdown 自由文本，Task Hall 业务结论显示 unknown；需要结构化 `talk-delivery-1`，格式异常时诚实降级，不冒充 complete。
+- **实现**：`bridges/workbuddy_bridge.py` 仅 ACP 路径置 `delivery_contract=True`；`bridges/cli_bridge.py` 的 `build_cli_task_prompt` 对非 review/test 追加统一合同（task_id 字符串、无 schema、字段/长度与 `scripts/talk_workflow.py` 校验器一致），review/test 仍走 `TALK_GATE_VERDICT`；`handle_queued_task` 从 raw stdout 提取/校验 JSON，合法则只发 JSON 本体；自由文本/错 task_id/缺字段→`partial`，超时/非 0→`blocked`；fallback evidence 脱敏且 ≤300；custom-local/无 flag 不变。
+- **重要说明**：443 任务正文误写 `schema="talk-delivery-1"` 与整数 `task_id`，与实际校验器冲突；Terra 按实际校验器实现（无 schema、字符串 task_id），K2.8 复核确认这是正确方向，共享 schema 未改。Terra 交付结论因此为 partial（流程说明），代码无缺陷。
+- **验证**：`tests.test_cli_bridge tests.test_workbuddy_delivery` **126 项 OK**；K2.8 独立复核 PASS（合同/归一/集成/测试/文档/范围）；真实角色任务未执行（需重启角色服务）。
+- **限制**：真实 `w-d 内置` 任务需获授权重启角色服务后验证；本片不涉及 API 重载；模型输出合法 JSON 仍属模型自报，不代替独立验收。
+- **提交**：`e38686e`；随后与前三项统一推送；部署/真机验证待用户确认。
+
 ## 2026-11-05 20:05 — WorkBuddy CLI 版本探针（440/441，K2.8 复核 PASS，待 API 重载）
 
 - **需求**：运行器版本面板此前对 WorkBuddy 显示未知；现在要显示内嵌 CLI 的真实版本。
