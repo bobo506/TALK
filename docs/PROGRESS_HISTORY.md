@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-05 21:40 — C 文档校正与旧分支归档准备；B 派发（447）
+
+- **用户决定**：本批顺序 **C（文档/归档）→ B（结构化交付格式修复回合）→ 新建角色到正常启停完整闭环**；取消定时任务项目化/定时唤醒（DSH 已实现）；WorkBuddy 模型发现/登记 UI 暂不做；本批 **Terra 开发、hy4 独立复核**。
+- **C 文档校正**：`docs/spec/DEVELOPMENT_ROADMAP.md` 顶层新增 2026-11-05 决策块；第 2 项删除清理、Kimi 运行器名称、DSH/WorkBuddy 强度读取、运行器版本提示标为已完成；第 8 项与 2026-10-17 表第 14 项定时任务标为取消；第 1 项 347/348 标注为历史待结案；“新建角色到正常启停完整闭环”登记为本批第三项。
+- **旧分支归档**：`codex/kimi-role-host-fix` 共 10 个提交（本地领先 `origin/codex/kimi-role-host-fix` 4 个纯文档提交）。核对：无仅存在于旧分支的文件、worktree 状态干净、产品代码已按文件集成（`d994293` 与旧分支产品文件零差异）。已创建 tag `archive/kimi-role-host-fix-20261026`（指向 `fa23f5a`），导出 4 个本地提交补丁到 `.tmp/archive/kimi-role-host-fix-20261026/`（`0001`–`0004`）。**未删除**旧 worktree 与本地分支，待用户明确授权。
+- **B 派发 447**：候选 `.tmp/wb-delivery-repair-20261105/candidate`（分支 `terra/wb-delivery-repair-20261105`，基线 `e83a91c`）。范围：WorkBuddy ACP general 任务同会话最多一次“格式修复回合”，任务命令按任务注入 flags，fake ACP 测试覆盖修复成功/失败/预算不足/非 end_turn，文档更新；不重启生产、不改共享校验 schema。主动模式已启动后台等待。
+- **未验证**：447 尚未交付；hy4 复核未开始；旧分支/worktree 删除未执行。
+
 ## 2026-11-05 20:50 — 四项部署验证：版本/强度生效，结构化交付 446 complete（445 诚实 partial）
 
 - **部署**：运行中的 TALK API 已重载（运行时控制文件触发；Python CLI 写入被沙箱拒绝，未绕过权限）；`w-d 内置` 角色服务正常停止→启动，generation 3、新实例 `ins_791ecfec0869`、running/ready，新 bridge 代码加载。
