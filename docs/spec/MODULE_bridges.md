@@ -158,6 +158,7 @@ TALK 的 WorkBuddy 角色新增 `workbuddy-acp:<modelId>` 选择：不再通过 
 - 依赖与限制：桌面 WorkBuddy 必须运行且已登录；ACP 是当前版本的内部接口，无跨版本兼容承诺；
   `session/close|delete|fork|list` 不支持，会话不能由 TALK 关闭/删除；工具进程的默认 cwd
   是桌面工作区，不应用 `session/new` 的 cwd；`session/resume` 可用但本入口每次新建会话；
+  任务结果目前是模型自然语言，未强制 `talk-delivery-1`，Task Hall 业务结论可能为 `unknown`；
   真实 TALK 角色/UI、多桌面会话并存、模型额度与桌面升级兼容性尚未验收。
 
 ## 当前实现

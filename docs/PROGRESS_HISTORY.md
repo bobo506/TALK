@@ -8,8 +8,9 @@
 - **实现（8 文件）**：新增 `bridges/workbuddy_acp.py`（发现 + ACP 客户端）、`scripts/workbuddy_acp_prompt.py`（UTF-8 stdin/stdout shim）、`scripts/workbuddy_acp_models.py`（真人登记模型选择）、`tests/test_workbuddy_acp.py`；`bridges/workbuddy_bridge.py` 路由 `workbuddy-acp:<modelId>`（chat/plan/task 三形态命令）；`scripts/workbuddy_role_host.py` 接受新别名并放宽 models.json 启动检查；`bridges/workbuddy_execution_native.py` 对内建别名稳定拒绝；`bridges/codex_effort.py` 仅对 ACP 命令放行 `max`/`enabled`。集成时给登记显示名加“（内置）”后缀，避免与同名 custom-local 混淆，并清理一处无用 import。
 - **验证**：新测试 **17 项 OK**；既有三模块回归 **81 项 OK**（主工作树用 `subst T:` 临时根，规避本机沙箱不能写系统临时目录导致的既有隔离断言失败）；`git diff --check` 干净；真实无端点覆盖发现返回 `http://127.0.0.1:50750`；真实聊天 `ACP_TALK_OK`、中文 `中文正常。`；真实任务写 `fix-ok.txt` = `ACP_FIX_OK`（10 字节）。
 - **复核**：K2.8 独立复核 **PASS**（逐文件/行号核对安全、发现、协议、集成、UTF-8、登记脚本与测试质量，无阻断项）。其交付正文为“说明文字 + 围栏 JSON”，系统判自由文本 invalid；协调者按证据核过，保留原报告不追改。非阻断观察：无用 `import re`（集成时清理）、宿主 dry-run 放宽 models.json 但运行期仍强制、PID 可见时发现只探 WorkBuddy 端口。
-- **已知限制**：依赖桌面 WorkBuddy 运行且已登录；ACP 为当前版本内部接口，无跨版本承诺；会话不能关闭/删除；工具进程默认 cwd 为桌面工作区，任务靠绝对路径说明；未做真实 TALK 角色/UI 端到端、多桌面会话并存、额度与桌面升级兼容性；模型选择需真人 Key 登记。
-- **提交**：`1564191`（代码与测试）；文档随后提交。推送待用户验收。
+- **已知限制**：依赖桌面 WorkBuddy 运行且已登录；ACP 为当前版本内部接口，无跨版本承诺；会话不能关闭/删除；工具进程默认 cwd 为桌面工作区，任务靠绝对路径说明；未做真实 TALK 角色/UI 端到端、多桌面会话并存、额度与桌面升级兼容性；任务结果目前是模型自然语言，未强制 `talk-delivery-1`，Task Hall 业务结论可能显示 unknown，结构化交付待另开小片。
+- **用户验收**：2026-11-05 用户确认验收通过。真实角色 **w-d 内置**（`agent:prj-e8fe7066bbec.w-d-8d8e1bdb`）消息 3211→3212 `OK`（约 10s）；任务 435 领取 17:25:27、完成 17:25:55，写入 `check.txt` 11 字节 `USER_ACP_OK`（hex `55 53 45 52 5F 41 43 50 5F 4F 4B`，无 BOM/换行），未改其它文件；任务结果为自由文本、Task Hall 结论 unknown，文件已由协调者实测。
+- **提交与推送**：`1564191`（代码与测试）、`ec84ff4`（文档）、本轮验收文档提交；已推送 `codex/terminal-return-codex`。
 
 ## 2026-11-05 11:20 — 运行器版本提示收尾：四运行器、首页缓存、位置与可见性（426/428/430，K2.8 复核）
 
