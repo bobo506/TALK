@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-06 01:25 — B 完成并推送（fix3 approved）；454 设计交付
+
+- **456（k2.8）复验 approved**：453 两条 finding 已修复——fallback 在首轮 `end_turn` 后立即登记（`workbuddy_acp.py:260`），主线程 deadline 到期经 fallback 返回首轮文本+partial+`repair=timeout`；repair 异常三条件（AcpError timeout/httpx Timeout/`monotonic()>=deadline`）归类正确；窗口测试 10/10；4 滴流用例 30 批 0 失败；155 项 OK/44.8s；diff blob `f513821c` 一致；文档口径一致。
+- **集成**：fix3 7 文件应用到主工作树，独立重跑 155 项 OK/45.1s、`git diff --check` 干净；提交 `87d0014`，推送 `origin/codex/terminal-return-codex`。
+- **收取**：447（partial，已处理）、448、452、455、453、456 全部收取；449/451 failed 不可收取。454 设计已收取。
+- **C**：已完成（路线图校正、旧分支 tag/补丁、旧 worktree/本地分支删除、等待 1 小时检查点规则）。
+- **未验证**：真实 WorkBuddy 桌面硬截止需部署重启角色后验证（未做，等用户授权）。
+- **下一步**：等用户确认 454 的 8 个待决问题与实施顺序；确认后开工作区隔离实现片（Terra 开发、k2.8 复核）。
+
 ## 2026-11-06 01:12 — 455 fix3 交付；456 定向复验
 
 - **455 fix3**：按 453 两条 finding 修复——①首轮 `end_turn` 后、validator/预算判断前立即登记 `state['repair_fallback']`，任何后续 deadline 返回首轮文本→partial，不再抛 timeout→blocked；②repair 异常按 `AcpError('workbuddy_acp_timeout')`/`httpx.TimeoutException`/`time.monotonic()>=deadline` 归类为 `repair=timeout`，其它才 failed；③测试预算 1.2→2.2s。
