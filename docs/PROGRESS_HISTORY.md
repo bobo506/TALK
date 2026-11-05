@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-05 17:10 — WorkBuddy 内置模型 ACP 通道（432/433，K2.8 复核 PASS，待用户验收）
+
+- **需求**：TALK 的 WorkBuddy 角色可直接使用桌面 WorkBuddy 账号自带的内置模型（如 `deepseek-v4.1-flash`），不再必须自备 `models.json` 自定义 API Key，按桌面额度计费。
+- **已验证链路**：桌面登录 → 内嵌 CLI `--serve` 的本地 ACP → `/api/v1/acp/connect` → `initialize` → 同一连接两次 `session/new` → `session/set_config_option`（model/mode/thought_level）→ `session/prompt` SSE → `DELETE`。
+- **关键事实**：同一新连接第一次 `session/new` 返回桌面当前活动会话，第二次才创建干净会话；实现只对第二次 `sessionId` 设置配置和发 prompt，第一次仅做非空/不同比较；SSE 按 sessionId 过滤，活动会话正文不进入输出/日志/异常；发现优先按 WorkBuddy PID 过滤监听端口，PID 不可见时回退全部 `127.0.0.1` 监听端口逐个探测（实测命中动态端口 50750，不写死）；`session/new` 的 cwd 不会应用到工具进程，任务提示前置“项目根 + 绝对路径 + 先 cd”；`session/close|delete|fork|list` 不支持，会话不能由 TALK 清理。
+- **实现（8 文件）**：新增 `bridges/workbuddy_acp.py`（发现 + ACP 客户端）、`scripts/workbuddy_acp_prompt.py`（UTF-8 stdin/stdout shim）、`scripts/workbuddy_acp_models.py`（真人登记模型选择）、`tests/test_workbuddy_acp.py`；`bridges/workbuddy_bridge.py` 路由 `workbuddy-acp:<modelId>`（chat/plan/task 三形态命令）；`scripts/workbuddy_role_host.py` 接受新别名并放宽 models.json 启动检查；`bridges/workbuddy_execution_native.py` 对内建别名稳定拒绝；`bridges/codex_effort.py` 仅对 ACP 命令放行 `max`/`enabled`。集成时给登记显示名加“（内置）”后缀，避免与同名 custom-local 混淆，并清理一处无用 import。
+- **验证**：新测试 **17 项 OK**；既有三模块回归 **81 项 OK**（主工作树用 `subst T:` 临时根，规避本机沙箱不能写系统临时目录导致的既有隔离断言失败）；`git diff --check` 干净；真实无端点覆盖发现返回 `http://127.0.0.1:50750`；真实聊天 `ACP_TALK_OK`、中文 `中文正常。`；真实任务写 `fix-ok.txt` = `ACP_FIX_OK`（10 字节）。
+- **复核**：K2.8 独立复核 **PASS**（逐文件/行号核对安全、发现、协议、集成、UTF-8、登记脚本与测试质量，无阻断项）。其交付正文为“说明文字 + 围栏 JSON”，系统判自由文本 invalid；协调者按证据核过，保留原报告不追改。非阻断观察：无用 `import re`（集成时清理）、宿主 dry-run 放宽 models.json 但运行期仍强制、PID 可见时发现只探 WorkBuddy 端口。
+- **已知限制**：依赖桌面 WorkBuddy 运行且已登录；ACP 为当前版本内部接口，无跨版本承诺；会话不能关闭/删除；工具进程默认 cwd 为桌面工作区，任务靠绝对路径说明；未做真实 TALK 角色/UI 端到端、多桌面会话并存、额度与桌面升级兼容性；模型选择需真人 Key 登记。
+- **提交**：`1564191`（代码与测试）；文档随后提交。推送待用户验收。
+
 ## 2026-11-05 11:20 — 运行器版本提示收尾：四运行器、首页缓存、位置与可见性（426/428/430，K2.8 复核）
 
 - **背景**：425 首版上线后用户实测发现两处问题——只显示 kimi-code/dsh 两个运行器；必须手动加 `?v=` 才能看到新页面；另外位置在侧栏标签下方不美观，要求移入项目设置详情页、放在「调度模式」与「角色配置宿主」之间。

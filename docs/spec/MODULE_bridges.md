@@ -128,6 +128,38 @@
 - 当前已实现：`bridges/cli_bridge.py`、`bridges/codex_bridge.py`、`bridges/kimi_bridge.py`、`bridges/pi_bridge.py`；DeepSeek Harness 通过通用 bridge 接入
 - 依赖 SDK：`TALK/client/`
 
+## WorkBuddy 内置模型 ACP 通道（2026-11-05）
+
+TALK 的 WorkBuddy 角色新增 `workbuddy-acp:<modelId>` 选择：不再通过 `models.json` 的
+`custom-local:*` 走自备 API Key，而是连接桌面 WorkBuddy 已登录的内嵌 CLI 本地 ACP 运行时，
+使用账号自带的内置模型（如 `deepseek-v4.1-flash`），按桌面额度计费。
+
+- 入口：`bridges/workbuddy_acp.py`（发现 + ACP 客户端）、`scripts/workbuddy_acp_prompt.py`
+  （cli_bridge 每回合 stdin/stdout shim）、`scripts/workbuddy_acp_models.py`
+  （真人登记模型选择）、`tests/test_workbuddy_acp.py`。
+- 传输：`POST /api/v1/acp/connect` → `initialize` → 同一连接两次 `session/new` →
+  `session/set_config_option`（model/mode/thought_level）→ `session/prompt`（SSE）→
+  `DELETE /api/v1/acp`。
+- 发现：优先用 WorkBuddy.exe PID 过滤 `netstat -ano` 的回环监听端口；PID 不可见时回退为
+  全部 `127.0.0.1` 监听端口逐个探测 `/api/v1/acp/connect`；不写死端口。
+- **安全不变量**：同一新连接第一次 `session/new` 返回桌面当前活动会话，第二次才创建干净会话。
+  只允许对第二次返回的 `sessionId` 设置配置和发 prompt；第一次仅做“非空且不同”比较。
+  SSE 按 `sessionId` 过滤，活动会话的更新不进入正文、日志或异常；`sessionToken` /
+  `connectionId` / prompt / 回复正文均不落盘、不打印。
+- 权限模式：消息/预检用 `plan`（不执行工具）；任务用 `bypassPermissions`，依赖桌面运行时
+  自身权限模型。任务提示前置“项目根目录 + 绝对路径 + 先 Set-Location/cd”。
+- 集成：`bridges/workbuddy_bridge.py` 识别 `workbuddy-acp:`，生成 chat/plan/task 三种
+  shim 命令；`scripts/workbuddy_role_host.py` 接受新别名并允许 models.json 不存在的宿主启动；
+  `bridges/workbuddy_execution_native.py` 对内置别名稳定拒绝
+  `workbuddy_builtin_execution_session_unsupported`（不实现多轮执行会话）。
+- 模型选择：`model_source=builtin`、`provider_id=managed:workbuddy`、
+  `connection_ref=native-workbuddy-acp`、`model_id=<运行时 ID>`、
+  `model_alias=workbuddy-acp:<运行时 ID>`、显示名 `<运行时 name>（内置）`。
+- 依赖与限制：桌面 WorkBuddy 必须运行且已登录；ACP 是当前版本的内部接口，无跨版本兼容承诺；
+  `session/close|delete|fork|list` 不支持，会话不能由 TALK 关闭/删除；工具进程的默认 cwd
+  是桌面工作区，不应用 `session/new` 的 cwd；`session/resume` 可用但本入口每次新建会话；
+  真实 TALK 角色/UI、多桌面会话并存、模型额度与桌面升级兼容性尚未验收。
+
 ## 当前实现
 
 ### 266原agent:kimi保ID迁移准备已派（2026-10-17）
