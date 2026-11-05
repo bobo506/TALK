@@ -37,12 +37,12 @@ def task(status: str = "running", workflow: str = "in_progress", **extra) -> dic
 
 
 class DefaultBudgetTests(unittest.TestCase):
-    """主动等待默认预算必须与任务默认执行预算一致，不能短于长任务耗时。"""
+    """单次等待默认 1 小时检查点；超时由发起者核对活动后决定重启或停止。"""
 
-    def test_default_wait_budget_is_one_day(self) -> None:
-        self.assertEqual(waiter.DEFAULT_TIMEOUT, 86400.0)
+    def test_default_wait_budget_is_one_hour_checkpoint(self) -> None:
+        self.assertEqual(waiter.DEFAULT_TIMEOUT, 3600.0)
         args = waiter.build_parser().parse_args(["--task-id", "1"])
-        self.assertEqual(args.timeout, 86400.0)
+        self.assertEqual(args.timeout, 3600.0)
 
 
 class TerminalTests(unittest.TestCase):

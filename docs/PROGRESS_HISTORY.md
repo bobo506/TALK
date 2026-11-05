@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 00:15 — 主动等待改为 1 小时检查点
+
+- **用户决定**：24 小时总预算不适合卡死场景；应每小时回来检查实际产出——无动作则停止并请示，有动作只是未完成则继续轮询。
+- **规则**：单次等待 job 默认 `--timeout 3600`（1 小时）。超时**不是任务失败**，而是检查点；发起者醒来核对任务状态、领取/心跳（心跳只续租约，不算产出）、执行进程 CPU 时间与工作集增量、TCP 连接与输出增长。有活动但未完成→重启 job 继续等；长时间零活动（CPU/内存均不增长、连接空转）→按最小范围终止卡住的执行进程，任务记 failed/blocked，报告用户定夺，不自动重派。单次 job 的 timeout 不设任务总时限。
+- **变更**：`scripts/talk_wait_task.py` `DEFAULT_TIMEOUT` 86400→3600、docstring 同步；`AGENTS.md`「发起者主被动与等待」与 `docs/guides/TERMINAL_MCP.md`「程序轮询 + 完成通知」同步；`tests.test_talk_wait_task` 的默认值断言改为 3600，**24 项 OK**。
+- **背景**：449 复核在 hy4 ACP 上卡死约 2 小时（shim 0 CPU/内存增长、TCP Established），说明“24 小时静默等待”不可接受。
+- **未验证**：1 小时检查点机制待下一个长任务实际演练；hy4 卡死根因仍待单独核查。
+
 ## 2026-11-06 00:05 — hy4 复核卡死中止；450 连通性验证；451 重派；448 complete
 
 - **448 交付 complete**：`prompt_once` 改为 daemon 线程 + 统一 deadline；T1 首轮滴流 1.203s 抛 `workbuddy_acp_timeout`、T2 修复轮滴流 1.219s 返回首轮并 normalize 为 partial；150 项 OK/32.5s，`git diff --check` 干净；候选 7 文件冻结（diff blob `a0fddd2280abaa933baa5f0a34254465e2b45cba`，HEAD `e83a91c`）。
