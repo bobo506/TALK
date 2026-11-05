@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-05 20:50 — 四项部署验证：版本/强度生效，结构化交付 446 complete（445 诚实 partial）
+
+- **部署**：运行中的 TALK API 已重载（运行时控制文件触发；Python CLI 写入被沙箱拒绝，未绕过权限）；`w-d 内置` 角色服务正常停止→启动，generation 3、新实例 `ins_791ecfec0869`、running/ready，新 bridge 代码加载。
+- **版本**：`GET /api/runners/versions` 返回 WorkBuddy `detected_version=2.165.0`、`status=match`（生产 API 进程真实探测）。
+- **强度**：`w-d 内置` 绑定返回 `effort_options=["low","high","max"]`、`source=adapter`、`effective_effort=null`（跟随模型默认）；页面刷新后应出现强度下拉。
+- **结构化交付 445**：文件 `result.txt` 16 字节 `USER_DELIVERY_OK` 正确；但模型输出在 `changed_files` 处被截断，bridge 按设计降级为 `partial`（Task Hall 不再 unknown，且未冒充 complete）。
+- **结构化交付 446（极简 JSON）**：文件 `result2.txt` 17 字节 `USER_DELIVERY_OK2` 正确；模型输出合法 `talk-delivery-1`，`conclusion=complete`，Task Hall 显示 complete。
+- **结论**：四项均已上线验证；结构化交付对“模型输出在预算内”有效，超长/截断时诚实降级。若需稳定 complete，可另开“格式修复回合”小片（本片不做）。
+- **限制**：445 的 partial 是模型输出截断，不是 bridge 校验错误；强度实际作用于任务的 ACP thought_level 仅由命令/配置测试覆盖，未做可观测的模型差异对比；真实浏览器页面由用户刷新验收。
+- **提交/推送**：代码 `fb35f2e` 已推送；本轮验证文档随后提交推送。
+
 ## 2026-11-05 20:45 — WorkBuddy 任务结构化交付（443，K2.8 复核 PASS，待角色重启验证）
 
 - **需求**：WorkBuddy 内置模型（ACP）的 general 任务结果此前是 Markdown 自由文本，Task Hall 业务结论显示 unknown；需要结构化 `talk-delivery-1`，格式异常时诚实降级，不冒充 complete。
