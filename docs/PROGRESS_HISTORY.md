@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-05 21:55 — 447 partial→448 返修；主动等待预算修正；旧 worktree/分支归档删除
+
+- **447 交付 partial**：核心实现完成（同会话一次修复、general 注入 flags、review/test 不注入、fake ACP 测试 147 项通过、文档），但严格 `--timeout` 硬截止未满足（每行检查 + 单次 read 超时会被 SSE 滴流重置）；Terra 自报 2 项未完成，未冒充 complete。
+- **448 返修**：冻结 447 候选（交付补丁 SHA256 `9D7D8AF0417F571A04B059BA513E1B5CA051052B0E4BFFD8AD7800A3CDDB2BA7`），从该补丁新建 `.tmp/wb-delivery-repair-fix1-20261105/candidate`（分支 `terra/wb-delivery-repair-fix1-20261105`，基线 `e83a91c`+447 补丁），派 Terra 448：daemon/watchdog 硬总时长、首轮超时抛 `AcpError`、修复轮超时保留首轮输出、慢速滴流 T1/T2 测试；active 等待（24 小时预算）。
+- **等待预算修正（用户指出）**：30 分钟上限是 `scripts/talk_wait_task.py` 的默认值/文档示例，并非用户要求。`DEFAULT_TIMEOUT` 由 `1800` 改为 `86400`（24 小时，与任务默认执行预算一致），docstring 同步；`AGENTS.md` 与 `docs/guides/TERMINAL_MCP.md` 明确“不得设置短于任务执行预算的上限，30 分钟/1 小时等短上限会误杀长任务”；新增默认值测试，`tests.test_talk_wait_task` **24 项 OK**。
+- **归档删除（用户确认后）**：删除旧 worktree `C:\Users\Administrator\.codex\worktrees\kimi-role-host-fix\TALK` 与本地分支 `codex/kimi-role-host-fix`（原 `fa23f5a`）；tag `archive/kimi-role-host-fix-20261026` 与 `.tmp/archive/kimi-role-host-fix-20261026/` 补丁保留，远端分支未动。
+- **未验证**：448 未交付；hy4 复核未开始；真实 WorkBuddy 桌面 ACP 修复未验。
+
 ## 2026-11-05 21:40 — C 文档校正与旧分支归档准备；B 派发（447）
 
 - **用户决定**：本批顺序 **C（文档/归档）→ B（结构化交付格式修复回合）→ 新建角色到正常启停完整闭环**；取消定时任务项目化/定时唤醒（DSH 已实现）；WorkBuddy 模型发现/登记 UI 暂不做；本批 **Terra 开发、hy4 独立复核**。

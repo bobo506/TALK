@@ -1,15 +1,16 @@
 # Project Progress
 
-## 当前快照（2026-11-05 21:40）
+## 当前快照（2026-11-05 21:55）
 
-- **角色**：本会话 DeepSeek 负责协调、文档与 Git 收尾；本批按用户 2026-11-05 指定 **Terra 开发、hy4 独立复核**（项目页面 development_requirements 的 kimi/deepseek 分工快照仅作历史）。
-- **最近完成**：①~⑩ 见下条 21:05 记录（四项部署验证与用户验收、428 收取）；⑪ 本批 **C**：路线图/进度文档校正完成，旧分支 `codex/kimi-role-host-fix` 已打归档 tag `archive/kimi-role-host-fix-20261026` 并导出 4 个本地提交补丁。
-- **当前状态**：C 文档待提交；**B 已派 Terra（任务 447）**，候选 `.tmp/wb-delivery-repair-20261105/candidate`（分支 `terra/wb-delivery-repair-20261105`，基线 `e83a91c`），主动模式已启动后台等待 job。hy4 已确认在册（`agent:prj-e8fe7066bbec.hy4-876f2f9f`），待 447 交付后派独立复核。
-- **卡点/未验证**：旧 worktree `C:\Users\Administrator\.codex\worktrees\kimi-role-host-fix\TALK` 与本地分支 `codex/kimi-role-host-fix` 的删除**待用户明确授权**；447 真实测试结果与 hy4 复核待完成；新建角色闭环尚未拆片。
-- **下一步**：447 交付→hy4 复核→集中返修（如需）→集成/验证；之后进入“新建角色到正常启停完整闭环”的方案/拆片。定时任务项目化已取消（DSH 已实现）；WorkBuddy 模型发现/登记 UI 暂不做。
+- **角色**：本会话 DeepSeek 负责协调、文档与 Git 收尾；本批按用户 2026-11-05 指定 **Terra 开发、hy4 独立复核**。
+- **最近完成**：①~⑩ 见 21:05 记录；⑪ **C**：路线图/进度校正、旧分支归档（tag `archive/kimi-role-host-fix-20261026` + 4 个补丁），旧 worktree 与本地分支已按用户确认删除；⑫ **主动等待上限修正**：`talk_wait_task` 默认总预算 30 分钟 → **24 小时**（86400 秒，与任务默认执行预算一致），AGENTS/TERMINAL_MCP 同步；24 项测试通过。
+- **当前状态**：C 文档已提交 `bda5734`；447 已交付但为 **partial**（硬总时长上限未满足），已冻结并重建返修候选 `.tmp/wb-delivery-repair-fix1-20261105/candidate`，**448 已派 Terra**（active 等待中，24 小时预算）。hy4 待 448 完成后独立复核。
+- **卡点/未验证**：448 硬截止实现与 T1/T2 测试待交付；hy4 复核未开始；真实 WorkBuddy 桌面修复需部署后实机验证；新建角色闭环尚未拆片。
+- **下一步**：448 交付→核对→hy4 复核→集成/部署验证→收取；之后进入“新建角色到正常启停完整闭环”的方案/拆片。
 - 恢复指令：`继续项目`。
 
-> 2026-11-05 21:40（DeepSeek，**C 文档校正完成；B 已派 Terra 447；本批顺序与分工确定**）：用户确定本批顺序 **C → B → 新建角色到正常启停的完整闭环**；定时任务项目化/定时唤醒**取消**（DSH 已实现）；WorkBuddy 内置模型“发现/登记”UI（候选 A）**暂不做**；本批 **Terra 开发、hy4 复核**。C：路线图校正（删除清理、Kimi 运行器名称、DSH/WorkBuddy 强度、运行器版本提示标为完成；定时任务标取消；347/348 标历史待结案），旧分支归档 tag+4 个补丁；删除旧 worktree/本地分支**待确认**。B：WorkBuddy ACP 结构化交付同会话一次“格式修复回合”，候选基线 `e83a91c`，任务 447 queued，主动模式后台等待。
+> 2026-11-05 21:55（DeepSeek，**447 partial→448 返修；等待预算改 24 小时；旧 worktree/分支已删除**）：447 核心实现完成（147 项通过），但 Terra 如实报 partial：`--timeout` 硬截止只按每行/单次 read 检查，SSE 零星滴流时无法保证总时长；已冻结并重建 fix1 候选（447 补丁 SHA256 记录），派 448 要求 daemon/watchdog 硬截止 + T1/T2 超时测试。另修主动等待预算：`scripts/talk_wait_task.py` 默认 `1800`→`86400` 秒（原 30 分钟上限是我沿用了文档示例、并非用户要求，长任务会被误杀），`AGENTS.md`/`TERMINAL_MCP.md` 同步为“不得短于任务执行预算”；`tests.test_talk_wait_task` 24 项通过。旧 worktree `C:\Users\Administrator\.codex\worktrees\kimi-role-host-fix\TALK` 与本地分支已删除，tag/补丁保留，远端分支未动。
+
 
 
 
