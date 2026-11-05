@@ -19,7 +19,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/style.css?v=20261029-theme-day-night-v1">
-  <link rel="stylesheet" href="/workspace.css?v=20261031-role-effort-v2">
+  <link rel="stylesheet" href="/workspace.css?v=20261105-runner-versions-layout-v1">
   <link rel="stylesheet" href="/role-creation.css?v=20261029-theme-day-night-v1">
   <link rel="stylesheet" href="/role-diagnostics.css?v=20261029-theme-day-night-v1">
 </head>
@@ -125,7 +125,6 @@
           </div>
           <p id="project-empty-note" class="project-empty-note hidden">还没有已注册项目。先用 <code>talk init</code> 建立项目上下文。</p>
         </section>
-        <div id="runner-versions" class="hidden" aria-label="运行器版本"></div>
         <section id="blackboard-view" class="blackboard-view hidden">
           <header id="blackboard-header" class="blackboard-header">
             <div>
@@ -312,6 +311,11 @@
             <button id="controller-mode-retry-btn" type="button" class="workspace-text-button hidden">重试</button>
           </div>
           <p id="controller-mode-status" class="controller-mode-status" role="status"></p>
+        </section>
+        <section id="runner-versions-panel" class="hidden" aria-label="运行器版本">
+          <div class="sidebar-kicker">项目级</div>
+          <h3>运行器版本</h3>
+          <div id="runner-versions-content" class="runner-versions-content" aria-live="polite"></div>
         </section>
         <!-- ROLE-DESC-F1 修正（#137/N4）：原动态角色详情拆成名称区与参与任务区两个动态容器，
              静态说明编辑区居中独立，布局顺序 = 名称区 → 说明区 → 参与任务区（贴合“名称下方”原需求）。
@@ -586,7 +590,7 @@
   <script src="/theme.js?v=20261029-theme-day-night-v1"></script>
 <script src="/role-creation.js?v=20261031-model-api-v1"></script>
   <script src="/role-diagnostics.js?v=20261023-backend-export-v1"></script>
-  <script src="/workspace.js?v=20261104-runner-versions-v1"></script>
+  <script src="/workspace.js?v=20261105-runner-versions-visibility-v1"></script>
   <script src="/app.js?v=20261104-task-hall-readonly-v3"></script>
 </body>
 </html>

@@ -346,6 +346,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="TALK", version="0.1.0", lifespan=lifespan)
 app.add_middleware(RequestLoggingMiddleware)
 
+
+@app.middleware("http")
+async def revalidate_html(request: Request, call_next):
+    response = await call_next(request)
+    if request.method == "GET" and response.headers.get("content-type", "").lower().startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 app.include_router(members.router)
 app.include_router(members.setup_router)
 app.include_router(groups.router)

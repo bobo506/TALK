@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-05 11:20 — 运行器版本提示收尾：四运行器、首页缓存、位置与可见性（426/428/430，K2.8 复核）
+
+- **背景**：425 首版上线后用户实测发现两处问题——只显示 kimi-code/dsh 两个运行器；必须手动加 `?v=` 才能看到新页面；另外位置在侧栏标签下方不美观，要求移入项目设置详情页、放在「调度模式」与「角色配置宿主」之间。
+- **426（后端）**：`GET /api/runners/versions` 固定返回 codex/kimi-code/dsh/workbuddy 四个规范运行时（注册表无行时用默认名，注册表额外 runtime 追加）；`server/main.py` 对 `text/html` 响应加 `Cache-Control: no-cache`，静态 JS 不受影响。
+- **428（布局）**：删除侧栏 `#runner-versions`，新增 `#runner-versions-panel` 插在 `#controller-mode-panel` 与 `#role-request-host-panel` 之间；沿用相邻面板的 kicker+h3+分隔线规格，样式迁入 `workspace.css` 并使用主题变量，去掉内联橙色；仅“项目设置被选中”时显示。
+- **430（可见性）**：K2.8 复核发现从任务/群聊页点“角色”时不经过 `renderTaskDetailsPanel`，面板保持 hidden；Terra 在 `renderWorkspaceList` 入口补 `syncRunnerVersions()`，并覆盖“选中角色失效回退项目设置”路径，补导航回归测试与版本串 `20261105-runner-versions-visibility-v1`。
+- **复核**：K2.8 首轮 NEEDS_CHANGES（仅可见性问题，其余全过），返修后定向复验 **PASS**；DeepSeek 集成时实跑 Python 40 项、Node 42 项、全量 Node 393 项（16 个基线失败逐名一致）。
+- **已知限制**：未做真实浏览器自动化；WorkBuddy 无可靠 CLI 探针显示未知；面板提示仍依赖 `runner_registry` 显示名（无行时用默认名）。
+
 ## 2026-11-04 23:55 — 运行器版本检测与只读升级提示（425）
 
 - **需求**：检查 TALK 已适配运行器是否有新版本，发现时提示用户；仅提示，不自动下载/安装/更新。

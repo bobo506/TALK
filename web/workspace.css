@@ -193,6 +193,12 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 
 /* C2-B 项目调度模式面板：项目级设置面板，复用浅色工作台层级；radio 两态 + 显式保存。 */
 #controller-mode-panel {color:var(--text); margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid var(--line);}
+#runner-versions-panel {color:var(--text); margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid var(--line);}
+#runner-versions-panel .sidebar-kicker {font-size:14px; color:var(--muted-strong); margin-bottom:10px;}
+#runner-versions-panel h3 {font-size:24px; font-weight:650; color:var(--text); margin:0;}
+.runner-versions-content {font-size:14px; color:var(--muted-strong); line-height:1.7; margin-top:14px; overflow-wrap:anywhere;}
+.runner-version-mismatch {color:var(--text); font-weight:650;}
+@media(max-width:700px){#runner-versions-panel h3 {font-size:20px;}}
 #controller-mode-panel .sidebar-kicker {font-size:14px; color:var(--muted-strong); margin-bottom:10px;}
 #controller-mode-panel h3 {font-size:24px; font-weight:650; color:var(--text); margin:0;}
 .controller-mode-hint {font-size:14px; color:var(--muted-strong); line-height:1.7; margin:14px 0 4px;}

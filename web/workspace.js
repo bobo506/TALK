@@ -12,23 +12,23 @@ function runnerVersionText(item) {
   return `${name}：${item.detected_version || "未知"}，关系未知${item.detail ? `（${item.detail}）` : ""}`;
 }
 function syncRunnerVersions() {
-  const box = document.getElementById("runner-versions");
-  if (!box || !box.isConnected || !box.parentElement) return;
-  const visible = blackboardOpen && workspaceUI.mode === "roles" && Boolean(myId);
-  box.classList.toggle("hidden", !visible);
+  const panel = document.getElementById("runner-versions-panel");
+  const box = document.getElementById("runner-versions-content");
+  if (!panel || !box || !panel.isConnected || !panel.parentElement) return;
+  const visible = blackboardOpen && workspaceUI.mode === "roles" && workspaceSettingsSelected() && Boolean(activeProjectId) && Boolean(myId);
+  panel.classList.toggle("hidden", !visible);
   if (!visible) return;
   if (runnerVersionsUI.member !== myId) {
     runnerVersionsUI.member = myId; runnerVersionsUI.items = null; runnerVersionsUI.lastFetch = 0;
   }
   box.replaceChildren();
-  const title = document.createElement("strong"); title.textContent = "运行器版本："; box.appendChild(title);
   if (!runnerVersionsUI.items || !runnerVersionsUI.items.length) {
     const placeholder = document.createElement("span"); placeholder.textContent = "未知"; box.appendChild(placeholder);
   } else {
     for (const item of runnerVersionsUI.items) {
       const row = document.createElement("div"); row.textContent = runnerVersionText(item);
       if (item.status === "newer" || item.status === "older") {
-        row.style.color = "#b45309"; row.style.fontWeight = "bold";
+        row.classList.add("runner-version-mismatch");
       }
       box.appendChild(row);
     }
@@ -268,7 +268,6 @@ function syncTaskListPaginationContext() {
 function syncWorkspaceLayout() {
   // 群聊导航不渲染任务列表；在公共导航入口同步，离页也能立即作废旧页码。
   syncTaskListPaginationContext();
-  if (typeof syncRunnerVersions === "function") syncRunnerVersions();
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
   document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
   document.querySelector(".workbench").classList.toggle("empty-chat-mode", workspaceUI.mode === "chats" && !workspaceHasConversation());
@@ -774,6 +773,7 @@ function workspaceRoleListSelection() {
   return element.closest(".role-entry") ? selection : null;
 }
 function renderWorkspaceList() {
+  syncRunnerVersions();
   // 有选区时暂缓重建：轮询/事件重绘会替换列表节点，把用户正在框选的文字清掉。
   // 选区消失后由 selectionchange 补一次重绘，状态不会长期滞后。
   if (workspaceRoleListSelection()) { workspaceUI.listRenderDeferred = true; return; }
@@ -801,7 +801,7 @@ function renderWorkspaceList() {
     // 选中角色失效（移出名册/禁用/切项目）时回退到“项目设置”，不保留无效选择、不自动改选其它角色。
     if (!roles.some(role => role.member_id === workspaceUI.selectedRole)) {
       workspaceUI.selectedRole = null;
-      if (workspaceUI.roleSelection === "role") workspaceUI.roleSelection = "settings";
+      if (workspaceUI.roleSelection === "role") { workspaceUI.roleSelection = "settings"; syncRunnerVersions(); }
     }
     // 固定首项“项目设置”：独立导航项，不参与角色搜索过滤，名册为空时也可达。
     const settingsRow = workspaceButton("", () => {
@@ -2091,6 +2091,7 @@ function controllerModeVersionSafe() { return Number.isSafeInteger(controllerMod
 function controllerModeKnown(mode) { return Object.prototype.hasOwnProperty.call(CONTROLLER_MODE_LABELS, mode); }
 // 项目级面板可见性统一由 renderTaskDetailsPanel() 同步（app.js），与开发要求编辑区同一同步点。
 function renderControllerModePanel() {
+  if (typeof syncRunnerVersions === "function") syncRunnerVersions();
   const panel = controllerModeEl("controller-mode-panel");
   if (!panel) return;
   const visible = blackboardOpen && workspaceUI.mode === "roles" && workspaceSettingsSelected() && Boolean(activeProjectId) && Boolean(myId);

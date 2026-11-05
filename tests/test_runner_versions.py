@@ -63,10 +63,51 @@ class VersionTests(unittest.TestCase):
         with patch.object(versions, "_probe", return_value=("0.164.0", "")):
             response = client.get("/api/runners/versions")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([r["runtime"] for r in response.json()], ["codex", "workbuddy"])
+        self.assertEqual([r["runtime"] for r in response.json()], ["codex", "kimi-code", "dsh", "workbuddy"])
+        self.assertEqual(response.json()[0]["display_name"], "Codex")
         self.assertEqual(client.post("/api/runners/versions").status_code, 405)
         # /{runner_id} PATCH remains the existing registry contract, not a versions writer.
         self.assertNotIn("patch", app.openapi()["paths"]["/api/runners/versions"])
+
+
+    def test_canonical_and_extra_runtimes(self):
+        app = FastAPI()
+        app.include_router(router)
+        rows = []
+        class Session:
+            def exec(self, query):
+                return SimpleNamespace(all=lambda: rows)
+        app.dependency_overrides[get_session] = lambda: Session()
+        app.dependency_overrides[get_current_member] = lambda: SimpleNamespace(kind="agent")
+        client = TestClient(app)
+        with patch.object(versions, "_probe", return_value=(None, "")):
+            result = client.get("/api/runners/versions").json()
+            self.assertEqual([(r["runtime"], r["display_name"]) for r in result], [
+                ("codex", "Codex CLI"), ("kimi-code", "Kimi Code"),
+                ("dsh", "DeepSeek Harness"), ("workbuddy", "WorkBuddy"),
+            ])
+            rows.extend([SimpleNamespace(runtime="codex", display_name="Registered Codex"),
+                         SimpleNamespace(runtime="codex", display_name="Later Codex"),
+                         SimpleNamespace(runtime="custom-x", display_name="Custom")])
+            result = client.get("/api/runners/versions").json()
+        self.assertEqual([r["runtime"] for r in result],
+                         ["codex", "kimi-code", "dsh", "workbuddy", "custom-x"])
+        self.assertEqual(result[0]["display_name"], "Registered Codex")
+        self.assertEqual(result[-1]["display_name"], "Custom")
+        for row in result:
+            self.assertTrue({"adapted_version", "adapted_source", "detected_version", "status", "detail"} <= row.keys())
+
+    def test_html_requires_revalidation_without_changing_static_resources(self):
+        from server.main import app
+        client = TestClient(app)
+        response = client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("cache-control"), "no-cache")
+        js = client.get("/workspace.js")
+        self.assertEqual(js.status_code, 200)
+        self.assertNotIn("no-cache", js.headers.get("cache-control", "").lower())
+        conditional = client.get("/", headers={"If-None-Match": response.headers["etag"]})
+        self.assertEqual(conditional.status_code, 304)
 
 
 if __name__ == "__main__":

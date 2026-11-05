@@ -71,16 +71,22 @@ def list_runner_versions(
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
-    """按已登记 runtime 去重，返回只读版本探测结果。"""
+    """Return version information for canonical and registered runtimes."""
     runners = session.exec(select(RunnerRegistry).order_by(RunnerRegistry.runner_id)).all()
-    seen = set()
-    result = []
+    names = {
+        "codex": "Codex CLI",
+        "kimi-code": "Kimi Code",
+        "dsh": "DeepSeek Harness",
+        "workbuddy": "WorkBuddy",
+    }
+    registered = {}
     for runner in runners:
-        if runner.runtime in seen:
-            continue
-        seen.add(runner.runtime)
-        result.append({"runtime": runner.runtime, "display_name": runner.display_name, **get_version(runner.runtime)})
-    return result
+        registered.setdefault(runner.runtime, runner.display_name)
+    names.update(registered)
+    return [
+        {"runtime": runtime, "display_name": name, **get_version(runtime)}
+        for runtime, name in names.items()
+    ]
 
 
 @router.post("", response_model=RunnerOut, status_code=status.HTTP_201_CREATED)
