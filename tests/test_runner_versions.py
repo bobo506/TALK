@@ -1,4 +1,6 @@
 import subprocess
+import tempfile
+from pathlib import Path
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -40,6 +42,51 @@ class VersionTests(unittest.TestCase):
         versions.clear_cache()
         with patch.object(versions.shutil, "which", side_effect=OSError()):
             self.assertEqual(versions.get_version("codex")["status"], "unknown")
+
+    def test_workbuddy_probe_success_and_isolated_config(self):
+        observed = {}
+        def run(args, **kwargs):
+            env = kwargs["env"]
+            config = Path(env["CODEBUDDY_CONFIG_DIR"])
+            self.assertTrue(config.is_dir())
+            self.assertEqual(config.parent, Path(tempfile.gettempdir()))
+            self.assertEqual(env["WORKBUDDY_CONFIG_DIR"], str(config))
+            for key in ("ELECTRON_RUN_AS_NODE", "CODEBUDDY_FORCE_LITE_WB_BUNDLE",
+                        "DISABLE_AUTOUPDATER", "CODEBUDDY_REMOTE_CONFIG_DISABLED",
+                        "CODEBUDDY_CODE_DISABLE_BACKGROUND_TASKS"):
+                self.assertEqual(env[key], "1")
+            self.assertEqual(args[-1], "--version")
+            self.assertEqual(kwargs["timeout"], 5)
+            observed["config"] = config
+            return subprocess.CompletedProcess(args, 0, stdout=b"2.165.0\n", stderr=b"")
+        exe = Path(versions.os.environ.get("LOCALAPPDATA", "")) / "Programs/WorkBuddy/WorkBuddy.exe"
+        asar = exe.parent / "resources/app.asar"
+        checked = []
+        def is_file(path):
+            checked.append(path)
+            return path in (exe, asar)
+        with patch.object(Path, "is_file", autospec=True, side_effect=is_file), patch.object(versions.subprocess, "run", side_effect=run) as process:
+            result = versions.get_version("workbuddy")
+        self.assertEqual(checked, [exe, asar])
+        self.assertEqual(Path(process.call_args.args[0][1]), asar / "cli/bin/codebuddy")
+        self.assertEqual((result["detected_version"], result["status"], result["adapted_version"]),
+                         ("2.165.0", "match", "2.165.0"))
+        self.assertFalse(observed["config"].exists())
+
+    def test_workbuddy_probe_failures(self):
+        for files in ([False], [True, False]):
+            with self.subTest(files=files), patch.object(Path, "is_file", side_effect=files):
+                self.assertEqual(versions._probe_workbuddy(), (None, "未找到 WorkBuddy"))
+        cases = [
+            (subprocess.TimeoutExpired("workbuddy", 5), "探测超时"),
+            (subprocess.CompletedProcess([], 1, stdout=b"", stderr=b""), "版本命令执行失败"),
+            (subprocess.CompletedProcess([], 0, stdout=b"no version", stderr=b""), "无法解析版本"),
+        ]
+        for outcome, detail in cases:
+            with self.subTest(detail=detail), patch.object(Path, "is_file", return_value=True):
+                options = {"side_effect": outcome} if isinstance(outcome, Exception) else {"return_value": outcome}
+                with patch.object(versions.subprocess, "run", **options):
+                    self.assertEqual(versions._probe_workbuddy(), (None, detail))
 
     def test_cache_and_clear(self):
         with patch.object(versions, "_probe", return_value=("0.164.0", "")) as probe:
