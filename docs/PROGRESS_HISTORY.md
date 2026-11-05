@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 00:05 — hy4 复核卡死中止；450 连通性验证；451 重派；448 complete
+
+- **448 交付 complete**：`prompt_once` 改为 daemon 线程 + 统一 deadline；T1 首轮滴流 1.203s 抛 `workbuddy_acp_timeout`、T2 修复轮滴流 1.219s 返回首轮并 normalize 为 partial；150 项 OK/32.5s，`git diff --check` 干净；候选 7 文件冻结（diff blob `a0fddd2280abaa933baa5f0a34254465e2b45cba`，HEAD `e83a91c`）。
+- **449 复核卡死**：hy4 ACP shim `PID 11056` 自 21:59 存活约 2 小时，累计 CPU 7.1s、8 秒采样 CPU/内存零增长，到 ACP `127.0.0.1:50750` 的 TCP 仍 Established；根因是**已部署代码没有总时长硬截止**（`--timeout 600` 仅为单次 read），WorkBuddy 持续 keepalive 使读取不断重置。经用户授权终止该 shim；449 变为 failed/blocked（结果 3227，failed 任务不支持普通 collect）。
+- **450 连通性验证**：hy4 80s 返回 `HY4_OK`，`talk-delivery-1` complete，已收取。
+- **451 重派**：同一候选与 diff hash 重新派 hy4 复核 448；复核材料目录 `hy4-retry`；等待 job 上限 20 分钟，超时则按用户指定改派 k2.8。
+- **未验证**：451 复核结论；真实 WorkBuddy 桌面硬截止（需部署重启角色）；hy4 卡死根因（后续单独核查）。
+
 ## 2026-11-05 21:55 — 447 partial→448 返修；主动等待预算修正；旧 worktree/分支归档删除
 
 - **447 交付 partial**：核心实现完成（同会话一次修复、general 注入 flags、review/test 不注入、fake ACP 测试 147 项通过、文档），但严格 `--timeout` 硬截止未满足（每行检查 + 单次 read 超时会被 SSE 滴流重置）；Terra 自报 2 项未完成，未冒充 complete。
