@@ -1,4 +1,6 @@
 ﻿import json
+import contextlib
+import io
 import os
 import subprocess
 import sys
@@ -43,10 +45,29 @@ class Handler(BaseHTTPRequestHandler):
             result={'configOptions':[{'id':params['configId'],'currentValue':'wrong' if self.server.bad_config in (True, params['configId']) else params['value']}]}
         elif method=='session/prompt':
             self.server.prompt_text=params['prompt'][0]['text']
+            index = len([x for x in self.server.writes if x[0] == 'session/prompt'])
+            script = self.server.script[index] if index < len(self.server.script) else {}
             if self.server.requests:
                 events.extend([{'jsonrpc':'2.0','id':901,'method':'session/request_permission','params':{}}, {'jsonrpc':'2.0','id':902,'method':'unknown/request','params':{}}])
             self.server.writes.append((method,params['sessionId']))
-            events.extend([{'method':'session/update','params':{'sessionId':'active','update':{'sessionUpdate':'agent_message_chunk','content':{'type':'text','text':'PRIVATE_DESKTOP'}}}}, {'method':'session/update','params':{'sessionId':'talk','update':{'sessionUpdate':'agent_message_chunk','content':{'type':'text','text':self.server.output}}}}, {'method':'session/update','params':{'sessionId':'talk','update':{'sessionUpdate':'usage_update','_meta':{'usage':{'credits':0.1}}}}}]); result={'stopReason':'end_turn'}
+            events.extend([{'method':'session/update','params':{'sessionId':'active','update':{'sessionUpdate':'agent_message_chunk','content':{'type':'text','text':'PRIVATE_DESKTOP'}}}}, {'method':'session/update','params':{'sessionId':'talk','update':{'sessionUpdate':'agent_message_chunk','content':{'type':'text','text':script.get('output', self.server.output)}}}}, {'method':'session/update','params':{'sessionId':'talk','update':{'sessionUpdate':'usage_update','_meta':{'usage':{'credits':0.1}}}}}]); result={'stopReason':script.get('stopReason','end_turn')}
+        if method == 'session/prompt' and script.get('drip_interval'):
+            event = {'method':'session/update','params':{'sessionId':'talk','update':{'sessionUpdate':'agent_message_chunk','content':{'type':'text','text':'x'}}}}
+            chunk = ('data: ' + json.dumps(event) + '\n\n').encode()
+            final = ('data: ' + json.dumps({'jsonrpc':'2.0','id':ident,'result':result}) + '\n\n').encode()
+            count = script.get('drip_count', 25)
+            fragmented = script.get('fragmented', False)
+            if fragmented:
+                chunk = b'x'
+                final = b'\n\n' + final
+            self.send_response(200); self.send_header('Content-Type','text/event-stream'); self.send_header('Content-Length',str(len(chunk)*count+len(final)+(1 if fragmented else 0))); self.end_headers()
+            try:
+                if fragmented: self.wfile.write(b':')
+                for _ in range(count):
+                    self.wfile.write(chunk); self.wfile.flush(); time.sleep(script['drip_interval'])
+                self.wfile.write(final)
+            except OSError: pass
+            return
         events.append({'jsonrpc':'2.0','id':ident,'result':result})
         raw=(('data: bad-json\n\n' if self.server.bad_sse else ''.join('data: '+json.dumps(event)+'\n\n' for event in events))).encode()
         self.send_response(200); self.send_header('Content-Type','text/event-stream'); self.send_header('Content-Length',str(len(raw))); self.end_headers()
@@ -56,11 +77,145 @@ class Handler(BaseHTTPRequestHandler):
 class Tests(unittest.TestCase):
     def setUp(self):
         self.s=ThreadingHTTPServer(('127.0.0.1',0),Handler); self.s.new_count=0; self.s.same=False; self.s.bad_config=False; self.s.bad_auth=False; self.s.bad_sse=False; self.s.slow=False; self.s.writes=[]; self.s.output="OK"; self.s.delete_fail=False; self.s.deletes=0; self.s.requests=False; self.s.replies=[]
+        self.s.script=[]
         self.thread=threading.Thread(target=self.s.serve_forever,daemon=True); self.thread.start(); self.endpoint='http://127.0.0.1:'+str(self.s.server_port)
     def tearDown(self): self.s.shutdown(); self.s.server_close(); self.thread.join()
     def prompt(self, **kwargs): return acp.prompt_once('m','hello',mode='chat',project_root=Path.cwd(),endpoint=self.endpoint,**kwargs)
     def test_isolation(self):
         result=self.prompt(); self.assertEqual(result['text'],'OK'); self.assertEqual(result['usage'],{'credits':.1}); self.assertEqual(result['stopReason'],'end_turn'); self.assertEqual(self.s.writes,[('session/set_config_option','talk'),('session/set_config_option','talk'),('session/prompt','talk')])
+    def test_hard_deadline_first_drip(self):
+        self.s.script = [{'drip_interval': .2, 'drip_count': 25}]
+        start = time.monotonic()
+        with self.assertRaises(acp.AcpError) as cm:
+            self.prompt(timeout=1.2)
+        elapsed = time.monotonic() - start
+        print(f'T1 elapsed={elapsed:.3f}s', file=sys.stderr)
+        self.assertEqual(cm.exception.code, 'workbuddy_acp_timeout')
+        self.assertLessEqual(elapsed, 1.7)
+
+    def test_hard_deadline_fragmented_sse_line(self):
+        # A byte drip keeps the HTTP read alive while iter_lines yields nothing.
+        self.s.script = [{'drip_interval': .2, 'drip_count': 25, 'fragmented': True}]
+        start = time.monotonic()
+        with self.assertRaises(acp.AcpError) as cm:
+            self.prompt(timeout=1.2)
+        self.assertEqual(cm.exception.code, 'workbuddy_acp_timeout')
+        self.assertLessEqual(time.monotonic() - start, 1.7)
+
+    def test_hard_deadline_repair_drip(self, fragmented=False):
+        from bridges.cli_bridge import CliRunResult, normalize_task_delivery
+        from scripts.workbuddy_acp_prompt import has_valid_delivery
+        self.s.script = [{'output':'bad'}, {'drip_interval': .2, 'drip_count': 25, 'fragmented': fragmented}]
+        stderr = io.StringIO()
+        start = time.monotonic()
+        # Exercise the same branch with a short budget; production reserve remains 60s.
+        with patch.object(acp, '_REPAIR_MIN_SECONDS', 0), contextlib.redirect_stderr(stderr):
+            result = self.prompt(timeout=2.2, repair_validator=lambda output: has_valid_delivery(output, 448), repair_prompt='repair')
+        elapsed = time.monotonic() - start
+        print(f'T2 elapsed={elapsed:.3f}s', file=sys.stderr)
+        self.assertLessEqual(elapsed, 2.7)
+        self.assertEqual(result['text'], 'bad')
+        self.assertIn('repair=timeout', stderr.getvalue())
+        self.assertEqual([sid for method,sid in self.s.writes if method=='session/prompt'], ['talk', 'talk'])
+        normalized = normalize_task_delivery(CliRunResult(0, result['text'], ''), task_id=448)
+        self.assertEqual(json.loads(normalized)['conclusion'], 'partial')
+
+    def test_hard_deadline_repair_fragmented_drip(self):
+        self.test_hard_deadline_repair_drip(fragmented=True)
+
+    def test_repair_timeout_exception_classification(self):
+        from bridges.cli_bridge import CliRunResult, normalize_task_delivery
+        original = acp._Client.rpc
+        for error in (acp.AcpError('workbuddy_acp_timeout'), acp.httpx.ReadTimeout('read')):
+            with self.subTest(error=type(error).__name__):
+                self.s.writes.clear()
+                self.s.script = [{'output': 'bad'}]
+                def rpc(client, method, *args, **kwargs):
+                    if method == 'session/prompt' and any(m == 'session/prompt' for m, _ in self.s.writes):
+                        raise error
+                    return original(client, method, *args, **kwargs)
+                stderr = io.StringIO()
+                with patch.object(acp._Client, 'rpc', rpc), contextlib.redirect_stderr(stderr):
+                    result = self.prompt(repair_validator=lambda _: False, repair_prompt='repair')
+                self.assertEqual(result['text'], 'bad')
+                self.assertIn('repair=timeout', stderr.getvalue())
+                self.assertNotIn('repair=failed', stderr.getvalue())
+                self.assertEqual(json.loads(normalize_task_delivery(CliRunResult(0, result['text'], ''), task_id=448))['conclusion'], 'partial')
+
+    def test_deadline_during_first_validation_returns_fallback(self):
+        from bridges.cli_bridge import CliRunResult, normalize_task_delivery
+        self.s.script = [{'output': 'bad'}]
+        entered = threading.Event()
+        release = threading.Event()
+        def validator(_):
+            entered.set()
+            release.wait(5)
+            return False
+        stderr = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(stderr):
+                result = self.prompt(timeout=1.5, repair_validator=validator, repair_prompt='repair')
+        finally:
+            release.set()
+        self.assertTrue(entered.is_set())
+        self.assertEqual(result['text'], 'bad')
+        self.assertIn('repair=timeout', stderr.getvalue())
+        self.assertEqual(json.loads(normalize_task_delivery(CliRunResult(0, result['text'], ''), task_id=448))['conclusion'], 'partial')
+
+    def test_repair_paths(self):
+        validator = lambda text: text == 'valid'
+        for first, second, timeout, expected, count in [('bad', 'valid', 600, 'valid', 2), ('valid', 'bad', 600, 'valid', 1), ('bad', 'bad2', 600, 'bad', 2), ('bad', 'valid', 1, 'bad', 1)]:
+            with self.subTest(first=first, second=second, timeout=timeout):
+                self.s.writes.clear(); self.s.script=[{'output':first}, {'output':second}]
+                result=self.prompt(timeout=timeout, repair_validator=validator, repair_prompt='repair')
+                self.assertEqual(result['text'],expected)
+                self.assertEqual([sid for method,sid in self.s.writes if method=='session/prompt'], ['talk']*count)
+                if count == 2: self.assertAlmostEqual(result['usage']['credits'], .2)
+    def test_repair_non_end_turn_and_default(self):
+        self.s.script=[{'output':'bad','stopReason':'max_tokens'}]
+        with self.assertRaises(acp.AcpError): self.prompt(repair_validator=lambda _: False, repair_prompt='repair')
+        self.assertEqual(len([x for x in self.s.writes if x[0]=='session/prompt']),1)
+        self.s.writes.clear(); self.s.script=[{'output':'bad'}, {'output':'valid'}]
+        self.assertEqual(self.prompt()['text'],'bad')
+        self.assertEqual(len([x for x in self.s.writes if x[0]=='session/prompt']),1)
+        self.s.writes.clear()
+        result = acp.prompt_once('m', 'hello', mode='plan', project_root=Path.cwd(), endpoint=self.endpoint)
+        self.assertEqual(result['text'], 'bad')
+        self.assertEqual(len([x for x in self.s.writes if x[0]=='session/prompt']),1)
+    def test_shim_valid_delivery_without_repair(self):
+        from tests.test_workbuddy_delivery import report
+        from bridges.cli_bridge import CliRunResult, normalize_task_delivery
+        cmd = [sys.executable, '-B', '-m', 'scripts.workbuddy_acp_prompt', '--model', 'm', '--mode', 'task', '--project-root', str(Path.cwd()), '--endpoint', self.endpoint, '--delivery-contract', '--expect-task-id', '443']
+        for conclusion, embedded in [('complete', True), ('partial', True), ('complete', False)]:
+            with self.subTest(conclusion=conclusion, embedded=embedded):
+                value = report()
+                value['conclusion'] = conclusion
+                if conclusion == 'partial':
+                    value['unfinished'] = ['pending']
+                good = json.dumps(value, ensure_ascii=False)
+                raw = f'\u524d\u8a00 {good} \u540e\u8bb0' if embedded else good
+                self.s.writes.clear()
+                self.s.script = [{'output': raw}, {'output': 'unexpected repair'}]
+                result = subprocess.run(cmd, input=b'hello', capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                output = result.stdout.decode('utf-8').rstrip('\n')
+                self.assertEqual(output, raw)
+                self.assertEqual(len([x for x in self.s.writes if x[0] == 'session/prompt']), 1)
+                normalized = normalize_task_delivery(CliRunResult(0, output, ''), task_id=443)
+                self.assertEqual(json.loads(normalized)['conclusion'], conclusion)
+
+    def test_shim_repair_exit_zero(self):
+        from tests.test_workbuddy_delivery import report
+        from bridges.cli_bridge import CliRunResult, normalize_task_delivery
+        good=json.dumps(report(),ensure_ascii=False)
+        cmd=[sys.executable,'-B','-m','scripts.workbuddy_acp_prompt','--model','m','--mode','task','--project-root',str(Path.cwd()),'--endpoint',self.endpoint,'--delivery-contract','--expect-task-id','443']
+        for second, expected in [(good,good), ('bad2','bad')]:
+            self.s.writes.clear(); self.s.script=[{'output':'bad'}, {'output':second}]
+            p=subprocess.run(cmd,input=b'hello',capture_output=True)
+            self.assertEqual(p.returncode,0,p.stderr); self.assertEqual(p.stdout.decode('utf-8').rstrip('\n'),expected)
+            normalized = normalize_task_delivery(CliRunResult(0,p.stdout.decode('utf-8'),''),task_id=443)
+            self.assertEqual(json.loads(normalized)['conclusion'], 'complete' if second == good else 'partial')
+            self.assertEqual(len([x for x in self.s.writes if x[0]=='session/prompt']),2)
     def test_duplicate(self):
         self.s.same=True
         with self.assertRaises(acp.AcpError) as cm: self.prompt()
@@ -77,7 +232,7 @@ class Tests(unittest.TestCase):
     def test_failures(self):
         for attr,code in [('bad_auth','workbuddy_acp_connect_failed'),('bad_sse','workbuddy_acp_initialize_failed'),('slow','workbuddy_acp_timeout')]:
             setattr(self.s,attr,True)
-            with self.assertRaises(acp.AcpError) as cm: self.prompt(timeout=.05)
+            with self.assertRaises(acp.AcpError) as cm: self.prompt(timeout=.05 if attr == 'slow' else 2)
             self.assertEqual(cm.exception.code,code); self.assertNotIn('PRIVATE',str(cm.exception)); setattr(self.s,attr,False)
     def test_discovery(self):
         acp._endpoint=None

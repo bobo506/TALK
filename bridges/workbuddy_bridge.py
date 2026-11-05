@@ -108,8 +108,16 @@ def make_effort_hook(client: Any, args: argparse.Namespace):
     from bridges.codex_effort import apply_effort
     from bridges.kimi_effort import resolve_target_effort
 
+    original_command = getattr(args, "task_command", None) or getattr(args, "command", None)
+    original_command = list(original_command) if isinstance(original_command, list) else original_command
+
     async def apply_effort_hook(task: Any) -> None:
-        del task
+        command = list(original_command) if isinstance(original_command, list) else original_command
+        if isinstance(command, list) and "scripts.workbuddy_acp_prompt" in command:
+            if (getattr(args, "delivery_contract", False) and isinstance(task, dict)
+                    and (task.get("task_kind") or "general") == "general" and task.get("id") is not None):
+                command += ["--delivery-contract", "--expect-task-id", str(task["id"])]
+            args.task_command = command
         project = str(
             getattr(args, "project_id", None) or os.environ.get("TALK_PROJECT_ID") or ""
         ).strip()

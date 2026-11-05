@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
+import threading
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -88,8 +90,16 @@ class _Client:
         self.headers = {'X-CodeBuddy-Request':'1', 'Accept':'application/json, text/event-stream'}
         self.counter = 0
         self.connected = False
+        self.deadline = None
+    def _bound_timeout(self):
+        if self.deadline is not None:
+            remaining = self.deadline - time.monotonic()
+            if remaining <= 0:
+                raise AcpError('workbuddy_acp_timeout')
+            self.client.timeout = httpx.Timeout(remaining)
     def connect(self):
         try:
+            self._bound_timeout()
             r = self.client.post(self.endpoint + '/api/v1/acp/connect', headers=self.headers, json={})
             r.raise_for_status(); data = r.json()
             if not data.get('connectionId') or not data.get('sessionToken'):
@@ -103,6 +113,7 @@ class _Client:
     def disconnect(self):
         try:
             if self.connected:
+                self._bound_timeout()
                 r = self.client.delete(self.endpoint + '/api/v1/acp', headers=self.headers)
                 r.raise_for_status()
         except httpx.HTTPError:
@@ -113,6 +124,7 @@ class _Client:
         self.counter += 1; request_id = self.counter
         chunks = []; usage = None; result = None; found = False
         try:
+            self._bound_timeout()
             with self.client.stream('POST', self.endpoint + '/api/v1/acp', headers=self.headers, json={'jsonrpc':'2.0','id':request_id,'method':method,'params':params}) as response:
                 response.raise_for_status()
                 content_type = response.headers.get('content-type', '')
@@ -144,6 +156,8 @@ class _Client:
                         if 'error' in obj or not isinstance(obj.get('result'), dict): raise ValueError()
                         result = obj['result']; found = True
                 for line in response.iter_lines():
+                    if self.deadline is not None and time.monotonic() >= self.deadline:
+                        raise AcpError('workbuddy_acp_timeout')
                     if not line:
                         if data_lines:
                             handle('\n'.join(data_lines)); data_lines = []
@@ -174,10 +188,61 @@ def _root(project_root):
     if not path.is_dir(): raise AcpError('workbuddy_acp_invalid_project_root')
     return path
 
-def prompt_once(model_id, text, *, mode, project_root, effort=None, timeout=600, endpoint=None):
+def _merge_usage(first, second):
+    # Only fields present in both rounds can be safely reported as totals.
+    if not isinstance(first, dict) or not isinstance(second, dict):
+        return None
+    return {key: value + second[key] for key, value in first.items()
+            if key in second and isinstance(value, (int, float)) and not isinstance(value, bool)
+            and isinstance(second[key], (int, float)) and not isinstance(second[key], bool)}
+
+
+_REPAIR_MIN_SECONDS = 60
+
+
+def prompt_once(model_id, text, *, mode, project_root, effort=None, timeout=600, endpoint=None,
+                repair_validator=None, repair_prompt=None):
+    """Bound the complete ACP operation by one wall-clock deadline.
+
+    A timed-out daemon worker may remain alive until its I/O unblocks; in-process
+    callers must not rely on that worker having been cleaned up on return.
+    """
+    started = time.monotonic()
+    deadline = started + timeout
+    state = {}
+    expired = threading.Event()
+    def work():
+        try:
+            state['result'] = _prompt_once_impl(model_id, text, mode=mode, project_root=project_root,
+                effort=effort, timeout=timeout, endpoint=endpoint, repair_validator=repair_validator,
+                repair_prompt=repair_prompt, started=started, deadline=deadline, state=state, expired=expired)
+        except BaseException as exc:
+            state['error'] = exc
+    worker = threading.Thread(target=work, daemon=True)
+    worker.start()
+    worker.join(max(0, deadline - time.monotonic()))
+    if worker.is_alive():
+        expired.set()
+        client = state.get('client')
+        if client is not None:
+            # Closing an httpx stream can itself block, so never do it on the caller.
+            threading.Thread(target=client.client.close, daemon=True).start()
+        if 'repair_fallback' in state:
+            print('[workbuddy-acp] repair=timeout', file=sys.stderr)
+            return {**state['repair_fallback'], 'elapsed': time.monotonic() - started}
+        raise AcpError('workbuddy_acp_timeout')
+    if 'error' in state:
+        raise state['error']
+    return state['result']
+
+
+def _prompt_once_impl(model_id, text, *, mode, project_root, effort, timeout, endpoint,
+                      repair_validator, repair_prompt, started, deadline, state, expired):
     if not model_id or mode not in ('chat','plan','task') or not isinstance(text,str) or not text.strip():
         raise AcpError('workbuddy_acp_invalid_input')
-    root = _root(project_root); started = time.monotonic(); client = _Client(endpoint, timeout)
+    root = _root(project_root); client = _Client(endpoint, timeout)
+    state['client'] = client
+    client.deadline = deadline
     try:
         client.connect(); client.initialize()
         first = client.new(root).get('sessionId'); second = client.new(root).get('sessionId')
@@ -191,6 +256,42 @@ def prompt_once(model_id, text, *, mode, project_root, effort=None, timeout=600,
             text = f'项目根目录为 {root}。进程默认 cwd 不是本项目。所有 Shell 命令先执行 Set-Location -LiteralPath "{safe_root}"（cmd 使用 cd /d "{root}"）；文件工具使用绝对路径，不要读写项目根之外。\n\n' + text
         result, output, usage = client.rpc('session/prompt', {'sessionId':second,'prompt':[{'type':'text','text':text}]}, 'workbuddy_acp_prompt_failed', second)
         if result.get('stopReason') != 'end_turn': raise AcpError('workbuddy_acp_prompt_failed')
+        if repair_validator is not None and repair_prompt is not None:
+            state['repair_fallback'] = {'text': output, 'usage': usage, 'stopReason': result['stopReason'], 'modelId': model_id, 'sessionId': second}
+        if repair_validator is not None and repair_prompt is not None:
+            repair_started = time.monotonic()
+            status = 'unneeded'
+            try:
+                if not repair_validator(output):
+                    remaining = timeout - (time.monotonic() - started)
+                    if remaining <= 0:
+                        state['repair_deadline_tripped'] = True
+                        status = 'timeout'
+                    elif remaining < _REPAIR_MIN_SECONDS:
+                        status = 'skipped_budget'
+                    else:
+                        status = 'failed'
+                        client.client.timeout = httpx.Timeout(remaining)
+                        repaired, repaired_text, repaired_usage = client.rpc(
+                            'session/prompt', {'sessionId': second, 'prompt': [{'type': 'text', 'text': repair_prompt}]},
+                            'workbuddy_acp_prompt_failed', second)
+                        usage = _merge_usage(usage, repaired_usage)
+                        if time.monotonic() >= deadline:
+                            state['repair_deadline_tripped'] = True
+                            status = 'timeout'
+                        elif (repaired.get('stopReason') == 'end_turn'
+                                and repair_validator(repaired_text)):
+                            output = repaired_text
+                            status = 'succeeded'
+            except Exception as exc:
+                if ((isinstance(exc, AcpError) and exc.code == 'workbuddy_acp_timeout')
+                        or isinstance(exc, httpx.TimeoutException) or time.monotonic() >= deadline):
+                    state['repair_deadline_tripped'] = True
+                    status = 'timeout'
+                else:
+                    status = 'failed'
+            if not expired.is_set():
+                print(f'[workbuddy-acp] repair={status} elapsed={time.monotonic()-repair_started:.2f}s', file=sys.stderr)
         return {'text':output,'usage':usage,'stopReason':result['stopReason'],'modelId':model_id,'sessionId':second,'elapsed':time.monotonic()-started}
     finally:
         try:

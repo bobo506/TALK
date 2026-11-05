@@ -17,6 +17,25 @@ def report():
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_acp_flags_per_task(self):
+        import argparse
+        from bridges.workbuddy_bridge import build_acp_command, make_effort_hook
+        async def run():
+            base=build_acp_command('m','task',str(Path.cwd()))
+            args=argparse.Namespace(task_command=base, command=['chat'], delivery_contract=True, project_id='', name='x')
+            hook=make_effort_hook(AsyncMock(),args)
+            with patch.dict('os.environ', {'TALK_PROJECT_ID':''}):
+                for kind, task_id in [('general',443),('review',444),('test',445),('general',446)]:
+                    await hook({'id':task_id,'task_kind':kind})
+                    if kind == 'general':
+                        self.assertEqual(args.task_command,base+['--delivery-contract','--expect-task-id',str(task_id)])
+                    else:
+                        self.assertEqual(args.task_command,base)
+                args.delivery_contract=False
+                await hook({'id':447,'task_kind':'general'})
+                self.assertEqual(args.task_command,base)
+        asyncio.run(run())
+
     def test_prompt_modes(self):
         for runtime, member in [("cli", "agent:x"), ("codex", "agent:codex")]:
             for kind in ("general", "review", "test"):
@@ -42,6 +61,26 @@ class DeliveryTests(unittest.TestCase):
             output = normalize_task_delivery(result, task_id=443)
             self.assertEqual(parse_delivery_report(output, expect_task_id=443).kind, "valid")
             self.assertEqual(json.loads(output)["conclusion"], "blocked")
+
+    def test_embedded_validator_matches_normalization(self):
+        from scripts.workbuddy_acp_prompt import has_valid_delivery
+        first = report()
+        last = report()
+        last['conclusion'] = 'partial'
+        last['unfinished'] = ['pending']
+        wrong = report()
+        wrong['task_id'] = '444'
+        encode = lambda value: json.dumps(value, ensure_ascii=False)
+        for raw, expected, conclusion in [
+            (f'\u524d\u8a00 {encode(first)} middle {encode(last)} \u540e\u8bb0', True, 'partial'),
+            (f'\u524d\u8a00 {encode(first)} \u540e\u8bb0 {encode(wrong)}', True, 'complete'),
+            (f'\u524d\u8a00 {encode(wrong)} \u540e\u8bb0', False, 'partial'),
+            ('prefix {invalid} suffix', False, 'partial'),
+        ]:
+            with self.subTest(raw=raw):
+                self.assertEqual(has_valid_delivery(raw, 443), expected)
+                result = normalize_task_delivery(CliRunResult(0, raw, ''), task_id=443)
+                self.assertEqual(json.loads(result)['conclusion'], conclusion)
 
     def test_schema_compatibility_and_redaction(self):
         incompatible = report()
