@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-05 19:45 — WorkBuddy 内置模型思考强度（436/438，K2.8 复核 PASS，待 API 重载/用户验收）
+
+- **需求**：WorkBuddy 桌面端内置模型有强度选项；TALK 角色详情也要能选，并作用于下一次任务执行。
+- **实测**：ACP `thought_level` 按模型不同——`deepseek-v4.1-flash` / `glm-5.3-flash` = `low/high/max/enabled`；`hy4free` = `high/enabled`；`enabled` 表示模型默认，不作为 TALK 档位。
+- **实现**：`bridges/workbuddy_acp.py` 新增只读 `probe_effort_options`（同一连接两次 `session/new`，仅第二个 set model，绝不 prompt；读 `configOptions.thought_level`，排除 enabled，canonical 顺序）；新增 `server/workbuddy_effort.py` 按模型缓存（成功 600s/失败 60s）与 single-flight；`server/models.py::resolve_role_effort` 接受 runtime options（catalog 优先 → runtime → adapter）；`server/routes/projects.py` 在 `/agents`、单绑定 GET/PUT、`/roles` 统一 enrichment；前端在无 effective 时增加“跟随模型默认”空选项，保存 null；版本串 `20261105-workbuddy-effort-v1`。
+- **首轮复核**：K2.8 六项 PASS，唯一 NEEDS_CHANGES——探测在全局锁内可阻塞最长 60s。Terra 438 改为网络探测出全局锁 + 按模型 Event single-flight；K2.8 定向复验 PASS。
+- **验证**：52 Python（50 回归 + 2 并发）/29 Node 通过；真实探测 deepseek/glm = `low/high/max`，hy4 = `high`；`git diff --check` 干净；两轮复核报告均为“说明 + 围栏 JSON” invalid，协调者按原文证据核过，不追改。
+- **限制**：运行中的 API 未重载，页面暂不显示新强度选项；未做真实浏览器/任务执行；探测依赖桌面运行/登录，且会创建不可清理的只读会话；聊天消息不使用该强度（仅任务执行）。
+- **提交**：`43de6f4`（代码/测试）；文档随后；本片与第 3/4 项一起推送待定。
+
 ## 2026-11-05 17:10 — WorkBuddy 内置模型 ACP 通道（432/433，K2.8 复核 PASS，待用户验收）
 
 - **需求**：TALK 的 WorkBuddy 角色可直接使用桌面 WorkBuddy 账号自带的内置模型（如 `deepseek-v4.1-flash`），不再必须自备 `models.json` 自定义 API Key，按桌面额度计费。
