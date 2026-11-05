@@ -9,7 +9,7 @@
 - **结构化交付 446（极简 JSON）**：文件 `result2.txt` 17 字节 `USER_DELIVERY_OK2` 正确；模型输出合法 `talk-delivery-1`，`conclusion=complete`，Task Hall 显示 complete。
 - **结论**：四项均已上线验证；结构化交付对“模型输出在预算内”有效，超长/截断时诚实降级。若需稳定 complete，可另开“格式修复回合”小片（本片不做）。
 - **用户验收**：2026-11-05 用户确认四项验收通过；428 已正常收取。
-- **流程缺口**：444 派发后未启动后台等待 job。`initiator_wait` 是按项目模式生成的建议/命令模板，代码明确“不启动进程”；轮询由 `scripts/talk_wait_task` 完成，但启动动作仍在发起 Agent 侧，没有程序级强制。建议后续在 DSH harness 层按 `action=start_background_wait` 自动启动等待 job，或 tool 层提供等价自动等待。
+- **流程缺口**：444 派发后未启动后台等待 job。`initiator_wait` 是按项目模式生成的建议/命令模板，代码明确“不启动进程”；轮询由 `scripts/talk_wait_task` 完成，但启动动作仍在发起 Agent 侧，没有程序级强制。建议后续在 DSH harness 层按 `action=start_background_wait` 自动启动等待 job，或 tool 层提供等价自动等待。**用户 2026-11-05 决定暂不修（无伤大雅），保留登记。**
 - **限制**：445 的 partial 是模型输出截断，不是 bridge 校验错误；强度实际作用于任务的 ACP thought_level 仅由命令/配置测试覆盖，未做可观测的模型差异对比；真实浏览器页面由用户刷新验收。
 - **提交/推送**：代码 `fb35f2e` 已推送；本轮验证文档随后提交推送。
 
