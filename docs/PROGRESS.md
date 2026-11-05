@@ -1,14 +1,16 @@
 # Project Progress
 
-## 当前快照（2026-11-05 20:50）
+## 当前快照（2026-11-05 21:05）
 
 - **角色**：本会话 DeepSeek 负责后端开发/复核协调与收尾；Terra 承担开发；K2.8 承担独立复核。
-- **最近完成**：①调度模式接通“程序轮询 + 完成通知”；②任务窗口只读展示交办内容；③等待工具识别“待澄清/需决策”；④运行器版本检测与只读升级提示；⑤WorkBuddy 内置模型 ACP 通道（用户验收）；⑥思考强度；⑦CLI 版本探针；⑧任务结构化交付；⑨四项部署验证（API 重载、角色重启、版本 `2.165.0/match`、强度 `low/high/max`、446 `complete`）。
-- **当前状态**：主工作树已推送 `fb35f2e`（本轮验证文档随后）；`w-d 内置` generation 3/`ins_791ecfec0869` running；版本与强度已在运行 API 生效；445 因模型 JSON 截断诚实降级 partial，446 极简任务 complete。
-- **卡点/未验证**：真实浏览器页面由用户刷新验收；强度实际作用于任务的 ACP thought_level 未做可观测差异对比；结构化交付在模型输出超长/截断时只能 partial，稳定 complete 需另开“格式修复回合”。
-- **下一步**：用户刷新页面验收强度/版本；如需稳定 complete，另开格式修复小片；否则按用户指定选择下一项。
+- **最近完成**：①调度模式接通“程序轮询 + 完成通知”；②任务窗口只读展示交办内容；③等待工具识别“待澄清/需决策”；④运行器版本检测与只读升级提示；⑤WorkBuddy 内置模型 ACP 通道（用户验收）；⑥思考强度；⑦CLI 版本探针；⑧任务结构化交付；⑨四项部署验证；⑩用户验收通过（版本/强度/结构化交付），428 已收取。
+- **当前状态**：代码/文档已推送 `68fdbd4`；`w-d 内置` generation 3/`ins_791ecfec0869` running；版本 `2.165.0/match`、强度 `low/high/max`；446 结构化 `complete`，445 截断降级 `partial`。
+- **卡点/未验证**：主动模式的**启动**仍靠发起者按 `talk_delegate_task` 返回的 `initiator_wait` 启动后台 job（该字段明确“不启动进程”）；444 曾漏启动，没有程序级强制。建议后续让 DSH harness 在 active 模式下自动启动等待 job；待用户确认。强度实际作用于任务的 ACP thought_level 未做可观测差异对比；模型输出超长时结构化交付只能 partial。
+- **下一步**：按用户指定；可选优先修“主动模式自动等待”（DSH 侧）或“格式修复回合”。
 - 恢复指令：`继续项目`。
 
+
+> 2026-11-05 21:05（DeepSeek，**四项用户验收通过；428 已收取；主动模式启动缺口记录**）：用户确认四项验收通过；428 已正常收取。发现 444 派发后未启动后台等待 job：`initiator_wait` 只是按项目模式生成的**建议/命令模板**（代码注释明确“不启动进程”），真正的轮询由 `scripts/talk_wait_task` 完成，但**启动动作仍在发起 Agent 侧**，没有程序级强制；444 因此未收到完成通知，后已补收取。建议后续在 DSH harness 层按 `initiator_wait.action=start_background_wait` 自动启动等待 job，或由 tool 层提供等价自动等待；待确认。
 
 > 2026-11-05 20:50（DeepSeek，**四项部署验证完成：版本/强度生效，446 结构化 complete**）：API 已重载，`/api/runners/versions` WorkBuddy `2.165.0/match`；`w-d 内置` 绑定 `effort_options=["low","high","max"]`/`source=adapter`；角色服务 generation 3、新实例 `ins_791ecfec0869` running。445 文件 16 字节正确但模型 JSON 在 changed_files 截断，bridge 诚实降级 partial；446 极简任务输出合法 JSON，Task Hall `complete`，文件 17 字节正确。代码 `fb35f2e` 已推送；验证文档随后推送。用户刷新页面即可看到强度下拉与版本面板；稳定 complete 需另开“格式修复回合”。
 
