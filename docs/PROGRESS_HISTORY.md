@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 01:12 — 455 fix3 交付；456 定向复验
+
+- **455 fix3**：按 453 两条 finding 修复——①首轮 `end_turn` 后、validator/预算判断前立即登记 `state['repair_fallback']`，任何后续 deadline 返回首轮文本→partial，不再抛 timeout→blocked；②repair 异常按 `AcpError('workbuddy_acp_timeout')`/`httpx.TimeoutException`/`time.monotonic()>=deadline` 归类为 `repair=timeout`，其它才 failed；③测试预算 1.2→2.2s。
+- 自测：155 项 OK/41.4s；4 个滴流用例循环 20 次共 80 次全过/161.8s；7 文件，blob `f513821c…`；未改 cli_bridge/talk_delivery/schema。协调者独立重跑 155 项 OK/41.4s、diff-check 干净。
+- **456**：交 k2.8 定向复验（窗口测试真实性、20 次独立循环、152+ 回归、范围/文档、真实桌面未验不判 blocked）。
+- 通过后：集成 fix3 → 全量相关测试 → 提交/推送 B+C。
+
 ## 2026-11-06 01:10 — 454 工作区隔离设计完成
 
 - 交付 `.tmp/workspace-isolation-20261106/DESIGN.md`（13.6KB）：现状 20 项能力、与目标差距 6 条、建议切片 4 个、待用户决定 8 项、兼容安全与未覆盖项。
