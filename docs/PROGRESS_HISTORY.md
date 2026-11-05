@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 00:45 — 检查点判定修正：451 非确认卡死，终止过早
+
+- **事实时间线**：451 于 00:03:59 领取；00:07:08 写 `unittest.log`；00:12:59 导出 `candidate.diff`；00:19:20 写 `hy4_probes.py`、00:19:42 写 `probes.log`（11/11 PASS）；00:24:28 写 `REVIEW.md`（approved，但漏测内嵌 JSON 边界）。20 分钟检查点 00:22:52 到期时仍有产出；00:25:58 终止 shim，距 `REVIEW.md` 仅 90 秒。
+- **判定错误**：终止依据是一次 15 秒 CPU/内存零增长采样；该采样发生在 `REVIEW.md` 之前，不能证明后续无产出。451 应重启等待而非终止。449 才是确认卡死（约 95 分钟零 CPU/内存、无新产物）。
+- **规则收紧（已写入 AGENTS.md / TERMINAL_MCP.md）**：零活动必须**持续 ≥10–15 分钟**、且无新输出/产物，才可按最小范围终止；刚有产出（刚写文件、刚有 CPU/内存增量）时即使当前采样为 0，也先重启等待。单次 job 超时仍只是检查点，不是任务失败。
+- **影响**：451 被记为 failed/blocked（结果 3229），其 `REVIEW.md`/探针产物保留；因漏测内嵌 JSON 边界，本就不作为最终复核结论。fix2 已覆盖该边界，452 已交付、453 由 k2.8 复核中。
+
 ## 2026-11-06 00:30 — hy4 复核发现内嵌 JSON 真缺陷；451 再次卡死；452 fix2 返修
 
 - **449 复核产物**（`.tmp/wb-delivery-repair-review-20261105/hy4/`）：VERDICT **changes_requested**。Finding 1（高）：shim 的 validator 用整段 `parse_delivery_report`，而 `cli_bridge.normalize_task_delivery` 会补读内嵌 JSON；首轮“前言 + 合法 JSON + 后记”会触发多余 repair，repair 超时返回首轮后仍被 normalize 判 `complete`，违反“repair 超时 → partial / 不得把超时当 complete”。Finding 2（中）：`USER_MANUAL.md:72`、`MODULE_bridges.md:133` 的“运行失败或超时显示 blocked”与实现（repair 超时→partial）不一致。

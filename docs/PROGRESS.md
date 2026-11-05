@@ -9,6 +9,8 @@
 - **下一步**：452 → k2.8 独立复核 → 集成候选 → 部署验证（重启 WorkBuddy 侧角色）→ 推送；之后进入“新建角色到正常启停完整闭环”的方案/拆片。
 - 恢复指令：`继续项目`。
 
+> 2026-11-06 00:45（DeepSeek，**修正检查点判定：451 不是确认卡死，终止过早**）：451 在 00:07 写 `unittest.log`、00:12 导出 diff、00:19 写探针并跑完 11 项、00:24:28 写 `REVIEW.md`；20 分钟检查点（00:22:52）时它仍有产出，我在 00:25:58 仅凭一次 15 秒零增长采样就终止了它，距 `REVIEW.md` 只有 90 秒，**证据不足**。449 才是确认卡死（约 95 分钟零 CPU/内存）。规则已收紧：零活动必须**持续 ≥10–15 分钟**且无新输出/产物才可终止；刚有产出时一律先重启等待。451 的 `REVIEW.md` 虽判 approved 但漏测内嵌 JSON 边界，已由 fix2 覆盖，不影响 B 的最终路径；hy4 稳定性仍待单独核查。
+
 > 2026-11-06 00:30（DeepSeek，**hy4 复核发现内嵌 JSON 真缺陷；451 再次卡死；452 fix2 返修**）：449 的复核产物给出 changes_requested：Finding 1 指出 shim 的 validator 用整段 `parse_delivery_report`，而 cli_bridge 会补读内嵌 JSON；首轮“前言+合法 JSON+后记”会触发多余 repair，repair 超时返回首轮后仍被 normalize 判 complete，违反“repair 超时→partial”。我已直接复现（`parse=unstructured`、`normalize=complete`），确认有效。451 重派又卡死（写 `REVIEW.md` 后无交付），终止为 failed/blocked（3229）；其 approved 漏测该边界，不采纳为最终结论。**452 fix2 已派 Terra**：让 validator 与 cli_bridge 补读口径一致（首轮已含合法交付则不 repair），修复 Finding 1/2 并补测试；候选 fix2（7 文件，blob `a0fddd22`）。1 小时检查点等待，之后 **k2.8** 独立复核（hy4 稳定性后续单独查）。
 
 
