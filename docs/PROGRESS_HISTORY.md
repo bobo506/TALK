@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 01:05 — 453 复核 changes_requested；455 fix3 派发
+
+- **453（k2.8）**：fix2 主目标通过——`has_valid_delivery` 与 `cli_bridge.normalize_task_delivery` 候选扫描逐字一致；内嵌合法 JSON 不触发 repair；首轮纯 JSON、多 JSON、无效 JSON、错 task_id 边界一致；152 项 OK/39.6s；文档口径准确；7 文件范围未越界。
+- **Finding 1（中）**：repair 超时标签竞态。worker 内 `_bound_timeout`/`iter_lines` 抛出的 `AcpError('workbuddy_acp_timeout')` 被 `except Exception` 吞为 `status='failed'`；worker 收尾快于主线程 join 时 `expired` 未置位，stderr 误报 `repair=failed`。语义仍 partial，但诊断错误、测试失败。独立复现 6/44（`test_hard_deadline_repair_drip`）。
+- **Finding 2（低-中）**：首轮已 `end_turn` 返回、但 `state['repair_fallback']` 登记前的窄窗内主线程 join 到期 → 抛 `workbuddy_acp_timeout` → shim 非零 → blocked；此时首轮输出已在手，应为 partial。证据 `flake_loop2.log` iter18、`probe_race.py` iter22。
+- **fix3**：从 fix2 补丁重建 `.tmp/wb-delivery-repair-fix3-20261106/candidate`（7 文件，blob `5a168fda`），派 Terra **455**：worker 截止异常权威标记 + fallback 提前登记 + 测试预算放宽 + 20 次循环；455 排在 454 之后。
+- 复核材料：`.tmp/wb-delivery-repair-review-fix2-20261106/k28/`（flake_loop1/2、probe_race.py、probe_output.log）。
+
 ## 2026-11-06 01:00 — 用户决定：新建角色闭环延后，优先工作区隔离
 
 - 用户明确：若“新建角色到正常启停完整闭环”与“跨项目工作区隔离”重叠，**延后第三项，优先做跨项目工作区隔离**；两者合并方式以 454 设计稿的待决问题为准。
