@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-05 20:05 — WorkBuddy CLI 版本探针（440/441，K2.8 复核 PASS，待 API 重载）
+
+- **需求**：运行器版本面板此前对 WorkBuddy 显示未知；现在要显示内嵌 CLI 的真实版本。
+- **探测**：`WorkBuddy.exe <LOCALAPPDATA>\Programs\WorkBuddy\resources\app.asar\cli\bin\codebuddy --version`，带 `ELECTRON_RUN_AS_NODE=1`/`CODEBUDDY_FORCE_LITE_WB_BUNDLE=1`，配置目录指向临时目录；实测 `2.165.0`、exit 0、无模型调用。关键坑：Windows 上 `app.asar` 是文件，不能对 asar 内部 entry 调 `Path.is_file()`。
+- **实现**：`server/runner_versions.py` 为 workbuddy 增加专用探针（只检查 exe 与 app.asar 两个真实文件；5s 超时；临时配置隔离；错误映射未找到/超时/非0/无法解析/探测失败）；适配基线 `2.165.0`；缓存/并发锁/版本比较不变；其它运行器探针不变；用户手册更新。
+- **验证**：`tests.test_runner_versions` **9 项 OK**；K2.8 独立复核 PASS，并用 pwsh 直接执行同一 CLI 命令确认 `2.165.0`/exit 0；Python 探针在角色 HOME/DSH 沙箱中因 `LOCALAPPDATA` 隔离或 `PermissionError` 返回“未找到/版本探测失败”（fail-closed，符合预期），生产 API 重载后复验页面。
+- **限制**：API 未重载，页面暂不显示；桌面安装路径/版本变化时可能显示未知；仅提示，不自动更新；真实浏览器未验。
+- **提交**：`1d1e4cb`（代码/测试）；文档随后；本片与第 4 项一起推送待定。
+
 ## 2026-11-05 19:45 — WorkBuddy 内置模型思考强度（436/438，K2.8 复核 PASS，待 API 重载/用户验收）
 
 - **需求**：WorkBuddy 桌面端内置模型有强度选项；TALK 角色详情也要能选，并作用于下一次任务执行。
