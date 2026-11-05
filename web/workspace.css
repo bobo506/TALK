@@ -1,4 +1,4 @@
-﻿/* 已确认的任务 / 角色双栏工作台。旧聊天入口继续保留。 */
+/* 已确认的任务 / 角色双栏工作台。旧聊天入口继续保留。 */
 .app-header {min-width:0!important; height:70px; min-height:70px; display:flex; gap:32px; padding:0 28px; border-bottom:1px solid var(--line);}
 .window-brand {padding:0; flex-shrink:0;} .header-actions {margin-left:auto; padding:0; gap:18px;}
 .app-header .project-select {width:180px; margin:0; font-size:16px;}
@@ -193,7 +193,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 
 /* C2-B 项目调度模式面板：项目级设置面板，复用浅色工作台层级；radio 两态 + 显式保存。 */
 #controller-mode-panel {color:var(--text); margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid var(--line);}
-#runner-versions-panel {color:var(--text); margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid var(--line);}
+#runner-versions-panel {color:var(--text); margin-bottom:36px; padding-bottom:30px;}
 #runner-versions-panel .sidebar-kicker {font-size:14px; color:var(--muted-strong); margin-bottom:10px;}
 #runner-versions-panel h3 {font-size:24px; font-weight:650; color:var(--text); margin:0;}
 .runner-versions-content {font-size:14px; color:var(--muted-strong); line-height:1.7; margin-top:14px; overflow-wrap:anywhere;}
