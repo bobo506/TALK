@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 00:30 — hy4 复核发现内嵌 JSON 真缺陷；451 再次卡死；452 fix2 返修
+
+- **449 复核产物**（`.tmp/wb-delivery-repair-review-20261105/hy4/`）：VERDICT **changes_requested**。Finding 1（高）：shim 的 validator 用整段 `parse_delivery_report`，而 `cli_bridge.normalize_task_delivery` 会补读内嵌 JSON；首轮“前言 + 合法 JSON + 后记”会触发多余 repair，repair 超时返回首轮后仍被 normalize 判 `complete`，违反“repair 超时 → partial / 不得把超时当 complete”。Finding 2（中）：`USER_MANUAL.md:72`、`MODULE_bridges.md:133` 的“运行失败或超时显示 blocked”与实现（repair 超时→partial）不一致。
+- **协调者直接复现**：`parse_delivery_report(prose+JSON).kind=unstructured`，`normalize_task_delivery` 同文本 `conclusion=complete`，确认 Finding 1 有效。
+- **451 重派**：hy4 写出 `REVIEW.md`（approved）与 11 项探针，但漏测内嵌 JSON 边界；随后再次卡死（写 REVIEW.md 后无交付）。终止 shim，任务 failed/blocked（结果 3229）；不采纳其 approved 作为最终结论。
+- **452 fix2**：从 fix1 补丁新建 `.tmp/wb-delivery-repair-fix2-20261106/candidate`（分支 `terra/wb-delivery-repair-fix2-20261106`，7 文件，diff blob `a0fddd22…`），派 Terra 让 validator 复用 cli_bridge 补读口径（首轮已含合法交付即不 repair），修 Finding 1/2、补测试；1 小时检查点等待。
+- **后续**：fix2 交 **k2.8** 独立复核（hy4 不稳定，后续单独核查）。
+
 ## 2026-11-06 00:15 — 主动等待改为 1 小时检查点
 
 - **用户决定**：24 小时总预算不适合卡死场景；应每小时回来检查实际产出——无动作则停止并请示，有动作只是未完成则继续轮询。

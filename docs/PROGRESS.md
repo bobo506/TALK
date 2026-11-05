@@ -1,15 +1,16 @@
 # Project Progress
 
-## 当前快照（2026-11-06 00:05）
+## 当前快照（2026-11-06 00:30）
 
 - **角色**：本会话 DeepSeek 负责协调、文档与 Git 收尾；本批按用户 2026-11-05 指定 **Terra 开发、hy4 独立复核**（hy4 异常时可改 k2.8）。
-- **最近完成**：①~⑫ 见下方 21:55/21:05 记录（C 归档、主动等待改为 **1 小时检查点**）；⑬ **B 返修 448 已交付 complete**（硬截止：首轮滴流 1.203s、修复轮滴流 1.219s，150 项 OK/32.5s，候选 7 文件冻结）。
-- **当前状态**：449 复核因 hy4 ACP 会话卡死（shim 0 CPU/内存、TCP 仍 Established）被中止，任务 failed（结果 3227 blocked，failed 任务 API 不可 collect）；随后 450 连通性验证 **HY4_OK**（80s，已收取），**451 复核已重派 hy4**（20 分钟等待 job，超时则改派 k2.8）。
-- **卡点/未验证**：451 复核结论待出；448 真实 WorkBuddy 桌面硬截止未验证（需部署重启角色）；hy4 卡死原因后续单独核查；新建角色闭环尚未拆片。
-- **下一步**：451 复核 → 处理 447（partial）/448 → 集成候选 → 部署验证（重启 WorkBuddy 侧角色）→ 推送；之后进入“新建角色到正常启停完整闭环”的方案/拆片。
+- **最近完成**：①~⑫ 见下方 21:55/21:05 记录（C 归档、主动等待改为 **1 小时检查点**）；⑬ **B 返修 448 已交付 complete**（硬截止：首轮滴流 1.203s、修复轮滴流 1.219s，150 项 OK/32.5s，候选 7 文件冻结）；⑭ hy4 复核发现内嵌 JSON 口径真缺陷，已开 **452 fix2 返修**。
+- **当前状态**：449 复核产物（`hy4/REVIEW.md`、`delivery.json`）判 **changes_requested**，Finding 1 经我直接复现确认（`parse_delivery_report`=unstructured，`normalize_task_delivery`=complete）；451 重派再次卡死，已终止为 failed/blocked（结果 3229），其 `REVIEW.md` 虽写 approved 但漏测该边界，不作最终结论。**452 已派 Terra**，候选 `.tmp/wb-delivery-repair-fix2-20261106/candidate`（7 文件，blob `a0fddd22…`），1 小时检查点等待。
+- **卡点/未验证**：452 fix2 待交付；最终复核改派 **k2.8**（hy4 不稳定，后续单独核查）；真实 WorkBuddy 桌面硬截止未验证（需部署重启角色）；新建角色闭环尚未拆片。
+- **下一步**：452 → k2.8 独立复核 → 集成候选 → 部署验证（重启 WorkBuddy 侧角色）→ 推送；之后进入“新建角色到正常启停完整闭环”的方案/拆片。
 - 恢复指令：`继续项目`。
 
-> 2026-11-06 00:05（DeepSeek，**hy4 复核卡死中止；450 验证 OK；451 重派；448 complete**）：449 复核运行约 2 小时后确认卡死——shim `PID 11056` 自 21:59 存活，累计 CPU 7.1s、8 秒采样 CPU/内存零增长，到 ACP `127.0.0.1:50750` 的 TCP 仍 Established；已部署代码无总时长硬截止（`--timeout 600` 只是单次 read），WorkBuddy 持续 keepalive 可无限续命。经用户授权终止该 shim，449 记为 failed/blocked（结果 3227，failed 任务不支持普通 collect）。随后派 450 连通性验证，hy4 80s 返回 `HY4_OK` 并已收取；**451 已重派 hy4 复核 448**，等待 job 20 分钟，届时无反馈则按用户指定改派 k2.8。448 候选仍为 7 文件冻结（diff blob `a0fddd22…`），未提交/未部署。
+> 2026-11-06 00:30（DeepSeek，**hy4 复核发现内嵌 JSON 真缺陷；451 再次卡死；452 fix2 返修**）：449 的复核产物给出 changes_requested：Finding 1 指出 shim 的 validator 用整段 `parse_delivery_report`，而 cli_bridge 会补读内嵌 JSON；首轮“前言+合法 JSON+后记”会触发多余 repair，repair 超时返回首轮后仍被 normalize 判 complete，违反“repair 超时→partial”。我已直接复现（`parse=unstructured`、`normalize=complete`），确认有效。451 重派又卡死（写 `REVIEW.md` 后无交付），终止为 failed/blocked（3229）；其 approved 漏测该边界，不采纳为最终结论。**452 fix2 已派 Terra**：让 validator 与 cli_bridge 补读口径一致（首轮已含合法交付则不 repair），修复 Finding 1/2 并补测试；候选 fix2（7 文件，blob `a0fddd22`）。1 小时检查点等待，之后 **k2.8** 独立复核（hy4 稳定性后续单独查）。
+
 
 
 
