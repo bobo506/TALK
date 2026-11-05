@@ -9,7 +9,7 @@
 - 只读 ``GET /api/tasks/{id}``，不领取、不完成、不取消、不写任务；
 - 身份只来自显式 ``--key-file``、环境变量 ``TALK_API_KEY`` 或
   ``TALK_WAIT_KEY_FILE``；Key 不写命令行、不打印、不落日志；
-- 默认每 15 秒查一次、总时长上限 30 分钟；到点或出错都输出单行可读结果。
+- 默认每 15 秒查一次、总时长上限 24 小时（与任务默认执行预算一致，长任务不应被 30 分钟等短上限误判超时）；到点或出错都输出单行可读结果。
 
 退出码：0=任务已进入终态（任务本身成功与否看输出）；1=等待超时；
 2=等待错误（Key/任务不可读等）；3=需要人工动作；64=用法错误。
@@ -27,7 +27,7 @@ from urllib import error, request
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 DEFAULT_INTERVAL = 15.0
-DEFAULT_TIMEOUT = 1800.0
+DEFAULT_TIMEOUT = 86400.0
 DEFAULT_REQUEST_TIMEOUT = 10.0
 MIN_INTERVAL = 5.0
 

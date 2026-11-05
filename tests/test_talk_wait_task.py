@@ -36,6 +36,15 @@ def task(status: str = "running", workflow: str = "in_progress", **extra) -> dic
     return payload
 
 
+class DefaultBudgetTests(unittest.TestCase):
+    """主动等待默认预算必须与任务默认执行预算一致，不能短于长任务耗时。"""
+
+    def test_default_wait_budget_is_one_day(self) -> None:
+        self.assertEqual(waiter.DEFAULT_TIMEOUT, 86400.0)
+        args = waiter.build_parser().parse_args(["--task-id", "1"])
+        self.assertEqual(args.timeout, 86400.0)
+
+
 class TerminalTests(unittest.TestCase):
     def test_terminal_status(self) -> None:
         for status in ("succeeded", "failed", "canceled"):
