@@ -27,6 +27,8 @@ class ProjectRouteTests(RouteTestCase):
         return project_root
 
     def test_human_registers_project_and_anyone_can_read(self):
+        project_root = self._tmpdir / "bike"
+        project_root.mkdir()
         with self.make_client() as client:
             created = client.post(
                 "/api/projects",
@@ -35,7 +37,7 @@ class ProjectRouteTests(RouteTestCase):
                     "project_id": "prj_bike",
                     "display_name": "自行车计划",
                     "description": "家庭自行车管理",
-                    "project_root_path": "/home/bobo/projects/bike",
+                    "project_root_path": str(project_root.resolve()),
                 },
             )
             listed = client.get("/api/projects", headers={"X-API-Key": "alice-key"})
@@ -48,7 +50,7 @@ class ProjectRouteTests(RouteTestCase):
         # maintainer defaults to the registering member
         self.assertEqual(body["maintainer_member_id"], "human:bobo")
         self.assertEqual([p["project_id"] for p in listed.json()], ["prj_bike"])
-        self.assertEqual(fetched.json()["project_root_path"], "/home/bobo/projects/bike")
+        self.assertEqual(fetched.json()["project_root_path"], str(project_root.resolve()))
 
     def test_server_generates_project_id_when_omitted(self):
         with self.make_client() as client:
@@ -121,6 +123,10 @@ class ProjectRouteTests(RouteTestCase):
         self.assertEqual(deleted.status_code, 403)
 
     def test_partial_patch_only_touches_provided_fields(self):
+        old_root = self._tmpdir / "old"
+        new_root = self._tmpdir / "new"
+        old_root.mkdir()
+        new_root.mkdir()
         with self.make_client() as client:
             client.post(
                 "/api/projects",
@@ -129,18 +135,18 @@ class ProjectRouteTests(RouteTestCase):
                     "project_id": "prj_patch",
                     "display_name": "Old Name",
                     "description": "Keep me",
-                    "project_root_path": "/old/path",
+                    "project_root_path": str(old_root),
                 },
             )
             updated = client.patch(
                 "/api/projects/prj_patch",
                 headers={"X-API-Key": "bobo-key"},
-                json={"project_root_path": "/new/path"},
+                json={"project_root_path": str(new_root.resolve())},
             )
 
         self.assertEqual(updated.status_code, 200)
         body = updated.json()
-        self.assertEqual(body["project_root_path"], "/new/path")
+        self.assertEqual(body["project_root_path"], str(new_root.resolve()))
         # untouched fields survive the partial patch
         self.assertEqual(body["display_name"], "Old Name")
         self.assertEqual(body["description"], "Keep me")

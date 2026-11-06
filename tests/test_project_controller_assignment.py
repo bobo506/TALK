@@ -66,6 +66,7 @@ PROJECT_TOOL_NAMES = (
     "talk_cancel_task",
     "talk_collect_result",
     "talk_get_delivery",
+    "talk_follow_tasks",
 )
 
 
@@ -492,7 +493,7 @@ class ControllerAssignmentApiTests(ControllerAssignmentTestCase):
             before = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:kimi", "content": "指定前的普通派发"},
+                json={"project_id": "prj_ctl", "target_member_id": "agent:kimi", "content": "指定前的普通派发"},
             )
         self.assertEqual(before.status_code, 201, before.text)
 
@@ -502,17 +503,17 @@ class ControllerAssignmentApiTests(ControllerAssignmentTestCase):
             to_non_controller = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:kimi", "content": "指定后仍可派给非主控"},
+                json={"project_id": "prj_ctl", "target_member_id": "agent:kimi", "content": "指定后仍可派给非主控"},
             )
             to_controller = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "派给主控本人"},
+                json={"project_id": "prj_ctl", "target_member_id": "agent:codex", "content": "派给主控本人"},
             )
             from_agent = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "kimi-key"},
-                json={"target_member_id": "agent:codex", "content": "agent 委派链路不变"},
+                json={"project_id": "prj_ctl", "target_member_id": "agent:codex", "content": "agent 委派链路不变"},
             )
         for response in (to_non_controller, to_controller, from_agent):
             self.assertEqual(response.status_code, 201, response.text)
@@ -860,6 +861,7 @@ class ControllerAssignmentBypassTests(ControllerAssignmentTestCase):
         self.assertEqual(self.stored_state(), (None, 2))
 
     def test_sync_and_profile_write_do_not_touch_assignment(self):
+        (self._tmpdir / "root").mkdir()
         self.register(project_root_path=str(self._tmpdir / "root"))
         self.assertEqual(self.assign().status_code, 200)
 
@@ -1141,7 +1143,7 @@ class ControllerAssignmentToolTests(ControllerAssignmentTestCase):
         self.assertEqual(unassigned["status"], "unassigned")
 
     def test_tool_surface_unchanged_and_description_documents_readonly(self):
-        self.assertEqual(len(TOOL_SCHEMAS), 9)
+        self.assertEqual(len(TOOL_SCHEMAS), 10)
         self.assertEqual(tuple(tool["name"] for tool in TOOL_SCHEMAS), PROJECT_TOOL_NAMES)
         description = tool_description("talk_list_agents")
         self.assertIn("controller_assignment", description)

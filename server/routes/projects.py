@@ -9,6 +9,8 @@ metadata; the actual ``.talk/`` profile files stay in the project repo.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -471,6 +473,35 @@ def _project_agent_outs(
     ]
 
 
+def _root_identity(value: str) -> str:
+    return os.path.normcase(str(Path(value).expanduser().resolve()))
+
+
+def _validated_root(value: str | None, session: Session, *, exclude: str | None = None) -> str | None:
+    if value is None:
+        return None
+    try:
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            raise HTTPException(status_code=422, detail="project_root_path_relative")
+        if not path.is_dir():
+            raise HTTPException(status_code=422, detail="project_root_path_invalid")
+        canonical = str(path.resolve())
+    except (OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=422, detail="project_root_path_invalid")
+    identity = os.path.normcase(canonical)
+    for other in session.exec(select(Project)).all():
+        if other.project_id == exclude or not other.project_root_path:
+            continue
+        try:
+            existing = _root_identity(other.project_root_path)
+        except (OSError, RuntimeError, ValueError):
+            continue
+        if existing == identity:
+            raise HTTPException(status_code=409, detail="project_root_path_conflict")
+    return canonical
+
+
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
 def register_project(
     body: ProjectCreate,
@@ -479,6 +510,7 @@ def register_project(
 ):
     """Register a project with the TALK server (called by `talk init`)."""
     _require_human(current)
+    begin_immediate_write(session)
     project_id = body.project_id or f"prj_{uuid4().hex[:12]}"
     if session.get(Project, project_id) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="project id already exists")
@@ -486,12 +518,13 @@ def register_project(
     maintainer_id = body.maintainer_member_id or current.id
     _get_member(maintainer_id, session)
 
+    root = _validated_root(body.project_root_path, session)
     now = datetime.now(timezone.utc)
     project = Project(
         project_id=project_id,
         display_name=body.display_name,
         description=body.description,
-        project_root_path=body.project_root_path,
+        project_root_path=root,
         development_requirements=body.development_requirements,
         maintainer_member_id=maintainer_id,
         created_at=now,
@@ -1045,14 +1078,21 @@ def update_project(
 ):
     """Update project metadata (display name / description / root path / development requirements)."""
     _require_human(current)
-    project = _get_project(project_id, session)
     fields_set = body.model_fields_set
+    if "project_root_path" in fields_set:
+        begin_immediate_write(session)
+    project = _get_project(project_id, session)
+    root = None
+    if "project_root_path" in fields_set:
+        if body.project_root_path is None:
+            raise HTTPException(status_code=422, detail="project_root_path_required")
+        root = _validated_root(body.project_root_path, session, exclude=project_id)
     if "display_name" in fields_set:
         project.display_name = body.display_name
     if "description" in fields_set:
         project.description = body.description
     if "project_root_path" in fields_set:
-        project.project_root_path = body.project_root_path
+        project.project_root_path = root
     if "development_requirements" in fields_set:
         # 省略即保持原值；显式空文本或 null 归一为 None（清空）。
         project.development_requirements = body.development_requirements
