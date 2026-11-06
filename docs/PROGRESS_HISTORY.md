@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 15:25 — GATE-1 470 partial；471 补强
+
+- **470 交付 partial**：`scripts/acceptance_gate.py` + `tests/test_acceptance_gate.py`（8 项/10.5s）+ `TASK_WORKFLOW.md` 7.1.2；回归 27 项全绿；候选 1 tracked + 2 未跟踪，tracked diff blob `4764dcf`。
+- **自报不足**：①`allowed_untracked` 只核对清单，未证明生成物，产品文件可被白名单；②常量授权只比 AST 语句，注释-only 提及未覆盖。
+- **471 fix1**：固定生成物模式（`Microsoft/`、`.tmp-tests/`、`.tmp/`、`__pycache__/`、`*.pyc`、`*.log`、`*.db-wal/shm`、`.pytest_cache/`）拒绝产品文件；注释-only 不触发授权（注释不改变运行时常量），实际赋值变更未授权仍 fail；测试锁定；8+ 项与 27 项回归全绿后交 k2.8。
+- **原则**：这是“发现问题补进脚本”的首次实际应用；gate 仍只做机械检查，语义/例外由复核/决策判断。
+
 ## 2026-11-06 15:20 — GATE-1 派发（470）
 
 - 用户确认 gate 脚本后，派 Terra 开发 `scripts/acceptance_gate.py` + `tests/test_acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；候选基线 `c66ba07`。
