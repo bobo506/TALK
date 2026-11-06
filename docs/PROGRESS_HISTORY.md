@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-06 16:30 — W2b 派发（476）
+
+- 用户明确“刷新后仍在最后工作区”=刷新前在 A 刷新后仍 A、切 B 后刷新仍 B；不是固定默认项目。确认后开 W2b。
+- **W2b 范围**：`GET /api/projects` human 全部/agent 只列 ProjectAgent 或 ProjectRole 已加入；`loadGroups` 带 `project_id=activeProjectId`；`setActiveProject` 重载 groups、清理跨项目 activeGroup/历史、刷新 Hall/群/成员、**不调用 stop/start/取消**；初始化先恢复上次项目再加载 tasks/agents/groups，无效回退；创建群/任务/上传用 activeProjectId；不新增创建工作区入口；测试覆盖 A/B 刷新、不可用回退、Agent 可见性、群过滤/无 stop；文档同步。
+- 候选 `terra/workspace-w2b-20261106` @ `b4b8d21`；交付后按硬门 + gate 检查，k2.8 复核，集成/部署，再做双工作区真实验收。
+
 ## 2026-11-06 16:20 — GATE-1 通过并集成 `4eceef7`
 
 - **475 终验 approved**：F1–F5 全部真实修复；14 项 gate 测试独立复跑全绿、基线 c66ba07 27 项全绿、新增失败=0、无断言弱化；cp936 下 pass/fail 两态 `--json` UTF-8 可解析；脚本 0 处 `?{2,}`/U+FFFD；F3 文档为 gate 自算 LF 口径；F4 CLI 子进程 exit 1/pass JSON；F5 delivery 模板无 schema。
