@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 15:30 — 471 代码完成但交付 invalid；472 重提
+
+- **471 fix1 实际完成**：`tests.test_acceptance_gate` 11 项/20.963s、27 项回归全绿；候选 1 tracked + 2 未跟踪；生成物白名单与常量授权测试已补。
+- **交付 invalid**：结果 JSON 多了 `schema` 字段，`talk-delivery-1` 以 `unknown_field` 拒收；按规则 invalid 不能作为 complete，也不能直接送复核。
+- **472**：不改候选/不重跑测试，只按允许字段重提 task_id=472 的合法 JSON；tracked diff blob 以本机命令为准（471 自报 3f4d089，协调者本地 4764dcf，需在交付中写清口径）。
+- **教训**：交付 schema 的未知字段也是门禁项；gate 脚本的 `validate_report` 已覆盖，后续交付模板要明确“不要 schema 字段”。
+- **下一步**：472 有效交付 → k2.8 复验 fix1 → 集成 gate → W2b。
+
 ## 2026-11-06 15:25 — GATE-1 470 partial；471 补强
 
 - **470 交付 partial**：`scripts/acceptance_gate.py` + `tests/test_acceptance_gate.py`（8 项/10.5s）+ `TASK_WORKFLOW.md` 7.1.2；回归 27 项全绿；候选 1 tracked + 2 未跟踪，tracked diff blob `4764dcf`。
