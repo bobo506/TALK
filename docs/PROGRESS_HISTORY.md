@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-06 10:05 — 无项目历史清理完成；W1 数据边界派发（458）
+
+- **用户确认**：删除 `prj_accept` 测试项目；按“历史无项目数据全部清除”执行。
+- **备份**：`backups/workspace-w1-backup-20261106.db`（11,481,088 字节）。
+- **删除**：`test-run20`（无项目群，23 条消息）、`prj_accept` 及其 `group:accept-bs`（15 条消息，0 任务/0 角色）；共 2 群/38 消息/1 项目。
+- **清理后**：projects 仅 `prj_e8fe7066bbec`；agent_tasks 457（0 无项目）、groups 458（0 无项目）、messages 2411、files 0、agent_task_schedules 0；`/healthz` 200。
+- **W1（458）**：派 Terra——根任务/群/日程/文件强制 `project_id`；`File.project_id` + 上传必填 + 跨项目 agent 403；`AgentTaskSchedule.project_id`；`GET /groups?project_id=` 过滤；DB 迁移补列；补/改测试；不改前端切换与角色运行时。
+- **下一步**：W1 交付 → k2.8 复核 → 集成/部署验证 → W2（前端切换、上次工作区、项目路径唯一/规范化）→ W3（角色运行时）→ W4（双工作区验收）。
+
 ## 2026-11-06 09:55 — B 部署验证通过；工作区模型改为“终端决定”
 
 - **B 部署验证**：经用户授权，启动 w-d 内置服务（gen5/`ins_2ffa80acc329`），任务 457 在 20s 返回 `WD_B_OK`、`talk-delivery-1` complete，已收取；随后停止服务（gen6）。确认新 `workbuddy_bridge`/shim 已加载，正常结构化交付可用。真实慢流硬截止/repair 未在真实模型上压测（单测覆盖）。
