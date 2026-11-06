@@ -167,7 +167,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(created.json()["authorized_slice_budget"], 0)
         self.assertEqual(created.json()["reserved_slice_count"], 0)
         self.assertIsNone(created.json()["authorization_expires_at"])
-        self.assertEqual(created.json()["max_clarification_rounds"], 1)
+        self.assertEqual(created.json()["max_clarification_rounds"], 3)
         self.assertEqual(created.json()["clarification_round_count"], 0)
         self.assertIsNotNone(created.json()["hall_group_id"])
         self.assertEqual([task["id"] for task in agent_tasks.json()], [created.json()["id"]])
@@ -241,7 +241,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(unknown_project.status_code, 400)
         self.assertEqual(self_assignment.status_code, 400)
 
-    def test_task_clarification_round_limit_is_bounded_to_one_or_two(self):
+    def test_task_clarification_round_limit_is_bounded_to_one_through_five(self):
         with self.make_client() as client:
             custom = client.post(
                 "/api/tasks",
@@ -251,6 +251,18 @@ class AgentTaskTests(RouteTestCase):
                     "content": "Allow two rounds",
                     "max_clarification_rounds": 2,
                 },
+            )
+            custom_min = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex",
+                      "content": "Allow one round", "max_clarification_rounds": 1},
+            )
+            custom_max = client.post(
+                "/api/tasks",
+                headers={"X-API-Key": "bobo-key"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex",
+                      "content": "Allow five rounds", "max_clarification_rounds": 5},
             )
             too_few = client.post(
                 "/api/tasks",
@@ -267,12 +279,16 @@ class AgentTaskTests(RouteTestCase):
                 json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Invalid unlimited rounds",
-                    "max_clarification_rounds": 3,
+                    "max_clarification_rounds": 6,
                 },
             )
 
         self.assertEqual(custom.status_code, 201)
         self.assertEqual(custom.json()["max_clarification_rounds"], 2)
+        self.assertEqual(custom_min.status_code, 201)
+        self.assertEqual(custom_min.json()["max_clarification_rounds"], 1)
+        self.assertEqual(custom_max.status_code, 201)
+        self.assertEqual(custom_max.json()["max_clarification_rounds"], 5)
         self.assertEqual(too_few.status_code, 422)
         self.assertEqual(too_many.status_code, 422)
 
@@ -2553,6 +2569,51 @@ class AgentTaskTests(RouteTestCase):
                 headers={"X-API-Key": "codex-key"},
                 json={"question_message_id": question_three.id},
             )
+            additional_limits = []
+            for expected_limit in (3, 4, 5):
+                decision = client.post(
+                    f"/api/tasks/{task['id']}/resolve-clarification",
+                    headers={"X-API-Key": "bobo-key"},
+                    json={"allow_additional_round": True},
+                )
+                self.assertEqual(decision.status_code, 200)
+                additional_limits.append(decision.json()["max_clarification_rounds"])
+                self.assertEqual(additional_limits[-1], expected_limit)
+                resumed_again = client.post(
+                    f"/api/tasks/{task['id']}/resume-tree",
+                    headers={"X-API-Key": "bobo-key"},
+                    json={"slice_budget": 0, "authorization_ttl_seconds": 60},
+                )
+                self.assertEqual(resumed_again.status_code, 200)
+                question = self.add_message(
+                    from_id="agent:codex", to_ids='["human:bobo"]', message_type="text",
+                    group_id=task["hall_group_id"], content=f"Question {expected_limit}",
+                )
+                round_response = client.post(
+                    f"/api/tasks/{task['id']}/request-clarification",
+                    headers={"X-API-Key": "codex-key"}, json={"question_message_id": question.id},
+                )
+                self.assertEqual(round_response.json()["clarification_round_count"], expected_limit)
+                answer = self.add_message(
+                    from_id="human:bobo", to_ids='["agent:codex"]', message_type="text",
+                    group_id=task["hall_group_id"], content=f"Answer {expected_limit}",
+                )
+                answer_response = client.post(
+                    f"/api/tasks/{task['id']}/submit-clarification-answer",
+                    headers={"X-API-Key": "bobo-key"}, json={"answer_message_id": answer.id},
+                )
+                self.assertEqual(answer_response.status_code, 200)
+                next_question = self.add_message(
+                    from_id="agent:codex", to_ids='["human:bobo"]', message_type="text",
+                    group_id=task["hall_group_id"], content=f"Beyond round {expected_limit}",
+                )
+                exhausted = client.post(
+                    f"/api/tasks/{task['id']}/request-clarification",
+                    headers={"X-API-Key": "codex-key"}, json={"question_message_id": next_question.id},
+                )
+                self.assertEqual(exhausted.status_code, 200, exhausted.text)
+                self.assertEqual(exhausted.json()["workflow_status"], "needs_decision")
+                self.assertEqual(exhausted.json()["checkpoint_reason"], "clarification_limit")
             cannot_exceed_limit = client.post(
                 f"/api/tasks/{task['id']}/resolve-clarification",
                 headers={"X-API-Key": "bobo-key"},
@@ -2562,6 +2623,7 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(escalated.status_code, 200)
         self.assertEqual(escalated.json()["workflow_status"], "needs_decision")
         self.assertEqual(escalated.json()["control_status"], "awaiting_human")
+        self.assertEqual(escalated.json()["checkpoint_reason"], "clarification_limit")
         self.assertEqual(blocked_claim.status_code, 409)
         self.assertEqual(wrong_resolver.status_code, 403)
         self.assertEqual(resolved.json()["workflow_status"], "clarification_answered")

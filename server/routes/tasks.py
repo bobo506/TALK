@@ -1339,7 +1339,7 @@ def _escalate_clarification_decision(
         )
         .values(
             control_status="awaiting_human",
-            checkpoint_reason="needs_decision",
+            checkpoint_reason="clarification_limit",
             updated_at=now,
         )
         .execution_options(synchronize_session=False)

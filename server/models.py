@@ -214,8 +214,9 @@ TASK_AUTHORIZED_SLICE_BUDGET_MAX = 3
 TASK_AUTHORIZATION_TTL_DEFAULT_SECONDS = 90 * 60
 TASK_AUTHORIZATION_TTL_MIN_SECONDS = 60
 TASK_AUTHORIZATION_TTL_MAX_SECONDS = 90 * 60
-TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT = 1
-TASK_MAX_CLARIFICATION_ROUNDS_LIMIT = 2
+TASK_MAX_CLARIFICATION_ROUNDS_MIN = 1
+TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT = 3
+TASK_MAX_CLARIFICATION_ROUNDS_LIMIT = 5
 
 # 项目级“开发要求”纯文本上限：用于创建与更新的同一套校验（按字符数计算）。
 PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS = 20000
@@ -3070,6 +3071,7 @@ _TASK_CHECKPOINT_REASONS = {
     "usage_limit",
     "review_exhausted",
     "needs_decision",
+    "clarification_limit",
 }
 _SCHEDULE_STATUSES = {"active", "paused", "completed", "canceled"}
 TASK_LEASE_DEFAULT_SECONDS = 120
@@ -3106,7 +3108,7 @@ class AgentTaskCreate(BaseModel):
     milestone_test_required: bool = False
     max_clarification_rounds: int = PydField(
         default=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
-        ge=TASK_MAX_CLARIFICATION_ROUNDS_DEFAULT,
+        ge=TASK_MAX_CLARIFICATION_ROUNDS_MIN,
         le=TASK_MAX_CLARIFICATION_ROUNDS_LIMIT,
     )
     # 292：可选执行会话元数据；缺失/None 时任务创建与执行完全保持旧行为。
