@@ -24,6 +24,7 @@ from sqlmodel import Session, select
 from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.workbuddy_effort import runtime_options_for_facts
 from server.auth import get_current_member
+from server.workspace_paths import resolve_profile_reference
 from server.role_deletions import RoleDeletion, public as deletion_public
 from server.role_startup import projection as startup_projection
 from server.db import begin_immediate_write, get_session
@@ -1702,6 +1703,7 @@ def create_project_role(
                 member_id=member_id,
                 role_name=role_name,
                 origin=PROJECT_ROLE_ORIGIN_MANAGED,
+                storage_layout="workspace-v1",
                 identity_exclusive=1,
                 credential_version=1,
                 key_issued_at=now,
@@ -3127,12 +3129,13 @@ def register_project_role_roster_paths(
 
     - 前置校验复用 ``_normalize_provision_operation_key`` + ``_require_provision_identity``：
       human-only 403、imported/离册/归档/禁用/策略不一致等稳定拒绝码与 POST /provision 相同；
-    - 三条路径必须是**非空仓库相对路径**，归一化反斜杠为 ``/``，拒绝绝对路径（盘符/
+    - 旧布局的三条路径必须是**非空仓库相对路径**，归一化反斜杠为 ``/``，拒绝绝对路径（盘符/
       前导 ``/`` 或 ``\\\\``）、任何 ``..`` 段与控制字符，且必须恰好落在同一个
       ``.talk/agents/<role_dir>/`` 下、basename 分别为 ``IDENTITY.md``/``SOUL.md``/
       ``USER.md``；否则 422 ``provision_roster_path_invalid``；
     - 补正 F8：``<role_dir>`` 必须**恰好**等于目标 ``member_id`` 自己的目录名，拒绝把
       另一个角色的档案路径登记到本角色（跨角色路径一律 422）；
+    - workspace-v1 引用须与角色布局、成员和对应档案文件名一致，不允许混用旧路径；
     - 成功时**只**更新该 ``ProjectAgent(project_id, member_id)`` 行的三条路径列与
       ``updated_at``：不动 ``business_role``/``decision_tier``/``capability_summary``、
       不动 Member/ProjectRole/绑定/说明/权限策略，也不动任何其它名册行；
@@ -3149,12 +3152,27 @@ def register_project_role_roster_paths(
     try:
         _require_provision_identity(project_id, target_member_id, operation_key, session)
         try:
-            paths = normalize_provision_roster_paths(
-                body.identity_path,
-                body.soul_path,
-                body.user_path,
-                expected_member_dir=provision_member_dir_name(target_member_id),
-            )
+            role = session.get(ProjectRole, (project_id, target_member_id))
+            references = {
+                "identity_path": body.identity_path,
+                "soul_path": body.soul_path,
+                "user_path": body.user_path,
+            }
+            if any(str(value).startswith("workspace-v1:") for value in references.values()):
+                project = session.get(Project, project_id)
+                root = Path(project.project_root_path) if project.project_root_path else Path(__file__).resolve().parent.parent
+                for field, value in references.items():
+                    resolved = resolve_profile_reference(root, project_id, target_member_id, role.storage_layout, value)
+                    if resolved.name != {"identity_path": "IDENTITY.md", "soul_path": "SOUL.md", "user_path": "USER.md"}[field]:
+                        raise ValueError("profile filename mismatch")
+                paths = references
+            else:
+                paths = normalize_provision_roster_paths(
+                    body.identity_path,
+                    body.soul_path,
+                    body.user_path,
+                    expected_member_dir=provision_member_dir_name(target_member_id),
+                )
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

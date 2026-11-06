@@ -60,6 +60,8 @@ def tearDownModule():
 PUBLIC_PROJECTION_KEYS = {
     "request_key",
     "project_id",
+    "storage_layout",
+    "deployment_shape",
     "kind",
     "status",
     "effective_status",
@@ -398,6 +400,25 @@ class IntentTests(RoleRequestApiTestCase):
             rows = list(session.exec(select(RoleProvisionRequestRow)).all())
         self.assertEqual(len(rows), 1)
 
+    def test_layout_for_new_and_existing_request_rows(self):
+        first = self.create_intent()
+        self.assertEqual(first.status_code, 201, first.text)
+        with self.session() as session:
+            row = session.get(RoleProvisionRequestRow, "op-intent-0001")
+            self.assertEqual(row.storage_layout, "workspace-v1")
+            values = row.model_dump(exclude={"storage_layout"})
+            values.update(request_key="old-request-0001", role_name="old-role")
+            old = RoleProvisionRequestRow(**values)
+            self.assertEqual(old.storage_layout, "legacy")
+            session.add(old)
+            row.storage_layout = "legacy"
+            session.add(row)
+            session.commit()
+        replay = self.create_intent()
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertEqual(self.request_row("op-intent-0001").storage_layout, "legacy")
+        self.assertEqual(self.request_row("old-request-0001").storage_layout, "legacy")
+
     def test_same_key_different_payload_conflicts(self):
         self.assertEqual(self.create_intent().status_code, 201)
         conflict = self.create_intent(role_description="换一份说明")
@@ -562,6 +583,20 @@ class ClaimTests(RoleRequestApiTestCase):
 class DiscoveryTests(RoleRequestApiTestCase):
     """A7/A8：只读发现、失效 leased 的 effective_status 与投影白名单。"""
 
+    def test_projection_keeps_frozen_shape_and_claim_layout(self):
+        self.enable_host()
+        self.create_intent()
+        with self.session() as session:
+            row = session.get(RoleProvisionRequestRow, "op-intent-0001")
+            row.payload = {**row.payload, "deployment_shape": "git"}
+            session.add(row)
+            session.commit()
+        detail = self.get_request("op-intent-0001").json()
+        self.assertEqual(detail["deployment_shape"], "git")
+        claimed = self.claim("op-intent-0001").json()
+        self.assertEqual(claimed["deployment_shape"], "git")
+        self.assertEqual(claimed["storage_layout"], "workspace-v1")
+
     def test_list_filters_and_projection_whitelist(self):
         self.enable_host()
         self.create_intent()
@@ -570,6 +605,8 @@ class DiscoveryTests(RoleRequestApiTestCase):
         self.assertEqual(len(listing), 2)
         for item in listing:
             self.assertEqual(set(item.keys()), PUBLIC_PROJECTION_KEYS)
+            self.assertEqual(item["storage_layout"], "workspace-v1")
+            self.assertIsNone(item["deployment_shape"])
             self.assertTrue(item["claimable"])
             self.assertEqual(item["effective_status"], "requested")
 

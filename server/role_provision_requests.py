@@ -818,6 +818,7 @@ def create_request_intent(
         )
         row = RoleProvisionRequestRow(
             request_key=request_key,
+            storage_layout="workspace-v1",
             project_id=project_id,
             kind=kind,
             payload=normalized["payload"],
@@ -998,6 +999,8 @@ def request_projection(
     projection = {
         "request_key": row.request_key,
         "project_id": row.project_id,
+        "storage_layout": row.storage_layout,
+        "deployment_shape": payload.get("deployment_shape"),
         "kind": row.kind,
         "status": row.status,
         "effective_status": effective_status,

@@ -332,6 +332,7 @@ class ProjectRoleApiTests(RoleApiTestCase):
             self.assertEqual(member.kind, "agent")
             self.assertEqual(member.display_name, "后端开发")
             role_row = session.get(ProjectRole, ("prj_alpha", member_id))
+            self.assertEqual(role_row.storage_layout, "workspace-v1")
             self.assertEqual(role_row.credential_version, 1)
             self.assertEqual(role_row.identity_exclusive, 1)
             self.assertIsNotNone(role_row.key_issued_at)
@@ -345,6 +346,35 @@ class ProjectRoleApiTests(RoleApiTestCase):
         self.assertEqual(len(self.operation_rows()), 1)
         self.assertEqual(len(self.description_rows()), 1)
         self.assertEqual(self.description_rows()[0].description, "负责后端切片")
+
+    def test_replay_preserves_existing_layout(self):
+        args = dict(role_name="replay", choice_id=self.choice_id, operation_key="layout-replay-0001")
+        first = self.create_role("prj_alpha", **args)
+        self.assertEqual(first.status_code, 201, first.text)
+        member_id = first.json()["member_id"]
+        with self.session() as session:
+            row = session.get(ProjectRole, ("prj_alpha", member_id))
+            self.assertEqual(row.storage_layout, "workspace-v1")
+            row.storage_layout = "legacy"
+            session.add(row)
+            session.commit()
+        replay = self.create_role("prj_alpha", **args)
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertTrue(replay.json()["reused"])
+        self.assertEqual(replay.json()["member_id"], member_id)
+        self.assertEqual(self.role_rows()[0].storage_layout, "legacy")
+
+    def test_legacy_attach_keeps_legacy_layout(self):
+        self.sync_roster("prj_alpha", [{"member_id": "agent:worker"}])
+        with self.make_client() as client:
+            response = client.post(
+                "/api/projects/prj_alpha/roles/legacy-attach",
+                headers={"X-API-Key": "bobo-key"},
+                json={"member_id": "agent:worker", "runner_id": RUNNER_ID,
+                      "choice_id": self.choice_id, "operation_key": "layout-attach-0001"},
+            )
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(self.role_rows()[0].storage_layout, "legacy")
 
     def test_create_requires_human_and_valid_payload(self):
         self.assertEqual(
