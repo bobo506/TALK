@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 11:05 — W1 461 复验仅剩文档编码；462 fix2
+
+- **461 复验**：候选 9 套件独立重跑 **284/284 全绿**（138.839s，无 skip/xfail）；基线 7571910 克隆 279 真实项全绿（唯一 error 为新增测试模块在基线的预期 loader 失败），逐名无新增失败；4 套件更新无断言删除；run-due null 逐条 skipped、合法日程提交；群空串忽略；SDK 同步/异步一致；增量与 458 冻结候选一致，blob `ca39baa…`。
+- **唯一阻断**：`docs/spec/SDK.md:351` 为 15 个字面 0x3F（应为群过滤中文说明），需 UTF-8 重写；纯文档，不影响 284 项结论。
+- **462 fix2**：从 fix1 状态建 `.tmp/workspace-w1-fix2-20261106/candidate`（blob 同 `ca39baa`），派 Terra 只修该行并扫描三份改动文档的编码；不重跑 284 项。之后 k2.8 快速终验。
+- **W2 留项**：run-due null 日程永久重复 skipped（建议 disabled/error/清理指引）；web 422 detail 原始数组字符串。
+
 ## 2026-11-06 10:50 — W1 460 fix1 complete；461 复验；交付硬门固化
 
 - **460 交付 complete**：17 文件（16 tracked + 未跟踪新测试 `tests/test_workspace_boundary.py`）；9 套件 **284 项/156.406s 全绿**（`.tmp_fix_final.log`），中间 105 项全绿；4 个既有套件更新、SDK 文档/测试补 project_id、run-due 对 null 日程逐条 skipped、群空串过滤归一。
