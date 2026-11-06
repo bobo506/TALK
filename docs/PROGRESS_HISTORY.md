@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 09:55 — B 部署验证通过；工作区模型改为“终端决定”
+
+- **B 部署验证**：经用户授权，启动 w-d 内置服务（gen5/`ins_2ffa80acc329`），任务 457 在 20s 返回 `WD_B_OK`、`talk-delivery-1` complete，已收取；随后停止服务（gen6）。确认新 `workbuddy_bridge`/shim 已加载，正常结构化交付可用。真实慢流硬截止/repair 未在真实模型上压测（单测覆盖）。
+- **用户确定工作区模型**：TALK 不自己创建/选择工作区；工作区由**发起任务的 Agent 终端**（目录 / `.talk/project.yaml` 的 project_id）决定；页面不提供创建工作区入口；已加入工作区仍可在左上角下拉切换；同一时刻只激活一个视图；A 工作区在跑任务时切到 B **不停止**；登录恢复上次工作区；**历史无项目数据全部清除**；未来所有任务/文件/群必须带项目工作区。
+- **`prj_e8fe7066bbec`**：现有 TALK 目录（`D:\claude-test\TALK`）的项目记录，保留为 TALK 工作区；`prj_accept` 是测试项目（1 群、0 任务/角色），待确认清理。
+- **只读盘点**：无项目群仅 `test-run20`（23 条消息）；无项目任务/日程/文件均为 0；`files` 表 0 行。
+- **实施顺序（协调者定）**：W1 数据边界（禁止无项目任务/群/日程；File 加 project_id；清理 test-run20 与 prj_accept）→ W2 前端切换/上次工作区 → W3 每工作区角色运行时（并入延后的新建角色闭环）→ W4 双工作区验收。
+
 ## 2026-11-06 01:25 — B 完成并推送（fix3 approved）；454 设计交付
 
 - **456（k2.8）复验 approved**：453 两条 finding 已修复——fallback 在首轮 `end_turn` 后立即登记（`workbuddy_acp.py:260`），主线程 deadline 到期经 fallback 返回首轮文本+partial+`repair=timeout`；repair 异常三条件（AcpError timeout/httpx Timeout/`monotonic()>=deadline`）归类正确；窗口测试 10/10；4 滴流用例 30 批 0 失败；155 项 OK/44.8s；diff blob `f513821c` 一致；文档口径一致。
