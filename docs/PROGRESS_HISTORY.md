@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 16:45 — W2b 476 complete；477 复核
+
+- **476 complete**：19 文件（18 tracked + 未跟踪 `tests/workspace_project_switch.test.cjs`）；产品改动仅 `server/routes/projects.py`（agent 项目可见性）、`web/app.js`（群过滤/切换/上次工作区）、`web/index.html`、2 文档，其余为测试更新/新增。
+- **自测**：后端 68 项/47.942s、Node 406 项/6.221s、`node --check`/`git diff --check` 全绿；首次 8 项/17 项失败已修正并保留日志；真实浏览器双工作区/运行中任务未验。
+- **证据**：tracked diff LF blob `507f348c`（与协调者 gate 同口径一致）；交付副本 `.tmp/w2b-evidence/development.json`；日志同目录。
+- **477 复核**：k2.8 检查 Agent 可见性、`loadGroups` project_id、`setActiveProject` 清理跨项目群/历史且无 stop、任务/Hall/群/角色一致性、A/B 刷新保持、19 文件断言弱化、真实浏览器残余风险；通过后集成/部署 + 真实验收。
+
 ## 2026-11-06 16:30 — W2b 派发（476）
 
 - 用户明确“刷新后仍在最后工作区”=刷新前在 A 刷新后仍 A、切 B 后刷新仍 B；不是固定默认项目。确认后开 W2b。

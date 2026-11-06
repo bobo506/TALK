@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1、W2a 已部署；GATE-1 已集成 `4eceef7`；**W2b（476）已派 Terra**：群聊/Hall 按 `activeProjectId` 过滤、切换清理跨项目会话且不停止运行任务/服务、任务/Hall/群/角色全页面一致、刷新保持当前工作区、Agent 只列已加入项目、不新增创建工作区入口；候选基线 `b4b8d21`。
-- **卡点/待确认**：476 待交付/复核；真实浏览器双工作区验收需后续执行；W2 遗留 run-due null 永久 skipped、web 422 detail。
-- **下一步**：476 → 证据检查（gate 脚本可用）→ k2.8 复核 → 集成/部署 → 双工作区真实验收。
+- **当前状态**：B/C 完成；W1、W2a 已部署；GATE-1 已集成；**W2b（476）交付 complete**：19 文件（18 tracked + 1 未跟踪测试）；后端 68 项/47.942s、Node 406 项/6.221s 全绿；`node --check`/diff-check 通过；真实浏览器双工作区/运行中任务未验。**477 k2.8 独立复核中**（群过滤/全页面切换/上次工作区/无 stop/Agent 可见性/测试弱化/残余风险）。
+- **卡点/待确认**：477 结论待出；通过后集成/部署（前端静态 + API reload），再做真实浏览器双工作区验收。
+- **下一步**：477 → 集成/部署 → 真实浏览器验收（A 跑任务→切 B→回 A）→ W3 角色运行时/新建角色闭环。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 16:45（DeepSeek，**W2b 476 complete；477 复核**）：476 交付 19 文件（18 tracked + 未跟踪 `tests/workspace_project_switch.test.cjs`），product 只 `server/routes/projects.py`、`web/app.js`、`web/index.html` + 2 文档，其余测试；后端 68 项/47.942s、Node 406 项/6.221s、`node --check`/diff-check 全绿；tracked diff LF blob `507f348c` 与本地一致。真实浏览器双工作区/运行中任务未验（limitation）。477 派 k2.8：Agent 可见性、群过滤/切换清理、全页面一致性、上次工作区 A/B、无 stop、19 文件断言是否弱化、残余风险；通过后集成/部署。
 
 > 2026-11-06 16:30（DeepSeek，**W2b 派发 476**）：用户确认“刷新后仍停留在刷新前的工作区”后开 W2b。Terra 范围：①`GET /api/projects` human 全部/agent 只列 ProjectAgent 或 ProjectRole 已加入；②`loadGroups` 带 `project_id=activeProjectId`；③`setActiveProject` 重载 groups、清理不属于新项目的 activeGroup/历史、刷新 Hall/群/成员、**不调用任何 stop/start/取消**；④初始化先恢复上次项目再加载 tasks/agents/groups，无效回退；⑤创建群/任务/上传用 activeProjectId；⑥不新增创建工作区入口；⑦测试覆盖 A/B 刷新保持、不可用回退、Agent 可见性、群过滤/无 stop；⑧文档同步。候选基线 `b4b8d21`。
 
