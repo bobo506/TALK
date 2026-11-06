@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1、W2a 已部署；GATE-1 已集成；**W2b 477 复核 approved 并集成推送 `4b59603`**：19 文件；Agent 项目可见性、群聊按工作区过滤、切换清理跨项目会话且无 stop/start、上次工作区 A/B/回退、任务/Hall/群/角色一致。已 reload API：PID `23780→22168`，`/` 已加载 `app.js?v=20261106-workspace-w2b`；agent projects 1、groups 65；human groups 478。
-- **卡点/待确认**：真实浏览器 A/B 验收未做；当前只有 1 个工作区，需要临时第二工作区（或用户用 `talk init` 建）才能验证切换；W2 遗留 run-due null 永久 skipped、web 422 detail。
-- **下一步**：用户确认验收工作区方式 → 真实浏览器 A 跑任务→切 B→回 A（不停）→ 刷新保持 → W3（角色运行时/新建角色闭环）。
+- **当前状态**：B/C 完成；W1、W2a 已部署；GATE-1 已集成；W2b 已通过并部署（`4b59603`，API PID 22168）；**临时验收工作区已建**：`prj_w2baccept20261106`（`W2B 验收工作区`，root `.tmp/w2b-acceptance-20261106/workspace`，群 `group:04d3aa77c928`，0 任务/0 角色；Terra 加入返回 `identity_exclusive_reference_refused`，属 W3 跨工作区角色运行时问题，本片不处理）。human 下拉可见 2 个工作区，agent 仅 TALK。
+- **卡点/待确认**：真实浏览器验收待用户执行（A=TALK 数据多，B=验收工作区只有 1 群；切换/刷新/回 A 数据不变）；W2b 临时项目验收后删除；W2 遗留 run-due null skipped、web 422 detail。
+- **下一步**：用户浏览器验收 → 清理临时项目/群/目录 → W3（每工作区角色运行时/新建角色闭环）。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 19:45（DeepSeek，**创建 W2b 临时验收工作区**）：按用户选 1，创建 `prj_w2baccept20261106`（`W2B 验收工作区`，root `D:\claude-test\TALK\.tmp\w2b-acceptance-20261106\workspace`，human:bobo 维护者），群 `group:04d3aa77c928`（W2B 验收群）；Terra 同步返回 `identity_exclusive_reference_refused`（身份跨项目独占，W3 范围），因此验收项目 0 角色；任务必须 target agent，未创建占位任务。human 下拉应出现 2 项，agent 仍仅 TALK。待用户浏览器验收切换/刷新/回 A 数据不变；验收后删除临时项目/群/目录。
 
 > 2026-11-06 17:00（DeepSeek，**W2b 通过并部署；待真实浏览器验收**）：477 复核 approved：19 文件范围合规；后端 agent 过滤真实用 ProjectAgent/ProjectRole；`setActiveProject` 全文无 stop/start/cancel；群/任务/Hall/角色随 activeProjectId；上次工作区按成员四态覆盖；独立重跑 68 项/48.2s、Node 406/406/6.5s；基线 b4b8d21 对照 8+16 项基线失败全部修正、新增失败=0，非弱化。已集成 19 文件（LF blob `507f348c`），提交推送 `4b59603`；reload API 后 PID 22168、`/` 命中 `app.js?v=20261106-workspace-w2b`，agent projects 1、groups 65，human groups 478。真实浏览器 A/B 未验；当前仅 1 个工作区，需临时第二工作区才能验收切换。
 

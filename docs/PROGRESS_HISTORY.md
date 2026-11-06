@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 19:45 — 创建 W2b 临时验收工作区
+
+- 用户选“方案 1”：创建临时工作区用于真实浏览器 A/B 验收。
+- 项目 `prj_w2baccept20261106`（`W2B 验收工作区`，root `.tmp/w2b-acceptance-20261106/workspace`，human:bobo 维护者）；群 `group:04d3aa77c928`（W2B 验收群）。
+- `POST /projects/{id}/sync` 加 Terra 返回 `identity_exclusive_reference_refused`（身份跨项目独占），故验收项目 0 角色；任务必须 target agent，未创建占位任务，避免误触发执行。
+- human 项目下拉应 2 项（TALK + 验收），agent 仅 TALK；待用户浏览器验收：切换任务/Hall/群/角色、刷新保持、回 TALK 数据不变。验收后删除临时项目/群/目录。
+- **W3 信号**：角色身份跨项目独占正是 W3（每工作区角色运行时）要解决的问题。
+
 ## 2026-11-06 17:00 — W2b 通过、集成 `4b59603`、部署
 
 - **477 复核 approved**：19 文件范围合规；后端 agent 过滤真实用 ProjectAgent/ProjectRole；`setActiveProject` 全文无 stop/start/cancel；`loadGroups` 带 project_id、竞态防护；上次工作区按成员四态（A/B/missing/null）真实覆盖；独立重跑后端 68 项/48.2s、Node 406/406/6.5s；基线 b4b8d21 对照 8(py)+16(node) 项基线失败全部修正、新增失败=0，核实为陈旧断言/补桩而非弱化；真实浏览器未验列 limitation。
