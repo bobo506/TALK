@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 17:00 — W2b 通过、集成 `4b59603`、部署
+
+- **477 复核 approved**：19 文件范围合规；后端 agent 过滤真实用 ProjectAgent/ProjectRole；`setActiveProject` 全文无 stop/start/cancel；`loadGroups` 带 project_id、竞态防护；上次工作区按成员四态（A/B/missing/null）真实覆盖；独立重跑后端 68 项/48.2s、Node 406/406/6.5s；基线 b4b8d21 对照 8(py)+16(node) 项基线失败全部修正、新增失败=0，核实为陈旧断言/补桩而非弱化；真实浏览器未验列 limitation。
+- **集成**：19 文件复制到主工作树，LF blob `507f348c` 与候选一致；提交推送 `4b59603`。
+- **部署**：受控 reload API PID 23780→**22168**；`/` 返回 `app.js?v=20261106-workspace-w2b`；agent `GET /api/projects` 仅 TALK、groups 65；human groups 478。
+- **待验收**：真实浏览器 A/B 切换与“A 运行中切 B”未做；当前只有 1 个工作区，需要临时第二工作区（或用户 `talk init` 建）才能验证；验收后再 W3。
+
 ## 2026-11-06 16:45 — W2b 476 complete；477 复核
 
 - **476 complete**：19 文件（18 tracked + 未跟踪 `tests/workspace_project_switch.test.cjs`）；产品改动仅 `server/routes/projects.py`（agent 项目可见性）、`web/app.js`（群过滤/切换/上次工作区）、`web/index.html`、2 文档，其余为测试更新/新增。

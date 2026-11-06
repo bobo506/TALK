@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1、W2a 已部署；GATE-1 已集成；**W2b（476）交付 complete**：19 文件（18 tracked + 1 未跟踪测试）；后端 68 项/47.942s、Node 406 项/6.221s 全绿；`node --check`/diff-check 通过；真实浏览器双工作区/运行中任务未验。**477 k2.8 独立复核中**（群过滤/全页面切换/上次工作区/无 stop/Agent 可见性/测试弱化/残余风险）。
-- **卡点/待确认**：477 结论待出；通过后集成/部署（前端静态 + API reload），再做真实浏览器双工作区验收。
-- **下一步**：477 → 集成/部署 → 真实浏览器验收（A 跑任务→切 B→回 A）→ W3 角色运行时/新建角色闭环。
+- **当前状态**：B/C 完成；W1、W2a 已部署；GATE-1 已集成；**W2b 477 复核 approved 并集成推送 `4b59603`**：19 文件；Agent 项目可见性、群聊按工作区过滤、切换清理跨项目会话且无 stop/start、上次工作区 A/B/回退、任务/Hall/群/角色一致。已 reload API：PID `23780→22168`，`/` 已加载 `app.js?v=20261106-workspace-w2b`；agent projects 1、groups 65；human groups 478。
+- **卡点/待确认**：真实浏览器 A/B 验收未做；当前只有 1 个工作区，需要临时第二工作区（或用户用 `talk init` 建）才能验证切换；W2 遗留 run-due null 永久 skipped、web 422 detail。
+- **下一步**：用户确认验收工作区方式 → 真实浏览器 A 跑任务→切 B→回 A（不停）→ 刷新保持 → W3（角色运行时/新建角色闭环）。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 17:00（DeepSeek，**W2b 通过并部署；待真实浏览器验收**）：477 复核 approved：19 文件范围合规；后端 agent 过滤真实用 ProjectAgent/ProjectRole；`setActiveProject` 全文无 stop/start/cancel；群/任务/Hall/角色随 activeProjectId；上次工作区按成员四态覆盖；独立重跑 68 项/48.2s、Node 406/406/6.5s；基线 b4b8d21 对照 8+16 项基线失败全部修正、新增失败=0，非弱化。已集成 19 文件（LF blob `507f348c`），提交推送 `4b59603`；reload API 后 PID 22168、`/` 命中 `app.js?v=20261106-workspace-w2b`，agent projects 1、groups 65，human groups 478。真实浏览器 A/B 未验；当前仅 1 个工作区，需临时第二工作区才能验收切换。
 
 > 2026-11-06 16:45（DeepSeek，**W2b 476 complete；477 复核**）：476 交付 19 文件（18 tracked + 未跟踪 `tests/workspace_project_switch.test.cjs`），product 只 `server/routes/projects.py`、`web/app.js`、`web/index.html` + 2 文档，其余测试；后端 68 项/47.942s、Node 406 项/6.221s、`node --check`/diff-check 全绿；tracked diff LF blob `507f348c` 与本地一致。真实浏览器双工作区/运行中任务未验（limitation）。477 派 k2.8：Agent 可见性、群过滤/切换清理、全页面一致性、上次工作区 A/B、无 stop、19 文件断言是否弱化、残余风险；通过后集成/部署。
 
