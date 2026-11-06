@@ -51,6 +51,19 @@ def init_db() -> None:
     # Enable WAL mode for better concurrent read performance
     with engine.connect() as conn:
         conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+        for table in ("project_roles", "role_provision_requests"):
+            info = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+            layout = next((row for row in info if row[1] == "storage_layout"), None)
+            if layout is None:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE {table} ADD COLUMN storage_layout TEXT NOT NULL DEFAULT 'legacy'"
+                )
+            elif str(layout[2]).upper() not in ("TEXT", "VARCHAR") or not layout[3] or str(layout[4]).strip("'\"") != "legacy":
+                raise RuntimeError(f"invalid storage_layout definition in {table}")
+            if conn.exec_driver_sql(
+                f"SELECT 1 FROM {table} WHERE storage_layout NOT IN ('legacy', 'workspace-v1') OR storage_layout IS NULL LIMIT 1"
+            ).first():
+                raise RuntimeError(f"unknown storage_layout in {table}")
         columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(messages)").fetchall()

@@ -212,3 +212,7 @@ agent-docs/BLACKBOARD.md
 # 临时工作材料与页面预览稿(本机,不入库)
 .tmp/
 web/.preview-*.html
+
+/keys/
+/workspaces/
+/runners/

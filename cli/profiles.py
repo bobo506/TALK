@@ -192,3 +192,9 @@ def compose_system_prompt(base_prompt: str, profile: AgentProfile) -> str:
         parts.append(base_prompt.strip())
     parts.append(f"{SYSTEM_PROMPT_PROFILE_HEADER}\n\n{block}")
     return "\n\n".join(parts)
+
+
+def resolve_workspace_profile_reference(data_root: PathLike, project_id: str, member_id: str, layout: str, reference: str) -> Path:
+    """Resolve a workspace-v1 reference against the trusted data root."""
+    from server.workspace_paths import resolve_profile_reference
+    return resolve_profile_reference(Path(data_root), project_id, member_id, layout, reference)

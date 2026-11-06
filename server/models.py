@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field as PydField, StrictBool, field_validator, model_validator
-from sqlalchemy import CheckConstraint, Column, Index, JSON, text
+from sqlalchemy import CheckConstraint, Column, Index, JSON, Text, text
 from sqlmodel import Field, Session, SQLModel, select
 
 from server.hall_types import DEFAULT_HALL_TYPE, HALL_TYPES
@@ -871,6 +871,7 @@ class ProjectRole(SQLModel, table=True):
 
     project_id: str = Field(primary_key=True)
     member_id: str = Field(primary_key=True, index=True)
+    storage_layout: str = Field(default="legacy", sa_column=Column(Text, nullable=False, server_default="legacy"))
     role_name: str
     origin: str = Field(default=PROJECT_ROLE_ORIGIN_MANAGED)
     identity_exclusive: int = Field(default=0)
@@ -1196,6 +1197,7 @@ class RoleProvisionRequestRow(SQLModel, table=True):
 
     request_key: str = Field(primary_key=True)
     project_id: str
+    storage_layout: str = Field(default="legacy", sa_column=Column(Text, nullable=False, server_default="legacy"))
     kind: str
     payload: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     request_fingerprint: str

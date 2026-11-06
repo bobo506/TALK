@@ -2470,6 +2470,21 @@ def _abort(
     return document, 1
 
 
+def _workspace_key_target(data_root: Any, project_id: str, member_id: str, key_root: Any, repo_root: Any) -> Path:
+    """Accept only the resolver-derived project key directory for workspace-v1."""
+    from server.workspace_paths import WorkspacePathError, deployment_shape, is_within, key_path
+    try:
+        shape = deployment_shape(Path(data_root))
+        target = key_path(Path(data_root), project_id, member_id, git_key_root=Path(key_root))
+        if shape == "git" and is_within(target, Path(repo_root)):
+            raise WorkspacePathError("key_root_inside_repo")
+        if Path(key_root).expanduser().resolve() != target.parent:
+            raise WorkspacePathError("key_root_mismatch")
+        return target
+    except (WorkspacePathError, OSError) as exc:
+        raise ProvisionError("key_root_inside_repo", "workspace Key root does not match the trusted path") from exc
+
+
 def run_provision(
     *,
     project_id: str,
@@ -2490,6 +2505,8 @@ def run_provision(
     transport: Any = None,
     environ: Any = None,
     repo_root: Any = REPO_ROOT,
+    storage_layout: str = "legacy",
+    data_root: Any = None,
 ) -> tuple[dict[str, Any], int]:
     """执行一次 provision；返回 ``(JSON 文档, 退出码)``。
 
@@ -2533,6 +2550,8 @@ def run_provision(
         document["project_root"] = str(project_root)
         return _abort(document, states, selected, exc.code, exc.detail)
     document["project_root"] = str(project_root_resolved)
+    if storage_layout not in ("legacy", "workspace-v1"):
+        return _abort(document, states, selected, "invalid_storage_layout", "Unknown storage layout")
 
     key_root_value = DEFAULT_KEY_ROOT if key_root is None else key_root
     try:
@@ -2546,7 +2565,7 @@ def run_provision(
             document, states, selected, "key_write_failed", "Key 根无法解析"
         )
     document["key_root"] = str(key_root_resolved)
-    if _path_is_within(key_root_resolved, repo_root):
+    if storage_layout != "workspace-v1" and _path_is_within(key_root_resolved, repo_root):
         return _abort(
             document,
             states,
@@ -2560,10 +2579,13 @@ def run_provision(
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     try:
-        target_key_path = key_file_path(key_root_resolved, member_id)
+        target_key_path = (_workspace_key_target(repo_root if data_root is None else data_root, project_id, member_id, key_root_resolved, repo_root)
+                           if storage_layout == "workspace-v1" else key_file_path(key_root_resolved, member_id))
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     document["key_file_path"] = str(target_key_path)
+    if storage_layout == "workspace-v1" and apply:
+        return _abort(document, states, selected, "workspace_layout_not_ready", "Workspace provisioning is not enabled")
     lock_path = lock_path_for(target_key_path)
 
     # 2) dry-run：只读本地检查 + 打印计划，零写入、零 HTTP。
@@ -3202,6 +3224,8 @@ def run_request_provision(
     transport: Any = None,
     environ: Any = None,
     repo_root: Any = REPO_ROOT,
+    storage_layout: str = "legacy",
+    data_root: Any = None,
     locks: Any = None,
     operator_key: Optional[str] = None,
     eligibility_check: Any = None,
@@ -3269,6 +3293,8 @@ def run_request_provision(
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     document["project_root"] = str(project_root_resolved)
+    if storage_layout not in ("legacy", "workspace-v1"):
+        return _abort(document, states, selected, "invalid_storage_layout", "Unknown storage layout")
 
     key_root_value = DEFAULT_KEY_ROOT if key_root is None else key_root
     try:
@@ -3280,7 +3306,7 @@ def run_request_provision(
     except OSError:
         return _abort(document, states, selected, "key_write_failed", "Key 根无法解析")
     document["key_root"] = str(key_root_resolved)
-    if _path_is_within(key_root_resolved, repo_root):
+    if storage_layout != "workspace-v1" and _path_is_within(key_root_resolved, repo_root):
         return _abort(
             document,
             states,
@@ -3291,10 +3317,13 @@ def run_request_provision(
 
     try:
         profile_paths = profile_target_paths(project_root_resolved, member_id)
-        target_key_path = key_file_path(key_root_resolved, member_id)
+        target_key_path = (_workspace_key_target(repo_root if data_root is None else data_root, project_id, member_id, key_root_resolved, repo_root)
+                           if storage_layout == "workspace-v1" else key_file_path(key_root_resolved, member_id))
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     document["key_file_path"] = str(target_key_path)
+    if storage_layout == "workspace-v1":
+        return _abort(document, states, selected, "workspace_layout_not_ready", "Workspace provisioning is not enabled")
 
     # R1-4b：调用方（worker）可在同一临界区里先核本机 Key 并做受限发布，再把已持有的锁
     # 交给本函数复用；未提供时按 R1-2 原顺序自行取锁。
