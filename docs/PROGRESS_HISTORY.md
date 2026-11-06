@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 14:55 — W2a 467 仅剩文档编码；468 fix2；编码规则入 gate
+
+- **467 复核**：候选 9 模块独立 223/223 全绿（221.966s，无 skip）；基线 9b91650 同清单 193 项恰两项已知失败，候选新增失败=0；fix1 仅改两处测试、无断言弱化；`talk_follow_tasks` 确为第 10 个正式工具；W2a 路径验收 30 项通过；5 文件/生成物/主工作树/DB/diff blob 均通过。
+- **唯一阻断**：`docs/spec/PROJECT_INTEGRATION.md:811` 为 104 个字面 `?` 的 mojibake（464 已存在），需 UTF-8 重写一行；纯文档不重跑测试。
+- **468 fix2**：从 fix1 状态建 `.tmp/workspace-w2a-fix2-20261106/candidate`（tracked diff blob `02410106`），只改该行；要求编码自检（该行 `?`=0、无 U+FFFD、strict UTF-8）+ `git diff --check`；之后 k2.8 快速终验。
+- **门禁回归**：文档变更必须附 strict UTF-8 + `?{2,}`/U+FFFD 扫描（开发/复核各一次），已写入 TASK_WORKFLOW 7.1.1；W1 fix2、W2a fix2 作为回归用例。
+
 ## 2026-11-06 14:35 — W2a fix1（466）全绿；467 复核
 
 - **466 complete**：9 模块 **223 项/231.071s 全绿**（`.tmp/workspace-w2a-fix1-20261106/task-466-unittest.log`，`Ran 223 tests ... OK`）；只补两处基线测试：assignment 4 个 POST 加 `project_id="prj_ctl"`、`PROJECT_TOOL_NAMES` 追加 `talk_follow_tasks` 且长度 10；W2a 产品实现与新增测试保持 464 状态。

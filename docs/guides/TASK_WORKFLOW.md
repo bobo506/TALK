@@ -236,6 +236,7 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 - **门禁回归规则（2026-11-06 用户确定）**：决策者发现新的任务包歧义或门禁漏检时，必须把**可机械化的部分**补进 gate 规则/manifest 字段，并加回归用例；不可机械化的保留为人工判断。规则/字段由决策者维护，脚本代码变更仍走开发与复核。已登记的两个例子：
   - 任务包引用候选差异时必须使用有类型的 `candidate.tracked_diff_blob`（`git diff | git hash-object --stdin`）与 `candidate.untracked_files[]` 分开，禁止裸写“blob”；预派发 lint 校验二者与候选 `git status` 一致。
   - 涉及工具面/常量集合变更时，manifest 必须显式声明 `authorized_mutations`（如 `TOOL_SCHEMAS`/`PROJECT_TOOL_NAMES` 的期望长度与元素）；预派发 lint 对照仓库实际值，未声明即阻断。
+  - 文档变更必须附 **strict UTF-8** + 连续 `?{2,}`/U+FFFD 扫描结果；开发自测与复核各跑一次。此类编码问题作为回归用例（W1 fix2、W2a fix2 已登记）。
 
 ### 7.2 审查任务包模板（发给复核 Agent）
 

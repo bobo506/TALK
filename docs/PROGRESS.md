@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1 已部署验证；**W2a fix1（466）交付 complete**：9 模块 **223 项/231.071s 全绿**，只补两处基线测试（assignment 4 处 project_id、工具常量 `talk_follow_tasks` + 长度 10）；W2a 产品实现（路径规范化/唯一性）未改；候选 4 tracked + 新测试，tracked diff blob `02410106…`。**467 k2.8 定向复验中**（候选+基线对照）。
-- **卡点/待确认**：467 结论待出；通过后集成 W2a、受控 reload 部署；gate 脚本小片排在 W2a 之后；W2b 未开始。
-- **下一步**：467 → 集成/部署 + 真实 API 路径校验 → gate 脚本（manifest/lint/回归规则）→ W2b（前端全页面切换/上次工作区）。
+- **当前状态**：B/C 完成；W1 已部署验证；**W2a 467 复核 changes_requested，唯一阻断为文档编码**：候选 9 模块 223 项独立复跑全绿（221.966s），基线 9b91650 193 项恰两项已知失败、新增失败=0；fix1 仅改两处测试、无断言弱化；`talk_follow_tasks` 确为正式第 10 工具；W2a 路径验收 30 项通过。**468 fix2** 只修 `docs/spec/PROJECT_INTEGRATION.md:811` 的 104 个 `?` 乱码（一行 UTF-8），并新增文档编码自检。
+- **卡点/待确认**：468 待交付/终验；W2a 未通过前不集成；gate 脚本仍排在 W2a 之后；W2b 未开始。
+- **下一步**：468 → k2.8 快速终验 → 集成 W2a + 受控 reload 部署 + 真实 API 路径校验 → gate 脚本（manifest/lint，含文档编码回归）→ W2b。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 14:55（DeepSeek，**467 仅剩文档编码；468 fix2；文档编码纳入门禁回归**）：467 独立复跑候选 9 模块 **223/223 全绿**（221.966s，无 skip）；基线 9b91650 同清单 193 项恰两项已知失败（assignment 缺 project_id、tool 数 9 vs 10），候选新增失败=0；fix1 仅改 `tests/test_project_controller_assignment.py` 两处，无断言弱化；`talk_follow_tasks` 确为 `TOOL_SCHEMAS` 第 10 个正式工具；W2a 路径验收 30 项通过；diff blob/日志/边界一致。**唯一阻断**：`docs/spec/PROJECT_INTEGRATION.md:811` 为 104 个字面 `?` 的 mojibake（464 已存在，fix1 未引入），需一行 UTF-8 重写。已建 fix2 候选派 468，并新增文档编码回归规则：文档变更必须附 strict UTF-8 + `?{2,}`/U+FFFD 扫描，开发/复核各跑一次（写入 TASK_WORKFLOW 7.1.1）。
 
 > 2026-11-06 14:35（DeepSeek，**466 全绿；467 复核**）：466 交付 complete：9 模块 **223 项/231.071s 全绿**，日志 `.tmp/workspace-w2a-fix1-20261106/task-466-unittest.log`（尾部 `Ran 223 tests ... OK`）；只改两处测试——assignment 4 个 POST 补 `project_id="prj_ctl"`、`PROJECT_TOOL_NAMES` 追加 `talk_follow_tasks` 且长度 10；W2a 产品实现、`test_project_root_identity.py` 等保持 464 状态。候选 4 tracked + 1 未跟踪，tracked diff blob `02410106…`；生成物 `Microsoft/`、`.tmp-tests` 不纳入。467 已派 k2.8：独立跑 9 模块 + 基线 9b91650 逐名对照、检查两处测试无弱化、W2a 路径验收、changed_files/日志/diff blob。
 
