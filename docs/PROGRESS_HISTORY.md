@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-06 10:30 — W1 复核 changes_requested；460 集中返修
+
+- **459 复核结论**：changes_requested。范围/文件授权/strip/迁移（生产备份副本实测）通过；但候选 50 项非通过：`test_tasks` 3F/25E、`test_groups` 9F/1E、`test_task_binding_snapshot` 2F、`test_talk_client` 5E；同基线 7571910 克隆 103 项全绿，排除环境。`docs/spec/SDK.md:51,137` 未跟 `send_file` 新签名；`run-due` 遇历史 null 日程整批回滚；群过滤空串返回 0 条；web 422 展示原始 detail（W2）。
+- **460 fix1**：从 458 候选状态建 `.tmp/workspace-w1-fix1-20261106/candidate`（11 tracked + 新测试，blob `89c1cb11`），派 Terra 集中返修：4 套件补 project_id/改 backward-compat 为 422；SDK 文档与测试补 project_id；run-due 跳过 null 并逐条回报；群空串过滤归一化。要求全绿后交 k2.8 复验。
+- **协调者未跑测试**，仅核对差异并按新流程转交。
+
 ## 2026-11-06 10:25 — W1（458）交付 partial；459 复核派发
 
 - **458 交付 partial**：12 文件（11 tracked + 新增未跟踪 `tests/test_workspace_boundary.py`）；实现任务/群/日程/文件项目必填、文件按项目授权、迁移、web/SDK 上传参数、文档。
