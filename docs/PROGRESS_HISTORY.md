@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-06 14:10 — W2a 464 partial；465 仅修两项基线测试
+
+- **464 实现**：`project_root_path` 非空时必须绝对/存在/为目录，`resolve()` 规范落库；Windows 大小写不敏感唯一（create/patch 冲突 409）；PATCH 清空 422；失败不写库；新增 `tests/test_project_root_identity.py`，更新假路径测试与 `PROJECT_INTEGRATION.md`。
+- **交付 partial**：指定 9 套件 223 项中 2 项失败，逐名对照基线 9b91650 同败：①`test_assignment_does_not_change_task_permissions` 4 处任务 POST 未补 `project_id`（W1 合同遗漏）；②`test_tool_surface_unchanged...` 期望 9 工具、实际 10（`talk_get_delivery` 已存在，测试未更新）。
+- **465 fix1**：从 W2a 状态建 fix1 候选（4 tracked + 新测试，blob `5dad2be3`），只改上述两个测试点；要求 9 套件全绿、原始日志、changed_files 排除 `Microsoft/`/`.tmp-tests` 生成物；不改 W2a 产品实现。之后 k2.8 复核。
+
 ## 2026-11-06 13:50 — W1 部署验证完成；W2a 派发（464）
 
 - **W1 部署**：runtime 受控 reload（`reload-api.request`），API PID 3000→21360，`/healthz` 200；迁移 `files`/`agent_task_schedules` 补列+索引生效；数据计数 463/464/18/0/0（+6 任务/6 Hall 为本批工作）；真实 API 无项目任务/群/上传 422、群过滤 200、run-due 200，未新增数据。
