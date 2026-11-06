@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 11:15 — W1 通过终验、集成推送 `44f4d18`；部署待确认
+
+- **463 终验 approved**：fix2 与 fix1 逐字节仅 `docs/spec/SDK.md:351` 一行；Python UTF-8 读回正常中文；三份文档无 0x3F 连串/U+FFFD；无代码/测试变化，461 的 284/284 全绿继续成立；未跟踪新测试保留；`git diff --check` 干净。
+- **集成**：fix2 17 文件应用到主工作树，diff blob `06a6f841` 与候选一致（含 `tests/test_workspace_boundary.py`）；提交并推送 `44f4d18`。
+- **部署**：生产 API 未重启，`files`/`agent_task_schedules` 补列与索引迁移尚未在运行实例执行；生产库已备份 `backups/workspace-w1-backup-20261106.db`。等用户确认部署窗口。
+- **W1 收尾**：458 partial、459/460/461/462/463 已收取；W2 遗留 run-due null 永久 skipped、web 422 detail、真实浏览器/e2e 未验。
+
 ## 2026-11-06 11:10 — W1 462 fix2 文档修复；463 快速终验
 
 - **462 complete**：只改 `docs/spec/SDK.md:351`；自报 UTF-8 正确、0x3F 为 0、相对 fix1 仅该行；候选 blob `06a6f841…`。
