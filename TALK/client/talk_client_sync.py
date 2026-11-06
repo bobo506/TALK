@@ -55,12 +55,13 @@ class TalkClientSync:
         self,
         path,
         *,
+        project_id: str,
         caption: str | None = None,
         to: str | list[str] | tuple[str, ...] | None = None,
         reply_to: int | None = None,
         group_id: str | None = None,
     ) -> dict[str, Any]:
-        return self._submit(self._client.send_file(path, caption=caption, to=to, reply_to=reply_to, group_id=group_id))
+        return self._submit(self._client.send_file(path, project_id=project_id, caption=caption, to=to, reply_to=reply_to, group_id=group_id))
 
     def revoke(self, message_id: int) -> dict[str, Any]:
         return self._submit(self._client.revoke(message_id))
@@ -88,6 +89,7 @@ class TalkClientSync:
         self,
         name: str,
         *,
+        project_id: str,
         group_id: str | None = None,
         description: str | None = None,
         member_ids: list[str] | tuple[str, ...] | None = None,
@@ -96,6 +98,7 @@ class TalkClientSync:
             self._client.create_group(
                 name,
                 group_id=group_id,
+                project_id=project_id,
                 description=description,
                 member_ids=member_ids,
             )
@@ -434,6 +437,7 @@ class TalkClientSync:
         target_member_id: str,
         content: str,
         *,
+        project_id: str,
         title: str | None = None,
         run_at: datetime | str | None = None,
         interval_seconds: int | None = None,
@@ -442,6 +446,7 @@ class TalkClientSync:
             self._client.create_task_schedule(
                 target_member_id,
                 content,
+                project_id=project_id,
                 title=title,
                 run_at=run_at,
                 interval_seconds=interval_seconds,

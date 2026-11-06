@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlmodel import select
 
 import server.routes.files as files_route
-from server.models import File
+from server.models import File, Project
 from server.routes.files import download_file, purge_expired_files
 from tests.test_support import RouteTestCase
 
@@ -15,6 +15,9 @@ class FilesRouteTests(RouteTestCase):
     def setUp(self):
         super().setUp()
         self.human = self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        with self.session() as session:
+            session.add(Project(project_id="test-project", display_name="Test", maintainer_member_id=self.human.id))
+            session.commit()
 
     def test_first_upload_logs_dedup_miss_and_creates_one_blob(self):
         content = b"same-bytes"
@@ -23,6 +26,7 @@ class FilesRouteTests(RouteTestCase):
             with self.make_client() as client:
                 response = client.post(
                     "/api/files",
+                    data={"project_id": "test-project"},
                     headers={"X-API-Key": "bobo-key"},
                     files={"file": ("first.txt", content, "text/plain")},
                 )
@@ -43,6 +47,7 @@ class FilesRouteTests(RouteTestCase):
         with self.make_client() as client:
             response = client.post(
                 "/api/files",
+                    data={"project_id": "test-project"},
                 headers={"X-API-Key": "bobo-key"},
                 files={"file": ("hello.txt", content, "text/plain")},
             )
@@ -73,10 +78,12 @@ class FilesRouteTests(RouteTestCase):
         with self.make_client() as client:
             missing_header = client.post(
                 "/api/files",
+                    data={"project_id": "test-project"},
                 files={"file": ("hello.txt", b"hello", "text/plain")},
             )
             invalid_key = client.post(
                 "/api/files",
+                    data={"project_id": "test-project"},
                 headers={"X-API-Key": "bad-key"},
                 files={"file": ("hello.txt", b"hello", "text/plain")},
             )
@@ -92,6 +99,7 @@ class FilesRouteTests(RouteTestCase):
             with self.make_client() as client:
                 response = client.post(
                     "/api/files",
+                    data={"project_id": "test-project"},
                     headers={"X-API-Key": "bobo-key"},
                     files={"file": ("huge.bin", b"1234", "application/octet-stream")},
                 )
@@ -113,6 +121,7 @@ class FilesRouteTests(RouteTestCase):
         with self.make_client() as client:
             upload_response = client.post(
                 "/api/files",
+                    data={"project_id": "test-project"},
                 headers={"X-API-Key": "bobo-key"},
                 files={"file": ("build.zip", content, "application/zip")},
             )
@@ -143,6 +152,7 @@ class FilesRouteTests(RouteTestCase):
         with self.make_client() as client:
             first_response = client.post(
                 "/api/files",
+                    data={"project_id": "test-project"},
                 headers={"X-API-Key": "bobo-key"},
                 files={"file": ("first.bin", content, "application/octet-stream")},
             )
@@ -152,6 +162,7 @@ class FilesRouteTests(RouteTestCase):
             with self.assertLogs("talk.files", level="INFO") as logs:
                 second_response = client.post(
                     "/api/files",
+                    data={"project_id": "test-project"},
                     headers={"X-API-Key": "bobo-key"},
                     files={"file": ("second.bin", content, "application/octet-stream")},
                 )

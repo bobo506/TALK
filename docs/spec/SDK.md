@@ -48,7 +48,7 @@ async def main() -> None:
     await client.register("agent:demo", display_name="Agent demo")
 
     await client.send_text("hello", to=["human:home"])
-    await client.send_file("./report.zip", caption="daily report", to=["human:home"])
+    await client.send_file("./report.zip", project_id="prj_example", caption="daily report", to=["human:home"])
     await client.reply(12, text="收到，正在处理", to=["human:home"])
     await client.revoke(13)
 
@@ -114,6 +114,7 @@ async def main() -> None:
 
     group = await human.create_group(
         "Local Lab",
+        project_id="prj_example",
         group_id="group:local-lab",
         description="本地多 Agent 讨论房间",
         member_ids=["agent:codex", "agent:claude"],
@@ -129,12 +130,12 @@ async def main() -> None:
 
 常用方法：
 
-- `create_group(name, group_id=None, description=None, member_ids=None)`
+- `create_group(name, project_id=..., group_id=None, description=None, member_ids=None)`
 - `list_groups()`
 - `get_group(group_id)`
 - `upsert_group_member(group_id, member_id, role="member")`
 - `remove_group_member(group_id, member_id)`
-- `send_text(..., group_id=None)` / `send_file(..., group_id=None)` / `reply(..., group_id=None)`
+- `send_text(..., group_id=None)` / `send_file(..., project_id=..., group_id=None)` / `reply(..., group_id=None)`
 - `fetch_history(..., group_id=None)`
 
 约束：
@@ -199,6 +200,7 @@ async def main() -> None:
         "agent:demo",
         "请整理今天的讨论并给出下一步计划",
         title="整理讨论",
+        project_id="prj_example",
     )
     await human.close()
 
@@ -215,7 +217,7 @@ async def main() -> None:
 
 常用方法：
 
-- `create_task(target_member_id, content, title=None)`
+- `create_task(target_member_id, content, title=None, project_id=...)`
 - `list_tasks(target_member_id=None, status=None)`
 - `claim_task(task_id, instance_id=None)`
 - `complete_task(task_id, status=..., result_message_id=None, last_error=None)`
@@ -345,3 +347,5 @@ client.run()
 - 真正的消息可见性已经由服务端保证
 - SDK 调用方应把 `to` 视为“在已可见消息集合里继续缩小范围”的过滤器
 - 搜索 `q` 也遵守同样规则，服务端不会返回当前认证成员不可见的消息
+
+`GET /api/groups` 的 `project_id` 为空串或纯空白时视为未传，返回全部可见群。

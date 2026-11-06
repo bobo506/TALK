@@ -119,8 +119,9 @@ def create_group(
     if session.get(Group, group_id) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="group id already exists")
 
-    if body.project_id is not None:
-        _ensure_project_exists(body.project_id, session)
+    if not body.project_id or not body.project_id.strip():
+        raise HTTPException(status_code=422, detail="project_id_required")
+    _ensure_project_exists(body.project_id, session)
 
     member_ids = list(dict.fromkeys([current.id, *body.member_ids]))
     for member_id in member_ids:
@@ -159,11 +160,14 @@ def create_group(
 
 @router.get("", response_model=list[GroupOut])
 def list_groups(
+    project_id: str | None = None,
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
     """List Groups visible to the current member."""
     stmt = select(Group)
+    if project_id and project_id.strip():
+        stmt = stmt.where(Group.project_id == project_id.strip())
     if current.kind != "human":
         stmt = stmt.join(GroupMember, GroupMember.group_id == Group.id).where(GroupMember.member_id == current.id)
     groups = session.exec(stmt.order_by(Group.created_at.desc())).all()

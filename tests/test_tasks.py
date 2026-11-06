@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
 import server.db as db
-from server.models import AgentInstance, AgentTask
+from server.models import AgentInstance, AgentTask, AgentTaskSchedule, Project
 from tests.test_support import RouteTestCase
 
 
@@ -11,6 +11,9 @@ class AgentTaskTests(RouteTestCase):
     def setUp(self):
         super().setUp()
         self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        with self.session() as session:
+            session.add(Project(project_id="prj_fixture", display_name="Fixture", maintainer_member_id="human:bobo"))
+            session.commit()
         self.add_member("human:alice", api_key="alice-key", display_name="Alice")
         self.add_member("agent:codex", api_key="codex-key", display_name="Codex")
         self.add_member("agent:other", api_key="other-key", display_name="Other")
@@ -131,7 +134,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "title": "Smoke",
                     "content": "Run the smoke task",
@@ -232,7 +235,7 @@ class AgentTaskTests(RouteTestCase):
             self_assignment = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "codex-key"},
-                json={"target_member_id": "agent:codex", "content": "hello"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "hello"},
             )
 
         self.assertEqual(unknown_project.status_code, 400)
@@ -243,7 +246,7 @@ class AgentTaskTests(RouteTestCase):
             custom = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Allow two rounds",
                     "max_clarification_rounds": 2,
@@ -252,7 +255,7 @@ class AgentTaskTests(RouteTestCase):
             too_few = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Invalid zero rounds",
                     "max_clarification_rounds": 0,
@@ -261,7 +264,7 @@ class AgentTaskTests(RouteTestCase):
             too_many = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Invalid unlimited rounds",
                     "max_clarification_rounds": 3,
@@ -283,7 +286,7 @@ class AgentTaskTests(RouteTestCase):
             locked_root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "No delegation"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "No delegation"},
             ).json()
             client.post(
                 f"/api/tasks/{locked_root['id']}/claim",
@@ -341,7 +344,7 @@ class AgentTaskTests(RouteTestCase):
             agent_override = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "other-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Unauthorized root override",
                     "may_delegate": True,
@@ -720,7 +723,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Legacy clients do not send quality fields",
                 },
@@ -1795,7 +1798,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "One child only",
                     "may_delegate": True,
@@ -1842,7 +1845,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Authorize exactly one child slice",
                     "may_delegate": True,
@@ -1900,7 +1903,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Pause and resume this tree",
                     "may_delegate": True,
@@ -2015,7 +2018,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Expire this authorization",
                     "may_delegate": True,
@@ -2085,7 +2088,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Simulate the pause propagation window",
                 },
@@ -2128,7 +2131,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Checkpoint then cancel",
                     "may_delegate": True,
@@ -2199,7 +2202,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "One running child",
                     "may_delegate": True,
@@ -2250,7 +2253,7 @@ class AgentTaskTests(RouteTestCase):
             root = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "One running task per target",
                     "may_delegate": True,
@@ -2300,7 +2303,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Do the thing"},
             )
             task = created.json()
             wrong_clarification = client.post(
@@ -2459,7 +2462,7 @@ class AgentTaskTests(RouteTestCase):
             task = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Bounded clarification",
                     "max_clarification_rounds": 1,
@@ -2575,7 +2578,7 @@ class AgentTaskTests(RouteTestCase):
             task = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Concurrent clarification"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Concurrent clarification"},
             ).json()
         questions = [
             self.add_message(
@@ -2620,7 +2623,7 @@ class AgentTaskTests(RouteTestCase):
             pending = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Cancel before claim"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Cancel before claim"},
             ).json()
             wrong_member = client.post(
                 f"/api/tasks/{pending['id']}/cancel",
@@ -2638,7 +2641,7 @@ class AgentTaskTests(RouteTestCase):
             running = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Already running"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Already running"},
             ).json()
             client.post(
                 f"/api/tasks/{running['id']}/claim",
@@ -2663,7 +2666,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Protected Hall"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Protected Hall"},
             ).json()
             hall_group_id = created["hall_group_id"]
             add_member = client.put(
@@ -2694,12 +2697,12 @@ class AgentTaskTests(RouteTestCase):
             missing = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:missing", "content": "hello"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:missing", "content": "hello"},
             )
             human = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "human:bobo", "content": "hello"},
+                json={"project_id": "prj_fixture", "target_member_id": "human:bobo", "content": "hello"},
             )
 
         self.assertEqual(missing.status_code, 400)
@@ -2715,7 +2718,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Do the thing"},
             )
             claimed = client.post(
                 f"/api/tasks/{created.json()['id']}/claim",
@@ -2741,7 +2744,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Do the thing"},
             )
             human_claim = client.post(
                 f"/api/tasks/{created.json()['id']}/claim",
@@ -2768,7 +2771,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Do the thing"},
             )
             task_id = created.json()["id"]
 
@@ -2831,7 +2834,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Recover me"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Recover me"},
             )
             task_id = created.json()["id"]
             first_claim = client.post(
@@ -2900,7 +2903,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Do the thing"},
             )
             response = client.post(
                 f"/api/tasks/{created.json()['id']}/claim",
@@ -2921,7 +2924,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Do the thing"},
             )
             client.post(
                 f"/api/tasks/{created.json()['id']}/claim",
@@ -2963,7 +2966,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Do the thing"},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Do the thing"},
             )
             client.post(
                 f"/api/tasks/{created.json()['id']}/claim",
@@ -2999,7 +3002,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks/schedules",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "title": "Later",
                     "content": "Run later",
@@ -3026,7 +3029,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks/schedules",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Run now", "run_at": run_at},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Run now", "run_at": run_at},
             )
             materialized = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "bobo-key"})
             materialized_task = materialized.json()["created_tasks"][0]
@@ -3052,13 +3055,33 @@ class AgentTaskTests(RouteTestCase):
         self.assertEqual(payload["updated_schedules"][0]["last_task_id"], payload["created_tasks"][0]["id"])
         self.assertEqual(second_run.json()["created_tasks"], [])
 
+    def test_run_due_skips_legacy_null_project_and_commits_valid_schedule(self):
+        run_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+        with self.session() as session:
+            legacy = AgentTaskSchedule(project_id=None, target_member_id="agent:codex", created_by="human:bobo", content="Legacy", schedule_type="once", next_run_at=run_at)
+            session.add(legacy)
+            session.commit()
+            session.refresh(legacy)
+            legacy_id = legacy.id
+        with self.make_client() as client:
+            valid = client.post("/api/tasks/schedules", headers={"X-API-Key": "bobo-key"}, json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Valid", "run_at": run_at.isoformat()})
+            self.assertEqual(valid.status_code, 201, valid.text)
+            result = client.post("/api/tasks/schedules/run-due", headers={"X-API-Key": "bobo-key"})
+            self.assertEqual(result.status_code, 200, result.text)
+            payload = result.json()
+            self.assertEqual(payload["skipped"], [{"schedule_id": legacy_id, "reason": "project_id_required"}])
+            self.assertEqual([t["schedule_id"] for t in payload["created_tasks"]], [valid.json()["id"]])
+            self.assertEqual(payload["updated_schedules"][0]["status"], "completed")
+            self.assertEqual(client.get(f"/api/tasks/schedules/{legacy_id}", headers={"X-API-Key": "bobo-key"}).json()["status"], "active")
+            self.assertEqual(client.get(f"/api/tasks/{payload['created_tasks'][0]['id']}", headers={"X-API-Key": "bobo-key"}).status_code, 200)
+
     def test_run_due_interval_schedule_advances_next_run(self):
         run_at = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
         with self.make_client() as client:
             created = client.post(
                 "/api/tasks/schedules",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "target_member_id": "agent:codex",
                     "content": "Run repeatedly",
                     "run_at": run_at,
@@ -3086,7 +3109,7 @@ class AgentTaskTests(RouteTestCase):
             created = client.post(
                 "/api/tasks/schedules",
                 headers={"X-API-Key": "bobo-key"},
-                json={"target_member_id": "agent:codex", "content": "Run later", "run_at": run_at},
+                json={"project_id": "prj_fixture", "target_member_id": "agent:codex", "content": "Run later", "run_at": run_at},
             )
             wrong_agent = client.patch(
                 f"/api/tasks/schedules/{created.json()['id']}",

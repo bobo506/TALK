@@ -10,6 +10,7 @@ import uvicorn
 
 import server.main as main
 from TALK.client import TalkClient, TalkClientSync
+from server.models import ProjectAgent
 from tests.test_support import RouteTestCase
 
 
@@ -48,6 +49,11 @@ class TalkClientTests(RouteTestCase):
         self.human = self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
         self.agent = self.add_member("agent:demo", api_key="demo-key", display_name="Demo")
         self.other = self.add_member("agent:other", api_key="other-key", display_name="Other")
+
+        self.register_project("prj_sdk_fixture")
+        with self.session() as session:
+            session.add(ProjectAgent(project_id="prj_sdk_fixture", member_id="agent:demo"))
+            session.commit()
 
         self._old_ping_interval = main.WS_PING_INTERVAL
         self._old_ping_timeout = main.WS_PING_TIMEOUT
@@ -117,7 +123,7 @@ class TalkClientTests(RouteTestCase):
 
         async def scenario(base_url: str) -> None:
             async with TalkClient(base_url, "demo-key") as agent_client:
-                created = await agent_client.send_file(upload_path, caption="demo artifact", to=["human:bobo"])
+                created = await agent_client.send_file(upload_path, project_id="prj_sdk_fixture", caption="demo artifact", to=["human:bobo"])
 
             self.assertEqual(created["type"], "file")
             self.assertEqual(created["filename"], "sdk-upload.txt")
@@ -277,6 +283,7 @@ class TalkClientTests(RouteTestCase):
                 control_root = await human_client.create_task(
                     "agent:demo",
                     "Exercise async task-tree controls",
+                    project_id="prj_sdk_async",
                     may_delegate=True,
                     slice_budget=1,
                     authorization_ttl_seconds=60,
@@ -375,7 +382,7 @@ class TalkClientTests(RouteTestCase):
                 )
                 canceled_tree = await human_client.cancel_task_tree(control_root["id"])
 
-            self.assertEqual(queued[0]["id"], created["id"])
+            self.assertEqual({task["id"] for task in queued}, {created["id"], control_root["id"]})
             self.assertEqual(fetched["project_id"], "prj_sdk_async")
             self.assertEqual(clarification["workflow_status"], "clarification_requested")
             self.assertEqual(answered["workflow_status"], "clarification_answered")
@@ -523,6 +530,7 @@ class TalkClientTests(RouteTestCase):
                 control_root = human_client.create_task(
                     "agent:demo",
                     "Exercise sync task-tree controls",
+                    project_id="prj_sdk_sync",
                     may_delegate=True,
                     slice_budget=1,
                     authorization_ttl_seconds=60,
@@ -612,7 +620,7 @@ class TalkClientTests(RouteTestCase):
                 agent_client.close()
                 human_client.close()
 
-        self.assertEqual([task["id"] for task in queued], [created["id"]])
+        self.assertEqual({task["id"] for task in queued}, {created["id"], control_root["id"]})
         self.assertEqual(fetched["project_id"], "prj_sdk_sync")
         self.assertEqual(fetched["task_kind"], "general")
         self.assertEqual(relations, [])
@@ -645,6 +653,7 @@ class TalkClientTests(RouteTestCase):
                 created = await human_client.create_task_schedule(
                     "agent:demo",
                     "Run scheduled SDK task",
+                    project_id="prj_sdk_fixture",
                     title="SDK schedule",
                     run_at=run_at,
                 )
@@ -664,6 +673,7 @@ class TalkClientTests(RouteTestCase):
             async with TalkClient(base_url, "bobo-key") as human_client:
                 group = await human_client.create_group(
                     "SDK Lab",
+                    project_id="prj_sdk_fixture",
                     group_id="group:sdk-lab",
                     description="Created from SDK tests",
                     member_ids=["agent:demo"],

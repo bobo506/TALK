@@ -2,7 +2,7 @@ import json
 
 from sqlmodel import select
 
-from server.models import DiscussionSession, DiscussionTurn, GroupMember, Message
+from server.models import DiscussionSession, DiscussionTurn, GroupMember, Message, Project
 from tests.test_support import RouteTestCase
 
 
@@ -10,6 +10,9 @@ class GroupRouteTests(RouteTestCase):
     def setUp(self):
         super().setUp()
         self.add_member("human:bobo", api_key="bobo-key", display_name="Bobo")
+        with self.session() as session:
+            session.add(Project(project_id="prj_fixture", display_name="Fixture", maintainer_member_id="human:bobo"))
+            session.commit()
         self.add_member("human:alice", api_key="alice-key", display_name="Alice")
         self.add_member("agent:codex", api_key="codex-key", display_name="Codex")
         self.add_member("agent:other", api_key="other-key", display_name="Other")
@@ -19,7 +22,7 @@ class GroupRouteTests(RouteTestCase):
             created = client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={
+                json={"project_id": "prj_fixture",
                     "id": "group:lab",
                     "name": "Local Lab",
                     "description": "Agent discussion room",
@@ -41,12 +44,21 @@ class GroupRouteTests(RouteTestCase):
         self.assertEqual([group["id"] for group in codex_groups.json()], ["group:lab"])
         self.assertEqual(other_groups.json(), [])
 
+    def test_empty_project_filter_is_ignored(self):
+        with self.make_client() as client:
+            created = client.post("/api/groups", headers={"X-API-Key": "bobo-key"}, json={"project_id": "prj_fixture", "id": "group:filter", "name": "Filter"})
+            self.assertEqual(created.status_code, 201, created.text)
+            for value in ("", "   "):
+                result = client.get("/api/groups", headers={"X-API-Key": "bobo-key"}, params={"project_id": value})
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual([group["id"] for group in result.json()], ["group:filter"])
+
     def test_human_can_add_update_and_remove_group_members(self):
         with self.make_client() as client:
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab"},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab"},
             )
             added = client.put(
                 "/api/groups/group:lab/members/agent:codex",
@@ -82,7 +94,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab"},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab"},
             )
             added = client.put(
                 "/api/groups/group:lab/members/agent:codex",
@@ -109,7 +121,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab"},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab"},
             )
             client.put(
                 "/api/groups/group:lab/members/agent:codex",
@@ -133,7 +145,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab"},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab"},
             )
             bad = client.put(
                 "/api/groups/group:lab/members/agent:codex",
@@ -149,7 +161,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
             )
         msg = self.add_message(
             from_id="agent:codex", to_ids=None, message_type="text",
@@ -188,7 +200,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
             )
             forbidden = client.delete("/api/groups/group:lab", headers={"X-API-Key": "codex-key"})
             still_there = client.get("/api/groups/group:lab", headers={"X-API-Key": "bobo-key"})
@@ -205,7 +217,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab", "description": "Old"},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab", "description": "Old"},
             )
             updated = client.patch(
                 "/api/groups/group:lab",
@@ -224,7 +236,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
             )
             updated = client.patch(
                 "/api/groups/group:lab",
@@ -260,16 +272,15 @@ class GroupRouteTests(RouteTestCase):
                 json={"id": "group:legacy", "name": "历史群"},
             )
 
-        self.assertEqual(created.status_code, 201)
-        self.assertIsNone(created.json()["project_id"])
-        self.assertEqual(created.json()["type"], "free")
+        self.assertEqual(created.status_code, 422)
+        self.assertEqual(created.json()["detail"], "project_id_required")
 
     def test_group_can_be_created_with_hall_type(self):
         with self.make_client() as client:
             created = client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:ideas", "name": "点子会", "type": "BrainStorm"},
+                json={"project_id": "prj_fixture", "id": "group:ideas", "name": "点子会", "type": "BrainStorm"},
             )
             fetched = client.get("/api/groups/group:ideas", headers={"X-API-Key": "bobo-key"})
 
@@ -282,7 +293,7 @@ class GroupRouteTests(RouteTestCase):
             created = client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:bogus", "name": "坏类型", "type": "bogus"},
+                json={"project_id": "prj_fixture", "id": "group:bogus", "name": "坏类型", "type": "bogus"},
             )
 
         self.assertEqual(created.status_code, 422)
@@ -302,7 +313,7 @@ class GroupRouteTests(RouteTestCase):
             client.post(
                 "/api/groups",
                 headers={"X-API-Key": "bobo-key"},
-                json={"id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
+                json={"project_id": "prj_fixture", "id": "group:lab", "name": "Local Lab", "member_ids": ["agent:codex"]},
             )
             agent_update = client.put(
                 "/api/groups/group:lab/members/agent:other",

@@ -1641,9 +1641,12 @@ def _create_task_with_hall(
 
 
 def _create_task_from_schedule(schedule: AgentTaskSchedule, now: datetime, session: Session) -> AgentTask:
+    if not schedule.project_id:
+        raise HTTPException(status_code=422, detail="project_id_required")
+    _ensure_project_exists(schedule.project_id, session)
     return _create_task_with_hall(
         schedule_id=schedule.id,
-        project_id=None,
+        project_id=schedule.project_id,
         target_member_id=schedule.target_member_id,
         created_by=schedule.created_by,
         content=schedule.content,
@@ -1695,6 +1698,8 @@ def create_task(
     if body.parent_task_id is None:
         _ensure_root_governance_request_allowed(body, current)
         project_id = body.project_id
+        if not project_id or not project_id.strip():
+            raise HTTPException(status_code=422, detail="project_id_required")
         _ensure_project_exists(project_id, session)
         parent_task_id = None
         root_task_id = None
@@ -1741,6 +1746,8 @@ def create_task(
         milestone_test_required = body.milestone_test_required
     else:
         parent, root, project_id, delegation_depth = _resolve_child_context(body, current, session)
+        if not project_id or not project_id.strip():
+            raise HTTPException(status_code=422, detail="project_id_required")
         _ensure_project_exists(project_id, session)
         try:
             _reserve_authorized_descendant(
@@ -1917,12 +1924,14 @@ def create_task_schedule(
     """Create a one-off or interval task schedule."""
     begin_immediate_write(session)
     _ensure_target_agent(body.target_member_id, session)
-    _ensure_target_role_not_archived(None, body.target_member_id, session)
-    _ensure_target_role_not_archived(None, current.id, session)
+    _ensure_project_exists(body.project_id, session)
+    _ensure_target_role_not_archived(body.project_id, body.target_member_id, session)
+    _ensure_target_role_not_archived(body.project_id, current.id, session)
     _ensure_distinct_participants(current.id, body.target_member_id)
     now = datetime.now(timezone.utc)
     run_at = body.run_at or now
     schedule = AgentTaskSchedule(
+        project_id=body.project_id,
         target_member_id=body.target_member_id,
         created_by=current.id,
         content=body.content,
@@ -1990,7 +1999,11 @@ def run_due_task_schedules(
     schedules = session.exec(stmt.order_by(AgentTaskSchedule.next_run_at.asc())).all()  # type: ignore[union-attr]
     created_tasks: list[AgentTask] = []
     updated_schedules: list[AgentTaskSchedule] = []
+    skipped = []
     for schedule in schedules:
+        if not schedule.project_id or not schedule.project_id.strip():
+            skipped.append({"schedule_id": schedule.id, "reason": "project_id_required"})
+            continue
         task = _create_task_from_schedule(schedule, now, session)
         session.flush()
 
@@ -2011,7 +2024,7 @@ def run_due_task_schedules(
         session.refresh(task)
     for schedule in updated_schedules:
         session.refresh(schedule)
-    return {"created_tasks": created_tasks, "updated_schedules": updated_schedules}
+    return {"created_tasks": created_tasks, "updated_schedules": updated_schedules, "skipped": skipped}
 
 
 @router.get("/schedules/{schedule_id}", response_model=AgentTaskScheduleOut)

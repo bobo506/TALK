@@ -11,13 +11,13 @@ from urllib.parse import quote
 from uuid import uuid4
 
 import aiofiles
-from fastapi import APIRouter, Depends, File as FastAPIFile, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File as FastAPIFile, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
 from server.db import STORAGE_DIR, UPLOAD_MAX_MB, get_session
-from server.models import File, FileOut, Member, Message
+from server.models import File, FileOut, Member, Message, Project, ProjectAgent, ProjectRole
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 logger = logging.getLogger("talk.files")
@@ -106,13 +106,30 @@ async def _iter_file(path: Path):
             yield chunk
 
 
+def _authorize_project_file(project_id: str | None, current: Member, session: Session, *, uploader_id: str | None = None) -> None:
+    if current.kind == "human":
+        return
+    if project_id is not None and uploader_id == current.id:
+        return
+    if project_id is not None and (session.get(ProjectAgent, (project_id, current.id)) is not None or session.get(ProjectRole, (project_id, current.id)) is not None):
+        return
+    raise HTTPException(status_code=403, detail="project file access denied")
+
+
 @router.post("", response_model=FileOut, status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile = FastAPIFile(...),
+    project_id: str = Form(...),
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
     """Upload a file and store its metadata."""
+    project_id = project_id.strip()
+    if not project_id:
+        raise HTTPException(status_code=422, detail="project_id_required")
+    if session.get(Project, project_id) is None:
+        raise HTTPException(status_code=400, detail="project_id not found")
+    _authorize_project_file(project_id, current, session)
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -165,6 +182,7 @@ async def upload_file(
 
     record = File(
         id=file_id,
+        project_id=project_id,
         filename=file.filename,
         mime=mime,
         size_bytes=size_bytes,
@@ -175,7 +193,7 @@ async def upload_file(
     session.add(record)
     session.commit()
 
-    return FileOut(file_id=file_id, filename=record.filename, size_bytes=record.size_bytes)
+    return FileOut(file_id=file_id, filename=record.filename, size_bytes=record.size_bytes, project_id=project_id)
 
 
 @router.get("/{file_id}")
@@ -195,6 +213,7 @@ async def download_file(
             detail="file expired" if expired_reference is not None else "file not found",
         )
 
+    _authorize_project_file(record.project_id, _current, session, uploader_id=record.uploader_id)
     disk_path = _resolve_disk_path(record.path)
     if not disk_path.exists() or not disk_path.is_file():
         raise HTTPException(

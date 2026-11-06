@@ -65,6 +65,7 @@ class File(SQLModel, table=True):
     __tablename__ = "files"
 
     id: str = Field(primary_key=True)  # uuid4
+    project_id: Optional[str] = Field(default=None, foreign_key="projects.project_id", index=True)
     filename: str
     mime: Optional[str] = None
     size_bytes: int
@@ -2580,6 +2581,8 @@ class AgentTaskRelation(SQLModel, table=True):
 class AgentTaskSchedule(SQLModel, table=True):
     __tablename__ = "agent_task_schedules"
 
+    project_id: Optional[str] = Field(default=None, foreign_key="projects.project_id", index=True)
+
     id: Optional[int] = Field(default=None, primary_key=True)
     target_member_id: str = Field(foreign_key="members.id", index=True)
     created_by: str = Field(foreign_key="members.id", index=True)
@@ -2751,6 +2754,7 @@ class MessageReplyOut(BaseModel):
 
 
 class FileOut(BaseModel):
+    project_id: Optional[str] = None
     file_id: str
     filename: str
     size_bytes: int
@@ -3464,6 +3468,7 @@ class AgentTaskTreeOut(BaseModel):
 
 
 class AgentTaskScheduleCreate(BaseModel):
+    project_id: str
     target_member_id: str
     content: str
     title: Optional[str] = None
@@ -3472,6 +3477,9 @@ class AgentTaskScheduleCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_schedule_create(self) -> "AgentTaskScheduleCreate":
+        self.project_id = self.project_id.strip()
+        if not self.project_id:
+            raise ValueError("project_id_required")
         self.target_member_id = self.target_member_id.strip()
         self.content = self.content.strip()
         if self.title is not None:
@@ -3497,6 +3505,7 @@ class AgentTaskScheduleUpdate(BaseModel):
 
 
 class AgentTaskScheduleOut(BaseModel):
+    project_id: Optional[str] = None
     id: int
     target_member_id: str
     created_by: str
@@ -3512,7 +3521,13 @@ class AgentTaskScheduleOut(BaseModel):
     updated_at: datetime
 
 
+class AgentTaskScheduleSkipOut(BaseModel):
+    schedule_id: int
+    reason: str
+
+
 class AgentTaskScheduleRunOut(BaseModel):
+    skipped: list[AgentTaskScheduleSkipOut] = []
     created_tasks: list[AgentTaskOut]
     updated_schedules: list[AgentTaskScheduleOut]
 

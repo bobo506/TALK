@@ -130,6 +130,7 @@ class TalkClient:
         self,
         path: str | Path,
         *,
+        project_id: str,
         caption: str | None = None,
         to: str | list[str] | tuple[str, ...] | None = None,
         reply_to: int | None = None,
@@ -143,7 +144,7 @@ class TalkClient:
             uploaded = await self._request_json(
                 "POST",
                 "/api/files",
-                files={"file": (file_path.name, fh, "application/octet-stream")},
+                files={"file": (file_path.name, fh, "application/octet-stream"), "project_id": (None, project_id)},
             )
 
         payload: JsonDict = {
@@ -203,12 +204,14 @@ class TalkClient:
         self,
         name: str,
         *,
+        project_id: str,
         group_id: str | None = None,
         description: str | None = None,
         member_ids: list[str] | tuple[str, ...] | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "id": group_id,
+            "project_id": project_id,
             "name": name,
             "description": description,
             "member_ids": list(member_ids or []),
@@ -573,12 +576,14 @@ class TalkClient:
         target_member_id: str,
         content: str,
         *,
+        project_id: str,
         title: str | None = None,
         run_at: datetime | str | None = None,
         interval_seconds: int | None = None,
     ) -> JsonDict:
         payload: JsonDict = {
             "target_member_id": target_member_id,
+            "project_id": project_id,
             "content": content,
             "title": title,
             "run_at": run_at.isoformat() if isinstance(run_at, datetime) else run_at,

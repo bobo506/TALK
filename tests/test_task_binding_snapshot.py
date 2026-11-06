@@ -935,24 +935,14 @@ class TargetBindingSnapshotCreationTests(b1a_fixtures.BindingApiTestCase):
             self.assertNotIn(snapshot["binding_fingerprint"], text_field)
             self.assertNotIn('"runner_id"', text_field)
 
-    def test_task_without_project_freezes_no_project_snapshot(self):
+    def test_task_without_project_is_rejected(self):
         with self.make_client() as client:
             created = client.post(
-                "/api/tasks",
-                headers={"X-API-Key": "bobo-key"},
+                "/api/tasks", headers={"X-API-Key": "bobo-key"},
                 json={"target_member_id": "agent:worker", "content": "No project"},
             )
-        self.assertEqual(created.status_code, 201, created.text)
-        body = created.json()
-        self.assertEqual(body["target_binding_state"], "no_project")
-        snapshot = body["target_binding_snapshot"]
-        self.assertEqual(tuple(snapshot), TARGET_BINDING_SNAPSHOT_KEYS)
-        self.assertEqual(snapshot["state"], "no_project")
-        for field in BINDING_FIELDS:
-            self.assertIsNone(snapshot[field], field)
-        stored, state = self._snapshot(body["id"])
-        self.assertEqual(stored, snapshot)
-        self.assertEqual(state, "no_project")
+        self.assertEqual(created.status_code, 422)
+        self.assertEqual(created.json()["detail"], "project_id_required")
 
     def test_subtask_resolves_its_own_target_and_parent_snapshot_is_untouched(self):
         self._bound_project("prj_child", alias="dsh/worker-alias")
@@ -1009,7 +999,8 @@ class TargetBindingSnapshotCreationTests(b1a_fixtures.BindingApiTestCase):
             child_body["target_binding_snapshot"]["binding_fingerprint"],
         )
 
-    def test_schedule_materialization_writes_no_project_snapshots_for_every_task(self):
+    def test_schedule_materialization_writes_project_snapshots_for_every_task(self):
+        self.register_project("prj_schedule_snapshot")
         run_at = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
         with self.make_client() as client:
             for index in (1, 2):
@@ -1017,6 +1008,7 @@ class TargetBindingSnapshotCreationTests(b1a_fixtures.BindingApiTestCase):
                     "/api/tasks/schedules",
                     headers={"X-API-Key": "bobo-key"},
                     json={
+                        "project_id": "prj_schedule_snapshot",
                         "target_member_id": "agent:worker",
                         "content": f"Scheduled {index}",
                         "run_at": run_at,
@@ -1030,13 +1022,13 @@ class TargetBindingSnapshotCreationTests(b1a_fixtures.BindingApiTestCase):
         created_tasks = materialized.json()["created_tasks"]
         self.assertEqual(len(created_tasks), 2)
         for task in created_tasks:
-            self.assertEqual(task["target_binding_state"], "no_project")
+            self.assertEqual(task["target_binding_state"], ROLE_BINDING_NOT_IN_ROSTER)
             snapshot = task["target_binding_snapshot"]
             self.assertEqual(tuple(snapshot), TARGET_BINDING_SNAPSHOT_KEYS)
             for field in BINDING_FIELDS:
                 self.assertIsNone(snapshot[field], field)
             stored, state = self._snapshot(task["id"])
-            self.assertEqual(state, "no_project")
+            self.assertEqual(state, ROLE_BINDING_NOT_IN_ROSTER)
             self.assertEqual(stored, snapshot)
 
     def test_cancelled_and_completed_tasks_keep_their_snapshot_bytes(self):

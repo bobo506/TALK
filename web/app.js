@@ -2827,6 +2827,7 @@ async function sendFileMessage(caption = null) {
 async function uploadPendingFile() {
   const form = new FormData();
   form.append("file", pendingFile);
+  form.append("project_id", (blackboardOpen ? activeProjectId : getActiveGroup()?.project_id) || activeProjectId || "");
 
   const res = await apiFetch("/api/files", {
     method: "POST",

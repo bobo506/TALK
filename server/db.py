@@ -358,6 +358,11 @@ def init_db() -> None:
             )
         if "launch_id" not in instance_columns:
             conn.exec_driver_sql("ALTER TABLE agent_instances ADD COLUMN launch_id TEXT")
+        for table in ("files", "agent_task_schedules"):
+            columns = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()}
+            if "project_id" not in columns:
+                conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN project_id TEXT REFERENCES projects(project_id)")
+            conn.exec_driver_sql(f"CREATE INDEX IF NOT EXISTS ix_{table}_project_id ON {table} (project_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_files_sha256 ON files (sha256)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_from_id ON messages (from_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_messages_group_id ON messages (group_id)")
