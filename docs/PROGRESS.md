@@ -12,6 +12,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-06 22:27（DeepSeek，**479 复核 changes_requested；交付格式两次无效**）：479 独立复核 W3a 设计稿：6 pass / 1 fail / 2 needs_change——fail 为建议命令 `python -m pytest` 不可用（应 `python -m unittest`，10 个测试文件均在）；needs_change 为 `server/db.py` 须进白名单（仓库无迁移模块，只在内联 `ALTER TABLE` 改 schema）、`workspaces/<p>/roles/<m>/` 目录链创建者与半创建恢复未写明；另 2 处行号差 1。479 与 480 两次投递均被判 `invalid`（数组字段写成字符串；单条 456>300；`complete` 与 `verification.result=fail` 自相矛盾），已按"已处理"收件，结论仅作 v2 修正依据。已把 `talk-delivery-1` 机械约束固化进 `TASK_WORKFLOW.md` 7.1.1（数组/对象类型、单条 20–300、`fail` 时结论必须 `partial`、禁 `schema` 字段）。481 正在出设计稿 v2（并入 Key 部署形态与 `runners/` 决策）。
+
 > 2026-11-06 22:25（DeepSeek，**Key 存放与运行器目录决策**）：用户确定——①开发期本机 TALK 处于 git 工作区，Key 不落 TALK 目录（沿用仓库外 `~/.talk/keys`，现"拒绝仓库内 Key"守卫保留）；TALK 正式使用/分发后（数据根非 git 工作区），Key 作为角色要素落 `TALK/keys/<project_id>/`，`.gitignore` 补 `/keys/` 兜底。②TALK 下为终端运行器提供独立目录 `runners/<runtime>/`，只存适配数据/元数据（模型清单/别名、强度选项、版本基线、探测缓存），不放凭据/登录态、不托管 CLI 本体。已写入 `docs/spec/WORKSPACE_STORAGE_DECISION.md` 决策 7/8 与目录图，`DEVELOPMENT_ROADMAP.md` 登记为 W3 之后的独立切片；W3a 设计据此修正（原"仓库根工作区默认保留旧 Key 路径"改为按部署形态自动判定）。
 
 > 2026-11-06 22:00（DeepSeek，**工作区存储方向确定**）：中央库 + 每工作区目录；真实项目在 TALK 外只放 `.talk/project.yaml`；`TALK/workspaces/<project_id>/` 放角色运行时/任务附件/日志；不拆库；文件夹绿色版分发。详见 `docs/spec/WORKSPACE_STORAGE_DECISION.md`。W3 先设计/拆分，不直接开发。
