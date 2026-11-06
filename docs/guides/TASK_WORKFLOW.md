@@ -233,6 +233,9 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 - **开发任务正文必须写死**：运行指定全部套件并**全绿**；`partial` 只允许真实外部阻塞，已知失败不得交付；交付包附命令、原始日志路径、项数/耗时、失败名（若有）、基线 commit、候选 diff blob；`changed_files` 必须包含新增/未跟踪文件。
 - **复核任务正文必须写死**：独立重跑**候选 + 基线**，逐名对比新增失败/错误；原始日志与对照写入复核材料；缺基线对照、证据不一致、断言弱化均判 `changes_requested`。
 - **协调者收货顺序**：先检查上述门禁证据；缺失直接退回开发，不进入复核。复核通过后才集成/收尾；协调者不重复跑测试。
+- **门禁回归规则（2026-11-06 用户确定）**：决策者发现新的任务包歧义或门禁漏检时，必须把**可机械化的部分**补进 gate 规则/manifest 字段，并加回归用例；不可机械化的保留为人工判断。规则/字段由决策者维护，脚本代码变更仍走开发与复核。已登记的两个例子：
+  - 任务包引用候选差异时必须使用有类型的 `candidate.tracked_diff_blob`（`git diff | git hash-object --stdin`）与 `candidate.untracked_files[]` 分开，禁止裸写“blob”；预派发 lint 校验二者与候选 `git status` 一致。
+  - 涉及工具面/常量集合变更时，manifest 必须显式声明 `authorized_mutations`（如 `TOOL_SCHEMAS`/`PROJECT_TOOL_NAMES` 的期望长度与元素）；预派发 lint 对照仓库实际值，未声明即阻断。
 
 ### 7.2 审查任务包模板（发给复核 Agent）
 

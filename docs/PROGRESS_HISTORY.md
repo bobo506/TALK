@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-06 14:30 — 门禁回归规则加入 TASK_WORKFLOW
+
+- 用户确定：决策者发现任务包歧义/门禁漏检时，把**可机械化部分**补进 gate 规则/manifest 字段并加回归用例；不可机械化保留人工判断；规则/字段由决策者维护，脚本代码变更仍走开发/复核。
+- 已登记两例：①候选差异用 `candidate.tracked_diff_blob`（`git diff | git hash-object --stdin`）+ `candidate.untracked_files[]` 分开，禁止裸“blob”；预派发 lint 对照候选 `git status`。②工具面/常量集合变更必须在 manifest 声明 `authorized_mutations`（如 `TOOL_SCHEMAS`/`PROJECT_TOOL_NAMES` 的长度与元素），未声明阻断。465 的两处歧义作为首批回归用例。
+- gate 脚本仍排在 W2a 之后；不改变“脚本只做机械检查、决策角色保留最终判断”的边界。
+
 ## 2026-11-06 14:20 — 465 blocked 为任务歧义；466 澄清授权
 
 - **465 blocked**：未改任何文件。①任务写 `5dad2be3…` 是候选 tracked diff blob，Terra 用未跟踪新测试单文件 hash 比较，误判候选漂移；②`TOOL_SCHEMAS` 10 项（第 10 `talk_follow_tasks`），`PROJECT_TOOL_NAMES` 9 项，任务只授权长度 10 未授权补常量，元组相等仍失败。
