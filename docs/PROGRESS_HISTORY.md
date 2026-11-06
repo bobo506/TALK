@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 16:20 — GATE-1 通过并集成 `4eceef7`
+
+- **475 终验 approved**：F1–F5 全部真实修复；14 项 gate 测试独立复跑全绿、基线 c66ba07 27 项全绿、新增失败=0、无断言弱化；cp936 下 pass/fail 两态 `--json` UTF-8 可解析；脚本 0 处 `?{2,}`/U+FFFD；F3 文档为 gate 自算 LF 口径；F4 CLI 子进程 exit 1/pass JSON；F5 delivery 模板无 schema。
+- **Blob 权威值**：`git diff` 子进程 LF 字节流 = `cce2166d990bced7c041f28bd0cc6f5e8f910bb4`；协调者本地 PS 管道 `202d37c0` 是 LF→CRLF 污染，Terra 交付值正确；manifest/交付应写 LF 值。
+- **集成**：3 文件复制到主工作树，tracked diff LF blob 与候选一致；提交推送 `4eceef7`（+417/−1）。
+- **下一步 W2b**：群聊/Hall 按 activeProjectId 过滤；切换清理跨项目会话选择但不停止运行任务/服务；任务/角色页已项目化需全页面验证；Agent 只列已加入项目；刷新恢复上次工作区；不提供创建工作区入口。
+
 ## 2026-11-06 16:05 — GATE-1 fix2 全绿；475 复核
 
 - **474 complete**：F1–F5 修复；`tests.test_acceptance_gate` **14 项/17.626s**、27 项回归全绿；脚本无 `?{2,}` 占位（协调者扫描确认）；delivery 文档补模板/无 schema；候选 3 文件（1 tracked + 2 未跟踪），无业务代码/前端。
