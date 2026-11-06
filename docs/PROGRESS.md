@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成并推送；工作区模型按用户 2026-11-06 确定；无项目历史清理完成；**W1 已部署并验证**：受控 reload 后 API 新 PID `21360`、`/healthz` 200；`files.project_id`、`agent_task_schedules.project_id` 及索引已迁移；数据计数 tasks 463/groups 464/roles 18/files 0/schedules 0（新增 6 任务/6 Hall 为本批工作，非丢失）；真实 API：无项目任务/群/上传均 422、`GET /groups?project_id=` 200、`run-due` 200。
-- **卡点/待确认**：W2 未开始；需确认 W2 拆分与范围（建议 W2a 路径唯一/规范化 → W2b 前端全页面切换/上次工作区 → 真实浏览器验收）；W2 遗留：run-due null 永久 skipped、web 422 detail。
-- **下一步**：用户确认 W2 范围 → 派 Terra 开发、k2.8 复核；每片按交付硬门（全绿/基线对照/原始日志/未跟踪文件）。
+- **当前状态**：B/C 完成并推送；工作区模型按用户 2026-11-06 确定；无项目历史清理完成；**W1 已部署并验证**（API PID 21360、迁移生效、无项目任务/群/上传 422、群过滤 200）；**W2a（464）已派 Terra**：`project_root_path` 绝对/存在/规范化、大小写不敏感唯一（409）、PATCH 不允许清空；候选基线 `9b91650`，按交付硬门执行。
+- **卡点/待确认**：W2a 待交付/复核；W2b 前端全页面切换/上次工作区未开始；W2 遗留：run-due null 永久 skipped、web 422 detail。
+- **下一步**：464 → 检查交付证据（全绿/日志/changed_files）→ 派 k2.8 复核（固定清单+疑问）→ 集成/部署 → W2b → 双工作区验收。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 13:50（DeepSeek，**W1 部署验证完成；W2a 派发 464**）：W1 已用 runtime 受控 reload 部署（API PID 21360、迁移列/索引生效、无项目任务/群/上传 422、群过滤/run-due 200、数据计数 intact）。用户确认 W2a 先行。464 已派 Terra：项目根路径必须绝对/存在/为目录、`resolve()` 规范化落库、Windows 大小写不敏感唯一（409）、PATCH 不允许清空、失败不写库；更新假路径测试；新建 `tests/test_project_root_identity.py`；候选基线 `9b91650`。要求指定 9 套件全绿 + 原始日志 + changed_files（含未跟踪）才可 complete；交付后 k2.8 复核（固定清单+疑问）。
 
 > 2026-11-06 11:25（DeepSeek，**W1 已部署并真实验证**）：经用户“部署”授权，使用 runtime 受控 reload（写 `reload-api.request`，不重启角色宿主）后 API 由 PID 3000 切到 **21360**，`/healthz` 200，marker 已被 runtime 清理。迁移核对：`files.project_id`、`agent_task_schedules.project_id` 及 `ix_*_project_id` 均存在；数据计数 tasks 463、groups 464、roles 18、files 0、schedules 0（比清理时多 6 任务/6 Hall，均为 W1 开发/复核任务，非丢失）。真实 API 检查：无项目任务/群/上传均 422、`GET /groups?project_id=prj_e8fe7066bbec` 200（464 个群均为该项目）、`run-due` 200、`/api/projects` 200；检查请求未新增数据。
 

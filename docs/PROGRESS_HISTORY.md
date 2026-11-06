@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-06 13:50 — W1 部署验证完成；W2a 派发（464）
+
+- **W1 部署**：runtime 受控 reload（`reload-api.request`），API PID 3000→21360，`/healthz` 200；迁移 `files`/`agent_task_schedules` 补列+索引生效；数据计数 463/464/18/0/0（+6 任务/6 Hall 为本批工作）；真实 API 无项目任务/群/上传 422、群过滤 200、run-due 200，未新增数据。
+- **W2a（464）**：用户确认先做路径身份。派 Terra：`project_root_path` 绝对/存在/目录、`resolve()` 规范落库、Windows 大小写不敏感唯一（409）、PATCH 清空 422、失败不写库；更新假路径测试 + 新增 `tests/test_project_root_identity.py`；指定 9 套件全绿 + 原始日志 + changed_files（含未跟踪）才可 complete。候选基线 `9b91650`。
+- **下一步**：464 交付 → 证据检查 → k2.8 复核 → 集成/部署 → W2b 前端切换。
+
 ## 2026-11-06 11:25 — W1 部署与真实验证
 
 - **部署方式**：写 `C:\Users\Administrator\.talk\role-service-host\runtime\reload-api.request`，由 `talk_runtime` 受控 `reload_api`（控制文件停止旧 API 并启动新进程，角色宿主保留）；marker 被 runtime 自动清理。
