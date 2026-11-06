@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 15:15 — W2a 部署与真实验证
+
+- **部署**：用户“先部署”授权；runtime 受控 reload（`reload-api.request`），API PID 21360→**23780**，`/healthz` 200，marker 自动清理；角色宿主未重启；W2a 无 schema 变更。
+- **真实 API**：重复 `D:\claude-test\TALK`（exact/case）→409 `project_root_path_conflict`；相对路径→422 `project_root_path_relative`；不存在/文件→422 `project_root_path_invalid`；PATCH 清空→422 `project_root_path_required`；`GET /api/projects` 200。
+- **数据**：projects 1、根路径未变、roles 18；tasks 469/groups 470（较 W1 时 +6，为 W2a 任务/Hall，非丢失）。
+- **下一步**：gate 脚本小片（manifest/lint + 文档编码/常量授权/tracked diff blob 回归，用 465/467/468 做用例）→ W2b。
+
 ## 2026-11-06 15:05 — W2a 通过终验、集成推送 `eb5b129`
 
 - **469 终验 approved**：`docs/spec/PROJECT_INTEGRATION.md:811` 与期望原文精确相等，`?`=0、U+FFFD=0、strict UTF-8；与 fix1 仅该行不同；无代码/测试变化，467 的 223/223 全绿继续适用；主工作树干净、未跟踪测试在、tracked diff blob `3da57f0b` 一致。

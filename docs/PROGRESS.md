@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1 已部署验证；**W2a 已通过 469 终验并集成推送 `eb5b129`**：根路径绝对/存在/目录、`resolve()` 规范化、Windows 大小写不敏感唯一（409）、PATCH 清空 422、失败不写库、现有 TALK 根重复 409；9 模块 223/223 全绿，基线 193 项仅两项已知失败、新增失败=0。**API 未 reload，W2a 尚未在运行实例生效（无 schema 变更）。**
-- **卡点/待确认**：是否现在 reload 部署 W2a 并做真实 API 路径校验；gate 脚本小片未开始；W2b 未开始。
-- **下一步**：用户确认 → 受控 reload + 真实 API 校验（重复 TALK 根 409、相对/不存在 422、PATCH 清空 422）→ gate 脚本（manifest/lint + 文档编码/常量授权回归）→ W2b（前端全页面切换/上次工作区）。
+- **当前状态**：B/C 完成；W1、W2a 均已部署验证。**W2a 已上线**：API reload 后 PID `23780`、`/healthz` 200；真实 API——重复 TALK 根（exact/case）409 `project_root_path_conflict`、相对 422 `project_root_path_relative`、不存在/文件 422 `project_root_path_invalid`、PATCH 清空 422 `project_root_path_required`；projects 仍 1、根路径未变、roles 18；tasks 469/groups 470（较 W1 时 +6，为 W2a 任务/Hall，非丢失）。
+- **卡点/待确认**：gate 脚本小片未开始；W2b 未开始；W2 遗留：run-due null 永久 skipped、web 422 detail、真实浏览器/e2e。
+- **下一步**：gate 脚本（manifest/lint + 文档编码/常量授权/tracked diff blob 回归，TC 用 465/467/468）→ W2b（前端全页面切换/上次工作区）→ 双工作区验收。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 15:15（DeepSeek，**W2a 已部署并真实验证**）：经用户“先部署”授权，runtime 受控 reload 后 API PID 21360→**23780**，`/healthz` 200、marker 自动清理。真实 API：重复 `D:\claude-test\TALK`（exact/case）→409 `project_root_path_conflict`；相对路径→422 `project_root_path_relative`；不存在/文件→422 `project_root_path_invalid`；PATCH 清空→422 `project_root_path_required`；projects 仍 1、根路径未变、roles 18；tasks 469/groups 470（+6 为 W2a 任务/Hall）。W2a 无 schema 变更。
 
 > 2026-11-06 15:05（DeepSeek，**W2a 通过并集成推送 `eb5b129`；部署待确认**）：469 终验 **approved**：第 811 行与期望精确相等、`?`=0/U+FFFD=0、strict UTF-8；与 fix1 仅该行不同；无代码/测试变化，467 的 223/223 全绿继续成立；主工作树干净、未跟踪测试在、diff blob `3da57f0b` 一致。W2a 5 文件已复制到主工作树（diff blob 与候选一致），提交推送 `eb5b129`。W2a 无 schema 变更，API reload 即可生效；待用户确认部署窗口。
 
