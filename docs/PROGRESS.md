@@ -14,6 +14,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 01:50（DeepSeek，**W3a-2a 中间状态（勿部署）**）：工作区有未提交改动——492：新角色/新请求行写 `storage_layout="workspace-v1"`；494：请求投影返回布局/冻结形态、路径登记接受 workspace-v1 引用（149 项测试通过）。**495 正在收口 worker 目录/`workspace.json` 与 provision 真实写入**；在此之前新布局角色不具备可用开通流程，**禁止部署或启用**。W3a-1 已提交并推送（`22446d5`）。W3a-2b（启动拒绝 + 页面提示）未开始。
+
 > 2026-11-07 00:57（DeepSeek，**W3a-1 完成并过审**）：488 交付（`project_roles`/`role_provision_requests` 幂等加 `storage_layout`、`server/workspace_paths.py` resolver、provision Key 形态守卫、profiles 兼容、`.gitignore`）→ 489 独立复核 **approved 8/8**：候选四模块 120 项、基线 113 项，无新增失败；复核者本机真实 symlink 用例通过（488 当时的 skip 属其会话权限）；未知 `storage_layout` 值 fail-closed 实证；workspace-v1 写盘被 `workspace_layout_not_ready` 阻断（留给 W3a-2）。提交 `22446d5`。遗留低风险项转 W3b：junction 真实用例、git 形态新 Key 命名与 legacy 统一、错误码粒度。
 
 > 2026-11-06 23:35（DeepSeek，**澄清额度片完成并合入**）：485 实现（MIN=1/DEFAULT=3/LIMIT=5、`ge` 绑 MIN 防 1–2 轮回归、`clarification_limit`、加轮 +1 到 5 后 409）→ 486 返修定性（两项 `list_agents` 在基线 8849919 同签名复现，可写 TEMP/TMP 下 68 项全绿）→ 487 独立复核 **approved**（自建候选/基线隔离树各 68 项全绿 103.4s/104.3s，断言未弱化，仅 3 文件改动）。已提交 `e59629f`。**环境限制**：本机默认 Windows 临时目录不可写，裸跑这两个用例会假失败（基线同样），后续测试/验收须显式设可写 `TEMP`/`TMP`/`SQLITE_TMPDIR`。生产生效（reload API）未做，等用户授权。
