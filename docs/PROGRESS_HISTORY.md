@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 15:00 — W2a fix2 文档编码修复；469 终验
+
+- **468 complete**：只改 `docs/spec/PROJECT_INTEGRATION.md:811`，替换 104 个字面 `?` 的 mojibake；自报该行 `?`=0、U+FFFD=0、strict UTF-8、相对 fix1 仅此一行；`git diff --check` 通过。
+- **协调者只读核对**：Python `open(encoding='utf-8')` 读回为“`project_root_path` 必须为绝对路径、存在且为目录；同一规范路径按 Windows 大小写不敏感只允许一个项目占用。”；`?`=0、U+FFFD=0；候选 4 tracked + 新测试，tracked diff blob `3da57f0b…`；主工作树干净；未跑测试。
+- **469 终验**：k2.8 快速核对第 811 行原文/编码、相对 fix1 仅此改动、无代码/测试变化、未跟踪测试、diff-check；不重跑 223 项（467 已确认全绿）。
+- **通过后**：集成 W2a（5 文件）→ 用户确认后受控 reload 部署 + 真实 API 路径校验 → gate 脚本 → W2b。
+
 ## 2026-11-06 14:55 — W2a 467 仅剩文档编码；468 fix2；编码规则入 gate
 
 - **467 复核**：候选 9 模块独立 223/223 全绿（221.966s，无 skip）；基线 9b91650 同清单 193 项恰两项已知失败，候选新增失败=0；fix1 仅改两处测试、无断言弱化；`talk_follow_tasks` 确为第 10 个正式工具；W2a 路径验收 30 项通过；5 文件/生成物/主工作树/DB/diff blob 均通过。

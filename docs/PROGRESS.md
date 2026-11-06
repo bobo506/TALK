@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1 已部署验证；**W2a 467 复核 changes_requested，唯一阻断为文档编码**：候选 9 模块 223 项独立复跑全绿（221.966s），基线 9b91650 193 项恰两项已知失败、新增失败=0；fix1 仅改两处测试、无断言弱化；`talk_follow_tasks` 确为正式第 10 工具；W2a 路径验收 30 项通过。**468 fix2** 只修 `docs/spec/PROJECT_INTEGRATION.md:811` 的 104 个 `?` 乱码（一行 UTF-8），并新增文档编码自检。
-- **卡点/待确认**：468 待交付/终验；W2a 未通过前不集成；gate 脚本仍排在 W2a 之后；W2b 未开始。
-- **下一步**：468 → k2.8 快速终验 → 集成 W2a + 受控 reload 部署 + 真实 API 路径校验 → gate 脚本（manifest/lint，含文档编码回归）→ W2b。
+- **当前状态**：B/C 完成；W1 已部署验证；**W2a 468 fix2 交付 complete**：只改 `docs/spec/PROJECT_INTEGRATION.md:811` 为正常中文“根路径必须绝对/存在/目录；同一规范路径按 Windows 大小写不敏感唯一”；协调者 Python UTF-8 读回该行 `?`=0、U+FFFD=0；候选 4 tracked + 新测试，tracked diff blob `3da57f0b…`；**469 k2.8 快速终验中**。
+- **卡点/待确认**：469 待出；W2a 通过后集成；部署需用户确认（W2a 无 schema 变更，API reload 生效）；gate 脚本小片未开始；W2b 未开始。
+- **下一步**：469 → 集成 W2a →（用户确认）reload 部署 + 真实 API 路径校验 → gate 脚本 → W2b。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 15:00（DeepSeek，**468 文档编码修复完成；469 终验**）：468 只改 `docs/spec/PROJECT_INTEGRATION.md:811`，交付自报该行 `?`=0、U+FFFD=0、strict UTF-8、相对 fix1 仅此一行；协调者用 Python 读回为“`project_root_path` 必须为绝对路径、存在且为目录；同一规范路径按 Windows 大小写不敏感只允许一个项目占用。”，候选 tracked diff blob `3da57f0b…`，主工作树干净；未跑测试。469 派 k2.8 快速终验：只核该行/编码/相对 fix1 仅此改动/无代码测试变化/diff-check；不重跑 223 项。
 
 > 2026-11-06 14:55（DeepSeek，**467 仅剩文档编码；468 fix2；文档编码纳入门禁回归**）：467 独立复跑候选 9 模块 **223/223 全绿**（221.966s，无 skip）；基线 9b91650 同清单 193 项恰两项已知失败（assignment 缺 project_id、tool 数 9 vs 10），候选新增失败=0；fix1 仅改 `tests/test_project_controller_assignment.py` 两处，无断言弱化；`talk_follow_tasks` 确为 `TOOL_SCHEMAS` 第 10 个正式工具；W2a 路径验收 30 项通过；diff blob/日志/边界一致。**唯一阻断**：`docs/spec/PROJECT_INTEGRATION.md:811` 为 104 个字面 `?` 的 mojibake（464 已存在，fix1 未引入），需一行 UTF-8 重写。已建 fix2 候选派 468，并新增文档编码回归规则：文档变更必须附 strict UTF-8 + `?{2,}`/U+FFFD 扫描，开发/复核各跑一次（写入 TASK_WORKFLOW 7.1.1）。
 
