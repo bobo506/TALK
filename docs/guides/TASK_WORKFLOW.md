@@ -234,10 +234,33 @@ python scripts/talk_workflow.py summary .tmp/workflow-usage-1/development.json -
 - **复核任务正文必须写死**：独立重跑**候选 + 基线**，逐名对比新增失败/错误；原始日志与对照写入复核材料；缺基线对照、证据不一致、断言弱化均判 `changes_requested`。
 - **协调者收货顺序**：先检查上述门禁证据；缺失直接退回开发，不进入复核。复核通过后才集成/收尾；协调者不重复跑测试。
 - **门禁回归规则（2026-11-06 用户确定）**：决策者发现新的任务包歧义或门禁漏检时，必须把**可机械化的部分**补进 gate 规则/manifest 字段，并加回归用例；不可机械化的保留为人工判断。规则/字段由决策者维护，脚本代码变更仍走开发与复核。已登记的两个例子：
-  - 任务包引用候选差异时必须使用有类型的 `candidate.tracked_diff_blob`（`git diff | git hash-object --stdin`）与 `candidate.untracked_files[]` 分开，禁止裸写“blob”；预派发 lint 校验二者与候选 `git status` 一致。
+  - 任务包引用候选差异时必须使用有类型的 `candidate.tracked_diff_blob`（口径见 7.1.2）与 `candidate.untracked_files[]` 分开，禁止裸写“blob”；预派发 lint 校验二者与候选 `git status` 一致。
   - 涉及工具面/常量集合变更时，manifest 必须显式声明 `authorized_mutations`（如 `TOOL_SCHEMAS`/`PROJECT_TOOL_NAMES` 的期望长度与元素）；预派发 lint 对照仓库实际值，未声明即阻断。
   - 文档变更必须附 **strict UTF-8** + 连续 `?{2,}`/U+FFFD 扫描结果；开发自测与复核各跑一次。此类编码问题作为回归用例（W1 fix2、W2a fix2 已登记）。
 
+### 7.1.2 可选机械验收门禁
+
+按任务准备 manifest、开发交付和独立复核 JSON，再运行 `python -m scripts.acceptance_gate check --manifest <路径> [--json]`。退出码 0 为通过、1 为检查失败、2 为配置错误；脚本只检查证据，不运行测试或替代人工判断。`tracked_diff_blob` 的权威口径是 gate 对 `git diff --no-ext-diff --no-textconv` 子进程原始 LF 字节输出计算的 Git blob hash，不经过 shell 管道重编码；可先填写 40 个零作为占位值运行 gate，以 `candidate.tracked_diff_blob` 检查输出的实际值为准。不要使用 PowerShell 5.1 管道计算，它可能将 LF 转为 CRLF。新增文件列入 `untracked_files`，`allowed_untracked` 只填写生成物。候选须基于指定基线且不含暂存变更。日志路径须存在；证据路径使用绝对路径，文档与未跟踪文件使用候选内相对路径。`doc` profile 必须列出变更文档，无需 tests/skipped 计数。
+
+manifest 示例（路径按实际替换）：
+
+```json
+{"schema":"talk-acceptance-gate-1","profile":"code","task_id":469,"project_root":"/work/TALK","candidate":"/work/candidate","baseline_ref":"9b91650","tracked_diff_blob":"<git diff blob>","untracked_files":[],"allowed_untracked":[],"delivery":"/evidence/development.json","review":"/evidence/review.json","changed_docs":[],"authorized_mutations":[],"logs":["/evidence/development.log"]}
+```
+
+复核 JSON 示例：
+
+```json
+{"schema":"talk-review-gate-1","task_id":469,"verdict":"approved","candidate":{"tests":223,"failures":0,"errors":0,"skipped":0,"log":"/evidence/candidate.log"},"baseline":{"ref":"9b91650","tests":193,"failures":2,"errors":0,"skipped":0,"log":"/evidence/baseline.log"},"baseline_failure_names":["failure1","failure2"],"new_failures":0}
+```
+
+开发交付遵循 `talk-delivery-1` 格式，**不要添加 `schema` 字段**。交付的 `task_id` 必须为字符串；review 的 `task_id` 可以是整数。最小模板（按实际情况填写）：
+
+```json
+{"task_id":"469","conclusion":"complete","completed":["完成内容"],"unfinished":[],"blocked":[],"changed_files":[],"baseline":{"ref":"基线","diff_note":"差异"},"verification":[{"check":"检查","result":"pass","evidence":"日志"}],"limitations":[],"progress_draft":{"summary":"完成","next":"复核"}}
+```
+
+复核通过、基线例外是否获批及语义正确性仍须由决策者判断。此脚本不强制每个切片使用。
 ### 7.2 审查任务包模板（发给复核 Agent）
 
 ```text
