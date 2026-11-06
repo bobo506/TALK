@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1 已部署验证；**W2a 464 partial**（2 项基线测试失败）；**465 返修被 blocked**：不是候选缺陷，而是任务正文两处歧义——①`5dad2be3…` 是候选 tracked diff blob，Terra 拿未跟踪新测试的单文件 hash 比较而误判候选漂移；②`PROJECT_TOOL_NAMES` 实际 9 项、`TOOL_SCHEMAS` 10 项（缺 `talk_follow_tasks`），任务只授权改长度未明确授权补常量。**466 已派**澄清并授权：diff blob 指 `git diff | git hash-object`；常量追加 `talk_follow_tasks`、长度 10；两处测试修复后跑 9 套件全绿。
-- **卡点/待确认**：466 待交付；W2a 未全绿不进入复核/集成；W2b 未开始；gate 脚本排在 W2a 之后。
-- **下一步**：466 → 检查证据 → k2.8 复核（候选+基线）→ 集成/部署 → gate 脚本小片 → W2b。
+- **当前状态**：B/C 完成；W1 已部署验证；**W2a fix1（466）交付 complete**：9 模块 **223 项/231.071s 全绿**，只补两处基线测试（assignment 4 处 project_id、工具常量 `talk_follow_tasks` + 长度 10）；W2a 产品实现（路径规范化/唯一性）未改；候选 4 tracked + 新测试，tracked diff blob `02410106…`。**467 k2.8 定向复验中**（候选+基线对照）。
+- **卡点/待确认**：467 结论待出；通过后集成 W2a、受控 reload 部署；gate 脚本小片排在 W2a 之后；W2b 未开始。
+- **下一步**：467 → 集成/部署 + 真实 API 路径校验 → gate 脚本（manifest/lint/回归规则）→ W2b（前端全页面切换/上次工作区）。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 14:35（DeepSeek，**466 全绿；467 复核**）：466 交付 complete：9 模块 **223 项/231.071s 全绿**，日志 `.tmp/workspace-w2a-fix1-20261106/task-466-unittest.log`（尾部 `Ran 223 tests ... OK`）；只改两处测试——assignment 4 个 POST 补 `project_id="prj_ctl"`、`PROJECT_TOOL_NAMES` 追加 `talk_follow_tasks` 且长度 10；W2a 产品实现、`test_project_root_identity.py` 等保持 464 状态。候选 4 tracked + 1 未跟踪，tracked diff blob `02410106…`；生成物 `Microsoft/`、`.tmp-tests` 不纳入。467 已派 k2.8：独立跑 9 模块 + 基线 9b91650 逐名对照、检查两处测试无弱化、W2a 路径验收、changed_files/日志/diff blob。
 
 > 2026-11-06 14:30（DeepSeek，**门禁回归规则已加入 TASK_WORKFLOW 7.1.1**）：用户确定——决策者发现任务包歧义/门禁漏检时，把**可机械化部分**补进 gate 规则/manifest 字段并加回归用例；不可机械化的留人工判断。规则/字段由决策者维护，脚本代码变更仍走开发/复核。已登记两例：①候选差异必须用 `candidate.tracked_diff_blob` + `candidate.untracked_files[]` 分开，禁止裸“blob”，预派发 lint 对照 `git status`；②工具面/常量集合变更必须在 manifest 声明 `authorized_mutations`（长度+元素），未声明即阻断。gate 脚本仍排在 W2a 之后做；465 的 diff blob / talk_follow_tasks 两例将作为首批回归用例。
 

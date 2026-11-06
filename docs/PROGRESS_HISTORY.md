@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-06 14:35 — W2a fix1（466）全绿；467 复核
+
+- **466 complete**：9 模块 **223 项/231.071s 全绿**（`.tmp/workspace-w2a-fix1-20261106/task-466-unittest.log`，`Ran 223 tests ... OK`）；只补两处基线测试：assignment 4 个 POST 加 `project_id="prj_ctl"`、`PROJECT_TOOL_NAMES` 追加 `talk_follow_tasks` 且长度 10；W2a 产品实现与新增测试保持 464 状态。
+- **候选**：4 tracked + 未跟踪 `tests/test_project_root_identity.py`；tracked diff blob `02410106…`；生成物 `Microsoft/`、`.tmp-tests` 不纳入交付。
+- **467 复核**：k2.8 独立跑候选 9 模块 + 基线 9b91650 逐名对照；检查两处测试无断言弱化、W2a 路径验收未回归、changed_files/日志/diff blob；疑问 A–J 含 `talk_follow_tasks` 是否正式工具、W2a Windows 大小写/符号链接边界、是否具备部署条件。
+
 ## 2026-11-06 14:30 — 门禁回归规则加入 TASK_WORKFLOW
 
 - 用户确定：决策者发现任务包歧义/门禁漏检时，把**可机械化部分**补进 gate 规则/manifest 字段并加回归用例；不可机械化保留人工判断；规则/字段由决策者维护，脚本代码变更仍走开发/复核。
