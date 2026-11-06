@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 20:00 — W2b 用户验收通过并清理
+
+- 用户浏览器验收：TALK↔W2B 验收工作区切换、刷新保持、回 TALK 数据不变均正常；仅 agent key 切换未点（API 已验证 agent 仅见 TALK）。
+- 清理：`DELETE /api/groups/group:04d3aa77c928` → 204；`DELETE /api/projects/prj_w2baccept20261106` → 204；删除 `.tmp/w2b-acceptance-20261106`。核验：projects 1、groups 478、tasks 477、messages 2431、project_agents 9、temp 群 0。
+- **W2b 收尾完成**：W1/W2a/W2b 全部上线；工作区切换、群过滤、上次工作区、Agent 可见性通过。
+- **W3 待设计**：角色身份跨项目独占 `identity_exclusive_reference_refused` 是每工作区角色运行时的核心；先做只读设计/拆分，不直接开发。
+
 ## 2026-11-06 19:45 — 创建 W2b 临时验收工作区
 
 - 用户选“方案 1”：创建临时工作区用于真实浏览器 A/B 验收。
