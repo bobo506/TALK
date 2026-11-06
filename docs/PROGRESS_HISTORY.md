@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 15:20 — GATE-1 派发（470）
+
+- 用户确认 gate 脚本后，派 Terra 开发 `scripts/acceptance_gate.py` + `tests/test_acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；候选基线 `c66ba07`。
+- 脚本只做证据检查：manifest `talk-acceptance-gate-1`、delivery `talk-delivery-1`、review `talk-review-gate-1`；检查交付 complete、tracked diff blob/未跟踪文件、日志、复核候选+基线/新增失败=0、文档 strict UTF-8/`?{2,}`/U+FFFD、常量 `authorized_mutations`、主工作树干净；profile `code/doc`；退出码 0/1/2；不运行 unittest。
+- 回归用例覆盖 465（blob vs 单文件 hash）、467/468（文档编码）、`talk_follow_tasks` 常量授权；≥6 正反例。
+- 下一步：470 交付 → 证据检查 → k2.8 复核 → 集成（工具脚本）→ W2b。
+
 ## 2026-11-06 15:15 — W2a 部署与真实验证
 
 - **部署**：用户“先部署”授权；runtime 受控 reload（`reload-api.request`），API PID 21360→**23780**，`/healthz` 200，marker 自动清理；角色宿主未重启；W2a 无 schema 变更。
