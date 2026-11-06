@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1、W2a 已部署；**GATE-1 fix1 复核 473 判 changes_requested**：机械功能/测试/基线/五类 CLI fail 全通过，但 F1–F3 需小修——①`--json` 在 cp936 控制台输出 GBK（json.load 失败）；②脚本自身 `acceptance_gate.py:159` 含 `'??????????'` 占位且会触发自身 doc.encoding；③7.1.2 的 blob 口径 `git diff | hash-object` 受 PS 5.1 管道 CRLF 影响（唯一可过值为 gate 自算 LF `486ce64`，交付自报 `3f4d089` 无法复现）；F4 缺 exit 1 CLI 单测、F5 缺 delivery 模板/无 schema 说明。**474 fix2** 已派修 F1–F5。
-- **卡点/待确认**：474 待交付/复验；gate 未集成；W2b 未开始。
-- **下一步**：474 → k2.8 复验 → 集成 gate → W2b（前端全页面切换/上次工作区）。
+- **当前状态**：B/C 完成；W1、W2a 已部署；**GATE-1 fix2（474）交付 complete**：F1–F5 已修，14 项 gate 测试/17.626s + 27 项回归全绿；脚本无 `?{2,}` 占位；delivery 文档补模板/无 schema；候选 3 文件（1 tracked + 2 未跟踪）。**475 k2.8 定向复验中**（F1–F5、14+27、基线 c66ba07、blob 口径）。
+- **卡点/待确认**：475 结论待出；通过后集成 gate 脚本；W2b 未开始。
+- **下一步**：475 → 集成 gate（脚本/测试/文档）→ W2b（前端全页面切换/上次工作区）。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 16:05（DeepSeek，**474 fix2 全绿；475 复核**）：474 交付 complete：14 项 gate 测试/17.626s、27 项回归全绿；F1 stdout/stderr UTF-8、F2 脚本无 `?{2,}` 占位、F3 文档改 gate 自算 LF 口径、F4 真实 CLI exit 1/`--json` 测试、F5 delivery 模板/无 schema；候选 1 tracked + 2 未跟踪，无业务改动；交付 blob `cce2166` vs 本地 PS `202d37c`，已交 475 按 gate LF 口径查清。475 派 k2.8 逐项复验 F1–F5、14+27、基线 c66ba07、473 已通过项未回归；通过后集成。
 
 > 2026-11-06 15:55（DeepSeek，**GATE-1 473 changes_requested；474 fix2**）：473 独立复验：候选 11 项/12.074s、27 项/20.106s 全绿，基线 c66ba07 27 项全绿、新增失败=0；范围/边界/白名单/AST/五类 CLI fail（partial/错 blob/new_failures/文档??/常量未授权，均 exit 1）、用法 exit 2、交付契约均通过。需小修：F1 `--json` 在 cp936 下输出 GBK（json.load 失败）；F2 脚本自身 159 行 `'??????????'` 占位、会触发自身 doc.encoding；F3 blob 口径文档受 PS 5.1 管道 CRLF 影响，gate 自算 LF `486ce64` 才可过，`4764dcf`（PS）与 `3f4d089`（无法复现）均被拒。F4 补 exit 1 CLI 单测、F5 补 delivery 模板/无 schema 说明。474 fix2 已派。
 

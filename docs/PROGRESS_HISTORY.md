@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-06 16:05 — GATE-1 fix2 全绿；475 复核
+
+- **474 complete**：F1–F5 修复；`tests.test_acceptance_gate` **14 项/17.626s**、27 项回归全绿；脚本无 `?{2,}` 占位（协调者扫描确认）；delivery 文档补模板/无 schema；候选 3 文件（1 tracked + 2 未跟踪），无业务代码/前端。
+- **Blob**：交付 `cce2166`、本地 PS 管道 `202d37c`；473 已确认 gate 自算 LF 才是权威口径，已交 475 查清并给唯一可过值。
+- **475 复核**：逐项 F1–F5（UTF-8 输出、脚本无乱码、blob 文档、CLI exit 1/`--json`、delivery 模板）、14+27、基线 c66ba07、473 已通过项未回归；通过后集成 gate 脚本 → W2b。
+
 ## 2026-11-06 15:55 — GATE-1 473 changes_requested；474 fix2
 
 - **473 复验**：候选 11 项/12.074s、27 项/20.106s 全绿；基线 c66ba07 27 项全绿、新增失败=0；范围/边界/白名单/AST/五类 CLI fail（partial、错 blob、new_failures>0、文档 `?{2,}`、常量未授权均 exit 1）、用法 exit 2、交付契约均通过。
