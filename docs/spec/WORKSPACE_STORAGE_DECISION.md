@@ -10,7 +10,8 @@
 4. **角色 ID 带项目前缀**：延续现有 `agent:<project_id>.<role>.<hash>` 形式；同名角色在不同工作区生成不同 ID/Key/运行时目录。
 5. **分发目标：文件夹绿色版**：整个 TALK 目录压缩拷贝到新设备，提供启动文件即可；不做安装器，不做可配置 `data_root`，不写 AppData/注册表。
 6. **角色运行时按 project+role 隔离**：路径包含 `project_id` 与 `member_id`；服务状态、HOME、cwd、Key、会话均按此命名空间隔离。
-7. **角色 Key 安全**：Key 可随 TALK 目录携带，但 zip 会包含秘密；实现时放 `TALK/keys/<project_id>/` 并明确提示，后续可评估加密或外部 Key 模式。
+7. **角色 Key 安全（2026-11-06 追加细化）**：按**部署形态自动判定**——数据根在 git 工作区内时，Key 一律不落 TALK 目录（沿用仓库外私有 Key 根，如 `~/.talk/keys`，现有"拒绝仓库内 Key"守卫保留）；数据根不是 git 工作区（绿色版解压后的正式使用）时，角色 Key 落 `TALK/keys/<project_id>/`，作为角色要素随目录管理。`.gitignore` 追加 `/keys/` 兜底，防止开发期误推；打包 zip 会包含明文秘密，需提示，不做加密。
+8. **运行器目录（2026-11-06 确定）**：`TALK/runners/<runtime>/` 单独存放终端运行器（codex / kimi-code / dsh / workbuddy）的**适配数据与元数据**——模型清单与别名、思考强度选项、版本适配基线、探测缓存等。**不放**凭据/登录态（仍在角色 native HOME），**不托管** CLI 安装本体；数据可由代码默认值生成、可覆盖、可重建。
 
 ## 目录布局
 
@@ -27,8 +28,10 @@ TALK/
         <member_id>/            # 角色运行时配置/HOME/会话
       tasks/                    # 任务附件、日志、导出
       runtime/                  # 服务状态、进程日志
+  runners/
+    <runtime>/                  # 适配数据/元数据：模型清单、强度选项、版本基线、探测缓存
   keys/
-    <project_id>/               # 角色 Key（敏感）
+    <project_id>/               # 角色 Key（敏感）；仅正式部署写入，开发期不写此目录
   uploads/                      # 文件上传（可按 project_id 分目录）
 ```
 
@@ -43,6 +46,8 @@ D:\test\
 
 - 不把实际项目源码放进 TALK。
 - 不把角色 Key/原生 HOME 放进项目源码目录。
+- 开发期（数据根在 git 工作区）不往 TALK 目录写 Key；只有正式部署（数据根不是 git 工作区）才写 `keys/`。
+- `runners/` 不放凭据/登录态，不托管运行器 CLI 安装本体。
 - 现在不拆每工作区 DB；所有表已有 `project_id`，保留未来按项目迁移/导出路径。
 - 现在不做安装器、服务注册、AppData 数据目录选择。
 - 不改现有 TALK 角色 ID 或迁移历史数据；新角色按新规则。
@@ -61,5 +66,6 @@ D:\test\
 - **W3a 身份与创建**：每工作区新建角色，ID 带项目前缀；同名跨工作区不同 ID/Key；现有角色不变。
 - **W3b 运行时隔离**：HOME/cwd/Key/服务状态/启动停止按 project+role 隔离；A 工作区 stop 不影响 B。
 - **W3c 双工作区验收**：两个工作区各建角色，分别跑任务、切换、停止，互不影响。
+- **运行器适配目录（独立后续切片，不在 W3a–W3c）**：`TALK/runners/<runtime>/` 落地决策 8，需先确定哪些适配数据从代码默认值迁到数据文件，避免两处真相。
 
-注意：`identity_exclusive_reference_refused` 表示**不要复用**另一个工作区已有的角色身份；W3 是在目标工作区**新建**自己的角色，不是放开跨项目复用。
+注意：`identity_exclusive_reference_refused` 表示**不要复用**另一个工作区已有的角色身份；W3 是在目标工作区**新建**自己的角色，不是放开跨项目复用。W3a 设计必须按决策 7/8：Key 落点按部署形态自动判定（git 工作区→仓库外；非 git 工作区→`TALK/keys/<project_id>/`），`runners/` 只存适配数据/元数据。

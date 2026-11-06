@@ -8,8 +8,11 @@
 - **工作区存储方向（2026-11-06 21:55 确定，见 [WORKSPACE_STORAGE_DECISION.md](spec/WORKSPACE_STORAGE_DECISION.md)）**：**中央 `talk.db` + `TALK/workspaces/<project_id>/` 每工作区目录**；任务/群/角色元数据仍中央库按 `project_id` 区分，工作区目录只放角色运行时、任务附件/日志/导出；真实项目目录（如 `D:\test`）在 TALK 外，只放 `.talk/project.yaml` 指针；**现在不拆每工作区 DB**；分发目标是文件夹绿色版（zip + 启动器），不做安装器/可配置 data_root。
 - **W3 下一步（先设计/拆分，不直接开发）**：W3a 每工作区新建角色（ID 带项目前缀，同名跨工作区不同 ID/Key，现有角色不变）；W3b 运行时按 project+role 隔离（HOME/cwd/Key/服务状态/启停）；W3c 双工作区角色验收。`identity_exclusive_reference_refused` 表示不复用他工作区身份，是在目标工作区新建自己的角色。
 - **待确认/遗留**：W3 设计未开始；W2 遗留 run-due null 日程永久 skipped、web 422 原始 detail；真实浏览器双工作区/A 运行中切 B 已由用户验收（agent key 切换未点，API 已验证 agent 仅见 TALK）。
+- **新增待办**：`runners/<runtime>/` 运行器适配数据目录（2026-11-06 决策，独立切片、排在 W3 之后）；Key 存放按部署形态自动判定（git 工作区→仓库外，正式部署→`TALK/keys/<project_id>/`）。
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
+
+> 2026-11-06 22:25（DeepSeek，**Key 存放与运行器目录决策**）：用户确定——①开发期本机 TALK 处于 git 工作区，Key 不落 TALK 目录（沿用仓库外 `~/.talk/keys`，现"拒绝仓库内 Key"守卫保留）；TALK 正式使用/分发后（数据根非 git 工作区），Key 作为角色要素落 `TALK/keys/<project_id>/`，`.gitignore` 补 `/keys/` 兜底。②TALK 下为终端运行器提供独立目录 `runners/<runtime>/`，只存适配数据/元数据（模型清单/别名、强度选项、版本基线、探测缓存），不放凭据/登录态、不托管 CLI 本体。已写入 `docs/spec/WORKSPACE_STORAGE_DECISION.md` 决策 7/8 与目录图，`DEVELOPMENT_ROADMAP.md` 登记为 W3 之后的独立切片；W3a 设计据此修正（原"仓库根工作区默认保留旧 Key 路径"改为按部署形态自动判定）。
 
 > 2026-11-06 22:00（DeepSeek，**工作区存储方向确定**）：中央库 + 每工作区目录；真实项目在 TALK 外只放 `.talk/project.yaml`；`TALK/workspaces/<project_id>/` 放角色运行时/任务附件/日志；不拆库；文件夹绿色版分发。详见 `docs/spec/WORKSPACE_STORAGE_DECISION.md`。W3 先设计/拆分，不直接开发。
 
