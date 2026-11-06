@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 14:20 — 465 blocked 为任务歧义；466 澄清授权
+
+- **465 blocked**：未改任何文件。①任务写 `5dad2be3…` 是候选 tracked diff blob，Terra 用未跟踪新测试单文件 hash 比较，误判候选漂移；②`TOOL_SCHEMAS` 10 项（第 10 `talk_follow_tasks`），`PROJECT_TOOL_NAMES` 9 项，任务只授权长度 10 未授权补常量，元组相等仍失败。
+- **466 澄清**：明确 diff blob 定义（`git diff | git hash-object --stdin`），授权 `PROJECT_TOOL_NAMES` 追加 `talk_follow_tasks` 且长度 10；继续修 assignment 测试 4 处 `project_id`；要求 9 套件全绿后交 k2.8。
+- **教训**：任务正文以后统一写“tracked diff blob”，不写裸 blob；涉及常量集合时同时授权“长度+元素”。
+- **后续**：466 通过 → k2.8 复核 → 集成/部署 → gate 脚本小片 → W2b。
+
 ## 2026-11-06 14:10 — W2a 464 partial；465 仅修两项基线测试
 
 - **464 实现**：`project_root_path` 非空时必须绝对/存在/为目录，`resolve()` 规范落库；Windows 大小写不敏感唯一（create/patch 冲突 409）；PATCH 清空 422；失败不写库；新增 `tests/test_project_root_identity.py`，更新假路径测试与 `PROJECT_INTEGRATION.md`。

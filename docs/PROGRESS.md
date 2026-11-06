@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1 已部署验证；**W2a（464）交付 partial**：根路径规范化/存在/唯一性实现完成，新增路径身份测试通过；但指定 9 套件 **223 项中 2 项失败**，逐名对照基线 9b91650 同败——①`test_assignment_does_not_change_task_permissions` 4 处任务 POST 未补 project_id（W1 遗留测试缺口）；②`test_tool_surface...` 期望 9 工具、实际 10（`talk_get_delivery` 早已加入，测试未更新）。已建 fix1 候选派 **465** 只修这两个测试点，不改 W2a 产品实现；全绿后才复核。
-- **卡点/待确认**：465 待交付；W2a 未全绿不进入复核/集成；W2b 前端切换未开始；W2 遗留 run-due null 永久 skipped、web 422 detail。
-- **下一步**：465 → 检查证据（全绿/日志/changed_files 去生成物）→ k2.8 复核（候选+基线）→ 集成/部署 → W2b（前端全页面切换/上次工作区）。
+- **当前状态**：B/C 完成；W1 已部署验证；**W2a 464 partial**（2 项基线测试失败）；**465 返修被 blocked**：不是候选缺陷，而是任务正文两处歧义——①`5dad2be3…` 是候选 tracked diff blob，Terra 拿未跟踪新测试的单文件 hash 比较而误判候选漂移；②`PROJECT_TOOL_NAMES` 实际 9 项、`TOOL_SCHEMAS` 10 项（缺 `talk_follow_tasks`），任务只授权改长度未明确授权补常量。**466 已派**澄清并授权：diff blob 指 `git diff | git hash-object`；常量追加 `talk_follow_tasks`、长度 10；两处测试修复后跑 9 套件全绿。
+- **卡点/待确认**：466 待交付；W2a 未全绿不进入复核/集成；W2b 未开始；gate 脚本排在 W2a 之后。
+- **下一步**：466 → 检查证据 → k2.8 复核（候选+基线）→ 集成/部署 → gate 脚本小片 → W2b。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 14:20（DeepSeek，**465 blocked 是任务歧义；466 澄清授权**）：465 未改任何文件，blocked 两点均非候选问题：①任务写的 `5dad2be3…` 是**候选 tracked diff blob**（`git diff | git hash-object --stdin`），Terra 误拿未跟踪新测试单文件 hash 对比，误判漂移；②`TOOL_SCHEMAS` 10 项（第 10 为 `talk_follow_tasks`），`PROJECT_TOOL_NAMES` 9 项；任务只授权改长度 10，未明确授权把 `talk_follow_tasks` 加入常量，故元组相等仍会失败。466 已澄清：diff blob 定义、明确授权追加常量+长度 10；继续修 assignment 测试 4 处 project_id；要求 9 套件全绿后交 k2.8。任务正文以后统一写“tracked diff blob”，不写裸 blob。
 
 > 2026-11-06 14:10（DeepSeek，**W2a 464 partial；465 只修两项基线测试**）：464 实现 `project_root_path` 绝对/存在/目录、`resolve()` 规范落库、Windows 大小写不敏感唯一（409）、PATCH 清空拒绝，并新增 `tests/test_project_root_identity.py`；但指定 9 套件 223 项中 2 项失败，逐名对照基线 9b91650 同败：①`test_assignment_does_not_change_task_permissions` 4 个任务 POST 未补 `project_id`（W1 合同遗漏）；②`test_tool_surface...` 期望 9 工具、实际 10（`talk_get_delivery` 早已加入，测试未更新）。按硬门 partial 不收货，已建 fix1 候选派 465 只改这两处测试（不改 W2a 产品实现），要求 9 套件全绿 + 原始日志 + changed_files 排除 `Microsoft/`/`.tmp-tests` 生成物；之后 k2.8 复核。
 
