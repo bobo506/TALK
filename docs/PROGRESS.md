@@ -1,15 +1,17 @@
 # Project Progress
 
-## 当前快照（2026-11-06 09:55）
+## 当前快照（2026-11-06 22:00）
 
-- **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
-- **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成；W1、W2a 已部署；GATE-1 已集成；**W2b 已通过用户浏览器验收并清理临时数据**：TALK↔W2B 验收工作区切换、刷新保持、回 TALK 数据不变均正常（agent key 切换未点，API 已验证 agent 仅见 TALK）；临时项目 `prj_w2baccept20261106`、群 `group:04d3aa77c928`、目录已删除；现仅 TALK 项目，groups 478 / tasks 477 / messages 2431 / project_agents 9。
-- **卡点/待确认**：W3（每工作区角色运行时/新建角色闭环）未开始；角色身份跨项目独占 `identity_exclusive_reference_refused` 是 W3 核心；W2 遗留 run-due null skipped、web 422 detail。
-- **下一步**：W3 先做设计/拆分（不改代码），再逐片开发；确认后我读角色模型与运行时边界，产出 2–3 个可独立验收的切片。
-- 恢复指令：`继续项目`。
+- **角色/流程**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。协调者不重复跑测试、不在候选上执行开发动作；开发自测 → 协调者核对交付/差异 → k2.8 候选+基线复核 → 协调者决策/集成。交付硬门在 `docs/guides/TASK_WORKFLOW.md` 7.1.1，门禁脚本 `scripts/acceptance_gate.py`（7.1.2）。
+- **当前状态**：B/C 完成并推送；**W1（数据边界）、W2a（路径唯一/规范化）、W2b（全页面工作区切换/群过滤/上次工作区）均已上线并验收**；GATE-1 已集成 `4eceef7`。最近提交：W2b `4b59603`，文档 `442f2ff` / `260d168`。API 运行 PID 22168（受控 reload），`/healthz` 200；页面加载 `app.js?v=20261106-workspace-w2b`。
+- **数据**：projects 1（`prj_e8fe7066bbec` = `D:\claude-test\TALK`）；groups 478；tasks 477；messages 2431；project_agents 9；临时 W2B 验收项目/群/目录已清理。
+- **工作区存储方向（2026-11-06 21:55 确定，见 [WORKSPACE_STORAGE_DECISION.md](spec/WORKSPACE_STORAGE_DECISION.md)）**：**中央 `talk.db` + `TALK/workspaces/<project_id>/` 每工作区目录**；任务/群/角色元数据仍中央库按 `project_id` 区分，工作区目录只放角色运行时、任务附件/日志/导出；真实项目目录（如 `D:\test`）在 TALK 外，只放 `.talk/project.yaml` 指针；**现在不拆每工作区 DB**；分发目标是文件夹绿色版（zip + 启动器），不做安装器/可配置 data_root。
+- **W3 下一步（先设计/拆分，不直接开发）**：W3a 每工作区新建角色（ID 带项目前缀，同名跨工作区不同 ID/Key，现有角色不变）；W3b 运行时按 project+role 隔离（HOME/cwd/Key/服务状态/启停）；W3c 双工作区角色验收。`identity_exclusive_reference_refused` 表示不复用他工作区身份，是在目标工作区新建自己的角色。
+- **待确认/遗留**：W3 设计未开始；W2 遗留 run-due null 日程永久 skipped、web 422 原始 detail；真实浏览器双工作区/A 运行中切 B 已由用户验收（agent key 切换未点，API 已验证 agent 仅见 TALK）。
+- **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
+- 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
-> 2026-11-06 20:00（DeepSeek，**W2b 用户验收通过并清理**）：用户浏览器点验 TALK↔W2B 验收工作区切换、刷新保持、回 TALK 数据不变均正常（仅 agent key 切换未点；API 已验证 agent 仅见 TALK）。清理：删群 `group:04d3aa77c928` → 204、删项目 `prj_w2baccept20261106` → 204、删临时目录；现 projects 1、groups 478、tasks 477、messages 2431、project_agents 9、无 temp 群。W2b 收尾完成；W3 需先设计/拆分，不直接开发。
+> 2026-11-06 22:00（DeepSeek，**工作区存储方向确定**）：中央库 + 每工作区目录；真实项目在 TALK 外只放 `.talk/project.yaml`；`TALK/workspaces/<project_id>/` 放角色运行时/任务附件/日志；不拆库；文件夹绿色版分发。详见 `docs/spec/WORKSPACE_STORAGE_DECISION.md`。W3 先设计/拆分，不直接开发。
 
 > 2026-11-06 19:45（DeepSeek，**创建 W2b 临时验收工作区**）：按用户选 1，创建 `prj_w2baccept20261106`（`W2B 验收工作区`，root `D:\claude-test\TALK\.tmp\w2b-acceptance-20261106\workspace`，human:bobo 维护者），群 `group:04d3aa77c928`（W2B 验收群）；Terra 同步返回 `identity_exclusive_reference_refused`（身份跨项目独占，W3 范围），因此验收项目 0 角色；任务必须 target agent，未创建占位任务。human 下拉应出现 2 项，agent 仍仅 TALK。待用户浏览器验收切换/刷新/回 A 数据不变；验收后删除临时项目/群/目录。
 

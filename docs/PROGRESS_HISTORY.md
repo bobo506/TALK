@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-06 22:00 — 工作区存储方向确定；W2 收尾
+
+- **用户确定**：中央 `talk.db` + `TALK/workspaces/<project_id>/` 每工作区目录；任务/群/角色元数据中央库按 `project_id` 区分；工作区目录只放角色运行时、任务附件/日志/导出；真实项目目录（如 `D:\test`）在 TALK 外，只放 `.talk/project.yaml` 指针；**现在不拆每工作区 DB**。
+- **分发方向**：文件夹绿色版（整个 TALK 目录 zip + 启动器），不做安装器、不做可配置 `data_root`、不写 AppData/注册表；角色原生 CLI 仍是外部程序。
+- **角色 ID**：延续 `agent:<project_id>.<role>.<hash>`；同名跨工作区不同 ID/Key/运行时目录；现有 TALK 角色不迁移不改名。
+- **角色 Key**：可随 TALK 目录携带，但 zip 含秘密；实现放 `TALK/keys/<project_id>/` 并提示，后续可评估加密/外部 Key。
+- **W3 建议切片**：W3a 每工作区新建角色（ID 带项目前缀）；W3b 运行时按 project+role 隔离（HOME/cwd/Key/服务状态/启停）；W3c 双工作区角色验收。`identity_exclusive_reference_refused` 表示不复用他工作区身份，不是放开跨项目复用。
+- **文档**：新增 `docs/spec/WORKSPACE_STORAGE_DECISION.md`；PROGRESS 快照更新到 22:00。
+- **下一步**：W3 先做只读设计/拆分，再逐片开发；不直接开大切片。
+
 ## 2026-11-06 20:00 — W2b 用户验收通过并清理
 
 - 用户浏览器验收：TALK↔W2B 验收工作区切换、刷新保持、回 TALK 数据不变均正常；仅 agent key 切换未点（API 已验证 agent 仅见 TALK）。
