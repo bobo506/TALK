@@ -1,6 +1,7 @@
 from urllib.parse import quote
 
 from cli.profiles import member_dir_name
+from server.models import ProjectAgent, ProjectRole
 from tests.test_support import RouteTestCase
 
 
@@ -51,6 +52,26 @@ class ProjectRouteTests(RouteTestCase):
         self.assertEqual(body["maintainer_member_id"], "human:bobo")
         self.assertEqual([p["project_id"] for p in listed.json()], ["prj_bike"])
         self.assertEqual(fetched.json()["project_root_path"], str(project_root.resolve()))
+
+    def test_project_list_filters_agent_membership_but_not_human_or_single_get(self):
+        with self.make_client() as client:
+            for name in ("roster", "role", "other"):
+                response = client.post("/api/projects", headers={"X-API-Key": "bobo-key"},
+                                       json={"project_id": f"prj_{name}", "display_name": name})
+                self.assertEqual(response.status_code, 201)
+            empty = client.get("/api/projects", headers={"X-API-Key": "codex-key"})
+            self.assertEqual(empty.json(), [])
+            with self.session() as session:
+                session.add(ProjectAgent(project_id="prj_roster", member_id="agent:codex"))
+                session.add(ProjectRole(project_id="prj_role", member_id="agent:codex",
+                                        role_name="tester", created_by="human:bobo"))
+                session.commit()
+            agent = client.get("/api/projects", headers={"X-API-Key": "codex-key"})
+            human = client.get("/api/projects", headers={"X-API-Key": "alice-key"})
+            single = client.get("/api/projects/prj_other", headers={"X-API-Key": "codex-key"})
+        self.assertEqual({p["project_id"] for p in agent.json()}, {"prj_roster", "prj_role"})
+        self.assertEqual({p["project_id"] for p in human.json()}, {"prj_roster", "prj_role", "prj_other"})
+        self.assertEqual(single.status_code, 200)
 
     def test_server_generates_project_id_when_omitted(self):
         with self.make_client() as client:

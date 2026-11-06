@@ -36,7 +36,7 @@ class RoleCreationWebUiTests(RouteTestCase):
             self.assertTrue(all(path in scripts for path in required))
             self.assertEqual([scripts.index(path) for path in required],sorted(scripts.index(path) for path in required))
             self.assertIn('/role-creation.js?v=20261031-model-api-v1',parser.assets)
-            self.assertIn('/workspace.js?v=20261104-initiator-wait-v1',parser.assets)
+            self.assertIn('/workspace.js?v=20261105-workbuddy-effort-v1',parser.assets)
             self.assertIn('role-create-auto-start',parser.ids)
             for asset in ['/role-creation.js','/role-creation.css']:
                 self.assertEqual(client.get(asset).status_code,200)

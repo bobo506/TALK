@@ -25,6 +25,7 @@ function harness() {
     activeProjectId: 'p1',
     myId: 'human:qa',
     members: [],
+    projectAgents: [],
     groups: [taskHall, chatRoom],
     userBadge: { textContent: '' },
     getActiveGroup() { return context.groups.find(g => g.id === context.activeGroupId) || null; },

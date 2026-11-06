@@ -541,8 +541,13 @@ def list_projects(
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
 ):
-    """List all registered projects."""
+    """List projects visible to this member."""
     projects = session.exec(select(Project).order_by(Project.created_at.desc())).all()
+    if current.kind != "human":
+        projects = [project for project in projects if (
+            session.get(ProjectAgent, (project.project_id, current.id)) is not None
+            or session.get(ProjectRole, (project.project_id, current.id)) is not None
+        )]
     return [ProjectOut.from_orm_project(project, session=session) for project in projects]
 
 

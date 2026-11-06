@@ -30,7 +30,7 @@ class TaskWebUiTests(RouteTestCase):
             "task-create-related",
         ):
             self.assertIn(f'id="{element_id}"', html)
-        self.assertIn("20261016-role-auto-start", html)
+        self.assertIn('src="/app.js?v=20261106-workspace-w2b"', html)
         self.assertNotIn("20261007-initiator-mode-ui", html)
         self.assertNotIn("20261006-controller-mode-c2b-ux", html)
         self.assertNotIn("20261005-role-desc-f2", html)

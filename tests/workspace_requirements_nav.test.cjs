@@ -62,7 +62,7 @@ function fakeEl(id, initialClasses = []) {
   const classes = new Set(initialClasses);
   const el = {
     id, value: '', textContent: '', className: '', disabled: false, readOnly: false,
-    title: '', type: '', open: false, dataset: {}, children: [],
+    title: '', type: '', open: false, dataset: {}, style: {}, children: [],
     listeners: {},
     classList: {
       add: c => classes.add(c),
@@ -73,6 +73,7 @@ function fakeEl(id, initialClasses = []) {
     addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
     appendChild(child) { el.children.push(child); return child; },
     append(...items) { el.children.push(...items); },
+    prepend(...items) { el.children.unshift(...items); },
     insertBefore(node) { el.children.push(node); return node; },
     replaceChildren() { el.children.length = 0; },
     setAttribute() {},
@@ -138,6 +139,13 @@ function harness({ projectId = 'A', memberId = 'human:qa', withTask = false } = 
     taskCreateAgent: 'task-create-agent',
   };
   const context = vm.createContext({
+    attachBtn: el('attach-btn'),
+    sendBtn: el('send-btn'),
+    mentionDropdown: el('mention-dropdown'),
+    sending: false,
+    pendingFile: null,
+    activeReplyTo: null,
+    clearComposerStatus() {},
     myId: memberId,
     activeProjectId: projectId,
     activeGroupId: null,

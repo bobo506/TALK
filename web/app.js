@@ -54,6 +54,7 @@ let setupKeyVisible = false;
 let setupKeyCopyTimer = null;
 let groups = [];
 let activeGroupId = null;
+let groupRequest = 0;
 let groupCreateOpen = false;
 let groupCreateSaving = false;
 let groupMembersOpen = false;
@@ -727,6 +728,7 @@ async function loadProjects() {
       await loadProjectAgents();
       await loadProjectTasks({ silent: true });
     } else {
+      localStorage.removeItem(activeProjectStorageKey());
       projectAgents = [];
       projectTasks = [];
       selectedTaskId = null;
@@ -840,11 +842,19 @@ async function loadSelectedTaskTree({ silent = false } = {}) {
 }
 
 async function setActiveProject(projectId) {
-  if (!projectId || projectId === activeProjectId) {
-    if (projectId) setBlackboardOpen(true);
+  if (!projectId || !projects.some(project => project.project_id === projectId)) return;
+  if (projectId === activeProjectId) {
+    setBlackboardOpen(true);
     return;
   }
   activeProjectId = projectId;
+  ++groupRequest;
+  groups = [];
+  activeGroupId = null;
+  localStorage.removeItem(activeGroupStorageKey());
+  workspaceUI.lastChatId = null;
+  groupMembersOpen = false;
+  resetTimelineState();
   workspaceUI.mode = "tasks";
   workspaceUI.selectedRole = null;
   // 切项目不串选：角色选择不回带到新项目，回到角色页时默认“项目设置”。
@@ -861,13 +871,16 @@ async function setActiveProject(projectId) {
   projectTasks = []; projectAgents = []; taskTreeError = "";
   renderProjectStrip(); renderWorkspaceMode();
   try {
-    await Promise.all([loadProjectAgents(), loadProjectTasks({ silent: true })]);
+    await Promise.all([loadProjectAgents(), loadGroups()]);
+    if (projectId !== activeProjectId) return;
+    await loadProjectTasks({ silent: true });
   } catch (err) {
     showComposerStatus(err.message, "error", { source: "tasks", timeoutMs: 3500 });
   }
   renderProjectStrip();
   renderRoomStrip();
   renderWorkspaceMode();
+  renderPresenceStrip();
 }
 
 async function refreshProjectWorkspace() {
@@ -1454,6 +1467,10 @@ function renderTaskCreateMode() {
 }
 
 function setTaskCreateOpen(open, { parentRoot = null } = {}) {
+  if (open && !activeProjectId) {
+    showComposerStatus("请先选择工作区。", "error", { source: "tasks", timeoutMs: 3500 });
+    return;
+  }
   if (open) workspaceUI.createReturnFocus = document.activeElement;
   taskCreateOpen = Boolean(open && activeProjectId);
   showTaskCreateError("");
@@ -1481,7 +1498,8 @@ function setTaskCreateOpen(open, { parentRoot = null } = {}) {
 
 async function createTaskFromPanel(event) {
   event.preventDefault();
-  if (taskCreateSaving || !activeProjectId) return;
+  if (taskCreateSaving) return;
+  if (!activeProjectId) { showTaskCreateError("请先选择工作区。"); return; }
   const payload = {
     project_id: activeProjectId,
     target_member_id: taskCreateAgent.value,
@@ -1555,14 +1573,27 @@ function activeGroupStorageKey() {
 }
 
 async function loadGroups() {
+  const request = ++groupRequest;
+  const projectId = activeProjectId;
+  const memberId = myId;
+  if (!projectId) {
+    groups = [];
+    activeGroupId = null;
+    localStorage.removeItem(activeGroupStorageKey());
+    return;
+  }
   try {
-    const res = await apiFetch("/api/groups");
+    const params = new URLSearchParams({ project_id: projectId });
+    const res = await apiFetch(`/api/groups?${params.toString()}`);
     if (!res.ok) {
       throw new Error(await readErrorDetail(res, `Group 列表加载失败: ${res.status}`));
     }
-    groups = await res.json();
+    const loaded = await res.json();
+    if (request !== groupRequest || projectId !== activeProjectId || memberId !== myId) return;
+    groups = loaded;
     restoreActiveGroup();
   } catch (err) {
+    if (request !== groupRequest || projectId !== activeProjectId || memberId !== myId) return;
     groups = [];
     activeGroupId = null;
     console.error(err);
@@ -1854,6 +1885,7 @@ function showGroupCreateError(message) {
 async function createGroupFromPanel(event) {
   event.preventDefault();
   if (groupCreateSaving) return;
+  if (!activeProjectId) { showGroupCreateError("请先选择工作区。"); return; }
 
   const name = groupCreateName.value.trim();
   if (!name) {
@@ -1868,7 +1900,7 @@ async function createGroupFromPanel(event) {
   const body = {
     name,
     member_ids: selectedMemberIds,
-    project_id: activeProjectId || null,
+    project_id: activeProjectId,
   };
   const id = groupCreateId.value.trim();
   const description = groupCreateDescription.value.trim();
@@ -2825,9 +2857,10 @@ async function sendFileMessage(caption = null) {
 }
 
 async function uploadPendingFile() {
+  if (!activeProjectId) throw new Error("请先选择工作区。");
   const form = new FormData();
   form.append("file", pendingFile);
-  form.append("project_id", (blackboardOpen ? activeProjectId : getActiveGroup()?.project_id) || activeProjectId || "");
+  form.append("project_id", activeProjectId);
 
   const res = await apiFetch("/api/files", {
     method: "POST",

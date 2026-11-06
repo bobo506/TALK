@@ -72,6 +72,7 @@ function workspaceContext({ roles, membersList, tasks, selectedRole, roleFilter 
     blackboardOpen: true,
     activeProjectId: 'p1',
     myId: 'human:qa',
+    currentMemberIsHuman: () => true,
     members: membersList,
     projectAgents: roles,
     projectTasks: tasks,

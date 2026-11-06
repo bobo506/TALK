@@ -42,6 +42,7 @@ function harness(options = {}) {
     myId: 'human:qa',
     activeProjectId: 'p1',
     members: [],
+    projectAgents: [],
     selectedTaskTree: null,
     taskTreeError: '',
     URLSearchParams,

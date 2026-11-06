@@ -7,7 +7,7 @@ from tests.test_support import RouteTestCase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_VERSION = "20261016-role-auto-start"
+STATIC_VERSION = "20261029-theme-day-night-v1"
 
 # I-2 自检符号集：退役后 web 运行时不得再出现（DOM id / 函数 / 状态 / 导出 / 按钮）。
 RETIRED_SCRIPT_SYMBOLS = (
@@ -72,7 +72,7 @@ class ControllerRetiredWebUiTests(RouteTestCase):
         self.assertNotIn("任务由主控分配", html)
         self.assertNotIn("供主控派发任务前读取", html)
         # 静态资源版本同步刷新缓存（4 处一致）。
-        self.assertEqual(html.count(STATIC_VERSION), 6)
+        self.assertEqual(html.count(STATIC_VERSION), 4)
         self.assertNotIn("20261006-controller-mode-c2b-ux", html)
         self.assertNotIn("20261005-role-desc-f2", html)
         self.assertNotIn("20260923-manual-task-cleanup-1", html)
@@ -162,7 +162,7 @@ class ControllerModeWebUiTests(RouteTestCase):
         self.assertLess(html.index('id="requirements-panel"'), html.index('id="controller-mode-panel"'))
         self.assertLess(html.index('id="controller-mode-panel"'), html.index('id="role-details-name-panel"'))
         # 静态资源版本六处一致。
-        self.assertEqual(html.count(STATIC_VERSION), 6)
+        self.assertEqual(html.count(STATIC_VERSION), 4)
         self.assertNotIn("20261006-controller-mode-c2b-ux", html)
         self.assertNotIn("20261006-controller-mode-c2b-f1", html)
         self.assertNotIn("20261005-role-desc-f2", html)
