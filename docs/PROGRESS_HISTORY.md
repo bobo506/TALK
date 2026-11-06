@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 15:05 — W2a 通过终验、集成推送 `eb5b129`
+
+- **469 终验 approved**：`docs/spec/PROJECT_INTEGRATION.md:811` 与期望原文精确相等，`?`=0、U+FFFD=0、strict UTF-8；与 fix1 仅该行不同；无代码/测试变化，467 的 223/223 全绿继续适用；主工作树干净、未跟踪测试在、tracked diff blob `3da57f0b` 一致。
+- **集成**：W2a 5 文件复制到主工作树，tracked diff blob 与候选一致；提交推送 `eb5b129`（5 files，154+/13-）。W2a 无 schema 变更，API reload 即可生效。
+- **部署**：未执行，等用户确认窗口；部署后真实 API 校验计划：重复 TALK 根 409、相对/不存在/文件路径 422、PATCH 清空 422、现有项目/任务/群计数不变。
+- **后续**：gate 脚本小片 → W2b 前端全页面切换/上次工作区。
+
 ## 2026-11-06 15:00 — W2a fix2 文档编码修复；469 终验
 
 - **468 complete**：只改 `docs/spec/PROJECT_INTEGRATION.md:811`，替换 104 个字面 `?` 的 mojibake；自报该行 `?`=0、U+FFFD=0、strict UTF-8、相对 fix1 仅此一行；`git diff --check` 通过。
