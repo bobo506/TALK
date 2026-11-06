@@ -7,10 +7,13 @@
 - **数据**：projects 1（`prj_e8fe7066bbec` = `D:\claude-test\TALK`）；groups 478；tasks 477；messages 2431；project_agents 9；临时 W2B 验收项目/群/目录已清理。
 - **工作区存储方向（2026-11-06 21:55 确定，见 [WORKSPACE_STORAGE_DECISION.md](spec/WORKSPACE_STORAGE_DECISION.md)）**：**中央 `talk.db` + `TALK/workspaces/<project_id>/` 每工作区目录**；任务/群/角色元数据仍中央库按 `project_id` 区分，工作区目录只放角色运行时、任务附件/日志/导出；真实项目目录（如 `D:\test`）在 TALK 外，只放 `.talk/project.yaml` 指针；**现在不拆每工作区 DB**；分发目标是文件夹绿色版（zip + 启动器），不做安装器/可配置 data_root。
 - **W3 进展**：**W3a 设计稿 v3 已通过 484 独立复验（approved，4/4）**，仓库内镜像 `docs/spec/W3A_DESIGN_20261106.md`（`.tmp/workspace-w3a-design-v3-20261106/DESIGN.md` 逐字镜像）；W3a **实施属新切片**，待用户确认后拆两子包（路径合同与兼容 → 创建流程），W3b/W3c 按原切分。`identity_exclusive_reference_refused` 表示不复用他工作区身份，是在目标工作区新建自己的角色。
+- **澄清额度（2026-11-06 完成）**：新建任务默认 3 次、硬上限 5 次（`ge=MIN=1`），用尽后 `needs_decision`+`awaiting_human`+`checkpoint_reason="clarification_limit"`；487 独立复核 approved（候选/基线各 68 项全绿、断言未弱化、无新增失败），本地提交 `e59629f`。**环境限制**：本机默认 Windows 临时目录不可写，`list_agents` 两项测试裸跑会假失败（基线同样），需显式设置可写 `TEMP`/`TMP`/`SQLITE_TMPDIR`。
 - **待确认/遗留**：W3 设计未开始；W2 遗留 run-due null 日程永久 skipped、web 422 原始 detail；真实浏览器双工作区/A 运行中切 B 已由用户验收（agent key 切换未点，API 已验证 agent 仅见 TALK）。
 - **新增待办**：`runners/<runtime>/` 运行器适配数据目录（2026-11-06 决策，独立切片、排在 W3 之后）；Key 存放按部署形态自动判定（git 工作区→仓库外，正式部署→`TALK/keys/<project_id>/`）。
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
+
+> 2026-11-06 23:35（DeepSeek，**澄清额度片完成并合入**）：485 实现（MIN=1/DEFAULT=3/LIMIT=5、`ge` 绑 MIN 防 1–2 轮回归、`clarification_limit`、加轮 +1 到 5 后 409）→ 486 返修定性（两项 `list_agents` 在基线 8849919 同签名复现，可写 TEMP/TMP 下 68 项全绿）→ 487 独立复核 **approved**（自建候选/基线隔离树各 68 项全绿 103.4s/104.3s，断言未弱化，仅 3 文件改动）。已提交 `e59629f`。**环境限制**：本机默认 Windows 临时目录不可写，裸跑这两个用例会假失败（基线同样），后续测试/验收须显式设可写 `TEMP`/`TMP`/`SQLITE_TMPDIR`。生产生效（reload API）未做，等用户授权。
 
 > 2026-11-06 23:05（DeepSeek，**W3a 设计过审**）：483 交付设计稿 v3（只把全量 discover 命令加 `-t .` 并补根目录旧文件约束），484 定向复验 **approved 4/4**：v3−v2 仅 +3/−1 行；导入阶段实测带 `-t .` 加载 3492 用例 exit 0、不带则原样复现 ImportError；机理查明是多份测试在 import 期 `sys.path.insert(0, PROJECT_ROOT)` 抢占，导致根目录旧 `test_talk_runtime.py` 被命中（窄模式不触发，非问题消除）；编码/越界/无夹带通过。设计稿已镜像到 `docs/spec/W3A_DESIGN_20261106.md`（逐字保留 + 状态头）。W3a 实施待用户确认后拆两子包。
 
