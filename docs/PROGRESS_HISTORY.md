@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-06 10:50 — W1 460 fix1 complete；461 复验；交付硬门固化
+
+- **460 交付 complete**：17 文件（16 tracked + 未跟踪新测试 `tests/test_workspace_boundary.py`）；9 套件 **284 项/156.406s 全绿**（`.tmp_fix_final.log`），中间 105 项全绿；4 个既有套件更新、SDK 文档/测试补 project_id、run-due 对 null 日程逐条 skipped、群空串过滤归一。
+- **协调者只读核对**：主工作树 tracked 差异为空；候选 blob `ca39baa…`；日志尾部 `Ran 284 tests ... OK`；开发者日志无基线对照，按新门禁把“候选+基线对照”列入 461 复验；未运行测试。
+- **461 复验**：派 k2.8，固定清单 + 10 项疑问（284 套件组成、基线对照、17 文件必要性、run-due skipped 语义、断言弱化、SDK 群/日程参数、群空串、日志完整性、shell 缓存、部署计划）。
+- **交付硬门固化**：`docs/guides/TASK_WORKFLOW.md` 新增 7.1.1——开发全绿+原始日志+基线+未跟踪文件；复核候选+基线对照；协调者收货先查证据、缺失退开发。
+
 ## 2026-11-06 10:30 — W1 复核 changes_requested；460 集中返修
 
 - **459 复核结论**：changes_requested。范围/文件授权/strip/迁移（生产备份副本实测）通过；但候选 50 项非通过：`test_tasks` 3F/25E、`test_groups` 9F/1E、`test_task_binding_snapshot` 2F、`test_talk_client` 5E；同基线 7571910 克隆 103 项全绿，排除环境。`docs/spec/SDK.md:51,137` 未跟 `send_file` 新签名；`run-due` 遇历史 null 日程整批回滚；群过滤空串返回 0 条；web 422 展示原始 detail（W2）。
