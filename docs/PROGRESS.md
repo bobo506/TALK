@@ -4,10 +4,12 @@
 
 - **角色**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。**2026-11-06 用户确定：协调者不重复运行开发测试、不在候选上执行开发动作，只核对交付/证据/复核结论并决策；有疑问交复核，返修交开发。**
 - **最近完成**：①~⑱ 见下方 01:25/01:12 等记录（B 已集成推送 `87d0014`、C 完成、454 设计交付）；⑲ **B 部署验证通过**：w-d 内置 gen5/`ins_2ffa80acc329` 启动，任务 457 在 **20s** 返回 `WD_B_OK`、结构化 `complete`，已收取并停止（gen6）；⑳ 工作区模型改为“终端决定”；㉑ 无项目历史清理完成（备份 + 2 群/38 消息/1 测试项目）；㉒ **W1（458）已派 Terra**。
-- **当前状态**：B/C 完成并推送；工作区模型按用户 2026-11-06 确定；无项目历史清理完成；**W1 已通过 463 终验并集成推送 `44f4d18`**：任务/群/日程/文件强制 project_id、文件按项目授权、迁移补列、run-due 跳过 null、群空串归一、SDK/文档同步；9 套件 284/284 全绿、基线 279 真实项全绿、无断言弱化。**生产 API 未重启，W1 迁移未在运行实例生效。**
-- **卡点/待确认**：W1 是否现在部署（重启 API，启动时执行 files/schedules 补列迁移；已有备份 `backups/workspace-w1-backup-20261106.db`）；W2 前端切换/上次工作区/路径唯一未开始；W2 遗留：run-due null 永久 skipped、web 422 detail。
-- **下一步**：用户确认部署 → 最小重启 API + 真实 API 验证（无项目任务/群/文件拒绝、群过滤、上传授权、run-due）→ W2；或先继续 W2、稍后部署。
+- **当前状态**：B/C 完成并推送；工作区模型按用户 2026-11-06 确定；无项目历史清理完成；**W1 已部署并验证**：受控 reload 后 API 新 PID `21360`、`/healthz` 200；`files.project_id`、`agent_task_schedules.project_id` 及索引已迁移；数据计数 tasks 463/groups 464/roles 18/files 0/schedules 0（新增 6 任务/6 Hall 为本批工作，非丢失）；真实 API：无项目任务/群/上传均 422、`GET /groups?project_id=` 200、`run-due` 200。
+- **卡点/待确认**：W2 未开始；需确认 W2 拆分与范围（建议 W2a 路径唯一/规范化 → W2b 前端全页面切换/上次工作区 → 真实浏览器验收）；W2 遗留：run-due null 永久 skipped、web 422 detail。
+- **下一步**：用户确认 W2 范围 → 派 Terra 开发、k2.8 复核；每片按交付硬门（全绿/基线对照/原始日志/未跟踪文件）。
 - 恢复指令：`继续项目`。
+
+> 2026-11-06 11:25（DeepSeek，**W1 已部署并真实验证**）：经用户“部署”授权，使用 runtime 受控 reload（写 `reload-api.request`，不重启角色宿主）后 API 由 PID 3000 切到 **21360**，`/healthz` 200，marker 已被 runtime 清理。迁移核对：`files.project_id`、`agent_task_schedules.project_id` 及 `ix_*_project_id` 均存在；数据计数 tasks 463、groups 464、roles 18、files 0、schedules 0（比清理时多 6 任务/6 Hall，均为 W1 开发/复核任务，非丢失）。真实 API 检查：无项目任务/群/上传均 422、`GET /groups?project_id=prj_e8fe7066bbec` 200（464 个群均为该项目）、`run-due` 200、`/api/projects` 200；检查请求未新增数据。
 
 > 2026-11-06 11:15（DeepSeek，**W1 通过并集成推送 `44f4d18`；部署待确认**）：463 终验 **approved**：fix2 相对 fix1 仅 `docs/spec/SDK.md:351` 一行；Python UTF-8 读回为正常中文；三份文档无 0x3F 连串/U+FFFD；无代码/测试变化，461 的 284/284 全绿继续成立。W1 17 文件已应用到主工作树（diff blob `06a6f841` 与候选一致，含未跟踪 `tests/test_workspace_boundary.py`），提交并推送 `44f4d18`。生产 API 未重启，迁移（files/schedules 补列+索引）尚未在运行实例执行；已备份生产库。待用户确认是否现在部署。
 

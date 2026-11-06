@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 11:25 — W1 部署与真实验证
+
+- **部署方式**：写 `C:\Users\Administrator\.talk\role-service-host\runtime\reload-api.request`，由 `talk_runtime` 受控 `reload_api`（控制文件停止旧 API 并启动新进程，角色宿主保留）；marker 被 runtime 自动清理。
+- **结果**：API PID 3000 → **21360**，`/healthz` 200；未重启角色宿主。
+- **迁移**：`files.project_id`、`agent_task_schedules.project_id` 与 `ix_*_project_id` 均存在；计数 tasks 463、groups 464、roles 18、files 0、schedules 0（比清理时多 6 任务/6 Hall，均为 W1 任务，非丢失）。
+- **真实 API**：无项目任务 422、无项目群 422、无项目上传 422；`GET /groups?project_id=prj_e8fe7066bbec` 200（464 群同项目）；`run-due` 200；`/api/projects` 200；未新增数据。
+- **下一步**：W2 范围确认（建议 W2a 路径唯一/规范化 → W2b 前端切换/上次工作区 → 真实验收）。
+
 ## 2026-11-06 11:15 — W1 通过终验、集成推送 `44f4d18`；部署待确认
 
 - **463 终验 approved**：fix2 与 fix1 逐字节仅 `docs/spec/SDK.md:351` 一行；Python UTF-8 读回正常中文；三份文档无 0x3F 连串/U+FFFD；无代码/测试变化，461 的 284/284 全绿继续成立；未跟踪新测试保留；`git diff --check` 干净。
