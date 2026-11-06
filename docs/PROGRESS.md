@@ -6,11 +6,13 @@
 - **当前状态**：B/C 完成并推送；**W1（数据边界）、W2a（路径唯一/规范化）、W2b（全页面工作区切换/群过滤/上次工作区）均已上线并验收**；GATE-1 已集成 `4eceef7`。最近提交：W2b `4b59603`，文档 `442f2ff` / `260d168`。API 运行 PID 22168（受控 reload），`/healthz` 200；页面加载 `app.js?v=20261106-workspace-w2b`。
 - **数据**：projects 1（`prj_e8fe7066bbec` = `D:\claude-test\TALK`）；groups 478；tasks 477；messages 2431；project_agents 9；临时 W2B 验收项目/群/目录已清理。
 - **工作区存储方向（2026-11-06 21:55 确定，见 [WORKSPACE_STORAGE_DECISION.md](spec/WORKSPACE_STORAGE_DECISION.md)）**：**中央 `talk.db` + `TALK/workspaces/<project_id>/` 每工作区目录**；任务/群/角色元数据仍中央库按 `project_id` 区分，工作区目录只放角色运行时、任务附件/日志/导出；真实项目目录（如 `D:\test`）在 TALK 外，只放 `.talk/project.yaml` 指针；**现在不拆每工作区 DB**；分发目标是文件夹绿色版（zip + 启动器），不做安装器/可配置 data_root。
-- **W3 下一步（先设计/拆分，不直接开发）**：W3a 每工作区新建角色（ID 带项目前缀，同名跨工作区不同 ID/Key，现有角色不变）；W3b 运行时按 project+role 隔离（HOME/cwd/Key/服务状态/启停）；W3c 双工作区角色验收。`identity_exclusive_reference_refused` 表示不复用他工作区身份，是在目标工作区新建自己的角色。
+- **W3 进展**：**W3a 设计稿 v3 已通过 484 独立复验（approved，4/4）**，仓库内镜像 `docs/spec/W3A_DESIGN_20261106.md`（`.tmp/workspace-w3a-design-v3-20261106/DESIGN.md` 逐字镜像）；W3a **实施属新切片**，待用户确认后拆两子包（路径合同与兼容 → 创建流程），W3b/W3c 按原切分。`identity_exclusive_reference_refused` 表示不复用他工作区身份，是在目标工作区新建自己的角色。
 - **待确认/遗留**：W3 设计未开始；W2 遗留 run-due null 日程永久 skipped、web 422 原始 detail；真实浏览器双工作区/A 运行中切 B 已由用户验收（agent key 切换未点，API 已验证 agent 仅见 TALK）。
 - **新增待办**：`runners/<runtime>/` 运行器适配数据目录（2026-11-06 决策，独立切片、排在 W3 之后）；Key 存放按部署形态自动判定（git 工作区→仓库外，正式部署→`TALK/keys/<project_id>/`）。
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
+
+> 2026-11-06 23:05（DeepSeek，**W3a 设计过审**）：483 交付设计稿 v3（只把全量 discover 命令加 `-t .` 并补根目录旧文件约束），484 定向复验 **approved 4/4**：v3−v2 仅 +3/−1 行；导入阶段实测带 `-t .` 加载 3492 用例 exit 0、不带则原样复现 ImportError；机理查明是多份测试在 import 期 `sys.path.insert(0, PROJECT_ROOT)` 抢占，导致根目录旧 `test_talk_runtime.py` 被命中（窄模式不触发，非问题消除）；编码/越界/无夹带通过。设计稿已镜像到 `docs/spec/W3A_DESIGN_20261106.md`（逐字保留 + 状态头）。W3a 实施待用户确认后拆两子包。
 
 > 2026-11-06 22:57（DeepSeek，**澄清机制小优化已定**）：用户确定——新建任务澄清额度**默认 3、硬上限 5**；用尽后仍走 `needs_decision`+`awaiting_human`+释放认领，由发起者程序轮询 attention 通知并处理（不新增状态、不伪造 blocked）；同时加**提问质量门**（已尝试什么/两个选项+代价/建议默认/为何不能自决，驳回也计一轮）。已写入 `AGENTS.md`「澄清额度与提问质量门」；代码改动（`server/models.py` 常量与 Pydantic 边界、`server/routes/tasks.py` 升级原因标记、相关测试）作为独立小片实施，W3a 设计片收尾后串行进行（两者共用 `models.py`）。
 
