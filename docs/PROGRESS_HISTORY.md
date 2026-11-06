@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-06 15:55 — GATE-1 473 changes_requested；474 fix2
+
+- **473 复验**：候选 11 项/12.074s、27 项/20.106s 全绿；基线 c66ba07 27 项全绿、新增失败=0；范围/边界/白名单/AST/五类 CLI fail（partial、错 blob、new_failures>0、文档 `?{2,}`、常量未授权均 exit 1）、用法 exit 2、交付契约均通过。
+- **F1–F3（中）**：①`--json` 在 cp936 控制台输出 GBK，`json.load(utf-8)` 失败；②脚本自身 `acceptance_gate.py:159` 含 `'??????????'` 占位，列入 changed_docs 会触发自身 doc.encoding；③7.1.2 blob 口径受 PS 5.1 管道 CRLF 影响。
+- **Blob 真相**：`git diff` 子进程 LF 字节流 = **486ce64**（gate 唯一可过值）；PS 5.1 管道 LF→CRLF = 4764dcf（协调者本地）；交付自报 3f4d089 任何编码变体均无法复现。文档应写 gate 自算 LF 口径。
+- **F4/F5（低）**：缺 exit 1 CLI 单测、pass 态 `--json` 解析测试；7.1.2 缺 delivery 模板/“不要 schema”说明。
+- **474 fix2**：修 F1–F5；11+ 与 27 全绿后交 k2.8 复验；通过后集成 gate → W2b。
+
 ## 2026-11-06 15:35 — 472 合法交付；473 复核
 
 - **472 complete**：无 `schema` 字段的合法 `talk-delivery-1`，沿用 471 的 11 项/20.963s 与 27 项/24.701s 证据；候选 3 文件（1 tracked + 2 未跟踪），无代码改动。
