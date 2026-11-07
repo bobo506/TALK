@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 14:25（DeepSeek，**W3b 片 1 完成并推送**）：片 1a 服务端统一意图门 `b1466d2`、片 1b 路径派生/Key 错误码/真实 junction `29930a3`、片 1c 错误码白名单与 worker 直报 `8b2c033`，三段独立复核均 approved（517 三树复跑全绿，并把争议的 `OSError 5 retention_open_unavailable` 裁决为**环境噪声**）。片 2 拆 2a/2b/2c 串行：2a `talk_runtime` 可信角色上下文 + 四 runner spec；2b `role_service_host` 与四 runner host 的 HOME/ownership/control/health/logs；2c execution session store 与四 channel。**服务端启动门在片 2/3 仍保持关闭**。
+
 > 2026-11-07 13:10（DeepSeek，**运行时重启的连带影响已修复**）：12:02 重启运行时把各角色 `desired_state` 置为 stopped，重启后未自动拉起；导致 k2.8 停止、511 复核任务排队 1 小时无人领取（Terra 也停着）。已显式 start k2.8（`ins_2bdf58dad3b6`）与 Terra（`ins_201f69011e2d`），均 running/ready；511 等待 job 已重启。**运维注意**：今后重启运行时后，需要显式 start 需要的角色服务（或依赖 auto_start/启动偏好）。
 
 > 2026-11-07 12:18（DeepSeek，**astra 可用性结论**）：astra 服务 running/ready，实际跑通两次咨询任务（510/512）。**限制**：多行回答会被截断成首段（510 得到 `1.`）；单行短答正常（512 正确返回 `4`）。**使用方式**：咨询时要求"一句话、单行、≤60 字"，仅答疑、不派操作任务、不要求改文档。若需长回答，先把问题拆成多个单行小问。
