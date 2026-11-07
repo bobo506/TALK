@@ -103,7 +103,34 @@ def profiles_dir(data_root: Path, project_id: str, member_id: str) -> Path:
     return _child(role_dir(data_root, project_id, member_id), "profiles")
 
 
+def native_home_dir(data_root: Path, project_id: str, member_id: str) -> Path:
+    return _child(role_dir(data_root, project_id, member_id), "native-home")
+
+
+def execution_session_store_path(data_root: Path, project_id: str, member_id: str) -> Path:
+    return _child(role_dir(data_root, project_id, member_id), "sessions", "execution-session-store.sqlite3")
+
+
+def records_dir(data_root: Path, project_id: str, member_id: str) -> Path:
+    return _child(role_dir(data_root, project_id, member_id), "state", "records")
+
+
+def control_dir(data_root: Path, project_id: str, member_id: str) -> Path:
+    return _child(role_dir(data_root, project_id, member_id), "state", "control")
+
+
+def manager_dir(data_root: Path, project_id: str, member_id: str, runner: str) -> Path:
+    if runner not in ("codex", "kimi", "dsh", "workbuddy"):
+        raise WorkspacePathError("invalid_id")
+    return _child(role_dir(data_root, project_id, member_id), "state", "manager", runner)
+
+
+def logs_dir(data_root: Path, project_id: str, member_id: str) -> Path:
+    return _child(role_dir(data_root, project_id, member_id), "logs")
+
+
 def key_path(data_root: Path, project_id: str, member_id: str, *, git_key_root: Path | None = None) -> Path:
+    project_component(project_id)
     if deployment_shape(data_root) == "git":
         root = Path.home() / ".talk" / "keys" if git_key_root is None else Path(git_key_root)
         if is_within(root, data_root):

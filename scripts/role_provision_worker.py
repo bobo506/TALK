@@ -106,6 +106,11 @@ WORKER_ERROR_CODES: frozenset[str] = frozenset(
         "key_write_failed",
         "key_permissions_failed",
         "key_root_inside_repo",
+        "key_root_mismatch",
+        "workspace_path_unavailable",
+        "workspace_link_refused",
+        "workspace_shape_unknown",
+        "workspace_id_invalid",
         "role_key_unknown",
         "role_key_stale",
         "identity_mismatch",
@@ -130,6 +135,7 @@ WORKER_ERROR_CODES: frozenset[str] = frozenset(
 #: 公共输出严格白名单：未列出的键一律不进入普通返回/交付。
 PUBLIC_KEYS: frozenset[str] = frozenset(
     {
+        "report_error_code",
         "schema",
         "mode",
         "enabled",
@@ -627,26 +633,32 @@ class RoleProvisionWorker:
         """Return the only legacy/workspace paths permitted for this request."""
         from scripts import role_provision as rp
 
-        key_root = self._key_root()
-        target = key_file_path(key_root, member_id)
-        profile_lock = profile_lock_path_for(self.project_root, member_id)
         if self._storage_layout == "workspace-v1":
-            from server.workspace_paths import WorkspacePathError, key_path, profiles_dir
+            from server.workspace_paths import WorkspacePathError, deployment_shape, is_within, key_path, profiles_dir
 
             try:
+                shape = deployment_shape(self.data_root)
+                if shape == "git" and self.key_root is None:
+                    raise WorkspacePathError("key_root_mismatch")
                 target = key_path(
                     self.data_root,
                     self.project_id,
                     member_id,
-                    git_key_root=key_root,
+                    git_key_root=self.key_root,
                 )
+                if shape == "git" and is_within(target, self.repo_root):
+                    raise WorkspacePathError("key_root_inside_repo")
                 profile_lock = (
                     profiles_dir(self.data_root, self.project_id, member_id)
                     / rp.PROFILE_LOCK_FILENAME
                 )
             except WorkspacePathError as exc:
-                raise WorkerError("profile_root_invalid", "工作区路径核验失败") from exc
+                raise WorkerError(rp.workspace_path_error_code(exc)) from exc
             key_root = target.parent
+        else:
+            key_root = self._key_root()
+            target = key_file_path(key_root, member_id)
+            profile_lock = profile_lock_path_for(self.project_root, member_id)
         return {
             "key_root": key_root,
             "key_path": target,
@@ -708,7 +720,7 @@ class RoleProvisionWorker:
             shape = deployment_shape(self.data_root)
             root = workspace_root(self.data_root, self.project_id)
         except WorkspacePathError as exc:
-            raise WorkerError("profile_root_invalid", "工作区根路径核验失败") from exc
+            raise WorkerError(rp.workspace_path_error_code(exc)) from exc
         frozen = projection.get("deployment_shape")
         if frozen is not None and frozen != shape:
             raise WorkerError("profile_root_invalid", "请求部署形态与当前数据根不一致")
@@ -779,12 +791,13 @@ class RoleProvisionWorker:
     def _workspace_role(self, member_id: str, *, newly_created: bool) -> None:
         """Create role directories, or resume only with proof of the same member."""
         from server.workspace_paths import WorkspacePathError, role_dir, workspace_root
+        from scripts import role_provision as rp
 
         try:
             roles = workspace_root(self.data_root, self.project_id) / "roles"
             role = role_dir(self.data_root, self.project_id, member_id)
         except WorkspacePathError as exc:
-            raise WorkerError("profile_root_invalid", "角色工作区路径核验失败") from exc
+            raise WorkerError(rp.workspace_path_error_code(exc)) from exc
         self._private_directory(roles)
         if role.exists():
             if newly_created:
@@ -1470,6 +1483,13 @@ class RoleProvisionWorker:
     ) -> dict[str, Any]:
         """回报 failed：只落有限稳定 error_code；丢响应先读同版本事实再判定。"""
         error_code = self._reportable(code)
+        # The server's existing request-report whitelist predates workspace codes.
+        # Preserve the specific local result while reporting an accepted generic code.
+        workspace_codes = {
+            "key_root_mismatch", "workspace_path_unavailable", "workspace_link_refused",
+            "workspace_shape_unknown", "workspace_id_invalid",
+        }
+        report_code = "http_error" if error_code in workspace_codes else error_code
         revision = self._current_revision(request_key)
         if revision is None:
             result["error_code"] = error_code
@@ -1479,9 +1499,11 @@ class RoleProvisionWorker:
             lease_token=lease_token,
             expected_revision=revision,
             outcome="failed",
-            error_code=error_code,
+            error_code=report_code,
         )
         result["revision"] = revision
+        if report_code != error_code:
+            result["report_error_code"] = report_code
         if report["status"] == 200:
             result["outcome"] = "reported"
             result["error_code"] = error_code

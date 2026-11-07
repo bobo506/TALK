@@ -138,6 +138,11 @@ _REASON_DETAILS: dict[str, str] = {
     "path_escape_refused": "解析后的目标路径逃出了声明根目录",
     "symlink_refused": "目标路径经过符号链接/junction（含声明根自身或其祖先 reparse point）",
     "key_root_inside_repo": "--key-root 必须位于仓库之外",
+    "key_root_mismatch": "Key 根与工作区的可信路径不一致",
+    "workspace_path_unavailable": "工作区路径不可用",
+    "workspace_link_refused": "工作区路径包含链接或重解析点",
+    "workspace_shape_unknown": "无法确定工作区部署形态",
+    "workspace_id_invalid": "工作区标识无效或过长",
     "profile_root_invalid": "项目身份档根目录无效或身份档写入失败",
     "operator_key_missing": "缺少 operator（human）凭据，未发送 ACK/单角色注册",
     "ack_failed": "ACK 请求失败",
@@ -2471,19 +2476,36 @@ def _abort(
     return document, 1
 
 
+def workspace_path_error_code(exc: Exception) -> str:
+    """Translate resolver failures consistently without disclosing path details."""
+    from server.workspace_paths import WorkspacePathError
+    code = exc.code if isinstance(exc, WorkspacePathError) else "path_unavailable"
+    return {
+        "key_root_inside_repo": "key_root_inside_repo",
+        "key_root_mismatch": "key_root_mismatch",
+        "path_unavailable": "workspace_path_unavailable",
+        "path_escape": "workspace_path_unavailable",
+        "link_refused": "workspace_link_refused",
+        "shape_unknown": "workspace_shape_unknown",
+        "invalid_id": "workspace_id_invalid",
+        "component_too_long": "workspace_id_invalid",
+    }.get(code, "workspace_path_unavailable")
+
+
 def _workspace_key_target(data_root: Any, project_id: str, member_id: str, key_root: Any, repo_root: Any) -> Path:
     """Accept only the resolver-derived project key directory for workspace-v1."""
-    from server.workspace_paths import WorkspacePathError, deployment_shape, is_within, key_path
+    from server.workspace_paths import WorkspacePathError, _checked, deployment_shape, is_within, key_path
     try:
+        declared = _checked(Path(key_root))
         shape = deployment_shape(Path(data_root))
         target = key_path(Path(data_root), project_id, member_id, git_key_root=Path(key_root))
         if shape == "git" and is_within(target, Path(repo_root)):
             raise WorkspacePathError("key_root_inside_repo")
-        if Path(key_root).expanduser().resolve() != target.parent:
+        if declared != target.parent:
             raise WorkspacePathError("key_root_mismatch")
         return target
     except (WorkspacePathError, OSError) as exc:
-        raise ProvisionError("key_root_inside_repo", "workspace Key root does not match the trusted path") from exc
+        raise ProvisionError(workspace_path_error_code(exc)) from exc
 
 
 
@@ -2497,7 +2519,7 @@ def _workspace_profile_paths(data_root: Any, project_id: str, member_id: str) ->
             f"workspace-v1:roles/{member_component(member_id)}/profiles/{PROFILE_FILENAMES[kind]}",
         ) for kind in PROFILE_KINDS}
     except (WorkspacePathError, OSError) as exc:
-        raise ProvisionError("profile_root_invalid", "workspace 档案根路径无效") from exc
+        raise ProvisionError(workspace_path_error_code(exc)) from exc
 
 
 def _workspace_profile_step(data_root: Any, project_id: str, member_id: str, overwrite: bool) -> dict[str, Any]:
@@ -2590,8 +2612,15 @@ def run_provision(
     key_root_value = DEFAULT_KEY_ROOT if key_root is None else key_root
     try:
         key_root_declared = Path(key_root_value).expanduser()
-        _assert_root_chain_has_no_reparse(key_root_declared)
-        key_root_resolved = key_root_declared.resolve()
+        if storage_layout == "workspace-v1":
+            from server.workspace_paths import _checked, WorkspacePathError
+            try:
+                key_root_resolved = _checked(key_root_declared)
+            except WorkspacePathError as exc:
+                raise ProvisionError(workspace_path_error_code(exc)) from exc
+        else:
+            _assert_root_chain_has_no_reparse(key_root_declared)
+            key_root_resolved = key_root_declared.resolve()
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     except OSError:
@@ -3340,8 +3369,15 @@ def run_request_provision(
     key_root_value = DEFAULT_KEY_ROOT if key_root is None else key_root
     try:
         key_root_declared = Path(key_root_value).expanduser()
-        _assert_root_chain_has_no_reparse(key_root_declared)
-        key_root_resolved = key_root_declared.resolve()
+        if storage_layout == "workspace-v1":
+            from server.workspace_paths import _checked, WorkspacePathError
+            try:
+                key_root_resolved = _checked(key_root_declared)
+            except WorkspacePathError as exc:
+                raise ProvisionError(workspace_path_error_code(exc)) from exc
+        else:
+            _assert_root_chain_has_no_reparse(key_root_declared)
+            key_root_resolved = key_root_declared.resolve()
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     except OSError:
