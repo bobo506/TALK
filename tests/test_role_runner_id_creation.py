@@ -44,6 +44,8 @@ from server.models import (
     ProjectRoleBinding,
     RoleCreationOperation,
     RoleProvisionRequestRow,
+    RoleServiceLaunch,
+    RoleServiceState,
     RunnerModelChoice,
     RunnerRegistry,
     is_safe_identifier_token,
@@ -436,8 +438,13 @@ class RealRunnerDirectRoleTests(RealRunnerApiTestCase):
                 headers={"X-API-Key": "bobo-key"},
             )
         self.assertEqual(started.status_code, 409, started.text)
-        self.assertEqual(started.json()["detail"], "control_kind_not_managed")
+        self.assertEqual(started.json()["detail"], "workspace_runtime_not_ready")
         with self.session() as session:
+            self.assertIsNone(session.get(RoleServiceState, ("prj_alpha", member_id)))
+            self.assertEqual(list(session.exec(select(RoleServiceLaunch).where(
+                RoleServiceLaunch.project_id == "prj_alpha",
+                RoleServiceLaunch.member_id == member_id,
+            )).all()), [])
             runner = session.get(RunnerRegistry, REAL_RUNNER_ID)
             assert runner is not None
             self.assertEqual(runner.adapter_status, "unverified")

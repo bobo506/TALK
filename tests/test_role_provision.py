@@ -1521,6 +1521,6 @@ class WorkspaceProvisionTests(RoleProvisionTestCase):
         with mock.patch("server.workspace_paths.profiles_dir", side_effect=WorkspacePathError("link_refused")):
             result, code = rp.run_provision(project_id=PROJECT_ID, member_id=MEMBER_ID, operation_key=OPERATION_KEY, project_root=self.project_root, key_root=key_root, base_url=BASE_URL, apply=True, transport=transport, environ=self.env_happy, repo_root=self.repo, data_root=data, storage_layout="workspace-v1")
         self.assertEqual(code, 1)
-        self.assertEqual(result["error_code"], "profile_root_invalid")
+        self.assertEqual(result["error_code"], "workspace_link_refused")
         self.assertFalse(key_root.exists())
         self.assertEqual(transport.calls, [])

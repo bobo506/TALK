@@ -71,7 +71,8 @@ class DshHostTest(unittest.TestCase):
         fake.private = private
         fake.drain_requested = False
         fake._health_degraded = False
-        fake._handles = {'a': object(), 'b': object()}
+        fake.workspace_context = None
+        fake._handles = {'a': {'record': {}}, 'b': {'record': {}}}
         host.DshRoleHost.publish_health(fake, 'serving')
         value = json.loads((private / 'manager-health.json').read_text(encoding='utf-8'))
         self.assertEqual(value['schema'], 'talk-dsh-manager-health-1')

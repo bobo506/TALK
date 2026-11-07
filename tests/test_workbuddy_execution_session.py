@@ -290,6 +290,7 @@ class WorkBuddyBridgeTests(unittest.IsolatedAsyncioTestCase):
         from scripts.workbuddy_role_host import WorkBuddyRoleHost, Drained
         from scripts import role_service_host as rsh
         host = WorkBuddyRoleHost.__new__(WorkBuddyRoleHost)
+        host.workspace_context = None
         with tempfile.TemporaryDirectory() as tmp:
             host.target_project, host.target_member = "p", "m"
             host.drain_requested = False

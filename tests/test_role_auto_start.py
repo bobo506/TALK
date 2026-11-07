@@ -150,7 +150,8 @@ class AutoStartApiTestCase(RoleRequestApiTestCase):
             )
 
     def drive_to_created(self, *, auto_start=True, runner_id: str = MANAGED_RUNNER,
-                         choice_id: str | None = None, request_key: str = REQUEST_KEY):
+                         choice_id: str | None = None, request_key: str = REQUEST_KEY,
+                         legacy: bool = True):
         """意图 → claim → C1 原子创建；返回 ``(created_body, lease_token)``。"""
         self.enable_host()
         body: dict = {
@@ -171,6 +172,13 @@ class AutoStartApiTestCase(RoleRequestApiTestCase):
             choice_id=choice_id or self.choice_id,
         )
         self.assertEqual(created.status_code, 201, created.text)
+        if legacy:
+            # Keep legacy transaction coverage while testing workspace gates separately.
+            with self.session() as session:
+                role = session.get(ProjectRole, ("prj_alpha", created.json()["member_id"]))
+                role.storage_layout = "legacy"
+                session.add(role)
+                session.commit()
         return created.json(), claimed["lease_token"]
 
     def finish_job_and_report(self, member_id: str, lease_token: str,
@@ -231,6 +239,28 @@ class AutoStartApiTestCase(RoleRequestApiTestCase):
                 "launches": len(list(session.exec(select(RoleServiceLaunch)).all())),
                 "states": len(list(session.exec(select(RoleServiceState)).all())),
             }
+
+
+class WorkspaceGateTests(AutoStartApiTestCase):
+    def test_default_workspace_gate_refuses_manual_and_automatic_start(self):
+        from unittest.mock import patch
+        import os
+        with patch.dict(os.environ, {"TALK_WORKSPACE_RUNTIME_ENABLED": "0"}):
+            self.make_managed()
+            created, token = self.drive_to_created(legacy=False)
+            member_id = created["member_id"]
+            started = self.service_start(member_id)
+            self.assertEqual(started.status_code, 409, started.text)
+            self.assertEqual(started.json()["detail"], "workspace_runtime_not_ready")
+            self.assertEqual(self.launch_rows(member_id), [])
+            self.assertIsNone(self.state_row(member_id))
+            reported = self.finish_job_and_report(member_id, token)
+            self.assertEqual(reported.status_code, 200, reported.text)
+            self.assertEqual(reported.json()["auto_start_status"], "not_eligible")
+            self.assertEqual(reported.json()["auto_start_error_code"], "workspace_runtime_not_ready")
+            self.assertIsNone(reported.json()["auto_start_launch_id"])
+            self.assertEqual(self.launch_rows(member_id), [])
+            self.assertIsNone(self.state_row(member_id))
 
 
 class AutoStartHappyPathTests(AutoStartApiTestCase):

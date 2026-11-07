@@ -9,8 +9,7 @@
 - 旧后端缺新增键、非项目路径都诚实降级成 ``null``（不造 ``unconfigured`` / ``bound``）；
 - 只输出 B1a 公开绑定字段，未知敏感键（凭据正文/凭据路径/实例日志）与任何
   ``binding_match*`` 都不带入角色摘要，也不从模型名/业务角色/实例推断绑定值；
-- 目录仍是九个工具，inputSchema 与 B3 冻结基线逐对象一致，只允许
-  ``talk_list_agents`` 中文描述补充只读绑定、null 降级与“配置不等于实际能力”；
+- Current catalog has ten tools; historical B3 differences and current schemas are frozen.
 - 集成证据：隔离 uvicorn 服务 + 独立 stdio 子进程分别调用目录与 ``talk_list_agents``；
 - ``development_requirements`` 在整份响应里仍只出现一次，角色清单也只一次。
 
@@ -55,7 +54,7 @@ BASELINE_TOOL_MODULE = (
     / "talk_task_tools.py"
 )
 
-# 九个 Task Hall 工具的名字与顺序（与 B3 冻结基线一致，本片不新增/改名）。
+# Current catalog, including the follow tool added after B3.
 PROJECT_TOOL_NAMES = (
     "talk_list_agents",
     "talk_delegate_task",
@@ -66,10 +65,11 @@ PROJECT_TOOL_NAMES = (
     "talk_cancel_task",
     "talk_collect_result",
     "talk_get_delivery",
+    "talk_follow_tasks",
 )
 # 冻结摘要只覆盖 names + inputSchema（不含任何工具描述文本）。
 FROZEN_TOOL_CATALOG_SHA256 = (
-    "a135482ce3338547eda22199d605b00a77801e71e28f0b2267abc428b2c58399"
+    "cc41fd7e4c7a2567b9e7f0d38762ff6297a4067b1b3be3e05b0e154d933d0142"
 )
 
 RUNNER_ID = "runner:dsh-cli"
@@ -457,12 +457,16 @@ class ToolSurfaceFreezeTests(unittest.TestCase):
         )
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
-    def test_nine_tools_and_input_schemas_match_frozen_digest(self):
-        self.assertEqual(len(TOOL_SCHEMAS), 9)
+    def test_current_tools_and_input_schemas_match_frozen_digest(self):
+        self.assertEqual(len(TOOL_SCHEMAS), 10)
         self.assertEqual(
             tuple(tool["name"] for tool in TOOL_SCHEMAS), PROJECT_TOOL_NAMES
         )
         self.assertEqual(self._catalog_digest(), FROZEN_TOOL_CATALOG_SHA256)
+        descriptions = json.dumps([tool["description"] for tool in TOOL_SCHEMAS],
+                                  ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        self.assertEqual(hashlib.sha256(descriptions.encode("utf-8")).hexdigest(),
+                         "dd5e9f14a680554ffc68a167a096b81829c4517931529be283ff31f11b5b7491")
 
     def test_input_schemas_match_b3_baseline_object_by_object(self):
         baseline = _load_baseline_tool_module()
@@ -472,18 +476,20 @@ class ToolSurfaceFreezeTests(unittest.TestCase):
                 "只保留摘要冻结断言"
             )
         self.assertEqual(
-            [tool["name"] for tool in baseline.TOOL_SCHEMAS],
+            [tool["name"] for tool in baseline.TOOL_SCHEMAS] + ["talk_follow_tasks"],
             [tool["name"] for tool in TOOL_SCHEMAS],
         )
         for current, frozen in zip(TOOL_SCHEMAS, baseline.TOOL_SCHEMAS):
-            self.assertEqual(
-                current["inputSchema"], frozen["inputSchema"], current["name"]
-            )
-            if current["name"] != "talk_list_agents":
-                # 其它工具的描述也必须逐字保持。
-                self.assertEqual(
-                    current["description"], frozen["description"], current["name"]
-                )
+            current_schema = current["inputSchema"]
+            if current["name"] == "talk_delegate_task":
+                # The full current session parameter is frozen by the catalog digest.
+                current_schema = dict(current_schema)
+                current_schema["properties"] = dict(current_schema["properties"])
+                self.assertIn("execution_session", current_schema["properties"])
+                del current_schema["properties"]["execution_session"]
+            self.assertEqual(current_schema, frozen["inputSchema"], current["name"])
+            if current["name"] not in {"talk_list_agents", "talk_delegate_task", "talk_wait_tasks"}:
+                self.assertEqual(current["description"], frozen["description"], current["name"])
 
     def test_list_agents_description_documents_binding_scope(self):
         description = next(
@@ -755,7 +761,7 @@ class RoleBindingToolConsumerStdioTests(RouteTestCase):
         self.assertEqual(len(lines), 2)
 
         tools = lines[0]["result"]["tools"]
-        self.assertEqual(len(tools), 9)
+        self.assertEqual(len(tools), 10)
         self.assertEqual(
             [tool["name"] for tool in tools], list(PROJECT_TOOL_NAMES)
         )

@@ -272,7 +272,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(set_command_effort(cmd,'unknown'),(cmd,'unchanged'))
     def test_role_host_aliases(self):
         from scripts.workbuddy_role_host import WorkBuddyRoleHost, rsh
-        host=object.__new__(WorkBuddyRoleHost); host.executable=Path('WorkBuddy.exe'); host.models_home=Path('missing'); host.project_root=Path.cwd(); host.display_name='test'
+        host=object.__new__(WorkBuddyRoleHost); host.workspace_context=None; host.executable=Path('WorkBuddy.exe'); host.models_home=Path('missing'); host.project_root=Path.cwd(); host.display_name='test'
         with patch.object(rsh.HostManager,'build_entry_argv',return_value=([], 'template','budget')):
             for alias in ('custom-local:x','workbuddy-acp:x'):
                 self.assertIn('--workbuddy-executable',host.build_entry_argv('workbuddy',alias)[0])

@@ -306,7 +306,7 @@ class NewKimiRoleHostTests(unittest.TestCase):
 
     def test_claim_scope_and_drain_keep_only_own_stop_and_owned_handles(self):
         manager = self.manager()
-        manager._handles['owned'] = object()
+        manager._handles['owned'] = {'record': {'project_id': 'p', 'member_id': 'agent:new'}}
         actions = [dict(project_id='p', member_id='agent:new', action='start'),
             dict(project_id='p', member_id='agent:new', action='stop'),
             dict(project_id='other', member_id='agent:new', action='start'),
@@ -331,7 +331,7 @@ class NewKimiRoleHostTests(unittest.TestCase):
 
     def test_health_failure_does_not_block_owned_stop_or_drop_handles(self):
         manager = self.manager()
-        manager._handles['owned'] = object()
+        manager._handles['owned'] = {'record': {'project_id': 'p', 'member_id': 'agent:new'}}
         manager.drain_requested = True
         actions = [dict(project_id='p', member_id='agent:new', action='stop'),
             dict(project_id='p', member_id='agent:other', action='stop'),
