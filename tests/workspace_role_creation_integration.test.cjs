@@ -37,7 +37,7 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   const controller=vm.runInContext('roleRequestApp',ctx);
   const toolbar=doc.getElementById('role-service-batch-actions');assert.match(h.texts(toolbar),/创建角色/);
   await controller.open();h.el('role-create-runner').value='r';await controller.chooseRunner();h.el('role-create-model').value='c';h.el('role-create-name').value='新助手';h.el('role-create-auto-start').checked=true;await controller.submit();
-  assert.equal(requests.find(r=>r.method==='POST').body.auto_start,true);
+  assert.equal(requests.find(r=>r.method==='POST').body.auto_start,false);
   assert.equal(ctx.projectAgents[0].member_id,'agent:new');assert.match(h.texts(ctx.blackboardColumns),/新助手/);
   assert.equal(controller.state.modal,false);assert.ok(h.el('role-create-modal').classList.contains('hidden'));
   assert.equal(h.texts(h.el('role-create-result')),'');
@@ -48,7 +48,12 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/正在配置/);
   assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/查看角色/);
   service={control_kind:'managed_cli',observed:'starting',readiness_service:'pending',native_login:'unverified',can_start:false,can_stop:true};
-  Object.assign(rows[0],{status:'provisioned',revision:4,lease_held:false,auto_start_status:'enqueued',auto_start_launch_id:'launch-auto'});await controller.refresh();
+  Object.assign(rows[0],{status:'provisioned',revision:4,lease_held:false,storage_layout:'workspace-v1'});await controller.refresh();
+  assert.match(h.texts(doc.getElementById('role-request-list')),/角色已准备，运行时隔离待启用/);
+  assert.match(h.texts(doc.getElementById('role-request-list')),/自动启动已关闭/);
+  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/角色已准备，运行时隔离待启用/);
+  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/自动启动已关闭/);
+  Object.assign(rows[0],{storage_layout:'legacy',auto_start:true,auto_start_status:'enqueued',auto_start_launch_id:'launch-auto'});await controller.refresh();
   assert.match(h.texts(ctx.blackboardColumns),/启动中/);assert.doesNotMatch(h.texts(ctx.blackboardColumns),/启动成功/);
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/绑定重置/);
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/自动启动请求已提交/);

@@ -163,16 +163,17 @@ test('创建弹窗运行器名去掉CLI字样',async()=>{
   assert.doesNotMatch(modelText,/xhigh/);
 });
 
-test('Codex角色允许保存自动启动意图，后台准备反馈不再是手动刷新前置',async()=>{
+test('Codex新角色关闭自动启动，后台准备反馈不再是手动刷新前置',async()=>{
   const h=harness({handler:c=>{
     if(c.path==='/api/runners')return response([{runner_id:'r',runtime:'codex',display_name:'Codex',adapter_status:'adapted',control_kind:'managed_cli'}]);
     if(c.path.endsWith('/model-choices'))return response([{runner_id:'r',choice_id:'c',model_display_name:'GPT-6.1 Terra'}]);
   }});
   await h.ready();await h.fill();
   const auto=h.el('role-create-auto-start');
-  assert.equal(auto.disabled,false);auto.checked=true;await h.ui.submit();
-  assert.equal(h.requests.find(r=>r.method==='POST').body.auto_start,true);
-  assert.match(h.el('role-create-notice').textContent,/后台会自动完成添加、官方授权准备和反馈/);
+  assert.equal(auto.disabled,true);auto.checked=true;await h.ui.submit();
+  assert.equal(h.requests.find(r=>r.method==='POST').body.auto_start,false);
+  assert.match(h.el('role-create-notice').textContent,/后台会自动完成添加与准备/);
+  assert.match(h.el('role-create-notice').textContent,/自动启动已关闭/);
 });
 
 test('Codex自动启动在官方准备未完成时显示等待而非成功',async()=>{
@@ -481,10 +482,10 @@ test('详情移除进度大块后，处理中与失败仍有简短反馈及原�
 });
 
 
-test('新建请求仅在用户勾选时自动首次启动，配置未完成不冒充已启动',async()=>{
+test('新建请求即使勾选也关闭自动启动，配置未完成不冒充已启动',async()=>{
   const h=harness();await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
-  const post=h.requests.find(r=>r.method==='POST');assert.equal(post.body.auto_start,true);
-  assert.match(h.el('role-create-notice').textContent,/按你的选择尝试自动启动/);
+  const post=h.requests.find(r=>r.method==='POST');assert.equal(post.body.auto_start,false);
+  assert.match(h.el('role-create-notice').textContent,/自动启动已关闭/);
   assert.doesNotMatch(h.texts(h.el('role-create-result')),/启动成功|请求已提交|启动中/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
   assert.equal(h.requests.some(r=>r.path.includes('/service/')),false);
@@ -500,17 +501,17 @@ test('旧缓存缺省、false、null和新true均沿原键原载荷重试，不�
   }
 });
 
-test('自动启动新请求丢响应重建页面后仍保留true及同一请求',async()=>{
+test('新请求丢响应重建页面后仍保留false及同一请求',async()=>{
   const storage=new Map();const h=harness({storage,handler:c=>{if(c.method==='POST')throw Error('lost');}});
   await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
-  const payload=h.requests.find(r=>r.method==='POST').body;assert.equal(payload.auto_start,true);
+  const payload=h.requests.find(r=>r.method==='POST').body;assert.equal(payload.auto_start,false);
   const reopened=harness({storage});await reopened.ready();await reopened.ui.open();await reopened.ui.submit();
   assert.deepEqual(reopened.requests.find(r=>r.method==='POST').body,payload);
 });
 
 async function completedAuto(h,extra={}) {
   await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
-  Object.assign(h.backend.rows[0],{status:'provisioned',member_id:'agent:auto',revision:4,credential_version:1,
+  Object.assign(h.backend.rows[0],{status:'provisioned',member_id:'agent:auto',revision:4,credential_version:1,auto_start:true,
     auto_start_status:'enqueued',auto_start_launch_id:'launch-public',auto_start_error_code:null,...extra});
   await h.ui.refresh();
 }
@@ -560,10 +561,13 @@ test('未知自动启动状态或错误码不冒充就绪、不展示后端任�
 });
 
 test('旧服务未确认auto意图时诚实提示，不仅凭提交载荷承诺自动启动',async()=>{
-  const h=harness({handler:(c,b)=>{
+  const key='role-pinned-legacy-0000';
+  const payload={request_key:key,kind:'create',confirm:true,role_name:'旧角色',role_description:null,runner_id:'r',choice_id:'c',auto_start:true};
+  const storage=new Map([['talk-role-intent:["p","human:a"]',JSON.stringify({key,payload})]]);
+  const h=harness({storage,handler:(c,b)=>{
     if(c.method==='POST') {const row={...c.body,status:'requested',revision:1};delete row.auto_start;b.rows=[row];return response(row);}
   }});
-  await h.ready();await h.fill();h.el('role-create-auto-start').checked=true;await h.ui.submit();
+  await h.ready();await h.ui.open();await h.ui.submit();
   assert.match(h.el('role-create-notice').textContent,/未确认自动启动意图/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
@@ -604,4 +608,16 @@ test('宿主关闭时提示先开启配置，不承诺自动处理且刷新不�
   assert.match(text,/请先开启宿主配置/);assert.doesNotMatch(text,/宿主会自动处理/);
   assert.match(text,/可以关闭.*请勿重复创建/);
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
+});
+
+test('新布局配置完成后展示隔离提示，旧布局及配置失败保留原反馈',async()=>{
+  const h=harness();
+  h.backend.rows=[{request_key:'role-layout-00000000',kind:'create',status:'provisioned',revision:4,member_id:'agent:new',storage_layout:'workspace-v1',auto_start:false}];
+  await h.ready();
+  let text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));
+  assert.match(text,/角色已准备，运行时隔离待启用/);assert.match(text,/自动启动已关闭/);
+  h.backend.rows[0].storage_layout='legacy';await h.ui.refresh();
+  text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));assert.doesNotMatch(text,/运行时隔离待启用|自动启动已关闭/);
+  Object.assign(h.backend.rows[0],{storage_layout:'workspace-v1',status:'failed',last_error_code:'preflight_failed'});await h.ui.refresh();
+  text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));assert.match(text,/配置未完成/);assert.doesNotMatch(text,/角色已准备/);
 });
