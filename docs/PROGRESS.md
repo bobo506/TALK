@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 11:40（DeepSeek，**Astra 咨询角色：已建，待用户授权**）：按用户要求在 codex 运行器新增模型选择 `gpt-6-astra`（choice `rmc_6ec2c7af90d5`），并创建咨询角色 **astra**（`agent:prj-e8fe7066bbec.astra-a88d641d`，role request `astra-consultant-20261107` 已 provisioned）。启动被 `native_authorization_required` 阻断：新角色 HOME 需在 **https://auth.openai.com/codex/device** 输入设备码 `44FW-7Z1DC`（会过期；过期后 cancel 再 start native-setup 可重发）。**用途约束**：astra 只做答疑咨询，不派操作任务、不改任何文档。授权后 start 服务并做 smoke 咨询。
+
 > 2026-11-07 11:25（DeepSeek，**W3a 全部完成，待人工验收**）：W3a 四段全部合入并推送——W3a-1 路径合同 `22446d5`、W3a-2a 创建流程 `2f4809a`、W3a-2b-1 后端启动拒绝 `340e52b`、W3a-2b-2 前端提示（本次提交）。506 独立复核 **approved**：新载荷固定 `auto_start:false`、旧载荷原键重试、`storage_layout` 来自真实 `request_projection` 字段、提示仅 workspace-v1、legacy 不受影响、58/58 Node 测试、编码干净。**部署与真实浏览器验收未做**：W3a 新布局角色仍不可运行（设计如此，等 W3b）；建议 W3a+W3b 同一窗口部署，澄清额度可在 W3a 验收后先单独 reload。**下一步**：W3b 只读设计交 Terra（用户指定，不用大K）；验收说明待补。
 
 > 2026-11-07 11:20（DeepSeek，**收件与改派安排**）：补收 489（W3a-1 复核 approved）、478（W3a 设计 complete）、426（旧返修 complete）。仍开放：**286** 为 2026-10-20 起 `manual_pause` 的排队任务，需发起者（codex）或用户在页面取消；**498（W3b 只读设计）** 因 hy4 执行器 `workbuddy_acp_timeout` 失败，**按用户要求改派 Terra**（不交给大K），等 505 完成后再派新任务（Terra 同一时刻只接一个任务）；大K 保留为备用开发/复核替补。
