@@ -119,6 +119,191 @@ class NewKimiRoleHostTests(unittest.TestCase):
             task_profile='review', private=host.manager_directory(self.config['state_dir'], 'p', member),
             state_dir=Path(self.config['state_dir']), project_root=self.root / 'project')
 
+    def workspace_context(self):
+        from server import workspace_paths as wp
+        data = self.root / 'data'
+        data.mkdir(exist_ok=True)
+        args = (data, 'p', 'agent:new')
+        return {'data_root': str(data), 'project_root': str(self.root / 'project'),
+            'project_id': 'p', 'member_id': 'agent:new', 'layout': 'workspace-v1',
+            'runner': 'kimi-code', 'key': str(wp.key_path(*args, git_key_root=Path(self.config['key_root']))),
+            'home': str(wp.native_home_dir(*args)), 'session': str(wp.execution_session_store_path(*args)),
+            'logs': str(wp.logs_dir(*args)), 'state': {'records': str(wp.records_dir(*args)),
+            'control': str(wp.control_dir(*args)), 'manager': str(wp.manager_dir(*args, 'kimi'))}}
+
+    def workspace_manager(self, context):
+        return host.KimiRoleHost(self.client, project='p', member='agent:new', display_name='test',
+            task_profile='review', private=self.root / 'unused-global',
+            state_dir=Path(self.config['state_dir']), project_root=self.root / 'project',
+            role_key_root=Path(self.config['key_root']), role_key_file=Path(context['key']),
+            workspace_context=context, workspace_project='p', workspace_member='agent:new',
+            workspace_data_root=self.root / 'data')
+
+    def test_workspace_home_environment_manager_health_and_drain(self):
+        context = self.workspace_context()
+        manager = self.workspace_manager(context)
+        role_home = Path(context['home'])
+        environment = manager.child_environment('p', 'agent:new')
+        for variable in host.rsh.NATIVE_HOME_ENV_VARS:
+            self.assertEqual(Path(environment[variable]), role_home)
+        self.assertEqual(Path(environment['KIMI_CODE_HOME']), role_home / '.kimi-code')
+        self.assertFalse((role_home / '.kimi-code').exists())
+        self.assertEqual(manager.private, Path(context['state']['manager']))
+        self.assertEqual(manager.private.parts[-3:], ('state', 'manager', 'kimi'))
+        manager.publish_health()
+        self.assertEqual(json.loads((manager.private / 'manager-health.json').read_text(encoding='utf-8'))['member_id'], 'agent:new')
+        (manager.private / 'drain.request').write_text('drain', encoding='utf-8')
+        with self.assertRaises(host.Drained):
+            manager.claimable_actions('p')
+        self.assertFalse((self.root / 'unused-global').exists())
+
+    def test_workspace_rejects_inconsistent_identity_runner_and_paths(self):
+        context = self.workspace_context()
+        for mutate in ('runner', 'member_id', 'home', 'manager'):
+            bad = deepcopy(context)
+            if mutate == 'manager':
+                bad['state']['manager'] = str(self.root / 'other')
+            else:
+                bad[mutate] = 'other' if mutate != 'home' else str(self.root / 'other')
+            with self.subTest(mutate=mutate), self.assertRaises(host.rsh.HostError) as caught:
+                self.workspace_manager(bad)
+            self.assertEqual(caught.exception.code, 'workspace_context_invalid')
+        manager = self.workspace_manager(context)
+        with self.assertRaises(host.rsh.HostError):
+            manager.child_environment('p', 'agent:other')
+
+    def test_main_legacy_without_context_never_queries_layout(self):
+        self.key()
+        layout_request = unittest.mock.Mock(side_effect=AssertionError('unexpected layout query'))
+        class FakeClient:
+            def request(inner, method, path, **kwargs):
+                if path.endswith('/role-storage-layouts'):
+                    return layout_request(method, path, **kwargs)
+                if path == '/api/members/me':
+                    return {'id': 'agent:new', 'kind': 'agent', 'display_name': 'test'} if kwargs.get('key') else {'kind': 'human'}
+                return [self.role]
+        def drain(manager, *args, **kwargs):
+            self.assertIsNone(manager.workspace_context)
+            expected_private = Path(self.config['state_dir']) / 'kimi-dynamic' / 'p' / 'agent_new'
+            self.assertEqual(manager.private, expected_private)
+            expected_home = Path(self.config['state_dir']) / 'native' / 'p' / 'agent_new'
+            environment = manager.child_environment('p', 'agent:new')
+            for variable in host.rsh.NATIVE_HOME_ENV_VARS:
+                self.assertEqual(Path(environment[variable]), expected_home)
+            self.assertEqual(Path(environment['KIMI_CODE_HOME']), expected_home / '.kimi-code')
+            self.assertEqual(environment['TALK_ROLE_SERVICE_MANAGED'], '1')
+            manager.publish_health()
+            health = json.loads((expected_private / 'manager-health.json').read_text(encoding='utf-8'))
+            self.assertEqual((health['member_id'], health['state'], health['draining']), ('agent:new', 'serving', False))
+            (expected_private / 'drain.request').write_text('drain', encoding='utf-8')
+            with self.assertRaises(host.Drained):
+                manager.claimable_actions('p')
+            raise host.Drained()
+        spec = host.host_spec(self.config, self.role)
+        argv = spec['argv'][spec['argv'].index('scripts.kimi_role_host') + 1:]
+        with patch.object(host.rsh, 'load_operator_key', return_value='synthetic'), \
+             patch.object(host.rsh, 'TalkHostClient', return_value=FakeClient()), \
+             patch.object(host.KimiRoleHost, 'serve', new=drain):
+            self.assertEqual(host.main(argv), 0)
+        layout_request.assert_not_called()
+        health = json.loads(((Path(self.config['state_dir']) / 'kimi-dynamic' / 'p' / 'agent_new') / 'manager-health.json').read_text(encoding='utf-8'))
+        self.assertEqual((health['state'], health['draining']), ('stopped', True))
+
+    def test_main_rejects_mismatched_layout_before_key_read(self):
+        class FakeClient:
+            def request(inner, method, path, **kwargs):
+                if path == '/api/members/me':
+                    return {'kind': 'human'}
+                if path.endswith('/role-storage-layouts'):
+                    return [{'member_id': 'agent:new', 'storage_layout': 'legacy'}]
+                return [self.role]
+        spec = host.host_spec(self.config, self.role)
+        argv = spec['argv'][spec['argv'].index('scripts.kimi_role_host') + 1:]
+        context = self.workspace_context()
+        argv[argv.index('--role-key-file') + 1] = context['key']
+        argv += ['--workspace-context', json.dumps(context), '--key-root', self.config['key_root']]
+        validate = host.rsh.validate_workspace_context
+        def isolated_validate(value, **kwargs):
+            kwargs['data_root'] = self.root / 'data'
+            return validate(value, **kwargs)
+        with patch.object(host.rsh, 'validate_workspace_context', side_effect=isolated_validate), \
+             patch.object(host.rsh, 'load_operator_key', return_value='synthetic'), \
+             patch.object(host.rsh, 'TalkHostClient', return_value=FakeClient()), \
+             patch.object(Path, 'read_text', side_effect=AssertionError('role key must not be read')), \
+             patch('sys.stdout', new_callable=io.StringIO) as output:
+            self.assertEqual(host.main(argv), 1)
+        self.assertEqual(json.loads(output.getvalue())['error_code'], 'workspace_context_invalid')
+
+    def test_main_rejects_missing_layout_before_key_read(self):
+        class FakeClient:
+            def request(inner, method, path, **kwargs):
+                if path == '/api/members/me':
+                    return {'kind': 'human'}
+                if path.endswith('/role-storage-layouts'):
+                    return []
+                return [self.role]
+        spec = host.host_spec(self.config, self.role)
+        argv = spec['argv'][spec['argv'].index('scripts.kimi_role_host') + 1:]
+        context = self.workspace_context()
+        argv[argv.index('--role-key-file') + 1] = context['key']
+        argv += ['--workspace-context', json.dumps(context), '--key-root', self.config['key_root']]
+        validate = host.rsh.validate_workspace_context
+        def isolated_validate(value, **kwargs):
+            kwargs['data_root'] = self.root / 'data'
+            return validate(value, **kwargs)
+        with patch.object(host.rsh, 'validate_workspace_context', side_effect=isolated_validate), \
+             patch.object(host.rsh, 'load_operator_key', return_value='synthetic'), \
+             patch.object(host.rsh, 'TalkHostClient', return_value=FakeClient()), \
+             patch.object(Path, 'read_text', side_effect=AssertionError('role key must not be read')), \
+             patch('sys.stdout', new_callable=io.StringIO) as output:
+            self.assertEqual(host.main(argv), 1)
+        self.assertEqual(json.loads(output.getvalue())['error_code'], 'workspace_context_invalid')
+
+    def test_main_forwards_valid_workspace_context_and_finishes_draining(self):
+        context = self.workspace_context()
+        key = Path(context['key'])
+        key.parent.mkdir(parents=True, exist_ok=True)
+        key.write_text('synthetic', encoding='utf-8')
+        class FakeClient:
+            def request(inner, method, path, **kwargs):
+                if path == '/api/members/me':
+                    return {'id': 'agent:new', 'kind': 'agent', 'display_name': 'test'} if kwargs.get('key') else {'kind': 'human'}
+                if path.endswith('/role-storage-layouts'):
+                    return [{'member_id': 'agent:new', 'storage_layout': 'workspace-v1'}]
+                return [self.role]
+        validate = host.rsh.validate_workspace_context
+        def isolated_validate(value, **kwargs):
+            kwargs['data_root'] = self.root / 'data'
+            return validate(value, **kwargs)
+        real_class = host.KimiRoleHost
+        def isolated_manager(*args, **kwargs):
+            kwargs['workspace_data_root'] = self.root / 'data'
+            return real_class(*args, **kwargs)
+        def drain(manager, *args, **kwargs):
+            self.assertEqual(manager.private, Path(context['state']['manager']))
+            manager.private.mkdir(parents=True, exist_ok=True)
+            (manager.private / 'drain.request').write_text('drain', encoding='utf-8')
+            self.assertTrue(manager._workspace_manager_tick('p'))
+        spec = host.host_spec(self.config, self.role)
+        argv = spec['argv'][spec['argv'].index('scripts.kimi_role_host') + 1:]
+        argv[argv.index('--role-key-file') + 1] = context['key']
+        argv += ['--workspace-context', json.dumps(context), '--key-root', self.config['key_root']]
+        with patch.object(host.rsh, 'validate_workspace_context', side_effect=isolated_validate), \
+             patch.object(host.rsh, 'load_operator_key', return_value='synthetic'), \
+             patch.object(host.rsh, 'TalkHostClient', return_value=FakeClient()), \
+             patch.object(real_class, 'serve', new=drain), \
+             patch.object(host, 'KimiRoleHost', side_effect=isolated_manager):
+            self.assertEqual(host.main(argv), 0)
+        health = json.loads((Path(context['state']['manager']) / 'manager-health.json').read_text(encoding='utf-8'))
+        self.assertEqual((health['state'], health['draining']), ('stopped', True))
+
+    def test_main_rejects_unpaired_workspace_arguments(self):
+        spec = host.host_spec(self.config, self.role)
+        argv = spec['argv'][spec['argv'].index('scripts.kimi_role_host') + 1:] + ['--key-root', self.config['key_root']]
+        with patch('sys.stdout', new_callable=io.StringIO) as output:
+            self.assertEqual(host.main(argv), 1)
+        self.assertEqual(json.loads(output.getvalue())['error_code'], 'workspace_context_invalid')
+
     def test_claim_scope_and_drain_keep_only_own_stop_and_owned_handles(self):
         manager = self.manager()
         manager._handles['owned'] = object()
@@ -172,7 +357,13 @@ class NewKimiRoleHostTests(unittest.TestCase):
         self.key(); self.client.rows = [self.role]
         argv = host.host_spec(self.config, self.role)['argv']
         argv = argv[argv.index('scripts.kimi_role_host') + 1:]
-        with patch.object(host.rsh, 'load_operator_key', return_value='synthetic-human-key'), \
+        request = self.client.request
+        def with_layout(method, path, **kwargs):
+            if path.endswith('/role-storage-layouts'):
+                return [{'member_id': 'agent:new', 'storage_layout': 'legacy'}]
+            return request(method, path, **kwargs)
+        with patch.object(self.client, 'request', side_effect=with_layout), \
+             patch.object(host.rsh, 'load_operator_key', return_value='synthetic-human-key'), \
              patch.object(host.rsh, 'TalkHostClient', return_value=self.client), \
              patch.object(host.KimiRoleHost, 'serve', side_effect=host.Drained), \
              patch.object(host.KimiRoleHost, 'publish_health', side_effect=OSError('synthetic health failure')), \
@@ -195,6 +386,7 @@ class NewKimiRoleHostTests(unittest.TestCase):
                 if self.path == '/api/members/me':
                     value = {'id': 'human:test', 'kind': 'human'} if self.headers.get('X-API-Key') == 'synthetic-human-key' else {'id': 'agent:new', 'kind': 'agent', 'display_name': 'Kimi'}
                 elif self.path.endswith('/roles'): value = [role]
+                elif self.path.endswith('/role-storage-layouts'): value = [{'member_id': 'agent:new', 'storage_layout': 'legacy'}]
                 else: value = {'data': []}
                 body = json.dumps(value).encode()
                 self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)

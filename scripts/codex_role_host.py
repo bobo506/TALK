@@ -95,9 +95,17 @@ class CodexRoleHost(rsh.HostManager):
         self.private = Path(private)
         self.drain_requested = False
         self._health_degraded = False
+        context = kwargs.get('workspace_context')
+        if context is not None and (not isinstance(context, dict) or context.get('runner') != 'codex'
+                or context.get('project_id') != project or context.get('member_id') != member):
+            raise rsh.HostError('workspace_context_invalid', 'workspace identity or runner mismatch')
         super().__init__(*args, **kwargs)
+        if self.workspace_context is not None:
+            self.private = Path(self.workspace_context['state']['manager'])
 
     def publish_health(self, state='serving'):
+        if self.workspace_context is not None:
+            self._workspace_check_file(self.private / 'manager-health.json', self.private)
         rsh.ensure_private_dir(self.private)
         value = {'schema': 'talk-codex-manager-health-1', 'pid': os.getpid(),
             'project_id': self.project, 'member_id': self.member,
@@ -123,6 +131,8 @@ class CodexRoleHost(rsh.HostManager):
     def claimable_actions(self, project_id):
         if project_id != self.project:
             return []
+        if self.workspace_context is not None:
+            self._workspace_check_file(self.private / 'drain.request', self.private)
         self.drain_requested = self.drain_requested or (self.private / 'drain.request').is_file()
         if self.drain_requested and not self._handles:
             raise Drained()
@@ -236,9 +246,25 @@ def main(argv=None):
                  'operator-key-file', 'role-key-file', 'expected-choice-id', 'expected-model-alias', 'codex-executable'):
         parser.add_argument('--' + name, required=True)
     parser.add_argument('--task-profile', choices=('review', 'tools'), default='tools')
+    parser.add_argument('--workspace-context', default=None)
+    parser.add_argument('--key-root', default=None)
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args(argv)
-    private = manager_directory(args.state_dir, args.project, args.member)
+    context = None
+    try:
+        if args.workspace_context is not None or args.key_root is not None:
+            if args.workspace_context is None or args.key_root is None:
+                raise rsh.HostError('workspace_context_invalid', 'workspace context and key root required')
+            context = rsh.validate_workspace_context(json.loads(args.workspace_context),
+                project=args.project, member=args.member, project_root=Path(args.project_root),
+                key_root=Path(args.key_root), role_key_file=Path(args.role_key_file))
+            if context['runner'] != 'codex':
+                raise rsh.HostError('workspace_context_invalid', 'workspace runner mismatch')
+    except (rsh.HostError, ValueError) as exc:
+        print(json.dumps({'ok': False, 'error_code': getattr(exc, 'code', 'workspace_context_invalid')}))
+        return 1
+    private = (Path(context['state']['manager']) if context is not None
+               else manager_directory(args.state_dir, args.project, args.member))
     if not args.apply:
         print(json.dumps({'mode': 'dry_run', 'project_id': args.project, 'member_id': args.member}))
         return 0
@@ -259,7 +285,21 @@ def main(argv=None):
                 or (role.get('model') or {}).get('choice_id') != args.expected_choice_id
                 or (role.get('model') or {}).get('model_alias') != args.expected_model_alias):
             raise rsh.HostError('binding_fingerprint_mismatch', 'Codex角色或模型选择已改变')
+        if context is not None:
+            layouts = client.request('GET', '/api/projects/' + args.project + '/role-storage-layouts')
+            layouts = layouts if isinstance(layouts, list) else layouts.get('data') if isinstance(layouts, dict) else None
+            if not isinstance(layouts, list) or any(not isinstance(row, dict) for row in layouts):
+                raise rsh.HostError('workspace_context_invalid', 'workspace layout unavailable')
+            matching = [row for row in layouts if row.get('member_id') == args.member]
+            if len(matching) != 1 or matching[0].get('storage_layout') not in ('legacy', 'workspace-v1'):
+                raise rsh.HostError('workspace_context_invalid', 'workspace layout invalid')
+            is_workspace = matching[0]['storage_layout'] == 'workspace-v1'
+            if is_workspace != (context is not None):
+                raise rsh.HostError('workspace_context_invalid', 'workspace layout mismatch')
         key_path = Path(args.role_key_file)
+        if context is not None:
+            rsh.validate_workspace_context(context, project=args.project, member=args.member,
+                project_root=Path(args.project_root), key_root=Path(args.key_root), role_key_file=key_path)
         role_key = key_path.read_text(encoding='utf-8').strip()
         identity = client.request('GET', '/api/members/me', key=role_key)
         if identity.get('id') != args.member or identity.get('kind') != 'agent':
@@ -267,11 +307,17 @@ def main(argv=None):
         manager = CodexRoleHost(client, project=args.project, member=args.member,
             display_name=role.get('role_name') or identity['display_name'], task_profile=args.task_profile,
             private=private, codex_executable=args.codex_executable, state_dir=Path(args.state_dir), operator_key=operator,
-            role_key_file=key_path, project_root=Path(args.project_root), verified_runtimes=['codex'])
+            role_key_file=key_path, project_root=Path(args.project_root), verified_runtimes=['codex'],
+            role_key_root=Path(args.key_root) if args.key_root else None, workspace_context=context,
+            workspace_project=args.project, workspace_member=args.member)
         while True:
             try:
                 manager.serve(args.project, poll_interval=rsh.DEFAULT_POLL_INTERVAL_SECONDS,
                     once=False, max_rounds=None, provision_worker=None)
+                if manager.workspace_context is not None and manager._workspace_draining and not manager._handles:
+                    manager.drain_requested = True
+                    manager.publish_health_best_effort('stopped')
+                    return 0
             except Drained:
                 manager.publish_health_best_effort('stopped')
                 return 0
