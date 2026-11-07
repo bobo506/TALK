@@ -79,9 +79,10 @@ class RuntimeTests(unittest.TestCase):
             restarted.stopping = True
             restarted._serve()
         second = json.loads(target.read_text(encoding="utf-8"))
-        self.assertEqual(set(first), {"schema", "runtime_protocol", "supported_layouts", "pid", "started_at", "written_at"})
+        self.assertEqual(set(first), {"schema", "runtime_protocol", "manager_protocol", "supported_layouts", "pid", "started_at", "written_at"})
         self.assertEqual(first["schema"], "talk-runtime-capability-1")
         self.assertEqual(first["runtime_protocol"], "talk-runtime-1")
+        self.assertEqual(first["manager_protocol"], "talk-manager-1")
         self.assertEqual(first["supported_layouts"], ["legacy", "workspace-v1"])
         self.assertEqual(first["pid"], os.getpid())
         self.assertEqual(first["started_at"], self.runtime.started_at)
@@ -91,6 +92,23 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(replacements[0], (self.private, "old"))
         self.assertEqual(json.loads(replacements[1][1]), first)
         self.assertEqual(second["started_at"], restarted.started_at)
+
+    def test_enabled_workspace_uses_role_spec_instead_of_fixed_recipe(self):
+        role = {"member_id": "agent:one", "storage_layout": "workspace-v1", "runner": {"runtime": "codex"}}
+        legacy = self.spec()
+        self.config["hosts"] = [legacy]
+        private = self.root / "isolated-manager"
+        private.mkdir()
+        workspace = {"member_id": "agent:one", "argv": ["fixture-workspace"],
+                     "health_file": str(private / "health.json"), "drain_file": str(private / "drain")}
+        with patch.dict(os.environ, {"TALK_WORKSPACE_RUNTIME_ENABLED": "1"}), \
+             patch.object(self.runtime, "workbuddy_spec", return_value=None), \
+             patch.object(self.runtime, "kimi_spec", return_value=None), \
+             patch.object(self.runtime, "codex_spec", return_value=workspace), \
+             patch.object(runtime, "process_parents", return_value={}):
+            self.runtime.reconcile_hosts([role])
+        self.assertEqual(self.spawned[0][1], ["fixture-workspace"])
+        self.assertEqual(self.runtime.hosts["agent:one"]["spec"], workspace)
 
     def test_capability_publish_failure_is_nonfatal_and_failed_start_does_not_publish(self):
         self.config["provision_worker"] = False
@@ -490,3 +508,77 @@ class ActualApiControlTests(unittest.TestCase):
 
 
 if __name__=="__main__":unittest.main()
+
+
+class WorkspaceLaunchBindingTests(unittest.TestCase):
+    def test_subclass_health_keeps_instance_host(self):
+        from tests.test_role_service_host import WorkspaceContextTests
+        from scripts.codex_role_host import CodexRoleHost
+        fixture = WorkspaceContextTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        manager = CodexRoleHost(None, project=fixture.project, member=fixture.member,
+            display_name="fixture", task_profile="fixture", private=Path(fixture.tmp.name) / "unused",
+            codex_executable="fixture", **fixture.kwargs)
+        manager.publish_health()
+        health = json.loads(manager.manager_health_file.read_text(encoding="utf-8"))
+        self.assertEqual(health["host"], manager.host)
+        self.assertEqual(health["manager_instance_id"], manager.manager_instance_id)
+        self.assertEqual(health["capability"]["role"]["member_id"], fixture.member)
+
+    def test_manager_binding_matrix_before_ready_and_targeted_stop(self):
+        from tests.test_role_service_host import WorkspaceContextTests, FakeHostClient, FakeProcess, _fake_facts
+        from scripts.role_service_host import HostManager
+        fixture = WorkspaceContextTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        state_dir = Path(fixture.tmp.name) / "runtime-state"
+        (state_dir / "runtime").mkdir(parents=True)
+        (state_dir / "runtime" / "capability.json").write_text(json.dumps({
+            "schema": "talk-runtime-capability-1", "runtime_protocol": "talk-runtime-1",
+            "manager_protocol": "talk-manager-1"}), encoding="utf-8")
+        changes = [None, "missing", "schema", "protocol", "layouts", "project_id", "member_id",
+                   "runner", "instance_id", "generation", "launch_id", "manager_instance_id"]
+        for index, change in enumerate(changes):
+            with self.subTest(change=change):
+                client = FakeHostClient(fixture.member)
+                manager = HostManager(client, state_dir=state_dir, runtime_log_disabled=True, **fixture.kwargs)
+                facts = _fake_facts(Path(fixture.context["key"]))
+                facts.runtime = "codex"
+                launch_id = "launch" + str(index)
+                launch = {"launch_id": launch_id, "project_id": fixture.project, "member_id": fixture.member,
+                          "expected_instance_id": "ins_" + launch_id, "generation": 1}
+                child, other = FakeProcess(32000 + index), FakeProcess(33000 + index)
+                manager._handles["other"] = {"process": other, "record": {"project_id": fixture.project,
+                    "member_id": "agent:other", "launch_id": "other"}}
+                tick = manager._workspace_manager_tick
+                def altered_tick(project):
+                    result = tick(project)
+                    health = json.loads(manager.manager_health_file.read_text(encoding="utf-8"))
+                    if change == "missing":
+                        health.pop("capability")
+                    elif change in ("schema", "protocol", "layouts"):
+                        key = {"schema": "schema", "protocol": "manager_protocol", "layouts": "supported_layouts"}[change]
+                        health["capability"][key] = [] if change == "layouts" else "wrong"
+                    elif change == "manager_instance_id":
+                        health["manager_instance_id"] = "different-manager"
+                    elif change in ("project_id", "member_id", "runner"):
+                        health["capability"]["role"][change] = "wrong"
+                    elif change:
+                        health["capability"]["binding"][change] = "wrong"
+                    manager.manager_health_file.write_text(json.dumps(health), encoding="utf-8")
+                    return result
+                with patch.object(manager, "preflight", return_value=facts), \
+                     patch.object(runtime.rsh, "spawn_hidden", return_value=child), \
+                     patch.object(runtime.rsh, "process_creation_time", return_value=None), \
+                     patch.object(manager, "_wait_ready", return_value=True), \
+                     patch.object(manager, "_workspace_manager_tick", side_effect=altered_tick):
+                    result = manager.execute_start(launch)
+                if change is None:
+                    self.assertEqual(result["outcome"], "ready")
+                    self.assertEqual(client.reports[-1]["outcome"], "ready")
+                else:
+                    self.assertEqual(result["error_code"], "workspace_capability_unbound")
+                    self.assertEqual(client.reports[-1]["outcome"], "failed")
+                    self.assertTrue(child.exited)
+                self.assertFalse(other.exited)

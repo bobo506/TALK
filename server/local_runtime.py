@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 POINTER = ROOT / ".talk/runtime.local.json"
 logger = logging.getLogger(__name__)
 
+RUNTIME_MANAGER_PROTOCOLS = {"talk-runtime-1": "talk-manager-1"}
+
 
 def bind_local_runtime(config_file, config):
     """显式运行统一入口时记住本机绑定；仅存清单路径，不复制任何凭据。"""
@@ -93,7 +95,9 @@ def workspace_runtime_capability(engine):
         if not isinstance(value, dict) or value.get("schema") != "talk-runtime-capability-1":
             raise ValueError
         reason = "capability_invalid_protocol"
-        if not isinstance(value.get("runtime_protocol"), str):
+        if (not isinstance(value.get("runtime_protocol"), str)
+                or value["runtime_protocol"] not in RUNTIME_MANAGER_PROTOCOLS
+                or value.get("manager_protocol") != RUNTIME_MANAGER_PROTOCOLS[value["runtime_protocol"]]):
             raise ValueError
         reason = "capability_invalid_layouts"
         layouts = value.get("supported_layouts")

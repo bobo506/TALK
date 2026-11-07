@@ -364,6 +364,7 @@ class TalkRuntime:
 
     def publish_capability(self):
         value = {"schema": "talk-runtime-capability-1", "runtime_protocol": "talk-runtime-1",
+                 "manager_protocol": "talk-manager-1",
                  "supported_layouts": ["legacy", "workspace-v1"], "pid": os.getpid(),
                  "started_at": self.started_at, "written_at": utcnow()}
         try:
@@ -649,11 +650,14 @@ class TalkRuntime:
         by_id = {r["member_id"]:r for r in roles}
         specs = {s["member_id"]:dict(s) for s in self.config.get("hosts", [])}
         workspace_roles = {r["member_id"] for r in roles if rsh.is_workspace_v1(r)}
+        workspace_enabled = os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") == "1"
         for member in workspace_roles:
-            self.statuses[member] = rsh.workspace_runtime_not_ready_status()
+            # A fixed legacy recipe must never receive a workspace role.
+            specs.pop(member, None)
+            if not workspace_enabled:
+                self.statuses[member] = rsh.workspace_runtime_not_ready_status()
         for role in roles:
-            # W3a：动态配方解析、身份/Key 读取和 spawn 之前即拒绝；不进入 W3b 隔离。
-            if role["member_id"] in workspace_roles:
+            if role["member_id"] in workspace_roles and not workspace_enabled:
                 continue
             if role["member_id"] not in specs:
                 try:
@@ -667,8 +671,7 @@ class TalkRuntime:
             role = by_id.get(member)
             if role is None or role.get("archived"):
                 continue
-            # 固定配置入口同样在健康文件、所有权判断和 spawn 之前拒绝。
-            if member in workspace_roles:
+            if member in workspace_roles and not workspace_enabled:
                 continue
             owned = self.hosts.get(member)
             if owned:

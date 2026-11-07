@@ -2,7 +2,7 @@
 
 The resolver maps persisted project/member/runner facts to the *same*
 deterministic health file and host entry that the local runtime uses when it
-starts a host.  It deliberately does not read health files, credentials, the
+starts a host. Resolution itself does not read health files, credentials, the
 process table, or native configuration, and it never starts a resolver/host.
 
 Fixed ``hosts`` recipes remain first priority.  Dynamic Kimi/Codex/DSH/WorkBuddy
@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import re
+import json
 from typing import Any, Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,6 +88,49 @@ def entry_from_argv(argv: Sequence[Any], project_root: Path | None = None) -> Pa
     return None
 
 
+def workspace_manager_health_path(data_root: Path, project_id: str, member_id: str, runner: str) -> Path:
+    """Return only the authoritative workspace manager health path."""
+    from server.workspace_paths import manager_dir, _checked
+    if runner not in _DYNAMIC or not Path(data_root).is_absolute():
+        raise RecoveryHostError("local_recovery_host_unconfigured")
+    return _checked(manager_dir(Path(data_root), project_id, member_id, _DYNAMIC[runner][0]) / "manager-health.json")
+
+
+def workspace_capability_matches(health_file: Path, *, manager_protocol: str, project_id: str,
+                                 member_id: str, runner: str, instance_id: str | None = None,
+                                 generation: int | None = None, launch_id: str | None = None,
+                                 host: str | None = None,
+                                 manager_instance_id: str | None = None) -> bool:
+    """Read role evidence, optionally requiring a complete launch binding."""
+    try:
+        health = json.loads(Path(health_file).read_text(encoding="utf-8"))
+        capability = health.get("capability")
+        if host is not None and (not host or health.get("host") != host):
+            return False
+        if manager_instance_id is not None and (not manager_instance_id
+                or health.get("manager_instance_id") != manager_instance_id):
+            return False
+        if not isinstance(capability, dict):
+            return False
+        role, binding, layouts = (capability.get("role"), capability.get("binding"),
+                                  capability.get("supported_layouts"))
+        if not (capability.get("schema") == "talk-role-capability-1"
+                and capability.get("manager_protocol") == manager_protocol
+                and isinstance(layouts, list) and "workspace-v1" in layouts
+                and isinstance(role, dict) and role.get("project_id") == project_id
+                and role.get("member_id") == member_id and role.get("runner") == runner):
+            return False
+        if instance_id is None and generation is None and launch_id is None:
+            return True
+        return (isinstance(instance_id, str) and bool(instance_id)
+                and type(generation) is int and isinstance(launch_id, str) and bool(launch_id)
+                and isinstance(binding, dict) and binding.get("instance_id") == instance_id
+                and type(binding.get("generation")) is int and binding.get("generation") == generation
+                and binding.get("launch_id") == launch_id)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
 def resolve_recovery_host(*, config: Mapping[str, Any], project_id: str, member_id: str,
                           original_runtime: str | None, current_runtime: str | None,
                           control_kind: str | None, storage_layout: str = "legacy",
@@ -114,7 +158,7 @@ def resolve_recovery_host(*, config: Mapping[str, Any], project_id: str, member_
         if entry is None:
             raise RecoveryHostError("local_recovery_entry_unverified")
         try:
-            health = _checked(manager_dir(Path(data_root), project_id, member_id, recipe_key) / "manager-health.json")
+            health = workspace_manager_health_path(Path(data_root), project_id, member_id, original_runtime)
         except (WorkspacePathError, OSError, ValueError) as exc:
             raise RecoveryHostError("local_recovery_host_unconfigured") from exc
         return RecoveryHost("workspace-" + original_runtime, original_runtime, health, entry)

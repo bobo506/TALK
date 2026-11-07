@@ -491,3 +491,44 @@ class DynamicLocalStopTests(RoleServiceTestCase):
             state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
             self.assertIsNotNone(state.process_launch_id)
             self.assertEqual(session.exec(select(RoleServiceRecovery)).all(), [])
+
+
+class WorkspaceManagerProtocolTests(unittest.TestCase):
+    def test_manifest_protocol_matrix(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "runtime" / "capability.json"
+            target.parent.mkdir()
+            valid = {"schema": "talk-runtime-capability-1", "runtime_protocol": "talk-runtime-1",
+                     "manager_protocol": "talk-manager-1", "supported_layouts": ["workspace-v1"],
+                     "pid": os.getpid(), "started_at": "2026-11-07T00:00:00Z",
+                     "written_at": "2026-11-07T00:00:00Z"}
+            missing = dict(valid); missing.pop("manager_protocol")
+            for manifest, accepted in [(valid, True), (missing, False),
+                    ({**valid, "runtime_protocol": "talk-runtime-2"}, False),
+                    ({**valid, "manager_protocol": "talk-manager-2"}, False)]:
+                with self.subTest(manifest=manifest):
+                    target.write_text(json.dumps(manifest), encoding="utf-8")
+                    with patch.object(local, "configured_runtime", return_value=(None, {"state_dir": folder})):
+                        self.assertEqual(local.workspace_runtime_capability(None) is not None, accepted)
+
+    def test_manager_binding_matrix(self):
+        from server.role_host_resolution import workspace_capability_matches
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "manager-health.json"
+            role = {"project_id": "p", "member_id": "m", "runner": "dsh"}
+            binding = {"instance_id": "i", "generation": 1, "launch_id": "l"}
+            cap = {"schema": "talk-role-capability-1", "manager_protocol": "talk-manager-1",
+                   "supported_layouts": ["workspace-v1"], "role": role, "binding": binding}
+            kwargs = {"manager_protocol": "talk-manager-1", **role, **binding}
+            variants = [({}, False), (cap, True), ({**cap, "schema": "wrong"}, False),
+                        ({**cap, "manager_protocol": "wrong"}, False),
+                        ({**cap, "supported_layouts": ["legacy"]}, False)]
+            for key in role:
+                variants.append(({**cap, "role": {**role, key: "wrong"}}, False))
+            for key in binding:
+                variants.append(({**cap, "binding": {**binding, key: "wrong"}}, False))
+            variants.append(({**cap, "binding": {**binding, "generation": True}}, False))
+            for value, expected in variants:
+                with self.subTest(capability=value):
+                    target.write_text(json.dumps({"capability": value}), encoding="utf-8")
+                    self.assertEqual(workspace_capability_matches(target, **kwargs), expected)

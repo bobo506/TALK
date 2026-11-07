@@ -1658,3 +1658,188 @@ def _utc_now():
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class WorkspaceReadyCapabilityTests(RoleServiceTestCase):
+    def test_workspace_manager_and_server_start_ready_flow(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from server import workspace_paths as wp
+        from scripts import role_service_host as rsh
+        from tests.test_role_service_host import FakeProcess, _fake_facts
+        case = self
+        class Client:
+            base_url = "http://testserver"
+            def request(self, method, path, body=None, **kwargs):
+                with case.make_client() as client:
+                    response = client.request(method, path, json=body,
+                        headers={"X-API-Key": case.role_a_key})
+                if response.status_code >= 400:
+                    raise rsh.HostError("fixture_http_error", str(response.status_code))
+                payload = response.json()
+                return payload if isinstance(payload, dict) else {"data": payload}
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            data, project, keys, state = (root / name for name in ("data", "project", "keys", "state"))
+            for directory in (data, project, keys, state): directory.mkdir()
+            args = (data, PROJECT_ID, self.role_a)
+            key = wp.key_path(*args, git_key_root=keys)
+            context = {"data_root": str(data), "project_root": str(project), "project_id": PROJECT_ID,
+                "member_id": self.role_a, "layout": "workspace-v1", "runner": "dsh", "key": str(key),
+                "home": str(wp.native_home_dir(*args)), "session": str(wp.execution_session_store_path(*args)),
+                "state": {"records": str(wp.records_dir(*args)), "control": str(wp.control_dir(*args)),
+                          "manager": str(wp.manager_dir(*args, "dsh"))}, "logs": str(wp.logs_dir(*args))}
+            (state / "runtime").mkdir()
+            manifest = {"schema": "talk-runtime-capability-1", "runtime_protocol": "talk-runtime-1",
+                "manager_protocol": "talk-manager-1", "supported_layouts": ["workspace-v1"],
+                "pid": os.getpid(), "started_at": "2026-11-07T00:00:00Z", "written_at": "2026-11-07T00:00:00Z"}
+            (state / "runtime" / "capability.json").write_text(json.dumps(manifest), encoding="utf-8")
+            with self.session() as session:
+                role = session.get(ProjectRole, (PROJECT_ID, self.role_a))
+                role.storage_layout = "workspace-v1"
+                session.add(role); session.commit()
+            manager = rsh.HostManager(Client(), host=HOST, state_dir=state, role_key_root=keys,
+                role_key_file=key, project_root=project, runtime_log_disabled=True, workspace_context=context,
+                workspace_project=PROJECT_ID, workspace_member=self.role_a, workspace_data_root=data)
+            facts = _fake_facts(key)
+            with patch.dict("os.environ", {"TALK_WORKSPACE_RUNTIME_ENABLED": "1"}), \
+                 patch("server.local_runtime.configured_runtime", return_value=(None, {"state_dir": str(state)})), \
+                 patch("server.local_runtime.ensure_local_runtime", return_value="disabled"), \
+                 patch("server.role_host_resolution.ROOT", data), \
+                 patch.object(manager, "preflight", return_value=facts), \
+                 patch.object(rsh, "spawn_hidden", return_value=FakeProcess(4321)), \
+                 patch.object(rsh, "process_creation_time", return_value=None):
+                started = self.start()
+                self.assertEqual(started.status_code, 200, started.text)
+                launch = started.json()
+                manager._workspace_manager_tick(PROJECT_ID)
+                def ready(instance_id, project_id, member_id):
+                    response = self.bind_instance(launch, {"expected_instance_id": instance_id})
+                    self.assertEqual(response.status_code, 200, response.text)
+                with patch.object(manager, "_wait_ready", side_effect=ready):
+                    result = manager.execute_start({**launch, "project_id": PROJECT_ID, "member_id": self.role_a})
+                self.assertEqual(result["outcome"], "ready")
+                self.assertEqual(self.state_row().observed_state, ROLE_SERVICE_OBSERVED_RUNNING)
+                self.assertEqual(self.launch_row(launch["launch_id"]).outcome, "ready")
+
+    def test_old_manager_cannot_claim_workspace_start(self):
+        import tempfile
+        from pathlib import Path
+        started = self.start()
+        self.assertEqual(started.status_code, 200, started.text)
+        launch = started.json()
+        with self.session() as session:
+            role = session.get(ProjectRole, (PROJECT_ID, self.role_a))
+            role.storage_layout = "workspace-v1"
+            session.add(role); session.commit()
+        before_state = self.state_row().model_dump()
+        before_launch = self.launch_row(launch["launch_id"]).model_dump()
+        with tempfile.TemporaryDirectory() as folder:
+            health = Path(folder) / "manager-health.json"
+            health.write_text("{}", encoding="utf-8")
+            with patch.dict("os.environ", {"TALK_WORKSPACE_RUNTIME_ENABLED": "1"}), \
+                 patch("server.local_runtime.workspace_runtime_capability", return_value={"manager_protocol": "talk-manager-1"}), \
+                 patch("server.role_host_resolution.workspace_manager_health_path", return_value=health):
+                body = {"host": HOST, "expected_instance_id": launch["expected_instance_id"],
+                        "owner_token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                response = self.claim(launch["launch_id"], body, key=self.role_a_key)
+                self.assertEqual(response.status_code, 409, response.text)
+                self.assertEqual(response.json()["detail"], "workspace_capability_unbound")
+                self.assertEqual(before_state, self.state_row().model_dump())
+                self.assertEqual(before_launch, self.launch_row(launch["launch_id"]).model_dump())
+                health.write_text(json.dumps({"host": HOST, "manager_instance_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "capability": {
+                    "schema": "talk-role-capability-1", "manager_protocol": "talk-manager-1",
+                    "supported_layouts": ["workspace-v1"], "role": {
+                        "project_id": PROJECT_ID, "member_id": self.role_a, "runner": "dsh"}}}), encoding="utf-8")
+                old_body = {"host": HOST, "expected_instance_id": launch["expected_instance_id"]}
+                old_manager = self.claim(launch["launch_id"], old_body, key=self.role_a_key)
+                self.assertEqual(old_manager.status_code, 409, old_manager.text)
+                self.assertEqual(old_manager.json()["detail"], "workspace_capability_unbound")
+                self.assertEqual(before_state, self.state_row().model_dump())
+                self.assertEqual(before_launch, self.launch_row(launch["launch_id"]).model_dump())
+                wrong_host = self.claim(launch["launch_id"], {**body, "host": "legacy-host"}, key=self.role_a_key)
+                self.assertEqual(wrong_host.status_code, 409, wrong_host.text)
+                self.assertEqual(wrong_host.json()["detail"], "workspace_capability_unbound")
+                self.assertEqual(before_state, self.state_row().model_dump())
+                self.assertEqual(before_launch, self.launch_row(launch["launch_id"]).model_dump())
+                with patch.dict("os.environ", {"TALK_WORKSPACE_RUNTIME_ENABLED": "0"}):
+                    disabled = self.claim(launch["launch_id"], body, key=self.role_a_key)
+                    self.assertEqual(disabled.status_code, 409, disabled.text)
+                self.assertEqual(self.claim(launch["launch_id"], body, key=self.role_a_key).status_code, 200)
+
+    def test_failure_report_is_accepted_after_manager_health_disappears(self):
+        import tempfile
+        from pathlib import Path
+        started = self.start()
+        self.assertEqual(started.status_code, 200, started.text)
+        launch = started.json()
+        with self.session() as session:
+            role = session.get(ProjectRole, (PROJECT_ID, self.role_a))
+            role.storage_layout = "workspace-v1"
+            session.add(role); session.commit()
+        manager_id = "d" * 32
+        with tempfile.TemporaryDirectory() as folder:
+            health = Path(folder) / "manager-health.json"
+            health.write_text(json.dumps({"host": HOST, "manager_instance_id": manager_id, "capability": {
+                "schema": "talk-role-capability-1", "manager_protocol": "talk-manager-1",
+                "supported_layouts": ["workspace-v1"], "role": {"project_id": PROJECT_ID,
+                    "member_id": self.role_a, "runner": "dsh"}}}), encoding="utf-8")
+            with patch.dict("os.environ", {"TALK_WORKSPACE_RUNTIME_ENABLED": "1"}), \
+                 patch("server.local_runtime.workspace_runtime_capability", return_value={"manager_protocol": "talk-manager-1"}), \
+                 patch("server.role_host_resolution.workspace_manager_health_path", return_value=health):
+                claimed = self.claim(launch["launch_id"], {"host": HOST,
+                    "expected_instance_id": launch["expected_instance_id"], "owner_token": manager_id}, key=self.role_a_key)
+                self.assertEqual(claimed.status_code, 200, claimed.text)
+                health.unlink()
+                claim = claimed.json()
+                failed = self.report(launch["launch_id"], {"generation": launch["generation"], "action": "start",
+                    "host": HOST, "claim_token": claim["claim_token"], "owner_token": claim["owner_token"],
+                    "outcome": "failed", "instance_id": None, "pid": None, "spawned": False,
+                    "error_code": "workspace_capability_unbound"}, key=self.role_a_key)
+                self.assertEqual(failed.status_code, 200, failed.text)
+                self.assertEqual(self.state_row().observed_state, ROLE_SERVICE_OBSERVED_FAILED)
+
+    def test_ready_requires_bound_capability_without_writing_state(self):
+        import tempfile
+        from pathlib import Path
+        started = self.start()
+        self.assertEqual(started.status_code, 200, started.text)
+        launch = started.json()
+        with self.session() as session:
+            role = session.get(ProjectRole, (PROJECT_ID, self.role_a))
+            role.storage_layout = "workspace-v1"
+            session.add(role); session.commit()
+        manager_id = "b" * 32
+        with tempfile.TemporaryDirectory() as folder:
+            health = Path(folder) / "manager-health.json"
+            capability = {"schema": "talk-role-capability-1", "manager_protocol": "talk-manager-1",
+                "supported_layouts": ["workspace-v1"],
+                "role": {"project_id": PROJECT_ID, "member_id": self.role_a, "runner": "dsh"},
+                "binding": {"instance_id": launch["expected_instance_id"],
+                            "generation": launch["generation"], "launch_id": launch["launch_id"]}}
+            with patch.dict("os.environ", {"TALK_WORKSPACE_RUNTIME_ENABLED": "1"}), \
+                 patch("server.local_runtime.workspace_runtime_capability", return_value={"manager_protocol": "talk-manager-1"}), \
+                 patch("server.role_host_resolution.workspace_manager_health_path", return_value=health):
+                health.write_text(json.dumps({"host": HOST, "manager_instance_id": manager_id,
+                                              "capability": capability}), encoding="utf-8")
+                claim_response = self.claim(launch["launch_id"], {"host": HOST,
+                    "expected_instance_id": launch["expected_instance_id"], "owner_token": manager_id}, key=self.role_a_key)
+                self.assertEqual(claim_response.status_code, 200, claim_response.text)
+                claim = claim_response.json()
+                self.assertEqual(self.bind_instance(launch, claim).status_code, 200)
+                before_state = self.state_row().model_dump()
+                before_launch = self.launch_row(launch["launch_id"]).model_dump()
+                for content in ({}, {"capability": {**capability, "binding": {**capability["binding"], "launch_id": "forged"}}},
+                                {"capability": capability, "manager_instance_id": "c" * 32}):
+                    health.write_text(json.dumps({"host": HOST, "manager_instance_id": manager_id, **content}), encoding="utf-8")
+                    response = self.ready_report(launch, claim)
+                    self.assertEqual(response.status_code, 409, response.text)
+                    self.assertEqual(response.json()["detail"], "workspace_capability_unbound")
+                    self.assertEqual(before_state, self.state_row().model_dump())
+                    self.assertEqual(before_launch, self.launch_row(launch["launch_id"]).model_dump())
+                health.write_text(json.dumps({"host": HOST, "manager_instance_id": manager_id,
+                                              "capability": capability}), encoding="utf-8")
+                response = self.ready_report(launch, claim)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(self.state_row().observed_state, ROLE_SERVICE_OBSERVED_RUNNING)

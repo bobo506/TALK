@@ -910,6 +910,30 @@ def _require_launch_participant(
         raise _fail(status.HTTP_403_FORBIDDEN, ROLE_SERVICE_ERROR_REPORT_UNAUTHORIZED)
 
 
+def _workspace_manager_evidence(ctx, launch, session, *, require_binding: bool, host: str,
+                                manager_instance_id: str | None = None) -> bool:
+    from server.local_runtime import workspace_runtime_capability
+    from server.role_host_resolution import (ROOT, RecoveryHostError, workspace_manager_health_path,
+                                              workspace_capability_matches)
+    try:
+        if os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") != "1":
+            return False
+        manifest = workspace_runtime_capability(session.get_bind())
+        if (manifest is None or not isinstance(manager_instance_id, str)
+                or len(manager_instance_id) != 32
+                or any(c not in "0123456789abcdef" for c in manager_instance_id)):
+            return False
+        runner = ctx.runner.runtime if ctx.runner is not None else None
+        path = workspace_manager_health_path(ROOT, launch.project_id, launch.member_id, runner)
+        binding = {"instance_id": launch.expected_instance_id, "generation": launch.generation,
+                   "launch_id": launch.launch_id} if require_binding else {}
+        return workspace_capability_matches(path, manager_protocol=manifest["manager_protocol"],
+            project_id=launch.project_id, member_id=launch.member_id, runner=runner, host=host,
+            manager_instance_id=manager_instance_id, **binding)
+    except (OSError, ValueError, TypeError, KeyError, RecoveryHostError):
+        return False
+
+
 def claim_role_service_launch(
     launch_id: str,
     *,
@@ -962,10 +986,19 @@ def claim_role_service_launch(
     if not host:
         raise _fail(status.HTTP_422_UNPROCESSABLE_ENTITY, "host_invalid")
 
+    if (launch.action == ROLE_SERVICE_ACTION_START and ctx.role.storage_layout == "workspace-v1"
+            and not _workspace_manager_evidence(ctx, launch, session, require_binding=False, host=host,
+                                                   manager_instance_id=owner_token)):
+        raise _fail(status.HTTP_409_CONFLICT, "workspace_capability_unbound")
+
     owner_token_out: Optional[str] = None
     if launch.action == ROLE_SERVICE_ACTION_START:
         owner_token_out = new_role_service_host_token()
         claim_token = new_role_service_host_token()
+        if ctx.role.storage_layout == "workspace-v1":
+            # The public manager id is pinned in the authenticated claim token;
+            # failure reports remain verifiable even if health disappears.
+            claim_token = owner_token + "." + claim_token
         launch.owner_token_hash = hash_role_service_token(owner_token_out)
         launch.claim_token_hash = hash_role_service_token(claim_token)
         state.process_launch_id = launch.launch_id
@@ -1125,6 +1158,12 @@ def report_role_service_launch(
         raise _fail(
             status.HTTP_409_CONFLICT, ROLE_SERVICE_ERROR_EXPECTED_INSTANCE_MISMATCH
         )
+
+    if (launch.action == ROLE_SERVICE_ACTION_START and outcome == ROLE_SERVICE_OUTCOME_READY
+            and ctx.role.storage_layout == "workspace-v1"
+            and not _workspace_manager_evidence(ctx, launch, session, require_binding=True, host=host,
+                                                   manager_instance_id=claim_token.partition(".")[0])):
+        raise _fail(status.HTTP_409_CONFLICT, "workspace_capability_unbound")
 
     fingerprint = _report_fingerprint(
         {

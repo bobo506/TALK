@@ -113,6 +113,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
@@ -559,6 +560,9 @@ def _publish_private_bytes(target: Path, payload: bytes) -> None:
         runner = runners.get(value.get("schema"))
         if runner is not None:
             value["capability"] = manager._manager_capability(value["project_id"], value["member_id"], runner)
+            if manager.workspace_context is not None:
+                value["host"] = manager.host
+                value["manager_instance_id"] = manager.manager_instance_id
             payload = (json.dumps(value) + "\n").encode("utf-8")
     ensure_private_dir(target.parent)
     if os.name == "nt":  # pragma: no cover - 平台相关
@@ -1454,6 +1458,7 @@ class HostManager:
         # 若与首次创建 writer 时的 project/member/instance 不一致，不写角色证据。
         self._launch_diag_identity: dict[str, tuple[str, str, str, str]] = {}
         self.client = client
+        self.runtime_state_dir = Path(state_dir or DEFAULT_STATE_DIR)
         self.host = host or socket.gethostname()
         self.workspace_context = None
         self._workspace_recheck = lambda: None
@@ -1464,6 +1469,8 @@ class HostManager:
                     member=workspace_member or "", project_root=Path(project_root or REPO_ROOT),
                     key_root=role_key_root, role_key_file=role_key_file, data_root=workspace_data_root)
             self.workspace_context = recheck()
+            # Public per-manager nonce binds a workspace start claim to its health.
+            self.manager_instance_id = uuid.uuid4().hex
             self._workspace_recheck = recheck
             self.store = WorkspaceOwnershipStore(self.workspace_context, recheck)
         else:
@@ -1525,12 +1532,35 @@ class HostManager:
         runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}[self.workspace_context["runner"]]
         payload = {"schema": f"talk-{runner}-manager-health-1", "pid": os.getpid(),
                    "project_id": project_id, "member_id": self.workspace_context["member_id"],
-                   "seen_at": datetime.now(timezone.utc).isoformat(), "state": "serving",
+                   "host": self.host, "manager_instance_id": self.manager_instance_id, "seen_at": datetime.now(timezone.utc).isoformat(), "state": "serving",
                    "draining": self._workspace_draining, "owned_launches": list(self._handles)}
         payload["capability"] = self._manager_capability(project_id, self.workspace_context["member_id"],
                                                          self.workspace_context["runner"])
         _publish_private_bytes(self.manager_health_file, (json.dumps(payload) + "\n").encode("utf-8"))
         return self._workspace_draining
+
+    def _workspace_launch_bound(self, project_id: str, member_id: str, runner: str,
+                                instance_id: str, generation: int, launch_id: str) -> bool:
+        """Validate the runtime protocol and the health file for this exact child."""
+        from server.local_runtime import RUNTIME_MANAGER_PROTOCOLS
+        from server.role_host_resolution import workspace_capability_matches
+        try:
+            manifest = json.loads((self.runtime_state_dir / "runtime" / "capability.json").read_text(encoding="utf-8"))
+            runtime_protocol = manifest.get("runtime_protocol")
+            manager_protocol = manifest.get("manager_protocol")
+            if (manifest.get("schema") != "talk-runtime-capability-1"
+                    or not isinstance(runtime_protocol, str)
+                    or RUNTIME_MANAGER_PROTOCOLS.get(runtime_protocol) != manager_protocol
+                    or manager_protocol != "talk-manager-1"):
+                return False
+            self._workspace_recheck()
+            self._workspace_check_file(self.manager_health_file, self.manager_health_file.parent)
+            return workspace_capability_matches(self.manager_health_file, manager_protocol=manager_protocol,
+                project_id=project_id, member_id=member_id, runner=runner, instance_id=instance_id,
+                generation=generation, launch_id=launch_id, host=self.host,
+                manager_instance_id=self.manager_instance_id)
+        except (OSError, ValueError, TypeError, AttributeError, HostError):
+            return False
 
     def role_key_path(self, member_id: str) -> Path:
         if self.workspace_context is not None:
@@ -2139,6 +2169,7 @@ class HostManager:
                 {
                     "host": self.host,
                     "expected_instance_id": launch["expected_instance_id"],
+                    **({"owner_token": self.manager_instance_id} if self.workspace_context is not None else {}),
                 },
             )
         except Exception as exc:
@@ -2614,6 +2645,29 @@ class HostManager:
                 },
             )
             raise
+        if self.workspace_context is not None:
+            try:
+                self._workspace_manager_tick(project_id)
+                bound = self._workspace_launch_bound(project_id, member_id, facts.runtime,
+                                                       instance_id, generation, launch_id)
+            except (HostError, OSError, ValueError):
+                bound = False
+            if not bound:
+                readiness_operation.finish("failed")
+                stopped = self._abort_spawned_child(process, control_file)
+                self._report_safely(
+                    diag, related_log_id=None, budgets=spawn_budgets, child_pid=process.pid,
+                    launch_id=launch_id, generation=generation, action="start",
+                    claim_token=claim_token, owner_token=owner_token, outcome="failed",
+                    instance_id=None, pid=None if stopped else process.pid,
+                    process_started_at=None if stopped else started_wall,
+                    error_code="workspace_capability_unbound", spawned=not stopped)
+                if stopped:
+                    self._handles.pop(launch_id, None)
+                    self.store.clear(project_id, member_id, launch_id)
+                    self._drop_launch_diagnostics(launch_id)
+                return {"launch_id": launch_id, "member_id": member_id, "outcome": "failed",
+                        "error_code": "workspace_capability_unbound", **diagnostics}
         readiness_operation.finish("succeeded")
 
         diag.record_event(
@@ -3187,6 +3241,12 @@ class HostManager:
     def _reject_workspace_v1(self, project_id: str, member_id: str) -> None:
         for row in self._project_role_rows(project_id):
             if str(row.get("member_id")) == member_id and is_workspace_v1(row):
+                if (self.workspace_context is not None
+                        and self.workspace_context.get("project_id") == project_id
+                        and self.workspace_context.get("member_id") == member_id
+                        and os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") == "1"):
+                    self._workspace_recheck()
+                    continue
                 raise workspace_runtime_not_ready_error()
         # 找不到成员时仍交给原 start API 产生既有 404，保持 legacy 错误顺序。
 

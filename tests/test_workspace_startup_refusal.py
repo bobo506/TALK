@@ -237,7 +237,7 @@ class WorkspaceCapabilityGateTests(WorkspaceStartupRefusalTests):
         self.capability_path.parent.mkdir(exist_ok=True)
         self.manifest = {
             "schema": "talk-runtime-capability-1", "runtime_protocol": "talk-runtime-1",
-            "supported_layouts": ["legacy", "workspace-v1"], "pid": os.getpid(),
+            "manager_protocol": "talk-manager-1", "supported_layouts": ["legacy", "workspace-v1"], "pid": os.getpid(),
             "started_at": "2026-11-07T00:00:00Z", "written_at": "2026-11-07T00:00:00+00:00",
         }
         binding = patch("server.local_runtime.configured_runtime", return_value=(
