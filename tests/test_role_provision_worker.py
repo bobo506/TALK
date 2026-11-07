@@ -248,6 +248,7 @@ class WorkerTestCase(RoleApiTestCase):
             "host_label": HOST_LABEL,
             "base_url": "http://127.0.0.1:8000",
             "project_root": self.project_root,
+            "repo_root": self._tmpdir,
             "key_root": self.key_root,
             "transport": self.transport,
             "enabled": True,
@@ -255,16 +256,22 @@ class WorkerTestCase(RoleApiTestCase):
             "environ": self.environ,
         }
         kwargs.update(overrides)
-        return RoleProvisionWorker(**kwargs)
+        worker = RoleProvisionWorker(**kwargs)
+        worker._storage_layout = "workspace-v1"
+        return worker
 
     def key_file(self, member_id: str) -> Path:
-        return rp.key_file_path(self.key_root, member_id)
+        from server.workspace_paths import key_path
+
+        return key_path(self._tmpdir, "prj_alpha", member_id, git_key_root=self.key_root)
 
     def metadata_file(self, member_id: str) -> Path:
-        return rp.credential_metadata_path(self.key_root, member_id)
+        return rp.credential_metadata_path(self.key_file(member_id).parent, member_id)
 
     def assert_key_root_empty(self) -> None:
         self.assertEqual(list(self.key_root.iterdir()), [])
+        workspace_keys = self._tmpdir / "keys"
+        self.assertEqual(list(workspace_keys.iterdir()) if workspace_keys.exists() else [], [])
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +399,7 @@ class CreateLoopTests(WorkerTestCase):
             self.assertTrue(acl_ok, acl_detail)
 
         # 真实元数据：只含 member/version/source/intent/时间，不含 Key。
-        metadata = rp.read_credential_metadata(self.key_root, member_id)
+        metadata = rp.read_credential_metadata(key_path.parent, member_id)
         self.assertIsNotNone(metadata)
         self.assertEqual(metadata["member_id"], member_id)
         self.assertEqual(metadata["credential_version"], 1)
@@ -402,9 +409,11 @@ class CreateLoopTests(WorkerTestCase):
         self.assertNotIn("api_key", raw)
 
         # 真实身份档三步文件。
-        agents_root = self.project_root / ".talk" / "agents"
+        from server.workspace_paths import profiles_dir
+
+        profiles = profiles_dir(self._tmpdir, "prj_alpha", member_id)
         for name in ("IDENTITY.md", "SOUL.md", "USER.md"):
-            self.assertTrue(list(agents_root.rglob(name)), name)
+            self.assertTrue((profiles / name).is_file(), name)
 
         # 没有启动任何服务进程：request 投影里服务仍是未启动。
         self.assertIsNone(request["provision_job"]["resume_of"])
@@ -592,14 +601,14 @@ class RefusalTests(WorkerTestCase):
             runner_id=None,
             choice_id=None,
         )
-        original = rp.acquire_provision_locks
+        original = worker._acquire_locks
         order: list[str] = []
 
         def recording(*args, **kwargs):
             order.append("locked")
             return original(*args, **kwargs)
 
-        with patch("scripts.role_provision_worker.acquire_provision_locks", side_effect=recording):
+        with patch.object(worker, "_acquire_locks", side_effect=recording):
             recovered = worker.process("op-recover-0001")
         self.assertEqual(order, ["locked"])
         self.assertEqual(recovered["outcome"], "provisioned", recovered)
@@ -647,7 +656,7 @@ class RefusalTests(WorkerTestCase):
         # 本人已知旧代：Key 文件 + 元数据版本 3。
         rp._write_key_file(self.key_file(member_id), SENTINEL_ROLE_KEY)
         rp.write_credential_metadata(
-            self.key_root, member_id, credential_version=3, source="create",
+            self.key_file(member_id).parent, member_id, credential_version=3, source="create",
             intent="op-intent-0001", intent_kind="create",
         )
         worker = self.make_worker()
@@ -666,7 +675,7 @@ class RefusalTests(WorkerTestCase):
             rp._read_key_file(self.key_file(member_id)), "new-role-key-after-rotation"
         )
         self.assertEqual(
-            rp.read_credential_metadata(self.key_root, member_id)["credential_version"], 4
+            rp.read_credential_metadata(self.key_file(member_id).parent, member_id)["credential_version"], 4
         )
 
         # 未知旧代（元数据版本不匹配）拒绝覆盖，旧文件保持原样。
@@ -724,7 +733,7 @@ class KeyAndStepTests(WorkerTestCase):
             member_id, request_key="op-intent-0001", kind="create", server_version=1
         )
         self.assertIsNone(error)
-        metadata = rp.read_credential_metadata(self.key_root, member_id)
+        metadata = rp.read_credential_metadata(self.key_file(member_id).parent, member_id)
         self.assertEqual(metadata["credential_version"], 1)
         self.assertEqual(metadata["source"], "existing_key")
 
@@ -1248,7 +1257,7 @@ class ReworkLeaseBoundaryTests(WorkerTestCase):
         worker = self.make_worker()
         case = self
 
-        def disabling_profile(**_kwargs):
+        def disabling_profile(*_args, **_kwargs):
             case.assertEqual(case.disable_host(expected_version=1).status_code, 200)
             return {
                 "state": "succeeded",
@@ -1258,7 +1267,7 @@ class ReworkLeaseBoundaryTests(WorkerTestCase):
             }
 
         with patch(
-            "scripts.role_provision._run_profile_step", side_effect=disabling_profile
+            "scripts.role_provision._workspace_profile_step", side_effect=disabling_profile
         ):
             result = worker.process("op-rework-mid")
         request = self.get_request("op-rework-mid")
@@ -1273,7 +1282,7 @@ class ReworkLeaseBoundaryTests(WorkerTestCase):
         self.create_intent("op-rework-budget")
         worker = self.make_worker(io_budget_seconds=1.0)
 
-        def slow_profile(**_kwargs):
+        def slow_profile(*_args, **_kwargs):
             time.sleep(1.5)
             return {
                 "state": "succeeded",
@@ -1282,7 +1291,7 @@ class ReworkLeaseBoundaryTests(WorkerTestCase):
                 "detail": "forced",
             }
 
-        with patch("scripts.role_provision._run_profile_step", side_effect=slow_profile):
+        with patch("scripts.role_provision._workspace_profile_step", side_effect=slow_profile):
             result = worker.process("op-rework-budget")
         self.assertEqual(result["outcome"], "failed", result)
         self.assertEqual(result["error_code"], "worker_io_budget_exceeded")
@@ -1294,7 +1303,7 @@ class ReworkLeaseBoundaryTests(WorkerTestCase):
         self.create_intent("op-rework-cancel")
         worker = self.make_worker()
 
-        def cancelling_profile(**_kwargs):
+        def cancelling_profile(*_args, **_kwargs):
             worker.cancel_stage()
             return {
                 "state": "succeeded",
@@ -1304,7 +1313,7 @@ class ReworkLeaseBoundaryTests(WorkerTestCase):
             }
 
         with patch(
-            "scripts.role_provision._run_profile_step", side_effect=cancelling_profile
+            "scripts.role_provision._workspace_profile_step", side_effect=cancelling_profile
         ):
             result = worker.process("op-rework-cancel")
         self.assertEqual(result["outcome"], "stopped", result)
@@ -1526,6 +1535,7 @@ class ReworkLiveLoopbackTests(WorkerTestCase):
             "host_label": HOST_LABEL,
             "base_url": self.base_url,
             "project_root": self.project_root,
+            "repo_root": self._tmpdir,
             "key_root": self.key_root,
             "enabled": True,
             "apply": True,
@@ -1558,7 +1568,7 @@ class ReworkLiveLoopbackTests(WorkerTestCase):
         if os.name == "nt":
             acl_ok, acl_detail = rp._windows_verify_private_acl(key_path)
             self.assertTrue(acl_ok, acl_detail)
-        metadata = rp.read_credential_metadata(self.key_root, member_id)
+        metadata = rp.read_credential_metadata(self.key_file(member_id).parent, member_id)
         self.assertEqual(metadata["source"], "create")
         self.assertNotIn("bobo-key", json.dumps(result))
 
@@ -1570,7 +1580,16 @@ class ReworkLiveLoopbackTests(WorkerTestCase):
         stream = io.StringIO()
         env = {key: value for key, value in os.environ.items() if key != "TALK_OPERATOR_API_KEY"}
         env["TALK_OPERATOR_API_KEY"] = ""
-        with patch.dict(os.environ, env, clear=True), redirect_stdout(stream):
+        original_worker = rpw.RoleProvisionWorker
+
+        def isolated_worker(**kwargs):
+            return original_worker(repo_root=self._tmpdir, **kwargs)
+
+        with (
+            patch("scripts.role_provision_worker.RoleProvisionWorker", side_effect=isolated_worker),
+            patch.dict(os.environ, env, clear=True),
+            redirect_stdout(stream),
+        ):
             code = role_service_host.main(
                 [
                     "serve",
@@ -1652,3 +1671,64 @@ class ReworkLiveLoopbackTests(WorkerTestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class WorkspaceWorkerTests(WorkerTestCase):
+    def test_workspace_conflicting_record_is_not_overwritten(self):
+        from server.workspace_paths import workspace_root
+        worker = self.make_worker(repo_root=self._tmpdir)
+        worker._workspace_project({"deployment_shape": "non_git"})
+        record = workspace_root(self._tmpdir, "prj_alpha") / "workspace.json"
+        document = json.loads(record.read_text(encoding="utf-8"))
+        document["project_id"] = "different-project"
+        record.write_text(json.dumps(document), encoding="utf-8")
+        before = record.read_bytes()
+        with self.assertRaises(WorkerError):
+            worker._workspace_project({"deployment_shape": "non_git"})
+        self.assertEqual(record.read_bytes(), before)
+
+    def test_workspace_repeat_does_not_send_new_key(self):
+        from server.workspace_paths import key_path
+        self.assertEqual(self.enable_host().status_code, 200)
+        self.assertEqual(self.create_intent("op-w3-repeat-0001").status_code, 201)
+        worker = self.make_worker(repo_root=self._tmpdir)
+        first = worker.process("op-w3-repeat-0001")
+        self.assertEqual(first["outcome"], "provisioned", first)
+        path = key_path(self._tmpdir, "prj_alpha", first["member_id"])
+        before = path.read_bytes()
+        sends = list(self.transport.calls)
+        second = worker.process("op-w3-repeat-0001")
+        self.assertEqual(second["outcome"], "skipped", second)
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(sum(x.endswith("/roles") and x.startswith("POST ") for x in sends),
+                         sum(x.endswith("/roles") and x.startswith("POST ") for x in self.transport.calls))
+
+    def test_legacy_paths_still_use_legacy_key_name(self):
+        worker = self.make_worker(repo_root=self._tmpdir)
+        worker._storage_layout = "legacy"
+        member = "agent:legacy.test"
+        self.assertEqual(worker._paths(member)["key_path"], rp.key_file_path(self.key_root, member))
+        self.assertFalse((self._tmpdir / "workspaces").exists())
+
+    def test_workspace_shape_change_fails_before_creating_directories(self):
+        worker = self.make_worker(repo_root=self._tmpdir)
+        with self.assertRaises(WorkerError) as ctx:
+            worker._workspace_project({"deployment_shape": "git"})
+        self.assertEqual(ctx.exception.code, "profile_root_invalid")
+        self.assertFalse((self._tmpdir / "workspaces").exists())
+
+    def test_unknown_existing_role_directory_is_not_adopted_or_deleted(self):
+        from server.workspace_paths import role_dir
+
+        worker = self.make_worker(repo_root=self._tmpdir)
+        worker._workspace_project({"deployment_shape": "non_git"})
+        member = "agent:unknown-existing"
+        role = role_dir(self._tmpdir, "prj_alpha", member)
+        worker._private_directory(role.parent)
+        worker._private_directory(role)
+        marker = role / "unknown.marker"
+        marker.write_text("keep", encoding="utf-8")
+        with self.assertRaises(WorkerError) as ctx:
+            worker._workspace_role(member, newly_created=False)
+        self.assertEqual(ctx.exception.code, "profile_root_invalid")
+        self.assertEqual(marker.read_text(encoding="utf-8"), "keep")

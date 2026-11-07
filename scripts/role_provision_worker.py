@@ -421,6 +421,7 @@ class RoleProvisionWorker:
         environ: Any = None,
         clock: Any = None,
         repo_root: Any = REPO_ROOT,
+        data_root: Any = None,
         diagnostics: Any = None,
     ):
         if not str(project_id or "").strip():
@@ -448,6 +449,8 @@ class RoleProvisionWorker:
         )
         self._clock = clock or time.monotonic
         self.repo_root = Path(repo_root)
+        self.data_root = Path(data_root) if data_root is not None else self.repo_root
+        self._storage_layout = "legacy"
         # 注入传输（测试/嵌入）时不做真实回环校验；否则默认传输本身强制回环。
         if transport is not None:
             self.transport = transport
@@ -621,13 +624,206 @@ class RoleProvisionWorker:
         return resolved
 
     def _paths(self, member_id: str) -> dict[str, Any]:
+        """Return the only legacy/workspace paths permitted for this request."""
+        from scripts import role_provision as rp
+
         key_root = self._key_root()
+        target = key_file_path(key_root, member_id)
+        profile_lock = profile_lock_path_for(self.project_root, member_id)
+        if self._storage_layout == "workspace-v1":
+            from server.workspace_paths import WorkspacePathError, key_path, profiles_dir
+
+            try:
+                target = key_path(
+                    self.data_root,
+                    self.project_id,
+                    member_id,
+                    git_key_root=key_root,
+                )
+                profile_lock = (
+                    profiles_dir(self.data_root, self.project_id, member_id)
+                    / rp.PROFILE_LOCK_FILENAME
+                )
+            except WorkspacePathError as exc:
+                raise WorkerError("profile_root_invalid", "工作区路径核验失败") from exc
+            key_root = target.parent
         return {
             "key_root": key_root,
-            "key_path": key_file_path(key_root, member_id),
+            "key_path": target,
             "metadata_path": credential_metadata_path(key_root, member_id),
-            "profile_lock": profile_lock_path_for(self.project_root, member_id),
+            "profile_lock": profile_lock,
         }
+
+    def _private_directory(self, path: Path) -> bool:
+        """Create or verify one private directory without adopting links/weak ACLs."""
+        import stat
+        from scripts import role_provision as rp
+
+        _assert_root_chain_has_no_reparse(path)
+        created = False
+        try:
+            if os.name == "nt":
+                import ctypes
+
+                security = rp._windows_build_private_security_attributes()
+                try:
+                    if ctypes.windll.kernel32.CreateDirectoryW(
+                        str(path), ctypes.byref(security.attributes)
+                    ):
+                        created = True
+                    elif ctypes.GetLastError() != 183 and not path.exists():
+                        raise OSError("CreateDirectoryW failed")
+                finally:
+                    security.close()
+            else:
+                try:
+                    path.mkdir(mode=0o700)
+                    created = True
+                except FileExistsError:
+                    pass
+            _assert_root_chain_has_no_reparse(path)
+            if not path.is_dir():
+                raise OSError("not a directory")
+            if os.name == "nt":
+                if not rp._windows_verify_private_acl(path)[0]:
+                    raise OSError("directory ACL is not private")
+            elif stat.S_IMODE(path.stat().st_mode) & 0o077:
+                raise OSError("directory permissions are not private")
+        except OSError as exc:
+            raise WorkerError("profile_root_invalid", "私有目录创建或权限核验失败") from exc
+        return created
+
+    def _workspace_project(self, projection: Mapping[str, Any]) -> None:
+        """Create/verify the project workspace and exclusively publish its cache."""
+        import tempfile
+        from datetime import datetime, timezone
+        from server.workspace_paths import (
+            WorkspacePathError,
+            deployment_shape,
+            workspace_root,
+        )
+        from scripts import role_provision as rp
+
+        try:
+            shape = deployment_shape(self.data_root)
+            root = workspace_root(self.data_root, self.project_id)
+        except WorkspacePathError as exc:
+            raise WorkerError("profile_root_invalid", "工作区根路径核验失败") from exc
+        frozen = projection.get("deployment_shape")
+        if frozen is not None and frozen != shape:
+            raise WorkerError("profile_root_invalid", "请求部署形态与当前数据根不一致")
+        self._private_directory(root.parent)
+        self._private_directory(root)
+        target = root / "workspace.json"
+        expected_root = str(self.project_root.resolve())
+        expected_name = str(projection.get("project_display_name") or self.project_id)
+        expected_keys = {
+            "schema",
+            "project_id",
+            "project_root",
+            "display_name",
+            "created_at",
+        }
+
+        def verify() -> None:
+            _assert_root_chain_has_no_reparse(target)
+            try:
+                obj = json.loads(target.read_text(encoding="utf-8"))
+                if (
+                    not isinstance(obj, dict)
+                    or set(obj) != expected_keys
+                    or obj.get("schema") != "talk-workspace-1"
+                    or obj.get("project_id") != self.project_id
+                    or obj.get("project_root") != expected_root
+                    or obj.get("display_name") != expected_name
+                    or not isinstance(obj.get("created_at"), str)
+                    or not obj.get("created_at")
+                ):
+                    raise ValueError("workspace identity mismatch")
+            except (OSError, ValueError, TypeError) as exc:
+                raise WorkerError(
+                    "profile_root_invalid", "workspace.json 缺失、非法或身份冲突"
+                ) from exc
+
+        if target.exists():
+            verify()
+            return
+        obj = {
+            "schema": "talk-workspace-1",
+            "project_id": self.project_id,
+            "project_root": expected_root,
+            "display_name": expected_name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        payload = (json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8")
+        if os.name == "nt":
+            temp = rp._windows_publish_temp_file(target, payload)
+        else:
+            fd, name = tempfile.mkstemp(prefix=".workspace.", suffix=".tmp", dir=root)
+            temp = Path(name)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+        try:
+            try:
+                # Hard-link publication is create-only: an existing target is never replaced.
+                os.link(temp, target)
+            except FileExistsError:
+                # A concurrent publisher won; always reread and verify its complete record.
+                pass
+            verify()
+        finally:
+            temp.unlink(missing_ok=True)
+
+    def _workspace_role(self, member_id: str, *, newly_created: bool) -> None:
+        """Create role directories, or resume only with proof of the same member."""
+        from server.workspace_paths import WorkspacePathError, role_dir, workspace_root
+
+        try:
+            roles = workspace_root(self.data_root, self.project_id) / "roles"
+            role = role_dir(self.data_root, self.project_id, member_id)
+        except WorkspacePathError as exc:
+            raise WorkerError("profile_root_invalid", "角色工作区路径核验失败") from exc
+        self._private_directory(roles)
+        if role.exists():
+            if newly_created:
+                raise WorkerError("profile_root_invalid", "新角色目录已存在；拒绝认领")
+            # A replay may resume a half-created role only with member-owned evidence:
+            # either a currently valid key, or the provenance record that authorizes a
+            # dedicated stale-key recovery. A directory/arbitrary key alone is not enough.
+            paths = self._paths(member_id)
+            if (
+                self._local_key_status(member_id, paths["key_path"]) != "ok"
+                and read_credential_metadata(paths["key_root"], member_id) is None
+            ):
+                raise WorkerError("profile_root_invalid", "既有角色目录缺少本人归属证据")
+        self._private_directory(role)
+        self._private_directory(role / "profiles")
+
+    def _acquire_locks(self, member_id: str, paths: Mapping[str, Any]):
+        """Lock the actual profile and Key targets for either storage layout."""
+        if self._storage_layout == "legacy":
+            return acquire_provision_locks(
+                self.project_root,
+                paths["key_root"],
+                member_id,
+                stale_seconds=self.lock_stale_seconds,
+            )
+        from scripts import role_provision as rp
+
+        handles = []
+        try:
+            for candidate in (
+                paths["profile_lock"],
+                rp.lock_path_for(paths["key_path"]),
+            ):
+                handles.append((candidate, rp.acquire_lock(candidate, self.lock_stale_seconds)))
+            return handles
+        except ProvisionError:
+            for held_path, held_handle in reversed(handles):
+                rp.release_lock(held_path, held_handle)
+            raise
 
     def _local_key_status(self, member_id: str, key_path: Path) -> str:
         """本机当前 Key 状态：``ok`` / ``stale`` / ``absent`` / ``unknown``。"""
@@ -664,7 +860,7 @@ class RoleProvisionWorker:
             raise WorkerError(
                 "role_key_foreign_refused", "现有 Key 文件不可读/含非法字符；拒绝覆盖"
             )
-        metadata = read_credential_metadata(self._key_root(), member_id)
+        metadata = read_credential_metadata(self._paths(member_id)["key_root"], member_id)
         if metadata is None:
             raise WorkerError(
                 "role_key_foreign_refused", "缺少本人来源记录；拒绝覆盖现有 Key 文件"
@@ -943,6 +1139,12 @@ class RoleProvisionWorker:
             kind = str(claimed.get("kind") or "")
             payload = claimed.get("payload") if isinstance(claimed.get("payload"), Mapping) else {}
 
+            self._storage_layout = str(claimed.get("storage_layout") or detail.get("storage_layout") or "legacy")
+            if self._storage_layout not in ("legacy", "workspace-v1"):
+                raise WorkerError("profile_root_invalid", "存储布局无效")
+            if self._storage_layout == "workspace-v1":
+                self._workspace_project(claimed)
+            newly_created = False
             new_key: Optional[str] = None
             publish_source: Optional[str] = None
             expected_old_version: Optional[int] = None
@@ -962,6 +1164,7 @@ class RoleProvisionWorker:
                     member_id = str(created.get("member_id") or "")
                     new_key = created.get("api_key")
                     publish_source = "create"
+                    newly_created = True
                     result["credential_version"] = created.get("credential_version") or 1
                 elif created["status"] == 200:
                     # 幂等重放：请求已创建但本次响应**不返 Key**；先核本机当前有效 Key。
@@ -1000,18 +1203,15 @@ class RoleProvisionWorker:
                         expected_credential_version=expected_version,
                     )
 
+            if self._storage_layout == "workspace-v1":
+                self._workspace_role(member_id, newly_created=newly_created)
             paths = self._paths(member_id)
             result["stage"] = "key"
             # R1-4b：核本机 Key / 受限轮换 / 私有发布 / 三步推进在**同一临界区**内完成，
             # 复用 R1-2 的身份档锁 + Key 锁（不另造一套弱化实现）。
             locks = None
             try:
-                locks = acquire_provision_locks(
-                    self.project_root,
-                    paths["key_root"],
-                    member_id,
-                    stale_seconds=self.lock_stale_seconds,
-                )
+                locks = self._acquire_locks(member_id, paths)
             except ProvisionError as exc:
                 result["outcome"] = "failed"
                 result["error_code"] = exc.code
@@ -1154,6 +1354,8 @@ class RoleProvisionWorker:
                     "transport": self.transport,
                     "environ": self.environ,
                     "repo_root": self.repo_root,
+                    "storage_layout": self._storage_layout,
+                    "data_root": self.data_root,
                     "locks": locks,
                     "operator_key": self._operator(),
                     "eligibility_check": self._eligibility_guard(
@@ -1205,6 +1407,7 @@ class RoleProvisionWorker:
                 result["error_code"] = code
                 return self._finish_failed(request_key, lease_token, result, code)
 
+            self._verify_lease(request_key, claimed, member_id=member_id, expected_credential_version=result.get("credential_version"), stage="report")
             result["stage"] = "report"
             return self._finish_provisioned(request_key, lease_token, result)
         except LeaseInvalidated as exc:

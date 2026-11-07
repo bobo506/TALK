@@ -3,11 +3,11 @@ import stat
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from server import workspace_paths as w
 from cli.profiles import resolve_workspace_profile_reference
-from scripts.role_provision import _workspace_key_target, ProvisionError
+from scripts.role_provision import _workspace_key_target, HttpResponse, ProvisionError
 
 
 class WorkspacePathsTests(unittest.TestCase):
@@ -48,12 +48,33 @@ class WorkspacePathsTests(unittest.TestCase):
             project = root / 'project'
             project.mkdir()
             key = w.key_path(root, 'project-id', 'agent:test')
-            kwargs = dict(project_id='project-id', member_id='agent:test', operation_key='operation-123', project_root=project, repo_root=root, data_root=root, storage_layout='workspace-v1', apply=False, steps='profile')
+            canary_key = 'workspace-v1-canary-0123456789abcdef'
+            transport = Mock()
+            def fake_request(method, url, **request_kwargs):
+                if url.endswith('/api/members/me'):
+                    return HttpResponse(200, {'id': 'agent:test'})
+                if method == 'GET':
+                    return HttpResponse(200, {
+                        'revision': 1,
+                        'status': 'pending',
+                        'credential_version': 1,
+                        'role_credential_version': 1,
+                        'steps': {step: {'state': 'pending', 'attempts': 0} for step in ('profile', 'key_file', 'preflight')},
+                    })
+                return HttpResponse(200, {'revision': request_kwargs['body']['revision'] + 1})
+            transport.request_json.side_effect = fake_request
+            kwargs = dict(project_id='project-id', member_id='agent:test', operation_key='operation-123', project_root=project, repo_root=root, data_root=root, storage_layout='workspace-v1', apply=False, steps='profile,key_file', environ={'TALK_ROLE_API_KEY': canary_key, 'TALK_OPERATOR_API_KEY': 'operator-canary-0123456789abcdef'}, transport=transport)
             doc, code = run_provision(key_root=key.parent, **kwargs)
             self.assertEqual(code, 0, doc)
             self.assertEqual(doc['key_file_path'], str(key))
             doc, code = run_provision(key_root=key.parent, **{**kwargs, 'apply': True})
-            self.assertEqual((code, doc['error_code']), (1, 'workspace_layout_not_ready'))
+            self.assertEqual(code, 0, doc)
+            self.assertIsNone(doc['error_code'])
+            self.assertEqual(doc['conclusion'], 'applied')
+            self.assertEqual(key.read_text(encoding='utf-8').strip(), canary_key)
+            profiles = w.profiles_dir(root, 'project-id', 'agent:test')
+            for name in ('IDENTITY.md', 'SOUL.md', 'USER.md'):
+                self.assertTrue((profiles / name).is_file())
             doc, code = run_provision(key_root=root / 'other', **kwargs)
             self.assertEqual(code, 1)
             self.assertEqual(doc['error_code'], 'key_root_inside_repo')

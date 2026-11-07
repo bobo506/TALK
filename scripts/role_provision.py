@@ -1782,6 +1782,7 @@ def _run_preflight_step(
     transport: Any,
     base_url: str,
     timeout: float,
+    workspace_refs: Optional[Mapping[str, str]] = None,
 ) -> dict[str, Any]:
     if role_key is None:
         return _step(
@@ -1815,7 +1816,7 @@ def _run_preflight_step(
         )
 
     paths_registered = all(
-        _path_matches(row.get(f"{kind}_path"), paths[kind], project_root)
+        (row.get(f"{kind}_path") == workspace_refs[f"{kind}_path"] if workspace_refs is not None else _path_matches(row.get(f"{kind}_path"), paths[kind], project_root))
         for kind in PROFILE_KINDS
     )
     registration = "not_needed"
@@ -1837,7 +1838,7 @@ def _run_preflight_step(
             "POST",
             _api(base_url, _provision_roster_paths_path(project_id, member_id)),
             api_key=operator_key,
-            body={"operation_key": operation_key, **_roster_relative_paths(member_id)},
+            body={"operation_key": operation_key, **(workspace_refs if workspace_refs is not None else _roster_relative_paths(member_id))},
             timeout=timeout,
         )
         if register_response.status != 200:
@@ -1857,7 +1858,7 @@ def _run_preflight_step(
             )
         refreshed_row = _roster_row(refreshed.payload, member_id)
         paths_registered = refreshed_row is not None and all(
-            _path_matches(refreshed_row.get(f"{kind}_path"), paths[kind], project_root)
+            (refreshed_row.get(f"{kind}_path") == workspace_refs[f"{kind}_path"] if workspace_refs is not None else _path_matches(refreshed_row.get(f"{kind}_path"), paths[kind], project_root))
             for kind in PROFILE_KINDS
         )
         if not paths_registered:
@@ -2485,6 +2486,39 @@ def _workspace_key_target(data_root: Any, project_id: str, member_id: str, key_r
         raise ProvisionError("key_root_inside_repo", "workspace Key root does not match the trusted path") from exc
 
 
+
+def _workspace_profile_paths(data_root: Any, project_id: str, member_id: str) -> dict[str, Path]:
+    from server.workspace_paths import WorkspacePathError, profiles_dir, resolve_profile_reference, member_component
+    try:
+        root = Path(data_root)
+        profiles_dir(root, project_id, member_id)
+        return {kind: resolve_profile_reference(
+            root, project_id, member_id, "workspace-v1",
+            f"workspace-v1:roles/{member_component(member_id)}/profiles/{PROFILE_FILENAMES[kind]}",
+        ) for kind in PROFILE_KINDS}
+    except (WorkspacePathError, OSError) as exc:
+        raise ProvisionError("profile_root_invalid", "workspace 档案根路径无效") from exc
+
+
+def _workspace_profile_step(data_root: Any, project_id: str, member_id: str, overwrite: bool) -> dict[str, Any]:
+    paths = _workspace_profile_paths(data_root, project_id, member_id)
+    plan = _profile_plan(paths, overwrite=overwrite)
+    for kind in PROFILE_KINDS:
+        name = PROFILE_FILENAMES[kind]
+        if name in plan["create"] or name in plan["overwrite"]:
+            target = _workspace_profile_paths(data_root, project_id, member_id)[kind]
+            try:
+                profile_helpers.atomic_write_text(target, _profile_template(kind, project_id, member_id))
+            except (OSError, ValueError) as exc:
+                raise ProvisionError("profile_root_invalid", f"写入身份档 {name} 失败，档案根路径无效") from exc
+    state = STATE_SUCCEEDED if (plan["create"] or plan["overwrite"]) else STATE_SKIPPED
+    return _step(state, 1, None, f"create={plan['create']} keep={plan['keep']} overwrite={plan['overwrite']} atomic=true")
+
+
+def _workspace_references(member_id: str) -> dict[str, str]:
+    from server.workspace_paths import member_component
+    return {f"{kind}_path": f"workspace-v1:roles/{member_component(member_id)}/profiles/{PROFILE_FILENAMES[kind]}" for kind in PROFILE_KINDS}
+
 def run_provision(
     *,
     project_id: str,
@@ -2575,7 +2609,8 @@ def run_provision(
         )
 
     try:
-        profile_paths = profile_target_paths(project_root_resolved, member_id)
+        profile_paths = (_workspace_profile_paths(repo_root if data_root is None else data_root, project_id, member_id)
+                         if storage_layout == "workspace-v1" else profile_target_paths(project_root_resolved, member_id))
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     try:
@@ -2584,8 +2619,6 @@ def run_provision(
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     document["key_file_path"] = str(target_key_path)
-    if storage_layout == "workspace-v1" and apply:
-        return _abort(document, states, selected, "workspace_layout_not_ready", "Workspace provisioning is not enabled")
     lock_path = lock_path_for(target_key_path)
 
     # 2) dry-run：只读本地检查 + 打印计划，零写入、零 HTTP。
@@ -2661,13 +2694,18 @@ def run_provision(
     # 补正 F5：同一个身份档可能在**不同的 --key-root** 下被并发配置，因此除 Key 锁之外
     # 还要拿身份档目录内的锁；两者按固定顺序获取，失败时反向释放自己已持有的锁。
     try:
-        profile_lock_path = profile_lock_path_for(project_root_resolved, member_id)
+        profile_lock_path = (profile_paths["identity"].parent / PROFILE_LOCK_FILENAME
+                             if storage_layout == "workspace-v1" else profile_lock_path_for(project_root_resolved, member_id))
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
 
     lock_handles: list[tuple[Path, dict[str, Any]]] = []
     try:
         for candidate in (profile_lock_path, lock_path):
+            if storage_layout == "workspace-v1":
+                _workspace_profile_paths(repo_root if data_root is None else data_root, project_id, member_id)
+                _workspace_key_target(repo_root if data_root is None else data_root, project_id, member_id, key_root_resolved, repo_root)
+                assert_inside_root(candidate.parent, candidate)
             lock_handles.append(
                 (candidate, acquire_lock(candidate, lock_stale_seconds))
             )
@@ -2726,7 +2764,7 @@ def run_provision(
         # 2) 本地三步（顺序固定）。
         if "profile" in selected:
             try:
-                states["profile"] = _run_profile_step(
+                states["profile"] = _workspace_profile_step(repo_root if data_root is None else data_root, project_id, member_id, overwrite_profile) if storage_layout == "workspace-v1" else _run_profile_step(
                     project_root=project_root_resolved,
                     member_id=member_id,
                     project_id=project_id,
@@ -2738,6 +2776,8 @@ def run_provision(
 
         if "key_file" in selected:
             try:
+                if storage_layout == "workspace-v1":
+                    _workspace_key_target(repo_root if data_root is None else data_root, project_id, member_id, key_root_resolved, repo_root)
                 states["key_file"] = _run_key_step(
                     key_path=target_key_path,
                     member_id=member_id,
@@ -2761,6 +2801,7 @@ def run_provision(
                     operation_key=operation_key,
                     project_root=project_root_resolved,
                     paths=profile_paths,
+                    workspace_refs=_workspace_references(member_id) if storage_layout == "workspace-v1" else None,
                     role_key=role_key,
                     operator_key=operator_key,
                     expected_choice_fingerprint=expected_choice_fingerprint,
@@ -3316,14 +3357,13 @@ def run_request_provision(
         )
 
     try:
-        profile_paths = profile_target_paths(project_root_resolved, member_id)
+        profile_paths = (_workspace_profile_paths(repo_root if data_root is None else data_root, project_id, member_id)
+                         if storage_layout == "workspace-v1" else profile_target_paths(project_root_resolved, member_id))
         target_key_path = (_workspace_key_target(repo_root if data_root is None else data_root, project_id, member_id, key_root_resolved, repo_root)
                            if storage_layout == "workspace-v1" else key_file_path(key_root_resolved, member_id))
     except ProvisionError as exc:
         return _abort(document, states, selected, exc.code, exc.detail)
     document["key_file_path"] = str(target_key_path)
-    if storage_layout == "workspace-v1":
-        return _abort(document, states, selected, "workspace_layout_not_ready", "Workspace provisioning is not enabled")
 
     # R1-4b：调用方（worker）可在同一临界区里先核本机 Key 并做受限发布，再把已持有的锁
     # 交给本函数复用；未提供时按 R1-2 原顺序自行取锁。
@@ -3331,13 +3371,22 @@ def run_request_provision(
     lock_handles: list[tuple[Path, dict[str, Any]]] = [] if owns_locks else list(locks)
     if owns_locks:
         try:
-            lock_handles = acquire_provision_locks(
+            if storage_layout == "workspace-v1":
+                for candidate in (profile_paths["identity"].parent / PROFILE_LOCK_FILENAME, lock_path_for(target_key_path)):
+                    _workspace_profile_paths(repo_root if data_root is None else data_root, project_id, member_id)
+                    _workspace_key_target(repo_root if data_root is None else data_root, project_id, member_id, key_root_resolved, repo_root)
+                    assert_inside_root(candidate.parent, candidate)
+                    lock_handles.append((candidate, acquire_lock(candidate, lock_stale_seconds)))
+            else:
+                lock_handles = acquire_provision_locks(
                 project_root_resolved,
                 key_root_resolved,
                 member_id,
                 stale_seconds=lock_stale_seconds,
             )
         except ProvisionError as exc:
+            for held_path, held_handle in reversed(lock_handles):
+                release_lock(held_path, held_handle)
             return _abort(document, states, selected, exc.code, exc.detail)
     if lock_handles:
         document["lock"] = lock_handles[-1][1]
@@ -3397,7 +3446,7 @@ def run_request_provision(
         if "profile" in selected:
             _checkpoint()
             try:
-                states["profile"] = _run_profile_step(
+                states["profile"] = _workspace_profile_step(repo_root if data_root is None else data_root, project_id, member_id, overwrite_profile) if storage_layout == "workspace-v1" else _run_profile_step(
                     project_root=project_root_resolved,
                     member_id=member_id,
                     project_id=project_id,
@@ -3410,6 +3459,8 @@ def run_request_provision(
         if "key_file" in selected:
             _checkpoint()
             try:
+                if storage_layout == "workspace-v1":
+                    _workspace_key_target(repo_root if data_root is None else data_root, project_id, member_id, key_root_resolved, repo_root)
                 states["key_file"] = _run_key_step(
                     key_path=target_key_path,
                     member_id=member_id,
@@ -3434,6 +3485,7 @@ def run_request_provision(
                     operation_key=operation_key,
                     project_root=project_root_resolved,
                     paths=profile_paths,
+                    workspace_refs=_workspace_references(member_id) if storage_layout == "workspace-v1" else None,
                     role_key=role_key,
                     operator_key=operator_key,
                     expected_choice_fingerprint=expected_choice_fingerprint,

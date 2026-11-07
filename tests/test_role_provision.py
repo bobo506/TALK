@@ -1473,3 +1473,54 @@ class CliAndSecretTests(RoleProvisionTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WorkspaceProvisionTests(RoleProvisionTestCase):
+    def test_workspace_and_legacy_write_and_register(self):
+        from server.workspace_paths import project_component, member_component
+        data = self._tmp / "data"
+        data.mkdir()
+        key_root = data / "keys" / project_component(PROJECT_ID)
+        refs = {f"{kind}_path": f"workspace-v1:roles/{member_component(MEMBER_ID)}/profiles/{rp.PROFILE_FILENAMES[kind]}" for kind in rp.PROFILE_KINDS}
+        row = {"member_id": MEMBER_ID, **refs}
+        transport = happy_transport(roster_responses=[rp.HttpResponse(200, [_roster_row(paths=False)]), rp.HttpResponse(200, [row])])
+        document, code = rp.run_provision(project_id=PROJECT_ID, member_id=MEMBER_ID, operation_key=OPERATION_KEY, project_root=self.project_root, key_root=key_root, base_url=BASE_URL, apply=True, transport=transport, environ=self.env_happy, repo_root=self.repo, data_root=data, storage_layout="workspace-v1")
+        self.assertEqual(code, 0, document)
+        self.assertEqual((key_root / (member_component(MEMBER_ID) + ".key")).read_text(encoding="utf-8").strip(), CANARY_KEY)
+        for kind in rp.PROFILE_KINDS:
+            self.assertTrue((data / "workspaces" / project_component(PROJECT_ID) / "roles" / member_component(MEMBER_ID) / "profiles" / rp.PROFILE_FILENAMES[kind]).is_file())
+        registration = next(c for c in transport.calls if _url_path(c["url"]) == ROSTER_PATHS_PATH)
+        for field, value in refs.items():
+            self.assertEqual(registration["body"][field], value)
+        legacy, legacy_code = self.run_script(happy_transport(), steps=["profile", "key_file"], env=self.env_happy)
+        self.assertEqual(legacy_code, 0, legacy)
+        self.assertTrue(self.key_file().is_file())
+        for name in rp.PROFILE_FILENAMES.values():
+            self.assertTrue(self.profile_path(name).is_file())
+
+    def test_request_workspace_uses_existing_key_and_profiles(self):
+        from server.workspace_paths import project_component, member_component
+        data = self._tmp / "data"
+        data.mkdir()
+        key_root = data / "keys" / project_component(PROJECT_ID)
+        key_root.mkdir(parents=True)
+        key = key_root / (member_component(MEMBER_ID) + ".key")
+        rp._write_key_file(key, CANARY_KEY)
+        transport = happy_transport()
+        result, code = rp.run_request_provision(project_id=PROJECT_ID, member_id=MEMBER_ID, operation_key=OPERATION_KEY, request_key="req-canary", lease_token="lease-canary", project_root=self.project_root, key_root=key_root, base_url=BASE_URL, steps=["profile", "key_file"], transport=transport, operator_key=CANARY_OPERATOR, repo_root=self.repo, data_root=data, storage_layout="workspace-v1")
+        self.assertEqual(code, 0, result)
+        self.assertTrue((data / "workspaces" / project_component(PROJECT_ID) / "roles" / member_component(MEMBER_ID) / "profiles" / "IDENTITY.md").is_file())
+        self.assertEqual(key.read_text(encoding="utf-8").strip(), CANARY_KEY)
+
+    def test_workspace_unsafe_profile_path_fails_before_side_effects(self):
+        from server.workspace_paths import WorkspacePathError, project_component
+        data = self._tmp / "data"
+        data.mkdir()
+        key_root = data / "keys" / project_component(PROJECT_ID)
+        transport = happy_transport()
+        with mock.patch("server.workspace_paths.profiles_dir", side_effect=WorkspacePathError("link_refused")):
+            result, code = rp.run_provision(project_id=PROJECT_ID, member_id=MEMBER_ID, operation_key=OPERATION_KEY, project_root=self.project_root, key_root=key_root, base_url=BASE_URL, apply=True, transport=transport, environ=self.env_happy, repo_root=self.repo, data_root=data, storage_layout="workspace-v1")
+        self.assertEqual(code, 1)
+        self.assertEqual(result["error_code"], "profile_root_invalid")
+        self.assertFalse(key_root.exists())
+        self.assertEqual(transport.calls, [])
