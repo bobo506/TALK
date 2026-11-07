@@ -153,6 +153,138 @@ class RuntimeTests(unittest.TestCase):
         self.assertNotIn("agent:workspace", self.runtime.hosts)
         self.assertEqual(self.client.calls, [])
 
+    def test_workspace_specs_use_authoritative_role_paths_and_reject_overrides(self):
+        from server import workspace_paths as wp
+        data = self.root / "data"
+        data.mkdir()
+        self.config.update(codex={"enabled": True, "executable": sys.executable},
+                           kimi={"enabled": True}, dsh={"enabled": True},
+                           workbuddy={"executable": "fixture", "models_home": "fixture"})
+        for runner, method, recipe in (("codex", "codex_spec", "codex"),
+                                       ("kimi-code", "kimi_spec", "kimi"),
+                                       ("dsh", "dsh_spec", "dsh"),
+                                       ("workbuddy", "workbuddy_spec", "workbuddy")):
+            with self.subTest(runner=runner), patch.object(runtime, "ROOT", data):
+                role = {"member_id": "agent:new", "project_id": self.runtime.project,
+                        "storage_layout": "workspace-v1", "binding_state": "bound",
+                        "runner": {"runtime": runner, "runner_id": "runner:dsh-test"},
+                        "service": {"control_kind": "managed_cli"},
+                        "model": {"choice_id": "choice", "model_alias": "alias"}}
+                def request(method, path, body=None, **kwargs):
+                    if path.endswith("/role-storage-layouts"):
+                        return [{"member_id": "agent:new", "storage_layout": "workspace-v1"}]
+                    if path.endswith("/roles"):
+                        return [role]
+                    if path == "/api/members/me":
+                        return self.client.identity
+                    return {"project_root_path": str(self.project)}
+                key = wp.key_path(data, self.runtime.project, "agent:new")
+                key.parent.mkdir(parents=True, exist_ok=True)
+                key.write_text("fixture-secret", encoding="utf-8")
+                with patch.object(self.client, "request", side_effect=request):
+                    spec = getattr(self.runtime, method)(role)
+                    ctx = spec["workspace_context"]
+                    args = (data, self.runtime.project, "agent:new")
+                    self.assertEqual(ctx["key"], str(key))
+                    self.assertEqual(ctx["home"], str(wp.native_home_dir(*args)))
+                    self.assertEqual(ctx["session"], str(wp.execution_session_store_path(*args)))
+                    self.assertEqual(ctx["state"]["records"], str(wp.records_dir(*args)))
+                    self.assertEqual(ctx["state"]["control"], str(wp.control_dir(*args)))
+                    self.assertEqual(ctx["state"]["manager"], str(wp.manager_dir(*args, recipe)))
+                    self.assertEqual(ctx["logs"], str(wp.logs_dir(*args)))
+                    self.assertEqual(spec["argv"][spec["argv"].index("--role-key-file") + 1], str(key))
+                    for field in ("role_key_file", "native_home", "session_store"):
+                        self.config[recipe][field] = str(self.root / "wrong")
+                        with self.assertRaisesRegex(ValueError, "workspace_override_mismatch"):
+                            getattr(self.runtime, method)(role)
+                        del self.config[recipe][field]
+                    self.config[recipe]["key_files"] = {"agent:new": str(self.root / "wrong")}
+                    with self.assertRaisesRegex(ValueError, "workspace_override_mismatch"):
+                        getattr(self.runtime, method)(role)
+                    del self.config[recipe]["key_files"]
+                    other = dict(role, member_id="agent:other")
+                    def other_request(method, path, body=None, **kwargs):
+                        if path.endswith("/role-storage-layouts"):
+                            return [{"member_id": "agent:other", "storage_layout": "workspace-v1"}]
+                        if path.endswith("/roles"):
+                            return [other]
+                        return {"project_root_path": str(self.project)}
+                    with patch.object(self.client, "request", side_effect=other_request):
+                        other_ctx = self.runtime.workspace_role_context(other)
+                    for field in ("key", "home", "session", "state", "logs"):
+                        self.assertNotEqual(ctx[field], other_ctx[field])
+
+    def test_workspace_context_rejects_forged_role_layout_and_project_root(self):
+        role = {"member_id": "agent:new", "storage_layout": "workspace-v1",
+                "runner": {"runtime": "codex"}, "binding_state": "bound"}
+        def facts(authoritative_role, layout="workspace-v1", root=None):
+            def request(method, path, body=None):
+                if path.endswith("/role-storage-layouts"):
+                    return [{"member_id": "agent:new", "storage_layout": layout}]
+                if path.endswith("/roles"):
+                    return [authoritative_role]
+                return {"project_root_path": str(root or self.project)}
+            return request
+        with patch.object(runtime, "ROOT", self.root):
+            for authority, layout, root in ((dict(role, binding_state="unbound"), "workspace-v1", None),
+                                            (role, "legacy", None), (role, "workspace-v1", self.root)):
+                with self.subTest(layout=layout, root=root), patch.object(self.runtime, "request", side_effect=facts(authority, layout, root)):
+                    with self.assertRaises(ValueError):
+                        self.runtime.workspace_role_context(role)
+
+    def test_workspace_git_key_and_missing_key_never_fall_back_to_legacy(self):
+        from server import workspace_paths as wp
+        data = self.root / "git-data"
+        data.mkdir()
+        (data / ".git").write_text("gitdir: fixture", encoding="utf-8")
+        role = {"member_id": "agent:new", "storage_layout": "workspace-v1", "binding_state": "bound",
+                "runner": {"runtime": "codex"}, "service": {"control_kind": "managed_cli"},
+                "model": {"choice_id": "choice", "model_alias": "alias"}}
+        self.config["codex"] = {"enabled": True, "executable": sys.executable}
+        legacy = runtime.key_file_path(Path(self.config["key_root"]), "agent:new")
+        legacy.parent.mkdir()
+        legacy.write_text("fixture-secret", encoding="utf-8")
+        def request(method, path, body=None, **kwargs):
+            if path.endswith("/role-storage-layouts"):
+                return [{"member_id": "agent:new", "storage_layout": "workspace-v1"}]
+            if path.endswith("/roles"):
+                return [role]
+            if path == "/api/members/me":
+                self.fail("missing workspace key must not use legacy identity")
+            return {"project_root_path": str(self.project)}
+        with patch.object(runtime, "ROOT", data), patch.object(self.client, "request", side_effect=request):
+            ctx = self.runtime.workspace_role_context(role)
+            self.assertEqual(ctx["key"], str(wp.key_path(data, self.runtime.project, "agent:new", git_key_root=legacy.parent)))
+            self.assertNotEqual(Path(ctx["key"]), legacy)
+            self.assertIsNone(self.runtime.codex_spec(role))
+            self.assertEqual(self.runtime.statuses["agent:new"]["state"], "key_not_configured")
+
+    def test_legacy_runner_specs_preserve_existing_recipes_and_key_override(self):
+        from scripts import codex_role_host, kimi_role_host, dsh_role_host
+        self.config.update(codex={"enabled": True, "executable": sys.executable},
+                           kimi={"enabled": True}, dsh={"enabled": True},
+                           workbuddy={"executable": "fixture", "models_home": "fixture"})
+        key = runtime.key_file_path(Path(self.config["key_root"]), "agent:new")
+        key.parent.mkdir()
+        key.write_text("fixture-secret", encoding="utf-8")
+        for runner, method, module in (("codex", "codex_spec", codex_role_host),
+                                        ("kimi-code", "kimi_spec", kimi_role_host),
+                                        ("dsh", "dsh_spec", dsh_role_host)):
+            role = {"member_id": "agent:new", "storage_layout": "legacy", "binding_state": "bound",
+                    "runner": {"runtime": runner, "runner_id": "runner:dsh-test"},
+                    "service": {"control_kind": "managed_cli"},
+                    "model": {"choice_id": "choice", "model_alias": "alias"}}
+            with self.subTest(runner=runner):
+                self.assertEqual(getattr(self.runtime, method)(role), module.host_spec(self.config, role))
+        override = self.root / "override.key"
+        override.write_text("fixture-secret", encoding="utf-8")
+        self.config["workbuddy"]["key_files"] = {"agent:new": str(override)}
+        role = {"member_id": "agent:new", "storage_layout": "legacy", "binding_state": "bound",
+                "runner": {"runtime": "workbuddy"}}
+        spec = self.runtime.workbuddy_spec(role)
+        self.assertEqual(spec["argv"][spec["argv"].index("--role-key-file") + 1], str(override))
+        self.assertNotIn("workspace_context", spec)
+
     def test_boot_only_starts_manager_and_never_requests_role_start(self):
         self.config["hosts"]=[self.spec()]
         self.runtime.reconcile_hosts([self.role(generation=3,ownership_held=False)])

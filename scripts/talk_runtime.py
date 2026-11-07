@@ -26,6 +26,8 @@ from scripts.role_provision_worker import RoleProvisionWorker
 from scripts.role_service_recovery import recorded_process_state
 from bridges.backend_error_codes import HOST_ERROR_CODES, RUNTIME_ERROR_CODES
 from bridges.stop_blockers import BUSY_STOP_CODE, safe_stop_blockers
+from server import workspace_paths as wp
+from urllib.parse import quote
 
 
 class RuntimeErrorCode(RuntimeError):
@@ -461,10 +463,104 @@ class TalkRuntime:
         self.startup_thread=threading.Thread(target=run,name="talk-project-startup",daemon=True)
         self.startup_thread.start()
 
+    def workspace_role_context(self, role):
+        """Build a fail-closed snapshot from the project and role authority APIs."""
+        member = role.get("member_id")
+        if not isinstance(member, str) or not member:
+            raise ValueError("workspace_member_invalid")
+        project_url = f"/api/projects/{quote(self.project, safe='')}"
+        project = self.request("GET", project_url)
+        roles = self.request("GET", project_url + "/roles")
+        layouts = self.request("GET", project_url + "/role-storage-layouts")
+        roles = roles.get("data") if isinstance(roles, dict) else roles
+        layouts = layouts.get("data") if isinstance(layouts, dict) else layouts
+        if not isinstance(project, dict) or not isinstance(roles, list) or not isinstance(layouts, list):
+            raise ValueError("workspace_authority_invalid")
+        matched_roles = [r for r in roles if isinstance(r, dict) and r.get("member_id") == member]
+        matched_layouts = [r for r in layouts if isinstance(r, dict) and r.get("member_id") == member]
+        if (len(matched_roles) != 1 or len(matched_layouts) != 1
+                or matched_layouts[0].get("storage_layout") != "workspace-v1"
+                or role.get("storage_layout") != "workspace-v1"
+                or role.get("project_id", self.project) != self.project
+                or matched_roles[0].get("project_id", self.project) != self.project
+                or any(matched_roles[0].get(field) != role.get(field)
+                       for field in ("runner", "model", "service", "binding_state", "archived"))):
+            raise ValueError("workspace_authority_mismatch")
+        registered = project.get("project_root_path")
+        if not isinstance(registered, str) or not Path(registered).is_absolute() or Path(registered).resolve() != self.project_root.resolve():
+            raise ValueError("workspace_project_root_mismatch")
+        runner = (role.get("runner") or {}).get("runtime")
+        runner_dir = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}.get(runner)
+        if runner_dir is None:
+            raise ValueError("workspace_runner_invalid")
+        data_root = ROOT
+        args = (data_root, self.project, member)
+        context = {"data_root": str(data_root), "project_root": str(self.project_root.resolve()),
+                   "project_id": self.project, "member_id": member, "layout": "workspace-v1",
+                   "key": str(wp.key_path(*args, git_key_root=Path(self.config["key_root"]))),
+                   "home": str(wp.native_home_dir(*args)),
+                   "session": str(wp.execution_session_store_path(*args)),
+                   "state": {"records": str(wp.records_dir(*args)), "control": str(wp.control_dir(*args)),
+                             "manager": str(wp.manager_dir(*args, runner_dir))},
+                   "logs": str(wp.logs_dir(*args)), "runner": runner}
+        recipe = self.config.get(runner_dir) or {}
+        for source in (self.config, recipe):
+            for field, target in (("role_key_file", "key"), ("native_home", "home"),
+                                  ("home", "home"), ("session_store", "session"),
+                                  ("session_store_path", "session")):
+                if field in source and (not isinstance(source[field], str) or not Path(source[field]).is_absolute()
+                                        or wp._checked(Path(source[field])) != wp._checked(Path(context[target]))):
+                    raise ValueError("workspace_override_mismatch")
+            for field, target in (("key_files", "key"), ("native_homes", "home"), ("session_stores", "session")):
+                values = source.get(field, {})
+                if not isinstance(values, dict):
+                    raise ValueError("workspace_override_invalid")
+                if member in values and (not isinstance(values[member], str) or not Path(values[member]).is_absolute()
+                                         or wp._checked(Path(values[member])) != wp._checked(Path(context[target]))):
+                    raise ValueError("workspace_override_mismatch")
+        return context
+
+    def workspace_spec(self, role, host_spec=None):
+        context = self.workspace_role_context(role)
+        member, runner = context["member_id"], context["runner"]
+        if runner == "workbuddy":
+            recipe = self.config.get("workbuddy")
+            if not recipe or role.get("archived") or role.get("binding_state") != "bound":
+                return None
+            spec = None
+        else:
+            spec = host_spec(self.config, role)
+            if spec is None:
+                return None
+        key = Path(context["key"])
+        if not key.is_file():
+            self.statuses[member] = {"state": "key_not_configured"}
+            return None
+        identity = self.client.request("GET", "/api/members/me", key=key.read_text(encoding="utf-8").strip())
+        if identity.get("id") != member or identity.get("kind") != "agent":
+            self.statuses[member] = {"state": "identity_mismatch"}
+            return None
+        if runner == "workbuddy":
+            argv = [sys.executable, "-B", "-X", "utf8", "-m", "scripts.workbuddy_role_host", "serve",
+                    "--project", self.project, "--member", member, "--state-dir", self.config["state_dir"],
+                    "--project-root", context["project_root"], "--base-url", self.config["base_url"],
+                    "--workbuddy-executable", recipe["executable"], "--workbuddy-models-home", recipe["models_home"],
+                    "--workbuddy-display-name", identity["display_name"], "--role-key-file", context["key"],
+                    "--operator-key-file", self.config["operator_key_file"], "--runtime-verified", "workbuddy", "--apply"]
+            spec = {"member_id": member, "argv": argv}
+        else:
+            spec["argv"][spec["argv"].index("--role-key-file") + 1] = context["key"]
+        private = Path(context["state"]["manager"])
+        spec.update(health_file=str(private / "manager-health.json"), drain_file=str(private / "drain.request"),
+                    workspace_context=context)
+        return spec
+
     def workbuddy_spec(self, role):
         recipe = self.config.get("workbuddy")
         if not recipe or role.get("archived") or role.get("binding_state") != "bound" or role.get("runner", {}).get("runtime") != "workbuddy":
             return None
+        if rsh.is_workspace_v1(role):
+            return self.workspace_spec(role)
         member = role["member_id"]
         key = Path(recipe.get("key_files", {}).get(member) or key_file_path(Path(self.config["key_root"]), member))
         if not key.is_file():
@@ -485,6 +581,8 @@ class TalkRuntime:
 
     def kimi_spec(self, role):
         from scripts.kimi_role_host import host_spec
+        if rsh.is_workspace_v1(role) and (role.get("runner") or {}).get("runtime") == "kimi-code":
+            return self.workspace_spec(role, host_spec)
         spec = host_spec(self.config, role)
         if spec is None:
             return None
@@ -501,6 +599,8 @@ class TalkRuntime:
 
     def codex_spec(self, role):
         from scripts.codex_role_host import host_spec
+        if rsh.is_workspace_v1(role) and (role.get("runner") or {}).get("runtime") == "codex":
+            return self.workspace_spec(role, host_spec)
         spec = host_spec(self.config, role)
         if spec is None:
             return None
@@ -517,6 +617,8 @@ class TalkRuntime:
 
     def dsh_spec(self, role):
         from scripts.dsh_role_host import host_spec
+        if rsh.is_workspace_v1(role) and (role.get("runner") or {}).get("runtime") == "dsh":
+            return self.workspace_spec(role, host_spec)
         spec = host_spec(self.config, role)
         if spec is None:
             return None
