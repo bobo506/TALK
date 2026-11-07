@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 20:10（DeepSeek，**astra 暂缓；W3b 3a 重派**）：用户决定 astra 往后放，专注 W3b。已确认新角色创建失败码 `profile_root_invalid` 的直接原因是 `workspaces/` 里一个 `CodexSandboxOffline` 的测试残留 ACL（`prj_alpha`，project_root 指向 `.tmp-tests`）；更根本的是 12:05 重启运行时把 **W3a 代码带上了生产**，新角色一律 `workspace-v1`、而启动门仍关闭，所以"能建不能跑"。用户选择继续 W3b、暂不重建 astra。534 的候选已存 `.tmp/w3b-s3a-partial-534.patch`（`git apply --check` 通过）；**536 已重派 3a**，白名单扩入 `server/local_runtime.py`、`server/role_startup.py`，要求接通恢复调用链并处理两个失败的真实 CLI 测试。
+
 > 2026-11-07 20:00（DeepSeek，**片 3a partial；准备重启**）：534 只完成"workspace manager health 路径解析 + 无证据时保守拒绝恢复"，但恢复调用链在 `server/local_runtime.py`、`server/role_startup.py`（不在白名单）未接通，正常恢复未实现；两个真实 CLI 合成测试仍失败（`runtime_stop_blocked`、8 秒超时）。候选已存 `.tmp/w3b-s3a-partial-534.patch`，工作区已回退干净。**3a 需扩白名单重派**。另：535 复现 astra 只回 `1.`（非偶发），用户计划重启后删除并手动重建 astra；若重建仍截断，再修 `bridges/codex_execution_native.py` 的 `item/completed` 收集。当前内存紧张，用户将重启电脑；重启后需 `run.ps1 -Action serve -Apply` 并手动 start 需要的角色服务。
 
 > 2026-11-07 19:45（DeepSeek，**W3b 片 2 完成；片 3 开始**）：2c-2（四 channel store 路径解析，仅测试）533 approved，提交 `b0f6f54`。**W3b 片 1、片 2 全部完成并推送**，启动门仍关闭。片 3 拆 3a/3b：3a stop/recovery 角色隔离（534 进行中）；3b 能力绑定/版本证明（门默认仍关闭）；**W3c 真实双工作区验收与开闸需用户另行授权**。
