@@ -1682,10 +1682,33 @@ class HostManager:
         env["TALK_ROLE_SERVICE_MANAGED"] = "1"
         env.update(self.child_env_extra)
         if self.workspace_context is not None:
-            self._workspace_recheck()
+            context = self._workspace_recheck()
+            if self.workspace_context != context:
+                raise HostError("workspace_context_invalid", "workspace context changed")
             for name in NATIVE_HOME_ENV_VARS:
                 env[name] = str(home)
+            env["TALK_EXECUTION_SESSION_STORE"] = context["session"]
         return env
+
+    def _prepare_workspace_session_store(self) -> str:
+        """Create and recheck each directory on the validated role session path."""
+        context = self._workspace_recheck()
+        if self.workspace_context != context:
+            raise HostError("workspace_context_invalid", "workspace context changed")
+        parent = Path(context["session"]).parent
+        root = Path(context["data_root"])
+        try:
+            relative = parent.relative_to(root)
+            current = root
+            for component in relative.parts:
+                self._workspace_recheck()
+                current = current / component
+                current.mkdir(mode=0o700, exist_ok=True)
+                self._workspace_recheck()
+            self._workspace_recheck()
+        except (OSError, ValueError) as exc:
+            raise HostError("workspace_context_invalid", "invalid workspace session directory") from exc
+        return context["session"]
 
     # ── 持久诊断（任务 272）─────────────────────────────────────────
 
@@ -2270,6 +2293,8 @@ class HostManager:
             budgets=spawn_budgets,
         )
         try:
+            if self.workspace_context is not None:
+                child_env["TALK_EXECUTION_SESSION_STORE"] = self._prepare_workspace_session_store()
             self._workspace_recheck()
             process = spawn_hidden(
                 argv,

@@ -85,8 +85,9 @@ class WorkspaceContextTests(unittest.TestCase):
 
     def test_context_drives_role_paths_and_environment(self):
         from scripts import role_service_host as rsh
-        manager = HostManager(None, child_env={"HOME": "outside"}, **self.kwargs)
+        manager = HostManager(None, child_env={"HOME": "outside", "TALK_EXECUTION_SESSION_STORE": "outside"}, **self.kwargs)
         env = manager.child_environment(self.project, self.member)
+        self.assertEqual(env["TALK_EXECUTION_SESSION_STORE"], self.context["session"])
         for name in rsh.NATIVE_HOME_ENV_VARS:
             self.assertEqual(env[name], self.context["home"])
         self.assertEqual(manager.store.record_path(self.project, self.member, "launch").parent,
@@ -121,6 +122,8 @@ class WorkspaceContextTests(unittest.TestCase):
         def spawn(argv, **kwargs):
             for name in rsh.NATIVE_HOME_ENV_VARS:
                 self.assertEqual(kwargs["env"][name], self.context["home"])
+            self.assertEqual(kwargs["env"]["TALK_EXECUTION_SESSION_STORE"], self.context["session"])
+            self.assertTrue(Path(self.context["session"]).parent.is_dir())
             self.assertEqual(kwargs["env"][rsh.CONTROL_FILE_ENV], str(manager.store.control_path("launch")))
             kwargs["stdout_target"].write(b"workspace stdout")
             kwargs["stdout_target"].flush()
@@ -137,6 +140,7 @@ class WorkspaceContextTests(unittest.TestCase):
         from scripts import role_service_host as rsh
         for changed in (dict(self.context, home=str(self.data / "wrong")),
                         {k: v for k, v in self.context.items() if k != "session"},
+                        dict(self.context, session=str(self.data / "wrong.sqlite3")),
                         dict(self.context, state={"records": self.context["state"]["records"]})):
             with self.subTest(changed=changed), self.assertRaises(HostError):
                 rsh.validate_workspace_context(changed, project=self.project, member=self.member,
@@ -147,6 +151,84 @@ class WorkspaceContextTests(unittest.TestCase):
         Path(self.context["state"]["records"]).write_text("wrong type", encoding="utf-8")
         with self.assertRaises(HostError):
             manager.child_environment(self.project, self.member)
+
+    def test_session_store_distinct_for_two_roles_and_rechecked(self):
+        from server import workspace_paths as wp
+        first = HostManager(None, **self.kwargs)
+        member = "agent:other"
+        args = (self.data, self.project, member)
+        context = dict(self.context, member_id=member,
+            key=str(wp.key_path(*args, git_key_root=self.key_root)),
+            home=str(wp.native_home_dir(*args)), session=str(wp.execution_session_store_path(*args)),
+            logs=str(wp.logs_dir(*args)),
+            state={"records": str(wp.records_dir(*args)), "control": str(wp.control_dir(*args)),
+                   "manager": str(wp.manager_dir(*args, "codex"))})
+        second = HostManager(None, **dict(self.kwargs, workspace_context=context,
+            workspace_member=member, role_key_file=Path(context["key"])))
+        a = first._prepare_workspace_session_store()
+        b = second._prepare_workspace_session_store()
+        self.assertNotEqual(a, b)
+        self.assertEqual(first.child_environment(self.project, self.member)["TALK_EXECUTION_SESSION_STORE"], a)
+        self.assertEqual(second.child_environment(self.project, member)["TALK_EXECUTION_SESSION_STORE"], b)
+        self.assertTrue(Path(a).parent.is_dir())
+        self.assertEqual(first._prepare_workspace_session_store(), a)
+        Path(a).parent.rmdir()
+        Path(a).parent.write_text("wrong type", encoding="utf-8")
+        with self.assertRaises(HostError):
+            first._prepare_workspace_session_store()
+
+    def test_session_context_changed_after_preflight_refuses_spawn(self):
+        from scripts import role_service_host as rsh
+        for changed in (None, str(self.data / "wrong.sqlite3")):
+            manager = HostManager(FakeHostClient(self.member), runtime_log_disabled=True, **self.kwargs)
+            facts = _fake_facts(Path(self.context["key"]))
+            facts.child_env = manager.child_environment(self.project, self.member)
+            launch = {"launch_id": "launch", "project_id": self.project, "member_id": self.member,
+                      "expected_instance_id": "ins_launch", "generation": 1}
+            def preflight(*args, **kwargs):
+                if changed is None:
+                    del manager.workspace_context["session"]
+                else:
+                    manager.workspace_context["session"] = changed
+                return facts
+            with self.subTest(changed=changed), patch.object(manager, "preflight", side_effect=preflight), \
+                    patch.object(rsh, "spawn_hidden") as spawn, self.assertRaises(HostError):
+                manager.execute_start(launch)
+            spawn.assert_not_called()
+
+    @unittest.skipUnless(os.name == "nt", "Windows junction test")
+    def test_session_parent_junction_refused_before_spawn(self):
+        from scripts import role_service_host as rsh
+        manager = HostManager(FakeHostClient(self.member), runtime_log_disabled=True, **self.kwargs)
+        facts = _fake_facts(Path(self.context["key"]))
+        facts.child_env = manager.child_environment(self.project, self.member)
+        parent = Path(self.context["session"]).parent
+        outside = Path(self.tmp.name) / "outside"
+        outside.mkdir()
+        sentinel = outside / "sentinel"
+        sentinel.write_text("unchanged", encoding="utf-8")
+        result = subprocess.run(["cmd", "/c", "mklink", "/J", str(parent), str(outside)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.addCleanup(os.rmdir, parent)
+        launch = {"launch_id": "launch", "project_id": self.project, "member_id": self.member,
+                  "expected_instance_id": "ins_launch", "generation": 1}
+        with patch.object(manager, "preflight", return_value=facts), \
+                patch.object(rsh, "spawn_hidden") as spawn, self.assertRaises(HostError):
+            manager.execute_start(launch)
+        spawn.assert_not_called()
+        self.assertEqual(sentinel.read_text(encoding="utf-8"), "unchanged")
+
+    def test_legacy_environment_remains_unchanged(self):
+        from scripts import role_service_host as rsh
+        with patch.dict(os.environ, {"TALK_EXECUTION_SESSION_STORE": "inherited"}):
+            manager = HostManager(None, state_dir=Path(self.tmp.name) / "legacy")
+            with patch.object(rsh, "validate_workspace_context", side_effect=AssertionError("legacy query")):
+                env = manager.child_environment(self.project, self.member)
+            self.assertNotIn("TALK_EXECUTION_SESSION_STORE", env)
+            explicit = HostManager(None, state_dir=Path(self.tmp.name) / "legacy-extra",
+                child_env={"TALK_EXECUTION_SESSION_STORE": "explicit"})
+            self.assertEqual(explicit.child_environment(self.project, self.member)["TALK_EXECUTION_SESSION_STORE"], "explicit")
 
 
 CHILD_SCRIPT = '''\
