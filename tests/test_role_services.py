@@ -114,6 +114,11 @@ class RoleServiceTestCase(RoleApiTestCase):
         self.assertEqual(created.status_code, 201, created.text)
         self.role_a = created.json()["member_id"]
         self.role_a_key = created.json()["api_key"]
+        with self.session() as session:
+            role = session.get(ProjectRole, (PROJECT_ID, self.role_a))
+            role.storage_layout = "legacy"
+            session.add(role)
+            session.commit()
 
     # ── API helpers ──────────────────────────────────────────────────
 
@@ -291,6 +296,11 @@ class RoleServiceTestCase(RoleApiTestCase):
             operation_key=operation_key,
         )
         self.assertEqual(created.status_code, 201, created.text)
+        with self.session() as session:
+            role = session.get(ProjectRole, (project, created.json()["member_id"]))
+            role.storage_layout = "legacy"
+            session.add(role)
+            session.commit()
         return created.json()["member_id"], created.json()["api_key"]
 
     def human_member(self) -> Member:
@@ -1240,6 +1250,11 @@ class RoleServiceIsolationTests(RoleServiceTestCase):
         )
         self.assertEqual(created.status_code, 201, created.text)
         other_member = created.json()["member_id"]
+        with self.session() as session:
+            role = session.get(ProjectRole, (OTHER_PROJECT_ID, other_member))
+            role.storage_layout = "legacy"
+            session.add(role)
+            session.commit()
         self.assertNotEqual(other_member, self.role_a)
 
         started = self.start()

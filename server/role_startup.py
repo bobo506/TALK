@@ -17,7 +17,7 @@ from fastapi import HTTPException
 from sqlmodel import select
 from server import models as m
 from server.role_services import (_as_utc,_now,_write_begin,load_role_service_context,
-    _require_managed_cli,_enqueue_start_launch,_idempotent_stopped,ownership_held,project_role_service,expire_due_launches)
+    _require_managed_cli,_require_start_layout,_enqueue_start_launch,_idempotent_stopped,ownership_held,project_role_service,expire_due_launches)
 
 TERMINAL={"enqueued","already_running","not_selected","skipped","failed"}
 LEASE_SECONDS=120
@@ -212,12 +212,15 @@ def _cold_recover(key,digest,operator,session,config,cutoff):
 
 def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
     config,health,cutoff=verified_runtime(key[0],key[1],session)
-    row=session.get(m.RoleStartupActivation,key);state=_generation(row,session)
-    ctx=load_role_service_context(key[0],key[2],session)
-    if workspace_runtime_guard and ctx.role.storage_layout=='workspace-v1':
-        # 只完成本次 activation 回执；不冷恢复、不停旧进程、不写服务状态或 launch。
+    _write_begin(session)
+    row=_locked_entry(key,digest,session);state=_generation(row,session)
+    try:
+        _require_start_layout(key[0],key[2],session)
+    except HTTPException as exc:
+        if exc.detail != WORKSPACE_RUNTIME_NOT_READY:raise
         _complete(key,digest,'skipped',session,error=WORKSPACE_RUNTIME_NOT_READY)
         return
+    ctx=load_role_service_context(key[0],key[2],session)
     current=project_role_service(key[0],key[2],session)
     # Preserve an already ready service; do not call a stale running DB row ready.
     already=_ready(state,current,cutoff)
@@ -226,6 +229,7 @@ def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
     _write_begin(session)
     row=_locked_entry(key,digest,session);state=_generation(row,session)
     verified_runtime(key[0],key[1],session)
+    _require_start_layout(key[0],key[2],session)
     expire_due_launches(session,now=_now(),project_id=key[0],member_id=key[2])
     ctx=load_role_service_context(key[0],key[2],session)
     current=project_role_service(key[0],key[2],session)

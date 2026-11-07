@@ -204,6 +204,29 @@ def load_role_service_context(
     return ServiceRoleContext(project, role, member, binding, runner)
 
 
+WORKSPACE_RUNTIME_NOT_READY = "workspace_runtime_not_ready"
+
+
+def _require_start_layout(project_id: str, member_id: str, session: Session) -> None:
+    """Read the authoritative layout under the caller's write transaction.
+
+    Workspace runtime isolation and its deployment capability binding are not
+    implemented yet.  No request parameter or deployment flag can enable it.
+    """
+    layout = session.exec(
+        select(ProjectRole.storage_layout).where(
+            ProjectRole.project_id == project_id, ProjectRole.member_id == member_id
+        )
+    ).one_or_none()
+    if layout is None:
+        if session.get(Project, project_id) is None:
+            raise _fail(status.HTTP_404_NOT_FOUND, ROLE_SERVICE_ERROR_PROJECT_NOT_FOUND)
+        if session.get(ProjectRole, (project_id, member_id)) is None:
+            raise _fail(status.HTTP_404_NOT_FOUND, ROLE_SERVICE_ERROR_ROLE_NOT_FOUND)
+    if layout != "legacy":
+        raise _fail(status.HTTP_409_CONFLICT, WORKSPACE_RUNTIME_NOT_READY)
+
+
 def _require_managed_cli(ctx: ServiceRoleContext) -> None:
     """启动入口的能力门控：只有 ``managed_cli`` 的运行器才可能有宿主执行者。
 
@@ -295,6 +318,7 @@ def _enqueue_start_launch(
     事实传入；CAS 沿用 ``synchronize_session=False`` 的 Core update，调用方在
     保存点回滚后如需读取 state 必须重新 ``session.get()``。
     """
+    _require_start_layout(project_id, member_id, session)
     from server.kimi_native_setup import require_native_setup_for_start
     require_native_setup_for_start(project_id, member_id, session)
     old_generation = int(expected_generation)
@@ -563,6 +587,7 @@ def start_role_service(
     行为/返回模型/错误码与 R1-3 逐字一致。
     """
     _write_begin(session)
+    _require_start_layout(project_id, member_id, session)
     ctx = load_role_service_context(project_id, member_id, session)
     _require_managed_cli(ctx)
     from server.kimi_native_setup import require_native_setup_for_start
@@ -802,6 +827,7 @@ def stop_role_service(
 #: ``managed_cli``）如实归为 ``auto_start_control_kind_not_managed``；
 #: 其余意外（资格/上下文/世代冲突等）统一如实归为 ``auto_start_enqueue_failed``。
 _AUTO_START_CODE_BY_SERVICE_ERROR = {
+    WORKSPACE_RUNTIME_NOT_READY: WORKSPACE_RUNTIME_NOT_READY,
     ROLE_SERVICE_ERROR_CONTROL_KIND_NOT_MANAGED: (
         ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED
     ),
@@ -832,6 +858,7 @@ def enqueue_auto_start_launch(
     的审计身份是 ``system:auto-start``（不冒充 human，不新增权限入口）。
     """
     try:
+        _require_start_layout(project_id, member_id, session)
         ctx = load_role_service_context(project_id, member_id, session)
         _require_managed_cli(ctx)
         expire_due_launches(session, now=now, project_id=project_id, member_id=member_id)
@@ -1535,6 +1562,17 @@ def start_all_role_services(
     results: list[RoleServiceStartAllMemberResult] = []
     for member_id in candidates:
         role = by_member[member_id]
+        _write_begin(session)
+        try:
+            _require_start_layout(project_id, member_id, session)
+        except HTTPException as exc:
+            session.rollback()
+            results.append(RoleServiceStartAllMemberResult(
+                member_id=member_id, role_name=role.role_name,
+                status=("skipped_workspace_runtime_not_ready" if exc.detail == WORKSPACE_RUNTIME_NOT_READY else "failed"),
+                error_code=str(exc.detail),
+            ))
+            continue
         state = _get_state(project_id, member_id, session)
         if state is not None and state.observed_state in (
             ROLE_SERVICE_OBSERVED_STARTING,
@@ -1606,7 +1644,7 @@ def start_all_role_services(
             skipped=sum(
                 1
                 for row in results
-                if row.status in ("skipped_running", "skipped_ownership_held")
+                if row.status in ("skipped_running", "skipped_ownership_held", "skipped_workspace_runtime_not_ready")
             ),
             failed=sum(1 for row in results if row.status == "failed"),
         ),
