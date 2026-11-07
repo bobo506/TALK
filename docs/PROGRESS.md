@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 12:18（DeepSeek，**astra 可用性结论**）：astra 服务 running/ready，实际跑通两次咨询任务（510/512）。**限制**：多行回答会被截断成首段（510 得到 `1.`）；单行短答正常（512 正确返回 `4`）。**使用方式**：咨询时要求"一句话、单行、≤60 字"，仅答疑、不派操作任务、不要求改文档。若需长回答，先把问题拆成多个单行小问。
+
 > 2026-11-07 12:10（DeepSeek，**运行时重启修复 astra；W3b 片1a 交付待复核**）：astra 之前卡启动的根因是 native 授权留下的宿主未被运行时重建、launch 无人 claim；按用户授权重启运行时后所有宿主 serving，astra 启动 **running/ready**（instance `ins_b4adf32cc411`），已发一次只答疑咨询（510）验证通路。注意：本次会话沙箱内 Python 无法写 `~/.talk/**`（`launcher.out` 被拒），`--detach` 失败；改用 **WMI `Win32_Process.Create`** 在沙箱外启动运行时（pid 17160），API `/healthz` 200。W3b 片 1a（服务端统一意图门，509）已交付：4 文件、88 项测试全绿，511 独立复核中；片 1b/2/3 未开始。
 
 > 2026-11-07 11:40（DeepSeek，**Astra 咨询角色：已建，待用户授权**）：按用户要求在 codex 运行器新增模型选择 `gpt-6-astra`（choice `rmc_6ec2c7af90d5`），并创建咨询角色 **astra**（`agent:prj-e8fe7066bbec.astra-a88d641d`，role request `astra-consultant-20261107` 已 provisioned）。启动被 `native_authorization_required` 阻断：新角色 HOME 需在 **https://auth.openai.com/codex/device** 输入设备码 `44FW-7Z1DC`（会过期；过期后 cancel 再 start native-setup 可重发）。**用途约束**：astra 只做答疑咨询，不派操作任务、不改任何文档。授权后 start 服务并做 smoke 咨询。
