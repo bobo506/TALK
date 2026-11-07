@@ -60,6 +60,95 @@ from tests.test_role_services import RoleServiceTestCase
 
 PYTHON_EXECUTABLE = getattr(sys, "_base_executable", sys.executable)
 
+
+class WorkspaceContextTests(unittest.TestCase):
+    def setUp(self):
+        from server import workspace_paths as wp
+        self.tmp = tempfile.TemporaryDirectory(prefix="workspace-host-")
+        self.addCleanup(self.tmp.cleanup)
+        self.data = Path(self.tmp.name) / "data"
+        self.data.mkdir()
+        self.project_root = Path(self.tmp.name) / "project"
+        self.project_root.mkdir()
+        self.key_root = Path(self.tmp.name) / "keys"
+        self.project, self.member = "project-a", "agent:a"
+        args = (self.data, self.project, self.member)
+        self.context = {"data_root": str(self.data), "project_root": str(self.project_root),
+            "project_id": self.project, "member_id": self.member, "layout": "workspace-v1",
+            "runner": "codex", "key": str(wp.key_path(*args, git_key_root=self.key_root)),
+            "home": str(wp.native_home_dir(*args)), "session": str(wp.execution_session_store_path(*args)),
+            "state": {"records": str(wp.records_dir(*args)), "control": str(wp.control_dir(*args)),
+                      "manager": str(wp.manager_dir(*args, "codex"))}, "logs": str(wp.logs_dir(*args))}
+        self.kwargs = dict(workspace_context=self.context, workspace_project=self.project,
+            workspace_member=self.member, workspace_data_root=self.data, project_root=self.project_root,
+            role_key_root=self.key_root, role_key_file=Path(self.context["key"]))
+
+    def test_context_drives_role_paths_and_environment(self):
+        from scripts import role_service_host as rsh
+        manager = HostManager(None, child_env={"HOME": "outside"}, **self.kwargs)
+        env = manager.child_environment(self.project, self.member)
+        for name in rsh.NATIVE_HOME_ENV_VARS:
+            self.assertEqual(env[name], self.context["home"])
+        self.assertEqual(manager.store.record_path(self.project, self.member, "launch").parent,
+                         Path(self.context["state"]["records"]))
+        self.assertEqual(manager.store.control_path("launch").parent, Path(self.context["state"]["control"]))
+        self.assertEqual(manager.manager_health_file.parent, Path(self.context["state"]["manager"]))
+        self.assertEqual(manager.manager_drain_file.parent, Path(self.context["state"]["manager"]))
+        self.assertEqual(manager.child_log_dir, Path(self.context["logs"]))
+        record = {"project_id": self.project, "member_id": self.member, "launch_id": "launch"}
+        record_file = manager.store.save(record)
+        self.assertEqual(json.loads(record_file.read_text(encoding="utf-8")), record)
+        control_file = manager.store.control_path("launch")
+        rsh._publish_private_bytes(control_file, b"shutdown\n")
+        self.assertEqual(control_file.read_bytes(), b"shutdown\n")
+        self.assertFalse(manager._workspace_manager_tick(self.project))
+        health = json.loads(manager.manager_health_file.read_text(encoding="utf-8"))
+        self.assertEqual(health["member_id"], self.member)
+        self.assertFalse(health["draining"])
+        manager.manager_drain_file.write_text("drain", encoding="utf-8")
+        self.assertTrue(manager._workspace_manager_tick(self.project))
+        self.assertTrue(json.loads(manager.manager_health_file.read_text(encoding="utf-8"))["draining"])
+        with self.assertRaises(HostError):
+            manager.child_environment(self.project, "agent:other")
+
+    def test_spawn_setup_writes_role_logs_and_passes_role_environment(self):
+        from scripts import role_service_host as rsh
+        manager = HostManager(FakeHostClient(self.member), runtime_log_disabled=True, **self.kwargs)
+        facts = _fake_facts(Path(self.context["key"]))
+        facts.child_env = manager.child_environment(self.project, self.member)
+        launch = {"launch_id": "launch", "project_id": self.project, "member_id": self.member,
+                  "expected_instance_id": "ins_launch", "generation": 1}
+        def spawn(argv, **kwargs):
+            for name in rsh.NATIVE_HOME_ENV_VARS:
+                self.assertEqual(kwargs["env"][name], self.context["home"])
+            self.assertEqual(kwargs["env"][rsh.CONTROL_FILE_ENV], str(manager.store.control_path("launch")))
+            kwargs["stdout_target"].write(b"workspace stdout")
+            kwargs["stdout_target"].flush()
+            kwargs["stderr_target"].write(b"workspace stderr")
+            kwargs["stderr_target"].flush()
+            raise OSError("fixture spawn failure")
+        with patch.object(manager, "preflight", return_value=facts), patch.object(rsh, "spawn_hidden", side_effect=spawn):
+            result = manager.execute_start(launch)
+        self.assertEqual(result["error_code"], "cli_missing")
+        self.assertEqual((manager.child_log_dir / "launch.out").read_bytes(), b"workspace stdout")
+        self.assertEqual((manager.child_log_dir / "launch.err").read_bytes(), b"workspace stderr")
+
+    def test_missing_mismatched_and_changed_context_refused(self):
+        from scripts import role_service_host as rsh
+        for changed in (dict(self.context, home=str(self.data / "wrong")),
+                        {k: v for k, v in self.context.items() if k != "session"},
+                        dict(self.context, state={"records": self.context["state"]["records"]})):
+            with self.subTest(changed=changed), self.assertRaises(HostError):
+                rsh.validate_workspace_context(changed, project=self.project, member=self.member,
+                    project_root=self.project_root, key_root=self.key_root,
+                    role_key_file=Path(self.context["key"]), data_root=self.data)
+        manager = HostManager(None, **self.kwargs)
+        Path(self.context["home"]).mkdir(parents=True)
+        Path(self.context["state"]["records"]).write_text("wrong type", encoding="utf-8")
+        with self.assertRaises(HostError):
+            manager.child_environment(self.project, self.member)
+
+
 CHILD_SCRIPT = '''\
 """固定文本受控子进程（R1-3 隔离测试夹具，不访问真实模型/网络资源）。"""
 import argparse
@@ -746,13 +835,14 @@ class RoleServiceHostLoopTests(RoleServiceTestCase):
         self.assertFalse(self.child_log.exists())
 
     def test_workspace_v1_pending_start_is_not_claimed_or_reported(self):
+        # 模拟启动门启用前已入队的旧 pending 意图，再切换角色布局。
+        launch = self._start_launch_via_api()
         with self.session() as session:
             from server.models import ProjectRole
             role = session.get(ProjectRole, ("prj_alpha", self.role_a))
             role.storage_layout = "workspace-v1"
             session.add(role)
             session.commit()
-        launch = self._start_launch_via_api()
         before = self.launch_row(launch["launch_id"]).model_dump()
         with patch("scripts.role_service_host.spawn_hidden") as spawn:
             outcome = self.manager.execute_start(launch)

@@ -184,6 +184,8 @@ class RuntimeTests(unittest.TestCase):
                 with patch.object(self.client, "request", side_effect=request):
                     spec = getattr(self.runtime, method)(role)
                     ctx = spec["workspace_context"]
+                    self.assertEqual(json.loads(spec["argv"][spec["argv"].index("--workspace-context") + 1]), ctx)
+                    self.assertEqual(spec["argv"][spec["argv"].index("--key-root") + 1], self.config["key_root"])
                     args = (data, self.runtime.project, "agent:new")
                     self.assertEqual(ctx["key"], str(key))
                     self.assertEqual(ctx["home"], str(wp.native_home_dir(*args)))

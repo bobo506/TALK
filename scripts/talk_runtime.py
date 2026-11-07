@@ -550,6 +550,8 @@ class TalkRuntime:
             spec = {"member_id": member, "argv": argv}
         else:
             spec["argv"][spec["argv"].index("--role-key-file") + 1] = context["key"]
+        spec["argv"].extend(["--workspace-context", json.dumps(context, ensure_ascii=False, separators=(",", ":")),
+                             "--key-root", str(self.config["key_root"])])
         private = Path(context["state"]["manager"])
         spec.update(health_file=str(private / "manager-health.json"), drain_file=str(private / "drain.request"),
                     workspace_context=context)

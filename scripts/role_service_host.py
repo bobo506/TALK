@@ -119,6 +119,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from server import workspace_paths as wp  # noqa: E402
 from scripts import role_service_host_diagnostics as host_diag  # noqa: E402 - 复用 271 基础诊断 API
 from scripts import role_service_host_loop_evidence as loop_evidence  # noqa: E402 - 282 本地循环证据
 from bridges.runtime_diagnostics_timeline import StageTimeline  # noqa: E402 - 276 阶段配对
@@ -705,6 +706,77 @@ class OwnershipStore:
             pass
         except OSError:  # pragma: no cover - 清理失败不掩盖成功停止事实
             pass
+
+
+def validate_workspace_context(context: Any, *, project: str, member: str,
+                               project_root: Path, key_root: Optional[Path],
+                               role_key_file: Optional[Path], data_root: Path = REPO_ROOT) -> dict[str, Any]:
+    """Re-derive every supplied path and reject links or malformed path components."""
+    try:
+        if not isinstance(context, dict) or context.get("layout") != WORKSPACE_V1_LAYOUT:
+            raise ValueError("layout")
+        if context.get("project_id") != project or context.get("member_id") != member or not member:
+            raise ValueError("identity")
+        runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}[context["runner"]]
+        if key_root is None or role_key_file is None:
+            raise ValueError("key root")
+        args = (data_root, project, member)
+        expected = {"data_root": data_root, "project_root": project_root,
+                    "key": wp.key_path(*args, git_key_root=key_root),
+                    "home": wp.native_home_dir(*args),
+                    "session": wp.execution_session_store_path(*args),
+                    "logs": wp.logs_dir(*args)}
+        state = {"records": wp.records_dir(*args), "control": wp.control_dir(*args),
+                 "manager": wp.manager_dir(*args, runner)}
+        supplied_state = context.get("state")
+        if not isinstance(supplied_state, dict) or set(supplied_state) != set(state):
+            raise ValueError("state")
+        for name, expected_path in list(expected.items()) + [("state." + k, v) for k, v in state.items()]:
+            raw = supplied_state.get(name[6:]) if name.startswith("state.") else context.get(name)
+            if not isinstance(raw, str) or not Path(raw).is_absolute():
+                raise ValueError("path")
+            path = Path(raw)
+            if wp._checked(path) != wp._checked(expected_path) or str(path) != str(expected_path):
+                raise ValueError("path mismatch")
+            for part in (path, *path.parents):
+                try:
+                    info = part.lstat()
+                except FileNotFoundError:
+                    continue
+                is_file = part == path and name in ("key", "session")
+                if not (stat.S_ISREG(info.st_mode) if is_file else stat.S_ISDIR(info.st_mode)):
+                    raise ValueError("path type")
+        if wp._checked(role_key_file) != wp._checked(expected["key"]) or str(role_key_file) != str(expected["key"]):
+            raise ValueError("key mismatch")
+        return json.loads(json.dumps(context))
+    except (KeyError, TypeError, ValueError, OSError) as exc:
+        raise HostError("workspace_context_invalid", "invalid workspace context") from exc
+
+
+class WorkspaceOwnershipStore(OwnershipStore):
+    """Ownership and control paths for exactly one validated workspace role."""
+    def __init__(self, context: dict[str, Any], recheck):
+        self.context, self.recheck = context, recheck
+        self.state_dir = Path(context["state"]["records"]).parent
+        self.recheck()
+        ensure_private_dir(self.state_dir)
+
+    def _check_identity(self, project_id: str, member_id: str) -> None:
+        if (project_id, member_id) != (self.context["project_id"], self.context["member_id"]):
+            raise HostError("workspace_context_invalid", "workspace identity mismatch")
+        self.recheck()
+
+    def _role_relative(self, project_id: str, member_id: str) -> Path:
+        self._check_identity(project_id, member_id)
+        return Path("records")
+
+    def control_path(self, launch_id: str) -> Path:
+        self.recheck()
+        return assert_inside_root(self.state_dir, Path("control") / (f"{_sanitize_token(str(launch_id))}.ctl"))
+
+    def native_home_dir(self, project_id: str, member_id: str) -> Path:
+        self._check_identity(project_id, member_id)
+        return ensure_private_dir(Path(self.context["home"]))
 
 
 def redact(record: Any) -> Any:
@@ -1307,6 +1379,10 @@ class HostManager:
         runtime_log_max_bytes: Any = None,
         runtime_log_max_file_bytes: Any = None,
         runtime_log_disabled: bool = False,
+        workspace_context: Optional[dict[str, Any]] = None,
+        workspace_project: Optional[str] = None,
+        workspace_member: Optional[str] = None,
+        workspace_data_root: Path = REPO_ROOT,
     ):
         # 产品片B：非法配置必须**先于**任何私有凭据读取/API/spawn 被拒绝，且 CLI 与
         # 程序化构造走同一套校验；这里保存的是副本，外部 dict 之后被改动不影响本实例。
@@ -1331,7 +1407,19 @@ class HostManager:
         self._launch_diag_identity: dict[str, tuple[str, str, str, str]] = {}
         self.client = client
         self.host = host or socket.gethostname()
-        self.store = OwnershipStore(state_dir or DEFAULT_STATE_DIR)
+        self.workspace_context = None
+        self._workspace_recheck = lambda: None
+        if workspace_context is not None:
+            workspace_context = json.loads(json.dumps(workspace_context))
+            def recheck():
+                return validate_workspace_context(workspace_context, project=workspace_project or "",
+                    member=workspace_member or "", project_root=Path(project_root or REPO_ROOT),
+                    key_root=role_key_root, role_key_file=role_key_file, data_root=workspace_data_root)
+            self.workspace_context = recheck()
+            self._workspace_recheck = recheck
+            self.store = WorkspaceOwnershipStore(self.workspace_context, recheck)
+        else:
+            self.store = OwnershipStore(state_dir or DEFAULT_STATE_DIR)
         self.operator_key = operator_key
         self.role_key_root = Path(role_key_root) if role_key_root else None
         self.role_key_file = Path(role_key_file) if role_key_file else None
@@ -1348,12 +1436,55 @@ class HostManager:
         self.ready_timeout = ready_timeout
         self.stop_timeout = stop_timeout
         self.project_root = Path(project_root) if project_root else REPO_ROOT
-        self.child_log_dir = Path(child_log_dir) if child_log_dir else None
+        self.child_log_dir = (Path(self.workspace_context["logs"]) if self.workspace_context is not None
+                              else Path(child_log_dir) if child_log_dir else None)
+        self.manager_health_file = (Path(self.workspace_context["state"]["manager"]) / "manager-health.json"
+                                    if self.workspace_context is not None else None)
+        self.manager_drain_file = (Path(self.workspace_context["state"]["manager"]) / "drain.request"
+                                   if self.workspace_context is not None else None)
+        self._workspace_draining = False
         self._handles: dict[str, dict[str, Any]] = {}
 
     # ── 凭据与入口 ──────────────────────────────────────────────────
 
+    def _workspace_check_file(self, path: Path, root: Path) -> None:
+        if self.workspace_context is None:
+            return
+        self._workspace_recheck()
+        try:
+            if not wp.is_within(path, root):
+                raise ValueError("path escape")
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                return
+            if not stat.S_ISREG(info.st_mode):
+                raise ValueError("not a file")
+        except (ValueError, OSError) as exc:
+            raise HostError("workspace_context_invalid", "invalid workspace file") from exc
+
+    def _workspace_manager_tick(self, project_id: str) -> bool:
+        if self.workspace_context is None:
+            return False
+        if project_id != self.workspace_context["project_id"]:
+            raise HostError("workspace_context_invalid", "workspace project mismatch")
+        self._workspace_recheck()
+        root = self.manager_health_file.parent
+        self._workspace_check_file(self.manager_drain_file, root)
+        self._workspace_draining = self._workspace_draining or self.manager_drain_file.is_file()
+        ensure_private_dir(root)
+        self._workspace_check_file(self.manager_health_file, root)
+        runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}[self.workspace_context["runner"]]
+        payload = {"schema": f"talk-{runner}-manager-health-1", "pid": os.getpid(),
+                   "project_id": project_id, "member_id": self.workspace_context["member_id"],
+                   "seen_at": datetime.now(timezone.utc).isoformat(), "state": "serving",
+                   "draining": self._workspace_draining, "owned_launches": list(self._handles)}
+        _publish_private_bytes(self.manager_health_file, (json.dumps(payload) + "\n").encode("utf-8"))
+        return self._workspace_draining
+
     def role_key_path(self, member_id: str) -> Path:
+        if self.workspace_context is not None:
+            self.store._check_identity(self.workspace_context["project_id"], member_id)
         if self.role_key_file is not None:
             return self.role_key_file
         if self.role_key_root is None:
@@ -1550,6 +1681,10 @@ class HostManager:
             env[name] = str(home)
         env["TALK_ROLE_SERVICE_MANAGED"] = "1"
         env.update(self.child_env_extra)
+        if self.workspace_context is not None:
+            self._workspace_recheck()
+            for name in NATIVE_HOME_ENV_VARS:
+                env[name] = str(home)
         return env
 
     # ── 持久诊断（任务 272）─────────────────────────────────────────
@@ -2104,10 +2239,13 @@ class HostManager:
         )
         try:
             if self.child_log_dir is not None:
+                self._workspace_recheck()
                 self.child_log_dir.mkdir(parents=True, exist_ok=True)
                 name = _sanitize_token(launch_id)
+                self._workspace_check_file(self.child_log_dir / f"{name}.out", self.child_log_dir)
                 stdout_target = open(self.child_log_dir / f"{name}.out", "ab")
                 opened.append(stdout_target)
+                self._workspace_check_file(self.child_log_dir / f"{name}.err", self.child_log_dir)
                 stderr_target = open(self.child_log_dir / f"{name}.err", "ab")
                 opened.append(stderr_target)
         except Exception as exc:
@@ -2132,6 +2270,7 @@ class HostManager:
             budgets=spawn_budgets,
         )
         try:
+            self._workspace_recheck()
             process = spawn_hidden(
                 argv,
                 cwd=self.project_root,
@@ -3219,6 +3358,11 @@ class HostManager:
                 # 既有诊断包装已保证不抛；这里再兜底，日志失败不影响业务。
                 pass
             while True:
+                if self.workspace_context is not None:
+                    draining = self._workspace_manager_tick(project_id)
+                    if draining and not self._handles:
+                        stop_reason = "drained"
+                        break
                 rounds += 1
                 round_in_flight = True
                 round_actions_seen = 0
@@ -3293,6 +3437,11 @@ class HostManager:
                             },
                         )
                         poll_failures = 0
+                if self.workspace_context is not None:
+                    actions = [action for action in actions
+                               if action.get("project_id") == project_id
+                               and action.get("member_id") == self.workspace_context["member_id"]
+                               and (not self._workspace_draining or action.get("action") == "stop")]
                 for action in actions:
                     try:
                         if action.get("action") == "stop":
@@ -3551,6 +3700,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--operator-key-file", default=None)
     parser.add_argument("--key-root", default=None, help="角色 Key 根（仓库之外）")
     parser.add_argument("--role-key-file", default=None, help="单角色 Key 文件覆盖")
+    parser.add_argument("--workspace-context", default=None, help="workspace context JSON")
     parser.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR))
     parser.add_argument("--project-root", default=str(REPO_ROOT))
     parser.add_argument("--cli-executable", default=None)
@@ -3687,6 +3837,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
         )
         return EXIT_FAILED
+    workspace_context = None
+    if args.workspace_context is not None:
+        try:
+            workspace_context = validate_workspace_context(json.loads(args.workspace_context),
+                project=args.project, member=args.member, project_root=Path(args.project_root),
+                key_root=Path(args.key_root) if args.key_root else None,
+                role_key_file=Path(args.role_key_file) if args.role_key_file else None)
+        except (HostError, ValueError):
+            print(json.dumps({"schema": SCHEMA, "ok": False, "error_code": "workspace_context_invalid"}))
+            return EXIT_FAILED
     try:
         operator_key = load_operator_key(
             None,
@@ -3728,6 +3888,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             runtime_log_max_bytes=args.runtime_log_max_bytes,
             runtime_log_max_file_bytes=args.runtime_log_max_file_bytes,
             runtime_log_disabled=args.runtime_log_disabled,
+            workspace_context=workspace_context, workspace_project=args.project, workspace_member=args.member,
         )
     except HostError as exc:
         print(json.dumps({"schema": SCHEMA, "ok": False, "error_code": exc.code}))
