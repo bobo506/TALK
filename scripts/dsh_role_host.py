@@ -80,9 +80,17 @@ class DshRoleHost(rsh.HostManager):
         self._active_connection = None
         self._active_secret = None
         self._active_binding_fingerprint = None
+        context = kwargs.get("workspace_context")
+        if context is not None and (not isinstance(context, dict) or context.get("runner") != "dsh"
+                or context.get("project_id") != project or context.get("member_id") != member):
+            raise rsh.HostError("workspace_context_invalid", "workspace identity or runner mismatch")
         super().__init__(*args, **kwargs)
+        if self.workspace_context is not None:
+            self.private = Path(self.workspace_context["state"]["manager"])
 
     def publish_health(self, state="serving"):
+        if getattr(self, "workspace_context", None) is not None:
+            self._workspace_check_file(self.private / "manager-health.json", self.private)
         rsh.ensure_private_dir(self.private)
         value = {"schema": "talk-dsh-manager-health-1", "pid": os.getpid(),
             "project_id": self.project, "member_id": self.member,
@@ -107,6 +115,8 @@ class DshRoleHost(rsh.HostManager):
     def claimable_actions(self, project_id):
         if project_id != self.project:
             return []
+        if self.workspace_context is not None:
+            self._workspace_check_file(self.private / "drain.request", self.private)
         self.drain_requested = self.drain_requested or (self.private / "drain.request").is_file()
         if self.drain_requested and not self._handles:
             raise Drained()
@@ -193,9 +203,24 @@ def main(argv=None):
                  "operator-key-file", "role-key-file", "expected-choice-id", "expected-model-alias"):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--task-profile", choices=("review", "tools"), default="tools")
+    parser.add_argument("--workspace-context", default=None)
+    parser.add_argument("--key-root", default=None)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
-    private = manager_directory(args.state_dir, args.project, args.member)
+    context = None
+    try:
+        if args.workspace_context is not None or args.key_root is not None:
+            if args.workspace_context is None or args.key_root is None:
+                raise rsh.HostError("workspace_context_invalid", "workspace context and key root required")
+            context = rsh.validate_workspace_context(json.loads(args.workspace_context),
+                project=args.project, member=args.member, project_root=Path(args.project_root),
+                key_root=Path(args.key_root), role_key_file=Path(args.role_key_file))
+            if context["runner"] != "dsh":
+                raise rsh.HostError("workspace_context_invalid", "workspace runner mismatch")
+    except (rsh.HostError, ValueError) as exc:
+        print(json.dumps({"ok": False, "error_code": getattr(exc, "code", "workspace_context_invalid")}))
+        return 1
+    private = Path(context["state"]["manager"]) if context is not None else manager_directory(args.state_dir, args.project, args.member)
     if not args.apply:
         print(json.dumps({"mode": "dry_run", "project_id": args.project, "member_id": args.member}))
         return 0
@@ -218,16 +243,54 @@ def main(argv=None):
                 or (role.get("model") or {}).get("choice_id") != args.expected_choice_id
                 or (role.get("model") or {}).get("model_alias") != args.expected_model_alias):
             raise rsh.HostError("binding_fingerprint_mismatch", "DSH角色或模型选择已改变")
+        if context is not None:
+            layouts = client.request("GET", "/api/projects/" + args.project + "/role-storage-layouts")
+            layouts = layouts if isinstance(layouts, list) else layouts.get("data") if isinstance(layouts, dict) else None
+            if not isinstance(layouts, list) or any(not isinstance(row, dict) for row in layouts):
+                raise rsh.HostError("workspace_context_invalid", "workspace layout unavailable")
+            matching = [row for row in layouts if row.get("member_id") == args.member]
+            if len(matching) != 1 or matching[0].get("storage_layout") != "workspace-v1":
+                raise rsh.HostError("workspace_context_invalid", "workspace layout mismatch")
         key_path = Path(args.role_key_file)
+        if context is not None:
+            rsh.validate_workspace_context(context, project=args.project, member=args.member,
+                project_root=Path(args.project_root), key_root=Path(args.key_root), role_key_file=key_path)
         role_key = key_path.read_text(encoding="utf-8").strip()
         identity = client.request("GET", "/api/members/me", key=role_key)
         if identity.get("id") != args.member or identity.get("kind") != "agent":
             raise rsh.HostError("identity_mismatch", "角色Key与目标不匹配")
         from scripts import dsh_role_setup
         try:
-            prepared = dsh_role_setup.setup(
-                args.project, args.member, root=Path(args.project_root),
-                which=shutil.which, environ=os.environ)
+            if context is None:
+                prepared = dsh_role_setup.setup(
+                    args.project, args.member, root=Path(args.project_root),
+                    which=shutil.which, environ=os.environ)
+            else:
+                # The legacy setup writes under state/native; validate the same binding and
+                # templates against the trusted home before creating its native subdirectory.
+                from scripts.kimi_role_setup import _open_db
+                db = _open_db(_database)
+                try:
+                    binding = dsh_role_setup._role(db, args.project, args.member)
+                finally:
+                    db.close()
+                entry = resolve_connection(runtime_config, binding)
+                profiles = runtime_config["dsh"].get("task_profiles", {})
+                if not isinstance(profiles, dict) or any(not isinstance(k, str) or not k or v not in ("review", "tools") for k, v in profiles.items()):
+                    raise rsh.HostError("dsh_task_profile_invalid", "DSH 任务 profile 无效：配置格式错误")
+                secret = next(iter(connection_environment(entry, os.environ).values()))
+                for profile in ("review", "tools"):
+                    validate_command(entry, binding, profile, which=shutil.which, secret=secret,
+                        native_home=Path(context["home"]).as_posix())
+                del secret
+                prepared = {"profile": profiles.get(args.member, "tools")}
+                if prepared["profile"] != args.task_profile:
+                    raise rsh.HostError("dsh_task_profile_invalid", "DSH 任务 profile 无效：与角色配置不一致")
+                rsh.validate_workspace_context(context, project=args.project, member=args.member,
+                    project_root=Path(args.project_root), key_root=Path(args.key_root), role_key_file=key_path)
+                native = Path(context["home"]) / ".dsh"
+                rsh._assert_root_chain_has_no_reparse(native)
+                rsh.ensure_private_dir(native)
         except dsh_role_setup.SetupError as exc:
             print(json.dumps({"ok": False, "error_code": exc.code}))
             return 1
@@ -236,11 +299,17 @@ def main(argv=None):
         manager = DshRoleHost(client, project=args.project, member=args.member,
             display_name=role.get("role_name") or identity["display_name"], task_profile=args.task_profile,
             private=private, runtime_config=runtime_config, state_dir=Path(args.state_dir), operator_key=operator,
-            role_key_file=key_path, project_root=Path(args.project_root), verified_runtimes=["dsh"])
+            role_key_file=key_path, project_root=Path(args.project_root), verified_runtimes=["dsh"],
+            role_key_root=Path(args.key_root) if args.key_root else None, workspace_context=context,
+            workspace_project=args.project, workspace_member=args.member)
         while True:
             try:
                 manager.serve(args.project, poll_interval=rsh.DEFAULT_POLL_INTERVAL_SECONDS,
                     once=False, max_rounds=None, provision_worker=None)
+                if manager.workspace_context is not None and manager._workspace_draining and not manager._handles:
+                    manager.drain_requested = True
+                    manager.publish_health_best_effort("stopped")
+                    return 0
             except Drained:
                 manager.publish_health_best_effort("stopped")
                 return 0

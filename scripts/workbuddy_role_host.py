@@ -21,13 +21,24 @@ class WorkBuddyRoleHost(rsh.HostManager):
         self.executable, self.models_home = Path(executable).resolve(), Path(models_home).resolve()
         self.display_name = display_name
         self.drain_requested = False
+        context = kwargs.get("workspace_context")
+        if context is not None and (not isinstance(context, dict) or context.get("runner") != "workbuddy"
+                or context.get("project_id") != project_id or context.get("member_id") != member_id):
+            raise rsh.HostError("workspace_context_invalid", "workspace identity or runner mismatch")
         super().__init__(client, **kwargs)
-        self.private = rsh.ensure_private_dir(rsh.assert_inside_root(self.store.state_dir,
-            Path("workbuddy-native") / rsh._sanitize_token(project_id) / rsh._sanitize_token(member_id)))
+        if self.workspace_context is not None:
+            self.private = Path(self.workspace_context["state"]["manager"])
+        else:
+            self.private = rsh.ensure_private_dir(rsh.assert_inside_root(self.store.state_dir,
+                Path("workbuddy-native") / rsh._sanitize_token(project_id) / rsh._sanitize_token(member_id)))
         self.drain_file = self.private / "drain.request"
         self.started_at = datetime.now(timezone.utc).isoformat()
 
     def health(self, state="serving"):
+        if self.workspace_context is not None:
+            self._workspace_check_file(self.drain_file, self.private)
+            self._workspace_check_file(self.private / "manager-health.json", self.private)
+            rsh.ensure_private_dir(self.private)
         payload={"schema":"talk-workbuddy-manager-health-1", "project_id":self.target_project,
             "member_id":self.target_member, "pid":os.getpid(), "started_at":self.started_at,
             "seen_at":datetime.now(timezone.utc).isoformat(), "state":state,
@@ -38,6 +49,8 @@ class WorkBuddyRoleHost(rsh.HostManager):
     def claimable_actions(self, project_id):
         if project_id != self.target_project:
             return []
+        if self.workspace_context is not None:
+            self._workspace_check_file(self.drain_file, self.private)
         draining=self.drain_requested or self.drain_file.is_file()
         self.health()
         if draining and not self._handles:
@@ -52,6 +65,9 @@ class WorkBuddyRoleHost(rsh.HostManager):
         argv,template,budget=super().build_entry_argv(runtime,model_alias)
         argv += ["--workbuddy-executable",str(self.executable),"--workbuddy-models-home",str(self.models_home),
                  "--workdir",str(self.project_root),"--display-name",self.display_name]
+        if self.workspace_context is not None:
+            home = self.store.native_home_dir(self.target_project, self.target_member)
+            argv += ["--workbuddy-native-home", str(home / ".codebuddy")]
         return argv,template,budget
 
     def child_environment(self, project_id, member_id):
@@ -77,6 +93,17 @@ def main(argv=None):
     if (args.cli_executable or args.cli_arg or args.cli_command_template or args.runtime_command_template
             or args.alias_flag or args.child_env or args.provision_worker or args.provision_worker_apply):
         raise rsh.HostError("workbuddy_entry_override_rejected")
+    context = None
+    if args.workspace_context is not None:
+        try:
+            context = rsh.validate_workspace_context(json.loads(args.workspace_context),
+                project=args.project, member=args.member, project_root=Path(args.project_root),
+                key_root=Path(args.key_root) if args.key_root else None,
+                role_key_file=Path(args.role_key_file) if args.role_key_file else None)
+            if context["runner"] != "workbuddy":
+                raise rsh.HostError("workspace_context_invalid", "workspace runner mismatch")
+        except (rsh.HostError, ValueError, TypeError) as exc:
+            raise rsh.HostError("workspace_context_invalid", "invalid workspace context") from exc
     exe=Path(args.workbuddy_executable).resolve();models=Path(args.workbuddy_models_home).resolve()
     if not exe.is_file() or exe.name.lower()!="workbuddy.exe":
         raise rsh.HostError("workbuddy_source_missing")
@@ -89,17 +116,34 @@ def main(argv=None):
         raise rsh.HostError("workbuddy_verified_credentials_required")
     operator=rsh.load_operator_key(None,{rsh.OPERATOR_KEY_ENV:"",rsh.OPERATOR_KEY_FILE_ENV:args.operator_key_file})
     client=rsh.TalkHostClient(args.base_url,operator)
+    if context is not None:
+        if client.request("GET", "/api/members/me").get("kind") != "human":
+            raise rsh.HostError("workbuddy_operator_not_human")
+        layouts = client.request("GET", "/api/projects/" + args.project + "/role-storage-layouts")
+        layouts = layouts if isinstance(layouts, list) else layouts.get("data") if isinstance(layouts, dict) else None
+        if not isinstance(layouts, list) or any(not isinstance(row, dict) for row in layouts):
+            raise rsh.HostError("workspace_context_invalid", "workspace layout unavailable")
+        matching = [row for row in layouts if row.get("member_id") == args.member]
+        if len(matching) != 1 or matching[0].get("storage_layout") != "workspace-v1":
+            raise rsh.HostError("workspace_context_invalid", "workspace layout mismatch")
+        rsh.validate_workspace_context(context, project=args.project, member=args.member,
+            project_root=Path(args.project_root), key_root=Path(args.key_root), role_key_file=Path(args.role_key_file))
     manager=WorkBuddyRoleHost(client,project_id=args.project,member_id=args.member,executable=exe,models_home=models,display_name=args.workbuddy_display_name,
         host=args.host,state_dir=Path(args.state_dir),operator_key=operator,role_key_file=Path(args.role_key_file),
         verified_runtimes=["workbuddy"],project_root=Path(args.project_root),
         execution_timeout_seconds=rsh.normalize_execution_timeout(args.cli_execution_timeout_seconds),
-        ready_timeout=args.ready_timeout,stop_timeout=args.stop_timeout)
+        ready_timeout=args.ready_timeout,stop_timeout=args.stop_timeout,
+        role_key_root=Path(args.key_root) if context is not None else None, workspace_context=context,
+        workspace_project=args.project, workspace_member=args.member)
     try:
         if client.request("GET","/api/members/me").get("kind")!="human":
             raise rsh.HostError("workbuddy_operator_not_human")
         while True:
             try:
                 manager.serve(args.project,poll_interval=args.poll_interval,once=False,max_rounds=None,provision_worker=None)
+                if manager.workspace_context is not None and manager._workspace_draining and not manager._handles:
+                    manager.drain_requested=True
+                    manager.health("stopped");return 0
             except Drained:
                 manager.health("stopped");return 0
             except BaseException:
