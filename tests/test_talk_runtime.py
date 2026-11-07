@@ -139,6 +139,20 @@ class RuntimeTests(unittest.TestCase):
         with patch.object(runtime.subprocess,"Popen") as popen:
             self.assertEqual(runtime.main(["serve","--config",str(self.path)]),0)
         popen.assert_not_called()
+    def test_workspace_v1_is_refused_before_dynamic_or_configured_spawn(self):
+        workspace = self.role("agent:workspace", generation=1, ownership_held=False)
+        workspace["storage_layout"] = "workspace-v1"
+        self.config["hosts"] = [self.spec("agent:workspace"), self.spec()]
+        self.runtime.reconcile_hosts([workspace, self.role(generation=1, ownership_held=False)])
+        self.assertEqual([item[0] for item in self.spawned], ["host-agent_one"])
+        self.assertEqual(self.runtime.statuses["agent:workspace"], {
+            "state": "workspace_runtime_not_ready",
+            "error_code": "workspace_runtime_not_ready",
+            "error_message": "角色已准备，运行时隔离待启用",
+        })
+        self.assertNotIn("agent:workspace", self.runtime.hosts)
+        self.assertEqual(self.client.calls, [])
+
     def test_boot_only_starts_manager_and_never_requests_role_start(self):
         self.config["hosts"]=[self.spec()]
         self.runtime.reconcile_hosts([self.role(generation=3,ownership_held=False)])

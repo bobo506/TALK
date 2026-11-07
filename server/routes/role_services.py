@@ -58,7 +58,8 @@ def save_role_startup(project_id: str, member_id: str, body: RoleStartupPreferen
 def activate_project_startup(project_id: str, body: ProjectStartupRequest,
                              current: Member = Depends(get_current_member), session: Session = Depends(get_session)):
     from server.role_startup import activate
-    return activate(project_id,body.activation_id,current,session)
+    return activate(project_id,body.activation_id,current,session,
+                    workspace_runtime_guard=body.workspace_runtime_guard)
 
 
 def _require_human(current: Member) -> None:

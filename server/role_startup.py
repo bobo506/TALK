@@ -23,13 +23,18 @@ TERMINAL={"enqueued","already_running","not_selected","skipped","failed"}
 LEASE_SECONDS=120
 ROUND_SECONDS=55
 PROOF_RESERVE_SECONDS=45
+WORKSPACE_RUNTIME_NOT_READY='workspace_runtime_not_ready'
+WORKSPACE_RUNTIME_NOT_READY_MESSAGE='角色已准备，运行时隔离待启用'
 
 def fail(code):raise HTTPException(409,code)
 def human(operator):
     if operator.kind!='human':raise HTTPException(403,'only human members can configure project startup')
 def public_entry(row):
-    return {'status':row.status,'error_code':row.error_code,'launch_id':row.launch_id,
-            'updated_at':_as_utc(row.updated_at).isoformat()}
+    value={'status':row.status,'error_code':row.error_code,'launch_id':row.launch_id,
+           'updated_at':_as_utc(row.updated_at).isoformat()}
+    if row.error_code==WORKSPACE_RUNTIME_NOT_READY:
+        value['error_message']=WORKSPACE_RUNTIME_NOT_READY_MESSAGE
+    return value
 def projection(project,member,session):
     pref=session.get(m.ProjectRoleStartup,(project,member))
     recent=session.exec(select(m.RoleStartupActivation).where(
@@ -148,12 +153,12 @@ def _ready(state,current,cutoff):
                       and _as_utc(state.process_started_at)>=cutoff)
     return bool(current_boot and current and current.observed=='running' and current.readiness_service=='ready')
 
-def _complete(key,digest,status,session,*,launch=None):
+def _complete(key,digest,status,session,*,launch=None,error=None):
     # Keep the final health/lease check beside commit. Flushed launch/state
     # changes roll back if the runtime stopped while checks were executing.
     verified_runtime(key[0],key[1],session)
     row=_locked_entry(key,digest,session)
-    _finish(row,status,launch=launch);session.add(row);session.commit()
+    _finish(row,status,error=error,launch=launch);session.add(row);session.commit()
 
 def _cold_recover(key,digest,operator,session,config,cutoff):
     """Only proven preboot ownership; current-boot failures remain manual."""
@@ -205,10 +210,14 @@ def _cold_recover(key,digest,operator,session,config,cutoff):
         confirmation='old_processes_confirmed_stopped',reason='original_host_exited')
     recover_stopped(key[0],key[2],body,operator,session,_preboot_at=cutoff,_on_recovered=audit)
 
-def _apply(key,digest,operator,session):
+def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
     config,health,cutoff=verified_runtime(key[0],key[1],session)
     row=session.get(m.RoleStartupActivation,key);state=_generation(row,session)
     ctx=load_role_service_context(key[0],key[2],session)
+    if workspace_runtime_guard and ctx.role.storage_layout=='workspace-v1':
+        # 只完成本次 activation 回执；不冷恢复、不停旧进程、不写服务状态或 launch。
+        _complete(key,digest,'skipped',session,error=WORKSPACE_RUNTIME_NOT_READY)
+        return
     current=project_role_service(key[0],key[2],session)
     # Preserve an already ready service; do not call a stale running DB row ready.
     already=_ready(state,current,cutoff)
@@ -250,7 +259,7 @@ def _apply(key,digest,operator,session):
                                  actor_id='system:project-startup',expected_generation=row.expected_generation)
     _complete(key,digest,'enqueued',session,launch=launch.launch_id)
 
-def activate(project,activation,operator,session):
+def activate(project,activation,operator,session,*,workspace_runtime_guard=False):
     human(operator);deadline=time.monotonic()+ROUND_SECONDS
     config,health,cutoff=verified_runtime(project,activation,session)
     _snapshot(project,activation,operator,session,health)
@@ -262,7 +271,7 @@ def activate(project,activation,operator,session):
         verified_runtime(project,activation,session)
         digest=_claim(key,session)
         if digest is None:continue
-        try:_apply(key,digest,operator,session)
+        try:_apply(key,digest,operator,session,workspace_runtime_guard=workspace_runtime_guard)
         except Exception as exc:
             session.rollback()
             code=getattr(exc,'detail',None) or getattr(exc,'code',None)

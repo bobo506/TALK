@@ -1524,6 +1524,23 @@ def list_project_roles(
     return [projected[member_id] for member_id in member_ids]
 
 
+@router.get("/{project_id}/role-storage-layouts")
+def list_project_role_storage_layouts(
+    project_id: str,
+    _current: Member = Depends(get_current_member),
+    session: Session = Depends(get_session),
+):
+    """W3a 启动守卫专用只读布局查询；不含 Key、路径或名册伪角色。"""
+    _get_project(project_id, session)
+    rows = session.exec(
+        select(ProjectRole).where(ProjectRole.project_id == project_id)
+    ).all()
+    return [
+        {"member_id": row.member_id, "storage_layout": row.storage_layout}
+        for row in sorted(rows, key=lambda row: row.member_id)
+    ]
+
+
 def _allocate_role_member_id(project_id: str, role_name: str, session: Session) -> str:
     """分配全新 ``member_id``：主键冲突只重取随机后缀，**绝不**复用已存在成员。"""
     for _ in range(8):

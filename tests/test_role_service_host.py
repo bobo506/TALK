@@ -230,6 +230,9 @@ class FakeHostClient:
         if path.endswith("/report"):
             self.reports.append(dict(body or {}))
             return {"ok": True}
+        if path.endswith("/role-storage-layouts"):
+            # 旧服务/旧数据没有该字段：必须继续走既有 claim/spawn 路径。
+            return {"data": [{"member_id": self.member_id}]}
         if "/role-services" in path:
             return {"data": []}
         raise AssertionError(path)
@@ -266,6 +269,13 @@ class RoleServiceHostLoopTests(RoleServiceTestCase):
 
     def setUp(self):
         super().setUp()
+        # 本类既有用例逐项验证 legacy 启停合同；新布局拒绝由专门用例覆盖。
+        with self.session() as session:
+            from server.models import ProjectRole
+            role = session.get(ProjectRole, ("prj_alpha", self.role_a))
+            role.storage_layout = "legacy"
+            session.add(role)
+            session.commit()
         self.port = free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
         config = uvicorn.Config(
@@ -711,6 +721,70 @@ class RoleServiceHostLoopTests(RoleServiceTestCase):
         self.assertEqual(payload["result"]["counts"]["requested"], 1)
         self.assertEqual(payload["result"]["counts"]["started"], 0)
         self.assertEqual(self.state_row().observed_state, "starting")
+
+    def test_workspace_v1_cli_start_is_refused_without_state_or_process(self):
+        with self.session() as session:
+            from server.models import ProjectRole
+            role = session.get(ProjectRole, ("prj_alpha", self.role_a))
+            role.storage_layout = "workspace-v1"
+            session.add(role)
+            session.commit()
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = host_main([
+                "start", "--project", "prj_alpha", "--member", self.role_a,
+                "--base-url", self.base_url, "--operator-key-file", str(self.operator_key_file),
+                "--state-dir", str(self.state_dir), "--key-root", str(self.key_root),
+            ])
+        self.assertEqual(code, 1)
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(payload["error_code"], "workspace_runtime_not_ready")
+        self.assertEqual(payload["error_message"], "角色已准备，运行时隔离待启用")
+        self.assertIsNone(self.state_row())
+        self.assertEqual(self.launch_rows(), [])
+        self.assertEqual(self.manager._handles, {})
+        self.assertFalse(self.child_log.exists())
+
+    def test_workspace_v1_pending_start_is_not_claimed_or_reported(self):
+        with self.session() as session:
+            from server.models import ProjectRole
+            role = session.get(ProjectRole, ("prj_alpha", self.role_a))
+            role.storage_layout = "workspace-v1"
+            session.add(role)
+            session.commit()
+        launch = self._start_launch_via_api()
+        before = self.launch_row(launch["launch_id"]).model_dump()
+        with patch("scripts.role_service_host.spawn_hidden") as spawn:
+            outcome = self.manager.execute_start(launch)
+        self.assertEqual(outcome["outcome"], "failed")
+        self.assertEqual(outcome["error_code"], "workspace_runtime_not_ready")
+        self.assertEqual(outcome["error_message"], "角色已准备，运行时隔离待启用")
+        self.assertEqual(self.launch_row(launch["launch_id"]).model_dump(), before)
+        self.assertEqual(self.manager._handles, {})
+        spawn.assert_not_called()
+
+    def test_start_all_skips_workspace_v1_and_requests_legacy(self):
+        member_b, _ = self.make_second_role()
+        with self.session() as session:
+            from server.models import ProjectRole
+            workspace = session.get(ProjectRole, ("prj_alpha", self.role_a))
+            legacy = session.get(ProjectRole, ("prj_alpha", member_b))
+            workspace.storage_layout = "workspace-v1"
+            legacy.storage_layout = "legacy"
+            session.add(workspace)
+            session.add(legacy)
+            session.commit()
+        result = self.manager.start_all("prj_alpha")
+        by_member = {row["member_id"]: row for row in result["results"]}
+        self.assertEqual(by_member[self.role_a]["status"], "skipped")
+        self.assertEqual(by_member[self.role_a]["error_code"], "workspace_runtime_not_ready")
+        self.assertEqual(by_member[self.role_a]["error_message"], "角色已准备，运行时隔离待启用")
+        self.assertEqual(by_member[member_b]["status"], "requested")
+        self.assertEqual(result["counts"], {"started": 0, "requested": 1, "skipped": 1, "failed": 0})
+        self.assertIsNone(self.state_row(self.role_a))
+        self.assertEqual(self.launch_rows(self.role_a), [])
+        self.assertEqual(self.state_row(member_b).observed_state, "starting")
+        self.assertEqual(self.manager._handles, {})
 
     def test_serve_loop_executes_pending_actions_only(self):
         # 启动管理器本身不启动任何角色：没有 pending 动作时什么都不做。

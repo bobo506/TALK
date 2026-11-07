@@ -167,6 +167,29 @@ CONTROL_FILE_ENV = "TALK_ROLE_SERVICE_CONTROL_FILE"
 #: 人类显式登记“已核对该运行器受管启动能力”的环境变量（逗号分隔；与 CLI 等价的本地登记）。
 VERIFIED_RUNTIMES_ENV = "TALK_HOST_VERIFIED_RUNTIMES"
 
+#: W3a 只拒绝启动；W3b 才会实现 workspace-v1 的运行时隔离。
+WORKSPACE_V1_LAYOUT = "workspace-v1"
+WORKSPACE_RUNTIME_NOT_READY = "workspace_runtime_not_ready"
+WORKSPACE_RUNTIME_NOT_READY_MESSAGE = "角色已准备，运行时隔离待启用"
+
+
+def is_workspace_v1(role: Any) -> bool:
+    """只信持久角色的只读布局投影；无字段的旧数据继续按 legacy 处理。"""
+    return isinstance(role, Mapping) and role.get("storage_layout") == WORKSPACE_V1_LAYOUT
+
+
+def workspace_runtime_not_ready_status() -> dict[str, str]:
+    return {
+        "state": WORKSPACE_RUNTIME_NOT_READY,
+        "error_code": WORKSPACE_RUNTIME_NOT_READY,
+        "error_message": WORKSPACE_RUNTIME_NOT_READY_MESSAGE,
+    }
+
+
+def workspace_runtime_not_ready_error() -> HostError:
+    return HostError(WORKSPACE_RUNTIME_NOT_READY, WORKSPACE_RUNTIME_NOT_READY_MESSAGE)
+
+
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_USAGE = 2
@@ -1880,6 +1903,20 @@ class HostManager:
                 "error_code": "ownership_unreleased",
             }
 
+        # 兼容已存在的 pending 动作：claim/report/所有权写入之前即拒绝。
+        try:
+            self._reject_workspace_v1(project_id, member_id)
+        except HostError as exc:
+            if exc.code != WORKSPACE_RUNTIME_NOT_READY:
+                raise
+            return {
+                "launch_id": launch_id,
+                "member_id": member_id,
+                "outcome": "failed",
+                "error_code": exc.code,
+                "error_message": exc.message,
+            }
+
         claim_budgets = self._host_budgets()
         claim_timeline = StageTimeline()
         claim_operation = claim_timeline.begin(
@@ -2925,8 +2962,23 @@ class HostManager:
         rows = payload.get("data")
         return rows if isinstance(rows, list) else []
 
+    def _project_role_rows(self, project_id: str) -> list[dict[str, Any]]:
+        """启动前读取权威布局投影；不写服务状态，也不读取角色 Key。"""
+        payload = self.client.request("GET", f"/api/projects/{project_id}/role-storage-layouts")
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            raise HostError("role_facts_unavailable", "无法读取项目角色布局")
+        return [row for row in rows if isinstance(row, dict)]
+
+    def _reject_workspace_v1(self, project_id: str, member_id: str) -> None:
+        for row in self._project_role_rows(project_id):
+            if str(row.get("member_id")) == member_id and is_workspace_v1(row):
+                raise workspace_runtime_not_ready_error()
+        # 找不到成员时仍交给原 start API 产生既有 404，保持 legacy 错误顺序。
+
     def request_start(self, project_id: str, member_id: str) -> dict[str, Any]:
         """只写启动请求（意图写），**不** spawn；由常驻管理器承接执行。"""
+        self._reject_workspace_v1(project_id, member_id)
         return self.client.request(
             "POST",
             f"/api/projects/{project_id}/roles/{urllib.parse.quote(member_id)}/service/start",
@@ -2942,13 +2994,61 @@ class HostManager:
     def start_all(
         self, project_id: str, member_ids: Optional[Sequence[str]] = None
     ) -> dict[str, Any]:
-        """只写批量启动请求（意图写），**不** spawn；返回服务端的逐角色请求结果。"""
+        """逐角色跳过 workspace-v1；其余角色沿用原批量意图写与返回合同。"""
+        rows = self._project_role_rows(project_id)
+        by_member = {str(row.get("member_id")): row for row in rows}
+        if member_ids is None:
+            # None 布局表示纯历史名册（没有 project_roles 行），不属于原 start-all 候选。
+            targets = [row for row in rows if row.get("storage_layout") is not None]
+        else:
+            targets = []
+            for raw in member_ids:
+                member = str(raw).strip()
+                if member and all(str(row.get("member_id")) != member for row in targets):
+                    targets.append(by_member.get(member) or {"member_id": member})
+        blocked = [row for row in targets if is_workspace_v1(row)]
         body: dict[str, Any] = {}
         if member_ids is not None:
-            body["member_ids"] = list(member_ids)
-        payload = self.client.request(
-            "POST", f"/api/projects/{project_id}/role-services/start-all", body
-        )
+            body["member_ids"] = [str(row.get("member_id")) for row in targets]
+        if blocked:
+            allowed = [str(row.get("member_id")) for row in targets if not is_workspace_v1(row)]
+            body["member_ids"] = allowed
+            if allowed:
+                payload = self.client.request(
+                    "POST", f"/api/projects/{project_id}/role-services/start-all", body
+                )
+            else:
+                payload = {
+                    "project_id": project_id,
+                    "requested": [],
+                    "results": [],
+                    "counts": {"started": 0, "requested": 0, "skipped": 0, "failed": 0},
+                }
+            payload["requested"] = [str(row.get("member_id")) for row in targets]
+            blocked_results = [{
+                "member_id": str(row.get("member_id")),
+                "role_name": row.get("role_name"),
+                "status": "skipped",
+                "launch_id": None,
+                "generation": None,
+                "expected_instance_id": None,
+                "error_code": WORKSPACE_RUNTIME_NOT_READY,
+                "error_message": WORKSPACE_RUNTIME_NOT_READY_MESSAGE,
+            } for row in blocked]
+            order = {str(row.get("member_id")): index for index, row in enumerate(targets)}
+            payload["results"] = sorted(
+                list(payload.get("results") or []) + blocked_results,
+                key=lambda row: order.get(str(row.get("member_id")), len(order)),
+            )
+            counts = payload.setdefault("counts", {})
+            counts["skipped"] = int(counts.get("skipped") or 0) + len(blocked)
+        else:
+            # 无新布局角色时请求体、服务端响应与既有逐字行为完全相同。
+            if member_ids is None:
+                body = {}
+            payload = self.client.request(
+                "POST", f"/api/projects/{project_id}/role-services/start-all", body
+            )
         payload["executor"] = "serve"
         payload["note"] = "启动请求已写入；由常驻管理器 serve 承接执行，本进程不 spawn。"
         return payload
@@ -3778,6 +3878,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 },
             )
         payload = {"schema": SCHEMA, "ok": False, "error_code": exc.code}
+        if exc.code == WORKSPACE_RUNTIME_NOT_READY:
+            payload["error_message"] = WORKSPACE_RUNTIME_NOT_READY_MESSAGE
         print(json.dumps(redact(payload), ensure_ascii=False, sort_keys=True))
         return EXIT_FAILED
 

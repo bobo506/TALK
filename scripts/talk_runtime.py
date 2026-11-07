@@ -306,7 +306,16 @@ class TalkRuntime:
 
     def roles(self):
         result = self.request("GET", f"/api/projects/{self.project}/roles")
-        return result.get("data", []) if isinstance(result, dict) else result
+        rows = result.get("data", []) if isinstance(result, dict) else result
+        # 独立只读查询避免改变既有 roles 公共投影的精确键集合。
+        layouts = self.request("GET", f"/api/projects/{self.project}/role-storage-layouts")
+        layout_rows = layouts.get("data", []) if isinstance(layouts, dict) else layouts
+        by_member = {row.get("member_id"): row.get("storage_layout")
+                     for row in layout_rows if isinstance(row, dict)}
+        for role in rows:
+            if role.get("member_id") in by_member:
+                role["storage_layout"] = by_member[role["member_id"]]
+        return rows
 
     def spawn(self, label, argv):
         if self.spawn_override:
@@ -429,7 +438,12 @@ class TalkRuntime:
                     return
                 self.startup_attempts+=1
                 result=self.startup_client.request("POST",f"/api/projects/{self.project}/role-services/startup",
-                    {"activation_id":self.activation_id})
+                    {"activation_id":self.activation_id,"workspace_runtime_guard":True})
+                if isinstance(result,dict):
+                    for row in result.get("results") or []:
+                        if (isinstance(row,dict)
+                                and row.get("error_code")==rsh.WORKSPACE_RUNTIME_NOT_READY):
+                            self.statuses[str(row.get("member_id"))]=rsh.workspace_runtime_not_ready_status()
                 if (isinstance(result,dict) and result.get("activation_id")==self.activation_id
                         and result.get("complete") is True):
                     self.startup_state="complete";self.startup_error=None
@@ -521,7 +535,13 @@ class TalkRuntime:
         parents=process_parents()
         by_id = {r["member_id"]:r for r in roles}
         specs = {s["member_id"]:dict(s) for s in self.config.get("hosts", [])}
+        workspace_roles = {r["member_id"] for r in roles if rsh.is_workspace_v1(r)}
+        for member in workspace_roles:
+            self.statuses[member] = rsh.workspace_runtime_not_ready_status()
         for role in roles:
+            # W3a：动态配方解析、身份/Key 读取和 spawn 之前即拒绝；不进入 W3b 隔离。
+            if role["member_id"] in workspace_roles:
+                continue
             if role["member_id"] not in specs:
                 try:
                     spec = self.workbuddy_spec(role) or self.kimi_spec(role) or self.codex_spec(role) or self.dsh_spec(role)
@@ -533,6 +553,9 @@ class TalkRuntime:
         for member, spec in specs.items():
             role = by_id.get(member)
             if role is None or role.get("archived"):
+                continue
+            # 固定配置入口同样在健康文件、所有权判断和 spawn 之前拒绝。
+            if member in workspace_roles:
                 continue
             owned = self.hosts.get(member)
             if owned:

@@ -1035,6 +1035,8 @@ class RoleStartupPreferenceRequest(BaseModel):
 class ProjectStartupRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     activation_id: str = PydField(pattern=r"^[a-f0-9]{32}$")
+    #: talk_runtime 的 W3a 启动拒绝开关；旧调用方缺省保持原行为。
+    workspace_runtime_guard: StrictBool = False
 
 
 class RoleDeletion(SQLModel, table=True):
