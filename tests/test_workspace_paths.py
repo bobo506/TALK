@@ -198,9 +198,9 @@ class WorkspacePathsTests(unittest.TestCase):
         worker._current_revision = Mock(return_value=3)
         worker.report = Mock(return_value={'status': 200, 'payload': {}})
         result = worker._finish_failed('request', 'lease', {}, 'workspace_link_refused')
-        self.assertEqual(worker.report.call_args.kwargs['error_code'], 'http_error')
+        self.assertEqual(worker.report.call_args.kwargs['error_code'], 'workspace_link_refused')
         self.assertEqual(result['error_code'], 'workspace_link_refused')
-        self.assertEqual(result['report_error_code'], 'http_error')
+        self.assertEqual(result['report_error_code'], 'workspace_link_refused')
 
     def test_key_layout_selection_never_falls_back(self):
         from scripts.role_provision import key_file_path

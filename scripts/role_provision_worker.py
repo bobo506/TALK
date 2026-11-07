@@ -73,6 +73,7 @@ from scripts.role_provision import (  # noqa: E402 - 复用 R1-2 已验私有路
     run_request_provision,
     write_credential_metadata,
 )
+from server.models import ROLE_REQUEST_HOST_ERROR_CODES  # noqa: E402
 
 SCHEMA = "talk-role-provision-worker-1"
 DEFAULT_POLL_INTERVAL_SECONDS = 2.0
@@ -1483,13 +1484,8 @@ class RoleProvisionWorker:
     ) -> dict[str, Any]:
         """回报 failed：只落有限稳定 error_code；丢响应先读同版本事实再判定。"""
         error_code = self._reportable(code)
-        # The server's existing request-report whitelist predates workspace codes.
-        # Preserve the specific local result while reporting an accepted generic code.
-        workspace_codes = {
-            "key_root_mismatch", "workspace_path_unavailable", "workspace_link_refused",
-            "workspace_shape_unknown", "workspace_id_invalid",
-        }
-        report_code = "http_error" if error_code in workspace_codes else error_code
+        # 本地码还须命中服务端白名单，避免把仅供本地使用的码发给服务端。
+        report_code = error_code if error_code in ROLE_REQUEST_HOST_ERROR_CODES else "http_error"
         revision = self._current_revision(request_key)
         if revision is None:
             result["error_code"] = error_code
@@ -1502,8 +1498,7 @@ class RoleProvisionWorker:
             error_code=report_code,
         )
         result["revision"] = revision
-        if report_code != error_code:
-            result["report_error_code"] = report_code
+        result["report_error_code"] = report_code
         if report["status"] == 200:
             result["outcome"] = "reported"
             result["error_code"] = error_code
