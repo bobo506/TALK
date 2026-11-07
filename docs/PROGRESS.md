@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 21:20（DeepSeek，**3b-2 完成；按用户要求转完整版 3b-3**）：540 复核 approved（541）：2 项 `ActualBootstrap` 错误在基线 `a7b098e` 与候选**同名同计数**，判环境既有；WinError 5 项受控重跑未复现；候选零新增失败。提交 `c4a5006`（服务端消费 runtime 清单 + 默认关闭开关，四入口共用门）。用户确认**不简化**，**542（3b-3）进行中**：runtime 清单增 `manager_protocol` + 协议允许表、启动就绪前 manager capability 的 role/binding 校验（旧 manager 无 capability 不得 ready，错误码 `workspace_capability_unbound`）、服务端 ready 报告二次校验。门仍默认关闭。
+
 > 2026-11-07 20:50（DeepSeek，**3b-1 完成；3b-2 采用轻量版版本证明**）：3b-1 复核 approved，提交 `4bd89c4`（runtime `runtime/capability.json` 原子发布 + manager health `capability` 块，74 项全绿）。与用户确认：版本证明取**轻量版**——部署级开关（默认关）+ runtime 清单（schema/布局/pid 存活/时间可解析）+ 缺证据拒绝；不引入版本矩阵/签名，manager 块仅诊断。**540（3b-2）进行中**：服务端 `workspace_runtime_capability` 消费清单，默认仍全拒；不会真正开生产门。
 
 > 2026-11-07 20:35（DeepSeek，**W3b 片 3a 完成；3b 拆两片**）：3a 复核 approved，提交 `2101cfb`（恢复链按权威布局、workspace 只读角色目录、拒绝矩阵、stop 隔离；四模块 59 项全绿，基线 1 个既有失败）。3b 拆 **3b-1 能力证明数据面**（runtime 发布 `runtime/capability.json`、manager health 增 `capability` 块，538 进行中）与 **3b-2 服务端门消费能力证明**（默认关闭、部署级开关、旧 manager 拒绝、对抗测试）。门仍未打开。
