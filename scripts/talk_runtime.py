@@ -362,6 +362,15 @@ class TalkRuntime:
             except (OSError, rsh.HostError):
                 print("runtime_api_health_write_failed",file=sys.stderr)
 
+    def publish_capability(self):
+        value = {"schema": "talk-runtime-capability-1", "runtime_protocol": "talk-runtime-1",
+                 "supported_layouts": ["legacy", "workspace-v1"], "pid": os.getpid(),
+                 "started_at": self.started_at, "written_at": utcnow()}
+        try:
+            rsh._publish_private_bytes(self.private / "capability.json", json.dumps(value).encode("utf-8"))
+        except Exception:
+            print("runtime_capability_write_failed", file=sys.stderr)
+
     def start_api(self):
         parsed = urlparse(self.config["base_url"])
         with socket.socket() as s:
@@ -971,6 +980,7 @@ class TalkRuntime:
             self._stop_api()
             self.health("startup_failed")
             raise
+        self.publish_capability()
         while not self.stopping:
             if (self.private/"stop.request").exists():
                 break

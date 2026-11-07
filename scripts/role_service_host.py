@@ -95,6 +95,8 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import contextvars
+import functools
 import http.client
 import importlib
 import io
@@ -543,9 +545,21 @@ def ensure_private_dir(path: Path) -> Path:
     return path
 
 
+_manager_health_context = contextvars.ContextVar("manager_health_context", default=None)
+
+
 def _publish_private_bytes(target: Path, payload: bytes) -> None:
     """原子发布一个私有权限文件（R1-2 已验流程：私有 ACL 临时文件 + 回读 + replace）。"""
     target = Path(target)
+    manager = _manager_health_context.get()
+    if manager is not None and target.name == "manager-health.json":
+        value = json.loads(payload)
+        runners = {"talk-codex-manager-health-1": "codex", "talk-kimi-manager-health-1": "kimi-code",
+                   "talk-dsh-manager-health-1": "dsh", "talk-workbuddy-manager-health-1": "workbuddy"}
+        runner = runners.get(value.get("schema"))
+        if runner is not None:
+            value["capability"] = manager._manager_capability(value["project_id"], value["member_id"], runner)
+            payload = (json.dumps(value) + "\n").encode("utf-8")
     ensure_private_dir(target.parent)
     if os.name == "nt":  # pragma: no cover - 平台相关
         temp_path = _windows_publish_temp_file(target, payload)
@@ -1353,6 +1367,40 @@ class PreflightFacts:
 class HostManager:
     """受管服务的宿主执行者：claim → 执行 → report，并持有活进程句柄。"""
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Runner hosts own the legacy health writers. Scope enrichment to their
+        # existing write, so the original health and its atomic publication stay intact.
+        for name in ("publish_health", "health"):
+            original = cls.__dict__.get(name)
+            if original is None:
+                continue
+            @functools.wraps(original)
+            def publish(self, *args, __original=original, **kw):
+                token = _manager_health_context.set(self)
+                try:
+                    return __original(self, *args, **kw)
+                finally:
+                    _manager_health_context.reset(token)
+            setattr(cls, name, publish)
+
+    def _manager_capability(self, project_id: str, member_id: str, runner: str) -> dict[str, Any]:
+        capability = {"schema": "talk-role-capability-1", "manager_protocol": "talk-manager-1",
+                      "supported_layouts": ["legacy", "workspace-v1"],
+                      "role": {"project_id": project_id, "member_id": member_id, "runner": runner}}
+        owned = [handle for handle in self._handles.values()
+                 if handle.get("record", {}).get("project_id") == project_id
+                 and handle.get("record", {}).get("member_id") == member_id]
+        if len(owned) == 1:
+            handle = owned[0]
+            record = handle["record"]
+            binding = {key: value for key, value in (
+                ("instance_id", record.get("instance_id")), ("generation", handle.get("generation")),
+                ("launch_id", record.get("launch_id"))) if value is not None and value != ""}
+            if binding:
+                capability["binding"] = binding
+        return capability
+
     def __init__(
         self,
         client: TalkHostClient,
@@ -1479,6 +1527,8 @@ class HostManager:
                    "project_id": project_id, "member_id": self.workspace_context["member_id"],
                    "seen_at": datetime.now(timezone.utc).isoformat(), "state": "serving",
                    "draining": self._workspace_draining, "owned_launches": list(self._handles)}
+        payload["capability"] = self._manager_capability(project_id, self.workspace_context["member_id"],
+                                                         self.workspace_context["runner"])
         _publish_private_bytes(self.manager_health_file, (json.dumps(payload) + "\n").encode("utf-8"))
         return self._workspace_draining
 
@@ -2398,7 +2448,7 @@ class HostManager:
         # 先登记活句柄（内存是所有权权威），再落私有记录：
         # 落盘失败也**不会**丢句柄，更不会留下无失败报告的无主子进程。
         self._handles[launch_id] = {
-            "process": process, "record": record, "record_persisted": False
+            "process": process, "record": record, "record_persisted": False, "generation": generation
         }
         diag.record_event(
             "spawned",

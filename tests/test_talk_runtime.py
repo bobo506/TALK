@@ -1,6 +1,7 @@
 """统一启动入口的原句柄、动态角色、重载和停止边界；不调用原生模型。"""
 from __future__ import annotations
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -9,6 +10,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from datetime import datetime
 from unittest.mock import patch
 
 from scripts import talk_runtime as runtime
@@ -51,6 +53,63 @@ class RuntimeTests(unittest.TestCase):
     def spec(self,member="agent:one"):
         d=self.state/member.replace(":","_");d.mkdir(exist_ok=True)
         return {"member_id":member,"argv":[sys.executable,"fixture.py"],"health_file":str(d/"health.json"),"drain_file":str(d/"drain.request")}
+
+    def test_capability_published_after_successful_start_and_atomically_replaced_on_restart(self):
+        self.config["provision_worker"] = False
+        Path(self.config["operator_key_file"]).write_text("fixture", encoding="utf-8")
+        self.runtime.attach_api = True
+        self.runtime.started_at = "2026-11-07T00:00:00+00:00"
+        restarted = runtime.TalkRuntime(self.config, client=self.client, attach_api=True)
+        restarted.started_at = "2026-11-07T00:01:00+00:00"
+        target = self.private / "capability.json"
+        target.write_text("old", encoding="utf-8")
+        real_replace = os.replace
+        replacements = []
+        def replace(source, destination):
+            if Path(destination) == target:
+                replacements.append((Path(source).parent, target.read_text(encoding="utf-8")))
+            return real_replace(source, destination)
+        with patch.object(runtime.os, "replace", side_effect=replace), \
+             patch.object(self.runtime, "wait_api"), patch.object(self.runtime, "health"), \
+             patch.object(self.runtime, "stop"), patch.object(restarted, "wait_api"), \
+             patch.object(restarted, "health"), patch.object(restarted, "stop"):
+            self.runtime.stopping = True
+            self.runtime._serve()
+            first = json.loads(target.read_text(encoding="utf-8"))
+            restarted.stopping = True
+            restarted._serve()
+        second = json.loads(target.read_text(encoding="utf-8"))
+        self.assertEqual(set(first), {"schema", "runtime_protocol", "supported_layouts", "pid", "started_at", "written_at"})
+        self.assertEqual(first["schema"], "talk-runtime-capability-1")
+        self.assertEqual(first["runtime_protocol"], "talk-runtime-1")
+        self.assertEqual(first["supported_layouts"], ["legacy", "workspace-v1"])
+        self.assertEqual(first["pid"], os.getpid())
+        self.assertEqual(first["started_at"], self.runtime.started_at)
+        datetime.fromisoformat(first["started_at"].replace("Z", "+00:00"))
+        datetime.fromisoformat(second["written_at"].replace("Z", "+00:00"))
+        self.assertEqual(len(replacements), 2)
+        self.assertEqual(replacements[0], (self.private, "old"))
+        self.assertEqual(json.loads(replacements[1][1]), first)
+        self.assertEqual(second["started_at"], restarted.started_at)
+
+    def test_capability_publish_failure_is_nonfatal_and_failed_start_does_not_publish(self):
+        self.config["provision_worker"] = False
+        Path(self.config["operator_key_file"]).write_text("fixture", encoding="utf-8")
+        self.runtime.attach_api = True
+        self.runtime.stopping = True
+        with patch.object(self.runtime, "wait_api"), patch.object(self.runtime, "health"), \
+             patch.object(self.runtime, "stop") as stop, \
+             patch.object(runtime.rsh, "_publish_private_bytes", side_effect=OSError("failure")), \
+             patch("builtins.print") as warning:
+            self.runtime._serve()
+        stop.assert_called_once()
+        warning.assert_called_once_with("runtime_capability_write_failed", file=sys.stderr)
+        with patch.object(self.runtime, "wait_api", side_effect=RuntimeError("not ready")), \
+             patch.object(self.runtime, "health"), patch.object(self.runtime, "_stop_api"), \
+             patch.object(self.runtime, "publish_capability") as publish:
+            with self.assertRaises(RuntimeError):
+                self.runtime._serve()
+        publish.assert_not_called()
     def test_dsh_effort_refresh_reads_patch_and_posts_once(self):
         native = self.state / "native" / "prj_fixture" / "agent_dsh"
         native.mkdir(parents=True)

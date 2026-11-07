@@ -106,6 +106,9 @@ class WorkspaceContextTests(unittest.TestCase):
         health = json.loads(manager.manager_health_file.read_text(encoding="utf-8"))
         self.assertEqual(health["member_id"], self.member)
         self.assertFalse(health["draining"])
+        self.assertEqual(health["capability"], {"schema": "talk-role-capability-1",
+            "manager_protocol": "talk-manager-1", "supported_layouts": ["legacy", "workspace-v1"],
+            "role": {"project_id": self.project, "member_id": self.member, "runner": "codex"}})
         manager.manager_drain_file.write_text("drain", encoding="utf-8")
         self.assertTrue(manager._workspace_manager_tick(self.project))
         self.assertTrue(json.loads(manager.manager_health_file.read_text(encoding="utf-8"))["draining"])
@@ -229,6 +232,53 @@ class WorkspaceContextTests(unittest.TestCase):
             explicit = HostManager(None, state_dir=Path(self.tmp.name) / "legacy-extra",
                 child_env={"TALK_EXECUTION_SESSION_STORE": "explicit"})
             self.assertEqual(explicit.child_environment(self.project, self.member)["TALK_EXECUTION_SESSION_STORE"], "explicit")
+
+    def test_runner_health_capabilities_in_legacy_and_workspace_paths(self):
+        from scripts.codex_role_host import CodexRoleHost
+        from scripts.kimi_role_host import KimiRoleHost
+        from scripts.dsh_role_host import DshRoleHost
+        from scripts.workbuddy_role_host import WorkBuddyRoleHost
+        cases = [(CodexRoleHost, "codex", {"codex_executable": "fixture"}),
+                 (KimiRoleHost, "kimi-code", {}), (DshRoleHost, "dsh", {"runtime_config": {}})]
+        capabilities = []
+        for index, (cls, runner, extra) in enumerate(cases):
+            member = "agent:legacy" + str(index)
+            private = Path(self.tmp.name) / ("legacy-manager-" + str(index))
+            manager = cls(None, project=self.project, member=member, display_name="fixture",
+                          task_profile="fixture", private=private, state_dir=Path(self.tmp.name) / ("state-" + str(index)), **extra)
+            manager._handles["launch"] = {"record": {"project_id": self.project, "member_id": member,
+                "instance_id": "instance-" + str(index), "launch_id": "launch"}, "generation": index + 1}
+            manager.publish_health()
+            health = json.loads((private / "manager-health.json").read_text(encoding="utf-8"))
+            capability = health["capability"]
+            self.assertEqual(capability["schema"], "talk-role-capability-1")
+            self.assertEqual(capability["manager_protocol"], "talk-manager-1")
+            self.assertEqual(capability["supported_layouts"], ["legacy", "workspace-v1"])
+            self.assertEqual(capability["role"], {"project_id": self.project, "member_id": member, "runner": runner})
+            self.assertEqual(capability["binding"], {"instance_id": "instance-" + str(index), "generation": index + 1, "launch_id": "launch"})
+            self.assertEqual(health["owned_launches"], ["launch"])
+            capabilities.append(capability)
+        self.assertNotEqual(capabilities[0], capabilities[1])
+        buddy = WorkBuddyRoleHost(None, project_id=self.project, member_id="agent:buddy", executable="fixture",
+                                  models_home=self.tmp.name, display_name="fixture", state_dir=Path(self.tmp.name) / "buddy-state")
+        buddy.health()
+        buddy_health = json.loads((buddy.private / "manager-health.json").read_text(encoding="utf-8"))
+        self.assertEqual(buddy_health["capability"]["role"]["runner"], "workbuddy")
+        self.assertNotIn("binding", buddy_health["capability"])
+        workspace = CodexRoleHost(None, project=self.project, member=self.member, display_name="fixture",
+            task_profile="fixture", private=Path(self.tmp.name) / "unused", codex_executable="fixture", **self.kwargs)
+        workspace._handles["live"] = {"record": {"project_id": self.project, "member_id": self.member,
+            "instance_id": "instance-workspace", "launch_id": "live"}, "generation": 7}
+        workspace.publish_health()
+        cap = json.loads(workspace.manager_health_file.read_text(encoding="utf-8"))["capability"]
+        self.assertEqual(cap["binding"], {"instance_id": "instance-workspace", "generation": 7, "launch_id": "live"})
+        del workspace._handles["live"]["generation"]
+        workspace.publish_health()
+        cap = json.loads(workspace.manager_health_file.read_text(encoding="utf-8"))["capability"]
+        self.assertEqual(cap["binding"], {"instance_id": "instance-workspace", "launch_id": "live"})
+        workspace._handles.clear()
+        workspace.publish_health()
+        self.assertNotIn("binding", json.loads(workspace.manager_health_file.read_text(encoding="utf-8"))["capability"])
 
 
 CHILD_SCRIPT = '''\
@@ -570,6 +620,10 @@ class RoleServiceHostLoopTests(RoleServiceTestCase):
             "ready",
             f"{outcome}\npoll={process.poll() if process else None}\n{self._child_logs()}",
         )
+        capability = self.manager._manager_capability("prj_alpha", self.role_a, "codex")
+        self.assertEqual(capability["binding"], {"instance_id": launch["expected_instance_id"],
+                                               "generation": launch["generation"],
+                                               "launch_id": launch["launch_id"]})
 
         state = self.state_row()
         self.assertEqual(state.observed_state, "running")
