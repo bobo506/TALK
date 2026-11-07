@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 19:35（DeepSeek，**W3b 片 2c-1 完成**）：宿主在 workspace 分支注入 `TALK_EXECUTION_SESSION_STORE`（角色 `sessions/execution-session-store.sqlite3`），spawn 前逐级建/重核目录；缺键/不一致/运行中替换都拒绝；legacy 不设该变量、逐字不变。531 复核 approved：基线 43 项 / 候选 47 项（含真实 junction 反例）全绿，提交 `8c7629b`。2c-2（四 channel/store 读取验证与必要修补）进行中。
+
 > 2026-11-07 19:20（DeepSeek，**W3b 片 2b 完成**）：2b-1 `a8050da`（runtime 传上下文 + 通用 host）、2b-2a `bf0cf4d`（codex/kimi host）、2b-2b `7b390c9`（dsh/workbuddy host）全部合入推送。2b-2b 首审发现 dsh 错误消息 7 处 `??` 乱码（527 changes_requested），528 返修后 529 定向复验 approved（乱码清零、逻辑未变、10 项全绿）。片 2c 拆两片：2c-1 宿主把角色 session store 经 `TALK_EXECUTION_SESSION_STORE` 传给子进程（530 进行中）；2c-2 核四 channel/store 读取并补必要修补。**启动门仍关闭。**
 
 > 2026-11-07 14:50（DeepSeek，**W3b 片 2b-1 边界修正并重派**）：520 正当阻塞——只授权通用 host 无法落地，因为 runtime 把 `workspace_context` 放在 spec 里但 spawn 只传 argv，四 runner 又各自算 health/drain。已把 `scripts/talk_runtime.py` 纳入 2b-1 白名单（只做"显式把上下文传给通用 host"这一条链路），四 runner host 留 2b-2；521 重做中。520 顺带修正的 `tests/test_role_service_host.py` 测试准备顺序保留到 521 候选。
