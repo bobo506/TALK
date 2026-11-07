@@ -14,6 +14,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 10:35（DeepSeek，**W3a-2a 完成并推送**）：492/494/496/499 四段合批：新角色与请求行写 `workspace-v1`、请求投影/冻结形态、路径登记接受 workspace-v1 引用、provision 真正写入（Key+三档案+`workspace-v1:` 登记）、worker 按"项目级目录→`workspace.json` 排他发布→建角色→角色目录→发布 Key→provision→复查租约→ACK"接线。500 独立复核 changes_requested（核心全过）；501 修两处（守卫测试适配、3 处中文乱码）；502 定向复验 **approved**（126 项四模块全绿、差异极简、断言实质）。已提交并推送 `2f4809a`。**503 在途**：W3a-2b-1 后端启动入口拒绝 workspace-v1 角色。另记：Terra 昨夜 497 僵尸（已停服务，待其重启后取消）；hy4 执行器模型失败退出码 2，暂不可用；大K 接替开发。
+
 > 2026-11-07 02:00（DeepSeek，**W3a-2a 仍未完成，暂停自动推进**）：495 只补了回归测试（`tests/test_workspace_provision_flow.py`），未实现产品改动；它确认了一个真实缺陷——**worker 在未创建 `workspace.json` 时仍报 `provisioned`**（新增用例 `test_non_git_request_creates_workspace_and_profiles` 失败，111 项中 1 项失败）。当前 W3a-2a 已落地：新角色/请求行写 `workspace-v1`（492）、请求投影返回布局/冻结形态 + 路径登记接受 workspace-v1 引用（494）；**未落地：worker 目录/`workspace.json` 排他发布与调用顺序、provision 真正写入、请求创建时冻结 `deployment_shape`、完整集成场景**。工作区改动已作为 **WIP 提交（本地，未推送，勿部署）**。**下次续做建议**：先按设计第 27–33 行一次性完成 worker+provision 闭环（附失败用例名与白名单），再补 2b 启动拒绝/页面提示，最后两片一起送 k2.8 复核。W3a-1 已推送（`22446d5`）。
 
 > 2026-11-07 01:50（DeepSeek，**W3a-2a 中间状态（勿部署）**）：工作区有未提交改动——492：新角色/新请求行写 `storage_layout="workspace-v1"`；494：请求投影返回布局/冻结形态、路径登记接受 workspace-v1 引用（149 项测试通过）。**495 正在收口 worker 目录/`workspace.json` 与 provision 真实写入**；在此之前新布局角色不具备可用开通流程，**禁止部署或启用**。W3a-1 已提交并推送（`22446d5`）。W3a-2b（启动拒绝 + 页面提示）未开始。
