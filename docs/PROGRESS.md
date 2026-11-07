@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-07 22:15（DeepSeek，**W3b 代码完成（片 1/2/3 全部）**）：3b-3 复核 approved（543）：协议矩阵、runtime ready 前 capability 绑定、服务端 claim/ready 二次校验 409 零写入、旧 manager 拒领均可接受；`owner_token` 复用非秘密 nonce、不构成身份认证；越界 `scripts/role_service_host.py` 经复核论证确属必需（规格片 3 白名单本就含它），**协调者予以追认**。提交 `945c074`。累计：片 1（`b1466d2`/`29930a3`/`8b2c033`）、片 2（`d0b81b0`/`a8050da`/`bf0cf4d`/`7b390c9`/`8c7629b`/`b0f6f54`）、片 3（`2101cfb`/`4bd89c4`/`c4a5006`/`945c074`）。**启动门仍默认关闭**。544（k2.8 全量回归）进行中；之后是用户手册/历史文档收尾，再等用户授权部署与 W3c 真实双工作区验收。已知环境限制：`ActualBootstrapTests` 两条在 Windows 文件锁下不收敛（基线同名同因）。
+
 > 2026-11-07 21:20（DeepSeek，**3b-2 完成；按用户要求转完整版 3b-3**）：540 复核 approved（541）：2 项 `ActualBootstrap` 错误在基线 `a7b098e` 与候选**同名同计数**，判环境既有；WinError 5 项受控重跑未复现；候选零新增失败。提交 `c4a5006`（服务端消费 runtime 清单 + 默认关闭开关，四入口共用门）。用户确认**不简化**，**542（3b-3）进行中**：runtime 清单增 `manager_protocol` + 协议允许表、启动就绪前 manager capability 的 role/binding 校验（旧 manager 无 capability 不得 ready，错误码 `workspace_capability_unbound`）、服务端 ready 报告二次校验。门仍默认关闭。
 
 > 2026-11-07 20:50（DeepSeek，**3b-1 完成；3b-2 采用轻量版版本证明**）：3b-1 复核 approved，提交 `4bd89c4`（runtime `runtime/capability.json` 原子发布 + manager health `capability` 块，74 项全绿）。与用户确认：版本证明取**轻量版**——部署级开关（默认关）+ runtime 清单（schema/布局/pid 存活/时间可解析）+ 缺证据拒绝；不引入版本矩阵/签名，manager 块仅诊断。**540（3b-2）进行中**：服务端 `workspace_runtime_capability` 消费清单，默认仍全拒；不会真正开生产门。
