@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from contextlib import ExitStack
+from unittest.mock import AsyncMock, patch
 
 from bridges.dsh_execution_channel import (
     ExecutionSessionRunError,
@@ -272,6 +274,77 @@ class FakeClient:
             "workspace_root": str(ROOT),
             "workspace_identity": WORKSPACE_ID,
         }
+
+
+class ChannelStorePathTests(unittest.IsolatedAsyncioTestCase):
+    async def test_each_channel_uses_role_environment_override_and_legacy_default(self):
+        from bridges import (
+            codex_execution_channel, dsh_execution_channel,
+            kimi_execution_channel, workbuddy_execution_channel,
+        )
+        from bridges.execution_session_store import STORE_FILE_ENV
+
+        class StoreOpened(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            workspace = root / "workspace"
+            workspace.mkdir()
+            role_a = root / "role-a" / "sessions" / "execution-session-store.sqlite3"
+            role_b = root / "role-b" / "sessions" / "execution-session-store.sqlite3"
+            override = root / "override" / "store.sqlite3"
+            legacy = workspace / ".talk" / "execution-session-store.sqlite3"
+            identity = dsh_execution_channel._workspace_identity(workspace)
+            native = SimpleNamespace(home=root / "fake-native-home", fingerprint="fake")
+            self.assertNotEqual(role_a, role_b)
+
+            for runtime, channel in (
+                ("codex", codex_execution_channel), ("kimi-code", kimi_execution_channel),
+                ("dsh", dsh_execution_channel), ("workbuddy", workbuddy_execution_channel),
+            ):
+                for env_path, explicit, expected in (
+                    (role_a, None, role_a), (role_b, None, role_b),
+                    (role_a, str(override), override), (None, None, legacy),
+                ):
+                    with self.subTest(runtime=runtime, environment=env_path, override=explicit):
+                        binding = binding_snapshot()
+                        binding["runtime"] = runtime
+                        task = make_task(1, content="test", base_sha="a" * 64)
+                        task["target_binding_snapshot"] = binding
+                        task["execution_session"].update(
+                            runtime=runtime, workspace_root=str(workspace),
+                            workspace_identity=identity,
+                        )
+                        environment = dict(os.environ)
+                        environment.pop(STORE_FILE_ENV, None)
+                        if env_path is not None:
+                            environment[STORE_FILE_ENV] = str(env_path)
+                        opened = []
+
+                        def open_store(path):
+                            store = ExecutionSessionStore(path)
+                            opened.append(store.path)
+                            raise StoreOpened
+
+                        with ExitStack() as stack:
+                            stack.enter_context(patch.dict(os.environ, environment, clear=True))
+                            stack.enter_context(patch.object(channel, "ExecutionSessionStore", side_effect=open_store))
+                            stack.enter_context(patch.object(channel, "_load_base_contract", new=AsyncMock(
+                                return_value={"version": "1", "sha256": "a" * 64})))
+                            if runtime == "dsh":
+                                stack.enter_context(patch.object(channel, "_native_package_root", return_value=(root, "test")))
+                                stack.enter_context(patch.object(channel, "_native_home", return_value=native.home))
+                                stack.enter_context(patch.object(channel, "_plugin_hashes", return_value={}))
+                                stack.enter_context(patch.object(channel, "_config_fingerprint", return_value="fake"))
+                            with self.assertRaises(StoreOpened):
+                                await channel.run_execution_session_task(
+                                    task=task, client=object(), member_id=TARGET, workdir=workspace,
+                                    command=["fake"], timeout=1, launch_id=LAUNCH, project_id=PROJECT,
+                                    binding_snapshot=binding, store_override=explicit, runner=native,
+                                )
+                        self.assertEqual(opened, [expected])
+                        self.assertTrue(expected.is_file())
 
 
 ROOT = Path(tempfile.gettempdir()) / "talk-292-runtime-root"
