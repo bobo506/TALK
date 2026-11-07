@@ -15,6 +15,8 @@
 - **关键路径**：仓库 `D:\claude-test\TALK`；DB `talk.db`；操作人 Key `D:\claude-test\TALK-private\operator.key`（勿打印）；门禁 `scripts/acceptance_gate.py` + `TASK_WORKFLOW.md` 7.1.2；本轮候选/证据在 `.tmp/workspace-*`、`.tmp/acceptance-gate-*`。
 - 恢复指令：`继续项目`（先读本快照、`PROGRESS_HISTORY.md`、`AGENTS.md`、`TASK_WORKFLOW.md`；W3 先设计再派发）。
 
+> 2026-11-08 00:05（DeepSeek，**测试合同同步通过；终轮全量回归中**）：545 测试合同同步复核 approved（546）：9 个测试文件、70+/25-，拒绝断言仍为 409+零 launch+零状态、legacy 正向断言逐字保留、错误码为既定映射、9 模块 233 项独立重跑全绿；**已知缺陷保留**：`bridges/talk_task_tools.py` 的 `talk_delegate_task` schema 仍声明澄清默认 1/上限 2，与 `server/models.py` 的 3/5 不一致（非 W3b，待单独小片修）。提交 `5f44fc2`。**547 终轮全量回归进行中**；通过后即做进度汇总并停止开发。
+
 > 2026-11-07 23:30（DeepSeek，**全量回归结果：24 项测试合同陈旧，需同步后再汇总**）：544 全量 Python 3599 项（146F/50E）、Node 44 项全过；基线 `8aacaf8` 对照后 **24 项为 W3b 引入的确定性测试失败，全部是"存量测试未随新合同更新"**（门控默认关闭 → 409；宿主夹具 `__new__` 构造不满足 workspace_context；错误码 `profile_root_invalid`→`workspace_link_refused`），**无跨模块产品破坏**；170 项为基线同败、约 51 项为 Windows 文件锁环境项、1 项时序敏感隔离通过。**545 已派**：只改测试（10 个文件）按新合同更新，不许放宽断言、不改产品；若查实产品缺陷则报告不硬改。545 绿后再跑一次全量回归，通过才做进度汇总。
 
 > 2026-11-07 22:15（DeepSeek，**W3b 代码完成（片 1/2/3 全部）**）：3b-3 复核 approved（543）：协议矩阵、runtime ready 前 capability 绑定、服务端 claim/ready 二次校验 409 零写入、旧 manager 拒领均可接受；`owner_token` 复用非秘密 nonce、不构成身份认证；越界 `scripts/role_service_host.py` 经复核论证确属必需（规格片 3 白名单本就含它），**协调者予以追认**。提交 `945c074`。累计：片 1（`b1466d2`/`29930a3`/`8b2c033`）、片 2（`d0b81b0`/`a8050da`/`bf0cf4d`/`7b390c9`/`8c7629b`/`b0f6f54`）、片 3（`2101cfb`/`4bd89c4`/`c4a5006`/`945c074`）。**启动门仍默认关闭**。544（k2.8 全量回归）进行中；之后是用户手册/历史文档收尾，再等用户授权部署与 W3c 真实双工作区验收。已知环境限制：`ActualBootstrapTests` 两条在 Windows 文件锁下不收敛（基线同名同因）。
