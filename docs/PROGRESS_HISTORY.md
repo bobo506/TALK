@@ -10395,3 +10395,27 @@ Updated: 2026-10-04 (Asia/Shanghai)
 ## 2026-10-29 绑定重置页面刷新中断（验收进行中）
 
 实际后台小K恢复已成功，页面因 Window 定时器接收者错误抛 Illegal invocation，停在等待宿主。本人修正定时器包装与缓存版本，104项相关测试通过，旧失败证据保留；真实新请求确认框遇浏览器控制超时，待恢复窗口完成验收。详 [修复记录](spec/BINDING_RESET_TIMER_FIX_20261029.md)。未操作 Key、后台启停或 Git。
+
+## 2026-11-08 W3b 运行时隔离（片 1 / 2 / 3 与测试合同同步）
+
+- **设计**：`docs/spec/W3B_DESIGN_20261107.md`（507 设计，508 复核 approved）。
+- **片 1（服务端默认关闭门 + 路径合同 + 错误码）**：
+  - `b1466d2` 服务端统一启动意图门：single/start-all/startup/首次配置共用 `_require_start_layout`，workspace-v1 一律 `409 workspace_runtime_not_ready`，零 launch/零状态/不冷恢复；客户端 guard 不可放行（509/511）；
+  - `29930a3` 路径派生（native-home/sessions/state/records|control|manager/logs）、Key 错误码细化、真实 Windows junction 六组合反例（513/514）；
+  - `8b2c033` 错误码登记进 `ROLE_REQUEST_HOST_ERROR_CODES` 并让 worker 直报细分码（515/516/517）。
+- **片 2（runtime 上下文 + 四 runner + session store）**：
+  - `d0b81b0` runtime 可信角色上下文与四 runner spec（518/519）；
+  - `a8050da` runtime 经 argv 传上下文 + 通用 host 落角色路径（521/522）；
+  - `bf0cf4d` codex/kimi host 接入上下文（523/524/525）；
+  - `7b390c9` dsh/workbuddy host 接入（526/527，528/529 修 dsh 乱码）；
+  - `8c7629b` 宿主注入 `TALK_EXECUTION_SESSION_STORE`（530/531）；
+  - `b0f6f54` 四 channel store 路径解析测试（532/533）。
+- **片 3（stop/recovery + 完整能力证明）**：
+  - `2101cfb` 恢复链按权威布局、workspace 只读角色目录、拒绝矩阵、stop 隔离（536/537）；
+  - `4bd89c4` runtime `runtime/capability.json` 原子发布 + manager health `capability`（538/539）；
+  - `c4a5006` 服务端消费清单 + 默认关闭部署开关（540/541，2 项 bootstrap 错误判环境既有）；
+  - `945c074` 完整版：协议矩阵、runtime ready 前 manager role/binding 校验（旧 manager 拒领，`workspace_capability_unbound`）、服务端 claim/ready 二次校验 409 零写入（542/543）。
+- **测试合同同步**：`5f44fc2` 将 24 项 W3b 引入的存量测试失败同步到新合同（门控拒绝、workspace_context 夹具、`workspace_link_refused`），未放宽断言（545/546）。
+- **终轮回归（547）**：Python 3600 项 `124F/44E/0S`，168 失败 ⊆ 544 基线集合（零新增）；Node 44 项全过；544 的 26 项全部消失。
+- **残余限制**：168 项基线历史测试失败；`ActualBootstrapTests` Windows 文件锁不收敛；`talk_delegate_task` schema 1/2 vs 3/5 待修；真实 CLI/双工作区/TOCTOU 属 W3c。
+- **部署**：未部署；W3a+W3b 同窗口，启动门默认关闭，开闸需 `TALK_WORKSPACE_RUNTIME_ENABLED=1`；详见 `docs/spec/W3B_DEPLOY_ACCEPTANCE_20261108.md`。

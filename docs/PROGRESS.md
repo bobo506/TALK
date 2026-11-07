@@ -1,5 +1,13 @@
 # Project Progress
 
+## W3b 完成快照（2026-11-08 00:45，用户次日部署验收）
+
+- **状态**：W3b 全部代码完成并推送；**未部署、启动门默认关闭**。终轮全量回归（547）：Python 3600 项 `124F/44E/0S`，168 个失败名**全部落在 544 基线集合内，零新增**；544 所报 24 项 W3b 测试失败 + 1 时序 + 1 夹具全部消失；Node 三套件 44 项全过。
+- **提交链**：片 1 `b1466d2`/`29930a3`/`8b2c033`；片 2 `d0b81b0`/`a8050da`/`bf0cf4d`/`7b390c9`/`8c7629b`/`b0f6f54`；片 3 `2101cfb`/`4bd89c4`/`c4a5006`/`945c074`；测试合同 `5f44fc2`；设计与文档 `c2ed5a7`/`6be2ac5`/`a4d8fe4` 等。HEAD 以 `git log -1` 为准。
+- **部署与验收**：见 [W3B_DEPLOY_ACCEPTANCE_20261108.md](spec/W3B_DEPLOY_ACCEPTANCE_20261108.md)。要点：W3a+W3b 同窗口、先备份 `talk.db`、清理 `workspaces/prj_alpha` 测试残留与 `CodexSandboxOffline` ACL；**开闸需显式设置 `TALK_WORKSPACE_RUNTIME_ENABLED=1` 并重启运行时**，默认保持关闭。
+- **已知债务/限制**：168 项基线历史测试失败（非 W3b）；`talk_delegate_task` schema 澄清轮数 1/2 与服务端 3/5 不一致（待小片修）；`ActualBootstrapTests` 在 Windows 文件锁下不收敛；astra 未重建（等门可用后验证）。
+- **下一步**：用户部署 W3a+W3b → 真实双工作区验收（W3c，需授权）→ 开闸启用新布局角色 → 重建 astra → 清偿小债务。
+
 ## 当前快照（2026-11-06 22:00）
 
 - **角色/流程**：本会话 DeepSeek 负责协调、决策、文档与 Git 收尾；开发自测由 **Terra** 负责，**k2.8** 独立复核。协调者不重复跑测试、不在候选上执行开发动作；开发自测 → 协调者核对交付/差异 → k2.8 候选+基线复核 → 协调者决策/集成。交付硬门在 `docs/guides/TASK_WORKFLOW.md` 7.1.1，门禁脚本 `scripts/acceptance_gate.py`（7.1.2）。
