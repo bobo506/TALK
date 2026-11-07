@@ -170,14 +170,15 @@ def _cold_recover(key,digest,operator,session,config,cutoff):
     row=session.get(m.RoleStartupActivation,key);state=_generation(row,session)
     if not ownership_held(state):return
     if cutoff is None:fail('startup_boot_unverified')
-    old,instance=candidate(key[0],key[2],session,_now(),_preboot_at=cutoff)
-    if old.owner_host.casefold()!=socket.gethostname().casefold():fail('recovery_wrong_local_host')
     ctx=load_role_service_context(key[0],key[2],session)
+    layout=ctx.role.storage_layout
+    old,instance=candidate(key[0],key[2],session,_now(),_preboot_at=cutoff,_expected_layout=layout)
+    if old.owner_host.casefold()!=socket.gethostname().casefold():fail('recovery_wrong_local_host')
     try:
         target=resolve_recovery_host(config=config,project_id=key[0],member_id=key[2],
             original_runtime=instance.runtime,
             current_runtime=(ctx.runner.runtime if ctx.runner is not None else None),
-            control_kind=ctx.control_kind)
+            control_kind=ctx.control_kind,storage_layout=layout,data_root=Path(__file__).resolve().parents[1])
     except RecoveryHostError as exc:
         fail(exc.code)
     health,entry=target.health_file,target.host_entry
@@ -190,10 +191,16 @@ def _cold_recover(key,digest,operator,session,config,cutoff):
         # Health must itself belong to the previous OS boot; never infer this from age.
         manager=json.loads(health.read_text(encoding='utf-8'))
         from scripts.role_service_host import _parse_iso
+        if not isinstance(manager,dict):fail('recovery_manager_identity_mismatch')
         if _parse_iso(manager.get('seen_at')) is None or _parse_iso(manager['seen_at'])>=cutoff:
             fail('recovery_not_previous_boot')
-        proof=local_proof(plan,health,entry,_preboot_at=cutoff)
-        if local_proof(plan,health,entry,_preboot_at=cutoff)!=proof:fail('recovery_local_evidence_changed')
+        proof_args={}
+        if layout=='workspace-v1':
+            launch=session.get(m.RoleServiceLaunch,old.process_launch_id)
+            proof_args={'workspace_data_root':Path(__file__).resolve().parents[1],
+                        'workspace_runner':instance.runtime,'owner_token_hash':launch.owner_token_hash if launch else None}
+        proof=local_proof(plan,health,entry,_preboot_at=cutoff,**proof_args)
+        if local_proof(plan,health,entry,_preboot_at=cutoff,**proof_args)!=proof:fail('recovery_local_evidence_changed')
     except HTTPException:raise
     except (HostError,OSError,ValueError) as exc:
         raise HTTPException(409,getattr(exc,'code','local_recovery_unverified')) from exc
@@ -208,7 +215,7 @@ def _cold_recover(key,digest,operator,session,config,cutoff):
     body=m.RoleServiceRecoveryRequest(operation_key='startup-'+key[1]+'-'+hashlib.sha256(key[2].encode()).hexdigest()[:20],
         **{k:v for k,v in plan.items() if k.startswith('expected_')},
         confirmation='old_processes_confirmed_stopped',reason='original_host_exited')
-    recover_stopped(key[0],key[2],body,operator,session,_preboot_at=cutoff,_on_recovered=audit)
+    recover_stopped(key[0],key[2],body,operator,session,_preboot_at=cutoff,_on_recovered=audit,_expected_layout=layout)
 
 def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
     config,health,cutoff=verified_runtime(key[0],key[1],session)

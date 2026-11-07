@@ -7,6 +7,7 @@ import ctypes
 from ctypes import wintypes
 from datetime import datetime, timezone
 import hashlib
+import hmac
 from functools import lru_cache
 import json
 import os
@@ -53,8 +54,8 @@ def system_boot_time():
     try:
         result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
             "(Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime.ToUniversalTime().ToString('o')"],
-            capture_output=True, encoding="utf-8", check=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
-        value = _parse_iso(result.stdout.strip())
+            capture_output=True, check=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
+        value = _parse_iso(result.stdout.decode("utf-8").strip())
         return value.timestamp() if value else None
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
@@ -92,9 +93,9 @@ def process_inventory():
     )
     try:
         result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
-                                capture_output=True, encoding="utf-8", check=True, timeout=15,
+                                capture_output=True, check=True, timeout=15,
                                 creationflags=subprocess.CREATE_NO_WINDOW)
-        rows = json.loads(result.stdout.lstrip("\ufeff") or "[]")
+        rows = json.loads(result.stdout.decode("utf-8").lstrip("\ufeff") or "[]")
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         raise HostError("recovery_process_inventory_unknown") from exc
     return rows if isinstance(rows, list) else [rows]
@@ -272,17 +273,61 @@ def _host_candidate(argv, entry):
     return None
 
 
-def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None, _preboot_at=None):
+def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None, _preboot_at=None,
+                workspace_data_root=None, workspace_runner=None, owner_token_hash=None):
     inventory = inventory or process_inventory
     if plan["expected_owner_host"].casefold() != socket.gethostname().casefold():
         raise HostError("recovery_wrong_local_host")
+    owner_digest = None
+    if workspace_data_root is not None:
+        from server import workspace_paths as wp
+        from scripts.role_service_host import _sanitize_token
+        runner_dir = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}.get(workspace_runner)
+        if runner_dir is None:
+            raise HostError("recovery_workspace_owner_unverified")
+        args = (Path(workspace_data_root), plan["project_id"], plan["member_id"])
+        launch_name = _sanitize_token(str(plan["expected_process_launch_id"]))
+        expected_health = wp.manager_dir(*args, runner_dir) / "manager-health.json"
+        record_path = wp.records_dir(*args) / (launch_name + ".json")
+        control_path = wp.control_dir(*args) / (launch_name + ".ctl")
+        if wp._checked(health_path) != wp._checked(expected_health):
+            raise HostError("recovery_workspace_owner_unverified")
+        wp._checked(record_path)
+        wp._checked(control_path)
+        owner_bytes = record_path.read_bytes()
+        owner = json.loads(owner_bytes.decode("utf-8"))
+        if not isinstance(owner, dict):
+            raise HostError("recovery_workspace_owner_unverified")
+        token = owner.get("owner_token")
+        if (not isinstance(token, str) or not isinstance(owner_token_hash, str)
+                or not hmac.compare_digest(hashlib.sha256(token.encode("utf-8")).hexdigest(), owner_token_hash)
+                or any(owner.get(k) != v for k, v in {
+                    "project_id": plan["project_id"], "member_id": plan["member_id"],
+                    "launch_id": plan["expected_process_launch_id"], "instance_id": plan["expected_instance_id"],
+                    "host": plan["expected_owner_host"], "pid": plan["process_pid"], "runtime": workspace_runner,
+                }.items())
+                or not isinstance(owner.get("control_file"), str)
+                or wp._checked(Path(owner["control_file"])) != wp._checked(control_path)):
+            raise HostError("recovery_workspace_owner_unverified")
+        owner_digest = hashlib.sha256(owner_bytes).hexdigest()
     health_bytes = health_path.read_bytes()
     health = json.loads(health_bytes.decode("utf-8"))
+    if not isinstance(health, dict):
+        raise HostError("recovery_manager_identity_mismatch")
     if health.get("project_id") != plan["project_id"] or health.get("member_id") != plan["member_id"]:
         raise HostError("recovery_manager_identity_mismatch")
+    if workspace_data_root is not None:
+        if (health.get("schema") != f"talk-{runner_dir}-manager-health-1"
+                or health.get("state") != "serving"
+                or not isinstance(health.get("owned_launches"), list)
+                or plan["expected_process_launch_id"] not in health["owned_launches"]):
+            raise HostError("recovery_workspace_manager_unverified")
     seen = _parse_iso(health.get("seen_at"))
     if _preboot_at is not None and (seen is None or seen >= _preboot_at):
         raise HostError("recovery_not_previous_boot")
+    if workspace_data_root is not None and (seen is None or _parse_iso(plan.get("process_started_at")) is None
+            or seen < _parse_iso(plan["process_started_at"])):
+        raise HostError("recovery_workspace_manager_unverified")
     if seen is None or (_preboot_at is None and (datetime.now(timezone.utc) - seen).total_seconds() <= 90):
         raise HostError("recovery_manager_recent")
     manager_pid, bridge_pid = health.get("pid"), plan["process_pid"]
@@ -328,11 +373,14 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
             raise HostError("recovery_replacement_process_present")
         # A known host entry with unreadable/incomplete identity is unknown.
         raise HostError("recovery_process_inventory_unknown")
-    return {"manager_pid": manager_pid, "bridge_pid": bridge_pid,
+    proof = {"manager_pid": manager_pid, "bridge_pid": bridge_pid,
             "both_absent": manager_state == bridge_state == "absent", "both_stopped": True,
             "manager_original_state":manager_state, "bridge_original_state":bridge_state,
             "manager_health_sha256": hashlib.sha256(health_bytes).hexdigest(),
             "host_entry_sha256": hashlib.sha256(host_entry.read_bytes()).hexdigest()}
+    if workspace_data_root is not None:
+        proof["workspace_owner_sha256"] = owner_digest
+    return proof
 
 
 def api_path(project, member):

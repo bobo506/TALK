@@ -90,43 +90,51 @@ def recover_local_human_stop(project_id, member_id, operator, session):
     if bound is None or bound[1]["project_id"] != project_id:
         return False
     from server.role_service_recovery import recovery_plan, recover_stopped
-    from server.models import AgentInstance, RoleServiceRecoveryRequest
+    from server.models import AgentInstance, RoleServiceLaunch, RoleServiceRecoveryRequest
     from server.role_host_resolution import RecoveryHostError, resolve_recovery_host
     from server.role_services import load_role_service_context
     from scripts.role_service_recovery import local_proof
     from scripts.role_service_host import HostError
+    ctx = load_role_service_context(project_id, member_id, session)
+    layout = ctx.role.storage_layout
     try:
-        plan = recovery_plan(project_id, member_id, operator, session).model_dump(mode="json")
+        plan = recovery_plan(project_id, member_id, operator, session, _expected_layout=layout).model_dump(mode="json")
     except HTTPException as exc:
         if exc.detail in ("recovery_no_ownership", "recovery_recent_heartbeat", "recovery_action_active"):
             return False
         raise
     config = bound[1]
-    ctx = load_role_service_context(project_id, member_id, session)
     instance = session.get(AgentInstance, plan["expected_instance_id"])
     try:
         target = resolve_recovery_host(
             config=config, project_id=project_id, member_id=member_id,
             original_runtime=(instance.runtime if instance is not None else None),
             current_runtime=(ctx.runner.runtime if ctx.runner is not None else None),
-            control_kind=ctx.control_kind)
+            control_kind=ctx.control_kind, storage_layout=layout, data_root=ROOT)
     except RecoveryHostError as exc:
         raise HTTPException(409, exc.code) from exc
     health, entry = target.health_file, target.host_entry
     try:
         from scripts.role_service_recovery import recorded_process_state
         manager = json.loads(health.read_text(encoding="utf-8"))
+        if not isinstance(manager, dict):
+            raise HostError("recovery_manager_identity_mismatch")
         if recorded_process_state(manager.get("pid"),manager.get("seen_at")) == "present":
             # 原宿主仍在时继续沿它持有的Popen执行普通关闭，不能释放归属。
             return False
         # 两次独立核验紧邻CAS；活进程/未知/替代进程/新健康文件均拒绝。
-        proof = local_proof(plan, health, entry)
-        if local_proof(plan, health, entry) != proof:
+        proof_args = {}
+        if layout == "workspace-v1":
+            launch = session.get(RoleServiceLaunch, plan["expected_process_launch_id"])
+            proof_args = {"workspace_data_root": ROOT, "workspace_runner": instance.runtime,
+                          "owner_token_hash": launch.owner_token_hash if launch else None}
+        proof = local_proof(plan, health, entry, **proof_args)
+        if local_proof(plan, health, entry, **proof_args) != proof:
             raise HostError("recovery_local_evidence_changed")
     except (HostError, OSError, ValueError) as exc:
         raise HTTPException(409, getattr(exc, "code", "local_recovery_unverified")) from exc
     request = RoleServiceRecoveryRequest(operation_key="human-stop-" + uuid.uuid4().hex,
         **{k:v for k,v in plan.items() if k.startswith("expected_")},
         confirmation="old_processes_confirmed_stopped", reason="original_host_exited")
-    recover_stopped(project_id, member_id, request, operator, session)
+    recover_stopped(project_id, member_id, request, operator, session, _expected_layout=layout)
     return True

@@ -9,9 +9,32 @@ from unittest.mock import Mock, patch
 
 from scripts import role_service_recovery as recovery
 from scripts.role_service_host import HostError
+from server.role_host_resolution import RecoveryHostError, resolve_recovery_host
+from server.workspace_paths import manager_dir
 
 
 class RoleServiceRecoveryCliTests(unittest.TestCase):
+    def test_workspace_host_resolution_uses_only_authoritative_role_path(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = {"project_root": str(root), "state_dir": str(root / "legacy"),
+                      "codex": {"enabled": True}, "hosts": [
+                          {"member_id": "agent:x", "health_file": str(root / "fake.json")}]}
+            def resolve(project="p", member="agent:x", **overrides):
+                args = dict(config=config, project_id=project, member_id=member,
+                            original_runtime="codex", current_runtime="codex",
+                            control_kind="managed_cli", storage_layout="workspace-v1", data_root=root)
+                args.update(overrides)
+                return resolve_recovery_host(**args)
+            one = resolve()
+            self.assertEqual(one.health_file, manager_dir(root, "p", "agent:x", "codex") / "manager-health.json")
+            self.assertNotEqual(one.health_file, resolve(member="agent:y").health_file)
+            self.assertNotEqual(one.health_file, resolve(project="other").health_file)
+            for changes in ({"current_runtime": "dsh"}, {"data_root": None},
+                            {"control_kind": "unknown"}, {"storage_layout": "unknown"}):
+                with self.subTest(changes=changes), self.assertRaises(RecoveryHostError):
+                    resolve(**changes)
+
     def test_pid_reuse_and_previous_boot_do_not_mean_the_old_process_is_alive(self):
         seen="2026-10-23T00:00:00Z"
         epoch=datetime(2026,10,23,tzinfo=timezone.utc).timestamp()

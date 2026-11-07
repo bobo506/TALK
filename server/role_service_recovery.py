@@ -30,8 +30,12 @@ def fail(code: str):
     raise HTTPException(409, code)
 
 
-def candidate(project_id: str, member_id: str, session: Session, now: datetime, *, _preboot_at=None):
-    load_role_service_context(project_id, member_id, session)
+def candidate(project_id: str, member_id: str, session: Session, now: datetime, *, _preboot_at=None, _expected_layout="legacy"):
+    ctx = load_role_service_context(project_id, member_id, session)
+    # Public manual recovery remains legacy-only. Trusted local callers pass
+    # the layout used to resolve evidence; reject a change before releasing it.
+    if _expected_layout not in ("legacy", "workspace-v1") or ctx.role.storage_layout != _expected_layout:
+        fail("recovery_workspace_evidence_unavailable")
     state = session.get(RoleServiceState, (project_id, member_id))
     if state is None or not state.process_launch_id:
         fail("recovery_no_ownership")
@@ -82,10 +86,10 @@ def candidate(project_id: str, member_id: str, session: Session, now: datetime, 
     return state, instance
 
 
-def recovery_plan(project_id: str, member_id: str, operator: Member, session: Session):
+def recovery_plan(project_id: str, member_id: str, operator: Member, session: Session, *, _expected_layout="legacy"):
     require_human(operator)
     now = _now()
-    state, instance = candidate(project_id, member_id, session, now)
+    state, instance = candidate(project_id, member_id, session, now, _expected_layout=_expected_layout)
     return RoleServiceRecoveryPlan(
         project_id=project_id, member_id=member_id, expected_generation=state.generation,
         expected_process_launch_id=state.process_launch_id, expected_instance_id=state.observed_instance_id,
@@ -105,7 +109,7 @@ def receipt(audit: RoleServiceRecovery, *, replayed=False):
 
 
 def recover_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRequest,
-                    operator: Member, session: Session, *, _preboot_at=None, _on_recovered=None):
+                    operator: Member, session: Session, *, _preboot_at=None, _on_recovered=None, _expected_layout="legacy"):
     require_human(operator)
     _write_begin(session)
     try:
@@ -122,7 +126,7 @@ def recover_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRe
             session.rollback()
             return result
         now = _now()
-        state, instance = candidate(project_id, member_id, session, now, _preboot_at=_preboot_at)
+        state, instance = candidate(project_id, member_id, session, now, _preboot_at=_preboot_at, _expected_layout=_expected_layout)
         if (state.generation != body.expected_generation
                 or state.process_launch_id != body.expected_process_launch_id
                 or state.observed_instance_id != body.expected_instance_id

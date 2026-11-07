@@ -10,10 +10,48 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from scripts import talk_runtime as runtime
 from tests import test_talk_runtime as fixtures
+
+
+class WorkspaceStopIsolationTests(unittest.TestCase):
+    def test_fake_stop_only_publishes_target_role_control(self):
+        from server import workspace_paths as wp
+        from scripts.role_service_host import HostManager
+
+        with tempfile.TemporaryDirectory(prefix="workspace-stop-") as folder:
+            data = Path(folder) / "data"
+            project_root = Path(folder) / "project"
+            key_root = Path(folder) / "keys"
+            data.mkdir()
+            project_root.mkdir()
+            def manager(member):
+                args = (data, "project-a", member)
+                context = {"data_root": str(data), "project_root": str(project_root),
+                    "project_id": "project-a", "member_id": member, "layout": "workspace-v1",
+                    "runner": "codex", "key": str(wp.key_path(*args, git_key_root=key_root)),
+                    "home": str(wp.native_home_dir(*args)), "session": str(wp.execution_session_store_path(*args)),
+                    "state": {"records": str(wp.records_dir(*args)), "control": str(wp.control_dir(*args)),
+                              "manager": str(wp.manager_dir(*args, "codex"))}, "logs": str(wp.logs_dir(*args))}
+                return HostManager(None, workspace_context=context, workspace_project="project-a",
+                    workspace_member=member, workspace_data_root=data, project_root=project_root,
+                    role_key_root=key_root, role_key_file=Path(context["key"]))
+            first, second = manager("agent:a"), manager("agent:b")
+            a_control = first.store.control_path("launch-a")
+            b_control = second.store.control_path("launch-b")
+            b_control.parent.mkdir(parents=True, exist_ok=True)
+            b_control.write_bytes(b"other-role-sentinel")
+            runtime_control = data / "runtime-stop.request"
+            runtime_control.write_bytes(b"runtime-sentinel")
+            a_process, b_process = Mock(returncode=0), Mock(returncode=0)
+            self.assertTrue(first._graceful_stop(a_process, a_control)[0])
+            self.assertEqual(a_control.read_bytes(), b"shutdown\n")
+            self.assertEqual(b_control.read_bytes(), b"other-role-sentinel")
+            self.assertEqual(runtime_control.read_bytes(), b"runtime-sentinel")
+            b_process.wait.assert_not_called()
+            b_process.terminate.assert_not_called()
 
 
 class ShutdownProgressTests(unittest.TestCase):
@@ -349,10 +387,17 @@ data['state']='stopped';health.write_text(json.dumps(data),encoding='utf-8')
                 'project_root': str(project), 'state_dir': str(state), 'key_root': str(root / 'keys'),
                 'operator_key_file': str(key), 'base_url': f'http://127.0.0.1:{port}', 'provision_worker': False,
                 'api_argv': [sys.executable, '-m', 'scripts.talk_api', '--control-file', '{control_file}'], 'hosts': []}), encoding='utf-8')
-            env = dict(os.environ, PYTHONPATH=str(runtime.ROOT)); env.pop('TALK_RUNTIME_FIXTURE_CONFIG', None)
+            # Extend the real fixture API with the layout endpoint now used by
+            # runtime.roles(), keeping the synthetic server isolated in this temp root.
+            (root / 'shutdown_fixture_api.py').write_text(
+                'from tests.talk_runtime_fixture import app\n'
+                '@app.get("/api/projects/{project}/role-storage-layouts")\n'
+                'def layouts(project): return []\n', encoding='utf-8')
+            env = dict(os.environ, PYTHONPATH=os.pathsep.join((str(root), str(runtime.ROOT))))
+            env.pop('TALK_RUNTIME_FIXTURE_CONFIG', None)
             flags = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
             api_marker = root / 'api.stop'
-            api = subprocess.Popen([sys.executable, '-B', '-m', 'scripts.talk_api', '--app', 'tests.talk_runtime_fixture:app',
+            api = subprocess.Popen([sys.executable, '-B', '-m', 'scripts.talk_api', '--app', 'shutdown_fixture_api:app',
                 '--port', str(port), '--control-file', str(api_marker)], cwd=runtime.ROOT, env=env,
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **flags)
             child = None
@@ -375,7 +420,7 @@ data['state']='stopped';health.write_text(json.dumps(data),encoding='utf-8')
                         '--config', str(config), '--apply', '--wait', '--wait-seconds', '12'], cwd=runtime.ROOT, env=env,
                         stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT, timeout=15, **flags)
                 raw = output.read_text(encoding='utf-8')
-                self.assertEqual(result.returncode, 0, raw)
+                self.assertEqual(result.returncode, 0, raw + "\nfixture health: " + health.read_text(encoding="utf-8"))
                 self.assertTrue(raw.strip(), 'synthetic CLI must return a completion receipt')
                 data = json.loads(raw)
                 self.assertEqual(data['stop_status'], 'stopped')

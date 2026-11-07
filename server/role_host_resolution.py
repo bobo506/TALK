@@ -89,9 +89,36 @@ def entry_from_argv(argv: Sequence[Any], project_root: Path | None = None) -> Pa
 
 def resolve_recovery_host(*, config: Mapping[str, Any], project_id: str, member_id: str,
                           original_runtime: str | None, current_runtime: str | None,
-                          control_kind: str | None) -> RecoveryHost:
+                          control_kind: str | None, storage_layout: str = "legacy",
+                          data_root: Path | None = None) -> RecoveryHost:
     """Resolve evidence path/entry or raise a stable recovery refusal code."""
     if not isinstance(project_id, str) or not project_id or not isinstance(member_id, str) or not member_id:
+        raise RecoveryHostError("local_recovery_identity_unverified")
+    if storage_layout == "workspace-v1":
+        # The caller must obtain the layout from the project/member authority,
+        # and supply the deployment data root used by the runtime.  In
+        # particular, never consult configured fixed or legacy health paths.
+        from server.workspace_paths import WorkspacePathError, manager_dir, _checked
+        if original_runtime not in _DYNAMIC or current_runtime != original_runtime or control_kind != "managed_cli":
+            raise RecoveryHostError("local_recovery_binding_changed")
+        if data_root is None or not Path(data_root).is_absolute():
+            raise RecoveryHostError("local_recovery_host_unconfigured")
+        recipe_key, _, module = _DYNAMIC[original_runtime]
+        recipe = config.get(recipe_key)
+        if (not isinstance(recipe, Mapping) or not recipe
+                or (original_runtime != "workbuddy" and recipe.get("enabled") is not True)):
+            raise RecoveryHostError("local_recovery_host_unconfigured")
+        configured_root = config.get("project_root")
+        root = Path(configured_root) if isinstance(configured_root, str) and configured_root else ROOT
+        entry = _module_entry(module, root)
+        if entry is None:
+            raise RecoveryHostError("local_recovery_entry_unverified")
+        try:
+            health = _checked(manager_dir(Path(data_root), project_id, member_id, recipe_key) / "manager-health.json")
+        except (WorkspacePathError, OSError, ValueError) as exc:
+            raise RecoveryHostError("local_recovery_host_unconfigured") from exc
+        return RecoveryHost("workspace-" + original_runtime, original_runtime, health, entry)
+    if storage_layout != "legacy":
         raise RecoveryHostError("local_recovery_identity_unverified")
     hosts = config.get("hosts") or []
     if not isinstance(hosts, list):

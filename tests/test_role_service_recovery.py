@@ -2,13 +2,17 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import threading
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
-from server.models import AgentInstance, AgentInstanceUpdate, AgentTask, Member, RoleServiceLaunch, RoleServiceRecovery, RoleServiceRecoveryRequest
+from server.models import AgentInstance, AgentInstanceUpdate, AgentTask, Member, ProjectRole, RoleServiceLaunch, RoleServiceRecovery, RoleServiceRecoveryRequest
 from server.role_service_recovery import recover_stopped, recovery_plan
 from tests.test_role_services import RoleServiceTestCase, PROJECT_ID, OTHER_PROJECT_ID, HOST
 from tests.test_project_roles import encode
@@ -39,6 +43,72 @@ class RoleServiceRecoveryTests(RoleServiceTestCase):
     def audits(self):
         with self.session() as session:
             return list(session.exec(select(RoleServiceRecovery)).all())
+
+    def test_workspace_recovery_refuses_before_legacy_evidence_or_release(self):
+        before = self.state_row().model_dump()
+        with self.session() as session:
+            role = session.get(ProjectRole, (PROJECT_ID, self.role_a))
+            role.storage_layout = "workspace-v1"
+            session.add(role)
+            session.commit()
+        self.assertEqual(self.plan().json()["detail"], "recovery_workspace_evidence_unavailable")
+        self.assertEqual(self.recover().json()["detail"], "recovery_workspace_evidence_unavailable")
+        self.assertEqual(self.state_row().model_dump(), before)
+        self.assertEqual(self.audits(), [])
+
+    def test_workspace_local_recovery_uses_role_owner_and_health(self):
+        from server import local_runtime, workspace_paths as wp
+        from scripts import role_service_recovery as proof
+        from scripts.role_service_host import _sanitize_token
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            launch_id = self.launch["launch_id"]
+            args = (root, PROJECT_ID, self.role_a)
+            health = wp.manager_dir(*args, "dsh") / "manager-health.json"
+            record = wp.records_dir(*args) / (_sanitize_token(launch_id) + ".json")
+            control = wp.control_dir(*args) / (_sanitize_token(launch_id) + ".ctl")
+            health.parent.mkdir(parents=True)
+            record.parent.mkdir(parents=True)
+            health_value = {"schema": "talk-dsh-manager-health-1", "pid": 1234,
+                "project_id": PROJECT_ID, "member_id": self.role_a, "state": "serving",
+                "seen_at": (datetime.now(timezone.utc)-timedelta(seconds=120)).isoformat(),
+                "owned_launches": [launch_id]}
+            owner = {"project_id": PROJECT_ID, "member_id": self.role_a, "launch_id": launch_id,
+                "instance_id": self.claimed["expected_instance_id"], "host": HOST, "pid": 4321,
+                "runtime": "dsh", "owner_token": self.claimed["owner_token"], "control_file": str(control)}
+            health.write_text(json.dumps(health_value), encoding="utf-8")
+            record.write_text(json.dumps(owner), encoding="utf-8")
+            with self.session() as session:
+                role = session.get(ProjectRole, (PROJECT_ID, self.role_a))
+                role.storage_layout = "workspace-v1"
+                session.add(role); session.commit()
+            config = {"project_id": PROJECT_ID, "project_root": str(root), "dsh": {"enabled": True}}
+            with patch.object(local_runtime, "ROOT", root), \
+                 patch.object(local_runtime, "configured_runtime", return_value=(None, config)), \
+                 patch.object(proof.socket, "gethostname", return_value=HOST), \
+                 patch.object(proof, "probe_pid", return_value="absent"), \
+                 patch.object(proof, "process_inventory", return_value=[]):
+                def attempt():
+                    with self.session() as session:
+                        return local_runtime.recover_local_human_stop(PROJECT_ID, self.role_a,
+                            session.get(Member, "human:bobo"), session)
+                for changes in ({"project_id": "other"}, {"owned_launches": []}, {"schema": "fake"}):
+                    health.write_text(json.dumps({**health_value, **changes}), encoding="utf-8")
+                    with self.subTest(health=changes), self.assertRaises(HTTPException): attempt()
+                health.write_text(json.dumps(health_value), encoding="utf-8")
+                for changes in ({"owner_token": "fake"}, {"control_file": str(root / "elsewhere")},
+                                {"member_id": "agent:other"}):
+                    record.write_text(json.dumps({**owner, **changes}), encoding="utf-8")
+                    with self.subTest(owner=changes), self.assertRaises(HTTPException): attempt()
+                record.write_text(json.dumps(owner), encoding="utf-8")
+                with patch.object(proof, "probe_pid", side_effect=lambda pid: "present" if pid == 1234 else "absent"):
+                    self.assertFalse(attempt())
+                with patch.object(proof, "probe_pid", side_effect=lambda pid: "present" if pid == 4321 else "absent"):
+                    with self.assertRaises(HTTPException): attempt()
+                self.assertEqual(self.audits(), [])
+                self.assertTrue(attempt())
+            self.assertEqual(self.state_row().observed_state, "stopped")
+            self.assertEqual(len(self.audits()), 1)
 
     def test_human_only_and_explicit_validated_confirmation(self):
         self.assertEqual(self.plan(self.role_a_key).status_code, 403)
