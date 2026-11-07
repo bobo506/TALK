@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 import subprocess
 import sys
 import uuid
+from datetime import datetime
 
 from fastapi import HTTPException
 
 ROOT = Path(__file__).resolve().parents[1]
 POINTER = ROOT / ".talk/runtime.local.json"
+logger = logging.getLogger(__name__)
 
 
 def bind_local_runtime(config_file, config):
@@ -46,6 +49,71 @@ def configured_runtime(engine):
     if Path(config["project_root"]).resolve() != ROOT:
         raise ValueError("local_runtime_project_mismatch")
     return path, config
+
+
+def _capability_pid_alive(pid):
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        if pid > 0xffffffff:
+            return False
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        kernel.GetExitCodeProcess.restype = wintypes.BOOL
+        kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel.CloseHandle.restype = wintypes.BOOL
+        handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = wintypes.DWORD()
+            return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code)) and code.value == 259)
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, OverflowError):
+        return False
+
+
+def workspace_runtime_capability(engine):
+    """Return validated local runtime evidence, or None with a safe diagnostic."""
+    reason = "runtime_binding_unavailable"
+    try:
+        bound = configured_runtime(engine)
+        if bound is None:
+            raise ValueError
+        reason = "capability_unreadable"
+        path = Path(bound[1]["state_dir"]) / "runtime" / "capability.json"
+        value = json.loads(path.read_text(encoding="utf-8"))
+        reason = "capability_invalid_schema"
+        if not isinstance(value, dict) or value.get("schema") != "talk-runtime-capability-1":
+            raise ValueError
+        reason = "capability_invalid_protocol"
+        if not isinstance(value.get("runtime_protocol"), str):
+            raise ValueError
+        reason = "capability_invalid_layouts"
+        layouts = value.get("supported_layouts")
+        if not isinstance(layouts, list) or "workspace-v1" not in layouts:
+            raise ValueError
+        reason = "capability_pid_not_alive"
+        pid = value.get("pid")
+        if type(pid) is not int or pid <= 0 or not _capability_pid_alive(pid):
+            raise ValueError
+        reason = "capability_invalid_time"
+        for field in ("started_at", "written_at"):
+            timestamp = value.get(field)
+            if not isinstance(timestamp, str):
+                raise ValueError
+            datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return value
+    except Exception:
+        # Never include configuration contents, paths, or exception text in logs.
+        logger.debug("workspace runtime capability rejected: %s", reason)
+        return None
 
 
 def ensure_local_runtime(engine):

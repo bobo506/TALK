@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -210,8 +211,7 @@ WORKSPACE_RUNTIME_NOT_READY = "workspace_runtime_not_ready"
 def _require_start_layout(project_id: str, member_id: str, session: Session) -> None:
     """Read the authoritative layout under the caller's write transaction.
 
-    Workspace runtime isolation and its deployment capability binding are not
-    implemented yet.  No request parameter or deployment flag can enable it.
+    Workspace starts require the deployment flag and live runtime evidence.
     """
     layout = session.exec(
         select(ProjectRole.storage_layout).where(
@@ -224,6 +224,10 @@ def _require_start_layout(project_id: str, member_id: str, session: Session) -> 
         if session.get(ProjectRole, (project_id, member_id)) is None:
             raise _fail(status.HTTP_404_NOT_FOUND, ROLE_SERVICE_ERROR_ROLE_NOT_FOUND)
     if layout != "legacy":
+        if layout == "workspace-v1" and os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") == "1":
+            from server.local_runtime import workspace_runtime_capability
+            if workspace_runtime_capability(session.get_bind()) is not None:
+                return
         raise _fail(status.HTTP_409_CONFLICT, WORKSPACE_RUNTIME_NOT_READY)
 
 

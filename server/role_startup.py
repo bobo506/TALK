@@ -162,6 +162,7 @@ def _complete(key,digest,status,session,*,launch=None,error=None):
 
 def _cold_recover(key,digest,operator,session,config,cutoff):
     """Only proven preboot ownership; current-boot failures remain manual."""
+    _require_start_layout(key[0],key[2],session)
     from server.role_service_recovery import candidate,recover_stopped
     from server.role_host_resolution import RecoveryHostError,resolve_recovery_host
     from server.role_services import load_role_service_context
@@ -206,6 +207,7 @@ def _cold_recover(key,digest,operator,session,config,cutoff):
         raise HTTPException(409,getattr(exc,'code','local_recovery_unverified')) from exc
     def audit(recovery,locked_session):
         verified_runtime(key[0],key[1],locked_session)
+        _require_start_layout(key[0],key[2],locked_session)
         current=_locked_entry(key,digest,locked_session)
         if current.expected_generation != recovery.previous_generation:fail('startup_manual_intent_present')
         pref=locked_session.get(m.ProjectRoleStartup,(key[0],key[2]))
