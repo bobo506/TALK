@@ -611,3 +611,10 @@ Codex已发布USER_MANUAL与MODULE_webui，并追加I-2旧human身份快照和�
 #185 Kimi规格草稿经#186 DeepSeek独立复核通过，186/185已由agent:codex收取；Codex在#187开发暂停后核16来源＋14草稿零漂移，将已审两份草稿逐字节发布至MODULE_bridges与PROJECT_INTEGRATION。G1–G8／created_by门禁、五键快照、30秒模式重读及正常退出与API错误区别已同步；旧固定主控／当时C2-A1叙述以局部注记保留，human写入、CAS及任务权限保持。回执：.tmp/initiator-mode-spec-sync-receipt/acceptance.json。
 
 I-3文档同步已闭合；运行中MCP最新说明重载、客户端实际T/W及返回余量、I-4真实主动消费者/G8/长等待/取消/排队仍未验收。175-O1测试维护与Schema maximum/clamp评估另片；不将文档发布外推为真实主动适配通过。
+
+## 分发版只保留新布局（2026-11-08 用户确定）
+
+- 当前 TALK 开发实例（`prj_e8fe7066bbec`）继续兼容存量 legacy 角色：不迁移、不重建，启停行为保持。
+- 后续完成的**正式安装包只带 workspace-v1 新布局**，不包含 legacy 路径与兼容入口；新装实例所有新角色统一 `workspaces/<project>/roles/<member>/…`。
+- 不提供“按项目切换布局”的开关；legacy 仅作当前实例的存量兼容。
+- 触发条件：W3c 验收与开闸稳定后，单独切片（只读盘点 → 回归 → 移除 legacy 兼容代码/迁移入口/相关文档）；现有实例不受影响。
