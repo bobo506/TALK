@@ -7,6 +7,7 @@ import sqlite3
 from scripts import dsh_connections as connections
 from scripts import role_service_host as host
 from scripts.kimi_role_setup import _local_facts, _open_db
+from server.workspace_paths import native_home_dir
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,6 +49,10 @@ def setup(project, member, *, root=ROOT, which=shutil.which, environ=None):
         db = _open_db(database)
         try:
             binding = _role(db, project, member)
+            layout = db.execute('SELECT storage_layout FROM project_roles WHERE project_id=? AND member_id=?',
+                                (project, member)).fetchone()
+            if not layout or layout[0] not in ('legacy', 'workspace-v1'):
+                raise SetupError('native_setup_not_supported')
         finally:
             db.close()
         entry = connections.resolve_connection(config, binding)
@@ -57,9 +62,12 @@ def setup(project, member, *, root=ROOT, which=shutil.which, environ=None):
         profile = profiles.get(member, 'tools')
         secret_env = connections.connection_environment(entry, environ)
         secret = next(iter(secret_env.values()))
-        state = Path(config['state_dir'])
-        relative = Path('native') / host._sanitize_token(project) / host._sanitize_token(member) / '.dsh'
-        native = host.assert_inside_root(state, relative)
+        if layout[0] == 'workspace-v1':
+            native = native_home_dir(root, project, member) / '.dsh'
+        else:
+            state = Path(config['state_dir'])
+            relative = Path('native') / host._sanitize_token(project) / host._sanitize_token(member) / '.dsh'
+            native = host.assert_inside_root(state, relative)
         native_home = native.parent.as_posix()
         # Both templates must be safe and resolvable, including the default tools profile.
         for name in connections.PROFILES:

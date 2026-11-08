@@ -610,14 +610,77 @@ test('宿主关闭时提示先开启配置，不承诺自动处理且刷新不�
   assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
 });
 
-test('新布局配置完成后展示隔离提示，旧布局及配置失败保留原反馈',async()=>{
+// 2026-11-08（561/566）：门已启用、角色按真实运行状态展示，“运行时隔离待启用”为误导文案，已彻底移除
+// （566 按 563 复核意见连同通知区死循环与 isolationFeedback 一并删除）。在册/已归档/已删除成员的
+// provisioned 行在详情、列表、创建提示中均不得再出现该文案；下列断言会在文案回归（mutant）时失败。
+test('运行中/已归档/已删除及新布局配置完成的行在详情/列表/提示均不出现“运行时隔离待启用”',async()=>{
   const h=harness();
   h.backend.rows=[{request_key:'role-layout-00000000',kind:'create',status:'provisioned',revision:4,member_id:'agent:new',storage_layout:'workspace-v1',auto_start:false}];
   await h.ready();
   let text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));
-  assert.match(text,/角色已准备，运行时隔离待启用/);assert.match(text,/自动启动已关闭/);
+  assert.doesNotMatch(text,/运行时隔离待启用|角色已准备/);assert.doesNotMatch(text,/自动启动已关闭/);
+  // 运行中角色：service ready 也不出现该提示；详情面板本身仍在（详情渲染路径未被移除）。
+  h.backend.roles=[{member_id:'agent:new',role_name:'N',archived:false,runner:{runtime:'kimi-code'},service:{observed:'running',readiness_service:'ready'}}];
+  await h.ui.refresh();
+  const runningPanel=h.ui.rolePanel({member_id:'agent:new'});
+  assert.ok(runningPanel);text=h.texts(runningPanel);assert.doesNotMatch(text,/运行时隔离待启用/);
+  // 已归档成员：详情面板仍在但不显示该提示（与在册成员同样无文案，二者区别由 566 列表用例区分）。
+  h.backend.roles[0].archived=true;await h.ui.refresh();
+  assert.ok(h.ui.rolePanel({member_id:'agent:new'}));text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));assert.doesNotMatch(text,/运行时隔离待启用/);
+  // 已删除成员（名册缺失）：同样不显示。
+  h.backend.roles=[];await h.ui.refresh();
+  text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));assert.doesNotMatch(text,/运行时隔离待启用/);
+  // 旧布局与配置失败：保持原反馈，无隔离文案。
+  h.backend.roles=[{member_id:'agent:new',role_name:'N',archived:false,runner:{runtime:'kimi-code'},service:{observed:'stopped'}}];
   h.backend.rows[0].storage_layout='legacy';await h.ui.refresh();
   text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));assert.doesNotMatch(text,/运行时隔离待启用|自动启动已关闭/);
   Object.assign(h.backend.rows[0],{storage_layout:'workspace-v1',status:'failed',last_error_code:'preflight_failed'});await h.ui.refresh();
   text=h.texts(h.ui.rolePanel({member_id:'agent:new'}));assert.match(text,/配置未完成/);assert.doesNotMatch(text,/角色已准备/);
+  // 566：列表与创建提示同样硬约束——“运行时隔离待启用/角色已准备”一旦重新出现即失败。
+  assert.doesNotMatch(h.texts(h.el('role-request-list')),/运行时隔离待启用|角色已准备/);
+  assert.doesNotMatch(h.el('role-create-notice').textContent,/运行时隔离待启用|角色已准备/);
+});
+
+// 566（续 561/563 复核）：通知区已整体删除——isolationFeedback 恒 null 使该区域成为死代码，
+// 按 563 推荐方案移除。无论成员在册/已归档/名册缺失，其 provisioned 历史请求行都不再渲染通知卡片；
+// 若 mutant 恢复通知区循环或隔离文案，下列对三类成员名称与卡片数的断言立即失败。
+test('在册/已归档/已删除成员的provisioned请求行不占用请求列表，requested/leased进行中行保留',async()=>{
+  const h=harness();
+  h.backend.roles=[
+    {member_id:'agent:live',role_name:'在册',archived:false,runner:{runtime:'kimi-code'},service:{observed:'running',readiness_service:'ready'}},
+    {member_id:'agent:arch',role_name:'已归档',archived:true,runner:{runtime:'kimi-code'},service:{observed:'stopped'}}];
+  h.backend.rows=[
+    {request_key:'role-arch-00000000',kind:'create',status:'provisioned',revision:4,member_id:'agent:arch',storage_layout:'workspace-v1',role_name:'已归档临时角色'},
+    {request_key:'role-miss-00000000',kind:'create',status:'provisioned',revision:4,member_id:'agent:miss',storage_layout:'workspace-v1',role_name:'已删除临时角色'},
+    {request_key:'role-live-00000000',kind:'create',status:'provisioned',revision:4,member_id:'agent:live',storage_layout:'workspace-v1',role_name:'在册角色'},
+    {request_key:'role-wait-00000000',kind:'create',status:'requested',revision:1,role_name:'进行中角色'}];
+  await h.ready();
+  const list=h.el('role-request-list');
+  const cards=()=>list.querySelectorAll().filter(n=>n.tagName==='SECTION'&&String(n.className).includes('role-request-card'));
+  let text=h.texts(list);
+  // 三类成员的 provisioned 历史行均不产生卡片，也不出现隔离/自动启动文案；列表中只有进行中行一张卡片。
+  assert.doesNotMatch(text,/已归档临时角色|已删除临时角色|在册角色/);
+  assert.doesNotMatch(text,/运行时隔离待启用|自动启动已关闭/);
+  assert.match(text,/进行中角色/);
+  assert.equal(cards().length,1);
+  // requested/leased 进行中行不受本切片影响，仍渲染且仍只有一张卡片。
+  h.backend.rows[3].status='leased';await h.ui.refresh();
+  text=h.texts(list);
+  assert.match(text,/进行中角色/);
+  assert.doesNotMatch(text,/运行时隔离待启用/);
+  assert.equal(cards().length,1);
+  // created 行原本就不进该列表（基线行为）：本切片未改变其既有展示路径，此处固定该行为防回归。
+  h.backend.rows[3].status='created';await h.ui.refresh();
+  assert.doesNotMatch(h.texts(list),/进行中角色/);
+  assert.equal(cards().length,0);
+});
+
+// 566（563 建议）：有可选模型时不得渲染“尚无可选模型”空态说明（563 已确认保存行为不变）。
+test('有可选模型时不渲染空态说明，模型下拉保持可用',async()=>{
+  const h=harness();await h.ready();await h.fill();
+  assert.ok(h.ui.state.choices.length>0);
+  const panel=h.el('role-create-model-setup');
+  assert.equal(panel.classList.contains('hidden'),true);
+  assert.doesNotMatch(h.texts(panel),/尚无可选模型|登记项目已有模型/);
+  assert.equal(h.el('role-create-model').disabled,false);
 });

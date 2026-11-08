@@ -24,13 +24,13 @@ class SetupTests(unittest.TestCase):
         self.dbpath = self.base / 'synthetic.db'
         db = sqlite3.connect(self.dbpath)
         db.executescript('''
-            CREATE TABLE project_roles(project_id TEXT, member_id TEXT, archived_at TEXT);
+            CREATE TABLE project_roles(project_id TEXT, member_id TEXT, archived_at TEXT, storage_layout TEXT DEFAULT 'legacy');
             CREATE TABLE project_role_bindings(project_id TEXT, member_id TEXT, runner_id TEXT,
                  model_alias TEXT, model_id TEXT, provider_id TEXT, model_source TEXT, connection_ref TEXT);
             CREATE TABLE runner_registry(runner_id TEXT, runtime TEXT, control_kind TEXT);
             CREATE TABLE role_service_state(project_id TEXT, member_id TEXT, desired_state TEXT,
                  observed_state TEXT, owner_host TEXT, process_launch_id TEXT);
-            INSERT INTO project_roles VALUES('prj_1','agent:one',NULL);
+            INSERT INTO project_roles(project_id,member_id,archived_at) VALUES('prj_1','agent:one',NULL);
             INSERT INTO runner_registry VALUES('r','kimi-code','managed_cli');
             INSERT INTO project_role_bindings VALUES('prj_1','agent:one','r',
                  'kimi-code/k3.1-pro','k3.1-pro','managed:kimi-code','builtin','native-kimi-code-managed-login');
@@ -80,6 +80,198 @@ display_name = "K3.1 Pro"
              patch.object(setup, 'acquire_lock', return_value={'token':'synthetic'}), \
              patch.object(setup, 'release_lock', return_value=True):
             setup.setup('prj_1','agent:one',root=self.root,run=login or self.login)
+
+    def set_layout(self, layout):
+        db = sqlite3.connect(self.dbpath)
+        try:
+            db.execute('UPDATE project_roles SET storage_layout=?', (layout,))
+            db.commit()
+        finally:
+            db.close()
+
+    def test_layout_page_home_environment_records_and_cancel(self):
+        from scripts import native_setup_process
+        from server.workspace_paths import native_home_dir
+        from unittest.mock import Mock
+        for layout in ('legacy', 'workspace-v1'):
+            with self.subTest(layout=layout):
+                self.set_layout(layout)
+                home = (self.state / 'native/prj_1/agent_one' if layout == 'legacy'
+                        else native_home_dir(self.root, 'prj_1', 'agent:one'))
+                process = Mock()
+                process.poll.side_effect = [None, 0]
+                with patch.object(setup.shutil, 'which', return_value='fake-kimi'), \
+                     patch.object(setup.host, 'ensure_private_dir', side_effect=self.private_dir), \
+                     patch.object(setup, 'acquire_lock', return_value={'token':'synthetic'}) as acquire, \
+                     patch.object(setup, 'release_lock'), \
+                     patch.object(native_setup_process, 'stop_previous') as stop, \
+                     patch.object(native_setup_process, 'spawn_recorded', side_effect=lambda *args: (args[-1](0), 'gen')) as spawn, \
+                     patch.object(native_setup_process, 'finish_record') as finish:
+                    popen = Mock(return_value=process)
+                    attempt = setup.begin_native_login('prj_1', 'agent:one', root=self.root, popen=popen)
+                    self.assertEqual(attempt.home, home)
+                    self.assertEqual(popen.call_args.kwargs['env']['HOME'], str(home))
+                    self.assertEqual(popen.call_args.kwargs['env']['KIMI_CODE_HOME'], str(home / '.kimi-code'))
+                    self.assertEqual(stop.call_args.args[0], home)
+                    self.assertEqual(spawn.call_args.args[0], home)
+                    self.assertEqual(acquire.call_args_list[0].args[0], setup.lock_path_for(home / 'native-setup-transition'))
+                    self.assertEqual(acquire.call_args_list[1].args[0], setup.lock_path_for(home / 'kimi-role-setup'))
+                    setup.cancel_native_login(attempt)
+                    process.terminate.assert_called_once()
+                    self.assertEqual(finish.call_args.args[0], home)
+
+    def test_unknown_layout_rejected_before_writes_or_spawn(self):
+        for layout in ('', None, 'future'):
+            with self.subTest(layout=layout):
+                self.set_layout(layout)
+                with patch.object(setup.shutil, 'which', return_value='fake-kimi'), \
+                     patch.object(setup.host, 'ensure_private_dir') as mkdir, \
+                     patch.object(setup, 'acquire_lock') as lock:
+                    with self.assertRaisesRegex(setup.SetupError, 'native_setup_not_supported'):
+                        setup.begin_native_login('prj_1', 'agent:one', root=self.root)
+                    with self.assertRaisesRegex(setup.SetupError, 'native_setup_not_supported'):
+                        setup.setup('prj_1', 'agent:one', root=self.root)
+                    mkdir.assert_not_called()
+                    lock.assert_not_called()
+
+    def test_workspace_interactive_setup_and_layout_change_rejected(self):
+        from server.workspace_paths import native_home_dir
+        self.set_layout('workspace-v1')
+        self.run_setup()
+        home = native_home_dir(self.root, 'prj_1', 'agent:one')
+        self.assertTrue((home / '.kimi-code/config.toml').is_file())
+        def change_layout(*args, **kwargs):
+            result = self.login(*args, **kwargs)
+            self.set_layout('legacy')
+            return result
+        with self.assertRaisesRegex(setup.SetupError, '发生变化'):
+            self.run_setup(change_layout)
+
+    def test_workspace_page_finish_writes_model_and_detects_layout_change(self):
+        from scripts import native_setup_process
+        from server.workspace_paths import native_home_dir
+        self.set_layout('workspace-v1')
+        home = native_home_dir(self.root, 'prj_1', 'agent:one')
+        process = type('Process', (), {})()
+        def popen(argv, **kwargs):
+            target = Path(kwargs['env']['KIMI_CODE_HOME']) / 'config.toml'
+            target.write_text('[providers."managed:kimi-code"]\n', encoding='utf-8')
+            return process
+        with patch.dict(os.environ, {'KIMI_CODE_HOME': str(self.manual)}), \
+             patch.object(setup.shutil, 'which', return_value='fake-kimi'), \
+             patch.object(setup.host, 'ensure_private_dir', side_effect=self.private_dir), \
+             patch.object(setup, 'acquire_lock', return_value={'token':'synthetic'}), \
+             patch.object(setup, 'release_lock'), \
+             patch.object(native_setup_process, 'stop_previous'), \
+             patch.object(native_setup_process, 'spawn_recorded', side_effect=lambda *args: (args[-1](0), 'gen')), \
+             patch.object(native_setup_process, 'finish_record'):
+            attempt = setup.begin_native_login('prj_1', 'agent:one', root=self.root, popen=popen)
+            self.assertEqual(setup.finish_native_login(attempt), 'added')
+            self.assertIn('k3.1-pro', (home / '.kimi-code/config.toml').read_text(encoding='utf-8'))
+            attempt = setup.begin_native_login('prj_1', 'agent:one', root=self.root, popen=popen)
+            self.set_layout('legacy')
+            with self.assertRaisesRegex(setup.SetupError, '发生变化'):
+                setup.finish_native_login(attempt)
+
+    def test_ready_workspace_missing_config_can_retry(self):
+        from server import kimi_native_setup as manager
+        from server.models import ProjectRole, RoleNativeSetup
+        from server.workspace_paths import native_home_dir
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        self.set_layout('workspace-v1')
+        role = SimpleNamespace(storage_layout='workspace-v1')
+        row = RoleNativeSetup(project_id='prj_1', member_id='agent:one', choice_id='choice',
+                              created_by='human:test', status='ready')
+        session = Mock()
+        session.get.side_effect = lambda model, key: role if model is ProjectRole else row if model is RoleNativeSetup else None
+        with patch.object(manager, 'ROOT', self.root), \
+             patch.object(manager, '_role_runtime', return_value='kimi-code'), \
+             patch.object(manager, '_selection_current', return_value=True):
+            self.assertEqual(manager.native_login_fact('prj_1', 'agent:one', session), (True, False))
+            out = manager._out(row, session)
+            self.assertEqual(out.status, 'failed')
+            self.assertTrue(out.can_start)
+            self.assertTrue(out.requires_user_action)
+            home = native_home_dir(self.root, 'prj_1', 'agent:one')
+            (home / '.kimi-code').mkdir(parents=True)
+            (home / '.kimi-code/config.toml').write_text('', encoding='utf-8')
+            self.assertEqual(manager.native_login_fact('prj_1', 'agent:one', session), (True, True))
+            self.assertEqual(manager._out(row, session).status, 'ready')
+
+    def test_ready_workspace_start_retries_when_config_missing(self):
+        from server import kimi_native_setup as manager
+        from server.models import (ProjectRole, ProjectRoleBinding, RunnerRegistry,
+                                   RoleNativeSetup, RoleProvisionJob, RoleServiceState)
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        role = SimpleNamespace(storage_layout='workspace-v1', archived_at=None, credential_version=1)
+        binding = SimpleNamespace(runner_id='r')
+        runner = SimpleNamespace(runtime='kimi-code', control_kind='managed_cli')
+        operation = SimpleNamespace(choice_id='choice', operation_key='operation')
+        job = SimpleNamespace(status='succeeded', credential_version=1)
+        row = RoleNativeSetup(project_id='prj_1', member_id='agent:one', choice_id='choice',
+                              created_by='human:test', status='ready', revision=1)
+        values = {ProjectRole: role, ProjectRoleBinding: binding, RunnerRegistry: runner,
+                  RoleProvisionJob: job, RoleNativeSetup: row, RoleServiceState: None}
+        session = Mock()
+        session.get.side_effect = lambda model, key: values.get(model)
+        adapter = SimpleNamespace(begin_native_login=Mock(side_effect=setup.SetupError('native_cli_missing')))
+        with patch.object(manager, '_operation', return_value=operation), \
+             patch.object(manager, '_selection_current', return_value=True), \
+             patch.object(manager, '_role_runtime', return_value='kimi-code'), \
+             patch.object(manager, '_adapter', return_value=adapter):
+            out = manager.NativeSetupManager().start('prj_1', 'agent:one', 1, 'human:test', session, root=self.root)
+        adapter.begin_native_login.assert_called_once()
+        self.assertEqual(out.status, 'failed')
+        self.assertEqual(out.error_code, 'native_cli_missing')
+
+    def test_codex_ready_workspace_config_and_retry(self):
+        from server import kimi_native_setup as manager
+        from server.models import (ProjectRole, ProjectRoleBinding, RunnerRegistry,
+                                   RoleNativeSetup, RoleProvisionJob, RoleServiceState)
+        from server.workspace_paths import native_home_dir
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        role = SimpleNamespace(storage_layout='workspace-v1', archived_at=None, credential_version=1)
+        binding = SimpleNamespace(runner_id='r')
+        runner = SimpleNamespace(runtime='codex', control_kind='managed_cli')
+        operation = SimpleNamespace(choice_id='choice', operation_key='operation')
+        job = SimpleNamespace(status='succeeded', credential_version=1)
+        row = RoleNativeSetup(project_id='prj_1', member_id='agent:one', choice_id='choice',
+                              created_by='human:test', status='ready', revision=1)
+        values = {ProjectRole: role, ProjectRoleBinding: binding, RunnerRegistry: runner,
+                  RoleProvisionJob: job, RoleNativeSetup: row, RoleServiceState: None}
+        session = Mock()
+        session.get.side_effect = lambda model, key: values.get(model)
+        adapter = SimpleNamespace(begin_native_login=Mock(side_effect=setup.SetupError('native_cli_missing')))
+        with patch.object(manager, 'ROOT', self.root), patch.object(manager, '_operation', return_value=operation), \
+             patch.object(manager, '_selection_current', return_value=True), \
+             patch.object(manager, '_role_runtime', return_value='codex'), \
+             patch.object(manager, '_adapter', return_value=adapter):
+            self.assertEqual(manager.native_login_fact('prj_1', 'agent:one', session), (True, False))
+            out = manager._out(row, session)
+            self.assertEqual(out.status, 'failed')
+            self.assertTrue(out.can_start and out.requires_user_action)
+            home = native_home_dir(self.root, 'prj_1', 'agent:one')
+            (home / '.kimi-code').mkdir(parents=True)
+            (home / '.kimi-code/config.toml').write_text('', encoding='utf-8')
+            self.assertFalse(manager._ready_home_exists('prj_1', 'agent:one', session))
+            for layout in ('future-layout', None, ''):
+                role.storage_layout = layout
+                self.assertFalse(manager._ready_home_exists('prj_1', 'agent:one', session))
+            role.storage_layout = 'legacy'
+            self.assertTrue(manager._ready_home_exists('prj_1', 'agent:one', session))
+            role.storage_layout = 'workspace-v1'
+            (home / '.codex').mkdir()
+            config = home / '.codex/config.toml'
+            config.write_text('', encoding='utf-8')
+            self.assertEqual(manager.native_login_fact('prj_1', 'agent:one', session), (True, True))
+            config.unlink()
+            out = manager.NativeSetupManager().start('prj_1', 'agent:one', 1, 'human:test', session, root=self.root)
+            adapter.begin_native_login.assert_called_once()
+            self.assertEqual(out.status, 'failed')
+            self.assertEqual(out.error_code, 'native_cli_missing')
 
     def binding_client(self, binding=None):
         binding = binding or {'runtime':'kimi-code','model_alias':'kimi-code/k3.1-pro','model_id':'k3.1-pro','provider_id':'managed:kimi-code'}

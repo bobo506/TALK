@@ -356,6 +356,8 @@ test('思考强度控件在名称编辑按钮之后、只列真实档位且不�
   assert.equal(select.value,'low');assert.equal(select.disabled,false);
   const text=allTexts(panel).join('\n');
   assert.doesNotMatch(text,/用户设置：|模型默认：|可选值来自|跟随模型默认/);
+  // 566（563 建议）：有选项时不得出现能力未知空态说明（561 新增的空态提示只在无选项时渲染）。
+  assert.doesNotMatch(text,/未检测到运行器能力|可刷新重试/);
 });
 
 test('用户覆盖值作为当前选择，并在列表与详情标注来源',async()=>{
@@ -399,6 +401,8 @@ test('能力未知时如实禁用并解释，不猜任何选项',async()=>{
   await h.enterRoles();await h.selectRole('agent:kimi');
   const panel=h.el('role-details-name-panel');const select=effortSelect(panel);
   assert.deepEqual(optionValues(select),[]);assert.equal(select.disabled,true);
+  // 561：空态不再只有禁用空框，需给出明确说明与恢复路径。
+  assert.match(allTexts(panel).join('\n'),/未检测到运行器能力或该模型未提供思考强度选项，可刷新重试/);
   assert.doesNotMatch(allTexts(panel).join('\n'),/可选值来自|未提供可校验/);
 });
 

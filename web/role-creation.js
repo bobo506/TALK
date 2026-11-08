@@ -121,10 +121,6 @@ function createRoleRequestUI(deps) {
     return lookup({ requested: state.host?.enabled === false ? "等待开启宿主配置" : "等待宿主", leased: "宿主已领取",
       created: row.lease_held ? "正在配置" : "等待宿主继续配置", provisioned: "配置已完成", failed: "配置未完成", canceled: "已取消" }, row.status, "配置状态未知");
   }
-  function isolationFeedback(row) {
-    return row.storage_layout === "workspace-v1" && row.status === "provisioned"
-      ? "角色已准备，运行时隔离待启用。自动启动已关闭。" : null;
-  }
   function autoStartFeedback(row) {
     // pending意图不能把配置失败/取消伪装成启动中；旧请求和恢复保持原反馈。
     if (row.kind !== "create" || row.auto_start !== true || row.status !== "provisioned") return null;
@@ -308,8 +304,6 @@ function createRoleRequestUI(deps) {
   function progress(row, { showRoleLink = true } = {}) {
     const box = node("section", "role-request-card");
     box.append(node("strong", "", row.role_name || "角色配置"), node("p", "role-request-status", label(row)));
-    const isolation = isolationFeedback(row);
-    if (isolation) box.append(node("p", "role-request-status", isolation));
     const autoStart = autoStartFeedback(row);
     if (autoStart) box.append(node("p", "role-request-status", autoStart.text));
     const setup = nativeSetup(state.roles.find(role => role.member_id === row.member_id));
@@ -349,15 +343,8 @@ function createRoleRequestUI(deps) {
       if (state.error) list.append(node("p", "role-request-error", state.error));
       if (state.limited) list.append(node("p", "role-request-status", "配置记录较多，部分记录未显示；本页保存的请求会继续跟踪。"));
       for (const row of waiting) list.append(progress(row));
-      const shownMembers = new Set();
-      for (const row of state.rows) {
-        if (!row.member_id || shownMembers.has(row.member_id)) continue;
-        shownMembers.add(row.member_id);
-        if (!isolationFeedback(row)) continue;
-        const card = node("section", "role-request-card");
-        card.append(node("strong", "", row.role_name || "角色配置"), node("p", "role-request-status", isolationFeedback(row)));
-        list.append(card);
-      }
+      // 566（续 561/563 复核）：原“通知区”（按成员渲染隔离提示卡片的循环）因隔离文案恒空已成
+      // 死代码，整段移除；requested/leased/failed 进行中行与 limited 提示保持不变。
     }
     renderHost();
     renderModelSetup();
@@ -371,7 +358,7 @@ function createRoleRequestUI(deps) {
     el("role-create-submit").disabled = state.busy || Boolean(state.modalRow) || !human() || state.supported !== true
       || (!pinned && (!el("role-create-runner").value || !el("role-create-model").value || !el("role-create-name").value.trim()));
     el("role-create-submit").textContent = state.busy ? "保存中…" : pinned ? "核对并重试保存" : "保存并配置";
-    el("role-create-notice").textContent = state.notice + (state.modal && !pinned ? " 新角色自动启动已关闭，运行时隔离待启用。" : "") + (state.attempt && state.storageUnavailable
+    el("role-create-notice").textContent = state.notice + (state.modal && !pinned ? " 新角色自动启动已关闭。" : "") + (state.attempt && state.storageUnavailable
       ? " 此浏览器无法保留待确认请求，请在关闭或刷新页面前核对保存结果。" : "");
     const result = el("role-create-result"); result.replaceChildren();
     if (state.modalRow) result.append(progress(state.modalRow));
@@ -683,7 +670,7 @@ function createRoleRequestUI(deps) {
         || !state.choices.some(c => c.choice_id === choice && c.runner_id === runner)) { state.notice = "请选择运行器和模型，并填写 1–64 字的名称、最多 2000 字的介绍。"; render(); return; }
       let key; try { key = deps.newKey(); } catch (_) { state.notice = "无法生成请求标识，请重新加载页面后再试。"; render(); return; }
       const selectedModel = state.choices.find(c => c.choice_id === choice);
-      // 新布局运行时隔离尚未启用；旧的已保存请求保留其原始启动意图。
+      // 新布局角色默认不自动启动；旧的已保存请求保留其原始启动意图。
       state.attempt = { key, labels: { runner: runnerLabel(state.runners.find(r => r.runner_id === runner)) || "已选运行器",
         model: modelSourceLabel(modelLabel(selectedModel), selectedModel && selectedModel.model_source) || "已选模型" },
         payload: { request_key: key, kind: "create", confirm: true,
@@ -701,7 +688,7 @@ function createRoleRequestUI(deps) {
       state.notice = row.auto_start === true ? "请求已保存，后台会自动完成添加、官方授权准备和反馈；准备完成后将按你的选择尝试自动启动。"
         : attempt.payload.auto_start === true ? "请求已保存，当前服务未确认自动启动意图；配置完成后请核对角色开关。"
         : row.storage_layout === "legacy" ? "请求已保存，后台会自动完成添加与准备；保存不会自动启动角色。"
-        : "请求已保存，后台会自动完成添加与准备；保存不会自动启动角色。自动启动已关闭，运行时隔离待启用。";
+        : "请求已保存，后台会自动完成添加与准备；保存不会自动启动角色。自动启动已关闭，可在角色开关手动启动。";
       await refresh();
     } catch (err) {
       if (!current(epoch)) return;
@@ -775,8 +762,6 @@ function createRoleRequestUI(deps) {
         const resume = button("继续配置", () => mutate(row, "resume")); resume.disabled = state.busy; panel.append(resume);
       }
     }
-    const isolation = isolationFeedback(row);
-    if (isolation) panel.append(node("p", "role-request-status", isolation));
     const autoStart = autoStartFeedback(row);
     if (autoStart) panel.append(node("p", "role-request-status", autoStart.text));
     // 2026-10-28：“绑定重置”已移到角色详情服务行，这里不再渲染；面板即使为空也返回，

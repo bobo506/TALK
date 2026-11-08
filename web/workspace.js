@@ -1908,6 +1908,12 @@ function workspaceRoleEffortControl(role) {
   select.addEventListener("change", () => saveRoleEffort(role.member_id, select.value));
   choice.append(workspaceEl("span", "role-effort-label", "思考强度"), select);
   box.appendChild(choice);
+  // 2026-11-08（561）：能力未知（effort_options 为空）时不再只留禁用空框，明确说明原因与恢复路径；
+  // 有选项时行为不变（不渲染该说明）。
+  if (!selectable) {
+    box.appendChild(workspaceEl("span", "role-effort-empty-hint",
+      "未检测到运行器能力或该模型未提供思考强度选项，可刷新重试。"));
+  }
   const error = roleEffortUI.errors.get(role.member_id);
   if (error) box.appendChild(workspaceEl("span", "role-effort-error", error));
   return box;

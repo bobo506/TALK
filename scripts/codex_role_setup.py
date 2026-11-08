@@ -15,6 +15,7 @@ from scripts import role_service_host as host
 from scripts import native_setup_process
 from scripts.kimi_role_setup import _local_facts, _open_db, release_native_login, cancel_native_login
 from scripts.role_provision import acquire_lock, release_lock, lock_path_for
+from server.workspace_paths import native_home_dir
 
 ROOT = Path(__file__).resolve().parents[1]
 EFFORTS = {'minimal', 'low', 'medium', 'high', 'xhigh'}
@@ -144,9 +145,16 @@ def begin_native_login(project, member, *, root=ROOT, popen=subprocess.Popen):
     try:
         db.execute('BEGIN IMMEDIATE')
         binding = _role(db, project, member)
-        state = Path(config['state_dir'])
-        home = host.ensure_private_dir(host.assert_inside_root(state,
-            Path('native') / host._sanitize_token(project) / host._sanitize_token(member)))
+        layout = db.execute('SELECT storage_layout FROM project_roles WHERE project_id=? AND member_id=?',
+                            (project, member)).fetchone()
+        if not layout or layout[0] not in ('legacy', 'workspace-v1'):
+            raise SetupError('native_setup_not_supported')
+        if layout[0] == 'workspace-v1':
+            home = host.ensure_private_dir(native_home_dir(root, project, member))
+        else:
+            state = Path(config['state_dir'])
+            home = host.ensure_private_dir(host.assert_inside_root(state,
+                Path('native') / host._sanitize_token(project) / host._sanitize_token(member)))
         native = host.ensure_private_dir(host.assert_inside_root(home, Path('.codex')))
         transition_path = lock_path_for(home / 'native-setup-transition')
         transition = acquire_lock(transition_path)
@@ -171,7 +179,7 @@ def begin_native_login(project, member, *, root=ROOT, popen=subprocess.Popen):
         return SimpleNamespace(project=project, member=member, root=root, config=config,
             database=database, binding=binding, executable=exe, home=home, native_home=native,
             lock_path=lock_path, lock=lock, process=process, process_generation=generation, released=False,
-            setup_runtime='codex', setup_version=version)
+            setup_runtime='codex', setup_version=version, storage_layout=layout[0])
     except Exception:
         if lock is not None:
             release_lock(lock_path, lock)
@@ -236,6 +244,10 @@ def finish_native_login(attempt):
     try:
         db.execute('BEGIN IMMEDIATE')
         if _role(db, attempt.project, attempt.member) != attempt.binding:
+            raise SetupError('native_model_selection_changed')
+        layout = db.execute('SELECT storage_layout FROM project_roles WHERE project_id=? AND member_id=?',
+                            (attempt.project, attempt.member)).fetchone()
+        if not layout or layout[0] != attempt.storage_layout or layout[0] not in ('legacy', 'workspace-v1'):
             raise SetupError('native_model_selection_changed')
         prior = read_config(attempt.native_home / 'config.toml', root=attempt.root)
         if prior is None or prior.get('model') != attempt.binding[1]:

@@ -31,9 +31,11 @@ class CodexSetupTests(unittest.TestCase):
             db.execute("UPDATE runner_registry SET runtime='codex'")
             db.execute("UPDATE project_role_bindings SET model_alias='public-selected-alias', model_id='selected-exact-model', provider_id='openai', connection_ref='native-codex-chatgpt-login'")
 
-    def begin(self, event_log=None):
+    def begin(self, event_log=None, expected_home=None):
         events = event_log if event_log is not None else []
+        expected_home = expected_home or self.state / 'native/prj_1/agent_one'
         def spawn(home, project, member, lock, callback, **kwargs):
+            self.assertEqual(home, expected_home)
             self.assertEqual(kwargs, {'lock_name':'codex-role-setup'})
             events.append('spawn')
             process = callback(0)
@@ -42,17 +44,46 @@ class CodexSetupTests(unittest.TestCase):
             self.assertEqual(argv,[str(self.exe),'login','--device-auth'])
             env = kwargs['env']
             self.assertNotIn('OPENAI_API_KEY', env)
-            self.assertEqual(env['CODEX_HOME'],str(self.state / 'native/prj_1/agent_one/.codex'))
+            self.assertEqual(env['HOME'],str(expected_home))
+            self.assertEqual(env['CODEX_HOME'],str(expected_home / '.codex'))
             self.assertNotEqual(env['CODEX_HOME'],str(self.manual))
             self.assertEqual(kwargs['stdin'],setup.subprocess.DEVNULL)
             return SimpleNamespace(poll=lambda:0, stdout=io.StringIO())
+        def stop_previous(home, project, member):
+            self.assertEqual((home, project, member), (expected_home, 'prj_1', 'agent:one'))
+            events.append('stop_old')
         with patch.object(setup,'require_version'), \
-             patch.object(setup.native_setup_process,'stop_previous',side_effect=lambda *args:events.append('stop_old')), \
+             patch.object(setup.native_setup_process,'stop_previous',side_effect=stop_previous), \
              patch.object(setup.native_setup_process,'spawn_recorded',side_effect=spawn), \
              patch.dict(os.environ,{'CODEX_HOME':str(self.manual),'OPENAI_API_KEY':'NEVER_COPY'}):
             attempt = setup.begin_native_login('prj_1','agent:one',root=self.root,popen=popen)
         self.addCleanup(setup.release_native_login,attempt)
         return attempt
+
+    def test_workspace_layout_uses_workspace_home_for_setup_and_process(self):
+        from server.workspace_paths import native_home_dir
+        with closing(sqlite3.connect(self.dbpath)) as db, db:
+            db.execute("UPDATE project_roles SET storage_layout='workspace-v1'")
+        home = native_home_dir(self.root, 'prj_1', 'agent:one')
+        attempt = self.begin(expected_home=home)
+        self.assertEqual(attempt.home, home)
+        self.assertEqual(attempt.native_home, home / '.codex')
+        self.assertEqual(attempt.lock_path, setup.lock_path_for(home / 'codex-role-setup'))
+        self.assertTrue((home / '.codex/config.toml').is_file())
+        self.assertFalse((self.state / 'native/prj_1/agent_one/.codex/config.toml').exists())
+
+    def test_unknown_or_null_layout_fails_before_setup_side_effects(self):
+        for layout in ('future-layout', None):
+            with self.subTest(layout=layout):
+                with closing(sqlite3.connect(self.dbpath)) as db, db:
+                    db.execute('UPDATE project_roles SET storage_layout=?', (layout,))
+                with patch.object(setup.native_setup_process, 'stop_previous') as stop, \
+                     patch.object(setup.native_setup_process, 'spawn_recorded') as spawn:
+                    with self.assertRaisesRegex(setup.SetupError, 'native_setup_not_supported'):
+                        setup.begin_native_login('prj_1', 'agent:one', root=self.root)
+                stop.assert_not_called()
+                spawn.assert_not_called()
+                self.assertFalse((self.state / 'native').exists())
 
     def test_independent_home_selected_model_file_store_and_stop_before_spawn(self):
         events=[]
@@ -186,6 +217,25 @@ class CodexSetupTests(unittest.TestCase):
             with self.assertRaisesRegex(setup.SetupError,'native_model_selection_changed'):
                 setup.finish_native_login(attempt)
         self.assertNotIn('model_reasoning_effort',setup.read_config(attempt.native_home/'config.toml'))
+
+    def test_finish_rejects_layout_changed_after_begin_without_writing(self):
+        from server.workspace_paths import native_home_dir
+        for initial, changed in [('legacy', 'workspace-v1'), ('workspace-v1', 'legacy'),
+                                 ('legacy', None), ('legacy', 'future-layout')]:
+            with self.subTest(initial=initial, changed=changed):
+                with closing(sqlite3.connect(self.dbpath)) as db, db:
+                    db.execute('UPDATE project_roles SET storage_layout=?', (initial,))
+                home = (native_home_dir(self.root, 'prj_1', 'agent:one') if initial == 'workspace-v1'
+                        else self.state / 'native/prj_1/agent_one')
+                attempt = self.begin(expected_home=home)
+                path = attempt.native_home / 'config.toml'
+                before = path.read_bytes()
+                with closing(sqlite3.connect(self.dbpath)) as db, db:
+                    db.execute('UPDATE project_roles SET storage_layout=?', (changed,))
+                with patch.object(setup, '_model_effort', return_value=self._effort()):
+                    with self.assertRaisesRegex(setup.SetupError, 'native_model_selection_changed'):
+                        setup.finish_native_login(attempt)
+                self.assertEqual(path.read_bytes(), before)
 
     async def _effort(self):return 'high'
 

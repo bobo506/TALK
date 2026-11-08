@@ -17,6 +17,7 @@ import tomllib
 
 from scripts import role_service_host as host
 from scripts.role_provision import acquire_lock, release_lock, lock_path_for
+from server.workspace_paths import native_home_dir
 
 ROOT = Path(__file__).resolve().parents[1]
 IDENTIFIER = re.compile(r"[A-Za-z0-9:._-]{1,128}\Z")
@@ -101,6 +102,17 @@ def _open_db(path: Path) -> sqlite3.Connection:
     db = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=5)
     db.execute("PRAGMA busy_timeout=5000")
     return db
+
+
+def _setup_home(db, config, root, project, member):
+    row = db.execute("SELECT storage_layout FROM project_roles WHERE project_id=? AND member_id=?",
+                     (project, member)).fetchone()
+    if not row or row[0] not in ("legacy", "workspace-v1"):
+        raise SetupError("native_setup_not_supported")
+    if row[0] == "workspace-v1":
+        return native_home_dir(root, project, member)
+    return host.assert_inside_root(Path(config["state_dir"]),
+        Path("native") / host._sanitize_token(project) / host._sanitize_token(member))
 
 
 def _validated_model(entry, binding: tuple[str, str, str]) -> dict:
@@ -242,9 +254,7 @@ def setup(project: str, member: str, *, root: Path = ROOT, run=subprocess.run) -
         # 如角色登录后仍缺模型，才读取用户配置中的所选公开模型描述。
         original_home = os.environ.get("KIMI_CODE_HOME")
         source = (Path(original_home).expanduser() if original_home else Path.home() / ".kimi-code") / "config.toml"
-        state_dir = Path(config["state_dir"])
-        relative = Path("native") / host._sanitize_token(project) / host._sanitize_token(member)
-        home = host.ensure_private_dir(host.assert_inside_root(state_dir, relative))
+        home = host.ensure_private_dir(_setup_home(db, config, root, project, member))
         kimi_home = host.ensure_private_dir(host.assert_inside_root(home, Path(".kimi-code")))
         lock_path = lock_path_for(home / "kimi-role-setup")
         lock = acquire_lock(lock_path)
@@ -259,7 +269,7 @@ def setup(project: str, member: str, *, root: Path = ROOT, run=subprocess.run) -
         if result.returncode != 0:
             raise SetupError("Kimi 登录未完成；请按提示重试。")
         db.execute("BEGIN IMMEDIATE")
-        if _role(db, project, member) != binding:
+        if _role(db, project, member) != binding or _setup_home(db, config, root, project, member) != home:
             raise SetupError("角色模型在登录期间发生变化，未写入模型；请重试。")
         outcome = _append_model(kimi_home / "config.toml", binding, lambda: _source_if_present(source, binding), allow_login_generated=not was_present)
         db.rollback()
@@ -310,9 +320,7 @@ def begin_native_login(project: str, member: str, *, root: Path = ROOT, popen=su
         binding = _role(db, project, member)
         original_home = os.environ.get("KIMI_CODE_HOME")
         source = (Path(original_home).expanduser() if original_home else Path.home() / ".kimi-code") / "config.toml"
-        state_dir = Path(config["state_dir"])
-        relative = Path("native") / host._sanitize_token(project) / host._sanitize_token(member)
-        home = host.ensure_private_dir(host.assert_inside_root(state_dir, relative))
+        home = host.ensure_private_dir(_setup_home(db, config, root, project, member))
         kimi_home = host.ensure_private_dir(host.assert_inside_root(home, Path(".kimi-code")))
         transition_path = lock_path_for(home / 'native-setup-transition')
         transition = acquire_lock(transition_path)
@@ -358,7 +366,8 @@ def finish_native_login(attempt: NativeLoginAttempt) -> str:
     try:
         db.execute("BEGIN IMMEDIATE")
         binding = _role(db, attempt.project, attempt.member)
-        if binding != attempt.binding:
+        if (binding != attempt.binding or _setup_home(db, attempt.config, attempt.root,
+                attempt.project, attempt.member) != attempt.home):
             raise SetupError("角色模型在登录期间发生变化，未写入模型；请重试。")
         outcome = _append_model(attempt.kimi_home / "config.toml", binding,
             lambda: _source_if_present(attempt.source, binding), allow_login_generated=not attempt.was_present)

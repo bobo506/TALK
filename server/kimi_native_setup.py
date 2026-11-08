@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 import re
 import threading
 import time
@@ -31,6 +32,7 @@ _URL = re.compile(r"https://[^\s<>\"']+", re.IGNORECASE)
 _ANSI = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 _DEVICE_CODE = re.compile(r'(?<![A-Z0-9])([A-Z0-9]{4}-[A-Z0-9]{4,5})(?![A-Z0-9])')
 SUPPORTED_RUNTIMES = {'kimi-code', 'codex'}
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _adapter(runtime):
@@ -92,12 +94,32 @@ def _selection_current(project_id: str, member_id: str, choice_id: str, session:
         ("runner_id", "model_source", "provider_id", "connection_ref", "model_id", "model_alias"))
 
 
+def _ready_home_exists(project_id, member_id, session, root=None):
+    from server.workspace_paths import native_home_dir, WorkspacePathError
+    role = session.get(ProjectRole, (project_id, member_id))
+    runtime = _role_runtime(project_id, member_id, session)
+    if runtime not in ('kimi-code', 'codex'):
+        return True
+    if role is None:
+        return False
+    if role.storage_layout == 'legacy':
+        return True
+    if role.storage_layout != 'workspace-v1':
+        return False
+    try:
+        config_dir = '.codex' if runtime == 'codex' else '.kimi-code'
+        return (native_home_dir(root or ROOT, project_id, member_id) / config_dir / 'config.toml').is_file()
+    except (OSError, WorkspacePathError):
+        return False
+
+
 def native_login_fact(project_id: str, member_id: str, session: Session) -> tuple[bool, bool]:
     """返回（是否有新流程记录，授权与当前所选模型是否已准备）。"""
     row = session.get(RoleNativeSetup, (project_id, member_id))
     if row is None:
         return False, False
-    return True, row.status == "ready" and _selection_current(project_id, member_id, row.choice_id, session)
+    return True, (row.status == "ready" and _selection_current(project_id, member_id, row.choice_id, session)
+                  and _ready_home_exists(project_id, member_id, session))
 
 
 def require_native_setup_for_start(project_id: str, member_id: str, session: Session) -> None:
@@ -106,15 +128,16 @@ def require_native_setup_for_start(project_id: str, member_id: str, session: Ses
         raise HTTPException(409, "native_authorization_required")
 
 
-def _out(row: RoleNativeSetup, session: Session) -> RoleNativeSetupOut:
+def _out(row: RoleNativeSetup, session: Session, root=None) -> RoleNativeSetupOut:
     current = _selection_current(row.project_id, row.member_id, row.choice_id, session)
-    ready = row.status == "ready" and current
+    missing_home = row.status == "ready" and current and not _ready_home_exists(row.project_id, row.member_id, session, root)
+    ready = row.status == "ready" and current and not missing_home
     return RoleNativeSetupOut(project_id=row.project_id, member_id=row.member_id,
-        choice_id=row.choice_id, status=row.status if current else "failed", revision=row.revision,
+        choice_id=row.choice_id, status=row.status if current and not missing_home else "failed", revision=row.revision,
         authorization_url=row.authorization_url if row.status in ACTIVE else None,
         authorization_code=row.authorization_code if row.status in ACTIVE else None,
-        error_code=row.error_code if current else "native_model_selection_changed",
-        requires_user_action=row.status == "awaiting_authorization" or (row.status == "failed" and current),
+        error_code="native_model_configuration_required" if missing_home else (row.error_code if current else "native_model_selection_changed"),
+        requires_user_action=missing_home or row.status == "awaiting_authorization" or (row.status == "failed" and current),
         can_start=not ready and row.status not in ACTIVE,
         can_cancel=row.status in CANCELABLE, updated_at=row.updated_at, completed_at=row.completed_at)
 
@@ -227,6 +250,8 @@ class NativeSetupManager:
         if role is None or role.archived_at is not None or runner is None or runner.runtime not in SUPPORTED_RUNTIMES \
                 or runner.control_kind != "managed_cli" or operation is None:
             raise HTTPException(409, "native_setup_not_supported")
+        if runner.runtime == 'kimi-code' and role.storage_layout not in ('legacy', 'workspace-v1'):
+            raise HTTPException(409, "native_setup_not_supported")
         job = session.get(RoleProvisionJob, operation.operation_key)
         if job is None or job.status != "succeeded" or job.credential_version != role.credential_version:
             raise HTTPException(409, "role_provision_incomplete")
@@ -243,8 +268,9 @@ class NativeSetupManager:
             raise HTTPException(409, "native_model_selection_changed")
         if row is not None and row.status in ACTIVE and self._active((project_id, member_id)):
             raise HTTPException(409, "native_setup_active")
-        if row is not None and row.status == "ready" and row.choice_id == operation.choice_id:
-            return _out(row, session)
+        if (row is not None and row.status == "ready" and row.choice_id == operation.choice_id
+                and _ready_home_exists(project_id, member_id, session, root)):
+            return _out(row, session, root)
         if row is None:
             row = RoleNativeSetup(project_id=project_id, member_id=member_id,
                 choice_id=operation.choice_id, created_by=actor_id)
@@ -272,13 +298,13 @@ class NativeSetupManager:
             row.updated_at = _now()
             session.add(row)
             session.commit()
-            return _out(row, session)
+            return _out(row, session, root)
         with self._lock:
             self._attempts[(project_id, member_id)] = (token, attempt)
         thread = threading.Thread(target=self._monitor, args=(project_id, member_id, token, attempt),
             name=f"role-native-setup-{uuid.uuid4().hex[:8]}", daemon=True)
         thread.start()
-        return _out(row, session)
+        return _out(row, session, root)
 
     def _monitor(self, project_id, member_id, token, attempt):
         key = (project_id, member_id)

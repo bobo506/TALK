@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts import dsh_role_setup as setup
 
@@ -28,11 +29,11 @@ class DshRoleSetupTest(unittest.TestCase):
         (self.root / '.talk' / 'runtime.local.json').write_text(json.dumps(dict(schema='talk-local-runtime-1',
             config_file=str(self.config_path), database_file=str(self.database))), encoding='utf-8')
         with closing(sqlite3.connect(self.database)) as db, db:
-            db.executescript('''CREATE TABLE project_roles(project_id TEXT,member_id TEXT,archived_at TEXT);
+            db.executescript('''CREATE TABLE project_roles(project_id TEXT,member_id TEXT,archived_at TEXT,storage_layout TEXT DEFAULT 'legacy');
                 CREATE TABLE runner_registry(runner_id TEXT,runtime TEXT,control_kind TEXT);
                 CREATE TABLE project_role_bindings(project_id TEXT,member_id TEXT,runner_id TEXT,model_source TEXT,
                     provider_id TEXT,connection_ref TEXT,model_id TEXT,model_alias TEXT);
-                INSERT INTO project_roles VALUES('project','agent:test',NULL);
+                INSERT INTO project_roles VALUES('project','agent:test',NULL,'legacy');
                 INSERT INTO runner_registry VALUES('runner:dsh-test','dsh','managed_cli');
                 INSERT INTO project_role_bindings VALUES('project','agent:test','runner:dsh-test','registry',
                     'provider','conn','model','alias');''')
@@ -78,6 +79,33 @@ class DshRoleSetupTest(unittest.TestCase):
         for profile in ('review', 'tools'):
             self.config['dsh']['task_profiles'] = {'agent:test': profile}
             self.assertEqual(self.run_setup()['profile'], profile)
+
+    def test_layout_paths_and_profile_match_host_contract(self):
+        from server.workspace_paths import native_home_dir
+        legacy = self.state / 'native' / 'project' / 'agent_test' / '.dsh'
+        result = self.run_setup()
+        self.assertEqual(result, {'profile': 'tools', 'native_dir': str(legacy)})
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute("UPDATE project_roles SET storage_layout='workspace-v1'")
+        self.config['dsh']['task_profiles'] = {'agent:test': 'review'}
+        home = native_home_dir(self.root, 'project', 'agent:test')
+        with patch.object(setup.connections, 'validate_command', wraps=setup.connections.validate_command) as validate:
+            result = self.run_setup()
+        self.assertEqual(result, {'profile': 'review', 'native_dir': str(home / '.dsh')})
+        self.assertTrue((home / '.dsh').is_dir())
+        self.assertEqual([c.kwargs['native_home'] for c in validate.call_args_list], [home.as_posix()] * 2)
+
+    def test_unknown_layout_rejected_before_directories_or_command_validation(self):
+        for layout in ('future-layout', None, ''):
+            with self.subTest(layout=layout):
+                with closing(sqlite3.connect(self.database)) as db, db:
+                    db.execute('UPDATE project_roles SET storage_layout=?', (layout,))
+                with patch.object(setup.host, 'ensure_private_dir') as mkdir, \
+                     patch.object(setup.connections, 'validate_command') as validate:
+                    self.assert_failure('native_setup_not_supported')
+                mkdir.assert_not_called()
+                validate.assert_not_called()
+                self.assertFalse((self.root / 'workspaces').exists())
 
     def test_missing_connection_and_mismatch(self):
         del self.config['dsh']['connections']['conn']

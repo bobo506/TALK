@@ -49,10 +49,9 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/查看角色/);
   service={control_kind:'managed_cli',observed:'starting',readiness_service:'pending',native_login:'unverified',can_start:false,can_stop:true};
   Object.assign(rows[0],{status:'provisioned',revision:4,lease_held:false,storage_layout:'workspace-v1'});await controller.refresh();
-  assert.match(h.texts(doc.getElementById('role-request-list')),/角色已准备，运行时隔离待启用/);
-  assert.match(h.texts(doc.getElementById('role-request-list')),/自动启动已关闭/);
-  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/角色已准备，运行时隔离待启用/);
-  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/自动启动已关闭/);
+  // 561：运行时门已启用，“运行时隔离待启用”为误导文案，列表与详情均不再显示。
+  assert.doesNotMatch(h.texts(doc.getElementById('role-request-list')),/运行时隔离待启用|自动启动已关闭/);
+  assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/运行时隔离待启用|自动启动已关闭/);
   Object.assign(rows[0],{storage_layout:'legacy',auto_start:true,auto_start_status:'enqueued',auto_start_launch_id:'launch-auto'});await controller.refresh();
   assert.match(h.texts(ctx.blackboardColumns),/启动中/);assert.doesNotMatch(h.texts(ctx.blackboardColumns),/启动成功/);
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/绑定重置/);
