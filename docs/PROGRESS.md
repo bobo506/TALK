@@ -1,5 +1,26 @@
 # Project Progress
 
+## 交接：W3c 剩余与下一步（2026-11-08 23:25）
+
+**本轮角色**：协调/决策（任务发起、复核调度、Git 收尾）；开发 Terra、复核 K2.8。
+
+W3c 未完成两项，按以下顺序各开一片（均需独立复核）：
+
+1. **W3c-1 双工作区隔离（A 停 B 不停）**
+   - 新建第二个项目（`POST /api/projects` 或页面），确认 `workspaces/<p2>/` 与 `workspace.json` 生成；
+   - 为项目 B 建一个 workspace-v1 角色（dsh 最省事，免设备码）；准备第二份 runtime manifest（`project_id=p2`、独立端口/`state_dir`/`key_root`），启动 runtime B；
+   - A、B 各起一个角色 → 停止 A 的角色 → 断言 B 的角色进程/实例/心跳不受影响（pid、`observed_instance_id`、bridge 存活）；再反向停 B 验 A；
+   - 清理：停角色 → 删角色 → 删项目 B / 停 runtime B；记录隔离证据（launch/instance/进程快照）。
+2. **W3c-2 恢复链**
+   - 场景 a：角色 running 时停/启 runtime（或 kill 宿主）→ 重启后宿主重认领、角色恢复、无 stale ownership/409；
+   - 场景 b：bridge 子进程被 kill → 宿主回报失败并释放（c53e59c 已做），下一次 start 正常；
+   - 场景 c：恢复后 stop/delete 正常、无残留（含 `.provision.lock.guard`/空 native-home）；
+   - 需补单元/接口测试 + 真实 E2E；已知瞬时 `host_unreachable`（重启后首次 start，launch 随后仍完成）在本片一并定位。
+
+**已知债务（可后置，不阻塞 W3c）**：workspace 删除残留 guard/空目录；`test_codex_new_role_host` 在 venv 下 PID 断言失败（基线同因）；`run.ps1` 无 BOM（PS 5.1 解析失败）；`tests.test_conversation_access` 14 项 `project_id_required` 基线失败（另案）。
+
+**当前环境**：运行时 pid **3704**（开闸）；Terra/K2.8 running；astra 停止；无待收取任务；HEAD `dfb38a2`（已推送 `origin/codex/terminal-return-codex`）。
+
 ## 性能、可靠性与 Codex 插件目录修复（2026-11-08 22:55）
 
 - **性能片** `c527034`（570 approved）：binding 读取改为缓存优先 + 后台单线程按模型去重预热，ACP 探测移出 DB 会话；`/api/events` 认证与回填进线程池；`/healthz` 改唯一临时文件；pending start 在 reconcile（2s 循环）内拉起宿主；连接池 30+30/15s（事故应急，注释保留）。
