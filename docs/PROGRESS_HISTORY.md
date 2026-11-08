@@ -9,7 +9,7 @@
 - **部署期发现并修复**：`run.ps1`（venv python）启动运行时时，所有 codex 角色 `start` 失败 `cli_incompatible`——`CodexRoleHost.build_entry_argv()` 用 `sys.executable`（venv 路径），而 `verify_runtime_entry()` 只认 `_python_executable()`（`sys._base_executable` 基础解释器），venv 启动器下二者不同。548 首次因协调者先改 deploy 文档导致基线不干净而停止（未改代码）；文档提交 `9b74508` 后 549 重做：新增 `_accepted_python_executables()`（两路径 `normcase(abspath())` 集合），其余校验不变，新增回归测试。550 k2.8 **approved**：范围 +38/−2、独立重跑 `tests.test_role_service_host` 46 项全绿/44.554s、`tests.test_codex_new_role_host` 2 个 `cli_incompatible` error 消失仅剩 1 个 PID 断言（与基线同因，判环境/测试未适配 venv 启动器）；E2E 复现 venv 下 codex 入口 argv 通过。提交 `3d41b23`。
 - **venv 启动 E2E**：09:49 用 `.venv\Scripts\python.exe -m scripts.talk_runtime serve --apply --detach`（等价 `run.ps1`）重启，runtime pid **19252**、API child 23104、capability 重新发布；Terra（codex）`ins_0817aea719ae`、k2.8 `ins_efdc991ce69a` 均 running/ready。Terra 宿主 health `pid=24304`（venv 启动器）与 `interpreter_pid=20624`（基础解释器）不同，运行时按 `interpreter_pid`/descendant 处理正常。
 - **限制/遗留**：① `run.ps1` 无 UTF-8 BOM，Windows PowerShell 5.1 无法解析（需 pwsh 7 或补 BOM）；② `test_codex_new_role_host` PID 断言未适配 venv；③ workspace-v1 角色删除残留 profiles；④ 开闸与 W3c 真实双工作区未做。
-- **数据**：projects 1、groups 548、messages 2504、project_roles 19（全 legacy）、role_provision_requests 27。
+- **数据**：projects 1、groups 548、messages 2504、project_roles 20（19 legacy + 1 已归档 workspace-v1 临时角色）、role_provision_requests 28（临时门禁请求 `tmp-gate-verify-20261108` 保留为审计记录）。
 - **提交**：`9b74508`（部署结果文档）、`3d41b23`（venv 解释器修复）。
 
 ## 2026-11-06 22:00 — 工作区存储方向确定；W2 收尾

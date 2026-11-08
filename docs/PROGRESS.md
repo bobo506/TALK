@@ -7,7 +7,7 @@
 - **部署前置修正（重要）**：`workspaces` 必须为**私有 DACL 且禁用继承**（仅当前用户+SYSTEM+Administrators），否则 provision 报 `profile_root_invalid`；仅删 `CodexSandboxOffline` 不够。残留 `workspaces/p-obzgux3bnrygqyi`（prj_alpha）、547 遗留测试进程 50515/51882、2.4GB 旧日志均已清理；备份 `backups/w3b-deploy-20261108/talk.db`（integrity ok）。
 - **修复（549 开发 → 550 k2.8 复核 approved）**：`run.ps1`/venv 启动运行时导致 codex 角色 `start` 失败 `cli_incompatible`（`sys.executable` 与 `sys._base_executable` 路径不同，`verify_runtime_entry` 只认后者）。已改为接受两种规范化路径、其余校验不变；提交 `3d41b23`。**venv 下实测**：Terra（codex）`ins_0817aea719ae`、k2.8 `ins_efdc991ce69a` 均 running/ready。
 - **已知限制**：① `test_codex_new_role_host` 的 PID 断言在 venv 下失败（启动器 pid 与解释器 pid 不同；基线同因，测试未适配）；② `run.ps1` 无 UTF-8 BOM，Windows PowerShell 5.1 解析失败（需 pwsh 7 或补 BOM）；③ workspace-v1 角色删除后 `workspaces/<p>/roles/<m>/profiles/*` 残留（本次手工清理，W3c 需修）。
-- **数据**：projects 1、groups 548、messages 2504、project_roles 19（全 legacy）、role_provision_requests 27。
+- **数据**：projects 1、groups 548、messages 2504、project_roles 20（19 legacy + 1 已归档 workspace-v1 临时角色）、role_provision_requests 28。
 - **下一步**：用户浏览器验收（默认门 409、legacy 启停、新角色开通提示）→ W3c 真实双工作区/开闸需另行授权 → 重建 astra → 小债务（`talk_delegate_task` schema 1/2 vs 3/5）。
 
 ## W3b 完成快照（2026-11-08 00:45，用户次日部署验收）
