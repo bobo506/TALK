@@ -67,3 +67,12 @@
   1. **run.ps1（venv）启动缺陷**：用 `.venv\Scripts\python.exe` 启动运行时时，所有 codex 角色 `start` 失败 `cli_incompatible`（`sys.executable` 与 `sys._base_executable` 不同，`verify_runtime_entry` 只认后者）。当前运行时用**基础解释器**临时启动；修复任务 548。
   2. **workspace-v1 角色删除残留**：删除回执 5 步 complete，但 `workspaces/<p>/roles/<m>/profiles/*` 仍保留（本次手工清理）。需在 W3c 修复/补验。
   3. 开闸（`TALK_WORKSPACE_RUNTIME_ENABLED=1`）与真实 CLI/双工作区验收仍未做。
+
+### 7.1 修复后复验（2026-11-08 09:49，已执行）
+
+- 修复提交 `3d41b23`（549 开发、550 k2.8 独立复核 **approved**）：`verify_runtime_entry` 接受 `sys.executable` 与 `_python_executable()` 两种规范化路径，其余校验（`-m` 模块、恰好一个 `--timeout`、正整数、真实 parser）不变；新增回归测试。
+- 用 venv 解释器重启（`.venv\Scripts\python.exe -m scripts.talk_runtime serve --apply --detach`，等价 `run.ps1` 的启动命令）：runtime pid **19252**、API child 23104、`capability.json` 重新发布；**Terra（codex）`ins_0817aea719ae` 与 k2.8 `ins_efdc991ce69a` 均 running/ready**。
+- 宿主 health 出现 `pid`（venv 启动器）与 `interpreter_pid`（基础解释器）不同，运行时按解释器/descendant 处理，状态 serving 正常。
+- **新限制**：`run.ps1` 为 UTF-8 无 BOM，Windows PowerShell 5.1 解析失败（`You must provide a value expression following the '/' operator`）；需用 PowerShell 7，或给 `run.ps1` 补 BOM（未在本片修改）。
+- 测试限制：`tests.test_codex_new_role_host` 的 `test_real_http_host_boots_and_drains...` 在 venv 下断言 `health.pid == process.pid` 失败（基线同因，测试未适配启动器父子 pid）；不影响产品启动。
+

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-08 09:55 — W3a+W3b 部署、默认门真实 409、venv 解释器修复
+
+- **部署（用户授权）**：08:46 正常停止旧运行时（`shutdown.phase=complete`）；备份 `backups/w3b-deploy-20261108/talk.db`（12.54MB，`integrity_check=ok`，停止后已 checkpoint 无 wal/shm）；清理 `workspaces/p-obzgux3bnrygqyi`（content `project_id=prj_alpha`、root 指向 `.tmp-tests` 的测试残留）、547 遗留测试进程（50515/51882）、轮转旧日志 2.4GB。
+- **workspaces ACL 修正**：provision worker 要求私有 DACL 且**无继承 ACE**（只允许 当前用户+SYSTEM+Administrators）。仅删 `CodexSandboxOffline` 不够，必须 `icacls workspaces /inheritance:r` 后重授三个主体；否则新角色开通报 `profile_root_invalid`。修正后 `_windows_verify_private_acl` 实测通过。
+- **启动与验证**：新代码 runtime pid 1328（基础解释器，临时）、API 9556；`/healthz` 200、`startup_state=complete`、`capability.json` 发布；9 宿主 serving。legacy：Terra、k2.8 `start → running/ready`。
+- **默认门真实 409**：按用户确认新建临时 workspace-v1 角色 `agent:prj_e8fe7066bbec.role-d0bf55b3`（request `tmp-gate-verify-20261108`；开通成功、profiles 落 `workspaces/<p>/roles/<m>/profiles`）→ `POST .../service/start` 返回 **409 `workspace_runtime_not_ready`**，`current_launch=null`、`generation=0`（零 launch、零状态写入）。删除回执 5 步 complete；但 `workspaces/<p>/roles/<m>/profiles/*` 残留，已手工清理（W3c 需修删除收尾）。
+- **部署期发现并修复**：`run.ps1`（venv python）启动运行时时，所有 codex 角色 `start` 失败 `cli_incompatible`——`CodexRoleHost.build_entry_argv()` 用 `sys.executable`（venv 路径），而 `verify_runtime_entry()` 只认 `_python_executable()`（`sys._base_executable` 基础解释器），venv 启动器下二者不同。548 首次因协调者先改 deploy 文档导致基线不干净而停止（未改代码）；文档提交 `9b74508` 后 549 重做：新增 `_accepted_python_executables()`（两路径 `normcase(abspath())` 集合），其余校验不变，新增回归测试。550 k2.8 **approved**：范围 +38/−2、独立重跑 `tests.test_role_service_host` 46 项全绿/44.554s、`tests.test_codex_new_role_host` 2 个 `cli_incompatible` error 消失仅剩 1 个 PID 断言（与基线同因，判环境/测试未适配 venv 启动器）；E2E 复现 venv 下 codex 入口 argv 通过。提交 `3d41b23`。
+- **venv 启动 E2E**：09:49 用 `.venv\Scripts\python.exe -m scripts.talk_runtime serve --apply --detach`（等价 `run.ps1`）重启，runtime pid **19252**、API child 23104、capability 重新发布；Terra（codex）`ins_0817aea719ae`、k2.8 `ins_efdc991ce69a` 均 running/ready。Terra 宿主 health `pid=24304`（venv 启动器）与 `interpreter_pid=20624`（基础解释器）不同，运行时按 `interpreter_pid`/descendant 处理正常。
+- **限制/遗留**：① `run.ps1` 无 UTF-8 BOM，Windows PowerShell 5.1 无法解析（需 pwsh 7 或补 BOM）；② `test_codex_new_role_host` PID 断言未适配 venv；③ workspace-v1 角色删除残留 profiles；④ 开闸与 W3c 真实双工作区未做。
+- **数据**：projects 1、groups 548、messages 2504、project_roles 19（全 legacy）、role_provision_requests 27。
+- **提交**：`9b74508`（部署结果文档）、`3d41b23`（venv 解释器修复）。
+
 ## 2026-11-06 22:00 — 工作区存储方向确定；W2 收尾
 
 - **用户确定**：中央 `talk.db` + `TALK/workspaces/<project_id>/` 每工作区目录；任务/群/角色元数据中央库按 `project_id` 区分；工作区目录只放角色运行时、任务附件/日志/导出；真实项目目录（如 `D:\test`）在 TALK 外，只放 `.talk/project.yaml` 指针；**现在不拆每工作区 DB**。
