@@ -1370,6 +1370,31 @@ class RoleServiceHostArgumentTests(unittest.TestCase):
         )
         self.assertTrue(verify_runtime_entry("codex", codex).startswith("bridges.codex_bridge@"))
 
+    def test_verify_runtime_entry_accepts_venv_and_base_only(self):
+        """不同的 venv 与基础路径都可用，其他程序及错误预算仍被拒绝。"""
+        base = str(Path(sys.executable).parent / "test-distinct-base-python.exe")
+        with patch.object(sys, "_base_executable", base):
+            argv = build_runtime_argv(
+                "codex", model_alias="gpt-5", command_template="codex exec --model {model} -"
+            )
+            self.assertNotEqual(os.path.normcase(os.path.abspath(sys.executable)),
+                                os.path.normcase(os.path.abspath(base)))
+            self.assertTrue(verify_runtime_entry("codex", argv).startswith("bridges.codex_bridge@"))
+            argv[0] = sys.executable
+            self.assertTrue(verify_runtime_entry("codex", argv).startswith("bridges.codex_bridge@"))
+            argv[0] = str(Path(sys.executable).parent / "test-unrelated-program.exe")
+            with self.assertRaises(HostError) as caught:
+                verify_runtime_entry("codex", argv)
+            self.assertEqual(caught.exception.code, "cli_incompatible")
+
+            argv[0] = sys.executable
+            timeout_index = argv.index("--timeout")
+            without_timeout = argv[:timeout_index] + argv[timeout_index + 2:]
+            for invalid in (without_timeout, argv + ["--timeout", "10"]):
+                with self.subTest(argv=invalid), self.assertRaises(HostError) as caught:
+                    verify_runtime_entry("codex", invalid)
+                self.assertEqual(caught.exception.code, "cli_incompatible")
+
     def test_operator_key_never_comes_from_plaintext_argv(self):
         from scripts.role_service_host import build_arg_parser
 

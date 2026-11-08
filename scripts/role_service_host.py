@@ -1028,6 +1028,15 @@ def _python_executable() -> str:
     return getattr(sys, "_base_executable", None) or sys.executable
 
 
+def _accepted_python_executables() -> set[str]:
+    """venv 解释器与基础解释器视为同一解释器，按平台路径规则比较。"""
+    return {
+        os.path.normcase(os.path.abspath(path))
+        for path in (sys.executable, _python_executable())
+        if path
+    }
+
+
 def runtime_module_file(recipe: RuntimeRecipe) -> Path:
     return REPO_ROOT / (recipe.module.replace(".", "/") + ".py")
 
@@ -1086,7 +1095,8 @@ def build_runtime_argv(
 def verify_runtime_entry(runtime: str, argv: Sequence[str]) -> str:
     """用**真实仓库入口**的 parser 解析核验 argv；返回入口指纹（模块路径 + sha256）。
 
-    产品片B：除了解析成功，还核验外层 argv **恰好一个** ``--timeout``，且真实 parser
+    venv 解释器与基础解释器视为同一解释器。产品片B：除了解析成功，还核验外层 argv
+    **恰好一个** ``--timeout``，且真实 parser
     解析出的 ``timeout`` 是正整数——证明“24 小时预算”确实进了真实入口，而不是只写在
     宿主自己的诊断里。
     """
@@ -1106,7 +1116,8 @@ def verify_runtime_entry(runtime: str, argv: Sequence[str]) -> str:
         raise HostError("cli_incompatible", "真实入口没有 build_parser")
     if (
         len(argv) < 3
-        or str(argv[0]) != _python_executable()
+        or not argv[0]
+        or os.path.normcase(os.path.abspath(str(argv[0]))) not in _accepted_python_executables()
         or str(argv[1]) != "-m"
         or str(argv[2]) != recipe.module
     ):
