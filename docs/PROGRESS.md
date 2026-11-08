@@ -1,16 +1,16 @@
 # Project Progress
 
-## W3c 进展快照（2026-11-08 11:45）
+## W3c 完成快照（2026-11-08 12:55）
 
-- **开闸**：11:37 以 `TALK_WORKSPACE_RUNTIME_ENABLED=1` 重启运行时（pid **17984**，venv 解释器），`capability.json` 正常；新布局角色不再返回 `workspace_runtime_not_ready`。
-- **W3c 已验证（真实 API）**：临时 workspace-v1 workbuddy 角色 `agent:prj-e8fe7066bbec.w3c-workbuddy-1950c4df`：
-  - `create`（provisioned）→ `start` → **running/ready**（`ins_e1903c1dec75`）；
-  - 落点正确：`workspaces/<p>/roles/<m>/{profiles,native-home,sessions,state/{manager,records},logs}`，manager health 带 capability 绑定；
-  - `state.pid == agent_instances.pid`（20752）；`stop` → stopped，运行时与其它角色不受影响。
-- **legacy 对照**：Terra `start → ready（ins_5688983084f8）→ stop` 正常，`state.pid == instance.pid`（17420），不再出现 `recovery_identity_mismatch`。
-- **修复**：提交 `7fe64eb`（workspace 角色 profile 解析 + 受管 pid 一致性 + ready 校验；553 复核 changes_requested → 554 修测试 mock → 555 **approved**，143 项全绿）。
-- **未完成/已知**：① workspace-v1 角色删除仍 `cleanup_failed`（manager 步），临时角色暂不能删（`w3c-353e11c4` 已归档、`w3c-workbuddy-1950c4df` 已停）；② 新 kimi/codex 角色启动需各自原生登录（设备码，astra 同样）；③ 运行时重启后首次 start 偶发瞬时 `host_unreachable`，重试即成功（待观察）；④ 双工作区隔离/恢复链/开闸后的 A 停 B 不停尚未完整验收。
-- **当前运行**：Terra `ins_5688983084f8`、k2.8 `ins_1ba921c02d50`。数据：project_roles 22（19 legacy + 3 workspace-v1，其中 1 已归档）、role_provision_requests 30。
+- **开闸**：`TALK_WORKSPACE_RUNTIME_ENABLED=1` 已随运行时启动（当前 pid **11868**，venv 解释器）；`capability.json` 正常，新布局角色不再 409 `workspace_runtime_not_ready`。
+- **W3c 全链路实测（真实 API + 文件系统）**：
+  - 临时 workspace-v1 角色 **create → start → stop → delete** 全部成功（workbuddy 运行时，3 个临时角色；`ins_0e2ae36f30d5` 等 ready；删除 5 步均 complete）；
+  - 落点：`workspaces/<p>/roles/<m>/{profiles,native-home,sessions,state/{manager,records},logs}`；manager health 带 capability 绑定；`state.pid == agent_instances.pid`；
+  - 删除后三档/sessions/state/logs/Key 均清除，仅按 legacy 语义保留 `profiles/.provision.lock.guard`（另有空 `native-home` 目录残留）。
+- **legacy 对照**：Terra `start → ready → stop` 正常、pid 一致，无 `recovery_identity_mismatch`。
+- **本段修复**：`7fe64eb`（workspace profile 解析 + 受管 pid 一致性；555 approved）、`1fc95f4`（workspace 删除 skip-guard/双锁/幂等；559 approved，259 项全绿）。
+- **未完成/已知**：① 新 kimi/codex 角色启动需各自原生登录（设备码；astra 同）；② 重启后**首次** start 偶发瞬时 `host_unreachable`（launch 随后仍完成；根因待小片）；③ workspace 删除残留 `profiles/.provision.lock.guard` 与空 `native-home` 目录（legacy parity，可在后续片清理）；④ 双工作区隔离/恢复链/开闸后 A 停 B 不停尚未完整验收。
+- **当前运行**：Terra `ins_b0e0cfe3f51f`、k2.8 `ins_302789c91529`。数据：project_roles 23（19 legacy + 4 workspace-v1，均归档）、role_provision_requests 31。
 
 ## 部署与修复快照（2026-11-08 09:55）
 

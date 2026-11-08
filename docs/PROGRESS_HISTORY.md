@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-08 12:55 — C 片完成：workspace-v1 角色删除与全链路 E2E
+
+- **C 迭代**：556（manager 步按布局解析 workspace manager health、双锁初版，profiles 步仍主动失败）→ 557（profile+Key 双锁先于删除、活锁/存活 manager 拒绝测试）→ 558（按 legacy 同款 `skip={".provision.lock",".provision.lock.guard"}` 清理三档/私有状态/日志，凭据按 workspace key 路径 + 回执摘要，幂等；同步 4 项旧断言与 2 项旧 HTTP 删除测试到 legacy 显式布局）→ 559 k2.8 **approved**（259 项 exit 0、legacy 零改动、基线 stash 对照证明 4 项旧失败属合同同步）。提交 `1fc95f4`（+199/−21）。
+- **真实 E2E（运行时 pid 11868，开闸）**：
+  - 删除两个历史临时 workspace 角色 → 5 步均 complete；
+  - 新建 workbuddy workspace-v1 角色 `w3c-ac2c4632` → provisioned → start **ready**（`ins_0e2ae36f30d5`）→ stop → delete **complete**；
+  - 删除后 Key 不存在，profiles/sessions/state/logs 清除；仅按语义保留 `profiles/.provision.lock.guard`，另有空 `native-home` 目录残留。
+- **已知/待办**：① 重启后首次 start 偶发瞬时 `host_unreachable`（launch 随后仍完成，客户端 5s 超时疑似启动期争用；根因待小片）；② 删除残留空 `native-home` 可直接清（guard 按 legacy 保留）；③ 新 kimi/codex 角色需各自原生登录（设备码；astra 同）；④ 双工作区隔离/恢复链/开闸后 A 停 B 不停未完整验收。
+- **数据**：project_roles 23（19 legacy + 4 workspace-v1，均归档）、role_provision_requests 31；运行 Terra `ins_b0e0cfe3f51f`、k2.8 `ins_302789c91529`。
+
 ## 2026-11-08 11:45 — 开闸 + W3c 创建/启动/停止链路验证（workspace-v1）
 
 - **开闸**：用户要求“到可以正常创建正常启动再验收”，11:37 以 `TALK_WORKSPACE_RUNTIME_ENABLED=1` 重启（runtime pid 17984，venv），capability 正常；新布局 start 不再 409 `workspace_runtime_not_ready`。
