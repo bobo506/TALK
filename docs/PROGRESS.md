@@ -1,5 +1,17 @@
 # Project Progress
 
+## W3c-1 双工作区隔离：尝试后阻塞（2026-11-09 00:10）
+
+- **结论**：W3c-1 不能作为纯验收完成；当前代码把“本机 runtime / 宿主 / 桥 / 删除凭据”四处硬绑定到“项目根 = TALK 仓库根”。详见 [W3C_DUAL_WORKSPACE_FINDINGS_20261109.md](spec/W3C_DUAL_WORKSPACE_FINDINGS_20261109.md)。
+  - F1 runtime 绑定单项目：B 的 startup → `409 startup_local_runtime_unbound`，`startup_state=failed`；
+  - F2 宿主 `cwd=project_root` + `-m scripts.*` → `ModuleNotFoundError: scripts`；
+  - F3 宿主 `_local_facts` 要求项目根有 `.talk/runtime.local.json` → `dsh_host_config_invalid`；
+  - F4 角色子进程环境白名单不含 PYTHONPATH，桥 `-m bridges.*` → `bridge_process_exited`；
+  - F5 删除 cleanup 凭据同样要求单项目绑定 → B 角色删除 `local_runtime_required`。
+- **已实测**：项目 B 注册、`workspaces/<pB>/workspace.json` 生成、A/B 两个 workspace-v1 角色开通均正常；A 角色 start → running/ready（`ins_c243b0b0a775`）；B 角色在四处阻塞下无法 ready。
+- **当前环境**：runtime A pid **3704** 正常（healthz ok，3 在线）；runtime B 已 stop（pid 15536 退出）；本机绑定已恢复 A（`.talk/runtime.local.json` 与备份逐字一致）；A 临时角色 stop+delete 5 步 complete；**项目 B `prj_7e3fcc639c70` 与已归档临时角色、失败删除行保留为复现现场**（UI 会多一个“W3c 双工作区验收 B”）；证据在 `.tmp/w3c-dual-20261109/`。
+- **下一步**：请项目管理者在 A（完整多项目底座）/ B（最小“外部项目根可运行”）/ C（收缩到 P3）中选一个；选 B 则先派修复片，完成后重跑 W3c-1 并按产品流程删除项目 B。
+
 ## 交接：W3c 剩余与下一步（2026-11-08 23:25）
 
 **本轮角色**：协调/决策（任务发起、复核调度、Git 收尾）；开发 Terra、复核 K2.8。
