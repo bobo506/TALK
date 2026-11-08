@@ -99,6 +99,107 @@ class LocalDeletionTests(unittest.TestCase):
         finally:provision.release_provision_locks(locks)
         self.assertEqual(result["outcome"],"failed");self.assertTrue(self.profile.exists());self.assertTrue(self.key.exists())
 
+    def test_workspace_manager_requests_stop_then_cleans(self):
+        from server import workspace_paths as wp
+        workspace=wp.role_dir(self.root,self.project_id,self.member)
+        directory=wp.manager_dir(self.root,self.project_id,self.member,"workbuddy")
+        directory.mkdir(parents=True)
+        health=directory/"manager-health.json"; marker=directory/"drain.request"
+        health.write_text(json.dumps({"owned_launches":[]}),encoding="utf-8")
+        code="import pathlib,time,sys; p=pathlib.Path(sys.argv[1]);\nwhile not p.exists(): time.sleep(.02)\n"
+        process=subprocess.Popen([sys.executable,"-c",code,str(marker)],creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            self.runtime.hosts[self.member]={"process":process,"spec":{"member_id":self.member,
+                "health_file":str(health),"drain_file":str(marker)}}
+            role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+            with patch("scripts.talk_runtime.ROOT",self.root):
+                result=d.cleanup(self.runtime,self.member,self.receipt,role)
+            self.assertEqual(result["steps"]["manager"],"complete",result)
+            self.assertEqual(result["outcome"],"complete",result)
+            self.assertTrue(all(value == "complete" for value in result["steps"].values()),result)
+            self.assertEqual(process.poll(),0)
+            self.assertFalse(health.exists());self.assertFalse(marker.exists())
+            self.assertTrue(workspace.exists());self.assertTrue(self.key.exists())
+        finally:
+            if process.poll() is None:
+                marker.write_text("stop",encoding="utf-8");process.wait(timeout=5)
+
+    def test_workspace_unowned_live_manager_refuses_cleanup(self):
+        from server import workspace_paths as wp
+        directory=wp.manager_dir(self.root,self.project_id,self.member,"workbuddy")
+        directory.mkdir(parents=True)
+        (directory/"manager-health.json").write_text(json.dumps({"owned_launches":[],"pid":os.getpid()}),encoding="utf-8")
+        role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+        with patch("scripts.talk_runtime.ROOT",self.root), patch("scripts.role_service_recovery.recorded_process_state",return_value="present"):
+            result=d.cleanup(self.runtime,self.member,self.receipt,role)
+        self.assertEqual(result["error_code"],"manager_not_stopped")
+        self.assertTrue(self.key.exists())
+
+    def test_workspace_provision_lock_refuses_before_draining(self):
+        from server import workspace_paths as wp
+        directory=wp.manager_dir(self.root,self.project_id,self.member,"workbuddy")
+        directory.mkdir(parents=True)
+        health=directory/"manager-health.json"
+        health.write_text(json.dumps({"owned_launches":[],"pid":2147483000}),encoding="utf-8")
+        profile_lock=wp.profiles_dir(self.root,self.project_id,self.member)/provision.PROFILE_LOCK_FILENAME
+        held=provision.acquire_lock(profile_lock)
+        role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+        try:
+            with patch("scripts.talk_runtime.ROOT",self.root):
+                result=d.cleanup(self.runtime,self.member,self.receipt,role)
+        finally:
+            provision.release_lock(profile_lock,held)
+        self.assertEqual(result["error_code"],"cleanup_busy",result)
+        self.assertTrue(health.exists())
+        self.assertTrue(self.key.exists())
+
+    def test_workspace_live_record_refuses_cleanup(self):
+        from server import workspace_paths as wp
+        directory=wp.records_dir(self.root,self.project_id,self.member);directory.mkdir(parents=True)
+        record=directory/"launch_fixture.json"
+        record.write_text(json.dumps({"project_id":self.project_id,"member_id":self.member,
+            "launch_id":"launch_fixture","pid":os.getpid()}),encoding="utf-8")
+        role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+        with patch("scripts.talk_runtime.ROOT",self.root), patch("scripts.role_service_recovery.recorded_process_state",return_value="present"):
+            result=d.cleanup(self.runtime,self.member,self.receipt,role)
+        self.assertEqual(result["error_code"],"manager_not_stopped",result)
+        self.assertTrue(record.exists())
+
+    def test_workspace_wrong_credential_is_not_removed(self):
+        from server import workspace_paths as wp
+        key=wp.key_path(self.root,self.project_id,self.member,git_key_root=self.keys)
+        key.parent.mkdir(parents=True,exist_ok=True);key.write_text("different fixture",encoding="utf-8")
+        role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+        with patch("scripts.talk_runtime.ROOT",self.root):
+            result=d.cleanup(self.runtime,self.member,self.receipt,role)
+        self.assertEqual(result["error_code"],"credential_mismatch",result)
+        self.assertTrue(key.exists())
+
+    def test_workspace_unstarted_manager_step_is_idempotent(self):
+        from server import workspace_paths as wp
+        workspace=wp.role_dir(self.root,self.project_id,self.member)
+        profiles=workspace/"profiles";profiles.mkdir(parents=True)
+        for name in ("IDENTITY.md", "SOUL.md", "USER.md"):
+            (profiles/name).write_text("fixture",encoding="utf-8")
+        for name in ("sessions", "state", "logs"):
+            path=workspace/name;path.mkdir();(path/"fixture").write_text("fixture",encoding="utf-8")
+        key=wp.key_path(self.root,self.project_id,self.member,git_key_root=self.keys)
+        key.parent.mkdir(parents=True,exist_ok=True);key.write_text("isolated-role-key\n",encoding="utf-8")
+        metadata=provision.credential_metadata_path(key.parent,self.member)
+        metadata.write_text(json.dumps({"member_id":self.member}),encoding="utf-8")
+        other=wp.role_dir(self.root,self.project_id,"agent:other")
+        other.mkdir(parents=True);(other/"keep").write_text("keep",encoding="utf-8")
+        role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+        with patch("scripts.talk_runtime.ROOT",self.root):
+            for _ in range(2):
+                result=d.cleanup(self.runtime,self.member,self.receipt,role)
+                self.assertEqual(result["outcome"],"complete",result)
+                self.assertTrue(all(value == "complete" for value in result["steps"].values()),result)
+        self.assertEqual({p.name for p in profiles.iterdir()},{".provision.lock.guard"})
+        for path in (workspace/"sessions",workspace/"state",workspace/"logs",key,metadata):
+            self.assertFalse(path.exists(),path)
+        self.assertTrue((other/"keep").exists());self.assertTrue(self.key.exists())
+
     def test_config_concurrent_change_never_overwritten_and_retry_after_reload(self):
         changed={**self.config,"unrelated_setting":"keep-new-value"}
         self.path.write_text(json.dumps(changed),encoding="utf-8")

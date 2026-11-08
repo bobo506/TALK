@@ -792,7 +792,7 @@ class TalkRuntime:
                 result = {"outcome":"failed", "steps":{step:"failed" if step=="manager" else "pending" for step in STEPS},
                           "error_code":"local_runtime_required" if not receipt.get("cleanup_config_digest") else "runtime_config_changed"}
             else:
-                result = cleanup(self, member, receipt)
+                result = cleanup(self, member, receipt, role) if role.get("storage_layout") == "workspace-v1" else cleanup(self, member, receipt)
             self.request("POST", base+"/report", {"lease_token":receipt["lease_token"],
                 "revision":receipt["revision"], **result})
             break  # One bounded cleanup per tick; roles/API/worker remain responsive.

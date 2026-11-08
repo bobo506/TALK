@@ -178,7 +178,7 @@ def _key_paths(config, member):
     return paths
 
 
-def _drain(runtime, member, files):
+def _drain(runtime, member, files, workspace_root=None):
     owned = runtime.hosts.get(member)
     specs = [s for s in runtime.config.get("hosts", []) if s["member_id"] == member]
     if owned:
@@ -190,6 +190,9 @@ def _drain(runtime, member, files):
     from scripts.role_service_recovery import recorded_process_state
     wb = Path(runtime.config["state_dir"])/"workbuddy-native"/host._sanitize_token(runtime.project)/host._sanitize_token(member)
     health_paths = {Path(s["health_file"]) for s in specs} | {wb/"manager-health.json"}
+    if workspace_root is not None:
+        health_paths |= {workspace_root / "state" / "manager" / runner / "manager-health.json"
+                         for runner in ("codex", "kimi", "dsh", "workbuddy")}
     owned_health = Path(owned["spec"]["health_file"]) if owned else None
 
     def verify_health():
@@ -232,7 +235,15 @@ def _drain(runtime, member, files):
         for key in ("drain_file", "health_file"):
             path = Path(spec[key])
             root = Path(runtime.config["state_dir"])
-            provision.assert_inside_root(root, path.relative_to(root))
+            if workspace_root is not None and path.is_relative_to(workspace_root):
+                relative = path.relative_to(workspace_root)
+                if (len(relative.parts) != 4 or relative.parts[:2] != ("state", "manager")
+                        or relative.parts[2] not in ("codex", "kimi", "dsh", "workbuddy")
+                        or relative.parts[3] != ("drain.request" if key == "drain_file" else "manager-health.json")):
+                    raise CleanupError("unsafe_resource")
+                provision.assert_inside_root(workspace_root, relative)
+            else:
+                provision.assert_inside_root(root, path.relative_to(root))
             # Only delete explicit leaf metadata, not its potentially shared parent.
             if path.is_dir():
                 raise CleanupError("unsafe_resource")
@@ -241,13 +252,18 @@ def _drain(runtime, member, files):
     runtime.statuses.pop(member, None)
 
 
-def _records(runtime, member, files):
+def _records(runtime, member, files, workspace_root=None):
     """A stopped DB row is insufficient if a private native-child receipt is live."""
     from scripts.role_service_recovery import recorded_process_state
     directory = provision.assert_inside_root(Path(runtime.config["state_dir"]),
         Path("roles")/host._sanitize_token(runtime.project)/host._sanitize_token(member))
     controls = []
-    if directory.exists():
+    directories = [directory]
+    if workspace_root is not None:
+        directories.append(workspace_root / "state" / "records")
+    for directory in directories:
+        if not directory.exists():
+            continue
         for path in directory.glob("*.json"):
             facts = json.loads(files.read(path))
             if facts.get("project_id") != runtime.project or facts.get("member_id") != member:
@@ -299,7 +315,7 @@ def _config(runtime, member, files):
         provision.release_lock(lock, held)
 
 
-def cleanup(runtime, member, receipt):
+def cleanup(runtime, member, receipt, role=None):
     steps = {step:"pending" for step in STEPS}
     files = Files(time.monotonic()+120)
     handles = []
@@ -312,27 +328,45 @@ def cleanup(runtime, member, receipt):
         for name in ("project_root", "state_dir", "key_root"):
             if Path(runtime.config[name]).drive.startswith("\\\\"):
                 raise CleanupError("unsafe_resource")
-        _drain(runtime, member, files)
-        controls = _records(runtime, member, files)
+        workspace_root = None
+        if role is not None and role.get("storage_layout") == "workspace-v1":
+            from server.workspace_paths import key_path, role_dir
+            from scripts.talk_runtime import ROOT
+            if role.get("member_id") != member or role.get("project_id", runtime.project) != runtime.project:
+                raise CleanupError("unsafe_resource")
+            workspace_root = role_dir(ROOT, runtime.project, member)
+            profile_lock = workspace_root / "profiles" / provision.PROFILE_LOCK_FILENAME
+            key = key_path(ROOT, runtime.project, member, git_key_root=Path(runtime.config["key_root"]))
+            # Match the workspace provisioners' profile-then-key ordering before
+            # touching even manager evidence. Both locks are released in finally.
+            for candidate in (profile_lock, provision.lock_path_for(key)):
+                handles.append((candidate, provision.acquire_lock(candidate)))
+        _drain(runtime, member, files, workspace_root)
+        controls = _records(runtime, member, files, workspace_root)
         steps[step] = "complete"
         root, keys = runtime.project_root, Path(runtime.config["key_root"])
         # Same locks as create/recover; no provision can recreate profiles during cleanup.
-        handles = provision.acquire_provision_locks(root, keys, member)
+        if workspace_root is None:
+            handles = provision.acquire_provision_locks(root, keys, member)
         step = "profiles"
-        directory = provision.profile_lock_path_for(root, member).parent
+        directory = (workspace_root / "profiles" if workspace_root is not None
+                     else provision.profile_lock_path_for(root, member).parent)
         files.remove(directory, tree=True, skip={".provision.lock", ".provision.lock.guard"})
         steps[step] = "complete"
         step = "credentials"
         if receipt["identity_disabled"]:
-            for path in _key_paths(runtime.config, member):
+            for path in ({key} if workspace_root is not None else _key_paths(runtime.config, member)):
                 files.remove(path, digest=receipt["credential_digest"])
-            metadata = provision.credential_metadata_path(keys, member)
+            metadata = provision.credential_metadata_path(key.parent if workspace_root is not None else keys, member)
             files.remove(metadata, verify=lambda data:json.loads(data).get("member_id")==member)
             steps[step] = "complete"
         else:
             steps[step] = "preserved"
         step = "private_state"
         state = Path(runtime.config["state_dir"])
+        if workspace_root is not None:
+            for name in ("sessions", "state", "logs"):
+                files.remove(workspace_root / name, tree=True)
         project_token, member_token = host._sanitize_token(runtime.project), host._sanitize_token(member)
         for launch in controls:
             files.remove(provision.assert_inside_root(state, Path("control")/(launch+".ctl")))

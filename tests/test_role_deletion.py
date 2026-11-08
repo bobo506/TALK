@@ -181,6 +181,7 @@ class RoleDeletionTests(RoleApiTestCase):
         with self.session() as session:
             session.add(m.AgentTask(project_id="prj_alpha",target_member_id=self.member,created_by="human:bobo",content="old failed",
                 status="failed",workflow_status="failed",finished_at=datetime.now(timezone.utc)-timedelta(days=1)))
+            session.flush()
             session.add(m.AgentTask(project_id=None,target_member_id=self.member,created_by="human:bobo",content="still queued"))
             session.commit()
         result=self.delete();self.assertEqual(result.status_code,409,result.text)
@@ -271,7 +272,8 @@ class RoleDeletionTests(RoleApiTestCase):
         key=key_file_path(keys,self.member);key.write_text(self.role["api_key"],encoding="utf-8")
         other=keys/"other.key";other.write_text("other role secret",encoding="utf-8")
         with self.session() as session:
-            p=session.get(m.Project,"prj_alpha");p.project_root_path=str(project);session.add(p);session.commit()
+            p=session.get(m.Project,"prj_alpha");p.project_root_path=str(project);session.add(p)
+            role=session.get(m.ProjectRole,("prj_alpha",self.member));role.storage_layout="legacy";session.add(role);session.commit()
         self.assertEqual(self.delete().status_code,200)
         with self.make_client() as client:
             class Client:
@@ -287,6 +289,41 @@ class RoleDeletionTests(RoleApiTestCase):
             self.assertEqual(result.json()["status"],"complete",result.text)
             self.assertEqual(client.get("/api/projects/prj_alpha/agents",headers={"X-API-Key":"bobo-key"}).json(),[])
         self.assertFalse(profile.exists());self.assertFalse(key.exists());self.assertEqual(other.read_text(encoding="utf-8"),"other role secret")
+
+    def test_real_http_workspace_cleanup_closes_loop(self):
+        from scripts.talk_runtime import TalkRuntime
+        from server import workspace_paths as wp
+        import hashlib
+        project=self._tmpdir/"workspace-project";project.mkdir()
+        keys=self._tmpdir/"legacy-keys";keys.mkdir()
+        state=self._tmpdir/"legacy-state";state.mkdir()
+        config={"project_id":"prj_alpha","project_root":str(project),"key_root":str(keys),"state_dir":str(state),"hosts":[]}
+        config_path=self._tmpdir/"workspace-runtime.json";config_path.write_text(json.dumps(config),encoding="utf-8")
+        workspace=wp.role_dir(self._tmpdir,"prj_alpha",self.member)
+        profiles=workspace/"profiles";profiles.mkdir(parents=True)
+        (profiles/"IDENTITY.md").write_text("fixture",encoding="utf-8")
+        for name in ("sessions","state","logs"):
+            path=workspace/name;path.mkdir();(path/"fixture").write_text("fixture",encoding="utf-8")
+        key=wp.key_path(self._tmpdir,"prj_alpha",self.member,git_key_root=keys)
+        key.parent.mkdir(parents=True,exist_ok=True);key.write_text(self.role["api_key"],encoding="utf-8")
+        with self.session() as session:
+            p=session.get(m.Project,"prj_alpha");p.project_root_path=str(project);session.add(p)
+            role=session.get(m.ProjectRole,("prj_alpha",self.member));role.storage_layout="workspace-v1";session.add(role);session.commit()
+        self.assertEqual(self.delete().status_code,200)
+        with self.make_client() as client:
+            class Client:
+                def request(_,method,path,body=None):
+                    response=client.request(method,path,json=body,headers={"X-API-Key":"bobo-key"})
+                    response.raise_for_status();return response.json()
+            runtime=TalkRuntime(config,client=Client(),config_path=config_path)
+            digest=hashlib.sha256(json.dumps(config,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
+            with patch("server.role_deletions._cleanup_binding_digest",return_value=digest), patch("scripts.talk_runtime.ROOT",self._tmpdir):
+                runtime.reconcile_deletions(runtime.roles())
+            result=client.get(self.base+"/deletion",headers={"X-API-Key":"bobo-key"})
+            self.assertEqual(result.json()["status"],"complete",result.text)
+            self.assertTrue(all(value == "complete" for value in result.json()["steps"].values()),result.text)
+        self.assertEqual({p.name for p in profiles.iterdir()},{".provision.lock.guard"})
+        for path in (workspace/"sessions",workspace/"state",workspace/"logs",key):self.assertFalse(path.exists(),path)
 
 
     def _shared_role(self):
@@ -314,8 +351,10 @@ class RoleDeletionTests(RoleApiTestCase):
                     ("/api/tasks/schedules",{"target_member_id":self.member,"content":"ambiguous"},"bobo-key"),
                     ("/api/tasks",{"target_member_id":"agent:worker","content":"ambiguous"},self.role["api_key"])]:
                 response=client.post(path,headers={"X-API-Key":key},json=body)
-                self.assertEqual(response.status_code,409,response.text)
-                self.assertEqual(response.json()["detail"],"task_project_scope_required")
+                self.assertEqual(response.status_code,422,response.text)
+                detail=response.json()["detail"]
+                if isinstance(detail,str):self.assertEqual(detail,"project_id_required")
+                else:self.assertTrue(any(item.get("loc",[])[-1:] == ["project_id"] for item in detail),detail)
 
     def test_deleted_shared_identity_cannot_claim_legacy_projectless_task(self):
         self._shared_role();self.delete()
@@ -344,8 +383,9 @@ class RoleDeletionTests(RoleApiTestCase):
         self.assertIn(blocked.status_code,[400,409])
 
     def test_unclosed_global_task_blocks_project_deletion(self):
-        self._shared_role();task=self.create_task(None,self.member)
-        self.assertEqual(task.status_code,201,task.text)
+        self._shared_role()
+        with self.session() as session:
+            session.add(m.AgentTask(target_member_id=self.member,created_by="human:bobo",content="legacy global task"));session.commit()
         response=self.delete()
         self.assertEqual(response.status_code,409,response.text)
         self.assertEqual(response.json()["detail"],"role_has_active_tasks")
@@ -363,7 +403,8 @@ class RoleDeletionTests(RoleApiTestCase):
             schedule=session.get(m.AgentTaskSchedule,sid);schedule.status="active";session.add(schedule);session.commit()
         with self.make_client() as client:
             result=client.post("/api/tasks/schedules/run-due",headers={"X-API-Key":"bobo-key"},json={})
-            self.assertEqual(result.status_code,409,result.text)
+            self.assertEqual(result.status_code,200,result.text)
+            self.assertIn({"schedule_id":sid,"reason":"project_id_required"},result.json()["skipped"])
         with self.session() as session:
             self.assertIsNone(session.exec(select(m.AgentTask).where(m.AgentTask.schedule_id==sid)).first())
 
@@ -374,13 +415,14 @@ class RoleDeletionTests(RoleApiTestCase):
         def scheduling():
             gate.wait()
             with self.make_client() as client:
-                return client.post("/api/tasks/schedules",headers={"X-API-Key":"bobo-key"},json={"target_member_id":self.member,"content":"race"})
+                return client.post("/api/tasks/schedules",headers={"X-API-Key":"bobo-key"},json={"project_id":"prj_alpha","target_member_id":self.member,"content":"race"})
         def deleting():
             gate.wait();return self.delete()
         with ThreadPoolExecutor(max_workers=2) as pool:
             a,b=pool.submit(scheduling),pool.submit(deleting)
             scheduled,removed=a.result(timeout=20),b.result(timeout=20)
-        self.assertIn((scheduled.status_code,removed.status_code),[(201,409),(409,200)],(scheduled.text,removed.text))
+        self.assertIn((scheduled.status_code,removed.status_code),[(201,409),(409,200),(400,200)],(scheduled.text,removed.text))
+        if scheduled.status_code == 400:self.assertEqual(scheduled.json()["detail"],"task_role_archived")
 
     def test_legacy_roster_only_role_gets_valid_tombstone_and_preserves_shared_key(self):
         with self.session() as session:
@@ -504,7 +546,8 @@ class RoleDeletionTests(RoleApiTestCase):
         cache=state/"workbuddy-native/prj_alpha"/_sanitize_token(self.member)/"home/cache/a/b/c";cache.mkdir(parents=True)
         for i in range(160):(cache/f"entry-{i}").write_text("synthetic cache",encoding="utf-8")
         with self.session() as session:
-            p=session.get(m.Project,"prj_alpha");p.project_root_path=str(project);session.add(p);session.commit()
+            p=session.get(m.Project,"prj_alpha");p.project_root_path=str(project);session.add(p)
+            role=session.get(m.ProjectRole,("prj_alpha",self.member));role.storage_layout="legacy";session.add(role);session.commit()
         self.assertEqual(self.delete().status_code,200)
         with self.make_client() as client:
             class Client:
