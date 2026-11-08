@@ -40,7 +40,8 @@ class CodexCommandTests(unittest.TestCase):
                     with self.subTest(profile=profile, command=name):
                         writable = sandbox == 'workspace-write'
                         expected = [
-                            'synthetic-codex', '-a', 'never', '--strict-config', '--disable', 'apps', 'exec',
+                            'synthetic-codex', '-a', 'never', '--strict-config', '--disable', 'apps',
+                            '--disable', 'remote_plugin', '--disable', 'plugins', 'exec',
                             '--model', 'synthetic-model', '--sandbox', sandbox, '--color', 'never',
                             '--skip-git-repo-check', '--ignore-rules',
                             '-c', 'windows.sandbox="' + ('elevated' if writable else 'unelevated') + '"',

@@ -202,7 +202,8 @@ class CodexRoleHost(rsh.HostManager):
         profile = load_profile(self.project, self.member)
         def command(prompt, sandbox):
             writable = sandbox == 'workspace-write'
-            parts = [self.codex_executable, '-a', 'never', '--strict-config', '--disable', 'apps', 'exec',
+            parts = [self.codex_executable, '-a', 'never', '--strict-config', '--disable', 'apps',
+                '--disable', 'remote_plugin', '--disable', 'plugins', 'exec',
                 '--model', config['model'], '--sandbox', sandbox, '--color', 'never',
                 '--skip-git-repo-check', '--ignore-rules',
                 '-c', 'windows.sandbox="' + ('elevated' if writable else 'unelevated') + '"',
