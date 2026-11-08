@@ -1,5 +1,19 @@
 # Project Progress
 
+## 原生准备修复与 UI 清理（2026-11-08 14:35）
+
+- **修复提交** `c35e343`（12 文件 +440/−58，567 后端 / 568 前端独立复核均 **approved**）：
+  - codex / kimi / **dsh** 原生准备按 `ProjectRole.storage_layout` 解析：workspace-v1 写入 `workspaces/<p>/roles/<m>/native-home/{.codex,.kimi-code,.dsh}`，legacy 逐字不变，未知布局写入前拒绝；
+  - codex 旧 `ready` 但目标配置缺失时回到 `requires_user_action/can_start`，可重新授权；codex `finish_native_login` 增加布局二次复核；
+  - 前端整段删除“运行时隔离待启用”通知区（iso function/循环/死过滤），进行中行与既有流程不变；强度空态保留简短说明。
+- **实机验证（运行时 pid 6700，开闸）**：
+  - legacy：Terra `ins_d998b83452e2`、k2.8 `ins_827aa9eb8b89` start → ready；
+  - **dsh 新布局角色**：`agent:prj-e8fe7066bbec.dsh-84640e53` 创建 → 启动 ready（`ins_278056e79d3c`）→ 停止 → 删除 5 步 complete（免设备码）；
+  - astra / rest01：native-setup 现为 `requires_user_action/can_start=true`（`native_model_configuration_required`），等用户重新授权后启动验证。
+- **任务列表**：原 26 个 submitted 已全部收取；当前仅剩 **286**（`agent:codex` 创建、manual_pause 旧排队）待用户决定是否取消。
+- **页面**：刷新后不再出现“角色已准备，运行时隔离待启用”；已归档/已删除成员的开通请求行不再占顶部。
+- **下一步**：用户重新授权 astra、rest01 → 验证启动；随后补 W3c 剩余（双工作区隔离、A 停 B 不停、恢复链）与文档收尾。
+
 ## W3c 完成快照（2026-11-08 12:55）
 
 - **开闸**：`TALK_WORKSPACE_RUNTIME_ENABLED=1` 已随运行时启动（当前 pid **11868**，venv 解释器）；`capability.json` 正常，新布局角色不再 409 `workspace_runtime_not_ready`。

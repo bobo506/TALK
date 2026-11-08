@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-08 14:35 — 原生准备布局修复（codex/kimi/dsh）与前端通知区清理
+
+- **后端**（560/562/565，567 复核 approved）：`scripts/codex_role_setup.py`、`scripts/kimi_role_setup.py`、`scripts/dsh_role_setup.py` 的原生准备 home 改为按 `ProjectRole.storage_layout` 解析——workspace-v1 用 `workspace_paths.native_home_dir(ROOT, project, member)` 下的 `.codex/.kimi-code/.dsh`，legacy 路径逐字不变，未知/空布局在目录/进程/命令写入前拒绝；`server/kimi_native_setup.py::_ready_home_exists` 按 runtime 分支（codex 查 `.codex/config.toml`、kimi 查 `.kimi-code/config.toml`、legacy True、未知布局 False），codex 旧 ready 无配置时可重新授权；codex `finish_native_login` 增加布局二次复核。三模块 62 项测试 exit 0。
+- **前端**（561/566，568 复核 approved）：整段删除 `role-creation.js` 的“运行时隔离待启用”通知区（`isolationFeedback`、通知卡片循环、`rolesByMember/archived` 死过滤、两处恒空调用点），进行中行/失败行/limited 提示保持基线；`workspace.js` 强度空态仅在无 options 时显示说明。Node 五套件 121 项全绿，mutant 自检可捕获文案/过滤回归。
+- **实机**：运行时以开闸变量重启（pid 6700）；legacy Terra/k2.8 start→ready（`ins_d998b83452e2`/`ins_827aa9eb8b89`）；dsh 临时 workspace 角色 `dsh-84640e53` 创建→启动 ready（`ins_278056e79d3c`）→停止→删除 5 步 complete；astra/rest01 native-setup 变为 `requires_user_action/can_start=true`，等待用户重新做设备码授权。
+- **任务清理**：26 个 submitted 全部收取（现 406 completed / 10 failed / 5 canceled）；仅 286 旧排队任务待用户决定是否取消。
+- **提交**：`c35e343`（12 文件 +440/−58）。
+
 ## 2026-11-08 12:55 — C 片完成：workspace-v1 角色删除与全链路 E2E
 
 - **C 迭代**：556（manager 步按布局解析 workspace manager health、双锁初版，profiles 步仍主动失败）→ 557（profile+Key 双锁先于删除、活锁/存活 manager 拒绝测试）→ 558（按 legacy 同款 `skip={".provision.lock",".provision.lock.guard"}` 清理三档/私有状态/日志，凭据按 workspace key 路径 + 回执摘要，幂等；同步 4 项旧断言与 2 项旧 HTTP 删除测试到 legacy 显式布局）→ 559 k2.8 **approved**（259 项 exit 0、legacy 零改动、基线 stash 对照证明 4 项旧失败属合同同步）。提交 `1fc95f4`（+199/−21）。
