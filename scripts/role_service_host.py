@@ -2138,6 +2138,38 @@ class HostManager:
             return None
         return found[0][0]
 
+    def _report_exited_children(self, project_id: str) -> None:
+        """Report a child exit once, retaining the handle if the receipt fails."""
+        for launch_id, handle in list(self._handles.items()):
+            record = handle.get("record") or {}
+            process = handle.get("process")
+            claim_token = handle.get("start_claim_token")
+            if (record.get("project_id") != project_id or process is None
+                    or not claim_token or process.poll() is None):
+                continue
+            member_id = str(record["member_id"])
+            diag = self._launch_diagnostics(
+                project_id=project_id, member_id=member_id, launch_id=launch_id,
+                instance_id=record.get("instance_id"), runtime=record.get("runtime"),
+                extra_secrets=(record.get("owner_token"), claim_token))
+            diag.record_event("bridge_process_exited", severity="warning", phase="start",
+                              stage="process", budgets=self._host_budgets(),
+                              extra={"child_pid": process.pid, "exit_code": process.poll(),
+                                     "error_code": "bridge_process_exited"})
+            try:
+                self._report_safely(
+                    diag, related_log_id=None, budgets=self._host_budgets(), child_pid=process.pid,
+                    launch_id=launch_id, generation=handle["generation"], action="start",
+                    claim_token=claim_token, owner_token=record["owner_token"], outcome="failed",
+                    instance_id=record["instance_id"], pid=process.pid,
+                    process_started_at=_parse_iso(record.get("process_started_at")),
+                    error_code="bridge_process_exited", spawned=True)
+            except (HostError, OSError, http.client.HTTPException):
+                continue
+            self._handles.pop(launch_id, None)
+            self.store.clear(project_id, member_id, launch_id)
+            self._drop_launch_diagnostics(launch_id)
+
     # ── start ───────────────────────────────────────────────────────
 
     def execute_start(self, launch: dict[str, Any]) -> dict[str, Any]:
@@ -2149,6 +2181,8 @@ class HostManager:
         launch_id = str(launch["launch_id"])
         project_id = str(launch["project_id"])
         member_id = str(launch["member_id"])
+
+        self._report_exited_children(project_id)
 
         # F2：本宿主仍持有同角色活进程时**不**领取新动作、**不**覆盖所有权。
         live = self._live_handles(project_id, member_id)
@@ -2499,7 +2533,8 @@ class HostManager:
         # 先登记活句柄（内存是所有权权威），再落私有记录：
         # 落盘失败也**不会**丢句柄，更不会留下无失败报告的无主子进程。
         self._handles[launch_id] = {
-            "process": process, "record": record, "record_persisted": False, "generation": generation
+            "process": process, "record": record, "record_persisted": False, "generation": generation,
+            "start_claim_token": claim_token,
         }
         diag.record_event(
             "spawned",
@@ -2622,7 +2657,11 @@ class HostManager:
                     "host": self.host,
                 },
             )
-            # 超时/失败**不**杀子进程：保留句柄与所有权记录，等人类显式 stop。
+            if process.poll() is not None:
+                self._report_exited_children(project_id)
+                return {"launch_id": launch_id, "member_id": member_id, "outcome": "failed",
+                        "error_code": "bridge_process_exited", **diagnostics}
+            # 仍存活时保留句柄与所有权，不能将超时伪装为退出。
             self._report_safely(
                 diag,
                 related_log_id=failure_ref,
@@ -2649,7 +2688,7 @@ class HostManager:
             }
         except Exception as exc:
             readiness_operation.finish("failed")
-            diag.record_exception(
+            failure_ref = diag.record_exception(
                 exc,
                 event="readiness_failed",
                 phase="start",
@@ -2664,6 +2703,19 @@ class HostManager:
                     "host": self.host,
                 },
             )
+            try:
+                if process.poll() is not None:
+                    self._report_exited_children(project_id)
+                else:
+                    self._report_safely(
+                        diag, related_log_id=failure_ref, budgets=spawn_budgets,
+                        child_pid=process.pid, launch_id=launch_id, generation=generation,
+                        action="start", claim_token=claim_token, owner_token=owner_token,
+                        outcome="failed", instance_id=None, pid=process.pid,
+                        process_started_at=started_wall, error_code="readiness_failed", spawned=True)
+            except Exception:
+                # Keep the original readiness exception and the ownership handle.
+                pass
             raise
         if self.workspace_context is not None:
             try:
@@ -2736,6 +2788,10 @@ class HostManager:
     ) -> bool:
         deadline = time.monotonic() + self.ready_timeout
         while time.monotonic() < deadline:
+            for handle in self._handles.values():
+                process = handle.get("process")
+                if process is not None and process.pid == expected_pid and process.poll() is not None:
+                    raise HostError("bridge_process_exited", "子进程在就绪前退出")
             payload = self.client.request(
                 "GET",
                 f"/api/instances?member_id={urllib.parse.quote(member_id)}"
@@ -3515,6 +3571,7 @@ class HostManager:
                 # 既有诊断包装已保证不抛；这里再兜底，日志失败不影响业务。
                 pass
             while True:
+                self._report_exited_children(project_id)
                 if self.workspace_context is not None:
                     draining = self._workspace_manager_tick(project_id)
                     if draining and not self._handles:

@@ -153,6 +153,56 @@ class RoleServiceRecoveryTests(RoleServiceTestCase):
         self.assertEqual(self.state_row().model_dump(), before)
         self.assertEqual(self.audits(), [])
 
+    def test_missing_instance_is_no_ownership_and_existing_mismatch_remains_guarded(self):
+        with self.session() as session:
+            instance = session.get(AgentInstance, self.claimed["expected_instance_id"])
+            instance.pid = 987654
+            session.add(instance)
+            session.commit()
+        self.assertEqual(self.plan().json()["detail"], "recovery_identity_mismatch")
+        stop = self.stop()
+        self.assertEqual((stop.status_code, stop.json()["detail"]), (409, "recovery_identity_mismatch"))
+        with self.session() as session:
+            instance = session.get(AgentInstance, self.claimed["expected_instance_id"])
+            session.delete(instance)
+            session.commit()
+        self.assertEqual(self.plan().json()["detail"], "recovery_no_ownership")
+        with self.session() as session:
+            from server.models import RoleServiceState
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            state.observed_instance_id = None
+            session.add(state)
+            session.commit()
+        self.assertEqual(self.plan().json()["detail"], "recovery_no_ownership")
+        self.assertEqual(self.audits(), [])
+
+    def test_stop_without_instance_row_succeeds_when_local_exit_proven(self):
+        with self.session() as session:
+            instance = session.get(AgentInstance, self.claimed["expected_instance_id"])
+            session.delete(instance)
+            session.commit()
+        with patch("server.role_services.socket.gethostname", return_value=HOST), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="exited"):
+            result = self.stop()
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertTrue(result.json()["idempotent_stopped"])
+            self.assertTrue(self.stop().json()["idempotent_stopped"])
+        self.assertIsNone(self.state_row().process_launch_id)
+
+    def test_stop_without_observed_instance_succeeds_when_local_exit_proven(self):
+        with self.session() as session:
+            from server.models import RoleServiceState
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            state.observed_instance_id = None
+            session.add(state)
+            session.commit()
+        with patch("server.role_services.socket.gethostname", return_value=HOST), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="exited"):
+            result = self.stop()
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertTrue(result.json()["idempotent_stopped"])
+        self.assertIsNone(self.state_row().process_launch_id)
+
     def test_fresh_heartbeat_blocks_recovery(self):
         self.set_instance_last_seen(self.claimed["expected_instance_id"], 0)
         result = self.recover()

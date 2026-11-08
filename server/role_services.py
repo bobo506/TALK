@@ -29,7 +29,9 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
+import socket
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -384,12 +386,47 @@ def _enqueue_start_launch(
 # ── 过期收敛 ─────────────────────────────────────────────────────────────
 
 
+def _dead_unreported_start(launch, state, session, now):
+    """Release only a locally verified, inactive instance with a dead process."""
+    if (state is None or launch.action != ROLE_SERVICE_ACTION_START
+            or launch.state not in (ROLE_SERVICE_LAUNCH_CLAIMED, ROLE_SERVICE_LAUNCH_EXPIRED)
+            or launch.claimed_at is None or launch.reported_at is not None
+            or _as_utc(launch.launch_expires_at) >= now
+            or state.current_launch_id != launch.launch_id
+            or state.process_launch_id != launch.launch_id
+            or state.generation != launch.generation
+            or not state.owner_host or not launch.claim_host
+            or state.owner_host.casefold() != launch.claim_host.casefold()
+            or state.owner_host.casefold() != socket.gethostname().casefold()):
+        return False
+    instance = session.get(AgentInstance, launch.expected_instance_id)
+    if (instance is None or instance.project_id != launch.project_id
+            or instance.member_id != launch.member_id or instance.launch_id != launch.launch_id
+            or not instance.host or instance.host.casefold() != state.owner_host.casefold()
+            or not instance.pid or instance.pid <= 0
+            or (state.pid is not None and state.pid != instance.pid)
+            or (state.observed_instance_id is not None and state.observed_instance_id != instance.id)
+            or instance.status == "busy" or instance.current_task_id
+            or instance.last_seen_at is None or _instance_is_fresh(instance, now)):
+        return False
+    if session.exec(select(AgentTask.id).where(
+        AgentTask.target_member_id == launch.member_id,
+        or_(AgentTask.status.in_(("queued", "running")), AgentTask.claim_token.is_not(None),
+            AgentTask.lease_expires_at.is_not(None)),
+    ).limit(1)).first() is not None:
+        return False
+    from scripts.role_service_recovery import recorded_process_state
+    return recorded_process_state(instance.pid, instance.process_started_at or instance.created_at) in (
+        "absent", "exited", "previous_boot", "pid_reused")
+
+
 def expire_due_launches(
     session: Session,
     *,
     now: Optional[datetime] = None,
     project_id: Optional[str] = None,
     member_id: Optional[str] = None,
+    proven_dead_only: bool = False,
 ) -> int:
     """把到期且未回报的动作标 ``expired``，并**只在仍是当前动作时**收敛角色状态。
 
@@ -407,6 +444,7 @@ def expire_due_launches(
                 ROLE_SERVICE_LAUNCH_PENDING,
                 ROLE_SERVICE_LAUNCH_CLAIMED,
                 ROLE_SERVICE_LAUNCH_REPORTED,
+                ROLE_SERVICE_LAUNCH_EXPIRED,
             )
         ),
         RoleServiceLaunch.launch_expires_at < now,
@@ -418,6 +456,31 @@ def expire_due_launches(
     expired = 0
     for launch in session.exec(stmt).all():
         state = _get_state(launch.project_id, launch.member_id, session)
+        proven_dead = _dead_unreported_start(launch, state, session, now)
+        if proven_dead_only and not proven_dead:
+            continue
+        if launch.state == ROLE_SERVICE_LAUNCH_EXPIRED and not proven_dead:
+            continue
+        if proven_dead:
+            launch.state = ROLE_SERVICE_LAUNCH_EXPIRED
+            launch.updated_at = now
+            state.desired_state = ROLE_SERVICE_DESIRED_STOPPED
+            state.observed_state = ROLE_SERVICE_OBSERVED_FAILED
+            state.last_result = ROLE_SERVICE_RESULT_FAILED
+            state.last_error_code = ROLE_SERVICE_ERROR_READINESS_TIMEOUT
+            state.last_error_message = "expired start released after local process exit was verified"
+            state.current_launch_id = None
+            state.process_launch_id = None
+            state.observed_instance_id = None
+            state.owner_host = None
+            state.pid = None
+            state.process_started_at = None
+            state.spawned = None
+            state.updated_at = now
+            logging.getLogger(__name__).info("released expired claimed start project=%s member=%s launch=%s",
+                                             launch.project_id, launch.member_id, launch.launch_id)
+            expired += 1
+            continue
         if launch.state == ROLE_SERVICE_LAUNCH_REPORTED:
             # 已回报的动作：只有“合法 ready 回报但缺实例证据”必须在截止后收敛为
             # readiness_timeout（不能 reported 让 starting 永久悬挂）；
@@ -670,6 +733,7 @@ def _idempotent_stopped(
     target.last_error_message = None
     target.current_launch_id = None
     target.process_launch_id = None
+    target.observed_instance_id = None
     target.owner_host = None
     target.spawned = False
     target.pid = None
@@ -769,9 +833,40 @@ def stop_role_service(
     ):
         raise _fail(status.HTTP_409_CONFLICT, ROLE_SERVICE_ERROR_UNKNOWN_OWNER)
 
+    instance = session.get(AgentInstance, state.observed_instance_id) if state.observed_instance_id else None
+    if instance is not None and (
+        start_launch.expected_instance_id != state.observed_instance_id
+        or instance.project_id != project_id or instance.member_id != member_id
+        or instance.launch_id != state.process_launch_id
+        or (state.pid is not None and instance.pid != state.pid)
+    ):
+        raise _fail(status.HTTP_409_CONFLICT, "recovery_identity_mismatch")
+
     blockers = _stop_blockers(state, start_launch, session)
     if blockers:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blockers)
+
+    # A missing instance alone is not proof of exit: a claimed bridge may be
+    # alive before registration.  For a local PID, however, an OS-verified exit
+    # provides the missing proof without requiring the recovery workflow.
+    expected_instance = (session.get(AgentInstance, start_launch.expected_instance_id)
+                         if instance is None and start_launch.expected_instance_id else instance)
+    if (instance is None and expected_instance is not None and (
+            expected_instance.project_id != project_id or expected_instance.member_id != member_id
+            or expected_instance.launch_id != state.process_launch_id
+            or (state.pid is not None and expected_instance.pid != state.pid))):
+        raise _fail(status.HTTP_409_CONFLICT, "recovery_identity_mismatch")
+    if (instance is None and (expected_instance is None or not _instance_is_fresh(expected_instance, now))
+            and state.owner_host and start_launch.claim_host
+            and state.owner_host.casefold() == start_launch.claim_host.casefold()
+            and state.owner_host.casefold() == socket.gethostname().casefold()
+            and state.pid and state.pid > 0 and state.process_started_at is not None):
+        from scripts.role_service_recovery import recorded_process_state
+        if recorded_process_state(state.pid, state.process_started_at) in (
+                "absent", "exited", "previous_boot", "pid_reused"):
+            return _idempotent_stopped(
+                project_id, member_id, ctx.role.role_name, state, session, now, operator
+            )
 
     old_generation = state.generation or 0
     new_generation = old_generation + 1
@@ -1187,6 +1282,34 @@ def report_role_service_launch(
         # 即使截止后也不改当前状态。
         if launch.report_fingerprint == fingerprint:
             return _receipt(launch, state, replayed=True)
+        # The original host may subsequently observe that its own child exited.
+        # Authenticate exactly as for the initial receipt and bind the exit to
+        # the still-current generation and PID before releasing ownership.
+        if (launch.action == ROLE_SERVICE_ACTION_START
+                and outcome == ROLE_SERVICE_OUTCOME_FAILED
+                and error_code == "bridge_process_exited" and spawned is True
+                and state is not None and state.current_launch_id == launch.launch_id
+                and state.process_launch_id == launch.launch_id
+                and state.generation == launch.generation
+                and pid is not None and state.pid == pid
+                and instance_id == launch.expected_instance_id):
+            launch.outcome = outcome
+            launch.error_code = error_code
+            launch.reported_at = now
+            launch.report_fingerprint = fingerprint
+            launch.updated_at = now
+            state.observed_state = ROLE_SERVICE_OBSERVED_FAILED
+            state.last_result = ROLE_SERVICE_RESULT_FAILED
+            state.last_error_code = error_code
+            state.last_error_message = "host reported that its bridge process exited"
+            state.process_launch_id = None
+            state.observed_instance_id = None
+            state.owner_host = None
+            state.pid = None
+            state.process_started_at = None
+            state.updated_at = now
+            session.commit()
+            return _receipt(launch, state, replayed=False)
         raise _fail(status.HTTP_409_CONFLICT, ROLE_SERVICE_ERROR_REPORT_CONFLICT)
     # 已被新动作取代（世代/当前动作不匹配）的旧动作：首次迟到一律 ``stale_report``，
     # 只写审计，绝不覆盖新世代。
@@ -1237,13 +1360,19 @@ def report_role_service_launch(
             state.last_result = ROLE_SERVICE_RESULT_FAILED
             state.last_error_code = error_code
             state.last_error_message = "service reported failure"
-            # R1-3 返修 F2：失败**不**等于可以重试。只有宿主明确“没有 spawn 过”
-            # （纯预检/凭据/入口失败）时才释放原所有权；已 spawn 的失败（就绪超时、
-            # 落盘异常、上报异常）必须保留 ``process_launch_id``/pid，让人类先 stop。
+            # 一般失败不能证明进程退出：明确未 spawn 或宿主回报本次子进程已退出时
+            # 才释放所有权；其余已 spawn 失败保留 process_launch_id/pid 供停止。
             # 旧宿主不传 ``spawned`` 时保守回退：带 pid 即视为已 spawn。
             did_spawn = spawned if spawned is not None else (pid is not None)
             state.spawned = bool(did_spawn)
-            if did_spawn:
+            if did_spawn and error_code == "bridge_process_exited" and instance_id == launch.expected_instance_id and pid:
+                # Authenticated host reports the exit of the child it spawned.
+                state.process_launch_id = None
+                state.observed_instance_id = None
+                state.owner_host = None
+                state.pid = None
+                state.process_started_at = None
+            elif did_spawn:
                 if pid is not None:
                     state.pid = pid
                 if process_started_at is not None:
@@ -1418,6 +1547,7 @@ def build_service_projection(
     else:
         alias_state = ROLE_SERVICE_MODEL_ALIAS_UNCONFIGURED
 
+    releasable = launch is not None and _dead_unreported_start(launch, state, session, now)
     can_start = (
         not archived
         and not archived_missing
@@ -1425,7 +1555,7 @@ def build_service_projection(
         and effective_control == RUNNER_CONTROL_MANAGED_CLI
         and observed
         not in (ROLE_SERVICE_OBSERVED_STARTING, ROLE_SERVICE_OBSERVED_RUNNING)
-        and not ownership_held(state)
+        and (not ownership_held(state) or releasable)
     )
     can_stop = (
         not archived
@@ -1537,8 +1667,21 @@ def project_role_service(
 def list_role_services(
     project_id: str, session: Session, *, now: Optional[datetime] = None
 ) -> list[RoleServiceProjectionOut]:
-    """``GET /api/projects/{project_id}/role-services`` 的只读投影（页面轮询用）。"""
+    """页面轮询时持久收敛已验证退出的过期领取，再返回服务投影。"""
     now = now or _now()
+    # 投影只在存在可证明已退出的候选时获取写锁；持锁后重新核验全部证据，
+    # 避免读取与写入之间发生世代、任务或实例身份变化。
+    candidates = session.exec(select(RoleServiceLaunch).where(
+        RoleServiceLaunch.project_id == project_id,
+        RoleServiceLaunch.action == ROLE_SERVICE_ACTION_START,
+        RoleServiceLaunch.state.in_((ROLE_SERVICE_LAUNCH_CLAIMED, ROLE_SERVICE_LAUNCH_EXPIRED)),
+        RoleServiceLaunch.launch_expires_at < now,
+    )).all()
+    if any(_dead_unreported_start(launch, _get_state(project_id, launch.member_id, session), session, now)
+           for launch in candidates):
+        _write_begin(session)
+        if expire_due_launches(session, now=now, project_id=project_id, proven_dead_only=True):
+            session.commit()
     role_rows = session.exec(
         select(ProjectRole).where(ProjectRole.project_id == project_id)
     ).all()

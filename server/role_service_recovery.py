@@ -41,10 +41,12 @@ def candidate(project_id: str, member_id: str, session: Session, now: datetime, 
         fail("recovery_no_ownership")
     launch = session.get(RoleServiceLaunch, state.process_launch_id)
     instance = session.get(AgentInstance, state.observed_instance_id) if state.observed_instance_id else None
+    if instance is None:
+        fail("recovery_no_ownership")
     if (launch is None or launch.action != "start" or launch.project_id != project_id
             or launch.member_id != member_id or launch.claim_host != state.owner_host
             or launch.expected_instance_id != state.observed_instance_id
-            or instance is None or instance.project_id != project_id or instance.member_id != member_id
+            or instance.project_id != project_id or instance.member_id != member_id
             or instance.launch_id != state.process_launch_id or instance.pid != state.pid
             or not state.owner_host or not state.pid or state.pid <= 0
             or state.process_started_at is None or instance.last_seen_at is None):

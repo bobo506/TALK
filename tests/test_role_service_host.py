@@ -748,6 +748,25 @@ class RoleServiceHostLoopTests(RoleServiceTestCase):
         self.assertIsNone(self.manager._handles.get(launch["launch_id"]))
         self.assertFalse(record_path.exists())
 
+    def test_exited_bridge_reports_failure_and_next_launch_can_be_claimed(self):
+        launch = self._start_launch_via_api()
+        self.assertEqual(self.manager.execute_start(launch)["outcome"], "ready")
+        self._track(self.manager)
+        process = self.manager._handles[launch["launch_id"]]["process"]
+        process.terminate()
+        process.wait(timeout=10)
+        self.manager._report_exited_children("prj_alpha")
+        self.manager._report_exited_children("prj_alpha")
+        self.assertNotIn(launch["launch_id"], self.manager._handles)
+        self.assertIsNone(self.state_row().process_launch_id)
+        self.assertEqual(self.state_row().last_error_code, "bridge_process_exited")
+        self.assertEqual(self.launch_row(launch["launch_id"]).outcome, "failed")
+        next_launch = self._start_launch_via_api()
+        try:
+            self.assertEqual(self.manager.execute_start(next_launch)["outcome"], "ready")
+        finally:
+            self._track(self.manager)
+
     def test_stop_without_live_handle_reports_unknown_owner_and_does_not_kill(self):
         launch = self._start_launch_via_api()
         outcome = self.manager.execute_start(launch)
@@ -1142,6 +1161,52 @@ class RoleServiceHostOwnershipUnitTests(unittest.TestCase):
         self.assertEqual(record["launch_id"], "start1")
         # 失败也带 spawned=True 的失败报告（服务端据此保留所有权）。
         self.assertTrue(any(row.get("spawned") is True for row in client.reports))
+
+    def test_child_exits_before_ready_is_reported_and_handle_released(self):
+        client = FakeHostClient()
+        manager = self._manager(client)
+        first, second = FakeProcess(211), FakeProcess(212)
+        first.exited = True
+        with patch.object(manager, "preflight", return_value=_fake_facts(self.key)), patch(
+            "scripts.role_service_host.spawn_hidden", side_effect=[first, second]
+        ), patch.object(manager, "_wait_ready", side_effect=[HostError("readiness_timeout"), True]):
+            result = manager.execute_start(self._launch(client, "exited"))
+            self.assertEqual(result["error_code"], "bridge_process_exited")
+            self.assertNotIn("exited", manager._handles)
+            self.assertEqual(client.reports[0]["error_code"], "bridge_process_exited")
+            self.assertTrue(client.reports[0]["spawned"])
+            self.assertEqual(manager.execute_start(self._launch(client, "retry", 2))["outcome"], "ready")
+        self.assertEqual(len(client.claims), 2)
+
+    def test_exit_report_transport_failure_keeps_handle_for_retry(self):
+        client = FakeHostClient()
+        manager = self._manager(client)
+        process = FakeProcess(213)
+        process.exited = True
+        with patch.object(manager, "preflight", return_value=_fake_facts(self.key)), patch(
+            "scripts.role_service_host.spawn_hidden", return_value=process
+        ), patch.object(manager, "_wait_ready", side_effect=HostError("readiness_timeout")), patch.object(
+            manager, "_report", side_effect=HostError("host_unreachable")
+        ):
+            manager.execute_start(self._launch(client, "retry-report"))
+        self.assertIn("retry-report", manager._handles)
+        manager._report_exited_children("prj_probe")
+        manager._report_exited_children("prj_probe")
+        self.assertNotIn("retry-report", manager._handles)
+        self.assertEqual(len(client.reports), 1)
+
+    def test_unexpected_readiness_error_is_reported_and_preserves_live_child(self):
+        client = FakeHostClient()
+        manager = self._manager(client)
+        process = FakeProcess(214)
+        with patch.object(manager, "preflight", return_value=_fake_facts(self.key)), patch(
+            "scripts.role_service_host.spawn_hidden", return_value=process
+        ), patch.object(manager, "_wait_ready", side_effect=ValueError("fixture failure")):
+            with self.assertRaises(ValueError):
+                manager.execute_start(self._launch(client, "unexpected"))
+        self.assertIn("unexpected", manager._handles)
+        self.assertEqual(client.reports[0]["error_code"], "readiness_failed")
+        self.assertTrue(client.reports[0]["spawned"])
 
     def test_ownership_write_failure_after_spawn_keeps_handle_and_reports(self):
         client = FakeHostClient()

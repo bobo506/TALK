@@ -669,6 +669,22 @@ class RoleServiceProtocolTests(RoleServiceTestCase):
             wrong_generation.json()["detail"], ROLE_SERVICE_ERROR_STALE_REPORT
         )
 
+    def test_exit_report_checks_pid_and_replays_without_mutation(self):
+        launch, claim = self.start_and_claim()
+        self.bind_instance(launch, claim)
+        self.assertEqual(self.ready_report(launch, claim).status_code, 200)
+        wrong = self.ready_report(launch, claim, outcome="failed", error_code="bridge_process_exited",
+                                  spawned=True, pid=9999)
+        self.assertEqual(wrong.status_code, 409)
+        self.assertEqual(self.state_row().process_launch_id, launch["launch_id"])
+        first = self.ready_report(launch, claim, outcome="failed", error_code="bridge_process_exited", spawned=True)
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertFalse(first.json()["replayed"])
+        replay = self.ready_report(launch, claim, outcome="failed", error_code="bridge_process_exited", spawned=True)
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertTrue(replay.json()["replayed"])
+        self.assertIsNone(self.state_row().process_launch_id)
+
     def test_identical_replay_is_read_only_even_after_deadline(self):
         launch, claim = self.start_and_claim()
         first = self.ready_report(launch, claim)
@@ -1380,6 +1396,72 @@ class RoleServiceProjectionTests(RoleServiceTestCase):
         self.assertFalse(row["can_stop"])
         self.assertEqual(before_state, self.state_row().model_dump())
         self.assertEqual(before_launch, self.launch_row(launch["launch_id"]).model_dump())
+
+    def test_dead_expired_unreported_claim_is_released_and_retryable(self):
+        launch, claim = self.start_and_claim(host="local-fixture")
+        self.bind_instance(launch, claim, host="local-fixture")
+        self.set_instance_last_seen(claim["expected_instance_id"], 120)
+        with patch("server.role_services.socket.gethostname", return_value="local-fixture"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"):
+            self.assertFalse(self.projected_service()["can_start"])
+            self.set_launch_expired(launch["launch_id"])
+            self.assertTrue(self.projected_service()["can_start"])
+            response = self.start()
+            self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.launch_row(launch["launch_id"]).state, "expired")
+        state = self.state_row()
+        self.assertIsNone(state.process_launch_id)
+        self.assertNotEqual(state.current_launch_id, launch["launch_id"])
+
+    def test_service_poll_persists_release_before_next_start(self):
+        launch, claim = self.start_and_claim(host="local-fixture")
+        self.bind_instance(launch, claim, host="local-fixture")
+        self.set_instance_last_seen(claim["expected_instance_id"], 120)
+        self.set_launch_expired(launch["launch_id"])
+        with patch("server.role_services.socket.gethostname", return_value="local-fixture"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="exited"):
+            self.assertTrue(self.projected_service()["can_start"])
+            self.assertIsNone(self.state_row().process_launch_id)
+            self.assertEqual(self.launch_row(launch["launch_id"]).state, "expired")
+            response = self.start()
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(self.claim(response.json()["launch_id"], {
+                "host": "local-fixture", "expected_instance_id": response.json()["expected_instance_id"]
+            }, key=self.role_a_key).status_code, 200)
+
+    def test_expired_claim_with_fresh_or_live_instance_is_not_released(self):
+        launch, claim = self.start_and_claim(host="local-fixture")
+        self.bind_instance(launch, claim, host="local-fixture")
+        self.set_launch_expired(launch["launch_id"])
+        with patch("server.role_services.socket.gethostname", return_value="local-fixture"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent"):
+            self.assertFalse(self.projected_service()["can_start"])
+        self.set_instance_last_seen(claim["expected_instance_id"], 120)
+        with patch("server.role_services.socket.gethostname", return_value="local-fixture"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="present"):
+            self.assertFalse(self.projected_service()["can_start"])
+            self.assertEqual(self.start().status_code, 409)
+        self.assertEqual(self.state_row().process_launch_id, launch["launch_id"])
+
+    def test_expired_claim_with_remote_or_busy_instance_is_not_released(self):
+        launch, claim = self.start_and_claim(host="local-fixture")
+        self.bind_instance(launch, claim, host="local-fixture")
+        self.set_launch_expired(launch["launch_id"])
+        self.set_instance_last_seen(claim["expected_instance_id"], 120)
+        with patch("server.role_services.socket.gethostname", return_value="remote-fixture"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent") as probe:
+            self.assertFalse(self.projected_service()["can_start"])
+            probe.assert_not_called()
+        with self.session() as session:
+            instance = session.get(AgentInstance, claim["expected_instance_id"])
+            instance.status = "busy"
+            session.add(instance)
+            session.commit()
+        with patch("server.role_services.socket.gethostname", return_value="local-fixture"), \
+             patch("scripts.role_service_recovery.recorded_process_state", return_value="absent") as probe:
+            self.assertFalse(self.projected_service()["can_start"])
+            probe.assert_not_called()
+        self.assertEqual(self.state_row().process_launch_id, launch["launch_id"])
 
     def test_claimed_start_timeout_keeps_owner_and_cannot_restart(self):
         launch, claim = self.start_and_claim()
