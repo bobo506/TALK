@@ -38,7 +38,19 @@ DB_PATH: str = CONFIG["storage"]["db_path"]
 # ── Engine ───────────────────────────────────────────────────────────
 
 _db_url = f"sqlite:///{DB_PATH}"
-engine = create_engine(_db_url, echo=False, connect_args={"check_same_thread": False})
+# 2026-11-08 应急：绑定读取可能在请求内同步探测运行器能力（最长 60s），
+# 默认 5+10 连接会被占满，进而让异步路由在事件循环里同步等连接、监听队列停止 accept。
+# 先放大连接池恢复可用性；正式修复见后续性能切片（探测移出会话/线程池）。
+# Keep capacity for concurrent API requests, SSE backfill and runtime polling.
+# WAL still serializes writers; 60 connections are burst capacity, not write throughput.
+engine = create_engine(
+    _db_url,
+    echo=False,
+    connect_args={"check_same_thread": False},
+    pool_size=30,
+    max_overflow=30,
+    pool_timeout=15,
+)
 
 
 def init_db() -> None:

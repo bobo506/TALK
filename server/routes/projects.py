@@ -10,6 +10,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import os
+import logging
+import time
+import queue
+import threading
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,6 +27,7 @@ from sqlmodel import Session, select
 
 from cli.profiles import load_profile, resolve_profile_path, write_profile_file
 from server.workbuddy_effort import runtime_options_for_facts
+from server import workbuddy_effort as effort_cache
 from server.auth import get_current_member
 from server.workspace_paths import resolve_profile_reference
 from server.role_deletions import RoleDeletion, public as deletion_public
@@ -593,7 +598,11 @@ def list_project_agents(
         .where(ProjectAgent.project_id == project_id)
         .order_by(ProjectAgent.member_id)
     ).all()
-    return _project_agent_outs(list(agents), session, project_id=project_id)
+    result = _project_agent_outs(list(agents), session, project_id=project_id)
+    # Probes start only after the request's shared authentication session is closed.
+    session.close()
+    _schedule_binding_refresh(result)
+    return result
 
 
 @router.get("/{project_id}/agents/{member_id:path}/profile", response_model=AgentProfileOut)
@@ -732,10 +741,80 @@ def update_agent_role_description(
     )
 
 
+def _cached_runtime_options(facts):
+    facts = facts or {}
+    model = facts.get("model_alias")
+    if facts.get("runtime") != "workbuddy" or not effort_cache.is_acp_alias(model):
+        return None, None
+    with effort_cache._lock:
+        cached = effort_cache._cache.get(model)
+        options = list(cached[1]) if cached and time.monotonic() < cached[0] else []
+    return (options, "adapter") if options else (None, None)
+
+
+def _refresh_runtime_options(facts):
+    started = time.monotonic()
+    try:
+        return runtime_options_for_facts(facts)
+    finally:
+        logging.getLogger("talk.diagnostics").debug(
+            "binding effort probe duration_ms=%d", int((time.monotonic() - started) * 1000)
+        )
+
+
+# One bounded daemon worker avoids per-role probe fan-out and never holds a DB session.
+_effort_refresh_queue = queue.Queue(maxsize=16)
+_effort_refresh_lock = threading.Lock()
+_effort_refresh_pending = set()
+_effort_refresh_worker = None
+
+
+def _effort_refresh_loop():
+    while True:
+        model = _effort_refresh_queue.get()
+        try:
+            _refresh_runtime_options({"runtime": "workbuddy", "model_alias": model})
+        except Exception:
+            logging.getLogger("talk.diagnostics").exception("binding effort background refresh failed")
+        finally:
+            with _effort_refresh_lock:
+                _effort_refresh_pending.discard(model)
+            _effort_refresh_queue.task_done()
+
+
+def _schedule_binding_refresh(agents):
+    global _effort_refresh_worker
+    for agent in agents:
+        binding = agent.binding
+        if (binding is None or binding.effort_source == "catalog"
+                or binding.runtime != "workbuddy"
+                or not effort_cache.is_acp_alias(binding.model_alias)):
+            continue
+        model = binding.model_alias
+        with effort_cache._lock:
+            cached = effort_cache._cache.get(model)
+            if cached and time.monotonic() < cached[0]:
+                continue
+        with _effort_refresh_lock:
+            if model in _effort_refresh_pending:
+                continue
+            try:
+                _effort_refresh_queue.put_nowait(model)
+            except queue.Full:
+                break
+            _effort_refresh_pending.add(model)
+            if _effort_refresh_worker is None or not _effort_refresh_worker.is_alive():
+                _effort_refresh_worker = threading.Thread(
+                    target=_effort_refresh_loop, name="talk-effort-probe", daemon=True
+                )
+                _effort_refresh_worker.start()
+
+
 def _binding_with_runtime_effort(facts):
     binding = build_role_binding_out(facts)
     if binding is not None and binding.effort_source != "catalog":
-        options, source = runtime_options_for_facts(facts)
+        # Read only an already-populated cache while the request owns a session.
+        options, source = _cached_runtime_options(facts)
         if options is not None:
             binding.effort_options = options
             binding.effort_source = source
@@ -769,6 +848,7 @@ def get_agent_role_binding(
     member_id: str,
     current: Member = Depends(get_current_member),
     session: Session = Depends(get_session),
+    refresh_effort: bool = Query(False),
 ):
     """读取单角色绑定（任意已认证成员可读；合同 §4.3）。
 
@@ -778,9 +858,16 @@ def get_agent_role_binding(
     - 成员已离册/已删除/被禁用/非 agent 时**仍返回**保留的存储行与失效状态
       （不 404、不自动清理），因为“存着但不有效”正是需要如实展示的事实；
     - ``binding: null`` 只表示**没有存储行**，不伪造默认运行器或模型；
-    - 读取只做一条事实 SQL：不 UPDATE、不自动清理、不做第二条补查询。
+    - Normal reads use one facts query; refresh releases the session, probes, then re-reads.
     """
     target_member_id = member_id.strip()
+    if not refresh_effort:
+        return _binding_response(project_id, target_member_id, session)
+    facts = read_role_binding_facts(session, project_id=project_id, member_id=target_member_id)
+    _require_facts_project(facts)
+    session.close()
+    _refresh_runtime_options(facts)
+    # Reload after probing; the binding may have changed.
     return _binding_response(project_id, target_member_id, session)
 
 
@@ -953,6 +1040,7 @@ def set_agent_role_binding_effort_override(
       ``updated_at`` 如实记录），不引入新 CAS。
     """
     _require_human(current)
+    current_id = current.id
     _get_project(project_id, session)
     target_member_id = member_id.strip()
     binding = session.get(ProjectRoleBinding, (project_id, target_member_id))
@@ -991,7 +1079,21 @@ def set_agent_role_binding_effort_override(
     }
     resolved = resolve_role_effort(effort_facts)
     if resolved["effort_source"] is None:
-        runtime_options, _ = runtime_options_for_facts(effort_facts)
+        session.close()
+        _refresh_runtime_options(effort_facts)
+        # Reload after probing; the binding may have changed.
+        binding = session.get(ProjectRoleBinding, (project_id, target_member_id))
+        if binding is None:
+            raise HTTPException(status_code=404, detail="role_binding_not_found")
+        runner = session.get(RunnerRegistry, binding.runner_id) if binding.runner_id else None
+        effort_facts = {
+            "model_alias": binding.model_alias,
+            "runtime": runner.runtime if runner is not None else None,
+            "default_effort": binding.default_effort,
+            "effort_override": binding.effort_override,
+            "supported_efforts": binding.supported_efforts,
+        }
+        runtime_options, _ = _cached_runtime_options(effort_facts)
         resolved = resolve_role_effort(effort_facts, runtime_options)
     if resolved["effort_source"] is None:
         raise HTTPException(
@@ -1005,7 +1107,7 @@ def set_agent_role_binding_effort_override(
         )
     if binding.effort_override != value:
         binding.effort_override = value
-        binding.updated_by = current.id
+        binding.updated_by = current_id
         binding.updated_at = datetime.now(timezone.utc)
         session.add(binding)
         session.commit()

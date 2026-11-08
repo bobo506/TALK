@@ -1844,3 +1844,40 @@ class WorkspaceReadyCapabilityTests(RoleServiceTestCase):
                 response = self.ready_report(launch, claim)
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertEqual(self.state_row().observed_state, ROLE_SERVICE_OBSERVED_RUNNING)
+
+
+class AvailabilityTests(RoleServiceTestCase):
+    def test_concurrent_health_checks_use_distinct_files(self):
+        from concurrent.futures import ThreadPoolExecutor
+        import server.main as main
+        with patch.object(main, "STORAGE_DIR", self.storage_dir):
+            with ThreadPoolExecutor(max_workers=20) as pool:
+                responses = list(pool.map(lambda _: main.healthz().status_code, range(80)))
+        self.assertEqual(responses, [200] * 80)
+        self.assertEqual(list(self.storage_dir.glob(".healthcheck*")), [])
+
+    def test_sse_authentication_does_not_block_event_loop(self):
+        import asyncio
+        import server.main as main
+        from fastapi import HTTPException
+        started, release = threading.Event(), threading.Event()
+        def slow_auth(token):
+            started.set()
+            release.wait(5)
+            return None
+        async def exercise():
+            with patch.object(main, "_resolve_sse_member", side_effect=slow_auth):
+                task = asyncio.create_task(main.sse_events(None, token="fixture", last_event_id=None, last_event_id_header=None))
+                for _ in range(100):
+                    if started.is_set():
+                        break
+                    await asyncio.sleep(.01)
+                self.assertTrue(started.is_set())
+                self.assertFalse(task.done())
+                release.set()
+                with self.assertRaises(HTTPException):
+                    await task
+        try:
+            asyncio.run(exercise())
+        finally:
+            release.set()

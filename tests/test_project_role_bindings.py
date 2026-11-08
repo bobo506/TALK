@@ -1876,3 +1876,81 @@ class RoleBindingFactsTests(BindingApiTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BindingProbeIsolationTests(BindingApiTestCase):
+    def test_roster_warms_one_probe_after_releasing_session(self):
+        from server import workbuddy_effort as cache
+        project = "prj_probe_warmup"
+        self.register_project(project)
+        self.sync(project, [{"member_id": "agent:worker"}, {"member_id": "agent:other"}])
+        self.register_runner(runtime="workbuddy")
+        for member in ("agent:worker", "agent:other"):
+            self.put_binding(project, member, self.binding_payload(model_alias="workbuddy-acp:warm-test"))
+        cache._cache.clear()
+        started, release = threading.Event(), threading.Event()
+        calls = []
+        def probe(model):
+            calls.append((model, self.engine.pool.checkedout()))
+            started.set()
+            if not release.wait(10):
+                raise RuntimeError("probe timeout")
+            return ["high"]
+        try:
+            with patch.object(cache, "probe_effort_options", side_effect=probe):
+                with self.make_client() as client:
+                    first = client.get(f"/api/projects/{project}/agents", headers={"X-API-Key": "bobo-key"})
+                    self.assertEqual(first.status_code, 200)
+                    self.assertTrue(started.wait(5))
+                    self.assertEqual(calls, [("warm-test", 0)])
+                    second = client.get(f"/api/projects/{project}/agents", headers={"X-API-Key": "bobo-key"})
+                    self.assertEqual(second.status_code, 200)
+                    self.assertEqual(len(calls), 1)
+                    release.set()
+                    projects_route._effort_refresh_queue.join()
+                    third = client.get(f"/api/projects/{project}/agents", headers={"X-API-Key": "bobo-key"})
+                    self.assertEqual([row["binding"]["effort_options"] for row in third.json()], [["high"], ["high"]])
+        finally:
+            release.set()
+            projects_route._effort_refresh_queue.join()
+            cache._cache.clear()
+
+    def test_explicit_probe_releases_session_and_list_does_not_wait(self):
+        from server import workbuddy_effort as cache
+        project = "prj_probe_isolation"
+        self.register_project(project)
+        self.sync(project, [{"member_id": "agent:worker"}])
+        self.register_runner(runtime="workbuddy")
+        self.put_binding(project, "agent:worker", self.binding_payload(model_alias="workbuddy-acp:probe-test"))
+        cache._cache.clear()
+        started, release = threading.Event(), threading.Event()
+        checked_out = []
+        result = []
+        def probe(model):
+            checked_out.append(self.engine.pool.checkedout())
+            started.set()
+            if not release.wait(10):
+                raise RuntimeError("probe timeout")
+            return ["high"]
+        def refresh():
+            with self.make_client() as client:
+                result.append(client.get(f"/api/projects/{project}/agents/agent:worker/binding?refresh_effort=true", headers={"X-API-Key": "bobo-key"}))
+        try:
+            with patch.object(cache, "probe_effort_options", side_effect=probe):
+                thread = threading.Thread(target=refresh)
+                thread.start()
+                try:
+                    self.assertTrue(started.wait(5))
+                    self.assertEqual(checked_out, [0])
+                    with self.make_client() as client:
+                        response = client.get(f"/api/projects/{project}/roles", headers={"X-API-Key": "bobo-key"})
+                        detail = client.get(f"/api/projects/{project}/agents/agent:worker/binding", headers={"X-API-Key": "bobo-key"})
+                    self.assertEqual((response.status_code, detail.status_code), (200, 200))
+                    self.assertFalse(release.is_set())
+                finally:
+                    release.set()
+                    thread.join(10)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(result[0].json()["binding"]["effort_options"], ["high"])
+        finally:
+            cache._cache.clear()

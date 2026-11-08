@@ -732,6 +732,18 @@ class TalkRuntime:
             self.statuses[member] = {"state":"starting","pid":process.pid}
             self.event("host_started", context={"member_id": member, "child_pid": process.pid, "stage": "startup"})
 
+    def reconcile_tick(self):
+        # Run every loop once startup recovery has finished. Provisioning may
+        # finish on any tick; never defer new managers to a long timer.
+        self.worker_tick()
+        roles = self.roles()
+        self.reconcile_deletions(roles)
+        self.reconcile_hosts(roles)
+        if not self.effort_refreshed:
+            self.effort_refreshed = True
+            threading.Thread(target=self.refresh_dsh_efforts, args=(roles,),
+                             name="talk-effort-refresh", daemon=True).start()
+
     def _dsh_reasoning_effort(self, member):
         """读取 DSH 角色 patch 里的 reasoningEffort；没有就返回 None（不猜）。"""
         import re
@@ -1010,13 +1022,7 @@ class TalkRuntime:
                 if self.startup_state not in ("complete","failed","unsupported") or (self.startup_thread and self.startup_thread.is_alive()):
                     self.sleep(2)
                     continue
-                self.worker_tick()
-                roles = self.roles()
-                self.reconcile_deletions(roles)
-                self.reconcile_hosts(roles)
-                if not self.effort_refreshed:
-                    self.effort_refreshed = True
-                    self.refresh_dsh_efforts(roles)
+                self.reconcile_tick()
             except (rsh.HostError, OSError, ValueError) as exc:
                 self.worker_error = getattr(exc, "code", None) or type(exc).__name__
                 self.event("runtime_exception", context={"stage": "serve", "error_code": self.worker_error}, exc=exc)

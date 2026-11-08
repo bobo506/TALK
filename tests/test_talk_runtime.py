@@ -364,6 +364,19 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(spec["argv"][spec["argv"].index("--role-key-file") + 1], str(override))
         self.assertNotIn("workspace_context", spec)
 
+    def test_new_role_starts_on_next_reconcile_tick_without_duplicates(self):
+        self.config["hosts"] = [self.spec()]
+        role = self.role(generation=1, ownership_held=False)
+        self.runtime.effort_refreshed = True
+        with patch.object(self.runtime, "roles", side_effect=[[], [role], [role]]), \
+             patch.object(self.runtime, "reconcile_deletions"):
+            self.runtime.reconcile_tick()
+            self.assertEqual(len(self.spawned), 0)
+            self.runtime.reconcile_tick()
+            self.assertEqual(len(self.spawned), 1)
+            self.runtime.reconcile_tick()
+            self.assertEqual(len(self.spawned), 1)
+
     def test_boot_only_starts_manager_and_never_requests_role_start(self):
         self.config["hosts"]=[self.spec()]
         self.runtime.reconcile_hosts([self.role(generation=3,ownership_held=False)])

@@ -140,7 +140,8 @@ class WorkbuddyApiTests(BindingApiTestCase):
         self.put_binding(p,'agent:worker',self.binding_payload(model_alias='workbuddy-acp:hy4free'))
         with patch.object(cache,'probe_effort_options',return_value=['high']):
             cache._cache.clear()
-            binding=self.get_binding(p,'agent:worker').json()['binding']
+            with self.make_client() as client:
+                binding=client.get(f'/api/projects/{p}/agents/agent:worker/binding?refresh_effort=true', headers={'X-API-Key':'bobo-key'}).json()['binding']
             self.assertEqual((binding['effort_options'],binding['effort_source']),(['high'],'adapter'))
             self.assertEqual(self.agent_by_id(p,'agent:worker')['binding']['effort_options'],['high'])
             with self.make_client() as client:

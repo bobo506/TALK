@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import itertools
 import logging
 import time
 import uuid
@@ -17,6 +18,7 @@ from sqlalchemy import and_, exists, literal, or_
 from sqlmodel import Session
 from sqlmodel import select
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from server.auth import resolve_member_by_key
 from server.conversation_access import is_conversation_observer
@@ -121,9 +123,15 @@ def _check_db_health() -> str:
 def _check_storage_health() -> str:
     storage_path = STORAGE_DIR.resolve()
     storage_path.mkdir(parents=True, exist_ok=True)
-    probe_path = storage_path / ".healthcheck"
-    probe_path.write_text("ok", encoding="utf-8")
-    probe_path.unlink(missing_ok=True)
+    probe_path = storage_path / (".healthcheck-" + uuid.uuid4().hex)
+    created = False
+    try:
+        with probe_path.open("x", encoding="utf-8") as probe:
+            created = True
+            probe.write("ok")
+    finally:
+        if created:
+            probe_path.unlink(missing_ok=True)
     return "ok"
 
 
@@ -416,6 +424,19 @@ def get_public_config():
     }
 
 
+def _resolve_sse_member(token: str):
+    with Session(engine) as session:
+        return resolve_member_by_key(token, session)
+
+
+def _sse_backfill_page(member_id: str, since_id: int, include_all_groups: bool):
+    with Session(engine) as session:
+        return list(itertools.islice(
+            _sse_backfill_events(member_id, since_id, session, include_all_groups=include_all_groups),
+            SSE_BACKFILL_BATCH_SIZE,
+        ))
+
+
 @app.get("/api/events")
 async def sse_events(
     request: Request,
@@ -424,8 +445,7 @@ async def sse_events(
     last_event_id_header: str | None = Header(None, alias="Last-Event-ID"),
 ):
     """Server-Sent Events stream authenticated via ?token=<api_key>."""
-    with Session(engine) as session:
-        member = resolve_member_by_key(token, session)
+    member = await run_in_threadpool(_resolve_sse_member, token)
 
     if member is None:
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -444,12 +464,17 @@ async def sse_events(
                 pass
 
             if backfill_requested:
-                with Session(engine) as session:
-                    for event_id, event_text in _sse_backfill_events(
-                        member.id, since_id, session, include_all_groups=include_all_groups
-                    ):
+                cursor = since_id
+                while True:
+                    page = await run_in_threadpool(_sse_backfill_page, member.id, cursor, include_all_groups)
+                    if not page:
+                        break
+                    for event_id, event_text in page:
                         replayed_event_ids.add(event_id)
+                        cursor = max(cursor, event_id)
                         yield event_text
+                    if len(page) < SSE_BACKFILL_BATCH_SIZE:
+                        break
 
             while True:
                 if await request.is_disconnected():
