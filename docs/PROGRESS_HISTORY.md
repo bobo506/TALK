@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-08 11:45 — 开闸 + W3c 创建/启动/停止链路验证（workspace-v1）
+
+- **开闸**：用户要求“到可以正常创建正常启动再验收”，11:37 以 `TALK_WORKSPACE_RUNTIME_ENABLED=1` 重启（runtime pid 17984，venv），capability 正常；新布局 start 不再 409 `workspace_runtime_not_ready`。
+- **开闸后暴露并修复的 A/B 缺陷**（551/552 开发 → 553 复核 changes_requested → 554 修测试 → 555 approved，提交 `7fe64eb`）：
+  - A：workspace-v1 宿主 `profile_fingerprint` 仍按 legacy 根找三档 → `profile_missing`；改为 `wp.profiles_dir(data_root, project, member)` + `PROFILE_FILENAMES`，legacy 逐字不变。
+  - B：venv 下 bridge 启动器/解释器 pid 不同，`role_service_state.pid` ≠ `agent_instances.pid` → stop/recovery 409 `recovery_identity_mismatch`；新增 `_managed_instance_pid`（宿主注入 `TALK_ROLE_SERVICE_HOST_PID`）+ `_wait_ready(expected_pid=process.pid)`，state 与 instance 统一为宿主 Popen 的子进程 pid。
+- **W3c 实测**：临时 workspace-v1 workbuddy 角色 `agent:prj-e8fe7066bbec.w3c-workbuddy-1950c4df` 创建→启动 ready（`ins_e1903c1dec75`）→落点 `workspaces/<p>/roles/<m>/{profiles,native-home,sessions,state/{manager,records},logs}`→pid 一致（20752）→stop 干净，运行时存活。legacy Terra start/stop 正常（pid 17420 一致）。
+- **新发现/遗留**：C：workspace-v1 角色删除 `cleanup_failed`（manager 步，未启动角色同样失败；实现点在白名单外 `scripts/role_delete.py`，待扩权后修）；新 kimi/codex 角色需各自原生登录（设备码）；运行时重启后首次 start 偶发瞬时 `host_unreachable`（重试成功，待观察）；双工作区隔离/恢复链/开闸后 A 停 B 不停未完整验收。
+- **数据**：project_roles 22（19 legacy + 3 workspace-v1，1 已归档）、role_provision_requests 30；运行角色 Terra `ins_5688983084f8`、k2.8 `ins_1ba921c02d50`。
+
 ## 2026-11-08 09:55 — W3a+W3b 部署、默认门真实 409、venv 解释器修复
 
 - **部署（用户授权）**：08:46 正常停止旧运行时（`shutdown.phase=complete`）；备份 `backups/w3b-deploy-20261108/talk.db`（12.54MB，`integrity_check=ok`，停止后已 checkpoint 无 wal/shm）；清理 `workspaces/p-obzgux3bnrygqyi`（content `project_id=prj_alpha`、root 指向 `.tmp-tests` 的测试残留）、547 遗留测试进程（50515/51882）、轮转旧日志 2.4GB。

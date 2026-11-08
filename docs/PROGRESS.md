@@ -1,5 +1,17 @@
 # Project Progress
 
+## W3c 进展快照（2026-11-08 11:45）
+
+- **开闸**：11:37 以 `TALK_WORKSPACE_RUNTIME_ENABLED=1` 重启运行时（pid **17984**，venv 解释器），`capability.json` 正常；新布局角色不再返回 `workspace_runtime_not_ready`。
+- **W3c 已验证（真实 API）**：临时 workspace-v1 workbuddy 角色 `agent:prj-e8fe7066bbec.w3c-workbuddy-1950c4df`：
+  - `create`（provisioned）→ `start` → **running/ready**（`ins_e1903c1dec75`）；
+  - 落点正确：`workspaces/<p>/roles/<m>/{profiles,native-home,sessions,state/{manager,records},logs}`，manager health 带 capability 绑定；
+  - `state.pid == agent_instances.pid`（20752）；`stop` → stopped，运行时与其它角色不受影响。
+- **legacy 对照**：Terra `start → ready（ins_5688983084f8）→ stop` 正常，`state.pid == instance.pid`（17420），不再出现 `recovery_identity_mismatch`。
+- **修复**：提交 `7fe64eb`（workspace 角色 profile 解析 + 受管 pid 一致性 + ready 校验；553 复核 changes_requested → 554 修测试 mock → 555 **approved**，143 项全绿）。
+- **未完成/已知**：① workspace-v1 角色删除仍 `cleanup_failed`（manager 步），临时角色暂不能删（`w3c-353e11c4` 已归档、`w3c-workbuddy-1950c4df` 已停）；② 新 kimi/codex 角色启动需各自原生登录（设备码，astra 同样）；③ 运行时重启后首次 start 偶发瞬时 `host_unreachable`，重试即成功（待观察）；④ 双工作区隔离/恢复链/开闸后的 A 停 B 不停尚未完整验收。
+- **当前运行**：Terra `ins_5688983084f8`、k2.8 `ins_1ba921c02d50`。数据：project_roles 22（19 legacy + 3 workspace-v1，其中 1 已归档）、role_provision_requests 30。
+
 ## 部署与修复快照（2026-11-08 09:55）
 
 - **状态**：W3a+W3b 已部署并验证。运行时 pid **19252**（`.venv` 解释器直接启动，等价 `run.ps1`）、API child 23104，`/healthz` 200、`startup_state=complete`、`capability.json` 已发布（`talk-runtime-capability-1` / `talk-runtime-1` / `talk-manager-1` / legacy+workspace-v1），9 宿主 serving。
