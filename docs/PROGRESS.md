@@ -1,5 +1,18 @@
 # Project Progress
 
+## 性能、可靠性与 Codex 插件目录修复（2026-11-08 22:55）
+
+- **性能片** `c527034`（570 approved）：binding 读取改为缓存优先 + 后台单线程按模型去重预热，ACP 探测移出 DB 会话；`/api/events` 认证与回填进线程池；`/healthz` 改唯一临时文件；pending start 在 reconcile（2s 循环）内拉起宿主；连接池 30+30/15s（事故应急，注释保留）。
+  - 实测页面接口：roles 0.07s、layouts 0.10s、requests 0.23s、services 0.30s、agents 0.78s；
+  - 新 workspace 角色首启：`to_claim` 27–52s → **10.0s**，`claim_to_report` 11.6s（dsh 桥冷启动）；legacy 0.5–1.9s / 2–8s。
+- **可靠性片** `c53e59c`（573 approved）：过期未回报 claimed launch 仅在“本机 + 心跳不新鲜 + 非忙 + 进程证明已退出”时释放（写锁内二次核验、幂等、日志）；宿主在 bridge 退出时按原领取身份回报并释放句柄，失败保留重试；missing-instance + 退出证据时 stop 幂等 `stopped`，身份不符仍 409。190 项测试通过。
+  - 安全边界（有意保留）：无退出证据或子进程仍存活时不自动释放，**人工显式 stop** 为恢复入口；已知非阻塞观察：服务端确定性 409 下宿主内存死句柄可能阻塞自动重启，重启宿主自愈。
+- **Codex 插件目录** `33cbffd` + `939f2ea`（575/578 approved）：`--disable apps` 单独无效；`--disable apps --disable remote_plugin --disable plugins` 有效。实机：移除 astra 的 67.9MB/12412 条 `remote_plugin_catalog` 后跑真实 TALK 任务（580）返回 OK，目录未重建；576（仅 apps）仍会生成。
+- **清理**：小G `agent:codex` 从项目删除（角色档案同步移除）、任务 286 取消、旧 astra/rest01 删除；删除前的 25 条历史 instance 行与 task 12 残留 reservation 已带备份修复（`.tmp/codex-instances-backup.json`、`.tmp/task12-backup.json`）。
+- **决策**：`docs/spec/HOST_LIFECYCLE_DECISION.md`（560f23e）——当前实例常驻+预热；安装包阶段按需宿主/空闲退出、轮询退避、软上限+LRU、按项目分 runtime。
+- **当前**：运行时 pid **3704**（开闸）；Terra/K2.8 running；astra 已停止（验证用）；无待收取任务。
+- **下一步**：W3c 剩余（双工作区隔离 A 停 B 不停、恢复链）与安装包宿主治理 P1；页面刷新验收 UI 清理。
+
 ## 原生准备修复与 UI 清理（2026-11-08 14:35）
 
 - **修复提交** `c35e343`（12 文件 +440/−58，567 后端 / 568 前端独立复核均 **approved**）：

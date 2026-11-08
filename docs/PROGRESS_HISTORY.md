@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-08 22:55 — 性能/可用性、可靠性恢复与 Codex 插件目录禁用
+
+- **性能/可用性** `c527034`（569 交付、570 复核 approved）：`server/routes/projects.py` 的 binding 读取改为“短会话读 facts → 关闭会话 → 缓存优先/后台单线程按模型去重预热”，显式单角色探测与强度校验在 session 关闭后执行；`server/main.py` 的 `/api/events` 认证与回填分页用 `run_in_threadpool` + 独立会话，`/healthz` 改 uuid 唯一临时文件（O_EXCL + finally 清理）；`server/db.py` 连接池 30+30/15s（事故应急，注释说明 SQLite WAL 单写者）；`scripts/talk_runtime.py` 抽出 reconcile tick，effort 刷新移守护线程，pending start 下一 tick 拉起宿主。
+  - 实机：API 事故（`QueuePool limit of size 5 overflow 10`、事件循环阻塞、连接被拒）恢复；页面接口 0.07–0.78s；新 workspace 角色首启 `to_claim` 10.0s（原 27–52s）、`claim_to_report` 11.6s；dsh 临时角色创建→启动→停止→删除全通过。
+- **可靠性** `c53e59c`（571/572 返修，573 复核 approved）：服务端过期 claimed launch 只在“本机宿主 + 心跳不新鲜 + 非忙 + 无活动任务 + `recorded_process_state` 证明已退出”时释放，写锁内二次核验、幂等、日志；宿主在 bridge 退出时按原领取身份回报失败与退出证据，回执确认后释放句柄，回报失败保留重试；missing-instance + 退出证据时 stop 幂等 `stopped`，实例存在但身份不符仍 `recovery_identity_mismatch`。190 项测试通过。
+  - 安全边界（有意）：无退出证据/子进程仍存活时不自动释放，人工显式 stop 为恢复入口；已知非阻塞观察：服务端确定性 409 下宿主内存死句柄阻塞自动重启，重启宿主自愈。
+- **Codex 插件目录** `33cbffd` + `939f2ea`（574/577，575/578 复核 approved）：`scripts/codex_role_host.py` 在 `exec` 前加 `--disable apps --disable remote_plugin --disable plugins`；`--disable apps` 单独实测无效（astra 首次 exec 仍生成 67.9MB/12412 条 `remote_plugin_catalog`），三项组合在移除缓存后跑真实 TALK 任务（580）返回 `OK` 且目录未重建。
+- **清理**：小G `agent:codex` 从项目删除（`.talk/agents/agent_codex` 档案同步删除，commit `24d31d5`）；286 取消（cancel-tree）；旧 astra/rest01 删除；删除前修复 25 条历史 instance 行与 task 12 的 `reserved_slice_count`（备份在 `.tmp/`），暴露“历史 instance 未 GC”缺口。
+- **宿主治理决策**：`docs/spec/HOST_LIFECYCLE_DECISION.md`（`560f23e`）——当前实例常驻+预热；安装包按需/空闲退出、轮询退避、软上限+LRU、按项目分 runtime/DB；30 宿主压力基线。
+- **验证任务**：576（仅 apps，OK 但仍生成目录）、579（三项，OK、复用旧缓存）、580（移除缓存，OK、不重建）均已完成并收取。
+
 ## 2026-11-08 14:35 — 原生准备布局修复（codex/kimi/dsh）与前端通知区清理
 
 - **后端**（560/562/565，567 复核 approved）：`scripts/codex_role_setup.py`、`scripts/kimi_role_setup.py`、`scripts/dsh_role_setup.py` 的原生准备 home 改为按 `ProjectRole.storage_layout` 解析——workspace-v1 用 `workspace_paths.native_home_dir(ROOT, project, member)` 下的 `.codex/.kimi-code/.dsh`，legacy 路径逐字不变，未知/空布局在目录/进程/命令写入前拒绝；`server/kimi_native_setup.py::_ready_home_exists` 按 runtime 分支（codex 查 `.codex/config.toml`、kimi 查 `.kimi-code/config.toml`、legacy True、未知布局 False），codex 旧 ready 无配置时可重新授权；codex `finish_native_login` 增加布局二次复核。三模块 62 项测试 exit 0。
