@@ -178,6 +178,18 @@ def parse_managed_started_at(value: object) -> datetime | None:
     return parsed
 
 
+def _managed_instance_pid(launch_id: str | None) -> int:
+    """报告宿主持有的子进程 PID；Windows venv 启动器会再创建解释器。"""
+    own_pid = os.getpid()
+    if not launch_id or os.name != "nt":
+        return own_pid
+    host_pid = os.environ.get("TALK_ROLE_SERVICE_HOST_PID", "")
+    if not host_pid.isdecimal() or int(host_pid) <= 0:
+        return own_pid
+    parent_pid = os.getppid()
+    return own_pid if parent_pid == int(host_pid) else parent_pid
+
+
 def build_instance_report_payload(
     *,
     runtime: str,
@@ -5228,7 +5240,7 @@ async def run_bridge(args: argparse.Namespace) -> None:
             runtime=args.runtime,
             status=status,
             host=host,
-            pid=os.getpid(),
+            pid=_managed_instance_pid(managed_launch_id),
             current_task_id=current_task_id,
             last_error=last_error,
             project_id=managed_project_id,

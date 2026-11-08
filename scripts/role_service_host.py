@@ -127,6 +127,7 @@ from scripts import role_service_host_diagnostics as host_diag  # noqa: E402 - �
 from scripts import role_service_host_loop_evidence as loop_evidence  # noqa: E402 - 282 本地循环证据
 from bridges.runtime_diagnostics_timeline import StageTimeline  # noqa: E402 - 276 阶段配对
 from scripts.role_provision import (  # noqa: E402 - 复用 R1-2 已验私有创建/路径/锁保护
+    PROFILE_FILENAMES,
     ProvisionError,
     _assert_root_chain_has_no_reparse,
     _is_reparse_point,
@@ -1740,7 +1741,14 @@ class HostManager:
     def profile_fingerprint(self, member_id: str) -> str:
         """本人三档（IDENTITY/SOUL/USER）的存在性 + 内容指纹；缺一档即稳定拒绝。"""
         try:
-            paths = profile_target_paths(self.project_root, member_id)
+            if self.workspace_context is None:
+                paths = profile_target_paths(self.project_root, member_id)
+            else:
+                context = self._workspace_recheck()
+                if context["member_id"] != member_id:
+                    raise ValueError("workspace identity mismatch")
+                directory = wp.profiles_dir(Path(context["data_root"]), context["project_id"], member_id)
+                paths = {kind: wp._checked(directory / name) for kind, name in PROFILE_FILENAMES.items()}
         except (ProvisionError, ValueError, OSError) as exc:
             raise HostError("profile_missing", "无法解析本人三档路径") from exc
         digest = __import__("hashlib").sha256()
@@ -2344,6 +2352,7 @@ class HostManager:
         control_file = self.store.control_path(launch_id)
         child_env = dict(facts.child_env)
         child_env[CONTROL_FILE_ENV] = str(control_file)
+        child_env["TALK_ROLE_SERVICE_HOST_PID"] = str(os.getpid())
         stdout_target: Any = subprocess.DEVNULL
         stderr_target: Any = subprocess.DEVNULL
         opened: list[Any] = []
@@ -2591,7 +2600,7 @@ class HostManager:
             budgets=spawn_budgets,
         )
         try:
-            self._wait_ready(instance_id, project_id, member_id)
+            self._wait_ready(instance_id, project_id, member_id, expected_pid=process.pid)
         except HostError as exc:
             readiness_operation.finish(
                 "failed",
@@ -2723,7 +2732,7 @@ class HostManager:
         }
 
     def _wait_ready(
-        self, instance_id: str, project_id: str, member_id: str
+        self, instance_id: str, project_id: str, member_id: str, *, expected_pid: Optional[int] = None
     ) -> bool:
         deadline = time.monotonic() + self.ready_timeout
         while time.monotonic() < deadline:
@@ -2740,6 +2749,8 @@ class HostManager:
                         and str(row.get("id")) == instance_id
                         and str(row.get("status")) in ("idle", "busy")
                     ):
+                        if expected_pid is not None and row.get("pid") != expected_pid:
+                            raise HostError("readiness_identity_mismatch", "实例 PID 与宿主子进程不一致")
                         return True
             time.sleep(0.2)
         raise HostError("readiness_timeout", "子进程未在期限内上报本次预分配实例")

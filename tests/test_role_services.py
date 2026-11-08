@@ -1714,7 +1714,8 @@ class WorkspaceReadyCapabilityTests(RoleServiceTestCase):
                 self.assertEqual(started.status_code, 200, started.text)
                 launch = started.json()
                 manager._workspace_manager_tick(PROJECT_ID)
-                def ready(instance_id, project_id, member_id):
+                def ready(instance_id, project_id, member_id, *, expected_pid=None):
+                    self.assertEqual(expected_pid, 4321)
                     response = self.bind_instance(launch, {"expected_instance_id": instance_id})
                     self.assertEqual(response.status_code, 200, response.text)
                 with patch.object(manager, "_wait_ready", side_effect=ready):

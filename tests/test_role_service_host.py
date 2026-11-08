@@ -83,6 +83,60 @@ class WorkspaceContextTests(unittest.TestCase):
             workspace_member=self.member, workspace_data_root=self.data, project_root=self.project_root,
             role_key_root=self.key_root, role_key_file=Path(self.context["key"]))
 
+    def test_workspace_profiles_fingerprint_and_missing(self):
+        from server import workspace_paths as wp
+        from scripts.role_provision import PROFILE_FILENAMES
+        manager = HostManager(None, **self.kwargs)
+        directory = wp.profiles_dir(self.data, self.project, self.member)
+        directory.mkdir(parents=True)
+        for kind, name in PROFILE_FILENAMES.items():
+            (directory / name).write_text(kind, encoding="utf-8")
+        first = manager.profile_fingerprint(self.member)
+        (directory / PROFILE_FILENAMES["user"]).write_text("changed", encoding="utf-8")
+        self.assertNotEqual(first, manager.profile_fingerprint(self.member))
+        (directory / PROFILE_FILENAMES["user"]).unlink()
+        with self.assertRaises(HostError) as caught:
+            manager.profile_fingerprint(self.member)
+        self.assertEqual(caught.exception.code, "profile_missing")
+        with self.assertRaises(HostError) as caught:
+            manager.profile_fingerprint("agent:other")
+        self.assertEqual(caught.exception.code, "profile_missing")
+
+    @unittest.skipUnless(os.name == "nt", "Windows venv launcher")
+    def test_managed_launcher_pid_matches_host_and_rejects_other_pid(self):
+        from bridges import cli_bridge
+        manager = HostManager(None, **self.kwargs)
+        with patch.dict(os.environ, {"TALK_ROLE_SERVICE_HOST_PID": "100"}), \
+                patch.object(cli_bridge.os, "getpid", return_value=300), \
+                patch.object(cli_bridge.os, "getppid", return_value=200):
+            self.assertEqual(cli_bridge._managed_instance_pid("launch"), 200)
+            self.assertEqual(cli_bridge._managed_instance_pid(None), 300)
+        with patch.dict(os.environ, {"TALK_ROLE_SERVICE_HOST_PID": "100"}), \
+                patch.object(cli_bridge.os, "getpid", return_value=200), \
+                patch.object(cli_bridge.os, "getppid", return_value=100):
+            self.assertEqual(cli_bridge._managed_instance_pid("launch"), 200)
+        class Client:
+            def __init__(self, pid):
+                self.pid = pid
+            def request(self, *args, **kwargs):
+                return {"data": [{"id": "instance", "status": "idle", "pid": self.pid}]}
+        manager.client = Client(200)
+        self.assertTrue(manager._wait_ready("instance", self.project, self.member, expected_pid=200))
+        manager.client = Client(201)
+        with self.assertRaises(HostError) as caught:
+            manager._wait_ready("instance", self.project, self.member, expected_pid=200)
+        self.assertEqual(caught.exception.code, "readiness_identity_mismatch")
+
+    @unittest.skipUnless(os.name == "nt", "Windows venv launcher")
+    def test_managed_pid_from_real_venv_spawn(self):
+        env = dict(os.environ, TALK_ROLE_SERVICE_HOST_PID=str(os.getpid()))
+        child = subprocess.Popen([sys.executable, "-B", "-c",
+            "from bridges.cli_bridge import _managed_instance_pid; print(_managed_instance_pid('launch'))"],
+            cwd=Path(__file__).resolve().parents[1], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = child.communicate(timeout=30)
+        self.assertEqual(child.returncode, 0, stderr.decode(errors="replace"))
+        self.assertEqual(int(stdout.strip()), child.pid)
+
     def test_context_drives_role_paths_and_environment(self):
         from scripts import role_service_host as rsh
         manager = HostManager(None, child_env={"HOME": "outside", "TALK_EXECUTION_SESSION_STORE": "outside"}, **self.kwargs)
@@ -642,6 +696,8 @@ class RoleServiceHostLoopTests(RoleServiceTestCase):
         self.assertEqual(instance.launch_id, launch["launch_id"])
         self.assertEqual(instance.project_id, "prj_alpha")
         self.assertEqual(instance.member_id, self.role_a)
+        self.assertEqual(instance.pid, process.pid)
+        self.assertEqual(state.pid, instance.pid)
 
         # 子进程 argv 里没有明文 Key、没有 owner/claim token、没有 operator Key。
         self.assertTrue(self.child_log.exists())
