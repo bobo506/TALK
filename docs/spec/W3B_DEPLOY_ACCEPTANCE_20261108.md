@@ -49,3 +49,21 @@
 - `ActualBootstrapTests` 两条在 Windows 文件锁下不收敛（基线同因，环境限制）。
 - `talk_delegate_task` 工具 schema 的澄清轮数默认 1/上限 2 与服务端 3/5 不一致（已知缺陷，待单独小片修）。
 - 真实 CLI、双工作区隔离、并发路径替换（TOCTOU）未在本机验证，属 W3c 真实验收范围。
+
+## 七、部署结果（2026-11-08 09:01–09:20，已执行）
+
+- **停止**：08:46 写 `stop.request`，`shutdown.phase=complete`，runtime 17160 与 API 15252 退出，9 宿主全部 stopped。
+- **备份**：`backups/w3b-deploy-20261108/talk.db`（12.54 MB，`integrity_check=ok`；停止后已 checkpoint，无 `-wal`/`-shm`）。
+- **清理**：删除 `workspaces/p-obzgux3bnrygqyi`（内容 `project_id=prj_alpha`、project_root 指向 `.tmp-tests` 的残留）；删除 547 遗留测试进程 50515/51882；轮转 `api.err`/`api.out` 共 2.4 GB。
+- **workspaces ACL（重要修正）**：仅删除 `CodexSandboxOffline` 不够；provision worker 要求目录为**私有 DACL 且无继承 ACE**（只允许 当前用户 + SYSTEM + Administrators），否则新角色开通报 `profile_root_invalid`。正确做法：
+  ```powershell
+  icacls D:\claude-test\TALK\workspaces /inheritance:r
+  icacls D:\claude-test\TALK\workspaces /grant:r "PC-202312301323\Administrator:(OI)(CI)F" "NT AUTHORITY\SYSTEM:(OI)(CI)F" "BUILTIN\Administrators:(OI)(CI)F"
+  ```
+- **启动**：09:02 启动新代码，runtime pid **1328**、API **9556**；`/healthz` 200、`startup_state=complete`、`capability.json` 发布（`talk-runtime-capability-1` / `talk-runtime-1` / `talk-manager-1` / `legacy`+`workspace-v1`），9 宿主 serving。
+- **legacy 验证**：Terra、k2.8 均 `start → running/ready`。
+- **默认门关闭（真实 409）**：临时新建 workspace-v1 角色 `agent:prj_e8fe7066bbec.role-d0bf55b3`（开通成功、profiles 落 `workspaces/<p>/roles/<m>/profiles`）→ `POST .../service/start` 返回 **409 `workspace_runtime_not_ready`**，`current_launch=null`、`generation=0`（零 launch、零状态写入）。删除该角色：5 个步骤均 `complete`。
+- **未完成/发现**：
+  1. **run.ps1（venv）启动缺陷**：用 `.venv\Scripts\python.exe` 启动运行时时，所有 codex 角色 `start` 失败 `cli_incompatible`（`sys.executable` 与 `sys._base_executable` 不同，`verify_runtime_entry` 只认后者）。当前运行时用**基础解释器**临时启动；修复任务 548。
+  2. **workspace-v1 角色删除残留**：删除回执 5 步 complete，但 `workspaces/<p>/roles/<m>/profiles/*` 仍保留（本次手工清理）。需在 W3c 修复/补验。
+  3. 开闸（`TALK_WORKSPACE_RUNTIME_ENABLED=1`）与真实 CLI/双工作区验收仍未做。
