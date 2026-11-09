@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-09 23:00 — WorkBuddy ACP 5.9.3 只读研究（W-B0）
+
+- 只读静态研究（未启动桌面/CLI、未改产品代码）：5.9.3 的 ACP 由**每会话 WorkBuddy CLI**（`@genie/agent-cli` 2.165.0）在 `127.0.0.1:<动态端口>` 的 `--serve` HTTP 提供，路由为 `GET/POST/DELETE /api/v1/acp`；连接标识来自 SSE `GET` 的响应头 **`Acp-Connection-Id`**，后续 POST/DELETE 必须回带；旧 `POST /api/v1/acp/connect` 不再是对外入口（桌面端口实测 404）。
+- 桌面拉起配方：`WorkBuddy.exe` + `ELECTRON_RUN_AS_NODE=1` 运行 `cli/dist/codebuddy-lite-wb.mjs --serve ...`，并注入 `WORKBUDDY_CONFIG_DIR=<user>\.workbuddy`、`CODEBUDDY_FORCE_LITE_WB_BUNDLE=1` 等；TALK 可复用同一配方自拉 CLI（方案 A，HTTP SSE），或改用 `--acp`（stdio ndJsonStream，方案 B）。
+- 产出：[WORKBUDDY_ACP_593_RESEARCH.md](../spec/WORKBUDDY_ACP_593_RESEARCH.md)（协议事实与证据、A/B 对比、适配器改造点、风险、W-B1 探针 / W-B2 实现切片建议）；证据 `.tmp/wb-asar/`、`.tmp/wb-acp-index.json`、旧诊断 `.tmp/workbuddy-acp-593-diagnosis.md`。
+- 未验证：外部拉起 CLI 的登录态复用与模型调用、沙箱/工具差异、SSE 事件格式与 `session/new` 参数；下一步 W-B1 真实探针（需实施授权）。
+
 ## 2026-11-09 22:40 — W3c-4 返修与「重置」入口 UI 收尾（601/602）
 
 - **601 开发 / 602 K2.8 定向复核 approved**（候选 117 / 基线 114、`new_failures=0`、既有断言零弱化）：任务门与失败记账收敛为“本项目+本角色+queued/running+（`instance_id==遗留实例` 或 `id==current_task_id`）”，未被该实例领取的同项目 queued 任务保留给新实例；恢复提交同事务清空 `instance.current_task_id`；`RoleServiceOrphanRecoveryRequest.operation_key` 补与普通恢复一致的 pattern（非法 422）。

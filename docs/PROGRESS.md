@@ -1,13 +1,13 @@
 # Project Progress
 
-## 收工快照（2026-11-09 22:40）
+## 收工快照（2026-11-09 23:00）
 
-- **本轮完成**：W3c-3 忙孤儿人工恢复入口（599/600）＋ W3c-4 三项可选返修（601/602 **approved**：任务门收敛到遗留实例、恢复同事务清 `current_task_id`、`operation_key` pattern；候选 117 / 基线 114、`new_failures=0`）＋ 重置失败原因只在详情显示（`62a271d`，Node 36 项）；收窄后的真实 E2E 复跑通过（409 门 → 终止 → 中断记账 → 指针清空 → 重启 ready，证据 `E2E_SUMMARY.json` run3）。
+- **本轮完成**：W3c-3 忙孤儿人工恢复入口（599/600）＋ W3c-4 三项可选返修（601/602 **approved**）＋ 重置失败原因只在详情显示（`62a271d`）＋ **WorkBuddy ACP 5.9.3 只读研究**（[WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md)：新协议为 CLI `--serve` 的 HTTP SSE `/api/v1/acp`，`Acp-Connection-Id` 响应头 + POST/DELETE 回带；桌面每会话拉起 `@genie/agent-cli` 2.165.0；给出 A/HTTP 与 B/stdio 两条集成方案及 W-B1 探针建议）。收窄后的真实 E2E 复跑通过（409 门 → 终止 → 中断记账 → 指针清空 → 重启 ready，证据 `E2E_SUMMARY.json` run3）。
 - **决策**：598 提出的“终止后不可逆”冲突按方案 A 落地：终止前的拒绝零终止零写入；已发起未确认 → 409 真实报告、零 DB 写入，重试走 `already_exited`。
 - **环境（22:41 部署后）**：runtime A **23688**（加载 W3c-2a 自动清理）、API child **3816**（22:41 reload 部署 W3c-4，`operation_key` pattern 已在 openapi 可见）、`/healthz` ok、3 online；Terra/K2.8 running/ready；无 running 任务；隔离栈已停（证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`）。
 - **命名调整（21:20）**：异常恢复按钮「终止孤儿并恢复」改名**「重置」**并仅在状态异常时显示；原「绑定重置」改名**「重新绑定」**（用户手册/恢复指南同步，Node 95 项通过）。
 - **部署边界**：W3c-2a（自动清理）与 W3c-3（人工「重置」入口）均已生效；页面文案「重置」/「重新绑定」硬刷新可见。
-- **待办（按优先级）**：① WorkBuddy ACP 5.9.3 只读研究 → 适配；② delete 90s 窗口（可选）；③ `host_unreachable` 在 API reload 窗口专项复现；④ legacy `guard`/空 `native-home` 残留；⑤ 可选补测：`operation_key` >120 字符显式用例。
+- **待办（按优先级）**：① WorkBuddy ACP 适配 **W-B1 只读探针**（真实 CLI 启动 + `--serve`/`--acp` 二选一验证登录态与最小 prompt，需用户确认实施授权）；② delete 90s 窗口（可选）；③ `host_unreachable` 在 API reload 窗口专项复现；④ legacy `guard`/空 `native-home` 残留；⑤ 可选补测：`operation_key` >120 字符显式用例。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
 ## 收工快照（2026-11-09 17:30）
