@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-09 22:40 — W3c-4 返修与「重置」入口 UI 收尾（601/602）
+
+- **601 开发 / 602 K2.8 定向复核 approved**（候选 117 / 基线 114、`new_failures=0`、既有断言零弱化）：任务门与失败记账收敛为“本项目+本角色+queued/running+（`instance_id==遗留实例` 或 `id==current_task_id`）”，未被该实例领取的同项目 queued 任务保留给新实例；恢复提交同事务清空 `instance.current_task_id`；`RoleServiceOrphanRecoveryRequest.operation_key` 补与普通恢复一致的 pattern（非法 422）。
+- **UI 收尾** `62a271d`：重置失败原因改存独立 `resetErrors`，只在角色详情显示，列表仅保留服务状态与稳定提示；启动/关闭/重置成功后清理；Node 36 项通过。
+- **真实 E2E（隔离栈，601 候选）**：首次 409 `orphan_tasks_active` → 确认后真实终止 bridge（`exit_code=1`）、`interrupted_task_ids=[603]`、任务 failed、旧实例 `current_task_id=null`、gen1→2、重启 ready `ins_af34e4056b40`（gen3）。证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json` run3。
+- **提交**：`62a271d`（UI）、`28db49d`（W3c-4）。剩余仅非阻断：delete 90s 窗口（可选）、`host_unreachable` 专项复现、legacy guard/空 native-home、`operation_key` >120 字符可选补测。
+
 ## 2026-11-09 20:47 — W3c-3：忙孤儿人工受控终止与恢复入口（597/598/599/600）
 
 - **决策**：598 因“终止已发起后无法保证零终止”停下提问；协调者按方案 A 裁决——终止前的拒绝一律零终止零写入；TerminateProcess 已发起但退出未确认时返回 409 如实报告（`termination_initiated=true`、`exit_confirmed=false`）、零 DB 写入，重试走 `already_exited` 继续恢复。
