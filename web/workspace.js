@@ -1044,6 +1044,7 @@ const roleServiceUI = {
   overlay: new Map(),
   busy: new Set(),
   errors: new Map(),
+  resetErrors: new Map(),
   orphanHints: new Set(),
   batch: null,
   pollTimer: null,
@@ -1080,6 +1081,7 @@ function ensureRoleServiceContext() {
   roleServiceUI.overlay = new Map();
   roleServiceUI.busy = new Set();
   roleServiceUI.errors = new Map();
+  roleServiceUI.resetErrors = new Map();
   roleServiceUI.orphanHints = new Set();
   roleServiceUI.batch = null;
   roleServiceUI.actionRefresh = 0;
@@ -1102,6 +1104,7 @@ function roleServiceView(role) {
     provided: declared || Boolean(overlay),
     service: overlay || raw,
     error: memberId ? (roleServiceUI.errors.get(memberId) || "") : "",
+    resetError: memberId ? (roleServiceUI.resetErrors.get(memberId) || "") : "",
   };
 }
 function roleServiceShorten(text, max = 60) {
@@ -1180,8 +1183,11 @@ function roleServiceControl(role) {
   else if (managed && ownershipHeld && !hint) hint = "请先「关闭」并确认已停止，再重新启动。";
   else if (managed && service?.native_setup_status && service.native_setup_status !== "ready" && !hint) hint = "请先完成下方运行器官方授权与所选模型准备，再启动角色。";
   else if (managed && service && service.can_start !== true && service.can_stop !== true && !hint) hint = "当前不可启动。";
-  if (view.error) hint = view.error;
-  return { view, status, busy, batchBusy, human, kind, observed, managed, ownershipHeld, canStart, canStop, hint };
+  const viewError = String(view.error || "");
+  const resetError = String(view.resetError || "");
+  if (viewError || resetError) hint = viewError || resetError;
+  return { view, status, busy, batchBusy, human, kind, observed, managed, ownershipHeld, canStart, canStop, hint,
+    error: viewError, resetError };
 }
 // 角色列表只显示当前服务状态；启动/关闭操作仅放在角色详情。
 function workspaceRoleServiceStateLabel(status) {
@@ -1229,7 +1235,8 @@ function workspaceRoleServiceControls(role, className = "role-service-controls")
   const listStatus = control.status.kind === "success" ? { ...control.status, text: "启动成功" } : control.status;
   box.appendChild(workspaceRoleServiceStateLabel(listStatus));
   if (roleServiceOrphanVisible(control)) box.appendChild(roleServiceOrphanButton(control));
-  const listHint = control.hint === "请先「关闭」并确认已停止，再重新启动。" ? "" : control.hint;
+  // 列表只显示服务状态与稳定提示；重置动作的失败原因只在角色详情显示，避免长期占用列表。
+  const listHint = control.resetError ? "" : (control.hint === "请先「关闭」并确认已停止，再重新启动。" ? "" : control.hint);
   if (listHint) box.appendChild(workspaceEl("p", "role-service-hint", listHint));
   return box;
 }
@@ -1555,7 +1562,7 @@ async function recoverRoleOrphan(memberId) {
   const payload = {operation_key: operationKey, expected_generation: control.view.service.generation,
     confirm_task_interrupt: false, reason: "human_terminated_orphan"};
   roleServiceUI.busy.add(memberId);
-  roleServiceUI.errors.delete(memberId);
+  roleServiceUI.resetErrors.delete(memberId);
   renderWorkspaceList(); renderTaskDetailsPanel();
   try {
     const request = () => apiFetch(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(memberId)}/service/recover-orphan`, {
@@ -1573,19 +1580,20 @@ async function recoverRoleOrphan(memberId) {
     if (!res.ok) {
       const detail = typeof body.detail === "string" ? body.detail : body.detail?.code;
       if (detail === "orphan_terminate_failed" && body.detail?.termination_initiated) {
-        roleServiceUI.errors.set(memberId, "终止已发起但未能确认退出，请核实进程状态后重试。");
+        roleServiceUI.resetErrors.set(memberId, "终止已发起但未能确认退出，请核实进程状态后重试。");
       } else {
-        roleServiceUI.errors.set(memberId, await roleServiceErrorDetail({json: async () => ({detail})}, `恢复失败（${res.status}）。`));
+        roleServiceUI.resetErrors.set(memberId, await roleServiceErrorDetail({json: async () => ({detail})}, `恢复失败（${res.status}）。`));
       }
     } else {
       roleServiceUI.orphanHints.delete(memberId);
+      roleServiceUI.resetErrors.delete(memberId);
       roleServiceUI.actionRefresh++;
       stopRoleServicePolling();
       await pollRoleServices(projectId, accountId);
       if (typeof loadProjectTasks === "function") await loadProjectTasks({silent: true});
     }
   } catch (err) {
-    if (projectId === activeProjectId && accountId === myId) roleServiceUI.errors.set(memberId, err?.message || "恢复请求失败，请重试。");
+    if (projectId === activeProjectId && accountId === myId) roleServiceUI.resetErrors.set(memberId, err?.message || "恢复请求失败，请重试。");
   } finally {
     roleServiceUI.busy.delete(memberId);
     if (projectId === activeProjectId && accountId === myId) { renderWorkspaceList(); renderTaskDetailsPanel(); }
@@ -1631,6 +1639,7 @@ async function startRoleService(memberId) {
   const projectId = activeProjectId, accountId = myId;
   roleServiceUI.busy.add(memberId);
   roleServiceUI.errors.delete(memberId);
+  roleServiceUI.resetErrors.delete(memberId);
   renderWorkspaceList(); renderTaskDetailsPanel();
   try {
     const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(memberId)}/service/start`, {
@@ -1659,6 +1668,7 @@ async function stopRoleService(memberId) {
   const projectId = activeProjectId, accountId = myId;
   roleServiceUI.busy.add(memberId);
   roleServiceUI.errors.delete(memberId);
+  roleServiceUI.resetErrors.delete(memberId);
   renderWorkspaceList(); renderTaskDetailsPanel();
   try {
     const res = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(memberId)}/service/stop`, {

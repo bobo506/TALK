@@ -87,7 +87,17 @@ test('重置入口仅在 human 且状态异常时显示', () => {
   assert.equal(findAll(agent.context.workspaceRoleServiceActions(unknown, 'detail'), n => n.textContent === '重置').length, 0);
 });
 
-test('孤儿入口二次确认任务失败并刷新服务和任务', async () => {
+test('动作失败原因只在详情显示，不进入列表', () => {
+  const role = {member_id: 'agent:a', service: serviceRow({ownership_held: true, observed: 'running'})};
+  const h = harness({roster: [role]});
+  h.roleServiceUI.resetErrors.set('agent:a', '原宿主仍在运行或无法确认已退出。');
+  const list = h.context.workspaceRoleServiceControls(role);
+  assert.doesNotMatch(allTexts(list).join(' '), /原宿主仍在运行/);
+  const detail = h.context.workspaceRoleServiceActions(role, 'detail');
+  assert.match(allTexts(detail).join(' '), /原宿主仍在运行/);
+});
+
+test('重置入口二次确认任务失败并刷新服务和任务', async () => {
   const role = {member_id: 'agent:a', service: serviceRow({ownership_held: true, observed: 'running', generation: 4})};
   const h = harness({roster: [role]});
   vm.runInContext("workspaceUI.mode = 'roles'", h.context);
@@ -129,7 +139,7 @@ test('孤儿入口取消不调用，终止未确认时说明真实状态', async
   assert.equal(calls, 0);
   h.context.window.confirm = () => true;
   await h.context.recoverRoleOrphan('agent:a');
-  assert.match(h.roleServiceUI.errors.get('agent:a'), /终止已发起但未能确认退出/);
+  assert.match(h.roleServiceUI.resetErrors.get('agent:a'), /终止已发起但未能确认退出/);
 });
 
 test('孤儿任务二次确认取消只发送第一次请求，错误码映射中文', async () => {
