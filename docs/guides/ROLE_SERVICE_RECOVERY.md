@@ -41,3 +41,12 @@ TALK API与各角色宿主管理器分别运行；仅恢复API不会自动恢复
 恢复后核新manager、Popen父链、launch/实例、idle及至少一次真实周期心跳，确认原Key/绑定/模型/名称保持；页面状态另由用户验收。周期心跳不会改写首次就绪时间。宿主跨Codex沙箱服务停止后的持续驻留仍须单独验证，本入口不提供自动清理或自动接管。
 
 2026-10-21补正：GET只读投影会把当前代次过期stop显示为关闭超时待核实，不依赖manager再次请求，也不自动释放归属。实际DeepSeek单次恢复与128项验证见[本次记录](../spec/ROLE_SERVICE_STOP_TIMEOUT_FIX_20261021.md)。
+
+## 宿主已死但 bridge 仍存活（忙孤儿，2026-11-09 W3c-3）
+
+上面的 CLI/`recover-stopped` 只在原 bridge 已退出、实例心跳过期后可用；若宿主已退出但 bridge 仍存活并持续心跳，会出现“无法启动（已在运行）+ 关闭一直待确认”的死锁，重启 runtime 也不能自愈。此时用页面角色详情或异常服务行上的“终止孤儿并恢复”（仅真人账号），或调用：
+
+- `POST /api/projects/{project_id}/roles/{member_id}/service/recover-orphan`：human-only；请求 `operation_key`、`expected_generation`、`confirm_task_interrupt`、`reason`。服务端先做本机身份与进程句柄证明，再终止确认属于该角色的遗留 bridge 并释放原归属，返回终止/退出证据与恢复审计；恢复后默认“未启动（已关闭）”，不自动启动。
+- 该成员在**本项目**仍有 queued/running 任务时，未带确认返回 409 `orphan_tasks_active`（尚未终止）；确认后任务置 `failed`、`last_error=orphan_terminated_by_human`、释放 claim/lease，不重派、不通知，跨项目任务不动。
+- 终止前的拒绝一律零终止零写入；终止已发起但退出未确认返回 409 `orphan_terminate_failed`（`termination_initiated=true`、`exit_confirmed=false`），零 DB 写入，重试按 `already_exited` 继续恢复。
+- 自定义或无法归因的 bridge 入口一律 `orphan_process_unverified` 拒绝；非本机 `recovery_wrong_local_host`。本机核查在写事务内完成，最慢可能占用写锁十余秒（含 CIM 查询）。

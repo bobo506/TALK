@@ -4233,6 +4233,27 @@ class RoleServiceRecoveryOut(BaseModel):
     replayed: bool = False
 
 
+class RoleServiceOrphanRecoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_key: str = PydField(min_length=8, max_length=120)
+    expected_generation: int = PydField(strict=True, ge=0)
+    confirm_task_interrupt: bool = PydField(default=False, strict=True)
+    reason: str = PydField(min_length=1, max_length=200)
+
+
+class RoleServiceOrphanRecoveryOut(BaseModel):
+    project_id: str
+    member_id: str
+    terminated_pid: int
+    already_exited: bool
+    exit_code: Optional[int] = None
+    exit_confirmed: bool
+    termination_initiated: bool
+    interrupted_task_ids: list[int]
+    recovery: RoleServiceRecoveryOut
+
+
 class RoleServiceStartAllRequest(BaseModel):
     """``POST .../role-services/start-all`` 请求体（合同 §10.9）。
 

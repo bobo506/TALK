@@ -1044,6 +1044,7 @@ const roleServiceUI = {
   overlay: new Map(),
   busy: new Set(),
   errors: new Map(),
+  orphanHints: new Set(),
   batch: null,
   pollTimer: null,
   pollBusy: false,
@@ -1079,6 +1080,7 @@ function ensureRoleServiceContext() {
   roleServiceUI.overlay = new Map();
   roleServiceUI.busy = new Set();
   roleServiceUI.errors = new Map();
+  roleServiceUI.orphanHints = new Set();
   roleServiceUI.batch = null;
   roleServiceUI.actionRefresh = 0;
   roleServiceUI.pollError = "";
@@ -1200,9 +1202,17 @@ function workspaceRoleServiceActions(role, className) {
   stop.setAttribute("aria-label", `关闭 ${workspaceMemberName(control.view.memberId)} 的服务`);
   if (control.hint) stop.title = control.hint;
   row.append(start, stop);
+  if (control.human && control.ownershipHeld) row.appendChild(roleServiceOrphanButton(control));
   box.appendChild(row);
   if (control.hint) box.appendChild(workspaceEl("p", "role-service-hint", control.hint));
   return box;
+}
+function roleServiceOrphanButton(control) {
+  const button = workspaceButton("终止孤儿并恢复", event => {
+    event?.stopPropagation?.(); recoverRoleOrphan(control.view.memberId);
+  }, "role-service-button role-service-stop");
+  button.disabled = control.busy || control.batchBusy;
+  return button;
 }
 function workspaceRoleServiceControls(role, className = "role-service-controls") {
   const control = roleServiceControl(role);
@@ -1211,6 +1221,11 @@ function workspaceRoleServiceControls(role, className = "role-service-controls")
   if (control.view.memberId) box.dataset.memberId = control.view.memberId;
   const listStatus = control.status.kind === "success" ? { ...control.status, text: "启动成功" } : control.status;
   box.appendChild(workspaceRoleServiceStateLabel(listStatus));
+  if (control.human && (["unknown", "stopping"].includes(control.observed)
+      || roleServiceUI.orphanHints.has(control.view.memberId)
+      || ["recovery_recent_heartbeat", "recovery_process_not_absent", "stop_timeout"].includes(control.view.service?.error_code))) {
+    box.appendChild(roleServiceOrphanButton(control));
+  }
   const listHint = control.hint === "请先「关闭」并确认已停止，再重新启动。" ? "" : control.hint;
   if (listHint) box.appendChild(workspaceEl("p", "role-service-hint", listHint));
   return box;
@@ -1505,6 +1520,16 @@ async function roleServiceErrorDetail(res, fallback) {
     recovery_process_inventory_unknown: "暂时无法核实本机进程，请检查权限后重试关闭。",
     recovery_tasks_active: "该角色仍有未结束的任务，请先处理任务再关闭。",
     local_recovery_unverified: "暂时无法核实原执行端，请检查本机服务后重试关闭。",
+    recovery_recent_heartbeat: "原执行端仍有心跳，请核实是否为孤儿进程。",
+    orphan_identity_mismatch: "角色进程身份不一致，无法恢复。",
+    orphan_no_ownership: "角色没有可恢复的进程归属。",
+    orphan_manager_alive: "原宿主仍在运行或无法确认已退出。",
+    orphan_process_unverified: "无法确认进程属于该角色，未执行终止。",
+    orphan_tasks_active: "角色仍有未结束任务，需要明确确认中断。",
+    orphan_terminate_failed: "终止操作失败，请核实进程状态后重试。",
+    orphan_recovery_write_failed: "进程退出已确认，但恢复状态未能保存，请重试。",
+    recovery_wrong_local_host: "角色进程不在本机，无法执行恢复。",
+    recovery_generation_conflict: "角色状态已变化，请刷新后重试。",
   };
   try {
     if (typeof readErrorDetail === "function") {
@@ -1515,6 +1540,53 @@ async function roleServiceErrorDetail(res, fallback) {
     if (body && typeof body.detail === "string" && body.detail) return messages[body.detail] || body.detail;
   } catch (_) { /* 响应体不可读时退回兜底文案 */ }
   return fallback;
+}
+async function recoverRoleOrphan(memberId) {
+  const role = workspaceRoles().find(item => item.member_id === memberId);
+  const control = role && roleServiceControl(role);
+  if (!control || !control.human || control.busy || control.batchBusy || !roleServicePageActive()) return;
+  if (!Number.isInteger(control.view.service?.generation)) return;
+  if (!window.confirm("只会终止本机遗留 bridge；在途任务会被记为失败，此操作不可撤销。确定继续吗？")) return;
+  const projectId = activeProjectId, accountId = myId;
+  const operationKey = `orphan-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const payload = {operation_key: operationKey, expected_generation: control.view.service.generation,
+    confirm_task_interrupt: false, reason: "human_terminated_orphan"};
+  roleServiceUI.busy.add(memberId);
+  roleServiceUI.errors.delete(memberId);
+  renderWorkspaceList(); renderTaskDetailsPanel();
+  try {
+    const request = () => apiFetch(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(memberId)}/service/recover-orphan`, {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload),
+    });
+    let res = await request();
+    let body = await res.json().catch(() => ({}));
+    if (res.status === 409 && body.detail === "orphan_tasks_active") {
+      if (!window.confirm("该角色有未结束任务。继续将把这些任务记为失败，确定中断吗？")) return;
+      payload.confirm_task_interrupt = true;
+      res = await request();
+      body = await res.json().catch(() => ({}));
+    }
+    if (projectId !== activeProjectId || accountId !== myId) return;
+    if (!res.ok) {
+      const detail = typeof body.detail === "string" ? body.detail : body.detail?.code;
+      if (detail === "orphan_terminate_failed" && body.detail?.termination_initiated) {
+        roleServiceUI.errors.set(memberId, "终止已发起但未能确认退出，请核实进程状态后重试。");
+      } else {
+        roleServiceUI.errors.set(memberId, await roleServiceErrorDetail({json: async () => ({detail})}, `恢复失败（${res.status}）。`));
+      }
+    } else {
+      roleServiceUI.orphanHints.delete(memberId);
+      roleServiceUI.actionRefresh++;
+      stopRoleServicePolling();
+      await pollRoleServices(projectId, accountId);
+      if (typeof loadProjectTasks === "function") await loadProjectTasks({silent: true});
+    }
+  } catch (err) {
+    if (projectId === activeProjectId && accountId === myId) roleServiceUI.errors.set(memberId, err?.message || "恢复请求失败，请重试。");
+  } finally {
+    roleServiceUI.busy.delete(memberId);
+    if (projectId === activeProjectId && accountId === myId) { renderWorkspaceList(); renderTaskDetailsPanel(); }
+  }
 }
 // 动作响应只带回 desired/observed/generation/launch 等有限字段；合并到已有投影，不臆造其它事实。
 function roleServiceMergeAction(base, data) {
@@ -1592,6 +1664,8 @@ async function stopRoleService(memberId) {
     });
     if (projectId !== activeProjectId || accountId !== myId) return;
     if (!res.ok) {
+      const detail = typeof res.clone === "function" ? await res.clone().json().catch(() => ({})) : {};
+      if (["recovery_recent_heartbeat", "recovery_process_not_absent", "stop_timeout"].includes(detail.detail)) roleServiceUI.orphanHints.add(memberId);
       roleServiceUI.errors.set(memberId, await roleServiceErrorDetail(res, `关闭失败（${res.status}），请稍后重试。`));
     } else {
       const data = await res.json().catch(() => null);

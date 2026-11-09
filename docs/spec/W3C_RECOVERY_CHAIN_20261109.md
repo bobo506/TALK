@@ -28,7 +28,7 @@
 
 ## 四、残余（非阻断，待后续片）
 
-1. **人工显式恢复入口**（586 必须修 2）未做：自动清理只处理“两次查询均 idle”的本地孤儿；忙孤儿/ACP 阻塞场景仍需人工。建议后续片：human 显式“终止孤儿并恢复”，替代硬等 90s。
+1. ~~**人工显式恢复入口**（586 必须修 2）~~ **W3c-3 已完成（2026-11-09，599/600 approved）**：human 显式“终止孤儿并恢复”，见第六节。
 2. **终止后轮询语义**：仍用 `recorded_process_state(pid, process_started_at)`，1.5s 偏差会立即判 `pid_reused` 并记 `terminated`，不能单凭事件证明进程已退出；可选改为 `WaitForSingleObject`/`GetExitCodeProcess` 真实存活确认。
 3. **delete 90s 窗口**：bridge 退出后实例行仍 idle，删除需等 90s 新鲜度过期；可在“进程已证退出”时跳过（可选）。
 4. **`host_unreachable`** 未复现：仅覆盖 API 稳定窗口；需 API reload 窗口专项复现。
@@ -36,4 +36,14 @@
 
 ## 五、部署说明
 
-`scripts/talk_runtime.py` 属 runtime 进程代码，生产 runtime A（pid 3704）需下次重启才带上本修复；E2E 已在临时项目 B 的 runtime（新代码进程）验证同一路径。API 无改动，无需 reload。
+`scripts/talk_runtime.py` 属 runtime 进程代码，生产 runtime A（pid 3704）需下次重启才带上本修复；E2E 已在临时项目 B 的 runtime（新代码进程）验证同一路径。W3c-3 新增 API 路由，需**受控 reload 生产 API** 才对外生效。
+
+## 六、W3c-3：忙孤儿人工受控终止与恢复（2026-11-09，599 开发 / 600 K2.8 approved）
+
+- **入口**：`POST /api/projects/{project_id}/roles/{member_id}/service/recover-orphan`，仅 human、仅本机 runtime 已绑定；请求 `operation_key`、`expected_generation`、`confirm_task_interrupt`、`reason`。
+- **证明链**：身份事实（launch/instance/owner_host/pid/process_started_at 一致）→ 同机 hostname → manager 健康文件身份 + `recorded_process_state` 非 present → bridge 句柄创建时间与 `process_started_at` 偏差 ≤5s → argv 经 `CommandLineToArgvW` 解析且命中内置 bridge 模块白名单与 `--project-id/--name/--instance-id/--launch-id`。自定义 bridge 入口无法归因时**安全拒绝**（`orphan_process_unverified`）。
+- **终止**：`OpenProcess` + 二次创建时间比对 + `TerminateProcess` + `WaitForSingleObject(5s)` + `GetExitCodeProcess`；`already_exited`（absent/exited）直接进入恢复。
+- **安全合同（方案 A）**：终止前的一切拒绝零终止、零 DB 写入；终止已发起但退出未确认 → 409 `orphan_terminate_failed`、`termination_initiated=true`、`exit_confirmed=false`、零 DB 写入，重试按 `already_exited` 继续恢复。证明与终止在 `BEGIN IMMEDIATE` 事务内执行，慢机写锁最长约 10–20s（含本机 CIM 查询）。
+- **任务语义**：该成员在**本项目内**的 queued/running 任务存在时，未确认 → 409 `orphan_tasks_active`（尚未终止）；确认后任务置 `failed`、`last_error=orphan_terminated_by_human`、释放 claim/lease、不重派、不通知、跨项目不动。未被他实例领取的同项目 queued 任务也会一并记失败（成员级口径）。
+- **真实 E2E**（隔离栈：独立 API 8011 + 库副本 + 同根临时 runtime B，生产未动）：复现 start 409 `already_running` / stop launch 永久 `pending` / `ownership_held=true`；无活动任务时 200 真实终止存活 bridge（`exit_code=1`）→ gen1→2 → start ready；忙任务时首次 409 `orphan_tasks_active` → 确认后终止 + 中断记账 → gen3→4 → start ready。证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`。
+- **复核遗留（非阻断）**：`instance.current_task_id` 终止后未清（已核查消费者不受影响）；queued 任务成员级语义需补测；`operation_key` 缺 pattern；写锁时长需文档化；自定义入口拒绝范围。

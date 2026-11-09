@@ -3,7 +3,7 @@
 - 全部实现在 :mod:`server.role_services`；本模块只做路由、权限边界与响应模型；
 - 意图写（start/stop/start-all）**仅 human**；claim/report 只允许目标角色的 agent
   或合法 human 宿主，agent **不能**修改 ``desired_state``；
-- 角色原生进程由本机runtime/宿主执行；服务端不按PID接管/kill角色进程；
+- 角色原生进程通常由本机runtime/宿主执行；孤儿进程仅由人类显式请求并经本机证明后终止；
 - 公共 GET 与所有响应都不返回 ``owner_token``/``claim_token``、argv 或绝对路径。
 """
 
@@ -28,13 +28,15 @@ from server.models import (
     RoleServiceRecoveryRequest,
     RoleServiceRecoveryPlan,
     RoleServiceRecoveryOut,
+    RoleServiceOrphanRecoveryRequest,
+    RoleServiceOrphanRecoveryOut,
     RoleNativeSetupOut,
     RoleNativeSetupStartRequest,
     RoleStartupPreferenceRequest,
     ProjectStartupRequest,
 )
 from server.role_service_recovery import recovery_plan, recover_stopped
-from server.local_runtime import require_local_runtime, recover_local_human_stop
+from server.local_runtime import require_local_runtime, recover_local_human_stop, recover_local_orphan
 from server.role_services import (
     claim_role_service_launch,
     list_role_services,
@@ -151,6 +153,14 @@ def get_recovery_plan(project_id: str, member_id: str,
                       current: Member = Depends(get_current_member),
                       session: Session = Depends(get_session)):
     return recovery_plan(project_id, member_id, current, session)
+
+
+@router.post("/projects/{project_id}/roles/{member_id}/service/recover-orphan",
+             response_model=RoleServiceOrphanRecoveryOut)
+def recover_role_orphan(project_id: str, member_id: str, body: RoleServiceOrphanRecoveryRequest,
+                        current: Member = Depends(get_current_member), session: Session = Depends(get_session)):
+    _require_human(current)
+    return recover_local_orphan(project_id, member_id, body, current, session)
 
 
 @router.post("/projects/{project_id}/roles/{member_id}/service/recover-stopped",

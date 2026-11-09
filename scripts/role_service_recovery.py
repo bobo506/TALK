@@ -264,13 +264,132 @@ def _script_candidate(script, entry):
     return "entry" if name == PurePosixPath(entry).name else None
 
 
-def _host_candidate(argv, entry):
+def _host_candidate(argv, entry, *, include_bridges=False):
     kind, value = _command_entry(argv)
+    if include_bridges and kind == "module" and value in {
+        "bridges.codex_bridge", "bridges.kimi_bridge", "bridges.dsh_bridge",
+        "bridges.workbuddy_bridge", "bridges.cli_bridge",
+    }:
+        return "bridge"
     if kind == "module":
         return _module_candidate(value, entry)
     if kind == "script":
         return _script_candidate(value, entry)
     return None
+
+
+class OrphanTerminationFailed(HostError):
+    def __init__(self, pid, initiated):
+        super().__init__("orphan_terminate_failed")
+        self.pid = pid
+        self.initiated = initiated
+
+
+def orphan_local_proof(plan, health_path, host_entry, *, probe=None, inventory=None, creation_time=None, workspace_runner=None):
+    """Prove the dead manager and the specific local bridge without mutating either."""
+    if os.name != "nt":
+        raise HostError("recovery_os_unsupported")
+    if plan["expected_owner_host"].casefold() != socket.gethostname().casefold():
+        raise HostError("recovery_wrong_local_host")
+    try:
+        health = json.loads(Path(health_path).read_text(encoding="utf-8"))
+        if (not isinstance(health, dict) or health.get("project_id") != plan["project_id"]
+                or health.get("member_id") != plan["member_id"]
+                or type(health.get("pid")) is not int or health["pid"] <= 0
+                or _parse_iso(health.get("seen_at")) is None):
+            raise ValueError("health identity")
+        if workspace_runner is not None:
+            runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}.get(workspace_runner)
+            if (runner is None or health.get("schema") != f"talk-{runner}-manager-health-1"
+                    or health.get("state") != "serving" or not isinstance(health.get("owned_launches"), list)
+                    or plan["expected_process_launch_id"] not in health["owned_launches"]):
+                raise ValueError("health ownership")
+    except (OSError, ValueError, TypeError) as exc:
+        raise HostError("orphan_manager_alive") from exc
+    manager = recorded_process_state(health["pid"], health["seen_at"], probe=probe)
+    if manager not in ("absent", "exited", "previous_boot", "pid_reused"):
+        raise HostError("orphan_manager_alive")
+    pid = plan["process_pid"]
+    bridge = recorded_process_state(pid, plan["instance_last_seen_at"], probe=probe)
+    if bridge in ("absent", "exited"):
+        return {"already_exited": True}
+    if bridge != "present":
+        raise HostError("orphan_process_unverified")
+    from scripts.role_service_host import process_creation_time
+    try:
+        created = (creation_time or process_creation_time)(pid)
+        expected = _parse_iso(plan["process_started_at"])
+        if created is None or expected is None or abs(created - expected.timestamp()) > 5:
+            raise ValueError("creation time")
+        rows = (inventory or process_inventory)()
+        matches = [row for row in rows if isinstance(row, dict) and row.get("ProcessId") == pid]
+        if len(matches) != 1 or not isinstance(matches[0].get("CommandLine"), str):
+            raise ValueError("command line")
+        argv = process_argv(matches[0]["CommandLine"])
+        if _host_candidate(argv, normalized(host_entry), include_bridges=True) != "bridge":
+            raise ValueError("bridge entry")
+        projects, bad_project = _identity_values(argv, ("--project-id",))
+        names, bad_name = _identity_values(argv, ("--name",))
+        launches, bad_launch = _identity_values(argv, ("--launch-id",))
+        instances, bad_instance = _identity_values(argv, ("--instance-id",))
+        canonical = ["bridge", "--project-id", *projects, "--member", *names]
+        if (bad_project or bad_name or bad_launch or bad_instance or len(projects) != 1
+                or len(names) != 1 or launches != [plan["expected_process_launch_id"]]
+                or instances != [plan["expected_instance_id"]]
+                or _identity_status(canonical, plan) != "same"):
+            raise ValueError("bridge identity")
+        return {"already_exited": False, "created_at": created}
+    except (OSError, ValueError, TypeError, HostError) as exc:
+        raise HostError("orphan_process_unverified") from exc
+
+
+def terminate_orphan(pid, expected_created_at):
+    """Pin and recheck the process handle before termination; confirm its exit."""
+    if os.name != "nt":
+        raise HostError("recovery_os_unsupported")
+    from scripts import talk_runtime as runtime
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel.TerminateProcess.restype = wintypes.BOOL
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.WaitForSingleObject.restype = wintypes.DWORD
+    kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x0001 | 0x1000 | 0x00100000, False, pid)
+    if not handle:
+        if ctypes.get_last_error() == 87:
+            return {"pid": pid, "exit_code": None, "already_exited": True, "exit_confirmed": True, "termination_initiated": False}
+        raise HostError("orphan_process_unverified")
+    initiated = False
+    try:
+        created = runtime._orphan_handle_creation_time(handle)
+        if created is None or abs(created - expected_created_at) > 0.001:
+            raise HostError("orphan_process_unverified")
+        exit_code = wintypes.DWORD()
+        if not kernel.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            raise HostError("orphan_process_unverified")
+        if exit_code.value != 259:
+            return {"pid": pid, "exit_code": exit_code.value, "already_exited": True, "exit_confirmed": True, "termination_initiated": False}
+        if not kernel.TerminateProcess(handle, 1):
+            raise OrphanTerminationFailed(pid, False)
+        initiated = True
+        if (kernel.WaitForSingleObject(handle, 5000) != 0
+                or not kernel.GetExitCodeProcess(handle, ctypes.byref(exit_code)) or exit_code.value == 259):
+            raise OrphanTerminationFailed(pid, True)
+        return {"pid": pid, "exit_code": exit_code.value, "already_exited": False, "exit_confirmed": True, "termination_initiated": True}
+    except OrphanTerminationFailed:
+        raise
+    except Exception as exc:
+        if initiated:
+            raise OrphanTerminationFailed(pid, True) from exc
+        if isinstance(exc, HostError):
+            raise
+        raise HostError("orphan_process_unverified") from exc
+    finally:
+        kernel.CloseHandle(handle)
 
 
 def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, inventory=None, _preboot_at=None,

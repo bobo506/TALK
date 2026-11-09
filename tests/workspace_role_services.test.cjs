@@ -74,6 +74,82 @@ function serviceRow(overrides = {}) {
 const activeHarnesses = [];
 afterEach(() => { for (const h of activeHarnesses.splice(0)) h.context.stopRoleServicePolling(); });
 
+test('孤儿入口仅 human 按归属或异常状态显示', () => {
+  const role = {member_id: 'agent:a', service: serviceRow({ownership_held: true, observed: 'running'})};
+  const h = harness({roster: [role]});
+  assert.ok(findAll(h.context.workspaceRoleServiceActions(role, 'detail'), n => n.textContent === '终止孤儿并恢复').length);
+  const unknown = {...role, service: serviceRow({observed: 'unknown'})};
+  assert.ok(findAll(h.context.workspaceRoleServiceControls(unknown), n => n.textContent === '终止孤儿并恢复').length);
+  const agent = harness({human: false, roster: [role]});
+  assert.equal(findAll(agent.context.workspaceRoleServiceActions(role, 'detail'), n => n.textContent === '终止孤儿并恢复').length, 0);
+});
+
+test('孤儿入口二次确认任务失败并刷新服务和任务', async () => {
+  const role = {member_id: 'agent:a', service: serviceRow({ownership_held: true, observed: 'running', generation: 4})};
+  const h = harness({roster: [role]});
+  vm.runInContext("workspaceUI.mode = 'roles'", h.context);
+  h.context.renderWorkspaceList = () => {};
+  h.context.renderTaskDetailsPanel = () => {};
+  const confirms = [], requests = [];
+  let refreshed = 0;
+  h.context.window.confirm = message => { confirms.push(message); return true; };
+  h.context.loadProjectTasks = async () => { refreshed++; };
+  h.context.apiFetch = async (url, opts) => {
+    requests.push({url, opts});
+    if (url.endsWith('/role-services')) return {ok: true, json: async () => []};
+    if (requests.filter(r => r.opts?.method === 'POST').length === 1)
+      return {ok: false, status: 409, json: async () => ({detail: 'orphan_tasks_active'})};
+    return {ok: true, status: 200, json: async () => ({})};
+  };
+  await h.context.recoverRoleOrphan('agent:a');
+  const posts = requests.filter(r => r.opts?.method === 'POST');
+  assert.equal(posts.length, 2);
+  assert.equal(JSON.parse(posts[0].opts.body).confirm_task_interrupt, false);
+  assert.equal(JSON.parse(posts[1].opts.body).confirm_task_interrupt, true);
+  assert.equal(confirms.length, 2);
+  assert.match(confirms[1], /任务记为失败/);
+  assert.ok(requests.some(r => r.url.endsWith('/role-services')));
+  assert.equal(refreshed, 1);
+});
+
+test('孤儿入口取消不调用，终止未确认时说明真实状态', async () => {
+  const role = {member_id: 'agent:a', service: serviceRow({ownership_held: true, generation: 4})};
+  const h = harness({roster: [role]});
+  vm.runInContext("workspaceUI.mode = 'roles'", h.context);
+  h.context.renderWorkspaceList = () => {};
+  h.context.renderTaskDetailsPanel = () => {};
+  let calls = 0;
+  h.context.window.confirm = () => false;
+  h.context.apiFetch = async () => { calls++; return {ok: false, status: 409,
+    json: async () => ({detail: {code: 'orphan_terminate_failed', termination_initiated: true}})}; };
+  await h.context.recoverRoleOrphan('agent:a');
+  assert.equal(calls, 0);
+  h.context.window.confirm = () => true;
+  await h.context.recoverRoleOrphan('agent:a');
+  assert.match(h.roleServiceUI.errors.get('agent:a'), /终止已发起但未能确认退出/);
+});
+
+test('孤儿任务二次确认取消只发送第一次请求，错误码映射中文', async () => {
+  const role = {member_id: 'agent:a', service: serviceRow({ownership_held: true, generation: 4})};
+  const h = harness({roster: [role]});
+  vm.runInContext("workspaceUI.mode = 'roles'", h.context);
+  h.context.renderWorkspaceList = () => {};
+  h.context.renderTaskDetailsPanel = () => {};
+  let confirms = 0, calls = 0;
+  h.context.window.confirm = () => ++confirms === 1;
+  h.context.apiFetch = async () => { calls++; return {ok: false, status: 409,
+    json: async () => ({detail: 'orphan_tasks_active'})}; };
+  await h.context.recoverRoleOrphan('agent:a');
+  assert.equal(calls, 1);
+  for (const code of ['orphan_identity_mismatch', 'orphan_no_ownership', 'orphan_manager_alive',
+    'orphan_process_unverified', 'orphan_tasks_active', 'orphan_terminate_failed',
+    'recovery_wrong_local_host', 'recovery_generation_conflict', 'local_runtime_unavailable']) {
+    const msg = await h.context.roleServiceErrorDetail({json: async () => ({detail: code})}, 'fallback');
+    assert.notEqual(msg, code);
+    assert.notEqual(msg, 'fallback');
+  }
+});
+
 test('全部启动被人工关闭取代后结束该批次轮询', () => {
   const h = harness({ roster: [{ member_id: 'agent:a', service: serviceRow() }] });
   h.roleServiceUI.batch = {

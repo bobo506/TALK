@@ -180,6 +180,109 @@ def require_local_runtime(engine, project_id=None):
         raise HTTPException(503, "local_runtime_unavailable") from exc
 
 
+def recover_local_orphan(project_id, member_id, body, operator, session):
+    """Explicit human operation, fenced by the SQLite write transaction."""
+    import hashlib
+    from sqlmodel import select
+    from server.models import (AgentTask, RoleServiceRecovery, RoleServiceRecoveryRequest,
+                               RoleServiceOrphanRecoveryOut)
+    from server.role_service_recovery import orphan_candidate, recover_stopped, receipt
+    from server.role_services import _as_utc, _now, _write_begin, load_role_service_context
+    from server.role_host_resolution import RecoveryHostError, resolve_recovery_host
+    from scripts.role_service_recovery import orphan_local_proof, terminate_orphan, OrphanTerminationFailed
+    from scripts.role_service_host import HostError
+    if operator.kind != "human":
+        raise HTTPException(403, "only human members can recover role services")
+    bound = configured_runtime(session.get_bind(), project_id)
+    if bound is None or bound[1].get("project_id") != project_id:
+        raise HTTPException(503, "local_runtime_unavailable")
+    fingerprint = hashlib.sha256(json.dumps(
+        {**body.model_dump(), "confirmed_by": operator.id}, sort_keys=True,
+        ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+    _write_begin(session)
+    try:
+        prior = session.get(RoleServiceRecovery, (project_id, member_id, body.operation_key))
+        if prior:
+            if prior.request_fingerprint != fingerprint or "orphan_result" not in prior.before_state:
+                raise HTTPException(409, "recovery_conflict")
+            result = RoleServiceOrphanRecoveryOut(project_id=project_id, member_id=member_id,
+                recovery=receipt(prior, replayed=True), **prior.before_state["orphan_result"])
+            session.rollback()
+            return result
+        state, instance = orphan_candidate(project_id, member_id, session)
+        if state.generation != body.expected_generation:
+            raise HTTPException(409, "recovery_generation_conflict")
+        tasks = session.exec(select(AgentTask).where(
+            AgentTask.project_id == project_id, AgentTask.target_member_id == member_id,
+            AgentTask.status.in_(("queued", "running")))).all()
+        if instance.current_task_id is not None:
+            current_task = session.get(AgentTask, instance.current_task_id)
+            if (current_task is not None and current_task.project_id == project_id
+                    and current_task not in tasks):
+                tasks.append(current_task)
+        if (tasks or instance.current_task_id is not None) and not body.confirm_task_interrupt:
+            raise HTTPException(409, "orphan_tasks_active")
+        plan = {"project_id": project_id, "member_id": member_id,
+                "expected_generation": state.generation, "expected_process_launch_id": state.process_launch_id,
+                "expected_instance_id": state.observed_instance_id, "expected_owner_host": state.owner_host,
+                "process_pid": state.pid, "process_started_at": _as_utc(state.process_started_at).isoformat(),
+                "instance_last_seen_at": _as_utc(instance.last_seen_at).isoformat()}
+        ctx = load_role_service_context(project_id, member_id, session)
+        try:
+            target = resolve_recovery_host(config=bound[1], project_id=project_id, member_id=member_id,
+                original_runtime=instance.runtime, current_runtime=ctx.runner.runtime if ctx.runner else None,
+                control_kind=ctx.control_kind, storage_layout=ctx.role.storage_layout, data_root=ROOT)
+            proof_args = {"workspace_runner": instance.runtime} if ctx.role.storage_layout == "workspace-v1" else {}
+            proof = orphan_local_proof(plan, target.health_file, target.host_entry, **proof_args)
+            if proof["already_exited"]:
+                outcome = {"pid": state.pid, "already_exited": True, "exit_code": None,
+                           "exit_confirmed": True, "termination_initiated": False}
+            else:
+                if orphan_local_proof(plan, target.health_file, target.host_entry, **proof_args) != proof:
+                    raise HostError("orphan_process_unverified")
+                outcome = terminate_orphan(state.pid, proof["created_at"])
+        except OrphanTerminationFailed as exc:
+            raise HTTPException(409, {"code": "orphan_terminate_failed", "termination_initiated": exc.initiated,
+                "terminated_pid": exc.pid, "exit_confirmed": False,
+                "message": "终止已发起但未能确认退出" if exc.initiated else "终止未能发起"}) from exc
+        except (HostError, RecoveryHostError) as exc:
+            raise HTTPException(409, exc.code) from exc
+        interrupted = []
+        for task in tasks:
+            task.status = "failed"
+            task.workflow_status = "failed"
+            task.finished_at = _now()
+            task.updated_at = task.finished_at
+            task.last_error = "orphan_terminated_by_human"
+            task.claim_token = None
+            task.lease_expires_at = None
+            session.add(task)
+            interrupted.append(task.id)
+        info = {"terminated_pid": outcome["pid"], "already_exited": outcome["already_exited"],
+                "exit_code": outcome["exit_code"], "exit_confirmed": outcome["exit_confirmed"],
+                "termination_initiated": outcome["termination_initiated"], "interrupted_task_ids": interrupted}
+        request = RoleServiceRecoveryRequest.model_construct(operation_key=body.operation_key,
+            expected_generation=state.generation, expected_process_launch_id=state.process_launch_id,
+            expected_instance_id=state.observed_instance_id, expected_owner_host=state.owner_host,
+            confirmation="orphan_process_terminated", reason="human_terminated_orphan")
+        def audit_orphan(audit, _session):
+            audit.before_state = {**audit.before_state, "orphan_result": info, "human_reason": body.reason,
+                                  "confirmation": "orphan_process_terminated"}
+        try:
+            recovery = recover_stopped(project_id, member_id, request, operator, session, _orphan_locked=True,
+                                       _fingerprint=fingerprint, _on_recovered=audit_orphan)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(500, {"code": "orphan_recovery_write_failed", "terminated_pid": outcome["pid"],
+                "termination_initiated": outcome["termination_initiated"], "exit_confirmed": outcome["exit_confirmed"],
+                "message": "进程退出已确认，但恢复状态未能保存；请重试。"}) from exc
+        return RoleServiceOrphanRecoveryOut(project_id=project_id, member_id=member_id, recovery=recovery, **info)
+    except Exception:
+        session.rollback()
+        raise
+
+
 def recover_local_human_stop(project_id, member_id, operator, session):
     """仅明确human关闭动作触发；本机证明+原generation/launch CAS，失败不入队假关闭。"""
     if operator.kind != "human":

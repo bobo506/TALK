@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-09 20:47 — W3c-3：忙孤儿人工受控终止与恢复入口（597/598/599/600）
+
+- **决策**：598 因“终止已发起后无法保证零终止”停下提问；协调者按方案 A 裁决——终止前的拒绝一律零终止零写入；TerminateProcess 已发起但退出未确认时返回 409 如实报告（`termination_initiated=true`、`exit_confirmed=false`）、零 DB 写入，重试走 `already_exited` 继续恢复。
+- **交付**（599 开发、600 K2.8 独立复核 **approved**；候选 Python 114 / Node 35 全过，基线 e87de2e Python 104 / Node 31，`new_failures=0`、既有断言零弱化）：新增 human-only `POST /api/projects/{p}/roles/{m}/service/recover-orphan`；`orphan_candidate` 允许新鲜心跳但要求身份一致；本机证明（同机、manager 证死、bridge 句柄创建时间 ±5s、argv 内置 bridge 白名单 + `--project-id/--name/--instance-id/--launch-id` 精确归因）；`terminate_orphan` OpenProcess+TerminateProcess+WaitForSingleObject/退出核验；`orphan_tasks_active` 二次确认后把该成员在本项目的 queued/running 任务置 failed（`orphan_terminated_by_human`、释放 claim/lease、不重派不通知、跨项目不动）；页面详情与异常服务行提供两次确认入口。
+- **真实 E2E（协调者，隔离栈：独立 API 8011 + 库副本 + 同根临时 runtime B，生产未动）**：复现死锁（start 409 `already_running`、stop launch 永久 `pending`、`ownership_held=true`）；①无活动任务：200 真实终止存活 bridge（`terminated_pid=3460`、`exit_code=1`、`termination_initiated=true`、`already_exited=false`）→ gen1→2 ownership 释放 → start ready `ins_a2fbafd52305`（gen3）；②忙任务：首次 409 `orphan_tasks_active` → 确认后 200、`interrupted_task_ids=[602]`、任务 failed 且 claim/lease 清空 → gen3→4 → start ready `ins_658a2e161b03`（gen5）。清理：角色删除 5 步 complete、项目 204、隔离 API/runtime 停止。证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`。
+- **复核遗留（非阻断，已记录）**：`instance.current_task_id` 终止后未清（已核查消费者不受影响）；未被他实例领取的同项目 queued 任务也会置 failed 的成员级语义需文档化/补测；`RoleServiceOrphanRecoveryRequest.operation_key` 缺 pattern；事务内 powershell 核查最长约 20s 写锁需文档化；自定义 bridge 入口一律安全拒绝。
+- **部署边界**：新增 API 路由，需受控 reload 生产 API 才生效；生产 runtime A 仍为旧 `talk_runtime` 代码（W3c-2a 待下次重启生效），本片未重启。
+
 ## 2026-11-09 17:20 — WorkBuddy 版本适配提醒与强度失败原因
 
 - **交付** `8e84fb3`（595/596 approved）：`server/runner_versions.py` 增加 `_probe_workbuddy_desktop`（ctypes `version.dll` 读 FileVersion，不启动桌面）、ACP 基线 `5.8.3`、`desktop_version/desktop_status/adapter_warning`；`server/workbuddy_effort.py` 缓存探测错误码并提供只读 `describe_model`；`server/models.py` 的 `RoleBindingOut` 增 `effort_error`、`routes/projects.py` 空选项时投影；`web/workspace.js` 面板显示 CLI/桌面版本与警告、强度空态显示失败原因。

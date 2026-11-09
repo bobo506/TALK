@@ -30,6 +30,27 @@ def fail(code: str):
     raise HTTPException(409, code)
 
 
+def orphan_candidate(project_id: str, member_id: str, session: Session):
+    """Resolve the ownership tuple without assuming a stale heartbeat."""
+    load_role_service_context(project_id, member_id, session)
+    state = session.get(RoleServiceState, (project_id, member_id))
+    if state is None or not state.process_launch_id or not state.observed_instance_id:
+        fail("orphan_no_ownership")
+    launch = session.get(RoleServiceLaunch, state.process_launch_id)
+    instance = session.get(AgentInstance, state.observed_instance_id)
+    if instance is None:
+        fail("orphan_no_ownership")
+    if (launch is None or launch.action != "start" or launch.project_id != project_id
+            or launch.member_id != member_id or launch.claim_host != state.owner_host
+            or launch.expected_instance_id != state.observed_instance_id
+            or instance.project_id != project_id or instance.member_id != member_id
+            or instance.launch_id != state.process_launch_id or instance.pid != state.pid
+            or not state.owner_host or not state.pid or state.pid <= 0
+            or state.process_started_at is None or instance.last_seen_at is None):
+        fail("orphan_identity_mismatch")
+    return state, instance
+
+
 def candidate(project_id: str, member_id: str, session: Session, now: datetime, *, _preboot_at=None, _expected_layout="legacy"):
     ctx = load_role_service_context(project_id, member_id, session)
     # Public manual recovery remains legacy-only. Trusted local callers pass
@@ -111,11 +132,13 @@ def receipt(audit: RoleServiceRecovery, *, replayed=False):
 
 
 def recover_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRequest,
-                    operator: Member, session: Session, *, _preboot_at=None, _on_recovered=None, _expected_layout="legacy"):
+                    operator: Member, session: Session, *, _preboot_at=None, _on_recovered=None, _expected_layout="legacy",
+                    _orphan_locked=False, _fingerprint=None):
     require_human(operator)
-    _write_begin(session)
+    if not _orphan_locked:
+        _write_begin(session)
     try:
-        fingerprint = hashlib.sha256(json.dumps(
+        fingerprint = _fingerprint or hashlib.sha256(json.dumps(
             {**body.model_dump(), "confirmed_by": operator.id}, sort_keys=True,
             ensure_ascii=False, separators=(",", ":"),
         ).encode("utf-8")).hexdigest()
@@ -128,7 +151,8 @@ def recover_stopped(project_id: str, member_id: str, body: RoleServiceRecoveryRe
             session.rollback()
             return result
         now = _now()
-        state, instance = candidate(project_id, member_id, session, now, _preboot_at=_preboot_at, _expected_layout=_expected_layout)
+        state, instance = (orphan_candidate(project_id, member_id, session) if _orphan_locked else
+                           candidate(project_id, member_id, session, now, _preboot_at=_preboot_at, _expected_layout=_expected_layout))
         if (state.generation != body.expected_generation
                 or state.process_launch_id != body.expected_process_launch_id
                 or state.observed_instance_id != body.expected_instance_id
