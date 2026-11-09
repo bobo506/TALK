@@ -159,4 +159,3 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
 2. 适配器采用方案 A：角色宿主拉起 CLI（固定空闲端口 + 环境变量），就绪探测 `/api/v1/health`，ACP 客户端改为 `GET` SSE 取 `acp-connection-id`/`acp-session-token` → `POST` 回带 → `DELETE` 关闭；删除固定端口扫描与 `/connect`；
 3. 强度探测复用 `session/new` 返回的模型/配置或 `session/set_config_option`；错误码沿用 `workbuddy_acp_runtime_unavailable`；
 4. 真实 E2E：hy4/w-d 强度、消息、general 任务、结构化交付；独立复核（避开 WorkBuddy 线路）。
-
