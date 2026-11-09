@@ -67,14 +67,28 @@ class OrphanApiTests(RoleServiceTestCase):
 
     def test_busy_gate_project_scope_and_replay(self):
         with self.session() as session:
-            a = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="task", status="running", claim_token="x")
-            b = AgentTask(project_id=OTHER_PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="other", status="queued")
+            instance = session.get(AgentInstance, self.claimed["expected_instance_id"])
+            a = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="task", status="running", instance_id=instance.id, claim_token="x", lease_expires_at=datetime.now(timezone.utc))
+            b = AgentTask(project_id=OTHER_PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="other", status="queued", instance_id=instance.id)
             session.add(a); session.add(b); session.commit()
             a_id, b_id = a.id, b.id
+            instance.current_task_id = str(a_id)
+            session.add(instance); session.commit()
+        # The test client's startup also applies legacy task normalization.
+        with self.make_client():
+            pass
+        with self.session() as session:
+            task_before = session.get(AgentTask, a_id).model_dump()
+            instance_before = session.get(AgentInstance, self.claimed["expected_instance_id"]).model_dump()
         before = self.state_row().model_dump()
-        self.assertEqual(self.post().json()["detail"], "orphan_tasks_active")
+        response = self.post()
+        self.assertEqual((response.status_code, response.json()["detail"]), (409, "orphan_tasks_active"))
         self.term_mock.assert_not_called()
         self.assertEqual(self.state_row().model_dump(), before)
+        self.assertEqual(self.audits(), [])
+        with self.session() as session:
+            self.assertEqual(session.get(AgentTask, a_id).model_dump(), task_before)
+            self.assertEqual(session.get(AgentInstance, self.claimed["expected_instance_id"]).model_dump(), instance_before)
         response = self.post({**self.body, "confirm_task_interrupt": True})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["interrupted_task_ids"], [a_id])
@@ -82,7 +96,10 @@ class OrphanApiTests(RoleServiceTestCase):
             a, b = session.get(AgentTask, a_id), session.get(AgentTask, b_id)
             self.assertEqual((a.status, a.last_error, a.claim_token), ("failed", "orphan_terminated_by_human", None))
             self.assertEqual(a.workflow_status, "failed")
+            self.assertIsNone(a.lease_expires_at)
+            self.assertIsNotNone(a.finished_at)
             self.assertEqual(b.status, "queued")
+            self.assertIsNone(session.get(AgentInstance, self.claimed["expected_instance_id"]).current_task_id)
         replay = self.post({**self.body, "confirm_task_interrupt": True})
         self.assertEqual(replay.status_code, 200, replay.text)
         self.assertTrue(replay.json()["recovery"]["replayed"])
@@ -118,7 +135,7 @@ class OrphanApiTests(RoleServiceTestCase):
 
     def test_current_task_id_is_also_interrupted(self):
         with self.session() as session:
-            task = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="current", status="paused")
+            task = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="current", status="queued")
             session.add(task)
             session.flush()
             task_id = task.id
@@ -132,6 +149,51 @@ class OrphanApiTests(RoleServiceTestCase):
         self.assertEqual(response.json()["interrupted_task_ids"], [task_id])
         with self.session() as session:
             self.assertEqual(session.get(AgentTask, task_id).workflow_status, "failed")
+            self.assertIsNone(session.get(AgentInstance, self.claimed["expected_instance_id"]).current_task_id)
+
+    def test_unclaimed_and_other_instance_tasks_remain_queued(self):
+        with self.session() as session:
+            other = AgentInstance(id="other-instance", member_id=self.role_a, runtime="codex", status="idle", project_id=PROJECT_ID)
+            session.add(other)
+            session.flush()
+            unclaimed = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="unclaimed", status="queued")
+            claimed_elsewhere = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="other instance", status="queued", instance_id=other.id)
+            session.add(unclaimed); session.add(claimed_elsewhere); session.commit()
+            task_ids = (unclaimed.id, claimed_elsewhere.id)
+        with self.make_client():
+            pass
+        with self.session() as session:
+            before = {task_id: session.get(AgentTask, task_id).model_dump() for task_id in task_ids}
+        response = self.post()
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["interrupted_task_ids"], [])
+        with self.session() as session:
+            for task_id, snapshot in before.items():
+                self.assertEqual(session.get(AgentTask, task_id).model_dump(), snapshot)
+
+    def test_invalid_operation_keys_rejected_before_termination(self):
+        before = self.state_row().model_dump()
+        for key in ("bad key 123", "_invalid-key"):
+            with self.subTest(key=key):
+                self.assertEqual(self.post({**self.body, "operation_key": key}).status_code, 422)
+        self.term_mock.assert_not_called()
+        self.assertEqual(self.state_row().model_dump(), before)
+        self.assertEqual(self.audits(), [])
+
+    def test_current_pointer_to_paused_task_does_not_interrupt_it(self):
+        with self.session() as session:
+            task = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="paused", status="paused")
+            session.add(task); session.flush()
+            task_id = task.id
+            instance = session.get(AgentInstance, self.claimed["expected_instance_id"])
+            instance.current_task_id = str(task_id)
+            session.add(instance); session.commit()
+        response = self.post()
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["interrupted_task_ids"], [])
+        with self.session() as session:
+            self.assertEqual(session.get(AgentTask, task_id).status, "paused")
+            self.assertIsNone(session.get(AgentInstance, self.claimed["expected_instance_id"]).current_task_id)
 
     def test_wait_timeout_at_api_has_no_database_writes(self):
         before = self.state_row().model_dump()
@@ -154,21 +216,35 @@ class OrphanApiTests(RoleServiceTestCase):
     def test_database_error_rolls_back_then_already_exited_retry(self):
         before = self.state_row().model_dump()
         with self.session() as session:
+            instance = session.get(AgentInstance, self.claimed["expected_instance_id"])
+            task = AgentTask(project_id=PROJECT_ID, target_member_id=self.role_a, created_by="human:bobo", content="rollback", status="running", instance_id=instance.id, claim_token="token")
+            session.add(task); session.flush()
+            task_id = task.id
+            instance.current_task_id = str(task_id)
+            session.add(instance); session.commit()
+        with self.make_client():
+            pass
+        with self.session() as session:
+            task_before = session.get(AgentTask, task_id).model_dump()
+            instance_before = session.get(AgentInstance, self.claimed["expected_instance_id"]).model_dump()
             session.execute(text("CREATE TRIGGER orphan_test_fail BEFORE INSERT ON role_service_recoveries BEGIN SELECT RAISE(ABORT, 'orphan test'); END"))
             session.commit()
         try:
-            failed = self.post()
+            failed = self.post({**self.body, "confirm_task_interrupt": True})
             self.assertEqual(failed.status_code, 500)
             self.assertEqual(failed.json()["detail"]["code"], "orphan_recovery_write_failed")
             self.assertTrue(failed.json()["detail"]["exit_confirmed"])
             self.assertEqual(self.state_row().model_dump(), before)
             self.assertEqual(self.audits(), [])
+            with self.session() as session:
+                self.assertEqual(session.get(AgentTask, task_id).model_dump(), task_before)
+                self.assertEqual(session.get(AgentInstance, self.claimed["expected_instance_id"]).model_dump(), instance_before)
         finally:
             with self.session() as session:
                 session.execute(text("DROP TRIGGER orphan_test_fail"))
                 session.commit()
         with patch("scripts.role_service_recovery.orphan_local_proof", return_value={"already_exited": True}):
-            response = self.post()
+            response = self.post({**self.body, "confirm_task_interrupt": True})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertTrue(response.json()["already_exited"])
 

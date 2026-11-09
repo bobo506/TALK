@@ -183,6 +183,7 @@ def require_local_runtime(engine, project_id=None):
 def recover_local_orphan(project_id, member_id, body, operator, session):
     """Explicit human operation, fenced by the SQLite write transaction."""
     import hashlib
+    from sqlalchemy import or_
     from sqlmodel import select
     from server.models import (AgentTask, RoleServiceRecovery, RoleServiceRecoveryRequest,
                                RoleServiceOrphanRecoveryOut)
@@ -214,13 +215,9 @@ def recover_local_orphan(project_id, member_id, body, operator, session):
             raise HTTPException(409, "recovery_generation_conflict")
         tasks = session.exec(select(AgentTask).where(
             AgentTask.project_id == project_id, AgentTask.target_member_id == member_id,
-            AgentTask.status.in_(("queued", "running")))).all()
-        if instance.current_task_id is not None:
-            current_task = session.get(AgentTask, instance.current_task_id)
-            if (current_task is not None and current_task.project_id == project_id
-                    and current_task not in tasks):
-                tasks.append(current_task)
-        if (tasks or instance.current_task_id is not None) and not body.confirm_task_interrupt:
+            AgentTask.status.in_(("queued", "running")),
+            or_(AgentTask.instance_id == instance.id, AgentTask.id == instance.current_task_id))).all()
+        if tasks and not body.confirm_task_interrupt:
             raise HTTPException(409, "orphan_tasks_active")
         plan = {"project_id": project_id, "member_id": member_id,
                 "expected_generation": state.generation, "expected_process_launch_id": state.process_launch_id,
@@ -268,6 +265,8 @@ def recover_local_orphan(project_id, member_id, body, operator, session):
         def audit_orphan(audit, _session):
             audit.before_state = {**audit.before_state, "orphan_result": info, "human_reason": body.reason,
                                   "confirmation": "orphan_process_terminated"}
+            instance.current_task_id = None
+            _session.add(instance)
         try:
             recovery = recover_stopped(project_id, member_id, request, operator, session, _orphan_locked=True,
                                        _fingerprint=fingerprint, _on_recovered=audit_orphan)
