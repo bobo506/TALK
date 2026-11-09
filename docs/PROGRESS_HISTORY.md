@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-09 17:20 — WorkBuddy 版本适配提醒与强度失败原因
+
+- **交付** `8e84fb3`（595/596 approved）：`server/runner_versions.py` 增加 `_probe_workbuddy_desktop`（ctypes `version.dll` 读 FileVersion，不启动桌面）、ACP 基线 `5.8.3`、`desktop_version/desktop_status/adapter_warning`；`server/workbuddy_effort.py` 缓存探测错误码并提供只读 `describe_model`；`server/models.py` 的 `RoleBindingOut` 增 `effort_error`、`routes/projects.py` 空选项时投影；`web/workspace.js` 面板显示 CLI/桌面版本与警告、强度空态显示失败原因。
+- **测试**：候选 Python 47 / Node 33 全过；基线 681ee5d Python 43 / Node 31 全过；无新增失败。
+- **部署与实测**：API reload child 17496→1952；`/api/runners/versions` workbuddy = CLI 2.165.0 match、desktop 5.9.3、desktop_status newer、adapter_warning；w-d binding = effort_options []、effort_error `workbuddy_acp_runtime_unavailable`。
+- **环境差异**：Terra 会话 LOCALAPPDATA 被沙箱重定向导致桌面包探测“未找到”；K2.8 以标准路径实测 5.9.3，生产 API 继承 Administrator 环境。
+- **后续**：WorkBuddy ACP 5.9.3 协议适配研究/实现；586 建议的人工恢复入口、delete 90s 窗口。
+
+
 ## 2026-11-09 16:50 — W3c-2a：孤儿 bridge 受控清理与恢复链 E2E
 
 - **诊断**（586 K2.8 approved）：场景 a 停/启 runtime + start 正常、`host_unreachable` 未复现；场景 b 仅 kill 宿主导致 `recovery_required` + start 409 + stop launch pending 的永久死锁（重启 runtime 亦不自愈）；b 恢复：bridge 退出 + 90s 实例过期后 stop 走人工恢复；c kill bridge 宿主回报 `bridge_process_exited` 并释放；d delete 受 90s 新鲜心跳保护，残留 guard/空 native-home。

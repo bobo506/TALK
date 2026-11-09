@@ -1,5 +1,12 @@
 # Project Progress
 
+## WorkBuddy 版本适配提醒完成（2026-11-09 17:20）
+
+- **交付** `8e84fb3`（595 Terra 开发、596 K2.8 复核 **approved**；候选 Python 47 / Node 33 全过，基线 43/31 全过，`new_failures=0`）：运行器版本面板增加 WorkBuddy **桌面版本**探测（`version.dll` 只读，与 ACP 验证基线 **5.8.3** 比较），未适配/未知时返回 `adapter_warning`；`workbuddy_effort` 缓存探测错误码（TTL 60s），binding 空选项时投影 `effort_error`，页面显示“强度获取失败（原因）”。不自动改绑定/升级。
+- **部署与实测**：API 受控 reload child **17496→1952**；`/api/runners/versions` → CLI `2.165.0` match、desktop `5.9.3`、`desktop_status=newer`、`adapter_warning` 正常；w-d binding（`refresh_effort=true`）→ `effort_options=[]`、`effort_error=workbuddy_acp_runtime_unavailable`。
+- **环境说明**：Terra 会话 `LOCALAPPDATA` 被 role 沙箱重定向，导致其自测“未找到 WorkBuddy”；K2.8 以标准 `LOCALAPPDATA` 实测返回 5.9.3，生产 API 继承 Administrator 环境。
+- **下一步**：WorkBuddy **ACP 5.9.3 协议适配研究**（只读：新握手/会话动态端口/`Acp-Connection-Id`）→ 实现/复核；586 建议的人工恢复入口与 delete 90s 窗口仍待排期。
+
 ## W3c-2a 完成：孤儿 bridge 受控清理与恢复链 E2E（2026-11-09 16:50）
 
 - **修复**：`244f226`（588，592 approved）+ `6a6d0c5`（593，594 approved）——runtime 在宿主已死且 `ownership_held` 时，对“同机、同项目、两次查询均 idle、无 current_task、句柄创建时间与记录偏差 ≤5s”的本地孤儿 bridge 用 Windows 句柄 `TerminateProcess` 受控终止；`recovery_required` 语义不变，忙角色不杀。真实 E2E 发现并修复了 `recorded_process_state` +1s 容差导致的“永不清理”缺陷。详见 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
