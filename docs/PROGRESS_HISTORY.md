@@ -6,6 +6,7 @@
 - 桌面拉起配方：`WorkBuddy.exe` + `ELECTRON_RUN_AS_NODE=1` 运行 `cli/dist/codebuddy-lite-wb.mjs --serve ...`，并注入 `WORKBUDDY_CONFIG_DIR=<user>\.workbuddy`、`CODEBUDDY_FORCE_LITE_WB_BUNDLE=1` 等；TALK 可复用同一配方自拉 CLI（方案 A，HTTP SSE），或改用 `--acp`（stdio ndJsonStream，方案 B）。
 - 产出：[WORKBUDDY_ACP_593_RESEARCH.md](../spec/WORKBUDDY_ACP_593_RESEARCH.md)（协议事实与证据、A/B 对比、适配器改造点、风险、W-B1 探针 / W-B2 实现切片建议）；证据 `.tmp/wb-asar/`、`.tmp/wb-acp-index.json`、旧诊断 `.tmp/workbuddy-acp-593-diagnosis.md`。
 - 未验证：外部拉起 CLI 的登录态复用与模型调用、沙箱/工具差异、SSE 事件格式与 `session/new` 参数；下一步 W-B1 真实探针（需实施授权）。
+- **W-B1 真实探针（23:51–00:20，已执行）**：TALK 用 `WorkBuddy.exe`+`ELECTRON_RUN_AS_NODE=1` 独立拉起 CLI，`/api/v1/health` 200；HTTP 侧 `GET /api/v1/acp` 返回 `acp-connection-id`+`acp-session-token`，`initialize`/`session/new`（含模型列表与权限配置）均 200；`session/prompt` 返回 `Authentication required`（外部 CLI 未登录，桌面是向子进程注入凭据）。方案 B `--acp` 未产出 ACP 帧（退出 0/无输出），暂不采用；**结论：方案 A（HTTP SSE）可行，实施前需一次性 CLI `/login` 验证**。探针产物与命令见 [`WORKBUDDY_ACP_593_RESEARCH.md`](../spec/WORKBUDDY_ACP_593_RESEARCH.md) 第十节、`.tmp/wb-probe/`。
 
 ## 2026-11-09 22:40 — W3c-4 返修与「重置」入口 UI 收尾（601/602）
 

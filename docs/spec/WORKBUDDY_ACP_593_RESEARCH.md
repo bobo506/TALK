@@ -1,6 +1,6 @@
 # WorkBuddy 5.9.3 ACP 协议只读研究（2026-11-09）
 
-状态：**只读研究完成，未改产品代码、未启动桌面/CLI 实测**。实现与真实 E2E 另行切片。
+状态：**只读研究 + W-B1 真实探针已完成**（2026-11-09 23:51–00:20，未改产品代码）。探针结论：HTTP 协议全部打通，但**外部拉起的 CLI 账号未登录**（`Authentication required`）；stdio `--acp` 在本机未跑通。详见第十节。
 
 ## 一、结论摘要
 
@@ -101,7 +101,7 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
 
 优点：无端口与连接 id、生命周期清晰、最接近 TALK 既有桥模式；缺点：传输层重写，若 `--acp` 与 `--serve` 能力不等价则需回退。
 
-**建议**：实施片先做 **B 的最小可行性探针**（启动 CLI、`initialize`、`session/new`、一次 `session/prompt`）；若 stdio 能力不足，再按 A 落地。
+**建议（按 W-B1 实测修订）**：**采用方案 A（HTTP SSE）**。探针已实际跑通启动、健康检查、SSE 连接、`initialize`、`session/new`（含模型与权限配置）与 `session/prompt` 调用路径；唯一阻塞是**账号登录态**（见第十节）。方案 B 的 `--acp` 在本机未产生任何 ACP 帧（进程退出 0 或无输出），暂不采用，留作后续可选。
 
 ## 六、适配器改造点（供后续实施切片）
 
@@ -134,3 +134,29 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
 - `cli/dist/codebuddy-lite-wb.mjs`：ACP HTTP 控制器（GET/POST/DELETE、400/503、连接 guard）。
 - `cli/bin/startup-profile.cjs`：`--serve/--acp/--a2a/--prewarm` 模式。
 - `.tmp/workbuddy-acp-593-diagnosis.md`：5.9.3 桌面端口 404 实测。
+
+## 十、W-B1 探针实测（2026-11-09 23:51–00:20）
+
+**启动方式（可复现）**：以 `WorkBuddy.exe` + `ELECTRON_RUN_AS_NODE=1` 运行 `cli/dist/codebuddy-lite-wb.mjs --serve --no-session-persistence --setting-sources user --settings '{"sandbox":{"allowUnsandboxedCommands":false}}' --port <空闲端口> --host 127.0.0.1`，环境设 `CODEBUDDY_CONFIG_DIR`/`WORKBUDDY_CONFIG_DIR=<用户>\.workbuddy`、`CODEBUDDY_FORCE_LITE_WB_BUNDLE=1` 等。约 10s 后 `GET /api/v1/health` 返回 200（pid/port 正常），说明 **CLI 可被 TALK 独立拉起，不依赖桌面进程存活**。
+
+**HTTP 协议实测（全部成功）**：
+- `GET /api/v1/acp`（`Accept: text/event-stream`）→ 200 SSE，响应头含 **`acp-connection-id`** 与 **`acp-session-token`**（新协议两者都要收）。
+- `POST /api/v1/acp` `initialize` → 200，`protocolVersion=1`、`promptCapabilities(image/embeddedContext)`、`loadSession=true`、`multitaskSupport=true`、`authMethods=[iOA, external, internal, selfhosted]`。
+- `POST` `session/new` → 200，返回 `sessionId`、可用模型列表（`auto/glm-5v-turbo/glm-5.1/glm-5.0-turbo/glm-5.0/glm-4.7/kimi-k2.5/minimax-m2.7/deepseek-v3-2-volc/custom-local:*`，含 credits/最大输入）、权限模式配置项（default/acceptEdits/plan/auto/dontAsk/bypassPermissions）。**消息与强度所需的模型/配置数据在这里可得**。
+- `POST` `session/prompt`（“只回复 OK”）→ 200，返回 `stopReason=refusal`，`_meta["codebuddy.ai/errorMessage"] = {"message":"Authentication required. Please use /login command to sign in to your account","category":"auth"}`。
+
+**结论**：传输层与 ACP 会话层已完全打通；**唯一阻塞是账号登录态**。外部拉起的 CLI 不会自动复用桌面的登录（仅指向 `~/.workbuddy` 不够，桌面是向子进程注入凭据）。解决办法需在实施前定：
+1. **一次性 CLI 登录（建议先验证）**：在终端启动同一 CLI 执行 `/login` 完成账号登录，使其持久化到 CLI 自己的凭据存储；之后 TALK 拉起的 CLI 直接复用。属用户一次性授权动作，符合 Codex/Kimi 的既有模式。
+2. 由桌面注入 token（`connectorTokenEnv`）：需要读取/转交账号秘密，**不符合当前秘密边界**，除非用户明确授权最小范围。
+3. 仅驱动桌面自己的会话（内部 IPC）：不可稳定自动化，不采用。
+
+**方案 B（stdio）实测**：`--acp` 进程可启动但退出码 0、无任何 JSON-RPC 帧；`--serve --acp --acp-transport stdio` 无 stdout 帧输出（阻塞）。**本机未跑通，暂不采用**；如后续确认正确调用方式可再评估。
+
+**探针产物**：`.tmp/wb-probe/`（`probe.py`、`acp_probe_v2.py`、`stdio_probe.py`、`acp-result-v2.json`、`cli.*.log`、`stdio*.err.log`）。探针进程已清理，未改动 WorkBuddy/TALK 产品代码。
+
+**建议的 W-B2（实施片）**：
+1. 先做一次性 CLI 登录验证（用户操作），确认外部拉起 CLI 可完成一次真实模型调用；
+2. 适配器采用方案 A：角色宿主拉起 CLI（固定空闲端口 + 环境变量），就绪探测 `/api/v1/health`，ACP 客户端改为 `GET` SSE 取 `acp-connection-id`/`acp-session-token` → `POST` 回带 → `DELETE` 关闭；删除固定端口扫描与 `/connect`；
+3. 强度探测复用 `session/new` 返回的模型/配置或 `session/set_config_option`；错误码沿用 `workbuddy_acp_runtime_unavailable`；
+4. 真实 E2E：hy4/w-d 强度、消息、general 任务、结构化交付；独立复核（避开 WorkBuddy 线路）。
+
