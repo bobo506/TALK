@@ -7,7 +7,8 @@
 - **真实 E2E（协调者，隔离栈：独立 API 8011 + 库副本 + 同根临时 runtime B，生产未动）**：复现死锁（start 409 `already_running`、stop launch 永久 `pending`、`ownership_held=true`）；①无活动任务：200 真实终止存活 bridge（`terminated_pid=3460`、`exit_code=1`、`termination_initiated=true`、`already_exited=false`）→ gen1→2 ownership 释放 → start ready `ins_a2fbafd52305`（gen3）；②忙任务：首次 409 `orphan_tasks_active` → 确认后 200、`interrupted_task_ids=[602]`、任务 failed 且 claim/lease 清空 → gen3→4 → start ready `ins_658a2e161b03`（gen5）。清理：角色删除 5 步 complete、项目 204、隔离 API/runtime 停止。证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`。
 - **复核遗留（非阻断，已记录）**：`instance.current_task_id` 终止后未清（已核查消费者不受影响）；未被他实例领取的同项目 queued 任务也会置 failed 的成员级语义需文档化/补测；`RoleServiceOrphanRecoveryRequest.operation_key` 缺 pattern；事务内 powershell 核查最长约 20s 写锁需文档化；自定义 bridge 入口一律安全拒绝。
 - **部署边界**：新增 API 路由，需受控 reload 生产 API 才生效；生产 runtime A 仍为旧 `talk_runtime` 代码（W3c-2a 待下次重启生效），本片未重启。
-- **2026-11-09 21:20 用户命名调整**：用户指出「终止孤儿并恢复」实际是异常状态下的重置操作，故按钮改名为「重置」，并把显示条件收紧为仅 `unknown/stopping`、关闭返回 `recovery_*`/`stop_timeout` 或已触发恢复提示时出现；原「绑定重置」改名「重新绑定」。用户手册、恢复指南同步；Node 95 项通过。
+- **2026-11-09 21:20 用户命名调整**：用户指出「终止孤儿并恢复」实际是异常状态下的重置操作，故按钮改名为「重置」，并把显示条件收紧为仅 `unknown/stopping`、关闭返回 `recovery_*`/`stop_timeout` 或已触发恢复提示时出现；原「绑定重置」改名「重新绑定」。用户手册、恢复指南同步；Node 95 项通过（提交 `e2b3b24`）。
+- **2026-11-09 21:57 部署**：runtime A graceful stop（旧 pid 3704，含 API）→ 新进程 **23688**（加载 W3c-2a 自动清理代码）+ API child **21352**；随后显式 start Terra `ins_4874d7caf3b7`、K2.8 `ins_e49afc31121b`，均 running/ready；`/healthz` ok、3 online。至此 W3c-1/1b/2a/3 全部生效。
 
 ## 2026-11-09 17:20 — WorkBuddy 版本适配提醒与强度失败原因
 

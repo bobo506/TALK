@@ -1,13 +1,13 @@
 # Project Progress
 
-## 收工快照（2026-11-09 20:47）
+## 收工快照（2026-11-09 21:58）
 
 - **本轮完成**：W3c-3 忙孤儿人工恢复入口（599 开发、600 K2.8 **approved**；候选 Python 114 / Node 35、基线 104 / 31、`new_failures=0`）；真实 E2E 在隔离栈通过——终止存活 bridge、忙任务 409→确认→中断记账、gen1→2/3→4 恢复并 start ready。
 - **决策**：598 提出的“终止后不可逆”冲突按方案 A 落地：终止前的拒绝零终止零写入；已发起未确认 → 409 真实报告、零 DB 写入，重试走 `already_exited`。
-- **环境**：生产 API 8000 正常、runtime A pid **3704**、Terra/K2.8 running；无 running 任务；隔离栈已停，临时项目/角色已清理（证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`）。
+- **环境（21:57 重启后）**：runtime A 新进程 **23688**（加载 W3c-2a 自动清理）、API child **21352**、`/healthz` ok、3 online；Terra `ins_4874d7caf3b7`、K2.8 `ins_e49afc31121b` 均 running/ready；无 running 任务；隔离栈已停（证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`）。
 - **命名调整（21:20）**：异常恢复按钮「终止孤儿并恢复」改名**「重置」**并仅在状态异常时显示；原「绑定重置」改名**「重新绑定」**（用户手册/恢复指南同步，Node 95 项通过）。
-- **部署边界**：新端点需**受控 reload 生产 API** 才生效；生产 runtime A 仍为旧 `talk_runtime` 代码（W3c-2a 待下次重启）。
-- **待办（按优先级）**：① 受控 reload 生产 API + 页面验收（需用户授权）；② WorkBuddy ACP 5.9.3 只读研究 → 适配；③ 非阻断记录项（`instance.current_task_id` 清理、queued 任务语义补测、`operation_key` pattern、事务写锁时长文档）；④ delete 90s 窗口（可选）；⑤ `host_unreachable` 在 API reload 窗口专项复现。
+- **部署边界**：W3c-2a（自动清理）与 W3c-3（人工「重置」入口）均已生效；页面文案「重置」/「重新绑定」硬刷新可见。
+- **待办（按优先级）**：① WorkBuddy ACP 5.9.3 只读研究 → 适配；② 非阻断记录项（`instance.current_task_id` 清理、queued 任务语义补测、`operation_key` pattern、事务写锁时长文档）；③ delete 90s 窗口（可选）；④ `host_unreachable` 在 API reload 窗口专项复现；⑤ legacy `guard`/空 `native-home` 残留。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
 ## 收工快照（2026-11-09 17:30）
