@@ -88,7 +88,7 @@ def start_native_setup(project_id: str, member_id: str, body: RoleNativeSetupSta
     _require_human(current)
     if body.confirm is not True:
         raise HTTPException(422, "native_setup_confirmation_required")
-    require_local_runtime(session.get_bind())
+    require_local_runtime(session.get_bind(), project_id)
     from server.kimi_native_setup import manager
     return manager.start(project_id, member_id, body.expected_revision, current.id, session)
 
@@ -121,7 +121,7 @@ def start_project_role_service(
     **不返回任何 token**，不直接spawn角色；已绑定本机入口时确保后台宿主可用。
     """
     _require_human(current)
-    require_local_runtime(session.get_bind())
+    require_local_runtime(session.get_bind(), project_id)
     return start_role_service(project_id, member_id, current, session)
 
 
@@ -141,7 +141,7 @@ def stop_project_role_service(
     """
     _require_human(current)
     recover_local_human_stop(project_id, member_id, current, session)
-    require_local_runtime(session.get_bind())
+    require_local_runtime(session.get_bind(), project_id)
     return stop_role_service(project_id, member_id, current, session)
 
 
@@ -177,7 +177,7 @@ def start_all_project_role_services(
     部分失败不整体回滚。
     """
     _require_human(current)
-    require_local_runtime(session.get_bind())
+    require_local_runtime(session.get_bind(), project_id)
     return start_all_role_services(project_id, body.member_ids, current, session)
 
 

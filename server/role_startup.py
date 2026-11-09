@@ -70,7 +70,7 @@ def verified_runtime(project,activation,session):
     from scripts.role_service_host import _parse_iso
     from bridges.runtime_log_retention import pinned,NativeFile
     try:
-        bound=configured_runtime(session.get_bind())
+        bound=configured_runtime(session.get_bind(), project)
         if bound is None or bound[1]['project_id']!=project:fail('startup_local_runtime_unbound')
         config=bound[1];path=Path(config['state_dir'])/'runtime'/'health.json'
         with pinned(path.parent),NativeFile(path) as file:

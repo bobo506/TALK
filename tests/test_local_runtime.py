@@ -532,3 +532,126 @@ class WorkspaceManagerProtocolTests(unittest.TestCase):
                 with self.subTest(capability=value):
                     target.write_text(json.dumps({"capability": value}), encoding="utf-8")
                     self.assertEqual(workspace_capability_matches(target, **kwargs), expected)
+
+class ProjectBindingTests(unittest.TestCase):
+    def setUp(self):
+        from sqlalchemy import text
+        self.temp = tempfile.TemporaryDirectory(prefix="project-binding-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        (self.repo / "config.toml").write_text('[storage]\ndb_path="fixture.db"\n', encoding="utf-8")
+        self.project = self.root / "project"
+        self.project.mkdir()
+        self.config_path = self.root / "manifest.json"
+        self.config_path.write_text('{}', encoding="utf-8")
+        self.config = {"project_id": "p1", "project_root": str(self.project), "state_dir": str(self.root / "state")}
+        self.engine = create_engine("sqlite:///" + (self.repo / "fixture.db").as_posix())
+        self.addCleanup(self.engine.dispose)
+        with self.engine.begin() as connection:
+            connection.execute(text("CREATE TABLE projects (project_id TEXT PRIMARY KEY, project_root_path TEXT)"))
+            connection.execute(text("INSERT INTO projects VALUES (:p, :r)"), {"p": "p1", "r": str(self.project)})
+        self.pointer = self.project / ".talk" / "runtime.local.json"
+        self.repo_pointer = self.repo / ".talk" / "runtime.local.json"
+        self.repo_pointer.parent.mkdir()
+        self.repo_pointer.write_text("unchanged", encoding="utf-8")
+        with patch.object(local, "ROOT", self.repo):
+            local.bind_local_runtime(self.config_path, self.config)
+
+    def test_project_pointer_and_fail_closed_validation(self):
+        from sqlalchemy import text
+        from scripts import talk_runtime
+        value = json.loads(self.pointer.read_text(encoding="utf-8"))
+        self.assertEqual(value, {"schema": "talk-local-runtime-1", "database_file": str((self.repo / "fixture.db").resolve()), "config_file": str(self.config_path.resolve())})
+        self.assertEqual(self.repo_pointer.read_text(encoding="utf-8"), "unchanged")
+        with patch.object(talk_runtime, "load_config", return_value=self.config):
+            self.assertEqual(local.configured_runtime(self.engine, "p1"), (self.config_path.resolve(), self.config))
+            self.assertIsNone(local.configured_runtime(self.engine, "wrong"))
+            for key, bad in [("schema", "bad"), ("database_file", str(self.root / "wrong.db")), ("config_file", str(self.root / "missing.json")), ("config_file", "relative.json")]:
+                with self.subTest(key=key, bad=bad):
+                    self.pointer.write_text(json.dumps({**value, key: bad}), encoding="utf-8")
+                    self.assertIsNone(local.configured_runtime(self.engine, "p1"))
+            self.pointer.write_text(json.dumps(value), encoding="utf-8")
+            for bad_config in [{**self.config, "project_id": "wrong"}, {**self.config, "project_root": str(self.repo)}]:
+                with patch.object(talk_runtime, "load_config", return_value=bad_config):
+                    self.assertIsNone(local.configured_runtime(self.engine, "p1"))
+            with self.engine.begin() as connection:
+                connection.execute(text("UPDATE projects SET project_root_path=:r WHERE project_id='p1'"), {"r": str(self.repo)})
+            self.assertIsNone(local.configured_runtime(self.engine, "p1"))
+            with self.engine.begin() as connection:
+                connection.execute(text("UPDATE projects SET project_root_path=:r WHERE project_id='p1'"), {"r": str(self.project)})
+            self.pointer.unlink()
+            self.assertIsNone(local.configured_runtime(self.engine, "p1"))
+
+    def test_legacy_and_project_capability_are_separate(self):
+        from scripts import talk_runtime
+        from datetime import timezone
+        state = Path(self.config["state_dir"]) / "runtime"
+        state.mkdir(parents=True)
+        capability = {"schema": "talk-runtime-capability-1", "runtime_protocol": "talk-runtime-1", "manager_protocol": "talk-manager-1", "supported_layouts": ["workspace-v1"], "pid": os.getpid(), "started_at": datetime.now(timezone.utc).isoformat(), "written_at": datetime.now(timezone.utc).isoformat()}
+        (state / "capability.json").write_text(json.dumps(capability), encoding="utf-8")
+        with patch.object(talk_runtime, "load_config", return_value=self.config), patch.object(local, "POINTER", self.repo_pointer):
+            self.assertEqual(local.workspace_runtime_capability(self.engine, "p1"), capability)
+            self.assertIsNone(local.workspace_runtime_capability(self.engine, "missing"))
+            self.repo_pointer.write_text(self.pointer.read_text(encoding="utf-8"), encoding="utf-8")
+            with patch.object(local, "ROOT", self.repo):
+                with self.assertRaisesRegex(ValueError, "local_runtime_project_mismatch"):
+                    local.configured_runtime(self.engine)
+                legacy = {**self.config, "project_root": str(self.repo)}
+                with patch.object(talk_runtime, "load_config", return_value=legacy):
+                    self.assertEqual(local.configured_runtime(self.engine), (self.config_path.resolve(), legacy))
+
+    def test_project_binding_uses_real_config_validation(self):
+        valid = {**self.config, "schema": "talk-runtime-config-1", "version": 1,
+                 "base_url": "http://127.0.0.1:1", "operator_key_file": str(self.root / "human.key"),
+                 "key_root": str(self.root / "keys"), "api_argv": [sys.executable, "{control_file}"], "hosts": []}
+        self.config_path.write_text(json.dumps(valid), encoding="utf-8")
+        self.assertEqual(local.configured_runtime(self.engine, "p1"), (self.config_path.resolve(), valid))
+        self.config_path.write_text(json.dumps({**valid, "version": 2}), encoding="utf-8")
+        self.assertIsNone(local.configured_runtime(self.engine, "p1"))
+
+    def test_startup_and_deletion_request_the_given_project(self):
+        from types import SimpleNamespace
+        from server.role_startup import verified_runtime
+        from server.role_deletions import _cleanup_binding_digest
+        session = unittest.mock.Mock()
+        session.get_bind.return_value = self.engine
+        session.get.return_value = SimpleNamespace(project_root_path=str(self.project))
+        with patch.object(local, "configured_runtime", return_value=(self.config_path, self.config)) as lookup:
+            self.assertIsNotNone(_cleanup_binding_digest(session, "p1"))
+            lookup.assert_called_once_with(self.engine, "p1")
+        with patch.object(local, "configured_runtime", return_value=None) as lookup:
+            with self.assertRaises(HTTPException) as error:
+                verified_runtime("p1", "activation", session)
+            self.assertEqual(error.exception.detail, "startup_local_runtime_unbound")
+            lookup.assert_called_once_with(self.engine, "p1")
+
+    def test_main_binds_attached_and_owned_runtime(self):
+        from contextlib import nullcontext
+        from scripts import talk_runtime
+        with patch.object(talk_runtime, "load_config", return_value=self.config), \
+             patch.object(talk_runtime.rsh, "ensure_private_dir"), \
+             patch.object(talk_runtime, "launcher_lock", return_value=nullcontext()), \
+             patch.object(talk_runtime.signal, "signal"), \
+             patch.object(talk_runtime, "TalkRuntime") as runtime, \
+             patch.object(local, "bind_local_runtime") as bind:
+            for extra in ([], ["--attach-api"]):
+                self.assertEqual(talk_runtime.main(["serve", "--config", str(self.config_path), "--apply", *extra]), 0)
+            self.assertEqual(bind.call_count, 2)
+            bind.assert_called_with(str(self.config_path), self.config)
+            self.assertEqual(runtime.return_value.serve.call_count, 2)
+
+    def test_spawn_and_child_environment_import_paths(self):
+        from scripts import talk_runtime
+        from scripts.role_service_host import HostManager
+        private = self.root / "state" / "runtime"
+        private.mkdir(parents=True)
+        runtime = talk_runtime.TalkRuntime(self.config, client=unittest.mock.Mock())
+        with patch.dict(os.environ, {"PYTHONPATH": "parent-path", "TALK_TEST_SECRET_SENTINEL": "hidden"}), patch.object(talk_runtime.subprocess, "Popen") as spawn:
+            runtime.spawn("fixture", ["fixture"])
+            self.assertEqual(spawn.call_args.kwargs["env"]["PYTHONPATH"], str(talk_runtime.ROOT) + os.pathsep + "parent-path")
+            manager = HostManager(None, state_dir=self.root / "host", child_env={"PYTHONPATH": "override"})
+            env = manager.child_environment("p1", "agent:fixture")
+            self.assertEqual(env["PYTHONPATH"], str(talk_runtime.ROOT))
+            self.assertNotIn("TALK_TEST_SECRET_SENTINEL", env)

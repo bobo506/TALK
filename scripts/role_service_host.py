@@ -1780,6 +1780,7 @@ class HostManager:
             env[name] = str(home)
         env["TALK_ROLE_SERVICE_MANAGED"] = "1"
         env.update(self.child_env_extra)
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
         if self.workspace_context is not None:
             context = self._workspace_recheck()
             if self.workspace_context != context:

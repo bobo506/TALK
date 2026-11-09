@@ -322,8 +322,10 @@ class TalkRuntime:
     def spawn(self, label, argv):
         if self.spawn_override:
             return self.spawn_override(label, argv)
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(ROOT) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
         with (self.private / (label + ".out")).open("ab") as stdout, (self.private / (label + ".err")).open("ab") as stderr:
-            return subprocess.Popen(argv, cwd=self.project_root, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
+            return subprocess.Popen(argv, cwd=self.project_root, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, env=env,
                 startupinfo=rsh._hidden_startupinfo(), **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}))
 
     def health(self, state="running"):
@@ -1104,9 +1106,8 @@ def main(argv=None):
             child=subprocess.Popen(command,cwd=config["project_root"],stdin=subprocess.DEVNULL,stdout=out,stderr=err,
                 **({"creationflags":flags,"startupinfo":rsh._hidden_startupinfo()} if os.name=="nt" else {"start_new_session":True}))
         print(json.dumps({"started_launcher_pid":child.pid,"note":"Check status for actual readiness."}));return 0
-    if not args.attach_api:
-        from server.local_runtime import bind_local_runtime
-        bind_local_runtime(args.config, config)
+    from server.local_runtime import bind_local_runtime
+    bind_local_runtime(args.config, config)
     runtime=TalkRuntime(config,attach_api=args.attach_api,config_path=Path(args.config).resolve())
     def stopping(*_):runtime.stopping=True
     signal.signal(signal.SIGINT,stopping)

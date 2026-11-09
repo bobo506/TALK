@@ -57,7 +57,7 @@ def _cleanup_binding_digest(session, project):
     """
     from server.local_runtime import configured_runtime
     try:
-        bound = configured_runtime(session.get_bind())
+        bound = configured_runtime(session.get_bind(), project)
         if not bound:
             return None
         _, config = bound

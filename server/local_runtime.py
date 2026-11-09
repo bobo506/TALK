@@ -21,20 +21,49 @@ RUNTIME_MANAGER_PROTOCOLS = {"talk-runtime-1": "talk-manager-1"}
 
 def bind_local_runtime(config_file, config):
     """显式运行统一入口时记住本机绑定；仅存清单路径，不复制任何凭据。"""
-    if Path(config["project_root"]).resolve() != ROOT:
-        return
     import tomllib
     with (ROOT/"config.toml").open("rb") as stream:
         database = tomllib.load(stream)["storage"]["db_path"]
     database = Path(database)
     if not database.is_absolute():
         database = ROOT/database
-    POINTER.parent.mkdir(parents=True, exist_ok=True)
-    POINTER.write_text(json.dumps({"schema":"talk-local-runtime-1", "database_file":str(database.resolve()),
+    pointer = Path(config["project_root"]).resolve() / ".talk" / "runtime.local.json"
+    pointer.parent.mkdir(parents=True, exist_ok=True)
+    pointer.write_text(json.dumps({"schema":"talk-local-runtime-1", "database_file":str(database.resolve()),
                                   "config_file":str(Path(config_file).resolve())}), encoding="utf-8")
 
 
-def configured_runtime(engine):
+def configured_runtime(engine, project_id=None):
+    if project_id is not None:
+        # Project-specific lookups never fall back to the repository binding.
+        try:
+            from sqlalchemy import text
+            with engine.connect() as connection:
+                root_value = connection.execute(
+                    text("SELECT project_root_path FROM projects WHERE project_id=:p"),
+                    {"p": project_id},
+                ).scalar_one_or_none()
+            if not root_value:
+                return None
+            root = Path(root_value).resolve()
+            pointer = json.loads((root / ".talk" / "runtime.local.json").read_text(encoding="utf-8"))
+            database = engine.url.database
+            if (not isinstance(pointer, dict) or pointer.get("schema") != "talk-local-runtime-1"
+                    or not database or not isinstance(pointer.get("database_file"), str)
+                    or not Path(pointer["database_file"]).is_absolute()
+                    or Path(database).resolve() != Path(pointer["database_file"]).resolve()
+                    or not isinstance(pointer.get("config_file"), str)):
+                return None
+            path = Path(pointer["config_file"])
+            if not path.is_absolute() or not path.is_file():
+                return None
+            from scripts.talk_runtime import load_config
+            config = load_config(path)
+            if config["project_id"] != project_id or Path(config["project_root"]).resolve() != root:
+                return None
+            return path, config
+        except Exception:
+            return None
     # 本机绑定同时精确限定数据库；隔离TestClient/临时数据库不会触及生产宿主。
     if not POINTER.is_file():
         return None
@@ -81,11 +110,11 @@ def _capability_pid_alive(pid):
         return False
 
 
-def workspace_runtime_capability(engine):
+def workspace_runtime_capability(engine, project_id=None):
     """Return validated local runtime evidence, or None with a safe diagnostic."""
     reason = "runtime_binding_unavailable"
     try:
-        bound = configured_runtime(engine)
+        bound = configured_runtime(engine, project_id)
         if bound is None:
             raise ValueError
         reason = "capability_unreadable"
@@ -120,8 +149,8 @@ def workspace_runtime_capability(engine):
         return None
 
 
-def ensure_local_runtime(engine):
-    bound = configured_runtime(engine)
+def ensure_local_runtime(engine, project_id=None):
+    bound = configured_runtime(engine, project_id)
     if bound is None:
         return "disabled"
     path, config = bound
@@ -144,9 +173,9 @@ def ensure_local_runtime(engine):
     return "requested"
 
 
-def require_local_runtime(engine):
+def require_local_runtime(engine, project_id=None):
     try:
-        return ensure_local_runtime(engine)
+        return ensure_local_runtime(engine, project_id)
     except Exception as exc:
         raise HTTPException(503, "local_runtime_unavailable") from exc
 
@@ -156,7 +185,7 @@ def recover_local_human_stop(project_id, member_id, operator, session):
     if operator.kind != "human":
         raise HTTPException(403, "only human members can recover role services")
     try:
-        bound = configured_runtime(session.get_bind())
+        bound = configured_runtime(session.get_bind(), project_id)
     except Exception as exc:
         raise HTTPException(503, "local_runtime_unavailable") from exc
     if bound is None or bound[1]["project_id"] != project_id:

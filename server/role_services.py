@@ -228,7 +228,7 @@ def _require_start_layout(project_id: str, member_id: str, session: Session) -> 
     if layout != "legacy":
         if layout == "workspace-v1" and os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") == "1":
             from server.local_runtime import workspace_runtime_capability
-            if workspace_runtime_capability(session.get_bind()) is not None:
+            if workspace_runtime_capability(session.get_bind(), project_id) is not None:
                 return
         raise _fail(status.HTTP_409_CONFLICT, WORKSPACE_RUNTIME_NOT_READY)
 
@@ -1013,7 +1013,7 @@ def _workspace_manager_evidence(ctx, launch, session, *, require_binding: bool, 
     try:
         if os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") != "1":
             return False
-        manifest = workspace_runtime_capability(session.get_bind())
+        manifest = workspace_runtime_capability(session.get_bind(), launch.project_id)
         if (manifest is None or not isinstance(manager_instance_id, str)
                 or len(manager_instance_id) != 32
                 or any(c not in "0123456789abcdef" for c in manager_instance_id)):

@@ -581,10 +581,11 @@ class DeletionBindingTests(RoleApiTestCase):
             "operator_key_file":str(self._tmpdir/"human.key"),"base_url":"http://127.0.0.1:1",
             "api_argv":[sys.executable,"--control-file","{control_file}"],"hosts":[]}
         path=self._tmpdir/"runtime.json";path.write_text(json.dumps(config),encoding="utf-8")
-        pointer=self._tmpdir/"binding.json"
+        pointer=project/".talk"/"runtime.local.json"
+        pointer.parent.mkdir()
         metadata={"schema":"talk-local-runtime-1","database_file":str(self.db_path),"config_file":str(path)}
         pointer.write_text(json.dumps(metadata),encoding="utf-8")
-        with patch.object(local,"ROOT",project),patch.object(local,"POINTER",pointer),self.session() as session:
+        with self.session() as session:
             actual=_cleanup_binding_digest(session,"prj_alpha")
             expected=hashlib.sha256(json.dumps(config,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
             self.assertEqual(actual,expected)
