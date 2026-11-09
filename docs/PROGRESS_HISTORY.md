@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-11-09 10:55 — W3c-1b：runtime 停止容忍已删项目 + 非绝对根拒绝
+
+- **任务链**：584 Terra 开发（partial：87 项 2 error 为已知 `ActualBootstrapTests` 文件锁）→ 585 K2.8 独立复核 **approved**（候选 87 / 基线 84，同 2 名 error，`new_failures=0`）。
+- **修复** `1ff8b2b`（4 文件 +55/−3）：
+  - `scripts/talk_runtime.py`：新增 `_shutdown_roles()`，仅把 `HostError.code == "project not found"` 转为空角色表；`stop()` 两处 `roles()` 查询改用该助手；其它错误码原样抛出；正常停止路径逐字不变。
+  - `server/local_runtime.py`：`configured_runtime(engine, project_id)` 在 `resolve()` 前 `isinstance(str) and is_absolute()` 校验，非绝对 `project_root_path` 直接返回 None。
+  - 新增 3 个 shutdown 用例（已删项目完成停止、其它错误传播、相对根拒绝）与 1 个 local_runtime 相对根用例；既有断言未弱化。
+- **部署**：API 受控 reload child_pid 1676→17496；runtime A pid 3704 未重启（`talk_runtime` 改动待下次 runtime 重启生效）。
+- **真实 E2E**：项目 B + runtime B（新代码 pid 10768 / 重启 15188）+ dsh 角色与宿主（manager 23536）；先删项目 → `stop --wait` **`stop_status=stopped`、`phase=complete`、`error_code=null`**（修复前 `stop_blocked`/`project not found`）；同 ID 恢复项目 → 角色删除 5 步 complete → 删项目 → 再停 runtime 仍 `stopped`；项目/角色/`workspaces/<pB>`/`keys-b` 清理完成，仅剩 `prj_e8fe7066bbec`。
+- **残余**：`.key.lock.guard` 归 legacy 清理片；生产 runtime A 需下次重启才带上 shutdown 修复。
+- **证据**：`.tmp/w3c1b-shutdown-404-584/`、`.tmp/w3c1b-review-584/review.json`、`.tmp/w3c1b-e2e/`。
+
+
 ## 2026-11-09 10:20 — W3c-1a：多工作区运行底座与双工作区隔离 E2E
 
 - **任务链**：581 因测试边界理解停在澄清点（partial、零代码）→ 582 续派实施（partial，246 项组合 3 项报错）→ 583 K2.8 独立复核 **approved**。

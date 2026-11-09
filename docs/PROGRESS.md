@@ -1,5 +1,13 @@
 # Project Progress
 
+## W3c-1b 完成：shutdown 404 与非绝对根（2026-11-09 10:55）
+
+- **修复** `1ff8b2b`（W3c-1b；584 Terra 开发、585 K2.8 复核 **approved**，候选 87 项 / 基线 84 项同 2 个 `ActualBootstrapTests` error、`new_failures=0`）：`talk_runtime.stop()` 在项目已删（404 `project not found`）时按“无角色”继续完成 drain/停止，其它 `HostError` 仍抛出；`configured_runtime` 在 `resolve()` 前拒绝非绝对 `project_root_path`。
+- **部署**：API 受控 reload child_pid **1676→17496**；runtime A（pid 3704）未重启，`talk_runtime` 修复待下次 runtime 重启生效（已在临时项目 B 的 runtime 上验证同一代码路径）。
+- **真实 E2E（W3c-1b）**：项目 B + runtime B（新代码，pid 10768/15188）+ dsh 角色与宿主（manager 23536）；**先删项目 → `stop --wait` 返回 `stop_status=stopped`、`phase=complete`、`error_code=null`**（修复前 `stop_blocked` / `project not found`）；随后同 ID 恢复项目 → 角色删除 5 步 complete → 删项目 → 再停 runtime 仍 `stopped`；项目/角色/`workspaces/<pB>`/`keys-b` 清理完成，仅剩 `prj_e8fe7066bbec`。
+- **残余**：`.key.lock.guard` 残留归 legacy 清理片；`talk_runtime` 修复需下次 runtime 重启才作用于生产 A。
+- **下一步**：W3c-2 恢复链（runtime 停/启、bridge 被 kill、恢复后 stop/delete、瞬时 `host_unreachable` 定位）；页面刷新验收 UI 清理。
+
 ## W3c-1 完成：多工作区运行底座（2026-11-09 10:20）
 
 - **修复**：`2781356`（W3c-1a；582 Terra 开发、583 K2.8 复核 **approved**，候选 246 项 / 基线 240 项同名 2 error、`new_failures=0`）。本机 runtime 绑定按项目解析（`bind_local_runtime` 写 `<项目根>/.talk/runtime.local.json`，`--attach-api` 也写；`configured_runtime(engine, project_id)` fail-closed，不回退 ROOT）；生产调用点全部显式传 project；宿主与角色子进程受控注入 `PYTHONPATH=<仓库根>`，不再依赖 cwd。详见 [W3C_DUAL_WORKSPACE_FINDINGS_20261109.md](spec/W3C_DUAL_WORKSPACE_FINDINGS_20261109.md)。

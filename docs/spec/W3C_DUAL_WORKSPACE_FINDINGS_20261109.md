@@ -67,6 +67,8 @@ F1/F5 是同一个“单项目绑定”在启动与删除两端的表现；F2/F3
 
 **残余（非阻断）**：
 
-1. 先删项目、后停 runtime 会令 runtime `stop_blocked`（shutdown 查角色 404 `project not found`）；本次按“同 ID 重建项目 → 停止 runtime → 再删项目”恢复。建议 shutdown 把项目 404 视作无角色，或文档固定“先停 runtime 再删项目”。
-2. K2.8 复核建议：`configured_runtime` 对 DB 中非绝对 `project_root_path` 显式 `is_absolute()` 拒绝并补用例（当前实践仍 fail-closed）。
-3. 角色删除后 `keys-b` 仅残留 `.key.lock.guard`（与 `profiles/.provision.lock.guard` 同类），已随目录清理。
+1. ~~先删项目、后停 runtime 会令 runtime `stop_blocked`~~ → **已修** `1ff8b2b`（W3c-1b；584 开发 / 585 K2.8 复核 approved）：shutdown 把 404 `project not found` 视作无角色。真实 E2E：项目 B 有宿主/角色时先删项目 → `stop --wait` 返回 `stop_status=stopped`、`phase=complete`、`error_code=null`；随后同 ID 恢复项目 → 角色删除 5 步 complete → 删项目 → 再停 runtime 仍 `stopped`。
+2. ~~非绝对 `project_root_path` 未显式拒绝~~ → **已修** `1ff8b2b`：`configured_runtime` 在 `resolve()` 前 `is_absolute()` 拒绝并补用例（候选 87 项 / 基线 84 项同名 2 error、`new_failures=0`）。
+3. 角色删除后 `keys-b` 仅残留 `.key.lock.guard`（与 `profiles/.provision.lock.guard` 同类），已随目录清理；作为 legacy 清理片债务保留。
+
+**部署说明**：`server/local_runtime.py` 的改动随 API 受控 reload 生效（child_pid 1676→17496）；`scripts/talk_runtime.py` 属 runtime 进程代码，生产 runtime A（pid 3704）需下次重启才带上该修复，本次已在临时项目 B 的 runtime（新代码进程）上验证同一代码路径。
