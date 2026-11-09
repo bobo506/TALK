@@ -1,5 +1,13 @@
 # Project Progress
 
+## 收工快照（2026-11-09 17:30）
+
+- **本轮完成**：W3c-1a 多工作区运行底座 `2781356`、W3c-1b shutdown 404/非绝对根 `1ff8b2b`、W3c-2a 孤儿 bridge 受控清理 `244f226`+`6a6d0c5`、WorkBuddy 版本适配提醒 `8e84fb3`；复核 583/585/592/594/596 均 **approved**；HEAD `4a74d46` 已推送。
+- **环境**：生产 runtime A pid **3704**、API child **1952**、`/healthz` 正常；Terra/K2.8 idle；hy4/w-d 停用（WorkBuddy 5.9.3 ACP 不兼容，页面已提示版本警告与 `effort_error`）；项目仅 `prj_e8fe7066bbec`；无临时项目/runtime/角色；无 running 任务。
+- **重要部署边界**：生产 runtime A 仍是旧 `talk_runtime` 代码，W3c-2a 修复待**下次 runtime 重启**才生效；API 已带 WorkBuddy 提醒改动。
+- **待办（按优先级）**：① WorkBuddy ACP 5.9.3 只读研究 → 适配（路线图第 17 项后半，需用户确认开工）；② 人工显式恢复入口（586 必须修 2，忙孤儿）；③ delete 90s 新鲜度窗口（可选）；④ `host_unreachable` 在 API reload 窗口专项复现；⑤ 性能冷启动：`role-services` ~1s、`runners/versions` 首调 5–6.6s（可选）。
+- **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)；WorkBuddy 诊断在 `.tmp/workbuddy-acp-593-diagnosis.md`。
+
 ## WorkBuddy 版本适配提醒完成（2026-11-09 17:20）
 
 - **交付** `8e84fb3`（595 Terra 开发、596 K2.8 复核 **approved**；候选 Python 47 / Node 33 全过，基线 43/31 全过，`new_failures=0`）：运行器版本面板增加 WorkBuddy **桌面版本**探测（`version.dll` 只读，与 ACP 验证基线 **5.8.3** 比较），未适配/未知时返回 `adapter_warning`；`workbuddy_effort` 缓存探测错误码（TTL 60s），binding 空选项时投影 `effort_error`，页面显示“强度获取失败（原因）”。不自动改绑定/升级。
