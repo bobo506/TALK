@@ -584,6 +584,21 @@ class ProjectBindingTests(unittest.TestCase):
             self.pointer.unlink()
             self.assertIsNone(local.configured_runtime(self.engine, "p1"))
 
+    def test_relative_project_root_is_rejected_even_when_it_resolves_to_valid_binding(self):
+        from sqlalchemy import text
+        from scripts import talk_runtime
+        relative = "project"
+        with self.engine.begin() as connection:
+            connection.execute(text("UPDATE projects SET project_root_path=:r WHERE project_id='p1'"), {"r": relative})
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(self.root)
+            with patch.object(talk_runtime, "load_config", return_value=self.config) as load:
+                self.assertIsNone(local.configured_runtime(self.engine, "p1"))
+                load.assert_not_called()
+        finally:
+            os.chdir(original_cwd)
+
     def test_legacy_and_project_capability_are_separate(self):
         from scripts import talk_runtime
         from datetime import timezone

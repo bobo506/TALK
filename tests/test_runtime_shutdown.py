@@ -101,6 +101,35 @@ class ShutdownProgressTests(unittest.TestCase):
         self.assertEqual(self.health()['shutdown']['phase'], 'stopping_roles')
         self.assertEqual(self.health()['shutdown']['pending_members'], ['agent:one'])
 
+    def test_deleted_project_drains_owned_host_and_completes_stop(self):
+        spec = self.spec()
+        self.config['hosts'] = [spec]
+        self.runtime.reconcile_hosts([self.role()])
+        Path(spec['health_file']).write_text('{"owned_launches":[]}', encoding='utf-8')
+        with patch.object(self.runtime, 'roles', side_effect=runtime.rsh.HostError('project not found')) as roles:
+            self.runtime.stop()
+        self.assertEqual(roles.call_count, 2)
+        final = self.health()
+        self.assertEqual(final['state'], 'stopped')
+        self.assertEqual(final['shutdown']['phase'], 'complete')
+        self.assertIsNone(final['shutdown']['error_code'])
+        self.assertEqual(final['hosts']['agent:one']['state'], 'stopped')
+        self.assertFalse(any(call[0] == 'POST' for call in self.client.calls))
+
+    def test_other_role_errors_propagate_in_each_shutdown_lookup(self):
+        spec = self.spec()
+        self.config['hosts'] = [spec]
+        self.runtime.reconcile_hosts([self.role()])
+        for first_lookup in (True, False):
+            with self.subTest(first_lookup=first_lookup):
+                error = runtime.rsh.HostError('host_unreachable')
+                responses = [error] if first_lookup else [[self.role()], error]
+                with patch.object(self.runtime, 'roles', side_effect=responses):
+                    with self.assertRaises(runtime.rsh.HostError) as raised:
+                        self.runtime.stop()
+                self.assertIs(raised.exception, error)
+                self.assertEqual(raised.exception.code, 'host_unreachable')
+
     def test_host_timeout_keeps_marker_and_api_with_live_progress(self):
         spec = self.spec()
         self.config['hosts'] = [spec]

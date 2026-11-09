@@ -871,6 +871,14 @@ class TalkRuntime:
             thread.join(timeout=min(2, remaining))
             self._shutdown_progress(self.shutdown_phase, self.shutdown_pending)
 
+    def _shutdown_roles(self):
+        try:
+            return {r["member_id"]:r for r in self.roles()}
+        except rsh.HostError as exc:
+            if exc.code == "project not found":
+                return {}
+            raise
+
     def stop(self):
         self.stopping = True
         self.shutdown_started_at = self.shutdown_started_at or utcnow()
@@ -888,7 +896,7 @@ class TalkRuntime:
         for member, owned in self.hosts.items():
             if owned["process"].poll() is None:
                 # Human-authenticated ordinary stop; the original manager verifies its Popen.
-                roles = {r["member_id"]:r for r in self.roles()}
+                roles = self._shutdown_roles()
                 service = roles.get(member, {}).get("service") or {}
                 if service.get("can_stop"):
                     try:
@@ -899,7 +907,7 @@ class TalkRuntime:
                         raise
         deadline = self.clock() + 90
         while self.clock() < deadline:
-            roles = {r["member_id"]:r for r in self.roles()}
+            roles = self._shutdown_roles()
             waiting = [member for member in self.hosts if roles.get(member, {}).get("service", {}).get("ownership_held")]
             self._shutdown_progress("stopping_roles", waiting)
             if not waiting:

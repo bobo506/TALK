@@ -43,7 +43,7 @@ def configured_runtime(engine, project_id=None):
                     text("SELECT project_root_path FROM projects WHERE project_id=:p"),
                     {"p": project_id},
                 ).scalar_one_or_none()
-            if not root_value:
+            if not isinstance(root_value, str) or not Path(root_value).is_absolute():
                 return None
             root = Path(root_value).resolve()
             pointer = json.loads((root / ".talk" / "runtime.local.json").read_text(encoding="utf-8"))
