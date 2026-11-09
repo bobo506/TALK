@@ -394,6 +394,147 @@ class RuntimeTests(unittest.TestCase):
             self.runtime.reconcile_hosts([self.role(ownership_held=True)])
         self.assertEqual(self.runtime.statuses["agent:one"]["state"],"recovery_required")
         self.assertFalse(self.spawned);self.assertFalse(self.runtime.hosts)
+
+    def test_idle_orphan_is_terminated_and_logged(self):
+        spec = self.spec()
+        Path(spec["health_file"]).write_text('{"pid":123}', encoding="utf-8")
+        self.client.rows = [{"id": "instance-one", "member_id": "agent:one", "project_id": self.runtime.project,
+                             "host": socket.gethostname(), "status": "idle", "pid": 4321,
+                             "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}]
+        started = datetime.fromisoformat(self.client.rows[0]["process_started_at"]).timestamp()
+        with patch.object(runtime, "_ORPHAN_WINDOWS", False), \
+             patch.object(runtime, "recorded_process_state", side_effect=["exited", "present", "exited"]), \
+             patch.object(runtime.rsh, "process_creation_time", return_value=started), \
+             patch.object(runtime.os, "kill") as kill, patch.object(self.runtime, "event") as event:
+            self.assertTrue(self.runtime._terminate_orphan_bridge("agent:one", spec))
+        kill.assert_called_once_with(4321, runtime.signal.SIGTERM)
+        event.assert_called_once_with("orphan_bridge_terminated", context={"member_id": "agent:one", "pid": 4321, "outcome": "terminated"})
+        self.assertEqual(self.client.calls[0][1], "/api/instances?member_id=agent%3Aone")
+
+    def test_orphan_safety_filters_and_manager_guard(self):
+        spec = self.spec()
+        row = {"id": "instance-one", "member_id": "agent:one", "project_id": self.runtime.project,
+               "host": socket.gethostname(), "status": "idle", "pid": 4321,
+               "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}
+        started = datetime.fromisoformat(row["process_started_at"]).timestamp()
+        Path(spec["health_file"]).write_text('{"pid":123}', encoding="utf-8")
+        cases = [({"current_task_id": "task"}, "present", started),
+                 ({"status": "busy"}, "present", started), ({"host": "remote"}, "present", started),
+                 ({"status": "offline"}, "present", started), ({"status": "stopped"}, "present", started),
+                 ({}, "absent", started), ({}, "exited", started), ({}, "pid_reused", started),
+                 ({"process_started_at": None}, "present", started), ({}, "present", None),
+                 ({}, "present", started + 30), ({"project_id": "another"}, "present", started)]
+        for changes, state, creation in cases:
+            with self.subTest(changes=changes, state=state, creation=creation):
+                self.client.rows = [{**row, **changes}]
+                with patch.object(runtime, "_ORPHAN_WINDOWS", False), \
+                     patch.object(runtime, "recorded_process_state", side_effect=lambda pid, seen: "exited" if pid == 123 else state), \
+                     patch.object(runtime.rsh, "process_creation_time", return_value=creation), \
+                     patch.object(runtime.os, "kill") as kill:
+                    self.assertFalse(self.runtime._terminate_orphan_bridge("agent:one", spec))
+                    kill.assert_not_called()
+        Path(spec["health_file"]).write_text('{"pid": 123, "seen_at": "2026-01-01T00:00:00Z"}', encoding="utf-8")
+        with patch.object(runtime, "recorded_process_state", return_value="present"), \
+             patch.object(runtime.os, "kill") as kill, patch.object(self.runtime, "request") as request:
+            self.assertFalse(self.runtime._terminate_orphan_bridge("agent:one", spec))
+            request.assert_not_called(); kill.assert_not_called()
+        self.runtime.stopping = True
+        with patch.object(self.runtime, "request") as request:
+            self.assertFalse(self.runtime._terminate_orphan_bridge("agent:one", spec))
+            request.assert_not_called()
+
+    def test_orphan_failures_do_not_interrupt_reconcile(self):
+        first = self.spec(); second = self.spec("agent:two")
+        self.config["hosts"] = [first, second]
+        Path(first["health_file"]).write_text('{"pid":123}', encoding="utf-8")
+        roles = [self.role(ownership_held=True), {"member_id": "agent:two", "service": {"ownership_held": False}}]
+        row = {"id": "instance-one", "member_id": "agent:one", "project_id": self.runtime.project, "host": socket.gethostname(),
+               "status": "idle", "pid": 4321, "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}
+        started = datetime.fromisoformat(row["process_started_at"]).timestamp()
+        for failure in ("request", "kill"):
+            with self.subTest(failure=failure):
+                self.runtime.hosts.clear(); self.spawned.clear()
+                request_result = runtime.rsh.HostError("host_unreachable") if failure == "request" else {"data": [row]}
+                with patch.object(runtime, "_ORPHAN_WINDOWS", False), \
+                     patch.object(self.runtime, "request", side_effect=request_result if failure == "request" else None,
+                                  return_value=request_result), \
+                     patch.object(runtime, "recorded_process_state", side_effect=lambda pid, seen: "exited" if pid == 123 else "present"), \
+                     patch.object(runtime.rsh, "process_creation_time", return_value=started), \
+                     patch.object(runtime.os, "kill", side_effect=OSError("denied")) as kill, \
+                     patch.object(self.runtime, "event") as event:
+                    self.runtime.reconcile_hosts(roles)
+                self.assertEqual(self.runtime.statuses["agent:one"]["state"], "recovery_required")
+                self.assertEqual(self.runtime.statuses["agent:two"]["state"], "starting")
+                self.assertEqual(kill.call_count, int(failure == "kill"))
+                event.assert_any_call("orphan_bridge_terminated", context={"member_id": "agent:one", "pid": 4321 if failure == "kill" else None, "outcome": "failed"})
+    def test_orphan_requires_readable_health_and_exited_manager(self):
+        spec = self.spec()
+        health = Path(spec["health_file"])
+        for content, state in [(None, "exited"), ("{", "exited"), ('{"pid":123}', "present"), ('{}', "exited")]:
+            with self.subTest(content=content, state=state):
+                if content is None:
+                    health.unlink(missing_ok=True)
+                else:
+                    health.write_text(content, encoding="utf-8")
+                with patch.object(runtime, "recorded_process_state", return_value=state), \
+                     patch.object(self.runtime, "request") as request, \
+                     patch.object(runtime, "_open_orphan_process") as opened:
+                    self.assertFalse(self.runtime._terminate_orphan_bridge("agent:one", spec))
+                    request.assert_not_called()
+                    opened.assert_not_called()
+
+    def test_windows_orphan_handle_and_second_idle_check(self):
+        spec = self.spec()
+        Path(spec["health_file"]).write_text('{"pid":123}', encoding="utf-8")
+        row = {"id": "instance-one", "member_id": "agent:one", "project_id": self.runtime.project,
+               "host": socket.gethostname(), "status": "idle", "pid": 4321,
+               "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}
+        started = datetime.fromisoformat(row["process_started_at"]).timestamp()
+        cases = [("open_failed", {}, None, started), ("time_mismatch", {}, 77, started + 3),
+                 ("status", {"status": "busy"}, 77, started), ("unknown_status", {"status": "starting"}, 77, started),
+                 ("pid", {"pid": 4322}, 77, started), ("task", {"current_task_id": "task"}, 77, started),
+                 ("id", {"id": "other"}, 77, started), ("idle", {}, 77, started)]
+        for name, changes, handle, creation in cases:
+            with self.subTest(name=name):
+                with patch.object(runtime, "_ORPHAN_WINDOWS", True), \
+                     patch.object(runtime, "recorded_process_state", side_effect=lambda pid, seen: "exited" if pid == 123 or name == "idle" and getattr(self, "_terminated_fixture", False) else "present"), \
+                     patch.object(self.runtime, "request", side_effect=[{"data": [row]}, {"data": [{**row, **changes}]}]), \
+                     patch.object(runtime, "_open_orphan_process", return_value=handle) as opened, \
+                     patch.object(runtime, "_orphan_handle_creation_time", return_value=creation), \
+                     patch.object(runtime, "_terminate_orphan_handle", side_effect=lambda h: setattr(self, "_terminated_fixture", True)) as terminate, \
+                     patch.object(runtime, "_close_orphan_handle") as close, patch.object(self.runtime, "event") as event:
+                    self._terminated_fixture = False
+                    self.assertEqual(self.runtime._terminate_orphan_bridge("agent:one", spec), name == "idle")
+                opened.assert_called_once_with(4321)
+                self.assertEqual(terminate.call_count, int(name == "idle"))
+                self.assertEqual(close.call_count, int(bool(handle)))
+                if name == "idle":
+                    terminate.assert_called_once_with(77)
+                    event.assert_called_once_with("orphan_bridge_terminated", context={"member_id": "agent:one", "pid": 4321, "outcome": "terminated"})
+
+    def test_windows_handle_exception_does_not_interrupt_reconcile(self):
+        first, second = self.spec(), self.spec("agent:two")
+        self.config["hosts"] = [first, second]
+        Path(first["health_file"]).write_text('{"pid":123}', encoding="utf-8")
+        row = {"id": "one", "member_id": "agent:one", "project_id": self.runtime.project,
+               "host": socket.gethostname(), "status": "idle", "pid": 4321,
+               "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}
+        for failing in ("open", "creation", "terminate", "close"):
+            with self.subTest(failing=failing):
+                self.runtime.hosts.clear(); self.spawned.clear()
+                self.client.rows = [row]
+                with patch.object(runtime, "_ORPHAN_WINDOWS", True), \
+                     patch.object(runtime, "recorded_process_state", side_effect=lambda pid, seen: "exited" if pid == 123 else "present"), \
+                     patch.object(runtime, "_open_orphan_process", side_effect=OSError("denied") if failing == "open" else None, return_value=77), \
+                     patch.object(runtime, "_orphan_handle_creation_time", side_effect=OSError("denied") if failing == "creation" else None, return_value=datetime.fromisoformat(row["process_started_at"]).timestamp()), \
+                     patch.object(runtime, "_terminate_orphan_handle", side_effect=OSError("denied") if failing == "terminate" else None), \
+                     patch.object(runtime, "_close_orphan_handle", side_effect=OSError("denied") if failing == "close" else None), \
+                     patch.object(self.runtime, "event") as event:
+                    self.runtime.reconcile_hosts([self.role(ownership_held=True), {"member_id": "agent:two", "service": {"ownership_held": False}}])
+                self.assertEqual(self.runtime.statuses["agent:one"]["state"], "recovery_required")
+                self.assertEqual(self.runtime.statuses["agent:two"]["state"], "starting")
+                event.assert_any_call("orphan_bridge_terminated", context={"member_id": "agent:one", "pid": 4321 if failing in ("terminate", "close") else None, "outcome": "failed"})
+
     def test_reused_manager_pid_does_not_block_but_old_owner_still_requires_human_stop(self):
         spec=self.spec();self.config["hosts"]=[spec]
         Path(spec["health_file"]).write_text('{"pid":123}',encoding="utf-8")

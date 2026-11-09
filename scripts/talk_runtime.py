@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import contextlib
+import http.client
 import json
 import math
 import os
@@ -46,6 +47,35 @@ EXITED_PROCESS_STATES = {"absent", "exited", "previous_boot", "pid_reused"}
 SHUTDOWN_ERROR_CODES = RUNTIME_ERROR_CODES | HOST_ERROR_CODES | frozenset({
     "runtime_startup_stop_timeout", "OSError", "HostError", "ValueError",
 })
+
+
+def _open_orphan_process(pid):
+    return rsh._kernel32.OpenProcess(0x0001 | 0x1000, False, pid)
+
+
+def _orphan_handle_creation_time(handle):
+    creation, exit_time, kernel, user = (rsh._FileTime() for _ in range(4))
+    if not rsh._kernel32.GetProcessTimes(handle, rsh._ctypes.byref(creation),
+            rsh._ctypes.byref(exit_time), rsh._ctypes.byref(kernel), rsh._ctypes.byref(user)):
+        return None
+    return ((creation.high << 32) | creation.low) / 10_000_000.0 - 11_644_473_600.0
+
+
+def _terminate_orphan_handle(handle):
+    # The default ctypes return type is BOOL; declare arguments to preserve 64-bit handles.
+    from ctypes import wintypes
+    function = rsh._kernel32.TerminateProcess
+    function.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    function.restype = wintypes.BOOL
+    if not function(handle, 1):
+        raise OSError("TerminateProcess failed")
+
+
+def _close_orphan_handle(handle):
+    rsh._kernel32.CloseHandle(handle)
+
+
+_ORPHAN_WINDOWS = os.name == "nt"
 
 
 def _runtime_identity(health):
@@ -647,6 +677,95 @@ class TalkRuntime:
             return None
         return spec
 
+    def _terminate_orphan_bridge(self, member, spec):
+        """Stop only an idle local instance whose process identity is verifiable."""
+        if self.stopping:
+            return False
+        pid = None
+        try:
+            health = Path(spec["health_file"])
+            if not health.is_file():
+                return False
+            manager = json.loads(health.read_text(encoding="utf-8"))
+            manager_pid = manager.get("pid")
+            if (type(manager_pid) is not int or manager_pid <= 0
+                    or recorded_process_state(manager_pid, manager.get("seen_at")) not in EXITED_PROCESS_STATES):
+                return False
+            path = f"/api/instances?member_id={quote(member, safe='')}"
+
+            def instances():
+                payload = self.request("GET", path)
+                rows = payload.get("data", []) if isinstance(payload, dict) else payload
+                if not isinstance(rows, list):
+                    raise ValueError("invalid instance response")
+                return rows
+
+            terminated = False
+            for row in instances():
+                if not isinstance(row, dict):
+                    continue
+                candidate = row.get("pid")
+                instance_id = row.get("id")
+                if (instance_id is None or isinstance(instance_id, bool)
+                        or row.get("member_id") != member or row.get("project_id") != self.project
+                        or row.get("host") != (self.config.get("host") or socket.gethostname())
+                        or row.get("status") != "idle"
+                        or "current_task_id" not in row or row["current_task_id"] is not None
+                        or isinstance(candidate, bool) or not isinstance(candidate, int) or candidate <= 0):
+                    continue
+                started = rsh._parse_iso(row.get("process_started_at"))
+                if started is None or recorded_process_state(candidate, row.get("process_started_at")) != "present":
+                    continue
+                handle = None
+                try:
+                    if _ORPHAN_WINDOWS:
+                        handle = _open_orphan_process(candidate)
+                        if not handle:
+                            continue
+                        created = _orphan_handle_creation_time(handle)
+                    else:
+                        created = rsh.process_creation_time(candidate)
+                    if created is None or abs(created - started.timestamp()) > 2:
+                        continue
+                    matches = [item for item in instances() if isinstance(item, dict) and item.get("id") == instance_id]
+                    if len(matches) != 1:
+                        continue
+                    current = matches[0]
+                    if (current.get("pid") != candidate or current.get("status") != "idle"
+                            or "current_task_id" not in current or current["current_task_id"] is not None
+                            or current.get("member_id") != member or current.get("project_id") != self.project
+                            or current.get("host") != row.get("host")
+                            or current.get("process_started_at") != row.get("process_started_at")):
+                        continue
+                    # The server has no atomic idle fence: this does not guarantee a busy role
+                    # cannot be killed; only local orphans idle in both queries are handled.
+                    pid = candidate
+                    if _ORPHAN_WINDOWS:
+                        _terminate_orphan_handle(handle)
+                    else:
+                        os.kill(pid, signal.SIGTERM)
+                finally:
+                    if handle:
+                        _close_orphan_handle(handle)
+                deadline = time.monotonic() + 5
+                while True:
+                    state = recorded_process_state(pid, row.get("process_started_at"))
+                    if state in EXITED_PROCESS_STATES:
+                        terminated = True
+                        outcome = "terminated"
+                        break
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        outcome = "timeout"
+                        break
+                    self.sleep(min(0.1, remaining))
+                self.event("orphan_bridge_terminated", context={"member_id": member, "pid": pid, "outcome": outcome})
+                pid = None
+            return terminated
+        except Exception:
+            self.event("orphan_bridge_terminated", context={"member_id": member, "pid": pid, "outcome": "failed"})
+            return False
+
     def reconcile_hosts(self, roles):
         parents=process_parents()
         by_id = {r["member_id"]:r for r in roles}
@@ -717,6 +836,7 @@ class TalkRuntime:
                     self.statuses[member] = {"state":"external_manager" if process_state=="present" else "external_manager_unverified","pid":existing.get("pid")}
                     continue
             if service.get("ownership_held"):
+                self._terminate_orphan_bridge(member, spec)
                 self.statuses[member] = {"state":"recovery_required"}
                 continue
             if Path(spec["drain_file"]).exists():
