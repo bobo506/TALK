@@ -1,5 +1,11 @@
 # Project Progress
 
+## 待办登记：WorkBuddy 版本适配提醒（2026-11-09 15:15）
+
+- 用户决定：hy4/w-d **不改绑**到 `models.json` 的 API 模型，内置模型继续走 ACP；等 K2.8 额度恢复后再开工。
+- 已登记路线图第 17 项：**WorkBuddy 版本适配提醒**——只读探测桌面/CLI 版本 + 已适配范围对比 + 运行器版本面板/角色行提示 + `effort_options` 为空时暴露失败原因；**未开工**。
+- 现状：W3c-2a 候选冻结（2 文件 +261，patch 备份 `.tmp/w3c2a-candidate-588.patch`），等 K2.8 复核；WorkBuddy 5.9.3 ACP 不兼容诊断在 `.tmp/workbuddy-acp-593-diagnosis.md`；hy4/w-d 当前不可用（内置 ACP 通道），不占用其他额度。
+
 ## W3c-1b 完成：shutdown 404 与非绝对根（2026-11-09 10:55）
 
 - **修复** `1ff8b2b`（W3c-1b；584 Terra 开发、585 K2.8 复核 **approved**，候选 87 项 / 基线 84 项同 2 个 `ActualBootstrapTests` error、`new_failures=0`）：`talk_runtime.stop()` 在项目已删（404 `project not found`）时按“无角色”继续完成 drain/停止，其它 `HostError` 仍抛出；`configured_runtime` 在 `resolve()` 前拒绝非绝对 `project_root_path`。
