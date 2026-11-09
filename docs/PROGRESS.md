@@ -1,5 +1,13 @@
 # Project Progress
 
+## W3c-1 完成：多工作区运行底座（2026-11-09 10:20）
+
+- **修复**：`2781356`（W3c-1a；582 Terra 开发、583 K2.8 复核 **approved**，候选 246 项 / 基线 240 项同名 2 error、`new_failures=0`）。本机 runtime 绑定按项目解析（`bind_local_runtime` 写 `<项目根>/.talk/runtime.local.json`，`--attach-api` 也写；`configured_runtime(engine, project_id)` fail-closed，不回退 ROOT）；生产调用点全部显式传 project；宿主与角色子进程受控注入 `PYTHONPATH=<仓库根>`，不再依赖 cwd。详见 [W3C_DUAL_WORKSPACE_FINDINGS_20261109.md](spec/W3C_DUAL_WORKSPACE_FINDINGS_20261109.md)。
+- **部署**：API 受控 reload，child_pid **24028→1676**；运行时 pid **3704** 与 Terra/K2.8 宿主未重启；`/healthz` 200。
+- **真实 E2E**：项目 B 的 runtime **首启 `startup_state=complete`**（pid 15076，自动写绑定）；B 角色 ready `ins_d6fa6cc54034`、A 角色 `ins_1dd4918c8a15`；**A 停 B 不停**（100s：B 宿主 18640/桥 7160 存活、心跳 <2s、service running），**反向同样**（A 宿主 18888/桥 19996、心跳 <7s）；修复前失败的 B 角色删除重试 5 步 complete；两个 iso 角色删除、项目 B 删除、`workspaces/<pB>` 与 `keys-b` 清理完成，仅剩 `prj_e8fe7066bbec`。
+- **残余（非阻断）**：① 先删项目再停 runtime 会 `stop_blocked`（shutdown 查角色 404），本次按“同 ID 重建 → 停 runtime → 再删项目”恢复，建议后续修 shutdown 404 语义或文档固定顺序；② `configured_runtime` 对非绝对 `project_root_path` 建议补显式拒绝与用例；③ 角色删除后残留 `.key.lock.guard`（同类既有债务）。
+- **下一步**：W3c-2 恢复链（runtime 停/启、bridge 被 kill、恢复后 stop/delete、瞬时 `host_unreachable` 定位）；页面刷新验收 UI 清理；推送本片。
+
 ## W3c-1 双工作区隔离：尝试后阻塞（2026-11-09 00:10）
 
 - **结论**：W3c-1 不能作为纯验收完成；当前代码把“本机 runtime / 宿主 / 桥 / 删除凭据”四处硬绑定到“项目根 = TALK 仓库根”。详见 [W3C_DUAL_WORKSPACE_FINDINGS_20261109.md](spec/W3C_DUAL_WORKSPACE_FINDINGS_20261109.md)。

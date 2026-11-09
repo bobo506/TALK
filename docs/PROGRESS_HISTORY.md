@@ -1,5 +1,25 @@
 # 开发历史 · TALK
 
+## 2026-11-09 10:20 — W3c-1a：多工作区运行底座与双工作区隔离 E2E
+
+- **任务链**：581 因测试边界理解停在澄清点（partial、零代码）→ 582 续派实施（partial，246 项组合 3 项报错）→ 583 K2.8 独立复核 **approved**。
+- **修复** `2781356`（10 文件 +183/−26）：
+  - `server/local_runtime.py` 绑定按项目解析：`bind_local_runtime` 写 `<项目根>/.talk/runtime.local.json`（`serve` 与 `--attach-api` 都写）；`configured_runtime(engine, project_id)` 参数化 SQL + fail-closed 校验（项目/根/DB/清单），失败返回 None 不回落 ROOT；
+  - `role_startup`、`role_deletions`、`role_services`（capability ×2）、`routes/role_services`（require ×4）、`recover_local_human_stop` 全部显式传 project；
+  - `talk_runtime.spawn` 复制父环境并前置 `PYTHONPATH=<仓库根>`；`role_service_host.child_environment` 在 `child_env_extra` 之后强制 `PYTHONPATH=<仓库根>`；宿主与 `-m bridges.*` 不再依赖 cwd；
+  - 新增 6 个绑定/拒绝/环境用例；`test_role_deletion` 夹具迁移到项目根指针、断言未弱化；`TALK_RUNTIME.md` 补说明。
+- **复核证据**：候选 246 项 / 2 error（`ActualBootstrapTests` 文件锁），基线 worktree f3e5d3d 240 项 / 同名 2 error，health.json 签名逐字段一致，`new_failures=0`；582 自报的 `retention_open_unavailable` 双方重跑均通过，判环境抖动。
+- **部署**：API 受控 reload child_pid 24028→1676；runtime pid 3704 与 Terra/K2.8 宿主未重启；`/healthz` 200。
+- **真实 E2E**（项目 B root `.tmp/w3c-dual-20261109/workspace`）：
+  - B runtime 首启 `startup_state=complete`（attempts=1，pid 15076），自动写绑定并发布 capability；
+  - B 角色 `ins_d6fa6cc54034`、A 角色 `ins_1dd4918c8a15` 均 ready；
+  - A 停 B 不停：100s 内 B 宿主 pid 18640、桥 7160 存活，manager 心跳 0.3–1.5s，service running、实例不变；
+  - 反向 B 停 A 不停：100s 内 A 宿主 pid 18888、桥 19996 存活，心跳 2.5–6.2s；
+  - 修复前 `local_runtime_required` 的 B 角色删除重试 5 步 complete；两个 iso 角色删除、项目 B 删除、`workspaces/<pB>` 与 `keys-b` 清理完成；仅剩 `prj_e8fe7066bbec`。
+- **残余**：先删项目再停 runtime 会 `stop_blocked`（shutdown 404 `project not found`），本次以“同 ID 重建→停 runtime→再删项目”恢复，建议后续修 404 语义或固定顺序；非绝对 `project_root_path` 建议补显式拒绝；`.key.lock.guard` 残留同类债务。
+- **证据**：`.tmp/w3c1a-multiproject-runtime-582/`、`.tmp/w3c1a-review-582/review.json`、`.tmp/w3c-dual-20261109/iso-stop-a-watch-b.json`、`iso-stop-b-watch-a.json`、`state-b/`。
+
+
 ## 2026-11-08 22:55 — 性能/可用性、可靠性恢复与 Codex 插件目录禁用
 
 - **性能/可用性** `c527034`（569 交付、570 复核 approved）：`server/routes/projects.py` 的 binding 读取改为“短会话读 facts → 关闭会话 → 缓存优先/后台单线程按模型去重预热”，显式单角色探测与强度校验在 session 关闭后执行；`server/main.py` 的 `/api/events` 认证与回填分页用 `run_in_threadpool` + 独立会话，`/healthz` 改 uuid 唯一临时文件（O_EXCL + finally 清理）；`server/db.py` 连接池 30+30/15s（事故应急，注释说明 SQLite WAL 单写者）；`scripts/talk_runtime.py` 抽出 reconcile tick，effort 刷新移守护线程，pending start 下一 tick 拉起宿主。

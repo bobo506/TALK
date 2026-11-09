@@ -44,3 +44,29 @@ F1/F5 是同一个“单项目绑定”在启动与删除两端的表现；F2/F3
 - **C. 收缩范围**：承认“一实例一项目”的现行模型，把双工作区整体移到 P3；W3c-1 改判为“单项目多角色隔离”已覆盖 + 文档标注限制。
 
 建议 B：它能让 W3c-1 具备可验收前提，又不把 P3 的分片/预算一起拉进来。
+
+## 修复与复验（2026-11-09）
+
+**修复**：`2781356`（W3c-1a，582 开发 / 583 K2.8 独立复核 approved、`new_failures=0`）。
+
+- 本机 runtime 绑定改为按项目解析：`bind_local_runtime` 写 `<项目根>/.talk/runtime.local.json`（`serve` 与 `--attach-api` 都写）；`configured_runtime(engine, project_id)` 以参数化 SQL 定位项目根并 fail-closed 校验项目/根/DB/清单，失败不回退 ROOT。
+- 全部生产调用点显式传 project：startup 校验、删除 digest、两处 capability、四处 `require_local_runtime`、`recover_local_human_stop`。
+- `TalkRuntime.spawn` 与 `role_service_host.child_environment` 注入受控 `PYTHONPATH=<TALK 仓库根>`，宿主与 `-m bridges.*` 不再依赖 cwd。
+
+**真实 E2E（API 受控 reload 24028→1676，运行时 pid 3704 不变；Terra/K2.8 宿主未重启）**：
+
+| 验证项 | 结果 |
+|---|---|
+| runtime B（项目根 ≠ TALK）首启 | `startup_state=complete`（attempts=1，pid 15076），自动写 B 根绑定，capability 正常 |
+| B 角色开通 + start | `ins_d6fa6cc54034` running/ready（修复前 `bridge_process_exited`） |
+| A 角色 | `ins_1dd4918c8a15` running/ready，重启后 `ins_d1dccbfd0fc8` |
+| A 停 B 不停 | 停 A 后 100s：B 宿主 pid 18640、桥 pid 7160 存活，manager 心跳 0.3–1.5s，service running，实例不变 |
+| 反向 B 停 A 不停 | 停 B 后 100s：A 宿主 pid 18888、桥 pid 19996 存活，心跳 2.5–6.2s，service running |
+| 旧失败删除重试 | 修复前 `local_runtime_required` 的 B 角色删除 → 5 步 complete |
+| 清理 | 两个 iso 角色删除均 5 步 complete；项目 B 删除；`workspaces/<pB>` 与 `TALK-private/w3c-dual/keys-b` 清除；仅剩 `prj_e8fe7066bbec` |
+
+**残余（非阻断）**：
+
+1. 先删项目、后停 runtime 会令 runtime `stop_blocked`（shutdown 查角色 404 `project not found`）；本次按“同 ID 重建项目 → 停止 runtime → 再删项目”恢复。建议 shutdown 把项目 404 视作无角色，或文档固定“先停 runtime 再删项目”。
+2. K2.8 复核建议：`configured_runtime` 对 DB 中非绝对 `project_root_path` 显式 `is_absolute()` 拒绝并补用例（当前实践仍 fail-closed）。
+3. 角色删除后 `keys-b` 仅残留 `.key.lock.guard`（与 `profiles/.provision.lock.guard` 同类），已随目录清理。
