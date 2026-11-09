@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-09 16:50 — W3c-2a：孤儿 bridge 受控清理与恢复链 E2E
+
+- **诊断**（586 K2.8 approved）：场景 a 停/启 runtime + start 正常、`host_unreachable` 未复现；场景 b 仅 kill 宿主导致 `recovery_required` + start 409 + stop launch pending 的永久死锁（重启 runtime 亦不自愈）；b 恢复：bridge 退出 + 90s 实例过期后 stop 走人工恢复；c kill bridge 宿主回报 `bridge_process_exited` 并释放；d delete 受 90s 新鲜心跳保护，残留 guard/空 native-home。
+- **修复** `244f226`（588/592 approved）：`_terminate_orphan_bridge` 在 `ownership_held` 分支受控终止可验证的 idle 本地孤儿（manager 死证、句柄创建时间、二次查询、异常不中断）；`6a6d0c5`（593/594 approved）：Windows 移除 `recorded_process_state` 1s 前置门槛，改句柄创建时间 5s 容差，修复“记录启动时间早 1.53s 导致永不清理”。
+- **E2E**：新代码 runtime B 下，kill 宿主 7536 后 bridge 6288 约 6s 内被终止；90s 后 stop `idempotent_stopped`（gen 6）→ start ready `ins_d981d84a3696`（gen 7）；角色删除 5 步、项目 B/workspace/keys 清理完成。
+- **残余**：人工显式恢复入口（忙孤儿）、终止后轮询提前记 terminated（可选 WaitForSingleObject）、delete 90s 窗口、`host_unreachable` 专项复现、guard/空 native-home 债务；生产 runtime A 需下次重启生效。
+- **证据**：`.tmp/w3c2-dual-20261109/`、`.tmp/w3c2-diag/`、`.tmp/w3c2a-e2e-orphan-guard.json`、`.tmp/w3c2a-review-588/`、`.tmp/w3c2a-review-593/`。
+
+
 ## 2026-11-09 10:55 — W3c-1b：runtime 停止容忍已删项目 + 非绝对根拒绝
 
 - **任务链**：584 Terra 开发（partial：87 项 2 error 为已知 `ActualBootstrapTests` 文件锁）→ 585 K2.8 独立复核 **approved**（候选 87 / 基线 84，同 2 名 error，`new_failures=0`）。

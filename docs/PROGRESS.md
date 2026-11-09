@@ -1,5 +1,13 @@
 # Project Progress
 
+## W3c-2a 完成：孤儿 bridge 受控清理与恢复链 E2E（2026-11-09 16:50）
+
+- **修复**：`244f226`（588，592 approved）+ `6a6d0c5`（593，594 approved）——runtime 在宿主已死且 `ownership_held` 时，对“同机、同项目、两次查询均 idle、无 current_task、句柄创建时间与记录偏差 ≤5s”的本地孤儿 bridge 用 Windows 句柄 `TerminateProcess` 受控终止；`recovery_required` 语义不变，忙角色不杀。真实 E2E 发现并修复了 `recorded_process_state` +1s 容差导致的“永不清理”缺陷。详见 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
+- **真实 E2E**：临时项目 B runtime B（新代码）→ 角色 ready `ins_48280c199d53` → **kill 宿主 7536 → bridge 6288 在 ~6s 内被自动终止**；90s 后 stop 走人工恢复（`idempotent_stopped`，gen 6）→ start ready `ins_d981d84a3696`（gen 7）；角色删除 5 步 complete、项目 B/workspace/keys 清理完成，仅剩 `prj_e8fe7066bbec`。
+- **复核**：588 候选 64 / 基线 58（同名环境项，`new_failures=0`）；593 候选 65 / 基线 64 **全过**、`new_failures=0`。
+- **残余**：① 人工显式恢复入口（忙孤儿）未做；② 终止后轮询仍用 `recorded_process_state`，可能提前记 `terminated`（可选 `WaitForSingleObject`）；③ delete 90s 窗口（可选）；④ `host_unreachable` 未复现（需 API reload 窗口专项）；⑤ guard/空 native-home 既有债务。生产 runtime A（pid 3704）需下次重启才带上本修复。
+- **下一步**：WorkBuddy 版本适配提醒片（路线图第 17 项）→ WorkBuddy ACP 5.9.3 适配研究；再按需做人工恢复入口/delete 窗口。
+
 ## 待办登记：WorkBuddy 版本适配提醒（2026-11-09 15:15）
 
 - 用户决定：hy4/w-d **不改绑**到 `models.json` 的 API 模型，内置模型继续走 ACP；等 K2.8 额度恢复后再开工。
