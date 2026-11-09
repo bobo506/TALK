@@ -4666,6 +4666,7 @@ class RoleBindingOut(BaseModel):
     # 可选项只来自官方目录（catalog）或运行器适配事实（adapter）；都没有时为空 + None。
     effort_options: list[str] = []
     effort_source: Optional[str] = None
+    effort_error: Optional[str] = None
     binding_state: Optional[str] = None
     binding_fingerprint: Optional[str] = None
     updated_by: Optional[str] = None

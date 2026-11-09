@@ -17,6 +17,7 @@ ADAPTED_VERSIONS = {
     "dsh": ("0.2.1-rc.5", "2026-11-04 当前验证基线"),
     "workbuddy": ("2.165.0", "2026-11-05 本机验证基线"),
 }
+WORKBUDDY_ACP_ADAPTED_DESKTOP = ("5.8.3", "2026-11-05 ACP 验证基线；5.9.3 已知不兼容")
 COMMANDS = {"codex": ("codex.cmd", "codex"), "kimi-code": ("kimi",), "dsh": ("dsh.cmd", "dsh")}
 _VERSION = re.compile(r"(?<![\w.])(\d+(?:\.\d+)+(?:-rc\.\d+)?)(?![\w.+-])")
 _cache = {}
@@ -49,6 +50,46 @@ def compare_versions(detected, adapted):
         av = (a[1] is None, a[1] or 0)
         bv = (b[1] is None, b[1] or 0)
     return "match" if av == bv else "newer" if av > bv else "older"
+
+
+def _probe_workbuddy_desktop():
+    """读取 Windows 可执行文件的固定版本资源，不启动桌面程序。"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if not localappdata:
+            return None, "未设置 LOCALAPPDATA，无法检测 WorkBuddy 桌面版本"
+        exe = Path(localappdata) / "Programs/WorkBuddy/WorkBuddy.exe"
+        if not exe.is_file():
+            return None, "未找到 WorkBuddy 桌面程序"
+        version = ctypes.WinDLL("version", use_last_error=True)
+        version.GetFileVersionInfoSizeW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(wintypes.DWORD)]
+        version.GetFileVersionInfoSizeW.restype = wintypes.DWORD
+        version.GetFileVersionInfoW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p]
+        version.GetFileVersionInfoW.restype = wintypes.BOOL
+        version.VerQueryValueW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(wintypes.UINT)]
+        version.VerQueryValueW.restype = wintypes.BOOL
+        size = version.GetFileVersionInfoSizeW(str(exe), None)
+        if not size:
+            return None, "无法读取 WorkBuddy 桌面版本资源"
+        buf = ctypes.create_string_buffer(size)
+        if not version.GetFileVersionInfoW(str(exe), 0, size, buf):
+            return None, "无法读取 WorkBuddy 桌面版本资源"
+        ptr, length = ctypes.c_void_p(), wintypes.UINT()
+        if not version.VerQueryValueW(buf, "\\", ctypes.byref(ptr), ctypes.byref(length)) or length.value < 52:
+            return None, "无法解析 WorkBuddy 桌面版本资源"
+        words = ctypes.cast(ptr, ctypes.POINTER(wintypes.DWORD))
+        if words[0] != 0xFEEF04BD:
+            return None, "无法解析 WorkBuddy 桌面版本资源"
+        ms, ls = words[2], words[3]
+        parts = [ms >> 16, ms & 0xffff, ls >> 16, ls & 0xffff]
+        if parts[-1] == 0:
+            parts.pop()
+        return ".".join(map(str, parts)), ""
+    except Exception:
+        return None, "WorkBuddy 桌面版本探测失败"
 
 
 def _probe_workbuddy():
@@ -123,5 +164,16 @@ def get_version(runtime):
         detected, detail = _probe(runtime)
         result = {"adapted_version": adapted, "adapted_source": source, "detected_version": detected,
                   "status": compare_versions(detected, adapted), "detail": detail or ("无已验证基线" if not adapted else "")}
+        if runtime == "workbuddy":
+            desktop, desktop_detail = _probe_workbuddy_desktop()
+            desktop_adapted, _ = WORKBUDDY_ACP_ADAPTED_DESKTOP
+            desktop_status = compare_versions(desktop, desktop_adapted)
+            warning = None if desktop_status == "match" else (
+                f"WorkBuddy 桌面版本 {desktop or '未知'}，TALK ACP 已验证版本 {desktop_adapted}；适配关系需确认"
+            )
+            result.update(desktop_version=desktop, desktop_adapted_version=desktop_adapted,
+                          desktop_status=desktop_status, adapter_warning=warning)
+            if desktop_detail:
+                result["detail"] = "；".join(filter(None, (result["detail"], desktop_detail)))
         _cache[runtime] = (time.monotonic(), result)
         return dict(result)

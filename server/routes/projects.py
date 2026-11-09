@@ -746,9 +746,7 @@ def _cached_runtime_options(facts):
     model = facts.get("model_alias")
     if facts.get("runtime") != "workbuddy" or not effort_cache.is_acp_alias(model):
         return None, None
-    with effort_cache._lock:
-        cached = effort_cache._cache.get(model)
-        options = list(cached[1]) if cached and time.monotonic() < cached[0] else []
+    options, _ = effort_cache.describe_model(model)
     return (options, "adapter") if options else (None, None)
 
 
@@ -818,6 +816,8 @@ def _binding_with_runtime_effort(facts):
         if options is not None:
             binding.effort_options = options
             binding.effort_source = source
+        if not binding.effort_options and binding.runtime == "workbuddy":
+            _, binding.effort_error = effort_cache.describe_model(binding.model_alias)
     return binding
 
 

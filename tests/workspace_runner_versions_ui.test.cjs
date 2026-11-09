@@ -116,3 +116,19 @@ test("角色导航立即同步版本面板并复用缓存", async () => {
   await h.tick();
   assert.equal(calls(), 1);
 });
+
+test("WorkBuddy 显示桌面和 CLI 版本及独立适配警告", () => {
+  const make = () => ({children: [], appendChild(n) { this.children.push(n); }, replaceChildren() { this.children = []; }, classList: {classes: new Set(), add(k) { this.classes.add(k); }, toggle() {}}});
+  const panel = make(); panel.isConnected = true; panel.parentElement = {}; const box = make();
+  const env = {document: {getElementById: id => id === "runner-versions-panel" ? panel : box, createElement: make}, blackboardOpen: true,
+    workspaceUI: {mode: "roles"}, myId: "a", activeProjectId: "p", workspaceSettingsSelected: () => true};
+  vm.createContext(env);
+  vm.runInContext(source.slice(source.indexOf("const runnerVersionsUI"), source.indexOf("// 参与任务分页")) + `
+    runnerVersionsUI.member = "a"; runnerVersionsUI.lastFetch = Date.now(); runnerVersionsUI.items = [
+      {runtime:"workbuddy", detected_version:"2.165.0", adapted_version:"2.165.0", status:"match", desktop_version:"5.9.3", adapter_warning:"桌面 5.9.3，已验证 5.8.3"}
+    ];`, env);
+  env.syncRunnerVersions();
+  assert.equal(box.children.length, 2); assert.match(box.children[0].textContent, /CLI 2\.165\.0.*桌面 5\.9\.3/);
+  assert.match(box.children[1].textContent, /5\.9\.3.*5\.8\.3/);
+  assert.ok(box.children[1].classList.classes.has("runner-version-mismatch"));
+});

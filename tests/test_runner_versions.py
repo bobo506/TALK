@@ -65,13 +65,44 @@ class VersionTests(unittest.TestCase):
         def is_file(path):
             checked.append(path)
             return path in (exe, asar)
-        with patch.object(Path, "is_file", autospec=True, side_effect=is_file), patch.object(versions.subprocess, "run", side_effect=run) as process:
+        with patch.object(Path, "is_file", autospec=True, side_effect=is_file), patch.object(versions.subprocess, "run", side_effect=run) as process, patch.object(versions, "_probe_workbuddy_desktop", return_value=("5.8.3", "")):
             result = versions.get_version("workbuddy")
         self.assertEqual(checked, [exe, asar])
         self.assertEqual(Path(process.call_args.args[0][1]), asar / "cli/bin/codebuddy")
         self.assertEqual((result["detected_version"], result["status"], result["adapted_version"]),
                          ("2.165.0", "match", "2.165.0"))
         self.assertFalse(observed["config"].exists())
+
+    def test_desktop_versions_and_warning(self):
+        for detected, detail, status in [("5.8.3", "", "match"), ("5.9.3", "", "newer"),
+                                          ("5.7.9", "", "older"), (None, "未找到桌面程序", "unknown")]:
+            with self.subTest(status=status):
+                versions.clear_cache()
+                with patch.object(versions, "_probe", return_value=("2.165.0", "")), \
+                     patch.object(versions, "_probe_workbuddy_desktop", return_value=(detected, detail)) as probe:
+                    result = versions.get_version("workbuddy")
+                    versions.get_version("workbuddy")
+                self.assertEqual(probe.call_count, 1)
+                self.assertEqual((result["detected_version"], result["adapted_version"], result["status"]),
+                                 ("2.165.0", "2.165.0", "match"))
+                self.assertEqual((result["desktop_version"], result["desktop_adapted_version"], result["desktop_status"]),
+                                 (detected, "5.8.3", status))
+                if status == "match":
+                    self.assertIsNone(result["adapter_warning"])
+                else:
+                    self.assertIn(detected or "未知", result["adapter_warning"])
+                    self.assertIn("5.8.3", result["adapter_warning"])
+                if detail:
+                    self.assertIn(detail, result["detail"])
+        versions.clear_cache()
+        with patch.object(versions, "_probe", return_value=(None, "")):
+            self.assertNotIn("adapter_warning", versions.get_version("codex"))
+
+    def test_desktop_missing_file(self):
+        with patch.dict(versions.os.environ, {"LOCALAPPDATA": "missing-root"}), patch.object(Path, "is_file", return_value=False):
+            version, detail = versions._probe_workbuddy_desktop()
+            self.assertIsNone(version)
+            self.assertTrue(detail)
 
     def test_workbuddy_probe_failures(self):
         for files in ([False], [True, False]):

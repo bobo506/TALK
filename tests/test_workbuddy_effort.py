@@ -48,6 +48,25 @@ class ProbeTests(unittest.TestCase):
             self.assertEqual(cache.options_for_model('workbuddy-acp:b'),[])
             clock.return_value=659; self.assertEqual(cache.options_for_model('workbuddy-acp:b'),[])
             clock.return_value=660; self.assertEqual(cache.options_for_model('workbuddy-acp:b'),['max']); self.assertEqual(probe.call_count,4)
+    def test_describe_model_cached_errors_and_expiry(self):
+        class ProbeError(Exception):
+            code = 'workbuddy_acp_runtime_unavailable'
+        model = 'workbuddy-acp:a'
+        with patch.object(cache.time, 'monotonic') as clock, patch.object(cache, 'probe_effort_options', side_effect=[ProbeError(), ['high'], RuntimeError()]) as probe:
+            clock.return_value = 10
+            self.assertEqual(cache.describe_model(model), ([], None))
+            self.assertEqual(probe.call_count, 0)
+            self.assertEqual(cache.options_for_model(model), [])
+            self.assertEqual(cache.describe_model(model), ([], 'workbuddy_acp_runtime_unavailable'))
+            clock.return_value = 70
+            self.assertEqual(cache.describe_model(model), ([], None))
+            self.assertEqual(cache.options_for_model(model), ['high'])
+            self.assertEqual(cache.describe_model(model), (['high'], None))
+            clock.return_value = 670
+            self.assertEqual(cache.options_for_model(model), [])
+            self.assertEqual(cache.describe_model(model), ([], 'workbuddy_acp_probe_failed'))
+            self.assertEqual(cache.describe_model('not-acp'), ([], None))
+
     def test_different_models_probe_concurrently(self):
         started = threading.Event()
         release = threading.Event()
@@ -134,6 +153,30 @@ from tests.test_project_role_bindings import BindingApiTestCase
 from server.models import ProjectRoleBinding
 
 class WorkbuddyApiTests(BindingApiTestCase):
+    def test_binding_failure_is_projected_and_catalog_takes_priority(self):
+        p = 'prj_wb_failure'
+        self.register_project(p); self.sync(p, [{'member_id': 'agent:worker'}]); self.register_runner(runtime='workbuddy')
+        self.put_binding(p, 'agent:worker', self.binding_payload(model_alias='workbuddy-acp:hy4free'))
+        class ProbeError(Exception):
+            code = 'workbuddy_acp_runtime_unavailable'
+        cache._cache.clear()
+        with patch.object(cache, 'probe_effort_options', side_effect=ProbeError()) as probe:
+            with self.make_client() as client:
+                path = f'/api/projects/{p}/agents/agent:worker/binding'
+                response = client.get(path, headers={'X-API-Key': 'bobo-key'}).json()['binding']
+                self.assertIsNone(response['effort_error'])
+                self.assertEqual(probe.call_count, 0)
+                response = client.get(path + '?refresh_effort=true', headers={'X-API-Key': 'bobo-key'}).json()['binding']
+                self.assertEqual((response['effort_options'], response['effort_error']), ([], 'workbuddy_acp_runtime_unavailable'))
+                self.assertEqual(probe.call_count, 1)
+            self.assertEqual(self.agent_by_id(p, 'agent:worker')['binding']['effort_error'], 'workbuddy_acp_runtime_unavailable')
+            with self.session() as session:
+                row = session.get(ProjectRoleBinding, (p, 'agent:worker')); row.supported_efforts = '["low"]'; session.add(row); session.commit()
+            binding = self.get_binding(p, 'agent:worker').json()['binding']
+            self.assertEqual(binding['effort_options'], ['low'])
+            self.assertIsNone(binding['effort_error'])
+        cache._cache.clear()
+
     def test_binding_views_and_validation(self):
         p='prj_wb_effort'
         self.register_project(p); self.sync(p,[{'member_id':'agent:worker'}]); self.register_runner(runtime='workbuddy')

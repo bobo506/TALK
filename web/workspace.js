@@ -3,7 +3,7 @@ const workspaceUI = { mode: "tasks", filter: "all", query: "", selectedRole: nul
 // 随现有渲染节奏刷新，十分钟内复用结果。
 const runnerVersionsUI = { items: null, lastFetch: 0, pending: false, member: null };
 function runnerVersionText(item) {
-  const name = `${item.display_name || item.runtime} (${item.runtime})`;
+  const name = `${item.display_name || item.runtime} (${item.runtime})` + (item.runtime === "workbuddy" ? `，CLI ${item.detected_version || "未知"}，桌面 ${item.desktop_version || "未知"}` : "");
   if (item.status === "match") return `${name}：${item.detected_version}，已适配 ${item.adapted_version}`;
   if (item.status === "newer" || item.status === "older") {
     const relation = item.status === "newer" ? "有新版本" : "旧于适配";
@@ -31,6 +31,12 @@ function syncRunnerVersions() {
         row.classList.add("runner-version-mismatch");
       }
       box.appendChild(row);
+      if (item.runtime === "workbuddy" && item.adapter_warning) {
+        const warning = document.createElement("div");
+        warning.textContent = item.adapter_warning;
+        warning.classList.add("runner-version-mismatch");
+        box.appendChild(warning);
+      }
     }
   }
   if (runnerVersionsUI.pending || Date.now() - runnerVersionsUI.lastFetch < 600000) return;
@@ -978,7 +984,7 @@ function roleBindingEffortFacts(row) {
   const options = Array.isArray(row.effort_options)
     ? row.effort_options.filter(value => typeof value === "string" && ROLE_BINDING_THINKING_STRENGTHS.has(value.toLowerCase()))
     : [];
-  return { override, fallback, effective, options, source: roleBindingText(row.effort_source) };
+  return { override, fallback, effective, options, source: roleBindingText(row.effort_source), error: roleBindingText(row.effort_error) };
 }
 // 2026-10-31（352）：自定义 API 来源的模型在展示名后追加「 API」，官方内置同名模型不加；
 // 已带后缀的不重复追加。只影响展示，不改 model_id / 绑定数据。
@@ -1912,7 +1918,7 @@ function workspaceRoleEffortControl(role) {
   // 有选项时行为不变（不渲染该说明）。
   if (!selectable) {
     box.appendChild(workspaceEl("span", "role-effort-empty-hint",
-      "未检测到运行器能力或该模型未提供思考强度选项，可刷新重试。"));
+      effort.error ? `强度获取失败（${effort.error}），可刷新重试。` : "未检测到运行器能力或该模型未提供思考强度选项，可刷新重试。"));
   }
   const error = roleEffortUI.errors.get(role.member_id);
   if (error) box.appendChild(workspaceEl("span", "role-effort-error", error));

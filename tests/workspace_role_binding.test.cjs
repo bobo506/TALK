@@ -452,3 +452,11 @@ test('无生效强度时可跟随模型默认，空值保存为 null',async()=>{
   select.fire('change');
   assert.deepEqual(JSON.parse(h.pending[h.pending.length-1].opts.body),{effort:null});
 });
+
+test('强度探测失败时显示错误码并保持空选项',async()=>{
+  const h=effortHarness(effortRow({effort_options:[],effort_source:null,effort_error:'workbuddy_acp_runtime_unavailable'}));
+  await h.enterRoles();await h.selectRole('agent:kimi');
+  const panel=h.el('role-details-name-panel');const select=effortSelect(panel);
+  assert.deepEqual(optionValues(select),[]);assert.equal(select.disabled,true);
+  assert.match(allTexts(panel).join('\n'),/强度获取失败（workbuddy_acp_runtime_unavailable）/);
+});
