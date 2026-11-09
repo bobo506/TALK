@@ -277,7 +277,7 @@ function createRoleRequestUI(deps) {
       && safeInt(row.credential_version) && row.credential_version > 0;
   }
   function resetButton(row) {
-    const btn = button("绑定重置", () => recover(row));
+    const btn = button("重新绑定", () => recover(row));
     btn.disabled = state.busy;
     return btn;
   }
@@ -287,7 +287,7 @@ function createRoleRequestUI(deps) {
       node("p", "role-reset-hint", "接入异常时修复本机配置，必要时更新接入凭据。"));
     return box;
   }
-  // 2026-10-28：按用户要求把“绑定重置”移到角色详情服务行的第 4 个按钮位（删除角色之后），
+  // 2026-10-28：按用户要求把“重新绑定”移到角色详情服务行的第 4 个按钮位（删除角色之后），
   // 详情里不再重复渲染维护面板中的旧位置；仅保留按钮本身，不再带说明段落。
   // 2026-10-29 B1-a：旧角色（imported + 已提交补录记录）没有创建请求行，用角色自身的
   // recoverable / credential_version 生成同样的恢复请求；服务端按补录锚点校验。
@@ -719,7 +719,7 @@ function createRoleRequestUI(deps) {
       if (saved && /^role-[a-zA-Z0-9_-]{8,120}$/.test(saved.key) && safeInt(saved.version) && saved.version > 0) intent = saved;
     } catch (_) {}
     intent ||= state.recoveryAttempts?.get(row.member_id);
-    if (!intent && !deps.confirm("绑定重置将修复本机接入，必要时更新 TALK 凭据并使旧凭据失效，不更换运行器或模型。确认重置？")) return;
+    if (!intent && !deps.confirm("重新绑定将修复本机接入，必要时更新 TALK 凭据并使旧凭据失效，不更换运行器或模型。确认重新绑定？")) return;
     intent ||= { key: deps.newKey(), version: row.credential_version };
     state.recoveryAttempts ||= new Map(); state.recoveryAttempts.set(row.member_id, intent);
     try { deps.storage?.setItem(savedKey, JSON.stringify({ key: intent.key, version: intent.version })); } catch (_) {}
@@ -764,7 +764,7 @@ function createRoleRequestUI(deps) {
     }
     const autoStart = autoStartFeedback(row);
     if (autoStart) panel.append(node("p", "role-request-status", autoStart.text));
-    // 2026-10-28：“绑定重置”已移到角色详情服务行，这里不再渲染；面板即使为空也返回，
+    // 2026-10-28：“重新绑定”已移到角色详情服务行，这里不再渲染；面板即使为空也返回，
     // 由 CSS `.role-maintenance:empty` 隐藏，避免调用方拿到 null 后改变既有渲染语义。
     return panel;
   }

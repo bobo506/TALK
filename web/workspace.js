@@ -1202,16 +1202,23 @@ function workspaceRoleServiceActions(role, className) {
   stop.setAttribute("aria-label", `关闭 ${workspaceMemberName(control.view.memberId)} 的服务`);
   if (control.hint) stop.title = control.hint;
   row.append(start, stop);
-  if (control.human && control.ownershipHeld) row.appendChild(roleServiceOrphanButton(control));
+  if (roleServiceOrphanVisible(control)) row.appendChild(roleServiceOrphanButton(control));
   box.appendChild(row);
   if (control.hint) box.appendChild(workspaceEl("p", "role-service-hint", control.hint));
   return box;
 }
+function roleServiceOrphanVisible(control) {
+  return Boolean(control.human && (["unknown", "stopping"].includes(control.observed)
+    || roleServiceUI.orphanHints.has(control.view.memberId)
+    || ["recovery_recent_heartbeat", "recovery_process_not_absent", "stop_timeout"].includes(control.view.service?.error_code)));
+}
 function roleServiceOrphanButton(control) {
-  const button = workspaceButton("终止孤儿并恢复", event => {
+  const button = workspaceButton("重置", event => {
     event?.stopPropagation?.(); recoverRoleOrphan(control.view.memberId);
   }, "role-service-button role-service-stop");
   button.disabled = control.busy || control.batchBusy;
+  button.title = "角色状态异常时，终止本机遗留进程并释放归属";
+  button.setAttribute("aria-label", "重置角色服务");
   return button;
 }
 function workspaceRoleServiceControls(role, className = "role-service-controls") {
@@ -1221,11 +1228,7 @@ function workspaceRoleServiceControls(role, className = "role-service-controls")
   if (control.view.memberId) box.dataset.memberId = control.view.memberId;
   const listStatus = control.status.kind === "success" ? { ...control.status, text: "启动成功" } : control.status;
   box.appendChild(workspaceRoleServiceStateLabel(listStatus));
-  if (control.human && (["unknown", "stopping"].includes(control.observed)
-      || roleServiceUI.orphanHints.has(control.view.memberId)
-      || ["recovery_recent_heartbeat", "recovery_process_not_absent", "stop_timeout"].includes(control.view.service?.error_code))) {
-    box.appendChild(roleServiceOrphanButton(control));
-  }
+  if (roleServiceOrphanVisible(control)) box.appendChild(roleServiceOrphanButton(control));
   const listHint = control.hint === "请先「关闭」并确认已停止，再重新启动。" ? "" : control.hint;
   if (listHint) box.appendChild(workspaceEl("p", "role-service-hint", listHint));
   return box;
@@ -1357,7 +1360,7 @@ function workspaceRoleServicePanel(role) {
   if (controls) section.appendChild(controls);
   const deleteButton = roleDeleteButton(role);
   if (deleteButton) (controls?.children[0] || section).appendChild(deleteButton);
-  // 2026-10-28：按用户要求“绑定重置”排在删除角色之后，作为服务行第 4 个按钮；
+  // 2026-10-28：按用户要求“重新绑定”排在删除角色之后，作为服务行第 4 个按钮；
   // 按钮与恢复逻辑仍由 role-creation.js 提供，这里只负责位置。
   if (typeof roleRequestApp !== "undefined") {
     const resetButton = roleRequestApp?.resetButton?.(role.member_id, role);
@@ -1546,7 +1549,7 @@ async function recoverRoleOrphan(memberId) {
   const control = role && roleServiceControl(role);
   if (!control || !control.human || control.busy || control.batchBusy || !roleServicePageActive()) return;
   if (!Number.isInteger(control.view.service?.generation)) return;
-  if (!window.confirm("只会终止本机遗留 bridge；在途任务会被记为失败，此操作不可撤销。确定继续吗？")) return;
+  if (!window.confirm("重置会终止本机遗留 bridge 并释放进程归属；在途任务会被记为失败，此操作不可撤销。确定继续吗？")) return;
   const projectId = activeProjectId, accountId = myId;
   const operationKey = `orphan-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const payload = {operation_key: operationKey, expected_generation: control.view.service.generation,
@@ -1561,7 +1564,7 @@ async function recoverRoleOrphan(memberId) {
     let res = await request();
     let body = await res.json().catch(() => ({}));
     if (res.status === 409 && body.detail === "orphan_tasks_active") {
-      if (!window.confirm("该角色有未结束任务。继续将把这些任务记为失败，确定中断吗？")) return;
+      if (!window.confirm("该角色有未结束任务。继续重置将把这些任务记为失败，确定中断吗？")) return;
       payload.confirm_task_interrupt = true;
       res = await request();
       body = await res.json().catch(() => ({}));

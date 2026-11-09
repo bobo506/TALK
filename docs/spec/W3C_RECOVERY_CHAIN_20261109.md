@@ -28,7 +28,7 @@
 
 ## 四、残余（非阻断，待后续片）
 
-1. ~~**人工显式恢复入口**（586 必须修 2）~~ **W3c-3 已完成（2026-11-09，599/600 approved）**：human 显式“终止孤儿并恢复”，见第六节。
+1. ~~**人工显式恢复入口**（586 必须修 2）~~ **W3c-3 已完成（2026-11-09，599/600 approved）**：human 显式“重置”，见第六节。
 2. **终止后轮询语义**：仍用 `recorded_process_state(pid, process_started_at)`，1.5s 偏差会立即判 `pid_reused` 并记 `terminated`，不能单凭事件证明进程已退出；可选改为 `WaitForSingleObject`/`GetExitCodeProcess` 真实存活确认。
 3. **delete 90s 窗口**：bridge 退出后实例行仍 idle，删除需等 90s 新鲜度过期；可在“进程已证退出”时跳过（可选）。
 4. **`host_unreachable`** 未复现：仅覆盖 API 稳定窗口；需 API reload 窗口专项复现。

@@ -74,14 +74,17 @@ function serviceRow(overrides = {}) {
 const activeHarnesses = [];
 afterEach(() => { for (const h of activeHarnesses.splice(0)) h.context.stopRoleServicePolling(); });
 
-test('孤儿入口仅 human 按归属或异常状态显示', () => {
-  const role = {member_id: 'agent:a', service: serviceRow({ownership_held: true, observed: 'running'})};
-  const h = harness({roster: [role]});
-  assert.ok(findAll(h.context.workspaceRoleServiceActions(role, 'detail'), n => n.textContent === '终止孤儿并恢复').length);
-  const unknown = {...role, service: serviceRow({observed: 'unknown'})};
-  assert.ok(findAll(h.context.workspaceRoleServiceControls(unknown), n => n.textContent === '终止孤儿并恢复').length);
-  const agent = harness({human: false, roster: [role]});
-  assert.equal(findAll(agent.context.workspaceRoleServiceActions(role, 'detail'), n => n.textContent === '终止孤儿并恢复').length, 0);
+test('重置入口仅在 human 且状态异常时显示', () => {
+  const healthy = {member_id: 'agent:a', service: serviceRow({ownership_held: true, observed: 'running'})};
+  const h = harness({roster: [healthy]});
+  assert.equal(findAll(h.context.workspaceRoleServiceActions(healthy, 'detail'), n => n.textContent === '重置').length, 0);
+  const unknown = {...healthy, service: serviceRow({observed: 'unknown'})};
+  assert.ok(findAll(h.context.workspaceRoleServiceActions(unknown, 'detail'), n => n.textContent === '重置').length);
+  assert.ok(findAll(h.context.workspaceRoleServiceControls(unknown), n => n.textContent === '重置').length);
+  const timedOut = {...healthy, service: serviceRow({ownership_held: true, observed: 'running', error_code: 'stop_timeout'})};
+  assert.ok(findAll(h.context.workspaceRoleServiceActions(timedOut, 'detail'), n => n.textContent === '重置').length);
+  const agent = harness({human: false, roster: [unknown]});
+  assert.equal(findAll(agent.context.workspaceRoleServiceActions(unknown, 'detail'), n => n.textContent === '重置').length, 0);
 });
 
 test('孤儿入口二次确认任务失败并刷新服务和任务', async () => {

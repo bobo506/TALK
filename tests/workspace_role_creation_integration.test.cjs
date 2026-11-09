@@ -54,7 +54,7 @@ test('真实页面模块启动顺序、toolbar、名册刷新、角色详情与�
   assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/运行时隔离待启用|自动启动已关闭/);
   Object.assign(rows[0],{storage_layout:'legacy',auto_start:true,auto_start_status:'enqueued',auto_start_launch_id:'launch-auto'});await controller.refresh();
   assert.match(h.texts(ctx.blackboardColumns),/启动中/);assert.doesNotMatch(h.texts(ctx.blackboardColumns),/启动成功/);
-  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/绑定重置/);
+  assert.match(h.texts(doc.getElementById('role-details-name-panel')),/重新绑定/);
   assert.match(h.texts(doc.getElementById('role-details-name-panel')),/自动启动请求已提交/);
   assert.doesNotMatch(h.texts(doc.getElementById('role-details-name-panel')),/配置进度|配置已完成|身份档案|运行器与模型绑定/);
   const detailChildren=doc.getElementById('role-details-name-panel').children;

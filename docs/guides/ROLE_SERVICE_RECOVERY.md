@@ -44,7 +44,7 @@ TALK API与各角色宿主管理器分别运行；仅恢复API不会自动恢复
 
 ## 宿主已死但 bridge 仍存活（忙孤儿，2026-11-09 W3c-3）
 
-上面的 CLI/`recover-stopped` 只在原 bridge 已退出、实例心跳过期后可用；若宿主已退出但 bridge 仍存活并持续心跳，会出现“无法启动（已在运行）+ 关闭一直待确认”的死锁，重启 runtime 也不能自愈。此时用页面角色详情或异常服务行上的“终止孤儿并恢复”（仅真人账号），或调用：
+上面的 CLI/`recover-stopped` 只在原 bridge 已退出、实例心跳过期后可用；若宿主已退出但 bridge 仍存活并持续心跳，会出现“无法启动（已在运行）+ 关闭一直待确认”的死锁，重启 runtime 也不能自愈。此时用页面角色详情或异常服务行上的“重置”（仅真人账号），或调用：
 
 - `POST /api/projects/{project_id}/roles/{member_id}/service/recover-orphan`：human-only；请求 `operation_key`、`expected_generation`、`confirm_task_interrupt`、`reason`。服务端先做本机身份与进程句柄证明，再终止确认属于该角色的遗留 bridge 并释放原归属，返回终止/退出证据与恢复审计；恢复后默认“未启动（已关闭）”，不自动启动。
 - 该成员在**本项目**仍有 queued/running 任务时，未带确认返回 409 `orphan_tasks_active`（尚未终止）；确认后任务置 `failed`、`last_error=orphan_terminated_by_human`、释放 claim/lease，不重派、不通知，跨项目任务不动。

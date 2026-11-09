@@ -325,7 +325,7 @@ test('同一角色以最新配置请求展示，历史失败不盖住新恢复�
   const h=harness({handler:limitedHistory});h.backend.rows=[
     {request_key:'role-earlier-00000000',member_id:'m',status:'failed',revision:2,created_at:'2026-10-12T00:00:00Z'},
     {request_key:'role-recover-00000000',member_id:'m',status:'provisioned',revision:3,credential_version:2,created_at:'2026-10-13T00:00:00Z'}];
-  await h.ready();const text=h.texts(h.ui.rolePanel({member_id:'m'}));assert.ok(h.ui.resetButton('m'));assert.doesNotMatch(text,/绑定重置|配置未完成/);
+  await h.ready();const text=h.texts(h.ui.rolePanel({member_id:'m'}));assert.ok(h.ui.resetButton('m'));assert.doesNotMatch(text,/重新绑定|配置未完成/);
 });
 
 test('同一成员已有更晚成功请求时，刷新不再弹旧失败提示',async()=>{
@@ -402,9 +402,9 @@ test('目录切换时晚到模型结果不覆盖当前选择，已下架模型�
   d.resolve(response([{runner_id:'r',choice_id:'late'}]));await old;assert.equal(h.ui.state.choices.length,0);
 });
 
-test('完成配置的详情不再重复成功状态或三步，绑定重置移出维护面板',async()=>{
+test('完成配置的详情不再重复成功状态或三步，重新绑定移出维护面板',async()=>{
   const h=harness();h.backend.rows=[{request_key:'x',member_id:'a',role_name:'助手',status:'provisioned',revision:8,credential_version:1,provision_job:{steps:{profile:{state:'succeeded'},key_file:{state:'skipped'},preflight:{state:'succeeded'}}}}];await h.ready();
-  const text=h.texts(h.ui.rolePanel({member_id:'a'}));assert.doesNotMatch(text,/绑定重置|必要时更新接入凭据/);assert.doesNotMatch(text,/配置已完成|配置进度|身份档案|配置检查|未启动|启动成功|关闭中/);
+  const text=h.texts(h.ui.rolePanel({member_id:'a'}));assert.doesNotMatch(text,/重新绑定|必要时更新接入凭据/);assert.doesNotMatch(text,/配置已完成|配置进度|身份档案|配置检查|未启动|启动成功|关闭中/);
   assert.ok(h.ui.resetButton('a'));
   assert.equal(h.requests.filter(r=>r.method==='POST').length,0);assert.equal(h.timers.size,0);
 });
@@ -413,7 +413,7 @@ test('旧角色按角色自身 recoverable/credential_version 提供重置入口
   const h=harness();await h.ready();
   const role={member_id:'agent:legacy',recoverable:true,credential_version:1};
   const button=h.ui.resetButton('agent:legacy',role);
-  assert.ok(button);assert.equal(button.textContent,'绑定重置');
+  assert.ok(button);assert.equal(button.textContent,'重新绑定');
   h.deps.confirm=()=>true;
   await button.fire('click');
   const posts=h.requests.filter(r=>r.method==='POST');
@@ -433,11 +433,11 @@ test('角色详情不提供自指入口，agent与缺代际旧记录没有可用
     await h.ready();
     const reset=h.ui.resetButton('agent:ready');
     if(!human){assert.equal(reset,null);continue;}
-    assert.equal(reset.textContent,'绑定重置');assert.equal(h.requests.some(r=>r.method==='POST'),false);
+    assert.equal(reset.textContent,'重新绑定');assert.equal(h.requests.some(r=>r.method==='POST'),false);
   }
 });
 
-test('绑定重置实际点击保留人工确认和recover载荷，不重选模型或直接轮换Key',async()=>{
+test('重新绑定实际点击保留人工确认和recover载荷，不重选模型或直接轮换Key',async()=>{
   const h=harness();h.backend.rows=[{request_key:'role-ready-00000000',member_id:'agent:ready',status:'provisioned',revision:4,credential_version:2}];await h.ready();
   let confirmation='';h.deps.confirm=text=>{confirmation=text;return true;};
   const panel=h.ui.resetButton('agent:ready');const button=panel;
@@ -448,14 +448,14 @@ test('绑定重置实际点击保留人工确认和recover载荷，不重选模�
   assert.equal(posts[0].path.endsWith('/role-requests'),true);assert.doesNotMatch(posts[0].path,/binding|rotate-key|service/);
 });
 
-test('绑定重置取消确认不发写请求，缺代际的已完成记录不提供操作',async()=>{
+test('重新绑定取消确认不发写请求，缺代际的已完成记录不提供操作',async()=>{
   const h=harness();h.backend.rows=[{request_key:'role-ready-00000000',member_id:'a',status:'provisioned',revision:4,credential_version:1}];await h.ready();
   h.deps.confirm=()=>false;await h.ui.resetButton('a').fire('click');
   assert.equal(h.requests.some(r=>r.method==='POST'),false);
   delete h.backend.rows[0].credential_version;await h.ui.refresh();assert.equal(h.ui.resetButton('a'),null);
 });
 
-test('请求处理中详情和创建结果的绑定重置按钮均禁用，不产生重复恢复',async()=>{
+test('请求处理中详情和创建结果的重新绑定按钮均禁用，不产生重复恢复',async()=>{
   const d=deferred();const h=harness({handler:c=>c.method==='POST'?d.promise:undefined});
   const row={request_key:'role-ready-00000000',member_id:'a',status:'provisioned',revision:4,credential_version:1};
   h.backend.rows=[row];await h.ready();h.ui.state.modalRow={...row};
@@ -463,7 +463,7 @@ test('请求处理中详情和创建结果的绑定重置按钮均禁用，不�
   const detail=h.ui.resetButton('a');const result=h.el('role-create-result');
   assert.ok(detail);assert.equal(detail.disabled,true);
   {
-    const reset=result.querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='绑定重置');
+    const reset=result.querySelectorAll().find(n=>n.tagName==='BUTTON'&&n.textContent==='重新绑定');
     assert.ok(reset);assert.equal(reset.disabled,true);
   }
   await h.ui.recover(row);assert.equal(h.requests.filter(r=>r.method==='POST').length,1);
