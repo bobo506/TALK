@@ -490,7 +490,7 @@ class RuntimeTests(unittest.TestCase):
                "host": socket.gethostname(), "status": "idle", "pid": 4321,
                "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}
         started = datetime.fromisoformat(row["process_started_at"]).timestamp()
-        cases = [("open_failed", {}, None, started), ("time_mismatch", {}, 77, started + 3),
+        cases = [("open_failed", {}, None, started), ("time_mismatch", {}, 77, started + 6),
                  ("status", {"status": "busy"}, 77, started), ("unknown_status", {"status": "starting"}, 77, started),
                  ("pid", {"pid": 4322}, 77, started), ("task", {"current_task_id": "task"}, 77, started),
                  ("id", {"id": "other"}, 77, started), ("idle", {}, 77, started)]
@@ -511,6 +511,31 @@ class RuntimeTests(unittest.TestCase):
                 if name == "idle":
                     terminate.assert_called_once_with(77)
                     event.assert_called_once_with("orphan_bridge_terminated", context={"member_id": "agent:one", "pid": 4321, "outcome": "terminated"})
+
+    def test_windows_orphan_creation_time_tolerance(self):
+        spec = self.spec()
+        Path(spec["health_file"]).write_text('{"pid":123}', encoding="utf-8")
+        row = {"id": "instance-one", "member_id": "agent:one", "project_id": self.runtime.project,
+               "host": socket.gethostname(), "status": "idle", "pid": 4321,
+               "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}
+        started = datetime.fromisoformat(row["process_started_at"]).timestamp()
+        for offset, should_terminate in [(1.5, True), (5, True), (5.01, False), (3600, False), (-5.01, False)]:
+            with self.subTest(offset=offset):
+                self.client.rows = [row]
+                with patch.object(runtime, "_ORPHAN_WINDOWS", True), \
+                     patch.object(runtime, "recorded_process_state", side_effect=lambda pid, seen: "exited" if pid == 123 else "pid_reused") as state, \
+                     patch.object(runtime, "_open_orphan_process", return_value=77) as opened, \
+                     patch.object(runtime, "_orphan_handle_creation_time", return_value=started + offset) as creation, \
+                     patch.object(runtime, "_terminate_orphan_handle") as terminate, \
+                     patch.object(runtime, "_close_orphan_handle") as close:
+                    self.assertEqual(self.runtime._terminate_orphan_bridge("agent:one", spec), should_terminate)
+                opened.assert_called_once_with(4321)
+                creation.assert_called_once_with(77)
+                close.assert_called_once_with(77)
+                self.assertEqual(terminate.call_count, int(should_terminate))
+                if should_terminate:
+                    terminate.assert_called_once_with(77)
+                self.assertEqual(state.call_count, 1 + int(should_terminate))
 
     def test_windows_handle_exception_does_not_interrupt_reconcile(self):
         first, second = self.spec(), self.spec("agent:two")

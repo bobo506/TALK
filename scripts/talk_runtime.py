@@ -714,7 +714,10 @@ class TalkRuntime:
                         or isinstance(candidate, bool) or not isinstance(candidate, int) or candidate <= 0):
                     continue
                 started = rsh._parse_iso(row.get("process_started_at"))
-                if started is None or recorded_process_state(candidate, row.get("process_started_at")) != "present":
+                if started is None:
+                    continue
+                # On platforms without a pinned handle, retain the existing process-state guard.
+                if not _ORPHAN_WINDOWS and recorded_process_state(candidate, row.get("process_started_at")) != "present":
                     continue
                 handle = None
                 try:
@@ -725,7 +728,9 @@ class TalkRuntime:
                         created = _orphan_handle_creation_time(handle)
                     else:
                         created = rsh.process_creation_time(candidate)
-                    if created is None or abs(created - started.timestamp()) > 2:
+                    # A recorded start may precede actual creation by up to 5s;
+                    # a larger difference is treated as PID reuse.
+                    if created is None or abs(created - started.timestamp()) > 5:
                         continue
                     matches = [item for item in instances() if isinstance(item, dict) and item.get("id") == instance_id]
                     if len(matches) != 1:
