@@ -170,3 +170,10 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
   2. 授权 TALK 研究桌面注入机制（读取桌面进程环境/加密凭据）——涉及秘密边界且跨版本脆弱，不推荐；
   3. 暂停 WorkBuddy 无头适配（保留现有“运行器版本警告 + effort_error”提示）。
 - 方案 B（stdio）即便可用也会遇到同一 token 问题，故仍不采用。
+
+### 10.2 决策（2026-11-10）：暂停 WorkBuddy 无头适配
+
+- 用户确认：**WorkBuddy 走订阅模式，本身不提供 API Key/接口 token**。因此“用户提供 `CODEBUDDY_AUTH_TOKEN`”方案不可行；读取桌面注入的凭据又超出秘密边界且跨版本脆弱。
+- **结论：暂停本项无头适配**。保留现有用户可见提示（运行器版本面板的桌面版本警告、绑定 `effort_error=workbuddy_acp_runtime_unavailable`），WorkBuddy 角色继续不可用；不修改 TALK 产品代码。
+- 重新启动条件：WorkBuddy 官方开放可用于本机的 ACP/API 凭据，或提供受支持的“外部会话/第三方客户端”接入方式；届时从本研究第十节继续（协议与探针脚本已就绪，`.tmp/wb-probe/`）。
+- 已清理探针 CLI 进程；WorkBuddy 桌面未改动。
