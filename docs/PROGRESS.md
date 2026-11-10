@@ -7,8 +7,9 @@
 - **环境（22:41 部署后）**：runtime A **23688**（加载 W3c-2a 自动清理）、API child **3816**（22:41 reload 部署 W3c-4，`operation_key` pattern 已在 openapi 可见）、`/healthz` ok、3 online；Terra/K2.8 running/ready；无 running 任务；隔离栈已停（证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`）。
 - **命名调整（21:20）**：异常恢复按钮「终止孤儿并恢复」改名**「重置」**并仅在状态异常时显示；原「绑定重置」改名**「重新绑定」**（用户手册/恢复指南同步，Node 95 项通过）。
 - **部署边界**：W3c-2a（自动清理）与 W3c-3（人工「重置」入口）均已生效；页面文案「重置」/「重新绑定」硬刷新可见。
+- **当前阻断**：Astra（唯一活跃 workspace-v1 角色）因 2026-11-09 21:57 重启 runtime 时漏设 `TALK_WORKSPACE_RUNTIME_ENABLED=1`，start 返回 409 `workspace_runtime_not_ready`；其余活跃角色均为 legacy、不受影响。W3c-6（604）修复后随下次 runtime 重启恢复。
 - **WorkBuddy W-B1 结论（已暂停）**：TALK 可独立拉起 CLI（`/api/v1/health` 200）；HTTP 侧 `GET /api/v1/acp`（`acp-connection-id`+`acp-session-token`）→ `initialize` → `session/new`（返回模型列表与权限配置）全部成功；账号登录（官方 `authUrl`）也能完成，但 `-p`/`session/prompt` 仍因**模型网关 token**（`CODEBUDDY_AUTH_TOKEN`，桌面注入）缺失而失败。用户确认 WorkBuddy 为**订阅模式、不提供 API Key**，故**暂停无头适配**，保留版本警告/`effort_error` 提示，不修改产品代码；协议与探针脚本留在 `.tmp/wb-probe/`，待官方开放接入方式再续。方案 B（`--acp` stdio）本机未产出 ACP 帧、暂不采用。详情 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 第十节。
-- **待办（按优先级）**：① **delete 90s 新鲜度窗口收窄**（W3c-5：进程已证退出时跳过 90s 等待，需你确认开工）；② `host_unreachable` 在 API reload 窗口专项复现；③ legacy `guard`/空 `native-home` 残留；④ 可选补测：`operation_key` >120 字符显式用例；⑤ WorkBuddy 无头适配（**已暂停**，待官方开放接入方式）。
+- **待办（按优先级）**：① **W3c-6（进行中，604）**：工作区运行门默认开启，修复重启后 `workspace_runtime_not_ready`（Astra 等 workspace-v1 角色）；② `host_unreachable` 在 API reload 窗口专项复现；③ legacy `guard`/空 `native-home` 残留；④ 可选补测：`operation_key` >120 字符显式用例；⑤ WorkBuddy 无头适配（**已暂停**，待官方开放接入方式）。~~delete 90s 窗口~~ 已放弃：与既有安全合同（新鲜心跳 + pid absent 仍拒绝）冲突，收益不足。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
 ## 收工快照（2026-11-09 17:30）
