@@ -177,3 +177,15 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
 - **结论：暂停本项无头适配**。保留现有用户可见提示（运行器版本面板的桌面版本警告、绑定 `effort_error=workbuddy_acp_runtime_unavailable`），WorkBuddy 角色继续不可用；不修改 TALK 产品代码。
 - 重新启动条件：WorkBuddy 官方开放可用于本机的 ACP/API 凭据，或提供受支持的“外部会话/第三方客户端”接入方式；届时从本研究第十节继续（协议与探针脚本已就绪，`.tmp/wb-probe/`）。
 - 已清理探针 CLI 进程；WorkBuddy 桌面未改动。
+
+### 10.3 更正（2026-11-10 下午，Astra 反证后）
+
+**10.1/10.2 的“5.9.3 改架构 / 缺 token 是唯一阻塞”结论撤回**，证据如下：
+1. `.tmp/wb-builtin-research/authenticated-probe.json`（11-05 15:47）：`workbuddyVersion=5.9.3`、`embeddedCliVersion=2.165.0`、transport 为 “desktop-owned embedded CLI ACP over loopback; normal connect/initialize handshake”，模型 `deepseek-v4.1-flash` 返回 `OK`。**成功时已是 5.9.3**。
+2. 三个 bundle 文件（CLI、sidecar-manager、server）与当时保存源码一致；“5.9.3 才切换架构”不成立。
+3. 我此前的 404 探针用的是 **`GET /api/v1/acp`** 与桌面 Electron 端口；正确握手是 **`POST /api/v1/acp/connect`**（`X-CodeBuddy-Request: 1`）→ `{connectionId, sessionToken}` → `POST /api/v1/acp`。`connect()` 仍保留，非 ACP 模式/错误进程也会 404。
+4. “模型认证只能靠 `CODEBUDDY_AUTH_TOKEN`”未获证明：独立 CLI 失败只说明**独立启动条件**不具备模型访问能力；桌面托管 CLI 才是 Nov 5 成功路径。
+
+**当前状态（复验中）**：本机 WorkBuddy 桌面**没有活跃 hosted CLI runtime**（`daemon.log`：`no active hosted CLI runtime (generation=0)`），因此暂时没有 ACP 端点可连。已准备 `.tmp/wb-probe/watch_hosted.py`：用户打开任意 WorkBuddy 对话触发桌面拉起 CLI 后，脚本扫描端口、`POST /api/v1/acp/connect`，用**第二次 `session/new` 的空白会话**做最小模型调用（绝不 prompt 第一次返回的桌面活动会话），并记录模型/stopReason/文本。
+
+**仍需验证**：空白会话是否真的无历史（Nov 5 探针 `prompt_tokens≈128k`，疑似接入了已有上下文）；context 隔离；桌面未开对话时 TALK 能否工作（大概率要求桌面有活跃会话）。
