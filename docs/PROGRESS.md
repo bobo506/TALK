@@ -11,7 +11,8 @@
 - **WorkBuddy 内置适配（已暂停，2026-11-10）**：宿主 CLI 实测可调用（`POST /api/v1/acp/connect`、空白会话、`deepseek-v4.1-flash` → `OK`，14.6s），但会**绑定/替换桌面当前对话**（`session/new` 第二次后日志 `Killing session …`；`_meta.continue=false` 仍返回当前会话；`DELETE` 显式关闭会话），无法做角色隔离；独立 CLI 又无模型访问能力。**结论：当前无可用隔离接入路径**。用户决定**暂停适配**，保留版本警告/`effort_error`，待厂商开放外部客户端/独立实例再续；本地助理 Open API 作为备选（需注册第三方应用 + OAuth，未评估）。证据与三条路线见 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.4。
 - **待办（按优先级）**：① `host_unreachable` 在 API reload 窗口专项复现；② legacy `guard`/空 `native-home` 残留；③ 可选补测：`operation_key` >120 字符显式用例；④ WorkBuddy 无头适配（**已暂停**，待官方开放接入方式）。~~delete 90s 窗口~~ 已放弃：与既有安全合同（新鲜心跳 + pid absent 仍拒绝）冲突，收益不足。
 - **L1 本地信任模式：已完成并人工验收通过**：页面免登录（刷新短暂加载属正常初始化）、右上角“本机操作员”、角色启停等人权恢复、成员列表隐藏 operator、agent Key 身份不变；API `pid 1404`、`/api/auth/mode=trusted`，代码 `7a0398c` + 页面修复 `35f896a`。Terra `ins_7ea85ea3f5f6`、Astra `ins_88b2a22ef6a8`、K2.8 `ins_5d49d5e623e3` 均 running/ready。
-- **进行中（L2）**：首次 MCP 自动创建工作区——`POST /api/local/workspaces/ensure` + MCP 启动器接入（只建项目 + runtime 绑定 + `.talk` 标记，不建角色/不启角色）；设计见 [LOCAL_TRUST_NO_ACCOUNT.md](spec/LOCAL_TRUST_NO_ACCOUNT.md) 第七节。
+- **L2 首次 MCP 自动创建工作区：已完成、620 复核 pass、E2E 通过（`a8bfa9e`）**：`POST /api/local/workspaces/ensure` 按目录幂等注册项目、启用 provision host、生成独立 runtime 配置（每项目 state_dir/key_root）、写 `.talk/project.yaml` + `runtime.local.json`、以 `--attach-api` 启动 runtime；**不建角色/不启角色**。真实 E2E：临时目录 ensure 200 → `.talk`/runtime 就绪、无角色 → stop + DELETE 204，项目/进程/目录清理无残留。终端启动器 `TALK_WORKSPACE_AUTO_ENSURE=1` 才自动 ensure（DSH/Kimi 启动器默认设置）；显式 project 缺 Key 仍按基线报错。
+- **已知边界（L3 候选）**：首次注册后终端没有角色 Key，后续任务工具仍不可用；"页面手动建角色 → 把角色 Key 交付给终端"的 onboarding 尚未实现。WorkBuddy 内置适配仍暂停。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
 ## 收工快照（2026-11-09 17:30）
