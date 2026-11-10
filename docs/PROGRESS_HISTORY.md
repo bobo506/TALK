@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-11 00:45 — L1/L2/L3 本地信任与工作区接入（607–623）
+
+- **L1 本地信任模式**：页面免登录、隐藏操作主体 `human:operator`（kind=human，不展示/不发 Key）、trusted 模式公网/未知来源对所有需鉴权接口 401（含有效 Key）、key 模式保持旧契约（缺头 422）；SSE/WS 无 token 支持；`/api/auth/mode`；成员列表隐藏 operator；`currentMemberIsHuman` 用 `/me.kind`，徽章显示“本机操作员”。608 开发 / 609 测试夹具 / 610 语法修复 / 611 验证 / 612 复核 changes_requested（key 模式缺头 422 回归）/ 613 返修 / 614 复验 approved；提交 `7a0398c`，页面修复 `35f896a`；API 重载后人工验收通过。
+- **L2 首次 MCP 自动创建工作区**：`POST /api/local/workspaces/ensure`（仅 operator/human）按目录幂等注册项目、启用 provision host、生成每项目独立 runtime 配置（state_dir/key_root）、写 `.talk/project.yaml` + `runtime.local.json`、`ensure_local_runtime` 以 `--attach-api` 启动；不建角色/不启角色。终端启动器 `TALK_WORKSPACE_AUTO_ENSURE=1` 才自动 ensure（DSH/Kimi 启动器默认设置）。617 开发 / 618 复核 changes_requested（缺 Key 报错被删、单测触网）/ 619 返修 / 620 复验 pass；提交 `a8bfa9e`；真实 E2E 临时目录 ensure → `.talk`/runtime → stop + DELETE 204。
+- **L3 终端 Agent 加入新项目**：`POST /api/local/workspaces/join` 当前 Agent 用现有 Key 幂等加入 `ProjectAgent` 名册；不建角色/Key。启动器 ensure 后自动 join，无 Key 跳过，human 403 `join_requires_agent` 忽略，其它错误抛出。621 开发 / 622 human 兼容返修 / 623 复验 pass（37 tests OK，new_failures=0）；提交 `62eb388`；真实 E2E ensure → join1/join2 → agent:deepseek 在册 → DELETE 204。
+- **WorkBuddy CDP 路线实测打通**（见 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.5）：用 `WORKBUDDY_REMOTE_DEBUGGING_PORT=9222` 启动桌面 → CDP 连页面 → 页面全局 `window.wb.conversations.create({cwd,title,transport:"local",mode:"craft",model:"deepseek-v4.1-flash"})` 成功；`conv.runPrompt([{type:"text",text:"只回复 OK"}],{emitUserMessage:true})` 返回 `content:[{type:"text",text:"OK"}]`、`responseModel=deepseek-v4.1-flash`；`wb.conversations.delete(id)` 清理，其他对话未受影响。**无需 ACP/CLI 端点**。前提：调试模式启动（TALK 非交互会话拉不起 GUI）、CDP 仅 loopback、`window.wb` 私有 API。下一步 W-B2：CDP 客户端接入角色执行通道。
+
 ## 2026-11-10 11:05 — W3c-6：工作区运行门默认开启（605/606）
 
 - **问题**：2026-11-09 21:57 重启 runtime A 时漏设 `TALK_WORKSPACE_RUNTIME_ENABLED=1`，`workspace-v1` 角色（当时仅 Astra 活跃）start 返回 409 `workspace_runtime_not_ready`；台账 15 个 workspace-v1 角色中其余 14 个为归档/测试角色。

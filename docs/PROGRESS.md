@@ -1,18 +1,20 @@
 # Project Progress
 
-## 收工快照（2026-11-10 11:05）
+## 收工快照（2026-11-11 00:45）
 
-- **本轮完成**：W3c-3 忙孤儿人工恢复入口（599/600）＋ W3c-4 三项可选返修（601/602 **approved**）＋ 重置失败原因只在详情显示（`62a271d`）＋ WorkBuddy ACP 5.9.3 只读研究与 W-B1 探针（结论见下条）＋ **W3c-6 工作区运行门默认开启**（605/606 approved、`6a5a180`，Astra 已恢复）；收窄后的真实 E2E 复跑通过（409 门 → 终止 → 中断记账 → 指针清空 → 重启 ready，证据 `E2E_SUMMARY.json` run3）。
+- **本轮完成**：W3c-3/4/6（隔离/恢复/工作区门，已验收）＋ **L1 本地信任模式**（免登录/隐藏 operator/公网拒绝，人工验收通过）＋ **L2 首次 MCP 自动创建工作区**（620 pass、E2E 通过）＋ **L3 终端 Agent 加入新项目**（623 pass、E2E 通过）＋ **WorkBuddy CDP 路线实测打通**（创建对话 + `runPrompt` 返回 OK，见 10.5）。
 - **决策**：598 提出的“终止后不可逆”冲突按方案 A 落地：终止前的拒绝零终止零写入；已发起未确认 → 409 真实报告、零 DB 写入，重试走 `already_exited`。
 - **环境（22:41 部署后）**：runtime A **23688**（加载 W3c-2a 自动清理）、API child **3816**（22:41 reload 部署 W3c-4，`operation_key` pattern 已在 openapi 可见）、`/healthz` ok、3 online；Terra/K2.8 running/ready；无 running 任务；隔离栈已停（证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`）。
 - **命名调整（21:20）**：异常恢复按钮「终止孤儿并恢复」改名**「重置」**并仅在状态异常时显示；原「绑定重置」改名**「重新绑定」**（用户手册/恢复指南同步，Node 95 项通过）。
 - **部署边界**：W3c-2a（自动清理）与 W3c-3（人工「重置」入口）均已生效；页面文案「重置」/「重新绑定」硬刷新可见。
 - **当前状态（已修复并验收）**：W3c-6 已部署——runtime A 重启用**未设置** `TALK_WORKSPACE_RUNTIME_ENABLED` 的方式启动（runtime **19860**、API child **16224**），Astra `ins_1832024782b1`、Terra `ins_4556b2d5aacc`、K2.8 `ins_5d49d5e623e3` 均 `running/ready`；`/healthz` ok、4 online。开闸语义现为**默认开启、仅显式 `0/false/no/off` 关闭**。**2026-11-10 11:09 用户确认 Astra 启动成功，人工验收通过。**
-- **WorkBuddy 内置适配（已暂停，2026-11-10）**：宿主 CLI 实测可调用（`POST /api/v1/acp/connect`、空白会话、`deepseek-v4.1-flash` → `OK`，14.6s），但会**绑定/替换桌面当前对话**（`session/new` 第二次后日志 `Killing session …`；`_meta.continue=false` 仍返回当前会话；`DELETE` 显式关闭会话），无法做角色隔离；独立 CLI 又无模型访问能力。**结论：当前无可用隔离接入路径**。用户决定**暂停适配**，保留版本警告/`effort_error`，待厂商开放外部客户端/独立实例再续；本地助理 Open API 作为备选（需注册第三方应用 + OAuth，未评估）。证据与三条路线见 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.4。
-- **待办（按优先级）**：① `host_unreachable` 在 API reload 窗口专项复现；② legacy `guard`/空 `native-home` 残留；③ 可选补测：`operation_key` >120 字符显式用例；④ WorkBuddy 无头适配（**已暂停**，待官方开放接入方式）。~~delete 90s 窗口~~ 已放弃：与既有安全合同（新鲜心跳 + pid absent 仍拒绝）冲突，收益不足。
+- **WorkBuddy 内置适配（CDP 路线已打通，2026-11-11 00:35）**：用 `WORKBUDDY_REMOTE_DEBUGGING_PORT=9222` 启动桌面 → CDP 连页面 → 调用页面全局 `window.wb.conversations.create({cwd,title,transport:"local",mode:"craft",model})` 成功创建专用对话；`conv.runPrompt([{type:"text",text:"只回复 OK"}],{emitUserMessage:true})` 返回 `content:[{type:"text",text:"OK"}]`、`responseModel=deepseek-v4.1-flash`；`wb.conversations.delete(id)` 清理成功，**其他对话未被替换**。无需 ACP/CLI 端点。前提：WorkBuddy 必须以调试模式启动（TALK 非交互会话拉不起 GUI）、CDP 仅 loopback、`window.wb` 为私有 API 无版本承诺。下一步 **W-B2**：把 CDP 客户端接入角色执行通道（创建/设模型强度/发任务/收结果/换新对话），并做真实任务 E2E。详情 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.5。
+- **待办（按优先级）**：① **W-B2 WorkBuddy CDP 适配**（研究已通，待开发/复核/E2E）；② `host_unreachable` 在 API reload 窗口专项复现；③ legacy `guard`/空 `native-home` 残留；④ 可选补测：`operation_key` >120 字符显式用例；⑤ "终端自己作为新角色执行"的 Key 交付 onboarding（未做）。~~delete 90s 窗口~~ 已放弃（与既有安全合同冲突）。
 - **L1 本地信任模式：已完成并人工验收通过**：页面免登录（刷新短暂加载属正常初始化）、右上角“本机操作员”、角色启停等人权恢复、成员列表隐藏 operator、agent Key 身份不变；API `pid 1404`、`/api/auth/mode=trusted`，代码 `7a0398c` + 页面修复 `35f896a`。Terra `ins_7ea85ea3f5f6`、Astra `ins_88b2a22ef6a8`、K2.8 `ins_5d49d5e623e3` 均 running/ready。
 - **L2 首次 MCP 自动创建工作区：已完成、620 复核 pass、E2E 通过（`a8bfa9e`）**：`POST /api/local/workspaces/ensure` 按目录幂等注册项目、启用 provision host、生成独立 runtime 配置（每项目 state_dir/key_root）、写 `.talk/project.yaml` + `runtime.local.json`、以 `--attach-api` 启动 runtime；**不建角色/不启角色**。真实 E2E：临时目录 ensure 200 → `.talk`/runtime 就绪、无角色 → stop + DELETE 204，项目/进程/目录清理无残留。终端启动器 `TALK_WORKSPACE_AUTO_ENSURE=1` 才自动 ensure（DSH/Kimi 启动器默认设置）；显式 project 缺 Key 仍按基线报错。
-- **已知边界（L3 候选）**：首次注册后终端没有角色 Key，后续任务工具仍不可用；"页面手动建角色 → 把角色 Key 交付给终端"的 onboarding 尚未实现。WorkBuddy 内置适配仍暂停。
+- **L3 终端 Agent 加入新项目：已完成、623 复核 pass、E2E 通过（`62eb388`）**：`POST /api/local/workspaces/join` 让当前 Agent 用现有 Key 幂等加入 `ProjectAgent` 名册（不建角色/Key）；启动器 ensure 后自动 join，无 Key 跳过，human 的 403 `join_requires_agent` 视为无需加入。真实 E2E：临时项目 ensure 200 → join 新建/重复 already → `agent:deepseek` 在册 → stop + DELETE 204；无 ProjectRole。
+- **环境**：runtime A **19860**、API child **1140**（L3 reload，含 `/api/local/workspaces/ensure|join`）；`/api/auth/mode=trusted`；Astra/Terra/K2.8 角色服务 running/ready（以页面/role-services 为准）。
+- **已知边界**：终端现在以**全局 Agent**身份建/看任务，角色仍手动创建、由角色宿主执行；"终端自己作为新角色执行"需要角色 Key 交付，未做。WorkBuddy 适配转入 **W-B2（CDP）**。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
 ## 收工快照（2026-11-09 17:30）

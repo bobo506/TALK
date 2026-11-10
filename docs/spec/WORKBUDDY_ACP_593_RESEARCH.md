@@ -213,3 +213,36 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
 **建议**：暂停“TALK 角色直接跑 WorkBuddy 内置模型”的实现；如要继续，唯一值得评估的是**本地助理 Open API**（需你注册开发者应用并授权）。
 
 **用户决定（2026-11-10 14:55）**：**暂停 WorkBuddy 适配**，保留现有版本警告/`effort_error` 提示；待厂商开放“外部客户端/独立实例”接入方式后再继续。协议事实、探测脚本（`.tmp/wb-probe/`）与本记录保留，届时可直接续做。
+
+### 10.5 CDP 路线实测打通（2026-11-11 00:35，推翻“无隔离接入路径”）
+
+**做法**：用 `WORKBUDDY_REMOTE_DEBUGGING_PORT=9222` 启动 WorkBuddy（启动前设置；`main/index.js` 在 app ready 前 `appendSwitch("remote-debugging-port", n)` + `remote-allow-origins` 仅 localhost）。CDP `/json` 得到页面 target（`file:///.../renderer/index.html`），WebSocket 连入后 `Runtime.evaluate`。
+
+**实测结果**：
+1. 页面全局存在 **`window.wb`**（不只是 `__wbInvoke`）；`wb.conversations.create/runPrompt/delete/list` 均可调用。
+2. 创建：
+```js
+const conv = await wb.conversations.create({
+  cwd: "D:\\work\\demo", title: "TALK 角色-xxx",
+  transport: "local", mode: "craft", model: "deepseek-v4.1-flash"
+});
+// conv.info.id = 新会话 UUID；返回对象含 sendPrompt/runPrompt/configManager/ensureRuntime/on...
+```
+3. 发送与结果（**无需 ACP/CLI 端点**）：
+```js
+const r = await conv.runPrompt([{type:"text", text:"只回复 OK 两个字母"}], {emitUserMessage:true});
+// r.content = [{type:"text", text:"OK"}], r.responseModel=deepseek-v4.1-flash, conv.info.state=idle
+```
+4. 清理：`await wb.conversations.delete(id)` 成功；`wb.conversations.list({transport:"local"})` 不再包含测试对话，**其他对话全部保留、未被替换**。
+5. 测试对话在桌面 UI 可见（标题自动改为首条消息），符合“TALK 对话可见、不影响其他对话”的要求。
+
+**能力面**：`conv.configManager` 有 `setModel/setMode/setPermissionMode/setThoughtLevel/setContextWindow/setSandboxMode`；`conv` 还有 `requests/artifacts/files/cancel/on` 等，可做模型/强度/权限设置、流式事件、上下文重置（新建 + 删除旧对话）。
+
+**前提与风险**：
+- **必须用调试模式启动 WorkBuddy**：TALK 运行在非交互会话时无法拉起 GUI（实测 0 进程），需用户双击 `start-workbuddy-debug.bat` 或带环境变量启动；测完应退出并用普通方式重启，关闭 9222。
+- CDP 是**全控制调试口**，只能绑 loopback（`remote-allow-origins` 已限 localhost）；TALK 不得对外暴露该端口。
+- `window.wb` 是**私有内部 API**，无版本承诺；WorkBuddy 升级可能改签名/字段。
+- 权限/工具调用可能触发 permission 请求；需设置 `permissionMode`（如 bypassPermissions）并处理 `on` 事件，属 W-B2 实现细节。
+- 不读取/复制账号凭据；只使用页面已有登录态。
+
+**结论**：**“TALK 自动创建并驱动 WorkBuddy 专用对话”已实测可行**，且不依赖 ACP/CLI 端点或 Open API。下一步是 W-B2：把 CDP 客户端接入角色宿主/执行通道（创建/复用/设置模型强度/发任务/收结果/换新对话），并做真实任务 E2E；需用户每次以调试模式启动 WorkBuddy（或后续做受管启动器）。
