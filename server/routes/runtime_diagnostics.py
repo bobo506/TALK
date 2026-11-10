@@ -16,7 +16,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlmodel import Session
 
 from bridges.runtime_diagnostics import LOG_ID_RE
-from server.auth import get_current_member
+import server.db as db
+from server.auth import get_current_member, is_trusted_host
 from server.db import get_session
 from server.models import Member, Project, ProjectAgent, ProjectRole
 from server.runtime_diagnostics_export import (
@@ -82,18 +83,10 @@ def require_log_reader(
     x_api_key: str | None = Header(default=None),
     session: Session = Depends(get_session),
 ) -> Member:
-    """Authenticate with the existing auth helper, but turn a missing key into 401.
-
-    ``get_current_member`` uses ``Header(...)``, which FastAPI would otherwise
-    report as a generic 422.  The log contract requires 401 for no key, so this
-    thin wrapper only supplies the missing-key mapping and then delegates to
-    the existing authentication/disabled-account checks.
-    """
-    if x_api_key is None or not x_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
+    """Preserve the log endpoint's missing-key contract and authenticate."""
+    host = request.client.host if request.client else None
+    if x_api_key is None and not (db.AUTH_MODE == "trusted" and is_trusted_host(host)):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
     return get_current_member(
         request=request, x_api_key=x_api_key, session=session
     )

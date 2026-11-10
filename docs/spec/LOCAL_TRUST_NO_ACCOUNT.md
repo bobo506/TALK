@@ -1,6 +1,6 @@
-# 本地信任模式：免登录、无人类账号（规划稿）
+# 本地信任模式：免登录、无人类账号
 
-状态：**规划稿，未开工**。2026-11-10 与用户确认方向后的设计记录，不构成开工授权；每个切片仍需确认范围/不变项/验收。
+状态：L1 候选已实现，等待独立复核；L2 工作区自动创建仍是规划，未实现。各切片须单独授权。
 
 ## 一、目标与边界
 
@@ -29,7 +29,7 @@
 - 审计归属；
 - 让既有 `_require_human` 检查零改动通过。
 
-它**不是账号**：页面不展示、不可登录、不出现在成员/角色选择列表、不参与 @ 提及；现有 `human:bobo` 等历史人类行保留为历史归属，不再用于登录。
+它**不是账号**：页面不展示、不可登录、不出现在成员/角色选择列表、不参与 @ 提及；现有 `human:bobo` 等历史人类行保留，密钥模式下原有登录能力保持。
 
 ## 三、鉴权矩阵
 
@@ -44,9 +44,12 @@ trusted_networks = ["loopback", "private"]   # 默认；public 始终拒绝
 |---|---|---|---|
 | loopback | operator | 该 agent | 401 |
 | 私网（10/8、172.16/12、192.168/16、fc00::/7） | operator | 该 agent | 401 |
-| 公网 IP | 401/403 | 401/403 | 401/403 |
+| 公网 IP | 401 / WS 4001 | 401 / WS 4001 | 401 / WS 4001 |
 
-- **必须**：只有来源 IP 属于 `trusted_networks` 才映射 operator；不信任 `X-Forwarded-For`（除非显式配置可信代理）。
+- trusted 模式先检查直连来源，公网或未知来源对全部需鉴权的 REST/SSE/WS 一律拒绝，即使携带有效 Key；不信任 `X-Forwarded-For`。`GET /api/auth/mode` 和 `GET /api/setup/status` 公开返回非敏感元数据。
+- `private` 使用 Python `ipaddress.is_private` 语义，也包含链路本地地址（IPv4 `169.254/16`、IPv6 `fe80::/10`）。不希望信任链路本地时，使用 `auth_mode = "key"`，或在网络层限制为明确允许的网段；当前 `trusted_networks` 不支持显式 CIDR。
+- 同源反向代理会使后端看到代理的受信地址，从而绕过来源闸门；公网暴露必须使用 key 模式或网络层限制。
+- 升级后采用默认 `auth_mode = "trusted"` 是鉴权行为变更；需要保留密钥登录的部署须明确设置 `auth_mode = "key"`。
 - `auth_mode="key"` 时完全退回现行为（保留登录），供未来公网/共享部署使用。
 - 无 Key 但带 `Authorization: Bearer` 等其它凭据不改变判断（仍按来源）。
 - 审计：operator 的写操作记录 remote IP、路径与操作类型；不记录请求体中的秘密（现有规则）。
@@ -56,7 +59,7 @@ trusted_networks = ["loopback", "private"]   # 默认；public 始终拒绝
 - 页面启动先调 `GET /api/auth/mode`：`trusted` → 直接进入主界面（隐藏登录层、移除 Key 输入/登出）；`key` → 保留现有登录。
 - `apiFetch` 在 trusted 模式不发送 `X-API-Key`；收到 401 时显示“本地信任未启用/网络不在受信范围”，不弹登录。
 - SSE（`/api/events?token=`）与 WebSocket（`?token=`）在 trusted 模式下允许**无 token** 连接并映射 operator；agent 仍用 token。
-- 页面顶部显示模式徽标：`本地信任`；从非 loopback 访问时显示“局域网可信模式”提示（提醒同网设备可控制）。
+- 非 loopback 访问时，页面顶部显示“局域网可信模式：同网设备可控制”提示。
 - 上传/下载/文件预览与 REST 使用同一主体判定。
 
 ## 五、权限语义改名
@@ -107,7 +110,7 @@ trusted_networks = ["loopback", "private"]   # 默认；public 始终拒绝
 ## 九、测试与验收
 
 - 鉴权矩阵单测：loopback/私网/公网 × 无 Key/合法 agent Key/非法 Key，断言主体与状态码。
-- 人类专属接口：trusted 无 Key 可调用；agent Key 仍 403；`auth_mode=key` 时无 Key 仍 401。
+- 人类专属接口：trusted 无 Key 可调用；agent Key 仍 403；`auth_mode=key` 时缺少 Key 头通常为 422，日志端点保持 401。
 - 页面：无登录直接进入；登出/Key 输入隐藏；401 提示；SSE/WS 无 token 可连。
 - Agent 隔离回归：`GET /api/tasks` 仍只返回自己的；跨项目/跨角色不可见。
 - Workspace ensure：幂等、路径规范化、写文件位置、runtime 配置、不建角色、不启角色；并发重复。

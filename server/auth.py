@@ -1,12 +1,58 @@
-"""API Key authentication dependency."""
+"""API key and local-trust authentication dependency."""
 
 from __future__ import annotations
 
+import ipaddress
+import secrets
+
+from sqlalchemy.exc import IntegrityError
+import server.db as db
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlmodel import Session, select
 
 from server.db import get_session
 from server.models import Member, ProjectAgent, ProjectRole
+
+
+OPERATOR_ID = "human:operator"
+
+
+def is_trusted_host(host: str | None) -> bool:
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return (("loopback" in db.TRUSTED_NETWORKS and address.is_loopback)
+            or ("private" in db.TRUSTED_NETWORKS and address.is_private))
+
+
+def ensure_local_operator(session: Session) -> Member:
+    member = session.get(Member, OPERATOR_ID)
+    if member is not None:
+        return member
+    member = Member(id=OPERATOR_ID, display_name="本机操作员", kind="human",
+                    api_key=secrets.token_urlsafe(48))
+    session.add(member)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        member = session.get(Member, OPERATOR_ID)
+        if member is None:
+            raise
+        return member
+    session.refresh(member)
+    return member
+
+
+def resolve_transport_member(token: str | None, host: str | None, session: Session) -> Member | None:
+    if db.AUTH_MODE == "trusted" and not is_trusted_host(host):
+        return None
+    if token:
+        return resolve_member_by_key(token, session)
+    if token is None and db.AUTH_MODE == "trusted":
+        return ensure_local_operator(session)
+    return None
 
 
 def resolve_member_by_key(api_key: str, session: Session) -> Member | None:
@@ -18,11 +64,13 @@ def resolve_member_by_key(api_key: str, session: Session) -> Member | None:
 
 def get_current_member(
     request: Request,
-    x_api_key: str = Header(...),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
     session: Session = Depends(get_session),
 ) -> Member:
-    """Resolve X-API-Key header to a Member, or 401."""
-    member = resolve_member_by_key(x_api_key, session)
+    """Authenticate the source and key, preserving the missing-header contract."""
+    if db.AUTH_MODE == "key" and x_api_key is None:
+        raise HTTPException(status_code=422, detail="X-API-Key header required")
+    member = resolve_transport_member(x_api_key, request.client.host if request.client else None, session)
     if member is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

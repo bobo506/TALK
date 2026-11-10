@@ -1,4 +1,6 @@
 [server]
+auth_mode = "trusted"
+trusted_networks = ["loopback", "private"]
 host = "127.0.0.1"
 port = 8000
 public_url = "http://127.0.0.1:8000"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tomllib
+import logging
 from pathlib import Path
 from typing import Generator
 
@@ -19,6 +20,18 @@ def _load_config() -> dict:
 
 
 CONFIG = _load_config()
+
+_auth_mode = CONFIG["server"].get("auth_mode", "key")
+_invalid_auth_mode = _auth_mode not in ("key", "trusted")
+if _invalid_auth_mode:
+    logging.getLogger("talk").error("Invalid auth_mode; rejecting all trusted sources")
+    _auth_mode = "trusted"
+AUTH_MODE: str = _auth_mode
+_networks = [] if _invalid_auth_mode else CONFIG["server"].get("trusted_networks", [])
+if not isinstance(_networks, list) or any(item not in ("loopback", "private") for item in _networks):
+    logging.getLogger("talk").error("Invalid trusted_networks; rejecting all trusted sources")
+    _networks = []
+TRUSTED_NETWORKS: tuple[str, ...] = tuple(_networks)
 
 HOST: str = CONFIG["server"]["host"]
 PORT: int = CONFIG["server"]["port"]

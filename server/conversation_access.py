@@ -102,7 +102,7 @@ def is_conversation_observer(member: Member | None) -> bool:
         return False
     if member.disabled_at is not None:
         return False
-    return member.id in observer_member_ids()
+    return member.id == "human:operator" or member.id in observer_member_ids()
 
 
 def is_group_member(group_id: str, member_id: str, session: Session) -> bool:

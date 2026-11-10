@@ -10,7 +10,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -20,7 +20,8 @@ from sqlmodel import select
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.concurrency import run_in_threadpool
 
-from server.auth import resolve_member_by_key
+from server.auth import OPERATOR_ID, ensure_local_operator, resolve_transport_member
+import server.db as db
 from server.conversation_access import is_conversation_observer
 from server.db import (
     FILE_RETENTION_DAYS,
@@ -275,6 +276,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 async def _server_lifespan(app: FastAPI):
     logger.info("Initializing database")
     init_db()
+    if db.AUTH_MODE == "trusted":
+        with Session(engine) as session:
+            ensure_local_operator(session)
+    logger.info("Authentication mode: %s", db.AUTH_MODE)
     from server.local_runtime import ensure_local_runtime
     try:
         runtime_state = ensure_local_runtime(engine)
@@ -424,9 +429,15 @@ def get_public_config():
     }
 
 
-def _resolve_sse_member(token: str):
+@app.get("/api/auth/mode")
+def auth_mode(session: Session = Depends(db.get_session)):
+    return {"mode": db.AUTH_MODE, "operator_member_id": OPERATOR_ID,
+            "requires_setup": members.needs_human_setup(session)}
+
+
+def _resolve_sse_member(token: str | None, host: str | None):
     with Session(engine) as session:
-        return resolve_member_by_key(token, session)
+        return resolve_transport_member(token, host, session)
 
 
 def _sse_backfill_page(member_id: str, since_id: int, include_all_groups: bool):
@@ -440,12 +451,12 @@ def _sse_backfill_page(member_id: str, since_id: int, include_all_groups: bool):
 @app.get("/api/events")
 async def sse_events(
     request: Request,
-    token: str = Query(...),
+    token: str | None = Query(None),
     last_event_id: int | None = Query(None, ge=0),
     last_event_id_header: str | None = Header(None, alias="Last-Event-ID"),
 ):
-    """Server-Sent Events stream authenticated via ?token=<api_key>."""
-    member = await run_in_threadpool(_resolve_sse_member, token)
+    """Server-Sent Events stream authenticated by source and optional token."""
+    member = await run_in_threadpool(_resolve_sse_member, token, request.client.host if request.client else None)
 
     if member is None:
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -503,11 +514,11 @@ async def sse_events(
 @app.websocket("/ws")
 async def websocket_endpoint(
     ws: WebSocket,
-    token: str = Query(...),
+    token: str | None = Query(None),
 ):
-    """WebSocket connection authenticated via ?token=<api_key>."""
+    """WebSocket connection authenticated by source and optional token."""
     with Session(engine) as session:
-        member = resolve_member_by_key(token, session)
+        member = resolve_transport_member(token, ws.client.host if ws.client else None, session)
 
     if member is None:
         await ws.close(code=WS_CLOSE_INVALID_API_KEY, reason="Invalid API key")

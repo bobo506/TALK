@@ -22,6 +22,7 @@ let appConfig = {
 };
 
 let apiKey = "";
+let trustedMode = false;
 let myId = "";
 let members = [];
 let lastId = 0;
@@ -445,10 +446,10 @@ function persistApiKey(key, { persistent = true } = {}) {
   localStorage.removeItem(LOCAL_API_KEY_STORAGE);
 }
 
-async function doLoginV2(providedKey = null, { persistent = true } = {}) {
+async function doLoginV2(providedKey = null, { persistent = true, trusted = false } = {}) {
   clearLoginError();
   const nextKey = (providedKey ?? loginKey.value).trim();
-  if (!nextKey) return false;
+  if (!nextKey && !trusted) return false;
   const request = ++loginRequest;
   loggingOut = false;
   apiKey = nextKey;
@@ -494,8 +495,8 @@ async function doLoginV2(providedKey = null, { persistent = true } = {}) {
     if (!current()) return false;
 
     loginOverlay.classList.add("hidden");
-    userBadge.textContent = myId;
-    persistApiKey(apiKey, { persistent });
+    userBadge.textContent = trusted ? "本机操作员" : myId;
+    if (!trusted) persistApiKey(apiKey, { persistent });
     hasPresenceSnapshot = false;
     onlineMemberIds = new Set();
     renderPresenceStrip();
@@ -548,9 +549,37 @@ async function createInitialAdmin() {
   }
 }
 
+function showTrustedError() {
+  loginOverlay.classList.remove("hidden");
+  setAuthMode("loading");
+  authLoading.textContent = "来源不在受信网络/本地信任未启用";
+}
+
+async function enterTrustedMode() {
+  trustedMode = true;
+  apiKey = "";
+  logoutBtn.classList.add("hidden");
+  setAuthMode("loading");
+  if (!await doLoginV2("", { trusted: true })) {
+    showTrustedError();
+    return;
+  }
+  const host = location.hostname.toLowerCase();
+  if (host !== "localhost" && host !== "[::1]" && !host.startsWith("127.")) {
+    userBadge.textContent = "局域网可信模式：同网设备可控制";
+  }
+}
+
 async function bootstrapAuthFlow() {
   setAuthMode("loading");
   try {
+    const modeRes = await fetch(API + "/api/auth/mode");
+    if (!modeRes.ok) throw new Error(`auth mode ${modeRes.status}`);
+    const mode = await modeRes.json();
+    if (mode.mode === "trusted") {
+      await enterTrustedMode();
+      return;
+    }
     const res = await fetch(API + "/api/setup/status");
     if (!res.ok) {
       throw new Error(`setup status ${res.status}`);
@@ -2614,7 +2643,7 @@ async function pollMessages() {
 }
 
 function connectWS() {
-  if (!apiKey) return;
+  if (!apiKey && !trustedMode) return;
   if (!("WebSocket" in window)) {
     connectEventStream({ fallback: false });
     return;
@@ -2625,7 +2654,8 @@ function connectWS() {
 
   setConnectionStatus(reconnectAttempts > 0 ? "reconnecting" : "connecting");
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new WebSocket(`${proto}//${location.host}/ws?token=${encodeURIComponent(apiKey)}`);
+  const tokenQuery = apiKey ? `?token=${encodeURIComponent(apiKey)}` : "";
+  ws = new WebSocket(`${proto}//${location.host}/ws${tokenQuery}`);
 
   ws.onopen = () => {
     const recovered = reconnectAttempts > 0;
@@ -2681,7 +2711,7 @@ function scheduleReconnect() {
 }
 
 function connectEventStream({ fallback = true } = {}) {
-  if (!apiKey || loggingOut) return;
+  if ((!apiKey && !trustedMode) || loggingOut) return;
   if (!("EventSource" in window)) {
     setConnectionStatus("polling");
     return;
@@ -2690,7 +2720,8 @@ function connectEventStream({ fallback = true } = {}) {
     return;
   }
 
-  const source = new EventSource(`${API}/api/events?token=${encodeURIComponent(apiKey)}`);
+  const tokenQuery = apiKey ? `?token=${encodeURIComponent(apiKey)}` : "";
+  const source = new EventSource(`${API}/api/events${tokenQuery}`);
   eventSource = source;
 
   source.onopen = () => {
@@ -4106,6 +4137,9 @@ function completeMention(memberId) {
 // ── API helper ───────────────────────────────────────────────────────
 function apiFetch(path, opts = {}) {
   opts.headers = opts.headers || {};
-  opts.headers["X-API-Key"] = apiKey;
-  return fetch(API + path, opts);
+  if (apiKey) opts.headers["X-API-Key"] = apiKey;
+  return fetch(API + path, opts).then((response) => {
+    if (trustedMode && response.status === 401) showTrustedError();
+    return response;
+  });
 }

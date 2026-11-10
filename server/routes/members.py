@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import func
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlmodel import Session, select
 
-from server.auth import get_current_member
+import server.db as db
+from server.auth import get_current_member, is_trusted_host
 from server.conversation_access import is_conversation_observer
 from server.db import get_session
 from server.models import Member, MemberCreate, MemberDisableUpdate, MemberOut
@@ -40,7 +41,13 @@ def needs_human_setup(session: Session) -> bool:
     return count_human_members(session) == 0
 
 
-@router.post("", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
+def require_registration_source(request: Request) -> None:
+    if db.AUTH_MODE == "trusted" and not is_trusted_host(request.client.host if request.client else None):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Untrusted source")
+
+
+@router.post("", response_model=MemberOut, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_registration_source)])
 def create_member(
     body: MemberCreate,
     response: Response,
@@ -98,7 +105,7 @@ def list_members(
     session: Session = Depends(get_session),
 ):
     """List all registered members (for UI @ autocomplete)."""
-    return session.exec(select(Member)).all()
+    return session.exec(select(Member).where(Member.id != "human:operator")).all()
 
 
 @router.get("/me", response_model=MemberOut)
