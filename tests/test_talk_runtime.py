@@ -101,7 +101,8 @@ class RuntimeTests(unittest.TestCase):
         private.mkdir()
         workspace = {"member_id": "agent:one", "argv": ["fixture-workspace"],
                      "health_file": str(private / "health.json"), "drain_file": str(private / "drain")}
-        with patch.dict(os.environ, {"TALK_WORKSPACE_RUNTIME_ENABLED": "1"}), \
+        with patch.dict(os.environ, {k: v for k, v in os.environ.items()
+                                     if k != "TALK_WORKSPACE_RUNTIME_ENABLED"}, clear=True), \
              patch.object(self.runtime, "workbuddy_spec", return_value=None), \
              patch.object(self.runtime, "kimi_spec", return_value=None), \
              patch.object(self.runtime, "codex_spec", return_value=workspace), \
@@ -220,7 +221,8 @@ class RuntimeTests(unittest.TestCase):
         workspace = self.role("agent:workspace", generation=1, ownership_held=False)
         workspace["storage_layout"] = "workspace-v1"
         self.config["hosts"] = [self.spec("agent:workspace"), self.spec()]
-        self.runtime.reconcile_hosts([workspace, self.role(generation=1, ownership_held=False)])
+        with patch.dict(os.environ, {"TALK_WORKSPACE_RUNTIME_ENABLED": "0"}):
+            self.runtime.reconcile_hosts([workspace, self.role(generation=1, ownership_held=False)])
         self.assertEqual([item[0] for item in self.spawned], ["host-agent_one"])
         self.assertEqual(self.runtime.statuses["agent:workspace"], {
             "state": "workspace_runtime_not_ready",

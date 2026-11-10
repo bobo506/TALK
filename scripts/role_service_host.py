@@ -123,6 +123,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from server import workspace_paths as wp  # noqa: E402
+from server.role_host_resolution import workspace_runtime_enabled  # noqa: E402
 from scripts import role_service_host_diagnostics as host_diag  # noqa: E402 - 复用 271 基础诊断 API
 from scripts import role_service_host_loop_evidence as loop_evidence  # noqa: E402 - 282 本地循环证据
 from bridges.runtime_diagnostics_timeline import StageTimeline  # noqa: E402 - 276 阶段配对
@@ -3323,7 +3324,7 @@ class HostManager:
                 if (self.workspace_context is not None
                         and self.workspace_context.get("project_id") == project_id
                         and self.workspace_context.get("member_id") == member_id
-                        and os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") == "1"):
+                        and workspace_runtime_enabled()):
                     self._workspace_recheck()
                     continue
                 raise workspace_runtime_not_ready_error()

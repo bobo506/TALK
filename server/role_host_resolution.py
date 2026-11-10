@@ -15,9 +15,17 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 import json
+import os
 from typing import Any, Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def workspace_runtime_enabled() -> bool:
+    """Default on; only explicit false values disable workspace runtime."""
+    return os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED", "").strip().lower() not in {
+        "0", "false", "no", "off"
+    }
 
 # runtime -> (config section, manager directory, host module)
 _DYNAMIC = {

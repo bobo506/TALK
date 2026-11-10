@@ -28,6 +28,7 @@ from scripts.role_service_recovery import recorded_process_state
 from bridges.backend_error_codes import HOST_ERROR_CODES, RUNTIME_ERROR_CODES
 from bridges.stop_blockers import BUSY_STOP_CODE, safe_stop_blockers
 from server import workspace_paths as wp
+from server.role_host_resolution import workspace_runtime_enabled
 from urllib.parse import quote
 
 
@@ -776,7 +777,7 @@ class TalkRuntime:
         by_id = {r["member_id"]:r for r in roles}
         specs = {s["member_id"]:dict(s) for s in self.config.get("hosts", [])}
         workspace_roles = {r["member_id"] for r in roles if rsh.is_workspace_v1(r)}
-        workspace_enabled = os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") == "1"
+        workspace_enabled = workspace_runtime_enabled()
         for member in workspace_roles:
             # A fixed legacy recipe must never receive a workspace role.
             specs.pop(member, None)

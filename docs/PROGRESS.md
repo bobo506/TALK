@@ -132,7 +132,7 @@ W3c 未完成两项，按以下顺序各开一片（均需独立复核）：
 ## 部署与修复快照（2026-11-08 09:55）
 
 - **状态**：W3a+W3b 已部署并验证。运行时 pid **19252**（`.venv` 解释器直接启动，等价 `run.ps1`）、API child 23104，`/healthz` 200、`startup_state=complete`、`capability.json` 已发布（`talk-runtime-capability-1` / `talk-runtime-1` / `talk-manager-1` / legacy+workspace-v1），9 宿主 serving。
-- **启动门**：仍默认关闭（`TALK_WORKSPACE_RUNTIME_ENABLED` 未设）。真实 409 验证：临时 workspace-v1 角色 `agent:prj_e8fe7066bbec.role-d0bf55b3` 开通成功后 `start` 返回 **409 `workspace_runtime_not_ready`**、零 launch/零状态写入；角色已删除。
+- **启动门**：仍默认关闭（`TALK_WORKSPACE_RUNTIME_ENABLED` 未设）。真实 409 验证：临时 workspace-v1 角色 `agent:prj_e8fe7066bbec.role-d0bf55b3` 开通成功后 `start` 返回 **409 `workspace_runtime_not_ready`**、零 launch/零状态写入；角色已删除。（**2026-11-10 W3c-6 起已改为默认开启、仅显式 `TALK_WORKSPACE_RUNTIME_ENABLED=0/false/no/off` 关闭**；本条为历史记录。）
 - **部署前置修正（重要）**：`workspaces` 必须为**私有 DACL 且禁用继承**（仅当前用户+SYSTEM+Administrators），否则 provision 报 `profile_root_invalid`；仅删 `CodexSandboxOffline` 不够。残留 `workspaces/p-obzgux3bnrygqyi`（prj_alpha）、547 遗留测试进程 50515/51882、2.4GB 旧日志均已清理；备份 `backups/w3b-deploy-20261108/talk.db`（integrity ok）。
 - **修复（549 开发 → 550 k2.8 复核 approved）**：`run.ps1`/venv 启动运行时导致 codex 角色 `start` 失败 `cli_incompatible`（`sys.executable` 与 `sys._base_executable` 路径不同，`verify_runtime_entry` 只认后者）。已改为接受两种规范化路径、其余校验不变；提交 `3d41b23`。**venv 下实测**：Terra（codex）`ins_0817aea719ae`、k2.8 `ins_efdc991ce69a` 均 running/ready。
 - **已知限制**：① `test_codex_new_role_host` 的 PID 断言在 venv 下失败（启动器 pid 与解释器 pid 不同；基线同因，测试未适配）；② `run.ps1` 无 UTF-8 BOM，Windows PowerShell 5.1 解析失败（需 pwsh 7 或补 BOM）；③ workspace-v1 角色删除后 `workspaces/<p>/roles/<m>/profiles/*` 残留（本次手工清理，W3c 需修）。

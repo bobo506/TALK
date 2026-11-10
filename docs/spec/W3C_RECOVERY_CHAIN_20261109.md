@@ -47,3 +47,5 @@
 - **任务语义**：该遗留实例在**本项目内**仍有 queued/running 任务时，未确认 → 409 `orphan_tasks_active`（尚未终止）；确认后任务置 `failed`、`last_error=orphan_terminated_by_human`、释放 claim/lease、不重派、不通知、跨项目不动。未被它领取的排队任务会保留给新实例。
 - **真实 E2E**（隔离栈：独立 API 8011 + 库副本 + 同根临时 runtime B，生产未动）：复现 start 409 `already_running` / stop launch 永久 `pending` / `ownership_held=true`；无活动任务时 200 真实终止存活 bridge（`exit_code=1`）→ gen1→2 → start ready；忙任务时首次 409 `orphan_tasks_active` → 确认后终止 + 中断记账 → gen3→4 → start ready。证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`。
 - **复核遗留（2026-11-09 21:20 后现状）**：600/602 复核的代码项已由 W3c-4 清零——任务门与失败记账已收敛到“遗留实例领取或 current_task_id 指向”的任务（未领取排队任务保留给新实例），恢复提交时同事务清空 `instance.current_task_id`，`operation_key` 已补 pattern；写锁时长与自定义 bridge 入口拒绝范围已在上文文档化。剩余仅非阻断的可选观察（如 >120 字符超长 key 的显式用例）。
+
+工作区运行门默认开启；仅当 `TALK_WORKSPACE_RUNTIME_ENABLED` 显式设为 `0/false/no/off` 时关闭，能力证据仍为必需。

@@ -14,6 +14,21 @@ from scripts.role_service_host import HostError
 from tests.test_role_services import PROJECT_ID, RoleServiceTestCase, encode
 
 
+class WorkspaceRuntimeEnabledTests(unittest.TestCase):
+    def test_default_and_explicit_values(self):
+        from server.role_host_resolution import workspace_runtime_enabled
+        for value, expected in ((None, True), ("", True), ("  ", True), ("0", False),
+                                ("false", False), ("no", False), ("off", False),
+                                ("  FaLsE  ", False), ("1", True), ("true", True),
+                                ("yes", True), ("on", True), ("???", True)):
+            with self.subTest(value=value), patch.dict(os.environ, {}, clear=False):
+                if value is None:
+                    os.environ.pop("TALK_WORKSPACE_RUNTIME_ENABLED", None)
+                else:
+                    os.environ["TALK_WORKSPACE_RUNTIME_ENABLED"] = value
+                self.assertEqual(workspace_runtime_enabled(), expected)
+
+
 class WorkspaceStartupRefusalTests(RoleServiceTestCase):
     def setUp(self):
         super().setUp()
@@ -258,7 +273,7 @@ class WorkspaceCapabilityGateTests(WorkspaceStartupRefusalTests):
 
     def test_rejection_matrix_at_single_start(self):
         variants = [
-            (None, self.manifest), ("False", self.manifest), ("true", self.manifest),
+            ("0", self.manifest), ("False", self.manifest), (None, None),
             ("1", None), ("1", {**self.manifest, "schema": "bad"}),
             ("1", {**self.manifest, "runtime_protocol": 1}),
             ("1", {**self.manifest, "supported_layouts": ["legacy"]}),
@@ -285,7 +300,7 @@ class WorkspaceCapabilityGateTests(WorkspaceStartupRefusalTests):
 
     def test_valid_manifest_enqueues_single_start(self):
         self.write_manifest(self.manifest)
-        os.environ["TALK_WORKSPACE_RUNTIME_ENABLED"] = "1"
+        os.environ.pop("TALK_WORKSPACE_RUNTIME_ENABLED", None)
         response = self.start()
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(len(self.launch_rows()), 1)
@@ -324,7 +339,7 @@ class WorkspaceCapabilityGateTests(WorkspaceStartupRefusalTests):
         real_gate = role_services._require_start_layout
         def expire_proof(project, member, session):
             real_gate(project, member, session)
-            os.environ.pop("TALK_WORKSPACE_RUNTIME_ENABLED", None)
+            os.environ["TALK_WORKSPACE_RUNTIME_ENABLED"] = "0"
         with patch.object(role_startup, "_require_start_layout", side_effect=expire_proof), \
              patch("server.role_service_recovery.candidate", side_effect=AssertionError("unexpected recovery")):
             with self.make_client() as client:

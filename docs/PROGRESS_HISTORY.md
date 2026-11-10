@@ -10545,4 +10545,4 @@ Updated: 2026-10-04 (Asia/Shanghai)
 - **测试合同同步**：`5f44fc2` 将 24 项 W3b 引入的存量测试失败同步到新合同（门控拒绝、workspace_context 夹具、`workspace_link_refused`），未放宽断言（545/546）。
 - **终轮回归（547）**：Python 3600 项 `124F/44E/0S`，168 失败 ⊆ 544 基线集合（零新增）；Node 44 项全过；544 的 26 项全部消失。
 - **残余限制**：168 项基线历史测试失败；`ActualBootstrapTests` Windows 文件锁不收敛；`talk_delegate_task` schema 1/2 vs 3/5 待修；真实 CLI/双工作区/TOCTOU 属 W3c。
-- **部署**：未部署；W3a+W3b 同窗口，启动门默认关闭，开闸需 `TALK_WORKSPACE_RUNTIME_ENABLED=1`；详见 `docs/spec/W3B_DEPLOY_ACCEPTANCE_20261108.md`。
+- **部署**：未部署；W3a+W3b 同窗口，启动门默认关闭，开闸需 `TALK_WORKSPACE_RUNTIME_ENABLED=1`；详见 `docs/spec/W3B_DEPLOY_ACCEPTANCE_20261108.md`。（**2026-11-10 W3c-6 起语义已反转为默认开启、仅显式 `0/false/no/off` 关闭**；本条保留为历史记录。）

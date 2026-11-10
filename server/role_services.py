@@ -30,7 +30,6 @@ import hashlib
 import hmac
 import json
 import logging
-import os
 import socket
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -40,6 +39,7 @@ from sqlalchemy import func, or_, update
 from sqlmodel import Session, select
 
 from server.db import begin_immediate_write
+from server.role_host_resolution import workspace_runtime_enabled
 from bridges.stop_blockers import BUSY_STOP_CODE, STOP_BLOCKER_LIMIT, safe_stop_blockers
 from server.models import (
     ROLE_AUTO_START_ACTOR,
@@ -226,7 +226,7 @@ def _require_start_layout(project_id: str, member_id: str, session: Session) -> 
         if session.get(ProjectRole, (project_id, member_id)) is None:
             raise _fail(status.HTTP_404_NOT_FOUND, ROLE_SERVICE_ERROR_ROLE_NOT_FOUND)
     if layout != "legacy":
-        if layout == "workspace-v1" and os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") == "1":
+        if layout == "workspace-v1" and workspace_runtime_enabled():
             from server.local_runtime import workspace_runtime_capability
             if workspace_runtime_capability(session.get_bind(), project_id) is not None:
                 return
@@ -1011,7 +1011,7 @@ def _workspace_manager_evidence(ctx, launch, session, *, require_binding: bool, 
     from server.role_host_resolution import (ROOT, RecoveryHostError, workspace_manager_health_path,
                                               workspace_capability_matches)
     try:
-        if os.environ.get("TALK_WORKSPACE_RUNTIME_ENABLED") != "1":
+        if not workspace_runtime_enabled():
             return False
         manifest = workspace_runtime_capability(session.get_bind(), launch.project_id)
         if (manifest is None or not isinstance(manager_instance_id, str)
