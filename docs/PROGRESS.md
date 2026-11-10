@@ -10,7 +10,7 @@
 - **当前状态（已修复并验收）**：W3c-6 已部署——runtime A 重启用**未设置** `TALK_WORKSPACE_RUNTIME_ENABLED` 的方式启动（runtime **19860**、API child **16224**），Astra `ins_1832024782b1`、Terra `ins_4556b2d5aacc`、K2.8 `ins_5d49d5e623e3` 均 `running/ready`；`/healthz` ok、4 online。开闸语义现为**默认开启、仅显式 `0/false/no/off` 关闭**。**2026-11-10 11:09 用户确认 Astra 启动成功，人工验收通过。**
 - **WorkBuddy 内置适配（已暂停，2026-11-10）**：宿主 CLI 实测可调用（`POST /api/v1/acp/connect`、空白会话、`deepseek-v4.1-flash` → `OK`，14.6s），但会**绑定/替换桌面当前对话**（`session/new` 第二次后日志 `Killing session …`；`_meta.continue=false` 仍返回当前会话；`DELETE` 显式关闭会话），无法做角色隔离；独立 CLI 又无模型访问能力。**结论：当前无可用隔离接入路径**。用户决定**暂停适配**，保留版本警告/`effort_error`，待厂商开放外部客户端/独立实例再续；本地助理 Open API 作为备选（需注册第三方应用 + OAuth，未评估）。证据与三条路线见 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.4。
 - **待办（按优先级）**：① `host_unreachable` 在 API reload 窗口专项复现；② legacy `guard`/空 `native-home` 残留；③ 可选补测：`operation_key` >120 字符显式用例；④ WorkBuddy 无头适配（**已暂停**，待官方开放接入方式）。~~delete 90s 窗口~~ 已放弃：与既有安全合同（新鲜心跳 + pid absent 仍拒绝）冲突，收益不足。
-- **进行中（607）**：**L1 本地信任模式**——页面免登录、隐藏操作主体 `human:operator`（非账号）、公网来源拒绝、局域网可信；含 SSE/WS 与页面改造；Terra 开发、K2.8 复核。设计稿 [LOCAL_TRUST_NO_ACCOUNT.md](spec/LOCAL_TRUST_NO_ACCOUNT.md)，已确认“内置隐藏主体 + 公网拒绝”。L2（首次 MCP 自动建工作区）随后。
+- **L1 本地信任模式：614 复核 approved，已本地提交 `7a0398c`，尚未部署**（按用户要求停在部署前）：免登录/隐藏 `human:operator`/公网拒绝（含有效 Key）/SSE/WS/页面改造；key 模式缺头 422 已恢复；指定模块 `new_failures=0`。**待办：重载 API → 真实页面验收**（不登录直接进、operator 权限、agent 隔离、公网拒绝）。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
 ## 收工快照（2026-11-09 17:30）
