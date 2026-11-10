@@ -10,6 +10,7 @@
 - **当前状态（已修复并验收）**：W3c-6 已部署——runtime A 重启用**未设置** `TALK_WORKSPACE_RUNTIME_ENABLED` 的方式启动（runtime **19860**、API child **16224**），Astra `ins_1832024782b1`、Terra `ins_4556b2d5aacc`、K2.8 `ins_5d49d5e623e3` 均 `running/ready`；`/healthz` ok、4 online。开闸语义现为**默认开启、仅显式 `0/false/no/off` 关闭**。**2026-11-10 11:09 用户确认 Astra 启动成功，人工验收通过。**
 - **WorkBuddy W-B1 结论（已暂停）**：TALK 可独立拉起 CLI（`/api/v1/health` 200）；HTTP 侧 `GET /api/v1/acp`（`acp-connection-id`+`acp-session-token`）→ `initialize` → `session/new`（返回模型列表与权限配置）全部成功；账号登录（官方 `authUrl`）也能完成，但 `-p`/`session/prompt` 仍因**模型网关 token**（`CODEBUDDY_AUTH_TOKEN`，桌面注入）缺失而失败。用户确认 WorkBuddy 为**订阅模式、不提供 API Key**，故**暂停无头适配**，保留版本警告/`effort_error` 提示，不修改产品代码；协议与探针脚本留在 `.tmp/wb-probe/`，待官方开放接入方式再续。方案 B（`--acp` stdio）本机未产出 ACP 帧、暂不采用。详情 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 第十节。
 - **待办（按优先级）**：① `host_unreachable` 在 API reload 窗口专项复现；② legacy `guard`/空 `native-home` 残留；③ 可选补测：`operation_key` >120 字符显式用例；④ WorkBuddy 无头适配（**已暂停**，待官方开放接入方式）。~~delete 90s 窗口~~ 已放弃：与既有安全合同（新鲜心跳 + pid absent 仍拒绝）冲突，收益不足。
+- **规划中（未开工）**：本地信任模式（页面免登录、无人类账号、局域网可信；AI 角色仍只看自己的）+ 首次 MCP 自动创建工作区（不建角色）。设计稿 [LOCAL_TRUST_NO_ACCOUNT.md](spec/LOCAL_TRUST_NO_ACCOUNT.md)；分 L1（鉴权/页面）、L2（ensure/启动器）两片，待用户确认后开工。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
 ## 收工快照（2026-11-09 17:30）
