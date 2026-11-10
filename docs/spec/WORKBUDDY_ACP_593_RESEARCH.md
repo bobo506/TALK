@@ -211,4 +211,3 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
   - 云端任务 API + ACP：在云端沙箱执行，不能直接操作本机 `D:\` 工作区。
 
 **建议**：暂停“TALK 角色直接跑 WorkBuddy 内置模型”的实现；如要继续，唯一值得评估的是**本地助理 Open API**（需你注册开发者应用并授权）。<br>
-
