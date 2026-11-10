@@ -189,3 +189,26 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
 **当前状态（复验中）**：本机 WorkBuddy 桌面**没有活跃 hosted CLI runtime**（`daemon.log`：`no active hosted CLI runtime (generation=0)`），因此暂时没有 ACP 端点可连。已准备 `.tmp/wb-probe/watch_hosted.py`：用户打开任意 WorkBuddy 对话触发桌面拉起 CLI 后，脚本扫描端口、`POST /api/v1/acp/connect`，用**第二次 `session/new` 的空白会话**做最小模型调用（绝不 prompt 第一次返回的桌面活动会话），并记录模型/stopReason/文本。
 
 **仍需验证**：空白会话是否真的无历史（Nov 5 探针 `prompt_tokens≈128k`，疑似接入了已有上下文）；context 隔离；桌面未开对话时 TALK 能否工作（大概率要求桌面有活跃会话）。
+
+### 10.4 宿主 CLI 实测成功，但确认与桌面当前对话冲突（2026-11-10 14:32）
+
+**成功证据**（`.tmp/wb-probe/hosted-acp-result.json`）：
+- 桌面拉起 hosted CLI 后，扫描到端口 `53631`，`POST /api/v1/acp/connect` 成功；
+- `initialize` 成功；两次 `session/new`：第一次返回桌面当前会话 `558538d7…`，第二次得到新会话 `01a1c428…`（UUIDv7）；
+- `set_config_option(model=deepseek-v4.1-flash)` 成功；`session/prompt` → `OK`，`stopReason=end_turn`，14.6s，无错误。
+
+**致命冲突**：
+1. `_meta.codebuddy.ai/continue=false` 实测**仍返回桌面当前会话**（`558538d7…`），不能据此新建而不绑定。
+2. 同一连接第二次 `session/new` 后，桌面日志出现 `Killing session 558538d7… cleaned up (0 remaining)`，随后该对话被重新拉起——说明**新会话替换/清理了桌面当前会话**。
+3. 因此用宿主 CLI 跑 TALK 任务会干扰用户正在使用的 WorkBuddy 对话，且无法做到“每角色独立上下文”；`DELETE /api/v1/acp` 还会显式关闭绑定会话。
+4. 现有适配器 `bridges/workbuddy_acp.py` 已实现“两次 session/new + 只用第二个”，协议本身并不缺；缺的是**不与桌面对话冲突的独立 CLI 实例**。
+
+**结论（修订）**：WorkBuddy 内置模型**没有可用的隔离接入路径**：
+- 独立 CLI：无模型访问能力（桌面凭据不注入）；
+- 宿主 CLI：能调用模型，但绑定/替换桌面当前对话，不能多角色隔离；
+- 官方 Open API（[open.workbuddy.cn/docs/openapi](https://open.workbuddy.cn/docs/openapi)）：
+  - 本地助理 API：需注册第三方应用 + OAuth 用户授权，向 PC 助理发消息/查历史；**是否支持指定内置模型、是否按消息隔离上下文仍未验证**；
+  - 云端任务 API + ACP：在云端沙箱执行，不能直接操作本机 `D:\` 工作区。
+
+**建议**：暂停“TALK 角色直接跑 WorkBuddy 内置模型”的实现；如要继续，唯一值得评估的是**本地助理 Open API**（需你注册开发者应用并授权）。<br>
+
