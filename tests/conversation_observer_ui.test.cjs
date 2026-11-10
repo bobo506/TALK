@@ -428,6 +428,27 @@ test('login failing after permission fetch does not retain observer capability',
   const routes=baseRoutes(observerPermissions).map(([prefix,responder])=>prefix==='/api/members'?[prefix,{status:500,data:{}}]:[prefix,responder]);
   const {context}=harness(routes); assert.equal(await loginAs(context,'bobo-key'),false);
   assert.equal(run(context,'canViewAllConversations'),false);
+  assert.equal(run(context,'myKind'),'');
+});
+
+test('identity kind from login governs human controls when operator is absent from members',async()=>{
+  let identity={id:'human:operator',kind:'human'};
+  const routes=baseRoutes(observerPermissions).map(([prefix,responder])=>
+    prefix==='/api/members/me'?[prefix,()=>({data:identity})]:[prefix,responder]);
+  const {context,document}=harness(routes);
+  assert.equal(await loginAs(context,'operator-key'),true);
+  assert.equal(run(context,'currentMemberIsHuman()'),true);
+  identity={id:'human:bobo',kind:'agent'};
+  assert.equal(await loginAs(context,'agent-key'),true);
+  assert.equal(run(context,'currentMemberIsHuman()'),false);
+  identity={id:'human:bobo'};
+  assert.equal(await loginAs(context,'legacy-key'),true);
+  assert.equal(run(context,'currentMemberIsHuman()'),true);
+  identity={id:'human:operator',kind:'human'};
+  assert.equal(await loginAs(context,'operator-key'),true);
+  assert.equal(run(context,'myKind'),'human');
+  document.getElementById('logout-btn').handlers.click[0]();
+  assert.equal(run(context,'myKind'),'');
 });
 
 test('read-only timeline does not expose a usable Reply action',async()=>{
@@ -526,6 +547,6 @@ test('milestone acceptance remains human-only and requires a satisfied test gate
   const root=controlTask({control_status:'awaiting_human',checkpoint_reason:'milestone'});
   assert.ok(!showControls(context,document,root).some(el=>el.textContent==='人工验收通过'));
   assert.ok(showControls(context,document,root,{testGate:true}).some(el=>el.textContent==='人工验收通过'));
-  run(context,'myId="agent:AI1"');
+  run(context,'myId="agent:AI1"; myKind="agent"');
   assert.ok(!showControls(context,document,root,{testGate:true}).some(el=>el.textContent==='人工验收通过'));
 });

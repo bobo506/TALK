@@ -24,6 +24,7 @@ let appConfig = {
 let apiKey = "";
 let trustedMode = false;
 let myId = "";
+let myKind = "";
 let members = [];
 let lastId = 0;
 let ws = null;
@@ -460,6 +461,7 @@ async function doLoginV2(providedKey = null, { persistent = true, trusted = fals
     resetMyPermissions();
     apiKey = "";
     myId = "";
+    myKind = "";
   };
 
   try {
@@ -474,6 +476,7 @@ async function doLoginV2(providedKey = null, { persistent = true, trusted = fals
     const me = await meRes.json();
     if (!current()) return false;
     myId = me.id;
+    myKind = typeof me.kind === "string" ? me.kind : "";
     await loadMyPermissions();
     if (!current()) return false;
 
@@ -630,6 +633,7 @@ logoutBtn.addEventListener("click", () => {
   resetMyPermissions();
   apiKey = "";
   myId = "";
+  myKind = "";
   // 导航可能延迟；先同步清除日志、详情及在途响应的身份上下文。
   if (typeof roleDiagnostics !== "undefined") roleDiagnostics.sync({ visible: false });
   if (pollTimer) {
@@ -1145,6 +1149,7 @@ function taskActionButton(label, className, handler) {
 }
 
 function currentMemberIsHuman() {
+  if (myKind) return myKind === "human";
   return members.find((member) => member.id === myId)?.kind === "human";
 }
 

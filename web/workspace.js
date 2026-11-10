@@ -108,6 +108,7 @@ function chatMemberName(member) {
   return name && !/CLI Bridge|agent:/i.test(name) ? name : ({codex:"Codex",deepseek:"DeepSeek",kimi:"Kimi"}[short] || short);
 }
 function workspaceMemberName(id) {
+  if (id === "human:operator") return "本机操作员";
   const projectName = projectAgents.find(role => role.member_id === id)?.role_name;
   if (typeof projectName === "string" && projectName.trim()) return projectName;
   const roleName = typeof roleRequestApp !== "undefined" && roleRequestApp?.roleName(id);
