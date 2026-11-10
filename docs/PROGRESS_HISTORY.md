@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-10 11:05 — W3c-6：工作区运行门默认开启（605/606）
+
+- **问题**：2026-11-09 21:57 重启 runtime A 时漏设 `TALK_WORKSPACE_RUNTIME_ENABLED=1`，`workspace-v1` 角色（当时仅 Astra 活跃）start 返回 409 `workspace_runtime_not_ready`；台账 15 个 workspace-v1 角色中其余 14 个为归档/测试角色。
+- **修复**（605 Terra / 606 K2.8 **approved**；候选 178 / 基线 177、`new_failures=无`）：新增 `server/role_host_resolution.py::workspace_runtime_enabled()`——未设置/空白默认开启，仅显式 `0/false/no/off` 关闭；API 启动门、claim/report 证据、宿主 `_reject_workspace_v1`、runtime `reconcile_hosts` 四处共用；capability/manager 协议/健康文件匹配仍强制，显式关闭行为与旧“未开闸”一致。拒绝测试改为显式关闭表达，新增默认开启两态用例。
+- **部署与真实验证**：提交 `6a5a180`；runtime A 受控重启（**未设**该环境变量）→ runtime **19860**、API child **16224**；start Astra → gen 9、`ins_1832024782b1`、`running/ready`；Terra `ins_4556b2d5aacc`、K2.8 `ins_5d49d5e623e3` 同批 ready；`/healthz` ok、4 online。
+- **文档**：两处历史记录的旧“默认关闭/需显式=1”已标注被本片反转；用户手册/恢复链文档无需改动（门不是用户操作）。
+
 ## 2026-11-09 23:00 — WorkBuddy ACP 5.9.3 只读研究（W-B0）
 
 - 只读静态研究（未启动桌面/CLI、未改产品代码）：5.9.3 的 ACP 由**每会话 WorkBuddy CLI**（`@genie/agent-cli` 2.165.0）在 `127.0.0.1:<动态端口>` 的 `--serve` HTTP 提供，路由为 `GET/POST/DELETE /api/v1/acp`；连接标识来自 SSE `GET` 的响应头 **`Acp-Connection-Id`**，后续 POST/DELETE 必须回带；旧 `POST /api/v1/acp/connect` 不再是对外入口（桌面端口实测 404）。
