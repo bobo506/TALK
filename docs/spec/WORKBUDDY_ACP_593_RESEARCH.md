@@ -154,8 +154,19 @@ CODEBUDDY_PROMPT_SUGGESTION_DISABLED=1
 
 **探针产物**：`.tmp/wb-probe/`（`probe.py`、`acp_probe_v2.py`、`stdio_probe.py`、`acp-result-v2.json`、`cli.*.log`、`stdio*.err.log`）。探针进程已清理，未改动 WorkBuddy/TALK 产品代码。
 
-**建议的 W-B2（实施片）**：
-1. 先做一次性 CLI 登录验证（用户操作），确认外部拉起 CLI 可完成一次真实模型调用；
+**建议的 W-B2（实施片，待 token 来源确定后）**：
+1. 先解决模型网关 token 来源（见 10.1），确认外部拉起 CLI 可完成一次真实模型调用；
 2. 适配器采用方案 A：角色宿主拉起 CLI（固定空闲端口 + 环境变量），就绪探测 `/api/v1/health`，ACP 客户端改为 `GET` SSE 取 `acp-connection-id`/`acp-session-token` → `POST` 回带 → `DELETE` 关闭；删除固定端口扫描与 `/connect`；
 3. 强度探测复用 `session/new` 返回的模型/配置或 `session/set_config_option`；错误码沿用 `workbuddy_acp_runtime_unavailable`；
 4. 真实 E2E：hy4/w-d 强度、消息、general 任务、结构化交付；独立复核（避开 WorkBuddy 线路）。
+
+### 10.1 账号登录验证（2026-11-10 09:47–10:05）
+
+- 以 `--auth none` 启动 CLI 后，`GET /api/v1/auth/account/status` 返回 `authenticated=true`、`userId=b52c1803-…`；`POST /api/v1/auth/account/login {"method":"internal"}` 返回官方 `authUrl`（`https://www.workbuddy.cn/login?platform=workbuddy&state=…&version=2.165.0`）。
+- 用户打开该 URL 完成登录后：`account/status` 仍显示 authenticated；ACP `authenticate`（method=`internal`）返回 `userinfo.userName="火🔥🔥火"`；但 **`-p "只回复 OK"` 与新进程的 ACP `session/prompt` 仍返回 `Authentication required`**。
+- 代码归因：模型网关鉴权走 `CustomTokenAuthenticationStorage`——只从 **`process.env.CODEBUDDY_AUTH_TOKEN`**（或 product config custom token / `CODEBUDDY_API_KEY`）读取；桌面在拉起每个 CLI 子进程时注入该 token（`buildSessionDeltaEnv`/`connectorTokenEnv`）。账号登录态（ACP userinfo）**不等于**模型网关 token，仅靠 `~/.workbuddy` 账号配置无法满足；`settings.json` 中也没有对应 env 字段。
+- **结论**：TALK 独立拉起 CLI 的“进程 + HTTP + ACP + 账号登录接口”全部可用，但**没有受支持的模型 token 来源**。需要用户决策：
+  1. 用户提供 `CODEBUDDY_AUTH_TOKEN` 或 `CODEBUDDY_API_KEY`（放仓库外 key 文件，TALK 仅以 env 注入子进程）——最快，但属用户显式授权的最小秘密范围；
+  2. 授权 TALK 研究桌面注入机制（读取桌面进程环境/加密凭据）——涉及秘密边界且跨版本脆弱，不推荐；
+  3. 暂停 WorkBuddy 无头适配（保留现有“运行器版本警告 + effort_error”提示）。
+- 方案 B（stdio）即便可用也会遇到同一 token 问题，故仍不采用。

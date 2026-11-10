@@ -7,7 +7,7 @@
 - **环境（22:41 部署后）**：runtime A **23688**（加载 W3c-2a 自动清理）、API child **3816**（22:41 reload 部署 W3c-4，`operation_key` pattern 已在 openapi 可见）、`/healthz` ok、3 online；Terra/K2.8 running/ready；无 running 任务；隔离栈已停（证据 `.tmp/w3c3-e2e/E2E_SUMMARY.json`）。
 - **命名调整（21:20）**：异常恢复按钮「终止孤儿并恢复」改名**「重置」**并仅在状态异常时显示；原「绑定重置」改名**「重新绑定」**（用户手册/恢复指南同步，Node 95 项通过）。
 - **部署边界**：W3c-2a（自动清理）与 W3c-3（人工「重置」入口）均已生效；页面文案「重置」/「重新绑定」硬刷新可见。
-- **WorkBuddy W-B1 结论**：TALK 可独立拉起 CLI（`/api/v1/health` 200）；HTTP 侧 `GET /api/v1/acp`（`acp-connection-id`+`acp-session-token`）→ `initialize` → `session/new`（返回模型列表与权限配置）全部成功；`session/prompt` 因**外部 CLI 未登录**返回 `Authentication required`。方案 B（`--acp` stdio）本机未产出 ACP 帧、暂不采用；**建议方案 A**，下一步需你一次性 CLI `/login` 验证。详情 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 第十节。
+- **WorkBuddy W-B1 结论**：TALK 可独立拉起 CLI（`/api/v1/health` 200）；HTTP 侧 `GET /api/v1/acp`（`acp-connection-id`+`acp-session-token`）→ `initialize` → `session/new`（返回模型列表与权限配置）全部成功。**账号登录已试**（官方 `authUrl` + 用户完成登录）：`account/status` 与 ACP `authenticate` 均显示已登录，但 `-p`/`session/prompt` 仍报 `Authentication required`——模型网关需要 `CODEBUDDY_AUTH_TOKEN`/`CODEBUDDY_API_KEY`，桌面是向自己的 CLI 子进程注入，**无受支持的独立获取途径**。方案 B（`--acp` stdio）本机未产出 ACP 帧、暂不采用。**待你决策**：①提供 token（仓库外 key 文件，TALK 仅 env 注入）→ 继续方案 A；②暂停 WorkBuddy 无头适配（保留版本警告/effort_error）。详情 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 第十节。
 - **待办（按优先级）**：① WorkBuddy 实施：**一次性 CLI `/login` 验证**（用户操作）→ W-B2 方案 A 适配（宿主拉起 CLI + SSE 连接 id）；② delete 90s 窗口（可选）；③ `host_unreachable` 在 API reload 窗口专项复现；④ legacy `guard`/空 `native-home` 残留；⑤ 可选补测：`operation_key` >120 字符显式用例。
 - **恢复**：说“继续项目”；先读本快照与 [W3C_RECOVERY_CHAIN_20261109.md](spec/W3C_RECOVERY_CHAIN_20261109.md)。
 
