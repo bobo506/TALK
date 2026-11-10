@@ -16,13 +16,80 @@ from bridges import talk_task_tools
 from bridges import talk_terminal_mcp as terminal
 from bridges.talk_task_tools import TOOL_SCHEMAS, TalkToolError
 from cli.talk import scaffold_project
-from server.models import AgentTask, Message
+from server.models import AgentTask, Message, ProjectAgent, ProjectRole
 from tests.test_support import RouteTestCase
 from tests.test_talk_client import LiveTalkServer
 from tests.test_talk_delivery import delivery_report
 
 ENTRY = Path(__file__).resolve().parents[1] / "bridges" / "talk_terminal_mcp.py"
 STDIO_FALLBACK_MARKER = "STDIO_FALLBACK_FILE_STDIO"
+
+
+class TerminalJoinTests(unittest.TestCase):
+    def test_ensure_then_join_with_key_and_without_key(self):
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self): return b'{"project_id":"prj_new"}'
+        with tempfile.TemporaryDirectory() as directory:
+            args = terminal.build_parser().parse_args(["--project-root", directory])
+            for key in ("agent-key", ""):
+                env = {"TALK_WORKSPACE_AUTO_ENSURE": "1", "TALK_API_KEY": key}
+                with self.subTest(key=bool(key)), patch.dict(os.environ, env, clear=True), patch.object(terminal, "urlopen", side_effect=lambda *a, **kw: Response()) as request:
+                    self.assertEqual(terminal.configure(args)[1], "prj_new")
+                    self.assertEqual(request.call_count, 2 if key else 1)
+                    if key:
+                        join = request.call_args_list[1].args[0]
+                        self.assertTrue(join.full_url.endswith("/api/local/workspaces/join"))
+                        self.assertEqual(json.loads(join.data), {"project_id": "prj_new"})
+                        self.assertEqual(join.get_header("X-api-key"), key)
+
+    def test_existing_marker_joins_and_403_is_reported(self):
+        from urllib.error import HTTPError
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scaffold_project(root, display_name="项目", project_id="prj_existing", server_url="http://example.test")
+            args = terminal.build_parser().parse_args(["--project-root", directory])
+            class Response:
+                status = 200
+                def __enter__(self): return self
+                def __exit__(self, *args): pass
+            with patch.dict(os.environ, {"TALK_API_KEY": "agent-key"}, clear=True), patch.object(terminal, "urlopen", return_value=Response()) as request:
+                self.assertEqual(terminal.configure(args)[1], "prj_existing")
+                self.assertEqual(request.call_count, 1)
+                self.assertEqual(json.loads(request.call_args.args[0].data), {"project_id": "prj_existing"})
+            error = HTTPError("http://example.test", 403, "forbidden", {}, io.BytesIO(b'{}'))
+            with patch.dict(os.environ, {"TALK_API_KEY": "agent-key"}, clear=True), patch.object(terminal, "urlopen", side_effect=error) as request:
+                with self.assertRaisesRegex(TalkToolError, "终端 Agent 加入项目失败：HTTP 403"):
+                    terminal.configure(args)
+                self.assertEqual(request.call_count, 1)
+                self.assertEqual(json.loads(request.call_args.args[0].data), {"project_id": "prj_existing"})
+
+            for detail in ("join_requires_agent", {"code": "join_requires_agent"}):
+                body = json.dumps({"detail": detail}).encode("utf-8")
+                with self.subTest(detail=detail, transport="HTTPError"):
+                    error = HTTPError("http://example.test", 403, "forbidden", {}, io.BytesIO(body))
+                    with patch.dict(os.environ, {"TALK_API_KEY": "human-key"}, clear=True), patch.object(terminal, "urlopen", side_effect=error):
+                        self.assertEqual(terminal.configure(args), ("http://example.test", "prj_existing"))
+                        self.assertEqual(os.environ["TALK_PROJECT_ID"], "prj_existing")
+
+                class ErrorResponse(Response):
+                    status = 403
+                    def read(self): return body
+                with self.subTest(detail=detail, transport="response"), patch.dict(os.environ, {"TALK_API_KEY": "human-key"}, clear=True), patch.object(terminal, "urlopen", return_value=ErrorResponse()):
+                    self.assertEqual(terminal.configure(args)[1], "prj_existing")
+
+            for status, body in ((403, b'{"detail":{"code":"other"}}'),
+                                 (403, b'invalid'),
+                                 (401, b'{"detail":"join_requires_agent"}'),
+                                 (404, b'{"detail":"join_requires_agent"}'),
+                                 (500, b'{"detail":"join_requires_agent"}')):
+                with self.subTest(status=status, body=body):
+                    error = HTTPError("http://example.test", status, "error", {}, io.BytesIO(body))
+                    with patch.dict(os.environ, {"TALK_API_KEY": "agent-key"}, clear=True), patch.object(terminal, "urlopen", side_effect=error):
+                        with self.assertRaisesRegex(TalkToolError, f"HTTP {status}"):
+                            terminal.configure(args)
 
 
 def run_stdio_process(command, *, input_text, env, cwd=None, timeout=15, check=False):
@@ -87,6 +154,13 @@ def run_stdio_process_with_files(command, *, input_text, env, cwd, timeout, chec
 
 
 class TerminalConfigTests(unittest.TestCase):
+    def setUp(self):
+        # Configuration tests use dummy URLs and must not contact a real server.
+        mocked = patch.object(terminal, "urlopen")
+        response = mocked.start().return_value.__enter__.return_value
+        response.status = 200
+        self.addCleanup(mocked.stop)
+
     def test_config_precedence_and_identity_are_explicit(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -248,6 +322,17 @@ class TerminalLiveTests(RouteTestCase):
 
     def configure_project(self, base_url):
         scaffold_project(self.project_root, display_name="终端测试", project_id="prj_terminal", server_url=base_url)
+
+    def test_agent_joins_existing_project_over_live_http(self):
+        self.add_member("agent:new", api_key="new-agent-key", display_name="新终端")
+        with LiveTalkServer(server_main.app) as base_url:
+            self.configure_project(base_url)
+            process = self.run_terminal(base_url, extra_args=["--check"], key="new-agent-key")
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(json.loads(process.stdout)["member_id"], "agent:new")
+        with self.session() as session:
+            self.assertIsNotNone(session.get(ProjectAgent, ("prj_terminal", "agent:new")))
+            self.assertIsNone(session.get(ProjectRole, ("prj_terminal", "agent:new")))
 
     @staticmethod
     def call(name, arguments=None, id_=1):

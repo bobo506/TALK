@@ -14,7 +14,7 @@ import server.db as db
 from tests.test_auth_trusted import main
 from server.auth import ensure_local_operator
 from server import local_runtime
-from server.models import Member, Project, ProjectRole, RoleProvisionHostConfig
+from server.models import Member, Project, ProjectAgent, ProjectRole, RoleProvisionHostConfig
 
 
 class LocalWorkspaceTests(unittest.TestCase):
@@ -141,6 +141,50 @@ class LocalWorkspaceTests(unittest.TestCase):
         self.assertTrue(all(x.status_code == 200 for x in results))
         self.assertEqual(len({x.json()["project_id"] for x in results}), 1)
 
+    def test_join_authorization_and_idempotence(self):
+        project_id = self.call().json()["project_id"]
+        with Session(self.engine) as session:
+            session.add(Member(id="human:test", kind="human", display_name="Human", api_key="human-test-key"))
+            session.commit()
+            operator_key = session.get(Member, "human:operator").api_key
+        def join(key=None, host="127.0.0.1", project=project_id):
+            headers = {"X-API-Key": key} if key else {}
+            return TestClient(main.app, client=(host, 50000)).post(
+                "/api/local/workspaces/join", json={"project_id": project}, headers=headers)
+        for key in (None, "human-test-key", operator_key):
+            response = join(key)
+            self.assertEqual((response.status_code, response.json()["detail"]), (403, "join_requires_agent"))
+        self.assertEqual(join("agent-test-key", host="8.8.8.8").status_code, 401)
+        response = join("agent-test-key", project="prj_missing")
+        self.assertEqual((response.status_code, response.json()["detail"]), (404, "project_not_found"))
+        self.assertEqual(join("agent-test-key").json(), {"project_id": project_id, "member_id": "agent:test", "joined": True, "already": False})
+        with Session(self.engine) as session:
+            row = session.get(ProjectAgent, (project_id, "agent:test"))
+            row.business_role = "dev"
+            session.add(row)
+            session.commit()
+        self.assertTrue(join("agent-test-key").json()["already"])
+        with Session(self.engine) as session:
+            rows = session.exec(select(ProjectAgent)).all()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0].business_role, "dev")
+            self.assertEqual(session.exec(select(ProjectRole)).all(), [])
+        self.assertFalse((self.home / ".talk/keys").exists())
+
+    def test_join_concurrent(self):
+        project_id = self.call().json()["project_id"]
+        def join(_):
+            return TestClient(main.app, client=("127.0.0.1", 50000)).post(
+                "/api/local/workspaces/join", json={"project_id": project_id},
+                headers={"X-API-Key": "agent-test-key"})
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            responses = list(pool.map(join, range(6)))
+        self.assertTrue(all(response.status_code == 200 for response in responses))
+        self.assertEqual(sum(not response.json()["already"] for response in responses), 1)
+        with Session(self.engine) as session:
+            self.assertEqual(len(session.exec(select(ProjectAgent)).all()), 1)
+            self.assertEqual(session.exec(select(ProjectRole)).all(), [])
+
 
 class TerminalConfigureTests(unittest.TestCase):
     def test_first_start_and_marker_reuse(self):
@@ -151,6 +195,7 @@ class TerminalConfigureTests(unittest.TestCase):
             root = Path(directory)
             args = argparse.Namespace(project_root=root, project=None, server="http://127.0.0.1:8000", wait_stats_file=None)
             class Response:
+                status = 200
                 def __enter__(self): return self
                 def __exit__(self, *args): pass
                 def read(self): return b'{"project_id":"prj_test"}'
@@ -165,7 +210,8 @@ class TerminalConfigureTests(unittest.TestCase):
                 os.environ.pop("TALK_PROJECT_ID")
                 os.environ["TALK_API_KEY"] = "test-human"
                 terminal.configure(args)
-                self.assertEqual(call.call_count, 1)
+                self.assertEqual(call.call_count, 2)
+                self.assertTrue(call.call_args.args[0].full_url.endswith("/join"))
 
     def test_first_start_without_key_reports_auth_failures(self):
         import argparse

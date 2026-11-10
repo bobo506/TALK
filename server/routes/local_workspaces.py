@@ -12,12 +12,13 @@ from uuid import uuid4
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from server import local_runtime
 from server.auth import get_current_member
 from server.db import begin_immediate_write, get_session
-from server.models import Member, Project
+from server.models import Member, Project, ProjectAgent
 from server.role_provision_requests import enable_host_config, host_config_projection
 
 router = APIRouter(prefix="/api/local/workspaces", tags=["local-workspaces"])
@@ -27,6 +28,33 @@ _lock = threading.Lock()
 class WorkspaceEnsure(BaseModel):
     project_root: str
     display_name: str | None = None
+
+
+class WorkspaceJoin(BaseModel):
+    project_id: str
+
+
+@router.post("/join")
+def join_workspace(body: WorkspaceJoin, current: Member = Depends(get_current_member),
+                   session: Session = Depends(get_session)):
+    if current.kind != "agent":
+        raise HTTPException(403, "join_requires_agent")
+    member_id = current.id
+    # Serialize the existence checks and insert across SQLite connections.
+    begin_immediate_write(session)
+    if session.get(Project, body.project_id) is None:
+        raise HTTPException(404, "project_not_found")
+    if session.get(ProjectAgent, (body.project_id, member_id)) is not None:
+        return {"project_id": body.project_id, "member_id": member_id, "joined": True, "already": True}
+    session.add(ProjectAgent(project_id=body.project_id, member_id=member_id))
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        if session.get(ProjectAgent, (body.project_id, member_id)) is None:
+            raise
+        return {"project_id": body.project_id, "member_id": member_id, "joined": True, "already": True}
+    return {"project_id": body.project_id, "member_id": member_id, "joined": True, "already": False}
 
 
 def _create_file(path: Path, contents: str, created: list[Path]) -> None:

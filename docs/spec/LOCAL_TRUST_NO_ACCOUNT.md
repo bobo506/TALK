@@ -98,6 +98,8 @@ trusted_networks = ["loopback", "private"]   # 默认；public 始终拒绝
 **不建角色、不启角色、不写仓库内其它文件**（除 `.talk/` 两个标记）。
 **并发/幂等**：同一路径并发 ensure 只产生一个项目；重复调用返回既有项目。
 
+**终端 Agent 加入项目（L3 候选）**：`POST /api/local/workspaces/join` 接收 `project_id`，沿用当前请求鉴权，仅允许 Agent Key；human、无 Key 的本地 operator 返回 `403 join_requires_agent`，项目不存在返回 `404 project_not_found`。接口幂等创建当前 Agent 的 `ProjectAgent` 名册行，保留已有行，并不创建角色或角色 Key，也不修改项目及 runtime。启动器拿到 project_id 后，如有 Key 则调用 join（包括已有项目）；失败会中止启动并显示 HTTP 状态，无 Key 首次 ensure 时跳过。ensure 仍要求 human/operator，因此 Agent Key 不能用于首次 ensure，需先完成工作区注册。
+
 ## 八、安全边界与风险（需确认）
 
 1. **局域网可信**：任何能访问 TALK 端口的设备都可作为 operator 控制一切。必须：

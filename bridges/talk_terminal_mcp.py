@@ -47,6 +47,17 @@ from bridges.talk_task_tools import (
 from cli.talk import load_project
 
 
+def _join_not_required(status: int, body: bytes) -> bool:
+    if status != 403:
+        return False
+    try:
+        detail = json.loads(body.decode("utf-8")).get("detail")
+        code = detail.get("code") if isinstance(detail, dict) else detail
+    except (ValueError, UnicodeError, AttributeError):
+        return False
+    return code == "join_requires_agent"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="在普通终端接入 TALK 任务工具")
     parser.add_argument("--project-root", type=Path, help="包含 .talk/project.yaml 的项目目录")
@@ -125,6 +136,21 @@ def configure(args: argparse.Namespace) -> tuple[str, str]:
         raise TalkToolError("TALK_API_KEY 未设置；请通过终端或 MCP 客户端的环境变量提供现有成员密钥")
 
     project_id = project_id.strip()
+    if api_key:
+        request = Request(server + "/api/local/workspaces/join",
+                          data=json.dumps({"project_id": project_id}).encode("utf-8"),
+                          headers={"Content-Type": "application/json", "Accept": "application/json",
+                                   "X-API-Key": api_key}, method="POST")
+        try:
+            with urlopen(request, timeout=30) as response:
+                status = response.status
+                if not 200 <= status < 300 and not _join_not_required(status, response.read()):
+                    raise TalkToolError(f"终端 Agent 加入项目失败：HTTP {status}")
+        except HTTPError as exc:
+            if not _join_not_required(exc.code, exc.read()):
+                raise TalkToolError(f"终端 Agent 加入项目失败：HTTP {exc.code}") from exc
+        except (URLError, OSError) as exc:
+            raise TalkToolError("终端 Agent 加入项目失败：连接错误") from exc
     os.environ.update(TALK_BASE_URL=server, TALK_PROJECT_ID=project_id, TALK_API_KEY=api_key)
     # 独立终端以 API Key 的真实身份为准，避免继承另一个 bridge 的成员提示。
     os.environ.pop("TALK_MEMBER_ID", None)
