@@ -78,7 +78,9 @@ trusted_networks = ["loopback", "private"]   # 默认；public 始终拒绝
 
 ## 七、工作区自动创建（第二阶段）
 
-**触发**：MCP 启动器在项目目录（cwd/`--project-root`）启动，发现无 `.talk/project.yaml` 且无 `project_id`。
+任务 617 的候选实现待独立复核，尚未完成无 Key 的终端任务工具链：现有终端任务和发送工具仍要求 `TALK_API_KEY`。首次注册接口与启动器接入的隔离验证不代表完整 MCP 场景可用；后续需经授权修改相应工具并验证。
+
+**触发**：`TALK_WORKSPACE_AUTO_ENSURE=1` 且项目目录（cwd/`--project-root`）存在、未提供 `project_id` 时尝试自动创建。普通终端入口默认关闭；DSH 与 Kimi 启动器默认启用，可用环境变量 `0` 禁用。明确提供项目 ID 时仍要求 `TALK_API_KEY`；首次自动创建可以不带 Key，但这不代表后续任务工具已支持无 Key。
 
 **接口草案**：`POST /api/local/workspaces/ensure`（trusted 模式、无 Key 即 operator；`auth_mode=key` 时要求 human Key）
 ```json

@@ -120,6 +120,42 @@ class TerminalConfigTests(unittest.TestCase):
                     self.assertNotIn("test-secret", errors.getvalue())
                     self.assertNotIn("Traceback", errors.getvalue())
 
+    def test_auto_ensure_is_opt_in_and_explicit_project_requires_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = terminal.build_parser().parse_args(["--project-root", directory])
+            for value in (None, "0", "true"):
+                env = {} if value is None else {"TALK_WORKSPACE_AUTO_ENSURE": value}
+                with self.subTest(value=value), patch.dict(os.environ, env, clear=True), patch.object(terminal, "urlopen") as request:
+                    with self.assertRaises(TalkToolError):
+                        terminal.configure(args)
+                    request.assert_not_called()
+            for source in ("argument", "environment", "marker"):
+                env = {"TALK_WORKSPACE_AUTO_ENSURE": "1"}
+                argv = ["--project-root", directory]
+                if source == "argument":
+                    argv += ["--project", "prj_test"]
+                elif source == "environment":
+                    env["TALK_PROJECT_ID"] = "prj_test"
+                else:
+                    (root / ".talk").mkdir()
+                    (root / ".talk/project.yaml").write_text("project_id: prj_test\n", encoding="utf-8")
+                with self.subTest(source=source), patch.dict(os.environ, env, clear=True), patch.object(terminal, "urlopen") as request:
+                    with self.assertRaisesRegex(TalkToolError, "TALK_API_KEY"):
+                        terminal.configure(terminal.build_parser().parse_args(argv))
+                    request.assert_not_called()
+
+    def test_launchers_set_default_auto_ensure_and_respect_override(self):
+        from scripts import dsh_talk_mcp_launch, kimi_talk_mcp_launch
+        for launcher in (dsh_talk_mcp_launch, kimi_talk_mcp_launch):
+            for value in (None, "0"):
+                env = {} if value is None else {"TALK_WORKSPACE_AUTO_ENSURE": value}
+                with self.subTest(launcher=launcher.__name__, value=value), patch.dict(os.environ, env, clear=True):
+                    with patch.object(launcher, "resolve_api_key", return_value=("test-key", "test")), patch.object(terminal, "main", return_value=0) as main:
+                        self.assertEqual(launcher.main([]), 0)
+                        main.assert_called_once()
+                        self.assertEqual(os.environ["TALK_WORKSPACE_AUTO_ENSURE"], value or "1")
+
     def test_invalid_project_yaml_has_actionable_error(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".talk" / "project.yaml"

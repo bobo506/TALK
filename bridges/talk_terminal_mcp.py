@@ -9,6 +9,8 @@ import os
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -64,7 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
 def configure(args: argparse.Namespace) -> tuple[str, str]:
     root = (args.project_root or Path.cwd()).resolve()
     project = {}
-    if args.project_root is not None or (root / ".talk" / "project.yaml").exists():
+    auto_ensure = os.environ.get("TALK_WORKSPACE_AUTO_ENSURE") == "1"
+    marker_exists = (root / ".talk" / "project.yaml").exists()
+    if marker_exists or (args.project_root is not None and not auto_ensure
+                         and not (args.project or os.environ.get("TALK_PROJECT_ID"))):
         try:
             project = load_project(root)
         except (OSError, UnicodeError, yaml.YAMLError) as exc:
@@ -85,10 +90,38 @@ def configure(args: argparse.Namespace) -> tuple[str, str]:
         valid_url = False
     if not valid_url:
         raise TalkToolError("服务地址必须是 HTTP(S) URL，且不能包含用户名、密码、查询参数或片段")
-    if not isinstance(project_id, str) or not project_id.strip():
-        raise TalkToolError("缺少 project_id：请指定 --project、TALK_PROJECT_ID 或有效项目目录")
     api_key = os.environ.get("TALK_API_KEY", "").strip()
-    if not api_key:
+    if not isinstance(project_id, str) or not project_id.strip():
+        if not auto_ensure:
+            raise TalkToolError("缺少 project_id：请指定 --project、TALK_PROJECT_ID 或有效项目目录")
+        if not root.is_dir():
+            raise TalkToolError("工作区目录不存在：project_root_invalid")
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if api_key:
+            headers["X-API-Key"] = api_key
+        request = Request(server + "/api/local/workspaces/ensure",
+                          data=json.dumps({"project_root": str(root), "display_name": root.name}, ensure_ascii=False).encode("utf-8"),
+                          headers=headers, method="POST")
+        try:
+            with urlopen(request, timeout=30) as response:
+                result = json.loads(response.read().decode("utf-8"))
+            project_id = result.get("project_id")
+        except HTTPError as exc:
+            if exc.code in (401, 403):
+                raise TalkToolError("工作区未注册且自动创建失败：需要本地信任模式或操作者权限") from exc
+            try:
+                detail = json.loads(exc.read().decode("utf-8")).get("detail")
+                code = detail.get("code") if isinstance(detail, dict) else detail
+                if not isinstance(code, str) or not code.replace("_", "").isalnum():
+                    code = "unknown_error"
+            except (ValueError, UnicodeError, AttributeError):
+                code = "unknown_error"
+            raise TalkToolError(f"工作区自动创建失败：HTTP {exc.code} {code}") from exc
+        except (URLError, OSError, ValueError, AttributeError) as exc:
+            raise TalkToolError("工作区自动创建失败：连接或响应无效") from exc
+        if not isinstance(project_id, str) or not project_id.strip():
+            raise TalkToolError("工作区自动创建失败：响应缺少 project_id")
+    elif not api_key:
         raise TalkToolError("TALK_API_KEY 未设置；请通过终端或 MCP 客户端的环境变量提供现有成员密钥")
 
     project_id = project_id.strip()

@@ -126,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
 
     project_root = Path(args.project_root).expanduser().resolve()
     os.environ["TALK_API_KEY"] = api_key
+    os.environ.setdefault("TALK_WORKSPACE_AUTO_ENSURE", "1")
     # 身份只由 API Key 对应的服务端成员决定，忽略任何继承的成员提示。
     os.environ.pop("TALK_MEMBER_ID", None)
 
