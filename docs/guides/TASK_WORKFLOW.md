@@ -331,6 +331,7 @@ manifest 示例（路径按实际替换）：
 
 - 角色职责与交叉复核分工以角色页当前项目的“开发要求”为准，主控派发前读取并纳入任务包；已派发任务保持原包。字段未加载或内容未配置时，不推断分工、不自动保存示例；本次会话有明确分工可沿用，否则由项目管理者配置。仓库规则见AGENTS.md，Codex负责范围、摘要、分歧裁决与文档/Git收尾。
 - 开发完成即**暂停**，等独立复核，不在复核期间并行改码。
+- **收取即对账**：每次收取前先查本项目全部 `workflow_status=submitted` 的任务（`talk_list_tasks(workflow_status="submitted")`，或 `GET /api/tasks?workflow_status=submitted`），按任务号从小到大核对；更早的 submitted 任务必须一并收取，暂不收的要写明原因与计划。切片收尾、提交和推送前再核对一次；`failed/canceled` 任务无可收取结果，但在汇总中列出。
 - 执行者可准备 `progress_draft`；正式进度文档仍由 Codex 维护。
 - 必要验证与进度整理结束后，统一由 Codex 提交/推送，避免“边做边推、重复 push”。
 - 已知权限障碍（例如推送凭据被拒）：**一次**明确报 `partial`/`blocked`，不重复试探、不申请用户级权限。
