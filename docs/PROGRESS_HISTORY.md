@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-11 22:40 — W-D1 第 1 片：工作区只读诊断内核（664/665）
+
+- **664（Terra 开发，601s）**：新增 `server/workspace_diagnostics.py`（167 行）与 `tests/test_workspace_diagnostics.py`（158 行），仅此两文件。公开行为：`inspect_root`（status `ok/missing/inaccessible/invalid/unconfigured`；`ENOENT`=missing，其余 OSError=inaccessible，`is_dir()==False` 不作删除证据；物理身份取 `st_dev/st_ino`，`st_ino==0` 或非整数→`workspace_identity_unknown`；marker 64KiB 上限、拒绝链接、只取 `project_id` 标量）；`detect_duplicates`（身份键 platform+machine+volume+file id 分组，不可得进 `unknown`）；`evaluate_move`（身份一致=强 `workspace_move_candidate`，仅标记相同=弱 `marker_only`，异项目标记=`workspace_marker_conflict`，无旧身份=`workspace_identity_unverified`）。
+- **665（K2.8 独立复核）approved**：10 项逐条 pass、`new_failures=[]`；本机 0 skip 重跑 `tests.test_workspace_diagnostics` 10/10（0.202s）与 `tests.test_workspace_paths` 12/12（3.434s）；真实 `mklink /J`、`GetShortPathNameW`、大小写与 symlink 别名均判同一物理对象；`_marker` 用 `_checked` + `O_NOFOLLOW` + `fstat(dev,ino)` 比对防 TOCTOU，对象标签/重复 key 拒绝；零副作用快照覆盖含 `.talk` 与空根；`py_compile`/UTF-8/`git diff --check` 通过。
+- **限制**：检测非原子、无硬超时、机器名为主机名而非全局机器身份（设计接受）；未接 API/DB/UI；664 交付机 3 项 skip 属环境不支持，复核机 0 skip 已补足；无用户可见变化。
+- **状态**：664/665 已收取，`submitted=[]`；两个新文件入库并推送。
+
 ## 2026-11-11 22:10 — W-D1：工作区登记与重关联设计合同（660–663）
 
 - **需求来源**：路线图第 9 项“记录/重新打开已有目录、识别重复/缺失/移动，用户主动重新关联并保项目与历史；344 失败未自动重派”。按用户确认，先做只读设计片，不改产品代码。

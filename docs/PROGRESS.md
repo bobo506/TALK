@@ -1,5 +1,14 @@
 # Project Progress
 
+## 收工快照（2026-11-11 22:40，W-D1 第 1 片完成）
+
+- **W-D1 第 1 片「只读诊断内核」完成（664 Terra / 665 K2.8 approved）**：新增 `server/workspace_diagnostics.py`（167 行）与 `tests/test_workspace_diagnostics.py`（158 行）。`inspect_root`（根状态 + 物理身份 + marker）、`detect_duplicates`（按卷+文件 ID 判同一物理目录）、`evaluate_move`（身份一致=强、仅标记=弱、标记冲突、不可验证）；身份不可得（`st_ino==0`/非整数）→ `workspace_identity_unknown` 且不参与“无重复”结论；marker 读取 64KiB 上限、拒绝链接/reparse、只取 `project_id` 标量。**本片无 API/DB/UI 改动，无用户可见变化。**
+- **验证（665 独立复核）**：10 项全 `pass`、`new_failures=[]`；复核机 **0 skip** 重跑 `tests.test_workspace_diagnostics` 10/10（0.202s）、`tests.test_workspace_paths` 12/12（3.434s，既有守卫未放宽）；真实 junction/8.3 短名/大小写/symlink 判同；零副作用快照与 marker 链接拒绝均实证；`py_compile`/UTF-8/diff-check 通过。
+- **边界**：`workspace_binding_*` 属后续切片；检测非原子、无硬超时、机器名非全局机器身份（设计已接受）；664 交付机 3 项 skip 因环境不支持，复核机已补足。
+- **提交与推送**：两个新文件 + 本文档，随本片推送。
+- **下一步**：第 2 片「只读诊断 API」（单项目 `GET /api/projects/{id}/workspace-diagnostics`、候选预览只读部分、分页/权限），需先确认范围。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-11 22:10，W-D1 设计片完成）
 
 - **W-D1 设计片（660 Terra 设计 / 661 K2.8 复核 / 662 返修 / 663 定向复验 approved）**：新增 [WORKSPACE_REGISTRATION_DESIGN.md](spec/WORKSPACE_REGISTRATION_DESIGN.md)（94 行，27,546 B，sha256 `805e9dbb…`，71 处 `path:line` 引用全部可解析、0 缺失/0 越界）。内容：现状盘点（带文件:行号）、四类判定（重复/缺失/移动/绑定失效，含稳定码与 unknown 区分）、检测+重关联 API 与页面合同、数据迁移与跨文件恢复/`recovery_required`、测试计划、5 个实现切片、5 项待裁决问题。**尚未实现**。
