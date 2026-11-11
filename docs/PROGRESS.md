@@ -1,5 +1,19 @@
 # Project Progress
 
+## 待修 Bug（2026-11-11 11:40 用户反馈）
+
+- **现象**：页面任务详情点「查看完整对话」/「查看成果」提示「当前账号尚未加入这个任务对话…」，人工操作员无法查看（`web/app.js:1289`、`web/workspace.js:2576`）。
+- **初查根因**：`web/app.js::loadMyPermissions()` 在 `apiKey` 为空时直接 `return`；**L1 本地信任模式本来就没有 API Key**，所以 `canViewAllConversations` 永远为 false，`canEnterGroup()` 对非成员人类返回 false。服务端实测无误：`GET /api/members/me/permissions` 对 `human:bobo` 返回 `can_view_all_conversations=true`，`human:operator` 在 `is_conversation_observer` 中也恒为 true。
+- **修复方向**：信任模式下也加载本人权限（不把 `apiKey` 作为前置条件，改用身份/`me` 守卫）；必要时 `canEnterGroup` 对合法人类观察者放行。保持 agent 未加入不可读、只读旁观不写成员。
+- **验收**：人工点两个按钮均可查看；非成员 agent 仍被拒；Node 覆盖「无 Key 信任模式仍加载权限」「人类观察者放行」「未授权不误放」。
+- **状态：未修，等用户下午回来安排。**
+
+## 待复核候选（2026-11-11 中午暂停）
+
+- **W-B4（638，Terra，partial）**：CDP 逐角色思考强度——`bridges/workbuddy_cdp.py`（模型枚举/强度下发/诊断）、`scripts/workbuddy_cdp_prompt.py`、`scripts/workbuddy_acp_models.py`（枚举校验+choice 能力）、`server/workbuddy_effort.py`、`server/routes/projects.py`、2 个 Python 测试、手册一句；候选 113/基线 110，唯一失败为既存 SSE，`new_failures=0`；真实桌面四模型档位与 low/high/max 读回通过。partial 仅因整树 diff 含并行 W-B5 前端文件。
+- **W-B5（639，K2.8，结果消息格式不合规但 `.tmp/wb5/development.json` 校验 complete）**：弹窗视觉统一与一键复制——`web/workspace.js`、`web/workspace.css`、`tests/workspace_role_services.test.cjs`；单一「复制启动命令」、复制成功自动关闭、失败保留并提示；复用 `.modal-*` 与 CSS 变量、深色适配。
+- **待办（用户回来后）**：① 639 结果按格式重发 → Terra 复核 639、K2.8 复核 638；② 受控 reload API；③ W-B4 真实 E2E（w-d 设 `max`、核对 `effective_effort` 与实际下发）；④ 弹窗浏览器截图核验；⑤ 修上面的查看对话/成果 bug；⑥ 文档与提交。
+
 ## 收工快照（2026-11-11 10:50）
 
 - **本轮完成**：**W-B3 未开调试模式时的启动拦截与弹窗**（630 Terra 开发 / 631 K2.8 独立复核 approved / 632 探测返修 / 633 定向复验 approved）＋真实 E2E（634/635/636）。
