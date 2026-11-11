@@ -38,6 +38,7 @@ from server.db import (
 from server.logging_config import configure_logging
 from server.models import GroupMember, Member, Message, MessageCreate, MessageOut
 from server.routes import local_workspaces, discussions, files, groups, hall_types, instances, members, messages, projects, role_requests, role_services, role_deletions, runners, runtime_diagnostics, tasks
+from server.routes import workspace_diagnostics
 from server.ws_hub import hub
 
 configure_logging()
@@ -372,6 +373,7 @@ app.include_router(members.setup_router)
 app.include_router(groups.router)
 app.include_router(hall_types.router)
 app.include_router(projects.router)
+app.include_router(workspace_diagnostics.router)
 app.include_router(local_workspaces.router)
 app.include_router(role_requests.router)
 app.include_router(role_services.router)

@@ -1,5 +1,15 @@
 # Project Progress
 
+## 收工快照（2026-11-11 23:15，W-D1 第 2 片完成）
+
+- **W-D1 第 2 片「只读诊断 API」完成（667 Terra / 668 K2.8 approved）**：新增 `server/routes/workspace_diagnostics.py`（134 行）与 `tests/test_workspace_diagnostics_api.py`（242 行），`server/main.py` 仅 +2 行注册路由。提供 `GET /api/projects/{id}/workspace-diagnostics`（根状态/身份/marker/issue、跨项目重复、`duplicate_check`、`binding=not_checked`）与 `POST /api/projects/{id}/workspace-relink-preview`（只读候选评估 + `blocked_reasons`，**不发 token、不写文件、不做 CAS**）。鉴权与既有入口一致或更严格（trusted 模式不自动建 operator）；marker 回显清洗、identity 剔除主机名、revision 为 sha256 摘要。
+- **验证（668 独立复核）**：10 项全 `pass`、`new_failures=[]`；独立重跑 API 9 项（1 skip：8.3 本卷不支持）0 失败 1.656s，回归 22 项 0 失败 3.754s；8 种预览情形（含“旧根缺失→弱证据、不报强”）、只读快照与 DB 行数不变、`ensure_local_runtime` 未被调用、无 500/无敏感回显均实证。
+- **非阻断注记**：`_human` 未填 `request.state.member_id`（仅影响访问日志可观测性）；preview 的 `duplicate_projects` 反映登记根重复、候选冲突在 `conflict_project_ids`（语义已在复核中确认自洽）。
+- **本片无用户可见变化**；666 的 blocked 与裁定（强匹配留持久身份片）已记录。
+- **提交与推送**：三个文件 + 本文档，随本片推送。
+- **下一步**：第 3 片「重关联存储与事务内核」（身份快照 + 操作日志 + 阶段机/CAS + 故障注入，仍**不开放**提交入口）；需先确认范围，可能拆成 3a 存储/迁移与 3b 事务/恢复。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-11 22:40，W-D1 第 1 片完成）
 
 - **W-D1 第 1 片「只读诊断内核」完成（664 Terra / 665 K2.8 approved）**：新增 `server/workspace_diagnostics.py`（167 行）与 `tests/test_workspace_diagnostics.py`（158 行）。`inspect_root`（根状态 + 物理身份 + marker）、`detect_duplicates`（按卷+文件 ID 判同一物理目录）、`evaluate_move`（身份一致=强、仅标记=弱、标记冲突、不可验证）；身份不可得（`st_ino==0`/非整数）→ `workspace_identity_unknown` 且不参与“无重复”结论；marker 读取 64KiB 上限、拒绝链接/reparse、只取 `project_id` 标量。**本片无 API/DB/UI 改动，无用户可见变化。**

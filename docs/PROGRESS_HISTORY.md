@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-11 23:15 — W-D1 第 2 片：只读诊断 API（666 blocked → 667/668）
+
+- **666（Terra）blocked**：任务包要求“真实 rename 后预览判强匹配”，但同时限定只读、不持久化身份；Terra 实测 rename 后旧路径 missing、`inspect_root` 取不到旧身份，`evaluate_move` 只能返回 `workspace_identity_unverified`。协调者按设计（历史身份属第 3 片）采纳其选项 A 并重派；666 已收取（blocked 记录保留），无产品代码。
+- **667（Terra 开发，812s）**：新增 `server/routes/workspace_diagnostics.py`（134 行）与 `tests/test_workspace_diagnostics_api.py`（242 行），`server/main.py` 仅 +2 行。`GET /api/projects/{id}/workspace-diagnostics`（root 状态/identity/marker/issues、`duplicate_projects`、`duplicate_check=unknown` 处理、`binding=not_checked`）与 `POST /api/projects/{id}/workspace-relink-preview`（`candidate_root` 校验 422、只读评估、`blocked_reasons`，无 token/CAS/写入）。鉴权与既有 `_require_human` 对齐或更严格（trusted 模式只接受已注册 operator，不自动创建）；marker 回显 ≤256 字符/无路径分隔符/可打印否则 null；identity 仅回显 platform/volume/file_id/collected_at（剔除主机名）；`revision` 为 sha256 摘要。
+- **668（K2.8 独立复核）approved**：10 项全 pass、`new_failures=[]`；独立重跑 API 9 项（1 skip：8.3 本卷不支持）0 失败 1.656s；回归 `test_workspace_diagnostics`+`test_workspace_paths` 22 项 0 失败 3.754s；8 种预览情形逐一断言（含“旧根缺失→弱、不报强”“复制目录→marker_only”“候选 marker 异项目→conflict”“候选缺失/不可访问/与其它项目同物理目录→阻断”）；只读快照（含 `.talk` 与空候选根）、DB 行/表计数不变、`ensure_local_runtime` 未被调用、UNC/NUL/普通文件/符号链接根无 500 且无写盘；范围仅 3 文件、UTF-8 无 BOM、无新增依赖。
+- **非阻断注记**：`_human` 未填 `request.state.member_id`（仅访问日志可观测性）；preview 的 `duplicate_projects` 反映登记根重复、候选冲突在 `conflict_project_ids`（复核确认自洽）。
+- **状态**：667/668 已收取，`submitted=[]`；3 文件入库并推送；强匹配验收与持久身份留待第 3 片。
+
 ## 2026-11-11 22:40 — W-D1 第 1 片：工作区只读诊断内核（664/665）
 
 - **664（Terra 开发，601s）**：新增 `server/workspace_diagnostics.py`（167 行）与 `tests/test_workspace_diagnostics.py`（158 行），仅此两文件。公开行为：`inspect_root`（status `ok/missing/inaccessible/invalid/unconfigured`；`ENOENT`=missing，其余 OSError=inaccessible，`is_dir()==False` 不作删除证据；物理身份取 `st_dev/st_ino`，`st_ino==0` 或非整数→`workspace_identity_unknown`；marker 64KiB 上限、拒绝链接、只取 `project_id` 标量）；`detect_duplicates`（身份键 platform+machine+volume+file id 分组，不可得进 `unknown`）；`evaluate_move`（身份一致=强 `workspace_move_candidate`，仅标记相同=弱 `marker_only`，异项目标记=`workspace_marker_conflict`，无旧身份=`workspace_identity_unverified`）。
