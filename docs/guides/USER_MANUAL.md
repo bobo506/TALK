@@ -71,28 +71,17 @@ Codex新角色支持CLI 0.164.0和0.163.0。Terra等模型使用准备时官方�
 
 配置记录多时可能只显示部分记录，本页保存的近期请求会继续跟踪。旧角色只要已用补录入口登记过、且凭据代际可用，也会显示重新绑定；既没有创建请求也没有补录来源的角色不显示该按钮。旧角色重置时会重新生成一次该角色的凭据：请先停止该角色再点击，恢复完成后重新启动才会使用新凭据（旧凭据在重置那一刻起失效）；仍被其它项目引用的角色不允许重置，会直接提示拒绝。自动启动未执行或投递失败时，详情不再单独显示提示行，以角色服务状态区的实际状态为准；页面不会反复重试启动。旧页面留下的未确认请求沿原载荷核对，不追补自动启动。完整准备与验收见[创建配置页面验收](ROLE_CREATION_PAGE_ACCEPTANCE.md)、[自动首次启动页面验收](ROLE_AUTO_START_PAGE_ACCEPTANCE.md)和[宿主worker指南](ROLE_REQUEST_WORKER.md)；真人浏览器与原生登录、模型能力仍待验。
 
-### WorkBuddy 内置模型（免自备 Key，CDP 桌面通道）
+### WorkBuddy 内置模型使用说明（免自备 Key，CDP 桌面通道）
 
-内置模型的普通任务结果使用结构化交付，Task Hall 可显示业务结论。首轮已含合法交付 JSON（包括前后有文字）时不再重发，按报告显示 complete 或 partial 等结论；首轮没有合法交付时可要求一次紧凑重发，重发失败或超时显示 partial。首轮运行失败或超时显示 blocked，任何超时或失败都不冒充 complete。
+WorkBuddy 角色可以使用 WorkBuddy 账号自带的内置模型（例如 Hy4、DeepSeek-V4.1-Flash），不需要在
+`models.json` 里配置自定义 API Key。TALK 通过本机 CDP 驱动桌面 WorkBuddy 的**专用临时对话**：每个任务
+新建一个对话、发送任务、取回结果后删除该对话，不影响你正在使用或历史保留的对话；调用使用桌面
+WorkBuddy 当前登录的账号与额度。任务结果使用结构化交付，Task Hall 可显示业务结论；首轮交付 JSON
+不合法时只重发一次，运行失败或超时显示 blocked，不冒充 complete。
 
-WorkBuddy 角色可以选择 WorkBuddy 账号自带的内置模型（例如 Hy4、DeepSeek-V4.1-Flash），不再需要
-在 `models.json` 里配置自定义 API Key。通道为 TALK 通过本机 CDP 驱动桌面 WorkBuddy 的**专用临时对话**：
-每个任务新建一个对话、发送任务、取回结果后删除该对话，不影响你正在使用或历史保留的对话；
-调用使用桌面 WorkBuddy 当前登录的账号与额度。
+#### 1. 一次性准备（管理员）
 
-**前提：WorkBuddy 必须以调试端口启动（仅本机回环 `127.0.0.1:9222`）。** 正常双击启动不会打开
-调试端口，此时角色的任务会明确失败（`workbuddy_cdp_unavailable`），不会静默改用其它通道。
-未开调试模式点启动会弹窗并可复制启动命令。
-启动方式（PowerShell）：
-
-```powershell
-$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"
-Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"
-```
-
-退出 WorkBuddy 后调试端口随之关闭；下次使用前按上面的方式重新启动。
-
-首次使用前，由真人管理员登记模型选择（只需一次；不登记时创建角色看不到“（内置·桌面）”选项）：
+首次使用前登记模型选择（只需一次；不登记时创建角色看不到“（内置·桌面）”选项）：
 
 ```powershell
 cd D:\claude-test\TALK
@@ -102,18 +91,49 @@ python -B -X utf8 -m scripts.workbuddy_acp_models register `
   --models hy4free,deepseek-v4.1-flash --transport cdp
 ```
 
-`register --transport cdp` 按显式模型清单登记 `workbuddy-cdp:` 选择（不探测桌面可用性；
-模型 id 写错时任务运行期会以 `workbuddy_cdp_create_failed` 明确失败）。登记后刷新页面，在
-“创建角色”中选择 WorkBuddy，模型下拉应出现 `Hy4（内置·桌面）`、`DeepSeek-V4.1-Flash（内置·桌面）`，
-按正常流程创建并启动即可。角色消息、任务预检与任务执行都走该通道；提示词会要求使用项目绝对路径。
+`register --transport cdp` 按显式模型清单登记 `workbuddy-cdp:` 选择；模型 id 必须与桌面
+WorkBuddy 的模型清单一致，写错时任务运行期会以 `workbuddy_cdp_create_failed` 明确失败。
+登记后刷新页面，创建角色时选 WorkBuddy，模型下拉出现 `Hy4（内置·桌面）`、
+`DeepSeek-V4.1-Flash（内置·桌面）` 等选项。
 
-**注意：角色的运行器/模型在创建时锁定，不能原地更换。** 需要换模型（或从旧的 ACP 通道迁移）时，
-请删除旧角色后按上面的流程新建角色；新角色会获得新的身份与 Key。
+#### 2. 每次使用前：以调试模式启动 WorkBuddy
 
-已知限制：桌面 WorkBuddy 未运行、未登录或未以调试端口启动时该角色无法调用模型；`window.wb` 是
-桌面私有接口，WorkBuddy 升级可能改动；TALK 不读取或复制账号凭据，调试端口仅绑定 loopback，
-不得对外暴露；CDP 通道暂不提供逐角色思考强度（按模型默认执行）；任务结果必须为结构化交付，
-首轮不合法时只重发一次。
+**WorkBuddy 必须以调试端口启动（仅本机回环 `127.0.0.1:9222`），并且要完全退出后重新启动才生效。**
+
+```powershell
+$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"
+Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"
+```
+
+- 从桌面图标正常双击启动**不会**打开调试端口；必须用上面的命令（托盘图标也要退出后再执行）。
+- 调试端口只绑定 loopback，TALK 不会自动启动 WorkBuddy，也不要把 9222 暴露到局域网/公网。
+- 退出 WorkBuddy 后调试端口随之关闭，下次使用前重新执行上面的命令。
+
+#### 3. 创建与启动角色
+
+1. 在 TALK 页面“创建角色”中选择 WorkBuddy，模型选“（内置·桌面）”的条目，按正常流程创建。
+2. 创建完成后点“启动”。若 WorkBuddy 未以调试模式运行，启动会被**阻止**并弹窗：
+   「请以调试模式启动 WorkBuddy 再使用其内置模型」，下方有启动命令和“复制命令”按钮。
+   点“复制命令”→ 退出 WorkBuddy → 在 PowerShell 粘贴执行 → 再回到页面点“启动”即可。
+3. 启动成功后角色显示 running，可正常派任务。
+
+**角色模型在创建时锁定，不能原地更换**；需要换模型（或从旧的 ACP 通道迁移）时，删除旧角色后按
+上面的流程新建角色，新角色会获得新的身份与 Key。
+
+#### 4. 派任务、看结果与失败提示
+
+- 任务预检与执行都走 CDP 通道；每个任务使用独立临时对话，完成后再删除，你自己的 WorkBuddy 对话不受影响。
+- 任务结果要求结构化交付（`talk-delivery-1`），Task Hall 显示 complete/partial/blocked。
+- 如果角色已在 running、但 WorkBuddy 被重启成普通模式，任务会失败（`workbuddy_cdp_unavailable`），
+  任务详情会弹同一个“请以调试模式启动 WorkBuddy”提示；按提示重启调试模式后，重新派任务即可。
+- 失败后若角色实例显示 `unknown`/不可用，先“关闭”再“启动”该角色即可恢复（不会影响其它角色）。
+
+#### 5. 已知限制
+
+- 桌面 WorkBuddy 未运行、未登录、或未以调试端口启动时，该角色无法调用模型；TALK 会明确报错，不会静默改用其它通道。
+- `window.wb` 是 WorkBuddy 桌面私有接口，WorkBuddy 升级可能改动，届时需要重新适配。
+- 调试端口是桌面全控制口，只能留在 loopback；TALK 不读取、不复制账号凭据，也不代替你登录。
+- CDP 通道当前不提供逐角色思考强度（按模型默认执行）；需要不同强度时先记录为后续功能。
 
 ### 删除角色
 
