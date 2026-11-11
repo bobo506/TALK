@@ -1941,24 +1941,31 @@ class AvailabilityTests(RoleServiceTestCase):
     def test_sse_authentication_does_not_block_event_loop(self):
         import asyncio
         import server.main as main
-        from fastapi import HTTPException
+        from fastapi import HTTPException, Request
         started, release = threading.Event(), threading.Event()
-        def slow_auth(token):
+        def slow_auth(token, host):
             started.set()
             release.wait(5)
             return None
         async def exercise():
-            with patch.object(main, "_resolve_sse_member", side_effect=slow_auth):
-                task = asyncio.create_task(main.sse_events(None, token="fixture", last_event_id=None, last_event_id_header=None))
+            request = Request({
+                "type": "http", "method": "GET", "path": "/api/events",
+                "headers": [], "client": ("127.0.0.1", 12345),
+                "server": ("127.0.0.1", 8000), "scheme": "http", "query_string": b"",
+            })
+            with patch.object(main, "_resolve_sse_member", side_effect=slow_auth) as resolve:
+                task = asyncio.create_task(main.sse_events(request, token="fixture", last_event_id=None, last_event_id_header=None))
                 for _ in range(100):
                     if started.is_set():
                         break
                     await asyncio.sleep(.01)
                 self.assertTrue(started.is_set())
                 self.assertFalse(task.done())
+                resolve.assert_called_once_with("fixture", "127.0.0.1")
                 release.set()
-                with self.assertRaises(HTTPException):
+                with self.assertRaises(HTTPException) as raised:
                     await task
+                self.assertEqual(raised.exception.status_code, 401)
         try:
             asyncio.run(exercise())
         finally:

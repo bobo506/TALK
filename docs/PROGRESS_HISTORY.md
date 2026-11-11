@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-11 16:50 — W-C1：修复过期 SSE 测试（651/652）
+
+- **问题**：`tests.test_role_services.AvailabilityTests.test_sse_authentication_does_not_block_event_loop` 长期失败（`AttributeError: 'NoneType' object has no attribute 'client'`），在多个切片的候选与基线上重复出现。
+- **根因**：测试过期，不是产品缺陷——仍以 `main.sse_events(None, ...)` 旧签名把 request 传成 None；patch 的 `_resolve_sse_member` 仍是一参函数，而当前实现为 `(token, host)` 两参且需要真实 Request。
+- **修复（651 Terra 开发 / 652 K2.8 approved）**：仅改 `tests/test_role_services.py`——用真实 Starlette Request（client=("127.0.0.1",12345)）调用真实 `sse_events`；patch 匹配两参慢鉴权并断言 host 传入；保留“事件循环推进、任务未完成、401”断言并新增 host/401 断言。产品代码、依赖零改动。
+- **验证**：候选 82/82 全绿（100s）；基线 `9affa69` 同命令 82 项、1 失败（正是该测试）；`new_failures=0`；`git diff --check`、UTF-8 通过。
+- **限制**：仅运行该测试模块，未跑全量套件；候选与基线各单次计时。
+
 ## 2026-11-11 15:10 — W-B4 思考强度 / W-B5 弹窗改版 / W-B6 查看权限（638–648）
 
 - **W-B4 WorkBuddy CDP 逐角色思考强度**（638 Terra 开发 / 641 K2.8 **approved** / 643 E2E）：`bridges/workbuddy_cdp.py` 增只读 `list_models`（`wb.models.list()`）与 low/high/max 白名单 + `setThoughtLevel` 下发、诊断带实际 effort；`scripts/workbuddy_acp_models.py --transport cdp` 真实枚举校验模型并写/更新 choice `capabilities`（`effort:<level>`、`effort_default:<level>`）；`server/workbuddy_effort.py` 按六维匹配 choice 能力投影 `effort_options`/默认值（纯 DB、无网络探测），`server/routes/projects.py` 接线；ACP 路径不变。候选 103/基线 100，唯一失败为既存 SSE，`new_failures=[]`。部署：API reload + `register --transport cdp`；hy4 `["high"]`、w-d `["low","high","max"]`。E2E：w-d `max` 生效、非法 `ultra`/hy4 `low` 均 422，任务 643 succeeded 且适配器 argv 实测 `--effort max`。提交 `e55b26f`。

@@ -1,5 +1,12 @@
 # Project Progress
 
+## W-C1 完成（2026-11-11 16:50，待提交）
+
+- **页面/测试债清理**：修复长期失败的 `tests.test_role_services.AvailabilityTests.test_sse_authentication_does_not_block_event_loop`（651 Terra / 652 K2.8 **approved**）。
+- **根因**：测试过期——仍按旧签名 `main.sse_events(None, ...)` 传 request=None，且 patch 的 `_resolve_sse_member` 是一参；当前实现要求真实 Request 与 `(token, host)` 两参。
+- **修复**：仅 `tests/test_role_services.py`：真实 Starlette Request（client=127.0.0.1）、两参慢鉴权 patch、新增 host 传递与 401 断言；原“事件循环推进/任务未完成/401”断言保留。产品代码零改动。
+- **结果**：候选 `tests.test_role_services` 82/82 全绿；基线 `9affa69` 同命令仍有且仅有这 1 个失败；`new_failures=0`。此后测试套件不再有已知 SSE 失败。
+
 ## 人工验收（2026-11-11 16:20）
 
 - 用户确认：**W-B4 思考强度通过**；**W-B6「查看完整对话/查看成果」通过**。
