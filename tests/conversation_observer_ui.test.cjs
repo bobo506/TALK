@@ -195,6 +195,74 @@ function roomButtons(document) {
   return document.created.filter((el) => String(el.className).includes('group-chat-row'));
 }
 
+test('信任模式无 Key 登录时加载权限并允许只读进入未加入的 Group 和 Task Hall', async () => {
+  const routes = baseRoutes({ data: { member_id: 'human:operator', can_view_all_conversations: true } })
+    .map(([prefix, responder]) => prefix === '/api/members/me'
+      ? [prefix, { data: { id: 'human:operator', kind: 'human' } }]
+      : [prefix, responder]);
+  const { context, fetchStub } = harness(routes);
+  assert.equal(await run(context, 'doLoginV2("", { trusted: true })'), true);
+  const requests = fetchStub.calls.filter((call) => call.url === '/api/members/me/permissions');
+  assert.equal(requests.length, 1);
+  assert.ok(!requests[0].opts.headers['X-API-Key']);
+  assert.equal(run(context, 'canViewAllConversations'), true);
+  assert.equal(run(context, 'canEnterGroup("group:lab")'), true);
+  assert.equal(run(context, 'canEnterGroup("group:task-1")'), true);
+  run(context, 'setActiveGroup("group:task-1")');
+  assert.equal(run(context, 'activeGroupReadOnly()'), true);
+  assert.equal(fetchStub.calls.filter((call) => call.method !== 'GET').length, 0);
+});
+
+test('信任模式权限为 false、错误或字段不符时拒绝未加入的对话', async () => {
+  for (const permissions of [
+    { data: { member_id: 'human:bobo', can_view_all_conversations: false } },
+    { status: 401, data: {} },
+    { status: 403, data: {} },
+    { data: { member_id: 'human:carol', can_view_all_conversations: true } },
+    { data: { member_id: 'human:bobo', can_view_all_conversations: 'true' } },
+    () => { throw new Error('network error'); },
+  ]) {
+    const { context, fetchStub } = harness(baseRoutes(permissions));
+    assert.equal(await run(context, 'doLoginV2("", { trusted: true })'), true);
+    assert.equal(fetchStub.calls.filter((call) => call.url === '/api/members/me/permissions').length, 1);
+    assert.equal(run(context, 'canViewAllConversations'), false);
+    assert.equal(run(context, 'canEnterGroup("group:lab")'), false);
+    assert.equal(run(context, 'canEnterGroup("group:task-1")'), false);
+  }
+});
+
+test('agent 的权限响应为 false 时仍不能进入未加入的 Group 和 Task Hall', async () => {
+  const routes = baseRoutes({ data: { member_id: 'agent:other', can_view_all_conversations: false } })
+    .map(([prefix, responder]) => prefix === '/api/members/me'
+      ? [prefix, { data: { id: 'agent:other', kind: 'agent' } }]
+      : [prefix, responder]);
+  const { context } = harness(routes);
+  assert.equal(await loginAs(context, 'agent-key'), true);
+  assert.equal(run(context, 'canEnterGroup("group:lab")'), false);
+  assert.equal(run(context, 'canEnterGroup("group:task-1")'), false);
+});
+
+test('Key 模式仍发送凭据并按权限响应授权', async () => {
+  const { context, fetchStub } = harness(baseRoutes(observerPermissions));
+  assert.equal(await loginAs(context, 'bobo-key'), true);
+  const requests = fetchStub.calls.filter((call) => call.url === '/api/members/me/permissions');
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].opts.headers['X-API-Key'], 'bobo-key');
+  assert.equal(run(context, 'canEnterGroup("group:lab")'), true);
+  assert.equal(run(context, 'canEnterGroup("group:task-1")'), true);
+});
+
+test('信任模式权限请求在登出后返回不得恢复授权', async () => {
+  const { context, document, fetchStub } = harness(baseRoutes('pend'));
+  const login = run(context, 'doLoginV2("", { trusted: true })');
+  for (let i = 0; i < 10 && !fetchStub.pendings.length; i += 1) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fetchStub.pendings.length, 1);
+  document.getElementById('logout-btn').handlers.click[0]();
+  fetchStub.pendings[0].resolve(response(true));
+  assert.equal(await login, false);
+  assert.equal(run(context, 'canViewAllConversations'), false);
+});
+
 test('观察者登录后可进入未加入的群聊，列表按钮不再禁用且标注只读', async () => {
   const { context, document } = harness(baseRoutes(observerPermissions));
   await loginAs(context, 'bobo-key');

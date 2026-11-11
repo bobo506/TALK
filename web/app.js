@@ -3927,7 +3927,7 @@ async function loadMyPermissions() {
   const request = ++myPermissionsRequest;
   const current = () => request === myPermissionsRequest && requestKey === apiKey && requestMember === myId && !loggingOut;
   canViewAllConversations = false;
-  if (!requestKey || !requestMember || !current()) return;
+  if (!requestMember || !current()) return;
   try {
     const res = await apiFetch("/api/members/me/permissions");
     if (!current()) return;

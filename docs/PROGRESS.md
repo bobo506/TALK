@@ -8,20 +8,23 @@
 - **真实 E2E**：w-d 设 `effort=max` → 200、`effective_effort=max`；非法 `ultra` 与 hy4 `low` → 422 `effort_not_supported`；任务 **643** succeeded，执行期间适配器 argv 实测含 `--effort max`。
 - **限制**：强度档位来自登记时快照，桌面模型清单变化后需重新登记；登记脚本在桌面不可达时失败（不写半套）。
 
-## W-B5 进行中（返修 642）
+## W-B5 弹窗（最终复验 647 进行中）
 
-- 640 Terra 复核 **changes_requested**：①旧弹窗异步剪贴板回调清掉新弹窗引用 → 可重复弹出（对抗用例 2 个弹窗）；②无障碍（可访问名称、焦点约束/恢复）。
-- 642 返修同时按用户要求放大（760 CSS ≈ 608 物理像素、标题 20/正文 16/命令 15/按钮 46）、补竞态与焦点测试；完成后 Terra 定向复验，协调者再用 headless Chrome 截图复验。
-- 原 639 结果消息正文含说明文字（格式不合规），以 `.tmp/wb5/development.json` 为交付内容；642 交付须为纯 JSON。
-- 已核验截图：`.tmp/wb5/modal-light.png`、`.tmp/wb5/modal-dark.png`（浅/深色均可渲染，按钮文案正确）。
+- 640 Terra 复核 **changes_requested**：①复制竞态（旧弹窗异步回调清掉新弹窗引用 → 重复弹窗）；②无障碍（可访问名称、焦点）。
+- 642 返修：`dialogActive()` 守卫、焦点陷阱/恢复、放大到 760 CSS（≈608 物理像素、标题 20/正文 16/命令 15/按钮 46）。
+- 644 定向复验 **changes_requested**：①reject 分支仍缺守卫；②双失败焦点失守；③深色按钮对比度 1.77:1。
+- 645 二次返修（complete，43/43）：reject 全分支守卫、双失败 `copy.focus()`、按钮改用 `--accent-bg/--accent-fg`（深色约 5.9:1）；纯 JSON 交付。
+- 截图：`.tmp/wb5/modal-light.png`、`.tmp/wb5/modal-dark.png`（协调者 headless Chrome 复验，608 物理像素）。
+- **待 647 Terra 最终复验通过后提交/推送。**
 
-## 待修 Bug（2026-11-11 11:40 用户反馈）
+## 已修 Bug（W-B6，646 开发 / 648 复核 approved，待提交）
 
-- **现象**：页面任务详情点「查看完整对话」/「查看成果」提示「当前账号尚未加入这个任务对话…」，人工操作员无法查看（`web/app.js:1289`、`web/workspace.js:2576`）。
-- **初查根因**：`web/app.js::loadMyPermissions()` 在 `apiKey` 为空时直接 `return`；**L1 本地信任模式本来就没有 API Key**，所以 `canViewAllConversations` 永远为 false，`canEnterGroup()` 对非成员人类返回 false。服务端实测无误：`GET /api/members/me/permissions` 对 `human:bobo` 返回 `can_view_all_conversations=true`，`human:operator` 在 `is_conversation_observer` 中也恒为 true。
-- **修复方向**：信任模式下也加载本人权限（不把 `apiKey` 作为前置条件，改用身份/`me` 守卫）；必要时 `canEnterGroup` 对合法人类观察者放行。保持 agent 未加入不可读、只读旁观不写成员。
-- **验收**：人工点两个按钮均可查看；非成员 agent 仍被拒；Node 覆盖「无 Key 信任模式仍加载权限」「人类观察者放行」「未授权不误放」。
-- **状态：未修，等用户下午回来安排。**
+- **现象**：任务详情点「查看完整对话」/「查看成果」提示「当前账号尚未加入这个任务对话…」（`web/app.js:1289`、`web/workspace.js:2576`），人工操作员无法查看。
+- **根因**：`web/app.js::loadMyPermissions()` 以 `apiKey` 非空为前置；本地信任模式无 API Key → 权限请求被跳过 → `canViewAllConversations` 恒 false。服务端 `/api/members/me/permissions` 实际返回 true。
+- **修复**：去掉 apiKey 前置（保留 `current()` 身份/序号/登出守卫）；`web/app.js` 1 行 + 测试新增 5 用例（无 Key 信任加载、false/401/403/字段不符拒绝、agent 拒绝、key 模式不回归、登出竞态）。
+- **复核**：648 K2.8 **approved**——候选 29/29、基线 24/24，`new_failures=0`；未改 `canEnterGroup`、未改 `workspace.js`/后端。
+- **真实浏览器证据（协调者）**：headless Chrome 加载页面后 `performance` 资源里出现 `GET /api/members/me/permissions`（fetch，364 bytes），响应 `{"member_id":"human:operator","can_view_all_conversations":true}`；页面 `apiKey` 为空，确认是信任模式路径。
+- **待提交/推送。**
 
 ## 收工快照（2026-11-11 10:50）
 
