@@ -1,6 +1,18 @@
 # Project Progress
 
-## W-C2 完成（2026-11-11 18:05，待提交）
+## 收工快照（2026-11-11 19:35，重启后）
+
+- **服务状态（已恢复，detached 后台进程）**：runtime pid `2172`、API 子进程 `14296`，`startup_state=complete`，7 个宿主在，`/healthz` ok；页面 `http://127.0.0.1:8000` 正常。日志 `.tmp/talk-runtime.out.log` / `.tmp/talk-runtime.err.log`。该进程脱离本次会话，关窗口不影响。
+- **角色**：hy4 / w-d 均 **stopped**；WorkBuddy 为普通启动（9222 未开），按用户决定暂不使用内置模型，故未启动这两个 CDP 角色。
+- **本轮已完成并推送**：W-B4 思考强度、W-B5 弹窗改版、W-B6 查看对话/成果权限、W-B7 自动启动门、W-C1 SSE 过期测试、W-C2/W-C2b reload 瞬时断连重试；最近提交 `cf86b80`（W-C2/W-C2b），此前 `ee57eb3`（W-C1）、`ff9a40a`（W-B7）、`9affa69`（W-B5）、`ba75f01`（W-B6）、`e55b26f`（W-B4）。
+- **人工验收**：用户已确认 W-B4 思考强度、W-B6 查看完整对话/成果通过；W-B5 已实际用「复制启动命令」启动成功。
+- **测试**：`tests.test_role_services` 82/82；host+bridge 四模块 186 项全过；`new_failures=0`。
+- **下一步（需要时）**：要用 hy4/w-d 内置模型时，先完全退出 WorkBuddy 并以调试模式启动：
+  `$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"; Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"`，再启动两个角色（页面点启动即可）。
+- **重启 runtime 注意**：`serve` 必须带 `--apply`；若 PowerShell 报 `NO_PROXY`/`no_proxy` 重复键，先删小写重复项再 `Start-Process`。
+- **可选遗留（非阻断，未授权不做）**：legacy `guard`/空 `native-home` 残留、`operation_key` >120 显式用例、终端自己作为新角色执行的 Key 交付 onboarding；`host_unreachable` 的协议级 at-least-once 边界（结果去重键、claim token 重签发）已记录为不默认做。
+
+## W-C2 完成（2026-11-11 18:05，已提交 `cf86b80`）
 
 - **复现（653 Terra）**：空闲轮询连续 `host_unreachable` 后 serve 继续并 `poll_recovered`（设计内）；start 的 report 断开时原版只上报一次、后续空轮不重报；bridge 发送任务结果/完成请求拒连时只调用一次 → 任务被标 failed 或停在 running（真实缺口）。
 - **修复**：宿主 claim 对明确 ConnectionRefused 有界重试（0.2/0.5/1s），`host_unreachable` 时重放同一 report；bridge 结果/完成请求仅对 ConnectError/ConnectTimeout 重试（共 4 次）。654 K2.8 **approved**（候选 142/基线 137，24F+14E 逐名一致，`new_failures=0`）。
