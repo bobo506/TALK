@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-11 15:10 — W-B4 思考强度 / W-B5 弹窗改版 / W-B6 查看权限（638–648）
+
+- **W-B4 WorkBuddy CDP 逐角色思考强度**（638 Terra 开发 / 641 K2.8 **approved** / 643 E2E）：`bridges/workbuddy_cdp.py` 增只读 `list_models`（`wb.models.list()`）与 low/high/max 白名单 + `setThoughtLevel` 下发、诊断带实际 effort；`scripts/workbuddy_acp_models.py --transport cdp` 真实枚举校验模型并写/更新 choice `capabilities`（`effort:<level>`、`effort_default:<level>`）；`server/workbuddy_effort.py` 按六维匹配 choice 能力投影 `effort_options`/默认值（纯 DB、无网络探测），`server/routes/projects.py` 接线；ACP 路径不变。候选 103/基线 100，唯一失败为既存 SSE，`new_failures=[]`。部署：API reload + `register --transport cdp`；hy4 `["high"]`、w-d `["low","high","max"]`。E2E：w-d `max` 生效、非法 `ultra`/hy4 `low` 均 422，任务 643 succeeded 且适配器 argv 实测 `--effort max`。提交 `e55b26f`。
+- **W-B5 调试模式弹窗视觉与交互**（639 K2.8 开发 / 640 Terra 复核 changes_requested → 642 返修 / 644 定向复验 changes_requested → 645 二次返修 / 647 Terra **approved**）：复用 `.modal-*` 与 CSS 变量，卡片 760 CSS（0.8 缩放下 608 物理像素）、标题 20/正文 16/命令 15/按钮 46；单一「复制启动命令」，复制成功自动关闭，双失败保留并提示；竞态守卫 `dialogActive()`（then/catch/回退全分支）、焦点陷阱/初始/恢复、双失败焦点守恒、`--accent-*` 深色对比 5.89:1；候选 43/43、基线 39/39、`new_failures=0`；协调者 headless Chrome 截图复验。639/642 结果消息曾含围栏外文字（记为格式问题），645 起为纯 JSON。
+- **W-B6 信任模式下查看完整对话/成果被误拒**（646 Terra 开发 / 648 K2.8 **approved**）：`web/app.js::loadMyPermissions()` 去掉 `apiKey` 非空前置（信任模式无 Key 也加载权限），保留身份/序号/登出守卫与严格 `member_id`+`can_view_all_conversations===true` 判定；`canEnterGroup`/`workspace.js`/后端未改。候选 29/29、基线 24/24、`new_failures=0`；headless Chrome 实测页面发出 `GET /api/members/me/permissions` 并返回 true。提交 `ba75f01`。
+- **限制/待办**：既存 SSE 测试失败（`server/main.py:460` `request=None`）仍待另片；auto-start 路径未加启动门（任务失败弹窗兜底）；思考强度档位来自登记快照，桌面模型清单变化需重新登记；受管调试启动器/“换模型”入口仍待办。
+
 ## 2026-11-11 10:50 — W-B3：未开调试模式时的启动拦截与弹窗（630–636）
 
 - **需求（用户当日提出）**：WorkBuddy CDP 角色在桌面未开调试端口时，点“启动”应直接阻止并弹窗「请以调试模式启动 WorkBuddy 再使用其内置模型」，下方给出可复制的启动命令；角色已在运行但任务因该码失败时也弹同一提示。

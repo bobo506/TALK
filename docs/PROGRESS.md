@@ -8,23 +8,23 @@
 - **真实 E2E**：w-d 设 `effort=max` → 200、`effective_effort=max`；非法 `ultra` 与 hy4 `low` → 422 `effort_not_supported`；任务 **643** succeeded，执行期间适配器 argv 实测含 `--effort max`。
 - **限制**：强度档位来自登记时快照，桌面模型清单变化后需重新登记；登记脚本在桌面不可达时失败（不写半套）。
 
-## W-B5 弹窗（最终复验 647 进行中）
+## W-B5 弹窗完成（647 approved，待提交）
 
 - 640 Terra 复核 **changes_requested**：①复制竞态（旧弹窗异步回调清掉新弹窗引用 → 重复弹窗）；②无障碍（可访问名称、焦点）。
 - 642 返修：`dialogActive()` 守卫、焦点陷阱/恢复、放大到 760 CSS（≈608 物理像素、标题 20/正文 16/命令 15/按钮 46）。
 - 644 定向复验 **changes_requested**：①reject 分支仍缺守卫；②双失败焦点失守；③深色按钮对比度 1.77:1。
-- 645 二次返修（complete，43/43）：reject 全分支守卫、双失败 `copy.focus()`、按钮改用 `--accent-bg/--accent-fg`（深色约 5.9:1）；纯 JSON 交付。
+- 645 二次返修（complete，43/43）：reject 全分支守卫、双失败 `copy.focus()`、按钮改用 `--accent-bg/--accent-fg`；纯 JSON 交付。
+- 647 Terra 最终定向复验 **approved**：候选 43/43、基线 39/39、`new_failures=0`；独立对抗 2/2（延迟 reject、双失败焦点）；浅/深按钮对比度 5.21:1 / 5.89:1（hover 4.59/5.78）。
 - 截图：`.tmp/wb5/modal-light.png`、`.tmp/wb5/modal-dark.png`（协调者 headless Chrome 复验，608 物理像素）。
-- **待 647 Terra 最终复验通过后提交/推送。**
+- **提交与推送见本轮 `git log -1`。**
 
-## 已修 Bug（W-B6，646 开发 / 648 复核 approved，待提交）
+## 已修 Bug（W-B6，646 开发 / 648 复核 approved，已提交 `ba75f01`）
 
 - **现象**：任务详情点「查看完整对话」/「查看成果」提示「当前账号尚未加入这个任务对话…」（`web/app.js:1289`、`web/workspace.js:2576`），人工操作员无法查看。
 - **根因**：`web/app.js::loadMyPermissions()` 以 `apiKey` 非空为前置；本地信任模式无 API Key → 权限请求被跳过 → `canViewAllConversations` 恒 false。服务端 `/api/members/me/permissions` 实际返回 true。
 - **修复**：去掉 apiKey 前置（保留 `current()` 身份/序号/登出守卫）；`web/app.js` 1 行 + 测试新增 5 用例（无 Key 信任加载、false/401/403/字段不符拒绝、agent 拒绝、key 模式不回归、登出竞态）。
 - **复核**：648 K2.8 **approved**——候选 29/29、基线 24/24，`new_failures=0`；未改 `canEnterGroup`、未改 `workspace.js`/后端。
 - **真实浏览器证据（协调者）**：headless Chrome 加载页面后 `performance` 资源里出现 `GET /api/members/me/permissions`（fetch，364 bytes），响应 `{"member_id":"human:operator","can_view_all_conversations":true}`；页面 `apiKey` 为空，确认是信任模式路径。
-- **待提交/推送。**
 
 ## 收工快照（2026-11-11 10:50）
 

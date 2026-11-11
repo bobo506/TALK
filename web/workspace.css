@@ -302,3 +302,27 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-name-dialog { width:min(430px,100%); }
 .role-name-field { margin-top:22px; }
 .role-name-footer { gap:10px; }
+
+/* W-B5 WorkBuddy 调试模式弹窗：复用 .modal-overlay/.modal-card/.modal-header/.modal-close 与全局 CSS 变量，
+   暗色模式随 html[data-theme="dark"] 自动适配；642 返修按用户要求整体放大（界面缩放 0.8 下仍清晰可读），
+   命令块等宽、可横向滚动，窄屏自适应。 */
+.workbuddy-debug-card { width:min(760px,92vw); padding:28px 32px; }
+.workbuddy-debug-card .modal-header { margin-bottom:14px; }
+.workbuddy-debug-card .modal-header h3 { font-size:20px; line-height:1.4; margin:0; }
+.workbuddy-debug-body { margin:0 0 16px; font-size:16px; line-height:1.7; color:var(--muted-strong); }
+.workbuddy-debug-command { margin:0 0 20px; padding:16px 18px; border:1px solid var(--line); border-radius:8px;
+  background:var(--blue-soft); color:var(--text); font-family:Consolas,"Courier New",monospace;
+  font-size:15px; line-height:1.7; white-space:pre; overflow-x:auto; }
+.workbuddy-debug-footer { display:flex; align-items:center; justify-content:flex-end; gap:12px; flex-wrap:wrap; }
+/* 645 返修：深色下 --blue-strong(#a6c6e6) 配白字对比度仅约 1.77:1，改走主题强调色变量，
+   浅色 #2f6fb1/#fff ≈5.2:1、深色 #35618c/#eef5fb ≈5.9:1，均 ≥4.5:1。 */
+.workbuddy-debug-footer .room-primary-btn { min-height:46px; padding:0 24px; font-size:16px; border-radius:8px;
+  background:var(--accent-bg); border-color:var(--accent-bg); color:var(--accent-fg); }
+.workbuddy-debug-footer .room-primary-btn:hover:not(:disabled) { filter:brightness(1.08); }
+.workbuddy-debug-error { margin:0; font-size:15px; line-height:1.6; color:var(--red); }
+@media(max-width:700px){
+  .workbuddy-debug-card { padding:18px 18px 20px; }
+  .workbuddy-debug-body { font-size:15px; }
+  .workbuddy-debug-command { padding:12px; font-size:14px; }
+  .workbuddy-debug-footer .room-primary-btn { width:100%; }
+}

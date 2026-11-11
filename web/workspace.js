@@ -1636,39 +1636,98 @@ const WORKBUDDY_DEBUG_COMMAND = '$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"\n
 const workbuddyNotifiedTasks = new Set();
 let workbuddyDialog = null;
 
+// W-B5：复用页面 .modal-overlay/.modal-card/.modal-header/.modal-close 结构与 CSS 变量，
+// 单一主按钮「复制启动命令」；复制成功自动关闭，两种方式都失败时保留弹窗并提示手动选择。
+// W-B5 返修（642）：异步复制回调先校验仍是当前实例且仍挂载，避免旧弹窗回调清掉新弹窗引用；
+// 弹窗带可访问名称（aria-labelledby）、打开时聚焦主按钮、Tab/Shift+Tab 焦点循环（焦点陷阱）、
+// 关闭（按钮/Esc/遮罩）后把焦点还给触发元素，并立即解除全局引用与 keydown 监听。
 function showWorkbuddyDebugDialog() {
   if (workbuddyDialog) return;
+  const previousFocus = document.activeElement || null;
   const overlay = document.createElement("div");
-  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px";
+  overlay.className = "modal-overlay";
   const panel = document.createElement("div");
-  panel.style.cssText = "background:white;color:#222;border-radius:8px;padding:24px;max-width:720px;width:100%";
+  panel.className = "modal-card workbuddy-debug-card";
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true");
-  const title = document.createElement("h2");
+  panel.setAttribute("aria-labelledby", "workbuddy-debug-title");
+  const header = document.createElement("div");
+  header.className = "modal-header";
+  const title = document.createElement("h3");
+  title.id = "workbuddy-debug-title";
   title.textContent = "请以调试模式启动 WorkBuddy 再使用其内置模型";
+  const close = document.createElement("button");
+  close.type = "button"; close.className = "modal-close"; close.textContent = "×";
+  close.setAttribute("aria-label", "关闭");
+  header.append(title, close);
+  const body = document.createElement("p");
+  body.className = "workbuddy-debug-body";
+  body.textContent = "检测到 WorkBuddy 未以远程调试模式运行，其内置模型暂时无法连接。请复制以下命令在 PowerShell 中执行，然后重新启动服务。";
   const command = document.createElement("pre");
-  command.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f4f6;padding:12px";
+  command.className = "workbuddy-debug-command";
   command.textContent = WORKBUDDY_DEBUG_COMMAND;
-  const copy = document.createElement("button"); copy.type = "button"; copy.textContent = "复制命令";
+  const footer = document.createElement("div");
+  footer.className = "workbuddy-debug-footer";
+  const copy = document.createElement("button");
+  copy.type = "button"; copy.className = "room-primary-btn"; copy.textContent = "复制启动命令";
+  footer.appendChild(copy);
+  const dialogActive = () => workbuddyDialog === overlay && overlay.isConnected;
+  const dismiss = () => {
+    // 先解除全局引用与监听，再移除 DOM，保证任何在途异步回调随后一看 dialogActive() 即中止。
+    if (workbuddyDialog === overlay) workbuddyDialog = null;
+    document.removeEventListener("keydown", onKey);
+    overlay.remove();
+    if (previousFocus && typeof previousFocus.focus === "function") previousFocus.focus();
+  };
+  const focusables = () => [copy, close].filter(el => !el.disabled);
+  const onKey = event => {
+    if (event.key === "Escape") { dismiss(); return; }
+    if (event.key !== "Tab") return;
+    // 焦点陷阱：Tab/Shift+Tab 在弹窗内循环，不泄漏到背景页面。
+    const items = focusables();
+    if (!items.length) return;
+    const idx = items.indexOf(document.activeElement);
+    event.preventDefault?.();
+    let next;
+    if (idx === -1) next = event.shiftKey ? items[items.length - 1] : items[0];
+    else next = items[(idx + (event.shiftKey ? -1 : 1) + items.length) % items.length];
+    next.focus();
+  };
+  let errorNote = null;
   copy.addEventListener("click", async () => {
+    // 645 返修：异步分支入口先校验仍是当前弹窗；关闭/被顶替后立即中止。
+    if (!dialogActive()) return;
+    let copied = false;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
       await navigator.clipboard.writeText(WORKBUDDY_DEBUG_COMMAND);
+      copied = true;
     } catch (_) {
+      // 645 返修：迟到的 reject 进入回退前同样先校验；旧弹窗的拒绝不得触碰 DOM/剪贴板/焦点。
+      if (!dialogActive()) return;
       const area = document.createElement("textarea"); area.value = WORKBUDDY_DEBUG_COMMAND;
       area.style.cssText = "position:fixed;left:-9999px;opacity:0";
       document.body.appendChild(area); area.select();
-      try { document.execCommand("copy"); } finally { area.remove(); }
+      try { copied = document.execCommand("copy") !== false; } catch (_) { copied = false; } finally { area.remove(); }
+    }
+    // 异步完成后必须仍是当前弹窗且仍挂载：已关闭或被新弹窗顶替时不得再操作。
+    if (!dialogActive()) return;
+    if (copied) { dismiss(); return; }
+    // 645 返修：双失败后临时 textarea 已移出，焦点收回弹窗内主按钮，不泄漏到页面背景。
+    copy.focus();
+    if (!errorNote) {
+      errorNote = document.createElement("p");
+      errorNote.className = "workbuddy-debug-error";
+      errorNote.setAttribute("role", "alert");
+      errorNote.setAttribute("tabindex", "-1");
+      errorNote.textContent = "复制失败，请手动选择命令";
+      footer.appendChild(errorNote);
     }
   });
-  const close = document.createElement("button"); close.type = "button"; close.textContent = "知道了";
-  const dismiss = () => { overlay.remove(); document.removeEventListener("keydown", onKey); workbuddyDialog = null; };
-  const onKey = event => { if (event.key === "Escape") dismiss(); };
   close.addEventListener("click", dismiss);
   overlay.addEventListener("click", event => { if (event.target === overlay) dismiss(); });
-  panel.append(title, command, copy, close); overlay.appendChild(panel); document.body.appendChild(overlay);
-  document.addEventListener("keydown", onKey); workbuddyDialog = overlay; close.focus();
+  panel.append(header, body, command, footer); overlay.appendChild(panel); document.body.appendChild(overlay);
+  document.addEventListener("keydown", onKey); workbuddyDialog = overlay; copy.focus();
 }
-
 function notifyWorkbuddyTaskFailure(task, projectId) {
   if (!task || task.status !== "failed" || typeof task.last_error !== "string"
       || !task.last_error.includes("workbuddy_cdp_unavailable")) return;

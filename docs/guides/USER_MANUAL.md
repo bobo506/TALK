@@ -113,8 +113,8 @@ Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"
 
 1. 在 TALK 页面“创建角色”中选择 WorkBuddy，模型选“（内置·桌面）”的条目，按正常流程创建。
 2. 创建完成后点“启动”。若 WorkBuddy 未以调试模式运行，启动会被**阻止**并弹窗：
-   「请以调试模式启动 WorkBuddy 再使用其内置模型」，下方有启动命令和“复制命令”按钮。
-   点“复制命令”→ 退出 WorkBuddy → 在 PowerShell 粘贴执行 → 再回到页面点“启动”即可。
+   「请以调试模式启动 WorkBuddy 再使用其内置模型」，下方有启动命令和“复制启动命令”按钮（复制成功后弹窗自动关闭）。
+   点“复制启动命令”→ 退出 WorkBuddy → 在 PowerShell 粘贴执行 → 再回到页面点“启动”即可。
 3. 启动成功后角色显示 running，可正常派任务。
 
 **角色模型在创建时锁定，不能原地更换**；需要换模型（或从旧的 ACP 通道迁移）时，删除旧角色后按

@@ -39,12 +39,13 @@ function fakeEl(tag) {
     setAttribute(k, v) { el.attrs[k] = String(v); },
     addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
     fire(type, event = {}) { for (const fn of el.listeners[type] || []) fn(event); },
-    focus() {},
+    focus() { if (el.ownerDocument) el.ownerDocument.activeElement = el; },
     select() {},
     remove() { if (el.parentElement) { const siblings = el.parentElement.children; siblings.splice(siblings.indexOf(el), 1); el.parentElement = null; } },
     scrollIntoView() {},
     querySelectorAll: () => [],
   };
+  Object.defineProperty(el, 'isConnected', { get: () => el.parentElement != null });
   Object.defineProperty(el, 'lastChild', { get: () => el.children[el.children.length - 1] || null });
   Object.defineProperty(el, 'childElementCount', { get: () => el.children.length });
   return el;
@@ -61,7 +62,7 @@ function findAll(node, pred, out = []) {
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-test('WorkBuddy 启动失败弹窗、复制和关闭', async () => {
+test('WorkBuddy 启动失败弹窗：单一主按钮、复制成功自动关闭、Esc/遮罩/× 均可关闭', async () => {
   const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
   h.context.__workspaceUI.mode = 'roles';
   h.context.renderWorkspaceList = () => {};
@@ -75,20 +76,107 @@ test('WorkBuddy 启动失败弹窗、复制和关闭', async () => {
   const command = '$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"\nStart-Process "$env:LOCALAPPDATA\\Programs\\WorkBuddy\\WorkBuddy.exe"';
   assert.ok(allTexts(body).includes(message));
   assert.ok(allTexts(body).includes(command));
-  findAll(body, n => n.textContent === '复制命令')[0].fire('click');
+  // 只有「复制启动命令」一个主按钮（加右上角 ×），不再有“复制命令”“知道了”。
+  const copyBtns = findAll(body, n => n.textContent === '复制启动命令');
+  assert.equal(copyBtns.length, 1);
+  assert.equal(findAll(body, n => n.textContent === '复制命令').length, 0);
+  assert.equal(findAll(body, n => n.textContent === '知道了').length, 0);
+  // clipboard 成功 → 复制内容并自动关闭弹窗。
+  copyBtns[0].fire('click');
   await sleep(0);
   assert.equal(copied, command);
-  findAll(body, n => n.textContent === '知道了')[0].fire('click');
   assert.equal(body.children.length, 0);
+  // Esc 关闭。
   await h.context.startRoleService('agent:a');
   h.context.document.fire('keydown', {key: 'Escape'});
   assert.equal(body.children.length, 0);
+  // 遮罩点击关闭。
   await h.context.startRoleService('agent:a');
   body.children[0].fire('click', {target: body.children[0]});
   assert.equal(body.children.length, 0);
+  // 右上角 × 关闭。
+  await h.context.startRoleService('agent:a');
+  findAll(body, n => n.tagName === 'button' && n.textContent === '×')[0].fire('click');
+  assert.equal(body.children.length, 0);
 });
 
-test('复制失败回退，其他启动错误不弹窗', async () => {
+test('复制竞态回归：延迟 clipboard 在关闭并重开后完成，不得清掉新弹窗（DOM 恒为 1 个弹窗）', async () => {
+  const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
+  h.context.__workspaceUI.mode = 'roles';
+  h.context.renderWorkspaceList = () => {}; h.context.renderTaskDetailsPanel = () => {};
+  let resolveWrite;
+  let firstWrite = true;
+  // 第一次点击的 clipboard 挂起模拟在途请求；之后立即 resolve 验证正常关闭路径。
+  h.context.navigator.clipboard = {writeText: () => {
+    if (firstWrite) { firstWrite = false; return new Promise(r => { resolveWrite = r; }); }
+    return Promise.resolve();
+  }};
+  h.context.apiFetch = async () => ({ok: false, status: 409, json: async () => ({detail: 'workbuddy_cdp_unavailable'})});
+  const body = h.context.document.body;
+  const overlays = () => findAll(body, n => n.className === 'modal-overlay');
+  // 弹窗 1：点击复制后 clipboard 挂起（未 resolve）。
+  await h.context.startRoleService('agent:a');
+  assert.equal(overlays().length, 1);
+  findAll(body, n => n.textContent === '复制启动命令')[0].fire('click');
+  // 用户随即 × 关闭并重新触发 → 弹窗 2。
+  findAll(body, n => n.tagName === 'button' && n.textContent === '×')[0].fire('click');
+  assert.equal(overlays().length, 0);
+  await h.context.startRoleService('agent:a');
+  assert.equal(overlays().length, 1);
+  // 弹窗 1 的在途 clipboard 此刻才 resolve：旧回调必须认出自己已被顶替，不得关闭/清空新弹窗。
+  resolveWrite();
+  await sleep(0);
+  assert.equal(overlays().length, 1);
+  assert.ok(allTexts(body).includes('请以调试模式启动 WorkBuddy 再使用其内置模型'));
+  // 新弹窗自身复制成功后正常关闭，且可以再次弹出（引用未被污染）。
+  findAll(body, n => n.textContent === '复制启动命令')[0].fire('click');
+  await sleep(0);
+  assert.equal(overlays().length, 0);
+  await h.context.startRoleService('agent:a');
+  assert.equal(overlays().length, 1);
+});
+
+test('弹窗无障碍：aria-labelledby、初始焦点在主按钮、Tab/Shift+Tab 焦点循环、关闭后焦点还原', async () => {
+  const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
+  h.context.__workspaceUI.mode = 'roles';
+  h.context.renderWorkspaceList = () => {}; h.context.renderTaskDetailsPanel = () => {};
+  h.context.navigator.clipboard = {writeText: async () => { throw new Error('denied'); }};
+  h.context.apiFetch = async () => ({ok: false, status: 409, json: async () => ({detail: 'workbuddy_cdp_unavailable'})});
+  const body = h.context.document.body;
+  // 打开前的触发元素持有焦点。
+  const trigger = h.context.document.createElement('button');
+  trigger.textContent = '启动服务';
+  body.appendChild(trigger);
+  trigger.focus();
+  assert.equal(h.context.document.activeElement, trigger);
+  await h.context.startRoleService('agent:a');
+  const overlays = () => findAll(body, n => n.className === 'modal-overlay');
+  assert.equal(overlays().length, 1);
+  const panel = findAll(body, n => n.attrs && n.attrs['role'] === 'dialog')[0];
+  assert.ok(panel, '弹窗应有 role=dialog');
+  assert.equal(panel.attrs['aria-modal'], 'true');
+  // 可访问名称：aria-labelledby 指向标题 id。
+  assert.equal(panel.attrs['aria-labelledby'], 'workbuddy-debug-title');
+  const title = findAll(panel, n => n.id === 'workbuddy-debug-title')[0];
+  assert.ok(title && title.textContent === '请以调试模式启动 WorkBuddy 再使用其内置模型');
+  const copy = findAll(panel, n => n.textContent === '复制启动命令')[0];
+  const closeBtn = findAll(panel, n => n.tagName === 'button' && n.textContent === '×')[0];
+  // 初始焦点落在「复制启动命令」。
+  assert.equal(h.context.document.activeElement, copy);
+  // Tab 在弹窗内循环：复制 → × → 复制；Shift+Tab 反向。
+  h.context.document.fire('keydown', {key: 'Tab'});
+  assert.equal(h.context.document.activeElement, closeBtn);
+  h.context.document.fire('keydown', {key: 'Tab'});
+  assert.equal(h.context.document.activeElement, copy);
+  h.context.document.fire('keydown', {key: 'Tab', shiftKey: true});
+  assert.equal(h.context.document.activeElement, closeBtn);
+  // Esc 关闭后焦点还原到触发元素。
+  h.context.document.fire('keydown', {key: 'Escape'});
+  assert.equal(overlays().length, 0);
+  assert.equal(h.context.document.activeElement, trigger);
+});
+
+test('复制回退：clipboard 抛错走 textarea+execCommand 成功仍关闭；两种都失败保留弹窗并提示', async () => {
   const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
   h.context.__workspaceUI.mode = 'roles';
   h.context.renderWorkspaceList = () => {}; h.context.renderTaskDetailsPanel = () => {};
@@ -96,13 +184,92 @@ test('复制失败回退，其他启动错误不弹窗', async () => {
   let copied = false;
   h.context.document.execCommand = command => { copied = command === 'copy'; return true; };
   h.context.showWorkbuddyDebugDialog();
-  findAll(h.context.document.body, n => n.textContent === '复制命令')[0].fire('click');
+  findAll(h.context.document.body, n => n.textContent === '复制启动命令')[0].fire('click');
   await sleep(0);
   assert.equal(copied, true);
-  findAll(h.context.document.body, n => n.textContent === '知道了')[0].fire('click');
+  assert.equal(h.context.document.body.children.length, 0);
+  // execCommand 返回 false → 弹窗保留并出现手动选择提示。
+  h.context.document.execCommand = () => false;
+  h.context.showWorkbuddyDebugDialog();
+  const body = h.context.document.body;
+  findAll(body, n => n.textContent === '复制启动命令')[0].fire('click');
+  await sleep(0);
+  assert.equal(body.children.length, 1);
+  assert.ok(allTexts(body).includes('复制失败，请手动选择命令'));
+  // execCommand 抛错同样保留弹窗，且不重复添加提示。
+  h.context.document.execCommand = () => { throw new Error('no exec'); };
+  findAll(body, n => n.textContent === '复制启动命令')[0].fire('click');
+  await sleep(0);
+  assert.equal(body.children.length, 1);
+  assert.equal(findAll(body, n => n.textContent === '复制失败，请手动选择命令').length, 1);
+  // 其他错误码不弹窗。
+  findAll(body, n => n.tagName === 'button' && n.textContent === '×')[0].fire('click');
   h.context.apiFetch = async () => ({ok: false, status: 409, json: async () => ({detail: 'already_running'})});
   await h.context.startRoleService('agent:a');
   assert.equal(h.context.document.body.children.length, 0);
+});
+
+// 645 返修回归：clipboard 的延迟 reject 在弹窗关闭并重开后才到达，
+// 旧弹窗守卫必须中止回退——不执行 execCommand、不追加 textarea、不抢新弹窗焦点、不新增弹窗。
+test('延迟 reject 守卫：关闭并重开后迟到拒绝，无回退无新弹窗焦点不被抢', async () => {
+  const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
+  h.context.__workspaceUI.mode = 'roles';
+  h.context.renderWorkspaceList = () => {}; h.context.renderTaskDetailsPanel = () => {};
+  let rejectWrite;
+  h.context.navigator.clipboard = {writeText: () => new Promise((_, reject) => { rejectWrite = reject; })};
+  let execCalls = 0;
+  h.context.document.execCommand = () => { execCalls++; return true; };
+  h.context.apiFetch = async () => ({ok: false, status: 409, json: async () => ({detail: 'workbuddy_cdp_unavailable'})});
+  const body = h.context.document.body;
+  const overlays = () => findAll(body, n => n.className === 'modal-overlay');
+  // 弹窗 1：点击复制后 writeText 挂起，用户随即 × 关闭再重新触发 → 弹窗 2。
+  await h.context.startRoleService('agent:a');
+  findAll(body, n => n.textContent === '复制启动命令')[0].fire('click');
+  findAll(body, n => n.tagName === 'button' && n.textContent === '×')[0].fire('click');
+  await h.context.startRoleService('agent:a');
+  assert.equal(overlays().length, 1);
+  const freshCopy = findAll(body, n => n.textContent === '复制启动命令')[0];
+  assert.equal(h.context.document.activeElement, freshCopy);
+  // 弹窗 1 的迟到 reject 到达：守卫在回退前中止，不得做任何 DOM/剪贴板/焦点操作。
+  rejectWrite(new Error('late denied'));
+  await sleep(0);
+  assert.equal(execCalls, 0, '迟到 reject 不得执行 execCommand 回退');
+  assert.equal(overlays().length, 1, '不得新增弹窗');
+  assert.equal(h.context.document.activeElement, freshCopy, '焦点不得被旧弹窗抢走');
+  assert.ok(allTexts(body).includes('请以调试模式启动 WorkBuddy 再使用其内置模型'));
+});
+
+// 645 返修回归：clipboard 与 execCommand 双失败后，焦点必须收回弹窗内（主按钮）；
+// 关闭弹窗后 keydown 监听立即移除。
+test('双失败焦点守恒：activeElement 留在弹窗内，关闭后 keydown 监听已移除', async () => {
+  const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
+  h.context.__workspaceUI.mode = 'roles';
+  h.context.renderWorkspaceList = () => {}; h.context.renderTaskDetailsPanel = () => {};
+  h.context.navigator.clipboard = {writeText: async () => { throw new Error('denied'); }};
+  h.context.document.execCommand = () => false;
+  h.context.apiFetch = async () => ({ok: false, status: 409, json: async () => ({detail: 'workbuddy_cdp_unavailable'})});
+  const body = h.context.document.body;
+  const removed = [];
+  const origRemove = h.context.document.removeEventListener.bind(h.context.document);
+  h.context.document.removeEventListener = (type, fn) => { removed.push(type); return origRemove(type, fn); };
+  await h.context.startRoleService('agent:a');
+  const panel = findAll(body, n => n.attrs && n.attrs['role'] === 'dialog')[0];
+  assert.ok(panel, '应有弹窗');
+  const copy = findAll(panel, n => n.textContent === '复制启动命令')[0];
+  copy.fire('click');
+  await sleep(0);
+  // 双失败：弹窗保留、出现提示，且焦点回到弹窗内主按钮。
+  assert.equal(body.children.length, 1);
+  assert.ok(allTexts(body).includes('复制失败，请手动选择命令'));
+  assert.equal(h.context.document.activeElement, copy, '双失败后焦点应回到弹窗内主按钮');
+  const inPanel = node => node === panel || (node && node.parentElement ? inPanel(node.parentElement) : false);
+  assert.ok(inPanel(h.context.document.activeElement), 'activeElement 必须在 .workbuddy-debug-card 内');
+  // 关闭后 keydown 监听被移除，且不会再因 Esc 触发任何弹窗行为。
+  findAll(body, n => n.tagName === 'button' && n.textContent === '×')[0].fire('click');
+  assert.ok(removed.includes('keydown'), '关闭时应移除 keydown 监听');
+  h.context.document.fire('keydown', {key: 'Escape'});
+  h.context.document.fire('keydown', {key: 'Tab'});
+  assert.equal(body.children.length, 0, '监听移除后 keydown 不得再操作页面');
 });
 
 test('任务详情失败提示只弹一次', () => {
@@ -119,7 +286,7 @@ test('任务详情失败提示只弹一次', () => {
   vm.runInContext(source, h.context);
   assert.throws(() => h.context.renderTaskDetailsPanel(), /stop after notification/);
   assert.ok(allTexts(h.context.document.body).includes('请以调试模式启动 WorkBuddy 再使用其内置模型'));
-  findAll(h.context.document.body, n => n.textContent === '知道了')[0].fire('click');
+  findAll(h.context.document.body, n => n.tagName === 'button' && n.textContent === '×')[0].fire('click');
   assert.throws(() => h.context.renderTaskDetailsPanel(), /stop after notification/);
   assert.equal(h.context.document.body.children.length, 0);
 });
@@ -316,7 +483,7 @@ function harness({ human = true, roster = [] } = {}) {
   const documentStub = {
     getElementById: id => id === 'workspace-search'
       ? findAll(board, node => node.id === id)[0] || null : getEl(id),
-    createElement: tag => fakeEl(tag),
+    createElement(tag) { const el = fakeEl(tag); el.ownerDocument = documentStub; return el; },
     createTextNode: text => ({ textContent: text }),
     querySelector: sel => (sel === '.workbench' ? workbench : null),
     activeElement: null,
