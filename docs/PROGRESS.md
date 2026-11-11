@@ -1,5 +1,15 @@
 # Project Progress
 
+## 收工快照（2026-11-12 01:20，W-D1 3b-1 完成）
+
+- **W-D1 3b-1「重关联操作状态机与幂等日志」完成（672 partial → 673 返修 → 674 K2.8 approved）**：新增表 `workspace_operations`（`operation_id` 主键、`project_id` 索引、`request_digest`、`stage`、`error_code`、`old_root`/`candidate_root`、时间戳；无外键级联、不存 Key/配置正文）与 `server/workspace_operations.py`（136 行）：`begin_operation`（同 ID 同摘要幂等、异摘要 `workspace_operation_conflict`）、`advance_stage`（`WHERE stage=?` CAS、非法转移 `workspace_stage_conflict`）、`list_recoverable`（只读、不自动重放）、`digest_request`（normcase+normpath、sha256、含 expected_revision）。`server/models.py` +16、`server/db.py` +1；新增测试 166 行。
+- **返修 673**：3a 的 `tests/test_workspace_registry.py` 仍断言“初始化后不得出现 `workspace_operations`”，与 3b-1 冲突；按新事实更新为“新增表集合 = {registrations, operations}”，其余断言未削弱。
+- **验证（674 独立复核）**：10 项全 pass、`new_failures=[]`；独立重跑 operations 6 项 0.828s OK、registry 5 项 3.947s OK、诊断三包 31 项 4.671s OK（skipped=1 平台不支持）；旧库 39→40 表、既有表/数据不变；CAS 同 stage 双向、故障注入无半写、恢复列表只读、幂等重放不改 stage/updated_at 均实证。
+- **专项结论**：摘要含 `expected_revision` 属 fail-closed 正确；字符串级 normcase 对 junction/8.3 别名可能产生不同摘要（3b-2 调用方需先按物理身份规范化）；`recovery_required` 为 sink、无自动恢复路径；直接 SQL 绕过不在威胁模型。
+- **提交与推送**：五文件 + 本文档，随本片推送。
+- **下一步**：3b-2「文件事务原语」（临时文件/fsync/原子替换/补偿/`recovery_required`，不开放 HTTP）；完成后 3b 整片收口。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 00:45，W-D1 第 3a 片完成）
 
 - **W-D1 第 3a 片「登记元数据与身份快照」完成（669 failed → 670 Terra / 671 K2.8 approved）**：新增表 `workspace_registrations`（`project_id` 主键、`revision` 默认 1、可空身份 platform/volume/file_id/collected_at、`updated_at`；不存路径/Key/主机名），`server/models.py` +14 行、`server/db.py` +1 行幂等索引；新增 `server/workspace_registry.py`（81 行：`get_registration`/`ensure_registration`/`save_identity` CAS）与 `tests/test_workspace_registry.py`（129 行）。旧库 `create_all` 只新增表（实测 38→39 表、既有表 schema/行全等）；**启动路径零调用、不自动回填**；CAS 冲突零写入；模块不自行 commit。

@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-12 01:20 — W-D1 3b-1：重关联操作状态机与幂等日志（672/673/674）
+
+- **672（Terra，617s）partial**：实现 `workspace_operations` 表与 `server/workspace_operations.py`（136 行）+ 测试（166 行）：阶段链 `started→prepared→files_staged→committed→completed`，任一非终态→`failed`/`recovery_required`（白名单 error_code）；`begin_operation` 幂等/异摘要冲突；`advance_stage` CAS + 非法转移拒绝；`list_recoverable` 只读；`digest_request` 含 expected_revision。自身 6 项测试全过；但 3a 的 `tests/test_workspace_registry.py:59` 旧断言“不得出现 operations 表”过期且不在白名单，如实报 partial。
+- **673（Terra 返修，526s）complete**：仅改该旧断言（DROP 两表夹具 + 新增表集合断言），保留既有表不变/重复初始化/不自动回填等断言；回归全绿。
+- **674（K2.8 独立复核）approved**：10 项全 pass、`new_failures=[]`；独立重跑 operations 6 项 0.828s、registry 5 项 3.947s、诊断三包 31 项 4.671s（skipped=1 平台不支持）；旧库 39→40 表、既有 39 表结构与行不变；CAS 同一 expected_stage 两次只有一次成功、跳级/回退/终态推进被拒；故障注入回滚无半写；`list_recoverable` 调用前后快照一致且无自动重放；`begin` 幂等不重置 stage/updated_at。
+- **专项结论**：摘要含 expected_revision 为 fail-closed 正确；字符串级 normcase 对 junction/8.3/symlink 别名可能不同摘要（3b-2 调用方需先物理身份规范化）；`recovery_required` 为 sink、无自动恢复路径；直接 SQL 绕过不在威胁模型；真实多进程并发未验（顺序模拟）。
+- **限制**：3b-2 文件原语未做；未开放 HTTP；未写文件/未启停服务。
+
 ## 2026-11-12 00:45 — W-D1 第 3a 片：登记元数据与身份快照（669 failed → 670/671）
 
 - **669（Terra）failed**：Codex 运行时瞬时失败，`last_error` 为 “Refusing to create helper binaries under temporary dir …\.codex” 的 PATH alias 警告；`changed_files=[]`，无代码产出。Terra 角色仍 `running/ready`、实例 idle、心跳正常；未自动连续重派，经用户确认后重试。

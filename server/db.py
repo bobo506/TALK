@@ -410,6 +410,7 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_type ON groups (type)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_projects_maintainer_member_id ON projects (maintainer_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspace_registrations_updated_at ON workspace_registrations (updated_at)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspace_operations_project_id ON workspace_operations (project_id)")
         conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_project_agents_business_role "
             "ON project_agents (business_role)"

@@ -43,6 +43,7 @@ class WorkspaceRegistryTests(unittest.TestCase):
 
     def test_old_database_migration_and_no_backfill(self):
         with self.engine.begin() as conn:
+            conn.exec_driver_sql('DROP TABLE workspace_operations')
             conn.exec_driver_sql('DROP TABLE workspace_registrations')
         def snapshot():
             with self.engine.connect() as conn:
@@ -55,8 +56,7 @@ class WorkspaceRegistryTests(unittest.TestCase):
             db.init_db()
             db.init_db()
         after = snapshot()
-        self.assertEqual(set(after[0]) - set(before[0]), {'workspace_registrations'})
-        self.assertNotIn('workspace_operations', after[0])
+        self.assertEqual(set(after[0]) - set(before[0]), {'workspace_registrations', 'workspace_operations'})
         for table in before[0]:
             self.assertEqual(before[1][table], after[1][table], table)
             self.assertEqual(before[2][table], after[2][table], table)

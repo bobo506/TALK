@@ -148,6 +148,22 @@ class WorkspaceRegistration(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
 
 
+class WorkspaceOperation(SQLModel, table=True):
+    """Durable relink operation metadata; transaction ownership stays with callers."""
+
+    __tablename__ = "workspace_operations"
+
+    operation_id: str = Field(sa_column=Column(Text, primary_key=True))
+    project_id: str = Field(sa_column=Column(Text, nullable=False))
+    request_digest: str = Field(sa_column=Column(Text, nullable=False))
+    stage: str = Field(sa_column=Column(Text, nullable=False))
+    error_code: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    old_root: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    candidate_root: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class ProjectAgent(SQLModel, table=True):
     """Per-(project, agent) profile path index (PROJECT_INTEGRATION §7.1).
 
