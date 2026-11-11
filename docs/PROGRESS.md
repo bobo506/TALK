@@ -1,5 +1,18 @@
 # Project Progress
 
+## 收工快照（2026-11-11 09:10）
+
+- **本轮完成**：**W-B2 WorkBuddy CDP 执行通道**（624 Terra 开发 / 625 返修 / 626 K2.8 独立复核 **approved**）＋**内置模型恢复与真实任务 E2E**（627/628）。提交见 `git log -1`。
+- **实现**：新增 `bridges/workbuddy_cdp.py`、`scripts/workbuddy_cdp_prompt.py`、`tests/test_workbuddy_cdp.py`；`bridges/workbuddy_bridge.py` 增 `workbuddy-cdp:` 分支、`scripts/workbuddy_role_host.py` 接受该前缀、`scripts/workbuddy_acp_models.py` 增 `--transport cdp`。旧 ACP/custom-local 分支逐字未变；服务端/前端零改动。候选 70 项全过、基线 60 项（唯一差异为基线无 CDP 测试模块的 loader error），`new_failures=0`。
+- **实机（WorkBuddy 5.9.3，调试端口 9222）**：适配器 chat 返回 `OK`（25s）、task+交付合同返回有效 `talk-delivery-1` JSON（22s）；E2E 任务 **627**（Hy4，191s）与 **628**（DeepSeek-V4.1-Flash，60s）均 succeeded 且交付包校验通过；WorkBuddy 对话列表回到基线 40 条、无残留。
+- **绑定恢复**：角色模型创建时锁定（六维校验），不能原地改；经用户确认后删除旧 `hy4`/`w-d 内置`（5 步清理 complete），按同名新建 CDP 角色：`hy4` = `agent:prj-e8fe7066bbec.hy4-2bbb4889`（`ins_0c9faa73efda`，pid 9732，Hy4），`w-d 内置` = `agent:prj-e8fe7066bbec.w-d-a6718675`（`ins_070295d46282`，pid 7784，DeepSeek-V4.1-Flash），均 `running/ready`。
+- **模型选择**：登记 `workbuddy-cdp:hy4free`（`rmc_5c505bbca8c5`）、`workbuddy-cdp:deepseek-v4.1-flash`（`rmc_7fd4672d2b4d`）、`workbuddy-cdp:glm-5.3-flash`（`rmc_fc4b0e4069b3`），显示名“（内置·桌面）”。
+- **部署边界**：未重启 API/runtime，只由 runtime 重组 workbuddy 角色宿主；新宿主加载工作区代码后启动。
+- **运行时要求**：WorkBuddy 必须以 `WORKBUDDY_REMOTE_DEBUGGING_PORT=9222` 启动（仅 loopback；启动前清掉 `ELECTRON_RUN_AS_NODE`）；正常双击启动时角色任务会明确失败 `workbuddy_cdp_unavailable`，不会静默改道。
+- **已知限制**：`window.wb` 为桌面私有 API，升级可能失效；CDP 绑定 `effort_options` 为空（强度按模型默认）；登记脚本按显式模型清单、不校验存在；适配器一处 CRLF 混入（非阻断）。
+- **待办（按优先级）**：① 受管 WorkBuddy 调试启动器/开机引导（避免重启后忘开 9222）；② CDP 强度探测接入（`reasoning.supportedEfforts` → binding eager）；③ "角色换模型"产品化入口（当前只能删除重建）；④ 可选：`scripts/workbuddy_cdp_prompt.py` 行尾归一；⑤ 既有 `host_unreachable`、legacy guard 残留等待办不变。
+- **恢复**：说“继续项目”；先读本快照与 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.5/10.6。
+
 ## 收工快照（2026-11-11 00:45）
 
 - **本轮完成**：W3c-3/4/6（隔离/恢复/工作区门，已验收）＋ **L1 本地信任模式**（免登录/隐藏 operator/公网拒绝，人工验收通过）＋ **L2 首次 MCP 自动创建工作区**（620 pass、E2E 通过）＋ **L3 终端 Agent 加入新项目**（623 pass、E2E 通过）＋ **WorkBuddy CDP 路线实测打通**（创建对话 + `runPrompt` 返回 OK，见 10.5）。

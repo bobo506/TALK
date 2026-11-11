@@ -246,3 +246,41 @@ const r = await conv.runPrompt([{type:"text", text:"只回复 OK 两个字母"}]
 - 不读取/复制账号凭据；只使用页面已有登录态。
 
 **结论**：**“TALK 自动创建并驱动 WorkBuddy 专用对话”已实测可行**，且不依赖 ACP/CLI 端点或 Open API。下一步是 W-B2：把 CDP 客户端接入角色宿主/执行通道（创建/复用/设置模型强度/发任务/收结果/换新对话），并做真实任务 E2E；需用户每次以调试模式启动 WorkBuddy（或后续做受管启动器）。
+
+### 10.6 W-B2 实现与部署（2026-11-11）
+
+**实现（624 开发 / 625 返修 / 626 K2.8 独立复核 approved）**：
+- `bridges/workbuddy_cdp.py`：CDP 客户端。`GET /json` 选 `renderer/index.html` 页面 target，校验只连
+  loopback 且端口与端点一致；一次 `Runtime.evaluate` 内完成「create → setPermissionMode/setThoughtLevel
+  → runPrompt → delete」，conversation 对象保留在页面全局（实测跨 evaluate 重新 `get` 的对话会卡在
+  `working`；保留对象的三段 evaluate 可行）；页面 timer + finally 删除双保险；错误码
+  `workbuddy_cdp_{unavailable,connect_failed,target_missing,create_failed,config_failed,prompt_failed,timeout,invalid_input}`。
+- 成功判定：`state === "completed"` 且 `content` 为数组（真实桌面返回**没有** `stopReason`、没有 `usage`；
+  624 首版按 ACP 形状判 `stopReason`，实机复验发现恒失败，625 修正）。
+- `scripts/workbuddy_cdp_prompt.py`：与 ACP 适配器同形的一次性 stdin→stdout 适配器，支持
+  `--delivery-contract/--expect-task-id`，同一对话内一次修复回合；退出码 2/3 与 ACP 一致。
+- `bridges/workbuddy_bridge.py` 新增 `workbuddy-cdp:` 分支；强度与交付参数判断泛化到两种适配器；
+  `scripts/workbuddy_role_host.py` 前缀白名单加入 `workbuddy-cdp:`；
+  `scripts/workbuddy_acp_models.py` 增加 `--transport cdp`（显式模型清单登记，不探测桌面）。
+- 旧 `workbuddy-acp:`/`custom-local:` 分支与错误码逐字未变；服务端/前端零改动。
+- 测试：候选 70 项全过（62.4s），基线 `0d1b4f3` 60 项、唯一差异为基线缺少 `tests.test_workbuddy_cdp`
+  的 loader error，`new_failures=0`。
+
+**实机验证（2026-11-11 07:30–09:00，WorkBuddy 5.9.3 / Electron 37.10.3，调试端口 9222）**：
+- 适配器直跑：chat 模式返回 `OK`（exit 0，约 25s）；task 模式 + 交付合同返回**有效** `talk-delivery-1` JSON（约 22s）；
+  每次运行后 `wb.conversations.list` 数量回到基线（40），无残留对话，用户既有对话未被替换。
+- 端到端：登记 `workbuddy-cdp:` 模型选择后，删除旧 ACP 角色并按同一名称新建 CDP 角色
+  （`hy4` → `agent:prj-e8fe7066bbec.hy4-2bbb4889`，Hy4；`w-d 内置` → `agent:prj-e8fe7066bbec.w-d-a6718675`，
+  DeepSeek-V4.1-Flash），start 后 `running/ready`；真实任务 627（191s）/628（60s）均 succeeded，
+  交付包通过 `talk-delivery-1` 校验（`talk_get_delivery` 显示 complete 且任务号一致）。
+- **迁移约束**：角色模型在创建时锁定（创建操作与绑定六维校验），不能原地把 ACP 绑定改成 CDP 别名，
+  否则 start 报 `choice_unverified`；迁移必须删除旧角色并新建。
+
+**已生效的运行时要求**：
+- WorkBuddy 必须以 `WORKBUDDY_REMOTE_DEBUGGING_PORT=9222` 启动；启动前须清掉继承的
+  `ELECTRON_RUN_AS_NODE=1`，否则 Electron 进程以 Node 模式立即退出（实测 exit 0、无日志、无 GUI）。
+- 该环境变量只对本次进程有效；退出 WorkBuddy 后调试端口关闭。
+
+**已知限制**：`window.wb` 为私有 API，桌面升级可能失效；CDP 绑定的 `effort_options` 为空
+（`server/workbuddy_effort.py` 只探测 ACP 别名），逐角色思考强度暂不可用，按模型默认执行；
+登记脚本按显式清单登记、不校验模型存在；`scripts/workbuddy_cdp_prompt.py` 存在一处 CRLF 混入（非阻断）。

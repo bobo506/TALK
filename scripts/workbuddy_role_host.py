@@ -60,7 +60,7 @@ class WorkBuddyRoleHost(rsh.HostManager):
             and (not draining or row.get("action")=="stop")]
 
     def build_entry_argv(self, runtime, model_alias):
-        if runtime != "workbuddy" or not isinstance(model_alias, str) or not any(model_alias.startswith(prefix) and len(model_alias) > len(prefix) for prefix in ("custom-local:", "workbuddy-acp:")):
+        if runtime != "workbuddy" or not isinstance(model_alias, str) or not any(model_alias.startswith(prefix) and len(model_alias) > len(prefix) for prefix in ("custom-local:", "workbuddy-acp:", "workbuddy-cdp:")):
             raise rsh.HostError("workbuddy_binding_unsupported")
         argv,template,budget=super().build_entry_argv(runtime,model_alias)
         argv += ["--workbuddy-executable",str(self.executable),"--workbuddy-models-home",str(self.models_home),

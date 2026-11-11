@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-11-11 09:10 — W-B2：WorkBuddy CDP 执行通道与内置模型恢复（624–628）
+
+- **背景**：桌面 WorkBuddy 5.9.3 的 ACP/CLI 通道不可用（10.4 结论）；10.5 已实测调试端口 CDP 的页面私有 API 可创建/驱动/删除专用对话。本片把它接进角色执行通道，恢复 WorkBuddy 内置模型角色。
+- **624（Terra 开发，交付 partial）**：7 个文件——新增 `bridges/workbuddy_cdp.py`、`scripts/workbuddy_cdp_prompt.py`、`tests/test_workbuddy_cdp.py`；改 `bridges/workbuddy_bridge.py`（`workbuddy-cdp:` 分支、强度/交付判断泛化）、`scripts/workbuddy_role_host.py`（前缀白名单）、`scripts/workbuddy_acp_models.py`（`--transport cdp`）、`tests/test_workbuddy_new_role_host.py`。自测 69 项全过；基线工作树因沙箱 `.git` 只读未能创建，故报 partial。协调者随后创建 `.tmp/wb2-cdp/baseline`（`0d1b4f3`）。
+- **实机缺陷与 625 返修（Terra）**：协调者用真实桌面跑适配器发现 exit 3 `workbuddy_cdp_prompt_failed`——真实 `runPrompt` 返回无 `stopReason`（`state:"completed"`），624 首版按 ACP 形状判定恒失败。625 改为 `state==="completed"` + content 数组，测试假体改为真实形状并补 failed 反例；候选 70 项全过（62.4s），基线 60 项唯一差异为基线无 `tests.test_workbuddy_cdp` 的 loader error，`new_failures=0`。同时实测确认「保留 conversation 对象、分三次 evaluate」可行，不需改成单次 evaluate。
+- **626（K2.8 独立复核，approved）**：候选 70 项 / 基线 60 项独立重跑、`new_failures=0`；逐行核对 7 文件差异、ACP 路径逐字未变、CDP 生命周期/清理/错误码/loopback 校验、测试质量（Node 实执页面表达式）、编码卫生与 changed_files；协调者 5 项补充关注点（极短 timeout 清理、invalid_input 映射、`proxy=None` 兼容、evaluate 容错、keep 不误删）全部通过。报告 `.tmp/wb2-cdp-review/`。
+- **实机证据**：适配器 chat 返回 `OK`（exit 0，25s）、task+交付合同返回有效 `talk-delivery-1` JSON（22s），每次运行后对话列表数量回到 40、无残留（`.tmp/wb2-cdp/adapter2.*`、`adapter-delivery2.*`、`probe-notes.md`）。
+- **绑定恢复（用户确认删除重建）**：角色模型创建时锁定（创建操作与绑定六维校验，原地改绑定会 `choice_unverified`）。删除旧 `hy4`（`agent:...hy4-876f2f9f`）与 `w-d 内置`（`agent:...w-d-8d8e1bdb`），删除 5 步均 complete；按同名新建 `hy4` = `agent:prj-e8fe7066bbec.hy4-2bbb4889`、`w-d 内置` = `agent:prj-e8fe7066bbec.w-d-a6718675`（均为 workspace-v1、`workbuddy-cdp:` 选择），start 后 `ins_0c9faa73efda`/pid 9732 与 `ins_070295d46282`/pid 7784，`running/ready`。
+- **E2E**：任务 627（Hy4）191s、628（DeepSeek-V4.1-Flash）60s，均 succeeded 且 `talk_get_delivery` 显示 complete、任务号一致；真实调用链为 host → `bridges.workbuddy_bridge --workbuddy-model workbuddy-cdp:...` → `scripts.workbuddy_cdp_prompt`（plan 预检 + task 执行）。
+- **部署边界**：未重启 API/runtime；只终止旧 workbuddy 宿主（runtime 自动重组新宿主加载新代码），API 与其它角色不受影响。模型选择补齐显示名（“Hy4（内置·桌面）”等）。
+- **运行时要求**：WorkBuddy 必须以 `WORKBUDDY_REMOTE_DEBUGGING_PORT=9222` 启动（仅 loopback），启动前清掉继承的 `ELECTRON_RUN_AS_NODE`；正常启动时任务明确 `workbuddy_cdp_unavailable`，不静默改道。
+- **限制/待办**：`window.wb` 私有 API；CDP 强度未接入（按模型默认）；登记脚本不校验模型存在；一处 CRLF；受管调试启动器与“换模型”入口留待后续片。
+
 ## 2026-11-11 00:45 — L1/L2/L3 本地信任与工作区接入（607–623）
 
 - **L1 本地信任模式**：页面免登录、隐藏操作主体 `human:operator`（kind=human，不展示/不发 Key）、trusted 模式公网/未知来源对所有需鉴权接口 401（含有效 Key）、key 模式保持旧契约（缺头 422）；SSE/WS 无 token 支持；`/api/auth/mode`；成员列表隐藏 operator；`currentMemberIsHuman` 用 `/me.kind`，徽章显示“本机操作员”。608 开发 / 609 测试夹具 / 610 语法修复 / 611 验证 / 612 复核 changes_requested（key 模式缺头 422 回归）/ 613 返修 / 614 复验 approved；提交 `7a0398c`，页面修复 `35f896a`；API 重载后人工验收通过。

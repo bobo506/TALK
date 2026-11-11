@@ -74,6 +74,16 @@ class WorkspaceHostsTest(unittest.TestCase):
                 self.assertNotEqual(manager.store.native_home_dir('p', 'agent:one'), other.store.native_home_dir('p', 'agent:two'))
                 self.assertFalse((other.private/'drain.request').exists())
 
+    def test_cdp_alias_accepted_and_unknown_rejected(self):
+        manager = self.manager('workbuddy', self.context('workbuddy'))
+        with patch.object(rsh.HostManager, 'build_entry_argv', return_value=([], 'fake', 'fake')):
+            argv, _, _ = manager.build_entry_argv('workbuddy', 'workbuddy-cdp:model')
+        self.assertIn('--workbuddy-native-home', argv)
+        with self.assertRaises(rsh.HostError):
+            manager.build_entry_argv('workbuddy', 'unknown:model')
+        with self.assertRaises(rsh.HostError):
+            manager.build_entry_argv('workbuddy', 'workbuddy-cdp:')
+
     def test_invalid_context_rejected_before_writes(self):
         for runner in ('dsh', 'workbuddy'):
             for field in ('runner', 'member_id', 'home', 'manager', 'layout'):

@@ -71,36 +71,48 @@ Codex新角色支持CLI 0.164.0和0.163.0。Terra等模型使用准备时官方�
 
 配置记录多时可能只显示部分记录，本页保存的近期请求会继续跟踪。旧角色只要已用补录入口登记过、且凭据代际可用，也会显示重新绑定；既没有创建请求也没有补录来源的角色不显示该按钮。旧角色重置时会重新生成一次该角色的凭据：请先停止该角色再点击，恢复完成后重新启动才会使用新凭据（旧凭据在重置那一刻起失效）；仍被其它项目引用的角色不允许重置，会直接提示拒绝。自动启动未执行或投递失败时，详情不再单独显示提示行，以角色服务状态区的实际状态为准；页面不会反复重试启动。旧页面留下的未确认请求沿原载荷核对，不追补自动启动。完整准备与验收见[创建配置页面验收](ROLE_CREATION_PAGE_ACCEPTANCE.md)、[自动首次启动页面验收](ROLE_AUTO_START_PAGE_ACCEPTANCE.md)和[宿主worker指南](ROLE_REQUEST_WORKER.md)；真人浏览器与原生登录、模型能力仍待验。
 
-### WorkBuddy 内置模型（免自备 Key）
+### WorkBuddy 内置模型（免自备 Key，CDP 桌面通道）
 
 内置模型的普通任务结果使用结构化交付，Task Hall 可显示业务结论。首轮已含合法交付 JSON（包括前后有文字）时不再重发，按报告显示 complete 或 partial 等结论；首轮没有合法交付时可要求一次紧凑重发，重发失败或超时显示 partial。首轮运行失败或超时显示 blocked，任何超时或失败都不冒充 complete。
 
-角色详情的思考强度按所选内置模型提供；无覆盖时选择“跟随模型默认”，修改作用于下一次任务执行。桌面不可用时选项可能暂不可用。
+WorkBuddy 角色可以选择 WorkBuddy 账号自带的内置模型（例如 Hy4、DeepSeek-V4.1-Flash），不再需要
+在 `models.json` 里配置自定义 API Key。通道为 TALK 通过本机 CDP 驱动桌面 WorkBuddy 的**专用临时对话**：
+每个任务新建一个对话、发送任务、取回结果后删除该对话，不影响你正在使用或历史保留的对话；
+调用使用桌面 WorkBuddy 当前登录的账号与额度。
 
-WorkBuddy 角色可以选择 WorkBuddy 账号自带的内置模型（例如 DeepSeek-V4.1-Flash），不再需要
-在 `models.json` 里配置自定义 API Key。该通道使用桌面 WorkBuddy 当前登录的账号与额度；
-本机需保持 WorkBuddy 桌面端运行并已登录。
+**前提：WorkBuddy 必须以调试端口启动（仅本机回环 `127.0.0.1:9222`）。** 正常双击启动不会打开
+调试端口，此时角色的任务会明确失败（`workbuddy_cdp_unavailable`），不会静默改用其它通道。
+启动方式（PowerShell）：
 
-首次使用前，由真人管理员登记模型选择（只需一次；不登记时创建角色看不到“（内置）”选项）：
+```powershell
+$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"
+Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"
+```
+
+退出 WorkBuddy 后调试端口随之关闭；下次使用前按上面的方式重新启动。
+
+首次使用前，由真人管理员登记模型选择（只需一次；不登记时创建角色看不到“（内置·桌面）”选项）：
 
 ```powershell
 cd D:\claude-test\TALK
-python -B -X utf8 -m scripts.workbuddy_acp_models list
 python -B -X utf8 -m scripts.workbuddy_acp_models register `
   --api-base http://127.0.0.1:8000 `
   --operator-key-file <你的真人 Key 文件路径> `
-  --models deepseek-v4.1-flash
+  --models hy4free,deepseek-v4.1-flash --transport cdp
 ```
 
-`list` 读取的是桌面运行时当前账号真实可用清单；`register` 只登记模型选择，不代表模型已调用。
-登记后刷新页面，在“创建角色”中选择 WorkBuddy，模型下拉应出现
-`DeepSeek-V4.1-Flash（内置）`，按正常流程创建并启动即可。角色消息、任务预检与任务执行都走
-该通道；任务工具在桌面运行时内执行，提示词会要求使用项目绝对路径。
+`register --transport cdp` 按显式模型清单登记 `workbuddy-cdp:` 选择（不探测桌面可用性；
+模型 id 写错时任务运行期会以 `workbuddy_cdp_create_failed` 明确失败）。登记后刷新页面，在
+“创建角色”中选择 WorkBuddy，模型下拉应出现 `Hy4（内置·桌面）`、`DeepSeek-V4.1-Flash（内置·桌面）`，
+按正常流程创建并启动即可。角色消息、任务预检与任务执行都走该通道；提示词会要求使用项目绝对路径。
 
-已知限制：桌面 WorkBuddy 未运行/未登录时该角色无法调用模型；内置 ACP 是当前版本内部接口，
-桌面升级可能失效；会话不能由 TALK 关闭/删除；不支持多轮“执行会话”（`workbuddy-acp:` 别名会被
-明确拒绝）；任务结果是模型自然语言，未强制结构化交付，Task Hall 业务结论可能显示 unknown，
-以实际文件和证据为准；多桌面会话并存、真实模型额度与桌面 UI 行为尚未做端到端验收。
+**注意：角色的运行器/模型在创建时锁定，不能原地更换。** 需要换模型（或从旧的 ACP 通道迁移）时，
+请删除旧角色后按上面的流程新建角色；新角色会获得新的身份与 Key。
+
+已知限制：桌面 WorkBuddy 未运行、未登录或未以调试端口启动时该角色无法调用模型；`window.wb` 是
+桌面私有接口，WorkBuddy 升级可能改动；TALK 不读取或复制账号凭据，调试端口仅绑定 loopback，
+不得对外暴露；CDP 通道暂不提供逐角色思考强度（按模型默认执行）；任务结果必须为结构化交付，
+首轮不合法时只重发一次。
 
 ### 删除角色
 
