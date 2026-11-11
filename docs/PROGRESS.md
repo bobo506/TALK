@@ -5,7 +5,8 @@
 - **本轮完成（任务 659 K2.8 独立复核 approved，结果消息 3448 已收取）**：**W-C4 删除残留清理与 `operation_key` 边界对齐**——`scripts/role_delete.py` 在删除事务完成、锁释放后尽力回收锁守卫与空壳（`profiles`、空的 `native-home`、`.talk/agents/<member>`、Key 锁守卫）；守卫被占用或可见 `.lock` 仍在时保留且不影响 `complete`；`server/models.py` 两个恢复请求模型 `max_length` 120→`OPERATION_KEY_MAX_CHARS`(128)，与契约 8–128 一致。
 - **验证**：基线 187 项 / 3 失败（`tests.test_role_provision.CliAndSecretTests` 三个 CLI 子进程用例 exit 1，改动前同样失败）；候选 194 项 / 同 3 失败，`new_failures=0`；追加回归 `test_role_service_recovery_cli + test_role_provision_followup + test_workspace_paths + test_role_provision_requests` 100 项全过；`py_compile`、UTF-8、`git diff --check` 通过。证据 `.tmp/w-c4/`。
 - **独立复核（659，K2.8）**：8 项逐条 `pass`（卫生 `pass_with_note`，文档差异已核实）；复核环境候选 194 / 基线 187（`git archive 2ade45e` 干净提取）均 **0 失败**，`new_failures=0`，**approved**；报告 `.tmp/w-c4-review/review.json`。
-- **未做（需授权）**：存量残留未删除——只读 dry-run 为 **14 个 legacy guard-only 目录** + **9 个 workspace 角色空壳**（均在仓库工作区内）；私有 Key 根的守卫未扫描；删除前需逐条核对归属并单独授权。真实删除 E2E 未做（会动生产数据）。
+- **存量清理（2026-11-11 21:15，已授权执行）**：删除 23 项无主残留（14 个 legacy guard-only 目录 + 9 个 workspace 角色空壳，共 23 文件 / 736 B）。删除前逐项复核：成员不在名册、角色服务 `stopped/not_started`、无 queued/running 任务、非 reparse、guard 未被持有；明细 `.tmp/w-c4/residue-plan.json`、结果 `.tmp/w-c4/cleanup-result.json`。**遗留未删**：6 个 `native-home` 非空（含 `.dsh`/`LocalLow` 等原生登录态）的 workspace 残留、私有 Key 根（`TALK-private\keys`）下的 guard，均未扫描/未授权。
+- **未做（需授权）**：上述 6 个含原生登录态的 workspace 残留与私有 Key 根 guard；真实删除 E2E 未做（会动生产数据）。
 - **环境**：runtime `2172`、API 子进程 `14296` 仍在运行（`/healthz` ok、`auth=trusted`），本轮未重启服务、未改生产数据。
 - **提交与推送**：`dce88f0`（主体）、`6a72411`（可见锁守卫补强），文档随切片提交；已按完整切片推送 `codex/terminal-return-codex`。
 - **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部 W-C4 记录。
