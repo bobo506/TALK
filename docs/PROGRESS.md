@@ -1,5 +1,14 @@
 # Project Progress
 
+## 收工快照（2026-11-12 01:50，W-D1 3b 整片完成）
+
+- **3b-2「重关联文件事务原语」完成（675 Terra / 676 K2.8 approved）**：新增 `server/workspace_relink_files.py`（241 行）与测试（239 行）。`prepare_write`（同目录 `O_EXCL` 临时文件 + 写入后 fsync + 回读 sha256；`expected_digest` CAS；链接/越界拒绝）、`commit_write`（替换前复核目标未变、`os.replace` 原子替换、目录 fsync 尽力而为）、`abort_write`、`rollback_write`（目标被外部改动 → `workspace_recovery_required`，不覆盖）、`commit_batch`（失败逆序回滚，回滚失败报 `recovery_required` 并带 rolled_back/not_rolled_back）。稳定码：`workspace_path_refused`/`workspace_file_conflict`/`workspace_write_failed`/`workspace_recovery_required`。
+- **验证（676 独立复核）**：10 项全 pass、`new_failures=[]`；独立重跑 `test_workspace_relink_files` **15 项 0 失败 0.433s**、回归 operations/registry/diagnostics/paths **33 项 0 失败 7.226s**（675 自报 4 跳过系平台差异）；8 MiB 探针实证无大小限制；无 DB/网络/进程副作用。
+- **3b 整片收口**：3b-1（操作日志/状态机/幂等/CAS/故障注入，`1494ff8`）+ 3b-2（文件事务原语）均 approved；`submitted=[]`，本轮共 4 次提交推送（`b87f920`/`e703199`/`1494ff8` + 本文档提交）。
+- **进入第 4 片前的必办项（复核要求）**：① `prepare_write`/`read` 增加大小上限（建议 1 MiB）+ 稳定码（防止第 4 片 HTTP 暴露后大文件读入内存）；② 3a 三条：`identity_platform` 收敛为 `os.name`（删除 `windows` 别名）、Windows 64 位文件 ID 边界文档化、`save_identity` 未登记/冲突错误码区分；③ 第 4 片必须串行锁保证 prepare→commit 窗口（本片 docstring 已声明调用方负责持久化与锁）。
+- **未做**：第 4 片（受保护提交入口与登记收口）、第 5 片（页面与真实浏览器验收）均未开始，等用户醒来再确认范围。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 01:20，W-D1 3b-1 完成）
 
 - **W-D1 3b-1「重关联操作状态机与幂等日志」完成（672 partial → 673 返修 → 674 K2.8 approved）**：新增表 `workspace_operations`（`operation_id` 主键、`project_id` 索引、`request_digest`、`stage`、`error_code`、`old_root`/`candidate_root`、时间戳；无外键级联、不存 Key/配置正文）与 `server/workspace_operations.py`（136 行）：`begin_operation`（同 ID 同摘要幂等、异摘要 `workspace_operation_conflict`）、`advance_stage`（`WHERE stage=?` CAS、非法转移 `workspace_stage_conflict`）、`list_recoverable`（只读、不自动重放）、`digest_request`（normcase+normpath、sha256、含 expected_revision）。`server/models.py` +16、`server/db.py` +1；新增测试 166 行。

@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-12 01:50 — W-D1 3b-2：重关联文件事务原语（675/676）
+
+- **675（Terra，602s）complete**：新增 `server/workspace_relink_files.py`（241 行）与 `tests/test_workspace_relink_files.py`（239 行）。`prepare_write`（绝对路径/无 NUL/长度/`..` 校验、`allowed_roots` 内、目标与父目录链接/reparse 拒绝、已存在文件必须匹配 `expected_digest`、同目录 `O_EXCL` 临时文件、写入后 fsync + 回读 sha256、失败清理）、`commit_write`（临时文件同目录命名校验、替换前复核目标存在性与 old_digest、`os.replace` 原子替换、目录 fsync 尽力而为）、`abort_write`、`rollback_write`（目标不等于 new_digest → `workspace_recovery_required` 且不覆盖；新建删除/覆盖恢复旧字节）、`commit_batch`（失败逆序回滚，回滚失败报 `recovery_required` 并带 `rolled_back`/`not_rolled_back`）。模块不写 DB、不启进程、不访问网络。
+- **676（K2.8 独立复核）approved**：10 项全 pass、`new_failures=[]`；独立重跑 `test_workspace_relink_files` 15 项 0 失败 0.433s、回归 operations/registry/diagnostics/paths 33 项 0 失败 7.226s；真实 symlink/junction 拒绝、摘要冲突、崩溃模拟、批量回滚、fsync/replace 证据均通过；8 MiB 探针实证当前**无大小上限**。
+- **限制与前置**：真实多进程并发、跨卷、网络盘未验；`prepare_write` 读取旧文件并常驻 `old_bytes` 无上限——复核建议在第 4 片（HTTP 暴露）前加 1 MiB 上限与稳定码；回滚 `created` 分支的校验后 unlink 窗口需第 4 片串行锁保证；目录 fsync 在 Windows 为尽力而为，已文档化。
+- **3b 整片收口**：3b-1（`1494ff8`）+ 3b-2 均 approved，3b 完成；第 4/5 片未开始。
+
 ## 2026-11-12 01:20 — W-D1 3b-1：重关联操作状态机与幂等日志（672/673/674）
 
 - **672（Terra，617s）partial**：实现 `workspace_operations` 表与 `server/workspace_operations.py`（136 行）+ 测试（166 行）：阶段链 `started→prepared→files_staged→committed→completed`，任一非终态→`failed`/`recovery_required`（白名单 error_code）；`begin_operation` 幂等/异摘要冲突；`advance_stage` CAS + 非法转移拒绝；`list_recoverable` 只读；`digest_request` 含 expected_revision。自身 6 项测试全过；但 3a 的 `tests/test_workspace_registry.py:59` 旧断言“不得出现 operations 表”过期且不在白名单，如实报 partial。
