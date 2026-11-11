@@ -464,7 +464,7 @@ def _project_agent_outs(
             ],
             role_description=descriptions_by_member.get(agent.member_id),
             binding=_binding_with_runtime_effort(
-                binding_facts_by_member.get(agent.member_id)
+                binding_facts_by_member.get(agent.member_id), session
             ),
             binding_state=resolve_role_binding_state(
                 binding_facts_by_member.get(agent.member_id)
@@ -808,8 +808,16 @@ def _schedule_binding_refresh(agents):
                 _effort_refresh_worker.start()
 
 
-def _binding_with_runtime_effort(facts):
+def _binding_with_runtime_effort(facts, session):
     binding = build_role_binding_out(facts)
+    if binding is not None and effort_cache.is_cdp_alias(binding.model_alias) and binding.runtime == 'workbuddy':
+        options, default, error = effort_cache.cdp_effort_for_facts(session, facts)
+        binding.effort_options = options
+        binding.effort_source = 'adapter' if options else None
+        binding.effort_error = error
+        binding.default_effort = default
+        binding.effective_effort = (binding.effort_override if binding.effort_override in options else default) if options else None
+        return binding
     if binding is not None and binding.effort_source != "catalog":
         # Read only an already-populated cache while the request owns a session.
         options, source = _cached_runtime_options(facts)
@@ -834,7 +842,7 @@ def _binding_response(
     return RoleBindingResponse(
         project_id=project_id,
         member_id=member_id,
-        binding=_binding_with_runtime_effort(facts),
+        binding=_binding_with_runtime_effort(facts, session),
         binding_state=resolve_role_binding_state(facts),
     )
 
@@ -1005,6 +1013,14 @@ def set_agent_role_binding_effort(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="default_effort_invalid",
         )
+    runner = session.get(RunnerRegistry, binding.runner_id) if binding.runner_id else None
+    if effort_cache.is_cdp_alias(binding.model_alias) and runner is not None and runner.runtime == 'workbuddy':
+        facts = read_role_binding_facts(session, project_id=project_id, member_id=target_member_id)
+        options, _, _ = effort_cache.cdp_effort_for_facts(session, facts)
+        if not options:
+            raise HTTPException(status_code=409, detail="effort_capability_unknown")
+        if value not in options:
+            raise HTTPException(status_code=422, detail="default_effort_invalid")
     if binding.default_effort != value:
         binding.default_effort = value
         binding.updated_by = current.id
@@ -1070,6 +1086,20 @@ def set_agent_role_binding_effort_override(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="effort_value_invalid",
         )
+    if effort_cache.is_cdp_alias(binding.model_alias) and runner is not None and runner.runtime == 'workbuddy':
+        facts = read_role_binding_facts(session, project_id=project_id, member_id=target_member_id)
+        options, _, _ = effort_cache.cdp_effort_for_facts(session, facts)
+        if not options:
+            raise HTTPException(status_code=409, detail="effort_capability_unknown")
+        if value not in options:
+            raise HTTPException(status_code=422, detail="effort_not_supported")
+        if binding.effort_override != value:
+            binding.effort_override = value
+            binding.updated_by = current_id
+            binding.updated_at = datetime.now(timezone.utc)
+            session.add(binding)
+            session.commit()
+        return _binding_response(project_id, target_member_id, session)
     effort_facts = {
         "model_alias": binding.model_alias,
         "runtime": runner.runtime if runner is not None else None,
@@ -1510,7 +1540,7 @@ def _role_projection(
         role = roles.get(member_id)
         member = members.get(member_id)
         facts = facts_by_member.get(member_id) or {}
-        binding_out = _binding_with_runtime_effort(facts)
+        binding_out = _binding_with_runtime_effort(facts, session)
         if role is not None:
             role_name = role.role_name
             origin = role.origin

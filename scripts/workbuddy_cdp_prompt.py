@@ -32,7 +32,7 @@ def main(argv=None):
         result = prompt_once(model, text, mode=args.mode, project_root=args.project_root,
                              effort=args.effort, timeout=args.timeout, endpoint=args.endpoint, **options)
         sys.stdout.buffer.write((result['text'].rstrip('\n') + '\n').encode('utf-8'))
-        diagnostic = {'model': model, 'elapsed': round(result['elapsed'], 2)}
+        diagnostic = {'model': model, 'effort': args.effort, 'elapsed': round(result['elapsed'], 2)}
         sys.stderr.buffer.write(('[workbuddy-cdp] ' + json.dumps(diagnostic, ensure_ascii=False) + '\n').encode('utf-8'))
         return 0
     except CdpError as exc:

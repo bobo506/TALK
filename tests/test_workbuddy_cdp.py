@@ -6,12 +6,13 @@ import sys
 import threading
 import time
 import unittest
+import httpx
 from pathlib import Path
 from unittest.mock import patch
 
 from websockets.sync.server import serve
 from websockets.exceptions import ConnectionClosed
-from bridges.workbuddy_cdp import CdpError, prompt_once
+from bridges.workbuddy_cdp import CdpError, prompt_once, list_models
 from bridges import workbuddy_bridge
 from scripts import workbuddy_acp_models
 
@@ -47,12 +48,15 @@ class FakeCDP:
                 msg = json.loads(raw)
                 self.messages.append(msg)
                 expression = msg['params']['expression']
-                kind = ('create' if 'conversations.create' in expression else
+                kind = ('models' if 'wb.models.list' in expression else
+                        'create' if 'conversations.create' in expression else
                         'config' if 'setPermissionMode' in expression else
                         'prompt' if 'runPrompt' in expression else 'delete')
                 if self.delay and kind == 'prompt':
                     time.sleep(self.delay)
                 value = {'ok': kind != self.fail}
+                if kind == 'models':
+                    value['models'] = [{'model_id':'hy4free', 'name':'Hy4', 'supported_efforts':['high'], 'default_effort':'high'}]
                 if kind == 'prompt' and value['ok']:
                     response = {'clientRequestId': 'client-1', 'requestId': 'request-1',
                                 'state': self.prompt_state,
@@ -95,6 +99,15 @@ class CdpTests(unittest.TestCase):
     def call(self, server, **kwargs):
         return prompt_once('model-1', 'prompt text', mode='task', project_root=ROOT,
                            endpoint=server.endpoint, timeout=kwargs.pop('timeout', 3), **kwargs)
+
+    def test_list_models_and_validation(self):
+        server = self.fake()
+        self.assertEqual(list_models(endpoint=server.endpoint), [{'model_id':'hy4free', 'name':'Hy4', 'supported_efforts':['high'], 'default_effort':'high'}])
+        self.assertIn('wb.models.list()', server.messages[0]['params']['expression'])
+        with self.assertRaises(CdpError):
+            self.call(server, effort='enabled')
+        with self.assertRaises(CdpError):
+            list_models(endpoint='http://example.com:9222')
 
     def test_success_payload_and_cleanup(self):
         server = self.fake()
@@ -219,3 +232,34 @@ class CdpTests(unittest.TestCase):
         self.assertEqual(payload['model_alias'], 'workbuddy-cdp:m')
         self.assertEqual(payload['connection_ref'], 'native-workbuddy-cdp')
         self.assertTrue(payload['model_display_name'].endswith('\uff08\u5185\u7f6e\u00b7\u684c\u9762\uff09'))
+
+    def test_registration_enumerates_before_writes_and_updates_existing(self):
+        catalog = [{'model_id':'hy4free', 'name':'Hy4', 'supported_efforts':['high'], 'default_effort':'high'},
+                   {'model_id':'deepseek-v4.1-flash', 'name':'DeepSeek', 'supported_efforts':['low','high','max'], 'default_effort':'high'}]
+        existing = {**workbuddy_acp_models.choice_payload(catalog[0], 'cdp'), 'runner_id':'runner:wb', 'choice_id':'old', 'capabilities':['other']}
+        writes = []
+        def handler(request):
+            if request.url.path == '/api/members/me': return httpx.Response(200, json={'kind':'human'})
+            if request.method == 'GET': return httpx.Response(200, json=[existing])
+            payload = json.loads(request.content)
+            writes.append((request.method, request.url.path, payload))
+            return httpx.Response(200, json={'choice_id':'new'})
+        client_class = httpx.Client
+        def client(**kwargs):
+            return client_class(transport=httpx.MockTransport(handler), **kwargs)
+        with patch.object(workbuddy_acp_models.httpx, 'Client', side_effect=client), patch.object(workbuddy_acp_models, 'list_cdp_models', return_value=catalog):
+            with self.assertRaises(ValueError):
+                workbuddy_acp_models.register('http://localhost', 'key', ['hy4free', 'missing'], 'runner:wb', transport='cdp')
+            self.assertEqual(writes, [])
+            result = workbuddy_acp_models.register('http://localhost', 'key', ['hy4free', 'deepseek-v4.1-flash'], 'runner:wb', transport='cdp')
+            existing['capabilities'] = ['other','effort:high','effort_default:high']
+            writes_before = len(writes)
+            workbuddy_acp_models.register('http://localhost', 'key', ['hy4free'], 'runner:wb', transport='cdp')
+            self.assertEqual(len(writes), writes_before)
+        self.assertEqual([r['status'] for r in result], ['existing', 'created'])
+        self.assertEqual(writes[0], ('PATCH', '/api/runners/runner:wb/model-choices/old', {'capabilities':['other','effort:high','effort_default:high']}))
+        self.assertEqual(writes[1][2]['capabilities'], ['effort:low','effort:high','effort:max','effort_default:high'])
+        with patch.object(workbuddy_acp_models.httpx, 'Client', side_effect=client), patch.object(workbuddy_acp_models, 'list_cdp_models', side_effect=CdpError('workbuddy_cdp_unavailable')):
+            with self.assertRaises(CdpError):
+                workbuddy_acp_models.register('http://localhost', 'key', ['hy4free'], 'runner:wb', transport='cdp')
+        self.assertEqual(len(writes), writes_before)

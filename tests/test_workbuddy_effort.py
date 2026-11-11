@@ -150,9 +150,35 @@ class ProbeTests(unittest.TestCase):
             self.assertEqual(resolve_role_effort({},options)['effort_options'],['high'])
 
 from tests.test_project_role_bindings import BindingApiTestCase
-from server.models import ProjectRoleBinding
+from server.models import ProjectRoleBinding, RunnerModelChoice
 
 class WorkbuddyApiTests(BindingApiTestCase):
+    def test_cdp_choices_projection_validation_and_mismatch(self):
+        p = 'prj_wb_cdp_effort'
+        self.register_project(p); self.sync(p, [{'member_id':'agent:worker'}, {'member_id':'agent:other'}]); self.register_runner(runtime='workbuddy')
+        for member, mid, levels in [('agent:worker','hy4free',['high']), ('agent:other','deepseek-v4.1-flash',['low','high','max'])]:
+            payload = self.binding_payload(provider_id='managed:workbuddy', connection_ref='native-workbuddy-cdp', model_id=mid, model_alias='workbuddy-cdp:' + mid)
+            self.assertEqual(self.put_binding(p, member, payload).status_code, 200)
+            with self.session() as session:
+                session.add(RunnerModelChoice(choice_id='choice-' + mid, created_by='human:bobo', **{k:payload[k] for k in ('runner_id','model_source','provider_id','connection_ref','model_id','model_alias')}, capabilities=['effort:' + x for x in levels] + ['effort_default:high']))
+                session.commit()
+        with patch.object(cache, 'probe_effort_options', side_effect=AssertionError('ACP probe used')):
+            for member, levels in [('agent:worker',['high']), ('agent:other',['low','high','max'])]:
+                binding = self.get_binding(p, member).json()['binding']
+                self.assertEqual((binding['effort_options'],binding['default_effort'],binding['effective_effort'],binding['effort_source']), (levels,'high','high','adapter'))
+                self.assertEqual(self.agent_by_id(p,member)['binding']['effort_options'],levels)
+            self.assertEqual(self.put_effort_override(p,'agent:worker','low').status_code,422)
+            self.assertEqual(self.set_effort(p,'agent:worker','low').status_code,422)
+            for value in ['low','high','max']:
+                response = self.put_effort_override(p,'agent:other',value)
+                self.assertEqual(response.status_code,200)
+                self.assertEqual(response.json()['binding']['effective_effort'], value)
+            self.assertEqual(self.put_effort_override(p,'agent:other',None).json()['binding']['effective_effort'],'high')
+            with self.session() as session:
+                facts = {'runtime':'workbuddy','runner_id':'runner:dsh-cli','model_source':'builtin','provider_id':'managed:workbuddy','connection_ref':'native-workbuddy-cdp','model_id':'hy4free','model_alias':'workbuddy-cdp:hy4free'}
+                for dimension in ('runner_id','model_source','provider_id','connection_ref','model_id','model_alias'):
+                    altered = dict(facts); altered[dimension] += '-wrong'
+                    self.assertEqual(cache.cdp_effort_for_facts(session, altered), ([],None,'workbuddy_cdp_choice_not_found'))
     def test_binding_failure_is_projected_and_catalog_takes_priority(self):
         p = 'prj_wb_failure'
         self.register_project(p); self.sync(p, [{'member_id': 'agent:worker'}]); self.register_runner(runtime='workbuddy')

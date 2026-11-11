@@ -91,8 +91,8 @@ python -B -X utf8 -m scripts.workbuddy_acp_models register `
   --models hy4free,deepseek-v4.1-flash --transport cdp
 ```
 
-`register --transport cdp` 按显式模型清单登记 `workbuddy-cdp:` 选择；模型 id 必须与桌面
-WorkBuddy 的模型清单一致，写错时任务运行期会以 `workbuddy_cdp_create_failed` 明确失败。
+`register --transport cdp` 从运行中的桌面 WorkBuddy 读取模型清单并校验指定 id，再登记或更新
+`workbuddy-cdp:` 选择与支持的强度；桌面不可达或模型不存在时登记失败。
 登记后刷新页面，创建角色时选 WorkBuddy，模型下拉出现 `Hy4（内置·桌面）`、
 `DeepSeek-V4.1-Flash（内置·桌面）` 等选项。
 
@@ -133,7 +133,7 @@ Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"
 - 桌面 WorkBuddy 未运行、未登录、或未以调试端口启动时，该角色无法调用模型；TALK 会明确报错，不会静默改用其它通道。
 - `window.wb` 是 WorkBuddy 桌面私有接口，WorkBuddy 升级可能改动，届时需要重新适配。
 - 调试端口是桌面全控制口，只能留在 loopback；TALK 不读取、不复制账号凭据，也不代替你登录。
-- CDP 通道当前不提供逐角色思考强度（按模型默认执行）；需要不同强度时先记录为后续功能。
+- 角色详情可按模型支持的档位选择思考强度，修改作用于下一次任务。
 
 ### 删除角色
 

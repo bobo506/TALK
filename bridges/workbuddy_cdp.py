@@ -33,7 +33,7 @@ def _js(value):
     return json.dumps(value, ensure_ascii=True)
 
 
-async def _run(model_id, text, mode, root, effort, deadline, endpoint, keep, validator, repair_prompt):
+async def _target_url(endpoint, deadline):
     def remaining():
         return max(0.001, deadline - time.monotonic())
 
@@ -60,6 +60,14 @@ async def _run(model_id, text, mode, root, effort, deadline, endpoint, keep, val
             raise ValueError()
     except (TypeError, ValueError):
         raise CdpError('workbuddy_cdp_connect_failed') from None
+    return url
+
+
+async def _run(model_id, text, mode, root, effort, deadline, endpoint, keep, validator, repair_prompt):
+    def remaining():
+        return max(0.001, deadline - time.monotonic())
+
+    url = await _target_url(endpoint, deadline)
     token = 'talk_' + uuid.uuid4().hex
     counter = 0
     try:
@@ -137,7 +145,7 @@ def prompt_once(model_id, text, *, mode, project_root, effort=None, timeout=600,
                 keep_conversation=False, repair_validator=None, repair_prompt=None):
     started = time.monotonic()
     if (not isinstance(model_id, str) or not model_id.strip() or not isinstance(text, str) or not text.strip()
-            or mode not in ('chat', 'plan', 'task') or (effort is not None and effort not in ('low', 'high', 'max', 'enabled'))
+            or mode not in ('chat', 'plan', 'task') or (effort is not None and effort not in ('low', 'high', 'max'))
             or isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0):
         raise CdpError('workbuddy_cdp_invalid_input')
     try:
@@ -155,3 +163,40 @@ def prompt_once(model_id, text, *, mode, project_root, effort=None, timeout=600,
             raise CdpError('workbuddy_cdp_timeout') from None
     result = asyncio.run(run())
     return {**result, 'modelId': model_id, 'elapsed': time.monotonic() - started}
+
+
+def list_models(timeout=10, endpoint=None):
+    """Read the desktop model catalog within one bounded loopback CDP request."""
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+        raise CdpError('workbuddy_cdp_invalid_input')
+    address = _endpoint(endpoint or os.environ.get('TALK_WORKBUDDY_CDP_ENDPOINT') or 'http://127.0.0.1:9222')
+    deadline = time.monotonic() + timeout
+
+    async def run():
+        url = await _target_url(address, deadline)
+        remaining = max(0.001, deadline - time.monotonic())
+        options = {'proxy': None} if 'proxy' in inspect.signature(websockets.connect).parameters else {}
+        try:
+            async with websockets.connect(url, open_timeout=remaining, close_timeout=min(0.05, remaining), max_size=16 * 1024 * 1024, **options) as ws:
+                expression = '''(async()=>{try{const r=await window.wb.models.list(); if(!r || !Array.isArray(r.items)) return {ok:false}; return {ok:true,models:r.items.map(m=>({model_id:m.id,name:m.name,supported_efforts:m.reasoning?.supportedEfforts ?? [],default_effort:m.reasoning?.defaultEffort ?? null}))}}catch(e){return {ok:false}}})()'''
+                await ws.send(json.dumps({'id': 1, 'method': 'Runtime.evaluate', 'params': {'expression': expression, 'awaitPromise': True, 'returnByValue': True}}))
+                while True:
+                    message = json.loads(await ws.recv())
+                    if message.get('id') != 1:
+                        continue
+                    result = message.get('result', {})
+                    value = result.get('result', {}).get('value')
+                    if 'error' in message or 'exceptionDetails' in result or not isinstance(value, dict) or not value.get('ok') or not isinstance(value.get('models'), list):
+                        raise CdpError('workbuddy_cdp_models_failed')
+                    return value['models']
+        except CdpError:
+            raise
+        except (OSError, websockets.exceptions.WebSocketException, ValueError, KeyError, TypeError):
+            raise CdpError('workbuddy_cdp_connect_failed') from None
+
+    async def bounded():
+        try:
+            return await asyncio.wait_for(run(), timeout)
+        except asyncio.TimeoutError:
+            raise CdpError('workbuddy_cdp_timeout') from None
+    return asyncio.run(bounded())
