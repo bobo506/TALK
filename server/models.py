@@ -134,6 +134,20 @@ class Project(SQLModel, table=True):
     last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class WorkspaceRegistration(SQLModel, table=True):
+    """Optional registration metadata; never implicitly backfilled."""
+
+    __tablename__ = "workspace_registrations"
+
+    project_id: str = Field(sa_column=Column(Text, primary_key=True))
+    revision: int = Field(default=1, sa_column_kwargs={"server_default": "1"})
+    identity_platform: Optional[str] = None
+    identity_volume_id: Optional[int] = None
+    identity_file_id: Optional[int] = None
+    identity_collected_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+
+
 class ProjectAgent(SQLModel, table=True):
     """Per-(project, agent) profile path index (PROJECT_INTEGRATION §7.1).
 

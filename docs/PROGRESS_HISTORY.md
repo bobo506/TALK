@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-12 00:45 — W-D1 第 3a 片：登记元数据与身份快照（669 failed → 670/671）
+
+- **669（Terra）failed**：Codex 运行时瞬时失败，`last_error` 为 “Refusing to create helper binaries under temporary dir …\.codex” 的 PATH alias 警告；`changed_files=[]`，无代码产出。Terra 角色仍 `running/ready`、实例 idle、心跳正常；未自动连续重派，经用户确认后重试。
+- **670（Terra 重试，481s）**：4 文件——`server/models.py` +14（仅新增 `WorkspaceRegistration` 表：`project_id` 主键、`revision` 默认 1、可空 `identity_platform/volume_id/file_id/collected_at`、`updated_at`；不存路径/Key/主机名）、`server/db.py` +1（幂等索引 `ix_workspace_registrations_updated_at`）、新增 `server/workspace_registry.py`（81 行：`get_registration`/`ensure_registration`（`on_conflict_do_nothing`，显式调用）/`save_identity`（`revision==expected_revision` CAS，失败 `workspace_revision_conflict`；身份校验拒 bool/负数/超 2^63-1/无时区时间，非法零写入；模块不 commit））、新增 `tests/test_workspace_registry.py`（129 行）。
+- **671（K2.8 独立复核）approved**：10 项全 pass、`new_failures=[]`；独立重跑 registry 5 项 3.884s OK、回归 `test_workspace_diagnostics + test_workspace_diagnostics_api + test_workspace_paths` 31 项 5.492s OK（skipped=1，8.3 平台不支持）；实测旧库初始化 38→39 表、既有 38 表 schema 与行全等、重复初始化幂等；全仓 grep 确认启动/创建/诊断路径**零调用** registry（不自动回填）、`projects` 表不变；CAS 成功 1→2、冲突零写入、`identity=None` 清空四字段；未登记行 rowcount=0 报 `workspace_revision_conflict`（fail-closed，建议 3b 区分）；`identity_platform` 双写 `nt`/`windows` 建议 3b 收敛为 `os.name`；Windows 文件 ID 2^64 风险为 fail-closed，建议文档化。
+- **限制**：CAS 并发为顺序模拟（670 已声明）；`workspace_operations`/阶段机/故障注入不在本片（3b）；无公开入口、无用户可见变化。
+- **状态**：670/671 已收取，`submitted=[]`；四文件入库并推送；669 保留 failed 记录。
+
 ## 2026-11-11 23:15 — W-D1 第 2 片：只读诊断 API（666 blocked → 667/668）
 
 - **666（Terra）blocked**：任务包要求“真实 rename 后预览判强匹配”，但同时限定只读、不持久化身份；Terra 实测 rename 后旧路径 missing、`inspect_root` 取不到旧身份，`evaluate_move` 只能返回 `workspace_identity_unverified`。协调者按设计（历史身份属第 3 片）采纳其选项 A 并重派；666 已收取（blocked 记录保留），无产品代码。

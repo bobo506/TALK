@@ -1,5 +1,15 @@
 # Project Progress
 
+## 收工快照（2026-11-12 00:45，W-D1 第 3a 片完成）
+
+- **W-D1 第 3a 片「登记元数据与身份快照」完成（669 failed → 670 Terra / 671 K2.8 approved）**：新增表 `workspace_registrations`（`project_id` 主键、`revision` 默认 1、可空身份 platform/volume/file_id/collected_at、`updated_at`；不存路径/Key/主机名），`server/models.py` +14 行、`server/db.py` +1 行幂等索引；新增 `server/workspace_registry.py`（81 行：`get_registration`/`ensure_registration`/`save_identity` CAS）与 `tests/test_workspace_registry.py`（129 行）。旧库 `create_all` 只新增表（实测 38→39 表、既有表 schema/行全等）；**启动路径零调用、不自动回填**；CAS 冲突零写入；模块不自行 commit。
+- **验证（671 独立复核）**：10 项全 pass、`new_failures=[]`；独立重跑 registry 5 项 3.884s OK、回归三包 31 项 5.492s OK（skipped=1 仅 8.3 平台不支持）；旧库迁移/无回填/CAS/身份校验均实证。
+- **非阻断建议（留 3b）**：① `identity_platform` 应只保留 `os.name` 值（`nt`/`posix`），删除 `windows` 别名（当前表空、零迁移成本）；② Windows 文件 ID 可达 2^64-1，当前 2^63-1 上限会 fail-closed 拒收部分合法身份，需文档化或改无损存储；③ `save_identity` 对“未登记行”与“revision 冲突”同报 `workspace_revision_conflict`，3b 公开入口应区分或文档化。
+- **669 失败记录**：Codex 运行时瞬时失败（PATH alias 警告，无代码产出）；按用户确认重试为 670 成功，未自动连续重派。
+- **提交与推送**：四文件 + 本文档，随本片推送。
+- **下一步**：第 3b 片「操作日志 + 阶段机 + 故障注入 + 恢复」，仍**不开放**提交入口；完成后才做第 4 片受保护提交入口与登记收口、第 5 片页面。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-11 23:15，W-D1 第 2 片完成）
 
 - **W-D1 第 2 片「只读诊断 API」完成（667 Terra / 668 K2.8 approved）**：新增 `server/routes/workspace_diagnostics.py`（134 行）与 `tests/test_workspace_diagnostics_api.py`（242 行），`server/main.py` 仅 +2 行注册路由。提供 `GET /api/projects/{id}/workspace-diagnostics`（根状态/身份/marker/issue、跨项目重复、`duplicate_check`、`binding=not_checked`）与 `POST /api/projects/{id}/workspace-relink-preview`（只读候选评估 + `blocked_reasons`，**不发 token、不写文件、不做 CAS**）。鉴权与既有入口一致或更严格（trusted 模式不自动建 operator）；marker 回显清洗、identity 剔除主机名、revision 为 sha256 摘要。
