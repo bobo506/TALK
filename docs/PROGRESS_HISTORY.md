@@ -7,9 +7,9 @@
   - `scripts/role_delete.py`：新增 `_sweep_guard` / `_sweep_empty_dir` / `_sweep_shell`。`cleanup()` 在 `finally` 释放锁之后，仅当 `outcome=complete` 时回收：profile 守卫（legacy 为 `.talk/agents/<member>/.provision.lock.guard`，workspace-v1 为 `<role>/profiles/.provision.lock.guard`）、删除成功凭据的 Key 锁守卫、空 `profiles`、空 `native-home`、空角色目录/身份档目录。原“先算结果后清扫”改造保持返回值语义不变；清扫异常被吞掉，不会把已完成删除变成失败或进入重试。
   - `server/models.py`：`RoleServiceRecoveryRequest` / `RoleServiceOrphanRecoveryRequest.operation_key` 的 `max_length` 由 `120` 改为 `OPERATION_KEY_MAX_CHARS`（128），与 `normalize_operation_key` 及 ROLE_LIFECYCLE_DESIGN“8–128 安全 token”一致。
   - `scripts/role_provision.py`：守卫“永不删除”注释限定为 provision 层，并注明角色删除、member id 退役后由 `role_delete` 回收（协议与实现零改动）。
-- **设计取舍（安全边界）**：守卫只在删除事务完成、锁已释放后回收——被别的进程打开/加锁时 Windows `os.remove` 必然共享冲突失败，残留保留且删除结果仍 `complete`（无重试、无抢锁）。不删除可见 `.provision.lock`、不递归删除非空 `native-home`（原生登录态）或其他成员资源。
-- **测试**：更新 4 处旧“仅剩 guard”断言（`test_role_delete_local` 3 处、`test_role_deletion` 1 处）；新增 workspace 空壳回收、非空 `native-home` 保留、被占用守卫保留、128 字符 HTTP 接受、129 拒绝零写入、模型与 `normalize_operation_key` 8/120/121/128 与 7/129/200 边界用例（用 `.` 分段规避“像凭据”的 ≥40 位连续串启发式）。
-- **验证**：基线（改动前）187 项、3 失败，均 `tests.test_role_provision.CliAndSecretTests` CLI 子进程 exit 1；候选 193 项、同 3 项失败（逐名一致），`new_failures=0`。追加回归 100 项全过。`py_compile`、UTF-8（无 BOM、无替换字符）、`git diff --check` 通过。证据 `.tmp/w-c4/baseline.txt`、`candidate-full.txt`、`candidate-extra.txt`。
+- **设计取舍（安全边界）**：守卫只在删除事务完成、锁已释放后回收——被别的进程打开/加锁时 Windows `os.remove` 必然共享冲突失败，残留保留且删除结果仍 `complete`（无重试、无抢锁）；若可见 `.lock` 仍存在（说明另一代际在途或释放失败），该路径的守卫一律保留。不删除可见 `.provision.lock`、不递归删除非空 `native-home`（原生登录态）或其他成员资源。
+- **测试**：更新 4 处旧“仅剩 guard”断言（`test_role_delete_local` 3 处、`test_role_deletion` 1 处）；新增 workspace 空壳回收、非空 `native-home` 保留、被占用守卫保留、可见 `.lock` 存在时守卫保留、128 字符 HTTP 接受、129 拒绝零写入、模型与 `normalize_operation_key` 8/120/121/128 与 7/129/200 边界用例（用 `.` 分段规避“像凭据”的 ≥40 位连续串启发式）。
+- **验证**：基线（改动前）187 项、3 失败，均 `tests.test_role_provision.CliAndSecretTests` CLI 子进程 exit 1；候选 194 项、同 3 项失败（逐名一致），`new_failures=0`。追加回归 100 项全过。`py_compile`、UTF-8（无 BOM、无替换字符）、`git diff --check` 通过。证据 `.tmp/w-c4/baseline.txt`、`candidate-final.txt`、`candidate-extra-final.txt`。
 - **未做/限制**：① 未独立复核（Terra/K2.8 均 stopped，本会话无 TALK MCP 工具；按用户选择本机开发）；② 存量残留未删除，只读 dry-run 为 14 个 legacy guard-only 目录 + 9 个 workspace 角色空壳（另有私有 Key 根守卫未扫描），删除需单独授权并逐条核对归属；③ 未在真实删除流程上跑 E2E（删角色会动生产数据，仅单测覆盖真实 Windows 文件锁/句柄行为）。
 - **环境**：runtime `2172` / API `14296` 未重启，`/healthz` ok、`auth=trusted`；本轮未改生产 DB 与运行数据。
 
