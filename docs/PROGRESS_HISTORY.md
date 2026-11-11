@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-11 22:10 — W-D1：工作区登记与重关联设计合同（660–663）
+
+- **需求来源**：路线图第 9 项“记录/重新打开已有目录、识别重复/缺失/移动，用户主动重新关联并保项目与历史；344 失败未自动重派”。按用户确认，先做只读设计片，不改产品代码。
+- **660（Terra 设计，556s）**：新增 `docs/spec/WORKSPACE_REGISTRATION_DESIGN.md`（94 行）：现状盘点（项目登记/`.talk` 指针/local runtime/工作区落点/页面与数据范围，均带文件:行号）、四类判定表（`workspace_duplicate`、`workspace_root_missing|inaccessible|invalid|unconfigured`、`workspace_move_candidate|identity_unverified|marker_conflict`、`workspace_binding_invalid|unknown`，含 unknown 与 ok 分离、跨平台/网络盘边界、代价对比）、检测 `GET /workspace-diagnostics` 与 `POST /workspace-relink-preview`、提交 `POST /workspace-relink`（权限 human/operator、Agent 403、preview_token+expected_revision+operation_id、忙守卫、跨项目唯一性）、页面两步确认、数据迁移与跨文件恢复（持久操作日志/阶段机/`recovery_required`）、测试计划、5 个实现切片与不做项、5 项待裁决问题。
+- **661（K2.8 独立复核）changes_requested**：8 个维度实质通过（范围、31 处引用语义、产品约束、安全边界、判定可实施、决策问题、切片、卫生），唯一待修为“12 处引用行号漂移”；报告 `.tmp/wd1-review/review.json`。
+- **协调者裁定（对复核清单再核对）**：打开源码逐条比对后确认 **5 组（7 个数字引用）属实**——`local_workspaces.py` 103→112（`workspace_already_bound`）、142→148（指针创建）、138→141（`workspace_runtime_conflict`）、171→174（503）、`local_runtime.py` 49/60/65→47/56/59/63/66（5 个 `return None`）；**7 处为复核误判**——`cli/talk.py:112/:204`、`models.py:112`（就是 `project_root_path`）、`workspace_paths.py:72`（`deployment_shape` 入口）、`app.js:938`（`render_project_strip` 入口）、`tasks.py:1905`（`if project_id:`）。原稿冻结为 `.tmp/wd1/design-frozen-ea2b155a.md`。
+- **662（Terra 返修）**：按裁定只改 5 组；差异 2 行（仅引用数字）；新 sha256 `805e9dbb…`；全量复读 71 处引用无越界。返修前曾因任务包“只写 `.tmp/wd1/`”与“改设计稿”矛盾进入 `clarification_requested`，协调者答复以设计稿为唯一产品树写入例外后继续（模板遗留错误已记录）。
+- **663（K2.8 定向复验）approved**：5 组新行号与源码语句一一对应；7 处误判裁定全部成立（`cli/talk.py:112` 函数名略异但行号实质正确）；71 处引用 0 缺失/0 越界；抽查 60+ 处语义一致；`git diff --no-index` 仅第 12、14 行两处变化；卫生通过。**结果消息围栏外含“校验通过。以下为最终交付内容：”一行，属格式违规**，已按围栏内 JSON 提取校验（`validate --expect-task-id 663` 通过）并记录，不改变业务结论。
+- **交付状态**：设计稿已入库；产品代码/测试零改动（`git status` 仅该新增文档），未运行产品测试（如实标注）。
+- **待裁决（阻塞实现片）**：① 无 `.talk/project.yaml` 候选能否重关联（推荐拒绝）；② 仅标记匹配、物理身份变化能否人工确认（推荐允许并标弱证据，需全局唯一性可验证）；③ 任一其他登记根不可访问是否阻止（推荐阻止）；④ 重新关联是否重写本机指针/runtime 配置（推荐仅最小 CAS 改写可证明归属的文件，否则拒绝）；⑤ 谁能操作与忙状态范围（推荐仅 human/operator；运行或状态未知时禁止提交，排队任务允许但提交期间阻止领取）。
+- **下一步**：用户裁决 5 项后，按设计第 6 节拆实现片（建议顺序：只读诊断内核 → 只读 API → 存储/事务内核 → 受保护提交入口与登记收口 → 页面入口与真实场景），每片重新确认范围并独立复核。
+
 ## 2026-11-11 20:25 — W-C4：删除残留清理与 operation_key 边界（本机自测）
 
 - **债务来源**：PROGRESS 可选遗留登记（2026-11-09 起）——角色删除后残留 `profiles/.provision.lock.guard`、`.talk/agents/<member>/`、空 `native-home/` 与 Key 锁守卫；`operation_key` 契约 8–128，但两个恢复请求模型写成 120，121–128 在创建可过、在恢复被 422 且无显式用例。
