@@ -245,6 +245,16 @@ class LocalDeletionTests(unittest.TestCase):
         self.assertFalse(provision.lock_guard_path_for(lock).exists())
         self.assertFalse(directory.exists())
 
+    def test_visible_lock_keeps_its_guard(self):
+        directory=self.root/"locked-shell";directory.mkdir()
+        lock=directory/provision.PROFILE_LOCK_FILENAME
+        lock.write_text("{}",encoding="utf-8")
+        provision.lock_guard_path_for(lock).write_text("guard",encoding="utf-8")
+        d._sweep_shell(directory,(),())
+        self.assertTrue(lock.exists())
+        self.assertTrue(provision.lock_guard_path_for(lock).exists())
+        self.assertTrue(directory.exists())
+
     def test_config_concurrent_change_never_overwritten_and_retry_after_reload(self):
         changed={**self.config,"unrelated_setting":"keep-new-value"}
         self.path.write_text(json.dumps(changed),encoding="utf-8")

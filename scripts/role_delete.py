@@ -361,13 +361,18 @@ def _sweep_shell(profile_dir, key_files, extra_dirs):
 
     Addresses only the enumerated guard files and the role's own empty
     directories: the profile shell, an empty ``native-home`` and (workspace-v1)
-    the now empty role directory.  Failures are ignored by design; the deletion
-    result and its receipts are decided by the steps, not by residue.
+    the now empty role directory.  A still visible ``.lock`` means another
+    operation generation is in flight, so its guard is left alone.  Failures are
+    ignored by design; the deletion result and its receipts are decided by the
+    steps, not by residue.
     """
     lock = Path(profile_dir) / provision.PROFILE_LOCK_FILENAME
-    _sweep_guard(provision.lock_guard_path_for(lock))
+    if not os.path.lexists(lock):
+        _sweep_guard(provision.lock_guard_path_for(lock))
     for key_file in key_files:
-        _sweep_guard(provision.lock_guard_path_for(provision.lock_path_for(key_file)))
+        key_lock = provision.lock_path_for(key_file)
+        if not os.path.lexists(key_lock):
+            _sweep_guard(provision.lock_guard_path_for(key_lock))
     for directory in (profile_dir, *extra_dirs):
         _sweep_empty_dir(directory)
 
