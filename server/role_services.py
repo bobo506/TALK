@@ -40,6 +40,7 @@ from sqlmodel import Session, select
 
 from server.db import begin_immediate_write
 from server.role_host_resolution import workspace_runtime_enabled
+from server.workbuddy_cdp import cdp_endpoint_available
 from bridges.stop_blockers import BUSY_STOP_CODE, STOP_BLOCKER_LIMIT, safe_stop_blockers
 from server.models import (
     ROLE_AUTO_START_ACTOR,
@@ -653,6 +654,12 @@ def start_role_service(
     启动复用；本包装继续负责原事务边界与 human 审计（``updated_by=operator.id``），
     行为/返回模型/错误码与 R1-3 逐字一致。
     """
+    binding = session.get(ProjectRoleBinding, (project_id, member_id))
+    if binding is not None and (
+        binding.connection_ref == "native-workbuddy-cdp"
+        or (binding.model_alias or "").startswith("workbuddy-cdp:")
+    ) and not cdp_endpoint_available():
+        raise _fail(status.HTTP_409_CONFLICT, "workbuddy_cdp_unavailable")
     _write_begin(session)
     _require_start_layout(project_id, member_id, session)
     ctx = load_role_service_context(project_id, member_id, session)

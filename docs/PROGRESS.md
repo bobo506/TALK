@@ -1,5 +1,17 @@
 # Project Progress
 
+## 收工快照（2026-11-11 10:50）
+
+- **本轮完成**：**W-B3 未开调试模式时的启动拦截与弹窗**（630 Terra 开发 / 631 K2.8 独立复核 approved / 632 探测返修 / 633 定向复验 approved）＋真实 E2E（634/635/636）。
+- **实现（7 文件）**：新增 `server/workbuddy_cdp.py`（仅 loopback、原始 socket、0.6s 预算的 CDP 探测）；`server/role_services.py` 单角色启动入口在 `_write_begin` 前拦截（仅 `native-workbuddy-cdp` / `workbuddy-cdp:` 绑定；不可用 → 409 `workbuddy_cdp_unavailable`、零 launch/零状态写入；start-all 逐角色返回该码）；`web/workspace.js` 启动 409 弹窗（标题「请以调试模式启动 WorkBuddy 再使用其内置模型」+ 两行启动命令 + 复制按钮，clipboard 失败回退 textarea；遮罩/Esc/知道了可关）；`web/app.js` 任务 `failed` 且 `last_error` 含该码时弹同一提示（同任务只弹一次）；`tests/test_workbuddy_cdp_gate.py`、`tests/workspace_role_services.test.cjs`、`docs/guides/USER_MANUAL.md` 一句说明。
+- **返修**：630 首版用 httpx 探测，本机首请求 438ms > 0.4s 预算，真实 E2E 出现「调试端口正常却 409」误报；632 改原始 socket（实测 8–10ms），633 复核 approved（门测试 10/10；联合 92 项唯一失败为既存 SSE，`new_failures=0`）。
+- **真实 E2E**：调试模式开 → 启动 hy4 200/running，任务 **634** succeeded；退出 WorkBuddy → start 返回 **409** 且 generation 不变、零 launch；重开调试 → start 200/running；调试关闭时任务 **635** failed，`last_error` 含 `workbuddy_cdp_unavailable`（前端失败弹窗数据链路成立）；重开调试后 **636** succeeded。
+- **部署**：API 受控 reload（新 pid 17612）；runtime 与角色宿主未重启。当前 hy4 `agent:prj-e8fe7066bbec.hy4-2bbb4889` running（gen 5、`ins_b06c2ff5bce1`），w-d `agent:prj-e8fe7066bbec.w-d-a6718675` running。
+- **对账**：本轮 submitted 任务已全部收取（630/631/632/633/634/636）；635 failed 无可收取结果，已记录。
+- **已知限制**：既存 SSE 测试 `test_sse_authentication_does_not_block_event_loop` 失败（`server/main.py:460` 对 `request=None` 未容错），与本片无关，建议另片修；auto-start 路径未加门，由任务失败弹窗兜底；弹窗无 CSS 类（暗色主题观感非阻断）。
+- **待办（按优先级）**：① 受管 WorkBuddy 调试启动器/开机引导；② `server.main.sse_events` 对 `request=None` 容错（既存测试债）；③ CDP 强度探测接入；④ "角色换模型"产品化入口；⑤ 既有 `host_unreachable`、legacy guard 残留等待办不变。
+- **恢复**：说“继续项目”；先读本快照与 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.5/10.6。
+
 ## 收工快照（2026-11-11 09:10）
 
 - **本轮完成**：**W-B2 WorkBuddy CDP 执行通道**（624 Terra 开发 / 625 返修 / 626 K2.8 独立复核 **approved**）＋**内置模型恢复与真实任务 E2E**（627/628）。提交见 `git log -1`。

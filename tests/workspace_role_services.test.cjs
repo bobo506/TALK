@@ -18,7 +18,7 @@ function fakeEl(tag) {
   const classes = new Set();
   const el = {
     tagName: tag, id: '', className: '', textContent: '', value: '', disabled: false, readOnly: false,
-    dataset: {}, attrs: {}, children: [], listeners: {}, replaceCount: 0,
+    dataset: {}, attrs: {}, children: [], listeners: {}, style: {}, replaceCount: 0,
     classList: {
       add(...cs) { cs.forEach(c => classes.add(c)); },
       remove(...cs) { cs.forEach(c => classes.delete(c)); },
@@ -40,6 +40,8 @@ function fakeEl(tag) {
     addEventListener(type, fn) { (el.listeners[type] ||= []).push(fn); },
     fire(type, event = {}) { for (const fn of el.listeners[type] || []) fn(event); },
     focus() {},
+    select() {},
+    remove() { if (el.parentElement) { const siblings = el.parentElement.children; siblings.splice(siblings.indexOf(el), 1); el.parentElement = null; } },
     scrollIntoView() {},
     querySelectorAll: () => [],
   };
@@ -58,6 +60,69 @@ function findAll(node, pred, out = []) {
   return out;
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+test('WorkBuddy 启动失败弹窗、复制和关闭', async () => {
+  const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
+  h.context.__workspaceUI.mode = 'roles';
+  h.context.renderWorkspaceList = () => {};
+  h.context.renderTaskDetailsPanel = () => {};
+  let copied;
+  h.context.navigator.clipboard = {writeText: async text => { copied = text; }};
+  h.context.apiFetch = async () => ({ok: false, status: 409, json: async () => ({detail: 'workbuddy_cdp_unavailable'})});
+  await h.context.startRoleService('agent:a');
+  const body = h.context.document.body;
+  const message = '请以调试模式启动 WorkBuddy 再使用其内置模型';
+  const command = '$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"\nStart-Process "$env:LOCALAPPDATA\\Programs\\WorkBuddy\\WorkBuddy.exe"';
+  assert.ok(allTexts(body).includes(message));
+  assert.ok(allTexts(body).includes(command));
+  findAll(body, n => n.textContent === '复制命令')[0].fire('click');
+  await sleep(0);
+  assert.equal(copied, command);
+  findAll(body, n => n.textContent === '知道了')[0].fire('click');
+  assert.equal(body.children.length, 0);
+  await h.context.startRoleService('agent:a');
+  h.context.document.fire('keydown', {key: 'Escape'});
+  assert.equal(body.children.length, 0);
+  await h.context.startRoleService('agent:a');
+  body.children[0].fire('click', {target: body.children[0]});
+  assert.equal(body.children.length, 0);
+});
+
+test('复制失败回退，其他启动错误不弹窗', async () => {
+  const h = harness({roster: [{member_id: 'agent:a', service: serviceRow()}]});
+  h.context.__workspaceUI.mode = 'roles';
+  h.context.renderWorkspaceList = () => {}; h.context.renderTaskDetailsPanel = () => {};
+  h.context.navigator.clipboard = {writeText: async () => { throw new Error('denied'); }};
+  let copied = false;
+  h.context.document.execCommand = command => { copied = command === 'copy'; return true; };
+  h.context.showWorkbuddyDebugDialog();
+  findAll(h.context.document.body, n => n.textContent === '复制命令')[0].fire('click');
+  await sleep(0);
+  assert.equal(copied, true);
+  findAll(h.context.document.body, n => n.textContent === '知道了')[0].fire('click');
+  h.context.apiFetch = async () => ({ok: false, status: 409, json: async () => ({detail: 'already_running'})});
+  await h.context.startRoleService('agent:a');
+  assert.equal(h.context.document.body.children.length, 0);
+});
+
+test('任务详情失败提示只弹一次', () => {
+  const h = harness();
+  const source = appSource.slice(appSource.indexOf('function renderTaskDetailsPanel()'), appSource.indexOf('\nasync function openTaskHall', appSource.indexOf('function renderTaskDetailsPanel()')));
+  h.context.renderWorkspaceRoleDetails = () => {}; h.context.renderRequirementsPanel = () => {};
+  h.context.renderControllerModePanel = () => {}; h.context.renderRoleDescriptionPanel = () => {};
+  h.context.getContextTask = () => ({id: 630, status: 'failed', last_error: 'failed: workbuddy_cdp_unavailable'});
+  h.context.taskContextKey = () => 'ctx'; h.context.resetWorkspaceResult = () => {};
+  h.context.taskDetailsPanel = fakeEl('div'); h.context.groupMembersPanel = fakeEl('div');
+  // 后续详情组件与此验证无关，在弹窗调用后中止渲染。
+  h.context.taskDetailsTitle = {};
+  Object.defineProperty(h.context.taskDetailsTitle, 'textContent', {set() { throw new Error('stop after notification'); }});
+  vm.runInContext(source, h.context);
+  assert.throws(() => h.context.renderTaskDetailsPanel(), /stop after notification/);
+  assert.ok(allTexts(h.context.document.body).includes('请以调试模式启动 WorkBuddy 再使用其内置模型'));
+  findAll(h.context.document.body, n => n.textContent === '知道了')[0].fire('click');
+  assert.throws(() => h.context.renderTaskDetailsPanel(), /stop after notification/);
+  assert.equal(h.context.document.body.children.length, 0);
+});
 
 // 冻结契约里的 service 投影（隔离 fixture，只作为渲染输入，不写任何生产数据）。
 function serviceRow(overrides = {}) {
@@ -247,6 +312,7 @@ function harness({ human = true, roster = [] } = {}) {
   board.append(getEl('blackboard-header'), toolbar, getEl('role-service-batch-feedback'),
     getEl('blackboard-summary'), getEl('blackboard-columns'));
   const workbench = fakeEl('div');
+  const documentListeners = {};
   const documentStub = {
     getElementById: id => id === 'workspace-search'
       ? findAll(board, node => node.id === id)[0] || null : getEl(id),
@@ -255,6 +321,10 @@ function harness({ human = true, roster = [] } = {}) {
     querySelector: sel => (sel === '.workbench' ? workbench : null),
     activeElement: null,
     body: fakeEl('body'),
+    addEventListener(type, fn) { (documentListeners[type] ||= []).push(fn); },
+    removeEventListener(type, fn) { documentListeners[type] = (documentListeners[type] || []).filter(item => item !== fn); },
+    fire(type, event) { for (const fn of documentListeners[type] || []) fn(event); },
+    execCommand() { return true; },
   };
   const members = [
     { id: 'human:qa', kind: 'human', display_name: 'bobo' },
@@ -262,6 +332,7 @@ function harness({ human = true, roster = [] } = {}) {
   ];
   const context = vm.createContext({
     document: documentStub,
+    navigator: {},
     // vm 的新 context 默认没有宿主计时器；注入 Node 的 setTimeout/clearTimeout，
     // 让真实 workspace.js 的轮询生命周期（不是测试内镜像）被实际驱动。
     setTimeout,

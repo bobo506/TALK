@@ -1632,6 +1632,52 @@ function roleServiceBaseFor(memberId) {
   const role = workspaceRoles().find(item => item.member_id === memberId);
   return role && roleServiceDeclared(role) ? roleServiceObject(role.service) : null;
 }
+const WORKBUDDY_DEBUG_COMMAND = '$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"\nStart-Process "$env:LOCALAPPDATA\\Programs\\WorkBuddy\\WorkBuddy.exe"';
+const workbuddyNotifiedTasks = new Set();
+let workbuddyDialog = null;
+
+function showWorkbuddyDebugDialog() {
+  if (workbuddyDialog) return;
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px";
+  const panel = document.createElement("div");
+  panel.style.cssText = "background:white;color:#222;border-radius:8px;padding:24px;max-width:720px;width:100%";
+  panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true");
+  const title = document.createElement("h2");
+  title.textContent = "请以调试模式启动 WorkBuddy 再使用其内置模型";
+  const command = document.createElement("pre");
+  command.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f4f6;padding:12px";
+  command.textContent = WORKBUDDY_DEBUG_COMMAND;
+  const copy = document.createElement("button"); copy.type = "button"; copy.textContent = "复制命令";
+  copy.addEventListener("click", async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(WORKBUDDY_DEBUG_COMMAND);
+    } catch (_) {
+      const area = document.createElement("textarea"); area.value = WORKBUDDY_DEBUG_COMMAND;
+      area.style.cssText = "position:fixed;left:-9999px;opacity:0";
+      document.body.appendChild(area); area.select();
+      try { document.execCommand("copy"); } finally { area.remove(); }
+    }
+  });
+  const close = document.createElement("button"); close.type = "button"; close.textContent = "知道了";
+  const dismiss = () => { overlay.remove(); document.removeEventListener("keydown", onKey); workbuddyDialog = null; };
+  const onKey = event => { if (event.key === "Escape") dismiss(); };
+  close.addEventListener("click", dismiss);
+  overlay.addEventListener("click", event => { if (event.target === overlay) dismiss(); });
+  panel.append(title, command, copy, close); overlay.appendChild(panel); document.body.appendChild(overlay);
+  document.addEventListener("keydown", onKey); workbuddyDialog = overlay; close.focus();
+}
+
+function notifyWorkbuddyTaskFailure(task, projectId) {
+  if (!task || task.status !== "failed" || typeof task.last_error !== "string"
+      || !task.last_error.includes("workbuddy_cdp_unavailable")) return;
+  const key = `${projectId}:${task.id}`;
+  if (workbuddyNotifiedTasks.has(key)) return;
+  workbuddyNotifiedTasks.add(key);
+  showWorkbuddyDebugDialog();
+}
+
 async function startRoleService(memberId) {
   const role = workspaceRoles().find(item => item.member_id === memberId);
   if (!role || role.archived === true || roleServiceUI.busy.has(memberId)) return;
@@ -1649,7 +1695,9 @@ async function startRoleService(memberId) {
     });
     if (projectId !== activeProjectId || accountId !== myId) return;
     if (!res.ok) {
-      roleServiceUI.errors.set(memberId, await roleServiceErrorDetail(res, `启动失败（${res.status}），请稍后重试。`));
+      const detail = await roleServiceErrorDetail(res, `启动失败（${res.status}），请稍后重试。`);
+      roleServiceUI.errors.set(memberId, detail);
+      if (res.status === 409 && detail === "workbuddy_cdp_unavailable") showWorkbuddyDebugDialog();
     } else {
       const data = await res.json().catch(() => null);
       roleServiceUI.overlay.set(memberId, roleServiceMergeAction(roleServiceBaseFor(memberId), data));

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-11 10:50 — W-B3：未开调试模式时的启动拦截与弹窗（630–636）
+
+- **需求（用户当日提出）**：WorkBuddy CDP 角色在桌面未开调试端口时，点“启动”应直接阻止并弹窗「请以调试模式启动 WorkBuddy 再使用其内置模型」，下方给出可复制的启动命令；角色已在运行但任务因该码失败时也弹同一提示。
+- **630（Terra 开发，交付 partial）**：7 文件——新增 `server/workbuddy_cdp.py`（loopback 探测）与 `tests/test_workbuddy_cdp_gate.py`；`server/role_services.py` 在 `_write_begin` 前加门（仅 CDP 绑定；409 零写入；start-all 捕获逐角色错误码）；`web/workspace.js` 启动 409 弹窗 + 复制命令；`web/app.js` 任务失败同码弹窗（Set 去重）；`tests/workspace_role_services.test.cjs` 扩展；`docs/guides/USER_MANUAL.md` 一句。自测 Python 9、Node 39（基线 36）；基线 worktree 受沙箱 `.git` 权限阻挡，协调者代建 `.tmp/wb3-baseline`（`f06c631`）。
+- **631（K2.8 独立复核）approved**：7 条验收标准全过；候选/基线独立重跑，`new_failures=0`；唯一失败 `test_sse_authentication_does_not_block_event_loop` 在基线同样失败（既存）。
+- **真实 E2E 发现缺陷**：API 已加载 630 代码、WorkBuddy 调试端口正常时，启动仍 409。定位：630 的 httpx 探测首请求 438ms，超过 0.4s 预算与 `join(0.4)`，helper 直接返回 False；并非端点不可用。
+- **632（Terra 返修，交付 partial）**：探测改为原始 socket + 最小 HTTP/1.1 请求 + 状态行判定，单调时钟 deadline、默认预算 0.6s、零重试；补真实本地 socket/慢响应/停滞预算回归；实测 9222 连续 5 次 True（8–10ms）、不可达端口 9 为 False（约 612ms）。联合 92 项唯一失败仍为既存 SSE。
+- **633（K2.8 定向复验）approved**：门测试 10/10；真实 9222 连续 6 次 True；SSE 既存性三重证据（基线树、631 轮、任务前 httpx 原件复现）；门/前端/文档未变；`new_failures=0`。
+- **真实 E2E（协调者）**：调试模式开 → 启动 hy4 200/running、任务 634 succeeded；退出 WorkBuddy → start 409 且 generation 不变、零 launch；重开调试 → start 200/running；调试关闭时任务 635 failed，`last_error` 含 `workbuddy_cdp_unavailable`；重开调试后 636 succeeded。
+- **部署**：API 受控 reload（新 pid 17612），runtime/角色宿主未重启；hy4 恢复 running（gen 5、`ins_b06c2ff5bce1`），w-d 保持 running。
+- **限制/后续**：既存 SSE 测试失败（`server/main.py:460` `request=None`）另片修；auto-start 路径未加门（任务失败弹窗兜底）；弹窗无 CSS 类、暗色主题观感非阻断；受管调试启动器与“换模型”入口仍待办。
+
 ## 2026-11-11 09:10 — W-B2：WorkBuddy CDP 执行通道与内置模型恢复（624–628）
 
 - **背景**：桌面 WorkBuddy 5.9.3 的 ACP/CLI 通道不可用（10.4 结论）；10.5 已实测调试端口 CDP 的页面私有 API 可创建/驱动/删除专用对话。本片把它接进角色执行通道，恢复 WorkBuddy 内置模型角色。

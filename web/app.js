@@ -1200,6 +1200,8 @@ function renderTaskDetailsPanel() {
   groupMembersPanel.classList.toggle("hidden", blackboardOpen || Boolean(task) || !getActiveGroup() || getActiveGroup().type === "task");
   if (!task) return;
 
+  notifyWorkbuddyTaskFailure(task, activeProjectId);
+
   taskDetailsTitle.textContent = task.title || `任务 #${task.id}`;
   taskDetailsStatus.innerHTML = "";
   const meta = taskStatusMeta(task);

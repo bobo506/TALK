@@ -82,6 +82,7 @@ WorkBuddy 角色可以选择 WorkBuddy 账号自带的内置模型（例如 Hy4�
 
 **前提：WorkBuddy 必须以调试端口启动（仅本机回环 `127.0.0.1:9222`）。** 正常双击启动不会打开
 调试端口，此时角色的任务会明确失败（`workbuddy_cdp_unavailable`），不会静默改用其它通道。
+未开调试模式点启动会弹窗并可复制启动命令。
 启动方式（PowerShell）：
 
 ```powershell
