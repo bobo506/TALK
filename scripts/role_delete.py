@@ -3,6 +3,8 @@
 Only canonical per-role roots and explicitly registered key files are eligible.
 Windows parent handles pin every ancestor; deletion addresses the checked HANDLE.
 Shared native login/model directories and diagnostic logs are never targets.
+A completed deletion also reclaims the role's own lock guards and empty shells
+(an occupied guard keeps its residue; that never changes the result).
 """
 from __future__ import annotations
 import hashlib
@@ -315,10 +317,68 @@ def _config(runtime, member, files):
         provision.release_lock(lock, held)
 
 
+def _sweep_guard(path):
+    """Remove a deleted role's lock guard; leave it if anything still holds it.
+
+    守卫文件在锁路径存活期间从不删除——它让字节锁的对象身份保持稳定，创建/恢复
+    才不会被“删除后重建的另一个文件”绕过。角色删除完成即退役，其 member id 不再
+    复用，守卫与空目录成为纯残留，可在锁释放后回收。Windows 上被打开/加锁的守卫
+    无法删除（共享冲突），残留由持有者保留；本函数从不因此报错。
+    """
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return
+    if not stat.S_ISREG(info.st_mode) or _link(info):
+        return
+    try:
+        os.remove(path)
+    except OSError:
+        return
+
+
+def _sweep_empty_dir(path):
+    """Remove the deleted role's own empty shell; never recurse into content.
+
+    Only an empty directory is removed (``os.rmdir``), so a non-empty
+    ``native-home`` (native login state) and anything else inside stays. Link
+    entries are never followed or removed.
+    """
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return
+    if not stat.S_ISDIR(info.st_mode) or _link(info):
+        return
+    try:
+        os.rmdir(path)
+    except OSError:
+        return
+
+
+def _sweep_shell(profile_dir, key_files, extra_dirs):
+    """Best-effort shell cleanup after a completed deletion released its locks.
+
+    Addresses only the enumerated guard files and the role's own empty
+    directories: the profile shell, an empty ``native-home`` and (workspace-v1)
+    the now empty role directory.  Failures are ignored by design; the deletion
+    result and its receipts are decided by the steps, not by residue.
+    """
+    lock = Path(profile_dir) / provision.PROFILE_LOCK_FILENAME
+    _sweep_guard(provision.lock_guard_path_for(lock))
+    for key_file in key_files:
+        _sweep_guard(provision.lock_guard_path_for(provision.lock_path_for(key_file)))
+    for directory in (profile_dir, *extra_dirs):
+        _sweep_empty_dir(directory)
+
+
 def cleanup(runtime, member, receipt, role=None):
     steps = {step:"pending" for step in STEPS}
     files = Files(time.monotonic()+120)
     handles = []
+    profile_dir = None
+    sweep_dirs = ()
+    sweep_keys = ()
     step = "manager"
     try:
         if os.name != "nt":
@@ -349,14 +409,19 @@ def cleanup(runtime, member, receipt, role=None):
         if workspace_root is None:
             handles = provision.acquire_provision_locks(root, keys, member)
         step = "profiles"
-        directory = (workspace_root / "profiles" if workspace_root is not None
-                     else provision.profile_lock_path_for(root, member).parent)
-        files.remove(directory, tree=True, skip={".provision.lock", ".provision.lock.guard"})
+        profile_dir = (workspace_root / "profiles" if workspace_root is not None
+                       else provision.profile_lock_path_for(root, member).parent)
+        sweep_dirs = ((workspace_root / "native-home", workspace_root)
+                      if workspace_root is not None else ())
+        files.remove(profile_dir, tree=True, skip={".provision.lock", ".provision.lock.guard"})
         steps[step] = "complete"
         step = "credentials"
         if receipt["identity_disabled"]:
-            for path in ({key} if workspace_root is not None else _key_paths(runtime.config, member)):
+            credential_paths = ({key} if workspace_root is not None
+                                else _key_paths(runtime.config, member))
+            for path in credential_paths:
                 files.remove(path, digest=receipt["credential_digest"])
+            sweep_keys = tuple(credential_paths)
             metadata = provision.credential_metadata_path(key.parent if workspace_root is not None else keys, member)
             files.remove(metadata, verify=lambda data:json.loads(data).get("member_id")==member)
             steps[step] = "complete"
@@ -389,15 +454,25 @@ def cleanup(runtime, member, receipt, role=None):
         step = "startup_config"
         _config(runtime, member, files)
         steps[step] = "complete"
-        return {"outcome":"complete", "steps":steps, "error_code":None}
+        result = {"outcome":"complete", "steps":steps, "error_code":None}
     except Exception as exc:
         code = exc.code if isinstance(exc, CleanupError) else "cleanup_busy" if isinstance(exc, provision.ProvisionError) and "lock" in exc.code else "cleanup_failed"
         if code == "cleanup_budget" and files.deleted > 0 and step != "manager":
             # Tangible progress yields the lease; the next runtime tick resumes
             # the same tombstone. Never turn a lock/ownership error into a retry loop.
             steps[step] = "pending"
-            return {"outcome":"pending", "steps":steps, "error_code":None}
-        steps[step] = "failed"
-        return {"outcome":"failed", "steps":steps, "error_code":code}
+            result = {"outcome":"pending", "steps":steps, "error_code":None}
+        else:
+            steps[step] = "failed"
+            result = {"outcome":"failed", "steps":steps, "error_code":code}
     finally:
         provision.release_provision_locks(handles)
+    # Only a completed deletion retires the member id, so only then can the
+    # guard files and the now empty shells be reclaimed. Residue never changes
+    # the result decided above.
+    if result["outcome"] == "complete" and profile_dir is not None:
+        try:
+            _sweep_shell(profile_dir, sweep_keys, sweep_dirs)
+        except Exception:
+            pass
+    return result

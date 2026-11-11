@@ -73,6 +73,10 @@ class LocalDeletionTests(unittest.TestCase):
         self.assertEqual(saved["workbuddy"]["key_files"],{"agent:other":"other.key"})
         self.assertEqual(saved["workbuddy"]["models_home"],"shared-models")
         self.assertEqual(self.run_cleanup()["outcome"],"complete")
+        # 删除完成后身份档目录只剩守卫，守卫与空壳都应回收；其他角色原样保留。
+        self.assertFalse(self.profile.parent.exists())
+        self.assertEqual(self.other.read_text(encoding="utf-8"),"keep")
+        self.assertFalse(provision.lock_guard_path_for(provision.lock_path_for(self.key)).exists())
 
     def test_shared_identity_key_and_metadata_preserved(self):
         self.receipt={"identity_disabled":False,"credential_digest":None}
@@ -119,7 +123,7 @@ class LocalDeletionTests(unittest.TestCase):
             self.assertTrue(all(value == "complete" for value in result["steps"].values()),result)
             self.assertEqual(process.poll(),0)
             self.assertFalse(health.exists());self.assertFalse(marker.exists())
-            self.assertTrue(workspace.exists());self.assertTrue(self.key.exists())
+            self.assertFalse(workspace.exists(),workspace);self.assertTrue(self.key.exists())
         finally:
             if process.poll() is None:
                 marker.write_text("stop",encoding="utf-8");process.wait(timeout=5)
@@ -195,10 +199,51 @@ class LocalDeletionTests(unittest.TestCase):
                 result=d.cleanup(self.runtime,self.member,self.receipt,role)
                 self.assertEqual(result["outcome"],"complete",result)
                 self.assertTrue(all(value == "complete" for value in result["steps"].values()),result)
-        self.assertEqual({p.name for p in profiles.iterdir()},{".provision.lock.guard"})
+        self.assertFalse(profiles.exists())
+        self.assertFalse(workspace.exists())
         for path in (workspace/"sessions",workspace/"state",workspace/"logs",key,metadata):
             self.assertFalse(path.exists(),path)
         self.assertTrue((other/"keep").exists());self.assertTrue(self.key.exists())
+
+    def test_workspace_empty_shells_are_reclaimed_after_delete(self):
+        from server import workspace_paths as wp
+        workspace=wp.role_dir(self.root,self.project_id,self.member)
+        profiles=workspace/"profiles";profiles.mkdir(parents=True)
+        role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+        with patch("scripts.talk_runtime.ROOT",self.root):
+            result=d.cleanup(self.runtime,self.member,self.receipt,role)
+        self.assertEqual(result["outcome"],"complete",result)
+        self.assertFalse(profiles.exists(),profiles)
+        self.assertFalse(workspace.exists(),workspace)
+        self.assertFalse(provision.lock_guard_path_for(provision.lock_path_for(self.key)).exists())
+
+    def test_non_empty_native_home_is_never_removed(self):
+        from server import workspace_paths as wp
+        workspace=wp.role_dir(self.root,self.project_id,self.member)
+        native=workspace/"native-home"/".dsh"
+        native.mkdir(parents=True);(native/"login.json").write_text("keep",encoding="utf-8")
+        (workspace/"profiles").mkdir()
+        role={"member_id":self.member,"project_id":self.project_id,"storage_layout":"workspace-v1"}
+        with patch("scripts.talk_runtime.ROOT",self.root):
+            self.assertEqual(d.cleanup(self.runtime,self.member,self.receipt,role)["outcome"],"complete")
+        self.assertTrue((native/"login.json").exists())
+        self.assertFalse((workspace/"profiles").exists())
+        self.assertTrue(workspace.exists(),workspace)
+
+    def test_held_guard_and_shell_survive_until_released(self):
+        directory=self.root/"held-shell";directory.mkdir()
+        lock=directory/provision.PROFILE_LOCK_FILENAME
+        held=provision._lock_guard_acquire(lock)
+        self.assertIsNotNone(held)
+        try:
+            d._sweep_shell(directory,(),())
+            self.assertTrue(provision.lock_guard_path_for(lock).exists())
+            self.assertTrue(directory.exists())
+        finally:
+            provision._lock_guard_release(held)
+        d._sweep_shell(directory,(),())
+        self.assertFalse(provision.lock_guard_path_for(lock).exists())
+        self.assertFalse(directory.exists())
 
     def test_config_concurrent_change_never_overwritten_and_retry_after_reload(self):
         changed={**self.config,"unrelated_setting":"keep-new-value"}

@@ -12,11 +12,19 @@ import subprocess
 import sys
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import text
 from sqlmodel import select
 
 from scripts import role_service_recovery as proof
-from server.models import AgentInstance, AgentTask, RoleServiceRecovery
+from server.models import (
+    AgentInstance,
+    AgentTask,
+    RoleServiceOrphanRecoveryRequest,
+    RoleServiceRecovery,
+    RoleServiceRecoveryRequest,
+    normalize_operation_key,
+)
 from tests.test_project_roles import encode
 from tests.test_role_services import RoleServiceTestCase, PROJECT_ID, OTHER_PROJECT_ID
 
@@ -173,12 +181,19 @@ class OrphanApiTests(RoleServiceTestCase):
 
     def test_invalid_operation_keys_rejected_before_termination(self):
         before = self.state_row().model_dump()
-        for key in ("bad key 123", "_invalid-key"):
-            with self.subTest(key=key):
+        for key in ("bad key 123", "_invalid-key", "a" * 129):
+            with self.subTest(key=key[:12]):
                 self.assertEqual(self.post({**self.body, "operation_key": key}).status_code, 422)
         self.term_mock.assert_not_called()
         self.assertEqual(self.state_row().model_dump(), before)
         self.assertEqual(self.audits(), [])
+
+    def test_max_length_operation_key_is_accepted(self):
+        key = "a" * 128
+        response = self.post({**self.body, "operation_key": key})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual([row.operation_key for row in self.audits()], [key])
+        self.term_mock.assert_called_once()
 
     def test_current_pointer_to_paused_task_does_not_interrupt_it(self):
         with self.session() as session:
@@ -323,3 +338,52 @@ class LocalProofTests(TestCase):
             if process.poll() is None:
                 process.terminate()
                 process.wait(timeout=5)
+
+
+class OperationKeyBoundaryTests(TestCase):
+    """``operation_key`` 契约是 8–128 安全 token；恢复端点曾误写为 120。"""
+
+    @staticmethod
+    def _recovery(key):
+        return RoleServiceRecoveryRequest(
+            operation_key=key,
+            expected_generation=0,
+            expected_process_launch_id="launch",
+            expected_instance_id="instance",
+            expected_owner_host="host",
+            confirmation="old_processes_confirmed_stopped",
+            reason="original_host_exited",
+        )
+
+    @staticmethod
+    def _orphan(key):
+        return RoleServiceOrphanRecoveryRequest(
+            operation_key=key, expected_generation=0, reason="人工确认原宿主已退出"
+        )
+
+    @staticmethod
+    def _key(length):
+        # '.' 在安全 token 白名单内、又不在凭据启发式的 40 位连续串字符集里，
+        # 用它分段，长度边界才是唯一被检验的规则。
+        return ("op-2026-11-11.boundary." + "a1b2c3d4.e5f6g7h8." * 20)[:length]
+
+    def test_lengths_from_8_to_128_are_accepted(self):
+        for length in (8, 120, 121, 128):
+            key = self._key(length)
+            self.assertEqual(len(key), length)
+            with self.subTest(length=length):
+                self.assertEqual(self._recovery(key).operation_key, key)
+                self.assertEqual(self._orphan(key).operation_key, key)
+                self.assertEqual(normalize_operation_key(key), key)
+
+    def test_lengths_outside_the_contract_are_rejected(self):
+        for length in (7, 129, 200):
+            key = self._key(length)
+            self.assertEqual(len(key), length)
+            with self.subTest(length=length):
+                with self.assertRaises(ValidationError):
+                    self._recovery(key)
+                with self.assertRaises(ValidationError):
+                    self._orphan(key)
+                with self.assertRaises(ValueError):
+                    normalize_operation_key(key)

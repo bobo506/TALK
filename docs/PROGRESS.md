@@ -1,5 +1,14 @@
 # Project Progress
 
+## 收工快照（2026-11-11 20:25，W-C4 清债）
+
+- **本轮完成（本机开发 + 自测，未独立复核）**：**W-C4 删除残留清理与 `operation_key` 边界对齐**——`scripts/role_delete.py` 在删除事务完成、锁释放后尽力回收锁守卫与空壳（`profiles`、空的 `native-home`、`.talk/agents/<member>`、Key 锁守卫）；守卫被占用时保留且不影响 `complete`；`server/models.py` 两个恢复请求模型 `max_length` 120→`OPERATION_KEY_MAX_CHARS`(128)，与契约 8–128 一致。
+- **验证**：基线 187 项 / 3 失败（`tests.test_role_provision.CliAndSecretTests` 三个 CLI 子进程用例 exit 1，改动前同样失败）；候选 193 项 / 同 3 失败，`new_failures=0`；追加回归 `test_role_service_recovery_cli + test_role_provision_followup + test_workspace_paths + test_role_provision_requests` 100 项全过；`py_compile`、UTF-8、`git diff --check` 通过。证据 `.tmp/w-c4/`。
+- **未做（需授权/条件）**：① 存量残留未删除——只读 dry-run 为 **14 个 legacy guard-only 目录** + **9 个 workspace 角色空壳**（均在仓库工作区内）；私有 Key 根的守卫未扫描；删除前需逐条核对归属并单独授权。② 独立复核未做——Terra/K2.8 当前均 stopped，本会话无 TALK MCP 工具。
+- **环境**：runtime `2172`、API 子进程 `14296` 仍在运行（`/healthz` ok、`auth=trusted`、`/api/auth/mode=trusted`），本轮未重启服务、未改生产数据。
+- **提交**：`c4663dd`（本地；未推送——按“开发+验证+独立复核+收尾”才推送的规则，独立复核待补）。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部 W-C4 记录。
+
 ## 收工快照（2026-11-11 19:35，重启后）
 
 - **服务状态（已恢复，detached 后台进程）**：runtime pid `2172`、API 子进程 `14296`，`startup_state=complete`，7 个宿主在，`/healthz` ok；页面 `http://127.0.0.1:8000` 正常。日志 `.tmp/talk-runtime.out.log` / `.tmp/talk-runtime.err.log`。该进程脱离本次会话，关窗口不影响。
@@ -10,7 +19,7 @@
 - **下一步（需要时）**：要用 hy4/w-d 内置模型时，先完全退出 WorkBuddy 并以调试模式启动：
   `$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"; Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"`，再启动两个角色（页面点启动即可）。
 - **重启 runtime 注意**：`serve` 必须带 `--apply`；若 PowerShell 报 `NO_PROXY`/`no_proxy` 重复键，先删小写重复项再 `Start-Process`。
-- **可选遗留（非阻断，未授权不做）**：legacy `guard`/空 `native-home` 残留、`operation_key` >120 显式用例、终端自己作为新角色执行的 Key 交付 onboarding；`host_unreachable` 的协议级 at-least-once 边界（结果去重键、claim token 重签发）已记录为不默认做。
+- **可选遗留（非阻断，未授权不做）**：legacy `guard`/空 `native-home` **存量**残留（代码已由 W-C4 修，存量需单独授权清理）、终端自己作为新角色执行的 Key 交付 onboarding；`host_unreachable` 的协议级 at-least-once 边界（结果去重键、claim token 重签发）已记录为不默认做。~~`operation_key` >120 显式用例~~ 已由 W-C4 完成。
 
 ## W-C2 完成（2026-11-11 18:05，已提交 `cf86b80`）
 

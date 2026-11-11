@@ -322,7 +322,8 @@ class RoleDeletionTests(RoleApiTestCase):
             result=client.get(self.base+"/deletion",headers={"X-API-Key":"bobo-key"})
             self.assertEqual(result.json()["status"],"complete",result.text)
             self.assertTrue(all(value == "complete" for value in result.json()["steps"].values()),result.text)
-        self.assertEqual({p.name for p in profiles.iterdir()},{".provision.lock.guard"})
+        self.assertFalse(profiles.exists(),profiles)
+        self.assertFalse(workspace.exists(),workspace)
         for path in (workspace/"sessions",workspace/"state",workspace/"logs",key):self.assertFalse(path.exists(),path)
 
 

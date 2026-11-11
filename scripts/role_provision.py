@@ -613,7 +613,8 @@ def _now_iso() -> str:
 # 来源的不可解析锁一律 fail closed（不按年龄或内容抢占，需人工确认）。
 # ---------------------------------------------------------------------------
 
-#: 与可见锁文件配对的 OS 守卫文件名后缀（守卫文件本身从不删除）。
+#: 与可见锁文件配对的 OS 守卫文件名后缀（provision 层从不删除；角色删除完成、
+#: member id 退役后由 :mod:`scripts.role_delete` 回收）。
 LOCK_GUARD_SUFFIX = ".guard"
 
 #: 进程内登记的守卫句柄：``(锁路径, token) -> fd``；仅本进程可见。
@@ -621,7 +622,7 @@ _LOCK_GUARD_FDS: dict[tuple[str, str], int] = {}
 
 
 def lock_guard_path_for(lock_path: Any) -> Path:
-    """守卫文件路径：``<lock>.guard``；与锁文件同目录、同生命周期（不删除）。"""
+    """守卫文件路径：``<lock>.guard``；与锁文件同目录，provision 层不删除它。"""
     return Path(str(lock_path) + LOCK_GUARD_SUFFIX)
 
 

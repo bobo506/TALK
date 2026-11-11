@@ -4200,7 +4200,7 @@ class RoleServiceStopOut(BaseModel):
 class RoleServiceRecoveryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    operation_key: str = PydField(min_length=8, max_length=120, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]+$")
+    operation_key: str = PydField(min_length=8, max_length=OPERATION_KEY_MAX_CHARS, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]+$")
     expected_generation: int = PydField(strict=True, ge=0)
     expected_process_launch_id: str = PydField(min_length=1, max_length=200)
     expected_instance_id: str = PydField(min_length=1, max_length=200)
@@ -4238,7 +4238,7 @@ class RoleServiceRecoveryOut(BaseModel):
 class RoleServiceOrphanRecoveryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    operation_key: str = PydField(min_length=8, max_length=120, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]+$")
+    operation_key: str = PydField(min_length=8, max_length=OPERATION_KEY_MAX_CHARS, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]+$")
     expected_generation: int = PydField(strict=True, ge=0)
     confirm_task_interrupt: bool = PydField(default=False, strict=True)
     reason: str = PydField(min_length=1, max_length=200)

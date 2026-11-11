@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-11-11 20:25 — W-C4：删除残留清理与 operation_key 边界（本机自测）
+
+- **债务来源**：PROGRESS 可选遗留登记（2026-11-09 起）——角色删除后残留 `profiles/.provision.lock.guard`、`.talk/agents/<member>/`、空 `native-home/` 与 Key 锁守卫；`operation_key` 契约 8–128，但两个恢复请求模型写成 120，121–128 在创建可过、在恢复被 422 且无显式用例。
+- **实现（4 个产品/文档文件 + 2 个测试文件）**：
+  - `scripts/role_delete.py`：新增 `_sweep_guard` / `_sweep_empty_dir` / `_sweep_shell`。`cleanup()` 在 `finally` 释放锁之后，仅当 `outcome=complete` 时回收：profile 守卫（legacy 为 `.talk/agents/<member>/.provision.lock.guard`，workspace-v1 为 `<role>/profiles/.provision.lock.guard`）、删除成功凭据的 Key 锁守卫、空 `profiles`、空 `native-home`、空角色目录/身份档目录。原“先算结果后清扫”改造保持返回值语义不变；清扫异常被吞掉，不会把已完成删除变成失败或进入重试。
+  - `server/models.py`：`RoleServiceRecoveryRequest` / `RoleServiceOrphanRecoveryRequest.operation_key` 的 `max_length` 由 `120` 改为 `OPERATION_KEY_MAX_CHARS`（128），与 `normalize_operation_key` 及 ROLE_LIFECYCLE_DESIGN“8–128 安全 token”一致。
+  - `scripts/role_provision.py`：守卫“永不删除”注释限定为 provision 层，并注明角色删除、member id 退役后由 `role_delete` 回收（协议与实现零改动）。
+- **设计取舍（安全边界）**：守卫只在删除事务完成、锁已释放后回收——被别的进程打开/加锁时 Windows `os.remove` 必然共享冲突失败，残留保留且删除结果仍 `complete`（无重试、无抢锁）。不删除可见 `.provision.lock`、不递归删除非空 `native-home`（原生登录态）或其他成员资源。
+- **测试**：更新 4 处旧“仅剩 guard”断言（`test_role_delete_local` 3 处、`test_role_deletion` 1 处）；新增 workspace 空壳回收、非空 `native-home` 保留、被占用守卫保留、128 字符 HTTP 接受、129 拒绝零写入、模型与 `normalize_operation_key` 8/120/121/128 与 7/129/200 边界用例（用 `.` 分段规避“像凭据”的 ≥40 位连续串启发式）。
+- **验证**：基线（改动前）187 项、3 失败，均 `tests.test_role_provision.CliAndSecretTests` CLI 子进程 exit 1；候选 193 项、同 3 项失败（逐名一致），`new_failures=0`。追加回归 100 项全过。`py_compile`、UTF-8（无 BOM、无替换字符）、`git diff --check` 通过。证据 `.tmp/w-c4/baseline.txt`、`candidate-full.txt`、`candidate-extra.txt`。
+- **未做/限制**：① 未独立复核（Terra/K2.8 均 stopped，本会话无 TALK MCP 工具；按用户选择本机开发）；② 存量残留未删除，只读 dry-run 为 14 个 legacy guard-only 目录 + 9 个 workspace 角色空壳（另有私有 Key 根守卫未扫描），删除需单独授权并逐条核对归属；③ 未在真实删除流程上跑 E2E（删角色会动生产数据，仅单测覆盖真实 Windows 文件锁/句柄行为）。
+- **环境**：runtime `2172` / API `14296` 未重启，`/healthz` ok、`auth=trusted`；本轮未改生产 DB 与运行数据。
+
 ## 2026-11-11 18:05 — W-C2：API reload 窗口 host_unreachable / bridge_process_exited（653–658）
 
 - **复现（653 Terra）**：离线桩证明三件事——空闲轮询连续 `host_unreachable` 后宿主继续并 `poll_recovered`；start 的 report 断开时原版只上报一次、后续空轮不重报；bridge 发送任务结果/完成请求拒连时只调用一次，任务被标 failed 或停在 running。
