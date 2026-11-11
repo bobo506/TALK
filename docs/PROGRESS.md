@@ -1,5 +1,10 @@
 # Project Progress
 
+## 人工验收（2026-11-11 16:20）
+
+- 用户确认：**W-B4 思考强度通过**；**W-B6「查看完整对话/查看成果」通过**。
+- W-B5 弹窗：用户已实际用「复制启动命令」启动成功（15:0x），视觉未单独评价。
+
 ## 用户决定（2026-11-11 15:35）
 
 - **不做受管 WorkBuddy 调试启动器**：用户只在使用 w-d 内置模型时手动执行启动命令，不要求 WorkBuddy 常驻调试模式；保留现有弹窗/复制命令指引即可。
@@ -14,9 +19,10 @@
 - **复核**：641 K2.8 **approved**——候选 103 项 / 基线 100 项，唯一失败为既存 SSE，`new_failures=[]`；ACP 路径不变、读路径无 CDP 探测、六维失配不猜。
 - **部署与登记**：API 受控 reload；`scripts.workbuddy_acp_models register --transport cdp` 更新 3 个 choice 能力。当前 hy4 `effort_options=["high"]`（默认 high），w-d `["low","high","max"]`（默认 high）。
 - **真实 E2E**：w-d 设 `effort=max` → 200、`effective_effort=max`；非法 `ultra` 与 hy4 `low` → 422 `effort_not_supported`；任务 **643** succeeded，执行期间适配器 argv 实测含 `--effort max`。
+- **人工验收：2026-11-11 用户确认通过。**
 - **限制**：强度档位来自登记时快照，桌面模型清单变化后需重新登记；登记脚本在桌面不可达时失败（不写半套）。
 
-## W-B5 弹窗完成（647 approved，待提交）
+## W-B5 弹窗完成（647 approved，已提交 `9affa69`）
 
 - 640 Terra 复核 **changes_requested**：①复制竞态（旧弹窗异步回调清掉新弹窗引用 → 重复弹窗）；②无障碍（可访问名称、焦点）。
 - 642 返修：`dialogActive()` 守卫、焦点陷阱/恢复、放大到 760 CSS（≈608 物理像素、标题 20/正文 16/命令 15/按钮 46）。
@@ -24,7 +30,7 @@
 - 645 二次返修（complete，43/43）：reject 全分支守卫、双失败 `copy.focus()`、按钮改用 `--accent-bg/--accent-fg`；纯 JSON 交付。
 - 647 Terra 最终定向复验 **approved**：候选 43/43、基线 39/39、`new_failures=0`；独立对抗 2/2（延迟 reject、双失败焦点）；浅/深按钮对比度 5.21:1 / 5.89:1（hover 4.59/5.78）。
 - 截图：`.tmp/wb5/modal-light.png`、`.tmp/wb5/modal-dark.png`（协调者 headless Chrome 复验，608 物理像素）。
-- **提交与推送见本轮 `git log -1`。**
+- **提交与推送：`9affa69`。用户已实际使用「复制启动命令」启动成功（视觉未单独评价）。**
 
 ## 已修 Bug（W-B6，646 开发 / 648 复核 approved，已提交 `ba75f01`）
 
@@ -33,6 +39,7 @@
 - **修复**：去掉 apiKey 前置（保留 `current()` 身份/序号/登出守卫）；`web/app.js` 1 行 + 测试新增 5 用例（无 Key 信任加载、false/401/403/字段不符拒绝、agent 拒绝、key 模式不回归、登出竞态）。
 - **复核**：648 K2.8 **approved**——候选 29/29、基线 24/24，`new_failures=0`；未改 `canEnterGroup`、未改 `workspace.js`/后端。
 - **真实浏览器证据（协调者）**：headless Chrome 加载页面后 `performance` 资源里出现 `GET /api/members/me/permissions`（fetch，364 bytes），响应 `{"member_id":"human:operator","can_view_all_conversations":true}`；页面 `apiKey` 为空，确认是信任模式路径。
+- **人工验收：2026-11-11 用户确认「查看完整对话/查看成果」通过。**
 
 ## 收工快照（2026-11-11 10:50）
 
