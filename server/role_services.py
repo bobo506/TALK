@@ -104,6 +104,7 @@ from server.models import (
     ROLE_SERVICE_STOP_OUTCOMES,
     ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED,
     ROLE_REQUEST_ERROR_AUTO_START_ENQUEUE_FAILED,
+    ROLE_REQUEST_ERROR_WORKBUDDY_CDP_UNAVAILABLE,
     RUNNER_CONTROL_MANAGED_CLI,
     RUNNER_CONTROL_UNKNOWN,
     AgentInstance,
@@ -302,6 +303,15 @@ def _preallocate_instance_id(session: Session) -> str:
 # ── 共享 start 入队核心（R1-4c-a：人工 start 与配置成功后的自动首次启动复用）──
 
 
+def _require_workbuddy_cdp_available(project_id: str, member_id: str, session: Session) -> None:
+    binding = session.get(ProjectRoleBinding, (project_id, member_id))
+    if binding is not None and (
+        binding.connection_ref == "native-workbuddy-cdp"
+        or (binding.model_alias or "").startswith("workbuddy-cdp:")
+    ) and not cdp_endpoint_available():
+        raise _fail(status.HTTP_409_CONFLICT, ROLE_REQUEST_ERROR_WORKBUDDY_CDP_UNAVAILABLE)
+
+
 def _enqueue_start_launch(
     ctx: ServiceRoleContext,
     project_id: str,
@@ -311,6 +321,7 @@ def _enqueue_start_launch(
     now: datetime,
     actor_id: str,
     expected_generation: int,
+    cdp_checked: bool = False,
 ) -> RoleServiceLaunch:
     """共享 start 入队核心：CAS 推进世代 + 新建 ``pending`` start launch。
 
@@ -325,6 +336,10 @@ def _enqueue_start_launch(
     事实传入；CAS 沿用 ``synchronize_session=False`` 的 Core update，调用方在
     保存点回滚后如需读取 state 必须重新 ``session.get()``。
     """
+    # Manual start checks before its transaction to preserve error precedence;
+    # all other callers are checked here before any generation or launch write.
+    if not cdp_checked:
+        _require_workbuddy_cdp_available(project_id, member_id, session)
     _require_start_layout(project_id, member_id, session)
     from server.kimi_native_setup import require_native_setup_for_start
     require_native_setup_for_start(project_id, member_id, session)
@@ -654,12 +669,7 @@ def start_role_service(
     启动复用；本包装继续负责原事务边界与 human 审计（``updated_by=operator.id``），
     行为/返回模型/错误码与 R1-3 逐字一致。
     """
-    binding = session.get(ProjectRoleBinding, (project_id, member_id))
-    if binding is not None and (
-        binding.connection_ref == "native-workbuddy-cdp"
-        or (binding.model_alias or "").startswith("workbuddy-cdp:")
-    ) and not cdp_endpoint_available():
-        raise _fail(status.HTTP_409_CONFLICT, "workbuddy_cdp_unavailable")
+    _require_workbuddy_cdp_available(project_id, member_id, session)
     _write_begin(session)
     _require_start_layout(project_id, member_id, session)
     ctx = load_role_service_context(project_id, member_id, session)
@@ -691,6 +701,7 @@ def start_role_service(
             now=now,
             actor_id=operator.id,
             expected_generation=old_generation,
+            cdp_checked=True,
         )
     except HTTPException:
         session.rollback()
@@ -933,6 +944,7 @@ def stop_role_service(
 #: ``managed_cli``）如实归为 ``auto_start_control_kind_not_managed``；
 #: 其余意外（资格/上下文/世代冲突等）统一如实归为 ``auto_start_enqueue_failed``。
 _AUTO_START_CODE_BY_SERVICE_ERROR = {
+    ROLE_REQUEST_ERROR_WORKBUDDY_CDP_UNAVAILABLE: ROLE_REQUEST_ERROR_WORKBUDDY_CDP_UNAVAILABLE,
     WORKSPACE_RUNTIME_NOT_READY: WORKSPACE_RUNTIME_NOT_READY,
     ROLE_SERVICE_ERROR_CONTROL_KIND_NOT_MANAGED: (
         ROLE_REQUEST_ERROR_AUTO_START_CONTROL_KIND_NOT_MANAGED

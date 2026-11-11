@@ -281,6 +281,28 @@ const r = await conv.runPrompt([{type:"text", text:"只回复 OK 两个字母"}]
   `ELECTRON_RUN_AS_NODE=1`，否则 Electron 进程以 Node 模式立即退出（实测 exit 0、无日志、无 GUI）。
 - 该环境变量只对本次进程有效；退出 WorkBuddy 后调试端口关闭。
 
-**已知限制**：`window.wb` 为私有 API，桌面升级可能失效；CDP 绑定的 `effort_options` 为空
-（`server/workbuddy_effort.py` 只探测 ACP 别名），逐角色思考强度暂不可用，按模型默认执行；
-登记脚本按显式清单登记、不校验模型存在；`scripts/workbuddy_cdp_prompt.py` 存在一处 CRLF 混入（非阻断）。
+**已知限制**：`window.wb` 为私有 API，桌面升级可能失效；逐角色思考强度来自登记时的模型清单
+快照（`capabilities`），模型清单变化后需重跑登记；登记脚本要求桌面以调试端口运行（会真实枚举
+`wb.models.list()`），桌面不可达时明确失败、不写半套。
+
+### 10.7 WorkBuddy 版本升级适配检查清单（2026-11-11 用户确定）
+
+**触发场景**：WorkBuddy 桌面升级、换账号套餐、或发现已登记的内置模型不可用/任务报
+`workbuddy_cdp_create_failed`。TALK **不做自动刷新**，按本清单人工适配一遍。
+
+1. **确认版本与 API 面**：`GET http://127.0.0.1:9222/json/version` 记录 WorkBuddy/Electron 版本；
+   在页面检查 `window.wb.conversations.create/runPrompt/delete`、`wb.models.list()`、
+   `conv.configManager.setThoughtLevel` 是否仍存在。
+2. **以调试模式启动桌面**（完全退出后）：
+   `$env:WORKBUDDY_REMOTE_DEBUGGING_PORT = "9222"; Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"`。
+3. **适配器实机自检**：`scripts.workbuddy_cdp_prompt` chat 模式返回 `OK`（exit 0）；
+   task 模式 + `--delivery-contract` 返回有效 `talk-delivery-1` JSON；运行后对话列表数量不变。
+4. **刷新模型与强度**：
+   `python -B -X utf8 -m scripts.workbuddy_acp_models register --api-base http://127.0.0.1:8000 --operator-key-file <真人 Key> --models <当前清单> --transport cdp`
+   —— 会真实枚举并校验模型 id，更新已有 choice 的 `capabilities`（支持档位/默认档位）。
+5. **核对页面与绑定**：角色页 `effort_options` 与模型下拉正确、绑定仍 `bound`；模型下线时任务会
+   明确失败，需按“删除角色 → 重建”处理（角色模型不可原地更换）。
+6. **回归**：跑 `tests.test_workbuddy_cdp`、`tests.test_workbuddy_cdp_gate`、
+   `tests.test_workbuddy_effort` 与一次真实任务；记录版本、命令、证据路径与未验证项。
+7. **边界**：不自动重启用户桌面、不读取/复制凭据、调试端口只留 loopback；升级后若 `window.wb`
+   结构变化，先停用相关角色再适配。

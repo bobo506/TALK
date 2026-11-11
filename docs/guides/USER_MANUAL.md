@@ -117,6 +117,8 @@ Start-Process "$env:LOCALAPPDATA\Programs\WorkBuddy\WorkBuddy.exe"
    点“复制启动命令”→ 退出 WorkBuddy → 在 PowerShell 粘贴执行 → 再回到页面点“启动”即可。
 3. 启动成功后角色显示 running，可正常派任务。
 
+若创建时勾选自动启动或使用项目启动配置，未开调试模式会跳过该角色的自动启动并标明 `workbuddy_cdp_unavailable`，不会静默启动。
+
 **角色模型在创建时锁定，不能原地更换**；需要换模型（或从旧的 ACP 通道迁移）时，删除旧角色后按
 上面的流程新建角色，新角色会获得新的身份与 Key。
 

@@ -44,6 +44,35 @@ class ProjectStartupTests(RoleServiceTestCase):
         self.assertEqual(response.status_code,200,response.text)
         return next(r for r in response.json()['results'] if r['member_id']==self.role_a)
 
+    def bind_cdp(self):
+        with self.session() as session:
+            binding=session.get(m.ProjectRoleBinding,(PROJECT_ID,self.role_a))
+            binding.connection_ref='native-workbuddy-cdp';binding.model_alias='workbuddy-cdp:model'
+            session.add(binding);session.commit()
+
+    def test_cdp_unavailable_does_not_block_other_role(self):
+        created=self.create_role(PROJECT_ID,role_name='second',choice_id=self.choice_id,operation_key='op-second-0001')
+        self.assertEqual(created.status_code,201,created.text)
+        other=created.json()['member_id']
+        with self.session() as session:
+            role=session.get(m.ProjectRole,(PROJECT_ID,other));role.storage_layout='legacy';session.add(role);session.commit()
+        self.bind_cdp();self.preference(True);self.preference(True,member=other)
+        with patch('server.role_services.cdp_endpoint_available',return_value=False) as probe:
+            response=self.activate()
+        self.assertEqual(response.status_code,200,response.text)
+        results={row['member_id']:row for row in response.json()['results']}
+        self.assertEqual((results[self.role_a]['status'],results[self.role_a]['error_code']),('failed','workbuddy_cdp_unavailable'))
+        self.assertEqual(results[other]['status'],'enqueued')
+        self.assertIsNone(self.state_row());self.assertEqual(self.launch_rows(),[])
+        self.assertEqual(len(self.launch_rows(other)),1);probe.assert_called_once_with()
+
+    def test_cdp_available_project_startup_enqueues(self):
+        self.bind_cdp();self.preference(True)
+        with patch('server.role_services.cdp_endpoint_available',return_value=True) as probe:
+            result=self.result()
+        self.assertEqual(result['status'],'enqueued');self.assertEqual(len(self.launch_rows()),1)
+        probe.assert_called_once_with()
+
     def test_default_false_persist_idempotent_and_reads_do_not_start(self):
         role=next(r for r in self.get_roles().json() if r['member_id']==self.role_a)
         self.assertEqual(role['startup']['enabled'],False)

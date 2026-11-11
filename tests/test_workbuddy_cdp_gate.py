@@ -95,6 +95,17 @@ class GateTests(RoleServiceTestCase):
             self.assertIsNone(self.state_row())
             self.assertEqual(self.launch_rows(), [])
 
+    def test_unavailable_keeps_manual_error_precedence_for_running_role(self):
+        self.assertEqual(self.start().status_code, 200)
+        before = self.state_row().model_dump()
+        self.bind("native-workbuddy-cdp", "workbuddy-cdp:model")
+        with patch("server.role_services.cdp_endpoint_available", return_value=False) as probe:
+            response = self.start()
+        self.assertEqual((response.status_code, response.json()["detail"]), (409, "workbuddy_cdp_unavailable"))
+        probe.assert_called_once_with()
+        self.assertEqual(self.state_row().model_dump(), before)
+        self.assertEqual(len(self.launch_rows()), 1)
+
     def test_available_starts(self):
         self.bind("native-workbuddy-cdp", "workbuddy-cdp:model")
         with patch("server.role_services.cdp_endpoint_available", return_value=True) as probe:

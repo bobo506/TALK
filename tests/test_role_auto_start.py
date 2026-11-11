@@ -266,6 +266,57 @@ class WorkspaceGateTests(AutoStartApiTestCase):
 class AutoStartHappyPathTests(AutoStartApiTestCase):
     """AUTO_START_DESIGN §3/§5：唯一一次成功入队的端到端链路。"""
 
+    def check_cdp_auto_start(self, available):
+        from unittest.mock import patch
+        self.make_managed()
+        created, token = self.drive_to_created()
+        member_id = created["member_id"]
+        with self.session() as session:
+            binding = session.get(ProjectRoleBinding, ("prj_alpha", member_id))
+            binding.connection_ref = "native-workbuddy-cdp"
+            binding.model_alias = "workbuddy-cdp:model"
+            session.add(binding)
+            session.commit()
+        before = self.state_row(member_id)
+        with patch("server.role_services.cdp_endpoint_available", return_value=available) as probe:
+            reported = self.finish_job_and_report(member_id, token)
+        probe.assert_called_once_with()
+        self.assertEqual(reported.status_code, 200, reported.text)
+        body = reported.json()
+        self.assertEqual(body["status"], "provisioned")
+        self.assertEqual(body["auto_start_status"], "enqueued" if available else "failed")
+        self.assertEqual(body["auto_start_error_code"], None if available else "workbuddy_cdp_unavailable")
+        self.assertEqual(len(self.launch_rows(member_id)), int(available))
+        after = self.state_row(member_id)
+        if available:
+            self.assertEqual(after.generation, 1)
+            self.assertTrue(body["auto_start_launch_id"])
+        else:
+            self.assertIsNone(body["auto_start_launch_id"])
+            self.assertEqual(after.generation if after else 0, before.generation if before else 0)
+
+    def test_cdp_unavailable_after_provision(self):
+        self.check_cdp_auto_start(False)
+
+    def test_cdp_available_after_provision(self):
+        self.check_cdp_auto_start(True)
+
+    def test_non_cdp_auto_start_does_not_probe(self):
+        from unittest.mock import patch
+        self.make_managed()
+        created, token = self.drive_to_created()
+        with self.session() as session:
+            binding = session.get(ProjectRoleBinding, ("prj_alpha", created["member_id"]))
+            binding.connection_ref = "native-workbuddy-acp"
+            binding.model_alias = "workbuddy-acp:model"
+            session.add(binding)
+            session.commit()
+        with patch("server.role_services.cdp_endpoint_available", side_effect=AssertionError("unexpected probe")) as probe:
+            reported = self.finish_job_and_report(created["member_id"], token)
+        probe.assert_not_called()
+        self.assertEqual(reported.json()["auto_start_status"], "enqueued")
+        self.assertEqual(len(self.launch_rows(created["member_id"])), 1)
+
     def test_create_auto_start_provisioned_enqueues_exactly_one_launch(self):
         created, _token, reported = self.happy_path()
         member_id = created["member_id"]

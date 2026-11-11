@@ -1,5 +1,13 @@
 # Project Progress
 
+## 用户决定（2026-11-11 15:35）
+
+- **不做受管 WorkBuddy 调试启动器**：用户只在使用 w-d 内置模型时手动执行启动命令，不要求 WorkBuddy 常驻调试模式；保留现有弹窗/复制命令指引即可。
+- **不做「角色换模型」入口**：角色不换模型；需要别的模型时删除后重建（新身份）。
+- **模型清单变化不自动化**：WorkBuddy 升级/适配时人工执行一遍刷新——已写入 [WORKBUDDY_ACP_593_RESEARCH.md](spec/WORKBUDDY_ACP_593_RESEARCH.md) 10.7「版本升级适配检查清单」（含重跑 `register --transport cdp` 刷新模型与强度、实机自检、回归）。
+- **auto-start 路径补启动门：已完成（649 开发 / 650 复核 approved）**——CDP 探测下沉到共享入队核心 `_enqueue_start_launch`；创建自动启动失败记 `auto_start_status=failed` + `auto_start_error_code=workbuddy_cdp_unavailable`、零 launch、请求保持 provisioned；项目启动配置逐角色 failed + 稳定码、不整体 500；人工启动 409 与零写入不变。候选 169/基线 163，唯一失败为既存 SSE，`new_failures=0`。
+- **W-B7 真实 E2E（协调者）**：调试关闭时创建 `wb7-probe`（auto_start）→ `auto_start_status=failed`、`auto_start_error_code=workbuddy_cdp_unavailable`、generation 0、current_launch null；重开调试后创建 `wb7-probe2` → `auto_start_status=enqueued`、role 起至 running；两个探针角色已停止并删除（cleanup complete），hy4/w-d 已恢复 running。
+
 ## W-B4 完成（2026-11-11 14:20）
 
 - **实现（8 文件）**：`bridges/workbuddy_cdp.py`（`list_models` 只读枚举 + effort 白名单 low/high/max + `setThoughtLevel` 下发）、`scripts/workbuddy_cdp_prompt.py`（诊断带实际 effort）、`scripts/workbuddy_acp_models.py`（`--transport cdp` 真实枚举校验模型、写/更新 choice `capabilities`：`effort:<level>` + `effort_default:<level>`）、`server/workbuddy_effort.py`（CDP 别名按六维匹配 choice 能力投影，纯 DB 无网络探测）、`server/routes/projects.py`（接线）、`tests/test_workbuddy_cdp.py`、`tests/test_workbuddy_effort.py`、手册。
