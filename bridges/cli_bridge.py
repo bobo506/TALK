@@ -100,6 +100,37 @@ ONE_SENTENCE_MARKERS = ("一句话", "一两句话", "one sentence", "single sen
 SENTENCE_ENDINGS = "。！？.!?"
 
 
+async def _retry_task_delivery_connect(operation: Any) -> Any:
+    """Retry only connection establishment failures for non-idempotent POSTs."""
+    for delay in (0.2, 0.5, 1.0, None):
+        try:
+            return await operation()
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            if delay is None:
+                raise
+            await asyncio.sleep(delay)
+    raise AssertionError("unreachable")
+
+
+async def _retry_managed_startup_connect(operation: Any, deadline: float) -> Any:
+    """Bound managed startup, retrying only connection failures before readiness."""
+    loop = asyncio.get_running_loop()
+    delays = iter((0.2, 0.5, 1.0, 2.0, 2.0, 2.0, 1.3))
+    while True:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise TimeoutError("managed bridge startup connection budget exhausted")
+        try:
+            # Bound an individual connection attempt as well as the backoff.
+            return await asyncio.wait_for(operation(), timeout=remaining)
+        except (httpx.ConnectError, httpx.ConnectTimeout, ConnectionResetError):
+            delay = next(delays, None)
+            remaining = deadline - loop.time()
+            if delay is None or remaining <= delay:
+                raise
+            await asyncio.sleep(delay)
+
+
 def _clear_deprecated_decision_tier_env() -> None:
     """Drop any inherited ``TALK_DECISION_TIER`` so CLI children never observe it.
 
@@ -3415,10 +3446,8 @@ async def _handle_execution_session_claimed(
         await _raise_if_task_lease_lost(heartbeat_task)
         result_message_id: int | None = None
         if creator:
-            result_message = await client.send_text(
-                reply,
-                to=[str(creator)],
-                group_id=claimed.get("hall_group_id"),
+            result_message = await _retry_task_delivery_connect(
+                lambda: client.send_text(reply, to=[str(creator)], group_id=claimed.get("hall_group_id"))
             )
             result_message_id = int(result_message["id"])
         await _raise_if_task_lease_lost(heartbeat_task)
@@ -3430,7 +3459,7 @@ async def _handle_execution_session_claimed(
         }
         if claim_token is not None:
             completion_kwargs["claim_token"] = claim_token
-        await client.complete_task(task_id, **completion_kwargs)
+        await _retry_task_delivery_connect(lambda: client.complete_task(task_id, **completion_kwargs))
         if diagnostics is not None:
             try:
                 diagnostics.record_event(
@@ -3881,10 +3910,8 @@ async def handle_queued_task(
                 budgets=budgets,
             )
             try:
-                result_message = await client.send_text(
-                    reply,
-                    to=[str(creator)],
-                    group_id=claimed.get("hall_group_id"),
+                result_message = await _retry_task_delivery_connect(
+                    lambda: client.send_text(reply, to=[str(creator)], group_id=claimed.get("hall_group_id"))
                 )
                 result_message_id = int(result_message["id"])
             except asyncio.CancelledError:
@@ -3946,7 +3973,7 @@ async def handle_queued_task(
             budgets=budgets,
         )
         try:
-            await client.complete_task(task_id, **completion_kwargs)
+            await _retry_task_delivery_connect(lambda: client.complete_task(task_id, **completion_kwargs))
         except asyncio.CancelledError:
             complete_operation.finish("canceled")
             if diagnostics is not None:
@@ -4148,13 +4175,15 @@ async def _fail_task_after_preflight_limit(
             budgets=budgets,
         )
         try:
-            result_message = await client.send_text(
-                (
-                    f"自动预检连续失败 {attempts} 次，已停止重试并将任务标记为失败。"
-                    "请检查 Agent 的 TALK_TASK_PREFLIGHT 输出协议后重新创建任务。"
-                ),
-                to=[creator],
-                group_id=claimed.get("hall_group_id") or task.get("hall_group_id"),
+            result_message = await _retry_task_delivery_connect(
+                lambda: client.send_text(
+                    (
+                        f"自动预检连续失败 {attempts} 次，已停止重试并将任务标记为失败。"
+                        "请检查 Agent 的 TALK_TASK_PREFLIGHT 输出协议后重新创建任务。"
+                    ),
+                    to=[creator],
+                    group_id=claimed.get("hall_group_id") or task.get("hall_group_id"),
+                )
             )
             result_message_id = int(result_message["id"])
         except asyncio.CancelledError:
@@ -4195,7 +4224,7 @@ async def _fail_task_after_preflight_limit(
         budgets=budgets,
     )
     try:
-        await client.complete_task(task_id, **completion_kwargs)
+        await _retry_task_delivery_connect(lambda: client.complete_task(task_id, **completion_kwargs))
     except asyncio.CancelledError:
         complete_operation.finish("canceled")
         raise
@@ -5209,8 +5238,17 @@ async def run_bridge(args: argparse.Namespace) -> None:
                 "managed": bool(managed_launch_id),
             },
         )
+    # Registration and the first status PUT share one startup budget.  The
+    # optional startup hook above is best-effort and is deliberately unchanged.
+    startup_deadline = asyncio.get_running_loop().time() + 9.0 if managed_launch_id else None
     try:
-        await client.register(member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})")
+        register = lambda: client.register(
+            member_id, display_name=args.display_name or f"{args.runtime} CLI Bridge ({member_id})"
+        )
+        if startup_deadline is not None:
+            await _retry_managed_startup_connect(register, startup_deadline)
+        else:
+            await register()
     except asyncio.CancelledError:
         raise
     except Exception as exc:
@@ -5297,7 +5335,10 @@ async def run_bridge(args: argparse.Namespace) -> None:
             return True
 
     try:
-        await report_status("idle")
+        if startup_deadline is not None:
+            await _retry_managed_startup_connect(lambda: report_status("idle"), startup_deadline)
+        else:
+            await report_status("idle")
     except asyncio.CancelledError:
         raise
     except Exception as exc:

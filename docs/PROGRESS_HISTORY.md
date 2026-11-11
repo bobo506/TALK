@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-11 18:05 — W-C2：API reload 窗口 host_unreachable / bridge_process_exited（653–658）
+
+- **复现（653 Terra）**：离线桩证明三件事——空闲轮询连续 `host_unreachable` 后宿主继续并 `poll_recovered`；start 的 report 断开时原版只上报一次、后续空轮不重报；bridge 发送任务结果/完成请求拒连时只调用一次，任务被标 failed 或停在 running。
+- **修复（W-C2）**：`scripts/role_service_host.py` 对明确 ConnectionRefused 的 claim 做 0.2/0.5/1s 有界重试，`host_unreachable` 时重放同一 report；`bridges/cli_bridge.py` 对任务结果/完成请求仅重试 ConnectError/ConnectTimeout（共 4 次调用），不重试 4xx、读超时等歧义错误。654 K2.8 approved：候选 142/基线 137，24F+14E 逐名一致，`new_failures=0`。
+- **E2E 发现第二缺口**：实测 reload 停机约 3.2s；窗口前 5s start → 角色 4s 内 failed/`bridge_process_exited`（bridge 启动首次 `PUT /api/instances` 连接失败即退出）。
+- **返修（W-C2b，655）**：bridge 启动握手（成员注册 + 首次实例 PUT）共用 9s 预算，仅重试 ConnectError/ConnectTimeout/ConnectionResetError，同一 instance/载荷，握手完成前不进入消息/任务循环；超预算如实退出，非受管路径不变。658 K2.8 approved：候选 186 全过、基线 175，`new_failures=0`。
+- **修复后真实 E2E**：reload 窗口内 start → running（`ins_7511ec28ea5b`，无 `bridge_process_exited`）；任务 656（reload 期间创建，排队 42s）→ succeeded（3445）；任务 657（执行中 reload、两次 ConnectError）→ 继续并 succeeded（3446）。
+- **残余边界**：宿主 claim/report 重试需宿主进程重启生效；超过 9s 的中断仍失败；任务结果 POST 无去重键，只重试连接建立阶段；claim 响应丢失无法收敛。均已在交付与 PROGRESS 记录。
+
 ## 2026-11-11 16:50 — W-C1：修复过期 SSE 测试（651/652）
 
 - **问题**：`tests.test_role_services.AvailabilityTests.test_sse_authentication_does_not_block_event_loop` 长期失败（`AttributeError: 'NoneType' object has no attribute 'client'`），在多个切片的候选与基线上重复出现。

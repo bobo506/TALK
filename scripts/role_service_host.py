@@ -1997,6 +1997,19 @@ class HostManager:
             return []
         return self.diagnostics_policy.child_diagnostics_arguments()
 
+    def _claim_with_retry(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+        """Only retry a refused connection: claim tokens cannot be reissued after commit."""
+        for delay in (0.2, 0.5, 1.0, None):
+            try:
+                return self.client.request("POST", path, body)
+            except HostError as exc:
+                cause = exc.__cause__
+                reason = cause.reason if isinstance(cause, urllib.error.URLError) else cause
+                if exc.code != "host_unreachable" or not isinstance(reason, ConnectionRefusedError) or delay is None:
+                    raise
+                time.sleep(delay)
+        raise AssertionError("unreachable")
+
     def _report_safely(
         self,
         diagnostics: Optional[host_diag.HostDiagnostics],
@@ -2020,7 +2033,14 @@ class HostManager:
             budgets=budgets if budgets is not None else self._host_budgets(),
         )
         try:
-            result = self._report(**report_kwargs)
+            for delay in (0.2, 0.5, 1.0, None):
+                try:
+                    result = self._report(**report_kwargs)
+                    break
+                except HostError as exc:
+                    if exc.code != "host_unreachable" or delay is None:
+                        raise
+                    time.sleep(delay)
         except Exception as exc:
             report_operation.finish("failed")
             if diagnostics is not None:
@@ -2218,8 +2238,7 @@ class HostManager:
             budgets=claim_budgets,
         )
         try:
-            response = self.client.request(
-                "POST",
+            response = self._claim_with_retry(
                 f"/api/role-service-launches/{launch_id}/claim",
                 {
                     "host": self.host,
@@ -3179,8 +3198,7 @@ class HostManager:
             budgets=budgets,
         )
         try:
-            response = self.client.request(
-                "POST",
+            response = self._claim_with_retry(
                 f"/api/role-service-launches/{launch_id}/claim",
                 {
                     "host": str(record["host"]),

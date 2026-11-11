@@ -1,6 +1,14 @@
 # Project Progress
 
-## W-C1 完成（2026-11-11 16:50，待提交）
+## W-C2 完成（2026-11-11 18:05，待提交）
+
+- **复现（653 Terra）**：空闲轮询连续 `host_unreachable` 后 serve 继续并 `poll_recovered`（设计内）；start 的 report 断开时原版只上报一次、后续空轮不重报；bridge 发送任务结果/完成请求拒连时只调用一次 → 任务被标 failed 或停在 running（真实缺口）。
+- **修复**：宿主 claim 对明确 ConnectionRefused 有界重试（0.2/0.5/1s），`host_unreachable` 时重放同一 report；bridge 结果/完成请求仅对 ConnectError/ConnectTimeout 重试（共 4 次）。654 K2.8 **approved**（候选 142/基线 137，24F+14E 逐名一致，`new_failures=0`）。
+- **真实 E2E 发现第二缺口**：reload 停机约 3.2s，窗口前 5s start → 角色 4s 内 `bridge_process_exited`（bridge 启动首个 `PUT /api/instances` 无重试）→ **W-C2b（655）**：启动握手（注册+首次 PUT）共用 9s 预算，仅重试 ConnectError/ConnectTimeout/ConnectionResetError，同一 instance/载荷，握手完成前不接任务；超预算如实退出。658 K2.8 **approved**（候选 186 全过、基线 175，`new_failures=0`）。
+- **修复后 E2E**：reload 窗口内 start → running（无 `bridge_process_exited`）；任务 656（reload 期间创建）→ succeeded（3445）；任务 657（执行中 reload、两次 ConnectError）→ succeeded（3446）。
+- **残余边界**：宿主 claim/report 重试需宿主进程重启生效（本次 E2E 桥侧已生效）；超过 9s 的中断仍会失败；任务结果 POST 无去重键，只重试连接建立阶段，读写歧义错误不重放；claim 响应丢失无法收敛。
+
+## W-C1 完成（2026-11-11 16:50，已提交 `ee57eb3`）
 
 - **页面/测试债清理**：修复长期失败的 `tests.test_role_services.AvailabilityTests.test_sse_authentication_does_not_block_event_loop`（651 Terra / 652 K2.8 **approved**）。
 - **根因**：测试过期——仍按旧签名 `main.sse_events(None, ...)` 传 request=None，且 patch 的 `_resolve_sse_member` 是一参；当前实现要求真实 Request 与 `(token, host)` 两参。
