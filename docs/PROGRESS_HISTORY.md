@@ -10,7 +10,8 @@
 - **设计取舍（安全边界）**：守卫只在删除事务完成、锁已释放后回收——被别的进程打开/加锁时 Windows `os.remove` 必然共享冲突失败，残留保留且删除结果仍 `complete`（无重试、无抢锁）；若可见 `.lock` 仍存在（说明另一代际在途或释放失败），该路径的守卫一律保留。不删除可见 `.provision.lock`、不递归删除非空 `native-home`（原生登录态）或其他成员资源。
 - **测试**：更新 4 处旧“仅剩 guard”断言（`test_role_delete_local` 3 处、`test_role_deletion` 1 处）；新增 workspace 空壳回收、非空 `native-home` 保留、被占用守卫保留、可见 `.lock` 存在时守卫保留、128 字符 HTTP 接受、129 拒绝零写入、模型与 `normalize_operation_key` 8/120/121/128 与 7/129/200 边界用例（用 `.` 分段规避“像凭据”的 ≥40 位连续串启发式）。
 - **验证**：基线（改动前）187 项、3 失败，均 `tests.test_role_provision.CliAndSecretTests` CLI 子进程 exit 1；候选 194 项、同 3 项失败（逐名一致），`new_failures=0`。追加回归 100 项全过。`py_compile`、UTF-8（无 BOM、无替换字符）、`git diff --check` 通过。证据 `.tmp/w-c4/baseline.txt`、`candidate-final.txt`、`candidate-extra-final.txt`。
-- **未做/限制**：① 未独立复核（Terra/K2.8 均 stopped，本会话无 TALK MCP 工具；按用户选择本机开发）；② 存量残留未删除，只读 dry-run 为 14 个 legacy guard-only 目录 + 9 个 workspace 角色空壳（另有私有 Key 根守卫未扫描），删除需单独授权并逐条核对归属；③ 未在真实删除流程上跑 E2E（删角色会动生产数据，仅单测覆盖真实 Windows 文件锁/句柄行为）。
+- **独立复核（任务 659，K2.8）approved**：8 项核验逐条 `pass`（卫生 `pass_with_note`：`git diff --stat` 另含两处 docs，经核实为切片自带文档，非代码偏差）；复核环境用 `git archive 2ade45e` 干净提取基线，候选 194 项 / 基线 187 项均 **0 失败**（协调者本机的 3 个 `CliAndSecretTests` CLI 环境失败在复核环境未复现，两侧一致），`new_failures=0`；结论 **approved**，报告 `.tmp/w-c4-review/review.json`、原始日志 `candidate-run.txt`/`baseline-run.txt`；结果消息 3448 已收取（`workflow_status=completed`）。
+- **未做/限制**：① 存量残留未删除——只读 dry-run 为 14 个 legacy guard-only 目录 + 9 个 workspace 角色空壳（另有私有 Key 根守卫未扫描），删除需单独授权并逐条核对归属；② 未在真实删除流程上跑 E2E（删生产角色会动真实数据，仅单测覆盖真实 Windows 文件锁/句柄行为）；③ 守卫删除依赖 Windows 共享冲突语义，非 Windows 平台 cleanup 在入口即 `unsafe_resource` 拒绝，sweep 不会到达。
 - **环境**：runtime `2172` / API `14296` 未重启，`/healthz` ok、`auth=trusted`；本轮未改生产 DB 与运行数据。
 
 ## 2026-11-11 18:05 — W-C2：API reload 窗口 host_unreachable / bridge_process_exited（653–658）
