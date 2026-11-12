@@ -657,6 +657,74 @@ def note_instance_launch_evidence(
 # ── 启动 / 停止（human-only 意图写）─────────────────────────────────────
 
 
+def _release_dead_running(state, session, now):
+    """Release only a locally proven dead, fully identified terminal launch.
+
+    Called under the existing writer lock; preserve desired intent and generation.
+    Unknown, remote and live processes keep their existing ownership guards.
+    """
+    if (state is None or state.observed_state not in ('running', 'starting', 'stopping')
+            or not state.owner_host or state.owner_host.casefold() != socket.gethostname().casefold()
+            or not state.pid or state.pid <= 0 or state.process_started_at is None):
+        return False
+    from scripts.role_service_recovery import recorded_process_state
+    if recorded_process_state(state.pid, state.process_started_at) not in ('absent', 'exited'):
+        return False
+    from server.role_service_recovery import orphan_candidate
+    old, instance = orphan_candidate(state.project_id, state.member_id, session)
+    if (not instance.host or instance.host.casefold() != old.owner_host.casefold()
+            or (instance.process_started_at is not None and
+                abs((_as_utc(instance.process_started_at) - _as_utc(old.process_started_at)).total_seconds()) > 5)):
+        raise _fail(status.HTTP_409_CONFLICT, 'recovery_identity_mismatch')
+    launch = session.get(RoleServiceLaunch, old.process_launch_id)
+    current = session.get(RoleServiceLaunch, old.current_launch_id) if old.current_launch_id else None
+    missing_current_mismatch = current is None and (old.current_launch_id or launch.generation != old.generation)
+    current_mismatch = current is not None and (
+        current.project_id != old.project_id or current.member_id != old.member_id
+        or current.generation != old.generation
+        or (current.launch_id != launch.launch_id and
+            (current.action != ROLE_SERVICE_ACTION_STOP or current.target_start_launch_id != launch.launch_id)))
+    if missing_current_mismatch or current_mismatch:
+        raise _fail(status.HTTP_409_CONFLICT, 'recovery_identity_mismatch')
+    if _stop_blockers(old, launch, session):
+        raise _fail(status.HTTP_409_CONFLICT, 'recovery_tasks_active')
+    # Retain the recovery workflow's cross-project queued-task and residual
+    # lease guards; a dead process does not authorize taking over its work.
+    from sqlalchemy import and_
+    paused_root = and_(AgentTask.status == 'queued', AgentTask.control_status == 'paused',
+        AgentTask.parent_task_id.is_(None), AgentTask.root_task_id == AgentTask.id,
+        AgentTask.claimed_by.is_(None), AgentTask.instance_id.is_(None),
+        AgentTask.claim_token.is_(None), AgentTask.lease_expires_at.is_(None))
+    tasks = session.exec(select(AgentTask.id).where(AgentTask.target_member_id == old.member_id,
+        or_(AgentTask.claim_token.is_not(None), AgentTask.lease_expires_at.is_not(None),
+            and_(AgentTask.status.in_(('queued', 'running')), paused_root.is_not(True))))
+        .limit(1)).first()
+    if tasks is not None:
+        raise _fail(status.HTTP_409_CONFLICT, 'recovery_tasks_active')
+    active = session.exec(select(RoleServiceLaunch).where(
+        RoleServiceLaunch.project_id == old.project_id, RoleServiceLaunch.member_id == old.member_id,
+        RoleServiceLaunch.state.in_((ROLE_SERVICE_LAUNCH_PENDING, ROLE_SERVICE_LAUNCH_CLAIMED)),
+    )).first()
+    if active is not None:
+        raise _fail(status.HTTP_409_CONFLICT, 'recovery_action_active')
+    if recorded_process_state(old.pid, old.process_started_at) not in ('absent', 'exited'):
+        raise _fail(status.HTTP_409_CONFLICT, 'recovery_process_unverified')
+    old.observed_state = ROLE_SERVICE_OBSERVED_STOPPED
+    old.current_launch_id = old.process_launch_id = old.observed_instance_id = old.owner_host = None
+    old.pid = old.process_started_at = None
+    old.spawned = False
+    old.stopped_at = now
+    old.last_result = ROLE_SERVICE_RESULT_STOPPED
+    old.last_error_code = old.last_error_message = None
+    old.updated_at = now
+    old.updated_by = 'system:stale-recovery'
+    instance.status = 'offline'
+    instance.updated_at = now
+    session.add(old); session.add(instance)
+    session.flush()
+    return True
+
+
 def start_role_service(
     project_id: str, member_id: str, operator: Member, session: Session
 ) -> RoleServiceStartOut:
@@ -684,6 +752,7 @@ def start_role_service(
     now = _now()
     expire_due_launches(session, now=now, project_id=project_id, member_id=member_id)
     state = _get_state(project_id, member_id, session)
+    _release_dead_running(state, session, now)
     if state is not None and state.observed_state in (
         ROLE_SERVICE_OBSERVED_STARTING,
         ROLE_SERVICE_OBSERVED_RUNNING,
@@ -1749,7 +1818,7 @@ def start_all_role_services(
     - ``member_ids`` 只用于“只重试失败子集”；出现跨项目或不存在 ID 时稳定拒绝
       （``404 role_not_found``），不静默忽略；
     - 单个角色失败**不**回滚其它角色；失败清单可定向重试；
-    - 不重复 spawn：已在 ``running/starting`` 的角色一律跳过。
+    - 不重复 spawn：活进程和无法证明退出的 ``running/starting`` 角色仍跳过。
     """
     if session.get(Project, project_id) is None:
         raise _fail(status.HTTP_404_NOT_FOUND, ROLE_SERVICE_ERROR_PROJECT_NOT_FOUND)
@@ -1790,7 +1859,15 @@ def start_all_role_services(
             ))
             continue
         state = _get_state(project_id, member_id, session)
-        if state is not None and state.observed_state in (
+        try:
+            stale = _release_dead_running(state, session, _now())
+        except HTTPException as exc:
+            session.rollback()
+            results.append(RoleServiceStartAllMemberResult(
+                member_id=member_id, role_name=role.role_name,
+                status='failed', error_code=str(exc.detail)))
+            continue
+        if not stale and state is not None and state.observed_state in (
             ROLE_SERVICE_OBSERVED_STARTING,
             ROLE_SERVICE_OBSERVED_RUNNING,
         ):

@@ -19,7 +19,7 @@ from sqlmodel import select
 from server.workspace_relink_guard import operation_code as _relink_guard_code
 from server import models as m
 from server.role_services import (_as_utc,_now,_write_begin,load_role_service_context,
-    _require_managed_cli,_require_start_layout,_enqueue_start_launch,_idempotent_stopped,ownership_held,project_role_service,expire_due_launches)
+    _require_managed_cli,_require_start_layout,_enqueue_start_launch,_idempotent_stopped,_release_dead_running,ownership_held,project_role_service,expire_due_launches)
 
 TERMINAL={"enqueued","already_running","not_selected","skipped","failed"}
 LEASE_SECONDS=120
@@ -111,7 +111,16 @@ def _snapshot(project,activation,operator,session,health):
             pref=session.get(m.ProjectRoleStartup,(project,member.member_id))
             state=session.get(m.RoleServiceState,(project,member.member_id))
             changed=bool(pref and _as_utc(pref.updated_at)>=started)
-            manual=bool(state and _as_utc(state.updated_at)>=started)
+            actor=session.get(m.Member,state.updated_by) if state and state.updated_by else None
+            action=session.get(m.RoleServiceLaunch,state.current_launch_id) if state and state.current_launch_id else None
+            # Observed reports update updated_at but retain the last intent's actor.
+            # A launch's creation time, not the mutable state timestamp, dates that intent.
+            # Idempotent human stop has no launch row. Automatic failure
+            # convergence can also clear it while retaining the human actor.
+            stopped_intent=bool(state and state.desired_state=='stopped'
+                                and state.observed_state=='stopped' and state.last_result=='stopped')
+            intent_at=action.created_at if action else (state.updated_at if stopped_intent else None)
+            manual=bool(actor and actor.kind=='human' and intent_at and _as_utc(intent_at)>=started)
             session.add(m.RoleStartupActivation(project_id=project,activation_id=activation,
                 member_id=member.member_id,enabled=bool(pref and pref.enabled),
                 preference_revision=pref.revision if pref else 0,
@@ -242,6 +251,12 @@ def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
         _complete(key,digest,'skipped',session,error=WORKSPACE_RUNTIME_NOT_READY)
         return
     ctx=load_role_service_context(key[0],key[2],session)
+    stale=_release_dead_running(state,session,_now())
+    if stale:
+        logging.getLogger(__name__).info('project=%s role=%s code=%s',key[0],key[2],
+            'startup_stale_recovered' if row.enabled else 'startup_not_selected')
+        if not row.enabled:
+            _complete(key,digest,'skipped',session,error='startup_not_selected');return
     current=project_role_service(key[0],key[2],session)
     # Preserve an already ready service; do not call a stale running DB row ready.
     already=_ready(state,current,cutoff)
@@ -284,7 +299,8 @@ def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
     _locked_entry(key,digest,session)
     launch=_enqueue_start_launch(ctx,key[0],key[2],session=session,now=_now(),
                                  actor_id='system:project-startup',expected_generation=row.expected_generation)
-    _complete(key,digest,'enqueued',session,launch=launch.launch_id)
+    _complete(key,digest,'enqueued',session,launch=launch.launch_id,
+              error='startup_stale_recovered' if stale else None)
 
 def activate(project,activation,operator,session,*,workspace_runtime_guard=False):
     human(operator);deadline=time.monotonic()+ROUND_SECONDS
