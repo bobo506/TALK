@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-12 21:20 — W-D1 真实重定向演练 + 项目删除清理修复（705/706）
+
+- **真实演练（第 0 项）**：创建临时项目 `prj_wd1e2e_*`（旧根/新根/临时 runtime 配置均在 `.tmp/e2e-wd1-real/`），
+  preview 200（`marker_only`、candidate_root、token）；relink 200（`stage=completed`、revision 2、根指向新根）；
+  校验：新根指针写入、旧指针不变、配置 `project_root` 更新、旧根保留、删除项目 204。全程未碰现有项目。
+- **演练发现缺陷**：删除项目后 `workspace_registrations`/`workspace_relink_previews`/`workspace_operations` 各残留 1 行。
+- **705 complete / 706 K2.8 approved**：`DELETE /api/projects/{id}` 增加活动重关联检查（非终态 → 409 `workspace_busy`，全部行不变）；
+  否则同一事务清理三表 + 既有清理 + 删除项目；新增 `tests/test_workspace_project_delete_cleanup.py` 覆盖 active/completed/无行/跨项目。
+  测试产生的 3 行孤儿已由协调者手工清理。
+- **状态**：705/706 已收取，`submitted=[]`；API 已 reload。
+
 ## 2026-11-12 20:05 — W-D1 人工验收通过（收尾）
 
 - 用户对项目设置“工作区”面板排版、重关联弹窗三按钮样式、Windows 目录选择窗置顶表示验收通过；703/704 已收取，`submitted=[]`。

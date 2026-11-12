@@ -1411,7 +1411,19 @@ def unregister_project(
 ):
     """Unregister a project from the TALK server."""
     _require_human(current)
+    # Serialize the busy check with relink writes and the subsequent cleanup.
+    begin_immediate_write(session)
     project = _get_project(project_id, session)
+    active = session.execute(
+        text("SELECT 1 FROM workspace_operations WHERE project_id = :project_id "
+             "AND stage NOT IN ('completed', 'failed') LIMIT 1"),
+        {"project_id": project_id},
+    ).first()
+    if active:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="workspace_busy")
+    for table in ("workspace_operations", "workspace_relink_previews", "workspace_registrations"):
+        session.execute(text(f"DELETE FROM {table} WHERE project_id = :project_id"),
+                        {"project_id": project_id})
     # ROLE-DESC-B1（设计 §3.1-D9）：SQLite 未开启 foreign_keys PRAGMA，新表若不显式清理
     # 就会在删项目后留下孤儿行。这里显式删除本项目全部角色说明行；既有 project_agents
     # 的孤儿行是本片之前的既有事实，**本片不追改**（不为此扩大范围）。
