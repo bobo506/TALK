@@ -1,4 +1,8 @@
-"""Explicit registration metadata operations; transaction ownership stays with the caller."""
+"""Explicit registration metadata operations; transaction ownership stays with the caller.
+
+Windows file IDs are unsigned 64-bit; only 0..2^63-1 are accepted here.
+Larger IDs fail closed as unavailable identity, reported as workspace_identity_invalid.
+"""
 
 from datetime import datetime, timezone
 from collections.abc import Mapping
@@ -32,7 +36,7 @@ def _identity_values(identity):
     platform = identity.get("platform")
     volume_id, file_id = identity.get("volume_id"), identity.get("file_id")
     collected_at = identity.get("collected_at")
-    if not isinstance(platform, str) or platform not in ("posix", "nt", "windows"):
+    if not isinstance(platform, str) or platform not in ("posix", "nt"):
         raise WorkspaceRegistryError("workspace_identity_invalid")
     if any(type(value) is not int or value < 0 or value > 2**63 - 1
            for value in (volume_id, file_id)):
@@ -77,5 +81,7 @@ def save_identity(session: Session, project_id: str, identity, expected_revision
             .execution_options(synchronize_session=False)
         )
         if result.rowcount != 1:
+            if get_registration(session, project_id) is None:
+                raise WorkspaceRegistryError("workspace_registration_not_found")
             raise WorkspaceRegistryError("workspace_revision_conflict")
         return get_registration(session, project_id)

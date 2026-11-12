@@ -22,7 +22,7 @@ IDENTITY = {"platform": "nt", "volume_id": 42, "file_id": 123,
 
 class WorkspaceRegistryTests(unittest.TestCase):
     def setUp(self):
-        base = Path('.tmp/wd1-impl3a')
+        base = Path('.tmp/wd1-impl4a1/test-tmp')
         base.mkdir(parents=True, exist_ok=True)
         self.tmp = tempfile.TemporaryDirectory(dir=base)
         self.addCleanup(self.tmp.cleanup)
@@ -96,7 +96,7 @@ class WorkspaceRegistryTests(unittest.TestCase):
             ensure_registration(s, 'p1')
             s.commit()
             before = get_registration(s, 'p1').model_dump()
-            for field, bad in [('platform', 'posix; DROP TABLE projects'), ('platform', None),
+            for field, bad in [('platform', 'posix; DROP TABLE projects'), ('platform', None), ('platform', 'windows'),
                                ('volume_id', True), ('volume_id', -1), ('volume_id', 2**63), ('volume_id', '1'),
                                ('file_id', False), ('file_id', -1), ('file_id', 2**63), ('file_id', '1'),
                                ('collected_at', '2026-01-01T00:00:00'), ('collected_at', datetime.now()),
@@ -108,13 +108,33 @@ class WorkspaceRegistryTests(unittest.TestCase):
             self.assertEqual(get_registration(s, 'p1').model_dump(), before)
             s.commit()
 
+    def test_platform_allowlist(self):
+        with Session(self.engine) as s:
+            ensure_registration(s, 'p1')
+            s.commit()
+            before = get_registration(s, 'p1').model_dump()
+            self.assert_code('workspace_identity_invalid', save_identity, s, 'p1', {**IDENTITY, 'platform': 'windows'}, 1)
+            self.assertEqual(before, get_registration(s, 'p1').model_dump())
+            print('PLATFORM windows -> workspace_identity_invalid; registration unchanged')
+            for revision, platform in enumerate(('posix', 'nt'), 1):
+                row = save_identity(s, 'p1', {**IDENTITY, 'platform': platform}, revision)
+                self.assertEqual(platform, row.identity_platform)
+            print('PLATFORM posix, nt -> accepted; revision=3')
+
     def test_missing_project_and_unregistered_revision(self):
         with Session(self.engine) as s:
             self.assert_code('workspace_project_not_found', ensure_registration, s, 'missing')
             self.assert_code('workspace_project_not_found', save_identity, s, 'missing', IDENTITY, 1)
             self.assertIsNone(get_registration(s, 'missing'))
-            self.assert_code('workspace_revision_conflict', save_identity, s, 'p1', IDENTITY, 1)
+            self.assert_code('workspace_registration_not_found', save_identity, s, 'p1', IDENTITY, 1)
             self.assertIsNone(get_registration(s, 'p1'))
+            print('REGISTRATION missing -> workspace_registration_not_found; registration remains absent')
+            ensure_registration(s, 'p1')
+            s.commit()
+            before = get_registration(s, 'p1').model_dump()
+            self.assert_code('workspace_revision_conflict', save_identity, s, 'p1', IDENTITY, 99)
+            self.assertEqual(before, get_registration(s, 'p1').model_dump())
+            print('REGISTRATION wrong revision -> workspace_revision_conflict; registration unchanged')
 
     def test_no_io_in_registry_module(self):
         source = Path('server/workspace_registry.py').read_text(encoding='utf-8')

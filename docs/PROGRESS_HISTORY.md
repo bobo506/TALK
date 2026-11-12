@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-12 09:40 — W-D1 4a-1：重关联前置加固（677/678）
+
+- **677（Terra，587s）complete**：`server/workspace_relink_files.py` 新增 `MAX_FILE_BYTES = 1 MiB`：`prepare_write` 读前 `lstat` 判既有文件大小、payload 超限、既有文件超限均 `workspace_file_too_large`，恰好 1 MiB 允许，失败清理临时文件；`server/workspace_registry.py` 的 platform 白名单收敛为 `posix`/`nt`（`windows` → `workspace_identity_invalid`），`save_identity` 在未 `ensure_registration` 时抛 `workspace_registration_not_found`（与 `workspace_revision_conflict` 区分，均零写入）；两测试文件补 1 MiB 三例、platform、错误码用例。
+- **678（K2.8 独立复核）approved**：10 项 pass、`new_failures=[]`；独立重跑 `test_workspace_relink_files + test_workspace_registry` 与回归 `operations/diagnostics/paths` 全过；上限读前判断、错误码区分、零写入均实证。
+- **限制/后续**：固定 1 MiB（目标仅指针/runtime 配置）；第 5 项“prepare→commit 串行锁”留 4a-2 编排内核（计划用“每项目最多一个非终态操作”的 DB 约束 + SQLite 写事务串行化）；第 4b 片才开放 HTTP。
+
 ## 2026-11-12 01:50 — W-D1 3b-2：重关联文件事务原语（675/676）
 
 - **675（Terra，602s）complete**：新增 `server/workspace_relink_files.py`（241 行）与 `tests/test_workspace_relink_files.py`（239 行）。`prepare_write`（绝对路径/无 NUL/长度/`..` 校验、`allowed_roots` 内、目标与父目录链接/reparse 拒绝、已存在文件必须匹配 `expected_digest`、同目录 `O_EXCL` 临时文件、写入后 fsync + 回读 sha256、失败清理）、`commit_write`（临时文件同目录命名校验、替换前复核目标存在性与 old_digest、`os.replace` 原子替换、目录 fsync 尽力而为）、`abort_write`、`rollback_write`（目标不等于 new_digest → `workspace_recovery_required` 且不覆盖；新建删除/覆盖恢复旧字节）、`commit_batch`（失败逆序回滚，回滚失败报 `recovery_required` 并带 `rolled_back`/`not_rolled_back`）。模块不写 DB、不启进程、不访问网络。

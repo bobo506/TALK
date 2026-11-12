@@ -1,5 +1,13 @@
 # Project Progress
 
+## 收工快照（2026-11-12 09:40，W-D1 4a-1 完成）
+
+- **4a-1「重关联前置加固」完成（677 Terra / 678 K2.8 approved）**：`server/workspace_relink_files.py` 增 1 MiB 大小上限（`MAX_FILE_BYTES`，读前 `lstat`，payload/既有文件超限均 `workspace_file_too_large`，恰好 1 MiB 允许，失败无临时文件）；`server/workspace_registry.py` 的 `identity_platform` 白名单收敛为 `posix`/`nt`（`windows` → `workspace_identity_invalid`），`save_identity` 未登记行 → `workspace_registration_not_found`（与 revision 冲突区分，均零写入）；两测试文件补边界/错误码用例。
+- **验证（678 独立复核）**：10 项 pass、`new_failures=[]`；独立重跑 `test_workspace_relink_files + test_workspace_registry` 与回归 `operations/diagnostics/paths` 全过；1 MiB 三例、platform/错误码、零写入均实证。
+- **第 4 片拆两步**：4a-1（本片，加固）→ **4a-2（编排内核，不开放接口）** → 4b（提交入口 + 旧 PATCH/ensure 收口）。设计第 5 片（页面与真实浏览器验收）需用户参与。
+- **提交与推送**：四文件 + 本文档，随本片推送。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 01:50，W-D1 3b 整片完成）
 
 - **3b-2「重关联文件事务原语」完成（675 Terra / 676 K2.8 approved）**：新增 `server/workspace_relink_files.py`（241 行）与测试（239 行）。`prepare_write`（同目录 `O_EXCL` 临时文件 + 写入后 fsync + 回读 sha256；`expected_digest` CAS；链接/越界拒绝）、`commit_write`（替换前复核目标未变、`os.replace` 原子替换、目录 fsync 尽力而为）、`abort_write`、`rollback_write`（目标被外部改动 → `workspace_recovery_required`，不覆盖）、`commit_batch`（失败逆序回滚，回滚失败报 `recovery_required` 并带 rolled_back/not_rolled_back）。稳定码：`workspace_path_refused`/`workspace_file_conflict`/`workspace_write_failed`/`workspace_recovery_required`。

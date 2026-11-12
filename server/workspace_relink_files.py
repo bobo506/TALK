@@ -16,6 +16,7 @@ from pathlib import Path
 from server.workspace_paths import WorkspacePathError, is_within
 
 MAX_PATH = 4096
+MAX_FILE_BYTES = 1024 * 1024
 
 
 class WorkspaceFileError(Exception):
@@ -81,7 +82,14 @@ def _checked(target, roots):
 
 def _read(target):
     try:
-        return target.read_bytes()
+        if target.lstat().st_size > MAX_FILE_BYTES:
+            _error("workspace_file_too_large")
+        # Bound the read too, in case the file grows after lstat.
+        with target.open('rb') as stream:
+            data = stream.read(MAX_FILE_BYTES + 1)
+        if len(data) > MAX_FILE_BYTES:
+            _error("workspace_file_too_large")
+        return data
     except FileNotFoundError:
         return None
     except OSError:
@@ -100,7 +108,7 @@ def _stage(target, payload):
             stream.write(payload)
             stream.flush()
             os.fsync(stream.fileno())
-        actual = temp.read_bytes()
+        actual = _read(temp)
         if actual != payload or _digest(actual) != _digest(payload):
             _error("workspace_write_failed")
         return temp
@@ -137,6 +145,8 @@ def prepare_write(target, payload: bytes, expected_digest: str | None, allowed_r
     target = _checked(target, allowed_roots)
     if not isinstance(payload, bytes):
         _error("workspace_write_failed")
+    if len(payload) > MAX_FILE_BYTES:
+        _error("workspace_file_too_large")
     old = _read(target)
     if (old is None and expected_digest is not None) or (old is not None and expected_digest != _digest(old)):
         _error("workspace_file_conflict")
@@ -148,20 +158,25 @@ def prepare_write(target, payload: bytes, expected_digest: str | None, allowed_r
 def commit_write(receipt: WriteReceipt, allowed_roots) -> WriteReceipt:
     if receipt.committed or receipt.finished:
         _error("workspace_write_failed")
-    target = _checked(receipt.target, allowed_roots)
+    target = _path(receipt.target)
     temp = _checked(receipt.temp, allowed_roots)
     if temp.parent != target.parent or not temp.name.startswith('.' + target.name + '.talk-tmp-'):
         _error("workspace_path_refused")
-    staged = _read(temp)
-    if staged is None or _digest(staged) != receipt.new_digest:
-        _error("workspace_write_failed")
-    current = _read(target)
-    if (current is None) != receipt.created or (current is not None and _digest(current) != receipt.old_digest):
-        _error("workspace_file_conflict")
     try:
-        os.replace(temp, target)
-    except OSError:
-        _error("workspace_write_failed")
+        target = _checked(target, allowed_roots)
+        staged = _read(temp)
+        if staged is None or _digest(staged) != receipt.new_digest:
+            _error("workspace_write_failed")
+        current = _read(target)
+        if (current is None) != receipt.created or (current is not None and _digest(current) != receipt.old_digest):
+            _error("workspace_file_conflict")
+        try:
+            os.replace(temp, target)
+        except OSError:
+            _error("workspace_write_failed")
+    except WorkspaceFileError:
+        abort_write(receipt)
+        raise
     receipt.committed = True
     _sync_dir(target.parent)
     return receipt

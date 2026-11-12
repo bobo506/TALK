@@ -1,5 +1,6 @@
 import ast
 import hashlib
+import io
 import os
 import stat
 import tempfile
@@ -43,6 +44,39 @@ class RelinkFileTests(unittest.TestCase):
         files.commit_write(receipt, self.roots)
         self.assertEqual(b'updated', self.target.read_bytes())
 
+    def test_file_size_boundaries_and_cleanup(self):
+        payload = b'x' * files.MAX_FILE_BYTES
+        receipt = self.prepare(new=payload)
+        files.commit_write(receipt, self.roots)
+        self.assertEqual(payload, self.target.read_bytes())
+        self.assertEqual([self.target], list(self.root.iterdir()))
+        print('SIZE payload=1048576 -> success; committed bytes=1048576; temps=0')
+
+        before = self.target.read_bytes()
+        self.error('workspace_file_too_large', self.prepare, self.target, before, payload + b'x')
+        self.assertEqual(before, self.target.read_bytes())
+        self.assertEqual([self.target], list(self.root.iterdir()))
+        print('SIZE payload=1048577 -> workspace_file_too_large; target unchanged; temps=0')
+
+        self.target.write_bytes(payload + b'y')
+        before_digest = digest(payload + b'y')
+        with mock.patch.object(Path, 'open', side_effect=AssertionError('oversized file opened')):
+            self.error('workspace_file_too_large', files.prepare_write, self.target, b'new', None, self.roots)
+        self.assertEqual(before_digest, digest(self.target.read_bytes()))
+        self.assertEqual([self.target], list(self.root.iterdir()))
+        print('SIZE existing=1048577 -> workspace_file_too_large; open=0; digest unchanged; temps=0')
+
+    def test_file_grows_after_lstat_is_bounded(self):
+        self.target.write_bytes(b'x')
+        original_open = Path.open
+        def grown_open(path, *args, **kwargs):
+            if path == self.target:
+                return io.BytesIO(b'x' * (files.MAX_FILE_BYTES + 2))
+            return original_open(path, *args, **kwargs)
+        with mock.patch.object(Path, 'open', grown_open):
+            self.error('workspace_file_too_large', files.prepare_write, self.target, b'new', None, self.roots)
+        self.assertEqual([self.target], list(self.root.iterdir()))
+
     def test_conflicts(self):
         self.target.write_bytes(b'old')
         for expected in (None, digest(b'wrong')):
@@ -52,6 +86,7 @@ class RelinkFileTests(unittest.TestCase):
         self.target.write_bytes(b'external')
         err = self.error('workspace_file_conflict', files.commit_write, receipt, self.roots)
         self.assertEqual(b'external', self.target.read_bytes())
+        self.assertFalse(receipt.temp.exists())
         files.abort_write(receipt)
         self.target.unlink()
         self.error('workspace_file_conflict', files.prepare_write, self.target, b'new', digest(b'old'), self.roots)
@@ -220,6 +255,7 @@ class RelinkFileTests(unittest.TestCase):
         receipt.temp.write_bytes(b'tampered')
         self.error('workspace_write_failed', files.commit_write, receipt, self.roots)
         self.assertEqual(b'new', self.target.read_bytes())
+        self.assertFalse(receipt.temp.exists())
         files.abort_write(receipt)
 
     def test_no_forbidden_imports_or_target_writes(self):
