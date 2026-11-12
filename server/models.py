@@ -148,6 +148,22 @@ class WorkspaceRegistration(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
 
 
+class WorkspaceRelinkPreview(SQLModel, table=True):
+    """Short-lived, single-use authorization for a relink preview."""
+
+    __tablename__ = "workspace_relink_previews"
+
+    token: str = Field(sa_column=Column(Text, primary_key=True))
+    project_id: str
+    actor_member_id: str
+    candidate_root: str
+    candidate_identity: str
+    expected_revision: int
+    created_at: datetime
+    expires_at: datetime
+    used_at: Optional[datetime] = None
+
+
 class WorkspaceOperation(SQLModel, table=True):
     """Durable relink operation metadata; transaction ownership stays with callers."""
 

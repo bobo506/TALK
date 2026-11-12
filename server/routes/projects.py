@@ -1222,9 +1222,11 @@ def update_project(
     project = _get_project(project_id, session)
     root = None
     if "project_root_path" in fields_set:
+        if body.project_root_path != project.project_root_path:
+            raise HTTPException(status_code=409, detail="workspace_relink_required")
         if body.project_root_path is None:
             raise HTTPException(status_code=422, detail="project_root_path_required")
-        root = _validated_root(body.project_root_path, session, exclude=project_id)
+        root = project.project_root_path
     if "display_name" in fields_set:
         project.display_name = body.display_name
     if "description" in fields_set:

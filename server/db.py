@@ -410,6 +410,7 @@ def init_db() -> None:
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_groups_type ON groups (type)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_projects_maintainer_member_id ON projects (maintainer_member_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspace_registrations_updated_at ON workspace_registrations (updated_at)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspace_relink_previews_expires_at ON workspace_relink_previews (expires_at)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspace_operations_project_id ON workspace_operations (project_id)")
         conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ux_workspace_operations_active ON workspace_operations(project_id) WHERE stage NOT IN ('completed','failed')")
         conn.exec_driver_sql(

@@ -75,6 +75,24 @@ def _root(value: str) -> Path:
         raise HTTPException(422, "project_root_invalid")
 
 
+def _existing_project(root: Path, session: Session):
+    identity = os.path.normcase(str(root))
+    project = None
+    for existing in session.exec(select(Project)).all():
+        if not existing.project_root_path:
+            continue
+        try:
+            existing_root = Path(existing.project_root_path).expanduser().resolve()
+            same = os.path.samefile(root, existing_root)
+        except (OSError, RuntimeError, ValueError):
+            continue
+        if same:
+            if project is not None or os.path.normcase(str(existing_root)) != identity:
+                raise HTTPException(409, "workspace_duplicate")
+            project = existing
+    return project
+
+
 @router.post("/ensure")
 def ensure_workspace(body: WorkspaceEnsure, current: Member = Depends(get_current_member),
                      session: Session = Depends(get_session)):
@@ -82,6 +100,7 @@ def ensure_workspace(body: WorkspaceEnsure, current: Member = Depends(get_curren
         raise HTTPException(403, "human_required")
     with _lock:
         root = _root(body.project_root)
+        _existing_project(root, session)
         engine = session.get_bind()
         try:
             template = local_runtime.configured_runtime(engine)
@@ -101,9 +120,7 @@ def ensure_workspace(body: WorkspaceEnsure, current: Member = Depends(get_curren
                 try:
                     with Session(bind=connection) as work:
                         begin_immediate_write(work)
-                        identity = os.path.normcase(str(root))
-                        project = next((p for p in work.exec(select(Project)).all()
-                                        if p.project_root_path and os.path.normcase(str(Path(p.project_root_path).expanduser().resolve())) == identity), None)
+                        project = _existing_project(root, work)
                         marker = root / ".talk" / "project.yaml"
                         metadata = None
                         if marker.exists():

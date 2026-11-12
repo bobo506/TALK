@@ -134,21 +134,32 @@ class WorkspaceDiagnosticsApiTests(unittest.TestCase):
         self.assertEqual(other['duplicate_projects'], [])
 
     def test_preview_matrix(self):
+        def checked(path):
+            response = self.preview(path)
+            result = response.json()
+            if result['blocked_reasons']:
+                self.assertEqual(response.status_code, 409)
+                self.assertTrue(result['code'].startswith('workspace_'))
+                self.assertNotIn('preview_token', result)
+            else:
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('preview_token', result)
+            return result
         self.marker(self.root, 'project-a')
         alias = self.root / '..' / 'root'
-        got = self.preview(alias).json()
+        got = checked(alias)
         self.assertEqual((got['code'], got['match_confidence']), ('workspace_move_candidate', 'strong'))
         copy = self.base / 'copy'
         shutil.copytree(self.root, copy)
-        self.assertEqual(self.preview(copy).json()['code'], 'marker_only')
+        self.assertEqual(checked(copy)['code'], 'marker_only')
         with mock.patch.object(core, '_identity', return_value=None):
-            weak = self.preview(copy).json()
+            weak = checked(copy)
         self.assertEqual((weak['code'], weak['match_confidence']), ('workspace_identity_unverified', 'unknown'))
         self.marker(copy, 'project-b')
-        got = self.preview(copy).json()
+        got = checked(copy)
         self.assertEqual(got['code'], 'workspace_marker_conflict')
         self.assertIn('workspace_marker_conflict', [r['code'] for r in got['blocked_reasons']])
-        got = self.preview(self.base / 'absent').json()
+        got = checked(self.base / 'absent')
         self.assertEqual(got['code'], 'workspace_root_missing')
         self.assertIn('workspace_root_missing', [r['code'] for r in got['blocked_reasons']])
         real_stat = Path.stat
@@ -157,17 +168,17 @@ class WorkspaceDiagnosticsApiTests(unittest.TestCase):
                 raise PermissionError(13, 'private local details')
             return real_stat(path, *args, **kwargs)
         with mock.patch.object(Path, 'stat', fake_stat):
-            got = self.preview(self.other).json()
+            got = checked(self.other)
         self.assertEqual(got['code'], 'workspace_root_inaccessible')
         self.assertIn('workspace_root_inaccessible', [r['code'] for r in got['blocked_reasons']])
         self.project('project-b', self.other)
-        got = self.preview(self.other).json()
+        got = checked(self.other)
         self.assertEqual(got['code'], 'workspace_duplicate')
         self.assertEqual(got['conflict_project_ids'], ['project-b'])
         self.assertIn({'code': 'workspace_duplicate', 'project_ids': ['project-b']}, got['blocked_reasons'])
         moved = self.base / 'moved'
         self.root.rename(moved)
-        got = self.preview(moved).json()
+        got = checked(moved)
         self.assertEqual((got['code'], got['match_confidence']), ('workspace_identity_unverified', 'unknown'))
 
     def test_read_only_and_safe_response(self):
@@ -178,17 +189,24 @@ class WorkspaceDiagnosticsApiTests(unittest.TestCase):
         def database():
             with self.engine.connect() as conn:
                 names = [r[0] for r in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))]
-                counts = {n: conn.execute(text('SELECT COUNT(*) FROM "' + n + '"')).scalar() for n in names}
-                row = conn.execute(text('SELECT * FROM projects WHERE project_id = :id'), {'id': 'project-a'}).first()
-                return counts, tuple(row)
+                return {n: [tuple(row) for row in conn.execute(text('SELECT * FROM "' + n + '"'))] for n in names}
         before = (snapshot(self.root), snapshot(self.other), database())
         with mock.patch.object(runtime, 'ensure_local_runtime') as ensure:
             get = self.get()
             post = self.preview(self.other)
             ensure.assert_not_called()
-        self.assertEqual(before, (snapshot(self.root), snapshot(self.other), database()))
+        after = (snapshot(self.root), snapshot(self.other), database())
+        self.assertEqual(before[:2], after[:2])
+        for name in before[2]:
+            if name == 'workspace_relink_previews':
+                self.assertEqual(len(after[2][name]), len(before[2][name]) + 1)
+            else:
+                self.assertEqual(before[2][name], after[2][name], name)
         self.assertFalse((self.other / '.talk').exists())
         get_json, post_json = get.json(), post.json()
+        self.assertIn('preview_token', post_json)
+        self.assertIn('expires_at', post_json)
+        post_json['preview_token'] = '<redacted>'
         # Preserve complete response shapes while removing machine-specific IDs.
         for data in (get_json, post_json):
             data['revision'] = '<redacted opaque revision>'
@@ -203,7 +221,7 @@ class WorkspaceDiagnosticsApiTests(unittest.TestCase):
         for response in (get, post):
             self.assertEqual(response.status_code, 200)
             text_body = response.text
-            for forbidden in ('human-test-key', 'SAMPLE_PRIVATE_VALUE', str(self.base), 'api_key', 'development_requirements', 'machine', 'preview_token'):
+            for forbidden in ('human-test-key', 'SAMPLE_PRIVATE_VALUE', str(self.base), 'api_key', 'development_requirements', 'machine'):
                 self.assertNotIn(forbidden, text_body)
 
     def test_untrusted_marker_path_is_not_reflected(self):

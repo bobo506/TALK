@@ -1,19 +1,25 @@
-"""Read-only workspace diagnostics; observations never authorize a move."""
+"""Workspace diagnostics and short-lived relink authorizations."""
 from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy import update
+from sqlalchemy.exc import OperationalError
 from sqlmodel import Session, select
 
 import server.db as db
 from server.auth import OPERATOR_ID, is_trusted_host, resolve_member_by_key
-from server.db import get_session
-from server.models import Member, Project
+from server.db import begin_immediate_write, get_session
+from server.models import Member, Project, WorkspaceRelinkPreview
+from server import workspace_operations as ops, workspace_registry as registry, workspace_relink as relink
 from server.workspace_diagnostics import detect_duplicates, evaluate_move, inspect_root
 
 router = APIRouter(prefix="/api/projects", tags=["workspace diagnostics"])
@@ -103,6 +109,10 @@ def preview(project_id: str, body: Any = Body(...), current: Member = Depends(_h
     if (not isinstance(candidate_root, str) or not candidate_root.strip() or len(candidate_root) > 32767
             or "\x00" in candidate_root or not Path(candidate_root).is_absolute()):
         raise HTTPException(422, "invalid candidate_root")
+    try:
+        candidate_root = str(Path(candidate_root).resolve())
+    except (OSError, RuntimeError, ValueError):
+        raise HTTPException(422, "invalid candidate_root") from None
     old = inspect_root(project.project_root_path)
     move = evaluate_move(old, candidate_root)
     candidate = move["candidate"]
@@ -131,4 +141,111 @@ def preview(project_id: str, body: Any = Body(...), current: Member = Depends(_h
                   candidate_identity_confidence="strong" if candidate["identity"] else "unknown",
                   match_confidence="strong" if code == "workspace_move_candidate" else "unknown",
                   conflict_project_ids=conflicts, blocked_reasons=reasons)
+    if reasons:
+        return JSONResponse(status_code=409, content=report)
+    registration = registry.get_registration(session, project_id)
+    revision = registration.revision if registration else 1
+    try:
+        snapshot = relink.candidate_snapshot(candidate_root)
+        snapshot["old_root_digest"] = hashlib.sha256((project.project_root_path or "").encode("utf-8")).hexdigest()
+    except relink.WorkspaceRelinkError as exc:
+        raise HTTPException(409, exc.code) from None
+    now = datetime.now(timezone.utc)
+    row = WorkspaceRelinkPreview(token=uuid4().hex, project_id=project_id, actor_member_id=current.id,
+                                 candidate_root=candidate_root, candidate_identity=json.dumps(snapshot),
+                                 expected_revision=revision, created_at=now, expires_at=now + timedelta(minutes=10))
+    session.add(row)
+    session.commit()
+    report.update(preview_token=row.token, expires_at=(now + timedelta(minutes=10)).isoformat(), expected_revision=revision)
     return report
+
+
+def _normalize_result_root(result):
+    result["project_root"] = (os.path.normcase(os.path.normpath(result["project_root"]))
+                              if result["project_root"] else None)
+    return result
+
+
+@router.post("/{project_id}/workspace-relink")
+def submit_relink(project_id: str, body: Any = Body(...), current: Member = Depends(_human),
+                  session: Session = Depends(get_session)):
+    if not isinstance(body, dict):
+        raise HTTPException(422, "workspace_operation_input_invalid")
+    operation_id, root, revision = body.get("operation_id"), body.get("candidate_root"), body.get("expected_revision")
+    token = body.get("preview_token")
+    try:
+        ops._identifier(operation_id)
+        ops._request(project_id, None, root, revision)
+        try:
+            root = str(Path(root).resolve())
+        except (OSError, RuntimeError, ValueError):
+            raise relink.WorkspaceRelinkError("workspace_preview_stale") from None
+        begin_immediate_write(session)
+        existing = ops.get_operation(session, operation_id)
+        if existing is not None:
+            digest = ops.digest_request(project_id, existing.old_root, root, revision)
+            if digest != existing.request_digest:
+                raise relink.WorkspaceRelinkError("workspace_operation_conflict")
+            result = relink._result(session, existing)
+            return _normalize_result_root(result)
+        project = _project(session, project_id)
+        relink.busy_preflight(session, project_id)
+        row = session.get(WorkspaceRelinkPreview, token) if isinstance(token, str) else None
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        registration = registry.get_registration(session, project_id)
+        actual_revision = registration.revision if registration else 1
+        if (row is None or row.used_at is not None or row.expires_at.replace(tzinfo=None) <= now
+                or row.project_id != project_id or row.actor_member_id != current.id
+                or row.candidate_root != root or row.expected_revision != revision or actual_revision != revision):
+            raise relink.WorkspaceRelinkError("workspace_preview_stale")
+        try:
+            snapshot = json.loads(row.candidate_identity)
+            if not isinstance(snapshot, dict) or not {"identity", "pointer_digest", "old_root_digest"} <= snapshot.keys():
+                raise ValueError
+        except (TypeError, ValueError):
+            raise relink.WorkspaceRelinkError("workspace_preview_stale") from None
+        if hashlib.sha256((project.project_root_path or "").encode("utf-8")).hexdigest() != snapshot["old_root_digest"]:
+            raise relink.WorkspaceRelinkError("workspace_preview_stale")
+        if relink.candidate_snapshot(root)["identity"] != snapshot["identity"]:
+            raise relink.WorkspaceRelinkError("workspace_preview_stale")
+        observed = inspect_root(root)
+        marker = observed["marker"]
+        if observed["status"] != "ok" or (marker["parseable"] and marker["project_id"] != project_id):
+            raise relink.WorkspaceRelinkError("workspace_preview_stale")
+        comparisons = detect_duplicates([(pid, path) for pid, path in _projects(session) if pid != project_id] + [(project_id, root)])
+        if comparisons["unknown"] or any(project_id in g["project_ids"] for g in comparisons["duplicates"]):
+            raise relink.WorkspaceRelinkError("workspace_preview_stale")
+        writes, roots = relink.plan_writes(project_id, project.project_root_path, root, snapshot)
+        changed = session.execute(update(WorkspaceRelinkPreview).where(
+            WorkspaceRelinkPreview.token == token, WorkspaceRelinkPreview.used_at.is_(None),
+            WorkspaceRelinkPreview.expires_at > now).values(used_at=now))
+        if changed.rowcount != 1:
+            raise relink.WorkspaceRelinkError("workspace_preview_stale")
+        if registration is None:
+            registry.ensure_registration(session, project_id)
+        session.commit()
+        bind = session.get_bind()
+        pointer_parent = Path(root) / ".talk"
+        created = False
+        if not pointer_parent.exists():
+            pointer_parent.mkdir()
+            created = True
+        try:
+            result = relink.execute_relink(lambda: Session(bind), project_id=project_id, candidate_root=root,
+                                           expected_revision=revision, operation_id=operation_id,
+                                           writes=writes, allowed_roots=roots)
+        finally:
+            if created:
+                try:
+                    pointer_parent.rmdir()
+                except OSError:
+                    pass
+        return _normalize_result_root(result)
+    except OperationalError as exc:
+        session.rollback()
+        if "locked" in str(exc).lower() or "busy" in str(exc).lower():
+            raise HTTPException(409, "workspace_busy") from None
+        raise
+    except (ops.WorkspaceOperationError, relink.WorkspaceRelinkError) as exc:
+        session.rollback()
+        raise HTTPException(409, exc.code) from None

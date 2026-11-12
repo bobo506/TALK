@@ -4,12 +4,14 @@ A successful return means the operation has committed. Callers must not attempt
 to roll back this operation through their own session.
 """
 import os
+import json
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
-from server.models import Project
+from server.models import AgentTask, Project, RoleServiceState
 from server import workspace_operations as ops, workspace_registry as registry
 from server.workspace_diagnostics import inspect_root
 from server import workspace_relink_files as files
@@ -22,6 +24,73 @@ class WorkspaceRelinkError(Exception):
         self.rolled_back = tuple(rolled_back)
         self.not_rolled_back = tuple(not_rolled_back)
         super().__init__(code)
+
+
+def busy_preflight(session, project_id):
+    """Fail closed on active or uncertain role, task, or operation state."""
+    for role in session.execute(select(RoleServiceState).where(RoleServiceState.project_id == project_id)).scalars():
+        if (role.desired_state != "stopped" or role.observed_state not in ("stopped", "not_started")
+                or role.owner_host or role.process_launch_id or role.pid or role.current_launch_id):
+            raise WorkspaceRelinkError("workspace_busy")
+    for task in session.execute(select(AgentTask).where(AgentTask.project_id == project_id)).scalars():
+        if (task.status not in ("queued", "succeeded", "failed", "canceled")
+                or (task.status == "queued" and task.claimed_by)):
+            raise WorkspaceRelinkError("workspace_busy")
+    active = session.execute(select(ops.WorkspaceOperation.operation_id).where(
+        ops.WorkspaceOperation.project_id == project_id,
+        ops.WorkspaceOperation.stage.not_in(("completed", "failed")))).first()
+    if active:
+        raise WorkspaceRelinkError("workspace_busy")
+
+
+def candidate_snapshot(candidate_root):
+    """Capture physical identity and pointer digest without exposing file content."""
+    info = inspect_root(candidate_root)
+    identity = info.get("identity") or {}
+    keys = ("platform", "machine", "volume_id", "file_id")
+    resolved_root = Path(candidate_root).resolve()
+    pointer = resolved_root / ".talk" / "runtime.local.json"
+    try:
+        target = files._checked(pointer, (resolved_root,))
+        data = files._read(target)
+    except files.WorkspaceFileError as exc:
+        raise WorkspaceRelinkError(exc.code) from None
+    return {"identity": [identity.get(k) for k in keys],
+            "pointer_digest": files._digest(data) if data is not None else None}
+
+
+def plan_writes(project_id, old_root, candidate_root, snapshot):
+    """Build the two permitted writes from the old binding and preview snapshot."""
+    try:
+        old_pointer = files._checked(Path(old_root) / ".talk" / "runtime.local.json", (old_root,))
+        pointer_bytes = files._read(old_pointer)
+        pointer = json.loads(pointer_bytes.decode("utf-8"))
+        if (not isinstance(pointer, dict) or pointer.get("schema") != "talk-local-runtime-1"
+                or not isinstance(pointer.get("config_file"), str)
+                or not os.path.isabs(pointer["config_file"])):
+            raise ValueError
+        config_path = files._path(pointer["config_file"])
+        files._checked(config_path, (config_path.parent,))
+        config_bytes = files._read(config_path)
+        config = json.loads(config_bytes.decode("utf-8"))
+        if (not isinstance(config, dict) or config.get("project_id") != project_id
+                or not isinstance(config.get("project_root"), str)
+                or os.path.normcase(os.path.normpath(config["project_root"])) != os.path.normcase(os.path.normpath(old_root))):
+            raise ValueError
+    except (TypeError, ValueError, UnicodeError, AttributeError, files.WorkspaceFileError):
+        raise WorkspaceRelinkError("workspace_binding_invalid") from None
+    current_snapshot = candidate_snapshot(candidate_root)
+    if any(current_snapshot[key] != snapshot[key] for key in ("identity", "pointer_digest")):
+        raise WorkspaceRelinkError("workspace_file_conflict")
+    target = files._checked(Path(candidate_root) / ".talk" / "runtime.local.json", (candidate_root,))
+    current = files._read(target)
+    if current is not None and current != pointer_bytes:
+        raise WorkspaceRelinkError("workspace_file_conflict")
+    config["project_root"] = candidate_root
+    payload = json.dumps(config, ensure_ascii=False, indent=2).encode("utf-8")
+    return ([{"target": target, "payload": pointer_bytes, "expected_digest": snapshot["pointer_digest"]},
+             {"target": config_path, "payload": payload, "expected_digest": files._digest(config_bytes)}],
+            (candidate_root, config_path.parent))
 
 
 def _result(session, op):
