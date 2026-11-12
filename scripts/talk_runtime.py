@@ -833,11 +833,13 @@ class TalkRuntime:
                     specs[spec["member_id"]] = spec
         for member, spec in specs.items():
             role = by_id.get(member)
-            if role is None or role.get("archived"):
+            if role is not None and role.get("archived"):
                 continue
             if member in workspace_roles and not workspace_enabled:
                 continue
             owned = self.hosts.get(member)
+            if role is None and owned:
+                continue
             if owned:
                 if owned["process"].poll() is None:
                     state="starting"
@@ -858,7 +860,8 @@ class TalkRuntime:
                 self.hosts.pop(member)
                 prior = self.failures.get(member,{"count":0})
                 self.failures[member] = {"count":prior["count"]+1,"generation":(role.get("service") or {}).get("generation"),"retry_at":self.clock()+min(30,2**(prior["count"]+1))}
-            service = role.get("service") or {}
+            service_value = role.get("service") if role is not None else None
+            service = service_value if isinstance(service_value, dict) else {}
             failures = self.failures.get(member)
             if failures and failures["generation"] != service.get("generation"):
                 self.failures.pop(member); failures = None
@@ -896,6 +899,18 @@ class TalkRuntime:
                             self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":"orphan_host_unverified"}
                             continue
                         verified = True
+                        observed = service.get("observed")
+                        readiness = service.get("readiness_service")
+                        desired = service.get("desired")
+                        if (observed in ("running", "starting", "stopping") or
+                                readiness in ("ready", "starting") or desired == "running"):
+                            self.statuses[member] = {"state":"external_manager", "pid":pid, "reason":"orphan_host_serving"}
+                            continue
+                        if (not isinstance(service_value, dict) or
+                                observed not in ("stopped", "failed", "unknown", "not_started") or
+                                readiness not in ("pending", "failed", "unknown") or desired != "stopped"):
+                            self.statuses[member] = {"state":"external_manager", "pid":pid, "reason":"orphan_host_unknown"}
+                            continue
                         if created is not None:
                             result = terminate_orphan(pid, created)
                             if not result.get("exit_confirmed"):
@@ -935,6 +950,8 @@ class TalkRuntime:
                     self.event("orphan_host_terminated", context={"member_id":member, "pid":pid, "outcome":outcome})
                     if outcome == "failed":
                         continue
+            if role is None:
+                continue
             if service.get("ownership_held"):
                 self._terminate_orphan_bridge(member, spec)
                 self.statuses[member] = {"state":"recovery_required"}

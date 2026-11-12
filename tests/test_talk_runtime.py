@@ -184,7 +184,8 @@ class RuntimeTests(unittest.TestCase):
         finally:
             self.runtime.request = original
 
-    def role(self,member="agent:one",**service):return {"member_id":member,"service":service}
+    def role(self,member="agent:one",**service):
+        return {"member_id":member,"service":{"observed":"stopped", "desired":"stopped", "readiness_service":"pending", **service}}
     def test_config_rejects_remote_inline_key_and_path_escape(self):
         self.write_config();self.assertEqual(runtime.load_config(self.path)["project_id"],"prj_fixture")
         for key,value,code in [("base_url","http://example.org:8000","loopback"),("key_root",str(self.project/"keys"),"inside_project"),("api_argv",[sys.executable,"--key","fixture","{control_file}"],"argv")]:
@@ -428,6 +429,52 @@ class RuntimeTests(unittest.TestCase):
         event.assert_any_call("orphan_host_terminated", context={"member_id":"agent:one", "pid":123, "outcome":"terminated"})
         self.assertEqual(len(self.spawned), 1)
         self.assertEqual(self.runtime.statuses["agent:one"]["state"], "starting")
+
+    def test_orphan_serving_service_is_preserved(self):
+        self.orphan_fixture()
+        cases = [{"observed": state} for state in ("running", "starting", "stopping")]
+        cases += [{"readiness_service": state} for state in ("ready", "starting")]
+        cases += [{"desired": "running"}]
+        for service in cases:
+            with self.subTest(service=service), patch.object(runtime, "recorded_process_state", return_value="present"), \
+                 patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+                 patch.object(runtime, "_close_orphan_handle") as close, patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                 patch.object(runtime, "_orphan_host_matches", return_value=True), \
+                 patch.object(runtime, "terminate_orphan") as terminate, patch.object(runtime, "_terminate_orphan_handle") as terminate_handle:
+                self.runtime.reconcile_hosts([self.role(ownership_held=True, **service)])
+                terminate.assert_not_called(); terminate_handle.assert_not_called(); close.assert_called_once_with(1)
+                self.assertEqual(self.runtime.statuses["agent:one"], {"state":"external_manager", "pid":123, "reason":"orphan_host_serving"})
+                self.assertFalse(self.spawned)
+
+    def test_orphan_inactive_service_terminates_then_spawns(self):
+        self.orphan_fixture()
+        for observed in ("stopped", "failed", "unknown", "not_started"):
+            with self.subTest(observed=observed), patch.object(runtime, "recorded_process_state", return_value="present"), \
+                 patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+                 patch.object(runtime, "_close_orphan_handle"), patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                 patch.object(runtime, "_orphan_host_matches", return_value=True), \
+                 patch.object(runtime, "terminate_orphan", return_value={"exit_confirmed":True}) as terminate:
+                self.runtime.hosts.clear(); self.spawned.clear()
+                self.runtime.reconcile_hosts([self.role(ownership_held=False, observed=observed)])
+                terminate.assert_called_once_with(123, 42)
+                self.assertEqual(len(self.spawned), 1)
+                self.assertEqual(self.runtime.statuses["agent:one"]["state"], "starting")
+
+    def test_orphan_unknown_service_is_preserved(self):
+        self.orphan_fixture()
+        cases = [[], [{"member_id":"agent:one"}], [{"member_id":"agent:one", "service":None}],
+                 [{"member_id":"agent:one", "service":"invalid"}],
+                 [self.role(desired=None)], [self.role(observed="invalid")], [self.role(readiness_service=None)]]
+        for roles in cases:
+            with self.subTest(roles=roles), patch.object(runtime, "recorded_process_state", return_value="present"), \
+                 patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+                 patch.object(runtime, "_close_orphan_handle") as close, patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                 patch.object(runtime, "_orphan_host_matches", return_value=True), \
+                 patch.object(runtime, "terminate_orphan") as terminate, patch.object(runtime, "_terminate_orphan_handle") as terminate_handle:
+                self.runtime.reconcile_hosts(roles)
+                terminate.assert_not_called(); terminate_handle.assert_not_called(); close.assert_called_once_with(1)
+                self.assertEqual(self.runtime.statuses["agent:one"], {"state":"external_manager", "pid":123, "reason":"orphan_host_unknown"})
+                self.assertFalse(self.spawned)
 
     def test_orphan_mismatch_is_not_terminated(self):
         self.orphan_fixture()
