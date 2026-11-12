@@ -1,13 +1,13 @@
 """Explicit registration metadata operations; transaction ownership stays with the caller.
 
-Windows file IDs are unsigned 64-bit; only 0..2^63-1 are accepted here.
-Larger IDs fail closed as unavailable identity, reported as workspace_identity_invalid.
+Identity values use unsigned 64-bit integers; SQLite stores their signed wrap.
+Registry reads return raw unsigned values without marking ORM fields dirty.
 """
 
 from datetime import datetime, timezone
 from collections.abc import Mapping
 
-from sqlalchemy import exists, select, update
+from sqlalchemy import exists, orm, select, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlmodel import Session
 
@@ -21,6 +21,20 @@ class WorkspaceRegistryError(ValueError):
         self.code = code
         super().__init__(code)
 
+
+
+def encode_unsigned_64(value):
+    """Encode an unsigned identity as an SQLite signed INTEGER."""
+    if type(value) is not int or not 0 <= value < 2**64:
+        raise WorkspaceRegistryError("workspace_identity_invalid")
+    return value if value < 2**63 else value - 2**64
+
+
+def decode_unsigned_64(stored):
+    """Decode an SQLite signed INTEGER to its unsigned identity."""
+    if type(stored) is not int or not -(2**63) <= stored < 2**63:
+        raise WorkspaceRegistryError("workspace_identity_invalid")
+    return stored if stored >= 0 else stored + 2**64
 
 def _require_project(session: Session, project_id: str) -> None:
     if not session.execute(select(exists().where(Project.project_id == project_id))).scalar_one():
@@ -38,7 +52,7 @@ def _identity_values(identity):
     collected_at = identity.get("collected_at")
     if not isinstance(platform, str) or platform not in ("posix", "nt"):
         raise WorkspaceRegistryError("workspace_identity_invalid")
-    if any(type(value) is not int or value < 0 or value > 2**63 - 1
+    if any(type(value) is not int or value < 0 or value > 2**64 - 1
            for value in (volume_id, file_id)):
         raise WorkspaceRegistryError("workspace_identity_invalid")
     try:
@@ -49,13 +63,19 @@ def _identity_values(identity):
         collected_at = collected_at.astimezone(timezone.utc).replace(tzinfo=None)
     except (ValueError, TypeError, OverflowError):
         raise WorkspaceRegistryError("workspace_identity_invalid") from None
-    return dict(identity_platform=platform, identity_volume_id=volume_id,
-                identity_file_id=file_id, identity_collected_at=collected_at)
+    return dict(identity_platform=platform, identity_volume_id=encode_unsigned_64(volume_id),
+                identity_file_id=encode_unsigned_64(file_id), identity_collected_at=collected_at)
 
 
 def get_registration(session: Session, project_id: str) -> WorkspaceRegistration | None:
     with session.no_autoflush:
-        return session.get(WorkspaceRegistration, project_id, populate_existing=True)
+        row = session.get(WorkspaceRegistration, project_id, populate_existing=True)
+        if row is not None:
+            for name in ("identity_volume_id", "identity_file_id"):
+                value = getattr(row, name)
+                if value is not None:
+                    orm.attributes.set_committed_value(row, name, decode_unsigned_64(value))
+        return row
 
 
 def ensure_registration(session: Session, project_id: str) -> WorkspaceRegistration:

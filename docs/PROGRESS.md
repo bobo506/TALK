@@ -1,5 +1,14 @@
 # Project Progress
 
+## 收工快照（2026-11-12 11:00，W-D1 4a-2 完成）
+
+- **4a-2「重关联编排内核」完成（679→680→681→682/683→684 approved）**：新增 `server/workspace_relink.py`（自持 T1/T2/T3 事务：T1 提交 `started→prepared` 操作行 → 文件 `prepare/commit_batch` 原子替换 → T2 单次提交 `files_staged→committed`、项目根 CAS、`save_identity` revision+1、`completed`；失败 T3 标记 `failed`，回滚失败 `recovery_required` 并带清单）；`server/workspace_registry.py` 支持 `0..2^64-1`（signed wrap，真实卷 ID 可存）、platform 收敛、未登记/冲突错误码区分；`server/db.py` 增加部分唯一索引（同项目仅一个非终态操作，映射 `workspace_busy`）；`workspace_operations.ERROR_CODES` 仅扩充；新增 core 测试 15 项。
+- **验证（684 定向复验 + 682 复核）**：core 15/15；六模块回归（operations/registry/relink_files/diagnostics/diagnostics_api/paths）按 681 自报全绿、684 复核确认代码零改动；`execute_relink` docstring 已按实际契约修正（成功即已提交、不触碰调用方会话）。
+- **4b 必须处理（复核结论）**：① `recovery_required` 属非终态，会阻塞同项目新操作——4b 需给出恢复闭环；② SQLite `busy/locked` 需映射 `workspace_busy`；③ T1 后崩溃/文件已提交但 T2 未提交的窗口用 `list_recoverable` 识别，不可自动还原旧文件内容；④ 本片未接 HTTP、未验真实多进程并发。
+- **提交与推送**：4a-2 五文件 + 文档，随本片推送。
+- **下一步**：**4b**（开放 `POST /api/projects/{id}/workspace-relink` + 预览 token/operation_id/二次确认/忙守卫/仅 human/operator，并收口旧 `PATCH` 根目录与 `ensure` 旁路）；第 5 片页面与真实浏览器验收需用户参与。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 09:40，W-D1 4a-1 完成）
 
 - **4a-1「重关联前置加固」完成（677 Terra / 678 K2.8 approved）**：`server/workspace_relink_files.py` 增 1 MiB 大小上限（`MAX_FILE_BYTES`，读前 `lstat`，payload/既有文件超限均 `workspace_file_too_large`，恰好 1 MiB 允许，失败无临时文件）；`server/workspace_registry.py` 的 `identity_platform` 白名单收敛为 `posix`/`nt`（`windows` → `workspace_identity_invalid`），`save_identity` 未登记行 → `workspace_registration_not_found`（与 revision 冲突区分，均零写入）；两测试文件补边界/错误码用例。

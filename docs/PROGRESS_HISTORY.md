@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-12 11:00 — W-D1 4a-2：重关联编排内核（679–684）
+
+- **679（Terra）partial**：实现 `server/workspace_relink.py`（204 行）+ core 测试（214 行）+ 部分唯一索引 + 错误码白名单；自身 12 项通过，但报 3 个真问题：旧状态机测试与新索引冲突、调用方事务回滚后文件无法原子撤销、本机真实卷 ID 超 2^63−1。
+- **680（返修）partial**：改为内核自持事务（`session_factory`，T1/T2/T3），unsigned 64 signed-wrap，索引/状态机旧测试更新；core 15 项通过、真实身份可存；仅剩旧 `2^63` 非法断言与“接受 2^63”矛盾。
+- **681（返修）complete**：按裁定把旧 `2^63` 反例改 `2^64`（仍断言非法），六模块回归全绿。
+- **682（K2.8 复核）changes_requested**：代码/事务/索引/unsigned/测试改动均通过；唯一 blocking 为 `execute_relink` docstring 仍写“调用方拥有事务”，与实现不符。
+- **683（文档返修）complete**：仅改 docstring（六项契约：内核自持事务、成功即已提交、不触碰调用方会话、幂等、失败补偿、崩溃窗口归 4b），代码零改动。
+- **684（K2.8 定向复验）approved**：docstring 与实现一致、代码零 diff、core 15 项全过、py_compile/UTF-8/diff-check 通过。
+- **结果**：4a-2 五文件（`server/workspace_relink.py` 新、`workspace_registry.py`、`db.py`、`workspace_operations.py`、两个测试文件）入库；679–684 已收取，`submitted=[]`。
+- **限制与 4b 前置**：未开放 HTTP、未验真实多进程；`recovery_required` 会阻塞同项目新操作（4b 需恢复闭环）；SQLite busy/locked 需映射 `workspace_busy`；崩溃窗口文件 receipts 未持久化，不能自动还原旧内容。
+
 ## 2026-11-12 09:40 — W-D1 4a-1：重关联前置加固（677/678）
 
 - **677（Terra，587s）complete**：`server/workspace_relink_files.py` 新增 `MAX_FILE_BYTES = 1 MiB`：`prepare_write` 读前 `lstat` 判既有文件大小、payload 超限、既有文件超限均 `workspace_file_too_large`，恰好 1 MiB 允许，失败清理临时文件；`server/workspace_registry.py` 的 platform 白名单收敛为 `posix`/`nt`（`windows` → `workspace_identity_invalid`），`save_identity` 在未 `ensure_registration` 时抛 `workspace_registration_not_found`（与 `workspace_revision_conflict` 区分，均零写入）；两测试文件补 1 MiB 三例、platform、错误码用例。

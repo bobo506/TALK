@@ -60,8 +60,9 @@ class WorkspaceOperationTests(unittest.TestCase):
         for name in before:
             self.assertEqual(before[name], after[name], name)
         self.assertEqual(after["workspace_operations"][1], [])
-        self.assertEqual([i["name"] for i in inspect(self.engine).get_indexes("workspace_operations")],
-                         ["ix_workspace_operations_project_id"])
+        names = {i["name"] for i in inspect(self.engine).get_indexes("workspace_operations")}
+        self.assertIn("ix_workspace_operations_project_id", names)
+        self.assertIn("ux_workspace_operations_active", names)
         print(f"MIGRATION tables {len(before)} -> {len(after)}; old schema/rows identical; projects=1; new rows=0; repeated init=ok")
 
     def test_begin_idempotence_and_invalid_input(self):
@@ -103,7 +104,10 @@ class WorkspaceOperationTests(unittest.TestCase):
             for index, source in enumerate(operations.CHAIN[:-1]):
                 for target in ("failed", "recovery_required"):
                     op = f"{source}-{target}"
-                    self.begin(s, op)
+                    project = "p-" + op
+                    s.add(Project(project_id=project, display_name=project, maintainer_member_id="human:test"))
+                    s.flush()
+                    self.begin(s, op, project)
                     for a, b in zip(operations.CHAIN[:index], operations.CHAIN[1:index + 1]):
                         advance_stage(s, op, a, b)
                     before = get_operation(s, op).model_dump()
@@ -114,12 +118,16 @@ class WorkspaceOperationTests(unittest.TestCase):
                     self.code("workspace_stage_conflict", advance_stage, s, op, target, "completed")
             for index, stage in enumerate(operations.CHAIN[:-1]):
                 op = f"normal-{stage}"
-                self.begin(s, op)
+                project = "p-" + op
+                s.add(Project(project_id=project, display_name=project, maintainer_member_id="human:test"))
+                s.flush()
+                self.begin(s, op, project)
                 for a, b in zip(operations.CHAIN[:index], operations.CHAIN[1:index + 1]):
                     advance_stage(s, op, a, b)
             before = self.snapshot(s)
             self.assertEqual(before, self.snapshot(s))
-            self.assertEqual(before, [row.model_dump() for row in list_recoverable(s, "p1")])
+            self.assertEqual([row for row in before if row["project_id"] == "p-normal-started"],
+                             [row.model_dump() for row in list_recoverable(s, "p-normal-started")])
             self.assertEqual(list_recoverable(s, "other"), [])
             self.assertEqual(len(before), 8)
             self.assertEqual({row["stage"] for row in before}, set(operations.RECOVERABLE))

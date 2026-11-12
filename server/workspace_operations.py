@@ -15,6 +15,10 @@ from server.models import Project, WorkspaceOperation
 ERROR_CODES = frozenset({
     "workspace_project_not_found", "workspace_operation_conflict",
     "workspace_stage_conflict", "workspace_operation_input_invalid",
+    "workspace_busy", "workspace_file_conflict", "workspace_file_too_large",
+    "workspace_path_refused", "workspace_write_failed", "workspace_revision_conflict",
+    "workspace_registration_not_found", "workspace_identity_invalid",
+    "workspace_identity_unknown", "workspace_recovery_required",
 })
 CHAIN = ("started", "prepared", "files_staged", "committed", "completed")
 RECOVERABLE = (*CHAIN[:-1], "recovery_required")

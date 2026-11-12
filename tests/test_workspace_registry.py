@@ -97,8 +97,8 @@ class WorkspaceRegistryTests(unittest.TestCase):
             s.commit()
             before = get_registration(s, 'p1').model_dump()
             for field, bad in [('platform', 'posix; DROP TABLE projects'), ('platform', None), ('platform', 'windows'),
-                               ('volume_id', True), ('volume_id', -1), ('volume_id', 2**63), ('volume_id', '1'),
-                               ('file_id', False), ('file_id', -1), ('file_id', 2**63), ('file_id', '1'),
+                               ('volume_id', True), ('volume_id', -1), ('volume_id', 2**64), ('volume_id', '1'),
+                               ('file_id', False), ('file_id', -1), ('file_id', 2**64), ('file_id', '1'),
                                ('collected_at', '2026-01-01T00:00:00'), ('collected_at', datetime.now()),
                                ('collected_at', 'invalid')]:
                 with self.subTest(field=field, bad=bad):
@@ -135,6 +135,32 @@ class WorkspaceRegistryTests(unittest.TestCase):
             self.assert_code('workspace_revision_conflict', save_identity, s, 'p1', IDENTITY, 99)
             self.assertEqual(before, get_registration(s, 'p1').model_dump())
             print('REGISTRATION wrong revision -> workspace_revision_conflict; registration unchanged')
+
+    def test_unsigned_boundaries_and_real_identity(self):
+        from server.workspace_registry import encode_unsigned_64, decode_unsigned_64
+        from server.workspace_diagnostics import inspect_root
+        with Session(self.engine) as s:
+            ensure_registration(s, 'p1')
+            s.commit()
+            for revision, value in enumerate((2**63, 2**64 - 1), 1):
+                identity = {**IDENTITY, 'volume_id': value, 'file_id': value}
+                row = save_identity(s, 'p1', identity, revision)
+                self.assertEqual((row.identity_volume_id, row.identity_file_id), (value, value))
+                s.commit()
+                with self.engine.connect() as conn:
+                    stored = conn.exec_driver_sql('SELECT identity_volume_id, identity_file_id FROM workspace_registrations WHERE project_id = ?', ('p1',)).one()
+                self.assertEqual(tuple(stored), (value - 2**64, value - 2**64))
+                self.assertEqual(decode_unsigned_64(encode_unsigned_64(value)), value)
+                self.assertEqual(get_registration(s, 'p1').identity_volume_id, value)
+            self.assert_code('workspace_identity_invalid', encode_unsigned_64, 2**64)
+            self.assert_code('workspace_identity_invalid', save_identity, s, 'p1', {**IDENTITY, 'volume_id': 2**64}, 3)
+            info = inspect_root(self.tmp.name)
+            self.assertEqual(info['status'], 'ok')
+            self.assertIsNotNone(info['identity'])
+            row = save_identity(s, 'p1', info['identity'], 3)
+            s.commit()
+            self.assertEqual(get_registration(s, 'p1').identity_volume_id, info['identity']['volume_id'])
+            print('UNSIGNED 2^63 and 2^64-1 signed wrap roundtrip; 2^64 rejected; real identity volume=', info['identity']['volume_id'])
 
     def test_no_io_in_registry_module(self):
         source = Path('server/workspace_registry.py').read_text(encoding='utf-8')
