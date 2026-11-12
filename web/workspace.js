@@ -253,7 +253,7 @@ function workspaceTaskDurationEl(task) {
   return el;
 }
 function syncTaskListPaginationContext() {
-  const key = myId && activeProjectId && workspaceUI.mode === "tasks" && blackboardOpen
+  const key = myId && activeProjectId && workspaceUI.mode === "tasks" && (blackboardOpen || workspaceTaskChatActive())
     ? JSON.stringify([myId, activeProjectId, workspaceUI.filter, workspaceUI.query]) : null;
   if (key !== taskListPageUI.key) {
     taskListPageUI.key = key;
@@ -263,7 +263,7 @@ function syncTaskListPaginationContext() {
 function syncWorkspaceLayout() {
   // 同步导航与分页上下文。
   syncTaskListPaginationContext();
-  document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
+  document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen || workspaceTaskChatActive());
   document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
   document.getElementById("project-blackboard-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "tasks"));
   document.getElementById("workspace-roles-btn").setAttribute("aria-pressed", String(blackboardOpen && workspaceUI.mode === "roles"));
@@ -273,6 +273,10 @@ function syncWorkspaceLayout() {
   if (typeof roleRequestApp !== "undefined") roleRequestApp?.sync();
 }
 function selectWorkspaceTask(task) {
+  if (workspaceTaskChatActive() && task.hall_group_id) {
+    openTaskHall(task);
+    return;
+  }
   workspaceUI.query = ""; document.getElementById("workspace-search").value = "";
   workspaceUI.mode = "tasks";
   blackboardOpen = true;

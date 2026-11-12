@@ -907,11 +907,14 @@ function setBlackboardOpen(open) {
 function renderWorkspaceMode() {
   syncWorkspaceLayout();
   const conversation = workspaceHasConversation();
-  blackboardView.classList.toggle("hidden", !blackboardOpen);
+  blackboardView.classList.toggle("hidden", !(blackboardOpen || conversation));
   hallHeader.classList.toggle("hidden", !conversation);
   messagesEl.classList.toggle("hidden", !conversation);
   composerFooter.classList.toggle("hidden", !conversation);
+  const tools = document.getElementById("workspace-tools");
+  const listScrollTop = tools.scrollTop;
   renderBlackboard();
+  tools.scrollTop = listScrollTop;
   renderGroupMembersPanel();
   renderTaskHallBrief();
   syncComposerReadOnly();

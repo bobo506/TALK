@@ -249,9 +249,9 @@ test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源
     assert.ok(indexHtml.includes(`/${asset}?v=${STATIC_VERSION}`), `${asset} 保留原缓存版本`);
   }
   assert.ok(indexHtml.includes('/role-creation.css?v=20261029-theme-day-night-v1'), '本次 role-creation.css 更新缓存版本');
-  assert.ok(indexHtml.includes('/style.css?v=20261112-hall-only'));
-  assert.ok(indexHtml.includes('/app.js?v=20261112-hall-only'));
-  assert.ok(indexHtml.includes('/workspace.js?v=20261112-hall-only'), '本次 workspace.js 更新缓存版本');
+  assert.ok(indexHtml.includes('/style.css?v=20261112-hall-split'));
+  assert.ok(indexHtml.includes('/app.js?v=20261112-hall-split'));
+  assert.ok(indexHtml.includes('/workspace.js?v=20261112-hall-split'), '本次 workspace.js 更新缓存版本');
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 

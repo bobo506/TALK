@@ -1976,16 +1976,13 @@ pre {
   }
 }
 
-/* 任务 Hall 保留紧凑导航，消息区使用剩余宽度。 */
-.workbench.task-chat-mode.task-chat-mode { grid-template-columns: 150px minmax(0, 1fr); }
-.task-chat-mode.task-chat-mode .workspace-tools { padding: 16px 10px; }
-@media (max-width: 700px) {
-  .workbench.task-chat-mode.task-chat-mode { min-width: 0; }
-  .task-chat-mode.task-chat-mode .workspace-tools { max-height: none; }
-  .task-chat-mode.task-chat-mode .timeline-workspace { min-width: 0; }
+/* 沿用项目模式的列表列宽与样式，在右侧显示 Hall。 */
+.workbench.project-mode.task-chat-mode { grid-template-columns: minmax(270px, 32%) minmax(0, 1fr); }
+.workbench.project-mode.task-chat-mode .timeline-workspace { display: flex; }
+.workbench.project-mode.task-chat-mode .details-panel { display: none; }
+@media (max-width: 1000px) {
+  .workbench.project-mode.task-chat-mode { grid-template-columns: 280px minmax(0, 1fr); }
 }
-
-.task-chat-mode.task-chat-mode .workspace-tabs { gap: 8px; flex-wrap: wrap; }
-.task-chat-mode.task-chat-mode .workspace-tabs > button { font-size: 16px; }
-
-@media (max-width: 980px) { .workbench.task-chat-mode.task-chat-mode { min-width: 0; } }
+@media (max-width: 700px) {
+  .workbench.project-mode.task-chat-mode .timeline-workspace { width: 100%; height: 75vh; min-height: 480px; flex: none; }
+}
