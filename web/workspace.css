@@ -326,3 +326,21 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
   .workbuddy-debug-command { padding:12px; font-size:14px; }
   .workbuddy-debug-footer .room-primary-btn { width:100%; }
 }
+
+/* 工作区诊断与重新选择目录：限定在对应面板和弹窗内。 */
+#workspace-diagnostics-panel {color:var(--text); margin-bottom:36px; padding-bottom:30px; border-bottom:1px solid var(--line);}
+#workspace-diagnostics-panel .sidebar-kicker {font-size:13px; color:var(--muted-strong); margin:0 0 10px;}
+#workspace-diagnostics-panel h3 {font-size:24px; font-weight:650; color:var(--text); margin:0;}
+#workspace-diagnostics-panel .workspace-diagnostics-group {margin-top:16px;}
+#workspace-diagnostics-panel .workspace-diagnostics-status {font-size:14px; line-height:1.6; color:var(--muted-strong); margin:0 0 8px;}
+#workspace-diagnostics-panel .requirements-toolbar {gap:12px; margin-top:10px;}
+@media(max-width:700px) {#workspace-diagnostics-panel h3 {font-size:20px;}}
+.workspace-relink-card {width:min(500px, 94vw); padding:20px;}
+.workspace-relink-card .modal-header {margin-bottom:10px;}
+.workspace-relink-card .modal-header h3 {margin:0; font-size:var(--font-section);}
+.workspace-relink-description {font-size:var(--font-body); line-height:1.6; color:var(--muted-strong); margin:0 0 16px;}
+.workspace-relink-field {min-width:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--card-soft); padding:8px 12px;}
+.workspace-relink-label {font-size:var(--font-control); font-weight:600; color:var(--muted-strong); margin-bottom:8px;}
+.workspace-relink-value {font-size:var(--font-body); color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.workspace-relink-error {font-size:var(--font-body); color:var(--red); margin:10px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.workspace-relink-card .group-create-footer {justify-content:flex-end; gap:8px; margin-top:16px;}

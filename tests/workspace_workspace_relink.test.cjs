@@ -44,7 +44,7 @@ async function ready(h) {
 }
 function parts(h) {
   const modal = h.open();
-  return { modal, selected: modal.children[1], error: modal.children[2], browse: modal.children[3].children[0], confirm: modal.children[3].children[1], cancel: modal.children[3].children[2] };
+  return { modal, selected: modal.children[2].children[1], error: modal.children[3], browse: modal.children[4].children[0], confirm: modal.children[4].children[1], cancel: modal.children[4].children[2] };
 }
 async function choose(h, d, path = 'C:\\picked') {
   d.browse.fire('click'); const i = h.requests.length - 1; h.reply(i, { path }); await h.flush();
@@ -52,15 +52,26 @@ async function choose(h, d, path = 'C:\\picked') {
 const success = { candidate_root: 'C:\\normalized', preview_token: 'tok', expected_revision: 3, blocked_reasons: [] };
 test('真人面板样式与入口；Agent 不显示', async () => {
   const h = harness(); await ready(h); assert.ok(h.find(h.panel, '重新选择该项目的目录'));
-  assert.equal(h.panel.children[0].tagName, 'div'); assert.match(h.panel.attrs.style, /border-bottom/);
-  assert.ok(h.panel.children.at(-1).classList.contains('requirements-toolbar'));
+  const heading = h.panel.children[0].children[0];
+  assert.equal(heading.children[0].tagName, 'p'); assert.ok(heading.children[0].classList.contains('sidebar-kicker')); assert.equal(heading.children[0].textContent, '项目级 · 本机目录');
+  assert.equal(heading.children[1].tagName, 'h3'); assert.equal(heading.children[1].textContent, '工作区');
+  const group = h.panel.children[1]; assert.ok(group.classList.contains('workspace-diagnostics-group'));
+  assert.equal(group.children[0].textContent, '目录状态：不存在'); assert.ok(group.children[0].classList.contains('workspace-diagnostics-status'));
+  assert.ok(group.children.at(-1).classList.contains('requirements-toolbar')); assert.ok(h.find(group, '重新选择该项目的目录').classList.contains('room-secondary-btn'));
   const a = harness(false); a.ctx.renderWorkspaceDiagnosticsPanel(); assert.equal(a.requests.length, 0); assert.ok(a.panel.classList.contains('hidden'));
 });
 test('对话框只有说明、已选、错误和三个按钮，焦点循环及恢复', async () => {
   const h = harness(); await ready(h); const opener = h.find(h.panel, '重新选择该项目的目录'); opener.focus();
-  const d = parts(h); assert.deepEqual(d.modal.children.map(n => n.tagName), ['h3', 'p', 'p', 'div']);
-  assert.deepEqual(d.modal.children[3].children.map(n => n.textContent), ['浏览', '确认', '取消']);
-  assert.equal(d.selected.textContent, '尚未选择'); assert.ok(d.error.classList.contains('hidden')); assert.equal(d.confirm.disabled, true);
+  const d = parts(h); assert.ok(h.document.body.children[0].classList.contains('modal-overlay')); assert.ok(d.modal.classList.contains('modal-card')); assert.ok(d.modal.classList.contains('workspace-relink-card'));
+  assert.deepEqual(d.modal.children.map(n => n.tagName), ['div', 'p', 'div', 'p', 'div']);
+  assert.ok(d.modal.children[0].classList.contains('modal-header')); assert.equal(d.modal.children[0].children[0].tagName, 'h3'); assert.equal(d.modal.children[0].children[0].textContent, '重新选择该项目的目录');
+  assert.equal(d.modal.children[1].textContent, '选择该项目被移动或改名后的目录；不会移动文件、不会合并历史。');
+  assert.ok(d.modal.children[2].classList.contains('workspace-relink-field')); assert.equal(d.modal.children[2].children[0].textContent, '已选目录');
+  assert.ok(d.modal.children[4].classList.contains('group-create-footer')); assert.deepEqual(d.modal.children[4].children.map(n => n.textContent), ['浏览', '确认', '取消']);
+  assert.ok(d.browse.classList.contains('room-secondary-btn')); assert.ok(d.confirm.classList.contains('room-primary-btn')); assert.ok(d.cancel.classList.contains('room-secondary-btn'));
+  assert.equal(d.selected.textContent, '尚未选择'); assert.ok(d.error.classList.contains('workspace-relink-error')); assert.equal(d.error.attrs.role, 'alert'); assert.ok(d.error.classList.contains('hidden')); assert.equal(d.confirm.disabled, true);
+  const descendants = node => [node, ...node.children.flatMap(descendants)];
+  assert.equal(descendants(d.modal).filter(n => n.tagName === 'button').length, 3); assert.ok(!descendants(d.modal).some(n => ['input', 'textarea'].includes(n.tagName)));
   assert.doesNotMatch(h.text(d.modal), /检查目录|预览/); assert.equal(h.document.activeElement, d.browse);
   let prevented = false; h.events.keydown[0]({ key: 'Tab', shiftKey: true, preventDefault() { prevented = true; } });
   assert.equal(prevented, true); assert.equal(h.document.activeElement, d.cancel);
@@ -75,7 +86,7 @@ test('浏览成功回填、取消不改且传上次选择，picker 错误只显�
 });
 test('确认先 preview 后 relink，使用服务端返回值并防重复，成功关闭刷新', async () => {
   const h = harness(); await ready(h); const d = parts(h); await choose(h, d);
-  d.confirm.fire('click'); d.confirm.fire('click'); assert.equal(h.requests.length, 3); assert.match(h.requests[2].url, /workspace-relink-preview$/);
+  d.confirm.fire('click'); assert.equal(d.browse.disabled, true); assert.equal(d.confirm.disabled, true); assert.equal(d.cancel.disabled, true); d.confirm.fire('click'); assert.equal(h.requests.length, 3); assert.match(h.requests[2].url, /workspace-relink-preview$/);
   assert.deepEqual(JSON.parse(h.requests[2].opts.body), { candidate_root: 'C:\\picked' });
   h.reply(2, { ...success, private: 'SECRET' }); await h.flush(); assert.match(h.requests[3].url, /workspace-relink$/);
   assert.deepEqual(JSON.parse(h.requests[3].opts.body), { candidate_root: 'C:\\normalized', preview_token: 'tok', expected_revision: 3, operation_id: 'op-123', confirm: true });

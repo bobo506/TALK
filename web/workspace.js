@@ -354,27 +354,25 @@ function drawWorkspaceDiagnostics() {
   const panel = document.getElementById("workspace-diagnostics-panel");
   if (!panel || !workspaceDiagnosticVisible()) return;
   panel.replaceChildren();
-  panel.setAttribute("style", "color:var(--text);margin-bottom:36px;padding-bottom:30px;border-bottom:1px solid var(--line)");
   const heading = workspaceEl("div", "requirements-heading"), headingBody = workspaceEl("div", "");
-  const kicker = workspaceEl("div", "sidebar-kicker", "项目级 · 本机目录");
-  kicker.setAttribute("style", "font-size:14px;color:var(--muted-strong);margin-bottom:10px");
+  const kicker = workspaceEl("p", "sidebar-kicker", "项目级 · 本机目录");
   const title = workspaceEl("h3", "", "工作区");
-  title.setAttribute("style", "font-size:clamp(20px, 3vw, 24px);font-weight:650;color:var(--text);margin:0");
   headingBody.append(kicker, title); heading.appendChild(headingBody); panel.appendChild(heading);
+  const group = workspaceEl("div", "workspace-diagnostics-group");
   const data = workspaceDiagnosticUI.data;
-  if (workspaceDiagnosticUI.error) panel.appendChild(workspaceEl("p", "", workspaceDiagnosticUI.error));
-  else if (!data) panel.appendChild(workspaceEl("p", "", "正在读取工作区诊断…"));
+  if (workspaceDiagnosticUI.error) group.appendChild(workspaceEl("p", "workspace-diagnostics-status", workspaceDiagnosticUI.error));
+  else if (!data) group.appendChild(workspaceEl("p", "workspace-diagnostics-status", "正在读取工作区诊断…"));
   else {
-    panel.appendChild(workspaceEl("p", "", `目录状态：${WORKSPACE_ROOT_STATUS[data.root_status] || "未知"}`));
-    for (const issue of Array.isArray(data.issues) ? data.issues : []) panel.appendChild(workspaceEl("p", "", workspaceDiagnosticMessage(issue?.code)));
-    if (Array.isArray(data.duplicate_projects) && data.duplicate_projects.length) panel.appendChild(workspaceEl("p", "", "警告：工作区目录与其他项目重复。"));
-    if (data.duplicate_check === "unknown") panel.appendChild(workspaceEl("p", "", "部分项目目录无法核验，重复检查未完成。"));
+    group.appendChild(workspaceEl("p", "workspace-diagnostics-status", `目录状态：${WORKSPACE_ROOT_STATUS[data.root_status] || "未知"}`));
+    for (const issue of Array.isArray(data.issues) ? data.issues : []) group.appendChild(workspaceEl("p", "workspace-diagnostics-status", workspaceDiagnosticMessage(issue?.code)));
+    if (Array.isArray(data.duplicate_projects) && data.duplicate_projects.length) group.appendChild(workspaceEl("p", "workspace-diagnostics-status", "警告：工作区目录与其他项目重复。"));
+    if (data.duplicate_check === "unknown") group.appendChild(workspaceEl("p", "workspace-diagnostics-status", "部分项目目录无法核验，重复检查未完成。"));
   }
   const open = workspaceButton("重新选择该项目的目录", () => openWorkspaceRelinkDialog(), "room-secondary-btn");
   open.id = "workspace-relink-open";
   const toolbar = workspaceEl("div", "requirements-toolbar"); toolbar.appendChild(open);
   if (workspaceDiagnosticUI.error) toolbar.appendChild(workspaceButton("重试诊断", () => loadWorkspaceDiagnostics(), "workspace-text-button"));
-  panel.appendChild(toolbar);
+  group.appendChild(toolbar); panel.appendChild(group);
 }
 async function loadWorkspaceDiagnostics() {
   if (!workspaceDiagnosticVisible()) return;
@@ -405,18 +403,21 @@ function workspaceRelinkOperationId() {
 function openWorkspaceRelinkDialog() {
   if (!workspaceDiagnosticVisible() || workspaceDiagnosticUI.dialog) return;
   const project = activeProjectId, member = myId, previousFocus = document.activeElement;
-  const overlay = workspaceEl("div", "modal-overlay"), panel = workspaceEl("div", "modal-card");
+  const overlay = workspaceEl("div", "modal-overlay"), panel = workspaceEl("div", "modal-card workspace-relink-card");
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true"); panel.setAttribute("aria-label", "重新选择该项目的目录");
-  const title = workspaceEl("h3", "", "重新选择该项目的目录");
-  const selected = workspaceEl("p", "requirements-hint", "尚未选择");
-  selected.setAttribute("style", "overflow:hidden;text-overflow:ellipsis;white-space:nowrap");
-  const error = workspaceEl("p", "requirements-status error hidden", ""); error.setAttribute("role", "alert");
-  error.setAttribute("style", "overflow:hidden;text-overflow:ellipsis;white-space:nowrap");
+  const header = workspaceEl("div", "modal-header");
+  header.appendChild(workspaceEl("h3", "", "重新选择该项目的目录"));
+  const description = workspaceEl("p", "workspace-relink-description", "选择该项目被移动或改名后的目录；不会移动文件、不会合并历史。");
+  const field = workspaceEl("div", "workspace-relink-field");
+  const label = workspaceEl("div", "workspace-relink-label", "已选目录");
+  const selected = workspaceEl("div", "workspace-relink-value", "尚未选择");
+  field.append(label, selected);
+  const error = workspaceEl("p", "workspace-relink-error hidden", ""); error.setAttribute("role", "alert");
   const browse = workspaceButton("浏览", () => pick(), "room-secondary-btn");
   const confirm = workspaceButton("确认", () => submit(), "room-primary-btn");
   const cancel = workspaceButton("取消", () => close(), "room-secondary-btn");
-  const toolbar = workspaceEl("div", "requirements-toolbar"); toolbar.append(browse, confirm, cancel);
-  panel.append(title, selected, error, toolbar); overlay.appendChild(panel); document.body.appendChild(overlay);
+  const footer = workspaceEl("div", "group-create-footer"); footer.append(browse, confirm, cancel);
+  panel.append(header, description, field, error, footer); overlay.appendChild(panel); document.body.appendChild(overlay);
   let path = null, busy = false, closed = false;
   const current = () => !closed && project === activeProjectId && member === myId && workspaceDiagnosticVisible();
   function controls() { browse.disabled = busy; confirm.disabled = busy || !path; cancel.disabled = busy; }
