@@ -1,5 +1,13 @@
 # Project Progress
 
+## 收工快照（2026-11-12 15:20，W-D1 4b 已部署）
+
+- **4b 已部署**：`reload-api` → 新 API child；`runtime stop --wait` → `serve --apply --detach` 重启（runtime `2836`、API `9684`、`startup_state=complete`）。OpenAPI 已包含 `/api/projects/{project_id}/workspace-relink` 与 `-preview`；重启后按原意图用 `start-all` 恢复 Terra（`ins_1420fe4c3fd2`，gen 68）与 K2.8（`ins_bf27f457e619`，gen 69），均 `running/ready`；`/healthz` ok、`submitted=[]`。证据 `.tmp/deploy-4b/`。
+- **4b 收口**：4b-1（入口/令牌/PATCH/ensure 收口）+ 4b-2（领取/启动/自动启动守卫与串行化）均 approved 并推送（`82b0290`、`c96a6f7`）；部署记录随本快照提交。
+- **残余（非阻断）**：claim/start 在 SQLite busy timeout 时可能 500（既有）；自动启动跳过会保留 `desired=running/observed=stopped` 至下次 reconcile；真实多进程未验。
+- **下一步**：第 5 片「页面入口与真实场景」——项目设置中的工作区诊断/“重新关联已有目录”流程（预览→二次确认→结果），真实浏览器验收需用户参与。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 15:00，W-D1 4b 完成）
 
 - **4b-2「重关联/领取串行化与守卫」完成（690 blocked→691 扩权返修→692 K2.8 approved）**：新增 `server/workspace_relink_guard.py`；`execute_relink` 在 **T1 写事务内**复检角色/任务/活动操作，忙则回滚 T1（无操作行）；`claim`、`start`、`start-all`、自动启动路径全部接入守卫（检查在各自写事务内），稳定码 `workspace_busy`/`workspace_recovery_required`；SQLite 写锁串行化。

@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-12 15:20 — W-D1 4b 部署（API reload + runtime 重启）
+
+- **部署前**：`/healthz` ok、无 queued/running 任务、无 submitted、Terra/K2.8 running 且 idle；记录现场 `.tmp/deploy-4b/pre-state.json`。
+- **API reload**：`talk_runtime reload-api --apply` → API child 由 `14296` 变为 `10024`，OpenAPI 出现 `/workspace-relink` 与 `-preview`，`/healthz` ok。
+- **runtime 重启**：`talk_runtime stop --apply --wait --wait-seconds 300` → `stop_status=stopped`、`process_state=absent`、端口关闭；`serve --apply --detach` → runtime `2836`、API child `9684`、`startup_state=complete`；宿主全部 serving。
+- **角色恢复**：重启后角色为 stopped；以本机 operator（trusted，无 Key）调用 `start-all` 恢复 Terra（`ins_1420fe4c3fd2`，gen 68）与 K2.8（`ins_bf27f457e619`，gen 69），均 `running/ready`；`/healthz` ok、`submitted=[]`。
+- **注意**：`start-all` 用 Agent Key 调会 403（只允许 human/operator）；trusted 模式 loopback 不带 Key 即为 operator。
+- 证据：`.tmp/deploy-4b/{pre-state,post-state,deploy-result}.json`。
+
 ## 2026-11-12 15:00 — W-D1 4b-2：重关联/领取串行化与守卫（690/691/692）
 
 - **690（Terra）blocked**：白名单只允许改守卫模块与入口，但复现出真实竞态——路由忙预检提交后、内核建操作前，claim 可成功（200/running）且 relink 仍完成；修复必须改 `workspace_relink.py` 在 T1 内复检。未写产品代码。
