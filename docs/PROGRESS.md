@@ -1,5 +1,12 @@
 # Project Progress
 
+## 暂停现场（2026-11-12 13:30，用户外出前要求停止）
+
+- **4b-1 未完成**：687 partial 已收取（8 文件改动在**工作区未提交**，含 models/db/routes/workspace_relink/两个测试）；688（relink 成功响应返回真实项目根的返修）已派发并长时间 `running`（instance `ins_6e14fc7eddc9`），结果未收取；等待 job 已超时退出。
+- **当前代码状态**：工作区含 4b-1 候选 + 688 在途改动，均**未提交**；生产服务未重启、未部署、未改生产数据、未接任务领取/角色启动守卫（4b-2 未做）。
+- **恢复顺序**：① 先确认 688 是否仍在活动（有进展就等/重启等待 job，无进展按最小范围终止并记 failed）；② 收取 687/688，核对返回根合同；③ 派独立复核（689）→ 收取 → 入库推送；④ 再做 4b-2（任务领取/角色启动/恢复态守卫 + 并发 E2E）；⑤ 最后第 5 片页面与真实浏览器验收。
+- **不要**：在 4b-2 完成前部署 4b-1 到生产。
+
 ## 收工快照（2026-11-12 11:00，W-D1 4a-2 完成）
 
 - **4a-2「重关联编排内核」完成（679→680→681→682/683→684 approved）**：新增 `server/workspace_relink.py`（自持 T1/T2/T3 事务：T1 提交 `started→prepared` 操作行 → 文件 `prepare/commit_batch` 原子替换 → T2 单次提交 `files_staged→committed`、项目根 CAS、`save_identity` revision+1、`completed`；失败 T3 标记 `failed`，回滚失败 `recovery_required` 并带清单）；`server/workspace_registry.py` 支持 `0..2^64-1`（signed wrap，真实卷 ID 可存）、platform 收敛、未登记/冲突错误码区分；`server/db.py` 增加部分唯一索引（同项目仅一个非终态操作，映射 `workspace_busy`）；`workspace_operations.ERROR_CODES` 仅扩充；新增 core 测试 15 项。
