@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-13 02:40 — 第 12 项修复：异常退出后的选择性自启动与恢复（P0/P1a/P1b/P2）
+
+- **P0（717 开发 / 718 复核 approved，`44f3fd1`）**：`_release_dead_running` 仅在本地可证明死亡（owner host、pid、process_started_at、instance/launch 身份、无任务/租约/活动 launch）时释放 stale running；`_snapshot` 手动意图改为“人工 actor + intent 时间”，不再由 observed 心跳触发；启动激活与 start-all 接入；禁用偏好 → `startup_not_selected`，活进程仍 `skipped_running`。新增 `tests/test_role_startup_stale_recovery.py`。
+- **P1a（719/720 approved，`e75a19f`；725/726 修正，`a200999`）**：runtime `reconcile_hosts` 对健康文件 present 的非 self.hosts 宿主做 argv 归属证明；**服务中（running/starting/stopping 或 ready）宿主不杀**，标 `external_manager/orphan_host_serving`；非运行态才受控终止并重新拉起；证明失败 `recovery_required/orphan_host_unverified`。
+- **P1b（721/722 approved，`8f776d8`）**：`workspaceRoleStartupPanel` 显示精确原因，未恢复用户已移除的通用旧文案；测试覆盖 skipped/failed/running 场景。
+- **P2（723/724 approved，`288ad05`）**：过期租约+死实例的 requeue/instance error/CAS 验证，最小修复；未过期不提前抢占；与角色启动阻断的交互已确认。
+- **真实验证**：全杀（含宿主）→ 重启自动恢复 Terra/K2.8（最终 gen78/74，running/ready）；只杀 runtime/API 保留宿主时，修正前 P1a 误杀服务中 Terra 宿主（recover-stopped 恢复），修正后宿主保留并标 `orphan_host_serving`，角色不中断。
+- **限制**：P2 未做真实“长任务运行中 kill”；P1b 视觉验收待用户；K2.8 旧宿主已被替换为受管实例。
+
 ## 2026-11-12 23:40 — 第 12 项审计：异常退出后的选择性自启动与恢复（受控 kill）
 
 - **方法**：生产空闲窗口（无运行任务）设 Terra 启动偏好 enabled、K2.8 disabled，强制 kill runtime 树后重启；716 合成审计（未做实栈/kill，partial）仅作参考。
