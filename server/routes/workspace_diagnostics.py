@@ -156,7 +156,8 @@ def preview(project_id: str, body: Any = Body(...), current: Member = Depends(_h
                                  expected_revision=revision, created_at=now, expires_at=now + timedelta(minutes=10))
     session.add(row)
     session.commit()
-    report.update(preview_token=row.token, expires_at=(now + timedelta(minutes=10)).isoformat(), expected_revision=revision)
+    report.update(preview_token=row.token, expires_at=(now + timedelta(minutes=10)).isoformat(), expected_revision=revision,
+                  candidate_root=candidate_root)
     return report
 
 

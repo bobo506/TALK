@@ -312,6 +312,163 @@ function workspaceTaskRow(task) {
   button.appendChild(meta);
   return button;
 }
+// 工作区诊断仅显示已知状态码，避免把服务端异常或私有配置回显到页面。
+const workspaceDiagnosticUI = { key: null, request: 0, data: null, error: "", dialog: null };
+const WORKSPACE_MESSAGES = {
+  workspace_root_unconfigured: "未配置工作区目录", workspace_root_invalid: "目录无效",
+  workspace_root_missing: "目录不存在", workspace_root_inaccessible: "目录不可访问",
+  workspace_duplicate: "目录与其他项目重复", workspace_identity_unknown: "无法确认目录身份",
+  workspace_marker_conflict: "目录标记属于其他项目", workspace_identity_unverified: "无法确认与原目录的关系",
+  workspace_move_candidate: "目录身份与原目录一致", workspace_busy: "项目有正在进行的操作或任务",
+  workspace_preview_stale: "预览已过期或目录状态已改变", workspace_revision_conflict: "工作区版本已改变",
+  workspace_operation_conflict: "操作标识发生冲突", workspace_recovery_required: "工作区需要恢复处理",
+  workspace_binding_invalid: "运行配置无效", workspace_file_conflict: "目录中的配置存在冲突",
+  workspace_file_too_large: "关联文件过大", workspace_path_refused: "目录不符合安全要求",
+  workspace_write_failed: "写入失败", workspace_stage_conflict: "操作状态已改变",
+  workspace_operation_input_invalid: "请求参数无效", workspace_registration_not_found: "工作区登记不存在",
+  workspace_project_not_found: "项目不存在", workspace_identity_invalid: "目录身份无效"
+};
+const WORKSPACE_ROOT_STATUS = { ok: "正常", unconfigured: "未配置", invalid: "无效", missing: "不存在", inaccessible: "无法访问", unknown: "未知" };
+function workspaceDiagnosticMessage(code) { return WORKSPACE_MESSAGES[code] || "无法确认工作区状态"; }
+function workspaceDiagnosticVisible() {
+  return Boolean(blackboardOpen && workspaceUI.mode === "roles" && workspaceSettingsSelected() && activeProjectId && myId && currentMemberIsHuman());
+}
+function renderWorkspaceDiagnosticsPanel() {
+  const panel = document.getElementById("workspace-diagnostics-panel");
+  if (!panel || panel.tagName !== "SECTION") return;
+  const visible = workspaceDiagnosticVisible();
+  panel.classList.toggle("hidden", !visible);
+  const key = visible ? JSON.stringify([activeProjectId, myId]) : null;
+  if (key !== workspaceDiagnosticUI.key) {
+    ++workspaceDiagnosticUI.request;
+    if (workspaceDiagnosticUI.dialog) workspaceDiagnosticUI.dialog.close(true);
+    Object.assign(workspaceDiagnosticUI, { key, data: null, error: "" });
+    if (key) loadWorkspaceDiagnostics();
+  }
+  if (visible) drawWorkspaceDiagnostics();
+}
+function drawWorkspaceDiagnostics() {
+  const panel = document.getElementById("workspace-diagnostics-panel");
+  if (!panel || !workspaceDiagnosticVisible()) return;
+  panel.replaceChildren();
+  panel.appendChild(workspaceEl("h3", "", "工作区"));
+  const data = workspaceDiagnosticUI.data;
+  if (workspaceDiagnosticUI.error) panel.appendChild(workspaceEl("p", "", workspaceDiagnosticUI.error));
+  else if (!data) panel.appendChild(workspaceEl("p", "", "正在读取工作区诊断…"));
+  else {
+    panel.appendChild(workspaceEl("p", "", `目录状态：${WORKSPACE_ROOT_STATUS[data.root_status] || "未知"}`));
+    for (const issue of Array.isArray(data.issues) ? data.issues : []) panel.appendChild(workspaceEl("p", "", workspaceDiagnosticMessage(issue?.code)));
+    if (Array.isArray(data.duplicate_projects) && data.duplicate_projects.length) panel.appendChild(workspaceEl("p", "", "警告：工作区目录与其他项目重复。"));
+    if (data.duplicate_check === "unknown") panel.appendChild(workspaceEl("p", "", "部分项目目录无法核验，重复检查未完成。"));
+  }
+  const open = workspaceButton("重新关联已有目录", () => openWorkspaceRelinkDialog(), "room-secondary-btn");
+  open.id = "workspace-relink-open";
+  panel.appendChild(open);
+  if (workspaceDiagnosticUI.error) panel.appendChild(workspaceButton("重试诊断", () => loadWorkspaceDiagnostics(), "workspace-text-button"));
+}
+async function loadWorkspaceDiagnostics() {
+  if (!workspaceDiagnosticVisible()) return;
+  const key = workspaceDiagnosticUI.key, project = activeProjectId, request = ++workspaceDiagnosticUI.request;
+  workspaceDiagnosticUI.error = ""; workspaceDiagnosticUI.data = null; drawWorkspaceDiagnostics();
+  try {
+    const res = await apiFetch(`/api/projects/${encodeURIComponent(project)}/workspace-diagnostics`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (request !== workspaceDiagnosticUI.request || key !== workspaceDiagnosticUI.key) return;
+    workspaceDiagnosticUI.data = data;
+  } catch (_) {
+    if (request !== workspaceDiagnosticUI.request || key !== workspaceDiagnosticUI.key) return;
+    workspaceDiagnosticUI.error = "工作区诊断读取失败，请重试。";
+  }
+  drawWorkspaceDiagnostics();
+}
+function workspaceRelinkPathValid(value) {
+  return typeof value === "string" && value.length <= 32767 && !value.includes("\0") &&
+    (/^[a-zA-Z]:[\\/]/.test(value) || /^\\\\[^\\/]+[\\/][^\\/]+(?:[\\/]|$)/.test(value));
+}
+function workspaceRelinkOperationId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+function openWorkspaceRelinkDialog() {
+  if (!workspaceDiagnosticVisible() || workspaceDiagnosticUI.dialog) return;
+  const project = activeProjectId, member = myId, previousFocus = document.activeElement;
+  const overlay = workspaceEl("div", "modal-overlay"), panel = workspaceEl("div", "modal-card");
+  panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true"); panel.setAttribute("aria-label", "重新关联已有目录");
+  const header = workspaceEl("div", "modal-header"), title = workspaceEl("h3", "", "重新关联已有目录");
+  const closeButton = workspaceButton("×", () => close(), "modal-close"); closeButton.setAttribute("aria-label", "关闭");
+  header.append(title, closeButton);
+  const hint = workspaceEl("p", "", "不移动文件、不合并历史、不启动任务；旧目录只读保留，生效需重启 runtime。请先检查目录。");
+  const label = workspaceEl("label", "", "已有目录的绝对路径");
+  const input = workspaceEl("input", "profile-textarea"); input.type = "text"; input.autocomplete = "off"; label.appendChild(input);
+  const status = workspaceEl("p", "", ""); status.setAttribute("role", "status");
+  const check = workspaceButton("检查目录", () => preview(), "room-secondary-btn");
+  const confirm = workspaceButton("确认重新关联", () => submit(), "room-primary-btn"); confirm.disabled = true;
+  const cancel = workspaceButton("取消", () => close(), "room-secondary-btn");
+  panel.append(header, hint, label, status, check, confirm, cancel); overlay.appendChild(panel); document.body.appendChild(overlay);
+  let ticket = null, busy = false, closed = false, sequence = 0;
+  const current = () => !closed && project === activeProjectId && member === myId && workspaceDiagnosticVisible();
+  function controls() { check.disabled = busy; confirm.disabled = busy || !ticket; input.disabled = busy; closeButton.disabled = busy; cancel.disabled = busy; }
+  function close(force = false) {
+    if (busy && force !== true) return;
+    closed = true; ++sequence; document.removeEventListener("keydown", onKey); overlay.remove();
+    if (workspaceDiagnosticUI.dialog?.overlay === overlay) workspaceDiagnosticUI.dialog = null;
+    const focusTarget = previousFocus?.isConnected === false ? document.getElementById("workspace-relink-open") : previousFocus;
+    if (focusTarget && typeof focusTarget.focus === "function") focusTarget.focus();
+  }
+  function onKey(event) {
+    if (event.key === "Escape") { event.preventDefault(); close(); return; }
+    if (event.key !== "Tab") return;
+    const items = [closeButton, input, check, confirm, cancel].filter(item => !item.disabled);
+    if (!items.length) { event.preventDefault(); return; }
+    const index = items.indexOf(document.activeElement);
+    if (index < 0 || (event.shiftKey && index === 0) || (!event.shiftKey && index === items.length - 1)) {
+      event.preventDefault(); items[event.shiftKey ? items.length - 1 : 0].focus();
+    }
+  }
+  overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
+  input.addEventListener("input", () => { ticket = null; ++sequence; status.textContent = ""; controls(); });
+  async function preview() {
+    if (busy || !current()) return;
+    ticket = null; controls();
+    if (!workspaceRelinkPathValid(input.value)) { status.textContent = "请输入有效的绝对目录路径（盘符或 UNC），且不能包含 NUL 或超过长度限制。"; return; }
+    busy = true; controls(); status.textContent = "正在检查目录…"; const request = ++sequence;
+    try {
+      const res = await apiFetch(`/api/projects/${encodeURIComponent(project)}/workspace-relink-preview`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidate_root: input.value }) });
+      const data = await res.json();
+      if (!current() || request !== sequence) return;
+      if (!res.ok) {
+        const reasons = Array.isArray(data.blocked_reasons) ? data.blocked_reasons.map(item => workspaceDiagnosticMessage(item?.code)) : [workspaceDiagnosticMessage(data.detail)];
+        status.textContent = `无法重新关联：${reasons.join("；")}。请重新检查。`; return;
+      }
+      if (!workspaceRelinkPathValid(data.candidate_root) || typeof data.preview_token !== "string" || !data.preview_token || !Number.isSafeInteger(data.expected_revision)) throw new Error();
+      const operationId = workspaceRelinkOperationId();
+      ticket = { candidate_root: data.candidate_root, preview_token: data.preview_token, expected_revision: data.expected_revision, operation_id: operationId };
+      const reasons = Array.isArray(data.blocked_reasons) ? data.blocked_reasons.map(item => workspaceDiagnosticMessage(item?.code)) : [];
+      if (reasons.length) { ticket = null; status.textContent = `无法重新关联：${reasons.join("；")}。`; return; }
+      status.textContent = `将要登记的新根：${data.candidate_root}。目录状态：${WORKSPACE_ROOT_STATUS[data.candidate_status] || "未知"}；评估：${workspaceDiagnosticMessage(data.code)}。`;
+    } catch (_) { if (current() && request === sequence) status.textContent = "目录检查失败，请重试。"; }
+    finally { busy = false; if (!closed) controls(); }
+  }
+  async function submit() {
+    if (busy || !ticket || !current()) return;
+    busy = true; controls(); status.textContent = "正在重新关联…";
+    try {
+      const res = await apiFetch(`/api/projects/${encodeURIComponent(project)}/workspace-relink`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...ticket, confirm: true }) });
+      const data = await res.json();
+      if (!current()) return;
+      ticket = null;
+      if (!res.ok) { status.textContent = `重新关联失败：${workspaceDiagnosticMessage(data.detail)}。请重新检查目录。`; return; }
+      status.textContent = "重新关联成功。生效需重启 runtime。";
+      loadWorkspaceDiagnostics();
+    } catch (_) { if (current()) { ticket = null; status.textContent = "重新关联结果未能确认，请重新检查目录。"; } }
+    finally { busy = false; if (!closed) controls(); }
+  }
+  workspaceDiagnosticUI.dialog = { overlay, close };
+  document.addEventListener("keydown", onKey); input.focus();
+}
 // ── REQ-2 项目级“开发要求”编辑区（角色页，不绑定单个角色） ─────────────
 // 上限与后端 PROJECT_DEVELOPMENT_REQUIREMENTS_MAX_CHARS 一致；字符数按 Unicode
 // 码点计数（JS 展开迭代与 Python len 对成形文本一致），不用 maxlength 误拒 emoji。
@@ -333,6 +490,7 @@ const requirementsDrafts = new Map();
 function requirementsEl(id) { return typeof document === "undefined" ? null : document.getElementById(id); }
 function requirementsDraftKey(projectId, memberId) { return `${memberId}/${projectId}`; }
 function renderRequirementsPanel() {
+  renderWorkspaceDiagnosticsPanel();
   const panel = requirementsEl("requirements-panel");
   if (!panel) return;
   // ROLE-SETTINGS-1：开发要求只属于“项目设置”页；选中具体角色或离开角色页时隐藏，草稿状态不受影响。

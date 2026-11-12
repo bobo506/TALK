@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-12 16:05 — W-D1 第 5 片：工作区诊断与重关联页面入口（693/694/695）
+
+- **693（Terra）blocked**：预览响应缺少规范化 `candidate_root`，前端无法展示服务器解析结果；未写产品代码。
+- **694（修订版）complete**：后端 preview 200 增加 `candidate_root`（`server/routes/workspace_diagnostics.py` +3/−1、API 测试 +12）；前端 `web/workspace.js` +158（项目设置“工作区”区：诊断展示、root_status/issue 中文、duplicate 警告；重关联对话框：绝对路径校验、预览、二次确认、取消零写入、错误码中文映射、防重复、焦点陷阱）、`web/index.html` +3、新增 Node 测试 90 行、用户手册；`tests/workspace_workspace_relink.test.cjs` 覆盖可见性/诊断/校验/预览/确认/取消/防重复/无泄漏。
+- **695（K2.8 独立复核）approved**：范围、可见性、诊断、校验、预览/确认载荷（使用服务器返回 candidate_root）、错误码、取消零写入、无泄漏、独立重跑均通过。
+- **部署与验证**：`reload-api` 加载 `candidate_root`；对临时候选根真实调用 preview 返回 200（`candidate_root`、`code=marker_only`、token，证据 `.tmp/e2e-wd1/preview.json`）。
+- **真实浏览器自动化受限**：headless Chrome 可加载页面/取全局函数，但停在“正在加载初始化状态…”遮罩，进入角色/项目设置后渲染进程无响应（多次复现，直接调用渲染函数同样）；截图 `.tmp/e2e-wd1/page-settings.png`。**待用户真实浏览器人工验收**。
+- **未做**：部署环境临时项目真实 relink E2E（避免改动生产项目；隔离测试覆盖）、真实多进程并发。
+
 ## 2026-11-12 15:20 — W-D1 4b 部署（API reload + runtime 重启）
 
 - **部署前**：`/healthz` ok、无 queued/running 任务、无 submitted、Terra/K2.8 running 且 idle；记录现场 `.tmp/deploy-4b/pre-state.json`。

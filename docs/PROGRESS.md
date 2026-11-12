@@ -1,5 +1,16 @@
 # Project Progress
 
+## 收工快照（2026-11-12 16:05，W-D1 第 5 片完成，待人工视觉验收）
+
+- **第 5 片「工作区诊断与重新关联页面入口」完成（694 实现 / 695 K2.8 approved）**：`web/workspace.js`（+158：项目设置“工作区”区 + 重关联对话框：诊断展示、绝对路径校验、预览、二次确认、取消零写入、错误码中文、防重复、焦点陷阱）、`web/index.html`（+3 容器）、新增 `tests/workspace_workspace_relink.test.cjs`（90 行）、`docs/guides/USER_MANUAL.md`；后端 preview 200 增加规范化 `candidate_root`（694 一并补充）。
+- **部署**：API 已再次 `reload-api` 加载 `candidate_root` 字段；runtime 未再重启。
+- **真实 API 验证**：对临时候选根 `.tmp/e2e-wd1/newroot` 调 preview → 200，返回 `candidate_root`、`code=marker_only`、token（证据 `.tmp/e2e-wd1/preview.json`）。
+- **真实浏览器验证受限**：headless Chrome（CDP）能加载页面并获取全局函数，但页面停在“正在加载初始化状态…”遮罩，进入“角色/项目设置”视图会使渲染进程无响应；多次尝试（直接调用渲染函数同样）无法完成交互，截图见 `.tmp/e2e-wd1/page-settings.png`。**需用户在真实浏览器人工验收**。
+- **残余**：真实 relink 的临时项目 E2E 未在部署环境执行（避免改动生产项目；隔离测试已覆盖）；真实多进程并发未验。
+- **提交与推送**：六文件 + 文档，随本片推送。
+- **下一步**：用户在页面验收（项目设置 → 工作区 → 重新关联）；通过后 W-D1 全链路收尾。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 15:20，W-D1 4b 已部署）
 
 - **4b 已部署**：`reload-api` → 新 API child；`runtime stop --wait` → `serve --apply --detach` 重启（runtime `2836`、API `9684`、`startup_state=complete`）。OpenAPI 已包含 `/api/projects/{project_id}/workspace-relink` 与 `-preview`；重启后按原意图用 `start-all` 恢复 Terra（`ins_1420fe4c3fd2`，gen 68）与 K2.8（`ins_bf27f457e619`，gen 69），均 `running/ready`；`/healthz` ok、`submitted=[]`。证据 `.tmp/deploy-4b/`。

@@ -76,9 +76,10 @@ class RelinkApiTests(unittest.TestCase):
                         for name in ('agent_tasks', 'messages', 'members', 'project_agents', 'role_service_state')}
         before = history()
         with mock.patch('server.local_runtime.ensure_local_runtime') as ensure:
-            preview = self.preview()
+            preview = self.preview(self.new / '..' / 'new')
             self.assertEqual(preview.status_code, 200)
             body = preview.json()
+            self.assertEqual(body['candidate_root'], str(self.new.resolve()))
             response = self.submit(body['preview_token'])
             self.assertEqual(response.status_code, 200, response.text)
             self.assertEqual(response.json()['stage'], 'completed')
@@ -119,7 +120,9 @@ class RelinkApiTests(unittest.TestCase):
             self.assertNotIn('database_file', response.text)
             self.assertNotIn('config_file', response.text)
             self.assertNotIn('SAMPLE_SECRET', response.text)
-        self.assertNotIn(json.dumps(str(self.base))[1:-1], preview.text)
+        preview_without_candidate = dict(preview.json())
+        del preview_without_candidate['candidate_root']
+        self.assertNotIn(json.dumps(str(self.base))[1:-1], json.dumps(preview_without_candidate))
 
     def test_stale_and_permission(self):
         token = self.preview().json()['preview_token']
@@ -142,7 +145,10 @@ class RelinkApiTests(unittest.TestCase):
         self.assertEqual(self.submit(token).json()['detail'], 'workspace_preview_stale')
 
     def test_blocked_preview_and_busy(self):
-        self.assertEqual(self.preview(self.base / 'missing').status_code, 409)
+        blocked = self.preview(self.base / 'missing')
+        self.assertEqual(blocked.status_code, 409)
+        self.assertNotIn('preview_token', blocked.json())
+        self.assertNotIn('candidate_root', blocked.json())
         with Session(self.engine) as session:
             self.assertEqual(session.query(WorkspaceRelinkPreview).count(), 0)
         token = self.preview().json()['preview_token']
