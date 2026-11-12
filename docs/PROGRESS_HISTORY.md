@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-12 19:50 — W-D1 第 5 片收尾修复：按钮统一 + 选择窗置顶（703/704）
+
+- **用户反馈**：确认按钮与另两个样式不统一；点浏览后 Windows 目录选择窗不在最前，需最小化页面才能看到。
+- **703 complete**：`web/workspace.js` 确认按钮改为与浏览/取消同一 `room-secondary-btn`（保留未选/提交中禁用）；`server/routes/local_workspaces.py` 的 `_PICKER_SCRIPT` 增加 `TopMost=$true` 隐藏 owner、`Show()`/`Activate()` 后 `$dialog.ShowDialog($owner)`、finally 关闭；`web/index.html` bump 版本；Python/Node 用例补断言。自测：picker 用例与 Node 用例全过。
+- **704（K2.8）approved**：按钮统一、置顶脚本结构、无副作用、独立重跑均通过；704 交付本身“无 json 围栏 + evidence 314>300”格式违规，已记录并截断后重新校验。
+- **状态**：703/704 已收取，`submitted=[]`；API 已 reload；等待用户确认置顶效果与按钮样式。
+
 ## 2026-11-12 17:45 — W-D1 第 5 片视觉收尾（701/702）
 
 - **用户截图反馈**：工作区面板（kicker/标题/状态/按钮）字体层级与间距不整齐；弹窗外观粗糙，需与 TALK 现有弹窗统一、整洁美观；字体大小与全站协调。

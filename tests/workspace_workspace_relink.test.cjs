@@ -8,7 +8,7 @@ function harness(human = true) {
   let active = null;
   function el(tag) {
     const classes = new Set();
-    const node = { tagName: tag, set className(value) { classes.clear(); value.split(/\s+/).filter(Boolean).forEach(c => classes.add(c)); }, children: [], listeners: {}, attrs: {}, textContent: '', value: '', disabled: false,
+    const node = { tagName: tag, get className() { return [...classes].join(' '); }, set className(value) { classes.clear(); value.split(/\s+/).filter(Boolean).forEach(c => classes.add(c)); }, children: [], listeners: {}, attrs: {}, textContent: '', value: '', disabled: false,
       classList: { toggle(c, b) { b ? classes.add(c) : classes.delete(c); }, add(c) { classes.add(c); }, remove(c) { classes.delete(c); }, contains(c) { return classes.has(c); } },
       appendChild(c) { node.children.push(c); c.parent = node; return c; }, append(...cs) { cs.forEach(c => node.appendChild(c)); },
       replaceChildren(...cs) { node.children = []; node.append(...cs); }, setAttribute(k, v) { node.attrs[k] = v; },
@@ -68,7 +68,7 @@ test('对话框只有说明、已选、错误和三个按钮，焦点循环及�
   assert.equal(d.modal.children[1].textContent, '选择该项目被移动或改名后的目录；不会移动文件、不会合并历史。');
   assert.ok(d.modal.children[2].classList.contains('workspace-relink-field')); assert.equal(d.modal.children[2].children[0].textContent, '已选目录');
   assert.ok(d.modal.children[4].classList.contains('group-create-footer')); assert.deepEqual(d.modal.children[4].children.map(n => n.textContent), ['浏览', '确认', '取消']);
-  assert.ok(d.browse.classList.contains('room-secondary-btn')); assert.ok(d.confirm.classList.contains('room-primary-btn')); assert.ok(d.cancel.classList.contains('room-secondary-btn'));
+  assert.deepEqual([d.browse.className, d.confirm.className, d.cancel.className], Array(3).fill('room-secondary-btn'));
   assert.equal(d.selected.textContent, '尚未选择'); assert.ok(d.error.classList.contains('workspace-relink-error')); assert.equal(d.error.attrs.role, 'alert'); assert.ok(d.error.classList.contains('hidden')); assert.equal(d.confirm.disabled, true);
   const descendants = node => [node, ...node.children.flatMap(descendants)];
   assert.equal(descendants(d.modal).filter(n => n.tagName === 'button').length, 3); assert.ok(!descendants(d.modal).some(n => ['input', 'textarea'].includes(n.tagName)));

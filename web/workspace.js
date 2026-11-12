@@ -414,7 +414,7 @@ function openWorkspaceRelinkDialog() {
   field.append(label, selected);
   const error = workspaceEl("p", "workspace-relink-error hidden", ""); error.setAttribute("role", "alert");
   const browse = workspaceButton("浏览", () => pick(), "room-secondary-btn");
-  const confirm = workspaceButton("确认", () => submit(), "room-primary-btn");
+  const confirm = workspaceButton("确认", () => submit(), "room-secondary-btn");
   const cancel = workspaceButton("取消", () => close(), "room-secondary-btn");
   const footer = workspaceEl("div", "group-create-footer"); footer.append(browse, confirm, cancel);
   panel.append(header, description, field, error, footer); overlay.appendChild(panel); document.body.appendChild(overlay);

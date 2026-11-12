@@ -36,13 +36,28 @@ if (-not [Environment]::UserInteractive -or [Diagnostics.Process]::GetCurrentPro
 Add-Type -AssemblyName System.Windows.Forms
 if (-not [System.Windows.Forms.SystemInformation]::UserInteractive) { exit 12 }
 $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+$owner = $null
 try {
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.TopMost = $true
+    $owner.ShowInTaskbar = $false
+    $owner.FormBorderStyle = 'None'
+    $owner.StartPosition = 'CenterScreen'
+    $owner.Width = 1
+    $owner.Height = 1
+    $owner.Opacity = 0
     if ($env:TALK_PICKER_INITIAL_DIR) { $dialog.SelectedPath = $env:TALK_PICKER_INITIAL_DIR }
-    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    $owner.Show()
+    $owner.Activate()
+    [System.Windows.Forms.Application]::DoEvents()
+    if ($dialog.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) {
         [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
         [Console]::Out.Write($dialog.SelectedPath)
     }
-} finally { $dialog.Dispose() }
+} finally {
+    if ($owner) { $owner.Close(); $owner.Dispose() }
+    $dialog.Dispose()
+}
 '''
 
 

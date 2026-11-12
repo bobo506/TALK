@@ -41,6 +41,22 @@ class PickerTests(unittest.TestCase):
     def post(self, body=None):
         return self.client.post('/api/local/workspaces/pick-directory', json=body or {})
 
+    def test_picker_script_topmost_owner(self):
+        script = picker._PICKER_SCRIPT
+        for fragment in ("New-Object System.Windows.Forms.Form", "$owner.TopMost = $true",
+                         "$owner.ShowInTaskbar = $false", "$owner.FormBorderStyle = 'None'",
+                         "$owner.StartPosition = 'CenterScreen'", "$owner.Width = 1",
+                         "$owner.Height = 1", "$owner.Opacity = 0", "$owner.Show()",
+                         "$owner.Activate()", "$dialog.ShowDialog($owner)",
+                         "$owner.Close()", "$owner.Dispose()", "$dialog.Dispose()",
+                         "$env:TALK_PICKER_INITIAL_DIR", "System.Text.UTF8Encoding($false)",
+                         "exit 12"):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, script)
+        self.assertLess(script.index('$owner.Show()'), script.index('$owner.Activate()'))
+        self.assertLess(script.index('$owner.Activate()'), script.index('$dialog.ShowDialog($owner)'))
+        self.assertLess(script.index('finally {'), script.index('$owner.Close()'))
+
     def test_selection_cancel_and_no_path_logging(self):
         capture = Capture(); logging.getLogger().addHandler(capture)
         self.addCleanup(logging.getLogger().removeHandler, capture)
@@ -107,7 +123,7 @@ class PickerTests(unittest.TestCase):
 
 class PickerAuthenticationTests(unittest.TestCase):
     def test_real_key_and_trusted_authentication(self):
-        with tempfile.TemporaryDirectory(dir=Path('.tmp/wd1-impl5c').resolve()) as tmp:
+        with tempfile.TemporaryDirectory() as tmp:
             engine = create_engine('sqlite:///' + (Path(tmp) / 'picker.sqlite').as_posix(),
                                    connect_args={'check_same_thread': False})
             try:
