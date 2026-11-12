@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-12 23:15 — 正式端到端验收（冷启动/持久性/双工作区/运行器）
+
+- **冷停机**：`talk_runtime stop --apply --wait` → `stop_status=stopped`、`process_state=absent`、8000 端口关闭；进程扫描无 TALK runtime/API/宿主/bridge 残留。
+- **冷启动**：`serve --apply --detach` → runtime `7684`、API child `16628`、`startup_state=complete`、宿主 serving；Terra `ins_97da886ad353`（gen70）、K2.8 `ins_3deacebf9459`（gen71）running/ready。
+- **持久性**：projects=1、tasks=713、messages=2686、groups=714、project_agents=10，前后一致；项目根、最近任务列表正常。
+- **运行器真实任务**：714（Terra）、715（K2.8）均 succeeded/submitted，结果消息 `DONE`，已收取。
+- **双工作区**：临时项目 B `prj_2272dff51013`；`ensure` → B runtime `11556` startup complete（attach-api）；A 角色保持 running/ready；停 B 后 A healthz ok 393s、角色实例不变；B 项目 DELETE 204、GET 404、W-D1 三表 0 孤儿、runtime 目录与 `wsB` 清理。
+- **限制**：UI 工作区切换/选择持久化未在浏览器验证；临时 B 未创建角色（W3c E2E 已覆盖 B 角色启动）；异常 kill/断电恢复未验证。
+- **证据**：`.tmp/e2e-formal/summary.json` 及同目录分项 JSON。
+
 ## 2026-11-12 22:40 — 任务 Hall 左右分栏修复（712/713）
 
 - **用户反馈**：点「查看完整对话」后左侧任务列表消失，要求左侧列表大小/位置/选中态不变、右侧进入对话窗口。

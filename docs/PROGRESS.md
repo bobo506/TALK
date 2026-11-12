@@ -1,13 +1,14 @@
 # Project Progress
 
-## 当前快照（2026-11-12 23:05，群聊拆除/任务 Hall 分栏验收通过）
+## 当前快照（2026-11-12 23:15，正式端到端验收完成）
 
-- **群聊管理界面已拆除（708 实现 / 709 复核 partial / 710 返修 / 711 approved）**：去掉「群聊」导航、房间列表/搜索/刷新、新建群聊、群成员增删、删除群聊及相关文案；保留任务 Hall（任务详情 →「查看完整对话」：消息/历史/发送/presence/只读与观察者逻辑）；不改后端、不删数据、不改接口。`web/app.js` -731 行、`web/index.html` -97 行，资源版本号已 bump。
-- **复核中发现的回归已修**：`tests/workspace_project_switch.test.cjs` 曾引用已删除的 `refreshGroups()`；710 改用保留函数做截取边界，保留“切换项目不串 group”断言，删除仅针对已移除建群逻辑的用例；711 定向复验通过。
-- **交付格式**：708/709/710/711 交付中有“无 json 围栏”或字段超长，均已记录（不伪造通过）。
-- **任务 Hall 分栏修复（712/713 approved）**：点「查看完整对话」后左侧任务列表保持原宽度/位置/选中态，右侧显示对话；点「任务」返回仅列表；桌面左右分栏、窄屏降级；`web/app.js/workspace.js/style.css/index.html` 与 2 个布局测试调整。
-- **部署**：前端静态资源，刷新即生效；本轮未重启 API/runtime。
-- **W-D1 残余**：真实多进程并发未验；SQLite busy timeout 下 claim/start 可能 500（既有）；自动启动跳过会暂留 `desired=running/observed=stopped`。
-- **第 1 项已核实为完成**：W3c-1~6（2026-11-09/10）已完成按项目 runtime 绑定、宿主/桥 cwd 解耦、双工作区 A停B不停正反向 E2E、孤儿清理/恢复、运行门默认开启；路线图条目已更正。
-- **下一步候选**：①正式端到端验收（冷启动/双工作区/切回记录/退出清理/重开持久性/各运行器，需服务停机窗口）；②异常关机后的选择性自启动与退出恢复；③外部桌面运行器接入；④Windows 桌面外壳；⑤旧分支/工作区归档；⑥历史候选结案。
+- **正式 E2E 完成（第 2 项，2026-11-12 23:00–23:15）**：
+  - **冷启动**：`stop --apply --wait` → `stop_status=stopped`、进程 absent、8000 端口关闭、无 TALK 子进程残留；`serve --apply --detach` → runtime `7684`、API child `16628`、`startup_state=complete`、宿主 serving；Terra `ins_97da886ad353`（gen70）、K2.8 `ins_3deacebf9459`（gen71）running/ready。
+  - **持久性**：projects=1、tasks=713、messages=2686、groups=714、project_agents=10，冷启动前后一致；项目根 `D:\claude-test\TALK`；最近任务 713/712/711… 正常。
+  - **真实运行器任务**：Terra（714）与 K2.8（715）各执行一次冷启动验收任务，均 `succeeded/submitted`，结果消息均为 `DONE`，已收取。
+  - **双工作区隔离**：临时项目 B `prj_2272dff51013`，`ensure` 后 B runtime `11556` startup complete（attach-api）；A 角色保持 running/ready；停 B → A healthz ok、角色实例不变；清理：B 项目 DELETE 204、GET 404、W-D1 三表 0 孤儿、B runtime 目录与 `wsB` 目录删除。
+  - 最终：healthz ok、online 3、宿主 serving、Terra/K2.8 running/ready。
+  - 证据：`.tmp/e2e-formal/{pre-state,persistence,dispatch,runner-tasks,runner-results,ensure-b,final-state,summary}.json`。
+- **限制**：UI 工作区切换/选择持久化未在浏览器验证（API 级）；临时 B 未创建角色（B 角色启动由 2026-11-09 W3c E2E 覆盖）；异常 kill/断电恢复未验证（第 12 项）。
+- **下一步候选**：①异常关机后的选择性自启动与退出恢复（第 12 项）；②外部桌面运行器接入（第 13 项）；③Windows 桌面程序外壳（第 14 项）；④旧分支/工作区归档（第 16 项）；⑤历史候选结案（347/348、`prj_accept`）；⑥非阻断残余（`host_unreachable`、legacy guard/空 native-home、delete 90s 窗口）。
 - **恢复**：说“继续项目”；详情见 [PROGRESS_HISTORY.md](PROGRESS_HISTORY.md) 顶部。
