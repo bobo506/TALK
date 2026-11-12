@@ -1395,6 +1395,11 @@ def _try_requeue_expired_task(task: AgentTask, now: datetime, session: Session) 
             AgentTask.status == "running",
             AgentTask.lease_expires_at.is_not(None),
             AgentTask.lease_expires_at <= now,
+            AgentTask.lease_expires_at == task.lease_expires_at,
+            AgentTask.attempt == task.attempt,
+            AgentTask.claimed_by == task.claimed_by,
+            AgentTask.instance_id == task.instance_id,
+            AgentTask.claim_token == task.claim_token,
         )
         .values(
             status="queued",
