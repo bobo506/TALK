@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-12 23:40 — 第 12 项审计：异常退出后的选择性自启动与恢复（受控 kill）
+
+- **方法**：生产空闲窗口（无运行任务）设 Terra 启动偏好 enabled、K2.8 disabled，强制 kill runtime 树后重启；716 合成审计（未做实栈/kill，partial）仅作参考。
+- **发现**：
+  1. `taskkill /F /T /PID 7684` 首次 exit -1、runtime 未死；需显式 Stop-Process 才完全停止。
+  2. 旧宿主 9160/12484/11592/14260 在 runtime 死后存活，被新 runtime 记为 `external_manager`，需人工终止。
+  3. K2.8（偏好 disabled）激活 `skipped/startup_manual_intent_present`，随后 observed=failed/bridge_process_exited；Terra（enabled）激活未完成，host `recovery_required`、observed unknown。
+  4. 无自动恢复：陈旧 `desired/observed=running` + 死 pid 使 `start-all` 返回 `skipped_running`；人工 `stop`（idempotent_stopped）后 `start-all` 才恢复。
+  5. 恢复后 Terra `ins_6cdc22ab7640` gen73、K2.8 `ins_f3b7ddd2419e` gen72，running/ready，无重复实例；偏好均恢复 enabled。
+- **缺口**：P0 stale running 状态阻塞恢复；P1 孤儿宿主归属/清理；P1 偏好与手动意图冲突提示 + `last_activation` 展示；P2 kill 时有运行任务的 claim/lease 恢复未测。
+- **证据**：`.tmp/e2e-crash/findings.md` 与 JSON。
+
 ## 2026-11-12 23:15 — 正式端到端验收（冷启动/持久性/双工作区/运行器）
 
 - **冷停机**：`talk_runtime stop --apply --wait` → `stop_status=stopped`、`process_state=absent`、8000 端口关闭；进程扫描无 TALK runtime/API/宿主/bridge 残留。
