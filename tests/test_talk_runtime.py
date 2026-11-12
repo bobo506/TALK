@@ -389,13 +389,150 @@ class RuntimeTests(unittest.TestCase):
     def test_external_manager_or_unknown_owner_is_never_adopted(self):
         s=self.spec();self.config["hosts"]=[s]
         Path(s["health_file"]).write_text('{"pid":123}',encoding="utf-8")
-        with patch.object(runtime,"recorded_process_state",return_value="present"):
+        with patch.object(runtime,"recorded_process_state",return_value="present"), \
+             patch.object(runtime, "_ORPHAN_WINDOWS", True), \
+             patch.object(runtime, "_open_orphan_process", return_value=1), \
+             patch.object(runtime, "_close_orphan_handle"), \
+             patch.object(runtime, "_orphan_handle_creation_time", return_value=1), \
+             patch.object(runtime, "_orphan_host_matches", return_value=False):
             self.runtime.reconcile_hosts([self.role(ownership_held=True)])
-        self.assertEqual(self.runtime.statuses["agent:one"]["state"],"external_manager")
+        self.assertEqual(self.runtime.statuses["agent:one"]["state"],"recovery_required")
+        self.assertEqual(self.runtime.statuses["agent:one"]["reason"],"orphan_host_unverified")
         with patch.object(runtime,"recorded_process_state",return_value="exited"):
             self.runtime.reconcile_hosts([self.role(ownership_held=True)])
         self.assertEqual(self.runtime.statuses["agent:one"]["state"],"recovery_required")
         self.assertFalse(self.spawned);self.assertFalse(self.runtime.hosts)
+
+    def orphan_fixture(self):
+        spec = self.spec()
+        spec["argv"] = [sys.executable, "-B", "-m", "scripts.dsh_role_host", "--project", self.runtime.project, "--member", "agent:one"]
+        self.config["hosts"] = [spec]
+        Path(spec["health_file"]).write_text(json.dumps({"pid": 123, "activation_id": "old"}), encoding="utf-8")
+        return spec
+
+    def test_orphan_match_terminates_then_spawns(self):
+        self.orphan_fixture()
+        argv = [sys.executable, "-B", "-m", "scripts.dsh_role_host", "--project", self.runtime.project, "--member", "agent:one"]
+        with patch.object(runtime, "recorded_process_state", return_value="present"), \
+             patch.object(runtime, "_ORPHAN_WINDOWS", True), \
+             patch.object(runtime, "_open_orphan_process", return_value=1), \
+             patch.object(runtime, "_close_orphan_handle") as close, \
+             patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+             patch.object(runtime, "process_inventory", return_value=[{"ProcessId":123, "CommandLine":"fixture"}]), \
+             patch.object(runtime, "process_argv", return_value=argv), \
+             patch.object(runtime, "terminate_orphan", return_value={"exit_confirmed":True, "already_exited":False}) as terminate, \
+             patch.object(self.runtime, "event") as event:
+            self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+        terminate.assert_called_once_with(123, 42)
+        close.assert_called_once_with(1)
+        event.assert_any_call("orphan_host_terminated", context={"member_id":"agent:one", "pid":123, "outcome":"terminated"})
+        self.assertEqual(len(self.spawned), 1)
+        self.assertEqual(self.runtime.statuses["agent:one"]["state"], "starting")
+
+    def test_orphan_mismatch_is_not_terminated(self):
+        self.orphan_fixture()
+        base = [sys.executable, "-m", "scripts.dsh_role_host", "--project", self.runtime.project, "--member", "agent:one"]
+        cases = [base[:3] + ["--project", "other", "--member", "agent:one"],
+                 base[:-1] + ["agent:other"],
+                 [sys.executable, "-c", "scripts.dsh_role_host", "--project", self.runtime.project, "--member", "agent:one"],
+                 [sys.executable, "-m", "scripts.codex_role_host", "--project", self.runtime.project, "--member", "agent:one"],
+                 base + ["--member", "agent:other"]]
+        for argv in cases:
+            with self.subTest(argv=argv), patch.object(runtime, "recorded_process_state", return_value="present"), \
+                 patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+                 patch.object(runtime, "_close_orphan_handle"), patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                 patch.object(runtime, "process_inventory", return_value=[{"ProcessId":123, "CommandLine":"fixture"}]), \
+                 patch.object(runtime, "process_argv", return_value=argv), patch.object(runtime, "terminate_orphan") as terminate:
+                self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+                terminate.assert_not_called()
+                self.assertEqual(self.runtime.statuses["agent:one"]["reason"], "orphan_host_unverified")
+                self.assertEqual(self.runtime.statuses["agent:one"]["state"], "recovery_required")
+                self.assertFalse(self.spawned)
+
+    def test_orphan_current_activation_and_unknown_never_terminate(self):
+        spec = self.orphan_fixture()
+        for state, activation, reason in (("present", self.runtime.activation_id, "orphan_host_current_activation"),
+                                          ("unknown", "old", "orphan_host_unverified")):
+            with self.subTest(state=state), patch.object(runtime, "recorded_process_state", return_value=state), \
+                 patch.object(runtime, "_open_orphan_process") as opened:
+                Path(spec["health_file"]).write_text(json.dumps({"pid":123, "activation_id":activation}), encoding="utf-8")
+                self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+                opened.assert_not_called()
+                self.assertEqual(self.runtime.statuses["agent:one"]["reason"], reason)
+                self.assertFalse(self.spawned)
+
+    def test_orphan_exited_states_keep_spawn_behavior(self):
+        self.orphan_fixture()
+        for state in ("absent", "exited", "previous_boot", "pid_reused"):
+            with self.subTest(state=state), patch.object(runtime, "recorded_process_state", return_value=state), \
+                 patch.object(runtime, "terminate_orphan") as terminate:
+                self.runtime.hosts.clear()
+                self.spawned.clear()
+                self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+                terminate.assert_not_called()
+                self.assertEqual(len(self.spawned), 1)
+                self.assertEqual(self.runtime.statuses["agent:one"]["state"], "starting")
+
+    def test_orphan_termination_error_and_exited_race(self):
+        self.orphan_fixture()
+        for second, outcome, expected in (("present", "failed", "recovery_required"), ("exited", "already_exited", "starting")):
+            with self.subTest(second=second), patch.object(runtime, "recorded_process_state", side_effect=["present", second]), \
+                 patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+                 patch.object(runtime, "_close_orphan_handle"), patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                 patch.object(runtime, "_orphan_host_matches", return_value=True), \
+                 patch.object(runtime, "terminate_orphan", side_effect=PermissionError("fixture")) as terminate, \
+                 patch.object(self.runtime, "event") as event:
+                self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+                terminate.assert_called_once_with(123, 42)
+                self.assertEqual(self.runtime.statuses["agent:one"]["state"], expected)
+                event.assert_any_call("orphan_host_terminated", context={"member_id":"agent:one", "pid":123, "outcome":outcome})
+                if second == "present":
+                    self.assertEqual(self.runtime.statuses["agent:one"]["reason"], "orphan_host_termination_failed")
+                    self.assertFalse(self.spawned)
+                else:
+                    self.assertEqual(len(self.spawned), 1)
+
+    def test_orphan_without_creation_time_uses_pinned_handle(self):
+        import ctypes
+        from ctypes import wintypes
+        self.orphan_fixture()
+        class ExitProbe:
+            def __init__(self): self.calls = 0
+            def __call__(self, handle, pointer):
+                self.calls += 1
+                ctypes.cast(pointer, ctypes.POINTER(wintypes.DWORD)).contents.value = 259 if self.calls == 1 else 0
+                return 1
+        probe = ExitProbe()
+        with patch.object(runtime, "recorded_process_state", return_value="present"), \
+             patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+             patch.object(runtime, "_close_orphan_handle"), patch.object(runtime, "_orphan_handle_creation_time", return_value=None), \
+             patch.object(runtime, "_orphan_host_matches", return_value=True), \
+             patch.object(runtime.rsh._kernel32, "GetExitCodeProcess", probe), \
+             patch.object(runtime, "_terminate_orphan_handle") as terminate, \
+             patch.object(runtime, "terminate_orphan") as normal:
+            self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+        terminate.assert_called_once_with(1)
+        normal.assert_not_called()
+        self.assertEqual(self.runtime.statuses["agent:one"]["state"], "starting")
+
+    def test_orphan_owned_manager_keeps_existing_behavior(self):
+        spec = self.orphan_fixture()
+        self.runtime.hosts["agent:one"] = {"process":Process(123), "spec":spec}
+        for pid, expected in ((123, "serving"), (456, "manager_unverified")):
+            Path(spec["health_file"]).write_text(json.dumps({"pid":pid, "state":"serving", "seen_at":runtime.utcnow()}), encoding="utf-8")
+            with self.subTest(expected=expected), patch.object(runtime, "process_parents", return_value={}), \
+                 patch.object(runtime, "terminate_orphan") as terminate:
+                self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+                terminate.assert_not_called()
+                self.assertEqual(self.runtime.statuses["agent:one"]["state"], expected)
+                self.assertFalse(self.spawned)
+
+    def test_orphan_match_requires_exact_python_host_and_identity(self):
+        self.orphan_fixture()
+        spec = self.config["hosts"][0]
+        with patch.object(runtime, "process_inventory", return_value=[{"ProcessId":123, "CommandLine":"fixture"}]), \
+             patch.object(runtime, "process_argv", return_value=[sys.executable, "scripts/dsh_role_host.py", "--project", self.runtime.project, "--member", "agent:one"]):
+            self.assertTrue(runtime._orphan_host_matches(123, spec["argv"], self.runtime.project, "agent:one"))
 
     def test_idle_orphan_is_terminated_and_logged(self):
         spec = self.spec()

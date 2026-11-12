@@ -24,7 +24,8 @@ if str(ROOT) not in sys.path:
 from scripts import role_service_host as rsh
 from scripts.role_provision import key_file_path
 from scripts.role_provision_worker import RoleProvisionWorker
-from scripts.role_service_recovery import recorded_process_state
+from scripts.role_service_recovery import (recorded_process_state, process_inventory, process_argv,
+                                           terminate_orphan, _identity_values)
 from bridges.backend_error_codes import HOST_ERROR_CODES, RUNTIME_ERROR_CODES
 from bridges.stop_blockers import BUSY_STOP_CODE, safe_stop_blockers
 from server import workspace_paths as wp
@@ -77,6 +78,42 @@ def _close_orphan_handle(handle):
 
 
 _ORPHAN_WINDOWS = os.name == "nt"
+
+
+def _host_command_entry(argv):
+    """Extract a Python host entry without treating arguments as executable code."""
+    if not argv or not re.fullmatch(r"python(?:w|[0-9.]*)?(?:\.exe)?", Path(str(argv[0]).replace("\\", "/")).name, re.I):
+        return None
+    i = 1
+    while i < len(argv):
+        arg = argv[i]
+        if arg in ("-B", "-u", "-E", "-s", "-S", "-I", "-O", "-OO"):
+            i += 1
+        elif arg in ("-X", "-W") and i + 1 < len(argv):
+            i += 2
+        elif arg == "-m" and i + 1 < len(argv):
+            module = argv[i + 1]
+            return module if re.fullmatch(r"scripts\.[a-zA-Z0-9_]*role_host", module) else None
+        else:
+            path = str(arg).replace("\\", "/")
+            match = re.search(r"(?:^|/)scripts/([a-zA-Z0-9_]*role_host)\.py$", path)
+            return "scripts." + match.group(1) if match else None
+    return None
+
+
+def _orphan_host_matches(pid, expected_argv, project, member):
+    """Check host executable and unambiguous project/member in memory only."""
+    expected = _host_command_entry(expected_argv)
+    if not expected:
+        return False
+    rows = [row for row in process_inventory() if row.get("ProcessId") == pid]
+    if len(rows) != 1 or not isinstance(rows[0].get("CommandLine"), str):
+        return False
+    argv = process_argv(rows[0]["CommandLine"])
+    projects, bad_project = _identity_values(argv, ("--project",))
+    members, bad_member = _identity_values(argv, ("--member",))
+    return (_host_command_entry(argv) == expected and not bad_project and not bad_member
+            and projects == [project] and members == [member])
 
 
 def _runtime_identity(health):
@@ -839,8 +876,65 @@ class TalkRuntime:
             if existing:
                 process_state=recorded_process_state(existing.get("pid"), existing.get("seen_at"))
                 if process_state not in ("absent","exited","previous_boot","pid_reused"):
-                    self.statuses[member] = {"state":"external_manager" if process_state=="present" else "external_manager_unverified","pid":existing.get("pid")}
-                    continue
+                    pid = existing.get("pid")
+                    if process_state != "present" or (existing.get("activation_id") and existing.get("activation_id") == self.activation_id):
+                        reason = "orphan_host_unverified" if process_state != "present" else "orphan_host_current_activation"
+                        self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":reason}
+                        continue
+                    handle = None
+                    outcome = "failed"
+                    verified = False
+                    try:
+                        # Pin the PID before reading argv, including when creation time is unavailable.
+                        if not _ORPHAN_WINDOWS or type(pid) is not int or pid <= 0:
+                            raise ValueError("orphan_host_unverified")
+                        handle = _open_orphan_process(pid)
+                        if not handle:
+                            raise OSError("orphan_host_open_failed")
+                        created = _orphan_handle_creation_time(handle)
+                        if not _orphan_host_matches(pid, spec["argv"], self.project, member):
+                            self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":"orphan_host_unverified"}
+                            continue
+                        verified = True
+                        if created is not None:
+                            result = terminate_orphan(pid, created)
+                            if not result.get("exit_confirmed"):
+                                raise OSError("orphan_host_exit_unconfirmed")
+                            outcome = "already_exited" if result.get("already_exited") else "terminated"
+                        else:
+                            # The open handle pins the verified process even without creation time.
+                            from ctypes import wintypes
+                            code = wintypes.DWORD()
+                            get_exit = rsh._kernel32.GetExitCodeProcess
+                            get_exit.argtypes = [wintypes.HANDLE, rsh._ctypes.POINTER(wintypes.DWORD)]
+                            get_exit.restype = wintypes.BOOL
+                            if not get_exit(handle, rsh._ctypes.byref(code)):
+                                raise OSError("orphan_host_exit_unverified")
+                            if code.value != 259:
+                                outcome = "already_exited"
+                            else:
+                                _terminate_orphan_handle(handle)
+                                deadline = time.monotonic() + 5
+                                while time.monotonic() < deadline:
+                                    if not get_exit(handle, rsh._ctypes.byref(code)):
+                                        raise OSError("orphan_host_exit_unverified")
+                                    if code.value != 259:
+                                        outcome = "terminated"
+                                        break
+                                    time.sleep(0.05)
+                                if outcome == "failed":
+                                    raise OSError("orphan_host_exit_unconfirmed")
+                    except (OSError, ValueError, rsh.HostError, subprocess.SubprocessError):
+                        if recorded_process_state(pid, existing.get("seen_at")) in ("absent", "exited"):
+                            outcome = "already_exited"
+                        else:
+                            self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":"orphan_host_termination_failed" if verified else "orphan_host_unverified"}
+                    finally:
+                        if handle:
+                            _close_orphan_handle(handle)
+                    self.event("orphan_host_terminated", context={"member_id":member, "pid":pid, "outcome":outcome})
+                    if outcome == "failed":
+                        continue
             if service.get("ownership_held"):
                 self._terminate_orphan_bridge(member, spec)
                 self.statuses[member] = {"state":"recovery_required"}
