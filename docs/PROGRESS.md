@@ -1,5 +1,18 @@
 # Project Progress
 
+## 收工快照（2026-11-12 17:20，W-D1 第 5 片返修完成，待人工验收）
+
+- **第 5 片返修完成（696/697/699/700 approved）**：
+  - 对话框按用户习惯重做：只剩说明“重新选择该项目的目录”、已选目录一行、错误行一行、**浏览 / 确认 / 取消**；不再有输入框/检查目录/评估列表；确认时内部先 preview 再 relink，阻断/错误只在弹窗内一行显示。
+  - 新增 `POST /api/local/workspaces/pick-directory`：本机 Windows 原生“选择文件夹”（固定 PowerShell/WinForms，初始目录走环境变量、120s 超时、取消 null、单窗并发锁、稳定码 busy/timeout/unavailable/failed）；仅 human/operator、仅 loopback。
+  - 工作区区复用项目设置页 `requirements-panel` 等样式，与其它面板统一。
+  - `wb7-probe`/`wb7-probe2` 删除请求 complete；`web/role-creation.js` 对归档/不在名册角色不再弹陈旧创建/自动启动提示。
+- **验证**：picker 分支（200/null/403/422/409/504/503/500）全 mock；Node 用例覆盖三按钮结构、浏览/取消、预览阻断、确认载荷、错误行、防重复；698 复核 9/10，唯一 BOM/CRLF 已由 699 修复、700 定向复验 approved（700 交付本身有“无围栏+字段超长”格式违规，已记录并按字段截断后校验）。
+- **部署**：本轮结束时已 `reload-api` 加载 picker 接口；runtime 未重启。
+- **待人工验收**：浏览器 Ctrl+F5 → 角色 → 项目设置 → 工作区 → “重新选择该项目的目录” → 浏览（应弹本机选择文件夹）→ 选目录 → 确认；重点看样式、按钮文案、取消/错误提示。
+- **残余**：真实点击“浏览”弹窗、真实目录确认未由自动化验证（需人工）；真实 relink E2E 未在部署环境执行；真实多进程未验。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 16:05，W-D1 第 5 片完成，待人工视觉验收）
 
 - **第 5 片「工作区诊断与重新关联页面入口」完成（694 实现 / 695 K2.8 approved）**：`web/workspace.js`（+158：项目设置“工作区”区 + 重关联对话框：诊断展示、绝对路径校验、预览、二次确认、取消零写入、错误码中文、防重复、焦点陷阱）、`web/index.html`（+3 容器）、新增 `tests/workspace_workspace_relink.test.cjs`（90 行）、`docs/guides/USER_MANUAL.md`；后端 preview 200 增加规范化 `candidate_root`（694 一并补充）。

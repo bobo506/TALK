@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-12 17:20 — W-D1 第 5 片返修：原生目录选择 + 三按钮对话框 + 提示过滤（696/697/699/700）
+
+- **用户验收意见**：①”工作区“区与页面风格不统一；②对话框应改为“浏览（本机选择文件夹）+ 确认 + 取消”三个按钮，说明改为“重新选择该项目的目录”，去掉其它元素；③`wb7-probe` 陈旧自动启动提示需清理。
+- **696 complete**：新增 `POST /api/local/workspaces/pick-directory`（Windows WinForms 固定脚本、初始目录环境变量、120s 超时、取消 null、并发锁、稳定码；仅 human/operator、仅 loopback）；`web/workspace.js` 对话框重做为说明+已选目录+错误行+三按钮，确认内部 preview→relink；工作区区复用 `requirements-panel` 等现有样式；新增 `tests/test_local_workspace_picker.py`；Node 用例重写 92 行。
+- **697 complete**：`web/role-creation.js` 对归档或不在名册的角色跳过 `request:`/`auto:` 提示；活跃角色不变；`tests/role_creation_dom.cjs` 补例。`wb7-probe`/`wb7-probe2` 删除请求返回 complete。
+- **698（K2.8）partial**：功能/安全/结构/测试 9/10 通过；唯一问题 `tests/test_local_workspace_picker.py` 带 UTF-8 BOM + 1 处 CRLF。
+- **699 partial**：去除 BOM、统一 LF，单测通过；partial 原因是该文件为未跟踪新文件、无法用 git diff 证明“仅格式变化”。
+- **700（定向复验）approved**：确认无 BOM、LF-only、内容等价、单测全过；700 交付本身有“无 json 围栏 + completed 字段 398>300”格式违规，已记录并将字段截断后重新校验通过。
+- **状态**：696/697/699/700 已收取，`submitted=[]`；API 已 reload 加载 picker；runtime 未重启；真实弹窗/真实确认仍需人工验收。
+
 ## 2026-11-12 16:05 — W-D1 第 5 片：工作区诊断与重关联页面入口（693/694/695）
 
 - **693（Terra）blocked**：预览响应缺少规范化 `candidate_root`，前端无法展示服务器解析结果；未写产品代码。

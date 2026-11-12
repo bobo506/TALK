@@ -492,6 +492,10 @@ function createRoleRequestUI(deps) {
           observed: r.service.observed, readiness_service: r.service.readiness_service,
         } : null }));
       for (const row of state.rows) {
+        if (row.member_id) {
+          const role = state.roles.find(item => item.member_id === row.member_id);
+          if (!role || role.archived === true) continue;
+        }
         const before = previousRows.get(row.request_key);
         const recent = state.recentKeys.includes(row.request_key);
         if (row.status === "failed" && !superseded.has(row.request_key) && (!before || before.status !== "failed") && (before || recent)) {

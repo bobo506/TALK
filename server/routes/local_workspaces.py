@@ -2,15 +2,19 @@
 from __future__ import annotations
 
 import json
+import ipaddress
+import ntpath
 import os
+import re
 import socket
+import subprocess
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
@@ -23,6 +27,84 @@ from server.role_provision_requests import enable_host_config, host_config_proje
 
 router = APIRouter(prefix="/api/local/workspaces", tags=["local-workspaces"])
 _lock = threading.Lock()
+_picker_lock = threading.Lock()
+
+# Fixed script only. Client input is passed through the environment, never code.
+_PICKER_SCRIPT = r'''
+$ErrorActionPreference = 'Stop'
+if (-not [Environment]::UserInteractive -or [Diagnostics.Process]::GetCurrentProcess().SessionId -eq 0) { exit 12 }
+Add-Type -AssemblyName System.Windows.Forms
+if (-not [System.Windows.Forms.SystemInformation]::UserInteractive) { exit 12 }
+$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+try {
+    if ($env:TALK_PICKER_INITIAL_DIR) { $dialog.SelectedPath = $env:TALK_PICKER_INITIAL_DIR }
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+        [Console]::Out.Write($dialog.SelectedPath)
+    }
+} finally { $dialog.Dispose() }
+'''
+
+
+def _picker_path_valid(value):
+    return (isinstance(value, str) and 0 < len(value) <= 32767 and '\0' not in value
+            and ntpath.isabs(value) and bool(re.match(r'^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+(?:[\\/]|$))', value)))
+
+
+def _picker_windows():
+    return os.name == 'nt'
+
+
+@router.post('/pick-directory')
+def pick_directory(request: Request, body: object = Body(default=None),
+                   current: Member = Depends(get_current_member)):
+    if current.kind != 'human':
+        raise HTTPException(403, 'human_required')
+    try:
+        loopback = ipaddress.ip_address(request.client.host if request.client else '').is_loopback
+    except ValueError:
+        loopback = False
+    if not loopback:
+        raise HTTPException(403, 'workspace_picker_unavailable')
+    if body is None:
+        body = {}
+    if not isinstance(body, dict) or set(body) - {'initial_dir'}:
+        raise HTTPException(422, 'workspace_picker_input_invalid')
+    initial = body.get('initial_dir')
+    if 'initial_dir' in body and not _picker_path_valid(initial):
+        raise HTTPException(422, 'workspace_picker_input_invalid')
+    if not _picker_windows():
+        raise HTTPException(503, 'workspace_picker_unavailable')
+    if not _picker_lock.acquire(blocking=False):
+        raise HTTPException(409, 'workspace_picker_busy')
+    try:
+        # Keep runtime credentials out of the dialog subprocess environment.
+        safe_names = {'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'PATH', 'PATHEXT',
+                      'TEMP', 'TMP', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA',
+                      'HOMEDRIVE', 'HOMEPATH', 'SYSTEMDRIVE', 'PSMODULEPATH'}
+        env = {name: value for name, value in os.environ.items() if name.upper() in safe_names}
+        env['TALK_PICKER_INITIAL_DIR'] = initial or ''
+        try:
+            result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-STA',
+                                     '-Command', _PICKER_SCRIPT], env=env, capture_output=True,
+                                    timeout=120, check=False)
+        except subprocess.TimeoutExpired:
+            raise HTTPException(504, 'workspace_picker_timeout') from None
+        except OSError:
+            raise HTTPException(503, 'workspace_picker_unavailable') from None
+        if result.returncode == 12:
+            raise HTTPException(503, 'workspace_picker_unavailable')
+        if result.returncode:
+            raise HTTPException(500, 'workspace_picker_failed')
+        try:
+            path = result.stdout.decode('utf-8')
+        except (UnicodeError, AttributeError):
+            raise HTTPException(500, 'workspace_picker_failed') from None
+        if path and not _picker_path_valid(path):
+            raise HTTPException(500, 'workspace_picker_failed')
+        return {'path': path or None}
+    finally:
+        _picker_lock.release()
 
 
 class WorkspaceEnsure(BaseModel):
