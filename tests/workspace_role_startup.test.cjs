@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const {documentFixture}=require('./role_creation_dom.cjs');
@@ -61,10 +61,9 @@ test('agent/归档/缺绑定/不受管/旧后端均隐藏且不能发送',async(
     assert.equal(x.panel(),null);await x.save(true);assert.equal(x.requests.length,0);
   }
 });
-test('失败执行不再显示自动启动提示，保存不把入队说成已就绪',()=>{
+test('失败执行不显示旧提示或敏感信息，保存不把入队说成已就绪',()=>{
   const x=fixture();x.role.startup.last_activation={status:'failed',error_code:'private-path'};
   const text=x.h.texts(x.panel());
-  // 2026-10-28：按用户要求移除“上次自动启动未完成，请查看服务状态后手动启动。”，不再展示该行。
   assert.doesNotMatch(text,/查看服务状态后手动启动/);
   assert.doesNotMatch(text,/private-path|启动成功/);
   assert.match(text,/随项目自动启动/);
@@ -73,4 +72,52 @@ test('页面详情接入控件，资源版本更新，UI没有启动执行API调
   assert.match(source,/const startupPanel = workspaceRoleStartupPanel\(role\)/);
   assert.match(fs.readFileSync(require.resolve('../web/index.html'),'utf8'),/20261029-theme-day-night-v1/);
   assert.doesNotMatch(part,/role-services\/startup|\/service\/start|\/service\/stop/);
+});
+test('跳过时仅指定原因显示手动操作提示',()=>{
+  const x=fixture(),expected='未自动启动：检测到手动运行或停止操作；可在角色服务区手动启动。';
+  for(const code of ['startup_manual_intent_present','startup_not_selected']){
+    x.role.startup.last_activation={status:'skipped',error_code:code};
+    assert.equal(x.panel().children[2].textContent,expected);
+    assert.ok(expected.length<=40);
+  }
+  x.role.startup.last_activation={status:'skipped',error_code:'other'};
+  assert.equal(x.panel().children.length,2);
+});
+test('失败原因映射中文，未知错误不泄露原文',()=>{
+  const x=fixture();
+  for(const [code,expected] of [
+    ['recovery_required','启动失败：角色状态需要恢复处理。'],
+    ['startup_recovery_required','启动失败：角色状态需要恢复处理。'],
+    ['bridge_process_exited','启动失败：角色服务进程已退出。'],
+    ['startup_runtime_unverified','启动失败：运行环境状态未核实。'],
+    ['startup_runtime_conflict','启动失败：运行环境存在冲突。'],
+    ['private-path','启动失败：原因未知。'],
+    ['toString','启动失败：原因未知。'],
+  ]){
+    x.role.startup.last_activation={status:'failed',error_code:code};
+    assert.equal(x.panel().children[2].textContent,expected,code);
+    assert.ok(expected.length<=40);
+  }
+});
+test('成功、排队、已运行及未选中状态不展示原因',()=>{
+  const x=fixture();
+  for(const status of ['success','enqueued','already_running','not_selected']){
+    x.role.startup.last_activation={status,error_code:'recovery_required'};
+    assert.equal(x.panel().children.length,2,status);
+  }
+});
+test('角色运行且就绪时隐藏旧失败原因，启动中仍可查看',()=>{
+  const x=fixture();x.role.startup.last_activation={status:'failed',error_code:'bridge_process_exited'};
+  x.role.service.observed='running';x.role.service.readiness_service='ready';
+  assert.equal(x.panel().children.length,2);
+  x.role.service.readiness_service='unverified';
+  assert.equal(x.panel().children[2].textContent,'启动失败：角色服务进程已退出。');
+});
+test('保存失败优先于启动原因，且页面源码没有旧通用文案',async()=>{
+  const x=fixture();x.role.startup.last_activation={status:'failed',error_code:'recovery_required'};
+  x.respond(async()=>({ok:false,json:async()=>({})}));await x.save(true);
+  const panel=x.panel();assert.equal(panel.children.length,3);
+  assert.equal(panel.children[2].textContent,'保存失败，请重试。');
+  assert.doesNotMatch(x.h.texts(panel),/角色状态需要恢复处理/);
+  assert.ok(!source.includes('上次自动启动未完成，'+'请查看服务状态后手动启动。'));
 });

@@ -2153,10 +2153,25 @@ async function saveRoleStartup(memberId, enabled) {
     if (current()) { roleStartupUI.busy.delete(memberId); renderWorkspaceRoleDetails(); }
   }
 }
+function roleStartupActivationReason(activation) {
+  if (activation?.status === "skipped" && ["startup_manual_intent_present", "startup_not_selected"].includes(activation.error_code)) {
+    return "未自动启动：检测到手动运行或停止操作；可在角色服务区手动启动。";
+  }
+  if (activation?.status !== "failed") return "";
+  switch (activation.error_code) {
+    case "recovery_required":
+    case "startup_recovery_required": return "启动失败：角色状态需要恢复处理。";
+    case "bridge_process_exited": return "启动失败：角色服务进程已退出。";
+    case "startup_runtime_unverified": return "启动失败：运行环境状态未核实。";
+    case "startup_runtime_conflict": return "启动失败：运行环境存在冲突。";
+    default: return "启动失败：原因未知。";
+  }
+}
 function workspaceRoleStartupPanel(role) {
   roleStartupContext();
+  const service = roleServiceView(role).service;
   if (!currentMemberIsHuman() || !role.startup || role.archived || role.deletion
-      || roleServiceView(role).service?.control_kind !== "managed_cli" || role.binding_state !== "bound") return null;
+      || service?.control_kind !== "managed_cli" || role.binding_state !== "bound") return null;
   const value = roleStartupValue(role), panel = workspaceEl("div", "role-startup-panel");
   const label = workspaceEl("label", "role-startup-choice"), input = workspaceEl("input");
   input.type = "checkbox"; input.checked = value.enabled === true;
@@ -2165,9 +2180,11 @@ function workspaceRoleStartupPanel(role) {
   label.append(input, workspaceEl("span", "", "随项目自动启动")); panel.appendChild(label);
   panel.appendChild(workspaceEl("p", "role-service-hint", "下次加载项目时生效；本次手动关闭后不会再次拉起。"));
   const error = roleStartupUI.errors.get(role.member_id);
-  // 2026-10-28：按用户要求移除“上次自动启动未完成，请查看服务状态后手动启动。”一行；
-  // 上次激活失败的真实状态仍由角色服务状态区展示，这里只保留本页保存失败的错误提示。
   if (error) panel.appendChild(workspaceEl("p", "role-service-hint error", error));
+  else if (!(service.observed === "running" && service.readiness_service === "ready")) {
+    const reason = roleStartupActivationReason(value.last_activation);
+    if (reason) panel.appendChild(workspaceEl("p", "role-service-hint", reason));
+  }
   return panel;
 }
 // ── 2026-10-31（351-A）角色详情页思考强度设置 ─────────────────────────────
