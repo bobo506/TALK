@@ -1,5 +1,16 @@
 # Project Progress
 
+## 收工快照（2026-11-12 15:00，W-D1 4b 完成）
+
+- **4b-2「重关联/领取串行化与守卫」完成（690 blocked→691 扩权返修→692 K2.8 approved）**：新增 `server/workspace_relink_guard.py`；`execute_relink` 在 **T1 写事务内**复检角色/任务/活动操作，忙则回滚 T1（无操作行）；`claim`、`start`、`start-all`、自动启动路径全部接入守卫（检查在各自写事务内），稳定码 `workspace_busy`/`workspace_recovery_required`；SQLite 写锁串行化。
+- **竞态修复实证**：690 复现“claim 成功且 relink 也完成”；691 修复后双向均只有一方成功（claim 先→relink 409 无操作行；relink 先→claim 409 任务仍 queued），start/start-all 同样；回归 150 项 0 失败（1 skip 8.3）+ 4 项真实路由交错。
+- **4b 整片完成**：4b-1（入口/令牌/收口）+ 4b-2（并发守卫）均 approved；`submitted=[]`。
+- **证据事故（已记录）**：691 首轮回归覆盖 `.tmp/wd1-impl2/api-samples.json`；已保留覆盖版 `.after-4b1-overwrite.json` 并尽力恢复原文件（best-effort，非逐字节保证），产品无影响。
+- **残余（非阻断）**：claim/start 在 SQLite busy timeout 时可能返回 500（既有行为，relink 路径已映射 409）；自动启动跳过会暂时保留 `desired=running/observed=stopped` 直到下次 reconcile；真实多进程未验。
+- **重要**：4b 已具备部署条件，但**尚未部署**（API 仍为旧代码）；部署与第 5 片页面验收需用户确认。
+- **提交与推送**：七文件 + 文档，随本片推送。
+- **恢复**：说“继续项目”；先读本快照与 `PROGRESS_HISTORY.md` 顶部记录。
+
 ## 收工快照（2026-11-12 13:55，W-D1 4b-1 完成）
 
 - **4b-1「受保护提交入口与登记收口」完成（687→688 返修→689 K2.8 approved）**：新增 `workspace_relink_previews` 表（10 分钟单次 token、绑定项目/操作人/候选根/物理身份/revision）；`POST /api/projects/{id}/workspace-relink`（幂等优先于令牌、token 原子标记、入口忙预检、写计划仅候选指针 + 可证明归属的 runtime 配置、失败补偿）；`PATCH` 改根 → 409 `workspace_relink_required`；`ensure` 同物理目录 → 409 `workspace_duplicate`；relink 成功返回真实规范化 `project_root`/revision/stage。旧诊断测试仅更新两处合同（预览只新增一行 token、阻断 409 不签发）。

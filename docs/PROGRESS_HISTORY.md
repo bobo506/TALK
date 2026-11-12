@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-12 15:00 — W-D1 4b-2：重关联/领取串行化与守卫（690/691/692）
+
+- **690（Terra）blocked**：白名单只允许改守卫模块与入口，但复现出真实竞态——路由忙预检提交后、内核建操作前，claim 可成功（200/running）且 relink 仍完成；修复必须改 `workspace_relink.py` 在 T1 内复检。未写产品代码。
+- **691（扩权返修）partial→实现完成**：新增 `server/workspace_relink_guard.py`；`workspace_relink.py` T1 事务内（`begin_operation` 后）复检角色/任务/活动操作，忙则回滚 T1；`role_services.start/start-all`、`routes/tasks.claim`、`role_startup` 自动启动接入守卫（各自写事务内）；测试新增守卫 90 行 + 角色服务补 189 行。双向竞态实证：claim 先→relink 409 无操作行、根/revision 不变；relink 先→claim 409 任务仍 queued；start/start-all 同样。回归 150 项 0 失败（1 skip 8.3）+ 4 项真实路由交错。partial 原因是首轮回归覆盖既有证据 `.tmp/wd1-impl2/api-samples.json`（原内容未知）。
+- **证据恢复（协调者）**：覆盖版保留为 `.tmp/wd1-impl2/api-samples.after-4b1-overwrite.json`（2228 B，14:17）；用 4a-2 时期副本（2102 B，10:17）尽力恢复原路径，标注 best-effort；产品无影响。
+- **692（K2.8 独立复核）approved**：fail-closed on unknown；写锁串行化成立；T1 复检有效；recovery 门与自动启动跳过符合设计；无新增失败；证据恢复被判可接受（需在 PROGRESS 明确标注）。
+- **残余（非阻断）**：claim/start 在 SQLite busy timeout 时可能 500（既有行为，relink 已映射 409）；自动启动跳过保留 `desired=running/observed=stopped` 至下次 reconcile；真实多进程未验。
+- **状态**：690/691/692 已收取，`submitted=[]`；七文件入库并推送；**未部署**，第 5 片页面待确认。
+
 ## 2026-11-12 13:55 — W-D1 4b-1：受保护提交入口与登记收口（687/688/689）
 
 - **687（Terra）partial**：实现 8 文件——`workspace_relink_previews` 表 + 索引、预览签发 token 与阻断 409、`POST /api/projects/{id}/workspace-relink`（幂等优先于令牌、token 原子标记、入口忙预检、写计划、失败补偿）、`PATCH` 收口、`ensure` 物理身份重复、API 测试 272 行；旧诊断测试仅改两处合同。唯一未完成：成功响应的 `project_root` 用脱敏占位符而非真实根。

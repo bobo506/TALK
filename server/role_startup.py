@@ -6,6 +6,7 @@ generation can execute saved choices; service ownership is never adopted.
 from datetime import datetime,timedelta,timezone
 import hashlib
 import json
+import logging
 import math
 from pathlib import Path
 import re
@@ -15,6 +16,7 @@ import time
 
 from fastapi import HTTPException
 from sqlmodel import select
+from server.workspace_relink_guard import operation_code as _relink_guard_code
 from server import models as m
 from server.role_services import (_as_utc,_now,_write_begin,load_role_service_context,
     _require_managed_cli,_require_start_layout,_enqueue_start_launch,_idempotent_stopped,ownership_held,project_role_service,expire_due_launches)
@@ -219,10 +221,20 @@ def _cold_recover(key,digest,operator,session,config,cutoff):
         confirmation='old_processes_confirmed_stopped',reason='original_host_exited')
     recover_stopped(key[0],key[2],body,operator,session,_preboot_at=cutoff,_on_recovered=audit,_expected_layout=layout)
 
+def _skip_relink(key, digest, session):
+    code = _relink_guard_code(session, key[0])
+    if not code:
+        return False
+    logging.getLogger(__name__).info("project=%s role=%s code=%s", key[0], key[2], code)
+    _complete(key, digest, 'skipped', session, error=code)
+    return True
+
+
 def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
     config,health,cutoff=verified_runtime(key[0],key[1],session)
     _write_begin(session)
     row=_locked_entry(key,digest,session);state=_generation(row,session)
+    if _skip_relink(key,digest,session):return
     try:
         _require_start_layout(key[0],key[2],session)
     except HTTPException as exc:
@@ -237,6 +249,7 @@ def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
         _cold_recover(key,digest,operator,session,config,cutoff)
     _write_begin(session)
     row=_locked_entry(key,digest,session);state=_generation(row,session)
+    if _skip_relink(key,digest,session):return
     verified_runtime(key[0],key[1],session)
     _require_start_layout(key[0],key[2],session)
     expire_due_launches(session,now=_now(),project_id=key[0],member_id=key[2])
@@ -260,6 +273,7 @@ def _apply(key,digest,operator,session,*,workspace_runtime_guard=False):
         _locked_entry(key,digest,session)
         _idempotent_stopped(key[0],key[2],ctx.role.role_name,state,session,_now(),operator)
         _write_begin(session);row=_locked_entry(key,digest,session);state=_generation(row,session)
+        if _skip_relink(key,digest,session):return
         verified_runtime(key[0],key[1],session)
         ctx=load_role_service_context(key[0],key[2],session)
     if state and state.observed_state in ('unknown','stopping'):fail('startup_recovery_required')

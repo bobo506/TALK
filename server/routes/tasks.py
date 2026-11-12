@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from server.auth import get_current_member
+from server.workspace_relink_guard import operation_code as _relink_guard_code
 from server.db import begin_immediate_write, get_session
 from server.models import (
     AgentInstance,
@@ -2879,6 +2880,9 @@ def claim_task(
     task = _get_task(task_id, session)
     if task.target_member_id != current.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="task belongs to another agent")
+    if task.project_id is not None and _relink_guard_code(session, task.project_id, claim=True):
+        session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="workspace_busy")
     # 角色生命周期 R1-1（合同 §9.3）：归档角色的领取禁入（与创建守卫同在 R1-1）。
     if task.project_id is not None:
         role = session.get(ProjectRole, (task.project_id, current.id))
@@ -2896,6 +2900,9 @@ def claim_task(
         begin_immediate_write(session)
         session.expire_all()
         task = _get_task(task_id, session)
+        if task.project_id is not None and _relink_guard_code(session, task.project_id, claim=True):
+            session.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="workspace_busy")
         instance = _ensure_instance_owner(body.instance_id, current, session)
     root = _get_root_task(task, session)
     if task.status == "running" and task.claimed_by == current.id and task.instance_id == body.instance_id:

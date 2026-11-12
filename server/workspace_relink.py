@@ -15,6 +15,7 @@ from server.models import AgentTask, Project, RoleServiceState
 from server import workspace_operations as ops, workspace_registry as registry
 from server.workspace_diagnostics import inspect_root
 from server import workspace_relink_files as files
+from server.workspace_relink_guard import operation_code, relink_busy_code
 
 
 class WorkspaceRelinkError(Exception):
@@ -201,9 +202,13 @@ def execute_relink(session_factory, *, project_id, candidate_root, expected_revi
                 ops.WorkspaceOperation.project_id == project_id,
                 ops.WorkspaceOperation.stage.not_in(("completed", "failed")))).first()
             if busy:
-                raise WorkspaceRelinkError("workspace_busy")
+                raise WorkspaceRelinkError(operation_code(session, project_id) or "workspace_busy")
             try:
                 ops.begin_operation(session, operation_id, project_id, old_root, candidate_root, expected_revision)
+                code = relink_busy_code(session, project_id, operation_id)
+                if code:
+                    session.rollback()
+                    raise WorkspaceRelinkError(code)
                 ops.advance_stage(session, operation_id, "started", "prepared")
                 session.commit()
             except IntegrityError:

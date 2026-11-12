@@ -39,6 +39,7 @@ from sqlalchemy import func, or_, update
 from sqlmodel import Session, select
 
 from server.db import begin_immediate_write
+from server.workspace_relink_guard import operation_code as _relink_guard_code
 from server.role_host_resolution import workspace_runtime_enabled
 from server.workbuddy_cdp import cdp_endpoint_available
 from bridges.stop_blockers import BUSY_STOP_CODE, STOP_BLOCKER_LIMIT, safe_stop_blockers
@@ -669,8 +670,12 @@ def start_role_service(
     启动复用；本包装继续负责原事务边界与 human 审计（``updated_by=operator.id``），
     行为/返回模型/错误码与 R1-3 逐字一致。
     """
-    _require_workbuddy_cdp_available(project_id, member_id, session)
     _write_begin(session)
+    code = _relink_guard_code(session, project_id)
+    if code:
+        session.rollback()
+        raise _fail(status.HTTP_409_CONFLICT, code)
+    _require_workbuddy_cdp_available(project_id, member_id, session)
     _require_start_layout(project_id, member_id, session)
     ctx = load_role_service_context(project_id, member_id, session)
     _require_managed_cli(ctx)
@@ -975,6 +980,9 @@ def enqueue_auto_start_launch(
     原样上抛，由调用方回滚保存点后登记 ``auto_start_enqueue_failed``。自动动作
     的审计身份是 ``system:auto-start``（不冒充 human，不新增权限入口）。
     """
+    code = _relink_guard_code(session, project_id)
+    if code:
+        return None, code
     try:
         _require_start_layout(project_id, member_id, session)
         ctx = load_role_service_context(project_id, member_id, session)
@@ -1769,6 +1777,9 @@ def start_all_role_services(
         role = by_member[member_id]
         _write_begin(session)
         try:
+            code = _relink_guard_code(session, project_id)
+            if code:
+                raise _fail(status.HTTP_409_CONFLICT, code)
             _require_start_layout(project_id, member_id, session)
         except HTTPException as exc:
             session.rollback()

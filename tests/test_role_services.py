@@ -1970,3 +1970,192 @@ class AvailabilityTests(RoleServiceTestCase):
             asyncio.run(exercise())
         finally:
             release.set()
+
+
+class WorkspaceRelinkRoleGuardTests(RoleServiceTestCase):
+    def test_active_recovery_and_terminal_gates(self):
+        from server.models import WorkspaceOperation
+        for stage, code in (("started", "workspace_busy"), ("recovery_required", "workspace_recovery_required")):
+            with self.session() as session:
+                row = session.get(WorkspaceOperation, "guard")
+                if row is None:
+                    row = WorkspaceOperation(operation_id="guard", project_id=PROJECT_ID, request_digest="synthetic", stage=stage)
+                else:
+                    row.stage = stage
+                session.add(row); session.commit()
+            response = self.start()
+            self.assertEqual((response.status_code, response.json()["detail"]), (409, code))
+            response = self.start_all()
+            self.assertEqual(response.status_code, 200)
+            item = next(row for row in response.json()["results"] if row["member_id"] == self.role_a)
+            self.assertEqual((item["status"], item["error_code"]), ("failed", code))
+            with self.session() as session:
+                state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+                self.assertTrue(state is None or (state.generation == 0 and state.current_launch_id is None))
+        with self.session() as session:
+            row = session.get(WorkspaceOperation, "guard"); row.stage = "completed"
+            session.add(row); session.commit()
+        self.assertEqual(self.start().status_code, 200)
+
+    def _race_relink_setup(self):
+        import hashlib
+        import tempfile
+        from pathlib import Path
+        from server import workspace_registry
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        old, new = Path(folder.name) / "old", Path(folder.name) / "new"
+        old.mkdir(); new.mkdir()
+        target = new / "target"; target.write_bytes(b"before")
+        with self.session() as session:
+            project = session.get(Project, PROJECT_ID); project.project_root_path = str(old)
+            session.add(project); workspace_registry.ensure_registration(session, PROJECT_ID); session.commit()
+        identity = {"platform": __import__("os").name, "volume_id": 1, "file_id": 1, "collected_at": datetime.now(timezone.utc).isoformat()}
+        args = dict(project_id=PROJECT_ID, candidate_root=str(new), expected_revision=1, operation_id="race",
+                    writes=[{"target": str(target), "payload": b"after", "expected_digest": hashlib.sha256(b"before").hexdigest()}], allowed_roots=[str(new)])
+        return old, new, target, identity, args
+
+    def _race_start_first(self, batch):
+        from server import workspace_relink as relink
+        from server.models import WorkspaceOperation
+        from server import workspace_registry
+        old, new, target, identity, args = self._race_relink_setup()
+        with self.session() as session:
+            from server.db import begin_immediate_write
+            begin_immediate_write(session); relink.busy_preflight(session, PROJECT_ID); session.commit()
+        response = self.start_all() if batch else self.start()
+        self.assertEqual(response.status_code, 200)
+        if batch:
+            self.assertEqual(response.json()["results"][0]["status"], "requested")
+        with patch.object(relink, "inspect_root", return_value={"status": "ok", "identity": identity}):
+            with self.assertRaises(relink.WorkspaceRelinkError) as exc:
+                relink.execute_relink(self.session, **args)
+        self.assertEqual(exc.exception.code, "workspace_busy")
+        with self.session() as session:
+            self.assertIsNone(session.get(WorkspaceOperation, "race"))
+            self.assertEqual(session.get(Project, PROJECT_ID).project_root_path, str(old))
+            self.assertEqual(workspace_registry.get_registration(session, PROJECT_ID).revision, 1)
+        self.assertEqual(target.read_bytes(), b"before")
+        print("RACE %s-first: start=200 relink=workspace_busy operation=absent revision=1" % ("start-all" if batch else "start"))
+
+    def _race_relink_first(self, batch):
+        from server import workspace_relink as relink
+        old, new, target, identity, args = self._race_relink_setup()
+        prepare = relink.files.prepare_write
+        outcomes = []
+        def interleave(*a, **kw):
+            response = self.start_all() if batch else self.start()
+            outcomes.append(response)
+            return prepare(*a, **kw)
+        with patch.object(relink, "inspect_root", return_value={"status": "ok", "identity": identity}), patch.object(relink.files, "prepare_write", side_effect=interleave):
+            result = relink.execute_relink(self.session, **args)
+        self.assertEqual(result["stage"], "completed")
+        response = outcomes[0]
+        if batch:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["results"][0]["error_code"], "workspace_busy")
+        else:
+            self.assertEqual((response.status_code, response.json()["detail"]), (409, "workspace_busy"))
+        with self.session() as session:
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertTrue(state is None or (state.generation == 0 and state.current_launch_id is None))
+        print("RACE relink-first: relink=completed %s=workspace_busy generation=unchanged" % ("start-all" if batch else "start"))
+
+    def test_race_start_first(self):
+        self._race_start_first(False)
+
+    def test_race_start_all_first(self):
+        self._race_start_first(True)
+
+    def test_race_relink_then_start(self):
+        self._race_relink_first(False)
+
+    def test_race_relink_then_start_all(self):
+        self._race_relink_first(True)
+
+    def test_failed_operation_allows_start_all(self):
+        from server.models import WorkspaceOperation
+        with self.session() as session:
+            session.add(WorkspaceOperation(operation_id="failed-op", project_id=PROJECT_ID, request_digest="synthetic", stage="failed"))
+            session.commit()
+        response = self.start_all()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"][0]["status"], "requested")
+
+    def test_configuration_auto_start_is_skipped_in_write_transaction(self):
+        from server.db import begin_immediate_write
+        from server.models import WorkspaceOperation
+        with self.session() as session:
+            session.add(WorkspaceOperation(operation_id="guard", project_id=PROJECT_ID, request_digest="synthetic", stage="started"))
+            session.commit()
+        with self.session() as session:
+            begin_immediate_write(session)
+            self.assertEqual(enqueue_auto_start_launch(PROJECT_ID, self.role_a, session=session, now=datetime.now(timezone.utc)), (None, "workspace_busy"))
+            session.commit()
+            state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+            self.assertTrue(state is None or (state.generation == 0 and state.current_launch_id is None))
+
+    def _route_race(self, batch, start_first):
+        from server import workspace_relink as relink, workspace_registry
+        from server.models import WorkspaceOperation
+        old, new, target, identity, args = self._race_relink_setup()
+        (old / ".talk").mkdir(); (new / ".talk").mkdir()
+        config = old.parent / "runtime.json"
+        config.write_text(json.dumps({"project_id": PROJECT_ID, "project_root": str(old)}), encoding="utf-8")
+        pointer = {"schema": "talk-local-runtime-1", "database_file": str(old.parent / "db"), "config_file": str(config)}
+        (old / ".talk" / "runtime.local.json").write_text(json.dumps(pointer), encoding="utf-8")
+        outcome = []
+        def do_start():
+            response = self.start_all() if batch else self.start()
+            outcome.append(response)
+        def check_start_busy():
+            response = outcome[0]
+            if batch:
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["results"][0]["error_code"], "workspace_busy")
+            else:
+                self.assertEqual((response.status_code, response.json()["detail"]), (409, "workspace_busy"))
+        with self.make_client() as client:
+            preview = client.post(f"/api/projects/{PROJECT_ID}/workspace-relink-preview", headers={"X-API-Key": "bobo-key"}, json={"candidate_root": str(new)})
+            self.assertEqual(preview.status_code, 200, preview.text)
+            body = {"preview_token": preview.json()["preview_token"], "candidate_root": str(new), "expected_revision": 1, "operation_id": "route-race"}
+            if start_first:
+                execute = relink.execute_relink
+                def interleave(*a, **kw):
+                    do_start()
+                    return execute(*a, **kw)
+                with patch.object(relink, "execute_relink", side_effect=interleave):
+                    response = client.post(f"/api/projects/{PROJECT_ID}/workspace-relink", headers={"X-API-Key": "bobo-key"}, json=body)
+                self.assertEqual(outcome[0].status_code, 200)
+                if batch:self.assertEqual(outcome[0].json()["results"][0]["status"], "requested")
+                self.assertEqual((response.status_code, response.json()["detail"]), (409, "workspace_busy"))
+                with self.session() as session:
+                    self.assertIsNone(session.get(WorkspaceOperation, "route-race"))
+                    self.assertEqual(session.get(Project, PROJECT_ID).project_root_path, str(old))
+                    self.assertEqual(workspace_registry.get_registration(session, PROJECT_ID).revision, 1)
+                self.assertFalse((new / ".talk" / "runtime.local.json").exists())
+            else:
+                prepare = relink.files.prepare_write
+                def interleave(*a, **kw):
+                    if not outcome:do_start()
+                    return prepare(*a, **kw)
+                with patch.object(relink.files, "prepare_write", side_effect=interleave):
+                    response = client.post(f"/api/projects/{PROJECT_ID}/workspace-relink", headers={"X-API-Key": "bobo-key"}, json=body)
+                self.assertEqual((response.status_code, response.json().get("stage")), (200, "completed"), response.text)
+                check_start_busy()
+                with self.session() as session:
+                    state = session.get(RoleServiceState, (PROJECT_ID, self.role_a))
+                    self.assertTrue(state is None or (state.generation == 0 and state.current_launch_id is None))
+        print("ROUTE RACE %s %s: pass" % ("start-all" if batch else "start", "start-first" if start_first else "relink-first"))
+
+    def test_route_race_start_first(self):
+        self._route_race(False, True)
+
+    def test_route_race_start_all_first(self):
+        self._route_race(True, True)
+
+    def test_route_race_relink_then_start(self):
+        self._route_race(False, False)
+
+    def test_route_race_relink_then_start_all(self):
+        self._route_race(True, False)
