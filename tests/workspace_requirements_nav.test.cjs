@@ -29,9 +29,7 @@ const APP_PIECES = [
   sliceBetween(appSource, 'function getContextTask()', 'function taskKindLabel('),
   sliceBetween(appSource, 'function taskKindLabel(', 'function checkpointReasonLabel('),
   sliceBetween(appSource, 'function renderTaskDetailsPanel()', 'async function openTaskHall('),
-  sliceBetween(appSource, 'function sortedGroupMembers(', 'function showGroupMembersError('),
-  sliceBetween(appSource, 'function renderGroupMembersPanel()', 'function memberKindFromId('),
-  sliceBetween(appSource, 'function memberKindFromId(', 'function toggleMemberKindFilter('),
+  sliceBetween(appSource, 'function renderGroupMembersPanel()', 'function showAgentProfileError('),
   sliceBetween(appSource, 'function getActiveGroup()', 'function canManageGroups('),
   sliceBetween(appSource, 'function getGroupMemberIds(', 'function setActiveGroup('),
   sliceBetween(appSource, 'function setActiveGroup(', 'function renderRoomStrip()'),
@@ -147,6 +145,7 @@ function harness({ projectId = 'A', memberId = 'human:qa', withTask = false } = 
     activeReplyTo: null,
     clearComposerStatus() {},
     myId: memberId,
+    myKind: "human",
     activeProjectId: projectId,
     activeGroupId: null,
     blackboardOpen: false,
@@ -197,7 +196,7 @@ function harness({ projectId = 'A', memberId = 'human:qa', withTask = false } = 
 }
 
 const enterRoles = h => { h.el('workspace-roles-btn').fire('click'); return h.tick(); };
-const enterChats = h => { h.el('workspace-chats-btn').fire('click'); return h.tick(); };
+const enterHall = h => { h.ui.setActiveGroup('group:task-hall'); return h.tick(); };
 
 test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐藏；点角色后互斥切换（真实按钮 → renderWorkspaceMode 全链路）', async () => {
   const h = harness();
@@ -234,32 +233,27 @@ test('R1 角色页默认“项目设置”：编辑区显示、角色详情隐�
   assert.equal(h.requests.length, before);
 });
 
-test('R1 角色 → 群聊 → 普通房间：编辑区与角色详情都隐藏（原缺陷路径）', async () => {
-  const h = harness();
+test('R1 角色 → 任务 Hall：编辑区与角色详情都隐藏', async () => {
+  const h = harness({ withTask: true });
   await enterRoles(h);
   assert.equal(h.hidden('requirements-panel'), false);
-  // 真实链路：群聊按钮 → openWorkspaceChats → setActiveGroup → renderWorkspaceMode
-  // → renderRoomStrip + renderGroupMembersPanel → renderTaskDetailsPanel → renderRequirementsPanel
-  await enterChats(h);
-  assert.equal(h.ui.workspaceUI.mode, 'chats');
-  assert.equal(h.context.activeGroupId, 'group:chat1');
+  await enterHall(h);
+  assert.equal(h.ui.workspaceUI.mode, 'tasks');
+  assert.equal(h.context.activeGroupId, 'group:task-hall');
   assert.equal(h.context.blackboardOpen, false);
   assert.equal(h.hidden('requirements-panel'), true);
   assert.deepEqual([h.hidden('role-details-name-panel'), h.hidden('role-details-tasks-panel')], [true, true]);
-  // 群聊成员面板正常显示（没有把整个详情栏误隐藏）
-  assert.equal(h.hidden('group-members-panel'), false);
-  // 停留期间再次刷新详情（模拟 5 秒轮询之外的重绘入口）也不会复活
   h.ui.renderGroupMembersPanel();
   assert.equal(h.hidden('requirements-panel'), true);
 });
 
-test('R1 群聊返回角色页：编辑区恢复显示且同项目草稿保留', async () => {
-  const h = harness();
+test('R1 任务 Hall 返回角色页：编辑区恢复显示且同项目草稿保留', async () => {
+  const h = harness({ withTask: true });
   await enterRoles(h);
   const before = h.requests.length;
   h.el('requirements-input').value = '草稿：R1 往返保留';
   h.el('requirements-input').fire('input');
-  await enterChats(h);
+  await enterHall(h);
   assert.equal(h.hidden('requirements-panel'), true);
   await enterRoles(h);
   assert.equal(h.hidden('requirements-panel'), false);

@@ -73,23 +73,11 @@ function workspaceChatRooms(items, projectId) {
   return items.filter(group => group.type !== "task" && (!projectId || !group.project_id || group.project_id === projectId));
 }
 function workspaceHasConversation() {
-  return ["tasks", "chats"].includes(workspaceUI.mode) && !blackboardOpen && Boolean(getActiveGroup()) && canEnterGroup(activeGroupId)
-    && (workspaceUI.mode !== "chats" || workspaceChatRooms([getActiveGroup()], activeProjectId).length > 0);
+  return workspaceUI.mode === "tasks" && !blackboardOpen && Boolean(getActiveGroup()) && canEnterGroup(activeGroupId);
 }
-// 任务完整对话：任务模式下进入任务 Hall 对话时，右侧不再重复任务详情栏，聊天占用腾出的空间。
+// 任务完整对话占用详情栏空间。
 function workspaceTaskChatActive() {
-  return workspaceUI.mode === "tasks" && !blackboardOpen && workspaceHasConversation();
-}
-function openWorkspaceChats() {
-  const rooms = workspaceChatRooms(groups, activeProjectId);
-  const next = rooms.find(group => group.id === workspaceUI.lastChatId && canEnterGroup(group.id))
-    || rooms.find(group => group.id === activeGroupId && canEnterGroup(group.id))
-    || rooms.find(group => canEnterGroup(group.id));
-  workspaceUI.mode = "chats";
-  hallFilterInput.value = "";
-  // 空群聊不回落到旧全局消息流；由页面显示空状态。
-  setActiveGroup(next?.id || null);
-  renderWorkspaceMode();
+  return workspaceHasConversation();
 }
 function workspaceEl(tag, className, text) {
   const node = document.createElement(tag);
@@ -273,13 +261,11 @@ function syncTaskListPaginationContext() {
   }
 }
 function syncWorkspaceLayout() {
-  // 群聊导航不渲染任务列表；在公共导航入口同步，离页也能立即作废旧页码。
+  // 同步导航与分页上下文。
   syncTaskListPaginationContext();
   document.querySelector(".workbench").classList.toggle("project-mode", blackboardOpen);
   document.querySelector(".workbench").classList.toggle("task-chat-mode", workspaceTaskChatActive());
-  document.querySelector(".workbench").classList.toggle("empty-chat-mode", workspaceUI.mode === "chats" && !workspaceHasConversation());
   document.getElementById("project-blackboard-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "tasks"));
-  document.getElementById("workspace-chats-btn").setAttribute("aria-pressed", String(workspaceUI.mode === "chats"));
   document.getElementById("workspace-roles-btn").setAttribute("aria-pressed", String(blackboardOpen && workspaceUI.mode === "roles"));
   if (myId) userBadge.textContent = workspaceMemberName(myId);
   // R1-3：每次导航/刷新都同步服务轮询上下文——离开角色页、切项目或切账号立即停表。
@@ -952,7 +938,7 @@ function renderWorkspaceList() {
   // 选区消失后由 selectionchange 补一次重绘，状态不会长期滞后。
   if (workspaceRoleListSelection()) { workspaceUI.listRenderDeferred = true; return; }
   const rolesMode = workspaceUI.mode === "roles";
-  // 开发要求编辑区的可见性统一由 renderTaskDetailsPanel() 同步（app.js），覆盖群聊等不经本函数的导航路径。
+  // 开发要求编辑区的可见性统一由 renderTaskDetailsPanel() 同步（app.js）。
   syncWorkspaceLayout();
   blackboardTitle.textContent = rolesMode ? "角色" : "任务";
   blackboardDescription.textContent = rolesMode
@@ -2792,7 +2778,6 @@ async function showWorkspaceResult(task) {
   } catch (err) { if (current()) panel.textContent = err.message; }
 }
 if (typeof document !== "undefined") {
-  document.getElementById("workspace-chats-btn").addEventListener("click", openWorkspaceChats);
   document.getElementById("workspace-roles-btn").addEventListener("click", () => {
     workspaceUI.mode = "roles"; blackboardOpen = Boolean(activeProjectId); selectedTaskTree = null; ++taskTreeRequest;
     workspaceUI.query = ""; document.getElementById("workspace-search").value = "";

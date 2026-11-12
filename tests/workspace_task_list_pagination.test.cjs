@@ -227,7 +227,7 @@ function harness({ human = true, tasks = [] } = {}) {
   };
 }
 
-test('复核导航：经真实群聊按钮离页再返回任务，页码必须重置', async () => {
+test('复核导航：经真实角色按钮离页再返回任务，页码必须重置', async () => {
   const h = harness({ tasks: Array.from({ length: 41 }, (_, i) => makeTask(i + 1)) });
   Object.assign(h.context, {
     hallFilterInput: h.el('hall-filter-input'),
@@ -244,10 +244,9 @@ test('复核导航：经真实群聊按钮离页再返回任务，页码必须�
   vm.runInContext(appSource.slice(start, end), h.context);
   click(h.nextBtn());
   assert.equal(h.pageUI.page, 2);
-  // 真正导航到群聊的分支不调用 renderWorkspaceList。
-  click(h.el('workspace-chats-btn'));
-  assert.equal(h.ui.mode, 'chats');
-  assert.equal(h.pageUI.page, 1, '进入群聊时立即重置，不依赖任务列表重绘');
+  click(h.el('workspace-roles-btn'));
+  assert.equal(h.ui.mode, 'roles');
+  assert.equal(h.pageUI.page, 1, '进入角色页时立即重置');
   h.ui.mode = 'tasks';
   h.context.renderWorkspaceMode();
   assert.equal(h.pagerInfo(), '第 1 / 3 页 · 共 41 项');

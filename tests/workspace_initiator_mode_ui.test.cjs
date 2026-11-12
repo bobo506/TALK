@@ -45,9 +45,7 @@ const APP_PIECES = [
   sliceBetween(appSource, 'function getContextTask()', 'function taskKindLabel('),
   sliceBetween(appSource, 'function taskKindLabel(', 'function checkpointReasonLabel('),
   sliceBetween(appSource, 'function renderTaskDetailsPanel()', 'async function openTaskHall('),
-  sliceBetween(appSource, 'function sortedGroupMembers(', 'function showGroupMembersError('),
-  sliceBetween(appSource, 'function renderGroupMembersPanel()', 'function memberKindFromId('),
-  sliceBetween(appSource, 'function memberKindFromId(', 'function toggleMemberKindFilter('),
+  sliceBetween(appSource, 'function renderGroupMembersPanel()', 'function showAgentProfileError('),
   sliceBetween(appSource, 'function getActiveGroup()', 'function canManageGroups('),
   sliceBetween(appSource, 'function getGroupMemberIds(', 'function setActiveGroup('),
   sliceBetween(appSource, 'function setActiveGroup(', 'function renderRoomStrip()'),
@@ -157,6 +155,7 @@ function harness() {
   };
   const context = vm.createContext({
     myId: 'human:qa',
+    myKind: 'human',
     activeProjectId: 'A',
     activeGroupId: null,
     blackboardOpen: false,
@@ -246,12 +245,13 @@ test('静态退役：无主控面板 DOM、缓存按变更资源更新；web 源
   }
   assert.ok(!workspaceSource.includes('/controller-assignment'), 'workspace.js 不再读写指定端点');
   assert.ok(!appSource.includes('/controller-assignment'), 'app.js 不再读写指定端点');
-  for (const asset of ['style.css', 'role-diagnostics.css']) {
+  for (const asset of ['role-diagnostics.css']) {
     assert.ok(indexHtml.includes(`/${asset}?v=${STATIC_VERSION}`), `${asset} 保留原缓存版本`);
   }
   assert.ok(indexHtml.includes('/role-creation.css?v=20261029-theme-day-night-v1'), '本次 role-creation.css 更新缓存版本');
-  assert.ok(indexHtml.includes('/app.js?v=20261106-workspace-w2b'), '未修改的 app.js 保留原缓存版本');
-  assert.ok(indexHtml.includes('/workspace.js?v=20261105-workbuddy-effort-v1'), '本次 workspace.js 更新缓存版本');
+  assert.ok(indexHtml.includes('/style.css?v=20261112-hall-only'));
+  assert.ok(indexHtml.includes('/app.js?v=20261112-hall-only'));
+  assert.ok(indexHtml.includes('/workspace.js?v=20261112-hall-only'), '本次 workspace.js 更新缓存版本');
   assert.ok(!indexHtml.includes('20261006-controller-mode'), '旧版本串不残留');
 });
 

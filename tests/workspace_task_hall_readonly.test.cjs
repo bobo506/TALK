@@ -29,7 +29,7 @@ function harness() {
     getElementById(id) { const find = n => n.id === id ? n : n.children.map(find).find(Boolean); return [...elements.values()].map(find).find(Boolean) || null; } };
   const ctx = vm.createContext({ document, messagesEl: el('messages'), msgInput: el('input'), attachBtn: el('attach'), sendBtn: el('send'), mentionDropdown: el('mentions'),
     workspaceUI: { mode: 'tasks' }, blackboardOpen: false, activeGroupId: 't', selectedTaskId: null,
-    groups: [{ id: 't', type: 'task' }, { id: 'g', type: 'group' }], projectTasks: [{ id: 1, hall_group_id: 't', title: '<标题>', content: '第一行\n第二行', workflow_status: 'submitted', created_by: '人', target_member_id: '执行者', created_at: '2026-11-04' }],
+    groups: [{ id: 't', type: 'task', members: [{member_id:'人'}, {member_id:'执行者'}] }, { id: 'g', type: 'group' }], projectTasks: [{ id: 1, hall_group_id: 't', title: '<标题>', content: '第一行\n第二行', workflow_status: 'submitted', created_by: '人', target_member_id: '执行者', created_at: '2026-11-04' }],
     sending: false, pendingFile: null, activeReplyTo: null, renderedMessageIds: new Set(), messageRecords: new Map(), appliedHistoryQuery: '', emptySearchText: '', emptyTimelineText: '',
     getActiveGroup() { return ctx.groups.find(g => g.id === ctx.activeGroupId); }, workspaceHasConversation: () => true, activeGroupReadOnly: () => ctx.observer || false,
     workspaceMemberName: id => id || '—', formatTaskTime: x => x, showComposerStatus() {}, clearComposerStatus() {}, updateComposerPlaceholder() {}, clearPendingFile() {}, clearReplyTarget() {},
@@ -60,6 +60,8 @@ test('任务交办内容置顶、保留原文且不计入消息；历史向前�
   assert.equal(toggle.textContent, '收起');
   assert.match(details.textContent, /第一行\n第二行/);
   assert.match(details.textContent, /发起者：人\n执行者：执行者\n创建时间：2026-11-04/);
+  assert.equal(details.children[0].textContent, '参与者：人、执行者');
+  assert.equal(details.children[0].children.length, 0, '参与者只读展示');
   assert.match(details.style.cssText, /max-height\s*:\s*60vh/i);
   assert.match(details.style.cssText, /overflow\s*:\s*auto/i);
   assert.doesNotMatch(details.style.cssText, /position\s*:\s*(sticky|fixed|absolute)/i);

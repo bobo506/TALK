@@ -96,14 +96,11 @@ test('任务模式下没有可用对话（空项目/无权限）不启用 task-c
   assert.equal(workbench.has('task-chat-mode'), false);
 });
 
-test('群聊空状态沿用 empty-chat-mode，不混入 task-chat-mode', () => {
-  const { context: c, workbench } = harness();
-  c.blackboardOpen = false;
-  c.activeGroupId = null;
-  vm.runInContext('workspaceUI.mode = "chats"', c);
-  c.syncWorkspaceLayout();
-  assert.equal(workbench.has('task-chat-mode'), false);
-  assert.equal(workbench.has('empty-chat-mode'), true);
+test('页面移除群聊入口、创建入口、房间列表及空态', () => {
+  const html = fs.readFileSync(require.resolve('../web/index.html'), 'utf8');
+  for (const id of ['workspace-chats-btn', 'group-create-overlay', 'group-room-list', 'workspace-chat-empty', 'hall-filter-input', 'delete-group-btn']) {
+    assert.ok(!html.includes(`id="${id}"`), id);
+  }
 });
 
 test('workspaceTaskChatActive 只读布局条件，不触碰详情 DOM', () => {

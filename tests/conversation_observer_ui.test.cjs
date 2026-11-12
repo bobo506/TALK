@@ -81,6 +81,7 @@ function makeDocument() {
   return {
     created,
     getElementById(id) {
+      if (['workspace-chats-btn', 'room-strip', 'group-create-overlay', 'group-room-list', 'workspace-chat-empty', 'hall-filter-input'].includes(id)) return null;
       if (!byId.has(id)) byId.set(id, fakeEl());
       return byId.get(id);
     },
@@ -263,35 +264,20 @@ test('信任模式权限请求在登出后返回不得恢复授权', async () =>
   assert.equal(run(context, 'canViewAllConversations'), false);
 });
 
-test('观察者登录后可进入未加入的群聊，列表按钮不再禁用且标注只读', async () => {
-  const { context, document } = harness(baseRoutes(observerPermissions));
+test('观察者可以只读进入未加入的任务 Hall', async () => {
+  const { context } = harness(baseRoutes(observerPermissions));
   await loginAs(context, 'bobo-key');
-  assert.equal(run(context, 'canViewAllConversations'), true);
-  assert.equal(run(context, 'canEnterGroup("group:lab")'), true);
-  assert.equal(run(context, 'canEnterGroup("group:task-1")'), true);
-
-  document.created.length = 0;
-  run(context, 'workspaceUI.mode = "chats"; renderRoomStrip()');
-  const lab = roomButtons(document).find((el) => el.children[0] && el.children[0].textContent === 'Lab');
-  assert.ok(lab, '群列表应渲染 Lab 房间');
-  assert.equal(lab.disabled, false);
-  assert.match(lab.children[1].textContent, /未加入（只读）/);
-  assert.match(lab.title, /可只读查看/);
+  await run(context, 'openTaskHall({id: 7, hall_group_id: "group:task-1"})');
+  assert.equal(run(context, 'activeGroupId'), 'group:task-1');
+  assert.equal(run(context, 'activeGroupReadOnly()'), true);
 });
 
-test('普通成员无权限时群列表仍禁用并提示尚未加入', async () => {
+test('普通成员无权限时不能进入未加入的任务 Hall', async () => {
   const { context, document } = harness(baseRoutes(plainPermissions));
   await loginAs(context, 'carol-key');
-  assert.equal(run(context, 'canViewAllConversations'), false);
-  assert.equal(run(context, 'canEnterGroup("group:lab")'), false);
-  assert.equal(run(context, 'canEnterGroup("group:mine")'), true);
-
-  document.created.length = 0;
-  run(context, 'workspaceUI.mode = "chats"; renderRoomStrip()');
-  const lab = roomButtons(document).find((el) => el.children[0] && el.children[0].textContent === 'Lab');
-  assert.ok(lab);
-  assert.equal(lab.disabled, true);
-  assert.match(lab.children[1].textContent, /尚未加入/);
+  await run(context, 'openTaskHall({id: 7, hall_group_id: "group:task-1"})');
+  assert.equal(run(context, 'activeGroupId'), null);
+  assert.match(document.getElementById('task-details-error').textContent, /尚未加入/);
 });
 
 test('旧服务 404 / 缺字段 / 成员不匹配都不授予旁观权限', async () => {
@@ -371,7 +357,11 @@ test('观察者可从未加入的 Task Hall 查看完整对话与成果', async 
   const { context, document } = harness(routes);
   await loginAs(context, 'bobo-key');
 
-  await run(context, 'openTaskHall({ id: 7, hall_group_id: "group:task-1" })');
+  context.fixtureTask = task7;
+  run(context, 'workspaceUI.mode = "tasks"; blackboardOpen = true; selectedTaskId = 7; projectTasks = [fixtureTask]; renderTaskDetailsPanel()');
+  const openButton = document.getElementById('task-details-actions').children.find(el => el.textContent === '查看完整对话');
+  assert.ok(openButton, '任务详情提供完整对话入口');
+  await openButton.handlers.click[0]();
   assert.equal(run(context, 'activeGroupId'), 'group:task-1');
   assert.equal(run(context, 'workspaceUI.mode'), 'tasks');
   // 等待 setActiveGroup 内部的任务树加载/详情重绘落定，避免其异步清理覆盖成果面板。
@@ -383,6 +373,27 @@ test('观察者可从未加入的 Task Hall 查看完整对话与成果', async 
   context.resultTask = { id: 7, hall_group_id: 'group:task-1', result_message_id: 42 };
   await run(context, 'showWorkspaceResult(resultTask)');
   assert.equal(document.getElementById('task-result-body').textContent, '成果正文');
+});
+
+test('任务 Hall 可发送、搜索历史并展示成员在线状态', async () => {
+  const task = { id: 8, hall_group_id: 'group:mine', title: '任务', content: '内容', workflow_status: 'needs_decision', created_by: 'human:carol', target_member_id: 'agent:AI1' };
+  const routes = baseRoutes(plainPermissions).map(([prefix, responder]) => prefix === '/api/tasks' ? [prefix, url => ({data: url.includes('/tree') ? [] : [task]})] : [prefix, responder]);
+  const { context, document, fetchStub } = harness(routes);
+  await loginAs(context, 'carol-key');
+  context.fixtureTask = task;
+  run(context, 'groups = groups.map(g => g.id === "group:mine" ? {...g, type: "task"} : g); projectTasks = [fixtureTask]; hasPresenceSnapshot = true; onlineMemberIds = new Set(["human:carol"]);');
+  await run(context, 'openTaskHall(fixtureTask)');
+  run(context, 'renderPresenceStrip()');
+  assert.match(document.getElementById('presence-summary').textContent, /Hall 在线 1\/2/);
+  document.getElementById('history-search-input').value = '关键字';
+  await run(context, 'applyHistorySearch()');
+  assert.ok(fetchStub.calls.some(c => c.method === 'GET' && c.url.includes('group_id=group%3Amine') && c.url.includes('q=')));
+  assert.equal(run(context, 'workspaceHasConversation()'), true);
+  assert.equal(run(context, 'getContextTask()?.workflow_status'), 'needs_decision');
+  assert.equal(run(context, 'composerReadOnly()'), false);
+  document.getElementById('msg-input').value = '任务消息';
+  await run(context, 'sendMessage()');
+  assert.ok(fetchStub.calls.some(c => c.method === 'POST' && c.url === '/api/messages' && c.opts.body.includes('group:mine')));
 });
 
 test('非观察者查看完整对话与成果仍被成员规则阻挡', async () => {

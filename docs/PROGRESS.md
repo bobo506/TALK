@@ -1,10 +1,11 @@
 # Project Progress
 
-## 当前快照（2026-11-12 21:20，W-D1 演练完成 + 清理缺陷修复）
+## 当前快照（2026-11-12 22:15，群聊拆除完成）
 
-- **第 0 项「W-D1 真实重定向演练」完成**：临时项目 `prj_wd1e2e_*`，preview `marker_only` → relink `completed`、revision 2；项目根更新、新根指针写入、旧指针不变、runtime 配置 `project_root` 更新、旧根保留、删除项目 204；全程未碰现有项目。证据 `.tmp/e2e-wd1-real/<时间戳>/evidence.json`。
-- **演练发现缺陷已修（705/706 approved）**：删除项目会残留 `workspace_registrations`/`workspace_relink_previews`/`workspace_operations` 孤儿行；现在删除前有非终态操作 → 409 `workspace_busy`，否则同事务清理三表；测试覆盖 active/completed/无行/跨项目。API 已 reload。
+- **群聊管理界面已拆除（708 实现 / 709 复核 partial / 710 返修 / 711 approved）**：去掉「群聊」导航、房间列表/搜索/刷新、新建群聊、群成员增删、删除群聊及相关文案；保留任务 Hall（任务详情 →「查看完整对话」：消息/历史/发送/presence/只读与观察者逻辑）；不改后端、不删数据、不改接口。`web/app.js` -731 行、`web/index.html` -97 行，资源版本号已 bump。
+- **复核中发现的回归已修**：`tests/workspace_project_switch.test.cjs` 曾引用已删除的 `refreshGroups()`；710 改用保留函数做截取边界，保留“切换项目不串 group”断言，删除仅针对已移除建群逻辑的用例；711 定向复验通过。
+- **交付格式**：708/709/710/711 交付中有“无 json 围栏”或字段超长，均已记录（不伪造通过）。
+- **部署**：前端静态资源，刷新即生效；本轮未重启 API/runtime。
 - **W-D1 残余**：真实多进程并发未验；SQLite busy timeout 下 claim/start 可能 500（既有）；自动启动跳过会暂留 `desired=running/observed=stopped`。
-- **用户决定**：群聊按方案 A 拆除（去掉群聊页/建群/成员管理，任务 Hall 保留在任务详情）；后续优先级 0 → 1 → 2。
-- **下一步**：群聊拆除切片（A）→ 第 1 项多工作区隔离（先设计/切片计划）→ 第 2 项正式端到端验收。
+- **下一步**：第 1 项 **多工作区隔离**——先设计/切片计划（角色 cwd、任务/消息归属、原生会话、服务生命周期、双工作区实测），确认后实施；第 2 项正式端到端验收随后。
 - **恢复**：说“继续项目”；详情见 [PROGRESS_HISTORY.md](PROGRESS_HISTORY.md) 顶部。

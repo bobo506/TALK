@@ -7,8 +7,7 @@ function slice(a,b) { const i=source.indexOf(a), j=source.indexOf(b,i); assert.o
 const functions = [
   slice('function activeProjectStorageKey()', 'async function loadProjectAgents()'),
   slice('async function setActiveProject(', 'async function refreshProjectWorkspace()'),
-  slice('function activeGroupStorageKey()', 'async function refreshGroups()'),
-  slice('function restoreActiveGroup()', 'function getActiveGroup()'),
+  slice('function activeGroupStorageKey()', 'function getActiveGroup()'),
 ].join('\n');
 function setup() {
   const c = { URLSearchParams, console, calls: [], store: {}, results: {},
@@ -55,9 +54,8 @@ test('按成员恢复 A 或 B，不可用回退首项，无项目删除缓存', 
  const c=setup(); c.store['talk_active_project_id:agent:a']='missing'; await c.loadProjects();
  assert.equal(c.activeProjectId,null); assert.equal(c.store['talk_active_project_id:agent:a'],undefined);
 });
-test('创建与上传使用当前工作区并提供缺失提示',()=>{
+test('任务创建与上传使用当前工作区并提供缺失提示',()=>{
  const task=slice('async function createTaskFromPanel(', '// ── Group / Hall');
- const group=slice('async function createGroupFromPanel(', '\nfunction ');
  const upload=slice('async function uploadPendingFile()', '\nasync function ');
- for (const piece of [task,group,upload]) { assert.match(piece,/请先选择工作区/); assert.match(piece,/project_id[^\n]*activeProjectId/); }
+ for (const piece of [task,upload]) { assert.match(piece,/请先选择工作区/); assert.match(piece,/project_id[^\n]*activeProjectId/); }
 });

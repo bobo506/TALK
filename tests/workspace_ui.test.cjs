@@ -124,21 +124,6 @@ test('没有选中群聊时不会请求全局消息',async()=>{
   await c.loadHistory(); await c.pollMessages(); assert.equal(pending.length,0);
 });
 
-test('创建群聊携带当前项目并进入新房间',async()=>{
-  const {context:c}=harness('createGroupFromPanel'); let submitted;
-  Object.assign(c,{groupCreateSaving:false,groupCreateName:{value:'协作群'},groupCreateId:{value:''},
-    groupCreateDescription:{value:''},selectedCreateMemberIds:new Set(['human:alice']),
-    submitGroupCreateBtn:{},cancelGroupCreateBtn:{},groups:[],
-    clearComposerStatus(){},showGroupCreateError(message){throw Error(message);},
-    setGroupCreateOpen(open){c.modalOpen=open;},setActiveGroup(id){c.entered=id;},
-    apiFetch:async(url,options)=>{submitted={url,body:JSON.parse(options.body)};return {ok:true,json:async()=>({id:'new-room',project_id:'p1'})};}});
-  await c.createGroupFromPanel({preventDefault(){}});
-  assert.equal(submitted.url,'/api/groups'); assert.equal(submitted.body.project_id,'p1');
-  assert.deepEqual(submitted.body.member_ids,['human:alice']);
-  assert.equal(c.entered,'new-room'); assert.equal(c.modalOpen,false);
-});
-
-
 test('群聊邀请按项目角色筛选，排除自己和禁用成员，保留其他真人账号',()=>{
   const members=[{id:'human:qa',kind:'human'}, {id:'human:bobo',kind:'human'},
     {id:'agent:codex',kind:'agent'},{id:'agent:pi',kind:'agent'},

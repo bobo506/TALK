@@ -18,7 +18,7 @@
   </script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=20261029-theme-day-night-v1">
+  <link rel="stylesheet" href="/style.css?v=20261112-hall-only">
   <link rel="stylesheet" href="/workspace.css?v=20261105-runner-versions-panel-v2">
   <link rel="stylesheet" href="/role-creation.css?v=20261029-theme-day-night-v1">
   <link rel="stylesheet" href="/role-diagnostics.css?v=20261029-theme-day-night-v1">
@@ -119,7 +119,6 @@
         <section id="project-strip" class="project-strip hidden">
           <div class="workspace-tabs" aria-label="工作台视图">
             <button id="project-blackboard-btn" type="button" aria-pressed="true">任务<span id="project-task-count" class="hidden"></span></button>
-            <button id="workspace-chats-btn" type="button" aria-pressed="false">群聊</button>
             <button id="workspace-roles-btn" type="button" aria-pressed="false">角色</button>
             <button id="refresh-project-btn" type="button" class="workspace-refresh" aria-label="刷新当前列表">刷新</button>
           </div>
@@ -147,24 +146,9 @@
           </div>
         </section>
 
-        <section id="room-strip" class="room-strip workspace-chats hidden">
-          <div class="sidebar-heading">
-            <h2>群聊房间</h2>
-            <div class="sidebar-actions">
-              <button id="toggle-group-create-btn" type="button" class="room-primary-btn" title="新建群聊" aria-label="新建群聊">新建群聊</button>
-              <button id="refresh-groups-btn" type="button" class="icon-action subtle hidden" title="刷新群聊" aria-label="刷新群聊">↻</button>
-            </div>
-          </div>
-          <div class="hall-filter-shell">
-            <span aria-hidden="true">⌕</span>
-            <input id="hall-filter-input" type="text" placeholder="搜索群聊" aria-label="搜索群聊" autocomplete="off">
-          </div>
-          <div id="group-room-list" class="group-room-list"></div>
-        </section>
       </aside>
 
       <section class="timeline-workspace">
-        <div id="workspace-chat-empty" class="workspace-chat-empty hidden"><h2>选择一个群聊房间</h2><p>从左侧进入已有群聊，或新建一个房间开始交流。</p></div>
         <header id="hall-header" class="hall-header">
           <div class="hall-title-row">
             <div>
@@ -365,82 +349,9 @@
           <p id="role-export-status" class="role-export-status" role="status"></p>
         </section>
         <section id="role-details-tasks-panel" class="role-details-panel hidden" aria-label="参与的任务"></section>
-        <section id="group-members-panel" class="group-members-panel hidden">
-          <div class="details-card">
-            <div class="details-card-header">
-              <div>
-                <h3>群聊成员</h3>
-                <div id="group-members-subtitle" class="group-members-subtitle"></div>
-              </div>
-              <button id="toggle-group-members-btn" type="button" class="icon-action" title="添加成员" aria-label="添加成员">＋</button>
-              <button id="manage-group-members-btn" type="button" class="workspace-text-button" aria-pressed="false">管理</button>
-              <button id="close-group-members-btn" type="button" class="room-secondary-btn hidden">收起</button>
-            </div>
-            <form id="group-meta-form" class="group-meta-form hidden">
-              <label class="group-create-field">
-                <span>群聊名称</span>
-                <input id="group-meta-name" type="text" maxlength="80">
-              </label>
-              <label class="group-create-field">
-                <span>描述</span>
-                <input id="group-meta-description" type="text">
-              </label>
-              <button id="group-meta-save-btn" type="submit" class="room-primary-btn">保存</button>
-            </form>
-            <div id="group-members-list" class="group-members-list"></div>
-            <form id="group-member-add-form" class="group-member-add-form hidden">
-              <select id="group-member-add-select" class="group-member-select" aria-label="选择要加入群聊的成员"></select>
-              <select id="group-member-add-role" class="group-member-role-select" aria-label="选择成员角色">
-                <option value="member">普通成员</option>
-                <option value="moderator">管理员</option>
-                <option value="owner">群主</option>
-              </select>
-              <button id="group-member-add-btn" type="submit" class="room-primary-btn">添加成员</button>
-            </form>
-            <p id="group-members-error" class="group-create-error hidden"></p>
-            <button id="delete-group-btn" type="button" class="room-danger-btn hidden">删除群聊</button>
-          </div>
-        </section>
+        <section id="group-members-panel" class="hidden"></section>
       </aside>
     </div>
-  </div>
-
-  <div id="group-create-overlay" class="modal-overlay hidden">
-    <form id="group-create-panel" class="group-create-panel modal-card" role="dialog" aria-modal="true" aria-labelledby="group-create-heading">
-      <div class="modal-header">
-        <h3 id="group-create-heading">新建群聊</h3>
-        <button id="close-group-create-btn" type="button" class="modal-close" aria-label="关闭">×</button>
-      </div>
-      <div class="group-create-grid">
-        <label class="group-create-field">
-          <span>名称</span>
-          <input id="group-create-name" type="text" placeholder="例如：SDK 开发组" maxlength="80">
-        </label>
-        <label class="group-create-field">
-          <span>ID（可选）</span>
-          <input id="group-create-id" type="text" placeholder="group:sdk">
-        </label>
-        <label class="group-create-field wide">
-          <span>描述（可选）</span>
-          <input id="group-create-description" type="text" placeholder="这个群聊用来交流什么">
-        </label>
-      </div>
-      <div class="group-create-members-wrap">
-        <div class="group-create-label">邀请成员</div>
-        <p class="group-invite-hint">你会自动加入群聊，无需选择自己。</p>
-        <select id="group-create-member-select" class="group-member-select" aria-label="添加群聊成员">
-          <option value="">添加成员…</option>
-        </select>
-        <div id="group-create-member-chips" class="group-create-chips"></div>
-      </div>
-      <div class="group-create-footer">
-        <p id="group-create-error" class="group-create-error hidden"></p>
-        <div class="group-create-buttons">
-          <button id="cancel-group-create-btn" type="button" class="room-secondary-btn">取消</button>
-          <button id="submit-group-create-btn" type="submit" class="room-primary-btn">创建并进入</button>
-        </div>
-      </div>
-    </form>
   </div>
 
   <div id="agent-profile-overlay" class="modal-overlay hidden">
@@ -591,7 +502,7 @@
   <script src="/theme.js?v=20261029-theme-day-night-v1"></script>
 <script src="/role-creation.js?v=20261031-model-api-v1"></script>
   <script src="/role-diagnostics.js?v=20261023-backend-export-v1"></script>
-  <script src="/workspace.js?v=20261112-workspace-relink-topmost"></script>
-  <script src="/app.js?v=20261106-workspace-w2b"></script>
+  <script src="/workspace.js?v=20261112-hall-only"></script>
+  <script src="/app.js?v=20261112-hall-only"></script>
 </body>
 </html>

@@ -1975,3 +1975,17 @@ pre {
     max-width: min(760px, 92%);
   }
 }
+
+/* 任务 Hall 保留紧凑导航，消息区使用剩余宽度。 */
+.workbench.task-chat-mode.task-chat-mode { grid-template-columns: 150px minmax(0, 1fr); }
+.task-chat-mode.task-chat-mode .workspace-tools { padding: 16px 10px; }
+@media (max-width: 700px) {
+  .workbench.task-chat-mode.task-chat-mode { min-width: 0; }
+  .task-chat-mode.task-chat-mode .workspace-tools { max-height: none; }
+  .task-chat-mode.task-chat-mode .timeline-workspace { min-width: 0; }
+}
+
+.task-chat-mode.task-chat-mode .workspace-tabs { gap: 8px; flex-wrap: wrap; }
+.task-chat-mode.task-chat-mode .workspace-tabs > button { font-size: 16px; }
+
+@media (max-width: 980px) { .workbench.task-chat-mode.task-chat-mode { min-width: 0; } }

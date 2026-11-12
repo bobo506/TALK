@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-12 22:15 — 拆除群聊管理界面，保留任务 Hall（707 blocked / 708 / 709 / 710 / 711）
+
+- **用户决定**：独立群聊没有使用场景，按方案 A 去掉群聊页面功能；任务 Hall 必须保留；不改后端/数据/历史。
+- **707 blocked**：白名单缺 `web/workspace.js`（群聊按钮绑定与布局访问），未写产品代码；另全量 Node 测试含需参数的独立探针 `role_name_http_probe.cjs`。
+- **708 complete（扩权版）**：去掉群聊导航/房间列表/搜索/刷新/空态、新建群聊弹窗、群成员增删、删除群聊及文案；`workspace.js` 清理按钮绑定与视图切换；任务 Hall 与 groups/messages 数据保留；`web/app.js` -731 行、`web/index.html` -97 行、`web/style.css` +14、`web/workspace.js` -25；7 个 Node 测试按需调整并新增“无群聊入口 + Hall 可打开”断言。
+- **709 partial**：发现未申报回归 `tests/workspace_project_switch.test.cjs` 仍以已删除的 `refreshGroups()` 为截取边界，基线 4/4 通过 → 拆除后 4/4 失败。
+- **710 complete**：该测试改用保留函数（restoreActiveGroup/getActiveGroup 等）做边界，保留“切换项目不串 group”断言，仅删除/改写直接测试已移除建群逻辑的用例。
+- **711 approved**：定向复验通过；`tests/*.cjs` 未再发现对已删除群聊函数的真实运行依赖。
+- **状态**：707–711 已收取，`submitted=[]`；前端静态资源刷新生效；后端未改。
+
 ## 2026-11-12 21:20 — W-D1 真实重定向演练 + 项目删除清理修复（705/706）
 
 - **真实演练（第 0 项）**：创建临时项目 `prj_wd1e2e_*`（旧根/新根/临时 runtime 配置均在 `.tmp/e2e-wd1-real/`），
