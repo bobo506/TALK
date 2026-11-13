@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-13 22:10 — 14 免安装阶段 1 完成：便携路径/首次启动/启停
+
+- **735（Terra，partial）**：`TALK_CONFIG`、`scripts/portable_paths.py`、`scripts/portable_bootstrap.py`、`start/stop/status.bat`、10 项便携测试；阻塞在 `server/local_runtime.py` 固定读取仓库根 `config.toml`。
+- **736（Terra，complete）**：`bind_local_runtime` 改为读取 `TALK_CONFIG`，相对 DB 按 `TALK_HOME` 解析；隔离便携根 bootstrap→随机端口 API→startup HTTP 200 complete→stop 通过。
+- **737（K2.8）approved**：manifest/SHA、tracked diff、TALK_CONFIG 回退与 chdir 守卫、local_runtime 绑定、bootstrap 幂等/Key/项目、bat 引号/端口/单实例、测试真实性、生产未受影响等 9 项核查通过；独立复跑 10 项便携测试 + 76 项 startup + 29 项 local_runtime 全过。
+- **提交**：`1b2392b`（9 文件 +528/−3）：`.gitignore`、`server/db.py`、`server/local_runtime.py`、`scripts/portable_paths.py`、`scripts/portable_bootstrap.py`、`start.bat`/`stop.bat`/`status.bat`、`tests/test_portable_phase1.py`。
+- **非阻断残余**：Key ACL、真实双击 bat/浏览器回退、首次端口参数化、未跟踪测试残留 `portable-phase1-d45aswhw/`、便携无 project_id 自动恢复；阶段 2/3/4（启动器/弹窗、embeddable/打包、干净机器 E2E）未做。
+- 未部署生产 runtime；735/736/737 已收取。
+
 ## 2026-11-13 20:45 — 产品亮点补充宿主启动机制；14 免安装分发方案草案
 
 - **产品亮点**：[USER_MANUAL.md](guides/USER_MANUAL.md) 的“TALK 的协作优势”新增“按需启动，空闲不占资源”：只保留需要运行角色的后台宿主；本轮启动过的角色关闭后保留宿主、再次启动更快；重启只拉起勾选“随项目自动启动”的角色；记录 2026-11-13 实测（冷启动 2 个勾选角色、手动启动未勾选角色约 10–11 秒就绪）。
