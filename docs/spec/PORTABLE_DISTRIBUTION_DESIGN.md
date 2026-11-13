@@ -71,7 +71,7 @@ TALK/
 ## 4. 路径与配置规则
 
 - 所有入口先 `cd /d "%~dp0"`，并导出 `TALK_HOME=<文件夹绝对路径>`；配置中不写开发机绝对路径。
-- `config.toml` 保持在仓库根（`server/db.py` 现有读取位置），由首次启动生成：
+- `config.toml`：便携模式放在 `config/config.toml`，由启动脚本设置 `TALK_CONFIG` 指向它；`server/db.py` 增加 `TALK_CONFIG` 环境变量支持，未设置时回退仓库根 `config.toml`（开发实例兼容）。配置中的相对路径按 `TALK_HOME`/启动 cwd 解析，由首次启动生成：
   - `db_path = "./data/talk.db"`；`storage_dir="./data/storage"`；`logging.path="./data/logs/talk.log"`；`backup.dir="./data/backups"`；
   - 删除开发机的 `runtime_diagnostics.sources` 与 `backend_diagnostics` 绝对路径；如需要，按 `TALK_HOME` 生成或留空。
   - 默认 `auth_mode="trusted"`、`trusted_networks=["loopback"]`，仅本机可信；局域网使用由用户显式放宽。
