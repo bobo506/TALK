@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-13 16:30 — 15a 工作区切换与持久化验收（用户口头通过，K2.8 复核 partial）
+
+- **730（Terra）partial**：DOM 测试 `tests/workspace_project_switch.test.cjs` 4/4 通过；读取 `TALK-private\operator.key` 被 Codex 沙箱拒绝（PermissionError），未创建 B、未伪造浏览器结果，产出人工浏览器清单；未改产品。
+- **B 与用户验收（协调者 human-only）**：创建临时项目 `prj_97c2a3ffe849`（根 `.tmp/e2e-15a-20261113/wsB`，无角色/任务）；用户完成 A→B→刷新保持 B→切回 A→刷新保持 A，口头反馈“顺路通过”（无逐项截图/异常）；删除返回 204、GET 404、`/api/projects` 仅 A、wsB 已清理。
+- **A 未中断**：Terra `ins_b8a390d9a761`/pid `13592`、K2.8 `ins_2eb973afae92`/pid `15664` 在创建/切换/删除前后均 running/ready，instance/pid 未变；A 任务计数无异常。
+- **731（K2.8）复核 partial**：12 项 API/证据链核对 pass，独立复跑 DOM 4/4；唯真实浏览器四步仅用户口头声明，未记为 K2.8 独立浏览器验证；建议保留定性区分。**格式违规**：原交付围栏外有说明文字、`verification[12].result=partial` 不合法；协调者仅做格式规整（改为 `not_run`）并校验通过，未改结论。
+- **复核副产物**：K2.8 存在 3 条历史 `idle` 实例 `ins_3deacebf9459`(pid 11208)、`ins_f3b7ddd2419e`(15648)、`ins_87aad513bfac`(772)，`last_seen` 为 11-12 且进程已不存在，未被自动置 offline；不影响当前服务，建议 P2/实例清理片处理。
+- **状态**：730/731 已收取（`submitted=[]`）；无产品代码/配置/运行时变更；15b（退出/重开）未做。
+
 ## 2026-11-13 15:55 — 范围决定：关闭桌面运行器接入，14 改为免安装文件夹分发
 
 - 用户决定**外部桌面运行器接入（13）不做**：暂时全部使用 CLI 接入，CLI 运行稳定；该项关闭。
