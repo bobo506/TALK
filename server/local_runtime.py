@@ -22,11 +22,12 @@ RUNTIME_MANAGER_PROTOCOLS = {"talk-runtime-1": "talk-manager-1"}
 def bind_local_runtime(config_file, config):
     """显式运行统一入口时记住本机绑定；仅存清单路径，不复制任何凭据。"""
     import tomllib
-    with (ROOT/"config.toml").open("rb") as stream:
+    config_path = Path(os.environ.get("TALK_CONFIG") or ROOT / "config.toml")
+    with config_path.open("rb") as stream:
         database = tomllib.load(stream)["storage"]["db_path"]
     database = Path(database)
     if not database.is_absolute():
-        database = ROOT/database
+        database = Path(os.environ.get("TALK_HOME") or ROOT) / database
     pointer = Path(config["project_root"]).resolve() / ".talk" / "runtime.local.json"
     pointer.parent.mkdir(parents=True, exist_ok=True)
     pointer.write_text(json.dumps({"schema":"talk-local-runtime-1", "database_file":str(database.resolve()),

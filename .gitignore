@@ -216,3 +216,7 @@ web/.preview-*.html
 /keys/
 /workspaces/
 /runners/
+/data/
+/config/config.toml
+/config/runtime.json
+/config/*.local.toml

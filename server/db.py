@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import tomllib
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import Generator
 
@@ -11,7 +13,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 # ── Config ───────────────────────────────────────────────────────────
 
-_CFG_PATH = Path(__file__).resolve().parent.parent / "config.toml"
+_CFG_PATH = Path(os.environ["TALK_CONFIG"]) if os.environ.get("TALK_CONFIG") else Path(__file__).resolve().parent.parent / "config.toml"
 
 
 def _load_config() -> dict:
@@ -20,6 +22,12 @@ def _load_config() -> dict:
 
 
 CONFIG = _load_config()
+
+# The managed runtime starts the API from the project root.  In portable mode
+# static assets and relative config paths belong to TALK_HOME instead; change
+# only the dedicated API process, after resolving/loading TALK_CONFIG.
+if os.environ.get("TALK_HOME") and Path(sys.argv[0]).name == "talk_api.py":
+    os.chdir(os.environ["TALK_HOME"])
 
 _auth_mode = CONFIG["server"].get("auth_mode", "key")
 _invalid_auth_mode = _auth_mode not in ("key", "trusted")
