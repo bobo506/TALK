@@ -68,7 +68,6 @@ function bindRunnerOnboarding(overlay) {
   if (runnerOnboardingUI.bound) return;
   runnerOnboardingUI.bound = true;
   document.getElementById("runner-onboarding-close").addEventListener("click", closeRunnerOnboarding);
-  document.getElementById("runner-onboarding-dismiss").addEventListener("click", closeRunnerOnboarding);
   document.getElementById("runner-onboarding-action").addEventListener("click", () => {
     const context = runnerOnboardingUI.context;
     if (!context || context.member !== myId || context.project !== activeProjectId || !currentMemberIsHuman()) {
@@ -134,7 +133,7 @@ async function maybeShowRunnerOnboarding() {
     const message = kind === "ready"
       ? `已适配 ${available.map(item => item.display_name || item.runtime).join("、")} 运行器，可创建角色`
       : `缺少 ${missing.map(item => item.display_name || item.runtime).join("、")} 运行器，请先安装或适配其他运行器${hasUnknown ? "；其余运行器状态未知" : ""}`;
-    document.getElementById("runner-onboarding-title").textContent = message;
+    document.getElementById("runner-onboarding-title").textContent = "运行器提示";
     document.getElementById("runner-onboarding-message").textContent = message + (available.some(item => item.status === "newer" || item.status === "older") ? "。部分运行器版本关系待确认，创建前请核对" : "");
     const action = document.getElementById("runner-onboarding-action");
     action.textContent = kind === "ready" ? "创建角色" : "查看运行器状态";

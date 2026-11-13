@@ -22,7 +22,7 @@ function harness(items = [codex], roles = []) {
       focus() { document.activeElement = n; }, scrollIntoView() { calls.scroll++; } };
     nodes[id] = n; return n;
   }
-  for (const id of ["runner-onboarding-overlay", "runner-onboarding-title", "runner-onboarding-message", "runner-onboarding-close", "runner-onboarding-dismiss", "runner-onboarding-action", "runner-versions-panel"]) node(id);
+  for (const id of ["runner-onboarding-overlay", "runner-onboarding-title", "runner-onboarding-message", "runner-onboarding-close", "runner-onboarding-action", "runner-versions-panel"]) node(id);
   nodes["runner-onboarding-overlay"].classList.add("hidden");
   const before = node("before"); before.focus();
   const env = { document, sessionStorage: { getItem: k => storage.get(k) || null, setItem: (k,v) => storage.set(k,v) },
@@ -37,7 +37,10 @@ function harness(items = [codex], roles = []) {
 
 test("零角色且 Codex 可用时显示创建引导并还原焦点", async () => {
   const h = harness(); await h.env.maybeShowRunnerOnboarding();
-  assert.equal(h.hidden(), false); assert.match(h.nodes["runner-onboarding-title"].textContent, /Codex CLI/);
+  assert.equal(h.hidden(), false);
+  assert.equal(h.nodes["runner-onboarding-title"].textContent, "运行器提示");
+  assert.equal(h.nodes["runner-onboarding-message"].textContent, "已适配 Codex CLI 运行器，可创建角色");
+  assert.notEqual(h.nodes["runner-onboarding-title"].textContent, h.nodes["runner-onboarding-message"].textContent);
   assert.equal(h.nodes["runner-onboarding-action"].textContent, "创建角色");
   assert.equal(h.env.document.activeElement, h.nodes["runner-onboarding-action"]);
   h.click("runner-onboarding-close"); assert.equal(h.hidden(), true); assert.equal(h.env.document.activeElement, h.before);
@@ -52,7 +55,7 @@ test("有角色且可用时不提示；有角色但确定无可用时仍提示",
   const missing = harness(missingRunners, [{}]); await missing.env.maybeShowRunnerOnboarding(); assert.equal(missing.hidden(), false);
   assert.match(missing.nodes["runner-onboarding-message"].textContent, /Codex CLI、Kimi Code、DeepSeek Harness/);
   assert.equal(missing.nodes["runner-onboarding-action"].textContent, "查看运行器状态");
-  missing.click("runner-onboarding-dismiss"); await missing.env.maybeShowRunnerOnboarding(); assert.equal(missing.hidden(), true);
+  missing.click("runner-onboarding-close"); await missing.env.maybeShowRunnerOnboarding(); assert.equal(missing.hidden(), true);
 });
 test("WorkBuddy 不计入；受支持运行器 unknown 无版本时不误报", async () => {
   const h = harness([{ ...workbuddy, probe_status: "missing" }, missingRunners[0]]); await h.env.maybeShowRunnerOnboarding();
@@ -63,7 +66,8 @@ test("WorkBuddy 不计入；受支持运行器 unknown 无版本时不误报", a
 test("无角色且全部缺失时列出缺失名称，混合错误时标注未知", async () => {
   const all = harness(missingRunners); await all.env.maybeShowRunnerOnboarding();
   assert.equal(all.hidden(), false);
-  assert.match(all.nodes["runner-onboarding-message"].textContent, /缺少 Codex CLI、Kimi Code、DeepSeek Harness 运行器/);
+  assert.equal(all.nodes["runner-onboarding-title"].textContent, "运行器提示");
+  assert.equal(all.nodes["runner-onboarding-message"].textContent, "缺少 Codex CLI、Kimi Code、DeepSeek Harness 运行器，请先安装或适配其他运行器");
   assert.doesNotMatch(all.nodes["runner-onboarding-message"].textContent, /其余运行器状态未知/);
   const mixed = harness([missingRunners[0], {...missingRunners[1], probe_status: "error"}, workbuddy]);
   await mixed.env.maybeShowRunnerOnboarding();
@@ -87,12 +91,12 @@ test("请求失败、非数组不误报", async () => {
   }
 });
 test("session 去重，项目或成员变化可再次判定，Esc 关闭", async () => {
-  const h = harness(); await h.env.maybeShowRunnerOnboarding(); h.click("runner-onboarding-dismiss");
+  const h = harness(); await h.env.maybeShowRunnerOnboarding(); h.click("runner-onboarding-close");
   await h.env.maybeShowRunnerOnboarding(); assert.equal(h.hidden(), true);
   h.env.activeProjectId = "p2"; await h.env.maybeShowRunnerOnboarding(); assert.equal(h.hidden(), false);
   let prevented = false, stopped = false;
   h.nodes["runner-onboarding-overlay"].fire("keydown", {key:"Escape", preventDefault() { prevented = true; }, stopPropagation() { stopped = true; }});
-  assert.ok(prevented && stopped && h.hidden()); await h.env.maybeShowRunnerOnboarding(); assert.equal(h.hidden(), true);
+  assert.ok(prevented && stopped && h.hidden()); assert.equal(h.env.document.activeElement, h.before); await h.env.maybeShowRunnerOnboarding(); assert.equal(h.hidden(), true);
   h.env.myId = "human:b"; await h.env.maybeShowRunnerOnboarding(); assert.equal(h.hidden(), false);
 });
 test("按钮仅导航和打开表单或滚动状态面板", async () => {
@@ -100,7 +104,7 @@ test("按钮仅导航和打开表单或滚动状态面板", async () => {
   assert.equal(ready.hidden(), true); assert.equal(ready.env.workspaceUI.mode, "roles"); assert.equal(ready.env.workspaceUI.roleSelection, "settings");
   assert.equal(ready.env.blackboardOpen, true); assert.equal(ready.calls.render, 1); assert.equal(ready.calls.open, 1);
   const missing = harness(missingRunners); await missing.env.maybeShowRunnerOnboarding(); missing.click("runner-onboarding-action");
-  assert.equal(missing.env.workspaceUI.mode, "roles"); assert.equal(missing.env.workspaceUI.roleSelection, "settings"); assert.equal(missing.env.blackboardOpen, true);
+  assert.equal(missing.hidden(), true); assert.equal(missing.env.workspaceUI.mode, "roles"); assert.equal(missing.env.workspaceUI.roleSelection, "settings"); assert.equal(missing.env.blackboardOpen, true);
   assert.equal(missing.calls.sync, 1); assert.equal(missing.calls.scroll, 1); assert.equal(missing.calls.open, 0);
 });
 test("其他弹窗打开时不抢占；异步项目切换不显示过期提示", async () => {
@@ -122,6 +126,17 @@ test("登录遮罩消失后再显示，非真人不请求", async () => {
 test("静态弹窗语义及项目角色加载入口", () => {
   const html = fs.readFileSync(require.resolve("../web/index.html"), "utf8");
   assert.match(html, /id="runner-onboarding-overlay"/); assert.match(html, /role="dialog" aria-modal="true" aria-labelledby="runner-onboarding-title" aria-describedby="runner-onboarding-message"/);
+  const modal = html.slice(html.indexOf('<div id="runner-onboarding-overlay"'), html.indexOf('<div id="agent-profile-overlay"'));
+  assert.doesNotMatch(html, /id="runner-onboarding-dismiss"/);
+  assert.doesNotMatch(source, /runner-onboarding-dismiss/);
+  assert.match(modal, /class="modal-card runner-onboarding-card"/);
+  assert.match(modal, /class="runner-onboarding-actions"/);
+  assert.equal((modal.match(/<button\b/g) || []).length, 2);
+  assert.match(modal, /id="runner-onboarding-close"/);
+  assert.match(modal, /id="runner-onboarding-action"[^>]*class="room-primary-btn"/);
+  assert.match(html, /workspace\.css\?v=20261113-runner-onboarding-v2/);
+  assert.match(html, /workspace\.js\?v=20261113-runner-onboarding-v2/);
+  assert.match(html, /app\.js\?v=20261113-runner-onboarding-v2/);
   const app = fs.readFileSync(require.resolve("../web/app.js"), "utf8");
   assert.match(app.slice(app.indexOf("async function loadProjectAgents()"), app.indexOf("async function loadProjectTasks(")), /projectAgents = loaded;[\s\S]*maybeShowRunnerOnboarding\(\)/);
 });

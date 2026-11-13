@@ -19,7 +19,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/style.css?v=20261112-hall-split">
-  <link rel="stylesheet" href="/workspace.css?v=20261105-runner-versions-panel-v2">
+  <link rel="stylesheet" href="/workspace.css?v=20261113-runner-onboarding-v2">
   <link rel="stylesheet" href="/role-creation.css?v=20261029-theme-day-night-v1">
   <link rel="stylesheet" href="/role-diagnostics.css?v=20261029-theme-day-night-v1">
 </head>
@@ -355,16 +355,15 @@
   </div>
 
   <div id="runner-onboarding-overlay" class="modal-overlay hidden">
-    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="runner-onboarding-title" aria-describedby="runner-onboarding-message">
+    <section class="modal-card runner-onboarding-card" role="dialog" aria-modal="true" aria-labelledby="runner-onboarding-title" aria-describedby="runner-onboarding-message">
       <div class="modal-header">
-        <h3 id="runner-onboarding-title"></h3>
+        <h3 id="runner-onboarding-title">运行器提示</h3>
         <button id="runner-onboarding-close" type="button" class="modal-close" aria-label="关闭">×</button>
       </div>
-      <p id="runner-onboarding-message"></p>
-      <div class="group-create-footer"><div class="group-create-buttons">
-        <button id="runner-onboarding-dismiss" type="button" class="room-secondary-btn">知道了</button>
+      <p id="runner-onboarding-message" class="runner-onboarding-message"></p>
+      <div class="runner-onboarding-actions">
         <button id="runner-onboarding-action" type="button" class="room-primary-btn"></button>
-      </div></div>
+      </div>
     </section>
   </div>
 
@@ -516,7 +515,7 @@
   <script src="/theme.js?v=20261029-theme-day-night-v1"></script>
 <script src="/role-creation.js?v=20261031-model-api-v1"></script>
   <script src="/role-diagnostics.js?v=20261023-backend-export-v1"></script>
-  <script src="/workspace.js?v=20261113-runner-onboarding"></script>
-  <script src="/app.js?v=20261113-runner-onboarding"></script>
+  <script src="/workspace.js?v=20261113-runner-onboarding-v2"></script>
+  <script src="/app.js?v=20261113-runner-onboarding-v2"></script>
 </body>
 </html>

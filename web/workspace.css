@@ -344,3 +344,17 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .workspace-relink-value {font-size:var(--font-body); color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .workspace-relink-error {font-size:var(--font-body); color:var(--red); margin:10px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .workspace-relink-card .group-create-footer {justify-content:flex-end; gap:8px; margin-top:16px;}
+
+/* 运行器引导弹窗。 */
+.runner-onboarding-card { width:min(560px,92vw); padding:24px 28px; }
+.runner-onboarding-card .modal-header { margin-bottom:10px; }
+.runner-onboarding-card .modal-header h3 { font-size:20px; line-height:1.4; margin:0; }
+.runner-onboarding-message { margin:0 0 20px; font-size:15px; line-height:1.7; color:var(--muted-strong); }
+.runner-onboarding-actions { display:flex; justify-content:flex-end; }
+.runner-onboarding-actions .room-primary-btn { min-height:46px; padding:0 24px; font-size:16px; border-radius:8px;
+  background:var(--accent-bg); border-color:var(--accent-bg); color:var(--accent-fg); }
+.runner-onboarding-actions .room-primary-btn:hover:not(:disabled) { filter:brightness(1.08); }
+@media(max-width:700px) {
+  .runner-onboarding-card { padding:18px 18px 20px; }
+  .runner-onboarding-actions .room-primary-btn { width:100%; }
+}
