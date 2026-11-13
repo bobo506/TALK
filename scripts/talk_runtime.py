@@ -51,6 +51,24 @@ SHUTDOWN_ERROR_CODES = RUNTIME_ERROR_CODES | HOST_ERROR_CODES | frozenset({
 })
 
 
+def _service_is_serving(service):
+    return (service.get("desired") == "running" or
+            service.get("observed") in ("running", "starting", "stopping") or
+            service.get("readiness_service") in ("ready", "starting"))
+
+
+def _needs_host(role):
+    if not isinstance(role, dict) or role.get("archived") or role.get("deletion"):
+        return False
+    service = role.get("service")
+    if not isinstance(service, dict):
+        return False
+    launch = service.get("current_launch")
+    return (_service_is_serving(service) or
+            (isinstance(launch, dict) and launch.get("action") == "start" and
+             launch.get("state") in ("pending", "claimed")))
+
+
 def _open_orphan_process(pid):
     return rsh._kernel32.OpenProcess(0x0001 | 0x1000, False, pid)
 
@@ -861,11 +879,12 @@ class TalkRuntime:
                     specs[spec["member_id"]] = spec
         for member, spec in specs.items():
             role = by_id.get(member)
-            if role is not None and role.get("archived"):
+            if role is not None and (role.get("archived") or role.get("deletion")):
                 continue
             if member in workspace_roles and not workspace_enabled:
                 continue
             owned = self.hosts.get(member)
+            needs_host = _needs_host(role)
             if role is None and owned:
                 continue
             if owned:
@@ -886,14 +905,19 @@ class TalkRuntime:
                 # An exited manager never grants adoption of its previous native children.
                 self.event("host_exited", context={"member_id": member, "returncode": owned["process"].poll(), "outcome": "failed"})
                 self.hosts.pop(member)
-                prior = self.failures.get(member,{"count":0})
-                self.failures[member] = {"count":prior["count"]+1,"generation":(role.get("service") or {}).get("generation"),"retry_at":self.clock()+min(30,2**(prior["count"]+1))}
+                if needs_host:
+                    prior = self.failures.get(member,{"count":0})
+                    self.failures[member] = {"count":prior["count"]+1,"generation":(role.get("service") or {}).get("generation"),"retry_at":self.clock()+min(30,2**(prior["count"]+1))}
+                else:
+                    self.failures.pop(member, None)
             service_value = role.get("service") if role is not None else None
             service = service_value if isinstance(service_value, dict) else {}
             failures = self.failures.get(member)
             if failures and failures["generation"] != service.get("generation"):
                 self.failures.pop(member); failures = None
-            if failures and (failures["count"]>=3 or self.clock()<failures["retry_at"]):
+            if not needs_host:
+                self.failures.pop(member, None)
+            if needs_host and failures and (failures["count"]>=3 or self.clock()<failures["retry_at"]):
                 self.statuses[member] = {"state":"manager_failed","attempts":failures["count"]}
                 continue
             existing = None
@@ -923,25 +947,16 @@ class TalkRuntime:
                         if not handle:
                             raise OSError("orphan_host_open_failed")
                         created = _orphan_handle_creation_time(handle)
-                        if not _orphan_host_matches(pid, spec["argv"], self.project, member):
-                            if (member in configured_members and
-                                    _configured_host_matches(pid, spec["argv"], self.project, member, existing)):
-                                observed = service.get("observed")
-                                readiness = service.get("readiness_service")
-                                desired = service.get("desired")
-                                serving = (observed in ("running", "starting", "stopping") or
-                                           readiness in ("ready", "starting") or desired == "running")
-                                self.statuses[member] = {"state":"external_manager", "pid":pid,
-                                                         "reason":"orphan_host_serving" if serving else "orphan_host_configured"}
-                            else:
-                                self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":"orphan_host_unverified"}
+                        if not (_orphan_host_matches(pid, spec["argv"], self.project, member) or
+                                (member in configured_members and
+                                 _configured_host_matches(pid, spec["argv"], self.project, member, existing))):
+                            self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":"orphan_host_unverified"}
                             continue
                         verified = True
                         observed = service.get("observed")
                         readiness = service.get("readiness_service")
                         desired = service.get("desired")
-                        if (observed in ("running", "starting", "stopping") or
-                                readiness in ("ready", "starting") or desired == "running"):
+                        if _service_is_serving(service):
                             self.statuses[member] = {"state":"external_manager", "pid":pid, "reason":"orphan_host_serving"}
                             continue
                         if (not isinstance(service_value, dict) or
@@ -993,6 +1008,9 @@ class TalkRuntime:
             if service.get("ownership_held"):
                 self._terminate_orphan_bridge(member, spec)
                 self.statuses[member] = {"state":"recovery_required"}
+                continue
+            if not needs_host:
+                self.statuses[member] = {"state":"stopped"}
                 continue
             if Path(spec["drain_file"]).exists():
                 self.statuses[member] = {"state":"drain_marker_present"}

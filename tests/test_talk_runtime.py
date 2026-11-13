@@ -94,7 +94,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(second["started_at"], restarted.started_at)
 
     def test_enabled_workspace_uses_role_spec_instead_of_fixed_recipe(self):
-        role = {"member_id": "agent:one", "storage_layout": "workspace-v1", "runner": {"runtime": "codex"}}
+        role = {"member_id": "agent:one", "storage_layout": "workspace-v1", "runner": {"runtime": "codex"}, "service": {"desired": "running"}}
         legacy = self.spec()
         self.config["hosts"] = [legacy]
         private = self.root / "isolated-manager"
@@ -185,7 +185,7 @@ class RuntimeTests(unittest.TestCase):
             self.runtime.request = original
 
     def role(self,member="agent:one",**service):
-        return {"member_id":member,"service":{"observed":"stopped", "desired":"stopped", "readiness_service":"pending", **service}}
+        return {"member_id":member,"service":{"observed":"stopped", "desired":"stopped", "readiness_service":"pending", "current_launch":{"action":"start", "state":"pending"}, **service}}
     def test_config_rejects_remote_inline_key_and_path_escape(self):
         self.write_config();self.assertEqual(runtime.load_config(self.path)["project_id"],"prj_fixture")
         for key,value,code in [("base_url","http://example.org:8000","loopback"),("key_root",str(self.project/"keys"),"inside_project"),("api_argv",[sys.executable,"--key","fixture","{control_file}"],"argv")]:
@@ -380,6 +380,82 @@ class RuntimeTests(unittest.TestCase):
             self.runtime.reconcile_tick()
             self.assertEqual(len(self.spawned), 1)
 
+    def test_needs_host_includes_start_activation_and_excludes_inactive_roles(self):
+        base = self.role(current_launch=None)
+        self.assertFalse(runtime._needs_host(None))
+        self.assertFalse(runtime._needs_host(base))
+        for service in ({"desired":"running"}, {"observed":"running"}, {"observed":"starting"},
+                        {"observed":"stopping"}, {"readiness_service":"ready"},
+                        {"readiness_service":"starting"},
+                        {"current_launch":{"action":"start", "state":"pending"}},
+                        {"current_launch":{"action":"start", "state":"claimed"}}):
+            with self.subTest(service=service):
+                values = {"current_launch":None, **service}
+                self.assertTrue(runtime._needs_host(self.role(**values)))
+        for launch in ({"action":"stop", "state":"pending"}, {"action":"start", "state":"done"}):
+            self.assertFalse(runtime._needs_host(self.role(current_launch=launch)))
+        self.assertFalse(runtime._needs_host({**self.role(), "archived":True}))
+        self.assertFalse(runtime._needs_host({**self.role(), "deletion":{"status":"pending"}}))
+
+    def test_on_demand_activation_and_owned_host_lifetime(self):
+        self.config["hosts"] = [self.spec()]
+        stopped = self.role(current_launch=None)
+        self.runtime.reconcile_hosts([stopped])
+        self.assertFalse(self.spawned)
+        self.runtime.reconcile_hosts([self.role(current_launch=None, desired="running")])
+        self.assertEqual(len(self.spawned), 1)
+        owned = self.runtime.hosts["agent:one"]
+        self.runtime.reconcile_hosts([stopped])
+        self.runtime.reconcile_hosts([stopped])
+        self.assertIs(self.runtime.hosts["agent:one"], owned)
+        self.assertEqual(len(self.spawned), 1)
+        owned["process"].returncode = 1
+        self.runtime.reconcile_hosts([stopped])
+        self.now += 60
+        self.runtime.reconcile_hosts([stopped])
+        self.assertNotIn("agent:one", self.runtime.hosts)
+        self.assertNotIn("agent:one", self.runtime.failures)
+        self.assertEqual(len(self.spawned), 1)
+        self.runtime.reconcile_hosts([self.role()])
+        self.assertEqual(len(self.spawned), 2)
+
+    def test_archived_and_deleted_roles_never_spawn(self):
+        self.config["hosts"] = [self.spec()]
+        for role in ({**self.role(), "archived":True}, {**self.role(), "deletion":{"status":"pending"}}):
+            self.runtime.reconcile_hosts([role])
+        self.assertFalse(self.spawned)
+
+    def test_startup_activation_launch_only_starts_enabled_role(self):
+        self.config["hosts"] = [self.spec("agent:enabled"), self.spec("agent:disabled")]
+        enabled = self.role("agent:enabled", current_launch=None)
+        disabled = self.role("agent:disabled", current_launch=None)
+        self.runtime.reconcile_hosts([enabled, disabled])
+        self.assertFalse(self.spawned)
+        enabled["service"]["current_launch"] = {"action":"start", "state":"pending"}
+        self.runtime.reconcile_hosts([enabled, disabled])
+        self.assertEqual(set(self.runtime.hosts), {"agent:enabled"})
+        self.assertEqual(len(self.spawned), 1)
+
+    def test_external_inactive_standard_and_configured_hosts_follow_demand(self):
+        for configured in (False, True):
+            for launch in (None, {"action":"start", "state":"pending"}):
+                with self.subTest(configured=configured, launch=launch):
+                    self.runtime.hosts.clear(); self.spawned.clear()
+                    spec = self.configured_orphan_fixture()[0] if configured else self.orphan_fixture()
+                    with patch.object(runtime, "recorded_process_state", return_value="present"), \
+                         patch.object(runtime, "_ORPHAN_WINDOWS", True), \
+                         patch.object(runtime, "_open_orphan_process", return_value=1), \
+                         patch.object(runtime, "_close_orphan_handle") as close, \
+                         patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                         patch.object(runtime, "process_inventory", return_value=[{"ProcessId":123, "CommandLine":"fixture"}]), \
+                         patch.object(runtime, "process_argv", return_value=spec["argv"]), \
+                         patch.object(runtime, "terminate_orphan", return_value={"exit_confirmed":True}) as terminate:
+                        self.runtime.reconcile_hosts([self.role(current_launch=launch, ownership_held=False)])
+                    terminate.assert_called_once_with(123, 42)
+                    close.assert_called_once_with(1)
+                    self.assertEqual(len(self.spawned), int(launch is not None))
+                    self.assertEqual(self.runtime.statuses["agent:one"]["state"], "starting" if launch else "stopped")
+
     def test_boot_only_starts_manager_and_never_requests_role_start(self):
         self.config["hosts"]=[self.spec()]
         self.runtime.reconcile_hosts([self.role(generation=3,ownership_held=False)])
@@ -426,7 +502,6 @@ class RuntimeTests(unittest.TestCase):
         cases = [({"observed": state}, "orphan_host_serving") for state in ("running", "starting", "stopping")]
         cases += [({"readiness_service": state}, "orphan_host_serving") for state in ("ready", "starting")]
         cases += [({"desired": "running"}, "orphan_host_serving")]
-        cases += [({"observed": state}, "orphan_host_configured") for state in ("stopped", "failed")]
         for service, reason in cases:
             with self.subTest(service=service), patch.object(runtime, "recorded_process_state", return_value="present"), \
                  patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
@@ -720,7 +795,7 @@ class RuntimeTests(unittest.TestCase):
         first = self.spec(); second = self.spec("agent:two")
         self.config["hosts"] = [first, second]
         Path(first["health_file"]).write_text('{"pid":123}', encoding="utf-8")
-        roles = [self.role(ownership_held=True), {"member_id": "agent:two", "service": {"ownership_held": False}}]
+        roles = [self.role(ownership_held=True), {"member_id": "agent:two", "service": {"ownership_held": False, "desired":"running"}}]
         row = {"id": "instance-one", "member_id": "agent:one", "project_id": self.runtime.project, "host": socket.gethostname(),
                "status": "idle", "pid": 4321, "current_task_id": None, "process_started_at": "2026-01-01T00:00:00+00:00"}
         started = datetime.fromisoformat(row["process_started_at"]).timestamp()
@@ -828,7 +903,7 @@ class RuntimeTests(unittest.TestCase):
                      patch.object(runtime, "_terminate_orphan_handle", side_effect=OSError("denied") if failing == "terminate" else None), \
                      patch.object(runtime, "_close_orphan_handle", side_effect=OSError("denied") if failing == "close" else None), \
                      patch.object(self.runtime, "event") as event:
-                    self.runtime.reconcile_hosts([self.role(ownership_held=True), {"member_id": "agent:two", "service": {"ownership_held": False}}])
+                    self.runtime.reconcile_hosts([self.role(ownership_held=True), {"member_id": "agent:two", "service": {"ownership_held": False, "desired":"running"}}])
                 self.assertEqual(self.runtime.statuses["agent:one"]["state"], "recovery_required")
                 self.assertEqual(self.runtime.statuses["agent:two"]["state"], "starting")
                 event.assert_any_call("orphan_bridge_terminated", context={"member_id": "agent:one", "pid": 4321 if failing in ("terminate", "close") else None, "outcome": "failed"})
@@ -860,7 +935,7 @@ class RuntimeTests(unittest.TestCase):
     def test_dynamic_workbuddy_uses_exact_identity_key_and_separate_home(self):
         keys=Path(self.config["key_root"]);keys.mkdir();key=runtime.key_file_path(keys,"agent:new");key.write_text("fixture-secret",encoding="utf-8")
         self.config["workbuddy"]={"executable":str(self.root/"WorkBuddy.exe"),"models_home":str(self.root/"models")}
-        role={"member_id":"agent:new","role_name":"Renamed project role","binding_state":"bound","runner":{"runtime":"workbuddy"},"service":{}}
+        role={"member_id":"agent:new","role_name":"Renamed project role","binding_state":"bound","runner":{"runtime":"workbuddy"},"service":{"desired":"running"}}
         self.runtime.reconcile_hosts([role])
         argv=self.spawned[0][1]
         self.assertIn(str(key),argv);self.assertNotIn("fixture-secret",argv)
