@@ -1404,8 +1404,21 @@ def main(argv=None):
         if args.attach_api:command.append("--attach-api")
         flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW | subprocess.CREATE_BREAKAWAY_FROM_JOB if os.name=="nt" else 0
         with (private/"launcher.out").open("ab") as out,(private/"launcher.err").open("ab") as err:
-            child=subprocess.Popen(command,cwd=config["project_root"],stdin=subprocess.DEVNULL,stdout=out,stderr=err,
-                **({"creationflags":flags,"startupinfo":rsh._hidden_startupinfo()} if os.name=="nt" else {"start_new_session":True}))
+            options = {"creationflags": flags, "startupinfo": rsh._hidden_startupinfo()} if os.name == "nt" else {"start_new_session": True}
+            try:
+                child = subprocess.Popen(command, cwd=config["project_root"], stdin=subprocess.DEVNULL, stdout=out, stderr=err, **options)
+            except PermissionError as exc:
+                if os.name != "nt" or not flags & subprocess.CREATE_BREAKAWAY_FROM_JOB:
+                    raise RuntimeErrorCode("runtime_detach_permission_denied") from exc
+                err.write(b"detach: breakaway denied; retrying without CREATE_BREAKAWAY_FROM_JOB\n")
+                err.flush()
+                options["creationflags"] = flags & ~subprocess.CREATE_BREAKAWAY_FROM_JOB
+                try:
+                    child = subprocess.Popen(command, cwd=config["project_root"], stdin=subprocess.DEVNULL, stdout=out, stderr=err, **options)
+                except OSError as retry_exc:
+                    err.write(b"detach: retry without breakaway failed\n")
+                    err.flush()
+                    raise RuntimeErrorCode("runtime_detach_retry_failed") from retry_exc
         print(json.dumps({"started_launcher_pid":child.pid,"note":"Check status for actual readiness."}));return 0
     from server.local_runtime import bind_local_runtime
     bind_local_runtime(args.config, config)
