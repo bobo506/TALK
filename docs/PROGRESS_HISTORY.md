@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-13 16:50 — 15b 退出/重开与冷启动持久性通过
+
+- **停机**：Terra/K2.8 正常停止 → `talk_runtime stop --apply --wait` 返回 `stopped`/`phase=complete`；8000 关闭、无生产 runtime/API/宿主/桥进程；counts 保持 `members=48`、`messages=2704`、`agent_tasks=731`、`groups=732`、`projects=1`、`project_agents=10`、`agent_instances=484`。
+- **冷启动**：16:41 `serve --apply --detach` 启动 runtime `12588`（API `11964`）、startup complete、7 宿主 `serving`；Terra gen84/`ins_fc14f1a23429`/pid `17280`、K2.8 gen82/`ins_b75b74df8bda`/pid `16084` 按启动偏好自动恢复 running/ready/idle；其余角色保持 stopped；counts 一致，`agent_instances` 484→486 为两条新实例的正常增加。
+- **用户浏览器**：刷新后确认 TALK 工作区、角色运行/就绪、任务 Hall 可打开，反馈“验证通过”（无截图）。
+- **732（K2.8）复核 complete**：核对三时点 counts、runtime-after、实时 runtime/API/角色/实例、启动偏好、无重复实例/宿主、Git/HEAD；限制如实标注：停机 8000/无进程为协调者时点观测、浏览器为口头声明。**格式违规**：`verification.result=pass-with-limitation`、`progress_draft` 为字符串、`completed[0]` 302 字符；协调者仅规整为合法枚举/对象/≤300 字符并校验通过，未改结论。
+- **状态**：730/731/732 已收取（`submitted=[]`）；无产品代码/配置变更；15a/15b 完成，剩余 K2.8 3 条历史 idle 实例清理、宿主生命周期设计、P2 长任务 kill。
+
 ## 2026-11-13 16:30 — 15a 工作区切换与持久化验收（用户口头通过，K2.8 复核 partial）
 
 - **730（Terra）partial**：DOM 测试 `tests/workspace_project_switch.test.cjs` 4/4 通过；读取 `TALK-private\operator.key` 被 Codex 沙箱拒绝（PermissionError），未创建 B、未伪造浏览器结果，产出人工浏览器清单；未改产品。
