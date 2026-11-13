@@ -23,6 +23,11 @@ def me():return {'id':'human:runtime-fixture','kind':'human'}
 @app.get('/api/projects/{project}/roles')
 def roles(project):return []
 
+@app.get('/api/projects/{project}/role-storage-layouts')
+def role_storage_layouts(project):
+    # Runtime roles() joins this projection; shutdown must not 404 on the empty fixture.
+    return []
+
 @app.post('/api/projects/{project_id}/role-services/startup')
 def startup(project_id,body:dict):
     # Empty synthetic project; no server DB, production binding, or real roles.
