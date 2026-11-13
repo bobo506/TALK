@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-14 02:50 — 14 阶段3 便携包与首次启动（候选 approved）
+
+- **747**：新增 `scripts/build_portable.py`（allowlist/scan/embeddable/zip）、start/start-gui 首次 bootstrap、`talk_runtime` detach breakaway 回退；单测+回归通过；完整构建在 pip 后 `_ssl` 失败。
+- **748/749**：修复 site-packages 元数据 scan、加入 `TALK/client` SDK、加长 `_ssl` 重试；但 pip 后 10 次仍瞬时 DLL 失败，进程退出后恢复；749 partial（未产出受控 zip/E2E）。
+- **人工包**：用 748 staging runtime 组装 `.tmp/portable-manual-clean/TALK`；清理 tests/__pycache__；`TALK-portable-clean.zip` 21,750,905 bytes/1,440 files（`D:\TALK-portable-clean.zip`）；包内 embeddable 3.12.1 + 依赖 + TALK/client，导入通过。
+- **E2E**：`.tmp/portable-clean-e2e/TALK` 与 `D:\TALK-portable`（端口 8132）首启 bootstrap→Edge 窗口→自动关窗→服务停止/端口关闭，退出码 0；证据 `.tmp/portable-manual-clean/e2e.log`。
+- **750（K2.8）approved**：zip 完整性/负面清单、导入、8132 E2E 证据、detach 回退、89 项回归、生产未动均通过；构建脚本 `_ssl` 瞬时失败如实保留。
+- **提交**：`ff6d4b7`（build_portable/tests、talk_runtime detach、start/start-gui、docs）。
+- **阶段4**：干净路径/预配置副本 E2E 已做（同机不同路径）；另一台干净 Windows、真实人工关窗、升级迁移未做。
+- **已知限制**：Edge app 窗口、页面内链接可导航；关窗不可取消，忙任务/停止失败可能残留；构建脚本一次在线构建仍受 `_ssl` 瞬时失败影响；scan 硬编码 `d:\claude-test`。
+
 ## 2026-11-14 02:00 — 14 阶段2b Edge 应用窗口启动器（候选 approved，待人工关窗）
 
 - **743（blocked）**：pywebview/pythonnet 依赖因 pip 网络失败未安装，真实窗口未验证；**744（partial）**：pip 恢复后真实 pywebview 窗口第二次无响应，且本机 pythonnet netfx 加载失败、coreclr 与 WebView2 WinForms 不兼容。

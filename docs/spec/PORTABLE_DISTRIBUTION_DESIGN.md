@@ -1,6 +1,6 @@
 # TALK 免安装文件夹分发设计（2026-11-13 方案草案）
 
-> 状态：方案草案；**阶段 1 / 2a 已实现；阶段 2b 候选已实现（2026-11-14，`df0d1fc`，746 approved，待用户人工关窗验收）**；阶段 3/4 未实现，不构成后续开工授权。目标形态是“拷贝一个文件夹即可使用”，不做安装包、Windows 服务或托盘常驻；提供一个随文件夹分发的**便携桌面窗口启动器**：点击启动 TALK 服务并打开 Edge 应用窗口，关闭窗口即退出服务（2026-11-13 用户补充；2b 由 pywebview 改为 Edge app）。
+> 状态：方案草案；**阶段 1 / 2a 已实现；阶段 2b 候选已实现（`df0d1fc`，746 approved，待人工关窗）；阶段 3 便携包已产出（`ff6d4b7`，750 approved，包 `D:\TALK-portable` + `D:\TALK-portable-clean.zip`）**；阶段 4 部分（同机不同路径 E2E），另一台干净 Windows/升级迁移/真实人工关窗待做。目标形态是“拷贝一个文件夹即可使用”，不做安装包、Windows 服务或托盘常驻；启动器使用 Edge 应用窗口（2b 由 pywebview 改为 Edge app）。
 
 ## 1. 决策与目标
 
@@ -228,8 +228,8 @@ TALK/
 - **阶段 1（已完成，`1b2392b`，735-737 approved）**：路径/配置抽象（`TALK_CONFIG`/`TALK_HOME`/`TALK_KEYS_DIR`）+ 便携目录 + 首次启动 bootstrap + CLI start/stop/status；隔离便携根 startup 已验证。
 - **阶段 2a（已完成，`f5075cf` + `8ba6ef6`，740/742 approved，用户视觉验收）**：运行器检测弹窗 + `probe_status`（ok/missing/error）+ 单句文案/去“知道了”/统一样式；每成员/项目/浏览器标签页会话一次。
 - **阶段 2b（候选实现，`df0d1fc`，746 approved，待用户人工关窗验收）**：Edge 应用窗口启动器（启动服务/打开窗口/关闭即停/单实例）；pywebview 因 pythonnet/.NET 兼容问题弃用。
-- **阶段 3（切片）**：embeddable Python + 依赖安装 + 构建脚本/zip + 首次启动 bootstrap 集成 + 安全检查。
-- **阶段 4（切片）**：干净机器/另一用户 E2E + 升级/迁移 + 文档/用户手册更新。
+- **阶段 3（已完成，`ff6d4b7`，750 approved）**：embeddable Python 3.12.1 + 依赖安装 + 构建脚本/zip + 首次启动 bootstrap 集成 + 安全检查；包 `D:\TALK-portable`（验收副本 8132）与 `D:\TALK-portable-clean.zip`（20.7MB/1,440 files）；包内导入与 8132 首启 E2E 通过。构建脚本 pip 后 `_ssl` 瞬时失败，当前包由暂存 runtime 组装，可复现性待修。
+- **阶段 4（部分，待做）**：同机不同路径/预配置 E2E 已完成；另一台干净 Windows、升级/迁移、真实人工关窗仍待做。
 每片仍按“目的/范围/不变项/验收”先确认；开发和独立复核按项目任务流程执行。
 
 ## 14. 待确认决策
