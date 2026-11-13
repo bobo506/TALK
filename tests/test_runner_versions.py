@@ -34,14 +34,29 @@ class VersionTests(unittest.TestCase):
 
     def test_probe_failures(self):
         with patch.object(versions.shutil, "which", return_value=None):
-            self.assertEqual(versions.get_version("codex")["status"], "unknown")
+            result = versions.get_version("codex")
+            self.assertEqual((result["status"], result["probe_status"]), ("unknown", "missing"))
         versions.clear_cache()
         with patch.object(versions.shutil, "which", return_value="codex"), patch.object(versions.subprocess, "run", side_effect=subprocess.TimeoutExpired("codex", 3)):
             result = versions.get_version("codex")
             self.assertEqual((result["status"], result["detail"]), ("unknown", "探测超时"))
+            self.assertEqual(result["probe_status"], "error")
         versions.clear_cache()
         with patch.object(versions.shutil, "which", side_effect=OSError()):
-            self.assertEqual(versions.get_version("codex")["status"], "unknown")
+            self.assertEqual(versions.get_version("codex")["probe_status"], "error")
+
+    def test_cli_probe_outcomes(self):
+        cases = [
+            (subprocess.CompletedProcess([], 1, stdout=b"", stderr=b""), None, "unknown", "error"),
+            (subprocess.CompletedProcess([], 0, stdout=b"no version", stderr=b""), None, "unknown", "error"),
+            (subprocess.CompletedProcess([], 0, stdout=b"codex-cli 0.164.0", stderr=b""), "0.164.0", "match", "ok"),
+        ]
+        for outcome, detected, status, probe_status in cases:
+            with self.subTest(probe_status=probe_status, outcome=outcome), patch.object(versions.shutil, "which", return_value="codex"), patch.object(versions.subprocess, "run", return_value=outcome):
+                versions.clear_cache()
+                result = versions.get_version("codex")
+                self.assertEqual((result["detected_version"], result["status"], result["probe_status"]), (detected, status, probe_status))
+        self.assertEqual(versions.get_version("unrecognized")["probe_status"], "error")
 
     def test_workbuddy_probe_success_and_isolated_config(self):
         observed = {}
@@ -78,7 +93,7 @@ class VersionTests(unittest.TestCase):
                                           ("5.7.9", "", "older"), (None, "未找到桌面程序", "unknown")]:
             with self.subTest(status=status):
                 versions.clear_cache()
-                with patch.object(versions, "_probe", return_value=("2.165.0", "")), \
+                with patch.object(versions, "_probe", return_value=("2.165.0", "", "ok")), \
                      patch.object(versions, "_probe_workbuddy_desktop", return_value=(detected, detail)) as probe:
                     result = versions.get_version("workbuddy")
                     versions.get_version("workbuddy")
@@ -95,7 +110,7 @@ class VersionTests(unittest.TestCase):
                 if detail:
                     self.assertIn(detail, result["detail"])
         versions.clear_cache()
-        with patch.object(versions, "_probe", return_value=(None, "")):
+        with patch.object(versions, "_probe", return_value=(None, "", "error")):
             self.assertNotIn("adapter_warning", versions.get_version("codex"))
 
     def test_desktop_missing_file(self):
@@ -105,24 +120,26 @@ class VersionTests(unittest.TestCase):
             self.assertTrue(detail)
 
     def test_workbuddy_probe_failures(self):
-        for files in ([False], [True, False]):
-            with self.subTest(files=files), patch.object(Path, "is_file", side_effect=files):
-                self.assertEqual(versions._probe_workbuddy(), (None, "未找到 WorkBuddy"))
+        for files, probe_status in [([False], "missing"), ([True, False], "error")]:
+            with self.subTest(files=files), patch.dict(versions.os.environ, {"LOCALAPPDATA": "test-root"}), patch.object(Path, "is_file", side_effect=files):
+                self.assertEqual(versions._probe_workbuddy(), (None, "未找到 WorkBuddy", probe_status))
         cases = [
             (subprocess.TimeoutExpired("workbuddy", 5), "探测超时"),
             (subprocess.CompletedProcess([], 1, stdout=b"", stderr=b""), "版本命令执行失败"),
             (subprocess.CompletedProcess([], 0, stdout=b"no version", stderr=b""), "无法解析版本"),
         ]
         for outcome, detail in cases:
-            with self.subTest(detail=detail), patch.object(Path, "is_file", return_value=True):
+            with self.subTest(detail=detail), patch.dict(versions.os.environ, {"LOCALAPPDATA": "test-root"}), patch.object(Path, "is_file", return_value=True):
                 options = {"side_effect": outcome} if isinstance(outcome, Exception) else {"return_value": outcome}
                 with patch.object(versions.subprocess, "run", **options):
-                    self.assertEqual(versions._probe_workbuddy(), (None, detail))
+                    self.assertEqual(versions._probe_workbuddy(), (None, detail, "error"))
+        with patch.dict(versions.os.environ, {}, clear=True):
+            self.assertEqual(versions._probe_workbuddy()[2], "error")
 
     def test_cache_and_clear(self):
-        with patch.object(versions, "_probe", return_value=("0.164.0", "")) as probe:
+        with patch.object(versions, "_probe", return_value=("0.164.0", "", "ok")) as probe:
             self.assertEqual(versions.get_version("codex")["status"], "match")
-            versions.get_version("codex")
+            self.assertEqual(versions.get_version("codex")["probe_status"], "ok")
             self.assertEqual(probe.call_count, 1)
             versions.clear_cache()
             versions.get_version("codex")
@@ -138,11 +155,12 @@ class VersionTests(unittest.TestCase):
         client = TestClient(app)
         self.assertIn(client.get("/api/runners/versions").status_code, (401, 403, 422))
         app.dependency_overrides[get_current_member] = lambda: SimpleNamespace(kind="agent")
-        with patch.object(versions, "_probe", return_value=("0.164.0", "")):
+        with patch.object(versions, "_probe", return_value=("0.164.0", "", "ok")):
             response = client.get("/api/runners/versions")
         self.assertEqual(response.status_code, 200)
         self.assertEqual([r["runtime"] for r in response.json()], ["codex", "kimi-code", "dsh", "workbuddy"])
         self.assertEqual(response.json()[0]["display_name"], "Codex")
+        self.assertEqual(response.json()[0]["probe_status"], "ok")
         self.assertEqual(client.post("/api/runners/versions").status_code, 405)
         # /{runner_id} PATCH remains the existing registry contract, not a versions writer.
         self.assertNotIn("patch", app.openapi()["paths"]["/api/runners/versions"])
@@ -158,7 +176,7 @@ class VersionTests(unittest.TestCase):
         app.dependency_overrides[get_session] = lambda: Session()
         app.dependency_overrides[get_current_member] = lambda: SimpleNamespace(kind="agent")
         client = TestClient(app)
-        with patch.object(versions, "_probe", return_value=(None, "")):
+        with patch.object(versions, "_probe", return_value=(None, "", "error")):
             result = client.get("/api/runners/versions").json()
             self.assertEqual([(r["runtime"], r["display_name"]) for r in result], [
                 ("codex", "Codex CLI"), ("kimi-code", "Kimi Code"),
@@ -173,7 +191,7 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(result[0]["display_name"], "Registered Codex")
         self.assertEqual(result[-1]["display_name"], "Custom")
         for row in result:
-            self.assertTrue({"adapted_version", "adapted_source", "detected_version", "status", "detail"} <= row.keys())
+            self.assertTrue({"adapted_version", "adapted_source", "detected_version", "status", "detail", "probe_status"} <= row.keys())
 
     def test_html_requires_revalidation_without_changing_static_resources(self):
         from server.main import app

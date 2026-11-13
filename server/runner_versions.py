@@ -94,11 +94,16 @@ def _probe_workbuddy_desktop():
 
 def _probe_workbuddy():
     try:
-        exe = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs/WorkBuddy/WorkBuddy.exe"
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if not localappdata:
+            return None, "未设置 LOCALAPPDATA，无法检测 WorkBuddy", "error"
+        exe = Path(localappdata) / "Programs/WorkBuddy/WorkBuddy.exe"
         asar = exe.parent / "resources/app.asar"
         entry = asar / "cli/bin/codebuddy"
-        if not exe.is_file() or not asar.is_file():
-            return None, "未找到 WorkBuddy"
+        if not exe.is_file():
+            return None, "未找到 WorkBuddy", "missing"
+        if not asar.is_file():
+            return None, "未找到 WorkBuddy", "error"
         with tempfile.TemporaryDirectory(prefix="talk-wb-version-") as config_dir:
             env = os.environ.copy()
             env.update({
@@ -116,14 +121,14 @@ def _probe_workbuddy():
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             if result.returncode != 0:
-                return None, "版本命令执行失败"
+                return None, "版本命令执行失败", "error"
             output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
             version = parse_version("workbuddy", output)
-            return (version, "") if version else (None, "无法解析版本")
+            return (version, "", "ok") if version else (None, "无法解析版本", "error")
     except subprocess.TimeoutExpired:
-        return None, "探测超时"
+        return None, "探测超时", "error"
     except Exception:
-        return None, "版本探测失败"
+        return None, "版本探测失败", "error"
 
 
 def _probe(runtime):
@@ -131,21 +136,21 @@ def _probe(runtime):
         return _probe_workbuddy()
     commands = COMMANDS.get(runtime)
     if not commands:
-        return None, "无可靠 CLI 探针"
+        return None, "无可靠 CLI 探针", "error"
     try:
         exe = next((path for name in commands if (path := shutil.which(name))), None)
         if not exe:
-            return None, "未找到命令"
+            return None, "未找到命令", "missing"
         result = subprocess.run([exe, "--version"], timeout=3, stdin=subprocess.DEVNULL, capture_output=True)
         if result.returncode != 0:
-            return None, "版本命令执行失败"
+            return None, "版本命令执行失败", "error"
         output = result.stdout.decode("utf-8", errors="replace")
         version = parse_version(runtime, output)
-        return (version, "") if version else (None, "无法解析版本")
+        return (version, "", "ok") if version else (None, "无法解析版本", "error")
     except subprocess.TimeoutExpired:
-        return None, "探测超时"
+        return None, "探测超时", "error"
     except Exception:
-        return None, "版本探测失败"
+        return None, "版本探测失败", "error"
 
 
 def clear_cache():
@@ -161,9 +166,10 @@ def get_version(runtime):
         if cached and now - cached[0] < 600:
             return dict(cached[1])
         adapted, source = ADAPTED_VERSIONS.get(runtime, (None, "无已验证基线"))
-        detected, detail = _probe(runtime)
+        detected, detail, probe_status = _probe(runtime)
         result = {"adapted_version": adapted, "adapted_source": source, "detected_version": detected,
-                  "status": compare_versions(detected, adapted), "detail": detail or ("无已验证基线" if not adapted else "")}
+                  "status": compare_versions(detected, adapted), "probe_status": probe_status,
+                  "detail": detail or ("无已验证基线" if not adapted else "")}
         if runtime == "workbuddy":
             desktop, desktop_detail = _probe_workbuddy_desktop()
             desktop_adapted, _ = WORKBUDDY_ACP_ADAPTED_DESKTOP

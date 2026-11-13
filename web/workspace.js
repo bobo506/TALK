@@ -49,6 +49,107 @@ function syncRunnerVersions() {
     .finally(() => { runnerVersionsUI.pending = false; syncRunnerVersions(); });
 }
 // 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
+// 项目角色加载后独立探测；避免切换账号或项目时显示过期结果。
+const runnerOnboardingUI = { request: 0, context: null, previousFocus: null, bound: false, loginObserver: null, seen: new Set() };
+function closeRunnerOnboarding() {
+  const overlay = document.getElementById("runner-onboarding-overlay");
+  if (!overlay || overlay.classList.contains("hidden")) return;
+  overlay.classList.add("hidden");
+  runnerOnboardingUI.context = null;
+  const previous = runnerOnboardingUI.previousFocus;
+  runnerOnboardingUI.previousFocus = null;
+  if (previous && typeof previous.focus === "function" && previous.isConnected !== false) previous.focus();
+}
+function runnerOnboardingSettings() {
+  workspaceUI.mode = "roles"; workspaceUI.roleSelection = "settings"; blackboardOpen = true;
+  renderWorkspaceMode();
+}
+function bindRunnerOnboarding(overlay) {
+  if (runnerOnboardingUI.bound) return;
+  runnerOnboardingUI.bound = true;
+  document.getElementById("runner-onboarding-close").addEventListener("click", closeRunnerOnboarding);
+  document.getElementById("runner-onboarding-dismiss").addEventListener("click", closeRunnerOnboarding);
+  document.getElementById("runner-onboarding-action").addEventListener("click", () => {
+    const context = runnerOnboardingUI.context;
+    if (!context || context.member !== myId || context.project !== activeProjectId || !currentMemberIsHuman()) {
+      closeRunnerOnboarding(); return;
+    }
+    closeRunnerOnboarding();
+    runnerOnboardingSettings();
+    if (context.kind === "ready") {
+      if (typeof roleRequestApp !== "undefined" && roleRequestApp && typeof roleRequestApp.open === "function") roleRequestApp.open();
+    } else {
+      syncRunnerVersions();
+      document.getElementById("runner-versions-panel")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }
+  });
+  overlay.addEventListener("keydown", event => {
+    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeRunnerOnboarding(); }
+  });
+}
+async function maybeShowRunnerOnboarding() {
+  const request = ++runnerOnboardingUI.request;
+  const member = myId, project = activeProjectId;
+  if (runnerOnboardingUI.context && (runnerOnboardingUI.context.member !== member || runnerOnboardingUI.context.project !== project || !currentMemberIsHuman())) closeRunnerOnboarding();
+  if (!member || !project || !currentMemberIsHuman() || !Array.isArray(projectAgents)) return;
+  const overlay = document.getElementById("runner-onboarding-overlay");
+  if (!overlay) return;
+  const prefix = `talk.runner-hint:${encodeURIComponent(member)}:${encodeURIComponent(project)}:`;
+  const seen = kind => {
+    const key = prefix + kind;
+    if (runnerOnboardingUI.seen.has(key)) return true;
+    try { return sessionStorage.getItem(key) === "1"; } catch (_) { return false; }
+  };
+  if (seen("ready") || seen("missing")) return;
+  try {
+    const res = await apiFetch("/api/runners/versions");
+    if (!res.ok) throw new Error("运行器状态请求失败");
+    const items = await res.json();
+    if (!Array.isArray(items)) throw new Error("运行器状态不是数组");
+    if (request !== runnerOnboardingUI.request || member !== myId || project !== activeProjectId || !currentMemberIsHuman() || !Array.isArray(projectAgents)) return;
+    const supported = items.filter(item => item && ["codex", "kimi-code", "dsh"].includes(item.runtime));
+    const available = supported.filter(item => typeof item.detected_version === "string" && item.detected_version.trim() && ["match", "newer", "older"].includes(item.status));
+    const missing = supported.filter(item => item.probe_status === "missing");
+    const hasUnknown = supported.some(item => item.probe_status !== "ok" && item.probe_status !== "missing");
+    if (!available.length && !missing.length) return;
+    if (available.length && projectAgents.length > 0) return;
+    const kind = available.length ? "ready" : "missing";
+    if (seen("ready") || seen("missing")) return;
+    // 登录过程中的项目加载可能先于登录遮罩消失；等遮罩关闭再重新判断上下文。
+    const login = document.getElementById("login-overlay");
+    if (login && !login.classList.contains("hidden")) {
+      if (typeof MutationObserver !== "undefined" && !runnerOnboardingUI.loginObserver) {
+        const observer = new MutationObserver(() => {
+          if (login.classList.contains("hidden")) {
+            observer.disconnect(); runnerOnboardingUI.loginObserver = null; void maybeShowRunnerOnboarding();
+          }
+        });
+        runnerOnboardingUI.loginObserver = observer;
+        observer.observe(login, { attributes: true, attributeFilter: ["class"] });
+      }
+      return;
+    }
+    // 已有弹窗时不抢占焦点，下一次角色列表刷新再判断。
+    if (document.querySelector('.modal-overlay:not(.hidden), .role-create-backdrop:not(.hidden)')) return;
+    const message = kind === "ready"
+      ? `已适配 ${available.map(item => item.display_name || item.runtime).join("、")} 运行器，可创建角色`
+      : `缺少 ${missing.map(item => item.display_name || item.runtime).join("、")} 运行器，请先安装或适配其他运行器${hasUnknown ? "；其余运行器状态未知" : ""}`;
+    document.getElementById("runner-onboarding-title").textContent = message;
+    document.getElementById("runner-onboarding-message").textContent = message + (available.some(item => item.status === "newer" || item.status === "older") ? "。部分运行器版本关系待确认，创建前请核对" : "");
+    const action = document.getElementById("runner-onboarding-action");
+    action.textContent = kind === "ready" ? "创建角色" : "查看运行器状态";
+    bindRunnerOnboarding(overlay);
+    runnerOnboardingUI.context = { member, project, kind };
+    runnerOnboardingUI.previousFocus = document.activeElement;
+    runnerOnboardingUI.seen.add(prefix + kind);
+    try { sessionStorage.setItem(prefix + kind, "1"); } catch (_) { /* 存储不可用时使用内存去重。 */ }
+    overlay.classList.remove("hidden");
+    action.focus();
+  } catch (error) {
+    console.warn("运行器引导检测失败", error);
+  }
+}
+// 参与任务分页：每页固定 20 条；页码绑定 账号/项目/角色/筛选 上下文，任何变化（含离开角色详情）都重置第一页。
 const ROLE_TASKS_PAGE_SIZE = 20;
 const roleTasksPageUI = { key: null, page: 1 };
 // 主任务列表分页：每页固定 20 条；页码绑定 账号/项目/模式/离页/搜索/筛选 上下文，

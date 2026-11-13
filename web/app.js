@@ -717,7 +717,10 @@ async function loadProjectAgents() {
     throw new Error(await readErrorDetail(res, `项目 Agent 加载失败: ${res.status}`));
   }
   const loaded = await res.json();
-  if (request === projectAgentRequest && projectId === activeProjectId && memberId === myId) projectAgents = loaded;
+  if (request === projectAgentRequest && projectId === activeProjectId && memberId === myId) {
+    projectAgents = loaded;
+    if (typeof maybeShowRunnerOnboarding === "function") void maybeShowRunnerOnboarding();
+  }
 }
 
 async function loadProjectTasks({ silent = false } = {}) {
