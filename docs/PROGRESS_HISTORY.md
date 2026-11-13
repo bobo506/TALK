@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-13 15:22 — P1b 启动原因文案人工验收通过
+
+- **验收**：用户目检角色详情「随项目自动启动」面板（页面 `workspace.js?v=20261112-hall-split`，runtime `6664`、7 宿主 `serving`）：Terra/K2.8 已勾选，DeepSeek/Astra/hy4/大K/w-d 未勾选，提示语为“下次加载项目时生效；本次手动关闭后不会再次拉起。”；codex/WorkBuddy接入验证 等归档角色不显示面板；旧通用文案“上次自动启动未完成，请查看服务状态后手动启动。”不存在。
+- **原因行**：当前可见角色 `last_activation` 为 `not_selected`/`enqueued`，按 721/722 设计与单测锁定不显示原因行；`skipped`（manual intent/not selected）与 `failed`（recovery_required、bridge_process_exited、runtime_unverified/conflict、未知）文案映射保持。
+- **结论**：P1b（721/722）视觉验收闭合；无代码、配置或运行时变更。
+
 ## 2026-11-13 14:54 — 修复 runtime fixture 缺 role-storage-layouts，ActualBootstrapTests 恢复通过
 
 - **根因**：`tests/talk_runtime_fixture.py` 只实现 3 个端点；`TalkRuntime.roles()`（shutdown 的 `_shutdown_roles` 会调用）请求 `/api/projects/{project}/role-storage-layouts`，fixture 返回 404，runtime 停在 `stopping_roles`/`stop_blocked`，bootstrap 测试等待 `stopped` 超时并在清理时报 WinError 32。该缺口在 HEAD `7e0896f` 即存在，与 727 候选无关。
