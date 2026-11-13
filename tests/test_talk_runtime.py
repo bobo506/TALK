@@ -411,6 +411,93 @@ class RuntimeTests(unittest.TestCase):
         Path(spec["health_file"]).write_text(json.dumps({"pid": 123, "activation_id": "old"}), encoding="utf-8")
         return spec
 
+    def configured_orphan_fixture(self):
+        spec = self.spec()
+        spec["argv"] = ["C:/Python/python.exe", "-B", "C:/TALK/.tmp/next_member_entry.py",
+                        "--project", self.runtime.project, "--member", "agent:one"]
+        self.config["hosts"] = [spec]
+        health = {"pid": 123, "activation_id": "old", "project_id": self.runtime.project,
+                  "member_id": "agent:one"}
+        Path(spec["health_file"]).write_text(json.dumps(health), encoding="utf-8")
+        return spec, health
+
+    def test_configured_orphan_is_observed_without_termination_or_spawn(self):
+        spec, _ = self.configured_orphan_fixture()
+        cases = [({"observed": state}, "orphan_host_serving") for state in ("running", "starting", "stopping")]
+        cases += [({"readiness_service": state}, "orphan_host_serving") for state in ("ready", "starting")]
+        cases += [({"desired": "running"}, "orphan_host_serving")]
+        cases += [({"observed": state}, "orphan_host_configured") for state in ("stopped", "failed")]
+        for service, reason in cases:
+            with self.subTest(service=service), patch.object(runtime, "recorded_process_state", return_value="present"), \
+                 patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+                 patch.object(runtime, "_close_orphan_handle") as close, patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                 patch.object(runtime, "process_inventory", return_value=[{"ProcessId":123, "CommandLine":"fixture"}]), \
+                 patch.object(runtime, "process_argv", return_value=spec["argv"]), \
+                 patch.object(runtime, "terminate_orphan") as terminate, patch.object(runtime, "_terminate_orphan_handle") as terminate_handle:
+                self.runtime.reconcile_hosts([self.role(ownership_held=False, **service)])
+                self.assertEqual(self.runtime.statuses["agent:one"], {"state":"external_manager", "pid":123, "reason":reason})
+                terminate.assert_not_called(); terminate_handle.assert_not_called(); close.assert_called_once_with(1)
+                self.assertFalse(self.spawned)
+
+    def test_configured_orphan_mismatches_are_unverified(self):
+        spec, health = self.configured_orphan_fixture()
+        base = spec["argv"][:]
+        cases = [(base + ["extra"], health), (base[:-1], health),
+                 (base[:2] + ["C:/TALK/.tmp/other.py"] + base[3:], health),
+                 (["C:/Other/python.exe"] + base[1:], health),
+                 (base[:-1] + ["agent:other"], health),
+                 (base, {**health, "project_id":"other"}), (base, {**health, "member_id":"agent:other"})]
+        for argv, facts in cases:
+            with self.subTest(argv=argv, health=facts), patch.object(runtime, "recorded_process_state", return_value="present"), \
+                 patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+                 patch.object(runtime, "_close_orphan_handle"), patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+                 patch.object(runtime, "process_inventory", return_value=[{"ProcessId":123, "CommandLine":"fixture"}]), \
+                 patch.object(runtime, "process_argv", return_value=argv), \
+                 patch.object(runtime, "terminate_orphan") as terminate, patch.object(runtime, "_terminate_orphan_handle") as terminate_handle:
+                Path(spec["health_file"]).write_text(json.dumps(facts), encoding="utf-8")
+                self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+                self.assertEqual(self.runtime.statuses["agent:one"], {"state":"recovery_required", "pid":123, "reason":"orphan_host_unverified"})
+                terminate.assert_not_called(); terminate_handle.assert_not_called(); self.assertFalse(self.spawned)
+
+    def test_computed_orphan_cannot_use_configured_match(self):
+        spec, _ = self.configured_orphan_fixture()
+        self.config["hosts"] = []
+        with patch.object(self.runtime, "workbuddy_spec", return_value=spec), \
+             patch.object(runtime, "recorded_process_state", return_value="present"), \
+             patch.object(runtime, "_ORPHAN_WINDOWS", True), patch.object(runtime, "_open_orphan_process", return_value=1), \
+             patch.object(runtime, "_close_orphan_handle"), patch.object(runtime, "_orphan_handle_creation_time", return_value=42), \
+             patch.object(runtime, "_configured_host_matches") as configured, \
+             patch.object(runtime, "terminate_orphan") as terminate, patch.object(runtime, "_terminate_orphan_handle") as terminate_handle:
+            self.runtime.reconcile_hosts([self.role(ownership_held=False)])
+        configured.assert_not_called(); terminate.assert_not_called(); terminate_handle.assert_not_called()
+        self.assertFalse(self.spawned)
+        self.assertEqual(self.runtime.statuses["agent:one"], {"state":"recovery_required", "pid":123, "reason":"orphan_host_unverified"})
+
+    def test_configured_match_validates_inventory_arguments_and_identity(self):
+        spec, health = self.configured_orphan_fixture()
+        base = spec["argv"][:]
+        row = {"ProcessId":123, "CommandLine":"fixture"}
+        def matches(expected, actual, facts=health, rows=None):
+            with patch.object(runtime, "process_inventory", return_value=[row] if rows is None else rows), \
+                 patch.object(runtime, "process_argv", return_value=actual):
+                return runtime._configured_host_matches(123, expected, self.runtime.project, "agent:one", facts)
+        normalized = ['"c:\\python\\PYTHON.EXE"', "-B", '"c:\\talk\\.TMP\\NEXT_MEMBER_ENTRY.PY"'] + base[3:]
+        self.assertTrue(matches(base, normalized))
+        no_flags = base[:3]
+        self.assertTrue(matches(no_flags, no_flags))
+        equals = base[:3] + ["--project-id=" + self.runtime.project, "--member=agent:one"]
+        self.assertTrue(matches(equals, equals))
+        for argv in (base[:3] + ["--project", "other"], base[:3] + ["--project-id=other"],
+                     base[:3] + ["--member", "agent:other"], base[:3] + ["--member="],
+                     base[:3] + ["--project"], base[:3] + ["--member", "--project", self.runtime.project]):
+            with self.subTest(argv=argv):
+                self.assertFalse(matches(argv, argv))
+        for expected in ([], None, "invalid", [1]):
+            self.assertFalse(matches(expected, base))
+        for rows in ([], [row, row], [{"ProcessId":123, "CommandLine":None}]):
+            self.assertFalse(matches(base, base, rows=rows))
+        self.assertFalse(matches(base, base, facts=None))
+
     def test_orphan_match_terminates_then_spawns(self):
         self.orphan_fixture()
         argv = [sys.executable, "-B", "-m", "scripts.dsh_role_host", "--project", self.runtime.project, "--member", "agent:one"]

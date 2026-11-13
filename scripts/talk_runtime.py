@@ -116,6 +116,33 @@ def _orphan_host_matches(pid, expected_argv, project, member):
             and projects == [project] and members == [member])
 
 
+def _configured_host_matches(pid, expected_argv, project, member, health):
+    """Verify the complete configured command and health identity in memory."""
+    if (not isinstance(expected_argv, list) or not expected_argv or
+            not all(isinstance(token, str) for token in expected_argv) or
+            not isinstance(health, dict) or health.get("project_id") != project or
+            health.get("member_id") != member):
+        return False
+    rows = [row for row in process_inventory() if row.get("ProcessId") == pid]
+    if len(rows) != 1 or not isinstance(rows[0].get("CommandLine"), str):
+        return False
+    argv = process_argv(rows[0]["CommandLine"])
+    if (not isinstance(argv, list) or len(argv) != len(expected_argv) or
+            not all(isinstance(token, str) for token in argv)):
+        return False
+    for actual, expected in zip(argv, expected_argv):
+        if any(char in actual or char in expected for char in ("/", "\\")):
+            actual = actual.strip('"').replace("\\", "/").casefold()
+            expected = expected.strip('"').replace("\\", "/").casefold()
+        if actual != expected:
+            return False
+    projects, bad_project = _identity_values(argv, ("--project", "--project-id"))
+    members, bad_member = _identity_values(argv, ("--member",))
+    return (not bad_project and not bad_member and
+            all(value == project for value in projects) and
+            all(value == member for value in members))
+
+
 def _runtime_identity(health):
     if not isinstance(health, dict):
         raise RuntimeErrorCode("runtime_stop_health_invalid")
@@ -820,6 +847,7 @@ class TalkRuntime:
             specs.pop(member, None)
             if not workspace_enabled:
                 self.statuses[member] = rsh.workspace_runtime_not_ready_status()
+        configured_members = set(specs)
         for role in roles:
             if role["member_id"] in workspace_roles and not workspace_enabled:
                 continue
@@ -896,7 +924,17 @@ class TalkRuntime:
                             raise OSError("orphan_host_open_failed")
                         created = _orphan_handle_creation_time(handle)
                         if not _orphan_host_matches(pid, spec["argv"], self.project, member):
-                            self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":"orphan_host_unverified"}
+                            if (member in configured_members and
+                                    _configured_host_matches(pid, spec["argv"], self.project, member, existing)):
+                                observed = service.get("observed")
+                                readiness = service.get("readiness_service")
+                                desired = service.get("desired")
+                                serving = (observed in ("running", "starting", "stopping") or
+                                           readiness in ("ready", "starting") or desired == "running")
+                                self.statuses[member] = {"state":"external_manager", "pid":pid,
+                                                         "reason":"orphan_host_serving" if serving else "orphan_host_configured"}
+                            else:
+                                self.statuses[member] = {"state":"recovery_required", "pid":pid, "reason":"orphan_host_unverified"}
                             continue
                         verified = True
                         observed = service.get("observed")
