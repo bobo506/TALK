@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-13 20:30 — 宿主生命周期已部署验证：按需拉起、周期内保留、外部宿主终止
+
+- **733（Terra）/734（K2.8）**：按需宿主实现与独立复核 approved；候选 sha256 `33fc371…`/`faa8a55…`；提交 `1b065fa`。
+- **冷启动**：新代码 runtime `14944` 启动后，serving 宿主仅 Terra `3252`（解释器 `9076`）与 K2.8 `11796`，其余 5 角色 status=stopped、无宿主进程；两角色 ready。
+- **按需启动**：disabled 的 Astra 手动 start → 宿主约 2–4s 出现（pid `6068`），约 8.8s serving、10.9s 角色 ready；stop 后服务 stopped，宿主仍 serving（周期内保留）。
+- **受控崩溃**：只杀 runtime `14944`/API `13688`、保留 3 宿主 → 新 runtime `4044` 中 Terra/K2.8 为 `external_manager/orphan_host_serving`（实例 `ins_c40dd421a220`/`13160`、`ins_73292e0e282b`/`16028` 未变），Astra 外部宿主 `6068` 被核验终止、无重拉；无 `recovery_required`。
+- **恢复**：停角色 → 终止旧 runtime/API/残留宿主 → 新 runtime `9960`（API `12440`），仅 2 个 owned serving 宿主（Terra `6164`、K2.8 `13884`）；Terra gen86/`ins_3c2b5b7cc58d`/`16152`、K2.8 gen84/`ins_d78ad89ee10f`/`7864` ready；counts 保持（members 48、messages 2707、tasks 734、groups 735、projects 1、project_agents 10；instances 491 为累计新建）。
+- **证据**：`.tmp/host-lifecycle-20261113/deploy/`（before/boot/astra-stopped/crash-after/restore-after + timeline.md）。
+- **残余**：archived+owned 契约无测试；deletion 外部宿主与 cleanup 的基线互锁待产品确认；未设宿主上限；启动延迟 +2–5s 为实测约值；733/734 已收取。
+
 ## 2026-11-13 17:20 — 宿主生命周期暂缓，外部宿主终止策略已定
 
 - 用户决定**暂缓实现**“周期内保留宿主 + 重启只拉起勾选角色”的宿主生命周期改造；方案保留在 [HOST_LIFECYCLE_DECISION.md](spec/HOST_LIFECYCLE_DECISION.md)。
