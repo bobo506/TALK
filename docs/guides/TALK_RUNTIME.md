@@ -40,7 +40,7 @@ Windows后台入口使用无控制台启动，API随同启动的管理器及 `ru
 
 本机清单沿用此前已核验的 DSH、Codex、三个 Kimi 的窄宿主配方；这些本机辅助文件仍是部署依赖，不能删除 `.tmp/legacy-role-page-control` 后继续使用原清单。WorkBuddy 工厂可自动发现新绑定角色。其它运行器的新成员需先准备并核验该成员的宿主配方，不能把某一成员的静态配方用于所有身份。
 
-清单内的旧窄宿主只有由本代运行入口拉起时才由本代 runtime 持有并显示 `serving`；若它们在崩溃后仍存活，本代 runtime 不能用标准 `*_role_host.py` 的 argv 证明归属，会显示 `recovery_required/orphan_host_unverified`，而不是把它当作可观察的外部宿主。收口方式：先在页面正常关闭该角色并确认旧桥退出，核实创建时间/命令行后终止旧宿主进程，由运行入口按清单重新拉起；随后正常启动角色。2026-11-13 已按此把 K2.8 宿主替换为 `444`、DeepSeek 宿主替换为 `4308`，7 个宿主均为 `serving`。
+清单内的旧窄宿主：727–729 已实现清单归属证明（提交 `59f5406`，**需重启 runtime 加载后生效**）。加载后，崩溃重启时仍存活的清单宿主会按完整 argv 与健康文件身份识别：命中且服务中显示 `external_manager/orphan_host_serving`，非服务态显示 `external_manager/orphan_host_configured`，只观察，不接管、不终止、不自动重拉；未命中仍 `recovery_required/orphan_host_unverified`。未加载新代码的 runtime 仍按旧逻辑把窄宿主判为 `recovery_required`。需要人工收口时仍可：在页面正常关闭该角色并确认旧桥退出，核实创建时间/命令行后终止旧宿主进程，由运行入口按清单重新拉起；随后正常启动角色。2026-11-13 已按此前方式把 K2.8 宿主替换为 `444`、DeepSeek 宿主替换为 `4308`，7 个宿主均为 `serving`。
 
 ## 新建Kimi角色的宿主接入（2026-10-26补正）
 

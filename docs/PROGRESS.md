@@ -1,12 +1,11 @@
 # Project Progress
 
-## 当前快照（2026-11-13 10:25，遗留宿主收口完成）
+## 当前快照（2026-11-13 13:50，窄宿主归属证明复核通过，待部署）
 
-- **收口结果**：02:28 重启后遗留的两个外部窄宿主已由本代 runtime 重新拉起为自有宿主（`serving`），不再是 `recovery_required/orphan_host_unverified`。
-  - K2.8：旧宿主 `2944` 终止 → 新宿主 `444`（runtime 14544 子进程）→ 正常 start gen76，实例 `ins_529c8c6abc32`、桥 `10624`，running/ready/idle。
-  - DeepSeek：旧宿主 `7448` 终止 → 新宿主 `4308`；角色服务保持 stopped，无桥进程。
-  - Terra 未受影响：宿主 `14548`、实例 `ins_4cd512d3ddd3`、running/ready/idle。
-- **现状**：runtime `14544` running/startup complete，7 个宿主全部 `serving`；healthz ok；`submitted/assigned/in_progress` 均为 0。
-- **更正**：上一快照“K2.8 旧 unmanaged 宿主已替换为受管实例”只对实例成立；宿主仍是清单配置的 `.tmp` 窄宿主（外部进程），本轮才真正收口。
-- **残余**：宿主仍依赖 `.tmp/legacy-role-page-control`（部署依赖）；下次崩溃重启后仍会被判 `orphan_host_unverified`，根治需另开代码片识别清单内窄宿主 argv。P1b 文案目检、P2 真实长任务 kill 仍未做。
+- **727–729 完成**：`config["hosts"]` 窄宿主按完整 argv + health 身份识别；服务中 → `external_manager/orphan_host_serving`，非服务态 → `orphan_host_configured`，只观察、不接管、不终止、不重拉；标准 `*_role_host.py` 路径不变。
+- **复核**：K2.8 729 approved（9 项 verification 全 pass、15 项对抗用例、0 阻断）；727/728/729 已收取，`submitted=[]`。
+- **提交**：`59f5406`（仅 `scripts/talk_runtime.py`、`tests/test_talk_runtime.py`）；**runtime 仍是 02:28 加载的旧代码，改动未生效**，清单内窄宿主在新逻辑加载前仍会显示 `recovery_required`。
+- **基线缺口**：`tests/talk_runtime_fixture.py` 缺 `/api/projects/{project}/role-storage-layouts`，`ActualBootstrapTests` 在 HEAD `7e0896f` 与候选均 `errors=2`（独立 worktree 复跑确认），与 727 无关；建议另开小片修夹具。
+- **现状**：runtime `14544`、7 宿主 `serving`；Terra/K2.8 running/ready/idle；healthz ok；无待收取/进行中任务。
+- **下一步**：待用户确认后重启 runtime 加载 `59f5406`，并做真实崩溃验证（只杀 runtime、保留窄宿主 → 应显示 `external_manager/orphan_host_serving`）；夹具缺口另片。
 - **恢复**：说“继续项目”；详情见 [PROGRESS_HISTORY.md](PROGRESS_HISTORY.md) 顶部。

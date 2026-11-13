@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-13 13:50 — 窄宿主归属证明（727–729）：清单宿主只观察，不误报待恢复
+
+- **727（Terra 开发）**：`scripts/talk_runtime.py` 新增 `_configured_host_matches()`：仅对 `config["hosts"]` 显式条目，按完整 argv（路径 token 去引号、`\`→`/`、casefold；非路径 token 精确）+ health `project_id/member_id` + 可选 `--project/--project-id/--member` 身份值证明归属；`reconcile_hosts` 在 workspace-v1 覆盖 pop 后记录清单成员，标准匹配失败时才调用；命中且服务中 → `external_manager/orphan_host_serving`，非服务态 → `external_manager/orphan_host_configured`，随后 `continue`，绝不进入 `terminate_orphan`/句柄终止/重拉。标准 `*_role_host.py` 路径逐行未变。`tests/test_talk_runtime.py` 新增 4 组用例（serving/configured、argv 与身份不符、computed 来源、匹配边界），定向 55 项通过。
+- **728（Terra 补证）**：Codex 沙箱拒绝写入 `.git/index.lock`，`git checkout` 回 HEAD 失败；协调者改用独立 detached worktree 在 `7e0896f` 复跑 `ActualBootstrapTests`，同样 `errors=2`（89.317s；候选 88.577s），失败位置同为 `test_local_runtime.py:233` 等待 `stopped` 未收敛 + 清理 WinError 32。根因定位：`tests/talk_runtime_fixture.py` 只实现 3 个端点，缺 `/api/projects/{project}/role-storage-layouts`，而 `TalkRuntime.roles()`/`_shutdown_roles` 会请求它，fixture 404 使 shutdown 停在 `stopping_roles`/`stop_blocked`。该 fixture 不在候选 diff，属 HEAD 既有测试夹具缺口。另清理了测试遗留的 12 个 `talk-local-runtime-*` 假 runtime 与 14 个 fixture API 进程（均为 `prj_fixture`/随机端口，不涉生产）。
+- **729（K2.8 独立复核）**：approved，9 项 verification 全 pass、15 项对抗用例（重复 flag、大小写、hex、引号路径、pid 类型等）、0 阻断；非阻断限制：含斜杠 token 统一 casefold、窄宿主路径不发 `orphan_host_terminated` 事件、真实崩溃场景仍待实测。
+- **状态**：727/728/729 已收取（`submitted=[]`）；代码提交 `59f5406`；**runtime 未重启，改动未生效**；真实崩溃场景（窄宿主服务中跨重启、stop_blocked 交互、真实 CommandLine 引号/8.3 路径）待部署后验证。
+- **证据**：`.tmp/narrow-host-proof-20261113/`（delivery-727/728/729、candidate-manifest.json、baseline-bootstrap.txt、terra/candidate-bootstrap.txt、review/adversarial.py、review/three-module-rerun.txt）。
+
 ## 2026-11-13 10:25 — 遗留宿主收口：K2.8 / DeepSeek 外部窄宿主回归本代 runtime
 
 - **背景**：02:28 崩溃恢复重启后，清单里的两个窄宿主（`.tmp/legacy-role-page-control/.../next_member_entry.py` pid 2944、`deepseek_member_entry.py` pid 7448，均始于 11-12 23:31）作为外部进程继续存活；P1a 的 `_host_command_entry` 只识别标准 `*_role_host.py`，因此两者被判 `recovery_required/orphan_host_unverified`。上一快照“K2.8 旧 unmanaged 宿主已替换为受管实例”只对实例成立，对宿主不成立。
