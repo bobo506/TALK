@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-13 10:25 — 遗留宿主收口：K2.8 / DeepSeek 外部窄宿主回归本代 runtime
+
+- **背景**：02:28 崩溃恢复重启后，清单里的两个窄宿主（`.tmp/legacy-role-page-control/.../next_member_entry.py` pid 2944、`deepseek_member_entry.py` pid 7448，均始于 11-12 23:31）作为外部进程继续存活；P1a 的 `_host_command_entry` 只识别标准 `*_role_host.py`，因此两者被判 `recovery_required/orphan_host_unverified`。上一快照“K2.8 旧 unmanaged 宿主已替换为受管实例”只对实例成立，对宿主不成立。
+- **K2.8 收口**：human stop（gen75，观察 stopped，桥 7216 退出）→ 核验创建时间/命令行后终止旧宿主 2944 → runtime 以清单配方拉起新宿主 `444`（parent 14544，health `serving`）→ human start（gen76）→ 新实例 `ins_529c8c6abc32`、桥 `10624`，running/ready/idle。
+- **DeepSeek 收口**：角色服务已 stopped、无子桥，核验后终止旧宿主 7448 → runtime 拉起新宿主 `4308`（无子进程），服务保持 stopped。
+- **验证**：runtime 健康文件 7 个宿主全部 `serving`；Terra 宿主 14548、实例 `ins_4cd512d3ddd3`、pid 2192 均未变；healthz ok；`submitted/assigned/in_progress` 均为 0；旧 PID 2944/7448 已退出（7216 已被 chrome 复用，按创建时间区分）。
+- **限制/残余**：窄宿主仍依赖 `.tmp/legacy-role-page-control`（`TALK_RUNTIME.md` 已记为部署依赖），只有本代 runtime 拉起时才显示 `serving`；下次崩溃重启仍会判 unverified，根治需代码片支持清单内窄宿主 argv 的归属证明。P1b 文案目检与 P2“长任务运行中 kill”仍未做。
+- **证据**：`.tmp/legacy-host-closeout-20261113/`（`before/kimi-stopped/kimi-restarted/after` 快照、`before-processes.txt`、`after-runtime-health.json`、`ops.py`）。
+- **变更文件**：`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`、`docs/spec/DEVELOPMENT_ROADMAP.md`、`docs/guides/TALK_RUNTIME.md`。
+
 ## 2026-11-13 02:40 — 第 12 项修复：异常退出后的选择性自启动与恢复（P0/P1a/P1b/P2）
 
 - **P0（717 开发 / 718 复核 approved，`44f3fd1`）**：`_release_dead_running` 仅在本地可证明死亡（owner host、pid、process_started_at、instance/launch 身份、无任务/租约/活动 launch）时释放 stale running；`_snapshot` 手动意图改为“人工 actor + intent 时间”，不再由 observed 心跳触发；启动激活与 start-all 接入；禁用偏好 → `startup_not_selected`，活进程仍 `skipped_running`。新增 `tests/test_role_startup_stale_recovery.py`。
