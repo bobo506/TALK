@@ -1,6 +1,6 @@
 # TALK 免安装文件夹分发设计（2026-11-13 方案草案）
 
-> 状态：方案草案；**阶段 1 / 2a 已实现（2026-11-13，`1b2392b`、`f5075cf`+`8ba6ef6`）**，阶段 2b/3/4 未实现，不构成后续开工授权。目标形态是“拷贝一个文件夹即可使用”，不做安装包、Windows 服务或托盘常驻；提供一个随文件夹分发的**便携桌面窗口启动器**：点击启动 TALK 服务并打开桌面窗口，关闭窗口即退出服务（2026-11-13 用户补充）。
+> 状态：方案草案；**阶段 1 / 2a 已实现；阶段 2b 候选已实现（2026-11-14，`df0d1fc`，746 approved，待用户人工关窗验收）**；阶段 3/4 未实现，不构成后续开工授权。目标形态是“拷贝一个文件夹即可使用”，不做安装包、Windows 服务或托盘常驻；提供一个随文件夹分发的**便携桌面窗口启动器**：点击启动 TALK 服务并打开 Edge 应用窗口，关闭窗口即退出服务（2026-11-13 用户补充；2b 由 pywebview 改为 Edge app）。
 
 ## 1. 决策与目标
 
@@ -106,36 +106,37 @@ TALK/
 
 目标：点击启动器 → 启动 TALK 服务 → 在**桌面窗口**（非浏览器标签页）打开 TALK → 关闭窗口即退出服务。
 
-### 技术选项
+### 技术选项（2026-11-14 决策更新）
 
 | 方案 | 说明 | 取舍 |
 |---|---|---|
-| **A. pywebview + Edge WebView2（推荐）** | 随附 Python 运行；原生窗口嵌入 WebView2；关闭窗口由 Python 进程收尾 | 需要目标机有 WebView2 Runtime（Win10/11/Edge 常见）；`pywebview` + `pythonnet` 进依赖；无浏览器地址栏 |
-| B. Edge/Chrome `--app` + 关闭探测 | 轻量，无额外 webview 依赖；以 app 窗口打开 | 本质仍是浏览器引擎/进程；关闭窗口的探测不稳定；可能残留后台进程 |
-| C. C# WinForms/WPF + WebView2 | 原生 exe，行为最可控 | 需额外 .NET/WebView2 构建链，与 Python 打包分离 |
+| **A. Edge `--app` 应用窗口（已采用，2b 实测）** | 启动本机 Edge 的 app 窗口；无地址栏/标签页；关闭窗口时 Edge 进程退出，启动器据此停服 | 不依赖 pywebview/pythonnet；窗口仍是 Edge 引擎；关窗后无法取消关闭；页面内链接可导航 |
+| B. pywebview + Edge WebView2（原推荐，弃用） | 原生窗口嵌入 WebView2 | 本机 pythonnet netfx 加载失败；coreclr 与 WebView2 WinForms 的 `System.Windows.Forms.ContextMenu` 不兼容；真实窗口第二次易无响应 |
+| C. C# WinForms/WPF + WebView2 | 原生 exe，行为最可控 | 需额外 .NET/WebView2 构建链，与 Python 打包分离；首版不采用 |
 
-- 首版推荐 A；如果目标机缺少 WebView2 Runtime，启动器明确提示安装（或回退 B 并说明差异），不能静默失败。
-- 启动器与 TALK 服务同目录；窗口标题/图标使用 TALK；外部链接交给系统浏览器，窗口内只允许 `http://127.0.0.1:<port>`。
+- 首版采用 A：启动器用 `msedge.exe --app=<url> --user-data-dir=<home>/data/launcher-profile --no-first-run --no-default-browser-check --disable-background-mode`；关闭窗口 = Edge 进程退出。
+- Edge 路径查找 `%ProgramFiles(x86)%` → `%ProgramFiles%` → `%LOCALAPPDATA%`；缺失时明确报错，不静默失败。
+- 启动器与 TALK 服务同目录；窗口只以 TALK URL 启动；页面内链接仍可导航（不宣称导航拦截）。
 
 ### 生命周期
 
-1. 启动器单实例：已有一个启动器窗口时，第二次点击聚焦/提示，不启动第二个服务。
+1. 启动器单实例：已有启动器时第二次点击只提示“已在运行”，不重复起服务/窗口。
 2. 服务未运行：启动 `talk_runtime serve --config config/runtime.json --apply`（由启动器持有/监控），轮询 `/healthz`；失败弹窗显示原因。
-3. 页面：打开 `http://127.0.0.1:8000`；默认 trusted loopback 无需登录；key 模式显示登录页，由用户在窗口内输入。
+3. 页面：打开 `http://127.0.0.1:<port>`；默认 trusted loopback 无需登录；key 模式显示登录页，由用户在窗口内输入。
 4. 关闭窗口：
-   - 先尝试优雅 `talk_runtime stop --apply --wait`；
-   - 有运行中任务/停止被阻塞时，弹窗提示，**默认取消关闭并保持服务**；用户明确确认后才继续（遵守现有忙任务停止守卫，不强制杀）；
-   - 服务不是本次启动器拉起的（已由外部运行）时，询问“只关闭窗口/同时停止服务”，默认只关闭窗口；
-   - 停止完成后退出启动器。
+   - Edge 进程退出后，owned 服务先复核归属，再 `talk_runtime stop --apply --wait`；
+   - 停止成功 → 启动器退出；
+   - 忙任务/停止失败 → 窗口已关闭，无法取消；提示“服务未停止，请处理忙任务后使用 stop.bat/status.bat”，**不强制杀**；
+   - 服务不是本次启动器拉起的（已由外部运行）→ 只关闭窗口，不停止服务。
 5. 启动器崩溃/被强杀：服务可能仍在；`status.bat`/`stop.bat` 可查看/停止；下次启动器发现已运行则附挂。
 6. 不安装 Windows 服务、不写开机启动、不做托盘常驻。
 
 ### 登录与安全
 
-- 默认只绑定 `127.0.0.1`；窗口只访问回环地址。
+- 默认只绑定 `127.0.0.1`；窗口只以 TALK URL 启动。
 - key 模式不在启动器内嵌凭据；由用户在窗口登录页输入。
-- WebView2 使用独立 profile（建议 `data/launcher-profile`），不读取系统浏览器 Cookie/Key。
-- 启动器不提供任意 URL 导航、本地文件访问或开发者工具入口（可选调试开关仅开发包）。
+- Edge 使用独立 profile `data/launcher-profile`，不读取系统浏览器 Cookie/Key。
+- 不提供任意 URL 启动或本地文件访问；页面内链接可导航，属已知限制。
 
 ## 5.2 运行器检测弹窗（2026-11-13 用户补充）
 
@@ -226,8 +227,8 @@ TALK/
 
 - **阶段 1（已完成，`1b2392b`，735-737 approved）**：路径/配置抽象（`TALK_CONFIG`/`TALK_HOME`/`TALK_KEYS_DIR`）+ 便携目录 + 首次启动 bootstrap + CLI start/stop/status；隔离便携根 startup 已验证。
 - **阶段 2a（已完成，`f5075cf` + `8ba6ef6`，740/742 approved，用户视觉验收）**：运行器检测弹窗 + `probe_status`（ok/missing/error）+ 单句文案/去“知道了”/统一样式；每成员/项目/浏览器标签页会话一次。
-- **阶段 2b（切片，待做）**：桌面窗口启动器（启动服务/打开窗口/关闭即停/单实例）。
-- **阶段 3（切片）**：embeddable Python + 依赖安装 + 构建脚本/zip + 安全检查。
+- **阶段 2b（候选实现，`df0d1fc`，746 approved，待用户人工关窗验收）**：Edge 应用窗口启动器（启动服务/打开窗口/关闭即停/单实例）；pywebview 因 pythonnet/.NET 兼容问题弃用。
+- **阶段 3（切片）**：embeddable Python + 依赖安装 + 构建脚本/zip + 首次启动 bootstrap 集成 + 安全检查。
 - **阶段 4（切片）**：干净机器/另一用户 E2E + 升级/迁移 + 文档/用户手册更新。
 每片仍按“目的/范围/不变项/验收”先确认；开发和独立复核按项目任务流程执行。
 
@@ -240,7 +241,7 @@ TALK/
 5. **端口冲突**：明确失败（推荐）还是自动换端口？
 6. **分发内容**：是否包含 `docs/`（建议包含）与 `tests/`（建议不包含）？
 7. **首版平台**：仅 Windows x64（建议）还是同时考虑 Linux？
-8. **启动器技术**：pywebview + WebView2（推荐）还是 Edge app 窗口/C# WebView2？
+8. **启动器技术**：Edge `--app` 应用窗口（已采用，2b 实测）；pywebview + WebView2 因 pythonnet/.NET 兼容问题弃用；C# WebView2 未采用。
 9. **关闭时忙任务**：取消关闭并保持服务（推荐，遵守忙停止守卫）还是提示后强制停止？
 10. **服务已在外部运行**：启动器只附挂、关闭窗口不停止（推荐）还是关闭时一并停止？
 11. **弹窗条件 2**：无可用运行器时，项目已有角色是否仍弹（建议仍弹一次，避免角色无法执行）；“已适配”是否要求本机已安装（建议是，避免“可创建”误导）。

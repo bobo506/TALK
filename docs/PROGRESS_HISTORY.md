@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-14 02:00 — 14 阶段2b Edge 应用窗口启动器（候选 approved，待人工关窗）
+
+- **743（blocked）**：pywebview/pythonnet 依赖因 pip 网络失败未安装，真实窗口未验证；**744（partial）**：pip 恢复后真实 pywebview 窗口第二次无响应，且本机 pythonnet netfx 加载失败、coreclr 与 WebView2 WinForms 不兼容。
+- **745（complete）**：启动器改用 **Edge `--app` 应用窗口**（无地址栏/标签页，独立 profile），移除 pywebview/pythonnet/WebView2/导航守卫依赖；owned 关窗按归属 stop，attach 不停止，stop 失败只提示不杀，单实例/Edge 缺失/启动超时保护保留。
+- **746（K2.8）approved**：三文件 sha 一致、技术切换干净、生命周期/归属/单实例/配置走查通过；GUI E2E 为真实 msedge `--app` 8124，owned 后端口/Edge 无残留、attach 后健康；82 项测试复跑通过；生产 7936 未动。
+- **提交**：`df0d1fc`（scripts/talk_launcher.py、start-gui.bat、tests/test_talk_launcher.py）。
+- **已知限制**：页面内链接可导航；关窗后无法取消，忙任务/停止失败可能残留服务（提示 stop.bat/status.bat）；真实人工关窗待用户验收；`start-gui.bat` 首次 bootstrap、embeddable/打包属阶段 3。
+- 743-746 已收取；未部署生产。
+
 ## 2026-11-14 00:15 — 14 阶段2a 运行器检测弹窗完成、部署并视觉验收
 
 - **738（Terra，partial）**：实现项目加载后的运行器引导弹窗、会话去重、焦点、创建角色/查看状态导航、WorkBuddy 排除；阻塞在“unknown 不误报”与“unknown 显示缺少”冲突。
