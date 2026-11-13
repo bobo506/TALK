@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-13 14:10 — 部署窄宿主归属证明（59f5406）并验证常驻启动
+
+- **正常停机**：`talk_runtime stop --apply --wait` → `stop_status=stopped`、`shutdown.phase=complete`；端口 8000 关闭，7 个宿主 `stopped`；旧 runtime `14544` 退出。停机前 `submitted/assigned/in_progress=0`，Terra/K2.8 均 idle。
+- **清理测试遗留**：终止 4 组 K2.8 复核期间留下的 `talk-local-runtime-*` fixture（`prj_fixture`/随机端口，位于 K2.8 native 目录下），共 16 个 runtime/API 进程；不涉生产配置。
+- **启动**：14:06:20 `serve --apply --detach` 启动新 runtime `1484`（launcher 13516 已退出），API child `8500`、`api_mode=owned`、`startup_state=complete`；7 个宿主全部 `serving`：deepseek `13084`、K2.8 `14140`、Astra `780`、Terra `16128`、hy4 `15564`、大K `8684`、w-d `12008`。
+- **角色**：启动偏好自动拉起 Terra gen80/`ins_75d2582d5aad`/pid `8472`、K2.8 gen78/`ins_2d680caadfcf`/pid `11240`，均 running/ready/idle；healthz ok；`submitted/assigned/in_progress=0`。
+- **未验证**：真实崩溃复现（只杀 runtime/API、保留窄宿主）以观察 `external_manager/orphan_host_serving` 仍待维护窗口实测；`tests/talk_runtime_fixture.py` 缺 `role-storage-layouts` 的基线夹具缺口仍待另片。
+- **证据**：`.tmp/narrow-host-proof-20261113/deploy-after.json`（runtime/agents/healthz 快照）。
+
 ## 2026-11-13 13:50 — 窄宿主归属证明（727–729）：清单宿主只观察，不误报待恢复
 
 - **727（Terra 开发）**：`scripts/talk_runtime.py` 新增 `_configured_host_matches()`：仅对 `config["hosts"]` 显式条目，按完整 argv（路径 token 去引号、`\`→`/`、casefold；非路径 token 精确）+ health `project_id/member_id` + 可选 `--project/--project-id/--member` 身份值证明归属；`reconcile_hosts` 在 workspace-v1 覆盖 pop 后记录清单成员，标准匹配失败时才调用；命中且服务中 → `external_manager/orphan_host_serving`，非服务态 → `external_manager/orphan_host_configured`，随后 `continue`，绝不进入 `terminate_orphan`/句柄终止/重拉。标准 `*_role_host.py` 路径逐行未变。`tests/test_talk_runtime.py` 新增 4 组用例（serving/configured、argv 与身份不符、computed 来源、匹配边界），定向 55 项通过。
