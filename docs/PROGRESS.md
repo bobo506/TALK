@@ -1,12 +1,13 @@
 # Project Progress
 
-## 当前快照（2026-11-13 22:10，14 免安装阶段 1 完成）
+## 当前快照（2026-11-14 00:15，14 阶段2a 弹窗已上线并视觉验收）
 
-- **14 阶段 1 已完成**：`TALK_CONFIG`、便携路径（`TALK_HOME`/`TALK_KEYS_DIR`/data 目录）、幂等 bootstrap（config/runtime/Key/管理员/默认项目/.talk）、`start/stop/status.bat`；`local_runtime` 绑定已按 `TALK_CONFIG` 修复；提交 `1b2392b`。
-- **验证**：10 项便携测试（隔离 bootstrap→随机端口 API→startup HTTP 200→stop）、76 项 startup 回归、29 项 local_runtime 补跑通过；737 独立复核 approved。
-- **非阻断残余（阶段 1）**：Key ACL 未收紧；真实双击 bat/浏览器回退未验；首次端口未参数化；未跟踪测试残留 `portable-phase1-d45aswhw/`；便携无 project_id 自动恢复未做。
-- **宿主生命周期**：runtime `9960`、仅 Terra `6164`/K2.8 `13884` 两个 owned 宿主；Terra gen86、K2.8 gen84 ready；healthz ok；任务 0。
-- **下一步**：阶段 2——桌面窗口启动器（pywebview/WebView2、关闭即停、单实例）+ 运行器检测弹窗；阶段 3 embeddable/打包；阶段 4 干净机器 E2E。
-- **其他范围**：13 关闭（仅 CLI）；17 ACP 与会议关闭；15a/15b/实例清理已完成。
-- **提交**：`1b2392b`（阶段 1）；此前 `1b065fa`/`59f5406`/`b650567`/`1e2cd0b`/`055c24d`/`c660c33`/`bb5724f`/`5277d9c`/`0b45f60`/`25925bc`/`4783839`/`8bfc1f7`/`afb93df`/`27bfb2a`；本次文档另提交。
+- **14 阶段 2a 完成**：项目加载后运行器引导弹窗已部署；无角色且可用 → “已适配 xx，可创建角色”；无可用且确认 missing → “缺少 xx…”（有角色也弹一次）；仅 error/unknown 不误报；WorkBuddy 排除；每成员/项目/浏览器标签页会话一次。
+- **视觉返修**：标题“运行器提示”、正文单句、无“知道了”、主按钮右对齐、卡片 560px/内边距/字号统一；用户截图验收通过。
+- **运行态**：runtime `7936`（API `4968`）、仅 Terra/K2.8 两个宿主 serving，均 ready；healthz ok；projects=1、任务 0。
+- **提交**：`f5075cf`（2a 主体）、`8ba6ef6`（视觉返修）；735-742 已收取，`submitted=[]`。
+- **14 阶段 1 已完成**：`TALK_CONFIG`/便携路径/bootstrap/start-stop-status，`1b2392b`。
+- **下一步**：阶段 2b 桌面窗口启动器（pywebview/WebView2、关闭即停、单实例，需用户窗口验收）；阶段 3 embeddable/打包；阶段 4 干净机器 E2E。
+- **已知残余**：无 Tab 焦点陷阱；跨类型 seen 抑制；ready+missing 混合只弹 ready；真实无运行器环境未构造；Key ACL/真实双击 bat/端口参数化等阶段 1 非阻断项。
+- **其他范围**：13 关闭（仅 CLI）；17 ACP 与会议关闭；15a/15b/实例清理完成。
 - **恢复**：说“继续项目”；详情见 [PROGRESS_HISTORY.md](PROGRESS_HISTORY.md) 顶部。

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-14 00:15 — 14 阶段2a 运行器检测弹窗完成、部署并视觉验收
+
+- **738（Terra，partial）**：实现项目加载后的运行器引导弹窗、会话去重、焦点、创建角色/查看状态导航、WorkBuddy 排除；阻塞在“unknown 不误报”与“unknown 显示缺少”冲突。
+- **739（Terra，complete）**：后端 `runner_versions` 增加 `probe_status`（ok/missing/error），区分命令缺失与探测失败；前端只对 `missing` 弹“缺少”，仅 error/unknown 不误报；混合态追加“其余运行器状态未知”；12 项后端 + 12 项前端 + 29 项回归通过。
+- **740（K2.8）approved**：probe_status 合同/调用方/缓存/旧客户端兼容、missing·error 语义、前端判定/交互、测试真实性、生产只读 smoke 通过；非阻断：标题正文重复、跨类型 seen、无焦点陷阱等。
+- **741（Terra）视觉返修**：标题固定“运行器提示”，正文只一句；移除“知道了”；卡片 560px/24–28px 内边距、标题 20px、正文 15px/1.7；主按钮右对齐、accent、46px；窄屏全宽；缓存 v2。
+- **742（K2.8）approved**：4 文件 sha 一致、标题/正文单次、无 dismiss、按钮/样式/焦点/缓存版本、12+29 测试通过；生产未动。
+- **部署**：停机 runtime 9960（停 Terra/K2.8）→ 新 runtime `7936`（API `4968`），仅 2 宿主，Terra/K2.8 ready；`/api/runners/versions` 返回 probe_status=ok；临时空项目 `prj_0259eccb2a8c`、`prj_a95dc86d6c4c` 用于视觉验收后已删除，projects 回到 1。
+- **用户验收**：新样式通过；确认弹窗频率保持“每成员/项目/浏览器标签页会话一次”（同标签刷新不重复，新标签/重开会再提示）。
+- **提交**：`f5075cf`（2a 主体）、`8ba6ef6`（视觉返修）；735-742 已收取。
+- **残余/非阻断**：无 Tab 焦点陷阱；同 session 先 ready 后 missing 会被跨类型 seen 抑制；ready+missing 混合只弹 ready；真实无运行器环境未构造，缺失提示由单测覆盖；阶段 2b/3/4 未做。
+
 ## 2026-11-13 22:10 — 14 免安装阶段 1 完成：便携路径/首次启动/启停
 
 - **735（Terra，partial）**：`TALK_CONFIG`、`scripts/portable_paths.py`、`scripts/portable_bootstrap.py`、`start/stop/status.bat`、10 项便携测试；阻塞在 `server/local_runtime.py` 固定读取仓库根 `config.toml`。
