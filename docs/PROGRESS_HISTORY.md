@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-11-13 14:22 — 真实崩溃复现通过：窄宿主被识别为外部服务中，角色不中断
+
+- **崩溃**：14:16 只终止 runtime `1484` 与其 API `8500`，保留 7 个宿主；8000 端口关闭，宿主进程全部存活。
+- **新 runtime `10712`**（14:16:21 启动，API `5536`）按新代码分类：
+  - K2.8 窄宿主 `14140` → `external_manager/orphan_host_serving`；
+  - DeepSeek 窄宿主 `13084` → `external_manager/orphan_host_configured`；
+  - Terra 标准宿主（health pid `3740`）→ `external_manager/orphan_host_serving`；
+  - Astra/hy4/大K/w-d 四个已停止角色的标准宿主经核验后受控终止并重新拉起为自有 `serving`（`520`/`6692`/`4284`/`14876`）；
+  - 无任何 `recovery_required`；`orphan_host_unverified` 未出现。
+- **角色不中断**：Terra 保持 `ins_75d2582d5aad`/pid `8472`、K2.8 保持 `ins_2d680caadfcf`/pid `11240`，全程 running/ready；healthz ok；`submitted/assigned/in_progress=0`。
+- **恢复干净受管状态**：正常停止 Terra/K2.8（gen81/79）→ 核验后终止 runtime `10712`/API `5536` 与全部宿主 → 14:20:43 启动 runtime `6664`，7 个宿主全部 owned `serving`（DeepSeek `2868`、K2.8 `13772`、Astra `15736`、Terra `12548`、hy4 `14600`、大K `15580`、w-d `12352`）；启动偏好拉起 Terra gen82/`ins_b8a390d9a761`/pid `13592`、K2.8 gen80/`ins_2eb973afae92`/pid `15664`，均 running/ready/idle；healthz ok；任务 0。
+- **证据**：`.tmp/narrow-host-proof-20261113/crash-before.json`、`crash-after.json`、`restore-after.json`。
+
 ## 2026-11-13 14:10 — 部署窄宿主归属证明（59f5406）并验证常驻启动
 
 - **正常停机**：`talk_runtime stop --apply --wait` → `stop_status=stopped`、`shutdown.phase=complete`；端口 8000 关闭，7 个宿主 `stopped`；旧 runtime `14544` 退出。停机前 `submitted/assigned/in_progress=0`，Terra/K2.8 均 idle。

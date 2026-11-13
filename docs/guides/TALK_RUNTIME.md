@@ -40,7 +40,7 @@ Windows后台入口使用无控制台启动，API随同启动的管理器及 `ru
 
 本机清单沿用此前已核验的 DSH、Codex、三个 Kimi 的窄宿主配方；这些本机辅助文件仍是部署依赖，不能删除 `.tmp/legacy-role-page-control` 后继续使用原清单。WorkBuddy 工厂可自动发现新绑定角色。其它运行器的新成员需先准备并核验该成员的宿主配方，不能把某一成员的静态配方用于所有身份。
 
-清单内的旧窄宿主：727–729 已部署（提交 `59f5406`，runtime `1484` 于 2026-11-13 14:06 重启加载）。崩溃重启时仍存活的清单宿主会按完整 argv 与健康文件身份识别：命中且服务中显示 `external_manager/orphan_host_serving`，非服务态显示 `external_manager/orphan_host_configured`，只观察，不接管、不终止、不自动重拉；未命中仍 `recovery_required/orphan_host_unverified`。需要人工收口时仍可：在页面正常关闭该角色并确认旧桥退出，核实创建时间/命令行后终止旧宿主进程，由运行入口按清单重新拉起；随后正常启动角色。2026-11-13 10:20 曾按此方式把 K2.8/DeepSeek 宿主替换为 `444`/`4308`；14:06 正常重启后由新 runtime 重新拉起为 K2.8 `14140`、DeepSeek `13084`，7 个宿主均为 `serving`。
+清单内的旧窄宿主：727–729 已部署（提交 `59f5406`，runtime `1484` 于 2026-11-13 14:06 重启加载）。崩溃重启时仍存活的清单宿主会按完整 argv 与健康文件身份识别：命中且服务中显示 `external_manager/orphan_host_serving`，非服务态显示 `external_manager/orphan_host_configured`，只观察，不接管、不终止、不自动重拉；未命中仍 `recovery_required/orphan_host_unverified`。需要人工收口时仍可：在页面正常关闭该角色并确认旧桥退出，核实创建时间/命令行后终止旧宿主进程，由运行入口按清单重新拉起；随后正常启动角色。2026-11-13 10:20 曾按此方式把 K2.8/DeepSeek 宿主替换为 `444`/`4308`；14:06 正常重启后由新 runtime 重新拉起为 K2.8 `14140`、DeepSeek `13084`，7 个宿主均为 `serving`。同日 14:16 已做真实崩溃复现：只杀 runtime/API、保留窄宿主，新 runtime 将 K2.8 标为 `external_manager/orphan_host_serving`、DeepSeek 标为 `orphan_host_configured`，两个角色均未中断；随后恢复正常受管状态为 runtime `6664` 的 7 个自有宿主。
 
 ## 新建Kimi角色的宿主接入（2026-10-26补正）
 
