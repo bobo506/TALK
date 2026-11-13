@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-13 17:15 — 一次性清理 K2.8 3 条历史 idle 实例
+
+- **备份**：清理前用 SQLite online backup 生成 `.tmp/e2e-instance-cleanup-20261113/talk-before-cleanup.db`。
+- **证据**：`ins_3deacebf9459`(pid 11208)、`ins_f3b7ddd2419e`(15648)、`ins_87aad513bfac`(772) 均为 `idle`、`current_task_id=null`、无 running/queued 任务、无 claim_token/lease、`recorded_process_state=absent`、`last_seen` 为 11-12。
+- **更新**：单事务按 id+`status='idle'`+`current_task_id is null` 更新 3 行 → `offline`，`last_error='stale_instance_cleanup:pid_absent_20261113'`，`updated_at` 刷新；`last_seen_at`/pid/launch 保持不变。rowcount=3，否则回滚。
+- **验证**：K2.8 live 实例只剩当前 `ins_b75b74df8bda`/pid 16084；Terra 仍 `ins_fc14f1a23429`/17280；healthz ok；`submitted/assigned/in_progress=0`；DB 其他行未动。`agent_tasks/groups/messages` 较 15b 各 +1，是任务 732 自身创建的正常增加。
+- **未处理（超出本次范围）**：仍有 1 条 2026-08-16 的 `agent:pi` `busy` 实例（pid 6968、current_task 2390、project_id null）和 10 条历史 `error` 实例；未触碰。
+- 无产品代码/配置变更。
+
 ## 2026-11-13 16:50 — 15b 退出/重开与冷启动持久性通过
 
 - **停机**：Terra/K2.8 正常停止 → `talk_runtime stop --apply --wait` 返回 `stopped`/`phase=complete`；8000 关闭、无生产 runtime/API/宿主/桥进程；counts 保持 `members=48`、`messages=2704`、`agent_tasks=731`、`groups=732`、`projects=1`、`project_agents=10`、`agent_instances=484`。
