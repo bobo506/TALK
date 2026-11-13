@@ -1,5 +1,16 @@
 # 开发历史 · TALK
 
+## 2026-11-13 14:54 — 修复 runtime fixture 缺 role-storage-layouts，ActualBootstrapTests 恢复通过
+
+- **根因**：`tests/talk_runtime_fixture.py` 只实现 3 个端点；`TalkRuntime.roles()`（shutdown 的 `_shutdown_roles` 会调用）请求 `/api/projects/{project}/role-storage-layouts`，fixture 返回 404，runtime 停在 `stopping_roles`/`stop_blocked`，bootstrap 测试等待 `stopped` 超时并在清理时报 WinError 32。该缺口在 HEAD `7e0896f` 即存在，与 727 候选无关。
+- **修复**：fixture 增加只读端点 `role_storage_layouts(project) -> []`（无数据库、无真实角色），注释说明供 runtime `roles()` 投影合并。
+- **验证**：
+  - `.venv\Scripts\python.exe -B -X utf8 -m unittest -v tests.test_local_runtime.ActualBootstrapTests` → `Ran 2 tests in 23.429s, OK`（修复前 2 errors、约 89s）。
+  - 三模块 `tests.test_talk_runtime tests.test_local_runtime tests.test_role_startup_stale_recovery` → `Ran 101 tests in 105.542s, OK`；需把 `TEMP/TMP` 指向长路径 `D:\claude-test\TALK\.tmp\fixture-layout-fix-20261113\temp`，否则默认 TEMP 仍会触发 `ADMINI~1` 短路径类既有敏感（非本修复引入，失败日志保留）。
+  - 生产 runtime `6664` 未重启、7 宿主 `serving`、healthz ok、任务 0。
+- **证据**：`.tmp/fixture-layout-fix-20261113/bootstrap.log`、`three-module.log`（默认 TEMP 的短路径失败原始记录）、`three-module-longtemp.log`。
+- **文件**：`tests/talk_runtime_fixture.py`。
+
 ## 2026-11-13 14:22 — 真实崩溃复现通过：窄宿主被识别为外部服务中，角色不中断
 
 - **崩溃**：14:16 只终止 runtime `1484` 与其 API `8500`，保留 7 个宿主；8000 端口关闭，宿主进程全部存活。
