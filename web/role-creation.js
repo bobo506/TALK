@@ -239,11 +239,49 @@ function createRoleRequestUI(deps) {
       if (current(epoch)) { state.nativeBusy.delete(member); render(); schedule(); }
     }
   }
+  // 保留同一个验证码内的选择，以便轮询重绘后继续手动复制。
+  let deviceSelection = null;
+  deps.document.addEventListener?.("selectionchange", () => {
+    const selection = deps.document.getSelection?.();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const code = range?.startContainer?.parentElement?.closest?.("code.role-device-code");
+    if (code && !selection.isCollapsed && range.endContainer === range.startContainer) {
+      deviceSelection = { code, member: code.dataset.member, text: code.textContent,
+        start: range.startOffset, end: range.endOffset };
+    } else if (deviceSelection?.code.isConnected) deviceSelection = null;
+  });
+  function restoreDeviceSelection(code) {
+    const saved = deviceSelection;
+    if (!saved || saved.member !== code.dataset.member || saved.text !== code.textContent) return;
+    queueMicrotask(() => {
+      if (deviceSelection !== saved || saved.code.isConnected || !code.isConnected || !code.firstChild) return;
+      const selection = deps.document.getSelection?.();
+      if (!selection || (!selection.isCollapsed && selection.rangeCount)) return;
+      const range = deps.document.createRange();
+      range.setStart(code.firstChild, saved.start); range.setEnd(code.firstChild, saved.end);
+      selection.removeAllRanges(); selection.addRange(range);
+      deviceSelection = { ...saved, code };
+    });
+  }
+  async function copyDeviceCode(code, value) {
+    try {
+      const clipboard = deps.clipboard || globalThis.navigator?.clipboard;
+      if (!clipboard?.writeText) throw new Error("clipboard unavailable");
+      await clipboard.writeText(value);
+    } catch (_) {
+      deps.alert?.("复制失败，请手动复制已选中的验证码。");
+      const selection = deps.document.getSelection?.();
+      if (selection && deps.document.createRange) {
+        const range = deps.document.createRange(); range.selectNodeContents(code);
+        selection.removeAllRanges(); selection.addRange(range);
+      }
+    }
+  }
   function nativeSetup(role) {
     if (!human() || role?.archived || !["kimi-code", "codex"].includes(role?.runner?.runtime)) return null;
     const runnerName = role.runner.runtime === "codex" ? "Codex" : "Kimi Code";
     const member = role.member_id, setup = state.nativeSetups.get(member);
-    if (setup?.status === "not_required") return null;
+    if (["not_required", "ready"].includes(setup?.status)) return null;
     const box = node("div", "role-reset-control role-native-setup");
     box.append(node("strong", "", `${runnerName} 官方授权与模型准备`));
     const labels = { required: "需官方授权", starting: "正在启动官方授权…",
@@ -253,12 +291,17 @@ function createRoleRequestUI(deps) {
     const model = (runnerName === "Codex" ? role.model?.model_id : null)
       || role.model?.model_display_name || role.model?.model_alias || role.model?.model_id;
     if (model) box.append(node("p", "role-reset-hint", `所选模型：${model}`));
-    if (runnerName === "Codex") box.append(node("p", "role-reset-hint", "思考强度使用准备时官方模型目录返回的默认值。"));
     if (setup?.authorization_url && setup.status === "awaiting_authorization") {
       const link = node("a", "role-service-button", `打开 ${runnerName} 官方授权页面`);
       link.href = setup.authorization_url; link.target = "_blank"; link.rel = "noopener noreferrer";
       box.append(link);
-      if (setup.authorization_code) box.append(node("p", "role-device-code", `在官方页面输入一次性验证码：${setup.authorization_code}`));
+      if (setup.authorization_code) {
+        const line = node("p", "role-reset-hint", "在官方页面输入一次性验证码：");
+        const code = node("code", "role-device-code", setup.authorization_code);
+        code.dataset.member = member; line.append(code);
+        line.append(button("复制验证码", () => copyDeviceCode(code, setup.authorization_code)));
+        box.append(line); restoreDeviceSelection(code);
+      }
     }
     if (state.nativeErrors.has(member)) box.append(node("p", "role-request-error", state.nativeErrors.get(member)));
     if (setup?.error_code) box.append(node("p", "role-request-error", nativeErrorsText[setup.error_code] || "准备未完成，请刷新后重试。"));
@@ -268,7 +311,6 @@ function createRoleRequestUI(deps) {
     actions.append(button("刷新授权状态", () => loadNativeSetup(role)));
     for (const child of actions.children) child.disabled = state.nativeBusy.has(member);
     box.append(actions);
-    box.append(node("p", "role-reset-hint", `通过 ${runnerName} 官方流程授权。角色使用独立目录；保存后会在后台自动开始准备，完成后可在角色详情启动或关闭。${runnerName === "Codex" ? "设备码登录需先在 ChatGPT 安全设置或工作区权限中启用。" : ""}`));
     return box;
   }
   function canRecover(row) {

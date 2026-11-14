@@ -1,4 +1,4 @@
-"""Windows desktop wrapper for a portable TALK runtime."""
+"""Desktop wrapper for a portable TALK runtime."""
 from __future__ import annotations
 
 import ctypes
@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import urllib.request
+import webbrowser
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -44,41 +45,65 @@ def notify(message):
         ctypes.windll.user32.MessageBoxW(None, str(message), 'TALK', 0x10)
 
 
-def find_edge(env):
-    for name in ('ProgramFiles(x86)', 'ProgramFiles', 'LOCALAPPDATA'):
-        root = env.get(name)
-        if root:
-            candidate = Path(root) / 'Microsoft' / 'Edge' / 'Application' / 'msedge.exe'
-            if candidate.is_file():
-                return candidate
-    raise LauncherError('未找到 Microsoft Edge，请安装 Edge 后重试。')
+def browser_candidates(env, platform=None):
+    platform = platform or sys.platform
+    if platform == 'darwin':
+        user = Path(env.get('HOME') or str(Path.home()))
+        return ([Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+                 user / 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'],
+                [Path('/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge')])
+    if platform == 'win32':
+        chrome = [Path(env[name]) / 'Google/Chrome/Application/chrome.exe'
+                  for name in ('ProgramFiles', 'ProgramFiles(x86)', 'LOCALAPPDATA') if env.get(name)]
+        edge = [Path(env[name]) / 'Microsoft/Edge/Application/msedge.exe'
+                for name in ('ProgramFiles(x86)', 'ProgramFiles', 'LOCALAPPDATA') if env.get(name)]
+        return chrome, edge
+    return [], []
 
 
-def run_edge(edge, home, url, env):
+def find_browser(env, platform=None):
+    chrome, edge = browser_candidates(env, platform)
+    return next((path for path in (*chrome, *edge) if path.is_file()), None)
+
+
+def run_browser(browser, home, url, env):
     profile = home / 'data' / 'launcher-profile'
     profile.mkdir(parents=True, exist_ok=True)
     delay = env.get('TALK_LAUNCHER_AUTOCLOSE_MS')
     seconds = max(0, int(delay)) / 1000 if delay else None
-    process = subprocess.Popen([str(edge), f'--app={url}', f'--user-data-dir={profile}',
+    process = subprocess.Popen([str(browser), f'--app={url}', f'--user-data-dir={profile}',
                                 '--no-first-run', '--no-default-browser-check',
                                 '--disable-background-mode'], env=env)
     timer = None
+    auto_closed = False
     if seconds is not None:
-        def close_edge():
+        def close_browser():
+            nonlocal auto_closed
             try:
                 if process.poll() is None:
+                    auto_closed = True
                     process.terminate()
             except OSError:
-                pass  # The Edge process may already have exited.
-        timer = threading.Timer(seconds, close_edge)
+                pass  # The browser process may already have exited.
+        timer = threading.Timer(seconds, close_browser)
         timer.daemon = True
         timer.start()
     try:
-        process.wait()
+        exit_code = process.wait()
     finally:
         if timer:
             timer.cancel()
             timer.join()
+    if exit_code and not auto_closed:
+        raise LauncherError(f"浏览器启动或运行失败（退出码 {exit_code}）。")
+
+
+def open_default_browser(url):
+    try:
+        if not webbrowser.open(url):
+            raise LauncherError('无法打开系统默认浏览器，请检查浏览器设置。')
+    except (OSError, webbrowser.Error) as exc:
+        raise LauncherError(f'无法打开系统默认浏览器：{exc}') from exc
 
 
 class SingleInstance:
@@ -194,11 +219,15 @@ def main():
     try:
         home, path, config, url = resolve_config(os.environ)
         with SingleInstance(path):
-            edge = find_edge(os.environ)
+            browser = find_browser(os.environ)
             launcher = Launcher(home, path, config, url, os.environ)
             try:
                 launcher.start()
-                run_edge(edge, home, url + '/?desktop=1', launcher.env)
+                if browser is None:
+                    open_default_browser(url + '/?desktop=1')
+                    notify('已使用系统默认浏览器；关闭浏览器窗口不会自动停服务，请用 stop.bat 停止服务。')
+                    return 0
+                run_browser(browser, home, url + '/?desktop=1', launcher.env)
             except Exception:
                 if launcher.owned:
                     ok, detail = launcher.stop()

@@ -1,7 +1,10 @@
 'use strict';
 function documentFixture() {
   const elements = new Map();
-  const document = { activeElement: null };
+  const document = { activeElement: null, listeners: {},
+    addEventListener(k,fn) {(this.listeners[k] ||= []).push(fn);},
+    fire(k) {for (const fn of this.listeners[k] || []) fn();},
+  };
   function element(tag = 'div') {
     const classes = new Set(); let text = '';
     const n = { tagName: tag.toUpperCase(), className: '', children: [], dataset: {}, value: '', disabled: false, listeners: {}, attrs: {},

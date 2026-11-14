@@ -360,3 +360,5 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
   .runner-onboarding-card { padding:18px 18px 20px; }
   .runner-onboarding-actions .room-primary-btn { width:100%; }
 }
+
+.role-device-code { user-select:text; -webkit-user-select:text; }

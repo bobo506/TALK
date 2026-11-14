@@ -117,7 +117,7 @@ test('新Codex角色显示官方链接和验证码，旧角色和非人类不被
     const panel=h.ui.rolePanel({member_id:'agent:new'}),text=panel?h.texts(panel):'';
     if(human&&status==='awaiting_authorization') {
       assert.match(text,/Codex 官方授权/);assert.match(text,/ABCD-EFGHI/);assert.match(text,/exact-model/);
-      assert.match(text,/官方模型目录返回的默认值/);assert.doesNotMatch(text,/xhigh/);
+      assert.doesNotMatch(text,/官方模型目录返回的默认值/);assert.doesNotMatch(text,/xhigh/);
       assert.equal(panel.querySelectorAll().find(n=>n.tagName==='A').href,'https://auth.openai.com/codex/device');
     } else {assert.doesNotMatch(text,/ABCD-EFGHI|开始官方授权|Codex 官方授权/);}
   }
@@ -216,6 +216,67 @@ test('未勾选自动启动的Codex后台准备仍持续轮询到ready或失败'
   assert.ok(h.timers.size>0,'required 状态仍应轮询后台准备');
   status='ready';await h.ui.refresh();
   assert.equal(h.timers.size,0,'ready 后停止轮询');
+});
+
+test('Codex 和 Kimi 授权完成后隐藏授权栏，验证码可复制且无冗余说明',async()=>{
+  for(const runtime of ['codex','kimi-code']) {
+    let setup={member_id:'agent:new',status:'awaiting_authorization',revision:2,
+      authorization_url:'https://example.test/device',authorization_code:'ABCD-1234',can_cancel:true};
+    const h=harness({handler:c=>c.path.endsWith('/native-setup')?response(setup):undefined});
+    h.backend.roles=[{member_id:'agent:new',runner:{runtime},model:{model_id:'model'},service:{observed:'stopped'}}];
+    h.backend.rows=[{request_key:'role-native-test-000',kind:'create',status:'provisioned',revision:3,member_id:'agent:new'}];
+    const copied=[];h.deps.clipboard={writeText:async value=>copied.push(value)};
+    await h.ready();
+    let panel=h.ui.rolePanel({member_id:'agent:new'}), nodes=panel.querySelectorAll();
+    const code=nodes.find(n=>n.tagName==='CODE'&&n.className==='role-device-code');
+    assert.equal(code.textContent,'ABCD-1234');
+    const copy=nodes.find(n=>n.tagName==='BUTTON'&&n.textContent==='复制验证码');
+    assert.equal(copy.type,'button');await copy.fire('click');assert.deepEqual(copied,['ABCD-1234']);
+    assert.doesNotMatch(h.texts(panel),/思考强度使用准备时官方模型目录返回的默认值|官方流程授权|设备码登录需先/);
+    setup={...setup,authorization_code:null};await h.ui.refresh();
+    panel=h.ui.rolePanel({member_id:'agent:new'});
+    assert.equal(panel.querySelectorAll().some(n=>n.textContent==='复制验证码'),false);
+    setup={...setup,status:'ready'};await h.ui.refresh();
+    panel=h.ui.rolePanel({member_id:'agent:new'});
+    assert.equal(panel.querySelectorAll().some(n=>n.className.includes('role-native-setup')),false);
+  }
+});
+
+test('授权状态重绘后恢复同一码的文字选择',async()=>{
+  const setup={member_id:'agent:new',status:'awaiting_authorization',revision:2,
+    authorization_url:'https://example.test/device',authorization_code:'ABCD',can_cancel:true};
+  const h=harness({handler:c=>c.path.endsWith('/native-setup')?response(setup):undefined});
+  h.backend.roles=[{member_id:'agent:new',runner:{runtime:'codex'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-native-test-002',kind:'create',status:'provisioned',revision:3,member_id:'agent:new'}];
+  await h.ready();
+  const old=h.ui.rolePanel({member_id:'agent:new'}).querySelectorAll().find(n=>n.tagName==='CODE');
+  old.isConnected=true;
+  const textNode={parentElement:{closest:()=>old}};
+  const selectedRange={startContainer:textNode,endContainer:textNode,startOffset:1,endOffset:3};
+  let restored;
+  const selection={rangeCount:1,isCollapsed:false,getRangeAt:()=>selectedRange,removeAllRanges(){},addRange:r=>{restored=r;}};
+  h.document.getSelection=()=>selection;
+  h.document.createRange=()=>({setStart:(n,i)=>{assert.equal(i,1);},setEnd:(n,i)=>{assert.equal(i,3);}});
+  h.document.fire('selectionchange');
+  old.isConnected=false;selection.isCollapsed=true;
+  const fresh=h.ui.rolePanel({member_id:'agent:new'}).querySelectorAll().find(n=>n.tagName==='CODE');
+  fresh.isConnected=true;fresh.firstChild={};await Promise.resolve();
+  assert.ok(restored,'重绘后保留选区');
+});
+
+test('复制失败时提示并选中验证码，不重绘面板',async()=>{
+  const setup={member_id:'agent:new',status:'awaiting_authorization',revision:2,
+    authorization_url:'https://example.test/device',authorization_code:'CODE',can_cancel:true};
+  const h=harness({handler:c=>c.path.endsWith('/native-setup')?response(setup):undefined});
+  h.backend.roles=[{member_id:'agent:new',runner:{runtime:'codex'},service:{observed:'stopped'}}];
+  h.backend.rows=[{request_key:'role-native-test-001',kind:'create',status:'provisioned',revision:3,member_id:'agent:new'}];
+  h.deps.clipboard={writeText:async()=>{throw Error('denied');}};
+  let selected;const range={selectNodeContents:n=>{selected=n;}};
+  h.document.createRange=()=>range;h.document.getSelection=()=>({removeAllRanges(){},addRange(r){assert.equal(r,range);}});
+  await h.ready();const panel=h.ui.rolePanel({member_id:'agent:new'}),nodes=panel.querySelectorAll();
+  const code=nodes.find(n=>n.tagName==='CODE');
+  await nodes.find(n=>n.textContent==='复制验证码').fire('click');
+  assert.equal(selected,code);assert.match(h.alerts.at(-1),/手动复制/);assert.equal(panel.querySelectorAll().find(n=>n.tagName==='CODE'),code);
 });
 
 test('后台准备失败弹窗一次且保留角色详情可读错误',async()=>{

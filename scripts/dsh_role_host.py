@@ -6,9 +6,11 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 import time
+import uuid
 
 from scripts import role_service_host as rsh
 from scripts.dsh_connections import (
@@ -24,6 +26,47 @@ from scripts.kimi_role_setup import _local_facts
 
 class Drained(Exception):
     pass
+
+
+def _ensure_model_patch(home, binding, secret):
+    """只在缺失时原子创建模型 patch，保留已有的用户配置。"""
+    alias = binding["model_alias"]
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", alias):
+        raise rsh.HostError("dsh_model_alias_invalid", "模型别名不能作为 patch 文件名")
+    home = Path(home)
+    rsh.ensure_private_dir(home)
+    target = home / ("model-" + alias + ".patch.yml")
+    if rsh._is_reparse_point(target):
+        raise rsh.HostError("state_dir_insecure", "模型 patch 不能是链接")
+    if target.exists():
+        if not target.is_file():
+            raise rsh.HostError("state_dir_insecure", "模型 patch 不是文件")
+        return
+    provider = binding["provider_id"]
+    lines = ["- id: agent-default-model", "  config:",
+             "    provider: " + json.dumps(provider, ensure_ascii=False),
+             "    model: " + json.dumps(alias, ensure_ascii=False)]
+    # 仅 DeepSeek 的插件 ID 有已确认的映射；其他 provider 不猜测插件 ID。
+    if provider == "deepseek-official":
+        effort = binding.get("effort_override") or binding.get("default_effort") or "max"
+        if not isinstance(effort, str) or effort not in ("off", "low", "high", "max"):
+            raise rsh.HostError("dsh_effort_invalid", "DSH 推理强度不可用")
+        lines += ["- id: llm-deepseek", "  config:",
+                  "    reasoningEffort: " + effort]
+    payload = ("\n".join(lines) + "\n").encode("utf-8")
+    if secret and secret.encode("utf-8") in payload:
+        raise rsh.HostError("dsh_model_patch_invalid", "模型 patch 不能包含连接秘密")
+    temporary = home / (".model-patch-" + uuid.uuid4().hex + ".tmp")
+    try:
+        rsh._publish_private_bytes(temporary, payload)
+        try:
+            # 硬链接原子地创建目标且不替换已存在的文件，避免检查后并发覆盖。
+            os.link(temporary, target)
+        except FileExistsError:
+            if rsh._is_reparse_point(target) or not target.is_file():
+                raise rsh.HostError("state_dir_insecure", "模型 patch 不是普通文件") from None
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def manager_directory(state_dir, project, member):
@@ -144,6 +187,21 @@ class DshRoleHost(rsh.HostManager):
             raise rsh.HostError("binding_fingerprint_mismatch", "角色模型绑定不完整或已改变")
         return binding
 
+    def prepare_model_patch(self, model_alias):
+        """????????????????????? patch?"""
+        home = self.store.native_home_dir(self.project, self.member)
+        if rsh.lock_path_for(home / "dsh-role-setup").exists():
+            raise rsh.HostError("dsh_setup_in_progress", "?????????????")
+        binding = self._current_binding(self.project, self.member, model_alias)
+        try:
+            entry = resolve_connection(self.runtime_config, binding)
+            secret = next(iter(connection_environment(entry, os.environ).values()))
+            if self.workspace_context is not None:
+                self._workspace_check_file(home / ("model-" + model_alias + ".patch.yml"), home)
+            _ensure_model_patch(home, binding, secret)
+        except ConnectionSetupError as exc:
+            raise rsh.HostError(exc.code, "DSH ??????????") from None
+
     def build_entry_argv(self, runtime, model_alias):
         if runtime != "dsh":
             raise rsh.HostError("dsh_runtime_only", "宿主仅服务当前 DSH 角色")
@@ -158,6 +216,9 @@ class DshRoleHost(rsh.HostManager):
             secret = next(iter(secret_env.values()))
             self._active_secret = secret
             self._active_binding_fingerprint = binding["binding_fingerprint"]
+            if self.workspace_context is not None:
+                self._workspace_check_file(home / ("model-" + model_alias + ".patch.yml"), home)
+            _ensure_model_patch(home, binding, secret)
             validate_command(entry, binding, self.task_profile, which=shutil.which, secret=secret,
                 native_home=native_home)
             template = connection_command(entry, binding, self.task_profile, native_home=native_home)
@@ -302,6 +363,7 @@ def main(argv=None):
             role_key_file=key_path, project_root=Path(args.project_root), verified_runtimes=["dsh"],
             role_key_root=Path(args.key_root) if args.key_root else None, workspace_context=context,
             workspace_project=args.project, workspace_member=args.member)
+        manager.prepare_model_patch(args.expected_model_alias)
         while True:
             try:
                 manager.serve(args.project, poll_interval=rsh.DEFAULT_POLL_INTERVAL_SECONDS,

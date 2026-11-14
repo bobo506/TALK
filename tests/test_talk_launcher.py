@@ -103,26 +103,41 @@ class LauncherTests(unittest.TestCase):
         with launcher.SingleInstance(self.path):
             pass
 
-    def test_find_edge_in_order_and_missing(self):
-        roots = [self.home / 'x86', self.home / 'program', self.home / 'local']
-        env = dict(zip(('ProgramFiles(x86)', 'ProgramFiles', 'LOCALAPPDATA'), map(str, roots)))
-        paths = [root / 'Microsoft/Edge/Application/msedge.exe' for root in roots]
-        for path in reversed(paths):
+    def test_browser_priority_and_missing(self):
+        roots = [self.home / 'program', self.home / 'x86', self.home / 'local']
+        env = dict(zip(('ProgramFiles', 'ProgramFiles(x86)', 'LOCALAPPDATA'), map(str, roots)))
+        chrome = [root / 'Google/Chrome/Application/chrome.exe' for root in roots]
+        edge = [root / 'Microsoft/Edge/Application/msedge.exe' for root in roots]
+        for path in (edge[1], chrome[2], chrome[0]):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.touch()
-            self.assertEqual(launcher.find_edge(env), path)
-        for path in paths:
-            path.unlink()
-        with self.assertRaisesRegex(launcher.LauncherError, '未找到 Microsoft Edge'):
-            launcher.find_edge(env)
+        self.assertEqual(launcher.find_browser(env, 'win32'), chrome[0])
+        chrome[0].unlink()
+        self.assertEqual(launcher.find_browser(env, 'win32'), chrome[2])
+        chrome[2].unlink()
+        self.assertEqual(launcher.find_browser(env, 'win32'), edge[1])
+        edge[1].unlink()
+        self.assertIsNone(launcher.find_browser(env, 'win32'))
+
+    def test_macos_candidates_and_precedence(self):
+        env = {'HOME': str(self.home)}
+        chrome, edge = launcher.browser_candidates(env, 'darwin')
+        self.assertEqual(str(chrome[0]), str(Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')))
+        self.assertEqual(chrome[1], self.home / 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+        self.assertEqual(str(edge[0]), str(Path('/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge')))
+        with patch.object(Path, 'is_file', autospec=True, side_effect=lambda path: path in (chrome[1], edge[0])):
+            self.assertEqual(launcher.find_browser(env, 'darwin'), chrome[1])
+        with patch.object(Path, 'is_file', autospec=True, side_effect=lambda path: path == edge[0]):
+            self.assertEqual(launcher.find_browser(env, 'darwin'), edge[0])
 
     def test_edge_arguments_and_autoclose(self):
         process = unittest.mock.Mock()
         process.poll.return_value = None
+        process.wait.return_value = 0
         timer = unittest.mock.Mock()
         with patch.object(launcher.subprocess, 'Popen', return_value=process) as popen, \
              patch.object(launcher.threading, 'Timer', return_value=timer) as make_timer:
-            launcher.run_edge('edge.exe', self.home, self.app.url, {'TALK_LAUNCHER_AUTOCLOSE_MS': '3000'})
+            launcher.run_browser('edge.exe', self.home, self.app.url, {'TALK_LAUNCHER_AUTOCLOSE_MS': '3000'})
             args = popen.call_args.args[0]
             self.assertEqual(args, ['edge.exe', '--app=' + self.app.url,
                 '--user-data-dir=' + str(self.home / 'data/launcher-profile'), '--no-first-run',
@@ -133,6 +148,13 @@ class LauncherTests(unittest.TestCase):
             process.wait.assert_called_once_with()
             timer.cancel.assert_called_once_with()
 
+    def test_browser_failed_exit_is_reported(self):
+        process = unittest.mock.Mock()
+        process.wait.return_value = 3
+        with patch.object(launcher.subprocess, 'Popen', return_value=process):
+            with self.assertRaisesRegex(launcher.LauncherError, '浏览器启动或运行失败'):
+                launcher.run_browser('browser.exe', self.home, self.app.url, {})
+
     def test_main_owned_and_attach_close_and_stop_failure(self):
         class Lock:
             def __enter__(self): return self
@@ -142,8 +164,8 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(owned=owned, result=stop_result), \
                  patch.object(launcher, 'resolve_config', return_value=(self.home, self.path, self.config, self.app.url)), \
                  patch.object(launcher, 'SingleInstance', return_value=Lock()), \
-                 patch.object(launcher, 'find_edge', return_value='edge.exe'), \
-                 patch.object(launcher, 'run_edge') as edge, \
+                 patch.object(launcher, 'find_browser', return_value='edge.exe'), \
+                 patch.object(launcher, 'run_browser') as edge, \
                  patch.object(self.app, 'start'), patch.object(self.app, 'read_owned_identity', return_value=(123, 'start')), \
                  patch.object(self.app, 'run_runtime', return_value=SimpleNamespace(returncode=0 if stop_result[0] else 1,
                                                                                    stdout=stop_result[1], stderr='')) as runtime, \
@@ -158,17 +180,28 @@ class LauncherTests(unittest.TestCase):
                 if not stop_result[0]:
                     self.assertIn('服务未停止，请处理忙任务后使用 stop.bat/status.bat', notify.call_args.args[0])
 
-    def test_missing_edge_never_starts_runtime(self):
+    def test_default_browser_does_not_wait_or_stop(self):
         class Lock:
             def __enter__(self): return self
             def __exit__(self, *args): pass
         with patch.object(launcher, 'resolve_config', return_value=(self.home, self.path, self.config, self.app.url)), \
              patch.object(launcher, 'SingleInstance', return_value=Lock()), \
-             patch.object(launcher, 'find_edge', side_effect=launcher.LauncherError('未找到 Microsoft Edge')), \
-             patch.object(launcher, 'Launcher') as constructor, patch.object(launcher, 'notify') as notify:
-            self.assertEqual(launcher.main(), 1)
-            self.assertIn('未找到 Microsoft Edge', notify.call_args.args[0])
-            constructor.assert_not_called()
+             patch.object(launcher, 'find_browser', return_value=None), \
+             patch.object(launcher, 'Launcher', return_value=self.app), \
+             patch.object(self.app, 'start'), patch.object(self.app, 'stop') as stop, \
+             patch.object(launcher, 'open_default_browser') as opened, patch.object(launcher, 'notify') as notify:
+            self.app.owned = True
+            self.assertEqual(launcher.main(), 0)
+            opened.assert_called_once_with(self.app.url + '/?desktop=1')
+            self.assertIn('不会自动停服务', notify.call_args.args[0])
+            self.assertIn('stop.bat', notify.call_args.args[0])
+            stop.assert_not_called()
+
+    def test_default_browser_failure_is_clear(self):
+        with patch.object(launcher.webbrowser, 'open', return_value=False):
+            with self.assertRaisesRegex(launcher.LauncherError, '无法打开系统默认浏览器'):
+                launcher.open_default_browser(self.app.url)
+
 
 
 if __name__ == '__main__':

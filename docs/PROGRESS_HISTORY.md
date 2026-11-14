@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-14 20:20 — DSH 自动 patch + A 启动器/授权 UI（便携任务可执行）
+
+- **DSH 任务**：760 在 claim 时才生成 patch，现场 bridge 已先起仍 ENOENT；763 改为宿主服务循环前 `prepare_model_patch`，765 复核 approved。现场清空手工 patch、重启 runtime/test01 后宿主启动即生成；任务 `PORTABLE-DSH-A54D82` 成功回复。test03 Codex 任务此前已成功。
+- **A 开发（762/764 approved）**：启动器 Chrome→Edge→默认浏览器，含 Windows/macOS 路径；默认浏览器不伪造关闭停服务并提示 stop.bat。授权栏删除两段文案；ready 后整块隐藏；验证码可复制/可选中。15 项 launcher + 65 项 DOM 测试通过。
+- **限制**：代理环境真实 Chrome app 退出码 2147483651，用户桌面验收待做；macOS 仅路径检测，单实例锁仍 Windows-only。
+- **包**：clean zip 21,755,007 bytes/1,440 files，SHA256 `F3E88C59…D26F`；D:\TALK-portable 已应用 A + 763，test01/test03 running。
+- **待做**：用户视觉验收 Chrome/授权 UI；B WorkBuddy 便携适配。
+
 ## 2026-11-14 17:10 — 便携 native setup 根分离，Codex test03 授权成功
 
 - **根因**：Codex test03 native setup 用代码根找 `.talk`，便携 project_root=data/project、data_root=TALK_HOME 分离；native home 在 TALK_HOME/workspaces。修复 `server/kimi_native_setup._roots` + codex/kimi `begin_native_login(data_root)`；759 复核 approved。
