@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-15 00:50 — 仓库内 GUI 启动入口（弃用命令行登录）
+
+- **需求**：用户要求在 TALK 项目下建桌面启动入口，以后登录/优化 TALK 都用这个入口，弃用命令行登录。
+- **实现**：`start-gui.vbs`（无窗口）→ `start-gui.bat` 识别仓库布局 → `scripts/talk_desktop.py`：读 `config.toml`，服务在跑就接入、没跑就起 API 子进程，关窗只停自己起的进程；`install-shortcut.bat` 生成桌面 `TALK` 快捷方式；`start.bat` 在仓库布局下提示改用桌面入口，避免对 dev 配置跑便携 bootstrap。
+- **验证**：`tests/test_talk_desktop.py` 17 项通过（unittest）；真实开窗——attach 8000 不新增进程、临时根 8934 启动后关窗自动停服（日志有 `/api/tasks` 200）、`start-gui.bat` 9.7s exit 0 且观察到 `--app=http://127.0.0.1:8000` 窗口、`start-gui.vbs` 拉起同一路径；桌面 `TALK.lnk` 指向 `start-gui.vbs`。
+- **环境事件**：2026-11-14 22:51 本机系统 Python 的 `Lib` 被便携运行时目录（junction/覆盖）替换，标准库丢失；已用 `D:\TALK-portable\runtime\python\python312.zip` 恢复运行，`.venv` 可用。全局 `site-packages` 仍缺 fastapi 等，生产 8000 靠已加载模块运行，重启前必须先修复。
+- **未验证**：桌面快捷方式的人工双击（按同一 bat 路径验证）；`?desktop=1` 之外的界面样式未改动。
+
 ## 2026-11-14 22:45 — 项目收尾：开发结束、临时产物清理、结案标注
 
 - **决定**：用户确认 TALK 项目结束。便携分发阶段 4 剩余项（另一台干净 Windows 首启、升级/迁移、构建脚本 `_ssl`）与 Mac 启动器端到端**不再做**；旧开发分支归档、`agent:pi` busy 实例与 10 条 error 实例、347/348 旧候选均标注**结案、不再处理**；任务对账由用户人工核对，无漏收。

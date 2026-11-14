@@ -10,6 +10,11 @@ if exist "%TALK_HOME%runtime\python\python.exe" (
 ) else if exist "%TALK_HOME%.venv\Scripts\python.exe" (
   set "PYTHON=%TALK_HOME%.venv\Scripts\python.exe"
 )
+rem Repository layout: do not bootstrap a portable layout over the dev config.
+if exist "%TALK_HOME%server\main.py" if exist "%TALK_HOME%config.toml" (
+  echo Repository layout detected. Use start-gui.vbs or start-gui.bat instead.
+  exit /b 1
+)
 if not exist "%TALK_CONFIG%" (
   "%PYTHON%" -B -X utf8 -m scripts.portable_bootstrap --root "%TALK_HOME%." --apply
   if errorlevel 1 exit /b 1
