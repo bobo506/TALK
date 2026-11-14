@@ -32,4 +32,4 @@ Updated: 2026-11-15 00:30 (+08:00)
 ## Recent Notes
 - 归档位置：`D:\TALK-archive-20261114\`（`cited-evidence`、`root-stale-copies`、`stray-profile-root-20261115`）。
 - 恢复：说“继续项目”。
-- 环境事件（2026-11-14 22:51）：本机系统 Python（`AppData\Local\Programs\Python\Python312`）的 `Lib` 被便携运行时目录覆盖，标准库丢失；已用 `D:\TALK-portable\runtime\python\python312.zip` 恢复运行，`.venv` 可用。全局 `site-packages`（fastapi/uvicorn 等）尚未重装，生产 8000 目前靠已加载模块运行，重启前需先修复该解释器依赖。
+- 环境事件（2026-11-14 22:51）：本机系统 Python（`AppData\Local\Programs\Python\Python312`）的 `Lib` 被便携运行时目录覆盖，标准库丢失。修复：拷回 `python312.zip` 并补 4 个缺失 `.pyd`；依赖装到并列目录 `Python312\talk-deps`，由 `Lib\site-packages\talk-deps.pth` 前置。已实测该解释器可起完整 API（临时根 8934，`/api/members` 200，控制文件优雅停止）。全局 `pip` 仍未装回；重装 Python 需重做这两步。
