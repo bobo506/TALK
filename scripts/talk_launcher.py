@@ -198,7 +198,7 @@ def main():
             launcher = Launcher(home, path, config, url, os.environ)
             try:
                 launcher.start()
-                run_edge(edge, home, url, launcher.env)
+                run_edge(edge, home, url + '/?desktop=1', launcher.env)
             except Exception:
                 if launcher.owned:
                     ok, detail = launcher.stop()

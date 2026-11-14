@@ -15,6 +15,58 @@ if str(SOURCE_ROOT) not in sys.path:
 
 from scripts import portable_paths as paths
 
+# Fresh portable databases have no runner registry.  Seed only the CLI runners
+# supported by this distribution (WorkBuddy ACP is closed); these rows describe
+# registration facts, not installed/logged-in state.
+RUNNER_SEEDS = (
+    ("runner:codex-local", "codex", "Codex CLI"),
+    ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "kimi-code", "Kimi Code · K2.8 Preview 执行"),
+    ("runner:dsh-deepseek-local", "dsh", "DeepSeek Harness CLI"),
+)
+MODEL_SEEDS = (
+    ("runner:codex-local", "gpt-6.1-terra", "gpt-6.1-terra", "GPT-6.1 Terra", "openai", "native-codex-chatgpt-login"),
+    ("runner:codex-local", "gpt-6-astra", "gpt-6-astra", "GPT-6 Astra", "openai", "native-codex-chatgpt-login"),
+    ("runner:codex-local", "gpt-6.1-sol", "gpt-6.1-sol", "gpt-6.1-sol · xhigh", "openai", "native-codex-chatgpt-login"),
+    ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "kimi-for-coding", "kimi-code/kimi-for-coding", "K2.8 Preview", "managed:kimi-code", "native-kimi-code-managed-login"),
+    ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "k3", "kimi-code/k3", "K3", "managed:kimi-code", "native-kimi-code-managed-login"),
+    ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "k3.1-pro", "kimi-code/k3.1-pro", "K3.1 Pro", "managed:kimi-code", "native-kimi-code-managed-login"),
+    ("runner:dsh-deepseek-local", "deepseek-flash", "deepseek-flash", "DeepSeek Flash · max", "deepseek-official", "native-dsh-user-env"),
+)
+
+
+def seed_runners(session, admin):
+    """Insert canonical CLI runners/models once; preserve existing rows."""
+    import hashlib
+    from sqlmodel import select
+    from server.models import RunnerRegistry, RunnerModelChoice
+
+    created = {"runners": 0, "models": 0}
+    for runner_id, runtime, display_name in RUNNER_SEEDS:
+        if session.get(RunnerRegistry, runner_id) is None:
+            session.add(RunnerRegistry(runner_id=runner_id, runtime=runtime, display_name=display_name,
+                                       adapter_status="unverified", adapter_note=None, capabilities=[],
+                                       control_kind="managed_cli", created_by=admin.id))
+            created["runners"] += 1
+    session.commit()
+    for runner_id, model_id, alias, display, provider, connection in MODEL_SEEDS:
+        if session.exec(select(RunnerModelChoice).where(
+                RunnerModelChoice.runner_id == runner_id,
+                RunnerModelChoice.model_id == model_id,
+                RunnerModelChoice.model_source == "builtin",
+                RunnerModelChoice.provider_id == provider,
+                RunnerModelChoice.connection_ref == connection,
+                RunnerModelChoice.model_alias == alias)).first() is not None:
+            continue
+        digest = hashlib.sha256(f"{runner_id}|{model_id}|{alias}|{provider}|{connection}".encode()).hexdigest()[:12]
+        session.add(RunnerModelChoice(choice_id=f"rmc_{digest}", runner_id=runner_id, model_id=model_id,
+                                      model_source="builtin", provider_id=provider, connection_ref=connection,
+                                      model_alias=alias, model_display_name=display,
+                                      source_kind="declared", capabilities=[], created_by=admin.id))
+        created["models"] += 1
+    session.commit()
+    return created
+
+
 
 def write_new(path, content):
     try:
@@ -122,6 +174,7 @@ def bootstrap(root, port, project_name, apply):
                    "hosts": [], "provision_worker": True}
         result["runtime_status"] = "created" if write_new(paths.config_dir() / "runtime.json", json.dumps(runtime, ensure_ascii=False, indent=2) + "\n") else "existing"
         result["project"] = {"id": project.project_id, "status": project_status, "root": str(project_root)}
+        result["seed"] = seed_runners(session, admin)
     engine.dispose()
     return result
 

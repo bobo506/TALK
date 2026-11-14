@@ -12,6 +12,8 @@ const DEFAULT_REVOKE_WINDOW_SEC = 120;
 const DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const JUMP_HIGHLIGHT_MS = 1000;
 const SETUP_KEY_BYTES = 32;
+const DESKTOP_MODE = new URLSearchParams(location.search).has("desktop");
+if (DESKTOP_MODE) document.documentElement.classList.add("desktop-mode");
 
 let appConfig = {
   revoke_window_sec: DEFAULT_REVOKE_WINDOW_SEC,

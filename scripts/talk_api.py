@@ -10,7 +10,8 @@ async def serve(args):
     control=Path(args.control_file).resolve()
     if control.exists():
         raise RuntimeError("api_control_marker_exists")
-    server=uvicorn.Server(uvicorn.Config(args.app,host=args.host,port=args.port,log_level="info"))
+    server=uvicorn.Server(uvicorn.Config(args.app,host=args.host,port=args.port,log_level="info",
+                                         timeout_graceful_shutdown=5))
     async def watch():
         while not server.should_exit:
             if control.is_file():
