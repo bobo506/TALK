@@ -34,6 +34,38 @@ MODEL_SEEDS = (
 )
 
 
+def runner_recipes():
+    """Host recipes needed to start dynamic roles; no secrets or dev absolute paths."""
+    import shutil
+    codex = shutil.which("codex") or shutil.which("codex.cmd")
+    recipes = {
+        "kimi": {"enabled": True, "task_profiles": {}},
+        "dsh": {
+            "enabled": True,
+            "task_profiles": {},
+            "connections": {
+                "native-dsh-user-env": {
+                    "runner_id": "runner:dsh-deepseek-local",
+                    "runtime": "dsh",
+                    "model_source": "builtin",
+                    "provider_id": "deepseek-official",
+                    "connection_ref": "native-dsh-user-env",
+                    "model_id": "deepseek-flash",
+                    "model_alias": "deepseek-flash",
+                    "auth_type": "native",
+                    "target_api_key_env": "DEEPSEEK_API_KEY",
+                    "command_template": "dsh.cmd --profile headless --patch {native_home}/model-{model}.patch.yml",
+                    "tools_command_template": "dsh.cmd --profile headless --patch {native_home}/model-{model}.patch.yml",
+                },
+            },
+        },
+    }
+    if codex and Path(codex).is_absolute():
+        recipes["codex"] = {"enabled": True, "executable": codex}
+    return recipes
+
+
+
 def seed_runners(session, admin, project_id):
     """Insert canonical CLI runners/models once; preserve existing rows."""
     import hashlib
@@ -178,8 +210,22 @@ def bootstrap(root, port, project_name, apply):
                    "key_root": str(keys), "state_dir": str(paths.state_dir()),
                    "api_argv": [str(paths.python_executable()), "-B", "-X", "utf8", "-m", "scripts.talk_api",
                                 "--host", "127.0.0.1", "--port", str(port), "--control-file", "{control_file}"],
-                   "hosts": [], "provision_worker": True}
-        result["runtime_status"] = "created" if write_new(paths.config_dir() / "runtime.json", json.dumps(runtime, ensure_ascii=False, indent=2) + "\n") else "existing"
+                   "hosts": [], "provision_worker": True, **runner_recipes()}
+        runtime_path = paths.config_dir() / "runtime.json"
+        result["runtime_status"] = "created" if write_new(runtime_path, json.dumps(runtime, ensure_ascii=False, indent=2) + "\n") else "existing"
+        if result["runtime_status"] == "existing":
+            # Merge missing host recipes into an existing portable config; never
+            # overwrite a user's customized recipe.
+            existing_runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+            changed = False
+            for key, value in runner_recipes().items():
+                if key not in existing_runtime:
+                    existing_runtime[key] = value
+                    changed = True
+            if changed:
+                temp_path = runtime_path.with_suffix(".json.tmp")
+                temp_path.write_text(json.dumps(existing_runtime, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                os.replace(temp_path, runtime_path)
         result["project"] = {"id": project.project_id, "status": project_status, "root": str(project_root)}
         result["seed"] = seed_runners(session, admin, project.project_id)
     engine.dispose()

@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-14 14:20 — 便携运行时补全宿主配方，test01 启动成功
+
+- **现象**：DSH `test01` 创建成功，点启动后 `readiness_timeout`、launch 过期；runtime hosts 为空。根因：便携 `config/runtime.json` 只有基础字段，缺少 `codex`/`kimi`/`dsh` 宿主配方；`dsh_spec` 返回 None，DSH 宿主未被拉起。
+- **修复**：`portable_bootstrap.runner_recipes()` 生成三套配方并写入新 config；已有 config 只补缺失 key（不覆盖用户自定义）：
+  - codex：检测 `codex`/`codex.cmd` 路径；
+  - kimi：enabled + 空 task_profiles；
+  - dsh：enabled + native-dsh-user-env connection + `dsh.cmd` command template。
+- **验证**：`D:\TALK-portable` merge 配方并重启 runtime；DSH host `16272` serving；旧 start launch 过期后重新 POST start → launch `f584ae89…` claimed，test01 `running/ready`，实例 idle。日志确认 host 以 test01 身份轮询、manager-health serving。
+- **包**：clean zip 21,752,690 bytes/1,440 files，SHA256 `5E17CC53…2780`；包内 bootstrap 与源码一致；`D:\TALK-portable-clean.zip` 已替换。
+- **755 复核 approved**：codex 配方仅在 `shutil.which` 绝对路径时写入（无 codex 时省略，相对 fallback 删除）；测试豁免仅限实际探测路径，新增无 codex/相对 codex 测试；`test_portable_phase1` 12/12、launcher+build 19/19 通过；754 的隔离 startup 409 未复现。
+- **待做**：Codex/Kimi 真实启动（原生登录）待用户；构建脚本 `_ssl` 已知问题维持。
+
 ## 2026-11-14 13:50 — 便携版角色配置宿主 seed（test 角色完成配置）
 
 - **现象**：用户创建 Kimi Code `test` 角色后停在“等待创建宿主配置”；便携 DB `role_provision_host_config` 无行，worker 不领取。

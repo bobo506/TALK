@@ -13,6 +13,9 @@ import urllib.error
 import urllib.request
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
+
+from scripts.portable_bootstrap import runner_recipes
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -66,11 +69,41 @@ class PortablePhase1Tests(unittest.TestCase):
         runtime = json.loads(files[1].read_text(encoding="utf-8"))
         self.assertEqual(runtime["api_argv"][0], sys.executable)
         self.assertEqual(runtime["base_url"], "http://127.0.0.1:19437")
+        codex = shutil.which("codex") or shutil.which("codex.cmd")
+        if "codex" in runtime:
+            self.assertTrue(Path(runtime["codex"]["executable"]).is_absolute())
+        if not codex:
+            self.assertNotIn("codex", runtime)
         # Every generated machine path is derived from the explicit fixture or interpreter.
-        text = b"\n".join(original[:3]).decode("utf-8").replace("\\\\", "\\")
+        text = b"\n".join(original[:3]).decode("utf-8").replace("\\\\", "\\").lower()
+        allowed = [str(self.base), sys.executable]
+        allowed.extend(executable for executable in (shutil.which("codex"), shutil.which("codex.cmd"))
+                       if executable and Path(executable).is_absolute())
+        for path in allowed:
+            text = text.replace(path.lower(), "")
         for forbidden in ("D:\\claude-test", "C:\\Users\\Administrator"):
-            if forbidden.lower() not in str(self.base).lower() and forbidden.lower() not in sys.executable.lower():
-                self.assertNotIn(forbidden.lower(), text.lower())
+            self.assertNotIn(forbidden.lower(), text)
+
+    def test_bootstrap_without_codex(self):
+        code = '''import shutil, sys
+from unittest.mock import patch
+from scripts import portable_bootstrap
+original = shutil.which
+def which(command, *args, **kwargs):
+    return None if command in ("codex", "codex.cmd") else original(command, *args, **kwargs)
+sys.argv = ["portable_bootstrap", "--root", sys.argv[1], "--port", "19437", "--apply"]
+with patch.object(shutil, "which", side_effect=which):
+    portable_bootstrap.main()
+'''
+        result = subprocess.run([sys.executable, "-B", "-X", "utf8", "-c", code, str(self.root)],
+                                cwd=ROOT, env=self.env, text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        runtime = json.loads((self.root / "config/runtime.json").read_text(encoding="utf-8"))
+        self.assertNotIn("codex", runtime)
+
+    def test_relative_codex_is_omitted(self):
+        with patch("shutil.which", return_value="codex.cmd"):
+            self.assertNotIn("codex", runner_recipes())
 
     def test_talk_config_subprocess(self):
         applied = self.run_bootstrap("--apply")
