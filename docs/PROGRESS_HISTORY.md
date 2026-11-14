@@ -4,9 +4,9 @@
 
 - **实现**：bootstrap 检测 `%LOCALAPPDATA%\Programs\WorkBuddy\WorkBuddy.exe`（及 ProgramFiles/WORKBUDDY_EXE）与 `%USERPROFILE%\.workbuddy\models.json`；存在才写 runtime `workbuddy` 配方、登记 runner `runner:workbuddy-embedded-cli` + 3 个 CDP 模型（hy4free / deepseek-v4.1-flash / glm-5.3-flash，带 effort capabilities）。
 - **复核**：768 changes_requested（capabilities 为空）→ 769 补齐 → 770 approved；19 项 portable/WorkBuddy 测试通过。未打包 WorkBuddy 本体。
-- **现场**：`D:\TALK-portable` 已 bootstrap：+1 runner、+3 models、workbuddy 配方；8132 保持停止，交用户 start-gui 验收。
+- **现场**：`D:\TALK-portable` 已 bootstrap：+1 runner、+3 models、workbuddy 配方；用户创建 test02 并启动成功；任务 6 返回 `PORTABLE-WD-7805ED test02 已收到`。B 真实验收通过。
 - **包**：clean zip 21,755,645 bytes/1,440 files，SHA256 `1B9E79E8…8B11`。
-- **待做**：真实 WorkBuddy 桌面/CDP/角色启动/任务验收；A 的 Chrome 真实验收已由用户通过。
+- **待做**：无 B 阻塞；test01/test03 当前 stopped，可在角色页手动启动。
 
 ## 2026-11-14 20:20 — DSH 自动 patch + A 启动器/授权 UI（便携任务可执行）
 
