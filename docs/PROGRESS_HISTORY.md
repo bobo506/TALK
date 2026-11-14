@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-14 13:50 — 便携版角色配置宿主 seed（test 角色完成配置）
+
+- **现象**：用户创建 Kimi Code `test` 角色后停在“等待创建宿主配置”；便携 DB `role_provision_host_config` 无行，worker 不领取。
+- **修复**：`portable_bootstrap` 在 seed runners 时，若无 host config 行则插入 enabled=1、host_label=`socket.gethostname()`、lease 900、max_active 2、max_attempts 3、config_version=1、updated_by=admin；不覆盖已有（含 disabled）配置。
+- **结果**：`D:\TALK-portable` 重跑 bootstrap，host 1 行；等待 request `role-8ab7f780f5c4119671ed3ceab5264d03` 处理为 `provisioned`，job succeeded，member `agent:prj-1edf8a11f96f.test-a569b852`；`auto_start_intent=0`；用户确认角色出现。
+- **包**：clean zip 21,752,134 bytes/1,440 files，SHA256 `C28D2DEB…332D`；包内 bootstrap 与源码一致。
+- **752 定向复核 approved**：host seed 字段/幂等、worker 链路、包一致性、29 项回归通过；生产 7936/8000 未动。
+- **待做**：真实启动该角色（Kimi 原生登录/模型调用）仍待用户验证；构建脚本 `_ssl` 已知问题维持。
+
 ## 2026-11-14 09:40 — 便携版关窗/运行器/退出修复
 
 - **关窗报错**：便携 8132 首次关闭弹“服务未停止 / runtime_stop_blocked / runtime_api_stop_timeout”；现场 API `8932` 已停监听但 uvicorn 优雅关闭被残留 SSE/WebSocket 卡住，runtime `8728` 不退出。修复 `scripts/talk_api.py`：`uvicorn.Config(timeout_graceful_shutdown=5)`；真实 Edge 手动关窗连续 2 次 launcher 退出 0、8132 关闭、无残留；再次启动正常。用户确认“已修复通过”。

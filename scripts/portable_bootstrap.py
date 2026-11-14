@@ -34,13 +34,20 @@ MODEL_SEEDS = (
 )
 
 
-def seed_runners(session, admin):
+def seed_runners(session, admin, project_id):
     """Insert canonical CLI runners/models once; preserve existing rows."""
     import hashlib
+    import socket
     from sqlmodel import select
-    from server.models import RunnerRegistry, RunnerModelChoice
+    from server.models import RoleProvisionHostConfig, RunnerRegistry, RunnerModelChoice
 
-    created = {"runners": 0, "models": 0}
+    created = {"runners": 0, "models": 0, "host": 0}
+    if session.get(RoleProvisionHostConfig, project_id) is None:
+        host_label = (socket.gethostname() or "local")[:64]
+        session.add(RoleProvisionHostConfig(project_id=project_id, enabled=1, host_label=host_label,
+                                            lease_seconds=900, max_active_leases=2, max_attempts=3,
+                                            config_version=1, updated_by=admin.id))
+        created["host"] = 1
     for runner_id, runtime, display_name in RUNNER_SEEDS:
         if session.get(RunnerRegistry, runner_id) is None:
             session.add(RunnerRegistry(runner_id=runner_id, runtime=runtime, display_name=display_name,
@@ -174,7 +181,7 @@ def bootstrap(root, port, project_name, apply):
                    "hosts": [], "provision_worker": True}
         result["runtime_status"] = "created" if write_new(paths.config_dir() / "runtime.json", json.dumps(runtime, ensure_ascii=False, indent=2) + "\n") else "existing"
         result["project"] = {"id": project.project_id, "status": project_status, "root": str(project_root)}
-        result["seed"] = seed_runners(session, admin)
+        result["seed"] = seed_runners(session, admin, project.project_id)
     engine.dispose()
     return result
 

@@ -1,13 +1,11 @@
 # Project Progress
 
-## 当前快照（2026-11-14 09:40，便携版关窗/运行器/退出已修复）
+## 当前快照（2026-11-14 13:50，便携 test 角色已完成配置）
 
-- **便携版 8132**：关窗 API 优雅关闭超时已修（5s），真实 Edge 手动关窗连续验证通过；再次启动正常。
-- **运行器**：全新便携 DB 自动 seed Codex/Kimi Code/DSH + 7 个默认模型，创建角色下拉不再为空；用户已确认选项出现。
-- **退出按钮**：桌面模式（`?desktop=1`）隐藏右上角“退出”；普通浏览器保留。
-- **包**：`D:\TALK-portable`（验收副本 8132）已同步；`D:\TALK-portable-clean.zip` 21,751,988 bytes/1,440 files，SHA256 `8F2D2FAB…07FB8`。
-- **验证**：3 runners/7 models API 查询、Edge 关窗/8132 关闭、29 项 portable/launcher/build 测试通过（长 TEMP）。
-- **生产**：runtime `7936`/API `4968` 未动，8000 正常；projects=1。
-- **待做**：K2.8 复核本次修复；用户真实创建角色（原生登录/模型）验证；阶段4 另一台干净 Windows/升级迁移；构建脚本 `_ssl` 瞬时失败。
-- **提交**：`df0d1fc`（2b）、`ff6d4b7`（3）、`403d571`（3 文档）；本次修复待提交/推送。
+- **便携版**：`D:\TALK-portable`（8132）运行中；Kimi Code `test` 角色已由 worker 完成配置（`provisioned`/`bound`，服务 stopped，member `agent:prj-1edf8a11f96f.test-a569b852`）；用户确认角色出现。
+- **修复**：`portable_bootstrap` 自动登记本机角色配置宿主（`role_provision_host_config`，enabled=1），不再停在“等待创建宿主配置”；不覆盖已有 disabled 配置。
+- **包**：`D:\TALK-portable-clean.zip` 21,752,134 bytes/1,440 files，SHA256 `C28D2DEB…332D`；已同步 host seed。
+- **验证**：752 定向复核 approved；29 项 portable/launcher/build 回归通过；生产 7936/8000 未动。
+- **待做**：真实启动 test 角色（Kimi 原生登录/模型调用）待用户验证；构建脚本 `_ssl` 瞬时失败；阶段4 另一台干净 Windows/升级迁移。
+- **提交**：`e55d392`（关窗/seed/退出修复）、`6ced903`（文档）、本次 host seed/文档待提交推送。
 - **恢复**：说“继续项目”；详情见 [PROGRESS_HISTORY.md](PROGRESS_HISTORY.md) 顶部、[PORTABLE_PACKAGE.md](guides/PORTABLE_PACKAGE.md)。
