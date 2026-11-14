@@ -3,7 +3,8 @@
 当前交付（2026-11-14 凌晨构建，750 复核 approved）：
 
 - 预配置验收副本：`D:\TALK-portable`（端口 **8132**，config/data/keys 在文件夹内；用于早上验收，避免与生产 8000 冲突）。
-- 干净分发 zip：`D:\TALK-portable-clean.zip`（20.7 MB，1,440 files；首次启动生成自己的配置/Key）。
+- 干净分发 zip：`D:\TALK-portable-clean.zip`（21,751,988 bytes，1,440 files，SHA256 `8F2D2FAB…07FB8`；首次启动生成自己的配置/Key）。
+- 2026-11-14 09:40 修复：关窗 API 优雅关闭 5s 超时；全新 DB 自动登记 Codex/Kimi Code/DSH + 默认模型；桌面模式隐藏右上角“退出”。
 - 构建脚本 `_ssl` 在 pip 后立即导入会瞬时失败（进程退出后恢复），因此当前交付包由暂存 runtime 组装；750 已如实记录，后续可修复构建脚本的可复现性。
 
 ## 使用

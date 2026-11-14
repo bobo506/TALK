@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-14 09:40 — 便携版关窗/运行器/退出修复
+
+- **关窗报错**：便携 8132 首次关闭弹“服务未停止 / runtime_stop_blocked / runtime_api_stop_timeout”；现场 API `8932` 已停监听但 uvicorn 优雅关闭被残留 SSE/WebSocket 卡住，runtime `8728` 不退出。修复 `scripts/talk_api.py`：`uvicorn.Config(timeout_graceful_shutdown=5)`；真实 Edge 手动关窗连续 2 次 launcher 退出 0、8132 关闭、无残留；再次启动正常。用户确认“已修复通过”。
+- **运行器下拉为空**：便携全新 DB 没有 `runner_registry`/`runner_model_choices`，弹窗只看 `/api/runners/versions`。修复 `portable_bootstrap`：首次 bootstrap 幂等 seed Codex/Kimi Code/DSH 三个运行器与 7 个默认模型（WorkBuddy 排除）；`D:\TALK-portable` 已重跑 seed，API 实测 3 runners/7 choices。用户确认运行器选项出现。
+- **右上角退出**：桌面 URL `?desktop=1`，`app.js` 加 `desktop-mode`，`workspace.css` 在该模式隐藏 `#logout-btn`，并修正旧 CSS 强制显示导致 trusted 模式仍显示退出的问题。普通浏览器不受影响。
+- **包更新**：`TALK-portable-clean.zip` 更新为 21,751,988 bytes/1,440 files，SHA256 `8F2D2FAB…07FB8`；`D:\TALK-portable` 已同步源码/DB。
+- **验证**：3 个运行器/7 个模型 API 查询通过；真实 Edge `?desktop=1`、关窗/8132 关闭通过；portable/launcher/build 29 项测试通过（长 TEMP）；751 定向复核 approved。
+- **待做**：真实创建角色（原生登录/模型）仍需用户操作验证；seed/timeout/desktop URL 的断言级测试建议补；构建脚本 `_ssl` 瞬时失败仍为已知问题。
+
 ## 2026-11-14 02:50 — 14 阶段3 便携包与首次启动（候选 approved）
 
 - **747**：新增 `scripts/build_portable.py`（allowlist/scan/embeddable/zip）、start/start-gui 首次 bootstrap、`talk_runtime` detach breakaway 回退；单测+回归通过；完整构建在 pip 后 `_ssl` 失败。

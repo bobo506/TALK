@@ -364,6 +364,8 @@ Agent 提交结果后，任务会进入“结果待收取”。
 
 - 早上验收副本：`D:\TALK-portable`（端口 **8132**，避免与生产 8000 冲突）；双击 `start-gui.bat`，打开 Edge 应用窗口，关闭窗口后后台服务停止。
 - 干净分发 zip：`D:\TALK-portable-clean.zip`；首次启动生成自己的配置、默认项目和 Key（默认 `%LOCALAPPDATA%\TALK\keys`）。
+- 首次启动会自动登记 Codex、Kimi Code、DSH 及默认模型；空项目的“创建角色”可直接选择。
+- 桌面启动器会隐藏右上角“退出”；关闭 Edge 窗口即停止服务。
 - 数据、配置、日志都在便携文件夹的 `config/`、`data/`；删除文件夹即卸载（Key 目录可另行删除）。
 - 当前限制：Edge 应用窗口、页面内链接可导航；关窗后忙任务/停止失败可能残留服务，使用 `stop.bat`/`status.bat`；未验证另一台干净 Windows 和升级迁移。
 - 详细说明见[便携版指南](PORTABLE_PACKAGE.md)。
