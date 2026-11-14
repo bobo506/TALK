@@ -2,35 +2,30 @@
 
 ## Latest
 
-Updated: 2026-11-14 22:08 (+08:00)
+Updated: 2026-11-14 22:45 (+08:00)
 
 ### 1) Current Progress
-- 便携版 `D:\TALK-portable`（8132）运行中；A（Chrome/授权 UI）与 B（WorkBuddy）均已由用户验收通过。
-- 角色：test02（WorkBuddy）running/ready；test01（DSH）、test03（Codex）stopped；test（Kimi）not_started（需原生登录）。
-- 任务：6 个；4 成功（test03/DSH×2/WorkBuddy），2 个失败为已修复的 DSH model patch 历史问题；当前无执行中任务。
-- 包：`D:\TALK-portable-clean.zip` 21,755,645 bytes/1,440 files，SHA256 `1B9E79E8…8B11`。
-- 生产 TALK 8000 健康，runtime `7936` 未动。
+- **项目状态：开发结束（用户 2026-11-14 确认）**。无进行中切片、无待办、无待收取任务（用户已人工核对对账无遗漏）。
+- 最终功能集：便携分发阶段 1–3、Chrome 优先/授权 UI（A）、WorkBuddy 条件适配（B）；test01/test03/test02 均真实跑通任务，A/B 已由用户验收。
+- 运行状态：生产 TALK `8000`（pid 4968）运行中；便携 `8132`、runtime `7936`/`8932` 已正常停止，无残留。
+- 收尾清理：删除临时产物约 66 GB（`.tmp-tests` 40 GB/71,739 目录、`.tmp` 26 GB）；删除 598 个被误跟踪的测试 DB；陈旧副本归档至 `D:\TALK-archive-20261114`；D 盘可用 161.9 → 227.2 GB。
 
 ### 2) Open Questions / Pending Confirmation
-- test01/test03 是否现在重启做长任务观察。
-- 是否需要 Mac 启动器端到端（目前仅路径检测，单实例锁 Windows-only）。
-- 另一台干净 Windows、升级/迁移、构建脚本 `_ssl` 仍未验收。
+- 无。以下项已由用户 2026-11-14 决定不再做：便携分发阶段 4 剩余项（另一台干净 Windows、升级迁移、构建脚本 `_ssl`）、Mac 启动器端到端、旧开发分支归档、历史实例清理、347/348 旧候选结案。
 
 ### 3) Next Plan
-1. 需要时手动启动 test01/test03，做一次长任务/多轮任务观察。
-2. 另一台干净 Windows 首次启动/升级迁移验收。
-3. 如确需 Mac，单独做跨平台启动器单实例与打包切片。
+- 无。项目结束；日后如需重启，按 `AGENTS.md` 重新说明目的/范围/不变项/验收并获确认。
 
 ### 4) Verification
-- A：15 项 launcher + 65 项 DOM 测试；用户真实 Chrome/关窗验收通过。
-- B：19 项 portable/WorkBuddy 测试；test02 真实启动，任务 6 返回 `PORTABLE-WD-7805ED test02 已收到`。
-- Codex/DSH：native setup/DSH patch 52 项测试；test03/test01 真实任务成功。
-- 未验证：Mac 真机、另一台干净 Windows、WorkBuddy 长任务。
+- `D:\TALK-portable\stop.bat` → `stop_status=stopped`；8132/8932/7936 均 closed，8000 仍 LISTEN（pid 4968）。
+- 清理前后磁盘：D 盘可用 161.9 GB → 227.2 GB。
+- 证据保留：`D:\TALK-archive-20261114\cited-evidence`（140 个文档引用文件，4.8 MB）与 `root-stale-copies`。
+- 未验证：无（本轮无代码改动，未运行测试套件）。
 
 ### 5) Changed Files
-- 最近提交：`e6922f1`、`b6ef803`、`8399c2b`、`0ba75db`、`6e068fb`、`e2e2c9e`。
-- 详细完成记录见 `docs/PROGRESS_HISTORY.md` 顶部；已推送 `origin/codex/terminal-return-codex`，0/0。
+- 文档：`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`、`docs/spec/DEVELOPMENT_ROADMAP.md`、`.gitignore`。
+- 删除 598 个误跟踪测试 DB（`.tmp-tests/**/talk.db`、`.tmp/mem1_e2e/talk-test.db`）。
 
 ## Recent Notes
-- A/B 验收说明：`docs/guides/PORTABLE_PACKAGE.md`、`docs/guides/USER_MANUAL.md`。
+- 归档位置：`D:\TALK-archive-20261114\`（`cited-evidence`、`root-stale-copies`）。
 - 恢复：说“继续项目”。

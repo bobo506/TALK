@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-14 22:45 — 项目收尾：开发结束、临时产物清理、结案标注
+
+- **决定**：用户确认 TALK 项目结束。便携分发阶段 4 剩余项（另一台干净 Windows 首启、升级/迁移、构建脚本 `_ssl`）与 Mac 启动器端到端**不再做**；旧开发分支归档、`agent:pi` busy 实例与 10 条 error 实例、347/348 旧候选均标注**结案、不再处理**；任务对账由用户人工核对，无漏收。
+- **服务**：用便携自带 `stop.bat` 正常停止 8132（`stop_status=stopped`，runtime pid 10016 正常退出），8132/8932/7936 全部关闭；生产 `8000`（pid 4968）保持运行未动。
+- **清理**：删除 `.tmp-tests`（71,739 目录/40 GB）与 `.tmp`（311,587 文件/26 GB），D 盘可用 161.9 → 227.2 GB；删除仓库根目录陈旧副本 14 个、两个 0 字节垃圾文件与 6 个测试运行时根目录。删除前把文档引用的 140 个小文件（4.8 MB）与 415 证据文件归档到 `D:\TALK-archive-20261114\cited-evidence`，陈旧副本移到 `root-stale-copies`。
+- **跟踪清理**：发现 598 个测试 DB 曾被误提交（`.tmp-tests/**/talk.db`、`.tmp/mem1_e2e/talk-test.db`），本次提交一并删除；`.gitignore` 增加 `.tmp-tests/`，避免再次误提交。
+- **文档**：`docs/PROGRESS.md` 改为收尾快照（项目结束、无待办）；`docs/spec/DEVELOPMENT_ROADMAP.md` 第 1、9、10、12、14、15、16 项追加 2026-11-14 结案标注。
+- **未验证**：本轮无产品代码改动，未运行测试套件；`.git` 历史中仍保留这些测试 DB 的旧对象，未做历史改写。
+
 ## 2026-11-14 21:20 — 便携 WorkBuddy 条件适配（B）
 
 - **实现**：bootstrap 检测 `%LOCALAPPDATA%\Programs\WorkBuddy\WorkBuddy.exe`（及 ProgramFiles/WORKBUDDY_EXE）与 `%USERPROFILE%\.workbuddy\models.json`；存在才写 runtime `workbuddy` 配方、登记 runner `runner:workbuddy-embedded-cli` + 3 个 CDP 模型（hy4free / deepseek-v4.1-flash / glm-5.3-flash，带 effort capabilities）。
