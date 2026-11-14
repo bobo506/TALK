@@ -285,10 +285,11 @@ def setup(project: str, member: str, *, root: Path = ROOT, run=subprocess.run) -
 class NativeLoginAttempt:
     """一次页面授权持有的本机事实；对象不进入 API、日志或数据库。"""
     def __init__(self, *, project, member, root, config, database, binding, source, executable, home,
-                 kimi_home, was_present, lock_path, lock, process, process_generation=None):
+                 kimi_home, was_present, lock_path, lock, process, process_generation=None, data_root=None):
         self.project = project
         self.member = member
         self.root = root
+        self.data_root = data_root or root
         self.config = config
         self.database = database
         self.binding = binding
@@ -304,7 +305,7 @@ class NativeLoginAttempt:
         self.released = False
 
 
-def begin_native_login(project: str, member: str, *, root: Path = ROOT, popen=subprocess.Popen) -> NativeLoginAttempt:
+def begin_native_login(project: str, member: str, *, root: Path = ROOT, data_root=None, popen=subprocess.Popen) -> NativeLoginAttempt:
     """在角色专属 HOME 启动官方登录；只返回内存句柄，不读取或复制凭据。"""
     config, database = _local_facts(root, project, member)
     executable = shutil.which("kimi")
@@ -320,7 +321,7 @@ def begin_native_login(project: str, member: str, *, root: Path = ROOT, popen=su
         binding = _role(db, project, member)
         original_home = os.environ.get("KIMI_CODE_HOME")
         source = (Path(original_home).expanduser() if original_home else Path.home() / ".kimi-code") / "config.toml"
-        home = host.ensure_private_dir(_setup_home(db, config, root, project, member))
+        home = host.ensure_private_dir(_setup_home(db, config, data_root or root, project, member))
         kimi_home = host.ensure_private_dir(host.assert_inside_root(home, Path(".kimi-code")))
         transition_path = lock_path_for(home / 'native-setup-transition')
         transition = acquire_lock(transition_path)
@@ -347,7 +348,8 @@ def begin_native_login(project: str, member: str, *, root: Path = ROOT, popen=su
         return NativeLoginAttempt(project=project, member=member, root=root, config=config,
             database=database, binding=binding, source=source, executable=executable,
             home=home, kimi_home=kimi_home, was_present=was_present,
-            lock_path=lock_path, lock=lock, process=process, process_generation=process_generation)
+            lock_path=lock_path, lock=lock, process=process, process_generation=process_generation,
+            data_root=data_root)
     except Exception:
         if lock is not None:
             release_lock(lock_path, lock)
@@ -366,7 +368,7 @@ def finish_native_login(attempt: NativeLoginAttempt) -> str:
     try:
         db.execute("BEGIN IMMEDIATE")
         binding = _role(db, attempt.project, attempt.member)
-        if (binding != attempt.binding or _setup_home(db, attempt.config, attempt.root,
+        if (binding != attempt.binding or _setup_home(db, attempt.config, attempt.data_root,
                 attempt.project, attempt.member) != attempt.home):
             raise SetupError("角色模型在登录期间发生变化，未写入模型；请重试。")
         outcome = _append_model(attempt.kimi_home / "config.toml", binding,

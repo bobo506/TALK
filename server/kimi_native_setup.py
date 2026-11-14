@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 import re
 import threading
 import time
@@ -18,6 +19,7 @@ from sqlmodel import Session, select
 from server import db
 from server.models import (
     DEFAULT_EFFORT_VALUES,
+    Project,
     ProjectRole,
     RoleCreationOperation,
     RoleNativeSetup,
@@ -94,6 +96,14 @@ def _selection_current(project_id: str, member_id: str, choice_id: str, session:
         ("runner_id", "model_source", "provider_id", "connection_ref", "model_id", "model_alias"))
 
 
+def _roots(project_id, session, root=None):
+    project = session.get(Project, project_id)
+    stored = project.project_root_path if project is not None else None
+    project_root = Path(stored) if stored and Path(stored).is_absolute() else Path(root or ROOT)
+    data_root = Path(os.environ.get("TALK_HOME") or project_root or ROOT)
+    return project_root, data_root
+
+
 def _ready_home_exists(project_id, member_id, session, root=None):
     from server.workspace_paths import native_home_dir, WorkspacePathError
     role = session.get(ProjectRole, (project_id, member_id))
@@ -108,7 +118,7 @@ def _ready_home_exists(project_id, member_id, session, root=None):
         return False
     try:
         config_dir = '.codex' if runtime == 'codex' else '.kimi-code'
-        return (native_home_dir(root or ROOT, project_id, member_id) / config_dir / 'config.toml').is_file()
+        return (native_home_dir(_roots(project_id, session, root)[1], project_id, member_id) / config_dir / 'config.toml').is_file()
     except (OSError, WorkspacePathError):
         return False
 
@@ -287,8 +297,9 @@ class NativeSetupManager:
         session.add(row)
         session.commit()
         try:
-            kwargs = {"root": root} if root is not None else {}
-            attempt = _adapter(runner.runtime).begin_native_login(project_id, member_id, **kwargs)
+            project_root, data_root = _roots(project_id, session, root)
+            attempt = _adapter(runner.runtime).begin_native_login(
+                project_id, member_id, root=project_root, data_root=data_root)
             attempt.setup_runtime = runner.runtime
         except Exception as exc:  # 公开只落稳定分类，绝不落原生异常正文。
             row = session.get(RoleNativeSetup, (project_id, member_id))

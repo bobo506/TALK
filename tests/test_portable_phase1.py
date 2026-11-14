@@ -69,16 +69,18 @@ class PortablePhase1Tests(unittest.TestCase):
         runtime = json.loads(files[1].read_text(encoding="utf-8"))
         self.assertEqual(runtime["api_argv"][0], sys.executable)
         self.assertEqual(runtime["base_url"], "http://127.0.0.1:19437")
-        codex = shutil.which("codex") or shutil.which("codex.cmd")
-        if "codex" in runtime:
-            self.assertTrue(Path(runtime["codex"]["executable"]).is_absolute())
-        if not codex:
-            self.assertNotIn("codex", runtime)
+        expected = runner_recipes().get("codex")
+        self.assertEqual(runtime.get("codex"), expected)
+        if expected:
+            executable = Path(expected["executable"])
+            self.assertTrue(executable.is_absolute())
+            self.assertTrue(executable.is_file())
+            self.assertIn(executable.name.lower(), ("codex.exe", "codex"))
         # Every generated machine path is derived from the explicit fixture or interpreter.
         text = b"\n".join(original[:3]).decode("utf-8").replace("\\\\", "\\").lower()
         allowed = [str(self.base), sys.executable]
-        allowed.extend(executable for executable in (shutil.which("codex"), shutil.which("codex.cmd"))
-                       if executable and Path(executable).is_absolute())
+        if expected:
+            allowed.append(expected["executable"])
         for path in allowed:
             text = text.replace(path.lower(), "")
         for forbidden in ("D:\\claude-test", "C:\\Users\\Administrator"):
@@ -90,7 +92,7 @@ from unittest.mock import patch
 from scripts import portable_bootstrap
 original = shutil.which
 def which(command, *args, **kwargs):
-    return None if command in ("codex", "codex.cmd") else original(command, *args, **kwargs)
+    return None if command in ("codex.exe", "codex", "codex.cmd") else original(command, *args, **kwargs)
 sys.argv = ["portable_bootstrap", "--root", sys.argv[1], "--port", "19437", "--apply"]
 with patch.object(shutil, "which", side_effect=which):
     portable_bootstrap.main()
@@ -104,6 +106,46 @@ with patch.object(shutil, "which", side_effect=which):
     def test_relative_codex_is_omitted(self):
         with patch("shutil.which", return_value="codex.cmd"):
             self.assertNotIn("codex", runner_recipes())
+
+    def test_codex_shim_resolves_preferred_binary(self):
+        shim = self.base / "npm" / "codex.CMD"
+        shim.parent.mkdir()
+        shim.touch()
+        package = shim.parent / "node_modules" / "@openai" / "codex"
+        other = package / "other" / "codex.exe"
+        preferred = package / "node_modules" / "@openai" / "codex-win32-x64" / "vendor" / "x86_64-pc-windows-msvc" / "bin" / "codex.exe"
+        for executable in (other, preferred):
+            executable.parent.mkdir(parents=True, exist_ok=True)
+            executable.touch()
+        with patch("shutil.which", return_value=str(shim)):
+            self.assertEqual(runner_recipes()["codex"]["executable"], str(preferred))
+            preferred.unlink()
+            self.assertEqual(runner_recipes()["codex"]["executable"], str(other))
+
+    def test_bootstrap_with_only_shim_omits_codex(self):
+        shim = self.base / "npm" / "codex.cmd"
+        shim.parent.mkdir()
+        shim.touch()
+        code = '''import sys
+from unittest.mock import patch
+from scripts import portable_bootstrap
+shim = sys.argv[2]
+sys.argv = ["portable_bootstrap", "--root", sys.argv[1], "--port", "19437", "--apply"]
+with patch("shutil.which", return_value=shim):
+    portable_bootstrap.main()
+'''
+        result = subprocess.run([sys.executable, "-B", "-X", "utf8", "-c", code, str(self.root), str(shim)],
+                                cwd=ROOT, env=self.env, text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        runtime = json.loads((self.root / "config/runtime.json").read_text(encoding="utf-8"))
+        self.assertNotIn("codex", runtime)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("codex.cmd"), "requires Windows npm shim")
+    def test_installed_codex_resolves_real_exe(self):
+        executable = Path(runner_recipes()["codex"]["executable"])
+        self.assertTrue(executable.is_absolute())
+        self.assertTrue(executable.is_file())
+        self.assertEqual(executable.name.lower(), "codex.exe")
 
     def test_talk_config_subprocess(self):
         applied = self.run_bootstrap("--apply")

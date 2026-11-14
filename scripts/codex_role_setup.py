@@ -137,7 +137,7 @@ def write_config(path, value):
     host._publish_private_bytes(path, ''.join(lines).encode('utf-8'))
 
 
-def begin_native_login(project, member, *, root=ROOT, popen=subprocess.Popen):
+def begin_native_login(project, member, *, root=ROOT, data_root=None, popen=subprocess.Popen):
     config, database = _local_facts(root, project, member)
     exe = executable(config)
     db = _open_db(database)
@@ -150,7 +150,7 @@ def begin_native_login(project, member, *, root=ROOT, popen=subprocess.Popen):
         if not layout or layout[0] not in ('legacy', 'workspace-v1'):
             raise SetupError('native_setup_not_supported')
         if layout[0] == 'workspace-v1':
-            home = host.ensure_private_dir(native_home_dir(root, project, member))
+            home = host.ensure_private_dir(native_home_dir(data_root or root, project, member))
         else:
             state = Path(config['state_dir'])
             home = host.ensure_private_dir(host.assert_inside_root(state,

@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-11-14 17:10 — 便携 native setup 根分离，Codex test03 授权成功
+
+- **根因**：Codex test03 native setup 用代码根找 `.talk`，便携 project_root=data/project、data_root=TALK_HOME 分离；native home 在 TALK_HOME/workspaces。修复 `server/kimi_native_setup._roots` + codex/kimi `begin_native_login(data_root)`；759 复核 approved。
+- **现场**：更新 D:\TALK-portable 三文件、重启 runtime；test03 native setup 进入 `awaiting_authorization`，用户完成 Codex 设备授权后 `ready` 并启动成功。
+- **任务执行自检**：test03 Codex 成功回复 `PORTABLE-207674 test03 已收到`；test01 DSH 任务失败，缺 `native-home/model-deepseek-flash.patch.yml`（DSH setup 未生成），已派 Terra 760 修复。
+- **包**：clean zip 21,753,137 bytes/1,440 files，SHA256 `7EFB88B6…AFDD`；test01/test03 均 running。
+- **待做**：760 DSH patch + K2.8 复核；A 启动器/授权 UI；B WorkBuddy 便携适配。
+
+## 2026-11-14 16:40 — 便携 Codex 真实 exe（757 approved）
+
+- Codex test03 native setup 失败 `native_setup_failed`；配方 executable 是 npm `codex.CMD`，`codex_role_setup.executable()` 只接受 `codex.exe`/`codex`。
+- 修复：`runner_recipes()` 依次查 codex.exe/codex/codex.cmd，仅使用真实 exe；.cmd 仅作 shim，从同级 npm `@openai/codex` 搜真实 `codex.exe`；找不到则省略。757 复核 approved，15 项测试通过。
+- 包：5E17/3E87 中间版本；随后 758 处理 native setup 根分离。
+
 ## 2026-11-14 14:20 — 便携运行时补全宿主配方，test01 启动成功
 
 - **现象**：DSH `test01` 创建成功，点启动后 `readiness_timeout`、launch 过期；runtime hosts 为空。根因：便携 `config/runtime.json` 只有基础字段，缺少 `codex`/`kimi`/`dsh` 宿主配方；`dsh_spec` 返回 None，DSH 宿主未被拉起。

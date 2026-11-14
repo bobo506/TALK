@@ -37,7 +37,28 @@ MODEL_SEEDS = (
 def runner_recipes():
     """Host recipes needed to start dynamic roles; no secrets or dev absolute paths."""
     import shutil
-    codex = shutil.which("codex") or shutil.which("codex.cmd")
+    candidates = [shutil.which(name) for name in ("codex.exe", "codex", "codex.cmd")]
+    codex = None
+    shims = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate)
+        if not path.is_absolute() or not path.is_file():
+            continue
+        if path.name.lower() in ("codex.exe", "codex"):
+            codex = str(path)
+            break
+        if path.suffix.lower() in (".cmd", ".bat"):
+            shims.append(path)
+    if codex is None:
+        for shim in shims:
+            package = shim.parent / "node_modules" / "@openai" / "codex"
+            preferred = package / "node_modules" / "@openai" / "codex-win32-x64" / "vendor" / "x86_64-pc-windows-msvc" / "bin" / "codex.exe"
+            matches = [preferred] if preferred.is_file() else sorted(package.rglob("codex.exe"))
+            codex = next((str(path) for path in matches if path.is_file()), None)
+            if codex:
+                break
     recipes = {
         "kimi": {"enabled": True, "task_profiles": {}},
         "dsh": {
@@ -60,7 +81,7 @@ def runner_recipes():
             },
         },
     }
-    if codex and Path(codex).is_absolute():
+    if codex:
         recipes["codex"] = {"enabled": True, "executable": codex}
     return recipes
 
