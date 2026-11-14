@@ -1,12 +1,11 @@
 # Project Progress
 
-## 当前快照（2026-11-14 20:20，便携 test01/test03 任务均可执行）
+## 当前快照（2026-11-14 21:20，便携 WorkBuddy 已登记/待真实验收）
 
-- **test01 DSH**：763 宿主启动前生成 `model-deepseek-flash.patch.yml`；765 复核 approved；现场清空手工 patch、重启 runtime/test01 后自动生成，任务 `PORTABLE-DSH-A54D82` 成功。
-- **test03 Codex**：native setup 根分离 + 设备授权已完成；任务 `PORTABLE-207674` 成功；running/ready。
-- **A 启动器/授权 UI**：Chrome→Edge→默认浏览器（含 Windows/macOS 路径）；ready 后授权栏隐藏；两段冗余文案删除；验证码可复制/选中。764 复核 approved；真实 Chrome 桌面验收待用户，Mac 未端到端。
-- **包**：`D:\TALK-portable-clean.zip` 21,755,007 bytes/1,440 files，SHA256 `F3E88C59…D26F`；D:\TALK-portable 已应用。
-- **B WorkBuddy**：待开始；需本机 WorkBuddy 安装，不能打包本体。
+- **test01/test03**：DSH/Codex 角色任务均已成功执行；A 的 Chrome/授权 UI 已由用户验收通过。当前 8132 停止，等待用户 `start-gui.bat`。
+- **B WorkBuddy**：便携 bootstrap 已检测本机 `WorkBuddy.exe` + `.workbuddy\models.json`，登记 1 runner/3 CDP 模型（含 effort capabilities）并写 runtime 配方；770 复核 approved。真实桌面/CDP/角色创建/任务待验收。
+- **包**：`D:\TALK-portable-clean.zip` 21,755,645 bytes/1,440 files，SHA256 `1B9E79E8…8B11`。
+- **待做**：启动 start-gui → 创建/启动 WorkBuddy 角色 → 任务；B 真实验收后收尾。
 - **生产**：runtime `7936`/8000 未动。
-- **待做**：用户视觉验收 A（关窗停服务、授权栏、复制码）；B WorkBuddy 便携适配。
+- **提交**：`8399c2b` 后 B 变更待提交/推送。
 - **恢复**：说“继续项目”；详情见 [PROGRESS_HISTORY.md](PROGRESS_HISTORY.md) 顶部、[PORTABLE_PACKAGE.md](guides/PORTABLE_PACKAGE.md)。

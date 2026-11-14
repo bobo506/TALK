@@ -3,13 +3,14 @@
 当前交付（2026-11-14 凌晨构建，750 复核 approved）：
 
 - 预配置验收副本：`D:\TALK-portable`（端口 **8132**，config/data/keys 在文件夹内；用于早上验收，避免与生产 8000 冲突）。
-- 干净分发 zip：`D:\TALK-portable-clean.zip`（21,755,007 bytes，1,440 files，SHA256 `F3E88C59…D26F`；首次启动生成自己的配置/Key）。
+- 干净分发 zip：`D:\TALK-portable-clean.zip`（21,755,645 bytes，1,440 files，SHA256 `1B9E79E8…8B11`；首次启动生成自己的配置/Key）。
 - 2026-11-14 09:40 修复：关窗 API 优雅关闭 5s 超时；全新 DB 自动登记 Codex/Kimi Code/DSH + 默认模型；桌面模式隐藏右上角“退出”。
 - 2026-11-14 13:50 修复：全新 DB 自动登记本机“角色配置宿主”（`role_provision_host_config`，enabled=1）；等待中的 Kimi Code test 角色已完成配置（服务未自动启动，启动需原生登录）。
 - 2026-11-14 14:20 修复：全新 runtime 配置自动补 `codex`/`kimi`/`dsh` 宿主配方；DSH test01 已成功启动为 running/ready。已有 config 只补缺失 key，不覆盖自定义。
 - 2026-11-14 14:40 复核：codex 仅在 `which` 绝对路径时写入，未安装时省略，避免相对 fallback 让整份配置被拒；测试已覆盖。
 - 2026-11-14 17:10 修复：native setup 分离 project_root（.talk pointer）与 data_root（TALK_HOME workspaces）；Codex test03 已完成设备授权并启动。
-- 2026-11-14 20:20：DSH 宿主启动前自动生成 model patch，test01 任务已成功；启动器 Chrome→Edge→默认浏览器（含 macOS 路径检测）；授权 ready 后整块隐藏、验证码可复制、两段冗余文案删除。Chrome 真实桌面与 Mac 端到端仍需用户验证。
+- 2026-11-14 20:20：DSH 宿主启动前自动生成 model patch，test01 任务已成功；启动器 Chrome→Edge→默认浏览器（含 macOS 路径检测）；授权 ready 后整块隐藏、验证码可复制、两段冗余文案删除。Chrome 真实桌面已由用户验收通过。
+- 2026-11-14 21:20：WorkBuddy 条件适配；本机检测 `WorkBuddy.exe` + `.workbuddy\models.json` 后登记 runner/3 CDP 模型/配方，不打包本体。真实桌面/CDP 待验收。
 - 构建脚本 `_ssl` 在 pip 后立即导入会瞬时失败（进程退出后恢复），因此当前交付包由暂存 runtime 组装；750 已如实记录，后续可修复构建脚本的可复现性。
 
 ## 使用

@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-14 21:20 — 便携 WorkBuddy 条件适配（B）
+
+- **实现**：bootstrap 检测 `%LOCALAPPDATA%\Programs\WorkBuddy\WorkBuddy.exe`（及 ProgramFiles/WORKBUDDY_EXE）与 `%USERPROFILE%\.workbuddy\models.json`；存在才写 runtime `workbuddy` 配方、登记 runner `runner:workbuddy-embedded-cli` + 3 个 CDP 模型（hy4free / deepseek-v4.1-flash / glm-5.3-flash，带 effort capabilities）。
+- **复核**：768 changes_requested（capabilities 为空）→ 769 补齐 → 770 approved；19 项 portable/WorkBuddy 测试通过。未打包 WorkBuddy 本体。
+- **现场**：`D:\TALK-portable` 已 bootstrap：+1 runner、+3 models、workbuddy 配方；8132 保持停止，交用户 start-gui 验收。
+- **包**：clean zip 21,755,645 bytes/1,440 files，SHA256 `1B9E79E8…8B11`。
+- **待做**：真实 WorkBuddy 桌面/CDP/角色启动/任务验收；A 的 Chrome 真实验收已由用户通过。
+
 ## 2026-11-14 20:20 — DSH 自动 patch + A 启动器/授权 UI（便携任务可执行）
 
 - **DSH 任务**：760 在 claim 时才生成 patch，现场 bridge 已先起仍 ENOENT；763 改为宿主服务循环前 `prepare_model_patch`，765 复核 approved。现场清空手工 patch、重启 runtime/test01 后宿主启动即生成；任务 `PORTABLE-DSH-A54D82` 成功回复。test03 Codex 任务此前已成功。

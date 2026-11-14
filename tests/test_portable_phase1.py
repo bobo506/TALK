@@ -29,6 +29,12 @@ class PortablePhase1Tests(unittest.TestCase):
         self.keys = self.base / "external-keys"
         self.env = dict(os.environ, TALK_HOME=str(self.root), TALK_CONFIG=str(self.root / "config/config.toml"),
                         TALK_KEYS_DIR=str(self.keys), PYTHONPATH=str(ROOT))
+        # Do not let an installed WorkBuddy on the test host affect this fixture.
+        self.env.update({"USERPROFILE": str(self.base / "profile"),
+                         "LOCALAPPDATA": str(self.base / "local"),
+                         "PROGRAMFILES": str(self.base / "program"),
+                         "PROGRAMFILES(X86)": str(self.base / "program86"),
+                         "WORKBUDDY_EXE": ""})
 
     def run_bootstrap(self, *options):
         return subprocess.run([sys.executable, "-B", "-X", "utf8", "-m", "scripts.portable_bootstrap",
@@ -209,6 +215,11 @@ print(json.dumps(json.loads((project / ".talk/runtime.local.json").read_text(enc
                                     "--root", str(self.root), "--port", str(port), "--apply"],
                                    cwd=ROOT, env=self.env, text=True, encoding="utf-8", capture_output=True)
         self.assertEqual(bootstrap.returncode, 0, bootstrap.stderr)
+        runtime = json.loads((self.root / "config/runtime.json").read_text(encoding="utf-8"))
+        self.assertNotIn("workbuddy", runtime)
+        with closing(sqlite3.connect(self.root / "data/talk.db")) as conn:
+            self.assertEqual(conn.execute("select count(*) from runner_registry where runtime='workbuddy'").fetchone()[0], 0)
+            self.assertEqual(conn.execute("select count(*) from runner_model_choices where runner_id='runner:workbuddy-embedded-cli'").fetchone()[0], 0)
         project = json.loads(bootstrap.stdout)["project"]["id"]
         # A distribution contains the static assets at its own root.
         (self.root / "web").mkdir()

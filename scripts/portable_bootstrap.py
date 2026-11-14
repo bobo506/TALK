@@ -15,8 +15,7 @@ if str(SOURCE_ROOT) not in sys.path:
 
 from scripts import portable_paths as paths
 
-# Fresh portable databases have no runner registry.  Seed only the CLI runners
-# supported by this distribution (WorkBuddy ACP is closed); these rows describe
+# Fresh portable databases have no runner registry. These rows describe
 # registration facts, not installed/logged-in state.
 RUNNER_SEEDS = (
     ("runner:codex-local", "codex", "Codex CLI"),
@@ -32,6 +31,39 @@ MODEL_SEEDS = (
     ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "k3.1-pro", "kimi-code/k3.1-pro", "K3.1 Pro", "managed:kimi-code", "native-kimi-code-managed-login"),
     ("runner:dsh-deepseek-local", "deepseek-flash", "deepseek-flash", "DeepSeek Flash · max", "deepseek-official", "native-dsh-user-env"),
 )
+WORKBUDDY_RUNNER = ("runner:workbuddy-embedded-cli", "workbuddy", "WorkBuddy 内置CLI")
+WORKBUDDY_MODELS = tuple(
+    (WORKBUDDY_RUNNER[0], model, "workbuddy-cdp:" + model, display,
+     "managed:workbuddy", "native-workbuddy-cdp", capabilities)
+    for model, display, capabilities in (
+        ("hy4free", "Hy4（内置·桌面）", ["effort:high", "effort_default:high"]),
+        ("deepseek-v4.1-flash", "DeepSeek-V4.1-Flash（内置·桌面）", ["effort:low", "effort:high", "effort:max", "effort_default:high"]),
+        ("glm-5.3-flash", "GLM-5.3-Flash（内置·桌面）", ["effort:low", "effort:high", "effort:max", "effort_default:high"]),
+    )
+)
+
+
+def workbuddy_recipe():
+    """Detect only documented installation locations; never inspect private data."""
+    profile = os.environ.get("USERPROFILE")
+    if not profile or not Path(profile).is_absolute():
+        return None
+    models_home = Path(profile) / ".workbuddy"
+    # The CDP bridge requires models.json, without needing to read its contents here.
+    if not models_home.is_dir() or not (models_home / "models.json").is_file():
+        return None
+    candidates = [os.environ.get("WORKBUDDY_EXE")]
+    for name in ("LOCALAPPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)"):
+        base = os.environ.get(name)
+        if base and Path(base).is_absolute():
+            suffix = ("Programs", "WorkBuddy", "WorkBuddy.exe") if name == "LOCALAPPDATA" else ("WorkBuddy", "WorkBuddy.exe")
+            candidates.append(str(Path(base).joinpath(*suffix)))
+    for candidate in candidates:
+        if candidate:
+            executable = Path(candidate)
+            if executable.is_absolute() and executable.is_file():
+                return {"executable": str(executable), "models_home": str(models_home)}
+    return None
 
 
 def runner_recipes():
@@ -83,11 +115,14 @@ def runner_recipes():
     }
     if codex:
         recipes["codex"] = {"enabled": True, "executable": codex}
+    workbuddy = workbuddy_recipe()
+    if workbuddy:
+        recipes["workbuddy"] = workbuddy
     return recipes
 
 
 
-def seed_runners(session, admin, project_id):
+def seed_runners(session, admin, project_id, workbuddy_enabled=False):
     """Insert canonical CLI runners/models once; preserve existing rows."""
     import hashlib
     import socket
@@ -101,14 +136,16 @@ def seed_runners(session, admin, project_id):
                                             lease_seconds=900, max_active_leases=2, max_attempts=3,
                                             config_version=1, updated_by=admin.id))
         created["host"] = 1
-    for runner_id, runtime, display_name in RUNNER_SEEDS:
+    runners = RUNNER_SEEDS + ((WORKBUDDY_RUNNER,) if workbuddy_enabled else ())
+    models = tuple((*seed, []) for seed in MODEL_SEEDS) + (WORKBUDDY_MODELS if workbuddy_enabled else ())
+    for runner_id, runtime, display_name in runners:
         if session.get(RunnerRegistry, runner_id) is None:
             session.add(RunnerRegistry(runner_id=runner_id, runtime=runtime, display_name=display_name,
                                        adapter_status="unverified", adapter_note=None, capabilities=[],
                                        control_kind="managed_cli", created_by=admin.id))
             created["runners"] += 1
     session.commit()
-    for runner_id, model_id, alias, display, provider, connection in MODEL_SEEDS:
+    for runner_id, model_id, alias, display, provider, connection, capabilities in models:
         if session.exec(select(RunnerModelChoice).where(
                 RunnerModelChoice.runner_id == runner_id,
                 RunnerModelChoice.model_id == model_id,
@@ -121,7 +158,7 @@ def seed_runners(session, admin, project_id):
         session.add(RunnerModelChoice(choice_id=f"rmc_{digest}", runner_id=runner_id, model_id=model_id,
                                       model_source="builtin", provider_id=provider, connection_ref=connection,
                                       model_alias=alias, model_display_name=display,
-                                      source_kind="declared", capabilities=[], created_by=admin.id))
+                                      source_kind="declared", capabilities=capabilities, created_by=admin.id))
         created["models"] += 1
     session.commit()
     return created
@@ -247,8 +284,10 @@ def bootstrap(root, port, project_name, apply):
                 temp_path = runtime_path.with_suffix(".json.tmp")
                 temp_path.write_text(json.dumps(existing_runtime, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 os.replace(temp_path, runtime_path)
+            runtime = existing_runtime
         result["project"] = {"id": project.project_id, "status": project_status, "root": str(project_root)}
-        result["seed"] = seed_runners(session, admin, project.project_id)
+        result["seed"] = seed_runners(session, admin, project.project_id,
+                                      workbuddy_enabled=bool(runtime.get("workbuddy")))
     engine.dispose()
     return result
 
