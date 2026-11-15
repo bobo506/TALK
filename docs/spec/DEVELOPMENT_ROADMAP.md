@@ -3,13 +3,13 @@
 > **2026-11-15 20:00 用户提出“开箱即用 / 一体化启动”方向（待确认，未开工）**：目标是拿到便携包即可使用；启动 TALK 时自动检测并接入本机已安装的运行器（Codex / KimiCode / WorkBuddy / DSH），自动生成成员与 MCP 配置（已存在则跳过），没有运行器时给出提示；GUI 增加加载页与进度条。按下面顺序推进，每项开工前仍先确认目的/范围/不变项/验收：
 >
 > 1. 恢复 `~/.talk/keys`（从 `talk.db` 读取，不回显密钥）；验证 codex/kimi/dsh 角色宿主可正常重启。
-> 2. 接入 Codex（stdio 或 URL）、KimiCode（`.kimi-code/mcp.json`）、WorkBuddy（`.workbuddy/mcp.json`）三个发起侧，验证 `talk_*` 工具可见；发起侧使用对应 agent 自身身份，不共用 operator。
+> 2. 接入 Codex（stdio 或 URL）、KimiCode（`.kimi-code/mcp.json`）、WorkBuddy（`.workbuddy/mcp.json`）与 **DSH** 四个发起侧，验证 `talk_*` 工具可见；发起侧使用对应 agent 自身身份，不共用 operator。
 > 3. 新增 TALK HTTP MCP 端点 `/mcp`（streamable HTTP），支持 URL 方式接入（WorkBuddy 必需，Codex 可统一走 URL）。
 > 4. 启动器检测已安装运行器，幂等生成/更新 MCP 配置与成员（已存在则跳过，不重复写）。
 > 5. 启动器按检测结果登记并启动执行侧 role host（角色运行器）。
 > 6. GUI 合并启动：起服务 + 开页面；关页面不停服务；页面提供“退出服务”。
 > 7. GUI 加载页：主题动画/文案 + 进度条（初始化、下载、接入进度）。
-> 8. 未接入 MCP 时提示（“请先通过 agent 接入 TALK MCP，再启动 TALK 服务”）；已接入则进入主界面。
+> 8. 启动时自动为 DSH / WorkBuddy / Codex / KimiCode 四类运行器接入；**仅当用户使用这四类之外的 agent 时**才提示“请安装 DSH / WorkBuddy / Codex / KimiCode 之一作为分配或执行角色”，未接入不阻塞启动。
 > 9. 单目录收拢：删除 `D:\TALK-portable`，本地只保留 TALK 仓库目录；便携包改为构建产物，不再常驻。
 > 10. 便携包构建 + GitHub Release 发布（zip 资产，一版一 release；不进 git 仓库）。
 > 11. 交接文档：拿到包 → 启动 → 自动接入 → 无运行器提示的完整说明。
