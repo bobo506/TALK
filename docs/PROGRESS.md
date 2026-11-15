@@ -9,13 +9,17 @@ Updated: 2026-11-15 00:30 (+08:00)
 - 最终功能集：便携分发阶段 1–3、Chrome 优先/授权 UI（A）、WorkBuddy 条件适配（B）；test01/test03/test02 均真实跑通任务，A/B 已由用户验收。
 - 运行状态：生产 TALK `8000`（pid 4968）运行中；便携 `8132`、runtime `7936`/`8932` 已正常停止，无残留。
 - 收尾清理：删除临时产物约 66 GB（`.tmp-tests` 40 GB/71,739 目录、`.tmp` 26 GB）；删除 598 个被误跟踪的测试 DB；陈旧副本归档至 `D:\TALK-archive-20261114`；D 盘可用 161.9 → 227.2 GB。
-- 2026-11-15 新增仓库内 GUI 启动入口（用户要求：在 TALK 项目下建入口、弃用命令行登录）：`start-gui.bat`/`start-gui.vbs` → `scripts/talk_desktop.py`，`install-shortcut.bat` 生成桌面快捷方式；服务已运行则接入，未运行则启动子进程并在关窗后停止。项目仍为结束状态。
+- 2026-11-15 晚：角色经删除重建后恢复——Terra（codex，`gpt-6.1-terra`）、K2.8（kimi-code，`kimi-for-coding`）在线；四条终端发起身份（codex-t/kimi-t/dsh-t/workbuddy-t）已建立并接入 MCP。第 3 项（HTTP MCP `/mcp`）派给 Terra 后**因 Codex 执行环境无法创建命令进程而 blocked**（见 Open Questions）。
 
 ### 2) Open Questions / Pending Confirmation
-- 无。以下项已由用户 2026-11-14 决定不再做：便携分发阶段 4 剩余项（另一台干净 Windows、升级迁移、构建脚本 `_ssl`）、Mac 启动器端到端、旧开发分支归档、历史实例清理、347/348 旧候选结案。
+- **待用户决策（2026-11-15 22:00）**：Terra 的 Codex 0.164 无法创建命令进程，第 3 项无法开发。
+  - 证据：任务 #772 交付（result 3572）自报 blocked；两次 `git status` 均报 `Failed to create unified exec process: timed out after 15000ms connecting runner pipe-out`；未改任何文件。
+  - 本机 sandbox 初始化日志有 `failed to grant non-inheriting read-attributes ACE on user profile ... os error 32; continuing setup`；sandbox 用户与代理端口（10808/10809）已创建；`codex-command-runner.exe` 可启动（需 pipe-in），判断是 codex 与 runner 的管道/沙箱通道问题。
+  - 选项：A 修 Codex 执行环境（排查 sandbox ACL/管道，必要时重跑 setup）；B 临时交换角色（K2.8 开发、Terra 复核）；C 先做第 12 项升 0.169 适配（仍需能执行命令的角色验证）。
+- 以下项已由用户 2026-11-14 决定不再做：便携分发阶段 4 剩余项（另一台干净 Windows、升级迁移、构建脚本 `_ssl`）、Mac 启动器端到端、旧开发分支归档、历史实例清理、347/348 旧候选结案。
 
 ### 3) Next Plan
-- 项目仍按 2026-11-14 结论保持结束；2026-11-15 用户提出“开箱即用 / 一体化启动”方向，**11 项待确认清单**见 `docs/spec/DEVELOPMENT_ROADMAP.md` 顶部（未开工，逐项确认后按片执行）。
+- 2026-11-15 用户提出“开箱即用 / 一体化启动”方向，清单见 `docs/spec/DEVELOPMENT_ROADMAP.md` 顶部（第 1、2 项已完成，第 3 项因 Codex 执行环境阻塞待决策，第 4→13 项待推进）。历史“项目结束”结论仅指 2026-11-14 前的范围。
 
 ### 4) Verification
 - `D:\TALK-portable\stop.bat` → `stop_status=stopped`；8132/8932/7936 均 closed，8000 仍 LISTEN（pid 4968）。
