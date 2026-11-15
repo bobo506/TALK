@@ -12,10 +12,12 @@ Updated: 2026-11-15 00:30 (+08:00)
 - 2026-11-15 晚：角色经删除重建后恢复——Terra（codex，`gpt-6.1-terra`）、K2.8（kimi-code，`kimi-for-coding`）在线；四条终端发起身份（codex-t/kimi-t/dsh-t/workbuddy-t）已建立并接入 MCP。第 3 项（HTTP MCP `/mcp`）派给 Terra 后**因 Codex 执行环境无法创建命令进程而 blocked**（见 Open Questions）。
 
 ### 2) Open Questions / Pending Confirmation
-- **待用户决策（2026-11-15 22:00）**：Terra 的 Codex 0.164 无法创建命令进程，第 3 项无法开发。
-  - 证据：任务 #772 交付（result 3572）自报 blocked；两次 `git status` 均报 `Failed to create unified exec process: timed out after 15000ms connecting runner pipe-out`；未改任何文件。
-  - 本机 sandbox 初始化日志有 `failed to grant non-inheriting read-attributes ACE on user profile ... os error 32; continuing setup`；sandbox 用户与代理端口（10808/10809）已创建；`codex-command-runner.exe` 可启动（需 pipe-in），判断是 codex 与 runner 的管道/沙箱通道问题。
-  - 选项：A 修 Codex 执行环境（排查 sandbox ACL/管道，必要时重跑 setup）；B 临时交换角色（K2.8 开发、Terra 复核）；C 先做第 12 项升 0.169 适配（仍需能执行命令的角色验证）。
+- **待用户决策（2026-11-15 22:15 复核后）**：Terra 的 Codex 0.164 在**角色宿主环境**里无法创建命令进程，第 3 项无法开发；管理员上下文用**完全相同参数**可正常执行（见下），根因指向 TALK 角色宿主的 Codex 适配层，而非 CLI/版本/参数。
+  - Terra 两次交付（#772 result 3572、#773 result 3573）均 blocked、`changed_files: []`；错误：`Failed to create unified exec process: timed out after 15000ms connecting runner pipe-out`。
+  - 对照实验（管理员上下文，Codex 0.164）：`echo hi` 1239ms 通过；加 TALK 全同参数（`--strict-config --disable apps/remote_plugin/plugins --sandbox read-only -c windows.sandbox="unelevated" --model gpt-6.1-terra`、stdin 传 prompt、隐藏窗口）1111–1552ms 通过；重定向 USERPROFILE/HOME/APPDATA/LOCALAPPDATA/TEMP 后仍通过。
+  - 结论：差异在角色宿主的启动环境/CODEX_HOME/隔离方式；`codex-command-runner.exe` 本身可启动。沙箱初始化日志曾出现 `failed to grant ... ACE on user profile ... os error 32`。
+  - 选项：A1 关角色 Codex 沙箱参数验证（改代码）；A2 深挖 `codex_bridge`/宿主 spawn 与角色 HOME（改代码，较慢）；B 本切片改由 K2.8 开发、Terra 复核（立即推进，需确认）。
+  - 附带：talk-delivery-1 校验要求 `task_id` 为**字符串**、`verification[].evidence` 单行、不得出现 `schema/status/blockers/incomplete` 字段；下次派发按此写。
 - 以下项已由用户 2026-11-14 决定不再做：便携分发阶段 4 剩余项（另一台干净 Windows、升级迁移、构建脚本 `_ssl`）、Mac 启动器端到端、旧开发分支归档、历史实例清理、347/348 旧候选结案。
 
 ### 3) Next Plan
