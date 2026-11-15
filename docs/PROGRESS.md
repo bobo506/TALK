@@ -16,7 +16,8 @@ Updated: 2026-11-15 00:30 (+08:00)
   - Terra 两次交付（#772 result 3572、#773 result 3573）均 blocked、`changed_files: []`；错误：`Failed to create unified exec process: timed out after 15000ms connecting runner pipe-out`。
   - 对照实验（管理员上下文，Codex 0.164）：`echo hi` 1239ms 通过；加 TALK 全同参数（`--strict-config --disable apps/remote_plugin/plugins --sandbox read-only -c windows.sandbox="unelevated" --model gpt-6.1-terra`、stdin 传 prompt、隐藏窗口）1111–1552ms 通过；重定向 USERPROFILE/HOME/APPDATA/LOCALAPPDATA/TEMP 后仍通过。
   - 结论：差异在角色宿主的启动环境/CODEX_HOME/隔离方式；`codex-command-runner.exe` 本身可启动。沙箱初始化日志曾出现 `failed to grant ... ACE on user profile ... os error 32`。
-  - 选项：A1 关角色 Codex 沙箱参数验证（改代码）；A2 深挖 `codex_bridge`/宿主 spawn 与角色 HOME（改代码，较慢）；B 本切片改由 K2.8 开发、Terra 复核（立即推进，需确认）。
+  - **A1 已试并排除（2026-11-15 23:15，探测任务 #774 result 3574）**：把 `scripts/codex_role_host.py` 的 `windows.sandbox` 临时改为 `disabled` 并重启 Terra 后，`git status --short` 与 `cmd /c echo hi` 仍各两次报同一 `runner pipe-out` 超时（15.2–16.3 秒）；补丁已回退、Terra 已重启回原配置。结论：**与 sandbox 策略无关**，问题在 Codex 的 unified exec runner 管道在角色宿主环境里建不起来。
+  - 选项：A2 深挖 `codex_bridge`/宿主 spawn、角色 HOME 与 HANDLE/Job 继承（改代码，较慢）；B 本切片改由 K2.8 开发、Terra 复核（立即推进，需确认）。
   - 附带：talk-delivery-1 校验要求 `task_id` 为**字符串**、`verification[].evidence` 单行、不得出现 `schema/status/blockers/incomplete` 字段；下次派发按此写。
 - 以下项已由用户 2026-11-14 决定不再做：便携分发阶段 4 剩余项（另一台干净 Windows、升级迁移、构建脚本 `_ssl`）、Mac 启动器端到端、旧开发分支归档、历史实例清理、347/348 旧候选结案。
 
