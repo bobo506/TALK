@@ -33,3 +33,4 @@ Updated: 2026-11-15 00:30 (+08:00)
 - 归档位置：`D:\TALK-archive-20261114\`（`cited-evidence`、`root-stale-copies`、`stray-profile-root-20261115`）。
 - 恢复：说“继续项目”。
 - 环境事件（2026-11-14 22:51）：本机系统 Python（`AppData\Local\Programs\Python\Python312`）的 `Lib` 被便携运行时目录覆盖，标准库丢失。修复：拷回 `python312.zip` 并补 4 个缺失 `.pyd`；依赖装到并列目录 `Python312\talk-deps`，由 `Lib\site-packages\talk-deps.pth` 前置。已实测该解释器可起完整 API（临时根 8934，`/api/members` 200，控制文件优雅停止）。全局 `pip` 仍未装回；重装 Python 需重做这两步。
+- 运行器环境（2026-11-15）：Codex CLI **临时钉在 `0.164.0`**（TALK 目前只接受 0.163/0.164，属临时措施）；Kimi Code CLI 安装原生 `2.0.2` 到 `~/.kimi-code/bin/kimi.exe`（并在 `%APPDATA%\npm\kimi.exe` 留一份供现有进程识别）。新版本适配已登记为路线图第 12 项。
