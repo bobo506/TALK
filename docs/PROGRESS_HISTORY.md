@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-16 17:30 — 第 3 项完成：HTTP MCP `/mcp` 端点（K2.8 开发、Terra 复核）
+
+- 交付：新增 `server/routes/mcp.py`（无状态 streamable HTTP JSON-RPC：initialize/tools/list/tools/call；`jsonrpc=="2.0"` 校验 -32600；无 id → 202；带 id 的 notifications 正常响应；`params` 非对象 → -32602；工具域失败 → 静态 `TOOL_FAILURE_TEXT` + 服务端 `logger.exception`）、`bridges/talk_tool_registry.py`（复用 stdio 的 `TOOL_SCHEMAS`/`dispatch_tool`）、`bridges/talk_call_context.py`（ContextVar 保存 base_url/api_key，HTTP 路径不写 `os.environ`）、`tests/test_mcp_http.py`（32 项）；修改 `server/main.py`（注册 router）、`bridges/talk_task_tools.py`/`bridges/initiator_followup.py`（contextvar 优先、env 兜底，stdio 行为不变）。
+- 安全设计：回调地址只从 ASGI scope 派生或回退配置 loopback URL，Host 头不参与；非 loopback 拒绝；成员 Key 不会发往非 loopback；客户端错误文本只回静态消息。
+- 复核过程：Terra 独立复核连续 4 轮 rejected（并发 env 串扰 → 锁阻塞 600 秒 → params 不一致 → 脱敏遗漏 → file URI 空格），K2.8 逐一返修；最终 #806 **approved**：静态异常响应 + 日志留全量、脱敏反例与不误伤用例通过、32 passed。
+- 已知限制：`test_runtime_log_authentication` 在 Terra 沙箱环境稳定 503；协调者在管理员上下文单独运行 1 passed in 3.01s，判定为环境限制，非本切片代码问题。
+- 提交 `2be7a3f`。`bridges/talk_terminal_mcp.py`、其它路由、docs、生产配置未改。
+- 另：Terra 恢复手段同期确认——runner 完整性标签 Low→Medium 生效（Astra #795 首次定位，提交 `3f2888b`）；协调者随后把 `D:\claude-test\TALK` 根目录及子树统一设为 Medium，并给新 sandbox 用户补角色 native-home 写权限，Terra 命令/读写验收通过（#796/#797）。
+
 ## 2026-11-16 14:37 — Terra runner 完整性标签最小验证（#795）
 
 - 用户依次授权只读安全上下文核对、单 runner 标签验证及临时补充 WRITE_OWNER；协调身份为 `agent:codex-t`。未授权目录递归修复、沙箱关闭、账号重建或服务重启，本轮均未执行。
