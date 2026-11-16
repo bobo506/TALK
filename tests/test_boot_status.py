@@ -16,7 +16,7 @@ def test_status_without_launcher_and_loading(tmp_path):
         assert response.json()['runners'] == {'detected': [], 'none': True, 'source': 'unknown'}
         assert response.json()['ready'] and response.json()['service_ready']
         page = client.get('/loading')
-        assert page.status_code == 200 and all(marker in page.text for marker in ('progressbar', 'runner-none', 'runner-detected'))
+        assert page.status_code == 200 and all(marker in page.text for marker in ('progressbar', 'runner-none', 'runner-detected', 'loading-steps', 'step-chip'))
 
 
 def test_status_filters_sensitive_fields(tmp_path):
