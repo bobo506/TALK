@@ -13,9 +13,10 @@ def test_status_without_launcher_and_loading(tmp_path):
         response = client.get('/api/boot/status')
         assert response.status_code == 200
         assert response.json()['launcher'] is None
+        assert response.json()['runners'] == {'detected': [], 'none': True, 'source': 'unknown'}
         assert response.json()['ready'] and response.json()['service_ready']
         page = client.get('/loading')
-        assert page.status_code == 200 and 'progressbar' in page.text
+        assert page.status_code == 200 and all(marker in page.text for marker in ('progressbar', 'runner-none', 'runner-detected'))
 
 
 def test_status_filters_sensitive_fields(tmp_path):
@@ -25,6 +26,7 @@ def test_status_filters_sensitive_fields(tmp_path):
     with patch.dict(os.environ, {'TALK_CONFIG': str(tmp_path / 'config.toml')}):
         data = TestClient(main.app).get('/api/boot/status').json()
     assert data['launcher']['detected'] == ['codex']
+    assert data['runners'] == {'detected': ['codex'], 'none': False, 'source': 'launcher'}
     assert data['launcher']['configs_written'] == ['codex']
     assert data['launcher']['download']['text'] == '无需下载'
     assert data['ready'] and len(data['stages']) == 6

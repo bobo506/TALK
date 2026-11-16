@@ -3472,3 +3472,35 @@ document.getElementById("shutdown-service-btn").addEventListener("click", async 
     alert("退出服务时发生异常，请运行 stop.bat。");
   }
 });
+
+// 启动器摘要只反映上次检测结果，不推断实时连接状态。
+(function initRunnerStatus() {
+  const banner = document.getElementById("runner-banner");
+  const title = document.getElementById("runner-banner-title");
+  const detail = document.getElementById("runner-banner-detail");
+  const settings = document.getElementById("runner-settings-status");
+  const settingsDetail = document.getElementById("runner-settings-detail");
+  const labels = {codex: "Codex", kimi: "KimiCode", workbuddy: "WorkBuddy", dsh: "DSH"};
+  document.getElementById("runner-banner-close").addEventListener("click", () => {
+    banner.hidden = true;
+    try { sessionStorage.setItem("talk-runner-banner-dismissed", "1"); } catch (_) {}
+  });
+  fetch("/api/boot/status", {cache: "no-store"}).then(response => {
+    if (!response.ok) throw new Error("status unavailable");
+    return response.json();
+  }).then(data => {
+    const runners = data.runners;
+    if (!runners || !Array.isArray(runners.detected)) throw new Error("invalid status");
+    const names = runners.detected.map(name => labels[name] || name).join("、");
+    const message = runners.none ? "未检测到可用的运行器：服务已启动但尚未接入 TALK，当前无法分配或接收任务" : `本机已安装 ${names}，可接入使用`;
+    const description = runners.none ? "请安装 Codex、KimiCode、WorkBuddy 或 DSH，随后重新启动并完成接入。" : "检测结果来自启动器摘要；实际接入情况请查看角色配置。";
+    title.textContent = message; detail.textContent = description;
+    settings.textContent = message;
+    const launcher = data.launcher || {};
+    settingsDetail.textContent = runners.source === "unknown" ? "未获得启动器检测摘要，接入状态未知。" : runners.none ? description : runners.detected.map(name => `${labels[name] || name}：${(launcher.configs_written || []).includes(name) ? "已写入配置" : (launcher.skipped || []).includes(name) ? "已跳过配置" : "配置状态未提供"}`).join("；") + "。实际连接状态未提供。";
+    banner.dataset.kind = runners.none ? "none" : "detected";
+    let dismissed = false;
+    try { dismissed = sessionStorage.getItem("talk-runner-banner-dismissed") === "1"; } catch (_) {}
+    banner.hidden = dismissed;
+  }).catch(() => { settings.textContent = "运行器状态读取失败"; settingsDetail.textContent = "请稍后刷新页面重试。"; });
+})();

@@ -1,0 +1,7 @@
+/* 语义色板：默认午夜；旧变量名保留供后续切片使用。 */
+:root, [data-theme="midnight"] {
+ color-scheme: dark; --bg:#070c18; --glow:#14203a; --window:#0c1425; --panel:#101a2d; --card:#111d32; --card-soft:#17243b; --line:#243651; --line-strong:#385070; --text:#edf3ff; --muted:#91a6c8; --muted-strong:#b4c6e1; --blue:#83a8ff; --blue-strong:#9cc6ff; --blue-soft:#1b3152; --green:#55d9b5; --amber:#efb555; --red:#ff8e91; --red-soft:#3d222d; --shadow:0 16px 38px #0007; --shadow-soft:0 8px 20px #0005; --header-bg:#0a1221; --header-soft-bg:#101a2d; --accent-bg:#526ff0; --accent-fg:#fff; --segment-active-bg:#405ac1; --segment-active-text:#fff; --input:#0b1527; --scroll-track:#0a1221; --scroll-thumb:#344968; --warning-bg:#302619; --success-bg:#0b302e; --radius:12px;
+}
+[data-theme="daylight"] {
+ color-scheme: light; --bg:#f1f5fc; --glow:#dce8ff; --window:#fff; --panel:#f9fbff; --card:#fff; --card-soft:#f1f5fc; --line:#d9e3f1; --line-strong:#bdcde0; --text:#182840; --muted:#697e9b; --muted-strong:#506682; --blue:#4169d7; --blue-strong:#3154b8; --blue-soft:#e8efff; --green:#087d65; --amber:#a46712; --red:#bd404c; --red-soft:#fff0f1; --shadow:0 16px 38px #35507818; --shadow-soft:0 8px 20px #35507812; --header-bg:#fff; --header-soft-bg:#f9fbff; --accent-bg:#4769dc; --accent-fg:#fff; --segment-active-bg:#4769dc; --segment-active-text:#fff; --input:#fff; --scroll-track:#f0f4fa; --scroll-thumb:#b8c8dc; --warning-bg:#fff6e4; --success-bg:#e5f8f1; --radius:12px;
+}

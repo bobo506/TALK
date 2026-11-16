@@ -56,7 +56,10 @@ def boot_status():
             {'name': '检查更新/下载', 'state': 'complete', 'text': '无需下载'},
             {'name': '就绪', 'state': 'complete' if ready else 'error'},
         ]
-    return {'service_ready': True, 'launcher': launcher, 'stages': stages, 'ready': ready}
+    detected = launcher.get('detected', []) if launcher else []
+    runners = {'detected': detected, 'none': not detected,
+               'source': 'launcher' if launcher and 'detected' in launcher else 'unknown'}
+    return {'service_ready': True, 'launcher': launcher, 'stages': stages, 'ready': ready, 'runners': runners}
 
 
 @router.get('/loading', include_in_schema=False)

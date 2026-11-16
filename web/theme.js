@@ -3,26 +3,26 @@
 (function () {
   "use strict";
   const STORAGE_KEY = "talk-theme-mode";
-  const MODES = ["auto", "light", "dark"];
+  const MODES = ["auto", "daylight", "midnight"];
   const DAY_START = 8;
   const NIGHT_START = 18;
 
   function storedMode() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      return MODES.includes(raw) ? raw : "auto";
+      return raw === "light" ? "daylight" : raw === "dark" ? "midnight" : MODES.includes(raw) ? raw : "midnight";
     } catch (_) {
-      return "auto";
+      return "midnight";
     }
   }
 
   function autoTheme(now) {
     const hour = (now || new Date()).getHours();
-    return hour >= DAY_START && hour < NIGHT_START ? "light" : "dark";
+    return hour >= DAY_START && hour < NIGHT_START ? "daylight" : "midnight";
   }
 
   function resolve(mode, now) {
-    const normalized = MODES.includes(mode) ? mode : "auto";
+    const normalized = MODES.includes(mode) ? mode : "midnight";
     return normalized === "auto" ? autoTheme(now) : normalized;
   }
 
