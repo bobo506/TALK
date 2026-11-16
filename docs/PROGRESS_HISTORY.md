@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-16 20:05 — 第 4 项完成：启动器自动检测运行器并幂等接入 MCP（Terra 开发、K2.8 复核）
+
+- 切片 A（Terra #809 → 返修 #811，K2.8 复核 #812 approved）：新增 `scripts/mcp_onboarding.py`（检测 Codex/Kimi/WorkBuddy/DSH；`--check/--apply/--repo/--home`；按成员 ID 规则发现 key，兼容 `-t` 与旧 `_t`，缺失返回 `key_missing`；四端 stdio 配置生成/合并；幂等、`.bak-<时间戳>` 备份、不回显 Key）与 `tests/test_mcp_onboarding.py`（20 项）。返修修掉真实 bug：原 key 文件名用下划线 `_t`，实际为连字符 `-t`。
+- 切片 B（Terra #813，K2.8 复核 #814 approved）：`mcp_onboarding` 增加**只读**成员检查（`members_ok`/`member_missing`/`--skip-members`，仅 GET `/api/members`，API 不可达记 `api_unavailable` 且继续生成配置）；`scripts/talk_desktop.py` 在 attach/start 前调用一次 onboarding（失败仅 stderr 警告、不改退出码、不阻塞开窗、幂等）。
+- 验收：`test_mcp_onboarding` 24 passed、`test_talk_desktop` 19 passed + 3 subtests；真实 `--check` exit 0 / 303ms，四个 `-t` 成员均在 `members_ok`，真实四端配置 md5/mtime/大小不变、无新增 `.bak`；`git status` 仅白名单文件。
+- 提交：`c033683`（切片 A）、`c73587f`（切片 B）。
+- 已知限制：本切片不创建成员（缺失只报 `member_missing`）；真实 HOME 的 `--apply` 未执行（验收用临时 HOME/repo），真实客户端加载与桌面窗口未实测；TOML/YAML 通用合并仅覆盖本机实际布局，不支持布局会 fail-safe 报错且不改原文件。
+
 ## 2026-11-16 17:30 — 第 3 项完成：HTTP MCP `/mcp` 端点（K2.8 开发、Terra 复核）
 
 - 交付：新增 `server/routes/mcp.py`（无状态 streamable HTTP JSON-RPC：initialize/tools/list/tools/call；`jsonrpc=="2.0"` 校验 -32600；无 id → 202；带 id 的 notifications 正常响应；`params` 非对象 → -32602；工具域失败 → 静态 `TOOL_FAILURE_TEXT` + 服务端 `logger.exception`）、`bridges/talk_tool_registry.py`（复用 stdio 的 `TOOL_SCHEMAS`/`dispatch_tool`）、`bridges/talk_call_context.py`（ContextVar 保存 base_url/api_key，HTTP 路径不写 `os.environ`）、`tests/test_mcp_http.py`（32 项）；修改 `server/main.py`（注册 router）、`bridges/talk_task_tools.py`/`bridges/initiator_followup.py`（contextvar 优先、env 兜底，stdio 行为不变）。
