@@ -7,6 +7,7 @@
 - 第 8 项（无运行器提示/已安装提示）并入本片完成：四类都没检测到 → 琥珀色“服务已启动但尚未接入 TALK，无法分配/接收任务”；检测到 → 青绿色“本机已安装 X，可接入使用”。
 - K2.8 复核 #822 **approved with limitations**：tokens 覆盖无缺失、默认 midnight/迁移/无闪烁、新旧页面逻辑保持、隔离实例 runners 过滤语义正确、回归 3+23+32 passed、node 检查通过；并用 Edge 无头在临时实例抓到 4 张真实截图（加载页明暗、主页两种提示条）。
 - 复核发现的 `web/app.js` 分隔符 `join("?")`（显示成 `Codex?KimiCode`）与 `style.css` 注释乱码由 Terra #823 修复；`node --check` 通过、`web/` 下无 `????`。
+- 用户看过真实截图后要求补步骤 chips 与完整轨道动画：Terra #824 完成（`f9d0ac2`）——6 个步骤 chips 三态（done/doing/pending）、三圈轨道+3 光点动画、呼吸徽标、`prefers-reduced-motion`、进度条按步骤推进、`?theme=` 支持、404/缺字段降级短流程；K2.8 #825 **approved** 并补两张真实截图（`docs/mockups/after/shot_loading_steps_{midnight,daylight}.png`），3+23 项测试通过、无残留进程。
 - 已知限制：真实生产页面需重启 API 后才能看到新代码（静态 CSS/JS 已可从磁盘加载，但 `/api/boot/status` 新字段需重启）；截图为临时空库实例，真实项目数据下的密度/布局需重启后目检。
 
 ## 2026-11-16 21:15 — 第 7 项完成：GUI 加载页 + boot 状态接口（Terra 开发、K2.8 复核）
