@@ -3449,3 +3449,26 @@ function apiFetch(path, opts = {}) {
     return response;
   });
 }
+
+// Local desktop service shutdown.
+document.getElementById("shutdown-service-btn").addEventListener("click", async () => {
+  if (!confirm("确定退出 TALK 服务？所有连接将断开。")) return;
+  try {
+    const response = await apiFetch("/api/local/shutdown", { method: "POST" });
+    if (response.status === 202) {
+      const overlay = document.createElement("div");
+      overlay.setAttribute("role", "alert");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.85);color:white;display:grid;place-items:center;font-size:1.5rem";
+      overlay.textContent = "服务正在停止… 可以关闭窗口。";
+      document.body.appendChild(overlay);
+    } else if (response.status === 403) {
+      alert("无权限退出服务，请使用本机操作员或运行 stop.bat。");
+    } else if (response.status === 409) {
+      alert("当前非桌面启动或无法停止服务，请运行 stop.bat。");
+    } else {
+      alert("退出服务失败，请运行 stop.bat。");
+    }
+  } catch (_) {
+    alert("退出服务时发生异常，请运行 stop.bat。");
+  }
+});

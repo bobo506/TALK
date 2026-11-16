@@ -122,7 +122,7 @@ class DesktopEntryTests(unittest.TestCase):
             self.assertEqual(desktop.run(self.home, {}), 0)
         service.assert_not_called()
 
-    def test_run_started_service_stops_after_window_close(self):
+    def test_run_started_service_remains_after_window_close(self):
         service = Mock()
         with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
              patch.object(desktop, 'healthy', return_value=False), \
@@ -132,7 +132,7 @@ class DesktopEntryTests(unittest.TestCase):
             self.assertEqual(desktop.run(self.home, {}), 0)
         service.start.assert_called_once_with()
         service.wait_healthy.assert_called_once()
-        service.stop.assert_called_once_with()
+        service.stop.assert_not_called()
 
     def test_run_default_browser_keeps_started_service(self):
         service = Mock()
@@ -153,6 +153,19 @@ class DesktopEntryTests(unittest.TestCase):
             with self.assertRaisesRegex(desktop.LauncherError, '已被占用'):
                 desktop.run(self.home, {})
         service.assert_not_called()
+
+    def test_run_stops_service_when_health_check_fails(self):
+        service = Mock()
+        service.wait_healthy.side_effect = desktop.LauncherError('health failed')
+        with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+             patch.object(desktop, 'healthy', return_value=False), \
+             patch.object(desktop, 'port_available', return_value=True), \
+             patch.object(desktop, 'ApiService', return_value=service), \
+             patch.object(desktop, 'launch_window') as window:
+            with self.assertRaises(desktop.LauncherError):
+                desktop.run(self.home, {})
+        service.stop.assert_called_once_with()
+        window.assert_not_called()
 
     def test_run_stops_service_when_window_fails(self):
         service = Mock()

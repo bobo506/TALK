@@ -143,7 +143,7 @@ class ApiService:
 
 
 def launch_window(url, env):
-    """优先 Chrome/Edge 应用窗口；返回是否由应用窗口承载（决定能否随窗停服务）。"""
+    """Launch a browser window and report whether it is an app window."""
     browser = find_browser(env)
     if browser is None:
         open_default_browser(url + DESKTOP_QUERY)
@@ -206,14 +206,12 @@ def run(home, env):
         service.start()
         owns_service = True
         service.wait_healthy(url)
-        app_window = launch_window(url, env)
+        launch_window(url, env)
     except BaseException:
         if owns_service:
             service.stop()
         raise
-    # 应用窗口关闭即退出；默认浏览器模式收不到窗口关闭事件，服务留给用户自行停止。
-    if owns_service and app_window:
-        service.stop()
+    print('服务仍在运行，可在页面点“退出服务”或运行 stop.bat。', flush=True)
     return 0
 
 

@@ -38,7 +38,7 @@ from server.db import (
 from server.logging_config import configure_logging
 from server.models import GroupMember, Member, Message, MessageCreate, MessageOut
 from server.routes import local_workspaces, discussions, files, groups, hall_types, instances, members, messages, mcp, projects, role_requests, role_services, role_deletions, runners, runtime_diagnostics, tasks
-from server.routes import workspace_diagnostics
+from server.routes import workspace_diagnostics, local_shutdown
 from server.ws_hub import hub
 
 configure_logging()
@@ -368,6 +368,7 @@ async def revalidate_html(request: Request, call_next):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
+app.include_router(local_shutdown.router)
 app.include_router(members.router)
 app.include_router(members.setup_router)
 app.include_router(groups.router)
