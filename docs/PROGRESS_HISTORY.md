@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-16 20:55 — 第 6 项完成：GUI 关窗不停服务 + 页面“退出服务”（Terra 开发、K2.8 复核）
+
+- 交付（`f6ee423`）：`scripts/talk_desktop.py` start 分支关窗后不再 `service.stop()`（异常/健康检查失败仍清理自己起的进程）；`scripts/talk_api.py` 启动时把控制文件绝对路径写入环境变量；新增 `server/routes/local_shutdown.py`（`POST /api/local/shutdown`，仅 trusted loopback 的 `human:operator`；agent Key/非 loopback → 403；无控制文件 env/写失败 → 409；重复调用 202 幂等；不泄露路径）；`web/index.html`/`web/app.js` 增加“退出服务”按钮（二次确认、202 遮罩、403/409 提示、`stop.bat` 兜底）。
+- K2.8 复核 #816 **approved（带非阻断限制）**：关窗不停服务、权限矩阵（含伪造 XFF/Host 不可绕过）、真实隔离停机（202 + 进程 1 秒内退出码 0，生产 8000 未触碰）、页面按钮静态检查、回归 31 passed + 9 subtests、范围干净；浏览器真实交互未实测列为限制。
+- 复核发现的乱码提示（`web/app.js` 异常分支 `???????`）由 Terra #817 修复（改为“退出服务时发生异常，请运行 stop.bat。”），`node --check` 与 20 项测试通过，`web/` 下已无 `????` 残留。
+- 已知限制：真实桌面窗口/浏览器点击未实测（页面按钮逻辑经代码与静态检查）；`talk_desktop.py` 的 `launch_window` 返回值成为死代码（非阻断，未处理）。
+
 ## 2026-11-16 20:05 — 第 4 项完成：启动器自动检测运行器并幂等接入 MCP（Terra 开发、K2.8 复核）
 
 - 切片 A（Terra #809 → 返修 #811，K2.8 复核 #812 approved）：新增 `scripts/mcp_onboarding.py`（检测 Codex/Kimi/WorkBuddy/DSH；`--check/--apply/--repo/--home`；按成员 ID 规则发现 key，兼容 `-t` 与旧 `_t`，缺失返回 `key_missing`；四端 stdio 配置生成/合并；幂等、`.bak-<时间戳>` 备份、不回显 Key）与 `tests/test_mcp_onboarding.py`（20 项）。返修修掉真实 bug：原 key 文件名用下划线 `_t`，实际为连字符 `-t`。
