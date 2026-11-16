@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-16 14:37 — Terra runner 完整性标签最小验证（#795）
+
+- 用户依次授权只读安全上下文核对、单 runner 标签验证及临时补充 WRITE_OWNER；协调身份为 `agent:codex-t`。未授权目录递归修复、沙箱关闭、账号重建或服务重启，本轮均未执行。
+- 实测 Terra 的 `codex-command-runner-0.164.0.exe` 继承 Low 完整性标签；角色目录、native-home、`.codex`、`.sandbox-bin` 同样带可继承 Low，仓库根也有 Low。现存 Terra Python 链为 Medium、非受限令牌，部分进程属于 Job；未读取 Job 具体限制、失败时 runner 令牌或管道安全描述符。管理员目录当前 runner 版本不同，不能作为同版本对照。
+- 首次直接修改标签被 Windows 拒绝（非自动审批拒绝），标签未改变。用户另行授权后，仅为该文件临时补充管理员 WRITE_OWNER，将标签 `S:AI(ML;ID;NW;;;LW)` 改成 `S:AI(ML;;NW;;;ME)`，立即精确恢复原 owner/group/DACL，文件 SHA256 不变。原安全描述符及结果保存在仓库外 `D:\agent-audit\terra-runner-label-20261116\before.json` 和 `authorized-label-change.json`；原失败事实保留。
+- #795 由 Terra 在原角色上下文执行一次 `cmd /c echo hi`；结果消息 3595 为合法 talk-delivery-1，报告 stdout=hi、exit=0、耗时 1.4669958 秒，无文件变更。协调者核对报告，不重复执行，也不将自报冒称独立复核。收取前 submitted 清单仅有 #795，现已正常收取 completed；本轮无 failed/canceled 任务。
+- 结论：单文件标签变更后最小 shell 调用恢复，强烈支持 runner Low 标签为本次故障原因；此前“ACL/沙箱已全部排除”不成立。保留当前 Medium 标签，不关闭沙箱、不改普通 ACL。尚未验证完整开发读写/测试、长期运行、独立复核及重建/升级持久性；上级目录 Low 仍存在，新 runner 可能再次继承。持久修复是后续待确认切片，不自动开工。
+- 无产品或用户操作流程变更，模块文档和用户手册无需改写；仅更新历史与当前进度，本地 Git 保存，不推送内部诊断材料。原 /mcp 交付和其他工作区改动保持，独立复核状态不变。
+
 ## 2026-11-15 00:50 — 仓库内 GUI 启动入口（弃用命令行登录）
 
 - **需求**：用户要求在 TALK 项目下建桌面启动入口，以后登录/优化 TALK 都用这个入口，弃用命令行登录。
