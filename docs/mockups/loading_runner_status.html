@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>TALK 加载页 · 运行器状态效果图</title>
+<style>
+  :root{
+    --bg:#070b16; --panel:#0e1628; --line:#1f2c47;
+    --txt:#e8eefc; --muted:#8fa3c8; --brand:#5b8cff; --brand2:#7c5cff;
+    --ok:#2ee6a8; --warn:#ffb648; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(91,140,255,.18), transparent 60%),
+      radial-gradient(900px 500px at 90% 110%, rgba(124,92,255,.14), transparent 60%),
+      var(--bg);
+    color:var(--txt);font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:38px 28px 26px;min-height:100%;
+  }
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo{
+    width:46px;height:46px;border-radius:14px;position:relative;
+    background:conic-gradient(from 210deg, var(--brand), var(--brand2), #38d9ff, var(--brand));
+    box-shadow:0 0 28px rgba(91,140,255,.55), inset 0 0 0 1px rgba(255,255,255,.18);
+    animation:spin 9s linear infinite;
+  }
+  .logo::after{
+    content:"T";position:absolute;inset:3px;border-radius:11px;background:#0a1020;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;
+    background:linear-gradient(180deg,#0c1426,#0a1020);color:#dfe9ff;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .title{font-size:26px;font-weight:800;letter-spacing:.5px}
+  .title span{background:linear-gradient(90deg,#9db8ff,#7c5cff 60%,#38d9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{color:var(--muted);font-size:13px;margin-top:2px}
+  .orbit{position:relative;width:210px;height:210px;margin:26px 0 8px}
+  .ring{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(91,140,255,.25)}
+  .ring.r2{inset:24px;border-color:rgba(124,92,255,.22)}
+  .ring.r3{inset:48px;border-color:rgba(56,217,255,.18)}
+  .dot{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--brand);box-shadow:0 0 16px var(--brand);top:-5px;left:50%;transform:translateX(-50%)}
+  .orbit .dot{animation:orb 5s linear infinite}
+  .orbit .d2{background:var(--brand2);box-shadow:0 0 16px var(--brand2);animation-duration:7.5s;animation-direction:reverse}
+  .orbit .d3{background:#38d9ff;box-shadow:0 0 16px #38d9ff;animation-duration:9s}
+  @keyframes orb{from{transform:rotate(0) translateY(0)}to{transform:rotate(360deg) translateY(0)}}
+  .orbit{animation:spinSlow 26s linear infinite}
+  @keyframes spinSlow{to{transform:rotate(360deg)}}
+  .core{position:absolute;inset:66px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #1b2a4d, #0b1224);
+    border:1px solid rgba(91,140,255,.35);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 40px rgba(91,140,255,.25), inset 0 0 30px rgba(56,217,255,.10);animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 34px rgba(91,140,255,.22), inset 0 0 26px rgba(56,217,255,.08)}50%{box-shadow:0 0 54px rgba(91,140,255,.42), inset 0 0 34px rgba(56,217,255,.16)}}
+  .core b{font-size:15px;letter-spacing:1px;color:#cfe0ff}
+  .stagebox{width:min(980px,94vw)}
+  .status{display:flex;justify-content:space-between;align-items:center;margin:10px 2px 8px}
+  .status .now{font-size:14px;color:#c9d8f6}
+  .status .pct{font-size:13px;color:var(--muted)}
+  .bar{height:10px;border-radius:99px;background:#111b31;border:1px solid var(--line);overflow:hidden}
+  .bar > i{display:block;height:100%;width:62%;border-radius:99px;
+    background:linear-gradient(90deg,#38d9ff,#5b8cff 45%,#7c5cff);box-shadow:0 0 18px rgba(91,140,255,.65);
+    animation:flow 2.6s ease-in-out infinite}
+  @keyframes flow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
+  .steps{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;justify-content:center}
+  .step{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:5px 11px;background:rgba(15,24,42,.6)}
+  .step.done{color:#bff7e3;border-color:rgba(46,230,168,.45);background:rgba(46,230,168,.08)}
+  .step.doing{color:#cfe0ff;border-color:rgba(91,140,255,.6);background:rgba(91,140,255,.12)}
+  .cards{width:min(980px,94vw);display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
+  .card{border-radius:16px;padding:16px 18px;background:linear-gradient(180deg,rgba(18,28,48,.92),rgba(12,19,34,.92));
+    border:1px solid var(--line);box-shadow:0 18px 40px rgba(0,0,0,.35)}
+  .card h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .pill{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid transparent}
+  .card p{margin:6px 0;font-size:13px;line-height:1.65;color:#c6d4ee}
+  .card .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
+  .warn{border-color:rgba(255,182,72,.45)}
+  .warn h3{color:#ffd08a}
+  .warn .pill{background:rgba(255,182,72,.12);border-color:rgba(255,182,72,.4);color:#ffd08a}
+  .okbox{border-color:rgba(46,230,168,.4)}
+  .okbox h3{color:#a9f5d8}
+  .okbox .pill{background:rgba(46,230,168,.1);border-color:rgba(46,230,168,.38);color:#a9f5d8}
+  .label{font-size:11px;color:#6f84ab;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .chip{font-size:12px;border:1px solid var(--line);border-radius:9px;padding:4px 9px;color:#aebfe0;background:rgba(13,21,37,.7)}
+  .chip.miss{opacity:.55;text-decoration:line-through;text-decoration-color:rgba(255,255,255,.25)}
+  .footer{color:#5e7194;font-size:11px;margin-top:22px}
+  .note{width:min(980px,94vw);margin-top:14px;font-size:12px;color:#7286ab;text-align:center}
+</style>
+</head>
+<body>
+  <div class="brand">
+    <div class="logo"></div>
+    <div>
+      <div class="title">TALK <span>正在启动</span></div>
+      <div class="tag">让 Agent 与人类坐在同一张桌上协作</div>
+    </div>
+  </div>
+
+  <div class="orbit">
+    <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div>
+    <div class="dot"></div><div class="dot d2"></div><div class="dot d3"></div>
+    <div class="core"><b>INITIALIZING</b></div>
+  </div>
+
+  <div class="stagebox">
+    <div class="status"><div class="now">正在检测本机运行器…</div><div class="pct">62%</div></div>
+    <div class="bar"><i></i></div>
+    <div class="steps">
+      <span class="step done">启动服务 ✓</span>
+      <span class="step doing">检测运行器</span>
+      <span class="step">接入 MCP</span>
+      <span class="step">自动角色</span>
+      <span class="step">检查更新</span>
+      <span class="step">就绪</span>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card warn">
+      <div class="label">状态 A · 四类运行器均未检测到</div>
+      <h3>未检测到可用的运行器 <span class="pill">服务已启动 · 未接入</span></h3>
+      <p>TALK 服务已正常启动，但本机没有可用于分配或执行任务的运行器，<b>当前无法分配任务，也无法接收任务</b>，相当于尚未接入 TALK。</p>
+      <p class="hint">请安装以下任意一类后重新启动，TALK 会自动完成 MCP 接入：</p>
+      <div class="chips">
+        <span class="chip miss">Codex</span><span class="chip miss">KimiCode</span>
+        <span class="chip miss">WorkBuddy</span><span class="chip miss">DSH</span>
+      </div>
+    </div>
+
+    <div class="card okbox">
+      <div class="label">状态 B · 已检测到其中一类（示例：DSH）</div>
+      <h3>本机已安装 DSH，可接入使用 <span class="pill">已自动接入</span></h3>
+      <p>已检测到 <b>DSH</b>，MCP 配置已写入/已存在，当前可以正常分配与接收任务。</p>
+      <p class="hint">其余未检测到的运行器不会阻塞启动；后续安装任意一类后，下次启动会自动补上接入。</p>
+      <div class="chips">
+        <span class="chip miss">Codex</span><span class="chip miss">KimiCode</span>
+        <span class="chip miss">WorkBuddy</span><span class="chip">DSH ✓</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">效果图：同一加载页在两种检测结果下的提示样式（实际页面只显示其中一种状态）</div>
+  <div class="footer">TALK · 本地服务运行中 · 127.0.0.1</div>
+</body>
+</html>

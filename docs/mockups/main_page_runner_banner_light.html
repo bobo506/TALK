@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>TALK 主页面 · 亮色提示条效果图</title>
+<style>
+  :root{--bg:#eef3fd;--panel:#ffffff;--line:#d8e2f3;--txt:#1b2740;--muted:#5b6d8f;--brand:#3b6ef0;--brand2:#6a4cf0;--ok:#0a8a63;--warn:#a86400}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1100px 560px at 20% -10%, rgba(112,150,255,.22), transparent 60%),var(--bg);color:var(--txt);
+       font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;min-height:100vh}
+  .top{display:flex;align-items:center;gap:14px;padding:14px 26px;border-bottom:1px solid var(--line);background:#fff}
+  .logo{width:34px;height:34px;border-radius:11px;background:conic-gradient(from 210deg,var(--brand),var(--brand2),#2bb8e6,var(--brand));position:relative;box-shadow:0 6px 16px rgba(59,110,240,.25)}
+  .logo::after{content:"T";position:absolute;inset:2px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#3b6ef0}
+  .brand{font-weight:800;font-size:17px}.brand span{background:linear-gradient(90deg,#3b6ef0,#6a4cf0);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav{display:flex;gap:18px;margin-left:26px;color:var(--muted);font-size:13px}.nav b{color:#1b2740;font-weight:600}
+  .spacer{flex:1}.who{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+  .avatar{width:26px;height:26px;border-radius:50%;background:#e3ebfb;border:1px solid var(--line)}
+  .banner{display:flex;align-items:flex-start;gap:12px;margin:18px 26px 0;padding:14px 16px;border-radius:14px;border:1px solid var(--line);font-size:13px;line-height:1.6;background:#fff}
+  .banner .ico{width:26px;height:26px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
+  .warn{background:linear-gradient(180deg,#fffaf1,#fff);border-color:rgba(168,100,0,.32)}
+  .warn .ico{background:rgba(168,100,0,.1);color:#a86400;border:1px solid rgba(168,100,0,.32)}
+  .warn b{color:#a86400}
+  .okb{background:linear-gradient(180deg,#f4fdf9,#fff);border-color:rgba(10,138,99,.3)}
+  .okb .ico{background:rgba(10,138,99,.09);color:#0a8a63;border:1px solid rgba(10,138,99,.3)}
+  .okb b{color:#0a8a63}
+  .banner .body{flex:1}.banner .sub{color:var(--muted);font-size:12px;margin-top:3px}
+  .x{color:#94a5c1;font-size:16px;line-height:1;margin-left:6px}
+  .content{padding:22px 26px;display:grid;grid-template-columns:260px 1fr;gap:18px}
+  .side{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;height:260px;box-shadow:0 10px 24px rgba(31,49,90,.06)}
+  .side h4{margin:0 0 10px;font-size:13px;color:#2c3d5e}
+  .row{height:10px;border-radius:6px;background:#e6edf9;margin:10px 0}.row.s{width:70%}
+  .main{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;min-height:260px;box-shadow:0 10px 24px rgba(31,49,90,.06)}
+  .main h4{margin:0 0 12px;font-size:14px}
+  .ph{height:14px;border-radius:7px;background:#e6edf9;margin:10px 0}.ph.s{width:55%}
+  .label{font-size:10px;letter-spacing:.14em;color:#8496b5;margin:18px 26px 0;text-transform:uppercase}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo"></div><div class="brand">TALK <span>工作区</span></div>
+    <div class="nav"><b>任务</b><span>角色</span><span>项目设置</span></div>
+    <div class="spacer"></div><div class="who"><div class="avatar"></div>operator</div>
+  </div>
+
+  <div class="label">状态 A · 四类运行器均未检测到（顶部琥珀色提示条，可关闭）</div>
+  <div class="banner warn">
+    <div class="ico">!</div>
+    <div class="body">
+      <div><b>未检测到可用的运行器</b>：TALK 服务已启动，但尚未接入任何运行器，<b>当前无法分配或接收任务</b>。</div>
+      <div class="sub">请安装 Codex / KimiCode / WorkBuddy / DSH 任意一类后重新启动，TALK 会自动完成接入；已安装的不会重复创建配置。</div>
+    </div>
+    <div class="x">×</div>
+  </div>
+
+  <div class="label">状态 B · 已检测到其中一类（示例：DSH，顶部青绿色提示条，可关闭）</div>
+  <div class="banner okb">
+    <div class="ico">✓</div>
+    <div class="body">
+      <div><b>本机已安装 DSH，可接入使用</b>：MCP 配置已自动写入/已存在，现在可以正常分配与接收任务。</div>
+      <div class="sub">其余运行器未安装不影响使用；后续安装任意一类后，下次启动会自动补上接入。</div>
+    </div>
+    <div class="x">×</div>
+  </div>
+
+  <div class="content">
+    <div class="side"><h4>任务</h4><div class="row"></div><div class="row s"></div><div class="row"></div><div class="row s"></div></div>
+    <div class="main"><h4>任务详情</h4><div class="ph"></div><div class="ph s"></div><div class="ph"></div><div class="ph s"></div><div class="ph"></div></div>
+  </div>
+</body>
+</html>

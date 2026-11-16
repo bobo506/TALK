@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-16 22:20 — 界面统一换肤 · 切片 1 完成（Terra 开发、K2.8 复核）
+
+- 用户确认方向：统一为效果图风格，明暗两套 tokens，默认 midnight（深色），保留切换；提示条关闭后在项目设置保留“运行器接入状态”入口。效果图与真实截图见 `docs/mockups/`（含 `after/` 四张）。
+- 交付（`2517fd4`）：新增 `web/theme-tokens.css`（midnight/daylight 两套 tokens，覆盖背景/面板/描边/文字/主色/成功/警告/圆角/阴影/输入/滚动条）；`web/style.css` 外壳统一走 `var()`；`web/loading.html` 改 tokens 并注入运行器提示块；`web/theme.js` 默认 midnight、旧 light/dark 迁移、首屏预置 `data-theme`；`web/index.html`/`web/app.js` 主页面提示条（两种状态、sessionStorage 关闭）、项目设置“运行器接入状态”只读区；`server/routes/boot_status.py` 增加 `runners {detected,none,source}`；`tests/test_boot_status.py` 覆盖。
+- 第 8 项（无运行器提示/已安装提示）并入本片完成：四类都没检测到 → 琥珀色“服务已启动但尚未接入 TALK，无法分配/接收任务”；检测到 → 青绿色“本机已安装 X，可接入使用”。
+- K2.8 复核 #822 **approved with limitations**：tokens 覆盖无缺失、默认 midnight/迁移/无闪烁、新旧页面逻辑保持、隔离实例 runners 过滤语义正确、回归 3+23+32 passed、node 检查通过；并用 Edge 无头在临时实例抓到 4 张真实截图（加载页明暗、主页两种提示条）。
+- 复核发现的 `web/app.js` 分隔符 `join("?")`（显示成 `Codex?KimiCode`）与 `style.css` 注释乱码由 Terra #823 修复；`node --check` 通过、`web/` 下无 `????`。
+- 已知限制：真实生产页面需重启 API 后才能看到新代码（静态 CSS/JS 已可从磁盘加载，但 `/api/boot/status` 新字段需重启）；截图为临时空库实例，真实项目数据下的密度/布局需重启后目检。
+
 ## 2026-11-16 21:15 — 第 7 项完成：GUI 加载页 + boot 状态接口（Terra 开发、K2.8 复核）
 
 - 交付（`9928882`）：新增 `web/loading.html`（深色主题动画/文案、底部进度条、步骤文字、失败重试；无外部依赖；每次启动展示且最短约 600ms；“检查更新/下载”在无真实下载时显示“无需下载”，不伪造百分比）；新增 `server/routes/boot_status.py`（`GET /api/boot/status` 只读，返回 `service_ready/launcher/stages/ready`，字段白名单过滤，无 Key/路径；文件缺失/损坏降级不 500）；`server/main.py` 在 StaticFiles mount 前注册 `/loading` 与路由；`scripts/talk_desktop.py` 在 onboarding 后、开窗前写 `logs/launcher/boot-status.json`（覆盖幂等，失败 `ready:false` 仍开窗），窗口 URL 改为 `/loading?desktop=1`。
