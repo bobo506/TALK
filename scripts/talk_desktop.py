@@ -18,6 +18,7 @@ SOURCE_ROOT = Path(__file__).resolve().parent.parent
 if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 
+from scripts import mcp_onboarding
 from scripts.talk_launcher import (  # noqa: E402  (依赖上面的 sys.path 插入)
     LauncherError,
     SingleInstance,
@@ -188,6 +189,14 @@ def run(home, env):
     action = plan_action(healthy(url), port_available(host, port))
     if action == 'blocked':
         raise LauncherError(f'端口 {port} 已被占用，但 TALK 健康检查失败；请检查占用进程后再试。')
+    try:
+        result = mcp_onboarding.run(Path(home), Path(env.get('USERPROFILE') or Path.home()), True)
+        if (result['errors'] or result['member_status'] == 'api_unavailable') and sys.stderr is not None:
+            print('Warning: MCP onboarding reported an error or member API unavailable.', file=sys.stderr)
+    except Exception:
+        # Do not include exception text, which may contain configuration secrets.
+        if sys.stderr is not None:
+            print('Warning: MCP onboarding failed.', file=sys.stderr)
     if action == 'attach':
         launch_window(url, env)
         return 0

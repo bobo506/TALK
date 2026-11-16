@@ -14,6 +14,9 @@ class DesktopEntryTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix='talk-desktop-')
         self.addCleanup(self.tmp.cleanup)
         self.home = Path(self.tmp.name)
+        self.real_onboarding = desktop.mcp_onboarding.run
+        self.onboarding = patch.object(desktop.mcp_onboarding, 'run', return_value={'errors': [], 'member_status': 'checked'}).start()
+        self.addCleanup(patch.stopall)
 
     def write_config(self, text):
         (self.home / 'config.toml').write_text(text, encoding='utf-8')
@@ -161,6 +164,41 @@ class DesktopEntryTests(unittest.TestCase):
             with self.assertRaisesRegex(desktop.LauncherError, '浏览器失败'):
                 desktop.run(self.home, {})
         service.stop.assert_called_once_with()
+
+    def test_onboarding_called_once_and_failure_does_not_block(self):
+        with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+             patch.object(desktop, 'healthy', return_value=True), \
+             patch.object(desktop, 'port_available', return_value=True), \
+             patch.object(desktop, 'launch_window') as window:
+            self.assertEqual(desktop.run(self.home, {'USERPROFILE': str(self.home)}), 0)
+            self.onboarding.assert_called_once_with(self.home, self.home, True)
+            self.onboarding.reset_mock()
+            self.onboarding.side_effect = RuntimeError('secret-key')
+            with patch.object(desktop.sys, 'stderr') as stderr:
+                self.assertEqual(desktop.run(self.home, {'USERPROFILE': str(self.home)}), 0)
+                self.assertNotIn('secret-key', str(stderr.write.call_args_list))
+            self.assertEqual(window.call_count, 2)
+
+    def test_onboarding_repeat_is_idempotent(self):
+        # Exercise the real onboarding through the desktop entry on isolated paths.
+        real_run = self.real_onboarding
+        config = self.home / '.codex' / 'config.toml'
+        config.parent.mkdir()
+        config.write_text('', encoding='utf-8')
+        key = self.home / '.talk' / 'keys' / 'agent_codex_t.key'
+        key.parent.mkdir(parents=True)
+        key.write_text('test-key', encoding='utf-8')
+        self.onboarding.side_effect = lambda repo, home, apply: real_run(repo, home, apply, skip_members=True)
+        with patch.object(desktop.mcp_onboarding.shutil, 'which', return_value=None), \
+             patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+             patch.object(desktop, 'healthy', return_value=True), \
+             patch.object(desktop, 'port_available', return_value=True), \
+             patch.object(desktop, 'launch_window'):
+            self.assertEqual(desktop.run(self.home, {'USERPROFILE': str(self.home)}), 0)
+            original, timestamp = config.read_bytes(), config.stat().st_mtime_ns
+            self.assertEqual(desktop.run(self.home, {'USERPROFILE': str(self.home)}), 0)
+        self.assertEqual((config.read_bytes(), config.stat().st_mtime_ns), (original, timestamp))
+        self.assertEqual(self.onboarding.call_count, 2)
 
     def test_main_already_running_is_quiet(self):
         with patch.object(desktop, 'SingleInstance',

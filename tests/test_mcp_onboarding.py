@@ -1,4 +1,5 @@
 ﻿import json
+import io
 import os
 from pathlib import Path
 import subprocess
@@ -14,6 +15,7 @@ from scripts import mcp_onboarding as m
 @pytest.fixture
 def setup_env(tmp_path, monkeypatch):
     monkeypatch.setattr(m.shutil, 'which', lambda _: None)
+    monkeypatch.setattr(m, 'urlopen', lambda *a, **kw: io.BytesIO(b'[]'))
     repo, home = tmp_path / 'repo', tmp_path / 'home'
     for path in (repo / 'bridges/talk_terminal_mcp.py', repo / 'scripts/kimi_talk_mcp_launch.py', home / '.kimi-code/bin/kimi.exe', home / 'AppData/Local/Programs/WorkBuddy/WorkBuddy.exe'):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -161,4 +163,42 @@ def test_missing_dsh_key_reported(setup_env):
     (home / '.talk/keys/agent_dsh_t.key').unlink()
     result = m.run(repo, home, False)
     assert result['errors'] == [{'client': 'dsh', 'reason': 'key_missing'}]
+    assert 'secret-' not in json.dumps(result)
+
+
+def test_members_present_and_missing_continue(setup_env, monkeypatch):
+    repo, home = setup_env
+    calls = []
+    def response(url, timeout):
+        calls.append((url, timeout))
+        return io.BytesIO(json.dumps([{'id': member} for member in m.MEMBER_IDS]).encode())
+    monkeypatch.setattr(m, 'urlopen', response)
+    result = m.run(repo, home, False)
+    assert result['members_ok'] == list(m.MEMBER_IDS) and result['member_missing'] == []
+    assert calls == [('http://127.0.0.1:8000/api/members', 3)]
+    monkeypatch.setattr(m, 'urlopen', lambda *a, **kw: io.BytesIO(b'[{"id":"agent:codex-t"}]'))
+    result = m.run(repo, home, True)
+    assert result['members_ok'] == ['agent:codex-t']
+    assert result['member_missing'] == list(m.MEMBER_IDS[1:])
+    assert len(result['configs_written']) == 4
+
+
+def test_skip_members_does_not_request(setup_env, monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError('unexpected network request')
+    monkeypatch.setattr(m, 'urlopen', fail)
+    result = m.run(*setup_env, True, skip_members=True)
+    assert result['member_status'] == 'skipped' and len(result['configs_written']) == 4
+    monkeypatch.setattr(sys, 'argv', ['mcp_onboarding', '--check', '--skip-members', '--repo', str(setup_env[0]), '--home', str(setup_env[1])])
+    assert m.main() == 0
+
+
+@pytest.mark.parametrize('error', [TimeoutError('secret-network-key'), OSError('secret-network-key')])
+def test_unavailable_safe_and_continues(setup_env, monkeypatch, error):
+    def fail(*args, **kwargs):
+        raise error
+    monkeypatch.setattr(m, 'urlopen', fail)
+    result = m.run(*setup_env, True)
+    assert result['member_status'] == 'api_unavailable'
+    assert not result['member_missing'] and len(result['configs_written']) == 4
     assert 'secret-' not in json.dumps(result)

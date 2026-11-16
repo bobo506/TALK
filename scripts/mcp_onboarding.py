@@ -9,6 +9,7 @@ import re
 import shutil
 import sys
 import tomllib
+from urllib.request import urlopen
 
 
 def detect(home: Path) -> dict:
@@ -146,7 +147,24 @@ def write_changed(path: Path, content: str) -> None:
     path.write_text(content, encoding='utf-8', newline='')
 
 
-def run(repo: Path, home: Path, apply: bool) -> dict:
+MEMBER_IDS = tuple(f'agent:{name}-t' for name in ('codex', 'kimi', 'workbuddy', 'dsh'))
+
+
+def check_members() -> dict:
+    try:
+        with urlopen('http://127.0.0.1:8000/api/members', timeout=3) as response:
+            members = json.load(response)
+        if not isinstance(members, list) or any(not isinstance(item, dict) or not isinstance(item.get('id'), str) for item in members):
+            raise ValueError('invalid member response')
+        ids = {item['id'] for item in members}
+    except Exception:
+        # Responses and exception text can contain secrets; report only a fixed status.
+        return {'member_status': 'api_unavailable', 'members_ok': [], 'member_missing': []}
+    return {'member_status': 'checked', 'members_ok': [i for i in MEMBER_IDS if i in ids],
+            'member_missing': [i for i in MEMBER_IDS if i not in ids]}
+
+
+def run(repo: Path, home: Path, apply: bool, skip_members: bool = False) -> dict:
     repo, home = repo.expanduser().resolve(), home.expanduser().resolve()
     detected = detect(home)
     venv = repo / '.venv/Scripts/python.exe'
@@ -159,6 +177,7 @@ def run(repo: Path, home: Path, apply: bool) -> dict:
         'dsh': home / '.dsh/profiles/desktop/cordis.patch.yml',
     }
     output = {'detected': detected, 'configs_written': [], 'skipped': [], 'errors': []}
+    output.update({'member_status': 'skipped', 'members_ok': [], 'member_missing': []} if skip_members else check_members())
     if not apply:
         output['planned'] = []
     for name, path in targets.items():
@@ -201,9 +220,10 @@ def main() -> int:
     group.add_argument('--check', action='store_true')
     group.add_argument('--apply', action='store_true')
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--skip-members', action='store_true')
     parser.add_argument('--home', type=Path, default=Path(os.environ.get('USERPROFILE') or Path.home()))
     args = parser.parse_args()
-    result = run(args.repo, args.home, args.apply)
+    result = run(args.repo, args.home, args.apply, args.skip_members)
     print(json.dumps(result, ensure_ascii=False))
     return 1 if result['errors'] else 0
 
