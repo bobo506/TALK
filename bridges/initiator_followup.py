@@ -11,6 +11,7 @@ import threading
 import time
 from uuid import uuid4
 
+from bridges import talk_call_context
 from bridges.mcp_wait_context import CURRENT_WAIT, WaitContext, WaitBudgetExpired, check_cancelled, wait_sleep, WaitCancelled
 
 
@@ -66,7 +67,9 @@ class Budget:
         keys = {'client_timeout_seconds':'TALK_FOLLOWUP_CLIENT_TIMEOUT_SECONDS',
                 'wait_seconds':'TALK_FOLLOWUP_WAIT_SECONDS', 'total_seconds':'TALK_FOLLOWUP_TOTAL_SECONDS',
                 'return_margin_seconds':'TALK_FOLLOWUP_RETURN_MARGIN_SECONDS'}
-        values = {name:os.environ[key] for name,key in keys.items() if os.environ.get(key)}
+        # stdio 入口继续从 os.environ 读取；HTTP /mcp 路径若有 per-request
+        # contextvar 覆盖则优先取覆盖值，未覆盖的键逐字回退 os.environ。
+        values = {name:talk_call_context.env(key) for name,key in keys.items() if talk_call_context.env(key)}
         return cls.parse(values) if values else None
 
     def public(self):
@@ -289,7 +292,7 @@ class Followups:
         budget=Budget.environment()
         explicit_flow=None
         if budget is None:
-            project=arguments.get('project_id') or os.environ.get('TALK_PROJECT_ID')
+            project=arguments.get('project_id') or talk_call_context.env('TALK_PROJECT_ID')
             with self.lock:
                 explicit_flow=next((f for f in self.flows.values()
                     if f.project==project and f.state!='stopped'),None)
@@ -348,7 +351,7 @@ class Followups:
     def _call(self, arguments):
         action=arguments.get('action','next')
         if action=='start':
-            return self.start(arguments.get('project_id') or os.environ.get('TALK_PROJECT_ID'),arguments.get('task_ids'),arguments.get('budget'))
+            return self.start(arguments.get('project_id') or talk_call_context.env('TALK_PROJECT_ID'),arguments.get('task_ids'),arguments.get('budget'))
         flow=self.get(arguments.get('followup_id'))
         if action=='stop':
             self.stop(flow,'creator_stopped');return self.view(flow)
@@ -377,7 +380,7 @@ class Followups:
     def prepare_delegate(self, arguments, *, budget=None, explicit_flow=None):
         budget=budget or Budget.environment()
         if budget is None:return None
-        project=arguments.get('project_id') or os.environ.get('TALK_PROJECT_ID')
+        project=arguments.get('project_id') or talk_call_context.env('TALK_PROJECT_ID')
         owner,mode,version=self.identity_mode(project)
         if explicit_flow is not None and owner!=explicit_flow.owner:
             self.stop(explicit_flow,'identity_changed')

@@ -37,7 +37,7 @@ from server.db import (
 )
 from server.logging_config import configure_logging
 from server.models import GroupMember, Member, Message, MessageCreate, MessageOut
-from server.routes import local_workspaces, discussions, files, groups, hall_types, instances, members, messages, projects, role_requests, role_services, role_deletions, runners, runtime_diagnostics, tasks
+from server.routes import local_workspaces, discussions, files, groups, hall_types, instances, members, messages, mcp, projects, role_requests, role_services, role_deletions, runners, runtime_diagnostics, tasks
 from server.routes import workspace_diagnostics
 from server.ws_hub import hub
 
@@ -385,6 +385,7 @@ app.include_router(tasks.router)
 app.include_router(messages.router)
 app.include_router(files.router)
 app.include_router(runtime_diagnostics.router)
+app.include_router(mcp.router)
 
 
 @app.get("/healthz")

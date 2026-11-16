@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+from bridges import talk_call_context
 from bridges import talk_delivery
 from bridges import mcp_wait_context
 from bridges.talk_delivery import (
@@ -256,8 +257,13 @@ class _IdentityShapeError(TalkToolError):
 
 
 def _config() -> tuple[str, str]:
-    base_url = os.environ.get("TALK_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-    api_key = os.environ.get("TALK_API_KEY", "").strip()
+    # HTTP /mcp 路径下这些变量来自 per-request contextvar（不写进程 env，
+    # 保证并发请求互不串扰）；stdio 入口没有 contextvar 时逐字回退 os.environ。
+    # 与原 os.environ.get 语义一致：只有“未设置”才回退默认地址，显式空串保持空串
+    # （contextvar 里 str 覆盖值原样生效，None 表示清除/未设置，二者可区分）。
+    raw_base_url = talk_call_context.env("TALK_BASE_URL")
+    base_url = ("http://127.0.0.1:8000" if raw_base_url is None else raw_base_url).rstrip("/")
+    api_key = (talk_call_context.env("TALK_API_KEY") or "").strip()
     if not api_key:
         raise TalkToolError("TALK_API_KEY 未设置")
     return base_url, api_key
@@ -335,14 +341,14 @@ def _api_request(
 
 
 def _project_id(value: Any = None, *, required: bool = False) -> str | None:
-    project_id = str(value or os.environ.get("TALK_PROJECT_ID") or "").strip() or None
+    project_id = str(value or talk_call_context.env("TALK_PROJECT_ID") or "").strip() or None
     if required and project_id is None:
         raise TalkToolError("缺少 project_id，且当前 bridge 未设置 TALK_PROJECT_ID")
     return project_id
 
 
 def _member_id() -> str:
-    member_id = os.environ.get("TALK_MEMBER_ID", "").strip()
+    member_id = (talk_call_context.env("TALK_MEMBER_ID") or "").strip()
     if member_id:
         return member_id
     current = _api_request("GET", "/api/members/me")
