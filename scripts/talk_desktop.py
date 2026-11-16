@@ -6,12 +6,14 @@ API 子进程，窗口关闭后只停止这个子进程，不碰其他人启动�
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import socket
 import subprocess
 import sys
 import time
 import tomllib
+from datetime import datetime, timezone
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
@@ -29,7 +31,7 @@ from scripts.talk_launcher import (  # noqa: E402  (依赖上面的 sys.path 插
     run_browser,
 )
 
-DESKTOP_QUERY = '/?desktop=1'
+DESKTOP_QUERY = '/loading?desktop=1'
 START_TIMEOUT_SEC = 45
 STOP_TIMEOUT_SEC = 20
 
@@ -183,20 +185,55 @@ def install_shortcut(home, env=None):
     return result.stdout.strip()
 
 
+def write_boot_status(home, result=None):
+    """Write a non-sensitive onboarding summary."""
+    result = result or {}
+    clients = ('codex', 'kimi', 'workbuddy', 'dsh')
+    members = {f'agent:{name}-t' for name in clients}
+    detected = result.get('detected', {})
+    def client_names(items):
+        return [item['client'] for item in items if isinstance(item, dict) and item.get('client') in clients]
+    failed = bool(result.get('errors')) or result.get('member_status') == 'api_unavailable' or result.get('_failed', False)
+    data = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'detected': [name for name in clients if isinstance(detected.get(name), dict) and detected[name].get('detected') is True],
+        'members_ok': [name for name in result.get('members_ok', []) if name in members],
+        'member_missing': [name for name in result.get('member_missing', []) if name in members],
+        'configs_written': client_names(result.get('configs_written', [])),
+        'skipped': client_names(result.get('skipped', [])),
+        'download': {'needed': False, 'text': '无需下载'},
+        'ready': not failed,
+    }
+    if failed:
+        data['error'] = 'MCP 配置失败，请查看日志'
+    path = Path(home) / 'logs' / 'launcher' / 'boot-status.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix('.json.tmp')
+    temporary.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+    os.replace(temporary, path)
+
+
 def run(home, env):
     host, port = read_server(home)
     url = local_url(host, port)
     action = plan_action(healthy(url), port_available(host, port))
     if action == 'blocked':
         raise LauncherError(f'端口 {port} 已被占用，但 TALK 健康检查失败；请检查占用进程后再试。')
+    result = {'_failed': True}
     try:
         result = mcp_onboarding.run(Path(home), Path(env.get('USERPROFILE') or Path.home()), True)
         if (result['errors'] or result['member_status'] == 'api_unavailable') and sys.stderr is not None:
             print('Warning: MCP onboarding reported an error or member API unavailable.', file=sys.stderr)
     except Exception:
+        result = {'_failed': True}
         # Do not include exception text, which may contain configuration secrets.
         if sys.stderr is not None:
             print('Warning: MCP onboarding failed.', file=sys.stderr)
+    try:
+        write_boot_status(home, result)
+    except Exception:
+        if sys.stderr is not None:
+            print('Warning: could not write boot status.', file=sys.stderr)
     if action == 'attach':
         launch_window(url, env)
         return 0

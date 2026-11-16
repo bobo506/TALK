@@ -236,3 +236,34 @@ class DesktopEntryTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class BootStatusDesktopTests(unittest.TestCase):
+    def test_window_uses_loading_page(self):
+        with patch.object(desktop, 'find_browser', return_value=None), patch.object(desktop, 'open_default_browser') as browser, patch.object(desktop, 'notify'):
+            desktop.launch_window('http://127.0.0.1:8123', {})
+        browser.assert_called_once_with('http://127.0.0.1:8123/loading?desktop=1')
+
+    def test_summary_overwrites_and_removes_sensitive_paths(self):
+        import json
+        with tempfile.TemporaryDirectory() as home:
+            result = {'detected': {'codex': {'detected': True}}, 'members_ok': ['agent:codex-t'], 'member_missing': [], 'configs_written': [{'client':'codex', 'path':'secret-path'}], 'skipped': [], 'errors': [], 'member_status':'checked'}
+            desktop.write_boot_status(home, result)
+            path = Path(home) / 'logs/launcher/boot-status.json'
+            first = json.loads(path.read_text(encoding='utf-8'))
+            desktop.write_boot_status(home, result)
+            second = json.loads(path.read_text(encoding='utf-8'))
+            self.assertEqual(first['configs_written'], ['codex'])
+            self.assertEqual(first['detected'], ['codex'])
+            self.assertTrue(second['ready'])
+            self.assertNotIn('secret-path', str(second))
+            desktop.write_boot_status(home, {'_failed': True})
+            self.assertFalse(json.loads(path.read_text(encoding='utf-8'))['ready'])
+
+    def test_onboarding_exception_records_failure_and_opens_window(self):
+        import json
+        with tempfile.TemporaryDirectory() as home, patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), patch.object(desktop, 'healthy', return_value=True), patch.object(desktop, 'port_available', return_value=False), patch.object(desktop.mcp_onboarding, 'run', side_effect=RuntimeError('secret-key')), patch.object(desktop, 'launch_window') as window:
+            self.assertEqual(desktop.run(home, {}), 0)
+            data = json.loads((Path(home) / 'logs/launcher/boot-status.json').read_text(encoding='utf-8'))
+            self.assertFalse(data['ready'])
+            self.assertNotIn('secret-key', str(data))
+            window.assert_called_once()
