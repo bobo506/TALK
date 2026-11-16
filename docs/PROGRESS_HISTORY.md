@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-16 21:15 — 第 7 项完成：GUI 加载页 + boot 状态接口（Terra 开发、K2.8 复核）
+
+- 交付（`9928882`）：新增 `web/loading.html`（深色主题动画/文案、底部进度条、步骤文字、失败重试；无外部依赖；每次启动展示且最短约 600ms；“检查更新/下载”在无真实下载时显示“无需下载”，不伪造百分比）；新增 `server/routes/boot_status.py`（`GET /api/boot/status` 只读，返回 `service_ready/launcher/stages/ready`，字段白名单过滤，无 Key/路径；文件缺失/损坏降级不 500）；`server/main.py` 在 StaticFiles mount 前注册 `/loading` 与路由；`scripts/talk_desktop.py` 在 onboarding 后、开窗前写 `logs/launcher/boot-status.json`（覆盖幂等，失败 `ready:false` 仍开窗），窗口 URL 改为 `/loading?desktop=1`。
+- K2.8 复核 #819 **approved with limitations**：路由顺序、boot 状态脱敏/降级、加载页静态逻辑（轮询/跳转/最短 600ms/无假进度/失败态）、启动器写入时机与幂等、隔离 API 实测（端口 18123）、回归（3 + 23 + 32 passed）全部通过；真实浏览器动画/跳转/重试未实测列为限制。
+- 复核发现的 `talk_desktop.py` 两处 boot-status 中文文案乱码由 Terra #820 修复（`无需下载`、`MCP 配置失败，请查看日志`），23 项测试通过；`scripts/` 下仍存在 `dsh_role_host.py` 第 191/194/203 行的**既有**乱码（docstring 与两条错误文案），不在本切片白名单，登记为已知遗留。
+- 已知限制：真实浏览器视觉/交互未实测（用户后续可打开加载页验看）；自动角色启动状态未由启动器提供，接口标为未知；`download` 阶段目前恒为“无需下载”，待第 10 项 Release 接真实数据。
+
 ## 2026-11-16 20:55 — 第 6 项完成：GUI 关窗不停服务 + 页面“退出服务”（Terra 开发、K2.8 复核）
 
 - 交付（`f6ee423`）：`scripts/talk_desktop.py` start 分支关窗后不再 `service.stop()`（异常/健康检查失败仍清理自己起的进程）；`scripts/talk_api.py` 启动时把控制文件绝对路径写入环境变量；新增 `server/routes/local_shutdown.py`（`POST /api/local/shutdown`，仅 trusted loopback 的 `human:operator`；agent Key/非 loopback → 403；无控制文件 env/写失败 → 409；重复调用 202 幂等；不泄露路径）；`web/index.html`/`web/app.js` 增加“退出服务”按钮（二次确认、202 遮罩、403/409 提示、`stop.bat` 兜底）。
