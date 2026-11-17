@@ -14,6 +14,12 @@ from scripts import talk_runtime
 
 
 class PortableBuildTests(unittest.TestCase):
+    def test_readme_describes_key_location_and_copy_risk(self):
+        self.assertIn('data/keys', build.README)
+        self.assertNotIn('LOCALAPPDATA', build.README)
+        self.assertIn('TALK_KEYS_DIR', build.README)
+        self.assertIn('\u590d\u5236\u6216\u8f6c\u53d1', build.README)
+
     def test_allowlist_exclusions_and_zip(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'source'

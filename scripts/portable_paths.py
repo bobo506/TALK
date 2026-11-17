@@ -17,7 +17,7 @@ def config_path():
 
 
 def keys_dir():
-    default = Path(os.environ["LOCALAPPDATA"]) / "TALK" / "keys" if os.name == "nt" and os.environ.get("LOCALAPPDATA") else Path.home() / ".talk" / "keys"
+    default = talk_home() / "data" / "keys"
     return Path(os.environ.get("TALK_KEYS_DIR") or default).resolve()
 
 

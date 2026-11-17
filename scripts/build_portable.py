@@ -19,7 +19,7 @@ PYTHON_URL = "https://www.python.org/ftp/python/3.12.1/" + PYTHON_ZIP
 ALLOW = ("server", "web", "scripts", "bridges", "cli", "docs", "examples", "TALK", "requirements.txt", "README.md", "start.bat", "stop.bat", "status.bat", "start-gui.bat")
 EXCLUDED = {"tests", ".git", ".venv", ".talk", ".agents", ".codex", "__pycache__", "logs", "backups", "storage", "workspaces", "keys", "node_modules"}
 SECRET = re.compile(rb"(?:-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{30,}|\bsk-[A-Za-z0-9_-]{32,})")
-README = """TALK 便携包（Windows x64）\n\n需要 Microsoft Edge。双击 start-gui.bat，首次启动会初始化配置和本地项目并打开窗口。关闭窗口后等待后台服务停止。start.bat 使用默认浏览器；stop.bat 可停止服务。\n配置在 config，数据库、项目、上传及日志在 data。管理员 Key 默认在 %LOCALAPPDATA%\\TALK\\keys；可用 TALK_KEYS_DIR 指定其他位置。请妥善保管数据和 Key。\n卸载：关闭 TALK 后删除本文件夹；如不再需要，可另行删除 Key 目录。\n"""
+README = """TALK 便携包（Windows x64）\n\n需要 Microsoft Edge。双击 start-gui.bat，首次启动会初始化配置和本地项目并打开窗口。关闭窗口后等待后台服务停止。start.bat 使用默认浏览器；stop.bat 可停止服务。\n配置在 config，数据库、项目、上传及日志在 data。管理员 Key 默认在包内 data/keys。整个文件夹被复制或转发时 Key 会一并被带走；如需隔离可用 TALK_KEYS_DIR 指向包外。请妥善保管数据和 Key。\n卸载：关闭 TALK 后删除本文件夹；如不再需要，可另行删除 Key 目录。\n"""
 
 
 def excluded(path):
