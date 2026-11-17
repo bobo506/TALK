@@ -28,7 +28,7 @@
   box-sizing: border-box;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  background: var(--card);
+  background: var(--input);
   color: var(--text);
   padding: 8px 10px;
   font: inherit;
@@ -74,3 +74,15 @@
   .role-export-actions .room-primary-btn,
   .role-export-actions .room-secondary-btn { font-size: 14px; }
 }
+
+/* ?????????????????? */
+.role-diagnostics-panel {padding:22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); box-shadow:var(--shadow-soft); overflow-wrap:anywhere; scrollbar-color:var(--scroll-thumb) var(--scroll-track);}
+.role-diagnostics-panel pre,.role-diagnostics-panel code {background:var(--card-soft); color:var(--text);}
+.role-diagnostics-panel pre {max-width:100%; overflow:auto; padding:12px; border:1px solid var(--line); border-radius:var(--radius); scrollbar-color:var(--scroll-thumb) var(--scroll-track);}
+.role-diagnostics-panel table {width:100%; border-collapse:collapse; color:var(--text);}
+.role-diagnostics-panel th,.role-diagnostics-panel td {padding:10px; border-bottom:1px solid var(--line); text-align:left; overflow-wrap:anywhere;}
+.role-diagnostics-panel th {background:var(--card-soft); color:var(--muted-strong);}
+.role-diagnostics-panel tbody tr:nth-child(even) {background:var(--card-soft);}
+.role-diagnostics-panel tbody tr:hover {background:var(--blue-soft);}
+.role-export-range input:disabled {background:var(--card-soft); color:var(--muted);}
+@media(max-width:700px) {.role-diagnostics-panel {padding:16px;} .role-diagnostics-panel table {display:block; max-width:100%; overflow-x:auto;} .role-export-actions > * {max-width:100%;}}

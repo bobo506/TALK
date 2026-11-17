@@ -1,8 +1,8 @@
-.role-create-backdrop {position:fixed; inset:0; z-index:100; background:rgba(24,34,45,.35); display:flex; align-items:center; justify-content:center; padding:24px;}
+.role-create-backdrop {position:fixed; inset:0; z-index:100; background:var(--overlay); display:flex; align-items:center; justify-content:center; padding:24px;}
 .role-create-backdrop.hidden,.role-request-list.hidden,.role-request-host-panel.hidden {display:none!important;}
 /* 2026-10-28：桌面 0.8 界面缩放下 100vh 仍是物理视口（见 workspace.css 的 --interface-scale 注释），
    未补偿时弹窗只拿到 80% 的可用高度，下拉加高后即出现内部滚动条；这里与 .modal-card 采用同一补偿口径。 */
-.role-create-dialog {width:min(620px,100%); max-height:calc(100vh / var(--interface-scale,1) - 48px); overflow:auto; background:var(--card); border:1px solid var(--line-strong); border-radius:14px; padding:26px; box-shadow:0 20px 70px rgba(28,39,53,.2); color:var(--text);}
+.role-create-dialog {width:min(620px,100%); max-height:calc(100vh / var(--interface-scale,1) - 48px); overflow:auto; background:var(--card); border:1px solid var(--line-strong); border-radius:14px; padding:26px; box-shadow:var(--shadow); color:var(--text);}
 .role-create-heading {display:flex; align-items:center; justify-content:space-between; gap:18px;}
 .role-create-heading h2 {font-size:25px; font-weight:650; margin:0;}
 .role-create-grid {display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px;}
@@ -16,8 +16,8 @@
 .role-create-dialog .role-request-field select {height:auto;}
 .role-request-field :focus {outline:2px solid var(--line-strong); outline-offset:2px;}
 .role-request-field :disabled {background:var(--card-soft); color:var(--muted-strong);}
-.role-create-primary {background:#2b6595; color:white; border-color:var(--blue); min-height:44px;}
-.role-create-primary:hover:not(:disabled) {background:#245984; color:white;}
+.role-create-primary {background:var(--accent-bg); color:var(--accent-fg); border-color:var(--accent-bg); min-height:44px;}
+.role-create-primary:hover:not(:disabled) {background:var(--segment-active-bg); color:var(--accent-fg);}
 .role-service-batch-actions {display:flex; align-items:center; flex-wrap:wrap; gap:10px;}
 .role-create-footer {display:flex; justify-content:flex-end; margin-top:20px;}
 .role-request-hint {color:var(--muted-strong); font-size:14px; line-height:1.7; margin:12px 0;}
@@ -37,3 +37,14 @@
 .role-reset-control {max-width:440px;}
 .role-reset-hint {margin:7px 0 0; font-size:12px; line-height:1.6; color:var(--muted-strong); overflow-wrap:anywhere;}
 @media(max-width:700px) {.role-create-backdrop {padding:12px;} .role-create-dialog {padding:20px; max-height:calc(100vh - 24px);} .role-create-grid {grid-template-columns:1fr;} .role-create-grid .wide {grid-column:auto;} .role-request-list {padding:0 20px;} .role-request-steps {display:block;} .role-request-steps li {margin:8px 0;}}
+
+/* ?????????????????? */
+.role-create-dialog {scrollbar-color:var(--scroll-thumb) var(--scroll-track);}
+.role-request-field input,.role-request-field select,.role-request-field textarea {background:var(--input);}
+.role-request-field input::placeholder,.role-request-field textarea::placeholder {color:var(--muted);}
+.role-request-field :focus-visible {outline-color:var(--blue); box-shadow:0 0 0 3px var(--focus-ring);}
+.role-request-field :disabled {cursor:not-allowed; opacity:1;}
+.role-create-primary:disabled {background:var(--card-soft); border-color:var(--line); color:var(--muted);}
+.role-request-card {background:var(--panel); box-shadow:var(--shadow-soft);}
+.role-request-steps li {min-width:0; overflow-wrap:anywhere;}
+@media(max-width:700px) {.role-create-dialog {box-sizing:border-box; max-height:calc(100vh / var(--interface-scale, 1) - 24px);} .role-create-footer {flex-wrap:wrap; gap:10px;} .role-create-footer button {max-width:100%;}}

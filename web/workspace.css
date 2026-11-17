@@ -242,7 +242,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-service-state.running {border-color:var(--line); background:var(--blue-soft); color:var(--blue);}
 .role-service-state.unknown {border-color:var(--line-strong); background:var(--card-soft); color:var(--amber);}
 .role-service-button {background:var(--card); border:1px solid var(--line-strong); border-radius:6px; color:var(--blue); font-size:14px; line-height:1.4; padding:6px 14px; cursor:pointer;}
-.role-service-button:hover:not(:disabled) {border-color:#9db6cc; background:var(--blue-soft);}
+.role-service-button:hover:not(:disabled) {border-color:var(--blue); background:var(--blue-soft);}
 .role-service-button:disabled {opacity:0.5; cursor:not-allowed; color:var(--muted);}
 .role-delete-button {color:var(--red); border-color:var(--line-strong);}
 .role-delete-button:hover:not(:disabled) {color:var(--red); border-color:var(--red); background:var(--red-soft);}
@@ -288,7 +288,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 .role-effort-control { display:flex; flex-direction:column; gap:2px; min-width:0; max-width:100%; flex:0 1 auto; margin-left:auto; }
 .role-effort-choice { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted-strong); min-width:0; }
 .role-effort-label { font-weight:600; white-space:nowrap; }
-.role-effort-select { max-width:170px; height:28px; padding:0 6px; font-size:12px; border:1px solid var(--line); border-radius:6px; background:var(--card, #fff); color:var(--text); cursor:pointer; }
+.role-effort-select { max-width:170px; height:28px; padding:0 6px; font-size:12px; border:1px solid var(--line); border-radius:6px; background:var(--input); color:var(--text); cursor:pointer; }
 .role-effort-select:disabled { cursor:not-allowed; opacity:0.7; }
 .role-effort-select:focus-visible { outline:2px solid var(--line-strong); outline-offset:2px; }
 .role-effort-hint { font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
@@ -296,7 +296,7 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
 @media(max-width:700px){ .role-effort-select { max-width:150px; } }
 .role-startup-panel { margin:12px 0; }
 .role-startup-choice { display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
-.role-startup-choice input { width:16px; height:16px; margin:0; accent-color:var(--accent, #6071cb); }
+.role-startup-choice input { width:16px; height:16px; margin:0; accent-color:var(--accent-bg); }
 .role-name-edit { flex:0 0 17px; width:17px; height:17px; min-width:17px; padding:0; border-radius:4px; cursor:pointer; }
 .role-name-edit svg { width:12px; height:12px; }
 .role-name-edit:hover { color:var(--blue); background:var(--blue-soft, var(--blue-soft)); }
@@ -418,3 +418,26 @@ button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visi
   .task-card {grid-template-columns:minmax(0,1fr) auto; padding:18px 20px;}
   .task-card .task-status-badge {max-width:120px; overflow-wrap:anywhere;}
 }
+
+/* ?????????????????????? */
+.role-entry {min-width:0; background:var(--panel); color:var(--text);}
+.role-entry.selected,.role-entry:hover,.role-settings-entry {background:var(--blue-soft);}
+.role-row {color:var(--text); min-width:0;}
+.role-binding-summary {color:var(--muted-strong);}
+.role-service-state {display:inline-flex; align-items:center; gap:7px; max-width:100%;}
+.role-service-state::before {content:""; flex:none; width:7px; height:7px; border-radius:50%; background:currentColor;}
+.role-service-state.success {background:var(--success-bg); color:var(--green);}
+.role-service-state.danger {background:var(--red-soft); color:var(--red);}
+.role-service-state.neutral {color:var(--muted-strong);}
+.role-service-button:focus-visible,.role-row:focus-visible,.role-effort-select:focus-visible {outline:2px solid var(--blue); outline-offset:2px;}
+.role-delete-section {padding:14px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card-soft);}
+.role-startup-choice input,.controller-mode-option input {accent-color:var(--accent-bg);}
+#workspace-diagnostics-panel,#requirements-panel,#controller-mode-panel,#runner-versions-panel,#role-request-host-panel {box-sizing:border-box; min-width:0; margin:0 0 18px; padding:22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); box-shadow:var(--shadow-soft); overflow-wrap:anywhere;}
+#requirements-panel .runner-status {background:var(--card-soft); border-color:var(--line);}
+#requirements-panel textarea,#role-request-host-panel input {background:var(--input); color:var(--text); border-color:var(--line-strong);}
+.controller-mode-option {background:var(--card-soft);}
+.controller-mode-option:hover {border-color:var(--blue);}
+.role-task-table th {background:var(--card-soft); color:var(--muted-strong);}
+.role-task-table tbody tr:nth-child(even) {background:var(--card-soft);}
+.role-task-table tbody tr:hover {background:var(--blue-soft);}
+@media(max-width:700px) {#workspace-diagnostics-panel,#requirements-panel,#controller-mode-panel,#runner-versions-panel,#role-request-host-panel {padding:16px;} .role-details-panel h2 {font-size:28px; overflow-wrap:anywhere;} .role-effort-control {margin-left:0;} .role-service-row > * {max-width:100%;} .role-task-table {width:100%;} }
