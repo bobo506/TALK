@@ -243,6 +243,8 @@ class DesktopEntryTests(unittest.TestCase):
         with patch.object(desktop.subprocess, 'run', return_value=ok) as run:
             self.assertEqual(desktop.install_shortcut(self.home, {}), 'C:\\Desktop\\TALK.lnk')
         self.assertIn('TALK.lnk', run.call_args.args[0][-1])
+        icon = self.home.resolve() / 'web' / 'icons' / 'favicon.ico'
+        self.assertIn(f"$s.IconLocation='{icon},0';", run.call_args.args[0][-1])
         failed = SimpleNamespace(returncode=1, stdout='', stderr='boom')
         with patch.object(desktop.subprocess, 'run', return_value=failed):
             with self.assertRaisesRegex(desktop.LauncherError, '创建桌面快捷方式失败'):

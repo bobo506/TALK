@@ -163,7 +163,7 @@ def install_shortcut(home, env=None):
     vbs = home / 'start-gui.vbs'
     if not vbs.is_file():
         raise LauncherError(f'缺少桌面入口：{vbs}')
-    browser = find_browser(env) or Path(env.get('SystemRoot', r'C:\Windows')) / 'System32' / 'shell32.dll'
+    icon = str(home / 'web' / 'icons' / 'favicon.ico').replace("'", "''")
     script = (
         "$ErrorActionPreference='Stop';"
         "$desktop=[Environment]::GetFolderPath('Desktop');"
@@ -173,7 +173,7 @@ def install_shortcut(home, env=None):
         f"$s.TargetPath=Join-Path $env:SystemRoot 'System32\\wscript.exe';"
         f"$s.Arguments='\"{vbs}\"';"
         f"$s.WorkingDirectory='{home}';"
-        f"$s.IconLocation='{browser},0';"
+        f"$s.IconLocation='{icon},0';"
         "$s.Description='TALK 桌面版';"
         "$s.Save();"
         "Write-Output $link"
