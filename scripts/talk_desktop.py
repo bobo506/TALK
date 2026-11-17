@@ -78,6 +78,51 @@ def port_available(host, port):
     return True
 
 
+
+def find_runtime_config(home, env):
+    """Find an existing runtime configuration in priority order."""
+    home = Path(home).resolve()
+    configured = env.get('TALK_RUNTIME_CONFIG')
+    candidates = []
+    if configured and Path(configured).is_absolute():
+        candidates.append(Path(configured))
+    candidates.extend((home / 'config' / 'runtime.json',
+                       home.parent / 'TALK-private' / 'talk-runtime.json'))
+    return next((path.resolve() for path in candidates if path.is_file()), None)
+
+
+def runtime_notice(home, message):
+    """Keep launcher diagnostics available even when started without a console."""
+    if sys.stderr is not None:
+        print(message, file=sys.stderr)
+    try:
+        log_dir = Path(home) / 'logs' / 'launcher'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with (log_dir / 'runtime-launcher.log').open('a', encoding='utf-8') as log:
+            print(message, file=log)
+    except OSError:
+        pass
+
+
+def start_runtime(home, config, env):
+    if config is None:
+        runtime_notice(home, '未找到 runtime 配置，角色不会自动启动。')
+        return
+    flags = (getattr(subprocess, 'DETACHED_PROCESS', 0) |
+             getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))
+    try:
+        process = subprocess.Popen(
+            [sys.executable, '-B', '-X', 'utf8', '-m', 'scripts.talk_runtime',
+             'serve', '--config', str(config), '--apply', '--attach-api'],
+            cwd=str(home), env=env, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags)
+        code = process.poll()
+        if code is not None and code != 0:
+            runtime_notice(home, f'runtime 启动失败（退出码 {code}），角色不会自动启动。')
+    except Exception:
+        # Avoid logging exception details, which can contain private paths or configuration.
+        runtime_notice(home, 'runtime 启动异常；角色不会自动启动。')
+
 class ApiService:
     """按根目录配置启动/停止一个 API 子进程；只对自己启动的进程负责。"""
 
@@ -238,16 +283,23 @@ def run(home, env):
     action = plan_action(healthy(url), port_available(host, port))
     if action == 'blocked':
         raise LauncherError(f'端口 {port} 已被占用，但 TALK 健康检查失败；请检查占用进程后再试。')
+    runtime_config = find_runtime_config(home, env)
+    child_env = dict(env)
+    child_env.pop('TALK_RUNTIME_CONFIG', None)
+    if runtime_config is not None:
+        child_env['TALK_RUNTIME_CONFIG'] = str(runtime_config)
     if action == 'attach':
+        start_runtime(home, runtime_config, child_env)
         onboard_and_write(home, env)
         launch_window(url, env)
         return 0
-    service = ApiService(home, host, port, env)
+    service = ApiService(home, host, port, child_env)
     owns_service = False
     try:
         service.start()
         owns_service = True
         service.wait_healthy(url)
+        start_runtime(home, runtime_config, child_env)
         onboard_and_write(home, env)
         launch_window(url, env)
     except BaseException:

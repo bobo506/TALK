@@ -69,6 +69,86 @@ class DesktopEntryTests(unittest.TestCase):
         self.assertEqual(env['TALK_CONFIG'], str(self.home / 'config.toml'))
         self.assertEqual(popen.call_args.kwargs['cwd'], str(self.home))
 
+    def test_runtime_config_priority_and_invalid_env_fallback(self):
+        home = self.home / 'TALK'
+        home.mkdir()
+        portable = home / 'config' / 'runtime.json'
+        portable.parent.mkdir()
+        private = self.home / 'TALK-private' / 'talk-runtime.json'
+        private.parent.mkdir()
+        explicit = self.home / 'explicit.json'
+        for path in (portable, private, explicit):
+            path.write_text('{}', encoding='utf-8')
+        self.assertEqual(desktop.find_runtime_config(home, {'TALK_RUNTIME_CONFIG': str(explicit)}), explicit)
+        self.assertEqual(desktop.find_runtime_config(home, {'TALK_RUNTIME_CONFIG': 'relative.json'}), portable)
+        self.assertEqual(desktop.find_runtime_config(home, {'TALK_RUNTIME_CONFIG': str(self.home / 'missing')}), portable)
+        portable.unlink()
+        self.assertEqual(desktop.find_runtime_config(home, {}), private)
+        private.unlink()
+        self.assertIsNone(desktop.find_runtime_config(home, {}))
+
+    def test_run_passes_runtime_to_api_and_spawns_after_health(self):
+        config = self.home / 'config' / 'runtime.json'
+        config.parent.mkdir()
+        config.write_text('{}', encoding='utf-8')
+        order = []
+        service = Mock()
+        service.start.side_effect = lambda: order.append('start')
+        service.wait_healthy.side_effect = lambda url: order.append('healthy')
+        process = Mock()
+        process.poll.return_value = None
+        def spawn(*args, **kwargs):
+            order.append('runtime')
+            return process
+        with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+             patch.object(desktop, 'healthy', return_value=False), \
+             patch.object(desktop, 'port_available', return_value=True), \
+             patch.object(desktop, 'ApiService', return_value=service) as api, \
+             patch.object(desktop.subprocess, 'Popen', side_effect=spawn) as popen, \
+             patch.object(desktop, 'launch_window', side_effect=lambda *args: order.append('window')):
+            self.assertEqual(desktop.run(self.home, {}), 0)
+        self.assertEqual(order, ['start', 'healthy', 'runtime', 'window'])
+        self.assertEqual(api.call_args.args[3]['TALK_RUNTIME_CONFIG'], str(config))
+        popen.assert_called_once()
+        self.assertEqual(popen.call_args.args[0], [desktop.sys.executable, '-B', '-X', 'utf8', '-m',
+                         'scripts.talk_runtime', 'serve', '--config', str(config), '--apply', '--attach-api'])
+        self.assertEqual(popen.call_args.kwargs['cwd'], str(self.home))
+        self.assertEqual(popen.call_args.kwargs['stdin'], desktop.subprocess.DEVNULL)
+        self.assertEqual(popen.call_args.kwargs['stdout'], desktop.subprocess.DEVNULL)
+        self.assertEqual(popen.call_args.kwargs['stderr'], desktop.subprocess.DEVNULL)
+        self.assertEqual(popen.call_args.kwargs['creationflags'],
+                         getattr(desktop.subprocess, 'DETACHED_PROCESS', 0) | getattr(desktop.subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))
+
+    def test_no_runtime_config_keeps_window_and_does_not_spawn(self):
+        with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+             patch.object(desktop, 'healthy', return_value=True), \
+             patch.object(desktop, 'port_available', return_value=True), \
+             patch.object(desktop, 'find_runtime_config', return_value=None), \
+             patch.object(desktop.subprocess, 'Popen') as popen, \
+             patch.object(desktop, 'launch_window') as window:
+            self.assertEqual(desktop.run(self.home, {}), 0)
+        popen.assert_not_called()
+        window.assert_called_once()
+        self.assertIn('未找到 runtime 配置，角色不会自动启动。',
+                      (self.home / 'logs/launcher/runtime-launcher.log').read_text(encoding='utf-8'))
+
+    def test_runtime_failure_does_not_block_attached_window(self):
+        config = self.home / 'runtime.json'
+        config.write_text('{}', encoding='utf-8')
+        for failure in (OSError('failure'), Mock(poll=Mock(return_value=1))):
+            with self.subTest(failure=failure), \
+                 patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+                 patch.object(desktop, 'healthy', return_value=True), \
+                 patch.object(desktop, 'port_available', return_value=True), \
+                 patch.object(desktop.subprocess, 'Popen', side_effect=[failure]) as popen, \
+                 patch.object(desktop, 'launch_window') as window:
+                self.assertEqual(desktop.run(self.home, {'TALK_RUNTIME_CONFIG': str(config)}), 0)
+                popen.assert_called_once()
+                window.assert_called_once()
+        log = (self.home / 'logs/launcher/runtime-launcher.log').read_text(encoding='utf-8')
+        self.assertIn('runtime 启动异常；角色不会自动启动。', log)
+        self.assertIn('runtime 启动异常；角色不会自动启动。', log)
+
     def test_service_stop_uses_control_file_then_clears_it(self):
         service = desktop.ApiService(self.home, '127.0.0.1', 8000, {})
         captured = {}
