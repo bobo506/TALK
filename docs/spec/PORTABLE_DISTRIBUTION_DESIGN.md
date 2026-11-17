@@ -166,8 +166,11 @@ TALK/
 ## 6. Key 与安全
 
 - **分发包不带真实 Key**；首次启动生成 operator key 与管理员；角色 Key 由创建/恢复流程生成。
-- 默认 `TALK_KEYS_DIR = %LOCALAPPDATA%\TALK\keys`（便携文件夹外），避免整个文件夹被复制/转发时泄露；支持 `TALK_KEYS_DIR` 覆盖。
-- 若用户要求完全自包含（U 盘搬移），可选 `keys/` 放在 `data/keys`，但 README 必须显著警告“文件夹即凭据”；构建/分发默认不包含。
+- **2026-11-17 用户决定：便携包默认自包含** —— `TALK_KEYS_DIR` 默认 `<便携包>/data/keys`，key 随包存放；支持 `TALK_KEYS_DIR` 覆盖。
+  - 理由（用户）：TALK Key 不是模型付费 Key，不涉及计费；TALK 只在单机运行，多设备出现相同 Key 也不影响。
+  - 仍保留约束：`data/keys` 目录 ACL 仅当前用户；构建后检查包内**不含**真实 `.key`（首次启动才生成）；仓库（Git）永远不提交 key。
+  - README 提示：整个文件夹被复制/转发时，Key 会一并被带走；如需更严格隔离可显式设置 `TALK_KEYS_DIR` 到包外。
+- 开发期（Git 仓库）仍使用仓库外 key（`TALK-private\keys` / `~/.talk\keys`），因为仓库会被提交/推送，且 `key_root` 不允许在仓库内；这与便携包自包含不冲突。
 - 默认 bind `127.0.0.1`；局域网访问需用户显式改配置；日志不输出 Key；`keys` 目录 ACL 仅当前用户。
 - 分发包构建后检查：无 `.key`/`credential.json`、无 `.env`、无真实 DB、无 native session。
 
