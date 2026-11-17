@@ -2,13 +2,13 @@
 
 ## Latest
 
-Updated: 2026-11-17 22:15 (+08:00)
+Updated: 2026-11-17 22:45 (+08:00)
 
-**当前结论**：路线图第 13 项完成（Terra #850、K2.8 #852 approved，`6c6fed7`）：终端发起身份不再出现在角色列表/任务角色选择，单查与 MCP 保持兼容；图标（`c47b316`）、ACL 健壮性（`5ce37c3`）、第 12 项（`faa57bc`）均已完成。Terra/K2.8/Astra 均 running。剩余：第 10 项（便携包+Release，需授权）、第 11 项（交接文档）。
+**当前结论**：第 10/11 项主体完成（`c8bc206`）：便携包 Key 默认 `data/keys`、交接文档落地；最终包 `TALK-portable-0.1.0.zip`（24.9MB / 1474 文件 / sha256 `edac9d69…`）构建成功，隔离沙箱 bootstrap + HTTP 冒烟通过。**仅剩 GitHub Release 未发**（`gh` 未登录，待用户 `gh auth login`）。第 12/13 项、图标、ACL 健壮性均已完成；API 仍是 09:12 旧进程，待重启验证第 13 项与 ACL 新逻辑。
 
 ### 1) Current Progress
-- 路线图 13 项：第 1–7 已完成；第 8 项并入换肤切片 1；第 9 项用户已手动清理；**第 12、13 项已完成**；待推进：第 10（便携包+Release，需授权）、第 11（交接文档）。
-- 换肤切片 1–4 全部完成（`2517fd4`+`f9d0ac2`、`409a629`、`537634e`、`a7423f7`）；自定义图标 `c47b316`。
+- 路线图 13 项：第 1–7 完成；第 8 并入换肤；第 9 用户清理；第 12、13 完成；**第 10（构建+冒烟完成，Release 待 gh 登录）、第 11（交接文档完成）**。
+- 换肤切片 1–4 全部完成（`2517fd4`+`f9d0ac2`、`409a629`、`537634e`、`a7423f7`）；自定义图标 `c47b316`；便携包 `c8bc206`。
 - ACL 健壮性完成（`5ce37c3`）：校验容忍可信继承、外来拒绝、受保护 DACL、Codex 宿主读 key 前自愈、runtime 自检告警；41+9 测试通过；**重启 runtime/角色后生效**。
 - 第 12 项：`bridges/codex_execution_native.py` 区间+能力探测+60s 缓存；`codex_role_host`/`codex_role_setup` 共用；`--check-version`；测试 26+6、59+26、25+3 通过（ACL 环境噪音已记为基线同现）。
 - 角色：Terra（codex）、K2.8（kimi-code）、Astra（codex，仅咨询）均 running；Terra 命令/读写能力已验收。

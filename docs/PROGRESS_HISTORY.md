@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-17 22:45 — 第 10/11 项：便携包构建 + 首次冒烟 + 交接文档
+
+- 便携包 Key 默认改为包内（Terra #853，K2.8 #854 approved，`c8bc206`）：`scripts/portable_paths.py::keys_dir()` 默认 `<TALK_HOME>/data/keys`，`TALK_KEYS_DIR` 仍可覆盖；`build_portable.py` README 同步（含“复制文件夹=带走 Key”提示，不再提 LOCALAPPDATA）；新增/更新测试 10 passed。
+- 交接文档：`docs/guides/PORTABLE_HANDOVER.md`（前置条件、解压结构、首次启动/自动接入、无运行器提示、创建角色、日常退出、数据备份、升级、排障、卸载）。
+- 最终包：`D:\backups\portable-final-20261117\TALK-portable-0.1.0.zip`，**24,932,084 字节 / 1474 文件 / sha256 `edac9d69d394135973eec0020555a50483a5ca2c613132376f1c8a69d1836fc5`**；构建脚本内置检查（无 DB/密钥/开发路径）。
+- 冒烟（隔离沙箱 `D:\agent-sandbox\talk-portable-smoke-20261117`）：解压 → `runtime\python\python.exe -m scripts.portable_bootstrap --root <pkg> --apply` 成功生成 `config/config.toml`、`config/runtime.json`、`data/talk.db`、`data/keys/operator.key`(44B)、`data/project`（项目/管理员/runtime 均 created，seed runners=4/models=10/host=1）；以 `uvicorn server.main:app --port 18753` 启动后 `/loading`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/` 均 200。
+- 冒烟中发现并绕开的环境坑：PowerShell 5.1 `Set-Content -Encoding UTF8` 会写 BOM，导致 `tomllib` 解析失败；测试配置改为无 BOM 写入后正常（包内 bootstrap 生成的配置本身无 BOM）。
+- **Release 未发布**：`gh` 未登录（`gh auth login` 未执行），待用户登录后创建 `v0.1.0` 并上传 zip。
+
 ## 2026-11-17 22:15 — 路线图第 13 项完成：终端发起身份不进角色列表（Terra #850，K2.8 #852 approved）
 
 - 交付（`6c6fed7`，3 文件 +53/−1）：`server/routes/projects.py` 用固定集合 `{agent:codex-t, agent:kimi-t, agent:dsh-t, agent:workbuddy-t}` 在 `GET /agents`/`GET /roles` **排序后**过滤（不用 `-t` 泛化，避免误伤）；`web/workspace.js` 对空名册回退候选做展示过滤（仅展示，不改请求）；新增 `tests/test_terminal_identity_filter.py`（隔离 DB，覆盖四终端、执行角色、`agent:test-t` 不误伤、单查 200、终端认证）。
