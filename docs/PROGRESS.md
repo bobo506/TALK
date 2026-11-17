@@ -2,66 +2,38 @@
 
 ## Latest
 
-Updated: 2026-11-18 00:30 (+08:00)
+Updated: 2026-11-18 00:55 (+08:00)
 
-**当前结论**：退出服务语义改为**停整机**（有 running 任务则 409 提示等待），浏览器托盘随服务停止自动退出，终端过滤回退为仅 `-t` 四个（`1fb21ab`，K2.8 #858/#861 approved，53 测试通过）。**待人工验证**：点“退出服务”后 runtime/角色/Chrome 托盘应全部消失。其余：便携包 `TALK-portable-0.1.0.zip` 已构建冒烟（sha256 `edac9d69…`），仅剩 GitHub Release（需 `gh auth login`）；API 已重启到 23:54 版本，但 runtime/角色宿主仍是旧进程，本次整机退出后重启可加载全部新代码。
+**当前结论**：今天完成换肤 4 片、自定义图标、ACL 健壮性、路线图第 12/13 项、便携包构建+冒烟+交接文档、退出服务按钮迁移、退出停整机+托盘自动退出（均已复核并推送，HEAD `1ba9534`）。**进行中**：#862（Terra）让启动器自动带起 runtime，使“随项目自动启动”生效；工作区 `scripts/talk_desktop.py` 有未提交改动。**待人工验收**：完整重启后角色自动启动、“退出服务”停整机+Chrome 托盘消失。`gh` 未登录，Release 未发。
 
 ### 1) Current Progress
-- 路线图 13 项：第 1–7 完成；第 8 并入换肤；第 9 用户清理；第 12、13 完成；**第 10（构建+冒烟完成，Release 待 gh 登录）、第 11（交接文档完成）**。
-- 换肤切片 1–4 全部完成（`2517fd4`+`f9d0ac2`、`409a629`、`537634e`、`a7423f7`）；自定义图标 `c47b316`；便携包 `c8bc206`。
-- ACL 健壮性完成（`5ce37c3`）：校验容忍可信继承、外来拒绝、受保护 DACL、Codex 宿主读 key 前自愈、runtime 自检告警；41+9 测试通过；**重启 runtime/角色后生效**。
-- 第 12 项：`bridges/codex_execution_native.py` 区间+能力探测+60s 缓存；`codex_role_host`/`codex_role_setup` 共用；`--check-version`；测试 26+6、59+26、25+3 通过（ACL 环境噪音已记为基线同现）。
-- 角色：Terra（codex）、K2.8（kimi-code）、Astra（codex，仅咨询）均 running；Terra 命令/读写能力已验收。
-- 2026-11-17 09:50 事故修复：`.talk` 残留 `CodexSandboxUsers` ACE → keys 继承 → host `key_permissions_failed`；runtime 因临时文件继承 ACE 崩溃。已按 `PROGRESS_HISTORY.md` 备份并重置私有 ACL、手动重启 runtime（pid 12516），三角色 running。
-- 换肤切片 1 交付：`web/theme-tokens.css`（两套 tokens）、`web/style.css` 外壳、`web/loading.html`、`web/theme.js`（默认 midnight、旧值迁移、无闪烁）、`web/index.html`/`web/app.js`（两种提示条 + 设置区）、`server/routes/boot_status.py`（`runners`）。
-- 运行环境：Codex CLI 钉 `0.164.0`；Kimi Code CLI `2.0.2`；Terra runner 与仓库根目录完整性标签为 **Medium**（手动修复，重建/升级后需复查）。
+- 路线图 13 项：第 1–7、12、13 完成；第 8 并入换肤；第 9 用户已清理；第 11 交接文档完成；**第 10 构建+冒烟完成，Release 待 `gh auth login`**。
+- 换肤 1–4：`2517fd4`+`f9d0ac2`、`409a629`、`537634e`、`a7423f7`；图标 `c47b316`；ACL `5ce37c3`；Codex 版本 `faa57bc`；终端过滤 `6c6fed7`；便携包 `c8bc206`；按钮迁移 `9fa801d`；整机退出/托盘 `1fb21ab`。
+- 角色：Terra、K2.8 running；Astra stopped（未勾自动启动，符合预期）；任务 #862 由 Terra 执行中。
+- 生产：API 约 00:36、runtime 约 00:38 启动；此前“重启后 Astra 仍在跑”已确认是旧进程未停，不是自动启动。
+- 便携包：`D:\backups\portable-final-20261117\TALK-portable-0.1.0.zip`（24,932,084 B / 1474 文件 / sha256 `edac9d69…`），隔离沙箱 bootstrap+HTTP 冒烟通过。
 
 ### 2) Open Questions / Pending Confirmation
-- 切片 2 范围（任务区换肤）需按惯例先确认。
-- 生产 `8000` 未重启：新 UI 静态文件可从磁盘加载，但 `/api/boot/status` 的 `runners` 字段与 `/mcp` 需重启 API 才生效；重启需用户授权。
-- 已知限制：换肤截图为临时空库实例，真实项目数据密度/布局需重启后目检；加载页实际样式较效果图简化（无步骤 chips/完整轨道动画），如需更接近效果图可在切片 2/3 追加。
-- 已知遗留：`scripts/dsh_role_host.py` 第 191/194/203 行既有乱码（docstring + 错误文案），未修。
-- 已知环境限制：`test_runtime_log_authentication` 在 Terra 沙箱运行环境返回 503；管理员上下文 1 passed in 3.01s。
+- #862 未复核：启动器自动带 runtime 后，需确认不会与已运行的 runtime 冲突、失败不阻断窗口。
+- 真实整机退出未实测：点“退出服务”后 runtime/角色/API/Chrome 托盘是否全部退出；有任务时 409 提示是否正常。
+- Release 阻塞：`gh auth login` 未执行；发布前建议用新 Key 逻辑重建最终 zip。
+- 已知遗留：`scripts/talk_desktop.py` 历史 mojibake（未修，避免扩大）；本机部分测试受 key 继承 ACL 影响（基线同样复现）。
 
 ### 3) Next Plan
-- 切片 2：任务区换肤——任务列表、任务 Hall 消息气泡、输入框、状态标签、任务相关弹窗统一到 tokens，明暗两套截图验收。
-- 分工：**Terra 开发、K2.8 复核**；协调者只做范围/授权/判断与收尾。
-- 后续：切片 3（角色/设置/诊断页）→ 切片 4（亮色边角）→ 路线图第 9 项起。
+1. 等 #862 完成 → K2.8 复核 → 提交推送；
+2. 用户完整重启 → 验证自动启动（仅 Terra/K2.8）与“退出服务”停整机、托盘消失；
+3. `gh auth login` → 重建便携包 → 发 `v0.1.0` Release（zip 资产，不进 git）；
+4. 按需处理路线图剩余可选项（如 diagnostics 页表格/筛选）。
 
 ### 4) Verification
-- `pytest tests/test_boot_status.py -q`：3 passed；`test_talk_desktop.py`：23 passed + 3 subtests；`test_mcp_http.py`：32 passed；`node --check web/app.js`、`web/theme.js` 通过。
-- 隔离实例（端口 8321）：tokens 覆盖脚本比对无缺失；`runners` 过滤非法名（evil-bot/42）正确；`/loading` 200；Edge 无头抓 4 张真实截图（加载页明暗、主页两种提示条）。
-- 复核发现的 `join("?")` 与 `style.css` 注释乱码已修复；`web/` 下无 `????`。
-- 未验证：生产 `8000` 未重启（`/mcp`、新 boot 状态未生效）；真实项目数据下页面未目检。
+- 已通过：换肤各片 `pytest tests/test_talk_desktop.py`/`test_boot_status.py`；图标 25+3；ACL 41+9；Codex 版本 59+26；终端过滤 26+3；整机退出/托盘 53 项（K2.8 #861）。
+- 冒烟：解压 → `portable_bootstrap` 生成 config/data/data/keys/operator.key/project；临时端口 `/loading`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/` 均 200。
+- 未验证：真实整机退出与托盘退出、启动器自动 runtime（#862 完成后）；Release 未发布。
 
 ### 5) Changed Files
-- 换肤切片 1：新增 `web/theme-tokens.css`；修改 `web/style.css`、`web/loading.html`、`web/theme.js`、`web/index.html`、`web/app.js`、`server/routes/boot_status.py`、`tests/test_boot_status.py`；截图 `docs/mockups/after/`。
-- 第 7 项：新增 `web/loading.html`、`server/routes/boot_status.py`、`tests/test_boot_status.py`；修改 `server/main.py`、`scripts/talk_desktop.py`、`tests/test_talk_desktop.py`。
-- 第 6 项：新增 `server/routes/local_shutdown.py`、`tests/test_local_shutdown.py`；修改 `scripts/talk_desktop.py`、`scripts/talk_api.py`、`server/main.py`、`web/index.html`、`web/app.js`、`tests/test_talk_desktop.py`。
-- 第 4 项：新增 `scripts/mcp_onboarding.py`、`tests/test_mcp_onboarding.py`；修改 `scripts/talk_desktop.py`、`tests/test_talk_desktop.py`。
-- 第 3 项：新增 `server/routes/mcp.py`、`bridges/talk_tool_registry.py`、`bridges/talk_call_context.py`、`tests/test_mcp_http.py`；修改 `server/main.py`、`bridges/talk_task_tools.py`、`bridges/initiator_followup.py`。
-- 提交：`9928882`（第 7 项）；`f6ee423`（第 6 项）；`c033683`、`c73587f`（第 4 项）；`2be7a3f`（第 3 项）。
-
-## 待清理清单（2026-11-17 登记，未执行）
-
-第 9 项“单目录收拢”：**2026-11-17 16:5x 用户已手动删除到回收站**（协调者核查：5 项均已不存在），D 盘 TALK 相关只保留仓库与 `TALK-private`。
-
-已清理（用户手动，回收站可恢复）：
-
-| 路径 | 大小 | 说明 |
-|---|---|---|
-| `D:\TALK-portable` | 676 MB | 便携包构建产物 |
-| `D:\TALK-portable-clean.zip` | 20.7 MB | 便携包 zip |
-| `D:\TALK-archive-20261114` | 6.9 MB | 11-14 清理归档 |
-| `D:\claude-test\talk-test-temp` | 空 | 旧测试临时目录 |
-| `D:\claude-testshotsprofile-daylight` | 23.5 MB | 截图命令误建的 Edge profile |
-
-保留项：`D:\claude-test\TALK`（仓库）、`D:\claude-test\TALK-private`（私密运行时配置，运行必需）、`D:\backups`、`D:\agent-trash`、`D:\agent-audit`。删除前已核查：运行配置/进程/启动项/DB 配置指针均不依赖这些目录（DB 仅历史消息文本提及）。
+- 今日主要：`web/*`（换肤/图标/manifest）、`server/routes/boot_status.py`、`server/routes/local_shutdown.py`、`server/routes/projects.py`、`scripts/talk_desktop.py`、`scripts/talk_launcher.py`、`scripts/talk_runtime.py`、`scripts/portable_paths.py`、`scripts/build_portable.py`、`bridges/codex_execution_native.py`、`scripts/codex_role_host.py`、`scripts/codex_role_setup.py`、`scripts/role_provision.py`、`scripts/role_service_host.py`、`tests/*`、`docs/*`。
+- 工作区未提交：`scripts/talk_desktop.py`（#862）。
 
 ## Recent Notes
-- 归档/备份：`D:\backups\codex-sandbox-rebuild-20261116-1345`、`D:\backups\talk-acl-20261116-0035`、`D:\backups\talk-legacy-convert-20261116-1025`；诊断日志 `D:\agent-trash\talk-diag\codex-spawn.log`。
-- 临时目录：仓库根仍有 `.tmp-acceptance`（历史）与 `.tmp-tests`（含 `mcp-799-archive`）；均未跟踪，未清理。
-- 恢复：说“继续项目”。
-- 环境事件（2026-11-14 22:51）：系统 Python `Lib` 被便携运行时覆盖；已补 `python312.zip` 与 4 个 `.pyd`，依赖在 `Python312\talk-deps`。全局 `pip` 未装回。
-- 运行器环境（2026-11-15）：Codex CLI 临时钉 `0.164.0`；Kimi Code CLI 2.0.2（`~/.kimi-code/bin/kimi.exe` 与 `%APPDATA%\npm\kimi.exe`）。新版本适配见路线图第 12 项。
-- 事故相关：桌面误删清单 `D:\desktop-deleted-20261114.txt`；本机沙箱/服务重建记录见 `PROGRESS_HISTORY.md` 2026-11-16 各段。
+- 完整历史见 `docs/PROGRESS_HISTORY.md`；上下文交接见 `docs/HANDOFF_20261118.md`。
+- 恢复：新窗口说「继续项目」，先读本文件与交接快照。
