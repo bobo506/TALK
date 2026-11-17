@@ -2,12 +2,12 @@
 
 ## Latest
 
-Updated: 2026-11-17 22:10 (+08:00)
+Updated: 2026-11-17 22:15 (+08:00)
 
-**当前结论**：TALK 自定义图标完成（`c47b316`，K2.8 #851 approved）：`web/icons/` 素材、`web/manifest.webmanifest`、两个 HTML 的 favicon/manifest 标签、快捷方式改用仓库 ico；桌面快捷方式已即时生效，任务栏需重开窗口验证。私有 ACL 健壮性（`5ce37c3`）与第 12 项（`faa57bc`）已完成；第 13 项（终端身份过滤，#850）运行中。Terra/K2.8/Astra 均 running。
+**当前结论**：路线图第 13 项完成（Terra #850、K2.8 #852 approved，`6c6fed7`）：终端发起身份不再出现在角色列表/任务角色选择，单查与 MCP 保持兼容；图标（`c47b316`）、ACL 健壮性（`5ce37c3`）、第 12 项（`faa57bc`）均已完成。Terra/K2.8/Astra 均 running。剩余：第 10 项（便携包+Release，需授权）、第 11 项（交接文档）。
 
 ### 1) Current Progress
-- 路线图 13 项：第 1–7 已完成；第 8 项并入换肤切片 1；第 9 项用户已手动清理；第 12 项（Codex 版本适配）完成；第 13 项（终端身份过滤）运行中；待推进：第 10（便携包+Release，需授权）、第 11（交接文档）。
+- 路线图 13 项：第 1–7 已完成；第 8 项并入换肤切片 1；第 9 项用户已手动清理；**第 12、13 项已完成**；待推进：第 10（便携包+Release，需授权）、第 11（交接文档）。
 - 换肤切片 1–4 全部完成（`2517fd4`+`f9d0ac2`、`409a629`、`537634e`、`a7423f7`）；自定义图标 `c47b316`。
 - ACL 健壮性完成（`5ce37c3`）：校验容忍可信继承、外来拒绝、受保护 DACL、Codex 宿主读 key 前自愈、runtime 自检告警；41+9 测试通过；**重启 runtime/角色后生效**。
 - 第 12 项：`bridges/codex_execution_native.py` 区间+能力探测+60s 缓存；`codex_role_host`/`codex_role_setup` 共用；`--check-version`；测试 26+6、59+26、25+3 通过（ACL 环境噪音已记为基线同现）。

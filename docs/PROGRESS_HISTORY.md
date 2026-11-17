@@ -1,5 +1,11 @@
 # 开发历史 · TALK
 
+## 2026-11-17 22:15 — 路线图第 13 项完成：终端发起身份不进角色列表（Terra #850，K2.8 #852 approved）
+
+- 交付（`6c6fed7`，3 文件 +53/−1）：`server/routes/projects.py` 用固定集合 `{agent:codex-t, agent:kimi-t, agent:dsh-t, agent:workbuddy-t}` 在 `GET /agents`/`GET /roles` **排序后**过滤（不用 `-t` 泛化，避免误伤）；`web/workspace.js` 对空名册回退候选做展示过滤（仅展示，不改请求）；新增 `tests/test_terminal_identity_filter.py`（隔离 DB，覆盖四终端、执行角色、`agent:test-t` 不误伤、单查 200、终端认证）。
+- 复核：K2.8 #852 **approved with limitations**——过滤精确、排序/字段不变、单查与 MCP 兼容、前端仅展示层、26+3 测试通过、`node --check`/`git diff --check` 干净；真实浏览器角色页/转交下拉未实测（not_run，可列限制）。
+- 说明：终端身份仍可在成员 API/MCP 侧使用，只是不出现在角色列表与任务角色选择中。
+
 ## 2026-11-17 22:10 — TALK 自定义图标（协调者生成素材、Terra #849 接入、K2.8 #851 approved）
 
 - 问题：桌面快捷方式用 Chrome 图标、任务栏是地球（页面无 favicon/manifest）。
