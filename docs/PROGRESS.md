@@ -2,9 +2,9 @@
 
 ## Latest
 
-Updated: 2026-11-17 15:20 (+08:00)
+Updated: 2026-11-17 16:55 (+08:00)
 
-**当前结论**：界面换肤 4 片全部完成（切片 4 亮色边角：Terra #836、K2.8 #837 approved）。明暗两套截图在 `docs/mockups/live/`（main/tasks/roles/settings 的 daylight 与 midnight）。生产 API 已重启、`/mcp` 生效，Terra/K2.8/Astra 均 running。下一步为路线图第 9 项（单目录收拢，需用户确认删除/迁移 `D:\TALK-portable`）。
+**当前结论**：界面换肤 4 片全部完成；第 9 项“单目录收拢”已由用户手动删除到回收站（5 项全部 gone，仓库与 `TALK-private` 保留），D 盘 TALK 相关只剩仓库与私密配置。生产 API 已重启、`/mcp` 生效，Terra/K2.8/Astra 均 running。下一步：路线图第 12 项（Codex CLI 新版适配）待用户确认后开工。
 
 ### 1) Current Progress
 - 路线图 13 项：第 1–7 已完成；第 8 项（运行器提示）并入换肤切片 1 完成；第 9→13 项待推进（第 9 单目录收拢、第 10 Release、第 11 交接文档、第 12 Codex 版本适配、第 13 终端身份隐藏）。
@@ -42,17 +42,19 @@ Updated: 2026-11-17 15:20 (+08:00)
 
 ## 待清理清单（2026-11-17 登记，未执行）
 
-第 9 项“单目录收拢”：用户要求**先不动、只登记**，等后续确认再处理。现状：
+第 9 项“单目录收拢”：**2026-11-17 16:5x 用户已手动删除到回收站**（协调者核查：5 项均已不存在），D 盘 TALK 相关只保留仓库与 `TALK-private`。
 
-| 路径 | 大小 | 说明 | 建议 |
-|---|---|---|---|
-| `D:\TALK-portable` | 676 MB / 3760 文件 | 便携包构建产物 | 可移到隔离区后删除，需要时重建 |
-| `D:\TALK-portable-clean.zip` | 20.7 MB | 便携包 zip | 同上（Release 资产可重建） |
-| `D:\TALK-archive-20261114` | 6.9 MB | 11-14 清理归档：`cited-evidence`(4.8MB/145) + `root-stale-copies`(2.1MB/14) + `stray-profile-root-20261115` | 可移隔离区 |
-| `D:\claude-test\talk-test-temp` | 0 MB / 0 文件 | 旧测试临时目录 | 可移隔离区 |
-| `D:\claude-testshotsprofile-daylight` | 23.5 MB / 421 文件 | 截图命令误建的 Edge profile 目录 | 可移隔离区 |
+已清理（用户手动，回收站可恢复）：
 
-保留项：`D:\claude-test\TALK`（仓库）、`D:\claude-test\TALK-private`（私密运行时配置：`talk-runtime.json`/keys/operator.key，运行必需）、`D:\backups`（安全备份）、`D:\agent-trash`（隔离区）、`D:\agent-audit`（审计日志）。
+| 路径 | 大小 | 说明 |
+|---|---|---|
+| `D:\TALK-portable` | 676 MB | 便携包构建产物 |
+| `D:\TALK-portable-clean.zip` | 20.7 MB | 便携包 zip |
+| `D:\TALK-archive-20261114` | 6.9 MB | 11-14 清理归档 |
+| `D:\claude-test\talk-test-temp` | 空 | 旧测试临时目录 |
+| `D:\claude-testshotsprofile-daylight` | 23.5 MB | 截图命令误建的 Edge profile |
+
+保留项：`D:\claude-test\TALK`（仓库）、`D:\claude-test\TALK-private`（私密运行时配置，运行必需）、`D:\backups`、`D:\agent-trash`、`D:\agent-audit`。删除前已核查：运行配置/进程/启动项/DB 配置指针均不依赖这些目录（DB 仅历史消息文本提及）。
 
 ## Recent Notes
 - 归档/备份：`D:\backups\codex-sandbox-rebuild-20261116-1345`、`D:\backups\talk-acl-20261116-0035`、`D:\backups\talk-legacy-convert-20261116-1025`；诊断日志 `D:\agent-trash\talk-diag\codex-spawn.log`。
