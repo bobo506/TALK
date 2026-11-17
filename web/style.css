@@ -382,7 +382,7 @@ button:disabled {
   font-size: 20px;
   line-height: 1;
   font-weight: 750;
-  box-shadow: 0 1px 3px rgba(47, 54, 64, 0.08);
+  box-shadow: var(--icon-shadow);
 }
 
 .icon-action.subtle {
@@ -454,7 +454,7 @@ button:disabled {
   border-color: var(--green);
   background: var(--blue-soft);
   color: var(--text);
-  box-shadow: 0 10px 22px rgba(47, 111, 177, 0.08);
+  box-shadow: var(--chip-shadow);
 }
 
 .group-room-list {
@@ -500,7 +500,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(17, 22, 28, 0.42);
+  background: var(--overlay);
 }
 
 .modal-overlay.hidden {
@@ -548,7 +548,7 @@ button:disabled {
 }
 
 .modal-close:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--card-soft);
   color: var(--text);
 }
 
@@ -611,7 +611,7 @@ button:disabled {
 .history-search-input:focus,
 .composer-textarea:focus {
   border-color: var(--line-strong);
-  box-shadow: 0 0 0 3px rgba(82, 119, 156, 0.14);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 input.auth-input:-webkit-autofill,
@@ -658,7 +658,7 @@ input.auth-input:-webkit-autofill:focus,
   align-items: center;
   gap: 6px;
   padding: 4px 8px 4px 12px;
-  border: 1px solid rgba(82, 119, 156, 0.30);
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--blue-soft);
   color: var(--text);
@@ -694,10 +694,10 @@ input.auth-input:-webkit-autofill:focus,
 .auth-primary-btn,
 .send-btn {
   min-height: 38px;
-  border: 1px solid var(--blue-strong);
+  border: 1px solid var(--control-primary-bg);
   border-radius: 8px;
-  background: var(--blue-strong);
-  color: #ffffff;
+  background: var(--control-primary-bg);
+  color: var(--control-primary-fg);
   font-size: var(--font-control);
   font-weight: 750;
   padding: 0 14px;
@@ -848,7 +848,7 @@ input.auth-input:-webkit-autofill:focus,
   color: var(--text);
   padding: 11px 12px;
   text-align: left;
-  box-shadow: 0 3px 10px rgba(47, 54, 64, 0.045);
+  box-shadow: var(--shadow-soft);
 }
 
 .task-card:hover,
@@ -1183,9 +1183,9 @@ input.auth-input:-webkit-autofill:focus,
 
 .history-btn.primary,
 #history-search-btn {
-  border-color: var(--blue-strong);
-  background: var(--blue-strong);
-  color: #ffffff;
+  border-color: var(--control-primary-bg);
+  background: var(--control-primary-bg);
+  color: var(--control-primary-fg);
 }
 
 .history-status {
@@ -1421,7 +1421,7 @@ pre {
   border-radius: 10px;
   background: var(--card);
   color: var(--text);
-  box-shadow: 0 18px 36px rgba(47, 54, 64, 0.14);
+  box-shadow: var(--menu-shadow);
 }
 
 #mention-dropdown li {
@@ -1664,7 +1664,7 @@ pre {
 
 .room-danger-btn:hover {
   background: var(--red);
-  color: #ffffff;
+  color: var(--danger-hover-fg);
 }
 
 .room-danger-btn:disabled {
@@ -1940,3 +1940,12 @@ input, textarea, select { background-color: var(--input); color: var(--text); bo
 .runner-banner small, .runner-status small { color: var(--muted-strong); }
 .runner-banner button { margin-left: auto; color: var(--muted); background: transparent; border: 0; font-size: 20px; }
 .runner-status { margin-bottom: 24px; }
+
+/* Shared themed form and rich text details. */
+input::placeholder, textarea::placeholder { color: var(--muted-strong); opacity: 1; }
+input:disabled, textarea:disabled, select:disabled { background-color: var(--card-soft); color: var(--muted-strong); cursor: not-allowed; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.rich-text code { background: var(--card-soft); color: var(--text); }
+.rich-text pre { background: var(--card-soft); color: var(--text); border-color: var(--line-strong); }
+.rich-text blockquote { border-left: 3px solid var(--blue); background: var(--card-soft); color: var(--muted-strong); }
+html { scrollbar-color: var(--scroll-thumb) var(--scroll-track); }

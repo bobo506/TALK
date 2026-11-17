@@ -48,3 +48,5 @@
 .role-request-card {background:var(--panel); box-shadow:var(--shadow-soft);}
 .role-request-steps li {min-width:0; overflow-wrap:anywhere;}
 @media(max-width:700px) {.role-create-dialog {box-sizing:border-box; max-height:calc(100vh / var(--interface-scale, 1) - 24px);} .role-create-footer {flex-wrap:wrap; gap:10px;} .role-create-footer button {max-width:100%;}}
+
+.role-request-field input:disabled,.role-request-field select:disabled,.role-request-field textarea:disabled {background:var(--card-soft); color:var(--muted-strong);}
