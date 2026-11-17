@@ -260,6 +260,15 @@ class BootStatusDesktopTests(unittest.TestCase):
             desktop.launch_window('http://127.0.0.1:8123', {})
         browser.assert_called_once_with('http://127.0.0.1:8123/loading?desktop=1')
 
+    def test_window_passes_health_url_to_browser(self):
+        with tempfile.TemporaryDirectory() as home, \
+             patch.object(desktop, 'find_browser', return_value='browser.exe'), \
+             patch.object(desktop, 'run_browser') as browser:
+            self.assertTrue(desktop.launch_window('http://127.0.0.1:8123', {'LOCALAPPDATA': home}))
+        browser.assert_called_once_with('browser.exe', Path(home) / 'TALK',
+                                        'http://127.0.0.1:8123/loading?desktop=1',
+                                        {'LOCALAPPDATA': home}, health_url='http://127.0.0.1:8123')
+
     def test_summary_overwrites_and_removes_sensitive_paths(self):
         import json
         with tempfile.TemporaryDirectory() as home:

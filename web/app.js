@@ -3464,7 +3464,13 @@ document.getElementById("shutdown-service-btn").addEventListener("click", async 
     } else if (response.status === 403) {
       alert("无权限退出服务，请使用本机操作员或运行 stop.bat。");
     } else if (response.status === 409) {
-      alert("当前非桌面启动或无法停止服务，请运行 stop.bat。");
+      const body = await response.json().catch(() => ({}));
+      if (body.detail?.code === "tasks_running") {
+        const ids = (body.detail.task_ids || []).map(id => `#${id}`).join("、");
+        alert(`有任务执行中（${ids}），请等待任务结束后再退出服务。`);
+      } else {
+        alert("当前非桌面启动或无法停止服务，请运行 stop.bat。");
+      }
     } else {
       alert("退出服务失败，请运行 stop.bat。");
     }

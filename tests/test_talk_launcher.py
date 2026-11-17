@@ -1,5 +1,6 @@
 """Desktop launcher ownership and shutdown tests; no GUI or production state."""
 import os
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -129,6 +130,56 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(launcher.find_browser(env, 'darwin'), chrome[1])
         with patch.object(Path, 'is_file', autospec=True, side_effect=lambda path: path == edge[0]):
             self.assertEqual(launcher.find_browser(env, 'darwin'), edge[0])
+
+    def test_preferences_create_merge_and_recover_corrupt_json(self):
+        profile = self.home / 'profile'
+        preferences = profile / 'Default' / 'Preferences'
+        launcher.prepare_browser_profile(profile)
+        self.assertEqual(json.loads(preferences.read_text(encoding='utf-8')), {'background_mode': {'enabled': False}})
+        preferences.write_text(json.dumps({'other': {'value': 1}, 'background_mode': {'enabled': True, 'extra': 2}}), encoding='utf-8')
+        launcher.prepare_browser_profile(profile)
+        self.assertEqual(json.loads(preferences.read_text(encoding='utf-8')), {'other': {'value': 1}, 'background_mode': {'enabled': False, 'extra': 2}})
+        preferences.write_text('{broken', encoding='utf-8')
+        launcher.prepare_browser_profile(profile)
+        self.assertEqual(json.loads(preferences.read_text(encoding='utf-8')), {'background_mode': {'enabled': False}})
+
+    def test_health_monitor_three_consecutive_failures_terminate_tree(self):
+        process = unittest.mock.Mock(pid=1234)
+        process.poll.return_value = None
+        stop = unittest.mock.Mock()
+        stop.wait.return_value = False
+        stop.is_set.return_value = False
+        closed = unittest.mock.Mock()
+        with patch.object(launcher, 'healthy', side_effect=[False, True, False, False, False]) as health, \
+             patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as kill:
+            launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, closed)
+        self.assertEqual(health.call_count, 5)
+        kill.assert_called_once_with(['taskkill', '/PID', '1234', '/T', '/F'], capture_output=True, check=False)
+        closed.set.assert_called_once_with()
+        process.terminate.assert_not_called()
+
+    def test_health_monitor_success_does_not_terminate(self):
+        process = unittest.mock.Mock()
+        process.poll.return_value = None
+        stop = unittest.mock.Mock()
+        stop.wait.side_effect = [False, False, True]
+        closed = unittest.mock.Mock()
+        with patch.object(launcher, 'healthy', return_value=True), patch.object(launcher.subprocess, 'run') as kill:
+            launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, closed)
+        kill.assert_not_called()
+        process.terminate.assert_not_called()
+        closed.set.assert_not_called()
+
+    def test_health_monitor_non_windows_terminates_handle(self):
+        process = unittest.mock.Mock()
+        process.poll.return_value = None
+        stop = unittest.mock.Mock()
+        stop.wait.return_value = False
+        stop.is_set.return_value = False
+        with patch.object(launcher, 'healthy', return_value=False), patch.object(launcher.os, 'name', 'posix'):
+            launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, unittest.mock.Mock())
+        process.terminate.assert_called_once_with()
 
     def test_edge_arguments_and_autoclose(self):
         process = unittest.mock.Mock()

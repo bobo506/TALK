@@ -437,6 +437,8 @@ class TalkRuntime:
             return self.spawn_override(label, argv)
         env = os.environ.copy()
         env["PYTHONPATH"] = str(ROOT) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+        if label == "api" and self.config_path:
+            env["TALK_RUNTIME_CONFIG"] = str(self.config_path.resolve())
         with (self.private / (label + ".out")).open("ab") as stdout, (self.private / (label + ".err")).open("ab") as stderr:
             return subprocess.Popen(argv, cwd=self.project_root, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, env=env,
                 startupinfo=rsh._hidden_startupinfo(), **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}))

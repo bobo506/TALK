@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 from server.models import Project, ProjectAgent, ProjectRole
@@ -7,7 +8,7 @@ from tests.test_support import RouteTestCase
 class TestTerminalIdentityFilter(RouteTestCase):
     def test_project_lists_and_terminal_authentication(self):
         terminal = {"agent:codex-t", "agent:kimi-t", "agent:dsh-t", "agent:workbuddy-t"}
-        execution = {"agent:terra", "agent:k2.8", "agent:astra", "agent:test-t"}
+        execution = {"agent:terra", "agent:k2.8", "agent:astra", "agent:test-t", "agent:test", "agent:prj-example.terra-123", "agent:codex", "agent:kimi", "agent:workbuddy"}
         self.add_member("human:test", api_key="human-key")
         for index, member_id in enumerate(sorted(terminal | execution)):
             self.add_member(member_id, api_key=f"agent-key-{index}")
@@ -15,8 +16,9 @@ class TestTerminalIdentityFilter(RouteTestCase):
             session.add(Project(project_id="prj_test", display_name="Test", maintainer_member_id="human:test"))
             for member_id in terminal | execution:
                 session.add(ProjectAgent(project_id="prj_test", member_id=member_id))
-            for member_id in terminal:
-                session.add(ProjectRole(project_id="prj_test", member_id=member_id, role_name=member_id, created_by="human:test"))
+            for member_id in terminal | execution:
+                archived_at = datetime.now(timezone.utc) if member_id in {"agent:codex", "agent:kimi", "agent:workbuddy"} else None
+                session.add(ProjectRole(project_id="prj_test", member_id=member_id, role_name=member_id, created_by="human:test", archived_at=archived_at))
             session.commit()
         with self.make_client() as client:
             for endpoint in ("agents", "roles"):
@@ -29,8 +31,8 @@ class TestTerminalIdentityFilter(RouteTestCase):
                     response = client.get("/api/members/me", headers={"X-API-Key": f"agent-key-{index}"})
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.json()["id"], member_id)
-                    response = client.get(
-                        f"/api/projects/prj_test/roles/{quote(member_id, safe='')}/tasks",
-                        headers={"X-API-Key": "human-key"},
-                    )
-                    self.assertEqual(response.status_code, 200, response.text)
+                response = client.get(
+                    f"/api/projects/prj_test/roles/{quote(member_id, safe='')}/tasks",
+                    headers={"X-API-Key": "human-key"},
+                )
+                self.assertEqual(response.status_code, 200, response.text)

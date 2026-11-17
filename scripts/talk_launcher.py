@@ -66,9 +66,47 @@ def find_browser(env, platform=None):
     return next((path for path in (*chrome, *edge) if path.is_file()), None)
 
 
-def run_browser(browser, home, url, env):
+def prepare_browser_profile(profile):
+    preferences = profile / 'Default' / 'Preferences'
+    preferences.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        data = json.loads(preferences.read_text(encoding='utf-8'))
+        if not isinstance(data, dict):
+            data = {}
+    except (FileNotFoundError, UnicodeDecodeError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data.get('background_mode'), dict):
+        data['background_mode'] = {}
+    data['background_mode']['enabled'] = False
+    preferences.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+
+
+def monitor_browser_health(process, health_url, stop, closed):
+    failures = 0
+    while not stop.wait(2):
+        if process.poll() is not None:
+            return
+        failures = 0 if healthy(health_url) else failures + 1
+        if failures >= 3:
+            if stop.is_set() or process.poll() is not None:
+                return
+            try:
+                closed.set()
+                if os.name == 'nt':
+                    result = subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                                            capture_output=True, check=False)
+                    if result.returncode:
+                        closed.clear()
+                else:
+                    process.terminate()
+            except OSError:
+                closed.clear()
+            return
+
+
+def run_browser(browser, home, url, env, health_url=None):
     profile = home / 'data' / 'launcher-profile'
-    profile.mkdir(parents=True, exist_ok=True)
+    prepare_browser_profile(profile)
     delay = env.get('TALK_LAUNCHER_AUTOCLOSE_MS')
     seconds = max(0, int(delay)) / 1000 if delay else None
     process = subprocess.Popen([str(browser), f'--app={url}', f'--user-data-dir={profile}',
@@ -76,6 +114,13 @@ def run_browser(browser, home, url, env):
                                 '--disable-background-mode'], env=env)
     timer = None
     auto_closed = False
+    stop_monitor = threading.Event()
+    health_closed = threading.Event()
+    monitor = None
+    if health_url:
+        monitor = threading.Thread(target=monitor_browser_health,
+                                   args=(process, health_url, stop_monitor, health_closed), daemon=True)
+        monitor.start()
     if seconds is not None:
         def close_browser():
             nonlocal auto_closed
@@ -91,10 +136,13 @@ def run_browser(browser, home, url, env):
     try:
         exit_code = process.wait()
     finally:
+        stop_monitor.set()
+        if monitor:
+            monitor.join()
         if timer:
             timer.cancel()
             timer.join()
-    if exit_code and not auto_closed:
+    if exit_code and not auto_closed and not health_closed.is_set():
         raise LauncherError(f"浏览器启动或运行失败（退出码 {exit_code}）。")
 
 

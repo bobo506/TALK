@@ -152,7 +152,7 @@ def launch_window(url, env):
         notify('已使用系统默认浏览器；关闭标签页不会自动停服务，可用 stop.bat 停止服务。')
         return False
     profile_root = Path(env.get('LOCALAPPDATA') or Path.home()) / 'TALK'
-    run_browser(browser, profile_root, url + DESKTOP_QUERY, env)
+    run_browser(browser, profile_root, url + DESKTOP_QUERY, env, health_url=url)
     return True
 
 
