@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-17 10:10 — 启动误报/加载页/BOM/乱码修复（Terra 开发、K2.8 复核）
+
+- 背景：用户重启后加载页报“启动阶段报错”、主页误报“未检测到运行器”。定位三个问题：启动器在服务未起时做成员检查导致 `api_unavailable` → `ready:false`；`boot_status.py`/`talk_desktop.py` 存在中文乱码；加载页把警告当硬失败。
+- 交付（`41bbcf9`）：`talk_desktop.py` start 分支改为 `service.start()` → `wait_healthy()` → onboarding → 写 boot 状态 → 开窗；`write_boot_status` 仅 `errors` 非空判失败，`member_status` 白名单透传；`boot_status.py` 修复乱码并改用 `utf-8-sig` 读取（容忍 BOM）；`loading.html` 在 `service_ready=true` 且 `launcher.ready=false` 时显示警告 + “继续进入” + 约 5 秒自动跳转，仅服务不可用才停错误页；两测试文件补顺序/过滤/BOM/页面断言。
+- 复核：K2.8 #827 approved with limitations（唯一必须修项 = BOM，已由 #829 修复），#830 定向确认 **approved**（6 + 25 项测试通过、BOM 实测 ready:true、生产 8000 未重启）。
+- 说明：期间修正了 ACL 事故（见上一条）；`#828` 因仓库根 `Everyone:(CI)(DENY)(S,DC)` 导致原子替换写入失败，改用就地写入后完成。
+
 ## 2026-11-17 09:50 — 角色全部无法启动事故：Key/私有目录 ACL 被继承 ACE 破坏（已修复）
 
 - 现象：设备重启后 Terra/K2.8 均 `failed`、Astra `stopped`；role host `.out` 反复输出 `{"ok": false, "error_code": "key_permissions_failed"}`；`runtime health.json` 中 hosts 均为 `manager_failed`，API 启动角色返回 `workspace_runtime_not_ready`；原 runtime 进程已退出。
