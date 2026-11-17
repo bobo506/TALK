@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-17 23:05 — “退出服务”按钮移到右上角（Terra #855，K2.8 #856 approved）
+
+- 需求：用户反馈按钮太小、固定在右下角不直观，要求放到“本机操作员”旁边。
+- 交付（`9fa801d`）：`web/index.html` 把 `#shutdown-service-btn` 移入 header `.header-actions`（`#user-badge` 后），去掉 fixed 内联样式；`web/style.css` 新增 `.shutdown-service-btn`（tokens、12px、hover、nowrap、title）；缓存戳 `20261117-shutdown-header`。
+- 复核：K2.8 #856 approved——CDP 实测 1280 宽按钮 x=1201,y=16,w=56,h=23，1024/900 窄屏无重叠；tokens/hover/nowrap 正常；`node --check`、25+3 测试通过；截图 `docs/mockups/live/live_main_shutdown_button.png`（协调者重抓主页面版本，初版为加载页）。
+- 已知小限制：hover 的 `background: var(--panel-2)` 在 tokens 中未定义，回退透明（颜色/边框 hover 仍生效），非阻断。
+
 ## 2026-11-17 22:45 — 第 10/11 项：便携包构建 + 首次冒烟 + 交接文档
 
 - 便携包 Key 默认改为包内（Terra #853，K2.8 #854 approved，`c8bc206`）：`scripts/portable_paths.py::keys_dir()` 默认 `<TALK_HOME>/data/keys`，`TALK_KEYS_DIR` 仍可覆盖；`build_portable.py` README 同步（含“复制文件夹=带走 Key”提示，不再提 LOCALAPPDATA）；新增/更新测试 10 passed。
