@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-11-17 09:50 — 角色全部无法启动事故：Key/私有目录 ACL 被继承 ACE 破坏（已修复）
+
+- 现象：设备重启后 Terra/K2.8 均 `failed`、Astra `stopped`；role host `.out` 反复输出 `{"ok": false, "error_code": "key_permissions_failed"}`；`runtime health.json` 中 hosts 均为 `manager_failed`，API 启动角色返回 `workspace_runtime_not_ready`；原 runtime 进程已退出。
+- 根因：`C:\Users\Administrator\.talk` 上残留一条显式 `CodexSandboxUsers:(OI)(CI)(RX)` ACE（此前沙箱实验遗留），继承到 `.talk\keys` 下所有 role key；TALK 的 `_windows_verify_private_acl` 要求“仅私有主体、无继承 ACE、无 DENY”，因此所有 host 拒绝启动。清理该 ACE 后又发现 `.talk` 自身改为继承 profile，导致 `role-service-host/runtime`、各角色 workspace `state` 目录里的临时文件继承 `Administrator` ACE，`_windows_publish_temp_file` 校验失败、runtime 启动即崩。
+- 修复（协调者操作，全部先备份 ACL）：
+  - `D:\backups\talk-keys-acl-20261117`、`D:\backups\talk-state-acl-20261117` 保存原 ACL；
+  - `icacls C:\Users\Administrator\.talk /remove:g *S-1-5-21-...-1002` 清除沙箱组 ACE；
+  - 对 `.talk\keys` 下 50 个 `*.key` 逐个 `/inheritance:r` + 仅授予 SYSTEM/Administrators/Administrator（显式，非继承）；
+  - 对 `role-service-host\runtime`、`role-service-host\roles` 及三个 workspace 角色的 `state` 目录设置**非继承**私有 ACL（`(F)` 不带 OI/CI），并恢复 `launcher.lock` 访问；
+  - 手动重启 runtime（pid 12516，`--attach-api`），再依次 start Terra/K2.8/Astra；当前三者均 `running/success`。
+- 验证：`_windows_verify_private_acl` 对全部 `agent_*.key` 返回 True；host `.out` 不再出现 `key_permissions_failed`；`role-services` 三角色 running。
+- 教训/后续：沙箱实验对用户目录/私有目录的 ACL 变更必须记录并在结束时恢复；建议增加启动自检（Key 私有 ACL + runtime 存活）与恢复提示，避免只显示“启动阶段报错”。`#826` 的启动顺序/提示修复仍在复核（#827）。
+
 ## 2026-11-16 22:20 — 界面统一换肤 · 切片 1 完成（Terra 开发、K2.8 复核）
 
 - 用户确认方向：统一为效果图风格，明暗两套 tokens，默认 midnight（深色），保留切换；提示条关闭后在项目设置保留“运行器接入状态”入口。效果图与真实截图见 `docs/mockups/`（含 `after/` 四张）。

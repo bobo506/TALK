@@ -2,14 +2,15 @@
 
 ## Latest
 
-Updated: 2026-11-16 22:20 (+08:00)
+Updated: 2026-11-17 09:55 (+08:00)
 
-**当前结论**：界面统一换肤·切片 1 已完成（Terra 开发、K2.8 复核 approved，`2517fd4`）：`midnight/daylight` 两套 tokens、全局外壳、加载页改 tokens、运行器提示条（第 8 项并入）与项目设置“运行器接入状态”；真实截图见 `docs/mockups/after/`。下一步为切片 2（任务区换肤）。生产 `8000` 尚未重启，`/mcp` 与新 boot 状态接口未生效。
+**当前结论**：设备重启后角色因 **Key/私有目录 ACL 被继承 ACE 破坏**而全部启动失败，已修复（清理沙箱组 ACE、重置私有 ACL、重启 runtime），Terra/K2.8/Astra 均 running；详见 `PROGRESS_HISTORY.md` 2026-11-17 09:50。界面换肤切片 1 已完成（`2517fd4` + `f9d0ac2`）；`#826`（启动顺序/加载页警告/乱码修复）仍在 K2.8 复核（#827）。
 
 ### 1) Current Progress
 - 路线图 13 项：第 1–7 已完成；第 8 项（运行器提示）并入换肤切片 1 完成；第 9→13 项待推进（第 9 单目录收拢、第 10 Release、第 11 交接文档、第 12 Codex 版本适配、第 13 终端身份隐藏）。
 - 换肤切片 1 已完成（`2517fd4` + 加载页 chips/轨道 `f9d0ac2`）；切片 2（任务区：任务列表/任务 Hall/输入框/弹窗）待开工；切片 3（角色/设置/诊断页）、切片 4（亮色主题边角统一）后续。
 - 角色：Terra（codex）、K2.8（kimi-code）、Astra（codex，仅咨询）均 running；Terra 命令/读写能力已验收。
+- 2026-11-17 09:50 事故修复：`.talk` 残留 `CodexSandboxUsers` ACE → keys 继承 → host `key_permissions_failed`；runtime 因临时文件继承 ACE 崩溃。已按 `PROGRESS_HISTORY.md` 备份并重置私有 ACL、手动重启 runtime（pid 12516），三角色 running。
 - 换肤切片 1 交付：`web/theme-tokens.css`（两套 tokens）、`web/style.css` 外壳、`web/loading.html`、`web/theme.js`（默认 midnight、旧值迁移、无闪烁）、`web/index.html`/`web/app.js`（两种提示条 + 设置区）、`server/routes/boot_status.py`（`runners`）。
 - 运行环境：Codex CLI 钉 `0.164.0`；Kimi Code CLI `2.0.2`；Terra runner 与仓库根目录完整性标签为 **Medium**（手动修复，重建/升级后需复查）。
 
