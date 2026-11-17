@@ -135,6 +135,7 @@ from scripts.role_provision import (  # noqa: E402 - 复用 R1-2 已验私有创
     _windows_build_private_security_attributes,
     _windows_publish_temp_file,
     _windows_verify_private_acl,
+    _windows_harden_trusted_inherited_acl,
     acquire_lock,
     assert_inside_root,
     lock_path_for,
@@ -2086,6 +2087,10 @@ class HostManager:
         key_file = self.role_key_path(member_id)
         if not key_file.is_file():
             raise HostError("identity_mismatch", "角色 Key 文件不存在")
+        if os.name == "nt":
+            ok, detail = _windows_harden_trusted_inherited_acl(key_file)
+            if not ok:
+                raise HostError("key_permissions_failed", f"Key ACL check failed: {detail}; inspect ACL, remove untrusted entries and configure private grants with icacls <key-file> /inheritance:r")
         try:
             role_key = key_file.read_text(encoding="utf-8").strip()
         except OSError as exc:

@@ -1272,6 +1272,11 @@ class TalkRuntime:
 
     def _serve(self):
         rsh.ensure_private_dir(self.private)
+        if os.name == "nt":
+            for label, directory in (("state_dir", Path(self.config["state_dir"])), ("runtime", self.private)):
+                ok, detail = rsh._windows_verify_private_acl(directory)
+                if not ok:
+                    print(f"state_dir_insecure: {label} ACL check failed: {detail}; inspect directory ACL and inheritance", file=sys.stderr, flush=True)
         rsh.ensure_private_dir(Path(self.config["state_dir"])/"api-service")
         self.operator = Path(self.config["operator_key_file"]).read_text(encoding="utf-8").strip()
         for journal in self.diagnostics.values():

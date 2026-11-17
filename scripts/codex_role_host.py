@@ -321,6 +321,12 @@ def main(argv=None):
         if context is not None:
             rsh.validate_workspace_context(context, project=args.project, member=args.member,
                 project_root=Path(args.project_root), key_root=Path(args.key_root), role_key_file=key_path)
+        if os.name == 'nt':
+            ok, detail = rsh._windows_harden_trusted_inherited_acl(key_path)
+            if not ok:
+                raise rsh.HostError('key_permissions_failed',
+                    f'Key ACL check failed: {detail}; inspect ACL, remove untrusted entries '
+                    'and configure private grants with icacls <key-file> /inheritance:r')
         role_key = key_path.read_text(encoding='utf-8').strip()
         identity = client.request('GET', '/api/members/me', key=role_key)
         if identity.get('id') != args.member or identity.get('kind') != 'agent':
@@ -361,7 +367,10 @@ def main(argv=None):
     except (rsh.HostError, OSError, ValueError) as exc:
         if manager is not None and manager._handles:
             raise
-        print(json.dumps({'ok': False, 'error_code': getattr(exc, 'code', 'codex_host_config_invalid')}))
+        error = {'ok': False, 'error_code': getattr(exc, 'code', 'codex_host_config_invalid')}
+        if isinstance(exc, rsh.HostError) and exc.code == 'key_permissions_failed':
+            error['detail'] = str(exc)
+        print(json.dumps(error))
         return 1
 
 

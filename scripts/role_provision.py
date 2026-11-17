@@ -904,6 +904,10 @@ if _WINDOWS:  # pragma: no cover - 平台分支，Windows 上由真实调用覆�
                 _wt.BOOL,
             ]
             advapi32.SetSecurityDescriptorDacl.restype = _wt.BOOL
+            advapi32.SetSecurityDescriptorControl.argtypes = [ctypes.c_void_p, _wt.WORD, _wt.WORD]
+            advapi32.SetSecurityDescriptorControl.restype = _wt.BOOL
+            advapi32.SetNamedSecurityInfoW.argtypes = [_wt.LPWSTR, ctypes.c_int, _wt.DWORD, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+            advapi32.SetNamedSecurityInfoW.restype = _wt.DWORD
             advapi32.GetNamedSecurityInfoW.argtypes = [
                 _wt.LPWSTR,
                 ctypes.c_int,
@@ -1363,6 +1367,8 @@ def _windows_build_private_security_attributes() -> "_WindowsPrivateSecurity":
             raise _WindowsAclError("InitializeSecurityDescriptor failed")
         if not _advapi32.SetSecurityDescriptorDacl(descriptor, True, acl, False):
             raise _WindowsAclError("SetSecurityDescriptorDacl failed")
+        if not _advapi32.SetSecurityDescriptorControl(descriptor, 0x1000, 0x1000):
+            raise _WindowsAclError("SetSecurityDescriptorControl failed")
         attributes = _SecurityAttributes(
             nLength=ctypes.sizeof(_SecurityAttributes),
             lpSecurityDescriptor=ctypes.cast(descriptor, ctypes.c_void_p),
@@ -1462,11 +1468,15 @@ def _windows_verify_private_acl(path: Path) -> tuple[bool, str]:
             return False, "acl_empty"
         allowed = set(_windows_acl_sids())
         seen: list[str] = []
+        origins: list[str] = []
         for index in range(info.AceCount):
             ace = ctypes.c_void_p()
             if not _advapi32.GetAce(dacl, index, ctypes.byref(ace)):
                 return False, "get_ace_failed"
             header = ctypes.cast(ace, ctypes.POINTER(_AceHeader)).contents
+            origin = "inherited" if header.AceFlags & 0x10 else "explicit"
+            if header.AceType not in (0x00, 0x01) or header.AceSize < 16:
+                return False, f"unsupported_ace:type={header.AceType}:{origin}"
             sid_text = ctypes.c_wchar_p()
             try:
                 if not _advapi32.ConvertSidToStringSidW(
@@ -1479,18 +1489,40 @@ def _windows_verify_private_acl(path: Path) -> tuple[bool, str]:
                 if sid_text:
                     _kernel32.LocalFree(ctypes.cast(sid_text, ctypes.c_void_p))
             seen.append(sid)
-            if header.AceFlags & 0x10:  # INHERITED_ACE
-                return False, f"inherited_ace:{sid}"
-            if header.AceType != 0x00:  # ACCESS_ALLOWED_ACE_TYPE
-                return False, f"non_allowed_ace:{sid}"
+            if header.AceType != 0x00:
+                return False, f"non_allowed_ace:{sid}:{origin}"
             if sid not in allowed:
-                return False, f"extra_principal:{sid}"
+                return False, f"extra_principal:{sid}:{origin}"
+            origins.append(origin)
         if _windows_current_user_sid() not in seen:
             return False, "current_user_missing"
-        return True, "acl=" + ",".join(seen)
+        return True, "acl=" + ",".join(f"{sid}:{origin}" for sid, origin in zip(seen, origins))
     finally:
         if descriptor:
             _kernel32.LocalFree(descriptor)
+
+
+def _windows_harden_trusted_inherited_acl(path: Path) -> tuple[bool, str]:
+    """Protect a verified ACL with trusted inherited entries; reject untrusted entries."""
+    ok, detail = _windows_verify_private_acl(path)
+    if not ok or ":inherited" not in detail:
+        return ok, detail
+    if _is_reparse_point(path):
+        return False, "reparse_point"
+    try:
+        security = _windows_build_private_security_attributes()
+    except (_WindowsAclError, OSError):
+        return False, "repair_security_descriptor_failed"
+    try:
+        status = _advapi32.SetNamedSecurityInfoW(
+            str(path), 1, 0x80000004, None, None,
+            ctypes.cast(security._keepalive[0], ctypes.c_void_p), None,
+        )
+        if status:
+            return False, f"repair_failed status={status}"
+    finally:
+        security.close()
+    return _windows_verify_private_acl(path)
 
 
 def _enforce_private_permissions(path: Path) -> str:
