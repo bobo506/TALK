@@ -40,6 +40,20 @@ Updated: 2026-11-17 15:20 (+08:00)
 - 第 3 项：新增 `server/routes/mcp.py`、`bridges/talk_tool_registry.py`、`bridges/talk_call_context.py`、`tests/test_mcp_http.py`；修改 `server/main.py`、`bridges/talk_task_tools.py`、`bridges/initiator_followup.py`。
 - 提交：`9928882`（第 7 项）；`f6ee423`（第 6 项）；`c033683`、`c73587f`（第 4 项）；`2be7a3f`（第 3 项）。
 
+## 待清理清单（2026-11-17 登记，未执行）
+
+第 9 项“单目录收拢”：用户要求**先不动、只登记**，等后续确认再处理。现状：
+
+| 路径 | 大小 | 说明 | 建议 |
+|---|---|---|---|
+| `D:\TALK-portable` | 676 MB / 3760 文件 | 便携包构建产物 | 可移到隔离区后删除，需要时重建 |
+| `D:\TALK-portable-clean.zip` | 20.7 MB | 便携包 zip | 同上（Release 资产可重建） |
+| `D:\TALK-archive-20261114` | 6.9 MB | 11-14 清理归档：`cited-evidence`(4.8MB/145) + `root-stale-copies`(2.1MB/14) + `stray-profile-root-20261115` | 可移隔离区 |
+| `D:\claude-test\talk-test-temp` | 0 MB / 0 文件 | 旧测试临时目录 | 可移隔离区 |
+| `D:\claude-testshotsprofile-daylight` | 23.5 MB / 421 文件 | 截图命令误建的 Edge profile 目录 | 可移隔离区 |
+
+保留项：`D:\claude-test\TALK`（仓库）、`D:\claude-test\TALK-private`（私密运行时配置：`talk-runtime.json`/keys/operator.key，运行必需）、`D:\backups`（安全备份）、`D:\agent-trash`（隔离区）、`D:\agent-audit`（审计日志）。
+
 ## Recent Notes
 - 归档/备份：`D:\backups\codex-sandbox-rebuild-20261116-1345`、`D:\backups\talk-acl-20261116-0035`、`D:\backups\talk-legacy-convert-20261116-1025`；诊断日志 `D:\agent-trash\talk-diag\codex-spawn.log`。
 - 临时目录：仓库根仍有 `.tmp-acceptance`（历史）与 `.tmp-tests`（含 `mcp-799-archive`）；均未跟踪，未清理。
