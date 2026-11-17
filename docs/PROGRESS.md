@@ -2,9 +2,9 @@
 
 ## Latest
 
-Updated: 2026-11-17 22:45 (+08:00)
+Updated: 2026-11-18 00:30 (+08:00)
 
-**当前结论**：第 10/11 项主体完成（`c8bc206`）：便携包 Key 默认 `data/keys`、交接文档落地；最终包 `TALK-portable-0.1.0.zip`（24.9MB / 1474 文件 / sha256 `edac9d69…`）构建成功，隔离沙箱 bootstrap + HTTP 冒烟通过。**仅剩 GitHub Release 未发**（`gh` 未登录，待用户 `gh auth login`）。第 12/13 项、图标、ACL 健壮性均已完成；API 仍是 09:12 旧进程，待重启验证第 13 项与 ACL 新逻辑。
+**当前结论**：退出服务语义改为**停整机**（有 running 任务则 409 提示等待），浏览器托盘随服务停止自动退出，终端过滤回退为仅 `-t` 四个（`1fb21ab`，K2.8 #858/#861 approved，53 测试通过）。**待人工验证**：点“退出服务”后 runtime/角色/Chrome 托盘应全部消失。其余：便携包 `TALK-portable-0.1.0.zip` 已构建冒烟（sha256 `edac9d69…`），仅剩 GitHub Release（需 `gh auth login`）；API 已重启到 23:54 版本，但 runtime/角色宿主仍是旧进程，本次整机退出后重启可加载全部新代码。
 
 ### 1) Current Progress
 - 路线图 13 项：第 1–7 完成；第 8 并入换肤；第 9 用户清理；第 12、13 完成；**第 10（构建+冒烟完成，Release 待 gh 登录）、第 11（交接文档完成）**。

@@ -1,5 +1,15 @@
 # 开发历史 · TALK
 
+## 2026-11-18 00:30 — 退出服务停整机 + 托盘自动退出 + 终端过滤回退（Terra #857/#859/#860，K2.8 #858/#861 approved）
+
+- 背景：用户发现点“退出服务”只停 API，`talk_runtime` 与角色宿主继续存活（Astra 自 09:49 未停过，被误认为自动启动）；关闭窗口后 Chrome 托盘图标残留。
+- 交付（`1fb21ab`，9 文件 +236/−17）：
+  - **退出服务=停整机**：`server/routes/local_shutdown.py` 先查全库 `status=running` 任务，有则 409 `tasks_running`（最多 10 个 id，前端提示等待）；无则 detached spawn `talk_runtime stop --config … --apply --wait`，再写 API 控制文件；无 `TALK_RUNTIME_CONFIG` 时回退只停 API。`scripts/talk_runtime.py` 启动 API 时注入该 env；`web/app.js` 处理 409 提示。
+  - **托盘自动退出**：`scripts/talk_launcher.py` 对隔离 profile 写 `background_mode.enabled=false`，健康监控连续 3 次失败后 `taskkill /PID <本次Popen> /T /F`；关窗口但服务仍在时不终止。
+  - **终端过滤回退**：`server/routes/projects.py`/`web/workspace.js` 只过滤四个 `-t` 身份；`agent:codex/kimi/workbuddy` 历史上是执行角色（23/96/3 次 target），恢复显示。
+- 复核：K2.8 #858（A 通过、B 必须回退）+ #861（合并 approved）：53 项测试通过；确认 `talk_runtime.stop()` 关闭末期自行写控制文件（`talk-runtime-stop`），#859 延迟写仅边缘兜底、无害。
+- 待人工：真实点“退出服务”→ 确认 runtime/角色/Chrome 托盘全部消失；有任务时应提示等待。
+
 ## 2026-11-17 23:05 — “退出服务”按钮移到右上角（Terra #855，K2.8 #856 approved）
 
 - 需求：用户反馈按钮太小、固定在右下角不直观，要求放到“本机操作员”旁边。
