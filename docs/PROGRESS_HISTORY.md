@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-17 21:10 — 私有 ACL 健壮性（Terra #843/#846，K2.8 #847 approved）
+
+- 背景：今晨 ACL 事故的根因是 `_windows_verify_private_acl` 拒绝一切继承 ACE，而创建/发布文件会继承父目录 ACE；同时 Codex 专用宿主在读 key 前未接入预检。
+- 交付（`5ce37c3`，5 文件 +168/−7）：`scripts/role_provision.py` 校验按 ACE 逐条判定（可信主体 SYSTEM/Administrators/当前用户 的继承 ACE 通过并带 `:inherited`；外来 SID/DENY 拒绝；非 Windows 行为不变）、`SetSecurityDescriptorControl(SE_DACL_PROTECTED)` 受保护 DACL 创建、新增 `_windows_harden_trusted_inherited_acl` 自愈 helper（幂等、只收紧可信继承、外来文件拒绝不静默修复）；`scripts/role_service_host.py` 通用预检接入；`scripts/talk_runtime.py` state_dir/runtime 自检仅告警不崩；`scripts/codex_role_host.py` 读 role key 前调用自愈；新增 `tests/test_private_acl_robustness.py`（真实 icacls 构造 ACL）。
+- 复核：K2.8 #847 **approved**——41 passed + 9 subtests、`--check-version` 0.164 allowed、`git diff --check` 干净、自愈幂等且错误消息无路径/key 内容、生产角色未重启。
+- 生效条件：新逻辑需在 runtime/角色重启后才会加载（当前运行进程仍是旧代码）。
+
 ## 2026-11-17 17:50 — 路线图第 12 项完成：Codex CLI 新版适配（Terra 开发、K2.8 复核）
 
 - 交付（`faa57bc`，9 文件 +240/−70）：`bridges/codex_execution_native.py` 版本策略改为 `MIN_SUPPORTED=0.163` / `MAX_TESTED=0.169`，高于上限放行但带 `codex_version_untested` 警告，低于下限 `codex_version_unsupported`；九项能力探测（`--disable/--sandbox/--model/--skip-git-repo-check/--ignore-rules/--strict-config/--config/-c/exec/stdin -`），缺失报 `codex_capability_missing:<flag>`；60 秒进程内缓存（键含可执行文件 resolve+mtime+size、cwd、env 哈希，支持 `clear_codex_probe_cache()` 与 `use_cache=False`）；`scripts/codex_role_host.py`/`codex_role_setup.py` 共用 helper，旧 0.163/0.164 错误码兼容；新增 `--check-version` 只读自检；新增 `tests/test_codex_version_support.py` 并把旧锁定断言改为区间断言、mock 探测。
