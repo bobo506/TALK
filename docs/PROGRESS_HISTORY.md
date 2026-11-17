@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-17 15:20 — 界面换肤 · 切片 4 完成（亮色主题边角统一，Terra 开发、K2.8 复核）
+
+- 交付：`web/theme-tokens.css` 新增 `--control-primary-bg/-fg`、`--danger-hover-fg`、`--icon-shadow`、`--chip-shadow`、`--menu-shadow`（明暗两套）；`web/style.css` 残留硬编码色改 tokens 并补表单/焦点/富文本/滚动条；`web/role-creation.css` 禁用态修正；`web/index.html` 缓存戳更新。JS 零改动。
+- K2.8 复核 #837 **approved**：diff 仅 4 文件（+31/−20）、新增行硬编码色 0、6 个新 tokens 两套齐全、对比度复现（daylight 正文 14.83:1 / 次要 4.91:1 / 按钮 6.79:1 / danger 5.25:1；midnight accent 4.29→4.72）、CDP daylight 计算样式全部 token 化、暗色仅 accent 调深、回归 25+6 通过、5 个 JS `node --check` 通过。
+- 截图：`docs/mockups/live/live_main_daylight.png`（协调者）、`live_roles_daylight.png`、`live_settings_daylight.png`（K2.8 CDP）。
+- 换肤 4 片至此全部完成。
+
 ## 2026-11-17 11:30 — 界面换肤 · 切片 3 完成（角色/设置/诊断，Terra 开发、K2.8 复核）
 
 - 交付（`537634e`）：`web/role-creation.css`（+15/−4）、`web/role-diagnostics.css`（+13/−1）、`web/workspace.css`（+26/−3）改为 tokens（角色列表/状态点/操作按钮/绑定行/删除区、创建角色弹窗、项目设置五面板、诊断日志导出区、≤700px 窄窗）；`web/index.html` 三个样式 `?v=20261117-roles-restyle`；JS 零改动。

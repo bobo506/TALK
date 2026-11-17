@@ -2,13 +2,13 @@
 
 ## Latest
 
-Updated: 2026-11-17 11:30 (+08:00)
+Updated: 2026-11-17 15:20 (+08:00)
 
-**当前结论**：界面换肤切片 3（角色/项目设置/诊断）已完成并复核（Terra #834、K2.8 #835 approved with limitations；提交 `537634e`）：角色列表/创建弹窗/设置五面板/诊断导出区统一 tokens，截图 `docs/mockups/live/live_roles_midnight.png`、`live_settings_midnight.png`。切片 1–3 均已完成；**切片 4（亮色边角统一）待下午继续**。生产 API 已重启、`/mcp` 生效，Terra/K2.8/Astra 均 running。
+**当前结论**：界面换肤 4 片全部完成（切片 4 亮色边角：Terra #836、K2.8 #837 approved）。明暗两套截图在 `docs/mockups/live/`（main/tasks/roles/settings 的 daylight 与 midnight）。生产 API 已重启、`/mcp` 生效，Terra/K2.8/Astra 均 running。下一步为路线图第 9 项（单目录收拢，需用户确认删除/迁移 `D:\TALK-portable`）。
 
 ### 1) Current Progress
 - 路线图 13 项：第 1–7 已完成；第 8 项（运行器提示）并入换肤切片 1 完成；第 9→13 项待推进（第 9 单目录收拢、第 10 Release、第 11 交接文档、第 12 Codex 版本适配、第 13 终端身份隐藏）。
-- 换肤切片 1–3 已完成（切片 1 `2517fd4`+`f9d0ac2`；切片 2 `409a629`；切片 3 `537634e`）；切片 4（亮色主题边角统一）待下午继续。
+- 换肤切片 1–4 全部完成（切片 1 `2517fd4`+`f9d0ac2`；切片 2 `409a629`；切片 3 `537634e`；切片 4 待提交后补记）。
 - 角色：Terra（codex）、K2.8（kimi-code）、Astra（codex，仅咨询）均 running；Terra 命令/读写能力已验收。
 - 2026-11-17 09:50 事故修复：`.talk` 残留 `CodexSandboxUsers` ACE → keys 继承 → host `key_permissions_failed`；runtime 因临时文件继承 ACE 崩溃。已按 `PROGRESS_HISTORY.md` 备份并重置私有 ACL、手动重启 runtime（pid 12516），三角色 running。
 - 换肤切片 1 交付：`web/theme-tokens.css`（两套 tokens）、`web/style.css` 外壳、`web/loading.html`、`web/theme.js`（默认 midnight、旧值迁移、无闪烁）、`web/index.html`/`web/app.js`（两种提示条 + 设置区）、`server/routes/boot_status.py`（`runners`）。
