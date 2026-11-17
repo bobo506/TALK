@@ -2,13 +2,13 @@
 
 ## Latest
 
-Updated: 2026-11-17 21:10 (+08:00)
+Updated: 2026-11-17 22:10 (+08:00)
 
-**当前结论**：私有 ACL 健壮性完成并复核（Terra #843/#846、K2.8 #847 approved，提交 `5ce37c3`）：可信继承 ACE 通过、外来 SID/DENY 拒绝、受保护 DACL 创建、`codex_role_host` 读 key 前自愈、runtime 仅告警；41 项测试通过。**需重启 runtime/角色后新逻辑才生效**。路线图第 12 项（Codex 版本适配）已完成（`faa57bc`）；界面换肤 4 片、第 9 项清理也已完成。Terra/K2.8/Astra 均 running。下一步：第 13 项（终端身份隐藏）或第 10 项 Release（需授权）。
+**当前结论**：TALK 自定义图标完成（`c47b316`，K2.8 #851 approved）：`web/icons/` 素材、`web/manifest.webmanifest`、两个 HTML 的 favicon/manifest 标签、快捷方式改用仓库 ico；桌面快捷方式已即时生效，任务栏需重开窗口验证。私有 ACL 健壮性（`5ce37c3`）与第 12 项（`faa57bc`）已完成；第 13 项（终端身份过滤，#850）运行中。Terra/K2.8/Astra 均 running。
 
 ### 1) Current Progress
-- 路线图 13 项：第 1–7 已完成；第 8 项并入换肤切片 1；第 9 项（单目录收拢）用户已手动清理；**第 12 项（Codex 版本适配）已完成**；待推进：第 10（便携包+Release）、第 11（交接文档）、第 13（终端身份隐藏）。
-- 换肤切片 1–4 全部完成（`2517fd4`+`f9d0ac2`、`409a629`、`537634e`、`a7423f7`）。
+- 路线图 13 项：第 1–7 已完成；第 8 项并入换肤切片 1；第 9 项用户已手动清理；第 12 项（Codex 版本适配）完成；第 13 项（终端身份过滤）运行中；待推进：第 10（便携包+Release，需授权）、第 11（交接文档）。
+- 换肤切片 1–4 全部完成（`2517fd4`+`f9d0ac2`、`409a629`、`537634e`、`a7423f7`）；自定义图标 `c47b316`。
 - ACL 健壮性完成（`5ce37c3`）：校验容忍可信继承、外来拒绝、受保护 DACL、Codex 宿主读 key 前自愈、runtime 自检告警；41+9 测试通过；**重启 runtime/角色后生效**。
 - 第 12 项：`bridges/codex_execution_native.py` 区间+能力探测+60s 缓存；`codex_role_host`/`codex_role_setup` 共用；`--check-version`；测试 26+6、59+26、25+3 通过（ACL 环境噪音已记为基线同现）。
 - 角色：Terra（codex）、K2.8（kimi-code）、Astra（codex，仅咨询）均 running；Terra 命令/读写能力已验收。

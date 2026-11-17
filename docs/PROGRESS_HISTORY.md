@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-17 22:10 — TALK 自定义图标（协调者生成素材、Terra #849 接入、K2.8 #851 approved）
+
+- 问题：桌面快捷方式用 Chrome 图标、任务栏是地球（页面无 favicon/manifest）。
+- 素材：协调者用 Pillow 生成 `web/icons/`（`favicon.ico` 7 尺寸、`talk-192/512.png`、`talk-maskable-512.png`、`apple-touch-icon.png`），深色圆角 + 三圈轨道 + T，与加载页主题一致；桌面 `TALK.lnk` 已改为该 ico。
+- 接入（`c47b316`）：新增 `web/manifest.webmanifest`（TALK/standalone/#070b16/192+512+maskable）；`web/index.html` 与 `web/loading.html` 增加 favicon/apple-touch-icon/manifest/theme-color；`scripts/talk_desktop.py` 的 `install_shortcut` 改为仓库内 ico（不再用浏览器 exe）；`tests/test_talk_desktop.py` 加断言。
+- 复核：K2.8 #851 **approved**——Manifest/图标 200、7 尺寸 ico、head 标签齐全、25+3 测试通过、生产未重启。
+- 说明：任务栏图标需关闭旧 TALK 窗口后重开（Edge favicon 缓存）；如果仍显示浏览器图标，再评估自定义 WebView2 启动器。
+
 ## 2026-11-17 21:10 — 私有 ACL 健壮性（Terra #843/#846，K2.8 #847 approved）
 
 - 背景：今晨 ACL 事故的根因是 `_windows_verify_private_acl` 拒绝一切继承 ACE，而创建/发布文件会继承父目录 ACE；同时 Codex 专用宿主在读 key 前未接入预检。
