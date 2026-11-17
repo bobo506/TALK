@@ -134,6 +134,21 @@ class DesktopEntryTests(unittest.TestCase):
         service.wait_healthy.assert_called_once()
         service.stop.assert_not_called()
 
+    def test_start_onboards_after_health_and_before_window(self):
+        order = []
+        service = Mock()
+        service.start.side_effect = lambda: order.append('start')
+        service.wait_healthy.side_effect = lambda url: order.append('healthy')
+        self.onboarding.side_effect = lambda *args: (order.append('onboarding') or {'errors': [], 'member_status': 'checked'})
+        with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+             patch.object(desktop, 'healthy', return_value=False), \
+             patch.object(desktop, 'port_available', return_value=True), \
+             patch.object(desktop, 'ApiService', return_value=service), \
+             patch.object(desktop, 'write_boot_status', side_effect=lambda *args: order.append('status')), \
+             patch.object(desktop, 'launch_window', side_effect=lambda *args: order.append('window')):
+            desktop.run(self.home, {})
+        self.assertEqual(order, ['start', 'healthy', 'onboarding', 'status', 'window'])
+
     def test_run_default_browser_keeps_started_service(self):
         service = Mock()
         with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
@@ -258,6 +273,15 @@ class BootStatusDesktopTests(unittest.TestCase):
             self.assertNotIn('secret-path', str(second))
             desktop.write_boot_status(home, {'_failed': True})
             self.assertFalse(json.loads(path.read_text(encoding='utf-8'))['ready'])
+
+    def test_unavailable_members_do_not_mark_configuration_failed(self):
+        import json
+        with tempfile.TemporaryDirectory() as home:
+            desktop.write_boot_status(home, {'errors': [], 'member_status': 'api_unavailable'})
+            data = json.loads((Path(home) / 'logs/launcher/boot-status.json').read_text(encoding='utf-8'))
+            self.assertTrue(data['ready'])
+            self.assertEqual(data['member_status'], 'api_unavailable')
+            self.assertNotIn('error', data)
 
     def test_onboarding_exception_records_failure_and_opens_window(self):
         import json

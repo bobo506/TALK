@@ -18,7 +18,7 @@ def _launcher():
     home = Path(os.environ.get('TALK_CONFIG') or ROOT / 'config.toml').resolve().parent
     path = home / 'logs' / 'launcher' / 'boot-status.json'
     try:
-        raw = json.loads(path.read_text(encoding='utf-8'))
+        raw = json.loads(path.read_text(encoding='utf-8-sig'))
     except FileNotFoundError:
         return None
     except (OSError, ValueError):
@@ -36,6 +36,7 @@ def _launcher():
         'configs_written': names('configs_written', CLIENTS), 'skipped': names('skipped', CLIENTS),
         'download': {'needed': False, 'text': '无需下载'}, 'ready': raw['ready'],
     }
+    result['member_status'] = raw.get('member_status') if raw.get('member_status') in ('checked', 'api_unavailable', 'skipped') else 'unknown'
     if not raw['ready']:
         result['error'] = '运行器检测或 MCP 接入失败，请查看启动日志。'
     return result

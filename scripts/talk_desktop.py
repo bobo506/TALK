@@ -193,7 +193,7 @@ def write_boot_status(home, result=None):
     detected = result.get('detected', {})
     def client_names(items):
         return [item['client'] for item in items if isinstance(item, dict) and item.get('client') in clients]
-    failed = bool(result.get('errors')) or result.get('member_status') == 'api_unavailable' or result.get('_failed', False)
+    failed = bool(result.get('errors')) or result.get('_failed', False)
     data = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'detected': [name for name in clients if isinstance(detected.get(name), dict) and detected[name].get('detected') is True],
@@ -202,6 +202,7 @@ def write_boot_status(home, result=None):
         'configs_written': client_names(result.get('configs_written', [])),
         'skipped': client_names(result.get('skipped', [])),
         'download': {'needed': False, 'text': '无需下载'},
+        'member_status': result.get('member_status') if result.get('member_status') in ('checked', 'api_unavailable', 'skipped') else 'unknown',
         'ready': not failed,
     }
     if failed:
@@ -213,12 +214,7 @@ def write_boot_status(home, result=None):
     os.replace(temporary, path)
 
 
-def run(home, env):
-    host, port = read_server(home)
-    url = local_url(host, port)
-    action = plan_action(healthy(url), port_available(host, port))
-    if action == 'blocked':
-        raise LauncherError(f'端口 {port} 已被占用，但 TALK 健康检查失败；请检查占用进程后再试。')
+def onboard_and_write(home, env):
     result = {'_failed': True}
     try:
         result = mcp_onboarding.run(Path(home), Path(env.get('USERPROFILE') or Path.home()), True)
@@ -234,7 +230,16 @@ def run(home, env):
     except Exception:
         if sys.stderr is not None:
             print('Warning: could not write boot status.', file=sys.stderr)
+
+
+def run(home, env):
+    host, port = read_server(home)
+    url = local_url(host, port)
+    action = plan_action(healthy(url), port_available(host, port))
+    if action == 'blocked':
+        raise LauncherError(f'端口 {port} 已被占用，但 TALK 健康检查失败；请检查占用进程后再试。')
     if action == 'attach':
+        onboard_and_write(home, env)
         launch_window(url, env)
         return 0
     service = ApiService(home, host, port, env)
@@ -243,6 +248,7 @@ def run(home, env):
         service.start()
         owns_service = True
         service.wait_healthy(url)
+        onboard_and_write(home, env)
         launch_window(url, env)
     except BaseException:
         if owns_service:
