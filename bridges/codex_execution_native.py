@@ -14,7 +14,9 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import uuid
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,9 +33,92 @@ SESSION_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 
 
 class CodexNativeError(RuntimeError):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
+    def __init__(self, code: str, message: str | None = None) -> None:
+        super().__init__(f"{code}: {message}" if message else code)
         self.reason_code = code
+
+
+MIN_SUPPORTED = (0, 163, 0)
+MAX_TESTED = (0, 169, 0)
+_VERSION_RE = re.compile(r"(?<![\w.])(\d+)\.(\d+)\.(\d+)(?![\w.+-])")
+
+
+def parse_codex_version(text: str) -> tuple[int, int, int]:
+    match = _VERSION_RE.search(text) if isinstance(text, str) else None
+    if not match:
+        raise CodexNativeError("codex_version_unparseable")
+    return tuple(map(int, match.groups()))
+
+
+def supported_version(value: str) -> bool:
+    try:
+        return parse_codex_version(value) >= MIN_SUPPORTED
+    except CodexNativeError:
+        return False
+
+
+def detect_capabilities(root_help: str, exec_help: str) -> dict[str, bool]:
+    # Match option declarations, not mentions in descriptive prose.
+    def option(text: str, flag: str) -> bool:
+        return bool(re.search(r"(?m)^\s*(?:-\w,?\s+)?" + re.escape(flag) + r"(?=[\s,=\[]|$)", text))
+    capabilities = {flag: option(exec_help, flag) for flag in (
+        "--disable", "--sandbox", "--model", "--skip-git-repo-check", "--ignore-rules")}
+    capabilities["--strict-config"] = option(root_help, "--strict-config")
+    capabilities["--config"] = option(exec_help, "--config") or option(exec_help, "-c")
+    capabilities["exec"] = bool(re.search(r"(?m)^\s*exec(?:\s|$)", root_help))
+    capabilities["stdin -"] = bool(re.search(r"(?is)(?:`-`|'\-'|\"-\")(?:(?!\n\s*\n).){0,200}\bstdin\b", exec_help))
+    return capabilities
+
+
+_CODEX_PROBE_CACHE: dict[tuple, tuple[float, dict]] = {}
+_CODEX_PROBE_TTL = 60.0
+
+
+def clear_codex_probe_cache() -> None:
+    _CODEX_PROBE_CACHE.clear()
+
+
+def check_codex(executable: str, *, cwd=None, env=None, use_cache=True) -> dict:
+    # Cache only identifiable executable files; include the environment because it
+    # can change both executable behavior and capability output. Store only its hash.
+    cache_key = None
+    path = Path(executable)
+    try:
+        if use_cache and path.is_absolute() and path.is_file():
+            stat = path.stat()
+            environment = dict(os.environ if env is None else env)
+            env_hash = hashlib.sha256(json.dumps(sorted(environment.items()), ensure_ascii=True).encode()).digest()
+            cache_key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size,
+                         str(Path(cwd or os.getcwd()).resolve()), env_hash, subprocess.run)
+            cached = _CODEX_PROBE_CACHE.get(cache_key)
+            if cached and time.monotonic() - cached[0] < _CODEX_PROBE_TTL:
+                return {**cached[1], "capabilities": cached[1]["capabilities"].copy()}
+    except OSError:
+        pass
+
+    def run(*args):
+        try:
+            result = subprocess.run([str(executable), *args], cwd=cwd, env=env,
+                stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8", timeout=15, check=True,
+                **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
+            return result.stdout
+        except (OSError, subprocess.SubprocessError, UnicodeError) as exc:
+            raise CodexNativeError("codex_probe_failed", str(exc)) from exc
+    version_tuple = parse_codex_version(run("--version"))
+    version = ".".join(map(str, version_tuple))
+    if version_tuple < MIN_SUPPORTED:
+        raise CodexNativeError("codex_version_unsupported", f"Detected {version}; minimum required is 0.163.0")
+    capabilities = detect_capabilities(run("--help"), run("exec", "--help"))
+    for flag, available in capabilities.items():
+        if not available:
+            raise CodexNativeError(f"codex_capability_missing:{flag}", f"Codex {version} is missing capability {flag}")
+    result = {"version": version, "capabilities": capabilities, "allowed": True,
+              "warning": "codex_version_untested" if version_tuple > MAX_TESTED else None}
+    if cache_key is not None:
+        if len(_CODEX_PROBE_CACHE) >= 128:
+            _CODEX_PROBE_CACHE.clear()
+        _CODEX_PROBE_CACHE[cache_key] = (time.monotonic(), {**result, "capabilities": capabilities.copy()})
+    return result
 
 
 def digest(value: Any) -> str:
@@ -132,20 +217,14 @@ def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, 
     executable = Path(shutil.which(argv[0]) or argv[0]).resolve()
     if executable.name.lower() not in {"codex.exe", "codex"} or not executable.is_file():
         raise CodexNativeError("codex_native_executable_required")
-    version = subprocess.run([str(executable), "--version"], capture_output=True,
-                             encoding="utf-8", timeout=15, check=True,
-                             **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
-    cli_version = version.stdout.strip()
-    if not cli_version.startswith("codex-cli "):
-        raise CodexNativeError("codex_version_unsupported")
-    cli_version = cli_version[len("codex-cli "):]
-    # 0.164 的 app-server 对本适配器使用的 thread/start、thread/read、
-    # thread/resume、turn/start 与 model/list 为增量兼容；0.163 旧角色仍可启动。
-    if cli_version not in SUPPORTED_VERSIONS:
-        raise CodexNativeError("codex_version_unsupported")
+    probe = check_codex(str(executable), cwd=workdir, env=env)
+    cli_version = probe["version"]
+    if probe["warning"]:
+        warnings.warn(f"{probe['warning']}: Codex {cli_version}", RuntimeWarning, stacklevel=2)
     prefix = argv[1:at]
     approved_prefix: list[str] = []
     approval = None
+    disabled: list[str] = []
     i = 0
     while i < len(prefix):
         flag = prefix[i]
@@ -156,12 +235,14 @@ def resolve_launch(command: Sequence[str], workdir: Path, binding: Mapping[str, 
         elif flag == "--strict-config":
             approved_prefix.append(flag)
             i += 1
+        elif flag == "--disable" and i + 1 < len(prefix):
+            disabled.append(prefix[i + 1])
+            i += 2
         else:
             raise CodexNativeError("codex_global_option_unsupported")
     if approval != "never":
         raise CodexNativeError("codex_approval_unverified")
     settings: dict[str, Any] = {}
-    disabled: list[str] = []
     sandbox = None
     i = at + 1
     while i < len(argv):
@@ -251,7 +332,7 @@ def read_rollout(path: Path, *, home: Path, session_id: str, workdir: Path,
         raise CodexNativeError("codex_rollout_header_missing")
     meta = rows[0].get("payload", {})
     meta_version = meta.get("cli_version")
-    if (meta.get("id") != session_id or meta_version not in SUPPORTED_VERSIONS
+    if (meta.get("id") != session_id or not supported_version(meta_version)
             or (version is not None and meta_version != version)
             or Path(meta.get("cwd", "")).resolve() != workdir.resolve()
             or meta.get("model_provider") != provider):
@@ -422,7 +503,7 @@ class CodexNative:
         thread_version = thread.get("cliVersion")
         if (Path(thread.get("cwd", "")).resolve() != self.workdir.resolve()
                 or thread.get("modelProvider") != self.spec.provider or thread.get("ephemeral") is not False
-                or (thread_version is not None and thread_version not in SUPPORTED_VERSIONS)):
+                or (thread_version is not None and thread_version != self.spec.version)):
             raise CodexNativeError("codex_thread_identity_mismatch")
         if attached and (result.get("model") != self.spec.model or result.get("reasoningEffort") != self.spec.effort
                          or result.get("approvalPolicy") != self.spec.approval

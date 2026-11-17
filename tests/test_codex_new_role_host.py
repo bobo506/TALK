@@ -37,7 +37,8 @@ class NewCodexRoleHostTests(unittest.TestCase):
             'archived': False, 'binding_state': 'bound',
             'runner': {'runtime': 'codex', 'status': 'unverified'},
             'model': {'choice_id': 'rmc_new', 'model_alias': 'model-selected', 'model_id': 'model-selected'},
-            'service': {'generation': 1, 'ownership_held': False, 'control_kind': 'managed_cli'}}
+            'service': {'generation': 1, 'ownership_held': False, 'control_kind': 'managed_cli',
+                        'current_launch': {'action': 'start', 'state': 'pending'}}}
         self.client = Client()
         self.client.identity = {'id': 'agent:new', 'kind': 'agent', 'display_name': 'new Codex'}
         self.spawned = []
@@ -122,7 +123,6 @@ class NewCodexRoleHostTests(unittest.TestCase):
             state_dir=Path(self.config['state_dir']), project_root=self.root / 'project')
 
     def test_generated_bridge_argv_passes_real_host_preflight_parser(self):
-        from scripts import codex_role_setup as setup
         from bridges import codex_bridge
         for profile, timeout in [('review', None), ('tools', 123)]:
             with self.subTest(profile=profile, timeout=timeout):
@@ -132,7 +132,7 @@ class NewCodexRoleHostTests(unittest.TestCase):
                 config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
                 with patch.object(manager, '_configuration', return_value=(config, 'low')), \
                      patch.object(manager, 'child_environment', return_value={}), \
-                     patch.object(setup, 'require_version'), \
+                     patch('bridges.codex_execution_native.check_codex', return_value={'version': '0.164.0', 'warning': None}), \
                      patch('cli.profiles.load_profile', return_value={}), \
                      patch('cli.profiles.compose_system_prompt', return_value='synthetic instructions'):
                     argv, _, _ = manager.build_entry_argv('codex', 'gpt-6.1-terra')
@@ -194,18 +194,34 @@ class NewCodexRoleHostTests(unittest.TestCase):
         self.assertEqual(effort, 'low')
 
     def test_entry_argv_carries_resolved_effort_not_stale_config_value(self):
-        from scripts import codex_role_setup as setup
         manager = self.manager()
         config = {'model': 'gpt-6.1-terra', 'model_reasoning_effort': 'low'}
         with patch.object(manager, '_configuration', return_value=(config, 'xhigh')), \
              patch.object(manager, 'child_environment', return_value={}), \
-             patch.object(setup, 'require_version'), \
+             patch('bridges.codex_execution_native.check_codex', return_value={'version': '0.164.0', 'warning': None}), \
              patch('cli.profiles.load_profile', return_value={}), \
              patch('cli.profiles.compose_system_prompt', return_value='synthetic instructions'):
             argv, _, _ = manager.build_entry_argv('codex', 'gpt-6.1-terra')
         parsed = argv[argv.index('--codex-task-command') + 1]
         self.assertIn('model_reasoning_effort="xhigh"', parsed)
         self.assertNotIn('model_reasoning_effort="low"', parsed)
+
+    def test_codex_probe_cache_avoids_second_spawn_and_can_be_bypassed(self):
+        from bridges import codex_execution_native as native
+        from tests.test_codex_version_support import fake_cli
+        executable = self.root / 'codex.exe'
+        executable.write_text('synthetic', encoding='utf-8')
+        native.clear_codex_probe_cache()
+        self.addCleanup(native.clear_codex_probe_cache)
+        with patch.object(native.subprocess, 'run', side_effect=fake_cli('0.164.0')) as run:
+            first = native.check_codex(str(executable))
+            self.assertEqual(run.call_count, 3)
+            first['capabilities'].clear()
+            second = native.check_codex(str(executable))
+            self.assertEqual(run.call_count, 3)
+            self.assertTrue(all(second['capabilities'].values()))
+            native.check_codex(str(executable), use_cache=False)
+            self.assertEqual(run.call_count, 6)
 
     def workspace_context(self):
         from server import workspace_paths as wp

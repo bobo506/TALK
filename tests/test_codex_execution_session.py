@@ -4,6 +4,7 @@
 身份、最近用量和送达证明。实机原生证据另存，不把本测试称真实模型验收。
 """
 from __future__ import annotations
+from tests.test_codex_version_support import fake_cli
 
 import asyncio
 import json
@@ -282,7 +283,7 @@ class CodexExecutionTests(unittest.IsolatedAsyncioTestCase):
         executable=self.root/'codex.exe';executable.write_bytes(b'test-only')
         command=[str(executable),'-a','never','--strict-config','exec','--model','gpt-6.1-sol',
                  '--sandbox','read-only','-c','model_reasoning_effort="xhigh"','-']
-        with patch.dict(os.environ,{'CODEX_HOME':str(self.native.home)}),patch('bridges.codex_execution_native.subprocess.run',return_value=SimpleNamespace(stdout='codex-cli 0.163.0\n')):
+        with patch.dict(os.environ,{'CODEX_HOME':str(self.native.home)}),patch('bridges.codex_execution_native.subprocess.run',side_effect=fake_cli('0.163.0')):
             one=resolve_launch(command,self.root,{**self.binding,'captured_at':'first'})
             two=resolve_launch(command,self.root,{**self.binding,'captured_at':'second'})
             self.assertEqual(one.fingerprint,two.fingerprint)

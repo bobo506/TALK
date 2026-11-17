@@ -14,6 +14,7 @@ from unittest.mock import patch
 from scripts import codex_role_setup as setup
 from scripts import codex_role_host as host
 from tests import test_kimi_role_setup as fixtures
+from tests.test_codex_version_support import fake_cli, EXEC
 
 
 class CodexSetupTests(unittest.TestCase):
@@ -105,16 +106,18 @@ class CodexSetupTests(unittest.TestCase):
         self.assertFalse((self.state/'native/prj_1/agent_one/.codex/config.toml').exists())
 
     def test_version_mismatch_blocks_device_authorization(self):
-        result=SimpleNamespace(stdout='codex-cli 0.999.0')
-        with patch.object(setup.subprocess,'run',return_value=result):
-            with self.assertRaisesRegex(setup.SetupError,'native_cli_version_unsupported'):
-                setup.require_version(str(self.exe),self.root,{})
+        for fake in (fake_cli('0.162.9'), fake_cli('0.164.0', help_text=EXEC.replace('--ignore-rules', '--other'))):
+            with self.subTest(fake=fake), patch.object(setup.subprocess, 'run', side_effect=fake):
+                with self.assertRaisesRegex(setup.SetupError, 'native_cli_version_unsupported'):
+                    setup.require_version(str(self.exe), self.root, {})
 
-    def test_version_gate_accepts_current_0_164_and_legacy_0_163(self):
-        for version in ('0.163.0','0.164.0'):
-            with self.subTest(version=version), patch.object(setup.subprocess,'run',
-                    return_value=SimpleNamespace(stdout='codex-cli '+version+'\n')):
-                self.assertEqual(setup.require_version(str(self.exe),self.root,{}),version)
+    def test_version_gate_accepts_supported_versions_and_warns_on_untested(self):
+        for version in ('0.163.0', '0.164.0', '0.165.0', '0.169.0'):
+            with self.subTest(version=version), patch.object(setup.subprocess, 'run', side_effect=fake_cli(version)):
+                self.assertEqual(setup.require_version(str(self.exe), self.root, {}), version)
+        with patch.object(setup.subprocess, 'run', side_effect=fake_cli('0.170.0')):
+            with self.assertWarnsRegex(RuntimeWarning, 'codex_version_untested'):
+                self.assertEqual(setup.require_version(str(self.exe), self.root, {}), '0.170.0')
 
     def test_terra_uses_official_low_instead_of_prior_xhigh(self):
         with closing(sqlite3.connect(self.dbpath)) as db, db:
@@ -213,7 +216,7 @@ class CodexSetupTests(unittest.TestCase):
         attempt=self.begin()
         with closing(sqlite3.connect(self.dbpath)) as db, db:
             db.execute("UPDATE project_role_bindings SET model_id='changed-model'")
-        with patch.object(setup,'_model_effort',return_value=self._effort()):
+        with patch.object(setup,'_model_effort',side_effect=self._effort):
             with self.assertRaisesRegex(setup.SetupError,'native_model_selection_changed'):
                 setup.finish_native_login(attempt)
         self.assertNotIn('model_reasoning_effort',setup.read_config(attempt.native_home/'config.toml'))
@@ -232,12 +235,12 @@ class CodexSetupTests(unittest.TestCase):
                 before = path.read_bytes()
                 with closing(sqlite3.connect(self.dbpath)) as db, db:
                     db.execute('UPDATE project_roles SET storage_layout=?', (changed,))
-                with patch.object(setup, '_model_effort', return_value=self._effort()):
+                with patch.object(setup, '_model_effort', side_effect=self._effort):
                     with self.assertRaisesRegex(setup.SetupError, 'native_model_selection_changed'):
                         setup.finish_native_login(attempt)
                 self.assertEqual(path.read_bytes(), before)
 
-    async def _effort(self):return 'high'
+    async def _effort(self, _attempt):return 'high'
 
     def test_unrecognized_existing_config_is_never_overwritten(self):
         native=self.state/'native/prj_1/agent_one/.codex'
@@ -262,7 +265,7 @@ class CodexCommandTests(unittest.TestCase):
                 state_dir=root/'state',project_root=root)
             config={'model':'exact-selected-model','model_reasoning_effort':'xhigh'}
             with patch.object(manager,'_configuration',return_value=(config,'xhigh')), \
-                 patch.object(setup,'require_version'),patch('cli.profiles.load_profile',return_value={}), \
+                 patch('bridges.codex_execution_native.subprocess.run', side_effect=fake_cli('0.164.0')),patch('cli.profiles.load_profile',return_value={}), \
                  patch('cli.profiles.compose_system_prompt',side_effect=lambda prompt,profile:prompt):
                 argv,_,_=manager.build_entry_argv('codex','public-alias')
             command=shlex.split(argv[argv.index('--codex-task-command')+1])
@@ -284,14 +287,16 @@ class CodexCommandTests(unittest.TestCase):
             setup.write_config(Path(env['CODEX_HOME'])/'config.toml',dict(setup.BASE_CONFIG,**config))
             binding=dict(runtime='codex',runner_id='runner:synthetic',provider_id='openai',
                 model_id='exact-selected-model',binding_fingerprint='synthetic-fingerprint')
-            with patch.dict(os.environ,env),patch.object(native.subprocess,'run',return_value=SimpleNamespace(stdout='codex-cli 0.163.0')):
+            with patch.dict(os.environ,env),patch.object(native.subprocess,'run',side_effect=fake_cli('0.163.0')):
                 launch=native.resolve_launch(command,root,binding)
                 legacy=[('base_instructions='+item.split('=',1)[1]) if item.startswith('developer_instructions=') else item for item in command]
                 with self.assertRaisesRegex(native.CodexNativeError,'codex_config_option_unsupported'):
                     native.resolve_launch(legacy,root,binding)
             self.assertEqual((launch.model,launch.effort,launch.sandbox),('exact-selected-model','xhigh','read-only'))
+            for feature in ('apps', 'remote_plugin', 'plugins'):
+                self.assertIn(['--disable', feature], [launch.argv[i:i+2] for i in range(len(launch.argv)-1)])
 
-    def test_native_adapter_negotiates_0_164_and_rejects_unlisted_versions(self):
+    def test_native_adapter_negotiates_supported_versions(self):
         import tempfile, shlex
         from bridges import codex_execution_native as native
         from scripts import codex_role_host as codex_host
@@ -303,7 +308,7 @@ class CodexCommandTests(unittest.TestCase):
                 state_dir=root/'state',project_root=root)
             config={'model':'gpt-6.1-terra','model_reasoning_effort':'low'}
             with patch.object(manager,'_configuration',return_value=(config,'low')), \
-                 patch.object(setup,'require_version'),patch('cli.profiles.load_profile',return_value={}), \
+                 patch('bridges.codex_execution_native.subprocess.run', side_effect=fake_cli('0.164.0')),patch('cli.profiles.load_profile',return_value={}), \
                  patch('cli.profiles.compose_system_prompt',side_effect=lambda prompt,profile:prompt):
                 argv,_,_=manager.build_entry_argv('codex','gpt-6.1-terra')
             command=shlex.split(argv[argv.index('--codex-task-command')+1])
@@ -313,13 +318,12 @@ class CodexCommandTests(unittest.TestCase):
             binding=dict(runtime='codex',runner_id='runner:synthetic',provider_id='openai',
                 model_id='gpt-6.1-terra',binding_fingerprint='synthetic-fingerprint')
             with patch.dict(os.environ,env),patch.object(native.subprocess,'run',
-                    return_value=SimpleNamespace(stdout='codex-cli 0.164.0')):
+                    side_effect=fake_cli('0.164.0')):
                 launch=native.resolve_launch(command,root,binding)
             self.assertEqual((launch.version,launch.effort),('0.164.0','low'))
             with patch.dict(os.environ,env),patch.object(native.subprocess,'run',
-                    return_value=SimpleNamespace(stdout='codex-cli 0.165.0')):
-                with self.assertRaisesRegex(native.CodexNativeError,'version_unsupported'):
-                    native.resolve_launch(command,root,binding)
+                    side_effect=fake_cli('0.165.0')):
+                self.assertEqual(native.resolve_launch(command,root,binding).version, '0.165.0')
 
 
 class CodexNativeConfigReadTests(unittest.TestCase):

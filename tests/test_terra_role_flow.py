@@ -3,6 +3,7 @@
 只读取合成 JSONL/内存 RPC 形状；不调用真实 CLI、登录或模型。
 """
 from __future__ import annotations
+from tests.test_codex_version_support import fake_cli
 
 import json
 from pathlib import Path
@@ -52,7 +53,7 @@ class TerraProtocolTests(unittest.TestCase):
             self.assertEqual(snapshot["used_tokens"], 12)
             self.assertEqual(users[0][1], text_digest("synthetic"))
 
-    def test_legacy_0_163_and_unknown_0_165_are_distinguished(self):
+    def test_legacy_and_new_supported_rollout_versions(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name).resolve()
             sid = str(uuid.uuid4())
@@ -60,9 +61,11 @@ class TerraProtocolTests(unittest.TestCase):
             self.assertEqual(read_rollout(path, home=root / "home", session_id=sid,
                 workdir=root, model="gpt-6.1-terra", provider="openai")[0]["used_tokens"], 12)
             path = _write_rollout(root, sid, "0.165.0")
+            self.assertEqual(read_rollout(path, home=root / "home", session_id=sid, workdir=root,
+                model="gpt-6.1-terra", provider="openai")[0]["used_tokens"], 12)
             with self.assertRaisesRegex(CodexNativeError, "rollout_identity_mismatch"):
                 read_rollout(path, home=root / "home", session_id=sid, workdir=root,
-                             model="gpt-6.1-terra", provider="openai")
+                             model="gpt-6.1-terra", provider="openai", version="0.164.0")
 
     def test_0_164_thread_response_ignores_additive_fields_and_checks_version(self):
         with tempfile.TemporaryDirectory() as name:
@@ -84,7 +87,7 @@ class TerraProtocolTests(unittest.TestCase):
             with self.assertRaisesRegex(CodexNativeError, "thread_identity_mismatch"):
                 native._verify_thread(result, sid, attached=True)
 
-    def test_version_is_part_of_launch_fingerprint_and_unknown_fails(self):
+    def test_version_is_part_of_launch_fingerprint_and_new_version_works(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name).resolve()
             home = root / "home"
@@ -101,17 +104,16 @@ class TerraProtocolTests(unittest.TestCase):
             from types import SimpleNamespace
             with patch.dict(os.environ, {"CODEX_HOME": str(home)}):
                 with patch("bridges.codex_execution_native.subprocess.run",
-                           return_value=SimpleNamespace(stdout="codex-cli 0.164.0\n")):
+                           side_effect=fake_cli("0.164.0")):
                     one = resolve_launch(command, root, binding)
                 with patch("bridges.codex_execution_native.subprocess.run",
-                           return_value=SimpleNamespace(stdout="codex-cli 0.163.0\n")):
+                           side_effect=fake_cli("0.163.0")):
                     two = resolve_launch(command, root, binding)
                 self.assertNotEqual(one.fingerprint, two.fingerprint)
                 self.assertEqual((one.version, two.version), ("0.164.0", "0.163.0"))
                 with patch("bridges.codex_execution_native.subprocess.run",
-                           return_value=SimpleNamespace(stdout="codex-cli 0.165.0\n")):
-                    with self.assertRaisesRegex(CodexNativeError, "version_unsupported"):
-                        resolve_launch(command, root, binding)
+                           side_effect=fake_cli("0.165.0")):
+                    self.assertEqual(resolve_launch(command, root, binding).version, "0.165.0")
 
 
 if __name__ == "__main__":

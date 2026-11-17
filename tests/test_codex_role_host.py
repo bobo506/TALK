@@ -22,7 +22,7 @@ class CodexCommandTests(unittest.TestCase):
         )
         temp_dir = Path('synthetic-temp')
         profile_data = {'synthetic': True}
-        with patch.object(codex_role_setup, 'require_version'), \
+        with patch('bridges.codex_execution_native.check_codex', return_value={'warning': None}), \
              patch('cli.profiles.load_profile', return_value=profile_data), \
              patch('cli.profiles.compose_system_prompt', side_effect=lambda prompt, profile: prompt), \
              patch.object(host, 'task_temp_directory', return_value=temp_dir):

@@ -7,10 +7,11 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import warnings
 from types import SimpleNamespace
 
 from bridges import codex_native_config as native_config
-from bridges.codex_execution_native import CodexNative, LaunchSpec, SUPPORTED_VERSIONS
+from bridges.codex_execution_native import CodexNative, CodexNativeError, LaunchSpec, check_codex
 from scripts import role_service_host as host
 from scripts import native_setup_process
 from scripts.kimi_role_setup import _local_facts, _open_db, release_native_login, cancel_native_login
@@ -70,20 +71,14 @@ def environment(home):
 
 
 def require_version(exe, root, env):
-    """只接受声明的协议版本；返回实际版本供启动/rollout 身份校验。"""
+    """Use the shared CLI version and capability gate for device setup."""
     try:
-        result = subprocess.run([exe, '--version'], cwd=root, env=env, stdin=subprocess.DEVNULL,
-            capture_output=True, text=True, encoding='utf-8', timeout=15, check=True,
-            **({'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}))
-        value = result.stdout.strip()
-        if not value.startswith('codex-cli '):
-            raise SetupError('native_cli_version_unsupported')
-        version = value[len('codex-cli '):]
-        if version not in SUPPORTED_VERSIONS:
-            raise SetupError('native_cli_version_unsupported')
-        return version
-    except (OSError, subprocess.SubprocessError):
-        raise SetupError('native_cli_version_unsupported') from None
+        probe = check_codex(exe, cwd=root, env=env)
+    except CodexNativeError as exc:
+        raise SetupError('native_cli_version_unsupported') from exc
+    if probe['warning']:
+        warnings.warn(f"{probe['warning']}: Codex {probe['version']}", RuntimeWarning, stacklevel=2)
+    return probe['version']
 
 
 def read_config(path, *, root=None):

@@ -193,12 +193,16 @@ class CodexRoleHost(rsh.HostManager):
         import shlex
         from bridges import cli_bridge
         from cli.profiles import compose_system_prompt, load_profile
-        from scripts.codex_role_setup import require_version, SetupError
+        from bridges.codex_execution_native import check_codex, CodexNativeError
+        import warnings
         config, effort = self._configuration(model_alias)
         try:
-            require_version(self.codex_executable, self.project_root, self.child_environment(self.project, self.member))
-        except SetupError:
-            raise rsh.HostError('codex_version_unsupported', '当前 Codex CLI 版本未适配') from None
+            probe = check_codex(self.codex_executable, cwd=self.project_root,
+                                env=self.child_environment(self.project, self.member))
+            if probe['warning']:
+                warnings.warn(f"{probe['warning']}: Codex {probe['version']}", RuntimeWarning, stacklevel=2)
+        except CodexNativeError as exc:
+            raise rsh.HostError(exc.reason_code, str(exc)) from None
         profile = load_profile(self.project, self.member)
         def command(prompt, sandbox):
             writable = sandbox == 'workspace-write'
@@ -242,6 +246,22 @@ class CodexRoleHost(rsh.HostManager):
 
 
 def main(argv=None):
+    # Self-check is deliberately independent of role configuration and credentials.
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == '--check-version':
+        import shutil
+        from bridges.codex_execution_native import check_codex, CodexNativeError
+        check_parser = argparse.ArgumentParser(description='Codex CLI capability check')
+        check_parser.add_argument('--check-version', action='store_true')
+        check_parser.add_argument('--codex-executable', default=shutil.which('codex.cmd') or shutil.which('codex') or 'codex')
+        check_args = check_parser.parse_args(argv)
+        try:
+            print(json.dumps(check_codex(check_args.codex_executable), ensure_ascii=False))
+            return 0
+        except CodexNativeError as exc:
+            print(json.dumps({'allowed': False, 'error_code': exc.reason_code, 'message': str(exc)}, ensure_ascii=False))
+            return 1
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('project', 'member', 'project-root', 'state-dir', 'base-url',
                  'operator-key-file', 'role-key-file', 'expected-choice-id', 'expected-model-alias', 'codex-executable'):
