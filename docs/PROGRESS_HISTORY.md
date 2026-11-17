@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-17 11:30 — 界面换肤 · 切片 3 完成（角色/设置/诊断，Terra 开发、K2.8 复核）
+
+- 交付（`537634e`）：`web/role-creation.css`（+15/−4）、`web/role-diagnostics.css`（+13/−1）、`web/workspace.css`（+26/−3）改为 tokens（角色列表/状态点/操作按钮/绑定行/删除区、创建角色弹窗、项目设置五面板、诊断日志导出区、≤700px 窄窗）；`web/index.html` 三个样式 `?v=20261117-roles-restyle`；JS 零改动。
+- K2.8 复核 #835 **approved with limitations**：diff 仅 4 文件、JS 无 diff、26 个变量在明暗两套均存在、新增行无硬编码色/无新增 `!important`、选择器全部命中真实 DOM、回归 25+6 通过、四个 JS `node --check` 通过；CDP 无头点击“角色/项目设置”抓了两张真实截图，700px 窄窗无溢出。
+- 截图：`docs/mockups/live/live_roles_midnight.png`、`live_settings_midnight.png`。
+- 已知限制：诊断页当前只有日志导出控件，表格/筛选/JSON 面板的样式为预留（未来接入真实 UI）；浏览器原生 confirm 不可换肤。
+
 ## 2026-11-17 11:05 — 界面换肤 · 切片 2 完成（任务区，Terra 开发、K2.8 复核）
 
 - 交付（`409a629`）：`web/workspace.css`（+56 行，任务列表选中/悬停、状态徽章药丸、详情标题/按钮/分区、Hall 气泡按 human/agent/system 分类描边、引用/代码块/文件卡、输入区、弹窗遮罩与面板、滚动条、≤700px 窄窗）；`web/theme-tokens.css` 新增 `--overlay`/`--focus-ring`（明暗两套）；`web/index.html` 更新 `theme-tokens.css`/`workspace.css` 缓存戳为 `20261117-tasks-restyle`。未改 `workspace.js`/业务逻辑。
