@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-17 11:05 — 界面换肤 · 切片 2 完成（任务区，Terra 开发、K2.8 复核）
+
+- 交付（`409a629`）：`web/workspace.css`（+56 行，任务列表选中/悬停、状态徽章药丸、详情标题/按钮/分区、Hall 气泡按 human/agent/system 分类描边、引用/代码块/文件卡、输入区、弹窗遮罩与面板、滚动条、≤700px 窄窗）；`web/theme-tokens.css` 新增 `--overlay`/`--focus-ring`（明暗两套）；`web/index.html` 更新 `theme-tokens.css`/`workspace.css` 缓存戳为 `20261117-tasks-restyle`。未改 `workspace.js`/业务逻辑。
+- K2.8 复核 #832 **approved with limitations**：diff 仅两个 CSS、无硬编码色值、!important 仅 5 处必要覆盖、覆盖范围逐项核对、回归 25+6 通过、Node 检查通过；真实页面截图（夜间）与 daylight 令牌生效。
+- 已知限制：任务列表无未读字段、消息无头像节点，纯 CSS 无法实现（需改 JS 结构，未做）；浏览器原生 confirm 不可换肤。
+- 真实截图：`docs/mockups/live/live_tasks_midnight.png`、`live_tasks_daylight.png`（协调者用同源 localStorage 探针抓取 daylight）；回访浏览器需强刷一次以命中新缓存戳。
+
 ## 2026-11-17 10:10 — 启动误报/加载页/BOM/乱码修复（Terra 开发、K2.8 复核）
 
 - 背景：用户重启后加载页报“启动阶段报错”、主页误报“未检测到运行器”。定位三个问题：启动器在服务未起时做成员检查导致 `api_unavailable` → `ready:false`；`boot_status.py`/`talk_desktop.py` 存在中文乱码；加载页把警告当硬失败。

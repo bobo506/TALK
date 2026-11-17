@@ -2,9 +2,9 @@
 
 ## Latest
 
-Updated: 2026-11-17 10:30 (+08:00)
+Updated: 2026-11-17 11:05 (+08:00)
 
-**当前结论**：生产 API 已重启并验证通过——`/mcp` 生效（initialize 返回 `talk_tools_mcp`）、加载页显示 6 个步骤 chips + 轨道动画 + “本机已安装 Codex、KimiCode、WorkBuddy、DSH”，主页面提示条为青绿色“可接入使用”，真实截图 `docs/mockups/live/`。Terra/K2.8/Astra 均 running。启动误报/加载页/BOM/乱码修复已复核并提交（`41bbcf9`）；换肤切片 1 已完成（`2517fd4` + `f9d0ac2`）。
+**当前结论**：界面换肤切片 2（任务区）已完成并复核（Terra #831、K2.8 #832 approved；提交 `409a629`）：任务列表/详情/Hall/输入区/弹窗统一到 tokens，明暗截图见 `docs/mockups/live/live_tasks_{midnight,daylight}.png`；`index.html` 缓存戳已更新（`20261117-tasks-restyle`）。生产 API 已重启、`/mcp` 生效，Terra/K2.8/Astra 均 running。
 
 ### 1) Current Progress
 - 路线图 13 项：第 1–7 已完成；第 8 项（运行器提示）并入换肤切片 1 完成；第 9→13 项待推进（第 9 单目录收拢、第 10 Release、第 11 交接文档、第 12 Codex 版本适配、第 13 终端身份隐藏）。
