@@ -186,6 +186,22 @@ button:disabled {
   padding: 0;
 }
 
+.shutdown-service-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.shutdown-service-btn:hover {
+  color: var(--text);
+  border-color: var(--blue);
+  background: var(--panel-2);
+}
+
 .window-control {
   min-width: 22px;
   text-align: center;

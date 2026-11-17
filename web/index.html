@@ -18,7 +18,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/theme-tokens.css?v=20261117-daylight-polish">
-  <link rel="stylesheet" href="/style.css?v=20261117-daylight-polish">
+  <link rel="stylesheet" href="/style.css?v=20261117-shutdown-header">
   <link rel="stylesheet" href="/workspace.css?v=20261117-roles-restyle">
   <link rel="stylesheet" href="/role-creation.css?v=20261117-daylight-polish">
   <link rel="stylesheet" href="/role-diagnostics.css?v=20261117-roles-restyle">
@@ -109,12 +109,12 @@
     <div class="header-actions">
       <span id="connection-status" class="hidden"></span>
       <span id="user-badge" class="user-badge"></span>
+      <button id="shutdown-service-btn" class="shutdown-service-btn" type="button" title="停止本机 TALK 服务">退出服务</button>
       <button id="logout-btn" class="logout-btn">退出</button>
     </div>
   </header>
 
   <div id="runner-banner" class="runner-banner" role="status" hidden><div><strong id="runner-banner-title"></strong><p id="runner-banner-detail"></p></div><button id="runner-banner-close" type="button" aria-label="关闭运行器提示">×</button></div>
-  <button id="shutdown-service-btn" type="button" style="position:fixed;right:1rem;bottom:1rem;z-index:40">退出服务</button>
   <div class="chat-shell flex-1 min-h-0">
     <div class="workbench">
       <aside id="workspace-tools" class="workspace-tools">
