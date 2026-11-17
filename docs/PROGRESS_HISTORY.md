@@ -1,5 +1,12 @@
 # 开发历史 · TALK
 
+## 2026-11-17 17:50 — 路线图第 12 项完成：Codex CLI 新版适配（Terra 开发、K2.8 复核）
+
+- 交付（`faa57bc`，9 文件 +240/−70）：`bridges/codex_execution_native.py` 版本策略改为 `MIN_SUPPORTED=0.163` / `MAX_TESTED=0.169`，高于上限放行但带 `codex_version_untested` 警告，低于下限 `codex_version_unsupported`；九项能力探测（`--disable/--sandbox/--model/--skip-git-repo-check/--ignore-rules/--strict-config/--config/-c/exec/stdin -`），缺失报 `codex_capability_missing:<flag>`；60 秒进程内缓存（键含可执行文件 resolve+mtime+size、cwd、env 哈希，支持 `clear_codex_probe_cache()` 与 `use_cache=False`）；`scripts/codex_role_host.py`/`codex_role_setup.py` 共用 helper，旧 0.163/0.164 错误码兼容；新增 `--check-version` 只读自检；新增 `tests/test_codex_version_support.py` 并把旧锁定断言改为区间断言、mock 探测。
+- 复核：K2.8 #840 approved with limitations（必须修：3 处旧 mock）→ Terra #841 修复 + 加缓存 → #842 定向确认 **approved**：26+6、59+26、25+3 通过；`--check-version` 0.164 allowed；隔离 npm 前缀安装 0.169 实测 allowed（未动全局 0.164）。
+- 已知环境噪音：部分回归在本机因 key 文件继承 ACE（`inherited_ace:S-1-5-21-...-500`）失败，baseline worktree 同样复现，与本次改动无关；这与此前 ACL 事故同源，建议后续做一次“私有 ACL 校验容忍继承/创建受保护 DACL”的健壮性切片。
+- 生产角色未重启，本次为代码/测试改动。
+
 ## 2026-11-17 15:20 — 界面换肤 · 切片 4 完成（亮色主题边角统一，Terra 开发、K2.8 复核）
 
 - 交付：`web/theme-tokens.css` 新增 `--control-primary-bg/-fg`、`--danger-hover-fg`、`--icon-shadow`、`--chip-shadow`、`--menu-shadow`（明暗两套）；`web/style.css` 残留硬编码色改 tokens 并补表单/焦点/富文本/滚动条；`web/role-creation.css` 禁用态修正；`web/index.html` 缓存戳更新。JS 零改动。
