@@ -585,6 +585,13 @@ def list_project_groups(
     return [_group_out(group, session) for group in groups]
 
 
+# Member.kind only distinguishes human and agent; exclude these known terminal identities.
+# Do not infer identity from the -t suffix: execution roles may also use it.
+_TERMINAL_IDENTITY_IDS = frozenset({
+    "agent:codex-t", "agent:kimi-t", "agent:dsh-t", "agent:workbuddy-t",
+})
+
+
 @router.get("/{project_id}/agents", response_model=list[ProjectAgentOut])
 def list_project_agents(
     project_id: str,
@@ -598,6 +605,7 @@ def list_project_agents(
         .where(ProjectAgent.project_id == project_id)
         .order_by(ProjectAgent.member_id)
     ).all()
+    agents = [agent for agent in agents if agent.member_id not in _TERMINAL_IDENTITY_IDS]
     result = _project_agent_outs(list(agents), session, project_id=project_id)
     # Probes start only after the request's shared authentication session is closed.
     session.close()
@@ -1663,7 +1671,8 @@ def list_project_roles(
     - 不返回 Key / token / 绝对路径 / argv。
     """
     _get_project(project_id, session)
-    member_ids = _role_list_member_ids(project_id, session)
+    member_ids = [member_id for member_id in _role_list_member_ids(project_id, session)
+                  if member_id not in _TERMINAL_IDENTITY_IDS]
     if not member_ids:
         return []
     projected = _role_projection(project_id, member_ids, session)

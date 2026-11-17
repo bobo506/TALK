@@ -2953,3 +2953,10 @@ if (typeof document !== "undefined") {
   }
 }
 if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceFinished, workspaceTreeMatches, workspaceNeedsMe, workspaceChatRooms, chatMemberName, workspaceChatCandidates, workspaceMentionCandidates, workspaceResultOpen, resetWorkspaceResult, syncWorkspaceResultButton, showWorkspaceResult, workspaceTaskChatActive, workspaceParseTime, workspaceFormatDuration, workspaceTaskDuration, workspaceTaskDurationEl, workspaceRoleKey, workspaceRoleLabel, workspaceRoleDescription, workspaceRoleDefaultDescription, workspaceRoleDescriptionText, workspaceRoleSummary, normalizeRoleDescriptionValue, ROLE_DESCRIPTION_MAX_CHARS, workspaceRequirementsLength, normalizeRequirementsValue, REQUIREMENTS_MAX_CHARS, workspaceSettingsSelected, ROLE_BINDING_STATES, workspaceRoleBindingSummary};
+
+// The empty-roster fallback uses members; hide known terminal identities in its options.
+if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", () => {
+  const terminalIds = new Set(["agent:codex-t", "agent:kimi-t", "agent:dsh-t", "agent:workbuddy-t"]);
+  const original = eligibleProjectAgents;
+  eligibleProjectAgents = () => original().filter(member => !terminalIds.has(member.id));
+});
