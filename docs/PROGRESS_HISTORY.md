@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-18 15:00 — v0.1.0 Release 发布（路线图第 10 项收口）
+
+- 前置：用户在浏览器完成 GitHub 设备授权，但 `gh auth login`（PID 6724）停在 “Press Enter” 未轮询，`hosts.yml` 未落盘；提示用户回窗口回车后，14:54:54 写入 `%APPDATA%\GitHub CLI\hosts.yml`，`gh auth status` 显示 `bobo506`（keyring，scopes: gist/read:org/repo/workflow）。
+- 发布：`gh release create v0.1.0` 指定 `--target 82776cc…`（HEAD，默认分支 `main` 不含该提交，故显式钉住），标题「TALK v0.1.0 · 首个便携版」，说明用预写中文 Markdown（`D:\backups\portable-release-20261118\RELEASE_NOTES_v0.1.0.md`，仓库外）。
+- 结果：https://github.com/bobo506/TALK/releases/tag/v0.1.0 —— `isDraft=false`、`isPrerelease=false`、`publishedAt 2026-11-18T06:57:15Z`；tag `v0.1.0` → `82776cc08de31e0c17139b797999775fd87bb854`。
+- 资产校验：`TALK-portable-0.1.0.zip`，`size=25027275`（与本地一致）、`state=uploaded`、GitHub 侧 `digest=sha256:b37f651abf19b12d82f43f53fb4ab78e2dbd46d8ad86a7839ece0fd602b8f0c7` 与本地哈希逐字符相同。
+- 收口：路线图第 1–13 项全部结束（第 5/7/8/13 项为历史取消或并入），无常驻待办；交接快照、路线图第 10 项与 `PORTABLE_HANDOVER` 的下载入口同步改为“已发布”。
+
 ## 2026-11-18 14:45 — 人工验收通过 + 便携包按 HEAD 重建冒烟（Release 仍待 gh 登录）
 
 - 人工验收：用户确认真实重启 / “退出服务”整机退出 / 托盘消失已验收通过（无需再补机器级证据；本轮 runtime 仍为 00:38 进程，日志侧未留重启痕迹）。

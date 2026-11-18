@@ -15,7 +15,7 @@
 
 ## 2. 获取与解压
 
-- 从 GitHub Releases 下载 `TALK-portable-<version>.zip`；
+- 从 GitHub Releases 下载 `TALK-portable-<version>.zip`（当前版本：[v0.1.0](https://github.com/bobo506/TALK/releases/tag/v0.1.0)）；
 - 解压到任意可写目录（建议非系统盘、路径不含中文空格也可，但避免 OneDrive 同步目录）；
 - 解压后目录结构：
 
