@@ -15,15 +15,16 @@ Updated: 2026-11-18 15:45 (+08:00)
 
 ### 2) Open Questions / Pending Confirmation
 - 无阻塞项。`v0.1.0` 已发布：https://github.com/bobo506/TALK/releases/tag/v0.1.0
-- 待跟进：`build_portable.py` 已排除 `docs/`；但构建脚本仍缺"主机名/内网 IP/`C:\Users\<user>`"扫描，可另行开片加严（未授权开工）。
-- 包内残留（代码默认值，未改以免与仓库源码不一致）：`scripts/kimi_k28_executor.py:70` 默认 `D:/claude-test/TALK`、`scripts/talk_desktop.py:90` 回退 `../TALK-private`、`scripts/codex_role_host.py:41` 回退 `C:/Users/Administrator`、`examples/agent_poller.py:18` 示例 IP。
+- **已决定不处理（2026-11-18 用户）**：以下三项均不影响下载包的使用与后续维护升级，不再跟进——
+  1. `build_portable.py` 未扫描主机名/内网 IP/`C:\Users\<user>`（`docs/` 已整体排除，包内已无此类内容）；
+  2. 包内 4 处代码默认值（`kimi_k28_executor.py:70` 的 `D:/claude-test/TALK`、`talk_desktop.py:90` 的 `../TALK-private`、`codex_role_host.py:41` 的 `C:/Users/Administrator`、`agent_poller.py:18` 示例 IP）——属仓库源码固有内容，改会与源码不一致；
+  3. tag `v0.1.0` 指向 `82776cc`（构建脚本修复前）：只影响“从该 tag 重新构建”，不影响下载资产，维护构建一律用 `main`/当前分支。
 - 已知遗留：`scripts/talk_desktop.py` 历史 mojibake（未修，避免扩大）；本机部分测试受 key 继承 ACL 影响（基线同样复现）。
 - 杂项：仓库根误落未跟踪 `Microsoft\Windows\PowerShell\ModuleAnalysisCache`（PowerShell 分析缓存），未清理。
 
 ### 3) Next Plan
-1. 可选：给 `build_portable.py` 增加主机名/内网 IP/`C:\Users\<user>` 扫描（需另行确认开工）；
-2. 可选：把 Release 说明归档到 `docs/releases/v0.1.0.md`；
-3. 可选：清理 `Microsoft\` 误落缓存（移入隔离区）。
+1. 无可执行待办；如需新功能按 `docs/spec/DEVELOPMENT_ROADMAP.md` 另行确认开工。
+2. 可选：把 Release 说明归档到 `docs/releases/v0.1.0.md`；清理 `Microsoft\` 误落缓存。
 
 ### 4) Verification
 - 已通过（历史）：换肤 `pytest tests/test_talk_desktop.py`/`test_boot_status.py`；图标 25+3；ACL 41+9；Codex 版本 59+26；终端过滤 26+3；整机退出/托盘 53 项（K2.8 #861）；#862 30 passed + 5 subtests（K2.8 #865 approved）。
