@@ -1,5 +1,13 @@
 # 开发历史 · TALK
 
+## 2026-11-18 14:45 — 人工验收通过 + 便携包按 HEAD 重建冒烟（Release 仍待 gh 登录）
+
+- 人工验收：用户确认真实重启 / “退出服务”整机退出 / 托盘消失已验收通过（无需再补机器级证据；本轮 runtime 仍为 00:38 进程，日志侧未留重启痕迹）。
+- 便携包重建（用户确认后执行）：`D:\backups\portable-release-20261118\TALK-portable-0.1.0.zip`，25,027,275 B / 1476 文件 / sha256 `b37f651abf19b12d82f43f53fb4ab78e2dbd46d8ad86a7839ece0fd602b8f0c7`；含 `2290ae0` 启动器自动带 runtime、`1fb21ab` 退出停整机+托盘退出、`9fa801d` 按钮迁移（旧包构建于这三项之前，已过期）。
+- 隔离冒烟（`D:\agent-sandbox\release-20261118`，未触生产）：解压 1476 文件 → `scripts.portable_bootstrap --root . --port 8931 --apply` 生成 config/runtime/data、`data/keys/operator.key`、默认项目 `prj_b40b63fce7e0` 与管理员（seed 4 runners / 10 models / 1 host）→ 沙箱 uvicorn 临时端口 `/`、`/loading`、`/healthz`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/api/projects` 全 200 → 已关停，8931 端口已释放。
+- 一致性：包内 `scripts/talk_desktop.py`、`scripts/portable_bootstrap.py`、`web/index.html` 与 HEAD 逐字节相同；`talk_desktop.py` 含 `find_runtime_config` 与 `--attach-api`。
+- 仍未做：`gh auth login` → `gh release create v0.1.0`（zip 作资产，不进 git）。
+
 ## 2026-11-18 00:55 — 全天汇总与上下文交接（#862 进行中）
 
 - 本日完成（详见下方各切片）：换肤 1–4、自定义图标、ACL 健壮性、Codex CLI 版本适配（第 12 项）、终端身份过滤及回退（第 13 项）、便携包构建/冒烟/交接文档（第 10/11 项主体）、“退出服务”按钮迁移、退出停整机+Chrome 托盘自动退出，均已复核并推送（HEAD `1ba9534`）。
