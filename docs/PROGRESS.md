@@ -2,9 +2,9 @@
 
 ## Latest
 
-Updated: 2026-11-18 18:25 (+08:00)
+Updated: 2026-11-18 20:40 (+08:00)
 
-**当前结论**：全部切片收口、人工验收通过、`v0.1.0` 已发布。今日两轮发布后复查：①首版包带出内部 docs（无密钥）→ 构建已排除 `docs/`；②**用户指出新用户入口与实际版本偏差** → 已修正 `QUICKSTART_USER`/`USER_MANUAL`/`PORTABLE_PACKAGE`/`PORTABLE_HANDOVER`/`QUICKSTART`/`README` 与包内 `README-PORTABLE.txt`（Key 路径 `data/keys`、关窗不停服务、退出服务按钮可见、浏览器 Chrome→Edge→默认），并按修正后脚本重建覆盖资产：**19,621,867 B / 1254 文件 / sha256 `56f488ce…d9f1`**，digest 一致、下载 200。
+**当前结论**：全部切片收口、人工验收通过、`v0.1.0` 已发布（资产 19,621,867 B / 1254 文件 / sha256 `56f488ce…d9f1`，不含 docs、README 与行为一致）。今日第三件收尾：**面向下载者的产品页补齐**——`README.md` 重写为中文产品页（截图、协作优势、9 项亮点、快速开始、备份/换机、FAQ、限制、MIT 许可），新增 `LICENSE`（MIT），GitHub 仓库简介/主页/10 个 topics 已设置，用户手册群聊章节同步改为"已下线"。无进行中任务、无待收取、无阻塞项。
 
 ### 1) Current Progress
 - 路线图 13 项：第 1–7、12、13 完成；第 8 并入换肤；第 9 用户已清理；第 11 交接文档完成；**第 10 构建+冒烟完成，v0.1.0 已发布（资产为不含 docs、README 与行为一致的包）**。
@@ -12,6 +12,7 @@ Updated: 2026-11-18 18:25 (+08:00)
 - 角色：Terra、K2.8 serving（idle）；Astra stopped（未勾自动启动，符合预期）；无 running 任务，`submitted` 对账为空。
 - 生产：runtime `10136` 自 11-18 00:38 运行，API 8000 存活；未在 agent 侧启停。
 - 便携包（发布资产）：`D:\backups\portable-r3-20261118\TALK-portable-0.1.0.zip`（19,621,867 B / 1254 文件 / sha256 `56f488ce…d9f1`），不含 `docs/`，`README-PORTABLE.txt` 已按实际行为重写；早期三版包留档于 `portable-release-`、`portable-clean-`、`portable-r2-20261118`。
+- 产品页（下载者入口）：`README.md` 重写（118 行，中文；顶部英文摘要；3 张截图；「为什么用 TALK」3 条；9 项亮点；快速开始；数据/Key/备份；局域网；FAQ；源码/Docker；文档索引；限制；MIT）；新增 `LICENSE`（MIT, Copyright 2026 bobo506）；GitHub 仓库 description/homepage/10 topics 已设置；`USER_MANUAL` 群聊章节改为"已下线"。
 
 ### 2) Open Questions / Pending Confirmation
 - 无阻塞项。`v0.1.0` 已发布：https://github.com/bobo506/TALK/releases/tag/v0.1.0
@@ -33,11 +34,12 @@ Updated: 2026-11-18 18:25 (+08:00)
 - 文档纠偏核对（11-18）：逐条对照代码确认——Key 默认 `data/keys`（`portable_paths.py:20`）、关窗不停服务（`talk_desktop.py:309`）、退出服务按钮在 header（`web/index.html:112`）、浏览器 Chrome→Edge→默认（`talk_desktop.py` `find_browser`）；6 份文档重写/修正、无断链。
 - 包内容审查（11-18）：1476 → 1257 → 1254 → **1254（README 修正版）**；首版 58 个 docs 含机器名/内网 IP/本机路径（无密钥、无 DB、无 config.toml）；最终包重扫只剩 4 处代码默认值（见 §2），令牌/私钥 0 命中。
 - 人工验收：用户确认通过（自动启动 / 整机退出 / 托盘消失）。
+- 产品页核对（11-18）：README 无断链/缺图（3 张截图均已在仓库）；主动模式按用户要求只写"当前仅 DSH 验证通过"；同模型多角色依据 `USER_MANUAL:347` 与 `EXECUTION_SESSION_KIMI_ADAPTATION` 的双 K2.8 实例；群聊章节与 UI 核对一致（`web/index.html` 仅"任务 / 角色"两个标签）。
 - Release（11-18）：`isDraft=false`、`isPrerelease=false`；`targetCommitish=82776cc…`；最终资产 `size=19621867`、`state=uploaded`、`digest=sha256:56f488ce…d9f1` 与本地一致；下载 HTTP 200 / `content-length` 相同。
 
 ### 5) Changed Files
 - 今日主要：`web/*`（换肤/图标/manifest）、`server/routes/boot_status.py`、`server/routes/local_shutdown.py`、`server/routes/projects.py`、`scripts/talk_desktop.py`、`scripts/talk_launcher.py`、`scripts/talk_runtime.py`、`scripts/portable_paths.py`、`scripts/build_portable.py`、`bridges/codex_execution_native.py`、`scripts/codex_role_host.py`、`scripts/codex_role_setup.py`、`scripts/role_provision.py`、`scripts/role_service_host.py`、`tests/*`、`docs/*`。
-- 本轮仅改文档：`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`、`docs/HANDOFF_20261118.md`；工作区无未提交代码。
+- 本轮：`README.md`（重写为产品页）、`LICENSE`（新增 MIT）、`docs/guides/USER_MANUAL.md`（群聊章节改"已下线"、导航说明、调度模式示例）、`docs/guides/QUICKSTART*.md`、`docs/guides/PORTABLE_*.md`、`scripts/build_portable.py`（README 文案）、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`、`docs/HANDOFF_20261118.md`；无产品逻辑改动。
 
 ## Recent Notes
 - 完整历史见 `docs/PROGRESS_HISTORY.md`；上下文交接见 `docs/HANDOFF_20261118.md`。

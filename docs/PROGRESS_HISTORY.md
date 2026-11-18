@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-11-18 20:40 — 产品页补齐：README 重写 + MIT 许可 + 仓库简介/topics + 群聊章节下线
+
+- 起因：用户提出"GitHub 上是不是还要写产品说明，让别人下载时知道这是什么、怎么用"，并要求把协作亮点写进去（主被动双模式、同模型多角色）。
+- 依据（逐条核对，不采信文档互抄）：亮点取自 `docs/guides/USER_MANUAL.md`「TALK 的协作优势」与各功能章节；主动模式语义核对同文件「调整项目调度模式」（等待期不调用模型、能否唤醒取决于发起终端）；同模型多角色依据 `USER_MANUAL:347`（项目里两个 K2.8 互不影响）与 `EXECUTION_SESSION_KIMI_ADAPTATION`（三个 Kimi 角色共用同一运行器、两个 K2.8 同选 `kimi-code/kimi-for-coding`），服务端无"模型唯一"约束。
+- 交付：
+  - `README.md` 重写（118 行）：定位一句话 + 英文摘要 + 3 张截图（主界面/任务/角色）+「为什么用 TALK」3 条 + 9 项功能亮点表 + 快速开始 + 系统要求 + 数据/Key/备份 + 局域网 + FAQ + 源码/Docker + 文档索引 + 已知限制 + 许可；
+  - 主动模式按用户要求写为"当前仅在 DSH 终端验证通过，其它终端尚未验证"；同模型多角色附"互评偏差可能一致，建议混搭厂商"的提示；
+  - 新增 `LICENSE`（MIT，Copyright 2026 bobo506）；
+  - GitHub 仓库设置：description、homepage（指向 v0.1.0 Release）、10 个 topics（ai-agents / multi-agent / agent-collaboration / chat / fastapi / sqlite / local-first / windows / codex / kimi）；此前三项均为空；
+  - `USER_MANUAL`：§9 改为「群聊（已下线）」；§2 标题、导航说明、调度模式示例、任务窗口说明去掉群聊；「群聊成员与提醒」改为「工作区与文件归属」。依据：`web/index.html` 现只有"任务 / 角色"两个标签，`server/routes` 无 rooms 路由。
+- 验证：README 相对链接与 3 张截图全部存在（脚本核对，0 断链）；`gh repo view` 回读 description/homepage/topics 正确；手册仅剩 3 处群聊说明且均为"已下线"表述。
+- 未做：产品代码零改动；未重建便携包（`docs/` 不随包发布，README 也不在包内）。
+
 ## 2026-11-18 18:25 — 新用户入口文档纠偏（6 份文档 + 包内 README），v0.1.0 资产第三次替换
 
 - 起因：用户指出新用户入口与实际版本偏差，直接影响首次安装、备份与换机。
