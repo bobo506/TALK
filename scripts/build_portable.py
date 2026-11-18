@@ -16,7 +16,9 @@ import zipfile
 ROOT = Path(__file__).resolve().parent.parent
 PYTHON_ZIP = "python-3.12.1-embed-amd64.zip"
 PYTHON_URL = "https://www.python.org/ftp/python/3.12.1/" + PYTHON_ZIP
-ALLOW = ("server", "web", "scripts", "bridges", "cli", "docs", "examples", "TALK", "requirements.txt", "README.md", "start.bat", "stop.bat", "status.bat", "start-gui.bat")
+# 注意：`docs/` 故意不在白名单内——内部开发文档（HANDOFF/PROGRESS_HISTORY/spec）含主机名、
+# 内网 IP、本机用户路径与任务日志，曾随 v0.1.0 首版包泄露，故不随包发布。
+ALLOW = ("server", "web", "scripts", "bridges", "cli", "examples", "TALK", "requirements.txt", "README.md", "start.bat", "stop.bat", "status.bat", "start-gui.bat")
 EXCLUDED = {"tests", ".git", ".venv", ".talk", ".agents", ".codex", "__pycache__", "logs", "backups", "storage", "workspaces", "keys", "node_modules"}
 SECRET = re.compile(rb"(?:-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bgh[pousr]_[A-Za-z0-9]{30,}|\bsk-[A-Za-z0-9_-]{32,})")
 README = """TALK 便携包（Windows x64）\n\n需要 Microsoft Edge。双击 start-gui.bat，首次启动会初始化配置和本地项目并打开窗口。关闭窗口后等待后台服务停止。start.bat 使用默认浏览器；stop.bat 可停止服务。\n配置在 config，数据库、项目、上传及日志在 data。管理员 Key 默认在包内 data/keys。整个文件夹被复制或转发时 Key 会一并被带走；如需隔离可用 TALK_KEYS_DIR 指向包外。请妥善保管数据和 Key。\n卸载：关闭 TALK 后删除本文件夹；如不再需要，可另行删除 Key 目录。\n"""
@@ -103,7 +105,7 @@ def scan(stage):
             raise ValueError(f'database in package: {relative}')
         if SECRET.search(data):
             raise ValueError(f'possible secret in package: {relative}')
-        if relative.parts[0] not in {'server', 'web', 'scripts', 'bridges', 'cli', 'docs', 'examples', 'TALK'} and b'd:\\claude-test' in data.lower():
+        if relative.parts[0] not in {'server', 'web', 'scripts', 'bridges', 'cli', 'examples', 'TALK'} and b'd:\\claude-test' in data.lower():
             raise ValueError(f'development path in package: {relative}')
     return count
 
