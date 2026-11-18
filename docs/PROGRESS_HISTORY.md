@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-18 15:30 — 发布资产复查：剔除内部文档、重建干净包并替换 v0.1.0 资产
+
+- 起因：用户要求检查“已发布、可下载的那个 zip”是否含私人数据（仓库历史不在本次范围）。
+- 首版审查结论（25,027,275 B / 1476 文件）：**无数据库、无 `config.toml`、无 `.key`/`.env`/hosts.yml/私钥块，令牌样式 0 命中**；初筛的 `sk-…` 全部是 `task-details`/`task-prefill` 一类标识符被截断误报，按词边界重扫为 0。**但 222 个 docs 中 58 个带本机痕迹**：机器名 `PC-202312301323`（5 篇）、内网 IP `192.168.1.23/.255`（USER_MANUAL/QUICKSTART 等 4 篇）、`C:\Users\Administrator`/`bobo`（约 15 篇）、`D:\claude-test` 与 `TALK-private` 路径（约 40 篇）。
+- 根因：`scripts/build_portable.py` 的 `ALLOW` 白名单含 `docs`，且第 106 行“开发路径”检查恰好把 `docs` 目录排除，内部开发日志因此随包发布。
+- 处置（用户选定“立即做干净包并覆盖 v0.1.0”）：`build_portable.py --out D:\backups\portable-clean-20261118`（不 zip）→ 整个 `docs/` **移动**（非删除）到同目录 `docs-removed` → 只回填 `guides/PORTABLE_HANDOVER.md`、`guides/USER_MANUAL.md`、`guides/QUICKSTART_USER.md`，把机器名/内网 IP/`C:\Users\<user>`/`D:\claude-test`/`TALK-private` 替换为占位 → 重新打包。
+- 结果：`TALK-portable-0.1.0.zip` **19,647,501 B / 1257 文件 / sha256 `4c91a3b65b55e49dcab40a60dbd44b22e6cb4c36a0b14c7e6ede7c04346d0374`**；隔离沙箱解压 → `portable_bootstrap --port 8932 --apply` → `/`、`/loading`、`/healthz`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/api/projects` 全 200；`gh release upload v0.1.0 --clobber` 覆盖资产 + `gh release edit` 更新说明；GitHub 侧 `digest` 与本地一致、下载 HTTP 200 / `content-length=19647501`。
+- 未改产品代码：包内仍保留 4 处代码默认值（`kimi_k28_executor.py:70` 的 `D:/claude-test/TALK`、`talk_desktop.py:90` 回退 `../TALK-private`、`codex_role_host.py:41` 回退 `C:/Users/Administrator`、`agent_poller.py:18` 示例 IP），改会与仓库源码不一致，留待构建脚本片统一处理。
+
 ## 2026-11-18 15:00 — v0.1.0 Release 发布（路线图第 10 项收口）
 
 - 前置：用户在浏览器完成 GitHub 设备授权，但 `gh auth login`（PID 6724）停在 “Press Enter” 未轮询，`hosts.yml` 未落盘；提示用户回窗口回车后，14:54:54 写入 `%APPDATA%\GitHub CLI\hosts.yml`，`gh auth status` 显示 `bobo506`（keyring，scopes: gist/read:org/repo/workflow）。
