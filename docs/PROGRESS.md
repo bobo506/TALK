@@ -16,10 +16,11 @@ Updated: 2026-11-18 20:40 (+08:00)
 
 ### 2) Open Questions / Pending Confirmation
 - 无阻塞项。`v0.1.0` 已发布：https://github.com/bobo506/TALK/releases/tag/v0.1.0
-- **已决定不处理（2026-11-18 用户）**：以下三项均不影响下载包的使用与后续维护升级，不再跟进——
+- **已决定不处理（2026-11-18 用户）**：以下四项均不影响下载包的使用与后续维护升级，不再跟进——
   1. `build_portable.py` 未扫描主机名/内网 IP/`C:\Users\<user>`（`docs/` 已整体排除，包内已无此类内容）；
   2. 包内 4 处代码默认值（`kimi_k28_executor.py:70` 的 `D:/claude-test/TALK`、`talk_desktop.py:90` 的 `../TALK-private`、`codex_role_host.py:41` 的 `C:/Users/Administrator`、`agent_poller.py:18` 示例 IP）——属仓库源码固有内容，改会与源码不一致；
-  3. tag `v0.1.0` 指向 `82776cc`（构建脚本与文档修复前）：只影响“从该 tag 重新构建”，不影响下载资产，维护构建一律用 `main`/当前分支。
+  3. tag `v0.1.0` 指向 `82776cc`（构建脚本与文档修复前）：只影响“从该 tag 重新构建”，不影响下载资产，维护构建一律用 `main`/当前分支；
+  4. 公开仓库当前树里仍可读到机器名（5 个文件）、内网 IP（12 个文件）、`C:\Users\...`（25 个文件）、`D:\claude-test`（54 个文件），历史中另有 598 个演示数据库——均为文档/开发记录，下载包不含；用户确认不影响使用，不清理（不清 docs、不重写历史）。
 - 已知遗留：`scripts/talk_desktop.py` 历史 mojibake（未修，避免扩大）；本机部分测试受 key 继承 ACL 影响（基线同样复现）。
 - 杂项：仓库根误落未跟踪 `Microsoft\Windows\PowerShell\ModuleAnalysisCache`（PowerShell 分析缓存），未清理。
 
