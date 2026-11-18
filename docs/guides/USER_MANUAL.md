@@ -31,7 +31,7 @@
 
 升级后采用默认 trusted 模式会改变原有鉴权行为，需要继续密钥登录时请明确设置 `auth_mode = "key"`。同源反向代理会绕过来源闸门，公网部署必须使用 key 模式或网络层限制；`private` 还包含链路本地地址，不希望信任时请使用 key 模式或在网络层限制明确网段。
 
-**桌面入口（仓库内使用）。** 在仓库根目录双击 `start-gui.vbs`（或运行 `start-gui.bat`）会直接打开无地址栏的 TALK 应用窗口，不必再用命令行登录：服务未运行时按根目录 `config.toml` 启动一个 API 子进程，关闭窗口只停止这个子进程；服务已在运行时直接接入，不会重复启动。首次使用可在根目录运行 `install-shortcut.bat` 生成桌面 `TALK` 快捷方式，之后双击快捷方式即可。
+**桌面入口（仓库内使用）。** 在仓库根目录双击 `start-gui.vbs`（或运行 `start-gui.bat`）会直接打开无地址栏的 TALK 应用窗口，不必再用命令行登录：服务未运行时按根目录 `config.toml` 启动服务并打开窗口；**关闭窗口不会停止服务**，需要停止请用页面右上角「退出服务」或 `stop.bat`。服务已在运行时直接接入，不会重复启动。首次使用可在根目录运行 `install-shortcut.bat` 生成桌面 `TALK` 快捷方式，之后双击快捷方式即可。
 
 ## 2. 认识任务、群聊与角色工作台
 
@@ -364,13 +364,14 @@ Agent 提交结果后，任务会进入“结果待收取”。
 
 ## 13. 便携版（免安装）
 
-- 早上验收副本：`D:\TALK-portable`（端口 **8132**，避免与生产 8000 冲突）；双击 `start-gui.bat`，优先打开 Chrome 应用窗口，未安装 Chrome 时回退 Edge；关闭窗口后后台服务停止。
-- 干净分发 zip：`D:\TALK-portable-clean.zip`；首次启动生成自己的配置、默认项目和 Key（默认 `%LOCALAPPDATA%\TALK\keys`）。
-- 首次启动会自动登记 Codex、Kimi Code、DSH 及默认模型；空项目的“创建角色”可直接选择。
-- 首次启动还会自动登记本机“角色配置宿主”；创建角色由本机 worker 自动完成配置，不会自动启动角色。
-- 首次启动会补全 Codex/Kimi Code/DSH 宿主配方；角色启动时仍需对应原生登录和本机 CLI。DSH 首次启动会自动生成模型 patch。
-- 本机已安装 WorkBuddy（含 `.workbuddy\models.json`）时，会自动出现 WorkBuddy runner 和 3 个桌面模型；未安装则不显示。WorkBuddy 本体不随包分发，桌面/CDP 授权需本机准备。
-- 授权完成后授权栏会自动隐藏；设备码可点“复制验证码”。桌面启动器会隐藏右上角“退出”；关闭窗口即停止服务。
-- 数据、配置、日志都在便携文件夹的 `config/`、`data/`；删除文件夹即卸载（Key 目录可另行删除）。
-- 当前限制：Chrome/Edge 应用窗口、页面内链接可导航；默认浏览器回退不会随窗口关闭自动停服务（用 `stop.bat`）；macOS 仅做路径检测，未端到端验证；未验证另一台干净 Windows 和升级迁移。
-- 详细说明见[便携版指南](PORTABLE_PACKAGE.md)。
+- 当前发布：`v0.1.0`（[Release](https://github.com/bobo506/TALK/releases/tag/v0.1.0)）的 `TALK-portable-0.1.0.zip`；解压即用，自带 Python，不需要 Docker。
+- 启动：双击 `start-gui.bat`。首次启动自动生成 `config/`（`config.toml`、`runtime.json`）、`data/`（`talk.db`、`storage/`、`logs/`、`backups/`、`state/`、`workspaces/`、`project/`）、`data/keys/operator.key`、默认项目与管理员 `human:operator`。
+- 窗口：优先 Chrome 应用窗口，其次 Edge，都没有时用系统默认浏览器；默认端口 `8000`，仅监听本机 `127.0.0.1`。
+- Key：默认在包内 `data/keys`，可用 `TALK_KEYS_DIR` 指向包外目录，避免随文件夹被复制。
+- 停止：点页面右上角（"本机操作员"旁）「退出服务」——有任务在跑会提示等待，无任务时停止服务、角色进程与浏览器托盘；或运行 `stop.bat`；`status.bat` 查看状态。
+- **关闭窗口不会停止服务**；需要停止请用上面两种方式。
+- 备份/换机：复制整个 `data/`（`talk.db` 是数据，`keys/` 是凭据，`storage/` 是上传文件）。
+- 首次启动会自动登记 Codex、Kimi Code、DSH 及默认模型；本机安装 WorkBuddy 时额外登记其 runner 与桌面模型；角色启动仍需对应原生登录与本机 CLI。
+- 不写注册表、不装 Windows 服务；删除文件夹即卸载（Key 目录可另行删除）。
+- 当前限制：未验证另一台干净 Windows 的首次启动与升级迁移；macOS 仅做路径检测；默认只监听本机，开放局域网需改 `config/config.toml` 的 `host`/`public_url`/`trusted_networks`。
+- 详细说明见[便携版说明](PORTABLE_PACKAGE.md)与[便携包交接](PORTABLE_HANDOVER.md)。
