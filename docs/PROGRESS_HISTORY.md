@@ -1,5 +1,21 @@
 # 开发历史 · TALK
 
+## 2026-11-18 18:25 — 新用户入口文档纠偏（6 份文档 + 包内 README），v0.1.0 资产第三次替换
+
+- 起因：用户指出新用户入口与实际版本偏差，直接影响首次安装、备份与换机。
+- 核实（逐条对照代码，不采信文档互抄）：
+  - `QUICKSTART_USER.md` 全文只讲 Docker Desktop（要求项目根有 `docker-compose.yml`/`Dockerfile`、`docker compose up -d`），**完全没提便携包**；
+  - `USER_MANUAL.md` §13 与 `PORTABLE_PACKAGE.md` 写 Key 默认 `%LOCALAPPDATA%\TALK\keys`，实际是 `<TALK_HOME>/data/keys`（`scripts/portable_paths.py:20`）；
+  - 同两处写"关闭窗口即停止服务"/"关闭窗口后启动器停止服务"，实际**关窗不停**（`scripts/talk_desktop.py:309` 打印"服务仍在运行…"）；
+  - "桌面启动器会隐藏右上角'退出'"：桌面模式只隐藏 `#logout-btn`（`web/workspace.css:7`），而「退出服务」按钮在 header 可见（`web/index.html:112`，`9fa801d` + 人工验收）；
+  - `USER_MANUAL.md` L34（仓库桌面入口）同样写"关闭窗口只停止这个子进程"，与代码不符；
+  - `scripts/build_portable.py:24` 的 README 常量（**会进包**）写"关闭窗口后等待后台服务停止"，与实际相反；
+  - `PORTABLE_PACKAGE.md` 写"Edge 应用窗口"，与代码 Chrome→Edge→默认浏览器（`talk_desktop.py` `find_browser`）矛盾，且同文件另一处自己写的是 Chrome→Edge。
+- 修正：重写 `QUICKSTART_USER`（便携包优先，Docker 降为附录，IP 示例改占位）、`PORTABLE_PACKAGE`（对齐 v0.1.0 当前发布）、`USER_MANUAL` §13 与 L34、`PORTABLE_HANDOVER`（浏览器优先级 + 退出服务位置）、`QUICKSTART` 索引与 `README` 增加便携包入口；`build_portable.py` README 常量改为"关窗不停服务 / 退出服务或 stop.bat / Chrome→Edge→默认"。
+- 验证：`pytest tests/test_build_portable.py` **8 passed**；6 份文档链接检查无断链；重建包 **19,621,867 B / 1254 文件 / sha256 `56f488ce6c3b484dfe84514e20db43fd072341896b5f3770fb239c2d89c1d9f1`**；沙箱 bootstrap + `/`、`/loading`、`/healthz`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/api/projects` 全 200；包内 README 已核对为正确文案。
+- 发布：`gh release upload v0.1.0 --clobber` + `gh release edit`；GitHub 侧 digest 与本地一致，下载 HTTP 200 / `content-length=19621867`。
+- 说明：本次只改文档与包内 README 文案，产品行为零改动。
+
 ## 2026-11-18 15:55 — 收尾决策：发布资产与收尾杂项不再处理
 
 - 用户决定：只要不影响“后续下载包的使用”和“后续维护升级”，tag 指向、构建脚本扫描项、包内代码默认值都不再改动。
