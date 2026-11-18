@@ -1,5 +1,14 @@
 # 开发历史 · TALK
 
+## 2026-11-18 15:45 — 构建脚本排除 docs/，重建并二次替换 v0.1.0 资产
+
+- 用户决定：包里不需要保留任何 docs，直接把 `docs/` 移出打包白名单。
+- 改动（`40b5ebf`）：`scripts/build_portable.py` 的 `ALLOW` 去掉 `docs`，开发路径检查的目录豁免集合同步去掉 `docs`，并加注释说明原因（内部文档含主机名/内网 IP/本机路径）；`pytest tests/test_build_portable.py` **8 passed**。
+- 重建：`D:\backups\portable-r2-20261118`，`TALK-portable-0.1.0.zip` **19,621,560 B / 1254 文件 / sha256 `9ec85731106aa2815f237d7be756ad908fab21c7748682e105e173ffd9221bb7`**；包内已无 `docs/` 目录。
+- 冒烟：沙箱解压 → `portable_bootstrap --port 8933 --apply` → `/`、`/loading`、`/healthz`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/api/projects` 全 200；重扫个人痕迹只剩 4 处代码默认值，令牌/私钥 0 命中。
+- 发布：`gh release upload v0.1.0 --clobber` + `gh release edit`（说明改为“包内不含 docs/”）；GitHub 侧 `digest` 与本地一致。
+- 说明：本次为协调 + 构建脚本微改，未单独安排 K2.8 独立复核；如需正式复核可另派。
+
 ## 2026-11-18 15:30 — 发布资产复查：剔除内部文档、重建干净包并替换 v0.1.0 资产
 
 - 起因：用户要求检查“已发布、可下载的那个 zip”是否含私人数据（仓库历史不在本次范围）。
