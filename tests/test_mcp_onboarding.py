@@ -17,15 +17,26 @@ def setup_env(tmp_path, monkeypatch):
     monkeypatch.setattr(m.shutil, 'which', lambda _: None)
     monkeypatch.setattr(m, 'urlopen', lambda *a, **kw: io.BytesIO(b'[]'))
     repo, home = tmp_path / 'repo', tmp_path / 'home'
-    for path in (repo / 'bridges/talk_terminal_mcp.py', repo / 'scripts/kimi_talk_mcp_launch.py', home / '.kimi-code/bin/kimi.exe', home / 'AppData/Local/Programs/WorkBuddy/WorkBuddy.exe'):
+    for path in (
+        repo / 'bridges/talk_terminal_mcp.py',
+        repo / 'scripts/kimi_talk_mcp_launch.py',
+        home / '.kimi-code/bin/kimi.exe',
+        home / 'AppData/Local/Programs/WorkBuddy/WorkBuddy.exe',
+        home / 'AppData/Local/Programs/Antigravity/Antigravity.exe',
+    ):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()
     (home / '.codex').mkdir(parents=True)
     (home / '.codex/config.toml').write_text('[other]\nvalue = 5\n', encoding='utf-8')
     (home / '.dsh/profiles/desktop').mkdir(parents=True)
     (home / '.dsh/profiles/desktop/cordis.patch.yml').write_text('- id: other\n  value: 3\n', encoding='utf-8')
+    (home / '.gemini/config').mkdir(parents=True)
+    (home / '.gemini/config/mcp_config.json').write_text(
+        json.dumps({'mcpServers': {'ambient_eye': {'command': 'ambient-eye'}}}) + '\n',
+        encoding='utf-8',
+    )
     (home / '.talk/keys').mkdir(parents=True)
-    for name in ('codex', 'workbuddy', 'dsh'):
+    for name in ('codex', 'workbuddy', 'dsh', 'antigravity'):
         (home / f'.talk/keys/agent_{name}_t.key').write_text('secret-' + name, encoding='utf-8')
     return repo, home
 
@@ -44,18 +55,37 @@ def test_detect_kimi_path(tmp_path, monkeypatch):
     assert m.detect(tmp_path)['kimi']['detected']
 
 
+@pytest.mark.parametrize('kind', ['desktop_exe', 'agy_exe', 'gemini_dir', 'agy_path'])
+def test_detect_antigravity_variants(tmp_path, monkeypatch, kind):
+    monkeypatch.setattr(m.shutil, 'which', lambda cmd: '/test/agy' if kind == 'agy_path' and cmd == 'agy' else None)
+    if kind == 'desktop_exe':
+        p = tmp_path / 'AppData/Local/Programs/Antigravity/Antigravity.exe'
+        p.parent.mkdir(parents=True)
+        p.touch()
+    elif kind == 'agy_exe':
+        p = tmp_path / 'AppData/Local/agy/bin/agy.exe'
+        p.parent.mkdir(parents=True)
+        p.touch()
+    elif kind == 'gemini_dir':
+        (tmp_path / '.gemini/antigravity').mkdir(parents=True)
+    detected = m.detect(tmp_path)
+    assert detected['antigravity'] == {'detected': True, 'reason': 'found'}
+    for other in ('codex', 'kimi', 'workbuddy', 'dsh'):
+        assert not detected[other]['detected']
+
+
 def test_check_no_write(setup_env):
     repo, home = setup_env
     before = {str(p): p.stat().st_mtime_ns for p in home.rglob('*') if p.is_file()}
     result = m.run(repo, home, False)
-    assert len(result['planned']) == 4 and not result['configs_written'] and not result['errors']
+    assert len(result['planned']) == 5 and not result['configs_written'] and not result['errors']
     assert before == {str(p): p.stat().st_mtime_ns for p in home.rglob('*') if p.is_file()}
     assert not (repo / '.kimi-code').exists()
 
 
 def test_apply_all_contents(setup_env):
     repo, home = setup_env
-    assert len(m.run(repo, home, True)['configs_written']) == 4
+    assert len(m.run(repo, home, True)['configs_written']) == 5
     codex = tomllib.loads((home / '.codex/config.toml').read_text(encoding='utf-8'))
     assert codex['other']['value'] == 5
     entry = codex['mcp_servers']['talk']
@@ -70,6 +100,12 @@ def test_apply_all_contents(setup_env):
     assert f"command: '{entry['command']}'" in dsh
     assert f"- '-X'\n          - 'utf8'\n          - '{entry['args'][2]}'\n          - '--project-root'\n          - '{repo}'" in dsh
     assert "TALK_API_KEY: 'secret-dsh'" in dsh and 'failOnStartupError: false' in dsh
+    agy_doc = json.loads((home / '.gemini/config/mcp_config.json').read_text(encoding='utf-8'))
+    assert agy_doc['mcpServers']['ambient_eye'] == {'command': 'ambient-eye'}
+    agy = agy_doc['mcpServers']['talk']
+    assert agy['command'] == entry['command']
+    assert agy['args'] == entry['args']
+    assert agy['env']['TALK_API_KEY'] == 'secret-antigravity'
 
 
 def test_idempotent_mtime(setup_env):
@@ -78,7 +114,7 @@ def test_idempotent_mtime(setup_env):
     paths = [Path(x['path']) for x in first['configs_written']]
     times = [p.stat().st_mtime_ns for p in paths]
     second = m.run(repo, home, True)
-    assert len(second['skipped']) == 4 and not second['configs_written'] and not second['errors']
+    assert len(second['skipped']) == 5 and not second['configs_written'] and not second['errors']
     assert times == [p.stat().st_mtime_ns for p in paths]
 
 
@@ -102,10 +138,13 @@ def test_no_key_output(setup_env, capsys):
 def test_backup(setup_env):
     repo, home = setup_env
     before = (home / '.codex/config.toml').read_bytes()
+    before_agy = (home / '.gemini/config/mcp_config.json').read_bytes()
     m.run(repo, home, True)
     backups = list((home / '.codex').glob('config.toml.bak-*'))
     assert len(backups) == 1 and backups[0].read_bytes() == before
     assert len(list((home / '.dsh/profiles/desktop').glob('cordis.patch.yml.bak-*'))) == 1
+    agy_backups = list((home / '.gemini/config').glob('mcp_config.json.bak-*'))
+    assert len(agy_backups) == 1 and agy_backups[0].read_bytes() == before_agy
 
 
 def test_existing_dsh_skipped(setup_env):
@@ -145,7 +184,70 @@ def test_existing_json_same_semantics_unchanged(setup_env):
     assert path.read_text(encoding='utf-8') == compact
 
 
-@pytest.mark.parametrize('client', ['codex', 'workbuddy', 'dsh'])
+@pytest.mark.parametrize('url_key', ['url', 'serverUrl'])
+def test_antigravity_preserves_http_mcp_config(setup_env, url_key):
+    repo, home = setup_env
+    path = home / '.gemini/config/mcp_config.json'
+    original = json.dumps({'mcpServers': {'talk': {url_key: 'http://127.0.0.1:8000/mcp'}}}, indent=2) + '\n'
+    path.write_text(original, encoding='utf-8')
+    result = m.run(repo, home, True)
+    assert not result['errors']
+    assert path.read_text(encoding='utf-8') == original
+    assert {'client': 'antigravity', 'path': str(path), 'reason': 'unchanged'} in result['skipped']
+
+
+@pytest.mark.parametrize('url_key', ['url', 'serverUrl'])
+def test_antigravity_http_mcp_config_skips_missing_key(setup_env, url_key):
+    repo, home = setup_env
+    (home / '.talk/keys/agent_antigravity_t.key').unlink()
+    path = home / '.gemini/config/mcp_config.json'
+    original = json.dumps({'mcpServers': {'talk': {url_key: 'http://127.0.0.1:8000/mcp'}}}, indent=2) + '\n'
+    path.write_text(original, encoding='utf-8')
+    result = m.run(repo, home, True)
+    assert not result['errors']
+    assert path.read_text(encoding='utf-8') == original
+    assert {'client': 'antigravity', 'path': str(path), 'reason': 'unchanged'} in result['skipped']
+
+
+@pytest.mark.parametrize('talk_entry', [
+    {'url': ''},
+    {'serverUrl': None},
+    {'url': '   '},
+    {'url': 123},
+    {'url': 'http://127.0.0.1:8000/mcp', 'serverUrl': ''},
+])
+def test_invalid_http_url_rejected_fail_closed(setup_env, talk_entry):
+    repo, home = setup_env
+    path = home / '.gemini/config/mcp_config.json'
+    original = json.dumps({'mcpServers': {'talk': talk_entry}}, indent=2) + '\n'
+    path.write_text(original, encoding='utf-8')
+    with pytest.raises(ValueError, match='invalid talk object'):
+        m.json_update(original, {'command': 'python', 'args': [], 'env': {'TALK_API_KEY': 'k'}})
+    result = m.run(repo, home, True)
+    assert result['errors'] == [{'client': 'antigravity', 'reason': 'ValueError'}]
+    assert path.read_text(encoding='utf-8') == original
+
+
+def test_antigravity_creates_mcp_config_from_scratch(tmp_path, monkeypatch):
+    monkeypatch.setattr(m.shutil, 'which', lambda _: None)
+    monkeypatch.setattr(m, 'urlopen', lambda *a, **kw: io.BytesIO(b'[]'))
+    repo, home = tmp_path / 'repo', tmp_path / 'home'
+    (repo / 'bridges/talk_terminal_mcp.py').parent.mkdir(parents=True)
+    (repo / 'bridges/talk_terminal_mcp.py').touch()
+    (home / 'AppData/Local/agy/bin').mkdir(parents=True)
+    (home / 'AppData/Local/agy/bin/agy.exe').touch()
+    (home / '.talk/keys').mkdir(parents=True)
+    (home / '.talk/keys/agent_antigravity-t.key').write_text('secret-fresh', encoding='utf-8')
+    target = home / '.gemini/config/mcp_config.json'
+    assert not target.parent.exists()
+    result = m.run(repo, home, True)
+    assert not result['errors']
+    assert result['configs_written'] == [{'client': 'antigravity', 'path': str(target)}]
+    data = json.loads(target.read_text(encoding='utf-8'))
+    assert data['mcpServers']['talk']['env']['TALK_API_KEY'] == 'secret-fresh'
+
+
+@pytest.mark.parametrize('client', ['codex', 'workbuddy', 'dsh', 'antigravity'])
 @pytest.mark.parametrize('separator', ['-', '_'])
 def test_member_key_names(setup_env, client, separator):
     repo, home = setup_env
@@ -155,7 +257,15 @@ def test_member_key_names(setup_env, client, separator):
         legacy.rename(selected)
     result = m.run(repo, home, True)
     assert not result['errors']
-    assert {x['client'] for x in result['configs_written']} == {'codex', 'kimi', 'workbuddy', 'dsh'}
+    assert {x['client'] for x in result['configs_written']} == {'codex', 'kimi', 'workbuddy', 'dsh', 'antigravity'}
+
+
+def test_missing_antigravity_key_reported(setup_env):
+    repo, home = setup_env
+    (home / '.talk/keys/agent_antigravity_t.key').unlink()
+    result = m.run(repo, home, False)
+    assert result['errors'] == [{'client': 'antigravity', 'reason': 'key_missing'}]
+    assert 'secret-' not in json.dumps(result)
 
 
 def test_missing_dsh_key_reported(setup_env):
@@ -180,7 +290,7 @@ def test_members_present_and_missing_continue(setup_env, monkeypatch):
     result = m.run(repo, home, True)
     assert result['members_ok'] == ['agent:codex-t']
     assert result['member_missing'] == list(m.MEMBER_IDS[1:])
-    assert len(result['configs_written']) == 4
+    assert len(result['configs_written']) == 5
 
 
 def test_skip_members_does_not_request(setup_env, monkeypatch):
@@ -188,7 +298,7 @@ def test_skip_members_does_not_request(setup_env, monkeypatch):
         raise AssertionError('unexpected network request')
     monkeypatch.setattr(m, 'urlopen', fail)
     result = m.run(*setup_env, True, skip_members=True)
-    assert result['member_status'] == 'skipped' and len(result['configs_written']) == 4
+    assert result['member_status'] == 'skipped' and len(result['configs_written']) == 5
     monkeypatch.setattr(sys, 'argv', ['mcp_onboarding', '--check', '--skip-members', '--repo', str(setup_env[0]), '--home', str(setup_env[1])])
     assert m.main() == 0
 
@@ -200,5 +310,5 @@ def test_unavailable_safe_and_continues(setup_env, monkeypatch, error):
     monkeypatch.setattr(m, 'urlopen', fail)
     result = m.run(*setup_env, True)
     assert result['member_status'] == 'api_unavailable'
-    assert not result['member_missing'] and len(result['configs_written']) == 4
+    assert not result['member_missing'] and len(result['configs_written']) == 5
     assert 'secret-' not in json.dumps(result)

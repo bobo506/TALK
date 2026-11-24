@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 router = APIRouter()
 ROOT = Path(__file__).resolve().parents[2]
-CLIENTS = {'codex', 'kimi', 'workbuddy', 'dsh'}
+CLIENTS = {'codex', 'kimi', 'workbuddy', 'dsh', 'antigravity'}
 MEMBERS = {f'agent:{name}-t' for name in CLIENTS}
 
 

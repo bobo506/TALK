@@ -588,7 +588,7 @@ def list_project_groups(
 # Member.kind only distinguishes human and agent; exclude these known terminal identities.
 # Do not infer identity from the -t suffix: execution roles may also use it.
 _TERMINAL_IDENTITY_IDS = frozenset({
-    "agent:codex-t", "agent:kimi-t", "agent:dsh-t", "agent:workbuddy-t",
+    "agent:codex-t", "agent:kimi-t", "agent:dsh-t", "agent:workbuddy-t", "agent:antigravity-t",
 })
 
 

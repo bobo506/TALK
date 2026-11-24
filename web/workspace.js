@@ -2956,7 +2956,7 @@ if (typeof module !== "undefined") module.exports = {workspaceRootId, workspaceF
 
 // The empty-roster fallback uses members; hide known terminal identities in its options.
 if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", () => {
-  const terminalIds = new Set(["agent:codex-t", "agent:kimi-t", "agent:dsh-t", "agent:workbuddy-t"]);
+  const terminalIds = new Set(["agent:codex-t", "agent:kimi-t", "agent:dsh-t", "agent:workbuddy-t", "agent:antigravity-t"]);
   const original = eligibleProjectAgents;
   eligibleProjectAgents = () => original().filter(member => !terminalIds.has(member.id));
 });

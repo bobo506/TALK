@@ -78,3 +78,29 @@ def test_status_with_utf8_bom(tmp_path):
         assert data['launcher'][field] == value
     assert 'error' not in data['launcher'] and 'warning' not in data['launcher']
     assert all(stage['state'] != 'error' for stage in data['stages'])
+
+
+def test_status_accepts_antigravity_and_ui_labels(tmp_path):
+    path = tmp_path / 'logs/launcher/boot-status.json'
+    path.parent.mkdir(parents=True)
+    payload = {
+        'ts': '2026-11-24T12:00:00+00:00',
+        'ready': True,
+        'detected': ['codex', 'antigravity', 'secret-token'],
+        'members_ok': ['agent:antigravity-t', 'agent:unknown-t'],
+        'member_missing': [],
+        'configs_written': ['antigravity', 'C:/secret'],
+        'skipped': ['codex'],
+        'member_status': 'checked',
+    }
+    path.write_text(json.dumps(payload), encoding='utf-8')
+    with patch.dict(os.environ, {'TALK_CONFIG': str(tmp_path / 'config.toml')}):
+        data = TestClient(main.app).get('/api/boot/status').json()
+    assert data['launcher']['detected'] == ['codex', 'antigravity']
+    assert data['launcher']['members_ok'] == ['agent:antigravity-t']
+    assert data['launcher']['configs_written'] == ['antigravity']
+    assert data['runners'] == {'detected': ['codex', 'antigravity'], 'none': False, 'source': 'launcher'}
+    assert 'secret-token' not in str(data) and 'C:/secret' not in str(data)
+    root = Path(__file__).resolve().parents[1]
+    assert "antigravity:'Antigravity'" in (root / 'web/loading.html').read_text(encoding='utf-8')
+    assert 'antigravity: "Antigravity"' in (root / 'web/app.js').read_text(encoding='utf-8')

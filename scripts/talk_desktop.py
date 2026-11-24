@@ -233,7 +233,7 @@ def install_shortcut(home, env=None):
 def write_boot_status(home, result=None):
     """Write a non-sensitive onboarding summary."""
     result = result or {}
-    clients = ('codex', 'kimi', 'workbuddy', 'dsh')
+    clients = ('codex', 'kimi', 'workbuddy', 'dsh', 'antigravity')
     members = {f'agent:{name}-t' for name in clients}
     detected = result.get('detected', {})
     def client_names(items):

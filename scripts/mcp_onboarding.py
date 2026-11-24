@@ -18,6 +18,12 @@ def detect(home: Path) -> dict:
         'kimi': (home / '.kimi-code/bin/kimi.exe').is_file() or bool(shutil.which('kimi')),
         'workbuddy': (home / 'AppData/Local/Programs/WorkBuddy/WorkBuddy.exe').is_file(),
         'dsh': (home / '.dsh').is_dir(),
+        'antigravity': (
+            (home / 'AppData/Local/Programs/Antigravity/Antigravity.exe').is_file()
+            or (home / 'AppData/Local/agy/bin/agy.exe').is_file()
+            or (home / '.gemini/antigravity').is_dir()
+            or bool(shutil.which('agy'))
+        ),
     }
     return {name: {'detected': value, 'reason': 'found' if value else 'not_found'} for name, value in checks.items()}
 
@@ -83,14 +89,32 @@ def toml_update(original: str, entry: dict) -> str:
     return text
 
 
-def json_update(original: str, entry: dict) -> str:
+def _json_talk_state(original: str) -> tuple[dict, dict, dict, bool]:
     data = json.loads(original) if original.strip() else {}
     if not isinstance(data, dict) or not isinstance(data.get('mcpServers', {}), dict):
         raise ValueError('invalid mcpServers object')
     servers = data.setdefault('mcpServers', {})
     existing = servers.get('talk', {})
-    if not isinstance(existing, dict) or not isinstance(existing.get('env', {}), dict):
+    if not isinstance(existing, dict):
         raise ValueError('invalid talk object')
+    # Preserve valid user-configured Streamable HTTP MCP entries instead of mixing url + command.
+    # Reject blank, null, or non-string url/serverUrl values fail-closed.
+    url_keys = [k for k in ('url', 'serverUrl') if k in existing]
+    if url_keys:
+        for key in url_keys:
+            value = existing[key]
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError('invalid talk object')
+        return data, servers, existing, True
+    if not isinstance(existing.get('env', {}), dict):
+        raise ValueError('invalid talk object')
+    return data, servers, existing, False
+
+
+def json_update(original: str, entry: dict) -> str:
+    data, servers, existing, is_http = _json_talk_state(original)
+    if is_http:
+        return original
     merged = {**existing, **entry, 'env': {**existing.get('env', {}), **entry['env']}}
     if existing == merged:
         return original
@@ -147,7 +171,7 @@ def write_changed(path: Path, content: str) -> None:
     path.write_text(content, encoding='utf-8', newline='')
 
 
-MEMBER_IDS = tuple(f'agent:{name}-t' for name in ('codex', 'kimi', 'workbuddy', 'dsh'))
+MEMBER_IDS = tuple(f'agent:{name}-t' for name in ('codex', 'kimi', 'workbuddy', 'dsh', 'antigravity'))
 
 
 def check_members() -> dict:
@@ -175,6 +199,7 @@ def run(repo: Path, home: Path, apply: bool, skip_members: bool = False) -> dict
         'kimi': repo / '.kimi-code/mcp.json',
         'workbuddy': home / '.workbuddy/mcp.json',
         'dsh': home / '.dsh/profiles/desktop/cordis.patch.yml',
+        'antigravity': home / '.gemini/config/mcp_config.json',
     }
     output = {'detected': detected, 'configs_written': [], 'skipped': [], 'errors': []}
     output.update({'member_status': 'skipped', 'members_ok': [], 'member_missing': []} if skip_members else check_members())
@@ -188,6 +213,8 @@ def run(repo: Path, home: Path, apply: bool, skip_members: bool = False) -> dict
             original = path.read_text(encoding='utf-8') if path.exists() else ''
             if name == 'dsh':
                 updated = yaml_update(original, repo, home, python)
+            elif name != 'codex' and _json_talk_state(original)[3]:
+                updated = original
             else:
                 launcher = str(repo / 'scripts/kimi_talk_mcp_launch.py') if name == 'kimi' else bridge
                 env = {'TALK_KIMI_KEY_FILE': str(home / '.talk/agent-kimi.key')} if name == 'kimi' else {'TALK_API_KEY': read_member_key(home, f'agent:{name}-t')}

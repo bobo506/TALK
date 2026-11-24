@@ -3486,7 +3486,7 @@ document.getElementById("shutdown-service-btn").addEventListener("click", async 
   const detail = document.getElementById("runner-banner-detail");
   const settings = document.getElementById("runner-settings-status");
   const settingsDetail = document.getElementById("runner-settings-detail");
-  const labels = {codex: "Codex", kimi: "KimiCode", workbuddy: "WorkBuddy", dsh: "DSH"};
+  const labels = {codex: "Codex", kimi: "KimiCode", workbuddy: "WorkBuddy", dsh: "DSH", antigravity: "Antigravity"};
   document.getElementById("runner-banner-close").addEventListener("click", () => {
     banner.hidden = true;
     try { sessionStorage.setItem("talk-runner-banner-dismissed", "1"); } catch (_) {}
@@ -3499,7 +3499,7 @@ document.getElementById("shutdown-service-btn").addEventListener("click", async 
     if (!runners || !Array.isArray(runners.detected)) throw new Error("invalid status");
     const names = runners.detected.map(name => labels[name] || name).join("、");
     const message = runners.none ? "未检测到可用的运行器：服务已启动但尚未接入 TALK，当前无法分配或接收任务" : `本机已安装 ${names}，可接入使用`;
-    const description = runners.none ? "请安装 Codex、KimiCode、WorkBuddy 或 DSH，随后重新启动并完成接入。" : "检测结果来自启动器摘要；实际接入情况请查看角色配置。";
+    const description = runners.none ? "请安装 Codex、KimiCode、WorkBuddy、DSH 或 Antigravity，随后重新启动并完成接入。" : "检测结果来自启动器摘要；实际接入情况请查看角色配置。";
     title.textContent = message; detail.textContent = description;
     settings.textContent = message;
     const launcher = data.launcher || {};

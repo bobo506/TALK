@@ -382,3 +382,23 @@ class BootStatusDesktopTests(unittest.TestCase):
             self.assertFalse(data['ready'])
             self.assertNotIn('secret-key', str(data))
             window.assert_called_once()
+
+    def test_summary_accepts_antigravity_and_strips_paths(self):
+        import json
+        with tempfile.TemporaryDirectory() as home:
+            result = {
+                'detected': {'antigravity': {'detected': True}, 'unknown': {'detected': True}},
+                'members_ok': ['agent:antigravity-t', 'agent:unknown-t'],
+                'member_missing': [],
+                'configs_written': [{'client': 'antigravity', 'path': 'C:/private/mcp_config.json'}],
+                'skipped': [],
+                'errors': [],
+                'member_status': 'checked',
+            }
+            desktop.write_boot_status(home, result)
+            data = json.loads((Path(home) / 'logs/launcher/boot-status.json').read_text(encoding='utf-8'))
+            self.assertEqual(data['detected'], ['antigravity'])
+            self.assertEqual(data['members_ok'], ['agent:antigravity-t'])
+            self.assertEqual(data['configs_written'], ['antigravity'])
+            self.assertTrue(data['ready'])
+            self.assertNotIn('C:/private', str(data))

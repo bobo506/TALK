@@ -2,17 +2,16 @@
 
 ## Latest
 
-Updated: 2026-11-18 20:40 (+08:00)
+Updated: 2026-11-24 21:06 (+08:00)
 
-**当前结论**：全部切片收口、人工验收通过、`v0.1.0` 已发布（资产 19,621,867 B / 1254 文件 / sha256 `56f488ce…d9f1`，不含 docs、README 与行为一致）。今日第三件收尾：**面向下载者的产品页补齐**——`README.md` 重写为中文产品页（截图、协作优势、9 项亮点、快速开始、备份/换机、FAQ、限制、MIT 许可），新增 `LICENSE`（MIT），GitHub 仓库简介/主页/10 个 topics 已设置，用户手册群聊章节同步改为"已下线"。无进行中任务、无待收取、无阻塞项。
+**当前结论**：已完成 **Antigravity 适配切片 A（发起侧 MCP 自动接入 + 终端身份过滤）** 开发、自测与独立对抗复核（`APPROVED`，89 passed + 5 subtests），已本地提交（未推送、未重启生产服务）。`v0.1.0` 已发布状态保持不变。下一步待用户在本机安装并登录 `agy` CLI 后，确认开工切片 B（`agy` 原生执行通道 + `neon`/`carbon`/`hydrogen` 模型与思考强度目录），或先推进本机 Antigravity MCP 实装接入 / 其它改进项。
 
 ### 1) Current Progress
-- 路线图 13 项：第 1–7、12、13 完成；第 8 并入换肤；第 9 用户已清理；第 11 交接文档完成；**第 10 构建+冒烟完成，v0.1.0 已发布（资产为不含 docs、README 与行为一致的包）**。
-- 关键提交：换肤 `2517fd4`/`f9d0ac2`/`409a629`/`537634e`/`a7423f7`；图标 `c47b316`；ACL `5ce37c3`；Codex 版本 `faa57bc`；终端过滤 `6c6fed7`；便携包 `c8bc206`；按钮迁移 `9fa801d`；整机退出/托盘 `1fb21ab`；启动器自动 runtime `2290ae0`；文档收口 `baed1fe`/`82776cc`/`9b99d05`/`6465885`/`ecb70c9`；构建排除 docs `40b5ebf`；文档纠偏与三次替换（本轮）。
-- 角色：Terra、K2.8 serving（idle）；Astra stopped（未勾自动启动，符合预期）；无 running 任务，`submitted` 对账为空。
-- 生产：runtime `10136` 自 11-18 00:38 运行，API 8000 存活；未在 agent 侧启停。
-- 便携包（发布资产）：`D:\backups\portable-r3-20261118\TALK-portable-0.1.0.zip`（19,621,867 B / 1254 文件 / sha256 `56f488ce…d9f1`），不含 `docs/`，`README-PORTABLE.txt` 已按实际行为重写；早期三版包留档于 `portable-release-`、`portable-clean-`、`portable-r2-20261118`。
-- 产品页（下载者入口）：`README.md` 重写（118 行，中文；顶部英文摘要；3 张截图；「为什么用 TALK」3 条；9 项亮点；快速开始；数据/Key/备份；局域网；FAQ；源码/Docker；文档索引；限制；MIT）；新增 `LICENSE`（MIT, Copyright 2026 bobo506）；GitHub 仓库 description/homepage/10 topics 已设置；`USER_MANUAL` 群聊章节改为"已下线"。
+- **Antigravity 适配（4 片串行规划）**：
+  - **切片 A（已完成并独立复核通过）**：`mcp_onboarding` 探测 Antigravity 并幂等写入 `~/.gemini/config/mcp_config.json`（保留既有 MCP 服务与 Streamable HTTP `url`/`serverUrl` 配置、畸形 URL fail-closed）、`talk_desktop` / `boot_status` 白名单与前端横幅/加载页展示、`agent:antigravity-t` 终端身份过滤。
+  - **切片 B（待前置条件与确认）**：`agy` CLI 能力/版本探测、无头执行通道与 `neon` / `carbon` / `hydrogen` 模型及思考强度目录（需本机先安装并登录 `agy` CLI 实测协议）。
+  - **切片 C/D（待切片 B 完成后确认）**：受管角色宿主与 `talk_runtime` 动态托管、页面创建/启停闭环、实机端到端验收与文档更新。
+- 历史 `v0.1.0` 发布与收尾状态（2026-11-18）：保持不变（详见 `docs/PROGRESS_HISTORY.md`）。
 
 ### 2) Open Questions / Pending Confirmation
 - 无阻塞项。`v0.1.0` 已发布：https://github.com/bobo506/TALK/releases/tag/v0.1.0
@@ -25,10 +24,11 @@ Updated: 2026-11-18 20:40 (+08:00)
 - 杂项：仓库根误落未跟踪 `Microsoft\Windows\PowerShell\ModuleAnalysisCache`（PowerShell 分析缓存），未清理。
 
 ### 3) Next Plan
-1. 无可执行待办；如需新功能按 `docs/spec/DEVELOPMENT_ROADMAP.md` 另行确认开工。
-2. 可选：把 Release 说明归档到 `docs/releases/v0.1.0.md`；清理 `Microsoft\` 误落缓存。
+1. 待用户本机安装并登录 `agy` CLI 后，实测 `agy --help` / 模型列表 / `stream-json` 输出，再确认开工 **Antigravity 切片 B**（原生执行通道 + `neon`/`carbon`/`hydrogen` 模型与思考强度）。
+2. 如需让本机 Antigravity 立即连上 TALK 协调派单，可在确认后为 `agent:antigravity-t` 创建成员/Key 并接入 `~/.gemini/config/mcp_config.json`（或复用后续的 `main` 合并、CDN 本地化、Origin 校验、CI 等改进切片）。
 
 ### 4) Verification
+- **Antigravity 切片 A（2026-11-24）**：自测与独立复核子代理定向复验（`APPROVED`）一致通过：`pytest -v tests/test_mcp_onboarding.py tests/test_boot_status.py tests/test_talk_desktop.py tests/test_terminal_identity_filter.py tests/test_build_portable.py` **89 passed, 5 subtests passed, 0 failed**；`node --check web/workspace.js web/app.js` 通过；4 组对抗探针（HTTP 无 key 跳过、`boot-status` 联调、13 种畸形 URL fail-closed、合法 HTTP 保留）全部通过；`git diff --check` 零空白错误。未验证：本机真实 Antigravity 重载 MCP 与生产 API 重载。
 - 已通过（历史）：换肤 `pytest tests/test_talk_desktop.py`/`test_boot_status.py`；图标 25+3；ACL 41+9；Codex 版本 59+26；终端过滤 26+3；整机退出/托盘 53 项（K2.8 #861）；#862 30 passed + 5 subtests（K2.8 #865 approved）。
 - 构建改动：`pytest tests/test_build_portable.py` **8 passed**（`40b5ebf`、本轮 README 修正后复跑仍 8 passed）。
 - 本轮冒烟（11-18）：四版包各跑一次——解压 → `portable_bootstrap --apply` 生成 config/runtime/data/`data/keys/operator.key`/默认项目/管理员 → 临时端口 `/`、`/loading`、`/healthz`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/api/projects` 全 200。
@@ -39,8 +39,8 @@ Updated: 2026-11-18 20:40 (+08:00)
 - Release（11-18）：`isDraft=false`、`isPrerelease=false`；`targetCommitish=82776cc…`；最终资产 `size=19621867`、`state=uploaded`、`digest=sha256:56f488ce…d9f1` 与本地一致；下载 HTTP 200 / `content-length` 相同。
 
 ### 5) Changed Files
-- 今日主要：`web/*`（换肤/图标/manifest）、`server/routes/boot_status.py`、`server/routes/local_shutdown.py`、`server/routes/projects.py`、`scripts/talk_desktop.py`、`scripts/talk_launcher.py`、`scripts/talk_runtime.py`、`scripts/portable_paths.py`、`scripts/build_portable.py`、`bridges/codex_execution_native.py`、`scripts/codex_role_host.py`、`scripts/codex_role_setup.py`、`scripts/role_provision.py`、`scripts/role_service_host.py`、`tests/*`、`docs/*`。
-- 本轮：`README.md`（重写为产品页）、`LICENSE`（新增 MIT）、`docs/guides/USER_MANUAL.md`（群聊章节改"已下线"、导航说明、调度模式示例）、`docs/guides/QUICKSTART*.md`、`docs/guides/PORTABLE_*.md`、`scripts/build_portable.py`（README 文案）、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`、`docs/HANDOFF_20261118.md`；无产品逻辑改动。
+- 本轮（2026-11-24 Antigravity 切片 A）：`scripts/mcp_onboarding.py`、`scripts/talk_desktop.py`、`server/routes/boot_status.py`、`server/routes/projects.py`、`web/workspace.js`、`web/app.js`、`web/loading.html`、`web/index.html`、`tests/test_mcp_onboarding.py`、`tests/test_boot_status.py`、`tests/test_talk_desktop.py`、`tests/test_terminal_identity_filter.py`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+- 2026-11-18：`README.md`、`LICENSE`、`docs/guides/USER_MANUAL.md`、`docs/guides/QUICKSTART*.md`、`docs/guides/PORTABLE_*.md`、`scripts/build_portable.py`、`docs/HANDOFF_20261118.md`。
 
 ## Recent Notes
 - 完整历史见 `docs/PROGRESS_HISTORY.md`；上下文交接见 `docs/HANDOFF_20261118.md`。

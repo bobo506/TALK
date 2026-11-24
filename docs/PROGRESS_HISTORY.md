@@ -1,5 +1,17 @@
 # 开发历史 · TALK
 
+## 2026-11-24 21:06 — Antigravity 适配切片 A：发起侧 MCP 自动接入与终端身份过滤
+
+- 起因：用户开启 Antigravity 适配（目标模型 `neon` / `carbon` / `hydrogen`），先按 4 片串行拆包推进切片 A（不依赖本机安装 `agy` CLI），并明确授权本次由 Antigravity 会话直接编码自测 + 独立复核子代理对抗复核。
+- 交付：
+  - `scripts/mcp_onboarding.py`：`detect()` 新增 `antigravity`（`Antigravity.exe`、`agy.exe`、`.gemini/antigravity`、`shutil.which('agy')`）；`MEMBER_IDS` 新增 `agent:antigravity-t`；目标配置指向 `~/.gemini/config/mcp_config.json`；抽取 `_json_talk_state()` 在读取成员 Key 前识别已手配的 Streamable HTTP（`url`/`serverUrl`）条目并原样保留，同时对空串/纯空白/非字符串 `url`/`serverUrl` 执行 fail-closed 拒绝（不混写 `url` + `command`、不覆写原文件）；
+  - `scripts/talk_desktop.py`、`server/routes/boot_status.py`：白名单加入 `antigravity` / `agent:antigravity-t`；
+  - `server/routes/projects.py`、`web/workspace.js`：`_TERMINAL_IDENTITY_IDS` / `terminalIds` 加入 `agent:antigravity-t`，在 `/agents`、`/roles` 与空名册回退中隐藏，不影响 `/api/members/me` 鉴权和单角色路由，不影响 `agent:antigravity` 执行角色名；
+  - `web/app.js`、`web/loading.html`、`web/index.html`：启动器运行器提示标签与空提示加入 Antigravity，更新前端脚本缓存版本号（`?v=20261124-antigravity-mcp`）；
+  - 测试：`tests/test_mcp_onboarding.py`、`tests/test_boot_status.py`、`tests/test_talk_desktop.py`、`tests/test_terminal_identity_filter.py`。
+- 独立复核：独立复核子代理首审 `CHANGES_REQUESTED`（发现 2 项 Must-Fix：Streamable HTTP 缺 key 时误报 `key_missing`、松散 truthiness 处理畸形 `url`/`serverUrl`）；集中修复并新增 8 项回归与精确集合断言后，定向复验 `APPROVED`（**89 passed, 5 subtests passed, 0 failed**；`node --check` 与 4 组对抗探针全部通过；`git diff --check` 干净）。
+- 边界与未做：未读取任何真实 Key、生产 DB 或本机真实 `~/.gemini/config/mcp_config.json`；未重启生产 API / runtime；未执行 `agy` CLI 执行侧适配（留待用户安装并登录 `agy` CLI 后确认切片 B）。
+
 ## 2026-11-18 20:40 — 产品页补齐：README 重写 + MIT 许可 + 仓库简介/topics + 群聊章节下线
 
 - 起因：用户提出"GitHub 上是不是还要写产品说明，让别人下载时知道这是什么、怎么用"，并要求把协作亮点写进去（主被动双模式、同模型多角色）。
