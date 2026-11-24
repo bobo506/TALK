@@ -78,6 +78,7 @@ def list_runner_versions(
         "kimi-code": "Kimi Code",
         "dsh": "DeepSeek Harness",
         "workbuddy": "WorkBuddy",
+        "antigravity": "Antigravity CLI",
     }
     registered = {}
     for runner in runners:

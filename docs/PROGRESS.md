@@ -2,15 +2,16 @@
 
 ## Latest
 
-Updated: 2026-11-24 21:06 (+08:00)
+Updated: 2026-11-24 22:10 (+08:00)
 
-**当前结论**：已完成 **Antigravity 适配切片 A（发起侧 MCP 自动接入 + 终端身份过滤）** 开发、自测与独立对抗复核（`APPROVED`，89 passed + 5 subtests），已本地提交（未推送、未重启生产服务）。`v0.1.0` 已发布状态保持不变。下一步待用户在本机安装并登录 `agy` CLI 后，确认开工切片 B（`agy` 原生执行通道 + `neon`/`carbon`/`hydrogen` 模型与思考强度目录），或先推进本机 Antigravity MCP 实装接入 / 其它改进项。
+**当前结论**：已完成 **Antigravity 适配切片 B（`agy` 原生执行通道 + Neon/Carbon/Hydrogen 3 模型与思考强度 + 版本探测）** 开发、自测与独立对抗复核（`APPROVED`，切片 B 33 passed + 关联回归 572 passed），已本地提交（未推送、未重启生产服务）。切片 A（`4954e36`）与 `v0.1.0` 发布状态保持不变。下一步待确认开工 **切片 C（受管角色宿主 + `talk_runtime` 动态托管 + 页面创建/启停/删除闭环）**。
 
 ### 1) Current Progress
 - **Antigravity 适配（4 片串行规划）**：
-  - **切片 A（已完成并独立复核通过）**：`mcp_onboarding` 探测 Antigravity 并幂等写入 `~/.gemini/config/mcp_config.json`（保留既有 MCP 服务与 Streamable HTTP `url`/`serverUrl` 配置、畸形 URL fail-closed）、`talk_desktop` / `boot_status` 白名单与前端横幅/加载页展示、`agent:antigravity-t` 终端身份过滤。
-  - **切片 B（待前置条件与确认）**：`agy` CLI 能力/版本探测、无头执行通道与 `neon` / `carbon` / `hydrogen` 模型及思考强度目录（需本机先安装并登录 `agy` CLI 实测协议）。
-  - **切片 C/D（待切片 B 完成后确认）**：受管角色宿主与 `talk_runtime` 动态托管、页面创建/启停闭环、实机端到端验收与文档更新。
+  - **切片 A（已完成，`4954e36`）**：`mcp_onboarding` 探测 Antigravity 并幂等写入 `~/.gemini/config/mcp_config.json`、`talk_desktop` / `boot_status` 白名单与前端横幅/加载页展示、`agent:antigravity-t` 终端身份过滤。
+  - **切片 B（已完成并独立复核通过）**：实机 `agy 1.5.16` 协议探测与能力/版本探测、`bridges/antigravity_{effort,execution_native,execution_channel,bridge}.py`、`bridges/cli_bridge.py` 全链路路由与 `stream-json` 正文抽取、跨任务磁盘会话证明与 90% 换窗、`/api/runners/versions` 与服务端 Carbon 3 档硬约束（Neon/Hydrogen 4 档）。
+  - **切片 C（待确认开工）**：`scripts/antigravity_role_host.py` / `antigravity_role_setup.py`、接入 `talk_runtime` / `role_service_host` / `role_service_recovery` / `role_delete` / `portable_bootstrap` 与页面创建/模型选择/思考强度/启停/删除闭环。
+  - **切片 D（待切片 C 完成后确认）**：实机创建 3 模型角色端到端验收与文档/手册更新。
 - 历史 `v0.1.0` 发布与收尾状态（2026-11-18）：保持不变（详见 `docs/PROGRESS_HISTORY.md`）。
 
 ### 2) Open Questions / Pending Confirmation
@@ -24,10 +25,11 @@ Updated: 2026-11-24 21:06 (+08:00)
 - 杂项：仓库根误落未跟踪 `Microsoft\Windows\PowerShell\ModuleAnalysisCache`（PowerShell 分析缓存），未清理。
 
 ### 3) Next Plan
-1. 待用户本机安装并登录 `agy` CLI 后，实测 `agy --help` / 模型列表 / `stream-json` 输出，再确认开工 **Antigravity 切片 B**（原生执行通道 + `neon`/`carbon`/`hydrogen` 模型与思考强度）。
-2. 如需让本机 Antigravity 立即连上 TALK 协调派单，可在确认后为 `agent:antigravity-t` 创建成员/Key 并接入 `~/.gemini/config/mcp_config.json`（或复用后续的 `main` 合并、CDN 本地化、Origin 校验、CI 等改进切片）。
+1. 待用户确认 **Antigravity 切片 C**（受管角色宿主 + `talk_runtime` 动态托管 + 页面角色创建/启停/删除闭环）的范围、不变项与验收标准后开工。
+2. 切片 C/D 收尾后，再依次推进用户确认的其它项目改进项（如前端 CDN 本地化 + Origin 校验、合并 `main` + 更新 README 截图、CI 等）。
 
 ### 4) Verification
+- **Antigravity 切片 B（2026-11-24）**：授权 1 次最小 `gemini-4-hydrogen-low` `stream-json` 探针 + 本机 `agy 1.5.16` 只读能力/模型实测；独立对抗复核子代理定向复验 `APPROVED`：切片 B 4 套测试 **33 passed, 12 subtests** + 16 套关联回归 **572 passed, 260 subtests**（0 失败），全部 9 组对抗探针及 `git diff --check` 通过。未验证：受管角色宿主启停与真实多轮对话任务端到端（属切片 C/D）。
 - **Antigravity 切片 A（2026-11-24）**：自测与独立复核子代理定向复验（`APPROVED`）一致通过：`pytest -v tests/test_mcp_onboarding.py tests/test_boot_status.py tests/test_talk_desktop.py tests/test_terminal_identity_filter.py tests/test_build_portable.py` **89 passed, 5 subtests passed, 0 failed**；`node --check web/workspace.js web/app.js` 通过；4 组对抗探针（HTTP 无 key 跳过、`boot-status` 联调、13 种畸形 URL fail-closed、合法 HTTP 保留）全部通过；`git diff --check` 零空白错误。未验证：本机真实 Antigravity 重载 MCP 与生产 API 重载。
 - 已通过（历史）：换肤 `pytest tests/test_talk_desktop.py`/`test_boot_status.py`；图标 25+3；ACL 41+9；Codex 版本 59+26；终端过滤 26+3；整机退出/托盘 53 项（K2.8 #861）；#862 30 passed + 5 subtests（K2.8 #865 approved）。
 - 构建改动：`pytest tests/test_build_portable.py` **8 passed**（`40b5ebf`、本轮 README 修正后复跑仍 8 passed）。
@@ -39,7 +41,8 @@ Updated: 2026-11-24 21:06 (+08:00)
 - Release（11-18）：`isDraft=false`、`isPrerelease=false`；`targetCommitish=82776cc…`；最终资产 `size=19621867`、`state=uploaded`、`digest=sha256:56f488ce…d9f1` 与本地一致；下载 HTTP 200 / `content-length` 相同。
 
 ### 5) Changed Files
-- 本轮（2026-11-24 Antigravity 切片 A）：`scripts/mcp_onboarding.py`、`scripts/talk_desktop.py`、`server/routes/boot_status.py`、`server/routes/projects.py`、`web/workspace.js`、`web/app.js`、`web/loading.html`、`web/index.html`、`tests/test_mcp_onboarding.py`、`tests/test_boot_status.py`、`tests/test_talk_desktop.py`、`tests/test_terminal_identity_filter.py`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+- 本轮（2026-11-24 Antigravity 切片 B）：`bridges/antigravity_effort.py`、`bridges/antigravity_execution_native.py`、`bridges/antigravity_execution_channel.py`、`bridges/antigravity_bridge.py`、`bridges/cli_bridge.py`、`server/runner_versions.py`、`server/routes/runners.py`、`server/models.py`、`server/routes/projects.py`、`server/execution_session_tasks.py`、`tests/test_antigravity_effort.py`、`tests/test_antigravity_execution_native.py`、`tests/test_antigravity_bridge.py`、`tests/test_runner_versions.py`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
+- 2026-11-24 Antigravity 切片 A（`4954e36`）：`scripts/mcp_onboarding.py`、`scripts/talk_desktop.py`、`server/routes/boot_status.py`、`server/routes/projects.py`、`web/workspace.js`、`web/app.js`、`web/loading.html`、`web/index.html`、`tests/test_mcp_onboarding.py`、`tests/test_boot_status.py`、`tests/test_talk_desktop.py`、`tests/test_terminal_identity_filter.py`。
 - 2026-11-18：`README.md`、`LICENSE`、`docs/guides/USER_MANUAL.md`、`docs/guides/QUICKSTART*.md`、`docs/guides/PORTABLE_*.md`、`scripts/build_portable.py`、`docs/HANDOFF_20261118.md`。
 
 ## Recent Notes

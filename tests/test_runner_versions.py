@@ -158,7 +158,7 @@ class VersionTests(unittest.TestCase):
         with patch.object(versions, "_probe", return_value=("0.164.0", "", "ok")):
             response = client.get("/api/runners/versions")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([r["runtime"] for r in response.json()], ["codex", "kimi-code", "dsh", "workbuddy"])
+        self.assertEqual([r["runtime"] for r in response.json()], ["codex", "kimi-code", "dsh", "workbuddy", "antigravity"])
         self.assertEqual(response.json()[0]["display_name"], "Codex")
         self.assertEqual(response.json()[0]["probe_status"], "ok")
         self.assertEqual(client.post("/api/runners/versions").status_code, 405)
@@ -181,13 +181,14 @@ class VersionTests(unittest.TestCase):
             self.assertEqual([(r["runtime"], r["display_name"]) for r in result], [
                 ("codex", "Codex CLI"), ("kimi-code", "Kimi Code"),
                 ("dsh", "DeepSeek Harness"), ("workbuddy", "WorkBuddy"),
+                ("antigravity", "Antigravity CLI"),
             ])
             rows.extend([SimpleNamespace(runtime="codex", display_name="Registered Codex"),
                          SimpleNamespace(runtime="codex", display_name="Later Codex"),
                          SimpleNamespace(runtime="custom-x", display_name="Custom")])
             result = client.get("/api/runners/versions").json()
         self.assertEqual([r["runtime"] for r in result],
-                         ["codex", "kimi-code", "dsh", "workbuddy", "custom-x"])
+                         ["codex", "kimi-code", "dsh", "workbuddy", "antigravity", "custom-x"])
         self.assertEqual(result[0]["display_name"], "Registered Codex")
         self.assertEqual(result[-1]["display_name"], "Custom")
         for row in result:
@@ -204,6 +205,35 @@ class VersionTests(unittest.TestCase):
         self.assertNotIn("no-cache", js.headers.get("cache-control", "").lower())
         conditional = client.get("/", headers={"If-None-Match": response.headers["etag"]})
         self.assertEqual(conditional.status_code, 304)
+
+    def test_antigravity_probe_and_windows_fallback_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = Path(tmp) / "agy" / "bin" / "agy.exe"
+            exe.parent.mkdir(parents=True)
+            exe.write_bytes(b"binary")
+            with patch.object(versions.shutil, "which", return_value=None), \
+                 patch.dict(versions.os.environ, {"LOCALAPPDATA": tmp}, clear=False), \
+                 patch.object(
+                     versions.subprocess,
+                     "run",
+                     return_value=subprocess.CompletedProcess([], 0, stdout=b"1.5.16\n", stderr=b""),
+                 ) as proc:
+                result = versions.get_version("antigravity")
+        self.assertEqual(Path(proc.call_args.args[0][0]), exe)
+        self.assertEqual(result["detected_version"], "1.5.16")
+        self.assertEqual(result["adapted_version"], "1.5.16")
+        self.assertEqual(result["status"], "match")
+        self.assertEqual(result["probe_status"], "ok")
+
+        versions.clear_cache()
+        with patch.object(versions.shutil, "which", return_value=None), \
+             patch.dict(
+                 versions.os.environ,
+                 {"LOCALAPPDATA": "nonexistent-root", "USERPROFILE": "nonexistent-root"},
+                 clear=False,
+             ):
+            missing = versions.get_version("antigravity")
+        self.assertEqual((missing["status"], missing["probe_status"]), ("unknown", "missing"))
 
 
 if __name__ == "__main__":

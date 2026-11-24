@@ -4625,6 +4625,9 @@ RUNNER_ADAPTER_EFFORT_VALUES = {
     # 351-E：DSH 的实际档位由用户在界面观察到 off/low/high/max；四档全部开放（用户确认），
     # 默认值仍由角色 patch/绑定决定。
     "dsh": frozenset({"off", "low", "high", "max"}),
+    # Antigravity CLI 总体支持 low/medium/high/xhigh；具体单模型（如 Carbon 仅 3 档）
+    # 由模型目录 supported_efforts 与 bridges/antigravity_effort 二次精确约束。
+    "antigravity": frozenset({"low", "medium", "high", "xhigh"}),
 }
 
 EFFORT_SOURCE_CATALOG = "catalog"
@@ -4698,6 +4701,12 @@ def resolve_role_effort(facts: Optional[dict], runtime_options=None) -> dict:
             if isinstance(runtime, str)
             else None
         )
+        if runtime == "antigravity" and adapter:
+            raw_model = facts.get("model_id") or facts.get("model_alias")
+            if isinstance(raw_model, str):
+                token = raw_model.strip().lower()
+                if token == "gemini-4-carbon" or token.startswith("gemini-4-carbon-"):
+                    adapter = frozenset({"low", "medium", "high"})
         options = canonical_effort_values(adapter) if adapter else []
         source = EFFORT_SOURCE_ADAPTER if adapter else None
     return {

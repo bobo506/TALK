@@ -2321,9 +2321,14 @@ def extract_kimi_final_assistant(output: str) -> str | None:
 
 def normalize_runtime_result(result: CliRunResult, *, runtime: str) -> CliRunResult:
     """Normalize runtime-specific stdout into the bridge's final-text contract."""
-    if runtime.strip().lower() not in {"kimi", "kimi-code", "kimi_code"}:
+    normalized_runtime = runtime.strip().lower()
+    if normalized_runtime in {"kimi", "kimi-code", "kimi_code"}:
+        extracted = extract_kimi_final_assistant(result.stdout)
+    elif normalized_runtime in {"antigravity", "agy"}:
+        from bridges.antigravity_execution_native import extract_antigravity_final_reply
+        extracted = extract_antigravity_final_reply(result.stdout)
+    else:
         return result
-    extracted = extract_kimi_final_assistant(result.stdout)
     if extracted is None:
         return result
     return CliRunResult(
@@ -3173,7 +3178,7 @@ async def _prepare_task_before_claim(
     if preflight_base_context is not None:
         continuation_note = ""
         execution_meta = task.get("execution_session") or {}
-        if (runtime in {"codex", "kimi-code", "workbuddy"} and execution_meta.get("runtime") == runtime
+        if (runtime in {"codex", "kimi-code", "workbuddy", "antigravity"} and execution_meta.get("runtime") == runtime
                 and type(execution_meta.get("base_task_id")) is int
                 and execution_meta["base_task_id"] > 0 and not execution_meta.get("force_new")):
             continuation_note = (
@@ -3371,6 +3376,8 @@ async def _handle_execution_session_claimed(
         from bridges.kimi_execution_channel import run_execution_session_task
     elif (claimed.get("execution_session") or {}).get("runtime") == "workbuddy":
         from bridges.workbuddy_execution_channel import run_execution_session_task
+    elif (claimed.get("execution_session") or {}).get("runtime") == "antigravity":
+        from bridges.antigravity_execution_channel import run_execution_session_task
 
     task_id = int(claimed["id"])
     creator = claimed.get("created_by")
@@ -3519,7 +3526,7 @@ async def handle_queued_task(
     task_id = int(task["id"])
     execution_task = bool(
         execution_context is not None
-        and str(runtime).lower() in {"dsh", "codex", "kimi-code", "workbuddy"}
+        and str(runtime).lower() in {"dsh", "codex", "kimi-code", "workbuddy", "antigravity"}
         and isinstance(task.get("execution_session"), dict)
     )
     runner = command_runner or run_cli_command

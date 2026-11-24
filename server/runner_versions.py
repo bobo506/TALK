@@ -16,9 +16,15 @@ ADAPTED_VERSIONS = {
     "kimi-code": ("2.0.2", "2026-11-04 当前验证基线"),
     "dsh": ("0.2.1-rc.5", "2026-11-04 当前验证基线"),
     "workbuddy": ("2.165.0", "2026-11-05 本机验证基线"),
+    "antigravity": ("1.5.16", "2026-11-24 本机验证基线"),
 }
 WORKBUDDY_ACP_ADAPTED_DESKTOP = ("5.8.3", "2026-11-05 ACP 验证基线；5.9.3 已知不兼容")
-COMMANDS = {"codex": ("codex.cmd", "codex"), "kimi-code": ("kimi",), "dsh": ("dsh.cmd", "dsh")}
+COMMANDS = {
+    "codex": ("codex.cmd", "codex"),
+    "kimi-code": ("kimi",),
+    "dsh": ("dsh.cmd", "dsh"),
+    "antigravity": ("agy.exe", "agy"),
+}
 _VERSION = re.compile(r"(?<![\w.])(\d+(?:\.\d+)+(?:-rc\.\d+)?)(?![\w.+-])")
 _cache = {}
 _lock = threading.Lock()
@@ -131,6 +137,24 @@ def _probe_workbuddy():
         return None, "版本探测失败", "error"
 
 
+def _find_antigravity_exe() -> str | None:
+    for name in COMMANDS["antigravity"]:
+        found = shutil.which(name)
+        if found:
+            return found
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        candidate = Path(localappdata) / "agy" / "bin" / "agy.exe"
+        if candidate.is_file():
+            return str(candidate)
+    userprofile = os.environ.get("USERPROFILE")
+    if userprofile:
+        candidate = Path(userprofile) / "AppData" / "Local" / "agy" / "bin" / "agy.exe"
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
 def _probe(runtime):
     if runtime == "workbuddy":
         return _probe_workbuddy()
@@ -138,13 +162,21 @@ def _probe(runtime):
     if not commands:
         return None, "无可靠 CLI 探针", "error"
     try:
-        exe = next((path for name in commands if (path := shutil.which(name))), None)
+        exe = _find_antigravity_exe() if runtime == "antigravity" else next(
+            (path for name in commands if (path := shutil.which(name))), None
+        )
         if not exe:
             return None, "未找到命令", "missing"
-        result = subprocess.run([exe, "--version"], timeout=3, stdin=subprocess.DEVNULL, capture_output=True)
+        result = subprocess.run(
+            [exe, "--version"],
+            timeout=3,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
         if result.returncode != 0:
             return None, "版本命令执行失败", "error"
-        output = result.stdout.decode("utf-8", errors="replace")
+        output = (result.stdout + result.stderr).decode("utf-8", errors="replace") if runtime == "antigravity" else result.stdout.decode("utf-8", errors="replace")
         version = parse_version(runtime, output)
         return (version, "", "ok") if version else (None, "无法解析版本", "error")
     except subprocess.TimeoutExpired:

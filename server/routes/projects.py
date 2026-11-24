@@ -1109,6 +1109,7 @@ def set_agent_role_binding_effort_override(
             session.commit()
         return _binding_response(project_id, target_member_id, session)
     effort_facts = {
+        "model_id": binding.model_id,
         "model_alias": binding.model_alias,
         "runtime": runner.runtime if runner is not None else None,
         "default_effort": binding.default_effort,
@@ -1125,6 +1126,7 @@ def set_agent_role_binding_effort_override(
             raise HTTPException(status_code=404, detail="role_binding_not_found")
         runner = session.get(RunnerRegistry, binding.runner_id) if binding.runner_id else None
         effort_facts = {
+            "model_id": binding.model_id,
             "model_alias": binding.model_alias,
             "runtime": runner.runtime if runner is not None else None,
             "default_effort": binding.default_effort,

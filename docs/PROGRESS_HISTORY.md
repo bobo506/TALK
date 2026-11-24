@@ -1,5 +1,18 @@
 # 开发历史 · TALK
 
+## 2026-11-24 22:10 — Antigravity 适配切片 B：`agy` 原生执行通道、3 模型/思考强度目录与版本探测
+
+- 起因：用户已在本机安装 `agy 1.5.16`（`%LOCALAPPDATA%\agy\bin\agy.exe`），确认选定 3 个基础模型（Gemini 4 Neon / Gemini 4 Carbon / Gemini 4 Hydrogen）通过 TALK 思考强度下拉切换（Carbon 仅 3 档 `low/medium/high`，Neon/Hydrogen 4 档 `low/medium/high/xhigh`），授权 1 次最小 Hydrogen Low 只读协议探针并由当前会话编码自测 + 独立复核子代理对抗复核。
+- 实机协议实测（1 次最小 `gemini-4-hydrogen-low` 调用 + 只读 `--version`/`--help`/`agy models`）：确认 `-p` 必须带值置于末尾（走 `prompt_transport="argv"`）、`--output-format stream-json` 事件结构（`init` / `step_update` / `result`、UUID `conversation_id`、`init.model`、`init.cwd`、`usage.total_tokens`）、以及 3 模型真实强度档位。
+- 交付：
+  - `bridges/antigravity_effort.py`：3 目标模型目录解析（`parse_agy_models_output`）、模型与强度合成（Carbon 严格 3 档拒绝 `xhigh`）、公开绑定强度裁决与支持 `--flag=val`/重复参数的命令安全改写；
+  - `bridges/antigravity_execution_native.py`：版本与能力探测（`MIN_SUPPORTED=1.5.0`、`MAX_TESTED=1.5.16`，高版本放行带 `antigravity_version_untested` 告警，60s 缓存）、`stream-json` 严格解析（全事件 `conversation_id` 与模型一致、`metrics_invalid` 清空脏值、`MAX_SAFE_INTEGER` 上限、`init.cwd` 校验）、受管 flag 白名单与指纹隔离、append-only 磁盘会话证明（`.talk-antigravity-sessions/<sid>.jsonl`，支持跨任务新建实例续用 `--conversation` 与篡改检测）、`close()` 进程终止超时不吞异常；
+  - `bridges/antigravity_execution_channel.py`、`bridges/antigravity_bridge.py`、`bridges/cli_bridge.py`：接入 TALK 统一执行会话通道（`new_session` / `reuse_session` / 90% 换窗 / 缺失容量 `new_context_unknown`）、`handle_queued_task` 与续轮预检门禁、`normalize_runtime_result`、逐任务原子强度刷新钩子（`review` 沙箱档 / `tools` 施工档）；
+  - `server/runner_versions.py`、`server/routes/runners.py`、`server/models.py`、`server/routes/projects.py`、`server/execution_session_tasks.py`：`/api/runners/versions` 接入 `antigravity`（`Antigravity CLI` 基线 `1.5.16` 及 Windows 安装路径回退）、服务端 `resolve_role_effort` 与 `PUT .../binding/effort` 对 Carbon 严格限制 3 档（422 拒 `xhigh`）、`execution_session` 白名单放行 `antigravity`；
+  - 测试：`tests/test_antigravity_effort.py`、`tests/test_antigravity_execution_native.py`、`tests/test_antigravity_bridge.py`、`tests/test_runner_versions.py`。
+- 独立复核：独立对抗复核子代理首审 `CHANGES_REQUESTED`（指出 8 项 Must-Fix：`prompt_transport` 误写 `"arg"`、`cli_bridge` 两处路由门漏接、内存快照跨任务不可复用、`--antigravity-model` 默认值劫持 Carbon 与 `--flag=val` 绕过、`close()` 吞超时、未受控 flag 未入指纹、脏指标残留与中断丢 `init`、服务端 Carbon 兜底广告 `xhigh`）；集中返修并增补回归后，定向复验 `APPROVED`（切片 B **33 passed, 12 subtests** + 16 套关联回归 **572 passed, 260 subtests**，全部 9 组对抗探针与 `git diff --check` 通过）。
+- 边界与未做：未读取私有 Key/认证文件/生产 DB，未重启生产服务；受管角色宿主（`scripts/antigravity_role_host.py` / `talk_runtime` 动态托管 / 页面创建与删除闭环）留待切片 C 串行推进。
+
 ## 2026-11-24 21:06 — Antigravity 适配切片 A：发起侧 MCP 自动接入与终端身份过滤
 
 - 起因：用户开启 Antigravity 适配（目标模型 `neon` / `carbon` / `hydrogen`），先按 4 片串行拆包推进切片 A（不依赖本机安装 `agy` CLI），并明确授权本次由 Antigravity 会话直接编码自测 + 独立复核子代理对抗复核。
