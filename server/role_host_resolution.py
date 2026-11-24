@@ -5,7 +5,7 @@ deterministic health file and host entry that the local runtime uses when it
 starts a host. Resolution itself does not read health files, credentials, the
 process table, or native configuration, and it never starts a resolver/host.
 
-Fixed ``hosts`` recipes remain first priority.  Dynamic Kimi/Codex/DSH/WorkBuddy
+Fixed ``hosts`` recipes remain first priority.  Dynamic Kimi/Codex/DSH/WorkBuddy/Antigravity
 are selected only from the original instance runtime plus the current managed
 runner facts; a mere ``workbuddy`` config section is not identity evidence.
 """
@@ -33,6 +33,7 @@ _DYNAMIC = {
     "codex": ("codex", "codex-dynamic", "scripts.codex_role_host"),
     "dsh": ("dsh", "dsh-dynamic", "scripts.dsh_role_host"),
     "workbuddy": ("workbuddy", "workbuddy-native", "scripts.workbuddy_role_host"),
+    "antigravity": ("antigravity", "antigravity-dynamic", "scripts.antigravity_role_host"),
 }
 
 
@@ -208,7 +209,7 @@ def resolve_recovery_host(*, config: Mapping[str, Any], project_id: str, member_
 
     recipe_key, directory, module = _DYNAMIC[original_runtime]
     recipe = config.get(recipe_key)
-    if original_runtime in ("kimi-code", "codex", "dsh"):
+    if original_runtime in ("kimi-code", "codex", "dsh", "antigravity"):
         if not isinstance(recipe, Mapping) or recipe.get("enabled") is not True:
             raise RecoveryHostError("local_recovery_host_unconfigured")
     elif not isinstance(recipe, Mapping) or not recipe:

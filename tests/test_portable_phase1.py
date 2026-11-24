@@ -82,11 +82,21 @@ class PortablePhase1Tests(unittest.TestCase):
             self.assertTrue(executable.is_absolute())
             self.assertTrue(executable.is_file())
             self.assertIn(executable.name.lower(), ("codex.exe", "codex"))
+        with patch.dict(os.environ, self.env, clear=True):
+            expected_agy = runner_recipes().get("antigravity")
+        self.assertEqual(runtime.get("antigravity"), expected_agy)
+        if expected_agy:
+            agy_executable = Path(expected_agy["executable"])
+            self.assertTrue(agy_executable.is_absolute())
+            self.assertTrue(agy_executable.is_file())
+            self.assertIn(agy_executable.name.lower(), ("agy.exe", "agy"))
         # Every generated machine path is derived from the explicit fixture or interpreter.
         text = b"\n".join(original[:3]).decode("utf-8").replace("\\\\", "\\").lower()
         allowed = [str(self.base), sys.executable]
         if expected:
             allowed.append(expected["executable"])
+        if expected_agy:
+            allowed.append(expected_agy["executable"])
         for path in allowed:
             text = text.replace(path.lower(), "")
         for forbidden in ("D:\\claude-test", "C:\\Users\\Administrator"):

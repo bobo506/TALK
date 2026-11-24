@@ -21,6 +21,7 @@ RUNNER_SEEDS = (
     ("runner:codex-local", "codex", "Codex CLI"),
     ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "kimi-code", "Kimi Code · K2.8 Preview 执行"),
     ("runner:dsh-deepseek-local", "dsh", "DeepSeek Harness CLI"),
+    ("runner:antigravity-local", "antigravity", "Antigravity CLI"),
 )
 MODEL_SEEDS = (
     ("runner:codex-local", "gpt-6.1-terra", "gpt-6.1-terra", "GPT-6.1 Terra", "openai", "native-codex-chatgpt-login"),
@@ -30,6 +31,17 @@ MODEL_SEEDS = (
     ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "k3", "kimi-code/k3", "K3", "managed:kimi-code", "native-kimi-code-managed-login"),
     ("runner:kimi-code-1aabe894a3c21096ad9c7f5211aa7e33", "k3.1-pro", "kimi-code/k3.1-pro", "K3.1 Pro", "managed:kimi-code", "native-kimi-code-managed-login"),
     ("runner:dsh-deepseek-local", "deepseek-flash", "deepseek-flash", "DeepSeek Flash · max", "deepseek-official", "native-dsh-user-env"),
+)
+ANTIGRAVITY_MODELS = (
+    ("runner:antigravity-local", "gemini-4-neon", "gemini-4-neon", "Gemini 4 Neon",
+     "google-antigravity", "native-antigravity-login",
+     ["effort:low", "effort:medium", "effort:high", "effort:xhigh", "effort_default:high"]),
+    ("runner:antigravity-local", "gemini-4-carbon", "gemini-4-carbon", "Gemini 4 Carbon",
+     "google-antigravity", "native-antigravity-login",
+     ["effort:low", "effort:medium", "effort:high", "effort_default:high"]),
+    ("runner:antigravity-local", "gemini-4-hydrogen", "gemini-4-hydrogen", "Gemini 4 Hydrogen",
+     "google-antigravity", "native-antigravity-login",
+     ["effort:low", "effort:medium", "effort:high", "effort:xhigh", "effort_default:high"]),
 )
 WORKBUDDY_RUNNER = ("runner:workbuddy-embedded-cli", "workbuddy", "WorkBuddy 内置CLI")
 WORKBUDDY_MODELS = tuple(
@@ -115,6 +127,10 @@ def runner_recipes():
     }
     if codex:
         recipes["codex"] = {"enabled": True, "executable": codex}
+    from scripts.antigravity_role_setup import antigravity_recipe
+    antigravity = antigravity_recipe()
+    if antigravity:
+        recipes["antigravity"] = antigravity
     workbuddy = workbuddy_recipe()
     if workbuddy:
         recipes["workbuddy"] = workbuddy
@@ -137,7 +153,7 @@ def seed_runners(session, admin, project_id, workbuddy_enabled=False):
                                             config_version=1, updated_by=admin.id))
         created["host"] = 1
     runners = RUNNER_SEEDS + ((WORKBUDDY_RUNNER,) if workbuddy_enabled else ())
-    models = tuple((*seed, []) for seed in MODEL_SEEDS) + (WORKBUDDY_MODELS if workbuddy_enabled else ())
+    models = tuple((*seed, []) for seed in MODEL_SEEDS) + ANTIGRAVITY_MODELS + (WORKBUDDY_MODELS if workbuddy_enabled else ())
     for runner_id, runtime, display_name in runners:
         if session.get(RunnerRegistry, runner_id) is None:
             session.add(RunnerRegistry(runner_id=runner_id, runtime=runtime, display_name=display_name,

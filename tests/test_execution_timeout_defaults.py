@@ -21,6 +21,7 @@ TEMPLATES = {
 
 def _bridge_cases():
     from bridges import (
+        antigravity_bridge,
         cli_bridge,
         codex_bridge,
         kimi_bridge,
@@ -41,6 +42,11 @@ def _bridge_cases():
             "workbuddy",
             workbuddy_bridge.build_parser(),
             ["--workbuddy-model", "controlled-model"],
+        ),
+        (
+            "antigravity",
+            antigravity_bridge.build_parser(),
+            ["--antigravity-model", "gemini-4-neon"],
         ),
     )
 
@@ -64,7 +70,7 @@ class ManagedRecipeDefaultsTests(unittest.TestCase):
 
         self.assertEqual(
             sorted(host.RUNTIME_RECIPES),
-            ["cli", "codex", "dsh", "kimi-code", "workbuddy"],
+            ["antigravity", "cli", "codex", "dsh", "kimi-code", "workbuddy"],
         )
         for runtime in sorted(host.RUNTIME_RECIPES):
             with self.subTest(runtime=runtime):

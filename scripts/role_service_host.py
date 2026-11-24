@@ -559,7 +559,8 @@ def _publish_private_bytes(target: Path, payload: bytes) -> None:
     if manager is not None and target.name == "manager-health.json":
         value = json.loads(payload)
         runners = {"talk-codex-manager-health-1": "codex", "talk-kimi-manager-health-1": "kimi-code",
-                   "talk-dsh-manager-health-1": "dsh", "talk-workbuddy-manager-health-1": "workbuddy"}
+                   "talk-dsh-manager-health-1": "dsh", "talk-workbuddy-manager-health-1": "workbuddy",
+                   "talk-antigravity-manager-health-1": "antigravity"}
         runner = runners.get(value.get("schema"))
         if runner is not None:
             value["capability"] = manager._manager_capability(value["project_id"], value["member_id"], runner)
@@ -738,7 +739,7 @@ def validate_workspace_context(context: Any, *, project: str, member: str,
             raise ValueError("layout")
         if context.get("project_id") != project or context.get("member_id") != member or not member:
             raise ValueError("identity")
-        runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}[context["runner"]]
+        runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy", "antigravity": "antigravity"}[context["runner"]]
         if key_root is None or role_key_file is None:
             raise ValueError("key root")
         args = (data_root, project, member)
@@ -865,6 +866,11 @@ RUNTIME_RECIPES: dict[str, RuntimeRecipe] = {
         "bridges.workbuddy_bridge",
         ("{python}", "-m", "bridges.workbuddy_bridge"),
         alias_flag="--workbuddy-model",
+    ),
+    "antigravity": RuntimeRecipe(
+        "bridges.antigravity_bridge",
+        ("{python}", "-m", "bridges.antigravity_bridge"),
+        alias_flag="--antigravity-model",
     ),
     "kimi-code": RuntimeRecipe(
         "bridges.kimi_bridge",
@@ -1543,7 +1549,7 @@ class HostManager:
         self._workspace_draining = self._workspace_draining or self.manager_drain_file.is_file()
         ensure_private_dir(root)
         self._workspace_check_file(self.manager_health_file, root)
-        runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}[self.workspace_context["runner"]]
+        runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy", "antigravity": "antigravity"}[self.workspace_context["runner"]]
         payload = {"schema": f"talk-{runner}-manager-health-1", "pid": os.getpid(),
                    "project_id": project_id, "member_id": self.workspace_context["member_id"],
                    "host": self.host, "manager_instance_id": self.manager_instance_id, "seen_at": datetime.now(timezone.utc).isoformat(), "state": "serving",

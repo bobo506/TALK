@@ -106,7 +106,7 @@ async function maybeShowRunnerOnboarding() {
     const items = await res.json();
     if (!Array.isArray(items)) throw new Error("运行器状态不是数组");
     if (request !== runnerOnboardingUI.request || member !== myId || project !== activeProjectId || !currentMemberIsHuman() || !Array.isArray(projectAgents)) return;
-    const supported = items.filter(item => item && ["codex", "kimi-code", "dsh"].includes(item.runtime));
+    const supported = items.filter(item => item && ["codex", "kimi-code", "dsh", "antigravity"].includes(item.runtime));
     const available = supported.filter(item => typeof item.detected_version === "string" && item.detected_version.trim() && ["match", "newer", "older"].includes(item.status));
     const missing = supported.filter(item => item.probe_status === "missing");
     const hasUnknown = supported.some(item => item.probe_status !== "ok" && item.probe_status !== "missing");
@@ -193,7 +193,7 @@ function chatMemberName(member) {
   const id = String(member?.id || "未指定");
   const short = id.replace(/^(agent|human):/, "");
   const name = member?.display_name;
-  return name && !/CLI Bridge|agent:/i.test(name) ? name : ({codex:"Codex",deepseek:"DeepSeek",kimi:"Kimi"}[short] || short);
+  return name && !/CLI Bridge|agent:/i.test(name) ? name : ({codex:"Codex",deepseek:"DeepSeek",kimi:"Kimi",antigravity:"Antigravity"}[short] || short);
 }
 function workspaceMemberName(id) {
   if (id === "human:operator") return "本机操作员";

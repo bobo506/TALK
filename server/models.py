@@ -4690,25 +4690,48 @@ def resolve_role_effort(facts: Optional[dict], runtime_options=None) -> dict:
     default = default_raw.strip().lower() if isinstance(default_raw, str) else ""
     default = default if default in DEFAULT_EFFORT_VALUES else None
     supported = parse_supported_efforts(facts.get("supported_efforts"))
+    runtime = facts.get("runtime")
+    antigravity_allowed = None
+    if runtime == "antigravity":
+        from bridges.antigravity_effort import supported_efforts_for_model
+
+        raw_model = facts.get("model_id") or facts.get("model_alias")
+        antigravity_allowed = frozenset(supported_efforts_for_model(raw_model))
+        if not antigravity_allowed:
+            return {
+                "default_effort": default,
+                "effort_override": override,
+                "effective_effort": override or default,
+                "effort_options": [],
+                "effort_source": None,
+            }
     if supported is not None:
-        options, source = supported, EFFORT_SOURCE_CATALOG
-    elif runtime_options is not None:
-        options, source = canonical_effort_values(runtime_options), EFFORT_SOURCE_ADAPTER
-    else:
-        runtime = facts.get("runtime")
-        adapter = (
-            RUNNER_ADAPTER_EFFORT_VALUES.get(runtime)
-            if isinstance(runtime, str)
-            else None
+        options = (
+            [item for item in supported if item in antigravity_allowed]
+            if antigravity_allowed is not None
+            else supported
         )
-        if runtime == "antigravity" and adapter:
-            raw_model = facts.get("model_id") or facts.get("model_alias")
-            if isinstance(raw_model, str):
-                token = raw_model.strip().lower()
-                if token == "gemini-4-carbon" or token.startswith("gemini-4-carbon-"):
-                    adapter = frozenset({"low", "medium", "high"})
-        options = canonical_effort_values(adapter) if adapter else []
-        source = EFFORT_SOURCE_ADAPTER if adapter else None
+        source = EFFORT_SOURCE_CATALOG
+    elif runtime_options is not None:
+        raw_runtime_options = canonical_effort_values(runtime_options)
+        options = (
+            [item for item in raw_runtime_options if item in antigravity_allowed]
+            if antigravity_allowed is not None
+            else raw_runtime_options
+        )
+        source = EFFORT_SOURCE_ADAPTER
+    else:
+        if antigravity_allowed is not None:
+            options = canonical_effort_values(antigravity_allowed)
+            source = EFFORT_SOURCE_ADAPTER
+        else:
+            adapter = (
+                RUNNER_ADAPTER_EFFORT_VALUES.get(runtime)
+                if isinstance(runtime, str)
+                else None
+            )
+            options = canonical_effort_values(adapter) if adapter else []
+            source = EFFORT_SOURCE_ADAPTER if adapter else None
     return {
         "default_effort": default,
         "effort_override": override,

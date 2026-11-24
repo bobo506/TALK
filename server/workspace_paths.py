@@ -120,7 +120,7 @@ def control_dir(data_root: Path, project_id: str, member_id: str) -> Path:
 
 
 def manager_dir(data_root: Path, project_id: str, member_id: str, runner: str) -> Path:
-    if runner not in ("codex", "kimi", "dsh", "workbuddy"):
+    if runner not in ("codex", "kimi", "dsh", "workbuddy", "antigravity"):
         raise WorkspacePathError("invalid_id")
     return _child(role_dir(data_root, project_id, member_id), "state", "manager", runner)
 

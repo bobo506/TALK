@@ -77,7 +77,7 @@ class WorkBuddyPortableTests(unittest.TestCase):
                     self.assertEqual(cdp_effort_for_facts(session, facts), (options, "high", None))
         finally:
             engine.dispose()
-        self.assertEqual(first["seed"]["runners"], 4)
+        self.assertEqual(first["seed"]["runners"], 5)
         before = runtime_path.read_bytes()
         second = self.apply()
         self.assertEqual(second["seed"], {"runners": 0, "models": 0, "host": 0})

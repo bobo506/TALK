@@ -1,5 +1,19 @@
 # 开发历史 · TALK
 
+## 2026-11-24 23:32 — Antigravity 适配切片 C：受管角色宿主、`talk_runtime` 动态托管、恢复/删除/便携引导与工作台接入
+
+- 起因：用户确认开工 Antigravity 适配切片 C，补齐单角色受管宿主、动态托管生命周期、恢复与删除清理、便携引导种子及前端角色创建/工作台闭环（继续由当前会话编码自测 + 独立复核子代理对抗复核）。
+- 隔离认证事实核实（只读 `agy models` 探针）：将 `HOME` / `USERPROFILE` / `APPDATA` / `LOCALAPPDATA` / `XDG_*` 全部指向空临时目录后，`agy models` 仍正常退出码 0 并返回 3 目标模型 11 个档位，因此 `AntigravityRoleHost` 可保持完整 `NATIVE_HOME_ENV_VARS` + `ANTIGRAVITY_HOME` 角色隔离，无需复制用户凭据或引入 Codex/Kimi 设备码流程。
+- 交付：
+  - `scripts/antigravity_role_setup.py`：集中可执行路径严格校验（`validate_executable_path`：绝对路径、祖先与目标无符号链接/重解析点、原始与解析基名均为 `agy`/`agy.exe`）、`detect_executable` / `antigravity_recipe` / `executable`、`prepare_role_home`（全祖先链路无重解析点守卫）、`probe_catalog`（复用真实 `check_antigravity` + `discover_antigravity_models` 与真实错误码映射）、`seed_antigravity_choices`（与 `portable_bootstrap` 同源确定性 `choice_id` 幂等登记 `runner:antigravity-local` 与 Neon/Carbon/Hydrogen 3 模型，默认 dry-run CLI）；
+  - `scripts/antigravity_role_host.py`：单项目/单成员受管宿主 `AntigravityRoleHost`（`legacy` + `workspace-v1`）、`host_spec`（默认 `tools` 档、显式 `review` 档、拒绝非 dict `task_profiles` 与非法可执行路径）、`publish_health`（`talk-antigravity-manager-health-1`）、`_configuration`（严格按公开绑定解析思考强度，Carbon 严格 3 档拒绝 `xhigh`）、`build_entry_argv`（经真实 `antigravity_bridge` parser 与 `verify_runtime_entry` 核验）、`child_environment`（`NATIVE_HOME_ENV_VARS` + `ANTIGRAVITY_HOME` 隔离）、`main`（`--check-version`、dry-run、`workspace-v1` 先于读 Key 校验布局、Windows Key ACL 加固）；
+  - `server/workspace_paths.py`、`server/role_host_resolution.py`、`scripts/role_service_host.py`、`scripts/role_service_recovery.py`、`scripts/role_delete.py`、`scripts/talk_runtime.py`、`scripts/portable_bootstrap.py`：全链路接入 `"antigravity"`（`manager_dir`、`_DYNAMIC`、`RUNTIME_RECIPES`、`process_inventory` 含 `agy.exe`、`_HOST_MODULES`、`bridges.antigravity_bridge` 孤儿桥接识别、`antigravity-dynamic` 与 `workspace-v1` `state/manager/antigravity` 活宿主拦截与安全清理、`talk_runtime` 配置校验 + `antigravity_spec`、`portable_bootstrap` 种子与 `runner_recipes`）；
+  - `server/models.py`、`server/routes/projects.py`：`resolve_role_effort` 严格按 `supported_efforts_for_model` 约束 Antigravity（未支持模型返回空清单 + `None`、陈旧库内 `supported_efforts` 对 Carbon 仍强夹紧为 3 档）；`POST /roles`、`attach`、`PUT /agents/{member}/binding` 初始化 Antigravity `default_effort="high"`，`POST /binding/default-effort` 同步对 Carbon 拒绝 `xhigh`；
+  - `web/workspace.js`、`web/index.html`：运行器首次引导弹窗（`maybeShowRunnerOnboarding`）与 `chatMemberName` 接入 `antigravity`，`workspace.js` 缓存版本号更新为 `?v=20261124-antigravity-host`；`web/role-creation.js` 原生仅对 Codex/Kimi 触发设备授权，无需额外改动；
+  - 测试：新增 `tests/test_antigravity_role_host.py`，同步更新 `tests/test_execution_timeout_defaults.py`、`tests/test_role_host_runtime_configuration.py`、`tests/test_workbuddy_portable.py`、`tests/test_portable_phase1.py`、`tests/test_workspace_paths.py`、`tests/workspace_runner_onboarding_ui.test.cjs`。
+- 独立复核：独立对抗复核子代理首审 `CHANGES_REQUESTED`（指出 6 项 Must-Fix：`probe_catalog` 误传 `timeout` 致运行时 `TypeError`、`_map_native_error` 映射了不存在的错误码、可执行路径基名/重解析点校验缺口、`prepare_role_home` Windows 父目录 junction 穿透、`resolve_role_effort` 对未支持 Antigravity 模型放行及 Carbon 陈旧目录未夹紧、`workspace_runner_onboarding_ui.test.cjs` 缓存版本号断言过期）；集中返修并同步解决 3 项非阻断优化后，定向复验 `APPROVED`（13 套 pytest **189 passed, 147 subtests passed, 0 failed** + `test_real_recipe_table_and_alias_flags_unchanged` **1 passed** + Node UI 3 套件 **89 pass, 0 fail** + 全部对抗复探针与 `git diff --check` 通过）。
+- 边界与未做：未读取私有 Key/认证文件/生产 DB，未重启生产 API / `talk_runtime`；生产环境实机建角色、切换思考强度、跑通真实任务交付/复核闭环及用户手册/README 更新留待切片 D 确认后推进。
+
 ## 2026-11-24 22:10 — Antigravity 适配切片 B：`agy` 原生执行通道、3 模型/思考强度目录与版本探测
 
 - 起因：用户已在本机安装 `agy 1.5.16`（`%LOCALAPPDATA%\agy\bin\agy.exe`），确认选定 3 个基础模型（Gemini 4 Neon / Gemini 4 Carbon / Gemini 4 Hydrogen）通过 TALK 思考强度下拉切换（Carbon 仅 3 档 `low/medium/high`，Neon/Hydrogen 4 档 `low/medium/high/xhigh`），授权 1 次最小 Hydrogen Low 只读协议探针并由当前会话编码自测 + 独立复核子代理对抗复核。

@@ -6,6 +6,7 @@ const source = fs.readFileSync(require.resolve("../web/workspace.js"), "utf8");
 const part = source.slice(source.indexOf("const runnerOnboardingUI"), source.indexOf("const ROLE_TASKS_PAGE_SIZE"));
 const codex = { runtime: "codex", display_name: "Codex CLI", detected_version: "1", status: "match" };
 const kimi = { runtime: "kimi-code", display_name: "Kimi Code", detected_version: "1", status: "match" };
+const antigravity = { runtime: "antigravity", display_name: "Antigravity CLI", detected_version: "1.5.16", status: "match" };
 const workbuddy = { runtime: "workbuddy", display_name: "WorkBuddy", detected_version: "1", status: "match" };
 const missingRunners = [codex, kimi, { runtime: "dsh", display_name: "DeepSeek Harness" }]
   .map(item => ({ ...item, detected_version: null, status: "unknown", probe_status: "missing" }));
@@ -44,6 +45,11 @@ test("零角色且 Codex 可用时显示创建引导并还原焦点", async () =
   assert.equal(h.nodes["runner-onboarding-action"].textContent, "创建角色");
   assert.equal(h.env.document.activeElement, h.nodes["runner-onboarding-action"]);
   h.click("runner-onboarding-close"); assert.equal(h.hidden(), true); assert.equal(h.env.document.activeElement, h.before);
+});
+test("零角色且 Antigravity CLI 可用时显示创建引导", async () => {
+  const h = harness([antigravity]); await h.env.maybeShowRunnerOnboarding();
+  assert.equal(h.hidden(), false);
+  assert.equal(h.nodes["runner-onboarding-message"].textContent, "已适配 Antigravity CLI 运行器，可创建角色");
 });
 test("多个可用运行器包含版本关系提示", async () => {
   const h = harness([{...codex, status: "newer"}, kimi]); await h.env.maybeShowRunnerOnboarding();
@@ -134,9 +140,9 @@ test("静态弹窗语义及项目角色加载入口", () => {
   assert.equal((modal.match(/<button\b/g) || []).length, 2);
   assert.match(modal, /id="runner-onboarding-close"/);
   assert.match(modal, /id="runner-onboarding-action"[^>]*class="room-primary-btn"/);
-  assert.match(html, /workspace\.css\?v=20261113-runner-onboarding-v2/);
-  assert.match(html, /workspace\.js\?v=20261113-runner-onboarding-v2/);
-  assert.match(html, /app\.js\?v=20261113-runner-onboarding-v2/);
+  assert.match(html, /workspace\.css\?v=20261117-roles-restyle/);
+  assert.match(html, /workspace\.js\?v=20261124-antigravity-host/);
+  assert.match(html, /app\.js\?v=20261124-antigravity-mcp/);
   const app = fs.readFileSync(require.resolve("../web/app.js"), "utf8");
   assert.match(app.slice(app.indexOf("async function loadProjectAgents()"), app.indexOf("async function loadProjectTasks(")), /projectAgents = loaded;[\s\S]*maybeShowRunnerOnboarding\(\)/);
 });

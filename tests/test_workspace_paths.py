@@ -164,7 +164,7 @@ class WorkspacePathsTests(unittest.TestCase):
                     with self.subTest(function=function.__name__, project=project, member=member):
                         with self.assertRaises(w.WorkspacePathError):
                             function(temp, project, member)
-            for runner in ('codex', 'kimi', 'dsh', 'workbuddy'):
+            for runner in ('codex', 'kimi', 'dsh', 'workbuddy', 'antigravity'):
                 self.assertEqual(w.manager_dir(temp, 'p/中', 'm:1', runner), role / 'state' / 'manager' / runner)
             for runner in ('', '../codex', 'Codex', 'x' * 200, None):
                 with self.assertRaises(w.WorkspacePathError):

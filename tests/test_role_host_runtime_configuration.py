@@ -1055,10 +1055,12 @@ class ExistingGuardRegressionTests(HostConfigTestCase):
     def test_real_recipe_table_and_alias_flags_unchanged(self):
         self.assertEqual(
             sorted(RUNTIME_RECIPES),
-            ["cli", "codex", "dsh", "kimi-code", "workbuddy"],
+            ["antigravity", "cli", "codex", "dsh", "kimi-code", "workbuddy"],
         )
         self.assertEqual(RUNTIME_RECIPES["kimi-code"].alias_flag, "--kimi-model")
         self.assertEqual(RUNTIME_RECIPES["kimi-code"].command_flag, None)
+        self.assertEqual(RUNTIME_RECIPES["antigravity"].alias_flag, "--antigravity-model")
+        self.assertEqual(RUNTIME_RECIPES["antigravity"].command_flag, None)
         self.assertEqual(RUNTIME_RECIPES["codex"].command_flag, "--codex-command")
         self.assertEqual(RUNTIME_RECIPES["dsh"].command_flag, "--command")
         self.assertEqual(resolve_alias_flag("dsh"), "--model")

@@ -191,10 +191,11 @@ def _drain(runtime, member, files, workspace_root=None):
             raise CleanupError("unsafe_resource")
     from scripts.role_service_recovery import recorded_process_state
     wb = Path(runtime.config["state_dir"])/"workbuddy-native"/host._sanitize_token(runtime.project)/host._sanitize_token(member)
-    health_paths = {Path(s["health_file"]) for s in specs} | {wb/"manager-health.json"}
+    agy = Path(runtime.config["state_dir"])/"antigravity-dynamic"/host._sanitize_token(runtime.project)/host._sanitize_token(member)
+    health_paths = {Path(s["health_file"]) for s in specs} | {wb/"manager-health.json", agy/"manager-health.json"}
     if workspace_root is not None:
         health_paths |= {workspace_root / "state" / "manager" / runner / "manager-health.json"
-                         for runner in ("codex", "kimi", "dsh", "workbuddy")}
+                         for runner in ("codex", "kimi", "dsh", "workbuddy", "antigravity")}
     owned_health = Path(owned["spec"]["health_file"]) if owned else None
 
     def verify_health():
@@ -240,7 +241,7 @@ def _drain(runtime, member, files, workspace_root=None):
             if workspace_root is not None and path.is_relative_to(workspace_root):
                 relative = path.relative_to(workspace_root)
                 if (len(relative.parts) != 4 or relative.parts[:2] != ("state", "manager")
-                        or relative.parts[2] not in ("codex", "kimi", "dsh", "workbuddy")
+                        or relative.parts[2] not in ("codex", "kimi", "dsh", "workbuddy", "antigravity")
                         or relative.parts[3] != ("drain.request" if key == "drain_file" else "manager-health.json")):
                     raise CleanupError("unsafe_resource")
                 provision.assert_inside_root(workspace_root, relative)
@@ -440,13 +441,13 @@ def cleanup(runtime, member, receipt, role=None):
         project_token, member_token = host._sanitize_token(runtime.project), host._sanitize_token(member)
         for launch in controls:
             files.remove(provision.assert_inside_root(state, Path("control")/(launch+".ctl")))
-        for category in ("roles", "native", "workbuddy-native", "codex-dynamic", "kimi-dynamic", "dsh-dynamic"):
+        for category in ("roles", "native", "workbuddy-native", "codex-dynamic", "kimi-dynamic", "dsh-dynamic", "antigravity-dynamic"):
             path = provision.assert_inside_root(state, Path(category)/project_token/member_token)
             files.remove(path, tree=True, native_root=path if category=="native" else None)
         # Dynamic manager directories are per member; after the member
         # directory is gone, only remove empty project/category parents. A shared
         # parent with another role or project is never removed.
-        for category in ("codex-dynamic", "kimi-dynamic", "dsh-dynamic"):
+        for category in ("codex-dynamic", "kimi-dynamic", "dsh-dynamic", "antigravity-dynamic"):
             project_dir = provision.assert_inside_root(state, Path(category)/project_token)
             category_dir = provision.assert_inside_root(state, Path(category))
             for candidate in (project_dir, category_dir):

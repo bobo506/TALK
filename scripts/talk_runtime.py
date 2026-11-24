@@ -332,6 +332,16 @@ def load_config(path):
                 or any(not isinstance(member, str) or not member or profile not in ("review", "tools")
                     for member, profile in codex_recipe.get("task_profiles", {}).items())):
             raise RuntimeErrorCode("runtime_host_config_invalid")
+    antigravity_recipe = config.get("antigravity")
+    if antigravity_recipe is not None:
+        if (not isinstance(antigravity_recipe, dict) or type(antigravity_recipe.get("enabled")) is not bool
+                or not isinstance(antigravity_recipe.get("executable"), str)
+                or not Path(antigravity_recipe["executable"]).is_absolute()
+                or Path(antigravity_recipe["executable"]).name.lower() not in ("agy.exe", "agy")
+                or not isinstance(antigravity_recipe.get("task_profiles", {}), dict)
+                or any(not isinstance(member, str) or not member or profile not in ("review", "tools")
+                    for member, profile in antigravity_recipe.get("task_profiles", {}).items())):
+            raise RuntimeErrorCode("runtime_host_config_invalid")
     recipe=config.get("workbuddy")
     if recipe is not None and (not isinstance(recipe,dict) or any(not isinstance(recipe.get(k),str) or not Path(recipe[k]).is_absolute() for k in ("executable","models_home")) or not isinstance(recipe.get("key_files",{}),dict)):
         raise RuntimeErrorCode("runtime_workbuddy_config_invalid")
@@ -617,7 +627,7 @@ class TalkRuntime:
         if not isinstance(registered, str) or not Path(registered).is_absolute() or Path(registered).resolve() != self.project_root.resolve():
             raise ValueError("workspace_project_root_mismatch")
         runner = (role.get("runner") or {}).get("runtime")
-        runner_dir = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}.get(runner)
+        runner_dir = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy", "antigravity": "antigravity"}.get(runner)
         if runner_dir is None:
             raise ValueError("workspace_runner_invalid")
         data_root = ROOT
@@ -762,6 +772,24 @@ class TalkRuntime:
             return None
         return spec
 
+    def antigravity_spec(self, role):
+        from scripts.antigravity_role_host import host_spec
+        if rsh.is_workspace_v1(role) and (role.get("runner") or {}).get("runtime") == "antigravity":
+            return self.workspace_spec(role, host_spec)
+        spec = host_spec(self.config, role)
+        if spec is None:
+            return None
+        member = spec["member_id"]
+        key = key_file_path(Path(self.config["key_root"]), member)
+        if not key.is_file():
+            self.statuses[member] = {"state": "key_not_configured"}
+            return None
+        identity = self.client.request("GET", "/api/members/me", key=key.read_text(encoding="utf-8").strip())
+        if identity.get("id") != member or identity.get("kind") != "agent":
+            self.statuses[member] = {"state": "identity_mismatch"}
+            return None
+        return spec
+
     def _terminate_orphan_bridge(self, member, spec):
         """Stop only an idle local instance whose process identity is verifiable."""
         if self.stopping:
@@ -873,7 +901,13 @@ class TalkRuntime:
                 continue
             if role["member_id"] not in specs:
                 try:
-                    spec = self.workbuddy_spec(role) or self.kimi_spec(role) or self.codex_spec(role) or self.dsh_spec(role)
+                    spec = (
+                        self.workbuddy_spec(role)
+                        or self.kimi_spec(role)
+                        or self.codex_spec(role)
+                        or self.dsh_spec(role)
+                        or self.antigravity_spec(role)
+                    )
                 except (rsh.HostError,OSError,ValueError):
                     self.statuses[role["member_id"]]={"state":"identity_check_failed"}
                     continue

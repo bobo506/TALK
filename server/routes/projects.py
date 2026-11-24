@@ -951,6 +951,11 @@ def put_agent_role_binding(
         )
 
     now = datetime.now(timezone.utc)
+    rebound_default_effort = None
+    if runner.runtime == "antigravity":
+        from bridges.antigravity_effort import default_effort_for_model
+
+        rebound_default_effort = default_effort_for_model(binding.model_id or binding.model_alias)
     values = {
         "project_id": project_id,
         "member_id": target_member_id,
@@ -965,7 +970,7 @@ def put_agent_role_binding(
         # 原生准备流程写回，避免把上一个模型的强度留在新绑定上。
         # 2026-10-31（351-A）：换模型后旧的用户覆盖与旧模型的能力清单同样作废——
         # 沿用到新模型就是拿旧模型的事实冒充新模型的可用性。
-        "default_effort": None,
+        "default_effort": rebound_default_effort,
         "effort_override": None,
         "supported_efforts": None,
         "updated_by": current.id,
@@ -1025,6 +1030,14 @@ def set_agent_role_binding_effort(
     if effort_cache.is_cdp_alias(binding.model_alias) and runner is not None and runner.runtime == 'workbuddy':
         facts = read_role_binding_facts(session, project_id=project_id, member_id=target_member_id)
         options, _, _ = effort_cache.cdp_effort_for_facts(session, facts)
+        if not options:
+            raise HTTPException(status_code=409, detail="effort_capability_unknown")
+        if value not in options:
+            raise HTTPException(status_code=422, detail="default_effort_invalid")
+    elif runner is not None and runner.runtime == "antigravity":
+        from bridges.antigravity_effort import supported_efforts_for_model
+
+        options = supported_efforts_for_model(binding.model_id or binding.model_alias)
         if not options:
             raise HTTPException(status_code=409, detail="effort_capability_unknown")
         if value not in options:
@@ -1903,6 +1916,11 @@ def create_project_role(
                 updated_at=now,
             ),
         )
+        initial_default_effort = None
+        if runner.runtime == "antigravity":
+            from bridges.antigravity_effort import default_effort_for_model
+
+            initial_default_effort = default_effort_for_model(choice.model_id or choice.model_alias)
         _tx_add_role_fact(
             session,
             ProjectRoleBinding(
@@ -1915,6 +1933,7 @@ def create_project_role(
                 model_id=choice.model_id,
                 model_alias=choice.model_alias or None,
                 model_display_name=choice.model_display_name,
+                default_effort=initial_default_effort,
                 updated_by=current.id,
                 updated_at=now,
             ),
@@ -2186,6 +2205,11 @@ def legacy_attach_project_role(
                     detail="binding_choice_mismatch",
                 )
         else:
+            initial_default_effort = None
+            if runner.runtime == "antigravity":
+                from bridges.antigravity_effort import default_effort_for_model
+
+                initial_default_effort = default_effort_for_model(choice.model_id or choice.model_alias)
             _tx_add_role_fact(
                 session,
                 ProjectRoleBinding(
@@ -2198,6 +2222,7 @@ def legacy_attach_project_role(
                     model_id=choice.model_id,
                     model_alias=choice.model_alias or None,
                     model_display_name=choice.model_display_name,
+                    default_effort=initial_default_effort,
                     updated_by=current.id,
                     updated_at=now,
                 ),

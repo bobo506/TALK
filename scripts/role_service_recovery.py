@@ -88,7 +88,7 @@ def process_inventory():
     # argv仅在本地内存中用于识别，不输出、落盘或送入服务端。
     command = (
         "$ErrorActionPreference='Stop'; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding; "
-        "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(python|pythonw|node|kimi|dsh|codex)\\.exe$' } "
+        "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(python|pythonw|node|kimi|dsh|codex|agy)\\.exe$' } "
         "| Select-Object ProcessId,ParentProcessId,CommandLine) | ConvertTo-Json -Compress"
     )
     try:
@@ -129,6 +129,7 @@ _HOST_MODULES = frozenset({
     "scripts.kimi_role_host",
     "scripts.codex_role_host",
     "scripts.workbuddy_role_host",
+    "scripts.antigravity_role_host",
     "scripts.role_service_host",
 })
 _HOST_SCRIPTS = frozenset(module.rsplit(".", 1)[1] + ".py" for module in _HOST_MODULES)
@@ -268,7 +269,7 @@ def _host_candidate(argv, entry, *, include_bridges=False):
     kind, value = _command_entry(argv)
     if include_bridges and kind == "module" and value in {
         "bridges.codex_bridge", "bridges.kimi_bridge", "bridges.dsh_bridge",
-        "bridges.workbuddy_bridge", "bridges.cli_bridge",
+        "bridges.workbuddy_bridge", "bridges.antigravity_bridge", "bridges.cli_bridge",
     }:
         return "bridge"
     if kind == "module":
@@ -299,7 +300,7 @@ def orphan_local_proof(plan, health_path, host_entry, *, probe=None, inventory=N
                 or _parse_iso(health.get("seen_at")) is None):
             raise ValueError("health identity")
         if workspace_runner is not None:
-            runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}.get(workspace_runner)
+            runner = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy", "antigravity": "antigravity"}.get(workspace_runner)
             if (runner is None or health.get("schema") != f"talk-{runner}-manager-health-1"
                     or health.get("state") != "serving" or not isinstance(health.get("owned_launches"), list)
                     or plan["expected_process_launch_id"] not in health["owned_launches"]):
@@ -401,7 +402,7 @@ def local_proof(plan, health_path: Path, host_entry: Path, *, probe=None, invent
     if workspace_data_root is not None:
         from server import workspace_paths as wp
         from scripts.role_service_host import _sanitize_token
-        runner_dir = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy"}.get(workspace_runner)
+        runner_dir = {"codex": "codex", "kimi-code": "kimi", "dsh": "dsh", "workbuddy": "workbuddy", "antigravity": "antigravity"}.get(workspace_runner)
         if runner_dir is None:
             raise HostError("recovery_workspace_owner_unverified")
         args = (Path(workspace_data_root), plan["project_id"], plan["member_id"])
