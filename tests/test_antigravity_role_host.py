@@ -93,13 +93,73 @@ class AntigravityRoleSetupTests(unittest.TestCase):
             self.assertIsNone(setup.antigravity_recipe())
 
     def test_environment_and_prepare_role_home_isolate_all_vars(self):
+        import urllib.request
+
         home = self.root / "isolated-home"
         prepared = setup.prepare_role_home(home)
         self.assertTrue(prepared.is_dir())
-        env = setup.environment(home)
+        clean_proxy_base = {
+            k: v for k, v in os.environ.items() if k.upper() not in set(setup.CANONICAL_PROXY_ENV_VARS)
+        }
+        with patch.dict(
+            os.environ,
+            {
+                **clean_proxy_base,
+                "HTTPS_PROXY": " http://user:s3cr3t@127.0.0.1:7890 ",
+                "NO_PROXY": "internal.local",
+            },
+            clear=True,
+        ):
+            env = setup.environment(home)
+            secrets = setup.sensitive_proxy_values()
         for var in rsh.NATIVE_HOME_ENV_VARS:
             self.assertEqual(Path(env[var]), home.resolve())
         self.assertEqual(Path(env["ANTIGRAVITY_HOME"]), home.resolve())
+        self.assertEqual(env["HTTPS_PROXY"], "http://user:s3cr3t@127.0.0.1:7890")
+        if os.name == "nt":
+            for lower_key in ("http_proxy", "https_proxy", "all_proxy", "no_proxy"):
+                self.assertNotIn(lower_key, env)
+        no_proxy_tokens = {item.strip().lower() for item in env["NO_PROXY"].split(",")}
+        self.assertTrue({"internal.local", "127.0.0.1", "localhost", "::1"}.issubset(no_proxy_tokens))
+        self.assertIn("http://user:s3cr3t@127.0.0.1:7890", secrets)
+        self.assertIn("user:s3cr3t", secrets)
+        self.assertIn("s3cr3t", secrets)
+
+        # Lowercase-only no_proxy is preserved in NO_PROXY (never shadowed in Go httpproxy).
+        lower_env = setup.apply_proxy_env(
+            {}, source={"http_proxy": "http://127.0.0.1:7890", "no_proxy": "corp.local"}
+        )
+        for key in ("NO_PROXY", "no_proxy"):
+            tokens = {item.strip().lower() for item in lower_env[key].split(",")}
+            self.assertTrue({"corp.local", "127.0.0.1", "localhost", "::1"}.issubset(tokens), lower_env)
+
+        # Wildcard NO_PROXY="*" must remain exact "*" so urllib wildcard bypass still works.
+        wild_env = setup.apply_proxy_env(
+            {}, source={"HTTPS_PROXY": "http://127.0.0.1:7890", "NO_PROXY": "*"}
+        )
+        self.assertEqual(wild_env["NO_PROXY"], "*")
+        self.assertTrue(urllib.request.proxy_bypass_environment("example.com", {"no": wild_env["NO_PROXY"]}))
+
+        # Control characters in proxy values are ignored; without proxy vars, NO_PROXY is not fabricated.
+        self.assertEqual(setup.apply_proxy_env({}, source={"HTTP_PROXY": "http://bad\r\nheader"}), {})
+        self.assertEqual(setup.apply_proxy_env({}, source={}), {})
+
+        # Credential parsing handles bare tokens, percent-encoded passwords, and ignores degenerate values.
+        token_secrets = setup.sensitive_proxy_values(
+            {
+                "HTTPS_PROXY": " http://mysecrettoken@127.0.0.1:7890 ",
+                "ALL_PROXY": "socks5://alice:p%40ssword@127.0.0.1:1080",
+                "HTTP_PROXY": " @ ",
+                "NO_PROXY": "foo@bar.local",
+            }
+        )
+        self.assertIn("http://mysecrettoken@127.0.0.1:7890", token_secrets)
+        self.assertIn("mysecrettoken", token_secrets)
+        self.assertIn("p%40ssword", token_secrets)
+        self.assertIn("p@ssword", token_secrets)
+        self.assertNotIn(" @ ", token_secrets)
+        self.assertNotIn("foo@bar.local", token_secrets)
+        self.assertEqual(setup.sensitive_proxy_values({"HTTPS_PROXY": "http://127.0.0.1:7890"}), ())
 
     def test_probe_catalog_real_check_and_real_error_mapping(self):
         help_text = "\n".join(
@@ -397,6 +457,7 @@ class AntigravityRoleHostTests(unittest.TestCase):
             workspace_project="p",
             workspace_member=context["member_id"],
             workspace_data_root=self.root / "data",
+            runtime_log_dir=Path(context["logs"]),
             antigravity_executable=str(self.exe),
         )
 
@@ -598,10 +659,49 @@ class AntigravityRoleHostTests(unittest.TestCase):
         context = self.workspace_context()
         manager = self.workspace_manager(context)
         role_home = Path(context["home"])
-        environment = manager.child_environment("p", "agent:agy-neon")
+        clean_proxy_base = {
+            k: v for k, v in os.environ.items() if k.upper() not in set(setup.CANONICAL_PROXY_ENV_VARS)
+        }
+        with patch.dict(
+            os.environ,
+            {
+                **clean_proxy_base,
+                "ALL_PROXY": "socks5://proxyuser:proxys3cr3t@127.0.0.1:7897",
+                "NO_PROXY": "corp.local",
+            },
+            clear=True,
+        ):
+            environment = manager.child_environment("p", "agent:agy-neon")
+            sensitive = manager._host_sensitive_values()
+            diag = manager._launch_diagnostics(
+                project_id="p",
+                member_id="agent:agy-neon",
+                launch_id="launch-proxy-redact",
+                instance_id="ins_1",
+                runtime="antigravity",
+            )
+            diag.record_event(
+                "proxy_probe",
+                extra={
+                    "detail": "Proxy socks5://proxyuser:proxys3cr3t@127.0.0.1:7897 rejected proxys3cr3t",
+                },
+            )
         for variable in rsh.NATIVE_HOME_ENV_VARS:
             self.assertEqual(Path(environment[variable]), role_home)
         self.assertEqual(Path(environment["ANTIGRAVITY_HOME"]), role_home)
+        self.assertEqual(environment["ALL_PROXY"], "socks5://proxyuser:proxys3cr3t@127.0.0.1:7897")
+        if os.name == "nt":
+            for lower_key in ("http_proxy", "https_proxy", "all_proxy", "no_proxy"):
+                self.assertNotIn(lower_key, environment)
+        no_proxy_tokens = {item.strip().lower() for item in environment["NO_PROXY"].split(",")}
+        self.assertTrue({"corp.local", "127.0.0.1", "localhost", "::1"}.issubset(no_proxy_tokens))
+        self.assertIn("socks5://proxyuser:proxys3cr3t@127.0.0.1:7897", sensitive)
+        self.assertIn("proxys3cr3t", sensitive)
+        log_files = list(Path(context["logs"]).rglob("events-*.jsonl"))
+        self.assertTrue(log_files)
+        log_text = "\n".join(p.read_text(encoding="utf-8") for p in log_files)
+        self.assertNotIn("proxys3cr3t", log_text)
+        self.assertIn("REDACTED", log_text)
         self.assertEqual(manager.private, Path(context["state"]["manager"]))
         self.assertEqual(manager.private.parts[-3:], ("state", "manager", "antigravity"))
         manager.publish_health()

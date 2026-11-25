@@ -38,6 +38,22 @@ RUNTIME = "antigravity"
 RUNNER_DISPLAY_NAME = "Antigravity CLI"
 PROVIDER_ID = "google-antigravity"
 CONNECTION_REF = "native-antigravity-login"
+CANONICAL_PROXY_ENV_VARS: tuple[str, ...] = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+)
+PROXY_ENV_VARS: tuple[str, ...] = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+)
 
 
 def _canonical_capabilities(efforts: Sequence[str], default_effort: str) -> list[str]:
@@ -120,10 +136,115 @@ def executable(config: Mapping[str, Any]) -> str:
     return validate_executable_path(value, must_exist=True)
 
 
+def _clean_proxy_value(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if not stripped or any(ch in stripped for ch in ("\r", "\n", "\x00")):
+        return None
+    return stripped
+
+
+def _merge_no_proxy_tokens(*raw_values: str) -> str:
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_values:
+        for item in raw.split(","):
+            token = item.strip()
+            if not token:
+                continue
+            low = token.lower()
+            if low not in seen:
+                tokens.append(token)
+                seen.add(low)
+    if "*" in seen:
+        return "*"
+    for host_token in ("127.0.0.1", "localhost", "::1"):
+        if host_token not in seen:
+            tokens.append(host_token)
+            seen.add(host_token)
+    return ",".join(tokens)
+
+
+def apply_proxy_env(env: dict[str, str], source: Mapping[str, str] | None = None) -> dict[str, str]:
+    """透传系统代理变量供 ``agy`` 访问模型服务，同时保证本机回环地址直连 TALK API。
+
+    - Windows 下 ``os.environ`` 大小写不敏感：读取 ``os.environ`` 时仅写入规范大写键
+      并清除重复小写别名，避免向 Win32 子进程环境块写入重复键；
+    - 合并已有 ``NO_PROXY`` / ``no_proxy`` 条目，避免新写 ``NO_PROXY`` 遮蔽用户的 ``no_proxy``；
+    - 保留 ``NO_PROXY="*"`` 通配语义，避免破坏 Python ``urllib`` 的通配绕过判定。
+    """
+    src = os.environ if source is None else source
+    windows_case_insensitive = os.name == "nt" and src is os.environ
+    keys_to_read = CANONICAL_PROXY_ENV_VARS if windows_case_insensitive else PROXY_ENV_VARS
+    has_proxy = False
+    for name in keys_to_read:
+        cleaned = _clean_proxy_value(src.get(name))
+        if cleaned is not None:
+            env[name] = cleaned
+            if name.lower() != "no_proxy":
+                has_proxy = True
+    if windows_case_insensitive:
+        for lower_name in ("http_proxy", "https_proxy", "all_proxy"):
+            env.pop(lower_name, None)
+    if not has_proxy:
+        return env
+    if windows_case_insensitive:
+        pre_lower = env.pop("no_proxy", "")
+        env["NO_PROXY"] = _merge_no_proxy_tokens(env.get("NO_PROXY", ""), pre_lower)
+    else:
+        merged = _merge_no_proxy_tokens(env.get("NO_PROXY", ""), env.get("no_proxy", ""))
+        env["NO_PROXY"] = merged
+        if "no_proxy" in env:
+            env["no_proxy"] = merged
+    return env
+
+
+def sensitive_proxy_values(source: Mapping[str, str] | None = None) -> tuple[str, ...]:
+    """返回含凭据的代理 URL 及解析出的 userinfo/密码，供宿主诊断日志自动脱敏。"""
+    from urllib.parse import unquote, urlsplit
+
+    src = os.environ if source is None else source
+    keys = CANONICAL_PROXY_ENV_VARS if (os.name == "nt" and src is os.environ) else PROXY_ENV_VARS
+    values: list[str] = []
+
+    def add(item: str | None) -> None:
+        if isinstance(item, str) and item and item not in values:
+            values.append(item)
+
+    for name in keys:
+        if name.lower() == "no_proxy":
+            continue
+        raw = src.get(name)
+        if not isinstance(raw, str):
+            continue
+        stripped = raw.strip()
+        if not stripped or "@" not in stripped:
+            continue
+        try:
+            parsed = urlsplit(stripped if "://" in stripped else f"http://{stripped}")
+        except ValueError:
+            continue
+        userinfo, sep, hostport = parsed.netloc.rpartition("@")
+        if not sep or not userinfo or not hostport:
+            continue
+        add(stripped)
+        if raw != stripped:
+            add(raw)
+        add(userinfo)
+        add(unquote(userinfo))
+        if ":" in userinfo:
+            raw_pass = userinfo.split(":", 1)[1]
+            add(raw_pass)
+            add(unquote(raw_pass))
+    return tuple(values)
+
+
 def environment(home: Path | str) -> dict[str, str]:
-    """构造仅含系统必要白名单 + 角色私有隔离根的子进程环境。"""
+    """构造仅含系统必要白名单 + 代理透传 + 角色私有隔离根的子进程环境。"""
     resolved = Path(home).resolve()
     env = {name: value for name in host.CHILD_ENV_ALLOWLIST if (value := os.environ.get(name))}
+    apply_proxy_env(env)
     env.update({name: str(resolved) for name in host.NATIVE_HOME_ENV_VARS})
     env["ANTIGRAVITY_HOME"] = str(resolved)
     return env

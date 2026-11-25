@@ -1,5 +1,24 @@
 # 开发历史 · TALK
 
+## 2026-11-25 22:08 — Antigravity 适配切片 D：隔离实机端到端验收、代理透传修复与文档更新
+
+- 起因：用户确认开工 Antigravity 适配切片 D（在独立沙箱内跑通 Neon / Carbon / Hydrogen 全生命周期真实端到端验收，修复实机问题，并同步更新 `README.md` 与 `docs/guides/USER_MANUAL.md`）。
+- 隔离实机端到端验收（`D:\agent-sandbox\slice-d-e2e-a6a1bedf`，临时端口 `65310`，真实 `portable_bootstrap --apply` + `talk_runtime serve --apply` + `talk_api` + `RoleProvisionWorker` + `AntigravityRoleHost` + `bridges.antigravity_bridge` + 本机真实 `agy 1.5.17`，全程 `ok=true` 退出码 `0`）：
+  - 自动探测 `%LOCALAPPDATA%\agy\bin\agy.exe`，种子登记 5 运行器 / 13 模型；`/` 与 `/loading` 返回 HTTP `200` 并加载 `workspace.js?v=20261124-antigravity-host`；`/api/runners/versions?refresh=true` 实测 `antigravity 1.5.17` 返回 `status: "newer"`（高版本放行带告警，不阻断）；
+  - 经 `POST /role-requests` 创建并自动配置 `E2E Neon` / `E2E Carbon` / `E2E Hydrogen` 3 角色；核实默认思考强度 `high`，Carbon 严格仅 `["low","medium","high"]`（`xhigh` 返回 `422 effort_not_supported`、`medium` 返回 `200`），Neon 接受 `xhigh`（`200`），Hydrogen 接受 `low`（`200`）；
+  - 启动 Hydrogen Low 受管服务达到 `observed="running"` / `readiness_service="ready"`；派发 1 条最小只读任务（`1-Slice D Antigravity Hydrogen Low 连通性探针`），真实 `agy 1.5.17` 在 100% 隔离的 `NATIVE_HOME_ENV_VARS` + `ANTIGRAVITY_HOME` 中经 `stream-json` 完成执行并提交合法 `talk-delivery-1` JSON（`submitted`），经 `POST /api/tasks/1/collect-result` 正常收取（`completed`）；
+  - 运行中动态切换 Hydrogen 强度 `low -> medium`（`200`）；停止服务（`stopped`）；删除 Carbon 角色（`POST /roles/{member}/delete`，Neon 与 Hydrogen 完好保留）；`talk_runtime stop --wait` 正常退出（`stop_status="stopped"`、`phase="complete"`）。全部临时沙箱目录已移入隔离区 `D:\agent-trash\20261125-slice-d-e2e`。
+- 实机发现并修复的真实缺陷（代理透传与诊断脱敏）：
+  - 现场问题：`HostManager.child_environment()` 默认剥离宿主系统代理变量（`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`），在需要系统代理访问 Google 服务的机器上导致 `agy` OAuth 令牌刷新超时并回退打印交互登录提示。
+  - 修复交付：
+    - `scripts/antigravity_role_setup.py`：新增 `CANONICAL_PROXY_ENV_VARS`、`_clean_proxy_value`（去外层空白并拒绝 `\r`/`\n`/`\x00`）、`_merge_no_proxy_tokens`（合并 `NO_PROXY`/`no_proxy` 并集后再补齐 `127.0.0.1,localhost,::1`，且原样保留精确 `"*"` 通配符兼容 Python `urllib`）、`apply_proxy_env`（Windows 下读 `os.environ` 仅输出规范大写键并清除小写重复键避免 Win32 重复环境变量；POSIX/显式大小写敏感字典同步合并）与 `sensitive_proxy_values`（`urlsplit` + `unquote` 提取代理 URL、`userinfo` 与明文/解码密码并跳过退化值）；
+    - `scripts/antigravity_role_host.py`：`child_environment()` 透传代理并保持 `NATIVE_HOME_ENV_VARS` + `ANTIGRAVITY_HOME` 完整隔离；`_host_sensitive_values()` 纳入代理凭据值，由 `_launch_diagnostics()` 与 `_manager_diagnostics()` 自动脱敏；
+    - `tests/test_antigravity_role_host.py`：新增代理隔离、`clear=True` 防宿主环境串味、Windows 无大小写重复键、仅小写 `no_proxy` 合并、`NO_PROXY="*"` 配合 `urllib.request.proxy_bypass_environment`、控制字符拒绝、9 类凭据提取边界及隔离 `runtime_log_dir` 下 `_launch_diagnostics()` JSONL 脱敏回归。
+- 文档同步：
+  - `README.md` 与 `docs/guides/USER_MANUAL.md`：补充 Antigravity CLI 完整说明（前置条件、MCP `~/.gemini/config/mcp_config.json`、`agent:antigravity-t`、`--seed-db <path> --apply`、3 模型与思考强度边界、登记名 `Antigravity CLI` 与弹窗名 `Antigravity`、Key/profile 与 `native-home`/`ANTIGRAVITY_HOME` 目录区分、代理透传与回环 `NO_PROXY`、主动调度未验证仅被动、以及明确区分已发布 `v0.1.0` 便携包不含 Antigravity CLI、当前位于仓库源码/后续版本）。
+- 独立复核：独立对抗复核子代理（`slice-d-reviewer`）首审 `CHANGES_REQUESTED`（指出 6 项 Must-Fix：`no_proxy` 被覆盖、Windows 大小写重复键、`NO_PROXY="*"` 失效、代理凭据脱敏与控制字符清洗缺口、`README.md` 需区分 `v0.1.0` 与源码、测试覆盖盲区；另附 2 项文档措辞 Minor）。集中返修后复验 `APPROVED`：独立复跑 5 套 pytest **49 passed, 18 subtests passed, 0 failed**，`README.md`（11 链接）/ `USER_MANUAL.md`（16 链接）0 断链，7 组对抗探针（含真实 Win32 `GetEnvironmentStringsW` 子进程环境块检查、`_Redactor` 脱敏及双 JSONL 日志流验证）与 `git diff --check` 全部通过。
+- 边界与未做：未读取生产 DB、真实 Key、用户凭据或 `TALK-private`；未重启/重载已有生产 TALK 服务；未重建 `v0.1.0` 便携包；切片 A–D 均仅本地提交，待用户确认后再决定是否推送 GitHub。
+
 ## 2026-11-24 23:32 — Antigravity 适配切片 C：受管角色宿主、`talk_runtime` 动态托管、恢复/删除/便携引导与工作台接入
 
 - 起因：用户确认开工 Antigravity 适配切片 C，补齐单角色受管宿主、动态托管生命周期、恢复与删除清理、便携引导种子及前端角色创建/工作台闭环（继续由当前会话编码自测 + 独立复核子代理对抗复核）。

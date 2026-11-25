@@ -26,7 +26,7 @@
 | 同模型多角色 | 同一运行器/模型可以建多个角色（如两个 K2.8 分工，或同模型分 dev / reviewer），各自独立身份、绑定、原生会话与任务队列，删一个不影响另一个 |
 | 任务交付闭环 | Task Hall：派发 → 执行 → 结构化交付 → 复核，全程留痕、结果可收取 |
 | 澄清与验收 | 澄清有额度，用尽转人工决策；任务树、Review、里程碑 Test 同处追踪 |
-| 多运行器同台 | Codex / KimiCode / DSH / WorkBuddy，角色可选模型与思考强度 |
+| 多运行器同台 | Codex / KimiCode / DSH / WorkBuddy / Antigravity CLI，角色可选模型与思考强度 |
 | 工作区隔离 | 多项目并行，切换工作区不打断正在跑的任务 |
 | 按需启动 | 只为需要运行的角色保留宿主，空闲不占资源 |
 | 开箱即用 | 解压双击、明暗主题、无地址栏窗口、「退出服务」一键停整机 |
@@ -49,7 +49,7 @@
 
 - Windows 10/11 x64（包内自带 Python 3.12，无需安装）；
 - Chrome 或 Edge（优先 Chrome 应用窗口，其次 Edge，都没有时用系统默认浏览器）；
-- 至少一个已登录的运行器：Codex CLI / KimiCode CLI / DSH / WorkBuddy。
+- 至少一个已登录的运行器：Codex CLI / KimiCode CLI / DSH / WorkBuddy，或源码/新版中的 Antigravity CLI（`agy`，已发布的 `v0.1.0` 便携包不含 Antigravity）。
 
 ## 数据、Key 与备份
 
@@ -84,7 +84,7 @@ trusted_networks = ["loopback", "private"]
 | 双击没反应 / 没有窗口 | 看 `logs/launcher/`、`data/logs/` 下的日志；确认没被杀软拦截 |
 | 8000 端口被占用 | `status.bat` 确认后停掉占用程序，或改 `config/config.toml` 的 `port` |
 | 关了窗口服务还在跑 | 设计如此，用「退出服务」或 `stop.bat` |
-| 提示未检测到运行器 | 安装 Codex / KimiCode / DSH / WorkBuddy 任一后重启 TALK |
+| 提示未检测到运行器 | 安装 Codex / KimiCode / DSH / WorkBuddy 或（源码/新版）Antigravity CLI 任一后重启 TALK |
 | 角色一直在配置中 | 对应运行器需在本机完成原生登录；角色页可看准备状态与原因 |
 
 ## 从源码运行（开发）
@@ -107,7 +107,7 @@ python -m uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
 
 ## 已知限制
 
-- 仅提供 Windows x64 分发包；未在第二台干净机器验证首次启动，未验证跨版本升级迁移；
+- 仅提供 Windows x64 分发包；未在第二台干净机器验证首次启动，未验证跨版本升级迁移；Antigravity CLI 支持当前位于仓库源码中，已发布的 `v0.1.0` 便携包暂未包含；
 - macOS / Linux 目前只有源码与 Docker 方式，桌面启动器未端到端验证；
 - 主动模式目前只在 DSH 终端验证通过，其它终端尚未验证；
 - 不写注册表、不装 Windows 服务，删文件夹即卸载。

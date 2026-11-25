@@ -347,8 +347,16 @@ class AntigravityRoleHost(rsh.HostManager):
         home = self.store.native_home_dir(project_id, member_id)
         if any(Path(env[name]).resolve() != home for name in rsh.NATIVE_HOME_ENV_VARS):
             raise rsh.HostError("antigravity_isolation_override", "角色隔离环境不得覆盖")
+        agy_setup.apply_proxy_env(env)
         env["ANTIGRAVITY_HOME"] = str(home)
         return env
+
+    def _host_sensitive_values(self):
+        values = list(super()._host_sensitive_values())
+        for secret in agy_setup.sensitive_proxy_values():
+            if secret not in values:
+                values.append(secret)
+        return tuple(values)
 
 
 def main(argv=None):
