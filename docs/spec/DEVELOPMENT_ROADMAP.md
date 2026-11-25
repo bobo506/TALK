@@ -1,5 +1,44 @@
 # TALK 后续开发安排：多终端主控与桌面工作区
 
+## 2026-11-24/25 项目全面体检与后续改进清单（待逐项确认开工）
+
+> **背景**：2026-11-24 用户对 TALK 做全面体检后决定重启演进——优先完成 **Antigravity CLI 适配（Neon / Carbon / Hydrogen）**，随后按优先级逐项落实体检中识别出的改进空间。以下改进项**仅作登记与排序参考，不构成自动开工授权**；每项启动前须先明确目的、范围、不变项与验收标准并获确认。
+
+### 0. 已完成前置项
+- **Antigravity CLI 适配（切片 A–D，已完成并推送 `origin/codex/terminal-return-codex`：`4954e36` / `34bf051` / `4b1dab0` / `e2601c9`）**：发起侧 MCP 自动接入（`~/.gemini/config/mcp_config.json`）与 `agent:antigravity-t` 身份过滤、`agy` 原生执行通道 + 3 模型/思考强度硬约束（Carbon 严格 3 档 `low/medium/high`，Neon/Hydrogen 4 档）、受管角色宿主与 `talk_runtime` 动态托管/恢复/删除/工作台引导、独立沙箱实机端到端验收（`agy 1.5.17`）、受管宿主代理透传与诊断日志脱敏修复、以及 `README.md` / `USER_MANUAL.md` 同步。当前待用户自行重启 TALK 完成页面人工验收。
+
+### 1. 安全与“本地优先”体验（最高性价比）
+1. **前端 4 个 CDN 静态库本地化（`web/vendor/`）**：`web/index.html` 当前外链 `cdn.jsdelivr.net` 的 Tailwind CSS、highlight.js、DOMPurify 与未锁定版本的 `marked`（均无 SRI 校验），纯内网/断网或 CDN 波动时样式崩坏且存在供应链风险。将上述静态资产直接 vendor 到 `web/vendor/` 随便携包分发，实现真正离线可用。
+2. **`trusted` 本机免密模式补齐 `Origin` / `Sec-Fetch-Site` 同源校验**：`server/auth.py` 与 `server/routes/local_shutdown.py` 对本机 `127.0.0.1` 免 Key 请求直接赋予 `human:operator` 权限，但缺少 `Origin` 校验，存在本机访问恶意网页触发 `/api/local/shutdown` 停服或跨站劫持 `ws://127.0.0.1:8000/ws` 的风险。新增轻量同源校验中间件（存在 `Origin` 时须匹配本机/配置源，否则 `403`）。
+3. **API Key 库内哈希存储与 HTTP MCP 进程内直调（长期安全加固）**：消除 `server/auth.py` 对 `members.api_key` 的明文存/查及 `server/routes/mcp.py` 经 loopback HTTP 转发明文 Key 的链路，逐步演进为进程内直调服务层 + 库内 Key 哈希校验。
+
+### 2. 架构与代码可维护性（结构债治理）
+4. **核心“巨石”文件按领域拆包**：当前单文件体量过大——`bridges/cli_bridge.py`（5,675 行 / 138 顶层定义）、`server/models.py`（5,410 行 / 158 类 / 41 表）、`scripts/role_service_host.py`（4,305 行）、`scripts/role_provision.py`（3,761 行）、`web/app.js`（3,512 行）、`server/routes/tasks.py`（3,487 行）、`server/routes/projects.py`（3,384 行）、`web/workspace.js`（2,962 行）。建议后端按领域拆子包（如 `server/models/{tasks,roles,workspace,chat}.py`），前端采用原生 ES Modules 拆分（不引入前端构建工具）。
+5. **数据库版本化迁移**：将 `server/db.py` 约 833 行手写 `init_db()`（每次启动重复跑大量 `PRAGMA table_info` / `ALTER TABLE` / 历史 `UPDATE` 回填 / 60+ 索引）改为基于 SQLite `PRAGMA user_version` 的轻量版本化一次性迁移，加快冷启动并保障跨版本升级可控。
+6. **并发与同步阻塞隐患根治**：彻底将请求内同步探测运行器能力（最长 60s）移出 DB Session 改为后台定时刷新缓存（告别 `server/db.py` 临时扩容 `30 + 30` 连接池的应急做法），并显式配置 SQLite `PRAGMA busy_timeout`，消除高并发写入时的 `database is locked`。
+7. **已下线/取消功能的代码包袱清理**：对已停用或取消的独立群聊 UI、会议、连接内主动跟进（`talk_follow_tasks` / `controlled_wait`）、定时任务表（`agent_task_schedules`）及 `web/index.html` 旧 DOM 统一做废弃标记或安全剥离。
+
+### 3. 工程基建、Git 卫生与构建一致性
+8. **Git 默认分支对齐与本地临时项清理**：将活跃分支 `codex/terminal-return-codex` 合并/对齐至 `main`（当前 `main` 远远落后于 `v0.1.0` 与 Antigravity 适配，访客克隆默认分支拿不到最新代码）；按安全回收规则清理/归档本地残留的 30+ 个旧 worktree 分支及根目录遗留未跟踪临时项。
+9. **补齐轻量 GitHub Actions CI 与 Linter**：新增 `.github/workflows/`、`pyproject.toml` / `ruff.toml`，自动运行核心 `pytest` 与 `ruff check`，把现有 235 个测试文件 / 10.6 万行测试资产转化为自动防回归防线。
+10. **构建链与部署方式对齐**：`scripts/build_portable.py` 升级 embeddable Python 版本（当前钉在较老的 `3.12.1`）并补齐下载 zip 的 SHA-256 校验；新增 `requirements.lock` 锁定精确依赖版本避免便携包漂移；更新 `Dockerfile`（从 Python 3.11 升至 3.12+ 并补齐 `talk_runtime` 协同启动，与便携版体验对齐）。
+
+### 4. 文档瘦身与对外门面细节
+11. **核心入口文档瘦身归档**：`docs/` 下已有 222 份文档，其中 `docs/PROJECT_BRIEF.md`（840 行 / 162 KB）与本文件（648 行 / 142 KB）被历史流水账占满；将旧流水账归档至 `docs/archive/`，两份入口压回约 100 行内以提升人机检索效率。
+12. **更新 `README.md` 两张滞后截图**：替换 `docs/mockups/live/live_main_daylight.png`（旧图中“退出服务”仍在右下角，实际已迁至右上角 header）与 `docs/mockups/live/live_roles_daylight.png`（旧图仍露出已被过滤隐藏的 `Codex 终端 / DSH 终端 / KimiCode 终端`）。
+
+### 5. `v0.2+` 高价值功能延伸
+13. **干净机器首启 + 便携包跨版本无痛升级脚本**：支持解压新版便携包后一键保留 `data/` 和 `config/` 升级，并在第二台全新 Windows 上做真实首启实测（可同步产出包含 Antigravity CLI 的新版便携包）。
+14. **主动模式跨终端泛化**：将 0-token 后台程序轮询 + 完成通知从 DSH 扩展到系统托盘通知或通用客户端 Hook，使 Codex / KimiCode / Antigravity 等终端也能用上主动模式。
+15. **协作效率看板**：基于已有的任务耗时、返工关系链与 90% 换窗记录，增加轻量统计视图（单切片耗时、首轮复核通过率、换窗频次）。
+
+### 推荐优先落地的 3 项高性价比批次
+1. **分支对齐 + 门面更新**：合并最新分支到 `main` + 替换 `README.md` 两张滞后截图（#8 + #12）；
+2. **离线安全双补齐**：前端 4 个 CDN 库本地化至 `web/vendor/` + `trusted` 模式 `Origin` 同源校验中间件（#1 + #2）；
+3. **自动防回归基建**：轻量 GitHub Actions CI（核心 `pytest` + `ruff`）+ `requirements.lock` + `build_portable.py` SHA-256 校验（#9 + #10）。
+
+---
+
 > **2026-11-15 20:00 用户提出“开箱即用 / 一体化启动”方向（待确认，未开工）**：目标是拿到便携包即可使用；启动 TALK 时自动检测并接入本机已安装的运行器（Codex / KimiCode / WorkBuddy / DSH），自动生成成员与 MCP 配置（已存在则跳过），没有运行器时给出提示；GUI 增加加载页与进度条。按下面顺序推进，每项开工前仍先确认目的/范围/不变项/验收：
 >
 > 1. 恢复 `~/.talk/keys`（从 `talk.db` 读取，不回显密钥）；验证 codex/kimi/dsh 角色宿主可正常重启。

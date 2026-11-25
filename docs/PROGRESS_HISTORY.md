@@ -1,5 +1,22 @@
 # 开发历史 · TALK
 
+## 2026-11-25 22:50 — 推送 Antigravity 切片 A–D 至 GitHub 并汇总后续改进路线图
+
+- 起因：用户确认先将 Antigravity 切片 A–D（4 个本地提交）推送到 GitHub，由用户自行重启 TALK 做页面人工验收，并按 `project-framework` 执行汇总进度、把 2026-11-24 项目全面体检提出的全部可改进点正式沉淀到项目文档。
+- 启动角色：Antigravity 会话（协调 / 编码自测，搭配独立只读对抗复核子代理；本轮为推送收尾与进度/路线图文档沉淀，未改产品代码、未启停生产服务）。
+- 完成事项：
+  - **GitHub 推送**：完成推送 `3fe93e0..e2601c9  codex/terminal-return-codex -> codex/terminal-return-codex`（包含切片 A `4954e36`、切片 B `34bf051`、切片 C `4b1dab0`、切片 D `e2601c9`）；推送前对完整 diff（340,824 B）做了密钥/私钥正则扫描（0 命中）。
+  - **全面体检改进清单沉淀**：在 `docs/spec/DEVELOPMENT_ROADMAP.md` 顶部新增「2026-11-24/25 项目全面体检与后续改进清单」，完整登记 5 大类 / 15 项待逐项确认的改进项与 3 项推荐优先落地的高性价比批次：
+    1. 安全与“本地优先”体验：前端 4 个 CDN 静态库本地化（`web/vendor/`）、`trusted` 模式 `Origin` / `Sec-Fetch-Site` 同源校验中间件、API Key 库内哈希与 HTTP MCP 进程内直调；
+    2. 架构与可维护性：8 个核心“巨石”文件按领域拆包、`server/db.py` 833 行 `init_db()` 改为 `PRAGMA user_version` 版本化迁移、运行器能力探测移出 DB Session + `PRAGMA busy_timeout`、已下线/取消功能包袱清理；
+    3. 工程基建、Git 卫生与构建一致性：`main` 分支对齐与本地旧 worktree/临时项清理、轻量 GitHub Actions CI + `ruff`、`build_portable.py` 升级 Python/SHA-256 校验 + `requirements.lock` + `Dockerfile` 对齐；
+    4. 文档瘦身与门面细节：`PROJECT_BRIEF.md` / `DEVELOPMENT_ROADMAP.md` 历史归档瘦身、替换 `README.md` 两张滞后亮色截图；
+    5. `v0.2+` 功能延伸：干净机器首启 + 便携包跨版本无痛升级脚本、主动模式跨终端泛化、协作效率看板。
+  - **进度快照更新**：同步更新 `docs/PROGRESS.md` 为短小当前快照，记录本轮启动角色、GitHub 推送结果、人工验收门禁与下一步改进清单索引。
+- 修改文件：`docs/spec/DEVELOPMENT_ROADMAP.md`、`docs/PROGRESS_HISTORY.md`、`docs/PROGRESS.md`。
+- 验证：推送前 diff 密钥扫描 0 命中；`git push origin codex/terminal-return-codex` 退出码 `0`（`3fe93e0..e2601c9`）；文档修改后执行 `git diff --check` 与相对链接检查通过。
+- 未验证 / 边界：未重启用户生产 TALK 服务（由用户自行重启并人工验收 Antigravity 3 模型页面流程）；未读取生产 DB/Key/凭据；上述 15 项改进清单均未开工，待用户逐项确认目的、范围、不变项与验收标准后推进。
+
 ## 2026-11-25 22:08 — Antigravity 适配切片 D：隔离实机端到端验收、代理透传修复与文档更新
 
 - 起因：用户确认开工 Antigravity 适配切片 D（在独立沙箱内跑通 Neon / Carbon / Hydrogen 全生命周期真实端到端验收，修复实机问题，并同步更新 `README.md` 与 `docs/guides/USER_MANUAL.md`）。

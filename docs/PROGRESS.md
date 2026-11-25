@@ -2,54 +2,52 @@
 
 ## Latest
 
-Updated: 2026-11-25 22:08 (+08:00)
+Updated: 2026-11-25 22:50 (+08:00)
+Role: Antigravity 会话（协调 / 编码自测，搭配独立只读对抗复核子代理；按用户本轮显式授权执行）
 
-**当前结论**：**Antigravity 适配 4 片（A–D）已全部完成并独立对抗复核通过（`APPROVED`）**。切片 D 已在独立沙箱内完成 Neon / Carbon / Hydrogen 全生命周期实机端到端验收（`agy 1.5.17`，`ok=true`），修复了实机发现的受管宿主系统代理透传与凭据脱敏问题，并同步更新 `README.md` 与 `docs/guides/USER_MANUAL.md`；4 片均已本地提交在 `codex/terminal-return-codex`（未推送 GitHub、未重启生产服务）。下一步待用户确认是否推送 GitHub、是否在现有生产库登记/重载 Antigravity，以及下一项改进切片。
+**当前结论**：**Antigravity 适配 4 片（A–D：`4954e36` / `34bf051` / `4b1dab0` / `e2601c9`）已全部完成、独立对抗复核 `APPROVED` 并推送至 GitHub `origin/codex/terminal-return-codex`**（`3fe93e0..e2601c9`）。当前由用户自行重启 TALK 进入页面人工验收；同时已按 `project-framework` 将 2026-11-24 项目全面体检识别出的 **5 大类 / 15 项可改进点**及 **3 项推荐高性价比批次**完整沉淀至 `docs/spec/DEVELOPMENT_ROADMAP.md`。
 
 ### 1) Current Progress
-- **Antigravity 适配（4 片串行规划 — 全部完成）**：
-  - **切片 A（已完成，`4954e36`）**：`mcp_onboarding` 探测 Antigravity 并幂等写入 `~/.gemini/config/mcp_config.json`、`talk_desktop` / `boot_status` 白名单与前端横幅/加载页展示、`agent:antigravity-t` 终端身份过滤。
-  - **切片 B（已完成，`34bf051`）**：实机 `agy 1.5.16` 协议探测与能力/版本探测、`bridges/antigravity_{effort,execution_native,execution_channel,bridge}.py`、`bridges/cli_bridge.py` 全链路路由与 `stream-json` 正文抽取、跨任务磁盘会话证明与 90% 换窗、`/api/runners/versions` 与服务端 Carbon 3 档硬约束（Neon/Hydrogen 4 档）。
-  - **切片 C（已完成，`4b1dab0`）**：`scripts/antigravity_role_setup.py` / `scripts/antigravity_role_host.py`（`legacy` + `workspace-v1`）、全链路接入 `talk_runtime` / `role_service_host` / `role_host_resolution` / `role_service_recovery` / `role_delete` / `portable_bootstrap` / `workspace_paths`、服务端 `resolve_role_effort` 对未支持模型 409 与 Carbon 3 档硬夹紧及建角/重绑默认强度初始化、前端运行器引导弹窗接入。
-  - **切片 D（已完成并独立复核通过）**：隔离沙箱实机端到端验收（`agy 1.5.17` 建 3 角色、思考强度校验/动态切换、启动服务、真实任务交付与收取、停服删角与 runtime 停机全绿）、修复受管宿主代理透传（含 Windows 去重、`no_proxy` 并集、`NO_PROXY="*"` 保留、回环保护、控制字符拦截与诊断日志脱敏）并更新 `README.md` / `docs/guides/USER_MANUAL.md`。
-- 历史 `v0.1.0` 发布与收尾状态（2026-11-18）：保持不变（详见 `docs/PROGRESS_HISTORY.md`）。
+- **Antigravity 适配（4 片串行规划 — 全部完成并已推送）**：
+  - **切片 A（`4954e36`）**：`mcp_onboarding` 探测 Antigravity 并幂等写入 `~/.gemini/config/mcp_config.json`、`talk_desktop` / `boot_status` 白名单与前端横幅/加载页展示、`agent:antigravity-t` 终端身份过滤。
+  - **切片 B（`34bf051`）**：实机 `agy 1.5.16` 协议/能力/版本探测、`bridges/antigravity_{effort,execution_native,execution_channel,bridge}.py`、`bridges/cli_bridge.py` 路由与 `stream-json` 正文抽取、磁盘会话证明与 90% 换窗、`/api/runners/versions` 与 Carbon 3 档硬约束（Neon/Hydrogen 4 档）。
+  - **切片 C（`4b1dab0`）**：`scripts/antigravity_role_setup.py` / `scripts/antigravity_role_host.py`（`legacy` + `workspace-v1`）、全链路接入 `talk_runtime` / `role_service_host` / `role_host_resolution` / `role_service_recovery` / `role_delete` / `portable_bootstrap` / `workspace_paths`、服务端默认强度初始化与 Carbon 强夹紧、工作台运行器引导弹窗。
+  - **切片 D（`e2601c9`）**：独立沙箱实机端到端验收（`agy 1.5.17`，10 步全绿）、修复受管宿主系统代理透传与诊断日志脱敏、同步更新 `README.md` 与 `docs/guides/USER_MANUAL.md`。
+- **后续改进清单沉淀**：2026-11-24 项目体检的 5 大类 / 15 项可改进点已完整登记至 `docs/spec/DEVELOPMENT_ROADMAP.md` 顶部（仅登记，未开工）。
+- **历史 `v0.1.0` 发布状态（2026-11-18）**：保持不变（https://github.com/bobo506/TALK/releases/tag/v0.1.0 ，详见 `docs/PROGRESS_HISTORY.md`）。
 
 ### 2) Open Questions / Pending Confirmation
-- 无阻塞项。`v0.1.0` 已发布：https://github.com/bobo506/TALK/releases/tag/v0.1.0
-- **已决定不处理（2026-11-18 用户）**：以下四项均不影响下载包的使用与后续维护升级，不再跟进——
-  1. `build_portable.py` 未扫描主机名/内网 IP/`C:\Users\<user>`（`docs/` 已整体排除，包内已无此类内容）；
-  2. 包内 4 处代码默认值（`kimi_k28_executor.py:70` 的 `D:/claude-test/TALK`、`talk_desktop.py:90` 的 `../TALK-private`、`codex_role_host.py:41` 的 `C:/Users/Administrator`、`agent_poller.py:18` 示例 IP）——属仓库源码固有内容，改会与源码不一致；
-  3. tag `v0.1.0` 指向 `82776cc`（构建脚本与文档修复前）：只影响“从该 tag 重新构建”，不影响下载资产，维护构建一律用 `main`/当前分支；
-  4. 公开仓库当前树里仍可读到机器名（5 个文件）、内网 IP（12 个文件）、`C:\Users\...`（25 个文件）、`D:\claude-test`（54 个文件），历史中另有 598 个演示数据库——均为文档/开发记录，下载包不含；用户确认不影响使用，不清理（不清 docs、不重写历史）。
-- 已知遗留：`scripts/talk_desktop.py` 历史 mojibake（未修，避免扩大）；本机部分测试受 key 继承 ACL 影响（基线同样复现）。
-- 杂项：仓库根误落未跟踪 `Microsoft\Windows\PowerShell\ModuleAnalysisCache`（PowerShell 分析缓存），未清理。
+- **人工验收门禁**：待用户自行重启 TALK 完成 Antigravity 实机页面验收（如复用已有 `talk.db`，需先执行 `python -B -X utf8 -m scripts.antigravity_role_setup --seed-db <talk.db> --apply`）。
+- **后续改进项授权**：`docs/spec/DEVELOPMENT_ROADMAP.md` 中 15 项改进均未获开工授权，每次仅确认并串行推进 1 个依赖闭环。
+- **历史已决定不处理项（2026-11-18 用户确认）**：`v0.1.0` 便携包构建扫描项、4 处源码默认值、`v0.1.0` tag 指向、公开仓库历史文档环境信息均不再处理（详见 `docs/PROGRESS_HISTORY.md`）。
+- **已知遗留与保留项**：`scripts/talk_desktop.py` 历史 mojibake（未修）；本机部分测试受 key 继承 ACL 影响；仓库根 5 个既有未跟踪目录（`.codex/`、`.kimi-code/`、`.talk/agents/agent_workbuddy/`、`.workbuddy/`、`Microsoft/`）保持不动。
 
 ### 3) Next Plan
-1. 待用户确认是否将 Antigravity 切片 A–D 本地提交推送至 GitHub（`codex/terminal-return-codex`）。
-2. 待用户确认是否在其现有生产环境登记 `runner:antigravity-local`（`python -B -X utf8 -m scripts.antigravity_role_setup --seed-db <talk.db> --apply`）并重载服务，或由用户按需自行执行。
-3. 待用户确认下一个要推进的项目改进项（如前端 CDN 本地化 + Origin/CORS 校验、合并 `main` + 更新 README 截图、CI 等）的范围、不变项与验收标准后开工。
+1. 等待用户自行重启 TALK 完成 Antigravity 3 模型（Neon / Carbon / Hydrogen）页面人工验收。
+2. 从 `docs/spec/DEVELOPMENT_ROADMAP.md`「2026-11-24/25 项目全面体检与后续改进清单」中择项确认目的、范围、不变项与验收标准后串行推进：
+   - **推荐首推 3 项高性价比批次**：
+     1. **分支对齐 + 门面更新**：合并 `codex/terminal-return-codex` 至 `main` + 替换 `README.md` 两张滞后亮色截图（#8 + #12）；
+     2. **离线与本机安全双补齐**：前端 4 个 CDN 库（Tailwind / highlight.js / DOMPurify / marked）本地化至 `web/vendor/` + `trusted` 本机免密模式补 `Origin` / `Sec-Fetch-Site` 同源校验中间件（#1 + #2）；
+     3. **自动防回归基建**：轻量 GitHub Actions CI（核心 `pytest` + `ruff`）+ `requirements.lock` + `build_portable.py` 升级 Python / SHA-256 校验（#9 + #10）。
+   - **其余已登记改进项（#3–#7、#11、#13–#15）**：
+     - 安全深化：API Key 库内哈希化 + HTTP MCP 进程内直调（#3）；
+     - 架构与数据库治理：8 个核心“巨石”文件按领域拆包（#4）、`server/db.py` `PRAGMA user_version` 版本化迁移（#5）、运行器能力探测移出 DB Session + SQLite `PRAGMA busy_timeout`（#6）、已下线群聊/会议/主动跟进/定时任务包袱清理（#7）；
+     - 部署与文档整理：`Dockerfile` 升 3.12+ 并对齐 `talk_runtime`（#10）、`PROJECT_BRIEF.md` 与 `DEVELOPMENT_ROADMAP.md` 历史归档瘦身（#11）；
+     - `v0.2+` 功能延伸：干净机器首启 + 便携包跨版本无痛升级脚本（#13）、主动模式跨终端泛化（#14）、协作效率看板（#15）。
 
 ### 4) Verification
-- **Antigravity 切片 D（2026-11-25）**：独立沙箱实机端到端验收（`D:\agent-sandbox\slice-d-e2e-a6a1bedf`，端口 `65310`，本机真实 `agy 1.5.17`）10 步全绿（`ok=true` 退出码 `0`：自动探测/种子 5 运行器 13 模型、`/` 与 `/loading` 200、`/api/runners/versions` `1.5.17 newer`、建 Neon/Carbon/Hydrogen 3 角色、Carbon 拒 `xhigh` 422 / Neon `xhigh` 200 / Hydrogen `low` 200、启服 `ready`、真实任务提交合法 `talk-delivery-1` JSON 并 `collect-result` 收取完成、运行中动态切换 `low -> medium`、停服删 Carbon、`talk_runtime stop --wait` 正常退出）；独立对抗复核子代理（`slice-d-reviewer`）首审 6 项 Must-Fix + 2 项文档 Minor 集中返修后复验 `APPROVED`：5 套 pytest **49 passed, 18 subtests passed, 0 failed**、`README.md`（11 链接）与 `USER_MANUAL.md`（16 链接）0 断链、7 组对抗探针（含 Win32 `GetEnvironmentStringsW` 无重复键、`_Redactor` 与双 JSONL 脱敏）及 `git diff --check` 全部通过。未验证：生产服务重载、真实浏览器人工点击、重建 `v0.1.0` 便携包。
-- **Antigravity 切片 C（2026-11-24，`4b1dab0`）**：只读验证隔离 `HOME`/`USERPROFILE`/`APPDATA`/`LOCALAPPDATA`/`XDG_*` 下 `agy models` 正常返回 11 个目标模型档位；独立对抗复核子代理定向复验 `APPROVED`：13 套 pytest **189 passed, 147 subtests passed, 0 failed** + `test_role_host_runtime_configuration.py -k test_real_recipe_table_and_alias_flags_unchanged` **1 passed** + Node UI 3 套件（`workspace_runner_onboarding_ui` / `workspace_role_creation` / `workspace_role_catalog`）**89 pass, 0 fail** + `node --check` + 全部对抗探针及 `git diff --check` 通过。
-- **Antigravity 切片 B（2026-11-24，`34bf051`）**：授权 1 次最小 `gemini-4-hydrogen-low` `stream-json` 探针 + 本机 `agy 1.5.16` 只读能力/模型实测；独立对抗复核子代理定向复验 `APPROVED`：切片 B 4 套测试 **33 passed, 12 subtests** + 16 套关联回归 **572 passed, 260 subtests**（0 失败），全部 9 组对抗探针及 `git diff --check` 通过。
-- **Antigravity 切片 A（2026-11-24，`4954e36`）**：自测与独立复核子代理定向复验（`APPROVED`）一致通过：`pytest -v tests/test_mcp_onboarding.py tests/test_boot_status.py tests/test_talk_desktop.py tests/test_terminal_identity_filter.py tests/test_build_portable.py` **89 passed, 5 subtests passed, 0 failed**；`node --check web/workspace.js web/app.js` 通过；4 组对抗探针（HTTP 无 key 跳过、`boot-status` 联调、13 种畸形 URL fail-closed、合法 HTTP 保留）全部通过；`git diff --check` 零空白错误。
-- 已通过（历史）：换肤 `pytest tests/test_talk_desktop.py`/`test_boot_status.py`；图标 25+3；ACL 41+9；Codex 版本 59+26；终端过滤 26+3；整机退出/托盘 53 项（K2.8 #861）；#862 30 passed + 5 subtests（K2.8 #865 approved）。
-- 构建改动：`pytest tests/test_build_portable.py` **8 passed**（`40b5ebf`、本轮 README 修正后复跑仍 8 passed）。
-- 本轮冒烟（11-18）：四版包各跑一次——解压 → `portable_bootstrap --apply` 生成 config/runtime/data/`data/keys/operator.key`/默认项目/管理员 → 临时端口 `/`、`/loading`、`/healthz`、`/manifest.webmanifest`、`/icons/favicon.ico`、`/api/projects` 全 200。
-- 文档纠偏核对（11-18）：逐条对照代码确认——Key 默认 `data/keys`（`portable_paths.py:20`）、关窗不停服务（`talk_desktop.py:309`）、退出服务按钮在 header（`web/index.html:112`）、浏览器 Chrome→Edge→默认（`talk_desktop.py` `find_browser`）；6 份文档重写/修正、无断链。
-- 包内容审查（11-18）：1476 → 1257 → 1254 → **1254（README 修正版）**；首版 58 个 docs 含机器名/内网 IP/本机路径（无密钥、无 DB、无 config.toml）；最终包重扫只剩 4 处代码默认值（见 §2），令牌/私钥 0 命中。
-- 人工验收：用户确认通过（自动启动 / 整机退出 / 托盘消失）。
-- 产品页核对（11-18）：README 无断链/缺图（3 张截图均已在仓库）；主动模式按用户要求只写"当前仅 DSH 验证通过"；同模型多角色依据 `USER_MANUAL:347` 与 `EXECUTION_SESSION_KIMI_ADAPTATION` 的双 K2.8 实例；群聊章节与 UI 核对一致（`web/index.html` 仅"任务 / 角色"两个标签）。
-- Release（11-18）：`isDraft=false`、`isPrerelease=false`；`targetCommitish=82776cc…`；最终资产 `size=19621867`、`state=uploaded`、`digest=sha256:56f488ce…d9f1` 与本地一致；下载 HTTP 200 / `content-length` 相同。
+- **本次推送与进度汇总（2026-11-25 22:50）**：推送前对 `origin/codex/terminal-return-codex..HEAD`（340,824 B）执行密钥正则扫描（0 命中）；`git push origin codex/terminal-return-codex` 退出码 `0`（`3fe93e0..e2601c9`）；本次文档修改通过 `git diff --check` 与相对链接校验。
+- **Antigravity 切片 A–D 独立复核（全部 `APPROVED`）**：
+  - 切片 D（`e2601c9`）：独立沙箱实机 `agy 1.5.17` 10 步 E2E 全绿 + 5 套 pytest **49 passed / 18 subtests** + `README.md`/`USER_MANUAL.md` 0 断链 + 7 组对抗探针；
+  - 切片 C（`4b1dab0`）：13 套 pytest **189 passed / 147 subtests** + `test_real_recipe_table_and_alias_flags_unchanged` 1 passed + Node UI **89 pass**；
+  - 切片 B（`34bf051`）：切片 B 4 套 **33 passed / 12 subtests** + 16 套回归 **572 passed / 260 subtests** + 9 组对抗探针；
+  - 切片 A（`4954e36`）：5 套 **89 passed / 5 subtests** + `node --check` + 4 组对抗探针。
+- **未验证**：生产服务重启加载、真实桌面浏览器页面点击人工验收、含 Antigravity CLI 的新版便携包构建与跨机首启。
 
 ### 5) Changed Files
-- 本轮（2026-11-25 Antigravity 切片 D）：`scripts/antigravity_role_setup.py`、`scripts/antigravity_role_host.py`、`tests/test_antigravity_role_host.py`、`README.md`、`docs/guides/USER_MANUAL.md`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
-- 2026-11-24 Antigravity 切片 C（`4b1dab0`）：`scripts/antigravity_role_setup.py`、`scripts/antigravity_role_host.py`、`server/workspace_paths.py`、`server/role_host_resolution.py`、`server/models.py`、`server/routes/projects.py`、`scripts/role_service_host.py`、`scripts/role_service_recovery.py`、`scripts/role_delete.py`、`scripts/talk_runtime.py`、`scripts/portable_bootstrap.py`、`web/workspace.js`、`web/index.html`、`tests/test_antigravity_role_host.py`、`tests/test_execution_timeout_defaults.py`、`tests/test_role_host_runtime_configuration.py`、`tests/test_workbuddy_portable.py`、`tests/test_portable_phase1.py`、`tests/test_workspace_paths.py`、`tests/workspace_runner_onboarding_ui.test.cjs`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
-- 2026-11-24 Antigravity 切片 B（`34bf051`）：`bridges/antigravity_effort.py`、`bridges/antigravity_execution_native.py`、`bridges/antigravity_execution_channel.py`、`bridges/antigravity_bridge.py`、`bridges/cli_bridge.py`、`server/runner_versions.py`、`server/routes/runners.py`、`server/models.py`、`server/routes/projects.py`、`server/execution_session_tasks.py`、`tests/test_antigravity_effort.py`、`tests/test_antigravity_execution_native.py`、`tests/test_antigravity_bridge.py`、`tests/test_runner_versions.py`、`docs/PROGRESS.md`、`docs/PROGRESS_HISTORY.md`。
-- 2026-11-24 Antigravity 切片 A（`4954e36`）：`scripts/mcp_onboarding.py`、`scripts/talk_desktop.py`、`server/routes/boot_status.py`、`server/routes/projects.py`、`web/workspace.js`、`web/app.js`、`web/loading.html`、`web/index.html`、`tests/test_mcp_onboarding.py`、`tests/test_boot_status.py`、`tests/test_talk_desktop.py`、`tests/test_terminal_identity_filter.py`。
-- 2026-11-18：`README.md`、`LICENSE`、`docs/guides/USER_MANUAL.md`、`docs/guides/QUICKSTART*.md`、`docs/guides/PORTABLE_*.md`、`scripts/build_portable.py`、`docs/HANDOFF_20261118.md`。
+- 本轮汇总（2026-11-25 22:50）：`docs/spec/DEVELOPMENT_ROADMAP.md`、`docs/PROGRESS_HISTORY.md`、`docs/PROGRESS.md`。
+- Antigravity 切片 A–D（已推送 `4954e36..e2601c9`）：详见 `docs/PROGRESS_HISTORY.md`。
 
 ## Recent Notes
-- 完整历史见 `docs/PROGRESS_HISTORY.md`；上下文交接见 `docs/HANDOFF_20261118.md`。
-- 恢复：新窗口说「继续项目」，先读本文件与交接快照。
+- 完整历史见 `docs/PROGRESS_HISTORY.md`；后续改进明细见 `docs/spec/DEVELOPMENT_ROADMAP.md`；上下文交接见 `docs/HANDOFF_20261118.md`。
+- 恢复：新窗口说「继续项目」，先读本文件与规则入口 `AGENTS.md`。
