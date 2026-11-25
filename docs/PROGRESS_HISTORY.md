@@ -1,5 +1,25 @@
 # 开发历史 · TALK
 
+## 2026-11-25 23:45 — 桌面启动器体验修复：Chrome 托盘自动退出与 MCP 接入告警/日志修复
+
+- 起因：用户实机启动 TALK 反馈两项问题：① 启动加载页提示“启动配置存在问题，请查看 `logs/launcher/`”；② 每次关闭 TALK 或退出服务后，右下角任务栏 Chrome 托盘图标不自动退出，再次双击 TALK 图标弹窗提示“已经在运行”。用户确认按方案 A+B 修复，并授权由当前 Antigravity 会话编码自测 + 独立只读子代理对抗复核。
+- 启动角色：Antigravity 会话（按用户本轮明确授权执行编码自测、本机补建 `agent:antigravity-t` 与收尾，搭配独立只读对抗复核子代理 `6e3908bc-ebf0-421f-a5ed-1177de1862cb`）。
+- 根因定位：
+  - 问题 1：切片 A 将 Antigravity 接入 `mcp_onboarding` 后，本机尚未建 `agent:antigravity-t` 与 `~/.talk/keys/agent_antigravity-t.key`，触发 `KeyMissingError` 记入 `errors` 导致 `boot-status.json` 置 `ready=false`；同时 `talk_desktop.py` 仅将笼统警告输出至 `stderr`（`start-gui.vbs` 无控制台直接丢失），`logs/launcher/` 下无诊断明细。
+  - 问题 2：`talk_launcher.py` 的 `prepare_browser_profile()` 仅把 `background_mode.enabled=false` 写入 `Default/Preferences` 而漏写 Chromium 真正读取的 `Local State`；本机 Chrome 158（`launcher-profile` 内同步了 14 个扩展且带 `glic` 配置）在关闭窗口后驻留托盘；“关窗不停服务”下 `/healthz` 仍健康导致健康监视永不触发，`process.wait()` 卡死阻塞 `SingleInstance` 互斥锁；服务停机时原逻辑仅按父 PID 强杀 `/T /F`，易留托盘残影与 `exit_type=Crashed` 且便携版未传 `health_url`。
+- 修复交付（6 代码/测试文件 + 本机环境补齐）：
+  - `scripts/mcp_onboarding.py`：将 `KeyMissingError`（检测到客户端但未开通 `-t` 终端身份）归类为 `skipped`（`reason="key_missing"`）而非 `errors`；空 Key 文件（`ValueError`）、非法 TOML/JSON、空/非法 HTTP `url`/`serverUrl` 与写入失败仍保持 fail-closed 记入 `errors` 并使 CLI 返回 `1`。
+  - `scripts/talk_desktop.py`：新增 `write_onboarding_log()`，按严格闭集白名单（客户端 5 项 + `ONBOARDING_ALLOWED_REASONS` 闭集，剥离路径/Key/异常正文）向 `logs/launcher/mcp-onboarding.log` 原子滚动写入最近 50 条脱敏 JSONL 诊断（含损坏 UTF-8 自恢复与写失败不阻塞启动）。
+  - `scripts/talk_launcher.py`：`prepare_browser_profile()` 改为 `.tmp` + `os.replace` 原子更新并同步写入 `Local State`（`background_mode.enabled=false`、`glic.launcher_enabled=false`），启动参数补充 `--disable-features=Glic`；新增私有 64 位安全 `_get_user32()` 与 `_list_visible_browser_windows()`（仅识别非 ToolWindow 且可见/最小化的 `Chrome_WidgetWin_1`，排除 `UAC Input Indicator` 等系统辅助窗，枚举失败返回 `None` fail-closed）；新增 Windows `monitor_browser_window()`（首次见窗后，若所有可见应用窗消失满宽限期则自动触发优雅退出；最小化态保持存活绝不误关）；新增 `_split_windows_cmdline()` + `_cmdline_matches_profile()` + UTF-8 PowerShell `_find_profile_browser_pids()`（严格精确匹配 `--user-data-dir=<profile>`，支持中文路径与空格引号，零误杀日常 Chrome）；新增 `_cleanup_orphan_profile_tray()`（启动前仅清理无可见窗的同 profile 僵尸托盘）、`terminate_browser_process()`（先 `WM_CLOSE` + 温和 `taskkill /T` 注销托盘并正常落盘 `exit_type=Normal`，超时再 `/F` 与同 profile 孤儿兜底）与 `_request_browser_close()` 锁内去重；便携版 `main()` 补传 `health_url=url`。
+  - `tests/test_mcp_onboarding.py`、`tests/test_talk_desktop.py`、`tests/test_talk_launcher.py`：同步更新并补充 10+ 项反例与边界单测（中文路径、UTF-8 BOM、多 `--user-data-dir`/引号内伪造、双监视线程并发去重、枚举失败 fail-closed、合法 client + 32 位 hex token 降级 `'unknown'`、损坏 UTF-8 日志自恢复等）。
+  - 本机环境（按用户方案 B 明确授权）：在生产 `talk.db` 补建 `agent:antigravity-t`（`Antigravity 终端`）并生成 64B `~/.talk/keys/agent_antigravity-t.key`（已用 `icacls` 移除继承并仅授予当前用户/Administrators/SYSTEM 权限，与 `agent_codex-t.key` 一致）；运行 `mcp_onboarding.run(..., apply=True, skip_members=True)` 两次幂等写入 `~/.gemini/config/mcp_config.json`（保留 `ambient_eye` 并新增 `talk`，0 报错）。
+- 验证与独立复核：
+  - 独立只读对抗复核子代理（`6e3908bc-ebf0-421f-a5ed-1177de1862cb`）首审 `CHANGES_REQUESTED`（指出 3 项 P1：PowerShell 中文路径 CP936 乱码、双监视线程 `closed` 竞态与孤儿分支无条件成功、Win32 64 位 `argtypes` 缺失与枚举异常 fail-open；2 项 P2：`taskkill` 超时与清理容错、日志损坏恢复与闭集白名单）；集中返修并落盘非阻断加固后，定向复验 **`APPROVED`**（15/15 命令行对抗用例与 64 位 `HWND` 探针全通过）。
+  - 6 套 pytest 回归：**122 passed, 8 subtests passed, 0 failed**（`test_talk_launcher` / `test_talk_desktop` / `test_mcp_onboarding` / `test_boot_status` / `test_local_shutdown` / `test_terminal_identity_filter`）；`git diff --check` 退出码 `0`。
+  - 隔离沙箱实机 Chrome `158.0.8127.37` 端到端验证（含中文路径 `D:\agent-sandbox\chrome-中文路径-20261125`）：① 最小化 3.5–4.0s 绝不误关；② 关窗后 Chrome 自动退出（`exit_type=Normal`、残留 PID=0、`SingleInstance` 锁立刻可重获）；③ 服务停机 `/healthz` 失效后浏览器自动优雅退出（`exit_type=Normal`、残留 PID=0、`SingleInstance` 锁立刻可重获）。
+- 修改文件：`scripts/mcp_onboarding.py`、`scripts/talk_desktop.py`、`scripts/talk_launcher.py`、`tests/test_mcp_onboarding.py`、`tests/test_talk_desktop.py`、`tests/test_talk_launcher.py`、`docs/PROGRESS_HISTORY.md`、`docs/PROGRESS.md`。
+- 未验证 / 边界：未重启用户生产 TALK 服务；待用户下次双击桌面 `TALK` 图标实机验收（确认加载页无警告、`logs/launcher/mcp-onboarding.log` 正常落盘、关闭窗口或点“退出服务”后右下角 Chrome 图标自动消失且可立即再次启动，同时验收 Antigravity 3 模型页面流程）。
+
 ## 2026-11-25 22:50 — 推送 Antigravity 切片 A–D 至 GitHub 并汇总后续改进路线图
 
 - 起因：用户确认先将 Antigravity 切片 A–D（4 个本地提交）推送到 GitHub，由用户自行重启 TALK 做页面人工验收，并按 `project-framework` 执行汇总进度、把 2026-11-24 项目全面体检提出的全部可改进点正式沉淀到项目文档。

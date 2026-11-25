@@ -230,10 +230,89 @@ def install_shortcut(home, env=None):
     return result.stdout.strip()
 
 
+ONBOARDING_CLIENTS = ('codex', 'kimi', 'workbuddy', 'dsh', 'antigravity')
+ONBOARDING_LOG_MAX_LINES = 50
+ONBOARDING_ALLOWED_REASONS = frozenset({
+    'not_detected',
+    'unchanged',
+    'key_missing',
+    'exception',
+    'OSError',
+    'PermissionError',
+    'FileNotFoundError',
+    'IsADirectoryError',
+    'ValueError',
+    'TypeError',
+    'UnicodeDecodeError',
+    'JSONDecodeError',
+    'TOMLDecodeError',
+})
+
+
+def _safe_onboarding_reason(value):
+    return value if isinstance(value, str) and value in ONBOARDING_ALLOWED_REASONS else 'unknown'
+
+
+def _sanitize_onboarding_entries(items):
+    sanitized = []
+    if not isinstance(items, list):
+        return sanitized
+    for item in items:
+        if isinstance(item, dict) and item.get('client') in ONBOARDING_CLIENTS:
+            sanitized.append({
+                'client': item['client'],
+                'reason': _safe_onboarding_reason(item.get('reason')),
+            })
+    return sanitized
+
+
+def write_onboarding_log(home, result=None):
+    """Append a non-sensitive onboarding diagnostic line to logs/launcher/mcp-onboarding.log."""
+    result = result or {}
+    detected = result.get('detected') if isinstance(result.get('detected'), dict) else {}
+    failed = bool(result.get('errors')) or result.get('_failed', False)
+    errors = _sanitize_onboarding_entries(result.get('errors') or [])
+    if result.get('_failed') and not errors:
+        errors = [{'client': 'onboarding', 'reason': 'exception'}]
+    configs_raw = result.get('configs_written') or []
+    configs_written = [
+        item['client'] for item in (configs_raw if isinstance(configs_raw, list) else [])
+        if isinstance(item, dict) and item.get('client') in ONBOARDING_CLIENTS
+    ]
+    member_status = result.get('member_status')
+    if member_status not in ('checked', 'api_unavailable', 'skipped'):
+        member_status = 'unknown'
+    entry = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'ready': not failed,
+        'member_status': member_status,
+        'detected': [
+            name for name in ONBOARDING_CLIENTS
+            if isinstance(detected.get(name), dict) and detected[name].get('detected') is True
+        ],
+        'configs_written': configs_written,
+        'skipped': _sanitize_onboarding_entries(result.get('skipped') or []),
+        'errors': errors,
+    }
+    path = Path(home) / 'logs' / 'launcher' / 'mcp-onboarding.log'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = []
+    try:
+        if path.is_file():
+            existing = [line for line in path.read_text(encoding='utf-8').splitlines() if line.strip()]
+    except (OSError, UnicodeDecodeError):
+        existing = []
+    lines = existing[-(ONBOARDING_LOG_MAX_LINES - 1):] if ONBOARDING_LOG_MAX_LINES > 1 else []
+    lines.append(json.dumps(entry, ensure_ascii=False))
+    temporary = path.with_suffix('.log.tmp')
+    temporary.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    os.replace(temporary, path)
+
+
 def write_boot_status(home, result=None):
     """Write a non-sensitive onboarding summary."""
     result = result or {}
-    clients = ('codex', 'kimi', 'workbuddy', 'dsh', 'antigravity')
+    clients = ONBOARDING_CLIENTS
     members = {f'agent:{name}-t' for name in clients}
     detected = result.get('detected', {})
     def client_names(items):
@@ -275,6 +354,11 @@ def onboard_and_write(home, env):
     except Exception:
         if sys.stderr is not None:
             print('Warning: could not write boot status.', file=sys.stderr)
+    try:
+        write_onboarding_log(home, result)
+    except Exception:
+        if sys.stderr is not None:
+            print('Warning: could not write onboarding log.', file=sys.stderr)
 
 
 def run(home, env):

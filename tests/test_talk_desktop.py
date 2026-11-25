@@ -381,6 +381,9 @@ class BootStatusDesktopTests(unittest.TestCase):
             data = json.loads((Path(home) / 'logs/launcher/boot-status.json').read_text(encoding='utf-8'))
             self.assertFalse(data['ready'])
             self.assertNotIn('secret-key', str(data))
+            log_text = (Path(home) / 'logs/launcher/mcp-onboarding.log').read_text(encoding='utf-8')
+            self.assertNotIn('secret-key', log_text)
+            self.assertIn('"reason": "exception"', log_text)
             window.assert_called_once()
 
     def test_summary_accepts_antigravity_and_strips_paths(self):
@@ -402,3 +405,64 @@ class BootStatusDesktopTests(unittest.TestCase):
             self.assertEqual(data['configs_written'], ['antigravity'])
             self.assertTrue(data['ready'])
             self.assertNotIn('C:/private', str(data))
+
+    def test_onboarding_log_records_sanitized_skip_error_and_exception(self):
+        import json
+        with tempfile.TemporaryDirectory() as home:
+            result = {
+                'detected': {'codex': {'detected': True}, 'antigravity': {'detected': True}, 'evil': {'detected': True}},
+                'configs_written': [{'client': 'codex', 'path': 'C:/secret/config.toml'}],
+                'skipped': [
+                    {'client': 'antigravity', 'reason': 'key_missing', 'path': 'C:/secret/mcp.json'},
+                    {'client': 'kimi', 'reason': '0123456789abcdef0123456789abcdef'},
+                    {'client': 'unknown', 'reason': 'secret-token'},
+                ],
+                'errors': [{'client': 'dsh', 'reason': 'ValueError', 'detail': 'secret-key'}],
+                'member_status': 'checked',
+            }
+            desktop.write_onboarding_log(home, result)
+            desktop.write_onboarding_log(home, {'_failed': True, 'detail': 'secret-boom'})
+            log_path = Path(home) / 'logs/launcher/mcp-onboarding.log'
+            lines = [json.loads(line) for line in log_path.read_text(encoding='utf-8').splitlines() if line.strip()]
+            self.assertEqual(len(lines), 2)
+            first, second = lines
+            self.assertFalse(first['ready'])
+            self.assertEqual(first['detected'], ['codex', 'antigravity'])
+            self.assertEqual(first['configs_written'], ['codex'])
+            self.assertEqual(first['skipped'], [
+                {'client': 'antigravity', 'reason': 'key_missing'},
+                {'client': 'kimi', 'reason': 'unknown'},
+            ])
+            self.assertEqual(first['errors'], [{'client': 'dsh', 'reason': 'ValueError'}])
+            self.assertFalse(second['ready'])
+            self.assertEqual(second['errors'], [{'client': 'onboarding', 'reason': 'exception'}])
+            raw = log_path.read_text(encoding='utf-8')
+            for forbidden in ('C:/secret', 'secret-token', 'secret-key', 'secret-boom', '0123456789abcdef'):
+                self.assertNotIn(forbidden, raw)
+
+    def test_onboarding_log_recovers_from_corrupt_utf8_and_write_failure_does_not_block(self):
+        import json
+        with tempfile.TemporaryDirectory() as home:
+            log_path = Path(home) / 'logs/launcher/mcp-onboarding.log'
+            log_path.parent.mkdir(parents=True)
+            log_path.write_bytes(b'\xff\xfe\x80invalid-utf8\n')
+            desktop.write_onboarding_log(home, {'errors': [], 'member_status': 'checked'})
+            lines = [json.loads(line) for line in log_path.read_text(encoding='utf-8').splitlines() if line.strip()]
+            self.assertEqual(len(lines), 1)
+            self.assertTrue(lines[0]['ready'])
+            with patch.object(desktop, 'read_server', return_value=('127.0.0.1', 8000)), \
+                 patch.object(desktop, 'healthy', return_value=True), \
+                 patch.object(desktop, 'port_available', return_value=False), \
+                 patch.object(desktop.mcp_onboarding, 'run', return_value={'errors': [], 'member_status': 'checked'}), \
+                 patch.object(desktop, 'write_onboarding_log', side_effect=OSError('disk full')), \
+                 patch.object(desktop, 'launch_window') as window:
+                self.assertEqual(desktop.run(home, {}), 0)
+                window.assert_called_once()
+
+    def test_onboarding_log_bounds_line_count(self):
+        with tempfile.TemporaryDirectory() as home:
+            for _ in range(desktop.ONBOARDING_LOG_MAX_LINES + 10):
+                desktop.write_onboarding_log(home, {'errors': [], 'member_status': 'checked'})
+            log_path = Path(home) / 'logs/launcher/mcp-onboarding.log'
+            lines = [line for line in log_path.read_text(encoding='utf-8').splitlines() if line.strip()]
+            self.assertEqual(len(lines), desktop.ONBOARDING_LOG_MAX_LINES)

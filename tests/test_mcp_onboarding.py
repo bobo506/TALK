@@ -160,8 +160,19 @@ def test_missing_key_reported_without_secret(setup_env):
     repo, home = setup_env
     (home / '.talk/keys/agent_codex_t.key').unlink()
     result = m.run(repo, home, True)
-    assert result['errors'] == [{'client': 'codex', 'reason': 'key_missing'}]
+    assert result['errors'] == []
+    assert {'client': 'codex', 'reason': 'key_missing'} in result['skipped']
     assert 'secret-' not in json.dumps(result)
+
+
+def test_empty_key_file_still_reported_as_error(setup_env, monkeypatch):
+    repo, home = setup_env
+    (home / '.talk/keys/agent_antigravity_t.key').write_text('   \n', encoding='utf-8')
+    result = m.run(repo, home, True)
+    assert result['errors'] == [{'client': 'antigravity', 'reason': 'ValueError'}]
+    assert 'secret-' not in json.dumps(result)
+    monkeypatch.setattr(sys, 'argv', ['mcp_onboarding', '--check', '--skip-members', '--repo', str(repo), '--home', str(home)])
+    assert m.main() == 1
 
 
 def test_unsupported_toml_preserved(setup_env):
@@ -264,7 +275,9 @@ def test_missing_antigravity_key_reported(setup_env):
     repo, home = setup_env
     (home / '.talk/keys/agent_antigravity_t.key').unlink()
     result = m.run(repo, home, False)
-    assert result['errors'] == [{'client': 'antigravity', 'reason': 'key_missing'}]
+    assert result['errors'] == []
+    assert {'client': 'antigravity', 'reason': 'key_missing'} in result['skipped']
+    assert all(item['client'] != 'antigravity' for item in result['planned'])
     assert 'secret-' not in json.dumps(result)
 
 
@@ -272,7 +285,9 @@ def test_missing_dsh_key_reported(setup_env):
     repo, home = setup_env
     (home / '.talk/keys/agent_dsh_t.key').unlink()
     result = m.run(repo, home, False)
-    assert result['errors'] == [{'client': 'dsh', 'reason': 'key_missing'}]
+    assert result['errors'] == []
+    assert {'client': 'dsh', 'reason': 'key_missing'} in result['skipped']
+    assert all(item['client'] != 'dsh' for item in result['planned'])
     assert 'secret-' not in json.dumps(result)
 
 

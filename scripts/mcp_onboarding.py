@@ -234,7 +234,9 @@ def run(repo: Path, home: Path, apply: bool, skip_members: bool = False) -> dict
             else:
                 output['planned'].append(item)
         except KeyMissingError:
-            output['errors'].append({'client': name, 'reason': 'key_missing'})
+            # Detected client without an issued terminal-identity key is unconfigured,
+            # not a broken config file; skip it without failing boot readiness.
+            output['skipped'].append({'client': name, 'reason': 'key_missing'})
         except (OSError, ValueError, TypeError) as exc:
             # Never include exception text: parser errors can contain configuration secrets.
             output['errors'].append({'client': name, 'reason': type(exc).__name__})

@@ -134,30 +134,255 @@ class LauncherTests(unittest.TestCase):
     def test_preferences_create_merge_and_recover_corrupt_json(self):
         profile = self.home / 'profile'
         preferences = profile / 'Default' / 'Preferences'
+        local_state = profile / 'Local State'
         launcher.prepare_browser_profile(profile)
         self.assertEqual(json.loads(preferences.read_text(encoding='utf-8')), {'background_mode': {'enabled': False}})
+        self.assertEqual(
+            json.loads(local_state.read_text(encoding='utf-8')),
+            {'background_mode': {'enabled': False}, 'glic': {'launcher_enabled': False}},
+        )
         preferences.write_text(json.dumps({'other': {'value': 1}, 'background_mode': {'enabled': True, 'extra': 2}}), encoding='utf-8')
+        local_state.write_text(json.dumps({'keep': 7, 'background_mode': {'enabled': True}, 'glic': {'launcher_enabled': True, 'x': 1}}), encoding='utf-8')
         launcher.prepare_browser_profile(profile)
         self.assertEqual(json.loads(preferences.read_text(encoding='utf-8')), {'other': {'value': 1}, 'background_mode': {'enabled': False, 'extra': 2}})
+        self.assertEqual(
+            json.loads(local_state.read_text(encoding='utf-8')),
+            {'keep': 7, 'background_mode': {'enabled': False}, 'glic': {'launcher_enabled': False, 'x': 1}},
+        )
         preferences.write_text('{broken', encoding='utf-8')
+        local_state.write_text('{broken', encoding='utf-8')
         launcher.prepare_browser_profile(profile)
         self.assertEqual(json.loads(preferences.read_text(encoding='utf-8')), {'background_mode': {'enabled': False}})
+        self.assertEqual(
+            json.loads(local_state.read_text(encoding='utf-8')),
+            {'background_mode': {'enabled': False}, 'glic': {'launcher_enabled': False}},
+        )
 
-    def test_health_monitor_three_consecutive_failures_terminate_tree(self):
+    def test_cmdline_matches_exact_profile_only(self):
+        target = self.home / 'data' / 'launcher-profile'
+        spaced = self.home / 'My User' / 'TALK' / 'data' / 'launcher-profile'
+        cjk = self.home / '测试用户' / 'TALK' / 'data' / 'launcher-profile'
+        self.assertTrue(launcher._cmdline_matches_profile(
+            f'chrome.exe --app=http://127.0.0.1:8000 --user-data-dir={target} --no-first-run', target))
+        self.assertTrue(launcher._cmdline_matches_profile(
+            f'chrome.exe "--user-data-dir={spaced}" --no-first-run', spaced))
+        self.assertTrue(launcher._cmdline_matches_profile(
+            f'chrome.exe --user-data-dir="{spaced}" --no-first-run', spaced))
+        self.assertTrue(launcher._cmdline_matches_profile(
+            f'chrome.exe "--user-data-dir={cjk}" --no-first-run', cjk))
+        self.assertFalse(launcher._cmdline_matches_profile(
+            f'chrome.exe --user-data-dir={target}-other --no-first-run', target))
+        self.assertFalse(launcher._cmdline_matches_profile(
+            'chrome.exe --profile-directory=Default', target))
+        # Quoted flag containing fake --user-data-dir text must not match.
+        self.assertFalse(launcher._cmdline_matches_profile(
+            f'chrome.exe --app="http://127.0.0.1/?q= --user-data-dir={target}"', target))
+        # Multiple --user-data-dir flags: Chromium honors the last one.
+        self.assertFalse(launcher._cmdline_matches_profile(
+            f'chrome.exe --user-data-dir={target} --user-data-dir={target}-other', target))
+
+    def test_find_profile_browser_pids_handles_utf8_cjk_single_array_and_rejects_bad_name(self):
+        cjk_profile = self.home / '测试用户' / 'launcher-profile'
+        single_json = json.dumps({
+            'ProcessId': 4242,
+            'CommandLine': f'chrome.exe "--user-data-dir={cjk_profile}" --no-first-run',
+        }, ensure_ascii=False)
+        array_json = json.dumps([
+            {'ProcessId': 1111, 'CommandLine': 'chrome.exe --profile-directory=Default'},
+            {'ProcessId': 4243, 'CommandLine': f'chrome.exe --user-data-dir="{cjk_profile}"'},
+            {'ProcessId': True, 'CommandLine': f'chrome.exe --user-data-dir="{cjk_profile}"'},
+        ], ensure_ascii=False)
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher.subprocess, 'run', side_effect=[
+                 SimpleNamespace(returncode=0, stdout='\ufeff' + single_json),
+                 SimpleNamespace(returncode=0, stdout=array_json),
+             ]) as run:
+            self.assertEqual(launcher._find_profile_browser_pids('chrome.exe', cjk_profile), {4242})
+            self.assertIn('[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false)', run.call_args_list[0].args[0][-1])
+            self.assertEqual(launcher._find_profile_browser_pids('chrome.exe', cjk_profile), {4243})
+            # Reject invalid executable name without invoking PowerShell.
+            self.assertEqual(launcher._find_profile_browser_pids("chrome';calc;.exe", cjk_profile), set())
+            self.assertEqual(run.call_count, 2)
+
+    def test_health_monitor_three_consecutive_failures_graceful_then_force(self):
         process = unittest.mock.Mock(pid=1234)
         process.poll.return_value = None
         stop = unittest.mock.Mock()
         stop.wait.return_value = False
         stop.is_set.return_value = False
         closed = unittest.mock.Mock()
+        closed.is_set.return_value = False
         with patch.object(launcher, 'healthy', side_effect=[False, True, False, False, False]) as health, \
              patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_get_process_tree_pids', return_value={1234}), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[999]), \
+             patch.object(launcher, '_post_close_windows') as post_close, \
+             patch.object(launcher, '_wait_process_exit', return_value=False), \
              patch.object(launcher.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as kill:
             launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, closed)
         self.assertEqual(health.call_count, 5)
-        kill.assert_called_once_with(['taskkill', '/PID', '1234', '/T', '/F'], capture_output=True, check=False)
+        post_close.assert_called_once_with([999])
+        self.assertEqual(kill.call_args_list[0].args[0], ['taskkill', '/PID', '1234', '/T'])
+        self.assertEqual(kill.call_args_list[1].args[0], ['taskkill', '/PID', '1234', '/T', '/F'])
         closed.set.assert_called_once_with()
         process.terminate.assert_not_called()
+
+    def test_health_monitor_graceful_exit_skips_force_kill(self):
+        process = unittest.mock.Mock(pid=1234)
+        process.poll.return_value = None
+        stop = unittest.mock.Mock()
+        stop.wait.return_value = False
+        stop.is_set.return_value = False
+        closed = unittest.mock.Mock()
+        closed.is_set.return_value = False
+        with patch.object(launcher, 'healthy', return_value=False), \
+             patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_get_process_tree_pids', return_value={1234}), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[999]), \
+             patch.object(launcher, '_post_close_windows') as post_close, \
+             patch.object(launcher, '_wait_process_exit', return_value=True), \
+             patch.object(launcher.subprocess, 'run', return_value=SimpleNamespace(returncode=0)) as kill:
+            launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, closed)
+        post_close.assert_called_once_with([999])
+        self.assertEqual(len(kill.call_args_list), 1)
+        self.assertEqual(kill.call_args_list[0].args[0], ['taskkill', '/PID', '1234', '/T'])
+        closed.set.assert_called_once_with()
+
+    def test_window_monitor_closes_tray_after_window_disappears(self):
+        process = unittest.mock.Mock(pid=2468)
+        process.poll.return_value = None
+        stop = unittest.mock.Mock()
+        stop.wait.return_value = False
+        stop.is_set.return_value = False
+        closed = unittest.mock.Mock()
+        closed.is_set.return_value = False
+        profile = self.home / 'data' / 'launcher-profile'
+        # Startup (no window yet) -> visible -> enum error (ignored) -> closed (poll 1) -> closed (poll 2 -> terminate).
+        windows_seq = [[], [101], None, [], []]
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_get_process_tree_pids', return_value={2468}), \
+             patch.object(launcher, '_list_visible_browser_windows', side_effect=windows_seq), \
+             patch.object(launcher, 'terminate_browser_process', return_value=True) as term:
+            launcher.monitor_browser_window(
+                process, profile, stop, closed, browser_name='chrome.exe', poll_interval=0.01, grace_polls=2,
+            )
+        closed.set.assert_called_once_with()
+        term.assert_called_once_with(process, profile=profile, browser_name='chrome.exe')
+
+    def test_window_monitor_fail_closed_on_enum_error(self):
+        process = unittest.mock.Mock(pid=2468)
+        process.poll.return_value = None
+        stop = unittest.mock.Mock()
+        stop.wait.side_effect = [False, False, False, False, True]
+        stop.is_set.return_value = False
+        closed = unittest.mock.Mock()
+        closed.is_set.return_value = False
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_get_process_tree_pids', return_value={2468}), \
+             patch.object(launcher, '_list_visible_browser_windows', side_effect=[[101], None, None, None]), \
+             patch.object(launcher, 'terminate_browser_process') as term:
+            launcher.monitor_browser_window(
+                process, self.home / 'profile', stop, closed, poll_interval=0.01, grace_polls=2,
+            )
+        term.assert_not_called()
+        closed.set.assert_not_called()
+
+    def test_window_monitor_ignores_startup_before_first_window(self):
+        process = unittest.mock.Mock(pid=2468)
+        process.poll.return_value = None
+        stop = unittest.mock.Mock()
+        stop.wait.side_effect = [False, False, False, True]
+        stop.is_set.return_value = False
+        closed = unittest.mock.Mock()
+        closed.is_set.return_value = False
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_get_process_tree_pids', return_value={2468}), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[]), \
+             patch.object(launcher, 'terminate_browser_process') as term:
+            launcher.monitor_browser_window(
+                process, self.home / 'profile', stop, closed, poll_interval=0.01, grace_polls=2,
+            )
+        term.assert_not_called()
+        closed.set.assert_not_called()
+
+    def test_cleanup_orphan_profile_tray_only_kills_windowless_profile(self):
+        fake_chrome = self.home / 'chrome.exe'
+        fake_chrome.write_text('', encoding='utf-8')
+        profile = self.home / 'data' / 'launcher-profile'
+        profile.mkdir(parents=True)
+        # Active window present -> do not touch.
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_find_profile_browser_pids', return_value={5555}), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[777]), \
+             patch.object(launcher, '_run_taskkill') as kill:
+            launcher._cleanup_orphan_profile_tray(fake_chrome, profile)
+        kill.assert_not_called()
+        # Window enumeration failed (None) -> fail-closed, do not touch.
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_find_profile_browser_pids', return_value={5555}), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=None), \
+             patch.object(launcher, '_run_taskkill') as kill:
+            launcher._cleanup_orphan_profile_tray(fake_chrome, profile)
+        kill.assert_not_called()
+        # Windowless tray zombie -> gracefully kill, then stop once gone.
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_find_profile_browser_pids', side_effect=[{5555}, set()]), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[]), \
+             patch.object(launcher, '_run_taskkill') as kill:
+            launcher._cleanup_orphan_profile_tray(fake_chrome, profile)
+        kill.assert_called_once_with(5555, force=False, tree=True)
+        # taskkill OSError must not crash startup.
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_find_profile_browser_pids', return_value={5555}), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[]), \
+             patch.object(launcher, '_run_taskkill', side_effect=OSError('missing taskkill')):
+            launcher._cleanup_orphan_profile_tray(fake_chrome, profile)
+
+    def test_terminate_browser_cleans_orphan_profile_pids_without_touching_others(self):
+        process = unittest.mock.Mock(pid=1000)
+        process.poll.return_value = 0
+        profile = self.home / 'data' / 'launcher-profile'
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_find_profile_browser_pids', side_effect=[{2001}, {2001}, {2001}]), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[]), \
+             patch.object(launcher, '_run_taskkill', return_value=SimpleNamespace(returncode=0)) as kill, \
+             patch.object(launcher.time, 'sleep'):
+            ok = launcher.terminate_browser_process(
+                process, profile=profile, browser_name='chrome.exe', grace_timeout=0.0,
+            )
+        self.assertTrue(ok)
+        self.assertEqual(kill.call_args_list[0].args, (2001,))
+        self.assertEqual(kill.call_args_list[0].kwargs, {'force': False, 'tree': True})
+        self.assertEqual(kill.call_args_list[1].args, (2001,))
+        self.assertEqual(kill.call_args_list[1].kwargs, {'force': True, 'tree': True})
+
+    def test_terminate_browser_returns_false_when_main_and_orphan_kill_fail(self):
+        process = unittest.mock.Mock(pid=1000)
+        process.poll.return_value = None
+        profile = self.home / 'data' / 'launcher-profile'
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_get_process_tree_pids', return_value={1000}), \
+             patch.object(launcher, '_list_visible_browser_windows', return_value=[]), \
+             patch.object(launcher, '_wait_process_exit', return_value=False), \
+             patch.object(launcher, '_find_profile_browser_pids', return_value={1000}), \
+             patch.object(launcher, '_run_taskkill', return_value=SimpleNamespace(returncode=1)):
+            ok = launcher.terminate_browser_process(
+                process, profile=profile, browser_name='chrome.exe', grace_timeout=0.0,
+            )
+        self.assertFalse(ok)
+
+    def test_request_browser_close_deduplicates_across_monitors(self):
+        import threading as _threading
+        process = unittest.mock.Mock(pid=1234)
+        process.poll.return_value = None
+        stop = _threading.Event()
+        closed = _threading.Event()
+        lock = _threading.Lock()
+        with patch.object(launcher, 'terminate_browser_process', return_value=True) as term:
+            launcher._request_browser_close(process, stop, closed, close_lock=lock)
+            launcher._request_browser_close(process, stop, closed, close_lock=lock)
+        term.assert_called_once()
+        self.assertTrue(closed.is_set())
 
     def test_health_monitor_success_does_not_terminate(self):
         process = unittest.mock.Mock()
@@ -165,11 +390,19 @@ class LauncherTests(unittest.TestCase):
         stop = unittest.mock.Mock()
         stop.wait.side_effect = [False, False, True]
         closed = unittest.mock.Mock()
+        closed.is_set.return_value = False
         with patch.object(launcher, 'healthy', return_value=True), patch.object(launcher.subprocess, 'run') as kill:
             launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, closed)
         kill.assert_not_called()
         process.terminate.assert_not_called()
         closed.set.assert_not_called()
+
+    def test_list_visible_browser_windows_returns_none_on_enum_failure(self):
+        fake_user32 = unittest.mock.Mock()
+        fake_user32.EnumWindows.return_value = 0
+        with patch.object(launcher.os, 'name', 'nt'), \
+             patch.object(launcher, '_get_user32', return_value=fake_user32):
+            self.assertIsNone(launcher._list_visible_browser_windows({1234}))
 
     def test_health_monitor_non_windows_terminates_handle(self):
         process = unittest.mock.Mock()
@@ -177,8 +410,10 @@ class LauncherTests(unittest.TestCase):
         stop = unittest.mock.Mock()
         stop.wait.return_value = False
         stop.is_set.return_value = False
+        closed = unittest.mock.Mock()
+        closed.is_set.return_value = False
         with patch.object(launcher, 'healthy', return_value=False), patch.object(launcher.os, 'name', 'posix'):
-            launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, unittest.mock.Mock())
+            launcher.monitor_browser_health(process, 'http://127.0.0.1:8124', stop, closed)
         process.terminate.assert_called_once_with()
 
     def test_edge_arguments_and_autoclose(self):
@@ -192,7 +427,7 @@ class LauncherTests(unittest.TestCase):
             args = popen.call_args.args[0]
             self.assertEqual(args, ['edge.exe', '--app=' + self.app.url,
                 '--user-data-dir=' + str(self.home / 'data/launcher-profile'), '--no-first-run',
-                '--no-default-browser-check', '--disable-background-mode'])
+                '--no-default-browser-check', '--disable-background-mode', '--disable-features=Glic'])
             self.assertEqual(make_timer.call_args.args[0], 3)
             make_timer.call_args.args[1]()
             process.terminate.assert_called_once_with()
@@ -224,6 +459,7 @@ class LauncherTests(unittest.TestCase):
                 self.app.owned, self.app.identity = owned, (123, 'start')
                 self.assertEqual(launcher.main(), 0 if stop_result[0] else 1)
                 edge.assert_called_once()
+                self.assertEqual(edge.call_args.kwargs.get('health_url'), self.app.url)
                 if owned:
                     runtime.assert_called_once_with('stop', '--wait')
                 else:

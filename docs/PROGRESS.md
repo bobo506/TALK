@@ -2,50 +2,37 @@
 
 ## Latest
 
-Updated: 2026-11-25 22:50 (+08:00)
-Role: Antigravity 会话（协调 / 编码自测，搭配独立只读对抗复核子代理；按用户本轮显式授权执行）
+Updated: 2026-11-25 23:45 (+08:00)
+Role: Antigravity 会话（按用户本轮明确授权执行编码自测、本机补建 `agent:antigravity-t` 与收尾，搭配独立只读对抗复核子代理）
 
-**当前结论**：**Antigravity 适配 4 片（A–D：`4954e36` / `34bf051` / `4b1dab0` / `e2601c9`）已全部完成、独立对抗复核 `APPROVED` 并推送至 GitHub `origin/codex/terminal-return-codex`**（`3fe93e0..e2601c9`）。当前由用户自行重启 TALK 进入页面人工验收；同时已按 `project-framework` 将 2026-11-24 项目全面体检识别出的 **5 大类 / 15 项可改进点**及 **3 项推荐高性价比批次**完整沉淀至 `docs/spec/DEVELOPMENT_ROADMAP.md`。
+**当前结论**：**桌面启动器体验修复切片已完成、独立对抗复核 `APPROVED` 并推送至 `origin/codex/terminal-return-codex`**：彻底修复 ① 未开通新终端 Key 导致的启动红字误报警并补齐 `logs/launcher/mcp-onboarding.log` 脱敏日志；② 关闭 TALK 窗口或点击“退出服务”后右下角 Chrome 托盘图标不退出、卡死 `SingleInstance` 无法再次启动的问题；并已按方案 B 在本机补建 `agent:antigravity-t`（私有 ACL 加固）及幂等接入 `~/.gemini/config/mcp_config.json`。当前待用户双击桌面 `TALK` 图标实机人工验收（含 Antigravity 3 模型页面验收）。
 
 ### 1) Current Progress
-- **Antigravity 适配（4 片串行规划 — 全部完成并已推送）**：
-  - **切片 A（`4954e36`）**：`mcp_onboarding` 探测 Antigravity 并幂等写入 `~/.gemini/config/mcp_config.json`、`talk_desktop` / `boot_status` 白名单与前端横幅/加载页展示、`agent:antigravity-t` 终端身份过滤。
-  - **切片 B（`34bf051`）**：实机 `agy 1.5.16` 协议/能力/版本探测、`bridges/antigravity_{effort,execution_native,execution_channel,bridge}.py`、`bridges/cli_bridge.py` 路由与 `stream-json` 正文抽取、磁盘会话证明与 90% 换窗、`/api/runners/versions` 与 Carbon 3 档硬约束（Neon/Hydrogen 4 档）。
-  - **切片 C（`4b1dab0`）**：`scripts/antigravity_role_setup.py` / `scripts/antigravity_role_host.py`（`legacy` + `workspace-v1`）、全链路接入 `talk_runtime` / `role_service_host` / `role_host_resolution` / `role_service_recovery` / `role_delete` / `portable_bootstrap` / `workspace_paths`、服务端默认强度初始化与 Carbon 强夹紧、工作台运行器引导弹窗。
-  - **切片 D（`e2601c9`）**：独立沙箱实机端到端验收（`agy 1.5.17`，10 步全绿）、修复受管宿主系统代理透传与诊断日志脱敏、同步更新 `README.md` 与 `docs/guides/USER_MANUAL.md`。
-- **后续改进清单沉淀**：2026-11-24 项目体检的 5 大类 / 15 项可改进点已完整登记至 `docs/spec/DEVELOPMENT_ROADMAP.md` 顶部（仅登记，未开工）。
+- **桌面启动器体验修复切片（已完成、独立复核 `APPROVED`）**：
+  - **MCP 接入与脱敏日志**：`scripts/mcp_onboarding.py` 将 `KeyMissingError` 归为 `skipped`（空 Key / 配置损坏仍 fail-closed 进 `errors`）；`scripts/talk_desktop.py` 新增 `write_onboarding_log()`，按严格闭集白名单向 `logs/launcher/mcp-onboarding.log` 原子滚动写入最近 50 条脱敏诊断（含损坏 UTF-8 自恢复）。
+  - **Chrome 托盘自动退出与零误杀隔离**：`scripts/talk_launcher.py` 原子更新 `Local State`（`background_mode.enabled=false`、`glic.launcher_enabled=false`）+ `--disable-features=Glic`；新增 64 位安全 Win32 窗口生命周期监视（首次见窗后关窗自动优雅退出、最小化绝不误关、枚举失败 fail-closed）、UTF-8 PowerShell 精确 `--user-data-dir` 孤儿托盘清理、先 `WM_CLOSE`/温和 `taskkill /T`（`exit_type=Normal` 清除托盘）后兜底 `/F`、以及便携版 `health_url` 补传。
+  - **本机 Antigravity MCP 补齐**：生产 `talk.db` 新增 `agent:antigravity-t` 与 64B 私有 ACL `~/.talk/keys/agent_antigravity-t.key`，`~/.gemini/config/mcp_config.json` 已幂等接入 `talk`（保留 `ambient_eye`）。
+- **Antigravity 适配（切片 A–D，`4954e36..e2601c9`）与全面体检 15 项路线图（`9083930`）**：均已完成并推送至 `origin/codex/terminal-return-codex`。
 - **历史 `v0.1.0` 发布状态（2026-11-18）**：保持不变（https://github.com/bobo506/TALK/releases/tag/v0.1.0 ，详见 `docs/PROGRESS_HISTORY.md`）。
 
 ### 2) Open Questions / Pending Confirmation
-- **人工验收门禁**：待用户自行重启 TALK 完成 Antigravity 实机页面验收（如复用已有 `talk.db`，需先执行 `python -B -X utf8 -m scripts.antigravity_role_setup --seed-db <talk.db> --apply`）。
+- **人工验收门禁**：待用户双击桌面 `TALK` 图标实机验收：① 加载页无红字警告且 `logs/launcher/mcp-onboarding.log` 正常写入；② 关窗或点“退出服务”后右下角 Chrome 托盘图标自动消失且可立即重开，日常 Chrome 不受影响；③ Antigravity 3 模型（Neon / Carbon / Hydrogen）页面流程（复用已有 `talk.db` 时需先执行 `python -B -X utf8 -m scripts.antigravity_role_setup --seed-db <talk.db> --apply`）。
 - **后续改进项授权**：`docs/spec/DEVELOPMENT_ROADMAP.md` 中 15 项改进均未获开工授权，每次仅确认并串行推进 1 个依赖闭环。
-- **历史已决定不处理项（2026-11-18 用户确认）**：`v0.1.0` 便携包构建扫描项、4 处源码默认值、`v0.1.0` tag 指向、公开仓库历史文档环境信息均不再处理（详见 `docs/PROGRESS_HISTORY.md`）。
 - **已知遗留与保留项**：`scripts/talk_desktop.py` 历史 mojibake（未修）；本机部分测试受 key 继承 ACL 影响；仓库根 5 个既有未跟踪目录（`.codex/`、`.kimi-code/`、`.talk/agents/agent_workbuddy/`、`.workbuddy/`、`Microsoft/`）保持不动。
 
 ### 3) Next Plan
-1. 等待用户自行重启 TALK 完成 Antigravity 3 模型（Neon / Carbon / Hydrogen）页面人工验收。
-2. 从 `docs/spec/DEVELOPMENT_ROADMAP.md`「2026-11-24/25 项目全面体检与后续改进清单」中择项确认目的、范围、不变项与验收标准后串行推进：
-   - **推荐首推 3 项高性价比批次**：
-     1. **分支对齐 + 门面更新**：合并 `codex/terminal-return-codex` 至 `main` + 替换 `README.md` 两张滞后亮色截图（#8 + #12）；
-     2. **离线与本机安全双补齐**：前端 4 个 CDN 库（Tailwind / highlight.js / DOMPurify / marked）本地化至 `web/vendor/` + `trusted` 本机免密模式补 `Origin` / `Sec-Fetch-Site` 同源校验中间件（#1 + #2）；
-     3. **自动防回归基建**：轻量 GitHub Actions CI（核心 `pytest` + `ruff`）+ `requirements.lock` + `build_portable.py` 升级 Python / SHA-256 校验（#9 + #10）。
-   - **其余已登记改进项（#3–#7、#11、#13–#15）**：
-     - 安全深化：API Key 库内哈希化 + HTTP MCP 进程内直调（#3）；
-     - 架构与数据库治理：8 个核心“巨石”文件按领域拆包（#4）、`server/db.py` `PRAGMA user_version` 版本化迁移（#5）、运行器能力探测移出 DB Session + SQLite `PRAGMA busy_timeout`（#6）、已下线群聊/会议/主动跟进/定时任务包袱清理（#7）；
-     - 部署与文档整理：`Dockerfile` 升 3.12+ 并对齐 `talk_runtime`（#10）、`PROJECT_BRIEF.md` 与 `DEVELOPMENT_ROADMAP.md` 历史归档瘦身（#11）；
-     - `v0.2+` 功能延伸：干净机器首启 + 便携包跨版本无痛升级脚本（#13）、主动模式跨终端泛化（#14）、协作效率看板（#15）。
+1. 等待用户实机重启 TALK 完成本次桌面启动器修复与 Antigravity 3 模型页面人工验收。
+2. 从 `docs/spec/DEVELOPMENT_ROADMAP.md`「2026-11-24/25 项目全面体检与后续改进清单」中择项确认目的、范围、不变项与验收标准后串行推进（推荐首推 3 批次：① 合并至 `main` + 替换 `README` 亮色截图 #8+#12；② 4 个 CDN 本地化 + `trusted` 同源校验 #1+#2；③ 轻量 CI + `requirements.lock` + `build_portable.py` 升级与校验 #9+#10）。
 
 ### 4) Verification
-- **本次推送与进度汇总（2026-11-25 22:50）**：推送前对 `origin/codex/terminal-return-codex..HEAD`（340,824 B）执行密钥正则扫描（0 命中）；`git push origin codex/terminal-return-codex` 退出码 `0`（`3fe93e0..e2601c9`）；本次文档修改通过 `git diff --check` 与相对链接校验。
-- **Antigravity 切片 A–D 独立复核（全部 `APPROVED`）**：
-  - 切片 D（`e2601c9`）：独立沙箱实机 `agy 1.5.17` 10 步 E2E 全绿 + 5 套 pytest **49 passed / 18 subtests** + `README.md`/`USER_MANUAL.md` 0 断链 + 7 组对抗探针；
-  - 切片 C（`4b1dab0`）：13 套 pytest **189 passed / 147 subtests** + `test_real_recipe_table_and_alias_flags_unchanged` 1 passed + Node UI **89 pass**；
-  - 切片 B（`34bf051`）：切片 B 4 套 **33 passed / 12 subtests** + 16 套回归 **572 passed / 260 subtests** + 9 组对抗探针；
-  - 切片 A（`4954e36`）：5 套 **89 passed / 5 subtests** + `node --check` + 4 组对抗探针。
-- **未验证**：生产服务重启加载、真实桌面浏览器页面点击人工验收、含 Antigravity CLI 的新版便携包构建与跨机首启。
+- **独立对抗复核（`6e3908bc-ebf0-421f-a5ed-1177de1862cb`）**：首审 `CHANGES_REQUESTED`（3×P1 + 2×P2）→ 集中返修并补全非阻断加固 → 定向复验 **`APPROVED`**（15/15 命令行对抗用例 + 64 位 `HWND` 探针全通过）。
+- **自动化回归**：6 套 pytest（`test_talk_launcher` / `test_talk_desktop` / `test_mcp_onboarding` / `test_boot_status` / `test_local_shutdown` / `test_terminal_identity_filter`）**122 passed, 8 subtests passed, 0 failed**；`git diff --check` 退出码 `0`。
+- **隔离沙箱实机 Chrome `158.0.8127.37` E2E（含中文路径 `D:\agent-sandbox\chrome-中文路径-20261125`）**：最小化 3.5–4.0s 不误关；关窗与服务停机均以 `exit_type=Normal` 自动退出、残留 PID=0、`SingleInstance` 锁立刻可重获。
+- **本机 MCP 实测**：`mcp_onboarding` 连续两次 `--apply --skip-members` 幂等（第 1 次写入 `antigravity`，第 2 次全部 `unchanged`，0 报错，`ambient_eye` 保留）；`agent_antigravity-t.key` 私有 ACL 与 `agent_codex-t.key` 一致。
+- **未验证**：用户真实桌面双击 `TALK.lnk` 实机点击关窗/“退出服务”及加载页验收、Antigravity 3 模型真实页面验收。
 
 ### 5) Changed Files
-- 本轮汇总（2026-11-25 22:50）：`docs/spec/DEVELOPMENT_ROADMAP.md`、`docs/PROGRESS_HISTORY.md`、`docs/PROGRESS.md`。
+- 本轮桌面启动器体验修复切片：`scripts/mcp_onboarding.py`、`scripts/talk_desktop.py`、`scripts/talk_launcher.py`、`tests/test_mcp_onboarding.py`、`tests/test_talk_desktop.py`、`tests/test_talk_launcher.py`、`docs/PROGRESS_HISTORY.md`、`docs/PROGRESS.md`。
 - Antigravity 切片 A–D（已推送 `4954e36..e2601c9`）：详见 `docs/PROGRESS_HISTORY.md`。
 
 ## Recent Notes
